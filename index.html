@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WB 웩슬러브레인센터 | 광주 유일 웩슬러 공식 검사센터</title>
+  <meta name="description" content="광주 웩슬러 지능검사 공식 센터 | WB 웩슬러브레인센터. 7세~고등 전연령 전문 심리사 1:1 해석 상담. 062-672-7575">
+  <meta name="keywords" content="광주 웩슬러, 광주 지능검사, 광주 독해력, 봉선동 학원, 광주 심리검사, 웩슬러검사, WISC, K-WISC, 광주 학습클리닉">
+  <meta property="og:title" content="WB 웩슬러브레인센터 | 광주 유일 웩슬러 공식 검사센터">
+  <meta property="og:description" content="광주 유일 웩슬러 공식 검사·해석 센터 | 7세~고등 전 연령 | 전문 심리사 1:1 해석 상담">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:       #1E9DD6;
+      --deep-blue:  #0F7AAB;
+      --navy:       #1B3A5C;
+      --coral:      #E85D4A;
+      --ivory:      #FAF8F3;
+      --dark-gray:  #2D2D2D;
+      --mid-gray:   #6B7280;
+      --light-gray: #F3F4F6;
+      --white:      #FFFFFF;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      color: var(--dark-gray);
+      background: var(--white);
+      line-height: 1.7;
+    }
+
+    /* ─── 공통 유틸 ─── */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+    .section { padding: 80px 0; }
+    .section-light { background: var(--ivory); }
+    .section-dark { background: var(--navy); color: var(--white); }
+    .section-blue { background: var(--blue); color: var(--white); }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 12px;
+    }
+    .section-dark .section-label,
+    .section-blue .section-label { color: rgba(255,255,255,0.7); }
+
+    .section-title {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 900;
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 16px;
+      color: var(--mid-gray);
+      line-height: 1.8;
+    }
+    .section-dark .section-sub,
+    .section-blue .section-sub { color: rgba(255,255,255,0.8); }
+
+    /* ─── 상단 고정 바 ─── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 999;
+      background: var(--navy);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar-logo {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--white);
+      letter-spacing: -0.02em;
+    }
+    .topbar-logo span { color: var(--blue); }
+    .topbar-cta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-call {
+      background: var(--coral);
+      color: var(--white);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 8px 18px;
+      border-radius: 6px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn-kakao {
+      background: #FEE500;
+      color: #3C1E1E;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 8px 18px;
+      border-radius: 6px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, #0d2a47 60%, #0F7AAB 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 20px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -100px; right: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(30,157,214,0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(30,157,214,0.2);
+      border: 1px solid rgba(30,157,214,0.5);
+      color: #7FD0F0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1.25;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: #7FD0F0;
+    }
+    .hero-sub {
+      font-size: clamp(15px, 2vw, 18px);
+      color: rgba(255,255,255,0.8);
+      margin-bottom: 40px;
+      line-height: 1.8;
+    }
+    .hero-sub strong { color: var(--white); font-weight: 700; }
+    .hero-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .btn-primary {
+      background: var(--coral);
+      color: var(--white);
+      font-size: 17px;
+      font-weight: 700;
+      padding: 16px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(232,93,74,0.4);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(232,93,74,0.5); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: var(--white);
+      font-size: 17px;
+      font-weight: 700;
+      padding: 16px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: 1.5px solid rgba(255,255,255,0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.18); }
+
+    /* ─── 신뢰 지표 ─── */
+    .stats {
+      background: var(--blue);
+      padding: 48px 20px;
+    }
+    .stats-grid {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      text-align: center;
+    }
+    .stat-item {
+      padding: 20px;
+      border-right: 1px solid rgba(255,255,255,0.2);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-num {
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-num span { font-size: 0.55em; font-weight: 500; vertical-align: middle; }
+    .stat-label {
+      font-size: 13px;
+      color: rgba(255,255,255,0.8);
+      font-weight: 500;
+    }
+
+    /* ─── 서비스 ─── */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 56px;
+    }
+    .service-card {
+      background: var(--white);
+      border: 1px solid #E5E7EB;
+      border-radius: 16px;
+      padding: 36px 28px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .service-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.1); }
+    .service-icon {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #E8F6FD, #C5E8F7);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    .service-card h3 {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .service-card p {
+      font-size: 14px;
+      color: var(--mid-gray);
+      line-height: 1.8;
+    }
+    .service-tag {
+      display: inline-block;
+      margin-top: 16px;
+      background: #EEF7FC;
+      color: var(--deep-blue);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    /* ─── 검사 과정 ─── */
+    .process-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      margin-top: 56px;
+      position: relative;
+    }
+    .process-steps::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      left: calc(12.5% + 20px);
+      right: calc(12.5% + 20px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--blue), var(--deep-blue));
+    }
+    .step {
+      text-align: center;
+      padding: 0 16px;
+      position: relative;
+    }
+    .step-circle {
+      width: 72px; height: 72px;
+      background: var(--navy);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 4px 16px rgba(27,58,92,0.3);
+    }
+    .step-circle span { font-size: 26px; }
+    .step h4 {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .step p { font-size: 13px; color: var(--mid-gray); line-height: 1.7; }
+
+    /* ─── 대상 연령 ─── */
+    .age-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 56px;
+    }
+    .age-card {
+      background: var(--white);
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      border: 1.5px solid #E5E7EB;
+    }
+    .age-emoji { font-size: 36px; margin-bottom: 12px; }
+    .age-range {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .age-test {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--blue);
+      background: #EEF7FC;
+      padding: 3px 10px;
+      border-radius: 100px;
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+    .age-desc { font-size: 13px; color: var(--mid-gray); line-height: 1.6; }
+
+    /* ─── 중간 CTA 배너 ─── */
+    .cta-banner {
+      background: linear-gradient(135deg, var(--coral) 0%, #c9392a 100%);
+      padding: 64px 20px;
+      text-align: center;
+    }
+    .cta-banner h2 {
+      font-size: clamp(22px, 4vw, 36px);
+      font-weight: 900;
+      color: var(--white);
+      margin-bottom: 12px;
+    }
+    .cta-banner p {
+      font-size: 16px;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 36px;
+    }
+    .cta-banner-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+    }
+    .btn-white {
+      background: var(--white);
+      color: var(--coral);
+      font-size: 17px;
+      font-weight: 800;
+      padding: 16px 36px;
+      border-radius: 8px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      transition: transform 0.15s;
+    }
+    .btn-white:hover { transform: translateY(-2px); }
+    .btn-kakao-lg {
+      background: #FEE500;
+      color: #3C1E1E;
+      font-size: 17px;
+      font-weight: 800;
+      padding: 16px 36px;
+      border-radius: 8px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      transition: transform 0.15s;
+    }
+    .btn-kakao-lg:hover { transform: translateY(-2px); }
+
+    /* ─── 왜 WB인가 ─── */
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      margin-top: 56px;
+    }
+    .why-card {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      padding: 28px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+    }
+    .why-icon {
+      font-size: 32px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .why-card h4 {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+    .why-card p {
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.8;
+    }
+
+    /* ─── FAQ ─── */
+    .faq-list { margin-top: 56px; }
+    .faq-item {
+      border-bottom: 1px solid #E5E7EB;
+      padding: 24px 0;
+    }
+    .faq-item:first-child { border-top: 1px solid #E5E7EB; }
+    .faq-q {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    .faq-q::before {
+      content: 'Q';
+      color: var(--blue);
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .faq-a {
+      font-size: 14px;
+      color: var(--mid-gray);
+      line-height: 1.8;
+      padding-left: 24px;
+    }
+
+    /* ─── 오시는 길 ─── */
+    .location-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      margin-top: 56px;
+    }
+    .location-info h3 {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--navy);
+      margin-bottom: 24px;
+    }
+    .location-item {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .location-item-icon {
+      width: 40px; height: 40px;
+      background: #EEF7FC;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .location-item-text strong {
+      display: block;
+      font-size: 13px;
+      color: var(--mid-gray);
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .location-item-text span {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .map-placeholder {
+      background: #E5E7EB;
+      border-radius: 16px;
+      height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--mid-gray);
+      font-size: 14px;
+      gap: 8px;
+    }
+    .map-placeholder span { font-size: 40px; }
+    .map-placeholder a {
+      margin-top: 12px;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 700;
+      padding: 10px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+
+    /* ─── 푸터 ─── */
+    footer {
+      background: #111827;
+      padding: 48px 20px;
+    }
+    .footer-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 32px;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .footer-logo {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+    .footer-logo span { color: var(--blue); }
+    .footer-info {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.9;
+    }
+    .footer-cta { text-align: right; }
+    .footer-phone {
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--white);
+      text-decoration: none;
+      display: block;
+      margin-bottom: 10px;
+    }
+    .footer-hours {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 16px;
+    }
+    .footer-bottom {
+      max-width: 960px;
+      margin: 32px auto 0;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    /* ─── 플로팅 버튼 ─── */
+    .float-call {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 998;
+      background: var(--coral);
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 800;
+      padding: 14px 22px;
+      border-radius: 100px;
+      text-decoration: none;
+      box-shadow: 0 4px 24px rgba(232,93,74,0.5);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: pulse 2.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 4px 24px rgba(232,93,74,0.5); }
+      50% { box-shadow: 0 4px 36px rgba(232,93,74,0.75); }
+    }
+
+    /* ─── 반응형 ─── */
+    @media (max-width: 768px) {
+      .section { padding: 60px 0; }
+      .topbar-logo { font-size: 15px; }
+      .btn-call, .btn-kakao { font-size: 12px; padding: 7px 12px; }
+
+      .stats-grid { grid-template-columns: 1fr; }
+      .stat-item { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.2); }
+      .stat-item:last-child { border-bottom: none; }
+
+      .services-grid { grid-template-columns: 1fr; }
+      .process-steps {
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+      }
+      .process-steps::before { display: none; }
+
+      .age-grid { grid-template-columns: 1fr 1fr; }
+      .why-grid { grid-template-columns: 1fr; }
+      .location-inner { grid-template-columns: 1fr; }
+      .footer-cta { text-align: left; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-buttons { flex-direction: column; }
+      .btn-primary, .btn-secondary { justify-content: center; }
+      .process-steps { grid-template-columns: 1fr; }
+      .age-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 상단 고정 바 -->
+<header class="topbar">
+  <div class="topbar-logo"><span>WB</span> 웩슬러브레인센터</div>
+  <div class="topbar-cta">
+    <a href="tel:062-672-7575" class="btn-call">📞 062-672-7575</a>
+    <a href="https://pf.kakao.com/_WBbrain" class="btn-kakao">카카오 상담</a>
+  </div>
+</header>
+
+<!-- 플로팅 전화 버튼 -->
+<a href="tel:062-672-7575" class="float-call">📞 무료 상담 신청</a>
+
+<!-- ① HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">✅ 광주 유일 웩슬러 공식 검사·해석 센터</div>
+    <h1>IQ 숫자 하나로<br>끝내지 않습니다<br><em>뇌 기능 전체를 봅니다</em></h1>
+    <p class="hero-sub">
+      <strong>전문 심리사 1:1 해석 상담</strong>으로 우리 아이의<br>
+      학습 부진의 진짜 이유를 찾아드립니다<br>
+      7세 ~ 고등 전 연령 대응
+    </p>
+    <div class="hero-buttons">
+      <a href="tel:062-672-7575" class="btn-primary">📞 무료 상담 신청 →</a>
+      <a href="#services" class="btn-secondary">서비스 알아보기</a>
+    </div>
+  </div>
+</section>
+
+<!-- ② 신뢰 지표 -->
+<section class="stats">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-num">500<span>건+</span></div>
+      <div class="stat-label">누적 웩슬러 검사</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">7<span>세~고등</span></div>
+      <div class="stat-label">전 연령 대응</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">1<span>:1</span></div>
+      <div class="stat-label">전문 심리사 해석 상담</div>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 서비스 -->
+<section class="section section-light" id="services">
+  <div class="container">
+    <p class="section-label">Services</p>
+    <h2 class="section-title">아이에게 필요한 것을<br>정확하게 찾아드립니다</h2>
+    <p class="section-sub">검사 → 해석 → 솔루션까지, 원스톱으로 제공합니다</p>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">🧠</div>
+        <h3>웩슬러 지능검사</h3>
+        <p>K-WPPSI · K-WISC · K-WAIS<br>연령별 공식 검사 실시 및 전문 심리사 1:1 해석 상담. IQ를 넘어 언어이해·작업기억·처리속도 등 뇌 기능 전체를 분석합니다.</p>
+        <span class="service-tag">핵심 서비스</span>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📖</div>
+        <h3>WB 독해력학원</h3>
+        <p>검사 결과 기반 맞춤 독해·어휘 프로그램. 5단계 레벨 체계로 초등~중등 체계적 독해력 향상. 강사 1:소그룹 밀착 지도.</p>
+        <span class="service-tag">학원 연계</span>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🎓</div>
+        <h3>고등 입시 컨설팅</h3>
+        <p>수행평가·생활기록부·대입 전략 1:1 Zoom 피드백. 웩슬러 강점 프로파일을 활용한 진로·학습 방향 설계.</p>
+        <span class="service-tag">고등 전용</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ④ 검사 과정 -->
+<section class="section" id="process">
+  <div class="container">
+    <p class="section-label">Process</p>
+    <h2 class="section-title">검사부터 솔루션까지<br>4단계로 진행됩니다</h2>
+    <div class="process-steps">
+      <div class="step">
+        <div class="step-circle"><span>📞</span></div>
+        <h4>상담 예약</h4>
+        <p>전화 또는 카카오채널로 예약 · 소요 시간·비용 안내</p>
+      </div>
+      <div class="step">
+        <div class="step-circle"><span>🖊️</span></div>
+        <h4>검사 실시</h4>
+        <p>1:1 개인 검사실 · 아이 연령에 맞는 공식 웩슬러 검사</p>
+      </div>
+      <div class="step">
+        <div class="step-circle"><span>📊</span></div>
+        <h4>결과 해석</h4>
+        <p>전문 심리사의 1:1 해석 상담 · 강점·약점 프로파일 제공</p>
+      </div>
+      <div class="step">
+        <div class="step-circle"><span>💡</span></div>
+        <h4>맞춤 솔루션</h4>
+        <p>학습 방향·교재·학원 연계까지 구체적 실행 계획 제시</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑤ 대상 연령 -->
+<section class="section section-light" id="target">
+  <div class="container">
+    <p class="section-label">Age Guide</p>
+    <h2 class="section-title">전 연령 대응합니다</h2>
+    <p class="section-sub">연령에 따라 적합한 웩슬러 검사 버전이 다릅니다</p>
+    <div class="age-grid">
+      <div class="age-card">
+        <div class="age-emoji">🧒</div>
+        <div class="age-range">만 2.5~7세</div>
+        <div class="age-test">K-WPPSI-IV</div>
+        <p class="age-desc">유아 지능·인지 발달 조기 파악</p>
+      </div>
+      <div class="age-card">
+        <div class="age-emoji">👧</div>
+        <div class="age-range">만 6~16세</div>
+        <div class="age-test">K-WISC-V</div>
+        <p class="age-desc">학습 부진·집중력·학교생활 어려움</p>
+      </div>
+      <div class="age-card">
+        <div class="age-emoji">🧑</div>
+        <div class="age-range">고등~대학</div>
+        <div class="age-test">K-WAIS-IV</div>
+        <p class="age-desc">진로·입시 전략·자기 이해</p>
+      </div>
+      <div class="age-card">
+        <div class="age-emoji">👨‍👩‍👧</div>
+        <div class="age-range">성인 가능</div>
+        <div class="age-test">K-WAIS-IV</div>
+        <p class="age-desc">직업 적성·자기 강점 분석</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 중간 CTA 배너 -->
+<section class="cta-banner">
+  <div class="container">
+    <h2>우리 아이 학습 부진,<br>원인을 모른 채 방치하지 마세요</h2>
+    <p>지금 바로 전화 또는 카카오채널로 무료 상담을 신청하세요</p>
+    <div class="cta-banner-buttons">
+      <a href="tel:062-672-7575" class="btn-white">📞 062-672-7575 전화 상담</a>
+      <a href="https://pf.kakao.com/_WBbrain" class="btn-kakao-lg">💬 카카오채널 상담</a>
+    </div>
+  </div>
+</section>
+
+<!-- ⑦ 왜 WB인가 -->
+<section class="section section-dark" id="why">
+  <div class="container">
+    <p class="section-label">Why WB</p>
+    <h2 class="section-title">광주 웩슬러 검사,<br>왜 WB여야 하는가</h2>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="why-icon">🏆</div>
+        <div>
+          <h4>광주 유일 웩슬러 공식 검사 기관</h4>
+          <p>정식 심리 자격을 갖춘 전문 심리사가 직접 검사하고 해석합니다. 검사지 판매가 아닌, 완전한 해석 서비스를 제공합니다.</p>
+        </div>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">🔬</div>
+        <div>
+          <h4>IQ 숫자 하나가 아닌 뇌 기능 전체 분석</h4>
+          <p>언어이해·시공간·유동추론·작업기억·처리속도 5가지 지표를 분석하여 강점과 약점을 구체적으로 파악합니다.</p>
+        </div>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">📋</div>
+        <div>
+          <h4>검사 → 해석 → 솔루션 원스톱</h4>
+          <p>검사 결과를 독해력학원·컨설팅과 연계하여 실제 학습 개선으로 이어지는 구체적인 솔루션을 제시합니다.</p>
+        </div>
+      </div>
+      <div class="why-card">
+        <div class="why-icon">🤝</div>
+        <div>
+          <h4>학부모와 함께하는 1:1 해석 상담</h4>
+          <p>결과지를 드리고 끝이 아닙니다. 학부모님과 함께 앉아 아이의 결과를 이해하고 다음 단계를 설계합니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑧ FAQ -->
+<section class="section section-light" id="faq">
+  <div class="container">
+    <p class="section-label">FAQ</p>
+    <h2 class="section-title">자주 묻는 질문</h2>
+    <div class="faq-list">
+      <div class="faq-item">
+        <p class="faq-q">웩슬러 검사는 얼마나 걸리나요?</p>
+        <p class="faq-a">연령과 아이의 집중력에 따라 다르지만 검사 자체는 약 60~90분 소요됩니다. 해석 상담은 별도로 50~60분 진행됩니다.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">몇 살부터 검사가 가능한가요?</p>
+        <p class="faq-a">만 2세 6개월부터 성인까지 전 연령 검사가 가능합니다. 연령에 따라 K-WPPSI(유아), K-WISC(아동·청소년), K-WAIS(청소년·성인) 중 적합한 버전으로 진행됩니다.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">검사 전 준비사항이 있나요?</p>
+        <p class="faq-a">아이가 충분히 수면하고 컨디션이 좋은 날 방문하시면 좋습니다. 배고프지 않게 식사 후 방문을 권장하며, 과도한 설명이나 사전 연습은 결과에 영향을 줄 수 있어 권장하지 않습니다.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">검사 결과가 학교에 제출되나요?</p>
+        <p class="faq-a">아닙니다. 검사 결과는 학부모님과 센터만 보유하며 외부 기관에 제공되지 않습니다. 특수교육 신청 등을 위한 공문 발급은 별도로 문의해 주세요.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">독해력학원은 별도 등록인가요?</p>
+        <p class="faq-a">네, 웩슬러 검사와 별도로 등록하는 학원 과정입니다. 검사 결과를 바탕으로 적합한 레벨에 배정되며, 강사와의 1:1 면담 후 시작합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑨ 오시는 길 -->
+<section class="section" id="location">
+  <div class="container">
+    <p class="section-label">Location</p>
+    <h2 class="section-title">찾아오시는 길</h2>
+    <div class="location-inner">
+      <div class="location-info">
+        <h3>WB 웩슬러브레인센터</h3>
+        <div class="location-item">
+          <div class="location-item-icon">📍</div>
+          <div class="location-item-text">
+            <strong>주소</strong>
+            <span>광주광역시 남구 봉선로 149<br>(봉선동)</span>
+          </div>
+        </div>
+        <div class="location-item">
+          <div class="location-item-icon">📞</div>
+          <div class="location-item-text">
+            <strong>전화</strong>
+            <span><a href="tel:062-672-7575" style="color:var(--navy);text-decoration:none;font-weight:800;">062-672-7575</a></span>
+          </div>
+        </div>
+        <div class="location-item">
+          <div class="location-item-icon">🕐</div>
+          <div class="location-item-text">
+            <strong>운영 시간</strong>
+            <span>평일 10:00 ~ 20:00<br>토요일 10:00 ~ 18:00</span>
+          </div>
+        </div>
+        <div class="location-item">
+          <div class="location-item-icon">🚗</div>
+          <div class="location-item-text">
+            <strong>주차</strong>
+            <span>건물 내 주차 가능</span>
+          </div>
+        </div>
+        <div style="margin-top:24px;">
+          <a href="https://map.kakao.com/link/search/WB웩슬러브레인센터" target="_blank" class="btn-primary" style="font-size:15px;padding:13px 24px;display:inline-flex;">
+            🗺️ 카카오맵으로 길 찾기
+          </a>
+        </div>
+      </div>
+      <div class="map-placeholder">
+        <span>🗺️</span>
+        <p>광주광역시 남구 봉선로 149</p>
+        <a href="https://map.kakao.com/link/search/WB웩슬러브레인센터" target="_blank">지도에서 보기</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑩ 하단 CTA -->
+<section class="cta-banner" style="background: linear-gradient(135deg, var(--navy) 0%, #0F7AAB 100%);">
+  <div class="container">
+    <h2>지금 바로 상담 예약하세요</h2>
+    <p>전문 심리사가 직접 답변드립니다 · 부담 없이 문의하세요</p>
+    <div class="cta-banner-buttons">
+      <a href="tel:062-672-7575" class="btn-white">📞 062-672-7575</a>
+      <a href="https://pf.kakao.com/_WBbrain" class="btn-kakao-lg">💬 카카오채널</a>
+    </div>
+  </div>
+</section>
+
+<!-- 푸터 -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-logo"><span>WB</span> 웩슬러브레인센터</div>
+      <div class="footer-info">
+        광주광역시 남구 봉선로 149 (봉선동)<br>
+        대표: 조영준 | 사업자등록번호: 문의 요망<br>
+        이메일: whdudwns33@gmail.com
+      </div>
+    </div>
+    <div class="footer-cta">
+      <a href="tel:062-672-7575" class="footer-phone">062-672-7575</a>
+      <p class="footer-hours">평일 10:00 ~ 20:00 · 토 10:00 ~ 18:00</p>
+      <a href="tel:062-672-7575" class="btn-call" style="font-size:15px;padding:12px 24px;">📞 전화 상담</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    © 2026 WB 웩슬러브레인센터. All rights reserved. · 광주 유일 웩슬러 공식 검사·해석 센터
+  </div>
+</footer>
+
+</body>
+</html>
