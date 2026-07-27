@@ -138,6 +138,8 @@
   .conf.low{background:var(--warn-bg);color:var(--warn)}
   .adjust{background:#f7fbe9;border:1px solid #dce8b8;color:#5f6f26;border-radius:8px;
     font-size:12px;padding:8px 10px;margin-top:8px}
+  .caveat{background:var(--light);border:1px solid var(--line);color:var(--mid);border-radius:8px;
+    font-size:11.5px;padding:6px 10px;margin-top:6px}
   .hypacts{display:flex;gap:6px;margin-top:11px}
   .tog{font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;border:1.5px solid var(--line);background:#fff;color:var(--mid)}
   .tog.accept.on{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
@@ -351,7 +353,7 @@
             <h3 style="margin:0">AI 해석 초안</h3>
             <span class="muted" style="font-size:12px" id="acceptCount"></span>
           </div>
-          <p class="muted" style="font-size:13px;margin-bottom:14px">신뢰도: <span class="conf high" style="padding:1px 7px">강</span> <span class="conf mid" style="padding:1px 7px">중</span> <span class="conf low" style="padding:1px 7px">약</span></p>
+          <p class="muted" style="font-size:13px;margin-bottom:14px">근거수준: <span class="conf high" style="padding:1px 7px">강</span> <span class="conf mid" style="padding:1px 7px">중</span> <span class="conf low" style="padding:1px 7px">약</span> <span style="font-size:11.5px">— 투사검사 특성상 대부분 약~중, 이 사례엔 '강' 없음</span></p>
           <div id="hypList"></div>
         </div>
 
@@ -460,12 +462,17 @@
 (function(){
   var views={landing:'v-landing',wizard:'v-wizard',preview:'v-preview',console:'v-console',report:'v-report'};
   var state={confirmed:false, step:1, hyp:[
-    {id:'roof', obs:'집 · 지붕을 크게', txt:'상상·내적 세계에 대한 관심이 큰 경향', conf:'mid', x:'19%', y:'40%', status:'accept'},
-    {id:'door', obs:'집 · 문 손잡이 없음', txt:'관계에 다가서는 데 신중한 경향 (가능성)', conf:'low', x:'20%', y:'80%', status:'accept'},
-    {id:'root', obs:'나무 · 뿌리·줄기 강조', txt:'안정감·현실 지향이 뚜렷함', conf:'mid', x:'50%', y:'88%', status:'accept'},
-    {id:'hand', obs:'사람 · 손 생략', txt:'환경과의 상호작용에 조심스러움 가능성', conf:'low', x:'74%', y:'68%', status:'accept',
-      adjust:'연령 보정: 만 8세에서는 발달상 정상 범위일 수 있음 — 단정 금지, 상담에서 확인 권장.'},
-    {id:'face', obs:'사람 · 큰 눈·미소', txt:'정서 표현이 개방적이고 긍정 정서가 드러남', conf:'high', x:'79%', y:'50%', status:'accept'}
+    {id:'roof', obs:'집 · 지붕을 크게', txt:'상상·공상에 대한 관심이 큰 경향 (가능성)', conf:'low', x:'19%', y:'40%', status:'accept',
+      caveat:'HTP 지붕 해석은 근거 약함 · 연구 간 의미 상충'},
+    {id:'door', obs:'집 · 문 손잡이 없음', txt:'관계에 다가서는 데 신중한 경향 (가능성)', conf:'mid', x:'20%', y:'80%', status:'accept',
+      caveat:'단일 지표로 단정 금지 · 면담(PDI)으로 확인'},
+    {id:'root', obs:'나무 · 뿌리·줄기 강조', txt:'안정감·현실 지향 추구 가능성', conf:'low', x:'50%', y:'88%', status:'accept',
+      caveat:'뿌리 상징 해석은 근거 약함'},
+    {id:'hand', obs:'사람 · 손 생략', txt:'행위·대인접촉에 조심스러움 가능성', conf:'low', x:'74%', y:'68%', status:'accept',
+      adjust:'연령 보정: 만 8세 전후에서는 발달상 정상 범위일 수 있음 — 병리 단정 금지.',
+      caveat:'귀찮음 등 대안 설명 가능 · 반복 시에만 의미'},
+    {id:'face', obs:'사람 · 큰 눈·미소', txt:'정서 표현이 개방적이고 긍정 정서가 드러남', conf:'mid', x:'79%', y:'50%', status:'accept',
+      caveat:'노골적 정서 기호만 참고 · 진단 아님'}
   ]};
 
   function $(s,r){return (r||document).querySelector(s)}
@@ -515,6 +522,7 @@
         '<div class="txt">'+(h.edited||h.txt)+'</div></div>'+
         '<span class="conf '+c[0]+'">'+c[1]+'</span></div>'+
         (h.adjust?'<div class="adjust">⚖ '+h.adjust+'</div>':'')+
+        (h.caveat?'<div class="caveat">⚠ '+h.caveat+'</div>':'')+
         '<div class="hypacts">'+
           '<button class="tog accept'+(h.status==='accept'?' on':'')+'" data-a="accept">채택</button>'+
           '<button class="tog edit'+(h.status==='edit'?' on':'')+'" data-a="edit">수정</button>'+
