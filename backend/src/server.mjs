@@ -2,7 +2,13 @@
 // 프로덕션은 Fastify + Postgres + 정식 인증으로 교체. 여기선 흐름·계약 검증이 목표.
 
 import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { store } from './store.mjs';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const PROTO_HTML = join(__dir, '..', '..', 'apps', 'picture-test', 'index.html');
 import { runPipeline, confirmSubmission } from './pipeline.mjs';
 import { assertTransition } from './stateMachine.mjs';
 
@@ -138,7 +144,21 @@ on('GET', /^\/api\/health$/, async (req, res) => json(res, 200, { ok: true }));
 // ── 디스패처 ─────────────────────────────────────────────────
 export const server = createServer(async (req, res) => {
   try {
+    // 개발용 CORS (프로덕션은 허용 출처를 좁힐 것)
+    res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'content-type,x-role,x-user-id');
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+
     const url = new URL(req.url, `http://localhost:${PORT}`);
+
+    // 정적: 프로토타입을 같은 출처에서 서빙(CORS 없이 API 호출 가능)
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+      const html = await readFile(PROTO_HTML, 'utf8');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
+
     for (const r of routes) {
       if (r.method !== req.method) continue;
       const m = url.pathname.match(r.pattern);

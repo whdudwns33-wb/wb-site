@@ -475,6 +475,37 @@
       caveat:'노골적 정서 기호만 참고 · 진단 아님'}
   ]};
 
+  // ── 백엔드 어댑터: 켜져 있으면 실제 API, 없으면 mock 폴백 ──
+  state.backend=false; state.submissionId=null; state.reportToken=null; state.selectedTest='HTP'; state.birthYear=null;
+  var qp=new URLSearchParams(location.search);
+  var API=(qp.get('api')!=null?qp.get('api'):'');   // 기본: 같은 출처
+  var EXPERT={'x-role':'expert'};
+  function api(method,path,body,headers){
+    return fetch(API+path,{method:method,headers:Object.assign({'content-type':'application/json'},headers||{}),
+      body:body?JSON.stringify(body):undefined}).then(function(r){return r.json().then(function(j){return {code:r.status,body:j}})});
+  }
+  function detectBackend(){
+    // 아티팩트/외부 호스트에서 오탐 방지: localhost이거나 ?api= 지정 시에만 탐지
+    var allow=qp.get('api')!=null||/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+    if(!allow) return Promise.resolve(false);
+    return fetch(API+'/api/health').then(function(r){return r.ok}).catch(function(){return false});
+  }
+  // 백엔드 element → 프로토타입 핀 좌표
+  var PIN_POS={'house.roof':['19%','40%'],'house.door':['20%','80%'],'tree.root':['50%','88%'],
+               'person.hand':['74%','68%'],'person.face':['79%','50%']};
+  var SMAP={ai_suggested:'accept',accepted:'accept',edited:'edit',rejected:'reject'};
+  function normalizeHyp(h){
+    var pos=PIN_POS[h.element]||['50%','50%'];
+    return {id:h.element, dbId:h.id, obs:h.observation, txt:h.text, conf:h.confidence,
+      adjust:h.age_adjustment||null, caveat:(h.caveats||[]).join(' · '),
+      status:SMAP[h.status]||'accept', x:pos[0], y:pos[1]};
+  }
+  function setBackendBadge(on){
+    var tag=$('.demobar .tag'); if(!tag) return;
+    tag.textContent=on?'● 백엔드 연결됨':'프로토타입 · 클릭 데모';
+    tag.style.color=on?'#7Cf0b0':'';
+  }
+
   function $(s,r){return (r||document).querySelector(s)}
   function $all(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
 
@@ -482,11 +513,21 @@
     Object.keys(views).forEach(function(k){$('#'+views[k]).classList.toggle('hidden',k!==v)});
     $all('.demobar .navbtn').forEach(function(b){b.classList.toggle('active',b.dataset.go===v)});
     window.scrollTo({top:0,behavior:'auto'});
-    if(v==='console'){mountDrawing('drawHost2',true);renderHyp();}
+    if(v==='console'){loadConsole();}
     if(v==='preview'){mountDrawing('drawHost1',false);}
     if(v==='report'){renderReport();}
   }
   $all('[data-go]').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.go)})});
+
+  // 콘솔 진입: 백엔드 있으면 실제 가설 로드, 없으면 mock
+  function loadConsole(){
+    if(state.backend && state.submissionId){
+      api('GET','/api/console/submissions/'+state.submissionId,null,EXPERT).then(function(r){
+        if(r.body&&r.body.hypotheses&&r.body.hypotheses.length){ state.hyp=r.body.hypotheses.map(normalizeHyp); }
+        mountDrawing('drawHost2',true); renderHyp();
+      }).catch(function(){ mountDrawing('drawHost2',true); renderHyp(); });
+    } else { mountDrawing('drawHost2',true); renderHyp(); }
+  }
 
   // drawing mount (+optional pins)
   function mountDrawing(hostId,withPins){
@@ -537,7 +578,9 @@
       b.addEventListener('click',function(){
         var id=b.closest('.hyp').dataset.id;
         var h=state.hyp.filter(function(x){return x.id===id})[0];
-        h.status=b.dataset.a; renderHyp(); updateGate();
+        h.status=b.dataset.a;
+        if(state.backend && h.dbId){ api('PATCH','/api/console/hypotheses/'+h.dbId,{action:b.dataset.a},EXPERT); }
+        renderHyp(); updateGate();
       });
     });
     $all('#hypList textarea[data-edit]').forEach(function(t){
@@ -563,15 +606,23 @@
   }
 
   $('#confirmBtn').addEventListener('click',function(){
-    state.confirmed=true;
-    var nav=$('#nav-report'); nav.innerHTML='학부모 리포트 <span style="color:#7FD0F0">✓</span>';
-    toast('✓ 해석이 확정되어 학부모 리포트가 발행되었습니다');
-    setTimeout(function(){go('report')},900);
+    function done(msg){ state.confirmed=true; var nav=$('#nav-report'); nav.innerHTML='학부모 리포트 <span style="color:#7FD0F0">✓</span>'; toast(msg); setTimeout(function(){go('report')},900); }
+    if(state.backend && state.submissionId){
+      api('POST','/api/console/submissions/'+state.submissionId+'/confirm',{},EXPERT).then(function(r){
+        if(r.code===200){ state.reportToken=r.body.share_token; done('✓ 백엔드 발행됨 · published (반영 '+r.body.kept+'건)'); }
+        else { toast('확정 실패: '+(r.body.error||r.code)); }
+      }).catch(function(){ done('✓ 확정(로컬)'); });
+    } else { done('✓ 해석이 확정되어 학부모 리포트가 발행되었습니다'); }
   });
 
   function renderReport(){
     $('#reportLocked').classList.toggle('hidden',state.confirmed);
     $('#reportReady').classList.toggle('hidden',!state.confirmed);
+    if(state.confirmed && state.backend && state.reportToken){
+      api('GET','/api/reports/'+state.reportToken+'?birth_year='+(state.birthYear||''),null).then(function(r){
+        var v=$('#reportReady .verified'); if(v&&r.code===200){ v.textContent='✓ 전문 심리사 확정 완료 · 백엔드 발행'; }
+      });
+    }
   }
 
   // wizard
@@ -584,13 +635,25 @@
     $('#wizPrev').disabled=n===1;
     $('#wizNext').textContent=n===4?'제출하고 미리보기 →':'다음 →';
   }
+  function submit(){
+    if(!(state.backend)){ toast('제출 완료! AI 미리보기를 생성합니다'); setTimeout(function(){go('preview')},700); return; }
+    var birthYear=new Date().getFullYear()-(parseInt($('#f-age').value,10)||8);
+    state.birthYear=birthYear;
+    toast('백엔드에 제출 중…');
+    api('POST','/api/submissions',{test_type:state.selectedTest,child:{alias:$('#f-alias').value,birth_year:birthYear,sex:$('#f-sex').value,context_note:$('#f-note').value}})
+      .then(function(r){ state.submissionId=r.body.submission_id;
+        return api('POST','/api/submissions/'+state.submissionId+'/consent',{analysis:true,store:true,improve:$('#c3').checked,guardian_verified:true}); })
+      .then(function(){ return api('POST','/api/submissions/'+state.submissionId+'/image',{image_ref:'sample-htp'}); })
+      .then(function(r){ toast('AI 해석 생성됨 · '+(r.body.status)); go('preview'); })
+      .catch(function(){ toast('백엔드 오류 — mock으로 진행'); go('preview'); });
+  }
   $('#wizNext').addEventListener('click',function(){
     if(state.step<4){setStep(state.step+1);window.scrollTo({top:0,behavior:'smooth'});}
-    else{toast('제출 완료! AI 미리보기를 생성합니다');setTimeout(function(){go('preview')},700);}
+    else{ submit(); }
   });
   $('#wizPrev').addEventListener('click',function(){if(state.step>1)setStep(state.step-1)});
   $all('#testChoice .opt').forEach(function(o){
-    o.addEventListener('click',function(){$all('#testChoice .opt').forEach(function(x){x.classList.remove('sel')});o.classList.add('sel')});
+    o.addEventListener('click',function(){$all('#testChoice .opt').forEach(function(x){x.classList.remove('sel')});o.classList.add('sel');state.selectedTest=o.dataset.test;});
   });
   $('#dropzone').addEventListener('click',function(){$('#uploaded').classList.remove('hidden');toast('샘플 HTP 그림을 불러왔어요')});
 
@@ -598,6 +661,7 @@
   function toast(m){toEl.textContent=m;toEl.classList.add('show');clearTimeout(toT);toT=setTimeout(function(){toEl.classList.remove('show')},2200)}
 
   // init
+  detectBackend().then(function(on){ state.backend=on; setBackendBadge(on); });
   setStep(1); go('landing');
 })();
 </script>
