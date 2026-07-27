@@ -55,31 +55,41 @@ export async function runPipeline(submissionId) {
   return { status: 'reviewing', hypotheses: saved.length };
 }
 
-// S2: 관찰 → 가설 매핑
-function mapHypotheses(observations, testType, age) {
+// S2: 관찰 → 가설 매핑 (실측/테스트에서도 실제 코드 재사용을 위해 export)
+export function mapHypotheses(observations, testType, age) {
   const kb = testType === 'HTP' ? HTP_KB : {};
   const out = [];
   for (const o of observations) {
     const entry = kb[o.element];
     if (!entry) continue;
-    const applies = entry.matchAbsent ? o.present === false : (entry.match ? entry.match(o.attributes) : true);
-    if (!applies) continue;
 
-    let confidence = entry.confidence;
+    // 속성 조건부(derive) 또는 단순 match/matchAbsent
+    let r;
+    if (entry.derive) {
+      r = entry.derive(o);
+    } else {
+      const applies = entry.matchAbsent ? o.present === false : (entry.match ? entry.match(o.attributes) : true);
+      if (!applies) continue;
+      r = { hypothesis: entry.hypothesis, confidence: entry.confidence, caveats: entry.caveats, strength: !!entry.strength, ageNorm: entry.ageNorm };
+    }
+    if (!r) continue;
+
+    let confidence = r.confidence;
     let age_adjustment = null;
+    const ageNorm = r.ageNorm || entry.ageNorm;
     // 연령 보정: 정상범위 연령이면 신뢰도 강등 + 문구
-    if (entry.ageNorm && age != null && age < entry.ageNorm.normalBelow) {
+    if (ageNorm && age != null && age < ageNorm.normalBelow) {
       confidence = downgrade(confidence);
-      age_adjustment = entry.ageNorm.note;
+      age_adjustment = ageNorm.note;
     }
     out.push({
       element: o.element,
       observation: o.note || o.element,
-      text: entry.hypothesis,
+      text: r.hypothesis,
       confidence,
       age_adjustment,
-      caveats: entry.caveats,
-      strength: !!entry.strength
+      caveats: r.caveats,
+      strength: !!r.strength
     });
   }
   return out;
