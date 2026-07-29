@@ -24,8 +24,11 @@ var VIEW_LIMIT = 3000;      // 체크현황 시트에 표시할 최대 줄 수
 
 /* ───────────────────────── 진입점 ───────────────────────── */
 
+/** 살아있는지 확인용. 데이터는 내주지 않는다.
+ *  웹앱 주소는 직원 링크에 담겨 나가므로, 주소만 알면 열람되는 통로를 두지 않는다.
+ *  실제 읽기·쓰기는 전부 비밀키를 확인하는 doPost로만 이뤄진다. */
 function doGet() {
-  return json({ ok: true, state: readState() });
+  return json({ ok: true, service: 'wb-taskboard' });
 }
 
 function doPost(e) {
