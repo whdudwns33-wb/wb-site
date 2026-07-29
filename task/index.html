@@ -1196,9 +1196,99 @@ function manageTasks(staffId) {
           '<div class="task-t">' + esc(t.title) + '</div>' +
           '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
           (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
-          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') + '</div></div>' +
-          '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button></div>').join('')
+          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') + '</div>' +
+          '<div class="row" style="gap:6px;margin-top:8px">' +
+            '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>' +
+            '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button>' +
+          '</div></div></div>').join('')
       : '<div class="empty">지시된 업무가 없습니다.</div>');
+}
+
+/* ── 업무 수정 ── */
+let eForm = null;
+
+function editTaskModal(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  eForm = { id: t.id, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+
+  modal('업무 수정',
+    '<div class="field"><label class="fl">업무 내용</label>' +
+      '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
+
+    '<div class="field"><label class="fl">한 줄 설명</label>' +
+      '<textarea class="in" id="eDetail">' + esc(t.detail || '') + '</textarea></div>' +
+
+    '<div class="field"><label class="fl">수행 가이드</label>' +
+      '<textarea class="in" id="eGuide" rows="5">' + esc(t.guide || '') + '</textarea></div>' +
+
+    '<div class="field"><label class="fl">단계 — 한 줄에 하나씩</label>' +
+      '<textarea class="in" id="eSteps" rows="5">' + esc((t.steps || []).map(s => s.label).join('\n')) + '</textarea>' +
+      '<div class="hint" style="margin-top:5px">순서를 그대로 두고 글자만 고치면 오늘 체크해둔 진행 상태가 유지됩니다.</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">목표 수량</label><input class="in" id="eTarget" type="number" min="0" value="' + (t.target || '') + '"></div>' +
+      '<div class="field"><label class="fl">단위</label><input class="in" id="eUnit" value="' + esc(t.unit || '건') + '"></div>' +
+    '</div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시간</label><input class="in" id="eTime" type="time" value="' + esc(t.time || '') + '"></div>' +
+      '<div class="field"><label class="fl">중요도</label><select class="in" id="ePri">' +
+        '<option value="normal"' + (t.priority !== 'high' ? ' selected' : '') + '>보통</option>' +
+        '<option value="high"' + (t.priority === 'high' ? ' selected' : '') + '>중요</option></select></div>' +
+    '</div>' +
+
+    '<div class="field"><label class="fl">반복</label>' +
+      '<div class="chips" id="eRepeat">' +
+        [['once', '한 번'], ['daily', '매일'], ['weekday', '평일'], ['days', '요일 지정']].map(([v, lb]) =>
+          '<button type="button" class="chip ' + (eForm.repeat === v ? 'on' : '') + '" data-act="erepeat" data-v="' + v + '">' + lb + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field" id="eDaysWrap" style="display:' + (eForm.repeat === 'days' ? '' : 'none') + '"><label class="fl">요일</label>' +
+      '<div class="chips">' + DOW.map((d, i) =>
+        '<button type="button" class="chip dow ' + (eForm.days.includes(i) ? 'on' : '') + '" data-act="edow" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시작일</label><input class="in" id="eStart" type="date" value="' + esc(t.start || today()) + '"></div>' +
+      '<div class="field"><label class="fl">종료일 (선택)</label><input class="in" id="eEnd" type="date" value="' + esc(t.end || '') + '"></div>' +
+    '</div>' +
+
+    '<div class="field"><button type="button" class="chip ' + (eForm.carry ? 'on' : '') + '" data-act="ecarry">' +
+      (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>',
+
+    '<button class="btn btn-primary btn-block mt14" data-act="esave">저장</button>');
+}
+
+function saveEditedTask() {
+  const t = state.tasks.find(x => x.id === eForm.id);
+  if (!t) return closeModal();
+
+  const title = ($('#eTitle').value || '').trim();
+  if (!title) return toast('업무 내용을 입력해 주세요');
+  if (eForm.repeat === 'days' && !eForm.days.length) return toast('요일을 선택해 주세요');
+
+  // 같은 순서의 단계는 id를 물려줘서 이미 체크한 진행 상태를 잃지 않게 한다
+  const oldSteps = t.steps || [];
+  const labels = ($('#eSteps').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+  t.steps = labels.map((label, i) => ({ id: (oldSteps[i] && oldSteps[i].id) || uid(), label: label }));
+
+  t.title = title;
+  t.detail = ($('#eDetail').value || '').trim();
+  t.guide = ($('#eGuide').value || '').trim();
+  t.target = Number($('#eTarget').value) || 0;
+  t.unit = ($('#eUnit').value || '건').trim();
+  t.time = $('#eTime').value || '';
+  t.priority = $('#ePri').value;
+  t.repeat = eForm.repeat;
+  t.days = eForm.days.slice().sort();
+  t.start = $('#eStart').value || today();
+  t.end = $('#eEnd').value || '';
+  t.carry = eForm.carry;
+  t.updatedAt = now();
+
+  eForm = null;
+  save(); queueSync(); closeModal(); render();
+  toast('수정했습니다');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1397,6 +1487,26 @@ document.addEventListener('click', ev => {
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
+    case 'etask': editTaskModal(id); break;
+    case 'erepeat': {
+      eForm.repeat = el.dataset.v;
+      document.querySelectorAll('#eRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === eForm.repeat));
+      $('#eDaysWrap').style.display = eForm.repeat === 'days' ? '' : 'none';
+      break;
+    }
+    case 'edow': {
+      const d = Number(el.dataset.d), i = eForm.days.indexOf(d);
+      if (i < 0) eForm.days.push(d); else eForm.days.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'ecarry': {
+      eForm.carry = !eForm.carry;
+      el.classList.toggle('on', eForm.carry);
+      el.textContent = (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월';
+      break;
+    }
+    case 'esave': saveEditedTask(); break;
     case 'deltask': {
       const t = task();
       if (!t || !confirm('이 지시를 중단할까요? 지난 기록은 유지됩니다.')) return;
