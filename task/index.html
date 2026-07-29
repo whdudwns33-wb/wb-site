@@ -412,6 +412,18 @@ function carryOver(staffId, date) {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** 그 주에 직원이 스스로 추가한 업무 */
+function staffAdded(anchor) {
+  const mon = mondayOf(anchor);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const out = [];
+  state.tasks.forEach(t => {
+    if (t.deleted || t.origin !== 'staff') return;
+    days.forEach(d => { if (occursOn(t, d)) out.push({ t: t, date: d }); });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /** 원장이 바로 봐야 할 것: 막힘 + 예정 시각이 지난 미완료 */
 function alertsToday() {
   const d = today(), hm = nowHM();
@@ -1004,6 +1016,32 @@ function viewBoard() {
         '</div>').join('') + '</div>';
   }
 
+  // 직원이 스스로 추가한 업무 — 지시서를 현실에 맞게 고치는 단서가 된다
+  const added = staffAdded(cursor);
+  if (added.length) {
+    const byStaff = {};
+    added.forEach(x => {
+      const n = (staffById(x.t.staffId) || {}).name || '?';
+      (byStaff[n] = byStaff[n] || []).push(x);
+    });
+    h += '<div class="card">' +
+      '<div class="between mb8"><div class="card-title">＋ 직원이 추가한 업무</div>' +
+      '<div class="pill">이번 주 ' + added.length + '건</div></div>' +
+      '<div class="card-sub mb14">지시하지 않았는데 실제로 하고 있는 일입니다. 반복되면 정식 지시로 올리세요.</div>' +
+      Object.keys(byStaff).map(n =>
+        '<div class="small" style="font-weight:700;margin-top:10px">' + esc(n) + ' · ' + byStaff[n].length + '건</div>' +
+        byStaff[n].map(x => {
+          const st = statusOf(x.t, x.date);
+          return '<div class="between small" style="padding:3px 0">' +
+            '<span class="muted">· ' + esc(x.t.title) + ' <span style="opacity:.7">(' + shortDate(x.date) + ')</span></span>' +
+            (st === 'done' ? '<span class="pill">완료</span>'
+              : st === 'blocked' ? '<span class="pill bad">막힘</span>'
+              : st === 'doing' ? '<span class="pill warn">진행중</span>' : '<span class="pill warn">미완료</span>') +
+          '</div>';
+        }).join('')
+      ).join('') + '</div>';
+  }
+
   const all = list.reduce((a, s) => { const p = progress(s.id, cursor); a.done += p.done; a.total += p.total; return a; }, { done: 0, total: 0 });
   const pct = all.total ? Math.round(all.done / all.total * 100) : 0;
   h += '<div class="card"><div class="prog">' +
@@ -1095,7 +1133,14 @@ function viewSettings() {
       '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
-    (s.syncUrl ? '<div class="hint mt14">✓ 설정됨 — 이제 <b>개인 링크에 이 설정이 함께 담겨</b> 나갑니다. 직원은 링크만 열면 됩니다.</div>' : '') +
+    (s.syncUrl
+      ? '<div class="hint mt14">✓ 설정됨 — 이제 <b>개인 링크에 이 설정이 함께 담겨</b> 나갑니다. 직원은 링크만 열면 됩니다.</div>' +
+        '<hr class="sep">' +
+        '<div class="card-title">내 다른 기기에서 열기</div>' +
+        '<div class="card-sub mb14">폰이나 다른 컴퓨터에서 원장 화면을 보려면 이 링크로 한 번 접속하세요. ' +
+          '접속 정보가 담겨 있으니 <b>원장님만</b> 쓰셔야 합니다.</div>' +
+        '<button class="btn btn-navy btn-block" data-act="adminlink">📱 내 기기용 링크 복사</button>'
+      : '') +
   '</div>' +
 
   '<div class="card">' +
@@ -1194,6 +1239,16 @@ function briefText(date) {
   if (blocked.length) txt += '🚧 막힘 ' + blocked.length + '건 — 조치 필요\n' + blocked.join('\n') + '\n─────────\n';
   txt += pend.length ? '⚠️ 미완료 ' + pend.length + '건\n' + pend.join('\n') + '\n' : '✅ 미완료 없음\n';
   if (clear.length) txt += '─────────\n✅ 전원 완료: ' + clear.join(', ') + '\n';
+
+  // 지시하지 않았는데 직원이 스스로 한 일
+  const own = [];
+  list.forEach(s => tasksFor(s.id, date).forEach(t => {
+    if (t.origin !== 'staff') return;
+    const st = statusOf(t, date);
+    own.push('· ' + s.name + ' — ' + t.title + ' [' + STATUS_LABEL[st] + ']');
+  }));
+  if (own.length) txt += '─────────\n＋ 직원 추가 업무 ' + own.length + '건\n' + own.join('\n') + '\n';
+
   return txt;
 }
 
@@ -1536,6 +1591,12 @@ document.addEventListener('click', ev => {
     }
     case 'copylink': copy(staffLink(id)); break;
     case 'alllinks': copy(liveStaff().map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')); break;
+    case 'adminlink': {
+      const url = location.origin + location.pathname + '?s=' +
+        b64(JSON.stringify({ u: state.settings.syncUrl, k: state.settings.syncSecret || '' }));
+      copy(url);
+      break;
+    }
     case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
     case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
