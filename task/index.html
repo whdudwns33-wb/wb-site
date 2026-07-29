@@ -156,6 +156,8 @@
   .tag.doing{ background: #FFF7ED; color: var(--amber); }
   .tag.blk  { background: var(--coral); color: var(--white); }
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
+  .tag.add  { background: #ECFDF5; color: var(--green); }
+  .tag.edit { background: #FFF7ED; color: var(--amber); }
   .note { margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
   .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
@@ -574,6 +576,18 @@ function repeatLabel(t) {
 }
 const initials = name => String(name || '?').trim().slice(0, 2);
 
+/** 지금 조작하는 사람 */
+const actor = () => session.isStaffLink ? 'staff' : 'admin';
+
+/** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
+function originTags(t) {
+  if (session.isStaffLink) return '';
+  let h = '';
+  if (t.origin === 'staff') h += '<span class="tag add">직원 추가</span>';
+  else if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
+  return h;
+}
+
 function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
@@ -728,6 +742,9 @@ function viewToday() {
     h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
   }
 
+  if (editable) {
+    h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
+  }
   if (session.isStaffLink) {
     h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
       '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
@@ -755,6 +772,7 @@ function taskRow(t, date, editable, isCarry) {
         (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+        originTags(t) +
       '</div>';
 
   if (hasDetail && st !== 'done') {
@@ -797,9 +815,12 @@ function taskPanel(t, date, c, editable) {
 
   if (editable) {
     const blocked = !!(c && c.blocked);
-    h += '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + ' mt14" ' +
-      'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
-      (blocked ? '✓ 막힘 해제' : '🚧 막혔어요 — 원장님께 알리기') + '</button>';
+    h += '<div class="row wraprow mt14" style="gap:8px">' +
+      '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + '" ' +
+        'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
+        (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
+      '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' +
+    '</div>';
   }
   return h + '</div>';
 }
@@ -1207,12 +1228,19 @@ function manageTasks(staffId) {
 /* ── 업무 수정 ── */
 let eForm = null;
 
-function editTaskModal(id) {
-  const t = state.tasks.find(x => x.id === id);
-  if (!t) return;
-  eForm = { id: t.id, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+const BLANK_TASK = () => ({
+  title: '', detail: '', guide: '', steps: [], target: 0, unit: '건',
+  time: '', priority: 'normal', repeat: 'once', days: [], start: today(), end: '', carry: true
+});
 
-  modal('업무 수정',
+function editTaskModal(id) {
+  const isNew = !id;
+  const t = isNew ? BLANK_TASK() : state.tasks.find(x => x.id === id);
+  if (!t) return;
+  eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+
+  const who = currentStaff();
+  modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : '업무 수정',
     '<div class="field"><label class="fl">업무 내용</label>' +
       '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
 
