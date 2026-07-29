@@ -115,18 +115,20 @@ function writeView(st) {
   var task = {};
   (st.tasks || []).forEach(function (t) { task[t.id] = t; });
 
-  var rows = [['날짜', '직원', '업무', '완료', '완료시각', '메모']];
+  var rows = [['날짜', '직원', '업무', '상태', '진행', '완료시각', '메모']];
   var keys = Object.keys(st.checks || {}).sort().reverse();
 
   for (var i = 0; i < keys.length && rows.length <= VIEW_LIMIT; i++) {
     var c = st.checks[keys[i]];
     var t = task[c.taskId];
     if (!t) continue;
+    var p = progressOf(t, c);
     rows.push([
       c.date,
       staffName[t.staffId] || '',
       t.title || '',
-      c.done ? '완료' : '미완료',
+      statusOf(c, p),
+      p.total > 1 ? p.done + ' / ' + p.total + (p.unit || '') : '',
       c.at ? new Date(c.at) : '',
       c.note || ''
     ]);
@@ -134,12 +136,31 @@ function writeView(st) {
 
   var sh = sheet(VIEW_SHEET);
   sh.clear();
-  sh.getRange(1, 1, rows.length, 6).setValues(rows);
-  sh.getRange(1, 1, 1, 6).setFontWeight('bold');
+  sh.getRange(1, 1, rows.length, 7).setValues(rows);
+  sh.getRange(1, 1, 1, 7).setFontWeight('bold');
   sh.setFrozenRows(1);
   if (rows.length > 1) {
-    sh.getRange(2, 5, rows.length - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
+    sh.getRange(2, 6, rows.length - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm');
   }
+}
+
+/** 단계·수량을 반영한 진행률 */
+function progressOf(t, c) {
+  var steps = t.steps || [];
+  if (steps.length) {
+    var n = 0;
+    steps.forEach(function (s) { if (c.steps && c.steps[s.id]) n++; });
+    return { done: n, total: steps.length, unit: '단계' };
+  }
+  if (t.target) return { done: (c.count || 0), total: t.target, unit: t.unit || '건' };
+  return { done: c.done ? 1 : 0, total: 1, unit: '' };
+}
+
+/** 미착수 / 진행중 / 완료 / 막힘 */
+function statusOf(c, p) {
+  if (c.blocked) return '막힘';
+  if (c.done) return '완료';
+  return p.done > 0 ? '진행중' : '미착수';
 }
 
 /* ───────────────────────── 공통 ───────────────────────── */
