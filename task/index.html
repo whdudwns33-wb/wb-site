@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>업무지시서 · WB 웩슬러브레인센터</title>
+<meta name="theme-color" content="#1B3A5C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:       #1E9DD6;
+    --deep-blue:  #0F7AAB;
+    --navy:       #1B3A5C;
+    --coral:      #E85D4A;
+    --ivory:      #FAF8F3;
+    --dark-gray:  #2D2D2D;
+    --mid-gray:   #6B7280;
+    --line:       #E5E7EB;
+    --light-gray: #F3F4F6;
+    --white:      #FFFFFF;
+    --green:      #16A34A;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--dark-gray);
+    background: var(--ivory);
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: 40px;
+  }
+
+  button, input, select, textarea { font-family: inherit; font-size: 100%; color: inherit; }
+  button { cursor: pointer; border: none; background: none; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 14px; }
+
+  /* ─── 상단 바 ─── */
+  .topbar {
+    background: var(--navy);
+    color: var(--white);
+    padding: 12px 0;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .brand { font-size: 15px; font-weight: 900; letter-spacing: -0.02em; }
+  .brand span { color: var(--blue); }
+  .brand small { display: block; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 0; }
+  .whoami {
+    font-size: 12px; font-weight: 700;
+    background: rgba(255,255,255,0.14);
+    padding: 6px 12px; border-radius: 999px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .whoami i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); font-style: normal; }
+  .whoami.off i { background: var(--mid-gray); }
+
+  /* ─── 탭 ─── */
+  .tabs { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 55px; z-index: 40; }
+  .tabs .wrap { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .tabs .wrap::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 13px 14px; font-size: 14px; font-weight: 700; color: var(--mid-gray);
+    border-bottom: 3px solid transparent; white-space: nowrap;
+  }
+  .tab.on { color: var(--deep-blue); border-bottom-color: var(--blue); }
+
+  /* ─── 카드 공통 ─── */
+  .card {
+    background: var(--white); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px; margin-bottom: 12px;
+  }
+  .card-title { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--mid-gray); }
+  main { padding-top: 16px; }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .muted { color: var(--mid-gray); }
+  .small { font-size: 12px; }
+  .mb8 { margin-bottom: 8px; } .mb14 { margin-bottom: 14px; } .mt14 { margin-top: 14px; }
+
+  /* ─── 버튼 ─── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 16px; border-radius: 10px; font-size: 14px; font-weight: 700;
+    background: var(--light-gray); color: var(--dark-gray); border: 1px solid transparent;
+    transition: filter .15s;
+  }
+  .btn:active { filter: brightness(0.94); }
+  .btn-primary { background: var(--blue); color: var(--white); }
+  .btn-navy { background: var(--navy); color: var(--white); }
+  .btn-ghost { background: var(--white); border-color: var(--line); }
+  .btn-danger { background: #FEF2F2; color: var(--coral); }
+  .btn-sm { padding: 7px 11px; font-size: 12.5px; border-radius: 8px; }
+  .btn-block { display: flex; width: 100%; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* ─── 폼 ─── */
+  label.fl { display: block; font-size: 12.5px; font-weight: 700; color: var(--mid-gray); margin-bottom: 5px; }
+  .in {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+    border-radius: 10px; background: var(--white); font-size: 14.5px;
+  }
+  .in:focus { outline: 2px solid rgba(30,157,214,.35); outline-offset: -1px; border-color: var(--blue); }
+  textarea.in { resize: vertical; min-height: 62px; line-height: 1.6; }
+  .field { margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--white); font-size: 13px; font-weight: 700; color: var(--mid-gray);
+  }
+  .chip.on { background: var(--navy); border-color: var(--navy); color: var(--white); }
+  .chip.dow { min-width: 42px; padding: 8px 0; text-align: center; justify-content: center; }
+
+  /* ─── 날짜 네비 ─── */
+  .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .datenav .d { font-size: 17px; font-weight: 900; }
+  .datenav .d em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--blue); margin-left: 6px; }
+  .navbtn { width: 38px; height: 38px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); font-size: 16px; font-weight: 900; color: var(--mid-gray); }
+
+  /* ─── 진행률 ─── */
+  .prog { display: flex; align-items: center; gap: 14px; }
+  .ring {
+    width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 14px; font-weight: 900; color: var(--navy);
+    background: conic-gradient(var(--blue) calc(var(--p) * 1%), var(--light-gray) 0);
+    position: relative;
+  }
+  .ring::after { content: ''; position: absolute; inset: 7px; background: var(--white); border-radius: 50%; }
+  .ring b { position: relative; z-index: 1; font-size: 15px; }
+  .bar { height: 8px; border-radius: 99px; background: var(--light-gray); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--blue); border-radius: 99px; }
+
+  /* ─── 업무 항목 ─── */
+  .task {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 13px 4px; border-bottom: 1px solid var(--light-gray);
+  }
+  .task:last-child { border-bottom: none; }
+  .box {
+    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; margin-top: 1px;
+    border: 2px solid #D1D5DB; background: var(--white);
+    display: grid; place-items: center; color: transparent; font-size: 15px; font-weight: 900;
+    transition: all .15s;
+  }
+  .task.done .box { background: var(--blue); border-color: var(--blue); color: var(--white); }
+  .task-body { flex: 1; min-width: 0; }
+  .task-t { font-size: 15px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+  .task.done .task-t { color: var(--mid-gray); text-decoration: line-through; }
+  .task-d { font-size: 13px; color: var(--mid-gray); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--light-gray); color: var(--mid-gray); }
+  .tag.time { background: #EAF6FC; color: var(--deep-blue); }
+  .tag.high { background: #FEF2F2; color: var(--coral); }
+  .tag.ok   { background: #ECFDF5; color: var(--green); }
+  .note {
+    margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px;
+    border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory);
+  }
+  .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
+  .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
+
+  /* ─── 주간 그리드 ─── */
+  .weekwrap { overflow-x: auto; }
+  table.week { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  table.week th, table.week td { border: 1px solid var(--line); padding: 7px 6px; text-align: center; }
+  table.week th.n, table.week td.n { text-align: left; width: 40%; font-weight: 700; }
+  table.week thead th { background: var(--light-gray); font-size: 12px; color: var(--mid-gray); font-weight: 700; }
+  table.week thead th.today { background: var(--navy); color: var(--white); }
+  .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
+  .dot.d { background: var(--blue); color: var(--white); }
+  .dot.x { background: #FDE8E4; }
+  .dot.none { background: transparent; }
+
+  /* ─── 직원 현황 ─── */
+  .staffcard { display: flex; gap: 14px; align-items: center; }
+  .ava { width: 44px; height: 44px; border-radius: 12px; background: var(--navy); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex-shrink: 0; }
+
+  /* ─── 토스트 / 모달 ─── */
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+    background: var(--navy); color: var(--white); padding: 12px 20px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 700; opacity: 0; pointer-events: none; transition: all .2s; z-index: 200;
+    max-width: 90vw; text-align: center;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  .modal { position: fixed; inset: 0; background: rgba(27,58,92,.55); display: grid; place-items: center; padding: 16px; z-index: 150; }
+  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; max-height: 88vh; overflow-y: auto; }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+  .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #EAF6FC; color: var(--deep-blue); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span>WB</span> 업무지시서<small>Work Order &amp; Check</small></div>
+    <button class="whoami off" id="whoami"><i></i><span>—</span></button>
+  </div>
+</header>
+
+<nav class="tabs"><div class="wrap" id="tabs"></div></nav>
+
+<main class="wrap" id="view"></main>
+
+<div id="toast"></div>
+<div id="modalHost"></div>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════
+   1. 저장소
+   ══════════════════════════════════════════════════════ */
+const LS_KEY = 'wb_taskboard_v1';
+const DOW = ['일','월','화','수','목','금','토'];
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
+const now = () => Date.now();
+
+function blankState() {
+  return {
+    version: 1,
+    staff: [],
+    tasks: [],
+    checks: {},
+    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터' }
+  };
+}
+
+let state = blankState();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      state = Object.assign(blankState(), p);
+      state.settings = Object.assign(blankState().settings, p.settings || {});
+    }
+  } catch (e) { console.warn('load failed', e); }
+}
+
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { toast('저장 공간이 부족합니다'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   2. 날짜 유틸
+   ══════════════════════════════════════════════════════ */
+function ymd(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
+function today() { return ymd(new Date()); }
+function dowOf(s) { return parseYmd(s).getDay(); }
+function label(s) {
+  const d = parseYmd(s);
+  return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')';
+}
+function relLabel(s) {
+  const diff = Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
+  if (diff === 0) return '오늘';
+  if (diff === -1) return '어제';
+  if (diff === 1) return '내일';
+  return null;
+}
+function mondayOf(s) { const d = parseYmd(s); const off = (d.getDay() + 6) % 7; return addDays(s, -off); }
+
+/* ══════════════════════════════════════════════════════
+   3. 도메인 로직
+   ══════════════════════════════════════════════════════ */
+const liveStaff = () => state.staff.filter(s => !s.deleted);
+const staffById = id => state.staff.find(s => s.id === id);
+
+function occursOn(task, date) {
+  if (task.deleted) return false;
+  if (task.start && date < task.start) return false;
+  if (task.end && date > task.end) return false;
+  switch (task.repeat) {
+    case 'once':    return date === task.start;
+    case 'daily':   return true;
+    case 'weekday': { const w = dowOf(date); return w >= 1 && w <= 5; }
+    case 'days':    return (task.days || []).includes(dowOf(date));
+    default:        return false;
+  }
+}
+
+function tasksFor(staffId, date) {
+  return state.tasks
+    .filter(t => t.staffId === staffId && occursOn(t, date))
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
+                 || (b.priority === 'high') - (a.priority === 'high')
+                 || (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+const ckey = (taskId, date) => taskId + '|' + date;
+const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
+const isDone = (taskId, date) => !!(state.checks[ckey(taskId, date)] || {}).done;
+
+function setCheck(taskId, date, patch) {
+  const k = ckey(taskId, date);
+  const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '' };
+  const next = Object.assign({}, cur, patch, { updatedAt: now() });
+  state.checks[k] = next;
+  save();
+  queueSync();
+  return next;
+}
+
+function progress(staffId, date) {
+  const list = tasksFor(staffId, date);
+  const done = list.filter(t => isDone(t.id, date)).length;
+  return { done: done, total: list.length, pct: list.length ? Math.round(done / list.length * 100) : 0 };
+}
+
+function weekProgress(staffId, anchor) {
+  const mon = mondayOf(anchor);
+  let done = 0, total = 0;
+  for (let i = 0; i < 7; i++) {
+    const p = progress(staffId, addDays(mon, i));
+    done += p.done; total += p.total;
+  }
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+/** 오늘 이전까지 100% 달성이 연속된 일수 */
+function streak(staffId) {
+  let d = today(), n = 0;
+  for (let i = 0; i < 120; i++) {
+    const p = progress(staffId, d);
+    if (p.total === 0) { d = addDays(d, -1); continue; }
+    if (p.done < p.total) break;
+    n++; d = addDays(d, -1);
+  }
+  return n;
+}
+
+/* ══════════════════════════════════════════════════════
+   4. 동기화 (선택) — Google Apps Script 웹앱
+   ══════════════════════════════════════════════════════ */
+const sync = {
+  busy: false, dirty: false, last: null, timer: null,
+
+  enabled() { return !!state.settings.syncUrl; },
+
+  merge(remote) {
+    if (!remote) return;
+    const byId = (arr) => { const m = {}; (arr || []).forEach(x => { m[x.id] = x; }); return m; };
+    ['staff', 'tasks'].forEach(key => {
+      const mine = byId(state[key]), theirs = byId(remote[key]);
+      const out = {};
+      Object.keys(Object.assign({}, mine, theirs)).forEach(id => {
+        const a = mine[id], b = theirs[id];
+        out[id] = (!a) ? b : (!b) ? a : ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a);
+      });
+      state[key] = Object.values(out);
+    });
+    const rc = remote.checks || {};
+    Object.keys(rc).forEach(k => {
+      const a = state.checks[k], b = rc[k];
+      if (!a || (b.updatedAt || 0) > (a.updatedAt || 0)) state.checks[k] = b;
+    });
+    save();
+  },
+
+  async run() {
+    if (!this.enabled() || this.busy) return;
+    this.busy = true; paintStatus();
+    try {
+      const res = await fetch(state.settings.syncUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          secret: state.settings.syncSecret || '',
+          state: { staff: state.staff, tasks: state.tasks, checks: state.checks }
+        })
+      });
+      const data = await res.json();
+      if (!data || data.ok !== true) throw new Error((data && data.error) || '동기화 거부됨');
+      this.merge(data.state);
+      this.last = now(); this.dirty = false;
+      render();
+    } catch (e) {
+      console.warn('sync', e);
+      this.dirty = true;
+      if (this.loud) toast('동기화 실패 — 주소·비밀키를 확인하세요');
+    } finally {
+      this.busy = false; this.loud = false; paintStatus();
+    }
+  }
+};
+
+function queueSync() {
+  if (!sync.enabled()) return;
+  sync.dirty = true;
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(() => sync.run(), 1200);
+}
+
+/* ══════════════════════════════════════════════════════
+   5. 세션 / 라우팅
+   ══════════════════════════════════════════════════════ */
+const session = {
+  get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
+  get isStaffLink() { return !!this.staffId; },
+  get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'; },
+  unlock() { sessionStorage.setItem('wb_admin', '1'); },
+  lock() { sessionStorage.removeItem('wb_admin'); }
+};
+
+let route = 'today';
+let cursor = today();          // 보고 있는 날짜
+let cursorPinned = false;      // 사용자가 직접 날짜를 옮겼는지
+let viewStaff = '';            // 관리자가 보는 대상 직원
+
+function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
+window.addEventListener('hashchange', () => {
+  const r = location.hash.replace('#/', '');
+  if (r && r !== route) { route = r; render(); }
+});
+
+/* ══════════════════════════════════════════════════════
+   6. 렌더 헬퍼
+   ══════════════════════════════════════════════════════ */
+const $ = sel => document.querySelector(sel);
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('on'), 2400);
+}
+function repeatLabel(t) {
+  if (t.repeat === 'once')    return label(t.start) + ' 1회';
+  if (t.repeat === 'daily')   return '매일';
+  if (t.repeat === 'weekday') return '평일(월~금)';
+  if (t.repeat === 'days')    return '매주 ' + (t.days || []).map(d => DOW[d]).join('·');
+  return '';
+}
+function initials(name) { return String(name || '?').trim().slice(0, 2); }
+
+function paintStatus() {
+  const el = $('#whoami');
+  const me = currentStaff();
+  let text, on = false;
+  if (session.isStaffLink) { text = me ? me.name + ' 선생님' : '알 수 없는 링크'; on = !!me; }
+  else if (session.isAdmin) { text = '원장 모드'; on = true; }
+  else { text = '잠김'; }
+  if (sync.busy) text += ' · 동기화중';
+  else if (sync.enabled() && sync.dirty) text += ' · 대기';
+  el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
+  el.classList.toggle('off', !on);
+}
+
+function currentStaff() {
+  if (session.isStaffLink) return staffById(session.staffId);
+  return staffById(viewStaff) || liveStaff()[0] || null;
+}
+
+/* ══════════════════════════════════════════════════════
+   7. 뷰
+   ══════════════════════════════════════════════════════ */
+function render() {
+  paintStatus();
+  renderTabs();
+
+  const v = $('#view');
+  if (session.isStaffLink && !staffById(session.staffId)) {
+    v.innerHTML = '<div class="card"><div class="empty"><b>🔗</b>이 링크에 연결된 직원 정보가 없습니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
+    return;
+  }
+  if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
+
+  const map = {
+    today: viewToday, week: viewWeek, write: viewWrite,
+    board: viewBoard, staff: viewStaff_, settings: viewSettings
+  };
+  v.innerHTML = (map[route] || viewToday)();
+}
+
+function renderTabs() {
+  const tabs = session.isStaffLink
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너']]
+    : session.isAdmin
+      ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황'], ['staff', '직원 관리'], ['settings', '설정']]
+      : [];
+  $('#tabs').innerHTML = tabs.map(([k, t]) =>
+    '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t + '</button>').join('');
+}
+
+/* ── 잠금 화면 ── */
+function viewLock() {
+  const first = !state.settings.adminPin;
+  return '<div class="card mt14">' +
+    '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
+    '<div class="card-sub mb14">' + (first
+      ? '직원에게 나가는 링크와 달리, 이 화면은 지시서를 만들고 현황을 보는 원장 전용입니다. 4자리 이상 비밀번호를 정해 주세요.'
+      : '비밀번호를 입력하면 지시서 작성과 현황 확인 화면이 열립니다.') + '</div>' +
+    '<div class="field"><input class="in" id="pin" type="password" inputmode="numeric" placeholder="비밀번호" autocomplete="off"></div>' +
+    '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
+      (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
+    '<hr class="sep">' +
+    '<div class="hint">직원분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
+  '</div>';
+}
+
+/* ── 오늘 ── */
+function viewToday() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+
+  const rel = relLabel(cursor);
+  const list = tasksFor(me.id, cursor);
+  const p = progress(me.id, cursor);
+  const editable = session.isStaffLink || session.isAdmin;
+
+  let h = '';
+
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
+    '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
+    '<button class="navbtn" data-act="day" data-n="1">›</button>' +
+  '</div>';
+
+  h += '<div class="card"><div class="prog">' +
+    '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
+    '<div style="flex:1">' +
+      '<div class="card-title">' + esc(me.name) + ' 선생님</div>' +
+      '<div class="card-sub mb8">지시 ' + p.total + '건 중 <b>' + p.done + '건 완료</b>' +
+        (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '') + '</div>' +
+      '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
+    '</div></div></div>';
+
+  if (!list.length) {
+    h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
+  } else {
+    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable)).join('') + '</div>';
+  }
+
+  if (session.isStaffLink) {
+    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
+      '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
+  }
+  return h;
+}
+
+function taskRow(t, date, editable) {
+  const c = getCheck(t.id, date);
+  const done = !!(c && c.done);
+  return '<div class="task ' + (done ? 'done' : '') + '" data-task="' + t.id + '">' +
+    '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '"' : 'disabled') + '>✓</button>' +
+    '<div class="task-body">' +
+      '<div class="task-t">' + esc(t.title) + '</div>' +
+      (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
+      '<div class="meta">' +
+        (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+        (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+        '<span class="tag">' + esc(repeatLabel(t)) + '</span>' +
+        (done && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+      '</div>' +
+      (editable
+        ? '<input class="note" data-act="note" data-id="' + t.id + '" value="' + esc(c && c.note || '') + '" placeholder="메모 · 미완료 사유를 남기세요">'
+        : (c && c.note ? '<div class="note">' + esc(c.note) + '</div>' : '')) +
+    '</div></div>';
+}
+
+function staffSwitcher(activeId) {
+  const list = liveStaff();
+  if (list.length < 2) return '';
+  return '<div class="chips mb14">' + list.map(s =>
+    '<button class="chip ' + (s.id === activeId ? 'on' : '') + '" data-act="pickstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>'
+  ).join('') + '</div>';
+}
+
+function emptyStaffCard() {
+  return '<div class="card"><div class="empty"><b>👥</b>먼저 직원을 등록해 주세요.</div>' +
+    '<button class="btn btn-primary btn-block" data-go="staff">직원 등록하러 가기</button></div>';
+}
+
+/* ── 주간 플래너 ── */
+function viewWeek() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const mon = mondayOf(cursor);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const rows = {};
+  days.forEach(d => tasksFor(me.id, d).forEach(t => { rows[t.id] = t; }));
+  const list = Object.values(rows);
+  const wp = weekProgress(me.id, cursor);
+  const editable = session.isStaffLink || session.isAdmin;
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="week" data-n="-1">‹</button>' +
+    '<div class="d">' + label(mon).replace(/\s\(.\)/, '') + ' ~ ' + label(days[6]).replace(/\s\(.\)/, '') + '</div>' +
+    '<button class="navbtn" data-act="week" data-n="1">›</button>' +
+  '</div>';
+
+  h += '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">이번 주 달성률</div>' +
+    '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
+    '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
+
+  if (!list.length) return h + '<div class="card"><div class="empty"><b>📋</b>이 주에 지시된 업무가 없습니다.</div></div>';
+
+  h += '<div class="card weekwrap"><table class="week"><thead><tr><th class="n">업무</th>' +
+    days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    list.map(t => '<tr><td class="n">' + esc(t.title) + '</td>' +
+      days.map(d => {
+        if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
+        const done = isDone(t.id, d);
+        const past = d < today();
+        const cls = done ? 'd' : (past ? 'x' : '');
+        return '<td><button class="dot ' + cls + '" ' +
+          (editable ? 'data-act="toggleday" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
+      }).join('') + '</tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="hint">파란칸 = 완료 · 붉은칸 = 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
+  return h;
+}
+
+/* ── 지시서 작성 ── */
+let draft = [];   // 발행 전 임시 업무 목록
+
+function viewWrite() {
+  const list = liveStaff();
+  if (!list.length) return emptyStaffCard();
+
+  return '<div class="card">' +
+    '<div class="card-title">업무 지시 추가</div>' +
+    '<div class="card-sub mb14">한 항목씩 담고, 마지막에 한 번에 발행합니다.</div>' +
+
+    '<div class="field"><label class="fl">받는 직원 (여러 명 선택 가능)</label>' +
+      '<div class="chips" id="wStaff">' + list.map(s =>
+        '<button type="button" class="chip ' + (wForm.staff.includes(s.id) ? 'on' : '') + '" data-act="wstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field"><label class="fl">업무 내용</label>' +
+      '<input class="in" id="wTitle" placeholder="예) 3시 김OO 학생 단어시험 채점 후 결과 입력"></div>' +
+
+    '<div class="field"><label class="fl">상세 지시 · 참고사항 (선택)</label>' +
+      '<textarea class="in" id="wDetail" placeholder="예) 오답 5개 이상이면 재시험, 결과는 클래스카드에 입력"></textarea></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시간 (선택)</label><input class="in" id="wTime" type="time"></div>' +
+      '<div class="field"><label class="fl">중요도</label><select class="in" id="wPri">' +
+        '<option value="normal">보통</option><option value="high">중요</option></select></div>' +
+    '</div>' +
+
+    '<div class="field"><label class="fl">반복</label>' +
+      '<div class="chips" id="wRepeat">' +
+        [['once', '한 번'], ['daily', '매일'], ['weekday', '평일'], ['days', '요일 지정']].map(([v, t]) =>
+          '<button type="button" class="chip ' + (wForm.repeat === v ? 'on' : '') + '" data-act="wrepeat" data-v="' + v + '">' + t + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field" id="wDaysWrap" style="display:' + (wForm.repeat === 'days' ? '' : 'none') + '"><label class="fl">요일 선택</label>' +
+      '<div class="chips">' + DOW.map((d, i) =>
+        '<button type="button" class="chip dow ' + (wForm.days.includes(i) ? 'on' : '') + '" data-act="wdow" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시작일</label><input class="in" id="wStart" type="date" value="' + esc(wForm.start) + '"></div>' +
+      '<div class="field" id="wEndWrap" style="display:' + (wForm.repeat === 'once' ? 'none' : '') + '"><label class="fl">종료일 (선택)</label>' +
+        '<input class="in" id="wEnd" type="date" value="' + esc(wForm.end) + '"></div>' +
+    '</div>' +
+
+    '<button class="btn btn-ghost btn-block" data-act="wadd">＋ 목록에 담기</button>' +
+  '</div>' +
+
+  (draft.length ? draftCard() : '');
+}
+
+function draftCard() {
+  return '<div class="card">' +
+    '<div class="between mb8"><div class="card-title">발행 대기 ' + draft.length + '건</div>' +
+    '<button class="btn btn-sm btn-danger" data-act="wclear">전체 비우기</button></div>' +
+    draft.map((d, i) =>
+      '<div class="task"><div class="task-body">' +
+        '<div class="task-t">' + esc(d.title) + '</div>' +
+        '<div class="meta">' +
+          '<span class="tag">' + esc(d.names.join(', ')) + '</span>' +
+          (d.time ? '<span class="tag time">' + esc(d.time) + '</span>' : '') +
+          (d.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+          '<span class="tag">' + esc(repeatLabel(d)) + '</span>' +
+        '</div></div>' +
+        '<button class="btn btn-sm btn-danger" data-act="wdel" data-i="' + i + '">삭제</button>' +
+      '</div>').join('') +
+    '<hr class="sep">' +
+    '<button class="btn btn-primary btn-block mb8" data-act="wpublish">지시서 발행하기</button>' +
+    '<div class="hint">발행하면 각 직원의 개인 링크에 즉시 반영됩니다. 발행 후 카카오톡으로 보낼 지시서 문구를 만들어 드립니다.</div>' +
+  '</div>';
+}
+
+/* ── 직원 현황 ── */
+function viewBoard() {
+  const list = liveStaff();
+  if (!list.length) return emptyStaffCard();
+
+  let h = '<div class="datenav">' +
+    '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
+    '<div class="d">' + label(cursor) + (relLabel(cursor) ? '<em>' + relLabel(cursor) + '</em>' : '') + '</div>' +
+    '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  const all = list.reduce((a, s) => { const p = progress(s.id, cursor); a.done += p.done; a.total += p.total; return a; }, { done: 0, total: 0 });
+  const pct = all.total ? Math.round(all.done / all.total * 100) : 0;
+  h += '<div class="card"><div class="prog">' +
+    '<div class="ring" style="--p:' + pct + '"><b>' + pct + '%</b></div>' +
+    '<div style="flex:1"><div class="card-title">전체 수행률</div>' +
+    '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
+    '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div></div>';
+
+  h += list.map(s => {
+    const p = progress(s.id, cursor);
+    const w = weekProgress(s.id, cursor);
+    const st = streak(s.id);
+    const pend = tasksFor(s.id, cursor).filter(t => !isDone(t.id, cursor));
+    const notes = tasksFor(s.id, cursor)
+      .map(t => ({ t: t, c: getCheck(t.id, cursor) }))
+      .filter(x => x.c && x.c.note);
+
+    return '<div class="card">' +
+      '<div class="staffcard mb14">' +
+        '<div class="ava">' + esc(initials(s.name)) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="between"><div class="card-title">' + esc(s.name) + '</div>' +
+            '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
+          '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
+          '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
+        '</div>' +
+      '</div>' +
+      (pend.length
+        ? '<div class="small" style="font-weight:700;margin-bottom:6px">미완료 ' + pend.length + '건</div>' +
+          pend.map(t => '<div class="small muted">· ' + esc(t.title) + (t.time ? ' (' + esc(t.time) + ')' : '') + '</div>').join('')
+        : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
+      (notes.length
+        ? '<hr class="sep">' + notes.map(x =>
+            '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
+        : '') +
+      '<hr class="sep">' +
+      '<div class="row" style="gap:8px">' +
+        '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  return h;
+}
+
+/* ── 직원 관리 ── */
+function viewStaff_() {
+  const list = liveStaff();
+  return '<div class="card">' +
+    '<div class="card-title">직원 등록</div>' +
+    '<div class="card-sub mb14">등록하면 직원별 개인 링크가 만들어집니다. 그 링크만 카카오톡으로 보내주세요.</div>' +
+    '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
+    '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
+  '</div>' +
+  (list.length
+    ? list.map(s => '<div class="card"><div class="between">' +
+        '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
+        '<div><div class="card-title">' + esc(s.name) + '</div>' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건</div></div></div>' +
+        '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
+        '<hr class="sep">' +
+        '<div class="row" style="gap:8px">' +
+          '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
+        '</div></div>').join('')
+    : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
+}
+
+/* ── 설정 ── */
+function viewSettings() {
+  const s = state.settings;
+  const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
+  return '<div class="card">' +
+    '<div class="card-title">여러 기기에서 함께 보기</div>' +
+    '<div class="card-sub mb14">비워두면 이 기기에만 저장됩니다(직원 체크를 원장님 폰에서 볼 수 없음). ' +
+      '구글 스프레드시트를 연결하면 직원이 체크하는 즉시 원장님 화면에서 확인됩니다. 연결 방법은 <b>task/README.md</b>에 있습니다.</div>' +
+    '<div class="field"><label class="fl">Apps Script 웹앱 주소</label>' +
+      '<input class="in" id="cfgUrl" value="' + esc(s.syncUrl) + '" placeholder="https://script.google.com/macros/s/.../exec"></div>' +
+    '<div class="field"><label class="fl">비밀키 (Apps Script에 넣은 값과 동일하게)</label>' +
+      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="예) wb-2026"></div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
+      '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button>' +
+    '</div>' +
+    '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">백업</div>' +
+    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
+      '<button class="btn btn-ghost" data-act="import">가져오기</button>' +
+    '</div>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">관리 비밀번호</div>' +
+    '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
+    '<div class="field"><input class="in" id="newPin" type="password" placeholder="새 비밀번호"></div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-primary" data-act="changepin">변경</button>' +
+      '<button class="btn btn-ghost" data-act="logout">잠그기</button>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ══════════════════════════════════════════════════════
+   8. 모달
+   ══════════════════════════════════════════════════════ */
+function modal(title, bodyHtml, footHtml) {
+  $('#modalHost').innerHTML =
+    '<div class="modal" data-act="closemodal"><div class="modal-box" data-stop="1">' +
+      '<div class="between mb14"><div class="card-title">' + esc(title) + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
+      bodyHtml + (footHtml || '') +
+    '</div></div>';
+}
+function closeModal() { $('#modalHost').innerHTML = ''; }
+
+function staffLink(id) {
+  return location.origin + location.pathname + '?u=' + id;
+}
+
+function orderText(staffId, date) {
+  const s = staffById(staffId);
+  const list = tasksFor(staffId, date);
+  let txt = '📋 ' + label(date) + ' 업무지시서\n' + (s ? s.name + ' 선생님\n' : '') + '─────────\n';
+  txt += list.length
+    ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + t.title + (t.priority === 'high' ? ' ⭐' : '') +
+        (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '')).join('\n')
+    : '(지시된 업무 없음)';
+  txt += '\n─────────\n확인 후 체크 부탁드립니다.\n' + staffLink(staffId);
+  return txt;
+}
+
+function reportText(staffId, date) {
+  const s = staffById(staffId);
+  const list = tasksFor(staffId, date);
+  const p = progress(staffId, date);
+  let txt = '✅ ' + label(date) + ' 업무 수행 보고\n' + (s ? s.name + '\n' : '') +
+    '완료 ' + p.done + '/' + p.total + '건 (' + p.pct + '%)\n─────────\n';
+  txt += list.map(t => {
+    const c = getCheck(t.id, date);
+    return (c && c.done ? '✅ ' : '⬜ ') + t.title + (c && c.note ? '\n   · ' + c.note : '');
+  }).join('\n') || '(지시된 업무 없음)';
+  return txt;
+}
+
+async function copy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('복사했습니다');
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('복사했습니다'); }
+    catch (e2) { toast('복사 실패 — 직접 선택해 주세요'); }
+    document.body.removeChild(ta);
+  }
+}
+
+function showText(title, text) {
+  modal(title,
+    '<textarea class="in" rows="12" id="mText" readonly>' + esc(text) + '</textarea>',
+    '<button class="btn btn-primary btn-block mt14" data-act="copytext">복사하기</button>');
+}
+
+function manageTasks(staffId) {
+  const s = staffById(staffId);
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  modal((s ? s.name : '') + ' 지시 목록',
+    list.length
+      ? list.map(t => '<div class="task"><div class="task-body">' +
+          '<div class="task-t">' + esc(t.title) + '</div>' +
+          '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
+          (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') + '</div></div>' +
+          '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button></div>').join('')
+      : '<div class="empty">지시된 업무가 없습니다.</div>');
+}
+
+/* ══════════════════════════════════════════════════════
+   9. 이벤트
+   ══════════════════════════════════════════════════════ */
+const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '' };
+
+document.addEventListener('click', ev => {
+  const goEl = ev.target.closest('[data-go]');
+  if (goEl) { go(goEl.dataset.go); return; }
+
+  const el = ev.target.closest('[data-act]');
+  if (!el) return;
+  // 모달 바깥(어두운 배경)을 눌렀을 때만 닫히도록 — 내용 클릭은 무시
+  if (el.dataset.act === 'closemodal'
+      && ev.target.closest('.modal-box')
+      && !ev.target.closest('button[data-act="closemodal"]')) return;
+
+  const act = el.dataset.act;
+  const id = el.dataset.id;
+
+  switch (act) {
+
+    /* 잠금 */
+    case 'setpin': {
+      const v = ($('#pin').value || '').trim();
+      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
+      state.settings.adminPin = v; save(); session.unlock(); go('staff'); toast('설정되었습니다');
+      break;
+    }
+    case 'login': {
+      if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
+      session.unlock(); render(); toast('환영합니다');
+      break;
+    }
+    case 'logout': session.lock(); render(); break;
+    case 'changepin': {
+      const v = ($('#newPin').value || '').trim();
+      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
+      state.settings.adminPin = v; save(); toast('변경되었습니다');
+      break;
+    }
+
+    /* 날짜 이동 */
+    case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
+    case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
+
+    /* 체크 */
+    case 'toggle': {
+      const c = getCheck(id, cursor);
+      setCheck(id, cursor, { done: !(c && c.done), at: (c && c.done) ? null : now() });
+      render();
+      break;
+    }
+    case 'toggleday': {
+      const d = el.dataset.date, c = getCheck(id, d);
+      setCheck(id, d, { done: !(c && c.done), at: (c && c.done) ? null : now() });
+      render();
+      break;
+    }
+
+    /* 직원 */
+    case 'pickstaff':   viewStaff = id; render(); break;
+    case 'openstaff':   viewStaff = id; go('today'); break;
+    case 'addstaff': {
+      const name = ($('#sName').value || '').trim();
+      if (!name) return toast('이름을 입력해 주세요');
+      state.staff.push({ id: uid(), name: name, createdAt: now(), updatedAt: now(), deleted: false });
+      save(); queueSync(); render(); toast(name + ' 등록 완료');
+      break;
+    }
+    case 'delstaff': {
+      const s = staffById(id);
+      if (!confirm((s ? s.name : '') + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
+      s.deleted = true; s.updatedAt = now();
+      save(); queueSync(); render();
+      break;
+    }
+    case 'copylink': copy(staffLink(id)); break;
+    case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
+    case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
+    case 'copytext': copy($('#mText').value); break;
+    case 'managetasks': manageTasks(id); break;
+    case 'deltask': {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t || !confirm('이 지시를 중단할까요? 지난 기록은 유지됩니다.')) return;
+      t.deleted = true; t.updatedAt = now();
+      save(); queueSync(); closeModal(); render(); toast('중단했습니다');
+      break;
+    }
+
+    /* 지시서 작성 */
+    case 'wstaff': {
+      const i = wForm.staff.indexOf(id);
+      if (i < 0) wForm.staff.push(id); else wForm.staff.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'wrepeat': {
+      wForm.repeat = el.dataset.v;
+      document.querySelectorAll('#wRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === wForm.repeat));
+      $('#wDaysWrap').style.display = wForm.repeat === 'days' ? '' : 'none';
+      $('#wEndWrap').style.display  = wForm.repeat === 'once' ? 'none' : '';
+      break;
+    }
+    case 'wdow': {
+      const d = Number(el.dataset.d), i = wForm.days.indexOf(d);
+      if (i < 0) wForm.days.push(d); else wForm.days.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'wadd': {
+      const title = ($('#wTitle').value || '').trim();
+      if (!wForm.staff.length) return toast('받는 직원을 선택해 주세요');
+      if (!title) return toast('업무 내용을 입력해 주세요');
+      if (wForm.repeat === 'days' && !wForm.days.length) return toast('요일을 선택해 주세요');
+      wForm.start = $('#wStart').value || today();
+      wForm.end = (wForm.repeat === 'once' ? '' : ($('#wEnd').value || ''));
+      draft.push({
+        title: title,
+        detail: ($('#wDetail').value || '').trim(),
+        time: $('#wTime').value || '',
+        priority: $('#wPri').value,
+        repeat: wForm.repeat,
+        days: wForm.days.slice().sort(),
+        start: wForm.start,
+        end: wForm.end,
+        staffIds: wForm.staff.slice(),
+        names: wForm.staff.map(x => (staffById(x) || {}).name).filter(Boolean)
+      });
+      render();
+      toast('목록에 담았습니다 (' + draft.length + '건)');
+      break;
+    }
+    case 'wdel': draft.splice(Number(el.dataset.i), 1); render(); break;
+    case 'wclear': draft = []; render(); break;
+    case 'wpublish': {
+      if (!draft.length) return;
+      const gid = uid();
+      const touched = new Set();
+      draft.forEach(d => d.staffIds.forEach(sid => {
+        state.tasks.push({
+          id: uid(), groupId: gid, staffId: sid,
+          title: d.title, detail: d.detail, time: d.time, priority: d.priority,
+          repeat: d.repeat, days: d.days, start: d.start, end: d.end,
+          createdAt: now(), updatedAt: now(), deleted: false
+        });
+        touched.add(sid);
+      }));
+      const n = draft.length;
+      draft = [];
+      save(); queueSync(); render();
+      toast(n + '건 발행 완료');
+      const first = [...touched][0];
+      if (first) setTimeout(() => showText('카카오톡 지시서 문구', orderText(first, today())), 400);
+      break;
+    }
+
+    /* 설정 */
+    case 'savecfg': {
+      state.settings.syncUrl = ($('#cfgUrl').value || '').trim();
+      state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
+      save(); toast('저장했습니다');
+      if (state.settings.syncUrl) { sync.loud = true; sync.run(); }
+      break;
+    }
+    case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
+    case 'export': {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'wb-업무지시서-' + today() + '.json';
+      a.click(); URL.revokeObjectURL(a.href);
+      break;
+    }
+    case 'import': {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json';
+      inp.onchange = () => {
+        const f = inp.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const p = JSON.parse(r.result);
+            if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
+            if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
+            state = Object.assign(blankState(), p);
+            save(); render(); toast('불러왔습니다');
+          } catch (e) { toast('파일을 읽을 수 없습니다'); }
+        };
+        r.readAsText(f);
+      };
+      inp.click();
+      break;
+    }
+    case 'closemodal': closeModal(); break;
+  }
+});
+
+/* 메모 입력 — 입력이 멈추면 저장 */
+let noteTimer = null;
+document.addEventListener('input', ev => {
+  const el = ev.target.closest('[data-act="note"]');
+  if (!el) return;
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => {
+    setCheck(el.dataset.id, cursor, { note: el.value });
+    toast('메모 저장됨');
+  }, 700);
+});
+
+/* 엔터로 제출 */
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  const t = ev.target;
+  if (t.id === 'pin')    document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
+  if (t.id === 'sName')  document.querySelector('[data-act="addstaff"]')?.click();
+});
+
+/* 복귀 시 최신화 */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }  // 자정을 넘겼을 때
+  sync.run();
+});
+
+/* ══════════════════════════════════════════════════════
+   10. 시작
+   ══════════════════════════════════════════════════════ */
+load();
+const h = location.hash.replace('#/', '');
+if (h) route = h;
+if (session.isStaffLink) route = (route === 'week') ? 'week' : 'today';
+render();
+
+if (sync.enabled()) {
+  sync.run();
+  setInterval(() => sync.run(), 45000);
+}
+</script>
+</body>
+</html>
