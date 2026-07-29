@@ -24,6 +24,7 @@
     --light-gray: #F3F4F6;
     --white:      #FFFFFF;
     --green:      #16A34A;
+    --amber:      #D97706;
   }
 
   body {
@@ -32,7 +33,7 @@
     background: var(--ivory);
     line-height: 1.6;
     -webkit-text-size-adjust: 100%;
-    padding-bottom: 40px;
+    padding-bottom: 48px;
   }
 
   button, input, select, textarea { font-family: inherit; font-size: 100%; color: inherit; }
@@ -41,21 +42,14 @@
   .wrap { max-width: 760px; margin: 0 auto; padding: 0 14px; }
 
   /* ─── 상단 바 ─── */
-  .topbar {
-    background: var(--navy);
-    color: var(--white);
-    padding: 12px 0;
-    position: sticky; top: 0; z-index: 50;
-  }
+  .topbar { background: var(--navy); color: var(--white); padding: 12px 0; position: sticky; top: 0; z-index: 50; }
   .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .brand { font-size: 15px; font-weight: 900; letter-spacing: -0.02em; }
   .brand span { color: var(--blue); }
   .brand small { display: block; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 0; }
   .whoami {
-    font-size: 12px; font-weight: 700;
-    background: rgba(255,255,255,0.14);
-    padding: 6px 12px; border-radius: 999px;
-    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.14);
+    padding: 6px 12px; border-radius: 999px; display: flex; align-items: center; gap: 6px;
   }
   .whoami i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); font-style: normal; }
   .whoami.off i { background: var(--mid-gray); }
@@ -66,20 +60,24 @@
   .tabs .wrap::-webkit-scrollbar { display: none; }
   .tab {
     padding: 13px 14px; font-size: 14px; font-weight: 700; color: var(--mid-gray);
-    border-bottom: 3px solid transparent; white-space: nowrap;
+    border-bottom: 3px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 5px;
   }
   .tab.on { color: var(--deep-blue); border-bottom-color: var(--blue); }
-
-  /* ─── 카드 공통 ─── */
-  .card {
-    background: var(--white); border: 1px solid var(--line);
-    border-radius: 14px; padding: 16px; margin-bottom: 12px;
+  .badge {
+    background: var(--coral); color: var(--white); font-size: 11px; font-weight: 900;
+    min-width: 18px; height: 18px; border-radius: 999px; padding: 0 5px;
+    display: inline-flex; align-items: center; justify-content: center;
   }
+
+  /* ─── 카드 ─── */
+  .card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card.alert { border-color: var(--coral); background: #FFF9F8; }
   .card-title { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
   .card-sub { font-size: 13px; color: var(--mid-gray); }
   main { padding-top: 16px; }
 
   .row { display: flex; align-items: center; gap: 10px; }
+  .wraprow { flex-wrap: wrap; }
   .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .muted { color: var(--mid-gray); }
   .small { font-size: 12px; }
@@ -90,33 +88,27 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 11px 16px; border-radius: 10px; font-size: 14px; font-weight: 700;
     background: var(--light-gray); color: var(--dark-gray); border: 1px solid transparent;
-    transition: filter .15s;
   }
   .btn:active { filter: brightness(0.94); }
   .btn-primary { background: var(--blue); color: var(--white); }
   .btn-navy { background: var(--navy); color: var(--white); }
   .btn-ghost { background: var(--white); border-color: var(--line); }
   .btn-danger { background: #FEF2F2; color: var(--coral); }
+  .btn-warn { background: #FFF7ED; color: var(--amber); border: 1px solid #FDE8CC; }
   .btn-sm { padding: 7px 11px; font-size: 12.5px; border-radius: 8px; }
   .btn-block { display: flex; width: 100%; }
   .btn:disabled { opacity: .5; cursor: default; }
 
   /* ─── 폼 ─── */
   label.fl { display: block; font-size: 12.5px; font-weight: 700; color: var(--mid-gray); margin-bottom: 5px; }
-  .in {
-    width: 100%; padding: 11px 12px; border: 1px solid var(--line);
-    border-radius: 10px; background: var(--white); font-size: 14.5px;
-  }
+  .in { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-size: 14.5px; }
   .in:focus { outline: 2px solid rgba(30,157,214,.35); outline-offset: -1px; border-color: var(--blue); }
   textarea.in { resize: vertical; min-height: 62px; line-height: 1.6; }
   .field { margin-bottom: 12px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 7px; }
-  .chip {
-    padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line);
-    background: var(--white); font-size: 13px; font-weight: 700; color: var(--mid-gray);
-  }
+  .chip { padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); font-size: 13px; font-weight: 700; color: var(--mid-gray); }
   .chip.on { background: var(--navy); border-color: var(--navy); color: var(--white); }
   .chip.dow { min-width: 42px; padding: 8px 0; text-align: center; justify-content: center; }
 
@@ -130,7 +122,7 @@
   .prog { display: flex; align-items: center; gap: 14px; }
   .ring {
     width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
-    display: grid; place-items: center; font-size: 14px; font-weight: 900; color: var(--navy);
+    display: grid; place-items: center; font-weight: 900; color: var(--navy);
     background: conic-gradient(var(--blue) calc(var(--p) * 1%), var(--light-gray) 0);
     position: relative;
   }
@@ -138,46 +130,64 @@
   .ring b { position: relative; z-index: 1; font-size: 15px; }
   .bar { height: 8px; border-radius: 99px; background: var(--light-gray); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--blue); border-radius: 99px; }
+  .bar.mini { height: 5px; }
+  .bar.doing i { background: var(--amber); }
 
   /* ─── 업무 항목 ─── */
-  .task {
-    display: flex; gap: 12px; align-items: flex-start;
-    padding: 13px 4px; border-bottom: 1px solid var(--light-gray);
-  }
+  .task { display: flex; gap: 12px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid var(--light-gray); }
   .task:last-child { border-bottom: none; }
+  .task.isblocked { background: #FFF9F8; border-radius: 10px; padding-left: 10px; padding-right: 10px; }
   .box {
     width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; margin-top: 1px;
     border: 2px solid #D1D5DB; background: var(--white);
     display: grid; place-items: center; color: transparent; font-size: 15px; font-weight: 900;
-    transition: all .15s;
   }
   .task.done .box { background: var(--blue); border-color: var(--blue); color: var(--white); }
+  .task.doing .box { border-color: var(--amber); }
   .task-body { flex: 1; min-width: 0; }
   .task-t { font-size: 15px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
   .task.done .task-t { color: var(--mid-gray); text-decoration: line-through; }
   .task-d { font-size: 13px; color: var(--mid-gray); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
-  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; align-items: center; }
   .tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--light-gray); color: var(--mid-gray); }
   .tag.time { background: #EAF6FC; color: var(--deep-blue); }
   .tag.high { background: #FEF2F2; color: var(--coral); }
   .tag.ok   { background: #ECFDF5; color: var(--green); }
-  .note {
-    margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px;
-    border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory);
-  }
+  .tag.doing{ background: #FFF7ED; color: var(--amber); }
+  .tag.blk  { background: var(--coral); color: var(--white); }
+  .tag.carry{ background: #FEF2F2; color: var(--coral); }
+  .note { margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
   .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
+
+  /* ─── 단계 / 가이드 ─── */
+  .opener { font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
+  .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
+  .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
+  .step { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; font-size: 13.5px; }
+  .sbox {
+    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 1px;
+    border: 2px solid #D1D5DB; background: var(--white);
+    display: grid; place-items: center; color: transparent; font-size: 12px; font-weight: 900;
+  }
+  .step.on .sbox { background: var(--green); border-color: var(--green); color: var(--white); }
+  .step.on span { color: var(--mid-gray); text-decoration: line-through; }
+  .counter { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+  .counter input { width: 74px; text-align: center; padding: 8px; }
 
   /* ─── 주간 그리드 ─── */
   .weekwrap { overflow-x: auto; }
   table.week { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
   table.week th, table.week td { border: 1px solid var(--line); padding: 7px 6px; text-align: center; }
-  table.week th.n, table.week td.n { text-align: left; width: 40%; font-weight: 700; }
+  table.week th.n, table.week td.n { text-align: left; width: 38%; font-weight: 700; }
   table.week thead th { background: var(--light-gray); font-size: 12px; color: var(--mid-gray); font-weight: 700; }
   table.week thead th.today { background: var(--navy); color: var(--white); }
   .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
-  .dot.d { background: var(--blue); color: var(--white); }
-  .dot.x { background: #FDE8E4; }
+  .dot.done { background: var(--blue); color: var(--white); }
+  .dot.doing { background: #FCD9A5; color: var(--amber); }
+  .dot.blocked { background: var(--coral); color: var(--white); }
+  .dot.miss { background: #FDE8E4; }
   .dot.none { background: transparent; }
 
   /* ─── 직원 현황 ─── */
@@ -192,13 +202,15 @@
     max-width: 90vw; text-align: center;
   }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
-
   .modal { position: fixed; inset: 0; background: rgba(27,58,92,.55); display: grid; place-items: center; padding: 16px; z-index: 150; }
-  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; max-height: 88vh; overflow-y: auto; }
+  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
   .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #EAF6FC; color: var(--deep-blue); }
+  .pill.warn { background: #FFF7ED; color: var(--amber); }
+  .pill.bad { background: #FEF2F2; color: var(--coral); }
+  .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
 </style>
 </head>
 <body>
@@ -231,7 +243,7 @@ const now = () => Date.now();
 
 function blankState() {
   return {
-    version: 1,
+    version: 2,
     staff: [],
     tasks: [],
     checks: {},
@@ -267,11 +279,10 @@ function ymd(d) {
 function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
 function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
 function today() { return ymd(new Date()); }
+function nowHM() { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
 function dowOf(s) { return parseYmd(s).getDay(); }
-function label(s) {
-  const d = parseYmd(s);
-  return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')';
-}
+function label(s) { const d = parseYmd(s); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')'; }
+function shortDate(s) { const d = parseYmd(s); return (d.getMonth() + 1) + '/' + d.getDate(); }
 function relLabel(s) {
   const diff = Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
   if (diff === 0) return '오늘';
@@ -279,13 +290,14 @@ function relLabel(s) {
   if (diff === 1) return '내일';
   return null;
 }
-function mondayOf(s) { const d = parseYmd(s); const off = (d.getDay() + 6) % 7; return addDays(s, -off); }
+function mondayOf(s) { const d = parseYmd(s); return addDays(s, -((d.getDay() + 6) % 7)); }
 
 /* ══════════════════════════════════════════════════════
    3. 도메인 로직
    ══════════════════════════════════════════════════════ */
 const liveStaff = () => state.staff.filter(s => !s.deleted);
 const staffById = id => state.staff.find(s => s.id === id);
+const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
 
 function occursOn(task, date) {
   if (task.deleted) return false;
@@ -314,12 +326,51 @@ const isDone = (taskId, date) => !!(state.checks[ckey(taskId, date)] || {}).done
 
 function setCheck(taskId, date, patch) {
   const k = ckey(taskId, date);
-  const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '' };
+  const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '', steps: {}, count: 0, blocked: false };
   const next = Object.assign({}, cur, patch, { updatedAt: now() });
   state.checks[k] = next;
   save();
   queueSync();
   return next;
+}
+
+/** 단계·수량을 고려한 개별 업무 진행률 */
+function taskProgress(t, c) {
+  const steps = t.steps || [];
+  if (steps.length) {
+    const done = steps.filter(s => c && c.steps && c.steps[s.id]).length;
+    return { done: done, total: steps.length, unit: '단계', pct: Math.round(done / steps.length * 100) };
+  }
+  if (t.target) {
+    const n = (c && c.count) || 0;
+    return { done: n, total: t.target, unit: t.unit || '건', pct: Math.min(100, Math.round(n / t.target * 100)) };
+  }
+  const d = (c && c.done) ? 1 : 0;
+  return { done: d, total: 1, unit: '', pct: d * 100 };
+}
+
+/** 미착수 todo / 진행중 doing / 완료 done / 막힘 blocked */
+function statusOf(t, date) {
+  const c = getCheck(t.id, date);
+  if (c && c.blocked) return 'blocked';
+  if (c && c.done) return 'done';
+  if (taskProgress(t, c).done > 0) return 'doing';
+  return 'todo';
+}
+const STATUS_LABEL = { todo: '미착수', doing: '진행중', done: '완료', blocked: '막힘' };
+
+/** 단계·수량이 다 차면 자동 완료, 되돌리면 자동 해제.
+ *  둘 다 있는 업무는 단계도 끝나고 수량도 채워져야 완료다. */
+function syncAuto(t, date) {
+  const c = getCheck(t.id, date);
+  if (!c) return;
+  const hasSteps = (t.steps || []).length > 0, hasTarget = !!t.target;
+  if (!hasSteps && !hasTarget) return;
+  const stepsOk = !hasSteps || t.steps.every(s => c.steps && c.steps[s.id]);
+  const countOk = !hasTarget || ((c.count || 0) >= t.target);
+  const full = stepsOk && countOk;
+  if (full && !c.done) setCheck(t.id, date, { done: true, at: now() });
+  else if (!full && c.done) setCheck(t.id, date, { done: false, at: null });
 }
 
 function progress(staffId, date) {
@@ -331,14 +382,10 @@ function progress(staffId, date) {
 function weekProgress(staffId, anchor) {
   const mon = mondayOf(anchor);
   let done = 0, total = 0;
-  for (let i = 0; i < 7; i++) {
-    const p = progress(staffId, addDays(mon, i));
-    done += p.done; total += p.total;
-  }
+  for (let i = 0; i < 7; i++) { const p = progress(staffId, addDays(mon, i)); done += p.done; total += p.total; }
   return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
 }
 
-/** 오늘 이전까지 100% 달성이 연속된 일수 */
 function streak(staffId) {
   let d = today(), n = 0;
   for (let i = 0; i < 120; i++) {
@@ -350,17 +397,43 @@ function streak(staffId) {
   return n;
 }
 
+/** 이월: 최근 7일 안에 못 끝낸 '이월' 업무 */
+function carryOver(staffId, date) {
+  const out = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = addDays(date, -i);
+    tasksFor(staffId, d).forEach(t => {
+      if (!t.carry || isDone(t.id, d)) return;
+      out.push({ t: t, date: d });
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 원장이 바로 봐야 할 것: 막힘 + 예정 시각이 지난 미완료 */
+function alertsToday() {
+  const d = today(), hm = nowHM();
+  let blocked = 0, overdue = 0;
+  liveStaff().forEach(s => tasksFor(s.id, d).forEach(t => {
+    const c = getCheck(t.id, d);
+    if (c && c.blocked) { blocked++; return; }
+    if (c && c.done) return;
+    if (t.time && t.time < hm) overdue++;
+  }));
+  return { blocked: blocked, overdue: overdue, total: blocked + overdue };
+}
+
 /* ══════════════════════════════════════════════════════
    4. 동기화 (선택) — Google Apps Script 웹앱
    ══════════════════════════════════════════════════════ */
 const sync = {
-  busy: false, dirty: false, last: null, timer: null,
+  busy: false, dirty: false, last: null, timer: null, loud: false,
 
   enabled() { return !!state.settings.syncUrl; },
 
   merge(remote) {
     if (!remote) return;
-    const byId = (arr) => { const m = {}; (arr || []).forEach(x => { m[x.id] = x; }); return m; };
+    const byId = arr => { const m = {}; (arr || []).forEach(x => { m[x.id] = x; }); return m; };
     ['staff', 'tasks'].forEach(key => {
       const mine = byId(state[key]), theirs = byId(remote[key]);
       const out = {};
@@ -424,15 +497,31 @@ const session = {
 };
 
 let route = 'today';
-let cursor = today();          // 보고 있는 날짜
-let cursorPinned = false;      // 사용자가 직접 날짜를 옮겼는지
-let viewStaff = '';            // 관리자가 보는 대상 직원
+let cursor = today();
+let cursorPinned = false;
+let viewStaff = '';
+const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
 window.addEventListener('hashchange', () => {
   const r = location.hash.replace('#/', '');
   if (r && r !== route) { route = r; render(); }
 });
+
+/** 링크에 담겨 온 동기화 설정을 흡수 — 직원 기기 세팅을 대신한다 */
+function absorbLinkConfig() {
+  const q = new URLSearchParams(location.search);
+  const s = q.get('s');
+  if (!s) return;
+  try {
+    const cfg = JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+    if (cfg.u) state.settings.syncUrl = cfg.u;
+    if (cfg.k) state.settings.syncSecret = cfg.k;
+    save();
+  } catch (e) { console.warn('link config', e); }
+  q.delete('s');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+}
 
 /* ══════════════════════════════════════════════════════
    6. 렌더 헬퍼
@@ -449,13 +538,13 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('on'), 2400);
 }
 function repeatLabel(t) {
-  if (t.repeat === 'once')    return label(t.start) + ' 1회';
+  if (t.repeat === 'once')    return (t.start ? label(t.start) + ' ' : '') + '1회';
   if (t.repeat === 'daily')   return '매일';
   if (t.repeat === 'weekday') return '평일(월~금)';
   if (t.repeat === 'days')    return '매주 ' + (t.days || []).map(d => DOW[d]).join('·');
   return '';
 }
-function initials(name) { return String(name || '?').trim().slice(0, 2); }
+const initials = name => String(name || '?').trim().slice(0, 2);
 
 function paintStatus() {
   const el = $('#whoami');
@@ -481,32 +570,32 @@ function currentStaff() {
 function render() {
   paintStatus();
   renderTabs();
-
   const v = $('#view');
+
   if (session.isStaffLink && !staffById(session.staffId)) {
     v.innerHTML = '<div class="card"><div class="empty"><b>🔗</b>이 링크에 연결된 직원 정보가 없습니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
     return;
   }
   if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
 
-  const map = {
-    today: viewToday, week: viewWeek, write: viewWrite,
-    board: viewBoard, staff: viewStaff_, settings: viewSettings
-  };
+  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
 function renderTabs() {
+  const a = alertsToday();
   const tabs = session.isStaffLink
     ? [['today', '오늘 할 일'], ['week', '주간 플래너']]
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황'], ['staff', '직원 관리'], ['settings', '설정']]
+      ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
+         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['settings', '설정']]
       : [];
-  $('#tabs').innerHTML = tabs.map(([k, t]) =>
-    '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t + '</button>').join('');
+  $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
+    '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
+    (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join('');
 }
 
-/* ── 잠금 화면 ── */
+/* ── 잠금 ── */
 function viewLock() {
   const first = !state.settings.adminPin;
   return '<div class="card mt14">' +
@@ -531,30 +620,43 @@ function viewToday() {
   const list = tasksFor(me.id, cursor);
   const p = progress(me.id, cursor);
   const editable = session.isStaffLink || session.isAdmin;
+  const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
 
   let h = '';
-
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
   h += '<div class="datenav">' +
     '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
     '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
-    '<button class="navbtn" data-act="day" data-n="1">›</button>' +
-  '</div>';
+    '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
+  list.forEach(t => counts[statusOf(t, cursor)]++);
 
   h += '<div class="card"><div class="prog">' +
     '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
     '<div style="flex:1">' +
       '<div class="card-title">' + esc(me.name) + ' 선생님</div>' +
-      '<div class="card-sub mb8">지시 ' + p.total + '건 중 <b>' + p.done + '건 완료</b>' +
-        (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '') + '</div>' +
+      '<div class="card-sub mb8">' +
+        (list.length
+          ? '완료 ' + counts.done + ' · 진행중 ' + counts.doing + ' · 미착수 ' + counts.todo +
+            (counts.blocked ? ' · <b style="color:var(--coral)">막힘 ' + counts.blocked + '</b>' : '') +
+            (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '')
+          : '지시된 업무가 없습니다') +
+      '</div>' +
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
 
+  if (carry.length) {
+    h += '<div class="sect">지난 미완료 — 오늘로 넘어왔습니다</div>' +
+      '<div class="card alert">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
+  }
+
   if (!list.length) {
-    h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
+    if (!carry.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
   } else {
-    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable)).join('') + '</div>';
+    if (carry.length) h += '<div class="sect">오늘 할 일</div>';
+    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
   }
 
   if (session.isStaffLink) {
@@ -564,24 +666,73 @@ function viewToday() {
   return h;
 }
 
-function taskRow(t, date, editable) {
+function taskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
-  const done = !!(c && c.done);
-  return '<div class="task ' + (done ? 'done' : '') + '" data-task="' + t.id + '">' +
-    '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '"' : 'disabled') + '>✓</button>' +
+  const st = statusOf(t, date);
+  const prog = taskProgress(t, c);
+  const hasDetail = (t.steps || []).length || t.guide || t.target;
+  const open = openPanels.has(t.id + '|' + date);
+
+  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
+    '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(t.title) + '</div>' +
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
       '<div class="meta">' +
+        (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
-        '<span class="tag">' + esc(repeatLabel(t)) + '</span>' +
-        (done && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
-      '</div>' +
-      (editable
-        ? '<input class="note" data-act="note" data-id="' + t.id + '" value="' + esc(c && c.note || '') + '" placeholder="메모 · 미완료 사유를 남기세요">'
-        : (c && c.note ? '<div class="note">' + esc(c.note) + '</div>' : '')) +
-    '</div></div>';
+        (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
+        (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
+        (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
+        (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+      '</div>';
+
+  if (hasDetail && st !== 'done') {
+    h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
+  }
+  if (hasDetail) {
+    h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
+      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + ((t.steps || []).length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+  }
+  if (open) h += taskPanel(t, date, c, editable);
+
+  h += (editable
+      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">'
+      : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
+
+  return h + '</div></div>';
+}
+
+function taskPanel(t, date, c, editable) {
+  let h = '<div class="panel">';
+
+  if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
+
+  if ((t.steps || []).length) {
+    h += '<div style="margin-top:10px">' + t.steps.map((s, i) => {
+      const on = !!(c && c.steps && c.steps[s.id]);
+      return '<div class="step ' + (on ? 'on' : '') + '">' +
+        '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
+        '<span>' + (i + 1) + '. ' + esc(s.label) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  if (t.target) {
+    h += '<div class="counter"><span>진행 수량</span>' +
+      '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="-1"' : 'disabled') + '>−</button>' +
+      '<input class="in" type="number" min="0" ' + (editable ? 'data-act="cntset" data-id="' + t.id + '" data-date="' + date + '"' : 'readonly') + ' value="' + ((c && c.count) || 0) + '">' +
+      '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="1"' : 'disabled') + '>＋</button>' +
+      '<span class="muted">/ ' + t.target + esc(t.unit || '건') + '</span></div>';
+  }
+
+  if (editable) {
+    const blocked = !!(c && c.blocked);
+    h += '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + ' mt14" ' +
+      'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
+      (blocked ? '✓ 막힘 해제' : '🚧 막혔어요 — 원장님께 알리기') + '</button>';
+  }
+  return h + '</div>';
 }
 
 function staffSwitcher(activeId) {
@@ -614,9 +765,8 @@ function viewWeek() {
 
   h += '<div class="datenav">' +
     '<button class="navbtn" data-act="week" data-n="-1">‹</button>' +
-    '<div class="d">' + label(mon).replace(/\s\(.\)/, '') + ' ~ ' + label(days[6]).replace(/\s\(.\)/, '') + '</div>' +
-    '<button class="navbtn" data-act="week" data-n="1">›</button>' +
-  '</div>';
+    '<div class="d">' + shortDate(mon) + ' ~ ' + shortDate(days[6]) + '</div>' +
+    '<button class="navbtn" data-act="week" data-n="1">›</button></div>';
 
   h += '<div class="card"><div class="between mb8">' +
     '<div class="card-title">이번 주 달성률</div>' +
@@ -631,26 +781,32 @@ function viewWeek() {
     list.map(t => '<tr><td class="n">' + esc(t.title) + '</td>' +
       days.map(d => {
         if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
-        const done = isDone(t.id, d);
-        const past = d < today();
-        const cls = done ? 'd' : (past ? 'x' : '');
+        const st = statusOf(t, d);
+        const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
         return '<td><button class="dot ' + cls + '" ' +
-          (editable ? 'data-act="toggleday" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
+          (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
       }).join('') + '</tr>').join('') +
     '</tbody></table></div>' +
-    '<div class="hint">파란칸 = 완료 · 붉은칸 = 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
+    '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
   return h;
 }
 
 /* ── 지시서 작성 ── */
-let draft = [];   // 발행 전 임시 업무 목록
+let draft = [];
+const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '', carry: true };
 
 function viewWrite() {
   const list = liveStaff();
   if (!list.length) return emptyStaffCard();
 
   return '<div class="card">' +
-    '<div class="card-title">업무 지시 추가</div>' +
+    '<div class="between mb8"><div class="card-title">AI가 짜준 지시서 넣기</div></div>' +
+    '<div class="card-sub mb14">담당 배정·단계·수행 가이드까지 정리된 JSON을 붙여넣으면 한 번에 등록됩니다.</div>' +
+    '<button class="btn btn-navy btn-block" data-act="aiopen">📋 JSON 붙여넣어 등록하기</button>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">업무 지시 직접 추가</div>' +
     '<div class="card-sub mb14">한 항목씩 담고, 마지막에 한 번에 발행합니다.</div>' +
 
     '<div class="field"><label class="fl">받는 직원 (여러 명 선택 가능)</label>' +
@@ -659,10 +815,21 @@ function viewWrite() {
       '</div></div>' +
 
     '<div class="field"><label class="fl">업무 내용</label>' +
-      '<input class="in" id="wTitle" placeholder="예) 3시 김OO 학생 단어시험 채점 후 결과 입력"></div>' +
+      '<input class="in" id="wTitle" placeholder="예) 스터디포스 구독 CS 전화 (1차)"></div>' +
 
-    '<div class="field"><label class="fl">상세 지시 · 참고사항 (선택)</label>' +
-      '<textarea class="in" id="wDetail" placeholder="예) 오답 5개 이상이면 재시험, 결과는 클래스카드에 입력"></textarea></div>' +
+    '<div class="field"><label class="fl">한 줄 설명 (선택)</label>' +
+      '<textarea class="in" id="wDetail" placeholder="예) 이번 주 신규 구독 12명 대상"></textarea></div>' +
+
+    '<div class="field"><label class="fl">수행 가이드 — 어떻게 하는지 (선택)</label>' +
+      '<textarea class="in" id="wGuide" rows="4" placeholder="직원이 처음 봐도 바로 할 수 있게 절차·멘트·판단기준을 적어주세요"></textarea></div>' +
+
+    '<div class="field"><label class="fl">단계 (선택) — 한 줄에 하나씩</label>' +
+      '<textarea class="in" id="wSteps" rows="4" placeholder="구독 명단 뽑기&#10;전화 스크립트 확인&#10;1차 전화 돌리기&#10;결과 기록"></textarea></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">목표 수량 (선택)</label><input class="in" id="wTarget" type="number" min="0" placeholder="12"></div>' +
+      '<div class="field"><label class="fl">단위</label><input class="in" id="wUnit" placeholder="명" value="건"></div>' +
+    '</div>' +
 
     '<div class="grid2">' +
       '<div class="field"><label class="fl">시간 (선택)</label><input class="in" id="wTime" type="time"></div>' +
@@ -686,6 +853,9 @@ function viewWrite() {
         '<input class="in" id="wEnd" type="date" value="' + esc(wForm.end) + '"></div>' +
     '</div>' +
 
+    '<div class="field"><button type="button" class="chip ' + (wForm.carry ? 'on' : '') + '" data-act="wcarry">' +
+      (wForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>' +
+
     '<button class="btn btn-ghost btn-block" data-act="wadd">＋ 목록에 담기</button>' +
   '</div>' +
 
@@ -703,13 +873,14 @@ function draftCard() {
           '<span class="tag">' + esc(d.names.join(', ')) + '</span>' +
           (d.time ? '<span class="tag time">' + esc(d.time) + '</span>' : '') +
           (d.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+          ((d.steps || []).length ? '<span class="tag doing">' + d.steps.length + '단계</span>' : '') +
           '<span class="tag">' + esc(repeatLabel(d)) + '</span>' +
         '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="wdel" data-i="' + i + '">삭제</button>' +
       '</div>').join('') +
     '<hr class="sep">' +
     '<button class="btn btn-primary btn-block mb8" data-act="wpublish">지시서 발행하기</button>' +
-    '<div class="hint">발행하면 각 직원의 개인 링크에 즉시 반영됩니다. 발행 후 카카오톡으로 보낼 지시서 문구를 만들어 드립니다.</div>' +
+    '<div class="hint">발행하면 각 직원의 개인 링크에 즉시 반영됩니다.</div>' +
   '</div>';
 }
 
@@ -723,22 +894,34 @@ function viewBoard() {
     '<div class="d">' + label(cursor) + (relLabel(cursor) ? '<em>' + relLabel(cursor) + '</em>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
 
+  // 막힘 먼저
+  const blocked = [];
+  list.forEach(s => tasksFor(s.id, cursor).forEach(t => {
+    if (statusOf(t, cursor) === 'blocked') blocked.push({ s: s, t: t, c: getCheck(t.id, cursor) });
+  }));
+  if (blocked.length) {
+    h += '<div class="card alert"><div class="card-title" style="color:var(--coral)">🚧 막힘 ' + blocked.length + '건 — 원장님 확인 필요</div>' +
+      blocked.map(x => '<div class="small mt14"><b>' + esc(x.s.name) + '</b> · ' + esc(x.t.title) +
+        (x.c && x.c.note ? '<br><span class="muted">“' + esc(x.c.note) + '”</span>' : '<br><span class="muted">사유 미기재</span>') +
+        '</div>').join('') + '</div>';
+  }
+
   const all = list.reduce((a, s) => { const p = progress(s.id, cursor); a.done += p.done; a.total += p.total; return a; }, { done: 0, total: 0 });
   const pct = all.total ? Math.round(all.done / all.total * 100) : 0;
   h += '<div class="card"><div class="prog">' +
     '<div class="ring" style="--p:' + pct + '"><b>' + pct + '%</b></div>' +
     '<div style="flex:1"><div class="card-title">전체 수행률</div>' +
     '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
-    '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div></div>';
+    '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
+    '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button></div>';
 
   h += list.map(s => {
     const p = progress(s.id, cursor);
     const w = weekProgress(s.id, cursor);
     const st = streak(s.id);
-    const pend = tasksFor(s.id, cursor).filter(t => !isDone(t.id, cursor));
-    const notes = tasksFor(s.id, cursor)
-      .map(t => ({ t: t, c: getCheck(t.id, cursor) }))
-      .filter(x => x.c && x.c.note);
+    const rows = tasksFor(s.id, cursor).map(t => ({ t: t, st: statusOf(t, cursor), c: getCheck(t.id, cursor) }));
+    const pend = rows.filter(x => x.st !== 'done');
+    const notes = rows.filter(x => x.c && x.c.note);
 
     return '<div class="card">' +
       '<div class="staffcard mb14">' +
@@ -748,36 +931,41 @@ function viewBoard() {
             '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
           '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
           '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
-        '</div>' +
-      '</div>' +
+        '</div></div>' +
       (pend.length
-        ? '<div class="small" style="font-weight:700;margin-bottom:6px">미완료 ' + pend.length + '건</div>' +
-          pend.map(t => '<div class="small muted">· ' + esc(t.title) + (t.time ? ' (' + esc(t.time) + ')' : '') + '</div>').join('')
+        ? pend.map(x => {
+            const prog = taskProgress(x.t, x.c);
+            const badge = x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
+                        : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
+                        : '<span class="pill">미착수</span>';
+            return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
+              (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
+          }).join('')
         : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
       (notes.length
         ? '<hr class="sep">' + notes.map(x =>
             '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
         : '') +
       '<hr class="sep">' +
-      '<div class="row" style="gap:8px">' +
+      '<div class="row wraprow" style="gap:8px">' +
         '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
         '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
         '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
-      '</div>' +
-    '</div>';
+      '</div></div>';
   }).join('');
 
   return h;
 }
 
 /* ── 직원 관리 ── */
-function viewStaff_() {
+function viewStaffAdmin() {
   const list = liveStaff();
   return '<div class="card">' +
     '<div class="card-title">직원 등록</div>' +
-    '<div class="card-sub mb14">등록하면 직원별 개인 링크가 만들어집니다. 그 링크만 카카오톡으로 보내주세요.</div>' +
+    '<div class="card-sub mb14">등록하면 직원별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 직원은 링크만 열면 됩니다.</div>' +
     '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
+    (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
   '</div>' +
   (list.length
     ? list.map(s => '<div class="card"><div class="between">' +
@@ -786,7 +974,7 @@ function viewStaff_() {
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
-        '<div class="row" style="gap:8px">' +
+        '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
         '</div></div>').join('')
@@ -807,9 +995,9 @@ function viewSettings() {
       '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="예) wb-2026"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
-      '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button>' +
-    '</div>' +
+      '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
+    (s.syncUrl ? '<div class="hint mt14">✓ 설정됨 — 이제 <b>개인 링크에 이 설정이 함께 담겨</b> 나갑니다. 직원은 링크만 열면 됩니다.</div>' : '') +
   '</div>' +
 
   '<div class="card">' +
@@ -817,8 +1005,7 @@ function viewSettings() {
     '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
-      '<button class="btn btn-ghost" data-act="import">가져오기</button>' +
-    '</div>' +
+      '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
   '</div>' +
 
   '<div class="card">' +
@@ -827,17 +1014,16 @@ function viewSettings() {
     '<div class="field"><input class="in" id="newPin" type="password" placeholder="새 비밀번호"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="changepin">변경</button>' +
-      '<button class="btn btn-ghost" data-act="logout">잠그기</button>' +
-    '</div>' +
+      '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
   '</div>';
 }
 
 /* ══════════════════════════════════════════════════════
-   8. 모달
+   8. 모달 · 텍스트 생성
    ══════════════════════════════════════════════════════ */
 function modal(title, bodyHtml, footHtml) {
   $('#modalHost').innerHTML =
-    '<div class="modal" data-act="closemodal"><div class="modal-box" data-stop="1">' +
+    '<div class="modal" data-act="closemodal"><div class="modal-box">' +
       '<div class="between mb14"><div class="card-title">' + esc(title) + '</div>' +
       '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
       bodyHtml + (footHtml || '') +
@@ -845,8 +1031,14 @@ function modal(title, bodyHtml, footHtml) {
 }
 function closeModal() { $('#modalHost').innerHTML = ''; }
 
+function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
+
 function staffLink(id) {
-  return location.origin + location.pathname + '?u=' + id;
+  let url = location.origin + location.pathname + '?u=' + id;
+  if (state.settings.syncUrl) {
+    url += '&s=' + b64(JSON.stringify({ u: state.settings.syncUrl, k: state.settings.syncSecret || '' }));
+  }
+  return url;
 }
 
 function orderText(staffId, date) {
@@ -855,9 +1047,10 @@ function orderText(staffId, date) {
   let txt = '📋 ' + label(date) + ' 업무지시서\n' + (s ? s.name + ' 선생님\n' : '') + '─────────\n';
   txt += list.length
     ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + t.title + (t.priority === 'high' ? ' ⭐' : '') +
-        (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '')).join('\n')
+        (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
+        ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
     : '(지시된 업무 없음)';
-  txt += '\n─────────\n확인 후 체크 부탁드립니다.\n' + staffLink(staffId);
+  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n' + staffLink(staffId);
   return txt;
 }
 
@@ -868,17 +1061,47 @@ function reportText(staffId, date) {
   let txt = '✅ ' + label(date) + ' 업무 수행 보고\n' + (s ? s.name + '\n' : '') +
     '완료 ' + p.done + '/' + p.total + '건 (' + p.pct + '%)\n─────────\n';
   txt += list.map(t => {
-    const c = getCheck(t.id, date);
-    return (c && c.done ? '✅ ' : '⬜ ') + t.title + (c && c.note ? '\n   · ' + c.note : '');
+    const c = getCheck(t.id, date), st = statusOf(t, date), pr = taskProgress(t, c);
+    const mark = st === 'done' ? '✅' : st === 'blocked' ? '🚧' : st === 'doing' ? '🔸' : '⬜';
+    return mark + ' ' + t.title +
+      (st === 'doing' ? ' (' + pr.done + '/' + pr.total + pr.unit + ')' : '') +
+      (c && c.note ? '\n   · ' + c.note : '');
   }).join('\n') || '(지시된 업무 없음)';
   return txt;
 }
 
+function briefText(date) {
+  const list = liveStaff();
+  let done = 0, total = 0;
+  const pend = [], blocked = [], clear = [];
+  list.forEach(s => {
+    const p = progress(s.id, date);
+    done += p.done; total += p.total;
+    let hasPend = false;
+    tasksFor(s.id, date).forEach(t => {
+      const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
+      if (st === 'done') return;
+      hasPend = true;
+      const line = '· ' + s.name + ' — ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+        (st === 'doing' ? ' [진행 ' + pr.done + '/' + pr.total + pr.unit + ']' : '') +
+        (c && c.note ? '\n   “' + c.note + '”' : '');
+      (st === 'blocked' ? blocked : pend).push(line);
+    });
+    if (!hasPend && p.total) clear.push(s.name);
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  let txt = '📊 ' + label(date) + ' 업무 마감 브리핑\n' +
+    '전체 ' + total + '건 중 ' + done + '건 완료 (' + pct + '%)\n─────────\n';
+  if (blocked.length) txt += '🚧 막힘 ' + blocked.length + '건 — 조치 필요\n' + blocked.join('\n') + '\n─────────\n';
+  txt += pend.length ? '⚠️ 미완료 ' + pend.length + '건\n' + pend.join('\n') + '\n' : '✅ 미완료 없음\n';
+  if (clear.length) txt += '─────────\n✅ 전원 완료: ' + clear.join(', ') + '\n';
+  return txt;
+}
+
 async function copy(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('복사했습니다');
-  } catch (e) {
+  try { await navigator.clipboard.writeText(text); toast('복사했습니다'); }
+  catch (e) {
     const ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
@@ -890,7 +1113,7 @@ async function copy(text) {
 
 function showText(title, text) {
   modal(title,
-    '<textarea class="in" rows="12" id="mText" readonly>' + esc(text) + '</textarea>',
+    '<textarea class="in" rows="13" id="mText" readonly>' + esc(text) + '</textarea>',
     '<button class="btn btn-primary btn-block mt14" data-act="copytext">복사하기</button>');
 }
 
@@ -903,29 +1126,105 @@ function manageTasks(staffId) {
       ? list.map(t => '<div class="task"><div class="task-body">' +
           '<div class="task-t">' + esc(t.title) + '</div>' +
           '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
-          (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') + '</div></div>' +
+          (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') + '</div></div>' +
           '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button></div>').join('')
       : '<div class="empty">지시된 업무가 없습니다.</div>');
 }
 
 /* ══════════════════════════════════════════════════════
-   9. 이벤트
+   9. AI 지시서(JSON) 가져오기
    ══════════════════════════════════════════════════════ */
-const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '' };
+const AI_SAMPLE = `{
+  "assignments": [
+    {
+      "staff": "김선생",
+      "title": "스터디포스 구독 CS 전화 (1차)",
+      "detail": "이번 주 신규 구독 12명 대상",
+      "guide": "1) 명단은 구독원장 시트에서 뽑습니다\\n2) 첫 인사: \\"안녕하세요, WB 웩슬러브레인센터입니다. 스터디포스 구독 잘 이용하고 계신지 확인차 연락드렸습니다.\\"\\n3) 미접속 7일 이상이면 사용법 재안내\\n4) 통화 거절/부재 시 문자 발송 후 다음날 재시도",
+      "steps": ["구독 명단 뽑기", "전화 스크립트 확인", "1차 전화 돌리기", "부재중 문자 발송", "결과 기록"],
+      "target": 12,
+      "unit": "명",
+      "time": "15:00",
+      "priority": "high",
+      "repeat": "days",
+      "days": [2, 5],
+      "carry": true
+    }
+  ]
+}`;
 
+function aiModal() {
+  modal('AI 지시서 붙여넣기',
+    '<div class="hint mb14">Claude에게 “이런 업무가 있어” 하고 말하면 담당·단계·가이드까지 짜서 아래 형식으로 만들어 줍니다. 그대로 붙여넣으세요.</div>' +
+    '<textarea class="in" rows="10" id="aiText" placeholder=\'{"assignments":[ ... ]}\'></textarea>' +
+    '<button class="btn btn-ghost btn-block mt14" data-act="aisample">예시 형식 보기</button>',
+    '<button class="btn btn-primary btn-block mt14" data-act="aiapply">등록하기</button>');
+}
+
+function applyAssignments(raw) {
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) { return toast('JSON 형식이 잘못되었습니다'); }
+
+  const list = Array.isArray(data) ? data : (data.assignments || []);
+  if (!list.length) return toast('등록할 업무가 없습니다');
+
+  // 이름 확인 → 없는 직원은 물어보고 등록
+  const missing = [...new Set(list.map(a => String(a.staff || '').trim()).filter(n => n && !staffByName(n)))];
+  if (missing.length) {
+    if (!confirm('등록되지 않은 직원이 있습니다: ' + missing.join(', ') + '\n새로 등록할까요?')) return;
+    missing.forEach(n => state.staff.push({ id: uid(), name: n, createdAt: now(), updatedAt: now(), deleted: false }));
+  }
+
+  let added = 0, skipped = 0;
+  list.forEach(a => {
+    const s = staffByName(a.staff);
+    if (!s) { skipped++; return; }
+    const steps = (a.steps || []).map(x => ({
+      id: uid(), label: typeof x === 'string' ? x : String(x.label || '')
+    })).filter(x => x.label);
+    state.tasks.push({
+      id: uid(), groupId: 'ai-' + now(), staffId: s.id,
+      title: String(a.title || '').trim() || '(제목 없음)',
+      detail: String(a.detail || ''),
+      guide: String(a.guide || ''),
+      steps: steps,
+      target: Number(a.target) || 0,
+      unit: String(a.unit || '건'),
+      time: String(a.time || ''),
+      priority: a.priority === 'high' ? 'high' : 'normal',
+      repeat: ['once', 'daily', 'weekday', 'days'].includes(a.repeat) ? a.repeat : 'once',
+      days: Array.isArray(a.days) ? a.days.map(Number).filter(n => n >= 0 && n <= 6) : [],
+      start: /^\d{4}-\d{2}-\d{2}$/.test(a.start || '') ? a.start : today(),
+      end: /^\d{4}-\d{2}-\d{2}$/.test(a.end || '') ? a.end : '',
+      carry: a.carry !== false,
+      createdAt: now(), updatedAt: now(), deleted: false
+    });
+    added++;
+  });
+
+  save(); queueSync(); closeModal(); render();
+  toast(added + '건 등록' + (skipped ? ' · ' + skipped + '건 건너뜀' : ''));
+}
+
+/* ══════════════════════════════════════════════════════
+   10. 이벤트
+   ══════════════════════════════════════════════════════ */
 document.addEventListener('click', ev => {
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
   const el = ev.target.closest('[data-act]');
   if (!el) return;
-  // 모달 바깥(어두운 배경)을 눌렀을 때만 닫히도록 — 내용 클릭은 무시
   if (el.dataset.act === 'closemodal'
       && ev.target.closest('.modal-box')
       && !ev.target.closest('button[data-act="closemodal"]')) return;
 
   const act = el.dataset.act;
   const id = el.dataset.id;
+  const date = el.dataset.date || cursor;
+  const task = () => state.tasks.find(x => x.id === id);
 
   switch (act) {
 
@@ -949,27 +1248,64 @@ document.addEventListener('click', ev => {
       break;
     }
 
-    /* 날짜 이동 */
+    /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
 
-    /* 체크 */
+    /* 체크 · 단계 · 수량 · 막힘 */
     case 'toggle': {
-      const c = getCheck(id, cursor);
-      setCheck(id, cursor, { done: !(c && c.done), at: (c && c.done) ? null : now() });
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const turnOn = !(c && c.done);
+      const steps = {};
+      (t.steps || []).forEach(s => { steps[s.id] = turnOn; });
+      setCheck(id, date, {
+        done: turnOn, at: turnOn ? now() : null,
+        steps: steps,
+        count: t.target ? (turnOn ? t.target : 0) : ((c && c.count) || 0),
+        blocked: turnOn ? false : (c ? c.blocked : false)
+      });
       render();
       break;
     }
-    case 'toggleday': {
-      const d = el.dataset.date, c = getCheck(id, d);
-      setCheck(id, d, { done: !(c && c.done), at: (c && c.done) ? null : now() });
+    case 'step': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const cur = Object.assign({}, (c && c.steps) || {});
+      const k = el.dataset.step;
+      cur[k] = !cur[k];
+      setCheck(id, date, { steps: cur, blocked: false });
+      syncAuto(t, date);
+      render();
+      break;
+    }
+    case 'cnt': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const n = Math.max(0, ((c && c.count) || 0) + Number(el.dataset.n));
+      setCheck(id, date, { count: n, blocked: false });
+      syncAuto(t, date);
+      render();
+      break;
+    }
+    case 'block': {
+      const c = getCheck(id, date);
+      const on = !(c && c.blocked);
+      setCheck(id, date, { blocked: on, done: on ? false : (c ? c.done : false) });
+      render();
+      toast(on ? '원장님 화면에 표시됩니다' : '막힘을 해제했습니다');
+      break;
+    }
+    case 'panel': {
+      const k = id + '|' + date;
+      openPanels.has(k) ? openPanels.delete(k) : openPanels.add(k);
       render();
       break;
     }
 
     /* 직원 */
-    case 'pickstaff':   viewStaff = id; render(); break;
-    case 'openstaff':   viewStaff = id; go('today'); break;
+    case 'pickstaff': viewStaff = id; render(); break;
+    case 'openstaff': viewStaff = id; go('today'); break;
     case 'addstaff': {
       const name = ($('#sName').value || '').trim();
       if (!name) return toast('이름을 입력해 주세요');
@@ -979,23 +1315,30 @@ document.addEventListener('click', ev => {
     }
     case 'delstaff': {
       const s = staffById(id);
-      if (!confirm((s ? s.name : '') + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
+      if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
       s.deleted = true; s.updatedAt = now();
       save(); queueSync(); render();
       break;
     }
     case 'copylink': copy(staffLink(id)); break;
+    case 'alllinks': copy(liveStaff().map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')); break;
     case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
     case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
+    case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
     case 'deltask': {
-      const t = state.tasks.find(x => x.id === id);
+      const t = task();
       if (!t || !confirm('이 지시를 중단할까요? 지난 기록은 유지됩니다.')) return;
       t.deleted = true; t.updatedAt = now();
       save(); queueSync(); closeModal(); render(); toast('중단했습니다');
       break;
     }
+
+    /* AI 가져오기 */
+    case 'aiopen': aiModal(); break;
+    case 'aisample': $('#aiText').value = AI_SAMPLE; break;
+    case 'aiapply': applyAssignments($('#aiText').value || ''); break;
 
     /* 지시서 작성 */
     case 'wstaff': {
@@ -1017,6 +1360,7 @@ document.addEventListener('click', ev => {
       el.classList.toggle('on');
       break;
     }
+    case 'wcarry': { wForm.carry = !wForm.carry; render(); break; }
     case 'wadd': {
       const title = ($('#wTitle').value || '').trim();
       if (!wForm.staff.length) return toast('받는 직원을 선택해 주세요');
@@ -1027,12 +1371,18 @@ document.addEventListener('click', ev => {
       draft.push({
         title: title,
         detail: ($('#wDetail').value || '').trim(),
+        guide: ($('#wGuide').value || '').trim(),
+        steps: ($('#wSteps').value || '').split('\n').map(x => x.trim()).filter(Boolean)
+                 .map(l => ({ id: uid(), label: l })),
+        target: Number($('#wTarget').value) || 0,
+        unit: ($('#wUnit').value || '건').trim(),
         time: $('#wTime').value || '',
         priority: $('#wPri').value,
         repeat: wForm.repeat,
         days: wForm.days.slice().sort(),
         start: wForm.start,
         end: wForm.end,
+        carry: wForm.carry,
         staffIds: wForm.staff.slice(),
         names: wForm.staff.map(x => (staffById(x) || {}).name).filter(Boolean)
       });
@@ -1044,13 +1394,15 @@ document.addEventListener('click', ev => {
     case 'wclear': draft = []; render(); break;
     case 'wpublish': {
       if (!draft.length) return;
-      const gid = uid();
-      const touched = new Set();
+      const gid = uid(), touched = new Set();
       draft.forEach(d => d.staffIds.forEach(sid => {
         state.tasks.push({
           id: uid(), groupId: gid, staffId: sid,
-          title: d.title, detail: d.detail, time: d.time, priority: d.priority,
-          repeat: d.repeat, days: d.days, start: d.start, end: d.end,
+          title: d.title, detail: d.detail, guide: d.guide,
+          steps: (d.steps || []).map(s => ({ id: uid(), label: s.label })),
+          target: d.target, unit: d.unit,
+          time: d.time, priority: d.priority,
+          repeat: d.repeat, days: d.days, start: d.start, end: d.end, carry: d.carry,
           createdAt: now(), updatedAt: now(), deleted: false
         });
         touched.add(sid);
@@ -1068,7 +1420,7 @@ document.addEventListener('click', ev => {
     case 'savecfg': {
       state.settings.syncUrl = ($('#cfgUrl').value || '').trim();
       state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
-      save(); toast('저장했습니다');
+      save(); render(); toast('저장했습니다');
       if (state.settings.syncUrl) { sync.loud = true; sync.run(); }
       break;
     }
@@ -1105,40 +1457,54 @@ document.addEventListener('click', ev => {
   }
 });
 
-/* 메모 입력 — 입력이 멈추면 저장 */
-let noteTimer = null;
+/* 메모 · 수량 직접 입력 */
+let inputTimer = null;
 document.addEventListener('input', ev => {
-  const el = ev.target.closest('[data-act="note"]');
-  if (!el) return;
-  clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => {
-    setCheck(el.dataset.id, cursor, { note: el.value });
-    toast('메모 저장됨');
-  }, 700);
+  const noteEl = ev.target.closest('[data-act="note"]');
+  if (noteEl) {
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(() => {
+      setCheck(noteEl.dataset.id, noteEl.dataset.date || cursor, { note: noteEl.value });
+      toast('메모 저장됨');
+    }, 700);
+    return;
+  }
+  const cntEl = ev.target.closest('[data-act="cntset"]');
+  if (cntEl) {
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(() => {
+      const t = state.tasks.find(x => x.id === cntEl.dataset.id);
+      const d = cntEl.dataset.date || cursor;
+      setCheck(cntEl.dataset.id, d, { count: Math.max(0, Number(cntEl.value) || 0), blocked: false });
+      if (t) syncAuto(t, d);
+      render();
+    }, 600);
+  }
 });
 
-/* 엔터로 제출 */
+/* 엔터 제출 */
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   const t = ev.target;
-  if (t.id === 'pin')    document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
-  if (t.id === 'sName')  document.querySelector('[data-act="addstaff"]')?.click();
+  if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
+  if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
 });
 
 /* 복귀 시 최신화 */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
-  if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }  // 자정을 넘겼을 때
+  if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
   sync.run();
 });
 
 /* ══════════════════════════════════════════════════════
-   10. 시작
+   11. 시작
    ══════════════════════════════════════════════════════ */
 load();
+absorbLinkConfig();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
-if (session.isStaffLink) route = (route === 'week') ? 'week' : 'today';
+if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
 
 if (sync.enabled()) {
