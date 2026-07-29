@@ -12,6 +12,11 @@
 // ⚠️ 아래 비밀키를 바꾸고, 앱 [설정] 화면에도 같은 값을 넣으세요.
 var SECRET = 'wb-2026';
 
+// 스프레드시트 ID. 비워두면 이 스크립트가 붙어 있는 시트를 씁니다.
+// 시트 주소 .../spreadsheets/d/★여기★/edit 의 가운데 부분을 넣으면
+// 독립 실행 스크립트로 만들었을 때도 정상 동작합니다.
+var SHEET_ID = '';
+
 var DATA_SHEET = '_data';
 var VIEW_SHEET = '체크현황';
 var CHUNK = 40000;          // 셀 하나에 넣을 최대 글자 수 (시트 한도 50,000)
@@ -164,8 +169,15 @@ function mergeChecks(x, y) {
 
 /* ───────────────────────── 저장/읽기 ───────────────────────── */
 
-function sheet(name) {
+function book() {
+  if (SHEET_ID) return SpreadsheetApp.openById(SHEET_ID);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('시트를 찾을 수 없습니다. 맨 위 SHEET_ID 에 스프레드시트 ID를 넣어주세요.');
+  return ss;
+}
+
+function sheet(name) {
+  var ss = book();
   return ss.getSheetByName(name) || ss.insertSheet(name);
 }
 
