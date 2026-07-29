@@ -750,6 +750,14 @@ function viewToday() {
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
 
+  if (editable && cursor === today()) {
+    h += '<div class="card" style="padding:12px">' +
+      '<div class="row" style="gap:8px">' +
+        '<input class="in" id="qAdd" placeholder="빠른 추가 — 예) 3시까지 보호자께 전화">' +
+        '<button class="btn btn-primary" data-act="qadd">추가</button>' +
+      '</div></div>';
+  }
+
   if (carry.length) {
     h += '<div class="sect">지난 미완료 — 오늘로 넘어왔습니다</div>' +
       '<div class="card alert">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
@@ -912,7 +920,9 @@ function viewWrite() {
   return '<div class="card">' +
     '<div class="between mb8"><div class="card-title">AI가 짜준 지시서 넣기</div></div>' +
     '<div class="card-sub mb14">담당 배정·단계·수행 가이드까지 정리된 JSON을 붙여넣으면 한 번에 등록됩니다.</div>' +
-    '<button class="btn btn-navy btn-block" data-act="aiopen">📋 JSON 붙여넣어 등록하기</button>' +
+    '<button class="btn btn-navy btn-block mb8" data-act="aiopen">📋 JSON 붙여넣어 등록하기</button>' +
+    '<button class="btn btn-ghost btn-block" data-act="kopen">💬 카톡 문장 붙여넣기</button>' +
+    '<div class="hint" style="margin-top:8px">이미 카톡으로 보낸 지시를 그대로 옮길 때 쓰세요.</div>' +
   '</div>' +
 
   '<div class="card">' +
@@ -1197,6 +1207,16 @@ function orderText(staffId, date) {
   return txt;
 }
 
+/** 방금 추가한 한 건을 카톡에 붙여넣을 문구로 */
+function quickText(t) {
+  const s = staffById(t.staffId);
+  return '📌 ' + (s ? s.name + ' 선생님\n' : '') +
+    (t.start !== today() ? label(t.start) + ' ' : '') +
+    (t.time ? '[' + t.time + '] ' : '') + t.title +
+    (t.priority === 'high' ? ' ⭐' : '') +
+    '\n\n지시서에 올려뒀습니다. 끝나면 체크 부탁드려요.\n' + staffLink(t.staffId);
+}
+
 function reportText(staffId, date) {
   const s = staffById(staffId);
   const list = tasksFor(staffId, date);
@@ -1398,6 +1418,125 @@ function saveEditedTask() {
   eForm = null;
   save(); queueSync(); closeModal(); render();
   toast(isNew ? '추가했습니다' : '수정했습니다');
+}
+
+/* ══════════════════════════════════════════════════════
+   8-1. 말로 쓴 지시를 업무로 — 카톡 문장 해석
+   ══════════════════════════════════════════════════════ */
+const pad2 = n => String(n).padStart(2, '0');
+
+/** "혜지쌤", "김혜지", "혜지 선생님" 모두 잡는다 */
+function matchStaff(text) {
+  const list = liveStaff();
+  for (const s of list) if (text.includes(s.name)) return { s: s, token: s.name };
+  for (const s of list) {
+    const short = s.name.length >= 3 ? s.name.slice(1) : '';
+    if (short.length >= 2 && text.includes(short)) return { s: s, token: short };
+  }
+  return null;
+}
+
+/** "3시까지", "오후 3시반", "15:00", "9시 30분" */
+function matchTime(text) {
+  let m = text.match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if (m) return { time: pad2(m[1]) + ':' + m[2], token: m[0] };
+
+  m = text.match(/(오전|오후|아침|저녁|밤|낮)?\s*(\d{1,2})\s*시\s*(반|\d{1,2}\s*분)?/);
+  if (!m) return null;
+  let h = Number(m[2]);
+  const mer = m[1] || '';
+  if (/오후|저녁|밤/.test(mer)) { if (h < 12) h += 12; }
+  else if (/오전|아침/.test(mer)) { if (h === 12) h = 0; }
+  else if (h >= 1 && h <= 7) h += 12;   // 오후에 도는 센터라 한 자리 시각은 오후로 본다
+  let mm = '00';
+  if (m[3]) mm = m[3] === '반' ? '30' : pad2(parseInt(m[3], 10));
+  return { time: pad2(h) + ':' + mm, token: m[0] };
+}
+
+/** "오늘", "내일", "모레", "금요일", "8월 3일" */
+function matchDate(text) {
+  if (/오늘/.test(text)) return { date: today(), token: '오늘' };
+  if (/내일/.test(text)) return { date: addDays(today(), 1), token: '내일' };
+  if (/모레/.test(text)) return { date: addDays(today(), 2), token: '모레' };
+
+  const dw = text.match(/([일월화수목금토])\s*요일/);
+  if (dw) {
+    const want = DOW.indexOf(dw[1]);
+    for (let i = 1; i <= 7; i++) {
+      const c = addDays(today(), i);
+      if (dowOf(c) === want) return { date: c, token: dw[0] };
+    }
+  }
+  const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (md) return { date: new Date().getFullYear() + '-' + pad2(md[1]) + '-' + pad2(md[2]), token: md[0] };
+  return null;
+}
+
+function cleanTitle(s) {
+  return String(s)
+    .replace(/(쌤|선생님|샘)/g, ' ')
+    .replace(/(긴급히?|급히|급하게|asap)/gi, ' ')   // 중요 표시로 이미 잡히므로 제목에서는 뺀다
+    .replace(/^[\s,.·\-~]*(에게|한테|께)?\s*/, '')
+    .replace(/\s*(좀|까지|안에|전에)\s*/g, ' ')
+    .replace(/\s*(부탁\s*(해요|드려요|드립니다|합니다|해)|해\s*주세요|해주세요|해줘요|해줘|하세요|해주시고|해주시면|바랍니다)\s*[.!~]*$/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\s.,!~]+$/, '')
+    .trim();
+}
+
+/** 한 줄에 한 건. 이름·시간·날짜를 뽑고 나머지를 업무 이름으로 쓴다. */
+function parseInstructions(text) {
+  return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    let rest = line;
+    const sm = matchStaff(rest); if (sm) rest = rest.replace(sm.token, ' ');
+    const tm = matchTime(rest);  if (tm) rest = rest.replace(tm.token, ' ');
+    const dm = matchDate(rest);  if (dm) rest = rest.replace(dm.token, ' ');
+    const title = cleanTitle(rest);
+    return {
+      staff: sm ? sm.s.name : '',
+      title: title || line,
+      time: tm ? tm.time : '',
+      start: dm ? dm.date : today(),
+      repeat: 'once',
+      priority: /긴급|급하|급히|중요|바로|asap/i.test(line) ? 'high' : 'normal',
+      carry: true,
+      raw: line
+    };
+  });
+}
+
+let kakaoText = '', kakaoParsed = null;
+
+function kakaoModal() {
+  const ready = kakaoParsed && kakaoParsed.length && kakaoParsed.every(x => x.staff);
+  modal('카톡 문장으로 지시 만들기',
+    '<div class="hint mb14">카톡에 쓴 문장을 그대로 붙여넣으세요. <b>한 줄에 한 건</b>이고, 이름·시간·날짜는 알아서 뽑습니다.</div>' +
+    '<textarea class="in" rows="5" id="kText" placeholder="혜지쌤 오늘 3시까지 상담건 0729-A 보호자께 전화 부탁해요&#10;윤지쌤 내일 교재 재고 확인해주세요">' + esc(kakaoText) + '</textarea>' +
+    '<button class="btn btn-ghost btn-block mt14" data-act="kparse">해석해 보기</button>' +
+    (kakaoParsed ? kakaoPreview() : ''),
+    ready ? '<button class="btn btn-primary btn-block mt14" data-act="kapply">' + kakaoParsed.length + '건 확인하고 등록</button>' : '');
+}
+
+function kakaoPreview() {
+  if (!kakaoParsed.length) return '<div class="empty">해석할 내용이 없습니다.</div>';
+  const missing = kakaoParsed.filter(x => !x.staff).length;
+  return '<hr class="sep">' +
+    kakaoParsed.map(x =>
+      '<div class="task"><div class="task-body">' +
+        '<div class="task-t">' + esc(x.title) + '</div>' +
+        '<div class="meta">' +
+          (x.staff ? '<span class="tag add">' + esc(x.staff) + '</span>'
+                   : '<span class="tag blk">담당 없음</span>') +
+          (x.time ? '<span class="tag time">' + esc(x.time) + '</span>' : '') +
+          '<span class="tag">' + esc(label(x.start)) + '</span>' +
+          (x.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+        '</div>' +
+        '<div class="small muted" style="margin-top:6px">원문: ' + esc(x.raw) + '</div>' +
+      '</div></div>').join('') +
+    (missing
+      ? '<div class="hint" style="color:var(--coral);margin-top:10px">담당이 없는 줄이 ' + missing +
+        '개 있습니다. 문장에 <b>이름</b>을 넣고 다시 해석해 주세요. (예: 혜지쌤 / 김혜지)</div>'
+      : '');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1603,6 +1742,44 @@ document.addEventListener('click', ev => {
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
     case 'newtask': editTaskModal(null); break;
+
+    /* 빠른 추가 — 한 줄로 쓰고 바로 카톡 문구까지 */
+    case 'qadd': {
+      const line = ($('#qAdd').value || '').trim();
+      if (!line) return toast('내용을 입력해 주세요');
+      const me = currentStaff();
+      if (!me) return toast('직원을 먼저 선택해 주세요');
+      const p = parseInstructions(line)[0];
+      const t = {
+        id: uid(), groupId: 'quick-' + now(), staffId: me.id,
+        title: p.title, detail: '', guide: '', steps: [], target: 0, unit: '건',
+        time: p.time, priority: p.priority,
+        repeat: 'once', days: [], start: p.start, end: '', carry: true,
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+      };
+      state.tasks.push(t);
+      save(); queueSync(); render();
+      toast(me.name + ' — 추가했습니다');
+      if (!session.isStaffLink) {
+        setTimeout(() => showText('카톡으로 보낼 문구', quickText(t)), 300);
+      }
+      break;
+    }
+
+    /* 카톡 문장 붙여넣기 */
+    case 'kopen': kakaoText = ''; kakaoParsed = null; kakaoModal(); break;
+    case 'kparse': {
+      kakaoText = $('#kText').value || '';
+      kakaoParsed = parseInstructions(kakaoText);
+      kakaoModal();
+      break;
+    }
+    case 'kapply': {
+      pendingAdd = kakaoParsed;
+      kakaoParsed = null; kakaoText = '';
+      closeModal(); render();
+      break;
+    }
     case 'etask': {
       const t = task();
       if (!t) break;
@@ -1802,6 +1979,7 @@ document.addEventListener('keydown', ev => {
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
   if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
+  if (t.id === 'qAdd')  document.querySelector('[data-act="qadd"]')?.click();
 });
 
 /* 복귀 시 최신화 */
