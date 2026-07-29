@@ -156,6 +156,8 @@
   .tag.doing{ background: #FFF7ED; color: var(--amber); }
   .tag.blk  { background: var(--coral); color: var(--white); }
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
+  .tag.add  { background: #ECFDF5; color: var(--green); }
+  .tag.edit { background: #FFF7ED; color: var(--amber); }
   .note { margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
   .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
@@ -574,6 +576,26 @@ function repeatLabel(t) {
 }
 const initials = name => String(name || '?').trim().slice(0, 2);
 
+/** 지금 조작하는 사람 */
+const actor = () => session.isStaffLink ? 'staff' : 'admin';
+
+/** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
+function originTags(t) {
+  if (session.isStaffLink) return '';
+  let h = '';
+  if (t.origin === 'staff') h += '<span class="tag add">직원 추가</span>';
+  else if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
+  return h;
+}
+
+/** 지시 내용을 고칠 수 있는가.
+ *  원장은 전부. 직원은 자기가 추가한 업무만 — 원장이 내린 지시는 못 건드린다.
+ *  (직원도 체크·단계·수량·메모·막힘은 언제나 가능하다) */
+function canEditTask(t) {
+  if (!session.isStaffLink) return session.isAdmin;
+  return t.origin === 'staff' && t.staffId === session.staffId;
+}
+
 function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
@@ -728,6 +750,9 @@ function viewToday() {
     h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
   }
 
+  if (editable) {
+    h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
+  }
   if (session.isStaffLink) {
     h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
       '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
@@ -755,6 +780,7 @@ function taskRow(t, date, editable, isCarry) {
         (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+        originTags(t) +
       '</div>';
 
   if (hasDetail && st !== 'done') {
@@ -797,9 +823,12 @@ function taskPanel(t, date, c, editable) {
 
   if (editable) {
     const blocked = !!(c && c.blocked);
-    h += '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + ' mt14" ' +
-      'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
-      (blocked ? '✓ 막힘 해제' : '🚧 막혔어요 — 원장님께 알리기') + '</button>';
+    h += '<div class="row wraprow mt14" style="gap:8px">' +
+      '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + '" ' +
+        'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
+        (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
+      (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '') +
+    '</div>';
   }
   return h + '</div>';
 }
@@ -1196,7 +1225,8 @@ function manageTasks(staffId) {
           '<div class="task-t">' + esc(t.title) + '</div>' +
           '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
           (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
-          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') + '</div>' +
+          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') +
+          originTags(t) + '</div>' +
           '<div class="row" style="gap:6px;margin-top:8px">' +
             '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>' +
             '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button>' +
@@ -1207,12 +1237,19 @@ function manageTasks(staffId) {
 /* ── 업무 수정 ── */
 let eForm = null;
 
-function editTaskModal(id) {
-  const t = state.tasks.find(x => x.id === id);
-  if (!t) return;
-  eForm = { id: t.id, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+const BLANK_TASK = () => ({
+  title: '', detail: '', guide: '', steps: [], target: 0, unit: '건',
+  time: '', priority: 'normal', repeat: 'once', days: [], start: today(), end: '', carry: true
+});
 
-  modal('업무 수정',
+function editTaskModal(id) {
+  const isNew = !id;
+  const t = isNew ? BLANK_TASK() : state.tasks.find(x => x.id === id);
+  if (!t) return;
+  eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+
+  const who = currentStaff();
+  modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : '업무 수정',
     '<div class="field"><label class="fl">업무 내용</label>' +
       '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
 
@@ -1256,16 +1293,33 @@ function editTaskModal(id) {
     '<div class="field"><button type="button" class="chip ' + (eForm.carry ? 'on' : '') + '" data-act="ecarry">' +
       (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>',
 
-    '<button class="btn btn-primary btn-block mt14" data-act="esave">저장</button>');
+    '<button class="btn btn-primary btn-block mt14" data-act="esave">저장</button>' +
+    (isNew ? '' : '<button class="btn btn-danger btn-block mb8" style="margin-top:8px" data-act="edelete">이 업무 중단</button>'));
 }
 
 function saveEditedTask() {
-  const t = state.tasks.find(x => x.id === eForm.id);
-  if (!t) return closeModal();
-
+  const isNew = !eForm.id;
   const title = ($('#eTitle').value || '').trim();
   if (!title) return toast('업무 내용을 입력해 주세요');
   if (eForm.repeat === 'days' && !eForm.days.length) return toast('요일을 선택해 주세요');
+
+  let t;
+  if (isNew) {
+    const who = currentStaff();
+    if (!who) return toast('직원을 먼저 선택해 주세요');
+    t = {
+      id: uid(), groupId: 'own-' + now(), staffId: who.id,
+      steps: [], createdAt: now(), deleted: false,
+      origin: actor()
+    };
+    state.tasks.push(t);
+  } else {
+    t = state.tasks.find(x => x.id === eForm.id);
+    if (!t) return closeModal();
+    if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 수정할 수 없습니다'); }
+    if (actor() === 'staff') t.lastEditBy = 'staff';
+    else if (t.origin !== 'staff') t.lastEditBy = 'admin';
+  }
 
   // 같은 순서의 단계는 id를 물려줘서 이미 체크한 진행 상태를 잃지 않게 한다
   const oldSteps = t.steps || [];
@@ -1288,7 +1342,7 @@ function saveEditedTask() {
 
   eForm = null;
   save(); queueSync(); closeModal(); render();
-  toast('수정했습니다');
+  toast(isNew ? '추가했습니다' : '수정했습니다');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1487,7 +1541,24 @@ document.addEventListener('click', ev => {
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
-    case 'etask': editTaskModal(id); break;
+    case 'newtask': editTaskModal(null); break;
+    case 'etask': {
+      const t = task();
+      if (!t) break;
+      if (!canEditTask(t)) return toast('원장님이 내린 지시는 수정할 수 없습니다');
+      editTaskModal(id);
+      break;
+    }
+    case 'edelete': {
+      const t = state.tasks.find(x => x.id === eForm.id);
+      if (!t) break;
+      if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 중단할 수 없습니다'); }
+      if (!confirm('이 업무를 중단할까요? 지난 기록은 유지됩니다.')) return;
+      t.deleted = true; t.updatedAt = now();
+      eForm = null;
+      save(); queueSync(); closeModal(); render(); toast('중단했습니다');
+      break;
+    }
     case 'erepeat': {
       eForm.repeat = el.dataset.v;
       document.querySelectorAll('#eRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === eForm.repeat));
