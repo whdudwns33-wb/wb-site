@@ -32,6 +32,12 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(25000);
     try {
+      // mode:'add' — 지시서만 밀어 넣기 (n8n·Make·시간 트리거용)
+      if (body.mode === 'add') {
+        var res = addAssignments(body.assignments || []);
+        return json({ ok: true, added: res.added, createdStaff: res.createdStaff });
+      }
+      // 기본 — 앱과 전체 상태를 주고받는다
       var merged = mergeState(readState(), body.state || {});
       writeState(merged);
       writeView(merged);
@@ -42,6 +48,87 @@ function doPost(e) {
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
+}
+
+/* ───────────────────────── 지시서 투입 ─────────────────────────
+ * 앱을 거치지 않고 업무를 등록한다. 직원은 '이름'으로 찾고, 없으면 새로 만든다.
+ * 시간 트리거에 걸어 두면 정해진 주기로 자동 발행된다 (아래 publishWeekly 참고).
+ */
+function addAssignments(list) {
+  var st = readState();
+  var createdStaff = [];
+
+  function findStaff(name) {
+    name = String(name || '').trim();
+    if (!name) return null;
+    for (var i = 0; i < st.staff.length; i++) {
+      if (!st.staff[i].deleted && st.staff[i].name === name) return st.staff[i];
+    }
+    var s = { id: Utilities.getUuid(), name: name, createdAt: nowMs(), updatedAt: nowMs(), deleted: false };
+    st.staff.push(s);
+    createdStaff.push(name);
+    return s;
+  }
+
+  var added = 0;
+  (list || []).forEach(function (a) {
+    var s = findStaff(a.staff);
+    if (!s) return;
+    var steps = (a.steps || []).map(function (x) {
+      return { id: Utilities.getUuid(), label: typeof x === 'string' ? x : String(x.label || '') };
+    }).filter(function (x) { return x.label; });
+
+    st.tasks.push({
+      id: Utilities.getUuid(),
+      groupId: 'api-' + nowMs(),
+      staffId: s.id,
+      title: String(a.title || '').trim() || '(제목 없음)',
+      detail: String(a.detail || ''),
+      guide: String(a.guide || ''),
+      steps: steps,
+      target: Number(a.target) || 0,
+      unit: String(a.unit || '건'),
+      time: String(a.time || ''),
+      priority: a.priority === 'high' ? 'high' : 'normal',
+      repeat: ['once', 'daily', 'weekday', 'days'].indexOf(a.repeat) >= 0 ? a.repeat : 'once',
+      days: (a.days || []).map(Number).filter(function (n) { return n >= 0 && n <= 6; }),
+      start: /^\d{4}-\d{2}-\d{2}$/.test(a.start || '') ? a.start : todayStr(),
+      end: /^\d{4}-\d{2}-\d{2}$/.test(a.end || '') ? a.end : '',
+      carry: a.carry !== false,
+      createdAt: nowMs(), updatedAt: nowMs(), deleted: false
+    });
+    added++;
+  });
+
+  writeState(st);
+  writeView(st);
+  return { added: added, createdStaff: createdStaff };
+}
+
+function nowMs() { return new Date().getTime(); }
+function todayStr() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+/* ───────────────── 정기 자동 발행 (선택) ─────────────────
+ * 매주 같은 업무를 반복해서 내보내야 한다면 여기에 적어두고
+ * 시계 아이콘(트리거) → 함수: publishWeekly → 주 단위 → 월요일 오전 8~9시 로 걸어두세요.
+ * 반복 설정(weekday/days)으로 해결되는 업무는 여기에 넣을 필요가 없습니다.
+ * 매주 내용이 바뀌는 업무(그 주 대상자·수량이 다른 것)에 쓰세요.
+ */
+var WEEKLY_SET = [
+  // {
+  //   staff: '김혜지',
+  //   title: '이번 주 신규 구독 CS 전화',
+  //   guide: '구독 명단에서 이번 주 신규만 추립니다\n미접속 7일 이상이면 사용법 재안내',
+  //   steps: ['명단 뽑기', '전화 돌리기', '결과 기록'],
+  //   target: 10, unit: '명', time: '15:00', repeat: 'days', days: [2, 5]
+  // }
+];
+
+function publishWeekly() {
+  if (!WEEKLY_SET.length) return;
+  addAssignments(WEEKLY_SET);
 }
 
 /* ───────────────────────── 병합 ───────────────────────── */
