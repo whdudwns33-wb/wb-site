@@ -27,7 +27,7 @@ export async function extractObservations({ testType, age, sex, imageRef, imageB
   const client = await getClient();
   const res = await client.messages.create({
     model: MODEL_S1,
-    max_tokens: 1024,
+    max_tokens: 4096,   // Opus 5는 적응형 thinking이 기본 → 관찰 JSON 잘림 방지 위해 여유
     system: S1_SYSTEM_PROMPT,
     tools: [S1_TOOL],
     tool_choice: { type: 'tool', name: 'record_observations' },
@@ -75,7 +75,7 @@ export async function generateText({ kind, payload }) {
   const client = await getClient();
   const res = await client.messages.create({
     model: MODEL_S3,
-    max_tokens: 2048,
+    max_tokens: 4096,   // thinking + 본문 여유
     system: SYS[kind] || SYS.expert_draft,
     messages: [{ role: 'user', content: '아래 관찰-가설(JSON)을 바탕으로 작성하세요:\n' + JSON.stringify(items, null, 2) }]
   });
