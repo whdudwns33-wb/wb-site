@@ -6,10 +6,21 @@
 ## 실행
 ```bash
 cd backend
-npm start          # http://localhost:8787  (mock AI)
-npm test           # end-to-end 스모크 테스트 (17 케이스)
+npm start          # http://localhost:8787  (키 없으면 mock AI)
+npm test           # end-to-end 스모크 테스트 (17 케이스, mock)
 ```
-실제 Claude 연동: `ANTHROPIC_API_KEY` 환경변수 설정 → `claudeClient.mjs`가 실제 Vision 호출 경로 사용.
+
+## 실제 Claude 연동
+```bash
+npm install                      # @anthropic-ai/sdk 설치
+export ANTHROPIC_API_KEY=sk-...  # 키가 있으면 자동으로 실제 호출 경로 사용
+npm start
+```
+- 키가 **없으면** mock으로 동작(무의존성 실행·CI 유지). 키가 **있으면** `claudeClient.mjs`가 공식 SDK로 호출.
+- **S1**(그림 판독): Vision + 강제 tool-use(`record_observations`)로 구조화 관찰 JSON.
+- **S3**(생성): 안전 프롬프트로 전문가 초안/학부모 미리보기/정식 리포트.
+- 실이미지: 업로드 시 `image_base64`(+선택 `media_type`)를 함께 전달하면 S1이 실제 판독. 데모 키워드(`sample-htp`)는 계속 mock 샘플.
+- **모델 선택**(기본 `claude-opus-5`): `MODEL_S1` / `MODEL_S3` 또는 `CLAUDE_MODEL` 환경변수로 단계별 교체 가능(예: S1만 `claude-sonnet-5`로 비용 절감).
 
 ## 구조
 ```

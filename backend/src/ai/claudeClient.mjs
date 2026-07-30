@@ -1,58 +1,89 @@
-// Claude 클라이언트 — 실제 API 경로 + 모의(mock) 폴백.
-// ANTHROPIC_API_KEY가 없으면 mock으로 동작(개발/CI에서 네트워크 없이 실행 가능).
-// 실제 연동 시 이 파일만 교체하면 나머지 파이프라인은 그대로 동작.
+// Claude 클라이언트 — 실제 API(@anthropic-ai/sdk) + 모의(mock) 폴백.
+// ANTHROPIC_API_KEY가 없으면 mock으로 동작(개발/CI에서 SDK 없이도 실행 가능).
+// SDK는 키가 있을 때만 지연 import → mock 경로는 무의존성 유지.
 
 import { S1_SYSTEM_PROMPT, S1_TOOL } from './s1Schema.mjs';
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL_DRAFT = 'claude-opus-5';      // 초안(S1/S3): 상위 모델
+// 모델(기본 Claude Opus 5). 필요 시 환경변수로 검사단계별 교체 가능.
+const MODEL_S1 = process.env.MODEL_S1 || process.env.CLAUDE_MODEL || 'claude-opus-5';
+const MODEL_S3 = process.env.MODEL_S3 || process.env.CLAUDE_MODEL || 'claude-opus-5';
 const useMock = !process.env.ANTHROPIC_API_KEY;
 
-// ── S1: Vision 관찰 추출 ─────────────────────────────────────────
-export async function extractObservations({ testType, age, sex, imageRef, imageBase64 }) {
-  if (useMock) return mockObservations({ testType, imageRef, age });
+let _client = null;
+async function getClient() {
+  if (_client) return _client;
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  _client = new Anthropic();          // ANTHROPIC_API_KEY를 환경에서 자동 사용
+  return _client;
+}
 
-  // 실제 경로: tool_choice로 record_observations 강제
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: MODEL_DRAFT,
-      max_tokens: 1024,
-      system: S1_SYSTEM_PROMPT,
-      tools: [S1_TOOL],
-      tool_choice: { type: 'tool', name: 'record_observations' },
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: `검사: ${testType}, 아동: 만 ${age}세 ${sex}. 관찰만 기록.` },
-          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } }
-        ]
-      }]
-    })
+// ── S1: Vision 관찰 추출 (강제 tool-use로 구조화 출력) ────────────
+export async function extractObservations({ testType, age, sex, imageRef, imageBase64, mediaType }) {
+  if (useMock || (!imageBase64 && String(imageRef || '').startsWith('sample-'))) {
+    return mockObservations({ testType, imageRef });
+  }
+  if (!imageBase64) throw new Error('S1: 이미지(base64)가 없습니다');
+
+  const client = await getClient();
+  const res = await client.messages.create({
+    model: MODEL_S1,
+    max_tokens: 1024,
+    system: S1_SYSTEM_PROMPT,
+    tools: [S1_TOOL],
+    tool_choice: { type: 'tool', name: 'record_observations' },
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: `검사: ${testType}, 아동: 만 ${age ?? '?'}세 ${sex ?? ''}. 관찰만 기록.` },
+        { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: imageBase64 } }
+      ]
+    }]
   });
-  if (!res.ok) throw new Error(`Claude S1 실패: ${res.status}`);
-  const data = await res.json();
-  const toolUse = (data.content || []).find((c) => c.type === 'tool_use');
-  if (!toolUse) throw new Error('S1: tool_use 응답 없음');
+  const toolUse = (res.content || []).find((b) => b.type === 'tool_use' && b.name === 'record_observations');
+  if (!toolUse) throw new Error('S1: record_observations 도구 응답 없음');
   return toolUse.input;
 }
 
-// ── S3: 자연어 생성 (전문가 초안 / 학부모 텍스트) ─────────────────
-// MVP는 템플릿 기반. 실제 연동 시 Claude messages 호출로 교체(시임 동일).
+// ── S3: 자연어 생성 (전문가 초안 / 학부모 미리보기 / 정식 리포트) ──
+const SYS = {
+  expert_draft:
+    "당신은 아동 심리평가 보조 도구입니다. 아래 관찰-가설 목록을 근거로 전문가가 '검수'할 초안을 작성하세요.\n" +
+    "규칙: 각 항목을 '관찰 → 가설(신뢰도) → 상담에서 확인할 질문' 형식으로. 단정 금지. '진단'이라는 단어 사용 금지.\n" +
+    "약한 근거는 명확히 '약'으로 표시하고 대안 설명을 병기. 마지막에 '본 초안은 가설이며, 타 검사·면담과 통합 필요' 문구 포함. 한국어.",
+  parent_preview:
+    "당신은 학부모에게 전할 '참고용 미리보기'를 씁니다.\n" +
+    "규칙: 강점을 먼저, 따뜻하고 쉬운 말로. 정서·병리 관련 강한 표현 금지(관찰 중심만).\n" +
+    "'전문가 확정 후 정식 해석 제공' 안내와 '참고용이며 진단이 아닙니다' 취지의 문구를 포함. 2~4문장, 한국어.",
+  parent_report:
+    "전문가가 확정한 항목만 사용해 학부모용 정식 리포트를 씁니다.\n" +
+    "구조: 강점 → 관찰된 특징 → 집에서 돕는 법 → 다음 단계(상담). 낙인·병리 언어를 성장 관점으로 리프레이밍.\n" +
+    "하단에 '본 리포트는 참고용이며 진단이 아닙니다' 면책 문구를 고정. 쉬운 한국어."
+};
+
 export async function generateText({ kind, payload }) {
   if (useMock) return mockGenerate({ kind, payload });
-  // TODO: 실제 Claude 호출 (kind별 시스템 프롬프트 주입)
-  return mockGenerate({ kind, payload });
+
+  const keep = (payload.hypotheses || []).filter((h) => h.status !== 'rejected');
+  const items = keep.map((h) => ({
+    observation: h.observation,
+    hypothesis: h.edited_text || h.text,
+    confidence: h.confidence,
+    age_adjustment: h.age_adjustment || null,
+    caveats: h.caveats || [],
+    strength: !!h.strength
+  }));
+  const client = await getClient();
+  const res = await client.messages.create({
+    model: MODEL_S3,
+    max_tokens: 2048,
+    system: SYS[kind] || SYS.expert_draft,
+    messages: [{ role: 'user', content: '아래 관찰-가설(JSON)을 바탕으로 작성하세요:\n' + JSON.stringify(items, null, 2) }]
+  });
+  return (res.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
 }
 
-// ── mock 구현 ────────────────────────────────────────────────────
-function mockObservations({ testType, imageRef, age }) {
-  // 데모: 샘플 HTP 케이스
+// ── mock 구현 (키/SDK 없이 흐름 검증용) ───────────────────────────
+function mockObservations({ testType, imageRef }) {
   if (testType === 'HTP' && imageRef === 'sample-htp') {
     return {
       image_quality: { ok: true, issues: [] },
@@ -66,7 +97,6 @@ function mockObservations({ testType, imageRef, age }) {
       crisis_flags: []
     };
   }
-  // 위기 신호 데모
   const flags = imageRef === 'sample-crisis' ? ['self_harm_imagery'] : [];
   return { image_quality: { ok: true, issues: [] }, observations: [], crisis_flags: flags };
 }
@@ -97,3 +127,6 @@ function mockGenerate({ kind, payload }) {
 }
 
 function confKo(c) { return c === 'high' ? '강' : c === 'mid' ? '중' : '약'; }
+
+// 상태 점검용
+export const clientInfo = { useMock, MODEL_S1, MODEL_S3 };
