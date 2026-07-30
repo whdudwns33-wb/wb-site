@@ -546,16 +546,19 @@
 
   // ── 백엔드 어댑터: 켜져 있으면 실제 API, 없으면 mock 폴백 ──
   state.backend=false; state.submissionId=null; state.reportToken=null; state.selectedTest='HTP'; state.birthYear=null;
+  // 배포 시 백엔드 주소를 주입하는 단일 지점. 비어 있으면 데모(mock) 모드로 동작.
+  // 예) var WB_API_BASE='https://api.wb-center.example';  ← 백엔드 배포 후 이 한 줄만 교체
+  var WB_API_BASE='';
   var qp=new URLSearchParams(location.search);
-  var API=(qp.get('api')!=null?qp.get('api'):'');   // 기본: 같은 출처
+  var API=(qp.get('api')!=null?qp.get('api'):WB_API_BASE);
   var EXPERT={'x-role':'expert'};
   function api(method,path,body,headers){
     return fetch(API+path,{method:method,headers:Object.assign({'content-type':'application/json'},headers||{}),
       body:body?JSON.stringify(body):undefined}).then(function(r){return r.json().then(function(j){return {code:r.status,body:j}})});
   }
   function detectBackend(){
-    // 아티팩트/외부 호스트에서 오탐 방지: localhost이거나 ?api= 지정 시에만 탐지
-    var allow=qp.get('api')!=null||/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+    // 아티팩트/외부 호스트에서 오탐 방지: WB_API_BASE 주입·?api= 지정·localhost일 때만 탐지
+    var allow=qp.get('api')!=null||WB_API_BASE!==''||/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
     if(!allow) return Promise.resolve(false);
     return fetch(API+'/api/health').then(function(r){return r.ok}).catch(function(){return false});
   }
