@@ -314,12 +314,7 @@
       <div>
         <div class="cpanel">
           <h3>AI가 관찰한 점</h3>
-          <ul style="margin:10px 0 0 18px;font-size:14.5px;line-height:1.9">
-            <li>밝은 표정과 큰 눈 — <b>정서 표현이 열려 있어요</b></li>
-            <li>튼튼한 나무 줄기와 뿌리 — <b>안정감을 좋아하는 편</b></li>
-            <li>지붕을 크게 — 상상·이야기를 즐기는 경향</li>
-            <li>사람의 손이 생략됨 — <span class="muted">이 나이대엔 흔한 표현일 수 있어요</span></li>
-          </ul>
+          <ul id="pvObs" style="margin:10px 0 0 18px;font-size:14.5px;line-height:1.9"></ul>
           <div class="disclaimer" style="margin-top:16px"><span>⏳</span><div><b>전문가 확정 대기 중.</b> 정서·관계에 대한 자세한 해석은 전문 심리사 확인 후 <b>학부모 리포트</b>로 제공됩니다.</div></div>
         </div>
         <div class="btnrow">
@@ -341,9 +336,7 @@
       <div>
         <div class="cpanel">
           <div class="drawwrap" id="drawHost2"></div>
-          <div class="cmeta">
-            <span class="m">검사 HTP</span><span class="m">별명 ○○ (샘플)</span><span class="m">만 8세 · 남아</span><span class="m">동생 출생 후</span>
-          </div>
+          <div class="cmeta" id="cmeta"></div>
           <p class="muted" style="font-size:12.5px">※ 핀에 마우스를 올리면 오른쪽 해당 가설이 강조됩니다.</p>
         </div>
       </div>
@@ -384,22 +377,18 @@
       <div style="margin-bottom:14px"><span class="verified">✓ 전문 심리사 확정 완료</span></div>
       <div class="report">
         <div class="rhead">
-          <div class="k">우리 아이 그림 이야기 · HTP</div>
+          <div class="k" id="rTest">우리 아이 그림 이야기 · HTP</div>
           <h2>○○의 그림이 들려주는 마음</h2>
           <p style="opacity:.85;font-size:14px">전문 심리사가 확인한 해석 요약입니다.</p>
         </div>
         <div class="rbody">
           <div class="block good">
             <h3>💛 이런 강점이 보여요</h3>
-            <p>표정과 눈을 또렷하고 밝게 그렸어요. 자기 감정을 표현하는 데 열려 있고, 튼튼한 나무처럼 <b>안정감을 소중히 여기는 아이</b>예요.</p>
+            <p id="rStrength">밝은 정서 표현 등 긍정적인 특징이 보여요.</p>
           </div>
           <div class="block">
             <h3>🔎 관찰된 특징</h3>
-            <ul>
-              <li>지붕을 크게 그린 건 상상과 이야기를 즐기는 마음과 연결될 수 있어요.</li>
-              <li>사람의 손을 생략한 표현은 이 나이대에 흔하지만, 새로운 관계에 <b>조금 신중한 편</b>일 가능성도 함께 봅니다.</li>
-              <li>동생이 태어난 시기와 겹쳐, 가족 안에서 자기 자리를 살피는 마음이 담겼을 수 있어요.</li>
-            </ul>
+            <ul id="rFeatures"></ul>
           </div>
           <div class="block tip">
             <h3>🌱 집에서 이렇게 도와주세요</h3>
@@ -458,22 +447,102 @@
 </svg>
 </template>
 
+<!-- KFD 동적 가족화 (거리·단절·자기 구석·장벽) -->
+<template id="kfdSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 KFD: 인물 간 거리·각자 활동·자기 구석·장벽">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <!-- 부모 1 (왼쪽, 요리) -->
+    <circle cx="95" cy="150" r="22" fill="#ffe7c2"/><line x1="95" y1="172" x2="95" y2="230"/>
+    <path d="M95 185 l-20 16 M95 185 l20 16"/><path d="M95 230 l-15 30 M95 230 l15 30"/>
+    <!-- 부모 2 (가운데, 다른 활동) -->
+    <circle cx="235" cy="150" r="22" fill="#ffe7c2"/><line x1="235" y1="172" x2="235" y2="230"/>
+    <path d="M235 185 l-20 16 M235 185 l20 16"/><path d="M235 230 l-15 30 M235 230 l15 30"/>
+    <!-- 장벽(가구) — 가운데-오른쪽 사이 -->
+  </g>
+  <rect x="330" y="215" width="70" height="55" fill="#eae0cf" stroke="#b6a683" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="2.5" fill="none" stroke-linecap="round">
+    <!-- 자기 (오른쪽 구석, 작게) -->
+    <circle cx="470" cy="245" r="14" fill="#ffe7c2"/><line x1="470" y1="259" x2="470" y2="288"/>
+    <path d="M470 267 l-11 9 M470 267 l11 9"/><path d="M470 288 l-9 12 M470 288 l9 12"/>
+    <circle cx="466" cy="243" r="1.6" fill="#4a4a4a"/><circle cx="474" cy="243" r="1.6" fill="#4a4a4a"/>
+    <path d="M465 251 q5 3 10 0"/>
+  </g>
+</svg>
+</template>
+
+<!-- DAP 인물화 (작게·신체부위 적음·손 생략·무표정) -->
+<template id="dapSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 DAP: 작은 인물·부위 적음·손 생략·무표정">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="260" cy="150" r="26" fill="#ffe7c2"/>
+    <circle cx="251" cy="146" r="2.4" fill="#4a4a4a"/><circle cx="269" cy="146" r="2.4" fill="#4a4a4a"/>
+    <line x1="250" y1="162" x2="270" y2="162"/> <!-- 무표정(직선 입) -->
+    <line x1="260" y1="176" x2="260" y2="238"/>
+    <path d="M260 190 l-22 16 M260 190 l22 16"/> <!-- 팔 끝 손 없음 -->
+    <path d="M260 238 l-16 30 M260 238 l16 30"/>
+  </g>
+</svg>
+</template>
+
+<!-- 자유화·빗속의 사람 (많은 비·우산 없음·어두운 색·구석) -->
+<template id="freeSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 PITR: 빗줄기 많음·우산 없음·어두운 색·구석 배치">
+  <rect width="520" height="340" fill="#f3f1ec"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#7ba05b" stroke-width="3"/>
+  <ellipse cx="200" cy="55" rx="120" ry="34" fill="#7d8794"/>
+  <g stroke="#5b6673" stroke-width="2.4" stroke-linecap="round">
+    <line x1="70" y1="95" x2="55" y2="140"/><line x1="120" y1="95" x2="105" y2="150"/>
+    <line x1="170" y1="95" x2="155" y2="145"/><line x1="220" y1="95" x2="205" y2="155"/>
+    <line x1="270" y1="95" x2="255" y2="140"/><line x1="150" y1="150" x2="135" y2="200"/>
+    <line x1="210" y1="160" x2="195" y2="210"/><line x1="90" y1="150" x2="78" y2="195"/>
+    <line x1="250" y1="150" x2="238" y2="200"/><line x1="300" y1="120" x2="288" y2="165"/>
+  </g>
+  <g stroke="#3a3f47" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="430" cy="205" r="18" fill="#c8ccd2"/><line x1="430" y1="223" x2="430" y2="262"/>
+    <path d="M430 233 l-16 13 M430 233 l16 13"/><path d="M430 262 l-12 22 M430 262 l12 22"/>
+    <circle cx="424" cy="203" r="1.8" fill="#3a3f47"/><circle cx="436" cy="203" r="1.8" fill="#3a3f47"/>
+    <path d="M424 212 q6 4 12 0"/>
+  </g>
+</svg>
+</template>
+
 <script>
 (function(){
   var views={landing:'v-landing',wizard:'v-wizard',preview:'v-preview',console:'v-console',report:'v-report'};
-  var state={confirmed:false, step:1, hyp:[
-    {id:'roof', obs:'집 · 지붕을 크게', txt:'상상·공상에 대한 관심이 큰 경향 (가능성)', conf:'low', x:'19%', y:'40%', status:'accept',
-      caveat:'HTP 지붕 해석은 근거 약함 · 연구 간 의미 상충'},
-    {id:'door', obs:'집 · 문 손잡이 없음', txt:'관계에 다가서는 데 신중한 경향 (가능성)', conf:'mid', x:'20%', y:'80%', status:'accept',
-      caveat:'단일 지표로 단정 금지 · 면담(PDI)으로 확인'},
-    {id:'root', obs:'나무 · 뿌리·줄기 강조', txt:'안정감·현실 지향 추구 가능성', conf:'low', x:'50%', y:'88%', status:'accept',
-      caveat:'뿌리 상징 해석은 근거 약함'},
-    {id:'hand', obs:'사람 · 손 생략', txt:'행위·대인접촉에 조심스러움 가능성', conf:'low', x:'74%', y:'68%', status:'accept',
-      adjust:'연령 보정: 만 8세 전후에서는 발달상 정상 범위일 수 있음 — 병리 단정 금지.',
-      caveat:'귀찮음 등 대안 설명 가능 · 반복 시에만 의미'},
-    {id:'face', obs:'사람 · 큰 눈·미소', txt:'정서 표현이 개방적이고 긍정 정서가 드러남', conf:'mid', x:'79%', y:'50%', status:'accept',
-      caveat:'노골적 정서 기호만 참고 · 진단 아님'}
-  ]};
+  // 검사별 그림·가설·핀 (mock). 백엔드 연결 시 가설은 실제 응답으로 대체됨.
+  var TESTS = {
+    HTP: { svg:'htpSVG', name:'집–나무–사람 (HTP)', hyp:[
+      {id:'house.roof', obs:'집 · 지붕을 크게', txt:'상상·공상에 대한 관심이 큰 경향 (가능성)', conf:'low', x:'19%', y:'40%', status:'accept', caveat:'HTP 지붕 해석은 근거 약함 · 연구 간 의미 상충'},
+      {id:'house.door', obs:'집 · 문 손잡이 없음', txt:'관계에 다가서는 데 신중한 경향 (가능성)', conf:'mid', x:'20%', y:'80%', status:'accept', caveat:'단일 지표로 단정 금지 · 면담(PDI)으로 확인'},
+      {id:'tree.root', obs:'나무 · 뿌리·줄기 강조', txt:'안정감·현실 지향 추구 가능성', conf:'low', x:'50%', y:'88%', status:'accept', caveat:'뿌리 상징 해석은 근거 약함'},
+      {id:'person.hand', obs:'사람 · 손 생략', txt:'행위·대인접촉에 조심스러움 가능성', conf:'low', x:'74%', y:'68%', status:'accept', adjust:'연령 보정: 만 8세 전후에서는 발달상 정상 범위일 수 있음 — 병리 단정 금지.', caveat:'귀찮음 등 대안 설명 가능 · 반복 시에만 의미'},
+      {id:'person.face', obs:'사람 · 큰 눈·미소', txt:'정서 표현이 개방적이고 긍정 정서가 드러남', conf:'mid', x:'79%', y:'50%', status:'accept', strength:true, caveat:'노골적 정서 기호만 참고 · 진단 아님'}
+    ]},
+    KFD: { svg:'kfdSVG', name:'동적 가족화 (KFD)', hyp:[
+      {id:'kfd.distance', obs:'가족 · 인물 간 거리 멂', txt:'정서적 거리·소외감 가능성', conf:'mid', x:'50%', y:'30%', status:'accept', caveat:'문화·상황 영향 · 단정 금지'},
+      {id:'kfd.activity', obs:'가족 · 각자 다른 활동', txt:'가족 내 정서적 단절감 가능성', conf:'mid', x:'31%', y:'55%', status:'accept', caveat:'문화·상황 영향'},
+      {id:'kfd.self_position', obs:'가족 · 자기 구석·작게', txt:'위축·소외감 가능성', conf:'mid', x:'88%', y:'75%', status:'accept', caveat:'발달 영향 · 반복 시 의미'},
+      {id:'kfd.barrier', obs:'가족 · 사물로 가로막힘', txt:'의사소통 차단·방어 욕구 가능성', conf:'low', x:'67%', y:'70%', status:'accept', caveat:'체계적 검증 제한'}
+    ]},
+    DAP: { svg:'dapSVG', name:'인물화 (DAP)', hyp:[
+      {id:'dap.parts', obs:'사람 · 신체부위 적음', txt:'발달 수준 미성숙 가능성 (발달 지표)', conf:'mid', x:'50%', y:'62%', status:'accept', caveat:'연령·미술경험 영향 · 정서 문제 아님'},
+      {id:'dap.omission', obs:'사람 · 손 생략', txt:'통제감 부족·행동 억제 가능성', conf:'low', x:'40%', y:'56%', status:'accept', adjust:'연령 보정: 만 9세 미만 생략은 발달상 정상 범위일 수 있음.', caveat:'정서지표 근거 약함 · 대안 설명 가능'},
+      {id:'dap.size', obs:'사람 · 작게 그림', txt:'위축·자존감 저하 가능성', conf:'low', x:'50%', y:'85%', status:'accept', caveat:'크기만으로 단정 불가'},
+      {id:'dap.face', obs:'사람 · 무표정', txt:'정서 둔마·우울 가능성', conf:'low', x:'50%', y:'40%', status:'accept', caveat:'문화·미술습관 영향'}
+    ]},
+    FREE: { svg:'freeSVG', name:'자유화·빗속의 사람', hyp:[
+      {id:'pitr.rain', obs:'빗속 · 빗줄기 많음', txt:'현재 스트레스가 크거나 민감할 가능성', conf:'mid', x:'32%', y:'30%', status:'accept', caveat:'상황 영향'},
+      {id:'pitr.umbrella', obs:'빗속 · 우산 없음', txt:'대처자원 부족 가능성', conf:'mid', x:'83%', y:'50%', status:'accept', caveat:'자원이 다른 형태일 수 있음'},
+      {id:'free.color', obs:'자유화 · 어두운 색 위주', txt:'에너지 저하·위축 가능성', conf:'low', x:'38%', y:'16%', status:'accept', caveat:'색채 해석은 문화·개인차 큼 · 고른 이유 확인 필수'},
+      {id:'free.space', obs:'자유화 · 구석 배치', txt:'위축·표현 최소화 가능성', conf:'low', x:'83%', y:'82%', status:'accept', caveat:'발달 영향'}
+    ]}
+  };
+  function cloneHyp(t){ return (TESTS[t]||TESTS.HTP).hyp.map(function(h){return Object.assign({},h);}); }
+  var state={confirmed:false, step:1, hyp:cloneHyp('HTP')};
 
   // ── 백엔드 어댑터: 켜져 있으면 실제 API, 없으면 mock 폴백 ──
   state.backend=false; state.submissionId=null; state.reportToken=null; state.selectedTest='HTP'; state.birthYear=null;
@@ -490,12 +559,15 @@
     if(!allow) return Promise.resolve(false);
     return fetch(API+'/api/health').then(function(r){return r.ok}).catch(function(){return false});
   }
-  // 백엔드 element → 프로토타입 핀 좌표
-  var PIN_POS={'house.roof':['19%','40%'],'house.door':['20%','80%'],'tree.root':['50%','88%'],
-               'person.hand':['74%','68%'],'person.face':['79%','50%']};
+  // 백엔드 element → 현재 검사 그림의 핀 좌표
+  function posFor(test, element){
+    var arr=(TESTS[test]||TESTS.HTP).hyp;
+    for(var i=0;i<arr.length;i++){ if(arr[i].id===element) return [arr[i].x,arr[i].y]; }
+    return ['50%','50%'];
+  }
   var SMAP={ai_suggested:'accept',accepted:'accept',edited:'edit',rejected:'reject'};
   function normalizeHyp(h){
-    var pos=PIN_POS[h.element]||['50%','50%'];
+    var pos=posFor(state.selectedTest, h.element);
     return {id:h.element, dbId:h.id, obs:h.observation, txt:h.text, conf:h.confidence,
       adjust:h.age_adjustment||null, caveat:(h.caveats||[]).join(' · '),
       status:SMAP[h.status]||'accept', x:pos[0], y:pos[1]};
@@ -514,7 +586,7 @@
     $all('.demobar .navbtn').forEach(function(b){b.classList.toggle('active',b.dataset.go===v)});
     window.scrollTo({top:0,behavior:'auto'});
     if(v==='console'){loadConsole();}
-    if(v==='preview'){mountDrawing('drawHost1',false);}
+    if(v==='preview'){ if(!state.backend) state.hyp=cloneHyp(state.selectedTest); mountDrawing('drawHost1',false); renderPvObs(); }
     if(v==='report'){renderReport();}
   }
   $all('[data-go]').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.go)})});
@@ -524,16 +596,29 @@
     if(state.backend && state.submissionId){
       api('GET','/api/console/submissions/'+state.submissionId,null,EXPERT).then(function(r){
         if(r.body&&r.body.hypotheses&&r.body.hypotheses.length){ state.hyp=r.body.hypotheses.map(normalizeHyp); }
-        mountDrawing('drawHost2',true); renderHyp();
-      }).catch(function(){ mountDrawing('drawHost2',true); renderHyp(); });
-    } else { mountDrawing('drawHost2',true); renderHyp(); }
+        mountDrawing('drawHost2',true); renderHyp(); fillCmeta();
+      }).catch(function(){ mountDrawing('drawHost2',true); renderHyp(); fillCmeta(); });
+    } else { state.hyp=cloneHyp(state.selectedTest); mountDrawing('drawHost2',true); renderHyp(); fillCmeta(); }
+  }
+  function fillCmeta(){
+    var el=$('#cmeta'); if(!el) return;
+    var meta=[['검사', (TESTS[state.selectedTest]||TESTS.HTP).name], ['별명','○○ (샘플)'],
+      ['나이', (state.birthYear? (new Date().getFullYear()-state.birthYear) : ($('#f-age')?$('#f-age').value:8))+'세']];
+    el.innerHTML=meta.map(function(m){return '<span class="m">'+m[0]+' '+m[1]+'</span>'}).join('');
+  }
+  function renderPvObs(){
+    var el=$('#pvObs'); if(!el) return;
+    el.innerHTML=state.hyp.slice(0,4).map(function(h){
+      return '<li>'+h.obs.replace(/^[^·]*· /,'')+' — <span class="muted">'+h.txt+'</span></li>';
+    }).join('');
   }
 
   // drawing mount (+optional pins)
   function mountDrawing(hostId,withPins){
     var host=$('#'+hostId); if(!host) return;
     host.innerHTML='';
-    host.appendChild(document.importNode($('#htpSVG').content,true));
+    var tid=(TESTS[state.selectedTest]||TESTS.HTP).svg;
+    host.appendChild(document.importNode($('#'+tid).content,true));
     if(withPins){
       state.hyp.forEach(function(h,i){
         var p=document.createElement('div');
@@ -618,10 +703,18 @@
   function renderReport(){
     $('#reportLocked').classList.toggle('hidden',state.confirmed);
     $('#reportReady').classList.toggle('hidden',!state.confirmed);
-    if(state.confirmed && state.backend && state.reportToken){
-      api('GET','/api/reports/'+state.reportToken+'?birth_year='+(state.birthYear||''),null).then(function(r){
-        var v=$('#reportReady .verified'); if(v&&r.code===200){ v.textContent='✓ 전문 심리사 확정 완료 · 백엔드 발행'; }
-      });
+    if(state.confirmed){
+      $('#rTest').textContent='우리 아이 그림 이야기 · '+(TESTS[state.selectedTest]||TESTS.HTP).name;
+      var keep=state.hyp.filter(function(h){return h.status!=='reject'});
+      var str=keep.filter(function(h){return h.strength}).map(function(h){return h.txt});
+      var feat=keep.filter(function(h){return !h.strength}).map(function(h){return h.txt});
+      $('#rStrength').textContent= str.length? str.join(' / ') : '밝은 정서 표현 등 아이만의 긍정적인 면이 함께 보여요.';
+      $('#rFeatures').innerHTML=(feat.length?feat:['—']).map(function(t){return '<li>'+t+'</li>'}).join('');
+      if(state.backend && state.reportToken){
+        api('GET','/api/reports/'+state.reportToken+'?birth_year='+(state.birthYear||''),null).then(function(r){
+          var v=$('#reportReady .verified'); if(v&&r.code===200){ v.textContent='✓ 전문 심리사 확정 완료 · 백엔드 발행'; }
+        });
+      }
     }
   }
 
@@ -643,7 +736,7 @@
     api('POST','/api/submissions',{test_type:state.selectedTest,child:{alias:$('#f-alias').value,birth_year:birthYear,sex:$('#f-sex').value,context_note:$('#f-note').value}})
       .then(function(r){ state.submissionId=r.body.submission_id;
         return api('POST','/api/submissions/'+state.submissionId+'/consent',{analysis:true,store:true,improve:$('#c3').checked,guardian_verified:true}); })
-      .then(function(){ return api('POST','/api/submissions/'+state.submissionId+'/image',{image_ref:'sample-htp'}); })
+      .then(function(){ return api('POST','/api/submissions/'+state.submissionId+'/image',{image_ref:'sample-'+state.selectedTest.toLowerCase()}); })
       .then(function(r){ toast('AI 해석 생성됨 · '+(r.body.status)); go('preview'); })
       .catch(function(){ toast('백엔드 오류 — mock으로 진행'); go('preview'); });
   }
