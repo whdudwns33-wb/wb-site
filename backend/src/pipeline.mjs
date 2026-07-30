@@ -4,7 +4,7 @@
 import { store } from './store.mjs';
 import { assertTransition } from './stateMachine.mjs';
 import { extractObservations, generateText } from './ai/claudeClient.mjs';
-import { HTP_KB } from './ai/knowledgeBase.mjs';
+import { KB_BY_TEST } from './ai/knowledgeBase.mjs';
 import { assertHypothesisValid, assertNoBannedWords, assertPublishable } from './guardrails.mjs';
 
 // 업로드 직후 실행. status: uploaded → processing → (escalated | reviewing)
@@ -57,7 +57,7 @@ export async function runPipeline(submissionId) {
 
 // S2: 관찰 → 가설 매핑 (실측/테스트에서도 실제 코드 재사용을 위해 export)
 export function mapHypotheses(observations, testType, age) {
-  const kb = testType === 'HTP' ? HTP_KB : {};
+  const kb = KB_BY_TEST[testType] || {};
   const out = [];
   for (const o of observations) {
     const entry = kb[o.element];

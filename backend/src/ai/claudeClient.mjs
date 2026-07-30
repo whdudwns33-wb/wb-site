@@ -84,21 +84,37 @@ export async function generateText({ kind, payload }) {
 
 // ── mock 구현 (키/SDK 없이 흐름 검증용) ───────────────────────────
 function mockObservations({ testType, imageRef }) {
-  if (testType === 'HTP' && imageRef === 'sample-htp') {
-    return {
-      image_quality: { ok: true, issues: [] },
-      observations: [
-        { element: 'house.roof', present: true, attributes: { size: 'large' }, note: '지붕이 몸체보다 크게', vision_confidence: 'high' },
-        { element: 'house.door', present: true, attributes: { handle: false }, note: '문 손잡이 없음', vision_confidence: 'mid' },
-        { element: 'tree.root', present: true, attributes: { emphasis: 'strong' }, note: '뿌리·밑동 강조', vision_confidence: 'mid' },
-        { element: 'person.hand', present: false, attributes: {}, note: '손 생략', vision_confidence: 'high' },
-        { element: 'person.face', present: true, attributes: { size: 'large', expression: 'smile' }, note: '큰 눈·미소', vision_confidence: 'high' }
-      ],
-      crisis_flags: []
-    };
-  }
+  const q = { ok: true, issues: [] };
+  const S = {
+    'sample-htp': [
+      { element: 'house.roof', present: true, attributes: { size: 'large' }, note: '지붕이 몸체보다 크게', vision_confidence: 'high' },
+      { element: 'house.door', present: true, attributes: { handle: false }, note: '문 손잡이 없음', vision_confidence: 'mid' },
+      { element: 'tree.root', present: true, attributes: { emphasis: 'strong' }, note: '뿌리·밑동 강조', vision_confidence: 'mid' },
+      { element: 'person.hand', present: false, attributes: {}, note: '손 생략', vision_confidence: 'high' },
+      { element: 'person.face', present: true, attributes: { size: 'large', expression: 'smile' }, note: '큰 눈·미소', vision_confidence: 'high' }
+    ],
+    'sample-kfd': [
+      { element: 'kfd.distance', present: true, attributes: { level: 'far' }, note: '인물 간 거리 멂', vision_confidence: 'mid' },
+      { element: 'kfd.activity', present: true, attributes: { interaction: false }, note: '각자 다른 활동', vision_confidence: 'mid' },
+      { element: 'kfd.self_position', present: true, attributes: { size: 'small', location: 'corner' }, note: '자기 구석·작게', vision_confidence: 'mid' },
+      { element: 'kfd.barrier', present: true, attributes: {}, note: '사물로 가로막힘', vision_confidence: 'mid' }
+    ],
+    'sample-dap': [
+      { element: 'dap.parts', present: true, attributes: { count: 'low' }, note: '신체부위 적음', vision_confidence: 'mid' },
+      { element: 'dap.omission', present: false, attributes: { part: 'hand' }, note: '손 생략', vision_confidence: 'high' },
+      { element: 'dap.size', present: true, attributes: { size: 'small' }, note: '작게 그림', vision_confidence: 'mid' },
+      { element: 'dap.face', present: true, attributes: { expression: 'blank' }, note: '무표정', vision_confidence: 'mid' }
+    ],
+    'sample-free': [
+      { element: 'pitr.rain', present: true, attributes: { amount: 'heavy' }, note: '빗줄기 많음', vision_confidence: 'high' },
+      { element: 'pitr.umbrella', present: false, attributes: {}, note: '우산 없음', vision_confidence: 'high' },
+      { element: 'free.color', present: true, attributes: { usage: 'dark' }, note: '어두운 색 위주', vision_confidence: 'mid' },
+      { element: 'free.space', present: true, attributes: { placement: 'corner' }, note: '구석 배치', vision_confidence: 'mid' }
+    ]
+  };
+  if (S[imageRef]) return { image_quality: q, observations: S[imageRef], crisis_flags: [] };
   const flags = imageRef === 'sample-crisis' ? ['self_harm_imagery'] : [];
-  return { image_quality: { ok: true, issues: [] }, observations: [], crisis_flags: flags };
+  return { image_quality: q, observations: [], crisis_flags: flags };
 }
 
 function mockGenerate({ kind, payload }) {

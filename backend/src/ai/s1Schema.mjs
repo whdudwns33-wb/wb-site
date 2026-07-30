@@ -29,10 +29,20 @@ export const S1_TOOL = {
               type: 'string',
               // HTP 지식베이스 키와 정렬(S2 매핑 보장). KFD/DAP 확장 시 키 추가.
               enum: [
+                // HTP
                 'house.roof', 'house.door', 'house.window', 'house.fence',
                 'tree.trunk', 'tree.root', 'tree.foliage', 'tree.branch',
                 'person.head', 'person.face', 'person.hand', 'person.arm',
-                'person.leg', 'person.body'
+                'person.leg', 'person.body',
+                // KFD
+                'kfd.distance', 'kfd.activity', 'kfd.self_position',
+                'kfd.compartment', 'kfd.barrier', 'kfd.order',
+                // DAP
+                'dap.parts', 'dap.proportion', 'dap.omission',
+                'dap.size', 'dap.pressure', 'dap.face',
+                // FREE / PITR
+                'pitr.rain', 'pitr.umbrella', 'pitr.protection',
+                'free.color', 'free.space', 'free.line'
               ],
               description: '관찰 대상 요소 키 (반드시 목록 중 하나). 예: house.roof, tree.root, person.hand'
             },
