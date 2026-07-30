@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>그림검사 AI 해석 · 프로토타입 | WB 웩슬러브레인센터</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#1E9DD6; --deep-blue:#0F7AAB; --navy:#1B3A5C; --navy-deep:#0d2a47;
+    --coral:#E85D4A; --ivory:#FAF8F3; --dark:#2D2D2D; --mid:#6B7280;
+    --light:#F3F4F6; --line:#e5e7eb; --white:#fff;
+    --ok:#2f9e6f; --ok-bg:#e6f5ee; --warn:#c9862a; --warn-bg:#fbf1de;
+    --blue-soft:#7FD0F0;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Noto Sans KR',sans-serif;color:var(--dark);background:var(--ivory);line-height:1.7}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none!important}
+
+  /* demo bar */
+  .demobar{position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;
+    display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap;
+    box-shadow:0 2px 14px rgba(0,0,0,.18)}
+  .demobar .logo{font-weight:900;font-size:15px;margin-right:8px;letter-spacing:-.02em}
+  .demobar .logo span{color:var(--blue)}
+  .demobar .tag{font-size:11px;font-weight:700;color:var(--blue-soft);
+    border:1px solid rgba(127,208,240,.4);padding:2px 8px;border-radius:100px;margin-right:auto}
+  .navbtn{background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75);
+    font-size:12px;font-weight:600;padding:6px 11px;border-radius:6px;white-space:nowrap}
+  .navbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+  .navbtn[disabled]{opacity:.35;cursor:not-allowed}
+  .navbtn .lock{font-size:10px}
+
+  .view{padding:40px 0 72px;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+  h1{font-size:clamp(26px,4.4vw,42px);font-weight:900;line-height:1.25;letter-spacing:-.02em;margin-bottom:16px}
+  h2{font-size:clamp(21px,3vw,28px);font-weight:900;margin-bottom:10px;letter-spacing:-.01em}
+  h3{font-size:17px;font-weight:800;margin-bottom:6px}
+  .lede{font-size:16px;color:var(--mid);max-width:60ch}
+  .center{text-align:center}
+  .muted{color:var(--mid)}
+
+  .disclaimer{background:var(--warn-bg);border:1px solid #e6d4a8;color:#8a6414;
+    border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;display:flex;gap:9px;align-items:flex-start}
+  .disclaimer b{color:#6f4f0d}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;
+    padding:14px 26px;border-radius:9px;border:none;text-decoration:none;transition:transform .12s,box-shadow .12s}
+  .btn-primary{background:var(--coral);color:#fff;box-shadow:0 5px 18px rgba(232,93,74,.35)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 9px 24px rgba(232,93,74,.45)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+  .btn-ghost:hover{border-color:var(--blue);color:var(--deep-blue)}
+  .btn-nav{background:var(--navy);color:#fff}
+  .btn-nav:hover{background:var(--navy-deep)}
+  .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+  .btnrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+
+  /* ── LANDING ── */
+  .hero{background:linear-gradient(140deg,var(--navy),var(--navy-deep) 60%,var(--deep-blue));
+    color:#fff;border-radius:20px;padding:52px 40px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-120px;right:-100px;width:400px;height:400px;
+    background:radial-gradient(circle,rgba(30,157,214,.28),transparent 68%)}
+  .hero .badge{display:inline-block;background:rgba(30,157,214,.2);border:1px solid rgba(30,157,214,.5);
+    color:var(--blue-soft);font-size:12px;font-weight:700;letter-spacing:.08em;padding:6px 14px;border-radius:100px;margin-bottom:20px}
+  .hero h1{color:#fff}.hero h1 em{font-style:normal;color:var(--blue-soft)}
+  .hero .lede{color:rgba(255,255,255,.82)}
+  .steps3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:40px 0}
+  .stepcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px}
+  .stepcard .n{width:34px;height:34px;border-radius:9px;background:var(--blue);color:#fff;
+    font-weight:900;display:grid;place-items:center;margin-bottom:12px}
+  .stepcard p{font-size:14px;color:var(--mid)}
+  .testgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+  .testcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;text-align:center}
+  .testcard .code{font-weight:900;color:var(--coral);font-size:13px;letter-spacing:.05em}
+  .testcard h3{font-size:15px;margin:6px 0 4px}
+  .testcard p{font-size:12.5px;color:var(--mid)}
+
+  /* ── WIZARD ── */
+  .wizsteps{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
+  .wizstep{flex:1;min-width:120px;padding:10px 12px;border-radius:9px;background:#fff;border:1px solid var(--line);
+    font-size:13px;font-weight:700;color:var(--mid);display:flex;gap:8px;align-items:center}
+  .wizstep .d{width:22px;height:22px;border-radius:50%;background:var(--light);color:var(--mid);
+    display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 auto}
+  .wizstep.active{border-color:var(--blue);color:var(--navy)}
+  .wizstep.active .d{background:var(--blue);color:#fff}
+  .wizstep.done .d{background:var(--ok);color:#fff}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:32px}
+  .choice{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+  .opt{border:1.5px solid var(--line);border-radius:12px;padding:16px 18px;background:#fff;text-align:left;transition:.12s}
+  .opt:hover{border-color:var(--blue)}
+  .opt.sel{border-color:var(--blue);background:#f2fafd;box-shadow:0 0 0 1px var(--blue)}
+  .opt .code{font-weight:900;color:var(--coral);font-size:12px}
+  .opt h3{font-size:16px;margin:4px 0 3px}
+  .opt p{font-size:13px;color:var(--mid)}
+  .dropzone{border:2px dashed var(--blue);border-radius:14px;background:#f2fafd;padding:30px;text-align:center;cursor:pointer}
+  .dropzone:hover{background:#eaf6fc}
+  .dropzone .ico{font-size:34px;margin-bottom:8px}
+  .field{margin-top:16px}
+  .field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);
+    border-radius:9px;font-family:inherit;font-size:14px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .consent{display:flex;gap:10px;align-items:flex-start;background:var(--light);border-radius:10px;padding:14px;margin-top:12px;font-size:13.5px}
+  .consent input{margin-top:4px}
+
+  /* ── DRAWING + OVERLAY ── */
+  .drawwrap{position:relative;background:#fffdf7;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .drawwrap svg{display:block;width:100%;height:auto}
+  .pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;
+    background:var(--coral);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;
+    border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;transition:.12s}
+  .pin:hover,.pin.hot{transform:translate(-50%,-50%) scale(1.25);z-index:3}
+  .pin.dim{opacity:.35}
+
+  /* ── EXPERT CONSOLE ── */
+  .console{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:22px;align-items:start}
+  .cpanel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px}
+  .cmeta{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .cmeta .m{font-size:12px;background:var(--light);border-radius:6px;padding:5px 10px;font-weight:600;color:var(--navy)}
+  .hyp{border:1px solid var(--line);border-radius:11px;padding:14px 15px;margin-bottom:12px;transition:.12s}
+  .hyp.rejected{opacity:.5;background:var(--light)}
+  .hyp .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .hyp .obs{font-size:12px;font-weight:700;color:var(--deep-blue);margin-bottom:3px}
+  .hyp .txt{font-size:14px}
+  .conf{font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;white-space:nowrap;flex:0 0 auto}
+  .conf.high{background:var(--ok-bg);color:var(--ok)}
+  .conf.mid{background:#e8f1fb;color:var(--deep-blue)}
+  .conf.low{background:var(--warn-bg);color:var(--warn)}
+  .adjust{background:#f7fbe9;border:1px solid #dce8b8;color:#5f6f26;border-radius:8px;
+    font-size:12px;padding:8px 10px;margin-top:8px}
+  .caveat{background:var(--light);border:1px solid var(--line);color:var(--mid);border-radius:8px;
+    font-size:11.5px;padding:6px 10px;margin-top:6px}
+  .hypacts{display:flex;gap:6px;margin-top:11px}
+  .tog{font-size:12px;font-weight:700;padding:6px 12px;border-radius:7px;border:1.5px solid var(--line);background:#fff;color:var(--mid)}
+  .tog.accept.on{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+  .tog.edit.on{background:#e8f1fb;border-color:var(--blue);color:var(--deep-blue)}
+  .tog.reject.on{background:#fdeae7;border-color:var(--coral);color:var(--coral)}
+  .editbox{margin-top:9px}
+  .editbox textarea{width:100%;border:1.5px solid var(--blue);border-radius:8px;padding:10px;font-family:inherit;font-size:13px}
+  .gatebar{background:var(--navy);color:#fff;border-radius:13px;padding:18px 20px;margin-top:8px}
+  .gatebar .st{font-size:12.5px;color:var(--blue-soft);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .gatebar .sum{font-size:13px;color:rgba(255,255,255,.8);margin-bottom:14px}
+  .gatebar textarea{width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+    color:#fff;border-radius:8px;padding:10px;font-family:inherit;font-size:13px;margin-bottom:14px}
+  .gatebar textarea::placeholder{color:rgba(255,255,255,.5)}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:var(--ok);color:#fff;font-weight:700;padding:13px 22px;border-radius:100px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:.3s;z-index:99;font-size:14px}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ── PARENT REPORT ── */
+  .locked{background:#fff;border:1px dashed var(--line);border-radius:16px;padding:48px 24px;text-align:center}
+  .locked .ico{font-size:44px;margin-bottom:12px}
+  .report{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+  .report .rhead{background:linear-gradient(135deg,var(--blue),var(--deep-blue));color:#fff;padding:30px 32px}
+  .report .rhead .k{font-size:12px;font-weight:700;letter-spacing:.1em;opacity:.85}
+  .report .rhead h2{color:#fff;margin:6px 0 4px}
+  .report .rbody{padding:30px 32px;display:grid;gap:22px}
+  .block{border-left:4px solid var(--blue);padding-left:16px}
+  .block.good{border-color:var(--ok)}
+  .block.tip{border-color:var(--coral)}
+  .block h3{font-size:16px}
+  .block p,.block li{font-size:14.5px;color:#3a4854}
+  .block ul{margin:6px 0 0 18px}
+  .rcta{background:var(--ivory);border-radius:12px;padding:22px;text-align:center;border:1px solid var(--line)}
+  .verified{display:inline-flex;align-items:center;gap:7px;background:var(--ok-bg);color:var(--ok);
+    font-size:12.5px;font-weight:800;padding:6px 13px;border-radius:100px}
+
+  @media(max-width:820px){
+    .steps3,.testgrid{grid-template-columns:1fr 1fr}
+    .console{grid-template-columns:1fr}
+    .choice,.row2{grid-template-columns:1fr}
+  }
+  @media(max-width:520px){.steps3,.testgrid{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){.view{animation:none}*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- 데모 내비게이션 -->
+<nav class="demobar">
+  <span class="logo">WB<span>·</span></span>
+  <span class="tag">프로토타입 · 클릭 데모</span>
+  <button class="navbtn" data-go="landing">랜딩</button>
+  <button class="navbtn" data-go="wizard">업로드</button>
+  <button class="navbtn" data-go="preview">AI 미리보기</button>
+  <button class="navbtn" data-go="console">전문가 콘솔</button>
+  <button class="navbtn" id="nav-report" data-go="report">학부모 리포트 <span class="lock">🔒</span></button>
+</nav>
+
+<!-- ══════════ 1. 랜딩 ══════════ -->
+<section class="view" id="v-landing">
+  <div class="wrap">
+    <div class="hero">
+      <span class="badge">◆ 광주 유일 웩슬러 공식 검사·해석 센터</span>
+      <h1>아이 그림 한 장에 담긴 마음,<br><em>AI가 읽고 전문가가 확인</em>합니다</h1>
+      <p class="lede">집·나무·사람(HTP), 가족화(KFD), 인물화(DAP), 자유화를 올리면 AI가 관찰 요소를 정리해 해석 초안을 만들고, 전문 심리사가 확인한 뒤 쉬운 리포트로 전해 드려요.</p>
+      <div class="btnrow">
+        <button class="btn btn-primary" data-go="wizard">그림 올리고 시작하기 →</button>
+        <button class="btn btn-ghost" data-go="console">전문가용 화면 보기</button>
+      </div>
+    </div>
+
+    <div class="steps3">
+      <div class="stepcard"><div class="n">1</div><h3>그림 올리기</h3><p>검사 종류를 고르고 아이가 그린 그림을 촬영해 올려요. 아이 나이·상황도 함께요.</p></div>
+      <div class="stepcard"><div class="n">2</div><h3>전문가 확인</h3><p>AI 초안을 전문 심리사가 검수·확정합니다. 확정 전에는 결과가 공개되지 않아요.</p></div>
+      <div class="stepcard"><div class="n">3</div><h3>쉬운 리포트</h3><p>아이의 강점부터, 관찰된 특징과 부모 팁까지 이해하기 쉽게 전해 드려요.</p></div>
+    </div>
+
+    <div class="eyebrow" style="margin-top:36px">다루는 그림검사</div>
+    <div class="testgrid">
+      <div class="testcard"><div class="code">HTP</div><h3>집–나무–사람</h3><p>정서·성격 전반</p></div>
+      <div class="testcard"><div class="code">KFD</div><h3>동적 가족화</h3><p>가족 속 자기 위치</p></div>
+      <div class="testcard"><div class="code">DAP</div><h3>인물화</h3><p>자아상·발달</p></div>
+      <div class="testcard"><div class="code">FREE</div><h3>자유화·기타</h3><p>스트레스 대처</p></div>
+    </div>
+
+    <div class="disclaimer" style="margin-top:28px">
+      <span>⚠️</span><div><b>본 서비스의 해석은 참고용이며 의학적·심리학적 진단이 아닙니다.</b> 정확한 평가는 전문가 대면 검사가 필요하며, 모든 결과는 전문 심리사 확정 후 제공됩니다.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 2. 업로드 마법사 ══════════ -->
+<section class="view hidden" id="v-wizard">
+  <div class="wrap">
+    <div class="eyebrow">업로드</div>
+    <h2>그림검사 업로드</h2>
+    <p class="lede" style="margin-bottom:24px">4단계면 끝나요. 데모에서는 샘플 HTP 그림이 자동으로 채워집니다.</p>
+
+    <div class="wizsteps" id="wizsteps">
+      <div class="wizstep active"><span class="d">1</span> 검사 선택</div>
+      <div class="wizstep"><span class="d">2</span> 그림 업로드</div>
+      <div class="wizstep"><span class="d">3</span> 아이 정보</div>
+      <div class="wizstep"><span class="d">4</span> 동의 · 제출</div>
+    </div>
+
+    <div class="panel">
+      <!-- step 1 -->
+      <div class="wstep" data-s="1">
+        <h3>어떤 그림검사인가요?</h3>
+        <p class="muted" style="font-size:14px">아이가 그린 그림의 종류를 선택하세요.</p>
+        <div class="choice" id="testChoice">
+          <button class="opt sel" data-test="HTP"><div class="code">HTP</div><h3>집–나무–사람</h3><p>가장 기본. 정서·성격을 폭넓게 봅니다.</p></button>
+          <button class="opt" data-test="KFD"><div class="code">KFD</div><h3>동적 가족화</h3><p>가족 관계 속 아이의 위치를 봅니다.</p></button>
+          <button class="opt" data-test="DAP"><div class="code">DAP</div><h3>인물화</h3><p>자아상과 발달 수준을 봅니다.</p></button>
+          <button class="opt" data-test="FREE"><div class="code">FREE</div><h3>자유화·기타</h3><p>스트레스 대처·창의성을 봅니다.</p></button>
+        </div>
+      </div>
+      <!-- step 2 -->
+      <div class="wstep hidden" data-s="2">
+        <h3>그림을 올려 주세요</h3>
+        <p class="muted" style="font-size:14px">전체가 보이게, 밝은 곳에서 정면으로 촬영하면 정확도가 올라갑니다.</p>
+        <div class="dropzone" id="dropzone" style="margin-top:14px">
+          <div class="ico">🖼️</div>
+          <b>여기를 눌러 샘플 그림 불러오기</b>
+          <p class="muted" style="font-size:13px">(데모용 HTP 샘플 이미지가 채워집니다)</p>
+        </div>
+        <div id="uploaded" class="hidden" style="margin-top:16px">
+          <div class="verified">✓ 샘플 HTP 그림이 업로드되었습니다</div>
+        </div>
+      </div>
+      <!-- step 3 -->
+      <div class="wstep hidden" data-s="3">
+        <h3>아이 정보 (해석 보정에 사용)</h3>
+        <div class="row2">
+          <div class="field"><label>아이 별명 <span class="muted">(실명 대신)</span></label><input id="f-alias" value="○○ (샘플)"></div>
+          <div class="field"><label>나이(만)</label><input id="f-age" value="8" inputmode="numeric"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>성별</label><select id="f-sex"><option>남아</option><option>여아</option><option>선택 안 함</option></select></div>
+          <div class="field"><label>이용 목적</label><select id="f-goal"><option>정서·성격 파악</option><option>가족관계 확인</option><option>발달 확인</option><option>상담 전 참고</option></select></div>
+        </div>
+        <div class="field"><label>참고할 상황 <span class="muted">(선택)</span></label><textarea id="f-note" rows="2" placeholder="예: 동생이 생긴 뒤 그림을 그렸어요">동생이 태어난 뒤 그린 그림이에요.</textarea></div>
+      </div>
+      <!-- step 4 -->
+      <div class="wstep hidden" data-s="4">
+        <h3>개인정보 동의</h3>
+        <p class="muted" style="font-size:14px">아동 정보와 그림은 민감정보로 안전하게 보호됩니다.</p>
+        <label class="consent"><input type="checkbox" id="c1" checked> <span><b>[필수]</b> 그림 해석을 위한 아동 정보·이미지 수집·이용에 동의합니다.</span></label>
+        <label class="consent"><input type="checkbox" id="c2" checked> <span><b>[필수]</b> 전문가 확정 전까지 결과가 공개되지 않음을 확인했습니다.</span></label>
+        <label class="consent"><input type="checkbox" id="c3"> <span><b>[선택]</b> 서비스 품질 개선을 위한 데이터 활용에 동의합니다.</span></label>
+        <div class="disclaimer" style="margin-top:16px"><span>⚠️</span><div>제출 즉시 보이는 것은 <b>관찰 중심의 순한 미리보기</b>이며, 정식 해석은 전문가 확정 후 리포트로 제공됩니다.</div></div>
+      </div>
+
+      <div class="btnrow" style="justify-content:space-between">
+        <button class="btn btn-ghost" id="wizPrev" disabled>← 이전</button>
+        <button class="btn btn-primary" id="wizNext">다음 →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 3. AI 미리보기 (학부모용 순한 버전) ══════════ -->
+<section class="view hidden" id="v-preview">
+  <div class="wrap">
+    <div class="eyebrow">즉시 · AI 참고용 미리보기</div>
+    <h2>그림 잘 받았어요 🎨</h2>
+    <p class="lede" style="margin-bottom:20px">AI가 그림에서 눈에 띄는 점을 먼저 정리했어요. 아래는 <b>관찰 중심의 순한 미리보기</b>이며, 정식 해석은 전문가 확인 후 전해 드립니다.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start" class="pv-grid">
+      <div class="drawwrap" id="drawHost1"></div>
+      <div>
+        <div class="cpanel">
+          <h3>AI가 관찰한 점</h3>
+          <ul id="pvObs" style="margin:10px 0 0 18px;font-size:14.5px;line-height:1.9"></ul>
+          <div class="disclaimer" style="margin-top:16px"><span>⏳</span><div><b>전문가 확정 대기 중.</b> 정서·관계에 대한 자세한 해석은 전문 심리사 확인 후 <b>학부모 리포트</b>로 제공됩니다.</div></div>
+        </div>
+        <div class="btnrow">
+          <button class="btn btn-nav" data-go="console">전문가 콘솔에서 검수 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 4. 전문가 콘솔 ══════════ -->
+<section class="view hidden" id="v-console">
+  <div class="wrap">
+    <div class="eyebrow">전문가 · 해석 콘솔</div>
+    <h2>AI 초안 검수 · 확정</h2>
+    <p class="lede" style="margin-bottom:22px">이미지 위 핀은 AI가 관찰한 지점입니다. 각 가설을 <b>채택·수정·삭제</b>하고, 확정하면 학부모 리포트가 열립니다.</p>
+
+    <div class="console">
+      <div>
+        <div class="cpanel">
+          <div class="drawwrap" id="drawHost2"></div>
+          <div class="cmeta" id="cmeta"></div>
+          <p class="muted" style="font-size:12.5px">※ 핀에 마우스를 올리면 오른쪽 해당 가설이 강조됩니다.</p>
+        </div>
+      </div>
+      <div>
+        <div class="cpanel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3 style="margin:0">AI 해석 초안</h3>
+            <span class="muted" style="font-size:12px" id="acceptCount"></span>
+          </div>
+          <p class="muted" style="font-size:13px;margin-bottom:14px">근거수준: <span class="conf high" style="padding:1px 7px">강</span> <span class="conf mid" style="padding:1px 7px">중</span> <span class="conf low" style="padding:1px 7px">약</span> <span style="font-size:11.5px">— 투사검사 특성상 대부분 약~중, 이 사례엔 '강' 없음</span></p>
+          <div id="hypList"></div>
+        </div>
+
+        <div class="gatebar">
+          <div class="st">🔒 확정 게이트 — 확정 전까지 학부모 노출 불가</div>
+          <div class="sum" id="gateSum"></div>
+          <textarea rows="2" placeholder="전문가 종합 코멘트 (선택) — 상담에서 확인할 점 등"></textarea>
+          <button class="btn btn-primary" id="confirmBtn" style="width:100%;justify-content:center">해석 확정하고 학부모 리포트 발행 →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 5. 학부모 리포트 ══════════ -->
+<section class="view hidden" id="v-report">
+  <div class="wrap">
+    <div class="eyebrow">학부모 · 요약 리포트</div>
+
+    <div id="reportLocked" class="locked">
+      <div class="ico">🔒</div>
+      <h3>아직 전문가 확정 전이에요</h3>
+      <p class="muted">전문 심리사가 해석을 확정하면 이 리포트가 열립니다.</p>
+      <div class="btnrow" style="justify-content:center"><button class="btn btn-nav" data-go="console">전문가 콘솔로 이동</button></div>
+    </div>
+
+    <div id="reportReady" class="hidden">
+      <div style="margin-bottom:14px"><span class="verified">✓ 전문 심리사 확정 완료</span></div>
+      <div class="report">
+        <div class="rhead">
+          <div class="k" id="rTest">우리 아이 그림 이야기 · HTP</div>
+          <h2>○○의 그림이 들려주는 마음</h2>
+          <p style="opacity:.85;font-size:14px">전문 심리사가 확인한 해석 요약입니다.</p>
+        </div>
+        <div class="rbody">
+          <div class="block good">
+            <h3>💛 이런 강점이 보여요</h3>
+            <p id="rStrength">밝은 정서 표현 등 긍정적인 특징이 보여요.</p>
+          </div>
+          <div class="block">
+            <h3>🔎 관찰된 특징</h3>
+            <ul id="rFeatures"></ul>
+          </div>
+          <div class="block tip">
+            <h3>🌱 집에서 이렇게 도와주세요</h3>
+            <ul>
+              <li>그림을 보며 "이 사람은 지금 뭘 하고 있어?"처럼 <b>이야기를 열어주는 질문</b>을 해보세요.</li>
+              <li>동생과 비교 대신, 아이만의 시간을 짧게라도 매일 만들어 주세요.</li>
+              <li>잘한 점을 구체적으로 짚어 칭찬하면 표현의 문이 더 열려요.</li>
+            </ul>
+          </div>
+          <div class="rcta">
+            <h3>더 정확한 이해가 필요하다면</h3>
+            <p class="muted" style="font-size:14px;margin:6px 0 16px">전문 심리사 1:1 대면 검사·해석 상담으로 아이를 깊이 있게 살펴볼 수 있어요.</p>
+            <a class="btn btn-primary" href="tel:062-672-7575">1:1 해석 상담 예약 · 062-672-7575</a>
+          </div>
+          <div class="disclaimer"><span>⚠️</span><div>본 리포트는 참고용이며 의학적·심리학적 진단이 아닙니다. 정확한 평가는 전문가 대면 검사가 필요합니다.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<!-- HTP 샘플 그림 (SVG) -->
+<template id="htpSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 HTP 그림: 집, 나무, 사람">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <!-- 집 -->
+  <g stroke="#3a6ea5" stroke-width="3" fill="none" stroke-linejoin="round">
+    <rect x="40" y="190" width="120" height="110" fill="#eaf3ff"/>
+    <polygon points="30,190 100,120 170,190" fill="#f6d7c9" stroke="#d98b6f"/>
+    <rect x="88" y="245" width="30" height="55" fill="#fff"/>
+    <rect x="55" y="210" width="26" height="26" fill="#fff"/>
+    <rect x="122" y="210" width="26" height="26" fill="#fff"/>
+  </g>
+  <!-- 나무 -->
+  <g>
+    <rect x="248" y="205" width="26" height="95" rx="5" fill="#b9825a"/>
+    <path d="M261 300 q-24 -6 -34 6 M261 300 q24 -6 34 6" stroke="#b9825a" stroke-width="4" fill="none"/>
+    <circle cx="261" cy="175" r="52" fill="#9ccb74" stroke="#6f9e4c" stroke-width="3"/>
+    <circle cx="240" cy="165" r="7" fill="#e8604c"/>
+    <circle cx="282" cy="180" r="7" fill="#e8604c"/>
+    <circle cx="266" cy="150" r="7" fill="#e8604c"/>
+  </g>
+  <!-- 사람 -->
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="410" cy="170" r="30" fill="#ffe7c2"/>
+    <circle cx="400" cy="165" r="4" fill="#4a4a4a"/>
+    <circle cx="421" cy="165" r="4" fill="#4a4a4a"/>
+    <path d="M398 182 q12 10 24 0" />
+    <line x1="410" y1="200" x2="410" y2="262"/>
+    <path d="M410 214 l-26 20 M410 214 l26 20"/>
+    <path d="M410 262 l-20 34 M410 262 l20 34"/>
+  </g>
+</svg>
+</template>
+
+<!-- KFD 동적 가족화 (거리·단절·자기 구석·장벽) -->
+<template id="kfdSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 KFD: 인물 간 거리·각자 활동·자기 구석·장벽">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <!-- 부모 1 (왼쪽, 요리) -->
+    <circle cx="95" cy="150" r="22" fill="#ffe7c2"/><line x1="95" y1="172" x2="95" y2="230"/>
+    <path d="M95 185 l-20 16 M95 185 l20 16"/><path d="M95 230 l-15 30 M95 230 l15 30"/>
+    <!-- 부모 2 (가운데, 다른 활동) -->
+    <circle cx="235" cy="150" r="22" fill="#ffe7c2"/><line x1="235" y1="172" x2="235" y2="230"/>
+    <path d="M235 185 l-20 16 M235 185 l20 16"/><path d="M235 230 l-15 30 M235 230 l15 30"/>
+    <!-- 장벽(가구) — 가운데-오른쪽 사이 -->
+  </g>
+  <rect x="330" y="215" width="70" height="55" fill="#eae0cf" stroke="#b6a683" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="2.5" fill="none" stroke-linecap="round">
+    <!-- 자기 (오른쪽 구석, 작게) -->
+    <circle cx="470" cy="245" r="14" fill="#ffe7c2"/><line x1="470" y1="259" x2="470" y2="288"/>
+    <path d="M470 267 l-11 9 M470 267 l11 9"/><path d="M470 288 l-9 12 M470 288 l9 12"/>
+    <circle cx="466" cy="243" r="1.6" fill="#4a4a4a"/><circle cx="474" cy="243" r="1.6" fill="#4a4a4a"/>
+    <path d="M465 251 q5 3 10 0"/>
+  </g>
+</svg>
+</template>
+
+<!-- DAP 인물화 (작게·신체부위 적음·손 생략·무표정) -->
+<template id="dapSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 DAP: 작은 인물·부위 적음·손 생략·무표정">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="260" cy="150" r="26" fill="#ffe7c2"/>
+    <circle cx="251" cy="146" r="2.4" fill="#4a4a4a"/><circle cx="269" cy="146" r="2.4" fill="#4a4a4a"/>
+    <line x1="250" y1="162" x2="270" y2="162"/> <!-- 무표정(직선 입) -->
+    <line x1="260" y1="176" x2="260" y2="238"/>
+    <path d="M260 190 l-22 16 M260 190 l22 16"/> <!-- 팔 끝 손 없음 -->
+    <path d="M260 238 l-16 30 M260 238 l16 30"/>
+  </g>
+</svg>
+</template>
+
+<!-- 자유화·빗속의 사람 (많은 비·우산 없음·어두운 색·구석) -->
+<template id="freeSVG">
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 PITR: 빗줄기 많음·우산 없음·어두운 색·구석 배치">
+  <rect width="520" height="340" fill="#f3f1ec"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#7ba05b" stroke-width="3"/>
+  <ellipse cx="200" cy="55" rx="120" ry="34" fill="#7d8794"/>
+  <g stroke="#5b6673" stroke-width="2.4" stroke-linecap="round">
+    <line x1="70" y1="95" x2="55" y2="140"/><line x1="120" y1="95" x2="105" y2="150"/>
+    <line x1="170" y1="95" x2="155" y2="145"/><line x1="220" y1="95" x2="205" y2="155"/>
+    <line x1="270" y1="95" x2="255" y2="140"/><line x1="150" y1="150" x2="135" y2="200"/>
+    <line x1="210" y1="160" x2="195" y2="210"/><line x1="90" y1="150" x2="78" y2="195"/>
+    <line x1="250" y1="150" x2="238" y2="200"/><line x1="300" y1="120" x2="288" y2="165"/>
+  </g>
+  <g stroke="#3a3f47" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="430" cy="205" r="18" fill="#c8ccd2"/><line x1="430" y1="223" x2="430" y2="262"/>
+    <path d="M430 233 l-16 13 M430 233 l16 13"/><path d="M430 262 l-12 22 M430 262 l12 22"/>
+    <circle cx="424" cy="203" r="1.8" fill="#3a3f47"/><circle cx="436" cy="203" r="1.8" fill="#3a3f47"/>
+    <path d="M424 212 q6 4 12 0"/>
+  </g>
+</svg>
+</template>
+
+<script>
+(function(){
+  var views={landing:'v-landing',wizard:'v-wizard',preview:'v-preview',console:'v-console',report:'v-report'};
+  // 검사별 그림·가설·핀 (mock). 백엔드 연결 시 가설은 실제 응답으로 대체됨.
+  var TESTS = {
+    HTP: { svg:'htpSVG', name:'집–나무–사람 (HTP)', hyp:[
+      {id:'house.roof', obs:'집 · 지붕을 크게', txt:'상상·공상에 대한 관심이 큰 경향 (가능성)', conf:'low', x:'19%', y:'40%', status:'accept', caveat:'HTP 지붕 해석은 근거 약함 · 연구 간 의미 상충'},
+      {id:'house.door', obs:'집 · 문 손잡이 없음', txt:'관계에 다가서는 데 신중한 경향 (가능성)', conf:'mid', x:'20%', y:'80%', status:'accept', caveat:'단일 지표로 단정 금지 · 면담(PDI)으로 확인'},
+      {id:'tree.root', obs:'나무 · 뿌리·줄기 강조', txt:'안정감·현실 지향 추구 가능성', conf:'low', x:'50%', y:'88%', status:'accept', caveat:'뿌리 상징 해석은 근거 약함'},
+      {id:'person.hand', obs:'사람 · 손 생략', txt:'행위·대인접촉에 조심스러움 가능성', conf:'low', x:'74%', y:'68%', status:'accept', adjust:'연령 보정: 만 8세 전후에서는 발달상 정상 범위일 수 있음 — 병리 단정 금지.', caveat:'귀찮음 등 대안 설명 가능 · 반복 시에만 의미'},
+      {id:'person.face', obs:'사람 · 큰 눈·미소', txt:'정서 표현이 개방적이고 긍정 정서가 드러남', conf:'mid', x:'79%', y:'50%', status:'accept', strength:true, caveat:'노골적 정서 기호만 참고 · 진단 아님'}
+    ]},
+    KFD: { svg:'kfdSVG', name:'동적 가족화 (KFD)', hyp:[
+      {id:'kfd.distance', obs:'가족 · 인물 간 거리 멂', txt:'정서적 거리·소외감 가능성', conf:'mid', x:'50%', y:'30%', status:'accept', caveat:'문화·상황 영향 · 단정 금지'},
+      {id:'kfd.activity', obs:'가족 · 각자 다른 활동', txt:'가족 내 정서적 단절감 가능성', conf:'mid', x:'31%', y:'55%', status:'accept', caveat:'문화·상황 영향'},
+      {id:'kfd.self_position', obs:'가족 · 자기 구석·작게', txt:'위축·소외감 가능성', conf:'mid', x:'88%', y:'75%', status:'accept', caveat:'발달 영향 · 반복 시 의미'},
+      {id:'kfd.barrier', obs:'가족 · 사물로 가로막힘', txt:'의사소통 차단·방어 욕구 가능성', conf:'low', x:'67%', y:'70%', status:'accept', caveat:'체계적 검증 제한'}
+    ]},
+    DAP: { svg:'dapSVG', name:'인물화 (DAP)', hyp:[
+      {id:'dap.parts', obs:'사람 · 신체부위 적음', txt:'발달 수준 미성숙 가능성 (발달 지표)', conf:'mid', x:'50%', y:'62%', status:'accept', caveat:'연령·미술경험 영향 · 정서 문제 아님'},
+      {id:'dap.omission', obs:'사람 · 손 생략', txt:'통제감 부족·행동 억제 가능성', conf:'low', x:'40%', y:'56%', status:'accept', adjust:'연령 보정: 만 9세 미만 생략은 발달상 정상 범위일 수 있음.', caveat:'정서지표 근거 약함 · 대안 설명 가능'},
+      {id:'dap.size', obs:'사람 · 작게 그림', txt:'위축·자존감 저하 가능성', conf:'low', x:'50%', y:'85%', status:'accept', caveat:'크기만으로 단정 불가'},
+      {id:'dap.face', obs:'사람 · 무표정', txt:'정서 둔마·우울 가능성', conf:'low', x:'50%', y:'40%', status:'accept', caveat:'문화·미술습관 영향'}
+    ]},
+    FREE: { svg:'freeSVG', name:'자유화·빗속의 사람', hyp:[
+      {id:'pitr.rain', obs:'빗속 · 빗줄기 많음', txt:'현재 스트레스가 크거나 민감할 가능성', conf:'mid', x:'32%', y:'30%', status:'accept', caveat:'상황 영향'},
+      {id:'pitr.umbrella', obs:'빗속 · 우산 없음', txt:'대처자원 부족 가능성', conf:'mid', x:'83%', y:'50%', status:'accept', caveat:'자원이 다른 형태일 수 있음'},
+      {id:'free.color', obs:'자유화 · 어두운 색 위주', txt:'에너지 저하·위축 가능성', conf:'low', x:'38%', y:'16%', status:'accept', caveat:'색채 해석은 문화·개인차 큼 · 고른 이유 확인 필수'},
+      {id:'free.space', obs:'자유화 · 구석 배치', txt:'위축·표현 최소화 가능성', conf:'low', x:'83%', y:'82%', status:'accept', caveat:'발달 영향'}
+    ]}
+  };
+  function cloneHyp(t){ return (TESTS[t]||TESTS.HTP).hyp.map(function(h){return Object.assign({},h);}); }
+  var state={confirmed:false, step:1, hyp:cloneHyp('HTP')};
+
+  // ── 백엔드 어댑터: 켜져 있으면 실제 API, 없으면 mock 폴백 ──
+  state.backend=false; state.submissionId=null; state.reportToken=null; state.selectedTest='HTP'; state.birthYear=null;
+  var qp=new URLSearchParams(location.search);
+  var API=(qp.get('api')!=null?qp.get('api'):'');   // 기본: 같은 출처
+  var EXPERT={'x-role':'expert'};
+  function api(method,path,body,headers){
+    return fetch(API+path,{method:method,headers:Object.assign({'content-type':'application/json'},headers||{}),
+      body:body?JSON.stringify(body):undefined}).then(function(r){return r.json().then(function(j){return {code:r.status,body:j}})});
+  }
+  function detectBackend(){
+    // 아티팩트/외부 호스트에서 오탐 방지: localhost이거나 ?api= 지정 시에만 탐지
+    var allow=qp.get('api')!=null||/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+    if(!allow) return Promise.resolve(false);
+    return fetch(API+'/api/health').then(function(r){return r.ok}).catch(function(){return false});
+  }
+  // 백엔드 element → 현재 검사 그림의 핀 좌표
+  function posFor(test, element){
+    var arr=(TESTS[test]||TESTS.HTP).hyp;
+    for(var i=0;i<arr.length;i++){ if(arr[i].id===element) return [arr[i].x,arr[i].y]; }
+    return ['50%','50%'];
+  }
+  var SMAP={ai_suggested:'accept',accepted:'accept',edited:'edit',rejected:'reject'};
+  function normalizeHyp(h){
+    var pos=posFor(state.selectedTest, h.element);
+    return {id:h.element, dbId:h.id, obs:h.observation, txt:h.text, conf:h.confidence,
+      adjust:h.age_adjustment||null, caveat:(h.caveats||[]).join(' · '),
+      status:SMAP[h.status]||'accept', x:pos[0], y:pos[1]};
+  }
+  function setBackendBadge(on){
+    var tag=$('.demobar .tag'); if(!tag) return;
+    tag.textContent=on?'● 백엔드 연결됨':'프로토타입 · 클릭 데모';
+    tag.style.color=on?'#7Cf0b0':'';
+  }
+
+  function $(s,r){return (r||document).querySelector(s)}
+  function $all(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
+
+  function go(v){
+    Object.keys(views).forEach(function(k){$('#'+views[k]).classList.toggle('hidden',k!==v)});
+    $all('.demobar .navbtn').forEach(function(b){b.classList.toggle('active',b.dataset.go===v)});
+    window.scrollTo({top:0,behavior:'auto'});
+    if(v==='console'){loadConsole();}
+    if(v==='preview'){ if(!state.backend) state.hyp=cloneHyp(state.selectedTest); mountDrawing('drawHost1',false); renderPvObs(); }
+    if(v==='report'){renderReport();}
+  }
+  $all('[data-go]').forEach(function(b){b.addEventListener('click',function(){go(b.dataset.go)})});
+
+  // 콘솔 진입: 백엔드 있으면 실제 가설 로드, 없으면 mock
+  function loadConsole(){
+    if(state.backend && state.submissionId){
+      api('GET','/api/console/submissions/'+state.submissionId,null,EXPERT).then(function(r){
+        if(r.body&&r.body.hypotheses&&r.body.hypotheses.length){ state.hyp=r.body.hypotheses.map(normalizeHyp); }
+        mountDrawing('drawHost2',true); renderHyp(); fillCmeta();
+      }).catch(function(){ mountDrawing('drawHost2',true); renderHyp(); fillCmeta(); });
+    } else { state.hyp=cloneHyp(state.selectedTest); mountDrawing('drawHost2',true); renderHyp(); fillCmeta(); }
+  }
+  function fillCmeta(){
+    var el=$('#cmeta'); if(!el) return;
+    var meta=[['검사', (TESTS[state.selectedTest]||TESTS.HTP).name], ['별명','○○ (샘플)'],
+      ['나이', (state.birthYear? (new Date().getFullYear()-state.birthYear) : ($('#f-age')?$('#f-age').value:8))+'세']];
+    el.innerHTML=meta.map(function(m){return '<span class="m">'+m[0]+' '+m[1]+'</span>'}).join('');
+  }
+  function renderPvObs(){
+    var el=$('#pvObs'); if(!el) return;
+    el.innerHTML=state.hyp.slice(0,4).map(function(h){
+      return '<li>'+h.obs.replace(/^[^·]*· /,'')+' — <span class="muted">'+h.txt+'</span></li>';
+    }).join('');
+  }
+
+  // drawing mount (+optional pins)
+  function mountDrawing(hostId,withPins){
+    var host=$('#'+hostId); if(!host) return;
+    host.innerHTML='';
+    var tid=(TESTS[state.selectedTest]||TESTS.HTP).svg;
+    host.appendChild(document.importNode($('#'+tid).content,true));
+    if(withPins){
+      state.hyp.forEach(function(h,i){
+        var p=document.createElement('div');
+        p.className='pin'; p.dataset.id=h.id; p.textContent=(i+1);
+        p.style.left=h.x; p.style.top=h.y;
+        p.addEventListener('mouseenter',function(){hot(h.id,true)});
+        p.addEventListener('mouseleave',function(){hot(h.id,false)});
+        host.appendChild(p);
+      });
+    }
+  }
+  function hot(id,on){
+    var card=$('.hyp[data-id="'+id+'"]'); if(card) card.style.boxShadow=on?'0 0 0 2px var(--coral)':'';
+    var pin=$('.pin[data-id="'+id+'"]'); if(pin) pin.classList.toggle('hot',on);
+  }
+
+  // expert hypotheses
+  var CONF={high:['high','강'],mid:['mid','중'],low:['low','약']};
+  function renderHyp(){
+    var list=$('#hypList'); list.innerHTML='';
+    state.hyp.forEach(function(h,i){
+      var c=CONF[h.conf];
+      var el=document.createElement('div');
+      el.className='hyp'+(h.status==='reject'?' rejected':''); el.dataset.id=h.id;
+      el.innerHTML=
+        '<div class="top"><div><div class="obs">📍'+(i+1)+' · '+h.obs+'</div>'+
+        '<div class="txt">'+(h.edited||h.txt)+'</div></div>'+
+        '<span class="conf '+c[0]+'">'+c[1]+'</span></div>'+
+        (h.adjust?'<div class="adjust">⚖ '+h.adjust+'</div>':'')+
+        (h.caveat?'<div class="caveat">⚠ '+h.caveat+'</div>':'')+
+        '<div class="hypacts">'+
+          '<button class="tog accept'+(h.status==='accept'?' on':'')+'" data-a="accept">채택</button>'+
+          '<button class="tog edit'+(h.status==='edit'?' on':'')+'" data-a="edit">수정</button>'+
+          '<button class="tog reject'+(h.status==='reject'?' on':'')+'" data-a="reject">삭제</button>'+
+        '</div>'+
+        (h.status==='edit'?'<div class="editbox"><textarea rows="2" data-edit="'+h.id+'">'+(h.edited||h.txt)+'</textarea></div>':'');
+      el.addEventListener('mouseenter',function(){hot(h.id,true)});
+      el.addEventListener('mouseleave',function(){hot(h.id,false)});
+      list.appendChild(el);
+    });
+    $all('#hypList .tog').forEach(function(b){
+      b.addEventListener('click',function(){
+        var id=b.closest('.hyp').dataset.id;
+        var h=state.hyp.filter(function(x){return x.id===id})[0];
+        h.status=b.dataset.a;
+        if(state.backend && h.dbId){ api('PATCH','/api/console/hypotheses/'+h.dbId,{action:b.dataset.a},EXPERT); }
+        renderHyp(); updateGate();
+      });
+    });
+    $all('#hypList textarea[data-edit]').forEach(function(t){
+      t.addEventListener('input',function(){
+        var h=state.hyp.filter(function(x){return x.id===t.dataset.edit})[0]; h.edited=t.value; updateGate();
+      });
+    });
+    updateGate();
+    $all('.pin').forEach(function(p){
+      var h=state.hyp.filter(function(x){return x.id===p.dataset.id})[0];
+      p.classList.toggle('dim',h.status==='reject');
+    });
+  }
+  function counts(){
+    var a=0,e=0,r=0; state.hyp.forEach(function(h){if(h.status==='accept')a++;else if(h.status==='edit')e++;else r++;});
+    return {a:a,e:e,r:r,keep:a+e};
+  }
+  function updateGate(){
+    var c=counts();
+    $('#acceptCount').textContent='채택 '+c.a+' · 수정 '+c.e+' · 삭제 '+c.r;
+    $('#gateSum').textContent='학부모 리포트에 반영될 항목 '+c.keep+'개 (삭제 '+c.r+'개 제외). 확정하면 이 순간부터 리포트 발행이 가능합니다.';
+    $('#confirmBtn').disabled=c.keep===0;
+  }
+
+  $('#confirmBtn').addEventListener('click',function(){
+    function done(msg){ state.confirmed=true; var nav=$('#nav-report'); nav.innerHTML='학부모 리포트 <span style="color:#7FD0F0">✓</span>'; toast(msg); setTimeout(function(){go('report')},900); }
+    if(state.backend && state.submissionId){
+      api('POST','/api/console/submissions/'+state.submissionId+'/confirm',{},EXPERT).then(function(r){
+        if(r.code===200){ state.reportToken=r.body.share_token; done('✓ 백엔드 발행됨 · published (반영 '+r.body.kept+'건)'); }
+        else { toast('확정 실패: '+(r.body.error||r.code)); }
+      }).catch(function(){ done('✓ 확정(로컬)'); });
+    } else { done('✓ 해석이 확정되어 학부모 리포트가 발행되었습니다'); }
+  });
+
+  function renderReport(){
+    $('#reportLocked').classList.toggle('hidden',state.confirmed);
+    $('#reportReady').classList.toggle('hidden',!state.confirmed);
+    if(state.confirmed){
+      $('#rTest').textContent='우리 아이 그림 이야기 · '+(TESTS[state.selectedTest]||TESTS.HTP).name;
+      var keep=state.hyp.filter(function(h){return h.status!=='reject'});
+      var str=keep.filter(function(h){return h.strength}).map(function(h){return h.txt});
+      var feat=keep.filter(function(h){return !h.strength}).map(function(h){return h.txt});
+      $('#rStrength').textContent= str.length? str.join(' / ') : '밝은 정서 표현 등 아이만의 긍정적인 면이 함께 보여요.';
+      $('#rFeatures').innerHTML=(feat.length?feat:['—']).map(function(t){return '<li>'+t+'</li>'}).join('');
+      if(state.backend && state.reportToken){
+        api('GET','/api/reports/'+state.reportToken+'?birth_year='+(state.birthYear||''),null).then(function(r){
+          var v=$('#reportReady .verified'); if(v&&r.code===200){ v.textContent='✓ 전문 심리사 확정 완료 · 백엔드 발행'; }
+        });
+      }
+    }
+  }
+
+  // wizard
+  function setStep(n){
+    state.step=n;
+    $all('#v-wizard .wstep').forEach(function(w){w.classList.toggle('hidden',+w.dataset.s!==n)});
+    $all('#wizsteps .wizstep').forEach(function(w,i){
+      w.classList.toggle('active',i+1===n); w.classList.toggle('done',i+1<n);
+    });
+    $('#wizPrev').disabled=n===1;
+    $('#wizNext').textContent=n===4?'제출하고 미리보기 →':'다음 →';
+  }
+  function submit(){
+    if(!(state.backend)){ toast('제출 완료! AI 미리보기를 생성합니다'); setTimeout(function(){go('preview')},700); return; }
+    var birthYear=new Date().getFullYear()-(parseInt($('#f-age').value,10)||8);
+    state.birthYear=birthYear;
+    toast('백엔드에 제출 중…');
+    api('POST','/api/submissions',{test_type:state.selectedTest,child:{alias:$('#f-alias').value,birth_year:birthYear,sex:$('#f-sex').value,context_note:$('#f-note').value}})
+      .then(function(r){ state.submissionId=r.body.submission_id;
+        return api('POST','/api/submissions/'+state.submissionId+'/consent',{analysis:true,store:true,improve:$('#c3').checked,guardian_verified:true}); })
+      .then(function(){ return api('POST','/api/submissions/'+state.submissionId+'/image',{image_ref:'sample-'+state.selectedTest.toLowerCase()}); })
+      .then(function(r){ toast('AI 해석 생성됨 · '+(r.body.status)); go('preview'); })
+      .catch(function(){ toast('백엔드 오류 — mock으로 진행'); go('preview'); });
+  }
+  $('#wizNext').addEventListener('click',function(){
+    if(state.step<4){setStep(state.step+1);window.scrollTo({top:0,behavior:'smooth'});}
+    else{ submit(); }
+  });
+  $('#wizPrev').addEventListener('click',function(){if(state.step>1)setStep(state.step-1)});
+  $all('#testChoice .opt').forEach(function(o){
+    o.addEventListener('click',function(){$all('#testChoice .opt').forEach(function(x){x.classList.remove('sel')});o.classList.add('sel');state.selectedTest=o.dataset.test;});
+  });
+  $('#dropzone').addEventListener('click',function(){$('#uploaded').classList.remove('hidden');toast('샘플 HTP 그림을 불러왔어요')});
+
+  var toEl=$('#toast'),toT;
+  function toast(m){toEl.textContent=m;toEl.classList.add('show');clearTimeout(toT);toT=setTimeout(function(){toEl.classList.remove('show')},2200)}
+
+  // init
+  detectBackend().then(function(on){ state.backend=on; setBackendBadge(on); });
+  setStep(1); go('landing');
+})();
+</script>
+</body>
+</html>

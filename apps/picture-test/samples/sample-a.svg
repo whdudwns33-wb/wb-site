@@ -1,0 +1,28 @@
+<svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="샘플 A HTP: 지붕 큼·문 손잡이 없음·뿌리 강조·손 생략·미소">
+  <rect width="520" height="340" fill="#fffdf7"/>
+  <line x1="0" y1="300" x2="520" y2="300" stroke="#8bbf6a" stroke-width="3"/>
+  <g stroke="#3a6ea5" stroke-width="3" fill="none" stroke-linejoin="round">
+    <rect x="40" y="190" width="120" height="110" fill="#eaf3ff"/>
+    <polygon points="30,190 100,120 170,190" fill="#f6d7c9" stroke="#d98b6f"/>
+    <rect x="88" y="245" width="30" height="55" fill="#fff"/>
+    <rect x="55" y="210" width="26" height="26" fill="#fff"/>
+    <rect x="122" y="210" width="26" height="26" fill="#fff"/>
+  </g>
+  <g>
+    <rect x="248" y="205" width="26" height="95" rx="5" fill="#b9825a"/>
+    <path d="M261 300 q-24 -6 -34 6 M261 300 q24 -6 34 6" stroke="#b9825a" stroke-width="4" fill="none"/>
+    <circle cx="261" cy="175" r="52" fill="#9ccb74" stroke="#6f9e4c" stroke-width="3"/>
+    <circle cx="240" cy="165" r="7" fill="#e8604c"/>
+    <circle cx="282" cy="180" r="7" fill="#e8604c"/>
+    <circle cx="266" cy="150" r="7" fill="#e8604c"/>
+  </g>
+  <g stroke="#4a4a4a" stroke-width="3" fill="none" stroke-linecap="round">
+    <circle cx="410" cy="170" r="30" fill="#ffe7c2"/>
+    <circle cx="400" cy="165" r="4" fill="#4a4a4a"/>
+    <circle cx="421" cy="165" r="4" fill="#4a4a4a"/>
+    <path d="M398 182 q12 10 24 0" />
+    <line x1="410" y1="200" x2="410" y2="262"/>
+    <path d="M410 214 l-26 20 M410 214 l26 20"/>
+    <path d="M410 262 l-20 34 M410 262 l20 34"/>
+  </g>
+</svg>
