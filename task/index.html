@@ -298,6 +298,9 @@ function mondayOf(s) { const d = parseYmd(s); return addDays(s, -((d.getDay() + 
    3. 도메인 로직
    ══════════════════════════════════════════════════════ */
 const liveStaff = () => state.staff.filter(s => !s.deleted);
+/** 통계에 넣을 사람 — 대표는 제외한다. 대표 업무가 섞이면 직원 수행률이 흐려진다. */
+const teamStaff = () => liveStaff().filter(s => !s.owner);
+const owners = () => liveStaff().filter(s => s.owner);
 const staffById = id => state.staff.find(s => s.id === id);
 const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
 
@@ -419,6 +422,8 @@ function staffAdded(anchor) {
   const out = [];
   state.tasks.forEach(t => {
     if (t.deleted || t.origin !== 'staff') return;
+    const s = staffById(t.staffId);
+    if (!s || s.owner) return;              // 대표가 스스로 넣은 건 '직원 추가'가 아니다
     days.forEach(d => { if (occursOn(t, d)) out.push({ t: t, date: d }); });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
@@ -1006,8 +1011,9 @@ function draftCard() {
 
 /* ── 직원 현황 ── */
 function viewBoard() {
-  const list = liveStaff();
-  if (!list.length) return emptyStaffCard();
+  const list = teamStaff();
+  const mine = owners();
+  if (!list.length && !mine.length) return emptyStaffCard();
 
   let h = '<div class="datenav">' +
     '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
@@ -1016,7 +1022,7 @@ function viewBoard() {
 
   // 막힘 먼저
   const blocked = [];
-  list.forEach(s => tasksFor(s.id, cursor).forEach(t => {
+  liveStaff().forEach(s => tasksFor(s.id, cursor).forEach(t => {
     if (statusOf(t, cursor) === 'blocked') blocked.push({ s: s, t: t, c: getCheck(t.id, cursor) });
   }));
   if (blocked.length) {
@@ -1061,46 +1067,52 @@ function viewBoard() {
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
     '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button></div>';
 
-  h += list.map(s => {
-    const p = progress(s.id, cursor);
-    const w = weekProgress(s.id, cursor);
-    const st = streak(s.id);
-    const rows = tasksFor(s.id, cursor).map(t => ({ t: t, st: statusOf(t, cursor), c: getCheck(t.id, cursor) }));
-    const pend = rows.filter(x => x.st !== 'done');
-    const notes = rows.filter(x => x.c && x.c.note);
-
-    return '<div class="card">' +
-      '<div class="staffcard mb14">' +
-        '<div class="ava">' + esc(initials(s.name)) + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div class="between"><div class="card-title">' + esc(s.name) + '</div>' +
-            '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
-          '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
-          '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
-        '</div></div>' +
-      (pend.length
-        ? pend.map(x => {
-            const prog = taskProgress(x.t, x.c);
-            const badge = x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
-                        : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
-                        : '<span class="pill">미착수</span>';
-            return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
-              (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
-          }).join('')
-        : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
-      (notes.length
-        ? '<hr class="sep">' + notes.map(x =>
-            '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
-        : '') +
-      '<hr class="sep">' +
-      '<div class="row wraprow" style="gap:8px">' +
-        '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
-      '</div></div>';
-  }).join('');
+  if (mine.length) {
+    h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
+    if (list.length) h += '<div class="sect">직원</div>';
+  }
+  h += list.map(s => staffCard(s)).join('');
 
   return h;
+}
+
+function staffCard(s) {
+  const p = progress(s.id, cursor);
+  const w = weekProgress(s.id, cursor);
+  const st = streak(s.id);
+  const rows = tasksFor(s.id, cursor).map(t => ({ t: t, st: statusOf(t, cursor), c: getCheck(t.id, cursor) }));
+  const pend = rows.filter(x => x.st !== 'done');
+  const notes = rows.filter(x => x.c && x.c.note);
+
+  return '<div class="card">' +
+    '<div class="staffcard mb14">' +
+    '<div class="ava">' + esc(initials(s.name)) + '</div>' +
+    '<div style="flex:1;min-width:0">' +
+      '<div class="between"><div class="card-title">' + esc(s.name) + '</div>' +
+        '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
+      '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
+      '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
+    '</div></div>' +
+    (pend.length
+    ? pend.map(x => {
+        const prog = taskProgress(x.t, x.c);
+        const badge = x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
+                    : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
+                    : '<span class="pill">미착수</span>';
+        return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
+          (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
+      }).join('')
+    : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
+    (notes.length
+    ? '<hr class="sep">' + notes.map(x =>
+        '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
+    : '') +
+    '<hr class="sep">' +
+    '<div class="row wraprow" style="gap:8px">' +
+    '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
+    '</div></div>';
 }
 
 /* ── 직원 관리 ── */
@@ -1116,13 +1128,17 @@ function viewStaffAdmin() {
   (list.length
     ? list.map(s => '<div class="card"><div class="between">' +
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
-        '<div><div class="card-title">' + esc(s.name) + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건</div></div></div>' +
+        '<div><div class="card-title">' + esc(s.name) +
+          (s.owner ? ' <span class="tag add">대표</span>' : '') + '</div>' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
+          (s.owner ? ' · 직원 통계에서 제외' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
+            (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
         '</div></div>').join('')
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
 }
@@ -1234,7 +1250,7 @@ function reportText(staffId, date) {
 }
 
 function briefText(date) {
-  const list = liveStaff();
+  const list = teamStaff();
   let done = 0, total = 0;
   const pend = [], blocked = [], clear = [];
   list.forEach(s => {
@@ -1268,6 +1284,16 @@ function briefText(date) {
     own.push('· ' + s.name + ' — ' + t.title + ' [' + STATUS_LABEL[st] + ']');
   }));
   if (own.length) txt += '─────────\n＋ 직원 추가 업무 ' + own.length + '건\n' + own.join('\n') + '\n';
+
+  // 대표 본인 업무는 직원 통계와 섞지 않고 따로 붙인다
+  const mineLines = [];
+  owners().forEach(s => tasksFor(s.id, date).forEach(t => {
+    const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
+    mineLines.push('· ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+      ' [' + STATUS_LABEL[st] + (st === 'doing' ? ' ' + pr.done + '/' + pr.total + pr.unit : '') + ']' +
+      (c && c.note ? '\n   “' + c.note + '”' : ''));
+  }));
+  if (mineLines.length) txt += '─────────\n🙋 내 업무 ' + mineLines.length + '건\n' + mineLines.join('\n') + '\n';
 
   return txt;
 }
@@ -1582,7 +1608,10 @@ function applyAssignments(input, preConfirmed) {
   const missing = [...new Set(list.map(a => String(a.staff || '').trim()).filter(n => n && !staffByName(n)))];
   if (missing.length) {
     if (!preConfirmed && !confirm('등록되지 않은 직원이 있습니다: ' + missing.join(', ') + '\n새로 등록할까요?')) return;
-    missing.forEach(n => state.staff.push({ id: uid(), name: n, createdAt: now(), updatedAt: now(), deleted: false }));
+    missing.forEach(n => {
+      const isOwner = list.some(a => String(a.staff || '').trim() === n && a.owner === true);
+      state.staff.push({ id: uid(), name: n, owner: isOwner, createdAt: now(), updatedAt: now(), deleted: false });
+    });
   }
 
   let added = 0, skipped = 0;
@@ -1726,6 +1755,14 @@ document.addEventListener('click', ev => {
       if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
       s.deleted = true; s.updatedAt = now();
       save(); queueSync(); render();
+      break;
+    }
+    case 'toggleowner': {
+      const s = staffById(id);
+      if (!s) break;
+      s.owner = !s.owner; s.updatedAt = now();
+      save(); queueSync(); render();
+      toast(s.owner ? s.name + ' — 대표로 지정 (직원 통계에서 제외)' : s.name + ' — 대표 해제');
       break;
     }
     case 'copylink': copy(staffLink(id)); break;
