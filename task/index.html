@@ -546,6 +546,11 @@ function absorbLinkParams() {
       const cfg = JSON.parse(unb64(s));
       if (cfg.u) state.settings.syncUrl = cfg.u;
       if (cfg.k) state.settings.syncSecret = cfg.k;
+      // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
+      if (cfg.p && !new URLSearchParams(location.search).get('u')) {
+        state.settings.adminPin = cfg.p;
+        session.unlock();
+      }
       save();
     } catch (e) { console.warn('link config', e); }
     q.delete('s'); touched = true;
@@ -715,6 +720,12 @@ function viewLock() {
     '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
       (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
     '<hr class="sep">' +
+    (first
+      ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
+        '여기서 비밀번호를 정하지 마시고, 즐겨찾기에 저장해둔 <b>원장 복구 링크</b>로 들어오세요. ' +
+        '접속 정보와 비밀번호가 한 번에 복구됩니다.<br>' +
+        '(복구 링크는 설정 화면에서 만듭니다. 데이터는 구글 시트에 있으니 사라지지 않습니다)</div><hr class="sep">'
+      : '') +
     '<div class="hint">직원분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
   '</div>';
 }
@@ -1162,10 +1173,12 @@ function viewSettings() {
     (s.syncUrl
       ? '<div class="hint mt14">✓ 설정됨 — 이제 <b>개인 링크에 이 설정이 함께 담겨</b> 나갑니다. 직원은 링크만 열면 됩니다.</div>' +
         '<hr class="sep">' +
-        '<div class="card-title">내 다른 기기에서 열기</div>' +
-        '<div class="card-sub mb14">폰이나 다른 컴퓨터에서 원장 화면을 보려면 이 링크로 한 번 접속하세요. ' +
-          '접속 정보가 담겨 있으니 <b>원장님만</b> 쓰셔야 합니다.</div>' +
-        '<button class="btn btn-navy btn-block" data-act="adminlink">📱 내 기기용 링크 복사</button>'
+        '<div class="card-title">원장 복구 링크</div>' +
+        '<div class="card-sub mb14">이 링크로 들어가면 <b>접속 정보와 비밀번호가 한 번에 들어가</b> 바로 열립니다. ' +
+          '폰에서 볼 때, 그리고 브라우저 데이터가 지워졌을 때 되살리는 용도입니다.<br><br>' +
+          '<b>복사한 뒤 즐겨찾기에 저장해 두세요.</b> 일반 주소를 저장하면 데이터가 사라졌을 때 되살릴 방법이 없습니다.<br>' +
+          '<span style="color:var(--coral)">이 링크를 가진 사람은 원장 화면을 열 수 있습니다. 직원에게 보내지 마세요.</span></div>' +
+        '<button class="btn btn-navy btn-block" data-act="adminlink">🔑 원장 복구 링크 복사</button>'
       : '') +
   '</div>' +
 
@@ -1769,8 +1782,13 @@ document.addEventListener('click', ev => {
     case 'alllinks': copy(liveStaff().map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')); break;
     case 'adminlink': {
       const url = location.origin + location.pathname + '?s=' +
-        b64(JSON.stringify({ u: state.settings.syncUrl, k: state.settings.syncSecret || '' }));
+        b64(JSON.stringify({
+          u: state.settings.syncUrl,
+          k: state.settings.syncSecret || '',
+          p: state.settings.adminPin || ''      // 비밀번호까지 담아 한 번에 복구되게
+        }));
       copy(url);
+      toast('복사했습니다 — 즐겨찾기에 저장해 두세요');
       break;
     }
     case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;

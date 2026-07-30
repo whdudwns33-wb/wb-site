@@ -118,6 +118,60 @@ function todayStr() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
+/* ───────────────── 드라이브 경유 자동 등록 ─────────────────
+ * 구글 드라이브에 아래 이름으로 시작하는 .json 파일이 놓이면 자동으로 지시서를 등록한다.
+ * Claude가 파일만 놓아두면 원장이 아무것도 붙여넣지 않아도 반영된다.
+ *
+ * 설치: 시계 아이콘(트리거) → 함수 importFromDrive → 분 단위 → 10분 간격
+ *       처음 실행할 때 드라이브 접근 권한을 한 번 승인해야 한다.
+ *
+ * 처리한 파일은 이름 끝에 __처리완료 가 붙어 다시 등록되지 않는다.
+ */
+var IMPORT_PREFIX = 'WB_지시서입력_';
+var DONE_MARK = '__처리완료';
+var LOG_SHEET = '_import로그';
+
+function importFromDrive() {
+  var files = DriveApp.searchFiles(
+    'title contains "' + IMPORT_PREFIX + '" and trashed = false');
+  var handled = 0;
+
+  while (files.hasNext()) {
+    var f = files.next();
+    var name = f.getName();
+    if (name.indexOf(DONE_MARK) >= 0) continue;          // 이미 처리한 파일
+    if (name.slice(-5).toLowerCase() !== '.json') continue;
+
+    var added = 0, created = [], err = '';
+    try {
+      var raw = f.getBlob().getDataAsString('UTF-8');
+      var data = JSON.parse(raw);
+      var list = Array.isArray(data) ? data : (data.assignments || []);
+      if (!list.length) throw new Error('assignments 가 비어 있습니다');
+      var res = addAssignments(list);
+      added = res.added;
+      created = res.createdStaff;
+      f.setName(name.replace(/\.json$/i, '') + DONE_MARK + '.json');
+    } catch (e) {
+      err = String(e);
+      f.setName(name.replace(/\.json$/i, '') + DONE_MARK + '_오류.json');
+    }
+    logImport(name, added, created, err);
+    handled++;
+  }
+  return handled;
+}
+
+function logImport(fileName, added, createdStaff, err) {
+  var sh = sheet(LOG_SHEET);
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['시각', '파일명', '등록건수', '새로 만든 직원', '오류']);
+    sh.getRange(1, 1, 1, 5).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  sh.appendRow([new Date(), fileName, added, (createdStaff || []).join(', '), err || '']);
+}
+
 /* ───────────────── 정기 자동 발행 (선택) ─────────────────
  * 매주 같은 업무를 반복해서 내보내야 한다면 여기에 적어두고
  * 시계 아이콘(트리거) → 함수: publishWeekly → 주 단위 → 월요일 오전 8~9시 로 걸어두세요.
