@@ -209,6 +209,24 @@
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
+  /* ─── 월간 달력 ─── */
+  table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.cal th { font-size: 11px; color: var(--mid-gray); font-weight: 700; padding: 4px 0; }
+  table.cal td { padding: 2px; }
+  .calday { width: 100%; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 10px;
+            background: var(--white); display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 1px; cursor: pointer; }
+  .calday b { font-size: 13px; color: var(--dark-gray); }
+  .calday small { font-size: 9px; color: var(--mid-gray); }
+  .calday.has { background: var(--light-gray); }
+  .calday.done { background: #EAF6FC; border-color: var(--blue); }
+  .calday.done b, .calday.done small { color: var(--deep-blue); }
+  .calday.doing { background: #FFF7ED; border-color: var(--amber); }
+  .calday.doing small { color: var(--amber); }
+  .calday.miss { background: #FEF2F2; border-color: #FECACA; }
+  .calday.miss small { color: var(--coral); }
+  .calday.today { outline: 2px solid var(--navy); outline-offset: -1px; }
+
   .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #EAF6FC; color: var(--deep-blue); }
   .pill.warn { background: #FFF7ED; color: var(--amber); }
   .pill.bad { background: #FEF2F2; color: var(--coral); }
@@ -293,6 +311,16 @@ function relLabel(s) {
   return null;
 }
 function mondayOf(s) { const d = parseYmd(s); return addDays(s, -((d.getDay() + 6) % 7)); }
+const ymOf = s => s.slice(0, 7);
+function ymLabel(ym) { return ym.slice(0, 4) + '년 ' + Number(ym.slice(5)) + '월'; }
+function ymAdd(ym, n) {
+  const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function monthDates(ym) {
+  const last = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
+  return Array.from({ length: last }, (_, i) => ym + '-' + String(i + 1).padStart(2, '0'));
+}
 
 /* ══════════════════════════════════════════════════════
    3. 도메인 로직
@@ -306,6 +334,7 @@ const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim()
 
 function occursOn(task, date) {
   if (task.deleted) return false;
+  if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
   switch (task.repeat) {
@@ -382,6 +411,19 @@ function progress(staffId, date) {
   const list = tasksFor(staffId, date);
   const done = list.filter(t => isDone(t.id, date)).length;
   return { done: done, total: list.length, pct: list.length ? Math.round(done / list.length * 100) : 0 };
+}
+
+/** 그 달의 월간 목표 (kind:'mgoal') — 일별 업무와 별도로 산다 */
+function goalsFor(staffId, ym) {
+  return state.tasks
+    .filter(t => !t.deleted && t.kind === 'mgoal' && t.staffId === staffId && t.month === ym)
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function monthProgress(staffId, ym) {
+  let done = 0, total = 0;
+  monthDates(ym).forEach(d => { const p = progress(staffId, d); done += p.done; total += p.total; });
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
 }
 
 function weekProgress(staffId, anchor) {
@@ -518,6 +560,7 @@ const session = {
 let route = 'today';
 let cursor = today();
 let cursorPinned = false;
+let ymCursor = today().slice(0, 7);   // 월간 플래너가 보고 있는 달
 let viewStaff = '';
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
@@ -655,16 +698,16 @@ function render() {
     else { v.innerHTML = viewPendingAdd(); return; }
   }
 
-  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
 function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너']]
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너']]
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['write', '지시서 작성'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -922,6 +965,96 @@ function viewWeek() {
       }).join('') + '</tr>').join('') +
     '</tbody></table></div>' +
     '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
+  return h;
+}
+
+/* ── 월간 플래너 ── */
+function viewMonth() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const ym = ymCursor;
+  const dates = monthDates(ym);
+  const mp = monthProgress(me.id, ym);
+  const goals = goalsFor(me.id, ym);
+  const editable = session.isStaffLink || session.isAdmin;
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="mnav" data-n="-1">‹</button>' +
+    '<div class="d">' + ymLabel(ym) + '</div>' +
+    '<button class="navbtn" data-act="mnav" data-n="1">›</button></div>';
+
+  /* 이달의 목표 */
+  h += '<div class="card"><div class="between mb8"><div class="card-title">🎯 이달의 목표</div>' +
+    (goals.length ? '<div class="pill">' + goals.filter(g => isDone(g.id, ym)).length + ' / ' + goals.length + '</div>' : '') +
+    '</div>';
+  if (!goals.length) h += '<div class="card-sub mb8">이번 달에 이루고 싶은 목표를 적어두세요. (예: 책 2권 읽기, 수학 오답 30개)</div>';
+  h += goals.map(g => {
+    const c = getCheck(g.id, ym);
+    const p = taskProgress(g, c);
+    const done = c && c.done;
+    return '<div class="task' + (done ? ' done' : '') + '"><div class="task-body">' +
+      '<div class="task-t">' + esc(g.title) + '</div>' +
+      '<div class="meta">' +
+        (g.target ? '<span class="tag ' + (done ? 'ok' : 'doing') + '">' + p.done + ' / ' + p.total + (g.unit || '') + '</span>' : '') +
+        (g.origin === 'staff' ? '<span class="tag add">학생 추가</span>' : '') +
+      '</div>' +
+      (g.target ? '<div class="bar" style="margin-top:8px"><i style="width:' + p.pct + '%"></i></div>' : '') +
+      '</div>' +
+      (editable
+        ? (g.target
+            ? '<button class="btn btn-sm" data-act="cnt" data-id="' + g.id + '" data-date="' + ym + '" data-n="1">＋1</button>' +
+              '<button class="btn btn-sm btn-ghost" data-act="cnt" data-id="' + g.id + '" data-date="' + ym + '" data-n="-1">－</button>'
+            : '<button class="btn btn-sm ' + (done ? 'btn-ghost' : 'btn-primary') + '" data-act="toggle" data-id="' + g.id + '" data-date="' + ym + '">' + (done ? '취소' : '완료') + '</button>') +
+          (canEditTask(g) ? '<button class="btn btn-sm btn-danger" data-act="gdel" data-id="' + g.id + '">삭제</button>' : '')
+        : '') +
+      '</div>';
+  }).join('');
+  if (editable) {
+    h += '<hr class="sep">' +
+      '<div class="field"><input class="in" id="gTitle" placeholder="목표 (예: 책 2권 읽기)"></div>' +
+      '<div class="row">' +
+        '<input class="in" id="gTarget" type="number" inputmode="numeric" placeholder="목표 수량 (선택)">' +
+        '<input class="in" id="gUnit" placeholder="단위 (권·회·쪽)" style="max-width:110px">' +
+        '<button class="btn btn-primary" data-act="gadd">추가</button>' +
+      '</div>' +
+      '<div class="hint">수량을 넣으면 ＋1 버튼으로 세면서 채웁니다. 다 채우면 자동 완료.</div>';
+  }
+  h += '</div>';
+
+  /* 이번 달 달성률 */
+  h += '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">이번 달 달성률</div>' +
+    '<div class="pill">' + mp.done + ' / ' + mp.total + '건 · ' + mp.pct + '%</div></div>' +
+    '<div class="bar"><i style="width:' + mp.pct + '%"></i></div></div>';
+
+  /* 달력 */
+  const firstDow = (dowOf(dates[0]) + 6) % 7;   // 월요일 시작
+  let cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push('<td></td>');
+  dates.forEach(d => {
+    const p = progress(me.id, d);
+    let cls = '', mark = '';
+    if (p.total > 0) {
+      if (p.done >= p.total) { cls = 'done'; mark = p.done; }
+      else if (d < today()) { cls = 'miss'; mark = p.done + '/' + p.total; }
+      else if (p.done > 0) { cls = 'doing'; mark = p.done + '/' + p.total; }
+      else { cls = 'has'; mark = p.total; }
+    }
+    cells.push('<td><button class="calday ' + cls + (d === today() ? ' today' : '') + '" data-act="daypick" data-date="' + d + '">' +
+      '<b>' + Number(d.slice(8)) + '</b>' + (mark !== '' ? '<small>' + mark + '</small>' : '') + '</button></td>');
+  });
+  while (cells.length % 7) cells.push('<td></td>');
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push('<tr>' + cells.slice(i, i + 7).join('') + '</tr>');
+
+  h += '<div class="card"><div class="card-title mb8">달력</div>' +
+    '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead>' +
+    '<tbody>' + rows.join('') + '</tbody></table>' +
+    '<div class="hint">날짜를 누르면 그날의 할 일로 이동합니다. 🔵 전부 완료 · 🟠 진행중 · 🩷 미완료 · 회색 숫자는 할 일 개수.</div></div>';
+
   return h;
 }
 
@@ -1701,6 +1834,34 @@ document.addEventListener('click', ev => {
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
+    case 'mnav': ymCursor = ymAdd(ymCursor, Number(el.dataset.n)); render(); break;
+    case 'daypick': cursor = el.dataset.date; cursorPinned = (cursor !== today()); go('today'); break;
+
+    /* 월간 목표 */
+    case 'gadd': {
+      const title = ($('#gTitle').value || '').trim();
+      if (!title) return toast('목표를 입력해 주세요');
+      const me = currentStaff(); if (!me) break;
+      const target = Math.max(0, Number($('#gTarget').value) || 0);
+      const unit = ($('#gUnit').value || '').trim() || '회';
+      state.tasks.push({
+        id: uid(), groupId: 'goal-' + now(), staffId: me.id,
+        kind: 'mgoal', month: ymCursor,
+        title: title, detail: '', guide: '', steps: [], target: target, unit: unit,
+        time: '', priority: 'normal', repeat: 'once', days: [], start: ymCursor + '-01', end: '', carry: false,
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+      });
+      save(); queueSync(); render(); toast('목표를 추가했습니다');
+      break;
+    }
+    case 'gdel': {
+      const t = task();
+      if (!t || !canEditTask(t)) break;
+      if (!confirm('이 목표를 삭제할까요?')) return;
+      t.deleted = true; t.updatedAt = now();
+      save(); queueSync(); render();
+      break;
+    }
 
     /* 체크 · 단계 · 수량 · 막힘 */
     case 'toggle': {
