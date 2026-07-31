@@ -172,6 +172,101 @@ function logImport(fileName, added, createdStaff, err) {
   sh.appendRow([new Date(), fileName, added, (createdStaff || []).join(', '), err || '']);
 }
 
+/* ───────────────── 막힘 알림 (선택) ─────────────────
+ * 학생이 [막힘]을 누르면 원장에게 알린다.
+ * 설치: 트리거 → 함수 notifyBlocked → 분 단위 → 10분 간격
+ *
+ * 채널 우선순위:
+ *  1) SOLAPI_KEY 가 있으면 문자(SMS) — 카카오 채널 템플릿(pfId·templateId)까지
+ *     넣으면 알림톡으로 나간다 (템플릿은 솔라피에서 사전 승인 필요)
+ *  2) 키가 없으면 NOTIFY_EMAIL 로 이메일 (무료, 즉시 사용 가능)
+ * 같은 건은 한 번만 알린다 (_알림로그 시트로 중복 방지)
+ */
+var NOTIFY_EMAIL   = '';   // 알림 받을 이메일 (비우면 이메일 알림 없음)
+var SOLAPI_KEY     = '';   // 솔라피 API Key (비우면 문자 대신 이메일)
+var SOLAPI_SECRET  = '';   // 솔라피 API Secret
+var SMS_FROM       = '';   // 솔라피에 등록된 발신번호 (숫자만)
+var SMS_TO         = '';   // 알림 받을 휴대폰 번호 (숫자만)
+var KAKAO_PF_ID    = '';   // (선택) 카카오 채널 pfId — 알림톡용
+var KAKAO_TEMPLATE = '';   // (선택) 승인된 알림톡 템플릿 ID
+var ALERT_SHEET    = '_알림로그';
+
+function notifyBlocked() {
+  var st = readState();
+  var sh = sheet(ALERT_SHEET);
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['시각', '건', '내용', '채널', '결과']);
+    sh.getRange(1, 1, 1, 5).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  var seen = {};
+  if (sh.getLastRow() > 1) {
+    sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues()
+      .forEach(function (r) { seen[String(r[0])] = true; });
+  }
+  var names = {}; (st.staff || []).forEach(function (s) { names[s.id] = s.name; });
+  var tasks = {}; (st.tasks || []).forEach(function (t) { tasks[t.id] = t; });
+  // 오래된 건으로 첫 실행 때 알림이 쏟아지지 않게 최근 3일만 본다
+  var cutoff = Utilities.formatDate(new Date(Date.now() - 3 * 86400000),
+    Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+  Object.keys(st.checks || {}).forEach(function (k) {
+    var c = st.checks[k];
+    if (!c || !c.blocked) return;
+    if (String(c.date || '') < cutoff) return;
+    if (seen[k]) return;
+    var t = tasks[c.taskId];
+    if (!t) return;
+    var who = names[t.staffId] || '?';
+    var text = '[WB컨설팅 막힘] ' + who + ' · ' + (t.title || '') +
+      (c.note ? '\n메모: ' + c.note : '');
+    var res = sendAlert(text);
+    sh.appendRow([new Date(), k, text, res.channel, res.ok ? 'OK' : res.error]);
+  });
+}
+
+function sendAlert(text) {
+  if (SOLAPI_KEY && SMS_TO) {
+    try {
+      var msg = { to: SMS_TO, from: SMS_FROM, text: text };
+      if (KAKAO_PF_ID && KAKAO_TEMPLATE) {
+        msg.kakaoOptions = { pfId: KAKAO_PF_ID, templateId: KAKAO_TEMPLATE };
+      }
+      var resp = UrlFetchApp.fetch('https://api.solapi.com/messages/v4/send', {
+        method: 'post',
+        headers: solapiAuth(),
+        contentType: 'application/json',
+        payload: JSON.stringify({ message: msg }),
+        muteHttpExceptions: true
+      });
+      if (resp.getResponseCode() < 300) return { channel: msg.kakaoOptions ? '알림톡' : '문자', ok: true };
+      return { channel: '문자', ok: false, error: resp.getContentText().slice(0, 150) };
+    } catch (e) {
+      return { channel: '문자', ok: false, error: String(e) };
+    }
+  }
+  if (NOTIFY_EMAIL) {
+    try {
+      MailApp.sendEmail(NOTIFY_EMAIL, text.split('\n')[0], text +
+        '\n\n관리자 화면에서 확인하세요.');
+      return { channel: '이메일', ok: true };
+    } catch (e) { return { channel: '이메일', ok: false, error: String(e) }; }
+  }
+  return { channel: '없음', ok: false, error: 'NOTIFY_EMAIL 또는 SOLAPI_KEY를 설정하세요' };
+}
+
+function solapiAuth() {
+  var date = new Date().toISOString();
+  var salt = Utilities.getUuid().replace(/-/g, '');
+  var sig = Utilities.computeHmacSha256Signature(date + salt, SOLAPI_SECRET)
+    .map(function (b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length === 1 ? '0' + v : v; })
+    .join('');
+  return {
+    'Authorization': 'HMAC-SHA256 apiKey=' + SOLAPI_KEY +
+      ', date=' + date + ', salt=' + salt + ', signature=' + sig
+  };
+}
+
 /* ───────────────── 정기 자동 발행 (선택) ─────────────────
  * 매주 같은 업무를 반복해서 내보내야 한다면 여기에 적어두고
  * 시계 아이콘(트리거) → 함수: publishWeekly → 주 단위 → 월요일 오전 8~9시 로 걸어두세요.
