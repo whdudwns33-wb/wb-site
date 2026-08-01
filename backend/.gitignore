@@ -1,1 +1,6 @@
 node_modules/
+
+# 실제 키가 들어가는 파일 — 커밋 금지 (.env.example 만 커밋)
+.env
+.env.*
+!.env.example
