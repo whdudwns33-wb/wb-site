@@ -637,6 +637,36 @@ function ctPill(name) {
   return '<span class="pill ' + cls + '">📞 ' + (d === 0 ? '오늘' : d + '일 전') + '</span>';
 }
 
+/** 위험 신호 — 퇴원은 후행지표라 결석·지각·연락 공백을 먼저 본다.
+ *  수업 지시서의 출결 체크를 학생별로 최근 14일 집계한다. */
+function riskMap() {
+  const from = addDays(today(), -13), to = today();
+  const m = {};
+  Object.keys(state.checks).forEach(k => {
+    const c = state.checks[k];
+    if (!c || !c.att || c.date < from || c.date > to) return;
+    const t = state.tasks.find(x => x.id === c.taskId);
+    if (!t || !isLesson(t)) return;
+    const n = studentOf(t);
+    if (!n) return;
+    m[n] = m[n] || { abs: 0, late: 0 };
+    if (c.att === 'A') m[n].abs++;
+    else if (c.att === 'L') m[n].late++;
+  });
+  return m;
+}
+/** 관심 필요 사유 목록 — [문구, 강도]. 비어 있으면 정상.
+ *  연락은 '기록이 있는데 30일 넘게 끊긴' 경우만 — 기록 없음은 연락 현황 카드가 맡는다. */
+function riskFlags(name, rm) {
+  const flags = [];
+  const r = rm[name];
+  if (r && r.abs >= 2) flags.push(['2주 결석 ' + r.abs + '회', 'bad']);
+  if (r && r.late >= 3) flags.push(['2주 지각 ' + r.late + '회', 'warn']);
+  const d = daysSinceContact(name);
+  if (d !== null && d > 30) flags.push(['연락 ' + d + '일 경과', 'warn']);
+  return flags;
+}
+
 /** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
 function originTags(t) {
   if (session.isStaffLink) return '';
@@ -1475,6 +1505,25 @@ function viewRoster() {
   // 선생님 개인 링크: 내 학생 먼저
   const myName = session.isStaffLink ? ((meStaff() || {}).name || '') : '';
   const isMine = s => myName && String(s.teacher || '').split('·').includes(myName);
+
+  // ⚠️ 관심 필요 — 위험 신호가 있는 학생을 맨 위로 (일반 직원은 내 학생만)
+  {
+    const rm = riskMap();
+    const scope = (session.isAdmin || isManager()) ? curActive : curActive.filter(isMine);
+    const risky = scope.map(s => ({ s: s, flags: riskFlags(s.name, rm) })).filter(x => x.flags.length);
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">⚠️ 관심 필요</div>' +
+      '<div class="pill ' + (risky.length ? 'bad' : '') + '">' + risky.length + '명</div></div>' +
+      (risky.length
+        ? '<div class="card-sub mb8">결석이 이어질 때 그날 바로 연락하는 것이 가장 효과가 큽니다.</div>' +
+          risky.map(x => '<div class="between small" style="padding:4px 0">' +
+            '<span>· ' + esc(x.s.name) + ' <span class="muted">(' + esc(x.s.grade) + ' · ' + esc(x.s.teacher || '미지정') + ')</span> ' +
+            x.flags.map(f => '<span class="pill ' + f[1] + '">' + esc(f[0]) + '</span>').join(' ') + '</span>' +
+            '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(x.s.name) + '">📞 기록</button></div>').join('')
+        : '<div class="small muted">지금 기준 위험 신호 없음 — 최근 2주 결석 2회 이상, 지각 3회 이상, 연락 30일 경과가 생기면 여기 올라옵니다.</div>') +
+      '</div>';
+  }
+
   if (myName) {
     const mine = rosterDb.students.filter(isMine);
     const mineActive = mine.filter(s => s.start <= cur && (!s.end || s.end > cur));
