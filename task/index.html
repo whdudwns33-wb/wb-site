@@ -1340,14 +1340,21 @@ function viewBooks() {
     const f = flatSections(b);
     const studs = bookStudents(b.id);
     const open = bookOpen.has(b.id);
+    const orders = state.tasks.filter(t => !t.deleted && t.title === '[주문] ' + b.title);
+    const openOrders = orders.filter(t =>
+      !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done));
 
     h += '<div class="card">' +
       '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
         '<div><div class="card-title">' + esc(b.title) +
-          (b.verify ? ' <span class="tag edit">검증필요</span>' : '') + '</div>' +
+          (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
+          (openOrders.length ? ' <span class="tag high">🛒 주문 진행 ' + openOrders.length + '</span>' : '') + '</div>' +
         '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
-          (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div>' +
-        '<span class="muted">' + (open ? '▾' : '▸') + '</span></div>';
+          (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') +
+          ' · 주문처: ' + (b.vendor ? esc(b.vendor) : '<span style="color:var(--amber)">미등록</span>') + '</div></div>' +
+        '<div class="row" style="gap:8px;flex-shrink:0">' +
+          '<button class="btn btn-sm btn-ghost" data-act="bkorder" data-id="' + b.id + '">🛒 주문</button>' +
+          '<span class="muted">' + (open ? '▾' : '▸') + '</span></div></div>';
 
     studs.forEach(st => {
       const idx = posOf(b, st.at);
@@ -2070,6 +2077,32 @@ document.addEventListener('click', ev => {
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
+    case 'bkorder': {
+      if (!bookDb) break;
+      const b = (bookDb.books || []).find(x => x.id === id);
+      if (!b) break;
+      const qty = (prompt('[' + b.title + '] 주문 요청\n수량과 메모를 입력하세요 (예: 3권, 다음 주 수업 전까지)') || '').trim();
+      if (!qty) return;
+      // 담당: 직원이 요청하면 본인, 원장이 요청하면 관리자(없으면 첫 직원)
+      let sid = session.isStaffLink ? session.staffId
+        : ((liveStaff().find(s => s.manager) || teamStaff()[0]) || {}).id;
+      if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
+      state.tasks.push({
+        id: uid(), groupId: 'order-' + now(), staffId: sid,
+        title: '[주문] ' + b.title, detail: '수량·메모: ' + qty + (b.vendor ? ' · 주문처: ' + b.vendor : ''),
+        guide: '재고 부족으로 요청된 교재 주문입니다.\n' +
+          (b.vendor ? '■ 주문처: ' + b.vendor + '\n'
+            : '■ 주문처: 미등록 — 거래 업체(' + ((bookDb.vendors || []).join('·') || '') + ') 중 확인해 메모에 남겨주세요 (교재 DB에 반영됩니다)\n') +
+          '1) 발주하면 "발주" 단계 체크 + 메모에 주문일 기록\n2) 교재가 도착하면 "입고 확인" 체크 — 자동으로 완료됩니다\n※ 주문이 불가하거나 지연되면 막힘으로 신고하세요.',
+        steps: [{ id: uid(), label: '발주 (주문처·주문일 메모)' }, { id: uid(), label: '입고 확인' }],
+        target: 0, unit: '건', time: '', priority: 'normal',
+        repeat: 'once', days: [], start: today(), end: '', carry: true,
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+      });
+      save(); queueSync(); render();
+      toast('주문 요청 등록 — ' + ((staffById(sid) || {}).name || '') + ' 님 할 일로 들어갔습니다');
+      break;
+    }
     case 'latt': {
       const t = task(); if (!t) break;
       const c = getCheck(id, date);
