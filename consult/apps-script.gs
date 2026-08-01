@@ -183,6 +183,8 @@ function logImport(fileName, added, createdStaff, err) {
  * 같은 건은 한 번만 알린다 (_알림로그 시트로 중복 방지)
  */
 var NOTIFY_EMAIL   = '';   // 알림 받을 이메일 (비우면 이메일 알림 없음)
+var KAKAO_REST_KEY = '';   // 카카오 디벨로퍼스 앱의 REST API 키 — 넣으면 카톡(나와의 채팅)으로 발송
+var KAKAO_AUTH_CODE = '';  // 최초 연결 1회용 인가 코드 (README의 카카오 연결 절차 참고)
 var SOLAPI_KEY     = '';   // 솔라피 API Key (비우면 문자 대신 이메일)
 var SOLAPI_SECRET  = '';   // 솔라피 API Secret
 var SMS_FROM       = '';   // 솔라피에 등록된 발신번호 (숫자만)
@@ -225,7 +227,72 @@ function notifyBlocked() {
   });
 }
 
+/* ── 카카오 '나에게 보내기' ──
+ * 알림톡 템플릿·비용 없이, 대표 본인의 카카오톡 '나와의 채팅'으로 보낸다.
+ * 최초 1회 연결: ① developers.kakao.com 앱 생성 → REST API 키를 KAKAO_REST_KEY에
+ * ② 카카오 로그인 활성화 + Redirect URI에 https://localhost 등록
+ * ③ 동의항목에서 '카카오톡 메시지 전송(talk_message)' 활성화
+ * ④ 브라우저에서 아래 주소를 열어 동의 (REST키 부분만 바꿔서):
+ *    https://kauth.kakao.com/oauth/authorize?client_id=REST키&redirect_uri=https://localhost&response_type=code&scope=talk_message
+ * ⑤ 이동된 주소창의 code= 뒷부분을 KAKAO_AUTH_CODE에 넣고 kakaoInit() 실행 1회
+ */
+function kakaoInit() {
+  var resp = UrlFetchApp.fetch('https://kauth.kakao.com/oauth/token', {
+    method: 'post',
+    payload: { grant_type: 'authorization_code', client_id: KAKAO_REST_KEY,
+               redirect_uri: 'https://localhost', code: KAKAO_AUTH_CODE },
+    muteHttpExceptions: true
+  });
+  var d = JSON.parse(resp.getContentText());
+  if (d.refresh_token) {
+    PropertiesService.getScriptProperties().setProperty('KAKAO_REFRESH', d.refresh_token);
+    Logger.log('카카오 연결 성공 — 이제 막힘 알림이 카카오톡으로 갑니다');
+    return;
+  }
+  throw new Error('카카오 연결 실패: ' + resp.getContentText());
+}
+
+function kakaoAccessToken() {
+  if (!KAKAO_REST_KEY) return null;
+  var props = PropertiesService.getScriptProperties();
+  var refresh = props.getProperty('KAKAO_REFRESH');
+  if (!refresh) return null;
+  var resp = UrlFetchApp.fetch('https://kauth.kakao.com/oauth/token', {
+    method: 'post',
+    payload: { grant_type: 'refresh_token', client_id: KAKAO_REST_KEY, refresh_token: refresh },
+    muteHttpExceptions: true
+  });
+  var d = JSON.parse(resp.getContentText());
+  if (d.refresh_token) props.setProperty('KAKAO_REFRESH', d.refresh_token);   // 갱신되면 저장
+  return d.access_token || null;
+}
+
+function sendKakaoMemo(text) {
+  var token = kakaoAccessToken();
+  if (!token) return { ok: false, error: '카카오 미연결' };
+  var resp = UrlFetchApp.fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
+    method: 'post',
+    headers: { Authorization: 'Bearer ' + token },
+    payload: { template_object: JSON.stringify({
+      object_type: 'text',
+      text: text,
+      link: { web_url: 'https://whdudwns33-wb.github.io/wb-site/consult/',
+              mobile_web_url: 'https://whdudwns33-wb.github.io/wb-site/consult/' },
+      button_title: '앱에서 확인'
+    }) },
+    muteHttpExceptions: true
+  });
+  if (resp.getResponseCode() < 300) return { ok: true };
+  return { ok: false, error: resp.getContentText().slice(0, 150) };
+}
+
 function sendAlert(text) {
+  // 1순위: 카카오톡 나와의 채팅
+  if (KAKAO_REST_KEY) {
+    var k = sendKakaoMemo(text);
+    if (k.ok) return { channel: '카카오톡', ok: true };
+    // 카카오 실패 시 아래 채널로 넘어간다
+  }
   if (SOLAPI_KEY && SMS_TO) {
     try {
       var msg = { to: SMS_TO, from: SMS_FROM, text: text };
