@@ -168,6 +168,24 @@
       "units": []
     },
     {
+      "id": "BK17",
+      "title": "어휘 3단계",
+      "subject": "국어 어휘",
+      "level": "초2",
+      "verify": true,
+      "note": "강 단위 진행 (현재 9강) · 교재 정식 명칭·총 강수 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK18",
+      "title": "논리와 상상 기본6 (창의)",
+      "subject": "국어 사고력",
+      "level": "초2",
+      "verify": true,
+      "note": "페이지 단위 진행 (현재 28p) · 총 구성 확인 필요",
+      "units": []
+    },
+    {
       "id": "BK16",
       "title": "WB 독해력 커리큘럼 (어휘·지문 정리)",
       "subject": "국어 독해력",
@@ -194,6 +212,8 @@
     { "name": "이재이", "teacher": "정다원", "bookId": "BK13", "at": "이등변삼각형", "perWeek": 2, "goal": "중간고사 80점" },
     { "name": "이재후", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 2, "goal": "낯선 비문학 이해 · 어휘(수능)+지문정리(고급)" },
     { "name": "김서하", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 1, "goal": "고난도 비문학 · 어휘(수능)+독해창 비상2" },
-    { "name": "정서안", "teacher": "정다원", "bookId": "BK14", "at": "", "perWeek": 2, "goal": "고3 모의고사 1등급" }
+    { "name": "정서안", "teacher": "정다원", "bookId": "BK14", "at": "", "perWeek": 2, "goal": "고3 모의고사 1등급" },
+    { "name": "박보서", "teacher": "최인찬", "bookId": "BK17", "at": "", "perWeek": 1, "goal": "어휘 9강 · 스터디포스 초급예비 적응" },
+    { "name": "박보서", "teacher": "최인찬", "bookId": "BK18", "at": "", "perWeek": 1, "goal": "기본6 28p 진행 중" }
   ]
 }
