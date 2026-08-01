@@ -1,0 +1,131 @@
+{
+  "updated": "2026-08-01",
+  "note": "시판 교재는 공개 목차·2022 개정 교육과정 기준으로 작성. '검증필요' 표시는 담당 선생님이 실물 교재와 대조 후 확정.",
+  "books": [
+    {
+      "id": "BK01",
+      "title": "베테랑의 개념완성 물질과 에너지",
+      "subject": "과학(화학)",
+      "level": "고2",
+      "verify": true,
+      "note": "인강교재 · 교육과정 4개 영역 기준, 소단원은 실물 대조 필요",
+      "units": [
+        { "name": "Ⅰ. 물질의 세 가지 상태", "sections": ["기체의 압력·온도·부피 관계", "이상 기체 방정식", "혼합 기체의 분압과 몰 분율", "액체 — 분자 간 상호작용과 성질", "고체 — 입자 배열에 따른 분류"] },
+        { "name": "Ⅱ. 용액의 성질", "sections": ["물의 성질과 수소 결합", "용액의 농도", "묽은 용액의 총괄성 — 증기압·끓는점·어는점", "삼투현상"] },
+        { "name": "Ⅲ. 화학 변화의 자발성", "sections": ["엔탈피와 열화학 반응식", "헤스 법칙", "엔트로피", "화학 변화의 자발성 판단"] },
+        { "name": "Ⅳ. 반응 속도", "sections": ["반응 속도의 표현", "활성화 에너지와 반응 속도", "반응 속도에 영향을 주는 요인 — 농도·온도·촉매"] }
+      ]
+    },
+    {
+      "id": "BK02",
+      "title": "개념원리 미적분Ⅰ",
+      "subject": "수학",
+      "level": "고2",
+      "verify": true,
+      "note": "2022 개정 (구 수학Ⅱ 승계) · 개념 교재",
+      "units": [
+        { "name": "Ⅰ. 함수의 극한과 연속", "sections": ["함수의 극한", "함수의 극한값의 계산", "함수의 연속"] },
+        { "name": "Ⅱ. 미분", "sections": ["미분계수", "도함수", "접선의 방정식·평균값 정리", "함수의 증가·감소와 극대·극소", "함수의 그래프", "방정식·부등식에의 활용", "속도와 가속도"] },
+        { "name": "Ⅲ. 적분", "sections": ["부정적분", "정적분", "정적분의 활용 — 넓이", "속도와 거리"] }
+      ]
+    },
+    {
+      "id": "BK03",
+      "title": "수학의 바이블 미적분Ⅰ",
+      "subject": "수학",
+      "level": "고2",
+      "verify": true,
+      "note": "문제 교재 · BK02와 병행 — 단원 구조 동일",
+      "units": [
+        { "name": "Ⅰ. 함수의 극한과 연속", "sections": ["함수의 극한", "함수의 극한값의 계산", "함수의 연속"] },
+        { "name": "Ⅱ. 미분", "sections": ["미분계수", "도함수", "접선의 방정식·평균값 정리", "함수의 증가·감소와 극대·극소", "함수의 그래프", "방정식·부등식에의 활용", "속도와 가속도"] },
+        { "name": "Ⅲ. 적분", "sections": ["부정적분", "정적분", "정적분의 활용 — 넓이", "속도와 거리"] }
+      ]
+    },
+    {
+      "id": "BK04",
+      "title": "라이트쎈 공통수학2",
+      "subject": "수학",
+      "level": "고1",
+      "verify": true,
+      "note": "2026년용은 A·B 2단계 구성으로 확인됨 — 'C단계'는 실물 대조 필요 (쎈과 혼동 여부)",
+      "units": [
+        { "name": "Ⅰ. 도형의 방정식", "sections": ["평면좌표", "직선의 방정식", "원의 방정식", "도형의 이동"] },
+        { "name": "Ⅱ. 집합과 명제", "sections": ["집합의 뜻과 포함 관계", "집합의 연산", "명제"] },
+        { "name": "Ⅲ. 함수와 그래프", "sections": ["함수", "합성함수와 역함수", "유리함수", "무리함수"] }
+      ]
+    },
+    {
+      "id": "BK05",
+      "title": "Sullivan Precalculus 10e",
+      "subject": "수학(영문)",
+      "level": "고1",
+      "verify": true,
+      "note": "학교교재 · Ch.1 소단원은 원서 목차 확인됨, Ch.3 이후는 챕터 수준 — 학교 진도 범위 확인 필요",
+      "units": [
+        { "name": "Ch.1 Graphs (좌표)", "sections": ["1.1 The Distance and Midpoint Formulas", "1.2 Graphs of Equations; Intercepts; Symmetry", "1.3 Lines", "1.4 Circles"] },
+        { "name": "Ch.2 Functions and Their Graphs", "sections": ["2.1 Functions", "2.2 The Graph of a Function", "2.3 Properties of Functions", "2.4 Library of Functions; Piecewise-defined Functions", "2.5 Graphing Techniques: Transformations", "2.6 Mathematical Models"] },
+        { "name": "Ch.3 Linear and Quadratic Functions", "sections": ["(소단원 검증 필요)"] },
+        { "name": "Ch.4 Polynomial and Rational Functions", "sections": ["(소단원 검증 필요)"] },
+        { "name": "Ch.5 Exponential and Logarithmic Functions", "sections": ["(소단원 검증 필요)"] },
+        { "name": "Ch.6 Trigonometric Functions", "sections": ["(소단원 검증 필요)"] }
+      ]
+    },
+    {
+      "id": "BK06",
+      "title": "WB 자체 독해교재",
+      "subject": "국어 독해",
+      "level": "중등",
+      "verify": true,
+      "note": "구성(챕터·회차) 정보 대기 — 대표님 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK07",
+      "title": "어휘 (중등)",
+      "subject": "국어 어휘",
+      "level": "중1",
+      "verify": true,
+      "note": "강 단위 진행 (현재 23~24강) · 교재 정식 명칭·총 강수 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK08",
+      "title": "독해창 비상1",
+      "subject": "국어 독해",
+      "level": "중1",
+      "verify": true,
+      "note": "페이지 단위 진행 (현재 16~21p) · 총 구성 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK09",
+      "title": "어휘 5단계",
+      "subject": "국어 어휘",
+      "level": "초3",
+      "verify": true,
+      "note": "강 단위 진행 (현재 4강) · 교재 정식 명칭·총 강수 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK10",
+      "title": "논리와 상상 도약5 (창의)",
+      "subject": "국어 사고력",
+      "level": "초3",
+      "verify": true,
+      "note": "페이지 단위 진행 (현재 34~40p) · 총 구성 확인 필요",
+      "units": []
+    }
+  ],
+  "students": [
+    { "name": "정서안", "teacher": "김동현", "bookId": "BK01", "at": "물의 성질과 수소 결합", "perWeek": 2, "goal": "방학 중 1회독" },
+    { "name": "고현준", "teacher": "김동현", "bookId": "BK02", "at": "함수의 극한", "perWeek": 1, "goal": "방학 중 2-2 중간범위 1회독" },
+    { "name": "이태호", "teacher": "김동현", "bookId": "BK04", "at": "원의 방정식", "perWeek": 2, "goal": "C단계 포함 방학 중 1회독" },
+    { "name": "이재후", "teacher": "김동현", "bookId": "BK05", "at": "1.1 The Distance and Midpoint Formulas", "perWeek": 2, "goal": "2학기 과정 1회독 도전" },
+    { "name": "진호윤", "teacher": "김혜지", "bookId": "BK06", "at": "", "perWeek": 2, "goal": "독해력 훈련" },
+    { "name": "김유찬", "teacher": "최인찬", "bookId": "BK07", "at": "", "perWeek": 1, "goal": "국어 노출 유지 · 어휘 23~24강" },
+    { "name": "김유찬", "teacher": "최인찬", "bookId": "BK08", "at": "", "perWeek": 1, "goal": "독해창 16~21p 진행 중" },
+    { "name": "장유혁", "teacher": "최인찬", "bookId": "BK09", "at": "", "perWeek": 1, "goal": "어휘력 쌓기 · 5단계 4강" },
+    { "name": "장유혁", "teacher": "최인찬", "bookId": "BK10", "at": "", "perWeek": 1, "goal": "도약5 34~40p 진행 중" }
+  ]
+}

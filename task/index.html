@@ -669,11 +669,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 그 외는 자기 할 일만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'write', 'board'] : ['today', 'week'];
+    const allowed = isManager() ? ['today', 'week', 'write', 'board', 'books'] : ['today', 'week', 'books'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -681,11 +681,11 @@ function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너']])
+        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total], ['books', '교재']]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재']])
     : session.isAdmin
       ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['settings', '설정']]
+         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -1285,6 +1285,84 @@ function attHistText() {
     out += shortDate(d) + '(' + DOW[dowOf(d)] + ')  ' + (parts.length ? parts.join(' · ') : '기록 없음') + '\n';
   }
   return out;
+}
+
+/* ── 교재 DB ──
+ * 데이터는 같은 폴더의 textbooks.json (정적 파일 — 동기화 무게 0, 수정은 저장소에서).
+ * 학생별 현재 위치(◀)와 남은 분량·예상 소요를 함께 보여준다. */
+let bookDb = null, bookDbErr = '';
+const bookOpen = new Set();
+function loadBooks() {
+  fetch('textbooks.json?v=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => { bookDb = d; if (route === 'books') render(); })
+    .catch(e => { bookDbErr = String(e); if (route === 'books') render(); });
+}
+
+function bookStudents(bookId) {
+  return ((bookDb && bookDb.students) || []).filter(s => s.bookId === bookId);
+}
+function flatSections(b) {
+  const out = [];
+  (b.units || []).forEach(u => (u.sections || []).forEach(sec => out.push({ unit: u.name, sec: sec })));
+  return out;
+}
+function posOf(b, at) {
+  if (!at) return -1;
+  const f = flatSections(b);
+  for (let i = 0; i < f.length; i++) if (f[i].sec.includes(at) || at.includes(f[i].sec)) return i;
+  return -1;
+}
+
+function viewBooks() {
+  if (!bookDb && !bookDbErr) { loadBooks(); return '<div class="card"><div class="empty"><b>📚</b>교재 데이터를 불러오는 중…</div></div>'; }
+  if (bookDbErr) return '<div class="card"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span></div></div>';
+
+  let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
+    '<div class="card-sub">소단원 목차와 학생별 현재 위치. 교재를 누르면 목차가 열립니다.<br>' +
+    '기준일 ' + esc(bookDb.updated || '') + ' · 목차 수정은 원장님이 저에게 말로 지시하면 반영됩니다.</div></div>';
+
+  (bookDb.books || []).forEach(b => {
+    const f = flatSections(b);
+    const studs = bookStudents(b.id);
+    const open = bookOpen.has(b.id);
+
+    h += '<div class="card">' +
+      '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
+        '<div><div class="card-title">' + esc(b.title) +
+          (b.verify ? ' <span class="tag edit">검증필요</span>' : '') + '</div>' +
+        '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
+          (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div>' +
+        '<span class="muted">' + (open ? '▾' : '▸') + '</span></div>';
+
+    studs.forEach(st => {
+      const idx = posOf(b, st.at);
+      const done = idx >= 0 ? idx : 0;
+      const remain = f.length ? f.length - done : 0;
+      const weeks = (st.perWeek && remain) ? Math.ceil(remain / st.perWeek) : 0;
+      const pct = f.length ? Math.round(done / f.length * 100) : 0;
+      h += '<hr class="sep"><div class="small"><b>' + esc(st.name) + '</b>' +
+        (st.teacher ? ' <span class="muted">(' + esc(st.teacher) + ')</span>' : '') +
+        (idx >= 0 ? ' — 현재 <b>' + esc(f[idx].sec) + '</b>' : (st.at ? ' — 위치 미확인' : '')) + '</div>' +
+        (f.length ? '<div class="bar" style="margin:6px 0 4px"><i style="width:' + pct + '%"></i></div>' +
+          '<div class="small muted">진행 ' + done + '/' + f.length +
+          (weeks ? ' · 주 ' + st.perWeek + '회 기준 약 ' + weeks + '주 남음' : '') +
+          (st.goal ? ' · 목표: ' + esc(st.goal) : '') + '</div>' : '');
+    });
+
+    if (open) {
+      let lastUnit = '';
+      h += '<hr class="sep">';
+      f.forEach((row, i) => {
+        if (row.unit !== lastUnit) { h += '<div class="sect" style="margin:10px 0 4px">' + esc(row.unit) + '</div>'; lastUnit = row.unit; }
+        const marks = studs.filter(st => posOf(b, st.at) === i).map(st => ' <span class="tag doing">◀ ' + esc(st.name) + '</span>').join('');
+        h += '<div class="small" style="padding:3px 0">' + (i + 1) + '. ' + esc(row.sec) + marks + '</div>';
+      });
+      if (!f.length) h += '<div class="small muted">목차가 아직 없습니다 — ' + esc(b.note || '') + '</div>';
+    }
+    h += '</div>';
+  });
+  return h;
 }
 
 /* ── 직원 관리 ── */
@@ -1977,6 +2055,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
     case 'fbtext': {
       const t = task(); if (!t) break;
       fbCtx = { id: id, date: date, focus: null, plus: [], minus: null };
