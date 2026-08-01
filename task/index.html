@@ -1425,8 +1425,41 @@ function viewRoster() {
   const cur = months[0];
   const curActive = activeIn(cur);
 
+  let h = '';
+
+  // 선생님 개인 링크: 내 학생 먼저
+  const myName = session.isStaffLink ? ((meStaff() || {}).name || '') : '';
+  const isMine = s => myName && String(s.teacher || '').split('·').includes(myName);
+  if (myName) {
+    const mine = rosterDb.students.filter(isMine);
+    const mineActive = mine.filter(s => s.start <= cur && (!s.end || s.end > cur));
+    if (mine.length) {
+      h += '<div class="card"><div class="between mb8">' +
+        '<div class="card-title">🧑‍🏫 내 학생</div>' +
+        '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
+        mineActive.map(s => '<div class="between small" style="padding:3px 0">' +
+          '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span></span>' +
+          (s.memo ? '<span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</div>').join('');
+      // 내 학생 월별 변동 (변동 있는 달만)
+      let moved = '';
+      months.forEach(m => {
+        const j = mine.filter(s => s.start === m && m !== baseline);
+        const l = mine.filter(s => s.end === m);
+        if (j.length || l.length) {
+          moved += '<div class="small" style="padding:2px 0"><b>' + Number(m.slice(5)) + '월</b> ' +
+            (j.length ? ' ➕ ' + j.map(s => esc(s.name)).join(', ') : '') +
+            (l.length ? ' ➖ ' + l.map(s => esc(s.name) + (s.reason ? '(' + esc(s.reason) + ')' : '')).join(', ') : '') + '</div>';
+        }
+      });
+      h += moved
+        ? '<hr class="sep"><div class="fl mb8">월별 변동</div>' + moved
+        : '<hr class="sep"><div class="small muted">기준월 이후 변동 없음 — 전원 유지 중 👍</div>';
+      h += '</div><div class="sect">센터 전체</div>';
+    }
+  }
+
   // 이번 달 요약
-  let h = '<div class="card"><div class="prog">' +
+  h += '<div class="card"><div class="prog">' +
     '<div class="ring" style="--p:100"><b>' + curActive.length + '</b></div>' +
     '<div style="flex:1"><div class="card-title">현재 재원생</div>' +
     '<div class="card-sub">기준월 ' + esc(baseline) + ' 이후의 신규·퇴원을 기록합니다.<br>' +
