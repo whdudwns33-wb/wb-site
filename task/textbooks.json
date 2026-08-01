@@ -115,6 +115,66 @@
       "verify": true,
       "note": "페이지 단위 진행 (현재 34~40p) · 총 구성 확인 필요",
       "units": []
+    },
+    {
+      "id": "BK11",
+      "title": "예비 매3비",
+      "subject": "국어 비문학",
+      "level": "고1",
+      "verify": true,
+      "note": "일 단위(DAY) 구성 — 총 DAY 수 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK12",
+      "title": "우공비 비문학 독해 2",
+      "subject": "국어 비문학",
+      "level": "중2",
+      "verify": true,
+      "note": "총 구성 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK13",
+      "title": "RPM 중학 수학 2-2",
+      "subject": "수학",
+      "level": "중2",
+      "verify": true,
+      "note": "교육과정 기준 — 실물 대조 필요",
+      "units": [
+        { "name": "Ⅰ. 삼각형의 성질", "sections": ["이등변삼각형", "직각삼각형의 합동", "삼각형의 외심과 내심"] },
+        { "name": "Ⅱ. 사각형의 성질", "sections": ["평행사변형", "여러 가지 사각형"] },
+        { "name": "Ⅲ. 도형의 닮음", "sections": ["도형의 닮음", "닮음의 활용"] },
+        { "name": "Ⅳ. 피타고라스 정리", "sections": ["피타고라스 정리"] },
+        { "name": "Ⅴ. 확률", "sections": ["경우의 수", "확률"] }
+      ]
+    },
+    {
+      "id": "BK14",
+      "title": "월간지 러너 (국어)",
+      "subject": "국어",
+      "level": "고2",
+      "verify": true,
+      "note": "월간 발행물 — 호 단위 진행",
+      "units": []
+    },
+    {
+      "id": "BK15",
+      "title": "독해창 비상2",
+      "subject": "국어 독해",
+      "level": "중2",
+      "verify": true,
+      "note": "총 구성 확인 필요",
+      "units": []
+    },
+    {
+      "id": "BK16",
+      "title": "WB 독해력 커리큘럼 (어휘·지문 정리)",
+      "subject": "국어 독해력",
+      "level": "중등~고등",
+      "verify": true,
+      "note": "자체 과정 — 어휘(중학/수능) · 지문 정리(중급/고급) 단계 구성 확인 필요 (스캔 대상)",
+      "units": []
     }
   ],
   "students": [
@@ -126,6 +186,14 @@
     { "name": "김유찬", "teacher": "최인찬", "bookId": "BK07", "at": "", "perWeek": 1, "goal": "국어 노출 유지 · 어휘 23~24강" },
     { "name": "김유찬", "teacher": "최인찬", "bookId": "BK08", "at": "", "perWeek": 1, "goal": "독해창 16~21p 진행 중" },
     { "name": "장유혁", "teacher": "최인찬", "bookId": "BK09", "at": "", "perWeek": 1, "goal": "어휘력 쌓기 · 5단계 4강" },
-    { "name": "장유혁", "teacher": "최인찬", "bookId": "BK10", "at": "", "perWeek": 1, "goal": "도약5 34~40p 진행 중" }
+    { "name": "장유혁", "teacher": "최인찬", "bookId": "BK10", "at": "", "perWeek": 1, "goal": "도약5 34~40p 진행 중" },
+    { "name": "고경민", "teacher": "정다원", "bookId": "BK11", "at": "", "perWeek": 2, "goal": "읽기 속도 향상" },
+    { "name": "김도윤", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 1, "goal": "글의 구조 파악 · 어휘(중학)+지문정리(중급)" },
+    { "name": "김은우", "teacher": "정다원", "bookId": "BK12", "at": "", "perWeek": 2, "goal": "글·문제 꼼꼼히 읽기" },
+    { "name": "이재이", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 2, "goal": "지문 구조 파악 · 어휘(중학)" },
+    { "name": "이재이", "teacher": "정다원", "bookId": "BK13", "at": "이등변삼각형", "perWeek": 2, "goal": "중간고사 80점" },
+    { "name": "이재후", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 2, "goal": "낯선 비문학 이해 · 어휘(수능)+지문정리(고급)" },
+    { "name": "김서하", "teacher": "정다원", "bookId": "BK16", "at": "", "perWeek": 1, "goal": "고난도 비문학 · 어휘(수능)+독해창 비상2" },
+    { "name": "정서안", "teacher": "정다원", "bookId": "BK14", "at": "", "perWeek": 2, "goal": "고3 모의고사 1등급" }
   ]
 }
