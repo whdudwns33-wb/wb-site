@@ -612,6 +612,31 @@ const attKey = staffId => '__att__' + staffId;
 const attOf = (staffId, date) => state.checks[attKey(staffId) + '|' + date] || null;
 const fmtTime = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 
+/** 학생 연락 기록 — 출근 체크처럼 특수 체크로 저장한다 (시트 체크현황에는 안 섞인다).
+ *  하루에 한 건: 같은 날 다시 기록하면 그날 기록이 갱신된다.
+ *  이름·유형·한 줄 메모만 남긴다 — 전화번호나 상담 상세는 넣지 않는다. */
+const CT_TYPES = { call: '전화상담', msg: '문자·카톡', meet: '대면상담' };
+const ctKey = name => '__ct__' + name;
+function contactsOf(name) {
+  const pre = ctKey(name) + '|';
+  return Object.keys(state.checks)
+    .filter(k => k.startsWith(pre)).map(k => state.checks[k])
+    .filter(c => c && c.done)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+function daysSinceContact(name) {
+  const list = contactsOf(name);
+  if (!list.length) return null;
+  return Math.round((new Date(today()) - new Date(list[0].date)) / 86400000);
+}
+/** 마지막 연락 표시 — 2주 안이면 무색, 한 달 안이면 주의, 넘으면 경고 */
+function ctPill(name) {
+  const d = daysSinceContact(name);
+  if (d === null) return '<span class="pill warn">연락 기록 없음</span>';
+  const cls = d > 30 ? 'bad' : d > 14 ? 'warn' : '';
+  return '<span class="pill ' + cls + '">📞 ' + (d === 0 ? '오늘' : d + '일 전') + '</span>';
+}
+
 /** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
 function originTags(t) {
   if (session.isStaffLink) return '';
@@ -911,7 +936,8 @@ function taskPanel(t, date, c, editable) {
         'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
         (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
       (isLesson(t)
-        ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>'
+        ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(studentOf(t)) + '">📞 연락 기록</button>'
         : '') +
       (t.title.startsWith('[주문] ')
         ? '<button class="btn btn-sm btn-navy" data-act="ordermsg" data-id="' + t.id + '">📱 발주 문자 보내기</button>'
@@ -927,6 +953,9 @@ const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'b
 
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
+
+/** 수업 지시서 제목에서 학생 이름만 뽑는다: [수업] 이름 (학년) — 과목 */
+const studentOf = t => (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
 
 /* ── 인터뷰형 코멘트 생성 ──
  * 선생님은 보기만 고르고, 문장은 문장 은행에서 학생·날짜 시드로 조합한다.
@@ -978,6 +1007,22 @@ function buildComment(ctx, seedStr) {
   return parts.join(' ');
 }
 
+/** 연락 기록 모달 — 유형 하나 누르면 오늘 날짜로 저장. 최근 이력도 같이 보여준다. */
+function ctModal(name) {
+  const hist = contactsOf(name).slice(0, 8);
+  modal('📞 ' + name + ' 연락 기록',
+    '<input class="in" id="ctMemo" placeholder="한 줄 메모 (선택) — 예: 8월 진도 안내, 결석 사유 확인" style="margin-bottom:10px">' +
+    '<div class="fl mb8">연락 유형을 누르면 오늘 날짜로 기록됩니다</div>' +
+    '<div class="chips mb14">' + Object.keys(CT_TYPES).map(v =>
+      '<button type="button" class="chip" data-act="ctsave" data-name="' + esc(name) + '" data-v="' + v + '">' + CT_TYPES[v] + '</button>').join('') + '</div>' +
+    '<div class="hint">메모는 짧게 — 상담 상세 내용이나 개인 사정은 적지 않습니다.<br>같은 날 다시 기록하면 그날 기록이 갱신됩니다.</div>' +
+    '<hr class="sep"><div class="fl mb8">최근 기록</div>' +
+    (hist.length
+      ? hist.map(c => '<div class="small" style="padding:2px 0">' + esc(c.date) + ' · ' + (CT_TYPES[c.type] || '연락') +
+          (c.by ? ' · ' + esc(c.by) : '') + (c.note ? ' <span class="muted">— ' + esc(c.note) + '</span>' : '') + '</div>').join('')
+      : '<div class="small muted">아직 기록이 없습니다. 첫 연락을 남겨보세요.</div>'));
+}
+
 let fbCtx = null;   // {id, date, focus, plus:[], minus}
 function fbModal() {
   const chip = (on, act, extra, label) =>
@@ -1000,7 +1045,7 @@ function fbModal() {
  *  템플릿 구조라 톤이 항상 같고, 점수 비교·진단성 표현이 들어갈 자리가 없다. */
 function feedbackText(t, date, genComment) {
   const c = getCheck(t.id, date);
-  const student = (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
+  const student = studentOf(t);
   const doneSteps = (t.steps || []).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
 
   const plus = [], minus = [], hw = [], etc = [];
@@ -1437,9 +1482,11 @@ function viewRoster() {
       h += '<div class="card"><div class="between mb8">' +
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
-        mineActive.map(s => '<div class="between small" style="padding:3px 0">' +
-          '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span></span>' +
-          (s.memo ? '<span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</div>').join('');
+        mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
+          '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span>' +
+          (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span>' +
+          '<span class="row" style="gap:6px">' + ctPill(s.name) +
+          '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(s.name) + '">📞 기록</button></span></div>').join('');
       // 내 학생 월별 변동 (변동 있는 달만)
       let moved = '';
       months.forEach(m => {
@@ -1472,6 +1519,22 @@ function viewRoster() {
     Object.keys(byT).sort((a, b) => byT[b] - byT[a]).map(t =>
       '<div class="between small" style="padding:3px 0"><span>' + esc(t) + '</span><span class="pill">' + byT[t] + '명</span></div>').join('') +
     '</div>';
+
+  // 연락 현황 — 대표·관리자는 전체, 오래 못 챙긴 학생부터 위로
+  if (session.isAdmin || isManager()) {
+    const rank = s => { const d = daysSinceContact(s.name); return d === null ? 9999 : d; };
+    const sorted = curActive.slice().sort((a, b) => rank(b) - rank(a));
+    const fresh = curActive.filter(s => { const d = daysSinceContact(s.name); return d !== null && d <= 30; }).length;
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">📞 연락 현황</div>' +
+      '<div class="pill ' + (fresh === curActive.length ? '' : 'warn') + '">최근 30일 내 연락 ' + fresh + '/' + curActive.length + '명</div></div>' +
+      '<div class="card-sub mb8">오래 연락하지 못한 학생이 위로 올라옵니다. 퇴원은 연락이 끊긴 뒤에 옵니다 — 위쪽부터 챙겨주세요.</div>' +
+      sorted.map(s => '<div class="between small" style="padding:4px 0">' +
+        '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.teacher || '미지정') + ')</span></span>' +
+        '<span class="row" style="gap:6px">' + ctPill(s.name) +
+        '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(s.name) + '">📞 기록</button></span></div>').join('') +
+      '</div>';
+  }
 
   // 월별 카드
   months.forEach(m => {
@@ -2194,6 +2257,21 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'ctlog': {
+      const name = el.dataset.name;
+      if (name) ctModal(name);
+      break;
+    }
+    case 'ctsave': {
+      const name = el.dataset.name, type = el.dataset.v;
+      if (!name || !CT_TYPES[type]) break;
+      const memo = (($('#ctMemo') || {}).value || '').trim();
+      const by = session.isStaffLink ? ((meStaff() || {}).name || '') : '대표';
+      setCheck(ctKey(name), today(), { done: true, at: now(), type: type, note: memo, by: by, blocked: false });
+      closeModal(); render();
+      toast(name + ' — ' + CT_TYPES[type] + ' 기록 완료');
+      break;
+    }
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
     case 'bkorder': {
       if (!bookDb) break;
