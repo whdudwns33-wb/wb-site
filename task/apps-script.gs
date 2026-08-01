@@ -177,9 +177,10 @@ function logImport(fileName, added, createdStaff, err) {
  * 설치: 트리거 → 함수 notifyBlocked → 분 단위 → 10분 간격
  *
  * 채널 우선순위:
- *  1) SOLAPI_KEY 가 있으면 문자(SMS) — 카카오 채널 템플릿(pfId·templateId)까지
- *     넣으면 알림톡으로 나간다 (템플릿은 솔라피에서 사전 승인 필요)
- *  2) 키가 없으면 NOTIFY_EMAIL 로 이메일 (무료, 즉시 사용 가능)
+ *  1) 솔라피 알림톡 — WB 카카오 채널 명의로 SMS_TO_LIST 전원에게 (SMS 미사용)
+ *     필요값: SOLAPI_KEY/SECRET · KAKAO_PF_ID(채널 연동) · KAKAO_TEMPLATE(승인 템플릿)
+ *  2) KAKAO_REST_KEY 연결 시 원장 카카오톡(나와의 채팅)
+ *  3) 둘 다 없으면 NOTIFY_EMAIL 로 이메일
  * 같은 건은 한 번만 알린다 (_알림로그 시트로 중복 방지)
  */
 var NOTIFY_EMAIL   = '';   // 알림 받을 이메일 (비우면 이메일 알림 없음)
@@ -188,7 +189,10 @@ var KAKAO_AUTH_CODE = '';  // 최초 연결 1회용 인가 코드 (README의 카
 var SOLAPI_KEY     = '';   // 솔라피 API Key (비우면 문자 대신 이메일)
 var SOLAPI_SECRET  = '';   // 솔라피 API Secret
 var SMS_FROM       = '';   // 솔라피에 등록된 발신번호 (숫자만)
-var SMS_TO         = '';   // 알림 받을 휴대폰 번호 (숫자만)
+var SMS_TO_LIST    = [     // 알림 받을 번호들 (숫자만) — 비어 있는 항목은 무시된다
+  '',   // 김혜지
+  ''    // 공현정
+];
 var KAKAO_PF_ID    = '';   // (선택) 카카오 채널 pfId — 알림톡용
 var KAKAO_TEMPLATE = '';   // (선택) 승인된 알림톡 템플릿 ID
 var ALERT_SHEET    = '_알림로그';
@@ -220,9 +224,10 @@ function notifyBlocked() {
     var t = tasks[c.taskId];
     if (!t) return;
     var who = names[t.staffId] || '?';
-    var text = '[WB업무 막힘] ' + who + ' · ' + (t.title || '') +
-      (c.note ? '\n메모: ' + c.note : '');
-    var res = sendAlert(text);
+    var vars = { target: who + ' 선생님', item: (t.title || ''), memo: c.note || '없음' };
+    var text = '[WB 알림]\n' + vars.target + ' 관련 확인이 필요한 항목이 있습니다.\n' +
+      '· 항목: ' + vars.item + '\n· 메모: ' + vars.memo + '\n앱에서 확인해 주세요.';
+    var res = sendAlert(text, vars);
     sh.appendRow([new Date(), k, text, res.channel, res.ok ? 'OK' : res.error]);
   });
 }
@@ -286,31 +291,35 @@ function sendKakaoMemo(text) {
   return { ok: false, error: resp.getContentText().slice(0, 150) };
 }
 
-function sendAlert(text) {
-  // 1순위: 카카오톡 나와의 채팅
+function sendAlert(text, vars) {
+  // 1순위: 알림톡 — WB 카카오 채널 명의로 수신 목록 전원에게. 문자(SMS)로는 보내지 않는다.
+  var targets = SMS_TO_LIST.filter(function (x) { return String(x || '').trim(); });
+  if (SOLAPI_KEY && KAKAO_PF_ID && KAKAO_TEMPLATE && targets.length) {
+    var sent = 0, err = '';
+    targets.forEach(function (to) {
+      try {
+        var msg = {
+          to: String(to).trim(), from: SMS_FROM,
+          kakaoOptions: {
+            pfId: KAKAO_PF_ID, templateId: KAKAO_TEMPLATE, disableSms: true,
+            variables: { '#{대상}': vars.target, '#{항목}': vars.item, '#{메모}': vars.memo }
+          }
+        };
+        var resp = UrlFetchApp.fetch('https://api.solapi.com/messages/v4/send', {
+          method: 'post', headers: solapiAuth(), contentType: 'application/json',
+          payload: JSON.stringify({ message: msg }), muteHttpExceptions: true
+        });
+        if (resp.getResponseCode() < 300) sent++;
+        else err = resp.getContentText().slice(0, 120);
+      } catch (e) { err = String(e); }
+    });
+    if (sent > 0) return { channel: '알림톡 ' + sent + '/' + targets.length + '명', ok: true };
+    return { channel: '알림톡', ok: false, error: err || '전송 실패' };
+  }
+  // 2순위: 원장 카카오톡 나와의 채팅
   if (KAKAO_REST_KEY) {
     var k = sendKakaoMemo(text);
     if (k.ok) return { channel: '카카오톡', ok: true };
-    // 카카오 실패 시 아래 채널로 넘어간다
-  }
-  if (SOLAPI_KEY && SMS_TO) {
-    try {
-      var msg = { to: SMS_TO, from: SMS_FROM, text: text };
-      if (KAKAO_PF_ID && KAKAO_TEMPLATE) {
-        msg.kakaoOptions = { pfId: KAKAO_PF_ID, templateId: KAKAO_TEMPLATE };
-      }
-      var resp = UrlFetchApp.fetch('https://api.solapi.com/messages/v4/send', {
-        method: 'post',
-        headers: solapiAuth(),
-        contentType: 'application/json',
-        payload: JSON.stringify({ message: msg }),
-        muteHttpExceptions: true
-      });
-      if (resp.getResponseCode() < 300) return { channel: msg.kakaoOptions ? '알림톡' : '문자', ok: true };
-      return { channel: '문자', ok: false, error: resp.getContentText().slice(0, 150) };
-    } catch (e) {
-      return { channel: '문자', ok: false, error: String(e) };
-    }
   }
   if (NOTIFY_EMAIL) {
     try {
