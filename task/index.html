@@ -856,6 +856,31 @@ function viewToday() {
     }
     h += '<div class="card" style="padding:12px"><div class="between">' +
       '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div></div>';
+
+    // 📞 이번 달 학부모 연락 — 담당 학생별 월 1회가 기본 업무.
+    // 연락 기록에서 자동 집계되고 매월 1일 저절로 리셋된다.
+    if (!rosterDb && !rosterErr) loadRoster();
+    if (rosterDb) {
+      const ym = today().slice(0, 7);
+      const mine = (rosterDb.students || []).filter(s =>
+        String(s.teacher || '').split('·').includes(me.name) &&
+        s.start <= ym && (!s.end || s.end > ym));
+      if (mine.length) {
+        const left = mine.filter(s => !contactsOf(s.name).some(c => String(c.date).slice(0, 7) === ym));
+        const done = mine.length - left.length;
+        const pct = Math.round(done / mine.length * 100);
+        h += '<div class="card" style="padding:12px">' +
+          '<div class="between mb8"><div class="card-title">📞 이번 달 학부모 연락</div>' +
+          '<span class="pill ' + (left.length ? '' : 'ok') + '">' + done + '/' + mine.length + '명</span></div>' +
+          '<div class="bar mb8"><i style="width:' + pct + '%"></i></div>' +
+          (left.length
+            ? '<div class="small muted" style="margin-bottom:6px">아직 이번 달 연락을 못 한 학생 — 누르면 바로 기록할 수 있어요</div>' +
+              '<div class="chips">' + left.map(s =>
+                '<button class="chip" data-act="ctlog" data-name="' + esc(s.name) + '">📞 ' + esc(s.name) + '</button>').join('') + '</div>'
+            : '<div class="small muted">이번 달 전원 연락 완료 🎉 다음 달 1일에 다시 시작됩니다.</div>') +
+          '</div>';
+      }
+    }
   }
 
   if (editable && cursor === today()) {
@@ -1472,7 +1497,7 @@ let rosterDb = null, rosterErr = '';
 function loadRoster() {
   fetch('roster.json?v=' + Date.now())
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { rosterDb = d; if (route === 'roster') render(); })
+    .then(d => { rosterDb = d; render(); })
     .catch(e => { rosterErr = String(e); if (route === 'roster') render(); });
 }
 function ymNext(ym) {
