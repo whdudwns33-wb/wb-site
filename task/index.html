@@ -669,11 +669,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 그 외는 자기 할 일만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'write', 'board', 'books'] : ['today', 'week', 'books'];
+    const allowed = isManager() ? ['today', 'week', 'write', 'board', 'books', 'roster'] : ['today', 'week', 'books', 'roster'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks };
+  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -681,11 +681,11 @@ function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total], ['books', '교재']]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재']])
+        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total], ['books', '교재'], ['roster', '원생']]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재'], ['roster', '원생']])
     : session.isAdmin
       ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['settings', '설정']]
+         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -1386,6 +1386,88 @@ function viewBooks() {
     }
     h += '</div>';
   });
+  return h;
+}
+
+/* ── 원생 현황 (월별 실적) ──
+ * 데이터는 roster.json (정적 파일). 신규·퇴원 이벤트에서 월별 재원·유지율을 계산한다.
+ * 원장·관리자·선생님 모두 열람 — 숫자가 경각심과 동기가 되도록 전원 공개.
+ */
+let rosterDb = null, rosterErr = '';
+function loadRoster() {
+  fetch('roster.json?v=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => { rosterDb = d; if (route === 'roster') render(); })
+    .catch(e => { rosterErr = String(e); if (route === 'roster') render(); });
+}
+function ymNext(ym) {
+  const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function rosterMonths() {
+  const cur = today().slice(0, 7);
+  let m = (rosterDb && rosterDb.baseline) || cur;
+  const out = [];
+  while (m <= cur && out.length < 36) { out.push(m); m = ymNext(m); }
+  return out.reverse();   // 최신 달 먼저
+}
+function activeIn(m) {
+  return ((rosterDb && rosterDb.students) || []).filter(s =>
+    s.start <= m && (!s.end || s.end > m));
+}
+
+function viewRoster() {
+  if (!rosterDb && !rosterErr) { loadRoster(); return '<div class="card"><div class="empty"><b>📈</b>원생 데이터를 불러오는 중…</div></div>'; }
+  if (rosterErr) return '<div class="card"><div class="empty"><b>⚠️</b>원생 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(rosterErr) + '</span></div></div>';
+
+  const baseline = rosterDb.baseline;
+  const months = rosterMonths();
+  const cur = months[0];
+  const curActive = activeIn(cur);
+
+  // 이번 달 요약
+  let h = '<div class="card"><div class="prog">' +
+    '<div class="ring" style="--p:100"><b>' + curActive.length + '</b></div>' +
+    '<div style="flex:1"><div class="card-title">현재 재원생</div>' +
+    '<div class="card-sub">기준월 ' + esc(baseline) + ' 이후의 신규·퇴원을 기록합니다.<br>' +
+    '신규·퇴원이 생기면 원장님·관리자가 알려주는 대로 반영됩니다.</div></div></div>';
+
+  // 선생님별 재원
+  const byT = {};
+  curActive.forEach(s => String(s.teacher || '미지정').split('·').forEach(t => { byT[t] = (byT[t] || 0) + 1; }));
+  h += '<hr class="sep"><div class="card-title mb8">담당별 재원 (겸임은 양쪽 집계)</div>' +
+    Object.keys(byT).sort((a, b) => byT[b] - byT[a]).map(t =>
+      '<div class="between small" style="padding:3px 0"><span>' + esc(t) + '</span><span class="pill">' + byT[t] + '명</span></div>').join('') +
+    '</div>';
+
+  // 월별 카드
+  months.forEach(m => {
+    const act = activeIn(m);
+    const joins = rosterDb.students.filter(s => s.start === m);
+    const leaves = rosterDb.students.filter(s => s.end === m);
+    const prevAct = m === baseline ? null : activeIn(months[months.indexOf(m) + 1] || m);
+    const keep = prevAct && prevAct.length
+      ? Math.round((prevAct.length - leaves.length) / prevAct.length * 100) : null;
+
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">' + m.slice(0, 4) + '년 ' + Number(m.slice(5)) + '월</div>' +
+      '<div class="row" style="gap:6px">' +
+        '<span class="pill">재원 ' + act.length + '</span>' +
+        (keep !== null ? '<span class="pill ' + (keep >= 95 ? '' : keep >= 85 ? 'warn' : 'bad') + '">유지율 ' + keep + '%</span>' : '<span class="pill">기준월</span>') +
+      '</div></div>' +
+      '<div class="between small" style="padding:2px 0"><span>➕ ' + (m === baseline ? '기준 등록' : '신규') + '</span>' +
+        '<span>' + (joins.length ? joins.length + '명' : '0') + '</span></div>' +
+      (m !== baseline && joins.length
+        ? '<div class="small muted">' + joins.map(s => esc(s.name) + '(' + esc(s.grade) + ')').join(', ') + '</div>' : '') +
+      '<div class="between small" style="padding:2px 0"><span>➖ 퇴원</span><span>' + (leaves.length ? leaves.length + '명' : '0') + '</span></div>' +
+      (leaves.length
+        ? leaves.map(s => '<div class="small muted">· ' + esc(s.name) + '(' + esc(s.grade) + ')' +
+            (s.reason ? ' — ' + esc(s.reason) : '') + '</div>').join('') : '') +
+      '</div>';
+  });
+
+  h += '<div class="hint">유지율 = (전월 재원 − 당월 퇴원) ÷ 전월 재원. 신규는 유지율에 넣지 않습니다.<br>' +
+    '숫자는 경향입니다 — 퇴원은 반드시 사유와 함께 보세요 (이사·시간 문제와 불만은 다른 이야기입니다).</div>';
   return h;
 }
 
