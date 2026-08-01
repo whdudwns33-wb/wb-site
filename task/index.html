@@ -866,7 +866,8 @@ function taskRow(t, date, editable, isCarry) {
   if (open) h += taskPanel(t, date, c, editable);
 
   h += (editable
-      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">'
+      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="' +
+        (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">'
       : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
 
   return h + '</div></div>';
@@ -900,10 +901,43 @@ function taskPanel(t, date, c, editable) {
       '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + '" ' +
         'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
         (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
+      (isLesson(t)
+        ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>'
+        : '') +
       (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '') +
     '</div>';
   }
   return h + '</div>';
+}
+
+/** 수업 지시서인가 — 제목 접두어로 판별 */
+const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
+
+/** 학부모 피드백 문구 — 그날의 체크·메모에서 조립한다.
+ *  메모 규칙: '+' 잘한 점 / '-' 보완점 / '숙제 ○○' 숙제 / 그 외는 코멘트.
+ *  템플릿 구조라 톤이 항상 같고, 점수 비교·진단성 표현이 들어갈 자리가 없다. */
+function feedbackText(t, date) {
+  const c = getCheck(t.id, date);
+  const student = (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
+  const doneSteps = (t.steps || []).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
+
+  const plus = [], minus = [], hw = [], etc = [];
+  ((c && c.note) || '').split(/\n|\//).map(x => x.trim()).filter(Boolean).forEach(line => {
+    if (line.startsWith('+')) plus.push(line.slice(1).trim());
+    else if (line.startsWith('-') || line.startsWith('−')) minus.push(line.slice(1).trim());
+    else if (/^숙제/.test(line)) hw.push(line.replace(/^숙제[:\s]*/, '').trim());
+    else etc.push(line);
+  });
+
+  let out = '안녕하세요 어머님, WB 웩슬러브레인센터입니다 :)\n' +
+    '오늘 ' + student + ' 학생 수업 내용 전해드립니다.\n\n';
+  if (doneSteps.length) out += '▪ 오늘 진행\n' + doneSteps.map(s => '· ' + s).join('\n') + '\n\n';
+  if (plus.length) out += '▪ 오늘 잘한 점\n' + plus.map(s => '· ' + s).join('\n') + '\n\n';
+  if (minus.length) out += '▪ 다음에 함께 봐주시면 좋은 점\n' + minus.map(s => '· ' + s).join('\n') + '\n\n';
+  if (etc.length) out += '▪ 선생님 코멘트\n' + etc.map(s => '· ' + s).join('\n') + '\n\n';
+  if (hw.length) out += '▪ 숙제\n' + hw.map(s => '· ' + s).join('\n') + '\n\n';
+  out += '궁금한 점 있으시면 편하게 답장 주세요 :)';
+  return out;
 }
 
 function staffSwitcher(activeId) {
@@ -1874,6 +1908,13 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'fbtext': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      if (!c || !c.note) toast('메모에 한 줄 적으면 코멘트로 들어갑니다 (+잘한점 / -보완점 / 숙제…)');
+      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, date));
+      break;
+    }
     case 'toggleowner': {
       if (!session.isAdmin) break;
       const s = staffById(id);
