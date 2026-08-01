@@ -853,6 +853,7 @@ function taskRow(t, date, editable, isCarry) {
         (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+        (c && c.att && ATT_LABEL[c.att] ? '<span class="tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '') +
         originTags(t) +
       '</div>';
 
@@ -895,6 +896,14 @@ function taskPanel(t, date, c, editable) {
       '<span class="muted">/ ' + t.target + esc(t.unit || '건') + '</span></div>';
   }
 
+  if (editable && isLesson(t)) {
+    const att = (c && c.att) || '';
+    h += '<div class="row wraprow mt14" style="gap:6px"><span class="fl" style="margin:0">학생 출결</span>' +
+      [['P', '출석'], ['L', '지각'], ['A', '결석']].map(([v, l]) =>
+        '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
+      ).join('') + '</div>';
+  }
+
   if (editable) {
     const blocked = !!(c && c.blocked);
     h += '<div class="row wraprow mt14" style="gap:8px">' +
@@ -909,6 +918,9 @@ function taskPanel(t, date, c, editable) {
   }
   return h + '</div>';
 }
+
+/** 수업 출결 표시용 */
+const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'blk'] };
 
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
@@ -1253,9 +1265,11 @@ function staffCard(s) {
     (pend.length
     ? pend.map(x => {
         const prog = taskProgress(x.t, x.c);
-        const badge = x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
+        const attMark = x.c && x.c.att && ATT_LABEL[x.c.att]
+          ? '<span class="pill ' + (x.c.att === 'A' ? 'bad' : x.c.att === 'L' ? 'warn' : '') + '" style="margin-right:4px">' + ATT_LABEL[x.c.att][0] + '</span>' : '';
+        const badge = attMark + (x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
                     : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
-                    : '<span class="pill">미착수</span>';
+                    : '<span class="pill">미착수</span>');
         return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
           (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
       }).join('')
@@ -2056,6 +2070,16 @@ document.addEventListener('click', ev => {
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
+    case 'latt': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const v = el.dataset.v;
+      const next = (c && c.att === v) ? '' : v;
+      setCheck(id, date, { att: next });
+      if (next === 'A') toast('결석 — 메모에 사유와 보강 계획을 남겨주세요');
+      render();
+      break;
+    }
     case 'fbtext': {
       const t = task(); if (!t) break;
       fbCtx = { id: id, date: date, focus: null, plus: [], minus: null };
