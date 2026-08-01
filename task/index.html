@@ -1283,7 +1283,7 @@ function staffCard(s) {
     : '') +
     '<hr class="sep">' +
     '<div class="row wraprow" style="gap:8px">' +
-    '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
+    (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' : '') +
     (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' : '') +
     '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
     '</div></div>';
