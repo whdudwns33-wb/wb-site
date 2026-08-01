@@ -913,10 +913,77 @@ function taskPanel(t, date, c, editable) {
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
 
+/* ── 인터뷰형 코멘트 생성 ──
+ * 선생님은 보기만 고르고, 문장은 문장 은행에서 학생·날짜 시드로 조합한다.
+ * 같은 학생이라도 날마다 다른 문장이 나오고, 조합이 수백 가지라 반복 티가 안 난다. */
+const FB_PLUS = [
+  ['오답을 스스로 설명함', '오답을 스스로 설명해낸 것'],
+  ['어려운 문제를 포기 안 함', '어려운 문제 앞에서 포기하지 않은 것'],
+  ['숙제를 성실히 해옴', '숙제를 성실하게 해온 것'],
+  ['요약을 조리 있게 말함', '읽은 내용을 조리 있게 요약한 것'],
+  ['어휘 정리가 꼼꼼함', '어휘 정리를 꼼꼼히 한 것'],
+  ['질문이 늘어남', '질문이 부쩍 늘어난 것']
+];
+const FB_MINUS = [
+  ['어휘', '어휘력'], ['추론 문제', '추론 유형'], ['실수', '아는 문제에서의 실수'],
+  ['풀이 속도', '풀이 속도'], ['집중 유지', '후반부 집중 유지'], ['없음', '']
+];
+const FB_BANK = {
+  best: ['오늘은 시작부터 끝까지 집중이 아주 좋았습니다.', '오늘 컨디션이 좋아서 수업 흐름이 유난히 매끄러웠어요.',
+    '자리에 앉자마자 바로 몰입하는 모습이 인상적이었습니다.', '오늘은 흐트러짐 없이 끝까지 밀도 있게 진행했어요.',
+    '집중력이 특히 좋은 날이었습니다.'],
+  good: ['오늘 수업 태도가 안정적이었어요.', '차분하게 잘 따라온 하루였습니다.',
+    '전반적으로 성실하게 참여했습니다.', '수업 리듬이 잘 잡힌 날이었어요.'],
+  soso: ['오늘은 무난하게 제 흐름대로 진행했습니다.', '평소 페이스대로 차근차근 진행한 날이었어요.',
+    '큰 기복 없이 계획한 분량을 마쳤습니다.'],
+  shaky: ['오늘은 집중이 조금 흔들리는 날이었어요.', '중반에 집중이 잠깐 풀렸지만 다시 잡고 잘 마무리했습니다.',
+    '컨디션이 다소 처져 보였지만 끝까지 해냈습니다.'],
+  plusPat: ['특히 {x}이 좋았습니다.', '오늘은 {x}이 눈에 띄었어요.', '{x}을 크게 칭찬해 주었습니다.',
+    '무엇보다 {x}이 반가웠습니다.', '{x}에서 성장이 보였어요.', '{x}이 오늘의 하이라이트였습니다.'],
+  minusPat: ['다만 {y} 부분은 조금 더 챙겨보려고 합니다.', '{y} 부분은 다음 수업에서 이어서 잡아가겠습니다.',
+    '{y} 쪽이 아직 아쉬워서 반복해서 다져갈 계획입니다.', '{y} 부분은 서두르지 않고 차근차근 보완하겠습니다.'],
+  closer: ['지금 흐름이 좋아서 이대로 이어가겠습니다.', '다음 시간도 오늘 같은 흐름으로 진행하겠습니다.',
+    '좋은 페이스라 그대로 밀고 가겠습니다.']
+};
+function seedPick(arr, seedStr, salt) {
+  let h = salt * 2654435761 >>> 0;
+  const s = String(seedStr);
+  for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) >>> 0;
+  return arr[h % arr.length];
+}
+function buildComment(ctx, seedStr) {
+  const parts = [];
+  parts.push(seedPick(FB_BANK[ctx.focus || 'good'], seedStr, 1));
+  (ctx.plus || []).slice(0, 2).forEach((idx, i) => {
+    parts.push(seedPick(FB_BANK.plusPat, seedStr, 2 + i).replace('{x}', FB_PLUS[idx][1]));
+  });
+  const m = ctx.minus == null ? null : FB_MINUS[ctx.minus];
+  if (m && m[1]) parts.push(seedPick(FB_BANK.minusPat, seedStr, 5).replace('{y}', m[1]));
+  else parts.push(seedPick(FB_BANK.closer, seedStr, 6));
+  return parts.join(' ');
+}
+
+let fbCtx = null;   // {id, date, focus, plus:[], minus}
+function fbModal() {
+  const chip = (on, act, extra, label) =>
+    '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-act="' + act + '" ' + extra + '>' + label + '</button>';
+  modal('코멘트 인터뷰 — 보기만 고르면 문장은 자동으로',
+    '<div class="fl mb8">1. 오늘 집중·태도는?</div><div class="chips mb14">' +
+      [['best', '아주 좋음'], ['good', '좋음'], ['soso', '보통'], ['shaky', '흔들림']].map(([v, l]) =>
+        chip(fbCtx.focus === v, 'fbq', 'data-q="focus" data-v="' + v + '"', l)).join('') + '</div>' +
+    '<div class="fl mb8">2. 잘한 점은? (최대 2개)</div><div class="chips mb14">' +
+      FB_PLUS.map((p, i) => chip(fbCtx.plus.includes(i), 'fbq', 'data-q="plus" data-v="' + i + '"', p[0])).join('') + '</div>' +
+    '<div class="fl mb8">3. 보완할 점은?</div><div class="chips mb14">' +
+      FB_MINUS.map((p, i) => chip(fbCtx.minus === i, 'fbq', 'data-q="minus" data-v="' + i + '"', p[0])).join('') + '</div>' +
+    '<div class="hint">문장은 학생·날짜에 따라 매일 다르게 조합됩니다. 만든 뒤 자유롭게 고칠 수 있어요.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="fbmake">✍ 피드백 문구 만들기</button>' +
+    '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="fbskip">인터뷰 없이 메모로만 만들기</button>');
+}
+
 /** 학부모 피드백 문구 — 그날의 체크·메모에서 조립한다.
  *  메모 규칙: '+' 잘한 점 / '-' 보완점 / '숙제 ○○' 숙제 / 그 외는 코멘트.
  *  템플릿 구조라 톤이 항상 같고, 점수 비교·진단성 표현이 들어갈 자리가 없다. */
-function feedbackText(t, date) {
+function feedbackText(t, date, genComment) {
   const c = getCheck(t.id, date);
   const student = (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
   const doneSteps = (t.steps || []).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
@@ -932,9 +999,11 @@ function feedbackText(t, date) {
   let out = '안녕하세요 어머님, WB 웩슬러브레인센터입니다 :)\n' +
     '오늘 ' + student + ' 학생 수업 내용 전해드립니다.\n\n';
   if (doneSteps.length) out += '▪ 오늘 진행\n' + doneSteps.map(s => '· ' + s).join('\n') + '\n\n';
+  if (genComment) out += '▪ 선생님 코멘트\n' + genComment + '\n\n';
   if (plus.length) out += '▪ 오늘 잘한 점\n' + plus.map(s => '· ' + s).join('\n') + '\n\n';
   if (minus.length) out += '▪ 다음에 함께 봐주시면 좋은 점\n' + minus.map(s => '· ' + s).join('\n') + '\n\n';
-  if (etc.length) out += '▪ 선생님 코멘트\n' + etc.map(s => '· ' + s).join('\n') + '\n\n';
+  if (!genComment && etc.length) out += '▪ 선생님 코멘트\n' + etc.map(s => '· ' + s).join('\n') + '\n\n';
+  if (genComment && etc.length) out += '▪ 덧붙임\n' + etc.map(s => '· ' + s).join('\n') + '\n\n';
   if (hw.length) out += '▪ 숙제\n' + hw.map(s => '· ' + s).join('\n') + '\n\n';
   out += '궁금한 점 있으시면 편하게 답장 주세요 :)';
   return out;
@@ -1419,9 +1488,9 @@ async function copy(text) {
   }
 }
 
-function showText(title, text) {
+function showText(title, text, editable) {
   modal(title,
-    '<textarea class="in" rows="13" id="mText" readonly>' + esc(text) + '</textarea>',
+    '<textarea class="in" rows="13" id="mText"' + (editable ? '' : ' readonly') + '>' + esc(text) + '</textarea>',
     '<button class="btn btn-primary btn-block mt14" data-act="copytext">복사하기</button>');
 }
 
@@ -1910,9 +1979,37 @@ document.addEventListener('click', ev => {
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
     case 'fbtext': {
       const t = task(); if (!t) break;
-      const c = getCheck(id, date);
+      fbCtx = { id: id, date: date, focus: null, plus: [], minus: null };
+      fbModal();
+      break;
+    }
+    case 'fbq': {
+      if (!fbCtx) break;
+      const q = el.dataset.q, v = el.dataset.v;
+      if (q === 'focus') fbCtx.focus = (fbCtx.focus === v) ? null : v;
+      else if (q === 'plus') {
+        const n = Number(v);
+        fbCtx.plus = fbCtx.plus.includes(n) ? fbCtx.plus.filter(x => x !== n)
+          : (fbCtx.plus.length >= 2 ? (toast('잘한 점은 2개까지만'), fbCtx.plus) : fbCtx.plus.concat(n));
+      }
+      else if (q === 'minus') fbCtx.minus = (fbCtx.minus === Number(v)) ? null : Number(v);
+      fbModal();
+      break;
+    }
+    case 'fbmake': {
+      if (!fbCtx) break;
+      const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
+      if (!fbCtx.focus && !fbCtx.plus.length && fbCtx.minus == null) return toast('보기를 하나 이상 골라주세요');
+      const gen = buildComment(fbCtx, t.title + '|' + fbCtx.date);
+      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, fbCtx.date, gen), true);
+      break;
+    }
+    case 'fbskip': {
+      if (!fbCtx) break;
+      const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
+      const c = getCheck(fbCtx.id, fbCtx.date);
       if (!c || !c.note) toast('메모에 한 줄 적으면 코멘트로 들어갑니다 (+잘한점 / -보완점 / 숙제…)');
-      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, date));
+      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, fbCtx.date), true);
       break;
     }
     case 'toggleowner': {
