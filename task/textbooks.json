@@ -243,6 +243,7 @@
     { "name": "장소은", "teacher": "공현정", "bookId": "BK19", "at": "", "perWeek": 1, "goal": "L1 7월분 진행 · 그룹수업 적응" },
     { "name": "조태준", "teacher": "공현정", "bookId": "BK19", "at": "", "perWeek": 1, "goal": "L2 8월분 · 예측 훈련" },
     { "name": "정라윤", "teacher": "공현정", "bookId": "BK20", "at": "", "perWeek": 1, "goal": "어휘 보강 병행" },
-    { "name": "이빈", "teacher": "공현정", "bookId": "BK20", "at": "", "perWeek": 1, "goal": "8/22 복귀 · 이유 말하기 훈련" }
+    { "name": "이빈", "teacher": "공현정", "bookId": "BK20", "at": "", "perWeek": 1, "goal": "8/22 복귀 · 이유 말하기 훈련" },
+    { "name": "이다율", "teacher": "공현정", "bookId": "BK19", "at": "", "perWeek": 1, "goal": "L2 7월분 · 8/22 복귀" }
   ]
 }

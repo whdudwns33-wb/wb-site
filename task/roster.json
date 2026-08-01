@@ -20,6 +20,7 @@
     { "name": "정라윤", "grade": "초2", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
     { "name": "장소은", "grade": "유치7", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
     { "name": "조태준", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
-    { "name": "이빈", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "", "memo": "휴가 — 8/22 등원" }
+    { "name": "이빈", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "", "memo": "휴가 — 8/22 등원" },
+    { "name": "이다율", "grade": "초2", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "", "memo": "휴가 — 8/22 등원" }
   ]
 }
