@@ -601,11 +601,23 @@ const initials = name => String(name || '?').trim().slice(0, 2);
 /** 지금 조작하는 사람 */
 const actor = () => session.isStaffLink ? 'staff' : 'admin';
 
+/** 관리자 — 원장이 직원 관리에서 지정한다.
+ *  본인 개인 링크로 들어오면 현황 보기·지시서 발행까지 열린다.
+ *  설정·직원 관리·업무 수정/삭제는 계속 원장 전용이다. */
+const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
+const isManager = () => { const m = meStaff(); return !!(m && m.manager && !m.deleted); };
+
+/** 출근 체크 — 업무가 아닌 특수 체크로 저장한다 (시트 체크현황에는 안 섞인다) */
+const attKey = staffId => '__att__' + staffId;
+const attOf = (staffId, date) => state.checks[attKey(staffId) + '|' + date] || null;
+const fmtTime = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
 /** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
 function originTags(t) {
   if (session.isStaffLink) return '';
   let h = '';
   if (t.origin === 'staff') h += '<span class="tag add">직원 추가</span>';
+  else if (t.origin === 'manager') h += '<span class="tag edit">관리자 발행</span>';
   else if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
   return h;
 }
@@ -622,7 +634,7 @@ function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
   let text, on = false;
-  if (session.isStaffLink) { text = me ? me.name + ' 선생님' : '알 수 없는 링크'; on = !!me; }
+  if (session.isStaffLink) { text = me ? me.name + ' 선생님' + (isManager() ? ' · 관리자' : '') : '알 수 없는 링크'; on = !!me; }
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
   if (sync.busy) text += ' · 동기화중';
@@ -655,6 +667,12 @@ function render() {
     else { v.innerHTML = viewPendingAdd(); return; }
   }
 
+  // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 그 외는 자기 할 일만
+  if (session.isStaffLink) {
+    const allowed = isManager() ? ['today', 'week', 'write', 'board'] : ['today', 'week'];
+    if (!allowed.includes(route)) route = 'today';
+  }
+
   const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
@@ -662,7 +680,9 @@ function render() {
 function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너']]
+    ? (isManager()
+        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너']])
     : session.isAdmin
       ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['settings', '설정']]
@@ -765,6 +785,17 @@ function viewToday() {
       '</div>' +
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
+
+  if (session.isStaffLink && cursor === today()) {
+    const att = attOf(me.id, cursor);
+    h += '<div class="card" style="padding:12px"><div class="between">' +
+      '<div class="card-title">🕘 출근 체크</div>' +
+      (att && att.done
+        ? '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' 출근</span>' +
+          '<button class="btn btn-sm btn-ghost" data-act="attcheck">취소</button></div>'
+        : '<button class="btn btn-sm btn-primary" data-act="attcheck">출근했습니다</button>') +
+      '</div></div>';
+  }
 
   if (editable && cursor === today()) {
     h += '<div class="card" style="padding:12px">' +
@@ -1076,7 +1107,8 @@ function viewBoard() {
     '<div style="flex:1"><div class="card-title">전체 수행률</div>' +
     '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
-    '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button></div>';
+    '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button>' +
+    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 출근 이력 (최근 14일)</button></div>';
 
   if (mine.length) {
     h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
@@ -1091,6 +1123,7 @@ function staffCard(s) {
   const p = progress(s.id, cursor);
   const w = weekProgress(s.id, cursor);
   const st = streak(s.id);
+  const att = attOf(s.id, cursor);
   const rows = tasksFor(s.id, cursor).map(t => ({ t: t, st: statusOf(t, cursor), c: getCheck(t.id, cursor) }));
   const pend = rows.filter(x => x.st !== 'done');
   const notes = rows.filter(x => x.c && x.c.note);
@@ -1102,7 +1135,11 @@ function staffCard(s) {
       '<div class="between"><div class="card-title">' + esc(s.name) + '</div>' +
         '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
       '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
-      '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
+      '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일 · ' +
+        (att && att.done
+          ? '출근 ' + fmtTime(att.at)
+          : (cursor <= today() ? '<span style="color:var(--coral)">출근 체크 없음</span>' : '출근 -')) +
+      '</div>' +
     '</div></div>' +
     (pend.length
     ? pend.map(x => {
@@ -1121,9 +1158,24 @@ function staffCard(s) {
     '<hr class="sep">' +
     '<div class="row wraprow" style="gap:8px">' +
     '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' +
-    '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+    (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' : '') +
     '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
     '</div></div>';
+}
+
+/** 출근 이력 — 최근 14일, 사람이 읽는 텍스트 (복사해서 카톡·보고에 쓴다) */
+function attHistText() {
+  const staff = liveStaff();
+  let out = '🕘 출근 이력 (최근 14일)\n─────────\n';
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(today(), -i);
+    const parts = staff.map(s => {
+      const a = attOf(s.id, d);
+      return a && a.done ? s.name + ' ' + fmtTime(a.at) : null;
+    }).filter(Boolean);
+    out += shortDate(d) + '(' + DOW[dowOf(d)] + ')  ' + (parts.length ? parts.join(' · ') : '기록 없음') + '\n';
+  }
+  return out;
 }
 
 /* ── 직원 관리 ── */
@@ -1140,9 +1192,11 @@ function viewStaffAdmin() {
     ? list.map(s => '<div class="card"><div class="between">' +
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
         '<div><div class="card-title">' + esc(s.name) +
-          (s.owner ? ' <span class="tag add">대표</span>' : '') + '</div>' +
+          (s.owner ? ' <span class="tag add">대표</span>' : '') +
+          (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
-          (s.owner ? ' · 직원 통계에서 제외' : '') + '</div></div></div>' +
+          (s.owner ? ' · 직원 통계에서 제외' : '') +
+          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
@@ -1150,6 +1204,8 @@ function viewStaffAdmin() {
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
+            (s.manager ? '관리자 해제' : '관리자로 지정') + '</button>' +
         '</div></div>').join('')
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
 }
@@ -1764,13 +1820,41 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'delstaff': {
+      if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
       s.deleted = true; s.updatedAt = now();
       save(); queueSync(); render();
       break;
     }
+    case 'togglemanager': {
+      if (!session.isAdmin) break;
+      const s = staffById(id);
+      if (!s) break;
+      s.manager = !s.manager; s.updatedAt = now();
+      save(); queueSync(); render();
+      toast(s.manager
+        ? s.name + ' — 관리자로 지정. 본인 개인 링크에서 현황·발행이 열립니다'
+        : s.name + ' — 관리자 해제');
+      break;
+    }
+    case 'attcheck': {
+      if (!session.isStaffLink) break;
+      const me = currentStaff(); if (!me) break;
+      const a = attOf(me.id, today());
+      if (a && a.done) {
+        if (!confirm('출근 체크를 취소할까요?')) return;
+        setCheck(attKey(me.id), today(), { done: false, at: null });
+      } else {
+        setCheck(attKey(me.id), today(), { done: true, at: now(), blocked: false });
+        toast('출근 체크 완료 — 오늘도 수고하세요!');
+      }
+      render();
+      break;
+    }
+    case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
     case 'toggleowner': {
+      if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s) break;
       s.owner = !s.owner; s.updatedAt = now();
@@ -1949,6 +2033,7 @@ document.addEventListener('click', ev => {
           target: d.target, unit: d.unit,
           time: d.time, priority: d.priority,
           repeat: d.repeat, days: d.days, start: d.start, end: d.end, carry: d.carry,
+          origin: session.isStaffLink ? 'manager' : undefined,
           createdAt: now(), updatedAt: now(), deleted: false
         });
         touched.add(sid);
