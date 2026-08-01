@@ -1,0 +1,25 @@
+{
+  "updated": "2026-08-01",
+  "baseline": "2026-08",
+  "note": "2026-08이 데이터 시작월. 이전 등록 이력은 소급하지 않으며, 이후의 신규·퇴원만 이벤트로 기록한다. 갱신은 원장·관리자가 Claude에게 알리면 반영된다.",
+  "students": [
+    { "name": "진호윤", "grade": "중2", "teacher": "김혜지", "subject": "국어 독해", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "정서안", "grade": "고2", "teacher": "김동현·정다원", "subject": "과학·국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "고현준", "grade": "고2", "teacher": "김동현", "subject": "미적분Ⅰ", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "이태호", "grade": "고1", "teacher": "김동현", "subject": "공통수학2", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "이재후", "grade": "고1", "teacher": "김동현·정다원", "subject": "수학·독해력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "김유찬", "grade": "중1", "teacher": "최인찬", "subject": "국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "장유혁", "grade": "초3", "teacher": "최인찬", "subject": "국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "박보서", "grade": "초2", "teacher": "최인찬", "subject": "국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "고경민", "grade": "고1", "teacher": "정다원", "subject": "국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "김도윤", "grade": "중1", "teacher": "정다원", "subject": "독해력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "김은우", "grade": "중2", "teacher": "정다원", "subject": "국어", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "이재이", "grade": "중2", "teacher": "정다원", "subject": "독해력·수학", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "김서하", "grade": "중2", "teacher": "정다원", "subject": "독해력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "김태건", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "정라윤", "grade": "초2", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "장소은", "grade": "유치7", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "조태준", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "" },
+    { "name": "이빈", "grade": "초3", "teacher": "공현정", "subject": "독해사고력", "start": "2026-08", "end": "", "reason": "", "memo": "휴가 — 8/22 등원" }
+  ]
+}
