@@ -158,6 +158,138 @@ async function handleRevoke(env, app, body, origin) {
   return json({ ok: true }, 200, origin);
 }
 
+
+/* ══════════════════════════════════════════════════════
+   인강 커리큘럼 자동 가져오기
+   앱은 정적 페이지라 외부 사이트를 직접 못 읽는다(CORS). 워커가 대신 가져와 파싱한다.
+   · /search      네이버 검색으로 강좌 페이지 주소를 찾는다
+   · /curriculum  그 주소에서 목차(회차·제목·시간)를 뽑는다
+   파서는 사이트별 선택자가 아니라 "회차 번호 + 시간 표기" 패턴 기반이라
+   사이트가 개편돼도 잘 버틴다. 다만 자바스크립트로 목록을 그리는 페이지는
+   여기서도 못 잡으므로, 그 경우 목차 붙여넣기로 안내한다.
+   ══════════════════════════════════════════════════════ */
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const SEARCH_DOMAINS = {
+  '엘리하이': 'mbest.co.kr', '엠베스트': 'mbest.co.kr', '메가스터디': 'megastudy.net',
+  '이투스': 'etoos.com', '대성마이맥': 'mimacstudy.com'
+};
+
+/** 내부망·로컬 주소로 워커를 대신 찔러보게 하는 것을 막는다 */
+function publicUrlOrNull(raw) {
+  let u;
+  try { u = new URL(String(raw || '')); } catch (e) { return null; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  const h = u.hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal')) return null;
+  if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(h)) {
+    const p = h.split('.').map(Number);
+    if (p[0] === 10 || p[0] === 127 || p[0] === 0 ||
+        (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
+        (p[0] === 192 && p[1] === 168) || (p[0] === 169 && p[1] === 254)) return null;
+  }
+  if (h === '[::1]' || h.startsWith('[fc') || h.startsWith('[fd')) return null;
+  return u.toString();
+}
+
+/** 한국 강의 사이트는 아직 euc-kr을 쓰는 곳이 있어 인코딩을 판별해 읽는다 */
+async function fetchPage(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'ko,en;q=0.8' } });
+  if (!res.ok) throw new Error('페이지를 가져오지 못했습니다 (HTTP ' + res.status + ')');
+  const buf = await res.arrayBuffer();
+  const dec = enc => { try { return new TextDecoder(enc).decode(buf); } catch (e) { return null; } };
+  const m = (res.headers.get('content-type') || '').match(/charset=["\']?([\w-]+)/i);
+  if (m) { const t = dec(m[1]); if (t) return t; }
+  const utf = dec('utf-8') || '';
+  if ((utf.match(/\uFFFD/g) || []).length > 5) { const t = dec('euc-kr'); if (t) return t; }
+  return utf;
+}
+
+const TAGRE = /<[^>]+>/g;
+function unesc(s) {
+  return String(s)
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, function (_, d) { return String.fromCharCode(Number(d)); })
+    .replace(/&amp;/g, '&');
+}
+/** 커리큘럼 행 판별 — "12:34" 같은 시간 표기 또는 "3강"으로 시작하는 줄 */
+const LEC_LINE = /\d{1,2}:\d{2}|^\d{1,3}\s*강[\s.]/;
+
+function extractCurriculum(html) {
+  html = String(html).replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ');
+  const lines = [];
+  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+  for (const row of rows) {
+    const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
+    let text = cells.map(function (c) { return c.replace(TAGRE, ' '); }).join(' ');
+    text = unesc(text.replace(/\s+/g, ' ')).trim();
+    if (text && LEC_LINE.test(text)) lines.push(text);
+  }
+  if (!lines.length) {
+    // 표가 아닌 페이지 — 시간 표기가 있는 줄만 건진다
+    html.replace(TAGRE, '\n').split('\n').forEach(function (ln) {
+      ln = unesc(ln.replace(/\s+/g, ' ')).trim();
+      if (ln.length > 6 && /\d{1,2}:\d{2}/.test(ln)) lines.push(ln);
+    });
+  }
+  return lines.join('\n');
+}
+
+async function handleSearch(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
+  if (!env.NAVER_ID || !env.NAVER_SECRET) {
+    return json({ ok: false, error: '네이버 검색 키가 설정되지 않았습니다' }, 400, origin);
+  }
+  const q = String(body.q || '').trim();
+  if (!q) return json({ ok: false, error: '검색어를 입력해 주세요' }, 400, origin);
+  const platform = String(body.platform || '');
+  const dom = SEARCH_DOMAINS[platform];
+  const query = (dom ? platform + ' ' : '') + q + ' 강좌';
+
+  const res = await fetch(
+    'https://openapi.naver.com/v1/search/webkr.json?display=20&query=' + encodeURIComponent(query),
+    { headers: { 'X-Naver-Client-Id': env.NAVER_ID, 'X-Naver-Client-Secret': env.NAVER_SECRET } });
+  if (!res.ok) return json({ ok: false, error: '네이버 검색 실패 (HTTP ' + res.status + ')' }, 502, origin);
+  const d = await res.json();
+
+  const out = [];
+  for (const it of (d.items || [])) {
+    const link = it.link || '';
+    if (!/^https?:\/\//i.test(link)) continue;
+    if (dom && link.indexOf(dom) < 0) continue;      // 고른 플랫폼 도메인만 남긴다
+    out.push({
+      title: unesc(String(it.title || '').replace(TAGRE, '')).replace(/\s+/g, ' ').trim(),
+      url: link,
+      desc: unesc(String(it.description || '').replace(TAGRE, '')).replace(/\s+/g, ' ').trim().slice(0, 120)
+    });
+  }
+  // 강좌 상세 페이지일 가능성이 큰 주소를 위로
+  out.sort(function (a, b) {
+    const A = /detail|chr_cd|lecture/i.test(a.url) ? 0 : 1;
+    const B = /detail|chr_cd|lecture/i.test(b.url) ? 0 : 1;
+    return A - B;
+  });
+  return json({ ok: true, items: out.slice(0, 8) }, 200, origin);
+}
+
+async function handleCurriculum(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
+  const url = publicUrlOrNull(body.url);
+  if (!url) return json({ ok: false, error: '주소가 올바르지 않습니다' }, 400, origin);
+  let html;
+  try { html = await fetchPage(url); }
+  catch (e) { return json({ ok: false, error: String(e && e.message || e) }, 502, origin); }
+  const text = extractCurriculum(html);
+  if (!text) {
+    return json({ ok: true, text: '', count: 0,
+      hint: '강의 목록을 찾지 못했습니다. 로그인이 필요하거나 자바스크립트로 그려지는 페이지일 수 있어요 — 사이트에서 목차를 복사해 붙여넣어 주세요.' }, 200, origin);
+  }
+  return json({ ok: true, text: text, count: text.split('\n').length }, 200, origin);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -185,6 +317,8 @@ export default {
       if (url.pathname === '/sync')   return await handleSync(env, app, body, okOrigin);
       if (url.pathname === '/token')  return await handleToken(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
+      if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
+      if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);
     } catch (e) {
       return json({ ok: false, error: String(e && e.message || e) }, 500, okOrigin);

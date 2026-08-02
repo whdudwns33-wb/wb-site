@@ -1426,10 +1426,36 @@ function ingAddModal() {
     '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
       ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
         '" data-act="ingpf" data-v="' + p + '">' + p + '</button>').join('') + '</div>' +
-    '<div class="fl mb8">커리큘럼 붙여넣기</div>' +
+    '<hr class="sep"><div class="fl mb8">① 강좌 찾기 — 이름으로 검색</div>' +
+    '<div class="row mb8"><input class="in" id="ingQ" placeholder="예: 현우진 뉴런 수학1">' +
+      '<button class="btn btn-sm btn-navy" data-act="ingsearch">검색</button></div>' +
+    '<div id="ingHits" class="small muted mb14">플랫폼을 고르고 강좌명을 검색하면 주소를 찾아줍니다.</div>' +
+    '<div class="fl mb8">② 또는 강좌 주소를 직접</div>' +
+    '<div class="row mb14"><input class="in" id="ingUrl" placeholder="https://...">' +
+      '<button class="btn btn-sm btn-navy" data-act="ingfetch">가져오기</button></div>' +
+    '<div class="fl mb8">③ 커리큘럼 (자동으로 채워집니다)</div>' +
     '<textarea class="in" id="ingText" rows="8" placeholder="1강 다항식의 덧셈과 뺄셈 52분&#10;2강 다항식의 곱셈 47분&#10;3강 곱셈 공식 (51:20)"></textarea>' +
-    '<div class="hint">강의 사이트에서 목차를 복사해 그대로 붙여넣으세요. 회차 번호와 시간을 자동으로 읽습니다.</div>',
+    '<div class="hint">자동으로 못 읽는 사이트도 있습니다(로그인 필요·자바스크립트로 그리는 페이지). ' +
+      '그럴 때는 사이트에서 목차를 복사해 위 칸에 그대로 붙여넣으면 됩니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="ingsave">등록</button>');
+}
+
+/** 주소에서 목차를 가져와 ③ 칸을 채운다 */
+function ingFetch() {
+  const url = ($('#ingUrl').value || '').trim();
+  if (!url) return toast('강좌 주소를 넣어주세요');
+  $('#ingHits').textContent = '목차를 가져오는 중…';
+  sync.post('/curriculum', { app: SYNC_APP, auth: sync.auth(), url: url })
+    .then(d => {
+      if (!d.text) { $('#ingHits').textContent = d.hint || '목차를 찾지 못했습니다.'; return; }
+      $('#ingText').value = d.text;
+      const n = ingParse(d.text).length;
+      $('#ingHits').textContent = '✓ ' + n + '강을 읽었습니다. 아래에서 확인하고 등록하세요.';
+      if (!($('#ingName').value || '').trim()) {
+        $('#ingName').value = decodeURIComponent(url).split('/').pop().slice(0, 40);
+      }
+    })
+    .catch(e => { $('#ingHits').textContent = '가져오기 실패 — ' + e.message; });
 }
 
 function ingAssignModal(sid, cid) {
@@ -2703,6 +2729,25 @@ document.addEventListener('click', ev => {
       document.querySelectorAll('#ingPf .chip').forEach(c => c.classList.toggle('on', c === el));
       break;
     }
+    case 'ingsearch': {
+      const q = ($('#ingQ').value || '').trim();
+      if (!q) return toast('강좌명을 입력해 주세요');
+      const pf = (document.querySelector('#ingPf .chip.on') || {}).dataset;
+      $('#ingHits').textContent = '검색 중…';
+      sync.post('/search', { app: SYNC_APP, auth: sync.auth(), q: q, platform: (pf && pf.v) || '' })
+        .then(d => {
+          if (!d.items.length) { $('#ingHits').textContent = '결과가 없습니다. 강좌 주소를 직접 넣어보세요.'; return; }
+          $('#ingHits').innerHTML = d.items.map(x =>
+            '<div class="between" style="padding:4px 0;gap:8px">' +
+              '<span style="flex:1">' + esc(x.title) + '</span>' +
+              '<button class="btn btn-sm btn-ghost" data-act="inguse" data-url="' + esc(x.url) + '">이걸로</button>' +
+            '</div>').join('');
+        })
+        .catch(e => { $('#ingHits').textContent = '검색 실패 — ' + e.message; });
+      break;
+    }
+    case 'inguse': { $('#ingUrl').value = el.dataset.url; ingFetch(); break; }
+    case 'ingfetch': ingFetch(); break;
     case 'ingsave': {
       const me = currentStaff(); if (!me) break;
       const name = ($('#ingName').value || '').trim();
@@ -3278,7 +3323,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-02.3';
+const APP_VER = '2026-08-02.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
