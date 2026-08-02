@@ -707,11 +707,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'write', 'board'] : ['today', 'week', 'month', 'ingang'];
+    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -719,10 +719,10 @@ function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강']])
+        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['write', '지시서 작성'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -823,6 +823,8 @@ function viewToday() {
       '</div>' +
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
+
+  h += tbCard(me, editable);
 
   if (cursor === today()) h += ingTodayCard(me, editable);
 
@@ -1351,6 +1353,189 @@ function ingAssignModal(sid, cid) {
       '<button class="btn btn-sm btn-ghost" data-act="ingcalc">계산</button></div>' +
     '<div class="hint" id="ingCalcOut">목표일을 넣고 [계산]을 누르면 하루 강수가 자동으로 채워집니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="ingdo" data-cid="' + esc(cid) + '">배정하기</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   타임블록 — "몇 시에 뭘 할지"를 시간 칸에 배치한다.
+   할 일 목록(체크리스트)과 다른 축이라 따로 둔다.
+   블록을 누르면 그 과목 타이머가 바로 시작돼 계획과 실측이 이어진다.
+   ══════════════════════════════════════════════════════ */
+const tbKey = sid => '__tb__' + sid;
+const tbOf = (sid, date) => (((state.checks[tbKey(sid) + '|' + date] || {}).blocks) || [])
+  .slice().sort((a, b) => String(a.s).localeCompare(String(b.s)));
+const tbSave = (sid, date, blocks) => setCheck(tbKey(sid), date, { blocks: blocks, done: true });
+
+function tbCard(me, editable) {
+  const blocks = tbOf(me.id, cursor);
+  const isToday = cursor === today();
+  const hm = nowHM();
+  let h = '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">🗓 시간표</div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="tbadd">＋ 시간 추가</button>' : '') + '</div>';
+
+  if (!blocks.length) {
+    h += '<div class="small muted">아직 짜둔 시간이 없습니다.' +
+      (editable ? ' 몇 시에 무엇을 할지 넣어보세요.' : '') + '</div></div>';
+    return h;
+  }
+  h += blocks.map((b, i) => {
+    const nowOn = isToday && b.s <= hm && hm < b.e;
+    return '<div class="between" style="padding:7px 0;border-bottom:1px solid var(--light-gray)' +
+      (nowOn ? ';background:#EAF6FC;border-radius:8px;padding-left:8px;padding-right:8px' : '') + '">' +
+      '<span class="row" style="gap:10px">' +
+        '<b class="small" style="font-variant-numeric:tabular-nums;color:var(--navy)">' + esc(b.s) + '~' + esc(b.e) + '</b>' +
+        '<span>' + esc(b.label) + (nowOn ? ' <span class="pill">지금</span>' : '') + '</span></span>' +
+      (editable
+        ? '<span class="row" style="gap:6px">' +
+            (b.subj ? '<button class="btn btn-sm btn-navy" data-act="tbstart" data-subj="' + esc(b.subj) + '">▶ 시작</button>' : '') +
+            '<button class="btn btn-sm btn-ghost" data-act="tbdel" data-i="' + i + '">×</button></span>'
+        : '') +
+      '</div>';
+  }).join('');
+  const mins = blocks.reduce((a, b) => {
+    const p = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+    return a + Math.max(0, p(b.e) - p(b.s));
+  }, 0);
+  h += '<div class="small muted" style="margin-top:10px">계획 ' + fmtDur(mins * 60) +
+    (isToday ? ' · 실제 ' + fmtDur(stTotal(me.id, cursor)) : '') + '</div></div>';
+  return h;
+}
+
+function tbAddModal(me) {
+  modal('🗓 시간 추가',
+    '<div class="row mb14"><input class="in" type="time" id="tbS" value="' + nowHM() + '">' +
+      '<span class="muted">~</span><input class="in" type="time" id="tbE"></div>' +
+    '<input class="in mb14" id="tbL" placeholder="무엇을 할지 (예: 수학 개념 3단원)">' +
+    '<div class="fl mb8">과목 (선택 — 고르면 시간표에서 바로 타이머를 켤 수 있어요)</div>' +
+    '<div class="chips" id="tbSubj">' +
+      stSubjects(me.id).map(s => '<button type="button" class="chip" data-act="tbsubj" data-v="' + esc(s) + '">' + esc(s) + '</button>').join('') +
+    '</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="tbsave">추가</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   회독 — 같은 교재를 몇 번 돌렸는지. 목표 회독수 대비 진행을 본다.
+   ══════════════════════════════════════════════════════ */
+const rdKey = sid => '__rd__' + sid;
+const rdItems = sid => ((state.checks[rdKey(sid) + '|all'] || {}).items) || [];
+const rdSave = (sid, items) => setCheck(rdKey(sid), 'all', { items: items, done: true });
+
+/* ══════════════════════════════════════════════════════
+   오답노트 — 틀린 문제를 기록하고 3일·7일 뒤에 다시 띄운다.
+   등록일에 저장하고, 복습 횟수(rv)로 다음 복습일을 정한다.
+   ══════════════════════════════════════════════════════ */
+const WN_REVIEW = [3, 7];   // 등록 후 며칠 뒤에 다시 볼지
+const wnKey = sid => '__wn__' + sid;
+const wnOf = (sid, date) => ((state.checks[wnKey(sid) + '|' + date] || {}).items) || [];
+const wnDates = sid => {
+  const pre = wnKey(sid) + '|';
+  return Object.keys(state.checks).filter(k => k.startsWith(pre)).map(k => k.slice(pre.length)).sort();
+};
+function wnAll(sid) {
+  const out = [];
+  wnDates(sid).forEach(d => wnOf(sid, d).forEach(x => out.push(Object.assign({}, x, { date: d }))));
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+/** 오늘 다시 볼 오답 — 복습 회차별로 예정일이 지났고 아직 안 본 것 */
+function wnDue(sid) {
+  const t = today();
+  return wnAll(sid).filter(x => {
+    if (x.fixed) return false;
+    const rv = x.rv || 0;
+    return rv < WN_REVIEW.length && addDays(x.date, WN_REVIEW[rv]) <= t;
+  });
+}
+function wnPatch(sid, date, id, patch) {
+  wnOf(sid, date).length && setCheck(wnKey(sid), date, {
+    items: wnOf(sid, date).map(x => x.id === id ? Object.assign({}, x, patch) : x), done: true
+  });
+}
+
+function wnRow(sid, x, editable) {
+  const rv = x.rv || 0;
+  return '<div class="task ' + (x.fixed ? 'done' : '') + '">' +
+    '<button class="box" ' + (editable
+      ? 'data-act="wnfix" data-date="' + x.date + '" data-id="' + esc(x.id) + '"' : 'disabled') + '>✓</button>' +
+    '<div class="task-body"><div class="task-t">' + esc(x.note) + '</div>' +
+      '<div class="meta">' +
+        (x.subj ? '<span class="tag">' + esc(x.subj) + '</span>' : '') +
+        (x.src ? '<span class="tag">' + esc(x.src) + '</span>' : '') +
+        '<span class="tag time">' + shortDate(x.date) + '</span>' +
+        (x.fixed ? '<span class="tag ok">해결</span>'
+          : '<span class="tag ' + (rv ? 'doing' : '') + '">복습 ' + rv + '/' + WN_REVIEW.length + '</span>') +
+      '</div>' +
+      (editable && !x.fixed && (x.rv || 0) < WN_REVIEW.length
+        ? '<button class="btn btn-sm btn-ghost mt8" data-act="wnrv" data-date="' + x.date + '" data-id="' + esc(x.id) + '">다시 봤어요</button>'
+        : '') +
+    '</div></div>';
+}
+
+/* ── 학습 탭 (회독 · 오답노트) ── */
+function viewStudy() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const editable = session.isStaffLink || session.isAdmin;
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  // 오늘 복습할 오답 먼저
+  const due = wnDue(me.id);
+  if (due.length) {
+    h += '<div class="card alert"><div class="card-title mb8" style="color:var(--coral)">' +
+      '🔁 오늘 다시 볼 오답 ' + due.length + '개</div>' +
+      due.map(x => wnRow(me.id, x, editable)).join('') + '</div>';
+  }
+
+  // 회독
+  const items = rdItems(me.id);
+  h += '<div class="card"><div class="between mb8"><div class="card-title">📚 회독</div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="rdadd">＋ 교재</button>' : '') + '</div>' +
+    (items.length
+      ? items.map((it, i) => {
+          const pct = it.target ? Math.min(100, Math.round(it.done / it.target * 100)) : 0;
+          return '<div style="padding:7px 0">' +
+            '<div class="between mb8"><span>' + esc(it.name) + '</span>' +
+            '<span class="row" style="gap:6px"><span class="pill' + (pct >= 100 ? '' : ' warn') + '">' +
+              it.done + ' / ' + it.target + '회독</span>' +
+            (editable
+              ? '<button class="btn btn-sm btn-primary" data-act="rdup" data-i="' + i + '">＋1</button>' +
+                '<button class="btn btn-sm btn-ghost" data-act="rddel" data-i="' + i + '">×</button>'
+              : '') + '</span></div>' +
+            '<div class="bar mini"><i style="width:' + pct + '%"></i></div></div>';
+        }).join('')
+      : '<div class="small muted">등록된 교재가 없습니다. 몇 회독을 목표로 할지 정해두면 진행이 보입니다.</div>') +
+    '</div>';
+
+  // 오답노트 전체
+  const all = wnAll(me.id);
+  const open = all.filter(x => !x.fixed);
+  h += '<div class="card"><div class="between mb8"><div class="card-title">✏️ 오답노트</div>' +
+    '<span class="row" style="gap:6px"><span class="pill' + (open.length ? ' warn' : '') + '">미해결 ' + open.length + '</span>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="wnadd">＋ 오답</button>' : '') + '</span></div>' +
+    (all.length
+      ? all.slice(0, 30).map(x => wnRow(me.id, x, editable)).join('')
+      : '<div class="small muted">틀린 문제를 한 줄로 남겨두면 3일·7일 뒤에 다시 띄워줍니다.</div>') +
+    '</div>';
+
+  return h;
+}
+
+function rdAddModal() {
+  modal('📚 회독 교재 추가',
+    '<input class="in mb14" id="rdName" placeholder="교재 이름 (예: 수학의 정석 상)">' +
+    '<div class="fl mb8">목표 회독수</div>' +
+    '<input class="in" type="number" min="1" max="20" id="rdTarget" value="3" style="max-width:110px">',
+    '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
+}
+function wnAddModal(me) {
+  modal('✏️ 오답 추가',
+    '<input class="in mb14" id="wnNote" placeholder="어떤 문제였는지 한 줄로 (예: 이차함수 최댓값 조건 놓침)">' +
+    '<input class="in mb14" id="wnSrc" placeholder="출처 (예: 쎈 3단원 42번) — 선택">' +
+    '<div class="fl mb8">과목</div><div class="chips" id="wnSubj">' +
+      stSubjects(me.id).map(s => '<button type="button" class="chip" data-act="wnsubj" data-v="' + esc(s) + '">' + esc(s) + '</button>').join('') +
+    '</div>' +
+    '<div class="hint">등록하면 3일 뒤, 7일 뒤에 자동으로 다시 띄워줍니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="wnsave">추가</button>');
 }
 
 /* ── 주간 플래너 ── */
@@ -2287,6 +2472,115 @@ document.addEventListener('click', ev => {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
       state.settings.adminPin = v; save(); toast('변경되었습니다');
+      break;
+    }
+
+    /* 타임블록 */
+    case 'tbadd': { const me = currentStaff(); if (me) tbAddModal(me); break; }
+    case 'tbsubj': {
+      document.querySelectorAll('#tbSubj .chip').forEach(c => c.classList.toggle('on', c === el));
+      if (!($('#tbL').value || '').trim()) $('#tbL').value = el.dataset.v;
+      break;
+    }
+    case 'tbsave': {
+      const me = currentStaff(); if (!me) break;
+      const s = $('#tbS').value, e = $('#tbE').value;
+      const lab = ($('#tbL').value || '').trim();
+      if (!s || !e) return toast('시작·종료 시각을 넣어주세요');
+      if (e <= s) return toast('종료 시각이 시작보다 빨라요');
+      if (!lab) return toast('무엇을 할지 적어주세요');
+      const pick = document.querySelector('#tbSubj .chip.on');
+      tbSave(me.id, cursor, tbOf(me.id, cursor).concat({
+        s: s, e: e, label: lab, subj: pick ? pick.dataset.v : ''
+      }));
+      closeModal(); render(); toast('추가했습니다');
+      break;
+    }
+    case 'tbdel': {
+      const me = currentStaff(); if (!me) break;
+      const list = tbOf(me.id, cursor).slice();
+      list.splice(Number(el.dataset.i), 1);
+      tbSave(me.id, cursor, list); render();
+      break;
+    }
+    case 'tbstart': {
+      const me = currentStaff(); if (!me) break;
+      const subj = el.dataset.subj;
+      if (!stSubjects(me.id).includes(subj)) {
+        setCheck('__stsubj__' + me.id, 'all', { list: stSubjects(me.id).concat(subj), done: true });
+      }
+      stStart(me.id, today(), subj);
+      render(); toast(subj + ' 시작!');
+      break;
+    }
+
+    /* 회독 */
+    case 'rdadd': rdAddModal(); break;
+    case 'rdsave': {
+      const me = currentStaff(); if (!me) break;
+      const name = ($('#rdName').value || '').trim();
+      if (!name) return toast('교재 이름을 넣어주세요');
+      rdSave(me.id, rdItems(me.id).concat({
+        id: uid(), name: name, target: Math.max(1, Number($('#rdTarget').value) || 1), done: 0
+      }));
+      closeModal(); render(); toast('추가했습니다');
+      break;
+    }
+    case 'rdup': {
+      const me = currentStaff(); if (!me) break;
+      const i = Number(el.dataset.i);
+      const list = rdItems(me.id).map((x, n) =>
+        n === i ? Object.assign({}, x, { done: Math.min(x.target, (x.done || 0) + 1) }) : x);
+      rdSave(me.id, list); render();
+      const it = list[i];
+      if (it && it.done >= it.target) toast(it.name + ' — 목표 회독 달성 🎉');
+      break;
+    }
+    case 'rddel': {
+      const me = currentStaff(); if (!me) break;
+      const list = rdItems(me.id).slice();
+      if (!confirm(list[Number(el.dataset.i)].name + ' 을(를) 삭제할까요?')) return;
+      list.splice(Number(el.dataset.i), 1);
+      rdSave(me.id, list); render();
+      break;
+    }
+
+    /* 오답노트 */
+    case 'wnadd': { const me = currentStaff(); if (me) wnAddModal(me); break; }
+    case 'wnsubj': {
+      document.querySelectorAll('#wnSubj .chip').forEach(c => c.classList.toggle('on', c === el));
+      break;
+    }
+    case 'wnsave': {
+      const me = currentStaff(); if (!me) break;
+      const note = ($('#wnNote').value || '').trim();
+      if (!note) return toast('어떤 문제였는지 한 줄만 적어주세요');
+      const pick = document.querySelector('#wnSubj .chip.on');
+      const d = today();
+      setCheck(wnKey(me.id), d, {
+        items: wnOf(me.id, d).concat({
+          id: uid(), note: note, src: ($('#wnSrc').value || '').trim(),
+          subj: pick ? pick.dataset.v : '', rv: 0, fixed: false
+        }), done: true
+      });
+      closeModal(); render(); toast('오답을 등록했습니다 — 3일 뒤에 다시 띄워드릴게요');
+      break;
+    }
+    case 'wnrv': {
+      const me = currentStaff(); if (!me) break;
+      const x = wnOf(me.id, el.dataset.date).find(i => i.id === el.dataset.id);
+      if (!x) break;
+      wnPatch(me.id, el.dataset.date, el.dataset.id, { rv: (x.rv || 0) + 1 });
+      render();
+      toast((x.rv || 0) + 1 >= WN_REVIEW.length ? '복습 완료 — 이제 해결로 체크해도 좋아요' : '다음 복습일에 다시 띄워드릴게요');
+      break;
+    }
+    case 'wnfix': {
+      const me = currentStaff(); if (!me) break;
+      const x = wnOf(me.id, el.dataset.date).find(i => i.id === el.dataset.id);
+      if (!x) break;
+      wnPatch(me.id, el.dataset.date, el.dataset.id, { fixed: !x.fixed });
+      render();
       break;
     }
 
