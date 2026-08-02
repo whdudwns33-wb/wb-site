@@ -1376,6 +1376,28 @@ function viewIngang() {
       (admin ? '<br>강좌를 등록하고 커리큘럼을 붙여넣으세요.' : '') + '</div></div>';
   }
 
+  // 앞으로 2주 일정 — 배정이 실제로 언제 잡혔는지 눈으로 확인할 수 있어야 한다
+  {
+    const up = [];
+    for (let i = 0; i < 14; i++) {
+      const d = addDays(today(), i);
+      const items = ingPlan(me.id, d);
+      if (items.length) up.push({ d: d, n: items.length, done: items.filter(x => x.done).length });
+    }
+    const total = up.reduce((a, x) => a + x.n, 0);
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">📅 앞으로 2주</div>' +
+      '<div class="pill' + (total ? '' : ' warn') + '">' + (total ? total + '강 예정' : '예정 없음') + '</div></div>' +
+      (up.length
+        ? '<div class="row wraprow" style="gap:6px">' + up.map(x =>
+            '<button class="chip' + (x.d === today() ? ' on' : '') + '" data-act="daypick" data-date="' + x.d + '">' +
+            shortDate(x.d) + '(' + DOW[dowOf(x.d)] + ') ' + x.done + '/' + x.n + '</button>').join('') + '</div>' +
+          '<div class="hint" style="margin-top:10px">날짜를 누르면 그날 할 일 화면으로 갑니다.</div>'
+        : '<div class="small muted">배정된 강의가 앞으로 2주 안에 없습니다. ' +
+          '배정 요일(' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '미설정') + ')을 확인해 보세요.</div>') +
+      '</div>';
+  }
+
   courses.forEach(c => {
     const s = ingStats(me.id, c, asg);
     h += '<div class="card"><div class="between mb8">' +
@@ -2743,8 +2765,10 @@ document.addEventListener('click', ev => {
       });
       Object.keys(buckets).forEach(d => ingSavePlan(me.id, d, ingPlan(me.id, d).concat(buckets[d])));
       setCheck('__ingset__' + me.id, 'all', { set: { days: days, perDay: per }, done: true });
+      const ds = Object.keys(buckets).sort();
       closeModal(); render();
-      toast(left.length + '강을 ' + Object.keys(buckets).length + '일에 나눠 배정했습니다');
+      toast(left.length + '강 배정 완료 — ' + shortDate(ds[0]) + ' ~ ' + shortDate(ds[ds.length - 1]) +
+        ' (' + ds.length + '일)');
       break;
     }
     case 'ingcatchup': {
@@ -3254,7 +3278,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-02.1';
+const APP_VER = '2026-08-02.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
