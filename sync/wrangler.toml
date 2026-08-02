@@ -1,0 +1,17 @@
+name = "wb-sync"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+# 학생 개인 링크와 원장 화면이 GitHub Pages에서 열리므로 그 출처만 허용한다.
+# 비우면 모든 출처를 허용하니 운영에서는 반드시 채운다.
+[vars]
+ALLOW_ORIGIN = "https://whdudwns33-wb.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wb-sync"
+database_id = "여기에-D1-생성-후-나오는-id"
+
+# 비밀값은 이 파일에 쓰지 않는다. 아래 명령으로 따로 넣는다.
+#   npx wrangler secret put TASK_ADMIN_SECRET
+#   npx wrangler secret put CONSULT_ADMIN_SECRET
