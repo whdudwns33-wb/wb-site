@@ -28,6 +28,8 @@ npx wrangler d1 execute wb-sync --remote --file=./schema.sql
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
+npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
+npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 
 # 4) 배포
 npx wrangler deploy
@@ -69,6 +71,23 @@ curl https://wb-sync.<계정>.workers.dev/health
 { "app": "consult", "auth": { "mode": "admin", "secret": "..." }, "staffId": "S1" }
 → { "ok": true, "token": "..." }
 ```
+
+### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)
+```jsonc
+{ "app":"consult", "auth":{...}, "q":"현우진 뉴런", "platform":"메가스터디" }
+→ { "ok":true, "items":[{ "title":"...", "url":"https://...", "desc":"..." }] }
+```
+`platform`을 주면 그 도메인 결과만 남기고, 강좌 상세 페이지로 보이는 주소를 위로 정렬한다.
+
+### `/curriculum` — 강좌 주소에서 목차 추출
+```jsonc
+{ "app":"consult", "auth":{...}, "url":"https://..." }
+→ { "ok":true, "text":"1강. 개념 52:10\n...", "count":59 }
+→ 못 읽으면 { "ok":true, "text":"", "count":0, "hint":"..." }
+```
+사이트별 선택자가 아니라 "회차 번호 + 시간 표기" 패턴으로 표를 훑는다.
+euc-kr 페이지도 인코딩을 판별해 읽는다. 자바스크립트로 목록을 그리는 페이지는
+서버에서 못 잡으므로 붙여넣기로 안내한다. 내부망·비HTTP 주소는 거부한다(SSRF 방어).
 
 ### `/revoke` — 토큰 해지 (원장만)
 ```jsonc
