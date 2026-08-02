@@ -855,7 +855,8 @@ function viewToday() {
         '<button class="btn btn-sm btn-ghost" data-act="attout">퇴근 취소</button></div>';
     }
     h += '<div class="card" style="padding:12px"><div class="between">' +
-      '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div></div>';
+      '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div>' +
+      '<button class="btn btn-sm btn-ghost mt8" data-act="atteditopen" data-id="' + me.id + '">✏️ 최근 기록 수정 (실수로 안 눌렀을 때)</button></div>';
 
     // 📞 이번 달 학부모 연락 — 담당 학생별 월 1회가 기본 업무.
     // 연락 기록에서 자동 집계되고 매월 1일 저절로 리셋된다.
@@ -1404,6 +1405,42 @@ function attHistText() {
   return out;
 }
 
+/** 출퇴근 기록 수정 — 급여에 직결되는 시각이라 권한을 좁게 둔다.
+ *  본인: 최근 3일(오늘 포함)만 직접 수정. 그 이전은 원장만. 원장은 항상 전부 가능. */
+const daysAgo = date => Math.round((parseYmd(today()) - parseYmd(date)) / 86400000);
+const canEditAtt = (staffId, date) => session.isAdmin ||
+  (session.isStaffLink && session.staffId === staffId && daysAgo(date) >= 0 && daysAgo(date) <= 2);
+function msFromDateTime(date, hm) {
+  const [h, m] = hm.split(':').map(Number);
+  const d = parseYmd(date);
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
+function attEditModal(staffId) {
+  const s = staffById(staffId);
+  if (!s) return;
+  let rows = '';
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(today(), -i);
+    const a = attOf(staffId, d);
+    const editable = canEditAtt(staffId, d);
+    rows += '<div class="between small" style="padding:5px 0;gap:8px">' +
+      '<span style="min-width:64px">' + shortDate(d) + '(' + DOW[dowOf(d)] + ')</span>' +
+      '<input class="in" type="time" style="flex:1" data-act="attedit-in" data-staff="' + staffId + '" data-date="' + d + '"' +
+        (editable ? '' : ' disabled') + ' value="' + (a && a.at ? fmtTime(a.at) : '') + '">' +
+      '<span class="muted">~</span>' +
+      '<input class="in" type="time" style="flex:1" data-act="attedit-out" data-staff="' + staffId + '" data-date="' + d + '"' +
+        (editable ? '' : ' disabled') + ' value="' + (a && a.out ? fmtTime(a.out) : '') + '">' +
+      '</div>';
+  }
+  modal('🕘 ' + esc(s.name) + ' 출퇴근 수정',
+    '<div class="hint mb14">' +
+      (session.isAdmin
+        ? '원장은 모든 날짜를 수정할 수 있습니다. 시간을 비우면 그 기록이 지워집니다.'
+        : '최근 3일(오늘 포함)만 직접 고칠 수 있습니다. 그 이전 기록은 원장님께 요청해 주세요.') +
+    '</div>' + rows);
+}
+
 /** 급여용 출퇴근 내보내기 — 대표 전용. 아카플로우 등 외부 급여 계산과는
  *  이 CSV 하나로만 연결한다 (단방향: 앱 → 급여, 역방향 없음). */
 function daysInMonth(ym) {
@@ -1423,9 +1460,11 @@ function payrollRows(ym) {
     daysInMonth(ym).forEach(d => {
       const a = attOf(s.id, d);
       if (!a || !a.done) return;
+      const valid = a.at && a.out && a.out > a.at;
       rows.push({
-        name: s.name, date: d, inT: fmtTime(a.at), outT: a.out ? fmtTime(a.out) : '',
-        hours: a.out ? Math.round((a.out - a.at) / 3600000 * 100) / 100 : null
+        name: s.name, date: d, inT: a.at ? fmtTime(a.at) : '', outT: a.out ? fmtTime(a.out) : '',
+        hours: valid ? Math.round((a.out - a.at) / 3600000 * 100) / 100 : null,
+        issue: !a.at ? '출근 미기록' : !a.out ? '퇴근 미기록' : !valid ? '시간 확인 필요(퇴근이 출근보다 빠름)' : ''
       });
     });
   });
@@ -1437,8 +1476,7 @@ function payrollCsv(ym) {
   const rows = payrollRows(ym);
   let csv = '﻿' + ['이름', '날짜', '출근', '퇴근', '근무시간(시간)', '비고'].map(q).join(',') + '\n';
   rows.forEach(r => {
-    csv += [r.name, r.date, r.inT, r.outT, r.hours != null ? r.hours.toFixed(2) : '',
-      r.hours == null ? '퇴근 미기록' : ''].map(q).join(',') + '\n';
+    csv += [r.name, r.date, r.inT, r.outT, r.hours != null ? r.hours.toFixed(2) : '', r.issue].map(q).join(',') + '\n';
   });
   // 직원별 월 합계 — 급여 계산에 바로 쓸 수 있게 CSV 끝에 덧붙인다
   const totals = {};
@@ -1736,6 +1774,7 @@ function viewStaffAdmin() {
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
             (s.manager ? '관리자 해제' : '관리자로 지정') + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="atteditopen" data-id="' + s.id + '">🕘 출퇴근 수정</button>' +
         '</div></div>').join('')
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
 }
@@ -2398,6 +2437,11 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'atteditopen': {
+      if (!session.isAdmin && !(session.isStaffLink && session.staffId === id)) break;
+      attEditModal(id);
+      break;
+    }
     case 'payrollmodal': if (session.isAdmin) payrollModal(); break;
     case 'paydownload': {
       if (!session.isAdmin) break;
@@ -2778,6 +2822,21 @@ document.addEventListener('input', ev => {
       render();
     }, 600);
   }
+});
+
+/* 출퇴근 시각 직접 수정 — time input은 값이 확정될 때(change) 저장한다 */
+document.addEventListener('change', ev => {
+  const el = ev.target.closest('[data-act="attedit-in"],[data-act="attedit-out"]');
+  if (!el) return;
+  const staffId = el.dataset.staff, date = el.dataset.date;
+  if (!canEditAtt(staffId, date)) { toast('이 날짜는 수정할 수 없습니다 — 원장님께 요청해 주세요'); render(); return; }
+  const field = el.dataset.act === 'attedit-in' ? 'at' : 'out';
+  const ms = el.value ? msFromDateTime(date, el.value) : null;
+  const cur = attOf(staffId, date);
+  const newAt = field === 'at' ? ms : (cur ? cur.at : null);
+  const newOut = field === 'out' ? ms : (cur ? cur.out : null);
+  setCheck(attKey(staffId), date, { [field]: ms, done: !!(newAt || newOut) });
+  toast('저장했습니다');
 });
 
 /* 엔터 제출 */
