@@ -1,0 +1,19 @@
+# 이 파일을 wrangler.preview.toml로 복사한 뒤, 사람 승인으로 만든 preview 자원 값만 입력한다.
+# wrangler.preview.toml은 gitignore 대상이며 비밀값은 넣지 않는다.
+name = "wb-sync-preview"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+# production GitHub Pages origin과 반드시 다른 실제 HTTPS preview 정적 origin으로 교체한다.
+ALLOW_ORIGIN = "https://replace-preview-static-origin.example.invalid"
+LEARNING_V2_ENABLED = "false"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wb-sync-preview"
+# production UUID와 다른 실제 preview D1 UUID로 교체한다.
+database_id = "REPLACE_WITH_REAL_PREVIEW_D1_UUID"
+
+# deploy-safe.ps1이 허용하는 health origin은 다음 고정 주소뿐이다.
+# https://wb-sync-preview.whdudwns33.workers.dev

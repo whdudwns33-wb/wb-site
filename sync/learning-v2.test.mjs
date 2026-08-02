@@ -95,7 +95,11 @@ function ownerActor() {
 
 function createHarness(actor = ownerActor()) {
   const database = createDatabase();
-  const env = { DB: new D1DatabaseMock(database), ALLOW_ORIGIN: 'https://app.example.test' };
+  const env = {
+    DB: new D1DatabaseMock(database),
+    ALLOW_ORIGIN: 'https://app.example.test',
+    LEARNING_V2_ENABLED: 'true'
+  };
   let idSequence = 0;
   const handler = createLearningV2Handler({
     authenticate: async () => actor,
@@ -359,7 +363,7 @@ test('v2 MVP flows enforce idempotency, revisions, normalized imports, and refer
     method: 'POST', idempotencyKey: 'integration:test-bad1',
     body: {
       providerKey: 'nelt', eventType: 'score_candidate', studentId: 'student:one',
-      occurredAt: 1_700_000_000_000, apiKey: 'must-not-enter-D1', summary: { overallScore: 70 }
+      occurredAt: 1_700_000_000_000, apiKey: 'x', summary: { overallScore: 70 }
     }
   });
   assert.equal(rejectedIntegration.response.status, 400);
@@ -442,4 +446,25 @@ test('운영 비활성 flag는 health만 열고 쓰기 API를 503으로 차단�
   assert.equal(blocked.data.error.code, 'learning_v2_disabled');
   assert.equal(database.prepare('SELECT COUNT(*) AS n FROM lp_student_programs').get().n, 0);
   database.close();
+});
+
+test('v2 flag는 누락되거나 정확한 문자열 true가 아니면 fail-closed다', async () => {
+  for (const value of [undefined, '', 'false', 'TRUE', ' true ', '1', true]) {
+    const { env, database, handler } = createHarness();
+    if (value === undefined) delete env.LEARNING_V2_ENABLED;
+    else env.LEARNING_V2_ENABLED = value;
+
+    const health = await call(handler, env, '/api/v2/learning/health', { method: 'GET' });
+    assert.equal(health.response.status, 200);
+    assert.equal(health.data.enabled, false);
+
+    const blocked = await call(handler, env, '/api/v2/learning/student-programs', {
+      method: 'POST', idempotencyKey: 'fail-closed-' + String(value),
+      body: { studentId: 'student:one', providerKey: 'wb_manual', programCode: 'P1' }
+    });
+    assert.equal(blocked.response.status, 503);
+    assert.equal(blocked.data.error.code, 'learning_v2_disabled');
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM lp_student_programs').get().n, 0);
+    database.close();
+  }
 });

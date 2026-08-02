@@ -10,23 +10,50 @@ const tokenMigration = await readFile(new URL('./migrations/003_token_hash_prefi
 const ORIGIN = 'https://whdudwns33-wb.github.io';
 
 class D1StatementMock {
-  constructor(database, sql, bindings = []) {
-    this.database = database;
+  constructor(owner, sql, bindings = []) {
+    this.owner = owner;
+    this.database = owner.database;
     this.sql = sql;
     this.bindings = bindings;
   }
-  bind(...bindings) { return new D1StatementMock(this.database, this.sql, bindings); }
-  first() { return this.database.prepare(this.sql).get(...this.bindings); }
+  bind(...bindings) { return new D1StatementMock(this.owner, this.sql, bindings); }
+  first() {
+    const value = this.database.prepare(this.sql).get(...this.bindings);
+    return this.owner.coordinatePlanRead(this.sql, this.bindings, value);
+  }
   all() { return { results: this.database.prepare(this.sql).all(...this.bindings) }; }
   run() {
     const result = this.database.prepare(this.sql).run(...this.bindings);
-    return { success: true, meta: { changes: Number(result.changes || 0) } };
+    const changes = Number(result.changes || 0);
+    if (changes === 0 && this.sql.startsWith('UPDATE checks SET owner=?,data=?,updated_at=?,srv_at=?')) {
+      this.owner.planCasMisses += 1;
+    }
+    return { success: true, meta: { changes } };
   }
 }
 
 class D1DatabaseMock {
-  constructor(database) { this.database = database; }
-  prepare(sql) { return new D1StatementMock(this.database, sql); }
+  constructor(database) {
+    this.database = database;
+    this.planCasMisses = 0;
+    this.planReadBarrierRemaining = 0;
+    this.planReadWaiters = [];
+  }
+  prepare(sql) { return new D1StatementMock(this, sql); }
+  armPlanCasRace() { this.planReadBarrierRemaining = 4; }
+  coordinatePlanRead(sql, bindings, value) {
+    const isPlanRead = sql.includes('SELECT data,updated_at,srv_at FROM checks') &&
+      String(bindings[1] || '').startsWith('__lpplan__');
+    if (!isPlanRead || this.planReadBarrierRemaining <= 0) return value;
+    this.planReadBarrierRemaining -= 1;
+    return new Promise(resolve => {
+      this.planReadWaiters.push({ resolve, value });
+      if (this.planReadWaiters.length === 2) {
+        const pair = this.planReadWaiters.splice(0, 2);
+        pair.forEach(waiter => waiter.resolve(waiter.value));
+      }
+    });
+  }
   batch(statements) {
     this.database.exec('BEGIN IMMEDIATE');
     try {
@@ -302,6 +329,63 @@ test('구형 평문 개인 토큰은 성공 인증 때 SHA-256으로 지연 이�
 });
 
 
+test('003 이전 bare SHA-256 저장행은 raw bearer로 인증되고 접두 형식으로 지연 이전된다', async () => {
+  const { database, env } = await createHarness();
+  const raw = 'pre-prefix-issued-bearer';
+  const bareHash = (await digest(raw)).toUpperCase();
+  database.prepare('DELETE FROM tokens WHERE app=? AND staff_id=?').run('consult', 'A');
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+  ).run('consult', bareHash, 'A', Date.now());
+
+  const result = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'person', id: 'A', token: raw }, since: 0, changes: []
+  });
+  assert.equal(result.response.status, 200);
+  const migrated = database.prepare('SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0')
+    .all('consult', 'A').map(row => row.token);
+  assert.deepEqual(migrated, ['sha256:' + await digest(raw)]);
+
+  const hashAsBearer = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'person', id: 'A', token: bareHash }, since: 0, changes: []
+  });
+  assert.equal(hashAsBearer.response.status, 401);
+  database.close();
+});
+
+test('bare digest 지연 이전은 stale prefixed 충돌에서 fail-close하고 정리 뒤 회복한다', async () => {
+  const { database, env } = await createHarness();
+  const raw = 'bare-conflict-issued-bearer';
+  const bareHash = await digest(raw);
+  database.prepare('DELETE FROM tokens WHERE app=? AND staff_id=?').run('consult', 'A');
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+  ).run('consult', bareHash, 'A', Date.now());
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,1)'
+  ).run('consult', 'sha256:' + bareHash, 'A', 1);
+
+  const blocked = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'person', id: 'A', token: raw }, since: 0, changes: []
+  });
+  assert.equal(blocked.response.status, 401);
+  const beforeCleanup = database.prepare('SELECT token,revoked FROM tokens WHERE app=? AND staff_id=? ORDER BY token')
+    .all('consult', 'A');
+  assert.equal(beforeCleanup.find(row => row.token === bareHash).revoked, 0);
+  assert.equal(beforeCleanup.find(row => row.token === 'sha256:' + bareHash).revoked, 1);
+
+  database.prepare('DELETE FROM tokens WHERE app=? AND token=? AND revoked=1')
+    .run('consult', 'sha256:' + bareHash);
+  const recovered = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'person', id: 'A', token: raw }, since: 0, changes: []
+  });
+  assert.equal(recovered.response.status, 200);
+  const active = database.prepare('SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0')
+    .all('consult', 'A').map(row => row.token);
+  assert.deepEqual(active, ['sha256:' + bareHash]);
+  database.close();
+});
+
 test('DB 해시 문자열은 bearer로 인증되지 않고 원문 bearer만 인증된다', async () => {
   const { database, env } = await createHarness();
   const raw = 'task-A-token';
@@ -444,5 +528,383 @@ test('003 migration은 bootstrap schema를 만들고 bare SHA-256을 충돌 없�
   ).get();
   assert.equal(migrationRow.name, 'token_bootstrap_hardening');
   assert.ok(migrationRow.applied_at > 0);
+  database.close();
+});
+
+
+test('003은 active bare와 stale prefixed 충돌에서 유효 bearer를 삭제하지 않고 실패한다', async () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(schema);
+  database.exec(learningMigration);
+  const bareHash = (await digest('active-conflict-issued-bearer')).toUpperCase();
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+  ).run('consult', bareHash, 'A', Date.now());
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,1)'
+  ).run('consult', 'sha256:' + bareHash.toLowerCase(), 'A', 1);
+
+  assert.throws(() => database.exec(tokenMigration));
+  const rows = database.prepare('SELECT token,revoked FROM tokens WHERE app=? ORDER BY token')
+    .all('consult');
+  assert.equal(rows.find(row => row.token === bareHash).revoked, 0);
+  assert.equal(rows.find(row => row.token === 'sha256:' + bareHash.toLowerCase()).revoked, 1);
+  assert.equal(database.prepare('SELECT 1 FROM lp_schema_migrations WHERE version=3').get(), undefined);
+  database.close();
+});
+
+test('003은 대소문자만 다른 bare digest 중복을 원본 보존 상태로 실패한다', async () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(schema);
+  database.exec(learningMigration);
+  const lowerHash = await digest('case-variant-bare-conflict');
+  const upperHash = lowerHash.toUpperCase();
+  assert.notEqual(lowerHash, upperHash);
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+  ).run('consult', lowerHash, 'A', Date.now());
+  database.prepare(
+    'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+  ).run('consult', upperHash, 'B', Date.now());
+
+  assert.throws(() => database.exec(tokenMigration));
+  const tokens = database.prepare('SELECT token FROM tokens WHERE app=? ORDER BY token')
+    .all('consult').map(row => row.token).sort();
+  assert.deepEqual(tokens, [lowerHash, upperHash].sort());
+  assert.equal(database.prepare('SELECT 1 FROM lp_schema_migrations WHERE version=3').get(), undefined);
+  database.close();
+});
+
+function planItem(itemId, overrides = {}) {
+  return Object.assign({
+    itemId,
+    studentCode: 'A',
+    date: '2026-08-03',
+    title: itemId === 'plan_alpha' ? '알파 계획' : '베타 계획',
+    sourceType: 'personal',
+    status: 'planned',
+    revision: 1,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    createdBy: 'manager'
+  }, overrides);
+}
+
+function planMutationChange(items, mutation, updatedAt = Date.now()) {
+  return {
+    table: 'checks',
+    k: '__lpplan__A|all',
+    owner: 'A',
+    updated_at: updatedAt,
+    data: {
+      taskId: '__lpplan__A',
+      date: 'all',
+      done: true,
+      value: items,
+      planMutation: mutation,
+      updatedAt
+    }
+  };
+}
+
+function seedPlan(database, items, updatedAt = Date.now() - 1000) {
+  database.prepare(
+    'INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).run('consult', '__lpplan__A|all', 'A', JSON.stringify({
+    taskId: '__lpplan__A', date: 'all', done: true, value: items, updatedAt
+  }), updatedAt, updatedAt);
+}
+
+function savedPlan(database) {
+  const row = database.prepare("SELECT data FROM checks WHERE app='consult' AND k='__lpplan__A|all'").get();
+  return JSON.parse(row.data).value;
+}
+
+function adminSync(env, change) {
+  return call(env, '/sync', {
+    app: 'consult',
+    auth: { mode: 'admin', secret: 'consult-admin' },
+    since: 0,
+    changes: [change]
+  });
+}
+
+function stablePlannerId(prefix, ...values) {
+  const input = values.map(value => value == null ? '' : String(value)).join('|');
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return String(prefix) + '_' + (hash >>> 0).toString(36);
+}
+
+test('lpplan CAS는 같은 base의 서로 다른 항목 동시 수정을 재시도해 모두 보존한다', async () => {
+  const { database, env } = await createHarness();
+  const alpha = planItem('plan_alpha');
+  const beta = planItem('plan_beta');
+  seedPlan(database, [alpha, beta]);
+  env.DB.armPlanCasRace();
+
+  const results = await Promise.all([
+    adminSync(env, planMutationChange([
+      planItem('plan_alpha', { title: '알파 수정', revision: 2 }), beta
+    ], { id: 'mut_alpha_2', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }] })),
+    adminSync(env, planMutationChange([
+      alpha, planItem('plan_beta', { title: '베타 수정', revision: 2 })
+    ], { id: 'mut_beta_2', items: [{ itemId: 'plan_beta', baseRevision: 1, nextRevision: 2 }] }))
+  ]);
+
+  assert.deepEqual(results.map(result => result.response.status), [200, 200]);
+  assert.ok(env.DB.planCasMisses >= 1, 'CAS compare miss 뒤 재조회·재시도가 실제 발생해야 한다');
+  const byId = new Map(savedPlan(database).map(item => [item.itemId, item]));
+  assert.equal(byId.get('plan_alpha').revision, 2);
+  assert.equal(byId.get('plan_alpha').title, '알파 수정');
+  assert.equal(byId.get('plan_beta').revision, 2);
+  assert.equal(byId.get('plan_beta').title, '베타 수정');
+  database.close();
+});
+
+test('lpplan CAS는 같은 항목의 divergent 동시 수정 중 두 번째를 409로 거절한다', async () => {
+  const { database, env } = await createHarness();
+  const alpha = planItem('plan_alpha');
+  seedPlan(database, [alpha]);
+  env.DB.armPlanCasRace();
+
+  const results = await Promise.all(['기기 1 수정', '기기 2 수정'].map((title, index) =>
+    adminSync(env, planMutationChange([
+      planItem('plan_alpha', { title, revision: 2 })
+    ], {
+      id: 'mut_divergent_' + index,
+      items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }]
+    }))
+  ));
+
+  assert.deepEqual(results.map(result => result.response.status).sort((a, b) => a - b), [200, 409]);
+  const conflict = results.find(result => result.response.status === 409);
+  assert.equal(conflict.data.code, 'learning_plan_revision_conflict');
+  assert.ok(env.DB.planCasMisses >= 1);
+  assert.ok(['기기 1 수정', '기기 2 수정'].includes(savedPlan(database)[0].title));
+  database.close();
+});
+
+test('동일 lpplan mutation 재시도는 멱등 성공하고 이미 판정 가능한 divergent stale 요청은 409다', async () => {
+  const { database, env } = await createHarness();
+  seedPlan(database, [planItem('plan_alpha')]);
+  const updated = planItem('plan_alpha', { title: '확정 수정', revision: 2 });
+  const mutation = { id: 'mut_retry_same', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }] };
+  const change = planMutationChange([updated], mutation);
+
+  const first = await adminSync(env, change);
+  const retry = await adminSync(env, change);
+  assert.equal(first.response.status, 200);
+  assert.equal(retry.response.status, 200);
+  assert.equal(savedPlan(database).length, 1);
+  assert.equal(savedPlan(database)[0].revision, 2);
+  assert.equal(savedPlan(database)[0].title, '확정 수정');
+
+  const staleDivergent = await adminSync(env, planMutationChange([
+    planItem('plan_alpha', { title: '충돌 수정', revision: 2 })
+  ], { id: 'mut_stale_divergent', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }] }));
+  assert.equal(staleDivergent.response.status, 409);
+  assert.equal(staleDivergent.data.code, 'learning_plan_revision_conflict');
+  database.close();
+});
+
+test('lpplan incoming snapshot에서 빠진 기존 항목은 삭제하지 않는다', async () => {
+  const { database, env } = await createHarness();
+  seedPlan(database, [planItem('plan_alpha'), planItem('plan_beta')]);
+  const result = await adminSync(env, planMutationChange([
+    planItem('plan_alpha', { title: '알파만 전송', revision: 2 })
+  ], { id: 'mut_missing_preserve', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }] }));
+
+  assert.equal(result.response.status, 200);
+  const byId = new Map(savedPlan(database).map(item => [item.itemId, item]));
+  assert.equal(byId.size, 2);
+  assert.equal(byId.get('plan_alpha').title, '알파만 전송');
+  assert.equal(byId.get('plan_beta').revision, 1);
+  database.close();
+});
+
+test('lpplan verbose 기본값과 compact 항목은 같은 revision에서 의미상 동일하다', async () => {
+  const { database, env } = await createHarness();
+  const compact = planItem('plan_alpha');
+  seedPlan(database, [compact]);
+  const verbose = Object.assign({}, compact, {
+    planId: stablePlannerId('daily', compact.studentCode, compact.date),
+    detail: '',
+    providerId: '',
+    minutes: 0,
+    priority: 1,
+    verificationRequired: true,
+    evidenceRefs: [],
+    verificationEvidenceRefs: [],
+    updatedAt: compact.createdAt,
+    updatedBy: compact.createdBy,
+    history: [{
+      action: 'created', fromStatus: '', toStatus: compact.status,
+      at: compact.createdAt, actor: compact.createdBy
+    }],
+    historyRetention: {
+      maxEntries: 30, droppedCount: 0,
+      oldestRetainedAt: compact.createdAt, newestRetainedAt: compact.createdAt
+    }
+  });
+  const result = await adminSync(env, planMutationChange([verbose], {
+    id: 'mut_semantic_equal', items: []
+  }));
+
+  assert.equal(result.response.status, 200);
+  assert.equal(savedPlan(database)[0].revision, 1);
+  assert.equal(savedPlan(database)[0].title, compact.title);
+  database.close();
+});
+
+test('lpclaim은 병합된 lpplan의 최신 date revision status만 허용한다', async () => {
+  const { database, env } = await createHarness();
+  seedPlan(database, [planItem('plan_alpha')]);
+  const moved = planItem('plan_alpha', {
+    date: '2026-08-04', status: 'in_progress', revision: 2
+  });
+  const merged = await adminSync(env, planMutationChange([moved], {
+    id: 'mut_claim_move', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }]
+  }));
+  assert.equal(merged.response.status, 200);
+
+  const claim = (date, expectedRevision, updatedAt) => ({
+    table: 'checks', k: '__lpclaim__A|all', owner: 'A', updated_at: updatedAt,
+    data: {
+      taskId: '__lpclaim__A', date: 'all', done: true, updatedAt,
+      value: { claims: [{
+        itemId: 'plan_alpha', date, expectedRevision,
+        claimedAt: new Date(updatedAt - 1).toISOString()
+      }] }
+    }
+  });
+  const staleDate = await adminSync(env, claim('2026-08-03', 2, Date.now()));
+  const staleRevision = await adminSync(env, claim('2026-08-04', 1, Date.now() + 1));
+  const current = await adminSync(env, claim('2026-08-04', 2, Date.now() + 2));
+  assert.equal(staleDate.response.status, 422);
+  assert.equal(staleRevision.response.status, 422);
+  assert.equal(current.response.status, 200);
+
+  const terminal = planItem('plan_alpha', {
+    date: '2026-08-04', status: 'completed', revision: 3
+  });
+  const completed = await adminSync(env, planMutationChange([terminal], {
+    id: 'mut_claim_terminal', items: [{ itemId: 'plan_alpha', baseRevision: 2, nextRevision: 3 }]
+  }));
+  assert.equal(completed.response.status, 200);
+  const terminalClaim = await adminSync(env, claim('2026-08-04', 3, Date.now() + 3));
+  assert.equal(terminalClaim.response.status, 422);
+  assert.equal(terminalClaim.data.details[0].code, 'invalid_learning_claim');
+  database.close();
+});
+
+test('lpplan 신규·마이그레이션 항목은 baseRevision 0에서 기존 revision을 보존한다', async () => {
+  const { database, env } = await createHarness();
+  const migrated = planItem('plan_alpha', { title: '마이그레이션 이력', revision: 7 });
+  const result = await adminSync(env, planMutationChange([migrated], {
+    id: 'mut_migrated_initial', items: [{ itemId: 'plan_alpha', baseRevision: 0, nextRevision: 7 }]
+  }));
+  assert.equal(result.response.status, 200);
+  assert.equal(savedPlan(database)[0].revision, 7);
+  database.close();
+});
+
+
+test('같은 배치의 lpclaim은 입력 순서와 무관하게 병합된 lpplan을 검증한다', async () => {
+  const { database, env } = await createHarness();
+  seedPlan(database, [planItem('plan_alpha')]);
+  const now = Date.now();
+  const moved = planMutationChange([
+    planItem('plan_alpha', { date: '2026-08-04', status: 'in_progress', revision: 2 })
+  ], { id: 'mut_batch_claim_move', items: [{ itemId: 'plan_alpha', baseRevision: 1, nextRevision: 2 }] }, now);
+  const claim = {
+    table: 'checks', k: '__lpclaim__A|all', owner: 'A', updated_at: now,
+    data: {
+      taskId: '__lpclaim__A', date: 'all', done: true, updatedAt: now,
+      value: { claims: [{
+        itemId: 'plan_alpha', date: '2026-08-04', expectedRevision: 2,
+        claimedAt: new Date(now - 1).toISOString()
+      }] }
+    }
+  };
+  const accepted = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'admin', secret: 'consult-admin' }, since: 0,
+    changes: [claim, moved]
+  });
+  assert.equal(accepted.response.status, 200);
+  assert.equal(accepted.data.accepted, 2);
+  const savedClaim = JSON.parse(database.prepare(
+    "SELECT data FROM checks WHERE app='consult' AND k='__lpclaim__A|all'"
+  ).get().data).value.claims[0];
+  assert.equal(savedClaim.date, '2026-08-04');
+  assert.equal(savedClaim.expectedRevision, 2);
+
+  const terminal = planMutationChange([
+    planItem('plan_alpha', { date: '2026-08-04', status: 'completed', revision: 3 })
+  ], { id: 'mut_batch_claim_terminal', items: [{ itemId: 'plan_alpha', baseRevision: 2, nextRevision: 3 }] }, now + 1);
+  const rejected = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'admin', secret: 'consult-admin' }, since: 0,
+    changes: [claim, terminal]
+  });
+  assert.equal(rejected.response.status, 422);
+  assert.equal(rejected.data.details[0].code, 'invalid_learning_claim');
+  assert.equal(savedPlan(database)[0].revision, 2, '검증 실패 배치는 lpplan도 일부 저장하면 안 된다');
+  assert.equal(savedPlan(database)[0].status, 'in_progress');
+  database.close();
+});
+
+
+test('lpplan 같은 revision의 보존 필드 차이는 compact 기본값으로 숨기지 않는다', async () => {
+  const { database, env } = await createHarness();
+  seedPlan(database, [planItem('plan_alpha', { audit: { note: '', refs: [] } })]);
+  const divergent = planItem('plan_alpha', { audit: { note: '', refs: ['evidence-1'] } });
+  const result = await adminSync(env, planMutationChange([divergent], {
+    id: 'mut_nested_audit_divergent', items: []
+  }));
+  assert.equal(result.response.status, 409);
+  assert.equal(result.data.code, 'learning_plan_revision_conflict');
+  assert.deepEqual(savedPlan(database)[0].audit, { note: '', refs: [] });
+  database.close();
+});
+
+test('consult managed learning rows reject nested foreign student codes atomically', async () => {
+  const { database, env } = await createHarness();
+  const now = Date.now();
+  const variants = [
+    ['lp', { platformState: { programStates: [{ history: [{ student_code: 'B' }] }] } }],
+    ['lpcore', { value: { programStates: [{ latestSnapshot: { studentCode: 'B' } }] } }],
+    ['lpplan', { value: [Object.assign(planItem('plan_scope'), { history: [{ student_code: 'B' }] })] }],
+    ['lpassess', { value: { schedules: [], occurrences: [{ studentCode: 'B' }] } }],
+    ['lpcampaign', { value: [{ student_code: 'B' }] }],
+    ['lpwrong', { value: [{ attempts: [{ studentCode: 'B' }] }] }],
+    ['lpimport', { value: { history: [{ student_code: 'B' }], keys: [] } }]
+  ];
+  for (let index = 0; index < variants.length; index += 1) {
+    const [kind, payload] = variants[index];
+    const taskId = '__' + kind + '__A';
+    const result = await call(env, '/sync', {
+      app: 'consult', auth: { mode: 'admin', secret: 'consult-admin' }, since: 0,
+      changes: [{
+        table: 'checks', k: taskId + '|all', owner: 'A', updated_at: now + index,
+        data: Object.assign({ taskId, date: 'all', done: true, updatedAt: now + index }, payload)
+      }]
+    });
+    assert.equal(result.response.status, 422, kind);
+    assert.equal(result.data.details[0].code, 'learning_student_mismatch', kind);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM checks WHERE app=? AND k=?').get('consult', taskId + '|all').n, 0, kind);
+  }
+  const accepted = await call(env, '/sync', {
+    app: 'consult', auth: { mode: 'admin', secret: 'consult-admin' }, since: 0,
+    changes: [{
+      table: 'checks', k: '__lpcore__A|all', owner: 'A', updated_at: now + 20,
+      data: {
+        taskId: '__lpcore__A', date: 'all', done: true, updatedAt: now + 20,
+        value: { programStates: [{ studentCode: 'A', history: [{ student_code: 'A' }, {}] }] }
+      }
+    }]
+  });
+  assert.equal(accepted.response.status, 200);
   database.close();
 });

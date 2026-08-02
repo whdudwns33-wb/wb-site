@@ -317,8 +317,8 @@ test('유효 행 상세를 검토하고 선택한 pending 후보만 승인한다
     student: row.student_code, date: row.check_date, status: row.status,
     progress: row.progress_pct, score: row.score, selected: row.selected
   })), [
-    { student: 'STU-060', date: '2026-08-03', status: '부분완료', progress: 50, score: 80, selected: true },
-    { student: 'STU-060', date: '2026-08-04', status: '완료', progress: 100, score: 95, selected: true }
+    { student: 'STU-060', date: '2026-08-03', status: '부분완료', progress: 50, score: 80, selected: false },
+    { student: 'STU-060', date: '2026-08-04', status: '완료', progress: 100, score: 95, selected: false }
   ]);
 
   const pending = imports.createConfirmCandidates(validation, { requestedBy: 'MANAGER-1' });
@@ -326,8 +326,19 @@ test('유효 행 상세를 검토하고 선택한 pending 후보만 승인한다
     approvedBy: 'MANAGER-1', approvedAt: '2026-08-03T09:00:00.000Z'
   }), error => error.code === 'SELECTION_REQUIRED');
 
+  assert.throws(() => imports.approveConfirmCandidates(pending, {
+    selectedRowIds: [reviewRows[1].row_id], expectedStudentCode: 'OTHER-STUDENT',
+    approvedBy: 'MANAGER-1', approvedAt: '2026-08-04T09:00:00+09:00'
+  }), error => error.code === 'STUDENT_SCOPE_MISMATCH');
+  assert.throws(() => imports.approveConfirmCandidates(pending, {
+    selectedRowIds: [reviewRows[1].row_id], expectedStudentCode: 'STU-060',
+    alreadyApprovedDuplicateKeys: [pending.candidates[1].duplicate_key],
+    approvedBy: 'MANAGER-1', approvedAt: '2026-08-04T09:00:00+09:00'
+  }), error => error.code === 'ALREADY_APPROVED');
+
   const approved = imports.approveConfirmCandidates(pending, {
-    selectedRowIds: [reviewRows[1].row_id],
+    selectedRowIds: [reviewRows[1].row_id], expectedStudentCode: 'STU-060',
+    alreadyApprovedDuplicateKeys: [],
     approvedBy: 'MANAGER-1', approvedAt: '2026-08-04T09:00:00+09:00'
   });
   assert.equal(approved.stage, 'approved');
@@ -336,6 +347,13 @@ test('유효 행 상세를 검토하고 선택한 pending 후보만 승인한다
   assert.equal(approved.approved_candidates[0].approval_status, 'approved');
   assert.equal(approved.approved_candidates[0].approved_by, 'MANAGER-1');
   assert.equal(approved.approved_candidates[0].approved_at, '2026-08-04T00:00:00.000Z');
+  assert.deepEqual(approved.approved_candidates[0].approval_record, {
+    decision: 'approved', approved_by: 'MANAGER-1', approved_at: '2026-08-04T00:00:00.000Z',
+    row_id: pending.candidates[1].row_id, row_number: pending.candidates[1].row_number,
+    student_code: 'STU-060', provider_id: 'classcard',
+    duplicate_key: pending.candidates[1].duplicate_key, payload_hash: pending.candidates[1].payload_hash,
+    source_hash: pending.candidates[1].source_hash
+  });
   assert.equal(approved.approved_candidates[0].ledger_write_allowed, true);
   assert.equal(approved.pending_candidates[0].ledger_write_allowed, false);
 });
@@ -352,7 +370,8 @@ test('자격정보 변형은 재귀 차단하고 accountIdRef는 opaque ID만 �
   });
   assert.equal(JSON.stringify(preview).includes(marker), false);
   assert.equal(preview.candidates[0].account_id_ref, '');
-  assert.equal(preview.candidates[0].issues.some(issue => issue.code === 'FORBIDDEN_CREDENTIAL_FIELD'), true);
+  assert.equal(preview.candidates[0].issues.some(issue => issue.code === 'FORBIDDEN_CREDENTIAL_FIELD' &&
+    /비밀번호·토큰·쿠키/.test(issue.message) && /차단/.test(issue.message)), true);
   assert.equal(preview.candidates[0].issues.some(issue => issue.code === 'INVALID_ACCOUNT_ID_REF'), true);
   assert.equal(imports.validatePreview(preview).summary.valid, 0);
   assert.equal(imports.isOpaqueAccountRef('student-ref:061'), true);

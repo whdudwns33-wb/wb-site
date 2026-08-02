@@ -1467,9 +1467,8 @@ export function createLearningV2Handler(options) {
     }
     if (request.method.toUpperCase() === 'OPTIONS') return corsResponse(origin);
     const headers = responseHeaders(origin);
-    const enabled = String((env || {}).LEARNING_V2_ENABLED === undefined
-      ? 'true'
-      : (env || {}).LEARNING_V2_ENABLED).toLowerCase() !== 'false';
+    // 환경변수 누락·오타·예상하지 못한 값은 모두 닫힌 상태다. 정확한 문자열 "true"만 명시적으로 연다.
+    const enabled = (env || {}).LEARNING_V2_ENABLED === 'true';
     if (!enabled) {
       const pathname = new URL(request.url).pathname;
       const healthRequest = request.method.toUpperCase() === 'GET' &&

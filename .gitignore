@@ -5,6 +5,7 @@
 sync/배포결과.txt
 sync/.wrangler/
 sync/.release-receipts/
+sync/wrangler.preview.toml
 .wrangler/
 
 # Dependency/build output

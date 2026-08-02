@@ -93,18 +93,28 @@ export async function resolveLegacyAuth(env, app, auth) {
   const token = String(auth.token || '');
   if (!SAFE_ID.test(id) || !isRawBearer(token)) return null;
 
-  const storedHash = tokenStorageValue(await sha256Hex(token));
+  const digest = await sha256Hex(token);
+  const storedHash = tokenStorageValue(digest);
   const createdAfter = Date.now() - TOKEN_TTL_MS;
   let row = await env.DB.prepare(
     'SELECT token, staff_id FROM tokens WHERE app=? AND token=? AND revoked=0 AND created_at>=? LIMIT 1'
   ).bind(app, storedHash, createdAfter).first();
-  let legacyRaw = false;
+  let legacyStoredToken = "";
+  if (!row) {
+    // 003 이전 Worker가 저장한 접두사 없는 digest는 raw bearer 자체가 아니다.
+    // 사용자가 제시한 raw bearer의 digest로만 찾고, DB digest 문자열 입력은 위에서 거부한다.
+    row = await env.DB.prepare(
+      "SELECT token, staff_id FROM tokens WHERE app=? AND lower(token)=? AND length(token)=64 " +
+      "AND token NOT GLOB '*[^0-9A-Fa-f]*' AND revoked=0 AND created_at>=? LIMIT 1"
+    ).bind(app, digest, createdAfter).first();
+    if (row) legacyStoredToken = row.token;
+  }
   if (!row) {
     row = await env.DB.prepare(
       "SELECT token, staff_id FROM tokens WHERE app=? AND token=? AND token NOT LIKE 'sha256:%' " +
       'AND revoked=0 AND created_at>=? LIMIT 1'
     ).bind(app, token, createdAfter).first();
-    legacyRaw = Boolean(row);
+    if (row) legacyStoredToken = token;
   }
   if (!row || row.staff_id !== id) return null;
 
@@ -115,21 +125,27 @@ export async function resolveLegacyAuth(env, app, auth) {
   try { staff = JSON.parse(staffRow.data); } catch (error) { return null; }
   if (staff.deleted) return null;
 
-  // 안전한 구형 평문 토큰만 첫 성공 인증 직후 접두 해시 형식으로 이전한다.
-  if (legacyRaw) {
+  // 접두사 없는 digest와 안전한 구형 원문 행은 첫 성공 인증 직후 표준 접두 해시로 이전한다.
+  if (legacyStoredToken) {
+    let canonical = null;
     try {
       const migrated = await env.DB.prepare(
         'UPDATE tokens SET token=? WHERE app=? AND token=? AND staff_id=? AND revoked=0'
-      ).bind(storedHash, app, token, id).run();
-      if (Number(migrated && migrated.meta && migrated.meta.changes || 0) !== 1) return null;
+      ).bind(storedHash, app, legacyStoredToken, id).run();
+      if (Number(migrated && migrated.meta && migrated.meta.changes || 0) !== 1) {
+        canonical = await env.DB.prepare(
+          'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0 AND created_at>=? LIMIT 1'
+        ).bind(app, storedHash, createdAfter).first();
+        if (!canonical || canonical.staff_id !== id) return null;
+      }
     } catch (error) {
-      const canonical = await env.DB.prepare(
+      canonical = await env.DB.prepare(
         'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0 AND created_at>=? LIMIT 1'
       ).bind(app, storedHash, createdAfter).first();
+      if (!canonical || canonical.staff_id !== id) return null;
       await env.DB.prepare(
         'UPDATE tokens SET revoked=1 WHERE app=? AND token=? AND staff_id=? AND revoked=0'
-      ).bind(app, token, id).run();
-      if (!canonical || canonical.staff_id !== id) return null;
+      ).bind(app, legacyStoredToken, id).run();
     }
   }
 
@@ -199,6 +215,201 @@ function normalizeTimestamp(value, now) {
 function validationFailure(code, message) {
   return { ok: false, code, message };
 }
+
+function jsonBytes(value) {
+  try { return new TextEncoder().encode(JSON.stringify(value)).length; }
+  catch (error) { return Number.POSITIVE_INFINITY; }
+}
+
+function validateLearningStudentScope(value, expectedStudentCode) {
+  const expected = String(expectedStudentCode || '');
+  const stack = [{ value, depth: 0 }];
+  const seen = new Set();
+  const maxNodes = 20000;
+  const maxDepth = 32;
+  let visited = 0;
+  while (stack.length) {
+    const current = stack.pop();
+    const node = current.value;
+    if (!node || typeof node !== 'object') continue;
+    if (seen.has(node)) continue;
+    seen.add(node);
+    visited += 1;
+    if (visited > maxNodes) {
+      return validationFailure('learning_student_scope_limit', '학습 데이터의 학생 범위를 안전하게 확인할 수 없습니다');
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key === 'studentCode' || key === 'student_code') {
+        const explicit = child === undefined || child === null ? '' : String(child).trim();
+        if (explicit && explicit !== expected) {
+          return validationFailure('learning_student_mismatch', '학습 데이터의 학생 식별자가 체크 키와 일치하지 않습니다');
+        }
+      }
+      if (child && typeof child === 'object') {
+        if (current.depth >= maxDepth) {
+          return validationFailure('learning_student_scope_limit', '학습 데이터의 학생 범위를 안전하게 확인할 수 없습니다');
+        }
+        stack.push({ value: child, depth: current.depth + 1 });
+      }
+    }
+  }
+  return { ok: true };
+}
+
+function stableJsonValue(value) {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  Object.keys(value).sort().forEach(key => {
+    if (value[key] !== undefined) out[key] = stableJsonValue(value[key]);
+  });
+  return out;
+}
+
+function plannerDerivedId(prefix, ...values) {
+  const source = values.map(value => value === null || value === undefined ? '' : String(value)).join('|');
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return String(prefix || 'id') + '_' + (hash >>> 0).toString(36);
+}
+
+function plannerComparable(item) {
+  const out = structuredClone(item);
+  // 아래 값은 브라우저의 lossless compact 형식에서 복원되는 파생 기본값이다.
+  if (!out.planId || out.planId === plannerDerivedId('daily', out.studentCode, out.date)) delete out.planId;
+  if (Number(out.minutes || 0) === 0) delete out.minutes;
+  if (Number(out.priority || 1) === 1) delete out.priority;
+  if (out.verificationRequired === true || out.verificationRequired === undefined) delete out.verificationRequired;
+  if (out.updatedAt === out.createdAt || !out.updatedAt) delete out.updatedAt;
+  if (out.updatedBy === out.createdBy || !out.updatedBy) delete out.updatedBy;
+  if (Array.isArray(out.history) && out.history.length === 1) {
+    const event = out.history[0] || {};
+    const eventKeys = Object.keys(event).sort();
+    const defaultKeys = ['action', 'actor', 'at', 'fromStatus', 'toStatus'].sort();
+    if (JSON.stringify(eventKeys) === JSON.stringify(defaultKeys) && event.action === 'created' &&
+        String(event.fromStatus || '') === '' && String(event.toStatus || '') === String(out.status || '') &&
+        String(event.at || '') === String(out.createdAt || '') &&
+        String(event.actor || '') === String(out.createdBy || '')) delete out.history;
+  }
+  if (out.historyRetention && typeof out.historyRetention === 'object' && !Array.isArray(out.historyRetention)) {
+    const retention = out.historyRetention;
+    if (Number(retention.maxEntries) === 30 && Number(retention.droppedCount || 0) === 0 &&
+        String(retention.oldestRetainedAt || '') === String(out.createdAt || '') &&
+        String(retention.newestRetainedAt || '') === String(out.createdAt || '')) {
+      delete out.historyRetention;
+    }
+  }
+  const compact = {};
+  Object.keys(out).forEach(key => {
+    const value = out[key];
+    if (value === '' || value === null || value === undefined) return;
+    if (Array.isArray(value) && !value.length) return;
+    compact[key] = value;
+  });
+  return JSON.stringify(stableJsonValue(compact));
+}
+
+function validatePlannerItems(items, studentCode) {
+  if (!Array.isArray(items) || items.length > 2000) {
+    return validationFailure('invalid_learning_plan', '플래너 항목 배열 형식이 올바르지 않습니다');
+  }
+  const byId = new Map();
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return validationFailure('invalid_learning_plan_item', '플래너 항목 형식이 올바르지 않습니다');
+    }
+    const itemId = String(item.itemId || '');
+    const revision = Number(item.revision);
+    if (!SAFE_ID.test(itemId) || String(item.studentCode || '') !== studentCode ||
+        !SAFE_DATE.test(String(item.date || '')) || !String(item.title || '') ||
+        !String(item.status || '') || !Number.isInteger(revision) || revision < 1) {
+      return validationFailure('invalid_learning_plan_item', '플래너 항목 식별자·학생·날짜·revision이 올바르지 않습니다');
+    }
+    if (byId.has(itemId)) {
+      return validationFailure('duplicate_learning_plan_item', '같은 플래너 항목이 두 번 포함됐습니다');
+    }
+    byId.set(itemId, item);
+  }
+  return { ok: true, byId };
+}
+
+function normalizePlanMutation(raw, incomingById) {
+  if (raw === undefined || raw === null) return { ok: true, legacy: true, id: '', entries: [] };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !SAFE_ID.test(String(raw.id || '')) || !Array.isArray(raw.items)) {
+    return validationFailure('invalid_learning_plan_mutation', '플래너 변경 의도 형식이 올바르지 않습니다');
+  }
+  const seen = new Set();
+  const entries = [];
+  for (const source of raw.items) {
+    const itemId = String(source && source.itemId || '');
+    const baseRevision = Number(source && source.baseRevision);
+    const nextRevision = Number(source && source.nextRevision);
+    const incoming = incomingById.get(itemId);
+    const validRevisionStep = baseRevision === 0 ? nextRevision >= 1 : nextRevision === baseRevision + 1;
+    if (!SAFE_ID.test(itemId) || seen.has(itemId) || !Number.isInteger(baseRevision) || baseRevision < 0 ||
+        !Number.isInteger(nextRevision) || !validRevisionStep ||
+        !incoming || Number(incoming.revision) !== nextRevision) {
+      return validationFailure('invalid_learning_plan_mutation', '플래너 변경 대상과 revision이 일치하지 않습니다');
+    }
+    seen.add(itemId);
+    entries.push({ itemId, baseRevision, nextRevision });
+  }
+  return { ok: true, legacy: false, id: String(raw.id), entries };
+}
+
+function mergeLearningPlanRecord(incomingData, parsed, storedData) {
+  const incomingResult = validatePlannerItems(incomingData && incomingData.value, parsed.subject);
+  if (!incomingResult.ok) return incomingResult;
+  const storedItems = storedData && Array.isArray(storedData.value) ? storedData.value : [];
+  const storedResult = validatePlannerItems(storedItems, parsed.subject);
+  if (!storedResult.ok) {
+    return validationFailure('learning_plan_storage_corrupt', '서버 플래너 원장이 손상되어 자동 병합하지 않았습니다');
+  }
+  const mutation = normalizePlanMutation(incomingData.planMutation, incomingResult.byId);
+  if (!mutation.ok) return mutation;
+  const targeted = new Map(mutation.entries.map(entry => [entry.itemId, entry]));
+  const merged = new Map(storedResult.byId);
+
+  for (const [itemId, incoming] of incomingResult.byId) {
+    const current = storedResult.byId.get(itemId);
+    const entry = targeted.get(itemId);
+    if (!current) {
+      if (!mutation.legacy && (!entry || entry.baseRevision !== 0)) {
+        return validationFailure('learning_plan_revision_conflict', '새 플래너 항목의 기준 revision이 일치하지 않습니다');
+      }
+      merged.set(itemId, incoming);
+      continue;
+    }
+    const currentRevision = Number(current.revision);
+    const incomingRevision = Number(incoming.revision);
+    const same = plannerComparable(current) === plannerComparable(incoming);
+    if (entry) {
+      if (same && currentRevision === entry.nextRevision) continue;
+      if (currentRevision !== entry.baseRevision || incomingRevision !== entry.nextRevision) {
+        return validationFailure('learning_plan_revision_conflict', '다른 기기에서 같은 플래너 항목을 먼저 수정했습니다');
+      }
+      merged.set(itemId, incoming);
+      continue;
+    }
+    if (!mutation.legacy && incomingRevision > currentRevision) {
+      return validationFailure('learning_plan_mutation_required', '변경 의도 없는 플래너 revision 증가는 저장할 수 없습니다');
+    }
+    if (incomingRevision > currentRevision) merged.set(itemId, incoming);
+    else if (incomingRevision === currentRevision && !same) {
+      return validationFailure('learning_plan_revision_conflict', '같은 revision의 플래너 내용이 서로 다릅니다');
+    }
+  }
+
+  const data = Object.assign({}, incomingData, { value: [...merged.values()] });
+  if (jsonBytes(data) > MAX_RECORD_BYTES) {
+    return validationFailure('learning_plan_too_large', '병합된 플래너 원장이 서버 저장 한도를 초과합니다');
+  }
+  return { ok: true, data };
+}
+
 
 function normalizeLearningClaimRecord(data, parsed, planItems, now) {
   const source = data && data.value && Array.isArray(data.value.claims) ? data.value.claims : null;
@@ -281,13 +492,24 @@ function normalizeChange(change, auth, app, taskRows, learningPlanRows, now) {
     if (app === 'consult' && CONSULT_MANAGED_LEARNING_CHECKS.has(parsed.specialKind) && auth.role !== 'admin' && !auth.publishForAll) {
       return validationFailure('learning_state_write_forbidden', '학습 원장 상태는 관리자만 수정할 수 있습니다');
     }
+    if (app === 'consult' && CONSULT_MANAGED_LEARNING_CHECKS.has(parsed.specialKind)) {
+      const scope = validateLearningStudentScope(data, parsed.subject);
+      if (!scope.ok) return scope;
+    }
     if (auth.role !== 'admin' && !auth.publishForAll) {
       const ownSpecial = parsed.subject === auth.id;
       const sharedTaskRecord = app === 'task' && auth.writeSharedChecks && TASK_SHARED_CHECKS.has(parsed.specialKind);
       if (!ownSpecial && !sharedTaskRecord) return validationFailure('special_check_forbidden', '다른 사람의 개인 기록은 수정할 수 없습니다');
     }
+    if (app === 'consult' && parsed.specialKind === 'lpplan') {
+      const stored = learningPlanRows.get(parsed.subject);
+      const merged = mergeLearningPlanRecord(data, parsed, stored && stored.data);
+      if (!merged.ok) return merged;
+      data = merged.data;
+    }
     if (app === 'consult' && parsed.specialKind === 'lpclaim') {
-      data = normalizeLearningClaimRecord(data, parsed, learningPlanRows.get(parsed.subject), now);
+      const stored = learningPlanRows.get(parsed.subject);
+      data = normalizeLearningClaimRecord(data, parsed, stored && stored.items, now);
       if (!data) return validationFailure('invalid_learning_claim', '완료 요청 형식이 올바르지 않습니다');
     }
   } else {
@@ -332,18 +554,61 @@ async function loadLearningPlanRows(env, app, changes) {
   for (const change of changes) {
     if (!change || change.table !== 'checks') continue;
     const parsed = parseCheckKey(change.k, app);
-    if (parsed && parsed.specialKind === 'lpclaim') subjects.add(parsed.subject);
+    if (parsed && (parsed.specialKind === 'lpclaim' || parsed.specialKind === 'lpplan')) subjects.add(parsed.subject);
   }
   for (const subject of subjects) {
     const row = await env.DB.prepare(
-      'SELECT data FROM checks WHERE app=? AND k=? LIMIT 1'
+      'SELECT data,updated_at,srv_at FROM checks WHERE app=? AND k=? LIMIT 1'
     ).bind(app, '__lpplan__' + subject + '|all').first();
     let data = {};
     try { data = row ? JSON.parse(row.data) : {}; } catch (error) {}
-    rows.set(subject, data && data.value && Array.isArray(data.value) ? data.value : []);
+    rows.set(subject, {
+      data,
+      items: data && data.value && Array.isArray(data.value) ? data.value : [],
+      updatedAt: Number(row && row.updated_at) || 0,
+      srvAt: Number(row && row.srv_at) || 0,
+      rawData: row ? String(row.data || '') : ''
+    });
   }
   return rows;
 }
+
+async function writeLearningPlanCas(env, app, change, maxAttempts) {
+  const parsed = parseCheckKey(change.k, app);
+  const key = change.k;
+  const attempts = Math.max(1, Number(maxAttempts) || 6);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const row = await env.DB.prepare(
+      'SELECT data,updated_at,srv_at FROM checks WHERE app=? AND k=? LIMIT 1'
+    ).bind(app, key).first();
+    let storedData = {};
+    try { storedData = row ? JSON.parse(row.data) : {}; }
+    catch (error) {
+      return validationFailure('learning_plan_storage_corrupt', '서버 플래너 원장이 손상되어 자동 병합하지 않았습니다');
+    }
+    const merged = mergeLearningPlanRecord(change.data, parsed, storedData);
+    if (!merged.ok) return merged;
+    const updatedAt = Math.max(Number(row && row.updated_at) || 0, Number(change.updated_at) || 0);
+    const srvAt = Math.max(Date.now(), (Number(row && row.srv_at) || 0) + 1);
+    const serialized = JSON.stringify(Object.assign({}, merged.data, { updatedAt }));
+    let result;
+    if (!row) {
+      result = await env.DB.prepare(
+        'INSERT OR IGNORE INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+      ).bind(app, key, change.owner || null, serialized, updatedAt, srvAt).run();
+    } else {
+      result = await env.DB.prepare(
+        'UPDATE checks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND k=? AND data=? AND updated_at=? AND srv_at=?'
+      ).bind(change.owner || null, serialized, updatedAt, srvAt, app, key,
+        String(row.data || ''), Number(row.updated_at) || 0, Number(row.srv_at) || 0).run();
+    }
+    if (result && result.meta && Number(result.meta.changes) === 1) {
+      return { ok: true, data: Object.assign({}, merged.data, { updatedAt }), updatedAt, srvAt };
+    }
+  }
+  return validationFailure('learning_plan_busy', '다른 기기에서 플래너를 계속 수정 중입니다. 최신 자료를 받은 뒤 다시 시도해 주세요');
+}
+
 
 function changeIdentity(change) {
   if (!change || typeof change !== 'object') return '';
@@ -391,24 +656,96 @@ async function handleSync(env, app, body, origin) {
       taskRows.set(result.value.id, { owner: result.value.owner, origin: result.value.data.origin || '' });
     }
   });
+  const checkEntries = [];
   changes.forEach((change, index) => {
-    if (!change || change.table !== 'checks') return;
+    if (change && change.table === 'checks') checkEntries.push({ change, index });
+  });
+  // 같은 배치의 완료 요청도 새 플래너 revision/date/status를 보도록 lpplan을 먼저 병합한다.
+  checkEntries.sort((left, right) => {
+    const leftParsed = parseCheckKey(left.change.k, app);
+    const rightParsed = parseCheckKey(right.change.k, app);
+    const leftPlan = leftParsed && leftParsed.specialKind === 'lpplan' ? 0 : 1;
+    const rightPlan = rightParsed && rightParsed.specialKind === 'lpplan' ? 0 : 1;
+    return leftPlan - rightPlan || left.index - right.index;
+  }).forEach(({ change, index }) => {
     const result = normalizeChange(change, auth, app, taskRows, learningPlanRows, now);
     if (!result.ok) {
       errors.push({ index, table: 'checks', key: changeIdentity(change), code: result.code, message: result.message });
       return;
     }
     normalizedByIndex.set(index, result.value);
+    const parsed = parseCheckKey(change.k, app);
+    if (app === 'consult' && parsed && parsed.specialKind === 'lpplan') {
+      learningPlanRows.set(parsed.subject, {
+        data: result.value.data,
+        items: result.value.data.value,
+        updatedAt: result.value.updated_at,
+        srvAt: 0,
+        rawData: ''
+      });
+    }
   });
 
   if (errors.length) {
+    const planRevisionConflicts = errors.every(error =>
+      error.code === 'learning_plan_revision_conflict' && String(error.key || '').startsWith('checks:__lpplan__')
+    );
+    if (planRevisionConflicts) {
+      return json({
+        ok: false,
+        error: errors[0].message,
+        code: 'learning_plan_revision_conflict',
+        details: errors
+      }, 409, origin);
+    }
     return json({ ok: false, error: '검증되지 않은 변경이 있어 배치 전체를 저장하지 않았습니다', code: 'change_validation_failed', details: errors }, 422, origin);
   }
 
   const normalized = [...normalizedByIndex.entries()].sort((a, b) => a[0] - b[0]).map(entry => entry[1]);
+  const learningPlanChanges = normalized.filter(change => {
+    if (app !== 'consult' || change.table !== 'checks') return false;
+    const parsed = parseCheckKey(change.k, app);
+    return parsed && parsed.specialKind === 'lpplan';
+  });
+  const finalLearningPlans = new Map();
+  for (const change of learningPlanChanges) {
+    const result = await writeLearningPlanCas(env, app, change, 8);
+    if (!result.ok) {
+      const conflict = result.code === 'learning_plan_revision_conflict' || result.code === 'learning_plan_busy';
+      return json({
+        ok: false,
+        error: result.message,
+        code: result.code,
+        details: [{ table: 'checks', key: changeIdentity(change), code: result.code, message: result.message }]
+      }, conflict ? 409 : 422, origin);
+    }
+    const parsed = parseCheckKey(change.k, app);
+    finalLearningPlans.set(parsed.subject, result.data);
+  }
+  // CAS 재시도 중 다른 항목까지 병합됐을 수 있으므로 lpclaim을 실제 저장 결과로 다시 검증한다.
+  for (const change of normalized) {
+    if (app !== 'consult' || change.table !== 'checks') continue;
+    const parsed = parseCheckKey(change.k, app);
+    if (!parsed || parsed.specialKind !== 'lpclaim' || !finalLearningPlans.has(parsed.subject)) continue;
+    const finalPlan = finalLearningPlans.get(parsed.subject);
+    const rechecked = normalizeLearningClaimRecord(change.data, parsed, finalPlan.value, now);
+    if (!rechecked) {
+      return json({
+        ok: false,
+        error: '플래너가 다른 기기에서 바뀌어 완료 요청을 저장하지 않았습니다',
+        code: 'learning_plan_revision_conflict',
+        details: [{ table: 'checks', key: changeIdentity(change), code: 'invalid_learning_claim', message: '최신 플래너와 완료 요청이 일치하지 않습니다' }]
+      }, 409, origin);
+    }
+    change.data = rechecked;
+  }
   // 같은 배치에 미래 srv_at을 만들지 않는다. 동일 ms 경계는 정렬 키 재조회로 중복 허용·누락 방지한다.
   const writeBase = Date.now();
-  const statements = normalized.map(change => upsertStmt(env, change.table, app, change, writeBase));
+  const statements = normalized.filter(change => {
+    if (app !== 'consult' || change.table !== 'checks') return true;
+    const parsed = parseCheckKey(change.k, app);
+    return !(parsed && parsed.specialKind === 'lpplan');
+  }).map(change => upsertStmt(env, change.table, app, change, writeBase));
   if (statements.length) await env.DB.batch(statements);
 
   const ownFilter = auth.readAll ? '' : ' AND owner=?';

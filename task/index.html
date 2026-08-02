@@ -78,6 +78,7 @@
   main { padding-top: 16px; }
 
   .row { display: flex; align-items: center; gap: 10px; }
+  .row > .in { min-width: 0; }
   .wraprow { flex-wrap: wrap; }
   .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .muted { color: var(--mid-gray); }
@@ -95,7 +96,7 @@
   .btn-navy { background: var(--navy); color: var(--white); }
   .btn-ghost { background: var(--white); border-color: var(--line); }
   .btn-danger { background: #FEF2F2; color: var(--coral); }
-  .btn-warn { background: #FFF7ED; color: var(--amber); border: 1px solid #FDE8CC; }
+  .btn-warn { background: #FFF7ED; color: #9A3412; border: 1px solid #FDE8CC; }
   .btn-sm { padding: 7px 11px; font-size: 12.5px; border-radius: 8px; }
   .btn-block { display: flex; width: 100%; }
   .btn:disabled { opacity: .5; cursor: default; }
@@ -188,7 +189,7 @@
   table.week thead th.today { background: var(--navy); color: var(--white); }
   .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
   .dot.done { background: var(--blue); color: var(--white); }
-  .dot.doing { background: #FCD9A5; color: var(--amber); }
+  .dot.doing { background: #FCD9A5; color: #7C2D12; }
   .dot.blocked { background: var(--coral); color: var(--white); }
   .dot.miss { background: #FDE8E4; }
   .dot.none { background: transparent; }
@@ -219,9 +220,16 @@
   .newver button { background: #fff; color: var(--navy); font-weight: 900;
     padding: 8px 14px; border-radius: 8px; font-size: 13px; }
   .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #EAF6FC; color: var(--deep-blue); }
-  .pill.warn { background: #FFF7ED; color: var(--amber); }
+  .pill.warn { background: #FFF7ED; color: #9A3412; }
   .pill.bad { background: #FEF2F2; color: var(--coral); }
   .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
+
+  @media (max-width: 520px) {
+    #view .card .row, .modal-box .row { flex-wrap: wrap; }
+    #view .card .row > .in, .modal-box .row > .in { flex: 1 1 160px; min-width: 0; }
+    #view .card .row > .btn, .modal-box .row > .btn { flex: 1 1 auto; }
+    .grid2 { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -237,7 +245,7 @@
 
 <main class="wrap" id="view"></main>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
 <script>
@@ -255,6 +263,56 @@ const LS_KEY = HAS_PERSON_SCOPE ? 'wb_task_v2_person_' + (SAFE_SCOPE_ID || 'inva
 const linkCodeVault = new Map();
 const DOW = ['일','월','화','수','목','금','토'];
 
+const TASK_ADMIN_SECRET_SESSION_KEY = 'wb_task_admin_secret_v1';
+let migratedPersistentAdminSecret = false;
+
+function getTaskAdminSecret(vault) {
+  try { return String((vault || sessionStorage).getItem(TASK_ADMIN_SECRET_SESSION_KEY) || ''); }
+  catch (error) { return ''; }
+}
+
+function setTaskAdminSecret(value, vault) {
+  const storage = vault || sessionStorage;
+  const clean = String(value || '').trim();
+  try {
+    if (clean) storage.setItem(TASK_ADMIN_SECRET_SESSION_KEY, clean);
+    else storage.removeItem(TASK_ADMIN_SECRET_SESSION_KEY);
+  } catch (error) { console.warn('session secret failed', error); }
+  return clean;
+}
+
+function removeAdminSecretFromState(target) {
+  if (target && target.settings && Object.prototype.hasOwnProperty.call(target.settings, 'syncSecret')) {
+    delete target.settings.syncSecret;
+  }
+  return target;
+}
+
+function scrubPersistentAdminSecrets(persistentStorage, sessionVault, keys, allowSession) {
+  let discovered = '';
+  Array.from(new Set(keys || [])).forEach(key => {
+    try {
+      const raw = persistentStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.settings || !Object.prototype.hasOwnProperty.call(parsed.settings, 'syncSecret')) return;
+      const candidate = String(parsed.settings.syncSecret || '').trim();
+      if (!discovered && candidate) discovered = candidate;
+      delete parsed.settings.syncSecret;
+      persistentStorage.setItem(key, JSON.stringify(parsed));
+    } catch (error) { console.warn('persistent secret cleanup failed', key, error); }
+  });
+  if (allowSession && discovered && !getTaskAdminSecret(sessionVault)) {
+    setTaskAdminSecret(discovered, sessionVault);
+  }
+  return !!discovered && !!allowSession;
+}
+
+function migratePersistentAdminSecret() {
+  const keys = HAS_PERSON_SCOPE ? [LS_KEY] : [LS_KEY, LEGACY_LS_KEY];
+  return scrubPersistentAdminSecrets(localStorage, sessionStorage, keys, !HAS_PERSON_SCOPE);
+}
+
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
 const now = () => Date.now();
 
@@ -264,7 +322,7 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', adminPinHash: '', adminPinSalt: '', adminPinVersion: 0, syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터', syncCursors: {} }
+    settings: { adminPin: '', adminPinHash: '', adminPinSalt: '', adminPinVersion: 0, syncUrl: '', centerName: 'WB 웩슬러브레인센터', syncCursors: {} }
   };
 }
 
@@ -272,6 +330,7 @@ let state = blankState();
 
 function load() {
   try {
+    migratedPersistentAdminSecret = migratePersistentAdminSecret();
     // 개인 링크는 과거 공용 저장소를 읽지 않는다. 원장만 기존 상태를 1회 복사한다.
     const scoped = localStorage.getItem(LS_KEY);
     const raw = scoped || (!HAS_PERSON_SCOPE ? localStorage.getItem(LEGACY_LS_KEY) : '');
@@ -279,6 +338,7 @@ function load() {
       const p = JSON.parse(raw);
       state = Object.assign(blankState(), p);
       state.settings = Object.assign(blankState().settings, p.settings || {});
+      removeAdminSecretFromState(state);
       state.settings.syncCursors = Object.assign({}, state.settings.syncCursors || {});
       if (!scoped) save();
     }
@@ -286,6 +346,7 @@ function load() {
 }
 
 function save() {
+  removeAdminSecretFromState(state);
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
 }
@@ -539,6 +600,9 @@ function alertsToday() {
  * 지금은 (1) 마지막 동기화 이후 바뀐 것만 (2) 학생은 자기 것만 주고받는다. */
 const SYNC_URL = 'https://wb-sync.whdudwns33.workers.dev';
 const SYNC_APP = 'task';
+const SYNC_BATCH_SIZE = 400;
+// 819,200건까지 한 회차에서 처리한다. 10MB 안전 가져오기와 100,000개 업무 상한을 넉넉히 수용한다.
+const MAX_SYNC_ROUNDS = 2048;
 
 /** 이 체크가 누구 것인지 — 서버가 학생별로 나눠 담는 기준이 된다.
  *  '__st__S1|2026-08-02' → S1,  '<taskId>|날짜' → 그 업무의 담당자 */
@@ -559,7 +623,7 @@ const sync = {
       const t = state.settings.myToken || '';
       return t ? { mode: 'person', id: session.staffId, token: t } : null;
     }
-    const k = state.settings.syncSecret || '';
+    const k = getTaskAdminSecret();
     return k ? { mode: 'admin', secret: k } : null;
   },
   enabled() { return !!this.auth(); },
@@ -618,17 +682,28 @@ const sync = {
     try {
       const t0 = now();
       const pending = this.collect(Number(state.settings.pushAt) || 0);
-      let guard = 0, again = true;
-      while (again && guard++ < 60) {
-        const batch = pending.splice(0, 400);
+      let rounds = 0;
+      let serverMore = true;
+      while ((pending.length || serverMore) && rounds < MAX_SYNC_ROUNDS) {
+        rounds++;
+        const batch = pending.splice(0, SYNC_BATCH_SIZE);
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
         this.apply(d.changes);
-        state.settings.pullAt = d.now;
-        again = !!d.more || pending.length > 0;
+        const previousPull = Number(state.settings.pullAt) || 0;
+        state.settings.pullAt = Number(d.now) || previousPull;
+        if (d.more && state.settings.pullAt <= previousPull) throw new Error('동기화 커서가 진행되지 않습니다');
+        serverMore = !!d.more;
+      }
+      if (pending.length || serverMore) {
+        const reason = [
+          pending.length ? '미전송 ' + pending.length + '건' : '',
+          serverMore ? '서버 다음 페이지 남음' : ''
+        ].filter(Boolean).join(', ');
+        throw new Error('동기화 처리 한도 초과 — ' + reason + '. 커서를 유지하고 다시 시도해 주세요');
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
@@ -677,7 +752,7 @@ const session = {
   get isStaffLink() { return HAS_PERSON_SCOPE; },
   get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'; },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
-  lock() { sessionStorage.removeItem('wb_admin'); }
+  lock() { sessionStorage.removeItem('wb_admin'); setTaskAdminSecret(''); }
 };
 
 let route = 'today';
@@ -2125,21 +2200,22 @@ function viewStaffAdmin() {
 /* ── 설정 ── */
 function viewSettings() {
   const s = state.settings;
+  const sessionSecret = getTaskAdminSecret();
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
-    '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. <b>비밀키만 넣으면</b> 이 기기가 연결됩니다.<br>' +
-      '연결되면 직원이 체크하는 즉시 원장님 화면에 반영됩니다.</div>' +
+    '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. 비밀키는 <b>현재 브라우저 탭 세션에만</b> 보관됩니다.<br>' +
+      '탭을 닫거나 화면을 잠그면 사라지므로 다음 세션에 다시 입력해 주세요.</div>' +
 
     '<div class="field"><label class="fl">원장 비밀키</label>' +
-      '<input class="in" id="cfgSecret" type="password" autocomplete="off" placeholder="' +
-        (s.syncSecret ? '저장됨 · 변경할 때만 새 비밀키 입력' : 'TASK_ADMIN_SECRET 입력') + '"></div>' +
+      '<input class="in" id="cfgSecret" type="password" autocomplete="off" aria-label="TASK 관리자 동기화 비밀키" placeholder="' +
+        (sessionSecret ? '현재 탭 세션에 연결됨 · 변경 시 새 비밀키 입력' : 'TASK_ADMIN_SECRET 입력') + '"></div>' +
     '<div class="row" style="gap:8px">' +
-      '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
+      '<button class="btn btn-primary" data-act="savecfg">이 세션에 연결</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
-    (s.syncSecret
-      ? '<div class="hint mt14">✓ 연결됨 — 개인 링크에는 <b>직원별 토큰</b>만 담겨 나갑니다. 링크는 언제든 해지할 수 있습니다.</div>' +
+    (sessionSecret
+      ? '<div class="hint mt14">✓ 이 탭 세션에 연결됨 — 비밀키는 기기 저장·백업·주소에 남지 않습니다. 개인 링크에는 <b>직원별 토큰</b>만 사용됩니다.</div>' +
         '<hr class="sep">' +
         '<div class="card-title">원장 주소</div>' +
         '<div class="card-sub mb14">보안상 주소에는 비밀키와 관리 비밀번호를 넣지 않습니다. 새 기기에서는 별도로 입력하세요.</div>' +
@@ -2149,7 +2225,7 @@ function viewSettings() {
 
   '<div class="card">' +
     '<div class="card-title">백업</div>' +
-    '<div class="card-sub mb14">직원·업무·체크 데이터만 내려받습니다. 관리자 비밀키·PIN·개인 토큰은 파일에 넣지 않습니다.</div>' +
+    '<div class="card-sub mb14">직원·업무·체크 데이터만 내려받습니다. 세션 비밀키·PIN·개인 토큰은 파일에 넣지 않습니다.</div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
       '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
@@ -2158,7 +2234,7 @@ function viewSettings() {
   '<div class="card">' +
     '<div class="card-title">관리 비밀번호</div>' +
     '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
-    '<div class="field"><input class="in" id="newPin" type="password" placeholder="새 비밀번호"></div>' +
+    '<div class="field"><input class="in" id="newPin" type="password" aria-label="새 관리 비밀번호" placeholder="새 비밀번호"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="changepin">변경</button>' +
       '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
@@ -2168,15 +2244,73 @@ function viewSettings() {
 /* ══════════════════════════════════════════════════════
    8. 모달 · 텍스트 생성
    ══════════════════════════════════════════════════════ */
+let modalReturnFocus = null;
+let modalTitleSequence = 0;
+const MODAL_FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function modalFocusableElements(box) {
+  if (!box) return [];
+  return Array.from(box.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(node =>
+    node.getAttribute('aria-hidden') !== 'true' && !node.hasAttribute('hidden'));
+}
+
+function handleModalKeydown(event) {
+  const box = $('#modalHost .modal-box');
+  if (!box) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeModal();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = modalFocusableElements(box);
+  if (!focusable.length) {
+    event.preventDefault();
+    box.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!box.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function modal(title, bodyHtml, footHtml) {
-  $('#modalHost').innerHTML =
-    '<div class="modal" data-act="closemodal"><div class="modal-box">' +
-      '<div class="between mb14"><div class="card-title">' + esc(title) + '</div>' +
-      '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
+  const host = $('#modalHost');
+  if (!host.innerHTML) modalReturnFocus = document.activeElement;
+  const titleId = 'wb-modal-title-' + (++modalTitleSequence);
+  host.innerHTML =
+    '<div class="modal" data-act="closemodal"><div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="' + titleId + '" tabindex="-1">' +
+      '<div class="between mb14"><div class="card-title" id="' + titleId + '">' + esc(title) + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="closemodal" aria-label="대화상자 닫기">닫기</button></div>' +
       bodyHtml + (footHtml || '') +
     '</div></div>';
+  document.removeEventListener('keydown', handleModalKeydown);
+  document.addEventListener('keydown', handleModalKeydown);
+  requestAnimationFrame(() => {
+    const box = $('#modalHost .modal-box');
+    if (!box) return;
+    const initial = box.querySelector('[autofocus]') || modalFocusableElements(box)[0] || box;
+    initial.focus();
+  });
 }
-function closeModal() { $('#modalHost').innerHTML = ''; }
+
+function closeModal() {
+  const host = $('#modalHost');
+  document.removeEventListener('keydown', handleModalKeydown);
+  host.innerHTML = '';
+  const returnTo = modalReturnFocus;
+  modalReturnFocus = null;
+  if (returnTo && document.contains(returnTo) && typeof returnTo.focus === 'function') returnTo.focus();
+}
 
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
 
@@ -3184,9 +3318,9 @@ document.addEventListener('click', async ev => {
     /* 설정 */
     case 'savecfg': {
       const nextSecret = ($('#cfgSecret').value || '').trim();
-      if (nextSecret) state.settings.syncSecret = nextSecret;
-      if (!state.settings.syncSecret) return toast('비밀키를 입력해 주세요');
-      save(); render(); toast('저장했습니다');
+      if (nextSecret) setTaskAdminSecret(nextSecret);
+      if (!getTaskAdminSecret()) return toast('비밀키를 입력해 주세요');
+      render(); toast('현재 탭 세션에만 연결했습니다');
       sync.loud = true; sync.run();
       break;
     }
@@ -3218,6 +3352,7 @@ document.addEventListener('click', async ev => {
             if (f.size > 10 * 1024 * 1024 || p.staff.length > 5000 || p.tasks.length > 100000) throw new Error('파일이 너무 큽니다');
             if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
             const secureSettings = Object.assign({}, state.settings);
+            delete secureSettings.syncSecret;
             state = blankState();
             state.version = Number(p.version) || 2;
             state.staff = p.staff.map(person => { const copy = Object.assign({}, person); delete copy.token; return copy; });
@@ -3303,6 +3438,9 @@ const h = location.hash.replace('#/', '');
 if (h) route = h;
 if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
+if (migratedPersistentAdminSecret) {
+  setTimeout(() => toast('기존 비밀키를 이번 탭 세션으로 옮기고 기기 저장에서 삭제했습니다'), 0);
+}
 
 let syncLoopStarted = false;
 async function startSyncSession() {
@@ -3335,7 +3473,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.1';
+const APP_VER = '2026-08-03.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

@@ -15,6 +15,15 @@
   var DAY_MS = 86400000;
   var mountSequence = 0;
   var PROGRAM_HISTORY_LIMIT = 20;
+  var PLANNER_HISTORY_LIMIT = 30;
+  var LEGACY_PLANNER_ACTOR = "legacy";
+  var PROVIDER_HISTORY_LIMIT = 50;
+  var ASSESSMENT_HISTORY_LIMIT = 50;
+  var ASSESSMENT_RESULT_HISTORY_LIMIT = 20;
+  var ASSESSMENT_OCCURRENCE_RANGE_LIMIT = 1000;
+  var CAMPAIGN_HISTORY_LIMIT = 50;
+  var CAMPAIGN_RESULT_HISTORY_LIMIT = 20;
+  var INACTIVE_PROVIDER_RESTORE = {};
   var PROGRAM_HISTORY_MAX_BYTES = 8 * 1024;
   var PROGRAM_SNAPSHOT_MAX_BYTES = 4 * 1024;
   var OPAQUE_ACCOUNT_REF_RE = /^[A-Za-z0-9][A-Za-z0-9:._\/#-]{0,127}$/;
@@ -120,6 +129,14 @@
     }
   });
 
+  var DEFAULT_PROVIDER_IMPORT_ALIASES = deepFreeze({
+    studyforce: ["studyforce", "스터디포스", "StudyForce", "study force", "스터디 포스"],
+    classcard: ["classcard", "클래스카드", "ClassCard", "class card", "클래스 카드"],
+    metamath: ["metamath", "메타수학", "MetaMath", "meta math", "메타 수학"],
+    nelt: ["nelt", "넬트", "NELT", "nelt assessment"],
+    manual: ["manual", "직접 관리"]
+  });
+
   var LABELS = deepFreeze({
     program: {
       unused: "미사용", preparing: "준비중", active: "사용중", partial: "부분완료",
@@ -165,6 +182,14 @@
     mastered: ["closed"],
     check_needed: ["generation_requested", "review_waiting", "assigned", "closed"],
     closed: []
+  });
+
+  var CAMPAIGN_TRANSITIONS = deepFreeze({
+    active: ["exam_ready"],
+    exam_ready: ["taken"],
+    taken: ["result_waiting"],
+    result_waiting: ["result_review"],
+    result_review: ["completed"]
   });
 
   var COMMON_MILESTONES = freeze([
@@ -247,6 +272,13 @@
     return date;
   }
 
+  function isoTimestamp(value, fieldName) {
+    var normalized = text(value);
+    ensure(normalized, (fieldName || "timestamp") + " is required");
+    ensure(Number.isFinite(Date.parse(normalized)), (fieldName || "timestamp") + " must be a timestamp");
+    return new Date(Date.parse(normalized)).toISOString();
+  }
+
   function formatDateOnly(date) {
     return date.getUTCFullYear() + "-" +
       String(date.getUTCMonth() + 1).padStart(2, "0") + "-" +
@@ -267,6 +299,25 @@
       return values.year + "-" + values.month + "-" + values.day;
     } catch (_error) {
       return new Date().toISOString().slice(0, 10);
+    }
+  }
+
+  function timestampDateInTimeZone(timestamp, timeZone) {
+    var instant = timestamp instanceof Date ? timestamp : new Date(Date.parse(timestamp));
+    ensure(Number.isFinite(instant.getTime()), "timestamp must be valid");
+    try {
+      var values = {};
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: text(timeZone, "Asia/Seoul"),
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(instant).forEach(function (part) {
+        values[part.type] = part.value;
+      });
+      return values.year + "-" + values.month + "-" + values.day;
+    } catch (_error) {
+      throw new Error("학생 시간대 설정이 올바르지 않아 평가 결과를 승인할 수 없습니다.");
     }
   }
 
@@ -301,20 +352,46 @@
     return formatDateOnly(date);
   }
 
+  function normalizeWeekday(value, fieldName) {
+    var validNumber = typeof value === "number" && Number.isInteger(value);
+    var validString = typeof value === "string" && /^[0-6]$/.test(value);
+    ensure(validNumber || validString,
+      (fieldName || "weekday") + " must be an integer from 0 to 6");
+    var normalized = Number(value);
+    ensure(normalized >= 0 && normalized <= 6,
+      (fieldName || "weekday") + " must be an integer from 0 to 6");
+    return normalized;
+  }
+
   function nextOrSameWeekday(dateOnly, weekday) {
     var date = parseDateOnly(dateOnly);
-    var target = Number(weekday);
-    ensure(Number.isInteger(target) && target >= 0 && target <= 6, "weekday must be 0-6");
+    var target = normalizeWeekday(weekday, "weekday");
     return addDays(dateOnly, (target - date.getUTCDay() + 7) % 7);
   }
 
   function lastLearningDayOfMonth(year, monthIndex, activeWeekdays) {
-    var weekdays = asArray(activeWeekdays).length ? activeWeekdays.map(Number) : [1, 2, 3, 4, 5];
+    var weekdays = asArray(activeWeekdays);
     var date = new Date(Date.UTC(year, monthIndex + 1, 0));
-    while (weekdays.indexOf(date.getUTCDay()) < 0) {
+    var offset;
+    for (offset = 0; offset < 7; offset += 1) {
+      if (weekdays.indexOf(date.getUTCDay()) >= 0) {
+        return formatDateOnly(date);
+      }
       date.setUTCDate(date.getUTCDate() - 1);
     }
-    return formatDateOnly(date);
+    throw new Error("activeWeekdays did not match a day in the month");
+  }
+
+  function normalizeActiveWeekdays(value) {
+    var source = value === undefined ? [1, 2, 3, 4, 5] : value;
+    ensure(Array.isArray(source) && source.length > 0, "activeWeekdays must be a non-empty array");
+    var output = [];
+    source.forEach(function (weekday) {
+      var normalized = normalizeWeekday(weekday, "activeWeekdays");
+      if (output.indexOf(normalized) < 0) output.push(normalized);
+    });
+    ensure(output.length > 0, "activeWeekdays must be a non-empty array");
+    return output;
   }
 
   function stableId(prefix) {
@@ -382,21 +459,212 @@
     return candidate;
   }
 
+  function boundAuditHistory(historyInput, limit, retentionInput) {
+    var history = clone(asArray(historyInput));
+    var previousRetention = retentionInput || {};
+    var droppedNow = Math.max(0, history.length - limit);
+    if (droppedNow) history = history.slice(-limit);
+    return {
+      history: history,
+      historyRetention: {
+        maxEntries: limit,
+        droppedCount: Math.floor(nonNegative(previousRetention.droppedCount, 0)) + droppedNow,
+        oldestRetainedAt: history.length ? text(history[0] &&
+          (history[0].at || history[0].verifiedAt || history[0].reviewedAt)) : "",
+        newestRetainedAt: history.length ? text(history[history.length - 1] &&
+          (history[history.length - 1].at || history[history.length - 1].verifiedAt ||
+            history[history.length - 1].reviewedAt)) : ""
+      }
+    };
+  }
+
+  function normalizeProviderAliasKey(value) {
+    var normalized = text(value);
+    if (normalized.normalize) normalized = normalized.normalize("NFKC");
+    return normalized.toLowerCase().replace(/[\s_\-./()[\]{}:]+/g, "");
+  }
+
+  function normalizeCustomProvider(provider) {
+    ensure(isObject(provider), "provider must be an object");
+    ensure(!hasCredentialField(provider), "provider credentials must not be stored");
+    var id = text(provider.id || provider.providerId).toLowerCase();
+    ensure(/^[a-z0-9][a-z0-9-]{0,63}$/.test(id), "provider id is invalid");
+    ensure(!DEFAULT_PROVIDERS[id], "built-in provider id cannot be replaced");
+    var label = text(provider.label);
+    ensure(label && label.length <= 80, "provider label is required");
+    ensure(normalizeProviderAliasKey(label), "온라인 프로그램 이름은 식별 가능한 문자를 포함해야 합니다.");
+    var aliasKeys = {};
+    aliasKeys[normalizeProviderAliasKey(id)] = true;
+    aliasKeys[normalizeProviderAliasKey(label)] = true;
+    var aliases = [];
+    asArray(provider.aliases).forEach(function (value) {
+      var alias = text(value);
+      ensure(alias && alias.length <= 80, "온라인 프로그램 별칭은 80자 이내여야 합니다.");
+      var key = normalizeProviderAliasKey(alias);
+      ensure(key, "온라인 프로그램 별칭은 식별 가능한 문자를 포함해야 합니다.");
+      if (!aliasKeys[key]) {
+        aliasKeys[key] = true;
+        aliases.push(alias);
+      }
+    });
+    ensure(aliases.length <= 20, "provider aliases exceed limit");
+    var boundedHistory = boundAuditHistory(provider.history, PROVIDER_HISTORY_LIMIT, provider.historyRetention);
+    var capabilities = Array.from(new Set(asArray(provider.capabilities).map(function (value) {
+      return text(value).toLowerCase();
+    }).filter(function (value) {
+      ensure(/^[a-z][a-z0-9_-]{0,63}$/.test(value), "provider capability is invalid");
+      return Boolean(value);
+    })));
+    ensure(capabilities.length <= 20, "provider capabilities exceed limit");
+    return {
+      id: id,
+      label: label,
+      aliases: aliases,
+      category: "custom",
+      evidenceMode: "teacher_check",
+      capabilities: capabilities,
+      active: provider.active !== false,
+      createdAt: text(provider.createdAt),
+      createdBy: text(provider.createdBy),
+      updatedAt: text(provider.updatedAt),
+      updatedBy: text(provider.updatedBy),
+      revision: Math.max(1, Math.floor(nonNegative(provider.revision, 1))),
+      history: boundedHistory.history,
+      historyRetention: boundedHistory.historyRetention
+    };
+  }
+
+  function normalizeCustomProviders(customProviders) {
+    var seen = {};
+    return asArray(customProviders).map(function (provider) {
+      var normalized = normalizeCustomProvider(provider);
+      ensure(!seen[normalized.id], "duplicate custom provider: " + normalized.id);
+      seen[normalized.id] = true;
+      return normalized;
+    });
+  }
+
+  function providerAliasValues(provider) {
+    return [provider.id, provider.label].concat(asArray(provider.aliases)).map(text).filter(Boolean);
+  }
+
+  function ensureProviderAliasesAvailable(provider, otherProviders) {
+    var owners = {};
+    Object.keys(DEFAULT_PROVIDER_IMPORT_ALIASES).forEach(function (providerId) {
+      DEFAULT_PROVIDER_IMPORT_ALIASES[providerId].forEach(function (alias) {
+        var key = normalizeProviderAliasKey(alias);
+        if (!owners[key]) owners[key] = { kind: "built_in", providerId: providerId };
+      });
+    });
+    asArray(otherProviders).forEach(function (other) {
+      if (!other || other.id === provider.id) return;
+      providerAliasValues(other).forEach(function (alias) {
+        var key = normalizeProviderAliasKey(alias);
+        if (!owners[key]) owners[key] = { kind: "custom", providerId: other.id, label: other.label };
+      });
+    });
+    var ownKeys = {};
+    providerAliasValues(provider).forEach(function (alias) {
+      var key = normalizeProviderAliasKey(alias);
+      ensure(key, "온라인 프로그램 이름/별칭은 식별 가능한 문자를 포함해야 합니다.");
+      if (ownKeys[key]) return;
+      ownKeys[key] = true;
+      var owner = owners[key];
+      if (!owner) return;
+      if (owner.kind === "built_in") {
+        ensure(false, "온라인 프로그램 이름/별칭 '" + alias + "'은(는) 기본 온라인 프로그램 '" +
+          DEFAULT_PROVIDERS[owner.providerId].label + "'과 충돌합니다.");
+      }
+      ensure(false, "온라인 프로그램 이름/별칭 '" + alias + "'은(는) 다른 사용자 지정 프로그램 '" +
+        text(owner.label, owner.providerId) + "'과 충돌합니다.");
+    });
+    return provider;
+  }
+
   function createProviderRegistry(customProviders) {
     var registry = clone(DEFAULT_PROVIDERS);
-    asArray(customProviders).forEach(function (provider) {
-      ensure(isObject(provider), "provider must be an object");
-      var id = text(provider.id).toLowerCase();
-      ensure(/^[a-z0-9_-]+$/.test(id), "provider id is invalid");
-      registry[id] = {
-        id: id,
-        label: text(provider.label, id),
-        category: text(provider.category, "custom"),
-        evidenceMode: text(provider.evidenceMode, "teacher_check"),
-        capabilities: asArray(provider.capabilities).map(String)
-      };
+    Object.keys(registry).forEach(function (id) {
+      registry[id].active = true;
+      registry[id].builtIn = true;
+    });
+    normalizeCustomProviders(customProviders).forEach(function (provider) {
+      registry[provider.id] = Object.assign({}, provider, { builtIn: false });
     });
     return registry;
+  }
+
+  function registerCustomProvider(state, providerInput, metadata) {
+    ensure(isObject(state), "state is required");
+    var meta = metadata || {};
+    var provider = normalizeCustomProvider(providerInput);
+    var next = clone(state);
+    next.settings = Object.assign({}, next.settings || {});
+    var customProviders = normalizeCustomProviders(next.settings.customProviders);
+    ensure(!customProviders.some(function (item) { return item.id === provider.id; }), "custom provider already exists");
+    ensureProviderAliasesAvailable(provider, customProviders);
+    provider.createdAt = text(meta.at, new Date().toISOString());
+    provider.createdBy = text(meta.actor, "system");
+    provider.updatedAt = provider.createdAt;
+    provider.updatedBy = provider.createdBy;
+    provider.history = [{
+      action: "registered",
+      at: provider.createdAt,
+      actor: provider.createdBy,
+      active: provider.active,
+      capabilities: clone(provider.capabilities)
+    }];
+    var registeredHistory = boundAuditHistory(provider.history, PROVIDER_HISTORY_LIMIT, provider.historyRetention);
+    provider.history = registeredHistory.history;
+    provider.historyRetention = registeredHistory.historyRetention;
+    next.settings.customProviders = customProviders.concat([provider]);
+    return next;
+  }
+
+  function setCustomProviderActive(state, providerId, active, metadata) {
+    ensure(typeof active === "boolean", "provider active decision is required");
+    var next = clone(state);
+    next.settings = Object.assign({}, next.settings || {});
+    var providers = normalizeCustomProviders(next.settings.customProviders);
+    var index = providers.findIndex(function (provider) { return provider.id === text(providerId).toLowerCase(); });
+    ensure(index >= 0, "custom provider not found");
+    var meta = metadata || {};
+    var at = text(meta.at, new Date().toISOString());
+    var actor = text(meta.actor, "system");
+    var provider = providers[index];
+    if (active) ensureProviderAliasesAvailable(provider, providers);
+    if (provider.active !== active) {
+      provider.active = active;
+      provider.revision += 1;
+      provider.updatedAt = at;
+      provider.updatedBy = actor;
+      provider.history.push({ action: active ? "enabled" : "disabled", at: at, actor: actor });
+      var boundedHistory = boundAuditHistory(provider.history, PROVIDER_HISTORY_LIMIT, provider.historyRetention);
+      provider.history = boundedHistory.history;
+      provider.historyRetention = boundedHistory.historyRetention;
+    }
+    next.settings.customProviders = providers;
+    return next;
+  }
+
+  function createProgramImportProviderDefinitions(customProviders) {
+    var activeProviders = normalizeCustomProviders(customProviders).filter(function (provider) {
+      return provider.active;
+    });
+    activeProviders.forEach(function (provider) {
+      ensureProviderAliasesAvailable(provider, activeProviders);
+    });
+    return activeProviders.map(function (provider) {
+      var capabilities = {};
+      provider.capabilities.forEach(function (capability) { capabilities[capability] = true; });
+      return {
+        id: provider.id,
+        label: provider.label,
+        aliases: clone(provider.aliases),
+        capabilities: capabilities,
+        required: ["check_date"],
+        requiredAny: [["reported_status", "current_unit", "progress_pct", "score"]]
+      };
+    });
   }
 
   function createStudentProfile(input) {
@@ -422,7 +690,8 @@
         weekStartsOn: 1,
         schoolRegularExamEnabled: student.academicStage !== "elementary",
         requireTeacherVerification: true,
-        notificationQuietHours: { start: "20:00", end: "08:00" }
+        notificationQuietHours: { start: "20:00", end: "08:00" },
+        customProviders: []
       },
       programStates: [],
       plannerItems: [],
@@ -514,13 +783,17 @@
     return { history: history, droppedCount: uniqueCount - history.length };
   }
 
-  function upsertStudentProgramState(state, input, registryInput) {
+  function upsertStudentProgramState(state, input, registryInput, restoreToken) {
     ensure(isObject(state), "state is required");
     ensure(isObject(input), "program state is required");
     ensure(!hasCredentialField(input), "credentials and passwords must not be stored");
-    var registry = registryInput || DEFAULT_PROVIDERS;
+    var registry = registryInput || createProviderRegistry(state.settings && state.settings.customProviders);
+    var currentRegistry = createProviderRegistry(state.settings && state.settings.customProviders);
     var providerId = text(input.providerId).toLowerCase();
-    ensure(Boolean(registry[providerId]), "unknown provider: " + providerId);
+    ensure(Boolean(registry[providerId]) && Boolean(currentRegistry[providerId]), "unknown provider: " + providerId);
+    ensure((registry[providerId].active !== false && currentRegistry[providerId].active !== false) ||
+      restoreToken === INACTIVE_PROVIDER_RESTORE,
+      "사용 중지된 온라인 프로그램에는 새 상태나 승인 결과를 반영할 수 없습니다.");
     var studentCode = text(input.studentCode, state.student && state.student.studentCode);
     var next = clone(state);
     var requestedId = text(input.programStateId, stableId("program", studentCode, providerId));
@@ -541,10 +814,13 @@
     var previousDroppedCount = Math.floor(nonNegative(
       previous && previous.historyRetention && previous.historyRetention.droppedCount, 0
     ));
+    var inputDroppedCount = Math.floor(nonNegative(
+      input && input.historyRetention && input.historyRetention.droppedCount, 0
+    ));
     var historyRetention = {
       maxEntries: PROGRAM_HISTORY_LIMIT,
       maxBytes: PROGRAM_HISTORY_MAX_BYTES,
-      droppedCount: previousDroppedCount + boundedHistory.droppedCount,
+      droppedCount: Math.max(previousDroppedCount, inputDroppedCount) + boundedHistory.droppedCount,
       oldestRetainedAt: history.length ? text(history[0].checkDate, history[0].approvedAt) : "",
       newestRetainedAt: history.length ? text(history[history.length - 1].checkDate, history[history.length - 1].approvedAt) : ""
     };
@@ -556,12 +832,25 @@
     }
     var assignedCount = previous ? Math.floor(nonNegative(previous.assignedCount, 0)) : 0;
     var completedCount = previous ? Math.floor(nonNegative(previous.completedCount, 0)) : 0;
+    var assignedCountKnown = previous
+      ? previous.assignedCountKnown === true || assignedCount > 0
+      : hasOwn(input, "assignedCountKnown") ? input.assignedCountKnown === true : false;
+    var completedCountKnown = previous
+      ? previous.completedCountKnown === true || completedCount > 0
+      : hasOwn(input, "completedCountKnown") ? input.completedCountKnown === true : false;
     if (hasOwn(input, "assignedCount") && input.assignedCount !== "" && input.assignedCount != null) {
       assignedCount = Math.floor(nonNegative(input.assignedCount, assignedCount));
+      if (!hasOwn(input, "assignedCountKnown")) assignedCountKnown = true;
     }
     if (hasOwn(input, "completedCount") && input.completedCount !== "" && input.completedCount != null) {
       completedCount = Math.floor(nonNegative(input.completedCount, completedCount));
+      if (!hasOwn(input, "completedCountKnown")) completedCountKnown = true;
     }
+    if (hasOwn(input, "assignedCountKnown")) assignedCountKnown = input.assignedCountKnown === true;
+    if (hasOwn(input, "completedCountKnown")) completedCountKnown = input.completedCountKnown === true;
+    // 양수 수량은 이미 관측된 값이므로 explicit false보다 내부 불변식을 우선한다.
+    if (assignedCount > 0) assignedCountKnown = true;
+    if (completedCount > 0) completedCountKnown = true;
     var lastCheckedAt = previous ? text(previous.lastCheckedAt) : "";
     if (!incomingLatest || incomingPromotes) lastCheckedAt = text(input.lastCheckedAt, lastCheckedAt);
     var evidenceRefs = Array.from(new Set(
@@ -575,6 +864,8 @@
       status: status,
       assignedCount: assignedCount,
       completedCount: completedCount,
+      assignedCountKnown: assignedCountKnown,
+      completedCountKnown: completedCountKnown,
       lastCheckedAt: lastCheckedAt,
       evidenceRefs: evidenceRefs,
       checkNeededReason: hasOwn(input, "checkNeededReason") ? text(input.checkNeededReason) : text(previous && previous.checkNeededReason),
@@ -635,6 +926,12 @@
     return upsertStudentProgramState(state, update, registryInput);
   }
 
+  function deterministicLegacyPlannerCreatedAt(source, date) {
+    var sourceUpdatedAt = text(source && source.updatedAt);
+    if (sourceUpdatedAt && Number.isFinite(Date.parse(sourceUpdatedAt))) return sourceUpdatedAt;
+    return date + "T00:00:00.000Z";
+  }
+
   function createPlannerItem(input) {
     var source = input || {};
     var studentCode = text(source.studentCode);
@@ -645,8 +942,17 @@
     parseDateOnly(date, "planner item date");
     var sourceType = text(source.sourceType, "personal");
     var verificationRequired = source.verificationRequired === undefined
-      ? sourceType !== "personal"
+      ? true
       : Boolean(source.verificationRequired);
+    var status = normalizePlannerStatus(source.status);
+    var createdAt = text(source.createdAt);
+    if (!createdAt) createdAt = deterministicLegacyPlannerCreatedAt(source, date);
+    var createdBy = text(source.createdBy, LEGACY_PLANNER_ACTOR);
+    var history = clone(asArray(source.history));
+    if (!history.length) {
+      history.push({ action: "created", fromStatus: "", toStatus: status, at: createdAt, actor: createdBy });
+    }
+    var boundedHistory = boundAuditHistory(history, PLANNER_HISTORY_LIMIT, source.historyRetention);
     return {
       itemId: text(source.itemId, stableId("plan", studentCode, date, sourceType, title, source.originItemId || "")),
       planId: text(source.planId, stableId("daily", studentCode, date)),
@@ -662,17 +968,58 @@
       originItemId: text(source.originItemId),
       minutes: Math.floor(nonNegative(source.minutes, 0)),
       priority: Math.max(0, Math.min(3, Math.floor(nonNegative(source.priority, 1)))),
-      status: normalizePlannerStatus(source.status),
+      status: status,
       verificationRequired: verificationRequired,
       evidenceRefs: asArray(source.evidenceRefs).map(String),
       verificationEvidenceRefs: asArray(source.verificationEvidenceRefs).map(String),
       verificationDecision: text(source.verificationDecision),
       carryoverRequestedDate: text(source.carryoverRequestedDate),
+      carryoverRequestReason: text(source.carryoverRequestReason),
+      carryoverRequestedBy: text(source.carryoverRequestedBy),
+      carryoverRequestedAt: text(source.carryoverRequestedAt),
+      carryoverPreviousStatus: text(source.carryoverPreviousStatus),
+      carryoverDecision: text(source.carryoverDecision),
+      carryoverDecisionReason: text(source.carryoverDecisionReason),
+      carryoverReviewedBy: text(source.carryoverReviewedBy),
+      carryoverReviewedAt: text(source.carryoverReviewedAt),
+      cancelReason: text(source.cancelReason),
+      canceledAt: text(source.canceledAt),
+      canceledBy: text(source.canceledBy),
+      systemHidden: source.systemHidden === true,
+      systemHiddenReason: text(source.systemHiddenReason),
+      systemHiddenAt: text(source.systemHiddenAt),
+      systemHiddenBy: text(source.systemHiddenBy),
+      systemReactivatedAt: text(source.systemReactivatedAt),
+      systemReactivatedBy: text(source.systemReactivatedBy),
       completedAt: text(source.completedAt),
       verifiedAt: text(source.verifiedAt),
       verifiedBy: text(source.verifiedBy),
+      createdAt: createdAt,
+      createdBy: createdBy,
+      updatedAt: text(source.updatedAt, createdAt),
+      updatedBy: text(source.updatedBy, createdBy),
+      history: boundedHistory.history,
+      historyRetention: boundedHistory.historyRetention,
       revision: Math.max(1, Math.floor(nonNegative(source.revision, 1)))
     };
+  }
+
+  function appendPlannerAudit(item, action, metadata, fromStatus, details) {
+    var meta = metadata || {};
+    var at = text(meta.at, new Date().toISOString());
+    var actor = text(meta.actor || meta.by, "system");
+    item.updatedAt = at;
+    item.updatedBy = actor;
+    item.history = clone(asArray(item.history));
+    item.history.push(Object.assign({
+      action: action,
+      fromStatus: text(fromStatus),
+      toStatus: item.status,
+      at: at,
+      actor: actor,
+      reason: text(meta.reason)
+    }, details || {}));
+    return item;
   }
 
   function addPlannerItem(state, itemInput) {
@@ -682,8 +1029,21 @@
       return existing.itemId === item.itemId;
     });
     if (index >= 0) {
-      item.revision = Number(next.plannerItems[index].revision || 0) + 1;
-      next.plannerItems[index] = item;
+      var previous = createPlannerItem(next.plannerItems[index]);
+      // 감사 tombstone은 stale planner snapshot으로 근거·revision까지 변하면 안 된다.
+      // 복구는 평가 일정의 명시 reactivation 경로에서만 수행한다.
+      if (previous.systemHidden === true) return next;
+      var evidenceRefs = Array.from(new Set(previous.evidenceRefs.concat(item.evidenceRefs)));
+      var verificationEvidenceRefs = Array.from(new Set(
+        previous.verificationEvidenceRefs.concat(item.verificationEvidenceRefs)
+      ));
+      var refsChanged = evidenceRefs.length !== previous.evidenceRefs.length ||
+        verificationEvidenceRefs.length !== previous.verificationEvidenceRefs.length;
+      if (!refsChanged) return next;
+      previous.evidenceRefs = evidenceRefs;
+      previous.verificationEvidenceRefs = verificationEvidenceRefs;
+      previous.revision = Number(previous.revision || 0) + 1;
+      next.plannerItems[index] = createPlannerItem(previous);
     } else {
       next.plannerItems.push(item);
     }
@@ -697,22 +1057,78 @@
       return item.itemId === itemId;
     });
     ensure(index >= 0, "planner item not found: " + itemId);
-    var current = next.plannerItems[index];
+    var current = createPlannerItem(next.plannerItems[index]);
     var updated = updater(clone(current));
+    updated.itemId = current.itemId;
     updated.revision = Number(current.revision || 0) + 1;
     next.plannerItems[index] = createPlannerItem(updated);
     return next;
   }
 
+  function editPlannerItem(state, itemId, changes, metadata) {
+    var input = changes || {};
+    var meta = metadata || {};
+    return updatePlannerItem(state, itemId, function (item) {
+      ensure(!item.occurrenceId, "평가 연결 플래너는 평가 일정/결과 전용 경로를 사용해야 합니다.");
+      ensure(["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0,
+        "planner item cannot be edited from " + item.status);
+      var before = item.status;
+      var auditChanges = {};
+      if (hasOwn(input, "title")) {
+        var nextTitle = text(input.title);
+        ensure(nextTitle, "planner item title is required");
+        if (nextTitle !== item.title) auditChanges.title = { from: item.title, to: nextTitle };
+        item.title = nextTitle;
+      }
+      if (hasOwn(input, "minutes")) {
+        var nextMinutes = Number(input.minutes);
+        ensure(Number.isFinite(nextMinutes) && nextMinutes >= 0, "planner minutes must be non-negative");
+        nextMinutes = Math.floor(nextMinutes);
+        if (nextMinutes !== item.minutes) auditChanges.minutes = { from: item.minutes, to: nextMinutes };
+        item.minutes = nextMinutes;
+      }
+      if (hasOwn(input, "date")) {
+        var nextDate = text(input.date);
+        parseDateOnly(nextDate, "planner item date");
+        if (nextDate !== item.date) auditChanges.date = { from: item.date, to: nextDate };
+        item.date = nextDate;
+        item.planId = stableId("daily", item.studentCode, nextDate);
+      }
+      ensure(Object.keys(auditChanges).length > 0, "planner edit has no changes");
+      return appendPlannerAudit(item, "edited", meta, before, { changes: auditChanges });
+    });
+  }
+
+  function cancelPlannerItem(state, itemId, cancellation) {
+    var input = cancellation || {};
+    ensure(text(input.reason), "cancel reason is required");
+    ensure(text(input.canceledBy || input.actor), "canceledBy is required");
+    return updatePlannerItem(state, itemId, function (item) {
+      ensure(!item.occurrenceId, "평가 연결 플래너는 평가 일정/결과 전용 경로를 사용해야 합니다.");
+      ensure(["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0,
+        "planner item cannot be canceled from " + item.status);
+      var before = item.status;
+      item.status = "canceled";
+      item.cancelReason = text(input.reason);
+      item.canceledBy = text(input.canceledBy || input.actor);
+      item.canceledAt = text(input.canceledAt || input.at, new Date().toISOString());
+      return appendPlannerAudit(item, "canceled", {
+        actor: item.canceledBy, at: item.canceledAt, reason: item.cancelReason
+      }, before);
+    });
+  }
+
   function claimPlannerItemCompletion(state, itemId, evidenceRef, claimedAt) {
     return updatePlannerItem(state, itemId, function (item) {
       ensure(["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0, "item cannot be claimed from " + item.status);
-      if (text(evidenceRef)) {
-        item.evidenceRefs = item.evidenceRefs.concat([String(evidenceRef)]);
-      }
+      var before = item.status;
+      if (text(evidenceRef)) item.evidenceRefs = item.evidenceRefs.concat([String(evidenceRef)]);
       item.completedAt = text(claimedAt, new Date().toISOString());
-      item.status = item.verificationRequired ? "verification_waiting" : "completed";
-      return item;
+      item.verificationRequired = true;
+      item.status = "verification_waiting";
+      return appendPlannerAudit(item, "completion_claimed", {
+        actor: "student_claim", at: item.completedAt
+      }, before, { evidenceRef: text(evidenceRef) });
     });
   }
 
@@ -723,39 +1139,92 @@
     ensure(text(input.evidenceRef), "verification evidenceRef is required");
     return updatePlannerItem(state, itemId, function (item) {
       ensure(item.status === "verification_waiting", "only verification_waiting items can be verified");
+      ensure(!item.occurrenceId, "assessment completion requires an approved assessment result");
+      var before = item.status;
       item.status = input.approved ? "completed" : "check_needed";
       item.verificationDecision = input.approved ? "approved" : "rejected";
       item.verificationEvidenceRefs = item.verificationEvidenceRefs.concat([text(input.evidenceRef)]);
       item.verifiedBy = text(input.verifiedBy);
       item.verifiedAt = text(input.verifiedAt, new Date().toISOString());
-      return item;
+      return appendPlannerAudit(item, input.approved ? "completion_approved" : "completion_rejected", {
+        actor: item.verifiedBy, at: item.verifiedAt, reason: text(input.reason)
+      }, before, { evidenceRef: text(input.evidenceRef) });
     });
   }
 
-  function requestPlannerCarryover(state, itemId, requestedDate) {
+  function requestPlannerCarryover(state, itemId, requestedDate, request) {
     parseDateOnly(requestedDate, "carryover requestedDate");
+    var input = request || {};
     return updatePlannerItem(state, itemId, function (item) {
+      ensure(!item.occurrenceId, "평가 연결 플래너는 평가 일정/결과 전용 경로를 사용해야 합니다.");
       ensure(["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0, "item cannot be carried over");
+      ensure(compareDates(requestedDate, item.date) > 0,
+        "carryover requestedDate must be later than planner item date");
+      var before = item.status;
       item.status = "carryover_candidate";
+      item.carryoverPreviousStatus = before;
       item.carryoverRequestedDate = requestedDate;
-      return item;
+      item.carryoverRequestReason = text(input.reason);
+      item.carryoverRequestedBy = text(input.requestedBy || input.actor, "system");
+      item.carryoverRequestedAt = text(input.requestedAt || input.at, new Date().toISOString());
+      item.carryoverDecision = "pending";
+      return appendPlannerAudit(item, "carryover_requested", {
+        actor: item.carryoverRequestedBy, at: item.carryoverRequestedAt, reason: item.carryoverRequestReason
+      }, before, {
+        requestedDate: requestedDate,
+        requestedBy: item.carryoverRequestedBy
+      });
     });
   }
 
-  function approvePlannerCarryover(state, itemId, approval) {
-    var input = approval || {};
-    ensure(text(input.approvedBy), "approvedBy is required");
-    var current = state.plannerItems.find(function (item) {
-      return item.itemId === itemId;
-    });
-    ensure(current && current.status === "carryover_candidate", "carryover candidate not found");
+  function reviewPlannerCarryover(state, itemId, review) {
+    var input = review || {};
+    ensure(typeof input.approved === "boolean", "carryover approved decision is required");
+    var reviewedBy = text(input.reviewedBy || input.approvedBy);
+    ensure(reviewedBy, "carryover reviewedBy is required");
+    if (!input.approved) ensure(text(input.reason), "carryover rejection reason is required");
+    var currentInput = asArray(state && state.plannerItems).find(function (item) { return item.itemId === itemId; });
+    ensure(currentInput, "planner item not found: " + itemId);
+    var current = createPlannerItem(currentInput);
+    ensure(!current.occurrenceId, "평가 연결 플래너는 평가 일정/결과 전용 경로를 사용해야 합니다.");
+    ensure(current.status === "carryover_candidate", "carryover candidate not found");
+    var reviewedAt = text(input.reviewedAt || input.approvedAt, new Date().toISOString());
+    if (!input.approved) {
+      return updatePlannerItem(state, itemId, function (item) {
+        var before = item.status;
+        item.status = ["planned", "in_progress", "check_needed"].indexOf(item.carryoverPreviousStatus) >= 0
+          ? item.carryoverPreviousStatus : "check_needed";
+        item.carryoverDecision = "rejected";
+        item.carryoverDecisionReason = text(input.reason);
+        item.carryoverReviewedBy = reviewedBy;
+        item.carryoverReviewedAt = reviewedAt;
+        return appendPlannerAudit(item, "carryover_rejected", {
+          actor: reviewedBy, at: reviewedAt, reason: item.carryoverDecisionReason
+        }, before, {
+          requestedDate: item.carryoverRequestedDate,
+          requestedBy: item.carryoverRequestedBy,
+          reviewedBy: reviewedBy
+        });
+      });
+    }
     var targetDate = text(input.date, current.carryoverRequestedDate);
     parseDateOnly(targetDate, "carryover date");
+    ensure(compareDates(targetDate, current.date) > 0,
+      "carryover date must be later than planner item date");
     var next = updatePlannerItem(state, itemId, function (item) {
+      var before = item.status;
       item.status = "carried_over";
-      item.verifiedBy = text(input.approvedBy);
-      item.verifiedAt = text(input.approvedAt, new Date().toISOString());
-      return item;
+      item.carryoverDecision = "approved";
+      item.carryoverDecisionReason = text(input.reason);
+      item.carryoverReviewedBy = reviewedBy;
+      item.carryoverReviewedAt = reviewedAt;
+      return appendPlannerAudit(item, "carryover_approved", {
+        actor: reviewedBy, at: reviewedAt, reason: item.carryoverDecisionReason
+      }, before, {
+        targetDate: targetDate,
+        requestedBy: item.carryoverRequestedBy,
+        reviewedBy: reviewedBy
+      });
     });
     return addPlannerItem(next, Object.assign({}, current, {
       itemId: stableId("plan", current.studentCode, targetDate, current.sourceType, current.title, current.itemId),
@@ -763,12 +1232,38 @@
       date: targetDate,
       originItemId: current.itemId,
       status: "planned",
+      verificationRequired: true,
+      verificationEvidenceRefs: [],
+      verificationDecision: "",
       carryoverRequestedDate: "",
+      carryoverRequestReason: "",
+      carryoverRequestedBy: "",
+      carryoverRequestedAt: "",
+      carryoverPreviousStatus: "",
+      carryoverDecision: "",
+      carryoverDecisionReason: "",
+      carryoverReviewedBy: "",
+      carryoverReviewedAt: "",
+      cancelReason: "",
+      canceledAt: "",
+      canceledBy: "",
       completedAt: "",
       verifiedAt: "",
       verifiedBy: "",
+      createdAt: reviewedAt,
+      createdBy: reviewedBy,
+      updatedAt: reviewedAt,
+      updatedBy: reviewedBy,
+      history: [{
+        action: "carried_over_created", fromStatus: "", toStatus: "planned",
+        at: reviewedAt, actor: reviewedBy, originItemId: current.itemId
+      }],
       revision: 1
     }));
+  }
+
+  function approvePlannerCarryover(state, itemId, approval) {
+    return reviewPlannerCarryover(state, itemId, Object.assign({}, approval || {}, { approved: true }));
   }
 
   function plannerSort(left, right) {
@@ -782,7 +1277,7 @@
   function getTodayPlan(state, date) {
     parseDateOnly(date, "today plan date");
     var items = asArray(state.plannerItems).filter(function (item) {
-      return item.date === date && item.status !== "canceled";
+      return item.date === date && item.systemHidden !== true;
     }).sort(plannerSort);
     return {
       date: date,
@@ -798,6 +1293,9 @@
       completed: items.filter(function (item) {
         return item.status === "completed";
       }),
+      canceled: items.filter(function (item) {
+        return item.status === "canceled";
+      }),
       all: items
     };
   }
@@ -806,9 +1304,9 @@
     var weekStart = startOfWeek(anchorDate, state.settings && state.settings.weekStartsOn);
     var weekEnd = addDays(weekStart, 6);
     var items = asArray(state.plannerItems).filter(function (item) {
-      return compareDates(item.date, weekStart) >= 0 &&
-        compareDates(item.date, weekEnd) <= 0 &&
-        item.status !== "canceled";
+      return item.systemHidden !== true &&
+        compareDates(item.date, weekStart) >= 0 &&
+        compareDates(item.date, weekEnd) <= 0;
     }).sort(plannerSort);
     var days = [];
     var offset;
@@ -833,6 +1331,12 @@
     }[scheduleType] || "정기 평가";
   }
 
+  function assessmentScheduleSemanticKey(studentCode, scheduleType, scheduleId) {
+    return text(scheduleType) === "custom"
+      ? stableId("assessment_schedule", text(studentCode), text(scheduleType), text(scheduleId))
+      : stableId("assessment_schedule", text(studentCode), text(scheduleType));
+  }
+
   function createAssessmentSchedule(input) {
     var source = input || {};
     var studentCode = text(source.studentCode);
@@ -842,21 +1346,30 @@
     ensure(["nelt", "metamath_weekly", "metamath_month_end", "custom"].indexOf(scheduleType) >= 0, "scheduleType is invalid");
     ensure(["months", "weekly", "month_end", "once"].indexOf(cadence.kind) >= 0, "cadence kind is invalid");
     parseDateOnly(source.anchorDate, "assessment anchorDate");
-    if (cadence.kind === "weekly") {
-      ensure(Number.isInteger(Number(cadence.weekday)) && Number(cadence.weekday) >= 0 && Number(cadence.weekday) <= 6, "weekday must be 0-6");
-    }
+    var weekday = cadence.kind === "weekly" ? normalizeWeekday(cadence.weekday, "weekday") : null;
+    var activeWeekdays = normalizeActiveWeekdays(cadence.activeWeekdays);
+    var title = text(source.title, assessmentTitle(scheduleType));
+    var defaultScheduleId = scheduleType === "custom"
+      ? stableId("schedule", studentCode, scheduleType, text(source.providerId, "manual"), title,
+        source.anchorDate, cadence.kind)
+      : stableId("schedule", studentCode, scheduleType);
+    var scheduleId = text(source.scheduleId, defaultScheduleId);
+    var semanticKey = assessmentScheduleSemanticKey(studentCode, scheduleType, scheduleId);
     return {
-      scheduleId: text(source.scheduleId, stableId("schedule", studentCode, scheduleType, source.anchorDate)),
+      // 표준 일정은 anchor와 무관한 ID를 쓰고 custom 일정은 명시 ID를 우선한다.
+      // 저장된 scheduleId가 있으면 그대로 보존해 occurrence/planner 참조를 깨지 않는다.
+      scheduleId: scheduleId,
+      semanticKey: semanticKey,
       studentCode: studentCode,
       scheduleType: scheduleType,
       providerId: text(source.providerId, scheduleType.indexOf("metamath") === 0 ? "metamath" : scheduleType === "nelt" ? "nelt" : "manual"),
-      title: text(source.title, assessmentTitle(scheduleType)),
+      title: title,
       anchorDate: source.anchorDate,
       cadence: {
         kind: cadence.kind,
         interval: Math.max(1, Math.floor(nonNegative(cadence.interval, 1))),
-        weekday: cadence.weekday === undefined ? null : Number(cadence.weekday),
-        activeWeekdays: asArray(cadence.activeWeekdays).length ? cadence.activeWeekdays.map(Number) : [1, 2, 3, 4, 5]
+        weekday: weekday,
+        activeWeekdays: activeWeekdays
       },
       durationMinutes: Math.floor(nonNegative(source.durationMinutes, scheduleType === "nelt" ? 40 : 30)),
       enabled: source.enabled !== false,
@@ -885,12 +1398,12 @@
         ? {
           kind: "weekly",
           interval: Math.max(1, Math.floor(nonNegative(source.intervalWeeks, 1))),
-          weekday: source.weekday === undefined ? 5 : Number(source.weekday)
+          weekday: source.weekday === undefined ? 5 : source.weekday
         }
         : {
           kind: "month_end",
           interval: Math.max(1, Math.floor(nonNegative(source.intervalMonths, 1))),
-          activeWeekdays: asArray(source.activeWeekdays).length ? source.activeWeekdays : [1, 2, 3, 4, 5]
+          activeWeekdays: source.activeWeekdays
         }
     }));
   }
@@ -899,6 +1412,8 @@
     return {
       occurrenceId: stableId("occurrence", schedule.scheduleId, date),
       scheduleId: schedule.scheduleId,
+      scheduleSemanticKey: assessmentScheduleSemanticKey(
+        schedule.studentCode, schedule.scheduleType, schedule.scheduleId),
       studentCode: schedule.studentCode,
       scheduleType: schedule.scheduleType,
       providerId: schedule.providerId,
@@ -908,6 +1423,8 @@
       status: "scheduled",
       verificationStatus: schedule.verificationRequired ? "required" : "not_required",
       externalRef: "",
+      resultHistory: [],
+      history: [],
       revision: 1
     };
   }
@@ -923,42 +1440,60 @@
     var output = [];
     var cadence = schedule.cadence;
     var iteration;
+    function appendOccurrence(date) {
+      ensure(output.length < ASSESSMENT_OCCURRENCE_RANGE_LIMIT,
+        "assessment range exceeds " + ASSESSMENT_OCCURRENCE_RANGE_LIMIT +
+        " occurrences; use a smaller range");
+      output.push(createOccurrence(schedule, date));
+    }
     if (cadence.kind === "months") {
-      for (iteration = 0; iteration < 1000; iteration += 1) {
-        var monthDate = addMonthsClamped(schedule.anchorDate, iteration * cadence.interval);
-        if (compareDates(monthDate, toDate) > 0) {
-          break;
-        }
-        if (compareDates(monthDate, fromDate) >= 0) {
-          output.push(createOccurrence(schedule, monthDate));
-        }
+      var monthAnchor = parseDateOnly(schedule.anchorDate);
+      var monthFrom = parseDateOnly(fromDate);
+      var monthDifference = (monthFrom.getUTCFullYear() - monthAnchor.getUTCFullYear()) * 12 +
+        monthFrom.getUTCMonth() - monthAnchor.getUTCMonth();
+      var monthOccurrenceIndex = Math.max(0, Math.floor(monthDifference / cadence.interval));
+      var monthDate = addMonthsClamped(schedule.anchorDate, monthOccurrenceIndex * cadence.interval);
+      if (compareDates(monthDate, fromDate) < 0) {
+        monthOccurrenceIndex += 1;
+        monthDate = addMonthsClamped(schedule.anchorDate, monthOccurrenceIndex * cadence.interval);
+      }
+      while (compareDates(monthDate, toDate) <= 0) {
+        appendOccurrence(monthDate);
+        monthOccurrenceIndex += 1;
+        monthDate = addMonthsClamped(schedule.anchorDate, monthOccurrenceIndex * cadence.interval);
       }
       return output;
     }
     if (cadence.kind === "weekly") {
-      var base = compareDates(schedule.anchorDate, fromDate) > 0 ? schedule.anchorDate : fromDate;
-      var weeklyDate = nextOrSameWeekday(base, cadence.weekday);
-      for (iteration = 0; iteration < 1000 && compareDates(weeklyDate, toDate) <= 0; iteration += 1) {
-        output.push(createOccurrence(schedule, weeklyDate));
-        weeklyDate = addDays(weeklyDate, 7 * cadence.interval);
+      var firstWeeklyDate = nextOrSameWeekday(schedule.anchorDate, cadence.weekday);
+      var weeklyPeriodDays = 7 * cadence.interval;
+      var weeklyOffset = compareDates(firstWeeklyDate, fromDate) >= 0
+        ? 0
+        : Math.ceil(daysBetween(firstWeeklyDate, fromDate) / weeklyPeriodDays);
+      var weeklyDate = addDays(firstWeeklyDate, weeklyOffset * weeklyPeriodDays);
+      while (compareDates(weeklyDate, toDate) <= 0) {
+        if (compareDates(weeklyDate, fromDate) >= 0) appendOccurrence(weeklyDate);
+        weeklyDate = addDays(weeklyDate, weeklyPeriodDays);
       }
       return output;
     }
     if (cadence.kind === "month_end") {
       var from = parseDateOnly(fromDate);
       var anchor = parseDateOnly(schedule.anchorDate);
-      var cursorMonth = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
-      if (cursorMonth.getTime() < Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)) {
-        cursorMonth = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
-      }
-      for (iteration = 0; iteration < 240; iteration += cadence.interval) {
-        var cursor = new Date(Date.UTC(cursorMonth.getUTCFullYear(), cursorMonth.getUTCMonth() + iteration, 1));
+      var anchorMonthNumber = anchor.getUTCFullYear() * 12 + anchor.getUTCMonth();
+      var fromMonthNumber = from.getUTCFullYear() * 12 + from.getUTCMonth();
+      var firstPhaseOffset = Math.max(0,
+        Math.ceil((fromMonthNumber - anchorMonthNumber) / cadence.interval) * cadence.interval);
+      for (iteration = 0; ; iteration += 1) {
+        var cursor = new Date(Date.UTC(anchor.getUTCFullYear(),
+          anchor.getUTCMonth() + firstPhaseOffset + (iteration * cadence.interval), 1));
+        if (compareDates(formatDateOnly(cursor), toDate) > 0) break;
         var endDate = lastLearningDayOfMonth(cursor.getUTCFullYear(), cursor.getUTCMonth(), cadence.activeWeekdays);
         if (compareDates(endDate, toDate) > 0) {
           break;
         }
         if (compareDates(endDate, fromDate) >= 0 && compareDates(endDate, schedule.anchorDate) >= 0) {
-          output.push(createOccurrence(schedule, endDate));
+          appendOccurrence(endDate);
         }
       }
       return output;
@@ -969,7 +1504,10 @@
     return output;
   }
 
-  function assessmentOccurrenceToPlannerItem(occurrence) {
+  function assessmentOccurrenceToPlannerItem(occurrence, creation) {
+    var meta = creation || {};
+    var createdAt = text(meta.createdAt || meta.at, new Date().toISOString());
+    var createdBy = text(meta.createdBy || meta.actor, "assessment_schedule");
     return createPlannerItem({
       itemId: stableId("plan", occurrence.studentCode, occurrence.scheduledDate, occurrence.occurrenceId),
       studentCode: occurrence.studentCode,
@@ -981,36 +1519,309 @@
       minutes: occurrence.durationMinutes,
       priority: 2,
       status: "planned",
-      verificationRequired: occurrence.verificationStatus === "required"
+      verificationRequired: occurrence.verificationStatus === "required",
+      createdAt: createdAt,
+      createdBy: createdBy
     });
+  }
+
+  function assessmentScheduleMatches(left, right) {
+    if (text(left && left.studentCode) !== text(right && right.studentCode) ||
+        text(left && left.scheduleType) !== text(right && right.scheduleType)) return false;
+    if (text(right && right.scheduleType) !== "custom") return true;
+    return text(left && left.scheduleId) === text(right && right.scheduleId);
+  }
+
+  function assessmentOccurrenceMatches(occurrence, schedule) {
+    if (!occurrence) return false;
+    if (text(occurrence.studentCode) !== text(schedule.studentCode)) return false;
+    if (text(occurrence.scheduleType)) {
+      if (text(occurrence.scheduleType) !== text(schedule.scheduleType)) return false;
+      if (text(schedule.scheduleType) !== "custom") return true;
+      return text(occurrence.scheduleId) === text(schedule.scheduleId);
+    }
+    return text(occurrence.scheduleId) === text(schedule.scheduleId);
+  }
+
+  function occurrenceHasProtectedHistory(state, occurrence) {
+    if (text(occurrence.externalRef)) return true;
+    if (["", "scheduled", "planned"].indexOf(text(occurrence.status)) < 0) return true;
+    var linked = asArray(state.plannerItems).filter(function (item) {
+      return text(item.occurrenceId) === text(occurrence.occurrenceId);
+    });
+    return linked.some(function (item) {
+      return item.systemHidden !== true && item.status !== "planned";
+    });
+  }
+
+  function assessmentScheduleAuditMetadata(range) {
+    var source = range || {};
+    return {
+      at: text(source.at || source.changedAt, new Date().toISOString()),
+      actor: text(source.actor || source.by, "assessment_schedule")
+    };
+  }
+
+  function tombstoneAssessmentPlannerItem(itemInput, schedule, range) {
+    var item = createPlannerItem(itemInput);
+    var before = item.status;
+    var metadata = assessmentScheduleAuditMetadata(range);
+    item.status = "canceled";
+    item.systemHidden = true;
+    item.systemHiddenReason = "assessment_schedule_removed";
+    item.systemHiddenAt = metadata.at;
+    item.systemHiddenBy = metadata.actor;
+    item.revision = Number(item.revision || 0) + 1;
+    appendPlannerAudit(item, "assessment_schedule_tombstoned", metadata, before, {
+      occurrenceId: item.occurrenceId,
+      scheduleId: schedule.scheduleId,
+      scheduledDate: item.date,
+      systemHidden: true
+    });
+    return createPlannerItem(item);
+  }
+
+  function reactivateAssessmentPlannerItem(itemInput, occurrence, range) {
+    var item = createPlannerItem(itemInput);
+    var before = item.status;
+    var metadata = assessmentScheduleAuditMetadata(range);
+    item.status = "planned";
+    item.systemHidden = false;
+    item.systemReactivatedAt = metadata.at;
+    item.systemReactivatedBy = metadata.actor;
+    item.revision = Number(item.revision || 0) + 1;
+    appendPlannerAudit(item, "assessment_schedule_reactivated", metadata, before, {
+      occurrenceId: occurrence.occurrenceId,
+      scheduleId: occurrence.scheduleId,
+      scheduledDate: occurrence.scheduledDate,
+      priorSystemHiddenReason: item.systemHiddenReason
+    });
+    return createPlannerItem(item);
+  }
+
+  function removeReplaceableAssessmentWindow(state, schedule, range) {
+    if (!range || !range.fromDate || !range.toDate) return state;
+    parseDateOnly(range.fromDate, "range fromDate");
+    parseDateOnly(range.toDate, "range toDate");
+    var removableOccurrenceIds = new Set();
+    asArray(state.assessmentOccurrences).forEach(function (occurrence) {
+      if (!assessmentOccurrenceMatches(occurrence, schedule)) return;
+      if (compareDates(occurrence.scheduledDate, range.fromDate) < 0 ||
+          compareDates(occurrence.scheduledDate, range.toDate) > 0) return;
+      if (!occurrenceHasProtectedHistory(state, occurrence)) {
+        removableOccurrenceIds.add(occurrence.occurrenceId);
+      }
+    });
+    if (!removableOccurrenceIds.size) return state;
+    state.assessmentOccurrences = state.assessmentOccurrences.filter(function (occurrence) {
+      return !removableOccurrenceIds.has(occurrence.occurrenceId);
+    });
+    state.plannerItems = state.plannerItems.map(function (item) {
+      if (!removableOccurrenceIds.has(item.occurrenceId) || item.status !== "planned") return item;
+      return tombstoneAssessmentPlannerItem(item, schedule, range);
+    });
+    return state;
   }
 
   function addAssessmentSchedule(state, scheduleInput, range) {
     var schedule = createAssessmentSchedule(scheduleInput);
     var next = clone(state);
-    var index = next.assessmentSchedules.findIndex(function (item) {
-      return item.scheduleId === schedule.scheduleId;
+    var plannerCreation = range && range.fromDate && range.toDate
+      ? assessmentScheduleAuditMetadata(range) : null;
+    var matchingIndexes = [];
+    next.assessmentSchedules.forEach(function (item, itemIndex) {
+      if (assessmentScheduleMatches(item, schedule)) matchingIndexes.push(itemIndex);
     });
-    if (index >= 0) {
-      schedule.revision = Number(next.assessmentSchedules[index].revision || 0) + 1;
-      next.assessmentSchedules[index] = schedule;
+    var index = matchingIndexes.length ? matchingIndexes[0] : -1;
+    var existing = index >= 0 ? createAssessmentSchedule(next.assessmentSchedules[index]) : null;
+    var resetAnchor = Boolean((range && range.resetAnchor === true) ||
+      (scheduleInput && scheduleInput.resetAnchor === true));
+    if (existing) {
+      schedule.scheduleId = existing.scheduleId;
+      if (!resetAnchor) schedule.anchorDate = existing.anchorDate;
+      schedule.semanticKey = assessmentScheduleSemanticKey(
+        schedule.studentCode, schedule.scheduleType, schedule.scheduleId);
+      schedule.revision = Math.max.apply(null, matchingIndexes.map(function (itemIndex) {
+        return Number(next.assessmentSchedules[itemIndex].revision || 0);
+      })) + 1;
+      next.assessmentSchedules = next.assessmentSchedules.filter(function (item) {
+        return !assessmentScheduleMatches(item, schedule);
+      });
+      next.assessmentSchedules.splice(index, 0, schedule);
     } else {
       next.assessmentSchedules.push(schedule);
     }
+    // 기존 anchor 기반 scheduleId로 생성된 회차도 새 semantic 일정에 귀속시킨다.
+    next.assessmentOccurrences = next.assessmentOccurrences.map(function (occurrence) {
+      if (!assessmentOccurrenceMatches(occurrence, schedule)) return occurrence;
+      return Object.assign({}, occurrence, {
+        scheduleId: schedule.scheduleId,
+        scheduleSemanticKey: schedule.semanticKey,
+        scheduleType: schedule.scheduleType,
+        studentCode: schedule.studentCode
+      });
+    });
+    next = removeReplaceableAssessmentWindow(next, schedule, range);
     if (range && range.fromDate && range.toDate) {
       expandAssessmentSchedule(schedule, range.fromDate, range.toDate).forEach(function (occurrence) {
-        if (!next.assessmentOccurrences.some(function (item) {
-          return item.occurrenceId === occurrence.occurrenceId;
-        })) {
+        var currentOccurrence = next.assessmentOccurrences.find(function (item) {
+          return item.occurrenceId === occurrence.occurrenceId ||
+            (assessmentOccurrenceMatches(item, schedule) && item.scheduledDate === occurrence.scheduledDate);
+        });
+        if (!currentOccurrence) {
           next.assessmentOccurrences.push(occurrence);
+          currentOccurrence = occurrence;
         }
-        if (!next.plannerItems.some(function (item) {
-          return item.occurrenceId === occurrence.occurrenceId;
-        })) {
-          next.plannerItems.push(assessmentOccurrenceToPlannerItem(occurrence));
+        var candidatePlanner = assessmentOccurrenceToPlannerItem(currentOccurrence, plannerCreation);
+        var linkedPlannerIndexes = [];
+        next.plannerItems.forEach(function (item, itemIndex) {
+          if (item.itemId === candidatePlanner.itemId ||
+              item.occurrenceId === currentOccurrence.occurrenceId) {
+            linkedPlannerIndexes.push(itemIndex);
+          }
+        });
+        var visiblePlannerExists = linkedPlannerIndexes.some(function (itemIndex) {
+          return next.plannerItems[itemIndex].systemHidden !== true;
+        });
+        if (!linkedPlannerIndexes.length) {
+          next.plannerItems.push(candidatePlanner);
+        } else if (!visiblePlannerExists) {
+          var tombstoneIndex = linkedPlannerIndexes.find(function (itemIndex) {
+            var item = next.plannerItems[itemIndex];
+            return item.systemHidden === true && item.status === "canceled" &&
+              item.systemHiddenReason === "assessment_schedule_removed";
+          });
+          if (tombstoneIndex !== undefined) {
+            next.plannerItems[tombstoneIndex] = reactivateAssessmentPlannerItem(
+              next.plannerItems[tombstoneIndex], currentOccurrence, range
+            );
+          }
         }
       });
     }
+    return next;
+  }
+
+  function approveAssessmentResult(state, occurrenceId, approval) {
+    ensure(isObject(state), "state is required");
+    var input = approval || {};
+    ensure(input.score !== undefined && input.score !== null && text(input.score) !== "", "assessment score is required");
+    ensure(input.maxScore !== undefined && input.maxScore !== null && text(input.maxScore) !== "", "assessment maxScore is required");
+    var score = Number(input.score);
+    var maxScore = Number(input.maxScore);
+    ensure(Number.isFinite(score) && score >= 0, "assessment score must be a non-negative number");
+    ensure(Number.isFinite(maxScore) && maxScore > 0, "assessment maxScore must be greater than zero");
+    ensure(score <= maxScore, "assessment score must not exceed maxScore");
+    var evidenceRef = text(input.evidenceRef);
+    var externalRef = text(input.externalRef);
+    var verifiedBy = text(input.verifiedBy);
+    ensure(evidenceRef, "assessment evidenceRef is required");
+    ensure(verifiedBy, "assessment verifiedBy is required");
+    var verifiedAt = isoTimestamp(input.verifiedAt, "assessment verifiedAt");
+    ensure(Date.parse(verifiedAt) <= Date.now() + 5 * 60 * 1000,
+      "assessment verifiedAt cannot be more than 5 minutes in the future");
+    var next = clone(state);
+    var index = next.assessmentOccurrences.findIndex(function (item) {
+      return item.occurrenceId === occurrenceId;
+    });
+    ensure(index >= 0, "assessment occurrence not found");
+    var occurrence = next.assessmentOccurrences[index];
+    var occurrenceSchedule = next.assessmentSchedules.find(function (schedule) {
+      return schedule.scheduleId === occurrence.scheduleId ||
+        (text(schedule.semanticKey) && text(schedule.semanticKey) === text(occurrence.scheduleSemanticKey));
+    });
+    var occurrenceType = text(occurrence.scheduleType, occurrenceSchedule && occurrenceSchedule.scheduleType);
+    ensure(["nelt", "metamath_weekly", "metamath_month_end", "custom"].indexOf(occurrenceType) >= 0,
+      "assessment occurrence type is not supported");
+    var occurrenceStatus = text(occurrence.status, "scheduled");
+    ensure(["scheduled", "planned", "taken", "result_waiting", "result_review", "verification_waiting",
+      "check_needed", "verified"].indexOf(occurrenceStatus) >= 0,
+      "현재 평가 상태('" + occurrenceStatus + "')에서는 결과를 승인할 수 없습니다.");
+    if (occurrence.latestResult) {
+      var latestVerifiedAt = isoTimestamp(
+        occurrence.latestResult.verifiedAt || occurrence.verifiedAt,
+        "latest assessment result verifiedAt"
+      );
+      ensure(Date.parse(verifiedAt) > Date.parse(latestVerifiedAt),
+        "assessment reapproval verifiedAt must be later than latest result");
+    }
+    var verifiedDate = timestampDateInTimeZone(verifiedAt, next.student && next.student.timeZone);
+    ensure(compareDates(verifiedDate, occurrence.scheduledDate) >= 0,
+      "평가 결과는 학생 시간대 기준 평가 예정일 당일 이후에만 승인할 수 있습니다.");
+    var linkedAssessmentPlanners = asArray(next.plannerItems).filter(function (item) {
+      return item.sourceType === "assessment" && item.occurrenceId === occurrenceId && item.status !== "canceled";
+    });
+    ensure(linkedAssessmentPlanners.length <= 1,
+      "평가 연결 플래너가 중복되어 결과 승인을 진행할 수 없습니다.");
+    occurrence.scheduleType = occurrenceType;
+    var resultHistory = clone(asArray(occurrence.resultHistory));
+    var history = clone(asArray(occurrence.history));
+    var result = {
+      resultId: stableId("assessment_result", occurrence.occurrenceId, verifiedAt, evidenceRef, externalRef, resultHistory.length + 1),
+      score: score,
+      maxScore: maxScore,
+      percentage: Math.round(score / maxScore * 1000) / 10,
+      evidenceRef: evidenceRef,
+      externalRef: externalRef,
+      verifiedBy: verifiedBy,
+      verifiedAt: verifiedAt
+    };
+    resultHistory.push(result);
+    history.push({
+      event: "result_approved",
+      fromStatus: text(occurrence.status, "scheduled"),
+      toStatus: "verified",
+      actor: verifiedBy,
+      at: verifiedAt,
+      evidenceRef: evidenceRef,
+      externalRef: externalRef,
+      resultId: result.resultId
+    });
+    var boundedResultHistory = boundAuditHistory(
+      resultHistory, ASSESSMENT_RESULT_HISTORY_LIMIT, occurrence.resultHistoryRetention
+    );
+    var boundedAssessmentHistory = boundAuditHistory(
+      history, ASSESSMENT_HISTORY_LIMIT, occurrence.historyRetention
+    );
+    occurrence.resultHistory = boundedResultHistory.history;
+    occurrence.resultHistoryRetention = boundedResultHistory.historyRetention;
+    occurrence.history = boundedAssessmentHistory.history;
+    occurrence.historyRetention = boundedAssessmentHistory.historyRetention;
+    occurrence.latestResult = result;
+    occurrence.score = score;
+    occurrence.maxScore = maxScore;
+    occurrence.externalRef = externalRef;
+    occurrence.status = "verified";
+    occurrence.verificationStatus = "verified";
+    occurrence.verifiedBy = verifiedBy;
+    occurrence.verifiedAt = verifiedAt;
+    occurrence.revision = Number(occurrence.revision || 0) + 1;
+    next.assessmentOccurrences[index] = occurrence;
+
+    next.plannerItems = next.plannerItems.map(function (item) {
+      if (item.sourceType !== "assessment" || item.occurrenceId !== occurrenceId || item.status === "canceled") return item;
+      var updated = createPlannerItem(item);
+      var before = updated.status;
+      updated.status = "completed";
+      updated.completedAt = text(updated.completedAt, verifiedAt);
+      updated.verificationDecision = "approved";
+      updated.verificationEvidenceRefs = Array.from(new Set(
+        asArray(updated.verificationEvidenceRefs).concat([evidenceRef])
+      ));
+      updated.verifiedBy = verifiedBy;
+      updated.verifiedAt = verifiedAt;
+      updated.revision = Number(updated.revision || 0) + 1;
+      appendPlannerAudit(updated, "assessment_result_approved", {
+        actor: verifiedBy,
+        at: verifiedAt
+      }, before, {
+        occurrenceId: occurrenceId,
+        resultId: result.resultId,
+        evidenceRef: evidenceRef,
+        externalRef: externalRef
+      });
+      return createPlannerItem(updated);
+    });
     return next;
   }
 
@@ -1044,6 +1855,12 @@
     var typeConfig = CAMPAIGN_TYPES[type];
     var startDate = text(source.startDate, addDays(source.examDate, type === "contest" || type === "kmt" ? -42 : -28));
     parseDateOnly(startDate, "campaign startDate");
+    var boundedCampaignHistory = boundAuditHistory(
+      source.history, CAMPAIGN_HISTORY_LIMIT, source.historyRetention
+    );
+    var boundedCampaignResults = boundAuditHistory(
+      source.resultHistory, CAMPAIGN_RESULT_HISTORY_LIMIT, source.resultHistoryRetention
+    );
     return {
       campaignId: text(source.campaignId, stableId("campaign", student.studentCode, type, source.provider, source.examDate, source.title)),
       studentCode: student.studentCode,
@@ -1074,6 +1891,11 @@
       status: initialStatus,
       activationBlockedReason: blocked ? "ELEMENTARY_REGULAR_EXAM_DISABLED" : "",
       migrationReviewRequired: Boolean(source.migrationReviewRequired),
+      latestResult: isObject(source.latestResult) ? clone(source.latestResult) : null,
+      resultHistory: boundedCampaignResults.history,
+      resultHistoryRetention: boundedCampaignResults.historyRetention,
+      history: boundedCampaignHistory.history,
+      historyRetention: boundedCampaignHistory.historyRetention,
       revision: Math.max(1, Math.floor(nonNegative(source.revision, 1)))
     };
   }
@@ -1085,7 +1907,27 @@
       return item.campaignId === campaign.campaignId;
     });
     if (index >= 0) {
-      campaign.revision = Number(next.prepCampaigns[index].revision || 0) + 1;
+      var previous = next.prepCampaigns[index];
+      campaign.status = previous.status;
+      campaign.consentStatus = previous.consentStatus;
+      campaign.consentEvidenceRef = previous.consentEvidenceRef;
+      campaign.consentApprovedBy = previous.consentApprovedBy;
+      campaign.consentApprovedAt = previous.consentApprovedAt;
+      campaign.reviewerId = previous.reviewerId;
+      campaign.activationBlockedReason = previous.activationBlockedReason;
+      campaign.migrationReviewRequired = previous.migrationReviewRequired;
+      var boundedPreviousHistory = boundAuditHistory(
+        previous.history, CAMPAIGN_HISTORY_LIMIT, previous.historyRetention
+      );
+      var boundedPreviousResults = boundAuditHistory(
+        previous.resultHistory, CAMPAIGN_RESULT_HISTORY_LIMIT, previous.resultHistoryRetention
+      );
+      campaign.history = boundedPreviousHistory.history;
+      campaign.historyRetention = boundedPreviousHistory.historyRetention;
+      campaign.resultHistory = boundedPreviousResults.history;
+      campaign.resultHistoryRetention = boundedPreviousResults.historyRetention;
+      if (previous.latestResult) campaign.latestResult = clone(previous.latestResult);
+      campaign.revision = Number(previous.revision || 0) + 1;
       next.prepCampaigns[index] = campaign;
     } else {
       next.prepCampaigns.push(campaign);
@@ -1103,6 +1945,8 @@
     ensure(index >= 0, "campaign not found");
     var campaign = next.prepCampaigns[index];
     ensure(!campaign.activationBlockedReason, "campaign activation is blocked");
+    ensure(["draft", "consent_pending", "review_pending", "planned"].indexOf(campaign.status) >= 0,
+      "campaign cannot be activated from " + campaign.status);
     if (campaign.academicStage === "elementary") {
       var consentEvidenceRef = text(input.consentEvidenceRef, campaign.consentEvidenceRef);
       var consentApprovedBy = text(input.consentApprovedBy, campaign.consentApprovedBy);
@@ -1116,8 +1960,116 @@
       campaign.consentApprovedBy = consentApprovedBy;
       campaign.consentApprovedAt = new Date(Date.parse(consentApprovedAt)).toISOString();
     }
+    var activatedAt = isoTimestamp(input.approvedAt || input.consentApprovedAt, "campaign approvedAt");
+    campaign.history = clone(asArray(campaign.history));
+    campaign.history.push({
+      event: "activated",
+      fromStatus: campaign.status,
+      toStatus: "active",
+      actor: text(input.approvedBy),
+      at: activatedAt,
+      evidenceRef: text(input.consentEvidenceRef)
+    });
+    var boundedCampaignHistory = boundAuditHistory(
+      campaign.history, CAMPAIGN_HISTORY_LIMIT, campaign.historyRetention
+    );
+    campaign.history = boundedCampaignHistory.history;
+    campaign.historyRetention = boundedCampaignHistory.historyRetention;
     campaign.status = "active";
     campaign.reviewerId = text(input.approvedBy);
+    campaign.revision = Number(campaign.revision || 0) + 1;
+    next.prepCampaigns[index] = campaign;
+    return next;
+  }
+
+  function transitionPrepCampaign(state, campaignId, toStatus, transition) {
+    var input = transition || {};
+    var actor = text(input.actor);
+    var evidenceRef = text(input.evidenceRef);
+    ensure(actor, "campaign transition actor is required");
+    ensure(evidenceRef, "campaign transition evidenceRef is required");
+    var at = isoTimestamp(input.at, "campaign transition at");
+    var next = clone(state);
+    var index = next.prepCampaigns.findIndex(function (item) {
+      return item.campaignId === campaignId;
+    });
+    ensure(index >= 0, "campaign not found");
+    var campaign = next.prepCampaigns[index];
+    ensure(Date.parse(at) <= Date.now() + 5 * 60 * 1000,
+      "campaign transition at cannot be more than 5 minutes in the future");
+    ensure(!campaign.activationBlockedReason, "campaign transition is blocked");
+    if (campaign.academicStage === "elementary") {
+      ensure(campaign.consentStatus === "approved",
+        "elementary campaign transition requires approved consent");
+    }
+    var allowed = CAMPAIGN_TRANSITIONS[campaign.status] || [];
+    ensure(allowed.indexOf(toStatus) >= 0,
+      "campaign transition is invalid: " + campaign.status + " -> " + toStatus);
+    if (["taken", "result_waiting", "result_review", "completed"].indexOf(toStatus) >= 0) {
+      var transitionDate = timestampDateInTimeZone(at, next.student && next.student.timeZone);
+      ensure(compareDates(transitionDate, campaign.examDate) >= 0,
+        "campaign cannot transition to " + toStatus + " before examDate in student timezone");
+    }
+
+    var result = null;
+    if (toStatus === "result_review") {
+      var resultSummary = text(input.resultSummary);
+      ensure(resultSummary, "campaign resultSummary is required");
+      var hasScore = input.score !== undefined && input.score !== null && text(input.score) !== "";
+      var hasMaxScore = input.maxScore !== undefined && input.maxScore !== null && text(input.maxScore) !== "";
+      ensure(hasScore === hasMaxScore, "campaign score and maxScore must be provided together");
+      var score = null;
+      var maxScore = null;
+      var percentage = null;
+      if (hasScore) {
+        score = Number(input.score);
+        maxScore = Number(input.maxScore);
+        ensure(Number.isFinite(score) && score >= 0, "campaign score must be a non-negative number");
+        ensure(Number.isFinite(maxScore) && maxScore > 0, "campaign maxScore must be greater than zero");
+        ensure(score <= maxScore, "campaign score must not exceed maxScore");
+        percentage = Math.round(score / maxScore * 1000) / 10;
+      }
+      var resultHistory = clone(asArray(campaign.resultHistory));
+      result = {
+        resultId: stableId("campaign_result", campaign.campaignId, at, evidenceRef, resultHistory.length + 1),
+        summary: resultSummary,
+        score: score,
+        maxScore: maxScore,
+        percentage: percentage,
+        evidenceRef: evidenceRef,
+        externalRef: text(input.externalRef),
+        reviewedBy: actor,
+        reviewedAt: at
+      };
+      resultHistory.push(result);
+      var boundedCampaignResults = boundAuditHistory(
+        resultHistory, CAMPAIGN_RESULT_HISTORY_LIMIT, campaign.resultHistoryRetention
+      );
+      campaign.resultHistory = boundedCampaignResults.history;
+      campaign.resultHistoryRetention = boundedCampaignResults.historyRetention;
+      campaign.latestResult = result;
+    }
+    if (toStatus === "completed") {
+      ensure(campaign.latestResult, "campaign reviewed result is required before completion");
+    }
+    campaign.history = clone(asArray(campaign.history));
+    campaign.history.push({
+      event: "status_transition",
+      fromStatus: campaign.status,
+      toStatus: toStatus,
+      actor: actor,
+      at: at,
+      evidenceRef: evidenceRef,
+      externalRef: text(input.externalRef),
+      resultId: result ? result.resultId : ""
+    });
+    var boundedCampaignHistory = boundAuditHistory(
+      campaign.history, CAMPAIGN_HISTORY_LIMIT, campaign.historyRetention
+    );
+    campaign.history = boundedCampaignHistory.history;
+    campaign.historyRetention = boundedCampaignHistory.historyRetention;
+    campaign.status = toStatus;
+    campaign.reviewerId = actor;
     campaign.revision = Number(campaign.revision || 0) + 1;
     next.prepCampaigns[index] = campaign;
     return next;
@@ -1150,6 +2102,9 @@
   }
 
   function campaignMilestonesToPlannerItems(campaign, options) {
+    var meta = options || {};
+    var createdAt = text(meta.createdAt || meta.at, new Date().toISOString());
+    var createdBy = text(meta.createdBy || meta.actor, "prep_campaign");
     return buildCampaignMilestones(campaign, options).filter(function (milestone) {
       return milestone.minutes > 0;
     }).map(function (milestone) {
@@ -1163,7 +2118,9 @@
         minutes: milestone.minutes,
         priority: milestone.offsetDays >= -3 && milestone.offsetDays <= 0 ? 2 : 1,
         status: milestone.status,
-        verificationRequired: true
+        verificationRequired: true,
+        createdAt: createdAt,
+        createdBy: createdBy
       });
     });
   }
@@ -1338,15 +2295,24 @@
   function recordTwinResult(caseInput, result) {
     var current = createWrongAnswerCase(caseInput);
     var input = result || {};
+    var hasCorrectCount = input.correctCount !== undefined && input.correctCount !== null && text(input.correctCount) !== "";
+    var hasTotalCount = input.totalCount !== undefined && input.totalCount !== null && text(input.totalCount) !== "";
+    var correctCount = Number(input.correctCount);
+    var totalCount = Number(input.totalCount);
     ensure(["submitted", "result_waiting"].indexOf(current.status) >= 0, "result can only be recorded after submission");
     ensure(text(input.externalResultRef), "externalResultRef is required");
+    ensure(hasCorrectCount, "correctCount is required");
+    ensure(hasTotalCount, "totalCount is required");
+    ensure(Number.isInteger(correctCount) && correctCount >= 0, "correctCount must be a non-negative integer");
+    ensure(Number.isInteger(totalCount) && totalCount > 0, "totalCount must be a positive integer");
+    ensure(correctCount <= totalCount, "correctCount cannot exceed totalCount");
     var next = clone(current);
     next.attemptNo = Number(current.attemptNo || 0) + 1;
     next.attempts.push({
       attemptNo: next.attemptNo,
       externalResultRef: text(input.externalResultRef),
-      correctCount: Math.floor(nonNegative(input.correctCount, 0)),
-      totalCount: Math.floor(nonNegative(input.totalCount, 0)),
+      correctCount: correctCount,
+      totalCount: totalCount,
       receivedAt: text(input.receivedAt, new Date().toISOString())
     });
     next.status = "verification_waiting";
@@ -1380,8 +2346,36 @@
       return item.caseId === remediation.caseId;
     });
     if (index >= 0) {
-      remediation.revision = Number(next.remediationCases[index].revision || 0) + 1;
-      next.remediationCases[index] = remediation;
+      var existingSource = next.remediationCases[index];
+      var existing = createWrongAnswerCase(existingSource);
+      var evolved = remediation.revision > existing.revision || remediation.history.length > existing.history.length;
+      if (evolved) {
+        next.remediationCases[index] = Object.assign({}, clone(existingSource), remediation);
+        return next;
+      }
+      var resolved = existing.status === "mastered" || existing.status === "closed";
+      var registrationEvent = remediation.history[0] || {};
+      var merged = Object.assign({}, clone(existingSource), existing);
+      ["edition", "unitId", "skillCode"].forEach(function (field) {
+        if (text(remediation[field])) {
+          merged[field] = remediation[field];
+        }
+      });
+      merged.status = resolved ? "captured" : existing.status;
+      merged.revision = Math.max(existing.revision, remediation.revision) + 1;
+      merged.attemptNo = existing.attemptNo;
+      merged.attempts = clone(existing.attempts);
+      merged.history = clone(existing.history);
+      merged.history.push({
+        from: existing.status,
+        to: merged.status,
+        at: text(caseInput && caseInput.createdAt, registrationEvent.at || new Date().toISOString()),
+        actor: text(caseInput && caseInput.createdBy, registrationEvent.actor || "system"),
+        note: resolved
+          ? "동일 교재 문항 오답 재등록 · 새 재학습 주기 시작"
+          : "동일 교재 문항 중복 등록 · 기존 재학습 진행상태 유지"
+      });
+      next.remediationCases[index] = merged;
     } else {
       next.remediationCases.push(remediation);
     }
@@ -1423,7 +2417,12 @@
       grade: legacy.grade
     };
     var state = createDefaultState({ student: sourceStudent });
-    var registry = createProviderRegistry(options && options.customProviders);
+    var configuredCustomProviders = options && Array.isArray(options.customProviders)
+      ? options.customProviders
+      : asArray(legacy.settings && legacy.settings.customProviders);
+    configuredCustomProviders = normalizeCustomProviders(configuredCustomProviders);
+    state.settings.customProviders = clone(configuredCustomProviders);
+    var registry = createProviderRegistry(configuredCustomProviders);
     var report = {
       fromVersion: Number(legacy.schemaVersion || 0),
       toVersion: SCHEMA_VERSION,
@@ -1436,6 +2435,7 @@
 
     if (Number(legacy.schemaVersion) === SCHEMA_VERSION) {
       state.settings = Object.assign({}, state.settings, legacy.settings || {});
+      state.settings.customProviders = clone(configuredCustomProviders);
       if (state.student.academicStage === "elementary") {
         state.settings.schoolRegularExamEnabled = false;
       }
@@ -1449,7 +2449,7 @@
             checkNeededReason: registry[requestedProvider]
               ? program.checkNeededReason
               : "프로그램 공급자 확인필요"
-          }), registry);
+          }), registry, INACTIVE_PROVIDER_RESTORE);
           report.programs += 1;
         } catch (error) {
           report.warnings.push("프로그램 정규화 보류: " + error.message);
@@ -1509,7 +2509,7 @@
           evidenceRefs: program.evidenceRefs,
           checkNeededReason: registry[requestedProvider] ? program.checkNeededReason : "기존 프로그램 공급자 확인필요",
           deepLink: program.deepLink
-        }, registry);
+        }, registry, INACTIVE_PROVIDER_RESTORE);
         report.programs += 1;
       } catch (error) {
         report.warnings.push("프로그램 이전 보류: " + error.message);
@@ -1540,7 +2540,14 @@
           minutes: item.minutes || item.estimatedMinutes,
           status: item.status,
           verificationRequired: item.verificationRequired === undefined ? true : item.verificationRequired,
-          evidenceRefs: item.evidenceRefs
+          evidenceRefs: item.evidenceRefs,
+          createdAt: item.createdAt,
+          createdBy: item.createdBy,
+          updatedAt: item.updatedAt,
+          updatedBy: item.updatedBy,
+          history: item.history,
+          historyRetention: item.historyRetention,
+          revision: item.revision
         });
         report.plannerItems += 1;
       } catch (error) {
@@ -1640,17 +2647,30 @@
     return '<p class="wb-lp__empty">' + escapeHtml(message) + "</p>";
   }
 
-  function plannerItemHtml(item, interactive) {
-    var action = interactive && ["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0
+  function plannerItemContextHtml(item) {
+    var notes = [];
+    if (item.originItemId) notes.push("이월된 항목");
+    if (item.status === "carryover_candidate" && item.carryoverRequestedDate) {
+      notes.push("이월 요청 " + item.carryoverRequestedDate);
+    }
+    if (item.status === "canceled" && item.cancelReason) notes.push("취소 사유: " + item.cancelReason);
+    return notes.length ? '<span class="wb-lp__meta wb-lp__task-note">' + escapeHtml(notes.join(" · ")) + "</span>" : "";
+  }
+
+  function plannerActionHtml(item, interactive) {
+    return interactive && ["planned", "in_progress", "check_needed"].indexOf(item.status) >= 0
       ? '<button class="wb-lp__button wb-lp__button--small" type="button" data-wb-action="claim" data-item-id="' +
         escapeHtml(item.itemId) + '">수행 완료 요청</button>'
       : "";
-    return '<li class="wb-lp__task">' +
+  }
+
+  function plannerItemHtml(item, interactive) {
+    return '<li class="wb-lp__task" data-planner-status="' + escapeHtml(item.status) + '">' +
       '<div class="wb-lp__task-main"><strong>' + escapeHtml(item.title) + "</strong>" +
       '<span class="wb-lp__meta">' + escapeHtml(item.minutes ? item.minutes + "분" : "시간 미정") +
-      " · " + escapeHtml(item.sourceType) + "</span></div>" +
+      " · " + escapeHtml(item.sourceType) + "</span>" + plannerItemContextHtml(item) + "</div>" +
       '<div class="wb-lp__task-side">' +
-      badge(LABELS.planner[item.status] || item.status, item.status) + action + "</div></li>";
+      badge(LABELS.planner[item.status] || item.status, item.status) + plannerActionHtml(item, interactive) + "</div></li>";
   }
 
   function renderTodayPlanner(state, date, interactive) {
@@ -1663,9 +2683,7 @@
     });
     var warningHtml = workload.warnings.length
       ? '<aside class="wb-lp__notice" role="status" aria-label="학습량 안내"><strong>학습량을 한번 살펴봐 주세요.</strong><ul>' +
-        workload.warnings.map(function (warning) {
-          return "<li>" + escapeHtml(warning.message) + "</li>";
-        }).join("") + "</ul></aside>"
+        workload.warnings.map(function (warning) { return "<li>" + escapeHtml(warning.message) + "</li>"; }).join("") + "</ul></aside>"
       : '<p class="wb-lp__calm" role="status">이번 주 학습량은 현재 소프트캡 안에 있습니다.</p>';
     function group(title, items) {
       return '<section class="wb-lp__group"><h3>' + escapeHtml(title) + "</h3>" +
@@ -1677,45 +2695,96 @@
       '<section class="wb-lp__summary"><h2>' + escapeHtml(date) + " 오늘</h2>" +
       '<p><strong>' + plan.active.length + '</strong>개 수행 예정 · <strong>' +
       plan.verificationWaiting.length + "</strong>개 확인대기</p></section>" +
-      warningHtml +
-      group("오늘 할 일", plan.active) +
-      group("선생님 확인대기", plan.verificationWaiting) +
-      group("이월 후보", plan.carryover) +
-      group("완료", plan.completed) +
-      "</div>";
+      warningHtml + group("오늘 할 일", plan.active) + group("선생님 확인대기", plan.verificationWaiting) +
+      group("이월 후보", plan.carryover) + group("완료", plan.completed) + group("취소", plan.canceled) + "</div>";
   }
 
-  function renderWeekPlanner(state, date) {
+  function renderWeekPlanner(state, date, interactive) {
     var week = getWeekPlan(state, date);
     return '<section><h2>' + escapeHtml(week.weekStart) + " – " + escapeHtml(week.weekEnd) + "</h2>" +
       '<ol class="wb-lp__week">' + week.days.map(function (day) {
         return '<li class="wb-lp__day"><h3>' + escapeHtml(day.date) + "</h3>" +
           (day.items.length ? '<ul class="wb-lp__compact-list">' + day.items.map(function (item) {
-            return "<li><span>" + escapeHtml(item.title) + "</span>" +
-              badge(LABELS.planner[item.status] || item.status, item.status) + "</li>";
+            return '<li data-planner-status="' + escapeHtml(item.status) + '"><span><strong>' + escapeHtml(item.title) +
+              "</strong> · " + escapeHtml(item.minutes ? item.minutes + "분" : "시간 미정") + "</span>" +
+              plannerItemContextHtml(item) + badge(LABELS.planner[item.status] || item.status, item.status) +
+              plannerActionHtml(item, interactive) + "</li>";
           }).join("") + "</ul>" : emptyMessage("계획 없음")) + "</li>";
       }).join("") + "</ol></section>";
   }
 
+  function renderAssessments(state, date) {
+    var occurrences = clone(asArray(state.assessmentOccurrences)).sort(function (left, right) {
+      return left.scheduledDate.localeCompare(right.scheduledDate);
+    });
+    var upcoming = occurrences.filter(function (item) {
+      return compareDates(item.scheduledDate, date) >= 0 && item.status !== "verified";
+    }).slice(0, 8);
+    var recent = occurrences.filter(function (item) {
+      return Boolean(item.latestResult);
+    }).sort(function (left, right) {
+      return text(right.latestResult && right.latestResult.verifiedAt).localeCompare(
+        text(left.latestResult && left.latestResult.verifiedAt)
+      );
+    }).slice(0, 8);
+    function assessmentCard(item, showResult) {
+      var result = item.latestResult;
+      var statusLabel = item.status === "verified" ? "결과 확인" : item.status === "scheduled" ? "예정" : item.status;
+      var resultHtml = showResult && result
+        ? '<p class="wb-lp__d-day">' + escapeHtml(result.score + "/" + result.maxScore + " · " + result.percentage + "%") + "</p>"
+        : "";
+      return '<li class="wb-lp__card"><div class="wb-lp__card-title"><strong>' + escapeHtml(item.title) + "</strong>" +
+        badge(statusLabel, item.status) + "</div>" + resultHtml +
+        '<p class="wb-lp__meta">' + escapeHtml(item.scheduledDate + " · " + item.providerId) + "</p></li>";
+    }
+    return '<section><h2>정기 평가</h2><p>결과는 선생님이 근거를 확인한 뒤에만 표시됩니다.</p>' +
+      '<section class="wb-lp__group"><h3>다가오는 평가</h3>' +
+      (upcoming.length ? '<ul class="wb-lp__card-grid">' + upcoming.map(function (item) {
+        return assessmentCard(item, false);
+      }).join("") + "</ul>" : emptyMessage("예정된 평가가 없습니다.")) + "</section>" +
+      '<section class="wb-lp__group"><h3>최근 결과</h3>' +
+      (recent.length ? '<ul class="wb-lp__card-grid">' + recent.map(function (item) {
+        return assessmentCard(item, true);
+      }).join("") + "</ul>" : emptyMessage("확인된 평가 결과가 없습니다.")) + "</section></section>";
+  }
+
   function renderPrograms(state, registryInput) {
-    var registry = registryInput || DEFAULT_PROVIDERS;
+    var registry = registryInput || createProviderRegistry(state.settings && state.settings.customProviders);
     return '<section><div class="wb-lp__section-head"><div><h2>온라인 프로그램</h2>' +
       "<p>계정 비밀번호는 저장하지 않으며, 외부 결과는 확인 후보로만 반영합니다.</p></div></div>" +
       (state.programStates.length ? '<ul class="wb-lp__card-grid">' + state.programStates.map(function (program) {
-        var provider = registry[program.providerId] || registry.manual;
-        var progress = program.assignedCount > 0
-          ? Math.min(100, Math.round(program.completedCount / program.assignedCount * 100))
-          : 0;
+        var provider = registry[program.providerId] || registry.manual || { label: program.providerId, active: false };
+        var data = program.latestSnapshot && isObject(program.latestSnapshot.data) ? program.latestSnapshot.data : {};
+        var assignedKnown = program.assignedCountKnown === true || Number(program.assignedCount) > 0;
+        var completedKnown = program.completedCountKnown === true || Number(program.completedCount) > 0;
+        var reportedRaw = data.progress_pct === undefined ? data.progressPct : data.progress_pct;
+        var reportedNumber = Number(reportedRaw);
+        var reportedProgress = reportedRaw !== "" && reportedRaw != null && Number.isFinite(reportedNumber)
+          ? Math.max(0, Math.min(100, reportedNumber)) : null;
+        var computedProgress = assignedKnown && Number(program.assignedCount) > 0
+          ? Math.min(100, Math.round(Number(program.completedCount || 0) / Number(program.assignedCount) * 100)) : null;
+        var progress = reportedProgress !== null ? reportedProgress : computedProgress;
+        var details = [];
+        if (assignedKnown && completedKnown) details.push(program.completedCount + "/" + program.assignedCount + " 수행");
+        else if (assignedKnown) details.push("배정 " + program.assignedCount + "개");
+        else if (completedKnown) details.push("수행 " + program.completedCount + "개");
+        if (reportedProgress !== null) details.push("보고 진행률 " + reportedProgress + "%");
+        var currentUnit = text(data.current_unit === undefined ? data.currentUnit : data.current_unit);
+        if (currentUnit) details.push("진도 " + currentUnit);
+        if (data.score !== undefined && data.score !== null && data.score !== "") {
+          var targetScore = data.target_score === undefined ? data.targetScore : data.target_score;
+          details.push("점수 " + data.score + (targetScore === undefined || targetScore === null || targetScore === "" ? "" : "/" + targetScore));
+        }
         var link = program.deepLink
           ? '<a class="wb-lp__button wb-lp__button--secondary" href="' + escapeHtml(program.deepLink) +
-            '" target="_blank" rel="noopener noreferrer">프로그램 열기</a>'
-          : "";
-        return '<li class="wb-lp__card"><div class="wb-lp__card-title"><strong>' +
-          escapeHtml(provider.label) + "</strong>" +
-          badge(LABELS.program[program.status] || program.status, program.status) + "</div>" +
-          '<p class="wb-lp__meta">' + escapeHtml(program.completedCount + "/" + program.assignedCount + " 수행") + "</p>" +
-          '<progress max="100" value="' + progress + '" aria-label="' + escapeHtml(provider.label + " 수행률 " + progress + "%") +
-          '"></progress>' + link + "</li>";
+            '" target="_blank" rel="noopener noreferrer">프로그램 열기</a>' : "";
+        var progressHtml = progress === null ? "" : '<progress max="100" value="' + progress + '" aria-label="' +
+          escapeHtml(provider.label + " 수행률 " + progress + "%") + '"></progress>';
+        var disabled = provider.active === false ? '<span class="wb-lp__badge wb-lp__badge--paused">연동 중지</span>' : "";
+        return '<li class="wb-lp__card"><div class="wb-lp__card-title"><strong>' + escapeHtml(provider.label) + "</strong>" +
+          badge(LABELS.program[program.status] || program.status, program.status) + disabled + "</div>" +
+          (details.length ? '<p class="wb-lp__meta">' + escapeHtml(details.join(" · ")) + "</p>" : "") +
+          progressHtml + link + "</li>";
       }).join("") + "</ul>" : emptyMessage("연결된 온라인 프로그램이 없습니다.")) + "</section>";
   }
 
@@ -1732,12 +2801,18 @@
         var blocked = campaign.activationBlockedReason
           ? '<p class="wb-lp__warning-text">활성화 전 사람 확인이 필요합니다.</p>'
           : "";
+        var latestResult = campaign.latestResult;
+        var resultHtml = latestResult
+          ? '<p class="wb-lp__meta">결과 · ' + escapeHtml(latestResult.summary) +
+            (latestResult.score === null || latestResult.score === undefined ? "" :
+              escapeHtml(" · " + latestResult.score + "/" + latestResult.maxScore)) + "</p>"
+          : "";
         return '<li class="wb-lp__card"><div class="wb-lp__card-title"><strong>' +
           escapeHtml(campaign.title) + "</strong>" +
           badge(LABELS.campaign[campaign.status] || campaign.status, campaign.status) + "</div>" +
           '<p class="wb-lp__d-day">' + escapeHtml(dDayLabel(campaign.examDate, date)) + "</p>" +
           '<p class="wb-lp__meta">' + escapeHtml(config.label + " · " + campaign.examDate) + "</p>" +
-          blocked + "</li>";
+          resultHtml + blocked + "</li>";
       }).join("") + "</ul>" : emptyMessage("활성 캠페인이 없습니다.")) + "</section>";
   }
 
@@ -1763,7 +2838,7 @@
     ensure(rootElement && rootElement.nodeType === 1, "mount root element is required");
     var config = options || {};
     var state = clone(config.state || createDemoState(config.today));
-    var registry = config.registry || DEFAULT_PROVIDERS;
+    var registry = config.registry || createProviderRegistry(state.settings && state.settings.customProviders);
     var activeTab = text(config.initialTab, "today");
     var currentDate = text(config.today, todayDate(state.student.timeZone));
     var mountId = text(rootElement.id, "wb-lp-" + (++mountSequence));
@@ -1778,10 +2853,13 @@
 
     function panelHtml() {
       if (activeTab === "week") {
-        return renderWeekPlanner(state, currentDate);
+        return renderWeekPlanner(state, currentDate, true);
       }
       if (activeTab === "programs") {
         return renderPrograms(state, registry);
+      }
+      if (activeTab === "assessments") {
+        return renderAssessments(state, currentDate);
       }
       if (activeTab === "campaigns") {
         return renderCampaigns(state, currentDate);
@@ -1805,6 +2883,7 @@
         tabButton(mountId, "today", "오늘", activeTab === "today") +
         tabButton(mountId, "week", "주간", activeTab === "week") +
         tabButton(mountId, "programs", "온라인 프로그램", activeTab === "programs") +
+        tabButton(mountId, "assessments", "정기 평가", activeTab === "assessments") +
         tabButton(mountId, "campaigns", "시험대비", activeTab === "campaigns") +
         tabButton(mountId, "remediation", "오답 재학습", activeTab === "remediation") +
         '</nav><main id="' + mountId + '-panel" class="wb-lp__tabpanel" role="tabpanel" aria-labelledby="' +
@@ -1888,10 +2967,11 @@
       },
       setState: function (nextState) {
         state = clone(nextState);
+        if (!config.registry) registry = createProviderRegistry(state.settings && state.settings.customProviders);
         render(false);
       },
       selectTab: function (tab) {
-        ensure(["today", "week", "programs", "campaigns", "remediation"].indexOf(tab) >= 0, "tab is invalid");
+        ensure(["today", "week", "programs", "assessments", "campaigns", "remediation"].indexOf(tab) >= 0, "tab is invalid");
         activeTab = tab;
         render(false);
       },
@@ -1906,6 +2986,7 @@
 
   function createDemoState(dateInput) {
     var date = text(dateInput, todayDate("Asia/Seoul"));
+    var demoCreatedAt = date + "T00:00:00.000Z";
     var state = createDefaultState({
       student: {
         studentCode: "DEMO-E3",
@@ -1935,7 +3016,9 @@
       sourceType: "online_program",
       providerId: "studyforce",
       minutes: 20,
-      verificationRequired: true
+      verificationRequired: true,
+      createdAt: demoCreatedAt,
+      createdBy: "demo"
     });
     state = addPlannerItem(state, {
       studentCode: state.student.studentCode,
@@ -1944,7 +3027,9 @@
       sourceType: "online_program",
       providerId: "classcard",
       minutes: 15,
-      verificationRequired: true
+      verificationRequired: true,
+      createdAt: demoCreatedAt,
+      createdBy: "demo"
     });
     state = addPrepCampaign(state, {
       campaignType: "nelt",
@@ -1979,11 +3064,16 @@
     PROGRAM_STATUSES: PROGRAM_STATUSES,
     PLANNER_STATUSES: PLANNER_STATUSES,
     CAMPAIGN_STATUSES: CAMPAIGN_STATUSES,
+    CAMPAIGN_TRANSITIONS: CAMPAIGN_TRANSITIONS,
     WRONG_ANSWER_STATUSES: WRONG_ANSWER_STATUSES,
     CAMPAIGN_TYPES: CAMPAIGN_TYPES,
     DEFAULT_PROVIDERS: DEFAULT_PROVIDERS,
     LABELS: LABELS,
     createProviderRegistry: createProviderRegistry,
+    normalizeCustomProviders: normalizeCustomProviders,
+    registerCustomProvider: registerCustomProvider,
+    setCustomProviderActive: setCustomProviderActive,
+    createProgramImportProviderDefinitions: createProgramImportProviderDefinitions,
     createStudentProfile: createStudentProfile,
     createDefaultState: createDefaultState,
     isOpaqueAccountRef: isOpaqueAccountRef,
@@ -1991,9 +3081,12 @@
     applyApprovedProgramImport: applyApprovedProgramImport,
     createPlannerItem: createPlannerItem,
     addPlannerItem: addPlannerItem,
+    editPlannerItem: editPlannerItem,
+    cancelPlannerItem: cancelPlannerItem,
     claimPlannerItemCompletion: claimPlannerItemCompletion,
     verifyPlannerItemCompletion: verifyPlannerItemCompletion,
     requestPlannerCarryover: requestPlannerCarryover,
+    reviewPlannerCarryover: reviewPlannerCarryover,
     approvePlannerCarryover: approvePlannerCarryover,
     getTodayPlan: getTodayPlan,
     getWeekPlan: getWeekPlan,
@@ -2003,10 +3096,12 @@
     expandAssessmentSchedule: expandAssessmentSchedule,
     assessmentOccurrenceToPlannerItem: assessmentOccurrenceToPlannerItem,
     addAssessmentSchedule: addAssessmentSchedule,
+    approveAssessmentResult: approveAssessmentResult,
     getElementaryCampaignOptions: getElementaryCampaignOptions,
     createPrepCampaign: createPrepCampaign,
     addPrepCampaign: addPrepCampaign,
     activatePrepCampaign: activatePrepCampaign,
+    transitionPrepCampaign: transitionPrepCampaign,
     buildCampaignMilestones: buildCampaignMilestones,
     campaignMilestonesToPlannerItems: campaignMilestonesToPlannerItems,
     getSoftCap: getSoftCap,
@@ -2022,6 +3117,7 @@
     dDayLabel: dDayLabel,
     renderTodayPlanner: renderTodayPlanner,
     renderWeekPlanner: renderWeekPlanner,
+    renderAssessments: renderAssessments,
     renderPrograms: renderPrograms,
     renderCampaigns: renderCampaigns,
     renderRemediation: renderRemediation,

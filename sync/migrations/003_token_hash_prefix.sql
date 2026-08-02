@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS bootstrap_codes (
 CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
   ON bootstrap_codes(app, staff_id, revoked, expires_at);
 
--- 동일 digest의 접두 행이 이미 있으면 모호한 bare 중복 행을 먼저 제거한다.
+-- 동일 digest의 접두 행이 이미 있으면 해지되었거나 만료된 bare 중복 행만 제거한다.
+-- 활성 bare는 삭제하지 않고 UPDATE의 UNIQUE 충돌로 fail-close한다.
 DELETE FROM tokens
 WHERE rowid IN (
   SELECT legacy.rowid
@@ -25,6 +26,10 @@ WHERE rowid IN (
    AND canonical.token = 'sha256:' || lower(legacy.token)
   WHERE length(legacy.token) = 64
     AND legacy.token NOT GLOB '*[^0-9A-Fa-f]*'
+    AND (
+      legacy.revoked != 0
+      OR legacy.created_at < (unixepoch('now') * 1000 - 7776000000)
+    )
 );
 
 UPDATE tokens

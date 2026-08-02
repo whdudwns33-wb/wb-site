@@ -1017,7 +1017,7 @@
       return {
         row_id: candidate.row_id,
         row_number: candidate.row_number,
-        selected: selected ? selected.has(candidate.row_id) : true,
+        selected: selected ? selected.has(candidate.row_id) : false,
         provider_id: candidate.provider_id,
         provider_label: candidate.provider_label,
         student_code: candidate.student_code,
@@ -1058,9 +1058,22 @@
     if (selected.size !== options.selectedRowIds.length) {
       throw new ProgramImportError('DUPLICATE_SELECTION', '같은 행을 중복 선택할 수 없습니다.');
     }
-    var available = new Set(confirmBatch.candidates.map(function (candidate) { return candidate.row_id; }));
+    var available = new Map(confirmBatch.candidates.map(function (candidate) {
+      return [candidate.row_id, candidate];
+    }));
+    var expectedStudentCode = text(options.expectedStudentCode);
+    var alreadyApprovedDuplicateKeys = new Set(
+      Array.isArray(options.alreadyApprovedDuplicateKeys) ? options.alreadyApprovedDuplicateKeys.map(String) : []
+    );
     selected.forEach(function (rowId) {
-      if (!available.has(rowId)) throw new ProgramImportError('UNKNOWN_SELECTION', '승인 후보에 없는 행이 선택되었습니다.');
+      var candidate = available.get(rowId);
+      if (!candidate) throw new ProgramImportError('UNKNOWN_SELECTION', '승인 후보에 없는 행이 선택되었습니다.');
+      if (expectedStudentCode && candidate.student_code !== expectedStudentCode) {
+        throw new ProgramImportError('STUDENT_SCOPE_MISMATCH', '현재 선택한 학생과 다른 학생의 행은 승인할 수 없습니다.');
+      }
+      if (alreadyApprovedDuplicateKeys.has(candidate.duplicate_key)) {
+        throw new ProgramImportError('ALREADY_APPROVED', '이미 승인·반영된 행입니다. 미리보기를 다시 실행해 주세요.');
+      }
     });
     var at = normalizedApprovedAt(options.approvedAt);
     var approved = [];
@@ -1084,8 +1097,10 @@
       output.ledger_write_allowed = true;
       output.approval_record = {
         decision: 'approved', approved_by: actor, approved_at: at,
-        row_id: output.row_id, duplicate_key: output.duplicate_key,
-        payload_hash: output.payload_hash
+        row_id: output.row_id, row_number: output.row_number,
+        student_code: output.student_code, provider_id: output.provider_id,
+        duplicate_key: output.duplicate_key, payload_hash: output.payload_hash,
+        source_hash: output.source_hash
       };
       approved.push(output);
       return output;
