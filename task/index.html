@@ -453,55 +453,122 @@ function alertsToday() {
 /* ══════════════════════════════════════════════════════
    4. 동기화 (선택) — Google Apps Script 웹앱
    ══════════════════════════════════════════════════════ */
+/* 동기화 — Cloudflare Workers + D1
+ * 예전에는 매번 전체 상태를 통째로 주고받았다. 학생이 100명이 되면
+ * 한 명이 체크 하나를 눌러도 나머지 99명 데이터가 오가서 감당이 안 된다.
+ * 지금은 (1) 마지막 동기화 이후 바뀐 것만 (2) 학생은 자기 것만 주고받는다. */
+const SYNC_URL = 'https://wb-sync.whdudwns33.workers.dev';
+const SYNC_APP = 'task';
+
+/** 이 체크가 누구 것인지 — 서버가 학생별로 나눠 담는 기준이 된다.
+ *  '__st__S1|2026-08-02' → S1,  '<taskId>|날짜' → 그 업무의 담당자 */
+function ownerOfCheck(key) {
+  const tid = String(key).split('|')[0];
+  const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
+  if (m) return m[1];
+  const t = (state.tasks || []).find(x => x.id === tid);
+  return t ? (t.staffId || null) : null;
+}
+
 const sync = {
-  busy: false, dirty: false, last: null, timer: null, loud: false,
+  busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
 
-  enabled() { return !!state.settings.syncUrl; },
+  /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
+  auth() {
+    if (session.isStaffLink) {
+      const t = state.settings.myToken || '';
+      return t ? { mode: 'person', id: session.staffId, token: t } : null;
+    }
+    const k = state.settings.syncSecret || '';
+    return k ? { mode: 'admin', secret: k } : null;
+  },
+  enabled() { return !!this.auth(); },
 
-  merge(remote) {
-    if (!remote) return;
-    const byId = arr => { const m = {}; (arr || []).forEach(x => { m[x.id] = x; }); return m; };
-    ['staff', 'tasks'].forEach(key => {
-      const mine = byId(state[key]), theirs = byId(remote[key]);
-      const out = {};
-      Object.keys(Object.assign({}, mine, theirs)).forEach(id => {
-        const a = mine[id], b = theirs[id];
-        out[id] = (!a) ? b : (!b) ? a : ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a);
-      });
-      state[key] = Object.values(out);
+  /** since 이후 바뀐 것만 모은다. 각 레코드가 이미 updatedAt을 갖고 있어
+   *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
+  collect(since) {
+    const out = [];
+    (state.staff || []).forEach(s => {
+      if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
     });
-    const rc = remote.checks || {};
-    Object.keys(rc).forEach(k => {
-      const a = state.checks[k], b = rc[k];
-      if (!a || (b.updatedAt || 0) > (a.updatedAt || 0)) state.checks[k] = b;
+    (state.tasks || []).forEach(t => {
+      if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
     });
-    save();
+    Object.keys(state.checks || {}).forEach(k => {
+      const c = state.checks[k];
+      if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
+    });
+    return out;
+  },
+
+  /** 받은 변경을 반영한다. 내 것이 더 최신이면 그대로 둔다 */
+  apply(changes) {
+    let n = 0;
+    (changes || []).forEach(ch => {
+      if (!ch || !ch.data) return;
+      const at = ch.data.updatedAt || 0;
+      if (ch.table === 'checks') {
+        const cur = state.checks[ch.key];
+        if (!cur || at > (cur.updatedAt || 0)) { state.checks[ch.key] = ch.data; n++; }
+      } else if (ch.table === 'staff' || ch.table === 'tasks') {
+        const arr = state[ch.table];
+        const i = arr.findIndex(x => x.id === ch.key);
+        if (i < 0) { arr.push(ch.data); n++; }
+        else if (at > (arr[i].updatedAt || 0)) { arr[i] = ch.data; n++; }
+      }
+    });
+    return n;
+  },
+
+  async post(path, body) {
+    const res = await fetch(SYNC_URL + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await res.json().catch(() => null);
+    if (!d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + res.status));
+    return d;
   },
 
   async run() {
-    if (!this.enabled() || this.busy) return;
+    const auth = this.auth();
+    if (!auth || this.busy) return;
     this.busy = true; paintStatus();
     try {
-      const res = await fetch(state.settings.syncUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          secret: state.settings.syncSecret || '',
-          state: { staff: state.staff, tasks: state.tasks, checks: state.checks }
-        })
-      });
-      const data = await res.json();
-      if (!data || data.ok !== true) throw new Error((data && data.error) || '동기화 거부됨');
-      this.merge(data.state);
-      this.last = now(); this.dirty = false;
+      const t0 = now();
+      const pending = this.collect(Number(state.settings.pushAt) || 0);
+      let guard = 0, again = true;
+      while (again && guard++ < 60) {
+        const batch = pending.splice(0, 400);
+        const d = await this.post('/sync', {
+          app: SYNC_APP, auth: auth,
+          since: Number(state.settings.pullAt) || 0,
+          changes: batch
+        });
+        this.apply(d.changes);
+        state.settings.pullAt = d.now;
+        again = !!d.more || pending.length > 0;
+      }
+      // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
+      state.settings.pushAt = t0;
+      save();
+      this.last = now(); this.dirty = false; this.err = '';
       render();
     } catch (e) {
       console.warn('sync', e);
-      this.dirty = true;
-      if (this.loud) toast('동기화 실패 — 주소·비밀키를 확인하세요');
+      this.dirty = true; this.err = String(e && e.message || e);
+      if (this.loud) toast('동기화 실패 — ' + this.err);
     } finally {
       this.busy = false; this.loud = false; paintStatus();
     }
+  },
+
+  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
+  async issueToken(staffId) {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 발급할 수 있습니다');
+    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
+    return d.token;
   }
 };
 
@@ -548,11 +615,13 @@ function absorbLinkParams() {
   const q = new URLSearchParams(location.search);
   let touched = false;
 
+  const tk = q.get('t');
+  if (tk) { state.settings.myToken = tk; save(); }
+
   const s = q.get('s');
   if (s) {
     try {
       const cfg = JSON.parse(unb64(s));
-      if (cfg.u) state.settings.syncUrl = cfg.u;
       if (cfg.k) state.settings.syncSecret = cfg.k;
       // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
       if (cfg.p && !new URLSearchParams(location.search).get('u')) {
@@ -1963,18 +2032,17 @@ function viewSettings() {
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
-    '<div class="card-sub mb14">비워두면 이 기기에만 저장됩니다(직원 체크를 원장님 폰에서 볼 수 없음). ' +
-      '구글 스프레드시트를 연결하면 직원이 체크하는 즉시 원장님 화면에서 확인됩니다. 연결 방법은 <b>task/README.md</b>에 있습니다.</div>' +
-    '<div class="field"><label class="fl">Apps Script 웹앱 주소</label>' +
-      '<input class="in" id="cfgUrl" value="' + esc(s.syncUrl) + '" placeholder="https://script.google.com/macros/s/.../exec"></div>' +
-    '<div class="field"><label class="fl">비밀키 (Apps Script에 넣은 값과 동일하게)</label>' +
-      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="예) wb-2026"></div>' +
+    '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. <b>비밀키만 넣으면</b> 이 기기가 연결됩니다.<br>' +
+      '연결되면 직원이 체크하는 즉시 원장님 화면에 반영됩니다.</div>' +
+
+    '<div class="field"><label class="fl">원장 비밀키</label>' +
+      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="배포할 때 만든 TASK_ADMIN_SECRET"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
-    (s.syncUrl
-      ? '<div class="hint mt14">✓ 설정됨 — 이제 <b>개인 링크에 이 설정이 함께 담겨</b> 나갑니다. 직원은 링크만 열면 됩니다.</div>' +
+    (s.syncSecret
+      ? '<div class="hint mt14">✓ 연결됨 — 개인 링크에는 <b>직원별 토큰</b>만 담겨 나갑니다. 링크는 언제든 해지할 수 있습니다.</div>' +
         '<hr class="sep">' +
         '<div class="card-title">원장 복구 링크</div>' +
         '<div class="card-sub mb14">이 링크로 들어가면 <b>접속 정보와 비밀번호가 한 번에 들어가</b> 바로 열립니다. ' +
@@ -2018,12 +2086,20 @@ function closeModal() { $('#modalHost').innerHTML = ''; }
 
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
 
+/** 개인 링크. 전체 접근 비밀키 대신 직원별 토큰을 담는다 — 링크를 잃어버려도 해지할 수 있다. */
 function staffLink(id) {
-  let url = location.origin + location.pathname + '?u=' + id;
-  if (state.settings.syncUrl) {
-    url += '&s=' + b64(JSON.stringify({ u: state.settings.syncUrl, k: state.settings.syncSecret || '' }));
-  }
-  return url;
+  const s = staffById(id);
+  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
+  return location.origin + location.pathname + '?u=' + id + t;
+}
+async function ensureToken(id) {
+  const s = staffById(id);
+  if (!s) throw new Error('대상을 찾을 수 없습니다');
+  if (s.token) return s.token;
+  s.token = await sync.issueToken(id);
+  s.updatedAt = now();
+  save(); queueSync();
+  return s.token;
 }
 
 function orderText(staffId, date) {
@@ -2794,12 +2870,23 @@ document.addEventListener('click', ev => {
       toast(s.owner ? s.name + ' — 대표로 지정 (직원 통계에서 제외)' : s.name + ' — 대표 해제');
       break;
     }
-    case 'copylink': copy(staffLink(id)); break;
-    case 'alllinks': copy(liveStaff().map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')); break;
+    case 'copylink': {
+      ensureToken(id)
+        .then(() => copy(staffLink(id)))
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'alllinks': {
+      const list = liveStaff();
+      toast(list.length + '명 링크 준비 중…');
+      Promise.all(list.map(s => ensureToken(s.id).catch(() => null)))
+        .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
     case 'adminlink': {
       const url = location.origin + location.pathname + '?s=' +
         b64(JSON.stringify({
-          u: state.settings.syncUrl,
           k: state.settings.syncSecret || '',
           p: state.settings.adminPin || ''      // 비밀번호까지 담아 한 번에 복구되게
         }));
@@ -2981,10 +3068,9 @@ document.addEventListener('click', ev => {
 
     /* 설정 */
     case 'savecfg': {
-      state.settings.syncUrl = ($('#cfgUrl').value || '').trim();
       state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
       save(); render(); toast('저장했습니다');
-      if (state.settings.syncUrl) { sync.loud = true; sync.run(); }
+      if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
       break;
     }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
@@ -3094,7 +3180,7 @@ if (sync.enabled()) {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-02.2';
+const APP_VER = '2026-08-02.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
