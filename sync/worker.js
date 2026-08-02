@@ -65,7 +65,10 @@ async function resolveAuth(env, app, auth) {
       'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
     ).bind(app, token).first();
     if (!row || row.staff_id !== id) return null;
-    return { scope: 'own', id: id };
+    // 학생 앱(consult)은 서로 보면 안 되므로 자기 것만.
+    // 직원 앱(task)은 연락 기록·온라인 프로그램·평가처럼 담당이 아닌 학생 정보도
+    // 함께 보고 기록해야 하므로 전체 범위를 준다. 대신 토큰은 언제든 해지할 수 있다.
+    return app === 'task' ? { scope: 'all', id: id } : { scope: 'own', id: id };
   }
   return null;
 }
