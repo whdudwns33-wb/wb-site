@@ -1,107 +1,79 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
-학생 100명 이상을 감당하기 위해 기존 Apps Script 동기화를 대체한다.
+`/task/`와 `/consult/`의 변경 행만 동기화하는 Worker다. 개인 code·bearer는 서버에 `sha256:<digest>`로 저장하며, 일반 개인은 자기 owner 범위만 읽고 쓴다. task 운영 화면의 `ct/exam/op/opset` 4종 check만 allowlist로 공유하고, 관리자와 명시적 manager만 전체 범위를 조회한다.
 
-## 왜 바꾸나
+## 현재 릴리스 정책
 
-| | 기존 (Apps Script + 시트) | 여기 (Workers + D1) |
-|---|---|---|
-| 한 번에 오가는 양 | **전체 상태** (모든 학생·업무·체크) | 바뀐 행만 (델타) |
-| 학생 한 명이 체크 하나를 누르면 | 나머지 99명 데이터까지 왕복 | 자기 1건만 |
-| 저장 방식 | JSON 한 덩어리를 시트 셀에 쪼개 저장, 매번 전체 재작성 | 테이블 + 인덱스, 해당 행만 갱신 |
-| 동시 처리 | 30개 한계 → 20~30명에서 실패 시작 | 사실상 무제한 |
-| 개인 링크 권한 | 링크마다 **전체 접근 비밀키**가 들어감 | 링크마다 다른 토큰, 자기 것만 |
+- 기존 `staff/tasks/checks` 경로가 운영 저장소다.
+- 학습 화면은 분할된 legacy bridge를 사용한다. 학생은 `lpclaim` 완료요청만 쓸 수 있고 학습 원장 blob은 관리자/manager만 쓴다.
+- `/api/v2/learning`은 다음 단계용 기반이며 운영에서는 `LEARNING_V2_ENABLED=false`다. health만 상태를 공개하고 쓰기 API는 열지 않는다.
+- 스터디포스·클래스카드·메타수학·NELT는 공식 계약이 확인되기 전 수동 CSV/JSON 후보만 받는다.
 
-## 배포 순서
+## 안전 배포 순서
 
-사전 준비: Node 설치, Cloudflare 로그인 (`npx wrangler login`)
+직접 `wrangler deploy`하지 않는다. 순서는 반드시 다음과 같다.
 
-```bash
+1. 운영 직전 Git bundle·소스 ZIP·D1 SQL 백업 생성 및 복원 검증
+2. 모든 신규 파일을 포함한 clean commit 준비 (`git add -A` 누락 금지)
+3. 자동 테스트와 인라인 JS 검사
+4. `deploy-safe.ps1` Worker dry-run
+5. [승인필요] 번호순 additive migration(002 → 003) → migration 원장 version 2·3 확인
+6. [승인필요] Worker 배포 → `/health`와 비활성 v2 health smoke test
+7. [승인필요] 정적 프런트 배포
+8. 24시간 인증 오류·4xx/5xx·거절 배치·확인대기 적체 감시
+
+검증만 실행:
+
+~~~powershell
 cd sync
+.\deploy-safe.ps1
+~~~
 
-# 1) D1 데이터베이스 생성 → 출력된 database_id를 wrangler.toml에 붙여넣는다
-npx wrangler d1 create wb-sync
+운영 변경은 검증한 40자리 커밋, 24시간 이내 백업 폴더, 실제 Worker URL, 확인 문구가 모두 필요하다.
 
-# 2) 스키마 적용 (원격)
-npx wrangler d1 execute wb-sync --remote --file=./schema.sql
+~~~powershell
+.\deploy-safe.ps1 -ApplyMigrations -Deploy `
+  -BackupDirectory 'C:\path\to\verified-backup' `
+  -ExpectedCommit '<40자리 검증 SHA>' `
+  -HealthUrl 'https://<worker-host>' `
+  -ConfirmProduction WB-SYNC-PRODUCTION
+~~~
 
-# 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
+스크립트는 백업 manifest의 bundle·ZIP·D1 SQL SHA-256과 Git bundle을 실제 검증하고, dirty/untracked worktree를 거부하며, 배포 전후 Worker 이력을 `.release-receipts`에 남긴다. 정적 프런트 배포는 자동으로 수행하지 않는다.
+
+## 비밀값
+
+`wrangler.toml`, 코드, URL, 문서에 비밀값을 쓰지 않는다. Cloudflare secret으로만 등록한다.
+
+~~~powershell
 npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
-npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
-npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
+npx wrangler secret put NAVER_ID
+npx wrangler secret put NAVER_SECRET
+~~~
 
-# 4) 배포
-npx wrangler deploy
-```
+기존 `s=` 복구 링크는 폐기됐다. 이미 공유된 구형 링크가 있다면 [승인필요] 관리자 secret 회전 후 새 연결을 설정한다.
 
-배포가 끝나면 `https://wb-sync.<계정>.workers.dev` 주소가 나온다. 이 주소를 앱에 넣는다.
+## 주요 API
 
-확인:
-```bash
-curl https://wb-sync.<계정>.workers.dev/health
-# {"ok":true,"now":...}
-```
+- `GET /health`: Worker 상태
+- `POST /sync`: 역할·owner 검증 후 원자적 delta push/pull
+- `POST /token`: 관리자만 24시간 유효한 1회용 개인 링크 code 발급
+- `POST /exchange`: 대상이 1회용 code를 교환해 90일 bearer 발급
+- `POST /revoke`: 관리자만 `staffId` 단위로 bearer와 미사용 code를 즉시 해지
 
-## API
+링크에는 `?u=<id>#c=<code>`만 들어가며 code는 네트워크 요청 전에 주소에서 제거된다. code 원문은 발급 응답에서 한 번만 제공되고 DB에는 `sha256:<digest>`만 저장된다. 링크를 새로 만드는 것만으로 기존 bearer는 끊기지 않으며, code 교환이 성공한 원자 트랜잭션에서만 이전 bearer를 회전한다.
+- `POST /search`: 후기·교재를 제외한 강좌 상세 후보 검색
+- `POST /curriculum`: 허용 호스트의 강의목차 추출; 403·동적 페이지는 직접 붙여넣기 안내
+- `GET /api/v2/learning/health`: v2 foundation의 enabled 상태
 
-모두 `POST`, 본문은 JSON.
-
-### `/sync`
-```jsonc
-{
-  "app": "consult",                 // task | consult
-  "auth": { "mode": "admin", "secret": "..." },
-  //  또는 { "mode": "person", "id": "<staffId>", "token": "..." }
-  "since": 1785651000000,           // 마지막으로 받은 서버 시각. 처음이면 0
-  "changes": [                      // 올릴 변경 (최대 500건)
-    { "table": "checks", "k": "__st__S1|2026-08-02", "owner": "S1",
-      "data": { }, "updated_at": 1785650000000 }
-  ]
-}
-```
-응답:
-```jsonc
-{ "ok": true, "now": 1785651111111, "more": false, "changes": [ /* since 이후 바뀐 행 */ ] }
-```
-`more: true`면 아직 남은 게 있다는 뜻이니 받은 `now`로 한 번 더 호출한다.
-
-### `/token` — 개인 링크 토큰 발급 (원장만)
-```jsonc
-{ "app": "consult", "auth": { "mode": "admin", "secret": "..." }, "staffId": "S1" }
-→ { "ok": true, "token": "..." }
-```
-
-### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)
-```jsonc
-{ "app":"consult", "auth":{...}, "q":"현우진 뉴런", "platform":"메가스터디" }
-→ { "ok":true, "items":[{ "title":"...", "url":"https://...", "desc":"..." }] }
-```
-`platform`을 주면 그 도메인 결과만 남기고, 강좌 상세 페이지로 보이는 주소를 위로 정렬한다.
-
-### `/curriculum` — 강좌 주소에서 목차 추출
-```jsonc
-{ "app":"consult", "auth":{...}, "url":"https://..." }
-→ { "ok":true, "text":"1강. 개념 52:10\n...", "count":59 }
-→ 못 읽으면 { "ok":true, "text":"", "count":0, "hint":"..." }
-```
-사이트별 선택자가 아니라 "회차 번호 + 시간 표기" 패턴으로 표를 훑는다.
-euc-kr 페이지도 인코딩을 판별해 읽는다. 자바스크립트로 목록을 그리는 페이지는
-서버에서 못 잡으므로 붙여넣기로 안내한다. 내부망·비HTTP 주소는 거부한다(SSRF 방어).
-
-### `/revoke` — 토큰 해지 (원장만)
-```jsonc
-{ "app": "consult", "auth": { "mode":"admin", "secret":"..." }, "token": "..." }
-```
-
-## 설계 메모
-
-- **충돌 처리**는 `updated_at`(클라이언트 시각) 기준 last-write-wins. 늦게 도착한 옛 기록이 최신을 덮지 않도록 `ON CONFLICT ... WHERE excluded.updated_at > 기존.updated_at` 으로 막는다.
-- **델타 기준은 `srv_at`(서버 시각)** 을 따로 둔다. 기기 시계가 틀어져도 빠지는 행이 생기지 않는다.
-- **개인 접속의 쓰기 범위**도 서버에서 검사한다. 클라이언트가 남의 `owner`를 붙여 보내도 저장되지 않는다.
-- `ALLOW_ORIGIN`을 비우면 모든 출처를 허용하므로 운영에서는 반드시 채운다.
+모든 sync push는 배치 전체 검증 후 저장한다. 한 건이라도 권한·형식 오류가 있으면 422로 전체 거절하며 클라이언트는 `rejected>0` 응답도 실패로 처리한다.
 
 ## 검증
 
-`scratchpad/test-worker.mjs` — 인메모리 SQLite로 D1을 흉내 내 20개 시나리오를 돌린다
-(인증·출처·델타·분할·위조 토큰·LWW·앱 격리·토큰 해지·전송 상한·100명 규모 조회).
+~~~powershell
+node --test ..\consult\learning-platform.test.cjs ..\consult\learning-shell.test.cjs ..\consult\learning-persistence.test.cjs ..\consult\program-imports.test.js ..\consult\program-import-ui.test.cjs .\worker-core.test.mjs .\worker-regression.test.mjs .\learning-v2.test.mjs .\security-static.test.mjs
+node ..\scripts\check-inline-html.mjs ..\consult\index.html ..\task\index.html
+~~~
+
+복구 기준과 최소 범위 rollback은 `../docs/learning-platform-v2/ROLLBACK.md`를 따른다.

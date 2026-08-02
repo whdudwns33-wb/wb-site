@@ -1,40 +1,16 @@
-import baseWorker from './worker-core.js';
+import baseWorker, { resolveLegacyAuth } from './worker-core.js';
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
   headers: {
     'Content-Type': 'application/json;charset=utf-8',
     'Access-Control-Allow-Origin': origin || '*',
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer'
   }
 });
-
-function safeEqual(a, b) {
-  a = String(a || '');
-  b = String(b || '');
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-async function resolveAuth(env, app, auth) {
-  if (!auth || typeof auth !== 'object') return null;
-  if (auth.mode === 'admin') {
-    const expected = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
-    return expected && safeEqual(auth.secret, expected) ? { scope: 'all' } : null;
-  }
-  if (auth.mode === 'person') {
-    const id = String(auth.id || '');
-    const token = String(auth.token || '');
-    if (!id || !token) return null;
-    const row = await env.DB.prepare(
-      'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
-    ).bind(app, token).first();
-    return row && row.staff_id === id ? { scope: 'own', id } : null;
-  }
-  return null;
-}
 
 const PLATFORM_RULES = {
   '엘리하이': {
@@ -179,7 +155,7 @@ function selectCourseItems(rawItems, query, platform) {
 }
 
 async function handleApiHubSearch(env, app, body, origin) {
-  const auth = await resolveAuth(env, app, body.auth);
+  const auth = await resolveLegacyAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
   if (!env.NAVER_ID || !env.NAVER_SECRET) {
     return json({ ok: false, error: '네이버 검색 키가 설정되지 않았습니다' }, 400, origin);

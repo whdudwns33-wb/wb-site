@@ -1,94 +1,135 @@
 import searchWorker from './search-filter.js';
+import { resolveLegacyAuth } from './worker-core.js';
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
   headers: {
     'Content-Type': 'application/json;charset=utf-8',
     'Access-Control-Allow-Origin': origin || '*',
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer'
   }
 });
 
-function safeEqual(a, b) {
-  a = String(a || '');
-  b = String(b || '');
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+const DEFAULT_COURSE_DOMAINS = ['mbest.co.kr', 'megastudy.net', 'etoos.com', 'mimacstudy.com'];
+const MAX_REDIRECTS = 4;
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 10000;
+
+function allowedCourseDomains(env) {
+  const configured = String(env.CURRICULUM_ALLOW_HOSTS || '').split(',')
+    .map(value => value.trim().toLowerCase()).filter(value => /^[a-z0-9.-]+$/.test(value));
+  return Array.from(new Set(DEFAULT_COURSE_DOMAINS.concat(configured)));
 }
 
-async function resolveAuth(env, app, auth) {
-  if (!auth || typeof auth !== 'object') return null;
-  if (auth.mode === 'admin') {
-    const expected = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
-    return expected && safeEqual(auth.secret, expected) ? { scope: 'all' } : null;
-  }
-  if (auth.mode === 'person') {
-    const id = String(auth.id || '');
-    const token = String(auth.token || '');
-    if (!id || !token) return null;
-    const row = await env.DB.prepare(
-      'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
-    ).bind(app, token).first();
-    return row && row.staff_id === id ? { scope: 'own', id } : null;
-  }
-  return null;
+function hostMatchesDomain(host, domain) {
+  return host === domain || host.endsWith('.' + domain);
 }
 
-function publicUrlOrNull(raw) {
+function publicUrlOrNull(raw, env) {
   let url;
   try { url = new URL(String(raw || '')); } catch (error) { return null; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.username || url.password) return null;
   const host = url.hostname.toLowerCase();
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return null;
-  if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(host)) {
-    const parts = host.split('.').map(Number);
-    if (parts.some(part => part > 255) || parts[0] === 10 || parts[0] === 127 || parts[0] === 0 ||
-        (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-        (parts[0] === 192 && parts[1] === 168) || (parts[0] === 169 && parts[1] === 254)) return null;
-  }
-  if (host === '[::1]' || host.startsWith('[fc') || host.startsWith('[fd')) return null;
+  if (!allowedCourseDomains(env).some(domain => hostMatchesDomain(host, domain))) return null;
+  url.hash = '';
   return url.toString();
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
-async function fetchCoursePage(rawUrl) {
-  const url = new URL(rawUrl);
-  const response = await fetch(url.toString(), {
-    redirect: 'follow',
-    headers: {
-      'User-Agent': USER_AGENT,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
-      'Referer': url.origin + '/',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'same-origin'
+async function readLimitedBody(response) {
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (declared > MAX_PAGE_BYTES) throw new Error('PAGE_TOO_LARGE');
+  if (!response.body || !response.body.getReader) {
+    const fallback = new Uint8Array(await response.arrayBuffer());
+    if (fallback.byteLength > MAX_PAGE_BYTES) throw new Error('PAGE_TOO_LARGE');
+    return fallback;
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const item = await reader.read();
+    if (item.done) break;
+    total += item.value.byteLength;
+    if (total > MAX_PAGE_BYTES) {
+      await reader.cancel('PAGE_TOO_LARGE');
+      throw new Error('PAGE_TOO_LARGE');
     }
-  });
-  if (!response.ok) return { ok: false, status: response.status, html: '' };
+    chunks.push(item.value);
+  }
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.byteLength; }
+  return output;
+}
 
-  const buffer = await response.arrayBuffer();
-  const decode = encoding => {
-    try { return new TextDecoder(encoding).decode(buffer); } catch (error) { return null; }
-  };
-  const charset = (response.headers.get('content-type') || '').match(/charset=["']?([\w-]+)/i);
-  if (charset) {
-    const decoded = decode(charset[1]);
-    if (decoded) return { ok: true, status: response.status, html: decoded };
+async function fetchCoursePage(rawUrl, env) {
+  let current = publicUrlOrNull(rawUrl, env);
+  if (!current) return { ok: false, status: 400, html: '', hint: '지원하는 공개 강좌 주소만 자동으로 가져올 수 있습니다.' };
+
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    const url = new URL(current);
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+          'Referer': url.origin + '/',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+    } catch (error) {
+      return { ok: false, status: 0, html: '', hint: '강좌 페이지 응답 시간이 초과되었습니다. 목차를 직접 붙여넣어 주세요.' };
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location || redirectCount === MAX_REDIRECTS) {
+        return { ok: false, status: response.status, html: '', hint: '강좌 페이지 이동이 너무 많아 자동 가져오기를 중단했습니다.' };
+      }
+      const next = publicUrlOrNull(new URL(location, current).toString(), env);
+      if (!next) return { ok: false, status: 400, html: '', hint: '허용되지 않은 주소로 이동하여 자동 가져오기를 중단했습니다.' };
+      current = next;
+      continue;
+    }
+    if (!response.ok) return { ok: false, status: response.status, html: '' };
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (contentType && !/(text\/html|application\/xhtml\+xml|text\/plain|application\/xml)/.test(contentType)) {
+      return { ok: false, status: 415, html: '', hint: '강좌 문서가 아닌 파일은 자동으로 가져오지 않습니다.' };
+    }
+
+    let buffer;
+    try { buffer = await readLimitedBody(response); }
+    catch (error) {
+      return { ok: false, status: 413, html: '', hint: '강좌 페이지가 너무 커서 자동 가져오기를 중단했습니다.' };
+    }
+    const decode = encoding => {
+      try { return new TextDecoder(encoding).decode(buffer); } catch (error) { return null; }
+    };
+    const charset = contentType.match(/charset=["']?([\w-]+)/i);
+    if (charset) {
+      const decoded = decode(charset[1]);
+      if (decoded) return { ok: true, status: response.status, html: decoded };
+    }
+    const utf8 = decode('utf-8') || '';
+    if ((utf8.match(/\uFFFD/g) || []).length > 5) {
+      const eucKr = decode('euc-kr');
+      if (eucKr) return { ok: true, status: response.status, html: eucKr };
+    }
+    return { ok: true, status: response.status, html: utf8 };
   }
-  const utf8 = decode('utf-8') || '';
-  if ((utf8.match(/\uFFFD/g) || []).length > 5) {
-    const eucKr = decode('euc-kr');
-    if (eucKr) return { ok: true, status: response.status, html: eucKr };
-  }
-  return { ok: true, status: response.status, html: utf8 };
+  return { ok: false, status: 508, html: '', hint: '강좌 페이지 이동을 완료하지 못했습니다.' };
 }
 
 const TAG_RE = /<[^>]+>/g;
@@ -155,13 +196,13 @@ function blockedHint(status) {
 }
 
 async function handleCurriculum(env, app, body, origin) {
-  const auth = await resolveAuth(env, app, body.auth);
+  const auth = await resolveLegacyAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
-  const url = publicUrlOrNull(body.url);
-  if (!url) return json({ ok: false, error: '올바른 공개 강좌 주소를 넣어 주세요' }, 400, origin);
+  const url = publicUrlOrNull(body.url, env);
+  if (!url) return json({ ok: false, error: '지원하는 공개 강좌 주소를 넣어 주세요' }, 400, origin);
 
-  const fetched = await fetchCoursePage(url);
-  if (!fetched.ok) return json({ ok: true, text: '', hint: blockedHint(fetched.status) }, 200, origin);
+  const fetched = await fetchCoursePage(url, env);
+  if (!fetched.ok) return json({ ok: true, text: '', hint: fetched.hint || blockedHint(fetched.status) }, 200, origin);
   const text = extractCurriculum(fetched.html);
   return json({
     ok: true,

@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS checks (
 CREATE INDEX IF NOT EXISTS idx_checks_srv   ON checks(app, srv_at);
 CREATE INDEX IF NOT EXISTS idx_checks_owner ON checks(app, owner, srv_at);
 
--- 개인 링크 토큰. 링크마다 다른 토큰을 줘서, 링크 하나가 새어도 그 사람 것만 열린다.
--- (기존 구조는 모든 개인 링크에 전체 접근 비밀키가 들어 있었다)
+-- 개인 링크 토큰. token에는 원문이 아니라 'sha256:<lowercase hex digest>'만 저장한다.
+-- 구형 평문 행은 성공 인증 즉시 같은 형식으로 이전하며, 발급 원문은 응답에서 한 번만 제공한다.
 CREATE TABLE IF NOT EXISTS tokens (
   app        TEXT    NOT NULL,
   token      TEXT    NOT NULL,
@@ -54,3 +54,17 @@ CREATE TABLE IF NOT EXISTS tokens (
   PRIMARY KEY (app, token)
 );
 CREATE INDEX IF NOT EXISTS idx_tokens_staff ON tokens(app, staff_id);
+
+-- 링크에는 장기 bearer 대신 짧게 만료되는 1회용 code만 넣는다. code 원문은 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS bootstrap_codes (
+  app         TEXT    NOT NULL,
+  code_hash   TEXT    NOT NULL,
+  staff_id    TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  consumed_at INTEGER,
+  revoked     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (app, code_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
+  ON bootstrap_codes(app, staff_id, revoked, expires_at);

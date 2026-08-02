@@ -4,11 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <title>컨설팅 플래너 · WB 웩슬러브레인센터</title>
 <meta name="theme-color" content="#1B3A5C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./learning-platform.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -257,13 +259,23 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
+<script src="./program-imports.js"></script>
+<script src="./learning-platform.js"></script>
+<script src="./learning-shell.js"></script>
 <script>
 "use strict";
 
 /* ══════════════════════════════════════════════════════
    1. 저장소
    ══════════════════════════════════════════════════════ */
-const LS_KEY = 'wb_consult_v1';
+const LEGACY_LS_KEY = 'wb_consult_v1';
+const LEGACY_LINK_TOKEN_KEY = 'wb_consult_link_tokens_v1';
+const URL_STAFF_ID = new URLSearchParams(location.search).get('u') || '';
+const SAFE_SCOPE_ID = /^[A-Za-z0-9_-]{1,128}$/.test(URL_STAFF_ID) ? URL_STAFF_ID : '';
+const HAS_PERSON_SCOPE = !!URL_STAFF_ID;
+// 원장과 개인 링크가 같은 localStorage·동기화 커서를 공유하지 않도록 역할별로 격리한다.
+const LS_KEY = HAS_PERSON_SCOPE ? 'wb_consult_v2_person_' + (SAFE_SCOPE_ID || 'invalid') : 'wb_consult_v2_admin';
+const linkCodeVault = new Map();
 const DOW = ['일','월','화','수','목','금','토'];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
@@ -271,11 +283,14 @@ const now = () => Date.now();
 
 function blankState() {
   return {
-    version: 2,
+    version: 3,
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터' }
+    settings: {
+      adminPin: '', adminPinHash: '', adminPinSalt: '', adminPinVersion: 0,
+      syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터', syncCursors: {}
+    }
   };
 }
 
@@ -283,11 +298,15 @@ let state = blankState();
 
 function load() {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    // 개인 링크는 과거 공용 저장소를 읽지 않는다. 원장만 기존 상태를 1회 복사한다.
+    const scoped = localStorage.getItem(LS_KEY);
+    const raw = scoped || (!HAS_PERSON_SCOPE ? localStorage.getItem(LEGACY_LS_KEY) : '');
     if (raw) {
       const p = JSON.parse(raw);
       state = Object.assign(blankState(), p);
       state.settings = Object.assign(blankState().settings, p.settings || {});
+      state.settings.syncCursors = Object.assign({}, state.settings.syncCursors || {});
+      if (!scoped) save();
     }
   } catch (e) { console.warn('load failed', e); }
 }
@@ -295,6 +314,75 @@ function load() {
 function save() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
+}
+
+function linkCodeFor(id) {
+  const entry = linkCodeVault.get(String(id));
+  if (!entry || Number(entry.expiresAt || 0) <= Date.now()) {
+    linkCodeVault.delete(String(id));
+    return '';
+  }
+  return String(entry.code || '');
+}
+
+function storeLinkCode(id, code, expiresAt) {
+  linkCodeVault.set(String(id), { code: String(code || ''), expiresAt: Number(expiresAt) || 0 });
+}
+
+function clearLinkCode(id) {
+  linkCodeVault.delete(String(id));
+}
+
+function migrateLegacyStaffTokens() {
+  // 개인 범위에서는 공용 legacy 저장소나 관리자 token vault에 절대 접근하지 않는다.
+  if (HAS_PERSON_SCOPE) return;
+  let changed = false;
+  (state.staff || []).forEach(person => {
+    if (!person || !person.token) return;
+    delete person.token;
+    changed = true;
+  });
+  try { localStorage.removeItem(LEGACY_LINK_TOKEN_KEY); } catch (error) {}
+  if (changed) save();
+}
+
+function hasAdminPin() {
+  return !!(state.settings.adminPinHash || state.settings.adminPin);
+}
+
+function randomHex(bytes) {
+  const out = new Uint8Array(bytes);
+  crypto.getRandomValues(out);
+  return Array.from(out, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function derivePinHash(pin, salt) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({
+    name: 'PBKDF2', salt: enc.encode(String(salt)), iterations: 120000, hash: 'SHA-256'
+  }, key, 256);
+  return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function setAdminPin(pin) {
+  const salt = randomHex(16);
+  state.settings.adminPinSalt = salt;
+  state.settings.adminPinHash = await derivePinHash(pin, salt);
+  state.settings.adminPinVersion = 1;
+  state.settings.adminPin = '';
+  save();
+}
+
+async function verifyAdminPin(pin) {
+  if (state.settings.adminPinHash && state.settings.adminPinSalt) {
+    return await derivePinHash(pin, state.settings.adminPinSalt) === state.settings.adminPinHash;
+  }
+  if (state.settings.adminPin && pin === state.settings.adminPin) {
+    await setAdminPin(pin);
+    return true;
+  }
+  return false;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -512,6 +600,17 @@ function ownerOfCheck(key) {
   return t ? (t.staffId || null) : null;
 }
 
+function syncCursor() {
+  const key = session.isStaffLink ? 'person:' + session.staffId : 'admin';
+  const all = state.settings.syncCursors || (state.settings.syncCursors = {});
+  if (!all[key]) {
+    all[key] = key === 'admin'
+      ? { pullAt: Number(state.settings.pullAt) || 0, pushAt: Number(state.settings.pushAt) || 0 }
+      : { pullAt: 0, pushAt: 0 };
+  }
+  return all[key];
+}
+
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
 
@@ -569,6 +668,7 @@ const sync = {
     });
     const d = await res.json().catch(() => null);
     if (!d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + res.status));
+    if (Number(d.rejected || 0) > 0) throw new Error('서버가 ' + d.rejected + '건을 거절해 동기화를 중단했습니다');
     return d;
   },
 
@@ -578,21 +678,24 @@ const sync = {
     this.busy = true; paintStatus();
     try {
       const t0 = now();
-      const pending = this.collect(Number(state.settings.pushAt) || 0);
+      const cursorState = syncCursor();
+      const pending = this.collect(Number(cursorState.pushAt) || 0);
       let guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
-          since: Number(state.settings.pullAt) || 0,
+          since: Number(cursorState.pullAt) || 0,
           changes: batch
         });
         this.apply(d.changes);
-        state.settings.pullAt = d.now;
+        const previousPull = Number(cursorState.pullAt) || 0;
+        cursorState.pullAt = Number(d.now) || previousPull;
+        if (d.more && cursorState.pullAt <= previousPull) throw new Error('동기화 커서가 진행되지 않습니다');
         again = !!d.more || pending.length > 0;
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
-      state.settings.pushAt = t0;
+      cursorState.pushAt = t0;
       save();
       this.last = now(); this.dirty = false; this.err = '';
       render();
@@ -605,12 +708,21 @@ const sync = {
     }
   },
 
-  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
-  async issueToken(staffId) {
+  /** 링크에는 장기 bearer 대신 24시간 안에 한 번만 교환할 bootstrap code를 넣는다. */
+  async issueBootstrap(staffId) {
     const auth = this.auth();
     if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 발급할 수 있습니다');
-    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
-    return d.token;
+    return await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
+  },
+
+  async exchangeBootstrap(staffId, code) {
+    return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
+  },
+
+  async revokeAccess(staffId) {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 해지할 수 있습니다');
+    return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
   }
 };
 
@@ -625,8 +737,8 @@ function queueSync() {
    5. 세션 / 라우팅
    ══════════════════════════════════════════════════════ */
 const session = {
-  get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
-  get isStaffLink() { return !!this.staffId; },
+  get staffId() { return SAFE_SCOPE_ID; },
+  get isStaffLink() { return HAS_PERSON_SCOPE; },
   get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_consult_admin') === '1'; },
   unlock() { sessionStorage.setItem('wb_consult_admin', '1'); },
   lock() { sessionStorage.removeItem('wb_consult_admin'); }
@@ -642,7 +754,7 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
-  if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
+  if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
   if (r && r !== route) { route = r; render(); }
 });
@@ -650,36 +762,40 @@ window.addEventListener('hashchange', () => {
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
 
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
+let pendingBootstrapCode = ''; // fragment에서 즉시 제거한 뒤 1회 교환할 코드
 
 /** 링크에 담겨 온 것들을 흡수한다.
- *  s=  동기화 설정 (학생 기기 세팅 대신)
+ *  s=  구형 비밀정보 복구 링크 (내용은 무시하고 URL에서 제거)
  *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
 function absorbLinkParams() {
   const q = new URLSearchParams(location.search);
   let touched = false;
 
-  const tk = q.get('t');
-  if (tk) { state.settings.myToken = tk; save(); }
+  const legacyToken = q.get('t');
+  if (legacyToken !== null) {
+    // URL bearer는 절대 흡수하지 않는다. 새 1회용 링크를 다시 받아야 한다.
+    q.delete('t'); touched = true;
+    setTimeout(() => toast('기존 토큰 링크는 사용할 수 없습니다. 새 개인 링크를 받아 주세요'), 0);
+  }
+
+  const codeMatch = location.hash.match(/[#&]c=([^&]+)/);
+  if (codeMatch) {
+    try {
+      const code = decodeURIComponent(codeMatch[1]);
+      if (code && code.length <= 256) pendingBootstrapCode = code;
+    } catch (error) { pendingBootstrapCode = ''; }
+  }
 
   const s = q.get('s');
   if (s) {
-    try {
-      const cfg = JSON.parse(unb64(s));
-      if (cfg.k) state.settings.syncSecret = cfg.k;
-      // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
-      if (cfg.p && !new URLSearchParams(location.search).get('u')) {
-        state.settings.adminPin = cfg.p;
-        session.unlock();
-      }
-      save();
-    } catch (e) { console.warn('link config', e); }
+    // 구형 복구 링크는 비밀키·PIN을 포함할 수 있으므로 내용을 흡수하지 않고 제거한다.
     q.delete('s'); touched = true;
   }
 
-  // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다
+  // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다.
   let raw = null;
-  const m = location.hash.match(/[#&]add=([^&]+)/);
-  if (m) raw = m[1];
+  const addMatch = location.hash.match(/[#&]add=([^&]+)/);
+  if (addMatch) raw = addMatch[1];
   else if (q.get('add')) { raw = q.get('add'); q.delete('add'); touched = true; }
 
   if (raw) {
@@ -687,11 +803,13 @@ function absorbLinkParams() {
       const p = JSON.parse(unb64(raw));
       const list = Array.isArray(p) ? p : (p.assignments || []);
       if (list.length) pendingAdd = list;
-    } catch (e) { console.warn('link add', e); }
+    } catch (error) { console.warn('link add', error); }
   }
 
-  if (touched || m) {
-    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (m ? '' : location.hash));
+  // code fragment는 네트워크 교환보다 먼저 제거한다.
+  if (touched || addMatch || codeMatch) {
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') +
+      (addMatch || codeMatch ? '' : location.hash));
   }
 }
 
@@ -766,7 +884,210 @@ function currentStaff() {
 /* ══════════════════════════════════════════════════════
    7. 뷰
    ══════════════════════════════════════════════════════ */
+
+const LP_PART_PREFIXES = ['lpcore', 'lpplan', 'lpassess', 'lpcampaign', 'lpwrong'];
+const LP_CLAIM_LIMIT = 200;
+let learningMount = null;
+let lpImportReview = null;
+
+function lpPartKey(prefix, studentId) { return '__' + prefix + '__' + studentId; }
+function lpPart(prefix, studentId) {
+  return state.checks[lpPartKey(prefix, studentId) + '|all'] || null;
+}
+function lpCanManage() { return session.isAdmin || isManager(); }
+function lpClaimsFor(studentId) {
+  const record = state.checks['__lpclaim__' + studentId + '|all'];
+  return record && record.value && Array.isArray(record.value.claims) ? record.value.claims.slice(-LP_CLAIM_LIMIT) : [];
+}
+function saveLearningClaim(studentId, claimInput) {
+  const input = claimInput || {};
+  const itemId = String(input.itemId || '');
+  const expectedRevision = Number(input.expectedRevision);
+  const date = String(input.date || '');
+  if (!itemId) throw new Error('완료 요청 항목 ID가 필요합니다');
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new Error('완료 요청 revision이 올바르지 않습니다');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('완료 요청 날짜가 올바르지 않습니다');
+  const claims = lpClaimsFor(studentId).filter(claim => claim && claim.itemId !== itemId);
+  claims.push({
+    itemId: itemId,
+    expectedRevision: expectedRevision,
+    date: date,
+    claimedAt: String(input.claimedAt || new Date().toISOString())
+  });
+  setCheck('__lpclaim__' + studentId, 'all', { value: { claims: claims.slice(-LP_CLAIM_LIMIT) }, done: true });
+}
+function clearLearningClaim(studentId, itemId) {
+  const claims = lpClaimsFor(studentId).filter(claim => claim && claim.itemId !== itemId);
+  setCheck('__lpclaim__' + studentId, 'all', { value: { claims: claims }, done: true });
+}
+function lpActorId() { return session.isAdmin ? 'academy-admin' : (session.staffId || 'academy-manager'); }
+function lpImportLedger(studentId) {
+  const record = state.checks['__lpimport__' + studentId + '|all'];
+  const value = record && record.value;
+  return value && typeof value === 'object' ? value : { keys: [], history: [] };
+}
+function normalizeLpImportLedger(value) {
+  const result = {
+    history: (value && value.history || []).slice(-100),
+    keys: Array.from(new Set(value && value.keys || [])).slice(-600)
+  };
+  const size = () => new TextEncoder().encode(JSON.stringify(result)).length;
+  while (size() > 52 * 1024 && (result.history.length || result.keys.length)) {
+    if (result.history.length > 20 || (result.history.length && !result.keys.length)) result.history.shift();
+    else if (result.keys.length) result.keys.shift();
+  }
+  if (size() > 52 * 1024) throw new Error('가져오기 이력이 너무 커서 저장할 수 없습니다');
+  return result;
+}
+
+function saveLpImportLedger(studentId, value) {
+  setCheck('__lpimport__' + studentId, 'all', { value: normalizeLpImportLedger(value), done: true });
+}
+
+function learningStateFor(student) {
+  if (!student || !window.WBLearningShell) return null;
+  const core = lpPart('lpcore', student.id);
+  const legacy = state.checks['__lp__' + student.id + '|all'];
+  if (!core && !(legacy && legacy.platformState)) return null;
+  let stored = legacy && legacy.platformState ? legacy.platformState : Object.assign({}, core && core.value || {}, {
+    plannerItems: (lpPart('lpplan', student.id) || {}).value || [],
+    assessmentSchedules: ((lpPart('lpassess', student.id) || {}).value || {}).schedules || [],
+    assessmentOccurrences: ((lpPart('lpassess', student.id) || {}).value || {}).occurrences || [],
+    prepCampaigns: (lpPart('lpcampaign', student.id) || {}).value || [],
+    remediationCases: (lpPart('lpwrong', student.id) || {}).value || []
+  });
+  try {
+    const normalized = WBLearningShell.normalizeState(stored, {
+      studentCode: student.id,
+      displayName: student.name
+    });
+    return WBLearningShell.applyCompletionClaims(normalized, lpClaimsFor(student.id));
+  } catch (error) {
+    console.warn('learning state', error);
+    return null;
+  }
+}
+
+function saveLearningState(studentId, nextState, options) {
+  if (!lpCanManage()) throw new Error('학습 원장 상태는 관리자만 저장할 수 있습니다');
+  const opts = options || {};
+  const pieces = {
+    lpcore: {
+      schemaVersion: nextState.schemaVersion,
+      student: nextState.student,
+      settings: nextState.settings,
+      programStates: nextState.programStates,
+      migrationIssues: nextState.migrationIssues || []
+    },
+    lpplan: nextState.plannerItems || [],
+    lpassess: {
+      schedules: nextState.assessmentSchedules || [],
+      occurrences: nextState.assessmentOccurrences || []
+    },
+    lpcampaign: nextState.prepCampaigns || [],
+    lpwrong: nextState.remediationCases || []
+  };
+  if (opts.importLedger) pieces.lpimport = normalizeLpImportLedger(opts.importLedger);
+  if (opts.clearClaimItemId) {
+    pieces.lpclaim = {
+      claims: lpClaimsFor(studentId).filter(claim => claim && claim.itemId !== opts.clearClaimItemId)
+    };
+  }
+  const stamp = now();
+  const nextChecks = Object.assign({}, state.checks);
+  Object.keys(pieces).forEach(prefix => {
+    const bytes = new TextEncoder().encode(JSON.stringify(pieces[prefix])).length;
+    if (bytes > 56 * 1024) throw new Error('학습 기록이 커졌습니다. v2 서버 이전 후 추가해 주세요 (' + prefix + ')');
+    const taskId = lpPartKey(prefix, studentId);
+    const key = ckey(taskId, 'all');
+    const current = nextChecks[key] || { taskId: taskId, date: 'all', done: false };
+    nextChecks[key] = Object.assign({}, current, { value: pieces[prefix], done: true, updatedAt: stamp });
+  });
+  const candidateState = Object.assign({}, state, { checks: nextChecks });
+  const serialized = JSON.stringify(candidateState);
+  if (new TextEncoder().encode(serialized).length > 4 * 1024 * 1024) {
+    throw new Error('브라우저 저장 한도에 가까워졌습니다. v2 이전 또는 오래된 이력 정리가 필요합니다');
+  }
+  try {
+    localStorage.setItem(LS_KEY, serialized);
+  } catch (error) {
+    throw new Error('브라우저 저장 공간이 부족해 변경을 저장하지 않았습니다');
+  }
+  state = candidateState;
+  queueSync();
+}
+
+function viewLearning() {
+  const student = currentStaff();
+  if (!student) return emptyStaffCard();
+  let out = session.isStaffLink ? '' : staffSwitcher(student.id);
+  const learningState = learningStateFor(student);
+  if (!learningState) {
+    if (!lpCanManage()) {
+      return out + '<div class="card"><div class="empty"><b>📚</b>통합 학습 설정 전입니다.<br>담당 선생님께 초기 설정을 요청해 주세요.</div></div>';
+    }
+    return out + '<div class="card"><div class="card-title">통합 학습 시작</div>' +
+      '<div class="card-sub mb14">학생 단계와 학년을 확인한 뒤 시작합니다. 초등은 학교 정기시험이 자동으로 꺼집니다.</div>' +
+      '<div class="row"><select class="in" id="lpInitStage"><option value="elementary">초등</option><option value="middle">중등</option><option value="high">고등</option></select>' +
+      '<input class="in" id="lpInitGrade" type="number" min="1" max="12" value="3" placeholder="학년"></div>' +
+      '<label class="small"><input type="checkbox" id="lpInitSchedules"> NELT 3개월·메타수학 주간/월말 일정도 1년 생성</label>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="lpinit">시작</button></div>';
+  }
+  if (lpCanManage()) out += WBLearningShell.renderManagementControls(learningState, { canManage: true, today: today() });
+  out += '<div id="learning-platform" aria-label="통합 학습 플래너"></div>';
+  return out;
+}
+
+function mountLearningView() {
+  const root = document.getElementById('learning-platform');
+  const student = currentStaff();
+  if (!root || !student || !window.WBLearningPlatform) return;
+  const learningState = learningStateFor(student);
+  if (!learningState) return;
+  learningMount = WBLearningPlatform.mountLearningPlatform(root, {
+    state: learningState,
+    today: today(),
+    onChange: (nextState, action) => {
+      try {
+        if (lpCanManage()) {
+          saveLearningState(student.id, nextState);
+        } else if (action && action.type === 'planner_completion_claimed') {
+          saveLearningClaim(student.id, { itemId: action.itemId, expectedRevision: action.expectedRevision, date: action.date, claimedAt: new Date().toISOString() });
+        } else {
+          throw new Error('학생 링크에서는 완료 요청만 저장할 수 있습니다');
+        }
+        // 플래너 내부 요청이 저장되면 관리자 확인대기 건수와 승인 버튼도 즉시 갱신한다.
+        setTimeout(() => {
+          render();
+          if (action && action.type === 'planner_completion_claimed') {
+            toast('완료 요청을 확인대기로 저장했습니다');
+          }
+        }, 0);
+      } catch (error) { toast(error.message); }
+    }
+  });
+}
+
+function runLearningCommand(command, successMessage) {
+  const student = currentStaff();
+  if (!student || !lpCanManage()) return toast('관리자 확인이 필요한 작업입니다');
+  const current = learningStateFor(student);
+  if (!current) return toast('통합 학습을 먼저 시작해 주세요');
+  try {
+    const next = WBLearningShell.applyCommand(current, command, {
+      actorId: lpActorId(), today: today(), at: new Date().toISOString()
+    });
+    saveLearningState(student.id, next, command && command.type === 'planner_verify'
+      ? { clearClaimItemId: command.itemId }
+      : null);
+    render();
+    toast(successMessage || '저장했습니다');
+  } catch (error) { toast(error.message); }
+}
+
+
 function render() {
+  if (learningMount) { learningMount.destroy(); learningMount = null; }
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -784,22 +1105,23 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'ingang', 'study'];
+    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'study', 'learning', 'write', 'board'] : ['today', 'week', 'month', 'ingang', 'study', 'learning'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, study: viewStudy, learning: viewLearning, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
+  if (route === 'learning') setTimeout(mountLearningView, 0);
 }
 
 function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강'], ['study', '학습']])
+        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['learning', '통합 학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강'], ['study', '학습'], ['learning', '통합 학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['learning', '통합 학습'], ['write', '지시서 작성'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -845,7 +1167,7 @@ function viewPendingAdd() {
 
 /* ── 잠금 ── */
 function viewLock() {
-  const first = !state.settings.adminPin;
+  const first = !hasAdminPin();
   return '<div class="card mt14">' +
     '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
     '<div class="card-sub mb14">' + (first
@@ -857,9 +1179,8 @@ function viewLock() {
     '<hr class="sep">' +
     (first
       ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
-        '여기서 비밀번호를 정하지 마시고, 즐겨찾기에 저장해둔 <b>원장 복구 링크</b>로 들어오세요. ' +
-        '접속 정보와 비밀번호가 한 번에 복구됩니다.<br>' +
-        '(복구 링크는 설정 화면에서 만듭니다. 데이터는 구글 시트에 있으니 사라지지 않습니다)</div><hr class="sep">'
+        '새 PIN을 만들기 전에 운영 D1 백업과 동기화 연결 상태를 확인하세요. ' +
+        '비밀키와 PIN을 주소에 담는 복구 링크는 보안상 더 이상 만들지 않습니다.</div><hr class="sep">'
       : '') +
     '<div class="hint">학생분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
   '</div>';
@@ -2029,8 +2350,8 @@ function viewStaffAdmin() {
   const list = liveStaff();
   return '<div class="card">' +
     '<div class="card-title">학생 등록</div>' +
-    '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 학생은 링크만 열면 됩니다.</div>' +
-    '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
+    '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정이 되어 있으면 학생별 제한 토큰으로 서버 기록을 불러오며, 비밀키와 PIN은 링크에 넣지 않습니다. 개인 링크는 발급 후 24시간 안에 한 번 열어야 합니다.</div>' +
+    '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김학생)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
   '</div>' +
@@ -2047,6 +2368,7 @@ function viewStaffAdmin() {
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="revokeaccess" data-id="' + s.id + '">링크 해지</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
@@ -2065,27 +2387,21 @@ function viewSettings() {
     '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. <b>비밀키만 넣으면</b> 이 기기가 연결됩니다.<br>' +
       '연결되면 학생이 체크하는 즉시 원장님 화면에 반영되고, 학생은 자기 데이터만 주고받습니다.</div>' +
     '<div class="field"><label class="fl">원장 비밀키</label>' +
-      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="배포할 때 만든 CONSULT_ADMIN_SECRET"></div>' +
+      '<input class="in" id="cfgSecret" type="password" value="" autocomplete="new-password" placeholder="' +
+        (s.syncSecret ? '저장됨 · 변경할 때만 새 비밀키 입력' : 'CONSULT_ADMIN_SECRET 입력') + '"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) +
       (sync.err ? ' · <span style="color:var(--coral)">' + esc(sync.err) + '</span>' : '') + '</div>' +
     (s.syncSecret
-      ? '<div class="hint mt14">✓ 연결됨 — 개인 링크에는 <b>학생별 토큰</b>만 담겨 나갑니다. 링크 하나가 새어도 그 학생 것만 열립니다.</div>' +
-        '<hr class="sep">' +
-        '<div class="card-title">원장 복구 링크</div>' +
-        '<div class="card-sub mb14">이 링크로 들어가면 <b>접속 정보와 비밀번호가 한 번에 들어가</b> 바로 열립니다. ' +
-          '폰에서 볼 때, 그리고 브라우저 데이터가 지워졌을 때 되살리는 용도입니다.<br><br>' +
-          '<b>복사한 뒤 즐겨찾기에 저장해 두세요.</b> 일반 주소를 저장하면 데이터가 사라졌을 때 되살릴 방법이 없습니다.<br>' +
-          '<span style="color:var(--coral)">이 링크를 가진 사람은 원장 화면을 열 수 있습니다. 학생에게 보내지 마세요.</span></div>' +
-        '<button class="btn btn-navy btn-block" data-act="adminlink">🔑 원장 복구 링크 복사</button>'
+      ? '<div class="hint mt14">✓ 연결됨 — 비밀키는 화면·URL·백업 파일에 다시 표시하지 않습니다.</div>'
       : '') +
   '</div>' +
 
   '<div class="card">' +
     '<div class="card-title">백업</div>' +
-    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
+    '<div class="card-sub mb14">학생·업무·체크 데이터만 내려받습니다. 관리자 비밀키·PIN·개인 토큰은 파일에 넣지 않습니다.</div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
       '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
@@ -2119,19 +2435,21 @@ function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g
 /** 개인 링크. 예전에는 여기에 전체 접근 비밀키를 담았는데,
  *  링크 하나가 새면 전체가 열리는 구조라 학생별 토큰으로 바꿨다. */
 function staffLink(id) {
-  const s = staffById(id);
-  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
-  return location.origin + location.pathname + '?u=' + id + t;
+  const code = linkCodeFor(id);
+  const suffix = code ? '#c=' + encodeURIComponent(code) : '';
+  return location.origin + location.pathname + '?u=' + encodeURIComponent(id) + suffix;
 }
-/** 토큰이 없으면 발급받아 직원/학생 기록에 붙인다 */
-async function ensureToken(id) {
-  const s = staffById(id);
-  if (!s) throw new Error('대상을 찾을 수 없습니다');
-  if (s.token) return s.token;
-  s.token = await sync.issueToken(id);
-  s.updatedAt = now();
-  save(); queueSync();
-  return s.token;
+
+async function issueLinkCode(id) {
+  if (!staffById(id)) throw new Error('대상을 찾을 수 없습니다');
+  if (sync.enabled()) {
+    for (let i = 0; sync.busy && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 50));
+    sync.loud = true;
+    await sync.run();
+  }
+  const issued = await sync.issueBootstrap(id);
+  storeLinkCode(id, issued.code, issued.expiresAt);
+  return issued.code;
 }
 
 function orderText(staffId, date) {
@@ -2143,7 +2461,7 @@ function orderText(staffId, date) {
         (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
         ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
     : '(지시된 업무 없음)';
-  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n' + staffLink(staffId);
+  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n개인 링크는 24시간 안에 한 번 열어야 합니다.\n' + staffLink(staffId);
   return txt;
 }
 
@@ -2572,7 +2890,7 @@ function applyAssignments(input, preConfirmed) {
 /* ══════════════════════════════════════════════════════
    10. 이벤트
    ══════════════════════════════════════════════════════ */
-document.addEventListener('click', ev => {
+document.addEventListener('click', async ev => {
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
@@ -2593,11 +2911,12 @@ document.addEventListener('click', ev => {
     case 'setpin': {
       const v = ($('#pin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); session.unlock(); go('staff'); toast('설정되었습니다');
+      await setAdminPin(v); session.unlock(); go('staff'); toast('설정되었습니다');
       break;
     }
     case 'login': {
-      if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
+      const v = ($('#pin').value || '').trim();
+      if (!await verifyAdminPin(v)) return toast('비밀번호가 다릅니다');
       session.unlock(); render(); toast('환영합니다');
       break;
     }
@@ -2605,7 +2924,7 @@ document.addEventListener('click', ev => {
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); toast('변경되었습니다');
+      await setAdminPin(v); toast('변경되었습니다');
       break;
     }
 
@@ -3014,31 +3333,41 @@ document.addEventListener('click', ev => {
         : s.name + ' — 관리자 해제');
       break;
     }
+    case 'revokeaccess': {
+      if (!session.isAdmin) break;
+      const person = staffById(id);
+      if (!person || !confirm(person.name + ' 님의 개인 링크와 접속 세션을 모두 해지할까요?')) break;
+      sync.revokeAccess(id)
+        .then(() => { clearLinkCode(id); toast('개인 링크와 접속 세션을 해지했습니다'); })
+        .catch(e => toast('링크를 해지하지 못했습니다 — ' + e.message));
+      break;
+    }
     case 'copylink': {
-      ensureToken(id)
+      issueLinkCode(id)
         .then(() => copy(staffLink(id)))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => clearLinkCode(id));
       break;
     }
     case 'alllinks': {
       const list = liveStaff();
       toast(list.length + '명 링크 준비 중…');
-      Promise.all(list.map(s => ensureToken(s.id).catch(() => null)))
+      Promise.all(list.map(s => issueLinkCode(s.id)))
         .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => list.forEach(s => clearLinkCode(s.id)));
       break;
     }
     case 'adminlink': {
-      const url = location.origin + location.pathname + '?s=' +
-        b64(JSON.stringify({
-          k: state.settings.syncSecret || '',
-          p: state.settings.adminPin || ''      // 비밀번호까지 담아 한 번에 복구되게
-        }));
-      copy(url);
-      toast('복사했습니다 — 즐겨찾기에 저장해 두세요');
+      copy(location.origin + location.pathname);
+      toast('보안상 비밀키·PIN은 주소에 넣지 않습니다');
       break;
     }
-    case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
+    case 'orderText':
+      issueLinkCode(id)
+        .then(() => { showText('카카오톡 지시서 문구', orderText(id, cursor)); clearLinkCode(id); })
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
     case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
@@ -3063,7 +3392,11 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(me.name + ' — 추가했습니다');
       if (!session.isStaffLink) {
-        setTimeout(() => showText('카톡으로 보낼 문구', quickText(t)), 300);
+        setTimeout(() => {
+          issueLinkCode(t.staffId)
+            .then(() => { showText('카톡으로 보낼 문구', quickText(t)); clearLinkCode(t.staffId); })
+            .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        }, 300);
       }
       break;
     }
@@ -3206,24 +3539,34 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(n + '건 발행 완료');
       const first = [...touched][0];
-      if (first) setTimeout(() => showText('카카오톡 지시서 문구', orderText(first, today())), 400);
+      if (first) setTimeout(() => {
+        issueLinkCode(first)
+          .then(() => { showText('카카오톡 지시서 문구', orderText(first, today())); clearLinkCode(first); })
+          .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      }, 400);
       break;
     }
 
     /* 설정 */
     case 'savecfg': {
-
-      state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
-      save(); render(); toast('저장했습니다');
-      if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
+      const nextSecret = ($('#cfgSecret').value || '').trim();
+      if (nextSecret) state.settings.syncSecret = nextSecret;
+      if (!state.settings.syncSecret) return toast('비밀키를 입력해 주세요');
+      save(); render(); toast(nextSecret ? '새 비밀키를 저장했습니다' : '기존 연결을 유지합니다');
+      sync.loud = true; sync.run();
       break;
     }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const clean = {
+        format: 'wb-consult-data', formatVersion: 2, exportedAt: new Date().toISOString(),
+        state: { version: state.version, staff: state.staff, tasks: state.tasks, checks: state.checks,
+          settings: { centerName: state.settings.centerName || 'WB 웩슬러브레인센터' } }
+      };
+      const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'wb-컨설팅플래너-' + today() + '.json';
+      a.download = 'wb-컨설팅플래너-안전백업-' + today() + '.json';
       a.click(); URL.revokeObjectURL(a.href);
       break;
     }
@@ -3235,16 +3578,223 @@ document.addEventListener('click', ev => {
         const r = new FileReader();
         r.onload = () => {
           try {
-            const p = JSON.parse(r.result);
-            if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
-            if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
-            state = Object.assign(blankState(), p);
-            save(); render(); toast('불러왔습니다');
+            if (String(r.result || '').length > 10 * 1024 * 1024) throw new Error('파일이 너무 큽니다');
+            const parsed = JSON.parse(r.result);
+            const p = parsed && parsed.format === 'wb-consult-data' ? parsed.state : parsed;
+            if (!p || !Array.isArray(p.staff) || !Array.isArray(p.tasks) || !p.checks || typeof p.checks !== 'object') throw new Error('형식 오류');
+            if (p.staff.length > 5000 || p.tasks.length > 50000 || Object.keys(p.checks).length > 200000) throw new Error('항목 수 초과');
+            if (!confirm('현재 학생·업무·체크 데이터를 덮어씁니다. 연결 비밀키와 PIN은 유지됩니다. 계속할까요?')) return;
+            const secure = {
+              syncSecret: state.settings.syncSecret, myToken: state.settings.myToken,
+              adminPin: state.settings.adminPin, adminPinHash: state.settings.adminPinHash,
+              adminPinSalt: state.settings.adminPinSalt, adminPinVersion: state.settings.adminPinVersion,
+              syncCursors: state.settings.syncCursors
+            };
+            state = Object.assign(blankState(), {
+              version: Number(p.version) || 3, staff: p.staff, tasks: p.tasks, checks: p.checks
+            });
+            state.settings = Object.assign(blankState().settings, {
+              centerName: p.settings && p.settings.centerName || 'WB 웩슬러브레인센터'
+            }, secure);
+            save(); render(); toast('데이터를 불러왔습니다');
           } catch (e) { toast('파일을 읽을 수 없습니다'); }
         };
         r.readAsText(f);
       };
       inp.click();
+      break;
+    }
+    case 'lpinit': {
+      const student = currentStaff();
+      if (!student || !lpCanManage()) break;
+      try {
+        let next = WBLearningShell.createInitialState({
+          studentCode: student.id,
+          displayName: student.name,
+          academicStage: $('#lpInitStage').value,
+          grade: Number($('#lpInitGrade').value) || 1
+        });
+        if ($('#lpInitSchedules').checked) {
+          next = WBLearningShell.applyCommand(next, {
+            type: 'schedules_generate', fromDate: today(), toDate: addDays(today(), 365), weekday: 5
+          }, {});
+        }
+        saveLearningState(student.id, next);
+        render(); toast('통합 학습을 시작했습니다');
+      } catch (error) { toast(error.message); }
+      break;
+    }
+    case 'lpprofile':
+      runLearningCommand({ type: 'profile_update', academicStage: $('#lpStage').value, grade: Number($('#lpGrade').value) || 1 }, '학년 단계를 저장했습니다');
+      break;
+    case 'lpschedule': {
+      const fromDate = $('#lpScheduleFrom').value || today();
+      runLearningCommand({ type: 'schedules_generate', fromDate: fromDate, toDate: addDays(fromDate, 365), weekday: Number($('#lpWeekday').value) || 5 }, '정기평가 1년 일정을 생성했습니다');
+      break;
+    }
+    case 'lpprogram':
+      runLearningCommand({
+        type: 'program_upsert', providerId: $('#lpProvider').value, status: $('#lpProgramStatus').value,
+        accountIdRef: ($('#lpAccountRef').value || '').trim(),
+        assignedCount: Number($('#lpAssigned').value) || 0, completedCount: Number($('#lpCompleted').value) || 0
+      }, '온라인 프로그램 상태를 확인 후보로 저장했습니다');
+      break;
+    case 'lpimportpreview': {
+      const student = currentStaff();
+      if (!student || !lpCanManage() || !window.WBProgramImports) break;
+      const raw = ($('#lpImportText').value || '').trim();
+      if (!raw) return toast('CSV 또는 JSON을 붙여넣어 주세요');
+      const providerId = $('#lpImportProvider').value;
+      try {
+        const parsed = /^[\[{]/.test(raw) ? WBProgramImports.parseJson(raw) : WBProgramImports.parseCsv(raw);
+        const rows = parsed.map(row => Object.assign({ student_code: student.id }, row));
+        WBProgramImports.previewImport({
+          providerId: providerId,
+          input: rows,
+          format: 'json',
+          sourceRef: 'consult-manual-import',
+          studentDirectory: [{ student_code: student.id, external_ids: {} }]
+        }).then(preview => {
+          const ledger = lpImportLedger(student.id);
+          const validation = WBProgramImports.validatePreview(preview, { existingIdempotencyKeys: ledger.keys });
+          const candidates = WBProgramImports.createConfirmCandidates(validation, { requestedBy: lpActorId() });
+          const reviewRows = WBProgramImports.createReviewRows(validation);
+          lpImportReview = { studentId: student.id, validation: validation, candidates: candidates, reviewRows: reviewRows };
+          const invalidReasons = validation.invalid_candidates.slice(0, 10).map(candidate =>
+            '행 ' + candidate.row_number + ': ' + candidate.issues.filter(issue => issue.blocking).map(issue => issue.message).join(', ')
+          );
+          const currentLearningState = learningStateFor(student);
+          const currentPrograms = currentLearningState && Array.isArray(currentLearningState.programStates)
+            ? currentLearningState.programStates : [];
+          const importDisplay = value => value === null || value === undefined || value === '' ? '-' : String(value);
+          const importDateDisplay = value => {
+            const display = importDisplay(value);
+            return display === '-' ? display : display.slice(0, 10);
+          };
+          const rowHtml = reviewRows.map(row => {
+            const currentProgram = currentPrograms.find(program =>
+              program && program.studentCode === student.id && program.providerId === row.provider_id
+            );
+            const currentSnapshot = currentProgram && currentProgram.latestSnapshot;
+            const currentData = currentSnapshot && currentSnapshot.data || {};
+            const currentProgress = currentData.progress_pct === undefined ? currentData.progressPct : currentData.progress_pct;
+            const currentTarget = currentData.target_score === undefined ? currentData.targetScore : currentData.target_score;
+            const currentScore = currentData.score == null ? '-' : String(currentData.score) + (currentTarget == null ? '' : '/' + currentTarget);
+            const incomingScore = row.score == null ? '-' : String(row.score) + (row.target_score == null ? '' : '/' + row.target_score);
+            const comparison = '현재: 상태 ' + importDisplay(currentProgram && currentProgram.status) +
+              ' · 날짜 ' + importDateDisplay(currentSnapshot && currentSnapshot.checkDate || currentProgram && currentProgram.lastCheckedAt) +
+              ' · 진행률 ' + (currentProgress == null ? '-' : currentProgress + '%') + ' · 점수 ' + currentScore +
+              ' → 반영: 상태 ' + importDisplay(row.status) + ' · 날짜 ' + importDateDisplay(row.check_date) +
+              ' · 진행률 ' + (row.progress_pct == null ? '-' : row.progress_pct + '%') + ' · 점수 ' + incomingScore;
+            const details = [
+              '학생 ' + (row.student_code || '-'),
+              row.current_unit ? '진도 ' + row.current_unit : '',
+              row.set_name ? '세트 ' + row.set_name : ''
+            ].filter(Boolean).join(' · ');
+            return '<label class="card-sub" style="display:block;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:10px">' +
+              '<input type="checkbox" data-lp-import-row value="' + esc(row.row_id) + '" checked> ' +
+              '<strong>행 ' + esc(row.row_number) + ' · ' + esc(row.provider_label || row.provider_id) + '</strong>' +
+              '<div class="hint">' + esc(details) + '</div><div class="hint" style="margin-top:4px">' + esc(comparison) + '</div></label>';
+          }).join('');
+          modal('프로그램 가져오기 확인',
+            '<div class="card-sub">전체 ' + validation.summary.total + '행 · 승인 가능 ' + validation.summary.valid + '행 · 확인필요 ' + validation.summary.invalid + '행</div>' +
+            (invalidReasons.length ? '<div class="hint mt14">' + invalidReasons.map(esc).join('<br>') + '</div>' : '') +
+            (rowHtml ? '<div style="max-height:360px;overflow:auto">' + rowHtml + '</div>' : '') +
+            '<div class="hint mt14">선택한 행만 승인자·승인시각과 함께 반영됩니다. 선택하지 않은 행은 반영되지 않고 원장에도 기록되지 않습니다.</div>' +
+            '<div class="hint mt14">최근 이력은 프로그램별 최대 20건·8KB를 보존합니다. 초과한 오래된 이력은 정리되고 누적 정리 건수는 상태에 기록됩니다.</div>',
+            validation.summary.valid
+              ? '<button class="btn btn-primary btn-block mt14" data-act="lpimportapply">선택 행 승인 및 반영</button>'
+              : '');
+        }).catch(error => toast(error.message));
+      } catch (error) { toast(error.message); }
+      break;
+    }
+    case 'lpimportapply': {
+      if (!lpImportReview || !lpCanManage()) break;
+      const student = currentStaff();
+      if (!student || student.id !== lpImportReview.studentId) return toast('학생 선택이 바뀌었습니다');
+      try {
+        if (!window.WBLearningPlatform || typeof WBLearningPlatform.applyApprovedProgramImport !== 'function') {
+          throw new Error('승인된 프로그램 가져오기 모듈을 사용할 수 없습니다');
+        }
+        const selectedRowIds = Array.from(document.querySelectorAll('[data-lp-import-row]:checked'))
+          .map(input => input.value);
+        if (!selectedRowIds.length) throw new Error('반영할 행을 한 개 이상 선택해 주세요');
+        let learningState = learningStateFor(student);
+        const ledger = lpImportLedger(student.id);
+        const currentKeys = new Set(ledger.keys || []);
+        const candidatesByRow = new Map(lpImportReview.candidates.candidates.map(candidate => [candidate.row_id, candidate]));
+        const staleRows = selectedRowIds.filter(rowId => {
+          const candidate = candidatesByRow.get(rowId);
+          return candidate && currentKeys.has(candidate.duplicate_key);
+        });
+        if (staleRows.length) throw new Error('미리보기 이후 이미 반영된 행이 있습니다. 다시 미리보기 해주세요');
+        const approvedAt = new Date().toISOString();
+        const approval = WBProgramImports.approveConfirmCandidates(lpImportReview.candidates, {
+          selectedRowIds: selectedRowIds,
+          approvedBy: lpActorId(),
+          approvedAt: approvedAt
+        });
+        approval.approved_candidates.forEach(candidate => {
+          if (candidate.student_code !== student.id) throw new Error('다른 학생의 가져오기 후보는 반영할 수 없습니다');
+          learningState = WBLearningPlatform.applyApprovedProgramImport(learningState, candidate);
+          ledger.keys.push(candidate.duplicate_key);
+          ledger.history.push({
+            rowId: candidate.row_id, at: candidate.approved_at, actor: candidate.approved_by,
+            providerId: candidate.provider_id, studentCode: student.id,
+            idempotencyKey: candidate.duplicate_key, payloadHash: candidate.payload_hash,
+            sourceHash: candidate.source_hash, reportedStatus: candidate.reported_status,
+            finalStatus: candidate.final_status, approvalStatus: candidate.approval_status,
+            confirmedByHuman: true
+          });
+        });
+        saveLearningState(student.id, learningState, { importLedger: ledger });
+        const appliedCount = approval.approved_candidates.length;
+        lpImportReview = null;
+        closeModal(); render(); toast('사람 확인을 거쳐 ' + appliedCount + '행을 반영했습니다');
+      } catch (error) { toast(error.message); }
+      break;
+    }
+    case 'lpplan':
+      runLearningCommand({
+        type: 'planner_add', date: $('#lpPlanDate').value || today(), title: ($('#lpPlanTitle').value || '').trim(),
+        minutes: Number($('#lpPlanMinutes').value) || 0, providerId: $('#lpPlanProvider').value
+      }, '플래너에 추가했습니다');
+      break;
+    case 'lpverifyitem': {
+      const evidence = document.querySelector('[data-lp-verify-evidence="' + CSS.escape(id) + '"]');
+      const decision = el.dataset.decision;
+      if (decision !== 'approve' && decision !== 'reject') return toast('승인 또는 반려를 선택해 주세요');
+      runLearningCommand({ type: 'planner_verify', itemId: id, approved: decision === 'approve', evidenceRef: evidence ? evidence.value.trim() : '' }, decision === 'approve' ? '완료를 승인했습니다' : '확인필요로 반려했습니다');
+      break;
+    }
+    case 'lpcampaign':
+      runLearningCommand({
+        type: 'campaign_add', campaignType: $('#lpCampaignType').value,
+        title: ($('#lpCampaignTitle').value || '').trim() || $('#lpCampaignType').selectedOptions[0].textContent,
+        examDate: $('#lpCampaignDate').value
+      }, '시험대비 캠페인 초안을 추가했습니다');
+      break;
+    case 'lpactivate': {
+      const consent = document.querySelector('[data-lp-consent-ref="' + CSS.escape(id) + '"]');
+      runLearningCommand({ type: 'campaign_activate', campaignId: id, consentEvidenceRef: consent ? consent.value.trim() : '' }, '시험대비 캠페인을 활성화했습니다');
+      break;
+    }
+    case 'lpwrong':
+      runLearningCommand({
+        type: 'wrong_add', textbookId: ($('#lpWrongBook').value || '').trim(),
+        page: ($('#lpWrongPage').value || '').trim(), problemNo: ($('#lpWrongNo').value || '').trim(),
+        skillCode: ($('#lpWrongSkill').value || '').trim()
+      }, '오답 참조를 등록했습니다');
+      break;
+    case 'lpwrongnext': {
+      const ref = document.querySelector('[data-lp-wrong-ref="' + CSS.escape(id) + '"]');
+      const result = document.querySelector('[data-lp-wrong-result="' + CSS.escape(id) + '"]');
+      const mastered = !!(result && result.value === 'mastered');
+      runLearningCommand({
+        type: 'wrong_advance', caseId: id, externalRef: ref ? ref.value.trim() : '',
+        mastered: mastered, nextRecheckDate: result && !mastered ? addDays(today(), 7) : ''
+      }, mastered ? '사람 확인을 거쳐 숙달 완료했습니다' : '오답 워크플로우를 다음 단계로 이동했습니다');
       break;
     }
     case 'closemodal': closeModal(); break;
@@ -3296,16 +3846,40 @@ document.addEventListener('visibilitychange', () => {
    11. 시작
    ══════════════════════════════════════════════════════ */
 load();
+migrateLegacyStaffTokens();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
 if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
 
-if (sync.enabled()) {
+let syncLoopStarted = false;
+async function startSyncSession() {
+  if (pendingBootstrapCode) {
+    const code = pendingBootstrapCode;
+    const previousToken = String(state.settings.myToken || '');
+    pendingBootstrapCode = '';
+    try {
+      const exchanged = await sync.exchangeBootstrap(session.staffId, code);
+      state.settings.myToken = exchanged.token;
+      save();
+      toast('개인 링크 인증을 완료했습니다');
+    } catch (error) {
+      // 교환 성공 전에는 기존 정상 세션을 유지한다. 토큰이 없을 때만 링크 만료 상태로 남는다.
+      sync.err = String(error && error.message || error);
+      render();
+      toast('개인 링크를 열 수 없습니다 — ' + sync.err);
+      if (!previousToken) return;
+    }
+  }
+  if (!sync.enabled()) return;
   sync.run();
-  setInterval(() => sync.run(), 45000);
+  if (!syncLoopStarted) {
+    syncLoopStarted = true;
+    setInterval(() => sync.run(), 45000);
+  }
 }
+startSyncSession();
 
 /* 순공시간 초 단위 표시 — 화면 전체를 다시 그리지 않고 숫자만 갈아끼운다 */
 setInterval(() => {
@@ -3323,7 +3897,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-02.4';
+const APP_VER = '2026-08-03.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

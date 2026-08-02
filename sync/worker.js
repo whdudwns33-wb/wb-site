@@ -1,4 +1,5 @@
 import curriculumWorker from './curriculum-fix.js';
+import { handleLearningV2Request } from './learning-v2.js';
 
 export function cleanupCurriculum(text) {
   const kept = String(text || '')
@@ -15,6 +16,8 @@ export function cleanupCurriculum(text) {
 
 export default {
   async fetch(request, env, ctx) {
+    const learningResponse = await handleLearningV2Request(request, env, ctx);
+    if (learningResponse) return learningResponse;
     const url = new URL(request.url);
     const response = await curriculumWorker.fetch(request, env, ctx);
     if (url.pathname !== '/curriculum' || request.method !== 'POST') return response;

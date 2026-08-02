@@ -1,0 +1,22 @@
+# Local secrets and deployment state
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+sync/배포결과.txt
+sync/.wrangler/
+sync/.release-receipts/
+.wrangler/
+
+# Dependency/build output
+node_modules/
+*.log
+
+# Local exports and sensitive snapshots
+*.local.json
+*.sensitive.json
+sync/*_remote_*.sql
+sync/*_backup_*.sql
+
+# Operating-system files
+.DS_Store
+Thumbs.db

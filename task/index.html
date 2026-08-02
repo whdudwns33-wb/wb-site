@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <title>업무지시서 · WB 웩슬러브레인센터</title>
 <meta name="theme-color" content="#1B3A5C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -245,7 +246,13 @@
 /* ══════════════════════════════════════════════════════
    1. 저장소
    ══════════════════════════════════════════════════════ */
-const LS_KEY = 'wb_taskboard_v1';
+const LEGACY_LS_KEY = 'wb_taskboard_v1';
+const LEGACY_LINK_TOKEN_KEY = 'wb_task_link_tokens_v1';
+const URL_STAFF_ID = new URLSearchParams(location.search).get('u') || '';
+const SAFE_SCOPE_ID = /^[A-Za-z0-9_-]{1,128}$/.test(URL_STAFF_ID) ? URL_STAFF_ID : '';
+const HAS_PERSON_SCOPE = !!URL_STAFF_ID;
+const LS_KEY = HAS_PERSON_SCOPE ? 'wb_task_v2_person_' + (SAFE_SCOPE_ID || 'invalid') : 'wb_task_v2_admin';
+const linkCodeVault = new Map();
 const DOW = ['일','월','화','수','목','금','토'];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
@@ -257,7 +264,7 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터' }
+    settings: { adminPin: '', adminPinHash: '', adminPinSalt: '', adminPinVersion: 0, syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터', syncCursors: {} }
   };
 }
 
@@ -265,11 +272,15 @@ let state = blankState();
 
 function load() {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    // 개인 링크는 과거 공용 저장소를 읽지 않는다. 원장만 기존 상태를 1회 복사한다.
+    const scoped = localStorage.getItem(LS_KEY);
+    const raw = scoped || (!HAS_PERSON_SCOPE ? localStorage.getItem(LEGACY_LS_KEY) : '');
     if (raw) {
       const p = JSON.parse(raw);
       state = Object.assign(blankState(), p);
       state.settings = Object.assign(blankState().settings, p.settings || {});
+      state.settings.syncCursors = Object.assign({}, state.settings.syncCursors || {});
+      if (!scoped) save();
     }
   } catch (e) { console.warn('load failed', e); }
 }
@@ -277,6 +288,75 @@ function load() {
 function save() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
+}
+
+function linkCodeFor(id) {
+  const entry = linkCodeVault.get(String(id));
+  if (!entry || Number(entry.expiresAt || 0) <= Date.now()) {
+    linkCodeVault.delete(String(id));
+    return '';
+  }
+  return String(entry.code || '');
+}
+
+function storeLinkCode(id, code, expiresAt) {
+  linkCodeVault.set(String(id), { code: String(code || ''), expiresAt: Number(expiresAt) || 0 });
+}
+
+function clearLinkCode(id) {
+  linkCodeVault.delete(String(id));
+}
+
+function migrateLegacyStaffTokens() {
+  // 개인 범위에서는 공용 legacy 저장소나 관리자 token vault에 절대 접근하지 않는다.
+  if (HAS_PERSON_SCOPE) return;
+  let changed = false;
+  (state.staff || []).forEach(person => {
+    if (!person || !person.token) return;
+    delete person.token;
+    changed = true;
+  });
+  try { localStorage.removeItem(LEGACY_LINK_TOKEN_KEY); } catch (error) {}
+  if (changed) save();
+}
+
+function hasAdminPin() {
+  return !!(state.settings.adminPinHash || state.settings.adminPin);
+}
+
+function randomHex(bytes) {
+  const out = new Uint8Array(bytes);
+  crypto.getRandomValues(out);
+  return Array.from(out, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function derivePinHash(pin, salt) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({
+    name: 'PBKDF2', salt: enc.encode(String(salt)), iterations: 120000, hash: 'SHA-256'
+  }, key, 256);
+  return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function setAdminPin(pin) {
+  const salt = randomHex(16);
+  state.settings.adminPinSalt = salt;
+  state.settings.adminPinHash = await derivePinHash(pin, salt);
+  state.settings.adminPinVersion = 1;
+  state.settings.adminPin = '';
+  save();
+}
+
+async function verifyAdminPin(pin) {
+  if (state.settings.adminPinHash && state.settings.adminPinSalt) {
+    return await derivePinHash(pin, state.settings.adminPinSalt) === state.settings.adminPinHash;
+  }
+  if (state.settings.adminPin && pin === state.settings.adminPin) {
+    await setAdminPin(pin);
+    return true;
+  }
+  return false;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -527,6 +607,7 @@ const sync = {
     });
     const d = await res.json().catch(() => null);
     if (!d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + res.status));
+    if (Number(d.rejected || 0) > 0) throw new Error('서버가 ' + d.rejected + '건을 거절해 동기화를 중단했습니다');
     return d;
   },
 
@@ -563,12 +644,21 @@ const sync = {
     }
   },
 
-  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
-  async issueToken(staffId) {
+  /** 링크에는 장기 bearer 대신 24시간 안에 한 번만 교환할 bootstrap code를 넣는다. */
+  async issueBootstrap(staffId) {
     const auth = this.auth();
     if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 발급할 수 있습니다');
-    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
-    return d.token;
+    return await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
+  },
+
+  async exchangeBootstrap(staffId, code) {
+    return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
+  },
+
+  async revokeAccess(staffId) {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 해지할 수 있습니다');
+    return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
   }
 };
 
@@ -583,8 +673,8 @@ function queueSync() {
    5. 세션 / 라우팅
    ══════════════════════════════════════════════════════ */
 const session = {
-  get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
-  get isStaffLink() { return !!this.staffId; },
+  get staffId() { return SAFE_SCOPE_ID; },
+  get isStaffLink() { return HAS_PERSON_SCOPE; },
   get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'; },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
   lock() { sessionStorage.removeItem('wb_admin'); }
@@ -599,7 +689,7 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
-  if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
+  if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
   if (r && r !== route) { route = r; render(); }
 });
@@ -607,36 +697,40 @@ window.addEventListener('hashchange', () => {
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
 
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
+let pendingBootstrapCode = ''; // fragment에서 즉시 제거한 뒤 1회 교환할 코드
 
 /** 링크에 담겨 온 것들을 흡수한다.
- *  s=  동기화 설정 (직원 기기 세팅 대신)
+ *  s=  구형 비밀정보 복구 링크 (내용은 무시하고 URL에서 제거)
  *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
 function absorbLinkParams() {
   const q = new URLSearchParams(location.search);
   let touched = false;
 
-  const tk = q.get('t');
-  if (tk) { state.settings.myToken = tk; save(); }
+  const legacyToken = q.get('t');
+  if (legacyToken !== null) {
+    // URL bearer는 절대 흡수하지 않는다. 새 1회용 링크를 다시 받아야 한다.
+    q.delete('t'); touched = true;
+    setTimeout(() => toast('기존 토큰 링크는 사용할 수 없습니다. 새 개인 링크를 받아 주세요'), 0);
+  }
+
+  const codeMatch = location.hash.match(/[#&]c=([^&]+)/);
+  if (codeMatch) {
+    try {
+      const code = decodeURIComponent(codeMatch[1]);
+      if (code && code.length <= 256) pendingBootstrapCode = code;
+    } catch (error) { pendingBootstrapCode = ''; }
+  }
 
   const s = q.get('s');
   if (s) {
-    try {
-      const cfg = JSON.parse(unb64(s));
-      if (cfg.k) state.settings.syncSecret = cfg.k;
-      // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
-      if (cfg.p && !new URLSearchParams(location.search).get('u')) {
-        state.settings.adminPin = cfg.p;
-        session.unlock();
-      }
-      save();
-    } catch (e) { console.warn('link config', e); }
+    // 구형 복구 링크는 비밀키·PIN을 포함할 수 있으므로 내용을 흡수하지 않고 제거한다.
     q.delete('s'); touched = true;
   }
 
-  // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다
+  // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다.
   let raw = null;
-  const m = location.hash.match(/[#&]add=([^&]+)/);
-  if (m) raw = m[1];
+  const addMatch = location.hash.match(/[#&]add=([^&]+)/);
+  if (addMatch) raw = addMatch[1];
   else if (q.get('add')) { raw = q.get('add'); q.delete('add'); touched = true; }
 
   if (raw) {
@@ -644,11 +738,13 @@ function absorbLinkParams() {
       const p = JSON.parse(unb64(raw));
       const list = Array.isArray(p) ? p : (p.assignments || []);
       if (list.length) pendingAdd = list;
-    } catch (e) { console.warn('link add', e); }
+    } catch (error) { console.warn('link add', error); }
   }
 
-  if (touched || m) {
-    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (m ? '' : location.hash));
+  // code fragment는 네트워크 교환보다 먼저 제거한다.
+  if (touched || addMatch || codeMatch) {
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') +
+      (addMatch || codeMatch ? '' : location.hash));
   }
 }
 
@@ -974,7 +1070,7 @@ function viewPendingAdd() {
 
 /* ── 잠금 ── */
 function viewLock() {
-  const first = !state.settings.adminPin;
+  const first = !hasAdminPin();
   return '<div class="card mt14">' +
     '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
     '<div class="card-sub mb14">' + (first
@@ -986,9 +1082,8 @@ function viewLock() {
     '<hr class="sep">' +
     (first
       ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
-        '여기서 비밀번호를 정하지 마시고, 즐겨찾기에 저장해둔 <b>원장 복구 링크</b>로 들어오세요. ' +
-        '접속 정보와 비밀번호가 한 번에 복구됩니다.<br>' +
-        '(복구 링크는 설정 화면에서 만듭니다. 데이터는 구글 시트에 있으니 사라지지 않습니다)</div><hr class="sep">'
+        '새 PIN을 만들기 전에 운영 D1 백업과 동기화 연결 상태를 확인하세요. ' +
+        '비밀키와 PIN을 주소에 담는 복구 링크는 보안상 더 이상 사용하지 않습니다.</div><hr class="sep">'
       : '') +
     '<div class="hint">직원분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
   '</div>';
@@ -1996,7 +2091,7 @@ function viewStaffAdmin() {
   const list = liveStaff();
   return '<div class="card">' +
     '<div class="card-title">직원 등록</div>' +
-    '<div class="card-sub mb14">등록하면 직원별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 직원은 링크만 열면 됩니다.</div>' +
+    '<div class="card-sub mb14">등록하면 직원별 개인 링크가 만들어집니다. 동기화 설정이 되어 있으면 직원별 제한 토큰으로 서버 기록을 불러오며, 비밀키와 PIN은 링크에 넣지 않습니다. 개인 링크는 발급 후 24시간 안에 한 번 열어야 합니다.</div>' +
     '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
@@ -2016,6 +2111,7 @@ function viewStaffAdmin() {
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="revokeaccess" data-id="' + s.id + '">링크 해지</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
@@ -2036,7 +2132,8 @@ function viewSettings() {
       '연결되면 직원이 체크하는 즉시 원장님 화면에 반영됩니다.</div>' +
 
     '<div class="field"><label class="fl">원장 비밀키</label>' +
-      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="배포할 때 만든 TASK_ADMIN_SECRET"></div>' +
+      '<input class="in" id="cfgSecret" type="password" autocomplete="off" placeholder="' +
+        (s.syncSecret ? '저장됨 · 변경할 때만 새 비밀키 입력' : 'TASK_ADMIN_SECRET 입력') + '"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
@@ -2044,18 +2141,15 @@ function viewSettings() {
     (s.syncSecret
       ? '<div class="hint mt14">✓ 연결됨 — 개인 링크에는 <b>직원별 토큰</b>만 담겨 나갑니다. 링크는 언제든 해지할 수 있습니다.</div>' +
         '<hr class="sep">' +
-        '<div class="card-title">원장 복구 링크</div>' +
-        '<div class="card-sub mb14">이 링크로 들어가면 <b>접속 정보와 비밀번호가 한 번에 들어가</b> 바로 열립니다. ' +
-          '폰에서 볼 때, 그리고 브라우저 데이터가 지워졌을 때 되살리는 용도입니다.<br><br>' +
-          '<b>복사한 뒤 즐겨찾기에 저장해 두세요.</b> 일반 주소를 저장하면 데이터가 사라졌을 때 되살릴 방법이 없습니다.<br>' +
-          '<span style="color:var(--coral)">이 링크를 가진 사람은 원장 화면을 열 수 있습니다. 직원에게 보내지 마세요.</span></div>' +
-        '<button class="btn btn-navy btn-block" data-act="adminlink">🔑 원장 복구 링크 복사</button>'
+        '<div class="card-title">원장 주소</div>' +
+        '<div class="card-sub mb14">보안상 주소에는 비밀키와 관리 비밀번호를 넣지 않습니다. 새 기기에서는 별도로 입력하세요.</div>' +
+        '<button class="btn btn-navy btn-block" data-act="adminlink">원장 주소 복사</button>'
       : '') +
   '</div>' +
 
   '<div class="card">' +
     '<div class="card-title">백업</div>' +
-    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
+    '<div class="card-sub mb14">직원·업무·체크 데이터만 내려받습니다. 관리자 비밀키·PIN·개인 토큰은 파일에 넣지 않습니다.</div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
       '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
@@ -2088,18 +2182,21 @@ function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g
 
 /** 개인 링크. 전체 접근 비밀키 대신 직원별 토큰을 담는다 — 링크를 잃어버려도 해지할 수 있다. */
 function staffLink(id) {
-  const s = staffById(id);
-  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
-  return location.origin + location.pathname + '?u=' + id + t;
+  const code = linkCodeFor(id);
+  const suffix = code ? '#c=' + encodeURIComponent(code) : '';
+  return location.origin + location.pathname + '?u=' + encodeURIComponent(id) + suffix;
 }
-async function ensureToken(id) {
-  const s = staffById(id);
-  if (!s) throw new Error('대상을 찾을 수 없습니다');
-  if (s.token) return s.token;
-  s.token = await sync.issueToken(id);
-  s.updatedAt = now();
-  save(); queueSync();
-  return s.token;
+
+async function issueLinkCode(id) {
+  if (!staffById(id)) throw new Error('대상을 찾을 수 없습니다');
+  if (sync.enabled()) {
+    for (let i = 0; sync.busy && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 50));
+    sync.loud = true;
+    await sync.run();
+  }
+  const issued = await sync.issueBootstrap(id);
+  storeLinkCode(id, issued.code, issued.expiresAt);
+  return issued.code;
 }
 
 function orderText(staffId, date) {
@@ -2111,7 +2208,7 @@ function orderText(staffId, date) {
         (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
         ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
     : '(지시된 업무 없음)';
-  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n' + staffLink(staffId);
+  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n개인 링크는 24시간 안에 한 번 열어야 합니다.\n' + staffLink(staffId);
   return txt;
 }
 
@@ -2540,7 +2637,7 @@ function applyAssignments(input, preConfirmed) {
 /* ══════════════════════════════════════════════════════
    10. 이벤트
    ══════════════════════════════════════════════════════ */
-document.addEventListener('click', ev => {
+document.addEventListener('click', async ev => {
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
@@ -2561,11 +2658,11 @@ document.addEventListener('click', ev => {
     case 'setpin': {
       const v = ($('#pin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); session.unlock(); go('staff'); toast('설정되었습니다');
+      await setAdminPin(v); session.unlock(); go('staff'); toast('설정되었습니다');
       break;
     }
     case 'login': {
-      if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
+      if (!await verifyAdminPin(($('#pin').value || '').trim())) return toast('비밀번호가 다릅니다');
       session.unlock(); render(); toast('환영합니다');
       break;
     }
@@ -2573,7 +2670,7 @@ document.addEventListener('click', ev => {
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); toast('변경되었습니다');
+      await setAdminPin(v); toast('변경되었습니다');
       break;
     }
 
@@ -2870,31 +2967,41 @@ document.addEventListener('click', ev => {
       toast(s.owner ? s.name + ' — 대표로 지정 (직원 통계에서 제외)' : s.name + ' — 대표 해제');
       break;
     }
+    case 'revokeaccess': {
+      if (!session.isAdmin) break;
+      const person = staffById(id);
+      if (!person || !confirm(person.name + ' 님의 개인 링크와 접속 세션을 모두 해지할까요?')) break;
+      sync.revokeAccess(id)
+        .then(() => { clearLinkCode(id); toast('개인 링크와 접속 세션을 해지했습니다'); })
+        .catch(e => toast('링크를 해지하지 못했습니다 — ' + e.message));
+      break;
+    }
     case 'copylink': {
-      ensureToken(id)
+      issueLinkCode(id)
         .then(() => copy(staffLink(id)))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => clearLinkCode(id));
       break;
     }
     case 'alllinks': {
       const list = liveStaff();
       toast(list.length + '명 링크 준비 중…');
-      Promise.all(list.map(s => ensureToken(s.id).catch(() => null)))
+      Promise.all(list.map(s => issueLinkCode(s.id)))
         .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => list.forEach(s => clearLinkCode(s.id)));
       break;
     }
     case 'adminlink': {
-      const url = location.origin + location.pathname + '?s=' +
-        b64(JSON.stringify({
-          k: state.settings.syncSecret || '',
-          p: state.settings.adminPin || ''      // 비밀번호까지 담아 한 번에 복구되게
-        }));
-      copy(url);
-      toast('복사했습니다 — 즐겨찾기에 저장해 두세요');
+      copy(location.origin + location.pathname);
+      toast('보안상 비밀키·PIN은 주소에 넣지 않습니다');
       break;
     }
-    case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
+    case 'orderText':
+      issueLinkCode(id)
+        .then(() => { showText('카카오톡 지시서 문구', orderText(id, cursor)); clearLinkCode(id); })
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
     case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
@@ -2919,7 +3026,11 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(me.name + ' — 추가했습니다');
       if (!session.isStaffLink) {
-        setTimeout(() => showText('카톡으로 보낼 문구', quickText(t)), 300);
+        setTimeout(() => {
+          issueLinkCode(t.staffId)
+            .then(() => { showText('카톡으로 보낼 문구', quickText(t)); clearLinkCode(t.staffId); })
+            .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        }, 300);
       }
       break;
     }
@@ -3062,20 +3173,32 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(n + '건 발행 완료');
       const first = [...touched][0];
-      if (first) setTimeout(() => showText('카카오톡 지시서 문구', orderText(first, today())), 400);
+      if (first) setTimeout(() => {
+        issueLinkCode(first)
+          .then(() => { showText('카카오톡 지시서 문구', orderText(first, today())); clearLinkCode(first); })
+          .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      }, 400);
       break;
     }
 
     /* 설정 */
     case 'savecfg': {
-      state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
+      const nextSecret = ($('#cfgSecret').value || '').trim();
+      if (nextSecret) state.settings.syncSecret = nextSecret;
+      if (!state.settings.syncSecret) return toast('비밀키를 입력해 주세요');
       save(); render(); toast('저장했습니다');
-      if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
+      sync.loud = true; sync.run();
       break;
     }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const backup = {
+        format: 'wb-task-data', version: state.version,
+        staff: (state.staff || []).map(person => { const copy = Object.assign({}, person); delete copy.token; return copy; }),
+        tasks: state.tasks || [], checks: state.checks || {},
+        centerName: state.settings.centerName || ''
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'wb-업무지시서-' + today() + '.json';
@@ -3091,9 +3214,17 @@ document.addEventListener('click', ev => {
         r.onload = () => {
           try {
             const p = JSON.parse(r.result);
-            if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
+            if (!p || !Array.isArray(p.staff) || !Array.isArray(p.tasks) || !p.checks || typeof p.checks !== 'object') throw new Error('형식 오류');
+            if (f.size > 10 * 1024 * 1024 || p.staff.length > 5000 || p.tasks.length > 100000) throw new Error('파일이 너무 큽니다');
             if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
-            state = Object.assign(blankState(), p);
+            const secureSettings = Object.assign({}, state.settings);
+            state = blankState();
+            state.version = Number(p.version) || 2;
+            state.staff = p.staff.map(person => { const copy = Object.assign({}, person); delete copy.token; return copy; });
+            state.tasks = p.tasks;
+            state.checks = p.checks;
+            state.settings = Object.assign(state.settings, secureSettings);
+            if (p.centerName) state.settings.centerName = String(p.centerName).slice(0, 200);
             save(); render(); toast('불러왔습니다');
           } catch (e) { toast('파일을 읽을 수 없습니다'); }
         };
@@ -3166,21 +3297,45 @@ document.addEventListener('visibilitychange', () => {
    11. 시작
    ══════════════════════════════════════════════════════ */
 load();
+migrateLegacyStaffTokens();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
 if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
 
-if (sync.enabled()) {
+let syncLoopStarted = false;
+async function startSyncSession() {
+  if (pendingBootstrapCode) {
+    const code = pendingBootstrapCode;
+    const previousToken = String(state.settings.myToken || '');
+    pendingBootstrapCode = '';
+    try {
+      const exchanged = await sync.exchangeBootstrap(session.staffId, code);
+      state.settings.myToken = exchanged.token;
+      save();
+      toast('개인 링크 인증을 완료했습니다');
+    } catch (error) {
+      // 교환 성공 전에는 기존 정상 세션을 유지한다. 토큰이 없을 때만 링크 만료 상태로 남는다.
+      sync.err = String(error && error.message || error);
+      render();
+      toast('개인 링크를 열 수 없습니다 — ' + sync.err);
+      if (!previousToken) return;
+    }
+  }
+  if (!sync.enabled()) return;
   sync.run();
-  setInterval(() => sync.run(), 45000);
+  if (!syncLoopStarted) {
+    syncLoopStarted = true;
+    setInterval(() => sync.run(), 45000);
+  }
 }
+startSyncSession();
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-02.4';
+const APP_VER = '2026-08-03.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
