@@ -1404,6 +1404,57 @@ function attHistText() {
   return out;
 }
 
+/** 급여용 출퇴근 내보내기 — 대표 전용. 아카플로우 등 외부 급여 계산과는
+ *  이 CSV 하나로만 연결한다 (단방향: 앱 → 급여, 역방향 없음). */
+function daysInMonth(ym) {
+  const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+  const last = new Date(y, m, 0).getDate();
+  const out = [];
+  for (let d = 1; d <= last; d++) out.push(ym + '-' + String(d).padStart(2, '0'));
+  return out;
+}
+function payrollRows(ym) {
+  const rows = [];
+  teamStaff().forEach(s => {
+    daysInMonth(ym).forEach(d => {
+      const a = attOf(s.id, d);
+      if (!a || !a.done) return;
+      rows.push({
+        name: s.name, date: d, inT: fmtTime(a.at), outT: a.out ? fmtTime(a.out) : '',
+        hours: a.out ? Math.round((a.out - a.at) / 3600000 * 100) / 100 : null
+      });
+    });
+  });
+  rows.sort((a, b) => a.name === b.name ? a.date.localeCompare(b.date) : a.name.localeCompare(b.name));
+  return rows;
+}
+function payrollCsv(ym) {
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  let csv = '﻿' + ['이름', '날짜', '출근', '퇴근', '근무시간(시간)', '비고'].map(q).join(',') + '\n';
+  payrollRows(ym).forEach(r => {
+    csv += [r.name, r.date, r.inT, r.outT, r.hours != null ? r.hours.toFixed(2) : '',
+      r.hours == null ? '퇴근 미기록' : ''].map(q).join(',') + '\n';
+  });
+  return csv;
+}
+function downloadFile(filename, text, mime) {
+  const blob = new Blob([text], { type: mime + ';charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function payrollModal() {
+  const ym = today().slice(0, 7);
+  const n = payrollRows(ym).length;
+  modal('📅 급여용 출퇴근 내보내기',
+    '<div class="card-sub mb14">선택한 달의 전 직원 출퇴근 기록을 CSV로 내려받습니다. 대표 본인 업무는 제외됩니다.</div>' +
+    '<input class="in" type="month" id="payYm" value="' + ym + '" style="margin-bottom:10px">' +
+    '<div class="hint">근무시간은 출근~퇴근 시각 차이로 자동 계산됩니다.<br>퇴근 체크를 안 한 날은 "퇴근 미기록"으로 표시되니 정산 전에 확인해 주세요.<br>이번 달 현재 기록 ' + n + '건.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="paydownload">CSV 다운로드</button>');
+}
+
 /* ── 교재 DB ──
  * 데이터는 같은 폴더의 textbooks.json (정적 파일 — 동기화 무게 0, 수정은 저장소에서).
  * 학생별 현재 위치(◀)와 남은 분량·예상 소요를 함께 보여준다. */
@@ -1650,6 +1701,8 @@ function viewStaffAdmin() {
     '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
+    '<button class="btn btn-ghost btn-block mt8" data-act="payrollmodal">📅 급여용 출퇴근 내보내기</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출근 이력 (최근 14일)</button>' +
   '</div>' +
   (list.length
     ? list.map(s => '<div class="card"><div class="between">' +
@@ -2331,6 +2384,14 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'payrollmodal': if (session.isAdmin) payrollModal(); break;
+    case 'paydownload': {
+      if (!session.isAdmin) break;
+      const ym = ($('#payYm') || {}).value || today().slice(0, 7);
+      downloadFile('WB_attendance_' + ym + '.csv', payrollCsv(ym), 'text/csv');
+      toast(ym + ' 출퇴근 CSV를 다운로드했습니다');
+      break;
+    }
     case 'ctlog': {
       const name = el.dataset.name;
       if (name) ctModal(name);
