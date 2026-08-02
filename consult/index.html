@@ -825,6 +825,8 @@ function viewToday() {
     '</div></div></div>';
 
   if (editable && cursor === today()) {
+    h += stCard(me);
+
     h += '<div class="card" style="padding:12px">' +
       '<div class="row" style="gap:8px">' +
         '<input class="in" id="qAdd" placeholder="빠른 추가 — 예) 3시까지 보호자께 전화">' +
@@ -940,6 +942,142 @@ function emptyStaffCard() {
     '<button class="btn btn-primary btn-block" data-go="staff">학생 등록하러 가기</button></div>';
 }
 
+/* ══════════════════════════════════════════════════════
+   순공시간 타이머 — 계획(플래너)과 별개로 '실제로 공부한 시간'을 잰다.
+   과목 칩을 누르면 시작, 다시 누르면 정지. 시작 시각만 저장하므로
+   앱을 닫아도 시간이 계속 흐르고, 기기를 바꿔도 이어진다.
+   ══════════════════════════════════════════════════════ */
+const ST_DEFAULT = ['국어', '수학', '영어', '탐구', '기타'];
+const ST_MAX_RUN = 6 * 3600;   // 한 번에 인정하는 최대 시간 — 정지를 깜빡해도 밤새 쌓이지 않는다
+
+const stKey = sid => '__st__' + sid;
+const stOf = (sid, date) => state.checks[stKey(sid) + '|' + date] || null;
+const stSubjects = sid => {
+  const c = state.checks['__stsubj__' + sid + '|all'];
+  return (c && Array.isArray(c.list) && c.list.length) ? c.list : ST_DEFAULT;
+};
+const stGoalMin = sid => {
+  const c = state.checks['__stgoal__' + sid + '|all'];
+  return Number(c && c.mins) || 0;
+};
+const stRunning = (sid, date) => {
+  const c = stOf(sid, date);
+  return (c && c.run && c.run.subj && c.run.since) ? c.run : null;
+};
+/** 그날 과목별 누적 초 — 진행 중인 타이머의 경과분까지 더해서 돌려준다 */
+function stSecs(sid, date) {
+  const c = stOf(sid, date);
+  const out = Object.assign({}, (c && c.secs) || {});
+  const r = stRunning(sid, date);
+  if (r) out[r.subj] = (out[r.subj] || 0) + stElapsed(r);
+  return out;
+}
+const stElapsed = r => Math.min(ST_MAX_RUN, Math.max(0, Math.floor((now() - r.since) / 1000)));
+const stTotal = (sid, date) => Object.values(stSecs(sid, date)).reduce((a, b) => a + b, 0);
+
+function fmtHMS(s) { return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)) + ':' + pad2(s % 60); }
+function fmtHM(s) { return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)); }
+function fmtDur(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? h + '시간 ' + m + '분' : m + '분';
+}
+
+/** 진행 중인 타이머를 정지하고 누적에 반영한다 (내부용) */
+function stFreeze(sid, date) {
+  const c = stOf(sid, date);
+  const secs = Object.assign({}, (c && c.secs) || {});
+  const r = stRunning(sid, date);
+  if (r) secs[r.subj] = (secs[r.subj] || 0) + stElapsed(r);
+  return secs;
+}
+function stStart(sid, date, subj) {
+  setCheck(stKey(sid), date, { secs: stFreeze(sid, date), run: { subj: subj, since: now() }, done: true });
+}
+function stStop(sid, date) {
+  setCheck(stKey(sid), date, { secs: stFreeze(sid, date), run: null, done: true });
+}
+
+function stCard(me) {
+  const date = today();
+  const secs = stSecs(me.id, date);
+  const total = Object.values(secs).reduce((a, b) => a + b, 0);
+  const goal = stGoalMin(me.id) * 60;
+  const pct = goal ? Math.min(100, Math.round(total / goal * 100)) : 0;
+  const r = stRunning(me.id, date);
+  const on = r ? r.subj : '';
+
+  return '<div class="card">' +
+    '<div class="between mb8"><div class="card-title">⏱ 순공시간</div>' +
+      '<div class="row" style="gap:6px">' +
+        (goal ? '<span class="pill ' + (pct >= 100 ? '' : 'warn') + '">목표 ' + fmtDur(goal) + ' · ' + pct + '%</span>' : '') +
+        '<button class="btn btn-sm btn-ghost" data-act="stgoal">🎯</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="stedit">✏️</button>' +
+      '</div></div>' +
+    '<div style="text-align:center;padding:4px 0 12px">' +
+      '<div id="stTot" style="font-size:36px;font-weight:900;letter-spacing:-.02em;color:var(--navy);font-variant-numeric:tabular-nums">' +
+        fmtHMS(total) + '</div>' +
+      (on
+        ? '<div class="small" style="color:var(--blue);font-weight:800">▶ ' + esc(on) + ' 공부 중 — 다시 누르면 정지</div>'
+        : '<div class="small muted">과목을 눌러 시작하세요</div>') +
+    '</div>' +
+    (goal ? '<div class="bar mb8"><i style="width:' + pct + '%"></i></div>' : '') +
+    '<div class="chips">' +
+      stSubjects(me.id).map(s =>
+        '<button class="chip ' + (on === s ? 'on' : '') + '" data-act="sttoggle" data-subj="' + esc(s) + '"' +
+          (on === s ? ' id="stChipOn"' : '') + '>' +
+          (on === s ? '⏸ ' : '▶ ') + esc(s) +
+          (secs[s] ? ' ' + fmtHM(secs[s]) : '') + '</button>').join('') +
+      '<button class="chip" data-act="stsubjadd">＋ 과목</button>' +
+    '</div></div>';
+}
+
+/** 주간 순공 통계 — 일별 막대 + 과목별 합계 */
+function stWeekCard(me, days) {
+  const per = days.map(d => ({ d: d, secs: stTotal(me.id, d) }));
+  const sum = per.reduce((a, x) => a + x.secs, 0);
+  if (!sum) return '';
+  const max = Math.max.apply(null, per.map(x => x.secs)) || 1;
+  const bySubj = {};
+  days.forEach(d => {
+    const s = stSecs(me.id, d);
+    Object.keys(s).forEach(k => { bySubj[k] = (bySubj[k] || 0) + s[k]; });
+  });
+  const goal = stGoalMin(me.id) * 60;
+  const met = goal ? per.filter(x => x.secs >= goal).length : 0;
+
+  return '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">⏱ 이번 주 순공시간</div>' +
+      '<div class="pill">' + fmtDur(sum) + '</div></div>' +
+    '<div class="row" style="align-items:flex-end;gap:6px;height:88px;margin-bottom:6px">' +
+      per.map(x => '<div style="flex:1;text-align:center">' +
+        '<div style="height:64px;display:flex;align-items:flex-end;justify-content:center">' +
+          '<div title="' + fmtDur(x.secs) + '" style="width:70%;border-radius:5px 5px 0 0;background:' +
+            (x.d === today() ? 'var(--navy)' : 'var(--blue)') + ';opacity:' + (x.secs ? 1 : .18) +
+            ';height:' + Math.max(3, Math.round(x.secs / max * 64)) + 'px"></div></div>' +
+        '<div class="small muted" style="margin-top:3px">' + DOW[dowOf(x.d)] + '</div></div>').join('') +
+    '</div>' +
+    '<div class="small muted" style="text-align:center;margin-bottom:10px">하루 평균 ' +
+      fmtDur(Math.round(sum / 7)) + (goal ? ' · 목표 달성 ' + met + '일' : '') + '</div>' +
+    '<hr class="sep">' +
+    Object.keys(bySubj).sort((a, b) => bySubj[b] - bySubj[a]).map(k =>
+      '<div class="between small" style="padding:3px 0"><span>' + esc(k) + '</span>' +
+      '<span class="pill">' + fmtDur(bySubj[k]) + '</span></div>').join('') +
+    '</div>';
+}
+
+/** 과목별 시간 직접 수정 — 정지를 깜빡했거나 앱 없이 공부한 날을 보정한다 */
+function stEditModal(sid) {
+  const date = today();
+  const secs = stSecs(sid, date);
+  modal('⏱ 오늘 공부시간 수정',
+    '<div class="hint mb14">분 단위로 고칠 수 있습니다. 타이머 정지를 깜빡했거나, 앱 없이 공부한 시간을 넣을 때 쓰세요.</div>' +
+    stSubjects(sid).map(s =>
+      '<div class="between mb8"><span class="small">' + esc(s) + '</span>' +
+      '<input class="in" type="number" min="0" style="max-width:120px" data-stedit="' + esc(s) + '" value="' +
+        Math.round((secs[s] || 0) / 60) + '"><span class="small muted">분</span></div>').join(''),
+    '<button class="btn btn-primary btn-block mt14" data-act="stsave">저장</button>');
+}
+
 /* ── 주간 플래너 ── */
 function viewWeek() {
   const me = currentStaff();
@@ -964,6 +1102,8 @@ function viewWeek() {
     '<div class="card-title">이번 주 달성률</div>' +
     '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
     '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
+
+  h += stWeekCard(me, days);
 
   if (!list.length) return h + '<div class="card"><div class="empty"><b>📋</b>이 주에 지시된 업무가 없습니다.</div></div>';
 
@@ -1215,6 +1355,31 @@ function viewBoard() {
           '</div>';
         }).join('')
       ).join('') + '</div>';
+  }
+
+  // 순공시간 — 계획 이행률과 별개로 '실제로 얼마나 앉아 있었나'를 본다
+  {
+    const rows = list.map(s => ({ s: s, secs: stTotal(s.id, cursor), run: stRunning(s.id, cursor) }))
+      .filter(x => x.secs || x.run)
+      .sort((a, b) => b.secs - a.secs);
+    if (rows.length) {
+      const sum = rows.reduce((a, x) => a + x.secs, 0);
+      h += '<div class="card"><div class="between mb8">' +
+        '<div class="card-title">⏱ 순공시간</div>' +
+        '<div class="pill">' + rows.length + '명 · 합계 ' + fmtDur(sum) + '</div></div>' +
+        rows.map(x => {
+          const goal = stGoalMin(x.s.id) * 60;
+          const p = goal ? Math.min(100, Math.round(x.secs / goal * 100)) : 0;
+          return '<div class="between small" style="padding:4px 0">' +
+            '<span>' + esc(x.s.name) +
+              (x.run ? ' <span class="pill">▶ ' + esc(x.run.subj) + '</span>' : '') + '</span>' +
+            '<span class="row" style="gap:6px">' +
+              (goal ? '<span class="pill ' + (p >= 100 ? '' : p >= 60 ? 'warn' : 'bad') + '">' + p + '%</span>' : '') +
+              '<b>' + fmtDur(x.secs) + '</b></span></div>';
+        }).join('') +
+        '<div class="hint" style="margin-top:10px">계획 이행률과 함께 보세요 — 시간은 많은데 이행률이 낮으면 계획이 과한 것입니다.</div>' +
+        '</div>';
+    }
   }
 
   const all = list.reduce((a, s) => { const p = progress(s.id, cursor); a.done += p.done; a.total += p.total; return a; }, { done: 0, total: 0 });
@@ -1850,6 +2015,52 @@ document.addEventListener('click', ev => {
       break;
     }
 
+    /* 순공시간 타이머 */
+    case 'sttoggle': {
+      const me = currentStaff(); if (!me) break;
+      const subj = el.dataset.subj;
+      const r = stRunning(me.id, today());
+      if (r && r.subj === subj) { stStop(me.id, today()); toast(subj + ' 정지 — 수고했어요'); }
+      else { stStart(me.id, today(), subj); toast(subj + ' 시작!'); }
+      render();
+      break;
+    }
+    case 'stsubjadd': {
+      const me = currentStaff(); if (!me) break;
+      const name = (prompt('추가할 과목 이름을 입력하세요 (예: 한국사)') || '').trim();
+      if (!name) break;
+      const list = stSubjects(me.id);
+      if (list.includes(name)) return toast('이미 있는 과목입니다');
+      setCheck('__stsubj__' + me.id, 'all', { list: list.concat(name), done: true });
+      render();
+      break;
+    }
+    case 'stgoal': {
+      const me = currentStaff(); if (!me) break;
+      const cur = stGoalMin(me.id);
+      const v = prompt('하루 목표 공부시간을 분 단위로 입력하세요 (예: 360 = 6시간)\n0을 넣으면 목표를 없앱니다', cur || 360);
+      if (v === null) break;
+      setCheck('__stgoal__' + me.id, 'all', { mins: Math.max(0, Number(v) || 0), done: true });
+      render();
+      break;
+    }
+    case 'stedit': {
+      const me = currentStaff(); if (!me) break;
+      stEditModal(me.id);
+      break;
+    }
+    case 'stsave': {
+      const me = currentStaff(); if (!me) break;
+      const secs = {};
+      document.querySelectorAll('[data-stedit]').forEach(inp => {
+        const m = Math.max(0, Number(inp.value) || 0);
+        if (m) secs[inp.dataset.stedit] = m * 60;
+      });
+      setCheck(stKey(me.id), today(), { secs: secs, run: null, done: true });
+      closeModal(); render(); toast('저장했습니다');
+      break;
+    }
+
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
@@ -2252,6 +2463,19 @@ if (sync.enabled()) {
   sync.run();
   setInterval(() => sync.run(), 45000);
 }
+
+/* 순공시간 초 단위 표시 — 화면 전체를 다시 그리지 않고 숫자만 갈아끼운다 */
+setInterval(() => {
+  const el = $('#stTot');
+  if (!el) return;
+  const me = currentStaff();
+  if (!me || !stRunning(me.id, today())) return;
+  const secs = stSecs(me.id, today());
+  el.textContent = fmtHMS(Object.values(secs).reduce((a, b) => a + b, 0));
+  const chip = $('#stChipOn');
+  const r = stRunning(me.id, today());
+  if (chip && r) chip.textContent = '⏸ ' + r.subj + (secs[r.subj] ? ' ' + fmtHM(secs[r.subj]) : '');
+}, 1000);
 </script>
 </body>
 </html>
