@@ -100,7 +100,7 @@
   .btn:disabled { opacity: .5; cursor: default; }
 
   /* ─── 폼 ─── */
-  label.fl { display: block; font-size: 12.5px; font-weight: 700; color: var(--mid-gray); margin-bottom: 5px; }
+  .fl { display: block; font-size: 12.5px; font-weight: 700; color: var(--mid-gray); margin-bottom: 5px; }
   .in { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-size: 14.5px; }
   .in:focus { outline: 2px solid rgba(30,157,214,.35); outline-offset: -1px; border-color: var(--blue); }
   textarea.in { resize: vertical; min-height: 62px; line-height: 1.6; }
@@ -707,11 +707,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'write', 'board'] : ['today', 'week', 'month'];
+    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'write', 'board'] : ['today', 'week', 'month', 'ingang'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -719,10 +719,10 @@ function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너']])
+        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['write', '지시서 작성'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['write', '지시서 작성'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -823,6 +823,8 @@ function viewToday() {
       '</div>' +
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
+
+  if (cursor === today()) h += ingTodayCard(me, editable);
 
   if (editable && cursor === today()) {
     h += stCard(me);
@@ -1076,6 +1078,279 @@ function stEditModal(sid) {
       '<input class="in" type="number" min="0" style="max-width:120px" data-stedit="' + esc(s) + '" value="' +
         Math.round((secs[s] || 0) / 60) + '"><span class="small muted">분</span></div>').join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="stsave">저장</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   인강 플래너
+   원본 앱(Flask+SQLite)의 핵심 설계를 그대로 옮겼다.
+   · 강좌(courses) ↔ 배정(plan)을 분리한다 — 같은 강좌를 여러 학생에게
+     다른 일정으로 배정해도 강의 데이터가 중복되지 않는다.
+   · 강의는 3단계 상태를 갖는다: 미배정 / 배정됨(미완료) / 완료
+   원본에 없던 두 가지를 더했다: 목표일 역산, 밀림 3일 이상 강조.
+   ══════════════════════════════════════════════════════ */
+const ING_PLATFORMS = ['엘리하이', '엠베스트', '메가스터디', '이투스', '대성마이맥', '기타'];
+const ING_LATE_WARN = 3;   // 이 일수 이상 밀리면 강조한다
+
+const ingKey = sid => '__ing__' + sid;          // 강좌·강의 목록
+const ingPlanKey = sid => '__ingp__' + sid;     // 날짜별 배정
+const ingCourses = sid => ((state.checks[ingKey(sid) + '|all'] || {}).courses) || [];
+const ingPlan = (sid, date) => ((state.checks[ingPlanKey(sid) + '|' + date] || {}).items) || [];
+const ingSet = sid => Object.assign({ days: [1, 2, 3, 4, 5], perDay: 2 },
+  (state.checks['__ingset__' + sid + '|all'] || {}).set || {});
+
+function ingSaveCourses(sid, courses) { setCheck(ingKey(sid), 'all', { courses: courses, done: true }); }
+function ingSavePlan(sid, date, items) { setCheck(ingPlanKey(sid), date, { items: items, done: true }); }
+const ingPlanDates = sid => {
+  const pre = ingPlanKey(sid) + '|';
+  return Object.keys(state.checks).filter(k => k.startsWith(pre)).map(k => k.slice(pre.length)).sort();
+};
+
+/** 배정 현황 — 'courseId|seq' → {date, done} */
+function ingAssigned(sid) {
+  const map = {};
+  ingPlanDates(sid).forEach(d => {
+    ingPlan(sid, d).forEach(it => { map[it.cid + '|' + it.seq] = { date: d, done: !!it.done }; });
+  });
+  return map;
+}
+function ingLec(sid, cid, seq) {
+  const c = ingCourses(sid).find(x => x.id === cid);
+  if (!c) return null;
+  const l = (c.lectures || []).find(x => Number(x.seq) === Number(seq));
+  return l ? { course: c, lec: l } : null;
+}
+function ingStats(sid, c, asg) {
+  asg = asg || ingAssigned(sid);
+  const lecs = c.lectures || [];
+  let assigned = 0, done = 0;
+  lecs.forEach(l => {
+    const a = asg[c.id + '|' + l.seq];
+    if (a) { assigned++; if (a.done) done++; }
+  });
+  return { total: lecs.length, assigned: assigned, done: done,
+    unassigned: lecs.length - assigned, pct: lecs.length ? Math.round(done / lecs.length * 100) : 0 };
+}
+
+/** 커리큘럼 텍스트 파서 — 사이트별이 아니라 패턴 기반이라 개편에 안 깨진다.
+ *  "1강 다항식의 덧셈 52분" / "01. 제목 (52:30)" 같은 형태를 모두 받는다. */
+function ingParse(text) {
+  const out = [];
+  String(text || '').split('\n').forEach(line => {
+    const s = line.trim();
+    if (!s) return;
+    const m = s.match(/^(\d{1,3})\s*(?:강|회|차|교시)?\s*[.)\]:-]?\s*(.*)$/);
+    if (!m) return;
+    let rest = (m[2] || '').trim(), min = null;
+    const t = rest.match(/[\s(\[]*(\d{1,3})\s*분(?:\s*\d{1,2}\s*초)?[)\]]*\s*$/)
+           || rest.match(/[\s(\[]*(\d{1,3}):(\d{2})[)\]]*\s*$/);
+    if (t) { min = Number(t[1]); rest = rest.slice(0, t.index).trim(); }
+    rest = rest.replace(/[\s\-–—·|,]+$/, '').trim();
+    out.push({ seq: Number(m[1]), title: rest || (m[1] + '강'), min: min });
+  });
+  return out;
+}
+
+/** count개를 start부터 지정 요일에 하루 perDay개씩 배정한 날짜 목록 (원본 assign_dates 이식) */
+function ingAssignDates(count, start, weekdays, perDay) {
+  const out = [];
+  let d = start, guard = 0;
+  perDay = Math.max(1, perDay);
+  const wd = (weekdays && weekdays.length) ? weekdays : [0, 1, 2, 3, 4, 5, 6];
+  while (out.length < count && guard < 1100) {
+    if (wd.includes(dowOf(d))) {
+      const n = Math.min(perDay, count - out.length);
+      for (let i = 0; i < n; i++) out.push(d);
+    }
+    d = addDays(d, 1); guard++;
+  }
+  return out;
+}
+/** 목표일 역산 — 원본에 없던 기능. "8/30까지 끝내려면 하루 몇 강?" */
+function ingPerDayFor(count, start, end, weekdays) {
+  const wd = (weekdays && weekdays.length) ? weekdays : [0, 1, 2, 3, 4, 5, 6];
+  let days = 0, d = start, guard = 0;
+  while (d <= end && guard < 1100) { if (wd.includes(dowOf(d))) days++; d = addDays(d, 1); guard++; }
+  return days ? Math.ceil(count / days) : count;
+}
+
+function ingToggle(sid, date, cid, seq) {
+  const items = ingPlan(sid, date).map(x =>
+    (x.cid === cid && Number(x.seq) === Number(seq)) ? Object.assign({}, x, { done: !x.done }) : x);
+  ingSavePlan(sid, date, items);
+}
+
+/** 오늘 이전 미완료를 전부 오늘로 — 따라잡기용 */
+function ingCatchup(sid) {
+  const t = today(), moved = [];
+  ingPlanDates(sid).forEach(d => {
+    if (d >= t) return;
+    const items = ingPlan(sid, d);
+    const late = items.filter(x => !x.done);
+    if (!late.length) return;
+    moved.push.apply(moved, late);
+    ingSavePlan(sid, d, items.filter(x => x.done));
+  });
+  if (moved.length) ingSavePlan(sid, t, ingPlan(sid, t).concat(moved));
+  return moved.length;
+}
+/** 기준일 이후 미완료를 통째로 ±N일 이동 — 시험기간용 */
+function ingShift(sid, from, n) {
+  const buckets = {};
+  let cnt = 0;
+  ingPlanDates(sid).forEach(d => {
+    if (d < from) return;
+    const items = ingPlan(sid, d);
+    const move = items.filter(x => !x.done);
+    if (!move.length) return;
+    ingSavePlan(sid, d, items.filter(x => x.done));
+    const nd = addDays(d, n);
+    (buckets[nd] = buckets[nd] || []).push.apply(buckets[nd], move);
+    cnt += move.length;
+  });
+  Object.keys(buckets).forEach(d => ingSavePlan(sid, d, ingPlan(sid, d).concat(buckets[d])));
+  return cnt;
+}
+
+/** 오늘 화면용 — 밀린 것과 오늘 것 */
+function ingTodayItems(sid) {
+  const t = today(), overdue = [];
+  ingPlanDates(sid).forEach(d => {
+    if (d >= t) return;
+    ingPlan(sid, d).forEach(x => { if (!x.done) overdue.push(Object.assign({}, x, { date: d })); });
+  });
+  overdue.sort((a, b) => a.date.localeCompare(b.date));
+  return { overdue: overdue, todays: ingPlan(sid, t).map(x => Object.assign({}, x, { date: t })) };
+}
+
+function ingRow(sid, it, editable) {
+  const f = ingLec(sid, it.cid, it.seq);
+  const late = it.date < today() ? Math.round((parseYmd(today()) - parseYmd(it.date)) / 86400000) : 0;
+  return '<div class="task ' + (it.done ? 'done' : '') + '">' +
+    '<button class="box" ' + (editable
+      ? 'data-act="ingcheck" data-sid="' + sid + '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"'
+      : 'disabled') + '>✓</button>' +
+    '<div class="task-body"><div class="task-t">' +
+      (f ? esc(f.course.name) + ' ' + it.seq + '강' : '(삭제된 강좌) ' + it.seq + '강') + '</div>' +
+      (f && f.lec.title ? '<div class="task-d">' + esc(f.lec.title) + '</div>' : '') +
+      '<div class="meta">' +
+        (f && f.lec.min ? '<span class="tag time">' + f.lec.min + '분</span>' : '') +
+        (f && f.course.platform ? '<span class="tag">' + esc(f.course.platform) + '</span>' : '') +
+        (late ? '<span class="tag ' + (late >= ING_LATE_WARN ? 'carry' : '') + '">' +
+          shortDate(it.date) + ' · ' + late + '일 밀림</span>' : '') +
+      '</div></div></div>';
+}
+
+/** 오늘 화면에 붙는 인강 카드 */
+function ingTodayCard(me, editable) {
+  const { overdue, todays } = ingTodayItems(me.id);
+  if (!overdue.length && !todays.length) return '';
+  const bad = overdue.filter(x => Math.round((parseYmd(today()) - parseYmd(x.date)) / 86400000) >= ING_LATE_WARN).length;
+  let h = '';
+  if (overdue.length) {
+    h += '<div class="card alert"><div class="between mb8">' +
+      '<div class="card-title" style="color:var(--coral)">🎬 먼저 듣자! — 밀린 인강 ' + overdue.length + '강</div>' +
+      (bad ? '<span class="pill bad">' + ING_LATE_WARN + '일 이상 ' + bad + '강</span>' : '') + '</div>' +
+      overdue.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
+  }
+  if (todays.length) {
+    const done = todays.filter(x => x.done).length;
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">🎬 오늘 인강</div>' +
+      '<div class="pill' + (done === todays.length ? '' : ' warn') + '">' + done + ' / ' + todays.length + '강</div></div>' +
+      todays.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
+  }
+  return h;
+}
+
+/* ── 인강 탭 ── */
+function viewIngang() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const admin = session.isAdmin || isManager();
+  const courses = ingCourses(me.id);
+  const asg = ingAssigned(me.id);
+  const set = ingSet(me.id);
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  const { overdue } = ingTodayItems(me.id);
+  if (overdue.length) {
+    h += '<div class="card alert"><div class="between">' +
+      '<div class="card-title" style="color:var(--coral)">밀린 인강 ' + overdue.length + '강</div>' +
+      (admin ? '<button class="btn btn-sm btn-warn" data-act="ingcatchup">전부 오늘로</button>' : '') +
+      '</div></div>';
+  }
+
+  if (admin) {
+    h += '<div class="card"><div class="card-title mb8">강좌 관리</div>' +
+      '<div class="card-sub mb14">배정 요일 ' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '미설정') +
+        ' · 하루 ' + set.perDay + '강 <button class="btn btn-sm btn-ghost" data-act="ingset">변경</button></div>' +
+      '<div class="row wraprow" style="gap:8px">' +
+        '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="ingshift">📅 일정 밀기</button>' +
+      '</div></div>';
+  }
+
+  if (!courses.length) {
+    return h + '<div class="card"><div class="empty"><b>🎬</b>등록된 강좌가 없습니다.' +
+      (admin ? '<br>강좌를 등록하고 커리큘럼을 붙여넣으세요.' : '') + '</div></div>';
+  }
+
+  courses.forEach(c => {
+    const s = ingStats(me.id, c, asg);
+    h += '<div class="card"><div class="between mb8">' +
+      '<div><div class="card-title">' + esc(c.name) + '</div>' +
+      '<div class="small muted">' + esc(c.platform || '') + ' · 총 ' + s.total + '강</div></div>' +
+      '<div class="pill' + (s.pct >= 100 ? '' : s.pct >= 50 ? ' warn' : ' bad') + '">' + s.pct + '%</div></div>' +
+      '<div class="bar mb8"><i style="width:' + s.pct + '%"></i></div>' +
+      '<div class="between small"><span class="muted">완료 ' + s.done + ' · 배정 ' + s.assigned +
+        ' · <b>미배정 ' + s.unassigned + '</b></span>' +
+      (admin
+        ? '<span class="row" style="gap:6px">' +
+            (s.unassigned ? '<button class="btn btn-sm btn-primary" data-act="ingassign" data-cid="' + esc(c.id) + '">배정</button>' : '') +
+            '<button class="btn btn-sm btn-ghost" data-act="ingdel" data-cid="' + esc(c.id) + '">삭제</button></span>'
+        : '') +
+      '</div></div>';
+  });
+
+  h += '<div class="hint">미배정 = 강의는 등록됐지만 아직 들을 날짜가 안 잡힌 것입니다. ' +
+    '[배정]을 누르면 요일·하루 강수에 맞춰 날짜가 자동으로 잡힙니다.</div>';
+  return h;
+}
+
+function ingAddModal() {
+  modal('🎬 강좌 등록',
+    '<input class="in mb8" id="ingName" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
+    '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
+      ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
+        '" data-act="ingpf" data-v="' + p + '">' + p + '</button>').join('') + '</div>' +
+    '<div class="fl mb8">커리큘럼 붙여넣기</div>' +
+    '<textarea class="in" id="ingText" rows="8" placeholder="1강 다항식의 덧셈과 뺄셈 52분&#10;2강 다항식의 곱셈 47분&#10;3강 곱셈 공식 (51:20)"></textarea>' +
+    '<div class="hint">강의 사이트에서 목차를 복사해 그대로 붙여넣으세요. 회차 번호와 시간을 자동으로 읽습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="ingsave">등록</button>');
+}
+
+function ingAssignModal(sid, cid) {
+  const c = ingCourses(sid).find(x => x.id === cid);
+  if (!c) return;
+  const asg = ingAssigned(sid);
+  const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]);
+  const set = ingSet(sid);
+  modal('📅 ' + c.name + ' 배정',
+    '<div class="card-sub mb14">미배정 <b>' + left.length + '강</b>을 날짜에 나눠 넣습니다.</div>' +
+    '<div class="fl mb8">시작일</div><input class="in mb14" type="date" id="ingStart" value="' + today() + '">' +
+    '<div class="fl mb8">요일</div><div class="chips mb14" id="ingDays">' +
+      DOW.map((d, i) => '<button type="button" class="chip ' + (set.days.includes(i) ? 'on' : '') +
+        '" data-act="ingday" data-v="' + i + '">' + d + '</button>').join('') + '</div>' +
+    '<div class="fl mb8">하루 몇 강</div>' +
+    '<div class="row mb8"><input class="in" type="number" min="1" id="ingPer" value="' + set.perDay + '" style="max-width:100px">' +
+      '<span class="small muted">강씩</span></div>' +
+    '<hr class="sep"><div class="fl mb8">또는 목표 완료일로 역산</div>' +
+    '<div class="row"><input class="in" type="date" id="ingEnd">' +
+      '<button class="btn btn-sm btn-ghost" data-act="ingcalc">계산</button></div>' +
+    '<div class="hint" id="ingCalcOut">목표일을 넣고 [계산]을 누르면 하루 강수가 자동으로 채워집니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="ingdo" data-cid="' + esc(cid) + '">배정하기</button>');
 }
 
 /* ── 주간 플래너 ── */
@@ -2012,6 +2287,114 @@ document.addEventListener('click', ev => {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
       state.settings.adminPin = v; save(); toast('변경되었습니다');
+      break;
+    }
+
+    /* 인강 플래너 */
+    case 'ingcheck': {
+      ingToggle(el.dataset.sid, el.dataset.date, el.dataset.cid, Number(el.dataset.seq));
+      render();
+      break;
+    }
+    case 'ingadd': ingAddModal(); break;
+    case 'ingpf': {
+      document.querySelectorAll('#ingPf .chip').forEach(c => c.classList.toggle('on', c === el));
+      break;
+    }
+    case 'ingsave': {
+      const me = currentStaff(); if (!me) break;
+      const name = ($('#ingName').value || '').trim();
+      if (!name) return toast('강좌 이름을 입력해 주세요');
+      const lectures = ingParse($('#ingText').value);
+      if (!lectures.length) return toast('커리큘럼을 읽지 못했습니다 — 회차 번호로 시작하는 줄이 필요합니다');
+      const pf = (document.querySelector('#ingPf .chip.on') || {}).dataset;
+      ingSaveCourses(me.id, ingCourses(me.id).concat({
+        id: uid(), name: name, platform: (pf && pf.v) || '기타', lectures: lectures
+      }));
+      closeModal(); render();
+      toast(name + ' — ' + lectures.length + '강 등록 완료');
+      break;
+    }
+    case 'ingdel': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id === el.dataset.cid);
+      if (!c || !confirm(c.name + ' 강좌를 삭제할까요? 배정된 일정도 함께 지워집니다.')) return;
+      ingPlanDates(me.id).forEach(d => {
+        const items = ingPlan(me.id, d).filter(x => x.cid !== c.id);
+        if (items.length !== ingPlan(me.id, d).length) ingSavePlan(me.id, d, items);
+      });
+      ingSaveCourses(me.id, ingCourses(me.id).filter(x => x.id !== c.id));
+      render(); toast('삭제했습니다');
+      break;
+    }
+    case 'ingassign': ingAssignModal(currentStaff().id, el.dataset.cid); break;
+    case 'ingday': el.classList.toggle('on'); break;
+    case 'ingcalc': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id ===
+        (document.querySelector('[data-act="ingdo"]') || {}).dataset.cid);
+      if (!c) break;
+      const asg = ingAssigned(me.id);
+      const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]).length;
+      const start = $('#ingStart').value, end = $('#ingEnd').value;
+      if (!end || end < start) return toast('목표 완료일을 시작일 이후로 넣어주세요');
+      const days = Array.from(document.querySelectorAll('#ingDays .chip.on')).map(x => Number(x.dataset.v));
+      const per = ingPerDayFor(left, start, end, days);
+      $('#ingPer').value = per;
+      $('#ingCalcOut').textContent = left + '강을 ' + shortDate(end) + '까지 끝내려면 하루 ' + per + '강씩 들어야 합니다.';
+      break;
+    }
+    case 'ingdo': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id === el.dataset.cid);
+      if (!c) break;
+      const asg = ingAssigned(me.id);
+      const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]);
+      if (!left.length) return toast('미배정 강의가 없습니다');
+      const start = $('#ingStart').value || today();
+      const days = Array.from(document.querySelectorAll('#ingDays .chip.on')).map(x => Number(x.dataset.v));
+      if (!days.length) return toast('요일을 하나 이상 선택해 주세요');
+      const per = Math.max(1, Number($('#ingPer').value) || 1);
+      const dates = ingAssignDates(left.length, start, days, per);
+      const buckets = {};
+      left.forEach((l, i) => {
+        const d = dates[i]; if (!d) return;
+        (buckets[d] = buckets[d] || []).push({ cid: c.id, seq: l.seq, done: false });
+      });
+      Object.keys(buckets).forEach(d => ingSavePlan(me.id, d, ingPlan(me.id, d).concat(buckets[d])));
+      setCheck('__ingset__' + me.id, 'all', { set: { days: days, perDay: per }, done: true });
+      closeModal(); render();
+      toast(left.length + '강을 ' + Object.keys(buckets).length + '일에 나눠 배정했습니다');
+      break;
+    }
+    case 'ingcatchup': {
+      const me = currentStaff(); if (!me) break;
+      if (!confirm('밀린 인강을 전부 오늘로 옮길까요?')) return;
+      const n = ingCatchup(me.id);
+      render(); toast(n + '강을 오늘로 옮겼습니다');
+      break;
+    }
+    case 'ingshift': {
+      const me = currentStaff(); if (!me) break;
+      const v = prompt('오늘 이후의 미완료 인강을 며칠 밀까요?\n(앞당기려면 -3 처럼 음수를 넣으세요)', '7');
+      if (v === null) break;
+      const n = Number(v);
+      if (!n) return toast('숫자를 넣어주세요');
+      const cnt = ingShift(me.id, today(), n);
+      render(); toast(cnt + '강을 ' + (n > 0 ? n + '일 뒤로' : (-n) + '일 앞으로') + ' 옮겼습니다');
+      break;
+    }
+    case 'ingset': {
+      const me = currentStaff(); if (!me) break;
+      const set = ingSet(me.id);
+      const d = prompt('배정할 요일을 번호로 입력하세요 (0=일 1=월 ... 6=토)\n예: 1,2,3,4,5', set.days.join(','));
+      if (d === null) break;
+      const days = String(d).split(',').map(x => Number(x.trim())).filter(x => x >= 0 && x <= 6);
+      const p = prompt('하루에 몇 강씩 배정할까요?', set.perDay);
+      if (p === null) break;
+      setCheck('__ingset__' + me.id, 'all',
+        { set: { days: days, perDay: Math.max(1, Number(p) || 1) }, done: true });
+      render(); toast('저장했습니다');
       break;
     }
 
