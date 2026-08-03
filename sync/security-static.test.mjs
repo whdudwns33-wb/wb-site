@@ -18,6 +18,21 @@ test('version.json matches both administrator app bundles', () => {
   }
 });
 
+test('두 관리자 앱은 로그인 성공과 운영 데이터 연결 상태를 구분해 안내한다', () => {
+  for (const source of [consult, task]) {
+    const status = source.slice(source.indexOf('function paintStatus()'), source.indexOf('function currentStaff()'));
+    assert.match(status, /원장 로그인됨/);
+    assert.match(status, /로컬 모드/);
+    assert.match(status, /관리 비밀번호와 운영 데이터 연결키는 보안상 별개/);
+    assert.match(status, /운영 데이터 연결 오류/);
+    assert.match(status, /aria-labelledby="adminLocalModeTitle"/);
+    assert.doesNotMatch(status, /role="(?:status|alert)"/);
+    assert.ok(source.includes('if (syncReady) startSyncSession();'));
+    assert.match(source, /paintAdminConnectionNotice/);
+    assert.ok(source.includes("case 'syncsettings': go('settings')"));
+  }
+});
+
 test('두 관리자 앱은 PIN을 PBKDF2로 저장하고 구형 비밀정보 링크를 흡수하지 않는다', () => {
   for (const source of [consult, task]) {
     assert.match(source, /name: 'PBKDF2'/);

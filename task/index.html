@@ -713,6 +713,7 @@ const sync = {
     } catch (e) {
       console.warn('sync', e);
       this.dirty = true; this.err = String(e && e.message || e);
+      if (typeof paintAdminConnectionNotice === 'function') paintAdminConnectionNotice();
       if (this.loud) toast('동기화 실패 — ' + this.err);
     } finally {
       this.busy = false; this.loud = false; paintStatus();
@@ -1050,12 +1051,47 @@ function paintStatus() {
   const me = currentStaff();
   let text, on = false;
   if (session.isStaffLink) { text = me ? me.name + ' 선생님' + (isManager() ? ' · 관리자' : '') : '알 수 없는 링크'; on = !!me; }
-  else if (session.isAdmin) { text = '원장 모드'; on = true; }
+  else if (session.isAdmin) {
+    text = '원장 로그인됨'; on = true;
+    if (!sync.enabled()) text += ' · 로컬 모드';
+    else if (sync.busy) text += ' · 운영 데이터 확인 중';
+    else if (sync.err) text += ' · 연결 오류';
+    else if (sync.last) text += ' · 운영 데이터 연결됨';
+    else text += ' · 연결 확인 대기';
+  }
   else { text = '잠김'; }
-  if (sync.busy) text += ' · 동기화중';
-  else if (sync.enabled() && sync.dirty) text += ' · 대기';
+  if (session.isStaffLink && sync.busy) text += ' · 동기화중';
+  else if (session.isStaffLink && sync.enabled() && sync.dirty) text += ' · 대기';
   el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
   el.classList.toggle('off', !on);
+}
+
+function adminConnectionNotice() {
+  if (session.isStaffLink || !session.isAdmin || route === 'settings') return '';
+  if (!sync.enabled()) {
+    return '<section class="card" aria-labelledby="adminLocalModeTitle"><div class="card-title" id="adminLocalModeTitle">원장 로그인 완료 · 로컬 모드</div>' +
+      '<div class="card-sub">로그인은 정상입니다. 운영 직원 데이터 연결 전이라 이 기기에 저장된 내용만 보입니다. 관리 비밀번호와 운영 데이터 연결키는 보안상 별개입니다.</div>' +
+      '<button class="btn btn-ghost btn-block mt14" data-act="syncsettings">운영 데이터 연결 설정</button></section>';
+  }
+  if (sync.err) {
+    return '<section class="card alert" aria-labelledby="adminSyncErrorTitle"><div class="card-title" id="adminSyncErrorTitle">원장 로그인 완료 · 운영 데이터 연결 오류</div>' +
+      '<div class="card-sub">로그인은 정상이며 동기화 연결만 실패했습니다. 설정에서 연결키를 확인한 뒤 다시 시도해 주세요.</div>' +
+      '<button class="btn btn-ghost btn-block mt14" data-act="syncsettings">연결 설정 확인</button></section>';
+  }
+  return '';
+}
+
+function syncStatusDetailHtml() {
+  const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
+  return '마지막 동기화: ' + esc(lastTxt) +
+    (sync.err ? ' · <span style="color:var(--coral)">' + esc(sync.err) + '</span>' : '');
+}
+
+function paintAdminConnectionNotice() {
+  const notice = $('#adminConnectionNotice');
+  if (notice) notice.innerHTML = adminConnectionNotice();
+  const detail = $('#syncStatusDetail');
+  if (detail) detail.innerHTML = syncStatusDetailHtml();
 }
 
 function currentStaff() {
@@ -1089,7 +1125,7 @@ function render() {
   }
 
   const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
-  v.innerHTML = (map[route] || viewToday)();
+  v.innerHTML = '<div id="adminConnectionNotice">' + adminConnectionNotice() + '</div>' + (map[route] || viewToday)();
 }
 
 function renderTabs() {
@@ -2201,7 +2237,6 @@ function viewStaffAdmin() {
 function viewSettings() {
   const s = state.settings;
   const sessionSecret = getTaskAdminSecret();
-  const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
     '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. 비밀키는 <b>현재 브라우저 탭 세션에만</b> 보관됩니다.<br>' +
@@ -2213,7 +2248,7 @@ function viewSettings() {
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="savecfg">이 세션에 연결</button>' +
       '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
-    '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
+    '<div class="small muted mt14" id="syncStatusDetail">' + syncStatusDetailHtml() + '</div>' +
     (sessionSecret
       ? '<div class="hint mt14">✓ 이 탭 세션에 연결됨 — 비밀키는 기기 저장·백업·주소에 남지 않습니다. 개인 링크에는 <b>직원별 토큰</b>만 사용됩니다.</div>' +
         '<hr class="sep">' +
@@ -2792,15 +2827,22 @@ document.addEventListener('click', async ev => {
     case 'setpin': {
       const v = ($('#pin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      await setAdminPin(v); session.unlock(); go('staff'); toast('설정되었습니다');
+      await setAdminPin(v); session.unlock(); go('staff');
+      const syncReady = sync.enabled();
+      toast(syncReady ? '관리 비밀번호 설정 완료 · 운영 데이터 연결을 확인합니다' : '관리 비밀번호 설정 완료 · 현재는 로컬 데이터만 표시합니다');
+      if (syncReady) startSyncSession();
       break;
     }
     case 'login': {
       if (!await verifyAdminPin(($('#pin').value || '').trim())) return toast('비밀번호가 다릅니다');
-      session.unlock(); render(); toast('환영합니다');
+      session.unlock(); render();
+      const syncReady = sync.enabled();
+      toast(syncReady ? '원장 로그인 완료 · 운영 데이터 연결을 확인합니다' : '원장 로그인 완료 · 현재는 로컬 데이터만 표시합니다');
+      if (syncReady) startSyncSession();
       break;
     }
     case 'logout': session.lock(); render(); break;
+    case 'syncsettings': go('settings'); break;
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
@@ -3473,7 +3515,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.3';
+const APP_VER = '2026-08-03.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

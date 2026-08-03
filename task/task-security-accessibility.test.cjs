@@ -19,6 +19,23 @@ test('manager password fields accept letters and symbols without a numeric keybo
   }
 });
 
+test('manager authentication is visibly distinguished from operating-data sync', () => {
+  const status = html.slice(html.indexOf('function paintStatus()'), html.indexOf('function currentStaff()'));
+  const render = html.slice(html.indexOf('function render()'), html.indexOf('function renderTabs()'));
+  const syncRun = html.slice(html.indexOf('const sync = {'), html.indexOf('function queueSync()'));
+  assert.match(status, /원장 로그인됨/);
+  assert.match(status, /로컬 모드/);
+  assert.match(status, /관리 비밀번호와 운영 데이터 연결키는 보안상 별개/);
+  assert.match(status, /운영 데이터 연결 오류/);
+  assert.match(status, /aria-labelledby="adminLocalModeTitle"/);
+  assert.doesNotMatch(status, /role="(?:status|alert)"/);
+  assert.ok(render.includes('id="adminConnectionNotice"'));
+  assert.ok(html.includes("case 'syncsettings': go('settings')"));
+  assert.match(html, /운영 데이터 연결을 확인합니다/);
+  assert.ok(html.includes('if (syncReady) startSyncSession();'));
+  assert.match(syncRun, /paintAdminConnectionNotice/);
+});
+
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
   return {
