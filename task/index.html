@@ -250,6 +250,12 @@ const SAFE_SCOPE_ID = (/^[A-Za-z0-9_-]{1,128}$/.test(new URLSearchParams(locatio
 const HAS_PERSON_SCOPE = !!SAFE_SCOPE_ID;
 const LS_KEY = HAS_PERSON_SCOPE ? 'wb_taskboard_person_v1_' + SAFE_SCOPE_ID : 'wb_taskboard_v1';
 const DOW = ['일','월','화','수','목','금','토'];
+const ADMIN_SESSION_KEY = 'wb_task_admin_session_v1';
+const ADMIN_VAULT_KEY = 'wb_task_admin_vault_v1';
+const SAFE_OPAQUE_TOKEN = /^[a-f0-9]{48}$/i;
+const PIN_KDF_LEGACY_ITERATIONS = 150000;
+const PIN_KDF_ITERATIONS = 600000;
+let memoryAdminRecoverySecret = '';
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
 const now = () => Date.now();
@@ -260,7 +266,7 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터' }
+    settings: { adminPin: '', adminPinHash: '', adminPinSalt: '', adminPinVersion: 0, syncUrl: '', centerName: 'WB 웩슬러브레인센터' }
   };
 }
 
@@ -273,13 +279,167 @@ function load() {
       const p = JSON.parse(raw);
       state = Object.assign(blankState(), p);
       state.settings = Object.assign(blankState().settings, p.settings || {});
+      // 과거 버전이 localStorage에 남긴 최고권한 비밀키는 현재 탭의 전환용 메모리로만
+      // 한 번 옮기고, 저장본에서는 즉시 제거한다.
+      const legacySecret = String(state.settings.syncSecret || '').trim();
+      if (!HAS_PERSON_SCOPE && legacySecret) memoryAdminRecoverySecret = legacySecret;
+      if (Object.prototype.hasOwnProperty.call(state.settings, 'syncSecret')) {
+        delete state.settings.syncSecret;
+        localStorage.setItem(LS_KEY, JSON.stringify(state));
+      }
     }
   } catch (e) { console.warn('load failed', e); }
 }
 
 function save() {
+  if (state.settings) delete state.settings.syncSecret;
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
+}
+
+function purgeLegacyAdminSecret() {
+  memoryAdminRecoverySecret = '';
+  if (state.settings) delete state.settings.syncSecret;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    if (stored && stored.settings && Object.prototype.hasOwnProperty.call(stored.settings, 'syncSecret')) {
+      delete stored.settings.syncSecret;
+      localStorage.setItem(LS_KEY, JSON.stringify(stored));
+    }
+  } catch (error) {
+    console.warn('legacy admin secret cleanup failed', error);
+  }
+}
+
+function hasAdminPin() {
+  return !!(state.settings.adminPinHash || state.settings.adminPin);
+}
+
+function randomHex(bytes) {
+  const out = new Uint8Array(bytes);
+  crypto.getRandomValues(out);
+  return Array.from(out, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function derivePinHash(pin, salt, iterations) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(String(pin)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({
+    name: 'PBKDF2', salt: enc.encode(String(salt)), iterations: iterations || PIN_KDF_ITERATIONS, hash: 'SHA-256'
+  }, key, 256);
+  return Array.from(new Uint8Array(bits), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function setAdminPin(pin) {
+  const salt = randomHex(16);
+  state.settings.adminPinSalt = salt;
+  state.settings.adminPinHash = await derivePinHash(pin, salt, PIN_KDF_ITERATIONS);
+  state.settings.adminPinVersion = 2;
+  state.settings.adminPin = '';
+  save();
+}
+
+async function verifyAdminPin(pin) {
+  if (state.settings.adminPinHash && state.settings.adminPinSalt) {
+    const legacy = Number(state.settings.adminPinVersion || 1) < 2;
+    const iterations = legacy ? PIN_KDF_LEGACY_ITERATIONS : PIN_KDF_ITERATIONS;
+    const valid = await derivePinHash(pin, state.settings.adminPinSalt, iterations) === state.settings.adminPinHash;
+    if (valid && legacy) await setAdminPin(pin);
+    return valid;
+  }
+  if (state.settings.adminPin && pin === state.settings.adminPin) {
+    await setAdminPin(pin);
+    return true;
+  }
+  return false;
+}
+
+function bytesToB64(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function b64ToBytes(value) {
+  const binary = atob(String(value || ''));
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+async function deriveVaultKey(pin, salt, iterations) {
+  const material = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(String(pin)), 'PBKDF2', false, ['deriveKey']);
+  return await crypto.subtle.deriveKey({
+    name: 'PBKDF2', salt, iterations: iterations || PIN_KDF_ITERATIONS, hash: 'SHA-256'
+  }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+function getAdminSession() {
+  if (HAS_PERSON_SCOPE) return null;
+  try {
+    const item = JSON.parse(sessionStorage.getItem(ADMIN_SESSION_KEY) || 'null');
+    if (!item || !SAFE_OPAQUE_TOKEN.test(String(item.token || '')) || Number(item.expiresAt) <= Date.now()) {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    return { token: String(item.token), expiresAt: Number(item.expiresAt) };
+  } catch (error) {
+    return null;
+  }
+}
+
+function setAdminSession(token, expiresAt) {
+  const item = { token: String(token || ''), expiresAt: Number(expiresAt) || 0 };
+  if (!SAFE_OPAQUE_TOKEN.test(item.token) || item.expiresAt <= Date.now()) throw new Error('원장 세션 형식 오류');
+  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(item));
+  purgeLegacyAdminSecret();
+  return item;
+}
+
+function clearAdminSession(removeVault) {
+  try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (error) {}
+  if (removeVault) try { localStorage.removeItem(ADMIN_VAULT_KEY); } catch (error) {}
+}
+
+async function sealAdminSession(pin) {
+  const item = getAdminSession();
+  if (!item) return false;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveVaultKey(pin, salt, PIN_KDF_ITERATIONS);
+  const clear = new TextEncoder().encode(JSON.stringify(item));
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, clear));
+  localStorage.setItem(ADMIN_VAULT_KEY, JSON.stringify({
+    version: 2, kdfIterations: PIN_KDF_ITERATIONS,
+    salt: bytesToB64(salt), iv: bytesToB64(iv), data: bytesToB64(encrypted), expiresAt: item.expiresAt
+  }));
+  return true;
+}
+
+async function restoreAdminSession(pin) {
+  if (HAS_PERSON_SCOPE) return false;
+  let vault;
+  try { vault = JSON.parse(localStorage.getItem(ADMIN_VAULT_KEY) || 'null'); }
+  catch (error) { return false; }
+  if (!vault || (vault.version !== 1 && vault.version !== 2)) return false;
+  if (Number(vault.expiresAt) <= Date.now()) {
+    clearAdminSession(true);
+    return false;
+  }
+  try {
+    const salt = b64ToBytes(vault.salt);
+    const iv = b64ToBytes(vault.iv);
+    const encrypted = b64ToBytes(vault.data);
+    const iterations = vault.version === 1 ? PIN_KDF_LEGACY_ITERATIONS : PIN_KDF_ITERATIONS;
+    const key = await deriveVaultKey(pin, salt, iterations);
+    const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+    const item = JSON.parse(new TextDecoder().decode(clear));
+    setAdminSession(item.token, item.expiresAt);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -473,19 +633,62 @@ function ownerOfCheck(key) {
   return t ? (t.staffId || null) : null;
 }
 
+/** 서버의 전 테이블 정렬 위치. 구형 pullAt 숫자는 rank=-1 커서로 승격한다. */
+function normalizePullCursor(raw, fallbackSince) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const srvAt = Number(raw.srv_at);
+    const tableRank = Number(raw.table_rank);
+    const key = String(raw.key || '');
+    if (Number.isSafeInteger(srvAt) && srvAt >= 0 &&
+        Number.isInteger(tableRank) && tableRank >= -1 && tableRank <= 2 &&
+        key.length <= 512 && (tableRank !== -1 || key === '')) {
+      return { srv_at: srvAt, table_rank: tableRank, key: key };
+    }
+  }
+  const legacy = Number(fallbackSince);
+  return {
+    srv_at: Number.isSafeInteger(legacy) && legacy >= 0 ? legacy : 0,
+    table_rank: -1,
+    key: ''
+  };
+}
+
+function samePullCursor(a, b) {
+  return !!a && !!b && a.srv_at === b.srv_at &&
+    a.table_rank === b.table_rank && a.key === b.key;
+}
+
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
 
-  /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
+  /** 원장은 24시간 세션으로, 직원은 개인 토큰으로 접속한다. 최고권한 비밀키는 auth에 보관하지 않는다. */
   auth() {
     if (session.isStaffLink) {
       const t = state.settings.myToken || '';
       return t ? { mode: 'person', id: session.staffId, token: t } : null;
     }
-    const k = state.settings.syncSecret || '';
-    return k ? { mode: 'admin', secret: k } : null;
+    const adminSession = getAdminSession();
+    if (adminSession) return { mode: 'admin_session', token: adminSession.token };
+    return null;
   },
   enabled() { return !!this.auth(); },
+
+  pullCursor() {
+    return normalizePullCursor(state.settings.pullCursor, state.settings.pullAt);
+  },
+
+  responseCursor(response, current) {
+    const next = normalizePullCursor(response && response.cursor, response && response.now);
+    if (response && response.more && samePullCursor(current, next)) {
+      throw new Error('동기화 페이지 위치가 진행되지 않았습니다');
+    }
+    return next;
+  },
+
+  rememberPullCursor(cursor) {
+    state.settings.pullCursor = cursor;
+    state.settings.pullAt = cursor.srv_at; // 구형 앱/서버와의 전환 기간 호환값
+  },
 
   /** since 이후 바뀐 것만 모은다. 각 레코드가 이미 updatedAt을 갖고 있어
    *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
@@ -529,29 +732,86 @@ const sync = {
       body: JSON.stringify(body)
     });
     const d = await res.json().catch(() => null);
-    if (!d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + res.status));
+    if (!d || d.ok !== true) {
+      const error = new Error((d && d.error) || ('HTTP ' + res.status));
+      error.status = res.status;
+      throw error;
+    }
     return d;
+  },
+
+  /** 새 원장 브라우저는 로컬 데이터를 올리지 않고 D1 정본을 먼저 통째로 복원한다. */
+  async pullOnly() {
+    const auth = this.auth();
+    if (!auth || auth.mode === 'person' || this.busy) return false;
+    const hasLocal = state.staff.length || state.tasks.length || Object.keys(state.checks).length;
+    if (hasLocal && !confirm('이 브라우저의 업무 데이터를 운영 서버 최신 상태로 교체합니다. 계속할까요?')) return false;
+    this.busy = true; paintStatus();
+    try {
+      const fresh = { staff: [], tasks: [], checks: {} };
+      let pullCursor = normalizePullCursor(null, 0), guard = 0, more = true, maxUpdated = 0;
+      while (more && guard++ < 60) {
+        const d = await this.post('/sync', {
+          app: SYNC_APP,
+          auth,
+          since: pullCursor.srv_at,
+          cursor: pullCursor,
+          changes: []
+        });
+        for (const change of (d.changes || [])) {
+          if (!change || !change.data) continue;
+          maxUpdated = Math.max(maxUpdated, Number(change.updated_at) || Number(change.data.updatedAt) || 0);
+          if (change.table === 'checks') fresh.checks[change.key] = change.data;
+          else if (change.table === 'staff' || change.table === 'tasks') fresh[change.table].push(change.data);
+        }
+        pullCursor = this.responseCursor(d, pullCursor);
+        more = !!d.more;
+      }
+      if (more) throw new Error('운영 데이터가 너무 많아 복원을 완료하지 못했습니다');
+      state.staff = fresh.staff;
+      state.tasks = fresh.tasks;
+      state.checks = fresh.checks;
+      this.rememberPullCursor(pullCursor);
+      state.settings.pushAt = Math.max(now(), maxUpdated);
+      bookDb = null; bookDbErr = ''; rosterDb = null; rosterErr = '';
+      save();
+      this.last = now(); this.dirty = false; this.err = '';
+      render();
+      return true;
+    } catch (error) {
+      this.err = String(error && error.message || error);
+      if (error && error.status === 401 && auth.mode === 'admin_session') {
+        clearAdminSession(false); session.lock();
+      }
+      render();
+      throw error;
+    } finally {
+      this.busy = false; paintStatus();
+    }
   },
 
   async run() {
     const auth = this.auth();
-    if (!auth || this.busy) return;
+    if (!auth || this.busy || (auth.mode !== 'person' && !session.isAdmin)) return;
     this.busy = true; paintStatus();
     try {
       const t0 = now();
       const pending = this.collect(Number(state.settings.pushAt) || 0);
-      let guard = 0, again = true;
+      let pullCursor = this.pullCursor(), guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
-          since: Number(state.settings.pullAt) || 0,
+          since: pullCursor.srv_at,
+          cursor: pullCursor,
           changes: batch
         });
         this.apply(d.changes);
-        state.settings.pullAt = d.now;
+        pullCursor = this.responseCursor(d, pullCursor);
+        this.rememberPullCursor(pullCursor);
         again = !!d.more || pending.length > 0;
       }
+      if (again) throw new Error('동기화 데이터가 너무 많아 이번 회차를 완료하지 못했습니다');
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
       save();
@@ -560,6 +820,10 @@ const sync = {
     } catch (e) {
       console.warn('sync', e);
       this.dirty = true; this.err = String(e && e.message || e);
+      if (e && e.status === 401 && auth.mode === 'admin_session') {
+        clearAdminSession(false);
+        session.lock();
+      }
       if (this.loud) toast('동기화 실패 — ' + this.err);
     } finally {
       this.busy = false; this.loud = false; paintStatus();
@@ -569,12 +833,29 @@ const sync = {
   /** 장기 bearer 대신 24시간 안에 한 번만 교환할 링크 code를 발급한다. */
   async issueBootstrap(staffId) {
     const auth = this.auth();
-    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 발급할 수 있습니다');
+    if (!auth || auth.mode === 'person') throw new Error('원장 화면에서만 발급할 수 있습니다');
     return await this.post('/bootstrap', { app: SYNC_APP, auth: auth, staffId: staffId });
   },
 
   async exchangeBootstrap(staffId, code) {
     return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
+  },
+
+  async recoverAdmin(secret) {
+    if (session.isStaffLink) throw new Error('직원 개인 주소에서는 원장 복구를 할 수 없습니다');
+    const value = String(secret || '').trim();
+    if (!value) throw new Error('TASK_ADMIN_SECRET을 입력해 주세요');
+    return await this.post('/admin-recover', { app: SYNC_APP, auth: { mode: 'admin', secret: value } });
+  },
+
+  async exchangeAdminBootstrap(code) {
+    return await this.post('/admin-exchange', { app: SYNC_APP, code });
+  },
+
+  async adminHandoff() {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin_session') throw new Error('원장 복구 세션으로 다시 연결해 주세요');
+    return await this.post('/admin-handoff', { app: SYNC_APP, auth });
   },
 
   async handoff() {
@@ -585,8 +866,21 @@ const sync = {
 
   async revokeAccess(staffId) {
     const auth = this.auth();
-    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 해지할 수 있습니다');
+    if (!auth || auth.mode === 'person') throw new Error('원장 화면에서만 해지할 수 있습니다');
     return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
+  },
+
+  async revokeAdminSession() {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin_session') return;
+    await this.post('/admin-revoke', { app: SYNC_APP, auth });
+  },
+
+  async privateAsset(key) {
+    const auth = this.auth();
+    if (!auth) throw new Error('운영 데이터 인증이 필요합니다');
+    const response = await this.post('/private-asset', { app: SYNC_APP, auth: auth, key: key });
+    return response.data;
   }
 };
 
@@ -617,7 +911,7 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
-  if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
+  if (/[#&](?:add|c|a)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
   if (r && r !== route) { route = r; render(); }
 });
@@ -626,10 +920,12 @@ function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g
 
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingBootstrapCode = ''; // 주소에서 즉시 지운 뒤 1회 교환할 code
+let pendingAdminBootstrapCode = ''; // 주소에서 즉시 지운 뒤 원장 세션으로 교환할 code
 
 /** 링크에 담겨 온 것들을 흡수한다.
  *  s=  구형 원장 복구 링크 (보안상 내용은 무시하고 제거)
  *  c=  1회용 개인 링크 code
+ *  a=  10분 안에 한 번만 쓰는 원장 복구 code
  *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
 function absorbLinkParams() {
   const q = new URLSearchParams(location.search);
@@ -646,6 +942,18 @@ function absorbLinkParams() {
   if (s) {
     q.delete('s'); touched = true;
     setTimeout(() => toast('보안상 원장 복구 링크의 비밀정보는 사용하지 않습니다'), 0);
+  }
+
+  const adminCodeMatch = location.hash.match(/[#&]a=([^&]+)/);
+  if (adminCodeMatch) {
+    if (HAS_PERSON_SCOPE) {
+      pendingAdminBootstrapCode = '';
+      setTimeout(() => toast('직원 개인 주소에서는 원장 링크를 사용할 수 없습니다'), 0);
+    } else {
+      try { pendingAdminBootstrapCode = decodeURIComponent(adminCodeMatch[1]); }
+      catch (error) { pendingAdminBootstrapCode = ''; }
+    }
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
   }
 
   const codeMatch = location.hash.match(/[#&]c=([^&]+)/);
@@ -668,7 +976,7 @@ function absorbLinkParams() {
     } catch (e) { console.warn('link add', e); }
   }
 
-  if (touched || m) {
+  if (touched || m || codeMatch || adminCodeMatch) {
     history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (m || codeMatch ? '' : location.hash));
   }
 }
@@ -923,7 +1231,7 @@ function render() {
   if (session.isStaffLink && !staffById(session.staffId)) {
     v.innerHTML = pendingBootstrapCode
       ? '<div class="card"><div class="empty"><b>⏳</b>업무를 안전하게 불러오는 중입니다.</div></div>'
-      : '<div class="card"><div class="empty"><b>🔗</b>새 개인 링크가 필요합니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
+      : '<div class="card"><div class="empty"><b>🔗</b>이 브라우저에는 접속 인증이 없습니다.<br>주소창 링크만 복사하면 인증은 옮겨지지 않습니다.<br>원래 카카오톡 화면에서 <b>다른 브라우저에서 열 링크 복사</b>를 누르거나 원장님께 새 링크를 요청해 주세요.</div></div>';
     return;
   }
   if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
@@ -994,22 +1302,33 @@ function viewPendingAdd() {
 
 /* ── 잠금 ── */
 function viewLock() {
-  const first = !state.settings.adminPin;
+  if (pendingAdminBootstrapCode) {
+    return '<div class="card"><div class="empty"><b>⏳</b>원장 접속을 안전하게 확인하는 중입니다.</div></div>';
+  }
+  const first = !hasAdminPin();
+  const canUnlock = !!sync.auth() || (!first && !!localStorage.getItem(ADMIN_VAULT_KEY));
+  if (!canUnlock) {
+    return '<div class="card mt14">' +
+      '<div class="card-title">' + (first ? '처음 오셨네요 · 원장 연결 복구' : '원장 연결 복구') + '</div>' +
+      '<div class="card-sub mb14">TASK_ADMIN_SECRET을 한 번 입력하면 24시간 원장 세션으로 바뀝니다. 비밀키는 이 브라우저에 저장하지 않습니다.</div>' +
+      '<div class="field"><input class="in" id="adminRecoverySecret" type="password" placeholder="TASK_ADMIN_SECRET" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+      '<button class="btn btn-primary btn-block" data-act="recoveradmin">' +
+        (memoryAdminRecoverySecret ? '기존 연결을 안전 세션으로 전환' : '원장 연결 복구') + '</button>' +
+      '<hr class="sep">' +
+      '<div class="hint">복구가 끝나면 이 기기에서 사용할 <b>10자 이상의 화면 잠금 비밀번호</b>를 설정하거나 입력합니다.</div>' +
+    '</div>';
+  }
   return '<div class="card mt14">' +
-    '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
+    '<div class="card-title">' + (first ? '처음 오셨네요 · 화면 잠금 비밀번호 설정' : '원장 모드') + '</div>' +
     '<div class="card-sub mb14">' + (first
-      ? '직원에게 나가는 링크와 달리, 이 화면은 지시서를 만들고 현황을 보는 원장 전용입니다. 4자리 이상 비밀번호를 정해 주세요.'
-      : '비밀번호를 입력하면 지시서 작성과 현황 확인 화면이 열립니다.') + '</div>' +
-    '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+      ? '운영 서버 연결을 확인했습니다. 이 브라우저 화면을 잠글 10자 이상 비밀번호를 정해 주세요.'
+      : '비밀번호를 입력하면 운영 서버에서 최신 지시서와 현황을 먼저 불러옵니다.') + '</div>' +
+    '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="' + (first ? 'new-password' : 'current-password') + '" autocapitalize="none" spellcheck="false"></div>' +
     '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
-      (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
+      (first ? '비밀번호 설정하고 서버 데이터 불러오기' : '들어가기') + '</button>' +
     '<hr class="sep">' +
-    (first
-      ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
-        '여기서 비밀번호를 정하지 마시고, 즐겨찾기에 저장해둔 <b>원장 복구 링크</b>로 들어오세요. ' +
-        '접속 정보와 비밀번호가 한 번에 복구됩니다.<br>' +
-        '(복구 링크는 설정 화면에서 만듭니다. 데이터는 구글 시트에 있으니 사라지지 않습니다)</div><hr class="sep">'
-      : '') +
+    '<div class="hint"><b>이 비밀번호는 계정 비밀번호가 아니라 이 브라우저의 화면 잠금입니다.</b><br>' +
+      '원장 복구 링크는 10분 안에 새 브라우저에서 한 번만 사용할 수 있고, 인증 뒤 주소에서 즉시 사라집니다.</div><hr class="sep">' +
     '<div class="hint">직원분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
   '</div>';
 }
@@ -1698,13 +2017,12 @@ function payrollModal() {
 }
 
 /* ── 교재 DB ──
- * 데이터는 같은 폴더의 textbooks.json (정적 파일 — 동기화 무게 0, 수정은 저장소에서).
+ * 학생 정보가 포함되므로 인증된 D1 운영 자료에서만 불러온다.
  * 학생별 현재 위치(◀)와 남은 분량·예상 소요를 함께 보여준다. */
 let bookDb = null, bookDbErr = '';
 const bookOpen = new Set();
 function loadBooks() {
-  fetch('textbooks.json?v=' + Date.now())
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  sync.privateAsset('textbooks')
     .then(d => { bookDb = d; if (route === 'books') render(); })
     .catch(e => { bookDbErr = String(e); if (route === 'books') render(); });
 }
@@ -1726,7 +2044,8 @@ function posOf(b, at) {
 
 function viewBooks() {
   if (!bookDb && !bookDbErr) { loadBooks(); return '<div class="card"><div class="empty"><b>📚</b>교재 데이터를 불러오는 중…</div></div>'; }
-  if (bookDbErr) return '<div class="card"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span></div></div>';
+  if (bookDbErr) return '<div class="card"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span><br>' +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="retrybooks">다시 불러오기</button></div></div>';
 
   let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
     '<div class="card-sub">소단원 목차와 학생별 현재 위치. 교재를 누르면 목차가 열립니다.<br>' +
@@ -1783,13 +2102,12 @@ function viewBooks() {
 }
 
 /* ── 원생 현황 (월별 실적) ──
- * 데이터는 roster.json (정적 파일). 신규·퇴원 이벤트에서 월별 재원·유지율을 계산한다.
- * 원장·관리자·선생님 모두 열람 — 숫자가 경각심과 동기가 되도록 전원 공개.
+ * 학생 정보는 인증된 D1 운영 자료에서 불러오며 개인 링크에는 담당 학생만 내려온다.
+ * 신규·퇴원 이벤트에서 월별 재원·유지율을 계산한다.
  */
 let rosterDb = null, rosterErr = '';
 function loadRoster() {
-  fetch('roster.json?v=' + Date.now())
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  sync.privateAsset('roster')
     .then(d => { rosterDb = d; render(); })
     .catch(e => { rosterErr = String(e); if (route === 'roster') render(); });
 }
@@ -1811,7 +2129,8 @@ function activeIn(m) {
 
 function viewRoster() {
   if (!rosterDb && !rosterErr) { loadRoster(); return '<div class="card"><div class="empty"><b>📈</b>원생 데이터를 불러오는 중…</div></div>'; }
-  if (rosterErr) return '<div class="card"><div class="empty"><b>⚠️</b>원생 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(rosterErr) + '</span></div></div>';
+  if (rosterErr) return '<div class="card"><div class="empty"><b>⚠️</b>원생 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(rosterErr) + '</span><br>' +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="retryroster">다시 불러오기</button></div></div>';
 
   const baseline = rosterDb.baseline;
   const months = rosterMonths();
@@ -2012,10 +2331,10 @@ function viewStaffAdmin() {
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
-          (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
+          (s.manager ? ' <span class="tag edit">주문담당</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
           (s.owner ? ' · 직원 통계에서 제외' : '') +
-          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div></div></div>' +
+          (s.manager ? ' · 교재 주문 기본 담당' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
@@ -2025,7 +2344,7 @@ function viewStaffAdmin() {
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
-            (s.manager ? '관리자 해제' : '관리자로 지정') + '</button>' +
+            (s.manager ? '주문담당 해제' : '주문담당 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="atteditopen" data-id="' + s.id + '">🕘 출퇴근 수정</button>' +
         '</div></div>').join('')
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
@@ -2033,28 +2352,24 @@ function viewStaffAdmin() {
 
 /* ── 설정 ── */
 function viewSettings() {
-  const s = state.settings;
+  const currentAuth = sync.auth();
+  const sessionConnected = !!currentAuth && currentAuth.mode === 'admin_session';
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
-    '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. <b>비밀키만 넣으면</b> 이 기기가 연결됩니다.<br>' +
-      '연결되면 직원이 체크하는 즉시 원장님 화면에 반영됩니다.</div>' +
-
-    '<div class="field"><label class="fl">원장 비밀키</label>' +
-      '<input class="in" id="cfgSecret" value="' + esc(s.syncSecret) + '" placeholder="배포할 때 만든 TASK_ADMIN_SECRET"></div>' +
-    '<div class="row" style="gap:8px">' +
-      '<button class="btn btn-primary" data-act="savecfg">저장</button>' +
-      '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>' +
+    '<div class="card-sub mb14">원장 연결은 24시간 세션으로 유지됩니다. TASK_ADMIN_SECRET은 잠금 화면의 비상 복구에만 한 번 사용하고 저장하지 않습니다.</div>' +
+    '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button>' +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) + '</div>' +
-    (s.syncSecret
-      ? '<div class="hint mt14">✓ 연결됨 — 개인 링크에는 <b>직원별 토큰</b>만 담겨 나갑니다. 링크는 언제든 해지할 수 있습니다.</div>' +
+    (currentAuth
+      ? '<div class="hint mt14">✓ 운영 서버 연결됨 — 개인 링크에는 <b>직원별 토큰</b>만 담겨 나갑니다.</div>' +
         '<hr class="sep">' +
-        '<div class="card-title">원장 복구 링크</div>' +
-        '<div class="card-sub mb14">이 링크로 들어가면 <b>접속 정보와 비밀번호가 한 번에 들어가</b> 바로 열립니다. ' +
-          '폰에서 볼 때, 그리고 브라우저 데이터가 지워졌을 때 되살리는 용도입니다.<br><br>' +
-          '<b>복사한 뒤 즐겨찾기에 저장해 두세요.</b> 일반 주소를 저장하면 데이터가 사라졌을 때 되살릴 방법이 없습니다.<br>' +
-          '<span style="color:var(--coral)">이 링크를 가진 사람은 원장 화면을 열 수 있습니다. 직원에게 보내지 마세요.</span></div>' +
-        '<button class="btn btn-navy btn-block" data-act="adminlink">🔑 원장 복구 링크 복사</button>'
+        '<div class="card-title">새 브라우저용 원장 링크</div>' +
+        '<div class="card-sub mb14">현재 원장 세션에서만 만들 수 있습니다. 10분 안에 한 번 열 수 있으며 새 브라우저가 인증되면 이전 세션은 종료됩니다.<br>' +
+          '<span style="color:var(--coral)">직원에게 보내거나 즐겨찾기에 저장하지 마세요.</span></div>' +
+        (sessionConnected
+          ? '<button class="btn btn-navy btn-block" data-act="adminlink">🔑 1회용 원장 링크 복사</button>' +
+            '<button class="btn btn-ghost btn-block mt8" data-act="disconnectadmin">이 기기 연결 해제</button>'
+          : '')
       : '') +
   '</div>' +
 
@@ -2068,8 +2383,8 @@ function viewSettings() {
 
   '<div class="card">' +
     '<div class="card-title">관리 비밀번호</div>' +
-    '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
-    '<div class="field"><input class="in" id="newPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="새 비밀번호"></div>' +
+    '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다. 새 비밀번호는 10자 이상이어야 합니다.</div>' +
+    '<div class="field"><input class="in" id="newPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="새 비밀번호 (10자 이상)"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="changepin">변경</button>' +
       '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
@@ -2577,22 +2892,64 @@ document.addEventListener('click', ev => {
   switch (act) {
 
     /* 잠금 */
+    case 'recoveradmin': {
+      const field = $('#adminRecoverySecret');
+      const entered = String(field && field.value || '').trim();
+      if (field) field.value = '';
+      const secret = entered || memoryAdminRecoverySecret;
+      purgeLegacyAdminSecret();
+      if (!secret) return toast('TASK_ADMIN_SECRET을 입력해 주세요');
+      (async () => {
+        const recovered = await sync.recoverAdmin(secret);
+        setAdminSession(recovered.token, recovered.expiresAt);
+        bookDb = null; bookDbErr = ''; rosterDb = null; rosterErr = '';
+        render();
+        toast(hasAdminPin() ? '원장 연결 복구 완료 · 화면 비밀번호를 입력해 주세요' : '원장 연결 복구 완료 · 10자 이상 화면 비밀번호를 설정해 주세요');
+      })().catch(error => {
+        clearAdminSession(false);
+        render();
+        toast('원장 연결을 복구하지 못했습니다 — ' + error.message);
+      });
+      break;
+    }
     case 'setpin': {
       const v = ($('#pin').value || '').trim();
-      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); session.unlock(); go('staff'); toast('설정되었습니다');
+      if (v.length < 10) return toast('10자 이상 입력해 주세요');
+      if (!sync.auth()) return toast('먼저 원장 복구 링크로 운영 서버에 연결해 주세요');
+      (async () => {
+        await setAdminPin(v);
+        if (getAdminSession()) await sealAdminSession(v);
+        const restored = await sync.pullOnly();
+        if (!restored) return;
+        session.unlock(); ensureSyncLoop(); go('staff'); toast('설정하고 운영 데이터를 불러왔습니다');
+      })().catch(error => toast('원장 데이터를 열지 못했습니다 — ' + error.message));
       break;
     }
     case 'login': {
-      if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
-      session.unlock(); render(); toast('환영합니다');
+      const v = ($('#pin').value || '').trim();
+      (async () => {
+        if (!await verifyAdminPin(v)) return toast('비밀번호가 다릅니다');
+        if (!sync.auth()) await restoreAdminSession(v);
+        if (!sync.auth()) {
+          render();
+          return toast('원장 세션이 만료되었습니다 · TASK_ADMIN_SECRET 또는 새 원장 링크가 필요합니다');
+        }
+        if (getAdminSession()) await sealAdminSession(v);
+        const restored = await sync.pullOnly();
+        if (!restored) return;
+        session.unlock(); ensureSyncLoop(); render(); toast('최신 운영 데이터를 불러왔습니다');
+      })().catch(error => toast('원장 데이터를 열지 못했습니다 — ' + error.message));
       break;
     }
     case 'logout': session.lock(); render(); break;
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
-      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
-      state.settings.adminPin = v; save(); toast('변경되었습니다');
+      if (v.length < 10) return toast('10자 이상 입력해 주세요');
+      (async () => {
+        await setAdminPin(v);
+        if (getAdminSession()) await sealAdminSession(v);
+        toast('변경되었습니다');
+      })().catch(error => toast('비밀번호를 바꾸지 못했습니다 — ' + error.message));
       break;
     }
 
@@ -2676,8 +3033,8 @@ document.addEventListener('click', ev => {
       s.manager = !s.manager; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.manager
-        ? s.name + ' — 관리자로 지정. 본인 개인 링크에서 현황·발행이 열립니다'
-        : s.name + ' — 관리자 해제');
+        ? s.name + ' — 교재 주문 기본 담당으로 지정했습니다'
+        : s.name + ' — 교재 주문 기본 담당에서 해제했습니다');
       break;
     }
     case 'attcheck': {
@@ -2795,6 +3152,16 @@ document.addEventListener('click', ev => {
       toast(name + ' — ' + CT_TYPES[type] + ' 기록 완료');
       break;
     }
+    case 'retrybooks': {
+      bookDb = null; bookDbErr = '';
+      loadBooks(); render();
+      break;
+    }
+    case 'retryroster': {
+      rosterDb = null; rosterErr = '';
+      loadRoster(); render();
+      break;
+    }
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
     case 'bkorder': {
       if (!bookDb) break;
@@ -2802,7 +3169,7 @@ document.addEventListener('click', ev => {
       if (!b) break;
       const qty = (prompt('[' + b.title + '] 주문 요청\n수량과 메모를 입력하세요 (예: 3권, 다음 주 수업 전까지)') || '').trim();
       if (!qty) return;
-      // 담당: 직원이 요청하면 본인, 원장이 요청하면 관리자(없으면 첫 직원)
+      // 담당: 직원이 요청하면 본인, 원장이 요청하면 주문담당(없으면 첫 직원)
       let sid = session.isStaffLink ? session.staffId
         : ((liveStaff().find(s => s.manager) || teamStaff()[0]) || {}).id;
       if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
@@ -2929,8 +3296,18 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'adminlink': {
-      copy(location.origin + location.pathname);
-      toast('보안상 비밀키와 비밀번호는 주소에 넣지 않습니다');
+      if (!confirm('새 브라우저에서 링크를 열면 이 원장 세션은 종료됩니다. 계속할까요?')) break;
+      sync.adminHandoff()
+        .then(issued => copy(location.origin + location.pathname + '#a=' + encodeURIComponent(issued.code)))
+        .then(() => toast('1회용 원장 링크를 복사했습니다 · 10분 안에 열어 주세요'))
+        .catch(error => toast('원장 링크를 만들지 못했습니다 — ' + error.message));
+      break;
+    }
+    case 'disconnectadmin': {
+      if (!confirm('이 기기의 원장 연결을 해제할까요?')) break;
+      sync.revokeAdminSession()
+        .catch(() => {})
+        .finally(() => { clearAdminSession(true); session.lock(); render(); toast('이 기기 연결을 해제했습니다'); });
       break;
     }
     case 'handoff': {
@@ -3126,15 +3503,16 @@ document.addEventListener('click', ev => {
     }
 
     /* 설정 */
-    case 'savecfg': {
-      state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
-      save(); render(); toast('저장했습니다');
-      if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
-      break;
-    }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const safe = JSON.parse(JSON.stringify(state));
+      delete safe.settings.syncSecret;
+      delete safe.settings.myToken;
+      delete safe.settings.adminPin;
+      delete safe.settings.adminPinHash;
+      delete safe.settings.adminPinSalt;
+      (safe.staff || []).forEach(person => { if (person) delete person.token; });
+      const blob = new Blob([JSON.stringify(safe, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'wb-업무지시서-' + today() + '.json';
@@ -3152,7 +3530,16 @@ document.addEventListener('click', ev => {
             const p = JSON.parse(r.result);
             if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
             if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
-            state = Object.assign(blankState(), p);
+            if (!Array.isArray(p.tasks) || !p.checks || typeof p.checks !== 'object') throw new Error('형식 오류');
+            const secure = Object.assign({}, state.settings);
+            state = blankState();
+            state.version = Number(p.version) || 2;
+            state.staff = p.staff.map(person => { const copy = Object.assign({}, person); delete copy.token; return copy; });
+            state.tasks = p.tasks;
+            state.checks = p.checks;
+            state.settings = Object.assign(state.settings, secure);
+            if (p.settings && p.settings.centerName) state.settings.centerName = String(p.settings.centerName).slice(0, 200);
+            delete state.settings.myToken;
             save(); render(); toast('불러왔습니다');
           } catch (e) { toast('파일을 읽을 수 없습니다'); }
         };
@@ -3232,7 +3619,31 @@ if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
 
 let syncLoopStarted = false;
+function ensureSyncLoop() {
+  if (syncLoopStarted) return;
+  syncLoopStarted = true;
+  setInterval(() => sync.run(), 45000);
+}
+
 async function startSyncSession() {
+  if (pendingAdminBootstrapCode) {
+    const code = pendingAdminBootstrapCode;
+    pendingAdminBootstrapCode = '';
+    try {
+      const exchanged = await sync.exchangeAdminBootstrap(code);
+      setAdminSession(exchanged.token, exchanged.expiresAt);
+      purgeLegacyAdminSecret();
+      bookDb = null; bookDbErr = ''; rosterDb = null; rosterErr = '';
+      render();
+      toast(hasAdminPin() ? '원장 링크 인증 완료 · 화면 비밀번호를 입력해 주세요' : '원장 링크 인증 완료 · 화면 비밀번호를 설정해 주세요');
+    } catch (error) {
+      sync.err = String(error && error.message || error);
+      clearAdminSession(false);
+      render();
+      toast('원장 링크를 열 수 없습니다 — ' + sync.err);
+    }
+    return;
+  }
   if (pendingBootstrapCode) {
     const code = pendingBootstrapCode;
     const previousToken = String(state.settings.myToken || '');
@@ -3241,6 +3652,7 @@ async function startSyncSession() {
       const exchanged = await sync.exchangeBootstrap(session.staffId, code);
       state.settings.myToken = exchanged.token;
       state.settings.pullAt = 0;
+      state.settings.pullCursor = null;
       state.settings.pushAt = 0;
       save();
       toast('개인 링크 인증을 완료했습니다');
@@ -3252,18 +3664,16 @@ async function startSyncSession() {
     }
   }
   if (!sync.enabled()) { render(); return; }
+  if (!session.isStaffLink && !session.isAdmin) { render(); return; }
   await sync.run();
-  if (!syncLoopStarted) {
-    syncLoopStarted = true;
-    setInterval(() => sync.run(), 45000);
-  }
+  ensureSyncLoop();
 }
 startSyncSession();
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.2';
+const APP_VER = '2026-08-03.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

@@ -16,9 +16,15 @@
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
+ *   POST /private-asset { app, auth, key }         → { ok, data }    인증 운영 자료
+ *   POST /admin-recover  { app, auth(admin) }      → { ok, token }   비상키 1회 입력으로 원장 세션 전환
+ *   POST /admin-exchange { app, code }             → { ok, token }   원장 1회 교환
+ *   POST /admin-handoff  { app, auth(admin_session) } → { ok, code } 새 브라우저 이동
+ *   POST /admin-revoke   { app, auth(admin_session) } → { ok }       현재 원장 세션 해지
  *
  * 인증
  *   auth = { mode:'admin',  secret }            → 전체 접근
+ *   auth = { mode:'admin_session', token }      → task 전체 접근(24시간)
  *   auth = { mode:'person', id, token }         → 본인 것만
  */
 
@@ -30,7 +36,43 @@ const TOKEN_HASH_PREFIX = 'sha256:';
 const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
 const HANDOFF_TTL_MS = 10 * 60 * 1000;
+const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const ADMIN_BOOTSTRAP_TTL_MS = 10 * 60 * 1000;
+const ADMIN_CODE_HASH_PREFIX = 'admin-code-sha256:';
+const ADMIN_TOKEN_HASH_PREFIX = 'admin-token-sha256:';
 const SAFE_BOOTSTRAP_CODE = /^[a-f0-9]{48}$/i;
+const PRIVATE_ASSET_KEYS = ['roster', 'textbooks'];
+const SYNC_TABLES = [
+  { name: 'staff', rank: 0, key: 'id' },
+  { name: 'tasks', rank: 1, key: 'id' },
+  { name: 'checks', rank: 2, key: 'k' }
+];
+
+/**
+ * srv_at 하나만으로 페이지를 넘기면 같은 시각의 행 또는 다른 테이블의 오래된
+ * 잔여 행을 건너뛸 수 있다. 모든 동기화 행의 위치를 (srv_at, table_rank, key)
+ * 세 값으로 고정해 다음 페이지가 정확히 그 다음 행에서 시작하게 한다.
+ *
+ * cursor가 없는 구형 클라이언트는 since를 첫 위치로 승격한다. table_rank=-1은
+ * 그 시각의 모든 테이블을 다시 포함하므로 배포 전후 경계에서도 누락보다 안전한
+ * 중복 수신을 택한다. 클라이언트의 LWW 적용은 같은 행의 중복을 무해하게 처리한다.
+ */
+export function normalizeSyncCursor(body) {
+  const raw = body && body.cursor;
+  if (raw === undefined || raw === null) {
+    const legacy = Number(body && body.since);
+    const srvAt = Number.isSafeInteger(legacy) && legacy >= 0 ? legacy : 0;
+    return { srv_at: srvAt, table_rank: -1, key: '' };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const srvAt = Number(raw.srv_at);
+  const tableRank = Number(raw.table_rank);
+  const key = String(raw.key || '');
+  if (!Number.isSafeInteger(srvAt) || srvAt < 0 ||
+      !Number.isInteger(tableRank) || tableRank < -1 || tableRank >= SYNC_TABLES.length ||
+      key.length > 512 || (tableRank === -1 && key !== '')) return null;
+  return { srv_at: srvAt, table_rank: tableRank, key };
+}
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -71,6 +113,14 @@ async function sha256Hex(value) {
 function tokenStorageValue(digest) {
   return TOKEN_HASH_PREFIX + String(digest || '').toLowerCase();
 }
+function adminCodeStorageValue(digest) {
+  return ADMIN_CODE_HASH_PREFIX + String(digest || '').toLowerCase();
+}
+
+function adminTokenStorageValue(digest) {
+  return ADMIN_TOKEN_HASH_PREFIX + String(digest || '').toLowerCase();
+}
+
 
 function randomOpaqueValue() {
   const bytes = new Uint8Array(24);
@@ -78,12 +128,23 @@ function randomOpaqueValue() {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function resolveAuth(env, app, auth) {
+export async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
   if (auth.mode === 'admin') {
     const want = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
     if (!want || !safeEqual(auth.secret, want)) return null;
-    return { scope: 'all' };
+    return { scope: 'all', kind: 'root_secret' };
+  }
+  if (auth.mode === 'admin_session') {
+    if (app !== 'task') return null;
+    const token = String(auth.token || '');
+    if (!SAFE_BOOTSTRAP_CODE.test(token)) return null;
+    const tokenHash = adminTokenStorageValue(await sha256Hex(token));
+    const row = await env.DB.prepare(
+      'SELECT token_hash FROM admin_sessions WHERE app=? AND token_hash=? AND revoked=0 AND expires_at>=? LIMIT 1'
+    ).bind(app, tokenHash, Date.now()).first();
+    if (!row) return null;
+    return { scope: 'all', kind: 'admin_session' };
   }
   if (auth.mode === 'person') {
     const id = String(auth.id || '');
@@ -97,11 +158,84 @@ async function resolveAuth(env, app, auth) {
     ).bind(app, tokenHash, token, token, createdAfter).first();
     if (!row || row.staff_id !== id) return null;
     // 개인 링크는 manager 플래그와 무관하게 항상 본인 범위다. 전체 관리는 원장 로그인만 사용한다.
-    return { scope: 'own', id: id };
+    return { scope: 'own', id: id, kind: 'person' };
   }
   return null;
 }
 
+
+function normalizePersonName(value) {
+  return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+}
+
+function teacherIncludes(raw, staffName) {
+  const target = normalizePersonName(staffName);
+  return String(raw || '').split(/[·,\/]/).map(normalizePersonName).filter(Boolean).includes(target);
+}
+
+export function filterPrivateAsset(key, data, staffName) {
+  if (!data || typeof data !== 'object') return null;
+  if (!staffName) return data;
+  const students = (Array.isArray(data.students) ? data.students : []).filter(student =>
+    teacherIncludes(student && student.teacher, staffName));
+  if (key === 'roster') {
+    return {
+      updated: String(data.updated || ''),
+      baseline: String(data.baseline || ''),
+      note: String(data.note || ''),
+      students
+    };
+  }
+  if (key === 'textbooks') {
+    return {
+      updated: String(data.updated || ''),
+      note: String(data.note || ''),
+      vendors: Array.isArray(data.vendors) ? data.vendors : [],
+      books: Array.isArray(data.books) ? data.books : [],
+      students
+    };
+  }
+  return null;
+}
+
+async function handlePrivateAsset(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
+  if (app !== 'task') return json({ ok: false, error: '직원 앱 전용 자료입니다' }, 404, origin);
+  const key = String(body.key || '');
+  if (!PRIVATE_ASSET_KEYS.includes(key)) return json({ ok: false, error: '허용되지 않은 자료입니다' }, 400, origin);
+  const row = await env.DB.prepare(
+    'SELECT data,updated_at,content_hash FROM private_assets WHERE app=? AND asset_key=? LIMIT 1'
+  ).bind(app, key).first();
+  if (!row) return json({ ok: false, error: '자료가 아직 준비되지 않았습니다' }, 404, origin);
+  let data;
+  try { data = JSON.parse(row.data); }
+  catch (error) { return json({ ok: false, error: '자료 형식이 올바르지 않습니다' }, 500, origin); }
+  if (auth.scope === 'own') {
+    const staffResult = await env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all();
+    const active = [];
+    for (const row of (staffResult.results || [])) {
+      try {
+        const parsed = JSON.parse(row.data);
+        const name = normalizePersonName(parsed && parsed.name);
+        if (parsed && !parsed.deleted && name) active.push({ id: String(row.id), name });
+      } catch (error) {
+        // 손상된 다른 직원 행은 권한 판정에 사용하지 않는다. 본인 행이면 아래에서 fail-closed 된다.
+      }
+    }
+    const staff = active.find(item => item.id === auth.id);
+    if (!staff) {
+      return json({ ok: false, error: '담당 직원을 확인할 수 없습니다' }, 403, origin);
+    }
+    const sameName = active.filter(item => item.name === staff.name);
+    if (sameName.length !== 1) {
+      return json({ ok: false, error: '동명이인 직원은 고유 ID 연결 후 이용할 수 있습니다' }, 409, origin);
+    }
+    data = filterPrivateAsset(key, data, staff.name);
+    if (!data) return json({ ok: false, error: '자료 형식이 올바르지 않습니다' }, 500, origin);
+  }
+  return json({ ok: true, key: key, updatedAt: row.updated_at, hash: row.content_hash, data: data }, 200, origin);
+}
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
 function upsertStmt(env, table, app, c, now) {
   const idCol = table === 'checks' ? 'k' : 'id';
@@ -120,8 +254,9 @@ async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
 
+  const cursor = normalizeSyncCursor(body);
+  if (!cursor) return json({ ok: false, error: '동기화 커서 형식이 올바르지 않습니다' }, 400, origin);
   const now = Date.now();
-  const since = Number(body.since) || 0;
   const changes = Array.isArray(body.changes) ? body.changes : [];
   if (changes.length > MAX_CHANGES) {
     return json({ ok: false, error: '한 번에 보낼 수 있는 변경은 ' + MAX_CHANGES + '건까지입니다' }, 413, origin);
@@ -147,28 +282,46 @@ async function handleSync(env, app, body, origin) {
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
   if (stmts.length) await env.DB.batch(stmts);
 
-  // ── 내려받기 (since 이후)
-  const out = [];
-  let more = false;
-  for (const t of ['staff', 'tasks', 'checks']) {
-    const idCol = t === 'checks' ? 'k' : 'id';
-    const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + t +
-      ' WHERE app=? AND srv_at > ?' + (auth.scope === 'own' ? ' AND owner=?' : '') +
-      ' ORDER BY srv_at LIMIT ' + (MAX_PULL + 1);
-    const st = auth.scope === 'own'
-      ? env.DB.prepare(sql).bind(app, since, auth.id)
-      : env.DB.prepare(sql).bind(app, since);
-    const res = await st.all();
-    const rows = (res.results || []);
-    if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
-    for (const r of rows) {
-      out.push({ table: t, key: r.key, owner: r.owner, data: JSON.parse(r.data), updated_at: r.updated_at, srv_at: r.srv_at });
-    }
-  }
+  // ── 내려받기: 세 테이블을 하나의 정렬된 스트림으로 만든 뒤 응답 전체에
+  // MAX_PULL을 적용한다. 테이블마다 LIMIT을 적용한 뒤 전역 since를 올리면 다른
+  // 테이블의 오래된 잔여 행이 영구히 누락될 수 있다.
+  const params = [];
+  const selects = SYNC_TABLES.map(spec => {
+    params.push(app);
+    if (auth.scope === 'own') params.push(auth.id);
+    return "SELECT '" + spec.name + "' AS table_name, " + spec.rank + ' AS table_rank, ' +
+      spec.key + ' AS row_key, owner, data, updated_at, srv_at FROM ' + spec.name +
+      ' WHERE app=?' + (auth.scope === 'own' ? ' AND owner=?' : '');
+  });
+  const sql = 'SELECT table_name,table_rank,row_key,owner,data,updated_at,srv_at FROM (' +
+    selects.join(' UNION ALL ') + ') AS sync_rows WHERE ' +
+    '(srv_at > ? OR (srv_at = ? AND (table_rank > ? OR (table_rank = ? AND row_key > ?)))) ' +
+    'ORDER BY srv_at ASC, table_rank ASC, row_key ASC LIMIT ' + (MAX_PULL + 1);
+  params.push(cursor.srv_at, cursor.srv_at, cursor.table_rank, cursor.table_rank, cursor.key);
+  const result = await env.DB.prepare(sql).bind(...params).all();
+  const rows = result.results || [];
+  const more = rows.length > MAX_PULL;
+  if (more) rows.length = MAX_PULL;
+  const out = rows.map(row => ({
+    table: row.table_name,
+    key: row.row_key,
+    owner: row.owner,
+    data: JSON.parse(row.data),
+    updated_at: row.updated_at,
+    srv_at: row.srv_at
+  }));
+  // 마지막 페이지는 마지막 srv_at 경계를 한 번 겹쳐 읽는다. 다음 요청이 같은
+  // 밀리초에 더 작은 table/key를 쓴 경우에도 누락되지 않으며 LWW가 중복을 제거한다.
+  // 중간 페이지(more=true)만 정확한 마지막 행 위치를 사용해야 페이지가 전진한다.
+  const last = rows.length ? rows[rows.length - 1] : null;
+  const nextCursor = last ? {
+    srv_at: Number(last.srv_at),
+    table_rank: more ? Number(last.table_rank) : -1,
+    key: more ? String(last.row_key) : ''
+  } : cursor;
 
-  // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
-  const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
-  return json({ ok: true, now: nextSince, more: more, changes: out }, 200, origin);
+  // now은 구형 클라이언트 호환용 숫자다. 새 클라이언트는 반드시 cursor를 쓴다.
+  return json({ ok: true, now: nextCursor.srv_at, cursor: nextCursor, more, changes: out }, 200, origin);
 }
 
 async function handleToken(env, app, body, origin) {
@@ -269,6 +422,104 @@ async function handleHandoff(env, app, body, origin) {
   }
   const issued = await issueBootstrap(env, app, auth.id, HANDOFF_TTL_MS);
   return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+}
+
+async function issueAdminBootstrap(env, app, ttlMs) {
+  if (app !== 'task') throw new Error('직원 앱 원장 세션만 지원합니다');
+  const code = randomOpaqueValue();
+  const codeHash = adminCodeStorageValue(await sha256Hex(code));
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ttlMs;
+  await env.DB.batch([
+    env.DB.prepare(
+      'UPDATE admin_bootstrap_codes SET revoked=1 WHERE app=? AND revoked=0 AND consumed_at IS NULL'
+    ).bind(app),
+    env.DB.prepare(
+      'INSERT INTO admin_bootstrap_codes(app,code_hash,created_at,expires_at,consumed_at,revoked) ' +
+      'VALUES(?,?,?,?,NULL,0)'
+    ).bind(app, codeHash, createdAt, expiresAt)
+  ]);
+  return { code, expiresAt };
+}
+
+async function handleAdminRecover(env, app, body, origin) {
+  if (app !== 'task') return json({ ok: false, error: '직원 앱 원장 세션만 지원합니다' }, 404, origin);
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.kind !== 'root_secret') {
+    return json({ ok: false, error: '원장 비상 복구 키가 올바르지 않습니다' }, 401, origin);
+  }
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ADMIN_SESSION_TTL_MS;
+  const token = randomOpaqueValue();
+  const tokenHash = adminTokenStorageValue(await sha256Hex(token));
+  await env.DB.batch([
+    env.DB.prepare('UPDATE admin_bootstrap_codes SET revoked=1 WHERE app=? AND revoked=0 AND consumed_at IS NULL').bind(app),
+    env.DB.prepare('UPDATE admin_sessions SET revoked=1 WHERE app=? AND revoked=0').bind(app),
+    env.DB.prepare(
+      'INSERT INTO admin_sessions(app,token_hash,created_at,expires_at,revoked) VALUES(?,?,?,?,0)'
+    ).bind(app, tokenHash, createdAt, expiresAt)
+  ]);
+  return json({ ok: true, token, expiresAt }, 200, origin);
+}
+
+async function handleAdminExchange(env, app, body, origin) {
+  if (app !== 'task') return json({ ok: false, error: '직원 앱 원장 세션만 지원합니다' }, 404, origin);
+  const code = String(body.code || '');
+  if (!SAFE_BOOTSTRAP_CODE.test(code)) {
+    return json({ ok: false, error: '올바른 원장 1회용 코드가 필요합니다' }, 400, origin);
+  }
+  const codeHash = adminCodeStorageValue(await sha256Hex(code));
+  const consumedAt = Date.now();
+  const markerBytes = new Uint32Array(1);
+  crypto.getRandomValues(markerBytes);
+  const consumeMarker = -(consumedAt * 1000 + (markerBytes[0] % 1000));
+  const token = randomOpaqueValue();
+  const tokenHash = adminTokenStorageValue(await sha256Hex(token));
+  const expiresAt = consumedAt + ADMIN_SESSION_TTL_MS;
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      'UPDATE admin_bootstrap_codes SET consumed_at=? ' +
+      'WHERE app=? AND code_hash=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=?'
+    ).bind(consumeMarker, app, codeHash, consumedAt),
+    env.DB.prepare(
+      'UPDATE admin_sessions SET revoked=1 WHERE app=? AND revoked=0 AND EXISTS (' +
+      'SELECT 1 FROM admin_bootstrap_codes WHERE app=? AND code_hash=? AND consumed_at=?)'
+    ).bind(app, app, codeHash, consumeMarker),
+    env.DB.prepare(
+      'INSERT INTO admin_sessions(app,token_hash,created_at,expires_at,revoked) ' +
+      'SELECT ?,?,?,?,0 WHERE EXISTS (' +
+      'SELECT 1 FROM admin_bootstrap_codes WHERE app=? AND code_hash=? AND consumed_at=?)'
+    ).bind(app, tokenHash, consumedAt, expiresAt, app, codeHash, consumeMarker),
+    env.DB.prepare(
+      'UPDATE admin_bootstrap_codes SET consumed_at=? WHERE app=? AND code_hash=? AND consumed_at=?'
+    ).bind(consumedAt, app, codeHash, consumeMarker)
+  ]);
+  const changed = index => Number(results[index] && results[index].meta && results[index].meta.changes || 0);
+  if (changed(0) !== 1 || changed(2) !== 1 || changed(3) !== 1) {
+    return json({ ok: false, error: '만료되었거나 이미 사용한 원장 링크입니다' }, 410, origin);
+  }
+  return json({ ok: true, token, expiresAt }, 200, origin);
+}
+
+async function handleAdminHandoff(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.kind !== 'admin_session') {
+    return json({ ok: false, error: '원장 세션 인증이 필요합니다' }, 401, origin);
+  }
+  const issued = await issueAdminBootstrap(env, app, ADMIN_BOOTSTRAP_TTL_MS);
+  return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+}
+
+async function handleAdminRevoke(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.kind !== 'admin_session') {
+    return json({ ok: false, error: '원장 세션 인증이 필요합니다' }, 401, origin);
+  }
+  const token = String(body.auth.token || '');
+  const tokenHash = adminTokenStorageValue(await sha256Hex(token));
+  await env.DB.prepare('UPDATE admin_sessions SET revoked=1 WHERE app=? AND token_hash=?')
+    .bind(app, tokenHash).run();
+  return json({ ok: true }, 200, origin);
 }
 
 async function handleRevoke(env, app, body, origin) {
@@ -450,6 +701,11 @@ export default {
       if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
       if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
+      if (url.pathname === '/admin-recover') return await handleAdminRecover(env, app, body, okOrigin);
+      if (url.pathname === '/admin-exchange') return await handleAdminExchange(env, app, body, okOrigin);
+      if (url.pathname === '/admin-handoff') return await handleAdminHandoff(env, app, body, okOrigin);
+      if (url.pathname === '/admin-revoke') return await handleAdminRevoke(env, app, body, okOrigin);
+      if (url.pathname === '/private-asset') return await handlePrivateAsset(env, app, body, okOrigin);
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);

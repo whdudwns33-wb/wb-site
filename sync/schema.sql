@@ -68,3 +68,38 @@ CREATE TABLE IF NOT EXISTS bootstrap_codes (
 );
 CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
   ON bootstrap_codes(app, staff_id, revoked, expires_at);
+
+-- 학생 명단·교재 DB처럼 인증 후에만 내려줄 운영 자료.
+-- GitHub Pages 정적 파일에 두면 주소를 아는 누구나 읽을 수 있으므로 D1에 보관한다.
+CREATE TABLE IF NOT EXISTS private_assets (
+  app          TEXT    NOT NULL,
+  asset_key    TEXT    NOT NULL,
+  data         TEXT    NOT NULL,
+  updated_at   INTEGER NOT NULL,
+  content_hash TEXT    NOT NULL,
+  PRIMARY KEY (app, asset_key)
+);
+
+-- 직원 개인 링크와 암호학적 네임스페이스를 분리한 원장 1회 코드/세션.
+CREATE TABLE IF NOT EXISTS admin_bootstrap_codes (
+  app         TEXT    NOT NULL,
+  code_hash   TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  consumed_at INTEGER,
+  revoked     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (app, code_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_bootstrap_active
+  ON admin_bootstrap_codes(app, revoked, expires_at);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  app         TEXT    NOT NULL,
+  token_hash  TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  revoked     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (app, token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_active
+  ON admin_sessions(app, revoked, expires_at);

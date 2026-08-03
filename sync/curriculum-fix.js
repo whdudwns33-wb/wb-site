@@ -1,4 +1,5 @@
 import searchWorker from './search-filter.js';
+import { resolveAuth } from './worker-core.js';
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -9,32 +10,6 @@ const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   }
 });
 
-function safeEqual(a, b) {
-  a = String(a || '');
-  b = String(b || '');
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-async function resolveAuth(env, app, auth) {
-  if (!auth || typeof auth !== 'object') return null;
-  if (auth.mode === 'admin') {
-    const expected = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
-    return expected && safeEqual(auth.secret, expected) ? { scope: 'all' } : null;
-  }
-  if (auth.mode === 'person') {
-    const id = String(auth.id || '');
-    const token = String(auth.token || '');
-    if (!id || !token) return null;
-    const row = await env.DB.prepare(
-      'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
-    ).bind(app, token).first();
-    return row && row.staff_id === id ? { scope: 'own', id } : null;
-  }
-  return null;
-}
 
 function publicUrlOrNull(raw) {
   let url;

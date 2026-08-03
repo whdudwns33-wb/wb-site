@@ -1,0 +1,4 @@
+.wrangler/
+sync/.wrangler/
+*.private-assets.sql
+*.private-assets.sqlite

@@ -2740,13 +2740,19 @@ document.addEventListener('click', ev => {
           $('#ingHits').innerHTML = d.items.map(x =>
             '<div class="between" style="padding:4px 0;gap:8px">' +
               '<span style="flex:1">' + esc(x.title) + '</span>' +
-              '<button class="btn btn-sm btn-ghost" data-act="inguse" data-url="' + esc(x.url) + '">이걸로</button>' +
+              '<button class="btn btn-sm btn-ghost" data-act="inguse" data-url="' + esc(x.url) + '" data-title="' + esc(x.title) + '">강좌 선택</button>' +
             '</div>').join('');
         })
         .catch(e => { $('#ingHits').textContent = '검색 실패 — ' + e.message; });
       break;
     }
-    case 'inguse': { $('#ingUrl').value = el.dataset.url; ingFetch(); break; }
+    case 'inguse': {
+      $('#ingUrl').value = el.dataset.url;
+      if (!($('#ingName').value || '').trim()) $('#ingName').value = el.dataset.title || '';
+      $('#ingHits').textContent = '✓ 강좌를 선택했습니다. 자동 목차가 필요하면 ② 가져오기를 누르세요. 사이트가 막으면 ③에 목차를 붙여넣으면 됩니다.';
+      toast('강좌를 선택했습니다');
+      break;
+    }
     case 'ingfetch': ingFetch(); break;
     case 'ingsave': {
       const me = currentStaff(); if (!me) break;
@@ -3323,7 +3329,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.2';
+const APP_VER = '2026-08-03.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

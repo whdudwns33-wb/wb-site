@@ -1,4 +1,4 @@
-import baseWorker from './worker-core.js';
+import baseWorker, { resolveAuth } from './worker-core.js';
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -9,32 +9,6 @@ const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   }
 });
 
-function safeEqual(a, b) {
-  a = String(a || '');
-  b = String(b || '');
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-async function resolveAuth(env, app, auth) {
-  if (!auth || typeof auth !== 'object') return null;
-  if (auth.mode === 'admin') {
-    const expected = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
-    return expected && safeEqual(auth.secret, expected) ? { scope: 'all' } : null;
-  }
-  if (auth.mode === 'person') {
-    const id = String(auth.id || '');
-    const token = String(auth.token || '');
-    if (!id || !token) return null;
-    const row = await env.DB.prepare(
-      'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
-    ).bind(app, token).first();
-    return row && row.staff_id === id ? { scope: 'own', id } : null;
-  }
-  return null;
-}
 
 const PLATFORM_RULES = {
   '엘리하이': {
@@ -78,6 +52,7 @@ const PLATFORM_RULES = {
 const GLOBAL_COURSE_URL = /lecture_detailview|view_lecture|view_lec_list|lctrdetail|lctrhomemain|lecture[^/?]*(?:detail|view)|(?:chr_cd|gid|lecture_id|lec_id|pid)=/i;
 const GLOBAL_NOISE_URL = /chrreview|clean_after|review|evaluate|\/qna\/|notice|event|promotion|t_promotion|\/book\/|textbook|teacher_main|curriculum|category_list|coursemap|examcenter/i;
 const TITLE_NOISE = /후기|수강평|리뷰|교재|문제집|이벤트|프로모션|질문|Q&A|공지사항|입시설명회/i;
+const DESCRIPTION_NOISE = /수강\s*(?:후기|평)|강의\s*후기|인강\s*후기|교재\s*(?:후기|리뷰|판매|추천)|문제집\s*(?:후기|리뷰|판매|추천)|중고\s*(?:교재|문제집)|책\s*리뷰/i;
 const TAG_RE = /<[^>]+>/g;
 
 function unescapeHtml(value) {
@@ -154,6 +129,8 @@ function scoreCandidate(item, query, platform, index) {
   const genericCourse = GLOBAL_COURSE_URL.test(urlText);
   const coverage = tokenCoverage(title, query);
   let score = platformCourse ? 140 : genericCourse ? 80 : 0;
+  if (DESCRIPTION_NOISE.test(desc)) score -= platformCourse ? 20 : 70;
+  if (!platformCourse && /구매|판매|중고|서평/i.test(desc)) score -= 50;
   score += Math.round(coverage * 70);
   if (/강좌정보|강좌|수강|강의/i.test(title + ' ' + desc)) score += 12;
   if (normalizeText(title).includes(normalizeText(query).replace(/\s+/g, ''))) score += 25;
@@ -163,7 +140,7 @@ function scoreCandidate(item, query, platform, index) {
   return { title, url: link, desc: desc.slice(0, 120), score, coverage, index };
 }
 
-function selectCourseItems(rawItems, query, platform) {
+export function selectCourseItems(rawItems, query, platform) {
   const unique = new Map();
   (rawItems || []).forEach((item, index) => {
     const candidate = scoreCandidate(item, query, platform, index);
