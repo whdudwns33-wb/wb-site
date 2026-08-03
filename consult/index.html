@@ -1514,7 +1514,7 @@ function viewLock() {
     '<div class="card-sub mb14">' + (first
       ? '학생에게 나가는 링크와 달리, 이 화면은 지시서를 만들고 현황을 보는 원장 전용입니다. 4자리 이상 비밀번호를 정해 주세요.'
       : '비밀번호를 입력하면 지시서 작성과 현황 확인 화면이 열립니다.') + '</div>' +
-    '<div class="field"><input class="in" id="pin" type="password" inputmode="numeric" placeholder="비밀번호" autocomplete="off"></div>' +
+    '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
     '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
       (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
     '<hr class="sep">' +
@@ -2752,7 +2752,7 @@ function viewSettings() {
   '<div class="card">' +
     '<div class="card-title">관리 비밀번호</div>' +
     '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
-    '<div class="field"><input class="in" id="newPin" type="password" aria-label="새 관리 비밀번호" placeholder="새 비밀번호"></div>' +
+    '<div class="field"><input class="in" id="newPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false" aria-label="새 관리 비밀번호" placeholder="새 비밀번호"></div>' +
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="changepin">변경</button>' +
       '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
@@ -4440,7 +4440,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.2';
+const APP_VER = '2026-08-03.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

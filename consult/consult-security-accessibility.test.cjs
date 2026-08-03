@@ -9,6 +9,19 @@ const persistence = require('./learning-persistence.js');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
+test('manager password fields accept letters and symbols without a numeric keyboard hint', () => {
+  const loginTag = html.match(/<input class="in" id="pin"[^>]*>/);
+  const changeTag = html.match(/<input class="in" id="newPin"[^>]*>/);
+  assert.ok(loginTag && changeTag);
+  for (const tag of [loginTag[0], changeTag[0]]) {
+    assert.match(tag, /type="password"/);
+    assert.match(tag, /inputmode="text"/);
+    assert.match(tag, /autocapitalize="none"/);
+    assert.match(tag, /spellcheck="false"/);
+    assert.doesNotMatch(tag, /inputmode="numeric"/);
+  }
+});
+
 function memoryStorage(initial = {}) {
   const data = new Map(Object.entries(initial));
   return {

@@ -8,6 +8,15 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const consult = fs.readFileSync(path.join(here, '..', 'consult', 'index.html'), 'utf8');
 const task = fs.readFileSync(path.join(here, '..', 'task', 'index.html'), 'utf8');
+const releaseVersion = JSON.parse(fs.readFileSync(path.join(here, '..', 'version.json'), 'utf8')).v;
+
+test('version.json matches both administrator app bundles', () => {
+  for (const source of [consult, task]) {
+    const match = source.match(/const APP_VER = '([^']+)'/);
+    assert.ok(match);
+    assert.equal(match[1], releaseVersion);
+  }
+});
 
 test('두 관리자 앱은 PIN을 PBKDF2로 저장하고 구형 비밀정보 링크를 흡수하지 않는다', () => {
   for (const source of [consult, task]) {
