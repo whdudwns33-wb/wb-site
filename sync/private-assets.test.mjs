@@ -247,5 +247,7 @@ test('operations docs pin the private-asset rollback floor and recovery semantic
   assert.match(readme, /admin_bootstrap_codes/);
   assert.match(deployGuide, /2026-08-03\.3/);
   assert.match(deployGuide, /roll-forward only|roll-forward-only/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(repoRoot, 'version.json'), 'utf8')).v, '2026-08-03.3');
+  const currentVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, 'version.json'), 'utf8')).v;
+  const [currentDate, currentRevision] = currentVersion.split('.');
+  assert.ok(currentDate > '2026-08-03' || (currentDate === '2026-08-03' && Number(currentRevision) >= 3));
 });
