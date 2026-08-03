@@ -54,3 +54,17 @@ CREATE TABLE IF NOT EXISTS tokens (
   PRIMARY KEY (app, token)
 );
 CREATE INDEX IF NOT EXISTS idx_tokens_staff ON tokens(app, staff_id);
+
+-- 개인 링크에는 장기 bearer 대신 짧게 유효한 1회용 code만 넣는다.
+CREATE TABLE IF NOT EXISTS bootstrap_codes (
+  app         TEXT    NOT NULL,
+  code_hash   TEXT    NOT NULL,
+  staff_id    TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  consumed_at INTEGER,
+  revoked     INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (app, code_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
+  ON bootstrap_codes(app, staff_id, revoked, expires_at);
