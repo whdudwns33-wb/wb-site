@@ -192,6 +192,34 @@
   .dot.miss { background: #FDE8E4; }
   .dot.none { background: transparent; }
 
+  /* ─── 수업 현황 ─── */
+  .schedule-note { margin: 12px 0; padding: 10px 12px; border: 1px solid #D5EBF7; border-radius: 10px; background: #F0F9FF; color: var(--deep-blue); font-size: 12.5px; line-height: 1.6; }
+  .schedule-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .schedule-kpi { min-width: 0; padding: 12px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); text-align: center; }
+  .schedule-kpi b { display: block; color: var(--navy); font-size: 20px; line-height: 1.1; }
+  .schedule-kpi span { display: block; margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 700; line-height: 1.25; }
+  .schedule-current-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .schedule-teacher { padding: 12px; border: 1px solid #BFE2F3; border-radius: 12px; background: #F7FCFF; }
+  .schedule-teacher .card-title { color: var(--deep-blue); }
+  .schedule-time-card { margin-bottom: 10px; padding: 0; overflow: hidden; }
+  .schedule-time-card.is-now { border: 2px solid var(--blue); box-shadow: 0 5px 18px rgba(73,164,207,.16); }
+  .schedule-time-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; background: var(--light-gray); }
+  .schedule-time-card.is-now .schedule-time-head { background: #EAF6FC; }
+  .schedule-time-head b { color: var(--navy); font-size: 15px; }
+  .schedule-time-body { padding: 4px 14px 12px; }
+  .schedule-teacher-row { padding: 10px 0; border-top: 1px solid var(--line); }
+  .schedule-teacher-row:first-child { border-top: 0; }
+  .schedule-student { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0 0 12px; font-size: 13px; }
+  .schedule-student-name { min-width: 0; font-weight: 700; }
+  .schedule-role { color: var(--mid-gray); font-size: 11.5px; font-weight: 600; }
+  .schedule-issues { border-color: #F6D6A6; background: #FFFBF3; }
+  .schedule-issue { padding: 10px 0; border-top: 1px solid #F3E2C8; }
+  .schedule-issue:first-child { border-top: 0; }
+  @media (max-width: 600px) {
+    .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .schedule-current-grid { grid-template-columns: 1fr; }
+  }
+
   /* ─── 직원 현황 ─── */
   .staffcard { display: flex; gap: 14px; align-items: center; }
   .ava { width: 44px; height: 44px; border-radius: 12px; background: var(--navy); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex-shrink: 0; }
@@ -239,6 +267,7 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
+<script src="./schedule-board-core.js?v=2026-08-03.4"></script>
 <script>
 "use strict";
 
@@ -939,7 +968,7 @@ function render() {
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
+  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -948,7 +977,7 @@ function renderTabs() {
   const tabs = session.isStaffLink
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재'], ['roster', '원생']]
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
+      ? [['schedule', '수업 현황'], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -1464,6 +1493,172 @@ function draftCard() {
     '<button class="btn btn-primary btn-block mb8" data-act="wpublish">지시서 발행하기</button>' +
     '<div class="hint">발행하면 각 직원의 개인 링크에 즉시 반영됩니다.</div>' +
   '</div>';
+}
+
+/* ── 수업 현황 ── */
+function seoulNowParts() {
+  const values = {};
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date()).forEach(part => {
+    if (part.type !== 'literal') values[part.type] = part.value;
+  });
+  const hour = Number(values.hour) % 24;
+  const minute = Number(values.minute);
+  return {
+    date: values.year + '-' + values.month + '-' + values.day,
+    minute: hour * 60 + minute,
+    label: String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0')
+  };
+}
+
+function lessonGradeOf(t) {
+  if (t.grade) return String(t.grade);
+  const title = String(t.title || '');
+  const open = title.indexOf('('), close = title.indexOf(')', open + 1);
+  return open >= 0 && close > open ? title.slice(open + 1, close).trim() : '';
+}
+
+function dailyLessonSchedule(date) {
+  const core = window.WBScheduleCore;
+  const entries = [], issues = [];
+  if (!core) {
+    issues.push({ teacherName: '시스템', studentName: '', message: '수업 시간 모듈을 불러오지 못했습니다', source: '', staffId: '' });
+    return { entries: entries, issues: issues };
+  }
+  const dow = dowOf(date);
+  state.tasks.filter(t => !t.deleted && isLesson(t)).forEach(t => {
+    const staff = staffById(t.staffId);
+    const base = {
+      task: t,
+      staffId: t.staffId || '',
+      teacherName: staff ? staff.name : '담당 미지정',
+      studentName: String(t.studentName || studentOf(t) || '학생 미입력'),
+      grade: lessonGradeOf(t)
+    };
+    const result = core.classifyTaskSchedule(t, { date: date, dow: dow, occurs: occursOn(t, date) });
+    result.slots.forEach((slot, index) => entries.push(Object.assign({}, base, {
+      key: String(t.id) + '|' + String(slot.slotId || index),
+      slot: slot,
+      role: String(slot.lessonRole || t.lessonRole || '역할 미입력')
+    })));
+    result.issues.forEach(problem => issues.push(Object.assign({}, base, {
+      message: problem.message,
+      source: problem.source,
+      code: problem.code
+    })));
+  });
+  entries.sort((a, b) => a.slot.startMinute - b.slot.startMinute ||
+    a.slot.endMinute - b.slot.endMinute || a.teacherName.localeCompare(b.teacherName, 'ko') ||
+    a.studentName.localeCompare(b.studentName, 'ko'));
+  issues.sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ko') || a.studentName.localeCompare(b.studentName, 'ko'));
+  return { entries: entries, issues: issues };
+}
+
+function scheduleAttendance(entry, date) {
+  const value = ((getCheck(entry.task.id, date) || {}).att) || '';
+  if (value === 'P') return { value: value, label: '출석', cls: '' };
+  if (value === 'L') return { value: value, label: '지각', cls: 'warn' };
+  if (value === 'A') return { value: value, label: '결석', cls: 'bad' };
+  return { value: '', label: '출석 미확인', cls: 'warn' };
+}
+
+function scheduleTeacherGroups(entries) {
+  const groups = new Map();
+  entries.forEach(entry => {
+    const key = entry.staffId || entry.teacherName;
+    if (!groups.has(key)) groups.set(key, { staffId: entry.staffId, teacherName: entry.teacherName, entries: [] });
+    groups.get(key).entries.push(entry);
+  });
+  return Array.from(groups.values());
+}
+
+function scheduleStudentHtml(entry, date) {
+  const att = scheduleAttendance(entry, date);
+  const sub = [entry.grade, entry.role].filter(Boolean).join(' · ');
+  return '<div class="schedule-student">' +
+    '<div class="schedule-student-name">' + esc(entry.studentName) +
+      (sub ? '<div class="schedule-role">' + esc(sub) + '</div>' : '') + '</div>' +
+    '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></div>';
+}
+
+function scheduleTeacherHtml(group, date, currentCard) {
+  const roles = [...new Set(group.entries.map(entry => entry.role).filter(Boolean))];
+  return '<div class="' + (currentCard ? 'schedule-teacher' : 'schedule-teacher-row') + '">' +
+    '<div class="between"><div><div class="card-title">' + esc(group.teacherName) + ' 선생님</div>' +
+      (roles.length ? '<div class="small muted">' + esc(roles.join(' · ')) + '</div>' : '') + '</div>' +
+      (group.staffId ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + group.staffId + '">업무 보기</button>' : '') + '</div>' +
+    group.entries.map(entry => scheduleStudentHtml(entry, date)).join('') + '</div>';
+}
+
+function scheduleClockBadge(stateName) {
+  if (stateName === 'current') return '<span class="pill">현재 예정</span>';
+  if (stateName === 'ended') return '<span class="pill">종료 시간대</span>';
+  return '<span class="pill warn">예정</span>';
+}
+
+function viewSchedule() {
+  if (!session.isAdmin) return viewToday();
+  const core = window.WBScheduleCore;
+  if (!core) return '<div class="card"><div class="empty"><b>⚠️</b>수업 현황을 불러오지 못했습니다.<br>새로고침해 주세요.</div></div>';
+
+  const nowKst = seoulNowParts();
+  const daily = dailyLessonSchedule(cursor);
+  daily.entries.forEach(entry => { entry.clockState = core.clockState(entry.slot, cursor, nowKst.date, nowKst.minute); });
+  const current = daily.entries.filter(entry => entry.clockState === 'current');
+  const attendanceRecorded = daily.entries.filter(entry => scheduleAttendance(entry, cursor).value).length;
+  const currentConfirmed = current.filter(entry => scheduleAttendance(entry, cursor).value).length;
+
+  let h = '<div class="datenav">' +
+    '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
+    '<div class="d">' + label(cursor) + (relLabel(cursor) ? '<em>' + relLabel(cursor) + '</em>' : '') + '</div>' +
+    '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  h += '<div class="schedule-note"><b>시간표 기준 예정 현황</b><br>실제 등원 여부는 출석·지각·결석 기록을 확인하세요. 현재 시각은 한국시간 ' + esc(nowKst.label) + '입니다.</div>';
+  h += '<div class="schedule-kpis">' +
+    '<div class="schedule-kpi"><b>' + daily.entries.length + '</b><span>해당일 수업</span></div>' +
+    '<div class="schedule-kpi"><b>' + current.length + '</b><span>현재 예정</span></div>' +
+    '<div class="schedule-kpi"><b>' + attendanceRecorded + '</b><span>출결 기록</span></div>' +
+    '<div class="schedule-kpi"><b>' + daily.issues.length + '</b><span>시간 확인 필요</span></div></div>';
+
+  if (cursor === nowKst.date) {
+    h += '<div class="sect">지금 수업 · 출석 확인 ' + currentConfirmed + '/' + current.length + '</div>';
+    h += current.length
+      ? '<div class="schedule-current-grid">' + scheduleTeacherGroups(current).map(group => scheduleTeacherHtml(group, cursor, true)).join('') + '</div>'
+      : '<div class="card"><div class="empty"><b>⏱️</b>현재 시간에 예정된 수업이 없습니다.</div></div>';
+  } else {
+    h += '<div class="card"><div class="small muted">선택한 날짜는 실시간 화면이 아닙니다. 아래 시간대별 전체 수업을 확인하세요.</div></div>';
+  }
+
+  h += '<div class="sect">시간대별 전체 수업</div>';
+  if (!daily.entries.length) {
+    h += '<div class="card"><div class="empty"><b>🗓️</b>시간이 확정된 수업이 없습니다.</div></div>';
+  } else {
+    const byTime = new Map();
+    daily.entries.forEach(entry => {
+      const key = entry.slot.startMinute + '-' + entry.slot.endMinute;
+      if (!byTime.has(key)) byTime.set(key, { label: entry.slot.label, state: entry.clockState, entries: [] });
+      byTime.get(key).entries.push(entry);
+    });
+    h += Array.from(byTime.values()).map(block =>
+      '<div class="card schedule-time-card ' + (block.state === 'current' ? 'is-now' : '') + '">' +
+        '<div class="schedule-time-head"><b>' + esc(block.label) + '</b>' + scheduleClockBadge(block.state) + '</div>' +
+        '<div class="schedule-time-body">' + scheduleTeacherGroups(block.entries).map(group => scheduleTeacherHtml(group, cursor, false)).join('') + '</div></div>'
+    ).join('');
+  }
+
+  if (daily.issues.length) {
+    h += '<div class="sect">시간·반복 확인 필요</div><div class="card schedule-issues">' +
+      '<div class="card-sub mb8">확인되지 않은 수업은 현재 수업으로 계산하지 않았습니다.</div>' +
+      daily.issues.map(item => '<div class="schedule-issue"><div class="between">' +
+        '<div><b>' + esc(item.teacherName) + ' · ' + esc(item.studentName) + '</b>' +
+          '<div class="small muted">' + esc(item.message) + '</div>' +
+          (item.source ? '<div class="small muted">등록값: ' + esc(item.source) + '</div>' : '') + '</div>' +
+        (item.staffId ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + item.staffId + '">확인</button>' : '') +
+      '</div></div>').join('') + '</div>';
+  }
+  return h;
 }
 
 /* ── 직원 현황 ── */
@@ -3263,7 +3458,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.2';
+const APP_VER = '2026-08-03.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
@@ -3283,6 +3478,9 @@ function checkVersion() {
 }
 checkVersion();
 setInterval(checkVersion, 10 * 60 * 1000);
+setInterval(() => {
+  if (route === 'schedule' && session.isAdmin && cursor === seoulNowParts().date) render();
+}, 60 * 1000);
 
 </script>
 </body>
