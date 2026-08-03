@@ -11,8 +11,11 @@
  * 엔드포인트
  *   GET  /health
  *   POST /sync    { app, auth, since, changes[] } → { ok, now, changes[] }
- *   POST /token   { app, auth(admin), staffId }   → { ok, token }   개인 링크 토큰 발급
- *   POST /revoke  { app, auth(admin), token }     → { ok }
+ *   POST /token     { app, auth(admin), staffId } → { ok, token }   구형 개인 링크 호환
+ *   POST /bootstrap { app, auth(admin), staffId } → { ok, code }    1회용 링크 발급
+ *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
+ *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
+ *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
  *   auth = { mode:'admin',  secret }            → 전체 접근
@@ -22,13 +25,22 @@
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
 const MAX_PULL = 2000;       // 응답당 상한. 초과하면 more:true로 알리고 다음 요청에서 이어받는다
+const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const TOKEN_HASH_PREFIX = 'sha256:';
+const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
+const HANDOFF_TTL_MS = 10 * 60 * 1000;
+const SAFE_BOOTSTRAP_CODE = /^[a-f0-9]{48}$/i;
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
   headers: {
     'Content-Type': 'application/json;charset=utf-8',
     'Access-Control-Allow-Origin': origin || '*',
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer'
   }
 });
 
@@ -50,6 +62,22 @@ function safeEqual(a, b) {
   return d === 0;
 }
 
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value || ''));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function tokenStorageValue(digest) {
+  return TOKEN_HASH_PREFIX + String(digest || '').toLowerCase();
+}
+
+function randomOpaqueValue() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
   if (auth.mode === 'admin') {
@@ -60,15 +88,16 @@ async function resolveAuth(env, app, auth) {
   if (auth.mode === 'person') {
     const id = String(auth.id || '');
     const token = String(auth.token || '');
-    if (!id || !token) return null;
+    if (!SAFE_ID.test(id) || !token || token.length > 256 || token.startsWith(TOKEN_HASH_PREFIX)) return null;
+    const tokenHash = tokenStorageValue(await sha256Hex(token));
+    const createdAfter = Date.now() - TOKEN_TTL_MS;
     const row = await env.DB.prepare(
-      'SELECT staff_id FROM tokens WHERE app=? AND token=? AND revoked=0'
-    ).bind(app, token).first();
+      'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
+      'AND (token=? OR created_at>=?) LIMIT 1'
+    ).bind(app, tokenHash, token, token, createdAfter).first();
     if (!row || row.staff_id !== id) return null;
-    // 학생 앱(consult)은 서로 보면 안 되므로 자기 것만.
-    // 직원 앱(task)은 연락 기록·온라인 프로그램·평가처럼 담당이 아닌 학생 정보도
-    // 함께 보고 기록해야 하므로 전체 범위를 준다. 대신 토큰은 언제든 해지할 수 있다.
-    return app === 'task' ? { scope: 'all', id: id } : { scope: 'own', id: id };
+    // 개인 링크는 manager 플래그와 무관하게 항상 본인 범위다. 전체 관리는 원장 로그인만 사용한다.
+    return { scope: 'own', id: id };
   }
   return null;
 }
@@ -100,6 +129,7 @@ async function handleSync(env, app, body, origin) {
 
   // ── 올리기
   const stmts = [];
+  let forbidden = false;
   for (const c of changes) {
     if (!c || !c.table || !APPS.includes(app)) continue;
     const t = c.table;
@@ -107,11 +137,14 @@ async function handleSync(env, app, body, origin) {
     if (!(t === 'checks' ? c.k : c.id)) continue;
     // 개인 접속은 자기 것만 쓸 수 있다. 남의 owner를 붙여 보내도 서버에서 막는다.
     if (auth.scope === 'own') {
-      if (t === 'staff' && c.id !== auth.id) continue;
-      if (t !== 'staff' && c.owner !== auth.id) continue;
+      if ((t === 'staff' && c.id !== auth.id) || (t !== 'staff' && c.owner !== auth.id)) {
+        forbidden = true;
+        break;
+      }
     }
     stmts.push(upsertStmt(env, t, app, c, now));
   }
+  if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
   if (stmts.length) await env.DB.batch(stmts);
 
   // ── 내려받기 (since 이후)
@@ -150,11 +183,108 @@ async function handleToken(env, app, body, origin) {
   return json({ ok: true, token: token }, 200, origin);
 }
 
+async function activeStaff(env, app, staffId) {
+  if (!SAFE_ID.test(staffId)) return false;
+  const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
+    .bind(app, staffId).first();
+  if (!row) return false;
+  try { return !JSON.parse(row.data).deleted; } catch (error) { return false; }
+}
+
+async function issueBootstrap(env, app, staffId, ttlMs) {
+  if (!await activeStaff(env, app, staffId)) throw new Error('활성 직원을 찾을 수 없습니다');
+  const code = randomOpaqueValue();
+  const codeHash = tokenStorageValue(await sha256Hex(code));
+  const createdAt = Date.now();
+  const expiresAt = createdAt + ttlMs;
+  await env.DB.batch([
+    env.DB.prepare(
+      'UPDATE bootstrap_codes SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL'
+    ).bind(app, staffId),
+    env.DB.prepare(
+      'INSERT INTO bootstrap_codes(app,code_hash,staff_id,created_at,expires_at,consumed_at,revoked) ' +
+      'VALUES(?,?,?,?,?,NULL,0)'
+    ).bind(app, codeHash, staffId, createdAt, expiresAt)
+  ]);
+  return { code, expiresAt };
+}
+
+async function handleBootstrap(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.scope !== 'all') return json({ ok: false, error: '원장만 발급할 수 있습니다' }, 401, origin);
+  const staffId = String(body.staffId || '');
+  if (!SAFE_ID.test(staffId)) return json({ ok: false, error: '올바른 staffId 필요' }, 400, origin);
+  try {
+    const issued = await issueBootstrap(env, app, staffId, BOOTSTRAP_TTL_MS);
+    return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+  } catch (error) {
+    return json({ ok: false, error: String(error && error.message || error) }, 409, origin);
+  }
+}
+
+async function handleExchange(env, app, body, origin) {
+  const staffId = String(body.staffId || '');
+  const code = String(body.code || '');
+  if (!SAFE_ID.test(staffId) || !SAFE_BOOTSTRAP_CODE.test(code)) {
+    return json({ ok: false, error: '올바른 1회용 코드가 필요합니다' }, 400, origin);
+  }
+  if (!await activeStaff(env, app, staffId)) return json({ ok: false, error: '접근할 수 없는 대상입니다' }, 401, origin);
+
+  const codeHash = tokenStorageValue(await sha256Hex(code));
+  const consumedAt = Date.now();
+  const markerBytes = new Uint32Array(1);
+  crypto.getRandomValues(markerBytes);
+  const consumeMarker = -(consumedAt * 1000 + (markerBytes[0] % 1000));
+  const token = randomOpaqueValue();
+  const storedHash = tokenStorageValue(await sha256Hex(token));
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      'UPDATE bootstrap_codes SET consumed_at=? ' +
+      'WHERE app=? AND code_hash=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=?'
+    ).bind(consumeMarker, app, codeHash, staffId, consumedAt),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND EXISTS (' +
+      'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
+    ).bind(app, staffId, app, codeHash, staffId, consumeMarker),
+    env.DB.prepare(
+      'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
+      'SELECT ?,?,?,?,0 WHERE EXISTS (' +
+      'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
+    ).bind(app, storedHash, staffId, consumedAt, app, codeHash, staffId, consumeMarker),
+    env.DB.prepare(
+      'UPDATE bootstrap_codes SET consumed_at=? WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?'
+    ).bind(consumedAt, app, codeHash, staffId, consumeMarker)
+  ]);
+  const changed = index => Number(results[index] && results[index].meta && results[index].meta.changes || 0);
+  if (changed(0) !== 1 || changed(2) !== 1 || changed(3) !== 1) {
+    return json({ ok: false, error: '만료되었거나 이미 사용한 링크입니다' }, 410, origin);
+  }
+  return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS }, 200, origin);
+}
+
+async function handleHandoff(env, app, body, origin) {
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.scope !== 'own' || !SAFE_ID.test(auth.id)) {
+    return json({ ok: false, error: '개인 인증이 필요합니다' }, 401, origin);
+  }
+  const issued = await issueBootstrap(env, app, auth.id, HANDOFF_TTL_MS);
+  return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+}
+
 async function handleRevoke(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth || auth.scope !== 'all') return json({ ok: false, error: '원장만 해지할 수 있습니다' }, 401, origin);
-  await env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND token=?')
-    .bind(app, String(body.token || '')).run();
+  const staffId = String(body.staffId || '');
+  if (staffId) {
+    if (!SAFE_ID.test(staffId)) return json({ ok: false, error: '올바른 staffId 필요' }, 400, origin);
+    await env.DB.batch([
+      env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=?').bind(app, staffId),
+      env.DB.prepare('UPDATE bootstrap_codes SET revoked=1 WHERE app=? AND staff_id=?').bind(app, staffId)
+    ]);
+  } else {
+    await env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND token=?')
+      .bind(app, String(body.token || '')).run();
+  }
   return json({ ok: true }, 200, origin);
 }
 
@@ -316,6 +446,9 @@ export default {
     try {
       if (url.pathname === '/sync')   return await handleSync(env, app, body, okOrigin);
       if (url.pathname === '/token')  return await handleToken(env, app, body, okOrigin);
+      if (url.pathname === '/bootstrap') return await handleBootstrap(env, app, body, okOrigin);
+      if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
+      if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);

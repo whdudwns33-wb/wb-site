@@ -245,7 +245,10 @@
 /* ══════════════════════════════════════════════════════
    1. 저장소
    ══════════════════════════════════════════════════════ */
-const LS_KEY = 'wb_taskboard_v1';
+const SAFE_SCOPE_ID = (/^[A-Za-z0-9_-]{1,128}$/.test(new URLSearchParams(location.search).get('u') || ''))
+  ? new URLSearchParams(location.search).get('u') : '';
+const HAS_PERSON_SCOPE = !!SAFE_SCOPE_ID;
+const LS_KEY = HAS_PERSON_SCOPE ? 'wb_taskboard_person_v1_' + SAFE_SCOPE_ID : 'wb_taskboard_v1';
 const DOW = ['일','월','화','수','목','금','토'];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
@@ -563,12 +566,27 @@ const sync = {
     }
   },
 
-  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
-  async issueToken(staffId) {
+  /** 장기 bearer 대신 24시간 안에 한 번만 교환할 링크 code를 발급한다. */
+  async issueBootstrap(staffId) {
     const auth = this.auth();
     if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 발급할 수 있습니다');
-    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
-    return d.token;
+    return await this.post('/bootstrap', { app: SYNC_APP, auth: auth, staffId: staffId });
+  },
+
+  async exchangeBootstrap(staffId, code) {
+    return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
+  },
+
+  async handoff() {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'person') throw new Error('개인 인증이 필요합니다');
+    return await this.post('/handoff', { app: SYNC_APP, auth: auth });
+  },
+
+  async revokeAccess(staffId) {
+    const auth = this.auth();
+    if (!auth || auth.mode !== 'admin') throw new Error('원장 화면에서만 해지할 수 있습니다');
+    return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
   }
 };
 
@@ -583,7 +601,7 @@ function queueSync() {
    5. 세션 / 라우팅
    ══════════════════════════════════════════════════════ */
 const session = {
-  get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
+  get staffId() { return SAFE_SCOPE_ID; },
   get isStaffLink() { return !!this.staffId; },
   get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'; },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
@@ -599,7 +617,7 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
-  if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
+  if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
   if (r && r !== route) { route = r; render(); }
 });
@@ -607,30 +625,33 @@ window.addEventListener('hashchange', () => {
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
 
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
+let pendingBootstrapCode = ''; // 주소에서 즉시 지운 뒤 1회 교환할 code
 
 /** 링크에 담겨 온 것들을 흡수한다.
- *  s=  동기화 설정 (직원 기기 세팅 대신)
+ *  s=  구형 원장 복구 링크 (보안상 내용은 무시하고 제거)
+ *  c=  1회용 개인 링크 code
  *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
 function absorbLinkParams() {
   const q = new URLSearchParams(location.search);
   let touched = false;
 
   const tk = q.get('t');
-  if (tk) { state.settings.myToken = tk; save(); }
+  if (tk) {
+    // 구형 링크는 전환 기간에만 1회 흡수하고 즉시 주소에서 제거한다.
+    state.settings.myToken = tk; save();
+    q.delete('t'); touched = true;
+  }
 
   const s = q.get('s');
   if (s) {
-    try {
-      const cfg = JSON.parse(unb64(s));
-      if (cfg.k) state.settings.syncSecret = cfg.k;
-      // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
-      if (cfg.p && !new URLSearchParams(location.search).get('u')) {
-        state.settings.adminPin = cfg.p;
-        session.unlock();
-      }
-      save();
-    } catch (e) { console.warn('link config', e); }
     q.delete('s'); touched = true;
+    setTimeout(() => toast('보안상 원장 복구 링크의 비밀정보는 사용하지 않습니다'), 0);
+  }
+
+  const codeMatch = location.hash.match(/[#&]c=([^&]+)/);
+  if (codeMatch) {
+    try { pendingBootstrapCode = decodeURIComponent(codeMatch[1]); } catch (error) { pendingBootstrapCode = ''; }
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
   }
 
   // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다
@@ -648,7 +669,7 @@ function absorbLinkParams() {
   }
 
   if (touched || m) {
-    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (m ? '' : location.hash));
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + (m || codeMatch ? '' : location.hash));
   }
 }
 
@@ -678,11 +699,10 @@ const initials = name => String(name || '?').trim().slice(0, 2);
 /** 지금 조작하는 사람 */
 const actor = () => session.isStaffLink ? 'staff' : 'admin';
 
-/** 관리자 — 원장이 직원 관리에서 지정한다.
- *  본인 개인 링크로 들어오면 현황 보기·지시서 발행까지 열린다.
- *  설정·직원 관리·업무 수정/삭제는 계속 원장 전용이다. */
+/** 개인 링크는 D1의 manager 표시에 관계없이 본인 업무 전용이다.
+ *  전체 현황·발행·학생 기록은 검증된 원장 세션에서만 수행한다. */
 const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
-const isManager = () => { const m = meStaff(); return !!(m && m.manager && !m.deleted); };
+const isManager = () => false;
 
 /** 출근 체크 — 업무가 아닌 특수 체크로 저장한다 (시트 체크현황에는 안 섞인다) */
 const attKey = staffId => '__att__' + staffId;
@@ -878,7 +898,7 @@ function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
   let text, on = false;
-  if (session.isStaffLink) { text = me ? me.name + ' 선생님' + (isManager() ? ' · 관리자' : '') : '알 수 없는 링크'; on = !!me; }
+  if (session.isStaffLink) { text = me ? me.name + ' 선생님 · 개인 업무' : '알 수 없는 링크'; on = !!me; }
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
   if (sync.busy) text += ' · 동기화중';
@@ -901,7 +921,9 @@ function render() {
   const v = $('#view');
 
   if (session.isStaffLink && !staffById(session.staffId)) {
-    v.innerHTML = '<div class="card"><div class="empty"><b>🔗</b>이 링크에 연결된 직원 정보가 없습니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
+    v.innerHTML = pendingBootstrapCode
+      ? '<div class="card"><div class="empty"><b>⏳</b>업무를 안전하게 불러오는 중입니다.</div></div>'
+      : '<div class="card"><div class="empty"><b>🔗</b>새 개인 링크가 필요합니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
     return;
   }
   if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
@@ -911,9 +933,9 @@ function render() {
     else { v.innerHTML = viewPendingAdd(); return; }
   }
 
-  // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 그 외는 자기 할 일만
+  // 개인 링크는 manager 표시에 관계없이 본인 업무 화면만 연다.
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'write', 'board', 'books', 'roster'] : ['today', 'week', 'books', 'roster'];
+    const allowed = ['today', 'week', 'books', 'roster'];
     if (!allowed.includes(route)) route = 'today';
   }
 
@@ -924,9 +946,7 @@ function render() {
 function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
-    ? (isManager()
-        ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['write', '지시서 작성'], ['board', '직원 현황', a.total], ['books', '교재'], ['roster', '원생']]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재'], ['roster', '원생']])
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재'], ['roster', '원생']]
     : session.isAdmin
       ? [['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
@@ -1047,30 +1067,8 @@ function viewToday() {
       '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div>' +
       '<button class="btn btn-sm btn-ghost mt8" data-act="atteditopen" data-id="' + me.id + '">✏️ 최근 기록 수정 (실수로 안 눌렀을 때)</button></div>';
 
-    // 📞 이번 달 학부모 연락 — 담당 학생별 월 1회가 기본 업무.
-    // 연락 기록에서 자동 집계되고 매월 1일 저절로 리셋된다.
     if (!rosterDb && !rosterErr) loadRoster();
-    if (rosterDb) {
-      const ym = today().slice(0, 7);
-      const mine = (rosterDb.students || []).filter(s =>
-        String(s.teacher || '').split('·').includes(me.name) &&
-        s.start <= ym && (!s.end || s.end > ym));
-      if (mine.length) {
-        const left = mine.filter(s => !contactsOf(s.name).some(c => String(c.date).slice(0, 7) === ym));
-        const done = mine.length - left.length;
-        const pct = Math.round(done / mine.length * 100);
-        h += '<div class="card" style="padding:12px">' +
-          '<div class="between mb8"><div class="card-title">📞 이번 달 학부모 연락</div>' +
-          '<span class="pill ' + (left.length ? '' : 'ok') + '">' + done + '/' + mine.length + '명</span></div>' +
-          '<div class="bar mb8"><i style="width:' + pct + '%"></i></div>' +
-          (left.length
-            ? '<div class="small muted" style="margin-bottom:6px">아직 이번 달 연락을 못 한 학생 — 누르면 바로 기록할 수 있어요</div>' +
-              '<div class="chips">' + left.map(s =>
-                '<button class="chip" data-act="ctlog" data-name="' + esc(s.name) + '">📞 ' + esc(s.name) + '</button>').join('') + '</div>'
-            : '<div class="small muted">이번 달 전원 연락 완료 🎉 다음 달 1일에 다시 시작됩니다.</div>') +
-          '</div>';
-      }
-    }
+    h += '<div class="card"><div class="small muted">학생 연락·평가·온라인 프로그램 기록은 개인정보 보호를 위해 원장 화면에서 관리합니다.</div></div>';
   }
 
   if (editable && cursor === today()) {
@@ -1098,7 +1096,10 @@ function viewToday() {
   }
   if (session.isStaffLink) {
     h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
-      '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
+      '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
+      '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.<br>' +
+      '위 링크는 10분 안에 새 브라우저에서 한 번만 열 수 있습니다.<br>' +
+      '새 브라우저에서 인증이 완료되면 이 브라우저의 동기화 연결은 종료됩니다.</div>';
   }
   return h;
 }
@@ -1836,7 +1837,8 @@ function viewRoster() {
           risky.map(x => '<div class="between small" style="padding:4px 0">' +
             '<span>· ' + esc(x.s.name) + ' <span class="muted">(' + esc(x.s.grade) + ' · ' + esc(x.s.teacher || '미지정') + ')</span> ' +
             x.flags.map(f => '<span class="pill ' + f[1] + '">' + esc(f[0]) + '</span>').join(' ') + '</span>' +
-            '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(x.s.name) + '">📞 기록</button></div>').join('')
+            (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(x.s.name) + '">📞 기록</button>' : '') +
+            '</div>').join('')
         : '<div class="small muted">지금 기준 위험 신호 없음 — 최근 2주 결석 2회 이상, 지각 3회 이상, 연락 30일 경과가 생기면 여기 올라옵니다.</div>') +
       '</div>';
   }
@@ -1850,9 +1852,7 @@ function viewRoster() {
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
         mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
           '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span>' +
-          (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span>' +
-          '<span class="row" style="gap:6px">' + ctPill(s.name) +
-          '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-name="' + esc(s.name) + '">📞 기록</button></span></div>').join('');
+          (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span></div>').join('');
       // 내 학생 월별 변동 (변동 있는 달만)
       let moved = '';
       months.forEach(m => {
@@ -1867,8 +1867,12 @@ function viewRoster() {
       h += moved
         ? '<hr class="sep"><div class="fl mb8">월별 변동</div>' + moved
         : '<hr class="sep"><div class="small muted">기준월 이후 변동 없음 — 전원 유지 중 👍</div>';
-      h += '</div><div class="sect">센터 전체</div>';
+      h += '</div>';
     }
+  }
+
+  if (session.isStaffLink) {
+    return h + '<div class="card"><div class="small muted">개인 링크에서는 담당 학생 명단만 확인할 수 있습니다. 센터 전체 기록과 학생 기록 수정은 원장 화면에서 관리합니다.</div></div>';
   }
 
   // 이번 달 요약
@@ -2016,6 +2020,7 @@ function viewStaffAdmin() {
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="revokeaccess" data-id="' + s.id + '">링크 해지</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
@@ -2086,20 +2091,34 @@ function closeModal() { $('#modalHost').innerHTML = ''; }
 
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
 
-/** 개인 링크. 전체 접근 비밀키 대신 직원별 토큰을 담는다 — 링크를 잃어버려도 해지할 수 있다. */
-function staffLink(id) {
-  const s = staffById(id);
-  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
-  return location.origin + location.pathname + '?u=' + id + t;
+const linkCodeVault = new Map();
+function storeLinkCode(id, code, expiresAt) {
+  linkCodeVault.set(String(id), { code: String(code || ''), expiresAt: Number(expiresAt) || 0 });
 }
-async function ensureToken(id) {
-  const s = staffById(id);
-  if (!s) throw new Error('대상을 찾을 수 없습니다');
-  if (s.token) return s.token;
-  s.token = await sync.issueToken(id);
-  s.updatedAt = now();
-  save(); queueSync();
-  return s.token;
+function linkCodeFor(id) {
+  const item = linkCodeVault.get(String(id));
+  if (!item || item.expiresAt <= Date.now()) { linkCodeVault.delete(String(id)); return ''; }
+  return item.code;
+}
+function clearLinkCode(id) { linkCodeVault.delete(String(id)); }
+
+/** 링크에는 장기 bearer 대신 1회용 code만 fragment로 담는다. */
+function staffLink(id) {
+  const code = linkCodeFor(id);
+  if (!code) throw new Error('인증 코드가 없어 링크를 만들 수 없습니다');
+  return location.origin + location.pathname + '?u=' + encodeURIComponent(id) + '#c=' + encodeURIComponent(code);
+}
+async function issueLinkCode(id) {
+  if (!staffById(id)) throw new Error('대상을 찾을 수 없습니다');
+  for (let i = 0; sync.busy && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 50));
+  if (sync.enabled()) {
+    sync.loud = true;
+    await sync.run();
+    if (sync.err) throw new Error('운영 데이터 연결 실패 — ' + sync.err);
+  }
+  const issued = await sync.issueBootstrap(id);
+  storeLinkCode(id, issued.code, issued.expiresAt);
+  return issued.code;
 }
 
 function orderText(staffId, date) {
@@ -2705,17 +2724,28 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'ctlog': {
+      if (!session.isAdmin) { toast('학생 기록은 원장 화면에서 관리합니다'); break; }
       const name = el.dataset.name;
       if (name) ctModal(name);
       break;
     }
-    case 'oplog': { if (el.dataset.name) opModal(el.dataset.name); break; }
-    case 'exlog': { if (el.dataset.name) examModal(el.dataset.name); break; }
+    case 'oplog': {
+      if (!session.isAdmin) { toast('학생 기록은 원장 화면에서 관리합니다'); break; }
+      if (el.dataset.name) opModal(el.dataset.name);
+      break;
+    }
+    case 'exlog': {
+      if (!session.isAdmin) { toast('학생 기록은 원장 화면에서 관리합니다'); break; }
+      if (el.dataset.name) examModal(el.dataset.name);
+      break;
+    }
     case 'exkind': {
+      if (!session.isAdmin) break;
       document.querySelectorAll('#exKind .chip').forEach(c => c.classList.toggle('on', c === el));
       break;
     }
     case 'exsave': {
+      if (!session.isAdmin) break;
       if (!examTarget) break;
       const d = $('#exDate').value || today();
       const kind = (document.querySelector('#exKind .chip.on') || {}).dataset;
@@ -2734,6 +2764,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'opprog': {
+      if (!session.isAdmin) break;
       if (!opTarget) break;
       el.classList.toggle('on');
       const picked = Array.from(document.querySelectorAll('#opProgs .chip.on')).map(x => x.dataset.v);
@@ -2742,6 +2773,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'opsave': {
+      if (!session.isAdmin) break;
       const name = el.dataset.name;
       if (!name) break;
       const cnt = {};
@@ -2753,6 +2785,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'ctsave': {
+      if (!session.isAdmin) break;
       const name = el.dataset.name, type = el.dataset.v;
       if (!name || !CT_TYPES[type]) break;
       const memo = (($('#ctMemo') || {}).value || '').trim();
@@ -2870,31 +2903,49 @@ document.addEventListener('click', ev => {
       toast(s.owner ? s.name + ' — 대표로 지정 (직원 통계에서 제외)' : s.name + ' — 대표 해제');
       break;
     }
+    case 'revokeaccess': {
+      if (!session.isAdmin) break;
+      const person = staffById(id);
+      if (!person || !confirm(person.name + ' 님의 개인 링크와 접속 세션을 모두 해지할까요?')) break;
+      sync.revokeAccess(id)
+        .then(() => { clearLinkCode(id); toast('개인 링크와 접속 세션을 해지했습니다'); })
+        .catch(e => toast('링크를 해지하지 못했습니다 — ' + e.message));
+      break;
+    }
     case 'copylink': {
-      ensureToken(id)
+      issueLinkCode(id)
         .then(() => copy(staffLink(id)))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => clearLinkCode(id));
       break;
     }
     case 'alllinks': {
       const list = liveStaff();
       toast(list.length + '명 링크 준비 중…');
-      Promise.all(list.map(s => ensureToken(s.id).catch(() => null)))
+      Promise.all(list.map(s => issueLinkCode(s.id)))
         .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
-        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message))
+        .finally(() => list.forEach(s => clearLinkCode(s.id)));
       break;
     }
     case 'adminlink': {
-      const url = location.origin + location.pathname + '?s=' +
-        b64(JSON.stringify({
-          k: state.settings.syncSecret || '',
-          p: state.settings.adminPin || ''      // 비밀번호까지 담아 한 번에 복구되게
-        }));
-      copy(url);
-      toast('복사했습니다 — 즐겨찾기에 저장해 두세요');
+      copy(location.origin + location.pathname);
+      toast('보안상 비밀키와 비밀번호는 주소에 넣지 않습니다');
       break;
     }
-    case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
+    case 'handoff': {
+      if (!confirm('새 브라우저에서 링크를 열면 현재 브라우저의 동기화 연결이 종료됩니다. 계속할까요?')) break;
+      sync.handoff()
+        .then(issued => copy(location.origin + location.pathname + '?u=' + encodeURIComponent(session.staffId) + '#c=' + encodeURIComponent(issued.code)))
+        .then(() => toast('새 브라우저용 링크를 복사했습니다 · 10분 안에 한 번 열어 주세요'))
+        .catch(e => toast('새 링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'orderText':
+      issueLinkCode(id)
+        .then(() => { showText('카카오톡 지시서 문구', orderText(id, cursor)); clearLinkCode(id); })
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
     case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
@@ -2919,7 +2970,11 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(me.name + ' — 추가했습니다');
       if (!session.isStaffLink) {
-        setTimeout(() => showText('카톡으로 보낼 문구', quickText(t)), 300);
+        setTimeout(() => {
+          issueLinkCode(t.staffId)
+            .then(() => { showText('카톡으로 보낼 문구', quickText(t)); clearLinkCode(t.staffId); })
+            .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+        }, 300);
       }
       break;
     }
@@ -3062,7 +3117,11 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(n + '건 발행 완료');
       const first = [...touched][0];
-      if (first) setTimeout(() => showText('카카오톡 지시서 문구', orderText(first, today())), 400);
+      if (first) setTimeout(() => {
+        issueLinkCode(first)
+          .then(() => { showText('카카오톡 지시서 문구', orderText(first, today())); clearLinkCode(first); })
+          .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      }, 400);
       break;
     }
 
@@ -3172,15 +3231,39 @@ if (h) route = h;
 if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
 render();
 
-if (sync.enabled()) {
-  sync.run();
-  setInterval(() => sync.run(), 45000);
+let syncLoopStarted = false;
+async function startSyncSession() {
+  if (pendingBootstrapCode) {
+    const code = pendingBootstrapCode;
+    const previousToken = String(state.settings.myToken || '');
+    pendingBootstrapCode = '';
+    try {
+      const exchanged = await sync.exchangeBootstrap(session.staffId, code);
+      state.settings.myToken = exchanged.token;
+      state.settings.pullAt = 0;
+      state.settings.pushAt = 0;
+      save();
+      toast('개인 링크 인증을 완료했습니다');
+    } catch (error) {
+      sync.err = String(error && error.message || error);
+      render();
+      toast('개인 링크를 열 수 없습니다 — ' + sync.err);
+      if (!previousToken) return;
+    }
+  }
+  if (!sync.enabled()) { render(); return; }
+  await sync.run();
+  if (!syncLoopStarted) {
+    syncLoopStarted = true;
+    setInterval(() => sync.run(), 45000);
+  }
 }
+startSyncSession();
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.1';
+const APP_VER = '2026-08-03.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
