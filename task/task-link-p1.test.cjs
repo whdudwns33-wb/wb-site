@@ -44,7 +44,7 @@ test('authenticated staff can create a browser handoff link', () => {
 
 test('personal links never unlock manager or student-record write screens', () => {
   assert.match(html, /const isManager = \(\) => false/);
-  assert.match(html, /const allowed = \['today', 'week', 'books', 'roster'\]/);
+  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
   assert.match(html, /개인 링크에서는 담당 학생 명단만 확인할 수 있습니다/);
   for (const action of ['ctlog', 'oplog', 'exlog']) {
     const block = html.match(new RegExp(`case '${action}':[\\s\\S]{0,220}?break;`))?.[0] || '';

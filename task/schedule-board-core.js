@@ -117,7 +117,14 @@
       };
     }
     const review = needsScheduleReview(task);
-    if (!fallbackOccurs && !review) return { slots: [], issues: [], sourceType: 'legacy' };
+    if (review) {
+      return {
+        slots: [],
+        issues: [issue('needs_review', '확정 전 시간표입니다. 원장 확인이 필요합니다', source)],
+        sourceType: 'legacy'
+      };
+    }
+    if (!fallbackOccurs) return { slots: [], issues: [], sourceType: 'legacy' };
     if (ranges.length === 1 && fallbackOccurs) {
       return {
         slots: [Object.assign({
@@ -136,7 +143,7 @@
         sourceType: 'legacy'
       };
     }
-    if (fallbackOccurs || review) {
+    if (fallbackOccurs) {
       return {
         slots: [],
         issues: [issue('missing_schedule', '수업 요일·시간·반복을 확인해 주세요', source)],

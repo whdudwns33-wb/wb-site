@@ -15,12 +15,17 @@
  *   POST /bootstrap { app, auth(admin), staffId } → { ok, code }    1회용 링크 발급
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
+ *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
+ *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
+ *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토(외부 전달 차단)
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
  *   auth = { mode:'admin',  secret }            → 전체 접근
  *   auth = { mode:'person', id, token }         → 본인 것만
  */
+
+import { handleLessonCreate } from './lesson-create.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -103,17 +108,139 @@ async function resolveAuth(env, app, auth) {
 }
 
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
-function upsertStmt(env, table, app, c, now) {
+function upsertStmt(env, table, app, c, now, ownScope) {
   const idCol = table === 'checks' ? 'k' : 'id';
   const key = table === 'checks' ? c.k : c.id;
+  const ownGuard = ownScope
+    ? (' AND ' + table + '.owner=excluded.owner' +
+      (table === 'tasks' ? " AND json_extract(tasks.data,'$.origin')='staff'" : ''))
+    : '';
   return env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
     'VALUES (?, ?, ?, ?, ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=excluded.data, ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
-    'WHERE excluded.updated_at > ' + table + '.updated_at'
+    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) out[key] = canonicalJson(value[key]);
+    return out;
+  }
+  return value;
+}
+
+function sameTaskJson(stored, incoming) {
+  try {
+    const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    return JSON.stringify(canonicalJson(parsed)) === JSON.stringify(canonicalJson(incoming));
+  } catch (error) {
+    return false;
+  }
+}
+
+async function inspectOwnTaskChanges(env, app, owner, entries) {
+  const taskEntries = entries.filter(entry => entry.table === 'tasks');
+  if (!taskEntries.length) return { skip: new Set(), newTaskIds: new Set() };
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id)))];
+  const placeholders = ids.map(() => '?').join(',');
+  const ownRows = await env.DB.prepare(
+    'SELECT id,data FROM tasks WHERE app=? AND owner=? AND id IN (' + placeholders + ')'
+  ).bind(app, owner, ...ids).all();
+  const allRows = await env.DB.prepare(
+    'SELECT id,owner FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+  ).bind(app, ...ids).all();
+  const ownById = new Map((ownRows.results || []).map(row => [String(row.id), row]));
+  const ownerById = new Map((allRows.results || []).map(row => [String(row.id), String(row.owner || '')]));
+  const skip = new Set();
+  const newTaskIds = new Set();
+
+  for (const entry of taskEntries) {
+    const change = entry.change;
+    const id = String(change.id);
+    const data = change.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data) ||
+        String(data.id || '') !== id || String(data.staffId || '') !== owner) {
+      return { error: '업무의 id와 담당자 정보가 개인 인증과 일치하지 않습니다' };
+    }
+    const storedOwner = ownerById.get(id);
+    if (storedOwner && storedOwner !== owner) {
+      return { error: '다른 담당자의 업무 ID는 사용할 수 없습니다' };
+    }
+    const current = ownById.get(id);
+    if (!current) {
+      if (data.origin !== 'staff') {
+        return { error: '개인 링크에서는 직원이 직접 만든 업무만 새로 등록할 수 있습니다' };
+      }
+      newTaskIds.add(id);
+      continue;
+    }
+    let currentData;
+    try { currentData = JSON.parse(current.data); } catch (error) { currentData = null; }
+    if (!currentData || currentData.origin !== 'staff') {
+      if (sameTaskJson(current.data, data)) {
+        skip.add(entry);
+        continue;
+      }
+      return { error: '원장이 등록한 업무는 개인 링크에서 수정하거나 삭제할 수 없습니다' };
+    }
+    if (data.origin !== 'staff') {
+      return { error: '직원 업무의 등록 주체를 변경할 수 없습니다' };
+    }
+  }
+  return { skip, newTaskIds };
+}
+
+async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
+  const checkEntries = entries.filter(entry => entry.table === 'checks');
+  if (!checkEntries.length) return null;
+  const generalTaskIds = [];
+
+  for (const entry of checkEntries) {
+    const key = String(entry.change.k || '');
+    const firstPipe = key.indexOf('|');
+    if (firstPipe <= 0 || firstPipe !== key.lastIndexOf('|') || firstPipe === key.length - 1) {
+      return '체크 키 형식을 확인해 주세요';
+    }
+    const keyTaskId = key.slice(0, firstPipe);
+    const keyDate = key.slice(firstPipe + 1);
+    const data = entry.change.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return '체크 데이터 형식을 확인해 주세요';
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'taskId') && String(data.taskId) !== keyTaskId) {
+      return '체크 데이터의 taskId가 체크 키와 일치하지 않습니다';
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'date') && String(data.date) !== keyDate) {
+      return '체크 데이터의 날짜가 체크 키와 일치하지 않습니다';
+    }
+
+    const special = keyTaskId.match(/^__[A-Za-z]+__(.+)$/);
+    if (special) {
+      if (special[1] !== owner) return '다른 담당자의 특수 체크는 저장할 수 없습니다';
+    } else {
+      generalTaskIds.push(keyTaskId);
+    }
+  }
+
+  const idsToFind = [...new Set(generalTaskIds.filter(id => !newTaskIds.has(id)))];
+  const allowed = new Set(newTaskIds);
+  if (idsToFind.length) {
+    const placeholders = idsToFind.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id FROM tasks WHERE app=? AND owner=? AND id IN (' + placeholders + ')'
+    ).bind(app, owner, ...idsToFind).all();
+    for (const row of (result.results || [])) allowed.add(String(row.id));
+  }
+  if (generalTaskIds.some(id => !allowed.has(id))) {
+    return '본인에게 배정된 업무의 체크만 저장할 수 있습니다';
+  }
+  return null;
 }
 
 async function handleSync(env, app, body, origin) {
@@ -128,7 +255,7 @@ async function handleSync(env, app, body, origin) {
   }
 
   // ── 올리기
-  const stmts = [];
+  const accepted = [];
   let forbidden = false;
   for (const c of changes) {
     if (!c || !c.table || !APPS.includes(app)) continue;
@@ -137,14 +264,33 @@ async function handleSync(env, app, body, origin) {
     if (!(t === 'checks' ? c.k : c.id)) continue;
     // 개인 접속은 자기 것만 쓸 수 있다. 남의 owner를 붙여 보내도 서버에서 막는다.
     if (auth.scope === 'own') {
-      if ((t === 'staff' && c.id !== auth.id) || (t !== 'staff' && c.owner !== auth.id)) {
+      // 직원 명부는 서버/원장 소유다. 구형 개인 UI가 명부 행을 다시 올려도 안전하게 무시한다.
+      if (t === 'staff') {
+        accepted.push({ table: t, change: c });
+        continue;
+      }
+      if (c.owner !== auth.id) {
         forbidden = true;
         break;
       }
     }
-    stmts.push(upsertStmt(env, t, app, c, now));
+    accepted.push({ table: t, change: c });
   }
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
+  let skipped = new Set();
+  if (auth.scope === 'own') {
+    const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted);
+    if (inspected.error) return json({ ok: false, error: inspected.error }, 403, origin);
+    skipped = inspected.skip;
+    for (const entry of accepted) {
+      if (entry.table === 'staff') skipped.add(entry);
+    }
+    const checkError = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
+    if (checkError) return json({ ok: false, error: checkError }, 403, origin);
+  }
+  const stmts = accepted
+    .filter(entry => !skipped.has(entry))
+    .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own'));
   if (stmts.length) await env.DB.batch(stmts);
 
   // ── 내려받기 (since 이후)
@@ -286,6 +432,282 @@ async function handleRevoke(env, app, body, origin) {
       .bind(app, String(body.token || '')).run();
   }
   return json({ ok: true }, 200, origin);
+}
+
+
+/* ══════════════════════════════════════════════════════
+   학부모 피드백 문구 검토(안전한 1단계)
+   여기서는 직원의 문구 요청과 원장의 문구 승인만 기록한다.
+   승인 상태도 외부 전달을 허용하지 않으며, 외부 전달 기능은 이 워커에 없다.
+   ══════════════════════════════════════════════════════ */
+const FEEDBACK_STATUSES = new Set([
+  'approval_waiting',
+  'content_approved_send_blocked',
+  'revision_requested',
+  'cancelled'
+]);
+const SAFE_FEEDBACK_PART = /^[A-Za-z0-9_-]{1,64}$/;
+const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_FEEDBACK_BODY = 5000;
+const MAX_REVIEW_NOTE = 1000;
+
+function validIsoDate(value) {
+  const text = String(value || '');
+  if (!SAFE_FEEDBACK_DATE.test(text)) return false;
+  const date = new Date(text + 'T00:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
+function normalizeFeedbackBody(value) {
+  return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
+}
+
+function feedbackIdentity(body) {
+  const taskId = String(body.taskId || '');
+  const feedbackDate = String(body.feedbackDate || '');
+  const feedbackType = String(body.feedbackType || 'class_feedback');
+  const templateVersion = String(body.templateVersion || 'v1');
+  if (!SAFE_ID.test(taskId)) return { error: '올바른 taskId가 필요합니다' };
+  if (!validIsoDate(feedbackDate)) return { error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' };
+  if (!SAFE_FEEDBACK_PART.test(feedbackType)) return { error: '올바른 feedbackType이 필요합니다' };
+  if (!SAFE_FEEDBACK_PART.test(templateVersion)) return { error: '올바른 templateVersion이 필요합니다' };
+  return { taskId, feedbackDate, feedbackType, templateVersion };
+}
+
+async function feedbackRequestKey(identity) {
+  const raw = [identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion].join('\u001f');
+  return 'fbr_' + (await sha256Hex(raw)).slice(0, 48);
+}
+
+function feedbackView(row) {
+  if (!row) return null;
+  return {
+    requestKey: row.request_key,
+    taskId: row.task_id,
+    owner: row.owner,
+    feedbackDate: row.feedback_date,
+    feedbackType: row.feedback_type,
+    templateVersion: row.template_version,
+    message: row.body,
+    bodyHash: row.body_hash,
+    revision: Number(row.revision),
+    status: row.status,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    reviewedAt: row.reviewed_at == null ? null : Number(row.reviewed_at),
+    reviewNote: row.review_note == null ? '' : String(row.review_note)
+  };
+}
+
+async function taskForFeedback(env, identity, auth, origin) {
+  const task = await env.DB.prepare('SELECT owner, data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind('task', identity.taskId).first();
+  if (!task) return { response: json({ ok: false, error: '업무를 찾을 수 없습니다' }, 404, origin) };
+  if (!task.owner || !SAFE_ID.test(String(task.owner))) {
+    return { response: json({ ok: false, error: '담당자가 지정된 업무만 요청할 수 있습니다' }, 409, origin) };
+  }
+  if (auth.scope === 'own' && task.owner !== auth.id) {
+    return { response: json({ ok: false, error: '본인 업무의 피드백만 요청할 수 있습니다' }, 403, origin) };
+  }
+  try {
+    if (JSON.parse(task.data || '{}').deleted) {
+      return { response: json({ ok: false, error: '삭제된 업무에는 요청할 수 없습니다' }, 409, origin) };
+    }
+  } catch (error) {
+    return { response: json({ ok: false, error: '업무 데이터가 올바르지 않습니다' }, 409, origin) };
+  }
+  return { task };
+}
+
+async function findFeedbackRequest(env, identity) {
+  return await env.DB.prepare(
+    'SELECT * FROM feedback_requests WHERE app=? AND task_id=? AND feedback_date=? ' +
+    'AND feedback_type=? AND template_version=? LIMIT 1'
+  ).bind('task', identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion).first();
+}
+
+async function handleFeedbackRequest(env, app, body, origin) {
+  if (app !== 'task') return json({ ok: false, error: '학부모 피드백은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
+
+  const action = String(body.action || 'submit');
+  if (action !== 'submit' && action !== 'cancel' && action !== 'list') {
+    return json({ ok: false, error: 'action은 submit, cancel 또는 list여야 합니다' }, 400, origin);
+  }
+  if (action === 'list') {
+    if (auth.scope !== 'own') {
+      return json({ ok: false, error: '직원 본인의 피드백 요청만 확인할 수 있습니다' }, 403, origin);
+    }
+    const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
+    const result = await env.DB.prepare(
+      "SELECT * FROM feedback_requests WHERE app=? AND owner=? ORDER BY CASE status " +
+      "WHEN 'revision_requested' THEN 0 WHEN 'approval_waiting' THEN 1 " +
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END, updated_at DESC LIMIT " + limit
+    ).bind('task', auth.id).all();
+    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+  }
+  const identity = feedbackIdentity(body);
+  if (identity.error) return json({ ok: false, error: identity.error }, 400, origin);
+  const checked = await taskForFeedback(env, identity, auth, origin);
+  if (checked.response) return checked.response;
+
+  const owner = String(checked.task.owner);
+  const now = Date.now();
+  let current = await findFeedbackRequest(env, identity);
+
+  if (action === 'cancel') {
+    if (!current) return json({ ok: false, error: '취소할 피드백 요청을 찾을 수 없습니다' }, 404, origin);
+    if (current.status === 'cancelled') {
+      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+    }
+    const result = await env.DB.prepare(
+      "UPDATE feedback_requests SET owner=?, status='cancelled', revision=revision+1, updated_at=?, " +
+      'reviewed_at=NULL, reviewed_by=NULL, review_note=NULL WHERE app=? AND request_key=? AND revision=?'
+    ).bind(owner, now, 'task', current.request_key, Number(current.revision)).run();
+    if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
+      return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
+    }
+    current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+      .bind('task', current.request_key).first();
+    return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+  }
+
+  const message = normalizeFeedbackBody(body.message);
+  if (!message) return json({ ok: false, error: '피드백 문구를 입력해 주세요' }, 400, origin);
+  if (message.length > MAX_FEEDBACK_BODY) {
+    return json({ ok: false, error: '피드백 문구는 ' + MAX_FEEDBACK_BODY + '자까지 입력할 수 있습니다' }, 413, origin);
+  }
+  const bodyHash = await sha256Hex(message);
+  const requestKey = await feedbackRequestKey(identity);
+
+  if (!current) {
+    const insertResult = await env.DB.prepare(
+      'INSERT OR IGNORE INTO feedback_requests ' +
+      '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
+      "VALUES (?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+    ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
+      identity.templateVersion, message, bodyHash, now, now).run();
+    current = await findFeedbackRequest(env, identity);
+    if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
+    if (current.body_hash === bodyHash && current.body === message) {
+      return json({ ok: true, idempotent: Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) !== 1, request: feedbackView(current) }, 200, origin);
+    }
+  }
+
+  if (current.body_hash === bodyHash && current.body === message && current.status === 'revision_requested') {
+    return json({
+      ok: false,
+      code: 'REVISION_UNCHANGED',
+      error: '수정 요청을 반영해 문구를 변경한 뒤 다시 제출해 주세요',
+      request: feedbackView(current)
+    }, 409, origin);
+  }
+
+  if (current.body_hash === bodyHash && current.body === message && current.status !== 'cancelled') {
+    return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+  }
+
+  const result = await env.DB.prepare(
+    "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, revision=revision+1, status='approval_waiting', " +
+    'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
+    'WHERE app=? AND request_key=? AND revision=?'
+  ).bind(owner, message, bodyHash, now, 'task', current.request_key, Number(current.revision)).run();
+  if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
+    return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
+  }
+  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+    .bind('task', current.request_key).first();
+  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+}
+
+async function handleFeedbackReview(env, app, body, origin) {
+  if (app !== 'task') return json({ ok: false, error: '학부모 피드백은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
+  if (auth.scope !== 'all') return json({ ok: false, error: '원장만 피드백 문구를 검토할 수 있습니다' }, 403, origin);
+
+  const action = String(body.action || 'list');
+  if (action === 'list') {
+    const clauses = ['app=?'];
+    const binds = ['task'];
+    if (body.status != null && body.status !== '') {
+      const status = String(body.status);
+      if (!FEEDBACK_STATUSES.has(status)) return json({ ok: false, error: '올바른 status가 필요합니다' }, 400, origin);
+      clauses.push('status=?'); binds.push(status);
+    }
+    if (body.owner != null && body.owner !== '') {
+      const owner = String(body.owner);
+      if (!SAFE_ID.test(owner)) return json({ ok: false, error: '올바른 owner가 필요합니다' }, 400, origin);
+      clauses.push('owner=?'); binds.push(owner);
+    }
+    if (body.feedbackDate != null && body.feedbackDate !== '') {
+      const feedbackDate = String(body.feedbackDate);
+      if (!validIsoDate(feedbackDate)) return json({ ok: false, error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' }, 400, origin);
+      clauses.push('feedback_date=?'); binds.push(feedbackDate);
+    }
+    const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
+    const statement = env.DB.prepare(
+      'SELECT * FROM feedback_requests WHERE ' + clauses.join(' AND ') +
+      " ORDER BY CASE status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END, updated_at DESC LIMIT " + limit
+    ).bind(...binds);
+    const result = await statement.all();
+    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+  }
+
+  if (action !== 'approve_content' && action !== 'request_revision') {
+    return json({ ok: false, error: 'action은 list, approve_content 또는 request_revision이어야 합니다' }, 400, origin);
+  }
+  const requestKey = String(body.requestKey || '');
+  const expectedRevision = Number(body.revision);
+  if (!SAFE_ID.test(requestKey) || !requestKey.startsWith('fbr_')) {
+    return json({ ok: false, error: '올바른 requestKey가 필요합니다' }, 400, origin);
+  }
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    return json({ ok: false, error: '현재 revision이 필요합니다' }, 400, origin);
+  }
+  let current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+    .bind('task', requestKey).first();
+  if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
+  if (Number(current.revision) !== expectedRevision) {
+    return json({ ok: false, error: '문구가 변경되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
+  }
+  if (current.status === 'cancelled') return json({ ok: false, error: '취소된 요청은 검토할 수 없습니다' }, 409, origin);
+
+  const now = Date.now();
+  if (action === 'approve_content') {
+    if (current.status === 'content_approved_send_blocked') {
+      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+    }
+    if (current.status !== 'approval_waiting') {
+      return json({ ok: false, error: '수정된 문구가 다시 제출된 뒤 승인할 수 있습니다' }, 409, origin);
+    }
+    const result = await env.DB.prepare(
+      "UPDATE feedback_requests SET status='content_approved_send_blocked', updated_at=?, reviewed_at=?, " +
+      "reviewed_by='director', review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
+    ).bind(now, now, 'task', requestKey, expectedRevision).run();
+    if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
+      return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
+    }
+  } else {
+    const note = normalizeFeedbackBody(body.note);
+    if (!note) return json({ ok: false, error: '수정 요청 내용을 입력해 주세요' }, 400, origin);
+    if (note.length > MAX_REVIEW_NOTE) return json({ ok: false, error: '수정 요청은 ' + MAX_REVIEW_NOTE + '자까지 입력할 수 있습니다' }, 413, origin);
+    if (current.status === 'revision_requested' && String(current.review_note || '') === note) {
+      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+    }
+    const result = await env.DB.prepare(
+      "UPDATE feedback_requests SET status='revision_requested', updated_at=?, reviewed_at=?, " +
+      "reviewed_by='director', review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
+    ).bind(now, now, note, 'task', requestKey, expectedRevision).run();
+    if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
+      return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
+    }
+  }
+  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+    .bind('task', requestKey).first();
+  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
 }
 
 
@@ -450,6 +872,13 @@ export default {
       if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
       if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
+      if (url.pathname === '/lesson-create') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonCreate(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
+      if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);

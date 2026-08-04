@@ -112,6 +112,12 @@
   .chip.on { background: var(--navy); border-color: var(--navy); color: var(--white); }
   .chip.dow { min-width: 42px; padding: 8px 0; text-align: center; justify-content: center; }
 
+  /* ─── 수업 등록 폼 ─── */
+  .lesson-slot { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #FCFDFE; }
+  .lesson-slot .grid2 { margin-top: 10px; }
+  .lesson-review { border-color: #F6D6A6; background: #FFFBF3; }
+  .lesson-confirmed { border-color: #B9E3C7; background: #F3FCF6; }
+
   /* ─── 날짜 네비 ─── */
   .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
   .datenav .d { font-size: 17px; font-weight: 900; }
@@ -267,7 +273,8 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
-<script src="./schedule-board-core.js?v=2026-08-03.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-04.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-04.1"></script>
 <script>
 "use strict";
 
@@ -910,7 +917,7 @@ function originTags(t) {
   if (session.isStaffLink) return '';
   let h = '';
   if (t.origin === 'staff') h += '<span class="tag add">직원 추가</span>';
-  else if (t.origin === 'manager') h += '<span class="tag edit">관리자 발행</span>';
+  else if (t.origin === 'manager' || t.origin === 'admin') h += '<span class="tag edit">관리자 발행</span>';
   else if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
   return h;
 }
@@ -919,8 +926,14 @@ function originTags(t) {
  *  원장은 전부. 직원은 자기가 추가한 업무만 — 원장이 내린 지시는 못 건드린다.
  *  (직원도 체크·단계·수량·메모·막힘은 언제나 가능하다) */
 function canEditTask(t) {
+  if (t && (t.lessonFormVersion || t.intakeVersion)) return false;
   if (!session.isStaffLink) return session.isAdmin;
   return t.origin === 'staff' && t.staffId === session.staffId;
+}
+
+function canEditLessonTask(t) {
+  if (!t || !(t.lessonFormVersion || t.intakeVersion)) return false;
+  return session.isAdmin || (session.isStaffLink && t.staffId === session.staffId && t.origin === 'staff');
 }
 
 function paintStatus() {
@@ -964,21 +977,21 @@ function render() {
 
   // 개인 링크는 manager 표시에 관계없이 본인 업무 화면만 연다.
   if (session.isStaffLink) {
-    const allowed = ['today', 'week', 'books', 'roster'];
+    const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'roster'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
+  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
   v.innerHTML = (map[route] || viewToday)();
 }
 
 function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['books', '교재'], ['roster', '원생']]
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '수업 현황'], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
+         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -1217,7 +1230,9 @@ function taskPanel(t, date, c, editable) {
       (t.title.startsWith('[주문] ')
         ? '<button class="btn btn-sm btn-navy" data-act="ordermsg" data-id="' + t.id + '">📱 발주 문자 보내기</button>'
         : '') +
-      (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '') +
+      (canEditLessonTask(t)
+        ? '<button class="btn btn-sm btn-ghost" data-act="lessonedit" data-id="' + t.id + '">✏️ 수업 정보 수정</button>'
+        : (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '')) +
     '</div>';
   }
   return h + '</div>';
@@ -1344,6 +1359,15 @@ function feedbackText(t, date, genComment) {
   return out;
 }
 
+function showFeedbackText(t, date, text) {
+  fbCtx = { id: t.id, date: date };
+  modal('학부모 피드백 문구 — 확인·수정',
+    '<textarea class="in" rows="13" id="mText">' + esc(text) + '</textarea>' +
+    '<div class="hint mt14"><b>보호자 미연결 · 실제 발송 차단</b><br>원장 검토 요청을 눌러도 외부 발송은 되지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="feedbacksubmit">원장 검토 요청</button>' +
+    '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">복사하기</button>');
+}
+
 function staffSwitcher(activeId) {
   const list = liveStaff();
   if (list.length < 2) return '';
@@ -1355,6 +1379,380 @@ function staffSwitcher(activeId) {
 function emptyStaffCard() {
   return '<div class="card"><div class="empty"><b>👥</b>먼저 직원을 등록해 주세요.</div>' +
     '<button class="btn btn-primary btn-block" data-go="staff">직원 등록하러 가기</button></div>';
+}
+
+
+/* ── 선생님 직접 수업 등록 ── */
+let lessonDraft = null;
+let lessonPreviewPayload = null;
+let lessonPreviewTask = null;
+let lessonPreviewExpectedUpdatedAt = 0;
+let lessonSubmitting = false;
+
+function lessonDraftStorageKey() {
+  return 'wb_task_lesson_draft_v1:' + (session.isStaffLink ? session.staffId : 'admin');
+}
+
+function persistLessonDraft() {
+  try { sessionStorage.setItem(lessonDraftStorageKey(), JSON.stringify(lessonDraft)); } catch (error) {}
+}
+
+function clearLessonDraft() {
+  try { sessionStorage.removeItem(lessonDraftStorageKey()); } catch (error) {}
+}
+
+function restoreLessonDraft() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(lessonDraftStorageKey()) || 'null');
+    if (saved && typeof saved === 'object') return Object.assign(newLessonDraft(), saved, {
+      scheduleSlots: Array.isArray(saved.scheduleSlots) && saved.scheduleSlots.length
+        ? saved.scheduleSlots.map(slot => Object.assign({ days: [], startTime: '', endTime: '' }, slot, {
+            days: Array.isArray(slot.days) ? slot.days.slice() : []
+          }))
+        : [{ days: [], startTime: '', endTime: '' }]
+    });
+  } catch (error) {}
+  return null;
+}
+
+function newLessonDraft() {
+  return {
+    staffId: session.isStaffLink ? session.staffId : '',
+    studentName: '', grade: '', subject: '', className: '',
+    scheduleText: '', scheduleSlots: [{ days: [], startTime: '', endTime: '' }],
+    materials: '', onlineProgram: '', homework: '', studentTraits: '',
+    goal: '', parentRequest: '', start: today()
+  };
+}
+
+function currentLessonDraft() {
+  if (!lessonDraft) lessonDraft = restoreLessonDraft() || newLessonDraft();
+  if (session.isStaffLink) lessonDraft.staffId = session.staffId;
+  return lessonDraft;
+}
+
+function lessonDraftFromTask(t) {
+  return {
+    staffId: t.staffId || '', studentName: t.studentName || studentOf(t), grade: t.grade || '',
+    subject: t.subject || '', className: t.className || '',
+    scheduleText: t.scheduleText || '',
+    scheduleSlots: Array.isArray(t.scheduleSlots) && t.scheduleSlots.length
+      ? t.scheduleSlots.map(slot => ({ days: (slot.days || []).slice(), startTime: slot.startTime || '', endTime: slot.endTime || '' }))
+      : [{ days: [], startTime: '', endTime: '' }],
+    materials: t.materials || '', onlineProgram: t.onlineProgram || (t.onlinePrograms || []).join(', '),
+    homework: t.homework || '', studentTraits: t.studentTraits || '', goal: t.goal || '',
+    parentRequest: t.parentRequest || '', start: t.start || today(),
+    _sourceTaskId: t.id, _sourceUpdatedAt: Number(t.updatedAt || 0)
+  };
+}
+
+function lessonTextField(key, labelText, rows, hint) {
+  const value = currentLessonDraft()[key] || '';
+  return '<div class="field"><label class="fl">' + esc(labelText) + '</label>' +
+    (rows
+      ? '<textarea class="in" rows="' + rows + '" data-lesson-field="' + key + '">' + esc(value) + '</textarea>'
+      : '<input class="in" data-lesson-field="' + key + '" value="' + esc(value) + '">') +
+    (hint ? '<div class="hint" style="margin-top:5px">' + esc(hint) + '</div>' : '') + '</div>';
+}
+
+function lessonSlotHtml(slot, index) {
+  slot = slot || { days: [], startTime: '', endTime: '' };
+  return '<div class="lesson-slot"><div class="between mb8"><b>확정 시간 ' + (index + 1) + '</b>' +
+    '<button class="btn btn-sm btn-danger" data-act="lessonslotdel" data-i="' + index + '">삭제</button></div>' +
+    '<div class="chips">' + DOW.map((day, dayIndex) =>
+      '<button type="button" class="chip dow ' + ((slot.days || []).includes(dayIndex) ? 'on' : '') + '" data-act="lessonday" data-i="' + index + '" data-d="' + dayIndex + '">' + day + '</button>'
+    ).join('') + '</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작</label><input class="in" type="time" data-lesson-slot="startTime" data-i="' + index + '" value="' + esc(slot.startTime || '') + '"></div>' +
+    '<div class="field"><label class="fl">종료</label><input class="in" type="time" data-lesson-slot="endTime" data-i="' + index + '" value="' + esc(slot.endTime || '') + '"></div></div></div>';
+}
+
+function viewLessonEntry() {
+  const draft = currentLessonDraft();
+  const staffSelect = session.isStaffLink
+    ? '<div class="guide mb14"><b>담당 선생님</b>' + esc(((staffById(session.staffId) || {}).name || '본인')) + ' 선생님으로만 등록됩니다.</div>'
+    : '<div class="field"><label class="fl">담당 선생님</label><select class="in" data-lesson-field="staffId">' +
+      '<option value="">선생님을 선택하세요</option>' + liveStaff().map(staff =>
+        '<option value="' + staff.id + '"' + (draft.staffId === staff.id ? ' selected' : '') + '>' + esc(staff.name) + '</option>'
+      ).join('') + '</select></div>';
+
+  return '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
+    '<div class="card-sub">아래 9개 항목을 채우면 업무지시서와 수업 현황판에 함께 반영됩니다. 없는 항목은 “없음”이라고 적어 주세요.</div></div>' +
+    '<div class="card">' + staffSelect +
+      '<div class="sect">1. 이름 / 학년</div><div class="grid2">' +
+        lessonTextField('studentName', '학생 이름', 0, '') + lessonTextField('grade', '학년', 0, '예: 초4, 중1, 고3') + '</div>' +
+      '<div class="sect">2. 과목·반</div><div class="grid2">' +
+        lessonTextField('subject', '과목', 0, '예: 국어, 영어, 수학') + lessonTextField('className', '반 / 수업 역할', 0, '예: 블렌디드, 비문학, 문제풀이') + '</div>' +
+      '<div class="sect">3. 수업 요일·시간</div>' +
+        lessonTextField('scheduleText', '원문 그대로', 2, '예: 월·수 17:00-19:00 / 일 12:00-14:00') +
+        '<div class="hint mb8">현황판에 확정 표시하려면 아래에 요일·시작·종료를 넣으세요. 불명확하면 비워도 등록되며 원장 확인 필요로 표시됩니다.</div>' +
+        (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
+        '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
+      '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></div>' +
+      '<div class="sect">4. 교재와 현재 진도</div>' + lessonTextField('materials', '교재·진도', 3, '') +
+      '<div class="sect">5. 온라인 프로그램</div>' + lessonTextField('onlineProgram', '온라인 프로그램', 2, '없으면 “없음”') +
+      '<div class="sect">6. 숙제 루틴과 수행률</div>' + lessonTextField('homework', '숙제', 3, '') +
+      '<div class="sect">7. 학생 특징</div>' + lessonTextField('studentTraits', '학생 특징', 3, '') +
+      '<div class="sect">8. 지금 목표</div>' + lessonTextField('goal', '현재 목표', 3, '') +
+      '<div class="sect">9. 특이사항·학부모 요청</div>' + lessonTextField('parentRequest', '특이사항·요청', 3, '없으면 “없음”') +
+      '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">등록 내용 미리보기</button>' +
+    '</div>';
+}
+
+function lessonInputPayload() {
+  const draft = currentLessonDraft();
+  const slots = (draft.scheduleSlots || []).filter(slot =>
+    (slot.days || []).length || slot.startTime || slot.endTime);
+  return Object.assign({}, draft, {
+    lessonRole: draft.className || draft.subject,
+    scheduleSlots: slots
+  });
+}
+
+function previewLessonRegistration() {
+  const core = window.WBLessonFormCore;
+  if (!core) return toast('수업 등록 모듈을 불러오지 못했습니다 — 새로고침해 주세요');
+  const draft = lessonInputPayload();
+  if (!session.isStaffLink && !draft.staffId) return toast('담당 선생님을 선택해 주세요');
+  const validation = core.validateLessonInput(draft);
+  if (!validation.valid) return toast(validation.errors[0].message);
+  let taskBody;
+  try { taskBody = core.buildLessonTaskBody(draft, { staffId: draft.staffId, start: draft.start || today() }); }
+  catch (error) { return toast(error.message || '입력 내용을 확인해 주세요'); }
+
+  lessonPreviewTask = taskBody;
+  lessonPreviewPayload = {
+    studentName: taskBody.studentName, grade: taskBody.grade,
+    subject: taskBody.subject, className: taskBody.className, lessonRole: taskBody.lessonRole,
+    scheduleText: taskBody.scheduleText, scheduleSlots: taskBody.scheduleSlots,
+    scheduleStatus: taskBody.scheduleStatus,
+    scheduleReviewReason: validation.warnings.map(item => item.message).join(' / '),
+    start: taskBody.start || today(), materials: taskBody.materials,
+    onlineProgram: taskBody.onlineProgram, homework: taskBody.homework,
+    studentTraits: taskBody.studentTraits, goal: taskBody.goal, parentRequest: taskBody.parentRequest
+  };
+
+  const review = taskBody.scheduleStatus === 'needs_review';
+  const teacher = staffById(draft.staffId);
+  const previewValue = value => esc(value || '없음').replace(/\n/g, '<br>');
+  const slotSummary = taskBody.scheduleSlots.map(slot =>
+    slot.days.map(day => DOW[day]).join('·') + ' ' + slot.startTime + '–' + slot.endTime
+  ).join(' / ');
+  const assignmentIdentity = core.canonicalLessonIdentity(taskBody, { staffId: draft.staffId });
+  const existing = state.tasks.find(item =>
+    !item.deleted && item.staffId === draft.staffId &&
+    (item.id === draft._sourceTaskId || core.canonicalLessonIdentity(item, { staffId: item.staffId }) === assignmentIdentity));
+  lessonPreviewExpectedUpdatedAt = existing ? Number(existing.updatedAt || draft._sourceUpdatedAt || 0) : 0;
+  modal(existing ? '수업 정보 수정 미리보기' : '수업 등록 미리보기',
+    '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
+      '<b>담당</b> ' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
+      '<b>1. 이름 / 학년</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
+      '<b>2. 과목·반</b><br>' + previewValue([taskBody.subject, taskBody.className].filter(Boolean).join(' / ')) + '<br><br>' +
+      '<b>3. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '<br><br>' +
+      '<b>4. 교재와 현재 진도</b><br>' + previewValue(taskBody.materials) + '<br><br>' +
+      '<b>5. 온라인 프로그램</b><br>' + previewValue(taskBody.onlineProgram) + '<br><br>' +
+      '<b>6. 숙제 루틴과 수행률</b><br>' + previewValue(taskBody.homework) + '<br><br>' +
+      '<b>7. 학생 특징</b><br>' + previewValue(taskBody.studentTraits) + '<br><br>' +
+      '<b>8. 지금 목표</b><br>' + previewValue(taskBody.goal) + '<br><br>' +
+      '<b>9. 특이사항·학부모 요청</b><br>' + previewValue(taskBody.parentRequest) + '</div>' +
+    '<div class="card ' + (review ? 'lesson-review' : 'lesson-confirmed') + ' mt14"><b>' +
+      (review ? '⚠️ 시간 확인 필요' : '✅ 현황판 시간 확정') + '</b><div class="small muted">' +
+      (review ? esc(lessonPreviewPayload.scheduleReviewReason || '요일·시작·종료 확인 필요') : esc(slotSummary)) + '</div></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="lessonsave">' + (existing ? '이 내용으로 수정' : '이 내용으로 등록') + '</button>' +
+    '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="closemodal">다시 수정</button>');
+}
+
+function applyCreatedLesson(task) {
+  const index = state.tasks.findIndex(item => item.id === task.id);
+  if (index >= 0 && Number(state.tasks[index].updatedAt || 0) > Number(task.updatedAt || 0)) return false;
+  if (index < 0) state.tasks.push(task); else state.tasks[index] = task;
+  save();
+  return true;
+}
+
+async function saveLessonRegistration(button) {
+  if (lessonSubmitting || !lessonPreviewPayload) return;
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  lessonSubmitting = true;
+  if (button) button.disabled = true;
+  try {
+    const draft = currentLessonDraft();
+    const targetStaffId = session.isStaffLink ? session.staffId : draft.staffId;
+    const result = await sync.post('/lesson-create', {
+      app: SYNC_APP, auth: auth, staffId: targetStaffId,
+      sourceTaskId: draft._sourceTaskId || undefined,
+      expectedUpdatedAt: lessonPreviewExpectedUpdatedAt || undefined,
+      lesson: lessonPreviewPayload
+    });
+    applyCreatedLesson(result.task);
+    clearLessonDraft();
+    lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = 0;
+    if (!session.isStaffLink) viewStaff = targetStaffId;
+    closeModal(); go('today');
+    toast(result.idempotent || result.duplicate ? '변경 사항이 없어 기존 수업을 그대로 유지했습니다' : (result.updated ? '수업 정보를 수정했습니다' : '수업을 등록했습니다'));
+  } catch (error) {
+    toast('수업 등록 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  } finally {
+    lessonSubmitting = false;
+  }
+}
+
+let feedbackQueue = [];
+let feedbackQueueLoaded = false;
+let feedbackQueueLoading = false;
+let feedbackQueueError = '';
+let ownFeedbackQueue = [];
+let ownFeedbackQueueLoaded = false;
+let ownFeedbackQueueLoading = false;
+let ownFeedbackQueueError = '';
+
+const FEEDBACK_STATUS_LABEL = {
+  approval_waiting: ['원장 검토 대기', 'warn'],
+  content_approved_send_blocked: ['문구 승인 · 발송 차단', ''],
+  revision_requested: ['수정 요청', 'bad'],
+  cancelled: ['취소', '']
+};
+
+async function loadFeedbackQueue(force) {
+  if (!session.isAdmin || feedbackQueueLoading || (feedbackQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { feedbackQueueError = '동기화 인증이 필요합니다'; feedbackQueueLoaded = true; render(); return; }
+  feedbackQueueLoading = true; feedbackQueueError = '';
+  if (route === 'feedback') render();
+  try {
+    const result = await sync.post('/feedback-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
+    feedbackQueue = result.requests || [];
+    feedbackQueueLoaded = true;
+  } catch (error) {
+    feedbackQueueError = String(error && error.message || error);
+    feedbackQueueLoaded = true;
+  } finally {
+    feedbackQueueLoading = false;
+    if (route === 'feedback') render();
+  }
+}
+
+async function loadOwnFeedbackQueue(force) {
+  if (!session.isStaffLink || ownFeedbackQueueLoading || (ownFeedbackQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { ownFeedbackQueueError = '동기화 인증이 필요합니다'; ownFeedbackQueueLoaded = true; render(); return; }
+  ownFeedbackQueueLoading = true; ownFeedbackQueueError = '';
+  if (route === 'feedback') render();
+  try {
+    const result = await sync.post('/feedback-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
+    ownFeedbackQueue = result.requests || [];
+    ownFeedbackQueueLoaded = true;
+  } catch (error) {
+    ownFeedbackQueueError = String(error && error.message || error);
+    ownFeedbackQueueLoaded = true;
+  } finally {
+    ownFeedbackQueueLoading = false;
+    if (route === 'feedback') render();
+  }
+}
+
+function ownFeedbackCard(item) {
+  const task = state.tasks.find(row => row.id === item.taskId);
+  const status = FEEDBACK_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
+      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    '<div class="guide">' + esc(item.message || '').replace(/\n/g, '<br>') + '</div>' +
+    (item.reviewNote ? '<div class="hint mt14"><b>원장 수정 요청</b><br>' + esc(item.reviewNote) + '</div>' : '') +
+    (item.status === 'revision_requested'
+      ? '<button class="btn btn-sm btn-primary mt14" data-act="fbeditrequest" data-key="' + item.requestKey + '">문구 수정 후 다시 요청</button>'
+      : '') + '</div>';
+}
+
+function viewOwnFeedbackRequests() {
+  if (!ownFeedbackQueueLoaded && !ownFeedbackQueueLoading) setTimeout(() => loadOwnFeedbackQueue(false), 0);
+  let h = '<div class="card"><div class="card-title">💬 내 피드백 검토 상태</div>' +
+    '<div class="card-sub">원장 검토 결과와 수정 요청을 확인합니다. 아직 보호자 발송 기능은 연결되지 않았습니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="fbownrefresh">새로고침</button></div>';
+  if (ownFeedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 상태를 불러오는 중입니다.</div></div>';
+  if (ownFeedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownFeedbackQueueError) + '</div></div>';
+  if (!ownFeedbackQueue.length) return h + '<div class="card"><div class="empty"><b>💬</b>아직 요청한 피드백 문구가 없습니다.</div></div>';
+  return h + ownFeedbackQueue.map(ownFeedbackCard).join('');
+}
+
+function feedbackQueueCard(item) {
+  const task = state.tasks.find(row => row.id === item.taskId);
+  const staff = staffById(item.owner);
+  const status = FEEDBACK_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
+      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc((staff && staff.name) || item.owner) + ' 선생님 · ' + esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    '<div class="guide">' + esc(item.message || '').replace(/\n/g, '<br>') + '</div>' +
+    (item.reviewNote ? '<div class="hint mt14">수정 요청: ' + esc(item.reviewNote) + '</div>' : '') +
+    (item.status === 'approval_waiting'
+      ? '<div class="row wraprow mt14">' +
+          '<button class="btn btn-sm btn-primary" data-act="fbreviewapprove" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">문구 승인(발송 아님)</button>' +
+          '<button class="btn btn-sm btn-warn" data-act="fbreviewrevise" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">수정 요청</button></div>'
+      : '') + '</div>';
+}
+
+function viewFeedbackReview() {
+  if (session.isStaffLink) return viewOwnFeedbackRequests();
+  if (!session.isAdmin) return viewToday();
+  if (!feedbackQueueLoaded && !feedbackQueueLoading) setTimeout(() => loadFeedbackQueue(false), 0);
+  let h = '<div class="card lesson-review"><div class="card-title">💬 학부모 피드백 문구 검토</div>' +
+    '<div class="card-sub"><b>보호자 미연결 · 실제 발송 차단</b><br>여기서 승인하는 것은 문구뿐이며 솔라피·카카오톡 발송은 일어나지 않습니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="fbrefresh">새로고침</button></div>';
+  if (feedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
+  if (feedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackQueueError) + '</div></div>';
+  if (!feedbackQueue.length) return h + '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
+  const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, cancelled: 3 };
+  return h + feedbackQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
+    .map(feedbackQueueCard).join('');
+}
+
+async function submitFeedbackForReview(button) {
+  if (!fbCtx) return;
+  const message = (($('#mText') || {}).value || '').trim();
+  if (!message) return toast('피드백 문구를 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/feedback-request', {
+      app: SYNC_APP, auth: auth, taskId: fbCtx.id,
+      feedbackDate: fbCtx.date, feedbackType: 'class_feedback', templateVersion: 'v1',
+      message: message
+    });
+    feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false;
+    const status = result.request && result.request.status;
+    toast(status === 'revision_requested'
+      ? '원장 수정 요청을 확인해 문구를 바꿔 주세요'
+      : (result.idempotent ? '같은 문구가 이미 원장 검토 대기 중입니다' : '원장 검토 요청을 등록했습니다'));
+    closeModal();
+  } catch (error) {
+    toast('검토 요청 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function reviewFeedbackRequest(action, key, revision) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const body = { app: SYNC_APP, auth: auth, action: action, requestKey: key, revision: Number(revision) };
+  if (action === 'request_revision') {
+    const note = prompt('선생님에게 전달할 수정 요청을 적어 주세요');
+    if (note === null) return;
+    body.note = note.trim();
+  }
+  try {
+    const result = await sync.post('/feedback-review', body);
+    const index = feedbackQueue.findIndex(item => item.requestKey === key);
+    if (index >= 0) feedbackQueue[index] = result.request;
+    render();
+    toast(action === 'approve_content' ? '문구만 승인했습니다 · 실제 발송은 차단되어 있습니다' : '수정 요청을 남겼습니다');
+  } catch (error) {
+    toast('피드백 검토 실패 — ' + (error.message || error));
+    loadFeedbackQueue(true);
+  }
 }
 
 /* ── 주간 플래너 ── */
@@ -2435,7 +2833,9 @@ function manageTasks(staffId) {
           ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') +
           originTags(t) + '</div>' +
           '<div class="row" style="gap:6px;margin-top:8px">' +
-            '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>' +
+            (canEditLessonTask(t)
+              ? '<button class="btn btn-sm btn-primary" data-act="lessonedit" data-id="' + t.id + '">수업 정보 수정</button>'
+              : '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>') +
             '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button>' +
           '</div></div></div>').join('')
       : '<div class="empty">지시된 업무가 없습니다.</div>');
@@ -3078,15 +3478,27 @@ document.addEventListener('click', ev => {
       const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
       if (!fbCtx.focus && !fbCtx.plus.length && fbCtx.minus == null) return toast('보기를 하나 이상 골라주세요');
       const gen = buildComment(fbCtx, t.title + '|' + fbCtx.date);
-      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, fbCtx.date, gen), true);
+      showFeedbackText(t, fbCtx.date, feedbackText(t, fbCtx.date, gen));
       break;
     }
+    case 'feedbacksubmit': submitFeedbackForReview(el); break;
+    case 'fbrefresh': feedbackQueueLoaded = false; loadFeedbackQueue(true); break;
+    case 'fbownrefresh': ownFeedbackQueueLoaded = false; loadOwnFeedbackQueue(true); break;
+    case 'fbeditrequest': {
+      const item = ownFeedbackQueue.find(row => row.requestKey === el.dataset.key);
+      const t = item && state.tasks.find(row => row.id === item.taskId);
+      if (!item || !t) return toast('수정할 수업 정보를 찾지 못했습니다');
+      showFeedbackText(t, item.feedbackDate, item.message || feedbackText(t, item.feedbackDate));
+      break;
+    }
+    case 'fbreviewapprove': reviewFeedbackRequest('approve_content', el.dataset.key, el.dataset.rev); break;
+    case 'fbreviewrevise': reviewFeedbackRequest('request_revision', el.dataset.key, el.dataset.rev); break;
     case 'fbskip': {
       if (!fbCtx) break;
       const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
       const c = getCheck(fbCtx.id, fbCtx.date);
       if (!c || !c.note) toast('메모에 한 줄 적으면 코멘트로 들어갑니다 (+잘한점 / -보완점 / 숙제…)');
-      showText('학부모 피드백 문구 — 확인·수정 후 복사하세요', feedbackText(t, fbCtx.date), true);
+      showFeedbackText(t, fbCtx.date, feedbackText(t, fbCtx.date));
       break;
     }
     case 'toggleowner': {
@@ -3146,6 +3558,33 @@ document.addEventListener('click', ev => {
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
     case 'newtask': editTaskModal(null); break;
+    case 'lessonday': {
+      const draft = currentLessonDraft(), slot = draft.scheduleSlots[Number(el.dataset.i)];
+      if (!slot) break;
+      const day = Number(el.dataset.d), at = slot.days.indexOf(day);
+      if (at < 0) slot.days.push(day); else slot.days.splice(at, 1);
+      slot.days.sort((a, b) => a - b); persistLessonDraft(); render();
+      break;
+    }
+    case 'lessonslotadd':
+      currentLessonDraft().scheduleSlots.push({ days: [], startTime: '', endTime: '' }); persistLessonDraft(); render(); break;
+    case 'lessonslotdel': {
+      const draft = currentLessonDraft();
+      draft.scheduleSlots.splice(Number(el.dataset.i), 1);
+      if (!draft.scheduleSlots.length) draft.scheduleSlots.push({ days: [], startTime: '', endTime: '' });
+      persistLessonDraft(); render(); break;
+    }
+    case 'lessonedit': {
+      const t = task();
+      if (!canEditLessonTask(t)) return toast('이 수업 정보는 수정할 수 없습니다');
+      lessonDraft = lessonDraftFromTask(t);
+      lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = Number(t.updatedAt || 0);
+      persistLessonDraft(); closeModal(); go('lesson');
+      toast('수업 정보를 불러왔습니다 — 수정 후 미리보기를 확인해 주세요');
+      break;
+    }
+    case 'lessonpreview': previewLessonRegistration(); break;
+    case 'lessonsave': saveLessonRegistration(el); break;
 
     /* 빠른 추가 — 한 줄로 쓰고 바로 카톡 문구까지 */
     case 'qadd': {
@@ -3385,6 +3824,26 @@ document.addEventListener('input', ev => {
   }
 });
 
+/* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */
+document.addEventListener('input', ev => {
+  const field = ev.target.closest('[data-lesson-field]');
+  if (field) {
+    currentLessonDraft()[field.dataset.lessonField] = field.value;
+    persistLessonDraft();
+    return;
+  }
+  const slotField = ev.target.closest('[data-lesson-slot]');
+  if (slotField) {
+    const slot = currentLessonDraft().scheduleSlots[Number(slotField.dataset.i)];
+    if (slot) { slot[slotField.dataset.lessonSlot] = slotField.value; persistLessonDraft(); }
+  }
+});
+
+document.addEventListener('change', ev => {
+  const field = ev.target.closest('[data-lesson-field]');
+  if (field) { currentLessonDraft()[field.dataset.lessonField] = field.value; persistLessonDraft(); }
+});
+
 /* 출퇴근 시각 직접 수정 — time input은 값이 확정될 때(change) 저장한다 */
 document.addEventListener('change', ev => {
   const el = ev.target.closest('[data-act="attedit-in"],[data-act="attedit-out"]');
@@ -3423,7 +3882,7 @@ load();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
-if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
+if (session.isStaffLink && !['today', 'week', 'lesson', 'feedback', 'books', 'roster'].includes(route)) route = 'today';
 render();
 
 let syncLoopStarted = false;
@@ -3458,7 +3917,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-03.4';
+const APP_VER = '2026-08-04.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
