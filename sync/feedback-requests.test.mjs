@@ -27,6 +27,10 @@ class FakeDB {
   addToken(token, staffId) { this.tokens.set(token, { staff_id: staffId }); }
   async first(sql, args) {
     if (sql.startsWith('SELECT staff_id FROM tokens')) return this.tokens.get(args[2]) || null;
+    if (sql.startsWith('SELECT data FROM staff')) {
+      const active = [...this.tokens.values()].some(row => row.staff_id === args[1]);
+      return active ? { data: JSON.stringify({ deleted: false }) } : null;
+    }
     if (sql.startsWith('SELECT owner, data FROM tasks')) return this.tasks.get(args[1]) || null;
     if (sql.includes('FROM feedback_requests WHERE app=? AND task_id=?')) {
       return [...this.feedback.values()].find(row => row.app === args[0] && row.task_id === args[1] &&

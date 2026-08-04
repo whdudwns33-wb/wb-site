@@ -97,9 +97,9 @@ test('report send UI contains no embedded phone number or secret and versions re
   const send = functionSource('submitDirectorReport');
   const addedSurface = summary + payload + send;
   assert.doesNotMatch(addedSurface, /01[016789][ -]?\d{3,4}[ -]?\d{4}|SOLAPI_(?:API_)?(?:KEY|SECRET)|TASK_ADMIN_SECRET/);
-  assert.equal(version.v, '2026-08-04.2');
-  assert.match(html, /const APP_VER = '2026-08-04\.2'/);
-  assert.match(consultHtml, /const APP_VER = '2026-08-04\.2'/);
-  assert.match(html, /lesson-form-core\.js\?v=2026-08-04\.2/);
-  assert.match(html, /schedule-board-core\.js\?v=2026-08-04\.2/);
+  assert.equal(version.v, '2026-08-04.3');
+  assert.match(html, /const APP_VER = '2026-08-04\.3'/);
+  assert.match(consultHtml, /const APP_VER = '2026-08-04\.3'/);
+  assert.match(html, /lesson-form-core\.js\?v=2026-08-04\.3/);
+  assert.match(html, /schedule-board-core\.js\?v=2026-08-04\.3/);
 });

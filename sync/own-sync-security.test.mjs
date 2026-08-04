@@ -30,6 +30,9 @@ class FakeDB {
     if (sql.startsWith('SELECT staff_id FROM tokens')) {
       return args[2] === 'teacher-token' ? { staff_id: 'teacher-1' } : null;
     }
+    if (sql.startsWith('SELECT data FROM staff')) {
+      return args[1] === 'teacher-1' ? { data: JSON.stringify({ deleted: false }) } : null;
+    }
     throw new Error('Unhandled first SQL: ' + sql);
   }
   async all(sql, args) {

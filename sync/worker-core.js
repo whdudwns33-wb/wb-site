@@ -37,6 +37,8 @@ const TOKEN_HASH_PREFIX = 'sha256:';
 const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
 const HANDOFF_TTL_MS = 10 * 60 * 1000;
+const MAX_PENDING_BOOTSTRAPS = 3;
+const MAX_ACTIVE_PERSON_SESSIONS = 3;
 const SAFE_BOOTSTRAP_CODE = /^[a-f0-9]{48}$/i;
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
@@ -102,7 +104,7 @@ async function resolveAuth(env, app, auth) {
       'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
       'AND (token=? OR created_at>=?) LIMIT 1'
     ).bind(app, tokenHash, token, token, createdAfter).first();
-    if (!row || row.staff_id !== id) return null;
+    if (!row || row.staff_id !== id || !await activeStaff(env, app, id)) return null;
     // 개인 링크는 manager 플래그와 무관하게 항상 본인 범위다. 전체 관리는 원장 로그인만 사용한다.
     return { scope: 'own', id: id };
   }
@@ -347,12 +349,23 @@ async function issueBootstrap(env, app, staffId, ttlMs) {
   const expiresAt = createdAt + ttlMs;
   await env.DB.batch([
     env.DB.prepare(
-      'UPDATE bootstrap_codes SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL'
-    ).bind(app, staffId),
+      'UPDATE bootstrap_codes SET revoked=1 ' +
+      'WHERE app=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at<?'
+    ).bind(app, staffId, createdAt),
     env.DB.prepare(
       'INSERT INTO bootstrap_codes(app,code_hash,staff_id,created_at,expires_at,consumed_at,revoked) ' +
       'VALUES(?,?,?,?,?,NULL,0)'
-    ).bind(app, codeHash, staffId, createdAt, expiresAt)
+    ).bind(app, codeHash, staffId, createdAt, expiresAt),
+    // 최근 미사용 링크를 소수만 함께 유지한다. 새 링크 하나가 기존 전달분을 즉시 끊지는 않되,
+    // 무제한으로 살아 있는 연결 링크가 쌓이는 것도 막는다. 방금 발급한 링크는 항상 보존한다.
+    env.DB.prepare(
+      'UPDATE bootstrap_codes SET revoked=1 ' +
+      'WHERE app=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND code_hash<>? ' +
+      'AND code_hash NOT IN (' +
+      'SELECT code_hash FROM bootstrap_codes ' +
+      'WHERE app=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND code_hash<>? AND expires_at>=? ' +
+      'ORDER BY created_at DESC, code_hash DESC LIMIT ' + (MAX_PENDING_BOOTSTRAPS - 1) + ')'
+    ).bind(app, staffId, codeHash, app, staffId, codeHash, createdAt)
   ]);
   return { code, expiresAt };
 }
@@ -374,9 +387,11 @@ async function handleExchange(env, app, body, origin) {
   const staffId = String(body.staffId || '');
   const code = String(body.code || '');
   if (!SAFE_ID.test(staffId) || !SAFE_BOOTSTRAP_CODE.test(code)) {
-    return json({ ok: false, error: '올바른 1회용 코드가 필요합니다' }, 400, origin);
+    return json({ ok: false, code: 'LINK_INVALID', error: '올바른 개인 링크가 필요합니다' }, 400, origin);
   }
-  if (!await activeStaff(env, app, staffId)) return json({ ok: false, error: '접근할 수 없는 대상입니다' }, 401, origin);
+  if (!await activeStaff(env, app, staffId)) {
+    return json({ ok: false, code: 'LINK_INVALID', error: '접근할 수 없는 개인 링크입니다' }, 401, origin);
+  }
 
   const codeHash = tokenStorageValue(await sha256Hex(code));
   const consumedAt = Date.now();
@@ -391,29 +406,54 @@ async function handleExchange(env, app, body, origin) {
       'WHERE app=? AND code_hash=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=?'
     ).bind(consumeMarker, app, codeHash, staffId, consumedAt),
     env.DB.prepare(
-      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND EXISTS (' +
-      'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
-    ).bind(app, staffId, app, codeHash, staffId, consumeMarker),
-    env.DB.prepare(
       'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
       'SELECT ?,?,?,?,0 WHERE EXISTS (' +
       'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
     ).bind(app, storedHash, staffId, consumedAt, app, codeHash, staffId, consumeMarker),
     env.DB.prepare(
+      'UPDATE tokens SET revoked=1 ' +
+      'WHERE app=? AND staff_id=? AND revoked=0 AND created_at<? AND EXISTS (' +
+      'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
+    ).bind(app, staffId, consumedAt - TOKEN_TTL_MS, app, codeHash, staffId, consumeMarker),
+    // 새 기기를 포함해 최근 세 세션만 유지한다. 새 연결 자체는 반드시 남기고,
+    // 나머지 중 생성 시각이 가장 최근인 두 세션만 보존한다.
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 ' +
+      'WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
+      'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
+      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_PERSON_SESSIONS - 1) + ') AND EXISTS (' +
+      'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
+    ).bind(app, staffId, storedHash, app, staffId, storedHash, app, codeHash, staffId, consumeMarker),
+    env.DB.prepare(
       'UPDATE bootstrap_codes SET consumed_at=? WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?'
     ).bind(consumedAt, app, codeHash, staffId, consumeMarker)
   ]);
   const changed = index => Number(results[index] && results[index].meta && results[index].meta.changes || 0);
-  if (changed(0) !== 1 || changed(2) !== 1 || changed(3) !== 1) {
-    return json({ ok: false, error: '만료되었거나 이미 사용한 링크입니다' }, 410, origin);
+  if (changed(0) !== 1 || changed(1) !== 1 || changed(4) !== 1) {
+    const row = await env.DB.prepare(
+      'SELECT consumed_at,revoked,expires_at FROM bootstrap_codes ' +
+      'WHERE app=? AND code_hash=? AND staff_id=? LIMIT 1'
+    ).bind(app, codeHash, staffId).first();
+    if (!row) return json({ ok: false, code: 'LINK_INVALID', error: '올바르지 않은 개인 링크입니다' }, 410, origin);
+    if (row.consumed_at !== null && row.consumed_at !== undefined) {
+      return json({ ok: false, code: 'LINK_USED', error: '이미 사용한 개인 링크입니다' }, 410, origin);
+    }
+    if (Number(row.expires_at) < consumedAt) {
+      return json({ ok: false, code: 'LINK_EXPIRED', error: '사용 시간이 지난 개인 링크입니다' }, 410, origin);
+    }
+    if (Number(row.revoked)) {
+      return json({ ok: false, code: 'LINK_REPLACED', error: '더 최근에 발급된 링크를 사용해 주세요' }, 410, origin);
+    }
+    return json({ ok: false, code: 'LINK_USED', error: '다른 화면에서 먼저 사용된 개인 링크입니다' }, 409, origin);
   }
-  return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS }, 200, origin);
+  return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS,
+    activeSessionLimit: MAX_ACTIVE_PERSON_SESSIONS }, 200, origin);
 }
 
 async function handleHandoff(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth || auth.scope !== 'own' || !SAFE_ID.test(auth.id)) {
-    return json({ ok: false, error: '개인 인증이 필요합니다' }, 401, origin);
+    return json({ ok: false, code: 'AUTH_REQUIRED', error: '개인 인증이 필요합니다' }, 401, origin);
   }
   const issued = await issueBootstrap(env, app, auth.id, HANDOFF_TTL_MS);
   return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);

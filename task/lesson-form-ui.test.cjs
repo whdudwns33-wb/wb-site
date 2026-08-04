@@ -51,5 +51,5 @@ test('feedback workflow asks for director review and never promises delivery', (
 });
 
 test('new lesson form core is loaded before the app script', () => {
-  assert.match(html, /<script src="\.\/lesson-form-core\.js\?v=2026-08-04\.2"><\/script>/);
+  assert.match(html, /<script src="\.\/lesson-form-core\.js\?v=2026-08-04\.3"><\/script>/);
 });
