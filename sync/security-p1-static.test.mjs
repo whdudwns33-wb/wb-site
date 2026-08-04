@@ -10,6 +10,7 @@ test('personal auth is always owner scoped', () => {
   assert.match(worker, /return \{ scope: 'own', id: id \};/);
   assert.doesNotMatch(worker, /app === 'task' \? \{ scope: 'all'/);
 });
+  assert.match(worker, /!await activeStaff\(env, app, id\)/);
 
 test('new bearer tokens are hashed and expire', () => {
   assert.match(worker, /TOKEN_HASH_PREFIX = 'sha256:'/);
@@ -23,8 +24,17 @@ test('bootstrap exchange and handoff routes exist', () => {
     assert.ok(worker.includes(`url.pathname === '${route}'`), route);
   }
   assert.match(worker, /HANDOFF_TTL_MS = 10 \* 60 \* 1000/);
+  assert.match(worker, /MAX_PENDING_BOOTSTRAPS = 3/);
+  assert.match(worker, /MAX_ACTIVE_PERSON_SESSIONS = 3/);
   assert.match(worker, /consumed_at IS NULL/);
-  assert.match(worker, /만료되었거나 이미 사용한 링크입니다/);
+  for (const code of ['LINK_INVALID', 'LINK_USED', 'LINK_EXPIRED', 'LINK_REPLACED', 'AUTH_REQUIRED']) {
+    assert.ok(worker.includes(`code: '${code}'`), code);
+  }
+  assert.match(worker, /expires_at<\?/);
+  assert.doesNotMatch(worker,
+    /UPDATE bootstrap_codes SET revoked=1 WHERE app=\? AND staff_id=\? AND revoked=0 AND consumed_at IS NULL['"]/);
+  assert.doesNotMatch(worker,
+    /UPDATE tokens SET revoked=1 WHERE app=\? AND staff_id=\? AND revoked=0 AND EXISTS/);
 });
 
 test('staff revoke invalidates bearer and bootstrap rows', () => {
