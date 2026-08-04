@@ -273,8 +273,8 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-04.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-04.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-04.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-04.2"></script>
 <script>
 "use strict";
 
@@ -1136,9 +1136,11 @@ function viewToday() {
   if (editable) {
     h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
   }
+  if (session.isStaffLink || session.isAdmin) {
+    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>';
+  }
   if (session.isStaffLink) {
-    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
-      '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
+    h += '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
       '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.<br>' +
       '위 링크는 10분 안에 새 브라우저에서 한 번만 열 수 있습니다.<br>' +
       '새 브라우저에서 인증이 완료되면 이 브라우저의 동기화 연결은 종료됩니다.</div>';
@@ -2737,6 +2739,36 @@ function quickText(t) {
     '\n\n지시서에 올려뒀습니다. 끝나면 체크 부탁드려요.\n' + staffLink(t.staffId);
 }
 
+/** 문자 미리보기는 업무 제목·메모·학생 이름 대신 이 집계 숫자만 사용한다. */
+const DIRECTOR_REPORT_TASK_URL = 'https://whdudwns33-wb.github.io/wb-site/task/';
+
+function reportCounts(staffId, date) {
+  const list = tasksFor(staffId, date);
+  const counts = { done: 0, doing: 0, pending: 0, blocked: 0 };
+  list.forEach(t => {
+    const status = statusOf(t, date);
+    if (status === 'done') counts.done++;
+    else if (status === 'doing') counts.doing++;
+    else if (status === 'blocked') counts.blocked++;
+    else counts.pending++;
+  });
+  return {
+    done: counts.done,
+    total: list.length,
+    doing: counts.doing,
+    pending: counts.pending,
+    blocked: counts.blocked
+  };
+}
+
+function directorReportSummaryText(staffId, date) {
+  const staff = staffById(staffId);
+  const counts = reportCounts(staffId, date);
+  return '📊 원장님 문자 발송용 요약\n' + ((staff && staff.name) || '선생님') + ' 선생님\n' +
+    '완료 ' + counts.done + '/' + counts.total + '건 · 진행 ' + counts.doing + '건 · 미완료 ' +
+    counts.pending + '건 · 막힘 ' + counts.blocked + '건\n업무지시서: ' + DIRECTOR_REPORT_TASK_URL;
+}
+
 function reportText(staffId, date) {
   const s = staffById(staffId);
   const list = tasksFor(staffId, date);
@@ -2818,6 +2850,124 @@ function showText(title, text, editable) {
   modal(title,
     '<textarea class="in" rows="13" id="mText"' + (editable ? '' : ' readonly') + '>' + esc(text) + '</textarea>',
     '<button class="btn btn-primary btn-block mt14" data-act="copytext">복사하기</button>');
+}
+
+let directorReportContext = null;
+let directorReportSending = false;
+
+function flushReportInputs() {
+  clearTimeout(inputTimer);
+  document.querySelectorAll('[data-act="note"]').forEach(noteEl => {
+    const date = noteEl.dataset.date || cursor;
+    const current = getCheck(noteEl.dataset.id, date);
+    if (String((current && current.note) || '') !== noteEl.value) {
+      setCheck(noteEl.dataset.id, date, { note: noteEl.value });
+    }
+  });
+  document.querySelectorAll('[data-act="cntset"]').forEach(cntEl => {
+    const date = cntEl.dataset.date || cursor;
+    const value = Math.max(0, Number(cntEl.value) || 0);
+    const current = getCheck(cntEl.dataset.id, date);
+    if (Number((current && current.count) || 0) !== value) {
+      const task = state.tasks.find(t => t.id === cntEl.dataset.id);
+      setCheck(cntEl.dataset.id, date, { count: value, blocked: false });
+      if (task) syncAuto(task, date);
+    }
+  });
+}
+
+function directorReportRequestPayload(context) {
+  const payload = {
+    app: SYNC_APP,
+    auth: sync.auth(),
+    reportDate: context.date
+  };
+  // 개인 링크는 staffId를 보내지 않는다. 서버가 개인 인증의 본인 id로 고정한다.
+  if (session.isAdmin) payload.staffId = context.staffId;
+  return payload;
+}
+
+async function settleDirectorReportSync() {
+  clearTimeout(sync.timer);
+  sync.timer = null;
+  for (let attempt = 0; sync.busy && attempt < 60; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  if (sync.busy) throw new Error('SYNC_BUSY');
+  await sync.run();
+  if (sync.dirty || sync.err) throw new Error('SYNC_FAILED');
+}
+
+function directorReportErrorText(error) {
+  const raw = String(error && error.message || error || '');
+  if (/SYNC_BUSY|SYNC_FAILED|동기화|인증/i.test(raw)) {
+    return '최신 수행 상태를 동기화하지 못해 문자 요청을 접수하지 않았습니다. 연결을 확인한 뒤 다시 시도해 주세요.';
+  }
+  if (/설정|구성|NOT_CONFIGURED|secret|api.?key|발신번호|수신번호/i.test(raw)) {
+    return '문자 발송 설정이 아직 완료되지 않았습니다. 원장님 설정을 확인해 주세요.';
+  }
+  if (/중복|이미.*접수/i.test(raw)) return '같은 수행 보고가 이미 접수됨';
+  return '문자 발송 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+}
+
+function showReportText(staffId, date) {
+  const canSend = date === today() && (session.isStaffLink || session.isAdmin);
+  directorReportContext = { staffId: staffId, date: date };
+  modal(label(date) + ' 수행 보고',
+    '<div class="fl mb8">상세 내부 보고</div>' +
+    '<textarea class="in" rows="13" id="mText" readonly>' + esc(reportText(staffId, date)) + '</textarea>' +
+    (canSend
+      ? '<hr class="sep"><div class="fl mb8">원장님 문자 발송용 요약</div>' +
+        '<div class="guide" id="directorReportSummary">' + esc(directorReportSummaryText(staffId, date)).replace(/\n/g, '<br>') + '</div>' +
+        '<div class="hint mt14">업무 제목·메모·학생 이름은 문자 요청에 포함되지 않습니다.<br>' +
+        '등록된 원장님 번호로만 요청하며 번호는 이 화면에 표시하지 않습니다.</div>'
+      : '<div class="hint mt14">과거 날짜는 상세 내부 보고 복사만 할 수 있습니다.</div>'),
+    '<button class="btn btn-ghost btn-block mt14" data-act="copytext">상세 보고 복사하기</button>' +
+    (canSend
+      ? '<button class="btn btn-primary btn-block mt8" data-act="directorreportsend">원장님께 요약 문자 접수</button>'
+      : ''));
+}
+
+function openReportText() {
+  flushReportInputs();
+  const staff = currentStaff();
+  if (!staff) return toast('보고할 선생님을 찾지 못했습니다');
+  showReportText(staff.id, cursor);
+}
+
+async function submitDirectorReport(button) {
+  const context = directorReportContext;
+  if (!context || context.date !== today()) return toast('오늘 수행 보고만 문자로 접수할 수 있습니다');
+  if (session.isStaffLink && context.staffId !== session.staffId) return toast('본인 수행 보고만 접수할 수 있습니다');
+  if (directorReportSending) return;
+  const auth = sync.auth();
+  if (!auth) return toast(session.isAdmin ? '원장 동기화 인증이 필요합니다' : '개인 링크 인증이 필요합니다');
+  if (!confirm('원장님께 오늘 수행 보고 요약 문자 1건을 접수할까요?\n문자 비용이 발생할 수 있습니다.')) return;
+
+  directorReportSending = true;
+  if (button) { button.disabled = true; button.textContent = '최신 상태 확인 중…'; }
+  try {
+    flushReportInputs();
+    await settleDirectorReportSync();
+    if (button) button.textContent = '문자 요청 접수 중…';
+    const result = await sync.post('/director-report-send', directorReportRequestPayload(context));
+    const sendStatus = String(result && result.send && result.send.status || 'unknown');
+    if (sendStatus === 'accepted') {
+      toast('원장님 문자 발송 요청이 접수됨');
+      closeModal();
+    } else {
+      toast('결과 확인 필요 — 다시 누르지 말고 원장 발송 내역을 확인해 주세요');
+      if (button) {
+        button.disabled = true;
+        button.textContent = '결과 확인 필요';
+      }
+    }
+  } catch (error) {
+    toast(directorReportErrorText(error));
+    if (button) { button.disabled = false; button.textContent = '원장님께 요약 문자 접수'; }
+  } finally {
+    directorReportSending = false;
+  }
 }
 
 function manageTasks(staffId) {
@@ -3553,7 +3703,8 @@ document.addEventListener('click', ev => {
         .then(() => { showText('카카오톡 지시서 문구', orderText(id, cursor)); clearLinkCode(id); })
         .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
       break;
-    case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
+    case 'report': openReportText(); break;
+    case 'directorreportsend': submitDirectorReport(el); break;
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
@@ -3917,7 +4068,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-04.1';
+const APP_VER = '2026-08-04.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

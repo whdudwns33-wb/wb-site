@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
+const directorSendSource = fs.readFileSync(new URL('./director-report-send.js', import.meta.url), 'utf8');
 const worker = (await import(new URL('./worker-core.js', import.meta.url))).default;
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/010_feedback_requests.sql', import.meta.url), 'utf8');
@@ -132,9 +133,15 @@ test('schema and migration are additive and restrict states', () => {
   }
 });
 
-test('worker contains no external delivery integration or recipient fields', () => {
-  assert.doesNotMatch(source, /api\.solapi\.com|SOLAPI_[A-Z_]+|templateId|phoneNumber|recipientPhone/i);
-  assert.doesNotMatch(source, /status\s*=\s*['"](?:sending|sent)['"]/i);
+test('parent feedback approval remains isolated from external delivery and recipient fields', () => {
+  const start = source.indexOf('학부모 피드백 문구 검토');
+  const end = source.indexOf('인강 커리큘럼 자동 가져오기');
+  const feedbackSource = source.slice(start, end);
+  assert.doesNotMatch(feedbackSource, /api\.solapi\.com|SOLAPI_[A-Z_]+|templateId|phoneNumber|recipientPhone/i);
+  assert.doesNotMatch(feedbackSource, /status\s*=\s*['"](?:sending|sent)['"]/i);
+  assert.doesNotMatch(source, /https:\/\/api\.solapi\.com/);
+  assert.match(source, /from '.\/director-report-send\.js'/);
+  assert.match(directorSendSource, /https:\/\/api\.solapi\.com\/messages\/v4\/send-many\/detail/);
 });
 
 test('authentication and cross-owner task access are enforced', async () => {
