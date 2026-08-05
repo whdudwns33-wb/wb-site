@@ -19,7 +19,7 @@
  *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
  *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토(외부 전달 차단)
  *   POST /director-report-preflight { app, auth(ops_once), reportDate, staffId } → Solapi 읽기 전용 점검
- *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
+ *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 알림톡(ATA)
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증

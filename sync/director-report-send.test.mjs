@@ -6,6 +6,7 @@ import test from 'node:test';
 import worker from './worker-core.js';
 import {
   buildDirectorReportText,
+  buildDirectorReportVariables,
   buildSolapiAuthorization,
   directorReportConstants,
   kstDateFromMs,
@@ -120,6 +121,8 @@ const fullConfig = {
   SOLAPI_API_KEY: 'test-api-key',
   SOLAPI_API_SECRET: 'test-api-secret',
   SOLAPI_SENDER_NUMBER: '0212345678',
+  SOLAPI_KAKAO_PF_ID: 'KA01PF260430020001571iXS2JSJv0xA',
+  SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID: 'KA01TP260805000000001directorReport',
   SOLAPI_TEST_RECIPIENT_PHONE: '01012345678'
 };
 
@@ -273,7 +276,7 @@ test('every send gate and secret is required and missing configuration performs 
   }
 });
 
-test('successful request sends one server-built LMS to the fixed secret slot and reports accepted as 접수', async () => {
+test('successful request sends one server-built ATA with SMS fallback disabled', async () => {
   const db = new FakeDB();
   db.addStaff('teacher-1', '테스트교사');
   db.addToken('person-token', 'teacher-1');
@@ -295,14 +298,19 @@ test('successful request sends one server-built LMS to the fixed secret slot and
   assert.match(captured.options.headers.Authorization, /^HMAC-SHA256 apiKey=test-api-key, date=.+, salt=.+, signature=[a-f0-9]{64}$/);
   assert.equal(captured.body.messages.length, 1);
   assert.equal(captured.body.messages[0].to, fullConfig.SOLAPI_TEST_RECIPIENT_PHONE);
-  assert.equal(captured.body.messages[0].from, fullConfig.SOLAPI_SENDER_NUMBER);
-  assert.equal(captured.body.messages[0].type, 'LMS');
+  assert.equal(captured.body.messages[0].type, 'ATA');
   assert.equal(captured.body.messages[0].autoTypeDetect, false);
+  assert.equal(captured.body.messages[0].kakaoOptions.pfId, fullConfig.SOLAPI_KAKAO_PF_ID);
+  assert.equal(captured.body.messages[0].kakaoOptions.templateId, fullConfig.SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID);
+  assert.equal(captured.body.messages[0].kakaoOptions.disableSms, true);
+  assert.deepEqual(captured.body.messages[0].kakaoOptions.variables,
+    buildDirectorReportVariables(TODAY, '테스트교사', result.body.summary));
+  assert.equal(Object.hasOwn(captured.body.messages[0], 'from'), false);
+  assert.equal(Object.hasOwn(captured.body.messages[0], 'text'), false);
   assert.equal(captured.body.strict, true);
   assert.equal(captured.body.allowDuplicates, false);
   assert.equal(captured.body.showMessageList, true);
-  assert.match(captured.body.messages[0].text, /담당: 테스트교사/);
-  assert.doesNotMatch(captured.body.messages[0].text, /비공개 업무 제목|학생비공개|비공개 메모/);
+  assert.doesNotMatch(JSON.stringify(captured.body.messages[0]), /비공개 업무 제목|학생비공개|비공개 메모/);
 
   const ledger = [...db.sends.values()][0];
   const stored = JSON.stringify(ledger);

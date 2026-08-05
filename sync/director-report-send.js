@@ -229,13 +229,33 @@ function normalizedDigits(value) {
 }
 
 function solapiBaseConfiguration(env) {
-  if (!env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER) return null;
+  if (!env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER ||
+      !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID) return null;
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   if (!/^\d{8,12}$/.test(sender)) return null;
+  const pfId = String(env.SOLAPI_KAKAO_PF_ID).trim();
+  const templateId = String(env.SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID).trim();
+  if (!/^KA01PF[A-Za-z0-9_-]{8,}$/.test(pfId) ||
+      !/^KA01TP[A-Za-z0-9_-]{8,}$/.test(templateId)) return null;
   return {
     apiKey: String(env.SOLAPI_API_KEY).trim(),
     apiSecret: String(env.SOLAPI_API_SECRET).trim(),
-    sender
+    sender,
+    pfId,
+    templateId
+  };
+}
+
+export function buildDirectorReportVariables(reportDate, staffName, summary) {
+  return {
+    '#{staff_name}': String(staffName),
+    '#{report_date}': String(reportDate),
+    '#{total_count}': String(summary.total),
+    '#{done_count}': String(summary.done),
+    '#{doing_count}': String(summary.doing),
+    '#{todo_count}': String(summary.todo),
+    '#{blocked_count}': String(summary.blocked),
+    '#{completion_rate}': String(summary.pct) + '%'
   };
 }
 
@@ -494,9 +514,7 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
     return json({ ok: false, code: 'REPORT_DATA_INVALID', error: '오늘 수행 현황을 안전하게 집계하지 못했습니다' }, 409, origin);
   }
   const reportText = buildDirectorReportText(reportDate, staff.name, summary);
-  if (new TextEncoder().encode(reportText).byteLength > 2000) {
-    return json({ ok: false, code: 'REPORT_TOO_LONG', error: '수행 보고 문자 길이를 확인해 주세요' }, 413, origin);
-  }
+  const templateVariables = buildDirectorReportVariables(reportDate, staff.name, summary);
 
   const messageHash = await sha256Hex(reportText);
   const idempotencyKey = auth.opsOnce
@@ -558,10 +576,14 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
       body: JSON.stringify({
         messages: [{
           to: config.recipient,
-          from: config.sender,
-          text: reportText,
-          type: 'LMS',
+          type: 'ATA',
           autoTypeDetect: false,
+          kakaoOptions: {
+            pfId: config.pfId,
+            templateId: config.templateId,
+            variables: templateVariables,
+            disableSms: true
+          },
           customFields: { wbSendId: sendId }
         }],
         strict: true,

@@ -109,7 +109,7 @@ test('dashboard is admin-only, mobile responsive, and keeps multi-teacher tasks 
 });
 
 test('task page and deployment version stay aligned', () => {
-  assert.equal(version.v, '2026-08-04.3');
-  assert.match(html, /const APP_VER = '2026-08-04\.3';/);
-  assert.match(html, /schedule-board-core\.js\?v=2026-08-04\.3/);
+  assert.equal(version.v, '2026-08-05.1');
+  assert.match(html, /const APP_VER = '2026-08-05\.1';/);
+  assert.match(html, /schedule-board-core\.js\?v=2026-08-05\.1/);
 });

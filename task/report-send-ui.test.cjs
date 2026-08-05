@@ -20,9 +20,9 @@ function functionSource(name) {
 }
 
 test('report modal preserves detailed copy and separates the privacy-safe director summary', () => {
-  assert.match(html, /data-act="report">오늘 수행 보고 문자 만들기/);
+  assert.match(html, /data-act="report">오늘 수행 보고 알림톡 만들기/);
   assert.match(html, /상세 내부 보고/);
-  assert.match(html, /원장님 문자 발송용 요약/);
+  assert.match(html, /원장님 알림톡 발송용 요약/);
   assert.match(html, /data-act="copytext">상세 보고 복사하기/);
   assert.match(html, /const canSend = date === today\(\) && \(session\.isStaffLink \|\| session\.isAdmin\)/);
   assert.match(html, /과거 날짜는 상세 내부 보고 복사만 할 수 있습니다/);
@@ -68,13 +68,13 @@ test('request payload lets the server derive private identity and contains no co
 test('send action requires confirmation, blocks duplicate clicks, and reports only request acceptance', () => {
   const send = functionSource('submitDirectorReport');
   assert.match(send, /if \(directorReportSending\) return/);
-  assert.match(send, /confirm\('원장님께 오늘 수행 보고 요약 문자 1건을 접수할까요/);
+  assert.match(send, /confirm\('원장님께 오늘 수행 보고 요약 알림톡 1건을 접수할까요/);
   assert.match(send, /button\.disabled = true/);
   assert.match(send, /await settleDirectorReportSync\(\)/);
   assert.match(send, /sync\.post\('\/director-report-send', directorReportRequestPayload\(context\)\)/);
   assert.match(send, /result && result\.send && result\.send\.status/);
   assert.match(send, /sendStatus === 'accepted'/);
-  assert.match(send, /원장님 문자 발송 요청이 접수됨/);
+  assert.match(send, /원장님 알림톡 발송 요청이 접수됨/);
   assert.match(send, /결과 확인 필요 — 다시 누르지 말고 원장 발송 내역을 확인해 주세요/);
   assert.match(send, /button\.textContent = '결과 확인 필요'/);
   assert.doesNotMatch(send, /전달 완료|발송 완료|recipient|phone|message\s*:/i);
@@ -97,9 +97,9 @@ test('report send UI contains no embedded phone number or secret and versions re
   const send = functionSource('submitDirectorReport');
   const addedSurface = summary + payload + send;
   assert.doesNotMatch(addedSurface, /01[016789][ -]?\d{3,4}[ -]?\d{4}|SOLAPI_(?:API_)?(?:KEY|SECRET)|TASK_ADMIN_SECRET/);
-  assert.equal(version.v, '2026-08-04.3');
-  assert.match(html, /const APP_VER = '2026-08-04\.3'/);
-  assert.match(consultHtml, /const APP_VER = '2026-08-04\.3'/);
-  assert.match(html, /lesson-form-core\.js\?v=2026-08-04\.3/);
-  assert.match(html, /schedule-board-core\.js\?v=2026-08-04\.3/);
+  assert.equal(version.v, '2026-08-05.1');
+  assert.match(html, /const APP_VER = '2026-08-05\.1'/);
+  assert.match(consultHtml, /const APP_VER = '2026-08-05\.1'/);
+  assert.match(html, /lesson-form-core\.js\?v=2026-08-05\.1/);
+  assert.match(html, /schedule-board-core\.js\?v=2026-08-05\.1/);
 });
