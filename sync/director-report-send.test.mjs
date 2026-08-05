@@ -430,3 +430,116 @@ test('provider HTTP errors are redacted and never retried', async () => {
     assert.equal(fetches, 1);
   }
 });
+const OPS_TOKEN = 'A'.repeat(43);
+
+function opsEnv(overrides = {}) {
+  const config = {
+    token: OPS_TOKEN,
+    nonce: 'ops-once-test-1',
+    staffId: 'teacher-1',
+    reportDate: TODAY,
+    expiresAt: Date.now() + (5 * 60 * 1000),
+    ...overrides
+  };
+  return { WB_DIRECTOR_REPORT_ONESHOT: JSON.stringify(config) };
+}
+
+function opsBody(overrides = {}) {
+  return {
+    auth: { mode: 'ops_once', secret: OPS_TOKEN },
+    staffId: 'teacher-1',
+    reportDate: TODAY,
+    ...overrides
+  };
+}
+
+test('ops_once stays disabled while the global approval gate is closed', async () => {
+  const db = new FakeDB();
+  db.addStaff('teacher-1');
+  db.addTask(dailyTask('task-a'));
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const result = await call(db, opsBody(), {
+      ...fullConfig,
+      ...opsEnv(),
+      WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+    });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.code, 'TEST_SEND_DISABLED');
+  });
+  assert.equal(fetches, 0);
+  assert.equal(db.sends.size, 0);
+});
+
+test('ops_once nonce is idempotent across repeats, concurrency, and a changed summary', async () => {
+  const db = new FakeDB();
+  db.addStaff('teacher-1');
+  db.addTask(dailyTask('task-a'));
+  let fetches = 0;
+  const env = { ...fullConfig, ...opsEnv() };
+  const [first, second] = await withFetch(async () => {
+    fetches += 1;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    return acceptedResponse(fetches);
+  }, () => Promise.all([
+    call(db, opsBody(), env),
+    call(db, opsBody(), env)
+  ]));
+  assert.equal(fetches, 1);
+  assert.equal(first.body.sendId, second.body.sendId);
+  assert.equal(db.sends.size, 1);
+
+  db.addTask(dailyTask('task-added-after-first-send'));
+  const third = await withFetch(async () => {
+    fetches += 1;
+    return acceptedResponse(fetches);
+  }, () => call(db, opsBody(), env));
+  assert.equal(third.body.sendId, first.body.sendId);
+  assert.equal(fetches, 1);
+  assert.equal(db.sends.size, 1);
+});
+
+test('ops_once rejects malformed, expired, overlong, mismatched, or expanded credentials', async () => {
+  const yesterday = new Date(Date.parse(TODAY + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  const cases = [
+    { name: 'secret absent', body: opsBody(), env: {} },
+    { name: 'wrong token', body: opsBody({ auth: { mode: 'ops_once', secret: 'B'.repeat(43) } }), env: opsEnv() },
+    { name: 'short token', body: opsBody({ auth: { mode: 'ops_once', secret: 'short' } }), env: opsEnv({ token: 'short' }) },
+    { name: 'expired', body: opsBody(), env: opsEnv({ expiresAt: Date.now() - 1 }) },
+    { name: 'over ttl', body: opsBody(), env: opsEnv({ expiresAt: Date.now() + (16 * 60 * 1000) }) },
+    { name: 'wrong staff', body: opsBody({ staffId: 'teacher-2' }), env: opsEnv() },
+    { name: 'wrong date', body: opsBody({ reportDate: yesterday }), env: opsEnv() },
+    { name: 'auth extra key', body: opsBody({ auth: { mode: 'ops_once', secret: OPS_TOKEN, id: 'teacher-1' } }), env: opsEnv() },
+    { name: 'config extra key', body: opsBody(), env: opsEnv({ extra: 'forbidden' }) }
+  ];
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    for (const item of cases) {
+      const db = new FakeDB();
+      db.addStaff('teacher-1');
+      const result = await call(db, item.body, { ...fullConfig, ...item.env });
+      assert.equal(result.status, 401, item.name);
+      assert.equal(db.sends.size, 0, item.name);
+    }
+  });
+  assert.equal(fetches, 0);
+});
+
+test('ops_once credential is limited to director-report-send and cannot authorize sync', async () => {
+  const response = await worker.fetch(new Request('https://worker.example/sync', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      app: 'task',
+      auth: { mode: 'ops_once', secret: OPS_TOKEN },
+      since: 0,
+      changes: []
+    })
+  }), {
+    DB: new FakeDB(),
+    TASK_ADMIN_SECRET: 'director-secret',
+    CONSULT_ADMIN_SECRET: 'consult-secret',
+    ...opsEnv()
+  });
+  assert.equal(response.status, 401);
+});

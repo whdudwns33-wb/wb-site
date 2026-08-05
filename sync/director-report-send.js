@@ -7,6 +7,7 @@ const STAFF_DAILY_LIMIT = 2;
 const GLOBAL_DAILY_LIMIT = 30;
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const OPS_ONCE_MAX_TTL_MS = 15 * 60 * 1000;
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'reportDate', 'staffId']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|guardian)/i;
@@ -20,6 +21,43 @@ function safeEqual(a, b) {
     diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
   }
   return diff === 0;
+}
+
+export function resolveDirectorReportOpsAuth(env, app, body, now = Date.now()) {
+  if (app !== 'task' || !body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const auth = body.auth;
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) return null;
+  if (auth.mode !== 'ops_once' || typeof auth.secret !== 'string') return null;
+  const authKeys = Object.keys(auth);
+  if (authKeys.length !== 2 || authKeys.some(key => key !== 'mode' && key !== 'secret')) return null;
+
+  let config;
+  try {
+    config = JSON.parse(String(env.WB_DIRECTOR_REPORT_ONESHOT || ''));
+  } catch (error) {
+    return null;
+  }
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
+  const allowedConfigKeys = new Set(['token', 'nonce', 'staffId', 'reportDate', 'expiresAt']);
+  const configKeys = Object.keys(config);
+  if (configKeys.length !== allowedConfigKeys.size || configKeys.some(key => !allowedConfigKeys.has(key))) return null;
+
+  const token = String(config.token || '');
+  const nonce = String(config.nonce || '');
+  const staffId = String(config.staffId || '');
+  const reportDate = String(config.reportDate || '');
+  const expiresAt = Number(config.expiresAt);
+  const timestamp = Number(now);
+  if (!/^[A-Za-z0-9_-]{43,172}$/.test(token) ||
+      !SAFE_ID.test(nonce) || !SAFE_ID.test(staffId) || !isIsoDate(reportDate) ||
+      !Number.isSafeInteger(timestamp) || !Number.isSafeInteger(expiresAt) ||
+      expiresAt <= timestamp || expiresAt > timestamp + OPS_ONCE_MAX_TTL_MS ||
+      reportDate !== kstDateFromMs(timestamp) ||
+      String(body.staffId || '') !== staffId || String(body.reportDate || '') !== reportDate ||
+      !safeEqual(auth.secret, token)) {
+    return null;
+  }
+  return { scope: 'all', opsOnce: { nonce, staffId, reportDate, expiresAt } };
 }
 
 function bytesToHex(value) {
@@ -375,9 +413,9 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
   }
 
   const messageHash = await sha256Hex(reportText);
-  const idempotencyKey = await sha256Hex([
-    app, staffId, reportDate, TEST_RECIPIENT_SLOT, messageHash
-  ].join('\u001f'));
+  const idempotencyKey = auth.opsOnce
+    ? await sha256Hex(['ops_once', app, auth.opsOnce.nonce].join('\u001f'))
+    : await sha256Hex([app, staffId, reportDate, TEST_RECIPIENT_SLOT, messageHash].join('\u001f'));
   const sendId = 'drs_' + idempotencyKey.slice(0, 48);
   const now = Date.now();
   const inserted = await env.DB.prepare(
@@ -501,5 +539,6 @@ export const directorReportConstants = Object.freeze({
   SOLAPI_SEND_URL,
   TASK_APP_URL,
   STAFF_DAILY_LIMIT,
-  GLOBAL_DAILY_LIMIT
+  GLOBAL_DAILY_LIMIT,
+  OPS_ONCE_MAX_TTL_MS
 });
