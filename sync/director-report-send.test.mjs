@@ -439,6 +439,7 @@ function opsEnv(overrides = {}) {
     staffId: 'teacher-1',
     reportDate: TODAY,
     expiresAt: Date.now() + (5 * 60 * 1000),
+    purpose: 'send',
     ...overrides
   };
   return { WB_DIRECTOR_REPORT_ONESHOT: JSON.stringify(config) };
@@ -542,4 +543,138 @@ test('ops_once credential is limited to director-report-send and cannot authoriz
     ...opsEnv()
   });
   assert.equal(response.status, 401);
+});
+
+async function callDirectorPreflight(db, body, envPatch = {}) {
+  const response = await worker.fetch(new Request('https://worker.example/director-report-preflight', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ app: 'task', ...body })
+  }), {
+    DB: db,
+    TASK_ADMIN_SECRET: 'director-secret',
+    CONSULT_ADMIN_SECRET: 'consult-secret',
+    ...envPatch
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+test('director preflight verifies API auth and active sender only while the send gate is closed', async () => {
+  const db = new FakeDB();
+  let captured = null;
+  const result = await withFetch(async (url, options) => {
+    captured = { url: String(url), method: options.method };
+    return new Response(JSON.stringify([
+      { phoneNumber: fullConfig.SOLAPI_SENDER_NUMBER, status: 'ACTIVE', handleKey: 'private-handle' }
+    ]), { status: 200 });
+  }, () => callDirectorPreflight(db, opsBody(), {
+    ...fullConfig,
+    ...opsEnv({ purpose: 'preflight' }),
+    WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+  }));
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, {
+    ok: true,
+    authOk: true,
+    senderConfigured: true,
+    senderActive: true,
+    activeSenderCount: 1
+  });
+  assert.deepEqual(captured, {
+    url: directorReportConstants.SOLAPI_ACTIVE_SENDERS_URL,
+    method: 'GET'
+  });
+  assert.equal(db.sends.size, 0);
+  assert.doesNotMatch(JSON.stringify(result.body), /0212345678|private-handle|test-api/);
+});
+
+test('director preflight refuses to run with an open gate or ordinary admin auth', async () => {
+  const db = new FakeDB();
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response('[]', { status: 200 });
+  }, async () => {
+    const openGate = await callDirectorPreflight(db, opsBody(), {
+      ...fullConfig,
+      ...opsEnv({ purpose: 'preflight' })
+    });
+    assert.equal(openGate.status, 409);
+
+    const admin = await callDirectorPreflight(db, {
+      auth: adminAuth,
+      staffId: 'teacher-1',
+      reportDate: TODAY
+    }, {
+      ...fullConfig,
+      ...opsEnv({ purpose: 'preflight' }),
+      WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+    });
+    assert.equal(admin.status, 401);
+  });
+  assert.equal(fetches, 0);
+});
+
+test('director preflight returns only safe Solapi authentication diagnostics', async () => {
+  const db = new FakeDB();
+  const result = await withFetch(async () => new Response(JSON.stringify({
+    errorCode: 'SignatureDoesNotMatch',
+    errorMessage: 'private API secret and phone 01099999999'
+  }), { status: 403 }), () => callDirectorPreflight(db, opsBody(), {
+    ...fullConfig,
+    ...opsEnv({ purpose: 'preflight' }),
+    WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+  }));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, false);
+  assert.equal(result.body.authOk, false);
+  assert.equal(result.body.senderActive, null);
+  assert.equal(result.body.providerHttpStatus, 403);
+  assert.equal(result.body.providerErrorCode, 'SignatureDoesNotMatch');
+  assert.doesNotMatch(JSON.stringify(result.body), /private API secret|01099999999/);
+});
+
+test('ops_once purpose cannot cross from preflight to send or send to preflight', async () => {
+  const db = new FakeDB();
+  db.addStaff('teacher-1');
+  db.addTask(dailyTask('task-a'));
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return acceptedResponse();
+  }, async () => {
+    const blockedSend = await call(db, opsBody(), {
+      ...fullConfig,
+      ...opsEnv({ purpose: 'preflight' })
+    });
+    assert.equal(blockedSend.status, 403);
+
+    const blockedPreflight = await callDirectorPreflight(db, opsBody(), {
+      ...fullConfig,
+      ...opsEnv({ purpose: 'send' }),
+      WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+    });
+    assert.equal(blockedPreflight.status, 403);
+  });
+  assert.equal(fetches, 0);
+  assert.equal(db.sends.size, 0);
+});
+
+test('director preflight keeps provider validation errors unknown and redacted', async () => {
+  const db = new FakeDB();
+  const result = await withFetch(async () => new Response(JSON.stringify({
+    errorCode: 'ValidationError',
+    errorMessage: 'private malformed key value 01099999999'
+  }), { status: 400 }), () => callDirectorPreflight(db, opsBody(), {
+    ...fullConfig,
+    ...opsEnv({ purpose: 'preflight' }),
+    WB_ACTUAL_TEST_SEND_APPROVED: 'false'
+  }));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, false);
+  assert.equal(result.body.authOk, null);
+  assert.equal(result.body.senderActive, null);
+  assert.equal(result.body.providerHttpStatus, 400);
+  assert.equal(result.body.providerErrorCode, 'ValidationError');
+  assert.doesNotMatch(JSON.stringify(result.body), /private malformed|01099999999/);
 });
