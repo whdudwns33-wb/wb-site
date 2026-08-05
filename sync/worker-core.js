@@ -18,7 +18,8 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
  *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
  *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토(외부 전달 차단)
- *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
+ *   POST /director-report-preflight { app, auth(ops_once), reportDate, staffId } → Solapi 읽기 전용 점검
+ *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 알림톡(ATA)
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -27,7 +28,7 @@
  */
 
 import { handleLessonCreate } from './lesson-create.js';
-import { handleDirectorReportSend } from './director-report-send.js';
+import { handleDirectorReportPreflight, handleDirectorReportSend, resolveDirectorReportOpsAuth } from './director-report-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -921,8 +922,13 @@ export default {
       }
       if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
       if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
+      if (url.pathname === '/director-report-preflight') {
+        const auth = resolveDirectorReportOpsAuth(env, app, body);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleDirectorReportPreflight(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/director-report-send') {
-        const auth = await resolveAuth(env, app, body.auth);
+        const auth = await resolveAuth(env, app, body.auth) || resolveDirectorReportOpsAuth(env, app, body);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleDirectorReportSend(env, app, body, okOrigin, auth, json);
       }

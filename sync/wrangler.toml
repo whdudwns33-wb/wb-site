@@ -15,3 +15,12 @@ database_id = "여기에-D1-생성-후-나오는-id"
 # 비밀값은 이 파일에 쓰지 않는다. 아래 명령으로 따로 넣는다.
 #   npx wrangler secret put TASK_ADMIN_SECRET
 #   npx wrangler secret put CONSULT_ADMIN_SECRET
+#   npx wrangler secret put SOLAPI_API_KEY
+#   npx wrangler secret put SOLAPI_API_SECRET
+#   npx wrangler secret put SOLAPI_SENDER_NUMBER
+#   npx wrangler secret put SOLAPI_KAKAO_PF_ID
+#   npx wrangler secret put SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID
+#   npx wrangler secret put SOLAPI_TEST_RECIPIENT_PHONE
+#   npx wrangler secret put WB_SEND_MODE
+#   npx wrangler secret put WB_TEST_RECIPIENT_ID
+#   npx wrangler secret put WB_ACTUAL_TEST_SEND_APPROVED  # 평상시 false

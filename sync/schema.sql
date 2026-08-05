@@ -101,8 +101,8 @@ CREATE INDEX IF NOT EXISTS idx_feedback_requests_owner
 CREATE INDEX IF NOT EXISTS idx_feedback_requests_status
   ON feedback_requests(app, status, updated_at);
 
--- 원장 본인(TEST-SMS-001)에게만 보내는 오늘 수행 보고 테스트 발송 원장.
--- 전화번호, 문자 본문, 공급자 원본 응답은 저장하지 않는다.
+-- 원장 본인 고정 슬롯(TEST-SMS-001, legacy key)에만 보내는 오늘 수행 보고 알림톡 원장.
+-- 전화번호, 알림톡 본문, 공급자 원본 응답은 저장하지 않는다.
 CREATE TABLE IF NOT EXISTS director_report_sends (
   app                    TEXT    NOT NULL CHECK (app = 'task'),
   send_id                TEXT    NOT NULL,

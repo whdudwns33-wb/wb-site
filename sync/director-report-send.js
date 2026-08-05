@@ -2,11 +2,13 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TEST_RECIPIENT_SLOT = 'TEST-SMS-001';
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
+const SOLAPI_ACTIVE_SENDERS_URL = 'https://api.solapi.com/senderid/v1/numbers/active';
 const TASK_APP_URL = 'https://whdudwns33-wb.github.io/wb-site/task/';
 const STAFF_DAILY_LIMIT = 2;
 const GLOBAL_DAILY_LIMIT = 30;
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const OPS_ONCE_MAX_TTL_MS = 15 * 60 * 1000;
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'reportDate', 'staffId']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|guardian)/i;
@@ -20,6 +22,45 @@ function safeEqual(a, b) {
     diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
   }
   return diff === 0;
+}
+
+export function resolveDirectorReportOpsAuth(env, app, body, now = Date.now()) {
+  if (app !== 'task' || !body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const auth = body.auth;
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) return null;
+  if (auth.mode !== 'ops_once' || typeof auth.secret !== 'string') return null;
+  const authKeys = Object.keys(auth);
+  if (authKeys.length !== 2 || authKeys.some(key => key !== 'mode' && key !== 'secret')) return null;
+
+  let config;
+  try {
+    config = JSON.parse(String(env.WB_DIRECTOR_REPORT_ONESHOT || ''));
+  } catch (error) {
+    return null;
+  }
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return null;
+  const allowedConfigKeys = new Set(['token', 'nonce', 'staffId', 'reportDate', 'expiresAt', 'purpose']);
+  const configKeys = Object.keys(config);
+  if (configKeys.length !== allowedConfigKeys.size || configKeys.some(key => !allowedConfigKeys.has(key))) return null;
+
+  const token = String(config.token || '');
+  const nonce = String(config.nonce || '');
+  const staffId = String(config.staffId || '');
+  const reportDate = String(config.reportDate || '');
+  const purpose = String(config.purpose || '');
+  const expiresAt = Number(config.expiresAt);
+  const timestamp = Number(now);
+  if (!/^[A-Za-z0-9_-]{43,172}$/.test(token) ||
+      !SAFE_ID.test(nonce) || !SAFE_ID.test(staffId) || !isIsoDate(reportDate) ||
+      (purpose !== 'send' && purpose !== 'preflight') ||
+      !Number.isSafeInteger(timestamp) || !Number.isSafeInteger(expiresAt) ||
+      expiresAt <= timestamp || expiresAt > timestamp + OPS_ONCE_MAX_TTL_MS ||
+      reportDate !== kstDateFromMs(timestamp) ||
+      String(body.staffId || '') !== staffId || String(body.reportDate || '') !== reportDate ||
+      !safeEqual(auth.secret, token)) {
+    return null;
+  }
+  return { scope: 'all', opsOnce: { nonce, staffId, reportDate, expiresAt, purpose } };
 }
 
 function bytesToHex(value) {
@@ -187,23 +228,49 @@ function normalizedDigits(value) {
   return String(value || '').replace(/[\s()-]/g, '');
 }
 
+function solapiBaseConfiguration(env) {
+  if (!env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER ||
+      !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID) return null;
+  const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
+  if (!/^\d{8,12}$/.test(sender)) return null;
+  const pfId = String(env.SOLAPI_KAKAO_PF_ID).trim();
+  const templateId = String(env.SOLAPI_DIRECTOR_REPORT_TEMPLATE_ID).trim();
+  if (!/^KA01PF[A-Za-z0-9_-]{8,}$/.test(pfId) ||
+      !/^KA01TP[A-Za-z0-9_-]{8,}$/.test(templateId)) return null;
+  return {
+    apiKey: String(env.SOLAPI_API_KEY).trim(),
+    apiSecret: String(env.SOLAPI_API_SECRET).trim(),
+    sender,
+    pfId,
+    templateId
+  };
+}
+
+export function buildDirectorReportVariables(reportDate, staffName, summary) {
+  return {
+    '#{staff_name}': String(staffName),
+    '#{report_date}': String(reportDate),
+    '#{total_count}': String(summary.total),
+    '#{done_count}': String(summary.done),
+    '#{doing_count}': String(summary.doing),
+    '#{todo_count}': String(summary.todo),
+    '#{blocked_count}': String(summary.blocked),
+    '#{completion_rate}': String(summary.pct) + '%'
+  };
+}
+
 function sendConfiguration(env) {
-  if (!safeEqual(env.WB_SEND_MODE, 'test') ||
+  const base = solapiBaseConfiguration(env);
+  if (!base ||
+      !safeEqual(env.WB_SEND_MODE, 'test') ||
       !safeEqual(env.WB_TEST_RECIPIENT_ID, TEST_RECIPIENT_SLOT) ||
       !safeEqual(env.WB_ACTUAL_TEST_SEND_APPROVED, 'true') ||
-      !env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET ||
-      !env.SOLAPI_SENDER_NUMBER || !env.SOLAPI_TEST_RECIPIENT_PHONE) {
+      !env.SOLAPI_TEST_RECIPIENT_PHONE) {
     return null;
   }
-  const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   const recipient = normalizedDigits(env.SOLAPI_TEST_RECIPIENT_PHONE);
-  if (!/^\d{8,12}$/.test(sender) || !/^01[016789]\d{7,8}$/.test(recipient)) return null;
-  return {
-    apiKey: String(env.SOLAPI_API_KEY),
-    apiSecret: String(env.SOLAPI_API_SECRET),
-    sender,
-    recipient
-  };
+  if (!/^01[016789]\d{7,8}$/.test(recipient)) return null;
+  return { ...base, recipient };
 }
 
 async function activeStaff(env, app, staffId) {
@@ -239,6 +306,11 @@ function safeProviderId(value) {
 function safeProviderStatus(value) {
   const text = String(value || '');
   return /^\d{1,16}$/.test(text) ? text : null;
+}
+
+function safeProviderErrorCode(value) {
+  const text = String(value || '');
+  return /^[A-Za-z0-9_-]{1,64}$/.test(text) ? text : null;
 }
 
 function statusLabel(status) {
@@ -325,12 +397,84 @@ function responseStatusFor(sendStatus) {
   return 202;
 }
 
+export async function handleDirectorReportPreflight(env, app, body, origin, auth, json) {
+  if (app !== 'task' || !auth || !auth.opsOnce || auth.opsOnce.purpose !== 'preflight') {
+    return json({ ok: false, error: '사전점검 권한이 없습니다' }, 403, origin);
+  }
+  const shapeError = validateRequestShape(body);
+  if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
+  if (!safeEqual(env.WB_ACTUAL_TEST_SEND_APPROVED, 'false')) {
+    return json({ ok: false, code: 'PREFLIGHT_REQUIRES_CLOSED_GATE', error: '발송 게이트를 닫은 뒤 점검해 주세요' }, 409, origin);
+  }
+  const config = solapiBaseConfiguration(env);
+  if (!config) {
+    return json({ ok: false, code: 'SOLAPI_CONFIG_INCOMPLETE', error: 'Solapi 기본 설정을 확인해 주세요' }, 503, origin);
+  }
+
+  const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(SOLAPI_ACTIVE_SENDERS_URL, {
+      method: 'GET',
+      headers: { Authorization: authorization, Accept: 'application/json' },
+      signal: controller.signal
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    return json({
+      ok: false,
+      code: controller.signal.aborted ? 'SOLAPI_PREFLIGHT_TIMEOUT' : 'SOLAPI_PREFLIGHT_NETWORK',
+      error: 'Solapi 읽기 전용 점검에 실패했습니다'
+    }, 502, origin);
+  }
+  clearTimeout(timeout);
+
+  let payload;
+  try {
+    const raw = await response.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_PROVIDER_RESPONSE_BYTES) {
+      return json({ ok: false, code: 'SOLAPI_PREFLIGHT_RESPONSE_TOO_LARGE', error: 'Solapi 점검 응답을 확인해 주세요' }, 502, origin);
+    }
+    payload = raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return json({ ok: false, code: 'SOLAPI_PREFLIGHT_INVALID_RESPONSE', error: 'Solapi 점검 응답을 확인해 주세요' }, 502, origin);
+  }
+
+  if (!response.ok) {
+    return json({
+      ok: false,
+      authOk: response.status === 401 || response.status === 403 ? false : null,
+      senderActive: null,
+      providerHttpStatus: response.status,
+      providerErrorCode: safeProviderErrorCode(payload && payload.errorCode) || undefined
+    }, 200, origin);
+  }
+  if (!Array.isArray(payload)) {
+    return json({ ok: false, code: 'SOLAPI_PREFLIGHT_INVALID_RESPONSE', error: 'Solapi 점검 응답을 확인해 주세요' }, 502, origin);
+  }
+  const senderActive = payload.some(item =>
+    item && item.status === 'ACTIVE' && normalizedDigits(item.phoneNumber) === config.sender
+  );
+  return json({
+    ok: true,
+    authOk: true,
+    senderConfigured: true,
+    senderActive,
+    activeSenderCount: Math.min(payload.length, 1000)
+  }, 200, origin);
+}
+
 export async function handleDirectorReportSend(env, app, body, origin, auth, json) {
   if (app !== 'task') {
     return json({ ok: false, error: '오늘 수행 보고는 task 앱에서만 사용할 수 있습니다' }, 400, origin);
   }
   const shapeError = validateRequestShape(body);
   if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
+  if (auth && auth.opsOnce && auth.opsOnce.purpose !== 'send') {
+    return json({ ok: false, error: '발송 전용 인증이 필요합니다' }, 403, origin);
+  }
 
   let staffId;
   if (auth.scope === 'own') {
@@ -370,14 +514,12 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
     return json({ ok: false, code: 'REPORT_DATA_INVALID', error: '오늘 수행 현황을 안전하게 집계하지 못했습니다' }, 409, origin);
   }
   const reportText = buildDirectorReportText(reportDate, staff.name, summary);
-  if (new TextEncoder().encode(reportText).byteLength > 2000) {
-    return json({ ok: false, code: 'REPORT_TOO_LONG', error: '수행 보고 문자 길이를 확인해 주세요' }, 413, origin);
-  }
+  const templateVariables = buildDirectorReportVariables(reportDate, staff.name, summary);
 
   const messageHash = await sha256Hex(reportText);
-  const idempotencyKey = await sha256Hex([
-    app, staffId, reportDate, TEST_RECIPIENT_SLOT, messageHash
-  ].join('\u001f'));
+  const idempotencyKey = auth.opsOnce
+    ? await sha256Hex(['ops_once', app, auth.opsOnce.nonce].join('\u001f'))
+    : await sha256Hex([app, staffId, reportDate, TEST_RECIPIENT_SLOT, messageHash].join('\u001f'));
   const sendId = 'drs_' + idempotencyKey.slice(0, 48);
   const now = Date.now();
   const inserted = await env.DB.prepare(
@@ -434,10 +576,14 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
       body: JSON.stringify({
         messages: [{
           to: config.recipient,
-          from: config.sender,
-          text: reportText,
-          type: 'LMS',
+          type: 'ATA',
           autoTypeDetect: false,
+          kakaoOptions: {
+            pfId: config.pfId,
+            templateId: config.templateId,
+            variables: templateVariables,
+            disableSms: true
+          },
           customFields: { wbSendId: sendId }
         }],
         strict: true,
@@ -499,7 +645,9 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
 export const directorReportConstants = Object.freeze({
   TEST_RECIPIENT_SLOT,
   SOLAPI_SEND_URL,
+  SOLAPI_ACTIVE_SENDERS_URL,
   TASK_APP_URL,
   STAFF_DAILY_LIMIT,
-  GLOBAL_DAILY_LIMIT
+  GLOBAL_DAILY_LIMIT,
+  OPS_ONCE_MAX_TTL_MS
 });

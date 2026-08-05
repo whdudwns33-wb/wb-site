@@ -30,10 +30,26 @@ npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
+npx wrangler secret put SOLAPI_API_KEY              # 업무지시서 전용 Solapi API Key
+npx wrangler secret put SOLAPI_API_SECRET           # 생성 시 한 번만 표시되는 API Secret
+npx wrangler secret put SOLAPI_SENDER_NUMBER        # Solapi에서 활성화된 발신번호
+npx wrangler secret put SOLAPI_TEST_RECIPIENT_PHONE # 원장 본인 테스트 수신번호
+npx wrangler secret put WB_SEND_MODE                 # test
+npx wrangler secret put WB_TEST_RECIPIENT_ID         # TEST-SMS-001
+npx wrangler secret put WB_ACTUAL_TEST_SEND_APPROVED # 평상시 false
 
 # 4) 배포
 npx wrangler deploy
 ```
+
+Solapi 비밀값은 `.dev.vars`, `.env`, `wrangler.toml`, README 또는 GitHub에 적지 않는다.
+기존 API Key의 Secret은 다시 볼 수 없으므로, 다른 자동화가 사용하는 Secret을 재생성하지 말고
+업무지시서 Worker 전용 API Key를 별도로 만든다. `SOLAPI_TEST_RECIPIENT_PHONE`은 원장 본인 번호만
+등록하며, 실제 직원·학부모 발송은 별도 승인 절차를 거친다.
+
+평상시 `WB_ACTUAL_TEST_SEND_APPROVED`는 반드시 `false`로 둔다. 원장 본인 1건 테스트를 별도로
+승인받은 직후에만 `true`로 바꾸고, 결과 확인 즉시 다시 `false`로 바꾸거나 Secret을 삭제한다.
+상세 절차는 [Solapi 원장 수행보고 문자 운영](./SOLAPI_OPERATIONS.md)을 따른다.
 
 배포가 끝나면 `https://wb-sync.<계정>.workers.dev` 주소가 나온다. 이 주소를 앱에 넣는다.
 
