@@ -180,6 +180,28 @@
   .res-item b{font-weight:800}
   .toggle-row{display:flex;gap:8px;margin-top:4px}
 
+  /* ─── 커리큘럼·시간표 생성기 ─── */
+  .gen-form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+  @media(max-width:760px){.gen-form{grid-template-columns:1fr 1fr}}
+  .gen-form label{display:block;font-size:11.5px;font-weight:700;color:var(--mid);margin-bottom:4px}
+  .gen-form input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13.5px}
+  .gen-form input:focus{outline:none;border-color:var(--blue)}
+  .tier-select{border:1.5px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;font-weight:600;background:#fff}
+  table.sched{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.sched th{background:var(--navy);color:#fff;text-align:center;font-size:11.5px;padding:8px 6px;font-weight:700}
+  table.sched td{border:1px solid var(--line);padding:6px;vertical-align:top;text-align:center}
+  table.sched td.timecol{background:var(--light);font-weight:700;font-size:11.5px;white-space:nowrap}
+  .slot-card{background:#e3f3fb;border-radius:7px;padding:5px 6px;font-size:11px;line-height:1.5;text-align:left}
+  .slot-card b{display:block;font-size:11.5px}
+  .slot-card.tier-premium{background:#fdecea}
+  .slot-card.tier-blended{background:#e6f5ee}
+  .gap-badge{font-weight:800}
+  .gap-badge.ok{color:var(--ok)}
+  .gap-badge.warn{color:var(--warn)}
+  .teacher-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .teacher-row .tname{flex:none;width:64px;font-weight:800}
+  .teacher-row .tload{flex:none;font-size:11.5px;color:var(--mid)}
+
   /* misc */
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;
     font-size:13px;font-weight:700;padding:11px 22px;border-radius:100px;box-shadow:0 6px 22px rgba(0,0,0,.25);
@@ -206,7 +228,8 @@
   <button class="navbtn" data-nav="board">③ 흡수전략 보드</button>
   <button class="navbtn" data-nav="tasks">④ 실행 작업</button>
   <button class="navbtn" data-nav="calc">⑤ 시나리오 계산기</button>
-  <button class="navbtn" data-nav="report">⑥ 요약 리포트</button>
+  <button class="navbtn" data-nav="schedule">⑥ 커리큘럼·시간표</button>
+  <button class="navbtn" data-nav="report">⑦ 요약 리포트</button>
   <button class="navbtn" data-nav="data">데이터</button>
   <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
 </nav>
@@ -222,15 +245,61 @@ const DATA = {"concepts":[{"code":"A","conceptName":"WB 리딩 브릿지 — 검
 
 /* ══════════════════ 상태 관리 ══════════════════ */
 const LS_KEY = 'wb-suwan-launch-v1';
+// 2026-08-07 대표 인터뷰 확정 답변 — 실사용 기본값으로 반영.
+// 점수 검증: A=24 · B=26 · C=41 → C안(데이터 러닝랩) 채택, 실제로는
+// "C안 커리큘럼 + B안 파트너십 구조(리드앤톡 운영위탁) + A안 프리미엄 요소" 혼합.
+const CONFIRMED_ANSWERS = {
+  v1: ['WB 검사데이터 기반 문해력 전문관 (본원의 수완 분원)', '국어·영어·학습코칭을 묶은 초중 종합 러닝랩'],
+  v2: '전 학년 폭넓게',
+  v3: ['웩슬러·문해력 검사 시스템', '문해력 커리큘럼·교재', '학부모 리포트·데이터 관리 체계'],
+  v4: '커리큘럼 결정권은 내가 갖는다 / 검사 데이터 소유권은 WB / 지분 50% 미만 불가',
+  b1: '기존 학원 인수 (원생·시설 승계, 빠른 매출)',
+  b2: '공동 지분 합작 (한 사업자로 묶음)',
+  b3: '종합 보습학원 인수 (과목 확장의 기반 확보)',
+  l1: '수완 학원가 중심 상가 (신규 노출 극대화)',
+  l2: 70,
+  l3: '6~8인 교실 3~4개 표준 구성',
+  l4: '보증금 5,000만 초과 · 월세 180만 초과도 입지가 좋으면 감수',
+  f1: 20000,
+  f2: '리더스·리드앤톡 포함 3자 공동 투자',
+  f3: 3000,
+  f4: '12개월 내 (표준 시나리오)',
+  f5: 5,
+  s1: ['리더스 유치원 졸업생·재원생', '리드앤톡 기존 회원의 전환', '신규 마케팅으로 외부 모집'],
+  s2: 100,
+  s3: ['졸업 전 학부모 설명회 + 우선등록 혜택', '정가 검사 우선 예약권 → 결과상담에서 등록 전환 (할인·무료 없음)'],
+  s4: ['검사 우선 예약권 + 결과 심층 리포트 제공 (정가 유지)', '영어+국어 통합 로드맵·통합 성장 리포트 제공', '리딩 레벨테스트 결과를 데이터로 연동·공유'],
+  s5: '신규 문의만 수완 배정, 재원생은 본원 유지',
+  c1: '국어+영어+학습코칭 통합 패키지',
+  c2: 28,
+  c3: ['입회 필수 관문 (검사 없이는 등록 불가)', '오픈 시즌 정가 검사 슬롯을 마케팅 전면에 활용 (할인 없이 가치 소구)'],
+  c4: ['반당 4명 이하 소수정예', '반당 6~8명 표준', '반당 10명 이상 + 레벨 세분화'],
+  c5: ['영어도서관·리딩 프로그램을 정규 커리큘럼에 편성'],
+  p1: '리드앤톡 원장에게 운영 위탁',
+  p2: 6,
+  p3: ['투자 지분 비율대로 배분', '역할별 고정 보수 + 성과 인센티브', '미정 — 계약서 초안 작성 후 협의 확정'],
+  t1: '개원부터 지입 차량 1대 계약',
+  t2: '오후 + 저녁 (중등 내신까지 커버)',
+  t3: '풀타임 실장 채용 (상담 전담)',
+  g1: '2026년 하반기 (회의 목표 — 11~2월 모집 시즌 직전 진입)',
+  g2: 150,
+  g3: '원생 수와 리텐션(재등록률)',
+};
+const CONFIRMED_MEMO = `[2026-08-07 대표 인터뷰 완료 — 확인 필요 3가지]
+1) 3개월 목표 100명은 공격적 목표 — 회의 원자료 기준선(30~60명대) 대비 과감함. 인수 매물의 기존 원생 규모 확정 후 ⑤ 계산기로 재검증할 것.
+2) 3자 수익배분(지분+인센티브 혼합)은 아직 미확정 — 계약서 초안 작성 시 구체화 필요.
+3) 오픈 목표일은 "2026년 하반기"만 확정. 아래 날짜(11/2)는 매물 확정 전 임시값 — 실제 계약 일정에 맞춰 수정할 것.`;
+
 const defaultState = () => ({
-  answers: {},            // qid -> value
-  selectedConcept: null,  // 'A' | 'B' | 'C'
+  answers: Object.assign({}, CONFIRMED_ANSWERS),  // qid -> value (2026-08-07 인터뷰 확정값이 기본 시드)
+  selectedConcept: 'C',   // 'A' | 'B' | 'C' — 인터뷰 점수(A24·B26·C41) 기준 확정
   actionState: {},        // actionKey -> 0(대기)|1(진행)|2(완료)
   customActions: [],      // {id, channel, phase, task, detail, kpi}
   tasks: null,            // null이면 seed에서 초기화
   calc: null,
-  openDate: '',
-  memo: ''
+  scheduleGen: null,      // null이면 인터뷰 답변에서 기본값 계산
+  openDate: '2026-11-02', // 잠정값 — "2026년 하반기" 목표, 매물 확정 후 수정
+  memo: CONFIRMED_MEMO
 });
 let S = load();
 function load(){
@@ -276,6 +345,7 @@ function render(){
   else if(currentView==='board') renderBoard();
   else if(currentView==='tasks') renderTasks();
   else if(currentView==='calc') renderCalc();
+  else if(currentView==='schedule') renderSchedule();
   else if(currentView==='report') renderReport();
   else if(currentView==='data') renderData();
 }
@@ -793,7 +863,185 @@ function renderCalc(){
 function calcSet(k,v){ S.calc = calcState(); S.calc[k] = isNaN(v)?0:v; save(); renderCalc(); }
 function calcReset(){ S.calc = null; save(); renderCalc(); }
 
-/* ══════════════════ ⑥ 요약 리포트 ══════════════════ */
+/* ══════════════════ ⑥ 커리큘럼·시간표 생성기 ══════════════════
+   인터뷰 답변(정원 정책·운영시간대·강사수·목표원생수)과 선택된 컨셉의
+   커리큘럼 라인을 조합해 반편성표·주간 시간표·강사 배정을 자동 계산한다.
+   순수 함수 조합이라 답변/설정을 바꾸면 화면을 다시 열 때마다 즉시 재계산된다. */
+const TIER_CAPACITY = { premium: 4, standard: 7, blended: 12 };
+const TIER_LABEL = { premium: '프리미엄 소수정예 (4명)', standard: '표준 (6~8명)', blended: '블렌디드 그룹 (10명+)' };
+const NON_CLASS_KEYWORDS = ['진단', '배치', '학습관리 시스템', '관리 시스템'];
+const DAY_PAIRS = [['월','목'], ['화','금'], ['월','수'], ['화','목'], ['수','금']];
+const TIME_WINDOWS = {
+  '평일 오후 2~8시 (초등 하교 후 집중)': [14, 20],
+  '오전(7세 프로그램) + 오후 초등': [9, 18],
+  '오후 + 저녁 (중등 내신까지 커버)': [14, 22],
+};
+
+function isSchedulableLine(line){
+  // 라인 "이름"만 검사한다 (설명 문장엔 '진단·처방형 수학'처럼 실제 수업 라인의
+  // 설명어로도 흔히 등장해 오탐 소지가 큼 — 인프라성 라인은 대개 이름 자체가 명시적임)
+  return !NON_CLASS_KEYWORDS.some(k => line.line.includes(k));
+}
+function defaultTierForLine(line){
+  if(/내신|집중|클리닉|심화/.test(line.line)) return 'premium';
+  if(/연계|블렌디드/.test(line.line)) return 'blended';
+  return 'standard';
+}
+function allowedTiers(){
+  const c4 = S.answers.c4;
+  const arr = Array.isArray(c4) ? c4 : (c4 ? [c4] : []);
+  const map = { '반당 4명 이하 소수정예':'premium', '반당 6~8명 표준':'standard', '반당 10명 이상 + 레벨 세분화':'blended' };
+  const allowed = arr.map(a=>map[a]).filter(Boolean);
+  return allowed.length ? allowed : ['premium','standard','blended'];
+}
+function scheduleGenState(){
+  const g = S.scheduleGen || {};
+  const [defStart, defEnd] = TIME_WINDOWS[S.answers.t2] || [14, 20];
+  return {
+    target: g.target != null ? g.target : (S.answers.g2 || S.answers.s2 || 100),
+    teacherCount: g.teacherCount != null ? g.teacherCount : (S.answers.p2 || 4),
+    rooms: g.rooms != null ? g.rooms : 4,
+    startHour: g.startHour != null ? g.startHour : defStart,
+    endHour: g.endHour != null ? g.endHour : defEnd,
+    sessionsPerWeek: g.sessionsPerWeek != null ? g.sessionsPerWeek : 2,
+    sessionHours: g.sessionHours != null ? g.sessionHours : 2,
+    tierOverride: g.tierOverride || {},
+  };
+}
+function setScheduleGen(patch){
+  S.scheduleGen = Object.assign(scheduleGenState(), patch);
+  save(); renderSchedule();
+}
+function buildCurriculumPlan(concept, gen){
+  const lines = concept.curriculum.filter(isSchedulableLine);
+  const commonLines = concept.curriculum.filter(l=>!isSchedulableLine(l));
+  const n = Math.max(1, lines.length);
+  const perLine = Math.round(gen.target / n);
+  const rows = lines.map(line => {
+    const tier = gen.tierOverride[line.line] || defaultTierForLine(line);
+    const cap = TIER_CAPACITY[tier];
+    const sections = Math.max(1, Math.ceil(perLine / cap));
+    return { line, tier, cap, sections, allocated: perLine, covered: sections * cap };
+  });
+  const totalAllocated = rows.reduce((a,r)=>a+r.allocated, 0);
+  const totalCovered = rows.reduce((a,r)=>a+r.covered, 0);
+  return { rows, commonLines, totalAllocated, totalCovered };
+}
+function buildWeeklyGrid(plan, gen){
+  const blocks = [];
+  for(let h=gen.startHour; h<gen.endHour; h+=gen.sessionHours) blocks.push(`${h}:00~${h+gen.sessionHours}:00`);
+  if(!blocks.length) blocks.push(`${gen.startHour}:00~${gen.endHour}:00`);
+  const teacherLoad = Array(Math.max(1, gen.teacherCount)).fill(0);
+  const cells = []; // {lineName, tier, sectionNo, dayPair, block, room, teacher, students}
+  let dpIdx = 0, blkIdx = 0, roomIdx = 0;
+  plan.rows.forEach(row => {
+    for(let s=0; s<row.sections; s++){
+      let t = teacherLoad.indexOf(Math.min(...teacherLoad));
+      teacherLoad[t] += gen.sessionsPerWeek * gen.sessionHours;
+      const dayPair = DAY_PAIRS[dpIdx % DAY_PAIRS.length];
+      const block = blocks[blkIdx % blocks.length];
+      const room = (roomIdx % gen.rooms) + 1;
+      const remain = row.allocated - s*row.cap;
+      const students = Math.max(1, Math.min(row.cap, remain > 0 ? remain : row.cap));
+      cells.push({ lineName: row.line.line, tier: row.tier, sectionNo: s+1, dayPair, block, room, teacher: t+1, students });
+      dpIdx++; blkIdx++; roomIdx++;
+    }
+  });
+  return { blocks, cells, teacherLoad };
+}
+function renderSchedule(){
+  const gen = scheduleGenState();
+  const concept = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : DATA.concepts[0];
+  if(!concept){ app.innerHTML = '<section class="view"><div class="card">컨셉 데이터가 없습니다.</div></section>'; return; }
+  const plan = buildCurriculumPlan(concept, gen);
+  const grid = buildWeeklyGrid(plan, gen);
+  const gapVal = plan.totalCovered - gen.target;
+  const tiers = allowedTiers();
+
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Step 6 · Auto-Generated Curriculum &amp; Schedule</div>
+    <h2>커리큘럼·시간표 자동 생성</h2>
+    <p class="lede"><b>${esc(concept.conceptName)}</b>의 커리큘럼 라인과 인터뷰 답변(정원 정책·운영시간대·강사 수·목표 원생 수)을 조합해
+      반편성표와 주간 시간표 초안을 자동으로 만듭니다. 아래 값을 바꾸면 즉시 다시 계산됩니다 — 매물·강사 채용이 확정되면 숫자를 갱신하세요.</p>
+
+    <div class="card">
+      <h3>생성 조건</h3>
+      <div class="gen-form">
+        <div><label>목표 원생 수 (명)</label><input type="number" value="${gen.target}" onchange="setScheduleGen({target:Number(this.value)||0})"></div>
+        <div><label>강사 수 (명)</label><input type="number" value="${gen.teacherCount}" onchange="setScheduleGen({teacherCount:Number(this.value)||1})"></div>
+        <div><label>동시 운영 강의실 수</label><input type="number" value="${gen.rooms}" onchange="setScheduleGen({rooms:Number(this.value)||1})"></div>
+        <div><label>1회 수업 시간(시간)</label><input type="number" value="${gen.sessionHours}" step="0.5" onchange="setScheduleGen({sessionHours:Number(this.value)||1})"></div>
+        <div><label>운영 시작 시각</label><input type="number" value="${gen.startHour}" onchange="setScheduleGen({startHour:Number(this.value)||0})"></div>
+        <div><label>운영 종료 시각</label><input type="number" value="${gen.endHour}" onchange="setScheduleGen({endHour:Number(this.value)||0})"></div>
+        <div><label>주간 세션 횟수</label><input type="number" value="${gen.sessionsPerWeek}" onchange="setScheduleGen({sessionsPerWeek:Number(this.value)||1})"></div>
+        <div><label>&nbsp;</label><button class="btn sm ghost" style="width:100%" onclick="S.scheduleGen=null;save();renderSchedule();toast('인터뷰 답변 기준으로 초기화')">인터뷰 값으로 리셋</button></div>
+      </div>
+      <p class="small muted">운영시간대는 인터뷰 Q31(t2) 답변, 목표 원생 수는 Q34(g2) 기준으로 기본값이 채워집니다. 반당 인원 티어는 Q25(c4)에서 고른 것만 라인별 선택지에 나타납니다.</p>
+    </div>
+
+    <div class="card tight">
+      <div class="grid4">
+        <div><div class="stat-lbl">개설 반 수</div><div class="res-big">${plan.rows.reduce((a,r)=>a+r.sections,0)}개</div></div>
+        <div><div class="stat-lbl">설계 수용 인원</div><div class="res-big">${plan.totalCovered}명</div></div>
+        <div><div class="stat-lbl">목표 대비</div><div class="res-big gap-badge ${gapVal>=0?'ok':'warn'}">${gapVal>=0?'+':''}${gapVal}명</div></div>
+        <div><div class="stat-lbl">강사 1인 평균 주간시수</div><div class="res-big">${(grid.teacherLoad.reduce((a,b)=>a+b,0)/grid.teacherLoad.length).toFixed(1)}h</div></div>
+      </div>
+    </div>
+
+    <div class="c-section-title"><h3>커리큘럼 반편성 계획</h3></div>
+    <div class="card tight" style="overflow-x:auto">
+      <table class="mini">
+        <thead><tr><th>라인</th><th>학년</th><th>티어</th><th>반당 인원</th><th>개설 반 수</th><th>배정/수용 인원</th></tr></thead>
+        <tbody>
+          ${plan.rows.map((r,i)=>`<tr>
+            <td><b>${esc(r.line.line)}</b><div class="small muted">${esc(r.line.desc)}</div></td>
+            <td class="small">${esc(r.line.grade)}</td>
+            <td><select class="tier-select" onchange="setScheduleGen({tierOverride:Object.assign({},scheduleGenState().tierOverride,{'${esc(r.line.line).replace(/'/g,"\\'")}':this.value})})">
+              ${tiers.map(t=>`<option value="${t}" ${r.tier===t?'selected':''}>${TIER_LABEL[t]}</option>`).join('')}
+            </select></td>
+            <td>${r.cap}명</td>
+            <td><b>${r.sections}개</b></td>
+            <td>${r.allocated}명 / ${r.covered}명</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      ${plan.commonLines.length ? `<p class="small muted" style="margin-top:10px">공통 운영 모듈(전체 재원생 대상, 별도 시간표 없음): ${plan.commonLines.map(l=>esc(l.line)).join(' · ')}</p>` : ''}
+    </div>
+
+    <div class="c-section-title"><h3>주간 시간표 (초안)</h3></div>
+    <div class="card tight" style="overflow-x:auto">
+      <table class="sched">
+        <thead><tr><th>시간대</th>${DAY_PAIRS.map(dp=>`<th>${dp.join('·')}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${grid.blocks.map(block => `<tr>
+            <td class="timecol">${block}</td>
+            ${DAY_PAIRS.map(dp => {
+              const cellsHere = grid.cells.filter(c => c.block===block && c.dayPair[0]===dp[0] && c.dayPair[1]===dp[1]);
+              if(!cellsHere.length) return '<td></td>';
+              return `<td>${cellsHere.map(c=>`<div class="slot-card tier-${c.tier}"><b>${esc(c.lineName)} ${c.sectionNo}반</b>강사${c.teacher}·${c.room}실·${c.students}명</div>`).join('')}</td>`;
+            }).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <p class="small muted" style="margin-top:10px">자동 배정된 초안입니다 — 강의실·요일은 실제 계약 후 조정하세요. 셀의 티어 색: 파랑=표준, 빨강=프리미엄, 초록=블렌디드.</p>
+    </div>
+
+    <div class="c-section-title"><h3>강사별 주간 배정</h3></div>
+    <div class="card tight">
+      ${grid.teacherLoad.map((load,i)=>{
+        const secs = grid.cells.filter(c=>c.teacher===i+1);
+        return `<div class="teacher-row">
+          <div class="tname">강사 ${i+1}</div>
+          <div style="flex:1">${secs.map(c=>`${esc(c.lineName)} ${c.sectionNo}반(${c.dayPair.join('·')} ${c.block})`).join(', ') || '미배정'}</div>
+          <div class="tload">주 ${load}시간</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ ⑦ 요약 리포트 ══════════════════ */
 function formatAnswer(q, v){
   if(v===undefined||v===null||v==='') return null;
   if(Array.isArray(v)){ if(!v.length) return null; return v.join(', '); }
