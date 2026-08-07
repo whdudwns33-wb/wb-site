@@ -18,6 +18,8 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
  *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
  *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토(외부 전달 차단)
+ *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
+ *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
@@ -28,6 +30,7 @@
 
 import { handleLessonCreate } from './lesson-create.js';
 import { handleDirectorReportSend } from './director-report-send.js';
+import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -921,6 +924,16 @@ export default {
       }
       if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
       if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
+      if (url.pathname === '/lesson-change-request') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonChangeRequest(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/lesson-change-review') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonChangeReview(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/director-report-send') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
