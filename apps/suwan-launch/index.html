@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수완지구 신규 학원 런치보드 | WB 웩슬러브레인센터</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#1E9DD6; --deep-blue:#0F7AAB; --navy:#1B3A5C; --navy-deep:#0d2a47;
+    --coral:#E85D4A; --ivory:#FAF8F3; --dark:#2D2D2D; --mid:#6B7280;
+    --light:#F3F4F6; --line:#e5e7eb; --white:#fff;
+    --ok:#2f9e6f; --ok-bg:#e6f5ee; --warn:#c9862a; --warn-bg:#fbf1de;
+    --bad:#c0392b; --bad-bg:#fdecea;
+    --blue-soft:#7FD0F0;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Noto Sans KR',sans-serif;color:var(--dark);background:var(--ivory);line-height:1.7}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  button{font-family:inherit;cursor:pointer}
+  input,textarea,select{font-family:inherit;font-size:14px}
+  .hidden{display:none!important}
+
+  /* ─── top bar ─── */
+  .demobar{position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;
+    display:flex;align-items:center;gap:6px;padding:9px 16px;flex-wrap:wrap;
+    box-shadow:0 2px 14px rgba(0,0,0,.18)}
+  .demobar .logo{font-weight:900;font-size:15px;margin-right:8px;letter-spacing:-.02em}
+  .demobar .logo span{color:var(--blue)}
+  .demobar .tag{font-size:11px;font-weight:700;color:var(--blue-soft);
+    border:1px solid rgba(127,208,240,.4);padding:2px 8px;border-radius:100px;margin-right:auto}
+  .navbtn{background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75);
+    font-size:12px;font-weight:600;padding:6px 11px;border-radius:6px;white-space:nowrap}
+  .navbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+  .view{padding:36px 0 80px;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+  h1{font-size:clamp(24px,4vw,38px);font-weight:900;line-height:1.3;letter-spacing:-.02em;margin-bottom:14px}
+  h2{font-size:clamp(20px,3vw,26px);font-weight:900;margin-bottom:10px;letter-spacing:-.01em}
+  h3{font-size:17px;font-weight:800;margin-bottom:6px}
+  .lede{font-size:15px;color:var(--mid);max-width:64ch}
+  .muted{color:var(--mid)}
+  .small{font-size:12.5px}
+
+  .card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px}
+  .card.tight{padding:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:860px){.grid3,.grid4{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;
+    background:var(--light);color:var(--mid)}
+  .pill.blue{background:#e3f3fb;color:var(--deep-blue)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}
+  .pill.warn{background:var(--warn-bg);color:var(--warn)}
+  .pill.bad{background:var(--bad-bg);color:var(--bad)}
+
+  .btn{display:inline-block;border:none;border-radius:8px;font-weight:700;font-size:14px;
+    padding:10px 20px;background:var(--blue);color:#fff;text-decoration:none}
+  .btn:hover{background:var(--deep-blue)}
+  .btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--dark)}
+  .btn.ghost:hover{border-color:var(--blue);color:var(--blue);background:transparent}
+  .btn.coral{background:var(--coral)}
+  .btn.sm{font-size:12.5px;padding:6px 13px}
+  .btn.xs{font-size:11.5px;padding:4px 10px;border-radius:6px}
+
+  .progressbar{height:8px;border-radius:100px;background:var(--light);overflow:hidden}
+  .progressbar>i{display:block;height:100%;background:var(--blue);border-radius:100px;transition:width .3s}
+
+  /* ─── home ─── */
+  .hero-launch{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 60%,var(--deep-blue) 100%);
+    border-radius:18px;color:#fff;padding:42px 34px;margin-bottom:20px}
+  .hero-launch .lede{color:rgba(255,255,255,.82)}
+  .stat-num{font-size:30px;font-weight:900;letter-spacing:-.02em;line-height:1.2}
+  .stat-lbl{font-size:12px;color:var(--mid);font-weight:600}
+  .partner{display:flex;gap:10px;align-items:flex-start}
+  .partner .dot{flex:none;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:15px}
+
+  /* ─── interview ─── */
+  .iv-layout{display:grid;grid-template-columns:230px 1fr;gap:20px;align-items:start}
+  @media(max-width:820px){.iv-layout{grid-template-columns:1fr}}
+  .iv-steps{position:sticky;top:64px}
+  .iv-step{display:flex;gap:9px;align-items:center;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--mid)}
+  .iv-step:hover{background:#fff}
+  .iv-step.active{background:var(--navy);color:#fff}
+  .iv-step.done .iv-num{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .iv-num{flex:none;width:22px;height:22px;border-radius:100px;border:1.5px solid var(--line);background:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--mid)}
+  .iv-step.active .iv-num{background:var(--blue);border-color:var(--blue);color:#fff}
+  .q-block{padding:18px 0;border-bottom:1px dashed var(--line)}
+  .q-block:last-of-type{border-bottom:none}
+  .q-title{font-size:15.5px;font-weight:800;margin-bottom:4px}
+  .q-hint{font-size:12.5px;color:var(--mid);margin-bottom:10px}
+  .opt-row{display:flex;flex-wrap:wrap;gap:8px}
+  .opt{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--dark);text-align:left}
+  .opt:hover{border-color:var(--blue)}
+  .opt.sel{border-color:var(--blue);background:#e3f3fb;color:var(--deep-blue)}
+  .opt .oh{display:block;font-size:11px;font-weight:500;color:var(--mid);margin-top:1px}
+  .q-input{width:100%;max-width:420px;border:1.5px solid var(--line);border-radius:9px;padding:10px 13px}
+  .q-input:focus{outline:none;border-color:var(--blue)}
+  textarea.q-input{max-width:100%;min-height:74px;resize:vertical}
+  .unit{font-size:13px;color:var(--mid);margin-left:8px;font-weight:600}
+  .scale-row{display:flex;gap:8px}
+  .scale-row .opt{width:44px;text-align:center;padding:8px 0}
+
+  /* ─── concepts ─── */
+  .concept-tabs{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+  .ctab{flex:1;min-width:200px;text-align:left;border:2px solid var(--line);border-radius:14px;background:#fff;padding:16px}
+  .ctab .cc{font-size:11px;font-weight:800;letter-spacing:.12em}
+  .ctab .cn{font-size:16px;font-weight:900;margin:2px 0}
+  .ctab .ct{font-size:12px;color:var(--mid)}
+  .ctab.active{border-color:var(--c-main,#1E9DD6);box-shadow:0 4px 18px rgba(0,0,0,.07)}
+  .concept-hero{border-radius:16px;padding:34px 30px;color:#fff;margin-bottom:16px;
+    background:linear-gradient(130deg,var(--c-main,#1B3A5C),var(--c-deep,#0d2a47))}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:100px;
+    font-size:12px;font-weight:700;padding:4px 12px}
+  .swatches{display:flex;gap:8px;margin-top:14px}
+  .swatch{width:34px;height:34px;border-radius:9px;border:2px solid rgba(255,255,255,.5)}
+  .c-section-title{display:flex;align-items:center;gap:8px;margin:26px 0 12px}
+  .c-section-title h3{margin:0}
+  .c-section-title::after{content:"";flex:1;height:1px;background:var(--line)}
+  .curri{border-left:4px solid var(--c-main,#1E9DD6);padding:10px 14px;background:#fff;border-radius:0 10px 10px 0;
+    border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .abs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:760px){.abs-grid{grid-template-columns:1fr}}
+  .abs-col{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+  .abs-col h4{font-size:12.5px;font-weight:800;margin-bottom:8px}
+  .abs-col ul{list-style:none}
+  .abs-col li{font-size:12.5px;padding:5px 0 5px 16px;position:relative;color:#444;line-height:1.55}
+  .abs-col li::before{content:"·";position:absolute;left:4px;font-weight:900;color:var(--c-main,#1E9DD6)}
+  table.mini{width:100%;border-collapse:collapse;font-size:13px}
+  table.mini th{background:var(--light);text-align:left;font-size:12px;padding:8px 10px}
+  table.mini td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
+
+  /* ─── strategy board ─── */
+  .ch-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .ch-tab{border:1.5px solid var(--line);background:#fff;border-radius:100px;font-size:13px;font-weight:700;padding:7px 16px;color:var(--mid)}
+  .ch-tab.active{background:var(--navy);border-color:var(--navy);color:#fff}
+  .action-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px}
+  .action-card.st1{border-left:4px solid var(--warn)}
+  .action-card.st2{border-left:4px solid var(--ok);opacity:.75}
+  .action-card.st0{border-left:4px solid var(--line)}
+  .action-top{display:flex;gap:8px;align-items:flex-start}
+  .action-top .t{font-size:13.5px;font-weight:700;flex:1;line-height:1.5}
+  .action-detail{font-size:12.5px;color:var(--mid);margin-top:5px;line-height:1.6}
+  .action-kpi{font-size:11.5px;color:var(--deep-blue);font-weight:700;margin-top:5px}
+  .stbtn{flex:none;border:1.5px solid var(--line);background:#fff;border-radius:7px;font-size:11px;font-weight:800;padding:4px 9px;color:var(--mid);white-space:nowrap}
+  .stbtn.s1{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+  .stbtn.s2{border-color:var(--ok);color:var(--ok);background:var(--ok-bg)}
+
+  /* ─── tasks ─── */
+  .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+  @media(max-width:760px){.kanban{grid-template-columns:1fr}}
+  .kcol{background:#f0ece3;border-radius:14px;padding:12px}
+  .kcol h4{font-size:13px;font-weight:800;padding:2px 6px 10px;display:flex;justify-content:space-between}
+  .tcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+  .tcard .tt{font-size:13.5px;font-weight:700;line-height:1.45}
+  .tcard .td{font-size:12px;color:var(--mid);margin-top:3px;line-height:1.55}
+  .tcard .trow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+
+  /* ─── calculator ─── */
+  .calc-grid{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+  @media(max-width:820px){.calc-grid{grid-template-columns:1fr}}
+  .calc-form label{display:block;font-size:12.5px;font-weight:700;margin:12px 0 4px}
+  .calc-form input[type=number]{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 12px}
+  .calc-form input:focus{outline:none;border-color:var(--blue)}
+  .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .res-big{font-size:26px;font-weight:900;letter-spacing:-.02em}
+  .res-item{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+  .res-item b{font-weight:800}
+  .toggle-row{display:flex;gap:8px;margin-top:4px}
+
+  /* misc */
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;padding:11px 22px;border-radius:100px;box-shadow:0 6px 22px rgba(0,0,0,.25);
+    opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+  .toast.show{opacity:1}
+  .footer-note{font-size:11.5px;color:var(--mid);text-align:center;padding:26px 0 40px}
+
+  @media print{
+    .demobar,.no-print{display:none!important}
+    body{background:#fff}
+    .view{padding:0}
+    .card{break-inside:avoid;border-color:#ccc}
+  }
+</style>
+</head>
+<body>
+
+<nav class="demobar no-print">
+  <div class="logo">WB<span>.</span> 수완 런치보드</div>
+  <div class="tag">내부 전략 도구</div>
+  <button class="navbtn" data-nav="home">홈</button>
+  <button class="navbtn" data-nav="interview">① 인터뷰</button>
+  <button class="navbtn" data-nav="concepts">② 컨셉 3안</button>
+  <button class="navbtn" data-nav="board">③ 흡수전략 보드</button>
+  <button class="navbtn" data-nav="tasks">④ 실행 작업</button>
+  <button class="navbtn" data-nav="calc">⑤ 시나리오 계산기</button>
+  <button class="navbtn" data-nav="data">데이터</button>
+</nav>
+
+<main id="app" class="wrap"></main>
+<div class="footer-note">WB 웩슬러브레인센터 × 리더스 유치원 × 리드앤톡 — 수완지구 신규 학원 오픈 준비 도구 · 데이터는 이 브라우저(localStorage)에 저장됩니다</div>
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+/* ══════════════════ DATA (전략 콘텐츠) ══════════════════ */
+const DATA = {"concepts":[],"interview":{"sections":[]},"matrix":{"channels":[],"principles":[]},"seedTasks":[]};
+
+/* ══════════════════ 상태 관리 ══════════════════ */
+const LS_KEY = 'wb-suwan-launch-v1';
+const defaultState = () => ({
+  answers: {},            // qid -> value
+  selectedConcept: null,  // 'A' | 'B' | 'C'
+  actionState: {},        // actionKey -> 0(대기)|1(진행)|2(완료)
+  customActions: [],      // {id, channel, phase, task, detail, kpi}
+  tasks: null,            // null이면 seed에서 초기화
+  calc: null,
+  openDate: '',
+  memo: ''
+});
+let S = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ return Object.assign(defaultState(), JSON.parse(raw)); }
+  }catch(e){}
+  return defaultState();
+}
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(n){ return (Math.round(n)).toLocaleString('ko-KR'); }
+
+/* 작업 시드 초기화 */
+function ensureTasks(){
+  if(!S.tasks){
+    S.tasks = (DATA.seedTasks||[]).map((t,i)=>({id:'seed'+i, title:t.title, detail:t.detail||'', tag:t.tag||'전략', col:'todo'}));
+    save();
+  }
+}
+
+/* ══════════════════ 라우팅 ══════════════════ */
+const app = document.getElementById('app');
+let currentView = 'home';
+function nav(v){
+  currentView = v;
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.nav===v));
+  window.scrollTo({top:0});
+  render();
+}
+document.querySelectorAll('.navbtn').forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.nav)));
+
+function render(){
+  ensureTasks();
+  if(currentView==='home') renderHome();
+  else if(currentView==='interview') renderInterview();
+  else if(currentView==='concepts') renderConcepts();
+  else if(currentView==='board') renderBoard();
+  else if(currentView==='tasks') renderTasks();
+  else if(currentView==='calc') renderCalc();
+  else if(currentView==='data') renderData();
+}
+
+/* ══════════════════ 공통 계산 ══════════════════ */
+function interviewProgress(){
+  const qs = DATA.interview.sections.flatMap(s=>s.questions);
+  if(!qs.length) return {done:0,total:0,pct:0};
+  const done = qs.filter(q=>{
+    const v = S.answers[q.id];
+    return v!==undefined && v!==null && v!=='' && !(Array.isArray(v)&&!v.length);
+  }).length;
+  return {done, total:qs.length, pct: Math.round(done/qs.length*100)};
+}
+function conceptScores(){
+  const sc = {A:0,B:0,C:0};
+  DATA.interview.sections.forEach(sec=>sec.questions.forEach(q=>{
+    if(!q.options) return;
+    const v = S.answers[q.id];
+    if(v===undefined||v===null) return;
+    const chosen = Array.isArray(v)?v:[v];
+    q.options.forEach(o=>{
+      if(chosen.includes(o.label) && o.weight){
+        sc.A += o.weight.A||0; sc.B += o.weight.B||0; sc.C += o.weight.C||0;
+      }
+    });
+  }));
+  return sc;
+}
+function allActions(){
+  const out = [];
+  (DATA.matrix.channels||[]).forEach(ch=>{
+    ['short','mid','long'].forEach(ph=>{
+      (ch.phases[ph]||[]).forEach((a,i)=>out.push({key:ch.id+'|'+ph+'|'+i, channel:ch.id, phase:ph, ...a}));
+    });
+  });
+  (S.customActions||[]).forEach(a=>out.push({key:a.id, channel:a.channel, phase:a.phase, task:a.task, detail:a.detail, kpi:a.kpi, custom:true}));
+  return out;
+}
+function boardProgress(){
+  const acts = allActions();
+  if(!acts.length) return {done:0,total:0,pct:0};
+  const done = acts.filter(a=>(S.actionState[a.key]||0)===2).length;
+  return {done, total:acts.length, pct:Math.round(done/acts.length*100)};
+}
+function taskProgress(){
+  const t = S.tasks||[];
+  if(!t.length) return {done:0,total:0,pct:0};
+  const done = t.filter(x=>x.col==='done').length;
+  return {done, total:t.length, pct:Math.round(done/t.length*100)};
+}
+function dday(){
+  if(!S.openDate) return null;
+  const d = new Date(S.openDate+'T00:00:00');
+  if(isNaN(d)) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((d-today)/86400000);
+}
+
+/* ══════════════════ 홈 ══════════════════ */
+function renderHome(){
+  const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  const sel = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : null;
+  const dd = dday();
+  app.innerHTML = `
+  <section class="view">
+    <div class="hero-launch">
+      <div class="eyebrow" style="color:var(--blue-soft)">Suwan New Academy Launch</div>
+      <h1>수완지구 신규 학원<br>오픈 준비 런치보드</h1>
+      <p class="lede">리더스 유치원 · 리드앤톡 · WB 웩슬러브레인센터 3자 협업으로 준비하는 신규 학원.
+      인터뷰로 방향을 정하고 → 컨셉 3안을 비교하고 → 채널별 흡수 전략을 실행 작업으로 굴립니다.</p>
+      <div class="chip-row">
+        <span class="chip">목표: 하반기 오픈</span>
+        <span class="chip">모집 시즌: 11~2월 역산</span>
+        <span class="chip">${dd===null?'오픈 목표일 미설정':(dd>=0?'D-'+dd:'D+'+(-dd))}</span>
+        ${sel?`<span class="chip">선택 컨셉: ${esc(sel.conceptName)}</span>`:'<span class="chip">컨셉 미선택</span>'}
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="card tight">
+        <div class="stat-lbl">① 전략 인터뷰</div>
+        <div class="stat-num">${iv.pct}%</div>
+        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${iv.pct}%"></i></div>
+        <div class="small muted">${iv.done}/${iv.total} 문항 답변</div>
+        <button class="btn sm" style="margin-top:10px" onclick="nav('interview')">이어서 진행</button>
+      </div>
+      <div class="card tight">
+        <div class="stat-lbl">③ 흡수전략 보드</div>
+        <div class="stat-num">${bd.pct}%</div>
+        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${bd.pct}%;background:var(--ok)"></i></div>
+        <div class="small muted">${bd.done}/${bd.total} 액션 완료</div>
+        <button class="btn sm" style="margin-top:10px" onclick="nav('board')">보드 열기</button>
+      </div>
+      <div class="card tight">
+        <div class="stat-lbl">④ 실행 작업</div>
+        <div class="stat-num">${tk.pct}%</div>
+        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${tk.pct}%;background:var(--coral)"></i></div>
+        <div class="small muted">${tk.done}/${tk.total} 작업 완료</div>
+        <button class="btn sm" style="margin-top:10px" onclick="nav('tasks')">작업 보기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>3자 협업 구조</h3>
+      <div class="grid3" style="margin-top:12px">
+        <div class="partner"><div class="dot" style="background:#7a5c9e">리</div>
+          <div><b>리더스 유치원</b> <span class="pill">+ 리더스 영유</span>
+          <div class="small muted">매년 졸업생 배출 + 직영 학원 재원생 보유. 학부모 신뢰 채널의 시작점.</div></div></div>
+        <div class="partner"><div class="dot" style="background:#2f7d5e">톡</div>
+          <div><b>리드앤톡 학원</b>
+          <div class="small muted">영어 수업 재원생 보유. 원장은 협업 파트너 — 커리큘럼·공간·인력 연계 검토.</div></div></div>
+        <div class="partner"><div class="dot" style="background:var(--deep-blue)">WB</div>
+          <div><b>WB 웩슬러브레인센터</b>
+          <div class="small muted">웩슬러 검사 데이터 · 12패턴 맞춤 설계 · 수완 학원 103곳 DB · 마케팅 자동화.</div></div></div>
+      </div>
+      <p class="small muted" style="margin-top:12px">세 곳 모두 컨셉이 다릅니다. 학생 이동은 "빼앗기"가 아니라 <b>합의된 연계·전환 설계</b>로 — 원장 일원화 커뮤니케이션 · 할인 금지 · 재원생 직접 조건 제시 지양 원칙을 지킵니다.</p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <h3 style="margin:0">오픈 목표일</h3>
+        <div>
+          <input type="date" id="openDate" class="q-input" style="max-width:180px;padding:7px 10px" value="${esc(S.openDate)}">
+          <button class="btn sm" onclick="setOpenDate()">저장</button>
+        </div>
+      </div>
+      <p class="small muted" style="margin-top:8px">모집 성수기(11~2월, 유치원 레벨테스트·진학 결정 시즌)에서 역산해 잡는 것을 권장합니다.</p>
+    </div>
+
+    ${sel?`<div class="card" style="border-left:5px solid ${esc(sel.design.palette[0]?sel.design.palette[0].hex:'#1E9DD6')}">
+      <div class="eyebrow">선택된 컨셉</div>
+      <h3>${esc(sel.conceptName)} — ${esc(sel.tagline)}</h3>
+      <p class="small muted">${esc(sel.positioning)}</p>
+      <button class="btn sm ghost" style="margin-top:8px" onclick="nav('concepts')">상세 보기</button>
+    </div>`:''}
+  </section>`;
+}
+function setOpenDate(){
+  S.openDate = document.getElementById('openDate').value; save(); toast('오픈 목표일 저장'); render();
+}
+
+/* ══════════════════ ① 인터뷰 ══════════════════ */
+let ivIdx = 0;
+function sectionDone(sec){
+  return sec.questions.every(q=>{
+    const v = S.answers[q.id];
+    return v!==undefined && v!==null && v!=='' && !(Array.isArray(v)&&!v.length);
+  });
+}
+function renderInterview(){
+  const secs = DATA.interview.sections;
+  if(!secs.length){ app.innerHTML = '<section class="view"><div class="card">인터뷰 데이터가 없습니다.</div></section>'; return; }
+  if(ivIdx>=secs.length) ivIdx = secs.length-1;
+  const sec = secs[ivIdx];
+  const iv = interviewProgress();
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Step 1 · Strategy Interview</div>
+    <h2>전략 인터뷰</h2>
+    <p class="lede">기획서와 2월 회의 내용을 바탕으로 만든 질문입니다. 한 번에 다 하지 않아도 됩니다 — 답은 즉시 저장됩니다.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin:14px 0 22px">
+      <div class="progressbar" style="flex:1"><i style="width:${iv.pct}%"></i></div>
+      <span class="small muted"><b>${iv.pct}%</b> (${iv.done}/${iv.total})</span>
+    </div>
+    <div class="iv-layout">
+      <div class="iv-steps no-print">
+        ${secs.map((s,i)=>`<div class="iv-step ${i===ivIdx?'active':''} ${sectionDone(s)?'done':''}" onclick="ivGo(${i})">
+          <span class="iv-num">${sectionDone(s)&&i!==ivIdx?'✓':(i+1)}</span>${esc(s.title)}</div>`).join('')}
+      </div>
+      <div class="card">
+        <h3>${ivIdx+1}. ${esc(sec.title)}</h3>
+        <p class="small muted" style="margin-bottom:6px">${esc(sec.intro)}</p>
+        ${sec.questions.map(q=>renderQuestion(q)).join('')}
+        <div style="display:flex;justify-content:space-between;margin-top:20px" class="no-print">
+          <button class="btn ghost sm" ${ivIdx===0?'disabled style="opacity:.4"':''} onclick="ivGo(${ivIdx-1})">← 이전</button>
+          ${ivIdx<secs.length-1
+            ?`<button class="btn sm" onclick="ivGo(${ivIdx+1})">다음 →</button>`
+            :`<button class="btn coral sm" onclick="finishInterview()">인터뷰 마치고 컨셉 추천 보기 →</button>`}
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+function ivGo(i){ ivIdx = Math.max(0, i); window.scrollTo({top:0}); renderInterview(); }
+function renderQuestion(q){
+  const v = S.answers[q.id];
+  let body = '';
+  if(q.type==='single' || q.type==='multi'){
+    const chosen = Array.isArray(v)?v:(v!=null?[v]:[]);
+    body = `<div class="opt-row">${(q.options||[]).map(o=>`
+      <button class="opt ${chosen.includes(o.label)?'sel':''}" onclick="pick('${esc(q.id)}','${esc(o.label).replace(/'/g,"\\'")}',${q.type==='multi'})">
+        ${esc(o.label)}${o.hint?`<span class="oh">${esc(o.hint)}</span>`:''}
+      </button>`).join('')}</div>`;
+  } else if(q.type==='number'){
+    body = `<input type="number" class="q-input" style="max-width:200px" value="${v!=null?esc(v):''}"
+      onchange="setAns('${esc(q.id)}', this.value===''?'':Number(this.value))">${q.unit?`<span class="unit">${esc(q.unit)}</span>`:''}`;
+  } else if(q.type==='scale'){
+    body = `<div class="scale-row">${[1,2,3,4,5].map(n=>`
+      <button class="opt ${v===n?'sel':''}" onclick="setAns('${esc(q.id)}',${n});renderInterview()">${n}</button>`).join('')}
+      <span class="unit">1 낮음 ~ 5 높음</span></div>`;
+  } else {
+    body = `<textarea class="q-input" placeholder="${esc(q.placeholder||'')}"
+      onchange="setAns('${esc(q.id)}', this.value)">${v!=null?esc(v):''}</textarea>`;
+  }
+  return `<div class="q-block">
+    <div class="q-title">${esc(q.q)}</div>
+    ${q.hint?`<div class="q-hint">💡 ${esc(q.hint)}</div>`:''}
+    ${body}
+  </div>`;
+}
+function setAns(qid, val){ S.answers[qid] = val; save(); }
+function pick(qid, label, multi){
+  if(multi){
+    const cur = Array.isArray(S.answers[qid])?S.answers[qid].slice():[];
+    const ix = cur.indexOf(label);
+    if(ix>=0) cur.splice(ix,1); else cur.push(label);
+    S.answers[qid] = cur;
+  } else {
+    S.answers[qid] = (S.answers[qid]===label)? undefined : label;
+  }
+  save(); renderInterview();
+}
+function finishInterview(){ nav('concepts'); toast('답변 기반 컨셉 추천을 확인하세요'); }
+
+/* ══════════════════ ② 컨셉 3안 ══════════════════ */
+let cIdx = null;
+function renderConcepts(){
+  const cs = DATA.concepts;
+  if(!cs.length){ app.innerHTML = '<section class="view"><div class="card">컨셉 데이터가 없습니다.</div></section>'; return; }
+  const sc = conceptScores();
+  const ranked = Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+  const hasScore = ranked.some(r=>r[1]>0);
+  const recommend = hasScore ? ranked[0][0] : null;
+  if(cIdx===null) cIdx = S.selectedConcept || recommend || cs[0].code;
+  const c = cs.find(x=>x.code===cIdx) || cs[0];
+  const main = c.design.palette[0]?c.design.palette[0].hex:'#1B3A5C';
+  const deep = c.design.palette[1]?c.design.palette[1].hex:'#0d2a47';
+  const chNames = {leadersGrad:'리더스 유치원·영유 졸업생', leadersAcademy:'리더스 직영학원 재원생', readAndTalk:'리드앤톡 재원생', external:'수완지구 외부 신규'};
+  app.innerHTML = `
+  <section class="view" style="--c-main:${esc(main)};--c-deep:${esc(deep)}">
+    <div class="eyebrow">Step 2 · Concept Proposals</div>
+    <h2>서로 다른 3개의 컨셉안</h2>
+    <p class="lede">같은 자산(3자 협업 + WB 검사 데이터)에서 출발하지만, 방향이 다른 세 가지 설계입니다.
+      ${hasScore?`인터뷰 답변 기준 추천: <b>${esc((cs.find(x=>x.code===recommend)||{}).conceptName||recommend)}</b> (A ${sc.A} · B ${sc.B} · C ${sc.C}점)`:'인터뷰를 진행하면 답변 기반 추천이 표시됩니다.'}</p>
+
+    <div class="concept-tabs" style="margin-top:16px">
+      ${cs.map(x=>{
+        const m = x.design.palette[0]?x.design.palette[0].hex:'#1E9DD6';
+        return `<button class="ctab ${x.code===c.code?'active':''}" style="--c-main:${esc(m)}" onclick="cGo('${esc(x.code)}')">
+          <div class="cc" style="color:${esc(m)}">${esc(x.code)}안 ${x.code===recommend&&hasScore?'· 추천':''} ${S.selectedConcept===x.code?'· ✔ 선택됨':''}</div>
+          <div class="cn">${esc(x.conceptName)}</div>
+          <div class="ct">${esc(x.tagline)}</div>
+        </button>`;
+      }).join('')}
+    </div>
+
+    <div class="concept-hero">
+      <div class="eyebrow" style="color:rgba(255,255,255,.75)">${esc(c.code)}안 · ${esc(c.conceptName)}</div>
+      <h2 style="color:#fff">${esc(c.design.heroCopy)}</h2>
+      <p style="color:rgba(255,255,255,.85);max-width:60ch;font-size:14.5px">${esc(c.positioning)}</p>
+      <div class="chip-row">${c.brandNames.map(b=>`<span class="chip">학원명 후보 · ${esc(b)}</span>`).join('')}</div>
+      <div class="swatches">${c.design.palette.map(p=>`<div class="swatch" style="background:${esc(p.hex)}" title="${esc(p.name)}"></div>`).join('')}</div>
+      <div style="margin-top:18px" class="no-print">
+        <button class="btn" style="background:#fff;color:${esc(main)}" onclick="selectConcept('${esc(c.code)}')">
+          ${S.selectedConcept===c.code?'✔ 이 컨셉으로 선택됨':'이 컨셉으로 선택'}</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card tight"><h3>타깃</h3><p class="small">${esc(c.target)}</p></div>
+      <div class="card tight"><h3>왜 이 안이 이기는가</h3><p class="small">${esc(c.whyWins)}</p></div>
+    </div>
+
+    <div class="c-section-title"><h3>커리큘럼 라인</h3></div>
+    <div class="grid2">
+      ${c.curriculum.map(cu=>`<div class="curri"><b>${esc(cu.line)}</b> <span class="pill blue">${esc(cu.grade)}</span>
+        <div class="small muted" style="margin-top:3px">${esc(cu.desc)}</div></div>`).join('')}
+    </div>
+
+    <div class="c-section-title"><h3>채널별 흡수·전환 전략 (단기 → 중기 → 장기)</h3></div>
+    ${Object.entries(c.absorption).map(([k,ph])=>`
+      <div class="card tight" style="margin-bottom:12px">
+        <b style="font-size:14px">${esc(chNames[k]||k)}</b>
+        <div class="abs-grid" style="margin-top:10px">
+          <div class="abs-col"><h4 style="color:var(--warn)">단기 (0~3개월)</h4><ul>${ph.short.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>
+          <div class="abs-col"><h4 style="color:var(--deep-blue)">중기 (3~12개월)</h4><ul>${ph.mid.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>
+          <div class="abs-col"><h4 style="color:var(--ok)">장기 (1~3년)</h4><ul>${ph.long.map(a=>`<li>${esc(a)}</li>`).join('')}</ul></div>
+        </div>
+      </div>`).join('')}
+
+    <div class="c-section-title"><h3>공간 · 차량 · 가격</h3></div>
+    <div class="grid3">
+      <div class="card tight"><h3 class="small" style="font-weight:800">공간 전략</h3><p class="small muted">${esc(c.space)}</p></div>
+      <div class="card tight"><h3 class="small" style="font-weight:800">차량(등하원)</h3><p class="small muted">${esc(c.vehicle)}</p></div>
+      <div class="card tight"><h3 class="small" style="font-weight:800">가격 정책</h3><p class="small muted">${esc(c.pricing)}</p></div>
+    </div>
+
+    <div class="c-section-title"><h3>규모 시나리오</h3></div>
+    <div class="card tight">
+      <table class="mini"><thead><tr><th>학생 수</th><th>월 매출 가정</th><th>메모</th></tr></thead>
+      <tbody>${c.scenarios.map(s=>`<tr><td><b>${esc(s.students)}명</b></td><td>${esc(s.monthlyRevenue)}</td><td class="muted">${esc(s.note)}</td></tr>`).join('')}</tbody></table>
+      <p class="small muted no-print" style="margin-top:8px">→ 정밀 손익은 <a href="#" onclick="nav('calc');return false">⑤ 시나리오 계산기</a>에서.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card tight"><h3>KPI</h3><ul style="list-style:none">${c.kpi.map(k=>`<li class="small" style="padding:4px 0">🎯 ${esc(k)}</li>`).join('')}</ul></div>
+      <div class="card tight"><h3>리스크 & 대응</h3>
+        ${c.risks.map(r=>`<div class="small" style="padding:5px 0;border-bottom:1px dashed var(--line)"><b style="color:var(--bad)">⚠ ${esc(r.risk)}</b><br><span class="muted">→ ${esc(r.mitigation)}</span></div>`).join('')}</div>
+    </div>
+
+    <div class="card tight" style="background:#fbfaf7">
+      <h3>디자인 방향</h3>
+      <p class="small muted">${esc(c.design.mood)}</p>
+      <p class="small muted" style="margin-top:6px">${esc(c.design.uiIdea)}</p>
+    </div>
+  </section>`;
+}
+function cGo(code){ cIdx = code; renderConcepts(); window.scrollTo({top:0}); }
+function selectConcept(code){
+  S.selectedConcept = (S.selectedConcept===code)? null : code;
+  save(); renderConcepts();
+  toast(S.selectedConcept?'컨셉이 선택되었습니다 — 흡수전략 보드에 반영':'컨셉 선택 해제');
+}
+
+/* ══════════════════ ③ 흡수전략 보드 ══════════════════ */
+let chFilter = 'all';
+const PHASE_LABEL = {short:'단기 0~3개월', mid:'중기 3~12개월', long:'장기 1~3년'};
+function renderBoard(){
+  const m = DATA.matrix;
+  if(!m.channels.length){ app.innerHTML = '<section class="view"><div class="card">전략 보드 데이터가 없습니다.</div></section>'; return; }
+  const bd = boardProgress();
+  const chs = m.channels;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Step 3 · Absorption Strategy Board</div>
+    <h2>학생 흡수·전환 전략 보드</h2>
+    <p class="lede">4개 채널 × 단기/중기/장기. 각 액션을 눌러 <b>대기 → 진행중 → 완료</b>로 굴리세요. 직접 액션을 추가할 수도 있습니다.</p>
+
+    <div class="card tight" style="margin-top:14px">
+      <b class="small">공통 원칙</b>
+      <div class="opt-row" style="margin-top:8px">${(m.principles||[]).map(p=>`<span class="pill warn">${esc(p)}</span>`).join('')}</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:14px 0">
+      <div class="progressbar" style="flex:1"><i style="width:${bd.pct}%;background:var(--ok)"></i></div>
+      <span class="small muted"><b>${bd.done}</b>/${bd.total} 완료</span>
+    </div>
+
+    <div class="ch-tabs">
+      <button class="ch-tab ${chFilter==='all'?'active':''}" onclick="chGo('all')">전체</button>
+      ${chs.map(ch=>`<button class="ch-tab ${chFilter===ch.id?'active':''}" onclick="chGo('${esc(ch.id)}')">${esc(ch.name)}</button>`).join('')}
+    </div>
+
+    ${chs.filter(ch=>chFilter==='all'||ch.id===chFilter).map(ch=>`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+          <h3>${esc(ch.name)}</h3><span class="pill blue">${esc(ch.size)}</span>
+        </div>
+        <p class="small muted" style="margin:4px 0 14px">${esc(ch.note)}</p>
+        <div class="abs-grid">
+          ${['short','mid','long'].map(ph=>`
+            <div>
+              <h4 class="small" style="font-weight:800;margin-bottom:8px">${PHASE_LABEL[ph]}</h4>
+              ${(ch.phases[ph]||[]).map((a,i)=>actionCard(ch.id+'|'+ph+'|'+i, a)).join('')}
+              ${(S.customActions||[]).filter(x=>x.channel===ch.id&&x.phase===ph).map(x=>actionCard(x.id, x, true)).join('')}
+              <button class="btn xs ghost no-print" onclick="addAction('${esc(ch.id)}','${ph}')">＋ 액션 추가</button>
+            </div>`).join('')}
+        </div>
+      </div>`).join('')}
+  </section>`;
+}
+function actionCard(key, a, custom){
+  const st = S.actionState[key]||0;
+  const stLabel = ['대기','진행중','완료'][st];
+  return `<div class="action-card st${st}">
+    <div class="action-top">
+      <div class="t">${esc(a.task)}</div>
+      <button class="stbtn s${st} no-print" onclick="cycleAction('${esc(key)}')">${stLabel}</button>
+      ${custom?`<button class="stbtn no-print" onclick="delAction('${esc(key)}')" title="삭제">✕</button>`:''}
+    </div>
+    ${a.detail?`<div class="action-detail">${esc(a.detail)}</div>`:''}
+    ${a.kpi?`<div class="action-kpi">KPI · ${esc(a.kpi)}${a.owner?` · 담당 ${esc(a.owner)}`:''}</div>`:''}
+  </div>`;
+}
+function chGo(id){ chFilter = id; renderBoard(); }
+function cycleAction(key){ S.actionState[key] = ((S.actionState[key]||0)+1)%3; save(); renderBoard(); }
+function addAction(channel, phase){
+  const task = prompt('액션 내용 (한 줄):'); if(!task) return;
+  const detail = prompt('상세 실행 방법 (선택):')||'';
+  const kpi = prompt('KPI (선택):')||'';
+  S.customActions.push({id:'ca'+Math.random().toString(36).slice(2,9), channel, phase, task, detail, kpi});
+  save(); renderBoard(); toast('액션 추가됨');
+}
+function delAction(id){
+  S.customActions = S.customActions.filter(a=>a.id!==id);
+  delete S.actionState[id];
+  save(); renderBoard();
+}
+
+/* ══════════════════ ④ 실행 작업 (칸반) ══════════════════ */
+function renderTasks(){
+  const cols = [['todo','할 일'],['doing','진행 중'],['done','완료']];
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Step 4 · Execution Tasks</div>
+    <h2>실행 작업 보드</h2>
+    <p class="lede">2월 회의 액션아이템에서 출발한 작업 목록입니다. 새 작업을 추가하고, 단계별로 옮기며 오픈까지 관리하세요.</p>
+    <div style="margin:14px 0" class="no-print">
+      <button class="btn sm" onclick="addTask()">＋ 새 작업</button>
+    </div>
+    <div class="kanban">
+      ${cols.map(([id,label])=>`
+        <div class="kcol">
+          <h4>${label}<span class="muted">${(S.tasks||[]).filter(t=>t.col===id).length}</span></h4>
+          ${(S.tasks||[]).filter(t=>t.col===id).map(t=>`
+            <div class="tcard">
+              <div class="tt">${esc(t.title)}</div>
+              ${t.detail?`<div class="td">${esc(t.detail)}</div>`:''}
+              <div class="trow no-print">
+                <span class="pill">${esc(t.tag)}</span>
+                ${id!=='todo'?`<button class="btn xs ghost" onclick="moveTask('${esc(t.id)}',-1)">←</button>`:''}
+                ${id!=='done'?`<button class="btn xs" onclick="moveTask('${esc(t.id)}',1)">→</button>`:''}
+                <button class="btn xs ghost" onclick="delTask('${esc(t.id)}')">삭제</button>
+              </div>
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>
+  </section>`;
+}
+const COL_ORDER = ['todo','doing','done'];
+function moveTask(id, dir){
+  const t = (S.tasks||[]).find(x=>x.id===id); if(!t) return;
+  const ix = COL_ORDER.indexOf(t.col);
+  t.col = COL_ORDER[Math.min(2, Math.max(0, ix+dir))];
+  save(); renderTasks();
+}
+function addTask(){
+  const title = prompt('작업 제목:'); if(!title) return;
+  const detail = prompt('상세 (선택):')||'';
+  const tag = prompt('태그 (전략/재무/공간/인력/모집/운영 등):')||'전략';
+  S.tasks.push({id:'t'+Math.random().toString(36).slice(2,9), title, detail, tag, col:'todo'});
+  save(); renderTasks(); toast('작업 추가됨');
+}
+function delTask(id){
+  if(!confirm('이 작업을 삭제할까요?')) return;
+  S.tasks = S.tasks.filter(t=>t.id!==id); save(); renderTasks();
+}
+
+/* ══════════════════ ⑤ 시나리오 계산기 ══════════════════ */
+const CALC_DEFAULT = {students:50, fee:24, rent:165, deposit:4000, premium:1500, fitout:5000,
+  teacherRatio:33, vanCount:0, vanCost:250, etcCost:300, invest:12000};
+function calcState(){ return Object.assign({}, CALC_DEFAULT, S.calc||{}); }
+function renderCalc(){
+  const c = calcState();
+  const revenue = c.students * c.fee;                    // 만원
+  const teacher = revenue * (c.teacherRatio/100);
+  const van = c.vanCount * c.vanCost;
+  const cost = c.rent + teacher + van + c.etcCost;
+  const profit = revenue - cost;
+  const investTotal = c.deposit + c.premium + c.fitout;
+  const payback = profit>0 ? (c.invest>0? c.invest/profit : investTotal/profit) : null;
+  const bepStudents = c.fee>0 ? Math.ceil((c.rent + van + c.etcCost) / (c.fee*(1-c.teacherRatio/100))) : 0;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Step 5 · Scenario Calculator</div>
+    <h2>시나리오 계산기</h2>
+    <p class="lede">2월 회의 수치(월세 150~180만 · 보증금 3,000~5,000만 · 초기 투자 1.0~1.5억 · 30/50/150/300명)를 기본값으로 넣어 두었습니다. 숫자를 바꿔가며 손익을 확인하세요.</p>
+    <div class="preset-row no-print" style="margin-top:14px">
+      ${[30,50,150,300].map(n=>`<button class="btn sm ${c.students===n?'':'ghost'}" onclick="calcSet('students',${n})">${n}명 시나리오</button>`).join('')}
+      <button class="btn sm ghost" onclick="calcReset()">기본값 복원</button>
+    </div>
+    <div class="calc-grid" style="margin-top:10px">
+      <div class="card calc-form">
+        <h3>가정 입력</h3>
+        <label>학생 수 (명)</label><input type="number" value="${c.students}" onchange="calcSet('students',Number(this.value))">
+        <label>평균 월 원비 (만원)</label><input type="number" value="${c.fee}" onchange="calcSet('fee',Number(this.value))">
+        <label>월세 (만원)</label><input type="number" value="${c.rent}" onchange="calcSet('rent',Number(this.value))">
+        <label>강사 인건비율 (매출 대비 %)</label><input type="number" value="${c.teacherRatio}" onchange="calcSet('teacherRatio',Number(this.value))">
+        <label>차량 대수 (대) — 1대당 약 20명 커버</label><input type="number" value="${c.vanCount}" onchange="calcSet('vanCount',Number(this.value))">
+        <label>차량 1대 월 비용 (만원, 지입·유류 포함)</label><input type="number" value="${c.vanCost}" onchange="calcSet('vanCost',Number(this.value))">
+        <label>기타 고정비 (만원 — 관리비·마케팅·교재 등)</label><input type="number" value="${c.etcCost}" onchange="calcSet('etcCost',Number(this.value))">
+        <hr style="border:none;border-top:1px dashed var(--line);margin:16px 0 4px">
+        <label>보증금 (만원)</label><input type="number" value="${c.deposit}" onchange="calcSet('deposit',Number(this.value))">
+        <label>권리금 (만원 — 기준: 3개월치 원비 수준부터)</label><input type="number" value="${c.premium}" onchange="calcSet('premium',Number(this.value))">
+        <label>인테리어·설비 (만원)</label><input type="number" value="${c.fitout}" onchange="calcSet('fitout',Number(this.value))">
+        <label>총 투자금 직접 입력 (만원, 회수기간 계산용)</label><input type="number" value="${c.invest}" onchange="calcSet('invest',Number(this.value))">
+      </div>
+      <div>
+        <div class="card">
+          <div class="grid3">
+            <div><div class="stat-lbl">월 매출</div><div class="res-big" style="color:var(--deep-blue)">${num(revenue)}<span class="small">만</span></div></div>
+            <div><div class="stat-lbl">월 비용</div><div class="res-big" style="color:var(--warn)">${num(cost)}<span class="small">만</span></div></div>
+            <div><div class="stat-lbl">월 이익</div><div class="res-big" style="color:${profit>=0?'var(--ok)':'var(--bad)'}">${num(profit)}<span class="small">만</span></div></div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="res-item"><span>강사 인건비 (${c.teacherRatio}%)</span><b>${num(teacher)}만</b></div>
+            <div class="res-item"><span>월세</span><b>${num(c.rent)}만</b></div>
+            <div class="res-item"><span>차량 (${c.vanCount}대 × ${num(c.vanCost)}만)</span><b>${num(van)}만</b></div>
+            <div class="res-item"><span>기타 고정비</span><b>${num(c.etcCost)}만</b></div>
+            <div class="res-item"><span>손익분기 학생 수 (현재 가정 기준)</span><b>${bepStudents}명</b></div>
+            <div class="res-item"><span>초기 투자 합계 (보증금+권리금+인테리어)</span><b>${num(investTotal)}만</b></div>
+            <div class="res-item"><span>투자금 회수 기간 ${c.invest>0?`(입력 투자금 ${num(c.invest)}만 기준)`:''}</span>
+              <b>${payback?payback.toFixed(1)+'개월':'이익이 0 이하 — 회수 불가'}</b></div>
+          </div>
+        </div>
+        <div class="card tight">
+          <h3 class="small" style="font-weight:800">차량 판단 참고 (회의 기준)</h3>
+          <p class="small muted">차량 미운영 → 70명 소수정예 대안 · 차량 운영 → 150~300명 필요. 저학년은 이동시간 대비 1시간 수업이 비효율이라 2~3시간 블록 수업 재설계가 전제입니다. 현재 가정에서 차량 ${c.vanCount}대는 약 ${c.vanCount*20}명을 커버합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+function calcSet(k,v){ S.calc = calcState(); S.calc[k] = isNaN(v)?0:v; save(); renderCalc(); }
+function calcReset(){ S.calc = null; save(); renderCalc(); }
+
+/* ══════════════════ 데이터 관리 ══════════════════ */
+function renderData(){
+  const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Data</div>
+    <h2>데이터 관리</h2>
+    <p class="lede">모든 입력은 이 브라우저의 localStorage에 저장됩니다. 다른 기기와 공유하거나 백업하려면 JSON으로 내보내세요.
+    이 데이터가 쌓이면 오픈 후 운영 프로그램(원생·수납·리포트 관리)으로 이어지는 출발점이 됩니다.</p>
+    <div class="card">
+      <h3>현재 상태</h3>
+      <div class="res-item"><span>인터뷰 답변</span><b>${iv.done}/${iv.total}</b></div>
+      <div class="res-item"><span>선택 컨셉</span><b>${S.selectedConcept?S.selectedConcept+'안':'미선택'}</b></div>
+      <div class="res-item"><span>전략 액션 완료</span><b>${bd.done}/${bd.total}</b></div>
+      <div class="res-item"><span>실행 작업 완료</span><b>${tk.done}/${tk.total}</b></div>
+      <div class="res-item"><span>오픈 목표일</span><b>${S.openDate||'미설정'}</b></div>
+    </div>
+    <div class="card no-print">
+      <h3>백업 · 공유</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn sm" onclick="exportJson()">JSON 내보내기</button>
+        <label class="btn sm ghost" style="cursor:pointer">JSON 가져오기<input type="file" accept=".json" style="display:none" onchange="importJson(this)"></label>
+        <button class="btn sm ghost" onclick="window.print()">보고서 인쇄 (현재 화면)</button>
+        <button class="btn sm ghost" style="color:var(--bad);border-color:var(--bad)" onclick="resetAll()">전체 초기화</button>
+      </div>
+      <p class="small muted" style="margin-top:10px">인쇄 팁: 컨셉 상세나 전략 보드 화면을 연 상태에서 브라우저 인쇄(Ctrl/Cmd+P)를 누르면 그 화면이 보고서 형태로 출력됩니다.</p>
+    </div>
+    <div class="card">
+      <h3>메모</h3>
+      <textarea class="q-input" style="min-height:110px" placeholder="회의 중 결정사항, 다음에 할 일 등을 자유롭게"
+        onchange="S.memo=this.value;save();toast('메모 저장')">${esc(S.memo||'')}</textarea>
+    </div>
+  </section>`;
+}
+function exportJson(){
+  const blob = new Blob([JSON.stringify({exportedAt:new Date().toISOString(), state:S}, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'wb-suwan-launch-백업.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('JSON 내보내기 완료');
+}
+function importJson(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const obj = JSON.parse(r.result);
+      const st = obj.state || obj;
+      if(typeof st !== 'object') throw new Error('형식 오류');
+      S = Object.assign(defaultState(), st);
+      save(); render(); toast('가져오기 완료');
+    }catch(e){ toast('가져오기 실패 — 파일 형식을 확인하세요'); }
+  };
+  r.readAsText(f);
+}
+function resetAll(){
+  if(!confirm('모든 답변·선택·작업 상태를 삭제합니다. 계속할까요?')) return;
+  localStorage.removeItem(LS_KEY);
+  S = defaultState(); ivIdx = 0; cIdx = null; chFilter='all';
+  render(); toast('초기화 완료');
+}
+
+/* ══════════════════ 시작 ══════════════════ */
+nav('home');
+</script>
+</body>
+</html>
