@@ -2710,9 +2710,85 @@ function vendorTypeBadge(vend) {
 }
 
 function bookPendingOrderCount(b) {
-  const orders = state.tasks.filter(t => !t.deleted && t.title === '[주문] ' + b.title);
+  return bookPendingOrders(b).length;
+}
+/** 이 책이 걸린 미완료 주문 — 책 하나짜리 주문(옛 방식 포함)과, 이 책이 포함된 일괄 주문 둘 다 잡는다 */
+function bookPendingOrders(b) {
+  const orders = state.tasks.filter(t => !t.deleted && t.title.startsWith('[주문] ') &&
+    (t.title === '[주문] ' + b.title || (Array.isArray(t.orderItems) && t.orderItems.some(it => it.title === b.title))));
   return orders.filter(t =>
-    !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done)).length;
+    !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done));
+}
+/** 이 주문을 취소할 수 있는가 — 원장은 전부, 직원은 본인에게 배정된 것만 */
+function canCancelOrder(t) {
+  return !!t && (session.isAdmin || (session.isStaffLink && t.staffId === session.staffId));
+}
+
+/** 담당: 직원이 요청하면 본인, 원장이 요청하면 관리자(없으면 첫 직원) */
+function orderAssignee() {
+  return session.isStaffLink ? session.staffId
+    : ((liveStaff().find(s => s.manager) || teamStaff()[0]) || {}).id;
+}
+
+/** 주문 지시서 하나를 만든다 — 책 한 권짜리도, 여러 권 묶은 것도 같은 모양으로 */
+function createOrderTask(vendorName, items, sid) {
+  const vend = ((bookDb.vendors || []).find(v => (v.name || v) === vendorName)) || null;
+  const titleMain = items.length > 1 ? (vendorName || '교재') + ' — ' + items.length + '권' : items[0].title;
+  state.tasks.push({
+    id: uid(), groupId: 'order-' + now(), staffId: sid,
+    title: '[주문] ' + titleMain,
+    detail: items.map(it => it.title + ': ' + it.qty).join(' · ') + (vendorName ? ' · 주문처: ' + vendorName : ''),
+    guide: '재고 부족으로 요청된 교재 주문입니다.\n■ 목록\n' +
+      items.map(it => '· ' + it.title + ': ' + it.qty).join('\n') + '\n' +
+      (vendorName ? '■ 주문처: ' + vendorName + (vend && vend.type === 'online' ? ' (온라인 직접 주문)' : '') + '\n'
+        : '■ 주문처: 미등록 — 거래 업체(' + ((bookDb.vendors || []).map(v => v.name || v).join('·') || '') + ') 중 확인해 메모에 남겨주세요 (교재 DB에 반영됩니다)\n') +
+      '1) 발주하면 "발주" 단계 체크 + 메모에 주문일 기록\n2) 교재가 도착하면 "입고 확인" 체크 — 자동으로 완료됩니다\n※ 주문이 불가하거나 지연되면 막힘으로 신고하세요.',
+    steps: [{ id: uid(), label: '발주 (주문처·주문일 메모)' }, { id: uid(), label: '입고 확인' }],
+    target: 0, unit: '건', time: '', priority: 'normal',
+    repeat: 'once', days: [], start: today(), end: '', carry: true,
+    // 자동 발송(book-order-send)이 읽는 구조화된 필드 — 자유 텍스트가 아니라 이 값으로만 문자를 만든다
+    orderVendor: vendorName || '', orderItems: items,
+    origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+  });
+}
+
+/** 일괄 주문용 선택 상태 — 책 id 집합. 거래처 섹션마다 그 안의 선택분만 쓴다 */
+const batchSelection = new Set();
+let batchDraft = null;     // 모달에 띄운 선택 책 목록 [{id,title}]
+let batchVendorName = '';
+
+function batchOrderModal(vendorKey) {
+  if (!bookDb) return;
+  const isUnassigned = vendorKey === UNASSIGNED_VENDOR_KEY;
+  const books = (bookDb.books || []).filter(b =>
+    batchSelection.has(b.id) && (isUnassigned ? !b.vendor : b.vendor === vendorKey));
+  if (books.length < 2) return toast('같은 거래처에서 2권 이상 선택해 주세요');
+  batchDraft = books.map(b => ({ id: b.id, title: b.title }));
+  batchVendorName = isUnassigned ? '' : vendorKey;
+  modal((isUnassigned ? '거래처 미등록' : vendorKey) + ' — ' + books.length + '권 한번에 주문',
+    '<div class="hint mb14">각 책의 수량을 입력하고 등록하면 지시서 하나로 묶여 담당 직원에게 들어갑니다.</div>' +
+    batchDraft.map(row =>
+      '<div class="field"><label class="fl">' + esc(row.title) + '</label>' +
+      '<input class="in" id="bq-' + row.id + '" placeholder="예: 3권">' + '</div>').join(''),
+    '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">' + books.length + '권 주문 요청 등록</button>');
+}
+
+function cancelOrderModal(bookId) {
+  const b = ((bookDb && bookDb.books) || []).find(x => x.id === bookId);
+  if (!b) return;
+  const orders = bookPendingOrders(b);
+  if (!orders.length) return toast('취소할 주문이 없습니다');
+  modal('주문 취소 — ' + b.title,
+    orders.map(t => {
+      const staff = staffById(t.staffId);
+      return '<div class="task"><div class="task-body">' +
+        '<div class="task-t">' + esc((staff && staff.name) || '담당 미배정') + '</div>' +
+        '<div class="small muted">' + esc(t.detail || '') + '</div>' +
+        (canCancelOrder(t)
+          ? '<button class="btn btn-sm btn-danger mt8" data-act="bkcancel" data-id="' + t.id + '">이 주문 취소</button>'
+          : '<div class="small muted mt8">본인 담당 주문만 취소할 수 있습니다</div>') +
+      '</div></div>';
+    }).join(''), '');
 }
 
 function bookCard(b) {
@@ -2720,15 +2796,20 @@ function bookCard(b) {
   const studs = bookStudents(b.id);
   const open = bookOpen.has(b.id);
   const openOrders = bookPendingOrderCount(b);
+  const checked = batchSelection.has(b.id);
 
   let h = '<div class="card">' +
     '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
-      '<div><div class="card-title">' + esc(b.title) +
-        (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
-        (openOrders ? ' <span class="tag high">🛒 주문 진행 ' + openOrders + '</span>' : '') + '</div>' +
-      '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
-        (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div>' +
+      '<div class="row" style="gap:8px;align-items:flex-start">' +
+        '<input type="checkbox" data-act="bkselect" data-id="' + b.id + '" ' + (checked ? 'checked' : '') +
+          ' style="margin-top:4px" title="일괄 주문에 담기">' +
+        '<div><div class="card-title">' + esc(b.title) +
+          (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
+          (openOrders ? ' <span class="tag high">🛒 주문 진행 ' + openOrders + '</span>' : '') + '</div>' +
+        '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
+          (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div></div>' +
       '<div class="row" style="gap:8px;flex-shrink:0">' +
+        (openOrders ? '<button class="btn btn-sm btn-danger" data-act="bkcancelopen" data-id="' + b.id + '">🗑 취소</button>' : '') +
         '<button class="btn btn-sm btn-ghost" data-act="bkorder" data-id="' + b.id + '">🛒 주문</button>' +
         '<span class="muted">' + (open ? '▾' : '▸') + '</span></div></div>';
 
@@ -2794,7 +2875,14 @@ function viewBooks() {
         '<div class="small muted">교재 ' + sec.books.length + '권' +
         (brands.length ? ' · ' + esc(brands.slice(0, 4).join('·')) + (brands.length > 4 ? ' 외' : '') : '') +
         '</div></div><span class="muted">' + (closed ? '▸' : '▾') + '</span></div></div>';
-    if (!closed) sec.books.forEach(b => { h += bookCard(b); });
+    if (!closed) {
+      sec.books.forEach(b => { h += bookCard(b); });
+      const selectedHere = sec.books.filter(b => batchSelection.has(b.id));
+      if (selectedHere.length >= 2) {
+        h += '<button class="btn btn-primary btn-block" data-act="bkbatch" data-key="' + esc(sec.key) + '">' +
+          '🛒 선택한 ' + selectedHere.length + '권 한번에 주문하기</button>';
+      }
+    }
   });
   return h;
 }
@@ -4101,27 +4189,46 @@ document.addEventListener('click', ev => {
       if (!b) break;
       const qty = (prompt('[' + b.title + '] 주문 요청\n수량과 메모를 입력하세요 (예: 3권, 다음 주 수업 전까지)') || '').trim();
       if (!qty) return;
-      // 담당: 직원이 요청하면 본인, 원장이 요청하면 관리자(없으면 첫 직원)
-      let sid = session.isStaffLink ? session.staffId
-        : ((liveStaff().find(s => s.manager) || teamStaff()[0]) || {}).id;
+      const sid = orderAssignee();
       if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
-      const vend = ((bookDb.vendors || []).find(v => (v.name || v) === b.vendor)) || null;
-      state.tasks.push({
-        id: uid(), groupId: 'order-' + now(), staffId: sid,
-        title: '[주문] ' + b.title, detail: '수량·메모: ' + qty + (b.vendor ? ' · 주문처: ' + b.vendor : ''),
-        guide: '재고 부족으로 요청된 교재 주문입니다.\n' +
-          (b.vendor ? '■ 주문처: ' + b.vendor + (vend && vend.type === 'online' ? ' (온라인 직접 주문)' : '') + '\n'
-            : '■ 주문처: 미등록 — 거래 업체(' + ((bookDb.vendors || []).map(v => v.name || v).join('·') || '') + ') 중 확인해 메모에 남겨주세요 (교재 DB에 반영됩니다)\n') +
-          '1) 발주하면 "발주" 단계 체크 + 메모에 주문일 기록\n2) 교재가 도착하면 "입고 확인" 체크 — 자동으로 완료됩니다\n※ 주문이 불가하거나 지연되면 막힘으로 신고하세요.',
-        steps: [{ id: uid(), label: '발주 (주문처·주문일 메모)' }, { id: uid(), label: '입고 확인' }],
-        target: 0, unit: '건', time: '', priority: 'normal',
-        repeat: 'once', days: [], start: today(), end: '', carry: true,
-        // 자동 발송(book-order-send)이 읽는 구조화된 필드 — 자유 텍스트가 아니라 이 값으로만 문자를 만든다
-        orderVendor: b.vendor || '', orderItems: [{ title: b.title, qty: qty }],
-        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
-      });
+      createOrderTask(b.vendor || '', [{ title: b.title, qty: qty }], sid);
       save(); queueSync(); render();
       toast('주문 요청 등록 — ' + ((staffById(sid) || {}).name || '') + ' 님 할 일로 들어갔습니다');
+      break;
+    }
+    case 'bkselect': {
+      batchSelection.has(id) ? batchSelection.delete(id) : batchSelection.add(id);
+      render();
+      break;
+    }
+    case 'bkbatch': batchOrderModal(el.dataset.key); break;
+    case 'bkbatchsubmit': {
+      if (!batchDraft || !batchDraft.length) break;
+      const sid = orderAssignee();
+      if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
+      const items = batchDraft.map(row => ({
+        title: row.title,
+        qty: (($('#bq-' + row.id) || {}).value || '').trim() || '1권'
+      }));
+      createOrderTask(batchVendorName, items, sid);
+      items.forEach(it => {
+        const b = (bookDb.books || []).find(x => x.title === it.title);
+        if (b) batchSelection.delete(b.id);
+      });
+      batchDraft = null; batchVendorName = '';
+      save(); queueSync(); closeModal(); render();
+      toast(items.length + '권 한번에 주문 요청 등록 — ' + ((staffById(sid) || {}).name || '') + ' 님 할 일로 들어갔습니다');
+      break;
+    }
+    case 'bkcancelopen': cancelOrderModal(id); break;
+    case 'bkcancel': {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t) break;
+      if (!canCancelOrder(t)) { closeModal(); return toast('이 주문은 취소할 권한이 없습니다'); }
+      if (!confirm('이 주문을 취소할까요?')) return;
+      t.deleted = true; t.updatedAt = now();
+      save(); queueSync(); closeModal(); render();
+      toast('주문을 취소했습니다');
       break;
     }
     case 'ordermsg': {
@@ -4135,6 +4242,10 @@ document.addEventListener('click', ev => {
           items.map(it => '· ' + it.title + ': ' + (it.qty || '(수량 입력)')).join('\n') +
           '\n\n입고 예정일 회신 부탁드립니다. 감사합니다.';
 
+        const cancelBtn = canCancelOrder(t)
+          ? '<button class="btn btn-ghost btn-block" style="margin-top:8px;color:var(--coral)" data-act="bkcancel" data-id="' + t.id + '">🗑 이 주문 취소</button>'
+          : '';
+
         if (vend && vend.type === 'online') {
           modal('온라인 직접 주문',
             '<div class="card-sub mb8">"' + esc(vend.name) + '"는 온라인에서 직접 주문하는 거래처입니다. 문자 발송 대상이 아닙니다.</div>' +
@@ -4142,7 +4253,8 @@ document.addEventListener('click', ev => {
             (vend.orderUrl
               ? '<a class="btn btn-primary btn-block mt14" href="' + esc(vend.orderUrl) + '" target="_blank" rel="noopener">🌐 주문 사이트 열기</a>'
               : '') +
-            '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">주문 목록 복사하기</button>');
+            '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">주문 목록 복사하기</button>' +
+            cancelBtn);
           return;
         }
 
@@ -4152,7 +4264,8 @@ document.addEventListener('click', ev => {
           '<div class="hint mt8" id="bosResult"></div>',
           '<button class="btn btn-primary btn-block mt14" data-act="bossend" data-id="' + t.id + '">🚀 지금 바로 문자 발송</button>' +
           '<a class="btn btn-ghost btn-block" style="margin-top:8px" id="smsLink" href="#" data-act="smsmanual">📱 대신 내 문자앱으로 직접 보내기</a>' +
-          '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">복사하기 (카톡용)</button>');
+          '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">복사하기 (카톡용)</button>' +
+          cancelBtn);
       };
       if (!bookDb && !bookDbErr) {
         loadBooks();
@@ -4675,7 +4788,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-07.3';
+const APP_VER = '2026-08-07.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
