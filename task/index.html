@@ -1088,6 +1088,12 @@ function canEditLessonTask(t) {
   return session.isAdmin || (session.isStaffLink && t.staffId === session.staffId && t.origin === 'staff');
 }
 
+/** 원장이 등록한 내 수업이라 직접은 못 고치지만, 변경을 제안할 수는 있는가 */
+function canProposeLessonChange(t) {
+  return !!t && isLesson(t) && session.isStaffLink && t.staffId === session.staffId &&
+    !canEditLessonTask(t) && !canEditTask(t);
+}
+
 function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
@@ -1398,7 +1404,9 @@ function taskPanel(t, date, c, editable) {
         : '') +
       (canEditLessonTask(t)
         ? '<button class="btn btn-sm btn-ghost" data-act="lessonedit" data-id="' + t.id + '">✏️ 수업 정보 수정</button>'
-        : (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '')) +
+        : (canEditTask(t)
+          ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>'
+          : (canProposeLessonChange(t) ? '<button class="btn btn-sm btn-ghost" data-act="lcpropose" data-id="' + t.id + '">📝 변경 요청</button>' : ''))) +
     '</div>';
   }
   return h + '</div>';
@@ -1861,18 +1869,225 @@ function feedbackQueueCard(item) {
 }
 
 function viewFeedbackReview() {
-  if (session.isStaffLink) return viewOwnFeedbackRequests();
+  if (session.isStaffLink) return viewOwnFeedbackRequests() + viewOwnLessonChangeRequests();
   if (!session.isAdmin) return viewToday();
   if (!feedbackQueueLoaded && !feedbackQueueLoading) setTimeout(() => loadFeedbackQueue(false), 0);
   let h = '<div class="card lesson-review"><div class="card-title">💬 학부모 피드백 문구 검토</div>' +
     '<div class="card-sub"><b>보호자 미연결 · 실제 발송 차단</b><br>여기서 승인하는 것은 문구뿐이며 솔라피·카카오톡 발송은 일어나지 않습니다.</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbrefresh">새로고침</button></div>';
-  if (feedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
-  if (feedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackQueueError) + '</div></div>';
-  if (!feedbackQueue.length) return h + '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
-  const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, cancelled: 3 };
-  return h + feedbackQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
-    .map(feedbackQueueCard).join('');
+  if (feedbackQueueLoading) h += '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
+  else if (feedbackQueueError) h += '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackQueueError) + '</div></div>';
+  else if (!feedbackQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
+  else {
+    const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, cancelled: 3 };
+    h += feedbackQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
+      .map(feedbackQueueCard).join('');
+  }
+  return h + '<hr class="sep">' + viewLessonChangeReview();
+}
+
+/* ── 수업 정보 변경 요청 — 원장이 등록한 지시서는 직원이 직접 못 고치니,
+ *    직원은 여기서 제안만 하고 원장이 승인해야 실제 지시서에 반영된다 ── */
+let lessonChangeQueue = [];
+let lessonChangeQueueLoaded = false;
+let lessonChangeQueueLoading = false;
+let lessonChangeQueueError = '';
+let ownLessonChangeQueue = [];
+let ownLessonChangeQueueLoaded = false;
+let ownLessonChangeQueueLoading = false;
+let ownLessonChangeQueueError = '';
+
+const LESSON_CHANGE_STATUS_LABEL = {
+  approval_waiting: ['원장 검토 대기', 'warn'],
+  approved: ['반영됨', 'ok'],
+  rejected: ['반려', 'bad'],
+  cancelled: ['취소', '']
+};
+const LESSON_CHANGE_REPEAT_LABEL = { once: '한 번', daily: '매일', weekday: '평일', days: '요일 지정' };
+
+async function loadLessonChangeQueue(force) {
+  if (!session.isAdmin || lessonChangeQueueLoading || (lessonChangeQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { lessonChangeQueueError = '동기화 인증이 필요합니다'; lessonChangeQueueLoaded = true; render(); return; }
+  lessonChangeQueueLoading = true; lessonChangeQueueError = '';
+  if (route === 'feedback') render();
+  try {
+    const result = await sync.post('/lesson-change-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
+    lessonChangeQueue = result.requests || [];
+    lessonChangeQueueLoaded = true;
+  } catch (error) {
+    lessonChangeQueueError = String(error && error.message || error);
+    lessonChangeQueueLoaded = true;
+  } finally {
+    lessonChangeQueueLoading = false;
+    if (route === 'feedback') render();
+  }
+}
+
+async function loadOwnLessonChangeQueue(force) {
+  if (!session.isStaffLink || ownLessonChangeQueueLoading || (ownLessonChangeQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { ownLessonChangeQueueError = '동기화 인증이 필요합니다'; ownLessonChangeQueueLoaded = true; render(); return; }
+  ownLessonChangeQueueLoading = true; ownLessonChangeQueueError = '';
+  if (route === 'feedback') render();
+  try {
+    const result = await sync.post('/lesson-change-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
+    ownLessonChangeQueue = result.requests || [];
+    ownLessonChangeQueueLoaded = true;
+  } catch (error) {
+    ownLessonChangeQueueError = String(error && error.message || error);
+    ownLessonChangeQueueLoaded = true;
+  } finally {
+    ownLessonChangeQueueLoading = false;
+    if (route === 'feedback') render();
+  }
+}
+
+/** 승인 대기 중인 제안 내용을 사람이 읽을 문장으로 — 값은 여기서 이스케이프한다 */
+function lessonChangeSummary(changes) {
+  changes = changes || {};
+  const items = [];
+  if (changes.days) items.push('요일 → ' + (changes.days.length ? esc(changes.days.map(d => DOW[d]).join('·')) : '(없음)'));
+  if (changes.time !== undefined) items.push('시간 → ' + esc(changes.time || '(없음)'));
+  if (changes.repeat) items.push('반복 → ' + esc(LESSON_CHANGE_REPEAT_LABEL[changes.repeat] || changes.repeat));
+  if (changes.detail !== undefined) items.push('교재/진도 → ' + esc(changes.detail || '(없음)'));
+  if (changes.guide !== undefined) items.push('수업 메모 → ' + esc(changes.guide || '(없음)'));
+  if (changes.target !== undefined) items.push('목표 수량 → ' + esc(String(changes.target)));
+  if (changes.unit !== undefined) items.push('단위 → ' + esc(changes.unit || ''));
+  return items.join('<br>');
+}
+
+function ownLessonChangeCard(item) {
+  const task = state.tasks.find(row => row.id === item.taskId);
+  const status = LESSON_CHANGE_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
+      esc((task && task.title) || item.taskId) + '</div><div class="small muted">수정본 ' + item.revision + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    '<div class="guide">' + lessonChangeSummary(item.changes) + '</div>' +
+    (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
+    (item.reviewNote ? '<div class="hint mt14"><b>원장 반려 사유</b><br>' + esc(item.reviewNote) + '</div>' : '') +
+    (item.status === 'rejected'
+      ? '<button class="btn btn-sm btn-primary mt14" data-act="lcpropose" data-id="' + item.taskId + '">내용 고쳐 다시 요청</button>'
+      : '') + '</div>';
+}
+
+function viewOwnLessonChangeRequests() {
+  if (!ownLessonChangeQueueLoaded && !ownLessonChangeQueueLoading) setTimeout(() => loadOwnLessonChangeQueue(false), 0);
+  let h = '<hr class="sep"><div class="card"><div class="card-title">📅 수업 정보 변경 요청 상태</div>' +
+    '<div class="card-sub">원장님이 등록한 수업의 요일·시간·진도를 바꿔달라고 제안한 내역입니다. 승인 전까지는 실제 지시서가 그대로 유지됩니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="lcownrefresh">새로고침</button></div>';
+  if (ownLessonChangeQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>불러오는 중입니다.</div></div>';
+  if (ownLessonChangeQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownLessonChangeQueueError) + '</div></div>';
+  if (!ownLessonChangeQueue.length) return h + '<div class="card"><div class="empty"><b>📅</b>아직 요청한 변경이 없습니다. 수업 카드의 "변경 요청" 버튼으로 제안할 수 있습니다.</div></div>';
+  return h + ownLessonChangeQueue.map(ownLessonChangeCard).join('');
+}
+
+function lessonChangeQueueCard(item) {
+  const task = state.tasks.find(row => row.id === item.taskId);
+  const staff = staffById(item.owner);
+  const status = LESSON_CHANGE_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
+      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc((staff && staff.name) || item.owner) + ' 선생님 · 수정본 ' + item.revision + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    '<div class="guide">' + lessonChangeSummary(item.changes) + '</div>' +
+    (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
+    (item.reviewNote ? '<div class="hint mt14">반려 사유: ' + esc(item.reviewNote) + '</div>' : '') +
+    (item.status === 'approval_waiting'
+      ? '<div class="row wraprow mt14">' +
+          '<button class="btn btn-sm btn-primary" data-act="lcreviewapprove" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">승인 · 지시서에 반영</button>' +
+          '<button class="btn btn-sm btn-warn" data-act="lcreviewreject" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">반려</button></div>'
+      : '') + '</div>';
+}
+
+function viewLessonChangeReview() {
+  if (!lessonChangeQueueLoaded && !lessonChangeQueueLoading) setTimeout(() => loadLessonChangeQueue(false), 0);
+  let h = '<div class="card lesson-review"><div class="card-title">📅 수업 정보 변경 요청 검토</div>' +
+    '<div class="card-sub">직원이 제안한 요일·시간·진도 변경입니다. 승인하면 바로 지시서에 반영됩니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="lcrefresh">새로고침</button></div>';
+  if (lessonChangeQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>불러오는 중입니다.</div></div>';
+  if (lessonChangeQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(lessonChangeQueueError) + '</div></div>';
+  if (!lessonChangeQueue.length) return h + '<div class="card"><div class="empty"><b>✅</b>검토할 변경 요청이 없습니다.</div></div>';
+  const rank = { approval_waiting: 0, rejected: 1, approved: 2, cancelled: 3 };
+  return h + lessonChangeQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
+    .map(lessonChangeQueueCard).join('');
+}
+
+/* ── 변경 요청 작성 모달 (직원 전용) ── */
+let lcForm = null;
+
+function lessonChangeModal(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  lcForm = { taskId: taskId, repeat: t.repeat || 'once', days: (t.days || []).slice() };
+  modal('수업 정보 변경 요청',
+    '<div class="hint mb14">여기서 고치는 건 원장님께 제안일 뿐입니다. 승인해야 실제 지시서가 바뀝니다.</div>' +
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시간</label><input class="in" id="lcTime" type="time" value="' + esc(t.time || '') + '"></div>' +
+      '<div class="field"><label class="fl">목표 수량</label><input class="in" id="lcTarget" type="number" min="0" value="' + (t.target || '') + '"></div>' +
+    '</div>' +
+    '<div class="field"><label class="fl">반복</label>' +
+      '<div class="chips" id="lcRepeat">' +
+        [['once', '한 번'], ['daily', '매일'], ['weekday', '평일'], ['days', '요일 지정']].map(([v, lb]) =>
+          '<button type="button" class="chip ' + (lcForm.repeat === v ? 'on' : '') + '" data-act="lcrepeat" data-v="' + v + '">' + lb + '</button>').join('') +
+      '</div></div>' +
+    '<div class="field" id="lcDaysWrap" style="display:' + (lcForm.repeat === 'days' ? '' : 'none') + '"><label class="fl">요일</label>' +
+      '<div class="chips">' + DOW.map((d, i) =>
+        '<button type="button" class="chip dow ' + (lcForm.days.includes(i) ? 'on' : '') + '" data-act="lcday" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
+    '<div class="field"><label class="fl">교재/진도</label><textarea class="in" id="lcDetail" rows="3">' + esc(t.detail || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">수업 메모</label><textarea class="in" id="lcGuide" rows="4">' + esc(t.guide || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">요청 사유 (원장님께 전달됩니다)</label><textarea class="in" id="lcNote" rows="2" placeholder="예: 학생 사정으로 화목반으로 옮겨주세요"></textarea></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="lcsubmit">원장님께 요청 보내기</button>');
+}
+
+async function submitLessonChange(button) {
+  if (!lcForm) return;
+  if (lcForm.repeat === 'days' && !lcForm.days.length) return toast('요일을 선택해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const changes = {
+    time: $('#lcTime').value || '',
+    target: Number($('#lcTarget').value) || 0,
+    repeat: lcForm.repeat,
+    days: lcForm.repeat === 'days' ? lcForm.days.slice().sort() : [],
+    detail: ($('#lcDetail').value || '').trim(),
+    guide: ($('#lcGuide').value || '').trim()
+  };
+  const note = ($('#lcNote').value || '').trim();
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/lesson-change-request', {
+      app: SYNC_APP, auth: auth, action: 'submit', taskId: lcForm.taskId, changes: changes, note: note
+    });
+    lessonChangeQueueLoaded = false; ownLessonChangeQueueLoaded = false;
+    lcForm = null;
+    toast(result.idempotent ? '같은 내용이 이미 원장 검토 대기 중입니다' : '원장님께 변경 요청을 보냈습니다');
+    closeModal();
+  } catch (error) {
+    toast('요청 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function reviewLessonChange(action, key, revision) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const body = { app: SYNC_APP, auth: auth, action: action, requestKey: key, revision: Number(revision) };
+  if (action === 'reject') {
+    const note = prompt('선생님에게 전달할 반려 사유를 적어 주세요');
+    if (note === null) return;
+    body.note = note.trim();
+  }
+  try {
+    const result = await sync.post('/lesson-change-review', body);
+    const index = lessonChangeQueue.findIndex(item => item.requestKey === key);
+    if (index >= 0) lessonChangeQueue[index] = result.request;
+    render();
+    toast(action === 'approve' ? '승인했습니다 · 지시서에 반영됐습니다' : '반려했습니다');
+  } catch (error) {
+    toast('검토 실패 — ' + (error.message || error));
+    loadLessonChangeQueue(true);
+  }
 }
 
 async function submitFeedbackForReview(button) {
@@ -3933,6 +4148,24 @@ document.addEventListener('click', ev => {
     }
     case 'fbreviewapprove': reviewFeedbackRequest('approve_content', el.dataset.key, el.dataset.rev); break;
     case 'fbreviewrevise': reviewFeedbackRequest('request_revision', el.dataset.key, el.dataset.rev); break;
+    case 'lcpropose': lessonChangeModal(id); break;
+    case 'lcrepeat': {
+      lcForm.repeat = el.dataset.v;
+      document.querySelectorAll('#lcRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === lcForm.repeat));
+      $('#lcDaysWrap').style.display = lcForm.repeat === 'days' ? '' : 'none';
+      break;
+    }
+    case 'lcday': {
+      const d = Number(el.dataset.d), i = lcForm.days.indexOf(d);
+      if (i < 0) lcForm.days.push(d); else lcForm.days.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'lcsubmit': submitLessonChange(el); break;
+    case 'lcownrefresh': ownLessonChangeQueueLoaded = false; loadOwnLessonChangeQueue(true); break;
+    case 'lcrefresh': lessonChangeQueueLoaded = false; loadLessonChangeQueue(true); break;
+    case 'lcreviewapprove': reviewLessonChange('approve', el.dataset.key, el.dataset.rev); break;
+    case 'lcreviewreject': reviewLessonChange('reject', el.dataset.key, el.dataset.rev); break;
     case 'fbskip': {
       if (!fbCtx) break;
       const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
@@ -4345,7 +4578,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-04.3';
+const APP_VER = '2026-08-07.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
