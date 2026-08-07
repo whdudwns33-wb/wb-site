@@ -206,7 +206,9 @@
   <button class="navbtn" data-nav="board">③ 흡수전략 보드</button>
   <button class="navbtn" data-nav="tasks">④ 실행 작업</button>
   <button class="navbtn" data-nav="calc">⑤ 시나리오 계산기</button>
+  <button class="navbtn" data-nav="report">⑥ 요약 리포트</button>
   <button class="navbtn" data-nav="data">데이터</button>
+  <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
 </nav>
 
 <main id="app" class="wrap"></main>
@@ -274,6 +276,7 @@ function render(){
   else if(currentView==='board') renderBoard();
   else if(currentView==='tasks') renderTasks();
   else if(currentView==='calc') renderCalc();
+  else if(currentView==='report') renderReport();
   else if(currentView==='data') renderData();
 }
 
@@ -789,6 +792,111 @@ function renderCalc(){
 }
 function calcSet(k,v){ S.calc = calcState(); S.calc[k] = isNaN(v)?0:v; save(); renderCalc(); }
 function calcReset(){ S.calc = null; save(); renderCalc(); }
+
+/* ══════════════════ ⑥ 요약 리포트 ══════════════════ */
+function formatAnswer(q, v){
+  if(v===undefined||v===null||v==='') return null;
+  if(Array.isArray(v)){ if(!v.length) return null; return v.join(', '); }
+  if(q.type==='number') return num(v) + (q.unit?' '+q.unit:'');
+  if(q.type==='scale') return v + ' / 5';
+  return String(v);
+}
+function renderReport(){
+  const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  const sc = conceptScores();
+  const ranked = Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+  const hasScore = ranked.some(r=>r[1]>0);
+  const sel = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : null;
+  const recommended = hasScore ? DATA.concepts.find(c=>c.code===ranked[0][0]) : null;
+  const dd = dday();
+
+  const answeredSections = DATA.interview.sections.map(sec=>{
+    const rows = sec.questions.map(q=>{
+      const txt = formatAnswer(q, S.answers[q.id]);
+      return txt ? {q: q.q, a: txt} : null;
+    }).filter(Boolean);
+    return {title: sec.title, rows};
+  }).filter(s=>s.rows.length);
+
+  const channelStats = (DATA.matrix.channels||[]).map(ch=>{
+    const acts = ['short','mid','long'].flatMap(ph=>(ch.phases[ph]||[]).map((a,i)=>ch.id+'|'+ph+'|'+i));
+    const done = acts.filter(k=>(S.actionState[k]||0)===2).length;
+    const doing = acts.filter(k=>(S.actionState[k]||0)===1).length;
+    return {name: ch.name, done, doing, total: acts.length};
+  });
+
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Summary Report</div>
+    <h2>수완지구 신규 학원 — 준비 현황 요약 리포트</h2>
+    <p class="lede">인터뷰 답변, 선택 컨셉, 흡수전략·실행 작업 진행 현황을 한 장으로 정리했습니다. 인쇄(Ctrl/Cmd+P)로 PDF 저장하거나 아래 버튼으로 텍스트를 복사해 공유하세요.</p>
+
+    <div class="no-print" style="display:flex;gap:10px;margin:16px 0">
+      <button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button>
+      <button class="btn sm ghost" onclick="copyReportText()">📋 텍스트로 복사</button>
+    </div>
+
+    <div class="card tight">
+      <div class="grid4">
+        <div><div class="stat-lbl">인터뷰 진행</div><div class="res-big">${iv.pct}%</div></div>
+        <div><div class="stat-lbl">흡수전략 액션</div><div class="res-big">${bd.done}/${bd.total}</div></div>
+        <div><div class="stat-lbl">실행 작업</div><div class="res-big">${tk.done}/${tk.total}</div></div>
+        <div><div class="stat-lbl">오픈 목표일</div><div class="res-big" style="font-size:18px">${S.openDate?esc(S.openDate):'미설정'}${dd!==null?` (${dd>=0?'D-'+dd:'D+'+(-dd)})`:''}</div></div>
+      </div>
+    </div>
+
+    <div class="c-section-title"><h3>컨셉 판단</h3></div>
+    <div class="card tight">
+      ${hasScore?`<p class="small">답변 기반 추천: <b>${esc(recommended.conceptName)}</b> (A ${sc.A} · B ${sc.B} · C ${sc.C}점)</p>`:'<p class="small muted">인터뷰 답변이 아직 없어 추천 점수가 계산되지 않았습니다.</p>'}
+      ${sel?`<p class="small" style="margin-top:6px">✔ 최종 선택된 컨셉: <b>${esc(sel.conceptName)}</b> — ${esc(sel.tagline)}</p><p class="small muted" style="margin-top:4px">${esc(sel.whyWins)}</p>`:'<p class="small muted" style="margin-top:6px">아직 컨셉이 최종 선택되지 않았습니다.</p>'}
+    </div>
+
+    <div class="c-section-title"><h3>인터뷰 답변 요약</h3></div>
+    ${answeredSections.length ? answeredSections.map(s=>`
+      <div class="card tight" style="margin-bottom:10px">
+        <b class="small">${esc(s.title)}</b>
+        <table class="mini" style="margin-top:8px"><tbody>
+          ${s.rows.map(r=>`<tr><td style="width:55%">${esc(r.q)}</td><td><b>${esc(r.a)}</b></td></tr>`).join('')}
+        </tbody></table>
+      </div>`).join('') : '<div class="card tight"><p class="small muted">아직 답변한 문항이 없습니다. ① 인터뷰에서 답변을 시작해 보세요.</p></div>'}
+
+    <div class="c-section-title"><h3>흡수전략 채널별 진행 현황</h3></div>
+    <div class="card tight">
+      <table class="mini"><thead><tr><th>채널</th><th>완료</th><th>진행중</th><th>전체</th></tr></thead>
+      <tbody>${channelStats.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.done}</td><td>${c.doing}</td><td>${c.total}</td></tr>`).join('')}</tbody></table>
+    </div>
+
+    ${S.memo?`<div class="c-section-title"><h3>메모</h3></div><div class="card tight"><p class="small" style="white-space:pre-wrap">${esc(S.memo)}</p></div>`:''}
+  </section>`;
+}
+function copyReportText(){
+  const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  const sc = conceptScores();
+  const sel = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : null;
+  const lines = [];
+  lines.push('■ 수완지구 신규 학원 준비 현황 요약');
+  lines.push(`- 오픈 목표일: ${S.openDate||'미설정'}`);
+  lines.push(`- 인터뷰 진행: ${iv.done}/${iv.total} (${iv.pct}%)`);
+  lines.push(`- 흡수전략 액션: ${bd.done}/${bd.total} 완료`);
+  lines.push(`- 실행 작업: ${tk.done}/${tk.total} 완료`);
+  lines.push(`- 컨셉 점수: A ${sc.A} · B ${sc.B} · C ${sc.C}`);
+  lines.push(`- 선택 컨셉: ${sel?sel.conceptName+' — '+sel.tagline:'미선택'}`);
+  lines.push('');
+  DATA.interview.sections.forEach(sec=>{
+    const rows = sec.questions.map(q=>{const t=formatAnswer(q, S.answers[q.id]); return t?`  · ${q.q} → ${t}`:null;}).filter(Boolean);
+    if(rows.length){ lines.push(`[${sec.title}]`); lines.push(...rows); lines.push(''); }
+  });
+  const text = lines.join('\n');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast('요약 텍스트가 복사되었습니다')).catch(()=>fallbackCopy(text));
+  } else { fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('요약 텍스트가 복사되었습니다'); }catch(e){ toast('복사 실패 — 텍스트를 직접 선택해 복사해주세요'); }
+  document.body.removeChild(ta);
+}
 
 /* ══════════════════ 데이터 관리 ══════════════════ */
 function renderData(){
