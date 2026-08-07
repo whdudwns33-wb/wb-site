@@ -21,6 +21,7 @@
  *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
+ *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -31,6 +32,7 @@
 import { handleLessonCreate } from './lesson-create.js';
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
+import { handleBookOrderSend } from './book-order-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -938,6 +940,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleDirectorReportSend(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/book-order-send') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookOrderSend(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
