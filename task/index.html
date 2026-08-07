@@ -2698,60 +2698,103 @@ function posOf(b, at) {
   return -1;
 }
 
+/** 거래처 카드 접기 상태 — 기본은 펼침, 닫은 것만 이 집합에 담는다 */
+const vendorClosed = new Set();
+const UNASSIGNED_VENDOR_KEY = '__unassigned__';
+
+function vendorTypeBadge(vend) {
+  if (!vend) return '';
+  return vend.type === 'online'
+    ? '<span class="tag" style="color:var(--navy)">🌐 온라인 직접 주문</span>'
+    : '<span class="tag" style="color:var(--navy)">📞 전화·문자 주문</span>';
+}
+
+function bookPendingOrderCount(b) {
+  const orders = state.tasks.filter(t => !t.deleted && t.title === '[주문] ' + b.title);
+  return orders.filter(t =>
+    !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done)).length;
+}
+
+function bookCard(b) {
+  const f = flatSections(b);
+  const studs = bookStudents(b.id);
+  const open = bookOpen.has(b.id);
+  const openOrders = bookPendingOrderCount(b);
+
+  let h = '<div class="card">' +
+    '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
+      '<div><div class="card-title">' + esc(b.title) +
+        (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
+        (openOrders ? ' <span class="tag high">🛒 주문 진행 ' + openOrders + '</span>' : '') + '</div>' +
+      '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
+        (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div>' +
+      '<div class="row" style="gap:8px;flex-shrink:0">' +
+        '<button class="btn btn-sm btn-ghost" data-act="bkorder" data-id="' + b.id + '">🛒 주문</button>' +
+        '<span class="muted">' + (open ? '▾' : '▸') + '</span></div></div>';
+
+  studs.forEach(st => {
+    const idx = posOf(b, st.at);
+    const done = idx >= 0 ? idx : 0;
+    const remain = f.length ? f.length - done : 0;
+    const weeks = (st.perWeek && remain) ? Math.ceil(remain / st.perWeek) : 0;
+    const pct = f.length ? Math.round(done / f.length * 100) : 0;
+    h += '<hr class="sep"><div class="small"><b>' + esc(st.name) + '</b>' +
+      (st.teacher ? ' <span class="muted">(' + esc(st.teacher) + ')</span>' : '') +
+      (idx >= 0 ? ' — 현재 <b>' + esc(f[idx].sec) + '</b>' : (st.at ? ' — 위치 미확인' : '')) + '</div>' +
+      (f.length ? '<div class="bar" style="margin:6px 0 4px"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="small muted">진행 ' + done + '/' + f.length +
+        (weeks ? ' · 주 ' + st.perWeek + '회 기준 약 ' + weeks + '주 남음' : '') +
+        (st.goal ? ' · 목표: ' + esc(st.goal) : '') + '</div>' : '');
+  });
+
+  if (open) {
+    let lastUnit = '';
+    h += '<hr class="sep">';
+    f.forEach((row, i) => {
+      if (row.unit !== lastUnit) { h += '<div class="sect" style="margin:10px 0 4px">' + esc(row.unit) + '</div>'; lastUnit = row.unit; }
+      const marks = studs.filter(st => posOf(b, st.at) === i).map(st => ' <span class="tag doing">◀ ' + esc(st.name) + '</span>').join('');
+      h += '<div class="small" style="padding:3px 0">' + (i + 1) + '. ' + esc(row.sec) + marks + '</div>';
+    });
+    if (!f.length) h += '<div class="small muted">목차가 아직 없습니다 — ' + esc(b.note || '') + '</div>';
+  }
+  return h + '</div>';
+}
+
 function viewBooks() {
   if (!bookDb && !bookDbErr) { loadBooks(); return '<div class="card"><div class="empty"><b>📚</b>교재 데이터를 불러오는 중…</div></div>'; }
   if (bookDbErr) return '<div class="card"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span></div></div>';
 
   let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
-    '<div class="card-sub">소단원 목차와 학생별 현재 위치. 교재를 누르면 목차가 열립니다.<br>' +
+    '<div class="card-sub">거래처(출판사)별로 묶었습니다. 거래처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
     '기준일 ' + esc(bookDb.updated || '') + ' · 목차 수정은 원장님이 저에게 말로 지시하면 반영됩니다.</div></div>';
 
+  const vendors = bookDb.vendors || [];
+  const byVendor = new Map(vendors.map(v => [v.name, []]));
+  const unassigned = [];
   (bookDb.books || []).forEach(b => {
-    const f = flatSections(b);
-    const studs = bookStudents(b.id);
-    const open = bookOpen.has(b.id);
-    const orders = state.tasks.filter(t => !t.deleted && t.title === '[주문] ' + b.title);
-    const openOrders = orders.filter(t =>
-      !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done));
+    if (b.vendor && byVendor.has(b.vendor)) byVendor.get(b.vendor).push(b);
+    else unassigned.push(b);
+  });
 
-    h += '<div class="card">' +
-      '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
-        '<div><div class="card-title">' + esc(b.title) +
-          (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
-          (openOrders.length ? ' <span class="tag high">🛒 주문 진행 ' + openOrders.length + '</span>' : '') + '</div>' +
-        '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
-          (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') +
-          ' · 주문처: ' + (b.vendor ? esc(b.vendor) : '<span style="color:var(--amber)">미등록</span>') + '</div></div>' +
-        '<div class="row" style="gap:8px;flex-shrink:0">' +
-          '<button class="btn btn-sm btn-ghost" data-act="bkorder" data-id="' + b.id + '">🛒 주문</button>' +
-          '<span class="muted">' + (open ? '▾' : '▸') + '</span></div></div>';
+  const sections = vendors
+    .map(v => ({ key: v.name, vend: v, books: byVendor.get(v.name) }))
+    .filter(sec => sec.books.length);
+  if (unassigned.length) sections.push({ key: UNASSIGNED_VENDOR_KEY, vend: null, books: unassigned });
 
-    studs.forEach(st => {
-      const idx = posOf(b, st.at);
-      const done = idx >= 0 ? idx : 0;
-      const remain = f.length ? f.length - done : 0;
-      const weeks = (st.perWeek && remain) ? Math.ceil(remain / st.perWeek) : 0;
-      const pct = f.length ? Math.round(done / f.length * 100) : 0;
-      h += '<hr class="sep"><div class="small"><b>' + esc(st.name) + '</b>' +
-        (st.teacher ? ' <span class="muted">(' + esc(st.teacher) + ')</span>' : '') +
-        (idx >= 0 ? ' — 현재 <b>' + esc(f[idx].sec) + '</b>' : (st.at ? ' — 위치 미확인' : '')) + '</div>' +
-        (f.length ? '<div class="bar" style="margin:6px 0 4px"><i style="width:' + pct + '%"></i></div>' +
-          '<div class="small muted">진행 ' + done + '/' + f.length +
-          (weeks ? ' · 주 ' + st.perWeek + '회 기준 약 ' + weeks + '주 남음' : '') +
-          (st.goal ? ' · 목표: ' + esc(st.goal) : '') + '</div>' : '');
-    });
+  if (!sections.length) return h + '<div class="card"><div class="empty"><b>📚</b>등록된 교재가 없습니다.</div></div>';
 
-    if (open) {
-      let lastUnit = '';
-      h += '<hr class="sep">';
-      f.forEach((row, i) => {
-        if (row.unit !== lastUnit) { h += '<div class="sect" style="margin:10px 0 4px">' + esc(row.unit) + '</div>'; lastUnit = row.unit; }
-        const marks = studs.filter(st => posOf(b, st.at) === i).map(st => ' <span class="tag doing">◀ ' + esc(st.name) + '</span>').join('');
-        h += '<div class="small" style="padding:3px 0">' + (i + 1) + '. ' + esc(row.sec) + marks + '</div>';
-      });
-      if (!f.length) h += '<div class="small muted">목차가 아직 없습니다 — ' + esc(b.note || '') + '</div>';
-    }
-    h += '</div>';
+  sections.forEach(sec => {
+    const closed = vendorClosed.has(sec.key);
+    const pending = sec.books.reduce((sum, b) => sum + bookPendingOrderCount(b), 0);
+    const brands = sec.vend && Array.isArray(sec.vend.brands) ? sec.vend.brands : [];
+    h += '<div class="card" style="padding:12px"><div class="between" data-act="vendortoggle" data-key="' + esc(sec.key) + '" style="cursor:pointer">' +
+      '<div><div class="card-title">' + (sec.vend ? esc(sec.vend.name) : '거래처 미등록') +
+        (sec.vend ? ' ' + vendorTypeBadge(sec.vend) : '') +
+        (pending ? ' <span class="tag high">🛒 주문 진행 ' + pending + '</span>' : '') + '</div>' +
+        '<div class="small muted">교재 ' + sec.books.length + '권' +
+        (brands.length ? ' · ' + esc(brands.slice(0, 4).join('·')) + (brands.length > 4 ? ' 외' : '') : '') +
+        '</div></div><span class="muted">' + (closed ? '▸' : '▾') + '</span></div></div>';
+    if (!closed) sec.books.forEach(b => { h += bookCard(b); });
   });
   return h;
 }
@@ -4046,6 +4089,12 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
+    case 'vendortoggle': {
+      const key = el.dataset.key;
+      vendorClosed.has(key) ? vendorClosed.delete(key) : vendorClosed.add(key);
+      render();
+      break;
+    }
     case 'bkorder': {
       if (!bookDb) break;
       const b = (bookDb.books || []).find(x => x.id === id);
@@ -4626,7 +4675,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-07.2';
+const APP_VER = '2026-08-07.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
