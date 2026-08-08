@@ -37,6 +37,7 @@
     font-size:12px;font-weight:600;padding:6px 11px;border-radius:6px;white-space:nowrap}
   .navbtn:hover{background:rgba(255,255,255,.1);color:#fff}
   .navbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+  .nav-sep{width:1px;align-self:stretch;background:rgba(255,255,255,.18);margin:2px 4px}
 
   .view{padding:36px 0 80px;animation:fade .3s ease}
   @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -227,6 +228,64 @@
   .checklist li{font-size:13.5px;padding:6px 0 6px 26px;position:relative}
   .checklist li::before{content:"☐";position:absolute;left:0;color:var(--blue);font-size:15px}
 
+  /* ─── 오픈 타임라인 ─── */
+  .tl-track{position:relative;padding-left:26px}
+  .tl-track::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .tl-item{position:relative;padding-bottom:22px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-dot{position:absolute;left:-26px;top:2px;width:18px;height:18px;border-radius:100px;background:var(--white);border:3px solid var(--blue)}
+  .tl-item.past .tl-dot{background:var(--ok);border-color:var(--ok)}
+  .tl-item.open .tl-dot{background:var(--coral);border-color:var(--coral)}
+  .tl-date{font-size:11.5px;font-weight:800;color:var(--deep-blue);letter-spacing:.02em}
+  .tl-title{font-size:14.5px;font-weight:800;margin:2px 0 3px}
+  .tl-desc{font-size:12.5px;color:var(--mid);line-height:1.6}
+
+  /* ─── 손익 차트 ─── */
+  .chart-card{overflow-x:auto}
+  .chart-svg{display:block;min-width:560px}
+  .chart-legend{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap}
+  .chart-legend .li{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+  .chart-legend .sw{width:12px;height:12px;border-radius:3px}
+  .chart-tip{position:absolute;background:var(--navy);color:#fff;font-size:11.5px;padding:6px 10px;border-radius:7px;
+    pointer-events:none;opacity:0;transition:opacity .12s;white-space:nowrap;z-index:10;font-variant-numeric:tabular-nums}
+  .chart-tip.show{opacity:1}
+  .chart-pt{cursor:pointer}
+
+  /* ─── 과목별 커리큘럼 ─── */
+  .subj-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .subj-tab{border:2px solid var(--line);background:var(--white);border-radius:12px;padding:12px 18px;font-weight:800;font-size:14px;color:var(--mid)}
+  .subj-tab.active{border-color:var(--c2-main,var(--blue));color:var(--c2-main,var(--deep-blue));background:var(--tint-blue)}
+  .stage-card{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .stage-card h4{font-size:15px;font-weight:900;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .book-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+  @media(max-width:700px){.book-grid{grid-template-columns:1fr}}
+  .book-chip{background:var(--light);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6}
+  .book-chip b{font-size:13px}
+  .format-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .format-card{flex:1;min-width:150px;border:1.5px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px}
+  .format-card b{display:block;font-size:13px;margin-bottom:4px;color:var(--deep-blue)}
+
+  /* ─── 학원 구성 시뮬레이터 ─── */
+  .sim-layout{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+  @media(max-width:900px){.sim-layout{grid-template-columns:1fr}}
+  .sim-cat{margin-bottom:20px}
+  .sim-cat h4{font-size:13.5px;font-weight:800;margin-bottom:8px;color:var(--mid);text-transform:uppercase;letter-spacing:.04em;font-size:11.5px}
+  .sim-opts{display:flex;flex-wrap:wrap;gap:10px}
+  .sim-opt{border:2px solid var(--line);background:var(--white);border-radius:12px;padding:14px 16px;min-width:140px;flex:1;text-align:left;cursor:pointer}
+  .sim-opt:hover{border-color:var(--blue)}
+  .sim-opt.picked{border-color:var(--blue);background:var(--tint-blue)}
+  .sim-opt .so-emoji{font-size:20px;margin-bottom:4px;display:block}
+  .sim-opt .so-name{font-weight:800;font-size:13.5px}
+  .sim-opt .so-desc{font-size:11px;color:var(--mid);margin-top:2px;line-height:1.5}
+  .sim-preview{position:sticky;top:64px;background:linear-gradient(150deg,var(--navy),var(--navy-deep));
+    color:#fff;border-radius:16px;padding:22px 20px}
+  .sim-preview h3{color:#fff;font-size:16px;margin-bottom:4px}
+  .sim-preview .sp-tagline{font-size:13px;opacity:.85;line-height:1.6;margin-bottom:14px;min-height:60px}
+  .sim-preview .sp-row{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid rgba(255,255,255,.15);font-size:12.5px}
+  .sim-preview .sp-row b{font-weight:800}
+  .sim-save-list{margin-top:12px}
+  .sim-save-item{background:var(--white);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;font-size:12.5px}
+
   /* misc */
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;
     font-size:13px;font-weight:700;padding:11px 22px;border-radius:100px;box-shadow:0 6px 22px rgba(0,0,0,.25);
@@ -256,6 +315,16 @@
   <button class="navbtn" data-nav="schedule">⑥ 커리큘럼·시간표</button>
   <button class="navbtn" data-nav="report">⑦ 요약 리포트</button>
   <button class="navbtn" data-nav="manual">⑧ 상담 매뉴얼</button>
+  <span class="nav-sep"></span>
+  <button class="navbtn" data-nav="subjects">📖 과목별 커리큘럼</button>
+  <button class="navbtn" data-nav="simulator">🧪 학원 구성 시뮬레이터</button>
+  <button class="navbtn" data-nav="opsmanual">🏭 운영 매뉴얼</button>
+  <button class="navbtn" data-nav="staffmanual">🎓 직원 교육 매뉴얼</button>
+  <button class="navbtn" data-nav="competitors">🥊 경쟁사 비교</button>
+  <button class="navbtn" data-nav="brochure">📰 학부모 브로슈어</button>
+  <button class="navbtn" data-nav="timeline">🗓 오픈 타임라인</button>
+  <button class="navbtn" data-nav="pnl">📈 손익 시뮬레이션</button>
+  <span class="nav-sep"></span>
   <button class="navbtn" data-nav="data">데이터</button>
   <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
 </nav>
@@ -325,7 +394,9 @@ const defaultState = () => ({
   calc: null,
   scheduleGen: null,      // null이면 인터뷰 답변에서 기본값 계산
   openDate: '2026-11-02', // 잠정값 — "2026년 하반기" 목표, 매물 확정 후 수정
-  memo: CONFIRMED_MEMO
+  memo: CONFIRMED_MEMO,
+  simConfig: { focus:'balanced', format:'standard', testUsage:'mandatory', vehicle:'fromStart', pricePosition:'premium' },
+  savedSims: []           // [{id, name, config}] — 학원 구성 시뮬레이터에 저장한 조합들
 });
 let S = load();
 function load(){
@@ -374,6 +445,14 @@ function render(){
   else if(currentView==='schedule') renderSchedule();
   else if(currentView==='report') renderReport();
   else if(currentView==='manual') renderManual();
+  else if(currentView==='subjects') renderSubjects();
+  else if(currentView==='simulator') renderSimulator();
+  else if(currentView==='opsmanual') renderOpsManual();
+  else if(currentView==='staffmanual') renderStaffManual();
+  else if(currentView==='competitors') renderCompetitors();
+  else if(currentView==='brochure') renderBrochure();
+  else if(currentView==='timeline') renderTimeline();
+  else if(currentView==='pnl') renderPnl();
   else if(currentView==='data') renderData();
 }
 
@@ -1309,6 +1388,607 @@ function renderManual(){
     <div class="card">
       <div class="script"><div class="who">상담사</div>"오늘 말씀 나눈 내용은 문자로도 정리해서 보내드릴게요. 천천히 고민해보시고, 궁금한 점 있으시면 언제든 카카오채널로 편하게 물어보세요. 등록을 지금 바로 결정하지 않으셔도 괜찮습니다."</div>
       <p class="small muted" style="margin-top:8px">클로징에서 압박하지 않는 것이 원칙입니다 — 자연 바이럴·재방문 유도가 강한 클로징보다 장기적으로 유리합니다.</p>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 🥊 경쟁사 비교 ══════════════════ */
+const COMPETITORS = [
+  { name:'김한철 수학학원', type:'수학 단과', vehicle:'미상', strength:'2월 재오픈, 지역 내 기존 인지도',
+    gap:'단일 과목 — 국어·영어·학습관리 공백. 검사 기반 배치 없음',
+    diff:'우리는 국어+영어+수학+학습관리를 한 곳에서, 검사 데이터로 반을 배치합니다.' },
+  { name:'스카이 영어학원', type:'영어 단과 (건물 수익쉐어형 입점)', vehicle:'일반적',
+    strength:'대형 상가 입점, 브랜드 노출도',
+    gap:'영어 단일 과목, 획일적 레벨 구조 — 개인화 부족',
+    diff:'우리는 검사 결과에 따라 개인별 로드맵을 짜고, 영어 외 과목도 같은 데이터로 관리합니다.' },
+  { name:'대형 어학원 (폴리·청담·ECC 등)', type:'영어 프랜차이즈', vehicle:'운영 일반적(비용 부담 큼)',
+    strength:'브랜드 파워, 체계화된 교재·시스템',
+    gap:'고가, 획일적 커리큘럼 — 아이 성향과 무관하게 같은 레벨 구조',
+    diff:'프랜차이즈 브랜드 파워 대신, 우리는 WB 검사 데이터라는 복제 불가능한 자산으로 승부합니다.' },
+  { name:'브라이튼 수완점 / LCI 수완 (영유 2강)', type:'영어유치원', vehicle:'셔틀 운영',
+    strength:'수완지구 영유 시장 선점, 높은 학부모 인지도',
+    gap:'유치원 이후(초등) 연계 트랙 부재 — 졸업 후 어디로 가야 할지 학부모가 직접 찾아야 함',
+    diff:'우리는 리더스 유치원·영유와 공식 연계되어 있어 "졸업 후 다음 단계"가 이미 준비돼 있습니다.' },
+];
+function renderCompetitors(){
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Market Position</div>
+    <h2>경쟁사 비교</h2>
+    <p class="lede">수완지구 실제 경쟁 구도 대비 우리 포지셔닝입니다. 리더스·리드앤톡 원장님께 "시장을 이 정도로 파악하고 있다"는 걸 보여주는 자료로 활용하세요.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+    <div class="card tight" style="overflow-x:auto">
+      <table class="mini">
+        <thead><tr><th>경쟁 기관</th><th>유형</th><th>강점</th><th>공백(우리 기회)</th><th>차량</th><th>우리와의 차별점</th></tr></thead>
+        <tbody>${COMPETITORS.map(c=>`<tr>
+          <td><b>${esc(c.name)}</b></td>
+          <td class="small">${esc(c.type)}</td>
+          <td class="small">${esc(c.strength)}</td>
+          <td class="small" style="color:var(--deep-blue)">${esc(c.gap)}</td>
+          <td class="small">${esc(c.vehicle)}</td>
+          <td class="small muted">${esc(c.diff)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="card tight">
+      <h3>종합 포지셔닝</h3>
+      <p class="small">수완지구 학원 시장은 <b>과목별 단과 학원(수학/영어)이 각자 흩어져 있고</b>, 영어유치원은 <b>졸업 이후 연계가 끊기는</b> 구조입니다.
+      우리는 이 두 공백 — "과목 통합 관리"와 "유치원 이후 연속성" — 을 동시에 채우는 유일한 신규 진입자입니다.</p>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 🗓 오픈 타임라인 ══════════════════ */
+function addDays(dateStr, days){
+  const d = new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+days);
+  return d;
+}
+function fmtDate(d){ return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+const TIMELINE_OFFSETS = [
+  { off:-90, title:'매물 계약·실사 완료', desc:'인수 대상 학원 재무 실사, 계약금 납입, 3자 투자 구조 확정' },
+  { off:-75, title:'3자 합의서·수익배분 확정', desc:'대표·리더스·리드앤톡 역할·지분·수익배분 계약서 서명' },
+  { off:-60, title:'인테리어 착공 + 강사 채용 시작', desc:'리브랜딩 공사 착수, 핵심 강사(국어·영어·수학) 채용 공고' },
+  { off:-30, title:'인테리어 완료 · 강사 채용 완료', desc:'검사실·상담실 세팅, 강사 전원 확정 및 사전 교육' },
+  { off:-21, title:'학부모 오픈 설명회 · 모집 시작', desc:'리더스·리드앤톡 재원생 대상 안내, 외부 신규 설명회 개최' },
+  { off:-7,  title:'최종 점검', desc:'시간표 확정, 반편성 완료, 상담 매뉴얼·직원 교육 마무리' },
+  { off:0,   title:'🎉 오픈', desc:'정식 개원' },
+  { off:7,   title:'첫 학부모 간담회', desc:'초기 재원 가정 대상 만족도·이슈 점검' },
+  { off:30,  title:'1차 정원 점검', desc:'3개월 목표(${target}명) 대비 진행률 확인, 흡수전략 보드 갱신' },
+];
+function renderTimeline(){
+  const openDate = S.openDate;
+  if(!openDate){ app.innerHTML = '<section class="view"><div class="card">홈 화면에서 오픈 목표일을 먼저 설정해주세요.</div></section>'; return; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const target = S.answers.s2 || 100;
+  const items = TIMELINE_OFFSETS.map(t => {
+    const d = addDays(openDate, t.off);
+    const isPast = d < today;
+    const isOpen = t.off === 0;
+    return { ...t, date: d, isPast, isOpen, desc: t.desc.replace('${target}', target) };
+  });
+  const openD = addDays(openDate, 0);
+  const openMonth = openD.getMonth()+1;
+  const inSeason = openMonth >= 9 || openMonth <= 2; // 학사일정상 9~2월이면 11~2월 모집시즌과 겹침
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Launch Timeline</div>
+    <h2>오픈 타임라인</h2>
+    <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 홈 화면에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+    <div class="card tight" style="margin-bottom:16px">
+      <span class="pill ${inSeason?'ok':'warn'}">${inSeason ? '✓ 11~2월 모집 시즌과 정렬됨' : '⚠ 모집 시즌(11~2월)과 어긋남 — 날짜 재검토 권장'}</span>
+    </div>
+    <div class="card">
+      <div class="tl-track">
+        ${items.map(it=>`<div class="tl-item ${it.isPast?'past':''} ${it.isOpen?'open':''}">
+          <div class="tl-dot"></div>
+          <div class="tl-date">${esc(fmtDate(it.date))}${it.isPast?' · 지남':''}</div>
+          <div class="tl-title">${esc(it.title)}</div>
+          <div class="tl-desc">${esc(it.desc)}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 📈 손익 시뮬레이션 (3개년) ══════════════════ */
+function pnlSeries(){
+  const c = calcState();
+  const price = S.answers.c2 || c.fee;
+  const points = [
+    { m:0,  students:0 },
+    { m:3,  students: S.answers.s2 || 100 },
+    { m:12, students: S.answers.g2 || 150 },
+    { m:24, students: Math.round(((S.answers.g2||150)+300)/2) },
+    { m:36, students: 300 },
+  ];
+  return points.map(p=>{
+    const revenue = p.students * price;
+    const teacher = revenue * (c.teacherRatio/100);
+    const cost = c.rent + teacher + (c.vanCount*c.vanCost) + c.etcCost;
+    const profit = revenue - cost;
+    return { ...p, revenue, cost, profit };
+  });
+}
+function renderPnl(){
+  const series = pnlSeries();
+  const W = 640, H = 300, PAD = { t:24, r:20, b:36, l:56 };
+  const plotW = W-PAD.l-PAD.r, plotH = H-PAD.t-PAD.b;
+  const maxY = Math.max(...series.map(s=>s.revenue), 1) * 1.15;
+  const x = i => PAD.l + (plotW/(series.length-1))*i;
+  const y = v => PAD.t + plotH - (Math.max(v,0)/maxY)*plotH;
+  const zeroY = y(0);
+  const revPath = series.map((s,i)=>`${i===0?'M':'L'}${x(i)},${y(s.revenue)}`).join(' ');
+  const profitPath = series.map((s,i)=>`${i===0?'M':'L'}${x(i)},${y(s.profit)}`).join(' ');
+  const areaPath = revPath + ` L${x(series.length-1)},${zeroY} L${x(0)},${zeroY} Z`;
+
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">3-Year P&amp;L Simulation</div>
+    <h2>손익 시뮬레이션 (오픈 후 36개월)</h2>
+    <p class="lede">⑤ 시나리오 계산기의 비용 가정(임대료·강사 인건비율·차량·기타)에, 확정된 학생 수 목표(3개월 ${num(S.answers.s2||100)}명 · 12개월 ${num(S.answers.g2||150)}명 · 36개월 300명)를 대입한 성장 곡선입니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+
+    <div class="card chart-card" style="position:relative">
+      <div class="chart-legend">
+        <div class="li"><span class="sw" style="background:var(--blue)"></span>매출</div>
+        <div class="li"><span class="sw" style="background:var(--coral)"></span>순이익</div>
+      </div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="36개월 매출·순이익 추이">
+        ${[0,0.25,0.5,0.75,1].map(f=>{ const gy = PAD.t+plotH*(1-f); return `<line x1="${PAD.l}" y1="${gy}" x2="${W-PAD.r}" y2="${gy}" stroke="var(--line)" stroke-width="1"/><text x="${PAD.l-8}" y="${gy+4}" font-size="10" text-anchor="end" fill="var(--mid)">${num(maxY*f/100)*100}</text>`; }).join('')}
+        <line x1="${PAD.l}" y1="${zeroY}" x2="${W-PAD.r}" y2="${zeroY}" stroke="var(--mid)" stroke-width="1"/>
+        <path d="${areaPath}" fill="var(--tint-blue)" opacity="0.6"/>
+        <path d="${revPath}" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="${profitPath}" fill="none" stroke="var(--coral)" stroke-width="2.5" stroke-linecap="round"/>
+        ${series.map((s,i)=>`
+          <circle class="chart-pt" cx="${x(i)}" cy="${y(s.revenue)}" r="4" fill="var(--blue)"
+            onmouseenter="showChartTip(event,'${s.m}개월 · 매출 ${num(s.revenue)}만원')" onmouseleave="hideChartTip()"/>
+          <circle class="chart-pt" cx="${x(i)}" cy="${y(s.profit)}" r="4" fill="var(--coral)"
+            onmouseenter="showChartTip(event,'${s.m}개월 · 순이익 ${num(s.profit)}만원')" onmouseleave="hideChartTip()"/>
+          <text x="${x(i)}" y="${H-PAD.b+18}" font-size="11" text-anchor="middle" fill="var(--mid)">${s.m}개월</text>
+        `).join('')}
+      </svg>
+      <div id="chartTip" class="chart-tip"></div>
+    </div>
+
+    <div class="card tight" style="overflow-x:auto">
+      <table class="mini">
+        <thead><tr><th>시점</th><th>학생 수</th><th>매출</th><th>비용</th><th>순이익</th></tr></thead>
+        <tbody>${series.map(s=>`<tr><td>${s.m}개월</td><td>${num(s.students)}명</td><td>${num(s.revenue)}만</td><td>${num(s.cost)}만</td>
+          <td><b style="color:${s.profit>=0?'var(--ok)':'var(--bad)'}">${num(s.profit)}만</b></td></tr>`).join('')}</tbody>
+      </table>
+      <p class="small muted" style="margin-top:8px">단위: 만원. 세부 비용 가정은 ⑤ 시나리오 계산기에서 조정할 수 있습니다 (이 화면은 계산기 값을 그대로 읽어옵니다).</p>
+    </div>
+  </section>`;
+}
+function showChartTip(e, text){
+  const tip = document.getElementById('chartTip'); if(!tip) return;
+  tip.textContent = text; tip.classList.add('show');
+  const rect = e.target.closest('.chart-card').getBoundingClientRect();
+  tip.style.left = (e.clientX - rect.left + 12) + 'px';
+  tip.style.top = (e.clientY - rect.top - 30) + 'px';
+}
+function hideChartTip(){ const tip = document.getElementById('chartTip'); if(tip) tip.classList.remove('show'); }
+
+/* ══════════════════ 📖 과목별 상세 커리큘럼 ══════════════════
+   WB 수완지구 콘텐츠마케팅 기획(2026-04) 실사용 교재 DB에서 발췌·구성.
+   컨셉 C의 4개 수업 라인(국어 독해랩·수학랩·영어랩·중등 내신 집중 트랙)에 맞춰
+   학년 단계별 목표·교재 예시·수업 형태 예시를 제시한다. */
+const SUBJECT_CURRICULUM = {
+  korean: { label:'국어 · 독해력', icon:'📘', lineRef:'국어 독해랩',
+    stages:[
+      { stage:'초3~4 (독해 기초)', goal:'문장→문단→글 구조 독해의 기초 체계화. 12패턴 매핑 기반 어휘·비문학 데이터 트래킹 시작.',
+        books:[
+          {name:'뿌리깊은 초등국어 독해력 1~2단계', pub:'마더텅', note:'문단·글 구조 독해 기초'},
+          {name:'기적의 독해력 초1~3', pub:'길벗', note:'매일 짧은 지문 루틴'},
+          {name:'ERI 독해가 문해력이다', pub:'-', note:'어휘·문법 통합형'},
+          {name:'디딤돌 초등국어', pub:'디딤돌', note:'교과서 연계 기본서'},
+        ]},
+      { stage:'초5~6 (비문학·교과 독해)', goal:'"읽기 학습"에서 "학습 읽기"로 전환되는 시기. 비문학 독해·교과 연계 지문·요약·추론 훈련.',
+        books:[
+          {name:'뿌리깊은 초등국어 3~6단계', pub:'마더텅', note:'심화 비문학 독해'},
+          {name:'숨마쿰라우데 초등국어', pub:'숨마쿰라우데', note:'문학·비문학 균형'},
+          {name:'신사고 우공비 독해', pub:'신사고', note:'교과서 연계 지문'},
+          {name:'초등국어 어휘왕', pub:'-', note:'어휘 확장'},
+        ]},
+      { stage:'중1~3 (내신·서술형)', goal:'문학 감상, 서술형 답안 쓰기까지 확장. 학교별 기출 유형 대비.',
+        books:[
+          {name:'숨마쿰라우데 중학국어', pub:'숨마쿰라우데', note:'내신 심화'},
+          {name:'우공비 중학국어', pub:'좋은책신사고', note:'학교별 기출 변형'},
+          {name:'블랙라벨 국어', pub:'진학사', note:'최상위 심화'},
+          {name:'마더텅 중학국어', pub:'마더텅', note:'서술형 대비'},
+        ]},
+    ]},
+  english: { label:'영어', icon:'🔤', lineRef:'영어랩(연계형)',
+    stages:[
+      { stage:'초1~3 (파닉스·리딩 입문)', goal:'파닉스·사이트워드 문자 해득 후 원서 리딩 입문. 리드앤톡 승계 커리큘럼과 연계.',
+        books:[
+          {name:'된다! 파닉스/리딩/문법', pub:'능률', note:'파닉스→리딩 단계 전환'},
+          {name:'Bricks Reading 100~200', pub:'사회평론', note:'AR·Lexile 레벨제 원서 리딩'},
+          {name:'EFL 리더스북 초1~3', pub:'이퓨쳐', note:'쉬운 스토리북'},
+          {name:'초등 필수 영단어 500', pub:'-', note:'기초 어휘'},
+        ]},
+      { stage:'초4~6 (리딩 확장·라이팅)', goal:'원서 리딩 레벨 확장 + 어휘·에세이 라이팅. 원어민 스피킹 클리닉 병행 가능.',
+        books:[
+          {name:'Bricks Reading 200~500', pub:'사회평론', note:'레벨 상향'},
+          {name:'Wonders Reading', pub:'Macmillan', note:'미국 교과 커리큘럼 기반'},
+          {name:'그래머 인사이드', pub:'-', note:'문법 체계화 입문'},
+          {name:'초등 필수 영단어 800', pub:'-', note:'어휘 확장'},
+        ]},
+      { stage:'중1~3 (내신 문법·독해)', goal:'원서 리딩에서 쌓은 감각을 문법·구문 체계로 전환. 학교별 내신 대비.',
+        books:[
+          {name:'그래머존 / Grammar Zone', pub:'능률', note:'중등 문법 체계'},
+          {name:'Reading Expert', pub:'-', note:'내신형 지문 독해'},
+          {name:'워드마스터', pub:'-', note:'중등 필수 어휘'},
+          {name:'능률 VOCA', pub:'능률', note:'수능 기초 어휘 연계'},
+        ]},
+    ]},
+  math: { label:'수학', icon:'📐', lineRef:'수학랩',
+    stages:[
+      { stage:'초3~4 (연산·기본 개념)', goal:'단원별 성취도 데이터로 결손 지점을 찾아 메우는 진단·처방형 수학.',
+        books:[
+          {name:'디딤돌 초등수학 기본', pub:'디딤돌', note:'개념 기초'},
+          {name:'디딤돌 초등수학 응용', pub:'디딤돌', note:'응용 문제 전환'},
+          {name:'기적의 계산법', pub:'길벗', note:'연산 자동화'},
+          {name:'팩토 초등', pub:'매스티안', note:'사고력 병행'},
+        ]},
+      { stage:'초5~6 (심화·경시 대비)', goal:'최상위권 심화, 경시 기출 대비까지 확장. 중등 선행 시작 가능.',
+        books:[
+          {name:'최상위 초등수학', pub:'디딤돌', note:'심화 문제'},
+          {name:'쎈 A·B', pub:'-', note:'단계별 문제풀이'},
+          {name:'일품', pub:'-', note:'응용·심화 전환'},
+          {name:'KMC 기출', pub:'-', note:'경시 대비(선택)'},
+        ]},
+      { stage:'중1~3 (내신 집중)', goal:'학교별 기출·수행평가 데이터 기반 내신 집중. 시험 4주 전 관리 모드 전환.',
+        books:[
+          {name:'개념원리', pub:'-', note:'중등 개념 정립'},
+          {name:'블랙라벨', pub:'진학사', note:'최상위 심화'},
+          {name:'RPM', pub:'-', note:'유형 반복 훈련'},
+          {name:'수력충전', pub:'-', note:'내신 기출 변형'},
+        ]},
+    ]},
+};
+let subjTab = 'korean';
+function subjGo(id){ subjTab = id; renderSubjects(); }
+function renderSubjects(){
+  const subj = SUBJECT_CURRICULUM[subjTab];
+  const tiers = allowedTiers();
+  const FORMAT_DESC = {
+    premium: '주 2회 × 2시간, 반당 4명. 개인별 오답노트 + 1:1 첨삭 추가',
+    standard: '주 2회 × 2시간, 반당 6~8명. 진도형 그룹 수업 + 데이터 트래킹',
+    blended: '주 2회, 반당 10명+. 그룹 강의 + 온라인 프로그램(플래너·단어테스트) 병행 그룹과외',
+  };
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Subject Curriculum Detail</div>
+    <h2>과목별 상세 커리큘럼</h2>
+    <p class="lede">학년 단계별 목표·실제 사용 교재 예시·수업 형태를 구체적으로 정리했습니다. 리드앤톡 원장님처럼 세부 설계를 중요하게 보시는 분께 특히 유용한 자료입니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+
+    <div class="subj-tabs">
+      ${Object.entries(SUBJECT_CURRICULUM).map(([id,s])=>`<button class="subj-tab ${subjTab===id?'active':''}" onclick="subjGo('${id}')">${s.icon} ${esc(s.label)}</button>`).join('')}
+    </div>
+
+    <p class="small muted" style="margin-bottom:14px">컨셉 커리큘럼 연결: <b>${esc(subj.lineRef)}</b> 라인에 해당</p>
+
+    ${subj.stages.map(st=>`
+      <div class="stage-card">
+        <h4>📍 ${esc(st.stage)}</h4>
+        <p class="small muted">${esc(st.goal)}</p>
+        <div class="book-grid">
+          ${st.books.map(b=>`<div class="book-chip"><b>${esc(b.name)}</b><div class="muted">${esc(b.pub)} · ${esc(b.note)}</div></div>`).join('')}
+        </div>
+      </div>`).join('')}
+
+    <div class="c-section-title"><h3>수업 형태 예시 (정원 티어 연동)</h3></div>
+    <div class="card tight">
+      <div class="format-row">
+        ${tiers.map(t=>`<div class="format-card"><b>${TIER_LABEL[t]}</b>${esc(FORMAT_DESC[t])}</div>`).join('')}
+      </div>
+      <p class="small muted" style="margin-top:10px">티어 구성은 ⑥ 커리큘럼·시간표 화면의 인터뷰 답변(Q25)과 연동됩니다.</p>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 🏭 운영 매뉴얼 ══════════════════ */
+function renderOpsManual(){
+  const t1 = S.answers.t1 || '';
+  const t3 = S.answers.t3 || '';
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Operations Manual</div>
+    <h2>학원 운영 매뉴얼</h2>
+    <p class="lede">오픈 후 일상 운영에서 지켜야 할 원칙과 프로세스입니다. 흡수전략 매트릭스의 공통 원칙과 인터뷰 확정 답변(차량·데스크 인력)을 반영했습니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+
+    <div class="card tight">
+      <h3>일일 운영 체크리스트</h3>
+      <ul class="checklist">
+        <li>등원 체크인 확인 (결석·지각 학부모 알림)</li>
+        <li>당일 수업 반편성·강사 배정 이상 유무 확인</li>
+        <li>검사실 예약 현황 및 자료 준비</li>
+        <li>${esc(t1 || '차량')} 운행 전 안전 점검 (탑승 인원 확인, 안전벨트)</li>
+        <li>당일 상담 예약 리마인드 발송</li>
+        <li>마감 시 결제·출결 데이터 정리</li>
+      </ul>
+    </div>
+
+    <div class="c-section-title"><h3>원비·결제 관리 원칙</h3></div>
+    <div class="card">
+      <div class="do-dont">
+        <div class="do-box"><b>✅ 원칙</b>모든 가정 동일 정가 적용. 결제일 고정(매월 1~5일), 미납 시 3일 전 사전 안내 후 개별 연락.</div>
+        <div class="dont-box"><b>❌ 금지</b>구두 할인 약속, "이번만" 예외 처리, 담당자별 다른 기준 적용.</div>
+      </div>
+      <p class="small muted" style="margin-top:10px">환불 규정은 계약 전 서면 고지 필수 — 분쟁 방지의 핵심입니다.</p>
+    </div>
+
+    <div class="c-section-title"><h3>학부모 컴플레인 대응 프로세스</h3></div>
+    <div class="card">
+      <ol style="padding-left:20px;font-size:13.5px;line-height:2">
+        <li>접수 — 누가, 언제, 어떤 채널로 받았는지 즉시 기록</li>
+        <li>1차 응대 — 접수 담당자가 24시간 내 공감 표현 + 사실관계 확인 (해결 약속은 아직 하지 않음)</li>
+        <li>내부 검토 — 원장·실장 공유, 재발 방지책까지 함께 논의</li>
+        <li>2차 회신 — 48시간 내 구체적 조치안과 함께 회신</li>
+        <li>사후 확인 — 1주일 후 만족도 재확인 콜</li>
+      </ol>
+      <p class="small muted" style="margin-top:10px">모든 컴플레인은 익명화해 강사 교육 자료로 재사용 — 같은 문제가 반복되지 않게 시스템화합니다.</p>
+    </div>
+
+    <div class="c-section-title"><h3>차량 안전 운영</h3></div>
+    <div class="card tight">
+      <p class="small">현재 정책: <b>${esc(t1 || '미정')}</b></p>
+      <ul class="checklist">
+        <li>동승 안전요원 배치 (운전자 외 1인)</li>
+        <li>탑승 명단 매일 체크 — 무단 결석 시 학부모 즉시 연락</li>
+        <li>노선별 탑승률 분기 점검, 70% 미만 노선 재편</li>
+        <li>차량 정기 안전 점검(월 1회) 기록 보관</li>
+      </ul>
+    </div>
+
+    <div class="c-section-title"><h3>검사실 운영 원칙</h3></div>
+    <div class="card tight">
+      <ul class="checklist">
+        <li>방음·독립 공간 유지 — 검사 중 외부 소음·방해 차단</li>
+        <li>검사 결과지·개인정보는 잠금 보관, 접근 권한 최소화</li>
+        <li>검사 후 24시간 내 결과 1차 정리, 상담 일정 안내</li>
+        <li>검사 도구·자료 정기 점검(분기 1회)</li>
+      </ul>
+    </div>
+
+    <div class="c-section-title"><h3>강사 관리</h3></div>
+    <div class="card tight">
+      <ul class="checklist">
+        <li>월 1회 강사 회의 — 반별 진도·이슈 공유</li>
+        <li>신규 강사 배정 전 12패턴 매핑·검사 해석 기초 교육 필수</li>
+        <li>강사 변동 시 학부모 사전 안내 + 인수인계 수업 1회 필수</li>
+        <li>수업 만족도는 분기별 익명 설문으로 확인</li>
+      </ul>
+    </div>
+
+    <div class="c-section-title"><h3>비상연락망</h3></div>
+    <div class="card tight">
+      <p class="small">데스크: <b>${esc(t3 || '미정')}</b> · 원장/실장 직통 · 차량 기사 직통 · 인근 병원·소방서 연락처를 상담실·차량 내부에 게시합니다.</p>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 🎓 직원 교육 매뉴얼 ══════════════════ */
+function renderStaffManual(){
+  const principles = DATA.matrix.principles || [];
+  const concept = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : DATA.concepts[0];
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Staff Training Manual</div>
+    <h2>직원 교육 매뉴얼</h2>
+    <p class="lede">신입 강사·직원이 입사 첫 주에 익혀야 할 내용입니다. ⑧ 상담 매뉴얼과 연계해서 사용하세요.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+
+    <div class="card">
+      <h3>브랜드 원칙 (전 직원 필수 숙지)</h3>
+      <ul class="checklist">${principles.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>
+      <p class="small muted" style="margin-top:8px">${esc(concept?concept.conceptName+'의 포지셔닝: '+concept.tagline:'')}</p>
+    </div>
+
+    <div class="c-section-title"><h3>직군별 역할</h3></div>
+    <div class="grid3">
+      <div class="card tight"><h3 class="small" style="font-weight:800">원장</h3><p class="small muted">커리큘럼 최종 결정, 3자 협업 커뮤니케이션 총괄, 위기 상황 최종 판단</p></div>
+      <div class="card tight"><h3 class="small" style="font-weight:800">실장(상담)</h3><p class="small muted">상담 매뉴얼 기반 응대, 검사→등록 퍼널 관리, 학부모 민원 1차 대응</p></div>
+      <div class="card tight"><h3 class="small" style="font-weight:800">강사</h3><p class="small muted">수업·진도 관리, 학생 이상 징후 실장에게 즉시 보고, 검사 결과 해석은 하지 않음(전문 영역 준수)</p></div>
+    </div>
+
+    <div class="c-section-title"><h3>신입 온보딩 1주차 체크리스트</h3></div>
+    <div class="card">
+      <ul class="checklist">
+        <li>1일차: 브랜드 원칙·컨셉 소개, 시설 투어, 비상연락망 숙지</li>
+        <li>2일차: 상담 매뉴얼 학습, 채널별 스크립트 롤플레이</li>
+        <li>3일차: 커리큘럼·교재 구성 숙지 (과목별 상세 커리큘럼 참고)</li>
+        <li>4일차: 시스템 사용법(출결·플래너·리포트 발송) 실습</li>
+        <li>5일차: 선배 직원 동석 수업·상담 참관</li>
+        <li>2주차부터: 단독 수업·상담 시작, 주 1회 피드백 미팅</li>
+      </ul>
+    </div>
+
+    <div class="c-section-title"><h3>행동 수칙</h3></div>
+    <div class="do-dont">
+      <div class="do-box"><b>✅ 해야 할 것</b>학생 이름·존중하는 언어 사용, 지각·결석 즉시 학부모 확인, 검사 결과·개인정보 철저히 보안 유지</div>
+      <div class="dont-box"><b>❌ 하지 말 것</b>임의 할인·조건 제시, 학생 간 성적 비교 발언, 검사 미해석 상태에서 성향 단정, SNS에 학생 정보 노출</div>
+    </div>
+
+    <div class="c-section-title"><h3>필수 교육 항목</h3></div>
+    <div class="card tight">
+      <ul class="checklist">
+        <li>아동 안전·응급 대응 교육 (분기 1회)</li>
+        <li>개인정보보호법 기본 교육 (입사 시 필수)</li>
+        <li>웩슬러 검사 기초 이해 (검사 해석은 자격자만, 강사는 개요만 숙지)</li>
+        <li>컴플레인 대응 프로세스 숙지 (⑦ 운영 매뉴얼 참고)</li>
+      </ul>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 📰 학부모 브로슈어 ══════════════════ */
+function renderBrochure(){
+  const concept = S.selectedConcept ? DATA.concepts.find(c=>c.code===S.selectedConcept) : DATA.concepts[0];
+  if(!concept){ app.innerHTML = '<section class="view"><div class="card">컨셉을 먼저 선택해주세요.</div></section>'; return; }
+  const main = concept.design.palette[0]?concept.design.palette[0].hex:'#1B3A5C';
+  const deep = concept.design.palette[1]?concept.design.palette[1].hex:'#0d2a47';
+  const price = S.answers.c2 ? num(S.answers.c2)+'만원' : '';
+  app.innerHTML = `
+  <section class="view" style="--c-main:${esc(main)}">
+    <div class="eyebrow">Parent-Facing Brochure</div>
+    <h2>학부모용 원페이지 브로슈어</h2>
+    <p class="lede">등록 상담·설명회에서 그대로 나눠드릴 수 있는 인쇄용 소개 자료입니다. 선택된 컨셉이 바뀌면 내용도 자동으로 바뀝니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
+
+    <div class="concept-hero" style="background:linear-gradient(130deg,${esc(main)},${esc(deep)})">
+      <div class="eyebrow" style="color:rgba(255,255,255,.75)">WB 웩슬러브레인센터 × 리더스 유치원 × 리드앤톡</div>
+      <h2 style="color:#fff">${esc(concept.design.heroCopy)}</h2>
+      <div class="chip-row"><span class="chip">${esc(concept.conceptName)}</span>${price?`<span class="chip">월 ${esc(price)}</span>`:''}</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card tight"><h3>이런 아이에게 잘 맞아요</h3><p class="small">${esc(concept.target)}</p></div>
+      <div class="card tight"><h3>왜 다른가요</h3><p class="small">${esc(concept.whyWins)}</p></div>
+    </div>
+
+    <div class="c-section-title"><h3>커리큘럼</h3></div>
+    <div class="grid2">
+      ${concept.curriculum.map(l=>`<div class="curri"><b>${esc(l.line)}</b> <span class="pill blue">${esc(l.grade)}</span>
+        <div class="small muted" style="margin-top:3px">${esc(l.desc)}</div></div>`).join('')}
+    </div>
+
+    <div class="c-section-title"><h3>안내</h3></div>
+    <div class="card tight">
+      <p class="small">오픈 목표: <b>${esc(S.openDate ? S.openDate.replace(/-/g,'.') : '준비 중')}</b> · 정원: 선착순 마감 · 문의: 카카오채널 · 상담 예약 시 웩슬러 검사 우선 안내</p>
+    </div>
+  </section>`;
+}
+
+/* ══════════════════ 🧪 학원 구성 시뮬레이터 ("옷 입혀보기") ══════════════════
+   5개 카테고리에서 옵션을 하나씩 골라 "내가 만든 학원"을 조합한다.
+   선택할 때마다 포지셔닝 카피와 손익 프리뷰가 즉시 다시 계산된다. */
+const SIM_CATS = [
+  { id:'focus', label:'① 커리큘럼 포커스', options:[
+    { v:'korean', emoji:'📘', name:'국어 중심', desc:'문해력·독해 데이터가 핵심 무기' },
+    { v:'english', emoji:'🔤', name:'영어 중심', desc:'파닉스~내신까지 수직 라인' },
+    { v:'math', emoji:'📐', name:'수학 중심', desc:'결손 진단형 수학 클리닉' },
+    { v:'balanced', emoji:'⚖️', name:'균형형(3과목 통합)', desc:'국·영·수를 한 곳에서 통합 관리' },
+  ]},
+  { id:'format', label:'② 수업 형태', options:[
+    { v:'premium', emoji:'💎', name:'프리미엄 소수정예', desc:'반당 4명, 밀착 관리' },
+    { v:'standard', emoji:'👥', name:'표준 그룹', desc:'반당 6~8명, 효율적 운영' },
+    { v:'blended', emoji:'🌐', name:'블렌디드 그룹', desc:'반당 10명+, 그룹과외형' },
+  ]},
+  { id:'testUsage', label:'③ 검사 활용도', options:[
+    { v:'mandatory', emoji:'🔒', name:'입회 필수 관문', desc:'검사 없이는 등록 불가' },
+    { v:'optional', emoji:'🎫', name:'유료 옵션 상품', desc:'원하는 가정만 선택' },
+    { v:'marketing', emoji:'📣', name:'마케팅 전용 활용', desc:'오픈 시즌 소구 포인트로만' },
+  ]},
+  { id:'vehicle', label:'④ 차량 정책', options:[
+    { v:'none', emoji:'🚶', name:'미운영', desc:'도보권 입지로 승부' },
+    { v:'later', emoji:'⏳', name:'40명 도달 후 도입', desc:'초기 비용 최소화' },
+    { v:'fromStart', emoji:'🚐', name:'개원부터 운영', desc:'접근성 최우선' },
+  ]},
+  { id:'pricePosition', label:'⑤ 가격 포지션', options:[
+    { v:'low', emoji:'💰', name:'중저가 (18~22만원)', desc:'접근성 우선' },
+    { v:'mid', emoji:'💵', name:'중가 (23~27만원)', desc:'표준 시세' },
+    { v:'premium', emoji:'💎', name:'프리미엄 (28만원+)', desc:'가치 기반 고가' },
+  ]},
+];
+const SIM_TEXT = {
+  focus: { korean:'문해력·독해 데이터를 앞세운', english:'파닉스부터 내신까지 잇는 영어 중심의', math:'결손 진단형 수학 클리닉을 축으로 한', balanced:'국·영·수를 한 곳에서 통합 관리하는' },
+  format: { premium:'프리미엄 소수정예형', standard:'표준 그룹형', blended:'블렌디드 대인원 그룹과외형' },
+  testUsage: { mandatory:'검사 없이는 입회가 불가능한', optional:'검사를 원하는 가정만 선택하는', marketing:'검사를 오픈 마케팅 전면에 내세우는' },
+  vehicle: { none:'차량 없이 입지로 승부하는', later:'초기엔 무차량, 40명부터 차량을 도입하는', fromStart:'개원부터 차량을 운행하는' },
+  pricePosition: { low:'중저가', mid:'중가', premium:'프리미엄 가격대' },
+};
+const SIM_PRICE_MAP = { low:20, mid:25, premium:30 };
+const SIM_CAP_MAP = { premium:4, standard:7, blended:12 };
+
+function simConfig(){ return S.simConfig || defaultState().simConfig; }
+function setSim(key, val){
+  S.simConfig = Object.assign({}, simConfig(), {[key]:val});
+  save(); renderSimulator();
+}
+function simTagline(cfg){
+  return `${SIM_TEXT.focus[cfg.focus]} ${SIM_TEXT.format[cfg.format]} 학원입니다. ${SIM_TEXT.testUsage[cfg.testUsage]} 운영 방식이며, ${SIM_TEXT.vehicle[cfg.vehicle]} ${SIM_TEXT.pricePosition[cfg.pricePosition]} 포지셔닝입니다.`;
+}
+function simPnlPreview(cfg){
+  const c = calcState();
+  const price = SIM_PRICE_MAP[cfg.pricePosition];
+  const students = S.answers.g2 || 150;
+  const revenue = students * price;
+  const teacher = revenue * (c.teacherRatio/100);
+  const van = cfg.vehicle === 'fromStart' ? c.vanCost : (cfg.vehicle === 'later' ? c.vanCost*0.5 : 0);
+  const cost = c.rent + teacher + van + c.etcCost;
+  const profit = revenue - cost;
+  const cap = SIM_CAP_MAP[cfg.format];
+  const sections = Math.ceil(students / cap);
+  return { revenue, cost, profit, students, price, sections, cap };
+}
+function saveSimConfig(){
+  const name = prompt('이 조합의 이름을 지어주세요 (예: "프리미엄 영어 소수정예형")');
+  if(!name) return;
+  S.savedSims = S.savedSims || [];
+  S.savedSims.push({ id:'sim'+Math.random().toString(36).slice(2,9), name, config: Object.assign({}, simConfig()) });
+  save(); renderSimulator(); toast('구성 저장됨');
+}
+function loadSimConfig(id){
+  const s = (S.savedSims||[]).find(x=>x.id===id); if(!s) return;
+  S.simConfig = Object.assign({}, s.config); save(); renderSimulator(); toast(`"${s.name}" 불러옴`);
+}
+function delSimConfig(id){
+  S.savedSims = (S.savedSims||[]).filter(x=>x.id!==id); save(); renderSimulator();
+}
+function renderSimulator(){
+  const cfg = simConfig();
+  const tagline = simTagline(cfg);
+  const preview = simPnlPreview(cfg);
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Academy Configurator</div>
+    <h2>학원 구성 시뮬레이터</h2>
+    <p class="lede">옷 골라 입듯, 카테고리별로 옵션을 하나씩 골라보세요. 고를 때마다 오른쪽 "내가 만든 학원" 카드가 즉시 갱신됩니다. 여러 조합을 저장해서 비교할 수 있습니다.</p>
+
+    <div class="sim-layout">
+      <div>
+        ${SIM_CATS.map(cat=>`
+          <div class="sim-cat">
+            <h4>${esc(cat.label)}</h4>
+            <div class="sim-opts">
+              ${cat.options.map(o=>`<button class="sim-opt ${cfg[cat.id]===o.v?'picked':''}" onclick="setSim('${cat.id}','${o.v}')">
+                <span class="so-emoji">${o.emoji}</span>
+                <span class="so-name">${esc(o.name)}</span>
+                <div class="so-desc">${esc(o.desc)}</div>
+              </button>`).join('')}
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="no-print">
+        <div class="sim-preview">
+          <div class="eyebrow" style="color:rgba(255,255,255,.6)">내가 만든 학원</div>
+          <h3>${esc(SIM_TEXT.pricePosition[cfg.pricePosition])} × ${esc(SIM_TEXT.format[cfg.format])}</h3>
+          <div class="sp-tagline">${esc(tagline)}</div>
+          <div class="sp-row"><span>목표 원생</span><b>${num(preview.students)}명</b></div>
+          <div class="sp-row"><span>월 원비</span><b>${preview.price}만원</b></div>
+          <div class="sp-row"><span>필요 반 수</span><b>${preview.sections}개 (반당 ${preview.cap}명)</b></div>
+          <div class="sp-row"><span>예상 월 매출</span><b>${num(preview.revenue)}만원</b></div>
+          <div class="sp-row"><span>예상 월 순이익</span><b style="color:${preview.profit>=0?'#7FE0B0':'#FFB199'}">${num(preview.profit)}만원</b></div>
+          <button class="btn sm" style="width:100%;margin-top:14px;background:#fff;color:var(--navy)" onclick="saveSimConfig()">💾 이 조합 저장하기</button>
+        </div>
+
+        ${(S.savedSims||[]).length ? `<div class="sim-save-list">
+          <h4 class="small" style="font-weight:800;margin-bottom:6px">저장된 조합 (${S.savedSims.length})</h4>
+          ${S.savedSims.map(s=>`<div class="sim-save-item">
+            <b>${esc(s.name)}</b>
+            <div class="trow" style="display:flex;gap:6px;margin-top:6px">
+              <button class="btn xs ghost" onclick="loadSimConfig('${s.id}')">불러오기</button>
+              <button class="btn xs ghost" onclick="delSimConfig('${s.id}')">삭제</button>
+            </div>
+          </div>`).join('')}
+        </div>` : ''}
+      </div>
     </div>
   </section>`;
 }
