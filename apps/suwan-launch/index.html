@@ -209,6 +209,31 @@
   .teacher-row .tname{flex:none;width:64px;font-weight:800}
   .teacher-row .tload{flex:none;font-size:11.5px;color:var(--mid)}
 
+  /* ─── 3자 합의 트래커 ─── */
+  .agr-item{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+  .agr-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .agr-status{border:none;border-radius:100px;font-size:12px;font-weight:800;padding:5px 12px;cursor:pointer;white-space:nowrap}
+  .agr-status.st-미논의{background:var(--light);color:var(--mid)}
+  .agr-status.st-논의중{background:var(--warn-bg);color:var(--warn)}
+  .agr-status.st-합의완료{background:var(--ok-bg);color:var(--ok)}
+  .agr-note{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;margin-top:8px;min-height:44px;font-family:inherit}
+
+  /* ─── 인수 실사 체크리스트 ─── */
+  .dd-cat{margin-bottom:18px}
+  .dd-cat h4{font-size:13px;font-weight:800;margin-bottom:8px;color:var(--deep-blue)}
+  .dd-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .dd-item:last-child{border-bottom:none}
+  .dd-item input[type=checkbox]{margin-top:3px;flex:none;width:16px;height:16px;accent-color:var(--blue)}
+  .dd-item.checked .dd-label{text-decoration:line-through;color:var(--mid)}
+  .dd-label{font-size:13px;line-height:1.6}
+
+  /* ─── 모집 퍼널 대시보드 ─── */
+  .funnel-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .funnel-bar-wrap{flex:1;background:var(--light);border-radius:8px;overflow:hidden;height:36px}
+  .funnel-bar{height:100%;background:var(--blue);display:flex;align-items:center;padding-left:12px;color:#fff;font-weight:800;font-size:13px;border-radius:8px;transition:width .3s;white-space:nowrap}
+  .funnel-lbl{flex:none;width:88px;font-size:12.5px;font-weight:700}
+  .funnel-pct{flex:none;width:64px;text-align:right;font-size:12px;color:var(--mid)}
+
   /* ─── 상담 매뉴얼 ─── */
   .manual-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .mtab{border:1.5px solid var(--line);background:#fff;border-radius:100px;font-size:13px;font-weight:700;padding:7px 16px;color:var(--mid)}
@@ -298,10 +323,12 @@
     opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
   .toast.show{opacity:1}
   .footer-note{font-size:11.5px;color:var(--mid);text-align:center;padding:26px 0 40px}
+  .print-only{display:none}
 
   @media print{
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .demobar,.no-print,.footer-note,.concept-tabs,.ch-tabs,.manual-tabs,.subj-tabs{display:none!important}
+    .print-only{display:block}
     body{background:#fff}
     .view{padding:0}
     .card{break-inside:avoid;border-color:#ccc}
@@ -331,6 +358,9 @@
   <button class="navbtn" data-nav="brochure">📰 학부모 브로슈어</button>
   <button class="navbtn" data-nav="timeline">🗓 오픈 타임라인</button>
   <button class="navbtn" data-nav="pnl">📈 손익 시뮬레이션</button>
+  <button class="navbtn" data-nav="agreements">🤝 3자 합의 트래커</button>
+  <button class="navbtn" data-nav="duediligence">🔍 인수 실사 체크리스트</button>
+  <button class="navbtn" data-nav="funnel">🎯 모집 퍼널 대시보드</button>
   <span class="nav-sep"></span>
   <button class="navbtn" data-nav="data">데이터</button>
   <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
@@ -403,7 +433,10 @@ const defaultState = () => ({
   openDate: '2026-11-02', // 잠정값 — "2026년 하반기" 목표, 매물 확정 후 수정
   memo: CONFIRMED_MEMO,
   simConfig: { focus:'balanced', format:'standard', testUsage:'mandatory', vehicle:'fromStart', pricePosition:'premium' },
-  savedSims: []           // [{id, name, config}] — 학원 구성 시뮬레이터에 저장한 조합들
+  savedSims: [],           // [{id, name, config}] — 학원 구성 시뮬레이터에 저장한 조합들
+  agreements: null,        // null이면 AGREEMENT_ITEMS에서 초기화 — 3자 합의 항목별 상태
+  duediligence: null,      // null이면 DD_ITEMS에서 초기화 — 인수 실사 체크
+  funnelEntries: []        // [{id, month, inquiry, testBooked, testDone, consult, enrolled}]
 });
 let S = load();
 function migrate(st){
@@ -417,6 +450,9 @@ function migrate(st){
   if(!st.memo) merged.memo = base.memo;
   if(!st.simConfig) merged.simConfig = base.simConfig;
   if(!Array.isArray(st.savedSims)) merged.savedSims = [];
+  if(!st.agreements) merged.agreements = base.agreements;
+  if(!st.duediligence) merged.duediligence = base.duediligence;
+  if(!Array.isArray(st.funnelEntries)) merged.funnelEntries = [];
   return merged;
 }
 function load(){
@@ -476,6 +512,9 @@ function render(){
   else if(currentView==='brochure') renderBrochure();
   else if(currentView==='timeline') renderTimeline();
   else if(currentView==='pnl') renderPnl();
+  else if(currentView==='agreements') renderAgreements();
+  else if(currentView==='duediligence') renderDueDiligence();
+  else if(currentView==='funnel') renderFunnel();
   else if(currentView==='data') renderData();
 }
 
@@ -594,7 +633,10 @@ function renderHome(){
           ['competitors','🥊 경쟁사 비교','내부 검토용 포지셔닝'],
           ['brochure','📰 학부모 브로슈어','인쇄용 소개 자료'],
           ['timeline','🗓 오픈 타임라인','역산 마일스톤·인허가'],
-          ['pnl','📈 손익 시뮬레이션','36개월 성장 곡선'],
+          ['pnl','📈 손익 시뮬레이션','36개월 성장 곡선 (검사 매출 포함)'],
+          ['agreements','🤝 3자 합의 트래커','합의 항목별 진행 상태'],
+          ['duediligence','🔍 인수 실사 체크리스트','재무·학생·인력·시설·법률'],
+          ['funnel','🎯 모집 퍼널 대시보드','문의→등록 실측 전환율'],
         ].map(([v,t,d])=>`<button class="card tight" style="text-align:left;cursor:pointer;margin:0" onclick="nav('${v}')">
           <b class="small" style="font-weight:800">${t}</b><div class="small muted" style="margin-top:2px">${d}</div>
         </button>`).join('')}
@@ -949,9 +991,10 @@ function delTask(id){
 
 /* ══════════════════ ⑤ 시나리오 계산기 ══════════════════ */
 const CALC_DEFAULT = {students:50, fee:24, rent:165, deposit:4000, premium:1500, fitout:5000,
-  teacherRatio:33, vanCount:0, vanCost:250, etcCost:300, invest:12000};
+  teacherRatio:33, vanCount:0, vanCost:250, etcCost:300, invest:12000, testsPerMonth:5, testPrice:35};
 function calcDefaults(){
   // 인터뷰 확정 답변이 있으면 그 값을 기본으로 (원비 c2, 차량 t1, 총투자 f1)
+  // 검사 단가는 통합상품(웩슬러+성향기질) 35만 — c3 '입회 필수 관문' 답변과 정합
   return Object.assign({}, CALC_DEFAULT, {
     fee: S.answers.c2 || CALC_DEFAULT.fee,
     vanCount: (typeof S.answers.t1 === 'string' && S.answers.t1.includes('개원부터')) ? 1 : CALC_DEFAULT.vanCount,
@@ -961,15 +1004,17 @@ function calcDefaults(){
 function calcState(){ return Object.assign(calcDefaults(), S.calc||{}); }
 function renderCalc(){
   const c = calcState();
-  const revenue = c.students * c.fee;                    // 만원
-  const teacher = revenue * (c.teacherRatio/100);
+  const tuitionRevenue = c.students * c.fee;              // 만원
+  const testRevenue = c.testsPerMonth * c.testPrice;
+  const revenue = tuitionRevenue + testRevenue;
+  const teacher = tuitionRevenue * (c.teacherRatio/100);   // 강사비는 원비 매출 기준(검사는 WB 센터 소관)
   const van = c.vanCount * c.vanCost;
   const cost = c.rent + teacher + van + c.etcCost;
   const profit = revenue - cost;
   const investTotal = c.deposit + c.premium + c.fitout;
   const payback = profit>0 ? (c.invest>0? c.invest/profit : investTotal/profit) : null;
   const margin = c.fee*(1-c.teacherRatio/100);
-  const bepStudents = margin>0 ? Math.ceil((c.rent + van + c.etcCost) / margin) : null;  // 인건비율 100%↑ 가드
+  const bepStudents = margin>0 ? Math.ceil((c.rent + van + c.etcCost - testRevenue) / margin) : null;  // 인건비율 100%↑ 가드
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">Step 5 · Scenario Calculator</div>
@@ -990,6 +1035,9 @@ function renderCalc(){
         <label>차량 1대 월 비용 (만원, 지입·유류 포함)</label><input type="number" value="${c.vanCost}" onchange="calcSet('vanCost',Number(this.value))">
         <label>기타 고정비 (만원 — 관리비·마케팅·교재 등)</label><input type="number" value="${c.etcCost}" onchange="calcSet('etcCost',Number(this.value))">
         <hr style="border:none;border-top:1px dashed var(--line);margin:16px 0 4px">
+        <label>월 검사 건수 (건) — 입회 필수 관문 기준</label><input type="number" value="${c.testsPerMonth}" onchange="calcSet('testsPerMonth',Number(this.value))">
+        <label>검사 평균 단가 (만원 — 웩슬러15·성향기질20·통합35)</label><input type="number" value="${c.testPrice}" onchange="calcSet('testPrice',Number(this.value))">
+        <hr style="border:none;border-top:1px dashed var(--line);margin:16px 0 4px">
         <label>보증금 (만원)</label><input type="number" value="${c.deposit}" onchange="calcSet('deposit',Number(this.value))">
         <label>권리금 (만원 — 기준: 3개월치 원비 수준부터)</label><input type="number" value="${c.premium}" onchange="calcSet('premium',Number(this.value))">
         <label>인테리어·설비 (만원)</label><input type="number" value="${c.fitout}" onchange="calcSet('fitout',Number(this.value))">
@@ -1003,6 +1051,8 @@ function renderCalc(){
             <div><div class="stat-lbl">월 이익</div><div class="res-big" style="color:${profit>=0?'var(--ok)':'var(--bad)'}">${num(profit)}<span class="small">만</span></div></div>
           </div>
           <div style="margin-top:16px">
+            <div class="res-item"><span>원비 매출</span><b>${num(tuitionRevenue)}만</b></div>
+            <div class="res-item"><span>검사 매출 (${c.testsPerMonth}건 × ${c.testPrice}만)</span><b style="color:var(--deep-blue)">+${num(testRevenue)}만</b></div>
             <div class="res-item"><span>강사 인건비 (${c.teacherRatio}%)</span><b>${num(teacher)}만</b></div>
             <div class="res-item"><span>월세</span><b>${num(c.rent)}만</b></div>
             <div class="res-item"><span>차량 (${c.vanCount}대 × ${num(c.vanCost)}만)</span><b>${num(van)}만</b></div>
@@ -1606,12 +1656,19 @@ function pnlSeries(){
     { m:24, students: Math.round(((S.answers.g2||150)+300)/2) },
     { m:36, students: 300 },
   ];
+  let prevStudents = 0, prevMonth = 0;
   return points.map(p=>{
-    const revenue = p.students * price;
-    const teacher = revenue * (c.teacherRatio/100);
+    const tuitionRevenue = p.students * price;
+    // 검사 매출: 그 구간에서 늘어난 신규 학생 수 × 검사 단가(입회 필수 관문) ÷ 경과 개월 = 월평균 검사 매출
+    const newStudents = Math.max(0, p.students - prevStudents);
+    const monthsElapsed = Math.max(1, p.m - prevMonth);
+    const testRevenueMonthly = newStudents > 0 ? (newStudents * c.testPrice) / monthsElapsed : 0;
+    const revenue = tuitionRevenue + testRevenueMonthly;
+    const teacher = tuitionRevenue * (c.teacherRatio/100);
     const cost = c.rent + teacher + (c.vanCount*c.vanCost) + c.etcCost;
     const profit = revenue - cost;
-    return { ...p, revenue, cost, profit };
+    prevStudents = p.students; prevMonth = p.m;
+    return { ...p, tuitionRevenue, testRevenue: testRevenueMonthly, revenue, cost, profit };
   });
 }
 function renderPnl(){
@@ -1660,11 +1717,11 @@ function renderPnl(){
 
     <div class="card tight" style="overflow-x:auto">
       <table class="mini">
-        <thead><tr><th>시점</th><th>학생 수</th><th>매출</th><th>비용</th><th>순이익</th></tr></thead>
-        <tbody>${series.map(s=>`<tr><td>${s.m}개월</td><td>${num(s.students)}명</td><td>${num(s.revenue)}만</td><td>${num(s.cost)}만</td>
+        <thead><tr><th>시점</th><th>학생 수</th><th>원비 매출</th><th>검사 매출</th><th>비용</th><th>순이익</th></tr></thead>
+        <tbody>${series.map(s=>`<tr><td>${s.m}개월</td><td>${num(s.students)}명</td><td>${num(s.tuitionRevenue)}만</td><td style="color:var(--deep-blue)">+${num(s.testRevenue)}만</td><td>${num(s.cost)}만</td>
           <td><b style="color:${s.profit>=0?'var(--ok)':'var(--bad)'}">${num(s.profit)}만</b></td></tr>`).join('')}</tbody>
       </table>
-      <p class="small muted" style="margin-top:8px">단위: 만원. 세부 비용 가정은 ⑤ 시나리오 계산기에서 조정할 수 있습니다 (이 화면은 계산기 값을 그대로 읽어옵니다).</p>
+      <p class="small muted" style="margin-top:8px">단위: 만원. 검사 매출 = 구간 내 순증 학생 수 × 검사 단가(${num(calcState().testPrice)}만, 입회 필수 관문 기준) ÷ 경과 개월. 세부 비용 가정은 ⑤ 시나리오 계산기에서 조정할 수 있습니다.</p>
     </div>
   </section>`;
 }
@@ -1677,6 +1734,214 @@ function showChartTip(e, text){
   tip.style.top = (e.clientY - rect.top - 30) + 'px';
 }
 function hideChartTip(){ const tip = document.getElementById('chartTip'); if(tip) tip.classList.remove('show'); }
+
+/* ══════════════════ 🤝 3자 합의 트래커 ══════════════════
+   partner-brief.html의 논의 안건 5개 + CONFIRMED_MEMO의 미해결 쟁점을 상태 보드로.
+   완전한 보안 문서가 아니라 내부 진행 관리용 — 파트너에게는 partner-brief로 별도 공유. */
+const AGREEMENT_ITEMS = [
+  { id:'a1', title:'방향 선택 (컨셉 채택)',
+    note:'인터뷰 점수 A24·B26·C41 기준 대표는 C안(데이터 러닝랩)으로 잠정 확정. 3자 미팅에서 최종 확인 필요.',
+    status:'논의중' },
+  { id:'a2', title:'역할 분담 (연령·과목별)',
+    note:'리더스=유아·초저 / WB=초등 중학년~중등 / 리드앤톡=영어 구간, 큰 틀만 잡혀 있고 세부 경계는 미확정.',
+    status:'미논의' },
+  { id:'a3', title:'커뮤니케이션 원칙',
+    note:'원장 일원화·할인 금지·재원생 직접 접촉 지양 — 대표 안으로는 확정, 3자 서면 합의는 아직.',
+    status:'논의중' },
+  { id:'a4', title:'사업 구조·수익 배분',
+    note:'지분+성과 인센티브 혼합 방향만 있고 구체 비율 미정 (계약서 초안 작성 전까지 열려 있음).',
+    status:'미논의' },
+  { id:'a5', title:'리드앤톡 지분 참여 범위 ⚠',
+    note:'인터뷰 답변이 서로 다른 결을 가짐 — "메인은 대표+리더스, 리드앤톡은 비지분 운영위탁"이라고 했다가 "3자 공동투자"도 선택함. 3자 미팅에서 반드시 정리해야 할 최우선 쟁점.',
+    status:'미논의' },
+  { id:'a6', title:'개인정보 제3자 제공 동의 체계',
+    note:'리더스 졸업생 명단을 WB가 받으려면 학부모 개별 동의 필요 — 동의서 양식·수집 항목 3자 합의 필요.',
+    status:'미논의' },
+  { id:'a7', title:'다음 만남 일정',
+    note:'구체안을 좁혀 다시 논의할 시점 — 아직 미정.',
+    status:'미논의' },
+];
+function agreementsState(){
+  if(!S.agreements) S.agreements = AGREEMENT_ITEMS.map(a=>({...a}));
+  return S.agreements;
+}
+const AGR_CYCLE = ['미논의','논의중','합의완료'];
+function cycleAgreement(id){
+  const list = agreementsState();
+  const item = list.find(a=>a.id===id); if(!item) return;
+  item.status = AGR_CYCLE[(AGR_CYCLE.indexOf(item.status)+1) % AGR_CYCLE.length];
+  save(); renderAgreements();
+}
+function setAgreementNote(id, text){
+  const item = agreementsState().find(a=>a.id===id); if(!item) return;
+  item.note = text; save();
+}
+function addAgreement(){
+  const title = prompt('새 합의 항목:'); if(!title) return;
+  agreementsState().push({ id:'a'+Math.random().toString(36).slice(2,9), title, note:'', status:'미논의' });
+  save(); renderAgreements();
+}
+function delAgreement(id){
+  S.agreements = agreementsState().filter(a=>a.id!==id); save(); renderAgreements();
+}
+function renderAgreements(){
+  const list = agreementsState();
+  const done = list.filter(a=>a.status==='합의완료').length;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">3-Party Agreement Tracker</div>
+    <h2>3자 합의 트래커</h2>
+    <p class="lede">대표·리더스 원장·리드앤톡 원장이 실제로 합의해야 할 항목들의 진행 상태입니다. partner-brief 페이지의 논의 안건과 연결되어 있습니다. <span class="pill bad">🔒 내부용</span></p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄</button> <button class="btn sm ghost" onclick="addAgreement()">＋ 항목 추가</button></div>
+    <div class="card tight" style="margin-bottom:16px">
+      <div class="progressbar"><i style="width:${Math.round(done/list.length*100)}%;background:var(--ok)"></i></div>
+      <p class="small muted" style="margin-top:8px">${done}/${list.length} 합의 완료</p>
+    </div>
+    ${list.map(a=>`<div class="agr-item">
+      <div class="agr-top">
+        <b>${esc(a.title)}</b>
+        <div class="no-print" style="display:flex;gap:6px">
+          <button class="agr-status st-${a.status}" onclick="cycleAgreement('${a.id}')">${a.status}</button>
+          ${!AGREEMENT_ITEMS.some(x=>x.id===a.id)?`<button class="btn xs ghost" onclick="delAgreement('${a.id}')">삭제</button>`:''}
+        </div>
+      </div>
+      <textarea class="agr-note no-print" onchange="setAgreementNote('${a.id}',this.value)" placeholder="메모">${esc(a.note)}</textarea>
+      <p class="small muted print-only">${esc(a.note)}</p>
+    </div>`).join('')}
+  </section>`;
+}
+
+/* ══════════════════ 🔍 인수 실사 체크리스트 ══════════════════ */
+const DD_CATEGORIES = [
+  { cat:'재무', items:[
+    '최근 3년 재무제표·세무신고 내역 확인',
+    '월별 원비 수납 현황(최근 12개월) 확인',
+    '미수금·미납률 확인',
+    '부채·미지급금 현황 확인',
+    '권리금 산정 근거 자료 확보 (통상 3개월치 원비 수준부터 협상)',
+  ]},
+  { cat:'학생', items:[
+    '재원생 명부(학년·과목·등록일·원비) 확보',
+    '최근 6개월 퇴원율·사유 확인',
+    '기존 할인·프로모션 내역 확인 (승계 시 원비 정책 충돌 여부)',
+    '학부모 만족도·컴플레인 이력 확인',
+  ]},
+  { cat:'인력', items:[
+    '강사 계약서(고용형태·급여·근속연수) 확보',
+    '4대보험 가입 현황 확인',
+    '핵심 강사 잔류 의향 확인 (인수 후 이탈 시 대체 계획 필요)',
+    '강사 대상 인수 사실 고지 시점·방식 결정',
+  ]},
+  { cat:'시설·계약', items:[
+    '임대차 계약서(잔여기간·전대 가능 여부·특약사항) 확인',
+    '시설 노후도·보수 필요 항목 실사',
+    '소방·안전 점검 이력 확인',
+    '집기·비품 목록과 소유권(양도 대상) 확인',
+  ]},
+  { cat:'법률', items:[
+    '최근 3년 민원·분쟁·소송 이력 확인',
+    '학원 등록증·인허가 서류 확인 (명의 변경 절차 포함)',
+    '폐업·매각 사유 확인 (숨겨진 리스크 파악)',
+    '개인정보 이관 범위·동의 여부 법률 검토',
+  ]},
+];
+function ddState(){
+  if(!S.duediligence) S.duediligence = {};
+  return S.duediligence;
+}
+function toggleDD(key){
+  const st = ddState();
+  st[key] = !st[key];
+  save(); renderDueDiligence();
+}
+function renderDueDiligence(){
+  const st = ddState();
+  const allKeys = DD_CATEGORIES.flatMap((c,ci)=>c.items.map((_,ii)=>`${ci}-${ii}`));
+  const doneCount = allKeys.filter(k=>st[k]).length;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Acquisition Due Diligence</div>
+    <h2>인수 실사 체크리스트</h2>
+    <p class="lede">확정 진입 방식(기존 학원 인수)에 맞춘 실사 항목입니다. 인수 이탈률은 통상 20~40%로 알려져 있어, 이 체크가 부실하면 승계 초기 이탈로 직결됩니다.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄</button></div>
+    <div class="card tight" style="margin-bottom:16px">
+      <div class="progressbar"><i style="width:${Math.round(doneCount/allKeys.length*100)}%;background:var(--ok)"></i></div>
+      <p class="small muted" style="margin-top:8px">${doneCount}/${allKeys.length} 확인 완료</p>
+    </div>
+    ${DD_CATEGORIES.map((c,ci)=>`
+      <div class="card dd-cat">
+        <h4>${esc(c.cat)}</h4>
+        ${c.items.map((item,ii)=>{ const key=`${ci}-${ii}`; const checked = !!st[key];
+          return `<label class="dd-item ${checked?'checked':''}">
+            <input type="checkbox" ${checked?'checked':''} onchange="toggleDD('${key}')">
+            <span class="dd-label">${esc(item)}</span>
+          </label>`; }).join('')}
+      </div>`).join('')}
+  </section>`;
+}
+
+/* ══════════════════ 🎯 모집 퍼널 실측 대시보드 ══════════════════ */
+const FUNNEL_STAGES = [
+  { key:'inquiry', label:'문의' }, { key:'testBooked', label:'검사예약' },
+  { key:'testDone', label:'검사실시' }, { key:'consult', label:'결과상담' }, { key:'enrolled', label:'등록' },
+];
+function addFunnelEntry(){
+  const month = prompt('기준 월 (예: 2026-11)'); if(!month) return;
+  const vals = {};
+  for(const s of FUNNEL_STAGES){
+    const v = prompt(`${s.label} 건수:`, '0');
+    if(v === null) return;
+    vals[s.key] = Math.max(0, Number(v)||0);
+  }
+  S.funnelEntries = S.funnelEntries || [];
+  S.funnelEntries.push({ id:'fn'+Math.random().toString(36).slice(2,9), month, ...vals });
+  S.funnelEntries.sort((a,b)=>a.month<b.month?-1:1);
+  save(); renderFunnel(); toast('입력 완료');
+}
+function delFunnelEntry(id){
+  S.funnelEntries = (S.funnelEntries||[]).filter(e=>e.id!==id); save(); renderFunnel();
+}
+function renderFunnel(){
+  const entries = S.funnelEntries || [];
+  const latest = entries[entries.length-1];
+  const totals = FUNNEL_STAGES.reduce((acc,s)=>{ acc[s.key] = entries.reduce((a,e)=>a+(e[s.key]||0),0); return acc; }, {});
+  const target3mo = S.answers.s2 || 100, target12mo = S.answers.g2 || 150;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Recruitment Funnel — Actuals</div>
+    <h2>모집 퍼널 실측 대시보드</h2>
+    <p class="lede">문의→검사예약→검사실시→결과상담→등록, 실제 진행 건수를 월별로 기록하고 전환율을 추적합니다. 오픈 전에는 예상치를, 오픈 후에는 실측치를 입력하세요.</p>
+    <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="addFunnelEntry()">＋ 월별 실적 입력</button></div>
+
+    ${!entries.length ? `<div class="card"><p class="small muted">아직 입력된 실적이 없습니다. "월별 실적 입력"으로 첫 데이터를 추가하세요.</p></div>` : `
+    <div class="card">
+      <h3>누적 퍼널 (${entries[0].month} ~ ${entries[entries.length-1].month})</h3>
+      ${FUNNEL_STAGES.map((s,i)=>{
+        const val = totals[s.key];
+        const base = totals[FUNNEL_STAGES[0].key] || 1;
+        const pct = Math.round(val/base*100);
+        const prevVal = i>0 ? totals[FUNNEL_STAGES[i-1].key] : null;
+        const stepPct = prevVal ? Math.round(val/Math.max(prevVal,1)*100) : 100;
+        return `<div class="funnel-row">
+          <div class="funnel-lbl">${esc(s.label)}</div>
+          <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(pct,6)}%">${num(val)}건</div></div>
+          <div class="funnel-pct">${i>0?`전단계 ${stepPct}%`:'기준'}</div>
+        </div>`;
+      }).join('')}
+      <p class="small muted" style="margin-top:10px">최종 등록 ${num(totals.enrolled)}명 — 확정 목표: 3개월 ${num(target3mo)}명 · 12개월 ${num(target12mo)}명 대비 ${Math.round(totals.enrolled/target3mo*100)}% (3개월 기준선)</p>
+    </div>
+
+    <div class="c-section-title"><h3>월별 입력 내역</h3></div>
+    <div class="card tight" style="overflow-x:auto">
+      <table class="mini">
+        <thead><tr><th>월</th>${FUNNEL_STAGES.map(s=>`<th>${esc(s.label)}</th>`).join('')}<th>등록전환율</th><th></th></tr></thead>
+        <tbody>${entries.map(e=>`<tr><td><b>${esc(e.month)}</b></td>${FUNNEL_STAGES.map(s=>`<td>${num(e[s.key]||0)}</td>`).join('')}
+          <td>${e.inquiry?Math.round((e.enrolled||0)/e.inquiry*100)+'%':'-'}</td>
+          <td class="no-print"><button class="btn xs ghost" onclick="delFunnelEntry('${e.id}')">삭제</button></td></tr>`).join('')}</tbody>
+      </table>
+    </div>`}
+  </section>`;
+}
 
 /* ══════════════════ 📖 과목별 상세 커리큘럼 ══════════════════
    WB 수완지구 콘텐츠마케팅 기획(2026-04) 실사용 교재 DB에서 발췌·구성.
