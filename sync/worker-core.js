@@ -24,6 +24,8 @@
  *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
  *   POST /book-add-request { app, auth, ... }     → 직원, 새 교재를 교재 목록에 추가해 달라고 신청
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
+ *   POST /book-edit-request { app, auth, ... }     → 직원, 기존 교재 정보를 고쳐 달라고 신청
+ *   POST /book-edit-review  { app, auth(admin) }   → 원장, 교재 수정 신청 승인·반려
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -36,6 +38,7 @@ import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
 import { handleBookOrderSend } from './book-order-send.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
+import { handleBookEditRequest, handleBookEditReview } from './book-edit-request.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -958,6 +961,16 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleBookAddReview(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/book-edit-request') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookEditRequest(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/book-edit-review') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookEditReview(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
