@@ -1433,11 +1433,20 @@ const FB_PLUS = [
   ['숙제를 성실히 해옴', '숙제를 성실하게 해온 것'],
   ['요약을 조리 있게 말함', '읽은 내용을 조리 있게 요약한 것'],
   ['어휘 정리가 꼼꼼함', '어휘 정리를 꼼꼼히 한 것'],
-  ['질문이 늘어남', '질문이 부쩍 늘어난 것']
+  ['질문이 늘어남', '질문이 부쩍 늘어난 것'],
+  ['스스로 다시 풀어봄', '틀린 문제를 스스로 다시 풀어본 것'],
+  ['필기가 꼼꼼함', '필기를 꼼꼼하게 정리한 것'],
+  ['어려운 지문도 끝까지 읽음', '어려운 지문도 끝까지 읽어낸 것'],
+  ['시간 안에 마무리함', '정해진 시간 안에 잘 마무리한 것'],
+  ['발표에 자신감 붙음', '발표할 때 자신감이 붙은 것'],
+  ['새 개념을 빠르게 이해함', '새로운 개념을 빠르게 이해한 것']
 ];
 const FB_MINUS = [
   ['어휘', '어휘력'], ['추론 문제', '추론 유형'], ['실수', '아는 문제에서의 실수'],
-  ['풀이 속도', '풀이 속도'], ['집중 유지', '후반부 집중 유지'], ['없음', '']
+  ['풀이 속도', '풀이 속도'], ['집중 유지', '후반부 집중 유지'],
+  ['문장 이해', '문장 이해력'], ['서술형 답안', '서술형 답안 작성'],
+  ['필기 정리', '필기 정리 습관'], ['시간 관리', '문제 풀이 시간 관리'],
+  ['없음', '']
 ];
 const FB_BANK = {
   best: ['오늘은 시작부터 끝까지 집중이 아주 좋았어요.', '오늘 컨디션이 좋아서 수업 흐름이 유난히 매끄럽더라고요.',
@@ -2863,14 +2872,57 @@ function payrollModal() {
 
 /* ── 교재 DB ──
  * 데이터는 같은 폴더의 textbooks.json (정적 파일 — 동기화 무게 0, 수정은 저장소에서).
- * 학생별 현재 위치(◀)와 남은 분량·예상 소요를 함께 보여준다. */
+ * 학생별 현재 위치(◀)와 남은 분량·예상 소요를 함께 보여준다.
+ *
+ * 새 교재는 선생님이 앱에서 신청하면(book-add-request.js) 원장 승인 후 여기 병합된다.
+ * textbooks.json 자체는 정적 파일이라 배포 없이는 못 고치므로, 승인된 신청만 따로
+ * 서버에서 읽어와(list_approved) bookDb.books에 얹는다 — 배포를 기다리지 않고 바로
+ * 목록에 나타나는 이유가 이것이다. */
 let bookDb = null, bookDbErr = '';
 const bookOpen = new Set();
 function loadBooks() {
   fetch('textbooks.json?v=' + Date.now())
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { bookDb = d; if (route === 'books') render(); })
+    .then(d => { bookDb = d; mergeBookAdditions(); if (route === 'books') render(); loadApprovedBookAdditions(false); })
     .catch(e => { bookDbErr = String(e); if (route === 'books') render(); });
+}
+
+let approvedBookAdditions = null;
+let approvedBookAdditionsLoaded = false;
+let approvedBookAdditionsLoading = false;
+
+/** 승인된 신청을 bookDb.books에 얹는다 — 이미 있는 id는 건너뛰어 중복을 막는다 */
+function mergeBookAdditions() {
+  if (!bookDb || !approvedBookAdditions) return;
+  const existingIds = new Set((bookDb.books || []).map(b => b.id));
+  approvedBookAdditions.forEach(a => {
+    if (existingIds.has(a.bookId)) return;
+    bookDb.books.push({
+      id: a.bookId, title: a.title, subject: a.subject || '', level: a.level || '',
+      verify: false, note: a.note || '', units: a.units || [],
+      vendor: a.vendorName || '', addedBy: a.owner, source: 'added'
+    });
+    existingIds.add(a.bookId);
+  });
+}
+
+async function loadApprovedBookAdditions(force) {
+  if (approvedBookAdditionsLoading || (approvedBookAdditionsLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { approvedBookAdditionsLoaded = true; return; }
+  approvedBookAdditionsLoading = true;
+  try {
+    const result = await sync.post('/book-add-request', { app: SYNC_APP, auth: auth, action: 'list_approved', limit: 300 });
+    approvedBookAdditions = result.books || [];
+    approvedBookAdditionsLoaded = true;
+    mergeBookAdditions();
+  } catch (error) {
+    approvedBookAdditions = approvedBookAdditions || [];
+    approvedBookAdditionsLoaded = true;
+  } finally {
+    approvedBookAdditionsLoading = false;
+    if (route === 'books') render();
+  }
 }
 
 function bookStudents(bookId) {
@@ -2995,6 +3047,7 @@ function bookCard(b) {
           ' style="margin-top:4px" title="일괄 주문에 담기">' +
         '<div><div class="card-title">' + esc(b.title) +
           (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
+          (b.source === 'added' ? ' <span class="tag" style="color:var(--navy)">🆕 신청 등록</span>' : '') +
           (openOrders ? ' <span class="tag high">🛒 주문 진행 ' + openOrders + '</span>' : '') + '</div>' +
         '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
           (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div></div>' +
@@ -3031,13 +3084,202 @@ function bookCard(b) {
   return h + '</div>';
 }
 
+/* ── 새 교재 추가 신청 ──
+ * textbooks.json은 정적 파일이라 앱에서 직접 못 고친다. 선생님이 신청하면(request)
+ * 원장이 검토(review)해 승인해야 교재 목록에 나타난다. 원장이 직접 신청하면 검토
+ * 없이 바로 등록된다. 승인 요청 → 검토 골격은 수업 정보 변경 요청과 같다. */
+let bookAddQueue = [];
+let bookAddQueueLoaded = false;
+let bookAddQueueLoading = false;
+let bookAddQueueError = '';
+let ownBookAddQueue = [];
+let ownBookAddQueueLoaded = false;
+let ownBookAddQueueLoading = false;
+let ownBookAddQueueError = '';
+
+const BOOK_ADD_STATUS_LABEL = {
+  approval_waiting: ['원장 검토 대기', 'warn'],
+  approved: ['등록됨', 'ok'],
+  rejected: ['반려', 'bad'],
+  cancelled: ['취소', '']
+};
+
+async function loadBookAddQueue(force) {
+  if (!session.isAdmin || bookAddQueueLoading || (bookAddQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { bookAddQueueError = '동기화 인증이 필요합니다'; bookAddQueueLoaded = true; return; }
+  bookAddQueueLoading = true; bookAddQueueError = '';
+  if (route === 'books') render();
+  try {
+    const result = await sync.post('/book-add-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
+    bookAddQueue = result.requests || [];
+    bookAddQueueLoaded = true;
+  } catch (error) {
+    bookAddQueueError = String(error && error.message || error);
+    bookAddQueueLoaded = true;
+  } finally {
+    bookAddQueueLoading = false;
+    if (route === 'books') render();
+  }
+}
+
+async function loadOwnBookAddQueue(force) {
+  if (!session.isStaffLink || ownBookAddQueueLoading || (ownBookAddQueueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { ownBookAddQueueError = '동기화 인증이 필요합니다'; ownBookAddQueueLoaded = true; return; }
+  ownBookAddQueueLoading = true; ownBookAddQueueError = '';
+  if (route === 'books') render();
+  try {
+    const result = await sync.post('/book-add-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
+    ownBookAddQueue = result.requests || [];
+    ownBookAddQueueLoaded = true;
+  } catch (error) {
+    ownBookAddQueueError = String(error && error.message || error);
+    ownBookAddQueueLoaded = true;
+  } finally {
+    ownBookAddQueueLoading = false;
+    if (route === 'books') render();
+  }
+}
+
+function bookAddSummary(item) {
+  const parts = [];
+  if (item.subject) parts.push('과목: ' + esc(item.subject));
+  if (item.level) parts.push('레벨: ' + esc(item.level));
+  if (item.vendorName) parts.push('거래처: ' + esc(item.vendorName));
+  const sectionCount = (item.units || []).reduce((n, u) => n + ((u.sections || []).length), 0);
+  if (sectionCount) parts.push('소단원 ' + sectionCount + '개');
+  return parts.join(' · ');
+}
+
+function ownBookAddCard(item) {
+  const status = BOOK_ADD_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' + esc(item.title) +
+      '</div><div class="small muted">' + bookAddSummary(item) + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    (item.note ? '<div class="small muted mt14">메모 — ' + esc(item.note) + '</div>' : '') +
+    (item.reviewNote ? '<div class="hint mt14"><b>원장 반려 사유</b><br>' + esc(item.reviewNote) + '</div>' : '') +
+    '</div>';
+}
+
+function viewOwnBookAddRequests() {
+  if (!ownBookAddQueueLoaded && !ownBookAddQueueLoading) setTimeout(() => loadOwnBookAddQueue(false), 0);
+  if (ownBookAddQueueLoading) return '<div class="card"><div class="empty"><b>⏳</b>내 교재 신청을 불러오는 중입니다.</div></div>';
+  if (ownBookAddQueueError) return '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownBookAddQueueError) + '</div></div>';
+  if (!ownBookAddQueue.length) return '';
+  let h = '<div class="card"><div class="card-title">📚 내가 신청한 교재</div>' +
+    '<div class="card-sub">직접 신청한 새 교재의 승인 상태입니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="baownrefresh">새로고침</button></div>';
+  return h + ownBookAddQueue.map(ownBookAddCard).join('');
+}
+
+function bookAddQueueCard(item) {
+  const staff = staffById(item.owner);
+  const status = BOOK_ADD_STATUS_LABEL[item.status] || [item.status, ''];
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">' + esc(item.title) +
+      '</div><div class="small muted">' + ((staff && staff.name) ? esc(staff.name) + ' 선생님 · ' : '') + bookAddSummary(item) + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
+    (item.note ? '<div class="small muted mt14">메모 — ' + esc(item.note) + '</div>' : '') +
+    '<div class="row wraprow mt14">' +
+      '<button class="btn btn-sm btn-primary" data-act="bareviewapprove" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">승인 · 교재 등록</button>' +
+      '<button class="btn btn-sm btn-warn" data-act="bareviewreject" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">반려</button></div>' +
+    '</div>';
+}
+
+function viewBookAddReview() {
+  if (!bookAddQueueLoaded && !bookAddQueueLoading) setTimeout(() => loadBookAddQueue(false), 0);
+  if (bookAddQueueLoading) return '<div class="card"><div class="empty"><b>⏳</b>교재 신청을 불러오는 중입니다.</div></div>';
+  if (bookAddQueueError) return '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(bookAddQueueError) + '</div></div>';
+  const pending = bookAddQueue.filter(item => item.status === 'approval_waiting');
+  if (!pending.length) return '';
+  let h = '<div class="card"><div class="card-title">📚 새 교재 추가 신청 검토 · ' + pending.length + '건</div>' +
+    '<div class="card-sub">선생님이 신청한 새 교재입니다. 승인하면 바로 교재 목록에 나타납니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="barefresh">새로고침</button></div>';
+  return h + pending.map(bookAddQueueCard).join('');
+}
+
+function bookAddModal() {
+  const vendors = (bookDb && bookDb.vendors) || [];
+  modal('📚 새 교재 추가 신청',
+    '<div class="hint mb14">' + (session.isAdmin
+      ? '원장님이 신청하면 검토 없이 바로 교재 목록에 등록됩니다.'
+      : '신청하면 원장님이 검토·승인한 뒤 교재 목록에 나타납니다. 승인 전까지는 목록에 보이지 않습니다.') + '</div>' +
+    '<div class="field"><label class="fl">교재명 *</label><input class="in" id="baTitle" placeholder="예: 독해력 마스터 3단계"></div>' +
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">과목</label><input class="in" id="baSubject" placeholder="예: 국어 독해"></div>' +
+      '<div class="field"><label class="fl">학년/레벨</label><input class="in" id="baLevel" placeholder="예: 초4"></div>' +
+    '</div>' +
+    '<div class="field"><label class="fl">거래처(주문처)</label><select class="in" id="baVendor">' +
+      '<option value="">미정 — 나중에 확인</option>' +
+      vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('') +
+    '</select></div>' +
+    '<div class="field"><label class="fl">목차 (선택, 한 줄에 소단원 하나씩)</label><textarea class="in" id="baSections" rows="4" placeholder="예:\n중심 문장 찾기\n세부 내용 확인"></textarea></div>' +
+    '<div class="field"><label class="fl">메모</label><textarea class="in" id="baNote" rows="2" placeholder="예: 새로 들어온 학생용, 재고 확인 필요 등"></textarea></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="basubmit">' + (session.isAdmin ? '교재 등록' : '원장님께 신청 보내기') + '</button>');
+}
+
+async function submitBookAdd(button) {
+  const title = (($('#baTitle') || {}).value || '').trim();
+  if (!title) return toast('교재명을 입력해 주세요');
+  const subject = (($('#baSubject') || {}).value || '').trim();
+  const level = (($('#baLevel') || {}).value || '').trim();
+  const vendorName = (($('#baVendor') || {}).value || '').trim();
+  const sectionsText = (($('#baSections') || {}).value || '').trim();
+  const units = sectionsText ? [{ name: '목차', sections: sectionsText.split('\n').map(s => s.trim()).filter(Boolean) }] : [];
+  const note = (($('#baNote') || {}).value || '').trim();
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/book-add-request', {
+      app: SYNC_APP, auth: auth, action: 'submit', title: title, subject: subject, level: level,
+      vendorName: vendorName, units: units, note: note
+    });
+    ownBookAddQueueLoaded = false; bookAddQueueLoaded = false;
+    const approvedNow = result.request && result.request.status === 'approved';
+    if (approvedNow) { approvedBookAdditionsLoaded = false; loadApprovedBookAdditions(true); }
+    toast(result.idempotent ? '같은 이름의 신청이 이미 접수돼 있습니다'
+      : (approvedNow ? '교재를 등록했습니다' : '원장님께 교재 추가를 신청했습니다'));
+    closeModal(); render();
+  } catch (error) {
+    toast('신청 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function reviewBookAdd(action, key, revision) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const body = { app: SYNC_APP, auth: auth, action: action, requestKey: key, revision: Number(revision) };
+  if (action === 'reject') {
+    const note = prompt('선생님에게 전달할 반려 사유를 적어 주세요');
+    if (note === null) return;
+    body.note = note.trim();
+  }
+  try {
+    const result = await sync.post('/book-add-review', body);
+    const index = bookAddQueue.findIndex(item => item.requestKey === key);
+    if (index >= 0) bookAddQueue[index] = result.request;
+    if (action === 'approve') { approvedBookAdditionsLoaded = false; loadApprovedBookAdditions(true); }
+    render();
+    toast(action === 'approve' ? '승인했습니다 · 교재 목록에 등록됐습니다' : '반려했습니다');
+  } catch (error) {
+    toast('검토 실패 — ' + (error.message || error));
+    loadBookAddQueue(true);
+  }
+}
+
 function viewBooks() {
   if (!bookDb && !bookDbErr) { loadBooks(); return '<div class="card"><div class="empty"><b>📚</b>교재 데이터를 불러오는 중…</div></div>'; }
   if (bookDbErr) return '<div class="card"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span></div></div>';
 
   let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
     '<div class="card-sub">거래처(출판사)별로 묶었습니다. 거래처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
-    '기준일 ' + esc(bookDb.updated || '') + ' · 목차 수정은 원장님이 저에게 말로 지시하면 반영됩니다.</div></div>';
+    '기준일 ' + esc(bookDb.updated || '') + ' · 기존 교재의 목차 수정은 원장님이 저에게 말로 지시하면 반영됩니다.</div>' +
+    '<button class="btn btn-sm btn-primary mt14" data-act="baopen">+ 새 교재 추가 신청</button></div>';
+
+  if (session.isAdmin) h += viewBookAddReview();
+  if (session.isStaffLink) h += viewOwnBookAddRequests();
 
   const vendors = bookDb.vendors || [];
   const byVendor = new Map(vendors.map(v => [v.name, []]));
@@ -4373,6 +4615,12 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
+    case 'baopen': bookAddModal(); break;
+    case 'basubmit': submitBookAdd(el); break;
+    case 'baownrefresh': ownBookAddQueueLoaded = false; loadOwnBookAddQueue(true); break;
+    case 'barefresh': bookAddQueueLoaded = false; loadBookAddQueue(true); break;
+    case 'bareviewapprove': reviewBookAdd('approve', el.dataset.key, el.dataset.rev); break;
+    case 'bareviewreject': reviewBookAdd('reject', el.dataset.key, el.dataset.rev); break;
     case 'bkorder': {
       if (!bookDb) break;
       const b = (bookDb.books || []).find(x => x.id === id);
@@ -4978,7 +5226,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-07.6';
+const APP_VER = '2026-08-07.7';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
