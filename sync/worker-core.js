@@ -17,7 +17,9 @@
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
  *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
- *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토(외부 전달 차단)
+ *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토("문구 승인"까지만, 발송은 별개)
+ *   POST /parent-feedback-send { app, auth(admin), requestKey } → 승인된 문구를 보호자에게 실제 발송
+ *   POST /guardian-contact { app, auth(admin), ... } → 원장, 보호자 연락처·발송 동의 등록/조회
  *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
@@ -39,6 +41,8 @@ import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-ch
 import { handleBookOrderSend } from './book-order-send.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
 import { handleBookEditRequest, handleBookEditReview } from './book-edit-request.js';
+import { handleGuardianContact } from './guardian-contact.js';
+import { handleParentFeedbackSend } from './parent-feedback-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -489,13 +493,15 @@ async function handleRevoke(env, app, body, origin) {
 
 
 /* ══════════════════════════════════════════════════════
-   학부모 피드백 문구 검토(안전한 1단계)
-   여기서는 직원의 문구 요청과 원장의 문구 승인만 기록한다.
-   승인 상태도 외부 전달을 허용하지 않으며, 외부 전달 기능은 이 워커에 없다.
+   학부모 피드백 문구 검토 + 실제 발송
+   여기서는 직원의 문구 요청과 원장의 문구 승인만 기록한다. "문구 승인"
+   (content_approved_send_blocked)과 "실제 발송"(sent)은 항상 별개의 명시적
+   동작이다 — 실제 발송은 parent-feedback-send.js가 담당하고, 원장만 누를 수 있다.
    ══════════════════════════════════════════════════════ */
 const FEEDBACK_STATUSES = new Set([
   'approval_waiting',
   'content_approved_send_blocked',
+  'sent',
   'revision_requested',
   'cancelled'
 ]);
@@ -596,7 +602,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
     const result = await env.DB.prepare(
       "SELECT * FROM feedback_requests WHERE app=? AND owner=? ORDER BY CASE status " +
       "WHEN 'revision_requested' THEN 0 WHEN 'approval_waiting' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END, updated_at DESC LIMIT " + limit
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
     ).bind('task', auth.id).all();
     return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
   }
@@ -703,7 +709,7 @@ async function handleFeedbackReview(env, app, body, origin) {
     const statement = env.DB.prepare(
       'SELECT * FROM feedback_requests WHERE ' + clauses.join(' AND ') +
       " ORDER BY CASE status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'cancelled' THEN 3 ELSE 4 END, updated_at DESC LIMIT " + limit
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
     ).bind(...binds);
     const result = await statement.all();
     return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
@@ -932,6 +938,16 @@ export default {
       }
       if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
       if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
+      if (url.pathname === '/parent-feedback-send') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleParentFeedbackSend(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/guardian-contact') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleGuardianContact(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);

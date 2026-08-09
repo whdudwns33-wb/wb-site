@@ -81,10 +81,11 @@ function seedOrderTask(db, overrides = {}) {
   return task;
 }
 
-test('schema and migration are additive and store no phone or message body', () => {
+test('schema and migration are additive, and the send ledger itself stores no phone or message body', () => {
   for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_sends/);
-    assert.doesNotMatch(sql, /phone|message_body/i);
+    const match = sql.match(/CREATE TABLE IF NOT EXISTS book_order_sends\s*\([\s\S]*?\);/);
+    assert.ok(match, 'book_order_sends 테이블 정의를 찾을 수 없습니다');
+    assert.doesNotMatch(match[0], /phone|message_body/i);
     assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
   }
 });

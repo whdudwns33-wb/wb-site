@@ -70,7 +70,9 @@ CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
   ON bootstrap_codes(app, staff_id, revoked, expires_at);
 
 -- 학부모 피드백 문구의 검토 요청 원장.
--- 이 테이블은 "문구 승인"까지만 다루며 실제 외부 발송 정보나 발송 결과를 저장하지 않는다.
+-- "문구 승인"(content_approved_send_blocked)과 "실제 발송"(sent)을 분리해 둔다 —
+-- 원장이 문구를 승인하는 것과 외부로 실제 발송 버튼을 누르는 것은 항상 별개의
+-- 명시적 동작이어야 한다(parent-feedback-send.js).
 CREATE TABLE IF NOT EXISTS feedback_requests (
   app              TEXT    NOT NULL,
   request_key      TEXT    NOT NULL,
@@ -85,6 +87,7 @@ CREATE TABLE IF NOT EXISTS feedback_requests (
   status           TEXT    NOT NULL CHECK (status IN (
     'approval_waiting',
     'content_approved_send_blocked',
+    'sent',
     'revision_requested',
     'cancelled'
   )),
@@ -283,4 +286,46 @@ CREATE INDEX IF NOT EXISTS idx_book_edit_requests_owner
   ON book_edit_requests(app, owner, updated_at);
 CREATE INDEX IF NOT EXISTS idx_book_edit_requests_status
   ON book_edit_requests(app, status, updated_at);
+
+-- 보호자 연락처·발송 동의 원장. 유일하게 개인정보(전화번호)를 담는 테이블이다 —
+-- roster.json 같은 정적 파일(GitHub Pages로 공개 서빙됨)에는 절대 올리지 않고
+-- 여기 D1(비공개 서버 DB)에만 둔다. 원장(scope='all')만 넣고 고칠 수 있다.
+CREATE TABLE IF NOT EXISTS guardian_contacts (
+  app          TEXT    NOT NULL,
+  student_name TEXT    NOT NULL,        -- roster.json의 학생 이름과 동일 표기로 맞춘다
+  phone        TEXT,                    -- 정규화된 숫자만(010########). 비어 있으면 미등록
+  consent      INTEGER NOT NULL DEFAULT 0 CHECK (consent IN (0, 1)),  -- 보호자 알림 발송 동의
+  updated_at   INTEGER NOT NULL,
+  updated_by   TEXT,
+  PRIMARY KEY (app, student_name)
+);
+
+-- 학부모 피드백 실제 발송 이력 — book_order_sends와 같은 골격
+-- (예약→발송중→결과, 멱등키로 중복 발송 방지, 하루 발송 한도).
+CREATE TABLE IF NOT EXISTS parent_feedback_sends (
+  app                  TEXT    NOT NULL CHECK (app = 'task'),
+  send_id              TEXT    NOT NULL,
+  idempotency_key      TEXT    NOT NULL,
+  feedback_request_key TEXT    NOT NULL,
+  student_name         TEXT    NOT NULL,
+  message_hash         TEXT    NOT NULL CHECK (length(message_hash) = 64),
+  status               TEXT    NOT NULL CHECK (status IN (
+    'reserved',
+    'dispatching',
+    'accepted',
+    'rejected',
+    'unknown'
+  )),
+  provider_group_id    TEXT,
+  provider_message_id  TEXT,
+  provider_status_code TEXT,
+  safe_error_code      TEXT,
+  created_at           INTEGER NOT NULL,
+  dispatch_started_at  INTEGER,
+  updated_at           INTEGER NOT NULL,
+  PRIMARY KEY (app, send_id),
+  UNIQUE (app, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_parent_feedback_sends_request
+  ON parent_feedback_sends(app, feedback_request_key, updated_at);
 
