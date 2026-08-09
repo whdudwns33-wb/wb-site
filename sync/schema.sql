@@ -70,9 +70,12 @@ CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
   ON bootstrap_codes(app, staff_id, revoked, expires_at);
 
 -- 학부모 피드백 문구의 검토 요청 원장.
--- "문구 승인"(content_approved_send_blocked)과 "실제 발송"(sent)을 분리해 둔다 —
--- 원장이 문구를 승인하는 것과 외부로 실제 발송 버튼을 누르는 것은 항상 별개의
--- 명시적 동작이어야 한다(parent-feedback-send.js).
+-- 원장 지시(2026-08)로 별도 승인 클릭 없이 제출 즉시 카카오 알림톡 실발송을 시도한다.
+-- status는 그 시도 결과다 — 'sent'는 성공, 'content_approved_send_blocked'는 "아직 안 나감"
+-- (보호자 연락처·동의 미등록, 발송 스위치 꺼짐, 카카오 반려 등 — 사유는 review_note에 남는다).
+-- teacher_name/student_name/content_text/plus_text/minus_text는 알림톡 템플릿 변수에
+-- 그대로 들어가는 항목별 값이다(parent-feedback-send.js). body/body_hash는 예전 자유 문구
+-- 형식과 "복사하기" 버튼용으로 계속 남겨둔다.
 CREATE TABLE IF NOT EXISTS feedback_requests (
   app              TEXT    NOT NULL,
   request_key      TEXT    NOT NULL,
@@ -83,6 +86,11 @@ CREATE TABLE IF NOT EXISTS feedback_requests (
   template_version TEXT    NOT NULL,
   body             TEXT    NOT NULL,
   body_hash        TEXT    NOT NULL,
+  teacher_name     TEXT,
+  student_name     TEXT,
+  content_text     TEXT,
+  plus_text        TEXT,
+  minus_text       TEXT,
   revision         INTEGER NOT NULL DEFAULT 1,
   status           TEXT    NOT NULL CHECK (status IN (
     'approval_waiting',
