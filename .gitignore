@@ -1,0 +1,6 @@
+# Wrangler 로컬 캐시/임시 파일 — 배포할 때마다 자동 생성된다. 커밋 대상 아님.
+.wrangler/
+**/.wrangler/
+
+# Node
+node_modules/
