@@ -3924,9 +3924,9 @@ async function saveGuardianContact(idx, button) {
     });
     if (guardianContacts) guardianContacts.set(name, result.contact);
     toast(name + ' 보호자 연락처를 저장했습니다');
+    render();
   } catch (error) {
     toast('저장 실패 — ' + (error.message || error));
-  } finally {
     if (button) button.disabled = false;
   }
 }
