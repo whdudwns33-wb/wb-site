@@ -281,8 +281,8 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-04.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-04.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-09.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-09.1"></script>
 <script>
 "use strict";
 
@@ -3101,17 +3101,16 @@ function canCancelOrder(t) {
   return !!t && (session.isAdmin || (session.isStaffLink && t.staffId === session.staffId));
 }
 
-/** 담당: 직원이 요청하면 본인, 원장이 요청하면 관리자(없으면 첫 직원) */
+/** 직원 주문은 입고 확인을 위해 본인 업무에 남기고, 원장 주문은 특정 직원에게 떠넘기지 않는다. */
 function orderAssignee() {
-  return session.isStaffLink ? session.staffId
-    : ((liveStaff().find(s => s.manager) || teamStaff()[0]) || {}).id;
+  return session.isStaffLink ? session.staffId : null;
 }
 
 /** 주문 지시서 하나를 만든다 — 책 한 권짜리도, 여러 권 묶은 것도 같은 모양으로 */
 function createOrderTask(vendorName, items, sid) {
   const vend = ((bookDb.vendors || []).find(v => (v.name || v) === vendorName)) || null;
   const titleMain = items.length > 1 ? (vendorName || '교재') + ' — ' + items.length + '권' : items[0].title;
-  state.tasks.push({
+  const order = {
     id: uid(), groupId: 'order-' + now(), staffId: sid,
     title: '[주문] ' + titleMain,
     detail: items.map(it => it.title + ': ' + it.qty).join(' · ') + (vendorName ? ' · 주문처: ' + vendorName : ''),
@@ -3126,7 +3125,40 @@ function createOrderTask(vendorName, items, sid) {
     // 자동 발송(book-order-send)이 읽는 구조화된 필드 — 자유 텍스트가 아니라 이 값으로만 문자를 만든다
     orderVendor: vendorName || '', orderItems: items,
     origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
-  });
+  };
+  state.tasks.push(order);
+  return order;
+}
+
+/** 주문 지시서를 먼저 D1에 저장한 뒤, 서버에 등록된 거래처 번호로 즉시 발송한다. */
+async function sendBookOrder(order, button) {
+  const auth = sync.auth();
+  if (!auth) return toast(session.isAdmin ? '원장 동기화 인증이 필요합니다' : '개인 링크 인증이 필요합니다');
+  const vend = ((bookDb && bookDb.vendors) || []).find(v => (v.name || v) === order.orderVendor);
+  if (vend && vend.type === 'online') return toast(vend.name + '는 온라인 주문처입니다 — 주문 사이트에서 직접 주문해 주세요');
+
+  if (button) { button.disabled = true; button.textContent = '주문 저장 중…'; }
+  try {
+    await settleSync();
+    if (button) button.textContent = '문자 보내는 중…';
+    const res = await sync.post('/book-order-send', { app: SYNC_APP, auth: auth, taskId: order.id });
+    if (!res.send || res.send.status !== 'accepted') {
+      if (button) { button.disabled = true; button.textContent = '결과 확인 필요'; }
+      return toast('발송 결과 확인이 필요합니다 — 다시 주문하지 말고 발송 내역을 확인해 주세요');
+    }
+    const firstStep = (order.steps || [])[0];
+    if (firstStep) {
+      const check = getCheck(order.id, today());
+      const steps = Object.assign({}, (check && check.steps) || {});
+      steps[firstStep.id] = true;
+      setCheck(order.id, today(), { steps: steps, note: '자동 발송 완료 · ' + new Date().toLocaleString('ko-KR') });
+    }
+    toast(res.idempotent ? '이미 발송된 주문입니다' : ((res.vendorName || '거래처') + ' — 문자 발송 완료'));
+    closeModal(); render();
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '🚀 지금 바로 문자 발송'; }
+    toast('발송 실패 — ' + (error.message || error));
+  }
 }
 
 /** 일괄 주문용 선택 상태 — 책 id 집합. 거래처 섹션마다 그 안의 선택분만 쓴다 */
@@ -3143,11 +3175,11 @@ function batchOrderModal(vendorKey) {
   batchDraft = books.map(b => ({ id: b.id, title: b.title }));
   batchVendorName = isUnassigned ? '' : vendorKey;
   modal((isUnassigned ? '거래처 미등록' : vendorKey) + ' — ' + books.length + '권 한번에 주문',
-    '<div class="hint mb14">각 책의 수량을 입력하고 등록하면 지시서 하나로 묶여 담당 직원에게 들어갑니다.</div>' +
+    '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 묶어 문자 한 통으로 보냅니다.</div>' +
     batchDraft.map(row =>
       '<div class="field"><label class="fl">' + esc(row.title) + '</label>' +
       '<input class="in" id="bq-' + row.id + '" placeholder="예: 3권">' + '</div>').join(''),
-    '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">' + books.length + '권 주문 요청 등록</button>');
+    '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">' + books.length + '권 · 문자 한 통으로 주문</button>');
 }
 
 function cancelOrderModal(bookId) {
@@ -3582,6 +3614,7 @@ function viewBooks() {
 
   let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
     '<div class="card-sub">거래처(출판사)별로 묶었습니다. 거래처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
+    '같은 출판사에 여러 권을 주문할 때는 왼쪽 체크박스로 책을 모두 고른 뒤 문자 한 통으로 주문하세요.<br>' +
     '기준일 ' + esc(bookDb.updated || '') + ' · 각 교재 카드의 "✏ 수정" 버튼으로 정보를 고칠 수 있습니다.</div>' +
     '<button class="btn btn-sm btn-primary mt14" data-act="baopen">+ 새 교재 추가 신청</button></div>';
 
@@ -3619,7 +3652,7 @@ function viewBooks() {
       const selectedHere = sec.books.filter(b => batchSelection.has(b.id));
       if (selectedHere.length >= 2) {
         h += '<button class="btn btn-primary btn-block" data-act="bkbatch" data-key="' + esc(sec.key) + '">' +
-          '🛒 선택한 ' + selectedHere.length + '권 한번에 주문하기</button>';
+          '🛒 선택한 ' + selectedHere.length + '권 · 문자 한 통으로 주문</button>';
       }
     }
   });
@@ -4335,7 +4368,7 @@ function directorReportRequestPayload(context) {
   return payload;
 }
 
-async function settleDirectorReportSync() {
+async function settleSync() {
   clearTimeout(sync.timer);
   sync.timer = null;
   for (let attempt = 0; sync.busy && attempt < 60; attempt++) {
@@ -4396,7 +4429,7 @@ async function submitDirectorReport(button) {
   if (button) { button.disabled = true; button.textContent = '최신 상태 확인 중…'; }
   try {
     flushReportInputs();
-    await settleDirectorReportSync();
+    await settleSync();
     if (button) button.textContent = '문자 요청 접수 중…';
     const result = await sync.post('/director-report-send', directorReportRequestPayload(context));
     const sendStatus = String(result && result.send && result.send.status || 'unknown');
@@ -5031,10 +5064,10 @@ document.addEventListener('click', ev => {
       const qty = (prompt('[' + b.title + '] 주문 요청\n수량과 메모를 입력하세요 (예: 3권, 다음 주 수업 전까지)') || '').trim();
       if (!qty) return;
       const sid = orderAssignee();
-      if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
-      createOrderTask(b.vendor || '', [{ title: b.title, qty: qty }], sid);
+      const order = createOrderTask(b.vendor || '', [{ title: b.title, qty: qty }], sid);
       save(); queueSync(); render();
-      toast('주문 요청 등록 — ' + ((staffById(sid) || {}).name || '') + ' 님 할 일로 들어갔습니다');
+      toast('주문 저장 · 출판사로 문자 보내는 중…');
+      sendBookOrder(order);
       break;
     }
     case 'bkselect': {
@@ -5046,19 +5079,19 @@ document.addEventListener('click', ev => {
     case 'bkbatchsubmit': {
       if (!batchDraft || !batchDraft.length) break;
       const sid = orderAssignee();
-      if (!sid) return toast('담당할 직원이 없습니다 — 직원을 먼저 등록해 주세요');
       const items = batchDraft.map(row => ({
         title: row.title,
         qty: (($('#bq-' + row.id) || {}).value || '').trim() || '1권'
       }));
-      createOrderTask(batchVendorName, items, sid);
+      const order = createOrderTask(batchVendorName, items, sid);
       items.forEach(it => {
         const b = (bookDb.books || []).find(x => x.title === it.title);
         if (b) batchSelection.delete(b.id);
       });
       batchDraft = null; batchVendorName = '';
       save(); queueSync(); closeModal(); render();
-      toast(items.length + '권 한번에 주문 요청 등록 — ' + ((staffById(sid) || {}).name || '') + ' 님 할 일로 들어갔습니다');
+      toast(items.length + '권 저장 · 문자 한 통으로 보내는 중…');
+      sendBookOrder(order);
       break;
     }
     case 'bkcancelopen': cancelOrderModal(id); break;
@@ -5123,31 +5156,7 @@ document.addEventListener('click', ev => {
     }
     case 'bossend': {
       const t = state.tasks.find(x => x.id === id); if (!t) break;
-      const auth = sync.auth();
-      if (!auth) { toast('동기화 인증이 필요합니다'); break; }
-      const btn = el; btn.disabled = true; btn.textContent = '보내는 중…';
-      const resultBox = $('#bosResult');
-      sync.post('/book-order-send', { app: SYNC_APP, auth: auth, taskId: t.id })
-        .then(res => {
-          if (res.send && res.send.status === 'accepted') {
-            const steps = t.steps || [];
-            if (steps[0]) {
-              const c = getCheck(t.id, today());
-              const cur = Object.assign({}, (c && c.steps) || {});
-              cur[steps[0].id] = true;
-              setCheck(t.id, today(), { steps: cur, note: '자동 발송 완료 · ' + new Date().toLocaleString('ko-KR') });
-            }
-            toast(res.idempotent ? '이미 발송된 주문입니다' : ((res.vendorName || '거래처') + ' — 발송 완료'));
-            closeModal(); render();
-          } else if (resultBox) {
-            resultBox.textContent = '⏳ ' + (res.send ? res.send.status : '처리 중') + ' — 잠시 후 다시 확인해 주세요';
-          }
-        })
-        .catch(error => {
-          if (btn) { btn.disabled = false; btn.textContent = '🚀 지금 바로 문자 발송'; }
-          if (resultBox) resultBox.textContent = '❌ ' + (error.message || error);
-          else toast('발송 실패 — ' + (error.message || error));
-        });
+      sendBookOrder(t, el);
       break;
     }
     case 'latt': {

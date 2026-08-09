@@ -38,10 +38,10 @@ test('admin lesson registration requires an explicit teacher selection', () => {
   assert.match(html, /if \(!session\.isStaffLink && !draft\.staffId\) return toast\('담당 선생님을 선택해 주세요'\)/);
 });
 
-test('feedback workflow asks for director review and never promises delivery', () => {
-  assert.match(html, /data-act="feedbacksubmit">원장 검토 요청/);
-  assert.match(html, /문구 승인\(발송 아님\)/);
-  assert.match(html, /보호자 미연결 · 실제 발송 차단/);
+test('feedback workflow sends immediately only through the server-side guardian gate', () => {
+  assert.match(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
+  assert.match(html, /승인 없이 바로 나갑니다/);
+  assert.match(html, /보호자 연락처·발송 동의가 등록된 학생만 실제로 발송/);
   assert.match(html, /sync\.post\('\/feedback-request'/);
   assert.match(html, /sync\.post\('\/feedback-review'/);
   assert.match(html, /action: 'list', limit: 100/);
@@ -51,5 +51,5 @@ test('feedback workflow asks for director review and never promises delivery', (
 });
 
 test('new lesson form core is loaded before the app script', () => {
-  assert.match(html, /<script src="\.\/lesson-form-core\.js\?v=2026-08-04\.3"><\/script>/);
+  assert.match(html, /<script src="\.\/lesson-form-core\.js\?v=2026-08-09\.1"><\/script>/);
 });
