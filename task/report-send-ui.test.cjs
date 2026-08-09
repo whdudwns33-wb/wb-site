@@ -97,9 +97,11 @@ test('report send UI contains no embedded phone number or secret and versions re
   const send = functionSource('submitDirectorReport');
   const addedSurface = summary + payload + send;
   assert.doesNotMatch(addedSurface, /01[016789][ -]?\d{3,4}[ -]?\d{4}|SOLAPI_(?:API_)?(?:KEY|SECRET)|TASK_ADMIN_SECRET/);
-  assert.equal(version.v, '2026-08-09.1');
-  assert.match(html, /const APP_VER = '2026-08-09\.1'/);
-  assert.match(consultHtml, /const APP_VER = '2026-08-09\.1'/);
-  assert.match(html, /lesson-form-core\.js\?v=2026-08-09\.1/);
-  assert.match(html, /schedule-board-core\.js\?v=2026-08-09\.1/);
+  /* version.json 은 task 와 consult 가 함께 쓴다. 한쪽만 올리면
+     다른 쪽 사용자에게 '새 버전' 배너가 영구히 뜬다. */
+  assert.match(version.v, /^\d{4}-\d{2}-\d{2}\.\d+$/);
+  assert.ok(html.includes("const APP_VER = '" + version.v + "'"), 'task APP_VER');
+  assert.ok(consultHtml.includes("const APP_VER = '" + version.v + "'"), 'consult APP_VER');
+  assert.ok(html.includes('lesson-form-core.js?v=' + version.v), 'lesson-form-core 캐시버스터');
+  assert.ok(html.includes('schedule-board-core.js?v=' + version.v), 'schedule-board-core 캐시버스터');
 });

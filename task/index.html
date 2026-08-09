@@ -281,10 +281,10 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-09.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-09.1"></script>
-<script src="./asset-core.js?v=2026-08-09.1"></script>
-<script src="./qr-core.js?v=2026-08-09.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-09.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-09.2"></script>
+<script src="./asset-core.js?v=2026-08-09.2"></script>
+<script src="./qr-core.js?v=2026-08-09.2"></script>
 <script>
 "use strict";
 
@@ -5945,7 +5945,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-09.1';
+const APP_VER = '2026-08-09.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

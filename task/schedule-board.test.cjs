@@ -108,8 +108,20 @@ test('dashboard is admin-only, mobile responsive, and keeps multi-teacher tasks 
   assert.match(html, /@media \(max-width: 600px\)[\s\S]{0,180}schedule-current-grid \{ grid-template-columns: 1fr;/);
 });
 
+/* 버전을 안 올리면 앱이 '새 버전이 있습니다' 배너를 띄우지 못해, 원장님은
+   파일을 올려도 옛 화면을 계속 보게 된다. 실제로 한 번 그렇게 놓쳤다.
+   특정 파일 하나만 검사하면 새로 추가한 스크립트가 빠져나가므로 전부 본다. */
 test('task page and deployment version stay aligned', () => {
-  assert.equal(version.v, '2026-08-09.1');
-  assert.match(html, /const APP_VER = '2026-08-09\.1';/);
-  assert.match(html, /schedule-board-core\.js\?v=2026-08-09\.1/);
+  assert.match(version.v, /^\d{4}-\d{2}-\d{2}\.\d+$/, 'version.json 형식');
+
+  const appVer = html.match(/const APP_VER = '([^']+)';/);
+  assert.ok(appVer, 'APP_VER 선언을 찾지 못했습니다');
+  assert.equal(appVer[1], version.v, 'APP_VER 와 version.json 이 어긋나면 새로고침 안내가 안 뜬다');
+
+  const localScripts = [...html.matchAll(/<script src="\.\/([^"]+)"/g)].map(m => m[1]);
+  assert.ok(localScripts.length >= 4, '로컬 스크립트를 찾지 못했습니다');
+  localScripts.forEach(src => {
+    assert.ok(src.includes('?v=' + version.v),
+      src + ' 에 현재 버전의 캐시버스터가 없습니다 — 브라우저가 옛 파일을 씁니다');
+  });
 });

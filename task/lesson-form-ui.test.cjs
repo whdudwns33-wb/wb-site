@@ -51,5 +51,7 @@ test('feedback workflow sends immediately only through the server-side guardian 
 });
 
 test('new lesson form core is loaded before the app script', () => {
-  assert.match(html, /<script src="\.\/lesson-form-core\.js\?v=2026-08-09\.1"><\/script>/);
+  const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
+  assert.ok(html.includes('<script src="./lesson-form-core.js?v=' + version.v + '"></script>'),
+    'lesson-form-core 의 캐시버스터가 version.json 과 어긋나면 옛 파일이 쓰인다');
 });
