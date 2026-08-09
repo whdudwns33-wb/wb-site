@@ -283,6 +283,7 @@
 
 <script src="./lesson-form-core.js?v=2026-08-09.1"></script>
 <script src="./schedule-board-core.js?v=2026-08-09.1"></script>
+<script src="./asset-core.js?v=2026-08-09.1"></script>
 <script>
 "use strict";
 
@@ -388,6 +389,46 @@ function setCheck(taskId, date, patch) {
   const k = ckey(taskId, date);
   const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '', steps: {}, count: 0, blocked: false };
   const next = Object.assign({}, cur, patch, { updatedAt: now() });
+  state.checks[k] = next;
+  save();
+  queueSync();
+  return next;
+}
+
+/* ══════════════════════════════════════════════════════
+   3-1. 기기 대장 (태블릿)
+   ── 저장은 checks에 '__asset__<번호>|all' 키로 얹는다. 출결(__st__)·
+      온라인프로그램(__op__)이 이미 같은 방식이라 백엔드를 건드리지 않는다.
+   ── 서버는 개인 링크의 '__프리픽스__<값>' 쓰기를 값 === 본인 staffId 일 때만
+      허용한다(worker-core.js). 기기 번호는 staffId가 아니므로 대장 편집은
+      원장 화면 전용이다. 직원에게 필요한 기기 정보는 업무지시서로 내려간다.
+   ══════════════════════════════════════════════════════ */
+const AC = () => window.WBAssetCore;
+
+function allAssets() {
+  const core = AC();
+  if (!core) return [];
+  return Object.keys(state.checks || {})
+    .filter(core.isAssetKey)
+    .map(k => core.normalizeAsset(state.checks[k]))
+    .filter(a => a.id && !a.deleted)
+    .sort((a, b) => a.id.localeCompare(b.id, 'en'));
+}
+
+function getAsset(id) {
+  const core = AC();
+  if (!core || !id) return null;
+  const row = state.checks[core.assetKey(id)];
+  return row ? core.normalizeAsset(row) : null;
+}
+
+function setAsset(id, patch) {
+  const core = AC();
+  if (!core || !id) return null;
+  const k = core.assetKey(id);
+  const cur = state.checks[k] || { id: id };
+  const next = core.normalizeAsset(Object.assign({}, cur, patch, { id: id }));
+  next.updatedAt = now();
   state.checks[k] = next;
   save();
   queueSync();
@@ -511,6 +552,9 @@ const SYNC_APP = 'task';
  *  '__st__S1|2026-08-02' → S1,  '<taskId>|날짜' → 그 업무의 담당자 */
 function ownerOfCheck(key) {
   const tid = String(key).split('|')[0];
+  /* 기기 대장은 담당자별로 쪼개지 않는다. 여기서 걸러내지 않으면
+     기기 번호가 담당자 id 자리에 들어가 조회 분할이 어긋난다. */
+  if (window.WBAssetCore && window.WBAssetCore.isAssetKey(key)) return null;
   const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
   if (m) return m[1];
   const t = (state.tasks || []).find(x => x.id === tid);
@@ -1148,7 +1192,7 @@ function render() {
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster };
+  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster, devices: viewDevices };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -1160,7 +1204,7 @@ function renderTabs() {
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '수업 현황'], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['settings', '설정']]
+         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -2709,6 +2753,156 @@ function viewSchedule() {
         (item.staffId ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + item.staffId + '">확인</button>' : '') +
       '</div></div>').join('') + '</div>';
   }
+  return h;
+}
+
+/* ── 기기 대장 ── */
+let deviceOpen = '';        // 펼쳐 놓은 기기 번호. '__add__' 면 추가 화면
+let deviceFilter = 'all';   // all | left | bad | 배치키
+
+/** 지시서를 받을 사람. 관리자를 기본값으로 채워 오타를 줄인다. */
+function askAssetStaff(msg) {
+  const mgr = liveStaff().filter(s => s.manager)[0] || liveStaff().filter(s => !s.owner)[0];
+  const v = prompt(msg, mgr ? mgr.name : '');
+  return v == null ? '' : String(v).trim();
+}
+
+function deviceAlertCount() {
+  const core = AC();
+  if (!core) return 0;
+  return core.auditProgress(allAssets()).dead;
+}
+
+function optionsHtml(list, cur) {
+  return list.map(o =>
+    '<option value="' + esc(o.v) + '"' + (o.v === cur ? ' selected' : '') + '>' + esc(o.t) + '</option>'
+  ).join('');
+}
+
+const BATTERY_OPTS = [{ v: '', t: '배터리 —' }, { v: 'ok', t: '배터리 정상' }, { v: 'weak', t: '배터리 성능 저하' }, { v: 'swollen', t: '배터리 부풀음 ⚠' }];
+const CHARGE_OPTS = [{ v: '', t: '충전 —' }, { v: 'ok', t: '충전 정상' }, { v: 'fail', t: '충전 불가 ⚠' }];
+const SCREEN_OPTS = [{ v: '', t: '화면 —' }, { v: 'ok', t: '화면 정상' }, { v: 'touch', t: '터치 불량' }, { v: 'crack', t: '화면 파손 ⚠' }];
+const LOCK_OPTS = [{ v: '', t: '잠금 —' }, { v: 'none', t: '잠금 없음' }, { v: 'mbest', t: '엠베스트 런처' }, { v: 'other', t: '기타 잠금' }];
+
+function deviceRow(a) {
+  const core = AC();
+  const h = core.healthOf(a);
+  const open = deviceOpen === a.id;
+  const kind = core.kindInfo(a.kind);
+  const holder = a.holder ? staffById(a.holder) : null;
+  const pillCls = h.level === 'dead' ? 'pill bad' : h.level === 'watch' ? 'pill warn' : 'pill';
+  const pillText = h.level === 'dead' ? '이상' : h.level === 'watch' ? '확인필요' : '정상';
+
+  let html = '<div class="task"><div class="task-body">' +
+    '<div class="task-t" data-act="assetopen" data-id="' + esc(a.id) + '" style="cursor:pointer">' +
+      esc(a.id) + ' · ' + esc(kind.label) +
+      ' <span class="' + pillCls + '">' + pillText + '</span></div>' +
+    '<div class="meta">' +
+      (a.place ? '<span class="tag ok">' + esc(core.placeLabel(a.place)) + '</span>' : '<span class="tag">배치 미지정</span>') +
+      (holder ? '<span class="tag time">' + esc(holder.name) + '</span>' : '') +
+      (a.spot ? '<span class="tag">' + esc(a.spot) + '</span>' : '') +
+      (a.pii ? '<span class="tag high">개인정보</span>' : '') +
+      (core.isAudited(a) ? '' : '<span class="tag doing">미실사</span>') +
+    '</div>' +
+    (h.reasons.length ? '<div class="hint" style="margin-top:6px">' + esc(h.reasons.join(' · ')) + '</div>' : '') +
+    '</div></div>';
+
+  if (!open) return html;
+
+  const rec = core.recommendTier(a);
+  const staffOpts = [{ v: '', t: '담당자 —' }].concat(
+    liveStaff().map(s => ({ v: s.id, t: s.name })));
+  const placeOpts = [{ v: '', t: '배치 —' }].concat(
+    core.PLACES.map(p => ({ v: p.key, t: p.label })));
+
+  html += '<div class="card mb8">' +
+    '<div class="grid2">' +
+      '<div class="field"><input class="in" id="as-model" value="' + esc(a.model) + '" placeholder="모델명 (SM-T583)"></div>' +
+      '<div class="field"><input class="in" id="as-serial" value="' + esc(a.serial) + '" placeholder="일련번호"></div>' +
+      '<div class="field"><input class="in" id="as-os" value="' + esc(a.os) + '" placeholder="안드로이드 버전"></div>' +
+      '<div class="field"><input class="in" id="as-chrome" value="' + esc(a.chrome) + '" placeholder="크롬 버전" inputmode="numeric"></div>' +
+      '<div class="field"><select class="in" id="as-battery">' + optionsHtml(BATTERY_OPTS, a.battery) + '</select></div>' +
+      '<div class="field"><select class="in" id="as-charge">' + optionsHtml(CHARGE_OPTS, a.charge) + '</select></div>' +
+      '<div class="field"><select class="in" id="as-screen">' + optionsHtml(SCREEN_OPTS, a.screen) + '</select></div>' +
+      '<div class="field"><select class="in" id="as-locked">' + optionsHtml(LOCK_OPTS, a.locked) + '</select></div>' +
+      '<div class="field"><select class="in" id="as-place">' + optionsHtml(placeOpts, a.place) + '</select></div>' +
+      '<div class="field"><select class="in" id="as-holder">' + optionsHtml(staffOpts, a.holder) + '</select></div>' +
+    '</div>' +
+    '<div class="field"><input class="in" id="as-spot" value="' + esc(a.spot) + '" placeholder="위치 (예: 2교실 교탁, 센터 대기실)"></div>' +
+    '<div class="field"><input class="in" id="as-note" value="' + esc(a.note) + '" placeholder="메모"></div>' +
+    '<label class="row mb8" style="cursor:pointer"><input type="checkbox" id="as-pii"' + (a.pii ? ' checked' : '') + '>' +
+      '<span>개인정보 취급 기기 (문진·설문 등) — 점검 주기를 따로 관리합니다</span></label>' +
+    (rec.tier ? '<div class="guide mb8"><b>추천 배치</b>' + esc(rec.tier + ' · ' + rec.why) + '</div>' : '') +
+    '<button class="btn btn-primary btn-block mb8" data-act="assetsave" data-id="' + esc(a.id) + '">실사 완료로 저장</button>' +
+    '<div class="row">' +
+      '<button class="btn btn-ghost" data-act="assetopen" data-id="">닫기</button>' +
+      '<button class="btn btn-ghost" data-act="assetdel" data-id="' + esc(a.id) + '">대장에서 삭제</button>' +
+    '</div>' +
+  '</div>';
+
+  return html;
+}
+
+function viewDevices() {
+  const core = AC();
+  if (!core) return '<div class="card mt14"><div class="card-title">기기 모듈을 불러오지 못했습니다</div>' +
+    '<div class="card-sub">새로고침해도 같으면 원장님께 알려주세요.</div></div>';
+
+  const all = allAssets();
+  const p = core.auditProgress(all);
+  const byPlace = core.countBy(all, 'place');
+
+  const filters = [['all', '전체', all.length], ['left', '미실사', p.left], ['bad', '이상', p.dead]]
+    .concat(core.PLACES.map(x => [x.key, x.label, byPlace[x.key] || 0]));
+
+  const shown = all.filter(a => {
+    if (deviceFilter === 'all') return true;
+    if (deviceFilter === 'left') return !core.isAudited(a);
+    if (deviceFilter === 'bad') return core.healthOf(a).level === 'dead';
+    return a.place === deviceFilter;
+  });
+
+  let h = '<div class="card mt14">' +
+    '<div class="card-title">기기 대장 · ' + all.length + '대</div>' +
+    '<div class="card-sub mb14">실사 ' + p.done + '/' + p.total + ' (' + p.pct + '%)' +
+      (p.dead ? ' · <b style="color:var(--coral)">이상 ' + p.dead + '대</b>' : '') +
+      (p.watch ? ' · 확인필요 ' + p.watch + '대' : '') + '</div>' +
+    (p.dead
+      ? '<div class="guide mb14" style="color:var(--coral)"><b>부푼 배터리는 아이들 공간에서 먼저 빼주세요</b>' +
+        '아래 “이상 기기 조치” 로 담당자에게 바로 내려보낼 수 있습니다.</div>'
+      : '') +
+    '<div class="row mb8" style="flex-wrap:wrap">' +
+      filters.map(([k, t, n]) =>
+        '<button class="btn btn-sm ' + (deviceFilter === k ? 'btn-primary' : 'btn-ghost') + '" ' +
+        'data-act="assetfilter" data-id="' + k + '">' + esc(t) + ' ' + n + '</button>').join('') +
+    '</div>' +
+    '<hr class="sep">' +
+    '<button class="btn btn-primary btn-block mb8" data-act="assetopen" data-id="__add__">＋ 기기 추가</button>' +
+    '<div class="row" style="flex-wrap:wrap">' +
+      '<button class="btn btn-ghost btn-sm" data-act="assetaudit">📋 실사 지시서 발행</button>' +
+      '<button class="btn btn-ghost btn-sm" data-act="assetrepair">🚨 이상 기기 조치</button>' +
+      '<button class="btn btn-ghost btn-sm" data-act="assetpii">🔒 개인정보 기기 점검</button>' +
+    '</div>' +
+    '<div class="hint" style="margin-top:8px">발행하면 담당자의 오늘 할 일에 바로 뜹니다.</div>' +
+  '</div>';
+
+  if (deviceOpen === '__add__') {
+    h += '<div class="card mt14">' +
+      '<div class="card-title">기기 추가</div>' +
+      '<div class="card-sub mb14">한 줄에 한 대씩. <b>번호, 모델명, 일련번호</b> 순서이고 쉼표나 탭으로 나눕니다. ' +
+        '번호를 비우면 자동으로 붙습니다.</div>' +
+      '<div class="field"><textarea class="in" id="as-bulk" rows="6" placeholder="A001, SM-T583, R52M1&#10;SM-T583&#10;SM-T500"></textarea></div>' +
+      '<button class="btn btn-primary btn-block mb8" data-act="assetbulk">대장에 넣기</button>' +
+      '<button class="btn btn-ghost btn-block" data-act="assetopen" data-id="">닫기</button>' +
+    '</div>';
+  }
+
+  h += '<div class="card mt14">';
+  h += shown.length
+    ? shown.map(deviceRow).join('')
+    : '<div class="card-sub">' + (all.length ? '해당하는 기기가 없습니다.' : '아직 등록된 기기가 없습니다. 위 “기기 추가”로 시작하세요.') + '</div>';
+  h += '</div>';
+
   return h;
 }
 
@@ -5358,6 +5552,75 @@ document.addEventListener('click', ev => {
     case 'aiapply': applyAssignments($('#aiText').value || ''); break;
     case 'padd': { const p = pendingAdd; pendingAdd = null; applyAssignments(p, true); go('today'); break; }
     case 'pcancel': pendingAdd = null; render(); toast('취소했습니다'); break;
+
+    /* 기기 대장 */
+    case 'assetopen': deviceOpen = (deviceOpen === id ? '' : (id || '')); render(); break;
+    case 'assetfilter': deviceFilter = id || 'all'; render(); break;
+    case 'assetsave': {
+      const place = $('#as-place').value;
+      setAsset(id, {
+        model: $('#as-model').value,
+        serial: $('#as-serial').value,
+        os: $('#as-os').value,
+        chrome: $('#as-chrome').value,
+        battery: $('#as-battery').value,
+        charge: $('#as-charge').value,
+        screen: $('#as-screen').value,
+        locked: $('#as-locked').value,
+        place: place,
+        tier: AC().tierOfPlace(place),
+        holder: $('#as-holder').value,
+        spot: $('#as-spot').value,
+        note: $('#as-note').value,
+        pii: $('#as-pii').checked,
+        kind: AC().kindOfModel($('#as-model').value),
+        checkedAt: now(),
+        checkedBy: 'admin'
+      });
+      deviceOpen = '';
+      render();
+      toast(id + ' 저장했습니다');
+      break;
+    }
+    case 'assetdel': {
+      if (!confirm(id + ' 을(를) 대장에서 지울까요?')) return;
+      setAsset(id, { deleted: true });
+      deviceOpen = '';
+      render();
+      toast('지웠습니다');
+      break;
+    }
+    case 'assetbulk': {
+      const out = AC().parseBulk($('#as-bulk').value, allAssets());
+      out.added.forEach(a => setAsset(a.id, a));
+      if (out.errors.length) {
+        alert('넣지 못한 줄이 있습니다\n\n' +
+          out.errors.map(e => e.line + '행: ' + e.why + '\n  ' + e.text).join('\n'));
+      }
+      if (out.added.length) { deviceOpen = ''; toast(out.added.length + '대를 넣었습니다'); }
+      render();
+      break;
+    }
+    case 'assetaudit': {
+      const name = askAssetStaff('실사를 맡길 선생님 이름');
+      if (!name) return;
+      const list = AC().buildAuditAssignments(allAssets(), { staff: name });
+      if (!list.length) return toast('실사할 기기가 없습니다');
+      applyAssignments(list, false);
+      break;
+    }
+    case 'assetrepair': {
+      const a = AC().buildRepairAssignment(allAssets(), { staff: askAssetStaff('조치를 맡길 선생님 이름') });
+      if (!a) return toast('이상으로 표시된 기기가 없습니다');
+      applyAssignments([a], false);
+      break;
+    }
+    case 'assetpii': {
+      const a = AC().buildPiiCheckAssignment(allAssets(), { staff: askAssetStaff('점검을 맡길 선생님 이름') });
+      if (!a) return toast('개인정보 취급으로 표시된 기기가 없습니다');
+      applyAssignments([a], false);
+      break;
+    }
 
     /* 지시서 작성 */
     case 'wstaff': {
