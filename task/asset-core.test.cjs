@@ -99,7 +99,7 @@ test('audit needs all three condition fields plus a timestamp', () => {
 /* ── 티어 추천 ── */
 
 test('A7 is recommended for teachers, Advanced2 for single-purpose', () => {
-  assert.equal(core.recommendTier(asset({ model: 'SM-T500', kind: 'a7' })).tier, 'T');
+  assert.equal(core.recommendTier(asset({ model: 'SM-T500', kind: 'a7' })).place, 'teacher');
   assert.equal(core.recommendTier(asset()).tier, 'B');
 });
 
@@ -254,6 +254,29 @@ test('privacy-handling devices get their own recurring check', () => {
   assert.ok(a.steps[0].includes('센터 대기실'));
   assert.ok(a.guide.includes('키오스크'));
   assert.equal(core.buildPiiCheckAssignment([asset()], { staff: '김혜지' }), null);
+});
+
+/* ── 한 번에 찍기 ── */
+
+test('the normal button fills every condition field so one tap completes an audit', () => {
+  const sets = core.quickSet('ok');
+  assert.deepEqual(sets, { battery: 'ok', charge: 'ok', screen: 'ok' });
+  const a = core.normalizeAsset(Object.assign({ id: 'A001', model: 'SM-T583', checkedAt: 1 }, sets));
+  assert.equal(core.isAudited(a), true);
+  assert.equal(core.healthOf(a).level, 'ok');
+});
+
+test('the fault buttons refuse to guess and ask for detail instead', () => {
+  assert.equal(core.quickSet('watch'), null);
+  assert.equal(core.quickSet('dead'), null);
+  assert.equal(core.quickSet('nope'), null);
+});
+
+test('condition buttons are ordered normal first — that is the common case', () => {
+  assert.deepEqual(core.CONDITIONS.map(c => c.key), ['ok', 'watch', 'dead']);
+  core.CONDITIONS.forEach(c => {
+    assert.ok(c.mark && c.label, 'each button needs a mark and a label');
+  });
 });
 
 /* ── 정규화 ── */

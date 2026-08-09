@@ -48,6 +48,20 @@
     { field: 'locked', value: 'other', why: '알 수 없는 런처 잠금' }
   ];
 
+  /* 실사는 목록에서 버튼 하나로 끝나야 한다. 50대를 8칸씩 채우게 하면 아무도 안 한다.
+     대부분은 '정상'이므로 그것만 한 번에 채우고, 이상한 것만 자세히 묻는다. */
+  const CONDITIONS = [
+    { key: 'ok', mark: '🟢', label: '정상', sets: { battery: 'ok', charge: 'ok', screen: 'ok' } },
+    { key: 'watch', mark: '🟡', label: '손봐야 함', sets: null },
+    { key: 'dead', mark: '🔴', label: '못 씀', sets: null }
+  ];
+
+  /** 버튼 하나로 채울 값. null이면 무엇이 문제인지 되물어야 한다. */
+  function quickSet(level) {
+    const c = CONDITIONS.filter(x => x.key === level)[0];
+    return c && c.sets ? Object.assign({}, c.sets) : null;
+  }
+
   function str(v) { return v == null ? '' : String(v).trim(); }
   function pad3(n) { return String(n).padStart(3, '0'); }
 
@@ -140,13 +154,15 @@
     return { level: level, reasons: reasons };
   }
 
-  /* 티어 추천. 확정은 원장이 하고, 여기서는 근거만 만든다. */
+  /* 배치 추천. 확정은 원장이 하고, 여기서는 근거만 만든다.
+     화면에는 배치 이름만 쓴다. 티어 문자(T/S/B/C)는 기획 문서용 표기라
+     운영 화면에 같이 띄우면 같은 것을 두 이름으로 부르게 된다. */
   function recommendTier(asset) {
     const a = normalizeAsset(asset);
-    if (healthOf(a).level === 'dead') return { tier: 'C', why: '상태 불량 — 격리' };
-    if (a.kind === 'a7') return { tier: 'T', why: 'Android 12 · 크롬 계속 수신 — 교사 상시 업무용' };
-    if (a.kind === 'adv2') return { tier: 'B', why: '크롬 138 동결 — 단일 목적. 웹 구동 확인되면 S로 올림' };
-    return { tier: '', why: '기종 확인 필요' };
+    if (healthOf(a).level === 'dead') return { tier: 'C', place: 'quarantine', why: '상태 불량' };
+    if (a.kind === 'a7') return { tier: 'T', place: 'teacher', why: 'Android 12 · 크롬 계속 수신 — 매일 쓰기 좋음' };
+    if (a.kind === 'adv2') return { tier: 'B', place: 'shared', why: '크롬 138 동결 — 한 가지 용도로 고정' };
+    return { tier: '', place: '', why: '' };
   }
 
   /* 배치유형을 정하면 티어가 따라온다. 둘을 따로 적게 하면 어긋난다. */
@@ -370,6 +386,8 @@
     KINDS: KINDS,
     PLACES: PLACES,
     TIERS: TIERS,
+    CONDITIONS: CONDITIONS,
+    quickSet: quickSet,
     assetKey: assetKey,
     isAssetKey: isAssetKey,
     assetIdFromKey: assetIdFromKey,

@@ -49,11 +49,53 @@ test('every device action in the markup has a handler case', () => {
 test('every field the save handler reads is rendered by the form', () => {
   const save = html.match(/case 'assetsave': \{[\s\S]*?\n    \}/);
   assert.ok(save, 'assetsave handler found');
-  const ids = [...new Set([...save[0].matchAll(/\$\('#(as-[a-z]+)'\)/g)].map(m => m[1]))];
-  assert.ok(ids.length >= 12, 'handler reads the full form, got ' + ids.length);
-  ids.forEach(id => {
-    assert.ok(html.includes('id="' + id + '"'), 'form is missing input ' + id);
+  const names = [...new Set([...save[0].matchAll(/assetField\(cur, '([a-z]+)'\)/g)].map(m => m[1]))];
+  assert.ok(names.length >= 12, 'handler reads the full form, got ' + names.length);
+  names.forEach(n => {
+    assert.ok(html.includes('id="as-' + n + '"'), 'form is missing input as-' + n);
   });
+});
+
+/* 자세히 칸을 접으면 그 입력들이 DOM에 없다. 직접 읽으면 저장할 때 터진다. */
+test('the save handler survives the collapsed detail panel', () => {
+  const save = html.match(/case 'assetsave': \{[\s\S]*?\n    \}/)[0];
+  assert.ok(!/\$\('#as-[a-z]+'\)\.(value|checked)/.test(save),
+    'reading an input directly breaks when the panel is collapsed — go through assetField');
+  const helper = html.match(/function assetField\(cur, name\) \{[\s\S]*?\n\}/);
+  assert.ok(helper, 'assetField helper found');
+  assert.ok(helper[0].includes('if (!el) return cur[name]'), 'falls back to the stored value');
+  assert.ok(helper[0].includes("type === 'checkbox'"), 'checkboxes read .checked, not .value');
+});
+
+test('one tap marks a device normal straight from the list', () => {
+  assert.ok(/data-act="assetquick"/.test(html), 'quick buttons are rendered on the row');
+  const row = html.match(/const quick = core\.CONDITIONS\.map[\s\S]*?\.join\(''\);/);
+  assert.ok(row, 'quick buttons are built from the shared condition list');
+  assert.ok(row[0].includes('data-cond="'), 'each button carries its condition');
+
+  const handler = html.match(/case 'assetquick': \{[\s\S]*?\n    \}/);
+  assert.ok(handler, 'assetquick handler found');
+  assert.ok(handler[0].includes('checkedAt: now()'), 'a quick tap completes the audit');
+});
+
+test('a fault tap asks what is wrong instead of guessing', () => {
+  const handler = html.match(/case 'assetquick': \{[\s\S]*?\n    \}/)[0];
+  assert.ok(handler.includes('if (!sets)'), 'handles the no-preset case');
+  assert.ok(handler.includes('deviceDetail = true'), 'opens the detail panel for the answer');
+  assert.equal(core.quickSet('dead'), null, 'core refuses to guess the fault');
+});
+
+test('detail panel starts collapsed and has a toggle', () => {
+  assert.ok(/let deviceDetail = false/.test(html), 'collapsed by default');
+  assert.ok(html.includes("case 'assetdetail':"), 'toggle handler exists');
+});
+
+/* 티어 문자와 배치 이름을 함께 띄우면 같은 것을 두 이름으로 부르게 된다. */
+test('the row shows placement names, not tier letters', () => {
+  const row = html.match(/function deviceRow\(a\) \{[\s\S]*?\n\}\n/);
+  assert.ok(row, 'deviceRow found');
+  assert.ok(row[0].includes('core.placeLabel('), 'placement is shown by name');
+  assert.ok(!/rec\.tier/.test(row[0]), 'tier letters stay out of the operating screen');
 });
 
 test('placement and tier are saved together so they cannot drift apart', () => {

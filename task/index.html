@@ -2759,6 +2759,14 @@ function viewSchedule() {
 /* ── 기기 대장 ── */
 let deviceOpen = '';        // 펼쳐 놓은 기기 번호. '__add__' 면 추가 화면
 let deviceFilter = 'all';   // all | left | bad | 배치키
+let deviceDetail = false;   // 자세히 칸을 펼쳤는가. 평소에는 접어 둔다
+
+/** 자세히 칸이 접혀 있으면 입력이 화면에 없다. 그때는 저장된 값을 그대로 둔다. */
+function assetField(cur, name) {
+  const el = $('#as-' + name);
+  if (!el) return cur[name];
+  return el.type === 'checkbox' ? el.checked : el.value;
+}
 
 /** 지시서를 받을 사람. 관리자를 기본값으로 채워 오타를 줄인다. */
 function askAssetStaff(msg) {
@@ -2793,6 +2801,12 @@ function deviceRow(a) {
   const pillCls = h.level === 'dead' ? 'pill bad' : h.level === 'watch' ? 'pill warn' : 'pill';
   const pillText = h.level === 'dead' ? '이상' : h.level === 'watch' ? '확인필요' : '정상';
 
+  /* 실사는 목록에서 버튼 한 번으로 끝난다. 펼쳐야 찍을 수 있으면 50대를 못 돈다. */
+  const quick = core.CONDITIONS.map(c =>
+    '<button class="btn btn-sm ' + (h.level === c.key && core.isAudited(a) ? 'btn-primary' : 'btn-ghost') + '" ' +
+    'data-act="assetquick" data-id="' + esc(a.id) + '" data-cond="' + c.key + '">' +
+    c.mark + ' ' + esc(c.label) + '</button>').join('');
+
   let html = '<div class="task"><div class="task-body">' +
     '<div class="task-t" data-act="assetopen" data-id="' + esc(a.id) + '" style="cursor:pointer">' +
       esc(a.id) + ' · ' + esc(kind.label) +
@@ -2805,6 +2819,7 @@ function deviceRow(a) {
       (core.isAudited(a) ? '' : '<span class="tag doing">미실사</span>') +
     '</div>' +
     (h.reasons.length ? '<div class="hint" style="margin-top:6px">' + esc(h.reasons.join(' · ')) + '</div>' : '') +
+    '<div class="row" style="margin-top:8px;flex-wrap:wrap">' + quick + '</div>' +
     '</div></div>';
 
   if (!open) return html;
@@ -2816,24 +2831,35 @@ function deviceRow(a) {
     core.PLACES.map(p => ({ v: p.key, t: p.label })));
 
   html += '<div class="card mb8">' +
+    '<div class="sect">어디에 둘지</div>' +
     '<div class="grid2">' +
-      '<div class="field"><input class="in" id="as-model" value="' + esc(a.model) + '" placeholder="모델명 (SM-T583)"></div>' +
-      '<div class="field"><input class="in" id="as-serial" value="' + esc(a.serial) + '" placeholder="일련번호"></div>' +
-      '<div class="field"><input class="in" id="as-os" value="' + esc(a.os) + '" placeholder="안드로이드 버전"></div>' +
-      '<div class="field"><input class="in" id="as-chrome" value="' + esc(a.chrome) + '" placeholder="크롬 버전" inputmode="numeric"></div>' +
-      '<div class="field"><select class="in" id="as-battery">' + optionsHtml(BATTERY_OPTS, a.battery) + '</select></div>' +
-      '<div class="field"><select class="in" id="as-charge">' + optionsHtml(CHARGE_OPTS, a.charge) + '</select></div>' +
-      '<div class="field"><select class="in" id="as-screen">' + optionsHtml(SCREEN_OPTS, a.screen) + '</select></div>' +
-      '<div class="field"><select class="in" id="as-locked">' + optionsHtml(LOCK_OPTS, a.locked) + '</select></div>' +
       '<div class="field"><select class="in" id="as-place">' + optionsHtml(placeOpts, a.place) + '</select></div>' +
       '<div class="field"><select class="in" id="as-holder">' + optionsHtml(staffOpts, a.holder) + '</select></div>' +
     '</div>' +
     '<div class="field"><input class="in" id="as-spot" value="' + esc(a.spot) + '" placeholder="위치 (예: 2교실 교탁, 센터 대기실)"></div>' +
-    '<div class="field"><input class="in" id="as-note" value="' + esc(a.note) + '" placeholder="메모"></div>' +
     '<label class="row mb8" style="cursor:pointer"><input type="checkbox" id="as-pii"' + (a.pii ? ' checked' : '') + '>' +
-      '<span>개인정보 취급 기기 (문진·설문 등) — 점검 주기를 따로 관리합니다</span></label>' +
-    (rec.tier ? '<div class="guide mb8"><b>추천 배치</b>' + esc(rec.tier + ' · ' + rec.why) + '</div>' : '') +
-    '<button class="btn btn-primary btn-block mb8" data-act="assetsave" data-id="' + esc(a.id) + '">실사 완료로 저장</button>' +
+      '<span>개인정보 취급 기기 (문진·설문 등)</span></label>' +
+    (rec.why ? '<div class="hint mb8">' + esc('추천 — ' + core.placeLabel(rec.place) + ' · ' + rec.why) + '</div>' : '') +
+
+    '<hr class="sep">' +
+    '<button class="btn btn-ghost btn-block mb8" data-act="assetdetail">' +
+      (deviceDetail ? '자세히 접기' : '자세히 입력 (모델·상태·잠금)') + '</button>' +
+
+    (deviceDetail
+      ? '<div class="grid2">' +
+          '<div class="field"><input class="in" id="as-model" value="' + esc(a.model) + '" placeholder="모델명 (SM-T583)"></div>' +
+          '<div class="field"><input class="in" id="as-serial" value="' + esc(a.serial) + '" placeholder="일련번호"></div>' +
+          '<div class="field"><input class="in" id="as-os" value="' + esc(a.os) + '" placeholder="안드로이드 버전"></div>' +
+          '<div class="field"><input class="in" id="as-chrome" value="' + esc(a.chrome) + '" placeholder="크롬 버전" inputmode="numeric"></div>' +
+          '<div class="field"><select class="in" id="as-battery">' + optionsHtml(BATTERY_OPTS, a.battery) + '</select></div>' +
+          '<div class="field"><select class="in" id="as-charge">' + optionsHtml(CHARGE_OPTS, a.charge) + '</select></div>' +
+          '<div class="field"><select class="in" id="as-screen">' + optionsHtml(SCREEN_OPTS, a.screen) + '</select></div>' +
+          '<div class="field"><select class="in" id="as-locked">' + optionsHtml(LOCK_OPTS, a.locked) + '</select></div>' +
+        '</div>' +
+        '<div class="field"><input class="in" id="as-note" value="' + esc(a.note) + '" placeholder="메모"></div>'
+      : '') +
+
+    '<button class="btn btn-primary btn-block mb8" data-act="assetsave" data-id="' + esc(a.id) + '">저장</button>' +
     '<div class="row">' +
       '<button class="btn btn-ghost" data-act="assetopen" data-id="">닫기</button>' +
       '<button class="btn btn-ghost" data-act="assetdel" data-id="' + esc(a.id) + '">대장에서 삭제</button>' +
@@ -5556,24 +5582,40 @@ document.addEventListener('click', ev => {
     /* 기기 대장 */
     case 'assetopen': deviceOpen = (deviceOpen === id ? '' : (id || '')); render(); break;
     case 'assetfilter': deviceFilter = id || 'all'; render(); break;
+    case 'assetdetail': deviceDetail = !deviceDetail; render(); break;
+    case 'assetquick': {
+      const sets = AC().quickSet(el.dataset.cond);
+      if (!sets) {
+        /* 무엇이 문제인지 추측하지 않는다. 펼쳐서 직접 고르게 한다. */
+        deviceOpen = id; deviceDetail = true; render();
+        toast('무엇이 문제인지 골라 주세요');
+        break;
+      }
+      setAsset(id, Object.assign({}, sets, { checkedAt: now(), checkedBy: 'admin' }));
+      render();
+      toast(id + ' 정상');
+      break;
+    }
     case 'assetsave': {
-      const place = $('#as-place').value;
+      const cur = getAsset(id) || {};
+      const place = assetField(cur, 'place');
+      const model = assetField(cur, 'model');
       setAsset(id, {
-        model: $('#as-model').value,
-        serial: $('#as-serial').value,
-        os: $('#as-os').value,
-        chrome: $('#as-chrome').value,
-        battery: $('#as-battery').value,
-        charge: $('#as-charge').value,
-        screen: $('#as-screen').value,
-        locked: $('#as-locked').value,
+        model: model,
+        serial: assetField(cur, 'serial'),
+        os: assetField(cur, 'os'),
+        chrome: assetField(cur, 'chrome'),
+        battery: assetField(cur, 'battery'),
+        charge: assetField(cur, 'charge'),
+        screen: assetField(cur, 'screen'),
+        locked: assetField(cur, 'locked'),
         place: place,
         tier: AC().tierOfPlace(place),
-        holder: $('#as-holder').value,
-        spot: $('#as-spot').value,
-        note: $('#as-note').value,
-        pii: $('#as-pii').checked,
-        kind: AC().kindOfModel($('#as-model').value),
+        holder: assetField(cur, 'holder'),
+        spot: assetField(cur, 'spot'),
+        note: assetField(cur, 'note'),
+        pii: assetField(cur, 'pii'),
+        kind: AC().kindOfModel(model),
         checkedAt: now(),
         checkedBy: 'admin'
       });
