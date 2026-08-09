@@ -221,6 +221,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_book_order_sends_provider_message
   ON book_order_sends(app, provider_message_id)
   WHERE provider_message_id IS NOT NULL;
 
+-- 저녁 일괄 발송에 포함된 원본 주문. 한 주문이 두 번 발송 묶음에 들어가지 않게 한다.
+CREATE TABLE IF NOT EXISTS book_order_batch_items (
+  app        TEXT    NOT NULL CHECK (app = 'task'),
+  task_id    TEXT    NOT NULL,
+  send_id    TEXT    NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (app, task_id)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_batch_items_send
+  ON book_order_batch_items(app, send_id);
+
 -- 교재 DB(textbooks.json)는 저장소의 정적 파일이라 앱에서 직접 고칠 수 없다.
 -- 여기서는 그 자리를 메운다: 선생님이 "이 교재를 새로 추가해 주세요"를 신청하면(request),
 -- 원장이 검토(review)해 승인해야 교재 목록에 실제로 나타난다. 원장이 직접 신청하면
@@ -336,4 +347,3 @@ CREATE TABLE IF NOT EXISTS parent_feedback_sends (
 );
 CREATE INDEX IF NOT EXISTS idx_parent_feedback_sends_request
   ON parent_feedback_sends(app, feedback_request_key, updated_at);
-

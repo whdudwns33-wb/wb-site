@@ -1,4 +1,5 @@
 import curriculumWorker from './curriculum-fix.js';
+import { handleScheduledBookOrders } from './book-order-send.js';
 
 export function cleanupCurriculum(text) {
   const kept = String(text || '')
@@ -27,5 +28,9 @@ export default {
     } catch (error) {
       return response;
     }
+  },
+
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(handleScheduledBookOrders(env, controller.scheduledTime));
   }
 };

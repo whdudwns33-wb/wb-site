@@ -178,6 +178,20 @@ async function findByIdempotency(env, app, idempotencyKey) {
     .bind(app, idempotencyKey).first();
 }
 
+async function findBatchSendForTask(env, app, taskId) {
+  return await env.DB.prepare(
+    'SELECT s.* FROM book_order_batch_items i JOIN book_order_sends s ON s.app=i.app AND s.send_id=i.send_id ' +
+    'WHERE i.app=? AND i.task_id=? LIMIT 1'
+  ).bind(app, taskId).first();
+}
+
+async function saveBatchItems(env, app, sendId, taskIds, now) {
+  if (!taskIds.length) return;
+  await env.DB.batch(taskIds.map(taskId => env.DB.prepare(
+    'INSERT OR IGNORE INTO book_order_batch_items(app,task_id,send_id,created_at) VALUES(?,?,?,?)'
+  ).bind(app, taskId, sendId, now)));
+}
+
 async function updateLedger(env, app, sendId, status, provider, safeErrorCode, now) {
   const result = await env.DB.prepare(
     'UPDATE book_order_sends SET status=?, provider_group_id=?, provider_message_id=?, ' +
@@ -190,18 +204,7 @@ async function updateLedger(env, app, sendId, status, provider, safeErrorCode, n
   return Number(result && result.meta && result.meta.changes || 0) === 1;
 }
 
-export async function handleBookOrderSend(env, app, body, origin, auth, json) {
-  if (app !== 'task') return json({ ok: false, error: '교재 주문 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
-  const shapeError = validateRequestShape(body);
-  if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
-
-  const taskId = String(body.taskId || '');
-  if (!SAFE_ID.test(taskId)) return json({ ok: false, error: '올바른 taskId가 필요합니다' }, 400, origin);
-
-  const loaded = await loadOrderTask(env, app, taskId, auth);
-  if (loaded.error) return json({ ok: false, error: loaded.error }, loaded.status, origin);
-  const { vendorName, items } = loaded;
-
+async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTaskIds, origin, json) {
   const config = sendConfiguration(env);
   if (!config) {
     return json({ ok: false, code: 'SEND_DISABLED', error: '교재 주문 자동 발송이 아직 켜져 있지 않습니다' }, 503, origin);
@@ -235,9 +238,14 @@ export async function handleBookOrderSend(env, app, body, origin, auth, json) {
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
     const existing = await findByIdempotency(env, app, idempotencyKey);
-    if (existing) return json(publicResult(existing, true), responseStatusFor(existing.status), origin);
+    if (existing) {
+      await saveBatchItems(env, app, existing.send_id, batchTaskIds, now);
+      return json(publicResult(existing, true), responseStatusFor(existing.status), origin);
+    }
     return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다', vendorName }, 429, origin);
   }
+
+  await saveBatchItems(env, app, sendId, batchTaskIds, now);
 
   const dispatchAt = Date.now();
   const dispatch = await env.DB.prepare(
@@ -298,4 +306,66 @@ export async function handleBookOrderSend(env, app, body, origin, auth, json) {
     app, send_id: sendId, vendor_name: vendorName, item_count: items.length,
     status: outcome.status, safe_error_code: outcome.errorCode, created_at: now, updated_at: Date.now()
   }, false), responseStatusFor(outcome.status), origin);
+}
+
+export async function handleBookOrderSend(env, app, body, origin, auth, json) {
+  if (app !== 'task') return json({ ok: false, error: '교재 주문 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const shapeError = validateRequestShape(body);
+  if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
+
+  const taskId = String(body.taskId || '');
+  if (!SAFE_ID.test(taskId)) return json({ ok: false, error: '올바른 taskId가 필요합니다' }, 400, origin);
+
+  const loaded = await loadOrderTask(env, app, taskId, auth);
+  if (loaded.error) return json({ ok: false, error: loaded.error }, loaded.status, origin);
+  const batchSend = await findBatchSendForTask(env, app, taskId);
+  if (batchSend) return json(publicResult(batchSend, true), responseStatusFor(batchSend.status), origin);
+  return await dispatchOrderMessage(env, app, taskId, loaded.vendorName, loaded.items, [], origin, json);
+}
+
+const scheduledJson = (obj, status) => new Response(JSON.stringify(obj), {
+  status: status || 200,
+  headers: { 'Content-Type': 'application/json;charset=utf-8' }
+});
+
+/** 매일 20:00 KST: 새 방식으로 접수된 미발송 주문을 출판사별 한 통으로 묶는다. */
+export async function handleScheduledBookOrders(env, scheduledTime) {
+  const cutoff = Number(scheduledTime) || Date.now();
+  const [taskResult, batchResult, directResult] = await Promise.all([
+    env.DB.prepare("SELECT id,data FROM tasks WHERE app='task' ORDER BY updated_at LIMIT 2000").all(),
+    env.DB.prepare("SELECT task_id FROM book_order_batch_items WHERE app='task'").all(),
+    env.DB.prepare(
+      "SELECT task_id FROM book_order_sends WHERE app='task' AND status IN ('reserved','dispatching','accepted','unknown')"
+    ).all()
+  ]);
+  const done = new Set([...(batchResult.results || []), ...(directResult.results || [])].map(row => row.task_id));
+  const groups = new Map();
+
+  for (const row of taskResult.results || []) {
+    if (done.has(row.id)) continue;
+    let task;
+    try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+    if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
+    const vendorName = String(task.orderVendor || '').trim();
+    const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
+      .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
+      .filter(item => item.title);
+    if (!vendorName || !items.length) continue;
+    if (!groups.has(vendorName)) groups.set(vendorName, { taskIds: [], items: [] });
+    groups.get(vendorName).taskIds.push(row.id);
+    groups.get(vendorName).items.push(...items);
+  }
+
+  const results = [];
+  for (const [vendorName, group] of groups) {
+    const batchKey = await sha256Hex([cutoff, vendorName, ...group.taskIds.sort()].join('\u001f'));
+    const batchId = 'batch_' + batchKey.slice(0, 48);
+    const response = await dispatchOrderMessage(
+      env, 'task', batchId, vendorName, group.items, group.taskIds, '*', scheduledJson
+    );
+    const result = await response.json();
+    results.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length,
+      status: result && result.send && result.send.status || result.code || 'failed' });
+  }
+  return { ok: results.every(result => result.status === 'accepted'), cutoff, results };
 }
