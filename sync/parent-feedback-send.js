@@ -1,18 +1,24 @@
 /**
- * 원장이 승인한 학부모 피드백 문구를 실제로 보호자에게 문자로 보낸다.
+ * 학부모 피드백을 카카오 알림톡(Solapi 카카오 비즈메시지)으로 실제 발송한다.
+ *
+ * 2026-08 원장 지시로 별도 "원장 승인" 클릭 없이, 선생님이 항목(잘한 점/보완점 등)을
+ * 고르고 제출하는 순간 이 발송을 바로 시도한다 — attemptParentFeedbackSend()가 그
+ * 자동 발송 지점이고, worker-core.js의 /feedback-request 제출 처리에서 직접 호출한다.
+ * handleParentFeedbackSend()(HTTP 엔드포인트, 원장 전용)는 그때 막혔던 건(보호자 연락처를
+ * 나중에 등록한 경우 등)을 원장이 수동으로 재시도할 때만 쓴다.
  *
  * book-order-send.js와 같은 안전장치를 따른다:
- *   · 앱은 requestKey만 보낸다. 전화번호는 앱이 절대 못 보내고, 서버가
- *     guardian_contacts(원장이 직접 입력한 보호자 연락처 원장)에서만 찾는다.
- *   · 문자 내용도 앱이 자유 텍스트로 못 보낸다. feedback_requests에 이미 저장된,
- *     원장이 승인한 문구(body)를 그대로 쓴다 — "문구 승인"과 "실제 발송"은 항상
- *     별개의 명시적 동작이다(먼저 /feedback-review approve_content, 그 다음 이 엔드포인트).
- *   · 발송 동의(consent)가 켜진 학생에게만 나간다. 연락처가 있어도 동의가 없으면 막는다.
+ *   · 전화번호는 서버가 guardian_contacts(원장이 직접 입력한 보호자 연락처)에서만 찾는다 —
+ *     앱도, 자동발송 호출부도 전화번호를 직접 넘기지 않는다.
+ *   · 발송 동의(consent)가 켜진 학생에게만 나간다.
  *   · 코드가 배포돼도 기본은 꺼짐 — WB_PARENT_FEEDBACK_SEND_ENABLED가 'true'여야 나간다.
- *   · 원장(scope='all')만 이 발송 버튼을 누를 수 있다 — 검토 권한과 동일하게 맞춘다.
- *   · 하루 발송 한도를 둬서 실수로 반복 클릭해도 폭주하지 않는다.
+ *   · 카카오 알림톡 전용 키(SOLAPI_KAKAO_API_KEY/SECRET)를 따로 써서, 교재주문·원장리포트가
+ *     쓰는 기존 SOLAPI_API_KEY와 완전히 분리한다 — 문제가 생겨도 서로 영향이 없다.
+ *   · 하루 발송 한도를 둬서 폭주를 막는다.
+ *   · 알림톡은 항상 승인된 고정 틀 + 항목별 변수로만 나간다 — 자유 문구를 그대로 보내지 않는다.
  *
  *   POST /parent-feedback-send { app, auth(admin), requestKey } → { ok, status, ... }
+ *     (막혔던 건을 원장이 수동으로 다시 시도할 때)
  */
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -20,10 +26,23 @@ const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const GLOBAL_DAILY_LIMIT = 150;
-const MAX_MESSAGE_BYTES = 2000;
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'requestKey']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|guardian|studentname)/i;
+
+/** 카카오 심사를 통과한 고정 문구 그대로다 — 실제 발송 문구는 카카오가 승인된 템플릿으로
+ *  렌더링하므로 여기 이 상수는 발송에 쓰이지 않고, 900자 상한 체크용 길이 계산에만 쓴다.
+ *  템플릿 문구를 다시 심사받아 바꾸면 이 상수도 반드시 같이 맞춰야 한다.
+ *  ⚠ 변수 자리표시자(#{...})를 뺀 "고정 부분" 글자 수만 재는 용도라 여기 텍스트 자체는
+ *  카카오에 실제로 등록된 원문과 100% 똑같을 필요는 없고, 길이만 비슷하면 된다 —
+ *  다만 안전하게 가려면 원문 그대로 유지하는 걸 권장한다.
+ */
+const TEMPLATE_FIXED_TEXT =
+  '안녕하세요, WB 웩슬러브레인센터(독해력학원)입니다.\n\n' +
+  ' 선생님이 오늘  학생 수업을 마치고,\n직접 관찰한 내용을 정리해 보내드립니다.\n\n' +
+  '▪ 오늘 배운 내용: \n▪ 잘한 점: \n▪ 다음에 더 신경 쓸 점: \n\n' +
+  '숫자로 비교하지 않고, 그날 그 아이만 보고 남긴 기록입니다.\n문의사항은 학원으로 연락 주세요. 감사합니다.';
+const MAX_ALIMTALK_CHARS = 900;
 
 function safeEqual(a, b) {
   a = String(a || ''); b = String(b || '');
@@ -76,19 +95,28 @@ function validateRequestShape(body) {
   return null;
 }
 
-/** 코드가 배포돼도 실제 발송은 이 네 가지가 모두 갖춰져야만 켜진다 */
+/** 코드가 배포돼도 실제 발송은 이 다섯 가지가 모두 갖춰져야만 켜진다.
+ *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
+ *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
 function sendConfiguration(env) {
   if (!safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
-      !env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER) {
+      !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
+      !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_TEMPLATE_ID || !env.SOLAPI_SENDER_NUMBER) {
     return null;
   }
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   if (!/^\d{8,12}$/.test(sender)) return null;
-  return { apiKey: String(env.SOLAPI_API_KEY), apiSecret: String(env.SOLAPI_API_SECRET), sender };
+  return {
+    apiKey: String(env.SOLAPI_KAKAO_API_KEY), apiSecret: String(env.SOLAPI_KAKAO_API_SECRET),
+    pfId: String(env.SOLAPI_KAKAO_PF_ID), templateId: String(env.SOLAPI_KAKAO_TEMPLATE_ID),
+    sender
+  };
 }
 
-/** t.studentName이 없으면 client의 studentOf(t)와 똑같은 규칙으로 제목에서 뽑는다 */
-function resolveStudentName(taskData) {
+/** t.studentName이 없으면 client의 studentOf(t)와 똑같은 규칙으로 제목에서 뽑는다.
+ *  worker-core.js도 feedback_requests.student_name을 저장할 때 이 함수를 그대로 써서,
+ *  여기서 발송할 때 찾는 이름과 항상 똑같게 맞춘다(어긋나면 보호자 조회가 실패한다). */
+export function resolveStudentName(taskData) {
   const explicit = String((taskData && taskData.studentName) || '').trim();
   if (explicit) return explicit;
   const title = String((taskData && taskData.title) || '');
@@ -104,6 +132,18 @@ async function guardianPhone(env, app, studentName) {
   if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
   if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
   return { phone };
+}
+
+/** 항목별 변수 값을 다듬는다 — 앞뒤 공백 제거, 지나치게 길면 잘라내지 않고 거부하도록
+ *  상위에서 900자 합산 체크를 한다. 여기서는 최소한의 정규화만 한다. */
+function cleanField(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function totalAlimtalkLength(fields) {
+  return TEMPLATE_FIXED_TEXT.length +
+    fields.teacherName.length + fields.studentName.length +
+    fields.contentText.length + fields.plusText.length + fields.minusText.length;
 }
 
 function safeProviderId(value) {
@@ -169,66 +209,63 @@ async function updateLedger(env, app, sendId, status, provider, safeErrorCode, n
   return Number(result && result.meta && result.meta.changes || 0) === 1;
 }
 
-/** 성공했을 때만 feedback_requests를 'sent'로 넘긴다. 이미 다른 상태로 바뀌었으면 조용히 둔다 */
-async function markFeedbackSent(env, app, requestKey, revision, now) {
+async function markFeedbackOutcome(env, app, requestKey, revision, status, note, now) {
   await env.DB.prepare(
-    "UPDATE feedback_requests SET status='sent', updated_at=? " +
-    "WHERE app=? AND request_key=? AND revision=? AND status='content_approved_send_blocked'"
-  ).bind(now, app, requestKey, revision).run();
+    "UPDATE feedback_requests SET status=?, review_note=?, updated_at=? " +
+    "WHERE app=? AND request_key=? AND revision=? AND status<>'sent' AND status<>'cancelled'"
+  ).bind(status, note || null, now, app, requestKey, revision).run();
 }
 
-export async function handleParentFeedbackSend(env, app, body, origin, auth, json) {
-  if (app !== 'task') return json({ ok: false, error: '학부모 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
-  const shapeError = validateRequestShape(body);
-  if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
-  if (auth.scope !== 'all') return json({ ok: false, error: '실제 발송은 원장만 할 수 있습니다' }, 403, origin);
-
-  const requestKey = String(body.requestKey || '');
-  if (!SAFE_ID.test(requestKey) || !requestKey.startsWith('fbr_')) {
-    return json({ ok: false, error: '올바른 requestKey가 필요합니다' }, 400, origin);
-  }
-
-  const current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind(app, requestKey).first();
-  if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
+/**
+ * 실제 발송을 시도하는 공용 로직. HTTP 엔드포인트(수동 재시도)와 /feedback-request 제출
+ * 처리(자동 발송)가 둘 다 이 함수를 쓴다. current는 feedback_requests 행이어야 한다.
+ */
+export async function attemptParentFeedbackSend(env, app, current) {
+  const now0 = Date.now();
   if (current.status === 'sent') {
-    return json({ ok: true, idempotent: true, code: 'ALREADY_SENT', request: { status: 'sent' } }, 200, origin);
+    return { ok: true, idempotent: true, code: 'ALREADY_SENT', status: 'sent' };
   }
-  if (current.status !== 'content_approved_send_blocked') {
-    return json({ ok: false, error: '문구 승인이 끝난 요청만 발송할 수 있습니다' }, 409, origin);
+  if (current.status === 'cancelled') {
+    return { ok: false, code: 'CANCELLED', status: current.status };
   }
 
-  const taskRow = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1')
-    .bind(app, current.task_id).first();
-  let taskData = {};
-  try { taskData = taskRow ? JSON.parse(taskRow.data || '{}') : {}; } catch (error) { taskData = {}; }
-  const studentName = resolveStudentName(taskData);
-  if (!studentName) return json({ ok: false, error: '지시서에서 학생 이름을 찾을 수 없습니다' }, 409, origin);
+  const teacherName = cleanField(current.teacher_name);
+  const studentName = cleanField(current.student_name);
+  const contentText = cleanField(current.content_text);
+  const plusText = cleanField(current.plus_text);
+  const minusText = cleanField(current.minus_text);
+  if (!teacherName || !studentName || !contentText || !plusText || !minusText) {
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '항목이 모두 채워지지 않아 발송하지 못했습니다', now0);
+    return { ok: false, code: 'FIELDS_INCOMPLETE', status: 'content_approved_send_blocked' };
+  }
 
   const config = sendConfiguration(env);
   if (!config) {
-    return json({ ok: false, code: 'SEND_DISABLED', error: '학부모 문자 자동 발송이 아직 켜져 있지 않습니다' }, 503, origin);
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '학부모 알림톡 자동 발송이 아직 켜져 있지 않습니다', now0);
+    return { ok: false, code: 'SEND_DISABLED', status: 'content_approved_send_blocked' };
   }
 
   const guardian = await guardianPhone(env, app, studentName);
-  if (guardian.error === 'GUARDIAN_NOT_REGISTERED' || guardian.error === 'GUARDIAN_PHONE_MISSING') {
-    return json({
-      ok: false, code: guardian.error,
-      error: '"' + studentName + '" 학생의 보호자 연락처가 등록되지 않았습니다 — 설정에서 먼저 등록해 주세요'
-    }, 409, origin);
-  }
-  if (guardian.error === 'GUARDIAN_CONSENT_MISSING') {
-    return json({
-      ok: false, code: 'GUARDIAN_CONSENT_MISSING',
-      error: '"' + studentName + '" 보호자의 발송 동의가 켜져 있지 않습니다'
-    }, 409, origin);
+  if (guardian.error) {
+    const note = guardian.error === 'GUARDIAN_CONSENT_MISSING'
+      ? '보호자의 발송 동의가 켜져 있지 않아 발송하지 못했습니다'
+      : '보호자 연락처가 등록되지 않아 발송하지 못했습니다 — 설정에서 먼저 등록해 주세요';
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', note, now0);
+    return { ok: false, code: guardian.error, status: 'content_approved_send_blocked' };
   }
 
-  const messageText = String(current.body || '');
-  if (new TextEncoder().encode(messageText).byteLength > MAX_MESSAGE_BYTES) {
-    return json({ ok: false, error: '문구가 너무 길어 문자 한 통에 안 들어갑니다 — 줄여서 다시 승인해 주세요' }, 413, origin);
+  const fields = { teacherName, studentName, contentText, plusText, minusText };
+  if (totalAlimtalkLength(fields) > MAX_ALIMTALK_CHARS) {
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '문구가 알림톡 글자수 상한(900자)을 넘어 발송하지 못했습니다', now0);
+    return { ok: false, code: 'MESSAGE_TOO_LONG', status: 'content_approved_send_blocked' };
   }
-  const idempotencyKey = await sha256Hex([app, requestKey, guardian.phone, current.body_hash].join(''));
+
+  const variablesHash = await sha256Hex(JSON.stringify(fields));
+  const idempotencyKey = await sha256Hex([app, current.request_key, guardian.phone, variablesHash].join(''));
   const sendId = 'pfs_' + idempotencyKey.slice(0, 48);
   const now = Date.now();
 
@@ -238,17 +275,21 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
     "SELECT ?,?,?,?,?,?,'reserved',?,? " +
     'WHERE (SELECT COUNT(*) FROM parent_feedback_sends WHERE app=? AND created_at > ?) < ' + GLOBAL_DAILY_LIMIT
   ).bind(
-    app, sendId, idempotencyKey, requestKey, studentName, current.body_hash, now, now,
+    app, sendId, idempotencyKey, current.request_key, studentName, variablesHash, now, now,
     app, now - 24 * 60 * 60 * 1000
   ).run();
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
     const existing = await findByIdempotency(env, app, idempotencyKey);
     if (existing) {
-      if (existing.status === 'accepted') await markFeedbackSent(env, app, requestKey, Number(current.revision), Date.now());
-      return json(publicResult(existing, true), responseStatusFor(existing.status), origin);
+      if (existing.status === 'accepted') {
+        await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
+      }
+      return { ok: existing.status !== 'rejected', idempotent: true, status: existing.status };
     }
-    return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다', studentName }, 429, origin);
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '오늘 발송 한도에 도달해 발송하지 못했습니다', now0);
+    return { ok: false, code: 'DAILY_SEND_LIMIT', status: 'content_approved_send_blocked' };
   }
 
   const dispatchAt = Date.now();
@@ -257,9 +298,7 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
     "WHERE app=? AND send_id=? AND status='reserved'"
   ).bind(dispatchAt, dispatchAt, app, sendId).run();
   if (Number(dispatch && dispatch.meta && dispatch.meta.changes || 0) !== 1) {
-    const existing = await findByIdempotency(env, app, idempotencyKey);
-    if (existing) return json(publicResult(existing, true), responseStatusFor(existing.status), origin);
-    return json({ ok: false, code: 'SEND_STATE_CONFLICT', error: '발송 상태를 확인해 주세요' }, 409, origin);
+    return { ok: false, code: 'SEND_STATE_CONFLICT', status: current.status };
   }
 
   const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
@@ -272,8 +311,16 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
       headers: { 'Content-Type': 'application/json;charset=utf-8', Authorization: authorization },
       body: JSON.stringify({
         messages: [{
-          to: guardian.phone, from: config.sender, text: messageText, type: 'LMS',
-          autoTypeDetect: false, customFields: { wbSendId: sendId }
+          to: guardian.phone, from: config.sender, type: 'ATA',
+          kakaoOptions: {
+            pfId: config.pfId, templateId: config.templateId, disableSms: true,
+            // ⚠ Solapi 변수 키 표기(#{...} 포함 여부 등)는 실제 콘솔 문서로 최종 확인 필요.
+            variables: {
+              '#{선생님}': teacherName, '#{학생명}': studentName, '#{학습내용}': contentText,
+              '#{잘한점}': plusText, '#{보완점}': minusText
+            }
+          },
+          customFields: { wbSendId: sendId }
         }],
         strict: true, allowDuplicates: false, showMessageList: true
       }),
@@ -283,11 +330,9 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
     clearTimeout(timeout);
     const code = controller.signal.aborted ? 'SOLAPI_TIMEOUT' : 'SOLAPI_NETWORK';
     await updateLedger(env, app, sendId, 'unknown', null, code, Date.now());
-    const row = await findByIdempotency(env, app, idempotencyKey);
-    return json(publicResult(row || {
-      app, send_id: sendId, student_name: studentName,
-      status: 'unknown', safe_error_code: code, created_at: now, updated_at: Date.now()
-    }, false), 202, origin);
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '발송 시도 중 통신 오류가 발생했습니다(' + code + ')', Date.now());
+    return { ok: false, code, status: 'content_approved_send_blocked' };
   }
   clearTimeout(timeout);
 
@@ -305,10 +350,62 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
   }
 
   await updateLedger(env, app, sendId, outcome.status, outcome.provider, outcome.errorCode, Date.now());
-  if (outcome.status === 'accepted') await markFeedbackSent(env, app, requestKey, Number(current.revision), Date.now());
-  const finalRow = await findByIdempotency(env, app, idempotencyKey);
-  return json(publicResult(finalRow || {
-    app, send_id: sendId, student_name: studentName,
-    status: outcome.status, safe_error_code: outcome.errorCode, created_at: now, updated_at: Date.now()
-  }, false), responseStatusFor(outcome.status), origin);
+  if (outcome.status === 'accepted') {
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
+  } else {
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', '카카오 발송이 거절되었습니다(' + (outcome.errorCode || outcome.status) + ')', Date.now());
+  }
+  return { ok: outcome.status === 'accepted', code: outcome.errorCode, status: outcome.status === 'accepted' ? 'sent' : 'content_approved_send_blocked' };
+}
+
+const RETRY_ERROR_TEXT = {
+  ALREADY_SENT: '이미 발송된 문구입니다',
+  CANCELLED: '취소된 요청은 발송할 수 없습니다',
+  FIELDS_INCOMPLETE: '항목이 모두 채워지지 않아 발송할 수 없습니다',
+  SEND_DISABLED: '학부모 알림톡 자동 발송이 아직 켜져 있지 않습니다',
+  GUARDIAN_NOT_REGISTERED: '보호자 연락처가 등록되지 않았습니다 — 설정에서 먼저 등록해 주세요',
+  GUARDIAN_PHONE_MISSING: '보호자 연락처가 등록되지 않았습니다 — 설정에서 먼저 등록해 주세요',
+  GUARDIAN_CONSENT_MISSING: '보호자의 발송 동의가 켜져 있지 않습니다',
+  MESSAGE_TOO_LONG: '문구가 알림톡 글자수 상한(900자)을 넘었습니다',
+  DAILY_SEND_LIMIT: '오늘 발송 한도에 도달했습니다',
+  SEND_STATE_CONFLICT: '발송 상태를 확인해 주세요',
+  SOLAPI_TIMEOUT: '카카오 발송 시도 중 응답이 없었습니다 — 잠시 후 다시 시도해 주세요',
+  SOLAPI_NETWORK: '카카오 발송 시도 중 통신 오류가 발생했습니다'
+};
+const RETRY_HTTP_STATUS = {
+  ALREADY_SENT: 200,
+  CANCELLED: 409,
+  FIELDS_INCOMPLETE: 409,
+  SEND_DISABLED: 503,
+  GUARDIAN_NOT_REGISTERED: 409,
+  GUARDIAN_PHONE_MISSING: 409,
+  GUARDIAN_CONSENT_MISSING: 409,
+  MESSAGE_TOO_LONG: 413,
+  DAILY_SEND_LIMIT: 429,
+  SEND_STATE_CONFLICT: 409
+};
+
+export async function handleParentFeedbackSend(env, app, body, origin, auth, json) {
+  if (app !== 'task') return json({ ok: false, error: '학부모 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const shapeError = validateRequestShape(body);
+  if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
+  if (auth.scope !== 'all') return json({ ok: false, error: '수동 재시도는 원장만 할 수 있습니다' }, 403, origin);
+
+  const requestKey = String(body.requestKey || '');
+  if (!SAFE_ID.test(requestKey) || !requestKey.startsWith('fbr_')) {
+    return json({ ok: false, error: '올바른 requestKey가 필요합니다' }, 400, origin);
+  }
+
+  const current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+    .bind(app, requestKey).first();
+  if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
+
+  const result = await attemptParentFeedbackSend(env, app, current);
+  if (result.status === 'sent') return json(result, 200, origin);
+  if (result.code && RETRY_HTTP_STATUS[result.code] != null) {
+    return json({ ...result, error: RETRY_ERROR_TEXT[result.code] }, RETRY_HTTP_STATUS[result.code], origin);
+  }
+  // 카카오가 응답은 했지만 거절/판단불가(rejected·unknown) — 결과는 그대로 두고 202로 알린다
+  return json(result, 202, origin);
 }

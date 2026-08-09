@@ -16,9 +16,9 @@
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
- *   POST /feedback-request { app, auth, ... }     → 직원 문구 요청·수정·취소
- *   POST /feedback-review  { app, auth(admin) }   → 원장 문구 검토("문구 승인"까지만, 발송은 별개)
- *   POST /parent-feedback-send { app, auth(admin), requestKey } → 승인된 문구를 보호자에게 실제 발송
+ *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
+ *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)
+ *   POST /parent-feedback-send { app, auth(admin), requestKey } → 막혔던 발송을 원장이 수동으로 재시도
  *   POST /guardian-contact { app, auth(admin), ... } → 원장, 보호자 연락처·발송 동의 등록/조회
  *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
@@ -42,7 +42,7 @@ import { handleBookOrderSend } from './book-order-send.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
 import { handleBookEditRequest, handleBookEditReview } from './book-edit-request.js';
 import { handleGuardianContact } from './guardian-contact.js';
-import { handleParentFeedbackSend } from './parent-feedback-send.js';
+import { handleParentFeedbackSend, attemptParentFeedbackSend, resolveStudentName } from './parent-feedback-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -493,10 +493,12 @@ async function handleRevoke(env, app, body, origin) {
 
 
 /* ══════════════════════════════════════════════════════
-   학부모 피드백 문구 검토 + 실제 발송
-   여기서는 직원의 문구 요청과 원장의 문구 승인만 기록한다. "문구 승인"
-   (content_approved_send_blocked)과 "실제 발송"(sent)은 항상 별개의 명시적
-   동작이다 — 실제 발송은 parent-feedback-send.js가 담당하고, 원장만 누를 수 있다.
+   학부모 피드백 — 항목 제출 + 실제 발송
+   2026-08 원장 지시: 별도 승인 클릭 없이, 직원이 항목(오늘 배운 내용·잘한 점·보완할 점)을
+   골라 제출하는 순간 카카오 알림톡 실발송을 바로 시도한다(parent-feedback-send.js의
+   attemptParentFeedbackSend). status는 그 시도 결과 — 'sent'는 성공, 'content_approved_
+   send_blocked'는 "아직 못 나감"(사유는 review_note)이다. /feedback-review는 원장이
+   발송 이력을 확인하고, 막힌 건을 수동으로 재시도하는 용도로 남아 있다.
    ══════════════════════════════════════════════════════ */
 const FEEDBACK_STATUSES = new Set([
   'approval_waiting',
@@ -509,6 +511,31 @@ const SAFE_FEEDBACK_PART = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
+const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
+const MAX_STUDENT_NAME = 40;
+
+/** 제출한 선생님의 실제 이름을 서버가 직접 찾는다 — 클라이언트가 이름을 자유롭게
+ *  적어 보내게 하면(직원이 다른 선생님 이름으로 보낼 수도 있어) 신뢰하지 않는다. */
+async function activeStaffName(env, app, staffId) {
+  const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
+    .bind(app, staffId).first();
+  if (!row) return null;
+  try {
+    const data = JSON.parse(row.data || '{}');
+    const name = String(data.name || '').replace(/\s+/g, ' ').trim();
+    if (String(data.id || staffId) !== staffId || data.deleted || !name || name.length > 40 ||
+        /[\r\n\u0000-\u001f]/.test(name) || !/^[가-힣A-Za-z·.\- ]+$/.test(name)) {
+      return null;
+    }
+    return name;
+  } catch (error) {
+    return null;
+  }
+}
+
+function normalizeFeedbackField(value) {
+  return String(value == null ? '' : value).replace(/[\r\n\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 function validIsoDate(value) {
   const text = String(value || '');
@@ -549,6 +576,11 @@ function feedbackView(row) {
     templateVersion: row.template_version,
     message: row.body,
     bodyHash: row.body_hash,
+    teacherName: row.teacher_name || '',
+    studentName: row.student_name || '',
+    contentText: row.content_text || '',
+    plusText: row.plus_text || '',
+    minusText: row.minus_text || '',
     revision: Number(row.revision),
     status: row.status,
     createdAt: Number(row.created_at),
@@ -568,14 +600,16 @@ async function taskForFeedback(env, identity, auth, origin) {
   if (auth.scope === 'own' && task.owner !== auth.id) {
     return { response: json({ ok: false, error: '본인 업무의 피드백만 요청할 수 있습니다' }, 403, origin) };
   }
+  let taskData;
   try {
-    if (JSON.parse(task.data || '{}').deleted) {
+    taskData = JSON.parse(task.data || '{}');
+    if (taskData.deleted) {
       return { response: json({ ok: false, error: '삭제된 업무에는 요청할 수 없습니다' }, 409, origin) };
     }
   } catch (error) {
     return { response: json({ ok: false, error: '업무 데이터가 올바르지 않습니다' }, 409, origin) };
   }
-  return { task };
+  return { task, taskData };
 }
 
 async function findFeedbackRequest(env, identity) {
@@ -637,24 +671,54 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (message.length > MAX_FEEDBACK_BODY) {
     return json({ ok: false, error: '피드백 문구는 ' + MAX_FEEDBACK_BODY + '자까지 입력할 수 있습니다' }, 413, origin);
   }
+
+  // 항목별 변수 — 카카오 알림톡 발송이 그대로 쓰는 값이다. 선생님 이름은 클라이언트가
+  // 자유롭게 못 적게 서버가 owner(auth.id)로 직접 찾고, 학생 이름도 지시서에서 서버가 뽑는다.
+  const teacherName = await activeStaffName(env, app, owner);
+  if (!teacherName) return json({ ok: false, error: '담당 직원 정보를 확인할 수 없어 제출할 수 없습니다' }, 409, origin);
+  const studentName = resolveStudentName(checked.taskData);
+  if (!studentName || studentName.length > MAX_STUDENT_NAME) {
+    return json({ ok: false, error: '지시서에서 학생 이름을 찾을 수 없습니다' }, 409, origin);
+  }
+  const contentText = normalizeFeedbackField(body.contentText);
+  const plusText = normalizeFeedbackField(body.plusText);
+  const minusText = normalizeFeedbackField(body.minusText);
+  if (!contentText || !plusText || !minusText) {
+    return json({ ok: false, error: '오늘 배운 내용·잘한 점·보완할 점을 모두 골라 주세요' }, 400, origin);
+  }
+  if (contentText.length > MAX_FEEDBACK_FIELD || plusText.length > MAX_FEEDBACK_FIELD || minusText.length > MAX_FEEDBACK_FIELD) {
+    return json({ ok: false, error: '항목별 문구는 각각 ' + MAX_FEEDBACK_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
+  }
+
   const bodyHash = await sha256Hex(message);
   const requestKey = await feedbackRequestKey(identity);
+  const sameFields = row => row && row.body_hash === bodyHash && row.body === message &&
+    row.teacher_name === teacherName && row.student_name === studentName &&
+    row.content_text === contentText && row.plus_text === plusText && row.minus_text === minusText;
 
   if (!current) {
     const insertResult = await env.DB.prepare(
       'INSERT OR IGNORE INTO feedback_requests ' +
-      '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
-      "VALUES (?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+      '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,' +
+      'teacher_name,student_name,content_text,plus_text,minus_text,' +
+      'revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
     ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
-      identity.templateVersion, message, bodyHash, now, now).run();
+      identity.templateVersion, message, bodyHash, teacherName, studentName, contentText, plusText, minusText,
+      now, now).run();
     current = await findFeedbackRequest(env, identity);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
-    if (current.body_hash === bodyHash && current.body === message) {
-      return json({ ok: true, idempotent: Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) !== 1, request: feedbackView(current) }, 200, origin);
+    const freshInsert = Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) === 1;
+    if (freshInsert) {
+      current = await attemptSendAndReload(env, app, current);
+      return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+    }
+    if (sameFields(current)) {
+      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
     }
   }
 
-  if (current.body_hash === bodyHash && current.body === message && current.status === 'revision_requested') {
+  if (sameFields(current) && current.status === 'revision_requested') {
     return json({
       ok: false,
       code: 'REVISION_UNCHANGED',
@@ -663,21 +727,35 @@ async function handleFeedbackRequest(env, app, body, origin) {
     }, 409, origin);
   }
 
-  if (current.body_hash === bodyHash && current.body === message && current.status !== 'cancelled') {
+  if (sameFields(current) && current.status !== 'cancelled') {
+    // 내용은 그대로다 — 다만 이전에 막혀서 못 나갔을 수 있으니(보호자 등록 등) 재시도는 해본다.
+    current = await attemptSendAndReload(env, app, current);
     return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
   }
 
   const result = await env.DB.prepare(
-    "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, revision=revision+1, status='approval_waiting', " +
+    "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_name=?, " +
+    "content_text=?, plus_text=?, minus_text=?, revision=revision+1, status='approval_waiting', " +
     'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
     'WHERE app=? AND request_key=? AND revision=?'
-  ).bind(owner, message, bodyHash, now, 'task', current.request_key, Number(current.revision)).run();
+  ).bind(owner, message, bodyHash, teacherName, studentName, contentText, plusText, minusText,
+    now, 'task', current.request_key, Number(current.revision)).run();
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
   }
   current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
     .bind('task', current.request_key).first();
+  current = await attemptSendAndReload(env, app, current);
   return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+}
+
+/** 제출 즉시 카카오 알림톡 발송을 시도하고, 상태가 바뀐 최신 행을 다시 읽어 돌려준다.
+ *  attemptParentFeedbackSend가 실패해도(설정 안 됨, 보호자 미등록 등) 예외를 던지지 않고
+ *  상태·사유를 review_note에 남기므로, 여기서는 그 결과를 그대로 반영한 최신 행만 반환한다. */
+async function attemptSendAndReload(env, app, current) {
+  await attemptParentFeedbackSend(env, app, current);
+  return await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
+    .bind(app, current.request_key).first();
 }
 
 async function handleFeedbackReview(env, app, body, origin) {
