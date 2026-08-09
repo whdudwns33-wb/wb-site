@@ -170,6 +170,29 @@ test('a successful send is recorded and resending the same order is idempotent (
   assert.equal(row.status, 'accepted');
 });
 
+test('books from one publisher in a batch order are sent in one message', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, {
+    orderItems: [
+      { title: '팩토사고력 Lv3 B 기본', qty: '2권' },
+      { title: '팩토사고력 Lv3 B 응용', qty: '1권' }
+    ]
+  });
+  let fetches = 0;
+  await withFetch(async (url, opts) => {
+    fetches += 1;
+    const message = JSON.parse(opts.body).messages[0];
+    assert.match(message.text, /팩토사고력 Lv3 B 기본: 2권/);
+    assert.match(message.text, /팩토사고력 Lv3 B 응용: 1권/);
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(db, { auth: admin, taskId: 'order-1' });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.itemCount, 2);
+  });
+  assert.equal(fetches, 1);
+});
+
 test('provider rejection and network failure are both recorded without throwing', async () => {
   const dbRej = new TestD1(); seedOrderTask(dbRej);
   await withFetch(async () => new Response(JSON.stringify({
