@@ -854,6 +854,9 @@ function viewLock() {
     '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
     '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
       (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
+    (!first
+      ? '<button class="btn btn-ghost btn-block mt14" data-act="recoverpin">비밀번호 재설정</button>'
+      : '') +
     '<hr class="sep">' +
     (first
       ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
@@ -2599,6 +2602,29 @@ document.addEventListener('click', ev => {
     case 'login': {
       if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
       session.unlock(); render(); toast('환영합니다');
+      break;
+    }
+    case 'recoverpin': {
+      modal('관리 비밀번호 재설정',
+        '<div class="card-sub mb14">동기화에 사용하는 <b>CONSULT_ADMIN_SECRET</b>으로 확인한 뒤 새 비밀번호를 저장합니다. 학생·업무 데이터는 바뀌지 않습니다.</div>' +
+        '<div class="field"><label class="fl">원장 비밀키</label><input class="in" id="recoverSecret" type="password" autocomplete="off"></div>' +
+        '<div class="field"><label class="fl">새 관리 비밀번호</label><input class="in" id="recoverPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>',
+        '<button class="btn btn-primary" data-act="recoverpinsave">확인하고 재설정</button>' +
+        '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
+      break;
+    }
+    case 'recoverpinsave': {
+      const secret = ($('#recoverSecret').value || '').trim();
+      const pin = ($('#recoverPin').value || '').trim();
+      if (!secret) return toast('원장 비밀키를 입력해 주세요');
+      if (pin.length < 4) return toast('새 비밀번호를 4자리 이상 입력해 주세요');
+      sync.post('/sync', {
+        app: SYNC_APP, auth: { mode: 'admin', secret: secret }, since: Date.now(), changes: []
+      }).then(() => {
+        state.settings.syncSecret = secret;
+        state.settings.adminPin = pin;
+        save(); session.unlock(); closeModal(); render(); toast('비밀번호를 재설정했습니다');
+      }).catch(() => toast('원장 비밀키가 맞지 않거나 서버에 연결할 수 없습니다'));
       break;
     }
     case 'logout': session.lock(); render(); break;
