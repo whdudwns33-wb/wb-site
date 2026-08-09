@@ -284,6 +284,7 @@
 <script src="./lesson-form-core.js?v=2026-08-09.1"></script>
 <script src="./schedule-board-core.js?v=2026-08-09.1"></script>
 <script src="./asset-core.js?v=2026-08-09.1"></script>
+<script src="./qr-core.js?v=2026-08-09.1"></script>
 <script>
 "use strict";
 
@@ -4090,7 +4091,8 @@ function viewStaffAdmin() {
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
-          '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-primary" data-act="qrlink" data-id="' + s.id + '">📷 태블릿 연결 QR</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
           '<button class="btn btn-sm btn-danger" data-act="revokeaccess" data-id="' + s.id + '">링크 해지</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
@@ -4279,6 +4281,34 @@ async function issueLinkCode(id) {
   storeLinkCode(id, issued.code, issued.expiresAt);
   return issued.code;
 }
+/** 개인 링크를 QR로 띄운다. 태블릿 카메라로 비추면 그 기기가 연결된다. */
+function showLinkQr(s) {
+  const link = staffLink(s.id);
+  const core = window.WBQRCore;
+  if (!core) return void toast('QR 모듈을 불러오지 못했습니다 — 링크 복사를 이용해 주세요');
+
+  let svg;
+  try {
+    svg = core.toSvg(core.encode(link), { size: 268 });
+  } catch (e) {
+    closeModal();
+    return void toast('QR을 만들지 못했습니다 — ' + e.message);
+  }
+
+  modal(s.name + ' 선생님 · 태블릿 연결',
+    '<div style="text-align:center">' + svg + '</div>' +
+    '<div class="guide mt8"><b>태블릿에서</b>' +
+      '1) 카메라 앱을 열고 이 QR을 비춥니다\n' +
+      '2) 뜨는 주소를 눌러 크롬으로 엽니다\n' +
+      '3) <b>[이 기기에 연결]</b> 을 누릅니다\n' +
+      '4) 크롬 메뉴 → <b>홈 화면에 추가</b>' +
+    '</div>' +
+    '<div class="hint mt8">이 QR은 <b>한 번만</b> 쓸 수 있습니다. 다른 기기를 또 연결하려면 새로 만드세요. ' +
+      '태블릿에서 원장 화면은 열지 마세요 — 관리 비밀번호가 그 기기에 남습니다.</div>',
+    '<hr class="sep"><button class="btn btn-ghost btn-block" data-act="copylinktext" data-id="' + s.id + '">' +
+      'QR이 안 읽히면 · 링크 복사</button>');
+}
+
 function orderText(staffId, date) {
   const s = staffById(staffId);
   const list = tasksFor(staffId, date);
@@ -5430,6 +5460,24 @@ document.addEventListener('click', ev => {
       issueLinkCode(id)
         .then(() => copy(staffLink(id), '개인 링크를 복사했습니다'))
         .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    /* 태블릿에 링크를 옮기는 유일하게 안 번거로운 길.
+       계정 로그인도 카톡도 없이 카메라로 화면을 비추면 끝난다. */
+    case 'qrlink': {
+      const s = staffById(id);
+      if (!s) return toast('대상을 찾을 수 없습니다');
+      modal(s.name + ' 선생님 · 태블릿 연결', '<div class="card-sub">연결 링크를 만드는 중…</div>');
+      issueLinkCode(id)
+        .then(() => showLinkQr(s))
+        .catch(e => {
+          closeModal();
+          toast('링크를 만들지 못했습니다 — ' + e.message);
+        });
+      break;
+    }
+    case 'copylinktext': {
+      copy(staffLink(id), '개인 링크를 복사했습니다');
       break;
     }
     case 'alllinks': {
