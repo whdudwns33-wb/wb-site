@@ -2605,16 +2605,21 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'recoverpin': {
+      const hasSavedSecret = !!state.settings.syncSecret;
       modal('관리 비밀번호 재설정',
-        '<div class="card-sub mb14">동기화에 사용하는 <b>CONSULT_ADMIN_SECRET</b>으로 확인한 뒤 새 비밀번호를 저장합니다. 학생·업무 데이터는 바뀌지 않습니다.</div>' +
-        '<div class="field"><label class="fl">원장 비밀키</label><input class="in" id="recoverSecret" type="password" autocomplete="off"></div>' +
+        '<div class="card-sub mb14">' + (hasSavedSecret
+          ? '이 기기에 저장된 동기화 연결 정보로 확인한 뒤 새 비밀번호를 저장합니다.'
+          : '동기화에 사용하는 <b>CONSULT_ADMIN_SECRET</b>으로 확인한 뒤 새 비밀번호를 저장합니다.') +
+          ' 학생·업무 데이터는 바뀌지 않습니다.</div>' +
+        (hasSavedSecret ? '' : '<div class="field"><label class="fl">원장 비밀키</label><input class="in" id="recoverSecret" type="password" autocomplete="off"></div>') +
         '<div class="field"><label class="fl">새 관리 비밀번호</label><input class="in" id="recoverPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>',
         '<button class="btn btn-primary" data-act="recoverpinsave">확인하고 재설정</button>' +
         '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
       break;
     }
     case 'recoverpinsave': {
-      const secret = ($('#recoverSecret').value || '').trim();
+      const secretEl = $('#recoverSecret');
+      const secret = ((secretEl && secretEl.value) || state.settings.syncSecret || '').trim();
       const pin = ($('#recoverPin').value || '').trim();
       if (!secret) return toast('원장 비밀키를 입력해 주세요');
       if (pin.length < 4) return toast('새 비밀번호를 4자리 이상 입력해 주세요');

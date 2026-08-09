@@ -12,8 +12,15 @@ test('consult admin password recovery verifies the consult sync secret', () => {
   assert.match(recovery, /sync\.post\('\/sync'/);
   assert.match(recovery, /app: SYNC_APP/);
   assert.match(recovery, /auth: \{ mode: 'admin', secret: secret \}/);
+  assert.match(recovery, /state\.settings\.syncSecret/);
   assert.match(recovery, /state\.settings\.adminPin = pin/);
   assert.match(recovery, /save\(\); session\.unlock\(\)/);
+});
+
+test('consult reuses a saved sync secret instead of asking for it again', () => {
+  const modal = html.match(/case 'recoverpin':[\s\S]*?\n\s*break;/)?.[0] || '';
+  assert.match(modal, /hasSavedSecret = !!state\.settings\.syncSecret/);
+  assert.match(modal, /hasSavedSecret \? '' : .*id="recoverSecret"/);
 });
 
 test('consult storage and sync identity stay isolated from task', () => {
