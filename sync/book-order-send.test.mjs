@@ -4,9 +4,13 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
+import { handleScheduledBookOrders } from './book-order-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/013_book_order_sends.sql', import.meta.url), 'utf8');
+const batchMigration = fs.readFileSync(new URL('./migrations/018_book_order_batch_items.sql', import.meta.url), 'utf8');
+const entry = fs.readFileSync(new URL('./worker.js', import.meta.url), 'utf8');
+const wrangler = fs.readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -74,7 +78,7 @@ function seedOrderTask(db, overrides = {}) {
   const task = {
     id: 'order-1', staffId: 'S-kim', title: '[주문] 개념원리 미적분Ⅰ',
     orderVendor: '천재출판사', orderItems: [{ title: '개념원리 미적분Ⅰ', qty: '3권' }],
-    deleted: false, ...overrides
+    createdAt: now, deleted: false, ...overrides
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', task.id, task.staffId, JSON.stringify(task), now, now).run();
@@ -88,6 +92,14 @@ test('schema and migration are additive, and the send ledger itself stores no ph
     assert.doesNotMatch(match[0], /phone|message_body/i);
     assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
   }
+});
+
+test('20:00 KST cron and additive batch mapping are configured without storing phone or message text', () => {
+  assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*"\]/);
+  assert.match(entry, /async scheduled\(controller, env, ctx\)/);
+  assert.match(entry, /handleScheduledBookOrders\(env, controller\.scheduledTime\)/);
+  assert.match(batchMigration, /CREATE TABLE IF NOT EXISTS book_order_batch_items/);
+  assert.doesNotMatch(batchMigration, /phone|message_body|DROP TABLE|DELETE FROM/i);
 });
 
 test('client cannot specify phone, recipient, or message — request is rejected before any fetch', async () => {
@@ -191,6 +203,44 @@ test('books from one publisher in a batch order are sent in one message', async 
     assert.equal(result.body.itemCount, 2);
   });
   assert.equal(fetches, 1);
+});
+
+test('scheduled orders from the same publisher are grouped once and cannot be sent again individually', async () => {
+  const db = new TestD1();
+  const cutoff = Date.now() + 1000;
+  seedOrderTask(db, { orderDelivery: 'scheduled_batch_v1' });
+  seedOrderTask(db, {
+    id: 'order-2', title: '[주문] 팩토사고력 Lv3 B 응용', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '팩토사고력 Lv3 B 응용', qty: '2권' }]
+  });
+  seedOrderTask(db, {
+    id: 'legacy-order', title: '[주문] 기존 미발송 주문',
+    orderItems: [{ title: '기존 미발송 주문', qty: '99권' }]
+  });
+  let fetches = 0;
+  await withFetch(async (url, opts) => {
+    fetches += 1;
+    const message = JSON.parse(opts.body).messages[0];
+    assert.match(message.text, /개념원리 미적분Ⅰ: 3권/);
+    assert.match(message.text, /팩토사고력 Lv3 B 응용: 2권/);
+    assert.doesNotMatch(message.text, /기존 미발송 주문/);
+    return acceptedResponse();
+  }, async () => {
+    const first = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff);
+    assert.equal(first.ok, true);
+    assert.equal(first.results.length, 1);
+    assert.equal(first.results[0].taskCount, 2);
+    assert.equal(first.results[0].itemCount, 2);
+
+    const again = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff);
+    assert.deepEqual(again.results, []);
+
+    const manual = await call(db, { auth: admin, taskId: 'order-1' });
+    assert.equal(manual.status, 200);
+    assert.equal(manual.body.idempotent, true);
+  });
+  assert.equal(fetches, 1, '같은 출판사 묶음과 재시도까지 실제 문자는 한 번만 보낸다');
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM book_order_batch_items WHERE app='task'").first().count, 2);
 });
 
 test('provider rejection and network failure are both recorded without throwing', async () => {
