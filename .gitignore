@@ -1,0 +1,12 @@
+# Wrangler 로컬 캐시/임시 파일 — 배포할 때마다 자동 생성된다. 커밋 대상 아님.
+.wrangler/
+**/.wrangler/
+
+# Node
+node_modules/
+
+# 운영 학생 원본 — 로컬 이관용, 저장소/Pages 배포 금지
+.private/
+
+# 구형 배포 스크립트가 만들던 관리자 비밀키 결과 파일 — 커밋 금지
+sync/배포결과.txt

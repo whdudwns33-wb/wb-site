@@ -1,0 +1,3417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>컨설팅 플래너 · WB 웩슬러브레인센터</title>
+<meta name="theme-color" content="#1B3A5C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:       #7C3AED;
+    --deep-blue:  #5B21B6;
+    --navy:       #1B3A5C;
+    --coral:      #E85D4A;
+    --ivory:      #FAF8F3;
+    --dark-gray:  #2D2D2D;
+    --mid-gray:   #6B7280;
+    --line:       #E5E7EB;
+    --light-gray: #F3F4F6;
+    --white:      #FFFFFF;
+    --green:      #16A34A;
+    --amber:      #D97706;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--dark-gray);
+    background: var(--ivory);
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: 48px;
+  }
+
+  button, input, select, textarea { font-family: inherit; font-size: 100%; color: inherit; }
+  button { cursor: pointer; border: none; background: none; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 14px; }
+
+  /* ─── 상단 바 ─── */
+  .topbar { background: var(--navy); color: var(--white); padding: 12px 0; position: sticky; top: 0; z-index: 50; }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .brand { font-size: 15px; font-weight: 900; letter-spacing: -0.02em; }
+  .brand span { color: var(--blue); }
+  .brand small { display: block; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 0; }
+  .whoami {
+    font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.14);
+    padding: 6px 12px; border-radius: 999px; display: flex; align-items: center; gap: 6px;
+  }
+  .whoami i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); font-style: normal; }
+  .whoami.off i { background: var(--mid-gray); }
+
+  /* ─── 탭 ─── */
+  .tabs { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 55px; z-index: 40; }
+  .tabs .wrap { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .tabs .wrap::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 13px 14px; font-size: 14px; font-weight: 700; color: var(--mid-gray);
+    border-bottom: 3px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 5px;
+  }
+  .tab.on { color: var(--deep-blue); border-bottom-color: var(--blue); }
+  .badge {
+    background: var(--coral); color: var(--white); font-size: 11px; font-weight: 900;
+    min-width: 18px; height: 18px; border-radius: 999px; padding: 0 5px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* ─── 카드 ─── */
+  .card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .card.alert { border-color: var(--coral); background: #FFF9F8; }
+  .card-title { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--mid-gray); }
+  main { padding-top: 16px; }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .wraprow { flex-wrap: wrap; }
+  .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .muted { color: var(--mid-gray); }
+  .small { font-size: 12px; }
+  .mb8 { margin-bottom: 8px; } .mb14 { margin-bottom: 14px; } .mt14 { margin-top: 14px; }
+
+  /* ─── 버튼 ─── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 16px; border-radius: 10px; font-size: 14px; font-weight: 700;
+    background: var(--light-gray); color: var(--dark-gray); border: 1px solid transparent;
+  }
+  .btn:active { filter: brightness(0.94); }
+  .btn-primary { background: var(--blue); color: var(--white); }
+  .btn-navy { background: var(--navy); color: var(--white); }
+  .btn-ghost { background: var(--white); border-color: var(--line); }
+  .btn-danger { background: #FEF2F2; color: var(--coral); }
+  .btn-warn { background: #FFF7ED; color: var(--amber); border: 1px solid #FDE8CC; }
+  .btn-sm { padding: 7px 11px; font-size: 12.5px; border-radius: 8px; }
+  .btn-block { display: flex; width: 100%; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* ─── 폼 ─── */
+  .fl { display: block; font-size: 12.5px; font-weight: 700; color: var(--mid-gray); margin-bottom: 5px; }
+  .in { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-size: 14.5px; }
+  .in:focus { outline: 2px solid rgba(30,157,214,.35); outline-offset: -1px; border-color: var(--blue); }
+  textarea.in { resize: vertical; min-height: 62px; line-height: 1.6; }
+  .field { margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); font-size: 13px; font-weight: 700; color: var(--mid-gray); }
+  .chip.on { background: var(--navy); border-color: var(--navy); color: var(--white); }
+  .chip.dow { min-width: 42px; padding: 8px 0; text-align: center; justify-content: center; }
+
+  /* ─── 날짜 네비 ─── */
+  .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .datenav .d { font-size: 17px; font-weight: 900; }
+  .datenav .d em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--blue); margin-left: 6px; }
+  .navbtn { width: 38px; height: 38px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); font-size: 16px; font-weight: 900; color: var(--mid-gray); }
+
+  /* ─── 진행률 ─── */
+  .prog { display: flex; align-items: center; gap: 14px; }
+  .ring {
+    width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 900; color: var(--navy);
+    background: conic-gradient(var(--blue) calc(var(--p) * 1%), var(--light-gray) 0);
+    position: relative;
+  }
+  .ring::after { content: ''; position: absolute; inset: 7px; background: var(--white); border-radius: 50%; }
+  .ring b { position: relative; z-index: 1; font-size: 15px; }
+  .bar { height: 8px; border-radius: 99px; background: var(--light-gray); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--blue); border-radius: 99px; }
+  .bar.mini { height: 5px; }
+  .bar.doing i { background: var(--amber); }
+
+  /* ─── 업무 항목 ─── */
+  .task { display: flex; gap: 12px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid var(--light-gray); }
+  .task:last-child { border-bottom: none; }
+  .task.isblocked { background: #FFF9F8; border-radius: 10px; padding-left: 10px; padding-right: 10px; }
+  .box {
+    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; margin-top: 1px;
+    border: 2px solid #D1D5DB; background: var(--white);
+    display: grid; place-items: center; color: transparent; font-size: 15px; font-weight: 900;
+  }
+  .task.done .box { background: var(--blue); border-color: var(--blue); color: var(--white); }
+  .task.doing .box { border-color: var(--amber); }
+  .task-body { flex: 1; min-width: 0; }
+  .task-t { font-size: 15px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+  .task.done .task-t { color: var(--mid-gray); text-decoration: line-through; }
+  .task-d { font-size: 13px; color: var(--mid-gray); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; align-items: center; }
+  .tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--light-gray); color: var(--mid-gray); }
+  .tag.time { background: #EAF6FC; color: var(--deep-blue); }
+  .tag.high { background: #FEF2F2; color: var(--coral); }
+  .tag.ok   { background: #ECFDF5; color: var(--green); }
+  .tag.doing{ background: #FFF7ED; color: var(--amber); }
+  .tag.blk  { background: var(--coral); color: var(--white); }
+  .tag.carry{ background: #FEF2F2; color: var(--coral); }
+  .tag.add  { background: #ECFDF5; color: var(--green); }
+  .tag.edit { background: #FFF7ED; color: var(--amber); }
+  .note { margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); }
+  .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
+  .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
+
+  /* ─── 단계 / 가이드 ─── */
+  .opener { font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
+  .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
+  .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
+  .step { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; font-size: 13.5px; }
+  .sbox {
+    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 1px;
+    border: 2px solid #D1D5DB; background: var(--white);
+    display: grid; place-items: center; color: transparent; font-size: 12px; font-weight: 900;
+  }
+  .step.on .sbox { background: var(--green); border-color: var(--green); color: var(--white); }
+  .step.on span { color: var(--mid-gray); text-decoration: line-through; }
+  .counter { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 700; }
+  .counter input { width: 74px; text-align: center; padding: 8px; }
+
+  /* ─── 주간 그리드 ─── */
+  .weekwrap { overflow-x: auto; }
+  table.week { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  table.week th, table.week td { border: 1px solid var(--line); padding: 7px 6px; text-align: center; }
+  table.week th.n, table.week td.n { text-align: left; width: 38%; font-weight: 700; }
+  table.week thead th { background: var(--light-gray); font-size: 12px; color: var(--mid-gray); font-weight: 700; }
+  table.week thead th.today { background: var(--navy); color: var(--white); }
+  .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
+  .dot.done { background: var(--blue); color: var(--white); }
+  .dot.doing { background: #FCD9A5; color: var(--amber); }
+  .dot.blocked { background: var(--coral); color: var(--white); }
+  .dot.miss { background: #FDE8E4; }
+  .dot.none { background: transparent; }
+
+  /* ─── 학생 현황 ─── */
+  .staffcard { display: flex; gap: 14px; align-items: center; }
+  .ava { width: 44px; height: 44px; border-radius: 12px; background: var(--navy); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex-shrink: 0; }
+
+  /* ─── 토스트 / 모달 ─── */
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+    background: var(--navy); color: var(--white); padding: 12px 20px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 700; opacity: 0; pointer-events: none; transition: all .2s; z-index: 200;
+    max-width: 90vw; text-align: center;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .modal { position: fixed; inset: 0; background: rgba(27,58,92,.55); display: grid; place-items: center; padding: 16px; z-index: 150; }
+  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; }
+
+  hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+  .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
+  /* ─── 월간 달력 ─── */
+  table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.cal th { font-size: 11px; color: var(--mid-gray); font-weight: 700; padding: 4px 0; }
+  table.cal td { padding: 2px; }
+  .calday { width: 100%; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 10px;
+            background: var(--white); display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 1px; cursor: pointer; }
+  .calday b { font-size: 13px; color: var(--dark-gray); }
+  .calday small { font-size: 9px; color: var(--mid-gray); }
+  .calday.has { background: var(--light-gray); }
+  .calday.done { background: #EAF6FC; border-color: var(--blue); }
+  .calday.done b, .calday.done small { color: var(--deep-blue); }
+  .calday.doing { background: #FFF7ED; border-color: var(--amber); }
+  .calday.doing small { color: var(--amber); }
+  .calday.miss { background: #FEF2F2; border-color: #FECACA; }
+  .calday.miss small { color: var(--coral); }
+  .calday.today { outline: 2px solid var(--navy); outline-offset: -1px; }
+
+  .newver {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+    background: var(--navy); color: #fff; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 13.5px; font-weight: 700; box-shadow: 0 -4px 16px rgba(0,0,0,.18);
+  }
+  .newver button { background: #fff; color: var(--navy); font-weight: 900;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #EAF6FC; color: var(--deep-blue); }
+  .pill.warn { background: #FFF7ED; color: var(--amber); }
+  .pill.bad { background: #FEF2F2; color: var(--coral); }
+  .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span>WB</span> 컨설팅 플래너<small>Consulting Planner</small></div>
+    <button class="whoami off" id="whoami"><i></i><span>—</span></button>
+  </div>
+</header>
+
+<nav class="tabs"><div class="wrap" id="tabs"></div></nav>
+
+<main class="wrap" id="view"></main>
+
+<div id="toast"></div>
+<div id="modalHost"></div>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════
+   1. 저장소
+   ══════════════════════════════════════════════════════ */
+const LS_KEY = 'wb_consult_v1';
+const DOW = ['일','월','화','수','목','금','토'];
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
+const now = () => Date.now();
+
+function blankState() {
+  return {
+    version: 2,
+    staff: [],
+    tasks: [],
+    checks: {},
+    settings: { adminPin: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터' }
+  };
+}
+
+let state = blankState();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      state = Object.assign(blankState(), p);
+      state.settings = Object.assign(blankState().settings, p.settings || {});
+    }
+  } catch (e) { console.warn('load failed', e); }
+}
+
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { toast('저장 공간이 부족합니다'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   2. 날짜 유틸
+   ══════════════════════════════════════════════════════ */
+function ymd(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
+function today() { return ymd(new Date()); }
+function nowHM() { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function dowOf(s) { return parseYmd(s).getDay(); }
+function label(s) { const d = parseYmd(s); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ')'; }
+function shortDate(s) { const d = parseYmd(s); return (d.getMonth() + 1) + '/' + d.getDate(); }
+function relLabel(s) {
+  const diff = Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
+  if (diff === 0) return '오늘';
+  if (diff === -1) return '어제';
+  if (diff === 1) return '내일';
+  return null;
+}
+function mondayOf(s) { const d = parseYmd(s); return addDays(s, -((d.getDay() + 6) % 7)); }
+const ymOf = s => s.slice(0, 7);
+function ymLabel(ym) { return ym.slice(0, 4) + '년 ' + Number(ym.slice(5)) + '월'; }
+function ymAdd(ym, n) {
+  const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function monthDates(ym) {
+  const last = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
+  return Array.from({ length: last }, (_, i) => ym + '-' + String(i + 1).padStart(2, '0'));
+}
+
+/* ══════════════════════════════════════════════════════
+   3. 도메인 로직
+   ══════════════════════════════════════════════════════ */
+const liveStaff = () => state.staff.filter(s => !s.deleted);
+/** 통계에 넣을 사람 — 대표는 제외한다. 대표 업무가 섞이면 학생 수행률이 흐려진다. */
+const teamStaff = () => liveStaff().filter(s => !s.owner);
+const owners = () => liveStaff().filter(s => s.owner);
+const staffById = id => state.staff.find(s => s.id === id);
+const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
+
+function occursOn(task, date) {
+  if (task.deleted) return false;
+  if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
+  if (task.start && date < task.start) return false;
+  if (task.end && date > task.end) return false;
+  switch (task.repeat) {
+    case 'once':    return date === task.start;
+    case 'daily':   return true;
+    case 'weekday': { const w = dowOf(date); return w >= 1 && w <= 5; }
+    case 'days':    return (task.days || []).includes(dowOf(date));
+    default:        return false;
+  }
+}
+
+function tasksFor(staffId, date) {
+  return state.tasks
+    .filter(t => t.staffId === staffId && occursOn(t, date))
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
+                 || (b.priority === 'high') - (a.priority === 'high')
+                 || (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+const ckey = (taskId, date) => taskId + '|' + date;
+const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
+const isDone = (taskId, date) => !!(state.checks[ckey(taskId, date)] || {}).done;
+
+function setCheck(taskId, date, patch) {
+  const k = ckey(taskId, date);
+  const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '', steps: {}, count: 0, blocked: false };
+  const next = Object.assign({}, cur, patch, { updatedAt: now() });
+  state.checks[k] = next;
+  save();
+  queueSync();
+  return next;
+}
+
+/** 단계·수량을 고려한 개별 업무 진행률 */
+function taskProgress(t, c) {
+  const steps = t.steps || [];
+  if (steps.length) {
+    const done = steps.filter(s => c && c.steps && c.steps[s.id]).length;
+    return { done: done, total: steps.length, unit: '단계', pct: Math.round(done / steps.length * 100) };
+  }
+  if (t.target) {
+    const n = (c && c.count) || 0;
+    return { done: n, total: t.target, unit: t.unit || '건', pct: Math.min(100, Math.round(n / t.target * 100)) };
+  }
+  const d = (c && c.done) ? 1 : 0;
+  return { done: d, total: 1, unit: '', pct: d * 100 };
+}
+
+/** 미착수 todo / 진행중 doing / 완료 done / 막힘 blocked */
+function statusOf(t, date) {
+  const c = getCheck(t.id, date);
+  if (c && c.blocked) return 'blocked';
+  if (c && c.done) return 'done';
+  if (taskProgress(t, c).done > 0) return 'doing';
+  return 'todo';
+}
+const STATUS_LABEL = { todo: '미착수', doing: '진행중', done: '완료', blocked: '막힘' };
+
+/** 단계·수량이 다 차면 자동 완료, 되돌리면 자동 해제.
+ *  둘 다 있는 업무는 단계도 끝나고 수량도 채워져야 완료다. */
+function syncAuto(t, date) {
+  const c = getCheck(t.id, date);
+  if (!c) return;
+  const hasSteps = (t.steps || []).length > 0, hasTarget = !!t.target;
+  if (!hasSteps && !hasTarget) return;
+  const stepsOk = !hasSteps || t.steps.every(s => c.steps && c.steps[s.id]);
+  const countOk = !hasTarget || ((c.count || 0) >= t.target);
+  const full = stepsOk && countOk;
+  if (full && !c.done) setCheck(t.id, date, { done: true, at: now() });
+  else if (!full && c.done) setCheck(t.id, date, { done: false, at: null });
+}
+
+function progress(staffId, date) {
+  const list = tasksFor(staffId, date);
+  const done = list.filter(t => isDone(t.id, date)).length;
+  return { done: done, total: list.length, pct: list.length ? Math.round(done / list.length * 100) : 0 };
+}
+
+/** 그 달의 월간 목표 (kind:'mgoal') — 일별 업무와 별도로 산다 */
+function goalsFor(staffId, ym) {
+  return state.tasks
+    .filter(t => !t.deleted && t.kind === 'mgoal' && t.staffId === staffId && t.month === ym)
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function monthProgress(staffId, ym) {
+  let done = 0, total = 0;
+  monthDates(ym).forEach(d => { const p = progress(staffId, d); done += p.done; total += p.total; });
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function weekProgress(staffId, anchor) {
+  const mon = mondayOf(anchor);
+  let done = 0, total = 0;
+  for (let i = 0; i < 7; i++) { const p = progress(staffId, addDays(mon, i)); done += p.done; total += p.total; }
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function streak(staffId) {
+  let d = today(), n = 0;
+  for (let i = 0; i < 120; i++) {
+    const p = progress(staffId, d);
+    if (p.total === 0) { d = addDays(d, -1); continue; }
+    if (p.done < p.total) break;
+    n++; d = addDays(d, -1);
+  }
+  return n;
+}
+
+/** 이월: 최근 7일 안에 못 끝낸 '이월' 업무 */
+function carryOver(staffId, date) {
+  const out = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = addDays(date, -i);
+    tasksFor(staffId, d).forEach(t => {
+      if (!t.carry || isDone(t.id, d)) return;
+      out.push({ t: t, date: d });
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 그 주에 학생이 스스로 추가한 업무 */
+function staffAdded(anchor) {
+  const mon = mondayOf(anchor);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const out = [];
+  state.tasks.forEach(t => {
+    if (t.deleted || t.origin !== 'staff') return;
+    const s = staffById(t.staffId);
+    if (!s || s.owner) return;              // 대표가 스스로 넣은 건 '학생 추가'가 아니다
+    days.forEach(d => { if (occursOn(t, d)) out.push({ t: t, date: d }); });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 원장이 바로 봐야 할 것: 막힘 + 예정 시각이 지난 미완료 */
+function alertsToday() {
+  const d = today(), hm = nowHM();
+  let blocked = 0, overdue = 0;
+  liveStaff().forEach(s => tasksFor(s.id, d).forEach(t => {
+    const c = getCheck(t.id, d);
+    if (c && c.blocked) { blocked++; return; }
+    if (c && c.done) return;
+    if (t.time && t.time < hm) overdue++;
+  }));
+  return { blocked: blocked, overdue: overdue, total: blocked + overdue };
+}
+
+/* ══════════════════════════════════════════════════════
+   4. 동기화 (선택) — Google Apps Script 웹앱
+   ══════════════════════════════════════════════════════ */
+/* 동기화 — Cloudflare Workers + D1
+ * 예전에는 매번 전체 상태를 통째로 주고받았다. 학생이 100명이 되면
+ * 한 명이 체크 하나를 눌러도 나머지 99명 데이터가 오가서 감당이 안 된다.
+ * 지금은 (1) 마지막 동기화 이후 바뀐 것만 (2) 학생은 자기 것만 주고받는다. */
+const SYNC_URL = 'https://wb-sync.whdudwns33.workers.dev';
+const SYNC_APP = 'consult';
+
+/** 이 체크가 누구 것인지 — 서버가 학생별로 나눠 담는 기준이 된다.
+ *  '__st__S1|2026-08-02' → S1,  '<taskId>|날짜' → 그 업무의 담당자 */
+function ownerOfCheck(key) {
+  const tid = String(key).split('|')[0];
+  const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
+  if (m) return m[1];
+  const t = (state.tasks || []).find(x => x.id === tid);
+  return t ? (t.staffId || null) : null;
+}
+
+const sync = {
+  busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
+
+  /** 원장은 연결된 기기 토큰(구형 기기는 비밀키), 학생은 개인 토큰으로 접속한다 */
+  auth() {
+    if (session.isStaffLink) {
+      const t = state.settings.myToken || '';
+      return t ? { mode: 'person', id: session.staffId, token: t } : null;
+    }
+    const t = state.settings.adminToken || '';
+    if (t) return { mode: 'admin_device', token: t };
+    const k = state.settings.syncSecret || '';
+    return k ? { mode: 'admin', secret: k } : null;
+  },
+  enabled() { return !!this.auth(); },
+
+  /** since 이후 바뀐 것만 모은다. 각 레코드가 이미 updatedAt을 갖고 있어
+   *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
+  collect(since) {
+    const out = [];
+    (state.staff || []).forEach(s => {
+      if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
+    });
+    (state.tasks || []).forEach(t => {
+      if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
+    });
+    Object.keys(state.checks || {}).forEach(k => {
+      const c = state.checks[k];
+      if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
+    });
+    return out;
+  },
+
+  /** 받은 변경을 반영한다. 내 것이 더 최신이면 그대로 둔다 */
+  apply(changes) {
+    let n = 0;
+    (changes || []).forEach(ch => {
+      if (!ch || !ch.data) return;
+      const at = ch.data.updatedAt || 0;
+      if (ch.table === 'checks') {
+        const cur = state.checks[ch.key];
+        if (!cur || at > (cur.updatedAt || 0)) { state.checks[ch.key] = ch.data; n++; }
+      } else if (ch.table === 'staff' || ch.table === 'tasks') {
+        const arr = state[ch.table];
+        const i = arr.findIndex(x => x.id === ch.key);
+        if (i < 0) { arr.push(ch.data); n++; }
+        else if (at > (arr[i].updatedAt || 0)) { arr[i] = ch.data; n++; }
+      }
+    });
+    return n;
+  },
+
+  async post(path, body) {
+    const res = await fetch(SYNC_URL + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await res.json().catch(() => null);
+    if (!d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + res.status));
+    return d;
+  },
+
+  async run() {
+    const auth = this.auth();
+    if (!auth || this.busy) return;
+    this.busy = true; paintStatus();
+    try {
+      const t0 = now();
+      const pending = this.collect(Number(state.settings.pushAt) || 0);
+      let guard = 0, again = true;
+      while (again && guard++ < 60) {
+        const batch = pending.splice(0, 400);
+        const d = await this.post('/sync', {
+          app: SYNC_APP, auth: auth,
+          since: Number(state.settings.pullAt) || 0,
+          changes: batch
+        });
+        this.apply(d.changes);
+        state.settings.pullAt = d.now;
+        again = !!d.more || pending.length > 0;
+      }
+      // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
+      state.settings.pushAt = t0;
+      save();
+      this.last = now(); this.dirty = false; this.err = '';
+      render();
+    } catch (e) {
+      console.warn('sync', e);
+      this.dirty = true; this.err = String(e && e.message || e);
+      if (this.loud) toast('동기화 실패 — ' + this.err);
+    } finally {
+      this.busy = false; this.loud = false; paintStatus();
+    }
+  },
+
+  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
+  async issueToken(staffId) {
+    const auth = this.auth();
+    if (!auth) throw new Error('원장 화면에서만 발급할 수 있습니다');
+    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
+    return d.token;
+  },
+
+  async issueAdminHandoff() {
+    const auth = this.auth();
+    if (!auth) throw new Error('동기화 연결이 필요합니다');
+    return await this.post('/admin-handoff', { app: SYNC_APP, auth: auth });
+  },
+
+  async exchangeAdmin(code) {
+    return await this.post('/exchange', { app: SYNC_APP, staffId: '__admin__', code: code });
+  }
+};
+
+function queueSync() {
+  if (!sync.enabled()) return;
+  sync.dirty = true;
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(() => sync.run(), 1200);
+}
+
+/* ══════════════════════════════════════════════════════
+   5. 세션 / 라우팅
+   ══════════════════════════════════════════════════════ */
+const session = {
+  get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
+  get isStaffLink() { return !!this.staffId; },
+  get isAdmin() {
+    return !this.isStaffLink && (sessionStorage.getItem('wb_consult_admin') === '1' ||
+      (!!state.settings.adminToken && !state.settings.adminPin));
+  },
+  unlock() { sessionStorage.setItem('wb_consult_admin', '1'); },
+  lock() { sessionStorage.removeItem('wb_consult_admin'); }
+};
+
+let route = 'today';
+let cursor = today();
+let cursorPinned = false;
+let ymCursor = today().slice(0, 7);   // 월간 플래너가 보고 있는 달
+let viewStaff = '';
+const openPanels = new Set();     // 펼쳐진 업무 패널
+
+function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
+window.addEventListener('hashchange', () => {
+  if (/[#&]admin=/.test(location.hash)) { absorbLinkParams(); connectAdminDevice(); return; }
+  // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
+  if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
+  const r = location.hash.replace('#/', '');
+  if (r && r !== route) { route = r; render(); }
+});
+
+function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
+
+let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
+let pendingAdminCode = ''; // 새 원장 기기에서 한 번만 교환할 연결 코드
+
+/** 링크에 담겨 온 것들을 흡수한다.
+ *  s=  동기화 설정 (학생 기기 세팅 대신)
+ *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
+function absorbLinkParams() {
+  const q = new URLSearchParams(location.search);
+  let touched = false;
+
+  const tk = q.get('t');
+  if (tk) { state.settings.myToken = tk; save(); }
+
+  const s = q.get('s');
+  if (s) {
+    try {
+      const cfg = JSON.parse(unb64(s));
+      if (cfg.k) state.settings.syncSecret = cfg.k;
+      // 원장 복구 링크에는 비밀번호도 담긴다 — 새 기기에서 다시 정하지 않아도 되게
+      if (cfg.p && !new URLSearchParams(location.search).get('u')) {
+        state.settings.adminPin = cfg.p;
+        session.unlock();
+      }
+      save();
+    } catch (e) { console.warn('link config', e); }
+    q.delete('s'); touched = true;
+  }
+
+  const adminMatch = location.hash.match(/[#&]admin=([^&]+)/);
+  if (adminMatch) {
+    try { pendingAdminCode = decodeURIComponent(adminMatch[1]); }
+    catch (e) { pendingAdminCode = ''; }
+  }
+
+  // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다
+  let raw = null;
+  const m = location.hash.match(/[#&]add=([^&]+)/);
+  if (m) raw = m[1];
+  else if (q.get('add')) { raw = q.get('add'); q.delete('add'); touched = true; }
+
+  if (raw) {
+    try {
+      const p = JSON.parse(unb64(raw));
+      const list = Array.isArray(p) ? p : (p.assignments || []);
+      if (list.length) pendingAdd = list;
+    } catch (e) { console.warn('link add', e); }
+  }
+
+  if (touched || m || adminMatch) {
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') +
+      ((m || adminMatch) ? '' : location.hash));
+  }
+}
+
+async function connectAdminDevice() {
+  const code = pendingAdminCode;
+  if (!code) return;
+  pendingAdminCode = '';
+  toast('새 컴퓨터 연결 중…');
+  try {
+    const d = await sync.exchangeAdmin(code);
+    state.settings.adminToken = d.token;
+    state.settings.syncSecret = '';
+    state.settings.pullAt = 0;
+    state.settings.pushAt = 0; // 기존 컴퓨터의 미전송 데이터도 서버 LWW로 안전하게 다시 비교한다
+    save(); session.unlock(); render();
+    sync.loud = true;
+    await sync.run();
+    toast('새 컴퓨터 연결 완료');
+  } catch (e) {
+    toast('연결 링크를 사용할 수 없습니다 — ' + e.message);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   6. 렌더 헬퍼
+   ══════════════════════════════════════════════════════ */
+const $ = sel => document.querySelector(sel);
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('on'), 2400);
+}
+function repeatLabel(t) {
+  if (t.repeat === 'once')    return (t.start ? label(t.start) + ' ' : '') + '1회';
+  if (t.repeat === 'daily')   return '매일';
+  if (t.repeat === 'weekday') return '평일(월~금)';
+  if (t.repeat === 'days')    return '매주 ' + (t.days || []).map(d => DOW[d]).join('·');
+  return '';
+}
+const initials = name => String(name || '?').trim().slice(0, 2);
+
+/** 지금 조작하는 사람 */
+const actor = () => session.isStaffLink ? 'staff' : 'admin';
+
+/** 관리자 — 원장이 학생 관리에서 지정한다 (선생님 계정용).
+ *  본인 개인 링크로 들어오면 학생 현황·플래너 발행까지 열린다.
+ *  설정·학생 등록/삭제·항목 수정은 계속 원장 전용이다. */
+const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
+const isManager = () => { const m = meStaff(); return !!(m && m.manager && !m.deleted); };
+
+/** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
+function originTags(t) {
+  if (session.isStaffLink) return '';
+  let h = '';
+  if (t.origin === 'staff') h += '<span class="tag add">학생 추가</span>';
+  else if (t.origin === 'manager') h += '<span class="tag edit">관리자 발행</span>';
+  else if (t.lastEditBy === 'staff') h += '<span class="tag edit">학생 수정</span>';
+  return h;
+}
+
+/** 지시 내용을 고칠 수 있는가.
+ *  원장은 전부. 학생은 자기가 추가한 업무만 — 원장이 내린 지시는 못 건드린다.
+ *  (학생도 체크·단계·수량·메모·막힘은 언제나 가능하다) */
+function canEditTask(t) {
+  if (!session.isStaffLink) return session.isAdmin;
+  return t.origin === 'staff' && t.staffId === session.staffId;
+}
+
+function paintStatus() {
+  const el = $('#whoami');
+  const me = currentStaff();
+  let text, on = false;
+  if (session.isStaffLink) { text = me ? me.name + (isManager() ? ' · 관리자' : ' 학생') : '알 수 없는 링크'; on = !!me; }
+  else if (session.isAdmin) { text = '원장 모드'; on = true; }
+  else { text = '잠김'; }
+  if (sync.busy) text += ' · 동기화중';
+  else if (sync.enabled() && sync.dirty) text += ' · 대기';
+  el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
+  el.classList.toggle('off', !on);
+}
+
+function currentStaff() {
+  if (session.isStaffLink) return staffById(session.staffId);
+  return staffById(viewStaff) || liveStaff()[0] || null;
+}
+
+/* ══════════════════════════════════════════════════════
+   7. 뷰
+   ══════════════════════════════════════════════════════ */
+function render() {
+  paintStatus();
+  renderTabs();
+  const v = $('#view');
+
+  if (session.isStaffLink && !staffById(session.staffId)) {
+    v.innerHTML = '<div class="card"><div class="empty"><b>🔗</b>이 링크에 연결된 학생 정보가 없습니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
+    return;
+  }
+  if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
+
+  if (pendingAdd) {
+    if (session.isStaffLink) { pendingAdd = null; toast('지시서 등록은 원장 화면에서만 됩니다'); }
+    else { v.innerHTML = viewPendingAdd(); return; }
+  }
+
+  // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
+  if (session.isStaffLink) {
+    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'ingang', 'study'];
+    if (!allowed.includes(route)) route = 'today';
+  }
+
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  v.innerHTML = (map[route] || viewToday)();
+}
+
+function renderTabs() {
+  const a = alertsToday();
+  const tabs = session.isStaffLink
+    ? (isManager()
+        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강'], ['study', '학습']])
+    : session.isAdmin
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'],
+         ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
+      : [];
+  $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
+    '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
+    (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join('');
+}
+
+/* ── 링크로 들어온 지시서 확인 ── */
+function viewPendingAdd() {
+  const byStaff = {};
+  pendingAdd.forEach(a => {
+    const n = String(a.staff || '(담당 미지정)').trim();
+    (byStaff[n] = byStaff[n] || []).push(a);
+  });
+  const newNames = Object.keys(byStaff).filter(n => !staffByName(n));
+
+  return '<div class="card mt14">' +
+    '<div class="card-title">지시서 ' + pendingAdd.length + '건을 등록할까요?</div>' +
+    '<div class="card-sub mb14">링크로 전달된 지시서입니다. 내용을 확인하고 등록하세요.</div>' +
+    (newNames.length
+      ? '<div class="guide mb14"><b>새로 등록될 학생</b>' + esc(newNames.join(', ')) + '</div>'
+      : '') +
+    Object.keys(byStaff).map(n =>
+      '<div class="sect">' + esc(n) + ' · ' + byStaff[n].length + '건</div>' +
+      byStaff[n].map(a =>
+        '<div class="task"><div class="task-body">' +
+          '<div class="task-t">' + esc(a.title || '(제목 없음)') + '</div>' +
+          '<div class="meta">' +
+            (a.time ? '<span class="tag time">' + esc(a.time) + '</span>' : '') +
+            (a.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+            ((a.steps || []).length ? '<span class="tag doing">' + a.steps.length + '단계</span>' : '') +
+            (a.guide ? '<span class="tag ok">가이드 있음</span>' : '') +
+            '<span class="tag">' + esc(repeatLabel({
+              repeat: a.repeat || 'once', days: a.days || [], start: a.start || today()
+            })) + '</span>' +
+          '</div></div></div>').join('')
+    ).join('') +
+    '<hr class="sep">' +
+    '<button class="btn btn-primary btn-block mb8" data-act="padd">전부 등록하기</button>' +
+    '<button class="btn btn-ghost btn-block" data-act="pcancel">취소</button>' +
+  '</div>';
+}
+
+/* ── 잠금 ── */
+function viewLock() {
+  const first = !state.settings.adminPin;
+  return '<div class="card mt14">' +
+    '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
+    '<div class="card-sub mb14">' + (first
+      ? '학생에게 나가는 링크와 달리, 이 화면은 지시서를 만들고 현황을 보는 원장 전용입니다. 4자리 이상 비밀번호를 정해 주세요.'
+      : '비밀번호를 입력하면 지시서 작성과 현황 확인 화면이 열립니다.') + '</div>' +
+    '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+    '<button class="btn btn-primary btn-block" data-act="' + (first ? 'setpin' : 'login') + '">' +
+      (first ? '비밀번호 설정하고 시작' : '들어가기') + '</button>' +
+    (!first
+      ? '<button class="btn btn-ghost btn-block mt14" data-act="recoverpin">비밀번호 재설정</button>'
+      : '') +
+    '<hr class="sep">' +
+    (first
+      ? '<div class="hint" style="color:var(--coral)"><b>전에 쓰던 데이터가 있는데 이 화면이 떴다면</b><br>' +
+        '여기서 비밀번호를 정하지 마시고, 즐겨찾기에 저장해둔 <b>원장 복구 링크</b>로 들어오세요. ' +
+        '접속 정보와 비밀번호가 한 번에 복구됩니다.<br>' +
+        '(복구 링크는 설정 화면에서 만듭니다. 데이터는 구글 시트에 있으니 사라지지 않습니다)</div><hr class="sep">'
+      : '') +
+    '<div class="hint">학생분들은 원장님이 보내드린 <b>개인 링크</b>로 들어가면 비밀번호 없이 본인 할 일만 보입니다.</div>' +
+  '</div>';
+}
+
+/* ── 오늘 ── */
+function viewToday() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+
+  const rel = relLabel(cursor);
+  const list = tasksFor(me.id, cursor);
+  const p = progress(me.id, cursor);
+  const editable = session.isStaffLink || session.isAdmin;
+  const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
+    '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
+    '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
+  list.forEach(t => counts[statusOf(t, cursor)]++);
+
+  h += '<div class="card"><div class="prog">' +
+    '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
+    '<div style="flex:1">' +
+      '<div class="card-title">' + esc(me.name) + ' 학생</div>' +
+      '<div class="card-sub mb8">' +
+        (list.length
+          ? '완료 ' + counts.done + ' · 진행중 ' + counts.doing + ' · 미착수 ' + counts.todo +
+            (counts.blocked ? ' · <b style="color:var(--coral)">막힘 ' + counts.blocked + '</b>' : '') +
+            (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '')
+          : '지시된 업무가 없습니다') +
+      '</div>' +
+      '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
+    '</div></div></div>';
+
+  h += tbCard(me, editable);
+
+  if (cursor === today()) h += ingTodayCard(me, editable);
+
+  if (editable && cursor === today()) {
+    h += stCard(me);
+
+    h += '<div class="card" style="padding:12px">' +
+      '<div class="row" style="gap:8px">' +
+        '<input class="in" id="qAdd" placeholder="빠른 추가 — 예) 3시까지 보호자께 전화">' +
+        '<button class="btn btn-primary" data-act="qadd">추가</button>' +
+      '</div></div>';
+  }
+
+  if (carry.length) {
+    h += '<div class="sect">지난 미완료 — 오늘로 넘어왔습니다</div>' +
+      '<div class="card alert">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
+  }
+
+  if (!list.length) {
+    if (!carry.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
+  } else {
+    if (carry.length) h += '<div class="sect">오늘 할 일</div>';
+    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
+  }
+
+  if (editable) {
+    h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
+  }
+  if (session.isStaffLink) {
+    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
+      '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
+  }
+  return h;
+}
+
+function taskRow(t, date, editable, isCarry) {
+  const c = getCheck(t.id, date);
+  const st = statusOf(t, date);
+  const prog = taskProgress(t, c);
+  const hasDetail = (t.steps || []).length || t.guide || t.target;
+  const open = openPanels.has(t.id + '|' + date);
+
+  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
+    '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
+    '<div class="task-body">' +
+      '<div class="task-t">' + esc(t.title) + '</div>' +
+      (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
+      '<div class="meta">' +
+        (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
+        (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+        (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+        (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
+        (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
+        (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
+        (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
+        originTags(t) +
+      '</div>';
+
+  if (hasDetail && st !== 'done') {
+    h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
+  }
+  if (hasDetail) {
+    h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
+      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + ((t.steps || []).length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+  }
+  if (open) h += taskPanel(t, date, c, editable);
+
+  h += (editable
+      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">'
+      : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
+
+  return h + '</div></div>';
+}
+
+function taskPanel(t, date, c, editable) {
+  let h = '<div class="panel">';
+
+  if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
+
+  if ((t.steps || []).length) {
+    h += '<div style="margin-top:10px">' + t.steps.map((s, i) => {
+      const on = !!(c && c.steps && c.steps[s.id]);
+      return '<div class="step ' + (on ? 'on' : '') + '">' +
+        '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
+        '<span>' + (i + 1) + '. ' + esc(s.label) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  if (t.target) {
+    h += '<div class="counter"><span>진행 수량</span>' +
+      '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="-1"' : 'disabled') + '>−</button>' +
+      '<input class="in" type="number" min="0" ' + (editable ? 'data-act="cntset" data-id="' + t.id + '" data-date="' + date + '"' : 'readonly') + ' value="' + ((c && c.count) || 0) + '">' +
+      '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="1"' : 'disabled') + '>＋</button>' +
+      '<span class="muted">/ ' + t.target + esc(t.unit || '건') + '</span></div>';
+  }
+
+  if (editable) {
+    const blocked = !!(c && c.blocked);
+    h += '<div class="row wraprow mt14" style="gap:8px">' +
+      '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + '" ' +
+        'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
+        (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
+      (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '') +
+    '</div>';
+  }
+  return h + '</div>';
+}
+
+function staffSwitcher(activeId) {
+  const list = liveStaff();
+  if (list.length < 2) return '';
+  return '<div class="chips mb14">' + list.map(s =>
+    '<button class="chip ' + (s.id === activeId ? 'on' : '') + '" data-act="pickstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>'
+  ).join('') + '</div>';
+}
+
+function emptyStaffCard() {
+  return '<div class="card"><div class="empty"><b>👥</b>먼저 학생을 등록해 주세요.</div>' +
+    '<button class="btn btn-primary btn-block" data-go="staff">학생 등록하러 가기</button></div>';
+}
+
+/* ══════════════════════════════════════════════════════
+   순공시간 타이머 — 계획(플래너)과 별개로 '실제로 공부한 시간'을 잰다.
+   과목 칩을 누르면 시작, 다시 누르면 정지. 시작 시각만 저장하므로
+   앱을 닫아도 시간이 계속 흐르고, 기기를 바꿔도 이어진다.
+   ══════════════════════════════════════════════════════ */
+const ST_DEFAULT = ['국어', '수학', '영어', '탐구', '기타'];
+const ST_MAX_RUN = 6 * 3600;   // 한 번에 인정하는 최대 시간 — 정지를 깜빡해도 밤새 쌓이지 않는다
+
+const stKey = sid => '__st__' + sid;
+const stOf = (sid, date) => state.checks[stKey(sid) + '|' + date] || null;
+const stSubjects = sid => {
+  const c = state.checks['__stsubj__' + sid + '|all'];
+  return (c && Array.isArray(c.list) && c.list.length) ? c.list : ST_DEFAULT;
+};
+const stGoalMin = sid => {
+  const c = state.checks['__stgoal__' + sid + '|all'];
+  return Number(c && c.mins) || 0;
+};
+const stRunning = (sid, date) => {
+  const c = stOf(sid, date);
+  return (c && c.run && c.run.subj && c.run.since) ? c.run : null;
+};
+/** 그날 과목별 누적 초 — 진행 중인 타이머의 경과분까지 더해서 돌려준다 */
+function stSecs(sid, date) {
+  const c = stOf(sid, date);
+  const out = Object.assign({}, (c && c.secs) || {});
+  const r = stRunning(sid, date);
+  if (r) out[r.subj] = (out[r.subj] || 0) + stElapsed(r);
+  return out;
+}
+const stElapsed = r => Math.min(ST_MAX_RUN, Math.max(0, Math.floor((now() - r.since) / 1000)));
+const stTotal = (sid, date) => Object.values(stSecs(sid, date)).reduce((a, b) => a + b, 0);
+
+function fmtHMS(s) { return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)) + ':' + pad2(s % 60); }
+function fmtHM(s) { return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)); }
+function fmtDur(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? h + '시간 ' + m + '분' : m + '분';
+}
+
+/** 진행 중인 타이머를 정지하고 누적에 반영한다 (내부용) */
+function stFreeze(sid, date) {
+  const c = stOf(sid, date);
+  const secs = Object.assign({}, (c && c.secs) || {});
+  const r = stRunning(sid, date);
+  if (r) secs[r.subj] = (secs[r.subj] || 0) + stElapsed(r);
+  return secs;
+}
+function stStart(sid, date, subj) {
+  setCheck(stKey(sid), date, { secs: stFreeze(sid, date), run: { subj: subj, since: now() }, done: true });
+}
+function stStop(sid, date) {
+  setCheck(stKey(sid), date, { secs: stFreeze(sid, date), run: null, done: true });
+}
+
+function stCard(me) {
+  const date = today();
+  const secs = stSecs(me.id, date);
+  const total = Object.values(secs).reduce((a, b) => a + b, 0);
+  const goal = stGoalMin(me.id) * 60;
+  const pct = goal ? Math.min(100, Math.round(total / goal * 100)) : 0;
+  const r = stRunning(me.id, date);
+  const on = r ? r.subj : '';
+
+  return '<div class="card">' +
+    '<div class="between mb8"><div class="card-title">⏱ 순공시간</div>' +
+      '<div class="row" style="gap:6px">' +
+        (goal ? '<span class="pill ' + (pct >= 100 ? '' : 'warn') + '">목표 ' + fmtDur(goal) + ' · ' + pct + '%</span>' : '') +
+        '<button class="btn btn-sm btn-ghost" data-act="stgoal">🎯</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="stedit">✏️</button>' +
+      '</div></div>' +
+    '<div style="text-align:center;padding:4px 0 12px">' +
+      '<div id="stTot" style="font-size:36px;font-weight:900;letter-spacing:-.02em;color:var(--navy);font-variant-numeric:tabular-nums">' +
+        fmtHMS(total) + '</div>' +
+      (on
+        ? '<div class="small" style="color:var(--blue);font-weight:800">▶ ' + esc(on) + ' 공부 중 — 다시 누르면 정지</div>'
+        : '<div class="small muted">과목을 눌러 시작하세요</div>') +
+    '</div>' +
+    (goal ? '<div class="bar mb8"><i style="width:' + pct + '%"></i></div>' : '') +
+    '<div class="chips">' +
+      stSubjects(me.id).map(s =>
+        '<button class="chip ' + (on === s ? 'on' : '') + '" data-act="sttoggle" data-subj="' + esc(s) + '"' +
+          (on === s ? ' id="stChipOn"' : '') + '>' +
+          (on === s ? '⏸ ' : '▶ ') + esc(s) +
+          (secs[s] ? ' ' + fmtHM(secs[s]) : '') + '</button>').join('') +
+      '<button class="chip" data-act="stsubjadd">＋ 과목</button>' +
+    '</div></div>';
+}
+
+/** 주간 순공 통계 — 일별 막대 + 과목별 합계 */
+function stWeekCard(me, days) {
+  const per = days.map(d => ({ d: d, secs: stTotal(me.id, d) }));
+  const sum = per.reduce((a, x) => a + x.secs, 0);
+  if (!sum) return '';
+  const max = Math.max.apply(null, per.map(x => x.secs)) || 1;
+  const bySubj = {};
+  days.forEach(d => {
+    const s = stSecs(me.id, d);
+    Object.keys(s).forEach(k => { bySubj[k] = (bySubj[k] || 0) + s[k]; });
+  });
+  const goal = stGoalMin(me.id) * 60;
+  const met = goal ? per.filter(x => x.secs >= goal).length : 0;
+
+  return '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">⏱ 이번 주 순공시간</div>' +
+      '<div class="pill">' + fmtDur(sum) + '</div></div>' +
+    '<div class="row" style="align-items:flex-end;gap:6px;height:88px;margin-bottom:6px">' +
+      per.map(x => '<div style="flex:1;text-align:center">' +
+        '<div style="height:64px;display:flex;align-items:flex-end;justify-content:center">' +
+          '<div title="' + fmtDur(x.secs) + '" style="width:70%;border-radius:5px 5px 0 0;background:' +
+            (x.d === today() ? 'var(--navy)' : 'var(--blue)') + ';opacity:' + (x.secs ? 1 : .18) +
+            ';height:' + Math.max(3, Math.round(x.secs / max * 64)) + 'px"></div></div>' +
+        '<div class="small muted" style="margin-top:3px">' + DOW[dowOf(x.d)] + '</div></div>').join('') +
+    '</div>' +
+    '<div class="small muted" style="text-align:center;margin-bottom:10px">하루 평균 ' +
+      fmtDur(Math.round(sum / 7)) + (goal ? ' · 목표 달성 ' + met + '일' : '') + '</div>' +
+    '<hr class="sep">' +
+    Object.keys(bySubj).sort((a, b) => bySubj[b] - bySubj[a]).map(k =>
+      '<div class="between small" style="padding:3px 0"><span>' + esc(k) + '</span>' +
+      '<span class="pill">' + fmtDur(bySubj[k]) + '</span></div>').join('') +
+    '</div>';
+}
+
+/** 과목별 시간 직접 수정 — 정지를 깜빡했거나 앱 없이 공부한 날을 보정한다 */
+function stEditModal(sid) {
+  const date = today();
+  const secs = stSecs(sid, date);
+  modal('⏱ 오늘 공부시간 수정',
+    '<div class="hint mb14">분 단위로 고칠 수 있습니다. 타이머 정지를 깜빡했거나, 앱 없이 공부한 시간을 넣을 때 쓰세요.</div>' +
+    stSubjects(sid).map(s =>
+      '<div class="between mb8"><span class="small">' + esc(s) + '</span>' +
+      '<input class="in" type="number" min="0" style="max-width:120px" data-stedit="' + esc(s) + '" value="' +
+        Math.round((secs[s] || 0) / 60) + '"><span class="small muted">분</span></div>').join(''),
+    '<button class="btn btn-primary btn-block mt14" data-act="stsave">저장</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   인강 플래너
+   원본 앱(Flask+SQLite)의 핵심 설계를 그대로 옮겼다.
+   · 강좌(courses) ↔ 배정(plan)을 분리한다 — 같은 강좌를 여러 학생에게
+     다른 일정으로 배정해도 강의 데이터가 중복되지 않는다.
+   · 강의는 3단계 상태를 갖는다: 미배정 / 배정됨(미완료) / 완료
+   원본에 없던 두 가지를 더했다: 목표일 역산, 밀림 3일 이상 강조.
+   ══════════════════════════════════════════════════════ */
+const ING_PLATFORMS = ['엘리하이', '엠베스트', '메가스터디', '이투스', '대성마이맥', '기타'];
+const ING_LATE_WARN = 3;   // 이 일수 이상 밀리면 강조한다
+
+const ingKey = sid => '__ing__' + sid;          // 강좌·강의 목록
+const ingPlanKey = sid => '__ingp__' + sid;     // 날짜별 배정
+const ingCourses = sid => ((state.checks[ingKey(sid) + '|all'] || {}).courses) || [];
+const ingPlan = (sid, date) => ((state.checks[ingPlanKey(sid) + '|' + date] || {}).items) || [];
+const ingSet = sid => Object.assign({ days: [1, 2, 3, 4, 5], perDay: 2 },
+  (state.checks['__ingset__' + sid + '|all'] || {}).set || {});
+
+function ingSaveCourses(sid, courses) { setCheck(ingKey(sid), 'all', { courses: courses, done: true }); }
+function ingSavePlan(sid, date, items) { setCheck(ingPlanKey(sid), date, { items: items, done: true }); }
+const ingPlanDates = sid => {
+  const pre = ingPlanKey(sid) + '|';
+  return Object.keys(state.checks).filter(k => k.startsWith(pre)).map(k => k.slice(pre.length)).sort();
+};
+
+/** 배정 현황 — 'courseId|seq' → {date, done} */
+function ingAssigned(sid) {
+  const map = {};
+  ingPlanDates(sid).forEach(d => {
+    ingPlan(sid, d).forEach(it => { map[it.cid + '|' + it.seq] = { date: d, done: !!it.done }; });
+  });
+  return map;
+}
+function ingLec(sid, cid, seq) {
+  const c = ingCourses(sid).find(x => x.id === cid);
+  if (!c) return null;
+  const l = (c.lectures || []).find(x => Number(x.seq) === Number(seq));
+  return l ? { course: c, lec: l } : null;
+}
+function ingStats(sid, c, asg) {
+  asg = asg || ingAssigned(sid);
+  const lecs = c.lectures || [];
+  let assigned = 0, done = 0;
+  lecs.forEach(l => {
+    const a = asg[c.id + '|' + l.seq];
+    if (a) { assigned++; if (a.done) done++; }
+  });
+  return { total: lecs.length, assigned: assigned, done: done,
+    unassigned: lecs.length - assigned, pct: lecs.length ? Math.round(done / lecs.length * 100) : 0 };
+}
+
+/** 커리큘럼 텍스트 파서 — 사이트별이 아니라 패턴 기반이라 개편에 안 깨진다.
+ *  "1강 다항식의 덧셈 52분" / "01. 제목 (52:30)" 같은 형태를 모두 받는다. */
+function ingParse(text) {
+  const out = [];
+  String(text || '').split('\n').forEach(line => {
+    const s = line.trim();
+    if (!s) return;
+    const m = s.match(/^(\d{1,3})\s*(?:강|회|차|교시)?\s*[.)\]:-]?\s*(.*)$/);
+    if (!m) return;
+    let rest = (m[2] || '').trim(), min = null;
+    const t = rest.match(/[\s(\[]*(\d{1,3})\s*분(?:\s*\d{1,2}\s*초)?[)\]]*\s*$/)
+           || rest.match(/[\s(\[]*(\d{1,3}):(\d{2})[)\]]*\s*$/);
+    if (t) { min = Number(t[1]); rest = rest.slice(0, t.index).trim(); }
+    rest = rest.replace(/[\s\-–—·|,]+$/, '').trim();
+    out.push({ seq: Number(m[1]), title: rest || (m[1] + '강'), min: min });
+  });
+  return out;
+}
+
+/** count개를 start부터 지정 요일에 하루 perDay개씩 배정한 날짜 목록 (원본 assign_dates 이식) */
+function ingAssignDates(count, start, weekdays, perDay) {
+  const out = [];
+  let d = start, guard = 0;
+  perDay = Math.max(1, perDay);
+  const wd = (weekdays && weekdays.length) ? weekdays : [0, 1, 2, 3, 4, 5, 6];
+  while (out.length < count && guard < 1100) {
+    if (wd.includes(dowOf(d))) {
+      const n = Math.min(perDay, count - out.length);
+      for (let i = 0; i < n; i++) out.push(d);
+    }
+    d = addDays(d, 1); guard++;
+  }
+  return out;
+}
+/** 목표일 역산 — 원본에 없던 기능. "8/30까지 끝내려면 하루 몇 강?" */
+function ingPerDayFor(count, start, end, weekdays) {
+  const wd = (weekdays && weekdays.length) ? weekdays : [0, 1, 2, 3, 4, 5, 6];
+  let days = 0, d = start, guard = 0;
+  while (d <= end && guard < 1100) { if (wd.includes(dowOf(d))) days++; d = addDays(d, 1); guard++; }
+  return days ? Math.ceil(count / days) : count;
+}
+
+function ingToggle(sid, date, cid, seq) {
+  const items = ingPlan(sid, date).map(x =>
+    (x.cid === cid && Number(x.seq) === Number(seq)) ? Object.assign({}, x, { done: !x.done }) : x);
+  ingSavePlan(sid, date, items);
+}
+
+/** 오늘 이전 미완료를 전부 오늘로 — 따라잡기용 */
+function ingCatchup(sid) {
+  const t = today(), moved = [];
+  ingPlanDates(sid).forEach(d => {
+    if (d >= t) return;
+    const items = ingPlan(sid, d);
+    const late = items.filter(x => !x.done);
+    if (!late.length) return;
+    moved.push.apply(moved, late);
+    ingSavePlan(sid, d, items.filter(x => x.done));
+  });
+  if (moved.length) ingSavePlan(sid, t, ingPlan(sid, t).concat(moved));
+  return moved.length;
+}
+/** 기준일 이후 미완료를 통째로 ±N일 이동 — 시험기간용 */
+function ingShift(sid, from, n) {
+  const buckets = {};
+  let cnt = 0;
+  ingPlanDates(sid).forEach(d => {
+    if (d < from) return;
+    const items = ingPlan(sid, d);
+    const move = items.filter(x => !x.done);
+    if (!move.length) return;
+    ingSavePlan(sid, d, items.filter(x => x.done));
+    const nd = addDays(d, n);
+    (buckets[nd] = buckets[nd] || []).push.apply(buckets[nd], move);
+    cnt += move.length;
+  });
+  Object.keys(buckets).forEach(d => ingSavePlan(sid, d, ingPlan(sid, d).concat(buckets[d])));
+  return cnt;
+}
+
+/** 오늘 화면용 — 밀린 것과 오늘 것 */
+function ingTodayItems(sid) {
+  const t = today(), overdue = [];
+  ingPlanDates(sid).forEach(d => {
+    if (d >= t) return;
+    ingPlan(sid, d).forEach(x => { if (!x.done) overdue.push(Object.assign({}, x, { date: d })); });
+  });
+  overdue.sort((a, b) => a.date.localeCompare(b.date));
+  return { overdue: overdue, todays: ingPlan(sid, t).map(x => Object.assign({}, x, { date: t })) };
+}
+
+function ingRow(sid, it, editable) {
+  const f = ingLec(sid, it.cid, it.seq);
+  const late = it.date < today() ? Math.round((parseYmd(today()) - parseYmd(it.date)) / 86400000) : 0;
+  return '<div class="task ' + (it.done ? 'done' : '') + '">' +
+    '<button class="box" ' + (editable
+      ? 'data-act="ingcheck" data-sid="' + sid + '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"'
+      : 'disabled') + '>✓</button>' +
+    '<div class="task-body"><div class="task-t">' +
+      (f ? esc(f.course.name) + ' ' + it.seq + '강' : '(삭제된 강좌) ' + it.seq + '강') + '</div>' +
+      (f && f.lec.title ? '<div class="task-d">' + esc(f.lec.title) + '</div>' : '') +
+      '<div class="meta">' +
+        (f && f.lec.min ? '<span class="tag time">' + f.lec.min + '분</span>' : '') +
+        (f && f.course.platform ? '<span class="tag">' + esc(f.course.platform) + '</span>' : '') +
+        (late ? '<span class="tag ' + (late >= ING_LATE_WARN ? 'carry' : '') + '">' +
+          shortDate(it.date) + ' · ' + late + '일 밀림</span>' : '') +
+      '</div></div></div>';
+}
+
+/** 오늘 화면에 붙는 인강 카드 */
+function ingTodayCard(me, editable) {
+  const { overdue, todays } = ingTodayItems(me.id);
+  if (!overdue.length && !todays.length) return '';
+  const bad = overdue.filter(x => Math.round((parseYmd(today()) - parseYmd(x.date)) / 86400000) >= ING_LATE_WARN).length;
+  let h = '';
+  if (overdue.length) {
+    h += '<div class="card alert"><div class="between mb8">' +
+      '<div class="card-title" style="color:var(--coral)">🎬 먼저 듣자! — 밀린 인강 ' + overdue.length + '강</div>' +
+      (bad ? '<span class="pill bad">' + ING_LATE_WARN + '일 이상 ' + bad + '강</span>' : '') + '</div>' +
+      overdue.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
+  }
+  if (todays.length) {
+    const done = todays.filter(x => x.done).length;
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">🎬 오늘 인강</div>' +
+      '<div class="pill' + (done === todays.length ? '' : ' warn') + '">' + done + ' / ' + todays.length + '강</div></div>' +
+      todays.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
+  }
+  return h;
+}
+
+/* ── 인강 탭 ── */
+function viewIngang() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const admin = session.isAdmin || isManager();
+  const courses = ingCourses(me.id);
+  const asg = ingAssigned(me.id);
+  const set = ingSet(me.id);
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  const { overdue } = ingTodayItems(me.id);
+  if (overdue.length) {
+    h += '<div class="card alert"><div class="between">' +
+      '<div class="card-title" style="color:var(--coral)">밀린 인강 ' + overdue.length + '강</div>' +
+      (admin ? '<button class="btn btn-sm btn-warn" data-act="ingcatchup">전부 오늘로</button>' : '') +
+      '</div></div>';
+  }
+
+  if (admin) {
+    h += '<div class="card"><div class="card-title mb8">강좌 관리</div>' +
+      '<div class="card-sub mb14">배정 요일 ' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '미설정') +
+        ' · 하루 ' + set.perDay + '강 <button class="btn btn-sm btn-ghost" data-act="ingset">변경</button></div>' +
+      '<div class="row wraprow" style="gap:8px">' +
+        '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="ingshift">📅 일정 밀기</button>' +
+      '</div></div>';
+  }
+
+  if (!courses.length) {
+    return h + '<div class="card"><div class="empty"><b>🎬</b>등록된 강좌가 없습니다.' +
+      (admin ? '<br>강좌를 등록하고 커리큘럼을 붙여넣으세요.' : '') + '</div></div>';
+  }
+
+  // 앞으로 2주 일정 — 배정이 실제로 언제 잡혔는지 눈으로 확인할 수 있어야 한다
+  {
+    const up = [];
+    for (let i = 0; i < 14; i++) {
+      const d = addDays(today(), i);
+      const items = ingPlan(me.id, d);
+      if (items.length) up.push({ d: d, n: items.length, done: items.filter(x => x.done).length });
+    }
+    const total = up.reduce((a, x) => a + x.n, 0);
+    h += '<div class="card"><div class="between mb8">' +
+      '<div class="card-title">📅 앞으로 2주</div>' +
+      '<div class="pill' + (total ? '' : ' warn') + '">' + (total ? total + '강 예정' : '예정 없음') + '</div></div>' +
+      (up.length
+        ? '<div class="row wraprow" style="gap:6px">' + up.map(x =>
+            '<button class="chip' + (x.d === today() ? ' on' : '') + '" data-act="daypick" data-date="' + x.d + '">' +
+            shortDate(x.d) + '(' + DOW[dowOf(x.d)] + ') ' + x.done + '/' + x.n + '</button>').join('') + '</div>' +
+          '<div class="hint" style="margin-top:10px">날짜를 누르면 그날 할 일 화면으로 갑니다.</div>'
+        : '<div class="small muted">배정된 강의가 앞으로 2주 안에 없습니다. ' +
+          '배정 요일(' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '미설정') + ')을 확인해 보세요.</div>') +
+      '</div>';
+  }
+
+  courses.forEach(c => {
+    const s = ingStats(me.id, c, asg);
+    h += '<div class="card"><div class="between mb8">' +
+      '<div><div class="card-title">' + esc(c.name) + '</div>' +
+      '<div class="small muted">' + esc(c.platform || '') + ' · 총 ' + s.total + '강</div></div>' +
+      '<div class="pill' + (s.pct >= 100 ? '' : s.pct >= 50 ? ' warn' : ' bad') + '">' + s.pct + '%</div></div>' +
+      '<div class="bar mb8"><i style="width:' + s.pct + '%"></i></div>' +
+      '<div class="between small"><span class="muted">완료 ' + s.done + ' · 배정 ' + s.assigned +
+        ' · <b>미배정 ' + s.unassigned + '</b></span>' +
+      (admin
+        ? '<span class="row" style="gap:6px">' +
+            (s.unassigned ? '<button class="btn btn-sm btn-primary" data-act="ingassign" data-cid="' + esc(c.id) + '">배정</button>' : '') +
+            '<button class="btn btn-sm btn-ghost" data-act="ingdel" data-cid="' + esc(c.id) + '">삭제</button></span>'
+        : '') +
+      '</div></div>';
+  });
+
+  h += '<div class="hint">미배정 = 강의는 등록됐지만 아직 들을 날짜가 안 잡힌 것입니다. ' +
+    '[배정]을 누르면 요일·하루 강수에 맞춰 날짜가 자동으로 잡힙니다.</div>';
+  return h;
+}
+
+function ingAddModal() {
+  modal('🎬 강좌 등록',
+    '<input class="in mb8" id="ingName" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
+    '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
+      ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
+        '" data-act="ingpf" data-v="' + p + '">' + p + '</button>').join('') + '</div>' +
+    '<hr class="sep"><div class="fl mb8">① 강좌 찾기 — 이름으로 검색</div>' +
+    '<div class="row mb8"><input class="in" id="ingQ" placeholder="예: 현우진 뉴런 수학1">' +
+      '<button class="btn btn-sm btn-navy" data-act="ingsearch">검색</button></div>' +
+    '<div id="ingHits" class="small muted mb14">플랫폼을 고르고 강좌명을 검색하면 주소를 찾아줍니다.</div>' +
+    '<div class="fl mb8">② 또는 강좌 주소를 직접</div>' +
+    '<div class="row mb14"><input class="in" id="ingUrl" placeholder="https://...">' +
+      '<button class="btn btn-sm btn-navy" data-act="ingfetch">가져오기</button></div>' +
+    '<div class="fl mb8">③ 커리큘럼 (자동으로 채워집니다)</div>' +
+    '<textarea class="in" id="ingText" rows="8" placeholder="1강 다항식의 덧셈과 뺄셈 52분&#10;2강 다항식의 곱셈 47분&#10;3강 곱셈 공식 (51:20)"></textarea>' +
+    '<div class="hint">자동으로 못 읽는 사이트도 있습니다(로그인 필요·자바스크립트로 그리는 페이지). ' +
+      '그럴 때는 사이트에서 목차를 복사해 위 칸에 그대로 붙여넣으면 됩니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="ingsave">등록</button>');
+}
+
+/** 주소에서 목차를 가져와 ③ 칸을 채운다 */
+function ingFetch() {
+  const url = ($('#ingUrl').value || '').trim();
+  if (!url) return toast('강좌 주소를 넣어주세요');
+  $('#ingHits').textContent = '목차를 가져오는 중…';
+  sync.post('/curriculum', { app: SYNC_APP, auth: sync.auth(), url: url })
+    .then(d => {
+      if (!d.text) { $('#ingHits').textContent = d.hint || '목차를 찾지 못했습니다.'; return; }
+      $('#ingText').value = d.text;
+      const n = ingParse(d.text).length;
+      $('#ingHits').textContent = '✓ ' + n + '강을 읽었습니다. 아래에서 확인하고 등록하세요.';
+      if (!($('#ingName').value || '').trim()) {
+        $('#ingName').value = decodeURIComponent(url).split('/').pop().slice(0, 40);
+      }
+    })
+    .catch(e => { $('#ingHits').textContent = '가져오기 실패 — ' + e.message; });
+}
+
+function ingAssignModal(sid, cid) {
+  const c = ingCourses(sid).find(x => x.id === cid);
+  if (!c) return;
+  const asg = ingAssigned(sid);
+  const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]);
+  const set = ingSet(sid);
+  modal('📅 ' + c.name + ' 배정',
+    '<div class="card-sub mb14">미배정 <b>' + left.length + '강</b>을 날짜에 나눠 넣습니다.</div>' +
+    '<div class="fl mb8">시작일</div><input class="in mb14" type="date" id="ingStart" value="' + today() + '">' +
+    '<div class="fl mb8">요일</div><div class="chips mb14" id="ingDays">' +
+      DOW.map((d, i) => '<button type="button" class="chip ' + (set.days.includes(i) ? 'on' : '') +
+        '" data-act="ingday" data-v="' + i + '">' + d + '</button>').join('') + '</div>' +
+    '<div class="fl mb8">하루 몇 강</div>' +
+    '<div class="row mb8"><input class="in" type="number" min="1" id="ingPer" value="' + set.perDay + '" style="max-width:100px">' +
+      '<span class="small muted">강씩</span></div>' +
+    '<hr class="sep"><div class="fl mb8">또는 목표 완료일로 역산</div>' +
+    '<div class="row"><input class="in" type="date" id="ingEnd">' +
+      '<button class="btn btn-sm btn-ghost" data-act="ingcalc">계산</button></div>' +
+    '<div class="hint" id="ingCalcOut">목표일을 넣고 [계산]을 누르면 하루 강수가 자동으로 채워집니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="ingdo" data-cid="' + esc(cid) + '">배정하기</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   타임블록 — "몇 시에 뭘 할지"를 시간 칸에 배치한다.
+   할 일 목록(체크리스트)과 다른 축이라 따로 둔다.
+   블록을 누르면 그 과목 타이머가 바로 시작돼 계획과 실측이 이어진다.
+   ══════════════════════════════════════════════════════ */
+const tbKey = sid => '__tb__' + sid;
+const tbOf = (sid, date) => (((state.checks[tbKey(sid) + '|' + date] || {}).blocks) || [])
+  .slice().sort((a, b) => String(a.s).localeCompare(String(b.s)));
+const tbSave = (sid, date, blocks) => setCheck(tbKey(sid), date, { blocks: blocks, done: true });
+
+function tbCard(me, editable) {
+  const blocks = tbOf(me.id, cursor);
+  const isToday = cursor === today();
+  const hm = nowHM();
+  let h = '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">🗓 시간표</div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="tbadd">＋ 시간 추가</button>' : '') + '</div>';
+
+  if (!blocks.length) {
+    h += '<div class="small muted">아직 짜둔 시간이 없습니다.' +
+      (editable ? ' 몇 시에 무엇을 할지 넣어보세요.' : '') + '</div></div>';
+    return h;
+  }
+  h += blocks.map((b, i) => {
+    const nowOn = isToday && b.s <= hm && hm < b.e;
+    return '<div class="between" style="padding:7px 0;border-bottom:1px solid var(--light-gray)' +
+      (nowOn ? ';background:#EAF6FC;border-radius:8px;padding-left:8px;padding-right:8px' : '') + '">' +
+      '<span class="row" style="gap:10px">' +
+        '<b class="small" style="font-variant-numeric:tabular-nums;color:var(--navy)">' + esc(b.s) + '~' + esc(b.e) + '</b>' +
+        '<span>' + esc(b.label) + (nowOn ? ' <span class="pill">지금</span>' : '') + '</span></span>' +
+      (editable
+        ? '<span class="row" style="gap:6px">' +
+            (b.subj ? '<button class="btn btn-sm btn-navy" data-act="tbstart" data-subj="' + esc(b.subj) + '">▶ 시작</button>' : '') +
+            '<button class="btn btn-sm btn-ghost" data-act="tbdel" data-i="' + i + '">×</button></span>'
+        : '') +
+      '</div>';
+  }).join('');
+  const mins = blocks.reduce((a, b) => {
+    const p = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+    return a + Math.max(0, p(b.e) - p(b.s));
+  }, 0);
+  h += '<div class="small muted" style="margin-top:10px">계획 ' + fmtDur(mins * 60) +
+    (isToday ? ' · 실제 ' + fmtDur(stTotal(me.id, cursor)) : '') + '</div></div>';
+  return h;
+}
+
+function tbAddModal(me) {
+  modal('🗓 시간 추가',
+    '<div class="row mb14"><input class="in" type="time" id="tbS" value="' + nowHM() + '">' +
+      '<span class="muted">~</span><input class="in" type="time" id="tbE"></div>' +
+    '<input class="in mb14" id="tbL" placeholder="무엇을 할지 (예: 수학 개념 3단원)">' +
+    '<div class="fl mb8">과목 (선택 — 고르면 시간표에서 바로 타이머를 켤 수 있어요)</div>' +
+    '<div class="chips" id="tbSubj">' +
+      stSubjects(me.id).map(s => '<button type="button" class="chip" data-act="tbsubj" data-v="' + esc(s) + '">' + esc(s) + '</button>').join('') +
+    '</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="tbsave">추가</button>');
+}
+
+/* ══════════════════════════════════════════════════════
+   회독 — 같은 교재를 몇 번 돌렸는지. 목표 회독수 대비 진행을 본다.
+   ══════════════════════════════════════════════════════ */
+const rdKey = sid => '__rd__' + sid;
+const rdItems = sid => ((state.checks[rdKey(sid) + '|all'] || {}).items) || [];
+const rdSave = (sid, items) => setCheck(rdKey(sid), 'all', { items: items, done: true });
+
+/* ══════════════════════════════════════════════════════
+   오답노트 — 틀린 문제를 기록하고 3일·7일 뒤에 다시 띄운다.
+   등록일에 저장하고, 복습 횟수(rv)로 다음 복습일을 정한다.
+   ══════════════════════════════════════════════════════ */
+const WN_REVIEW = [3, 7];   // 등록 후 며칠 뒤에 다시 볼지
+const wnKey = sid => '__wn__' + sid;
+const wnOf = (sid, date) => ((state.checks[wnKey(sid) + '|' + date] || {}).items) || [];
+const wnDates = sid => {
+  const pre = wnKey(sid) + '|';
+  return Object.keys(state.checks).filter(k => k.startsWith(pre)).map(k => k.slice(pre.length)).sort();
+};
+function wnAll(sid) {
+  const out = [];
+  wnDates(sid).forEach(d => wnOf(sid, d).forEach(x => out.push(Object.assign({}, x, { date: d }))));
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+/** 오늘 다시 볼 오답 — 복습 회차별로 예정일이 지났고 아직 안 본 것 */
+function wnDue(sid) {
+  const t = today();
+  return wnAll(sid).filter(x => {
+    if (x.fixed) return false;
+    const rv = x.rv || 0;
+    return rv < WN_REVIEW.length && addDays(x.date, WN_REVIEW[rv]) <= t;
+  });
+}
+function wnPatch(sid, date, id, patch) {
+  wnOf(sid, date).length && setCheck(wnKey(sid), date, {
+    items: wnOf(sid, date).map(x => x.id === id ? Object.assign({}, x, patch) : x), done: true
+  });
+}
+
+function wnRow(sid, x, editable) {
+  const rv = x.rv || 0;
+  return '<div class="task ' + (x.fixed ? 'done' : '') + '">' +
+    '<button class="box" ' + (editable
+      ? 'data-act="wnfix" data-date="' + x.date + '" data-id="' + esc(x.id) + '"' : 'disabled') + '>✓</button>' +
+    '<div class="task-body"><div class="task-t">' + esc(x.note) + '</div>' +
+      '<div class="meta">' +
+        (x.subj ? '<span class="tag">' + esc(x.subj) + '</span>' : '') +
+        (x.src ? '<span class="tag">' + esc(x.src) + '</span>' : '') +
+        '<span class="tag time">' + shortDate(x.date) + '</span>' +
+        (x.fixed ? '<span class="tag ok">해결</span>'
+          : '<span class="tag ' + (rv ? 'doing' : '') + '">복습 ' + rv + '/' + WN_REVIEW.length + '</span>') +
+      '</div>' +
+      (editable && !x.fixed && (x.rv || 0) < WN_REVIEW.length
+        ? '<button class="btn btn-sm btn-ghost mt8" data-act="wnrv" data-date="' + x.date + '" data-id="' + esc(x.id) + '">다시 봤어요</button>'
+        : '') +
+    '</div></div>';
+}
+
+/* ── 학습 탭 (회독 · 오답노트) ── */
+function viewStudy() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const editable = session.isStaffLink || session.isAdmin;
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  // 오늘 복습할 오답 먼저
+  const due = wnDue(me.id);
+  if (due.length) {
+    h += '<div class="card alert"><div class="card-title mb8" style="color:var(--coral)">' +
+      '🔁 오늘 다시 볼 오답 ' + due.length + '개</div>' +
+      due.map(x => wnRow(me.id, x, editable)).join('') + '</div>';
+  }
+
+  // 회독
+  const items = rdItems(me.id);
+  h += '<div class="card"><div class="between mb8"><div class="card-title">📚 회독</div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="rdadd">＋ 교재</button>' : '') + '</div>' +
+    (items.length
+      ? items.map((it, i) => {
+          const pct = it.target ? Math.min(100, Math.round(it.done / it.target * 100)) : 0;
+          return '<div style="padding:7px 0">' +
+            '<div class="between mb8"><span>' + esc(it.name) + '</span>' +
+            '<span class="row" style="gap:6px"><span class="pill' + (pct >= 100 ? '' : ' warn') + '">' +
+              it.done + ' / ' + it.target + '회독</span>' +
+            (editable
+              ? '<button class="btn btn-sm btn-primary" data-act="rdup" data-i="' + i + '">＋1</button>' +
+                '<button class="btn btn-sm btn-ghost" data-act="rddel" data-i="' + i + '">×</button>'
+              : '') + '</span></div>' +
+            '<div class="bar mini"><i style="width:' + pct + '%"></i></div></div>';
+        }).join('')
+      : '<div class="small muted">등록된 교재가 없습니다. 몇 회독을 목표로 할지 정해두면 진행이 보입니다.</div>') +
+    '</div>';
+
+  // 오답노트 전체
+  const all = wnAll(me.id);
+  const open = all.filter(x => !x.fixed);
+  h += '<div class="card"><div class="between mb8"><div class="card-title">✏️ 오답노트</div>' +
+    '<span class="row" style="gap:6px"><span class="pill' + (open.length ? ' warn' : '') + '">미해결 ' + open.length + '</span>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="wnadd">＋ 오답</button>' : '') + '</span></div>' +
+    (all.length
+      ? all.slice(0, 30).map(x => wnRow(me.id, x, editable)).join('')
+      : '<div class="small muted">틀린 문제를 한 줄로 남겨두면 3일·7일 뒤에 다시 띄워줍니다.</div>') +
+    '</div>';
+
+  return h;
+}
+
+function rdAddModal() {
+  modal('📚 회독 교재 추가',
+    '<input class="in mb14" id="rdName" placeholder="교재 이름 (예: 수학의 정석 상)">' +
+    '<div class="fl mb8">목표 회독수</div>' +
+    '<input class="in" type="number" min="1" max="20" id="rdTarget" value="3" style="max-width:110px">',
+    '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
+}
+function wnAddModal(me) {
+  modal('✏️ 오답 추가',
+    '<input class="in mb14" id="wnNote" placeholder="어떤 문제였는지 한 줄로 (예: 이차함수 최댓값 조건 놓침)">' +
+    '<input class="in mb14" id="wnSrc" placeholder="출처 (예: 쎈 3단원 42번) — 선택">' +
+    '<div class="fl mb8">과목</div><div class="chips" id="wnSubj">' +
+      stSubjects(me.id).map(s => '<button type="button" class="chip" data-act="wnsubj" data-v="' + esc(s) + '">' + esc(s) + '</button>').join('') +
+    '</div>' +
+    '<div class="hint">등록하면 3일 뒤, 7일 뒤에 자동으로 다시 띄워줍니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="wnsave">추가</button>');
+}
+
+/* ── 주간 플래너 ── */
+function viewWeek() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const mon = mondayOf(cursor);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const rows = {};
+  days.forEach(d => tasksFor(me.id, d).forEach(t => { rows[t.id] = t; }));
+  const list = Object.values(rows);
+  const wp = weekProgress(me.id, cursor);
+  const editable = session.isStaffLink || session.isAdmin;
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="week" data-n="-1">‹</button>' +
+    '<div class="d">' + shortDate(mon) + ' ~ ' + shortDate(days[6]) + '</div>' +
+    '<button class="navbtn" data-act="week" data-n="1">›</button></div>';
+
+  h += '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">이번 주 달성률</div>' +
+    '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
+    '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
+
+  h += stWeekCard(me, days);
+
+  if (!list.length) return h + '<div class="card"><div class="empty"><b>📋</b>이 주에 지시된 업무가 없습니다.</div></div>';
+
+  h += '<div class="card weekwrap"><table class="week"><thead><tr><th class="n">업무</th>' +
+    days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    list.map(t => '<tr><td class="n">' + esc(t.title) + '</td>' +
+      days.map(d => {
+        if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
+        const st = statusOf(t, d);
+        const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
+        return '<td><button class="dot ' + cls + '" ' +
+          (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
+      }).join('') + '</tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
+  return h;
+}
+
+/* ── 월간 플래너 ── */
+function viewMonth() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const ym = ymCursor;
+  const dates = monthDates(ym);
+  const mp = monthProgress(me.id, ym);
+  const goals = goalsFor(me.id, ym);
+  const editable = session.isStaffLink || session.isAdmin;
+
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += '<div class="datenav">' +
+    '<button class="navbtn" data-act="mnav" data-n="-1">‹</button>' +
+    '<div class="d">' + ymLabel(ym) + '</div>' +
+    '<button class="navbtn" data-act="mnav" data-n="1">›</button></div>';
+
+  /* 이달의 목표 */
+  h += '<div class="card"><div class="between mb8"><div class="card-title">🎯 이달의 목표</div>' +
+    (goals.length ? '<div class="pill">' + goals.filter(g => isDone(g.id, ym)).length + ' / ' + goals.length + '</div>' : '') +
+    '</div>';
+  if (!goals.length) h += '<div class="card-sub mb8">이번 달에 이루고 싶은 목표를 적어두세요. (예: 책 2권 읽기, 수학 오답 30개)</div>';
+  h += goals.map(g => {
+    const c = getCheck(g.id, ym);
+    const p = taskProgress(g, c);
+    const done = c && c.done;
+    return '<div class="task' + (done ? ' done' : '') + '"><div class="task-body">' +
+      '<div class="task-t">' + esc(g.title) + '</div>' +
+      '<div class="meta">' +
+        (g.target ? '<span class="tag ' + (done ? 'ok' : 'doing') + '">' + p.done + ' / ' + p.total + (g.unit || '') + '</span>' : '') +
+        (g.origin === 'staff' ? '<span class="tag add">학생 추가</span>' : '') +
+      '</div>' +
+      (g.target ? '<div class="bar" style="margin-top:8px"><i style="width:' + p.pct + '%"></i></div>' : '') +
+      '</div>' +
+      (editable
+        ? (g.target
+            ? '<button class="btn btn-sm" data-act="cnt" data-id="' + g.id + '" data-date="' + ym + '" data-n="1">＋1</button>' +
+              '<button class="btn btn-sm btn-ghost" data-act="cnt" data-id="' + g.id + '" data-date="' + ym + '" data-n="-1">－</button>'
+            : '<button class="btn btn-sm ' + (done ? 'btn-ghost' : 'btn-primary') + '" data-act="toggle" data-id="' + g.id + '" data-date="' + ym + '">' + (done ? '취소' : '완료') + '</button>') +
+          (canEditTask(g) ? '<button class="btn btn-sm btn-danger" data-act="gdel" data-id="' + g.id + '">삭제</button>' : '')
+        : '') +
+      '</div>';
+  }).join('');
+  if (editable) {
+    h += '<hr class="sep">' +
+      '<div class="field"><input class="in" id="gTitle" placeholder="목표 (예: 책 2권 읽기)"></div>' +
+      '<div class="row">' +
+        '<input class="in" id="gTarget" type="number" inputmode="numeric" placeholder="목표 수량 (선택)">' +
+        '<input class="in" id="gUnit" placeholder="단위 (권·회·쪽)" style="max-width:110px">' +
+        '<button class="btn btn-primary" data-act="gadd">추가</button>' +
+      '</div>' +
+      '<div class="hint">수량을 넣으면 ＋1 버튼으로 세면서 채웁니다. 다 채우면 자동 완료.</div>';
+  }
+  h += '</div>';
+
+  /* 이번 달 달성률 */
+  h += '<div class="card"><div class="between mb8">' +
+    '<div class="card-title">이번 달 달성률</div>' +
+    '<div class="pill">' + mp.done + ' / ' + mp.total + '건 · ' + mp.pct + '%</div></div>' +
+    '<div class="bar"><i style="width:' + mp.pct + '%"></i></div></div>';
+
+  /* 달력 */
+  const firstDow = (dowOf(dates[0]) + 6) % 7;   // 월요일 시작
+  let cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push('<td></td>');
+  dates.forEach(d => {
+    const p = progress(me.id, d);
+    let cls = '', mark = '';
+    if (p.total > 0) {
+      if (p.done >= p.total) { cls = 'done'; mark = p.done; }
+      else if (d < today()) { cls = 'miss'; mark = p.done + '/' + p.total; }
+      else if (p.done > 0) { cls = 'doing'; mark = p.done + '/' + p.total; }
+      else { cls = 'has'; mark = p.total; }
+    }
+    cells.push('<td><button class="calday ' + cls + (d === today() ? ' today' : '') + '" data-act="daypick" data-date="' + d + '">' +
+      '<b>' + Number(d.slice(8)) + '</b>' + (mark !== '' ? '<small>' + mark + '</small>' : '') + '</button></td>');
+  });
+  while (cells.length % 7) cells.push('<td></td>');
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push('<tr>' + cells.slice(i, i + 7).join('') + '</tr>');
+
+  h += '<div class="card"><div class="card-title mb8">달력</div>' +
+    '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead>' +
+    '<tbody>' + rows.join('') + '</tbody></table>' +
+    '<div class="hint">날짜를 누르면 그날의 할 일로 이동합니다. 🔵 전부 완료 · 🟠 진행중 · 🩷 미완료 · 회색 숫자는 할 일 개수.</div></div>';
+
+  return h;
+}
+
+/* ── 지시서 작성 ── */
+let draft = [];
+const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '', carry: true };
+
+function viewWrite() {
+  const list = liveStaff();
+  if (!list.length) return emptyStaffCard();
+
+  return '<div class="card">' +
+    '<div class="between mb8"><div class="card-title">AI가 짜준 지시서 넣기</div></div>' +
+    '<div class="card-sub mb14">담당 배정·단계·수행 가이드까지 정리된 JSON을 붙여넣으면 한 번에 등록됩니다.</div>' +
+    '<button class="btn btn-navy btn-block mb8" data-act="aiopen">📋 JSON 붙여넣어 등록하기</button>' +
+    '<button class="btn btn-ghost btn-block" data-act="kopen">💬 카톡 문장 붙여넣기</button>' +
+    '<div class="hint" style="margin-top:8px">이미 카톡으로 보낸 지시를 그대로 옮길 때 쓰세요.</div>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">업무 지시 직접 추가</div>' +
+    '<div class="card-sub mb14">한 항목씩 담고, 마지막에 한 번에 발행합니다.</div>' +
+
+    '<div class="field"><label class="fl">받는 학생 (여러 명 선택 가능)</label>' +
+      '<div class="chips" id="wStaff">' + list.map(s =>
+        '<button type="button" class="chip ' + (wForm.staff.includes(s.id) ? 'on' : '') + '" data-act="wstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field"><label class="fl">업무 내용</label>' +
+      '<input class="in" id="wTitle" placeholder="예) 스터디포스 구독 CS 전화 (1차)"></div>' +
+
+    '<div class="field"><label class="fl">한 줄 설명 (선택)</label>' +
+      '<textarea class="in" id="wDetail" placeholder="예) 이번 주 신규 구독 12명 대상"></textarea></div>' +
+
+    '<div class="field"><label class="fl">수행 가이드 — 어떻게 하는지 (선택)</label>' +
+      '<textarea class="in" id="wGuide" rows="4" placeholder="학생이 처음 봐도 바로 할 수 있게 절차·멘트·판단기준을 적어주세요"></textarea></div>' +
+
+    '<div class="field"><label class="fl">단계 (선택) — 한 줄에 하나씩</label>' +
+      '<textarea class="in" id="wSteps" rows="4" placeholder="구독 명단 뽑기&#10;전화 스크립트 확인&#10;1차 전화 돌리기&#10;결과 기록"></textarea></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">목표 수량 (선택)</label><input class="in" id="wTarget" type="number" min="0" placeholder="12"></div>' +
+      '<div class="field"><label class="fl">단위</label><input class="in" id="wUnit" placeholder="명" value="건"></div>' +
+    '</div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시간 (선택)</label><input class="in" id="wTime" type="time"></div>' +
+      '<div class="field"><label class="fl">중요도</label><select class="in" id="wPri">' +
+        '<option value="normal">보통</option><option value="high">중요</option></select></div>' +
+    '</div>' +
+
+    '<div class="field"><label class="fl">반복</label>' +
+      '<div class="chips" id="wRepeat">' +
+        [['once', '한 번'], ['daily', '매일'], ['weekday', '평일'], ['days', '요일 지정']].map(([v, t]) =>
+          '<button type="button" class="chip ' + (wForm.repeat === v ? 'on' : '') + '" data-act="wrepeat" data-v="' + v + '">' + t + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field" id="wDaysWrap" style="display:' + (wForm.repeat === 'days' ? '' : 'none') + '"><label class="fl">요일 선택</label>' +
+      '<div class="chips">' + DOW.map((d, i) =>
+        '<button type="button" class="chip dow ' + (wForm.days.includes(i) ? 'on' : '') + '" data-act="wdow" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시작일</label><input class="in" id="wStart" type="date" value="' + esc(wForm.start) + '"></div>' +
+      '<div class="field" id="wEndWrap" style="display:' + (wForm.repeat === 'once' ? 'none' : '') + '"><label class="fl">종료일 (선택)</label>' +
+        '<input class="in" id="wEnd" type="date" value="' + esc(wForm.end) + '"></div>' +
+    '</div>' +
+
+    '<div class="field"><button type="button" class="chip ' + (wForm.carry ? 'on' : '') + '" data-act="wcarry">' +
+      (wForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>' +
+
+    '<button class="btn btn-ghost btn-block" data-act="wadd">＋ 목록에 담기</button>' +
+  '</div>' +
+
+  (draft.length ? draftCard() : '');
+}
+
+function draftCard() {
+  return '<div class="card">' +
+    '<div class="between mb8"><div class="card-title">발행 대기 ' + draft.length + '건</div>' +
+    '<button class="btn btn-sm btn-danger" data-act="wclear">전체 비우기</button></div>' +
+    draft.map((d, i) =>
+      '<div class="task"><div class="task-body">' +
+        '<div class="task-t">' + esc(d.title) + '</div>' +
+        '<div class="meta">' +
+          '<span class="tag">' + esc(d.names.join(', ')) + '</span>' +
+          (d.time ? '<span class="tag time">' + esc(d.time) + '</span>' : '') +
+          (d.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+          ((d.steps || []).length ? '<span class="tag doing">' + d.steps.length + '단계</span>' : '') +
+          '<span class="tag">' + esc(repeatLabel(d)) + '</span>' +
+        '</div></div>' +
+        '<button class="btn btn-sm btn-danger" data-act="wdel" data-i="' + i + '">삭제</button>' +
+      '</div>').join('') +
+    '<hr class="sep">' +
+    '<button class="btn btn-primary btn-block mb8" data-act="wpublish">지시서 발행하기</button>' +
+    '<div class="hint">발행하면 각 학생의 개인 링크에 즉시 반영됩니다.</div>' +
+  '</div>';
+}
+
+/* ── 학생 현황 ── */
+function viewBoard() {
+  const list = teamStaff();
+  const mine = owners();
+  if (!list.length && !mine.length) return emptyStaffCard();
+
+  let h = '<div class="datenav">' +
+    '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
+    '<div class="d">' + label(cursor) + (relLabel(cursor) ? '<em>' + relLabel(cursor) + '</em>' : '') + '</div>' +
+    '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  // 막힘 먼저
+  const blocked = [];
+  liveStaff().forEach(s => tasksFor(s.id, cursor).forEach(t => {
+    if (statusOf(t, cursor) === 'blocked') blocked.push({ s: s, t: t, c: getCheck(t.id, cursor) });
+  }));
+  if (blocked.length) {
+    h += '<div class="card alert"><div class="card-title" style="color:var(--coral)">🚧 막힘 ' + blocked.length + '건 — 원장님 확인 필요</div>' +
+      blocked.map(x => '<div class="small mt14"><b>' + esc(x.s.name) + '</b> · ' + esc(x.t.title) +
+        (x.c && x.c.note ? '<br><span class="muted">“' + esc(x.c.note) + '”</span>' : '<br><span class="muted">사유 미기재</span>') +
+        '</div>').join('') + '</div>';
+  }
+
+  // 학생이 스스로 추가한 업무 — 지시서를 현실에 맞게 고치는 단서가 된다
+  const added = staffAdded(cursor);
+  if (added.length) {
+    const byStaff = {};
+    added.forEach(x => {
+      const n = (staffById(x.t.staffId) || {}).name || '?';
+      (byStaff[n] = byStaff[n] || []).push(x);
+    });
+    h += '<div class="card">' +
+      '<div class="between mb8"><div class="card-title">＋ 학생이 추가한 업무</div>' +
+      '<div class="pill">이번 주 ' + added.length + '건</div></div>' +
+      '<div class="card-sub mb14">지시하지 않았는데 실제로 하고 있는 일입니다. 반복되면 정식 지시로 올리세요.</div>' +
+      Object.keys(byStaff).map(n =>
+        '<div class="small" style="font-weight:700;margin-top:10px">' + esc(n) + ' · ' + byStaff[n].length + '건</div>' +
+        byStaff[n].map(x => {
+          const st = statusOf(x.t, x.date);
+          return '<div class="between small" style="padding:3px 0">' +
+            '<span class="muted">· ' + esc(x.t.title) + ' <span style="opacity:.7">(' + shortDate(x.date) + ')</span></span>' +
+            (st === 'done' ? '<span class="pill">완료</span>'
+              : st === 'blocked' ? '<span class="pill bad">막힘</span>'
+              : st === 'doing' ? '<span class="pill warn">진행중</span>' : '<span class="pill warn">미완료</span>') +
+          '</div>';
+        }).join('')
+      ).join('') + '</div>';
+  }
+
+  // 순공시간 — 계획 이행률과 별개로 '실제로 얼마나 앉아 있었나'를 본다
+  {
+    const rows = list.map(s => ({ s: s, secs: stTotal(s.id, cursor), run: stRunning(s.id, cursor) }))
+      .filter(x => x.secs || x.run)
+      .sort((a, b) => b.secs - a.secs);
+    if (rows.length) {
+      const sum = rows.reduce((a, x) => a + x.secs, 0);
+      h += '<div class="card"><div class="between mb8">' +
+        '<div class="card-title">⏱ 순공시간</div>' +
+        '<div class="pill">' + rows.length + '명 · 합계 ' + fmtDur(sum) + '</div></div>' +
+        rows.map(x => {
+          const goal = stGoalMin(x.s.id) * 60;
+          const p = goal ? Math.min(100, Math.round(x.secs / goal * 100)) : 0;
+          return '<div class="between small" style="padding:4px 0">' +
+            '<span>' + esc(x.s.name) +
+              (x.run ? ' <span class="pill">▶ ' + esc(x.run.subj) + '</span>' : '') + '</span>' +
+            '<span class="row" style="gap:6px">' +
+              (goal ? '<span class="pill ' + (p >= 100 ? '' : p >= 60 ? 'warn' : 'bad') + '">' + p + '%</span>' : '') +
+              '<b>' + fmtDur(x.secs) + '</b></span></div>';
+        }).join('') +
+        '<div class="hint" style="margin-top:10px">계획 이행률과 함께 보세요 — 시간은 많은데 이행률이 낮으면 계획이 과한 것입니다.</div>' +
+        '</div>';
+    }
+  }
+
+  const all = list.reduce((a, s) => { const p = progress(s.id, cursor); a.done += p.done; a.total += p.total; return a; }, { done: 0, total: 0 });
+  const pct = all.total ? Math.round(all.done / all.total * 100) : 0;
+  h += '<div class="card"><div class="prog">' +
+    '<div class="ring" style="--p:' + pct + '"><b>' + pct + '%</b></div>' +
+    '<div style="flex:1"><div class="card-title">전체 수행률</div>' +
+    '<div class="card-sub mb8">학생 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
+    '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
+    '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button></div>';
+
+  if (mine.length) {
+    h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
+    if (list.length) h += '<div class="sect">학생</div>';
+  }
+  h += list.map(s => staffCard(s)).join('');
+
+  return h;
+}
+
+function staffCard(s) {
+  const p = progress(s.id, cursor);
+  const w = weekProgress(s.id, cursor);
+  const st = streak(s.id);
+  const rows = tasksFor(s.id, cursor).map(t => ({ t: t, st: statusOf(t, cursor), c: getCheck(t.id, cursor) }));
+  const pend = rows.filter(x => x.st !== 'done');
+  const notes = rows.filter(x => x.c && x.c.note);
+
+  return '<div class="card">' +
+    '<div class="staffcard mb14">' +
+    '<div class="ava">' + esc(initials(s.name)) + '</div>' +
+    '<div style="flex:1;min-width:0">' +
+      '<div class="between"><div class="card-title">' + esc(s.name) + '</div>' +
+        '<div class="pill">' + p.done + '/' + p.total + '</div></div>' +
+      '<div class="bar" style="margin:6px 0 5px"><i style="width:' + p.pct + '%"></i></div>' +
+      '<div class="small muted">이번 주 ' + w.pct + '% · 연속 달성 ' + st + '일</div>' +
+    '</div></div>' +
+    (pend.length
+    ? pend.map(x => {
+        const prog = taskProgress(x.t, x.c);
+        const badge = x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
+                    : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
+                    : '<span class="pill">미착수</span>';
+        return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
+          (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
+      }).join('')
+    : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
+    (notes.length
+    ? '<hr class="sep">' + notes.map(x =>
+        '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
+    : '') +
+    '<hr class="sep">' +
+    '<div class="row wraprow" style="gap:8px">' +
+    (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + s.id + '">할 일 보기</button>' : '') +
+    (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' : '') +
+    '<button class="btn btn-sm btn-ghost" data-act="orderText" data-id="' + s.id + '">지시서 문구</button>' +
+    '</div></div>';
+}
+
+/* ── 학생 관리 ── */
+function viewStaffAdmin() {
+  const list = liveStaff();
+  return '<div class="card">' +
+    '<div class="card-title">학생 등록</div>' +
+    '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 학생은 링크만 열면 됩니다.</div>' +
+    '<div class="row"><input class="in" id="sName" placeholder="이름 (예: 김선생)">' +
+    '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
+    (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
+  '</div>' +
+  (list.length
+    ? list.map(s => '<div class="card"><div class="between">' +
+        '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
+        '<div><div class="card-title">' + esc(s.name) +
+          (s.owner ? ' <span class="tag add">대표</span>' : '') +
+          (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
+          (s.owner ? ' · 학생 통계에서 제외' : '') +
+          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div></div></div>' +
+        '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
+        '<hr class="sep">' +
+        '<div class="row wraprow" style="gap:8px">' +
+          '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
+            (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
+            (s.manager ? '관리자 해제' : '관리자로 지정') + '</button>' +
+        '</div></div>').join('')
+    : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 학생이 없습니다.</div></div>');
+}
+
+/* ── 설정 ── */
+function viewSettings() {
+  const s = state.settings;
+  const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
+  const connected = !!(s.adminToken || s.syncSecret);
+  return '<div class="card">' +
+    '<div class="card-title">새 컴퓨터 연결</div>' +
+    '<div class="card-sub mb14">아래 링크를 새 컴퓨터에서 한 번 열면 기존 데이터가 자동으로 연결됩니다. ' +
+      '비밀번호나 원장 비밀키를 입력할 필요가 없습니다.</div>' +
+    (connected
+      ? '<div class="row" style="gap:8px"><button class="btn btn-navy" data-act="adminlink">연결 링크 복사</button>' +
+        '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>'
+      : '<div class="hint" style="color:var(--coral)">이 기기의 동기화 연결을 먼저 복구해야 합니다.</div>') +
+    '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) +
+      (sync.err ? ' · <span style="color:var(--coral)">' + esc(sync.err) + '</span>' : '') + '</div>' +
+    (connected ? '<div class="hint mt14">✓ 연결됨 · 링크는 10분 동안 한 번만 사용할 수 있습니다.</div>' : '') +
+    '<details class="mt14"><summary class="small muted">비밀키로 긴급 연결</summary>' +
+      '<div class="field mt14"><label class="fl">CONSULT_ADMIN_SECRET</label>' +
+      '<input class="in" id="cfgSecret" type="password" value="' + esc(s.syncSecret) + '"></div>' +
+      '<button class="btn btn-ghost" data-act="savecfg">저장</button></details>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">백업</div>' +
+    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
+      '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
+  '</div>' +
+
+  '<div class="card">' +
+    '<div class="card-title">관리 비밀번호</div>' +
+    '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
+    '<div class="field"><input class="in" id="newPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="새 비밀번호"></div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-primary" data-act="changepin">변경</button>' +
+      '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
+  '</div>';
+}
+
+/* ══════════════════════════════════════════════════════
+   8. 모달 · 텍스트 생성
+   ══════════════════════════════════════════════════════ */
+function modal(title, bodyHtml, footHtml) {
+  $('#modalHost').innerHTML =
+    '<div class="modal" data-act="closemodal"><div class="modal-box">' +
+      '<div class="between mb14"><div class="card-title">' + esc(title) + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
+      bodyHtml + (footHtml || '') +
+    '</div></div>';
+}
+function closeModal() { $('#modalHost').innerHTML = ''; }
+
+function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
+
+/** 개인 링크. 예전에는 여기에 전체 접근 비밀키를 담았는데,
+ *  링크 하나가 새면 전체가 열리는 구조라 학생별 토큰으로 바꿨다. */
+function staffLink(id) {
+  const s = staffById(id);
+  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
+  return location.origin + location.pathname + '?u=' + id + t;
+}
+/** 토큰이 없으면 발급받아 직원/학생 기록에 붙인다 */
+async function ensureToken(id) {
+  const s = staffById(id);
+  if (!s) throw new Error('대상을 찾을 수 없습니다');
+  if (s.token) return s.token;
+  s.token = await sync.issueToken(id);
+  s.updatedAt = now();
+  save(); queueSync();
+  return s.token;
+}
+
+function orderText(staffId, date) {
+  const s = staffById(staffId);
+  const list = tasksFor(staffId, date);
+  let txt = '📋 ' + label(date) + ' 컨설팅 플래너\n' + (s ? s.name + ' 학생\n' : '') + '─────────\n';
+  txt += list.length
+    ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + t.title + (t.priority === 'high' ? ' ⭐' : '') +
+        (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
+        ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
+    : '(지시된 업무 없음)';
+  txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n' + staffLink(staffId);
+  return txt;
+}
+
+/** 방금 추가한 한 건을 카톡에 붙여넣을 문구로 */
+function quickText(t) {
+  const s = staffById(t.staffId);
+  return '📌 ' + (s ? s.name + ' 학생\n' : '') +
+    (t.start !== today() ? label(t.start) + ' ' : '') +
+    (t.time ? '[' + t.time + '] ' : '') + t.title +
+    (t.priority === 'high' ? ' ⭐' : '') +
+    '\n\n지시서에 올려뒀습니다. 끝나면 체크 부탁드려요.\n' + staffLink(t.staffId);
+}
+
+function reportText(staffId, date) {
+  const s = staffById(staffId);
+  const list = tasksFor(staffId, date);
+  const p = progress(staffId, date);
+  let txt = '✅ ' + label(date) + ' 업무 수행 보고\n' + (s ? s.name + '\n' : '') +
+    '완료 ' + p.done + '/' + p.total + '건 (' + p.pct + '%)\n─────────\n';
+  txt += list.map(t => {
+    const c = getCheck(t.id, date), st = statusOf(t, date), pr = taskProgress(t, c);
+    const mark = st === 'done' ? '✅' : st === 'blocked' ? '🚧' : st === 'doing' ? '🔸' : '⬜';
+    return mark + ' ' + t.title +
+      (st === 'doing' ? ' (' + pr.done + '/' + pr.total + pr.unit + ')' : '') +
+      (c && c.note ? '\n   · ' + c.note : '');
+  }).join('\n') || '(지시된 업무 없음)';
+  return txt;
+}
+
+function briefText(date) {
+  const list = teamStaff();
+  let done = 0, total = 0;
+  const pend = [], blocked = [], clear = [];
+  list.forEach(s => {
+    const p = progress(s.id, date);
+    done += p.done; total += p.total;
+    let hasPend = false;
+    tasksFor(s.id, date).forEach(t => {
+      const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
+      if (st === 'done') return;
+      hasPend = true;
+      const line = '· ' + s.name + ' — ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+        (st === 'doing' ? ' [진행 ' + pr.done + '/' + pr.total + pr.unit + ']' : '') +
+        (c && c.note ? '\n   “' + c.note + '”' : '');
+      (st === 'blocked' ? blocked : pend).push(line);
+    });
+    if (!hasPend && p.total) clear.push(s.name);
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  let txt = '📊 ' + label(date) + ' 업무 마감 브리핑\n' +
+    '전체 ' + total + '건 중 ' + done + '건 완료 (' + pct + '%)\n─────────\n';
+  if (blocked.length) txt += '🚧 막힘 ' + blocked.length + '건 — 조치 필요\n' + blocked.join('\n') + '\n─────────\n';
+  txt += pend.length ? '⚠️ 미완료 ' + pend.length + '건\n' + pend.join('\n') + '\n' : '✅ 미완료 없음\n';
+  if (clear.length) txt += '─────────\n✅ 전원 완료: ' + clear.join(', ') + '\n';
+
+  // 지시하지 않았는데 학생이 스스로 한 일
+  const own = [];
+  list.forEach(s => tasksFor(s.id, date).forEach(t => {
+    if (t.origin !== 'staff') return;
+    const st = statusOf(t, date);
+    own.push('· ' + s.name + ' — ' + t.title + ' [' + STATUS_LABEL[st] + ']');
+  }));
+  if (own.length) txt += '─────────\n＋ 학생 추가 업무 ' + own.length + '건\n' + own.join('\n') + '\n';
+
+  // 대표 본인 업무는 학생 통계와 섞지 않고 따로 붙인다
+  const mineLines = [];
+  owners().forEach(s => tasksFor(s.id, date).forEach(t => {
+    const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
+    mineLines.push('· ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+      ' [' + STATUS_LABEL[st] + (st === 'doing' ? ' ' + pr.done + '/' + pr.total + pr.unit : '') + ']' +
+      (c && c.note ? '\n   “' + c.note + '”' : ''));
+  }));
+  if (mineLines.length) txt += '─────────\n🙋 내 업무 ' + mineLines.length + '건\n' + mineLines.join('\n') + '\n';
+
+  return txt;
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast('복사했습니다'); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('복사했습니다'); }
+    catch (e2) { toast('복사 실패 — 직접 선택해 주세요'); }
+    document.body.removeChild(ta);
+  }
+}
+
+function showText(title, text) {
+  modal(title,
+    '<textarea class="in" rows="13" id="mText" readonly>' + esc(text) + '</textarea>',
+    '<button class="btn btn-primary btn-block mt14" data-act="copytext">복사하기</button>');
+}
+
+function manageTasks(staffId) {
+  const s = staffById(staffId);
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  modal((s ? s.name : '') + ' 지시 목록',
+    list.length
+      ? list.map(t => '<div class="task"><div class="task-body">' +
+          '<div class="task-t">' + esc(t.title) + '</div>' +
+          '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
+          (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') +
+          originTags(t) + '</div>' +
+          '<div class="row" style="gap:6px;margin-top:8px">' +
+            '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>' +
+            '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button>' +
+          '</div></div></div>').join('')
+      : '<div class="empty">지시된 업무가 없습니다.</div>');
+}
+
+/* ── 업무 수정 ── */
+let eForm = null;
+
+const BLANK_TASK = () => ({
+  title: '', detail: '', guide: '', steps: [], target: 0, unit: '건',
+  time: '', priority: 'normal', repeat: 'once', days: [], start: today(), end: '', carry: true
+});
+
+function editTaskModal(id) {
+  const isNew = !id;
+  const t = isNew ? BLANK_TASK() : state.tasks.find(x => x.id === id);
+  if (!t) return;
+  eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+
+  const who = currentStaff();
+  modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : '업무 수정',
+    '<div class="field"><label class="fl">업무 내용</label>' +
+      '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
+
+    '<div class="field"><label class="fl">한 줄 설명</label>' +
+      '<textarea class="in" id="eDetail">' + esc(t.detail || '') + '</textarea></div>' +
+
+    '<div class="field"><label class="fl">수행 가이드</label>' +
+      '<textarea class="in" id="eGuide" rows="5">' + esc(t.guide || '') + '</textarea></div>' +
+
+    '<div class="field"><label class="fl">단계 — 한 줄에 하나씩</label>' +
+      '<textarea class="in" id="eSteps" rows="5">' + esc((t.steps || []).map(s => s.label).join('\n')) + '</textarea>' +
+      '<div class="hint" style="margin-top:5px">순서를 그대로 두고 글자만 고치면 오늘 체크해둔 진행 상태가 유지됩니다.</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">목표 수량</label><input class="in" id="eTarget" type="number" min="0" value="' + (t.target || '') + '"></div>' +
+      '<div class="field"><label class="fl">단위</label><input class="in" id="eUnit" value="' + esc(t.unit || '건') + '"></div>' +
+    '</div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시간</label><input class="in" id="eTime" type="time" value="' + esc(t.time || '') + '"></div>' +
+      '<div class="field"><label class="fl">중요도</label><select class="in" id="ePri">' +
+        '<option value="normal"' + (t.priority !== 'high' ? ' selected' : '') + '>보통</option>' +
+        '<option value="high"' + (t.priority === 'high' ? ' selected' : '') + '>중요</option></select></div>' +
+    '</div>' +
+
+    '<div class="field"><label class="fl">반복</label>' +
+      '<div class="chips" id="eRepeat">' +
+        [['once', '한 번'], ['daily', '매일'], ['weekday', '평일'], ['days', '요일 지정']].map(([v, lb]) =>
+          '<button type="button" class="chip ' + (eForm.repeat === v ? 'on' : '') + '" data-act="erepeat" data-v="' + v + '">' + lb + '</button>').join('') +
+      '</div></div>' +
+
+    '<div class="field" id="eDaysWrap" style="display:' + (eForm.repeat === 'days' ? '' : 'none') + '"><label class="fl">요일</label>' +
+      '<div class="chips">' + DOW.map((d, i) =>
+        '<button type="button" class="chip dow ' + (eForm.days.includes(i) ? 'on' : '') + '" data-act="edow" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
+
+    '<div class="grid2">' +
+      '<div class="field"><label class="fl">시작일</label><input class="in" id="eStart" type="date" value="' + esc(t.start || today()) + '"></div>' +
+      '<div class="field"><label class="fl">종료일 (선택)</label><input class="in" id="eEnd" type="date" value="' + esc(t.end || '') + '"></div>' +
+    '</div>' +
+
+    '<div class="field"><button type="button" class="chip ' + (eForm.carry ? 'on' : '') + '" data-act="ecarry">' +
+      (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>',
+
+    '<button class="btn btn-primary btn-block mt14" data-act="esave">저장</button>' +
+    (isNew ? '' : '<button class="btn btn-danger btn-block mb8" style="margin-top:8px" data-act="edelete">이 업무 중단</button>'));
+}
+
+function saveEditedTask() {
+  const isNew = !eForm.id;
+  const title = ($('#eTitle').value || '').trim();
+  if (!title) return toast('업무 내용을 입력해 주세요');
+  if (eForm.repeat === 'days' && !eForm.days.length) return toast('요일을 선택해 주세요');
+
+  let t;
+  if (isNew) {
+    const who = currentStaff();
+    if (!who) return toast('학생을 먼저 선택해 주세요');
+    t = {
+      id: uid(), groupId: 'own-' + now(), staffId: who.id,
+      steps: [], createdAt: now(), deleted: false,
+      origin: actor()
+    };
+    state.tasks.push(t);
+  } else {
+    t = state.tasks.find(x => x.id === eForm.id);
+    if (!t) return closeModal();
+    if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 수정할 수 없습니다'); }
+    if (actor() === 'staff') t.lastEditBy = 'staff';
+    else if (t.origin !== 'staff') t.lastEditBy = 'admin';
+  }
+
+  // 같은 순서의 단계는 id를 물려줘서 이미 체크한 진행 상태를 잃지 않게 한다
+  const oldSteps = t.steps || [];
+  const labels = ($('#eSteps').value || '').split('\n').map(x => x.trim()).filter(Boolean);
+  t.steps = labels.map((label, i) => ({ id: (oldSteps[i] && oldSteps[i].id) || uid(), label: label }));
+
+  t.title = title;
+  t.detail = ($('#eDetail').value || '').trim();
+  t.guide = ($('#eGuide').value || '').trim();
+  t.target = Number($('#eTarget').value) || 0;
+  t.unit = ($('#eUnit').value || '건').trim();
+  t.time = $('#eTime').value || '';
+  t.priority = $('#ePri').value;
+  t.repeat = eForm.repeat;
+  t.days = eForm.days.slice().sort();
+  t.start = $('#eStart').value || today();
+  t.end = $('#eEnd').value || '';
+  t.carry = eForm.carry;
+  t.updatedAt = now();
+
+  eForm = null;
+  save(); queueSync(); closeModal(); render();
+  toast(isNew ? '추가했습니다' : '수정했습니다');
+}
+
+/* ══════════════════════════════════════════════════════
+   8-1. 말로 쓴 지시를 업무로 — 카톡 문장 해석
+   ══════════════════════════════════════════════════════ */
+const pad2 = n => String(n).padStart(2, '0');
+
+/** "혜지쌤", "김혜지", "혜지 선생님" 모두 잡는다 */
+function matchStaff(text) {
+  const list = liveStaff();
+  for (const s of list) if (text.includes(s.name)) return { s: s, token: s.name };
+  for (const s of list) {
+    const short = s.name.length >= 3 ? s.name.slice(1) : '';
+    if (short.length >= 2 && text.includes(short)) return { s: s, token: short };
+  }
+  return null;
+}
+
+/** "3시까지", "오후 3시반", "15:00", "9시 30분" */
+function matchTime(text) {
+  let m = text.match(/(\d{1,2})\s*:\s*(\d{2})/);
+  if (m) return { time: pad2(m[1]) + ':' + m[2], token: m[0] };
+
+  m = text.match(/(오전|오후|아침|저녁|밤|낮)?\s*(\d{1,2})\s*시\s*(반|\d{1,2}\s*분)?/);
+  if (!m) return null;
+  let h = Number(m[2]);
+  const mer = m[1] || '';
+  if (/오후|저녁|밤/.test(mer)) { if (h < 12) h += 12; }
+  else if (/오전|아침/.test(mer)) { if (h === 12) h = 0; }
+  else if (h >= 1 && h <= 7) h += 12;   // 오후에 도는 센터라 한 자리 시각은 오후로 본다
+  let mm = '00';
+  if (m[3]) mm = m[3] === '반' ? '30' : pad2(parseInt(m[3], 10));
+  return { time: pad2(h) + ':' + mm, token: m[0] };
+}
+
+/** "오늘", "내일", "모레", "금요일", "8월 3일" */
+function matchDate(text) {
+  if (/오늘/.test(text)) return { date: today(), token: '오늘' };
+  if (/내일/.test(text)) return { date: addDays(today(), 1), token: '내일' };
+  if (/모레/.test(text)) return { date: addDays(today(), 2), token: '모레' };
+
+  const dw = text.match(/([일월화수목금토])\s*요일/);
+  if (dw) {
+    const want = DOW.indexOf(dw[1]);
+    for (let i = 1; i <= 7; i++) {
+      const c = addDays(today(), i);
+      if (dowOf(c) === want) return { date: c, token: dw[0] };
+    }
+  }
+  const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if (md) return { date: new Date().getFullYear() + '-' + pad2(md[1]) + '-' + pad2(md[2]), token: md[0] };
+  return null;
+}
+
+function cleanTitle(s) {
+  return String(s)
+    .replace(/(쌤|선생님|샘)/g, ' ')
+    .replace(/(긴급히?|급히|급하게|asap)/gi, ' ')   // 중요 표시로 이미 잡히므로 제목에서는 뺀다
+    .replace(/^[\s,.·\-~]*(에게|한테|께)?\s*/, '')
+    .replace(/\s*(좀|까지|안에|전에)\s*/g, ' ')
+    .replace(/\s*(부탁\s*(해요|드려요|드립니다|합니다|해)|해\s*주세요|해주세요|해줘요|해줘|하세요|해주시고|해주시면|바랍니다)\s*[.!~]*$/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\s.,!~]+$/, '')
+    .trim();
+}
+
+/** 한 줄에 한 건. 이름·시간·날짜를 뽑고 나머지를 업무 이름으로 쓴다. */
+function parseInstructions(text) {
+  return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    let rest = line;
+    const sm = matchStaff(rest); if (sm) rest = rest.replace(sm.token, ' ');
+    const tm = matchTime(rest);  if (tm) rest = rest.replace(tm.token, ' ');
+    const dm = matchDate(rest);  if (dm) rest = rest.replace(dm.token, ' ');
+    const title = cleanTitle(rest);
+    return {
+      staff: sm ? sm.s.name : '',
+      title: title || line,
+      time: tm ? tm.time : '',
+      start: dm ? dm.date : today(),
+      repeat: 'once',
+      priority: /긴급|급하|급히|중요|바로|asap/i.test(line) ? 'high' : 'normal',
+      carry: true,
+      raw: line
+    };
+  });
+}
+
+let kakaoText = '', kakaoParsed = null;
+
+function kakaoModal() {
+  const ready = kakaoParsed && kakaoParsed.length && kakaoParsed.every(x => x.staff);
+  modal('카톡 문장으로 지시 만들기',
+    '<div class="hint mb14">카톡에 쓴 문장을 그대로 붙여넣으세요. <b>한 줄에 한 건</b>이고, 이름·시간·날짜는 알아서 뽑습니다.</div>' +
+    '<textarea class="in" rows="5" id="kText" placeholder="혜지쌤 오늘 3시까지 상담건 0729-A 보호자께 전화 부탁해요&#10;윤지쌤 내일 교재 재고 확인해주세요">' + esc(kakaoText) + '</textarea>' +
+    '<button class="btn btn-ghost btn-block mt14" data-act="kparse">해석해 보기</button>' +
+    (kakaoParsed ? kakaoPreview() : ''),
+    ready ? '<button class="btn btn-primary btn-block mt14" data-act="kapply">' + kakaoParsed.length + '건 확인하고 등록</button>' : '');
+}
+
+function kakaoPreview() {
+  if (!kakaoParsed.length) return '<div class="empty">해석할 내용이 없습니다.</div>';
+  const missing = kakaoParsed.filter(x => !x.staff).length;
+  return '<hr class="sep">' +
+    kakaoParsed.map(x =>
+      '<div class="task"><div class="task-body">' +
+        '<div class="task-t">' + esc(x.title) + '</div>' +
+        '<div class="meta">' +
+          (x.staff ? '<span class="tag add">' + esc(x.staff) + '</span>'
+                   : '<span class="tag blk">담당 없음</span>') +
+          (x.time ? '<span class="tag time">' + esc(x.time) + '</span>' : '') +
+          '<span class="tag">' + esc(label(x.start)) + '</span>' +
+          (x.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
+        '</div>' +
+        '<div class="small muted" style="margin-top:6px">원문: ' + esc(x.raw) + '</div>' +
+      '</div></div>').join('') +
+    (missing
+      ? '<div class="hint" style="color:var(--coral);margin-top:10px">담당이 없는 줄이 ' + missing +
+        '개 있습니다. 문장에 <b>이름</b>을 넣고 다시 해석해 주세요. (예: 혜지쌤 / 김혜지)</div>'
+      : '');
+}
+
+/* ══════════════════════════════════════════════════════
+   9. AI 지시서(JSON) 가져오기
+   ══════════════════════════════════════════════════════ */
+const AI_SAMPLE = `{
+  "assignments": [
+    {
+      "staff": "김선생",
+      "title": "스터디포스 구독 CS 전화 (1차)",
+      "detail": "이번 주 신규 구독 12명 대상",
+      "guide": "1) 명단은 구독원장 시트에서 뽑습니다\\n2) 첫 인사: \\"안녕하세요, WB 웩슬러브레인센터입니다. 스터디포스 구독 잘 이용하고 계신지 확인차 연락드렸습니다.\\"\\n3) 미접속 7일 이상이면 사용법 재안내\\n4) 통화 거절/부재 시 문자 발송 후 다음날 재시도",
+      "steps": ["구독 명단 뽑기", "전화 스크립트 확인", "1차 전화 돌리기", "부재중 문자 발송", "결과 기록"],
+      "target": 12,
+      "unit": "명",
+      "time": "15:00",
+      "priority": "high",
+      "repeat": "days",
+      "days": [2, 5],
+      "carry": true
+    }
+  ]
+}`;
+
+function aiModal() {
+  modal('AI 지시서 붙여넣기',
+    '<div class="hint mb14">Claude에게 “이런 업무가 있어” 하고 말하면 담당·단계·가이드까지 짜서 아래 형식으로 만들어 줍니다. 그대로 붙여넣으세요.</div>' +
+    '<textarea class="in" rows="10" id="aiText" placeholder=\'{"assignments":[ ... ]}\'></textarea>' +
+    '<button class="btn btn-ghost btn-block mt14" data-act="aisample">예시 형식 보기</button>',
+    '<button class="btn btn-primary btn-block mt14" data-act="aiapply">등록하기</button>');
+}
+
+function applyAssignments(input, preConfirmed) {
+  let data = input;
+  if (typeof input === 'string') {
+    try { data = JSON.parse(input); }
+    catch (e) { return toast('JSON 형식이 잘못되었습니다'); }
+  }
+  const list = Array.isArray(data) ? data : (data.assignments || []);
+  if (!list.length) return toast('등록할 업무가 없습니다');
+
+  // 이름 확인 → 없는 학생은 물어보고 등록
+  const missing = [...new Set(list.map(a => String(a.staff || '').trim()).filter(n => n && !staffByName(n)))];
+  if (missing.length) {
+    if (!preConfirmed && !confirm('등록되지 않은 학생이 있습니다: ' + missing.join(', ') + '\n새로 등록할까요?')) return;
+    missing.forEach(n => {
+      const isOwner = list.some(a => String(a.staff || '').trim() === n && a.owner === true);
+      state.staff.push({ id: uid(), name: n, owner: isOwner, createdAt: now(), updatedAt: now(), deleted: false });
+    });
+  }
+
+  let added = 0, skipped = 0;
+  list.forEach(a => {
+    const s = staffByName(a.staff);
+    if (!s) { skipped++; return; }
+    const steps = (a.steps || []).map(x => ({
+      id: uid(), label: typeof x === 'string' ? x : String(x.label || '')
+    })).filter(x => x.label);
+    state.tasks.push({
+      id: uid(), groupId: 'ai-' + now(), staffId: s.id,
+      title: String(a.title || '').trim() || '(제목 없음)',
+      detail: String(a.detail || ''),
+      guide: String(a.guide || ''),
+      steps: steps,
+      target: Number(a.target) || 0,
+      unit: String(a.unit || '건'),
+      time: String(a.time || ''),
+      priority: a.priority === 'high' ? 'high' : 'normal',
+      repeat: ['once', 'daily', 'weekday', 'days'].includes(a.repeat) ? a.repeat : 'once',
+      days: Array.isArray(a.days) ? a.days.map(Number).filter(n => n >= 0 && n <= 6) : [],
+      start: /^\d{4}-\d{2}-\d{2}$/.test(a.start || '') ? a.start : today(),
+      end: /^\d{4}-\d{2}-\d{2}$/.test(a.end || '') ? a.end : '',
+      carry: a.carry !== false,
+      createdAt: now(), updatedAt: now(), deleted: false
+    });
+    added++;
+  });
+
+  save(); queueSync(); closeModal(); render();
+  toast(added + '건 등록' + (skipped ? ' · ' + skipped + '건 건너뜀' : ''));
+}
+
+/* ══════════════════════════════════════════════════════
+   10. 이벤트
+   ══════════════════════════════════════════════════════ */
+document.addEventListener('click', ev => {
+  const goEl = ev.target.closest('[data-go]');
+  if (goEl) { go(goEl.dataset.go); return; }
+
+  const el = ev.target.closest('[data-act]');
+  if (!el) return;
+  if (el.dataset.act === 'closemodal'
+      && ev.target.closest('.modal-box')
+      && !ev.target.closest('button[data-act="closemodal"]')) return;
+
+  const act = el.dataset.act;
+  const id = el.dataset.id;
+  const date = el.dataset.date || cursor;
+  const task = () => state.tasks.find(x => x.id === id);
+
+  switch (act) {
+
+    /* 잠금 */
+    case 'setpin': {
+      const v = ($('#pin').value || '').trim();
+      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
+      state.settings.adminPin = v; save(); session.unlock(); go('staff'); toast('설정되었습니다');
+      break;
+    }
+    case 'login': {
+      if (($('#pin').value || '').trim() !== state.settings.adminPin) return toast('비밀번호가 다릅니다');
+      session.unlock(); render(); toast('환영합니다');
+      break;
+    }
+    case 'recoverpin': {
+      const hasSavedSecret = !!state.settings.syncSecret;
+      modal('관리 비밀번호 재설정',
+        '<div class="card-sub mb14">' + (hasSavedSecret
+          ? '이 기기에 저장된 동기화 연결 정보로 확인한 뒤 새 비밀번호를 저장합니다.'
+          : '동기화에 사용하는 <b>CONSULT_ADMIN_SECRET</b>으로 확인한 뒤 새 비밀번호를 저장합니다.') +
+          ' 학생·업무 데이터는 바뀌지 않습니다.</div>' +
+        (hasSavedSecret ? '' : '<div class="field"><label class="fl">원장 비밀키</label><input class="in" id="recoverSecret" type="password" autocomplete="off"></div>') +
+        '<div class="field"><label class="fl">새 관리 비밀번호</label><input class="in" id="recoverPin" type="password" inputmode="text" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>',
+        '<button class="btn btn-primary" data-act="recoverpinsave">확인하고 재설정</button>' +
+        '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
+      break;
+    }
+    case 'recoverpinsave': {
+      const secretEl = $('#recoverSecret');
+      const secret = ((secretEl && secretEl.value) || state.settings.syncSecret || '').trim();
+      const pin = ($('#recoverPin').value || '').trim();
+      if (!secret) return toast('원장 비밀키를 입력해 주세요');
+      if (pin.length < 4) return toast('새 비밀번호를 4자리 이상 입력해 주세요');
+      sync.post('/sync', {
+        app: SYNC_APP, auth: { mode: 'admin', secret: secret }, since: Date.now(), changes: []
+      }).then(() => {
+        state.settings.syncSecret = secret;
+        state.settings.adminPin = pin;
+        save(); session.unlock(); closeModal(); render(); toast('비밀번호를 재설정했습니다');
+      }).catch(() => toast('원장 비밀키가 맞지 않거나 서버에 연결할 수 없습니다'));
+      break;
+    }
+    case 'logout': session.lock(); render(); break;
+    case 'changepin': {
+      const v = ($('#newPin').value || '').trim();
+      if (v.length < 4) return toast('4자리 이상 입력해 주세요');
+      state.settings.adminPin = v; save(); toast('변경되었습니다');
+      break;
+    }
+
+    /* 타임블록 */
+    case 'tbadd': { const me = currentStaff(); if (me) tbAddModal(me); break; }
+    case 'tbsubj': {
+      document.querySelectorAll('#tbSubj .chip').forEach(c => c.classList.toggle('on', c === el));
+      if (!($('#tbL').value || '').trim()) $('#tbL').value = el.dataset.v;
+      break;
+    }
+    case 'tbsave': {
+      const me = currentStaff(); if (!me) break;
+      const s = $('#tbS').value, e = $('#tbE').value;
+      const lab = ($('#tbL').value || '').trim();
+      if (!s || !e) return toast('시작·종료 시각을 넣어주세요');
+      if (e <= s) return toast('종료 시각이 시작보다 빨라요');
+      if (!lab) return toast('무엇을 할지 적어주세요');
+      const pick = document.querySelector('#tbSubj .chip.on');
+      tbSave(me.id, cursor, tbOf(me.id, cursor).concat({
+        s: s, e: e, label: lab, subj: pick ? pick.dataset.v : ''
+      }));
+      closeModal(); render(); toast('추가했습니다');
+      break;
+    }
+    case 'tbdel': {
+      const me = currentStaff(); if (!me) break;
+      const list = tbOf(me.id, cursor).slice();
+      list.splice(Number(el.dataset.i), 1);
+      tbSave(me.id, cursor, list); render();
+      break;
+    }
+    case 'tbstart': {
+      const me = currentStaff(); if (!me) break;
+      const subj = el.dataset.subj;
+      if (!stSubjects(me.id).includes(subj)) {
+        setCheck('__stsubj__' + me.id, 'all', { list: stSubjects(me.id).concat(subj), done: true });
+      }
+      stStart(me.id, today(), subj);
+      render(); toast(subj + ' 시작!');
+      break;
+    }
+
+    /* 회독 */
+    case 'rdadd': rdAddModal(); break;
+    case 'rdsave': {
+      const me = currentStaff(); if (!me) break;
+      const name = ($('#rdName').value || '').trim();
+      if (!name) return toast('교재 이름을 넣어주세요');
+      rdSave(me.id, rdItems(me.id).concat({
+        id: uid(), name: name, target: Math.max(1, Number($('#rdTarget').value) || 1), done: 0
+      }));
+      closeModal(); render(); toast('추가했습니다');
+      break;
+    }
+    case 'rdup': {
+      const me = currentStaff(); if (!me) break;
+      const i = Number(el.dataset.i);
+      const list = rdItems(me.id).map((x, n) =>
+        n === i ? Object.assign({}, x, { done: Math.min(x.target, (x.done || 0) + 1) }) : x);
+      rdSave(me.id, list); render();
+      const it = list[i];
+      if (it && it.done >= it.target) toast(it.name + ' — 목표 회독 달성 🎉');
+      break;
+    }
+    case 'rddel': {
+      const me = currentStaff(); if (!me) break;
+      const list = rdItems(me.id).slice();
+      if (!confirm(list[Number(el.dataset.i)].name + ' 을(를) 삭제할까요?')) return;
+      list.splice(Number(el.dataset.i), 1);
+      rdSave(me.id, list); render();
+      break;
+    }
+
+    /* 오답노트 */
+    case 'wnadd': { const me = currentStaff(); if (me) wnAddModal(me); break; }
+    case 'wnsubj': {
+      document.querySelectorAll('#wnSubj .chip').forEach(c => c.classList.toggle('on', c === el));
+      break;
+    }
+    case 'wnsave': {
+      const me = currentStaff(); if (!me) break;
+      const note = ($('#wnNote').value || '').trim();
+      if (!note) return toast('어떤 문제였는지 한 줄만 적어주세요');
+      const pick = document.querySelector('#wnSubj .chip.on');
+      const d = today();
+      setCheck(wnKey(me.id), d, {
+        items: wnOf(me.id, d).concat({
+          id: uid(), note: note, src: ($('#wnSrc').value || '').trim(),
+          subj: pick ? pick.dataset.v : '', rv: 0, fixed: false
+        }), done: true
+      });
+      closeModal(); render(); toast('오답을 등록했습니다 — 3일 뒤에 다시 띄워드릴게요');
+      break;
+    }
+    case 'wnrv': {
+      const me = currentStaff(); if (!me) break;
+      const x = wnOf(me.id, el.dataset.date).find(i => i.id === el.dataset.id);
+      if (!x) break;
+      wnPatch(me.id, el.dataset.date, el.dataset.id, { rv: (x.rv || 0) + 1 });
+      render();
+      toast((x.rv || 0) + 1 >= WN_REVIEW.length ? '복습 완료 — 이제 해결로 체크해도 좋아요' : '다음 복습일에 다시 띄워드릴게요');
+      break;
+    }
+    case 'wnfix': {
+      const me = currentStaff(); if (!me) break;
+      const x = wnOf(me.id, el.dataset.date).find(i => i.id === el.dataset.id);
+      if (!x) break;
+      wnPatch(me.id, el.dataset.date, el.dataset.id, { fixed: !x.fixed });
+      render();
+      break;
+    }
+
+    /* 인강 플래너 */
+    case 'ingcheck': {
+      ingToggle(el.dataset.sid, el.dataset.date, el.dataset.cid, Number(el.dataset.seq));
+      render();
+      break;
+    }
+    case 'ingadd': ingAddModal(); break;
+    case 'ingpf': {
+      document.querySelectorAll('#ingPf .chip').forEach(c => c.classList.toggle('on', c === el));
+      break;
+    }
+    case 'ingsearch': {
+      const q = ($('#ingQ').value || '').trim();
+      if (!q) return toast('강좌명을 입력해 주세요');
+      const pf = (document.querySelector('#ingPf .chip.on') || {}).dataset;
+      $('#ingHits').textContent = '검색 중…';
+      sync.post('/search', { app: SYNC_APP, auth: sync.auth(), q: q, platform: (pf && pf.v) || '' })
+        .then(d => {
+          if (!d.items.length) { $('#ingHits').textContent = '결과가 없습니다. 강좌 주소를 직접 넣어보세요.'; return; }
+          $('#ingHits').innerHTML = d.items.map(x =>
+            '<div class="between" style="padding:4px 0;gap:8px">' +
+              '<span style="flex:1">' + esc(x.title) + '</span>' +
+              '<button class="btn btn-sm btn-ghost" data-act="inguse" data-url="' + esc(x.url) + '">이걸로</button>' +
+            '</div>').join('');
+        })
+        .catch(e => { $('#ingHits').textContent = '검색 실패 — ' + e.message; });
+      break;
+    }
+    case 'inguse': { $('#ingUrl').value = el.dataset.url; ingFetch(); break; }
+    case 'ingfetch': ingFetch(); break;
+    case 'ingsave': {
+      const me = currentStaff(); if (!me) break;
+      const name = ($('#ingName').value || '').trim();
+      if (!name) return toast('강좌 이름을 입력해 주세요');
+      const lectures = ingParse($('#ingText').value);
+      if (!lectures.length) return toast('커리큘럼을 읽지 못했습니다 — 회차 번호로 시작하는 줄이 필요합니다');
+      const pf = (document.querySelector('#ingPf .chip.on') || {}).dataset;
+      ingSaveCourses(me.id, ingCourses(me.id).concat({
+        id: uid(), name: name, platform: (pf && pf.v) || '기타', lectures: lectures
+      }));
+      closeModal(); render();
+      toast(name + ' — ' + lectures.length + '강 등록 완료');
+      break;
+    }
+    case 'ingdel': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id === el.dataset.cid);
+      if (!c || !confirm(c.name + ' 강좌를 삭제할까요? 배정된 일정도 함께 지워집니다.')) return;
+      ingPlanDates(me.id).forEach(d => {
+        const items = ingPlan(me.id, d).filter(x => x.cid !== c.id);
+        if (items.length !== ingPlan(me.id, d).length) ingSavePlan(me.id, d, items);
+      });
+      ingSaveCourses(me.id, ingCourses(me.id).filter(x => x.id !== c.id));
+      render(); toast('삭제했습니다');
+      break;
+    }
+    case 'ingassign': ingAssignModal(currentStaff().id, el.dataset.cid); break;
+    case 'ingday': el.classList.toggle('on'); break;
+    case 'ingcalc': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id ===
+        (document.querySelector('[data-act="ingdo"]') || {}).dataset.cid);
+      if (!c) break;
+      const asg = ingAssigned(me.id);
+      const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]).length;
+      const start = $('#ingStart').value, end = $('#ingEnd').value;
+      if (!end || end < start) return toast('목표 완료일을 시작일 이후로 넣어주세요');
+      const days = Array.from(document.querySelectorAll('#ingDays .chip.on')).map(x => Number(x.dataset.v));
+      const per = ingPerDayFor(left, start, end, days);
+      $('#ingPer').value = per;
+      $('#ingCalcOut').textContent = left + '강을 ' + shortDate(end) + '까지 끝내려면 하루 ' + per + '강씩 들어야 합니다.';
+      break;
+    }
+    case 'ingdo': {
+      const me = currentStaff(); if (!me) break;
+      const c = ingCourses(me.id).find(x => x.id === el.dataset.cid);
+      if (!c) break;
+      const asg = ingAssigned(me.id);
+      const left = (c.lectures || []).filter(l => !asg[c.id + '|' + l.seq]);
+      if (!left.length) return toast('미배정 강의가 없습니다');
+      const start = $('#ingStart').value || today();
+      const days = Array.from(document.querySelectorAll('#ingDays .chip.on')).map(x => Number(x.dataset.v));
+      if (!days.length) return toast('요일을 하나 이상 선택해 주세요');
+      const per = Math.max(1, Number($('#ingPer').value) || 1);
+      const dates = ingAssignDates(left.length, start, days, per);
+      const buckets = {};
+      left.forEach((l, i) => {
+        const d = dates[i]; if (!d) return;
+        (buckets[d] = buckets[d] || []).push({ cid: c.id, seq: l.seq, done: false });
+      });
+      Object.keys(buckets).forEach(d => ingSavePlan(me.id, d, ingPlan(me.id, d).concat(buckets[d])));
+      setCheck('__ingset__' + me.id, 'all', { set: { days: days, perDay: per }, done: true });
+      const ds = Object.keys(buckets).sort();
+      closeModal(); render();
+      toast(left.length + '강 배정 완료 — ' + shortDate(ds[0]) + ' ~ ' + shortDate(ds[ds.length - 1]) +
+        ' (' + ds.length + '일)');
+      break;
+    }
+    case 'ingcatchup': {
+      const me = currentStaff(); if (!me) break;
+      if (!confirm('밀린 인강을 전부 오늘로 옮길까요?')) return;
+      const n = ingCatchup(me.id);
+      render(); toast(n + '강을 오늘로 옮겼습니다');
+      break;
+    }
+    case 'ingshift': {
+      const me = currentStaff(); if (!me) break;
+      const v = prompt('오늘 이후의 미완료 인강을 며칠 밀까요?\n(앞당기려면 -3 처럼 음수를 넣으세요)', '7');
+      if (v === null) break;
+      const n = Number(v);
+      if (!n) return toast('숫자를 넣어주세요');
+      const cnt = ingShift(me.id, today(), n);
+      render(); toast(cnt + '강을 ' + (n > 0 ? n + '일 뒤로' : (-n) + '일 앞으로') + ' 옮겼습니다');
+      break;
+    }
+    case 'ingset': {
+      const me = currentStaff(); if (!me) break;
+      const set = ingSet(me.id);
+      const d = prompt('배정할 요일을 번호로 입력하세요 (0=일 1=월 ... 6=토)\n예: 1,2,3,4,5', set.days.join(','));
+      if (d === null) break;
+      const days = String(d).split(',').map(x => Number(x.trim())).filter(x => x >= 0 && x <= 6);
+      const p = prompt('하루에 몇 강씩 배정할까요?', set.perDay);
+      if (p === null) break;
+      setCheck('__ingset__' + me.id, 'all',
+        { set: { days: days, perDay: Math.max(1, Number(p) || 1) }, done: true });
+      render(); toast('저장했습니다');
+      break;
+    }
+
+    /* 순공시간 타이머 */
+    case 'sttoggle': {
+      const me = currentStaff(); if (!me) break;
+      const subj = el.dataset.subj;
+      const r = stRunning(me.id, today());
+      if (r && r.subj === subj) { stStop(me.id, today()); toast(subj + ' 정지 — 수고했어요'); }
+      else { stStart(me.id, today(), subj); toast(subj + ' 시작!'); }
+      render();
+      break;
+    }
+    case 'stsubjadd': {
+      const me = currentStaff(); if (!me) break;
+      const name = (prompt('추가할 과목 이름을 입력하세요 (예: 한국사)') || '').trim();
+      if (!name) break;
+      const list = stSubjects(me.id);
+      if (list.includes(name)) return toast('이미 있는 과목입니다');
+      setCheck('__stsubj__' + me.id, 'all', { list: list.concat(name), done: true });
+      render();
+      break;
+    }
+    case 'stgoal': {
+      const me = currentStaff(); if (!me) break;
+      const cur = stGoalMin(me.id);
+      const v = prompt('하루 목표 공부시간을 분 단위로 입력하세요 (예: 360 = 6시간)\n0을 넣으면 목표를 없앱니다', cur || 360);
+      if (v === null) break;
+      setCheck('__stgoal__' + me.id, 'all', { mins: Math.max(0, Number(v) || 0), done: true });
+      render();
+      break;
+    }
+    case 'stedit': {
+      const me = currentStaff(); if (!me) break;
+      stEditModal(me.id);
+      break;
+    }
+    case 'stsave': {
+      const me = currentStaff(); if (!me) break;
+      const secs = {};
+      document.querySelectorAll('[data-stedit]').forEach(inp => {
+        const m = Math.max(0, Number(inp.value) || 0);
+        if (m) secs[inp.dataset.stedit] = m * 60;
+      });
+      setCheck(stKey(me.id), today(), { secs: secs, run: null, done: true });
+      closeModal(); render(); toast('저장했습니다');
+      break;
+    }
+
+    /* 날짜 */
+    case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
+    case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
+    case 'mnav': ymCursor = ymAdd(ymCursor, Number(el.dataset.n)); render(); break;
+    case 'daypick': cursor = el.dataset.date; cursorPinned = (cursor !== today()); go('today'); break;
+
+    /* 월간 목표 */
+    case 'gadd': {
+      const title = ($('#gTitle').value || '').trim();
+      if (!title) return toast('목표를 입력해 주세요');
+      const me = currentStaff(); if (!me) break;
+      const target = Math.max(0, Number($('#gTarget').value) || 0);
+      const unit = ($('#gUnit').value || '').trim() || '회';
+      state.tasks.push({
+        id: uid(), groupId: 'goal-' + now(), staffId: me.id,
+        kind: 'mgoal', month: ymCursor,
+        title: title, detail: '', guide: '', steps: [], target: target, unit: unit,
+        time: '', priority: 'normal', repeat: 'once', days: [], start: ymCursor + '-01', end: '', carry: false,
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+      });
+      save(); queueSync(); render(); toast('목표를 추가했습니다');
+      break;
+    }
+    case 'gdel': {
+      const t = task();
+      if (!t || !canEditTask(t)) break;
+      if (!confirm('이 목표를 삭제할까요?')) return;
+      t.deleted = true; t.updatedAt = now();
+      save(); queueSync(); render();
+      break;
+    }
+
+    /* 체크 · 단계 · 수량 · 막힘 */
+    case 'toggle': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const turnOn = !(c && c.done);
+      const steps = {};
+      (t.steps || []).forEach(s => { steps[s.id] = turnOn; });
+      setCheck(id, date, {
+        done: turnOn, at: turnOn ? now() : null,
+        steps: steps,
+        count: t.target ? (turnOn ? t.target : 0) : ((c && c.count) || 0),
+        blocked: turnOn ? false : (c ? c.blocked : false)
+      });
+      render();
+      break;
+    }
+    case 'step': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const cur = Object.assign({}, (c && c.steps) || {});
+      const k = el.dataset.step;
+      cur[k] = !cur[k];
+      setCheck(id, date, { steps: cur, blocked: false });
+      syncAuto(t, date);
+      render();
+      break;
+    }
+    case 'cnt': {
+      const t = task(); if (!t) break;
+      const c = getCheck(id, date);
+      const n = Math.max(0, ((c && c.count) || 0) + Number(el.dataset.n));
+      setCheck(id, date, { count: n, blocked: false });
+      syncAuto(t, date);
+      render();
+      break;
+    }
+    case 'block': {
+      const c = getCheck(id, date);
+      const on = !(c && c.blocked);
+      setCheck(id, date, { blocked: on, done: on ? false : (c ? c.done : false) });
+      render();
+      toast(on ? '원장님 화면에 표시됩니다' : '막힘을 해제했습니다');
+      break;
+    }
+    case 'panel': {
+      const k = id + '|' + date;
+      openPanels.has(k) ? openPanels.delete(k) : openPanels.add(k);
+      render();
+      break;
+    }
+
+    /* 학생 */
+    case 'pickstaff': viewStaff = id; render(); break;
+    case 'openstaff': viewStaff = id; go('today'); break;
+    case 'addstaff': {
+      const name = ($('#sName').value || '').trim();
+      if (!name) return toast('이름을 입력해 주세요');
+      state.staff.push({ id: uid(), name: name, createdAt: now(), updatedAt: now(), deleted: false });
+      save(); queueSync(); render(); toast(name + ' 등록 완료');
+      break;
+    }
+    case 'delstaff': {
+      if (!session.isAdmin) break;
+      const s = staffById(id);
+      if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
+      s.deleted = true; s.updatedAt = now();
+      save(); queueSync(); render();
+      break;
+    }
+    case 'toggleowner': {
+      if (!session.isAdmin) break;
+      const s = staffById(id);
+      if (!s) break;
+      s.owner = !s.owner; s.updatedAt = now();
+      save(); queueSync(); render();
+      toast(s.owner ? s.name + ' — 대표로 지정 (학생 통계에서 제외)' : s.name + ' — 대표 해제');
+      break;
+    }
+    case 'togglemanager': {
+      if (!session.isAdmin) break;
+      const s = staffById(id);
+      if (!s) break;
+      s.manager = !s.manager; s.updatedAt = now();
+      save(); queueSync(); render();
+      toast(s.manager
+        ? s.name + ' — 관리자로 지정. 본인 개인 링크에서 현황·발행이 열립니다'
+        : s.name + ' — 관리자 해제');
+      break;
+    }
+    case 'copylink': {
+      ensureToken(id)
+        .then(() => copy(staffLink(id)))
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'alllinks': {
+      const list = liveStaff();
+      toast(list.length + '명 링크 준비 중…');
+      Promise.all(list.map(s => ensureToken(s.id).catch(() => null)))
+        .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
+        .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'adminlink': {
+      toast('10분 연결 링크 만드는 중…');
+      sync.issueAdminHandoff()
+        .then(d => copy(location.origin + location.pathname + '#admin=' + encodeURIComponent(d.code)))
+        .catch(e => toast('연결 링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
+    case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
+    case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
+    case 'copytext': copy($('#mText').value); break;
+    case 'managetasks': manageTasks(id); break;
+    case 'newtask': editTaskModal(null); break;
+
+    /* 빠른 추가 — 한 줄로 쓰고 바로 카톡 문구까지 */
+    case 'qadd': {
+      const line = ($('#qAdd').value || '').trim();
+      if (!line) return toast('내용을 입력해 주세요');
+      const me = currentStaff();
+      if (!me) return toast('학생을 먼저 선택해 주세요');
+      const p = parseInstructions(line)[0];
+      const t = {
+        id: uid(), groupId: 'quick-' + now(), staffId: me.id,
+        title: p.title, detail: '', guide: '', steps: [], target: 0, unit: '건',
+        time: p.time, priority: p.priority,
+        repeat: 'once', days: [], start: p.start, end: '', carry: true,
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
+      };
+      state.tasks.push(t);
+      save(); queueSync(); render();
+      toast(me.name + ' — 추가했습니다');
+      if (!session.isStaffLink) {
+        setTimeout(() => showText('카톡으로 보낼 문구', quickText(t)), 300);
+      }
+      break;
+    }
+
+    /* 카톡 문장 붙여넣기 */
+    case 'kopen': kakaoText = ''; kakaoParsed = null; kakaoModal(); break;
+    case 'kparse': {
+      kakaoText = $('#kText').value || '';
+      kakaoParsed = parseInstructions(kakaoText);
+      kakaoModal();
+      break;
+    }
+    case 'kapply': {
+      pendingAdd = kakaoParsed;
+      kakaoParsed = null; kakaoText = '';
+      closeModal(); render();
+      break;
+    }
+    case 'etask': {
+      const t = task();
+      if (!t) break;
+      if (!canEditTask(t)) return toast('원장님이 내린 지시는 수정할 수 없습니다');
+      editTaskModal(id);
+      break;
+    }
+    case 'edelete': {
+      const t = state.tasks.find(x => x.id === eForm.id);
+      if (!t) break;
+      if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 중단할 수 없습니다'); }
+      if (!confirm('이 업무를 중단할까요? 지난 기록은 유지됩니다.')) return;
+      t.deleted = true; t.updatedAt = now();
+      eForm = null;
+      save(); queueSync(); closeModal(); render(); toast('중단했습니다');
+      break;
+    }
+    case 'erepeat': {
+      eForm.repeat = el.dataset.v;
+      document.querySelectorAll('#eRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === eForm.repeat));
+      $('#eDaysWrap').style.display = eForm.repeat === 'days' ? '' : 'none';
+      break;
+    }
+    case 'edow': {
+      const d = Number(el.dataset.d), i = eForm.days.indexOf(d);
+      if (i < 0) eForm.days.push(d); else eForm.days.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'ecarry': {
+      eForm.carry = !eForm.carry;
+      el.classList.toggle('on', eForm.carry);
+      el.textContent = (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월';
+      break;
+    }
+    case 'esave': saveEditedTask(); break;
+    case 'deltask': {
+      const t = task();
+      if (!t || !confirm('이 지시를 중단할까요? 지난 기록은 유지됩니다.')) return;
+      t.deleted = true; t.updatedAt = now();
+      save(); queueSync(); closeModal(); render(); toast('중단했습니다');
+      break;
+    }
+
+    /* AI 가져오기 */
+    case 'aiopen': aiModal(); break;
+    case 'aisample': $('#aiText').value = AI_SAMPLE; break;
+    case 'aiapply': applyAssignments($('#aiText').value || ''); break;
+    case 'padd': { const p = pendingAdd; pendingAdd = null; applyAssignments(p, true); go('today'); break; }
+    case 'pcancel': pendingAdd = null; render(); toast('취소했습니다'); break;
+
+    /* 지시서 작성 */
+    case 'wstaff': {
+      const i = wForm.staff.indexOf(id);
+      if (i < 0) wForm.staff.push(id); else wForm.staff.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'wrepeat': {
+      wForm.repeat = el.dataset.v;
+      document.querySelectorAll('#wRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === wForm.repeat));
+      $('#wDaysWrap').style.display = wForm.repeat === 'days' ? '' : 'none';
+      $('#wEndWrap').style.display  = wForm.repeat === 'once' ? 'none' : '';
+      break;
+    }
+    case 'wdow': {
+      const d = Number(el.dataset.d), i = wForm.days.indexOf(d);
+      if (i < 0) wForm.days.push(d); else wForm.days.splice(i, 1);
+      el.classList.toggle('on');
+      break;
+    }
+    case 'wcarry': { wForm.carry = !wForm.carry; render(); break; }
+    case 'wadd': {
+      const title = ($('#wTitle').value || '').trim();
+      if (!wForm.staff.length) return toast('받는 학생을 선택해 주세요');
+      if (!title) return toast('업무 내용을 입력해 주세요');
+      if (wForm.repeat === 'days' && !wForm.days.length) return toast('요일을 선택해 주세요');
+      wForm.start = $('#wStart').value || today();
+      wForm.end = (wForm.repeat === 'once' ? '' : ($('#wEnd').value || ''));
+      draft.push({
+        title: title,
+        detail: ($('#wDetail').value || '').trim(),
+        guide: ($('#wGuide').value || '').trim(),
+        steps: ($('#wSteps').value || '').split('\n').map(x => x.trim()).filter(Boolean)
+                 .map(l => ({ id: uid(), label: l })),
+        target: Number($('#wTarget').value) || 0,
+        unit: ($('#wUnit').value || '건').trim(),
+        time: $('#wTime').value || '',
+        priority: $('#wPri').value,
+        repeat: wForm.repeat,
+        days: wForm.days.slice().sort(),
+        start: wForm.start,
+        end: wForm.end,
+        carry: wForm.carry,
+        staffIds: wForm.staff.slice(),
+        names: wForm.staff.map(x => (staffById(x) || {}).name).filter(Boolean)
+      });
+      render();
+      toast('목록에 담았습니다 (' + draft.length + '건)');
+      break;
+    }
+    case 'wdel': draft.splice(Number(el.dataset.i), 1); render(); break;
+    case 'wclear': draft = []; render(); break;
+    case 'wpublish': {
+      if (!draft.length) return;
+      const gid = uid(), touched = new Set();
+      draft.forEach(d => d.staffIds.forEach(sid => {
+        state.tasks.push({
+          id: uid(), groupId: gid, staffId: sid,
+          title: d.title, detail: d.detail, guide: d.guide,
+          steps: (d.steps || []).map(s => ({ id: uid(), label: s.label })),
+          target: d.target, unit: d.unit,
+          time: d.time, priority: d.priority,
+          repeat: d.repeat, days: d.days, start: d.start, end: d.end, carry: d.carry,
+          origin: session.isStaffLink ? 'manager' : undefined,
+          createdAt: now(), updatedAt: now(), deleted: false
+        });
+        touched.add(sid);
+      }));
+      const n = draft.length;
+      draft = [];
+      save(); queueSync(); render();
+      toast(n + '건 발행 완료');
+      const first = [...touched][0];
+      if (first) setTimeout(() => showText('카카오톡 지시서 문구', orderText(first, today())), 400);
+      break;
+    }
+
+    /* 설정 */
+    case 'savecfg': {
+      state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
+      state.settings.adminToken = '';
+      save(); render(); toast('저장했습니다');
+      if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
+      break;
+    }
+    case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
+    case 'export': {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'wb-컨설팅플래너-' + today() + '.json';
+      a.click(); URL.revokeObjectURL(a.href);
+      break;
+    }
+    case 'import': {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json';
+      inp.onchange = () => {
+        const f = inp.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const p = JSON.parse(r.result);
+            if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
+            if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
+            state = Object.assign(blankState(), p);
+            save(); render(); toast('불러왔습니다');
+          } catch (e) { toast('파일을 읽을 수 없습니다'); }
+        };
+        r.readAsText(f);
+      };
+      inp.click();
+      break;
+    }
+    case 'closemodal': closeModal(); break;
+  }
+});
+
+/* 메모 · 수량 직접 입력 */
+let inputTimer = null;
+document.addEventListener('input', ev => {
+  const noteEl = ev.target.closest('[data-act="note"]');
+  if (noteEl) {
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(() => {
+      setCheck(noteEl.dataset.id, noteEl.dataset.date || cursor, { note: noteEl.value });
+      toast('메모 저장됨');
+    }, 700);
+    return;
+  }
+  const cntEl = ev.target.closest('[data-act="cntset"]');
+  if (cntEl) {
+    clearTimeout(inputTimer);
+    inputTimer = setTimeout(() => {
+      const t = state.tasks.find(x => x.id === cntEl.dataset.id);
+      const d = cntEl.dataset.date || cursor;
+      setCheck(cntEl.dataset.id, d, { count: Math.max(0, Number(cntEl.value) || 0), blocked: false });
+      if (t) syncAuto(t, d);
+      render();
+    }, 600);
+  }
+});
+
+/* 엔터 제출 */
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  const t = ev.target;
+  if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
+  if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
+  if (t.id === 'qAdd')  document.querySelector('[data-act="qadd"]')?.click();
+});
+
+/* 복귀 시 최신화 */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
+  sync.run();
+});
+
+/* ══════════════════════════════════════════════════════
+   11. 시작
+   ══════════════════════════════════════════════════════ */
+load();
+absorbLinkParams();
+const h = location.hash.replace('#/', '');
+if (h) route = h;
+if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
+render();
+connectAdminDevice();
+
+if (sync.enabled()) {
+  sync.run();
+}
+setInterval(() => sync.run(), 45000);
+
+/* 순공시간 초 단위 표시 — 화면 전체를 다시 그리지 않고 숫자만 갈아끼운다 */
+setInterval(() => {
+  const el = $('#stTot');
+  if (!el) return;
+  const me = currentStaff();
+  if (!me || !stRunning(me.id, today())) return;
+  const secs = stSecs(me.id, today());
+  el.textContent = fmtHMS(Object.values(secs).reduce((a, b) => a + b, 0));
+  const chip = $('#stChipOn');
+  const r = stRunning(me.id, today());
+  if (chip && r) chip.textContent = '⏸ ' + r.subj + (secs[r.subj] ? ' ' + fmtHM(secs[r.subj]) : '');
+}, 1000);
+
+/* ── 새 버전 감지 ──
+ * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
+ * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
+const APP_VER = '2026-08-10.4';
+function checkVersion() {
+  fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !d.v || d.v === APP_VER || document.getElementById('newver')) return;
+      const el = document.createElement('div');
+      el.className = 'newver'; el.id = 'newver';
+      el.innerHTML = '<span>\uc0c8 \ubc84\uc804\uc774 \uc788\uc2b5\ub2c8\ub2e4 \u2014 \uc0c8\ub85c\uace0\uce68\ud558\uba74 \ubc14\ub85c \uc801\uc6a9\ub429\ub2c8\ub2e4</span>' +
+        '<button type="button" id="verReload">\uc0c8\ub85c\uace0\uce68</button>';
+      document.body.appendChild(el);
+      document.getElementById('verReload').onclick = () => {
+        location.replace(location.pathname + location.search.replace(/[?&]v=\d+/, '') +
+          (location.search ? '&' : '?') + 'v=' + Date.now() + location.hash);
+      };
+    })
+    .catch(() => {});
+}
+checkVersion();
+setInterval(checkVersion, 10 * 60 * 1000);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+
+import worker from './worker-core.js';
+
+const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
+const migration = fs.readFileSync(new URL('./migrations/019_private_roster.sql', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('./roster.js', import.meta.url), 'utf8');
+
+class D1Statement {
+  constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
+  bind(...args) { this.args = args; return this; }
+  first() { return this.database.prepare(this.sql).get(...this.args) || null; }
+  all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
+  run() {
+    const result = this.database.prepare(this.sql).run(...this.args);
+    return { meta: { changes: Number(result.changes || 0) } };
+  }
+}
+
+class TestD1 {
+  constructor() {
+    this.database = new DatabaseSync(':memory:');
+    this.database.exec(schema);
+  }
+  prepare(sql) { return new D1Statement(this.database, sql); }
+}
+
+const admin = { mode: 'admin', secret: 'director-secret' };
+const person = (id, token) => ({ mode: 'person', id, token });
+const clone = value => JSON.parse(JSON.stringify(value));
+
+function documentFixture() {
+  return {
+    roster: {
+      updated: '2026-08-10', baseline: '2026-08', note: '비공개 원생 명단',
+      students: [
+        {
+          id: 'student-a', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학',
+          start: '2026-08', end: '', reason: '', teacherIds: ['teacher-a']
+        },
+        {
+          id: 'student-b', name: '나학생', grade: '중2', teacher: '나선생', subject: '국어',
+          start: '2026-08', end: '', reason: '', memo: '관찰', teacherIds: ['teacher-b']
+        },
+        {
+          id: 'student-shared', name: '겸임학생', grade: '고1', teacher: '가선생·나선생', subject: '수학·국어',
+          start: '2026-08', end: '', reason: '', teacherIds: ['teacher-a', 'teacher-b']
+        }
+      ]
+    },
+    bookStudents: [
+      {
+        id: 'book-row-a', studentId: 'student-a', name: '가학생', teacher: '가선생', bookId: 'BK01',
+        at: '1단원', perWeek: 2, goal: '1회독', teacherIds: ['teacher-a']
+      },
+      {
+        id: 'book-row-a-2', studentId: 'student-a', name: '가학생', teacher: '가선생', bookId: 'BK04',
+        at: '3단원', perWeek: 1, goal: '복습', teacherIds: ['teacher-a']
+      },
+      {
+        id: 'book-row-b', studentId: 'student-b', name: '나학생', teacher: '나선생', bookId: 'BK02',
+        at: '', perWeek: 1, goal: '', teacherIds: ['teacher-b']
+      },
+      {
+        id: 'book-row-shared', studentId: 'student-shared', name: '겸임학생', teacher: '가선생·나선생', bookId: 'BK03',
+        at: '2단원', perWeek: 2, goal: '복습', teacherIds: ['teacher-a', 'teacher-b']
+      }
+    ]
+  };
+}
+
+function seedAuth(db) {
+  const now = Date.now();
+  for (const [id, name, deleted, token] of [
+    ['teacher-a', '가선생', false, 'token-a'],
+    ['teacher-b', '나선생', false, 'token-b'],
+    ['teacher-deleted', '퇴사선생', true, 'token-deleted']
+  ]) {
+    db.prepare('INSERT INTO staff (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
+      .bind('task', id, id, JSON.stringify({ id, name, deleted }), now, now).run();
+    db.prepare('INSERT INTO tokens (app,token,staff_id,created_at,revoked) VALUES (?,?,?,?,0)')
+      .bind('task', token, id, now).run();
+  }
+}
+
+async function call(db, body, app = 'task') {
+  const response = await worker.fetch(new Request('https://worker.example/roster', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ app, ...body })
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  return { status: response.status, headers: response.headers, body: await response.json() };
+}
+
+async function replace(db, document = documentFixture()) {
+  return call(db, { auth: admin, action: 'replace', document });
+}
+
+test('schema and migration add one private JSON document table without destructive SQL', () => {
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS private_rosters/);
+    assert.match(sql, /CHECK \(app = 'task'\)/);
+    assert.match(sql, /json_valid\(data\)/);
+    assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
+  }
+  assert.doesNotMatch(source, /fetch\s*\(|roster\.json|textbooks\.json/);
+});
+
+test('unauthenticated and consult requests are rejected', async () => {
+  const db = new TestD1(); seedAuth(db);
+  assert.equal((await call(db, { action: 'get' })).status, 401);
+  assert.equal((await call(db, {
+    auth: { mode: 'admin', secret: 'consult-secret' }, action: 'get'
+  }, 'consult')).status, 400);
+});
+
+test('director replaces and reads the full document without exposing teacherIds', async () => {
+  const db = new TestD1(); seedAuth(db);
+  const saved = await replace(db);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.rosterCount, 3);
+  assert.equal(saved.body.bookStudentCount, 4);
+  assert.equal(saved.headers.get('cache-control'), 'no-store');
+
+  const result = await call(db, { auth: admin, action: 'get' });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.roster.students.map(item => item.id), ['student-a', 'student-b', 'student-shared']);
+  assert.deepEqual(result.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-b', 'book-row-shared']);
+  assert.equal(JSON.stringify(result.body).includes('teacherIds'), false);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+});
+
+test('person receives only assigned and co-taught roster and book rows', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const teacherA = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  assert.equal(teacherA.status, 200);
+  assert.deepEqual(teacherA.body.roster.students.map(item => item.id), ['student-a', 'student-shared']);
+  assert.deepEqual(teacherA.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-shared']);
+  assert.equal(JSON.stringify(teacherA.body).includes('teacherIds'), false);
+
+  const teacherB = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
+  assert.deepEqual(teacherB.body.roster.students.map(item => item.id), ['student-b', 'student-shared']);
+  assert.deepEqual(teacherB.body.bookStudents.map(item => item.id), ['book-row-b', 'book-row-shared']);
+});
+
+test('person cannot replace, forge another id, or use a deleted staff session', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  assert.equal((await call(db, {
+    auth: person('teacher-a', 'token-a'), action: 'replace', document: documentFixture()
+  })).status, 403);
+  assert.equal((await call(db, { auth: person('teacher-a', 'token-b'), action: 'get' })).status, 401);
+  assert.equal((await call(db, {
+    auth: person('teacher-deleted', 'token-deleted'), action: 'get'
+  })).status, 401);
+});
+
+test('replace rejects missing identity, duplicate ids, bad references, and unknown fields', async () => {
+  const db = new TestD1(); seedAuth(db);
+
+  const missingTeacherIds = documentFixture();
+  delete missingTeacherIds.roster.students[0].teacherIds;
+  assert.equal((await replace(db, missingTeacherIds)).status, 400);
+
+  const duplicateRosterId = documentFixture();
+  duplicateRosterId.roster.students[1].id = 'student-a';
+  assert.match((await replace(db, duplicateRosterId)).body.error, /중복 id/);
+
+  const duplicateBookId = documentFixture();
+  duplicateBookId.bookStudents[2].id = 'book-row-a';
+  assert.match((await replace(db, duplicateBookId)).body.error, /중복 id/);
+
+  const badReference = documentFixture();
+  badReference.bookStudents[0].studentId = 'missing-student';
+  assert.equal((await replace(db, badReference)).status, 400);
+
+  const unknown = documentFixture();
+  unknown.roster.students[0].phone = '01012345678';
+  assert.match((await replace(db, unknown)).body.error, /허용되지 않은 항목/);
+
+  const invalidDate = documentFixture();
+  invalidDate.roster.updated = '2026-02-31';
+  assert.equal((await replace(db, invalidDate)).status, 400);
+
+  const unknownTeacher = documentFixture();
+  unknownTeacher.roster.students[0].teacherIds.push('teacher-unknown');
+  assert.match((await replace(db, unknownTeacher)).body.error, /활성 직원 ID/);
+
+  const deletedTeacher = documentFixture();
+  deletedTeacher.roster.students[0].teacherIds.push('teacher-deleted');
+  assert.match((await replace(db, deletedTeacher)).body.error, /활성 직원 ID/);
+});
+
+test('replace is an upsert and malformed stored data fails closed', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const changed = clone(documentFixture());
+  changed.roster.note = '교체됨';
+  await replace(db, changed);
+  assert.equal(db.prepare("SELECT count(*) AS count FROM private_rosters WHERE app='task'").first().count, 1);
+
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'")
+    .bind(JSON.stringify({ roster: {}, bookStudents: [] })).run();
+  const result = await call(db, { auth: admin, action: 'get' });
+  assert.equal(result.status, 500);
+  assert.equal(result.body.error, '저장된 원생 데이터 형식이 올바르지 않습니다');
+});

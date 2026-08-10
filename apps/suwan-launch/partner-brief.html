@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수완지구 신규 학원 준비 브리핑 | 리더스 유치원 · 리드앤톡 · WB 웩슬러브레인센터</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#1E9DD6; --deep-blue:#0F7AAB; --navy:#1B3A5C; --navy-deep:#0d2a47;
+    --coral:#E85D4A; --ivory:#FAF8F3; --dark:#2D2D2D; --mid:#6B7280;
+    --light:#F3F4F6; --line:#e5e7eb; --white:#fff; --blue-soft:#7FD0F0;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Noto Sans KR',sans-serif;color:var(--dark);background:var(--ivory);line-height:1.75}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px}
+  .section{padding:52px 0}
+  .section-light{background:var(--white)}
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:12px}
+  h1{font-size:clamp(26px,4.4vw,40px);font-weight:900;line-height:1.32;letter-spacing:-.02em;margin-bottom:16px}
+  h2{font-size:clamp(21px,3vw,27px);font-weight:900;margin-bottom:12px;letter-spacing:-.01em}
+  h3{font-size:16.5px;font-weight:800;margin-bottom:6px}
+  .lede{font-size:15.5px;color:var(--mid);max-width:62ch}
+  .muted{color:var(--mid)}
+  .small{font-size:13px}
+
+  /* hero */
+  .hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 60%,var(--deep-blue) 100%);
+    color:#fff;padding:64px 0 56px}
+  .hero .lede{color:rgba(255,255,255,.85)}
+  .hero .eyebrow{color:var(--blue-soft)}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+  .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:100px;
+    font-size:12.5px;font-weight:700;padding:5px 14px}
+
+  /* partners */
+  .partner-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+  @media(max-width:760px){.partner-grid{grid-template-columns:1fr}}
+  .partner-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .partner-card .dot{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-weight:900;color:#fff;font-size:16px;margin-bottom:12px}
+  .partner-card .role{font-size:12px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  .partner-card p{font-size:13.5px;color:var(--mid);margin-top:8px}
+
+  /* principles */
+  .principle-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+  @media(max-width:700px){.principle-list{grid-template-columns:1fr}}
+  .principle{background:var(--white);border:1px solid var(--line);border-left:4px solid var(--blue);
+    border-radius:0 10px 10px 0;padding:14px 16px;font-size:13.5px}
+  .principle b{display:block;font-size:14px;margin-bottom:3px}
+
+  /* concept cards */
+  .concept-grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:24px}
+  .concept-card{border-radius:16px;padding:26px;color:#fff;background:linear-gradient(135deg,var(--c1),var(--c2))}
+  .concept-card .code{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.8}
+  .concept-card h3{color:#fff;font-size:19px;margin:4px 0 8px}
+  .concept-card .tagline{font-size:14px;font-weight:700;opacity:.92;margin-bottom:10px}
+  .concept-card .pos{font-size:13.5px;line-height:1.75;opacity:.92;max-width:70ch}
+  .concept-card .why{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.25);font-size:13px;opacity:.9}
+  .swatches{display:flex;gap:6px;margin-top:14px}
+  .swatch{width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,.5)}
+
+  /* agenda */
+  .agenda{counter-reset:agenda}
+  .agenda-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .agenda-item:last-child{border-bottom:none}
+  .agenda-num{flex:none;width:28px;height:28px;border-radius:100px;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .agenda-item b{display:block;font-size:14.5px;margin-bottom:2px}
+  .agenda-item span{font-size:13px;color:var(--mid)}
+
+  .footer-note{font-size:12px;color:var(--mid);text-align:center;padding:36px 0 46px}
+  .divider{height:1px;background:var(--line);margin:0}
+
+  @media print{
+    body{background:#fff}
+    .section{padding:24px 0}
+    .hero{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .concept-card{-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow">수완지구 신규 학원 준비</div>
+    <h1>리더스 유치원 · 리드앤톡 · WB<br>세 곳이 함께 만드는 다음 학원</h1>
+    <p class="lede">리더스 유치원·리더스 영유의 졸업생, 리더스 직영학원과 리드앤톡의 재원 가정에게
+      더 오래, 더 잘 맞는 다음 단계를 만들어드리기 위해 세 기관이 함께 방향을 정하는 자리를 준비했습니다.
+      이 문서는 논의를 위한 초안이며, 확정된 것은 없습니다.</p>
+    <div class="chip-row">
+      <span class="chip">목표: 하반기 오픈</span>
+      <span class="chip">모집 시즌: 11~2월 역산 준비</span>
+      <span class="chip">3자 협의 · 초안 단계</span>
+    </div>
+  </div>
+</section>
+
+<section class="section section-light">
+  <div class="wrap">
+    <div class="eyebrow">Why Together</div>
+    <h2>왜 세 기관이 함께해야 할까요</h2>
+    <p class="lede">세 곳은 서로 다른 강점과 서로 다른 학부모 신뢰를 갖고 있습니다.
+      각자의 자리를 지키면서, 아이가 유치원부터 초·중등까지 성장하는 동안 자연스럽게
+      다음 단계로 이어질 수 있는 구조를 함께 설계하고자 합니다.</p>
+    <div class="partner-grid">
+      <div class="partner-card">
+        <div class="dot" style="background:#7a5c9e">리</div>
+        <div class="role">리더스 유치원 · 리더스 영유</div>
+        <h3>졸업생과 학부모 신뢰의 시작점</h3>
+        <p>매년 배출되는 졸업생과 직영학원 재원 가정에게 유치원 이후의 다음 단계를 어떻게 안내할지가
+          핵심 고민입니다.</p>
+      </div>
+      <div class="partner-card">
+        <div class="dot" style="background:#2f7d5e">톡</div>
+        <div class="role">리드앤톡 학원</div>
+        <h3>검증된 영어 커리큘럼과 재원 가정</h3>
+        <p>이미 쌓아온 커리큘럼과 재원 가정의 신뢰를 지키면서, 상위 과정으로 이어질 새로운 공간과
+          협력 방식을 함께 그려봅니다.</p>
+      </div>
+      <div class="partner-card">
+        <div class="dot" style="background:var(--deep-blue)">WB</div>
+        <div class="role">WB 웩슬러브레인센터</div>
+        <h3>검사 데이터와 학습관리 노하우</h3>
+        <p>봉선동에서 쌓은 웩슬러 검사·문해력 프로그램·학습관리 자동화 경험을 수완지구 신규 학원에
+          이식하는 역할을 맡습니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="section">
+  <div class="wrap">
+    <div class="eyebrow">Ground Rules</div>
+    <h2>함께 지키고자 하는 원칙</h2>
+    <p class="lede">세 기관의 신뢰가 흔들리지 않도록, 학생·학부모를 대하는 방식에 대해 먼저 합의하고 싶은 원칙입니다.</p>
+    <div class="principle-list">
+      <div class="principle"><b>💬 커뮤니케이션 일원화</b>재원생·졸업생 대상 안내는 반드시 소속 기관 원장님 명의로 나갑니다. 어느 쪽도 상대 기관 학부모에게 직접 영업하지 않습니다.</div>
+      <div class="principle"><b>🚫 할인 없는 정가 원칙</b>가격 경쟁 대신 검사·리포트·관리 같은 비가격 가치로 신뢰를 쌓습니다. 세 기관 모두 이 원칙을 함께 지킵니다.</div>
+      <div class="principle"><b>🤝 자연스러운 전환 시점만 활용</b>졸업·수료·학년 진급 등 자연스러운 시점에서만 다음 단계를 안내하고, 재원 중인 학생을 개별적으로 접촉하지 않습니다.</div>
+      <div class="principle"><b>📊 숫자로 투명하게 공유</b>전환·잔류 현황을 분기마다 세 기관이 함께 확인해, 어느 쪽도 손해 보지 않는다는 것을 데이터로 증명합니다.</div>
+      <div class="principle"><b>🧩 컨셉은 다르게, 역할은 보완적으로</b>세 기관은 서로 다른 색깔을 유지합니다. 신규 학원은 경쟁자가 아니라 다음 단계를 맡는 파트너로 설계합니다.</div>
+      <div class="principle"><b>📝 최종 결정은 3자 합의로</b>인수·통합처럼 큰 방향은 어느 한쪽이 먼저 정하지 않고, 세 기관이 함께 논의해 결정합니다.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="section section-light">
+  <div class="wrap">
+    <div class="eyebrow">Three Directions</div>
+    <h2>세 가지 방향 후보</h2>
+    <p class="lede">같은 원칙 위에서 출발하지만, 서로 다른 세 가지 방향을 검토하고 있습니다.
+      아직 확정된 안은 없으며, 오늘 논의를 통해 방향을 좁혀가고자 합니다.</p>
+    <div class="concept-grid">
+
+      <div class="concept-card" style="--c1:#2F5DA8;--c2:#1C2B4A">
+        <div class="code">A안 · 문해력 전문관</div>
+        <h3>WB 리딩 브릿지</h3>
+        <div class="tagline">감이 아니라 데이터로 — 한글 다음의 3년을 설계합니다</div>
+        <p class="pos">웩슬러 검사 데이터와 읽기 패턴 분석을 앞세운 초등 국어·문해력 전문학원입니다.
+          리더스 졸업생의 한글·독서 교육을 초등 문해력으로 잇는 공식 다음 단계로 자리 잡고,
+          소수정예 운영으로 품질과 신뢰를 지키는 방향입니다.</p>
+        <div class="why">왜 이 방향인가 — WB만 가진 검사 데이터 자산을 가장 직접적으로 활용할 수 있고,
+          초기 투자·인력 부담이 상대적으로 가볍습니다.</div>
+        <div class="swatches"><div class="swatch" style="background:#F8F4EA"></div><div class="swatch" style="background:#1C2B4A"></div><div class="swatch" style="background:#2F5DA8"></div><div class="swatch" style="background:#E3A94F"></div></div>
+      </div>
+
+      <div class="concept-card" style="--c1:#17B26A;--c2:#0A3B2E">
+        <div class="code">B안 · 영어 수직통합</div>
+        <h3>원라인 잉글리시</h3>
+        <div class="tagline">파닉스에서 내신까지, 갈아타지 않는 영어</div>
+        <p class="pos">리더스 영유 졸업생과 리드앤톡의 커리큘럼·재원 가정을 한 브랜드 안에서
+          파닉스부터 중등 내신까지 끊김 없이 잇는 영어 중심 어학원입니다.
+          리드앤톡과의 구체적 협력 방식(제휴/통합)은 함께 정해야 할 핵심 논의점입니다.</p>
+        <div class="why">왜 이 방향인가 — 리드앤톡의 기존 자산과 리더스 졸업생 파이프라인을
+          동시에 살릴 수 있어, 세 기관의 강점이 가장 직접적으로 결합되는 방향입니다.</div>
+        <div class="swatches"><div class="swatch" style="background:#F7F3E8"></div><div class="swatch" style="background:#0A3B2E"></div><div class="swatch" style="background:#17B26A"></div><div class="swatch" style="background:#C9A227"></div></div>
+      </div>
+
+      <div class="concept-card" style="--c1:#35C4F0;--c2:#0A1F33">
+        <div class="code">C안 · 초중 종합 관제</div>
+        <h3>데이터 러닝랩</h3>
+        <div class="tagline">검사로 시작해, 데이터로 관리하고, 리포트로 증명하는 초·중 공부 습관</div>
+        <p class="pos">진단검사부터 맞춤 배치, 플래너 관리, 정기 리포트까지를 표준 프로그램으로 만든
+          초·중 통합 종합학원입니다. 초등은 성장의 모수, 중등은 수익 중심축으로 삼는 단계적 확장 구조입니다.</p>
+        <div class="why">왜 이 방향인가 — 가장 넓은 학년대를 커버해 세 기관 각각의 재원 가정에게
+          공통적으로 필요한 학습관리 가치를 제공할 수 있습니다.</div>
+        <div class="swatches"><div class="swatch" style="background:#F2F6FA"></div><div class="swatch" style="background:#0A1F33"></div><div class="swatch" style="background:#35C4F0"></div><div class="swatch" style="background:#2EE6A8"></div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="section">
+  <div class="wrap">
+    <div class="eyebrow">Next Agenda</div>
+    <h2>오늘 함께 정하고 싶은 것</h2>
+    <div class="agenda">
+      <div class="agenda-item"><div class="agenda-num">1</div><div><b>방향 선택</b><span>세 가지 방향 중 어느 쪽으로, 혹은 어떤 조합으로 좁혀갈지</span></div></div>
+      <div class="agenda-item"><div class="agenda-num">2</div><div><b>역할 분담</b><span>연령·과목별로 각 기관이 어디를 맡고, 어디서 자연스럽게 다음 단계로 넘어가는지</span></div></div>
+      <div class="agenda-item"><div class="agenda-num">3</div><div><b>커뮤니케이션 원칙</b><span>학부모 안내는 어떤 명의로, 어떤 방식으로 나갈지에 대한 구체적 합의</span></div></div>
+      <div class="agenda-item"><div class="agenda-num">4</div><div><b>사업 구조·수익 배분</b><span>투자·운영·소개 기여를 어떻게 인정하고 나눌지의 원칙</span></div></div>
+      <div class="agenda-item"><div class="agenda-num">5</div><div><b>다음 만남 일정</b><span>구체안을 좁혀 다시 논의할 시점</span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="footer-note">
+  WB 웩슬러브레인센터 × 리더스 유치원 × 리드앤톡 — 수완지구 신규 학원 준비를 위한 논의용 초안입니다.<br>
+  이 문서의 수치·방향은 확정 사항이 아니며, 세 기관의 합의를 통해 변경될 수 있습니다.
+</div>
+
+</body>
+</html>

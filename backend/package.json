@@ -1,0 +1,18 @@
+{
+  "name": "wb-picture-test-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "그림검사 AI 해석 웹 · MVP 백엔드 (HTP). 무의존성 실행 골격.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node test/smoke.mjs",
+    "test:kb": "node test/kb-4tests.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0"
+  }
+}
