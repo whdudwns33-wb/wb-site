@@ -23,7 +23,7 @@
  *   POST /guardian-contact { app, auth(admin), ... } → 원장, 보호자 연락처·발송 동의 등록/조회
  *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
- *   POST /director-report-send { app, auth, reportDate, staffId? } → 원장 본인 테스트 LMS
+ *   POST /director-report-send { app, auth, reportDate, staffId? } → 고정된 원장 수신처 카카오 알림톡
  *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
  *   POST /book-add-request { app, auth, ... }     → 직원, 새 교재를 교재 목록에 추가해 달라고 신청
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
@@ -34,7 +34,7 @@
  * 인증
  *   auth = { mode:'admin',  secret }            → 전체 접근
  *   auth = { mode:'admin_device', token }       → 연결된 원장 기기
- *   auth = { mode:'person', id, token }         → 본인 것만
+ *   auth = { mode:'person', id, token }         → 본인 범위(task allowlist 관리 담당은 전체)
  */
 
 import { handleLessonCreate } from './lesson-create.js';
@@ -106,6 +106,13 @@ function randomOpaqueValue() {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function taskManagerIds(env) {
+  return new Set(String(env.TASK_MANAGER_STAFF_IDS || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(id => SAFE_ID.test(id)));
+}
+
 async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
   if (auth.mode === 'admin') {
@@ -134,26 +141,34 @@ async function resolveAuth(env, app, auth) {
       'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
       'AND (token=? OR created_at>=?) LIMIT 1'
     ).bind(app, tokenHash, token, token, createdAfter).first();
-    if (!row || row.staff_id !== id || !await activeStaff(env, app, id)) return null;
-    // 개인 링크는 직책과 무관하게 항상 본인 범위다. 전체 관리는 원장 비밀키 인증만 사용한다.
+    const staff = await activeStaffData(env, app, id);
+    if (!row || row.staff_id !== id || !staff) return null;
+    // 수정 가능한 staff 메타데이터가 아니라 배포 환경의 명시적 allowlist만 task 관리 권한을 준다.
+    if (app === 'task' && taskManagerIds(env).has(id)) return { scope: 'all', id: id, role: 'manager' };
     return { scope: 'own', id: id };
   }
   return null;
 }
 
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
-function upsertStmt(env, table, app, c, now, ownScope) {
+function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
   const idCol = table === 'checks' ? 'k' : 'id';
   const key = table === 'checks' ? c.k : c.id;
   const ownGuard = ownScope
     ? (' AND ' + table + '.owner=excluded.owner' +
       (table === 'tasks' ? " AND json_extract(tasks.data,'$.origin')='staff'" : ''))
     : '';
+  const insertData = managerTask
+    ? "json_set(?, '$.origin', 'manager', '$.lastEditBy', 'manager')"
+    : '?';
+  const updateData = managerTask
+    ? "json_set(excluded.data, '$.origin', COALESCE(json_extract(tasks.data,'$.origin'),'manager'), '$.lastEditBy', 'manager')"
+    : 'excluded.data';
   return env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
-    'VALUES (?, ?, ?, ?, ?, ?) ' +
+    'VALUES (?, ?, ?, ' + insertData + ', ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
-    '  owner=excluded.owner, data=excluded.data, ' +
+    '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
     'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
@@ -296,6 +311,14 @@ async function handleSync(env, app, body, origin) {
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
+    if (auth.role === 'manager' && t === 'tasks') {
+      const data = c.data;
+      if (!SAFE_ID.test(String(c.id || '')) || !SAFE_ID.test(String(c.owner || '')) ||
+          !data || typeof data !== 'object' || Array.isArray(data) ||
+          String(data.id || '') !== String(c.id) || String(data.staffId || '') !== String(c.owner)) {
+        return json({ ok: false, error: '업무의 id와 담당자 정보가 일치하지 않습니다' }, 403, origin);
+      }
+    }
     // 개인 접속은 자기 것만 쓸 수 있다. 남의 owner를 붙여 보내도 서버에서 막는다.
     if (auth.scope === 'own') {
       // 직원 명부는 서버/원장 소유다. 구형 개인 UI가 명부 행을 다시 올려도 안전하게 무시한다.
@@ -324,7 +347,8 @@ async function handleSync(env, app, body, origin) {
   }
   const stmts = accepted
     .filter(entry => !skipped.has(entry))
-    .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own'));
+    .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own',
+      auth.role === 'manager' && entry.table === 'tasks'));
   if (stmts.length) await env.DB.batch(stmts);
 
   // ── 내려받기 (since 이후)
@@ -348,7 +372,8 @@ async function handleSync(env, app, body, origin) {
 
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
   const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
-  return json({ ok: true, now: nextSince, more: more, changes: out }, 200, origin);
+  const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
+  return json({ ok: true, now: nextSince, more: more, changes: out, authRole }, 200, origin);
 }
 
 async function handleToken(env, app, body, origin) {
@@ -492,7 +517,7 @@ async function handleExchange(env, app, body, origin) {
 
 async function handleHandoff(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
-  if (!auth || auth.scope !== 'own' || !SAFE_ID.test(auth.id)) {
+  if (!auth || !SAFE_ID.test(auth.id) || (auth.scope !== 'own' && auth.role !== 'manager')) {
     return json({ ok: false, code: 'AUTH_REQUIRED', error: '개인 인증이 필요합니다' }, 401, origin);
   }
   const issued = await issueBootstrap(env, app, auth.id, HANDOFF_TTL_MS);
@@ -800,6 +825,7 @@ async function handleFeedbackReview(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
   if (auth.scope !== 'all') return json({ ok: false, error: '원장만 피드백 문구를 검토할 수 있습니다' }, 403, origin);
+  const reviewedBy = auth.role === 'manager' ? auth.id : 'director';
 
   const action = String(body.action || 'list');
   if (action === 'list') {
@@ -859,8 +885,8 @@ async function handleFeedbackReview(env, app, body, origin) {
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET status='content_approved_send_blocked', updated_at=?, reviewed_at=?, " +
-      "reviewed_by='director', review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
-    ).bind(now, now, 'task', requestKey, expectedRevision).run();
+      "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
+    ).bind(now, now, reviewedBy, 'task', requestKey, expectedRevision).run();
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }
@@ -873,8 +899,8 @@ async function handleFeedbackReview(env, app, body, origin) {
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET status='revision_requested', updated_at=?, reviewed_at=?, " +
-      "reviewed_by='director', review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
-    ).bind(now, now, note, 'task', requestKey, expectedRevision).run();
+      "reviewed_by=?, review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
+    ).bind(now, now, reviewedBy, note, 'task', requestKey, expectedRevision).run();
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }

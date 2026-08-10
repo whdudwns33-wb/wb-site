@@ -431,7 +431,7 @@ function revisionConflict(json, origin, current, message) {
   }, 409, origin);
 }
 
-function correctedTask(candidate, current, serverNow, actorScope) {
+function correctedTask(candidate, current, serverNow, actorRole) {
   const currentUpdatedAt = Number(current.updatedAt) || 0;
   const updatedAt = Math.max(Number(serverNow) || 0, currentUpdatedAt + 1);
   const id = current.id;
@@ -446,7 +446,7 @@ function correctedTask(candidate, current, serverNow, actorScope) {
     updatedAt,
     lessonRevision: revisionOf(current) + 1,
     previousUpdatedAt: currentUpdatedAt || null,
-    updatedByScope: actorScope === 'own' ? 'staff' : 'manager'
+    updatedByScope: actorRole
   };
 }
 
@@ -463,7 +463,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     taskOrigin = 'staff';
   } else {
     staffId = String(body.staffId || '');
-    taskOrigin = 'manager';
+    taskOrigin = auth.role === 'manager' ? 'manager' : 'admin';
   }
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(staffId) || !await activeStaff(env, app, staffId)) {
     return json({ ok: false, error: '활성 담당 선생님을 선택해 주세요' }, 409, origin);
@@ -564,7 +564,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       return revisionConflict(json, origin, current);
     }
 
-    const corrected = correctedTask(task, current, Date.now(), auth.scope);
+    const corrected = correctedTask(task, current, Date.now(), taskOrigin);
     const databaseUpdatedAt = Number.isFinite(row.updatedAt) ? row.updatedAt : Number(current.updatedAt);
     const result = await env.DB.prepare(
       'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'

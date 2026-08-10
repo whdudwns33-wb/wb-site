@@ -377,10 +377,10 @@
 <div id="toast"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-10.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-10.4"></script>
-<script src="./asset-core.js?v=2026-08-10.4"></script>
-<script src="./qr-core.js?v=2026-08-10.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-10.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-10.5"></script>
+<script src="./asset-core.js?v=2026-08-10.5"></script>
+<script src="./qr-core.js?v=2026-08-10.5"></script>
 <script>
 "use strict";
 
@@ -659,8 +659,14 @@ function ownerOfCheck(key) {
   return t ? (t.staffId || null) : null;
 }
 
+/** 권한 근거가 아니라, 재로드 뒤에도 전체 관리 캐시를 지워야 함을 기억하는 표식이다. */
+function hasSensitiveManagerCache(previousRole) {
+  return previousRole === 'manager' || sync.accessRole === 'manager' ||
+    state.settings.managerCacheSensitive === true;
+}
+
 const sync = {
-  busy: false, dirty: false, last: null, timer: null, loud: false, err: '', personVerified: false,
+  busy: false, dirty: false, last: null, timer: null, loud: false, err: '', personVerified: false, accessRole: '',
 
   /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
   auth() {
@@ -720,6 +726,11 @@ const sync = {
       error.status = res.status;
       error.code = String(d && (d.code || d.errorCode || d.reason) || '');
       error.apiResponse = !!d;
+      const personRequest = body && body.auth && body.auth.mode === 'person';
+      if (path !== '/sync' && session.isStaffLink && personRequest &&
+          (res.status === 401 || res.status === 403)) {
+        handlePersonAuthRejection(error, false);
+      }
       throw error;
     }
     return d;
@@ -727,7 +738,14 @@ const sync = {
 
   async run() {
     const auth = this.auth();
-    if (!auth || this.busy) return false;
+    if (!auth) {
+      if (session.isStaffLink && hasSensitiveManagerCache('')) resetPersonCache('');
+      else this.accessRole = '';
+      return false;
+    }
+    if (this.busy) return false;
+    const previousAccessRole = this.accessRole;
+    let nextAccessRole = '';
     this.busy = true; paintStatus();
     try {
       const t0 = now();
@@ -742,31 +760,55 @@ const sync = {
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
+        // 개인 잠금 중 완료된 오래된 요청이 민감 캐시를 다시 저장하지 못하게 한다.
+        const currentAuth = this.auth();
+        if (session.isStaffLink && (!currentAuth || currentAuth.token !== auth.token)) return false;
+        if (auth.mode === 'person' && d.authRole !== 'manager' && d.authRole !== 'staff') {
+          const roleError = new Error('개인 권한을 확인하지 못했습니다');
+          roleError.status = 403; roleError.code = 'AUTH_REQUIRED';
+          throw roleError;
+        }
+        const responseAccessRole = auth.mode === 'person' ? d.authRole : '';
+        const managerCacheDowngraded = responseAccessRole === 'staff' &&
+          (hasSensitiveManagerCache(previousAccessRole) || nextAccessRole === 'manager');
+        const scopedCacheUpgraded = responseAccessRole === 'manager' &&
+          !hasSensitiveManagerCache(previousAccessRole) && Number(state.settings.pullAt) > 0;
+        const roleChangedDuringSync = !!nextAccessRole && nextAccessRole !== responseAccessRole;
+        if (managerCacheDowngraded || scopedCacheUpgraded || roleChangedDuringSync) {
+          resetPersonCache(auth.token);
+          render();
+          location.reload();
+          return false;
+        }
+        nextAccessRole = responseAccessRole;
         applied += this.apply(d.changes);
         state.settings.pullAt = d.now;
         again = !!d.more || pending.length > 0;
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
+      if (auth.mode === 'person' && nextAccessRole === 'manager') state.settings.managerCacheSensitive = true;
+      else delete state.settings.managerCacheSensitive;
       save();
       this.last = now(); this.dirty = false; this.err = '';
+      this.accessRole = auth.mode === 'person' ? nextAccessRole : '';
       if (session.isStaffLink) {
         this.personVerified = true;
         personAccessProblem = null;
       }
-      if (applied || needsAccessRender) renderAfterSync();
+      const accessRoleChanged = previousAccessRole !== this.accessRole;
+      if (previousAccessRole === 'manager' && this.accessRole !== 'manager') render();
+      else if (applied || needsAccessRender || accessRoleChanged) renderAfterSync();
       return true;
     } catch (e) {
       console.warn('sync', e);
       this.dirty = true; this.err = String(e && e.message || e);
       if (session.isStaffLink) {
         const problem = classifyPersonLinkError(e, 'session');
-        if (problem.kind === 'session_expired' || problem.kind === 'session_revoked' || problem.kind === 'auth_required') {
-          this.personVerified = false;
-          personAccessProblem = problem;
-          state.settings.myToken = '';
-          save();
-          render();
+        const authRejected = Number(e && e.status) === 401 || Number(e && e.status) === 403 ||
+          problem.kind === 'session_expired' || problem.kind === 'session_revoked' || problem.kind === 'auth_required';
+        if (authRejected) {
+          handlePersonAuthRejection(e, nextAccessRole === 'manager', problem);
         }
       }
       if (this.loud) toast('동기화 실패 — ' + this.err);
@@ -779,7 +821,7 @@ const sync = {
   /** 장기 bearer 대신 24시간 안에 한 번만 교환할 링크 code를 발급한다. */
   async issueBootstrap(staffId) {
     const auth = this.auth();
-    if (!auth || auth.mode !== 'admin') throw new Error('관리자 화면에서만 발급할 수 있습니다');
+    if (!auth || (auth.mode !== 'admin' && !session.isManager)) throw new Error('관리자 화면에서만 발급할 수 있습니다');
     return await this.post('/bootstrap', { app: SYNC_APP, auth: auth, staffId: staffId });
   },
 
@@ -795,7 +837,7 @@ const sync = {
 
   async revokeAccess(staffId) {
     const auth = this.auth();
-    if (!auth || auth.mode !== 'admin') throw new Error('관리자 화면에서만 해지할 수 있습니다');
+    if (!auth || (auth.mode !== 'admin' && !session.isManager)) throw new Error('관리자 화면에서만 해지할 수 있습니다');
     return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
   }
 };
@@ -827,9 +869,20 @@ document.addEventListener('focusout', () => setTimeout(() => {
 const session = {
   get staffId() { return SAFE_SCOPE_ID; },
   get isStaffLink() { return !!this.staffId; },
-  get isAdmin() { return !this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'; },
+  get isManager() {
+    const auth = this.isStaffLink && sync.auth();
+    return !!(auth && auth.mode === 'person' && auth.id === this.staffId &&
+      sync.personVerified && sync.accessRole === 'manager');
+  },
+  get isAdmin() { return this.isManager || (!this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'); },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
-  lock() { sessionStorage.removeItem('wb_admin'); }
+  lock() {
+    sessionStorage.removeItem('wb_admin');
+    sync.accessRole = '';
+    if (!this.isStaffLink) return false;
+    resetPersonCache('');
+    return true;
+  }
 };
 
 let route = 'today';
@@ -854,6 +907,59 @@ let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingBootstrapCode = ''; // 명시적으로 연결하기 전까지 주소와 메모리에 보존할 1회용 code
 let personAccessProblem = null;
 let linkExchangeBusy = false;
+
+/** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
+function resetPersonCache(token) {
+  const keepToken = String(token || '');
+  clearTimeout(sync.timer); sync.timer = null; sync.dirty = false;
+  sync.accessRole = ''; sync.personVerified = false;
+  state.settings.myToken = '';
+  delete state.settings.managerCacheSensitive;
+  let removed = false;
+  try { localStorage.removeItem(LS_KEY); removed = true; }
+  catch (error) { console.warn('person cache cleanup failed', error); }
+  state = blankState();
+  if (keepToken) state.settings.myToken = keepToken;
+  if (keepToken || !removed) save();
+  viewStaff = ''; scheduleSearchQuery = ''; openPanels.clear();
+  pendingAdd = null;
+  pendingBootstrapCode = '';
+  personAccessProblem = null;
+  examTarget = null; opTarget = null; fbCtx = null;
+  lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null;
+  lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false;
+  feedbackQueue = []; feedbackQueueLoaded = false; feedbackQueueLoading = false; feedbackQueueError = '';
+  ownFeedbackQueue = []; ownFeedbackQueueLoaded = false; ownFeedbackQueueLoading = false; ownFeedbackQueueError = '';
+  lessonChangeQueue = []; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false; lessonChangeQueueError = '';
+  ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = '';
+  lcForm = null; draft = [];
+  bookDb = null; bookDbErr = ''; bookDbLoading = false;
+  approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false;
+  approvedBookEdits = null; approvedBookEditsLoaded = false; approvedBookEditsLoading = false;
+  batchSelection.clear(); batchDraft = null; batchVendorName = '';
+  bookAddQueue = []; bookAddQueueLoaded = false; bookAddQueueLoading = false; bookAddQueueError = '';
+  ownBookAddQueue = []; ownBookAddQueueLoaded = false; ownBookAddQueueLoading = false; ownBookAddQueueError = '';
+  bookEditQueue = []; bookEditQueueLoaded = false; bookEditQueueLoading = false; bookEditQueueError = '';
+  ownBookEditQueue = []; ownBookEditQueueLoaded = false; ownBookEditQueueLoading = false; ownBookEditQueueError = '';
+  beForm = null;
+  rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
+  guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false;
+  guardianContactsError = ''; settingsGuardianStudents = [];
+  linkCodeVault.clear(); directorReportContext = null; directorReportSending = false;
+  eForm = null; kakaoText = ''; kakaoParsed = null;
+}
+
+/** 개인 bearer가 거절되면 관리 캐시·열린 민감 화면까지 한 경로에서 닫는다. */
+function handlePersonAuthRejection(error, managerRoleSeen, knownProblem) {
+  const problem = knownProblem || classifyPersonLinkError(error, 'session');
+  resetPersonCache('');
+  personAccessProblem = problem;
+  if (error && typeof error === 'object') error.personAuthHandled = true;
+  closeModal();
+  render();
+  location.reload();
+  return problem;
+}
 
 function isKakaoInAppBrowser(ua) {
   return /KAKAOTALK/i.test(String(ua || ''));
@@ -1045,7 +1151,7 @@ function repeatLabel(t) {
 const initials = name => String(name || '?').trim().slice(0, 2);
 
 /** 지금 조작하는 사람 */
-const actor = () => session.isAdmin ? 'admin' : 'staff';
+const actor = () => session.isManager ? 'manager' : session.isAdmin ? 'admin' : 'staff';
 
 const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
 
@@ -1221,13 +1327,16 @@ function opModal(name) {
       : ''));
 }
 
-/** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
+/** 누가 만들고 누가 고쳤는지 — 관리 화면에서만 표시한다 */
 function originTags(t) {
   if (!session.isAdmin) return '';
   let h = '';
   if (t.origin === 'staff') h += '<span class="tag add">직원 추가</span>';
-  else if (t.origin === 'manager' || t.origin === 'admin') h += '<span class="tag edit">관리자 발행</span>';
-  else if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
+  else if (t.origin === 'manager') h += '<span class="tag edit">관리 담당 발행</span>';
+  else if (t.origin === 'admin') h += '<span class="tag edit">원장 발행</span>';
+  if (t.lastEditBy === 'staff') h += '<span class="tag edit">직원 수정</span>';
+  else if (t.lastEditBy === 'manager') h += '<span class="tag edit">관리 담당 수정</span>';
+  else if (t.lastEditBy === 'admin') h += '<span class="tag edit">원장 수정</span>';
   return h;
 }
 
@@ -1261,6 +1370,7 @@ function paintStatus() {
     else if (!sync.personVerified) text = '개인 인증 확인 중';
     else { text = me ? me.name + ' 선생님 · 개인 업무' : '대상을 찾을 수 없음'; on = !!me; }
   }
+  else if (session.isManager) { text = ((meStaff() || {}).name || '관리 담당') + ' · 관리 담당 모드'; on = true; }
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
   if (sync.busy && !pendingBootstrapCode) text += ' · 동기화중';
@@ -1441,7 +1551,7 @@ function viewToday() {
       '<button class="btn btn-sm btn-ghost mt8" data-act="atteditopen" data-id="' + me.id + '">✏️ 최근 기록 수정 (실수로 안 눌렀을 때)</button></div>';
 
     if (!rosterDb && !rosterErr) loadRoster();
-    h += '<div class="card"><div class="small muted">학생 연락·평가·온라인 프로그램 기록은 개인정보 보호를 위해 원장 화면에서 관리합니다.</div></div>';
+    h += '<div class="card"><div class="small muted">학생 연락·평가·온라인 프로그램 기록은 개인정보 보호를 위해 관리 화면에서 관리합니다.</div></div>';
   }
 
   if (editable && cursor === today()) {
@@ -1468,7 +1578,7 @@ function viewToday() {
     h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
   }
   if (session.isStaffLink || session.isAdmin) {
-    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>';
+    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 알림톡</button>';
   }
   if (session.isStaffLink && hasVerifiedPersonAuth()) {
     h += '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
@@ -4704,7 +4814,7 @@ function viewStaffAdmin() {
           (s.manager ? ' <span class="tag edit">관리 담당</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
           (s.owner ? ' · 직원 통계에서 제외' : '') +
-          (s.manager ? ' · 관리 담당 기본값 · 개인 링크는 본인 범위 · 급여 집계 포함' : '') + '</div></div></div>' +
+          (s.manager ? ' · 관리 담당 표시 · 운영 권한은 서버에서 별도 승인 · 급여 집계 포함' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
@@ -4809,6 +4919,22 @@ function viewGuardianContactPanel() {
 function viewSettings() {
   const s = state.settings;
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
+  const backupCard = '<div class="card">' +
+    '<div class="card-title">백업</div>' +
+    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
+      '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
+  '</div>';
+  if (session.isManager) {
+    return '<div class="card">' +
+      '<div class="card-title">관리 담당 개인 연결</div>' +
+      '<div class="card-sub mb14">서버가 확인한 관리 담당 개인 인증으로 운영 화면을 사용하고 있습니다.</div>' +
+      '<div class="small muted">마지막 동기화: ' + esc(lastTxt) + '</div>' +
+      '<div class="hint mt14">잠그면 이 기기의 개인 토큰과 업무 캐시를 모두 지웁니다. 다시 열려면 새 개인 링크가 필요합니다.</div>' +
+      '<button class="btn btn-ghost btn-block mt14" data-act="logout">이 기기 잠그기</button>' +
+    '</div>' + backupCard + viewGuardianContactPanel();
+  }
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
     '<div class="card-sub mb14">접속 주소는 앱에 들어 있습니다. <b>비밀키만 넣으면</b> 이 기기가 연결됩니다.<br>' +
@@ -4832,13 +4958,7 @@ function viewSettings() {
       : '') +
   '</div>' +
 
-  '<div class="card">' +
-    '<div class="card-title">백업</div>' +
-    '<div class="card-sub mb14">전체 데이터를 파일로 내려받거나 되돌립니다.</div>' +
-    '<div class="row" style="gap:8px">' +
-      '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
-      '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
-  '</div>' +
+  backupCard +
 
   '<div class="card">' +
     '<div class="card-title">관리 비밀번호</div>' +
@@ -4960,7 +5080,7 @@ function quickText(t) {
     '\n\n지시서에 올려뒀습니다. 끝나면 체크 부탁드려요.\n' + staffLink(t.staffId);
 }
 
-/** 문자 미리보기는 업무 제목·메모·학생 이름 대신 이 집계 숫자만 사용한다. */
+/** 알림톡 미리보기는 업무 제목·메모·학생 이름 대신 이 집계 숫자만 사용한다. */
 const DIRECTOR_REPORT_TASK_URL = 'https://whdudwns33-wb.github.io/wb-site/task/';
 
 function reportCounts(staffId, date) {
@@ -4985,7 +5105,7 @@ function reportCounts(staffId, date) {
 function directorReportSummaryText(staffId, date) {
   const staff = staffById(staffId);
   const counts = reportCounts(staffId, date);
-  return '📊 원장님 문자 발송용 요약\n' + ((staff && staff.name) || '선생님') + ' 선생님\n' +
+  return '📊 원장님 카카오 알림톡용 요약\n' + ((staff && staff.name) || '선생님') + ' 선생님\n' +
     '완료 ' + counts.done + '/' + counts.total + '건 · 진행 ' + counts.doing + '건 · 미완료 ' +
     counts.pending + '건 · 막힘 ' + counts.blocked + '건\n업무지시서: ' + DIRECTOR_REPORT_TASK_URL;
 }
@@ -5167,7 +5287,8 @@ async function createVerifiedHandoffLink() {
     return copied;
   } catch (error) {
     const problem = classifyPersonLinkError(error, 'session');
-    if (problem.kind === 'session_expired' || problem.kind === 'session_revoked' || problem.kind === 'auth_required') {
+    if (!error.personAuthHandled &&
+        (problem.kind === 'session_expired' || problem.kind === 'session_revoked' || problem.kind === 'auth_required')) {
       sync.personVerified = false;
       personAccessProblem = problem;
       state.settings.myToken = '';
@@ -5227,20 +5348,21 @@ async function settleSync() {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   if (sync.busy) throw new Error('SYNC_BUSY');
-  await sync.run();
+  const synced = await sync.run();
+  if (!synced) throw new Error('SYNC_FAILED');
   if (sync.dirty || sync.err) throw new Error('SYNC_FAILED');
 }
 
 function directorReportErrorText(error) {
   const raw = String(error && error.message || error || '');
   if (/SYNC_BUSY|SYNC_FAILED|동기화|인증/i.test(raw)) {
-    return '최신 수행 상태를 동기화하지 못해 문자 요청을 접수하지 않았습니다. 연결을 확인한 뒤 다시 시도해 주세요.';
+    return '최신 수행 상태를 동기화하지 못해 알림톡 요청을 접수하지 않았습니다. 연결을 확인한 뒤 다시 시도해 주세요.';
   }
   if (/설정|구성|NOT_CONFIGURED|secret|api.?key|발신번호|수신번호/i.test(raw)) {
-    return '문자 발송 설정이 아직 완료되지 않았습니다. 원장님 설정을 확인해 주세요.';
+    return '카카오 알림톡 발송 설정이 아직 완료되지 않았습니다. 원장님 설정을 확인해 주세요.';
   }
   if (/중복|이미.*접수/i.test(raw)) return '같은 수행 보고가 이미 접수됨';
-  return '문자 발송 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return '알림톡 발송 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
 function showReportText(staffId, date) {
@@ -5250,14 +5372,14 @@ function showReportText(staffId, date) {
     '<div class="fl mb8">상세 내부 보고</div>' +
     '<textarea class="in" rows="13" id="mText" readonly>' + esc(reportText(staffId, date)) + '</textarea>' +
     (canSend
-      ? '<hr class="sep"><div class="fl mb8">원장님 문자 발송용 요약</div>' +
+      ? '<hr class="sep"><div class="fl mb8">원장님 카카오 알림톡용 요약</div>' +
         '<div class="guide" id="directorReportSummary">' + esc(directorReportSummaryText(staffId, date)).replace(/\n/g, '<br>') + '</div>' +
-        '<div class="hint mt14">업무 제목·메모·학생 이름은 문자 요청에 포함되지 않습니다.<br>' +
-        '등록된 원장님 번호로만 요청하며 번호는 이 화면에 표시하지 않습니다.</div>'
+        '<div class="hint mt14">업무 제목·메모·학생 이름은 알림톡에 포함되지 않습니다.<br>' +
+        '승인된 수행보고 템플릿으로만 발송하며 등록된 원장님 번호는 이 화면에 표시하지 않습니다.</div>'
       : '<div class="hint mt14">과거 날짜는 상세 내부 보고 복사만 할 수 있습니다.</div>'),
     '<button class="btn btn-ghost btn-block mt14" data-act="copytext">상세 보고 복사하기</button>' +
     (canSend
-      ? '<button class="btn btn-primary btn-block mt8" data-act="directorreportsend">원장님께 요약 문자 접수</button>'
+      ? '<button class="btn btn-primary btn-block mt8" data-act="directorreportsend">원장님께 수행보고 알림톡</button>'
       : ''));
 }
 
@@ -5270,23 +5392,25 @@ function openReportText() {
 
 async function submitDirectorReport(button) {
   const context = directorReportContext;
-  if (!context || context.date !== today()) return toast('오늘 수행 보고만 문자로 접수할 수 있습니다');
+  if (!context || context.date !== today()) return toast('오늘 수행 보고만 알림톡으로 접수할 수 있습니다');
   if (session.isStaffLink && !session.isAdmin && context.staffId !== session.staffId) return toast('본인 수행 보고만 접수할 수 있습니다');
   if (directorReportSending) return;
   const auth = sync.auth();
   if (!auth) return toast(session.isAdmin ? '원장 동기화 인증이 필요합니다' : '개인 링크 인증이 필요합니다');
-  if (!confirm('원장님께 오늘 수행 보고 요약 문자 1건을 접수할까요?\n문자 비용이 발생할 수 있습니다.')) return;
+  if (!confirm('원장님께 오늘 수행 보고 알림톡 1건을 접수할까요?\n알림톡 비용이 발생할 수 있습니다.')) return;
 
   directorReportSending = true;
   if (button) { button.disabled = true; button.textContent = '최신 상태 확인 중…'; }
   try {
     flushReportInputs();
     await settleSync();
-    if (button) button.textContent = '문자 요청 접수 중…';
+    if (button) button.textContent = '알림톡 요청 접수 중…';
     const result = await sync.post('/director-report-send', directorReportRequestPayload(context));
     const sendStatus = String(result && result.send && result.send.status || 'unknown');
     if (sendStatus === 'accepted') {
-      toast('원장님 문자 발송 요청이 접수됨');
+      toast(result && result.idempotent
+        ? '같은 수행 보고가 이미 접수됨(기존 발송 포함)'
+        : '원장님 알림톡 발송 요청이 접수됨');
       closeModal();
     } else {
       toast('결과 확인 필요 — 다시 누르지 말고 원장 발송 내역을 확인해 주세요');
@@ -5297,7 +5421,7 @@ async function submitDirectorReport(button) {
     }
   } catch (error) {
     toast(directorReportErrorText(error));
-    if (button) { button.disabled = false; button.textContent = '원장님께 요약 문자 접수'; }
+    if (button) { button.disabled = false; button.textContent = '원장님께 수행보고 알림톡'; }
   } finally {
     directorReportSending = false;
   }
@@ -5407,8 +5531,7 @@ function saveEditedTask() {
     t = state.tasks.find(x => x.id === eForm.id);
     if (!t) return closeModal();
     if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 수정할 수 없습니다'); }
-    if (actor() === 'staff') t.lastEditBy = 'staff';
-    else if (t.origin !== 'staff') t.lastEditBy = 'admin';
+    t.lastEditBy = actor();
   }
 
   // 같은 순서의 단계는 id를 물려줘서 이미 체크한 진행 상태를 잃지 않게 한다
@@ -5678,7 +5801,12 @@ document.addEventListener('click', ev => {
       session.unlock(); render(); toast('환영합니다');
       break;
     }
-    case 'logout': session.lock(); render(); break;
+    case 'logout': {
+      const reload = session.lock();
+      render();
+      if (reload) location.reload();
+      break;
+    }
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
@@ -5794,8 +5922,8 @@ document.addEventListener('click', ev => {
       s.manager = !s.manager; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.manager
-        ? s.name + ' — 관리 담당으로 지정. 개인 링크 권한은 본인 업무 범위로 유지됩니다'
-        : s.name + ' — 관리 담당 해제');
+        ? s.name + ' — 관리 담당으로 표시했습니다. 운영 권한은 서버 승인 대상에게만 열립니다'
+        : s.name + ' — 관리 담당 표시 해제');
       break;
     }
     case 'attcheck': {
@@ -6574,7 +6702,6 @@ load();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h && !/(^|&)c=/.test(h)) route = h;
-if (session.isStaffLink && !session.isAdmin && !['today', 'week', 'lesson', 'feedback', 'books', 'roster'].includes(route)) route = 'today';
 render();
 
 let syncLoopStarted = false;
@@ -6593,7 +6720,11 @@ async function startSyncSession() {
     render();
     return false;
   }
-  if (!sync.enabled()) { render(); return false; }
+  if (!sync.enabled()) {
+    if (session.isStaffLink && hasSensitiveManagerCache('')) resetPersonCache('');
+    render();
+    return false;
+  }
   const verified = await sync.run();
   if (sync.enabled()) ensureSyncLoopStarted();
   return verified;
@@ -6603,7 +6734,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-10.4';
+const APP_VER = '2026-08-10.5';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

@@ -31,6 +31,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/019_private_roster.
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
+npx wrangler secret put TASK_MANAGER_STAFF_IDS # task 운영 관리자 staff ID, 쉼표로 구분
+npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID # 승인된 수행보고 알림톡 템플릿 ID
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 
@@ -90,9 +92,11 @@ curl https://wb-sync.<계정>.workers.dev/health
   ]
 }
 ```
-응답:
+응답의 `authRole`은 서버가 판정한 `admin | manager | staff` 값이다. task 앱은 이 값을
+권한 표시의 정본으로 사용하며, 수정 가능한 직원 명부의 `manager` 표시는 권한을 부여하지 않는다.
+
 ```jsonc
-{ "ok": true, "now": 1785651111111, "more": false, "changes": [ /* since 이후 바뀐 행 */ ] }
+{ "ok": true, "now": 1785651111111, "more": false, "authRole": "staff", "changes": [ /* since 이후 바뀐 행 */ ] }
 ```
 `more: true`면 아직 남은 게 있다는 뜻이니 받은 `now`로 한 번 더 호출한다.
 

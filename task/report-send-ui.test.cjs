@@ -20,9 +20,9 @@ function functionSource(name) {
 }
 
 test('report modal preserves detailed copy and separates the privacy-safe director summary', () => {
-  assert.match(html, /data-act="report">오늘 수행 보고 문자 만들기/);
+  assert.match(html, /data-act="report">오늘 수행 보고 알림톡/);
   assert.match(html, /상세 내부 보고/);
-  assert.match(html, /원장님 문자 발송용 요약/);
+  assert.match(html, /원장님 카카오 알림톡용 요약/);
   assert.match(html, /data-act="copytext">상세 보고 복사하기/);
   assert.match(html, /const canSend = date === today\(\) && \(session\.isStaffLink \|\| session\.isAdmin\)/);
   assert.match(html, /과거 날짜는 상세 내부 보고 복사만 할 수 있습니다/);
@@ -68,17 +68,18 @@ test('request payload lets the server derive private identity and contains no co
 test('send action requires confirmation, blocks duplicate clicks, and reports only request acceptance', () => {
   const send = functionSource('submitDirectorReport');
   assert.match(send, /if \(directorReportSending\) return/);
-  assert.match(send, /confirm\('원장님께 오늘 수행 보고 요약 문자 1건을 접수할까요/);
+  assert.match(send, /confirm\('원장님께 오늘 수행 보고 알림톡 1건을 접수할까요/);
   assert.match(send, /button\.disabled = true/);
   assert.match(send, /await settleSync\(\)/);
   assert.match(send, /sync\.post\('\/director-report-send', directorReportRequestPayload\(context\)\)/);
   assert.match(send, /result && result\.send && result\.send\.status/);
   assert.match(send, /sendStatus === 'accepted'/);
-  assert.match(send, /원장님 문자 발송 요청이 접수됨/);
+  assert.match(send, /result && result\.idempotent/);
+  assert.match(send, /같은 수행 보고가 이미 접수됨\(기존 발송 포함\)/);
+  assert.match(send, /원장님 알림톡 발송 요청이 접수됨/);
   assert.match(send, /결과 확인 필요 — 다시 누르지 말고 원장 발송 내역을 확인해 주세요/);
   assert.match(send, /button\.textContent = '결과 확인 필요'/);
   assert.doesNotMatch(send, /전달 완료|발송 완료|recipient|phone|message\s*:/i);
-  assert.doesNotMatch(send, /result\.idempotent.*이미 접수됨/);
   assert.match(send, /directorReportErrorText\(error\)/);
 });
 

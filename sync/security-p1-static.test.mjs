@@ -7,10 +7,21 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/004_security_access_v1.sql', import.meta.url), 'utf8');
 const deployScript = fs.readFileSync(new URL('./deploy.ps1', import.meta.url), 'utf8');
 
-test('every personal link stays owner scoped regardless of staff role', () => {
-  assert.match(worker, /!await activeStaff\(env, app, id\)/);
+test('only the task environment allowlist elevates personal auth', () => {
+  assert.match(worker, /const staff = await activeStaffData\(env, app, id\)/);
+  assert.match(worker, /TASK_MANAGER_STAFF_IDS/);
+  assert.match(worker, /app === 'task' && taskManagerIds\(env\)\.has\(id\)/);
+  assert.match(worker, /return \{ scope: 'all', id: id, role: 'manager' \}/);
   assert.match(worker, /return \{ scope: 'own', id: id \};/);
-  assert.doesNotMatch(worker, /staff\.manager[^\n]*scope: 'all'/);
+  assert.doesNotMatch(worker, /staff\.manager\s*===\s*true/);
+  assert.doesNotMatch(worker, /app === 'consult'[^\n]*scope: 'all'/);
+});
+
+test('sync returns the server auth role and stamps manager task audit fields', () => {
+  assert.match(worker, /authRole/);
+  assert.match(worker, /auth\.role === 'manager' \? 'manager'/);
+  assert.match(worker, /\$\.lastEditBy', 'manager'/);
+  assert.match(worker, /json_extract\(tasks\.data,'\$\.origin'\)/);
 });
 
 test('new bearer tokens are hashed and expire', () => {

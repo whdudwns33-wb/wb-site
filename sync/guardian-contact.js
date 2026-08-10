@@ -20,6 +20,10 @@ function normalizeName(value) {
   return String(value == null ? '' : value).trim();
 }
 
+function auditActor(auth) {
+  return auth.role === 'manager' ? String(auth.id) : 'director';
+}
+
 function view(row) {
   if (!row) return null;
   return {
@@ -67,7 +71,7 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
     'INSERT INTO guardian_contacts (app, student_name, phone, consent, updated_at, updated_by) VALUES (?,?,?,?,?,?) ' +
     'ON CONFLICT (app, student_name) DO UPDATE SET phone=excluded.phone, consent=excluded.consent, ' +
     'updated_at=excluded.updated_at, updated_by=excluded.updated_by'
-  ).bind(app, studentName, phone, consent, now, 'director').run();
+  ).bind(app, studentName, phone, consent, now, auditActor(auth)).run();
 
   const row = await env.DB.prepare('SELECT * FROM guardian_contacts WHERE app=? AND student_name=? LIMIT 1')
     .bind(app, studentName).first();

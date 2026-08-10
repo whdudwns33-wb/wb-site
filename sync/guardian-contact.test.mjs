@@ -27,10 +27,10 @@ class TestD1 {
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = (id, token) => ({ mode: 'person', id, token });
 
-async function call(db, body) {
+async function call(db, body, env = {}) {
   const response = await worker.fetch(new Request('https://worker.example/guardian-contact', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'task', ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...env });
   return { status: response.status, body: await response.json() };
 }
 
@@ -67,6 +67,16 @@ test('director can register a phone and toggle consent', async () => {
   const list = await call(db, { auth: admin, action: 'list' });
   assert.equal(list.body.contacts.length, 1);
   assert.equal(list.body.contacts[0].studentName, '테스트학생');
+});
+
+test('server-authorized manager changes are attributed to the manager staff id', async () => {
+  const db = new TestD1(); seedStaff(db);
+  const set = await call(db, {
+    auth: person('S-kim', 'tok-kim'), action: 'set', studentName: '테스트학생',
+    phone: '01012345678', consent: true
+  }, { TASK_MANAGER_STAFF_IDS: 'S-kim' });
+  assert.equal(set.status, 200);
+  assert.equal(db.prepare("SELECT updated_by FROM guardian_contacts WHERE app='task'").first().updated_by, 'S-kim');
 });
 
 test('invalid phone format is rejected', async () => {

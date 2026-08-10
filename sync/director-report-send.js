@@ -1,6 +1,30 @@
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TEST_RECIPIENT_SLOT = 'TEST-SMS-001';
+const ATA_IDEMPOTENCY_VERSION = 'ATA_V1';
+const MAX_ALIMTALK_CHARS = 1000;
+const DIRECTOR_REPORT_TEMPLATE_TEXT = [
+  '[WB 오늘 수행 보고]',
+  '담당: #{staff_name}',
+  '#{report_date} 기준',
+  '전체 #{total_count}건',
+  '완료 #{done_count}건',
+  '진행 #{doing_count}건',
+  '미완료 #{todo_count}건',
+  '막힘 #{blocked_count}건',
+  '수행률 #{completion_rate}',
+  '상세 내용은 업무지시서에서 확인해 주세요.'
+].join('\n');
+const DIRECTOR_REPORT_TEMPLATE_KEYS = Object.freeze([
+  '#{staff_name}',
+  '#{report_date}',
+  '#{total_count}',
+  '#{done_count}',
+  '#{doing_count}',
+  '#{todo_count}',
+  '#{blocked_count}',
+  '#{completion_rate}'
+]);
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
 const TASK_APP_URL = 'https://whdudwns33-wb.github.io/wb-site/task/';
 const STAFF_DAILY_LIMIT = 2;
@@ -146,6 +170,41 @@ export function buildDirectorReportText(reportDate, staffName, summary) {
   ].join('\n');
 }
 
+export function buildDirectorReportVariables(reportDate, staffName, summary) {
+  return {
+    '#{staff_name}': String(staffName),
+    '#{report_date}': String(reportDate),
+    '#{total_count}': String(summary.total),
+    '#{done_count}': String(summary.done),
+    '#{doing_count}': String(summary.doing),
+    '#{todo_count}': String(summary.todo),
+    '#{blocked_count}': String(summary.blocked),
+    '#{completion_rate}': String(summary.pct) + '%'
+  };
+}
+
+function characterLength(value) {
+  return Array.from(String(value == null ? '' : value)).length;
+}
+
+export function renderDirectorReportAlimtalk(variables) {
+  if (!variables || typeof variables !== 'object' || Array.isArray(variables)) return null;
+  const keys = Object.keys(variables);
+  if (keys.length !== DIRECTOR_REPORT_TEMPLATE_KEYS.length ||
+      !DIRECTOR_REPORT_TEMPLATE_KEYS.every(key => Object.hasOwn(variables, key))) return null;
+  let rendered = DIRECTOR_REPORT_TEMPLATE_TEXT;
+  for (const key of DIRECTOR_REPORT_TEMPLATE_KEYS) {
+    if (typeof variables[key] !== 'string') return null;
+    rendered = rendered.split(key).join(variables[key]);
+  }
+  return rendered;
+}
+
+export function directorReportAlimtalkFits(variables) {
+  const rendered = renderDirectorReportAlimtalk(variables);
+  return rendered !== null && characterLength(rendered) <= MAX_ALIMTALK_CHARS;
+}
+
 export async function buildSolapiAuthorization(apiKey, apiSecret, date, salt) {
   const requestDate = String(date || new Date().toISOString());
   const requestSalt = String(salt || crypto.randomUUID());
@@ -169,7 +228,7 @@ function validateRequestShape(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '요청 형식을 확인해 주세요';
   for (const key of Object.keys(body)) {
     if (FORBIDDEN_REQUEST_KEYS.test(key) || !ALLOWED_REQUEST_KEYS.has(key)) {
-      return '수신자나 문자 내용은 요청에서 지정할 수 없습니다';
+      return '수신자나 알림톡 내용은 요청에서 지정할 수 없습니다';
     }
   }
   if (!body.auth || typeof body.auth !== 'object' || Array.isArray(body.auth)) {
@@ -177,7 +236,7 @@ function validateRequestShape(body) {
   }
   for (const key of Object.keys(body.auth)) {
     if (FORBIDDEN_REQUEST_KEYS.test(key) || !ALLOWED_AUTH_KEYS.has(key)) {
-      return '수신자나 문자 내용은 요청에서 지정할 수 없습니다';
+      return '수신자나 알림톡 내용은 요청에서 지정할 수 없습니다';
     }
   }
   return null;
@@ -191,18 +250,24 @@ function sendConfiguration(env) {
   if (!safeEqual(env.WB_SEND_MODE, 'test') ||
       !safeEqual(env.WB_TEST_RECIPIENT_ID, TEST_RECIPIENT_SLOT) ||
       !safeEqual(env.WB_ACTUAL_TEST_SEND_APPROVED, 'true') ||
-      !env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET ||
+      !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
+      !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID ||
       !env.SOLAPI_SENDER_NUMBER || !env.SOLAPI_TEST_RECIPIENT_PHONE) {
     return null;
   }
-  const apiKey = String(env.SOLAPI_API_KEY).trim();
-  const apiSecret = String(env.SOLAPI_API_SECRET).trim();
+  const apiKey = String(env.SOLAPI_KAKAO_API_KEY).trim();
+  const apiSecret = String(env.SOLAPI_KAKAO_API_SECRET).trim();
+  const pfId = String(env.SOLAPI_KAKAO_PF_ID).trim();
+  const templateId = String(env.SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID).trim();
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   const recipient = normalizedDigits(env.SOLAPI_TEST_RECIPIENT_PHONE);
-  if (!apiKey || !apiSecret || !/^\d{8,12}$/.test(sender) || !/^01[016789]\d{7,8}$/.test(recipient)) return null;
+  if (!apiKey || !apiSecret || !SAFE_ID.test(pfId) || !SAFE_ID.test(templateId) ||
+      !/^\d{8,12}$/.test(sender) || !/^01[016789]\d{7,8}$/.test(recipient)) return null;
   return {
     apiKey,
     apiSecret,
+    pfId,
+    templateId,
     sender,
     recipient
   };
@@ -377,11 +442,6 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
     return json({ ok: false, error: '활성 직원을 찾을 수 없습니다' }, 404, origin);
   }
 
-  const config = sendConfiguration(env);
-  if (!config) {
-    return json({ ok: false, code: 'TEST_SEND_DISABLED', error: '원장 테스트 발송 설정이 완전하지 않아 차단했습니다' }, 503, origin);
-  }
-
   let summary;
   try {
     summary = await loadSummary(env, app, staffId, reportDate);
@@ -389,15 +449,38 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
     return json({ ok: false, code: 'REPORT_DATA_INVALID', error: '오늘 수행 현황을 안전하게 집계하지 못했습니다' }, 409, origin);
   }
   const reportText = buildDirectorReportText(reportDate, staff.name, summary);
-  if (new TextEncoder().encode(reportText).byteLength > 2000) {
-    return json({ ok: false, code: 'REPORT_TOO_LONG', error: '수행 보고 문자 길이를 확인해 주세요' }, 413, origin);
-  }
-
   const messageHash = await sha256Hex(reportText);
-  const idempotencyKey = await sha256Hex([
+  const legacyIdempotencyKey = await sha256Hex([
     app, staffId, reportDate, TEST_RECIPIENT_SLOT, messageHash
   ].join('\u001f'));
+  const legacy = await findByIdempotency(env, app, legacyIdempotencyKey);
+  if (legacy && legacy.status !== 'rejected') {
+    return json(publicResult(legacy, true), responseStatusFor(legacy.status), origin);
+  }
+
+  const reportVariables = buildDirectorReportVariables(reportDate, staff.name, summary);
+  if (!directorReportAlimtalkFits(reportVariables)) {
+    return json({ ok: false, code: 'REPORT_TOO_LONG', error: '수행 보고 길이를 확인해 주세요' }, 413, origin);
+  }
+
+  const idempotencyKey = await sha256Hex([
+    app, staffId, reportDate, TEST_RECIPIENT_SLOT, ATA_IDEMPOTENCY_VERSION, messageHash
+  ].join('\u001f'));
   const sendId = 'drs_' + idempotencyKey.slice(0, 48);
+  const existingBeforeDispatch = await findByIdempotency(env, app, idempotencyKey);
+  if (existingBeforeDispatch) {
+    return json(
+      publicResult(existingBeforeDispatch, true),
+      responseStatusFor(existingBeforeDispatch.status),
+      origin
+    );
+  }
+
+  const config = sendConfiguration(env);
+  if (!config) {
+    return json({ ok: false, code: 'TEST_SEND_DISABLED', error: '원장 알림톡 발송 설정이 완전하지 않아 차단했습니다' }, 503, origin);
+  }
+
   const now = Date.now();
   const inserted = await env.DB.prepare(
     'INSERT OR IGNORE INTO director_report_sends ' +
@@ -454,10 +537,13 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
         messages: [{
           to: config.recipient,
           from: config.sender,
-          text: reportText,
-          type: 'LMS',
-          subject: 'WB 오늘 수행 보고',
-          autoTypeDetect: false,
+          type: 'ATA',
+          kakaoOptions: {
+            pfId: config.pfId,
+            templateId: config.templateId,
+            disableSms: true,
+            variables: reportVariables
+          },
           customFields: { wbSendId: sendId }
         }],
         strict: true,
@@ -518,6 +604,10 @@ export async function handleDirectorReportSend(env, app, body, origin, auth, jso
 
 export const directorReportConstants = Object.freeze({
   TEST_RECIPIENT_SLOT,
+  ATA_IDEMPOTENCY_VERSION,
+  MAX_ALIMTALK_CHARS,
+  DIRECTOR_REPORT_TEMPLATE_TEXT,
+  DIRECTOR_REPORT_TEMPLATE_KEYS,
   SOLAPI_SEND_URL,
   TASK_APP_URL,
   STAFF_DAILY_LIMIT,

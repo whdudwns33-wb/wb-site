@@ -94,9 +94,13 @@ test('link and session failures have distinct user guidance', () => {
   assert.doesNotMatch(classifier, /status === 403/);
 });
 
-test('transient sync failures keep a verified bearer and do not demand a replacement link', () => {
-  assert.doesNotMatch(html, /if \(session\.isStaffLink\) \{\s*this\.personVerified = false;\s*const problem/);
-  assert.match(html, /if \(problem\.kind === 'session_expired'[\s\S]{0,220}this\.personVerified = false/);
+test('only authentication failures discard verified access; transient sync failures keep it', () => {
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const syncCatch = run.slice(run.indexOf('} catch (e) {'), run.indexOf('} finally {'));
+  assert.match(run, /const authRejected = Number\(e && e\.status\) === 401 \|\| Number\(e && e\.status\) === 403/);
+  assert.match(run, /if \(authRejected\) \{[\s\S]{0,160}handlePersonAuthRejection\(e, nextAccessRole === 'manager', problem\)/);
+  assert.doesNotMatch(run, /catch \(e\) \{\s*console\.warn\('sync', e\);\s*this\.accessRole = ''/);
+  assert.ok(syncCatch.indexOf('if (authRejected)') < syncCatch.indexOf('handlePersonAuthRejection'));
   const handoff = html.match(/async function createVerifiedHandoffLink\(\)[\s\S]*?\n}/)?.[0] || '';
   assert.match(handoff, /if \(!verified\)/);
   assert.match(handoff, /동기화 상태를 확인하지 못했습니다 — 잠시 후 다시 시도해 주세요/);
@@ -117,7 +121,7 @@ test('zero-change background sync does not collapse open dashboard details', () 
   const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
   assert.match(run, /let applied = 0/);
   assert.match(run, /applied \+= this\.apply\(d\.changes\)/);
-  assert.match(run, /if \(applied \|\| needsAccessRender\) renderAfterSync\(\)/);
+  assert.match(run, /if \(applied \|\| needsAccessRender \|\| accessRoleChanged\) renderAfterSync\(\)/);
 });
 
 test('deleting staff also revokes personal links and sessions', () => {
@@ -127,12 +131,20 @@ test('deleting staff also revokes personal links and sessions', () => {
   assert.match(block, /개인 링크는 해지됩니다/);
 });
 
-test('personal links stay own-scoped regardless of the staff manager flag', () => {
-  assert.match(html, /get isAdmin\(\) \{ return !this\.isStaffLink && sessionStorage\.getItem\('wb_admin'\) === '1'; \}/);
-  assert.doesNotMatch(html, /session\.isManager|get isManager\(\)/);
-  assert.match(html, /관리 담당 기본값 · 개인 링크는 본인 범위/);
-  assert.match(html, /개인 링크 권한은 본인 업무 범위로 유지됩니다/);
-  assert.doesNotMatch(html, /대표와 같은 운영 권한|운영 화면·수정·승인·QR 권한/);
+test('task managers elevate only from a verified server role', () => {
+  const manager = html.match(/get isManager\(\) \{[\s\S]*?\n  }/)?.[0] || '';
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  assert.match(html, /personVerified: false, accessRole: ''/);
+  assert.match(run, /d\.authRole !== 'manager' && d\.authRole !== 'staff'/);
+  assert.match(run, /nextAccessRole = responseAccessRole/);
+  assert.match(manager, /auth\.mode === 'person'/);
+  assert.match(manager, /auth\.id === this\.staffId/);
+  assert.match(manager, /sync\.personVerified && sync\.accessRole === 'manager'/);
+  assert.doesNotMatch(manager, /staffById|staff\.manager/);
+  assert.match(html, /get isAdmin\(\) \{ return this\.isManager \|\|/);
+  assert.match(html, /운영 권한은 서버에서 별도 승인/);
+  assert.match(html, /운영 권한은 서버 승인 대상에게만 열립니다/);
+  assert.doesNotMatch(html, /관리 담당 기본값 · 개인 링크는 본인 범위/);
   const publish = html.match(/case 'wpublish':[\s\S]{0,900}?draft\.forEach/)?.[0] || '';
   assert.match(publish, /if \(!session\.isAdmin\) break/);
   assert.match(html, /origin: actor\(\)/);
@@ -149,6 +161,145 @@ test('personal links stay own-scoped regardless of the staff manager flag', () =
   }
 });
 
+test('manager downgrade and auth rejection purge the full person cache', () => {
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const reset = html.match(/function resetPersonCache\(token\) \{[\s\S]*?\n}/)?.[0] || '';
+  const rejection = html.match(/function handlePersonAuthRejection\(error, managerRoleSeen, knownProblem\) \{[\s\S]*?\n}/)?.[0] || '';
+  assert.match(run, /const managerCacheDowngraded = responseAccessRole === 'staff'[\s\S]{0,120}hasSensitiveManagerCache\(previousAccessRole\)/);
+  assert.match(run, /resetPersonCache\(auth\.token\)[\s\S]{0,80}location\.reload\(\)/);
+  assert.ok(run.indexOf('resetPersonCache(auth.token)') < run.indexOf('applied += this.apply(d.changes)'));
+  assert.match(run, /let nextAccessRole = '';[\s\S]{0,80}this\.busy = true/);
+  assert.match(run, /handlePersonAuthRejection\(e, nextAccessRole === 'manager', problem\)/);
+  assert.match(rejection, /resetPersonCache\(''\)/);
+  assert.match(run, /state\.settings\.managerCacheSensitive = true/);
+  assert.match(reset, /localStorage\.removeItem\(LS_KEY\)/);
+  assert.match(reset, /state = blankState\(\)/);
+  assert.match(reset, /state\.settings\.myToken = ''/);
+  assert.match(reset, /delete state\.settings\.managerCacheSensitive/);
+  assert.match(reset, /if \(keepToken\) state\.settings\.myToken = keepToken/);
+  assert.match(reset, /if \(keepToken \|\| !removed\) save\(\)/);
+  for (const cacheReset of [
+    /rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = \[\]/,
+    /bookDb = null; bookDbErr = ''; bookDbLoading = false/,
+    /guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false/,
+    /feedbackQueue = \[\]; feedbackQueueLoaded = false; feedbackQueueLoading = false/,
+    /lessonChangeQueue = \[\]; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false/,
+    /bookAddQueue = \[\]; bookAddQueueLoaded = false; bookAddQueueLoading = false/,
+    /bookEditQueue = \[\]; bookEditQueueLoaded = false; bookEditQueueLoading = false/,
+    /linkCodeVault\.clear\(\)/
+  ]) assert.match(reset, cacheReset);
+});
+
+test('direct personal API 401/403 purges sensitive UI once, while sync, root admin, and 5xx keep their paths', () => {
+  const post = html.match(/async post\(path, body\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const rejection = html.match(/function handlePersonAuthRejection\(error, managerRoleSeen, knownProblem\) \{[\s\S]*?\n}/)?.[0] || '';
+  const handoff = html.match(/async function createVerifiedHandoffLink\(\)[\s\S]*?\n}/)?.[0] || '';
+  assert.match(post, /body && body\.auth && body\.auth\.mode === 'person'/);
+  assert.match(post, /path !== '\/sync' && session\.isStaffLink && personRequest/);
+  assert.match(post, /res\.status === 401 \|\| res\.status === 403/);
+  assert.doesNotMatch(post, /res\.status >= 500[\s\S]{0,100}handlePersonAuthRejection/);
+  assert.match(rejection, /resetPersonCache\(''\)/);
+  assert.doesNotMatch(rejection, /\belse\b/);
+  assert.match(rejection, /closeModal\(\);[\s\S]{0,40}render\(\);[\s\S]{0,40}location\.reload\(\)/);
+  assert.match(rejection, /error\.personAuthHandled = true/);
+  assert.match(handoff, /if \(!error\.personAuthHandled &&/);
+
+  const exercise = new Function('managerRoleSeen', 'sensitive', `
+    let personAccessProblem = null;
+    const calls = [];
+    const state = { settings: { myToken: 'token' } };
+    const sync = { accessRole: 'manager', personVerified: true };
+    const classifyPersonLinkError = () => ({ kind: 'auth_required' });
+    const hasSensitiveManagerCache = () => sensitive;
+    const resetPersonCache = () => { calls.push('reset'); sync.accessRole = ''; sync.personVerified = false; state.settings.myToken = ''; };
+    const save = () => calls.push('save');
+    const closeModal = () => calls.push('close');
+    const render = () => calls.push('render');
+    const location = { reload: () => calls.push('reload') };
+    ${rejection}
+    const error = { status: 401 };
+    handlePersonAuthRejection(error, managerRoleSeen);
+    return { calls, handled: error.personAuthHandled, token: state.settings.myToken,
+      accessRole: sync.accessRole, verified: sync.personVerified };
+  `);
+  assert.deepEqual(exercise(true, false), {
+    calls: ['reset', 'close', 'render', 'reload'], handled: true, token: '', accessRole: '', verified: false
+  });
+  assert.deepEqual(exercise(false, false), {
+    calls: ['reset', 'close', 'render', 'reload'], handled: true, token: '', accessRole: '', verified: false
+  });
+});
+
+test('staff cache is reloaded from zero when the server promotes it to manager', () => {
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  assert.match(run, /const scopedCacheUpgraded = responseAccessRole === 'manager'/);
+  assert.match(run, /!hasSensitiveManagerCache\(previousAccessRole\) && Number\(state\.settings\.pullAt\) > 0/);
+  assert.match(run, /managerCacheDowngraded \|\| scopedCacheUpgraded \|\| roleChangedDuringSync/);
+  assert.ok(run.indexOf('scopedCacheUpgraded') < run.indexOf('applied += this.apply(d.changes)'));
+});
+
+test('reload then 401 purges every person cache, including a persisted manager cache', () => {
+  const helper = html.match(/function hasSensitiveManagerCache\(previousRole\) \{[\s\S]*?\n}/)?.[0] || '';
+  const detectsPersistedCache = new Function('sync', 'state',
+    helper + '; return hasSensitiveManagerCache(\'\');');
+  assert.equal(detectsPersistedCache({ accessRole: '' }, {
+    settings: { managerCacheSensitive: true }
+  }), true);
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const rejection = html.match(/function handlePersonAuthRejection\(error, managerRoleSeen, knownProblem\) \{[\s\S]*?\n}/)?.[0] || '';
+  assert.match(run, /Number\(e && e\.status\) === 401/);
+  assert.match(run, /if \(authRejected\)[\s\S]{0,180}handlePersonAuthRejection/);
+  assert.match(rejection, /resetPersonCache\(''\)/);
+  const manager = html.match(/get isManager\(\) \{[\s\S]*?\n  }/)?.[0] || '';
+  assert.doesNotMatch(manager, /managerCacheSensitive|hasSensitiveManagerCache/);
+  const startup = html.match(/async function startSyncSession\(\) \{[\s\S]*?\n}/)?.[0] || '';
+  assert.match(startup, /if \(!sync\.enabled\(\)\)[\s\S]{0,140}hasSensitiveManagerCache\(''\)[\s\S]{0,80}resetPersonCache\(''\)/);
+});
+
+test('manager lock clears personal auth and cache; root lock keeps its existing session-only behavior', () => {
+  const sessionBlock = html.match(/const session = \{[\s\S]*?\n};/)?.[0] || '';
+  const logout = html.match(/case 'logout': \{[\s\S]*?\n\s*}/)?.[0] || '';
+  assert.match(sessionBlock, /sessionStorage\.removeItem\('wb_admin'\)/);
+  assert.match(sessionBlock, /sync\.accessRole = ''/);
+  assert.match(sessionBlock, /if \(!this\.isStaffLink\) return false/);
+  assert.match(sessionBlock, /resetPersonCache\(''\)/);
+  assert.ok(sessionBlock.indexOf('if (!this.isStaffLink) return false') < sessionBlock.indexOf("resetPersonCache('')"));
+  assert.match(logout, /const reload = session\.lock\(\)/);
+  assert.match(logout, /if \(reload\) location\.reload\(\)/);
+  assert.match(html, /잠그면 이 기기의 개인 토큰과 업무 캐시를 모두 지웁니다/);
+  assert.match(html, /서버가 확인한 관리 담당 개인 인증/);
+});
+
+test('manager authorship stays distinct from root admin and staff edits', () => {
+  assert.match(html, /const actor = \(\) => session\.isManager \? 'manager' : session\.isAdmin \? 'admin' : 'staff'/);
+  assert.match(html, /t\.lastEditBy = actor\(\)/);
+  for (const label of ['관리 담당 발행', '원장 발행', '관리 담당 수정', '원장 수정', '직원 수정']) {
+    assert.match(html, new RegExp(label));
+  }
+});
+
+test('manager deep links survive startup until the server role is known; verified staff remains allowlisted', () => {
+  const startupAt = html.indexOf('\nload();\nabsorbLinkParams();');
+  const startup = html.slice(startupAt, html.indexOf('let syncLoopStarted', startupAt));
+  const renderFn = html.match(/function render\(\) \{[\s\S]*?\n}/)?.[0] || '';
+  assert.match(startup, /if \(h && !\/\(\^\|&\)c=\/\.test\(h\)\) route = h/);
+  assert.doesNotMatch(startup, /session\.isStaffLink[\s\S]{0,180}route = 'today'/);
+  assert.match(renderFn, /if \(shouldGatePersonAccess\(\)\)[\s\S]{0,120}return/);
+  assert.match(renderFn, /if \(session\.isStaffLink && !session\.isAdmin\)[\s\S]{0,180}const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(renderFn, /if \(!allowed\.includes\(route\)\) route = 'today'/);
+  assert.ok(renderFn.indexOf('if (shouldGatePersonAccess())') <
+    renderFn.indexOf('if (session.isStaffLink && !session.isAdmin)'));
+});
+
+test('a false sync result blocks the director report before its send request', () => {
+  const settle = html.match(/async function settleSync\(\) \{[\s\S]*?\n}/)?.[0] || '';
+  const submit = html.match(/async function submitDirectorReport\(button\) \{[\s\S]*?\n}/)?.[0] || '';
+  assert.match(settle, /const synced = await sync\.run\(\)/);
+  assert.match(settle, /if \(!synced\) throw new Error\('SYNC_FAILED'\)/);
+  assert.ok(submit.indexOf('await settleSync()') <
+    submit.indexOf("sync.post('/director-report-send'"));
+});
+
 test('managers remain employees for payroll while owners are excluded', () => {
   assert.match(html, /const teamStaff = \(\) => liveStaff\(\)\.filter\(s => !s\.owner\)/);
   assert.match(html, /const payrollStaff = \(\) => state\.staff\.filter\(s => !s\.owner\)/);
@@ -158,7 +309,7 @@ test('managers remain employees for payroll while owners are excluded', () => {
 test('admin screens include staff QR and approval actions', () => {
   assert.match(html, /data-act="qrlink"/);
   assert.match(html, /case 'qrlink'/);
-  assert.match(html, /if \(!auth \|\| auth\.mode !== 'admin'\) throw new Error\('관리자 화면에서만 발급할 수 있습니다'\)/);
+  assert.match(html, /auth\.mode !== 'admin' && !session\.isManager/);
   for (const action of ['fbreviewapprove', 'lcreviewapprove', 'bareviewapprove', 'bereviewapprove']) {
     assert.match(html, new RegExp(`case '${action}'`), action);
   }

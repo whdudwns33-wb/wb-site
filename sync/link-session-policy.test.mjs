@@ -90,23 +90,24 @@ class TestD1 {
   }
 }
 
-const envFor = database => ({
+const envFor = (database, overrides = {}) => ({
   DB: database,
   TASK_ADMIN_SECRET: 'admin-secret',
-  CONSULT_ADMIN_SECRET: 'consult-secret'
+  CONSULT_ADMIN_SECRET: 'consult-secret',
+  ...overrides
 });
 
-async function postApp(database, app, path, body) {
+async function postApp(database, app, path, body, envOverrides = {}) {
   const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ app, ...body })
-  }), envFor(database));
+  }), envFor(database, envOverrides));
   return { status: response.status, body: await response.json() };
 }
 
-async function post(database, path, body) {
-  return postApp(database, 'task', path, body);
+async function post(database, path, body, envOverrides = {}) {
+  return postApp(database, 'task', path, body, envOverrides);
 }
 
 const admin = { mode: 'admin', secret: 'admin-secret' };
@@ -125,23 +126,38 @@ async function hashForStorage(value) {
   return 'sha256:' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-test('task manager personal auth cannot issue another teacher QR link', async () => {
+test('allowlisted task manager personal auth can issue another teacher QR link', async () => {
   const db = new TestD1();
   const now = Date.now();
   db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
-    .bind('task', 'manager-1', 'manager-1', JSON.stringify({ id: 'manager-1', name: '관리자선생님', manager: true, deleted: false }), now, now).run();
+    .bind('task', 'manager-1', 'manager-1', JSON.stringify({ id: 'manager-1', name: '관리자선생님', deleted: false }), now, now).run();
   db.seedStaff('teacher-2');
   db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
     .bind('task', 'manager-token', 'manager-1', now).run();
 
   const result = await post(db, '/bootstrap', {
     auth: { mode: 'person', id: 'manager-1', token: 'manager-token' }, staffId: 'teacher-2'
-  });
-  assert.equal(result.status, 401);
-  assert.equal(result.body.code, undefined);
+  }, { TASK_MANAGER_STAFF_IDS: ' other-manager , manager-1 ' });
+  assert.equal(result.status, 200);
+  assert.match(result.body.code, /^[a-f0-9]{48}$/);
 });
 
-test('consult personal auth stays owner scoped even when its staff row says manager', async () => {
+test('staff.manager metadata and an allowlist substring cannot elevate personal auth', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'teacher-1', 'teacher-1', JSON.stringify({ id: 'teacher-1', manager: true, deleted: false }), now, now).run();
+  db.seedStaff('teacher-2');
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('task', 'teacher-token', 'teacher-1', now).run();
+
+  const result = await post(db, '/bootstrap', {
+    auth: { mode: 'person', id: 'teacher-1', token: 'teacher-token' }, staffId: 'teacher-2'
+  }, { TASK_MANAGER_STAFF_IDS: 'teacher-10' });
+  assert.equal(result.status, 401);
+});
+
+test('consult personal auth stays owner scoped even when metadata and task allowlist say manager', async () => {
   const db = new TestD1();
   const now = Date.now();
   db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
@@ -153,8 +169,69 @@ test('consult personal auth stays owner scoped even when its staff row says mana
 
   const result = await postApp(db, 'consult', '/bootstrap', {
     auth: { mode: 'person', id: 'manager-1', token: 'manager-token' }, staffId: 'teacher-2'
-  });
+  }, { TASK_MANAGER_STAFF_IDS: 'manager-1' });
   assert.equal(result.status, 401);
+});
+
+test('allowlisted task manager handoff issues a code only for the same staff id', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.seedStaff('manager-1');
+  db.seedStaff('teacher-2');
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('task', 'manager-token', 'manager-1', now).run();
+  const auth = { mode: 'person', id: 'manager-1', token: 'manager-token' };
+  const managerEnv = { TASK_MANAGER_STAFF_IDS: 'manager-1' };
+
+  const issued = await post(db, '/handoff', { auth, staffId: 'teacher-2' }, managerEnv);
+  assert.equal(issued.status, 200);
+  assert.match(issued.body.code, /^[a-f0-9]{48}$/);
+  assert.ok(issued.body.expiresAt <= Date.now() + 10 * 60 * 1000);
+  assert.equal(db.count(
+    'SELECT count(*) AS n FROM bootstrap_codes WHERE app=? AND staff_id=?', 'task', 'manager-1'
+  ), 1);
+  assert.equal(db.count(
+    'SELECT count(*) AS n FROM bootstrap_codes WHERE app=? AND staff_id=?', 'task', 'teacher-2'
+  ), 0);
+  assert.equal((await exchange(db, issued.body.code, 'manager-1')).status, 200);
+});
+
+test('manager task sync server-stamps audit fields and preserves an existing origin', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.seedStaff('manager-1');
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('task', 'manager-token', 'manager-1', now).run();
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'existing-task', 'teacher-2', JSON.stringify({
+      id: 'existing-task', staffId: 'teacher-2', origin: 'admin', lastEditBy: 'admin', title: 'existing'
+    }), 1, 1).run();
+  const auth = { mode: 'person', id: 'manager-1', token: 'manager-token' };
+  const result = await post(db, '/sync', { auth, since: now, changes: [
+    { table: 'tasks', id: 'existing-task', owner: 'teacher-2', updated_at: 2,
+      data: { id: 'existing-task', staffId: 'teacher-2', origin: 'staff', lastEditBy: 'forged', title: 'updated' } },
+    { table: 'tasks', id: 'new-task', owner: 'teacher-2', updated_at: 2,
+      data: { id: 'new-task', staffId: 'teacher-2', origin: 'staff', lastEditBy: 'forged', title: 'new' } }
+  ] }, { TASK_MANAGER_STAFF_IDS: 'manager-1' });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.authRole, 'manager');
+
+  const existing = JSON.parse(db.database.prepare(
+    'SELECT data FROM tasks WHERE app=? AND id=?'
+  ).get('task', 'existing-task').data);
+  const created = JSON.parse(db.database.prepare(
+    'SELECT data FROM tasks WHERE app=? AND id=?'
+  ).get('task', 'new-task').data);
+  assert.equal(existing.origin, 'admin');
+  assert.equal(existing.lastEditBy, 'manager');
+  assert.equal(created.origin, 'manager');
+  assert.equal(created.lastEditBy, 'manager');
+
+  const malformed = await post(db, '/sync', { auth, since: now, changes: [
+    { table: 'tasks', id: 'malformed-task', owner: 'teacher-2', updated_at: 3, data: 'not-an-object' }
+  ] }, { TASK_MANAGER_STAFF_IDS: 'manager-1' });
+  assert.equal(malformed.status, 403);
+  assert.equal(db.count('SELECT count(*) AS n FROM tasks WHERE app=? AND id=?', 'task', 'malformed-task'), 0);
 });
 
 test('issuing a second link leaves the first unused link exchangeable', async () => {
@@ -310,8 +387,9 @@ test('a deleted staff member cannot use an otherwise active bearer', async () =>
     JSON.stringify({ id: 'teacher-1', name: '교사', deleted: true }), 'task', 'teacher-1'
   );
   const auth = { mode: 'person', id: 'teacher-1', token: connected.body.token };
-  const syncResult = await post(db, '/sync', { auth, since: Date.now(), changes: [] });
-  const handoffResult = await post(db, '/handoff', { auth });
+  const managerEnv = { TASK_MANAGER_STAFF_IDS: 'teacher-1' };
+  const syncResult = await post(db, '/sync', { auth, since: Date.now(), changes: [] }, managerEnv);
+  const handoffResult = await post(db, '/handoff', { auth }, managerEnv);
 
   assert.equal(syncResult.status, 401);
   assert.equal(handoffResult.status, 401);

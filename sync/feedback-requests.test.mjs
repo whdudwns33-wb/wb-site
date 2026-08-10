@@ -53,10 +53,10 @@ const fields = (overrides = {}) => ({
   contentText: '독해 지문 3개 풀이', plusText: '오답을 스스로 설명함', minusText: '어휘', ...overrides
 });
 
-async function call(db, path, body) {
+async function call(db, path, body, envOverrides = {}) {
   const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'task', ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...envOverrides });
   return { status: response.status, body: await response.json() };
 }
 
@@ -160,8 +160,34 @@ test('director can list, request revision, and stale reviews are rejected', asyn
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.request.status, 'revision_requested');
+  assert.equal(db.database.prepare(
+    'SELECT reviewed_by FROM feedback_requests WHERE app=? AND request_key=?'
+  ).get('task', key).reviewed_by, 'director');
   result = await call(db, '/feedback-review', { auth: admin, action: 'approve_content', requestKey: key, revision: 2 });
   assert.equal(result.status, 409);
+});
+
+test('allowlisted manager feedback review records the authenticated staff id', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '담당선생님');
+  seedStaff(db, 'manager-a', '관리선생님');
+  seedToken(db, 'manager-token', 'manager-a');
+  seedTask(db, 'task-a', 'teacher-a');
+  let result = await call(db, '/feedback-request', {
+    auth: admin, ...identity, message: '관리 담당이 검토할 문구입니다.', ...fields()
+  });
+  const key = result.body.request.requestKey;
+  db.database.prepare(
+    "UPDATE feedback_requests SET status='approval_waiting', reviewed_at=NULL, reviewed_by=NULL WHERE app=? AND request_key=?"
+  ).run('task', key);
+  result = await call(db, '/feedback-review', {
+    auth: person('manager-a', 'manager-token'), action: 'approve_content', requestKey: key, revision: 1
+  }, { TASK_MANAGER_STAFF_IDS: 'manager-a' });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.status, 'content_approved_send_blocked');
+  assert.equal(db.database.prepare(
+    'SELECT reviewed_by FROM feedback_requests WHERE app=? AND request_key=?'
+  ).get('task', key).reviewed_by, 'manager-a');
 });
 
 test('resubmitting unchanged content while revision_requested is rejected; changed content clears the note', async () => {

@@ -31,10 +31,10 @@ class TestD1 {
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = (id, token) => ({ mode: 'person', id, token });
 
-async function call(db, path, body) {
+async function call(db, path, body, env = {}) {
   const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'task', ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...env });
   return { status: response.status, body: await response.json() };
 }
 
@@ -124,6 +124,21 @@ test('director sees the pending request and approving it writes into the live ta
 
   const again = await call(db, '/lesson-change-review', { auth: admin, action: 'approve', requestKey, revision: 1 });
   assert.equal(again.body.idempotent, true, '이미 승인된 요청을 다시 승인해도 안전하다');
+});
+
+test('server-authorized manager approval records the manager staff id', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { time: '19:00' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: person('S-kim', 'tok-kim'), action: 'approve',
+    requestKey: submit.body.request.requestKey, revision: 1
+  }, { TASK_MANAGER_STAFF_IDS: 'S-kim' });
+  assert.equal(approve.status, 200);
+  assert.equal(db.prepare("SELECT reviewed_by FROM lesson_change_requests WHERE app='task'").first().reviewed_by, 'S-kim');
+  const task = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
+  assert.equal(task.lastEditBy, 'manager');
 });
 
 test('director can reject with a note, and staff sees it in their own list', async () => {

@@ -19,3 +19,5 @@ database_id = "5d65c2e2-47d9-4947-b402-704719914fd3"
 # 비밀값은 이 파일에 쓰지 않는다. 아래 명령으로 따로 넣는다.
 #   npx wrangler secret put TASK_ADMIN_SECRET
 #   npx wrangler secret put CONSULT_ADMIN_SECRET
+#   npx wrangler secret put TASK_MANAGER_STAFF_IDS
+#   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID

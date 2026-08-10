@@ -33,6 +33,10 @@ function normalizeText(value) {
   return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
 }
 
+function auditActor(auth) {
+  return auth.role === 'manager' ? String(auth.id) : 'director';
+}
+
 /** 화이트리스트 밖 필드는 조용히 버리고, 안에 있는 값만 형식을 검사해 정리한다 */
 function sanitizeLessonChanges(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -258,6 +262,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
   if (current.status === 'cancelled') return json({ ok: false, error: '취소된 요청은 검토할 수 없습니다' }, 409, origin);
 
   const now = Date.now();
+  const reviewedBy = auditActor(auth);
   if (action === 'approve') {
     if (current.status === 'approved') return json({ ok: true, idempotent: true, request: view(current) }, 200, origin);
     if (current.status !== 'approval_waiting') {
@@ -274,7 +279,10 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (!taskData || taskData.deleted) {
       return json({ ok: false, error: '삭제된 지시서는 반영할 수 없습니다' }, 409, origin);
     }
-    const merged = Object.assign({}, taskData, changes, { updatedAt: now });
+    const merged = Object.assign({}, taskData, changes, {
+      updatedAt: now,
+      lastEditBy: auth.role === 'manager' ? 'manager' : 'admin'
+    });
 
     const applied = await env.DB.batch([
       env.DB.prepare(
@@ -282,8 +290,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       ).bind(JSON.stringify(merged), now, now, app, current.task_id, taskRow.updated_at),
       env.DB.prepare(
         "UPDATE lesson_change_requests SET status='approved', updated_at=?, reviewed_at=?, " +
-        "reviewed_by='director', review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
-      ).bind(now, now, app, requestKey, expectedRevision)
+        "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
+      ).bind(now, now, reviewedBy, app, requestKey, expectedRevision)
     ]);
     const taskChanged = Number(applied[0] && applied[0].meta && applied[0].meta.changes || 0);
     const reqChanged = Number(applied[1] && applied[1].meta && applied[1].meta.changes || 0);
@@ -299,8 +307,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     }
     const result = await env.DB.prepare(
       "UPDATE lesson_change_requests SET status='rejected', updated_at=?, reviewed_at=?, " +
-      "reviewed_by='director', review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
-    ).bind(now, now, note, app, requestKey, expectedRevision).run();
+      "reviewed_by=?, review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
+    ).bind(now, now, reviewedBy, note, app, requestKey, expectedRevision).run();
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }

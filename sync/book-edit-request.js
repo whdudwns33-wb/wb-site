@@ -38,6 +38,10 @@ function normalizeText(value) {
   return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
 }
 
+function auditActor(auth) {
+  return auth.role === 'manager' ? String(auth.id) : 'director';
+}
+
 function sanitizeUnits(raw) {
   if (raw == null) return [];
   if (!Array.isArray(raw)) { const e = new Error('목차 형식을 확인해 주세요'); e.status = 400; throw e; }
@@ -123,7 +127,7 @@ export async function handleBookEditRequest(env, app, body, origin, auth, json) 
     return json({ ok: true, requests: (result.results || []).map(view) }, 200, origin);
   }
 
-  const owner = auth.scope === 'all' ? 'director' : String(auth.id || '');
+  const owner = auth.scope === 'all' ? auditActor(auth) : String(auth.id || '');
   if (!owner || !SAFE_ID.test(owner)) return json({ ok: false, error: '인증 정보를 확인할 수 없습니다' }, 401, origin);
 
   const bookId = String(body.bookId || '');
@@ -171,7 +175,7 @@ export async function handleBookEditRequest(env, app, body, origin, auth, json) 
   const autoApprove = auth.scope === 'all';
   const status = autoApprove ? 'approved' : 'approval_waiting';
   const reviewedAt = autoApprove ? now : null;
-  const reviewedBy = autoApprove ? 'director' : null;
+  const reviewedBy = autoApprove ? auditActor(auth) : null;
 
   if (!current) {
     await env.DB.prepare(
@@ -244,6 +248,7 @@ export async function handleBookEditReview(env, app, body, origin, auth, json) {
   if (current.status === 'cancelled') return json({ ok: false, error: '취소된 신청은 검토할 수 없습니다' }, 409, origin);
 
   const now = Date.now();
+  const reviewedBy = auditActor(auth);
   if (action === 'approve') {
     if (current.status === 'approved') return json({ ok: true, idempotent: true, request: view(current) }, 200, origin);
     if (current.status !== 'approval_waiting') {
@@ -251,8 +256,8 @@ export async function handleBookEditReview(env, app, body, origin, auth, json) {
     }
     const result = await env.DB.prepare(
       "UPDATE book_edit_requests SET status='approved', updated_at=?, reviewed_at=?, " +
-      "reviewed_by='director', review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
-    ).bind(now, now, app, requestKey, expectedRevision).run();
+      "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
+    ).bind(now, now, reviewedBy, app, requestKey, expectedRevision).run();
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }
@@ -265,8 +270,8 @@ export async function handleBookEditReview(env, app, body, origin, auth, json) {
     }
     const result = await env.DB.prepare(
       "UPDATE book_edit_requests SET status='rejected', updated_at=?, reviewed_at=?, " +
-      "reviewed_by='director', review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
-    ).bind(now, now, note, app, requestKey, expectedRevision).run();
+      "reviewed_by=?, review_note=? WHERE app=? AND request_key=? AND revision=? AND status<>'cancelled'"
+    ).bind(now, now, reviewedBy, note, app, requestKey, expectedRevision).run();
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }

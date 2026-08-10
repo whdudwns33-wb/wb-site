@@ -276,7 +276,7 @@ test('client cannot inject server-owned task fields', async () => {
   assert.equal(db.tasks.size, 0);
 });
 
-test('admin must choose an active teacher and uses manager origin', async () => {
+test('admin must choose an active teacher and uses admin origin', async () => {
   const db = new FakeDB();
   const missing = await call(db, { lesson: validLesson() }, { scope: 'all' });
   assert.equal(missing.response.status, 409);
@@ -285,7 +285,7 @@ test('admin must choose an active teacher and uses manager origin', async () => 
   const valid = await call(db, { staffId: 'teacher-2', lesson: validLesson() }, { scope: 'all' });
   assert.equal(valid.response.status, 200);
   assert.equal(valid.data.task.staffId, 'teacher-2');
-  assert.equal(valid.data.task.origin, 'manager');
+  assert.equal(valid.data.task.origin, 'admin');
 });
 
 test('duplicate submissions are idempotent with explicit response flags', async () => {
@@ -330,6 +330,29 @@ test('changed grade, schedule, and start update the same task with a revision', 
   assert.equal(corrected.data.task.lessonRevision, 2);
   assert.equal(corrected.data.task.grade, '초5');
   assert.equal(db.tasks.size, 1);
+});
+
+test('root admin and allowlisted manager lesson writes keep distinct server attribution', async () => {
+  for (const [auth, expectedActor] of [
+    [{ scope: 'all' }, 'admin'],
+    [{ scope: 'all', id: 'manager-1', role: 'manager' }, 'manager']
+  ]) {
+    const db = new FakeDB();
+    const created = await call(db, {
+      staffId: 'teacher-1', lesson: assignedLesson()
+    }, auth);
+    assert.equal(created.response.status, 200);
+    assert.equal(created.data.task.origin, expectedActor);
+
+    const updated = await call(db, {
+      staffId: 'teacher-1', sourceTaskId: created.data.task.id,
+      expectedUpdatedAt: created.data.task.updatedAt,
+      lesson: assignedLesson({ materials: '감사 주체 구분 수정' })
+    }, auth);
+    assert.equal(updated.response.status, 200);
+    assert.equal(updated.data.task.origin, expectedActor);
+    assert.equal(updated.data.task.updatedByScope, expectedActor);
+  }
 });
 
 test('a changed submission without an expected version cannot overwrite', async () => {

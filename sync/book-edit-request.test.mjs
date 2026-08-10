@@ -31,10 +31,10 @@ class TestD1 {
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = (id, token) => ({ mode: 'person', id, token });
 
-async function call(db, path, body) {
+async function call(db, path, body, env = {}) {
   const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: 'task', ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...env });
   return { status: response.status, body: await response.json() };
 }
 
@@ -89,6 +89,17 @@ test('director submitting is auto-approved and shows up immediately in list_appr
   const approvedList = await call(db, '/book-edit-request', { auth: person('S-kim', 'tok-kim'), action: 'list_approved' });
   assert.equal(approvedList.body.edits.length, 1);
   assert.equal(approvedList.body.edits[0].bookId, 'BK06');
+});
+
+test('server-authorized manager auto-approval records the manager staff id', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/book-edit-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', bookId: 'BK-MANAGER', title: '관리자 수정 교재'
+  }, { TASK_MANAGER_STAFF_IDS: 'S-kim' });
+  assert.equal(submit.status, 200);
+  const row = db.prepare("SELECT owner,reviewed_by FROM book_edit_requests WHERE app='task'").first();
+  assert.equal(row.owner, 'S-kim');
+  assert.equal(row.reviewed_by, 'S-kim');
 });
 
 test('director approves a staff edit, then it appears in list_approved', async () => {
