@@ -5,6 +5,10 @@ const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_STUDENTS = 2000;
 const MAX_BOOK_STUDENTS = 5000;
 
+function isBoardingLockError(error) {
+  return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
+}
+
 function fail(path, message) {
   throw new Error(path + ': ' + message);
 }
@@ -216,6 +220,23 @@ async function inactiveTeacherIds(env, app, document) {
   return Array.from(used).filter(id => !active.has(id));
 }
 
+async function boardedStudentConflicts(env, app, document) {
+  const result = await env.DB.prepare(
+    "SELECT date,student_id FROM transport_states WHERE app=? AND status='boarded'"
+  ).bind(app).all();
+  const students = new Map(document.roster.students.map(item => [item.id, item]));
+  const conflicts = new Set();
+  for (const row of result.results || []) {
+    const studentId = String(row.student_id || '');
+    const student = students.get(studentId);
+    const boardingMonth = String(row.date || '').slice(0, 7);
+    const activeForBoarding = student && YEAR_MONTH.test(boardingMonth) &&
+      student.start <= boardingMonth && (!student.end || student.end > boardingMonth);
+    if (!activeForBoarding) conflicts.add(studentId);
+  }
+  return [...conflicts];
+}
+
 export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
@@ -232,6 +253,14 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (inactiveIds.length) {
       return json({ ok: false, error: 'teacherIds에는 활성 직원 ID만 사용할 수 있습니다: ' + inactiveIds.join(', ') }, 400, origin);
     }
+    const boardedConflicts = await boardedStudentConflicts(env, app, document);
+    if (boardedConflicts.length) {
+      return json({
+        ok: false,
+        code: 'BOARDING_LOCK',
+        error: '탑승 후 미하차 상태인 학생은 명단에서 제거하거나 해당 운행월에 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
+      }, 409, origin);
+    }
     const issueConflicts = await activeBookIssueConflicts(env, app, document);
     if (issueConflicts.length) {
       return json({
@@ -242,10 +271,21 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       }, 409, origin);
     }
     const updatedAt = Date.now();
-    await env.DB.prepare(
-      'INSERT INTO private_rosters (app,data,updated_at) VALUES (?,?,?) ' +
-      'ON CONFLICT(app) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at'
-    ).bind(app, JSON.stringify(document), updatedAt).run();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO private_rosters (app,data,updated_at) VALUES (?,?,?) ' +
+        'ON CONFLICT(app) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at'
+      ).bind(app, JSON.stringify(document), updatedAt).run();
+    } catch (error) {
+      if (isBoardingLockError(error)) {
+        return json({
+          ok: false,
+          code: 'BOARDING_LOCK',
+          error: '탑승 후 미하차 상태인 학생은 명단에서 제거하거나 해당 운행월에 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
+        }, 409, origin);
+      }
+      throw error;
+    }
     return json({
       ok: true,
       updatedAt,

@@ -448,6 +448,7 @@
   /* ─── 학생별 교재 출고 ─── */
   .book-issue-board { border-color: #B9DDF0; }
   .ops-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .book-issue-kpis { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   .ops-kpi { min-width: 0; padding: 11px 7px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); text-align: center; }
   .ops-kpi b { display: block; color: var(--navy); font-size: 20px; line-height: 1; }
   .ops-kpi span { display: block; margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; }
@@ -459,6 +460,8 @@
   .book-issue-grid, .transport-route-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: 9px; }
   .book-issue-card { margin-bottom: 0; }
   .book-issue-card.is-risk { border-left: 4px solid var(--coral); background: #FFF9F7; }
+  .book-issue-unassigned { border-color: #F3B8B0; background: #FFF9F7; }
+  .book-issue-unassigned > summary { min-height: 44px; cursor: pointer; }
   .ops-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .ops-actions .btn { min-height: 44px; }
 
@@ -553,10 +556,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-11.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-11.3"></script>
-<script src="./asset-core.js?v=2026-08-11.3"></script>
-<script src="./qr-core.js?v=2026-08-11.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-11.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-11.4"></script>
+<script src="./asset-core.js?v=2026-08-11.4"></script>
+<script src="./qr-core.js?v=2026-08-11.4"></script>
 <script>
 "use strict";
 
@@ -4945,6 +4948,29 @@ function bookIssueViewRows() {
     a.studentName.localeCompare(b.studentName, 'ko') || a.title.localeCompare(b.title, 'ko'));
 }
 
+function bookIssueUnassignedStudents() {
+  if (!session.isAdmin) return [];
+  if (rosterLoading || rosterErr || !rosterDb || !Array.isArray(rosterDb.students) || !Array.isArray(privateBookStudents)) return null;
+  const currentMonth = today().slice(0, 7);
+  const assignedStudentIds = new Set(privateBookStudents.map(row => String(row && row.studentId || '')).filter(Boolean));
+  return rosterDb.students.filter(student => student && student.id && student.start <= currentMonth &&
+    (!student.end || student.end > currentMonth) && !assignedStudentIds.has(String(student.id)))
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+}
+
+function bookIssueUnassignedHtml(students) {
+  if (!session.isAdmin) return '';
+  if (students === null) return '<section class="card alert book-issue-unassigned"><div class="card-title">교재 미배정 현황 확인 대기</div>' +
+    '<div class="card-sub">최신 원생 명단을 확인하지 못해 이전 명단의 숫자를 표시하지 않습니다.</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="bookissuerefresh">원생 명단 다시 불러오기</button></section>';
+  if (!students.length) return '';
+  return '<details class="card book-issue-unassigned"><summary class="between"><span><b>교재 미배정 · 확인 필요 ' +
+    students.length + '명</b><span class="card-sub">현재 재원 명단에 있지만 학생별 교재 배정이 없습니다.</span></span><span class="pill bad">확인 필요</span></summary>' +
+    '<div class="hint mt8">명단 누락을 숨기지 않기 위한 확인 목록입니다. 교재는 자동 배정하지 않습니다.</div>' +
+    students.map(student => '<div class="between mt8"><div><b>' + esc(student.name || '이름 미입력') + '</b><span class="card-sub">' +
+      esc(student.grade || '학년 미지정') + ' · 담당 ' + esc(student.teacher || '미지정') + '</span></div><span class="pill warn">미배정</span></div>').join('') + '</details>';
+}
+
 async function loadBookIssues(force) {
   if (bookIssueLoading || (bookIssueLoaded && !force)) return;
   const auth = sync.auth();
@@ -5030,9 +5056,11 @@ function bookIssueCard(row) {
 
 function viewBookIssues() {
   if (!bookIssueLoaded && !bookIssueLoading) setTimeout(() => loadBookIssues(false), 0);
-  if (bookIssueLoading && !bookIssueLoaded) return '<section class="card book-issue-board"><div class="empty"><b>⏳</b>학생별 출고 현황을 불러오는 중…</div></section>';
+  const unassigned = bookIssueUnassignedStudents();
+  const unassignedHtml = bookIssueUnassignedHtml(unassigned);
+  if (bookIssueLoading && !bookIssueLoaded) return '<section class="card book-issue-board"><div class="empty"><b>⏳</b>학생별 출고 현황을 불러오는 중…</div></section>' + unassignedHtml;
   if (bookIssueError) return '<section class="card alert book-issue-board"><div class="card-title">학생별 출고 현황을 불러오지 못했습니다</div>' +
-    '<div class="card-sub">' + esc(bookIssueError) + '</div><button class="btn btn-sm btn-ghost mt14" data-act="bookissuerefresh">다시 시도</button></section>';
+    '<div class="card-sub">' + esc(bookIssueError) + '</div><button class="btn btn-sm btn-ghost mt14" data-act="bookissuerefresh">다시 시도</button></section>' + unassignedHtml;
   const all = bookIssueViewRows();
   const visible = all.filter(bookIssueMatches);
   const unissued = all.filter(row => ['unissued', 'pending'].includes(row.status)).length;
@@ -5042,13 +5070,17 @@ function viewBookIssues() {
   let h = '<section class="card book-issue-board"><div class="between"><div><div class="card-title">학생별 교재 출고·인계</div>' +
     '<div class="card-sub">보관함에서 꺼낸 시점과 학생에게 직접 전달한 시점을 나눠 누락을 찾습니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="bookissuerefresh" aria-label="학생별 출고 현황 새로고침">새로고침</button></div>' +
-    '<div class="ops-kpis" aria-label="교재 출고 요약"><div class="ops-kpi"><b>' + unissued + '</b><span>미출고</span></div>' +
+    '<div class="ops-kpis book-issue-kpis" aria-label="교재 출고 요약"><div class="ops-kpi"><b>' + unissued + '</b><span>미출고</span></div>' +
       '<div class="ops-kpi' + (risk ? ' is-alert' : '') + '"><b>' + risk + '</b><span>출고 후 1일+ 미수령</span></div>' +
-      '<div class="ops-kpi"><b>' + issuedToday + '</b><span>오늘 출고</span></div><div class="ops-kpi"><b>' + handed + '</b><span>인계 완료</span></div></div>' +
+      '<div class="ops-kpi"><b>' + issuedToday + '</b><span>오늘 출고</span></div><div class="ops-kpi"><b>' + handed + '</b><span>인계 완료</span></div>' +
+      (session.isAdmin ? (unassigned === null
+        ? '<div class="ops-kpi is-alert"><b>—</b><span>미배정 확인 불가</span></div>'
+        : '<div class="ops-kpi' + (unassigned.length ? ' is-alert' : '') + '"><b>' + unassigned.length + '</b><span>교재 미배정 · 확인 필요</span></div>') : '') + '</div>' +
     '<div class="ops-toolbar"><div class="chips" aria-label="교재 출고 상태 필터">' + BOOK_ISSUE_FILTERS.map(filter =>
       '<button class="chip ' + (bookIssueFilter === filter[0] ? 'on' : '') + '" data-act="bookissuefilter" data-status="' + filter[0] + '" aria-pressed="' + (bookIssueFilter === filter[0]) + '">' + filter[1] + '</button>').join('') + '</div>' +
       '<input class="in ops-search" type="search" data-book-issue-search aria-label="학생별 출고 검색" placeholder="학생·선생님·교재·상태 검색" value="' + esc(bookIssueSearchQuery) + '">' +
       '<span class="small muted" data-book-issue-search-status role="status" aria-live="polite"></span></div></section>';
+  h += unassignedHtml;
   h += '<div class="book-issue-grid">' + visible.map(bookIssueCard).join('') + '</div>' +
     '<div class="onboarding-empty-search" data-book-issue-search-empty hidden>검색 결과가 없습니다.</div>';
   if (!visible.length) h += '<div class="card"><div class="empty"><b>📦</b>' + (all.length ? '이 상태에 해당하는 교재가 없습니다.' : '학생에게 배정된 교재가 없습니다.') + '</div></div>';
@@ -5415,6 +5447,25 @@ function ensureTransportDraft() {
   return transportConfigDraft;
 }
 
+function transportRosterReady() {
+  return !!(rosterDb && Array.isArray(rosterDb.students)) && !rosterErr;
+}
+
+function transportDraftStudentIds(draft, routeId, stopId) {
+  const routeRow = (draft.routes || []).find(item => String(item.id) === String(routeId));
+  const stopRow = routeRow && (routeRow.stops || []).find(item => String(item.id) === String(stopId));
+  return stopRow && Array.isArray(stopRow.studentIds) ? stopRow.studentIds.map(String) : [];
+}
+
+function transportCapturedStudentIds(draft, routeId, stopId, select) {
+  const previous = transportDraftStudentIds(draft, routeId, stopId);
+  if (!transportRosterReady()) return previous;
+  const options = Array.from((select && select.options) || []);
+  const rendered = new Set(options.map(option => String(option.value)));
+  const selected = Array.from((select && select.selectedOptions) || []).map(option => String(option.value));
+  return Array.from(new Set(selected.concat(previous.filter(studentId => !rendered.has(studentId)))));
+}
+
 function captureTransportConfig() {
   const draft = ensureTransportDraft();
   const vehicles = Array.from(document.querySelectorAll('[data-tc-vehicle]')).map(row => ({
@@ -5435,7 +5486,7 @@ function captureTransportConfig() {
     stops: Array.from(row.querySelectorAll('[data-tc-stop]')).map(stop => ({
       id: String(stop.dataset.id || ''), name: String((stop.querySelector('[data-tc-stop-name]') || {}).value || '').trim(),
       time: String((stop.querySelector('[data-tc-stop-time]') || {}).value || ''),
-      studentIds: Array.from((stop.querySelector('[data-tc-students]') || {}).selectedOptions || []).map(option => String(option.value))
+      studentIds: transportCapturedStudentIds(draft, row.dataset.id, stop.dataset.id, stop.querySelector('[data-tc-students]'))
     }))
   }));
   draft.vehicles = vehicles; draft.drivers = drivers; draft.routes = routes;
@@ -5469,13 +5520,23 @@ function transportConfigRowHtml(config, locked) {
   const currentMonth = today().slice(0, 7);
   const liveStudents = students.filter(student => (!student.start || student.start <= currentMonth) &&
     (!student.end || student.end > currentMonth));
+  const rosterReady = transportRosterReady();
   const disabled = locked ? ' disabled aria-disabled="true"' : '';
+  const saveDisabled = locked || !rosterReady ? ' disabled aria-disabled="true"' : '';
+  const studentDisabled = locked || !rosterReady ? ' disabled aria-disabled="true"' : '';
+  const rosterGate = rosterReady ? '' : rosterErr
+    ? '<div class="hint mt8"><b>학생 명단을 불러오지 못했습니다</b> — 기존 학생 배정을 보호하기 위해 전체 설정 저장을 차단했습니다.' +
+      (rosterErr ? '<br><span class="small">' + esc(rosterErr) + '</span>' : '') +
+      '<br><button class="btn btn-sm btn-ghost mt8" data-act="transportrosterretry">학생 명단 다시 시도</button></div>'
+    : rosterLoading
+      ? '<div class="hint mt8"><b>학생 명단을 불러오는 중</b> — 완료될 때까지 학생 배정과 전체 설정 저장을 사용할 수 없습니다.</div>'
+      : '<div class="hint mt8"><b>학생 명단이 필요합니다</b> — 기존 학생 배정을 보호하기 위해 전체 설정 저장을 차단했습니다.' +
+        '<br><button class="btn btn-sm btn-ghost mt8" data-act="transportrosterretry">학생 명단 불러오기</button></div>';
   let h = '<section class="card transport-config"><div class="between"><div><div class="card-title">차량·노선 설정</div>' +
     '<div class="card-sub">원장·관리 담당만 전체 설정을 저장합니다. 학생 연락처와 주소는 이 화면에 표시하지 않습니다.</div></div>' +
-    '<button class="btn btn-sm btn-primary" data-act="transportsave"' + disabled + '>전체 설정 저장</button></div>' +
+    '<button class="btn btn-sm btn-primary" data-act="transportsave"' + saveDisabled + '>전체 설정 저장</button></div>' +
     (locked ? '<div class="hint mt8"><b>설정 잠김</b> — 현재 탑승 중인 학생이 있어 차량·기사·노선·학생 배정을 바꿀 수 없습니다. 모두 하차·인계한 뒤 수정하세요.</div>' : '') +
-    (!rosterDb && rosterLoading ? '<div class="hint mt8">학생 명단을 불러오는 중입니다. 명단이 열리기 전에는 학생 배정을 저장하지 마세요.</div>' : '') +
-    (rosterErr ? '<div class="hint mt8"><b>학생 명단 오류</b> — 학생 배정을 편집할 수 없습니다.</div>' : '');
+    rosterGate;
   h += '<details open><summary>차량 · ' + config.vehicles.length + '대</summary><div class="transport-config-list">' + config.vehicles.map(vehicle =>
     '<div class="transport-config-row transport-config-grid" data-tc-vehicle data-id="' + esc(vehicle.id) + '"><label><span class="fl">차량 이름</span><input class="in" data-tc-name value="' + esc(vehicle.name || vehicle.label || '') + '"' + disabled + '></label>' +
       '<label><span class="fl">차량번호</span><input class="in" data-tc-plate value="' + esc(vehicle.plate || '') + '" placeholder="예: 12가3456"' + disabled + '></label>' +
@@ -5494,12 +5555,18 @@ function transportConfigRowHtml(config, locked) {
       '<label><span class="fl">기사</span><select class="in" data-tc-driver-id' + disabled + '><option value="">선택</option>' + config.drivers.map(driver => '<option value="' + esc(driver.staffId || driver.id) + '"' + (String(routeRow.driverId || '') === String(driver.staffId || driver.id) ? ' selected' : '') + '>' + esc(driver.name || '미지정') + '</option>').join('') + '</select></label>' +
       '<label class="chip"><input type="checkbox" data-tc-active' + (routeRow.active !== false ? ' checked' : '') + disabled + '> 노선 사용</label></div>' +
       '<div class="field mt8"><span class="fl">운행 요일</span><div class="chips">' + [1,2,3,4,5,6,0].map(day => '<label class="chip"><input type="checkbox" data-tc-day value="' + day + '"' + (days.includes(day) ? ' checked' : '') + disabled + '> ' + DOW[day] + '</label>').join('') + '</div></div>' +
-      '<div class="sect">정류장·학생 배정</div>' + (routeRow.stops || []).map(stop =>
-        '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
+      '<div class="sect">정류장·학생 배정</div>' + (routeRow.stops || []).map(stop => {
+        const selectedIds = (stop.studentIds || []).map(String);
+        const liveIds = new Set(liveStudents.map(student => String(student.id)));
+        const missingIds = selectedIds.filter(studentId => !liveIds.has(studentId));
+        return '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
           '<label><span class="fl">도착 시간</span><input class="in" type="time" data-tc-stop-time value="' + esc(stop.time || '') + '"' + disabled + '></label></div>' +
-          '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + disabled + '>' +
-            liveStudents.map(student => '<option value="' + esc(student.id) + '"' + ((stop.studentIds || []).map(String).includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') + '</select></label>' +
-          '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigdelete" data-kind="stop" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '"' + disabled + '>정류장 삭제</button></div>').join('') +
+          '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
+            liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') +
+            missingIds.map(studentId => '<option value="' + esc(studentId) + '" selected>명단 없음 · 기존 배정 유지 (' + esc(studentId) + ')</option>').join('') + '</select></label>' +
+          (missingIds.length ? '<div class="hint mt8"><b>학생 명단 새로고침 필요</b> — 명단에서 찾지 못한 기존 배정 ' + missingIds.length + '건을 삭제하지 않고 유지합니다.</div>' : '') +
+          '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigdelete" data-kind="stop" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '"' + disabled + '>정류장 삭제</button></div>';
+      }).join('') +
       '<div class="ops-actions"><button class="btn btn-sm btn-ghost" data-act="transportconfigadd" data-kind="stop" data-route="' + esc(routeRow.id) + '"' + disabled + '>+ 정류장 추가</button>' +
         '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="route" data-id="' + esc(routeRow.id) + '"' + disabled + '>노선 삭제</button></div></div>';
   }).join('') + '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="route"' + disabled + '>+ 노선 추가</button></div></details>';
@@ -5509,6 +5576,10 @@ function transportConfigRowHtml(config, locked) {
 async function saveTransportConfig(button) {
   if (!session.isAdmin) return;
   if (transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 저장할 수 없습니다');
+  if (!transportRosterReady()) {
+    if (!rosterLoading && !rosterErr) loadRoster();
+    return toast(rosterErr ? '학생 명단을 다시 불러온 뒤 저장해 주세요' : '학생 명단을 불러온 뒤 저장해 주세요');
+  }
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   const config = captureTransportConfig();
@@ -5626,9 +5697,10 @@ function loadRoster() {
       privateBookStudents = Array.isArray(result.bookStudents) ? result.bookStudents : [];
       if (bookDb) bookDb.students = privateBookStudents.slice();
       rosterErr = '';
+      rosterLoading = false;
       renderAfterSync();
     })
-    .catch(e => { rosterErr = String(e); if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') renderAfterSync(); })
+    .catch(e => { rosterErr = String(e); rosterLoading = false; if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') renderAfterSync(); })
     .finally(() => { rosterLoading = false; });
 }
 function ymNext(ym) {
@@ -7407,7 +7479,7 @@ document.addEventListener('click', ev => {
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'bookretry': bookDb = null; bookDbErr = ''; loadBooks(); render(); break;
-    case 'bookissuerefresh': bookIssueError = ''; bookIssueLoaded = false; loadBookIssues(true); break;
+    case 'bookissuerefresh': rosterErr = ''; bookIssueError = ''; bookIssueLoaded = false; loadRoster(); loadBookIssues(true); break;
     case 'bookissuefilter': {
       if (!BOOK_ISSUE_FILTERS.some(filter => filter[0] === el.dataset.status)) break;
       bookIssueFilter = el.dataset.status;
@@ -7415,7 +7487,8 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'bookissuetransition': transitionBookIssue(el); break;
-    case 'transportrefresh': transportError = ''; loadTransport(transportDate, true); break;
+    case 'transportrefresh': rosterErr = ''; loadRoster(); transportError = ''; loadTransport(transportDate, true); break;
+    case 'transportrosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'transportday': {
       transportDate = addDays(transportDate, Number(el.dataset.n) || 0);
       transportError = ''; transportConfigDraft = null;
@@ -7571,11 +7644,31 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남고 개인 링크는 해지됩니다.')) return;
-      s.deleted = true; s.updatedAt = now();
-      save(); queueSync(); render();
-      sync.revokeAccess(id)
-        .then(() => toast(s.name + ' — 삭제 및 개인 링크 해지 완료'))
-        .catch(e => toast('직원 삭제는 저장했습니다 — 링크 해지는 다시 시도해 주세요: ' + e.message));
+      const auth = sync.auth();
+      if (!auth) return toast('동기화 인증이 필요합니다');
+      el.disabled = true;
+      sync.post('/staff-deactivate', {
+        app: SYNC_APP, auth: auth, staffId: id, expectedUpdatedAt: Number(s.updatedAt) || 0
+      }).then(result => {
+        const saved = result && result.staff && result.staff.data;
+        if (!saved || String(saved.id || '') !== id || !saved.deleted) {
+          throw new Error('서버의 직원 삭제 결과를 확인하지 못했습니다');
+        }
+        const index = state.staff.findIndex(item => item.id === id);
+        if (index >= 0) state.staff[index] = saved;
+        clearLinkCode(id);
+        save(); render();
+        toast(s.name + ' — 삭제 및 개인 링크 해지 완료');
+      }).catch(error => {
+        if (error && error.code === 'BOARDING_LOCK') {
+          toast('삭제하지 않았습니다 — 탑승 중·미하차 학생을 모두 정리한 뒤 다시 시도해 주세요');
+        } else if (error && error.code === 'STALE_REVISION') {
+          state.settings.pullAt = 0; save(); sync.dirty = true; sync.run();
+          toast('직원 정보가 다른 기기에서 바뀌었습니다 — 새로고침한 뒤 다시 시도해 주세요');
+        } else {
+          toast('직원을 삭제하지 못했습니다 — ' + String(error && error.message || error));
+        }
+      }).finally(() => { if (el && el.isConnected) el.disabled = false; });
       break;
     }
     case 'togglemanager': {
@@ -8464,7 +8557,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.3';
+const APP_VER = '2026-08-11.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

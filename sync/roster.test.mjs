@@ -192,6 +192,46 @@ test('replace rejects missing identity, duplicate ids, bad references, and unkno
   assert.match((await replace(db, deletedTeacher)).body.error, /활성 직원 ID/);
 });
 
+test('replace keeps unresolved boarded students active until transport is completed or reset', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  db.prepare('INSERT INTO transport_configs(app,data,updated_at,updated_by) VALUES(?,?,?,?)')
+    .bind('task', JSON.stringify({
+      vehicles: [{ id: 'van-a', name: '1호차', plate: '12가3456', capacity: 10 }],
+      routes: [{
+        id: 'route-a', name: 'A노선', direction: 'dropoff', vehicleId: 'van-a', driverId: 'teacher-a',
+        days: [1], startTime: '19:00', active: true,
+        stops: [{ id: 'stop-a', name: '정류장', time: '19:10', studentIds: ['student-a'] }]
+      }]
+    }), Date.now(), 'director').run();
+  db.prepare(
+    "INSERT INTO transport_states(app,date,route_id,student_id,status,revision,history,updated_at) " +
+    "VALUES(?,?,?,?, 'boarded',1,'[]',?)"
+  ).bind('task', '2026-08-10', 'route-a', 'student-a', Date.now()).run();
+
+  const removed = clone(documentFixture());
+  removed.roster.students = removed.roster.students.filter(item => item.id !== 'student-a');
+  removed.bookStudents = removed.bookStudents.filter(item => item.studentId !== 'student-a');
+  let result = await replace(db, removed);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+
+  const ended = clone(documentFixture());
+  ended.roster.students.find(item => item.id === 'student-a').end = '2026-08';
+  result = await replace(db, ended);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+  assert.equal(db.prepare(
+    "SELECT json_array_length(data,'$.roster.students') AS count FROM private_rosters WHERE app='task'"
+  ).first().count, 3);
+
+  db.prepare(
+    "UPDATE transport_states SET status='dropped',revision=revision+1,updated_at=? " +
+    "WHERE app='task' AND route_id='route-a' AND student_id='student-a'"
+  ).bind(Date.now()).run();
+  result = await replace(db, removed);
+  assert.equal(result.status, 200);
+});
+
 test('replace is an upsert and malformed stored data fails closed', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const changed = clone(documentFixture());

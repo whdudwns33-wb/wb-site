@@ -31,6 +31,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/020_book_order_disp
 npx wrangler d1 execute wb-sync --remote --file=./migrations/021_parent_feedback_student_ids.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/022_book_issues.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/023_transport.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/024_transport_integrity.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -75,6 +76,11 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 차량 기능은 `023_transport.sql`을 먼저 적용한 뒤 Worker를 배포한다. 설정·상태에는 stable ID와
 운행 정보만 저장하고 전화·주소·보호자 정보는 저장하지 않는다. 날짜와 관계없이 승차 후 미하차 기록이 있는
 노선·차량·운전 담당자·학생 배정은 설정 교체로 제거하거나 변경할 수 없다.
+
+차량 원장의 동시 변경 보호를 추가하는 배포에서는 `024_transport_integrity.sql`을 운영 D1에
+먼저 적용한 뒤 Worker와 Pages를 순서대로 배포한다. 이 트리거는 승차 처리와 원생 명단·기사·노선
+변경이 동시에 들어와도 미하차 기록의 참조가 사라지지 않게 최종 DB 쓰기에서 차단한다. 직원 삭제는
+`/staff-deactivate` CAS 경로만 사용해 직원 비활성화와 개인 토큰·1회용 링크 해지를 함께 확정한다.
 
 기존 `roster.json`과 `textbooks.json`의 학생 배정을 처음 이관할 때는 비밀키를 명령줄에 직접
 쓰지 말고 보안 입력으로 환경변수에 넣은 뒤 이관 도구를 실행한다.

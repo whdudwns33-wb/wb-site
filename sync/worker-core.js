@@ -30,6 +30,7 @@
  *   POST /book-edit-request { app, auth, ... }     → 직원, 기존 교재 정보를 고쳐 달라고 신청
  *   POST /book-edit-review  { app, auth(admin) }   → 원장, 교재 수정 신청 승인·반려
  *   POST /transport { app, auth, action, ... }      → 차량 노선 설정·승하차 상태
+ *   POST /staff-deactivate { app, auth(all), staffId, expectedUpdatedAt } → 직원 비활성화 CAS + 링크 해지
  *   POST /onboarding-patch { app, auth, ... }       → 신규 학생 30일 기록 CAS 수정
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
@@ -76,6 +77,18 @@ const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
     'Referrer-Policy': 'no-referrer'
   }
 });
+
+function isBoardingLockError(error) {
+  return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
+}
+
+function boardingLockResponse(origin) {
+  return json({
+    ok: false,
+    code: 'BOARDING_LOCK',
+    error: '승차 후 미하차 기록이 남아 있어 변경할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
+  }, 409, origin);
+}
 
 function corsHeaders(origin) {
   return {
@@ -321,6 +334,115 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
   return null;
 }
 
+async function effectiveStaffDeactivations(env, app, entries) {
+  if (app !== 'task') return [];
+  // 같은 직원이 한 동기화 묶음에 여러 번 있으면 실제 LWW 결과(가장 큰 updated_at,
+  // 동률이면 batch에서 먼저 적용되는 항목)만 검사한다. 중간 tombstone 때문에 최종 활성
+  // 상태까지 잘못 BOARDING_LOCK 되는 일을 막는다.
+  const finalById = new Map();
+  for (const entry of entries) {
+    if (entry.table !== 'staff' || !entry.change) continue;
+    const id = String(entry.change.id || '');
+    if (!id) continue;
+    const updatedAt = Number(entry.change.updated_at) || 0;
+    const previous = finalById.get(id);
+    if (!previous || updatedAt > previous.updatedAt) finalById.set(id, { entry, updatedAt });
+  }
+  const requested = [...finalById.values()]
+    .filter(item => !item.entry.change.data || item.entry.change.data.deleted)
+    .map(item => item.entry);
+  if (!requested.length) return [];
+
+  const currentById = new Map();
+  const ids = [...new Set(requested.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,data,updated_at FROM staff WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) currentById.set(String(row.id), row);
+  }
+
+  const effective = [];
+  for (const entry of requested) {
+    const id = String(entry.change.id || '');
+    const current = currentById.get(id);
+    if (!current || Number(entry.change.updated_at) <= Number(current.updated_at)) continue;
+    let data;
+    try { data = JSON.parse(current.data); } catch (error) { data = null; }
+    if (data && !data.deleted) effective.push(id);
+  }
+  return [...new Set(effective)];
+}
+
+function foldStaffEntries(entries) {
+  const finalById = new Map();
+  for (const entry of entries) {
+    if (entry.table !== 'staff' || !entry.change) continue;
+    const id = String(entry.change.id || '');
+    if (!id) continue;
+    const updatedAt = Number(entry.change.updated_at) || 0;
+    const previous = finalById.get(id);
+    // 동일 timestamp는 기존 batch에서 먼저 나온 항목만 적용(WHERE excluded.updated_at > current)된다.
+    if (!previous || updatedAt > previous.updatedAt) finalById.set(id, { entry, updatedAt });
+  }
+  return entries.filter(entry => entry.table !== 'staff' ||
+    (entry.change && finalById.get(String(entry.change.id || ''))?.entry === entry));
+}
+
+async function boardedDriverConflicts(env, app, staffIds) {
+  if (app !== 'task' || !staffIds.length) return [];
+  const boarded = await env.DB.prepare(
+    "SELECT date,route_id,student_id FROM transport_states WHERE app=? AND status='boarded'"
+  ).bind(app).all();
+  const boardedRows = boarded.results || [];
+  if (!boardedRows.length) return [];
+
+  const configRow = await env.DB.prepare('SELECT data FROM transport_configs WHERE app=? LIMIT 1')
+    .bind(app).first();
+  if (!configRow) return staffIds.slice();
+  let config;
+  try { config = JSON.parse(configRow.data); } catch (error) { config = null; }
+  if (!config || !Array.isArray(config.routes) || !Array.isArray(config.vehicles)) return staffIds.slice();
+  const routes = new Map(config.routes.filter(Boolean).map(route => [String(route.id || ''), route]));
+  const vehicles = new Set(config.vehicles.filter(Boolean).map(vehicle => String(vehicle.id || '')));
+  const rosterRow = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+  let rosterStudents = [];
+  try {
+    const document = rosterRow && JSON.parse(rosterRow.data);
+    rosterStudents = document && document.roster && Array.isArray(document.roster.students)
+      ? document.roster.students : [];
+  } catch (error) { rosterStudents = []; }
+  const rosterById = new Map(rosterStudents.filter(Boolean).map(student => [String(student.id || ''), student]));
+  const staffRows = await env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all();
+  const active = new Set();
+  for (const row of staffRows.results || []) {
+    try {
+      const data = JSON.parse(row.data);
+      if (data && !data.deleted) active.add(String(row.id));
+    } catch (error) { /* 손상된 직원은 활성 기사로 인정하지 않는다 */ }
+  }
+  const boardedDrivers = new Set();
+  for (const row of boardedRows) {
+    const route = routes.get(String(row.route_id || ''));
+    const date = String(row.date || '');
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(date + 'T00:00:00Z').getUTCDay() : -1;
+    const month = date.slice(0, 7);
+    const student = rosterById.get(String(row.student_id || ''));
+    const activeStudent = student && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
+      String(student.start || '') <= month && (!student.end || String(student.end) > month);
+    const assigned = route && Array.isArray(route.stops) && route.stops.some(stop => stop &&
+      Array.isArray(stop.studentIds) && stop.studentIds.includes(String(row.student_id || '')));
+    if (!route || !route.active || !Array.isArray(route.days) || !route.days.includes(day) || !assigned ||
+        !vehicles.has(String(route.vehicleId || '')) || !active.has(String(route.driverId || '')) || !activeStudent) {
+      return staffIds.slice();
+    }
+    boardedDrivers.add(String(route.driverId));
+  }
+  return staffIds.filter(id => boardedDrivers.has(id));
+}
+
 async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
@@ -381,11 +503,26 @@ async function handleSync(env, app, body, origin) {
     const checkError = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
     if (checkError) return json({ ok: false, error: checkError }, 403, origin);
   }
-  const stmts = accepted
-    .filter(entry => !skipped.has(entry))
+  const writeEntries = foldStaffEntries(accepted.filter(entry => !skipped.has(entry)));
+  const deactivations = await effectiveStaffDeactivations(env, app, writeEntries);
+  const boardedDrivers = await boardedDriverConflicts(env, app, deactivations);
+  if (boardedDrivers.length) {
+    return json({
+      ok: false,
+      code: 'BOARDING_LOCK',
+      error: '탑승 후 미하차 학생을 담당하는 기사는 삭제하거나 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
+    }, 409, origin);
+  }
+  const stmts = writeEntries
     .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own',
       auth.role === 'manager' && entry.table === 'tasks'));
-  if (stmts.length) await env.DB.batch(stmts);
+  if (stmts.length) {
+    try { await env.DB.batch(stmts); }
+    catch (error) {
+      if (isBoardingLockError(error)) return boardingLockResponse(origin);
+      throw error;
+    }
+  }
 
   // CAS 행에 대한 generic LWW 시도가 막혔다면 since와 관계없이 서버 정본을 돌려준다.
   // Pages는 authoritative 표시된 casVersion=1 행만 로컬 시간스탬프보다 우선 적용한다.
@@ -595,6 +732,86 @@ async function handleRevoke(env, app, body, origin) {
       .bind(app, String(body.token || '')).run();
   }
   return json({ ok: true }, 200, origin);
+}
+
+function authoritativeStaffRecord(row) {
+  if (!row) return null;
+  let data = null;
+  try { data = JSON.parse(row.data); } catch (error) { /* 손상된 행은 정본 메타데이터만 반환한다 */ }
+  return {
+    id: String(row.id), owner: row.owner == null ? null : String(row.owner), data,
+    updated_at: Number(row.updated_at), srv_at: Number(row.srv_at), authoritative: true
+  };
+}
+
+async function handleStaffDeactivate(env, app, body, origin) {
+  if (app !== 'task') {
+    return json({ ok: false, error: '직원 비활성화는 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
+  }
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '전체 관리 권한이 필요합니다' }, 401, origin);
+  }
+  const staffId = String(body.staffId || '');
+  const expected = Number(body.expectedUpdatedAt);
+  if (!SAFE_ID.test(staffId) || !Number.isSafeInteger(expected) || expected < 0) {
+    return json({ ok: false, error: '올바른 staffId와 expectedUpdatedAt이 필요합니다' }, 400, origin);
+  }
+
+  const select = () => env.DB.prepare(
+    'SELECT id,owner,data,updated_at,srv_at FROM staff WHERE app=? AND id=? LIMIT 1'
+  ).bind(app, staffId).first();
+  let current = await select();
+  let currentData = null;
+  try { currentData = current && JSON.parse(current.data); } catch (error) { /* 아래에서 stale로 처리 */ }
+  if (!current || Number(current.updated_at) !== expected || !currentData ||
+      typeof currentData !== 'object' || Array.isArray(currentData) || currentData.deleted) {
+    return json({
+      ok: false, code: 'STALE_REVISION',
+      error: '직원 정보가 바뀌었습니다. 새로고침 후 다시 처리해 주세요',
+      staff: authoritativeStaffRecord(current), updatedAt: current ? Number(current.updated_at) : 0
+    }, 409, origin);
+  }
+
+  const now = Date.now();
+  const nextUpdatedAt = Math.max(now, expected + 1);
+  const tombstone = { ...currentData, id: staffId, deleted: true, updatedAt: nextUpdatedAt };
+  const owner = current.owner == null ? staffId : String(current.owner);
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE staff SET owner=?,data=?,updated_at=?,srv_at=? ' +
+        "WHERE app=? AND id=? AND updated_at=? AND json_valid(data) AND json_type(data)='object' " +
+        "AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+      ).bind(owner, JSON.stringify(tombstone), nextUpdatedAt, now, app, staffId, expected),
+      env.DB.prepare(
+        "UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND EXISTS (" +
+        "SELECT 1 FROM staff WHERE app=? AND id=? AND updated_at=? " +
+        "AND json_valid(data) AND json_type(data)='object' AND COALESCE(json_extract(data,'$.deleted'),0)<>0)"
+      ).bind(app, staffId, app, staffId, nextUpdatedAt),
+      env.DB.prepare(
+        "UPDATE bootstrap_codes SET revoked=1 WHERE app=? AND staff_id=? AND EXISTS (" +
+        "SELECT 1 FROM staff WHERE app=? AND id=? AND updated_at=? " +
+        "AND json_valid(data) AND json_type(data)='object' AND COALESCE(json_extract(data,'$.deleted'),0)<>0)"
+      ).bind(app, staffId, app, staffId, nextUpdatedAt)
+    ]);
+  } catch (error) {
+    if (isBoardingLockError(error)) return boardingLockResponse(origin);
+    throw error;
+  }
+  const changed = Number(results[0] && results[0].meta && results[0].meta.changes || 0);
+  current = await select();
+  if (changed !== 1 || !current || Number(current.updated_at) !== nextUpdatedAt) {
+    return json({
+      ok: false, code: 'STALE_REVISION',
+      error: '직원 정보가 다른 화면에서 먼저 바뀌었습니다. 새로고침 후 다시 처리해 주세요',
+      staff: authoritativeStaffRecord(current), updatedAt: current ? Number(current.updated_at) : 0
+    }, 409, origin);
+  }
+  return json({
+    ok: true, idempotent: false, staff: authoritativeStaffRecord(current), updatedAt: nextUpdatedAt
+  }, 200, origin);
 }
 
 
@@ -1126,6 +1343,7 @@ export default {
       if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
       if (url.pathname === '/admin-handoff') return await handleAdminHandoff(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
+      if (url.pathname === '/staff-deactivate') return await handleStaffDeactivate(env, app, body, okOrigin);
       if (url.pathname === '/lesson-create') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);

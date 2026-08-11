@@ -7,6 +7,7 @@ import worker from './worker-core.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/023_transport.sql', import.meta.url), 'utf8');
+const integrityMigration = fs.readFileSync(new URL('./migrations/024_transport_integrity.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -22,6 +23,15 @@ class D1Statement {
 class TestD1 {
   constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); }
   prepare(sql) { return new D1Statement(this.database, sql); }
+  batch(statements) { return Promise.all(statements.map(statement => statement.run())); }
+  withoutIntegrity(callback) {
+    const names = this.database.prepare(
+      "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_transport_%'"
+    ).all().map(row => row.name);
+    for (const name of names) this.database.exec('DROP TRIGGER ' + name);
+    try { return callback(); }
+    finally { this.database.exec(integrityMigration); }
+  }
 }
 
 const today = new Intl.DateTimeFormat('en-CA', {
@@ -80,7 +90,11 @@ function seed(db) {
 }
 
 async function call(db, body, app = 'task') {
-  const response = await worker.fetch(new Request('https://worker.example/transport', {
+  return callPath(db, '/transport', body, app);
+}
+
+async function callPath(db, path, body, app = 'task') {
+  const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ app, ...body })
   }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
@@ -89,6 +103,17 @@ async function call(db, body, app = 'task') {
 
 async function replace(db, config = configFixture(), revision = 0) {
   return call(db, { auth: admin, action: 'replace', config, revision });
+}
+
+async function syncStaff(db, id, data, updatedAt) {
+  const response = await worker.fetch(new Request('https://worker.example/sync', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      app: 'task', auth: admin, since: 0,
+      changes: [{ table: 'staff', id, owner: id, data, updated_at: updatedAt }]
+    })
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  return { status: response.status, body: await response.json() };
 }
 
 function seedBoarded(db, date, routeId = 'route-a', studentId = 'student-a', revision = 1) {
@@ -108,6 +133,9 @@ test('schema and migration add non-destructive vehicle tables with constrained s
     assert.match(sql, /'scheduled','boarded','dropped','absent'/);
     assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
   }
+  assert.match(schema, /trg_transport_boarded_insert_guard/);
+  assert.match(integrityMigration, /RAISE\(ABORT, 'BOARDING_LOCK'\)/);
+  assert.doesNotMatch(integrityMigration, /DROP TABLE|DELETE FROM/i);
 });
 
 test('only all-scope replaces config and validation rejects capacity, inactive refs, and duplicates', async () => {
@@ -204,12 +232,40 @@ test('today boarded state locks route, vehicle, driver, and student config chang
 test('a boarded row from a previous date still locks config replacement', async () => {
   const db = new TestD1(); seed(db);
   const saved = await replace(db);
-  seedBoarded(db, plusDays(today, -1));
+  db.withoutIntegrity(() => seedBoarded(db, plusDays(today, -1)));
   const changed = configFixture();
   changed.routes[0].name = '자정 뒤 변경 시도';
   const result = await replace(db, changed, saved.body.revision);
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'BOARDING_LOCK');
+});
+
+test('generic staff sync cannot deactivate a driver with an unresolved boarded student', async () => {
+  const db = new TestD1(); seed(db); await replace(db);
+  seedBoarded(db, today, 'route-a', 'student-a');
+  const current = db.prepare("SELECT data,updated_at FROM staff WHERE app='task' AND id='driver-a'").first();
+  const deleted = { ...JSON.parse(current.data), deleted: true, updatedAt: Number(current.updated_at) + 1 };
+
+  let result = await syncStaff(db, 'driver-a', null, Number(current.updated_at) + 1);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+
+  result = await syncStaff(db, 'driver-a', deleted, Number(current.updated_at) + 1);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+  assert.equal(JSON.parse(db.prepare(
+    "SELECT data FROM staff WHERE app='task' AND id='driver-a'"
+  ).first().data).deleted, false);
+
+  db.prepare(
+    "UPDATE transport_states SET status='dropped',revision=revision+1,updated_at=? " +
+    "WHERE app='task' AND route_id='route-a' AND student_id='student-a'"
+  ).bind(Date.now()).run();
+  result = await syncStaff(db, 'driver-a', deleted, Number(current.updated_at) + 1);
+  assert.equal(result.status, 200);
+  assert.equal(JSON.parse(db.prepare(
+    "SELECT data FROM staff WHERE app='task' AND id='driver-a'"
+  ).first().data).deleted, true);
 });
 
 test('admin list keeps orphan boarded records visible and cannot report completed', async () => {
@@ -218,8 +274,8 @@ test('admin list keeps orphan boarded records visible and cannot report complete
   await call(db, { auth: person('driver-a', 'token-a'), action: 'state', date: today,
     routeId: 'route-a', studentId: 'student-a', next: 'boarded', revision: 0 });
   const empty = { vehicles: [], routes: [] };
-  db.prepare('UPDATE transport_configs SET data=?,updated_at=? WHERE app=?')
-    .bind(JSON.stringify(empty), saved.body.revision + 1, 'task').run();
+  db.withoutIntegrity(() => db.prepare('UPDATE transport_configs SET data=?,updated_at=? WHERE app=?')
+    .bind(JSON.stringify(empty), saved.body.revision + 1, 'task').run());
   const result = await call(db, { auth: admin, action: 'list', date: today });
   assert.equal(result.status, 200);
   assert.equal(result.body.states.some(item => item.routeId === 'route-a' && item.status === 'boarded'), true);
@@ -235,7 +291,8 @@ test('admin warns when a boarded student disappears from the current roster', as
   const row = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
   const document = JSON.parse(row.data);
   document.roster.students = document.roster.students.filter(student => student.id !== 'student-a');
-  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+  db.withoutIntegrity(() => db.prepare("UPDATE private_rosters SET data=? WHERE app='task'")
+    .bind(JSON.stringify(document)).run());
   const result = await call(db, { auth: admin, action: 'list', date: today });
   assert.equal(result.body.states.some(item => item.studentId === 'student-a' && item.status === 'boarded'), true);
   assert.equal(result.body.warnings.some(item => item.code === 'ORPHAN_BOARDED'), true);
@@ -244,9 +301,11 @@ test('admin warns when a boarded student disappears from the current roster', as
 
 test('admin list returns all-date unresolved rows without PII and caps them at 100', async () => {
   const db = new TestD1(); seed(db); await replace(db);
-  for (let index = 0; index < 101; index += 1) {
-    seedBoarded(db, plusDays(today, -index), 'orphan-route-' + index, 'orphan-student-' + index);
-  }
+  db.withoutIntegrity(() => {
+    for (let index = 0; index < 101; index += 1) {
+      seedBoarded(db, plusDays(today, -index), 'orphan-route-' + index, 'orphan-student-' + index);
+    }
+  });
   const result = await call(db, { auth: admin, action: 'list', date: today });
   assert.equal(result.status, 200);
   assert.equal(result.body.unresolved.length, 100);
@@ -261,8 +320,8 @@ test('summary deduplicates a projected boarded row that is also an invalid-route
   const db = new TestD1(); seed(db); await replace(db);
   await call(db, { auth: person('driver-a', 'token-a'), action: 'state', date: today,
     routeId: 'route-a', studentId: 'student-a', next: 'boarded', revision: 0 });
-  db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='driver-a'")
-    .bind(JSON.stringify({ id: 'driver-a', name: '김기사', deleted: true, phone: '010-SECRET' })).run();
+  db.withoutIntegrity(() => db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='driver-a'")
+    .bind(JSON.stringify({ id: 'driver-a', name: '김기사', deleted: true, phone: '010-SECRET' })).run());
   const result = await call(db, { auth: admin, action: 'list', date: today });
   assert.equal(result.body.warnings.some(item => item.code === 'ORPHAN_BOARDED'), true);
   assert.equal(result.body.routes.some(route => route.id === 'route-a' &&
@@ -273,7 +332,7 @@ test('summary deduplicates a projected boarded row that is also an invalid-route
 test('admin can reset an old orphan boarded row before config and roster validation', async () => {
   const db = new TestD1(); seed(db); await replace(db);
   const oldDate = plusDays(today, -40);
-  seedBoarded(db, oldDate, 'removed-route', 'removed-student');
+  db.withoutIntegrity(() => seedBoarded(db, oldDate, 'removed-route', 'removed-student'));
   const reset = await call(db, { auth: admin, action: 'state', date: oldDate,
     routeId: 'removed-route', studentId: 'removed-student', next: 'scheduled', revision: 1,
     reason: '과거 미하차 정정' });
@@ -325,4 +384,149 @@ test('only all-scope resets with a reason', async () => {
   assert.equal(history.length, 3);
   assert.equal(history[1].reason, '오입력 수정');
   assert.deepEqual(history.map(event => event.to), ['absent', 'scheduled', 'boarded']);
+});
+
+test('database triggers close boarding races across roster, config, and staff writes', async () => {
+  const db = new TestD1(); seed(db);
+  assert.throws(() => seedBoarded(db, today), /BOARDING_LOCK/);
+
+  await replace(db);
+  assert.throws(() => seedBoarded(db, '2026-xx-11'), /BOARDING_LOCK/);
+  seedBoarded(db, today);
+  const rosterRow = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
+  const roster = JSON.parse(rosterRow.data);
+  roster.roster.students = roster.roster.students.filter(item => item.id !== 'student-a');
+  assert.throws(() => db.prepare("UPDATE private_rosters SET data=? WHERE app='task'")
+    .bind(JSON.stringify(roster)).run(), /BOARDING_LOCK/);
+
+  assert.throws(() => db.prepare("UPDATE transport_configs SET updated_at=updated_at+1 WHERE app='task'").run(),
+    /BOARDING_LOCK/);
+  const staffRow = db.prepare("SELECT data FROM staff WHERE app='task' AND id='driver-a'").first();
+  assert.throws(() => db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='driver-a'")
+    .bind(JSON.stringify({ ...JSON.parse(staffRow.data), deleted: true })).run(), /BOARDING_LOCK/);
+});
+
+test('staff deactivate uses CAS and revokes tokens and bootstrap codes after the tombstone', async () => {
+  const db = new TestD1(); seed(db);
+  const current = db.prepare("SELECT updated_at FROM staff WHERE app='task' AND id='driver-b'").first();
+  db.prepare(
+    'INSERT INTO bootstrap_codes(app,code_hash,staff_id,created_at,expires_at,consumed_at,revoked) ' +
+    'VALUES(?,?,?,?,?,NULL,0)'
+  ).bind('task', 'sha256:test-bootstrap', 'driver-b', Date.now(), Date.now() + 10000).run();
+
+  const result = await callPath(db, '/staff-deactivate', {
+    auth: admin, staffId: 'driver-b', expectedUpdatedAt: Number(current.updated_at)
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.staff.authoritative, true);
+  assert.equal(result.body.staff.data.deleted, true);
+  assert.equal(result.body.updatedAt, result.body.staff.updated_at);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM tokens WHERE app='task' AND staff_id='driver-b'"
+  ).first().revoked, 1);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM bootstrap_codes WHERE app='task' AND staff_id='driver-b'"
+  ).first().revoked, 1);
+});
+
+test('staff deactivate stale CAS is not success and does not revoke access', async () => {
+  const db = new TestD1(); seed(db);
+  const current = db.prepare("SELECT updated_at FROM staff WHERE app='task' AND id='driver-b'").first();
+  const result = await callPath(db, '/staff-deactivate', {
+    auth: admin, staffId: 'driver-b', expectedUpdatedAt: Number(current.updated_at) - 1
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STALE_REVISION');
+  assert.equal(result.body.staff.authoritative, true);
+  assert.equal(result.body.staff.data.deleted, false);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM tokens WHERE app='task' AND staff_id='driver-b'"
+  ).first().revoked, 0);
+});
+
+test('staff deactivate is BOARDING_LOCKed for a boarded driver and fail-closed for an orphan route', async () => {
+  const db = new TestD1(); seed(db); await replace(db); seedBoarded(db, today);
+  const driverA = db.prepare("SELECT updated_at FROM staff WHERE app='task' AND id='driver-a'").first();
+  let result = await callPath(db, '/staff-deactivate', {
+    auth: admin, staffId: 'driver-a', expectedUpdatedAt: Number(driverA.updated_at)
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+  assert.equal(db.prepare(
+    "SELECT revoked FROM tokens WHERE app='task' AND staff_id='driver-a'"
+  ).first().revoked, 0);
+
+  db.withoutIntegrity(() => db.prepare("UPDATE transport_configs SET data=? WHERE app='task'")
+    .bind(JSON.stringify({ vehicles: [], routes: [] })).run());
+  const driverB = db.prepare("SELECT updated_at FROM staff WHERE app='task' AND id='driver-b'").first();
+  result = await callPath(db, '/staff-deactivate', {
+    auth: admin, staffId: 'driver-b', expectedUpdatedAt: Number(driverB.updated_at)
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'BOARDING_LOCK');
+});
+
+test('generic staff sync folds duplicate IDs to the final highest timestamp state', async () => {
+  const db = new TestD1(); seed(db); await replace(db); seedBoarded(db, today);
+  const current = db.prepare("SELECT data,updated_at FROM staff WHERE app='task' AND id='driver-a'").first();
+  const active = JSON.parse(current.data);
+  const deletedAt = Number(current.updated_at) + 1;
+  const activeAt = deletedAt + 1;
+  const result = await callPath(db, '/sync', {
+    auth: admin, since: 0,
+    changes: [
+      { table: 'staff', id: 'driver-a', owner: 'driver-a',
+        data: { ...active, deleted: true, updatedAt: deletedAt }, updated_at: deletedAt },
+      { table: 'staff', id: 'driver-a', owner: 'driver-a',
+        data: { ...active, deleted: false, updatedAt: activeAt }, updated_at: activeAt }
+    ]
+  });
+  assert.equal(result.status, 200);
+  const saved = db.prepare("SELECT data,updated_at FROM staff WHERE app='task' AND id='driver-a'").first();
+  assert.equal(JSON.parse(saved.data).deleted, false);
+  assert.equal(saved.updated_at, activeAt);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM tokens WHERE app='task' AND staff_id='driver-a'"
+  ).first().revoked, 0);
+});
+
+test('generic null staff deactivation atomically revokes old personal links', async () => {
+  const db = new TestD1(); seed(db);
+  const current = db.prepare("SELECT data,updated_at FROM staff WHERE app='task' AND id='driver-b'").first();
+  const nextAt = Number(current.updated_at) + 1;
+  db.prepare(
+    'INSERT INTO bootstrap_codes(app,code_hash,staff_id,created_at,expires_at,consumed_at,revoked) ' +
+    'VALUES(?,?,?,?,?,NULL,0)'
+  ).bind('task', 'sha256:generic-bootstrap', 'driver-b', Date.now(), Date.now() + 10000).run();
+  const result = await callPath(db, '/sync', {
+    auth: admin, since: 0,
+    changes: [{ table: 'staff', id: 'driver-b', owner: 'driver-b',
+      data: null, updated_at: nextAt }]
+  });
+  assert.equal(result.status, 200);
+  assert.equal(JSON.parse(db.prepare(
+    "SELECT data FROM staff WHERE app='task' AND id='driver-b'"
+  ).first().data), null);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM tokens WHERE app='task' AND staff_id='driver-b'"
+  ).first().revoked, 1);
+  assert.equal(db.prepare(
+    "SELECT revoked FROM bootstrap_codes WHERE app='task' AND staff_id='driver-b'"
+  ).first().revoked, 1);
+});
+
+test('admin can exactly reset a bounded malformed legacy date key while preserving history', async () => {
+  const db = new TestD1(); seed(db); await replace(db);
+  db.withoutIntegrity(() => seedBoarded(db, 'legacy:bad-date', 'removed-route', 'removed-student'));
+  const result = await call(db, {
+    auth: admin, action: 'state', date: 'legacy:bad-date', routeId: 'removed-route',
+    studentId: 'removed-student', next: 'scheduled', revision: 1, reason: '과거 잘못된 날짜 키 정정'
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.state.status, 'scheduled');
+  assert.equal(result.body.state.history.at(-1).reason, '과거 잘못된 날짜 키 정정');
+  assert.equal((await call(db, {
+    auth: admin, action: 'state', date: 'x'.repeat(41), routeId: 'removed-route',
+    studentId: 'removed-student', next: 'scheduled', revision: 1, reason: '범위 밖 키'
+  })).status, 400);
 });

@@ -61,6 +61,15 @@ function parseDate(value, path = 'date') {
   return date;
 }
 
+function boundedLegacyDateKey(value) {
+  return typeof value === 'string' && value.length >= 1 && value.length <= 40 &&
+    !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function isBoardingLockError(error) {
+  return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
+}
+
 function kstToday(now = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -431,8 +440,6 @@ async function resetState(env, date, routeId, studentId, expected, reason, auth)
 }
 
 async function changeState(env, body, auth) {
-  const date = parseDate(body.date);
-  const today = kstToday();
   const routeId = cleanId(body.routeId, 'routeId');
   const studentId = cleanId(body.studentId, 'studentId');
   const expected = Number(body.revision);
@@ -440,9 +447,20 @@ async function changeState(env, body, auth) {
   const next = String(body.next || '');
   if (!STATES.has(next) && next !== 'scheduled') problem('next는 boarded, dropped, absent 또는 scheduled여야 합니다');
   const reason = body.reason == null ? '' : cleanText(body.reason, 'reason', 500, true);
-  if (auth.scope === 'own' && date !== today) problem('기사 개인 링크에서는 오늘 운행만 처리할 수 있습니다', 403, 'DATE_FORBIDDEN');
   if (next === 'scheduled' && auth.scope !== 'all') problem('상태 초기화는 전체 관리 권한만 할 수 있습니다', 403, 'RESET_FORBIDDEN');
   if (next === 'scheduled' && !reason) problem('상태 초기화 사유를 입력해 주세요');
+  let date;
+  try { date = parseDate(body.date); }
+  catch (error) {
+    // 023 이전에 잘못 저장된 날짜 키도 원장이 정확한 PK와 revision을 지정하면
+    // 이력은 보존한 채 scheduled로 되돌릴 수 있다. 새 상태 기록에는 계속 ISO 날짜만 허용한다.
+    if (next === 'scheduled' && auth.scope === 'all' && boundedLegacyDateKey(body.date)) {
+      return await resetState(env, body.date, routeId, studentId, expected, reason, auth);
+    }
+    throw error;
+  }
+  const today = kstToday();
+  if (auth.scope === 'own' && date !== today) problem('기사 개인 링크에서는 오늘 운행만 처리할 수 있습니다', 403, 'DATE_FORBIDDEN');
   if (next === 'scheduled') return await resetState(env, date, routeId, studentId, expected, reason, auth);
   if (auth.scope === 'all' && Math.abs(dayDistance(date, today)) > 31) problem('오늘 기준 31일 이내의 운행만 처리할 수 있습니다', 400, 'DATE_RANGE');
   const loaded = await loadConfig(env);
@@ -515,7 +533,13 @@ export async function handleTransport(env, app, body, origin, auth, json) {
     else problem('action은 list, replace 또는 state여야 합니다');
     return json(result, 200, origin);
   } catch (error) {
-    return json({ ok: false, ...(error.code ? { code: error.code } : {}), error: String(error.message || error) },
-      error.status || 400, origin);
+    const boardingLock = isBoardingLockError(error);
+    return json({
+      ok: false,
+      ...(boardingLock ? { code: 'BOARDING_LOCK' } : (error.code ? { code: error.code } : {})),
+      error: boardingLock
+        ? '승차 후 미하차 기록이 남아 있어 변경할 수 없습니다. 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
+        : String(error.message || error)
+    }, boardingLock ? 409 : (error.status || 400), origin);
   }
 }

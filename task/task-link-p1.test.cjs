@@ -124,11 +124,19 @@ test('zero-change background sync does not collapse open dashboard details', () 
   assert.match(run, /if \(applied \|\| needsAccessRender \|\| accessRoleChanged\) renderAfterSync\(\)/);
 });
 
-test('deleting staff also revokes personal links and sessions', () => {
+test('staff deactivation is one authoritative CAS operation with link revocation', () => {
   const block = html.match(/case 'delstaff':[\s\S]*?\n\s*break;/)?.[0] || '';
   assert.ok(block);
-  assert.match(block, /sync\.revokeAccess\(id\)/);
   assert.match(block, /개인 링크는 해지됩니다/);
+  assert.match(block, /sync\.post\('\/staff-deactivate'/);
+  assert.match(block, /expectedUpdatedAt: Number\(s\.updatedAt\) \|\| 0/);
+  assert.match(block, /result && result\.staff && result\.staff\.data/);
+  assert.match(block, /state\.staff\[index\] = saved/);
+  assert.match(block, /clearLinkCode\(id\)/);
+  assert.doesNotMatch(block, /s\.deleted\s*=|sync\.run\(\)\.then|sync\.revokeAccess/);
+  assert.match(block, /STALE_REVISION/);
+  assert.match(block, /BOARDING_LOCK/);
+  assert.match(block, /탑승 중·미하차 학생을 모두 정리한 뒤 다시 시도/);
 });
 
 test('task managers elevate only from a verified server role', () => {

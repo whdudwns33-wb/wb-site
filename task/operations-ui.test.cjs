@@ -42,18 +42,59 @@ test('book issue risks use a real 24 hours and unmatched active records stay vis
   assert.match(html, /출고 후 1일\+ 미수령/);
 });
 
-test('book issue UI has four KPIs, filters, retry, keyboard focus restoration, and no contact fields', () => {
+test('book issue UI has status and admin-only unassigned KPIs, filters, retry, focus restoration, and no contact fields', () => {
   const view = block('function viewBookIssues()', 'async function transitionBookIssue(');
   const whole = block('/* ── 학생별 교재 출고·인계 ──', 'function viewBooks()');
   assert.match(view, /미출고/);
   assert.match(view, /출고 후 1일\+ 미수령/);
   assert.match(view, /오늘 출고/);
   assert.match(view, /인계 완료/);
+  assert.match(view, /session\.isAdmin \? \(unassigned === null[\s\S]{0,360}교재 미배정 · 확인 필요/);
+  assert.match(whole, /<details class="card book-issue-unassigned">/);
+  assert.match(whole, /교재는 자동 배정하지 않습니다/);
   assert.match(view, /data-book-issue-search/);
   assert.match(view, /bookissuerefresh/);
   assert.match(whole, /restoreBookIssueFocus/);
   assert.match(whole, /min-height: 44px|ops-actions/);
   assert.doesNotMatch(whole, /type=\"tel\"|data-(?:phone|address)|guardianPhone/);
+});
+
+test('unassigned book warning uses stable student ids, current enrollment, and fails closed outside admin roster', () => {
+  const source = block('function bookIssueUnassignedStudents()', 'function bookIssueUnassignedHtml(');
+  assert.match(source, /if \(!session\.isAdmin\) return \[\]/);
+  assert.match(source, /rosterLoading \|\| rosterErr \|\| !rosterDb[\s\S]{0,120}return null/);
+  assert.match(source, /assignedStudentIds.*studentId/);
+  assert.match(source, /student\.start <= currentMonth/);
+  assert.match(source, /!student\.end \|\| student\.end > currentMonth/);
+  assert.doesNotMatch(source, /student\.name.*assignedStudentIds|자동.*배정/);
+
+  const run = (session, rosterDb, privateBookStudents, rosterLoading = false, rosterErr = '') => new Function(
+    'session', 'rosterDb', 'privateBookStudents', 'rosterLoading', 'rosterErr', 'today',
+    source + '; return bookIssueUnassignedStudents();'
+  )(session, rosterDb, privateBookStudents, rosterLoading, rosterErr, () => '2026-08-11');
+  const roster = { students: [
+    { id: 'student-active-missing', name: '미배정학생', grade: '중1', teacher: '담당A', start: '2026-08', end: '' },
+    { id: 'student-active-assigned', name: '배정학생', grade: '중2', teacher: '담당B', start: '2026-07', end: '' },
+    { id: 'student-ended', name: '종료학생', grade: '중3', teacher: '담당C', start: '2026-01', end: '2026-08' },
+    { id: 'student-future', name: '예정학생', grade: '초6', teacher: '담당D', start: '2026-09', end: '' }
+  ] };
+  const assignments = [{ id: 'assignment-stable', studentId: 'student-active-assigned' }];
+
+  assert.deepEqual(run({ isAdmin: false }, roster, assignments), []);
+  assert.equal(run({ isAdmin: true }, null, assignments), null);
+  assert.equal(run({ isAdmin: true }, roster, assignments, true, ''), null);
+  assert.equal(run({ isAdmin: true }, roster, assignments, false, 'temporary error'), null);
+  assert.deepEqual(run({ isAdmin: true }, roster, assignments).map(student => student.id), ['student-active-missing']);
+});
+
+test('book issue errors keep roster-derived warnings visible and refresh both sources', () => {
+  const view = block('function viewBookIssues()', 'async function transitionBookIssue(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  assert.match(view, /const unassignedHtml = bookIssueUnassignedHtml\(unassigned\)/);
+  assert.match(view, /if \(bookIssueError\)[\s\S]{0,420}\+ unassignedHtml/);
+  assert.match(view, /unassigned === null[\s\S]{0,160}미배정 확인 불가/);
+  assert.match(html, /최신 원생 명단을 확인하지 못해 이전 명단의 숫자를 표시하지 않습니다/);
+  assert.match(actions, /case 'bookissuerefresh':[\s\S]{0,180}loadRoster\(\); loadBookIssues\(true\)/);
 });
 
 test('first-day package uses exact stable studentId schedule and shows every honest missing state', () => {
@@ -138,6 +179,47 @@ test('transport prioritizes onboarded students and exposes orphan state and capa
   assert.match(html, /Number\(error && error\.status\) === 409/);
   assert.match(html, /student\.start <= currentMonth/);
   assert.match(html, /\.package-states \.btn \{ min-width: 0; min-height: 44px/);
+});
+
+test('transport config fails closed until the private roster is available', () => {
+  const capture = block('function transportRosterReady()', 'function transportConfigValidation(');
+  const config = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
+  const save = block('async function saveTransportConfig(', 'function mutateTransportConfig(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  assert.match(capture, /rosterDb && Array\.isArray\(rosterDb\.students\)/);
+  assert.match(capture, /transportCapturedStudentIds\(draft, row\.dataset\.id, stop\.dataset\.id/);
+  assert.match(config, /saveDisabled = locked \|\| !rosterReady/);
+  assert.match(config, /studentDisabled = locked \|\| !rosterReady/);
+  assert.match(config, /data-act="transportrosterretry"/);
+  assert.match(save, /if \(!transportRosterReady\(\)\)/);
+  assert.match(actions, /case 'transportrosterretry': rosterErr = ''; rosterDb = null; loadRoster\(\); render\(\); break/);
+
+  const guard = new Function('rosterDb', 'rosterErr', capture + '; return {' +
+    'ready: transportRosterReady(), ids: transportDraftStudentIds({' +
+      'routes:[{id:"route-a",stops:[{id:"stop-a",studentIds:["student-a"]}]}]' +
+    '}, "route-a", "stop-a")};');
+  assert.equal(guard(null, '').ready, false);
+  assert.equal(guard({ students: [] }, 'temporary error').ready, false);
+  assert.deepEqual(guard({ students: [] }, '').ids, ['student-a']);
+});
+
+test('transport keeps draft students missing from a stale roster while honoring visible deselection', () => {
+  const source = block('function transportRosterReady()', 'function captureTransportConfig()');
+  const run = new Function('rosterDb', 'rosterErr', source + '; return transportCapturedStudentIds;')(
+    { students: [{ id: 'known-a' }, { id: 'known-b' }] }, ''
+  );
+  const draft = { routes: [{ id: 'route-a', stops: [{ id: 'stop-a', studentIds: ['known-a', 'missing-old'] }] }] };
+  const select = {
+    options: [{ value: 'known-a' }, { value: 'known-b' }],
+    selectedOptions: [{ value: 'known-b' }]
+  };
+  assert.deepEqual(run(draft, 'route-a', 'stop-a', select), ['known-b', 'missing-old']);
+
+  const config = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  assert.match(config, /명단 없음 · 기존 배정 유지/);
+  assert.match(config, /학생 명단 새로고침 필요/);
+  assert.match(actions, /case 'transportrefresh':[\s\S]{0,160}loadRoster\(\);[\s\S]{0,100}loadTransport\(transportDate, true\)/);
 });
 
 test('transport UI remains mobile accessible and excludes guardian PII', () => {
