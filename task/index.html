@@ -4091,6 +4091,17 @@ function booksOutsideSearch(books, vendorName, query) {
     bookSearchText(book, vendorName, bookSeriesName(book)), query
   )).length;
 }
+function updateBookBatchOutsideSearch(vendor, hasQuery) {
+  const outside = hasQuery
+    ? vendor.querySelectorAll('[data-book-entry][data-book-selected="true"][hidden]').length
+    : 0;
+  const note = vendor.querySelector('[data-book-batch-outside]');
+  if (note) {
+    note.hidden = outside === 0;
+    note.textContent = outside ? ' · 검색 밖 ' + outside + '권 포함' : '';
+  }
+  return outside;
+}
 
 /** 검색은 DOM 표시만 바꾼다. 기존 접기·선택·주문 상태는 건드리지 않는다. */
 function applyBookSearch(value) {
@@ -4124,6 +4135,7 @@ function applyBookSearch(value) {
     const toggle = vendor.querySelector('[data-act="vendortoggle"]');
     const expanded = hasQuery ? matches > 0 : vendor.dataset.closed !== 'true';
     vendor.hidden = hasQuery && matches === 0;
+    updateBookBatchOutsideSearch(vendor, hasQuery);
     if (body) body.hidden = !expanded;
     if (toggle) {
       toggle.setAttribute('aria-expanded', String(expanded));
@@ -4727,7 +4739,8 @@ function viewBooks() {
           '<span class="muted" data-book-series-arrow>' + (expanded ? '▾' : '▸') + '</span></span></button>' +
         '<div data-book-series-body' + (expanded ? '' : ' hidden') + '>';
       group.books.forEach(book => {
-        h += '<div class="book-entry" data-book-entry data-book-search="' +
+        h += '<div class="book-entry" data-book-entry data-book-selected="' +
+          String(batchSelection.has(book.id)) + '" data-book-search="' +
           esc(bookSearchText(book, sec.vend ? sec.vend.name : '거래처 미등록', group.name)) + '">' + bookCard(book) + '</div>';
       });
       h += '</div></section>';
@@ -4735,7 +4748,8 @@ function viewBooks() {
     if (selectedHere.length >= 2) {
       h += '<button class="btn btn-primary btn-block" data-act="bkbatch" data-key="' + esc(sec.key) + '">' +
         '🛒 선택한 ' + selectedHere.length + '권' +
-        (selectedOutsideSearch ? ' · 검색 밖 ' + selectedOutsideSearch + '권 포함' : '') +
+        '<span data-book-batch-outside' + (selectedOutsideSearch ? '' : ' hidden') + '>' +
+          (selectedOutsideSearch ? ' · 검색 밖 ' + selectedOutsideSearch + '권 포함' : '') + '</span>' +
         ' · 저녁 8시 발송 대기</button>';
     }
     h += '</div></section>';

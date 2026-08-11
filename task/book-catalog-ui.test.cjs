@@ -75,6 +75,30 @@ test('book search is token-based across title, series, subject, level, and vendo
   assert.equal(booksOutsideSearch([{ title: '아무 교재' }], '천재출판사', ''), 0);
 });
 
+test('DOM-only search refreshes the hidden selected-book count immediately', () => {
+  const source = block('function updateBookBatchOutsideSearch(', '/** 검색은 DOM 표시만 바꾼다');
+  const { updateBookBatchOutsideSearch } = new Function(
+    `${source}\nreturn { updateBookBatchOutsideSearch };`
+  )();
+  const note = { hidden: true, textContent: '' };
+  const vendor = {
+    querySelectorAll: selector => {
+      assert.equal(selector, '[data-book-entry][data-book-selected="true"][hidden]');
+      return [{}, {}];
+    },
+    querySelector: selector => {
+      assert.equal(selector, '[data-book-batch-outside]');
+      return note;
+    }
+  };
+  assert.equal(updateBookBatchOutsideSearch(vendor, true), 2);
+  assert.equal(note.hidden, false);
+  assert.equal(note.textContent, ' · 검색 밖 2권 포함');
+  assert.equal(updateBookBatchOutsideSearch(vendor, false), 0);
+  assert.equal(note.hidden, true);
+  assert.equal(note.textContent, '');
+});
+
 test('publisher-series-book accordion is searchable and mobile-friendly', () => {
   const view = block('function viewBooks()', '/* ── 원생 현황');
   const card = block('function bookCard(', '/* ── 새 교재 추가 신청');
@@ -95,7 +119,8 @@ test('publisher-series-book accordion is searchable and mobile-friendly', () => 
   assert.match(view, /seriesExpansion\.has\(seriesKey\)[\s\S]{0,100}\? seriesExpansion\.get\(seriesKey\) : !!\(selected \|\| groupPending\)/);
   assert.match(view, /선택 ' \+ selected/);
   assert.match(view, /주문 ' \+ groupPending/);
-  assert.match(view, /data-book-entry data-book-search/);
+  assert.match(view, /data-book-entry data-book-selected/);
+  assert.match(view, /data-book-selected="' \+\s*String\(batchSelection\.has\(book\.id\)\)/);
   assert.match(view, /기타·개별 교재/);
   assert.match(card, /aria-label="' \+ esc\(b\.title\) \+ ' 일괄 주문 선택/);
   assert.match(card, /book-card-actions/);
@@ -105,6 +130,7 @@ test('publisher-series-book accordion is searchable and mobile-friendly', () => 
   assert.match(search, /const expanded = hasQuery \? count > 0 : series\.dataset\.expanded === 'true'/);
   assert.match(search, /body\.hidden = !expanded/);
   assert.match(search, /toggle\.disabled = hasQuery/g);
+  assert.match(search, /updateBookBatchOutsideSearch\(vendor, hasQuery\)/);
   assert.match(search, /검색 중에는 결과를 자동으로 펼칩니다/);
   assert.doesNotMatch(search, /seriesExpansion\.(?:set|delete|clear)|vendorClosed\.(?:add|delete|clear)|batchSelection\.(?:add|delete|clear)/);
   assert.match(render, /applyBookSearch\(bookSearchQuery\);\s*restoreBookToggleFocus\(\)/);
@@ -162,6 +188,7 @@ test('series display never changes publisher batch or outbound order data', () =
   assert.match(order, /orderVendor: vendorName \|\| '', orderItems: items, orderDelivery: 'scheduled_batch_v1'/);
   assert.doesNotMatch(order, /series/i);
   assert.match(view, /const selectedHere = sec\.books\.filter\(b => batchSelection\.has\(b\.id\)\)/);
+  assert.match(view, /data-book-batch-outside/);
   assert.match(view, /검색 밖 ' \+ selectedOutsideSearch \+ '권 포함/);
   assert.doesNotMatch(toggle, /batchSelection/);
 });

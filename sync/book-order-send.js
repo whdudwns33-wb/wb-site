@@ -113,6 +113,13 @@ function kstDate(ms) {
   return new Date((Number(ms) || Date.now()) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+export function isRetryCronWindow(ms) {
+  const value = Number(ms);
+  const shifted = new Date((Number.isFinite(value) ? value : Date.now()) + 9 * 60 * 60 * 1000);
+  const minutes = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+  return minutes >= 19 * 60 + 45 && minutes <= 20 * 60 + 30;
+}
+
 function canOperateBookOrder(auth) {
   const rootAdmin = auth && auth.scope === 'all' && !auth.role && !auth.id && !auth.device;
   const manager = auth && auth.scope === 'all' && auth.role === 'manager' &&
@@ -370,19 +377,31 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
  * 날짜+거래처+task 집합으로 멱등키를 고정해 같은 날 반복 클릭도 실제 재발송하지 않는다.
  */
 async function retryRejectedBookOrders(env, app, origin, json) {
+  const now = Date.now();
+  if (isRetryCronWindow(now)) {
+    return json({
+      ok: false,
+      code: 'RETRY_CRON_WINDOW',
+      error: '20:00 예약 발송과 겹치지 않도록 20:30 이후 다시 시도해 주세요'
+    }, 409, origin);
+  }
+  const retryDate = kstDate(now).replace(/-/g, '');
+  const retryPrefix = 'retry_' + retryDate + '_';
+
   const selected = await env.DB.prepare(
     "SELECT t.id,t.data FROM book_order_batch_items i " +
     "JOIN book_order_sends failed ON failed.app=i.app AND failed.send_id=i.send_id " +
     "JOIN tasks t ON t.app=i.app AND t.id=i.task_id " +
     "WHERE i.app=? AND failed.status='rejected' " +
+    "AND failed.task_id NOT LIKE ? " +
     "AND NOT EXISTS (SELECT 1 FROM book_order_sends active " +
       "WHERE active.app=i.app AND active.task_id=i.task_id " +
       "AND active.status IN ('reserved','dispatching','accepted','unknown')) " +
     'ORDER BY t.updated_at,t.id LIMIT 2000'
-  ).bind(app).all();
+  ).bind(app, retryPrefix + '%').all();
 
   const groups = new Map();
-  const cutoff = Date.now();
+  const cutoff = now;
   for (const row of selected.results || []) {
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
@@ -416,7 +435,6 @@ async function retryRejectedBookOrders(env, app, origin, json) {
     previews.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length, messageBytes });
   }
 
-  const now = Date.now();
   const recent = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM book_order_sends WHERE app=? AND created_at>? AND task_id NOT LIKE ?"
   ).bind(app, now - 24 * 60 * 60 * 1000, SAMPLE_TASK_PREFIX + '%').first();
@@ -424,7 +442,6 @@ async function retryRejectedBookOrders(env, app, origin, json) {
     return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다' }, 429, origin);
   }
 
-  const retryDate = kstDate(now).replace(/-/g, '');
   const results = [];
   for (let i = 0; i < previews.length; i++) {
     const preview = previews[i];
@@ -442,7 +459,8 @@ async function retryRejectedBookOrders(env, app, origin, json) {
 
   const rejected = results.some(result => result.status === 'rejected');
   const uncertain = results.some(result => result.status !== 'accepted' && result.status !== 'rejected');
-  return json({ ok: !rejected, action: 'retry-rejected', results }, rejected ? 502 : uncertain ? 202 : 200, origin);
+  return json({ ok: !rejected && !uncertain, action: 'retry-rejected', results },
+    rejected ? 502 : uncertain ? 202 : 200, origin);
 }
 
 export async function handleBookOrderSend(env, app, body, origin, auth, json) {

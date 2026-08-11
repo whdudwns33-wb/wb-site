@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { handleScheduledBookOrders } from './book-order-send.js';
+import { handleScheduledBookOrders, isRetryCronWindow } from './book-order-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/013_book_order_sends.sql', import.meta.url), 'utf8');
@@ -60,6 +60,12 @@ async function withFetch(stub, action) {
   const original = globalThis.fetch;
   globalThis.fetch = stub;
   try { return await action(); } finally { globalThis.fetch = original; }
+}
+
+async function withNow(value, action) {
+  const original = Date.now;
+  Date.now = () => value;
+  try { return await action(); } finally { Date.now = original; }
 }
 
 async function call(db, body, envPatch = {}) {
@@ -294,9 +300,13 @@ test('rejected-only retry groups each vendor once and excludes accepted or unkno
   assert.equal(payloads.length, 2, 'accepted mapping 뒤 반복 호출은 provider를 다시 부르지 않는다');
 });
 
-test('rejected-only retry is root/allowlist-manager only and same-day provider rejection is idempotent', async () => {
+test('rejected-only retry is root/allowlist-manager only, once per KST day, and reopens next day', async () => {
   const db = new TestD1();
-  seedOrderTask(db, { id: 'failed-1', orderDelivery: 'scheduled_batch_v1' });
+  const dayOne = Date.parse('2026-08-11T00:00:00Z');
+  const dayTwo = Date.parse('2026-08-12T00:00:00Z');
+  const task = seedOrderTask(db, {
+    id: 'failed-1', orderDelivery: 'scheduled_batch_v1', createdAt: dayOne - 60_000
+  });
   seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
   let fetches = 0;
   await withFetch(async () => {
@@ -305,14 +315,73 @@ test('rejected-only retry is root/allowlist-manager only and same-day provider r
   }, async () => {
     const staff = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'retry-rejected' });
     assert.equal(staff.status, 403);
-    const first = await call(db, { auth: admin, action: 'retry-rejected' });
+    const first = await withNow(dayOne, () => call(db, { auth: admin, action: 'retry-rejected' }));
     assert.equal(first.status, 502);
     assert.equal(first.body.results[0].status, 'rejected');
-    const again = await call(db, { auth: admin, action: 'retry-rejected' });
-    assert.equal(again.status, 502);
-    assert.equal(again.body.results[0].idempotent, true);
+
+    task.orderVendor = '상형출판사';
+    task.orderItems = [{ title: '변경된 주문 교재', qty: '2권' }];
+    task.updatedAt = dayOne + 60_000;
+    db.prepare("UPDATE tasks SET data=?,updated_at=? WHERE app='task' AND id=?")
+      .bind(JSON.stringify(task), task.updatedAt, task.id).run();
+
+    const env = { BOOK_VENDOR_PHONES: JSON.stringify({ '천재출판사': '01099998888', '상형출판사': '01077776666' }) };
+    const sameDay = await withNow(dayOne + 60_000, () =>
+      call(db, { auth: admin, action: 'retry-rejected' }, env));
+    assert.equal(sameDay.status, 200);
+    assert.equal(sameDay.body.idempotent, true);
+    assert.deepEqual(sameDay.body.results, []);
+
+    const nextDay = await withNow(dayTwo, () =>
+      call(db, { auth: admin, action: 'retry-rejected' }, env));
+    assert.equal(nextDay.status, 502);
+    assert.equal(nextDay.body.results[0].status, 'rejected');
   });
-  assert.equal(fetches, 1, '같은 날 같은 rejected 집합은 실패했어도 한 번만 provider를 호출한다');
+  assert.equal(fetches, 2, '당일 내용·거래처 변경은 재발송하지 않고 다음 KST 날짜에만 다시 시도한다');
+});
+
+test('rejected retry reports an uncertain provider result as outer ok false with HTTP 202', async () => {
+  const db = new TestD1();
+  const sendAt = Date.parse('2026-08-11T00:00:00Z');
+  seedOrderTask(db, { id: 'failed-1', orderDelivery: 'scheduled_batch_v1', createdAt: sendAt - 60_000 });
+  seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
+  await withFetch(async () => { throw new Error('network down'); }, async () => {
+    const result = await withNow(sendAt, () =>
+      call(db, { auth: admin, action: 'retry-rejected' }));
+    assert.equal(result.status, 202);
+    assert.equal(result.body.ok, false);
+    assert.equal(result.body.results[0].status, 'unknown');
+  });
+});
+
+test('rejected retry blocks the inclusive 19:45-20:30 KST cron window before DB selection or fetch', async () => {
+  const at = time => Date.parse('2026-08-11T' + time + ':00Z');
+  assert.equal(isRetryCronWindow(at('10:44')), false, '19:44 KST는 허용');
+  assert.equal(isRetryCronWindow(at('10:45')), true, '19:45 KST부터 차단');
+  assert.equal(isRetryCronWindow(at('11:30')), true, '20:30 KST까지 차단');
+  assert.equal(isRetryCronWindow(at('11:31')), false, '20:31 KST부터 허용');
+
+  let dbQueries = 0;
+  let fetches = 0;
+  const db = {
+    prepare() {
+      dbQueries += 1;
+      throw new Error('cron window must return before querying D1');
+    }
+  };
+  await withNow(at('10:45'), async () => {
+    await withFetch(async () => {
+      fetches += 1;
+      return acceptedResponse();
+    }, async () => {
+      const result = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(result.status, 409);
+      assert.equal(result.body.code, 'RETRY_CRON_WINDOW');
+      assert.match(result.body.error, /20:30 이후/);
+    });
+  });
+  assert.equal(dbQueries, 0);
+  assert.equal(fetches, 0);
 });
 
 test('send is disabled by default even with valid credentials unless the explicit switch is on', async () => {
