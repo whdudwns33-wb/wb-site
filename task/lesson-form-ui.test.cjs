@@ -40,8 +40,8 @@ test('admin lesson registration requires an explicit teacher selection', () => {
 
 test('feedback workflow sends immediately only through the server-side guardian gate', () => {
   assert.match(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
-  assert.match(html, /승인 없이 바로 나갑니다/);
-  assert.match(html, /보호자 연락처·발송 동의가 등록된 학생만 실제로 발송/);
+  assert.match(html, /카카오 알림톡 발송 요청을 접수합니다/);
+  assert.match(html, /보호자 연락처·발송 동의가 등록된 학생만 접수/);
   assert.match(html, /sync\.post\('\/feedback-request'/);
   assert.match(html, /sync\.post\('\/feedback-review'/);
   assert.match(html, /action: 'list', limit: 100/);
@@ -49,6 +49,11 @@ test('feedback workflow sends immediately only through the server-side guardian 
   assert.match(html, /문구 수정 후 다시 요청/);
   assert.match(html, /if \(res\.status === 'sent'\)/);
   assert.match(html, /보호자 알림톡 발송 요청이 접수됐습니다/);
+  assert.match(html, /접수 여부 확인 필요/);
+  assert.match(html, /if \(note\.startsWith\('접수 여부 확인 필요'\)\) return '⚠ 접수 여부 확인 — '/);
+  assert.match(html, /if \(note\.startsWith\('카카오 발송이 거절되었습니다'\)\) return '발송 거절 — '/);
+  assert.match(html, /item\.status === 'content_approved_send_blocked' && sendState\.retry/);
+  assert.doesNotMatch(html, /승인 없이 바로 카카오 알림톡이 나갑니다|학부모 피드백 문자/);
   assert.doesNotMatch(html, /보호자께 카카오 알림톡을 보냈습니다|보호자 발송 완료/);
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });

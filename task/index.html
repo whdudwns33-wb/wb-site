@@ -2028,7 +2028,7 @@ function showFeedbackPreview(t, date, fields, letterText) {
     '<div class="field"><label class="fl">오늘 배운 내용</label><input class="in" id="fldContent" value="' + esc(fields.contentText || '') + '"></div>' +
     '<div class="field"><label class="fl">잘한 점</label><input class="in" id="fldPlus" value="' + esc(fields.plusText || '') + '"></div>' +
     '<div class="field"><label class="fl">다음에 더 신경 쓸 점</label><input class="in" id="fldMinus" value="' + esc(fields.minusText || '') + '"></div>' +
-    '<div class="hint mt14"><b>승인 없이 바로 나갑니다</b> — "보호자께 발송"을 누르면 원장 확인 없이 즉시 카카오 알림톡으로 나갑니다. 보호자 연락처·발송 동의가 등록된 학생만 실제로 발송되고, 나머지는 검토 화면에 사유와 함께 남습니다.</div>' +
+    '<div class="hint mt14"><b>승인 없이 발송 요청 접수</b> — "보호자께 발송"을 누르면 원장 확인 없이 카카오 알림톡 발송을 요청합니다. 보호자 연락처·발송 동의가 등록된 학생만 접수되고, 나머지는 검토 화면에 사유와 함께 남습니다.</div>' +
     '<textarea class="in" rows="6" id="mText" style="margin-top:10px">' + esc(letterText) + '</textarea>' +
     '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다 — 실제 발송 내용은 위 세 항목입니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="feedbacksubmit">📱 보호자께 발송</button>' +
@@ -2290,6 +2290,25 @@ const FEEDBACK_STATUS_LABEL = {
   cancelled: ['취소', '']
 };
 
+function feedbackSendState(item) {
+  if (item && item.status === 'content_approved_send_blocked') {
+    const note = String(item.reviewNote || '');
+    if (note.startsWith('접수 여부 확인 필요')) return { label: ['접수 여부 확인 필요', 'warn'], retry: false };
+    if (note.startsWith('카카오 발송이 거절되었습니다')) return { label: ['알림톡 거절 · 확인 필요', 'bad'], retry: false };
+  }
+  return { label: FEEDBACK_STATUS_LABEL[item && item.status] || [item && item.status || '', ''], retry: true };
+}
+
+function feedbackReviewPrefix(item, ownCard) {
+  if (item && item.status === 'revision_requested') {
+    return ownCard ? '<b>원장 수정 요청</b><br>' : '수정 요청: ';
+  }
+  const note = String(item && item.reviewNote || '');
+  if (note.startsWith('접수 여부 확인 필요')) return '⚠ 접수 여부 확인 — ';
+  if (note.startsWith('카카오 발송이 거절되었습니다')) return '발송 거절 — ';
+  return '⏳ 아직 안 나감 — ';
+}
+
 async function loadFeedbackQueue(force) {
   if (!session.isAdmin || feedbackQueueLoading || (feedbackQueueLoaded && !force)) return;
   const auth = sync.auth();
@@ -2330,7 +2349,7 @@ async function loadOwnFeedbackQueue(force) {
 
 function ownFeedbackCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
-  const status = FEEDBACK_STATUS_LABEL[item.status] || [item.status, ''];
+  const status = feedbackSendState(item).label;
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
       esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
       esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
@@ -2340,7 +2359,7 @@ function ownFeedbackCard(item) {
         '<br>▪ 보완할 점: ' + esc(item.minusText) + '</div>'
       : '<div class="guide">' + esc(item.message || '').replace(/\n/g, '<br>') + '</div>') +
     (item.reviewNote
-      ? '<div class="hint mt14">' + (item.status === 'revision_requested' ? '<b>원장 수정 요청</b><br>' : '⏳ 아직 안 나감 — ') + esc(item.reviewNote) + '</div>'
+      ? '<div class="hint mt14">' + feedbackReviewPrefix(item, true) + esc(item.reviewNote) + '</div>'
       : '') +
     (item.status === 'revision_requested'
       ? '<button class="btn btn-sm btn-primary mt14" data-act="fbeditrequest" data-key="' + item.requestKey + '">문구 수정 후 다시 요청</button>'
@@ -2350,7 +2369,7 @@ function ownFeedbackCard(item) {
 function viewOwnFeedbackRequests() {
   if (!ownFeedbackQueueLoaded && !ownFeedbackQueueLoading) setTimeout(() => loadOwnFeedbackQueue(false), 0);
   let h = '<div class="card"><div class="card-title">💬 내 피드백 발송 상태</div>' +
-    '<div class="card-sub">제출하는 순간 원장 승인 없이 바로 카카오 알림톡이 나갑니다. 보호자 연락처 미등록 등으로 막히면 여기서 사유가 보입니다.</div>' +
+    '<div class="card-sub">제출하면 원장 승인 없이 카카오 알림톡 발송 요청을 접수합니다. 보호자 연락처 미등록 등으로 막히면 여기서 사유가 보입니다.</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbownrefresh">새로고침</button></div>';
   if (ownFeedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 상태를 불러오는 중입니다.</div></div>';
   if (ownFeedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownFeedbackQueueError) + '</div></div>';
@@ -2361,7 +2380,8 @@ function viewOwnFeedbackRequests() {
 function feedbackQueueCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const staff = staffById(item.owner);
-  const status = FEEDBACK_STATUS_LABEL[item.status] || [item.status, ''];
+  const sendState = feedbackSendState(item);
+  const status = sendState.label;
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
       esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
       esc((staff && staff.name) || item.owner) + ' 선생님 · ' + esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
@@ -2371,14 +2391,14 @@ function feedbackQueueCard(item) {
         '<br>▪ 보완할 점: ' + esc(item.minusText) + '</div>'
       : '') +
     (item.reviewNote
-      ? '<div class="hint mt8">' + (item.status === 'revision_requested' ? '수정 요청: ' : '⏳ 아직 안 나감 — ') + esc(item.reviewNote) + '</div>'
+      ? '<div class="hint mt8">' + feedbackReviewPrefix(item, false) + esc(item.reviewNote) + '</div>'
       : '') +
     (item.status === 'approval_waiting'
       ? '<div class="row wraprow mt14">' +
           '<button class="btn btn-sm btn-primary" data-act="fbreviewapprove" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">문구 승인</button>' +
           '<button class="btn btn-sm btn-warn" data-act="fbreviewrevise" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">수정 요청</button></div>'
       : '') +
-    (item.status === 'content_approved_send_blocked'
+    (item.status === 'content_approved_send_blocked' && sendState.retry
       ? '<div class="row wraprow mt14"><button class="btn btn-sm btn-primary" data-act="fbsend" data-key="' + item.requestKey + '">📱 다시 발송 시도</button></div>' +
         '<div class="hint mt8" id="fbSendResult-' + item.requestKey + '"></div>'
       : '') + '</div>';
@@ -2389,7 +2409,7 @@ function viewFeedbackReview() {
   if (!session.isAdmin) return viewToday();
   if (!feedbackQueueLoaded && !feedbackQueueLoading) setTimeout(() => loadFeedbackQueue(false), 0);
   let h = '<div class="card lesson-review"><div class="card-title">💬 학부모 피드백 발송 현황</div>' +
-    '<div class="card-sub">선생님이 제출하는 순간 원장 승인 없이 카카오 알림톡이 바로 나갑니다 — 여기는 그 결과를 확인하는 화면입니다.<br>' +
+    '<div class="card-sub">선생님이 제출하면 원장 승인 없이 카카오 알림톡 발송 요청을 접수합니다 — 여기는 그 결과를 확인하는 화면입니다.<br>' +
     '보호자 연락처·발송 동의가 없는 학생은 자동으로 막히고, 등록 후 "다시 발송 시도"로 보낼 수 있습니다.</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbrefresh">새로고침</button></div>';
   if (feedbackQueueLoading) h += '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
@@ -2654,7 +2674,7 @@ async function reviewFeedbackRequest(action, key, revision) {
     const index = feedbackQueue.findIndex(item => item.requestKey === key);
     if (index >= 0) feedbackQueue[index] = result.request;
     render();
-    toast(action === 'approve_content' ? '문구를 승인했습니다 · 아래 "다시 발송 시도" 버튼을 눌러야 실제로 나갑니다' : '수정 요청을 남겼습니다');
+    toast(action === 'approve_content' ? '문구를 승인했습니다 · 발송 가능 상태라면 아래 버튼으로 다시 접수할 수 있습니다' : '수정 요청을 남겼습니다');
   } catch (error) {
     toast('피드백 검토 실패 — ' + (error.message || error));
     loadFeedbackQueue(true);
@@ -4910,7 +4930,7 @@ function viewGuardianContactPanel() {
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">학부모 피드백 문자는 여기 등록·동의된 학생에게만 나갑니다. 전화번호만 있고 동의가 꺼져 있으면 발송되지 않습니다.<br>' +
+    '<div class="card-sub mb14">학부모 피드백 알림톡은 여기 등록·동의된 학생에게만 접수됩니다. 전화번호만 있고 동의가 꺼져 있으면 발송되지 않습니다.<br>' +
     '이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }

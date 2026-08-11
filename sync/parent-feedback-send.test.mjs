@@ -301,6 +301,28 @@ test('HTTP 200 registration failure is rejected from failedMessageList and is ne
   assert.equal(ledger.safe_error_code, 'SOLAPI_STATUS_1011');
 });
 
+test('unknown provider outcome is marked as verify-before-retry and a repeat call makes no fetch', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db);
+  registerGuardian(db, '테스트학생');
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    throw new Error('network down');
+  }, async () => {
+    const first = await call(db, { auth: admin, requestKey });
+    assert.equal(first.body.code, 'SOLAPI_NETWORK');
+    const again = await call(db, { auth: admin, requestKey });
+    assert.equal(again.body.idempotent, true);
+    assert.equal(again.body.status, 'unknown');
+  });
+  assert.equal(fetches, 1);
+  const request = db.prepare('SELECT status,review_note FROM feedback_requests WHERE request_key=?').bind(requestKey).first();
+  assert.equal(request.status, 'content_approved_send_blocked');
+  assert.match(request.review_note, /^접수 여부 확인 필요/);
+  assert.match(request.review_note, /재발송 금지/);
+});
+
 test('consult app cannot use this feature', async () => {
   const db = new TestD1();
   const response = await worker.fetch(new Request('https://worker.example/parent-feedback-send', {

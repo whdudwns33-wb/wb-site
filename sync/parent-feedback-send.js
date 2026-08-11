@@ -200,6 +200,10 @@ function publicResult(row, idempotent) {
   };
 }
 
+function unknownSendNote(code) {
+  return '접수 여부 확인 필요 — Solapi 확인 전 재발송 금지(' + String(code || 'UNKNOWN') + ')';
+}
+
 async function findByIdempotency(env, app, idempotencyKey) {
   return await env.DB.prepare('SELECT * FROM parent_feedback_sends WHERE app=? AND idempotency_key=? LIMIT 1')
     .bind(app, idempotencyKey).first();
@@ -292,6 +296,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
     if (existing) {
       if (existing.status === 'accepted') {
         await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
+      } else if (existing.status === 'unknown') {
+        await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+          'content_approved_send_blocked', unknownSendNote(existing.safe_error_code), Date.now());
       }
       return { ok: existing.status !== 'rejected', idempotent: true, status: existing.status };
     }
@@ -338,7 +345,7 @@ export async function attemptParentFeedbackSend(env, app, current) {
     const code = controller.signal.aborted ? 'SOLAPI_TIMEOUT' : 'SOLAPI_NETWORK';
     await updateLedger(env, app, sendId, 'unknown', null, code, Date.now());
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
-      'content_approved_send_blocked', '발송 시도 중 통신 오류가 발생했습니다(' + code + ')', Date.now());
+      'content_approved_send_blocked', unknownSendNote(code), Date.now());
     return { ok: false, code, status: 'content_approved_send_blocked' };
   }
   clearTimeout(timeout);
@@ -359,6 +366,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
   await updateLedger(env, app, sendId, outcome.status, outcome.provider, outcome.errorCode, Date.now());
   if (outcome.status === 'accepted') {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
+  } else if (outcome.status === 'unknown') {
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', unknownSendNote(outcome.errorCode), Date.now());
   } else {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '카카오 발송이 거절되었습니다(' + (outcome.errorCode || outcome.status) + ')', Date.now());
@@ -413,6 +423,7 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
   if (result.code && RETRY_HTTP_STATUS[result.code] != null) {
     return json({ ...result, error: RETRY_ERROR_TEXT[result.code] }, RETRY_HTTP_STATUS[result.code], origin);
   }
-  // 카카오가 응답은 했지만 거절/판단불가(rejected·unknown) — 결과는 그대로 두고 202로 알린다
+  // 거절/판단불가(rejected·unknown) — 결과는 그대로 두고 202로 알린다.
+  // unknown은 중복 위험 때문에 Solapi 확인 전 같은 내용으로 다시 보내지 않는다.
   return json(result, 202, origin);
 }
