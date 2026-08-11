@@ -101,11 +101,15 @@ function sendConfiguration(env) {
       !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_TEMPLATE_ID || !env.SOLAPI_SENDER_NUMBER) {
     return null;
   }
+  const apiKey = String(env.SOLAPI_KAKAO_API_KEY).trim();
+  const apiSecret = String(env.SOLAPI_KAKAO_API_SECRET).trim();
+  const pfId = String(env.SOLAPI_KAKAO_PF_ID).trim();
+  const templateId = String(env.SOLAPI_KAKAO_TEMPLATE_ID).trim();
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
-  if (!/^\d{8,12}$/.test(sender)) return null;
+  if (!apiKey || !apiSecret || !SAFE_ID.test(pfId) || !SAFE_ID.test(templateId) ||
+      !/^\d{8,12}$/.test(sender)) return null;
   return {
-    apiKey: String(env.SOLAPI_KAKAO_API_KEY), apiSecret: String(env.SOLAPI_KAKAO_API_SECRET),
-    pfId: String(env.SOLAPI_KAKAO_PF_ID), templateId: String(env.SOLAPI_KAKAO_TEMPLATE_ID),
+    apiKey, apiSecret, pfId, templateId,
     sender
   };
 }
@@ -120,15 +124,48 @@ export function resolveStudentName(taskData) {
   return title.replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
 }
 
-async function guardianPhone(env, app, studentName) {
+async function guardianPhone(env, app, studentId, studentName) {
   const row = await env.DB.prepare(
-    'SELECT phone, consent FROM guardian_contacts WHERE app=? AND student_name=? LIMIT 1'
-  ).bind(app, studentName).first();
+    'SELECT student_name, phone, consent FROM guardian_contacts_by_student WHERE app=? AND student_id=? LIMIT 1'
+  ).bind(app, studentId).first();
   if (!row) return { error: 'GUARDIAN_NOT_REGISTERED' };
+  if (normalizedRosterText(row.student_name) !== normalizedRosterText(studentName)) {
+    return { error: 'GUARDIAN_IDENTITY_MISMATCH' };
+  }
   const phone = normalizedDigits(row.phone);
   if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
   if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
   return { phone };
+}
+
+function normalizedRosterText(value) {
+  return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
+}
+
+/**
+ * 이름은 표시용 스냅샷일 뿐, 수신자 결합 키로 쓰지 않는다. 현재 private_rosters에서
+ * stable studentId가 같은 학생을 다시 찾고 이름·담당자까지 일치할 때만 연락처 조회로 간다.
+ * 동명이인이나 개명 뒤 낡은 지시서가 다른 보호자에게 연결되는 일을 fail-closed로 막는다.
+ */
+async function verifyFeedbackStudent(env, app, studentId, studentName, owner) {
+  if (!SAFE_ID.test(studentId)) return { error: 'STUDENT_ID_MISSING' };
+  const row = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+  if (!row) return { error: 'STUDENT_NOT_IN_ROSTER' };
+  let students;
+  try {
+    const document = JSON.parse(row.data || '{}');
+    students = document && document.roster && document.roster.students;
+  } catch (error) {
+    return { error: 'STUDENT_NOT_IN_ROSTER' };
+  }
+  if (!Array.isArray(students)) return { error: 'STUDENT_NOT_IN_ROSTER' };
+  const student = students.find(item => item && item.id === studentId && Array.isArray(item.teacherIds));
+  if (!student) return { error: 'STUDENT_NOT_IN_ROSTER' };
+  if (normalizedRosterText(student.name) !== normalizedRosterText(studentName)) {
+    return { error: 'STUDENT_IDENTITY_MISMATCH' };
+  }
+  if (!student.teacherIds.includes(String(owner || ''))) return { error: 'STUDENT_OWNER_MISMATCH' };
+  return { studentId };
 }
 
 /** 항목별 변수 값을 다듬는다 — 앞뒤 공백 제거, 지나치게 길면 잘라내지 않고 거부하도록
@@ -154,9 +191,11 @@ function safeProviderStatus(value) {
 
 function providerOutcome(response, payload) {
   if (!response.ok) {
+    const rawCode = String(payload && (payload.errorCode || payload.statusCode) || '');
+    const safeCode = rawCode.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40).toUpperCase();
     return response.status >= 500
-      ? { status: 'unknown', errorCode: 'SOLAPI_HTTP_5XX' }
-      : { status: 'rejected', errorCode: 'SOLAPI_HTTP_4XX' };
+      ? { status: 'unknown', errorCode: 'SOLAPI_HTTP_' + response.status + (safeCode ? '_' + safeCode : '') }
+      : { status: 'rejected', errorCode: 'SOLAPI_HTTP_' + response.status + (safeCode ? '_' + safeCode : '') };
   }
   const groupId = safeProviderId(payload && payload.groupInfo && payload.groupInfo.groupId);
   const failed = payload && Array.isArray(payload.failedMessageList) ? payload.failedMessageList[0] : null;
@@ -187,7 +226,7 @@ function responseStatusFor(status) {
 
 function publicResult(row, idempotent) {
   return {
-    ok: row.status !== 'rejected',
+    ok: row.status === 'accepted',
     idempotent: !!idempotent,
     studentName: row.student_name,
     send: {
@@ -207,6 +246,13 @@ function unknownSendNote(code) {
 async function findByIdempotency(env, app, idempotencyKey) {
   return await env.DB.prepare('SELECT * FROM parent_feedback_sends WHERE app=? AND idempotency_key=? LIMIT 1')
     .bind(app, idempotencyKey).first();
+}
+
+async function findUncertainByFeedbackRequest(env, app, requestKey) {
+  return await env.DB.prepare(
+    "SELECT * FROM parent_feedback_sends WHERE app=? AND feedback_request_key=? " +
+    "AND status IN ('reserved','dispatching','unknown') ORDER BY updated_at DESC LIMIT 1"
+  ).bind(app, requestKey).first();
 }
 
 async function updateLedger(env, app, sendId, status, provider, safeErrorCode, now) {
@@ -242,6 +288,7 @@ export async function attemptParentFeedbackSend(env, app, current) {
   }
 
   const teacherName = cleanField(current.teacher_name);
+  const studentId = cleanField(current.student_id);
   const studentName = cleanField(current.student_name);
   const contentText = cleanField(current.content_text);
   const plusText = cleanField(current.plus_text);
@@ -259,11 +306,23 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: 'SEND_DISABLED', status: 'content_approved_send_blocked' };
   }
 
-  const guardian = await guardianPhone(env, app, studentName);
+  const verifiedStudent = await verifyFeedbackStudent(env, app, studentId, studentName, current.owner);
+  if (verifiedStudent.error) {
+    const note = verifiedStudent.error === 'STUDENT_ID_MISSING'
+      ? '학생 식별자가 없어 발송하지 못했습니다 — 원생 명단에서 학생을 선택해 수업을 다시 저장해 주세요'
+      : '현재 원생 명단과 지시서의 학생·담당자 정보가 일치하지 않아 발송하지 못했습니다';
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', note, now0);
+    return { ok: false, code: verifiedStudent.error, status: 'content_approved_send_blocked' };
+  }
+
+  const guardian = await guardianPhone(env, app, verifiedStudent.studentId, studentName);
   if (guardian.error) {
     const note = guardian.error === 'GUARDIAN_CONSENT_MISSING'
       ? '보호자의 발송 동의가 켜져 있지 않아 발송하지 못했습니다'
-      : '보호자 연락처가 등록되지 않아 발송하지 못했습니다 — 설정에서 먼저 등록해 주세요';
+      : guardian.error === 'GUARDIAN_IDENTITY_MISMATCH'
+        ? '현재 원생 명단의 학생 정보와 저장된 보호자 연락처가 일치하지 않습니다 — 설정에서 해당 학생 연락처를 다시 저장해 주세요'
+        : '보호자 연락처가 등록되지 않아 발송하지 못했습니다 — 설정에서 먼저 등록해 주세요';
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', note, now0);
     return { ok: false, code: guardian.error, status: 'content_approved_send_blocked' };
@@ -277,18 +336,25 @@ export async function attemptParentFeedbackSend(env, app, current) {
   }
 
   const variablesHash = await sha256Hex(JSON.stringify(fields));
-  const idempotencyKey = await sha256Hex([app, current.request_key, guardian.phone, variablesHash].join(''));
+  const idempotencyKey = await sha256Hex(
+    [app, current.request_key, verifiedStudent.studentId, guardian.phone, variablesHash].join('\u001f')
+  );
   const sendId = 'pfs_' + idempotencyKey.slice(0, 48);
   const now = Date.now();
 
   const inserted = await env.DB.prepare(
     'INSERT OR IGNORE INTO parent_feedback_sends ' +
-    '(app,send_id,idempotency_key,feedback_request_key,student_name,message_hash,status,created_at,updated_at) ' +
-    "SELECT ?,?,?,?,?,?,'reserved',?,? " +
-    'WHERE (SELECT COUNT(*) FROM parent_feedback_sends WHERE app=? AND created_at > ?) < ' + GLOBAL_DAILY_LIMIT
+    '(app,send_id,idempotency_key,feedback_request_key,student_id,student_name,message_hash,status,' +
+    'created_at,dispatch_started_at,updated_at) ' +
+    "SELECT ?,?,?,?,?,?,?,'dispatching',?,?,? " +
+    'WHERE (SELECT COUNT(*) FROM parent_feedback_sends WHERE app=? AND created_at > ?) < ' + GLOBAL_DAILY_LIMIT + ' ' +
+    "AND NOT EXISTS (SELECT 1 FROM parent_feedback_sends WHERE app=? AND feedback_request_key=? " +
+    "AND status IN ('reserved','dispatching','unknown'))"
   ).bind(
-    app, sendId, idempotencyKey, current.request_key, studentName, variablesHash, now, now,
-    app, now - 24 * 60 * 60 * 1000
+    app, sendId, idempotencyKey, current.request_key, verifiedStudent.studentId, studentName, variablesHash,
+    now, now, now,
+    app, now - 24 * 60 * 60 * 1000,
+    app, current.request_key
   ).run();
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
@@ -300,26 +366,33 @@ export async function attemptParentFeedbackSend(env, app, current) {
         await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
           'content_approved_send_blocked', unknownSendNote(existing.safe_error_code), Date.now());
       }
-      return { ok: existing.status !== 'rejected', idempotent: true, status: existing.status };
+      return {
+        ok: existing.status === 'accepted',
+        idempotent: true,
+        code: existing.safe_error_code || undefined,
+        status: existing.status
+      };
+    }
+    // 서로 다른 번호·본문·revision의 동시 요청은 멱등키가 달라질 수 있다. 위 INSERT의
+    // NOT EXISTS와 같은 트랜잭션 경계에서 한 건만 dispatching으로 만들고, 진 쪽은 여기서
+    // 실제 불확실 행을 다시 읽어 공급자 호출 없이 멈춘다.
+    const uncertain = await findUncertainByFeedbackRequest(env, app, current.request_key);
+    if (uncertain) {
+      const code = 'PRIOR_SEND_UNCERTAIN';
+      await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+        'content_approved_send_blocked', unknownSendNote(code), now0);
+      return { ok: false, idempotent: true, code, status: 'unknown' };
     }
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '오늘 발송 한도에 도달해 발송하지 못했습니다', now0);
     return { ok: false, code: 'DAILY_SEND_LIMIT', status: 'content_approved_send_blocked' };
   }
 
-  const dispatchAt = Date.now();
-  const dispatch = await env.DB.prepare(
-    "UPDATE parent_feedback_sends SET status='dispatching', dispatch_started_at=?, updated_at=? " +
-    "WHERE app=? AND send_id=? AND status='reserved'"
-  ).bind(dispatchAt, dispatchAt, app, sendId).run();
-  if (Number(dispatch && dispatch.meta && dispatch.meta.changes || 0) !== 1) {
-    return { ok: false, code: 'SEND_STATE_CONFLICT', status: current.status };
-  }
-
   const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);
   let response;
+  let raw;
   try {
     response = await fetch(SOLAPI_SEND_URL, {
       method: 'POST',
@@ -340,6 +413,8 @@ export async function attemptParentFeedbackSend(env, app, current) {
       }),
       signal: controller.signal
     });
+    // 응답 헤더뿐 아니라 본문 수신까지 같은 제한시간 안에 끝나야 한다.
+    raw = await response.text();
   } catch (error) {
     clearTimeout(timeout);
     const code = controller.signal.aborted ? 'SOLAPI_TIMEOUT' : 'SOLAPI_NETWORK';
@@ -352,18 +427,29 @@ export async function attemptParentFeedbackSend(env, app, current) {
 
   let outcome;
   try {
-    const raw = await response.text();
     if (new TextEncoder().encode(raw).byteLength > MAX_PROVIDER_RESPONSE_BYTES) {
-      outcome = { status: 'unknown', errorCode: 'SOLAPI_RESPONSE_TOO_LARGE' };
+      outcome = response.ok
+        ? { status: 'unknown', errorCode: 'SOLAPI_RESPONSE_TOO_LARGE' }
+        : providerOutcome(response, {});
     } else {
-      const payload = raw ? JSON.parse(raw) : {};
+      let payload = {};
+      try { payload = raw ? JSON.parse(raw) : {}; }
+      catch (error) {
+        if (response.ok) throw error;
+      }
       outcome = providerOutcome(response, payload);
     }
   } catch (error) {
     outcome = { status: 'unknown', errorCode: 'SOLAPI_INVALID_RESPONSE' };
   }
 
-  await updateLedger(env, app, sendId, outcome.status, outcome.provider, outcome.errorCode, Date.now());
+  const updated = await updateLedger(env, app, sendId, outcome.status, outcome.provider, outcome.errorCode, Date.now());
+  if (!updated) {
+    const code = 'SEND_RESULT_NOT_RECORDED';
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', unknownSendNote(code), Date.now());
+    return { ok: false, code, status: 'content_approved_send_blocked' };
+  }
   if (outcome.status === 'accepted') {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
   } else if (outcome.status === 'unknown') {
@@ -373,7 +459,12 @@ export async function attemptParentFeedbackSend(env, app, current) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '카카오 발송이 거절되었습니다(' + (outcome.errorCode || outcome.status) + ')', Date.now());
   }
-  return { ok: outcome.status === 'accepted', code: outcome.errorCode, status: outcome.status === 'accepted' ? 'sent' : 'content_approved_send_blocked' };
+  return {
+    ok: outcome.status === 'accepted',
+    code: outcome.errorCode,
+    sendStatus: outcome.status,
+    status: outcome.status === 'accepted' ? 'sent' : 'content_approved_send_blocked'
+  };
 }
 
 const RETRY_ERROR_TEXT = {
@@ -384,11 +475,18 @@ const RETRY_ERROR_TEXT = {
   GUARDIAN_NOT_REGISTERED: '보호자 연락처가 등록되지 않았습니다 — 설정에서 먼저 등록해 주세요',
   GUARDIAN_PHONE_MISSING: '보호자 연락처가 등록되지 않았습니다 — 설정에서 먼저 등록해 주세요',
   GUARDIAN_CONSENT_MISSING: '보호자의 발송 동의가 켜져 있지 않습니다',
+  GUARDIAN_IDENTITY_MISMATCH: '보호자 연락처의 학생 정보가 현재 원생 명단과 일치하지 않습니다',
+  STUDENT_ID_MISSING: '학생 식별자가 없습니다 — 원생 명단에서 학생을 선택해 수업을 다시 저장해 주세요',
+  STUDENT_NOT_IN_ROSTER: '현재 원생 명단에서 학생 식별자를 찾을 수 없습니다',
+  STUDENT_IDENTITY_MISMATCH: '현재 원생 명단과 지시서의 학생 이름이 일치하지 않습니다',
+  STUDENT_OWNER_MISMATCH: '현재 원생 명단의 담당자와 지시서 담당자가 일치하지 않습니다',
   MESSAGE_TOO_LONG: '문구가 알림톡 글자수 상한(900자)을 넘었습니다',
   DAILY_SEND_LIMIT: '오늘 발송 한도에 도달했습니다',
   SEND_STATE_CONFLICT: '발송 상태를 확인해 주세요',
-  SOLAPI_TIMEOUT: '카카오 발송 시도 중 응답이 없었습니다 — 잠시 후 다시 시도해 주세요',
-  SOLAPI_NETWORK: '카카오 발송 시도 중 통신 오류가 발생했습니다'
+  SOLAPI_TIMEOUT: '카카오 발송 시도 중 응답이 없었습니다 — 다시 보내지 말고 발송 내역을 확인해 주세요',
+  SOLAPI_NETWORK: '카카오 발송 시도 중 통신 오류가 발생했습니다 — 다시 보내지 말고 발송 내역을 확인해 주세요',
+  SEND_RESULT_NOT_RECORDED: '접수 결과를 기록하지 못했습니다 — 다시 보내지 말고 발송 내역을 확인해 주세요',
+  PRIOR_SEND_UNCERTAIN: '이전 발송의 접수 여부를 먼저 확인해 주세요 — 확인 전 재발송할 수 없습니다'
 };
 const RETRY_HTTP_STATUS = {
   ALREADY_SENT: 200,
@@ -398,9 +496,15 @@ const RETRY_HTTP_STATUS = {
   GUARDIAN_NOT_REGISTERED: 409,
   GUARDIAN_PHONE_MISSING: 409,
   GUARDIAN_CONSENT_MISSING: 409,
+  GUARDIAN_IDENTITY_MISMATCH: 409,
+  STUDENT_ID_MISSING: 409,
+  STUDENT_NOT_IN_ROSTER: 409,
+  STUDENT_IDENTITY_MISMATCH: 409,
+  STUDENT_OWNER_MISMATCH: 403,
   MESSAGE_TOO_LONG: 413,
   DAILY_SEND_LIMIT: 429,
-  SEND_STATE_CONFLICT: 409
+  SEND_STATE_CONFLICT: 409,
+  PRIOR_SEND_UNCERTAIN: 202
 };
 
 export async function handleParentFeedbackSend(env, app, body, origin, auth, json) {
@@ -423,7 +527,7 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
   if (result.code && RETRY_HTTP_STATUS[result.code] != null) {
     return json({ ...result, error: RETRY_ERROR_TEXT[result.code] }, RETRY_HTTP_STATUS[result.code], origin);
   }
-  // 거절/판단불가(rejected·unknown) — 결과는 그대로 두고 202로 알린다.
+  // 거절은 502, 판단불가(unknown·dispatching)는 202로 구분한다.
   // unknown은 중복 위험 때문에 Solapi 확인 전 같은 내용으로 다시 보내지 않는다.
-  return json(result, 202, origin);
+  return json(result, responseStatusFor(result.sendStatus || result.status), origin);
 }

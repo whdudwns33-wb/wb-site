@@ -353,6 +353,51 @@
     .book-card-actions .btn { flex: 1 1 auto; min-height: 44px; }
   }
 
+  /* ─── 신규 학생 30일 적응 관리 ─── */
+  .onboarding-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 70%); }
+  .onboarding-enrol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, .45fr) auto; gap: 8px; align-items: end; }
+  .onboarding-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .onboarding-kpi { padding: 11px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); text-align: center; }
+  .onboarding-kpi b { display: block; color: var(--navy); font-size: 20px; line-height: 1; }
+  .onboarding-kpi span { display: block; margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; }
+  .onboarding-kpi.is-alert { border-color: #F3B8B0; background: #FFF7F5; }
+  .onboarding-kpi.is-alert b { color: #9E3629; }
+  .onboarding-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .onboarding-toolbar .chips { margin-top: 0; }
+  .onboarding-search { flex: 1 1 220px; min-width: 0; }
+  .onboarding-card.is-first-day { border: 2px solid var(--deep-blue); box-shadow: 0 6px 18px rgba(15,122,171,.14); }
+  .onboarding-card.is-overdue { border-left: 4px solid var(--coral); }
+  .onboarding-card.is-closed { border-color: #D1D5DB; background: #F8FAFC; }
+  .onboarding-card.is-closed .onboarding-stage { background: var(--white); }
+  .onboarding-card-head { align-items: flex-start; gap: 12px; }
+  .onboarding-progress { min-width: 76px; text-align: right; }
+  .onboarding-progress strong { display: block; color: var(--deep-blue); font-size: 19px; }
+  .onboarding-stage { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #FCFDFE; }
+  .onboarding-stage.is-due { border-color: #F2B85C; background: #FFF9EE; }
+  .onboarding-stage.is-first { border-color: #8DCAE5; background: #F0F9FF; }
+  .onboarding-stage.is-overdue { border-color: #F3B8B0; background: #FFF7F5; }
+  .onboarding-stage > summary { list-style: none; cursor: pointer; }
+  .onboarding-stage > summary::-webkit-details-marker { display: none; }
+  .onboarding-stage-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 7px; }
+  .onboarding-stage:not([open]) .onboarding-stage-head { margin-bottom: 0; }
+  .onboarding-stage-head b { color: var(--navy); font-size: 13.5px; }
+  .onboarding-check { width: 100%; min-height: 44px; display: flex; gap: 9px; align-items: flex-start; padding: 8px 2px; color: var(--navy); text-align: left; font-size: 13px; line-height: 1.45; }
+  .onboarding-check + .onboarding-check { border-top: 1px solid var(--light-gray); }
+  .onboarding-check .sbox { margin-top: 0; }
+  .onboarding-check.is-on { color: var(--mid-gray); text-decoration: line-through; }
+  .onboarding-check.is-on .sbox { border-color: var(--green); background: var(--green); color: var(--white); }
+  .onboarding-empty-search { margin-top: 10px; padding: 14px; border-radius: 10px; background: var(--light-gray); color: var(--mid-gray); text-align: center; font-size: 13px; }
+  @media (max-width: 600px) {
+    .onboarding-enrol { grid-template-columns: 1fr; }
+    .onboarding-enrol .btn { min-height: 44px; }
+    .onboarding-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .onboarding-toolbar { display: block; }
+    .onboarding-toolbar .chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); margin-bottom: 8px; }
+    .onboarding-toolbar .chip { min-height: 44px; padding: 6px 4px; }
+    .onboarding-card-head { display: block; }
+    .onboarding-progress { margin-top: 8px; text-align: left; }
+  }
+
   /* ─── 직원 현황 ─── */
   .staffcard { display: flex; gap: 14px; align-items: center; }
   .ava { width: 44px; height: 44px; border-radius: 12px; background: var(--navy); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex-shrink: 0; }
@@ -400,10 +445,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-10.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-10.5"></script>
-<script src="./asset-core.js?v=2026-08-10.5"></script>
-<script src="./qr-core.js?v=2026-08-10.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-11.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-11.1"></script>
+<script src="./asset-core.js?v=2026-08-11.1"></script>
+<script src="./qr-core.js?v=2026-08-11.1"></script>
 <script>
 "use strict";
 
@@ -676,6 +721,9 @@ function ownerOfCheck(key) {
   /* 기기 대장은 담당자별로 쪼개지 않는다. 여기서 걸러내지 않으면
      기기 번호가 담당자 id 자리에 들어가 조회 분할이 어긋난다. */
   if (window.WBAssetCore && window.WBAssetCore.isAssetKey(key)) return null;
+  /* 신규 학생 적응 기록은 stable studentId로 묶인다. 이를 직원 id로 오인하면
+     개인 링크에 다른 학생 기록이 섞일 수 있으므로 관리자 범위에만 둔다. */
+  if (/^__onboarding__/.test(tid)) return null;
   const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
   if (m) return m[1];
   const t = (state.tasks || []).find(x => x.id === tid);
@@ -914,6 +962,9 @@ let cursorPinned = false;
 let viewStaff = '';
 let scheduleView = 'day';
 let scheduleSearchQuery = '';
+let onboardingSearchQuery = '';
+let onboardingStatusFilter = 'active';
+let onboardingRestoreFocus = null;
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
@@ -944,7 +995,7 @@ function resetPersonCache(token) {
   state = blankState();
   if (keepToken) state.settings.myToken = keepToken;
   if (keepToken || !removed) save();
-  viewStaff = ''; scheduleSearchQuery = ''; openPanels.clear();
+  viewStaff = ''; scheduleSearchQuery = ''; onboardingSearchQuery = ''; onboardingStatusFilter = 'active'; onboardingRestoreFocus = null; openPanels.clear();
   pendingAdd = null;
   pendingBootstrapCode = '';
   personAccessProblem = null;
@@ -1440,7 +1491,7 @@ function render() {
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster, devices: viewDevices };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster, devices: viewDevices };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -1449,6 +1500,10 @@ function render() {
   if (route === 'books') requestAnimationFrame(() => {
     applyBookSearch(bookSearchQuery);
     restoreBookToggleFocus();
+  });
+  if (route === 'onboarding') requestAnimationFrame(() => {
+    applyOnboardingSearch(onboardingSearchQuery);
+    restoreOnboardingFocus();
   });
 }
 
@@ -1459,7 +1514,7 @@ function renderTabs() {
     : session.isStaffLink && !session.isAdmin
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['roster', '원생']]
     : session.isAdmin
-      ? [['schedule', '현황판'], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
+      ? [['schedule', '현황판'], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -4776,7 +4831,7 @@ function loadRoster() {
   const auth = sync.auth();
   if (!auth) {
     rosterErr = session.isStaffLink ? '개인 인증을 먼저 확인해 주세요' : '설정에서 동기화 비밀키를 저장해 주세요';
-    if (route === 'roster' || route === 'schedule' || route === 'books') render();
+    if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding') render();
     return;
   }
   rosterLoading = true;
@@ -4789,7 +4844,7 @@ function loadRoster() {
       rosterErr = '';
       renderAfterSync();
     })
-    .catch(e => { rosterErr = String(e); if (route === 'roster' || route === 'schedule' || route === 'books') renderAfterSync(); })
+    .catch(e => { rosterErr = String(e); if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding') renderAfterSync(); })
     .finally(() => { rosterLoading = false; });
 }
 function ymNext(ym) {
@@ -4822,6 +4877,294 @@ function rosterStudentMatches(name, grade, reference) {
 function rosterStudentId(name, grade, reference) {
   const matches = rosterStudentMatches(name, grade, reference);
   return matches.length === 1 ? matches[0].id : '';
+}
+
+/* ── 신규 학생 30일 적응 관리 ──
+ * roster의 월 시작값은 실제 첫 등원일이 아니므로 절대 날짜로 추정하지 않는다.
+ * 원장·관리 담당이 stable studentId와 첫 등원일을 직접 묶은 뒤 D30까지 관리한다.
+ * 학부모 안내 항목은 발송 준비·확인 체크이며 이 화면에서 메시지를 보내지 않는다. */
+const ONBOARDING_STAGES = [
+  { key: 'prep', day: -1, label: '등록 즉시·첫 수업 전', items: [
+    { id: 'guardian', label: '보호자 연락처와 알림 수신 동의를 확인', notice: false },
+    { id: 'schedule', label: '확정 시간표·교실·담당 선생님 안내', notice: true },
+    { id: 'arrival', label: '등원·귀가 방법과 주차·출입 동선 안내', notice: true },
+    { id: 'emergency', label: '비상 연락망과 지각·결석·귀가 변경 연락 방법 안내', notice: true },
+    { id: 'system', label: '학원 앱·시스템·QR 및 출결 확인 방법 안내', notice: true },
+    { id: 'payment', label: '수강료·결제일·영수증과 환불·보강 기준 안내', notice: true },
+    { id: 'materials', label: '교재·준비물·숙제 제출 방식 안내', notice: true },
+    { id: 'privacy', label: '개인정보·사진 촬영/활용 동의와 상담 창구 확인', notice: true }
+  ] },
+  { key: 'd0', day: 0, label: 'D0 · 첫 등원일', items: [
+    { id: 'attendance', label: '첫 등원·출결과 안전한 귀가 확인', notice: false },
+    { id: 'orientation', label: '학생에게 공간·안전수칙·도움 요청 방법 안내', notice: false },
+    { id: 'teacher', label: '담당 교사가 시간표·학습 목표·교재를 최종 확인', notice: false },
+    { id: 'first_note', label: '첫 수업 결과와 귀가 여부를 보호자에게 안내할 내용 준비', notice: true }
+  ] },
+  { key: 'd1', day: 1, label: 'D1 · 다음 날 확인', items: [
+    { id: 'first_feedback', label: '첫날 적응·참여·특이사항 안내 완료 여부 확인', notice: true },
+    { id: 'next_schedule', label: '다음 수업 일정과 준비물을 다시 확인', notice: true },
+    { id: 'urgent_adjust', label: '즉시 조정할 안전·귀가·수업 어려움이 없는지 확인', notice: false }
+  ] },
+  { key: 'd7', day: 7, label: 'D7 · 1주 적응', items: [
+    { id: 'week_attendance', label: '출결·지각·귀가와 수업 참여 흐름 확인', notice: false },
+    { id: 'week_learning', label: '숙제·교재·수업 난이도와 시스템 사용 상태 확인', notice: false },
+    { id: 'week_parent', label: '1주 적응 상황과 필요한 협조 사항을 보호자에게 안내', notice: true },
+    { id: 'week_admin', label: '결제·동의서·앱 등록·교재 준비 누락 확인', notice: false }
+  ] },
+  { key: 'd14', day: 14, label: 'D14 · 2주 점검', items: [
+    { id: 'fortnight_fit', label: '학생의 학습·관계·환경 적응 상태 점검', notice: false },
+    { id: 'fortnight_adjust', label: '시간표·반 배치·교재 난이도 조정 필요 여부 결정', notice: false },
+    { id: 'fortnight_parent', label: '2주 중간 상담 내용과 결정 사항을 보호자와 확인', notice: true }
+  ] },
+  { key: 'd30', day: 30, label: 'D30 · 한 달 마무리', items: [
+    { id: 'month_summary', label: '한 달 출결·수업·과제·적응 내용을 종합', notice: false },
+    { id: 'month_report', label: '한 달 학습 요약과 다음 목표를 보호자에게 안내', notice: true },
+    { id: 'month_decision', label: '시간표·담당·교재·결제 변경 여부 확정', notice: false },
+    { id: 'next_review', label: '다음 상담·평가 일정을 정하고 정규 관리로 전환', notice: true }
+  ] }
+];
+const ONBOARDING_ITEMS = ONBOARDING_STAGES.flatMap(stage => stage.items.map(item => item.id));
+const ONBOARDING_FILTERS = [
+  ['active', '관리 중'], ['attention', '오늘·지연'], ['done', '완료'], ['closed', '종료·취소'], ['all', '전체']
+];
+const onboardingTaskId = studentId => '__onboarding__' + encodeURIComponent(String(studentId || ''));
+const onboardingKey = studentId => onboardingTaskId(studentId) + '|all';
+const validYmd = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && ymd(parseYmd(value)) === value;
+
+const onboardingAnyRecord = studentId => state.checks[onboardingKey(studentId)] || null;
+function onboardingRecord(studentId) {
+  const row = onboardingAnyRecord(studentId);
+  return row && !row.deleted ? row : null;
+}
+
+function setOnboarding(studentId, patch) {
+  if (!session.isAdmin || !studentId) return null;
+  const taskId = onboardingTaskId(studentId);
+  const key = taskId + '|all';
+  const cur = state.checks[key] || {
+    taskId: taskId, date: 'all', studentId: String(studentId), firstClassDate: '', items: {}
+  };
+  const cleanPatch = Object.assign({}, patch || {});
+  const resetItems = cleanPatch.resetItems === true;
+  delete cleanPatch.resetItems;
+  const next = Object.assign({}, cur, cleanPatch, {
+    taskId: taskId, date: 'all', studentId: String(studentId), updatedAt: now()
+  });
+  next.items = resetItems ? Object.assign({}, cleanPatch.items || {})
+    : Object.assign({}, cur.items || {}, cleanPatch.items || {});
+  state.checks[key] = next;
+  save(); queueSync();
+  return next;
+}
+
+function onboardingProgress(record) {
+  const done = ONBOARDING_ITEMS.filter(id => record && record.items && record.items[id]).length;
+  const total = ONBOARDING_ITEMS.length;
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function onboardingStatus(record, referenceDate) {
+  const current = referenceDate || today();
+  const first = record && record.firstClassDate;
+  const progress = onboardingProgress(record);
+  if (!validYmd(first)) return { key: 'date-missing', label: '첫 등원일 확인 필요', progress: progress, overdue: true };
+  const end = addDays(first, 30);
+  const overdueStages = ONBOARDING_STAGES.filter(stage => {
+    const stageDone = stage.items.every(item => record.items && record.items[item.id]);
+    return !stageDone && addDays(first, stage.day) < current;
+  });
+  const complete = current >= end && progress.done === progress.total;
+  if (complete) return { key: 'done', label: '30일 관리 완료', progress: progress, overdue: false, end: end };
+  if (first === current) return {
+    key: 'firstday', label: overdueStages.length ? '오늘 첫 등원 · 확인 지연' : '오늘 첫 등원',
+    progress: progress, overdue: !!overdueStages.length, end: end
+  };
+  if (overdueStages.length) return { key: 'overdue', label: '확인 지연 ' + overdueStages.length + '단계', progress: progress, overdue: true, end: end };
+  if (current < first) return { key: 'upcoming', label: '첫 등원 예정', progress: progress, overdue: false, end: end };
+  return { key: 'active', label: 'D30까지 관리 중', progress: progress, overdue: false, end: end };
+}
+
+function onboardingRows() {
+  if (!rosterDb) return [];
+  const currentMonth = today().slice(0, 7);
+  const priority = { firstday: 0, overdue: 1, upcoming: 2, active: 2, done: 3, closed: 4, cancelled: 5 };
+  return (rosterDb.students || []).map(student => {
+    const record = onboardingAnyRecord(student.id);
+    if (!record || !validYmd(record.firstClassDate)) return null;
+    const base = onboardingStatus(record);
+    const ended = !!student.end && student.end <= currentMonth;
+    const status = record.deleted
+      ? Object.assign({}, base, { key: 'cancelled', label: '관리 취소', overdue: false, inactive: true })
+      : ended
+        ? Object.assign({}, base, { key: 'closed', label: '재원 종료 · 관리 종료', overdue: false, inactive: true })
+        : base;
+    return { student: student, record: record, status: status };
+  }).filter(Boolean).sort((a, b) => (priority[a.status.key] ?? 9) - (priority[b.status.key] ?? 9) ||
+    a.record.firstClassDate.localeCompare(b.record.firstClassDate) ||
+    a.student.name.localeCompare(b.student.name, 'ko'));
+}
+
+function onboardingCandidateStudents() {
+  const currentMonth = today().slice(0, 7);
+  return ((rosterDb && rosterDb.students) || []).filter(student =>
+    (!student.end || student.end > currentMonth) && !onboardingAnyRecord(student.id));
+}
+
+function validOnboardingFirstDate(student, firstClassDate) {
+  if (!student || !validYmd(firstClassDate)) return false;
+  const month = firstClassDate.slice(0, 7);
+  return (!student.start || month >= student.start) && (!student.end || month < student.end);
+}
+
+function onboardingAttentionCount() {
+  return onboardingRows().filter(row => row.status.key === 'firstday' || row.status.key === 'overdue').length;
+}
+
+function onboardingMatchesFilter(row) {
+  if (onboardingStatusFilter === 'all') return true;
+  if (onboardingStatusFilter === 'done') return row.status.key === 'done';
+  if (onboardingStatusFilter === 'attention') return row.status.key === 'firstday' || row.status.key === 'overdue';
+  if (onboardingStatusFilter === 'closed') return row.status.key === 'closed' || row.status.key === 'cancelled';
+  return !['done', 'closed', 'cancelled'].includes(row.status.key);
+}
+
+function onboardingSearchText(student) {
+  return [student.name, student.grade, student.teacher, student.subject].map(value => String(value || '').toLocaleLowerCase()).join(' ');
+}
+
+function applyOnboardingSearch(value) {
+  onboardingSearchQuery = String(value || '');
+  const terms = onboardingSearchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const cards = Array.from(document.querySelectorAll('[data-onboarding-card]'));
+  let shown = 0;
+  cards.forEach(card => {
+    const match = terms.every(term => String(card.dataset.search || '').includes(term));
+    card.hidden = !match;
+    if (match) shown++;
+  });
+  const status = document.querySelector('[data-onboarding-search-status]');
+  if (status) status.textContent = terms.length ? shown + '명 검색됨' : cards.length + '명 표시 중';
+  const empty = document.querySelector('[data-onboarding-search-empty]');
+  if (empty) empty.hidden = !terms.length || shown > 0;
+}
+
+function rememberOnboardingFocus(button) {
+  const stage = button && button.closest('[data-onboarding-stage]');
+  onboardingRestoreFocus = button ? {
+    studentId: String(button.dataset.id || ''), itemId: String(button.dataset.item || ''),
+    stageKey: String(stage && stage.dataset.stage || '')
+  } : null;
+}
+
+function restoreOnboardingFocus() {
+  const target = onboardingRestoreFocus;
+  if (!target) return false;
+  onboardingRestoreFocus = null;
+  const button = Array.from(document.querySelectorAll('[data-act="onbcheck"]')).find(el =>
+    String(el.dataset.id || '') === target.studentId && String(el.dataset.item || '') === target.itemId);
+  if (!button) return false;
+  button.focus({ preventScroll: true });
+  return true;
+}
+
+function onboardingStageHtml(row, stage, focusKey) {
+  const record = row.record;
+  const due = addDays(record.firstClassDate, stage.day);
+  const doneCount = stage.items.filter(item => record.items && record.items[item.id]).length;
+  const complete = doneCount === stage.items.length;
+  const inactive = !!row.status.inactive;
+  const isDue = !inactive && !complete && due === today();
+  const overdue = !inactive && !complete && due < today();
+  const open = stage.key === focusKey;
+  const cls = (stage.key === 'd0' ? ' is-first' : '') + (isDue ? ' is-due' : '') + (overdue ? ' is-overdue' : '');
+  const timing = inactive ? '이력' : complete ? '완료' : overdue ? '지연' : isDue ? '오늘' : due > today() ? '예정' : '확인';
+  return '<details class="onboarding-stage' + cls + '" data-onboarding-stage data-stage="' + esc(stage.key) + '"' + (open ? ' open' : '') + '>' +
+    '<summary class="onboarding-stage-head"><span><b>' + esc(stage.label) + '</b><span class="card-sub">' + esc(label(due)) + '</span></span>' +
+      '<span class="pill ' + (overdue ? 'bad' : isDue ? 'warn' : '') + '">' + timing + ' · ' + doneCount + '/' + stage.items.length + '</span></summary>' +
+    stage.items.map(item => {
+      const checked = !!(record.items && record.items[item.id]);
+      return '<button type="button" class="onboarding-check' + (checked ? ' is-on' : '') + '" data-act="onbcheck" ' +
+        'data-id="' + esc(row.student.id) + '" data-item="' + esc(item.id) + '" role="checkbox" aria-checked="' + checked + '" ' +
+        (row.status.inactive ? 'disabled aria-disabled="true" ' : '') +
+        'aria-label="' + esc(row.student.name + ' · ' + stage.label + ' · ' + item.label) + '">' +
+        '<span class="sbox" aria-hidden="true">✓</span><span>' + esc(item.label) +
+        (item.notice ? ' <span class="pill">학부모 안내</span>' : '') + '</span></button>';
+    }).join('') + '</details>';
+}
+
+function onboardingCardHtml(row) {
+  const student = row.student, record = row.record, status = row.status, p = status.progress;
+  const inactive = status.key === 'closed' || status.key === 'cancelled';
+  const retainedStage = onboardingRestoreFocus && onboardingRestoreFocus.studentId === String(student.id)
+    ? onboardingRestoreFocus.stageKey : '';
+  const focusStage = ONBOARDING_STAGES.find(stage =>
+    !stage.items.every(item => record.items && record.items[item.id]) && addDays(record.firstClassDate, stage.day) <= today()) ||
+    ONBOARDING_STAGES.find(stage => !stage.items.every(item => record.items && record.items[item.id]));
+  const focusStageKey = retainedStage || (!inactive && focusStage && focusStage.key) || '';
+  const cardClass = status.key === 'firstday' ? ' is-first-day' : status.key === 'overdue' ? ' is-overdue' : inactive ? ' is-closed' : '';
+  const canRestore = status.key === 'cancelled' && (!student.end || student.end > today().slice(0, 7));
+  const history = record.canceledAt
+    ? '<div class="small muted mt8">취소 이력 ' + esc(label(ymd(new Date(record.canceledAt)))) +
+      (record.restoredAt ? ' · 최근 복원 ' + esc(label(ymd(new Date(record.restoredAt)))) : '') + '</div>' : '';
+  return '<article class="card onboarding-card' + cardClass + '" data-onboarding-card data-search="' + esc(onboardingSearchText(student)) + '">' +
+    '<div class="between onboarding-card-head"><div><div class="card-title">' + esc(student.name) +
+      (status.key === 'firstday' ? ' <span class="pill">첫 등원 TODAY</span>' : '') + '</div>' +
+      '<div class="card-sub">' + esc(student.grade || '학년 미지정') + ' · ' + esc(student.subject || '과목 미지정') + ' · ' + esc(student.teacher || '담당 미지정') + '</div>' +
+      '<label class="small mt8" for="onb-date-' + esc(student.id) + '">첫 등원일 ' +
+        '<input class="in" style="display:inline-block;width:auto;padding:6px 8px" id="onb-date-' + esc(student.id) + '" type="date" ' +
+        'data-onboarding-date data-id="' + esc(student.id) + '" value="' + esc(record.firstClassDate) + '"' + (inactive ? ' disabled' : '') + '></label>' + history + '</div>' +
+      '<div class="onboarding-progress"><strong>' + p.pct + '%</strong><span class="pill ' + (status.overdue ? 'bad' : '') + '">' + esc(status.label) + '</span>' +
+      (!inactive ? '<button class="btn btn-sm btn-ghost mt8" data-act="onbcancel" data-id="' + esc(student.id) + '">관리 취소</button>' :
+        canRestore ? '<button class="btn btn-sm btn-primary mt8" data-act="onbrestore" data-id="' + esc(student.id) + '">관리 복원</button>' : '') + '</div></div>' +
+    '<div class="bar mt14" role="progressbar" aria-label="' + esc(student.name) + ' 신규 적응 관리 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p.pct + '"><i style="width:' + p.pct + '%"></i></div>' +
+    '<div class="small muted mt8">' + p.done + '/' + p.total + '개 확인 · 최소 ' + esc(shortDate(record.firstClassDate)) + '부터 ' + esc(shortDate(addDays(record.firstClassDate, 30))) + '까지 관리</div>' +
+    ONBOARDING_STAGES.map(stage => onboardingStageHtml(row, stage, focusStageKey)).join('') + '</article>';
+}
+
+function viewOnboarding() {
+  if (!session.isAdmin) return '<div class="card"><div class="empty"><b>🔒</b>신규 학생 관리는 원장·관리 담당 화면에서만 사용할 수 있습니다.</div></div>';
+  if (!rosterDb && !rosterErr) {
+    loadRoster();
+    return '<div class="card"><div class="empty"><b>⏳</b>신규 학생 명단을 불러오는 중…</div></div>';
+  }
+  if (rosterErr) return '<div class="card"><div class="empty"><b>⚠️</b>원생 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(rosterErr) + '</span><br>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="rosterretry">다시 시도</button></div></div>';
+
+  const rows = onboardingRows();
+  const visibleRows = rows.filter(onboardingMatchesFilter);
+  const candidates = onboardingCandidateStudents().sort((a, b) =>
+    String(a.start || '').localeCompare(String(b.start || '')) || a.name.localeCompare(b.name, 'ko'));
+  const operationalRows = rows.filter(row => row.status.key !== 'closed' && row.status.key !== 'cancelled');
+  const firstToday = operationalRows.filter(row => row.status.key === 'firstday').length;
+  const overdue = operationalRows.filter(row => row.status.key === 'overdue').length;
+  const done = operationalRows.filter(row => row.status.key === 'done').length;
+
+  let h = '<section class="card onboarding-hero"><div class="card-title">신규 학생 30일 적응 관리</div>' +
+    '<div class="card-sub">실제 첫 등원일을 기준으로 첫 수업 전부터 D30까지 확인합니다. 월 등록일은 첫 등원일로 자동 추정하지 않습니다.</div>' +
+    '<div class="hint mt8"><b>알림톡 자동 발송 없음</b> — ‘학부모 안내’ 표시는 보낼 내용의 준비·확인 항목입니다. 현재 화면에서는 메시지를 보내지 않습니다.</div>' +
+    '<div class="onboarding-enrol mt14"><label><span class="fl">신규 학생</span><select class="in" id="onbStudent">' +
+      '<option value="">학생 선택</option>' + candidates.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade || '') +
+        (student.start > today().slice(0, 7) ? ' · ' + esc(student.start) + ' 시작' : '') + '</option>').join('') + '</select></label>' +
+      '<label><span class="fl">실제 첫 등원일</span><input class="in" id="onbFirstDate" type="date" required></label>' +
+      '<button class="btn btn-primary" data-act="onbadd"' + (candidates.length ? '' : ' disabled') + '>30일 관리 시작</button></div>' +
+    (candidates.length ? '' : '<div class="small muted mt8">새로 시작할 학생이 없습니다. 취소한 기록은 ‘종료·취소’에서 복원할 수 있습니다.</div>') + '</section>';
+
+  h += '<div class="onboarding-kpis" aria-label="신규 학생 관리 요약">' +
+    '<div class="onboarding-kpi"><b>' + (operationalRows.length - done) + '</b><span>관리 중</span></div>' +
+    '<div class="onboarding-kpi ' + (firstToday ? 'is-alert' : '') + '"><b>' + firstToday + '</b><span>오늘 첫 등원</span></div>' +
+    '<div class="onboarding-kpi ' + (overdue ? 'is-alert' : '') + '"><b>' + overdue + '</b><span>확인 지연</span></div>' +
+    '<div class="onboarding-kpi"><b>' + done + '</b><span>30일 완료</span></div></div>';
+
+  h += '<section class="card onboarding-toolbar"><div class="chips" aria-label="관리 상태 필터">' +
+    ONBOARDING_FILTERS.map(filter => '<button class="chip ' + (onboardingStatusFilter === filter[0] ? 'on' : '') + '" data-act="onbfilter" data-status="' + filter[0] + '">' + filter[1] + '</button>').join('') + '</div>' +
+    '<label class="onboarding-search"><input class="in" type="search" data-onboarding-search aria-label="신규 학생 검색" placeholder="이름·학년·담당·과목 검색" value="' + esc(onboardingSearchQuery) + '"></label>' +
+    '<span class="small muted" data-onboarding-search-status role="status" aria-live="polite"></span></section>';
+
+  h += visibleRows.map(onboardingCardHtml).join('') +
+    '<div class="onboarding-empty-search" data-onboarding-search-empty hidden>검색 결과가 없습니다.</div>';
+  if (!visibleRows.length) h += '<div class="card"><div class="empty"><b>🌱</b>' +
+    (rows.length ? '이 상태에 해당하는 학생이 없습니다.' : '학생과 실제 첫 등원일을 선택해 30일 관리를 시작하세요.') + '</div></div>';
+  return h;
 }
 
 function acaflowCodexPrompt() {
@@ -5093,7 +5436,7 @@ function viewStaffAdmin() {
 /* ── 보호자 연락처·발송 동의 ──
  * 학부모 피드백 실제 발송(parent-feedback-send.js)이 전화번호를 찾아오는 유일한 곳.
  * 학생 명단과 마찬가지로 D1에만 저장되고 원장만 보고 고친다. */
-let guardianContacts = null;      // Map studentName -> {phone, consent, updatedAt}
+let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianContactsLoaded = false;
 let guardianContactsLoading = false;
 let guardianContactsError = '';
@@ -5107,7 +5450,7 @@ async function loadGuardianContacts(force) {
   if (route === 'settings') render();
   try {
     const result = await sync.post('/guardian-contact', { app: SYNC_APP, auth: auth, action: 'list' });
-    guardianContacts = new Map((result.contacts || []).map(c => [c.studentName, c]));
+    guardianContacts = new Map((result.contacts || []).map(c => [c.studentId, c]));
     guardianContactsLoaded = true;
   } catch (error) {
     guardianContactsError = String(error && error.message || error);
@@ -5119,8 +5462,8 @@ async function loadGuardianContacts(force) {
 }
 
 async function saveGuardianContact(idx, button) {
-  const name = settingsGuardianStudents[Number(idx)];
-  if (!name) return toast('학생 정보를 찾을 수 없습니다');
+  const student = settingsGuardianStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   const phone = (($('#gcPhone-' + idx) || {}).value || '').trim();
   const consent = !!(($('#gcConsent-' + idx) || {}).checked);
   const auth = sync.auth();
@@ -5128,10 +5471,11 @@ async function saveGuardianContact(idx, button) {
   if (button) button.disabled = true;
   try {
     const result = await sync.post('/guardian-contact', {
-      app: SYNC_APP, auth: auth, action: 'set', studentName: name, phone: phone, consent: consent
+      app: SYNC_APP, auth: auth, action: 'set', studentId: student.id,
+      studentName: student.name, phone: phone, consent: consent
     });
-    if (guardianContacts) guardianContacts.set(name, result.contact);
-    toast(name + ' 보호자 연락처를 저장했습니다');
+    if (guardianContacts) guardianContacts.set(student.id, result.contact);
+    toast(student.name + ' 보호자 연락처를 저장했습니다');
     render();
   } catch (error) {
     toast('저장 실패 — ' + (error.message || error));
@@ -5144,7 +5488,7 @@ function viewGuardianContactPanel() {
   if (!guardianContactsLoaded && !guardianContactsLoading) setTimeout(() => loadGuardianContacts(false), 0);
   const cur = today().slice(0, 7);
   const students = (rosterDb ? activeIn(cur) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  settingsGuardianStudents = students.map(s => s.name);
+  settingsGuardianStudents = students.slice();
 
   let body;
   // 보호자 연락처만 일시 실패한 경우 인증된 원생 명단은 유지하고 재시도 안내를 얹는다.
@@ -5159,7 +5503,7 @@ function viewGuardianContactPanel() {
   else if (guardianContactsLoading) body = '<div class="empty"><b>⏳</b>보호자 연락처를 불러오는 중입니다.</div>';
   else if (!students.length) body = '<div class="empty">현재 재원생이 없습니다.</div>';
   else body = students.map((s, i) => {
-    const c = (guardianContacts && guardianContacts.get(s.name)) || { phone: '', consent: false };
+    const c = (guardianContacts && guardianContacts.get(s.id)) || { phone: '', consent: false };
     return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.teacher || '미지정') + ')</span></div>' +
       '<div class="row wraprow" style="gap:8px">' +
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + i + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
@@ -5170,7 +5514,7 @@ function viewGuardianContactPanel() {
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
     '<div class="card-sub mb14">학부모 피드백 알림톡은 여기 등록·동의된 학생에게만 접수됩니다. 전화번호만 있고 동의가 꺼져 있으면 발송되지 않습니다.<br>' +
-    '이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
+    '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }
 
@@ -6102,6 +6446,69 @@ document.addEventListener('click', ev => {
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'bookretry': bookDb = null; bookDbErr = ''; loadBooks(); render(); break;
+    case 'onbadd': {
+      if (!session.isAdmin || !rosterDb) break;
+      const studentId = String(($('#onbStudent') || {}).value || '');
+      const firstClassDate = String(($('#onbFirstDate') || {}).value || '');
+      if (onboardingAnyRecord(studentId)) return toast('기존 관리 이력이 있습니다. 종료·취소 화면에서 확인해 주세요');
+      const student = onboardingCandidateStudents().find(row => String(row.id) === studentId);
+      if (!student) return toast('신규 학생을 선택해 주세요');
+      if (!validOnboardingFirstDate(student, firstClassDate)) return toast('첫 등원일은 명단 시작월 이후의 재원 기간으로 입력해 주세요');
+      setOnboarding(studentId, {
+        firstClassDate: firstClassDate, items: {}, resetItems: true,
+        deleted: false, canceledAt: null, startedAt: now()
+      });
+      render(); toast(student.name + ' 학생 30일 관리를 시작했습니다');
+      break;
+    }
+    case 'onbfilter': {
+      if (!session.isAdmin || !ONBOARDING_FILTERS.some(filter => filter[0] === el.dataset.status)) break;
+      onboardingStatusFilter = el.dataset.status;
+      render();
+      break;
+    }
+    case 'onbcancel': {
+      if (!session.isAdmin || !rosterDb) break;
+      const studentId = String(id || '');
+      const record = onboardingRecord(studentId);
+      const student = (rosterDb.students || []).find(row => String(row.id) === studentId);
+      if (!record || !student) return toast('관리 기록을 다시 확인해 주세요');
+      if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생의 기록은 이력으로만 보관됩니다');
+      if (!confirm(student.name + ' 학생의 신규 30일 관리를 취소할까요?\n기록은 삭제하지 않고 취소 이력으로 보관됩니다.')) return;
+      const canceledAt = now();
+      const cancelHistory = Array.isArray(record.cancelHistory) ? record.cancelHistory.slice() : [];
+      cancelHistory.push(canceledAt);
+      setOnboarding(studentId, { deleted: true, canceledAt: canceledAt, cancelHistory: cancelHistory });
+      render(); toast(student.name + ' 학생 관리를 취소했습니다');
+      break;
+    }
+    case 'onbrestore': {
+      if (!session.isAdmin || !rosterDb) break;
+      const studentId = String(id || '');
+      const record = onboardingAnyRecord(studentId);
+      const student = (rosterDb.students || []).find(row => String(row.id) === studentId);
+      if (!record || !record.deleted || !student) return toast('취소 기록을 다시 확인해 주세요');
+      if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생은 신규 관리를 복원할 수 없습니다');
+      if (!confirm(student.name + ' 학생의 기존 체크와 첫 등원일을 그대로 복원할까요?')) return;
+      setOnboarding(studentId, { deleted: false, restoredAt: now() });
+      render(); toast(student.name + ' 학생 관리를 복원했습니다');
+      break;
+    }
+    case 'onbcheck': {
+      if (!session.isAdmin) break;
+      const studentId = String(id || '');
+      const itemId = String(el.dataset.item || '');
+      const record = onboardingRecord(studentId);
+      const student = rosterDb && (rosterDb.students || []).find(row => String(row.id) === studentId);
+      if (!record || !student || !ONBOARDING_ITEMS.includes(itemId)) return toast('관리 항목을 다시 확인해 주세요');
+      if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생의 기록은 수정할 수 없습니다');
+      const items = Object.assign({}, record.items || {});
+      items[itemId] = items[itemId] ? 0 : now();
+      rememberOnboardingFocus(el);
+      setOnboarding(studentId, { items: items });
+      render();
+      break;
+    }
 
     /* 체크 · 단계 · 수량 · 막힘 */
     case 'toggle': {
@@ -6893,6 +7300,11 @@ document.addEventListener('click', ev => {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  const onboardingSearch = ev.target.closest('[data-onboarding-search]');
+  if (onboardingSearch) {
+    applyOnboardingSearch(onboardingSearch.value);
+    return;
+  }
   const bookSearch = ev.target.closest('[data-book-search-input]');
   if (bookSearch) {
     applyBookSearch(bookSearch.value);
@@ -6941,6 +7353,21 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', ev => {
+  const onboardingDate = ev.target.closest('[data-onboarding-date]');
+  if (onboardingDate) {
+    if (!session.isAdmin) return;
+    const studentId = String(onboardingDate.dataset.id || '');
+    const student = rosterDb && (rosterDb.students || []).find(row => String(row.id) === studentId);
+    if (student && student.end && student.end <= today().slice(0, 7)) {
+      toast('재원이 종료된 학생의 기록은 수정할 수 없습니다'); render(); return;
+    }
+    if (!onboardingRecord(studentId) || !validOnboardingFirstDate(student, onboardingDate.value)) {
+      toast('첫 등원일은 명단 시작월 이후의 재원 기간으로 입력해 주세요'); render(); return;
+    }
+    setOnboarding(studentId, { firstClassDate: onboardingDate.value });
+    render(); toast('첫 등원일을 수정했습니다');
+    return;
+  }
   const acaflowFile = ev.target.closest('[data-acaflow-file]');
   if (acaflowFile) {
     if (!session.isAdmin || session.isStaffLink) return;
@@ -7037,7 +7464,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-10.5';
+const APP_VER = '2026-08-11.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

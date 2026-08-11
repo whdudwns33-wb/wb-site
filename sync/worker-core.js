@@ -639,6 +639,7 @@ function feedbackView(row) {
     message: row.body,
     bodyHash: row.body_hash,
     teacherName: row.teacher_name || '',
+    studentId: row.student_id || '',
     studentName: row.student_name || '',
     contentText: row.content_text || '',
     plusText: row.plus_text || '',
@@ -738,6 +739,14 @@ async function handleFeedbackRequest(env, app, body, origin) {
   // 자유롭게 못 적게 서버가 owner(auth.id)로 직접 찾고, 학생 이름도 지시서에서 서버가 뽑는다.
   const teacherName = await activeStaffName(env, app, owner);
   if (!teacherName) return json({ ok: false, error: '담당 직원 정보를 확인할 수 없어 제출할 수 없습니다' }, 409, origin);
+  const studentId = String(checked.taskData.studentId || '').trim();
+  if (!SAFE_ID.test(studentId)) {
+    return json({
+      ok: false,
+      code: 'STUDENT_ID_REQUIRED',
+      error: '원생 명단에서 학생을 선택해 만든 수업 지시서에서만 학부모 알림을 보낼 수 있습니다'
+    }, 409, origin);
+  }
   const studentName = resolveStudentName(checked.taskData);
   if (!studentName || studentName.length > MAX_STUDENT_NAME) {
     return json({ ok: false, error: '지시서에서 학생 이름을 찾을 수 없습니다' }, 409, origin);
@@ -755,18 +764,18 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const bodyHash = await sha256Hex(message);
   const requestKey = await feedbackRequestKey(identity);
   const sameFields = row => row && row.body_hash === bodyHash && row.body === message &&
-    row.teacher_name === teacherName && row.student_name === studentName &&
+    row.teacher_name === teacherName && row.student_id === studentId && row.student_name === studentName &&
     row.content_text === contentText && row.plus_text === plusText && row.minus_text === minusText;
 
   if (!current) {
     const insertResult = await env.DB.prepare(
       'INSERT OR IGNORE INTO feedback_requests ' +
       '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,' +
-      'teacher_name,student_name,content_text,plus_text,minus_text,' +
+      'teacher_name,student_id,student_name,content_text,plus_text,minus_text,' +
       'revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
     ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
-      identity.templateVersion, message, bodyHash, teacherName, studentName, contentText, plusText, minusText,
+      identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText, plusText, minusText,
       now, now).run();
     current = await findFeedbackRequest(env, identity);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
@@ -796,11 +805,11 @@ async function handleFeedbackRequest(env, app, body, origin) {
   }
 
   const result = await env.DB.prepare(
-    "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_name=?, " +
+    "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_id=?, student_name=?, " +
     "content_text=?, plus_text=?, minus_text=?, revision=revision+1, status='approval_waiting', " +
     'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
     'WHERE app=? AND request_key=? AND revision=?'
-  ).bind(owner, message, bodyHash, teacherName, studentName, contentText, plusText, minusText,
+  ).bind(owner, message, bodyHash, teacherName, studentId, studentName, contentText, plusText, minusText,
     now, 'task', current.request_key, Number(current.revision)).run();
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);

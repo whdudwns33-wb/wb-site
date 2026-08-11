@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS feedback_requests (
   body             TEXT    NOT NULL,
   body_hash        TEXT    NOT NULL,
   teacher_name     TEXT,
+  student_id       TEXT,              -- private_rosters.roster.students[].id (수신자 결합 정본)
   student_name     TEXT,
   content_text     TEXT,
   plus_text        TEXT,
@@ -328,6 +329,21 @@ CREATE TABLE IF NOT EXISTS guardian_contacts (
   PRIMARY KEY (app, student_name)
 );
 
+-- 이름 기반 guardian_contacts는 기존 데이터 확인·정리용으로만 남긴다. 실제 발송은
+-- 동명이인·개명 오연결을 막기 위해 stable studentId PK를 가진 이 테이블만 읽는다.
+CREATE TABLE IF NOT EXISTS guardian_contacts_by_student (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  student_id   TEXT    NOT NULL,
+  student_name TEXT    NOT NULL,        -- 화면·감사용 스냅샷; 조회 키로 사용하지 않음
+  phone        TEXT,
+  consent      INTEGER NOT NULL DEFAULT 0 CHECK (consent IN (0, 1)),
+  updated_at   INTEGER NOT NULL,
+  updated_by   TEXT,
+  PRIMARY KEY (app, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_contacts_by_student_name
+  ON guardian_contacts_by_student(app, student_name);
+
 -- 학부모 피드백 실제 발송 이력 — book_order_sends와 같은 골격
 -- (예약→발송중→결과, 멱등키로 중복 발송 방지, 하루 발송 한도).
 CREATE TABLE IF NOT EXISTS parent_feedback_sends (
@@ -335,6 +351,7 @@ CREATE TABLE IF NOT EXISTS parent_feedback_sends (
   send_id              TEXT    NOT NULL,
   idempotency_key      TEXT    NOT NULL,
   feedback_request_key TEXT    NOT NULL,
+  student_id           TEXT    NOT NULL,
   student_name         TEXT    NOT NULL,
   message_hash         TEXT    NOT NULL CHECK (length(message_hash) = 64),
   status               TEXT    NOT NULL CHECK (status IN (

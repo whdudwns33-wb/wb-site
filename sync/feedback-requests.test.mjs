@@ -9,6 +9,7 @@ const source = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'ut
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/010_feedback_requests.sql', import.meta.url), 'utf8');
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
+const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -44,7 +45,10 @@ function seedToken(db, token, staffId) {
 }
 function seedTask(db, id, owner, overrides = {}) {
   const now = Date.now();
-  const data = { id, staffId: owner, title: '[정규] 테스트학생(중2) — 국어 독해', studentName: '테스트학생', deleted: false, ...overrides };
+  const data = {
+    id, staffId: owner, title: '[정규] 테스트학생(중2) — 국어 독해',
+    studentId: 'student-test', studentName: '테스트학생', deleted: false, ...overrides
+  };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', id, owner, JSON.stringify(data), now, now).run();
 }
@@ -69,6 +73,8 @@ test('schema and migrations are additive and restrict states', () => {
     assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
   }
   assert.doesNotMatch(migration017, /DROP TABLE|DELETE FROM/i);
+  assert.doesNotMatch(migration021, /DROP TABLE|DELETE FROM/i);
+  assert.match(migration021, /ALTER TABLE feedback_requests ADD COLUMN student_id/);
 });
 
 test('feedback submission delegates all real sending to the dedicated send module', () => {
@@ -117,7 +123,20 @@ test('submission resolves teacher name from the staff table, not from client inp
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.request.teacherName, '김남기', '클라이언트가 보낸 teacherName은 무시되고 서버가 staff 테이블에서 찾은 이름을 쓴다');
+  assert.equal(result.body.request.studentId, 'student-test', '수신자 결합에는 지시서의 stable studentId를 저장한다');
   assert.equal(result.body.request.studentName, '테스트학생', '지시서 제목/필드에서 학생 이름을 뽑는다');
+});
+
+test('legacy lesson without stable studentId cannot create a parent-sendable feedback row', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-a', 'teacher-a', { studentId: '' });
+  const result = await call(db, '/feedback-request', {
+    auth: person('teacher-a', 'token-a'), ...identity, message: '오늘 수업 내용입니다.', ...fields()
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_ID_REQUIRED');
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").first().count, 0);
 });
 
 test('duplicate submit is idempotent and content update invalidates approval', async () => {

@@ -58,6 +58,13 @@ test('feedback workflow sends immediately only through the server-side guardian 
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });
 
+test('guardian contacts are saved and rendered by stable studentId, not by student name', () => {
+  assert.match(html, /new Map\(\(result\.contacts \|\| \[\]\)\.map\(c => \[c\.studentId, c\]\)\)/);
+  assert.match(html, /action: 'set', studentId: student\.id,[\s\S]{0,100}studentName: student\.name/);
+  assert.match(html, /guardianContacts\.get\(s\.id\)/);
+  assert.doesNotMatch(html, /guardianContacts\.get\(s\.name\)/);
+});
+
 test('new lesson form core is loaded before the app script', () => {
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
   assert.ok(html.includes('<script src="./lesson-form-core.js?v=' + version.v + '"></script>'),

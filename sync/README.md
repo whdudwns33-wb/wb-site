@@ -28,12 +28,19 @@ npx wrangler d1 execute wb-sync --remote --file=./schema.sql
 # 2-b) 기존 운영 데이터베이스는 2-a 대신 새 마이그레이션만 적용
 npx wrangler d1 execute wb-sync --remote --file=./migrations/019_private_roster.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/020_book_order_dispatch_lock.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/021_parent_feedback_student_ids.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
 npx wrangler secret put TASK_MANAGER_STAFF_IDS # task 운영 관리자 staff ID, 쉼표로 구분
 npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID # 승인된 수행보고 알림톡 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_API_KEY        # 카카오 알림톡 전용 API 키
+npx wrangler secret put SOLAPI_KAKAO_API_SECRET     # 카카오 알림톡 전용 API 시크릿
+npx wrangler secret put SOLAPI_KAKAO_PF_ID          # 연동된 카카오 채널 ID
+npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 템플릿 ID
+npx wrangler secret put SOLAPI_SENDER_NUMBER        # Solapi에 등록된 발신번호
+npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED # 승인·연락처 점검 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
@@ -49,6 +56,14 @@ npx wrangler deploy
 
 교재 주문 발송 잠금을 추가하는 배포에서는 반드시 `020_book_order_dispatch_lock.sql`을 운영 D1에
 먼저 적용한 뒤 Worker를 배포한다. 역순이면 재시도·예약·개별 발송이 잠금 테이블 오류로 차단된다.
+
+학부모 알림톡 stable-ID 전환에서는 `021_parent_feedback_student_ids.sql`을 먼저 적용한다. 기존
+이름 기반 보호자 연락처는 동명이인·개명 오발송 위험 때문에 자동 이관하지 않는다. 원장이 현재
+원생 명단의 학생을 다시 선택해 연락처와 동의를 저장해야 하며, 실제 발송은
+`guardian_contacts_by_student.student_id`만 사용한다. 학부모 수업 피드백 템플릿이
+`APPROVED`이고 변수 `#{선생님}`, `#{학생명}`, `#{학습내용}`, `#{잘한점}`, `#{보완점}`이 정확히
+일치하는 것을 확인한 뒤에만 `WB_PARENT_FEEDBACK_SEND_ENABLED=true`로 켠다. SMS 대체 발송은
+항상 비활성화한다(`disableSms: true`).
 
 기존 `roster.json`과 `textbooks.json`의 학생 배정을 처음 이관할 때는 비밀키를 명령줄에 직접
 쓰지 말고 보안 입력으로 환경변수에 넣은 뒤 이관 도구를 실행한다.
