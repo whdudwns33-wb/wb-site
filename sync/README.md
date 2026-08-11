@@ -32,6 +32,10 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/021_parent_feedback
 npx wrangler d1 execute wb-sync --remote --file=./migrations/022_book_issues.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/023_transport.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/024_transport_integrity.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/025_makeup.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/026_session_packs.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/027_parent_portal.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/028_guardian_ops_notifications.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -44,6 +48,11 @@ npx wrangler secret put SOLAPI_KAKAO_PF_ID          # 연동된 카카오 채널
 npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 템플릿 ID
 npx wrangler secret put SOLAPI_SENDER_NUMBER        # Solapi에 등록된 발신번호
 npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED # 승인·연락처 점검 뒤에만 true
+npx wrangler secret put SOLAPI_KAKAO_MAKEUP_PROPOSAL_APPROVED_TEMPLATE_ID
+npx wrangler secret put SOLAPI_KAKAO_MAKEUP_CONFIRMED_APPROVED_TEMPLATE_ID
+npx wrangler secret put SOLAPI_KAKAO_MAKEUP_CANCELLED_APPROVED_TEMPLATE_ID
+npx wrangler secret put SOLAPI_KAKAO_SESSION_BALANCE_APPROVED_TEMPLATE_ID
+npx wrangler secret put WB_GUARDIAN_OPS_SEND_ENABLED # 4개 템플릿 승인·별도 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
@@ -81,6 +90,17 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 먼저 적용한 뒤 Worker와 Pages를 순서대로 배포한다. 이 트리거는 승차 처리와 원생 명단·기사·노선
 변경이 동시에 들어와도 미하차 기록의 참조가 사라지지 않게 최종 DB 쓰기에서 차단한다. 직원 삭제는
 `/staff-deactivate` CAS 경로만 사용해 직원 비활성화와 개인 토큰·1회용 링크 해지를 함께 확정한다.
+
+보강·회차제·보호자 웹앱 배포는 `025_makeup.sql` → `026_session_packs.sql` →
+`027_parent_portal.sql` → `028_guardian_ops_notifications.sql` 순서로 먼저 적용하고 Worker를
+배포한 뒤 Pages를 배포한다. 월제 수업은
+회차권 행을 만들지 않으며, 실제 횟수제 학생·수업만 원장이 명시적으로 등록한다. 보호자 웹앱 동의는
+기존 수업 피드백 알림톡 동의와 별도이고, 꺼지면 해당 학생의 초대코드와 세션이 모두 해지된다.
+보호자 앱에는 전화번호·학생 특징·상담 메모·다른 학생 정보가 반환되지 않는다.
+
+보강·회차 운영 알림톡은 기존 수업 피드백 알림톡 동의를 재사용하지 않는다. 원장이 학생별
+`makeup`·`session` 동의를 따로 저장하고, 위 4개 템플릿이 Solapi에서 `APPROVED`이며 변수 계약이
+정확히 일치하는 것을 확인하기 전까지 `WB_GUARDIAN_OPS_SEND_ENABLED`를 설정하지 않는다.
 
 기존 `roster.json`과 `textbooks.json`의 학생 배정을 처음 이관할 때는 비밀키를 명령줄에 직접
 쓰지 말고 보안 입력으로 환경변수에 넣은 뒤 이관 도구를 실행한다.
@@ -259,6 +279,89 @@ KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기�
 허용 전이는 `scheduled → boarded|absent`, `boarded → dropped`이다. 전체 관리 권한만 `next:"scheduled"`와
 필수 `reason`으로 초기화할 수 있다. 같은 이전 revision의 중복 클릭은 409로 차단된다. 관리자
 조회에는 설정에서 누락됐더라도 `boarded`인 기록을 숨기지 않고 `ORPHAN_BOARDED` 경고로 반환한다.
+
+### `/makeup` — 전 학생 공통 보강 원장
+
+결석 출결 한 건에서 보강 검토를 만들고 `review_pending → reviewed → awaiting_parent →
+confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 학생·담당 선생님·정규 수업과
+확정 보강의 시간 겹침을 서버에서 다시 검사한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
+보강 완료만 할 수 있고, 원장·허용된 관리 담당만 검토·일정 제안·확정·취소를 할 수 있다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"create_from_absence",
+  "sourceTaskId":"lesson-1", "sourceDate":"2026-08-11" }
+{ "app":"task", "auth":{...}, "action":"propose", "caseId":"mu_...",
+  "revision":2, "date":"2026-08-14", "startTime":"18:00",
+  "endTime":"18:50", "staffId":"staff-1" }
+```
+
+결석 즉시 보호자에게 자동 발송하지 않는다. 관리자가 보강 가능 여부와 일정을 확인한 이후에만
+`notificationNeeded` 이벤트가 생성된다. 보호자 웹앱의 동일 revision 거절 응답이 있으면 확정을
+차단한다.
+
+### `/session-pack` — 지정 학생·수업의 횟수권
+
+월제 수업은 행이 없고, 횟수제 학생·수업만 `create`로 등록한다. 잔여 횟수는 append-only 사용
+원장의 합계로 계산하며 과거 행을 수정하지 않는다. 기본 정책은 출석·지각·당일취소·무단결석을
+1회 차감하고, 사전 인정 결석·학원 취소는 차감하지 않으며 실제 보강 완료 때 한 번만 차감한다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"create", "studentId":"student-1",
+  "lessonTaskId":"lesson-1", "totalSessions":8,
+  "validFrom":"2026-08-01", "expiresOn":"2026-08-31" }
+{ "app":"task", "auth":{...}, "action":"record", "packId":"sp_...",
+  "revision":1, "sourceType":"regular", "sourceKey":"check-..." }
+```
+
+같은 정규 출결·보강 consumption group은 두 번 차감되지 않고, 수동 증감은 사유가 있는 별도
+조정 행으로만 남는다.
+
+### `/parent-portal` — 보호자 전용 웹앱
+
+원장·관리 담당이 stable 학생 ID별 웹앱 동의를 별도로 저장하고 1회용 초대코드를 발급한다. 코드는
+교환 즉시 폐기되며 서버에는 해시만 저장된다. 보호자 세션은 한 학생만 볼 수 있고, 확정 시간표·보강
+제안/확정·횟수 잔여·이미 접수된 피드백의 안전한 요약만 반환한다.
+
+```jsonc
+// 관리자
+{ "app":"task", "auth":{...}, "action":"access_set",
+  "studentId":"student-1", "enabled":true, "expectedUpdatedAt":0 }
+{ "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
+
+// Worker origin의 보호자 웹앱: /#code=<1회용 코드>를 즉시 지운 뒤 교환한다.
+// exchange 응답은 HttpOnly·Secure·SameSite=Strict 쿠키를 설정한다.
+{ "app":"task", "action":"exchange", "code":"..." }
+{ "app":"task", "action":"view" }
+{ "app":"task", "action":"respond",
+  "caseId":"mu_...", "revision":3, "response":"accept" }
+```
+
+보호자 앱 정적 파일과 API는 같은 Worker origin에서 제공하고, 직원 GitHub Pages와 origin을
+분리한다. 초대·세션 원문, 전화번호, 내부 메모는 응답이나 장부에 저장하지 않으며 세션 토큰은
+자바스크립트나 localStorage에 노출하지 않는다. 오프라인 캐시는 사용하지 않고, 웹앱 동의나
+보호자 연락처 연결이 바뀌면 기존 코드·세션을 즉시 무효화한다.
+
+### `/guardian-ops-send` — 보강·회차 운영 알림톡
+
+원장·허용된 관리 담당 전용이다. `consent_set`으로 기존 수업 피드백 알림톡과 별개의
+`makeup`·`session` 동의를 학생별 저장하고, `preview`로 서버 정본 변수와 차단 사유를 확인한 뒤
+`send`한다. 요청에서 전화번호·수신자·본문을 지정할 수 없다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"consent_set",
+  "studentId":"student-1", "scope":"makeup", "consent":true, "expectedUpdatedAt":0 }
+{ "app":"task", "auth":{...}, "action":"preview",
+  "eventType":"makeup_proposal", "sourceId":"mu_...", "revision":3 }
+{ "app":"task", "auth":{...}, "action":"send",
+  "eventType":"session_balance", "sourceId":"sp_...", "revision":5 }
+```
+
+지원 이벤트는 `makeup_proposal`, `makeup_confirmed`, `makeup_cancelled`, `session_balance`다.
+서버가 현재 명단·보호자 연락처·별도 동의·원 수업/보강/회차 revision을 다시 대조한다. ATA만
+사용하고 SMS 대체 발송을 끈다. accepted는 접수로만 표시하고, unknown/dispatching은 공급자 확인
+전 재발송하지 않으며, 확정 rejected만 새 attempt로 재시도한다.
+보호자 앱의 공개 기준 주소는 비밀값이 아니므로 `wrangler.toml`의
+`WB_PARENT_PORTAL_BASE_URL`에 query/hash 없는 Worker origin 루트로 고정한다.
 
 ### `/onboarding-patch` — 신규 학생 30일 관리 CAS 저장
 

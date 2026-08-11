@@ -336,6 +336,9 @@
   html.person-mobile .book-issue-grid,
   html.person-mobile .transport-route-grid,
   html.person-mobile .transport-config-grid { grid-template-columns: 1fr; }
+  html.person-mobile .session-pack-create,
+  html.person-mobile .session-pack-grid { grid-template-columns: 1fr; }
+  html.person-mobile .makeup-grid { grid-template-columns: 1fr; }
   html.person-mobile .schedule-kpis,
   html.person-mobile .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   html.person-mobile .schedule-week-grid .schedule-day-card { display: block; }
@@ -485,6 +488,54 @@
   .transport-config-row { padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-top: 7px; }
   .transport-unmatched { border-color: #F3B8B0; background: #FFF7F5; }
   .transport-capacity { color: #9E3629; font-weight: 900; }
+
+  /* ─── 회차제 수업 ─── */
+  .session-pack-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 72%); }
+  .session-pack-create { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(90px, .45fr) minmax(135px, .7fr) minmax(135px, .7fr) auto; gap: 8px; align-items: end; margin-top: 12px; }
+  .session-pack-create .field { min-width: 0; margin-bottom: 0; }
+  .session-pack-create .in, .session-pack-create .btn { min-height: 44px; }
+  .session-pack-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); gap: 9px; }
+  .session-pack-card { min-width: 0; margin-bottom: 0; }
+  .session-pack-card.is-low { border-left: 4px solid var(--amber); background: #FFFBF3; }
+  .session-pack-card.is-empty, .session-pack-card.is-expired { border-left: 4px solid var(--coral); background: #FFF9F7; }
+  .session-pack-balance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 12px 0; }
+  .session-pack-balance span { padding: 9px 5px; border-radius: 9px; background: var(--light-gray); color: var(--mid-gray); text-align: center; font-size: 11px; font-weight: 700; }
+  .session-pack-balance b { display: block; color: var(--navy); font-size: 18px; line-height: 1.15; }
+  .session-pack-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .session-pack-actions .btn { min-height: 44px; }
+  .guardian-ops-action, .ops-notice-action { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 9px; }
+  .guardian-ops-action .btn, .ops-notice-action .btn { min-height: 44px; }
+  .guardian-ops-status { min-width: 0; color: var(--mid-gray); font-size: 12px; font-weight: 800; overflow-wrap: anywhere; }
+  .guardian-ops-status.is-accepted { color: #18733A; }
+  .guardian-ops-status.is-rejected, .guardian-ops-status.is-unknown { color: #9E3629; }
+  .guardian-ops-status.is-ready { color: var(--deep-blue); }
+  .guardian-ops-action .btn:focus-visible, .ops-notice-action .btn:focus-visible,
+  .guardian-ops-save:focus-visible, .guardian-ops-consent:focus-within {
+    outline: 3px solid rgba(30,157,214,.38); outline-offset: 2px;
+  }
+  .guardian-ops-consent { min-height: 44px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 9px; }
+  .guardian-ops-consent input { width: 20px; height: 20px; flex: 0 0 auto; }
+  .guardian-ops-save { min-height: 44px; }
+  .session-pack-record { margin-top: 10px; padding: 10px; border: 1px solid #D5EBF7; border-radius: 10px; background: #F8FCFF; }
+  .session-pack-record .in { min-height: 44px; margin-top: 8px; }
+  .session-pack-history { margin-top: 10px; border-top: 1px solid var(--light-gray); padding-top: 8px; }
+  .session-pack-history summary { min-height: 44px; color: var(--deep-blue); font-size: 12px; font-weight: 800; cursor: pointer; }
+  .session-pack-history-row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--light-gray); font-size: 11.5px; }
+
+  /* ─── 보강 관리 ─── */
+  .makeup-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 72%); }
+  .makeup-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .makeup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); gap: 9px; }
+  .makeup-card { min-width: 0; margin-bottom: 0; }
+  .makeup-card.is-overdue { border-left: 4px solid var(--coral); background: #FFF9F7; }
+  .makeup-card.is-today { border-left: 4px solid var(--deep-blue); background: #F8FCFF; }
+  .makeup-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .makeup-schedule { margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--light-gray); font-size: 12.5px; line-height: 1.55; }
+  .makeup-parent { margin-top: 8px; }
+  .makeup-notification { margin-top: 8px; padding: 9px 10px; border: 1px solid #F2B85C; border-radius: 9px; background: #FFF9EE; color: #80520A; font-size: 12px; font-weight: 800; }
+  .makeup-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .makeup-actions .btn, .makeup-request { min-height: 44px; }
+  .makeup-reason-guide { margin-top: 10px; padding: 9px; border-radius: 9px; background: #FFF7F5; color: #8B3A31; font-size: 12px; }
   @media (max-width: 720px) {
     .onboarding-board-row { grid-template-columns: 1fr; gap: 6px; padding: 12px 14px; }
     .onboarding-board-row.is-head { display: none; }
@@ -507,6 +558,15 @@
     .ops-toolbar .chip { min-height: 44px; padding: 6px 3px; }
     .book-issue-grid, .transport-route-grid { grid-template-columns: 1fr; }
     .transport-config-grid { grid-template-columns: 1fr; }
+    .session-pack-create, .session-pack-grid { grid-template-columns: 1fr; }
+    .session-pack-actions { display: grid; grid-template-columns: 1fr; }
+    .session-pack-actions .btn { width: 100%; }
+    .guardian-ops-action, .ops-notice-action { display: grid; grid-template-columns: 1fr; }
+    .guardian-ops-action .btn, .ops-notice-action .btn { width: 100%; }
+    .makeup-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .makeup-grid { grid-template-columns: 1fr; }
+    .makeup-actions { display: grid; grid-template-columns: 1fr; }
+    .makeup-actions .btn { width: 100%; }
   }
 
   /* ─── 직원 현황 ─── */
@@ -556,10 +616,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-11.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-11.4"></script>
-<script src="./asset-core.js?v=2026-08-11.4"></script>
-<script src="./qr-core.js?v=2026-08-11.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-11.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-11.5"></script>
+<script src="./asset-core.js?v=2026-08-11.5"></script>
+<script src="./qr-core.js?v=2026-08-11.5"></script>
 <script>
 "use strict";
 
@@ -1115,6 +1175,11 @@ let bookIssueRows = [], bookIssueLoaded = false, bookIssueLoading = false, bookI
 let bookIssueFilter = 'all', bookIssueSearchQuery = '', bookIssueRestoreFocus = null;
 let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoading = false, transportError = '';
 let transportRestoreFocus = null, transportConfigDraft = null;
+let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false, sessionPackError = '';
+let sessionPackRestoreFocus = null;
+let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
+let makeupRestoreFocus = null, makeupLiveMessage = '';
+let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
@@ -1172,9 +1237,16 @@ function resetPersonCache(token) {
   bookIssueFilter = 'all'; bookIssueSearchQuery = ''; bookIssueRestoreFocus = null;
   transportDate = today(); transportData = null; transportLoadedDate = ''; transportLoading = false;
   transportError = ''; transportRestoreFocus = null; transportConfigDraft = null;
+  sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
+  sessionPackRestoreFocus = null;
+  makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
+  makeupRestoreFocus = null; makeupLiveMessage = '';
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
   acaflowImportFileName = '';
   guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false;
+  guardianPortalAccess = new Map();
+  guardianOpsConsents = new Map(); guardianOpsConsentsError = '';
+  guardianOpsSendStates = new Map();
   guardianContactsError = ''; settingsGuardianStudents = [];
   linkCodeVault.clear(); directorReportContext = null; directorReportSending = false;
   eForm = null; kakaoText = ''; kakaoParsed = null;
@@ -1644,10 +1716,12 @@ function render() {
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
   if (session.isStaffLink && !session.isAdmin) {
     const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
+    allowed.push('sessions');
+    allowed.push('makeup');
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -1664,6 +1738,8 @@ function render() {
     restoreOnboardingFocus();
   });
   if (route === 'transport') requestAnimationFrame(restoreTransportFocus);
+  if (route === 'makeup') requestAnimationFrame(restoreMakeupFocus);
+  if (route === 'sessions') requestAnimationFrame(restoreSessionPackFocus);
 }
 
 function renderTabs() {
@@ -1671,10 +1747,10 @@ function renderTabs() {
   const tabs = session.isStaffLink && shouldGatePersonAccess()
     ? []
     : session.isStaffLink && !session.isAdmin
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '현황판'], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
+         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -1901,6 +1977,7 @@ function taskPanel(t, date, c, editable) {
       [['P', '출석'], ['L', '지각'], ['A', '결석']].map(([v, l]) =>
         '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
       ).join('') + '</div>';
+    h += makeupRequestHtml(t, date, c);
   }
 
   if (editable) {
@@ -2948,6 +3025,788 @@ async function sendParentFeedback(key, button) {
     if (resultBox) resultBox.textContent = '❌ ' + (error.message || error);
     else toast('발송 실패 — ' + (error.message || error));
   }
+}
+
+/* ── 보강·회차 보호자 운영 알림톡 — 자동발송 없이 관리자 명시 클릭만 허용한다. ── */
+const GUARDIAN_OPS_EVENT_LABELS = {
+  makeup_proposal: '보강 일정 제안', makeup_confirmed: '보강 일정 확정',
+  makeup_cancelled: '보강 취소', session_balance: '현재 회차 안내'
+};
+const GUARDIAN_OPS_BLOCKER_TEXT = {
+  SEND_DISABLED: '알림톡 준비 중 · 발송 스위치를 확인해 주세요',
+  TEMPLATE_NOT_APPROVED: '알림톡 준비 중 · 승인 템플릿 설정을 확인해 주세요',
+  GUARDIAN_NOT_REGISTERED: '보호자 연락처를 먼저 등록해 주세요',
+  GUARDIAN_PHONE_MISSING: '보호자 연락처를 먼저 확인해 주세요',
+  GUARDIAN_IDENTITY_MISMATCH: '현재 학생과 보호자 연락처 연결을 확인해 주세요',
+  OPS_CONSENT_MISSING: '해당 운영 알림의 별도 수신 동의를 먼저 저장해 주세요',
+  OPS_CONSENT_IDENTITY_MISMATCH: '보호자 정보가 변경되어 해당 운영 알림 동의를 다시 받아야 합니다',
+  PORTAL_ACCESS_MISSING: '보호자 웹앱 동의와 앱 연결을 먼저 준비해 주세요',
+  PORTAL_RECONSENT_REQUIRED: '보호자 정보가 변경되어 웹앱 이용 동의를 다시 받아야 합니다',
+  DAILY_SEND_LIMIT: '오늘 운영 알림톡 접수 한도에 도달했습니다',
+  SOURCE_EVENT_MISMATCH: '최신 보강·회차 상태를 다시 불러와 주세요',
+  SOURCE_IDENTITY_MISMATCH: '현재 학생·수업 연결을 다시 확인해 주세요',
+  SOURCE_CHANGED_BEFORE_DISPATCH: '접수 직전 보강·회차 상태가 변경됐습니다 · 최신 상태를 확인해 주세요',
+  SESSION_PACK_NOT_ACTIVE: '현재 이용 중인 회차권만 안내할 수 있습니다',
+  SESSION_PACK_OUTSIDE_VALIDITY: '회차권 유효기간을 확인해 주세요'
+};
+
+function guardianOpsKey(target) {
+  return [target.eventType, target.sourceId, Number(target.revision)].join('|');
+}
+
+function guardianOpsDomId(target) {
+  return 'guardianOps-' + String(target.eventType) + '-' + String(target.sourceId) + '-' + Number(target.revision);
+}
+
+function guardianOpsTargetForMakeup(caseId) {
+  const row = makeupRows.find(item => item.caseId === String(caseId || ''));
+  const eventType = row && ({ proposal: 'makeup_proposal', confirmed: 'makeup_confirmed', cancelled: 'makeup_cancelled' }[row.notificationEvent]);
+  const revision = Number(row && row.notificationEventRevision);
+  if (!row || !row.notificationNeeded || !eventType || !Number.isInteger(revision) || revision < 1) return null;
+  return { kind: 'makeup', eventType: eventType, sourceId: row.caseId, revision: revision, studentName: row.studentName || '학생' };
+}
+
+function guardianOpsTargetForSession(packId) {
+  const pack = sessionPackRows.find(item => item.packId === String(packId || ''));
+  const revision = Number(pack && pack.revision);
+  if (!pack || pack.status !== 'active' || !Number.isInteger(revision) || revision < 1) return null;
+  return { kind: 'session', eventType: 'session_balance', sourceId: pack.packId, revision: revision, studentName: pack.studentName || '학생' };
+}
+
+function guardianOpsStateText(state, emptyText) {
+  if (!state) return { cls: '', text: emptyText || '수동 접수 전' };
+  if (state.kind === 'checking') return { cls: ' is-ready', text: '알림톡 상태 확인 중…' };
+  if (state.kind === 'sending') return { cls: ' is-ready', text: '알림톡 요청 접수 중…' };
+  if (state.kind === 'accepted') return { cls: ' is-accepted', text: state.idempotent
+    ? '이미 접수된 동일 이벤트입니다' : '알림톡 요청 접수' };
+  if (state.kind === 'rejected') return { cls: ' is-rejected', text: '알림톡 요청 거절 · 다시 확인 필요' };
+  if (state.kind === 'unknown') return { cls: ' is-unknown', text: '알림톡 접수 여부 불명 · 확인 전 재요청 금지' };
+  if (state.kind === 'ready') return { cls: ' is-ready', text: '상태 확인 완료 · 아직 접수하지 않음' };
+  return { cls: '', text: GUARDIAN_OPS_BLOCKER_TEXT[state.code] || '알림톡 상태를 확인해 주세요' };
+}
+
+function guardianOpsStatusHtml(target, emptyText) {
+  const status = guardianOpsStateText(guardianOpsSendStates.get(guardianOpsKey(target)), emptyText);
+  return '<span class="guardian-ops-status' + status.cls + '" id="' + esc(guardianOpsDomId(target)) +
+    '" role="status" aria-live="polite" aria-atomic="true">' + esc(status.text) + '</span>';
+}
+
+function guardianOpsButtonHtml(target, action, label) {
+  const state = guardianOpsSendStates.get(guardianOpsKey(target));
+  const busy = state && (state.kind === 'checking' || state.kind === 'sending');
+  return '<button class="btn btn-sm btn-ghost" data-act="' + action + '" data-guardian-ops ' +
+    (target.kind === 'makeup' ? 'data-case="' : 'data-pack="') + esc(target.sourceId) + '" aria-describedby="' +
+    esc(guardianOpsDomId(target)) + '"' + (busy ? ' disabled' : '') + '>' + esc(label) + '</button>';
+}
+
+function repaintGuardianOpsTarget(target) {
+  if (target.kind === 'makeup') rememberMakeupFocus(target.sourceId, 'guardianopsmakeup');
+  else rememberSessionPackFocus(target.sourceId, 'opssessionnotice');
+  if ((target.kind === 'makeup' && route === 'makeup') || (target.kind === 'session' && route === 'sessions')) render();
+}
+
+function setGuardianOpsState(target, state) {
+  guardianOpsSendStates.set(guardianOpsKey(target), state);
+  repaintGuardianOpsTarget(target);
+}
+
+function guardianOpsPreviewState(preview) {
+  const blocker = String(preview && preview.blocker || '');
+  if (blocker === 'ALREADY_ACCEPTED' || (preview && preview.prior && preview.prior.status === 'accepted')) {
+    return { kind: 'accepted', idempotent: true };
+  }
+  if (blocker === 'PRIOR_SEND_UNCERTAIN' || (preview && preview.prior && ['dispatching', 'unknown'].includes(preview.prior.status))) {
+    return { kind: 'unknown', code: blocker || 'PRIOR_SEND_UNCERTAIN' };
+  }
+  if (!preview || preview.ready !== true) return { kind: 'blocked', code: blocker || 'PREVIEW_NOT_READY' };
+  return null;
+}
+
+async function requestGuardianOpsSend(target) {
+  if (!session.isAdmin || !target) return;
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  setGuardianOpsState(target, { kind: 'checking' });
+  let preview;
+  try {
+    const result = await sync.post('/guardian-ops-send', {
+      app: SYNC_APP, auth: auth, action: 'preview', eventType: target.eventType,
+      sourceId: target.sourceId, revision: Number(target.revision)
+    });
+    preview = result.preview;
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    setGuardianOpsState(target, { kind: 'blocked', code: String(error && error.code || 'PREVIEW_FAILED') });
+    return toast('알림톡 상태를 확인하지 못했습니다 — 접수하지 않았습니다');
+  }
+
+  const stopped = guardianOpsPreviewState(preview);
+  if (stopped) {
+    setGuardianOpsState(target, stopped);
+    if (stopped.kind === 'accepted') toast('이미 접수된 동일 이벤트입니다');
+    else if (stopped.kind === 'unknown') toast('접수 여부 확인 전에는 다시 요청할 수 없습니다');
+    else toast(GUARDIAN_OPS_BLOCKER_TEXT[stopped.code] || '알림톡 준비 상태를 확인해 주세요');
+    return;
+  }
+
+  const eventLabel = GUARDIAN_OPS_EVENT_LABELS[target.eventType] || '보호자 운영 안내';
+  const retryText = preview.retryAllowed ? '이전 요청이 거절되어 같은 상태를 다시 접수합니다.\n' : '';
+  if (!confirm(retryText + target.studentName + ' · ' + eventLabel + ' 알림톡 요청을 접수할까요?\n' +
+      '카카오 접수 비용이 발생할 수 있으며, 보호자가 확인했다는 뜻은 아닙니다.')) {
+    setGuardianOpsState(target, { kind: 'ready' });
+    return;
+  }
+
+  setGuardianOpsState(target, { kind: 'sending' });
+  try {
+    const result = await sync.post('/guardian-ops-send', {
+      app: SYNC_APP, auth: auth, action: 'send', eventType: target.eventType,
+      sourceId: target.sourceId, revision: Number(target.revision)
+    });
+    setGuardianOpsState(target, { kind: 'accepted', idempotent: !!result.idempotent });
+    toast(result.idempotent ? '이미 접수된 동일 이벤트입니다' : '알림톡 요청이 접수됐습니다');
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    const status = Number(error && error.status);
+    const code = String(error && error.code || '');
+    if (status === 202 || code === 'PRIOR_SEND_UNCERTAIN') {
+      setGuardianOpsState(target, { kind: 'unknown', code: code });
+      toast('알림톡 접수 여부를 확인해 주세요 — 확인 전 재요청하지 않습니다');
+    } else if (status === 502 || /_BEFORE_DISPATCH$/.test(code)) {
+      setGuardianOpsState(target, { kind: 'rejected', code: code });
+      toast('알림톡 요청이 거절됐습니다 — 상태를 확인해 주세요');
+    } else {
+      setGuardianOpsState(target, { kind: 'blocked', code: code || 'SEND_BLOCKED' });
+      toast(GUARDIAN_OPS_BLOCKER_TEXT[code] || '알림톡 요청을 접수하지 않았습니다 — 준비 상태를 확인해 주세요');
+    }
+  }
+}
+
+// 회차 카드는 운영 알림 공통 흐름을 이 세 도우미로만 연결한다.
+const opsSessionTarget = guardianOpsTargetForSession;
+const opsActionButtonHtml = guardianOpsButtonHtml;
+const opsNoticeStatusHtml = guardianOpsStatusHtml;
+
+/* ── 회차제 수업 — 월제는 행을 만들지 않고, 지정한 학생·수업만 서버 원장을 본다. ── */
+const SESSION_PACK_EVENTS = {
+  present: '출석', late: '지각', approved_absence: '사전 인정 결석', same_day: '당일 취소',
+  no_show: '무단결석', academy_cancel: '학원 휴강', makeup_completed: '보강 완료', manual_adjustment: '관리자 조정'
+};
+const SESSION_PACK_ADJUST_REASONS = [
+  ['correction', '오입력 정정'], ['carryover', '이월 반영'], ['manual_credit', '회차 복원'],
+  ['manual_charge', '회차 추가 차감'], ['other', '기타 운영 조정']
+];
+
+function sessionPackDaysLeft(expiresOn) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(expiresOn || ''))) return -9999;
+  return Math.round((parseYmd(expiresOn) - parseYmd(today())) / 86400000);
+}
+
+function sessionPackIsAttention(pack) {
+  if (!pack || pack.status !== 'active') return false;
+  const days = sessionPackDaysLeft(pack.expiresOn);
+  return Number(pack.remainingSessions) <= 1 || pack.expired || days <= 14;
+}
+
+function sessionPackAttentionCount() {
+  return sessionPackRows.filter(sessionPackIsAttention).length;
+}
+
+function rememberSessionPackFocus(packId, act) {
+  sessionPackRestoreFocus = packId ? { packId: String(packId), act: String(act || '') } : null;
+}
+
+function restoreSessionPackFocus() {
+  const saved = sessionPackRestoreFocus;
+  sessionPackRestoreFocus = null;
+  if (!saved) return false;
+  const selector = '[data-session-pack="' + saved.packId + '"]';
+  const card = document.querySelector(selector);
+  const target = card && (saved.act ? card.querySelector('[data-act="' + saved.act + '"]') : null);
+  if (target) target.focus({ preventScroll: true });
+  else if (card) card.focus({ preventScroll: true });
+  return !!(target || card);
+}
+
+function replaceSessionPack(pack) {
+  if (!pack || !pack.packId) return;
+  const index = sessionPackRows.findIndex(row => row.packId === pack.packId);
+  if (index < 0) sessionPackRows.push(pack); else sessionPackRows[index] = pack;
+  sessionPackLoaded = true;
+  sessionPackError = '';
+}
+
+async function loadSessionPacks(force) {
+  if (sessionPackLoading || (sessionPackLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) {
+    sessionPackError = '동기화 인증이 필요합니다'; sessionPackLoaded = true;
+    if (route === 'sessions') render();
+    return;
+  }
+  sessionPackLoading = true; sessionPackError = '';
+  if (route === 'sessions') render();
+  try {
+    const result = await sync.post('/session-pack', { app: SYNC_APP, auth: auth, action: 'list' });
+    sessionPackRows = Array.isArray(result.packs) ? result.packs : [];
+    sessionPackLoaded = true;
+  } catch (error) {
+    sessionPackError = String(error && error.message || error);
+    sessionPackLoaded = true;
+  } finally {
+    sessionPackLoading = false;
+    if (route === 'sessions') renderAfterSync();
+  }
+}
+
+function sessionPackLessonOptions() {
+  return state.tasks.filter(task => !task.deleted && task.studentId &&
+    (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion))
+    .sort((a, b) => String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko') ||
+      String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko'));
+}
+
+function sessionPackCreateHtml() {
+  if (!session.isAdmin) return '';
+  const lessons = sessionPackLessonOptions();
+  return '<section class="card"><div class="card-title">회차제 수업 지정</div>' +
+    '<div class="card-sub">학생 전체가 아니라 학생·수업 조합에만 적용합니다. 지정하지 않은 월제 수업은 아래 목록에 나타나지 않습니다.</div>' +
+    '<div class="session-pack-create"><label class="field"><span class="fl">학생·수업</span><select class="in" id="spLesson">' +
+      '<option value="">수업 선택</option>' + lessons.map(task => '<option value="' + esc(task.id) + '">' +
+        esc(task.studentName || '학생 미확인') + ' · ' + esc([task.grade, task.subject, task.className].filter(Boolean).join(' · ') || '수업') + '</option>').join('') +
+      '</select></label><label class="field"><span class="fl">총 횟수</span><input class="in" id="spTotal" type="number" min="1" max="200" value="8" inputmode="numeric"></label>' +
+      '<label class="field"><span class="fl">시작일</span><input class="in" id="spFrom" type="date" value="' + today() + '"></label>' +
+      '<label class="field"><span class="fl">종료일</span><input class="in" id="spExpires" type="date" value="' + addDays(today(), 30) + '"></label>' +
+      '<button class="btn btn-primary" data-act="spcreate"' + (lessons.length ? '' : ' disabled') + '>회차제 지정</button></div>' +
+    (!lessons.length ? '<div class="hint mt8">stable 학생 ID가 연결된 수업을 먼저 등록해 주세요.</div>' : '') + '</section>';
+}
+
+function sessionPackKpis(rows) {
+  const active = rows.filter(pack => pack.status === 'active');
+  const low3 = active.filter(pack => Number(pack.remainingSessions) > 0 && Number(pack.remainingSessions) <= 3).length;
+  const low1 = active.filter(pack => Number(pack.remainingSessions) > 0 && Number(pack.remainingSessions) <= 1).length;
+  const zero = active.filter(pack => Number(pack.remainingSessions) <= 0).length;
+  const expiring = active.filter(pack => pack.expired || sessionPackDaysLeft(pack.expiresOn) <= 14).length;
+  return '<div class="ops-kpis" aria-label="회차제 수업 요약">' +
+    '<div class="ops-kpi' + (low3 ? ' is-alert' : '') + '"><b>' + low3 + '</b><span>잔여 3회 이하</span></div>' +
+    '<div class="ops-kpi' + (low1 ? ' is-alert' : '') + '"><b>' + low1 + '</b><span>잔여 1회 이하</span></div>' +
+    '<div class="ops-kpi' + (zero ? ' is-alert' : '') + '"><b>' + zero + '</b><span>잔여 0회</span></div>' +
+    '<div class="ops-kpi' + (expiring ? ' is-alert' : '') + '"><b>' + expiring + '</b><span>14일 내 만료·경과</span></div></div>';
+}
+
+function sessionPackHistoryHtml(pack) {
+  const usage = Array.isArray(pack.usage) ? pack.usage.slice().reverse() : [];
+  if (!usage.length) return '';
+  return '<details class="session-pack-history"><summary>사용·조정 내역 ' + usage.length + '건</summary>' +
+    usage.slice(0, 20).map(row => '<div class="session-pack-history-row"><span>' +
+      esc(row.sourceDate ? shortDate(row.sourceDate) + ' · ' : '') + esc(SESSION_PACK_EVENTS[row.event] || row.event) + '</span><b>' +
+      (Number(row.delta) > 0 ? Number(row.delta) + '회 차감' : Number(row.delta) < 0 ? Math.abs(Number(row.delta)) + '회 복원' : '비차감') +
+      '</b></div>').join('') + '</details>';
+}
+
+function sessionPackOpsNoticeHtml(pack) {
+  if (!session.isAdmin || !pack || pack.status !== 'active') return '';
+  const target = opsSessionTarget(pack.packId);
+  if (!target) return '';
+  return '<div class="ops-notice-action">' +
+    opsActionButtonHtml(target, 'opssessionnotice', '현재 회차 보호자 안내') +
+    opsNoticeStatusHtml(target, '자동발송 없음 · 수동 접수 전') + '</div>';
+}
+
+function sessionPackStaffRecordHtml(pack) {
+  if (!session.isStaffLink || pack.teacherId !== session.staffId || pack.status !== 'active') return '';
+  const check = getCheck(pack.lessonTaskId, today());
+  const att = check && check.att;
+  const labelText = att === 'P' ? '오늘 출석' : att === 'L' ? '오늘 지각' : att === 'A' ? '오늘 결석' : '오늘 출결 미기록';
+  const unavailable = !['P', 'L', 'A'].includes(att) || pack.expired || today() < pack.validFrom || today() > pack.expiresOn;
+  const absenceSelect = att === 'A' ? '<label class="small" for="spAbsence-' + esc(pack.packId) + '">결석 차감 유형</label>' +
+    '<select class="in" id="spAbsence-' + esc(pack.packId) + '"><option value="">유형 선택</option>' +
+    [['approved_absence', '사전 인정 결석 · 비차감'], ['same_day', '당일 취소 · 1회 차감'],
+      ['no_show', '무단결석 · 1회 차감'], ['academy_cancel', '학원 휴강 · 비차감']]
+      .map(item => '<option value="' + item[0] + '"' + (check.absenceType === item[0] ? ' selected' : '') + '>' + item[1] + '</option>').join('') + '</select>' : '';
+  return '<div class="session-pack-record"><div class="between"><b>' + labelText + '</b><span class="pill">' + esc(shortDate(today())) + '</span></div>' +
+    absenceSelect + '<button class="btn btn-primary btn-block mt14" data-act="sprecord" data-session-pack-action data-pack="' + esc(pack.packId) + '"' +
+    (unavailable ? ' disabled' : '') + '>오늘 출결로 회차 반영</button>' +
+    (!att ? '<div class="small muted mt8">오늘 수업 카드에서 출결을 먼저 기록해 주세요.</div>' : '') + '</div>';
+}
+
+function sessionPackCard(pack) {
+  const remaining = Number(pack.remainingSessions) || 0;
+  const days = sessionPackDaysLeft(pack.expiresOn);
+  const expired = !!pack.expired || days < 0;
+  const cls = remaining <= 0 ? ' is-empty' : expired ? ' is-expired' : remaining <= 3 ? ' is-low' : '';
+  const status = pack.status === 'closed' ? ['종료', ''] : expired ? ['기간 만료', 'bad'] : days <= 14 ? ['만료 ' + Math.max(0, days) + '일 전', 'warn'] : ['운영 중', ''];
+  const adminActions = session.isAdmin && pack.status === 'active'
+    ? '<div class="session-pack-actions"><button class="btn btn-sm btn-warn" data-act="spadjust" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '" data-delta="1">1회 추가 차감</button>' +
+      '<button class="btn btn-sm btn-ghost" data-act="spadjust" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '" data-delta="-1">1회 복원</button>' +
+      '<button class="btn btn-sm btn-danger" data-act="spclose" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '">회차권 종료</button></div>' : '';
+  return '<article class="card session-pack-card' + cls + '" tabindex="-1" data-session-pack="' + esc(pack.packId) + '">' +
+    '<div class="between"><div><div class="card-title">' + esc(pack.studentName || '학생 연결 확인 필요') + '</div>' +
+      '<div class="card-sub">' + esc([pack.grade, pack.lessonLabel].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' +
+      '<span class="pill ' + status[1] + '">' + status[0] + '</span></div>' +
+    '<div class="session-pack-balance"><span><b>' + Number(pack.totalSessions) + '</b>총 횟수</span><span><b>' + Number(pack.usedSessions) + '</b>사용</span><span><b>' + remaining + '</b>남음</span></div>' +
+    '<div class="small muted">유효기간 ' + esc(pack.validFrom) + ' ~ ' + esc(pack.expiresOn) + ' · 수정본 ' + Number(pack.revision) + '</div>' +
+    sessionPackStaffRecordHtml(pack) + adminActions + sessionPackOpsNoticeHtml(pack) + sessionPackHistoryHtml(pack) + '</article>';
+}
+
+function viewSessionPacks() {
+  if (!sessionPackLoaded && !sessionPackLoading) setTimeout(() => loadSessionPacks(false), 0);
+  const rows = sessionPackRows.slice().sort((a, b) =>
+    Number(a.status !== 'active') - Number(b.status !== 'active') ||
+    Number(sessionPackIsAttention(b)) - Number(sessionPackIsAttention(a)) ||
+    Number(a.remainingSessions) - Number(b.remainingSessions) || String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko'));
+  let h = '<section class="card session-pack-hero"><div class="between"><div><div class="card-title">회차제 수업</div>' +
+    '<div class="card-sub">보강과 분리된 수업 회차 원장입니다. 지정한 학생·수업만 표시하며 월제 수업은 표시하지 않습니다.</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="sprefresh">새로고침</button></div>' +
+    '<div class="hint mt8">출석·지각 1회, 사전 인정 결석·학원 휴강 0회, 당일 취소·무단결석 1회입니다. 원 결석과 완료 보강은 합쳐 한 번만 차감합니다.</div></section>' +
+    sessionPackCreateHtml();
+  if (sessionPackLoading && !sessionPackLoaded) return h + '<div class="card"><div class="empty"><b>⏳</b>회차 현황을 불러오는 중입니다.</div></div>';
+  if (sessionPackError) h += '<div class="card alert" role="alert"><div class="card-title">회차 현황을 불러오지 못했습니다</div><div class="small">' + esc(sessionPackError) + '</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="sprefresh" autofocus>다시 시도</button></div>';
+  h += sessionPackKpis(rows);
+  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🔢</b>지정된 회차제 수업이 없습니다.<br><span class="muted">월제 수업은 정상이며 이 목록에 나타나지 않습니다.</span></div></div>';
+  return h + '<div class="session-pack-grid" aria-live="polite">' + rows.map(sessionPackCard).join('') + '</div>';
+}
+
+async function sessionPackConsumptionGroup(taskId, date) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SYNC_APP + '\n' + taskId + '\n' + date));
+  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  return 'mc_' + hex.slice(0, 48);
+}
+
+async function createSessionPack(button) {
+  if (!session.isAdmin) return toast('원장·관리 담당만 회차제를 지정할 수 있습니다');
+  const lessonTaskId = String(($('#spLesson') || {}).value || '');
+  const task = state.tasks.find(row => row.id === lessonTaskId && row.studentId);
+  const totalSessions = Number(($('#spTotal') || {}).value);
+  const validFrom = String(($('#spFrom') || {}).value || '');
+  const expiresOn = String(($('#spExpires') || {}).value || '');
+  if (!task) return toast('학생과 수업을 선택해 주세요');
+  if (!Number.isInteger(totalSessions) || totalSessions < 1 || totalSessions > 200) return toast('총 횟수는 1~200회로 입력해 주세요');
+  if (!validFrom || !expiresOn || expiresOn < validFrom) return toast('유효기간을 확인해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/session-pack', {
+      app: SYNC_APP, auth: auth, action: 'create', studentId: task.studentId, lessonTaskId: task.id,
+      totalSessions: totalSessions, validFrom: validFrom, expiresOn: expiresOn, deductionPolicy: 'recommended_v1'
+    });
+    replaceSessionPack(result.pack);
+    rememberSessionPackFocus(result.pack.packId, 'spclose');
+    render();
+    toast((result.pack.studentName || task.studentName || '학생') + ' 회차제를 지정했습니다');
+  } catch (error) {
+    toast('회차제 지정 실패 — ' + (error.message || error));
+    const select = $('#spLesson'); if (select) select.focus();
+  } finally {
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+function sessionPackAdjustmentModal(packId, revision, delta) {
+  const pack = sessionPackRows.find(row => row.packId === packId);
+  if (!session.isAdmin || !pack || ![1, -1].includes(delta)) return;
+  modal((delta > 0 ? '1회 추가 차감' : '1회 복원') + ' — ' + esc(pack.studentName || '학생'),
+    '<div class="hint mb14">기존 내역을 수정하지 않고 조정 행을 새로 남깁니다.</div>' +
+    '<div class="field"><label class="fl" for="spAdjustReason">조정 사유</label><select class="in" id="spAdjustReason" autofocus>' +
+      SESSION_PACK_ADJUST_REASONS.map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="spadjustsubmit" data-pack="' + esc(packId) + '" data-rev="' + revision + '" data-delta="' + delta + '">조정 기록</button>');
+}
+
+async function submitSessionPackAdjustment(button) {
+  if (!session.isAdmin) return;
+  const packId = String(button.dataset.pack || '');
+  const delta = Number(button.dataset.delta);
+  const revision = Number(button.dataset.rev);
+  const reasonCode = String(($('#spAdjustReason') || {}).value || '');
+  const auth = sync.auth();
+  if (!auth || !SESSION_PACK_ADJUST_REASONS.some(item => item[0] === reasonCode)) return toast('조정 사유를 선택해 주세요');
+  button.disabled = true;
+  try {
+    const result = await sync.post('/session-pack', {
+      app: SYNC_APP, auth: auth, action: 'adjust', packId: packId, revision: revision, delta: delta,
+      sourceKey: 'adj_' + uid().replace(/-/g, ''), reasonCode: reasonCode
+    });
+    replaceSessionPack(result.pack); closeModal(); rememberSessionPackFocus(packId, 'spadjust'); render();
+    toast(delta > 0 ? '1회를 추가 차감했습니다' : '1회를 복원했습니다');
+  } catch (error) {
+    toast('회차 조정 실패 — ' + (error.message || error));
+    if (Number(error && error.status) === 409) { sessionPackLoaded = false; loadSessionPacks(true); }
+    if (button.isConnected) button.disabled = false;
+  }
+}
+
+async function closeSessionPack(packId, revision, button) {
+  if (!session.isAdmin || !confirm('이 회차권을 종료할까요? 사용·조정 내역은 그대로 보관됩니다.')) return;
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/session-pack', { app: SYNC_APP, auth: auth, action: 'close', packId: packId, revision: revision });
+    replaceSessionPack(result.pack); rememberSessionPackFocus(packId, ''); render(); toast('회차권을 종료했습니다');
+  } catch (error) {
+    toast('회차권 종료 실패 — ' + (error.message || error));
+    if (Number(error && error.status) === 409) { sessionPackLoaded = false; loadSessionPacks(true); }
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+async function recordTodaySessionPack(packId, button) {
+  if (!session.isStaffLink) return;
+  const pack = sessionPackRows.find(row => row.packId === packId);
+  if (!pack || pack.teacherId !== session.staffId) return;
+  const check = pack && getCheck(pack.lessonTaskId, today());
+  if (!pack || !check || !['P', 'L', 'A'].includes(check.att)) return toast('오늘 실제 출결을 먼저 기록해 주세요');
+  if (check.att === 'A') {
+    const absenceType = String(($('#spAbsence-' + packId) || {}).value || '');
+    if (!['approved_absence', 'same_day', 'no_show', 'academy_cancel'].includes(absenceType)) return toast('결석 차감 유형을 선택해 주세요');
+    setCheck(pack.lessonTaskId, today(), { absenceType: absenceType });
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  rememberSessionPackFocus(packId, 'sprecord');
+  try {
+    const synced = await sync.run();
+    if (!synced) throw new Error('출결 동기화가 끝난 뒤 다시 시도해 주세요');
+    const result = await sync.post('/session-pack', {
+      app: SYNC_APP, auth: auth, action: 'record', packId: packId, revision: Number(pack.revision),
+      sourceType: 'regular', sourceKey: pack.lessonTaskId + '|' + today(),
+      consumptionGroupId: await sessionPackConsumptionGroup(pack.lessonTaskId, today())
+    });
+    replaceSessionPack(result.pack); render();
+    toast(result.idempotent ? '오늘 출결이 이미 회차에 반영되어 있습니다' : '오늘 출결을 회차에 반영했습니다');
+  } catch (error) {
+    toast('회차 반영 실패 — ' + (error.message || error));
+    if (Number(error && error.status) === 409) { sessionPackLoaded = false; loadSessionPacks(true); }
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+/* ── 주간 플래너 앞: 보강 확장 기능 ── */
+/* ── 보강 — 모든 학생의 결석 수업을 원 수업과 연결해 별도 원장으로 관리한다. ── */
+const MAKEUP_STATUS_LABELS = {
+  review_pending: '검토 대기', reviewed: '일정 제안 대기', awaiting_parent: '보호자 응답 대기',
+  confirmed: '일정 확정', completed: '완료', cancelled: '취소'
+};
+const MAKEUP_REASON_OPTIONS = [
+  ['policy_ineligible', '정책상 보강 없음'], ['already_resolved', '이미 처리'],
+  ['parent_declined', '보호자 취소'], ['schedule_unavailable', '일정 불가'],
+  ['student_inactive', '수강 종료'], ['other', '기타 운영 사유']
+];
+const MAKEUP_REASON_LABELS = Object.fromEntries(MAKEUP_REASON_OPTIONS);
+
+function makeupCaseForSource(taskId, date) {
+  return makeupRows.find(row => row.sourceTaskId === taskId && row.sourceDate === date) || null;
+}
+
+function makeupRequestHtml(task, date, check) {
+  if (!check || check.att !== 'A') return '';
+  const linked = makeupCaseForSource(task.id, date);
+  if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
+    esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
+  if (!task.studentId) return '<div class="small muted mt8">보강 검토는 원생 명단의 학생 ID를 수업에 연결한 뒤 요청할 수 있습니다.</div>';
+  return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
+    esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 요청</button>' +
+    '<span class="small muted">결석 출결을 서버에 저장한 뒤 요청됩니다.</span></div>';
+}
+
+function makeupIsDelayed(row, date) {
+  if (!row || ['completed', 'cancelled'].includes(row.status)) return false;
+  const due = row.status === 'confirmed' ? row.confirmedDate :
+    row.status === 'awaiting_parent' ? row.proposedDate : row.sourceDate;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(due || '')) && due < date;
+}
+
+function makeupKpiCounts(rows, date) {
+  const active = rows.filter(row => !['completed', 'cancelled'].includes(row.status));
+  return {
+    review: active.filter(row => row.status === 'review_pending').length,
+    awaiting: active.filter(row => row.status === 'awaiting_parent').length,
+    confirmed: active.filter(row => row.status === 'confirmed').length,
+    today: active.filter(row => (row.confirmedDate || row.proposedDate) === date).length,
+    overdue: active.filter(row => makeupIsDelayed(row, date)).length,
+    notification: rows.filter(row => row.notificationNeeded).length
+  };
+}
+
+function makeupAttentionCount() {
+  return makeupRows.filter(row => row.notificationNeeded || makeupIsDelayed(row, today()) ||
+    ['review_pending', 'reviewed', 'awaiting_parent'].includes(row.status)).length;
+}
+
+function rememberMakeupFocus(caseId, act) {
+  makeupRestoreFocus = caseId ? { caseId: String(caseId), act: String(act || '') } : null;
+}
+
+function restoreMakeupFocus() {
+  const saved = makeupRestoreFocus;
+  makeupRestoreFocus = null;
+  if (!saved) return false;
+  const card = document.querySelector('[data-makeup-case="' + CSS.escape(saved.caseId) + '"]');
+  const target = card && (saved.act ? card.querySelector('[data-act="' + saved.act + '"]') : null);
+  if (target) target.focus({ preventScroll: true });
+  else if (card) card.focus({ preventScroll: true });
+  return !!(target || card);
+}
+
+function replaceMakeup(row) {
+  if (!row || !row.caseId) return;
+  const index = makeupRows.findIndex(item => item.caseId === row.caseId);
+  if (index < 0) makeupRows.push(row); else makeupRows[index] = row;
+  makeupLoaded = true; makeupError = '';
+}
+
+async function loadMakeups(force) {
+  if (makeupLoading || (makeupLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) {
+    makeupError = '동기화 인증이 필요합니다'; makeupLoaded = true;
+    if (route === 'makeup') render();
+    return;
+  }
+  makeupLoading = true; makeupError = '';
+  if (route === 'makeup') render();
+  try {
+    const result = await sync.post('/makeup', { app: SYNC_APP, auth: auth, action: 'list' });
+    makeupRows = Array.isArray(result.cases) ? result.cases : [];
+    makeupLoaded = true;
+    makeupLiveMessage = '보강 현황 ' + makeupRows.length + '건을 새로 불러왔습니다.';
+  } catch (error) {
+    makeupError = String(error && error.message || error); makeupLoaded = true;
+  } finally {
+    makeupLoading = false;
+    if (route === 'makeup') renderAfterSync();
+  }
+}
+
+function makeupReasonSelect(id) {
+  return '<label class="field"><span class="fl">운영 사유</span><select class="in" id="' + id + '">' +
+    MAKEUP_REASON_OPTIONS.map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></label>' +
+    '<div class="makeup-reason-guide">질병·가정사 등 민감정보는 입력하지 않습니다. 정해진 운영 사유만 기록합니다.</div>';
+}
+
+function makeupStatusPill(row) {
+  const cls = row.status === 'cancelled' ? 'bad' : row.status === 'awaiting_parent' ? 'warn' : '';
+  return '<span class="pill ' + cls + '">' + esc(MAKEUP_STATUS_LABELS[row.status] || row.status) + '</span>';
+}
+
+function makeupParentHtml(row) {
+  if (row.status !== 'awaiting_parent' && !row.parentResponse) return '';
+  const current = Number(row.parentResponseRevision) === Number(row.revision);
+  const prefix = current ? '보호자 응답' : '이전 일정 응답';
+  if (row.parentResponse === 'accept') return '<div class="makeup-parent"><span class="tag ok">' + prefix + ' · 참석 가능</span></div>';
+  if (row.parentResponse === 'decline') return '<div class="makeup-parent"><span class="tag blk">' + prefix + ' · 참석 불가</span></div>';
+  return row.status === 'awaiting_parent'
+    ? '<div class="makeup-parent"><span class="tag high">보호자 응답 대기</span></div>' : '';
+}
+
+function makeupScheduleHtml(row) {
+  const confirmed = row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime;
+  const proposed = row.proposedDate && row.proposedStartTime && row.proposedEndTime;
+  if (!confirmed && !proposed) return '<div class="makeup-schedule">보강 일정이 아직 제안되지 않았습니다.</div>';
+  const date = confirmed ? row.confirmedDate : row.proposedDate;
+  const start = confirmed ? row.confirmedStartTime : row.proposedStartTime;
+  const end = confirmed ? row.confirmedEndTime : row.proposedEndTime;
+  const staffId = confirmed ? row.confirmedStaffId : row.proposedStaffId;
+  const staff = staffById(staffId);
+  return '<div class="makeup-schedule"><b>' + (confirmed ? '확정 일정' : '제안 일정') + '</b><br>' +
+    esc(date + ' · ' + start + '–' + end) + ' · ' + esc(staff ? staff.name + ' 선생님' : '담당 선생님') + '</div>';
+}
+
+function makeupAdminActions(row) {
+  if (!session.isAdmin || ['completed', 'cancelled'].includes(row.status)) return '';
+  const buttons = [];
+  if (row.status === 'review_pending') {
+    buttons.push('<button class="btn btn-sm btn-primary" data-act="mureviewrequired" data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">보강 진행</button>');
+    buttons.push('<button class="btn btn-sm btn-ghost" data-act="mureviewnot" data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">보강 없음</button>');
+  }
+  if (row.status === 'reviewed' || row.status === 'awaiting_parent') {
+    buttons.push('<button class="btn btn-sm btn-primary" data-act="mupropose" data-makeup-action data-case="' + esc(row.caseId) + '">' +
+      (row.status === 'awaiting_parent' ? '새 일정 제안' : '일정 제안') + '</button>');
+  }
+  const currentDecline = row.parentResponse === 'decline' && Number(row.parentResponseRevision) === Number(row.revision);
+  if (row.status === 'awaiting_parent' && !currentDecline) {
+    buttons.push('<button class="btn btn-sm btn-navy" data-act="muconfirm" data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">일정 확정</button>');
+  }
+  if (row.status !== 'review_pending') {
+    buttons.push('<button class="btn btn-sm btn-danger" data-act="mucancel" data-makeup-action data-case="' + esc(row.caseId) + '">취소</button>');
+  }
+  return buttons.join('');
+}
+
+function makeupNotificationHtml(row, initialLabel) {
+  if (!row.notificationNeeded) return '';
+  const eventLabel = row.notificationEvent
+    ? ({ proposal: '일정 제안', confirmed: '일정 확정', cancelled: '취소' }[row.notificationEvent] || '상태 변경') : '상태 변경';
+  const target = guardianOpsTargetForMakeup(row.caseId);
+  const currentState = target && guardianOpsSendStates.get(guardianOpsKey(target));
+  const heading = currentState && currentState.kind === 'accepted' ? '알림톡 상태' : (initialLabel || '알림톡 접수 필요');
+  const action = session.isAdmin && target
+    ? '<div class="guardian-ops-action">' +
+      guardianOpsButtonHtml(target, 'guardianopsmakeup', '알림톡 상태 확인·보내기') +
+      guardianOpsStatusHtml(target, '자동발송 없음 · 관리자 확인 필요') + '</div>' : '';
+  return '<div class="makeup-notification">' + esc(heading) + ' · ' + esc(eventLabel) + action + '</div>';
+}
+
+function makeupCard(row) {
+  const delayed = makeupIsDelayed(row, today());
+  const scheduledToday = (row.confirmedDate || row.proposedDate) === today();
+  const sourceTeacher = staffById(row.sourceTeacherId);
+  const reason = MAKEUP_REASON_LABELS[row.reason] || '';
+  const ownComplete = session.isStaffLink && row.status === 'confirmed' && row.confirmedStaffId === session.staffId;
+  const notification = makeupNotificationHtml(row, '알림톡 발송 필요 · 템플릿 준비 중');
+  const actions = makeupAdminActions(row) + (ownComplete
+    ? '<button class="btn btn-sm btn-primary" data-act="mucomplete" data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">보강 완료</button>' : '');
+  return '<article class="card makeup-card' + (delayed ? ' is-overdue' : scheduledToday ? ' is-today' : '') + '" tabindex="-1" data-makeup-case="' + esc(row.caseId) + '">' +
+    '<div class="between"><div><div class="card-title">' + esc(row.studentName || '학생 연결 확인 필요') + '</div>' +
+      '<div class="card-sub">' + esc([row.grade, row.subject, row.className].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' + makeupStatusPill(row) + '</div>' +
+    '<div class="makeup-meta"><span class="tag">원 수업 ' + esc(row.sourceDate) + '</span>' +
+      '<span class="tag">' + esc(sourceTeacher ? sourceTeacher.name + ' 선생님' : '원 수업 담당') + '</span>' +
+      (delayed ? '<span class="tag blk">지연</span>' : scheduledToday ? '<span class="tag time">오늘</span>' : '') +
+      (reason ? '<span class="tag">' + esc(reason) + '</span>' : '') + '</div>' +
+    makeupScheduleHtml(row) + makeupParentHtml(row) + notification +
+    (actions ? '<div class="makeup-actions">' + actions + '</div>' : '') + '</article>';
+}
+
+function makeupKpis(rows) {
+  const counts = makeupKpiCounts(rows, today());
+  return '<div class="ops-kpis makeup-kpis" aria-label="보강 현황 요약">' +
+    '<div class="ops-kpi' + (counts.review ? ' is-alert' : '') + '"><b>' + counts.review + '</b><span>검토 대기</span></div>' +
+    '<div class="ops-kpi' + (counts.awaiting ? ' is-alert' : '') + '"><b>' + counts.awaiting + '</b><span>보호자 응답 대기</span></div>' +
+    '<div class="ops-kpi"><b>' + counts.confirmed + '</b><span>일정 확정</span></div>' +
+    '<div class="ops-kpi' + (counts.overdue ? ' is-alert' : '') + '"><b>' + counts.today + ' / ' + counts.overdue + '</b><span>오늘 / 지연</span></div>' +
+    '<div class="ops-kpi' + (counts.notification ? ' is-alert' : '') + '"><b>' + counts.notification + '</b><span>알림 필요</span></div></div>';
+}
+
+function viewMakeups() {
+  if (!makeupLoaded && !makeupLoading) setTimeout(() => loadMakeups(false), 0);
+  const order = { review_pending: 0, reviewed: 1, awaiting_parent: 2, confirmed: 3, completed: 4, cancelled: 5 };
+  const rows = makeupRows.slice().sort((a, b) => Number(makeupIsDelayed(b, today())) - Number(makeupIsDelayed(a, today())) ||
+    Number(order[a.status] ?? 9) - Number(order[b.status] ?? 9) || String(a.sourceDate || '').localeCompare(String(b.sourceDate || '')));
+  let h = '<section class="card makeup-hero"><div class="between"><div><div class="card-title">보강 관리</div>' +
+    '<div class="card-sub">모든 학생의 결석 수업을 검토하고, 일정 제안·보호자 응답·확정·완료를 한 흐름으로 관리합니다.</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="murefresh">새로고침</button></div>' +
+    '<div class="makeup-reason-guide">질병·가정사 등 민감정보는 기록하지 않습니다. 보호자 알림은 자동으로 나가지 않으며 관리자가 상태 확인 후 명시적으로 접수합니다. ‘접수’는 보호자가 확인했다는 뜻이 아닙니다.</div>' +
+    '<div class="small muted mt8" role="status" aria-live="polite">' + esc(makeupLiveMessage) + '</div></section>';
+  if (makeupLoading && !makeupLoaded) return h + '<div class="card" role="status" aria-live="polite"><div class="empty"><b>⏳</b>보강 현황을 불러오는 중입니다.</div></div>';
+  if (makeupError) h += '<div class="card alert" role="alert"><div class="card-title">보강 현황을 불러오지 못했습니다</div><div class="small">' + esc(makeupError) + '</div>' +
+    '<button class="btn btn-sm btn-ghost mt14" data-act="murefresh" autofocus>다시 시도</button></div>';
+  h += makeupKpis(rows);
+  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">수업 카드에서 결석을 기록한 뒤 보강 검토를 요청하세요.</span></div></div>';
+  return h + '<div class="makeup-grid" aria-live="polite">' + rows.map(makeupCard).join('') + '</div>';
+}
+
+async function refreshMakeupsAfterConflict(error, caseId, act) {
+  if (error && error.current) replaceMakeup(error.current);
+  makeupLoaded = false;
+  await loadMakeups(true);
+  makeupLiveMessage = '다른 기기의 최신 변경을 다시 불러왔습니다.';
+  rememberMakeupFocus(caseId, act);
+  if (route === 'makeup') render();
+}
+
+async function mutateMakeup(payload, button, successText, focusAct, closeOnSuccess) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const caseId = String(payload.caseId || '');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/makeup', { app: SYNC_APP, auth: auth, ...payload });
+    replaceMakeup(result.case);
+    let completedText = successText;
+    const impact = result.sessionPackImpact;
+    if (impact && impact.refreshNeeded) {
+      sessionPackLoaded = false;
+      await loadSessionPacks(true);
+      completedText += sessionPackError ? ' · 회차 현황은 새로고침해 주세요'
+        : Number(impact.delta) === 1 ? ' · 회차 1회 반영' : ' · 기존 차감과 중복 없이 회차 반영';
+    } else if (impact && impact.reason === 'pack_identity_mismatch') {
+      completedText += ' · 회차권 배정 변경 확인 필요';
+    }
+    makeupLiveMessage = completedText;
+    if (closeOnSuccess) closeModal();
+    rememberMakeupFocus(caseId, focusAct);
+    if (route === 'makeup') render();
+    toast(completedText);
+    return result;
+  } catch (error) {
+    toast('보강 처리 실패 — ' + (error.message || error));
+    if (Number(error && error.status) === 409) await refreshMakeupsAfterConflict(error, caseId, focusAct);
+    return null;
+  } finally {
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+async function createMakeupFromAbsence(taskId, date, button) {
+  const task = state.tasks.find(row => row.id === taskId);
+  const check = getCheck(taskId, date);
+  const auth = sync.auth();
+  if (!task || !task.studentId || !check || check.att !== 'A') return toast('학생 ID가 연결된 수업의 결석 출결을 먼저 기록해 주세요');
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) { button.disabled = true; button.textContent = '출결 저장 중…'; }
+  try {
+    const synced = await sync.run();
+    if (!synced) throw new Error('출결 동기화가 끝난 뒤 다시 시도해 주세요');
+    const result = await sync.post('/makeup', {
+      app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date
+    });
+    replaceMakeup(result.case);
+    makeupLiveMessage = (result.idempotent ? '기존' : '새') + ' 보강 검토 건을 확인했습니다.';
+    if (button && button.isConnected) { button.textContent = '보강 요청됨'; button.disabled = true; }
+    toast(result.idempotent ? '이미 등록된 보강 검토 건입니다' : '보강 검토를 요청했습니다');
+  } catch (error) {
+    toast('보강 요청 실패 — ' + (error.message || error));
+    if (Number(error && error.status) === 409) await refreshMakeupsAfterConflict(error, '', '');
+    if (button && button.isConnected) { button.disabled = false; button.textContent = '보강 검토 요청'; }
+  }
+}
+
+function makeupReasonModal(row, mode) {
+  if (!session.isAdmin || !row) return;
+  const isReview = mode === 'review_not_required';
+  modal(isReview ? '보강 없음 처리' : '보강 취소',
+    makeupReasonSelect('muReason'),
+    '<button class="btn btn-primary btn-block mt14" data-act="' + (isReview ? 'mureviewnotsubmit' : 'mucancelsubmit') + '" data-case="' +
+      esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">' + (isReview ? '보강 없음으로 저장' : '보강 취소') + '</button>');
+}
+
+function makeupProposalModal(row) {
+  if (!session.isAdmin || !row) return;
+  const staff = liveStaff().slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const selected = row.proposedStaffId || row.sourceTeacherId || '';
+  const date = row.proposedDate || today();
+  modal('보강 일정 제안 — ' + esc(row.studentName || '학생'),
+    '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작</label><input class="in" id="muStart" type="time" value="' + esc(row.proposedStartTime || '18:00') + '"></div>' +
+    '<div class="field"><label class="fl" for="muEnd">종료</label><input class="in" id="muEnd" type="time" value="' + esc(row.proposedEndTime || '19:00') + '"></div></div>' +
+    '<div class="field"><label class="fl" for="muStaff">담당 선생님</label><select class="in" id="muStaff"><option value="">선택</option>' +
+      staff.map(item => '<option value="' + esc(item.id) + '"' + (item.id === selected ? ' selected' : '') + '>' + esc(item.name) + '</option>').join('') + '</select></div>' +
+    '<div class="hint">활성 직원과 학생의 정규 수업·확정 보강 시간이 겹치면 서버에서 저장을 막습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="muproposesubmit" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"' +
+      (staff.length ? '' : ' disabled') + '>보호자에게 제안할 일정 저장</button>');
+}
+
+async function submitMakeupProposal(button) {
+  const date = String(($('#muDate') || {}).value || '');
+  const startTime = String(($('#muStart') || {}).value || '');
+  const endTime = String(($('#muEnd') || {}).value || '');
+  const staffId = String(($('#muStaff') || {}).value || '');
+  if (!date || !startTime || !endTime || startTime >= endTime || !staffId) return toast('날짜·시작·종료·담당 선생님을 확인해 주세요');
+  await mutateMakeup({ action: 'propose', caseId: button.dataset.case, revision: Number(button.dataset.rev),
+    date: date, startTime: startTime, endTime: endTime, staffId: staffId }, button, '보강 일정을 제안 상태로 저장했습니다', 'mupropose', true);
+}
+
+async function submitMakeupReason(button, action) {
+  const reason = String(($('#muReason') || {}).value || '');
+  if (!MAKEUP_REASON_LABELS[reason]) return toast('운영 사유를 선택해 주세요');
+  const payload = action === 'review'
+    ? { action: 'review', caseId: button.dataset.case, revision: Number(button.dataset.rev), decision: 'not_required', reason: reason }
+    : { action: 'cancel', caseId: button.dataset.case, revision: Number(button.dataset.rev), reason: reason };
+  await mutateMakeup(payload, button, action === 'review' ? '보강 없음으로 처리했습니다' : '보강을 취소했습니다',
+    action === 'review' ? 'mureviewnot' : 'mucancel', true);
 }
 
 /* ── 주간 플래너 ── */
@@ -6466,23 +7325,80 @@ function viewStaffAdmin() {
 }
 
 /* ── 보호자 연락처·발송 동의 ──
- * 학부모 피드백 실제 발송(parent-feedback-send.js)이 전화번호를 찾아오는 유일한 곳.
- * 학생 명단과 마찬가지로 D1에만 저장되고 원장만 보고 고친다. */
+ * 화면은 stable studentId와 동의 범위만 서버로 보낸다. 실제 수신번호 조회는 피드백·운영
+ * 알림 Worker가 D1에서 각각 재검증하며, 학생 명단과 연락처는 관리자만 보고 고친다. */
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
+let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
+let guardianOpsConsents = new Map(); // stable studentId -> scope별 {consent,updatedAt,needsReconsent}
+let guardianOpsConsentsError = '';
 let guardianContactsLoaded = false;
 let guardianContactsLoading = false;
 let guardianContactsError = '';
 let settingsGuardianStudents = [];   // 현재 렌더링된 순서 — data-idx로 입력칸을 찾을 때 쓴다
 
+function emptyGuardianOpsConsent() {
+  return { consent: false, updatedAt: 0, needsReconsent: false };
+}
+
+function emptyGuardianOpsScopes() {
+  return { makeup: emptyGuardianOpsConsent(), session: emptyGuardianOpsConsent() };
+}
+
+function normalizeGuardianOpsConsent(row) {
+  return {
+    consent: !!(row && row.consent),
+    updatedAt: Number(row && row.updatedAt) || 0,
+    needsReconsent: !!(row && row.needsReconsent)
+  };
+}
+
+function applyGuardianOpsConsentRows(rows) {
+  const next = new Map();
+  (rows || []).forEach(row => {
+    if (!row || !row.studentId || !['makeup', 'session'].includes(row.scope)) return;
+    const current = next.get(row.studentId) || emptyGuardianOpsScopes();
+    current[row.scope] = normalizeGuardianOpsConsent(row);
+    next.set(row.studentId, current);
+  });
+  guardianOpsConsents = next;
+}
+
+async function refreshGuardianOpsConsents(auth) {
+  const result = await sync.post('/guardian-ops-send', {
+    app: SYNC_APP, auth: auth, action: 'consent_list'
+  });
+  applyGuardianOpsConsentRows(result.consents || []);
+  guardianOpsConsentsError = '';
+}
+
+async function refreshGuardianPortalAccess(auth) {
+  const result = await sync.post('/parent-portal', {
+    app: SYNC_APP, auth: auth, action: 'access_list'
+  });
+  guardianPortalAccess = new Map((result.access || []).map(row => [row.studentId, row]));
+}
+
 async function loadGuardianContacts(force) {
   if (!session.isAdmin || guardianContactsLoading || (guardianContactsLoaded && !force)) return;
   const auth = sync.auth();
   if (!auth) { guardianContactsError = '동기화 인증이 필요합니다'; guardianContactsLoaded = true; return; }
-  guardianContactsLoading = true; guardianContactsError = '';
+  guardianContactsLoading = true; guardianContactsError = ''; guardianOpsConsentsError = '';
   if (route === 'settings') render();
   try {
-    const result = await sync.post('/guardian-contact', { app: SYNC_APP, auth: auth, action: 'list' });
+    const results = await Promise.all([
+      sync.post('/guardian-contact', { app: SYNC_APP, auth: auth, action: 'list' }),
+      sync.post('/parent-portal', { app: SYNC_APP, auth: auth, action: 'access_list' }),
+      sync.post('/guardian-ops-send', { app: SYNC_APP, auth: auth, action: 'consent_list' })
+        .then(result => ({ result: result }), error => ({ error: error }))
+    ]);
+    const result = results[0];
     guardianContacts = new Map((result.contacts || []).map(c => [c.studentId, c]));
+    guardianPortalAccess = new Map((results[1].access || []).map(row => [row.studentId, row]));
+    if (results[2].error) {
+      guardianOpsConsentsError = '서버 연결 또는 관리 권한을 확인해 주세요';
+    } else {
+      applyGuardianOpsConsentRows(results[2].result.consents || []);
+    }
     guardianContactsLoaded = true;
   } catch (error) {
     guardianContactsError = String(error && error.message || error);
@@ -6494,6 +7410,7 @@ async function loadGuardianContacts(force) {
 }
 
 async function saveGuardianContact(idx, button) {
+  if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   const phone = (($('#gcPhone-' + idx) || {}).value || '').trim();
@@ -6507,10 +7424,108 @@ async function saveGuardianContact(idx, button) {
       studentName: student.name, phone: phone, consent: consent
     });
     if (guardianContacts) guardianContacts.set(student.id, result.contact);
+    try { await refreshGuardianOpsConsents(auth); }
+    catch (opsError) { guardianOpsConsentsError = '서버 연결 또는 관리 권한을 확인해 주세요'; }
+    try { await refreshGuardianPortalAccess(auth); }
+    catch (portalError) { guardianContactsError = '보호자 웹앱 동의 상태를 다시 불러와 주세요'; }
     toast(student.name + ' 보호자 연락처를 저장했습니다');
     render();
   } catch (error) {
     toast('저장 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function saveGuardianOpsConsent(idx, scope, button) {
+  if (!session.isAdmin || !['makeup', 'session'].includes(scope)) return;
+  const student = settingsGuardianStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  const inputId = scope === 'makeup' ? 'gcOpsMakeup-' + idx : 'gcOpsSession-' + idx;
+  const consent = !!(($("#" + inputId) || {}).checked);
+  const scopes = guardianOpsConsents.get(student.id) || emptyGuardianOpsScopes();
+  const before = scopes[scope] || emptyGuardianOpsConsent();
+  const expectedUpdatedAt = Number(before.updatedAt) || 0;
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/guardian-ops-send', {
+      app: SYNC_APP, auth: auth, action: 'consent_set', studentId: student.id,
+      scope: scope, consent: consent, expectedUpdatedAt: expectedUpdatedAt
+    });
+    scopes[scope] = normalizeGuardianOpsConsent(result.consent);
+    guardianOpsConsents.set(student.id, scopes);
+    guardianOpsConsentsError = '';
+    toast(student.name + (scope === 'makeup' ? ' 보강 알림 동의를 저장했습니다' : ' 회차 안내 동의를 저장했습니다'));
+    render();
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    if (error && error.code === 'CONSENT_REVISION_CONFLICT' && error.current) {
+      scopes[scope] = normalizeGuardianOpsConsent(error.current);
+      guardianOpsConsents.set(student.id, scopes);
+      toast('다른 화면에서 운영 알림 동의가 먼저 변경됐습니다 — 최신 상태를 확인해 주세요');
+      render();
+      return;
+    }
+    toast(GUARDIAN_OPS_BLOCKER_TEXT[String(error && error.code || '')] || '운영 알림 동의를 저장하지 못했습니다 — 준비 상태를 확인해 주세요');
+    if (button) button.disabled = false;
+  }
+}
+
+async function issueParentPortalInvite(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsGuardianStudents[Number(idx)];
+  const contact = student && guardianContacts && guardianContacts.get(student.id);
+  const access = student && guardianPortalAccess.get(student.id);
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  if (!contact || !contact.phone) return toast('보호자 연락처를 먼저 저장해 주세요');
+  if (access && access.needsReconsent) return toast('보호자 연락처가 변경되어 웹앱 이용 동의를 다시 저장해야 합니다');
+  if (!access || !access.enabled) return toast('보호자 웹앱 이용 동의를 먼저 저장해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, auth: auth, action: 'invite', studentId: student.id
+    });
+    const code = String(result.code || '');
+    if (!/^[a-f0-9]{48}$/.test(code)) throw new Error('보호자 초대 코드 응답을 확인해 주세요');
+    const link = new URL('/', new URL(SYNC_URL, location.href).origin);
+    link.hash = new URLSearchParams({ code: code }).toString();
+    await copy(link.toString(), student.name + ' 보호자 앱 초대 링크를 복사했습니다');
+  } catch (error) {
+    toast('초대 링크 발급 실패 — ' + (error.message || error));
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function saveGuardianPortalAccess(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsGuardianStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  const enabled = !!(($('#gcPortal-' + idx) || {}).checked);
+  const current = guardianPortalAccess.get(student.id);
+  const expectedUpdatedAt = Number(current && current.updatedAt) || 0;
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, auth: auth, action: 'access_set', studentId: student.id,
+      enabled: enabled, expectedUpdatedAt: expectedUpdatedAt
+    });
+    guardianPortalAccess.set(student.id, result.access);
+    toast(enabled ? student.name + ' 보호자 웹앱 이용 동의를 저장했습니다' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
+    render();
+  } catch (error) {
+    if (error && error.code === 'ACCESS_REVISION_CONFLICT' && error.current) {
+      guardianPortalAccess.set(student.id, error.current);
+      toast('다른 화면에서 웹앱 동의가 먼저 변경됐습니다 — 최신 상태를 확인해 주세요');
+      render();
+      return;
+    }
+    toast('웹앱 동의 저장 실패 — ' + (error.message || error));
     if (button) button.disabled = false;
   }
 }
@@ -6529,6 +7544,10 @@ function viewGuardianContactPanel() {
     notice = '<div class="hint mb14"><b>보호자 연락처를 불러오지 못했습니다</b> — ' + esc(guardianContactsError) +
       ' <button class="btn btn-sm btn-ghost" data-act="gcrefresh">다시 시도</button></div>';
   }
+  if (guardianOpsConsentsError) {
+    notice += '<div class="hint mb14"><b>보강·회차 알림 동의를 불러오지 못했습니다</b> — ' + esc(guardianOpsConsentsError) +
+      ' <button class="btn btn-sm btn-ghost" data-act="gcrefresh">다시 시도</button></div>';
+  }
 
   if (!rosterDb && !rosterErr) body = '<div class="empty"><b>⏳</b>원생 명단을 불러오는 중입니다.</div>';
   else if (rosterErr) body = '<div class="small" style="color:var(--coral)">원생 명단을 불러오지 못했습니다 — ' + esc(rosterErr) + '</div>';
@@ -6536,16 +7555,31 @@ function viewGuardianContactPanel() {
   else if (!students.length) body = '<div class="empty">현재 재원생이 없습니다.</div>';
   else body = students.map((s, i) => {
     const c = (guardianContacts && guardianContacts.get(s.id)) || { phone: '', consent: false };
+    const portal = guardianPortalAccess.get(s.id) || { enabled: false };
+    const ops = guardianOpsConsents.get(s.id) || emptyGuardianOpsScopes();
+    const makeupOps = ops.makeup || emptyGuardianOpsConsent();
+    const sessionOps = ops.session || emptyGuardianOpsConsent();
+    const opsDisabled = guardianOpsConsentsError ? ' disabled' : '';
     return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.teacher || '미지정') + ')</span></div>' +
       '<div class="row wraprow" style="gap:8px">' +
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + i + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
-        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcConsent-' + i + '" ' + (c.consent ? 'checked' : '') + '> 발송 동의</label>' +
-        '<button class="btn btn-sm btn-ghost" data-act="gcsave" data-idx="' + i + '">저장</button>' +
+        '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcConsent-' + i + '" ' + (c.consent ? 'checked' : '') + '> 수업 피드백 알림톡 동의</label>' +
+        '<button class="btn btn-sm btn-ghost" data-act="gcsave" data-idx="' + i + '">연락처·피드백 동의 저장</button>' +
+        '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsMakeup-' + i + '" ' + (makeupOps.consent ? 'checked' : '') + opsDisabled + '> 보강 알림 동의</label>' +
+        (makeupOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 보강 알림 재동의 필요</span>' : '') +
+        '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="makeup" data-idx="' + i + '"' + opsDisabled + '>보강 동의 저장</button>' +
+        '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
+        (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
+        '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' +
+        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 웹앱 동의</label>' +
+        (portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
+        '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">웹앱 동의 저장</button>' +
+        '<button class="btn btn-sm btn-primary" data-act="gcportalinvite" data-idx="' + i + '" ' + (!c.phone || !portal.enabled ? 'disabled' : '') + '>보호자 앱 초대</button>' +
       '</div></div>';
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">학부모 피드백 알림톡은 여기 등록·동의된 학생에게만 접수됩니다. 전화번호만 있고 동의가 꺼져 있으면 발송되지 않습니다.<br>' +
+    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 웹앱 이용 동의는 각각 확인합니다. 웹앱 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
     '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }
@@ -7452,6 +8486,56 @@ document.addEventListener('click', ev => {
     }
     case 'gcsave': saveGuardianContact(el.dataset.idx, el); break;
     case 'gcrefresh': guardianContactsLoaded = false; loadGuardianContacts(true); break;
+    case 'gcopsconsent': saveGuardianOpsConsent(el.dataset.idx, String(el.dataset.scope || ''), el); break;
+    case 'gcportalaccess': saveGuardianPortalAccess(el.dataset.idx, el); break;
+    case 'gcportalinvite': issueParentPortalInvite(el.dataset.idx, el); break;
+
+    /* 회차제 수업 */
+    case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
+    case 'spcreate': createSessionPack(el); break;
+    case 'spadjust': sessionPackAdjustmentModal(String(el.dataset.pack || ''), Number(el.dataset.rev), Number(el.dataset.delta)); break;
+    case 'spadjustsubmit': submitSessionPackAdjustment(el); break;
+    case 'spclose': closeSessionPack(String(el.dataset.pack || ''), Number(el.dataset.rev), el); break;
+    case 'sprecord': recordTodaySessionPack(String(el.dataset.pack || ''), el); break;
+    case 'opssessionnotice': requestGuardianOpsSend(opsSessionTarget(String(el.dataset.pack || ''))); break;
+
+    /* 보강 */
+    case 'murefresh': makeupLoaded = false; loadMakeups(true); break;
+    case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el); break;
+    case 'mureviewrequired': {
+      mutateMakeup({ action: 'review', caseId: String(el.dataset.case || ''), revision: Number(el.dataset.rev),
+        decision: 'required', reason: '' }, el, '보강 진행 대상으로 검토했습니다', 'mureviewrequired', false);
+      break;
+    }
+    case 'mureviewnot': {
+      makeupReasonModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'review_not_required');
+      break;
+    }
+    case 'mureviewnotsubmit': submitMakeupReason(el, 'review'); break;
+    case 'mupropose': {
+      makeupProposalModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')));
+      break;
+    }
+    case 'muproposesubmit': submitMakeupProposal(el); break;
+    case 'muconfirm': {
+      mutateMakeup({ action: 'confirm', caseId: String(el.dataset.case || ''), revision: Number(el.dataset.rev) },
+        el, '보강 일정을 확정했습니다', 'muconfirm', false);
+      break;
+    }
+    case 'mucancel': {
+      makeupReasonModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'cancel');
+      break;
+    }
+    case 'mucancelsubmit': submitMakeupReason(el, 'cancel'); break;
+    case 'guardianopsmakeup': requestGuardianOpsSend(guardianOpsTargetForMakeup(String(el.dataset.case || ''))); break;
+    case 'mucomplete': {
+      const row = makeupRows.find(item => item.caseId === String(el.dataset.case || ''));
+      if (!session.isStaffLink || !row || row.status !== 'confirmed' || row.confirmedStaffId !== session.staffId) break;
+      if (!confirm('실제 보강 수업을 완료했나요?')) break;
+      mutateMakeup({ action: 'complete', caseId: row.caseId, revision: Number(row.revision) },
+        el, '보강 수업을 완료했습니다', 'mucomplete', false);
+      break;
+    }
 
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
@@ -8557,7 +9641,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.4';
+const APP_VER = '2026-08-11.5';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

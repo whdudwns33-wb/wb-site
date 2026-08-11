@@ -32,6 +32,10 @@
  *   POST /transport { app, auth, action, ... }      → 차량 노선 설정·승하차 상태
  *   POST /staff-deactivate { app, auth(all), staffId, expectedUpdatedAt } → 직원 비활성화 CAS + 링크 해지
  *   POST /onboarding-patch { app, auth, ... }       → 신규 학생 30일 기록 CAS 수정
+ *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
+ *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
+ *   POST /parent-portal { app, action, ... }         → 보호자 초대·학생 범위 웹앱
+ *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -52,6 +56,10 @@ import { handleRoster } from './roster.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleTransport } from './transport.js';
 import { handleOnboardingPatch } from './onboarding.js';
+import { handleParentPortal } from './parent-portal.js';
+import { handleMakeup } from './makeup.js';
+import { handleSessionPack } from './session-pack.js';
+import { handleGuardianOpsSend } from './guardian-ops-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1317,13 +1325,17 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
     const allowed = (env.ALLOW_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
-    const okOrigin = !allowed.length || allowed.includes(origin) ? (origin || '*') : null;
+    const parentSameOrigin = url.pathname === '/parent-portal' && origin === url.origin;
+    const okOrigin = parentSameOrigin || !allowed.length || allowed.includes(origin) ? (origin || '*') : null;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(okOrigin || 'null') });
     }
     if (url.pathname === '/health') {
       return json({ ok: true, now: Date.now() }, 200, okOrigin);
+    }
+    if ((request.method === 'GET' || request.method === 'HEAD') && env.ASSETS) {
+      return env.ASSETS.fetch(request);
     }
     if (request.method !== 'POST') return json({ ok: false, error: 'POST만 허용' }, 405, okOrigin);
     if (okOrigin === null) return json({ ok: false, error: '허용되지 않은 출처' }, 403, '*');
@@ -1380,6 +1392,30 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleOnboardingPatch(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/parent-portal') {
+        const publicAction = ['exchange', 'view', 'respond', 'logout'].includes(String(body.action || ''));
+        if (publicAction && !parentSameOrigin) {
+          return json({ ok: false, error: '보호자 앱과 같은 출처에서만 사용할 수 있습니다' }, 403, okOrigin);
+        }
+        const auth = ['invite', 'access_list', 'access_set'].includes(body.action)
+          ? await resolveAuth(env, app, body.auth) : null;
+        return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
+      }
+      if (url.pathname === '/makeup') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleMakeup(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/session-pack') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleSessionPack(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/guardian-ops-send') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleGuardianOpsSend(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);

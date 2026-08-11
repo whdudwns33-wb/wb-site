@@ -289,13 +289,15 @@ test('rejected-only retry groups each vendor once and excludes accepted or unkno
   };
   let first;
   let again;
-  await withFetch(async (url, opts) => {
+  const nextKstMorning = Date.parse(new Date(Date.now() + 9 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10) + 'T00:00:00Z');
+  await withNow(nextKstMorning, () => withFetch(async (url, opts) => {
     payloads.push(JSON.parse(opts.body));
     return acceptedResponse(payloads.length);
   }, async () => {
     first = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'retry-rejected' }, env);
     again = await call(db, { auth: admin, action: 'retry-rejected' }, env);
-  });
+  }));
 
   assert.equal(first.status, 200);
   assert.equal(first.body.results.length, 2);

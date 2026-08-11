@@ -793,3 +793,520 @@ BEGIN
   UPDATE tokens SET revoked = 1 WHERE app = OLD.app AND staff_id = OLD.id;
   UPDATE bootstrap_codes SET revoked = 1 WHERE app = OLD.app AND staff_id = OLD.id;
 END;
+
+-- 모든 학생의 결석 수업과 보강 일정을 잇는 운영 원장.
+-- 이름·전화·보호자·상담 메모는 저장하지 않고 stable ID만 보관한다.
+CREATE TABLE IF NOT EXISTS makeup_cases (
+  app                         TEXT    NOT NULL CHECK (app = 'task'),
+  case_id                     TEXT    NOT NULL,
+  student_id                  TEXT    NOT NULL,
+  source_task_id              TEXT    NOT NULL,
+  source_date                 TEXT    NOT NULL CHECK (
+    length(source_date) = 10 AND strftime('%Y-%m-%d', source_date) = source_date
+  ),
+  source_teacher_id           TEXT    NOT NULL,
+  consumption_group_id        TEXT    NOT NULL,
+  status                      TEXT    NOT NULL CHECK (status IN (
+    'review_pending','reviewed','awaiting_parent','confirmed','completed','cancelled'
+  )),
+  revision                    INTEGER NOT NULL CHECK (revision >= 1),
+  proposed_start_at           TEXT,
+  proposed_end_at             TEXT,
+  proposed_staff_id           TEXT,
+  confirmed_start_at          TEXT,
+  confirmed_end_at            TEXT,
+  confirmed_staff_id          TEXT,
+  completed_at                INTEGER,
+  completed_by                TEXT,
+  cancelled_at                INTEGER,
+  cancelled_by                TEXT,
+  reason                      TEXT CHECK (reason IS NULL OR reason IN (
+    'policy_ineligible','already_resolved','parent_declined',
+    'schedule_unavailable','student_inactive','other'
+  )),
+  notification_needed         INTEGER NOT NULL DEFAULT 0 CHECK (notification_needed IN (0,1)),
+  notification_event          TEXT,
+  notification_event_revision INTEGER NOT NULL DEFAULT 0 CHECK (notification_event_revision >= 0),
+  history                     TEXT    NOT NULL CHECK (json_valid(history)),
+  created_at                  INTEGER NOT NULL,
+  updated_at                  INTEGER NOT NULL,
+  PRIMARY KEY (app, case_id),
+  UNIQUE (app, source_task_id, source_date),
+  UNIQUE (app, consumption_group_id),
+  CHECK (
+    (proposed_start_at IS NULL AND proposed_end_at IS NULL AND proposed_staff_id IS NULL)
+    OR (
+      proposed_start_at IS NOT NULL AND proposed_end_at IS NOT NULL AND proposed_staff_id IS NOT NULL
+      AND length(proposed_start_at) = 25 AND length(proposed_end_at) = 25
+      AND substr(proposed_start_at, 11, 1) = 'T' AND substr(proposed_end_at, 11, 1) = 'T'
+      AND substr(proposed_start_at, 20, 6) = '+09:00' AND substr(proposed_end_at, 20, 6) = '+09:00'
+      AND substr(proposed_start_at, 1, 10) = substr(proposed_end_at, 1, 10)
+      AND proposed_start_at < proposed_end_at
+    )
+  ),
+  CHECK (
+    (confirmed_start_at IS NULL AND confirmed_end_at IS NULL AND confirmed_staff_id IS NULL)
+    OR (
+      confirmed_start_at IS NOT NULL AND confirmed_end_at IS NOT NULL AND confirmed_staff_id IS NOT NULL
+      AND length(confirmed_start_at) = 25 AND length(confirmed_end_at) = 25
+      AND substr(confirmed_start_at, 11, 1) = 'T' AND substr(confirmed_end_at, 11, 1) = 'T'
+      AND substr(confirmed_start_at, 20, 6) = '+09:00' AND substr(confirmed_end_at, 20, 6) = '+09:00'
+      AND substr(confirmed_start_at, 1, 10) = substr(confirmed_end_at, 1, 10)
+      AND confirmed_start_at < confirmed_end_at
+    )
+  ),
+  CHECK ((status = 'completed') = (completed_at IS NOT NULL AND completed_by IS NOT NULL)),
+  CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL)),
+  CHECK (
+    notification_needed = 0 OR (
+      notification_event IN ('proposal','confirmed','cancelled')
+      AND notification_event_revision >= 1 AND notification_event_revision <= revision
+    )
+  )
+);
+CREATE INDEX IF NOT EXISTS idx_makeup_status
+  ON makeup_cases(app, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_makeup_student
+  ON makeup_cases(app, student_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_makeup_staff_time
+  ON makeup_cases(app, confirmed_staff_id, confirmed_start_at, confirmed_end_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_insert
+BEFORE INSERT ON makeup_cases
+WHEN NEW.status = 'confirmed' AND EXISTS (
+  SELECT 1 FROM makeup_cases AS other
+  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+    AND other.confirmed_start_at < NEW.confirmed_end_at
+    AND NEW.confirmed_start_at < other.confirmed_end_at
+    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_update
+BEFORE UPDATE OF status,confirmed_start_at,confirmed_end_at,confirmed_staff_id,student_id ON makeup_cases
+WHEN NEW.status = 'confirmed' AND EXISTS (
+  SELECT 1 FROM makeup_cases AS other
+  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+    AND other.confirmed_start_at < NEW.confirmed_end_at
+    AND NEW.confirmed_start_at < other.confirmed_end_at
+    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
+END;
+
+-- API 실수나 직접 쓰기로도 원장/타 담당자가 완료자로 기록될 수 없다.
+CREATE TRIGGER IF NOT EXISTS trg_makeup_complete_assignee
+BEFORE UPDATE OF status,completed_by ON makeup_cases
+WHEN NEW.status = 'completed' AND (
+  OLD.status <> 'confirmed'
+  OR NEW.confirmed_staff_id IS NOT OLD.confirmed_staff_id
+  OR OLD.confirmed_staff_id IS NULL
+  OR NEW.completed_by IS NULL
+  OR NEW.completed_by <> OLD.confirmed_staff_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_COMPLETE_ASSIGNEE');
+END;
+
+-- 지정한 학생·수업에만 여는 회차권. 월제 수업은 행을 만들지 않는다.
+-- 금액·결제·연락처·자유 메모는 저장하지 않고 수업 사용 횟수만 관리한다.
+CREATE TABLE IF NOT EXISTS session_packs (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  pack_id               TEXT    NOT NULL,
+  student_id            TEXT    NOT NULL,
+  lesson_task_id        TEXT    NOT NULL,
+  task_owner            TEXT    NOT NULL,
+  lesson_assignment_key TEXT    NOT NULL CHECK (length(lesson_assignment_key) BETWEEN 1 AND 256),
+  student_identity_hash TEXT    NOT NULL CHECK (length(student_identity_hash) = 64),
+  task_identity_hash    TEXT    NOT NULL CHECK (length(task_identity_hash) = 64),
+  total_sessions        INTEGER NOT NULL CHECK (total_sessions BETWEEN 1 AND 200),
+  valid_from            TEXT    NOT NULL CHECK (
+    length(valid_from) = 10 AND strftime('%Y-%m-%d', valid_from) = valid_from
+  ),
+  expires_on            TEXT    NOT NULL CHECK (
+    length(expires_on) = 10 AND strftime('%Y-%m-%d', expires_on) = expires_on
+    AND expires_on >= valid_from
+  ),
+  deduction_policy      TEXT    NOT NULL CHECK (deduction_policy = 'recommended_v1'),
+  status                TEXT    NOT NULL CHECK (status IN ('active','closed')),
+  revision              INTEGER NOT NULL CHECK (revision >= 1),
+  created_at            INTEGER NOT NULL,
+  created_by            TEXT    NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  updated_by            TEXT    NOT NULL,
+  closed_at             INTEGER,
+  closed_by             TEXT,
+  PRIMARY KEY (app, pack_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_session_packs_one_active
+  ON session_packs(app, student_id, lesson_task_id)
+  WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_session_packs_student
+  ON session_packs(app, student_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_session_packs_owner
+  ON session_packs(app, task_owner, updated_at);
+
+CREATE TABLE IF NOT EXISTS session_pack_usage (
+  app                  TEXT    NOT NULL CHECK (app = 'task'),
+  entry_id             TEXT    NOT NULL,
+  pack_id              TEXT    NOT NULL,
+  expected_revision    INTEGER NOT NULL CHECK (expected_revision >= 1),
+  source_type          TEXT    NOT NULL CHECK (source_type IN ('regular','makeup','adjustment')),
+  source_ref           TEXT    NOT NULL CHECK (length(source_ref) BETWEEN 1 AND 200),
+  source_date          TEXT    CHECK (
+    source_date IS NULL OR (length(source_date) = 10 AND strftime('%Y-%m-%d', source_date) = source_date)
+  ),
+  attendance_event     TEXT    NOT NULL CHECK (attendance_event IN (
+    'present','late','approved_absence','same_day','no_show','academy_cancel',
+    'makeup_completed','manual_adjustment'
+  )),
+  delta                INTEGER NOT NULL CHECK (delta BETWEEN -200 AND 200),
+  consumption_group_id TEXT,
+  reason_code          TEXT,
+  actor_id             TEXT    NOT NULL,
+  created_at           INTEGER NOT NULL,
+  PRIMARY KEY (app, entry_id),
+  UNIQUE (app, source_type, source_ref),
+  FOREIGN KEY (app, pack_id) REFERENCES session_packs(app, pack_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_pack_usage_pack
+  ON session_pack_usage(app, pack_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_session_pack_usage_one_consumption
+  ON session_pack_usage(app, pack_id, consumption_group_id)
+  WHERE delta > 0 AND consumption_group_id IS NOT NULL;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_usage_guard
+BEFORE INSERT ON session_pack_usage
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM session_packs AS pack
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id AND pack.status = 'active'
+  ) THEN RAISE(ABORT, 'SESSION_PACK_NOT_ACTIVE') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM session_packs AS pack
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id
+      AND pack.revision = NEW.expected_revision
+  ) THEN RAISE(ABORT, 'SESSION_PACK_REVISION_CONFLICT') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM session_packs AS pack
+    JOIN tasks AS task
+      ON task.app = pack.app AND task.id = pack.lesson_task_id
+    JOIN staff AS teacher
+      ON teacher.app = pack.app AND teacher.id = pack.task_owner
+    JOIN private_rosters AS roster
+      ON roster.app = pack.app
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id
+      AND task.owner = pack.task_owner
+      AND json_valid(task.data)
+      AND json_type(task.data) = 'object'
+      AND json_extract(task.data, '$.id') = pack.lesson_task_id
+      AND json_extract(task.data, '$.studentId') = pack.student_id
+      AND json_extract(task.data, '$.staffId') = pack.task_owner
+      AND COALESCE(json_extract(task.data, '$.deleted'), 0) = 0
+      AND (
+        json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+        OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) <> 0
+        OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) <> 0
+      )
+      AND CAST(COALESCE(
+        NULLIF(json_extract(task.data, '$.lessonAssignmentKey'), ''),
+        NULLIF(json_extract(task.data, '$.lessonDedupeKey'), ''),
+        json_extract(task.data, '$.id')
+      ) AS TEXT) = pack.lesson_assignment_key
+      AND json_valid(teacher.data)
+      AND json_type(teacher.data) = 'object'
+      AND COALESCE(json_extract(teacher.data, '$.deleted'), 0) = 0
+      AND json_valid(roster.data)
+      AND json_type(roster.data) = 'object'
+      AND EXISTS (
+        SELECT 1 FROM json_each(roster.data, '$.roster.students') AS student
+        WHERE json_type(student.value) = 'object'
+          AND json_extract(student.value, '$.id') = pack.student_id
+          AND json_extract(student.value, '$.start') <= strftime('%Y-%m', 'now', '+9 hours')
+          AND (
+            COALESCE(json_extract(student.value, '$.end'), '') = ''
+            OR strftime('%Y-%m', 'now', '+9 hours') < json_extract(student.value, '$.end')
+          )
+          AND json_type(student.value, '$.teacherIds') = 'array'
+          AND EXISTS (
+            SELECT 1 FROM json_each(student.value, '$.teacherIds') AS assigned
+            WHERE CAST(assigned.value AS TEXT) = pack.task_owner
+          )
+      )
+  ) THEN RAISE(ABORT, 'SESSION_PACK_IDENTITY_MISMATCH') END;
+  SELECT CASE WHEN NEW.source_type <> 'adjustment' AND NOT EXISTS (
+    SELECT 1 FROM session_packs AS pack
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id
+      AND NEW.source_date BETWEEN pack.valid_from AND pack.expires_on
+  ) THEN RAISE(ABORT, 'SESSION_PACK_DATE_OUT_OF_RANGE') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM session_packs AS pack
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id
+      AND (SELECT COALESCE(SUM(delta), 0) FROM session_pack_usage
+           WHERE app = NEW.app AND pack_id = NEW.pack_id) + NEW.delta
+          BETWEEN 0 AND pack.total_sessions
+  ) THEN RAISE(ABORT, 'SESSION_PACK_BALANCE_INVALID') END;
+END;
+
+-- 보강 완료 UPDATE 바로 다음 문장만 makeup 사용 원장을 쓸 수 있다. D1 batch에서
+-- 첫 CAS가 0건이면 changes()가 0이므로 두 번째 문장이 실패하고 전체 batch가 롤백된다.
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_makeup_usage_guard
+BEFORE INSERT ON session_pack_usage
+WHEN NEW.source_type = 'makeup' AND NEW.reason_code = 'makeup_atomic_v1'
+BEGIN
+  SELECT CASE WHEN changes() <> 1
+    THEN RAISE(ABORT, 'MAKEUP_REVISION_CONFLICT') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM makeup_cases AS item
+    WHERE item.app = NEW.app AND item.case_id = NEW.source_ref
+      AND item.status = 'completed'
+      AND item.consumption_group_id = NEW.consumption_group_id
+      AND item.completed_by = NEW.actor_id
+  ) THEN RAISE(ABORT, 'MAKEUP_USAGE_EVIDENCE_INVALID') END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_usage_revision
+AFTER INSERT ON session_pack_usage
+BEGIN
+  UPDATE session_packs
+  SET revision = revision + 1, updated_at = NEW.created_at, updated_by = NEW.actor_id
+  WHERE app = NEW.app AND pack_id = NEW.pack_id AND revision = NEW.expected_revision;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_usage_no_update
+BEFORE UPDATE ON session_pack_usage
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_LEDGER_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_usage_no_delete
+BEFORE DELETE ON session_pack_usage
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_LEDGER_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_immutable
+BEFORE UPDATE ON session_packs
+WHEN NEW.app IS NOT OLD.app
+  OR NEW.pack_id IS NOT OLD.pack_id
+  OR NEW.student_id IS NOT OLD.student_id
+  OR NEW.lesson_task_id IS NOT OLD.lesson_task_id
+  OR NEW.task_owner IS NOT OLD.task_owner
+  OR NEW.lesson_assignment_key IS NOT OLD.lesson_assignment_key
+  OR NEW.student_identity_hash IS NOT OLD.student_identity_hash
+  OR NEW.task_identity_hash IS NOT OLD.task_identity_hash
+  OR NEW.total_sessions IS NOT OLD.total_sessions
+  OR NEW.valid_from IS NOT OLD.valid_from
+  OR NEW.expires_on IS NOT OLD.expires_on
+  OR NEW.deduction_policy IS NOT OLD.deduction_policy
+  OR NEW.created_at IS NOT OLD.created_at
+  OR NEW.created_by IS NOT OLD.created_by
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_IMMUTABLE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_transition
+BEFORE UPDATE ON session_packs
+WHEN NEW.revision <> OLD.revision + 1
+  OR NEW.updated_at < OLD.updated_at
+  OR NOT (
+    NEW.status = OLD.status
+    OR (OLD.status = 'active' AND NEW.status = 'closed')
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_INVALID_TRANSITION');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_no_delete
+BEFORE DELETE ON session_packs
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_APPEND_ONLY');
+END;
+
+-- 보호자 웹앱 초대·세션·정형 응답.
+-- 원본 초대코드/세션토큰/전화번호는 저장하지 않는다. 한 세션은 한 stable studentId만 본다.
+CREATE TABLE IF NOT EXISTS guardian_portal_access (
+  app         TEXT    NOT NULL CHECK (app = 'task'),
+  student_id  TEXT    NOT NULL,
+  enabled     INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  guardian_identity_hash TEXT CHECK (
+    guardian_identity_hash IS NULL OR (
+      length(guardian_identity_hash) = 64 AND guardian_identity_hash NOT GLOB '*[^0-9a-f]*'
+    )
+  ),
+  accepted_at INTEGER,
+  updated_at  INTEGER NOT NULL,
+  updated_by  TEXT    NOT NULL,
+  CHECK (enabled = 0 OR guardian_identity_hash IS NOT NULL),
+  PRIMARY KEY (app, student_id)
+);
+
+CREATE TABLE IF NOT EXISTS guardian_portal_codes (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  code_hash    TEXT    NOT NULL CHECK (length(code_hash) = 71 AND code_hash LIKE 'sha256:%'),
+  student_id   TEXT    NOT NULL,
+  guardian_identity_hash TEXT NOT NULL CHECK (length(guardian_identity_hash) = 64),
+  access_updated_at INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL,
+  expires_at   INTEGER NOT NULL,
+  consumed_at  INTEGER,
+  revoked      INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0, 1)),
+  issued_by    TEXT    NOT NULL,
+  claim_id     TEXT CHECK (claim_id IS NULL OR length(claim_id) = 48),
+  PRIMARY KEY (app, code_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_portal_codes_student
+  ON guardian_portal_codes(app, student_id, revoked, expires_at);
+
+CREATE TABLE IF NOT EXISTS guardian_portal_sessions (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  token_hash   TEXT    NOT NULL CHECK (length(token_hash) = 71 AND token_hash LIKE 'sha256:%'),
+  student_id   TEXT    NOT NULL,
+  guardian_identity_hash TEXT NOT NULL CHECK (length(guardian_identity_hash) = 64),
+  access_updated_at INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL,
+  expires_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  revoked      INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0, 1)),
+  PRIMARY KEY (app, token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_portal_sessions_student
+  ON guardian_portal_sessions(app, student_id, revoked, expires_at);
+
+CREATE TABLE IF NOT EXISTS guardian_portal_responses (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  response_id  TEXT    NOT NULL,
+  student_id   TEXT    NOT NULL,
+  object_type  TEXT    NOT NULL CHECK (object_type = 'makeup'),
+  object_id    TEXT    NOT NULL,
+  revision     INTEGER NOT NULL CHECK (revision >= 1),
+  response     TEXT    NOT NULL CHECK (response IN ('accept', 'decline')),
+  created_at   INTEGER NOT NULL,
+  PRIMARY KEY (app, response_id),
+  UNIQUE (app, object_type, object_id, student_id, revision)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_portal_responses_object
+  ON guardian_portal_responses(app, object_type, object_id, created_at);
+
+-- 철회 또는 동의 대상 보호자 identity 변경은 기존 초대·세션을 같은 DB
+-- 쓰기 안에서 막는다. 휴대폰 번호가 바뀌면 새 보호자에게 기존 동의를 승계하지 않는다.
+CREATE TRIGGER IF NOT EXISTS trg_guardian_portal_access_revoke
+AFTER UPDATE OF enabled, guardian_identity_hash ON guardian_portal_access
+WHEN NEW.enabled = 0 OR OLD.guardian_identity_hash IS NOT NEW.guardian_identity_hash
+BEGIN
+  UPDATE guardian_portal_codes SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+  UPDATE guardian_portal_sessions SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+END;
+
+-- 보호자 응답의 사전 SELECT와 INSERT 사이에 관리자가 일정을 바꾸는 경합도 DB가 막는다.
+CREATE TRIGGER IF NOT EXISTS trg_guardian_portal_response_current
+BEFORE INSERT ON guardian_portal_responses
+WHEN NOT EXISTS (
+  SELECT 1 FROM makeup_cases item
+  WHERE item.app=NEW.app AND item.case_id=NEW.object_id AND item.student_id=NEW.student_id
+    AND item.status='awaiting_parent' AND item.revision=NEW.revision
+)
+BEGIN
+  SELECT RAISE(ABORT, 'PARENT_RESPONSE_STALE');
+END;
+
+-- decline이 먼저 저장됐으면 관리자 confirm이 같은 revision을 확정하지 못한다.
+CREATE TRIGGER IF NOT EXISTS trg_makeup_parent_decline_confirm
+BEFORE UPDATE OF status ON makeup_cases
+WHEN OLD.status='awaiting_parent' AND NEW.status='confirmed' AND EXISTS (
+  SELECT 1 FROM guardian_portal_responses response
+  WHERE response.app=OLD.app AND response.object_type='makeup' AND response.object_id=OLD.case_id
+    AND response.student_id=OLD.student_id AND response.revision=OLD.revision AND response.response='decline'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'PARENT_DECLINED');
+END;
+
+-- 보강·회차 운영 알림톡은 기존 수업 피드백 동의를 재사용하지 않는다.
+CREATE TABLE IF NOT EXISTS guardian_ops_notification_consents (
+  app                    TEXT    NOT NULL CHECK (app = 'task'),
+  student_id             TEXT    NOT NULL,
+  scope                  TEXT    NOT NULL CHECK (scope IN ('makeup','session')),
+  consent                INTEGER NOT NULL DEFAULT 0 CHECK (consent IN (0,1)),
+  guardian_identity_hash TEXT    NOT NULL CHECK (
+    length(guardian_identity_hash) = 64 AND guardian_identity_hash NOT GLOB '*[^0-9a-f]*'
+  ),
+  updated_at             INTEGER NOT NULL,
+  updated_by             TEXT    NOT NULL,
+  PRIMARY KEY (app, student_id, scope)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_ops_consents_scope
+  ON guardian_ops_notification_consents(app, scope, consent, student_id);
+
+CREATE TABLE IF NOT EXISTS guardian_ops_notification_sends (
+  app             TEXT    NOT NULL CHECK (app = 'task'),
+  send_id         TEXT    NOT NULL,
+  idempotency_key TEXT    NOT NULL CHECK (length(idempotency_key) = 64),
+  event_type      TEXT    NOT NULL CHECK (event_type IN (
+    'makeup_proposal','makeup_confirmed','makeup_cancelled','session_balance'
+  )),
+  source_id       TEXT    NOT NULL,
+  source_revision INTEGER NOT NULL CHECK (source_revision >= 1),
+  student_id      TEXT    NOT NULL,
+  variables_hash  TEXT    NOT NULL CHECK (length(variables_hash) = 64),
+  template_id     TEXT    NOT NULL,
+  attempt_no      INTEGER NOT NULL CHECK (attempt_no >= 1),
+  created_at      INTEGER NOT NULL,
+  created_by      TEXT    NOT NULL,
+  PRIMARY KEY (app, send_id),
+  UNIQUE (app, idempotency_key),
+  UNIQUE (app, event_type, source_id, source_revision, attempt_no)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_ops_sends_target
+  ON guardian_ops_notification_sends(app, event_type, source_id, source_revision, attempt_no);
+CREATE INDEX IF NOT EXISTS idx_guardian_ops_sends_day
+  ON guardian_ops_notification_sends(app, created_at);
+
+CREATE TABLE IF NOT EXISTS guardian_ops_notification_send_events (
+  app                  TEXT    NOT NULL CHECK (app = 'task'),
+  ledger_event_id      TEXT    NOT NULL,
+  send_id              TEXT    NOT NULL,
+  status               TEXT    NOT NULL CHECK (status IN ('accepted','rejected','unknown')),
+  provider_group_id    TEXT,
+  provider_message_id  TEXT,
+  provider_status_code TEXT,
+  safe_error_code      TEXT,
+  created_at           INTEGER NOT NULL,
+  PRIMARY KEY (app, ledger_event_id),
+  UNIQUE (app, send_id),
+  FOREIGN KEY (app, send_id) REFERENCES guardian_ops_notification_sends(app, send_id)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_ops_events_send
+  ON guardian_ops_notification_send_events(app, send_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_guardian_ops_events_provider_message
+  ON guardian_ops_notification_send_events(app, provider_message_id)
+  WHERE provider_message_id IS NOT NULL;
+
+CREATE TRIGGER IF NOT EXISTS trg_guardian_ops_sends_no_update
+BEFORE UPDATE ON guardian_ops_notification_sends
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_OPS_SEND_LEDGER_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_ops_sends_no_delete
+BEFORE DELETE ON guardian_ops_notification_sends
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_OPS_SEND_LEDGER_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_ops_events_no_update
+BEFORE UPDATE ON guardian_ops_notification_send_events
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_OPS_EVENT_LEDGER_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_ops_events_no_delete
+BEFORE DELETE ON guardian_ops_notification_send_events
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_OPS_EVENT_LEDGER_APPEND_ONLY');
+END;

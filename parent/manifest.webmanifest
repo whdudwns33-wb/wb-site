@@ -1,0 +1,19 @@
+{
+  "name": "WB 보호자",
+  "short_name": "WB 보호자",
+  "description": "수업 일정, 보강, 회차와 수업 피드백을 확인하는 보호자 웹앱",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f9",
+  "theme_color": "#1b3a5c",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
