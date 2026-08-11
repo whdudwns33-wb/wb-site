@@ -330,6 +330,29 @@
   html.person-mobile .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   html.person-mobile .tab { padding: 12px; font-size: 13px; }
 
+  /* ─── 교재 목록 ─── */
+  .book-search { margin-top: 12px; }
+  .book-vendor { margin-bottom: 16px; }
+  .book-vendor-toggle { width: 100%; min-height: 44px; text-align: left; }
+  .book-vendor-toggle:disabled, .book-series-toggle:disabled { cursor: default; }
+  .book-vendor-copy, .book-vendor-copy .card-title, .book-vendor-copy .small { display: block; }
+  .book-vendor-body { margin-top: -4px; }
+  .book-series { margin: 0 0 14px; padding-left: 8px; border-left: 3px solid #D5EBF7; }
+  .book-series-toggle { width: 100%; min-height: 44px; margin-bottom: 8px; padding: 4px 2px; text-align: left; }
+  .book-series-title { display: block; color: var(--navy); font-size: 13.5px; font-weight: 900; overflow-wrap: anywhere; }
+  .book-entry > .card { margin-bottom: 8px; }
+  .book-card-head { flex-wrap: wrap; align-items: flex-start; }
+  .book-card-main { flex: 1 1 260px; min-width: 0; align-items: flex-start; }
+  .book-card-main > div { min-width: 0; }
+  .book-card-main .card-title { overflow-wrap: anywhere; }
+  .book-card-actions { flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 600px) {
+    .book-series { padding-left: 6px; }
+    .book-card-main { flex-basis: 100%; }
+    .book-card-actions { width: 100%; }
+    .book-card-actions .btn { flex: 1 1 auto; min-height: 44px; }
+  }
+
   /* ─── 직원 현황 ─── */
   .staffcard { display: flex; gap: 14px; align-items: center; }
   .ava { width: 44px; height: 44px; border-radius: 12px; background: var(--navy); color: var(--white); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex-shrink: 0; }
@@ -1422,6 +1445,10 @@ function render() {
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
     applyScheduleSearch(scheduleSearchQuery);
+  });
+  if (route === 'books') requestAnimationFrame(() => {
+    applyBookSearch(bookSearchQuery);
+    restoreBookToggleFocus();
   });
 }
 
@@ -3874,11 +3901,11 @@ function loadBooks() {
       d.students = privateBookStudents.slice();
       bookDb = d;
       applyBookOverlays();
-      if (route === 'books') render();
+      if (route === 'books') renderAfterSync();
       loadApprovedBookAdditions(false);
       loadApprovedBookEdits(false);
     })
-    .catch(e => { bookDbErr = String(e); if (route === 'books') render(); })
+    .catch(e => { bookDbErr = String(e); if (route === 'books') renderAfterSync(); })
     .finally(() => { bookDbLoading = false; });
 }
 
@@ -3918,7 +3945,7 @@ async function loadApprovedBookAdditions(force) {
     approvedBookAdditionsLoaded = true;
   } finally {
     approvedBookAdditionsLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -3958,7 +3985,7 @@ async function loadApprovedBookEdits(force) {
     approvedBookEditsLoaded = true;
   } finally {
     approvedBookEditsLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -3998,7 +4025,121 @@ function posOf(b, at) {
 
 /** 거래처 카드 접기 상태 — 기본은 펼침, 닫은 것만 이 집합에 담는다 */
 const vendorClosed = new Set();
+const seriesExpansion = new Map();
 const UNASSIGNED_VENDOR_KEY = '__unassigned__';
+const OTHER_BOOK_SERIES = '기타·개별 교재';
+let bookSearchQuery = '';
+let bookToggleFocus = null;
+
+function rememberBookToggleFocus(el) {
+  bookToggleFocus = { act: el.dataset.act, key: el.dataset.key };
+}
+function restoreBookToggleFocus() {
+  const saved = bookToggleFocus;
+  bookToggleFocus = null;
+  if (!saved) return;
+  const target = Array.from(document.querySelectorAll('[data-act="' + saved.act + '"]'))
+    .find(button => button.dataset.key === saved.key);
+  if (target) target.focus({ preventScroll: true });
+}
+
+/** 시리즈는 주문 데이터가 아닌 표시용 파생값이다. 확실한 이름만 묶고 나머지는 추정하지 않는다. */
+function bookSeriesName(book) {
+  const explicit = String(book && book.series || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  if (explicit) return explicit;
+  const title = String(book && book.title || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const rules = [
+    [/^팩토\s*사고력(?:\s|$)/i, '팩토사고력'],
+    [/^독해창\s+비상[12](?:\s|$)/, '독해창'],
+    [/^논리와 상상\s+(?:기본|도약)\d+(?:\s|$)/, '논리와 상상'],
+    [/^개념원리(?:\s|$)/, '개념원리'],
+    [/^수학의 바이블(?:\s|$)/, '수학의 바이블'],
+    [/^라이트쎈(?:\s|$)/, '라이트쎈'],
+    [/^RPM(?:\s|$)/i, 'RPM'],
+    [/^우공비 비문학 독해(?:\s|$)/, '우공비 비문학 독해']
+  ];
+  const found = rules.find(rule => rule[0].test(title));
+  return found ? found[1] : OTHER_BOOK_SERIES;
+}
+
+function groupBooksBySeries(books) {
+  const groups = new Map();
+  (books || []).forEach(book => {
+    const name = bookSeriesName(book);
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(book);
+  });
+  return Array.from(groups, ([name, items]) => ({ name, books: items })).sort((a, b) =>
+    a.name === OTHER_BOOK_SERIES ? 1 : b.name === OTHER_BOOK_SERIES ? -1 : 0);
+}
+
+function normalizeBookSearch(value) {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase('ko').replace(/\s+/g, ' ').trim();
+}
+function bookSearchText(book, vendorName, seriesName) {
+  return normalizeBookSearch([
+    book && book.title, book && book.subject, book && book.level, vendorName, seriesName
+  ].filter(Boolean).join(' '));
+}
+function bookSearchMatches(text, query) {
+  const haystack = normalizeBookSearch(text);
+  return normalizeBookSearch(query).split(' ').filter(Boolean).every(term => haystack.includes(term));
+}
+function booksOutsideSearch(books, vendorName, query) {
+  if (!normalizeBookSearch(query)) return 0;
+  return (books || []).filter(book => !bookSearchMatches(
+    bookSearchText(book, vendorName, bookSeriesName(book)), query
+  )).length;
+}
+
+/** 검색은 DOM 표시만 바꾼다. 기존 접기·선택·주문 상태는 건드리지 않는다. */
+function applyBookSearch(value) {
+  bookSearchQuery = String(value || '').slice(0, 120);
+  const hasQuery = !!normalizeBookSearch(bookSearchQuery);
+  let shown = 0;
+  document.querySelectorAll('[data-book-series]').forEach(series => {
+    let count = 0;
+    series.querySelectorAll('[data-book-entry]').forEach(entry => {
+      const matched = bookSearchMatches(entry.dataset.bookSearch, bookSearchQuery);
+      entry.hidden = !matched;
+      if (matched) count++;
+    });
+    series.hidden = hasQuery && count === 0;
+    const body = series.querySelector('[data-book-series-body]');
+    const toggle = series.querySelector('[data-act="seriestoggle"]');
+    const expanded = hasQuery ? count > 0 : series.dataset.expanded === 'true';
+    if (body) body.hidden = !expanded;
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.disabled = hasQuery;
+      toggle.title = hasQuery ? '검색 중에는 결과를 자동으로 펼칩니다. 검색을 지우면 다시 접을 수 있습니다.' : '';
+    }
+    const arrow = series.querySelector('[data-book-series-arrow]');
+    if (arrow) arrow.textContent = expanded ? '▾' : '▸';
+    shown += count;
+  });
+  document.querySelectorAll('[data-book-vendor]').forEach(vendor => {
+    const matches = vendor.querySelectorAll('[data-book-entry]:not([hidden])').length;
+    const body = vendor.querySelector('[data-book-vendor-body]');
+    const toggle = vendor.querySelector('[data-act="vendortoggle"]');
+    const expanded = hasQuery ? matches > 0 : vendor.dataset.closed !== 'true';
+    vendor.hidden = hasQuery && matches === 0;
+    if (body) body.hidden = !expanded;
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.disabled = hasQuery;
+      toggle.title = hasQuery ? '검색 중에는 결과를 자동으로 펼칩니다. 검색을 지우면 다시 접을 수 있습니다.' : '';
+    }
+    const arrow = vendor.querySelector('[data-book-vendor-arrow]');
+    if (arrow) arrow.textContent = expanded ? '▾' : '▸';
+  });
+  const status = document.querySelector('[data-book-search-status]');
+  if (status) status.textContent = hasQuery
+    ? shown + '권 검색됨 · 검색 중에는 결과를 자동으로 펼칩니다. 접기는 검색을 지운 뒤 사용할 수 있습니다.'
+    : '전체 ' + shown + '권';
+  const empty = document.querySelector('[data-book-search-empty]');
+  if (empty) empty.hidden = !hasQuery || shown > 0;
+}
 
 function vendorTypeBadge(vend) {
   if (!vend) return '';
@@ -4064,13 +4205,16 @@ let batchVendorName = '';
 function batchOrderModal(vendorKey) {
   if (!bookDb) return;
   const isUnassigned = vendorKey === UNASSIGNED_VENDOR_KEY;
+  const vendorLabel = isUnassigned ? '거래처 미등록' : vendorKey;
   const books = (bookDb.books || []).filter(b =>
     batchSelection.has(b.id) && (isUnassigned ? !b.vendor : b.vendor === vendorKey));
   if (books.length < 2) return toast('같은 거래처에서 2권 이상 선택해 주세요');
+  const outsideSearch = booksOutsideSearch(books, vendorLabel, bookSearchQuery);
   batchDraft = books.map(b => ({ id: b.id, title: b.title }));
   batchVendorName = isUnassigned ? '' : vendorKey;
-  modal((isUnassigned ? '거래처 미등록' : vendorKey) + ' — ' + books.length + '권 한번에 주문',
-    '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 등록합니다. 저녁 8시에 다른 주문과 함께 문자 한 통으로 발송됩니다.</div>' +
+  modal(vendorLabel + ' — ' + books.length + '권 한번에 주문',
+    '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 등록합니다. 저녁 8시에 다른 주문과 함께 문자 한 통으로 발송됩니다.' +
+      (outsideSearch ? '<br><b>검색 밖 ' + outsideSearch + '권 포함</b> — 아래 전체 ' + books.length + '권을 확인해 주세요.' : '') + '</div>' +
     batchDraft.map(row =>
       '<div class="field"><label class="fl">' + esc(row.title) + '</label>' +
       '<input class="in" id="bq-' + row.id + '" placeholder="예: 3권">' + '</div>').join(''),
@@ -4103,21 +4247,23 @@ function bookCard(b) {
   const checked = batchSelection.has(b.id);
 
   let h = '<div class="card">' +
-    '<div class="between" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
-      '<div class="row" style="gap:8px;align-items:flex-start">' +
+    '<div class="between book-card-head" data-act="bkopen" data-id="' + b.id + '" style="cursor:pointer">' +
+      '<div class="row book-card-main" style="gap:8px">' +
         '<input type="checkbox" data-act="bkselect" data-id="' + b.id + '" ' + (checked ? 'checked' : '') +
-          ' style="margin-top:4px" title="일괄 주문에 담기">' +
+          ' style="margin-top:4px" aria-label="' + esc(b.title) + ' 일괄 주문 선택">' +
         '<div><div class="card-title">' + esc(b.title) +
           (b.verify ? ' <span class="tag edit">검증필요</span>' : '') +
           (b.source === 'added' ? ' <span class="tag" style="color:var(--navy)">🆕 신청 등록</span>' : '') +
           (openOrders ? ' <span class="tag high">🛒 주문 진행 ' + openOrders + '</span>' : '') + '</div>' +
         '<div class="small muted">' + esc(b.subject) + ' · ' + esc(b.level) +
           (f.length ? ' · 소단원 ' + f.length + '개' : ' · 목차 없음') + '</div></div></div>' +
-      '<div class="row" style="gap:8px;flex-shrink:0">' +
+      '<div class="row book-card-actions" style="gap:8px">' +
         (openOrders ? '<button class="btn btn-sm btn-danger" data-act="bkcancelopen" data-id="' + b.id + '">🗑 취소</button>' : '') +
         '<button class="btn btn-sm btn-ghost" data-act="beopen" data-id="' + b.id + '">✏ 수정</button>' +
         '<button class="btn btn-sm btn-ghost" data-act="bkorder" data-id="' + b.id + '">🛒 주문</button>' +
-        '<span class="muted">' + (open ? '▾' : '▸') + '</span></div></div>';
+        '<button class="btn btn-sm btn-ghost" data-act="bkopen" data-id="' + b.id + '" aria-label="' +
+          esc(b.title) + ' 목차 ' + (open ? '접기' : '펼치기') + '" aria-expanded="' + String(open) + '">' +
+          (open ? '▾' : '▸') + '</button></div></div>';
 
   studs.forEach(st => {
     const idx = posOf(b, st.at);
@@ -4172,7 +4318,7 @@ async function loadBookAddQueue(force) {
   const auth = sync.auth();
   if (!auth) { bookAddQueueError = '동기화 인증이 필요합니다'; bookAddQueueLoaded = true; return; }
   bookAddQueueLoading = true; bookAddQueueError = '';
-  if (route === 'books') render();
+  if (route === 'books') renderAfterSync();
   try {
     const result = await sync.post('/book-add-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
     bookAddQueue = result.requests || [];
@@ -4182,7 +4328,7 @@ async function loadBookAddQueue(force) {
     bookAddQueueLoaded = true;
   } finally {
     bookAddQueueLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -4191,7 +4337,7 @@ async function loadOwnBookAddQueue(force) {
   const auth = sync.auth();
   if (!auth) { ownBookAddQueueError = '동기화 인증이 필요합니다'; ownBookAddQueueLoaded = true; return; }
   ownBookAddQueueLoading = true; ownBookAddQueueError = '';
-  if (route === 'books') render();
+  if (route === 'books') renderAfterSync();
   try {
     const result = await sync.post('/book-add-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
     ownBookAddQueue = result.requests || [];
@@ -4201,7 +4347,7 @@ async function loadOwnBookAddQueue(force) {
     ownBookAddQueueLoaded = true;
   } finally {
     ownBookAddQueueLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -4347,7 +4493,7 @@ async function loadBookEditQueue(force) {
   const auth = sync.auth();
   if (!auth) { bookEditQueueError = '동기화 인증이 필요합니다'; bookEditQueueLoaded = true; return; }
   bookEditQueueLoading = true; bookEditQueueError = '';
-  if (route === 'books') render();
+  if (route === 'books') renderAfterSync();
   try {
     const result = await sync.post('/book-edit-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
     bookEditQueue = result.requests || [];
@@ -4357,7 +4503,7 @@ async function loadBookEditQueue(force) {
     bookEditQueueLoaded = true;
   } finally {
     bookEditQueueLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -4366,7 +4512,7 @@ async function loadOwnBookEditQueue(force) {
   const auth = sync.auth();
   if (!auth) { ownBookEditQueueError = '동기화 인증이 필요합니다'; ownBookEditQueueLoaded = true; return; }
   ownBookEditQueueLoading = true; ownBookEditQueueError = '';
-  if (route === 'books') render();
+  if (route === 'books') renderAfterSync();
   try {
     const result = await sync.post('/book-edit-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
     ownBookEditQueue = result.requests || [];
@@ -4376,7 +4522,7 @@ async function loadOwnBookEditQueue(force) {
     ownBookEditQueueLoaded = true;
   } finally {
     ownBookEditQueueLoading = false;
-    if (route === 'books') render();
+    if (route === 'books') renderAfterSync();
   }
 }
 
@@ -4516,14 +4662,20 @@ function viewBooks() {
     '<button class="btn btn-sm btn-ghost mt14" data-act="bookretry">다시 시도</button></div></div>';
 
   let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
-    '<div class="card-sub">거래처(출판사)별로 묶었습니다. 거래처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
+    '<div class="card-sub">주문처(출판사) → 시리즈 → 세부 교재 순서로 묶었습니다. 주문처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
+    '시리즈명이 확인되지 않은 교재는 잘못 추정하지 않고 "기타·개별 교재"에 둡니다.<br>' +
     '개별 주문도 매일 저녁 8시에 출판사별 문자 한 통으로 자동 묶입니다. 여러 권을 한 번에 입력하려면 왼쪽 체크박스를 사용하세요.<br>' +
     '기준일 ' + esc(bookDb.updated || '') + ' · 각 교재 카드의 "✏ 수정" 버튼으로 정보를 고칠 수 있습니다.</div>' +
+    '<input class="in book-search" type="search" data-book-search-input aria-label="교재 검색" ' +
+      'placeholder="교재명·시리즈·과목·학년·주문처 검색" value="' + esc(bookSearchQuery) + '">' +
+    '<div class="small muted mt8" data-book-search-status role="status" aria-live="polite">전체 ' +
+      (bookDb.books || []).length + '권</div>' +
     '<button class="btn btn-sm btn-primary mt14" data-act="baopen">+ 새 교재 추가 신청</button></div>';
 
   if (session.isAdmin) h += viewBookAddReview() + viewBookEditReview();
   if (session.isStaffLink && !session.isAdmin) h += viewOwnBookAddRequests() + viewOwnBookEditRequests();
 
+  const searching = !!normalizeBookSearch(bookSearchQuery);
   const vendors = bookDb.vendors || [];
   const byVendor = new Map(vendors.map(v => [v.name, []]));
   const unassigned = [];
@@ -4539,25 +4691,54 @@ function viewBooks() {
 
   if (!sections.length) return h + '<div class="card"><div class="empty"><b>📚</b>등록된 교재가 없습니다.</div></div>';
 
+  h += '<div class="card" data-book-search-empty hidden><div class="empty"><b>🔎</b>검색 결과가 없습니다.</div></div>';
+
   sections.forEach(sec => {
-    const closed = vendorClosed.has(sec.key);
     const pending = sec.books.reduce((sum, b) => sum + bookPendingOrderCount(b), 0);
+    const selectedHere = sec.books.filter(b => batchSelection.has(b.id));
+    const closed = vendorClosed.has(sec.key);
+    const vendorLabel = sec.vend ? sec.vend.name : '거래처 미등록';
+    const selectedOutsideSearch = booksOutsideSearch(selectedHere, vendorLabel, bookSearchQuery);
     const brands = sec.vend && Array.isArray(sec.vend.brands) ? sec.vend.brands : [];
-    h += '<div class="card" style="padding:12px"><div class="between" data-act="vendortoggle" data-key="' + esc(sec.key) + '" style="cursor:pointer">' +
-      '<div><div class="card-title">' + (sec.vend ? esc(sec.vend.name) : '거래처 미등록') +
+    h += '<section class="book-vendor" data-book-vendor data-closed="' + String(closed) + '">' +
+      '<button type="button" class="card between book-vendor-toggle" data-act="vendortoggle" data-key="' + esc(sec.key) +
+      '" aria-expanded="' + String(!closed) + '"' + (searching ? ' disabled' : '') + '>' +
+      '<span class="book-vendor-copy"><span class="card-title">' + (sec.vend ? esc(sec.vend.name) : '거래처 미등록') +
         (sec.vend ? ' ' + vendorTypeBadge(sec.vend) : '') +
-        (pending ? ' <span class="tag high">🛒 주문 진행 ' + pending + '</span>' : '') + '</div>' +
-        '<div class="small muted">교재 ' + sec.books.length + '권' +
+        (selectedHere.length ? ' <span class="tag">선택 ' + selectedHere.length + '</span>' : '') +
+        (pending ? ' <span class="tag high">🛒 주문 진행 ' + pending + '</span>' : '') + '</span>' +
+        '<span class="small muted">교재 ' + sec.books.length + '권' +
         (brands.length ? ' · ' + esc(brands.slice(0, 4).join('·')) + (brands.length > 4 ? ' 외' : '') : '') +
-        '</div></div><span class="muted">' + (closed ? '▸' : '▾') + '</span></div></div>';
-    if (!closed) {
-      sec.books.forEach(b => { h += bookCard(b); });
-      const selectedHere = sec.books.filter(b => batchSelection.has(b.id));
-      if (selectedHere.length >= 2) {
-        h += '<button class="btn btn-primary btn-block" data-act="bkbatch" data-key="' + esc(sec.key) + '">' +
-          '🛒 선택한 ' + selectedHere.length + '권 · 저녁 8시 발송 대기</button>';
-      }
+        '</span></span><span class="muted" data-book-vendor-arrow>' + (closed ? '▸' : '▾') + '</span></button>' +
+      '<div class="book-vendor-body" data-book-vendor-body' + (closed ? ' hidden' : '') + '>';
+    groupBooksBySeries(sec.books).forEach(group => {
+      const selected = group.books.filter(book => batchSelection.has(book.id)).length;
+      const groupPending = group.books.reduce((sum, book) => sum + bookPendingOrderCount(book), 0);
+      const seriesKey = sec.key + '::' + group.name;
+      const expanded = seriesExpansion.has(seriesKey)
+        ? seriesExpansion.get(seriesKey) : !!(selected || groupPending);
+      h += '<section class="book-series" data-book-series data-expanded="' + String(expanded) + '">' +
+        '<button type="button" class="between book-series-toggle" data-act="seriestoggle" data-key="' + esc(seriesKey) +
+        '" aria-expanded="' + String(expanded) + '"' + (searching ? ' disabled' : '') + '>' +
+        '<span class="book-series-title">' + esc(group.name) + ' <span class="pill">' + group.books.length + '권</span></span>' +
+        '<span class="row" style="gap:6px">' +
+          (selected ? '<span class="pill">선택 ' + selected + '</span>' : '') +
+          (groupPending ? '<span class="pill warn">주문 ' + groupPending + '</span>' : '') +
+          '<span class="muted" data-book-series-arrow>' + (expanded ? '▾' : '▸') + '</span></span></button>' +
+        '<div data-book-series-body' + (expanded ? '' : ' hidden') + '>';
+      group.books.forEach(book => {
+        h += '<div class="book-entry" data-book-entry data-book-search="' +
+          esc(bookSearchText(book, sec.vend ? sec.vend.name : '거래처 미등록', group.name)) + '">' + bookCard(book) + '</div>';
+      });
+      h += '</div></section>';
+    });
+    if (selectedHere.length >= 2) {
+      h += '<button class="btn btn-primary btn-block" data-act="bkbatch" data-key="' + esc(sec.key) + '">' +
+        '🛒 선택한 ' + selectedHere.length + '권' +
+        (selectedOutsideSearch ? ' · 검색 밖 ' + selectedOutsideSearch + '권 포함' : '') +
+        ' · 저녁 8시 발송 대기</button>';
     }
+    h += '</div></section>';
   });
   return h;
 }
@@ -6108,8 +6289,17 @@ document.addEventListener('click', ev => {
     }
     case 'bkopen': bookOpen.has(id) ? bookOpen.delete(id) : bookOpen.add(id); render(); break;
     case 'vendortoggle': {
+      if (normalizeBookSearch(bookSearchQuery)) break;
       const key = el.dataset.key;
       vendorClosed.has(key) ? vendorClosed.delete(key) : vendorClosed.add(key);
+      rememberBookToggleFocus(el);
+      render();
+      break;
+    }
+    case 'seriestoggle': {
+      if (normalizeBookSearch(bookSearchQuery)) break;
+      seriesExpansion.set(el.dataset.key, el.getAttribute('aria-expanded') !== 'true');
+      rememberBookToggleFocus(el);
       render();
       break;
     }
@@ -6689,6 +6879,11 @@ document.addEventListener('click', ev => {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  const bookSearch = ev.target.closest('[data-book-search-input]');
+  if (bookSearch) {
+    applyBookSearch(bookSearch.value);
+    return;
+  }
   const scheduleSearch = ev.target.closest('[data-schedule-search]');
   if (scheduleSearch) {
     applyScheduleSearch(scheduleSearch.value);

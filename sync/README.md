@@ -156,6 +156,15 @@ curl https://wb-sync.<계정>.workers.dev/health
 { "app":"task", "auth":{...}, "action":"sample" }
 ```
 
+확정 거절된 예약 주문은 원장 또는 서버 허용목록의 관리 담당만 즉시 재시도할 수 있다. 요청에서
+거래처·번호·문구·주문 ID를 지정할 수 없으며, 서버가 현재 장부의 `rejected` 매핑만 다시 읽어
+거래처별 한 통으로 묶는다. `accepted`, `unknown`, `reserved`, `dispatching`은 제외하고,
+KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 요청도 실제 발송은 한 번뿐이다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"retry-rejected" }
+```
+
 ### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)
 ```jsonc
 { "app":"consult", "auth":{...}, "q":"현우진 뉴런", "platform":"메가스터디" }

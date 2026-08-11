@@ -93,6 +93,21 @@ function seedOrderTask(db, overrides = {}) {
   return task;
 }
 
+function seedMappedSend(db, taskId, sendId, status, itemCount = 1) {
+  const now = Date.now() - 1000;
+  db.prepare(
+    'INSERT INTO book_order_sends ' +
+    '(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) ' +
+    "VALUES ('task',?,?,?,?,?,?,?, ?,?)"
+  ).bind(
+    sendId, 'key_' + sendId, 'batch_' + sendId, '천재출판사', itemCount,
+    'a'.repeat(64), status, now, now
+  ).run();
+  db.prepare(
+    "INSERT INTO book_order_batch_items(app,task_id,send_id,created_at) VALUES('task',?,?,?)"
+  ).bind(taskId, sendId, now).run();
+}
+
 test('schema and migration are additive, and the send ledger itself stores no phone or message body', () => {
   for (const sql of [schema, migration]) {
     const match = sql.match(/CREATE TABLE IF NOT EXISTS book_order_sends\s*\([\s\S]*?\);/);
@@ -219,6 +234,85 @@ test('root sample uses only the fixed test phone, is daily-idempotent, and never
   assert.equal(scheduled.results.length, 1);
   assert.equal(scheduled.results[0].taskCount, 1);
   assert.match(payloads[1].messages[0].text, /개념원리 미적분Ⅰ/);
+});
+
+test('rejected-only retry groups each vendor once and excludes accepted or unknown mappings', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { id: 'failed-1', orderDelivery: 'scheduled_batch_v1' });
+  seedOrderTask(db, {
+    id: 'failed-2', title: '[주문] 같은 출판사 두 번째', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '같은 출판사 두 번째', qty: '2권' }]
+  });
+  seedOrderTask(db, {
+    id: 'failed-other', title: '[주문] 다른 출판사', orderDelivery: 'scheduled_batch_v1',
+    orderVendor: '상형출판사', orderItems: [{ title: '다른 출판사 교재', qty: '1권' }]
+  });
+  seedOrderTask(db, {
+    id: 'already-accepted', title: '[주문] 접수 완료', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '접수 완료 교재', qty: '1권' }]
+  });
+  seedOrderTask(db, {
+    id: 'already-unknown', title: '[주문] 결과 불명', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '결과 불명 교재', qty: '1권' }]
+  });
+  seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
+  seedMappedSend(db, 'failed-2', 'old-rejected-2', 'rejected');
+  seedMappedSend(db, 'failed-other', 'old-rejected-3', 'rejected');
+  seedMappedSend(db, 'already-accepted', 'old-accepted', 'accepted');
+  seedMappedSend(db, 'already-unknown', 'old-unknown', 'unknown');
+
+  const payloads = [];
+  const env = {
+    TASK_MANAGER_STAFF_IDS: 'S-kim',
+    BOOK_VENDOR_PHONES: JSON.stringify({ '천재출판사': '01099998888', '상형출판사': '01077776666' })
+  };
+  let first;
+  let again;
+  await withFetch(async (url, opts) => {
+    payloads.push(JSON.parse(opts.body));
+    return acceptedResponse(payloads.length);
+  }, async () => {
+    first = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'retry-rejected' }, env);
+    again = await call(db, { auth: admin, action: 'retry-rejected' }, env);
+  });
+
+  assert.equal(first.status, 200);
+  assert.equal(first.body.results.length, 2);
+  assert.equal(payloads.length, 2, '거래처별 정확히 한 통만 실제 호출한다');
+  const grouped = first.body.results.find(result => result.vendorName === '천재출판사');
+  assert.equal(grouped.taskCount, 2);
+  assert.equal(grouped.itemCount, 2);
+  const groupedMessage = payloads.find(payload => payload.messages[0].to === '01099998888').messages[0].text;
+  assert.match(groupedMessage, /개념원리 미적분Ⅰ/);
+  assert.match(groupedMessage, /같은 출판사 두 번째/);
+  for (const payload of payloads) {
+    assert.doesNotMatch(payload.messages[0].text, /접수 완료 교재|결과 불명 교재/);
+  }
+  assert.equal(again.status, 200);
+  assert.equal(again.body.idempotent, true);
+  assert.deepEqual(again.body.results, []);
+  assert.equal(payloads.length, 2, 'accepted mapping 뒤 반복 호출은 provider를 다시 부르지 않는다');
+});
+
+test('rejected-only retry is root/allowlist-manager only and same-day provider rejection is idempotent', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { id: 'failed-1', orderDelivery: 'scheduled_batch_v1' });
+  seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({ errorCode: 'InvalidSenderNumber' }), { status: 400 });
+  }, async () => {
+    const staff = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'retry-rejected' });
+    assert.equal(staff.status, 403);
+    const first = await call(db, { auth: admin, action: 'retry-rejected' });
+    assert.equal(first.status, 502);
+    assert.equal(first.body.results[0].status, 'rejected');
+    const again = await call(db, { auth: admin, action: 'retry-rejected' });
+    assert.equal(again.status, 502);
+    assert.equal(again.body.results[0].idempotent, true);
+  });
+  assert.equal(fetches, 1, '같은 날 같은 rejected 집합은 실패했어도 한 번만 provider를 호출한다');
 });
 
 test('send is disabled by default even with valid credentials unless the explicit switch is on', async () => {

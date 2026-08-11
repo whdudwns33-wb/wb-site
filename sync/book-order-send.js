@@ -14,6 +14,7 @@
  *
  *   POST /book-order-send { app, auth, taskId } → 실제 주문
  *   POST /book-order-send { app, auth, action:'sample' } → root/allowlist manager 본인 일일 샘플
+ *   POST /book-order-send { app, auth, action:'retry-rejected' } → 확정 거절 배치만 당일 1회 재시도
  */
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -27,6 +28,7 @@ const SAMPLE_IDEMPOTENCY_VERSION = 'BOOK_ORDER_SAMPLE_V1';
 const SAMPLE_TASK_PREFIX = 'sample:book-order:';
 const SAMPLE_VENDOR_NAME = '__BOOK_ORDER_SAMPLE__';
 const SAMPLE_ITEMS = [{ title: '교재 주문 발송 경로 점검 (실제 주문 아님)', qty: '1권' }];
+const REJECTED_RETRY_VERSION = 'BOOK_ORDER_REJECTED_RETRY_V1';
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'taskId', 'action']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|vendor)/i;
@@ -109,6 +111,13 @@ function sampleSendConfiguration(env) {
 
 function kstDate(ms) {
   return new Date((Number(ms) || Date.now()) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function canOperateBookOrder(auth) {
+  const rootAdmin = auth && auth.scope === 'all' && !auth.role && !auth.id && !auth.device;
+  const manager = auth && auth.scope === 'all' && auth.role === 'manager' &&
+    SAFE_ID.test(String(auth.id || '')) && !auth.device;
+  return !!(rootAdmin || manager);
 }
 
 /** 거래처 전화번호는 앱이 절대 못 정한다 — 서버 비밀키(BOOK_VENDOR_PHONES, JSON)에서만 찾는다 */
@@ -355,20 +364,100 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
   }, false), responseStatusFor(outcome.status), origin);
 }
 
+/**
+ * 현재 mapping이 rejected인 예약 주문만 서버에서 다시 모은다.
+ * accepted/unknown/reserved/dispatching 이력이 하나라도 있으면 fail-closed로 제외한다.
+ * 날짜+거래처+task 집합으로 멱등키를 고정해 같은 날 반복 클릭도 실제 재발송하지 않는다.
+ */
+async function retryRejectedBookOrders(env, app, origin, json) {
+  const selected = await env.DB.prepare(
+    "SELECT t.id,t.data FROM book_order_batch_items i " +
+    "JOIN book_order_sends failed ON failed.app=i.app AND failed.send_id=i.send_id " +
+    "JOIN tasks t ON t.app=i.app AND t.id=i.task_id " +
+    "WHERE i.app=? AND failed.status='rejected' " +
+    "AND NOT EXISTS (SELECT 1 FROM book_order_sends active " +
+      "WHERE active.app=i.app AND active.task_id=i.task_id " +
+      "AND active.status IN ('reserved','dispatching','accepted','unknown')) " +
+    'ORDER BY t.updated_at,t.id LIMIT 2000'
+  ).bind(app).all();
+
+  const groups = new Map();
+  const cutoff = Date.now();
+  for (const row of selected.results || []) {
+    let task;
+    try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+    if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
+    const vendorName = String(task.orderVendor || '').trim();
+    const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
+      .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
+      .filter(item => item.title);
+    if (!vendorName || !items.length) continue;
+    if (!groups.has(vendorName)) groups.set(vendorName, { taskIds: [], items: [] });
+    groups.get(vendorName).taskIds.push(row.id);
+    groups.get(vendorName).items.push(...items);
+  }
+
+  if (!groups.size) {
+    return json({ ok: true, idempotent: true, action: 'retry-rejected', results: [] }, 200, origin);
+  }
+  if (!sendConfiguration(env)) {
+    return json({ ok: false, code: 'SEND_DISABLED', error: '교재 주문 자동 발송이 아직 켜져 있지 않습니다' }, 503, origin);
+  }
+
+  const previews = [];
+  for (const [vendorName, group] of groups) {
+    if (!vendorPhone(env, vendorName)) {
+      return json({ ok: false, code: 'VENDOR_PHONE_MISSING', error: '거래처 번호 등록을 먼저 확인해 주세요' }, 409, origin);
+    }
+    const messageBytes = new TextEncoder().encode(buildOrderMessage(vendorName, group.items)).byteLength;
+    if (messageBytes > MAX_MESSAGE_BYTES) {
+      return json({ ok: false, code: 'MESSAGE_TOO_LARGE', error: '주문 목록이 너무 많아 문자 한 통에 안 들어갑니다' }, 413, origin);
+    }
+    previews.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length, messageBytes });
+  }
+
+  const now = Date.now();
+  const recent = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM book_order_sends WHERE app=? AND created_at>? AND task_id NOT LIKE ?"
+  ).bind(app, now - 24 * 60 * 60 * 1000, SAMPLE_TASK_PREFIX + '%').first();
+  if ((Number(recent && recent.count) || 0) + groups.size > GLOBAL_DAILY_LIMIT) {
+    return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다' }, 429, origin);
+  }
+
+  const retryDate = kstDate(now).replace(/-/g, '');
+  const results = [];
+  for (let i = 0; i < previews.length; i++) {
+    const preview = previews[i];
+    const group = groups.get(preview.vendorName);
+    const taskIds = group.taskIds.slice().sort();
+    const key = await sha256Hex([REJECTED_RETRY_VERSION, retryDate, preview.vendorName, ...taskIds].join('\u001f'));
+    const retryBatchId = 'retry_' + retryDate + '_' + key.slice(0, 40);
+    const response = await dispatchOrderMessage(
+      env, app, retryBatchId, preview.vendorName, group.items, taskIds, origin, json
+    );
+    const result = await response.json();
+    results.push({ ...preview, idempotent: !!result.idempotent,
+      status: result && result.send && result.send.status || result.code || 'failed' });
+  }
+
+  const rejected = results.some(result => result.status === 'rejected');
+  const uncertain = results.some(result => result.status !== 'accepted' && result.status !== 'rejected');
+  return json({ ok: !rejected, action: 'retry-rejected', results }, rejected ? 502 : uncertain ? 202 : 200, origin);
+}
+
 export async function handleBookOrderSend(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '교재 주문 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
   const shapeError = validateRequestShape(body);
   if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
 
   if (body.action != null) {
-    if (body.action !== 'sample' || body.taskId != null) {
-      return json({ ok: false, error: '본인 샘플은 action만 지정해 주세요' }, 400, origin);
+    if (body.taskId != null || (body.action !== 'sample' && body.action !== 'retry-rejected')) {
+      return json({ ok: false, error: '지원하는 발송 action만 지정해 주세요' }, 400, origin);
     }
-    const rootAdmin = auth && auth.scope === 'all' && !auth.role && !auth.id && !auth.device;
-    const manager = auth && auth.scope === 'all' && auth.role === 'manager' && SAFE_ID.test(String(auth.id || '')) && !auth.device;
-    if (!rootAdmin && !manager) {
-      return json({ ok: false, error: '본인 샘플은 원장 또는 승인된 관리 담당 인증에서만 보낼 수 있습니다' }, 403, origin);
+    if (!canOperateBookOrder(auth)) {
+      return json({ ok: false, error: '원장 또는 승인된 관리 담당 인증이 필요합니다' }, 403, origin);
     }
+    if (body.action === 'retry-rejected') return await retryRejectedBookOrders(env, app, origin, json);
     const sampleTaskId = SAMPLE_TASK_PREFIX + kstDate();
     return await dispatchOrderMessage(
       env, app, sampleTaskId, SAMPLE_VENDOR_NAME, SAMPLE_ITEMS, [], origin, json, 'sample'
