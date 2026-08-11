@@ -47,6 +47,9 @@ test('feedback workflow sends immediately only through the server-side guardian 
   assert.match(html, /action: 'list', limit: 100/);
   assert.match(html, /원장 수정 요청/);
   assert.match(html, /문구 수정 후 다시 요청/);
+  assert.match(html, /if \(res\.status === 'sent'\)/);
+  assert.match(html, /보호자 알림톡 발송 요청이 접수됐습니다/);
+  assert.doesNotMatch(html, /보호자께 카카오 알림톡을 보냈습니다|보호자 발송 완료/);
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });
 

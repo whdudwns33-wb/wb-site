@@ -12,7 +12,8 @@
  *     실제로 나간다. 거래처 번호를 다 확인하기 전에는 이 스위치를 켜지 않는다.
  *   · 하루 발송 한도를 둬서 실수로 반복 클릭해도 폭주하지 않는다.
  *
- *   POST /book-order-send { app, auth, taskId } → { ok, status, ... }
+ *   POST /book-order-send { app, auth, taskId } → 실제 주문
+ *   POST /book-order-send { app, auth, action:'sample' } → root/allowlist manager 본인 일일 샘플
  */
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -21,7 +22,12 @@ const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const GLOBAL_DAILY_LIMIT = 30;
 const MAX_MESSAGE_BYTES = 2000;
-const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'taskId']);
+const SAMPLE_RECIPIENT_SLOT = 'TEST-SMS-001';
+const SAMPLE_IDEMPOTENCY_VERSION = 'BOOK_ORDER_SAMPLE_V1';
+const SAMPLE_TASK_PREFIX = 'sample:book-order:';
+const SAMPLE_VENDOR_NAME = '__BOOK_ORDER_SAMPLE__';
+const SAMPLE_ITEMS = [{ title: '교재 주문 발송 경로 점검 (실제 주문 아님)', qty: '1권' }];
+const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'taskId', 'action']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|vendor)/i;
 
@@ -76,17 +82,33 @@ function validateRequestShape(body) {
   return null;
 }
 
-/** 코드가 배포돼도 실제 발송은 이 네 가지가 모두 갖춰져야만 켜진다 */
-function sendConfiguration(env) {
-  if (!safeEqual(env.WB_BOOK_ORDER_SEND_ENABLED, 'true') ||
-      !env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER) {
-    return null;
-  }
+function solapiConfiguration(env) {
+  if (!env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_SENDER_NUMBER) return null;
   const apiKey = String(env.SOLAPI_API_KEY).trim();
   const apiSecret = String(env.SOLAPI_API_SECRET).trim();
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   if (!apiKey || !apiSecret || !/^\d{8,12}$/.test(sender)) return null;
   return { apiKey, apiSecret, sender };
+}
+
+/** 코드가 배포돼도 실제 거래처 발송은 명시 스위치까지 갖춰져야만 켜진다 */
+function sendConfiguration(env) {
+  return safeEqual(env.WB_BOOK_ORDER_SEND_ENABLED, 'true') ? solapiConfiguration(env) : null;
+}
+
+/** 본인 샘플은 거래처 발송 스위치와 분리하고, 고정된 테스트 수신처만 허용한다. */
+function sampleSendConfiguration(env) {
+  if (!safeEqual(env.WB_SEND_MODE, 'test') ||
+      !safeEqual(env.WB_TEST_RECIPIENT_ID, SAMPLE_RECIPIENT_SLOT) ||
+      !safeEqual(env.WB_ACTUAL_TEST_SEND_APPROVED, 'true') ||
+      !safeEqual(env.WB_BOOK_ORDER_SAMPLE_ENABLED, 'true')) return null;
+  const config = solapiConfiguration(env);
+  const recipient = normalizedDigits(env.SOLAPI_TEST_RECIPIENT_PHONE);
+  return config && /^01[016789]\d{7,8}$/.test(recipient) ? { ...config, recipient } : null;
+}
+
+function kstDate(ms) {
+  return new Date((Number(ms) || Date.now()) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /** 거래처 전화번호는 앱이 절대 못 정한다 — 서버 비밀키(BOOK_VENDOR_PHONES, JSON)에서만 찾는다 */
@@ -173,10 +195,13 @@ function responseStatusFor(status) {
 }
 
 function publicResult(row, idempotent) {
+  const sample = String(row.task_id || '').startsWith(SAMPLE_TASK_PREFIX);
   return {
     ok: row.status !== 'rejected',
     idempotent: !!idempotent,
-    vendorName: row.vendor_name,
+    ...(sample
+      ? { sample: true, recipientLabel: '원장님 본인' }
+      : { vendorName: row.vendor_name }),
     itemCount: Number(row.item_count) || 0,
     send: {
       sendId: row.send_id,
@@ -220,12 +245,15 @@ async function updateLedger(env, app, sendId, status, provider, safeErrorCode, n
   return Number(result && result.meta && result.meta.changes || 0) === 1;
 }
 
-async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTaskIds, origin, json) {
-  const config = sendConfiguration(env);
+async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTaskIds, origin, json, mode) {
+  const sample = mode === 'sample';
+  const config = sample ? sampleSendConfiguration(env) : sendConfiguration(env);
   if (!config) {
-    return json({ ok: false, code: 'SEND_DISABLED', error: '교재 주문 자동 발송이 아직 켜져 있지 않습니다' }, 503, origin);
+    return sample
+      ? json({ ok: false, code: 'SAMPLE_SEND_DISABLED', error: '본인 샘플 발송 설정이 완전하지 않아 차단했습니다' }, 503, origin)
+      : json({ ok: false, code: 'SEND_DISABLED', error: '교재 주문 자동 발송이 아직 켜져 있지 않습니다' }, 503, origin);
   }
-  const phone = vendorPhone(env, vendorName);
+  const phone = sample ? config.recipient : vendorPhone(env, vendorName);
   if (!phone) {
     return json({
       ok: false, code: 'VENDOR_PHONE_MISSING',
@@ -233,23 +261,26 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
     }, 409, origin);
   }
 
-  const messageText = buildOrderMessage(vendorName, items);
+  const messageText = (sample ? '[테스트 발송 · 실제 주문 아님]\n' : '') + buildOrderMessage(vendorName, items);
   if (new TextEncoder().encode(messageText).byteLength > MAX_MESSAGE_BYTES) {
     return json({ ok: false, error: '주문 목록이 너무 많아 문자 한 통에 안 들어갑니다 — 나눠서 주문해 주세요' }, 413, origin);
   }
   const messageHash = await sha256Hex(messageText);
-  const idempotencyKey = await sha256Hex([app, taskId, phone, messageHash].join(''));
-  const sendId = 'bos_' + idempotencyKey.slice(0, 48);
+  const idempotencyKey = await sha256Hex((sample
+    ? [app, SAMPLE_IDEMPOTENCY_VERSION, taskId, SAMPLE_RECIPIENT_SLOT]
+    : [app, taskId, phone, messageHash]).join('\u001f'));
+  const sendId = (sample ? 'boss_' : 'bos_') + idempotencyKey.slice(0, 48);
   const now = Date.now();
 
   const inserted = await env.DB.prepare(
     'INSERT OR IGNORE INTO book_order_sends ' +
     '(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) ' +
     "SELECT ?,?,?,?,?,?,?,'reserved',?,? " +
-    'WHERE (SELECT COUNT(*) FROM book_order_sends WHERE app=? AND created_at > ?) < ' + GLOBAL_DAILY_LIMIT
+    "WHERE ?=1 OR (SELECT COUNT(*) FROM book_order_sends WHERE app=? AND created_at > ? AND task_id NOT LIKE ?) < " +
+      GLOBAL_DAILY_LIMIT
   ).bind(
     app, sendId, idempotencyKey, taskId, vendorName, items.length, messageHash, now, now,
-    app, now - 24 * 60 * 60 * 1000
+    sample ? 1 : 0, app, now - 24 * 60 * 60 * 1000, SAMPLE_TASK_PREFIX + '%'
   ).run();
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
@@ -297,7 +328,7 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
     await updateLedger(env, app, sendId, 'unknown', null, code, Date.now());
     const row = await findByIdempotency(env, app, idempotencyKey);
     return json(publicResult(row || {
-      app, send_id: sendId, vendor_name: vendorName, item_count: items.length,
+      app, send_id: sendId, task_id: taskId, vendor_name: vendorName, item_count: items.length,
       status: 'unknown', safe_error_code: code, created_at: now, updated_at: Date.now()
     }, false), 202, origin);
   }
@@ -319,7 +350,7 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
   await updateLedger(env, app, sendId, outcome.status, outcome.provider, outcome.errorCode, Date.now());
   const finalRow = await findByIdempotency(env, app, idempotencyKey);
   return json(publicResult(finalRow || {
-    app, send_id: sendId, vendor_name: vendorName, item_count: items.length,
+    app, send_id: sendId, task_id: taskId, vendor_name: vendorName, item_count: items.length,
     status: outcome.status, safe_error_code: outcome.errorCode, created_at: now, updated_at: Date.now()
   }, false), responseStatusFor(outcome.status), origin);
 }
@@ -328,6 +359,21 @@ export async function handleBookOrderSend(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '교재 주문 발송은 task 앱에서만 사용할 수 있습니다' }, 400, origin);
   const shapeError = validateRequestShape(body);
   if (shapeError) return json({ ok: false, error: shapeError }, 400, origin);
+
+  if (body.action != null) {
+    if (body.action !== 'sample' || body.taskId != null) {
+      return json({ ok: false, error: '본인 샘플은 action만 지정해 주세요' }, 400, origin);
+    }
+    const rootAdmin = auth && auth.scope === 'all' && !auth.role && !auth.id && !auth.device;
+    const manager = auth && auth.scope === 'all' && auth.role === 'manager' && SAFE_ID.test(String(auth.id || '')) && !auth.device;
+    if (!rootAdmin && !manager) {
+      return json({ ok: false, error: '본인 샘플은 원장 또는 승인된 관리 담당 인증에서만 보낼 수 있습니다' }, 403, origin);
+    }
+    const sampleTaskId = SAMPLE_TASK_PREFIX + kstDate();
+    return await dispatchOrderMessage(
+      env, app, sampleTaskId, SAMPLE_VENDOR_NAME, SAMPLE_ITEMS, [], origin, json, 'sample'
+    );
+  }
 
   const taskId = String(body.taskId || '');
   if (!SAFE_ID.test(taskId)) return json({ ok: false, error: '올바른 taskId가 필요합니다' }, 400, origin);

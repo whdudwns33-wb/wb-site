@@ -33,6 +33,7 @@ npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
 npx wrangler secret put TASK_MANAGER_STAFF_IDS # task 운영 관리자 staff ID, 쉼표로 구분
 npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID # 승인된 수행보고 알림톡 템플릿 ID
+npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 
@@ -135,6 +136,24 @@ curl https://wb-sync.<계정>.workers.dev/health
 // 원장: 전체, 개인 링크: teacherIds에 본인 staffId가 있는 행만 반환
 { "app": "task", "auth": { "mode": "person", "id": "staff-kim", "token": "..." }, "action": "get" }
 → { "ok": true, "updatedAt": 178..., "roster": { ... }, "bookStudents": [ ... ] }
+```
+
+### `/book-order-send` — 교재 주문 문자
+
+실제 주문은 앱의 주문 `taskId`만 보내며, 수신번호와 문구는 서버가 결정한다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "taskId":"order-task-id" }
+```
+
+본인 샘플은 원장 또는 서버 허용목록의 관리 담당만 요청할 수 있다. 요청에서 번호·문구·주문을
+지정할 수 없고 `SOLAPI_TEST_RECIPIENT_PHONE`의 고정 번호로 KST 하루 한 번만 접수된다. 실제 주문
+배치와 장부 집계에는 포함되지 않는다. `WB_SEND_MODE=test`, `WB_TEST_RECIPIENT_ID=TEST-SMS-001`,
+`WB_ACTUAL_TEST_SEND_APPROVED=true`, `WB_BOOK_ORDER_SAMPLE_ENABLED=true`가 모두 일치해야 하며,
+확인 직후 마지막 값을 `false`로 되돌린다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"sample" }
 ```
 
 ### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)

@@ -41,6 +41,14 @@ const fullEnvBase = {
   BOOK_VENDOR_PHONES: JSON.stringify({ '천재출판사': '01099998888' })
 };
 
+const sampleEnvBase = {
+  WB_SEND_MODE: 'test',
+  WB_TEST_RECIPIENT_ID: 'TEST-SMS-001',
+  WB_ACTUAL_TEST_SEND_APPROVED: 'true',
+  WB_BOOK_ORDER_SAMPLE_ENABLED: 'true',
+  SOLAPI_TEST_RECIPIENT_PHONE: '01011112222'
+};
+
 function acceptedResponse(index = 1) {
   return new Response(JSON.stringify({
     groupInfo: { groupId: 'GROUP_' + index },
@@ -112,6 +120,105 @@ test('client cannot specify phone, recipient, or message — request is rejected
     }
   });
   assert.equal(fetches, 0);
+});
+
+test('sample rejects ordinary staff, admin-device auth, and request-controlled recipient, text, or task data', async () => {
+  const db = new TestD1(); seedOrderTask(db, { orderDelivery: 'scheduled_batch_v1' });
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const staff = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'sample' }, sampleEnvBase);
+    assert.equal(staff.status, 403);
+    const adminDevice = await call(db, { auth: { mode: 'admin_device', token: 'device-token' }, action: 'sample' }, sampleEnvBase);
+    assert.equal(adminDevice.status, 401);
+    const withTask = await call(db, { auth: admin, action: 'sample', taskId: 'order-1' }, sampleEnvBase);
+    assert.equal(withTask.status, 400);
+    for (const bad of [
+      { phone: '01000000000' }, { recipient: 'someone' }, { message: 'hi' },
+      { to: '01000000000' }, { vendor: '천재출판사' }
+    ]) {
+      const result = await call(db, { auth: admin, action: 'sample', ...bad }, sampleEnvBase);
+      assert.equal(result.status, 400, JSON.stringify(bad));
+    }
+  });
+  assert.equal(fetches, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_sends').first().count, 0);
+});
+
+test('sample requires every explicit test gate and a valid fixed server recipient', async () => {
+  const db = new TestD1();
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    for (const [key, value] of [
+      ['WB_SEND_MODE', 'live'],
+      ['WB_TEST_RECIPIENT_ID', 'OTHER'],
+      ['WB_ACTUAL_TEST_SEND_APPROVED', 'false'],
+      ['WB_BOOK_ORDER_SAMPLE_ENABLED', 'false'],
+      ['SOLAPI_TEST_RECIPIENT_PHONE', '']
+    ]) {
+      const result = await call(db, { auth: admin, action: 'sample' }, { ...sampleEnvBase, [key]: value });
+      assert.equal(result.status, 503, key);
+      assert.equal(result.body.code, 'SAMPLE_SEND_DISABLED', key);
+    }
+  });
+  assert.equal(fetches, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_sends').first().count, 0);
+});
+
+test('root sample uses only the fixed test phone, is daily-idempotent, and never consumes a real order', async () => {
+  const db = new TestD1();
+  const cutoff = Date.now() + 1000;
+  seedOrderTask(db, { orderDelivery: 'scheduled_batch_v1' });
+  for (let i = 0; i < 29; i++) {
+    db.prepare(
+      'INSERT INTO book_order_sends (app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) ' +
+      "VALUES ('task',?,?,?,?,1,?, 'accepted',?,?)"
+    ).bind('bos_prior' + i, 'prior-key-' + i, 'prior-task-' + i, '천재출판사', 'a'.repeat(64), cutoff - 1000, cutoff - 1000).run();
+  }
+  const payloads = [];
+  let first;
+  let again;
+  let scheduled;
+  await withFetch(async (url, opts) => {
+    payloads.push(JSON.parse(opts.body));
+    return acceptedResponse(payloads.length);
+  }, async () => {
+    const sampleEnv = { ...sampleEnvBase, WB_BOOK_ORDER_SEND_ENABLED: 'false' };
+    first = await call(db, { auth: admin, action: 'sample' }, sampleEnv);
+    again = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'sample' }, {
+      ...sampleEnv, TASK_MANAGER_STAFF_IDS: 'S-kim'
+    });
+    scheduled = await handleScheduledBookOrders({ DB: db, ...fullEnvBase, ...sampleEnvBase }, cutoff);
+  });
+
+  assert.equal(first.status, 200);
+  assert.equal(first.body.sample, true);
+  assert.equal(first.body.recipientLabel, '원장님 본인');
+  assert.equal(Object.hasOwn(first.body, 'vendorName'), false);
+  assert.equal(again.body.idempotent, true);
+  assert.equal(first.body.send.sendId, again.body.send.sendId);
+  assert.equal(again.status, 200, '서버 allowlist manager도 고정 본인 샘플만 요청할 수 있다');
+  assert.match(first.body.send.sendId, /^boss_[a-f0-9]{48}$/);
+  assert.equal(payloads.length, 2,
+    '샘플은 실제 주문 30건 한도와 분리되어 샘플 1회와 30번째 실제 주문이 각각 접수된다');
+
+  const sampleMessage = payloads[0].messages[0];
+  assert.equal(sampleMessage.to, sampleEnvBase.SOLAPI_TEST_RECIPIENT_PHONE);
+  assert.notEqual(sampleMessage.to, JSON.parse(fullEnvBase.BOOK_VENDOR_PHONES)['천재출판사']);
+  assert.match(sampleMessage.text, /^\[테스트 발송 · 실제 주문 아님\]/);
+  assert.match(sampleMessage.text, /교재 주문 부탁드립니다/);
+  assert.match(sampleMessage.text, /실제 주문 아님/);
+  assert.equal(sampleMessage.subject, 'WB 교재 주문');
+
+  const sampleRow = db.prepare("SELECT * FROM book_order_sends WHERE task_id LIKE 'sample:book-order:%'").first();
+  assert.ok(sampleRow);
+  assert.equal(sampleRow.vendor_name, '__BOOK_ORDER_SAMPLE__');
+  assert.equal(sampleRow.status, 'accepted');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_batch_items').first().count, 1,
+    '샘플은 batch mapping을 만들지 않고 실제 예약 주문만 mapping한다');
+  assert.equal(scheduled.ok, true);
+  assert.equal(scheduled.results.length, 1);
+  assert.equal(scheduled.results[0].taskCount, 1);
+  assert.match(payloads[1].messages[0].text, /개념원리 미적분Ⅰ/);
 });
 
 test('send is disabled by default even with valid credentials unless the explicit switch is on', async () => {

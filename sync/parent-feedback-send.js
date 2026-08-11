@@ -30,12 +30,9 @@ const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'requestKey']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|guardian|studentname)/i;
 
-/** 카카오 심사를 통과한 고정 문구 그대로다 — 실제 발송 문구는 카카오가 승인된 템플릿으로
- *  렌더링하므로 여기 이 상수는 발송에 쓰이지 않고, 900자 상한 체크용 길이 계산에만 쓴다.
- *  템플릿 문구를 다시 심사받아 바꾸면 이 상수도 반드시 같이 맞춰야 한다.
- *  ⚠ 변수 자리표시자(#{...})를 뺀 "고정 부분" 글자 수만 재는 용도라 여기 텍스트 자체는
- *  카카오에 실제로 등록된 원문과 100% 똑같을 필요는 없고, 길이만 비슷하면 된다 —
- *  다만 안전하게 가려면 원문 그대로 유지하는 걸 권장한다.
+/** Solapi에 등록된 템플릿 원문에서 변수 자리표시자만 뺀 고정 문구다.
+ *  실제 발송 문구는 카카오 템플릿으로 렌더링되며, 이 상수는 보수적인 900자 상한 계산에만 쓴다.
+ *  승인 전 템플릿 문구를 바꾸면 이 상수도 반드시 같이 맞춘다.
  */
 const TEMPLATE_FIXED_TEXT =
   '안녕하세요, WB 웩슬러브레인센터(독해력학원)입니다.\n\n' +
@@ -162,13 +159,24 @@ function providerOutcome(response, payload) {
       : { status: 'rejected', errorCode: 'SOLAPI_HTTP_4XX' };
   }
   const groupId = safeProviderId(payload && payload.groupInfo && payload.groupInfo.groupId);
+  const failed = payload && Array.isArray(payload.failedMessageList) ? payload.failedMessageList[0] : null;
+  if (failed) {
+    const messageId = safeProviderId(failed.messageId);
+    const statusCode = safeProviderStatus(failed.statusCode);
+    const provider = groupId && messageId && statusCode ? { groupId, messageId, statusCode } : undefined;
+    return {
+      status: 'rejected',
+      provider,
+      errorCode: 'SOLAPI_STATUS_' + (statusCode || 'REJECTED')
+    };
+  }
   const message = payload && Array.isArray(payload.messageList) ? payload.messageList[0] : null;
   const messageId = safeProviderId(message && message.messageId);
   const statusCode = safeProviderStatus(message && message.statusCode);
   if (!groupId || !messageId || !statusCode) return { status: 'unknown', errorCode: 'SOLAPI_AMBIGUOUS_RESPONSE' };
   const provider = { groupId, messageId, statusCode };
   if (statusCode === '2000' || statusCode === '3000' || statusCode === '4000') return { status: 'accepted', provider };
-  return { status: 'rejected', provider, errorCode: 'SOLAPI_REJECTED' };
+  return { status: 'rejected', provider, errorCode: 'SOLAPI_STATUS_' + statusCode };
 }
 
 function responseStatusFor(status) {
@@ -314,7 +322,6 @@ export async function attemptParentFeedbackSend(env, app, current) {
           to: guardian.phone, from: config.sender, type: 'ATA',
           kakaoOptions: {
             pfId: config.pfId, templateId: config.templateId, disableSms: true,
-            // ⚠ Solapi 변수 키 표기(#{...} 포함 여부 등)는 실제 콘솔 문서로 최종 확인 필요.
             variables: {
               '#{선생님}': teacherName, '#{학생명}': studentName, '#{학습내용}': contentText,
               '#{잘한점}': plusText, '#{보완점}': minusText

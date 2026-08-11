@@ -2285,7 +2285,7 @@ let ownFeedbackQueueError = '';
 const FEEDBACK_STATUS_LABEL = {
   approval_waiting: ['원장 검토 대기', 'warn'],
   content_approved_send_blocked: ['문구 승인 · 발송 대기', ''],
-  sent: ['보호자 발송 완료', ''],
+  sent: ['보호자 알림톡 접수', ''],
   revision_requested: ['수정 요청', 'bad'],
   cancelled: ['취소', '']
 };
@@ -2629,7 +2629,7 @@ async function submitFeedbackForReview(button) {
     });
     feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false;
     const status = result.request && result.request.status;
-    if (status === 'sent') toast('보호자께 카카오 알림톡을 보냈습니다');
+    if (status === 'sent') toast('보호자 알림톡 발송 요청이 접수됐습니다');
     else if (status === 'revision_requested') toast('원장 수정 요청을 확인해 문구를 바꿔 주세요');
     else if (result.idempotent) toast('같은 내용이 이미 처리되어 있습니다 — 상태는 "피드백 검토"에서 확인해 주세요');
     else toast('제출했습니다 — 아직 발송되지 않았다면 "피드백 검토"에서 사유를 확인해 주세요');
@@ -2661,7 +2661,7 @@ async function reviewFeedbackRequest(action, key, revision) {
   }
 }
 
-/** 승인된 문구를 실제로 보호자에게 문자로 보낸다 — 원장만, 승인과는 별개의 명시적 클릭 */
+/** 막혔던 알림톡을 다시 접수한다 — 원장만, 승인과는 별개의 명시적 클릭 */
 async function sendParentFeedback(key, button) {
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
@@ -2670,8 +2670,8 @@ async function sendParentFeedback(key, button) {
   try {
     const res = await sync.post('/parent-feedback-send', { app: SYNC_APP, auth: auth, requestKey: key });
     feedbackQueueLoaded = false;
-    if (res.send && res.send.status === 'accepted') {
-      toast((res.studentName || '학생') + ' 보호자께 문자를 보냈습니다');
+    if (res.status === 'sent') {
+      toast('보호자 알림톡 발송 요청이 접수됐습니다');
       loadFeedbackQueue(true);
     } else if (res.code === 'ALREADY_SENT') {
       toast('이미 발송된 문구입니다');
@@ -2679,10 +2679,10 @@ async function sendParentFeedback(key, button) {
     } else {
       const msg = '⏳ ' + (res.send ? res.send.status : '처리 중') + ' — 잠시 후 새로고침해서 확인해 주세요';
       if (resultBox) resultBox.textContent = msg; else toast(msg);
-      if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 문자 발송'; }
+      if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 알림톡 접수'; }
     }
   } catch (error) {
-    if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 문자 발송'; }
+    if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 알림톡 접수'; }
     if (resultBox) resultBox.textContent = '❌ ' + (error.message || error);
     else toast('발송 실패 — ' + (error.message || error));
   }

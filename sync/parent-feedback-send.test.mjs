@@ -207,9 +207,11 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
   const db = new TestD1();
   const { requestKey } = seedFeedback(db);
   registerGuardian(db, '테스트학생');
+  let sentPayload = null;
   let sentMessage = null;
   await withFetch(async (url, init) => {
-    sentMessage = JSON.parse(init.body).messages[0];
+    sentPayload = JSON.parse(init.body);
+    sentMessage = sentPayload.messages[0];
     return acceptedResponse();
   }, async () => {
     const r = await call(db, { auth: admin, requestKey });
@@ -226,6 +228,11 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
   assert.equal(sentMessage.kakaoOptions.variables['#{학습내용}'], '독해 지문 3개 풀이');
   assert.equal(sentMessage.kakaoOptions.variables['#{잘한점}'], '오답을 스스로 설명함');
   assert.equal(sentMessage.kakaoOptions.variables['#{보완점}'], '어휘');
+  assert.deepEqual(Object.keys(sentMessage.kakaoOptions.variables).sort(),
+    ['#{보완점}', '#{선생님}', '#{잘한점}', '#{학생명}', '#{학습내용}'].sort());
+  assert.equal(sentPayload.strict, true);
+  assert.equal(sentPayload.allowDuplicates, false);
+  assert.equal(sentPayload.showMessageList, true);
 
   const row = db.prepare("SELECT status FROM feedback_requests WHERE request_key=?").bind(requestKey).first();
   assert.equal(row.status, 'sent', '발송 성공 후 feedback_requests 상태가 sent로 바뀐다');
@@ -263,6 +270,35 @@ test('rejected provider response keeps feedback_requests blocked, not marked sen
   const row = db.prepare("SELECT status, review_note FROM feedback_requests WHERE request_key=?").bind(requestKey).first();
   assert.equal(row.status, 'content_approved_send_blocked', '거절된 발송은 문구 상태를 sent로 바꾸지 않는다');
   assert.match(row.review_note, /거절/, '거절 사유가 review_note에 남는다');
+});
+
+test('HTTP 200 registration failure is rejected from failedMessageList and is never retried automatically', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db);
+  registerGuardian(db, '테스트학생');
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({
+      groupInfo: { groupId: 'GROUP_FAILED' },
+      failedMessageList: [{ messageId: 'MSG_FAILED', statusCode: '1011' }],
+      messageList: []
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, async () => {
+    const first = await call(db, { auth: admin, requestKey });
+    assert.equal(first.body.code, 'SOLAPI_STATUS_1011');
+    assert.equal(first.body.status, 'content_approved_send_blocked');
+    const again = await call(db, { auth: admin, requestKey });
+    assert.equal(again.body.idempotent, true);
+    assert.equal(again.body.status, 'rejected');
+  });
+  assert.equal(fetches, 1);
+  const ledger = db.prepare(
+    'SELECT status, provider_status_code, safe_error_code FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first();
+  assert.equal(ledger.status, 'rejected');
+  assert.equal(ledger.provider_status_code, '1011');
+  assert.equal(ledger.safe_error_code, 'SOLAPI_STATUS_1011');
 });
 
 test('consult app cannot use this feature', async () => {
