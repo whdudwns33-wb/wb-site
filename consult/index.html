@@ -3391,7 +3391,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.2';
+const APP_VER = '2026-08-11.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
@@ -3403,8 +3403,9 @@ function checkVersion() {
         '<button type="button" id="verReload">\uc0c8\ub85c\uace0\uce68</button>';
       document.body.appendChild(el);
       document.getElementById('verReload').onclick = () => {
-        location.replace(location.pathname + location.search.replace(/[?&]v=\d+/, '') +
-          (location.search ? '&' : '?') + 'v=' + Date.now() + location.hash);
+        const next = new URL(location.href);
+        next.searchParams.set('v', String(Date.now()));
+        location.replace(next.pathname + next.search + next.hash);
       };
     })
     .catch(() => {});

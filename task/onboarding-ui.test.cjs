@@ -123,6 +123,28 @@ test('future-start students are eligible and cards sort by operational urgency',
   assert.equal(api.validOnboardingFirstDate(rosterDb.students[1], '2026-09-01'), true);
 });
 
+test('the private roster stays separate until an explicit onboarding record exists', () => {
+  const source = block('function onboardingRows()', 'function onboardingAttentionCount()');
+  const rosterDb = { students: [
+    { id: 'existing', name: '기존', start: '2024-03', end: '' },
+    { id: 'started', name: '신규', start: '2026-08', end: '' }
+  ] };
+  const records = new Map([['started', { firstClassDate: '2026-08-11', status: { key: 'firstday' } }]]);
+  const api = new Function('rosterDb', 'records', `
+    const today = () => '2026-08-11';
+    const validYmd = value => /^\\d{4}-\\d{2}-\\d{2}$/.test(value);
+    const onboardingAnyRecord = id => records.get(id) || null;
+    const onboardingStatus = record => record.status;
+    ${source}
+    return { onboardingRows, onboardingCandidateStudents, onboardingCandidateStartIsRecent };
+  `)(rosterDb, records);
+
+  assert.deepEqual(api.onboardingRows().map(row => row.student.id), ['started']);
+  assert.deepEqual(api.onboardingCandidateStudents().map(row => row.id), ['existing']);
+  assert.equal(api.onboardingCandidateStartIsRecent(rosterDb.students[0]), false);
+  assert.equal(api.onboardingCandidateStartIsRecent(rosterDb.students[1]), true);
+});
+
 test('cancellation is admin-only and uses the server CAS endpoint for cancel and restore', () => {
   const click = block("case 'onbcancel':", "case 'onbcheck':");
   const add = block("case 'onbadd':", "case 'onbfilter':");
@@ -138,6 +160,8 @@ test('cancellation is admin-only and uses the server CAS endpoint for cancel and
   assert.match(helper, /expectedUpdatedAt: Number\(current && current\.updatedAt\) \|\| 0/);
   assert.match(helper, /Number\(error && error\.status\) === 409/);
   assert.match(helper, /applyOnboardingRecord\(studentId, error\.current\)/);
+  assert.match(add, /명단 시작월[\s\S]{0,180}신규 판정에 사용하지 않습니다/);
+  assert.match(add, /if \(!confirm\(question\)\) return/);
 });
 
 test('ended and cancelled rows are history-only and excluded from operational KPIs', () => {
@@ -307,4 +331,54 @@ test('UI is searchable, status-driven, accessible, and never sends parent messag
   assert.match(view, /알림톡 자동 발송 없음/);
   assert.match(view, /현재 화면에서는 메시지를 보내지 않습니다/);
   assert.doesNotMatch(source, /sync\.post\([^)]*(?:feedback|kakao|message|send)|fetch\(|SOLAPI|sendParent/i);
+});
+
+test('the compact dashboard prioritizes active records and exposes day, next action, and missing essentials', () => {
+  const helpers = block('function onboardingDday(', 'function onboardingCardHtml(');
+  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const api = new Function(`
+    const parseYmd = value => new Date(value + 'T00:00:00');
+    const today = () => '2026-08-11';
+    const ymd = date => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    const addDays = (value, days) => { const date = parseYmd(value); date.setDate(date.getDate() + days); return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-'); };
+    const ONBOARDING_ITEMS = ['schedule'];
+    const ONBOARDING_STAGES = [{ key: 'prep', day: -1, label: '첫 수업 전', items: [{ id: 'schedule', label: '시간표 안내' }] }];
+    ${helpers}
+    return { onboardingDday, onboardingCompletionDate, onboardingNextAction };
+  `)();
+
+  assert.equal(api.onboardingDday('2026-08-11'), 'D-DAY');
+  assert.equal(api.onboardingDday('2026-08-13'), 'D-2');
+  assert.equal(api.onboardingDday('2026-08-09'), 'D+2');
+  assert.deepEqual(api.onboardingNextAction({ record: { firstClassDate: '2026-08-11', items: {} }, status: { key: 'firstday' } }),
+    { label: '시간표 안내', stage: '첫 수업 전', due: '2026-08-10' });
+  const completedAt = new Date(2026, 8, 2).getTime();
+  assert.equal(api.onboardingCompletionDate({ firstClassDate: '2026-08-01', items: { schedule: completedAt }, updatedAt: completedAt + 1000 }), '2026-09-02');
+  assert.equal(api.onboardingCompletionDate({ firstClassDate: '2026-08-20', items: { schedule: new Date(2026, 7, 25).getTime() } }), '2026-09-19');
+  assert.equal(api.onboardingCompletionDate({ firstClassDate: '2026-08-01', items: { schedule: true }, updatedAt: 0 }), '2026-08-31');
+  assert.match(view, /const dashboardRows = operationalRows\.filter\(row => row\.status\.key !== 'done' \|\| onboardingCompletionDate\(row\.record\)\.slice\(0, 7\) === currentMonth\)/);
+  assert.match(view, /const overdue = operationalRows\.filter\(row => row\.status\.overdue\)\.length/);
+  assert.match(view, /onboardingDashboardHtml\(dashboardRows\)/);
+  assert.match(helpers, /시간표 없음/);
+  assert.match(helpers, /docsMissing = packageStates\.filter\(value => value === 'pending'\)/);
+  assert.match(helpers, /docsPrepared = packageStates\.filter\(value => value === 'prepared'\)/);
+  assert.match(helpers, /docsDelivered = packageStates\.filter\(value => value === 'delivered'\)/);
+  assert.match(helpers, /전달 대기 ' \+ docsPrepared \+ '건/);
+  assert.match(helpers, /확인 대기 ' \+ docsDelivered \+ '건/);
+  assert.match(helpers, /row\.status\.key === 'done' \? shortDate\(onboardingCompletionDate\(record\)\) \+ ' 완료'/);
+  assert.match(helpers, /role="table"/);
+  assert.match(html, /@media \(max-width: 720px\)[\s\S]{0,500}\.onboarding-board-row \{ grid-template-columns: 1fr/);
+});
+
+test('starting management is folded away and labels existing roster candidates as manual choices', () => {
+  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  assert.match(view, /<details class="card onboarding-start">/);
+  assert.match(view, /기존 원생 명단에서 신규 관리 시작/);
+  assert.match(view, /명단 등록 ≠ 신규 학생/);
+  assert.match(view, /선택하는 것만으로 신규가 되지 않으며/);
+  assert.match(view, /명단 시작월 이번 달·예정 \(참고만\)/);
+  assert.match(view, /그 외 재원생 \(수동 선택\)/);
+  assert.match(view, /모든 학생은 확인 후에만 수동으로 시작/);
+  assert.doesNotMatch(view, /<details class="card onboarding-start" open/);
+  assert.ok(view.indexOf('onboardingDashboardHtml(dashboardRows)') < view.indexOf('<details class="card onboarding-start">'));
 });

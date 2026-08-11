@@ -20,9 +20,9 @@ test('admin and person browser storage are isolated', () => {
 
 test('personal QR links force the mobile layout even on a tablet', () => {
   assert.match(html, /classList\.toggle\('person-mobile', HAS_PERSON_SCOPE\)/);
-  assert.match(html, /html\.person-mobile \.wrap \{ max-width: 480px; \}/);
-  assert.match(html, /html\.person-mobile \.grid2,[\s\S]{0,120}grid-template-columns: 1fr/);
-  assert.match(html, /html\.person-mobile \.schedule-kpis \{ grid-template-columns: repeat\(2,/);
+  assert.match(html, /html\.person-mobile body \{ width: min\(100%, 480px\);[^}]*overflow-x: hidden;/);
+  assert.match(html, /html\.person-mobile \.grid2,[\s\S]{0,320}grid-template-columns: 1fr/);
+  assert.match(html, /html\.person-mobile \.schedule-kpis,[\s\S]{0,80}grid-template-columns: repeat\(2,/);
 });
 
 test('every shared task link requires a one-time code', () => {

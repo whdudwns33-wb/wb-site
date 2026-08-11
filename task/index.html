@@ -323,12 +323,43 @@
     .schedule-toolbar .between > .btn { display: none; }
   }
 
-  /* QR 개인 링크는 태블릿에서도 휴대폰과 같은 한 열 화면을 쓴다. */
-  html.person-mobile .wrap { max-width: 480px; }
+  /* QR 개인 링크는 태블릿 폭이어도 휴대폰과 같은 한 열 화면을 쓴다. */
+  html.person-mobile body { width: min(100%, 480px); min-width: 0; margin: 0 auto; overflow-x: hidden; }
+  html.person-mobile .wrap,
+  html.person-mobile main,
+  html.person-mobile .card { width: 100%; max-width: 100%; min-width: 0; }
+  html.person-mobile .row,
+  html.person-mobile .between,
+  html.person-mobile .task-body { min-width: 0; }
   html.person-mobile .grid2,
-  html.person-mobile .schedule-card-grid { grid-template-columns: 1fr; }
-  html.person-mobile .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  html.person-mobile .tab { padding: 12px; font-size: 13px; }
+  html.person-mobile .schedule-card-grid,
+  html.person-mobile .book-issue-grid,
+  html.person-mobile .transport-route-grid,
+  html.person-mobile .transport-config-grid { grid-template-columns: 1fr; }
+  html.person-mobile .schedule-kpis,
+  html.person-mobile .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html.person-mobile .schedule-week-grid .schedule-day-card { display: block; }
+  html.person-mobile .schedule-list-row { grid-template-columns: 76px minmax(0, 1fr); }
+  html.person-mobile .schedule-summary span { flex: 1 1 calc(50% - 4px); text-align: center; }
+  html.person-mobile .schedule-timeline-head { display: block; }
+  html.person-mobile .schedule-legend { justify-content: flex-start; margin-top: 7px; }
+  html.person-mobile .schedule-timeline-grid { --teacher-w: 72px; }
+  html.person-mobile .schedule-timeline-teacher b { font-size: 11px; }
+  html.person-mobile .book-series { padding-left: 6px; }
+  html.person-mobile .book-card-main { flex-basis: 100%; }
+  html.person-mobile .book-card-actions { width: 100%; }
+  html.person-mobile .book-card-actions .btn { flex: 1 1 auto; }
+  html.person-mobile .ops-toolbar { display: block; }
+  html.person-mobile .ops-toolbar .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
+  html.person-mobile .schedule-toolbar .chip { padding: 7px 6px; font-size: 11.5px; }
+  html.person-mobile .tab { min-height: 44px; padding: 12px; font-size: 13px; }
+  html.person-mobile .btn,
+  html.person-mobile .chip,
+  html.person-mobile .navbtn { min-height: 44px; }
+  html.person-mobile .navbtn { width: 44px; height: 44px; }
+  html.person-mobile button.box,
+  html.person-mobile button.dot { width: 44px; min-width: 44px; height: 44px; line-height: 44px; }
+  html.person-mobile .newver { left: 50%; right: auto; width: min(100%, 480px); transform: translateX(-50%); }
 
   /* ─── 교재 목록 ─── */
   .book-search { margin-top: 12px; }
@@ -362,6 +393,20 @@
   .onboarding-kpi span { display: block; margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; }
   .onboarding-kpi.is-alert { border-color: #F3B8B0; background: #FFF7F5; }
   .onboarding-kpi.is-alert b { color: #9E3629; }
+  .onboarding-start > summary { min-height: 44px; cursor: pointer; }
+  .onboarding-start[open] > summary { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .onboarding-start > summary > span:first-child > b, .onboarding-start > summary .card-sub { display: block; }
+  .onboarding-dashboard { padding: 0; overflow: hidden; }
+  .onboarding-dashboard-title { padding: 14px 16px 10px; }
+  .onboarding-board-row { display: grid; grid-template-columns: minmax(85px, .85fr) minmax(56px, .55fr) minmax(80px, .75fr) minmax(68px, .7fr) minmax(120px, 1.25fr) minmax(110px, 1.1fr); gap: 9px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; }
+  .onboarding-board-row.is-head { min-height: auto; padding-top: 7px; padding-bottom: 7px; background: var(--light-gray); color: var(--mid-gray); font-size: 10.5px; font-weight: 900; }
+  .onboarding-board-row.is-alert { background: #FFF9F7; }
+  .onboarding-board-row > * { min-width: 0; overflow-wrap: anywhere; }
+  .onboarding-board-row .card-sub { display: block; margin-top: 2px; font-size: 10.5px; }
+  .onboarding-board-name { color: var(--navy); font-size: 13px; font-weight: 900; }
+  .onboarding-board-progress { display: grid; grid-template-columns: minmax(42px, 1fr) auto; gap: 5px; align-items: center; }
+  .onboarding-board-progress .bar { margin: 0; }
+  .onboarding-missing { display: flex; flex-wrap: wrap; gap: 4px; }
   .onboarding-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .onboarding-toolbar .chips { margin-top: 0; }
   .onboarding-search { flex: 1 1 220px; min-width: 0; }
@@ -437,6 +482,11 @@
   .transport-config-row { padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-top: 7px; }
   .transport-unmatched { border-color: #F3B8B0; background: #FFF7F5; }
   .transport-capacity { color: #9E3629; font-weight: 900; }
+  @media (max-width: 720px) {
+    .onboarding-board-row { grid-template-columns: 1fr; gap: 6px; padding: 12px 14px; }
+    .onboarding-board-row.is-head { display: none; }
+    .onboarding-board-row > [data-label]::before { content: attr(data-label) ' · '; color: var(--mid-gray); font-size: 10.5px; font-weight: 900; }
+  }
   @media (max-width: 600px) {
     .onboarding-enrol { grid-template-columns: 1fr; }
     .onboarding-enrol .btn { min-height: 44px; }
@@ -503,10 +553,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-11.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-11.2"></script>
-<script src="./asset-core.js?v=2026-08-11.2"></script>
-<script src="./qr-core.js?v=2026-08-11.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-11.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-11.3"></script>
+<script src="./asset-core.js?v=2026-08-11.3"></script>
+<script src="./qr-core.js?v=2026-08-11.3"></script>
 <script>
 "use strict";
 
@@ -5767,6 +5817,10 @@ function onboardingCandidateStudents() {
     (!student.end || student.end > currentMonth) && !onboardingAnyRecord(student.id));
 }
 
+function onboardingCandidateStartIsRecent(student) {
+  return !!student && !!student.start && student.start >= today().slice(0, 7);
+}
+
 function validOnboardingFirstDate(student, firstClassDate) {
   if (!student || !validYmd(firstClassDate)) return false;
   const month = firstClassDate.slice(0, 7);
@@ -5925,6 +5979,60 @@ function firstDayPackageHtml(row) {
     '<div class="small muted mt8">‘확인’은 아래 ‘등록 즉시·첫 수업 전’ 체크와 같은 최종 기록을 사용합니다. 이 화면에서 학부모 알림톡은 자동 발송되지 않습니다.</div></section>';
 }
 
+function onboardingDday(firstClassDate) {
+  const diff = Math.round((parseYmd(firstClassDate) - parseYmd(today())) / 86400000);
+  return diff === 0 ? 'D-DAY' : diff > 0 ? 'D-' + diff : 'D+' + Math.abs(diff);
+}
+
+function onboardingCompletionDate(record) {
+  const itemTimes = ONBOARDING_ITEMS.map(id => Number(record && record.items && record.items[id]) || 0).filter(at => at >= 1000000000000);
+  const at = itemTimes.length ? Math.max(...itemTimes) : Number(record && record.updatedAt) || 0;
+  const d30 = addDays(record.firstClassDate, 30);
+  const recorded = at >= 1000000000000 ? ymd(new Date(at)) : d30;
+  return recorded > d30 ? recorded : d30;
+}
+
+function onboardingNextAction(row) {
+  const record = row.record;
+  const stage = ONBOARDING_STAGES.find(entry => !entry.items.every(item => record.items && record.items[item.id]));
+  if (!stage) return { label: row.status.key === 'done' ? '30일 관리 완료' : 'D30 완료일 대기', due: addDays(record.firstClassDate, 30) };
+  const item = stage.items.find(entry => !(record.items && record.items[entry.id]));
+  return { label: item.label, stage: stage.label, due: addDays(record.firstClassDate, stage.day) };
+}
+
+function onboardingDashboardHtml(rows) {
+  if (!rows.length) return '<section class="card onboarding-dashboard"><div class="empty"><b>🌱</b>현재 30일 관리 중인 신규 학생이 없습니다.<br>' +
+    '<span class="muted">원생 명단만으로는 신규 학생이 되지 않습니다. 아래에서 직접 관리를 시작해 주세요.</span></div></section>';
+  return '<section class="card onboarding-dashboard" aria-label="신규 학생 한눈에 보기"><div class="onboarding-dashboard-title">' +
+    '<div class="card-title">신규 학생 한눈에 보기</div><div class="card-sub">직접 시작한 관리 중 학생과 이번 달 완료 학생만 표시합니다. 지연·오늘 첫 등원 순입니다.</div></div>' +
+    '<div role="table" aria-label="신규 학생 관리 현황"><div class="onboarding-board-row is-head" role="row">' +
+      '<span role="columnheader">학생</span><span role="columnheader">첫 등원</span><span role="columnheader">상태</span>' +
+      '<span role="columnheader">진행률</span><span role="columnheader">다음 조치</span><span role="columnheader">핵심 준비</span></div>' +
+    rows.map(row => {
+      const student = row.student, record = row.record, next = onboardingNextAction(row);
+      const scheduleMissing = onboardingFirstWeekSchedule(student, record).length === 0;
+      const packageStates = ONBOARDING_PACKAGE_DOCS.map(doc => onboardingPackageState(record, doc));
+      const docsMissing = packageStates.filter(value => value === 'pending').length;
+      const docsPrepared = packageStates.filter(value => value === 'prepared').length;
+      const docsDelivered = packageStates.filter(value => value === 'delivered').length;
+      const missing = [];
+      if (scheduleMissing) missing.push('<span class="pill bad">시간표 없음</span>');
+      if (!record.classroom) missing.push('<span class="pill warn">교실 미입력</span>');
+      if (docsMissing) missing.push('<span class="pill warn">미준비 ' + docsMissing + '건</span>');
+      if (docsPrepared) missing.push('<span class="pill warn">전달 대기 ' + docsPrepared + '건</span>');
+      if (docsDelivered) missing.push('<span class="pill">확인 대기 ' + docsDelivered + '건</span>');
+      const dueText = row.status.key === 'done' ? shortDate(onboardingCompletionDate(record)) + ' 완료' :
+        next.due < today() ? shortDate(next.due) + '부터 지연' : next.due === today() ? '오늘' : shortDate(next.due) + ' 예정';
+      return '<div class="onboarding-board-row' + (row.status.overdue || row.status.key === 'firstday' ? ' is-alert' : '') + '" role="row">' +
+        '<div role="cell" data-label="학생"><span class="onboarding-board-name">' + esc(student.name) + '</span><span class="card-sub">' + esc(student.grade || '학년 미지정') + '</span></div>' +
+        '<div role="cell" data-label="첫 등원"><b>' + esc(onboardingDday(record.firstClassDate)) + '</b><span class="card-sub">' + esc(shortDate(record.firstClassDate)) + '</span></div>' +
+        '<div role="cell" data-label="상태"><span class="pill ' + (row.status.overdue ? 'bad' : '') + '">' + esc(row.status.label) + '</span></div>' +
+        '<div class="onboarding-board-progress" role="cell" data-label="진행률"><div class="bar" role="progressbar" aria-label="' + esc(student.name) + ' 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + row.status.progress.pct + '"><i style="width:' + row.status.progress.pct + '%"></i></div><b>' + row.status.progress.pct + '%</b></div>' +
+        '<div role="cell" data-label="다음 조치"><b>' + esc(next.stage || next.label) + '</b>' + (next.stage ? '<span class="card-sub">' + esc(next.label) + '</span>' : '') + '<span class="card-sub">' + esc(dueText) + '</span></div>' +
+        '<div class="onboarding-missing" role="cell" data-label="핵심 준비">' + (missing.join('') || '<span class="pill ok">핵심 준비 확인</span>') + '</div></div>';
+    }).join('') + '</div></section>';
+}
+
 function onboardingCardHtml(row) {
   const student = row.student, record = row.record, status = row.status, p = status.progress;
   const inactive = status.key === 'closed' || status.key === 'cancelled';
@@ -5967,27 +6075,45 @@ function viewOnboarding() {
   const rows = onboardingRows();
   const visibleRows = rows.filter(onboardingMatchesFilter);
   const candidates = onboardingCandidateStudents().sort((a, b) =>
-    String(a.start || '').localeCompare(String(b.start || '')) || a.name.localeCompare(b.name, 'ko'));
+    Number(onboardingCandidateStartIsRecent(b)) - Number(onboardingCandidateStartIsRecent(a)) ||
+    String(b.start || '').localeCompare(String(a.start || '')) || a.name.localeCompare(b.name, 'ko'));
+  const recentCandidates = candidates.filter(onboardingCandidateStartIsRecent);
+  const existingCandidates = candidates.filter(student => !onboardingCandidateStartIsRecent(student));
+  const candidateOptions = group => group.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' +
+    esc(student.grade || '학년 미지정') + ' · 명단 시작 ' + esc(student.start || '미기록') + '</option>').join('');
   const operationalRows = rows.filter(row => row.status.key !== 'closed' && row.status.key !== 'cancelled');
+  const currentMonth = today().slice(0, 7);
+  const dashboardRows = operationalRows.filter(row => row.status.key !== 'done' || onboardingCompletionDate(row.record).slice(0, 7) === currentMonth);
   const firstToday = operationalRows.filter(row => row.status.key === 'firstday').length;
-  const overdue = operationalRows.filter(row => row.status.key === 'overdue').length;
-  const done = operationalRows.filter(row => row.status.key === 'done').length;
+  const overdue = operationalRows.filter(row => row.status.overdue).length;
+  const active = dashboardRows.filter(row => row.status.key !== 'done').length;
+  const done = dashboardRows.filter(row => row.status.key === 'done').length;
 
   let h = '<section class="card onboarding-hero"><div class="card-title">신규 학생 30일 적응 관리</div>' +
-    '<div class="card-sub">실제 첫 등원일을 기준으로 첫 수업 전부터 D30까지 확인합니다. 월 등록일은 첫 등원일로 자동 추정하지 않습니다.</div>' +
+    '<div class="card-sub">원생 명단과 신규 관리 대상은 서로 다릅니다. 실제 첫 등원일을 입력해 관리를 시작한 학생만 신규 현황에 표시합니다.</div>' +
     '<div class="hint mt8"><b>알림톡 자동 발송 없음</b> — ‘학부모 안내’ 표시는 보낼 내용의 준비·확인 항목입니다. 현재 화면에서는 메시지를 보내지 않습니다.</div>' +
-    '<div class="onboarding-enrol mt14"><label><span class="fl">신규 학생</span><select class="in" id="onbStudent">' +
-      '<option value="">학생 선택</option>' + candidates.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade || '') +
-        (student.start > today().slice(0, 7) ? ' · ' + esc(student.start) + ' 시작' : '') + '</option>').join('') + '</select></label>' +
-      '<label><span class="fl">실제 첫 등원일</span><input class="in" id="onbFirstDate" type="date" required></label>' +
-      '<button class="btn btn-primary" data-act="onbadd"' + (candidates.length ? '' : ' disabled') + '>30일 관리 시작</button></div>' +
-    (candidates.length ? '' : '<div class="small muted mt8">새로 시작할 학생이 없습니다. 취소한 기록은 ‘종료·취소’에서 복원할 수 있습니다.</div>') + '</section>';
+    '</section>';
 
   h += '<div class="onboarding-kpis" aria-label="신규 학생 관리 요약">' +
-    '<div class="onboarding-kpi"><b>' + (operationalRows.length - done) + '</b><span>관리 중</span></div>' +
     '<div class="onboarding-kpi ' + (firstToday ? 'is-alert' : '') + '"><b>' + firstToday + '</b><span>오늘 첫 등원</span></div>' +
     '<div class="onboarding-kpi ' + (overdue ? 'is-alert' : '') + '"><b>' + overdue + '</b><span>확인 지연</span></div>' +
-    '<div class="onboarding-kpi"><b>' + done + '</b><span>30일 완료</span></div></div>';
+    '<div class="onboarding-kpi"><b>' + active + '</b><span>관리 중</span></div>' +
+    '<div class="onboarding-kpi"><b>' + done + '</b><span>이번 달 완료</span></div></div>';
+
+  h += onboardingDashboardHtml(dashboardRows);
+
+  h += '<details class="card onboarding-start"><summary class="between"><span><b>기존 원생 명단에서 신규 관리 시작</b>' +
+    '<span class="card-sub">필요할 때만 열어 직접 등록합니다.</span></span><span class="pill">수동 등록</span></summary>' +
+    '<div class="hint mt14"><b>명단 등록 ≠ 신규 학생</b> — 학생을 선택하는 것만으로 신규가 되지 않으며, 실제 첫 등원일을 입력하고 ‘30일 관리 시작’을 눌러야 현황판에 추가됩니다. 명단 시작월은 참고 정보이며 첫 등원일로 자동 사용하지 않습니다.</div>' +
+    '<div class="onboarding-enrol mt14"><label><span class="fl">관리할 학생 선택</span><select class="in" id="onbStudent">' +
+      '<option value="">학생 선택</option>' +
+      (recentCandidates.length ? '<optgroup label="명단 시작월 이번 달·예정 (참고만)">' + candidateOptions(recentCandidates) + '</optgroup>' : '') +
+      (existingCandidates.length ? '<optgroup label="그 외 재원생 (수동 선택)">' + candidateOptions(existingCandidates) + '</optgroup>' : '') +
+      '</select></label>' +
+      '<label><span class="fl">실제 첫 등원일</span><input class="in" id="onbFirstDate" type="date" required></label>' +
+      '<button class="btn btn-primary" data-act="onbadd"' + (candidates.length ? '' : ' disabled') + '>30일 관리 시작</button></div>' +
+    (candidates.length ? '<div class="small muted mt8">최근 명단 시작월을 정렬에만 사용하며 신규 여부는 판단하지 않습니다. 모든 학생은 확인 후에만 수동으로 시작됩니다.</div>' :
+      '<div class="small muted mt8">새로 시작할 학생이 없습니다. 취소한 기록은 ‘종료·취소’에서 복원할 수 있습니다.</div>') + '</details>';
 
   h += '<section class="card onboarding-toolbar"><div class="chips" aria-label="관리 상태 필터">' +
     ONBOARDING_FILTERS.map(filter => '<button class="chip ' + (onboardingStatusFilter === filter[0] ? 'on' : '') + '" data-act="onbfilter" data-status="' + filter[0] + '">' + filter[1] + '</button>').join('') + '</div>' +
@@ -6486,7 +6612,8 @@ function showLinkQr(s) {
       '1) 카메라 앱을 열고 이 QR을 비춥니다\n' +
       '2) 뜨는 주소를 눌러 크롬으로 엽니다\n' +
       '3) <b>[이 기기에 연결]</b> 을 누릅니다\n' +
-      '4) 크롬 메뉴 → <b>홈 화면에 추가</b>' +
+      '4) 크롬 메뉴에서 <b>데스크톱 사이트를 끄고 페이지 확대를 100%</b>로 맞춥니다\n' +
+      '5) 연결이 끝난 주소에서 <b>홈 화면에 추가</b>' +
     '</div>' +
     '<div class="hint mt8">이 QR은 <b>한 번만</b> 쓸 수 있습니다. 다른 기기를 또 연결하려면 새로 만드세요. ' +
       '태블릿에서 원장 화면은 열지 마세요 — 관리 비밀번호가 그 기기에 남습니다.</div>',
@@ -7308,6 +7435,9 @@ document.addEventListener('click', ev => {
       const student = onboardingCandidateStudents().find(row => String(row.id) === studentId);
       if (!student) return toast('신규 학생을 선택해 주세요');
       if (!validOnboardingFirstDate(student, firstClassDate)) return toast('첫 등원일은 명단 시작월 이후의 재원 기간으로 입력해 주세요');
+      const question = student.name + ' 학생의 명단 시작월(' + (student.start || '미기록') + ')은 신규 판정에 사용하지 않습니다.\n' +
+        label(firstClassDate) + '이 실제 첫 등원일이며 신규 30일 관리 대상이 맞습니까?';
+      if (!confirm(question)) return;
       patchOnboarding(studentId, 'create', { firstClassDate: firstClassDate },
         student.name + ' 학생 30일 관리를 시작했습니다');
       break;
@@ -8334,7 +8464,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.2';
+const APP_VER = '2026-08-11.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
@@ -8346,8 +8476,9 @@ function checkVersion() {
         '<button type="button" id="verReload">\uc0c8\ub85c\uace0\uce68</button>';
       document.body.appendChild(el);
       document.getElementById('verReload').onclick = () => {
-        location.replace(location.pathname + location.search.replace(/[?&]v=\d+/, '') +
-          (location.search ? '&' : '?') + 'v=' + Date.now() + location.hash);
+        const next = new URL(location.href);
+        next.searchParams.set('v', String(Date.now()));
+        location.replace(next.pathname + next.search + next.hash);
       };
     })
     .catch(() => {});
