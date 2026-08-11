@@ -27,6 +27,7 @@ npx wrangler d1 execute wb-sync --remote --file=./schema.sql
 
 # 2-b) 기존 운영 데이터베이스는 2-a 대신 새 마이그레이션만 적용
 npx wrangler d1 execute wb-sync --remote --file=./migrations/019_private_roster.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/020_book_order_dispatch_lock.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -45,6 +46,9 @@ npx wrangler deploy
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은
 저장소에 커밋하지 않는다. 운영 배포에 `deploy.ps1`을 다시 실행하면 관리자 비밀키가 교체되므로
 기존 서비스에는 위 수동 명령을 사용한다.
+
+교재 주문 발송 잠금을 추가하는 배포에서는 반드시 `020_book_order_dispatch_lock.sql`을 운영 D1에
+먼저 적용한 뒤 Worker를 배포한다. 역순이면 재시도·예약·개별 발송이 잠금 테이블 오류로 차단된다.
 
 기존 `roster.json`과 `textbooks.json`의 학생 배정을 처음 이관할 때는 비밀키를 명령줄에 직접
 쓰지 말고 보안 입력으로 환경변수에 넣은 뒤 이관 도구를 실행한다.
@@ -159,7 +163,8 @@ curl https://wb-sync.<계정>.workers.dev/health
 확정 거절된 예약 주문은 원장 또는 서버 허용목록의 관리 담당만 즉시 재시도할 수 있다. 요청에서
 거래처·번호·문구·주문 ID를 지정할 수 없으며, 서버가 현재 장부의 `rejected` 매핑만 다시 읽어
 거래처별 한 통으로 묶는다. `accepted`, `unknown`, `reserved`, `dispatching`은 제외하고,
-KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 요청도 실제 발송은 한 번뿐이다.
+KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 요청도 실제 발송은 한 번뿐이다. 재시도,
+20시 예약 발송, 개별 즉시 발송은 동일한 D1 lease를 사용해 동시에 Solapi를 호출하지 않는다.
 
 ```jsonc
 { "app":"task", "auth":{...}, "action":"retry-rejected" }

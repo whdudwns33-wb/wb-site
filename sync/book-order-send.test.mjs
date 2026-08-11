@@ -9,6 +9,7 @@ import { handleScheduledBookOrders, isRetryCronWindow } from './book-order-send.
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/013_book_order_sends.sql', import.meta.url), 'utf8');
 const batchMigration = fs.readFileSync(new URL('./migrations/018_book_order_batch_items.sql', import.meta.url), 'utf8');
+const lockMigration = fs.readFileSync(new URL('./migrations/020_book_order_dispatch_lock.sql', import.meta.url), 'utf8');
 const entry = fs.readFileSync(new URL('./worker.js', import.meta.url), 'utf8');
 const wrangler = fs.readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
 
@@ -49,11 +50,17 @@ const sampleEnvBase = {
   SOLAPI_TEST_RECIPIENT_PHONE: '01011112222'
 };
 
-function acceptedResponse(index = 1) {
-  return new Response(JSON.stringify({
+function acceptedPayload(index = 1) {
+  return {
     groupInfo: { groupId: 'GROUP_' + index },
     messageList: [{ messageId: 'MSG_' + index, statusCode: '2000' }]
-  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+}
+
+function acceptedResponse(index = 1) {
+  return new Response(JSON.stringify(acceptedPayload(index)), {
+    status: 200, headers: { 'content-type': 'application/json' }
+  });
 }
 
 async function withFetch(stub, action) {
@@ -129,6 +136,14 @@ test('20:00 KST cron and additive batch mapping are configured without storing p
   assert.match(entry, /handleScheduledBookOrders\(env, controller\.scheduledTime\)/);
   assert.match(batchMigration, /CREATE TABLE IF NOT EXISTS book_order_batch_items/);
   assert.doesNotMatch(batchMigration, /phone|message_body|DROP TABLE|DELETE FROM/i);
+  for (const sql of [schema, lockMigration]) {
+    const definition = sql.match(/CREATE TABLE IF NOT EXISTS book_order_dispatch_lock\s*\([\s\S]*?\);/);
+    assert.ok(definition);
+    assert.match(definition[0], /PRIMARY KEY \(app\)/);
+    assert.match(definition[0], /owner\s+TEXT\s+NOT NULL/);
+    assert.match(definition[0], /lease_until\s+INTEGER NOT NULL/);
+    assert.doesNotMatch(definition[0], /phone|message_body|DROP TABLE/i);
+  }
 });
 
 test('client cannot specify phone, recipient, or message — request is rejected before any fetch', async () => {
@@ -328,9 +343,12 @@ test('rejected-only retry is root/allowlist-manager only, once per KST day, and 
     const env = { BOOK_VENDOR_PHONES: JSON.stringify({ '천재출판사': '01099998888', '상형출판사': '01077776666' }) };
     const sameDay = await withNow(dayOne + 60_000, () =>
       call(db, { auth: admin, action: 'retry-rejected' }, env));
-    assert.equal(sameDay.status, 200);
-    assert.equal(sameDay.body.idempotent, true);
-    assert.deepEqual(sameDay.body.results, []);
+    assert.equal(sameDay.status, 502);
+    assert.equal(sameDay.body.ok, false);
+    assert.equal(sameDay.body.code, 'ALREADY_RETRIED_TODAY');
+    assert.equal(sameDay.body.results[0].idempotent, true);
+    assert.equal(sameDay.body.results[0].status, 'rejected');
+    assert.equal(sameDay.body.results[0].errorCode, 'SOLAPI_HTTP_400_INVALIDSENDERNUMBER');
 
     const nextDay = await withNow(dayTwo, () =>
       call(db, { auth: admin, action: 'retry-rejected' }, env));
@@ -338,6 +356,41 @@ test('rejected-only retry is root/allowlist-manager only, once per KST day, and 
     assert.equal(nextDay.body.results[0].status, 'rejected');
   });
   assert.equal(fetches, 2, '당일 내용·거래처 변경은 재발송하지 않고 다음 KST 날짜에만 다시 시도한다');
+});
+
+test('an already retried task is skipped without blocking a different newly rejected task', async () => {
+  const db = new TestD1();
+  const sendAt = Date.parse('2026-08-11T00:00:00Z');
+  seedOrderTask(db, {
+    id: 'failed-old', orderDelivery: 'scheduled_batch_v1', createdAt: sendAt - 120_000
+  });
+  seedMappedSend(db, 'failed-old', 'old-rejected', 'rejected');
+  let fetches = 0;
+  await withNow(sendAt, async () => {
+    await withFetch(async () => {
+      fetches += 1;
+      if (fetches === 1) {
+        return new Response(JSON.stringify({ errorCode: 'InvalidSenderNumber' }), { status: 400 });
+      }
+      return acceptedResponse(fetches);
+    }, async () => {
+      const first = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(first.status, 502);
+
+      seedOrderTask(db, {
+        id: 'failed-new', title: '[주문] 새로 거절된 주문', orderDelivery: 'scheduled_batch_v1',
+        orderItems: [{ title: '새로 거절된 주문', qty: '1권' }], createdAt: sendAt - 60_000
+      });
+      seedMappedSend(db, 'failed-new', 'new-rejected', 'rejected');
+
+      const second = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(second.status, 502, '기존 당일 거절 결과를 숨기지 않는다');
+      assert.equal(second.body.ok, false);
+      assert.equal(second.body.code, 'ALREADY_RETRIED_TODAY');
+      assert.deepEqual(second.body.results.map(result => result.status).sort(), ['accepted', 'rejected']);
+    });
+  });
+  assert.equal(fetches, 2, '기존 task는 건너뛰고 새 task만 한 번 provider에 보낸다');
 });
 
 test('rejected retry reports an uncertain provider result as outer ok false with HTTP 202', async () => {
@@ -382,6 +435,200 @@ test('rejected retry blocks the inclusive 19:45-20:30 KST cron window before DB 
   });
   assert.equal(dbQueries, 0);
   assert.equal(fetches, 0);
+});
+
+test('retry lease blocks an overlapping scheduler until the response body finishes, then releases', async () => {
+  const db = new TestD1();
+  const sendAt = Date.parse('2026-08-11T00:00:00Z');
+  seedOrderTask(db, {
+    id: 'failed-1', orderDelivery: 'scheduled_batch_v1', createdAt: sendAt - 120_000
+  });
+  seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
+  seedOrderTask(db, {
+    id: 'fresh-1', title: '[주문] 새 예약 주문', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '새 예약 주문', qty: '1권' }], createdAt: sendAt - 60_000
+  });
+
+  let fetches = 0;
+  let releaseBody;
+  let markBodyStarted;
+  const bodyStarted = new Promise(resolve => { markBodyStarted = resolve; });
+  await withNow(sendAt, async () => {
+    await withFetch(async () => {
+      fetches += 1;
+      if (fetches !== 1) return acceptedResponse(fetches);
+      return {
+        ok: true,
+        status: 200,
+        text() {
+          markBodyStarted();
+          return new Promise(resolve => { releaseBody = () => resolve(JSON.stringify(acceptedPayload(1))); });
+        }
+      };
+    }, async () => {
+      const retryPromise = call(db, { auth: admin, action: 'retry-rejected' });
+      await bodyStarted;
+      assert.equal(db.prepare("SELECT COUNT(*) AS count FROM book_order_dispatch_lock WHERE app='task'").first().count, 1);
+
+      const busy = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, sendAt);
+      assert.equal(busy.ok, false);
+      assert.equal(busy.code, 'BOOK_ORDER_SEND_BUSY');
+      assert.equal(fetches, 1, '겹친 scheduler는 provider를 호출하지 않는다');
+
+      releaseBody();
+      const retried = await retryPromise;
+      assert.equal(retried.status, 200);
+      assert.equal(db.prepare("SELECT COUNT(*) AS count FROM book_order_dispatch_lock WHERE app='task'").first().count, 0);
+
+      const afterRelease = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, sendAt);
+      assert.equal(afterRelease.ok, true);
+      assert.equal(fetches, 2, 'lease 해제 뒤 새 예약 주문은 실행할 수 있다');
+    });
+  });
+});
+
+test('direct task send and scheduler share the same lease and cannot fetch concurrently', async () => {
+  const db = new TestD1();
+  const sendAt = Date.parse('2026-08-11T00:00:00Z');
+  seedOrderTask(db, {
+    id: 'direct-1', orderDelivery: 'scheduled_batch_v1', createdAt: sendAt - 120_000
+  });
+  seedOrderTask(db, {
+    id: 'fresh-1', title: '[주문] 두 번째 예약 주문', orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '두 번째 예약 주문', qty: '1권' }], createdAt: sendAt - 60_000
+  });
+
+  let fetches = 0;
+  let releaseBody;
+  let markBodyStarted;
+  const bodyStarted = new Promise(resolve => { markBodyStarted = resolve; });
+  await withNow(sendAt, async () => {
+    await withFetch(async () => {
+      fetches += 1;
+      if (fetches !== 1) return acceptedResponse(fetches);
+      return {
+        ok: true,
+        status: 200,
+        text() {
+          markBodyStarted();
+          return new Promise(resolve => { releaseBody = () => resolve(JSON.stringify(acceptedPayload(1))); });
+        }
+      };
+    }, async () => {
+      const directPromise = call(db, { auth: admin, taskId: 'direct-1' });
+      await bodyStarted;
+      const busy = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, sendAt);
+      assert.equal(busy.code, 'BOOK_ORDER_SEND_BUSY');
+      assert.equal(fetches, 1);
+
+      releaseBody();
+      const direct = await directPromise;
+      assert.equal(direct.status, 200);
+      const afterRelease = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, sendAt);
+      assert.equal(afterRelease.ok, true);
+      assert.equal(fetches, 2, '직접 발송된 주문은 제외하고 새 주문만 scheduler가 보낸다');
+    });
+  });
+});
+
+test('live lease returns busy, while an expired-at-now lease is atomically taken over and released', async () => {
+  const db = new TestD1();
+  const sendAt = Date.parse('2026-08-11T00:00:00Z');
+  seedOrderTask(db, {
+    id: 'failed-1', orderDelivery: 'scheduled_batch_v1', createdAt: sendAt - 60_000
+  });
+  seedMappedSend(db, 'failed-1', 'old-rejected-1', 'rejected');
+  db.prepare(
+    "INSERT INTO book_order_dispatch_lock(app,owner,lease_until,updated_at) VALUES('task','live-owner',?,?)"
+  ).bind(sendAt + 1, sendAt).run();
+
+  let fetches = 0;
+  await withNow(sendAt, async () => {
+    await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const busy = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(busy.status, 409);
+      assert.equal(busy.body.code, 'BOOK_ORDER_SEND_BUSY');
+      assert.equal(fetches, 0);
+
+      db.prepare("UPDATE book_order_dispatch_lock SET lease_until=? WHERE app='task'").bind(sendAt).run();
+      const takenOver = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(takenOver.status, 200);
+      assert.equal(fetches, 1);
+      assert.equal(db.prepare("SELECT COUNT(*) AS count FROM book_order_dispatch_lock WHERE app='task'").first().count, 0);
+    });
+  });
+});
+
+test('scheduler releases its lease when candidate selection throws', async () => {
+  const db = new TestD1();
+  const originalPrepare = db.prepare.bind(db);
+  let failSelection = true;
+  db.prepare = sql => {
+    if (failSelection && String(sql).startsWith("SELECT id,data FROM tasks WHERE app='task'")) {
+      failSelection = false;
+      throw new Error('candidate read failed');
+    }
+    return originalPrepare(sql);
+  };
+  await assert.rejects(
+    handleScheduledBookOrders({ DB: db, ...fullEnvBase }, Date.now()),
+    /candidate read failed/
+  );
+  assert.equal(originalPrepare("SELECT COUNT(*) AS count FROM book_order_dispatch_lock WHERE app='task'").first().count, 0);
+});
+
+test('Solapi timeout covers a hanging response body and remains unknown/idempotent', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { id: 'order-timeout' });
+  let fetches = 0;
+  const nativeSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) =>
+    nativeSetTimeout(callback, delay === 8000 ? 5 : delay, ...args);
+  try {
+    await withFetch(async (url, options) => {
+      fetches += 1;
+      return {
+        ok: true,
+        status: 200,
+        text() {
+          return new Promise((resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+          });
+        }
+      };
+    }, async () => {
+      const first = await call(db, { auth: admin, taskId: 'order-timeout' });
+      assert.equal(first.status, 202);
+      assert.equal(first.body.send.status, 'unknown');
+      assert.equal(first.body.send.errorCode, 'SOLAPI_TIMEOUT');
+
+      const again = await call(db, { auth: admin, taskId: 'order-timeout' });
+      assert.equal(again.status, 202);
+      assert.equal(again.body.idempotent, true);
+    });
+  } finally {
+    globalThis.setTimeout = nativeSetTimeout;
+  }
+  assert.equal(fetches, 1, 'timeout 결과는 provider를 다시 호출하지 않는다');
+});
+
+test('invalid Solapi response body is unknown and cannot be retried', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { id: 'order-invalid-body' });
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response('{not-json', { status: 200 });
+  }, async () => {
+    const first = await call(db, { auth: admin, taskId: 'order-invalid-body' });
+    assert.equal(first.status, 202);
+    assert.equal(first.body.send.status, 'unknown');
+    assert.equal(first.body.send.errorCode, 'SOLAPI_INVALID_RESPONSE');
+    const again = await call(db, { auth: admin, taskId: 'order-invalid-body' });
+    assert.equal(again.status, 202);
+    assert.equal(again.body.idempotent, true);
+  });
+  assert.equal(fetches, 1);
 });
 
 test('send is disabled by default even with valid credentials unless the explicit switch is on', async () => {

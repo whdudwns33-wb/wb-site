@@ -232,6 +232,16 @@ CREATE TABLE IF NOT EXISTS book_order_batch_items (
 CREATE INDEX IF NOT EXISTS idx_book_order_batch_items_send
   ON book_order_batch_items(app, send_id);
 
+-- 예약 cron과 수동·직접 발송이 같은 주문을 동시에 발송하지 않게 하는 단일 lease.
+-- owner가 일치하는 실행만 해제하며, 비정상 종료 시 10분 뒤 다음 실행이 인계한다.
+CREATE TABLE IF NOT EXISTS book_order_dispatch_lock (
+  app         TEXT    NOT NULL CHECK (app = 'task'),
+  owner       TEXT    NOT NULL,
+  lease_until INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (app)
+);
+
 -- 교재 DB(textbooks.json)는 저장소의 정적 파일이라 앱에서 직접 고칠 수 없다.
 -- 여기서는 그 자리를 메운다: 선생님이 "이 교재를 새로 추가해 주세요"를 신청하면(request),
 -- 원장이 검토(review)해 승인해야 교재 목록에 실제로 나타난다. 원장이 직접 신청하면
