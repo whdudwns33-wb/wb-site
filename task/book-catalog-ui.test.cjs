@@ -133,7 +133,7 @@ test('publisher-series-book accordion is searchable and mobile-friendly', () => 
   assert.match(search, /updateBookBatchOutsideSearch\(vendor, hasQuery\)/);
   assert.match(search, /검색 중에는 결과를 자동으로 펼칩니다/);
   assert.doesNotMatch(search, /seriesExpansion\.(?:set|delete|clear)|vendorClosed\.(?:add|delete|clear)|batchSelection\.(?:add|delete|clear)/);
-  assert.match(render, /applyBookSearch\(bookSearchQuery\);\s*restoreBookToggleFocus\(\)/);
+  assert.match(render, /applyBookSearch\(bookSearchQuery\);[\s\S]{0,160}restoreBookToggleFocus\(\)/);
 });
 
 test('book accordion restores keyboard focus and uses valid button content', () => {

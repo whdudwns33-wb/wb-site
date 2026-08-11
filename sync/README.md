@@ -29,6 +29,8 @@ npx wrangler d1 execute wb-sync --remote --file=./schema.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/019_private_roster.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/020_book_order_dispatch_lock.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/021_parent_feedback_student_ids.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/022_book_issues.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/023_transport.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -64,6 +66,15 @@ npx wrangler deploy
 `APPROVED`이고 변수 `#{선생님}`, `#{학생명}`, `#{학습내용}`, `#{잘한점}`, `#{보완점}`이 정확히
 일치하는 것을 확인한 뒤에만 `WB_PARENT_FEEDBACK_SEND_ENABLED=true`로 켠다. SMS 대체 발송은
 항상 비활성화한다(`disableSms: true`).
+
+학생별 교재 출고 기능은 `022_book_issues.sql`을 먼저 적용한 뒤 Worker를 배포한다. 출고 원장은
+원생 이름·연락처를 저장하지 않고 `private_rosters.bookStudents`의 stable 배정 ID·학생 ID·교재
+ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배정을 원생 문서에서 삭제하거나
+다른 학생·교재로 바꾸는 교체 요청은 409로 차단된다.
+
+차량 기능은 `023_transport.sql`을 먼저 적용한 뒤 Worker를 배포한다. 설정·상태에는 stable ID와
+운행 정보만 저장하고 전화·주소·보호자 정보는 저장하지 않는다. 날짜와 관계없이 승차 후 미하차 기록이 있는
+노선·차량·운전 담당자·학생 배정은 설정 교체로 제거하거나 변경할 수 없다.
 
 기존 `roster.json`과 `textbooks.json`의 학생 배정을 처음 이관할 때는 비밀키를 명령줄에 직접
 쓰지 말고 보안 입력으로 환경변수에 넣은 뒤 이관 도구를 실행한다.
@@ -184,6 +195,73 @@ KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 �
 ```jsonc
 { "app":"task", "auth":{...}, "action":"retry-rejected" }
 ```
+
+### `/book-issue` — 학생별 교재 출고·인계
+
+현재 비공개 원생 문서의 교재 배정이 정본이다. 원장·관리 담당은 전체, 개인 링크는 현재
+`teacherIds`에 본인이 있는 배정만 조회·변경한다. 응답의 학생 이름·학년은 현재 원생 문서에서
+그때 파생하며 출고 원장에는 저장하지 않는다. 관리자 `warnings`에는 삭제된 배정(orphan)이나
+stable ID 정체성 불일치가 나오고, 일반 직원에게는 그런 이력을 노출하지 않는다.
+
+```jsonc
+// 전체/담당 배정과 상태 조회. 아직 시작하지 않은 배정은 status:none, revision:0
+{ "app":"task", "auth":{...}, "action":"list" }
+→ { "ok":true, "issues":[{
+  "assignmentId":"book-assignment-001", "studentId":"student-001",
+  "studentName":"홍길동", "grade":"중1", "bookId":"BK01",
+  "status":"none", "cycle":0, "revision":0,
+  "preparedAt":null, "issuedAt":null, "handedAt":null,
+  "cancelledAt":null, "cancelReason":"", "reissueReason":"", "history":[]
+}], "warnings":[] }
+
+// CAS 상태 변경. next가 정식 필드이며 event/expectedRevision은 전환기 호환 별칭이다.
+{ "app":"task", "auth":{...}, "action":"transition",
+  "assignmentId":"book-assignment-001", "next":"prepared", "revision":0 }
+→ { "ok":true, "idempotent":false, "issue":{ "status":"prepared", "revision":1, ... } }
+```
+
+허용 전이는 `none → prepared|issued`, `prepared → issued|cancelled`,
+`issued → handed|cancelled`, `handed|cancelled → reissue(새 cycle의 prepared)`이다.
+`cancelled`와 `reissue`에는 300자 이내 `reason`이 필수다. 성공한 요청을 같은 이전 revision으로
+즉시 다시 보내면 `idempotent:true`, 다른 변경과 충돌하면 최신 `current`와 함께 409를 반환한다.
+
+### `/transport` — 차량 노선·승하차 현황
+
+원장·관리 담당은 전체, 개인 링크는 본인이 운전 담당인 노선만 조회한다. 개인 링크의 상태 변경은
+KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기준 ±31일 이내 상태를 처리하며, 별도
+`unresolved` 목록에 잡힌 과거 미하차 기록은 날짜 제한 없이 사유를 남겨 초기화할 수 있다.
+
+```jsonc
+// 날짜별 조회. row가 없으면 scheduled/revision 0
+{ "app":"task", "auth":{...}, "action":"list", "date":"2026-08-11" }
+→ { "ok":true, "config":{"vehicles":[],"drivers":[],"routes":[]},
+    "routes":[], "states":[], "unresolved":[], "revision":0, "warnings":[], "summary":{...} }
+
+// 전체 관리 권한만 설정 교체. revision은 list/replace 응답의 설정 revision
+{ "app":"task", "auth":{...}, "action":"replace", "revision":0,
+  "config":{"vehicles":[{"id":"van-1","name":"1호차","plate":"12가3456","capacity":12}],
+    "routes":[{"id":"route-1","name":"월수금 귀가","direction":"dropoff",
+      "vehicleId":"van-1","driverId":"staff-kim","days":[1,3,5],"startTime":"19:00",
+      "stops":[{"id":"stop-1","name":"중앙공원","time":"19:15","studentIds":["student-1"]}],
+      "active":true}]}}
+
+// CAS 상태 변경
+{ "app":"task", "auth":{...}, "action":"state", "date":"2026-08-11",
+  "routeId":"route-1", "studentId":"student-1", "next":"boarded", "revision":0 }
+```
+
+허용 전이는 `scheduled → boarded|absent`, `boarded → dropped`이다. 전체 관리 권한만 `next:"scheduled"`와
+필수 `reason`으로 초기화할 수 있다. 같은 이전 revision의 중복 클릭은 409로 차단된다. 관리자
+조회에는 설정에서 누락됐더라도 `boarded`인 기록을 숨기지 않고 `ORPHAN_BOARDED` 경고로 반환한다.
+
+### `/onboarding-patch` — 신규 학생 30일 관리 CAS 저장
+
+기존 `checks`의 `__onboarding__<studentId>|all` 행을 그대로 쓰되, 원장·관리 담당의 동시 수정이
+서로 덮이지 않도록 현재 `updatedAt`을 조건으로 한 필드만 갱신한다. 지원 작업은 `create`, `item`,
+`package`, `classroom`, `date`, `cancel`, `restore`이며 서버가 stable 학생 ID·재원 기간·항목
+목록·시각·처리자를 검증한다. 충돌하면 409와 최신 `current`를 반환하므로 화면이 최신 상태를
+반영한 뒤 사용자가 다시 시도한다. 이 경로를 한 번 거친 `casVersion:1` 행은 예전 generic
+`/sync` LWW 요청으로 덮어쓸 수 없다.
 
 ### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)
 ```jsonc

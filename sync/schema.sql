@@ -382,3 +382,68 @@ CREATE TABLE IF NOT EXISTS private_rosters (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (app)
 );
+
+-- 학생별 교재 출고·인계 원장. 이름·연락처는 저장하지 않고 현재 private_rosters의
+-- stable assignment/student/book ID와 학생 표시명 해시를 매 요청 다시 대조한다.
+CREATE TABLE IF NOT EXISTS book_issues (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  assignment_id         TEXT    NOT NULL,
+  student_id            TEXT    NOT NULL,
+  book_id               TEXT    NOT NULL,
+  student_identity_hash TEXT    NOT NULL CHECK (length(student_identity_hash) = 64),
+  status                TEXT    NOT NULL CHECK (status IN ('prepared','issued','handed','cancelled')),
+  cycle                 INTEGER NOT NULL CHECK (cycle >= 1),
+  revision              INTEGER NOT NULL CHECK (revision >= 1),
+  prepared_at           INTEGER,
+  prepared_by           TEXT,
+  issued_at             INTEGER,
+  issued_by             TEXT,
+  handed_at             INTEGER,
+  handed_by             TEXT,
+  cancelled_at          INTEGER,
+  cancelled_by          TEXT,
+  cancel_reason         TEXT,
+  reissue_reason        TEXT,
+  history               TEXT    NOT NULL CHECK (json_valid(history)),
+  created_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  PRIMARY KEY (app, assignment_id)
+);
+CREATE INDEX IF NOT EXISTS idx_book_issues_status
+  ON book_issues(app, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_book_issues_student
+  ON book_issues(app, student_id, updated_at);
+
+-- 차량 노선 설정. 전화·주소·보호자 정보는 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS transport_configs (
+  app        TEXT    NOT NULL CHECK (app = 'task'),
+  data       TEXT    NOT NULL CHECK (json_valid(data) AND length(CAST(data AS BLOB)) <= 524288),
+  updated_at INTEGER NOT NULL,
+  updated_by TEXT    NOT NULL,
+  PRIMARY KEY (app)
+);
+
+-- row가 없으면 scheduled. 실제 상태가 생긴 학생만 날짜·노선·stable student ID로 저장한다.
+CREATE TABLE IF NOT EXISTS transport_states (
+  app         TEXT    NOT NULL CHECK (app = 'task'),
+  date        TEXT    NOT NULL,
+  route_id    TEXT    NOT NULL,
+  student_id  TEXT    NOT NULL,
+  status      TEXT    NOT NULL CHECK (status IN ('scheduled','boarded','dropped','absent')),
+  revision    INTEGER NOT NULL CHECK (revision >= 1),
+  boarded_at  INTEGER,
+  boarded_by  TEXT,
+  dropped_at  INTEGER,
+  dropped_by  TEXT,
+  absent_at   INTEGER,
+  absent_by   TEXT,
+  history     TEXT    NOT NULL DEFAULT '[]' CHECK (json_valid(history)),
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (app, date, route_id, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_transport_states_day
+  ON transport_states(app, date, status, route_id);
+CREATE INDEX IF NOT EXISTS idx_transport_states_student
+  ON transport_states(app, student_id, date);
+CREATE INDEX IF NOT EXISTS idx_transport_states_unresolved
+  ON transport_states(app, status, date, updated_at);

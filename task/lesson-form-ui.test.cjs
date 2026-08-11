@@ -14,7 +14,7 @@ test('task inline application script parses', () => {
 
 test('teachers get an own-scope nine-field lesson route', () => {
   assert.match(html, /\['today', '오늘 할 일'\],[\s\S]{0,180}\['lesson', '수업 등록'\]/);
-  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /\['feedback', '피드백 상태'\]/);
   assert.match(html, /lessonDraftStorageKey/);
   assert.match(html, /persistLessonDraft/);

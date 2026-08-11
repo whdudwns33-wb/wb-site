@@ -294,7 +294,7 @@ test('Kim Deokjae real-data samples produce the expected current student counts'
 test('dashboard is admin-only, mobile responsive, and keeps multi-teacher tasks separate', () => {
   assert.match(html, /const map = \{ schedule: viewSchedule,/);
   assert.match(html, /function viewSchedule\(\) \{\s*if \(!session\.isAdmin\) return viewToday\(\);/);
-  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /key: String\(t\.id\) \+ '\|' \+ String\(slot\.slotId \|\| index\)/);
   assert.match(html, /weeklyTeacherSummary\(weekly\.entries\)/);
   assert.match(html, /\.schedule-timeline-scroll \{[^}]*overflow-x: auto;/);

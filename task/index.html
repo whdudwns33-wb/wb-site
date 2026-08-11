@@ -387,6 +387,56 @@
   .onboarding-check.is-on { color: var(--mid-gray); text-decoration: line-through; }
   .onboarding-check.is-on .sbox { border-color: var(--green); background: var(--green); color: var(--white); }
   .onboarding-empty-search { margin-top: 10px; padding: 14px; border-radius: 10px; background: var(--light-gray); color: var(--mid-gray); text-align: center; font-size: 13px; }
+  .firstday-package { margin-top: 12px; padding: 13px; border: 1px solid #B9DDF0; border-radius: 12px; background: #F8FCFF; }
+  .firstday-package-head { align-items: flex-start; }
+  .firstday-schedule { margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--white); }
+  .firstday-schedule-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px solid var(--light-gray); font-size: 12.5px; }
+  .firstday-schedule-row:first-child { border-top: 0; }
+  .firstday-schedule-row time { color: var(--deep-blue); font-weight: 900; }
+  .firstday-classroom { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 10px; }
+  .package-docs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+  .package-doc { padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .package-doc b { display: block; min-height: 35px; color: var(--navy); font-size: 12.5px; line-height: 1.4; }
+  .package-states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 7px; }
+  .package-states .btn { min-width: 0; min-height: 44px; padding: 5px 3px; font-size: 10.5px; }
+
+  /* ─── 학생별 교재 출고 ─── */
+  .book-issue-board { border-color: #B9DDF0; }
+  .ops-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .ops-kpi { min-width: 0; padding: 11px 7px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); text-align: center; }
+  .ops-kpi b { display: block; color: var(--navy); font-size: 20px; line-height: 1; }
+  .ops-kpi span { display: block; margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; }
+  .ops-kpi.is-alert { border-color: #F3B8B0; background: #FFF7F5; }
+  .ops-kpi.is-alert b { color: #9E3629; }
+  .ops-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+  .ops-toolbar .chips { margin-top: 0; }
+  .ops-search { flex: 1 1 210px; min-width: 0; }
+  .book-issue-grid, .transport-route-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: 9px; }
+  .book-issue-card { margin-bottom: 0; }
+  .book-issue-card.is-risk { border-left: 4px solid var(--coral); background: #FFF9F7; }
+  .ops-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ops-actions .btn { min-height: 44px; }
+
+  /* ─── 차량 운행 ─── */
+  .transport-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 72%); }
+  .transport-datebar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  .transport-datebar .btn { min-height: 44px; }
+  .transport-datebar strong { color: var(--navy); text-align: center; }
+  .transport-route-card { margin-bottom: 0; }
+  .transport-route-card.is-riding { border: 2px solid var(--coral); box-shadow: 0 5px 16px rgba(232,93,74,.14); }
+  .transport-route-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .transport-stop { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--light-gray); }
+  .transport-student { padding: 9px 0; border-top: 1px solid var(--light-gray); }
+  .transport-student:first-child { border-top: 0; }
+  .transport-student.is-riding { margin: 0 -7px; padding: 9px 7px; border-radius: 9px; background: #FFF0ED; }
+  .transport-config details { border-top: 1px solid var(--line); padding: 10px 0; }
+  .transport-config details:first-of-type { border-top: 0; }
+  .transport-config summary { min-height: 44px; color: var(--navy); font-weight: 900; cursor: pointer; }
+  .transport-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .transport-config-list { margin-top: 10px; }
+  .transport-config-row { padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-top: 7px; }
+  .transport-unmatched { border-color: #F3B8B0; background: #FFF7F5; }
+  .transport-capacity { color: #9E3629; font-weight: 900; }
   @media (max-width: 600px) {
     .onboarding-enrol { grid-template-columns: 1fr; }
     .onboarding-enrol .btn { min-height: 44px; }
@@ -396,6 +446,14 @@
     .onboarding-toolbar .chip { min-height: 44px; padding: 6px 4px; }
     .onboarding-card-head { display: block; }
     .onboarding-progress { margin-top: 8px; text-align: left; }
+    .firstday-classroom { grid-template-columns: 1fr; }
+    .package-docs { grid-template-columns: 1fr; }
+    .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ops-toolbar { display: block; }
+    .ops-toolbar .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
+    .ops-toolbar .chip { min-height: 44px; padding: 6px 3px; }
+    .book-issue-grid, .transport-route-grid { grid-template-columns: 1fr; }
+    .transport-config-grid { grid-template-columns: 1fr; }
   }
 
   /* ─── 직원 현황 ─── */
@@ -445,10 +503,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-11.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-11.1"></script>
-<script src="./asset-core.js?v=2026-08-11.1"></script>
-<script src="./qr-core.js?v=2026-08-11.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-11.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-11.2"></script>
+<script src="./asset-core.js?v=2026-08-11.2"></script>
+<script src="./qr-core.js?v=2026-08-11.2"></script>
 <script>
 "use strict";
 
@@ -730,6 +788,13 @@ function ownerOfCheck(key) {
   return t ? (t.staffId || null) : null;
 }
 
+function onboardingReconcileChanges() {
+  return Object.keys(state.checks || {}).filter(key => {
+    const row = state.checks[key];
+    return /^__onboarding__/.test(key) && row && row.casVersion === 1;
+  }).map(key => ({ table: 'checks', k: key, owner: null, reconcile: true }));
+}
+
 /** 권한 근거가 아니라, 재로드 뒤에도 전체 관리 캐시를 지워야 함을 기억하는 표식이다. */
 function hasSensitiveManagerCache(previousRole) {
   return previousRole === 'manager' || sync.accessRole === 'manager' ||
@@ -775,7 +840,15 @@ const sync = {
       const at = ch.data.updatedAt || 0;
       if (ch.table === 'checks') {
         const cur = state.checks[ch.key];
-        if (!cur || at > (cur.updatedAt || 0)) { state.checks[ch.key] = ch.data; n++; }
+        const onboardingStudentId = String(ch.data.studentId || '');
+        const authoritativeOnboarding = ch.authoritative === true && ch.data.casVersion === 1 &&
+          /^__onboarding__/.test(String(ch.key || '')) &&
+          at >= Number(onboardingServerConfirmedAt.get(onboardingStudentId) || 0);
+        if (!cur || authoritativeOnboarding || at > (cur.updatedAt || 0)) {
+          state.checks[ch.key] = ch.data;
+          if (authoritativeOnboarding) onboardingServerConfirmedAt.set(onboardingStudentId, Number(at) || 0);
+          n++;
+        }
       } else if (ch.table === 'staff' || ch.table === 'tasks') {
         const arr = state[ch.table];
         const i = arr.findIndex(x => x.id === ch.key);
@@ -796,6 +869,7 @@ const sync = {
       const error = new Error((d && (d.error || d.message)) || ('HTTP ' + res.status));
       error.status = res.status;
       error.code = String(d && (d.code || d.errorCode || d.reason) || '');
+      error.current = d && d.current || null;
       error.apiResponse = !!d;
       const personRequest = body && body.auth && body.auth.mode === 'person';
       if (path !== '/sync' && session.isStaffLink && personRequest &&
@@ -823,9 +897,21 @@ const sync = {
       const needsAccessRender = session.isStaffLink && !this.personVerified;
       let applied = 0;
       const pending = this.collect(Number(state.settings.pushAt) || 0);
+      let reconcileQueued = false;
+      let reconcileOutstanding = 0;
+      const queueOnboardingReconcile = eligible => {
+        if (!eligible || reconcileQueued || Number(state.settings.onboardingCasReconcileVersion) >= 1) return;
+        const rows = onboardingReconcileChanges();
+        reconcileQueued = true;
+        reconcileOutstanding = rows.length;
+        if (rows.length) pending.push(...rows);
+        else state.settings.onboardingCasReconcileVersion = 1;
+      };
+      queueOnboardingReconcile(auth.mode === 'admin' || session.isManager);
       let guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
+        const batchReconcileCount = batch.filter(change => change && change.reconcile === true).length;
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
           since: Number(state.settings.pullAt) || 0,
@@ -854,6 +940,11 @@ const sync = {
         nextAccessRole = responseAccessRole;
         applied += this.apply(d.changes);
         state.settings.pullAt = d.now;
+        if (batchReconcileCount) {
+          reconcileOutstanding = Math.max(0, reconcileOutstanding - batchReconcileCount);
+          if (!reconcileOutstanding) state.settings.onboardingCasReconcileVersion = 1;
+        }
+        queueOnboardingReconcile(auth.mode === 'admin' || responseAccessRole === 'manager');
         again = !!d.more || pending.length > 0;
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
@@ -965,6 +1056,12 @@ let scheduleSearchQuery = '';
 let onboardingSearchQuery = '';
 let onboardingStatusFilter = 'active';
 let onboardingRestoreFocus = null;
+const onboardingPatchSequence = new Map();
+const onboardingServerConfirmedAt = new Map();
+let bookIssueRows = [], bookIssueLoaded = false, bookIssueLoading = false, bookIssueError = '';
+let bookIssueFilter = 'all', bookIssueSearchQuery = '', bookIssueRestoreFocus = null;
+let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoading = false, transportError = '';
+let transportRestoreFocus = null, transportConfigDraft = null;
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
@@ -996,6 +1093,8 @@ function resetPersonCache(token) {
   if (keepToken) state.settings.myToken = keepToken;
   if (keepToken || !removed) save();
   viewStaff = ''; scheduleSearchQuery = ''; onboardingSearchQuery = ''; onboardingStatusFilter = 'active'; onboardingRestoreFocus = null; openPanels.clear();
+  onboardingPatchSequence.clear();
+  onboardingServerConfirmedAt.clear();
   pendingAdd = null;
   pendingBootstrapCode = '';
   personAccessProblem = null;
@@ -1016,6 +1115,10 @@ function resetPersonCache(token) {
   bookEditQueue = []; bookEditQueueLoaded = false; bookEditQueueLoading = false; bookEditQueueError = '';
   ownBookEditQueue = []; ownBookEditQueueLoaded = false; ownBookEditQueueLoading = false; ownBookEditQueueError = '';
   beForm = null;
+  bookIssueRows = []; bookIssueLoaded = false; bookIssueLoading = false; bookIssueError = '';
+  bookIssueFilter = 'all'; bookIssueSearchQuery = ''; bookIssueRestoreFocus = null;
+  transportDate = today(); transportData = null; transportLoadedDate = ''; transportLoading = false;
+  transportError = ''; transportRestoreFocus = null; transportConfigDraft = null;
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
   acaflowImportFileName = '';
   guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false;
@@ -1487,11 +1590,11 @@ function render() {
 
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
   if (session.isStaffLink && !session.isAdmin) {
-    const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'roster'];
+    const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, roster: viewRoster, devices: viewDevices };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -1499,12 +1602,15 @@ function render() {
   });
   if (route === 'books') requestAnimationFrame(() => {
     applyBookSearch(bookSearchQuery);
+    applyBookIssueSearch(bookIssueSearchQuery);
     restoreBookToggleFocus();
+    restoreBookIssueFocus();
   });
   if (route === 'onboarding') requestAnimationFrame(() => {
     applyOnboardingSearch(onboardingSearchQuery);
     restoreOnboardingFocus();
   });
+  if (route === 'transport') requestAnimationFrame(restoreTransportFocus);
 }
 
 function renderTabs() {
@@ -1512,10 +1618,10 @@ function renderTabs() {
   const tabs = session.isStaffLink && shouldGatePersonAccess()
     ? []
     : session.isStaffLink && !session.isAdmin
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['roster', '원생']]
+    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '현황판'], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
+         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -4716,6 +4822,214 @@ async function reviewBookEdit(action, key, revision) {
   }
 }
 
+/* ── 학생별 교재 출고·인계 ──
+ * privateBookStudents의 stable assignment id가 정본이다. 개인 링크는 /roster와
+ * /book-issue 양쪽에서 서버가 본인 학생만 내려주며, UI도 현재 assignment id
+ * 목록과 교차해 다른 학생의 응답을 그리지 않는다. 연락처·주소는 다루지 않는다. */
+const BOOK_ISSUE_STATUS = {
+  unissued: ['미출고', 'warn'], pending: ['미출고', 'warn'], prepared: ['배부 준비', ''],
+  issued: ['보관함 출고', 'bad'], handed: ['학생 인계 완료', 'ok'], cancelled: ['출고 취소', 'warn']
+};
+const BOOK_ISSUE_FILTERS = [
+  ['all', '전체'], ['unissued', '미출고'], ['risk', '1일+ 미수령'], ['active', '인계 중'], ['handed', '완료']
+];
+
+function normalizeBookIssueStatus(value) {
+  const status = String(value || '').toLowerCase();
+  return BOOK_ISSUE_STATUS[status] ? status : 'unissued';
+}
+
+function bookIssueTime(row, key) {
+  const value = row && (row[key] ?? row[key.replace(/[A-Z]/g, c => '_' + c.toLowerCase())]);
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return n;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function bookIssueViewRows() {
+  const issueByAssignment = new Map((bookIssueRows || []).map(row => [String(row.assignmentId || row.assignment_id || ''), row]));
+  const bookById = new Map((((bookDb && bookDb.books) || [])).map(book => [String(book.id), book]));
+  const currentIds = new Set();
+  const rows = (privateBookStudents || []).map(assignment => {
+    const assignmentId = String(assignment.id || assignment.assignmentId || '');
+    if (!assignmentId) return null;
+    currentIds.add(assignmentId);
+    const stored = issueByAssignment.get(assignmentId) || {};
+    const book = bookById.get(String(assignment.bookId || '')) || {};
+    const status = normalizeBookIssueStatus(stored.status);
+    const issuedAt = bookIssueTime(stored, 'issuedAt');
+    const handedAt = bookIssueTime(stored, 'handedAt');
+    const storedStudentId = String(stored.studentId || stored.student_id || '');
+    const storedBookId = String(stored.bookId || stored.book_id || '');
+    const identityMismatch = String(stored.integrity || '') === 'mismatch' ||
+      !!(storedStudentId && storedStudentId !== String(assignment.studentId || '')) ||
+      !!(storedBookId && storedBookId !== String(assignment.bookId || ''));
+    const risk = status === 'issued' && !!issuedAt && Date.now() - issuedAt >= 86400000;
+    return {
+      assignmentId: assignmentId, studentId: String(assignment.studentId || ''), bookId: String(assignment.bookId || ''),
+      studentName: String(identityMismatch ? (stored.studentName || stored.student_name || '학생 연결 확인 필요') : (assignment.name || stored.studentName || stored.student_name || '학생 미입력')),
+      teacher: String(identityMismatch ? (stored.teacher || '담당 연결 확인 필요') : (assignment.teacher || stored.teacher || '담당 미지정')),
+      title: String(identityMismatch ? (stored.bookTitle || stored.book_title || storedBookId || '교재 연결 확인 필요') : (book.title || stored.bookTitle || stored.book_title || assignment.bookId || '교재 미입력')),
+      status: status, revision: Number(stored.revision) || 0, issuedAt: issuedAt, handedAt: handedAt,
+      updatedAt: bookIssueTime(stored, 'updatedAt'), risk: risk, integrity: identityMismatch ? 'mismatch' : ''
+    };
+  }).filter(Boolean);
+  if (session.isAdmin) {
+    (bookIssueRows || []).forEach(stored => {
+      const assignmentId = String(stored.assignmentId || stored.assignment_id || '');
+      if (!assignmentId || currentIds.has(assignmentId)) return;
+      const status = normalizeBookIssueStatus(stored.status);
+      const issuedAt = bookIssueTime(stored, 'issuedAt');
+      rows.push({
+        assignmentId: assignmentId, studentId: String(stored.studentId || stored.student_id || ''), bookId: String(stored.bookId || stored.book_id || ''),
+        studentName: String(stored.studentName || stored.student_name || '학생 연결 확인 필요'), teacher: String(stored.teacher || '담당 연결 확인 필요'),
+        title: String(stored.bookTitle || stored.book_title || stored.bookId || stored.book_id || '교재 연결 확인 필요'),
+        status: status, revision: Number(stored.revision) || 0, issuedAt: issuedAt, handedAt: bookIssueTime(stored, 'handedAt'),
+        updatedAt: bookIssueTime(stored, 'updatedAt'), risk: status === 'issued' && !!issuedAt && Date.now() - issuedAt >= 86400000,
+        integrity: 'orphan'
+      });
+    });
+  }
+  return rows.sort((a, b) => Number(!!b.integrity) - Number(!!a.integrity) || Number(b.risk) - Number(a.risk) ||
+    a.studentName.localeCompare(b.studentName, 'ko') || a.title.localeCompare(b.title, 'ko'));
+}
+
+async function loadBookIssues(force) {
+  if (bookIssueLoading || (bookIssueLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { bookIssueError = '동기화 인증이 필요합니다'; bookIssueLoaded = true; return; }
+  bookIssueLoading = true; bookIssueError = '';
+  if (route === 'books') renderAfterSync();
+  try {
+    const result = await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: 'list' });
+    bookIssueRows = Array.isArray(result.issues) ? result.issues : [];
+    bookIssueLoaded = true;
+  } catch (error) {
+    bookIssueError = String(error && error.message || error);
+    bookIssueLoaded = true;
+  } finally {
+    bookIssueLoading = false;
+    if (route === 'books') renderAfterSync();
+  }
+}
+
+function bookIssueMatches(row) {
+  if (bookIssueFilter === 'unissued' && !['unissued', 'pending'].includes(row.status)) return false;
+  if (bookIssueFilter === 'risk' && !row.risk) return false;
+  if (bookIssueFilter === 'active' && !['prepared', 'issued'].includes(row.status)) return false;
+  if (bookIssueFilter === 'handed' && row.status !== 'handed') return false;
+  return true;
+}
+
+function applyBookIssueSearch(value) {
+  bookIssueSearchQuery = String(value || '');
+  const terms = bookIssueSearchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const cards = Array.from(document.querySelectorAll('[data-book-issue-card]'));
+  let shown = 0;
+  cards.forEach(card => {
+    const match = terms.every(term => String(card.dataset.search || '').includes(term));
+    card.hidden = !match;
+    if (match) shown++;
+  });
+  const status = document.querySelector('[data-book-issue-search-status]');
+  if (status) status.textContent = terms.length ? shown + '건 검색됨' : cards.length + '건 표시 중';
+  const empty = document.querySelector('[data-book-issue-search-empty]');
+  if (empty) empty.hidden = !terms.length || shown > 0;
+}
+
+function restoreBookIssueFocus() {
+  const key = bookIssueRestoreFocus;
+  if (!key) return false;
+  bookIssueRestoreFocus = null;
+  const button = document.querySelector('[data-book-issue-focus="' + CSS.escape(key) + '"]');
+  if (!button) return false;
+  button.focus({ preventScroll: true });
+  return true;
+}
+
+function bookIssueActionButtons(row) {
+  if (row.integrity) return '<button class="btn btn-sm btn-ghost" disabled aria-disabled="true">연결 확인 후 처리</button>';
+  const base = ' data-id="' + esc(row.assignmentId) + '" data-rev="' + row.revision + '"';
+  if (['unissued', 'pending'].includes(row.status)) {
+    return '<button class="btn btn-sm btn-primary" data-act="bookissuetransition" data-next="prepared"' + base + ' data-book-issue-focus="' + esc(row.assignmentId) + '">배부 준비</button>';
+  }
+  if (row.status === 'cancelled') return '<button class="btn btn-sm btn-primary" data-act="bookissuetransition" data-next="reissue" data-reason-required="true"' + base +
+    ' data-book-issue-focus="' + esc(row.assignmentId) + '">사유 입력·재출고</button>';
+  if (row.status === 'prepared') return '<button class="btn btn-sm btn-primary" data-act="bookissuetransition" data-next="issued"' + base + ' data-book-issue-focus="' + esc(row.assignmentId) + '">보관함 출고</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="bookissuetransition" data-next="cancelled" data-reason-required="true"' + base + '>출고 취소</button>';
+  if (row.status === 'issued') return '<button class="btn btn-sm btn-primary" data-act="bookissuetransition" data-next="handed"' + base + ' data-book-issue-focus="' + esc(row.assignmentId) + '">학생 인계 완료</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="bookissuetransition" data-next="cancelled" data-reason-required="true"' + base + '>출고 취소</button>';
+  return '<button class="btn btn-sm btn-ghost" data-act="bookissuetransition" data-next="reissue" data-reason-required="true"' + base + ' data-book-issue-focus="' + esc(row.assignmentId) + '">인계 취소·재출고</button>';
+}
+
+function bookIssueCard(row) {
+  const labelRow = BOOK_ISSUE_STATUS[row.status] || BOOK_ISSUE_STATUS.unissued;
+  const timeText = row.status === 'handed' && row.handedAt ? '인계 ' + new Date(row.handedAt).toLocaleString('ko-KR')
+    : row.issuedAt ? '출고 ' + new Date(row.issuedAt).toLocaleString('ko-KR') : '아직 보관함에서 출고되지 않음';
+  return '<article class="card book-issue-card' + (row.risk ? ' is-risk' : '') + '" data-book-issue-card data-search="' +
+    esc([row.studentName, row.teacher, row.title, labelRow[0]].join(' ').toLocaleLowerCase()) + '">' +
+    '<div class="between"><div><div class="card-title">' + esc(row.studentName) + ' · ' + esc(row.title) + '</div>' +
+      '<div class="card-sub">담당 ' + esc(row.teacher) + ' · ' + esc(timeText) + '</div></div>' +
+      '<span class="pill ' + labelRow[1] + '">' + esc(labelRow[0]) + '</span></div>' +
+    (row.integrity ? '<div class="hint mt8"><b>연결 끊김·확인 필요</b> — ' +
+      (row.integrity === 'mismatch' ? '같은 배정 ID의 학생 또는 교재 정보가 달라 자동 연결하지 않았습니다.' : '현재 교재 배정에서 사라진 과거 출고 기록입니다. 미인계 여부를 확인하세요.') + '</div>' : '') +
+    (row.risk ? '<div class="hint mt8"><b>누락 위험</b> — 보관함 출고 후 실제 24시간 이상 학생 인계가 확인되지 않았습니다.</div>' : '') +
+    '<div class="ops-actions">' + bookIssueActionButtons(row) + '</div></article>';
+}
+
+function viewBookIssues() {
+  if (!bookIssueLoaded && !bookIssueLoading) setTimeout(() => loadBookIssues(false), 0);
+  if (bookIssueLoading && !bookIssueLoaded) return '<section class="card book-issue-board"><div class="empty"><b>⏳</b>학생별 출고 현황을 불러오는 중…</div></section>';
+  if (bookIssueError) return '<section class="card alert book-issue-board"><div class="card-title">학생별 출고 현황을 불러오지 못했습니다</div>' +
+    '<div class="card-sub">' + esc(bookIssueError) + '</div><button class="btn btn-sm btn-ghost mt14" data-act="bookissuerefresh">다시 시도</button></section>';
+  const all = bookIssueViewRows();
+  const visible = all.filter(bookIssueMatches);
+  const unissued = all.filter(row => ['unissued', 'pending'].includes(row.status)).length;
+  const risk = all.filter(row => row.risk).length;
+  const issuedToday = all.filter(row => row.issuedAt && ymd(new Date(row.issuedAt)) === today()).length;
+  const handed = all.filter(row => row.status === 'handed').length;
+  let h = '<section class="card book-issue-board"><div class="between"><div><div class="card-title">학생별 교재 출고·인계</div>' +
+    '<div class="card-sub">보관함에서 꺼낸 시점과 학생에게 직접 전달한 시점을 나눠 누락을 찾습니다.</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="bookissuerefresh" aria-label="학생별 출고 현황 새로고침">새로고침</button></div>' +
+    '<div class="ops-kpis" aria-label="교재 출고 요약"><div class="ops-kpi"><b>' + unissued + '</b><span>미출고</span></div>' +
+      '<div class="ops-kpi' + (risk ? ' is-alert' : '') + '"><b>' + risk + '</b><span>출고 후 1일+ 미수령</span></div>' +
+      '<div class="ops-kpi"><b>' + issuedToday + '</b><span>오늘 출고</span></div><div class="ops-kpi"><b>' + handed + '</b><span>인계 완료</span></div></div>' +
+    '<div class="ops-toolbar"><div class="chips" aria-label="교재 출고 상태 필터">' + BOOK_ISSUE_FILTERS.map(filter =>
+      '<button class="chip ' + (bookIssueFilter === filter[0] ? 'on' : '') + '" data-act="bookissuefilter" data-status="' + filter[0] + '" aria-pressed="' + (bookIssueFilter === filter[0]) + '">' + filter[1] + '</button>').join('') + '</div>' +
+      '<input class="in ops-search" type="search" data-book-issue-search aria-label="학생별 출고 검색" placeholder="학생·선생님·교재·상태 검색" value="' + esc(bookIssueSearchQuery) + '">' +
+      '<span class="small muted" data-book-issue-search-status role="status" aria-live="polite"></span></div></section>';
+  h += '<div class="book-issue-grid">' + visible.map(bookIssueCard).join('') + '</div>' +
+    '<div class="onboarding-empty-search" data-book-issue-search-empty hidden>검색 결과가 없습니다.</div>';
+  if (!visible.length) h += '<div class="card"><div class="empty"><b>📦</b>' + (all.length ? '이 상태에 해당하는 교재가 없습니다.' : '학생에게 배정된 교재가 없습니다.') + '</div></div>';
+  return h;
+}
+
+async function transitionBookIssue(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const assignmentId = String(button.dataset.id || '');
+  const next = String(button.dataset.next || '');
+  let reason = '';
+  if (button.dataset.reasonRequired === 'true') {
+    reason = String(prompt(next === 'reissue' ? '인계를 취소하고 다시 출고하는 사유를 입력해 주세요' : '출고를 취소하는 사유를 입력해 주세요') || '').trim();
+    if (!reason) return toast('취소·재출고 사유를 입력해 주세요');
+  }
+  bookIssueRestoreFocus = assignmentId;
+  button.disabled = true;
+  try {
+    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: 'transition', assignmentId: assignmentId,
+      next: next, revision: Number(button.dataset.rev) || 0, reason: reason });
+    await loadBookIssues(true);
+    toast(next === 'handed' ? '학생 인계를 완료했습니다' : next === 'issued' || next === 'reissue' ? '보관함 출고로 기록했습니다' : '출고 상태를 저장했습니다');
+  } catch (error) {
+    bookIssueRestoreFocus = null;
+    button.disabled = false;
+    toast('출고 상태 저장 실패 — ' + (error.message || error));
+    loadBookIssues(true);
+  }
+}
+
 function viewBooks() {
   if (!rosterDb) {
     if (!rosterErr && !rosterLoading) loadRoster();
@@ -4728,7 +5042,7 @@ function viewBooks() {
   if (bookDbErr) return '<div class="card alert"><div class="empty"><b>⚠️</b>교재 데이터를 불러오지 못했습니다.<br><span class="muted">' + esc(bookDbErr) + '</span><br>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="bookretry">다시 시도</button></div></div>';
 
-  let h = '<div class="card"><div class="card-title">📚 교재 DB</div>' +
+  let h = viewBookIssues() + '<div class="card"><div class="card-title">📚 교재 DB</div>' +
     '<div class="card-sub">주문처(출판사) → 시리즈 → 세부 교재 순서로 묶었습니다. 주문처를 누르면 접고 펼칠 수 있고, 교재를 누르면 목차가 열립니다.<br>' +
     '시리즈명이 확인되지 않은 교재는 잘못 추정하지 않고 "기타·개별 교재"에 둡니다.<br>' +
     '개별 주문도 매일 저녁 8시에 출판사별 문자 한 통으로 자동 묶입니다. 여러 권을 한 번에 입력하려면 왼쪽 체크박스를 사용하세요.<br>' +
@@ -4812,6 +5126,426 @@ function viewBooks() {
   return h;
 }
 
+/* ── 차량 운행 ──
+ * 차량은 교재·신규학생과 섞지 않는 독립 route다. 서버 list가 개인 링크 범위를
+ * 기사로 배정된 운행만 잘라 주며 UI에는 학생 이름 외 전화·주소를 표시하지 않는다. */
+const TRANSPORT_STATUS = {
+  scheduled: ['탑승 예정', 'warn'], boarded: ['탑승 중 · 미하차', 'bad'],
+  dropped: ['하차·인계 완료', 'ok'], absent: ['미탑승', '']
+};
+
+function deepCopy(value) { return JSON.parse(JSON.stringify(value || {})); }
+function transportSafeId(prefix) { return prefix + '-' + uid().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24); }
+function transportConfig() {
+  const value = transportData && transportData.config;
+  return value && typeof value === 'object' ? value : { vehicles: [], drivers: [], routes: [] };
+}
+
+function transportRoutes() {
+  const value = transportData && transportData.routes;
+  return Array.isArray(value) ? value : [];
+}
+
+function transportStates() {
+  const value = transportData && transportData.states;
+  return Array.isArray(value) ? value : [];
+}
+
+function transportStateKey(routeId, studentId) { return String(routeId) + '|' + String(studentId); }
+
+function normalizeTransportStatus(value) {
+  const status = String(value || '').toLowerCase();
+  return TRANSPORT_STATUS[status] ? status : 'scheduled';
+}
+
+function transportRouteStudents(route) {
+  const direct = Array.isArray(route.students) ? route.students : [];
+  const byStudent = new Map();
+  direct.forEach(student => {
+    const id = String(student.studentId || student.id || '');
+    const nestedStop = student.stop && typeof student.stop === 'object' ? student.stop : {};
+    if (id) byStudent.set(id, Object.assign({}, student, {
+      studentId: id, stopId: String(student.stopId || nestedStop.id || ''),
+      stopName: String(student.stopName || nestedStop.name || ''), stopTime: String(student.stopTime || nestedStop.time || '')
+    }));
+  });
+  (route.stops || []).forEach(stop => {
+    const stopStudents = Array.isArray(stop.students) ? stop.students : [];
+    stopStudents.forEach(student => {
+      const id = String(student.studentId || student.id || '');
+      if (id) byStudent.set(id, Object.assign({}, student, {
+        studentId: id, stopId: String(stop.id || ''), stopName: String(stop.name || ''), stopTime: String(stop.time || '')
+      }));
+    });
+    (stop.studentIds || []).forEach(studentId => {
+      const id = String(studentId || '');
+      const rosterStudent = rosterDb && (rosterDb.students || []).find(student => String(student.id) === id);
+      if (id && !byStudent.has(id)) byStudent.set(id, {
+        studentId: id, name: rosterStudent ? rosterStudent.name : '학생 정보 확인 필요',
+        stopId: String(stop.id || ''), stopName: String(stop.name || ''), stopTime: String(stop.time || '')
+      });
+    });
+  });
+  return Array.from(byStudent.values());
+}
+
+function transportVehicle(route) {
+  const config = transportConfig();
+  return route.vehicle || (config.vehicles || []).find(item => String(item.id) === String(route.vehicleId || route.vehicle_id || '')) || null;
+}
+function transportDriver(route) {
+  const config = transportConfig();
+  return route.driver || (config.drivers || []).find(item => String(item.id) === String(route.driverId || route.driver_id || '')) || null;
+}
+
+async function loadTransport(date, force) {
+  date = validYmd(date) ? date : today();
+  if (transportLoading || (!force && transportLoadedDate === date && transportData)) return;
+  const auth = sync.auth();
+  if (!auth) { transportError = '동기화 인증이 필요합니다'; transportLoadedDate = date; return; }
+  transportLoading = true; transportError = '';
+  if (route === 'transport') renderAfterSync();
+  try {
+    const result = await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'list', date: date });
+    transportData = {
+      config: result.config || { vehicles: [], drivers: [], routes: [] },
+      routes: Array.isArray(result.routes) ? result.routes : [], states: Array.isArray(result.states) ? result.states : [],
+      unresolved: Array.isArray(result.unresolved) ? result.unresolved : [],
+      warnings: Array.isArray(result.warnings) ? result.warnings : [],
+      revision: Number(result.revision ?? result.configRevision) || 0
+    };
+    transportLoadedDate = date;
+    transportConfigDraft = null;
+  } catch (error) {
+    transportError = String(error && error.message || error);
+    transportData = null;
+    transportLoadedDate = date;
+  } finally {
+    transportLoading = false;
+    if (route === 'transport') renderAfterSync();
+  }
+}
+
+function transportProjectedRows() {
+  const states = new Map(transportStates().map(row => [transportStateKey(row.routeId || row.route_id, row.studentId || row.student_id), row]));
+  const out = [];
+  transportRoutes().forEach(routeRow => {
+    const routeId = String(routeRow.id || routeRow.routeId || '');
+    transportRouteStudents(routeRow).forEach(student => {
+      const stateRow = states.get(transportStateKey(routeId, student.studentId)) || {};
+      out.push({ route: routeRow, routeId: routeId, student: student, studentId: String(student.studentId),
+        status: normalizeTransportStatus(stateRow.status), revision: Number(stateRow.revision) || 0, stateRow: stateRow });
+    });
+  });
+  return out;
+}
+
+function transportUnmatchedStates() {
+  const matched = new Set(transportProjectedRows().map(row => transportStateKey(row.routeId, row.studentId)));
+  const rows = [];
+  (transportData && Array.isArray(transportData.unresolved) ? transportData.unresolved : []).forEach(row => {
+    const key = transportStateKey(row.routeId || row.route_id, row.studentId || row.student_id);
+    if (String(row.date || '') === transportDate && matched.has(key)) return;
+    rows.push(row);
+  });
+  transportStates().forEach(row => {
+    if (normalizeTransportStatus(row.status) !== 'boarded') return;
+    if (!matched.has(transportStateKey(row.routeId || row.route_id, row.studentId || row.student_id))) rows.push(row);
+  });
+  const unique = new Map();
+  rows.forEach(row => {
+    if (normalizeTransportStatus(row.status) !== 'boarded') return;
+    const key = String(row.date || transportDate) + '|' + transportStateKey(row.routeId || row.route_id, row.studentId || row.student_id);
+    if (!unique.has(key)) unique.set(key, row);
+  });
+  return Array.from(unique.values());
+}
+
+function transportHasRiders() {
+  return transportStates().some(row => normalizeTransportStatus(row.status) === 'boarded') ||
+    transportProjectedRows().some(row => row.status === 'boarded') ||
+    transportUnmatchedStates().some(row => normalizeTransportStatus(row.status) === 'boarded');
+}
+
+function restoreTransportFocus() {
+  const key = transportRestoreFocus;
+  if (!key) return false;
+  transportRestoreFocus = null;
+  const button = document.querySelector('[data-transport-focus="' + CSS.escape(key) + '"]');
+  if (!button) return false;
+  button.focus({ preventScroll: true });
+  return true;
+}
+
+function transportStudentActions(row) {
+  const base = ' data-route="' + esc(row.routeId) + '" data-student="' + esc(row.studentId) + '" data-rev="' + row.revision + '"';
+  const focus = ' data-transport-focus="' + esc(transportStateKey(row.routeId, row.studentId)) + '"';
+  if (session.isStaffLink && !session.isAdmin && transportDate !== today()) {
+    return '<button class="btn btn-sm btn-ghost" disabled aria-disabled="true">개인 링크는 오늘만 처리</button>';
+  }
+  if (row.status === 'scheduled') return '<button class="btn btn-sm btn-primary" data-act="transportstate" data-next="boarded"' + base + focus + '>탑승</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="transportstate" data-next="absent"' + base + '>미탑승</button>';
+  if (row.status === 'boarded') return '<button class="btn btn-sm btn-primary" data-act="transportstate" data-next="dropped"' + base + focus + '>하차·인계 완료</button>';
+  if (!session.isAdmin) return '<span class="small muted">완료된 운행은 관리자만 되돌릴 수 있습니다.</span>';
+  return '<button class="btn btn-sm btn-ghost" data-act="transportstate" data-next="scheduled" data-reason-required="true"' + base + focus + '>상태 되돌리기</button>';
+}
+
+function transportRouteCard(routeRow, rows) {
+  const vehicle = transportVehicle(routeRow), driver = transportDriver(routeRow);
+  const routeId = String(routeRow.id || routeRow.routeId || '');
+  const riding = rows.filter(row => row.status === 'boarded').length;
+  const done = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
+  const direction = String(routeRow.direction || '') === 'pickup' ? '등원' : String(routeRow.direction || '') === 'dropoff' ? '하원' : (routeRow.direction || '방향 미입력');
+  const capacity = Number(vehicle && vehicle.capacity) || 0;
+  const over = capacity > 0 && rows.length > capacity;
+  let h = '<article class="card transport-route-card' + (riding ? ' is-riding' : '') + '"><div class="between"><div><div class="card-title">' +
+    esc(routeRow.name || '노선 이름 미입력') + '</div><div class="card-sub">' + esc(direction) + ' · ' + esc(routeRow.startTime || routeRow.time || '시간 미입력') + '</div></div>' +
+    '<span class="pill ' + (riding ? 'bad' : done === rows.length && rows.length ? 'ok' : 'warn') + '">' +
+      (riding ? '탑승 중 ' + riding + '명' : done === rows.length && rows.length ? '운행 확인 완료' : '운행 중') + '</span></div>' +
+    '<div class="transport-route-meta"><span class="pill">차량 ' + esc(vehicle && (vehicle.name || vehicle.label) || routeRow.vehicleName || '미지정') + '</span>' +
+      '<span class="pill">기사 ' + esc(driver && driver.name || routeRow.driverName || '미지정') + '</span>' +
+      '<span class="pill ' + (over ? 'bad' : '') + '">' + rows.length + (capacity ? '/' + capacity : '') + '명</span></div>' +
+    (riding ? '<div class="hint mt8"><b>가장 먼저 확인</b> — 탑승한 학생이 아직 하차·인계되지 않았습니다.</div>' : '') +
+    (over ? '<div class="hint mt8 transport-capacity">정원 초과 · 이 노선은 설정 저장이 차단됩니다.</div>' : '');
+  const byStop = new Map();
+  rows.forEach(row => {
+    const key = String(row.student.stopId || 'none');
+    if (!byStop.has(key)) byStop.set(key, []);
+    byStop.get(key).push(row);
+  });
+  if (!rows.length) h += '<div class="empty"><b>🚐</b>오늘 배정된 학생이 없습니다.</div>';
+  byStop.forEach(stopRows => {
+    const sample = stopRows[0].student;
+    h += '<section class="transport-stop"><div class="between small"><b>' + esc(sample.stopName || '정류장 미입력') + '</b><time>' + esc(sample.stopTime || '') + '</time></div>' +
+      stopRows.map(row => {
+        const status = TRANSPORT_STATUS[row.status];
+        return '<div class="transport-student' + (row.status === 'boarded' ? ' is-riding' : '') + '"><div class="between"><div><b class="small">' +
+          esc(row.student.name || row.student.studentName || '학생 정보 확인 필요') + '</b><div class="small muted">' + esc(sample.stopName || '정류장 미입력') + '</div></div>' +
+          '<span class="pill ' + status[1] + '">' + status[0] + '</span></div><div class="ops-actions">' + transportStudentActions(row) + '</div></div>';
+      }).join('') + '</section>';
+  });
+  return h + '</article>';
+}
+
+async function transitionTransportState(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const routeId = String(button.dataset.route || ''), studentId = String(button.dataset.student || '');
+  const next = String(button.dataset.next || '');
+  const stateDate = validYmd(button.dataset.date) ? button.dataset.date : transportDate;
+  let reason = '';
+  if (button.dataset.reasonRequired === 'true') {
+    reason = String(prompt('상태를 되돌리는 사유를 입력해 주세요') || '').trim();
+    if (!reason) return toast('되돌림 사유를 입력해 주세요');
+  }
+  transportRestoreFocus = transportStateKey(routeId, studentId);
+  button.disabled = true;
+  try {
+    await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'state', date: stateDate,
+      routeId: routeId, studentId: studentId, next: next, revision: Number(button.dataset.rev) || 0, reason: reason });
+    await loadTransport(transportDate, true);
+    toast(next === 'boarded' ? '탑승으로 기록했습니다' : next === 'dropped' ? '하차·인계를 완료했습니다' : next === 'absent' ? '미탑승으로 기록했습니다' : '상태를 되돌렸습니다');
+  } catch (error) {
+    transportRestoreFocus = null;
+    button.disabled = false;
+    toast('차량 상태 저장 실패 — ' + (error.message || error));
+    loadTransport(transportDate, true);
+  }
+}
+
+function ensureTransportDraft() {
+  if (!transportConfigDraft) {
+    const source = transportConfig();
+    transportConfigDraft = {
+      vehicles: Array.isArray(source.vehicles) ? deepCopy(source.vehicles) : [],
+      drivers: Array.isArray(source.drivers) ? deepCopy(source.drivers) : [],
+      routes: Array.isArray(source.routes) ? deepCopy(source.routes) : []
+    };
+  }
+  return transportConfigDraft;
+}
+
+function captureTransportConfig() {
+  const draft = ensureTransportDraft();
+  const vehicles = Array.from(document.querySelectorAll('[data-tc-vehicle]')).map(row => ({
+    id: String(row.dataset.id || ''), name: String((row.querySelector('[data-tc-name]') || {}).value || '').trim(),
+    plate: String((row.querySelector('[data-tc-plate]') || {}).value || '').trim(),
+    capacity: Math.max(0, Number((row.querySelector('[data-tc-capacity]') || {}).value) || 0)
+  }));
+  const drivers = (draft.drivers || []).map(driver => ({ id: String(driver.staffId || driver.id || ''),
+    staffId: String(driver.staffId || driver.id || ''), name: String(driver.name || '') }));
+  const routes = Array.from(document.querySelectorAll('[data-tc-route]')).map(row => ({
+    id: String(row.dataset.id || ''), name: String((row.querySelector('[data-tc-route-name]') || {}).value || '').trim(),
+    days: Array.from(row.querySelectorAll('[data-tc-day]:checked')).map(input => Number(input.value)).sort(),
+    direction: String((row.querySelector('[data-tc-direction]') || {}).value || ''),
+    startTime: String((row.querySelector('[data-tc-route-time]') || {}).value || ''),
+    vehicleId: String((row.querySelector('[data-tc-vehicle-id]') || {}).value || ''),
+    driverId: String((row.querySelector('[data-tc-driver-id]') || {}).value || ''),
+    active: !!(row.querySelector('[data-tc-active]') || {}).checked,
+    stops: Array.from(row.querySelectorAll('[data-tc-stop]')).map(stop => ({
+      id: String(stop.dataset.id || ''), name: String((stop.querySelector('[data-tc-stop-name]') || {}).value || '').trim(),
+      time: String((stop.querySelector('[data-tc-stop-time]') || {}).value || ''),
+      studentIds: Array.from((stop.querySelector('[data-tc-students]') || {}).selectedOptions || []).map(option => String(option.value))
+    }))
+  }));
+  draft.vehicles = vehicles; draft.drivers = drivers; draft.routes = routes;
+  return draft;
+}
+
+function transportConfigValidation(config) {
+  const errors = [];
+  const vehicles = new Map((config.vehicles || []).map(item => [String(item.id), item]));
+  const drivers = new Set((config.drivers || []).map(item => String(item.id)));
+  (config.vehicles || []).forEach(item => { if (!item.name || !item.plate || !(Number(item.capacity) > 0)) errors.push('차량 이름·차량번호·정원을 입력해 주세요'); });
+  (config.routes || []).forEach(routeRow => {
+    if (!routeRow.name || !routeRow.days.length || !routeRow.direction || !routeRow.startTime || !vehicles.has(routeRow.vehicleId) || !drivers.has(routeRow.driverId)) {
+      errors.push((routeRow.name || '이름 없는 노선') + ': 요일·방향·시간·차량·기사를 모두 입력해 주세요');
+    }
+    if (!(routeRow.stops || []).length) errors.push((routeRow.name || '이름 없는 노선') + ': 정류장을 하나 이상 추가해 주세요');
+    const assigned = [];
+    (routeRow.stops || []).forEach(stop => {
+      if (!stop.name || !stop.time) errors.push((routeRow.name || '노선') + ': 정류장 이름과 시간을 입력해 주세요');
+      assigned.push(...(stop.studentIds || []));
+    });
+    if (new Set(assigned).size !== assigned.length) errors.push((routeRow.name || '노선') + ': 한 학생이 여러 정류장에 중복 배정됐습니다');
+    const vehicle = vehicles.get(routeRow.vehicleId);
+    if (vehicle && new Set(assigned).size > Number(vehicle.capacity)) errors.push((routeRow.name || '노선') + ': 차량 정원 ' + vehicle.capacity + '명을 초과했습니다');
+  });
+  return Array.from(new Set(errors));
+}
+
+function transportConfigRowHtml(config, locked) {
+  const students = rosterDb && Array.isArray(rosterDb.students) ? rosterDb.students : [];
+  const currentMonth = today().slice(0, 7);
+  const liveStudents = students.filter(student => (!student.start || student.start <= currentMonth) &&
+    (!student.end || student.end > currentMonth));
+  const disabled = locked ? ' disabled aria-disabled="true"' : '';
+  let h = '<section class="card transport-config"><div class="between"><div><div class="card-title">차량·노선 설정</div>' +
+    '<div class="card-sub">원장·관리 담당만 전체 설정을 저장합니다. 학생 연락처와 주소는 이 화면에 표시하지 않습니다.</div></div>' +
+    '<button class="btn btn-sm btn-primary" data-act="transportsave"' + disabled + '>전체 설정 저장</button></div>' +
+    (locked ? '<div class="hint mt8"><b>설정 잠김</b> — 현재 탑승 중인 학생이 있어 차량·기사·노선·학생 배정을 바꿀 수 없습니다. 모두 하차·인계한 뒤 수정하세요.</div>' : '') +
+    (!rosterDb && rosterLoading ? '<div class="hint mt8">학생 명단을 불러오는 중입니다. 명단이 열리기 전에는 학생 배정을 저장하지 마세요.</div>' : '') +
+    (rosterErr ? '<div class="hint mt8"><b>학생 명단 오류</b> — 학생 배정을 편집할 수 없습니다.</div>' : '');
+  h += '<details open><summary>차량 · ' + config.vehicles.length + '대</summary><div class="transport-config-list">' + config.vehicles.map(vehicle =>
+    '<div class="transport-config-row transport-config-grid" data-tc-vehicle data-id="' + esc(vehicle.id) + '"><label><span class="fl">차량 이름</span><input class="in" data-tc-name value="' + esc(vehicle.name || vehicle.label || '') + '"' + disabled + '></label>' +
+      '<label><span class="fl">차량번호</span><input class="in" data-tc-plate value="' + esc(vehicle.plate || '') + '" placeholder="예: 12가3456"' + disabled + '></label>' +
+      '<label><span class="fl">정원</span><input class="in" type="number" min="1" max="99" data-tc-capacity value="' + esc(vehicle.capacity || '') + '"' + disabled + '></label>' +
+      '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="vehicle" data-id="' + esc(vehicle.id) + '"' + disabled + '>차량 삭제</button></div>').join('') +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="vehicle"' + disabled + '>+ 차량 추가</button></div></details>';
+  h += '<details><summary>기사 후보 · ' + config.drivers.length + '명</summary><div class="transport-config-list"><div class="hint">기사는 보안상 별도 연락처 명단을 만들지 않고 현재 직원 중에서 노선마다 선택합니다. 기사 추가·삭제는 직원 관리에서 재직 상태를 변경하세요.</div>' +
+    config.drivers.map(driver => '<div class="small" style="padding:5px 0">· ' + esc(driver.name || '이름 미입력') + '</div>').join('') + '</div></details>';
+  h += '<details><summary>노선 · ' + config.routes.length + '개</summary><div class="transport-config-list">' + config.routes.map(routeRow => {
+    const days = Array.isArray(routeRow.days) ? routeRow.days.map(Number) : [];
+    return '<div class="transport-config-row" data-tc-route data-id="' + esc(routeRow.id) + '"><div class="transport-config-grid">' +
+      '<label><span class="fl">노선 이름</span><input class="in" data-tc-route-name value="' + esc(routeRow.name || '') + '"' + disabled + '></label>' +
+      '<label><span class="fl">방향</span><select class="in" data-tc-direction' + disabled + '><option value="">선택</option><option value="pickup"' + (routeRow.direction === 'pickup' ? ' selected' : '') + '>등원</option><option value="dropoff"' + (routeRow.direction === 'dropoff' ? ' selected' : '') + '>하원</option></select></label>' +
+      '<label><span class="fl">출발 시간</span><input class="in" type="time" data-tc-route-time value="' + esc(routeRow.startTime || routeRow.time || '') + '"' + disabled + '></label>' +
+      '<label><span class="fl">차량</span><select class="in" data-tc-vehicle-id' + disabled + '><option value="">선택</option>' + config.vehicles.map(vehicle => '<option value="' + esc(vehicle.id) + '"' + (String(routeRow.vehicleId || '') === String(vehicle.id) ? ' selected' : '') + '>' + esc(vehicle.name || vehicle.label || '') + ' · ' + esc(vehicle.capacity || '?') + '명</option>').join('') + '</select></label>' +
+      '<label><span class="fl">기사</span><select class="in" data-tc-driver-id' + disabled + '><option value="">선택</option>' + config.drivers.map(driver => '<option value="' + esc(driver.staffId || driver.id) + '"' + (String(routeRow.driverId || '') === String(driver.staffId || driver.id) ? ' selected' : '') + '>' + esc(driver.name || '미지정') + '</option>').join('') + '</select></label>' +
+      '<label class="chip"><input type="checkbox" data-tc-active' + (routeRow.active !== false ? ' checked' : '') + disabled + '> 노선 사용</label></div>' +
+      '<div class="field mt8"><span class="fl">운행 요일</span><div class="chips">' + [1,2,3,4,5,6,0].map(day => '<label class="chip"><input type="checkbox" data-tc-day value="' + day + '"' + (days.includes(day) ? ' checked' : '') + disabled + '> ' + DOW[day] + '</label>').join('') + '</div></div>' +
+      '<div class="sect">정류장·학생 배정</div>' + (routeRow.stops || []).map(stop =>
+        '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
+          '<label><span class="fl">도착 시간</span><input class="in" type="time" data-tc-stop-time value="' + esc(stop.time || '') + '"' + disabled + '></label></div>' +
+          '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + disabled + '>' +
+            liveStudents.map(student => '<option value="' + esc(student.id) + '"' + ((stop.studentIds || []).map(String).includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') + '</select></label>' +
+          '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigdelete" data-kind="stop" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '"' + disabled + '>정류장 삭제</button></div>').join('') +
+      '<div class="ops-actions"><button class="btn btn-sm btn-ghost" data-act="transportconfigadd" data-kind="stop" data-route="' + esc(routeRow.id) + '"' + disabled + '>+ 정류장 추가</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="route" data-id="' + esc(routeRow.id) + '"' + disabled + '>노선 삭제</button></div></div>';
+  }).join('') + '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="route"' + disabled + '>+ 노선 추가</button></div></details>';
+  return h + '</section>';
+}
+
+async function saveTransportConfig(button) {
+  if (!session.isAdmin) return;
+  if (transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 저장할 수 없습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const config = captureTransportConfig();
+  const errors = transportConfigValidation(config);
+  if (errors.length) return toast(errors[0]);
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'replace', config: config,
+      revision: Number(transportData && transportData.revision) || 0 });
+    await loadTransport(transportDate, true);
+    toast('차량 전체 설정을 저장했습니다');
+  } catch (error) {
+    if (button) button.disabled = false;
+    const conflict = Number(error && error.status) === 409;
+    toast((conflict ? '설정 변경 차단 — 탑승 중 상태 또는 최신 설정을 다시 확인해 주세요' : '차량 설정 저장 실패 — ' + (error.message || error)));
+    loadTransport(transportDate, true);
+  }
+}
+
+function mutateTransportConfig(kind, action, id, routeId) {
+  if (!session.isAdmin || transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 변경할 수 없습니다');
+  const config = captureTransportConfig();
+  if (action === 'add') {
+    if (kind === 'vehicle') config.vehicles.push({ id: transportSafeId('vehicle'), name: '', plate: '', capacity: 9 });
+    else if (kind === 'driver') config.drivers.push({ id: transportSafeId('driver'), staffId: '', name: '' });
+    else if (kind === 'route') config.routes.push({ id: transportSafeId('route'), name: '', days: [], direction: '', startTime: '', vehicleId: '', driverId: '', stops: [], active: true });
+    else if (kind === 'stop') {
+      const routeRow = config.routes.find(item => String(item.id) === String(routeId));
+      if (routeRow) (routeRow.stops || (routeRow.stops = [])).push({ id: transportSafeId('stop'), name: '', time: '', studentIds: [] });
+    }
+  } else {
+    if (!confirm('이 ' + ({ vehicle: '차량', driver: '기사', route: '노선', stop: '정류장' }[kind] || '항목') + '을 삭제할까요? 저장 전까지 서버에는 반영되지 않습니다.')) return;
+    if (kind === 'vehicle') config.vehicles = config.vehicles.filter(item => String(item.id) !== String(id));
+    else if (kind === 'driver') config.drivers = config.drivers.filter(item => String(item.id) !== String(id));
+    else if (kind === 'route') config.routes = config.routes.filter(item => String(item.id) !== String(id));
+    else if (kind === 'stop') {
+      const routeRow = config.routes.find(item => String(item.id) === String(routeId));
+      if (routeRow) routeRow.stops = (routeRow.stops || []).filter(item => String(item.id) !== String(id));
+    }
+  }
+  transportConfigDraft = config;
+  render();
+}
+
+function viewTransport() {
+  if (!transportData || transportLoadedDate !== transportDate) {
+    if (!transportLoading && !transportError) loadTransport(transportDate, false);
+    if (transportError) return '<section class="card alert"><div class="card-title">차량 운행을 불러오지 못했습니다</div><div class="card-sub">' + esc(transportError) + '</div>' +
+      '<button class="btn btn-sm btn-ghost mt14" data-act="transportrefresh">다시 시도</button></section>';
+    return '<section class="card"><div class="empty"><b>🚐</b>차량 운행을 불러오는 중…</div></section>';
+  }
+  if (session.isAdmin && !rosterDb && !rosterLoading && !rosterErr) loadRoster();
+  const rows = transportProjectedRows();
+  const routes = transportRoutes();
+  const unmatched = transportUnmatchedStates();
+  const unmatchedBoarded = unmatched.filter(row => normalizeTransportStatus(row.status) === 'boarded').length;
+  const scheduled = rows.filter(row => row.status === 'scheduled').length;
+  const boarded = rows.filter(row => row.status === 'boarded').length + unmatchedBoarded;
+  const completed = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
+  let h = '<section class="card transport-hero"><div class="between"><div><div class="card-title">차량 운행</div>' +
+    '<div class="card-sub">등·하원 차량의 탑승부터 하차·인계까지 확인합니다. 학생 연락처와 주소는 표시하지 않습니다.</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="transportrefresh">새로고침</button></div>' +
+    '<div class="transport-datebar"><button class="btn btn-sm btn-ghost" data-act="transportday" data-n="-1" aria-label="이전 날짜">←</button>' +
+      '<strong>' + esc(label(transportDate)) + '</strong><div class="row" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="transporttoday">오늘</button>' +
+      '<button class="btn btn-sm btn-ghost" data-act="transportday" data-n="1" aria-label="다음 날짜">→</button></div></div></section>' +
+    '<div class="ops-kpis" aria-label="차량 운행 요약"><div class="ops-kpi"><b>' + routes.length + '</b><span>운행 노선</span></div>' +
+      '<div class="ops-kpi"><b>' + scheduled + '</b><span>탑승 예정</span></div><div class="ops-kpi' + (boarded ? ' is-alert' : '') + '"><b>' + boarded + '</b><span>탑승 중 · 최우선</span></div>' +
+      '<div class="ops-kpi"><b>' + completed + '</b><span>완료·미탑승</span></div></div>';
+  if (unmatched.length) h += '<section class="card transport-unmatched"><div class="card-title">설정 확인 필요 · ' + unmatched.length + '건' +
+    (unmatchedBoarded ? ' · 탑승 중 ' + unmatchedBoarded + '건 최우선' : '') + '</div>' +
+    '<div class="card-sub">과거 탑승 상태와 현재 노선·학생 배정이 연결되지 않습니다. 기록을 숨기지 않았습니다. ' +
+      (unmatchedBoarded ? '탑승 중·미하차 기록을 먼저 확인한 뒤 ' : '') + '원장 화면에서 노선 설정을 확인하세요.</div>' +
+    (session.isAdmin ? unmatched.map(row => '<div class="between mt8"><div class="small">· ' + esc(row.date || transportDate) + ' · 노선 ' +
+      esc(row.routeName || row.routeId || row.route_id || '미확인') + ' · 학생 ' +
+      esc(row.studentName || row.studentId || row.student_id || '미확인') + ' · 상태 ' +
+      esc((TRANSPORT_STATUS[normalizeTransportStatus(row.status)] || [row.status])[0]) + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="transportstate" data-next="scheduled" data-reason-required="true" data-date="' +
+      esc(row.date || transportDate) + '" data-route="' + esc(row.routeId || row.route_id || '') + '" data-student="' +
+      esc(row.studentId || row.student_id || '') + '" data-rev="' + (Number(row.revision) || 0) + '">확인 후 상태 정리</button></div>').join('') : '') + '</section>';
+  const stateByRoute = new Map();
+  rows.forEach(row => { if (!stateByRoute.has(row.routeId)) stateByRoute.set(row.routeId, []); stateByRoute.get(row.routeId).push(row); });
+  h += '<div class="transport-route-grid">' + routes.map(routeRow => transportRouteCard(routeRow, stateByRoute.get(String(routeRow.id || routeRow.routeId || '')) || [])).join('') + '</div>';
+  if (!routes.length) h += '<section class="card"><div class="empty"><b>🚐</b>이 날짜에 운행하는 노선이 없습니다.</div></section>';
+  if (session.isAdmin) h += transportConfigRowHtml(ensureTransportDraft(), transportHasRiders());
+  return h;
+}
+
 /* ── 원생 현황 (월별 실적) ──
  * 학생 개인정보는 인증된 Worker에서만 받고, 개인 링크에는 담당 학생만 내려온다.
  */
@@ -4831,7 +5565,7 @@ function loadRoster() {
   const auth = sync.auth();
   if (!auth) {
     rosterErr = session.isStaffLink ? '개인 인증을 먼저 확인해 주세요' : '설정에서 동기화 비밀키를 저장해 주세요';
-    if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding') render();
+    if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') render();
     return;
   }
   rosterLoading = true;
@@ -4844,7 +5578,7 @@ function loadRoster() {
       rosterErr = '';
       renderAfterSync();
     })
-    .catch(e => { rosterErr = String(e); if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding') renderAfterSync(); })
+    .catch(e => { rosterErr = String(e); if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') renderAfterSync(); })
     .finally(() => { rosterLoading = false; });
 }
 function ymNext(ym) {
@@ -4885,6 +5619,7 @@ function rosterStudentId(name, grade, reference) {
  * 학부모 안내 항목은 발송 준비·확인 체크이며 이 화면에서 메시지를 보내지 않는다. */
 const ONBOARDING_STAGES = [
   { key: 'prep', day: -1, label: '등록 즉시·첫 수업 전', items: [
+    { id: 'registration', label: '등록·수강 신청 서류 작성과 회수 여부를 확인', notice: false },
     { id: 'guardian', label: '보호자 연락처와 알림 수신 동의를 확인', notice: false },
     { id: 'schedule', label: '확정 시간표·교실·담당 선생님 안내', notice: true },
     { id: 'arrival', label: '등원·귀가 방법과 주차·출입 동선 안내', notice: true },
@@ -4937,24 +5672,46 @@ function onboardingRecord(studentId) {
   return row && !row.deleted ? row : null;
 }
 
-function setOnboarding(studentId, patch) {
-  if (!session.isAdmin || !studentId) return null;
-  const taskId = onboardingTaskId(studentId);
-  const key = taskId + '|all';
-  const cur = state.checks[key] || {
-    taskId: taskId, date: 'all', studentId: String(studentId), firstClassDate: '', items: {}
-  };
-  const cleanPatch = Object.assign({}, patch || {});
-  const resetItems = cleanPatch.resetItems === true;
-  delete cleanPatch.resetItems;
-  const next = Object.assign({}, cur, cleanPatch, {
-    taskId: taskId, date: 'all', studentId: String(studentId), updatedAt: now()
-  });
-  next.items = resetItems ? Object.assign({}, cleanPatch.items || {})
-    : Object.assign({}, cur.items || {}, cleanPatch.items || {});
-  state.checks[key] = next;
-  save(); queueSync();
-  return next;
+function applyOnboardingRecord(studentId, record) {
+  if (!record || String(record.studentId || '') !== String(studentId) ||
+      String(record.taskId || '') !== onboardingTaskId(studentId) || record.date !== 'all') return false;
+  const key = onboardingKey(studentId);
+  state.checks[key] = record;
+  onboardingServerConfirmedAt.set(String(studentId), Number(record.updatedAt) || 0);
+  save();
+  return true;
+}
+
+async function patchOnboarding(studentId, op, payload, successMessage) {
+  const auth = sync.auth();
+  if (!session.isAdmin || !auth) {
+    toast(session.isStaffLink ? '관리 권한을 다시 확인해 주세요' : '설정에서 동기화 비밀키를 저장해 주세요');
+    return null;
+  }
+  const requestSequence = (onboardingPatchSequence.get(String(studentId)) || 0) + 1;
+  onboardingPatchSequence.set(String(studentId), requestSequence);
+  const isLatestRequest = () => onboardingPatchSequence.get(String(studentId)) === requestSequence;
+  const current = onboardingAnyRecord(studentId);
+  try {
+    const result = await sync.post('/onboarding-patch', {
+      app: SYNC_APP, auth: auth, studentId: String(studentId),
+      expectedUpdatedAt: Number(current && current.updatedAt) || 0, op: op, payload: payload || {}
+    });
+    if (!isLatestRequest()) return null;
+    if (!applyOnboardingRecord(studentId, result.record)) throw new Error('저장된 기록 형식을 확인해 주세요');
+    render();
+    if (successMessage) toast(successMessage);
+    return result.record;
+  } catch (error) {
+    if (!isLatestRequest()) return null;
+    if (Number(error && error.status) === 409 && error.current && applyOnboardingRecord(studentId, error.current)) {
+      render();
+      toast('다른 기기에서 먼저 수정했습니다. 최신 상태를 반영했으니 다시 시도해 주세요');
+      return null;
+    }
+    toast('신규 학생 기록 저장 실패 — ' + String(error && error.message || error));
+    return null;
+  }
 }
 
 function onboardingProgress(record) {
@@ -5060,6 +5817,20 @@ function restoreOnboardingFocus() {
   const target = onboardingRestoreFocus;
   if (!target) return false;
   onboardingRestoreFocus = null;
+  if (target.classroom) {
+    const input = Array.from(document.querySelectorAll('[data-onboarding-classroom]')).find(el => String(el.dataset.id || '') === target.studentId);
+    if (!input) return false;
+    input.focus({ preventScroll: true });
+    return true;
+  }
+  if (target.packageDoc) {
+    const button = Array.from(document.querySelectorAll('[data-act="onbpackage"]')).find(el =>
+      String(el.dataset.id || '') === target.studentId && String(el.dataset.doc || '') === target.packageDoc &&
+      String(el.dataset.next || '') === target.packageNext);
+    if (!button) return false;
+    button.focus({ preventScroll: true });
+    return true;
+  }
   const button = Array.from(document.querySelectorAll('[data-act="onbcheck"]')).find(el =>
     String(el.dataset.id || '') === target.studentId && String(el.dataset.item || '') === target.itemId);
   if (!button) return false;
@@ -5092,6 +5863,68 @@ function onboardingStageHtml(row, stage, focusKey) {
     }).join('') + '</details>';
 }
 
+/* 첫날 준비 패키지의 최종 확인은 기존 prep item timestamp를 그대로 쓴다.
+ * 별도에는 준비·전달 시각만 최소 저장해 미준비→준비→전달→확인을 구분한다. */
+const ONBOARDING_PACKAGE_DOCS = [
+  { id: 'registration', label: '등록·수강 신청 서류', itemId: 'registration' },
+  { id: 'schedule', label: '확정 시간표 안내', itemId: 'schedule' },
+  { id: 'emergency', label: '비상 연락망·등하원·귀가 동의', itemId: 'emergency' },
+  { id: 'privacy', label: '개인정보·사진 활용 동의', itemId: 'privacy' },
+  { id: 'payment', label: '결제일·환불·보강 안내', itemId: 'payment' },
+  { id: 'system', label: '학원 시스템·앱·QR 안내', itemId: 'system' },
+  { id: 'materials', label: '교재·준비물 안내', itemId: 'materials' }
+];
+
+function onboardingPackageState(record, doc) {
+  if (record.items && record.items[doc.itemId]) return 'confirmed';
+  if (record.packageDeliveries && record.packageDeliveries[doc.id]) return 'delivered';
+  if (record.packagePrepared && record.packagePrepared[doc.id]) return 'prepared';
+  return 'pending';
+}
+
+function onboardingFirstWeekSchedule(student, record) {
+  if (!student || !record || !validYmd(record.firstClassDate)) return [];
+  return weeklyLessonSchedule(record.firstClassDate).entries
+    .filter(entry => String(entry.studentId || '') === String(student.id))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.slot.startMinute - b.slot.startMinute ||
+      a.teacherName.localeCompare(b.teacherName, 'ko'));
+}
+
+function firstDayPackageHtml(row) {
+  const student = row.student, record = row.record;
+  const inactive = !!row.status.inactive;
+  const schedule = onboardingFirstWeekSchedule(student, record);
+  const confirmed = ONBOARDING_PACKAGE_DOCS.filter(doc => onboardingPackageState(record, doc) === 'confirmed').length;
+  const scheduleHtml = schedule.length
+    ? schedule.map(entry => '<div class="firstday-schedule-row"><time datetime="' + esc(entry.date + 'T' + entry.slot.startTime) + '">' +
+        esc(DOW[dowOf(entry.date)] + ' ' + entry.slot.label) + '</time><span><b>' + esc(entry.teacherName || '담당 미지정') + '</b>' +
+        ' · ' + esc(entry.task && entry.task.lessonRole || entry.role || '수업') + '</span></div>').join('')
+    : '<div class="hint"><b>시간표 0건</b> — 첫 등원 주에 이 학생 ID로 확정된 수업이 없습니다. 이름이 같아도 자동으로 합치지 않습니다.</div>';
+  return '<section class="firstday-package" aria-label="' + esc(student.name) + ' 첫날 준비 패키지">' +
+    '<div class="between firstday-package-head"><div><div class="card-title">첫날 준비 패키지</div>' +
+      '<div class="card-sub">실제 시간표와 첫날 전달·회수 서류를 한곳에서 확인합니다.</div></div>' +
+      '<span class="pill ' + (confirmed < ONBOARDING_PACKAGE_DOCS.length ? 'warn' : 'ok') + '">' + confirmed + '/' + ONBOARDING_PACKAGE_DOCS.length + ' 확인</span></div>' +
+    '<div class="firstday-schedule"><b class="small">첫 등원 주 실제 시간표</b>' + scheduleHtml + '</div>' +
+    '<div class="firstday-classroom"><label><span class="fl">교실</span><input class="in" data-onboarding-classroom data-id="' + esc(student.id) + '" ' +
+      'placeholder="교실 미입력" value="' + esc(record.classroom || '') + '"' + (inactive ? ' disabled' : '') + '></label>' +
+      '<button class="btn btn-sm btn-ghost" data-act="onbclassroom" data-id="' + esc(student.id) + '"' + (inactive ? ' disabled' : '') + '>교실 저장</button></div>' +
+    (!record.classroom ? '<div class="hint mt8"><b>교실 미입력</b> — 첫날 안내 전에 실제 교실을 입력해 주세요.</div>' : '') +
+    '<div class="between mt14"><b class="small">서류·안내 묶음</b><span class="pill warn">문서 템플릿 미등록</span></div>' +
+    '<div class="small muted mt8">원본 파일이 등록되지 않아 내려받기 링크를 만들지 않았습니다. 아래는 준비·전달·확인 현황만 기록합니다.</div>' +
+    '<div class="package-docs">' + ONBOARDING_PACKAGE_DOCS.map(doc => {
+      const current = onboardingPackageState(record, doc);
+      return '<div class="package-doc"><b>' + esc(doc.label) + '</b><span class="small muted">현재: ' +
+        (current === 'confirmed' ? '확인 완료' : current === 'delivered' ? '전달됨' : current === 'prepared' ? '준비 완료' : '미준비') + '</span>' +
+        '<div class="package-states" role="group" aria-label="' + esc(doc.label + ' 상태') + '">' +
+          [['prepared', '준비'], ['delivered', '전달'], ['confirmed', '확인']].map(option =>
+            '<button type="button" class="btn btn-sm ' + (current === option[0] ? 'btn-primary' : 'btn-ghost') + '" data-act="onbpackage" data-id="' +
+              esc(student.id) + '" data-doc="' + esc(doc.id) + '" data-next="' + option[0] + '" aria-pressed="' + (current === option[0]) + '"' +
+              (inactive ? ' disabled aria-disabled="true"' : '') + '>' + option[1] + '</button>').join('') +
+        '</div></div>';
+    }).join('') + '</div>' +
+    '<div class="small muted mt8">‘확인’은 아래 ‘등록 즉시·첫 수업 전’ 체크와 같은 최종 기록을 사용합니다. 이 화면에서 학부모 알림톡은 자동 발송되지 않습니다.</div></section>';
+}
+
 function onboardingCardHtml(row) {
   const student = row.student, record = row.record, status = row.status, p = status.progress;
   const inactive = status.key === 'closed' || status.key === 'cancelled';
@@ -5118,6 +5951,7 @@ function onboardingCardHtml(row) {
         canRestore ? '<button class="btn btn-sm btn-primary mt8" data-act="onbrestore" data-id="' + esc(student.id) + '">관리 복원</button>' : '') + '</div></div>' +
     '<div class="bar mt14" role="progressbar" aria-label="' + esc(student.name) + ' 신규 적응 관리 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p.pct + '"><i style="width:' + p.pct + '%"></i></div>' +
     '<div class="small muted mt8">' + p.done + '/' + p.total + '개 확인 · 최소 ' + esc(shortDate(record.firstClassDate)) + '부터 ' + esc(shortDate(addDays(record.firstClassDate, 30))) + '까지 관리</div>' +
+    firstDayPackageHtml(row) +
     ONBOARDING_STAGES.map(stage => onboardingStageHtml(row, stage, focusStageKey)).join('') + '</article>';
 }
 
@@ -6446,6 +7280,26 @@ document.addEventListener('click', ev => {
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'bookretry': bookDb = null; bookDbErr = ''; loadBooks(); render(); break;
+    case 'bookissuerefresh': bookIssueError = ''; bookIssueLoaded = false; loadBookIssues(true); break;
+    case 'bookissuefilter': {
+      if (!BOOK_ISSUE_FILTERS.some(filter => filter[0] === el.dataset.status)) break;
+      bookIssueFilter = el.dataset.status;
+      render();
+      break;
+    }
+    case 'bookissuetransition': transitionBookIssue(el); break;
+    case 'transportrefresh': transportError = ''; loadTransport(transportDate, true); break;
+    case 'transportday': {
+      transportDate = addDays(transportDate, Number(el.dataset.n) || 0);
+      transportError = ''; transportConfigDraft = null;
+      render();
+      break;
+    }
+    case 'transporttoday': transportDate = today(); transportError = ''; transportConfigDraft = null; render(); break;
+    case 'transportstate': transitionTransportState(el); break;
+    case 'transportconfigadd': mutateTransportConfig(el.dataset.kind, 'add', '', el.dataset.route); break;
+    case 'transportconfigdelete': mutateTransportConfig(el.dataset.kind, 'delete', id, el.dataset.route); break;
+    case 'transportsave': saveTransportConfig(el); break;
     case 'onbadd': {
       if (!session.isAdmin || !rosterDb) break;
       const studentId = String(($('#onbStudent') || {}).value || '');
@@ -6454,11 +7308,8 @@ document.addEventListener('click', ev => {
       const student = onboardingCandidateStudents().find(row => String(row.id) === studentId);
       if (!student) return toast('신규 학생을 선택해 주세요');
       if (!validOnboardingFirstDate(student, firstClassDate)) return toast('첫 등원일은 명단 시작월 이후의 재원 기간으로 입력해 주세요');
-      setOnboarding(studentId, {
-        firstClassDate: firstClassDate, items: {}, resetItems: true,
-        deleted: false, canceledAt: null, startedAt: now()
-      });
-      render(); toast(student.name + ' 학생 30일 관리를 시작했습니다');
+      patchOnboarding(studentId, 'create', { firstClassDate: firstClassDate },
+        student.name + ' 학생 30일 관리를 시작했습니다');
       break;
     }
     case 'onbfilter': {
@@ -6475,11 +7326,7 @@ document.addEventListener('click', ev => {
       if (!record || !student) return toast('관리 기록을 다시 확인해 주세요');
       if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생의 기록은 이력으로만 보관됩니다');
       if (!confirm(student.name + ' 학생의 신규 30일 관리를 취소할까요?\n기록은 삭제하지 않고 취소 이력으로 보관됩니다.')) return;
-      const canceledAt = now();
-      const cancelHistory = Array.isArray(record.cancelHistory) ? record.cancelHistory.slice() : [];
-      cancelHistory.push(canceledAt);
-      setOnboarding(studentId, { deleted: true, canceledAt: canceledAt, cancelHistory: cancelHistory });
-      render(); toast(student.name + ' 학생 관리를 취소했습니다');
+      patchOnboarding(studentId, 'cancel', {}, student.name + ' 학생 관리를 취소했습니다');
       break;
     }
     case 'onbrestore': {
@@ -6490,8 +7337,7 @@ document.addEventListener('click', ev => {
       if (!record || !record.deleted || !student) return toast('취소 기록을 다시 확인해 주세요');
       if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생은 신규 관리를 복원할 수 없습니다');
       if (!confirm(student.name + ' 학생의 기존 체크와 첫 등원일을 그대로 복원할까요?')) return;
-      setOnboarding(studentId, { deleted: false, restoredAt: now() });
-      render(); toast(student.name + ' 학생 관리를 복원했습니다');
+      patchOnboarding(studentId, 'restore', {}, student.name + ' 학생 관리를 복원했습니다');
       break;
     }
     case 'onbcheck': {
@@ -6502,11 +7348,31 @@ document.addEventListener('click', ev => {
       const student = rosterDb && (rosterDb.students || []).find(row => String(row.id) === studentId);
       if (!record || !student || !ONBOARDING_ITEMS.includes(itemId)) return toast('관리 항목을 다시 확인해 주세요');
       if (student.end && student.end <= today().slice(0, 7)) return toast('재원이 종료된 학생의 기록은 수정할 수 없습니다');
-      const items = Object.assign({}, record.items || {});
-      items[itemId] = items[itemId] ? 0 : now();
       rememberOnboardingFocus(el);
-      setOnboarding(studentId, { items: items });
-      render();
+      patchOnboarding(studentId, 'item', { itemId: itemId, done: !(record.items && record.items[itemId]) });
+      break;
+    }
+    case 'onbclassroom': {
+      if (!session.isAdmin) break;
+      const studentId = String(id || '');
+      const record = onboardingRecord(studentId);
+      const input = Array.from(document.querySelectorAll('[data-onboarding-classroom]')).find(node => String(node.dataset.id || '') === studentId);
+      if (!record || !input) return toast('신규 학생 기록을 다시 확인해 주세요');
+      const classroom = String(input.value || '').trim().slice(0, 80);
+      onboardingRestoreFocus = { studentId: studentId, classroom: true };
+      patchOnboarding(studentId, 'classroom', { value: classroom },
+        classroom ? '교실을 저장했습니다' : '교실을 미입력 상태로 저장했습니다');
+      break;
+    }
+    case 'onbpackage': {
+      if (!session.isAdmin) break;
+      const studentId = String(id || ''), docId = String(el.dataset.doc || ''), next = String(el.dataset.next || '');
+      const record = onboardingRecord(studentId);
+      const doc = ONBOARDING_PACKAGE_DOCS.find(item => item.id === docId);
+      if (!record || !doc || !['prepared', 'delivered', 'confirmed'].includes(next)) return toast('첫날 준비 항목을 다시 확인해 주세요');
+      onboardingRestoreFocus = { studentId: studentId, packageDoc: docId, packageNext: next };
+      patchOnboarding(studentId, 'package', { docId: docId, next: next },
+        doc.label + ' · ' + (next === 'confirmed' ? '확인 완료' : next === 'delivered' ? '전달됨' : '준비') + '로 저장했습니다');
       break;
     }
 
@@ -7300,6 +8166,11 @@ document.addEventListener('click', ev => {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  const bookIssueSearch = ev.target.closest('[data-book-issue-search]');
+  if (bookIssueSearch) {
+    applyBookIssueSearch(bookIssueSearch.value);
+    return;
+  }
   const onboardingSearch = ev.target.closest('[data-onboarding-search]');
   if (onboardingSearch) {
     applyOnboardingSearch(onboardingSearch.value);
@@ -7364,8 +8235,7 @@ document.addEventListener('change', ev => {
     if (!onboardingRecord(studentId) || !validOnboardingFirstDate(student, onboardingDate.value)) {
       toast('첫 등원일은 명단 시작월 이후의 재원 기간으로 입력해 주세요'); render(); return;
     }
-    setOnboarding(studentId, { firstClassDate: onboardingDate.value });
-    render(); toast('첫 등원일을 수정했습니다');
+    patchOnboarding(studentId, 'date', { firstClassDate: onboardingDate.value }, '첫 등원일을 수정했습니다');
     return;
   }
   const acaflowFile = ev.target.closest('[data-acaflow-file]');
@@ -7464,7 +8334,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.1';
+const APP_VER = '2026-08-11.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

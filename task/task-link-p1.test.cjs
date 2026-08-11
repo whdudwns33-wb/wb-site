@@ -149,7 +149,7 @@ test('task managers elevate only from a verified server role', () => {
   assert.match(publish, /if \(!session\.isAdmin\) break/);
   assert.match(html, /origin: actor\(\)/);
   assert.doesNotMatch(html, /origin: session\.isStaffLink \? 'manager'/);
-  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /개인 링크에서는 담당 학생 명단만 확인할 수 있습니다/);
   for (const action of ['ctlog', 'oplog', 'exlog']) {
     const block = html.match(new RegExp(`case '${action}':[\\s\\S]{0,220}?break;`))?.[0] || '';
@@ -285,7 +285,7 @@ test('manager deep links survive startup until the server role is known; verifie
   assert.match(startup, /if \(h && !\/\(\^\|&\)c=\/\.test\(h\)\) route = h/);
   assert.doesNotMatch(startup, /session\.isStaffLink[\s\S]{0,180}route = 'today'/);
   assert.match(renderFn, /if \(shouldGatePersonAccess\(\)\)[\s\S]{0,120}return/);
-  assert.match(renderFn, /if \(session\.isStaffLink && !session\.isAdmin\)[\s\S]{0,180}const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(renderFn, /if \(session\.isStaffLink && !session\.isAdmin\)[\s\S]{0,200}const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(renderFn, /if \(!allowed\.includes\(route\)\) route = 'today'/);
   assert.ok(renderFn.indexOf('if (shouldGatePersonAccess())') <
     renderFn.indexOf('if (session.isStaffLink && !session.isAdmin)'));

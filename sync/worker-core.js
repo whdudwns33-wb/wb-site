@@ -29,6 +29,8 @@
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
  *   POST /book-edit-request { app, auth, ... }     → 직원, 기존 교재 정보를 고쳐 달라고 신청
  *   POST /book-edit-review  { app, auth(admin) }   → 원장, 교재 수정 신청 승인·반려
+ *   POST /transport { app, auth, action, ... }      → 차량 노선 설정·승하차 상태
+ *   POST /onboarding-patch { app, auth, ... }       → 신규 학생 30일 기록 CAS 수정
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -46,6 +48,9 @@ import { handleBookEditRequest, handleBookEditReview } from './book-edit-request
 import { handleGuardianContact } from './guardian-contact.js';
 import { handleParentFeedbackSend, attemptParentFeedbackSend, resolveStudentName } from './parent-feedback-send.js';
 import { handleRoster } from './roster.js';
+import { handleBookIssue } from './book-issue.js';
+import { handleTransport } from './transport.js';
+import { handleOnboardingPatch } from './onboarding.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -164,14 +169,38 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
   const updateData = managerTask
     ? "json_set(excluded.data, '$.origin', COALESCE(json_extract(tasks.data,'$.origin'),'manager'), '$.lastEditBy', 'manager')"
     : 'excluded.data';
+  // CAS endpoint를 한 번 통과한 onboarding 행은 예전 클라이언트의 generic LWW가 덮지 못한다.
+  // casVersion이 없는 기존 행은 Worker→Pages 배포 창 동안만 기존 저장과 호환한다.
+  const onboardingGuard = table === 'checks' && /^__onboarding__/.test(String(key || ''))
+    ? " AND COALESCE(json_extract(checks.data,'$.casVersion'),0)<>1"
+    : '';
   return env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
     'VALUES (?, ?, ?, ' + insertData + ', ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
-    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard
+    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
+}
+
+async function canonicalOnboardingChanges(env, app, keys) {
+  const unique = [...new Set(keys)].filter(key => /^__onboarding__/.test(key));
+  const changes = [];
+  // D1의 bind 개수 한도 안에서 실패 없이 조회한다.
+  for (let offset = 0; offset < unique.length; offset += 80) {
+    const chunk = unique.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT k AS key,owner,data,updated_at,srv_at FROM checks ' +
+      "WHERE app=? AND k IN (" + placeholders + ") AND json_extract(data,'$.casVersion')=1"
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      changes.push({ table: 'checks', key: row.key, owner: row.owner, data: JSON.parse(row.data),
+        updated_at: row.updated_at, srv_at: row.srv_at, authoritative: true });
+    }
+  }
+  return changes;
 }
 
 function canonicalJson(value) {
@@ -305,12 +334,19 @@ async function handleSync(env, app, body, origin) {
 
   // ── 올리기
   const accepted = [];
+  const attemptedOnboardingKeys = new Set();
   let forbidden = false;
   for (const c of changes) {
     if (!c || !c.table || !APPS.includes(app)) continue;
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
+    const onboardingKey = t === 'checks' && /^__onboarding__/.test(String(c.k || ''));
+    if (onboardingKey && c.reconcile === true) {
+      if (auth.scope === 'all') attemptedOnboardingKeys.add(String(c.k));
+      continue;
+    }
+    if (onboardingKey) attemptedOnboardingKeys.add(String(c.k));
     if (auth.role === 'manager' && t === 'tasks') {
       const data = c.data;
       if (!SAFE_ID.test(String(c.id || '')) || !SAFE_ID.test(String(c.owner || '')) ||
@@ -351,8 +387,15 @@ async function handleSync(env, app, body, origin) {
       auth.role === 'manager' && entry.table === 'tasks'));
   if (stmts.length) await env.DB.batch(stmts);
 
+  // CAS 행에 대한 generic LWW 시도가 막혔다면 since와 관계없이 서버 정본을 돌려준다.
+  // Pages는 authoritative 표시된 casVersion=1 행만 로컬 시간스탬프보다 우선 적용한다.
+  const forced = auth.scope === 'all'
+    ? await canonicalOnboardingChanges(env, app, attemptedOnboardingKeys)
+    : [];
+  const forcedKeys = new Set(forced.map(change => change.key));
+
   // ── 내려받기 (since 이후)
-  const out = [];
+  const out = forced.slice();
   let more = false;
   for (const t of ['staff', 'tasks', 'checks']) {
     const idCol = t === 'checks' ? 'k' : 'id';
@@ -366,6 +409,7 @@ async function handleSync(env, app, body, origin) {
     const rows = (res.results || []);
     if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
     for (const r of rows) {
+      if (t === 'checks' && forcedKeys.has(String(r.key))) continue;
       out.push({ table: t, key: r.key, owner: r.owner, data: JSON.parse(r.data), updated_at: r.updated_at, srv_at: r.srv_at });
     }
   }
@@ -1103,6 +1147,21 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleRoster(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/book-issue') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookIssue(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/transport') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleTransport(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/onboarding-patch') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleOnboardingPatch(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);

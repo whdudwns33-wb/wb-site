@@ -170,6 +170,36 @@ function responseDocument(document, auth) {
   };
 }
 
+async function studentIdentityHash(studentId, studentName) {
+  const normalized = String(studentName || '').normalize('NFKC').trim();
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(studentId) + '\n' + normalized));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function activeBookIssueConflicts(env, app, document) {
+  const result = await env.DB.prepare(
+    "SELECT assignment_id,student_id,book_id,student_identity_hash,status FROM book_issues " +
+    "WHERE app=? AND status IN ('prepared','issued')"
+  ).bind(app).all();
+  const assignments = new Map(document.bookStudents.map(item => [item.id, item]));
+  const students = new Map(document.roster.students.map(item => [item.id, item]));
+  const conflicts = [];
+  for (const row of result.results || []) {
+    const assignment = assignments.get(String(row.assignment_id));
+    if (!assignment) {
+      conflicts.push({ assignmentId: String(row.assignment_id), status: String(row.status), reason: 'removed' });
+      continue;
+    }
+    const student = students.get(assignment.studentId);
+    const hash = student ? await studentIdentityHash(student.id, student.name) : '';
+    if (assignment.studentId !== String(row.student_id) || assignment.bookId !== String(row.book_id) ||
+        hash !== String(row.student_identity_hash)) {
+      conflicts.push({ assignmentId: String(row.assignment_id), status: String(row.status), reason: 'identity_changed' });
+    }
+  }
+  return conflicts;
+}
+
 async function inactiveTeacherIds(env, app, document) {
   const used = new Set();
   document.roster.students.forEach(item => item.teacherIds.forEach(id => used.add(id)));
@@ -201,6 +231,15 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const inactiveIds = await inactiveTeacherIds(env, app, document);
     if (inactiveIds.length) {
       return json({ ok: false, error: 'teacherIds에는 활성 직원 ID만 사용할 수 있습니다: ' + inactiveIds.join(', ') }, 400, origin);
+    }
+    const issueConflicts = await activeBookIssueConflicts(env, app, document);
+    if (issueConflicts.length) {
+      return json({
+        ok: false,
+        code: 'ACTIVE_BOOK_ISSUE_CONFLICT',
+        error: '출고 진행 중인 교재 배정은 삭제하거나 학생·교재 정체성을 바꿀 수 없습니다',
+        conflicts: issueConflicts
+      }, 409, origin);
     }
     const updatedAt = Date.now();
     await env.DB.prepare(

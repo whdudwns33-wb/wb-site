@@ -17,6 +17,7 @@ function onboardingCore() {
   return new Function(`
     const state = { checks: {} };
     const session = { isAdmin: true };
+    const onboardingServerConfirmedAt = new Map();
     const save = () => {};
     const queueSync = () => {};
     const now = () => 123;
@@ -26,7 +27,7 @@ function onboardingCore() {
     const today = () => '2026-08-11';
     ${source}
     return { ONBOARDING_STAGES, ONBOARDING_ITEMS, onboardingTaskId, onboardingKey,
-      onboardingAnyRecord, onboardingProgress, onboardingStatus, setOnboarding, state };
+      onboardingAnyRecord, onboardingProgress, onboardingStatus, applyOnboardingRecord, state };
   `)();
 }
 
@@ -35,7 +36,7 @@ test('admin navigation exposes a dedicated onboarding route and staff links cann
   const tabs = block('function renderTabs()', '/* ── 링크로 들어온 지시서 확인');
   const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
 
-  assert.match(render, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'roster'\]/);
+  assert.match(render, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.doesNotMatch(render.match(/const allowed = \[[^\]]+\]/)[0], /onboarding/);
   assert.match(render, /onboarding: viewOnboarding/);
   assert.match(tabs, /session\.isAdmin[\s\S]{0,240}\['onboarding', '신규 학생', onboardingAttentionCount\(\)\]/);
@@ -51,7 +52,9 @@ test('onboarding records use stable studentId and stay outside every staff owner
   assert.ok(owner.indexOf('if (/^__onboarding__/') < owner.indexOf('tid.match(/^__[a-zA-Z]+__'));
   assert.equal(core.onboardingTaskId('student|stable'), '__onboarding__student%7Cstable');
   assert.equal(core.onboardingKey('student|stable'), '__onboarding__student%7Cstable|all');
-  const saved = core.setOnboarding('student-42', { firstClassDate: '2026-08-15', items: {} });
+  const saved = { studentId: 'student-42', taskId: '__onboarding__student-42', date: 'all',
+    firstClassDate: '2026-08-15', items: {}, updatedAt: 123, casVersion: 1 };
+  assert.equal(core.applyOnboardingRecord('student-42', saved), true);
   assert.equal(saved.studentId, 'student-42');
   assert.equal(saved.taskId, '__onboarding__student-42');
   assert.equal(saved.date, 'all');
@@ -120,28 +123,21 @@ test('future-start students are eligible and cards sort by operational urgency',
   assert.equal(api.validOnboardingFirstDate(rosterDb.students[1], '2026-09-01'), true);
 });
 
-test('cancellation is admin-only, cannot overwrite, and restores the existing history', () => {
+test('cancellation is admin-only and uses the server CAS endpoint for cancel and restore', () => {
   const click = block("case 'onbcancel':", "case 'onbcheck':");
   const add = block("case 'onbadd':", "case 'onbfilter':");
-  const core = onboardingCore();
-  core.setOnboarding('student-7', {
-    firstClassDate: '2026-08-20', items: { guardian: 11 }, canceledAt: 22,
-    cancelHistory: [22], deleted: true
-  });
-  const restored = core.setOnboarding('student-7', { deleted: false, restoredAt: 33 });
+  const helper = block('async function patchOnboarding(', 'function onboardingProgress(');
 
   assert.match(click, /if \(!session\.isAdmin/);
   assert.match(click, /confirm\(/);
   assert.match(click, /기록은 삭제하지 않고 취소 이력으로 보관/);
-  assert.match(click, /cancelHistory\.push\(canceledAt\)/);
+  assert.match(click, /patchOnboarding\(studentId, 'cancel', \{\}/);
   assert.match(click, /case 'onbrestore'/);
-  assert.match(click, /setOnboarding\(studentId, \{ deleted: false, restoredAt: now\(\) \}\)/);
+  assert.match(click, /patchOnboarding\(studentId, 'restore', \{\}/);
   assert.match(add, /if \(onboardingAnyRecord\(studentId\)\) return toast/);
-  assert.equal(restored.firstClassDate, '2026-08-20');
-  assert.equal(restored.items.guardian, 11);
-  assert.equal(restored.canceledAt, 22);
-  assert.deepEqual(restored.cancelHistory, [22]);
-  assert.equal(restored.deleted, false);
+  assert.match(helper, /expectedUpdatedAt: Number\(current && current\.updatedAt\) \|\| 0/);
+  assert.match(helper, /Number\(error && error\.status\) === 409/);
+  assert.match(helper, /applyOnboardingRecord\(studentId, error\.current\)/);
 });
 
 test('ended and cancelled rows are history-only and excluded from operational KPIs', () => {
@@ -186,9 +182,112 @@ test('checking an item keeps its stage open and restores keyboard focus', () => 
   assert.equal(focusApi.current(), null);
   assert.match(card, /retainedStage[\s\S]{0,500}focusStageKey/);
   assert.match(card, /onboardingStageHtml\(row, stage, focusStageKey\)/);
-  assert.match(click, /rememberOnboardingFocus\(el\)[\s\S]{0,120}setOnboarding[\s\S]{0,80}render\(\)/);
+  assert.match(click, /rememberOnboardingFocus\(el\)[\s\S]{0,160}patchOnboarding\(studentId, 'item'/);
   assert.match(render, /applyOnboardingSearch\(onboardingSearchQuery\);\s*restoreOnboardingFocus\(\)/);
   assert.match(html, /data-onboarding-stage data-stage=/);
+});
+
+test('the latest request applies a lower-timestamp server 409 to repair forged local state', async () => {
+  const source = block('function applyOnboardingRecord(studentId, record)', 'function onboardingProgress(record)');
+  const post = block('async post(path, body)', 'async run()');
+  const latest = { studentId: 'student-1', taskId: '__onboarding__student-1', date: 'all',
+    firstClassDate: '2026-08-15', items: { guardian: 321 }, updatedAt: 456, casVersion: 1 };
+  const forged = { ...latest, items: { forged: 999 }, updatedAt: 999 };
+  const state = { checks: { '__onboarding__student-1|all': forged } };
+  let saved = 0, rendered = 0, message = '';
+  const api = new Function('state', 'latest', 'hooks', `
+    const session = { isAdmin: true, isStaffLink: false };
+    const SYNC_APP = 'task';
+    const onboardingPatchSequence = new Map();
+    const onboardingServerConfirmedAt = new Map();
+    const onboardingTaskId = id => '__onboarding__' + encodeURIComponent(id);
+    const onboardingKey = id => onboardingTaskId(id) + '|all';
+    const onboardingAnyRecord = id => state.checks[onboardingKey(id)] || null;
+    const save = () => hooks.save();
+    const render = () => hooks.render();
+    const toast = value => hooks.toast(value);
+    const sync = { auth: () => ({ mode: 'admin', secret: 'x' }), post: async () => {
+      const error = new Error('conflict'); error.status = 409; error.current = latest; throw error;
+    } };
+    ${source}
+    return { patchOnboarding };
+  `)(state, latest, { save: () => { saved += 1; }, render: () => { rendered += 1; }, toast: value => { message = value; } });
+
+  await api.patchOnboarding('student-1', 'item', { itemId: 'schedule', done: true });
+  assert.equal(state.checks['__onboarding__student-1|all'], latest);
+  assert.equal(saved, 1);
+  assert.equal(rendered, 1);
+  assert.match(message, /최신 상태를 반영했으니 다시 시도/);
+  assert.match(post, /error\.current = d && d\.current \|\| null/);
+});
+
+test('a delayed older 409 cannot overwrite a newer success', async () => {
+  const source = block('function applyOnboardingRecord(studentId, record)', 'function onboardingProgress(record)');
+  const base = { studentId: 'student-1', taskId: '__onboarding__student-1', date: 'all',
+    firstClassDate: '2026-08-15', items: {}, updatedAt: 100, casVersion: 1 };
+  const older = { ...base, items: { guardian: 150 }, updatedAt: 150 };
+  const newer = { ...base, items: { schedule: 200 }, updatedAt: 200 };
+  const state = { checks: { '__onboarding__student-1|all': base } };
+  let rejectOlder;
+  const pendingOlder = new Promise((resolve, reject) => { rejectOlder = reject; });
+  let calls = 0;
+  const api = new Function('state', 'pendingOlder', 'newer', 'hooks', `
+    const session = { isAdmin: true, isStaffLink: false };
+    const SYNC_APP = 'task';
+    const onboardingPatchSequence = new Map();
+    const onboardingServerConfirmedAt = new Map();
+    const onboardingTaskId = id => '__onboarding__' + encodeURIComponent(id);
+    const onboardingKey = id => onboardingTaskId(id) + '|all';
+    const onboardingAnyRecord = id => state.checks[onboardingKey(id)] || null;
+    const save = () => hooks.save(); const render = () => {}; const toast = () => {};
+    const sync = { auth: () => ({ mode: 'admin', secret: 'x' }),
+      post: async () => hooks.next() === 1 ? pendingOlder : { ok: true, record: newer } };
+    ${source}
+    return { patchOnboarding };
+  `)(state, pendingOlder, newer, { save: () => {}, next: () => ++calls });
+
+  const first = api.patchOnboarding('student-1', 'item', { itemId: 'guardian', done: true });
+  await Promise.resolve();
+  await api.patchOnboarding('student-1', 'item', { itemId: 'schedule', done: true });
+  assert.equal(state.checks['__onboarding__student-1|all'], newer);
+  const error = new Error('older conflict'); error.status = 409; error.current = older;
+  rejectOlder(error);
+  await first;
+  assert.equal(state.checks['__onboarding__student-1|all'], newer);
+});
+
+test('new Pages reload reconciles forged CAS state even when normal collect and pull cursors skip it', () => {
+  const source = block('collect(since) {', 'async post(path, body)');
+  const reconcileSource = block('function onboardingReconcileChanges()', '/** 권한 근거가 아니라');
+  const run = block('async run() {', '/** 장기 bearer 대신');
+  const key = '__onboarding__student-1|all';
+  const forged = { studentId: 'student-1', taskId: '__onboarding__student-1', date: 'all',
+    classroom: 'FORGED', updatedAt: 999, casVersion: 1 };
+  const canonical = { ...forged, classroom: 'B', updatedAt: 100 };
+  const state = { checks: { [key]: forged }, staff: [], tasks: [] };
+  const api = new Function('state', `
+    const ownerOfCheck = () => null;
+    const onboardingServerConfirmedAt = new Map();
+    const sync = { ${source} };
+    ${reconcileSource}
+    return { collect: sync.collect.bind(sync), apply: sync.apply.bind(sync), reconcile: onboardingReconcileChanges,
+      confirmed: onboardingServerConfirmedAt };
+  `)(state);
+  assert.deepEqual(api.collect(10000), [], '기존 pushAt이 높으면 일반 collect는 forged 행을 놓친다');
+  assert.deepEqual(api.reconcile(), [{ table: 'checks', k: key, owner: null, reconcile: true }]);
+  assert.equal(api.apply([{ table: 'checks', key, data: canonical, authoritative: true }]), 1);
+  assert.equal(state.checks[key].classroom, 'B');
+  state.checks[key] = forged;
+  assert.equal(api.apply([{ table: 'checks', key, data: canonical }]), 0);
+  assert.equal(state.checks[key].classroom, 'FORGED');
+  const newerServerSuccess = { ...canonical, classroom: 'C', updatedAt: 200 };
+  state.checks[key] = newerServerSuccess;
+  api.confirmed.set('student-1', 200);
+  assert.equal(api.apply([{ table: 'checks', key, data: canonical, authoritative: true }]), 0,
+    '이미 확인된 최신 endpoint 응답을 늦은 reconcile 응답으로 되돌리면 안 된다');
+  assert.equal(state.checks[key].classroom, 'C');
+  assert.match(run, /queueOnboardingReconcile\(auth\.mode === 'admin' \|\| session\.isManager\)/);
+  assert.match(run, /state\.settings\.onboardingCasReconcileVersion = 1/);
 });
 
 test('UI is searchable, status-driven, accessible, and never sends parent messages', () => {
