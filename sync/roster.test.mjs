@@ -132,6 +132,55 @@ test('director replaces and reads the full document without exposing teacherIds'
   assert.equal(result.headers.get('cache-control'), 'no-store');
 });
 
+test('director adds an existing student and edits one record with roster CAS', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const before = await call(db, { auth: admin, action: 'get' });
+  const created = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
+    student: {
+      id: 'student-existing', name: '기존학생', grade: '초5', teacher: '가선생', subject: '영어',
+      start: '2026-08', end: '', reason: '', memo: '', entryType: 'existing', teacherIds: ['teacher-a']
+    }
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.student.entryType, 'existing');
+  const stored = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
+  assert.equal(stored.roster.students.find(item => item.id === 'student-existing').entryType, 'existing');
+
+  const detail = await call(db, { auth: admin, action: 'student_get', studentId: 'student-existing' });
+  assert.deepEqual(detail.body.student.teacherIds, ['teacher-a']);
+  const updated = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
+    student: { ...detail.body.student, grade: '초6', subject: '영어·독해' }
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.student.grade, '초6');
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === 'student-existing').subject, '영어·독해');
+
+  const stale = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
+    student: detail.body.student
+  });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, 'ROSTER_REVISION_CONFLICT');
+});
+
+test('student maintenance is admin-only and refuses a duplicate name and grade', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const current = await call(db, { auth: admin, action: 'get' });
+  const student = {
+    id: 'duplicate-id', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학',
+    start: '2026-08', end: '', reason: '', entryType: 'existing', teacherIds: ['teacher-a']
+  };
+  assert.equal((await call(db, { auth: person('teacher-a', 'token-a'), action: 'student_create',
+    expectedUpdatedAt: current.body.updatedAt, student })).status, 403);
+  const duplicate = await call(db, { auth: admin, action: 'student_create',
+    expectedUpdatedAt: current.body.updatedAt, student });
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
+});
+
 test('person receives only assigned and co-taught roster and book rows', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const teacherA = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });

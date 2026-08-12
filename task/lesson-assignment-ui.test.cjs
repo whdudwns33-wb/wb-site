@@ -26,3 +26,24 @@ test('review shows teacher names and every active roster student with explicit m
   assert.match(source, /body\.confirmIdentityMismatch = true/);
   assert.match(source, /같은 학생이 맞습니까/);
 });
+
+test('a missing roster student can be added as an existing student and approved', () => {
+  assert.match(source, /data-act="lessonassignmentaddexisting"/);
+  assert.match(source, /기존 원생으로 추가 후 승인/);
+  assert.match(source, /entryType: 'existing'/);
+  assert.match(source, /신규 학생 30일 관리에는 자동으로 등록되지 않습니다/);
+  assert.match(source, /action: editor\.student\._editing \? 'student_update' : 'student_create'/);
+  assert.match(source, /action: 'approve', requestKey: assignment\.requestKey/);
+  assert.match(source, /기존 원생 등록과 담당 연결을 완료했습니다/);
+});
+
+test('roster tab exposes basic student maintenance without storing contacts', () => {
+  assert.match(source, /원생 기본 정보 관리/);
+  assert.match(source, /data-act="rosterstudentadd"/);
+  assert.match(source, /data-act="rosterstudentedit"/);
+  assert.match(source, /action: 'student_get'/);
+  assert.match(source, /expectedUpdatedAt: Number\(rosterDb\.updatedAt\)/);
+  const editor = source.match(/function rosterStudentEditorHtml\([\s\S]*?\n\}/);
+  assert.ok(editor);
+  assert.doesNotMatch(editor[0], /phone|address|연락처 입력|주소 입력/);
+});

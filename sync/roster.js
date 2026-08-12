@@ -69,7 +69,7 @@ function rosterStudent(value, index) {
   const path = 'document.roster.students[' + index + ']';
   shape(value,
     ['id', 'name', 'grade', 'teacher', 'subject', 'start', 'end', 'reason', 'teacherIds'],
-    ['memo'], path);
+    ['memo', 'entryType'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -85,6 +85,10 @@ function rosterStudent(value, index) {
     teacherIds: teacherIds(value.teacherIds, path + '.teacherIds')
   };
   if (Object.prototype.hasOwnProperty.call(value, 'memo')) result.memo = text(value.memo, path + '.memo', 1000, true);
+  if (Object.prototype.hasOwnProperty.call(value, 'entryType')) {
+    if (!['existing', 'new'].includes(value.entryType)) fail(path + '.entryType', 'existing 또는 new여야 합니다');
+    result.entryType = value.entryType;
+  }
   return result;
 }
 
@@ -240,8 +244,73 @@ async function boardedStudentConflicts(env, app, document) {
 export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
-  if (action !== 'get' && action !== 'replace') {
-    return json({ ok: false, error: 'action은 get 또는 replace여야 합니다' }, 400, origin);
+  if (!['get', 'replace', 'student_get', 'student_create', 'student_update'].includes(action)) {
+    return json({ ok: false, error: '지원하지 않는 원생 명단 작업입니다' }, 400, origin);
+  }
+
+  if (action === 'student_get') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '원생 기본 정보는 원장만 수정할 수 있습니다' }, 403, origin);
+    const studentId = String(body.studentId || '');
+    if (!SAFE_ID.test(studentId)) return json({ ok: false, error: '원생을 다시 선택해 주세요' }, 400, origin);
+    const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
+    let document;
+    try { document = validateRosterDocument(JSON.parse(row.data)); }
+    catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    const student = document.roster.students.find(item => item.id === studentId);
+    if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
+    return json({ ok: true, updatedAt: Number(row.updated_at), student }, 200, origin);
+  }
+
+  if (action === 'student_create' || action === 'student_update') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '원생 기본 정보는 원장만 수정할 수 있습니다' }, 403, origin);
+    const expectedUpdatedAt = Number(body.expectedUpdatedAt);
+    if (!Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 1) {
+      return json({ ok: false, error: '원생 명단을 새로고침한 뒤 다시 저장해 주세요' }, 400, origin);
+    }
+    let nextStudent;
+    try { nextStudent = rosterStudent(body.student, 0); }
+    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+    const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
+    if (Number(row.updated_at) !== expectedUpdatedAt) {
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+    }
+    let document;
+    try { document = validateRosterDocument(JSON.parse(row.data)); }
+    catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
+    const same = document.roster.students.find(item => item.id !== nextStudent.id &&
+      String(item.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') &&
+      String(item.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko'));
+    if (same) return json({ ok: false, code: 'STUDENT_ALREADY_EXISTS', error: '같은 이름과 학년의 원생이 이미 있습니다. 기존 원생을 선택해 주세요', studentId: same.id }, 409, origin);
+    if (action === 'student_create') {
+      if (index >= 0) return json({ ok: false, code: 'STUDENT_ID_EXISTS', error: '이미 등록된 원생 ID입니다. 명단을 새로고침해 주세요' }, 409, origin);
+      document.roster.students.push(nextStudent);
+    } else {
+      if (index < 0) return json({ ok: false, error: '수정할 원생을 현재 명단에서 찾을 수 없습니다' }, 404, origin);
+      const oldName = document.roster.students[index].name;
+      document.roster.students[index] = nextStudent;
+      if (oldName !== nextStudent.name) {
+        document.bookStudents.forEach(item => { if (item.studentId === nextStudent.id) item.name = nextStudent.name; });
+      }
+    }
+    document.roster.updated = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try { document = validateRosterDocument(document); }
+    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+    const inactiveIds = await inactiveTeacherIds(env, app, document);
+    if (inactiveIds.length) return json({ ok: false, error: '재직 중인 담당 선생님만 선택해 주세요' }, 400, origin);
+    const boardedConflicts = await boardedStudentConflicts(env, app, document);
+    if (boardedConflicts.length) return json({ ok: false, code: 'BOARDING_LOCK', error: '탑승 후 미하차 상태인 학생 정보는 지금 변경할 수 없습니다' }, 409, origin);
+    const issueConflicts = await activeBookIssueConflicts(env, app, document);
+    if (issueConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ISSUE_CONFLICT', error: '출고 진행 중인 교재가 있어 이름 또는 배정 정보를 지금 변경할 수 없습니다' }, 409, origin);
+    const updatedAt = Date.now();
+    const changed = await env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+      .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt).run();
+    if (Number(changed.meta && changed.meta.changes || 0) !== 1) {
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+    }
+    return json({ ok: true, updatedAt, student: withoutTeacherIds(nextStudent) }, 200, origin);
   }
 
   if (action === 'replace') {
