@@ -56,6 +56,8 @@ npx wrangler secret put WB_GUARDIAN_OPS_SEND_ENABLED # 4개 템플릿 승인·�
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
+npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
+npx wrangler secret put NAVER_MAPS_SECRET   # 네이버 지도 API Key (Geocoding + Directions 5)
 
 # 4) 배포
 npx wrangler deploy
@@ -90,6 +92,11 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 먼저 적용한 뒤 Worker와 Pages를 순서대로 배포한다. 이 트리거는 승차 처리와 원생 명단·기사·노선
 변경이 동시에 들어와도 미하차 기록의 참조가 사라지지 않게 최종 DB 쓰기에서 차단한다. 직원 삭제는
 `/staff-deactivate` CAS 경로만 사용해 직원 비활성화와 개인 토큰·1회용 링크 해지를 함께 확정한다.
+
+차량 노선 자동 계산은 네이버 클라우드 Maps 애플리케이션에서 Geocoding과 Directions 5를 함께
+선택한 전용 `NAVER_MAPS_ID`·`NAVER_MAPS_SECRET`을 사용한다. 기존 검색용
+`NAVER_ID`·`NAVER_SECRET`은 인증 체계가 달라 지도에 재사용하지 않는다. 전용 키가 없으면
+버튼을 설정 필요 상태로 잠근다. 실시간 교통량을 반영한 제안이므로 저장 전에 정류장 순서와 시간을 확인한다.
 
 보강·회차제·보호자 웹앱 배포는 `025_makeup.sql` → `026_session_packs.sql` →
 `027_parent_portal.sql` → `028_guardian_ops_notifications.sql` 순서로 먼저 적용하고 Worker를

@@ -1,11 +1,13 @@
 /**
  * 차량 운행 API. 설정은 전체 관리 권한만 교체하고, 기사 개인 링크는 오늘 본인 노선의
- * 승차·하차·결석만 기록한다. 전화·주소·보호자 정보는 읽지도 응답하지도 않는다.
+ * 승차·하차·결석만 기록한다. 노선 설정의 학원·공개 정류장 주소 외에 전화·보호자 정보나
+ * 원생 명단의 개인 주소는 읽지도 응답하지도 않는다.
  *
  * POST /transport
  *   { action:'list', date }
  *   { action:'replace', config, revision }
  *   { action:'state', date, routeId, studentId, next, revision, reason? }
+ *   { action:'plan', baseAddress, direction, startTime, dwellMinutes, stops }
  */
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -14,6 +16,10 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DIRECTIONS = new Set(['pickup', 'dropoff']);
 const STATES = new Set(['boarded', 'dropped', 'absent']);
 const MAX_CONFIG_BYTES = 512 * 1024;
+const MAX_MAPS_BODY_BYTES = 256 * 1024;
+const MAPS_TIMEOUT_MS = 25000;
+const MAPS_GEOCODE_URL = 'https://maps.apigw.ntruss.com/map-geocode/v2/geocode';
+const MAPS_DIRECTIONS_URL = 'https://maps.apigw.ntruss.com/map-direction/v1/driving';
 
 function problem(message, status = 400, code = '') {
   const error = new Error(message);
@@ -49,6 +55,20 @@ function cleanText(value, path, max, allowEmpty = false) {
 
 function cleanId(value, path) {
   if (typeof value !== 'string' || !SAFE_ID.test(value)) problem(path + ': 올바른 ID가 아닙니다');
+  return value;
+}
+
+function minutesOf(value) {
+  const [hour, minute] = value.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function hhmm(minutes) {
+  return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
+}
+
+function nonNegativeInteger(value, path) {
+  if (!Number.isSafeInteger(value) || value < 0) problem(path + ': 0 이상의 정수여야 합니다');
   return value;
 }
 
@@ -138,23 +158,41 @@ function vehicle(value, index) {
 
 function stop(value, routeIndex, index) {
   const path = 'config.routes[' + routeIndex + '].stops[' + index + ']';
-  exactKeys(value, ['id', 'name', 'time', 'studentIds'], [], path);
+  exactKeys(value, ['id', 'name', 'time', 'studentIds'], ['address'], path);
   if (!HHMM.test(String(value.time || ''))) problem(path + '.time: HH:MM 형식이어야 합니다');
   if (!Array.isArray(value.studentIds) || value.studentIds.length > 100) {
     problem(path + '.studentIds: 최대 100명의 배열이어야 합니다');
   }
-  return {
+  const result = {
     id: cleanId(value.id, path + '.id'),
     name: cleanText(value.name, path + '.name', 100),
     time: value.time,
     studentIds: value.studentIds.map((id, studentIndex) => cleanId(id, path + '.studentIds[' + studentIndex + ']'))
   };
+  if (Object.prototype.hasOwnProperty.call(value, 'address')) {
+    result.address = cleanText(value.address, path + '.address', 200, true);
+  }
+  return result;
+}
+
+function savedPlan(value, routeIndex) {
+  const path = 'config.routes[' + routeIndex + '].plan';
+  exactKeys(value, ['provider', 'distanceMeters', 'driveMinutes', 'serviceMinutes', 'dwellMinutes', 'plannedAt'], [], path);
+  if (value.provider !== 'naver') problem(path + '.provider: naver여야 합니다');
+  const distanceMeters = nonNegativeInteger(value.distanceMeters, path + '.distanceMeters');
+  const driveMinutes = nonNegativeInteger(value.driveMinutes, path + '.driveMinutes');
+  const serviceMinutes = nonNegativeInteger(value.serviceMinutes, path + '.serviceMinutes');
+  const dwellMinutes = nonNegativeInteger(value.dwellMinutes, path + '.dwellMinutes');
+  if (dwellMinutes > 60) problem(path + '.dwellMinutes: 60분을 초과할 수 없습니다');
+  if (serviceMinutes < driveMinutes) problem(path + '.serviceMinutes: 운전 시간보다 짧을 수 없습니다');
+  const plannedAt = nonNegativeInteger(value.plannedAt, path + '.plannedAt');
+  return { provider: 'naver', distanceMeters, driveMinutes, serviceMinutes, dwellMinutes, plannedAt };
 }
 
 function route(value, index) {
   const path = 'config.routes[' + index + ']';
   exactKeys(value,
-    ['id', 'name', 'direction', 'vehicleId', 'driverId', 'days', 'startTime', 'stops', 'active'], [], path);
+    ['id', 'name', 'direction', 'vehicleId', 'driverId', 'days', 'startTime', 'stops', 'active'], ['plan'], path);
   if (!DIRECTIONS.has(value.direction)) problem(path + '.direction: pickup 또는 dropoff여야 합니다');
   if (!Array.isArray(value.days) || !value.days.length || value.days.length > 7) {
     problem(path + '.days: 0~6 요일을 하나 이상 선택해야 합니다');
@@ -168,7 +206,7 @@ function route(value, index) {
     problem(path + '.stops: 1~100개의 정류장이 필요합니다');
   }
   if (typeof value.active !== 'boolean') problem(path + '.active: true 또는 false여야 합니다');
-  return {
+  const result = {
     id: cleanId(value.id, path + '.id'),
     name: cleanText(value.name, path + '.name', 100),
     direction: value.direction,
@@ -179,17 +217,26 @@ function route(value, index) {
     stops: value.stops.map((item, stopIndex) => stop(item, index, stopIndex)),
     active: value.active
   };
+  if (Object.prototype.hasOwnProperty.call(value, 'plan')) result.plan = savedPlan(value.plan, index);
+  return result;
 }
 
 export function validateTransportConfig(raw, staffById, rosterById) {
-  exactKeys(raw, ['vehicles', 'routes'], ['drivers'], 'config');
+  exactKeys(raw, ['vehicles', 'routes'], ['drivers', 'baseAddress'], 'config');
   if (!Array.isArray(raw.vehicles) || raw.vehicles.length > 100) problem('config.vehicles: 최대 100대의 배열이어야 합니다');
   if (!Array.isArray(raw.routes) || raw.routes.length > 300) problem('config.routes: 최대 300개 노선의 배열이어야 합니다');
   if (raw.drivers != null && !Array.isArray(raw.drivers)) problem('config.drivers: 배열이어야 합니다');
   const config = { vehicles: raw.vehicles.map(vehicle), routes: raw.routes.map(route) };
+  if (Object.prototype.hasOwnProperty.call(raw, 'baseAddress')) {
+    config.baseAddress = cleanText(raw.baseAddress, 'config.baseAddress', 200, true);
+  }
   const vehicleById = new Map();
+  const vehiclePlates = new Set();
   for (const item of config.vehicles) {
     if (vehicleById.has(item.id)) problem('config.vehicles: 중복 차량 ID가 있습니다: ' + item.id);
+    const normalizedPlate = item.plate.toUpperCase().replace(/[^0-9A-Z가-힣]/g, '');
+    if (vehiclePlates.has(normalizedPlate)) problem('config.vehicles: 중복 차량번호가 있습니다');
+    vehiclePlates.add(normalizedPlate);
     vehicleById.set(item.id, item);
   }
   const routeIds = new Set();
@@ -202,9 +249,15 @@ export function validateTransportConfig(raw, staffById, rosterById) {
     if (!staffById.has(item.driverId)) problem('config.routes.' + item.id + ': 활성 운전 담당자를 선택해 주세요');
     const stopIds = new Set();
     const routeStudents = new Set();
+    let previousStopMinutes = minutesOf(item.startTime);
     for (const itemStop of item.stops) {
       if (stopIds.has(itemStop.id)) problem('config.routes.' + item.id + ': 중복 정류장 ID가 있습니다: ' + itemStop.id);
       stopIds.add(itemStop.id);
+      const stopMinutes = minutesOf(itemStop.time);
+      if (stopMinutes < previousStopMinutes) {
+        problem('config.routes.' + item.id + ': 정류장 시간은 출발시간부터 운행 순서대로 같거나 늦어야 합니다');
+      }
+      previousStopMinutes = stopMinutes;
       for (const studentId of itemStop.studentIds) {
         if (!rosterById.has(studentId)) problem('config.routes.' + item.id + ': 현재 원생이 아닌 학생입니다: ' + studentId);
         if (routeStudents.has(studentId)) problem('config.routes.' + item.id + ': 학생이 두 정류장에 중복 배정됐습니다: ' + studentId);
@@ -218,8 +271,37 @@ export function validateTransportConfig(raw, staffById, rosterById) {
         }
       }
     }
+    if (item.plan && minutesOf(item.startTime) + item.plan.serviceMinutes < previousStopMinutes) {
+      problem('config.routes.' + item.id + ': 지도 계산 시간이 마지막 정류장 시간보다 짧을 수 없습니다');
+    }
     if (routeStudents.size > assignedVehicle.capacity) {
       problem('config.routes.' + item.id + ': 탑승 학생 수가 차량 정원을 초과합니다');
+    }
+    if (item.plan && minutesOf(item.startTime) + item.plan.serviceMinutes > 1439) {
+      problem('config.routes.' + item.id + ': 운행이 자정을 넘을 수 없습니다');
+    }
+  }
+  const activeRoutes = config.routes.filter(item => item.active);
+  for (let leftIndex = 0; leftIndex < activeRoutes.length; leftIndex += 1) {
+    const left = activeRoutes[leftIndex];
+    const leftStart = minutesOf(left.startTime);
+    const leftCalculatedEnd = Math.max(minutesOf(left.stops.at(-1).time),
+      left.plan ? leftStart + left.plan.serviceMinutes : leftStart);
+    const leftEnd = Math.max(leftStart + 1, leftCalculatedEnd);
+    for (let rightIndex = leftIndex + 1; rightIndex < activeRoutes.length; rightIndex += 1) {
+      const right = activeRoutes[rightIndex];
+      if (!left.days.some(day => right.days.includes(day))) continue;
+      const rightStart = minutesOf(right.startTime);
+      const rightCalculatedEnd = Math.max(minutesOf(right.stops.at(-1).time),
+        right.plan ? rightStart + right.plan.serviceMinutes : rightStart);
+      const rightEnd = Math.max(rightStart + 1, rightCalculatedEnd);
+      if (leftStart >= rightEnd || rightStart >= leftEnd) continue;
+      if (left.driverId === right.driverId) {
+        problem('같은 요일·시간에 한 기사가 두 활성 노선을 운행할 수 없습니다: ' + left.name + ', ' + right.name);
+      }
+      if (left.vehicleId === right.vehicleId) {
+        problem('같은 요일·시간에 한 차량을 두 활성 노선에 배정할 수 없습니다: ' + left.name + ', ' + right.name);
+      }
     }
   }
   if (new TextEncoder().encode(JSON.stringify(config)).length > MAX_CONFIG_BYTES) problem('config: 저장 용량을 초과했습니다', 413);
@@ -277,12 +359,226 @@ function stateView(row, includeHistory) {
 
 function scopedConfig(config, auth, drivers) {
   if (auth.scope === 'all') return { ...config, drivers: [...drivers.values()] };
-  const routes = config.routes.filter(item => item.driverId === auth.id);
+  const routes = config.routes.filter(item => item.driverId === auth.id).map(routeForOwn);
   const vehicleIds = new Set(routes.map(item => item.vehicleId));
   return {
     vehicles: config.vehicles.filter(item => vehicleIds.has(item.id)),
     drivers: drivers.has(auth.id) ? [drivers.get(auth.id)] : [], routes
   };
+}
+
+function routeForOwn(item) {
+  const { plan: _plan, ...routeItem } = item;
+  return {
+    ...routeItem,
+    stops: item.stops.map(stopItem => {
+      const { address: _address, ...safeStop } = stopItem;
+      return safeStop;
+    })
+  };
+}
+
+function mapsCredentials(env) {
+  const mapsId = String(env.NAVER_MAPS_ID || '').trim();
+  const mapsSecret = String(env.NAVER_MAPS_SECRET || '').trim();
+  if (mapsId && mapsSecret) {
+    return { id: mapsId, secret: mapsSecret };
+  }
+  problem('지도 자동 계산 설정이 아직 완료되지 않았습니다', 503, 'MAPS_NOT_CONFIGURED');
+}
+
+function mapsConfigured(env) {
+  return !!(String(env.NAVER_MAPS_ID || '').trim() && String(env.NAVER_MAPS_SECRET || '').trim());
+}
+
+function mapsFailure(status) {
+  if (status === 401 || status === 403) {
+    problem('지도 자동 계산 인증 설정을 확인해 주세요', 502, 'MAPS_AUTH_FAILED');
+  }
+  if (status === 429) {
+    problem('네이버 클라우드에서 Geocoding과 Directions 5 API 사용 설정을 확인해 주세요', 502,
+      'MAPS_NOT_ENABLED');
+  }
+  if (status >= 500) problem('지도 서비스가 잠시 응답하지 않습니다', 503, 'MAPS_UNAVAILABLE');
+  problem('지도 서비스가 요청을 처리하지 못했습니다', 502, 'MAPS_PROVIDER_REJECTED');
+}
+
+async function boundedMapsJson(response, signal) {
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (declared > MAX_MAPS_BODY_BYTES) {
+    try { await response.body?.cancel(); } catch (error) { /* 응답 폐기 실패는 결과에 노출하지 않는다 */ }
+    problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+  }
+  if (!response.body) problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_MAPS_BODY_BYTES) {
+        await reader.cancel();
+        problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error && Number.isInteger(error.status) && /^MAPS_[A-Z_]+$/.test(String(error.code || ''))) throw error;
+    if (signal.aborted) problem('지도 자동 계산 시간이 초과됐습니다', 504, 'MAPS_TIMEOUT');
+    problem('지도 서비스 응답을 읽지 못했습니다', 503, 'MAPS_UNAVAILABLE');
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+  }
+}
+
+async function fetchMapsJson(url, credentials, signal) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'GET', signal,
+      headers: {
+        Accept: 'application/json',
+        'x-ncp-apigw-api-key-id': credentials.id,
+        'x-ncp-apigw-api-key': credentials.secret
+      }
+    });
+  } catch (error) {
+    if (signal.aborted) problem('지도 자동 계산 시간이 초과됐습니다', 504, 'MAPS_TIMEOUT');
+    problem('지도 서비스에 연결하지 못했습니다', 503, 'MAPS_UNAVAILABLE');
+  }
+  if (!response.ok) mapsFailure(response.status);
+  return boundedMapsJson(response, signal);
+}
+
+function providerAddress(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+async function geocodeMaps(address, label, credentials, signal) {
+  const url = new URL(MAPS_GEOCODE_URL);
+  url.searchParams.set('query', address);
+  url.searchParams.set('count', '1');
+  const data = await fetchMapsJson(url.toString(), credentials, signal);
+  const result = data && Array.isArray(data.addresses) ? data.addresses[0] : null;
+  if (!result) problem(label + ' 위치를 찾을 수 없습니다', 422, 'ADDRESS_NOT_FOUND');
+  const x = Number(result.x);
+  const y = Number(result.y);
+  const resolvedAddress = providerAddress(result.roadAddress) || providerAddress(result.jibunAddress);
+  if (!Number.isFinite(x) || x < -180 || x > 180 || !Number.isFinite(y) || y < -90 || y > 90 ||
+      !resolvedAddress) {
+    problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+  }
+  return { x, y, address: resolvedAddress };
+}
+
+async function directionsLeg(start, goal, credentials, signal) {
+  const url = new URL(MAPS_DIRECTIONS_URL);
+  url.searchParams.set('start', start.x + ',' + start.y);
+  url.searchParams.set('goal', goal.x + ',' + goal.y);
+  url.searchParams.set('option', 'traoptimal');
+  const data = await fetchMapsJson(url.toString(), credentials, signal);
+  if (Number(data && data.code) !== 0) {
+    problem('입력한 정류장 사이의 차량 경로를 찾을 수 없습니다', 422, 'ROUTE_NOT_FOUND');
+  }
+  const candidates = data && data.route && data.route.traoptimal;
+  const summary = Array.isArray(candidates) && candidates[0] && candidates[0].summary;
+  const distance = Number(summary && summary.distance);
+  const duration = Number(summary && summary.duration);
+  if (!Number.isSafeInteger(distance) || distance < 0 || !Number.isFinite(duration) || duration < 0) {
+    problem('지도 서비스 응답 형식이 올바르지 않습니다', 502, 'MAPS_INVALID_RESPONSE');
+  }
+  return { distance, minutes: Math.ceil(duration / 60000) };
+}
+
+function planStop(value, index) {
+  const path = 'stops[' + index + ']';
+  exactKeys(value, ['id', 'name', 'address'], [], path);
+  return {
+    id: cleanId(value.id, path + '.id'),
+    name: cleanText(value.name, path + '.name', 100),
+    address: cleanText(value.address, path + '.address', 200)
+  };
+}
+
+async function planTransport(env, body, auth) {
+  if (auth.scope !== 'all') problem('노선 자동 계산은 전체 관리 권한만 사용할 수 있습니다', 403, 'FORBIDDEN');
+  exactKeys(body, ['action', 'baseAddress', 'direction', 'startTime', 'dwellMinutes', 'stops'],
+    ['app', 'auth'], 'request');
+  const baseAddress = cleanText(body.baseAddress, 'baseAddress', 200);
+  if (!DIRECTIONS.has(body.direction)) problem('direction: pickup 또는 dropoff여야 합니다');
+  if (!HHMM.test(String(body.startTime || ''))) problem('startTime: HH:MM 형식이어야 합니다');
+  if (!Number.isInteger(body.dwellMinutes) || body.dwellMinutes < 0 || body.dwellMinutes > 60) {
+    problem('dwellMinutes: 0~60 사이의 정수여야 합니다');
+  }
+  if (!Array.isArray(body.stops) || body.stops.length < 1 || body.stops.length > 15) {
+    problem('stops: 1~15개의 정류장이 필요합니다');
+  }
+  const stops = body.stops.map(planStop);
+  if (new Set(stops.map(item => item.id)).size !== stops.length) problem('stops: 중복 정류장 ID가 있습니다');
+  const credentials = mapsCredentials(env);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MAPS_TIMEOUT_MS);
+  try {
+    const base = await geocodeMaps(baseAddress, '학원 주소', credentials, controller.signal);
+    const resolvedStops = [];
+    for (let index = 0; index < stops.length; index += 1) {
+      resolvedStops.push(await geocodeMaps(stops[index].address, '정류장 ' + (index + 1),
+        credentials, controller.signal));
+    }
+    // 등원은 학원 차고지 출발 → 각 정류장 승차 → 학원 도착 전체를 계산한다.
+    // 첫 정류장부터 계산하면 실제 출발·기사/차량 점유 시간이 과소 표시된다.
+    const points = body.direction === 'dropoff' ? [base, ...resolvedStops] : [base, ...resolvedStops, base];
+    const legs = [];
+    for (let index = 1; index < points.length; index += 1) {
+      legs.push(await directionsLeg(points[index - 1], points[index], credentials, controller.signal));
+    }
+    const suggestedStops = [];
+    let elapsed = 0;
+    if (body.direction === 'pickup') {
+      for (let index = 0; index < stops.length; index += 1) {
+        elapsed += legs[index].minutes;
+        suggestedStops.push({ id: stops[index].id, time: hhmm(minutesOf(body.startTime) + elapsed),
+          address: resolvedStops[index].address });
+        elapsed += body.dwellMinutes;
+      }
+      elapsed += legs.at(-1).minutes;
+    } else {
+      for (let index = 0; index < legs.length; index += 1) {
+        elapsed += legs[index].minutes;
+        suggestedStops.push({ id: stops[index].id, time: hhmm(minutesOf(body.startTime) + elapsed),
+          address: resolvedStops[index].address });
+        elapsed += body.dwellMinutes;
+      }
+    }
+    if (minutesOf(body.startTime) + elapsed > 1439) {
+      problem('자동 계산한 운행이 자정을 넘습니다. 출발시간이나 노선을 조정해 주세요', 422,
+        'ROUTE_CROSSES_MIDNIGHT');
+    }
+    const plan = {
+      provider: 'naver',
+      distanceMeters: legs.reduce((sum, item) => sum + item.distance, 0),
+      driveMinutes: legs.reduce((sum, item) => sum + item.minutes, 0),
+      serviceMinutes: elapsed,
+      dwellMinutes: body.dwellMinutes,
+      plannedAt: Date.now()
+    };
+    return { ok: true, plan, suggestedStops, trafficBased: true };
+  } finally {
+    controller.abort();
+    clearTimeout(timeout);
+  }
 }
 
 async function listTransport(env, body, auth) {
@@ -314,7 +610,7 @@ async function listTransport(env, body, auth) {
         });
       }
     }
-    return { ...item, students };
+    return { ...(auth.scope === 'all' ? item : routeForOwn(item)), students };
   });
   const warnings = [];
   const configRoutes = new Map(loaded.config.routes.map(item => [item.id, item]));
@@ -370,7 +666,10 @@ async function listTransport(env, body, auth) {
     states: rows.map(row => stateView(row, auth.scope === 'all')), revision: loaded.revision,
     warnings, summary: { expected, ...counts, completed: expected > 0 && counts.scheduled === 0 && counts.boarded === 0 }
   };
-  if (auth.scope === 'all') response.unresolved = unresolved;
+  if (auth.scope === 'all') {
+    response.unresolved = unresolved;
+    response.capabilities = { mapsPlanning: mapsConfigured(env) };
+  }
   return response;
 }
 
@@ -530,7 +829,8 @@ export async function handleTransport(env, app, body, origin, auth, json) {
     if (action === 'list') result = await listTransport(env, body, auth);
     else if (action === 'replace') result = await replaceConfig(env, body, auth);
     else if (action === 'state') result = await changeState(env, body, auth);
-    else problem('action은 list, replace 또는 state여야 합니다');
+    else if (action === 'plan') result = await planTransport(env, body, auth);
+    else problem('action은 list, replace, state 또는 plan이어야 합니다');
     return json(result, 200, origin);
   } catch (error) {
     const boardingLock = isBoardingLockError(error);

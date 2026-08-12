@@ -89,15 +89,15 @@ function seed(db) {
     .bind('task', JSON.stringify({ roster: { updated: today, baseline: month, students }, bookStudents: [] }), now).run();
 }
 
-async function call(db, body, app = 'task') {
-  return callPath(db, '/transport', body, app);
+async function call(db, body, app = 'task', envOverrides = {}) {
+  return callPath(db, '/transport', body, app, envOverrides);
 }
 
-async function callPath(db, path, body, app = 'task') {
+async function callPath(db, path, body, app = 'task', envOverrides = {}) {
   const response = await worker.fetch(new Request('https://worker.example' + path, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ app, ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...envOverrides });
   return { status: response.status, body: await response.json() };
 }
 
@@ -124,6 +124,39 @@ function seedBoarded(db, date, routeId = 'route-a', studentId = 'student-a', rev
     "VALUES(?,?,?,?, 'boarded',?,?,?,NULL,NULL,NULL,NULL,?,?)"
   ).bind('task', date, routeId, studentId, revision, now, 'director',
     JSON.stringify([{ from: 'scheduled', to: 'boarded', at: now, by: 'director' }]), now).run();
+}
+
+function planRequest(overrides = {}) {
+  return {
+    auth: admin, action: 'plan', baseAddress: '서울 학원로 1', direction: 'dropoff',
+    startTime: '18:00', dwellMinutes: 2,
+    stops: [
+      { id: 'stop-a', name: '첫 정류장', address: '서울 정류장로 10' },
+      { id: 'stop-b', name: '둘째 정류장', address: '서울 정류장로 20' }
+    ],
+    ...overrides
+  };
+}
+
+function mapsFetchMock({ geocode = {}, legs = [], status = 200 } = {}) {
+  let legIndex = 0;
+  return async function mockedFetch(input, options) {
+    const url = new URL(input);
+    assert.equal(options.headers['x-ncp-apigw-api-key-id'], 'maps-id');
+    assert.equal(options.headers['x-ncp-apigw-api-key'], 'maps-secret');
+    if (status !== 200) return Response.json({ privateProviderError: 'must-not-leak' }, { status });
+    if (url.pathname.includes('/geocode')) {
+      const query = url.searchParams.get('query');
+      const item = geocode[query];
+      return Response.json(item ? { status: 'OK', addresses: [{
+        x: String(item.x), y: String(item.y), roadAddress: item.address, jibunAddress: ''
+      }] } : { status: 'OK', addresses: [] });
+    }
+    const leg = legs[legIndex++];
+    return Response.json(leg ? { code: 0, route: { traoptimal: [{ summary: {
+      distance: leg.distance, duration: leg.minutes * 60000
+    } }] } } : { code: 3, route: {} });
+  };
 }
 
 test('schema and migration add non-destructive vehicle tables with constrained states', () => {
@@ -160,6 +193,197 @@ test('only all-scope replaces config and validation rejects capacity, inactive r
   assert.equal((await replace(db)).status, 200);
 });
 
+test('config accepts optional route-planning fields and rejects unsafe schedules and duplicate plates', async () => {
+  const db = new TestD1(); seed(db);
+  const valid = configFixture();
+  valid.baseAddress = '서울 학원로 1';
+  valid.routes[0].stops[0].address = '서울 정류장로 10';
+  valid.routes[0].plan = {
+    provider: 'naver', distanceMeters: 3200, driveMinutes: 12, serviceMinutes: 15, dwellMinutes: 2, plannedAt: Date.now()
+  };
+  const saved = await replace(db, valid);
+  assert.equal(saved.status, 200);
+
+  const duplicatePlate = configFixture();
+  duplicatePlate.vehicles[1].plate = '12가-3456';
+  assert.match((await replace(db, duplicatePlate, saved.body.revision)).body.error, /중복 차량번호/);
+
+  const earlyStop = configFixture();
+  earlyStop.routes[0].stops[0].time = '18:59';
+  assert.match((await replace(db, earlyStop, saved.body.revision)).body.error, /출발시간부터/);
+
+  const backwards = configFixture();
+  backwards.routes[0].stops.push({ id: 'stop-a2', name: '두 번째', time: '19:14', studentIds: [] });
+  assert.match((await replace(db, backwards, saved.body.revision)).body.error, /운행 순서/);
+
+  const stalePlan = configFixture();
+  stalePlan.routes[0].plan = {
+    provider: 'naver', distanceMeters: 1000, driveMinutes: 5, serviceMinutes: 10, dwellMinutes: 2, plannedAt: Date.now()
+  };
+  assert.match((await replace(db, stalePlan, saved.body.revision)).body.error, /마지막 정류장 시간/);
+
+  const driverOverlap = configFixture();
+  driverOverlap.routes[1].driverId = 'driver-a';
+  driverOverlap.routes[1].startTime = '19:10';
+  driverOverlap.routes[1].stops[0].time = '19:20';
+  assert.match((await replace(db, driverOverlap, saved.body.revision)).body.error, /한 기사/);
+
+  const vehicleOverlap = configFixture();
+  vehicleOverlap.routes[1].vehicleId = 'van-a';
+  vehicleOverlap.routes[1].startTime = '19:10';
+  vehicleOverlap.routes[1].stops[0].time = '19:20';
+  assert.match((await replace(db, vehicleOverlap, saved.body.revision)).body.error, /한 차량/);
+});
+
+test('route plan is all-scope only and validates an exact bounded request', async () => {
+  const db = new TestD1(); seed(db);
+  assert.equal((await call(db, planRequest({ auth: person('driver-a', 'token-a') }))).status, 403);
+  assert.equal((await call(db, planRequest({ extra: true }))).status, 400);
+  assert.equal((await call(db, planRequest({ stops: [] }))).status, 400);
+  assert.equal((await call(db, planRequest({ stops: Array.from({ length: 16 }, (_, index) => ({
+    id: 'stop-' + index, name: '정류장 ' + index, address: '서울 테스트로 ' + index
+  })) }))).status, 400);
+  assert.equal((await call(db, planRequest({ dwellMinutes: 61 }))).status, 400);
+  const missingKeys = await call(db, planRequest(), 'task');
+  assert.equal(missingKeys.status, 503);
+  assert.equal(missingKeys.body.code, 'MAPS_NOT_CONFIGURED');
+});
+
+test('admin list reports only whether dedicated maps credentials are ready', async () => {
+  const db = new TestD1(); seed(db); await replace(db);
+  const missing = await call(db, { auth: admin, action: 'list', date: today }, 'task', {
+    NAVER_ID: 'search-only-id', NAVER_SECRET: 'search-only-secret'
+  });
+  assert.deepEqual(missing.body.capabilities, { mapsPlanning: false });
+  const ready = await call(db, { auth: admin, action: 'list', date: today }, 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret'
+  });
+  assert.deepEqual(ready.body.capabilities, { mapsPlanning: true });
+  assert.doesNotMatch(JSON.stringify(ready.body.capabilities), /maps-id|maps-secret/);
+});
+
+test('dropoff plan geocodes public addresses and calculates traffic times sequentially', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mapsFetchMock({
+    geocode: {
+      '서울 학원로 1': { x: 127.0, y: 37.0, address: '서울 학원로 1' },
+      '서울 정류장로 10': { x: 127.1, y: 37.1, address: '서울 정류장로 10 (공개)' },
+      '서울 정류장로 20': { x: 127.2, y: 37.2, address: '서울 정류장로 20 (공개)' }
+    },
+    legs: [{ distance: 1000, minutes: 7 }, { distance: 2200, minutes: 8 }]
+  });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const result = await call(db, planRequest(), 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret',
+    NAVER_ID: 'fallback-id', NAVER_SECRET: 'fallback-secret'
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.plan, {
+    provider: 'naver', distanceMeters: 3200, driveMinutes: 15, serviceMinutes: 19, dwellMinutes: 2,
+    plannedAt: result.body.plan.plannedAt
+  });
+  assert.deepEqual(result.body.suggestedStops, [
+    { id: 'stop-a', time: '18:07', address: '서울 정류장로 10 (공개)' },
+    { id: 'stop-b', time: '18:17', address: '서울 정류장로 20 (공개)' }
+  ]);
+  assert.equal(result.body.trafficBased, true);
+});
+
+test('pickup plan includes academy departure, every stop, and final academy return', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mapsFetchMock({
+    geocode: {
+      '서울 학원로 1': { x: 127.0, y: 37.0, address: '서울 학원로 1' },
+      '서울 정류장로 10': { x: 127.1, y: 37.1, address: '서울 정류장로 10' },
+      '서울 정류장로 20': { x: 127.2, y: 37.2, address: '서울 정류장로 20' }
+    },
+    legs: [
+      { distance: 700, minutes: 4 },
+      { distance: 900, minutes: 5 },
+      { distance: 1800, minutes: 9 }
+    ]
+  });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const result = await call(db, planRequest({ direction: 'pickup', startTime: '07:30', dwellMinutes: 3 }),
+    'task', { NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret' });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.suggestedStops.map(item => item.time), ['07:34', '07:42']);
+  assert.equal(result.body.plan.distanceMeters, 3400);
+  assert.equal(result.body.plan.driveMinutes, 18);
+  assert.equal(result.body.plan.serviceMinutes, 24);
+});
+
+test('route plan returns safe provider error codes without leaking provider bodies or keys', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mapsFetchMock({ status: 429 });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const result = await call(db, planRequest(), 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret'
+  });
+  assert.equal(result.status, 502);
+  assert.equal(result.body.code, 'MAPS_NOT_ENABLED');
+  assert.doesNotMatch(JSON.stringify(result.body), /must-not-leak|maps-secret|maps-id/);
+});
+
+test('route plan limits provider response bodies', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_input, options) => {
+    assert.equal(options.headers['x-ncp-apigw-api-key-id'], 'maps-id');
+    return new Response('x', { status: 200, headers: { 'content-length': '300000' } });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const result = await call(db, planRequest(), 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret'
+  });
+  assert.equal(result.status, 502);
+  assert.equal(result.body.code, 'MAPS_INVALID_RESPONSE');
+});
+
+test('route plan hides coded provider stream failures', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    pull(controller) {
+      const error = new Error('upstream private ECONNRESET detail');
+      error.code = 'ECONNRESET';
+      controller.error(error);
+    }
+  }), { status: 200 });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const result = await call(db, planRequest(), 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret'
+  });
+  assert.equal(result.status, 503);
+  assert.equal(result.body.code, 'MAPS_UNAVAILABLE');
+  assert.doesNotMatch(JSON.stringify(result.body), /ECONNRESET|upstream private/);
+});
+
+test('route plan aborts a stalled provider call and reports only a safe timeout code', async t => {
+  const db = new TestD1(); seed(db);
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) => originalSetTimeout(callback,
+    delay === 25000 ? 0 : delay, ...args);
+  globalThis.fetch = async (_input, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new DOMException('provider secret timeout', 'AbortError')),
+      { once: true });
+  });
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+  });
+  const result = await call(db, planRequest(), 'task', {
+    NAVER_MAPS_ID: 'maps-id', NAVER_MAPS_SECRET: 'maps-secret'
+  });
+  assert.equal(result.status, 504);
+  assert.equal(result.body.code, 'MAPS_TIMEOUT');
+  assert.doesNotMatch(JSON.stringify(result.body), /provider secret|maps-secret/);
+});
+
 test('roster end month is exclusive when validating route students', async () => {
   const db = new TestD1(); seed(db);
   const row = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
@@ -172,15 +396,27 @@ test('roster end month is exclusive when validating route students', async () =>
 });
 
 test('driver list is scoped to own route and emits only safe student fields', async () => {
-  const db = new TestD1(); seed(db); await replace(db);
+  const db = new TestD1(); seed(db);
+  const config = configFixture();
+  config.baseAddress = '공개 학원 주소';
+  config.routes[0].stops[0].address = '공개 정류장 주소';
+  config.routes[0].plan = {
+    provider: 'naver', distanceMeters: 1000, driveMinutes: 5, serviceMinutes: 15, dwellMinutes: 2, plannedAt: Date.now()
+  };
+  await replace(db, config);
   const result = await call(db, { auth: person('driver-a', 'token-a'), action: 'list', date: today });
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.routes.map(route => route.id), ['route-a']);
   assert.deepEqual(result.body.config.routes.map(route => route.id), ['route-a']);
   assert.deepEqual(Object.keys(result.body.routes[0].students[0]).sort(),
     ['grade', 'id', 'name', 'revision', 'status', 'stop']);
+  assert.equal(Object.hasOwn(result.body.config, 'baseAddress'), false);
+  assert.equal(Object.hasOwn(result.body.config.routes[0], 'plan'), false);
+  assert.equal(Object.hasOwn(result.body.config.routes[0].stops[0], 'address'), false);
+  assert.equal(Object.hasOwn(result.body.routes[0], 'plan'), false);
+  assert.equal(Object.hasOwn(result.body.routes[0].stops[0], 'address'), false);
   const serialized = JSON.stringify(result.body);
-  assert.doesNotMatch(serialized, /SECRET|GUARDIAN|010-|address|phone|memo/i);
+  assert.doesNotMatch(serialized, /SECRET|GUARDIAN|010-|공개 학원 주소|공개 정류장 주소|address|phone|memo/i);
 });
 
 test('state uses strict transitions and CAS blocks double click', async () => {

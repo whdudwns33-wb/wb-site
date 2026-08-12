@@ -150,10 +150,10 @@ test('transport list, student transitions, and all-config replace use the agreed
   assert.match(state, /routeId: routeId, studentId: studentId, next: next, revision:/);
   assert.match(replace, /action: 'replace', config: config/);
   assert.match(html, /plate: String\(\(row\.querySelector\('\[data-tc-plate\]'\)/);
-  assert.match(html, /startTime: String\(\(row\.querySelector\('\[data-tc-route-time\]'\)/);
+  assert.match(html, /const startTime = String\(\(row\.querySelector\('\[data-tc-route-time\]'\)/);
   assert.match(html, /active: !!\(row\.querySelector\('\[data-tc-active\]'\)/);
   assert.match(html, /student\.stop && typeof student\.stop === 'object'/);
-  assert.match(html, /driverId=active staffId|기사.*현재 직원/);
+  assert.match(html, /driverId=active staffId|기사는 직원으로도 등록|이미 재직 직원/);
   assert.match(html, /data-next=\"boarded\"/);
   assert.match(html, /data-next=\"dropped\"/);
   assert.match(html, /data-next=\"absent\"/);
@@ -219,7 +219,96 @@ test('transport keeps draft students missing from a stale roster while honoring 
   const actions = block("case 'rosterretry':", "case 'onbadd':");
   assert.match(config, /명단 없음 · 기존 배정 유지/);
   assert.match(config, /학생 명단 새로고침 필요/);
-  assert.match(actions, /case 'transportrefresh':[\s\S]{0,160}loadRoster\(\);[\s\S]{0,100}loadTransport\(transportDate, true\)/);
+  assert.match(actions, /case 'transportrefresh':[\s\S]{0,360}loadRoster\(\);[\s\S]{0,100}loadTransport\(transportDate, true\)/);
+});
+
+test('transport quick driver registration preserves the route draft and uses synced active staff', async () => {
+  const source = block('async function addTransportDriver(', 'function mutateTransportConfig(');
+  assert.match(source, /const config = captureTransportConfig\(\)/);
+  assert.match(source, /sameMatches\.length > 1/);
+  assert.match(source, /clearTimeout\(sync\.timer\); sync\.timer = null/);
+  assert.match(source, /const synced = await sync\.run\(\)/);
+  assert.match(source, /action: 'list', date: transportDate/);
+  assert.match(source, /config\.drivers = serverDrivers\.map/);
+  assert.doesNotMatch(source, /config\.(?:vehicles|routes)\s*=\s*serverConfig/);
+  assert.match(source, /latestRevision !== originalRevision/);
+  assert.match(source, /transportConfigRevisionConflict = true/);
+  assert.match(source, /transportDriverTargetRoute[\s\S]{0,180}target\.driverId = String\(pendingId\)/);
+
+  const run = new Function(
+    'session', 'transportHasRiders', 'toast', 'sync', 'document', 'captureTransportConfig', 'liveStaff',
+    'confirm', 'uid', 'now', 'state', 'save', 'transportData', 'transportDate', 'transportDriverPending',
+    'render', 'route',
+    'const SYNC_APP="task"; let transportDriverTargetRoute="route-a", transportConfigDraft=null, transportConfigDirty=false, ' +
+      'transportConfigRevisionConflict=false, transportRestoreFocus=null; ' + source +
+      '; return { run:addTransportDriver, snapshot:()=>({draft:transportConfigDraft,dirty:transportConfigDirty,' +
+      'conflict:transportConfigRevisionConflict,pending:transportDriverPending.size}) };'
+  );
+  const originalStop = { id: 'stop-a', name: '공동 승차장', address: '공동 지점', time: '16:00', studentIds: ['student-a'] };
+  const originalVehicle = { id: 'vehicle-a', name: '1호차', plate: 'test', capacity: 9 };
+  const draft = { baseAddress: '학원', vehicles: [originalVehicle], drivers: [],
+    routes: [{ id: 'route-a', direction: 'pickup', driverId: '', stops: [originalStop] }] };
+  const pending = new Map();
+  const state = { staff: [] };
+  const api = run(
+    { isAdmin: true }, () => false, () => {},
+    { timer: null, busy: false, dirty: false, err: '', auth: () => ({ mode: 'admin' }), run: async () => true,
+      post: async () => ({ config: { drivers: [{ id: 'staff-new', staffId: 'staff-new', name: '새기사' }] }, revision: 7 }) },
+    { querySelector: () => ({ value: '새기사' }) }, () => draft, () => state.staff.filter(row => !row.deleted),
+    () => true, () => 'staff-new', () => 1234, state, () => {}, { revision: 7 }, '2026-08-12', pending,
+    () => {}, 'transport'
+  );
+  await api.run({ disabled: false, isConnected: true });
+  const snapshot = api.snapshot();
+  assert.equal(state.staff[0].id, 'staff-new');
+  assert.equal(snapshot.draft.vehicles[0], originalVehicle);
+  assert.equal(snapshot.draft.routes[0].stops[0], originalStop);
+  assert.deepEqual(snapshot.draft.routes[0].stops[0].studentIds, ['student-a']);
+  assert.equal(snapshot.draft.routes[0].driverId, 'staff-new');
+  assert.equal(snapshot.dirty, true);
+  assert.equal(snapshot.conflict, false);
+  assert.equal(snapshot.pending, 0);
+});
+
+test('transport route builder, map planner, and unsaved-draft guards expose the safe UI contract', () => {
+  const load = block('async function loadTransport(', 'function transportProjectedRows(');
+  const capture = block('function captureTransportConfig()', 'function transportConfigValidation(');
+  const config = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
+  const planner = block('async function planTransportRoute(', 'function openTransportGoogleMap(');
+  const google = block('function transportGoogleDirectionsUrl(', 'function transportRosterReady(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  assert.match(capture, /draft\.baseAddress = baseAddress/);
+  assert.match(capture, /address: String\(\(stop\.querySelector\('\[data-tc-stop-address\]'\)/);
+  assert.match(capture, /routePlanChanged = baseAddressChanged/);
+  assert.match(capture, /previousPlan \? previousPlan\.dwellMinutes : 3/);
+  assert.match(capture, /stop\.name !== String\(old\.name/);
+  assert.match(capture, /stop\.address !== String\(old\.address/);
+  assert.match(capture, /stop\.time !== String\(old\.time/);
+  assert.match(config, /\+ 등원 노선/);
+  assert.match(config, /\+ 하원 노선/);
+  assert.match(config, /data-act="transportstopmove"/);
+  assert.match(config, /저장되지 않은 변경이 있습니다/);
+  assert.match(config, /학생 집주소 대신 건물·상가·아파트 정문/);
+  assert.match(config, /네이버 예상시간 설정 필요/);
+  assert.match(config, /locked \|\| plannerBusy \|\| !mapsReady/);
+  assert.match(config, /Google 지도 모바일에서는 일부 경유지가 생략될 수 있어 경로 순서 확인용/);
+  assert.match(planner, /action: 'plan'/);
+  assert.match(planner, /capabilities\.mapsPlanning/);
+  assert.match(planner, /name: String\(stop\.name \|\| ''\)\.trim\(\), address:/);
+  assert.match(planner, /stops\.some\(stop => !stop\.name \|\| !stop\.address\)/);
+  assert.match(planner, /baseAddress: baseAddress, direction: routeRow\.direction, startTime: routeRow\.startTime/);
+  assert.match(planner, /dwellMinutes: dwellMinutes, stops: stops/);
+  assert.match(planner, /result && Array\.isArray\(result\.suggestedStops\)/);
+  assert.match(planner, /routeRow\.plan = plan/);
+  assert.match(planner, /transportConfigDirty = true/);
+  assert.match(google, /https:\/\/www\.google\.com\/maps\/dir\/\?/);
+  assert.match(google, /waypoints/);
+  assert.match(actions, /transportDiscardDraft\('새로고침하면/);
+  assert.match(actions, /transportDiscardDraft\('날짜를 이동하면/);
+  assert.match(actions, /transportDiscardDraft\('오늘로 이동하면/);
+  assert.match(load, /const draftRevision = Number\(transportData && transportData\.revision\) \|\| 0/);
+  assert.match(load, /if \(latestRevision !== draftRevision\) transportConfigRevisionConflict = true/);
+  assert.match(html, /\.transport-config \.btn, \.transport-config input, \.transport-config select \{ min-height: 44px/);
 });
 
 test('transport UI remains mobile accessible and excludes guardian PII', () => {

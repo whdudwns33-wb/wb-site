@@ -521,6 +521,16 @@
   .transport-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .transport-config-list { margin-top: 10px; }
   .transport-config-row { padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-top: 7px; }
+  .transport-route-editor > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; list-style: none; }
+  .transport-route-editor > summary::-webkit-details-marker { display: none; }
+  .transport-route-editor[open] > summary { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--light-gray); }
+  .transport-stop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .transport-stop-order { display: flex; gap: 5px; }
+  .transport-stop-order .btn { min-width: 44px; min-height: 44px; padding: 0; }
+  .transport-config .btn, .transport-config input, .transport-config select { min-height: 44px; }
+  .transport-plan-summary { margin-top: 8px; padding: 9px 10px; border-radius: 9px; background: #F0F9FF; color: var(--navy); }
+  .transport-savebar { position: sticky; bottom: 8px; z-index: 8; display: grid; gap: 7px; margin: 14px -2px -2px; padding: 10px; border: 1px solid #B9DDF0; border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 5px 18px rgba(15,122,171,.16); backdrop-filter: blur(8px); }
+  .transport-savebar .btn { width: 100%; }
   .transport-unmatched { border-color: #F3B8B0; background: #FFF7F5; }
   .transport-capacity { color: #9E3629; font-weight: 900; }
 
@@ -659,10 +669,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-12.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.1"></script>
-<script src="./asset-core.js?v=2026-08-12.1"></script>
-<script src="./qr-core.js?v=2026-08-12.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.2"></script>
+<script src="./asset-core.js?v=2026-08-12.2"></script>
+<script src="./qr-core.js?v=2026-08-12.2"></script>
 <script>
 "use strict";
 
@@ -1217,7 +1227,10 @@ const onboardingServerConfirmedAt = new Map();
 let bookIssueRows = [], bookIssueLoaded = false, bookIssueLoading = false, bookIssueError = '';
 let bookIssueFilter = 'all', bookIssueSearchQuery = '', bookIssueRestoreFocus = null;
 let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoading = false, transportError = '';
-let transportRestoreFocus = null, transportConfigDraft = null;
+let transportRestoreFocus = null, transportConfigDraft = null, transportConfigDirty = false, transportConfigRevisionConflict = false;
+let transportOpenRouteId = '', transportDriverTargetRoute = '', transportPlannerBusyRoute = '';
+const transportDriverPending = new Map();
+const transportRouteDwellMinutes = new Map();
 let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false, sessionPackError = '';
 let sessionPackRestoreFocus = null;
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
@@ -1280,7 +1293,9 @@ function resetPersonCache(token) {
   bookIssueRows = []; bookIssueLoaded = false; bookIssueLoading = false; bookIssueError = '';
   bookIssueFilter = 'all'; bookIssueSearchQuery = ''; bookIssueRestoreFocus = null;
   transportDate = today(); transportData = null; transportLoadedDate = ''; transportLoading = false;
-  transportError = ''; transportRestoreFocus = null; transportConfigDraft = null;
+  transportError = ''; transportRestoreFocus = null; transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false;
+  transportOpenRouteId = ''; transportDriverTargetRoute = ''; transportPlannerBusyRoute = '';
+  transportDriverPending.clear(); transportRouteDwellMinutes.clear();
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
@@ -6355,18 +6370,30 @@ async function loadTransport(date, force) {
   const auth = sync.auth();
   if (!auth) { transportError = '동기화 인증이 필요합니다'; transportLoadedDate = date; return; }
   transportLoading = true; transportError = '';
+  const preservedDraft = transportConfigDirty && transportConfigDraft ? transportConfigDraft : null;
+  const draftRevision = Number(transportData && transportData.revision) || 0;
   if (route === 'transport') renderAfterSync();
   try {
     const result = await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'list', date: date });
+    const latestRevision = Number(result.revision ?? result.configRevision) || 0;
     transportData = {
       config: result.config || { vehicles: [], drivers: [], routes: [] },
       routes: Array.isArray(result.routes) ? result.routes : [], states: Array.isArray(result.states) ? result.states : [],
       unresolved: Array.isArray(result.unresolved) ? result.unresolved : [],
       warnings: Array.isArray(result.warnings) ? result.warnings : [],
-      revision: Number(result.revision ?? result.configRevision) || 0
+      capabilities: result.capabilities && typeof result.capabilities === 'object' ? result.capabilities : {},
+      revision: latestRevision
     };
     transportLoadedDate = date;
-    transportConfigDraft = null;
+    if (preservedDraft) {
+      transportConfigDraft = preservedDraft;
+      if (latestRevision !== draftRevision) transportConfigRevisionConflict = true;
+    }
+    else {
+      transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false;
+      transportOpenRouteId = ''; transportDriverTargetRoute = '';
+      transportRouteDwellMinutes.clear();
+    }
   } catch (error) {
     transportError = String(error && error.message || error);
     transportData = null;
@@ -6429,7 +6456,8 @@ function restoreTransportFocus() {
 }
 
 function transportStudentActions(row) {
-  const base = ' data-route="' + esc(row.routeId) + '" data-student="' + esc(row.studentId) + '" data-rev="' + row.revision + '"';
+  const base = ' data-route="' + esc(row.routeId) + '" data-student="' + esc(row.studentId) + '" data-rev="' + row.revision + '"' +
+    ' data-student-name="' + esc(row.student.name || row.student.studentName || '학생 정보 확인 필요') + '" data-stop-name="' + esc(row.student.stopName || '정류장 미입력') + '"';
   const focus = ' data-transport-focus="' + esc(transportStateKey(row.routeId, row.studentId)) + '"';
   if (session.isStaffLink && !session.isAdmin && transportDate !== today()) {
     return '<button class="btn btn-sm btn-ghost" disabled aria-disabled="true">개인 링크는 오늘만 처리</button>';
@@ -6442,6 +6470,10 @@ function transportStudentActions(row) {
 }
 
 function transportRouteCard(routeRow, rows) {
+  rows = rows.slice().sort((a, b) => (a.status === 'boarded' ? 0 : a.status === 'scheduled' ? 1 : 2) -
+    (b.status === 'boarded' ? 0 : b.status === 'scheduled' ? 1 : 2) ||
+    String(a.student.stopTime || '').localeCompare(String(b.student.stopTime || '')) ||
+    String(a.student.name || '').localeCompare(String(b.student.name || ''), 'ko'));
   const vehicle = transportVehicle(routeRow), driver = transportDriver(routeRow);
   const routeId = String(routeRow.id || routeRow.routeId || '');
   const riding = rows.filter(row => row.status === 'boarded').length;
@@ -6485,6 +6517,12 @@ async function transitionTransportState(button) {
   const next = String(button.dataset.next || '');
   const stateDate = validYmd(button.dataset.date) ? button.dataset.date : transportDate;
   let reason = '';
+  if (next === 'dropped' || next === 'absent') {
+    const studentName = String(button.dataset.studentName || '학생 정보 확인 필요');
+    const stopName = String(button.dataset.stopName || '정류장 미입력');
+    const actionName = next === 'dropped' ? '하차·인계 완료' : '미탑승';
+    if (!confirm(studentName + ' 학생 · ' + stopName + '\n' + actionName + '로 기록할까요?')) return;
+  }
   if (button.dataset.reasonRequired === 'true') {
     reason = String(prompt('상태를 되돌리는 사유를 입력해 주세요') || '').trim();
     if (!reason) return toast('되돌림 사유를 입력해 주세요');
@@ -6508,12 +6546,52 @@ function ensureTransportDraft() {
   if (!transportConfigDraft) {
     const source = transportConfig();
     transportConfigDraft = {
+      baseAddress: String(source.baseAddress || ''),
       vehicles: Array.isArray(source.vehicles) ? deepCopy(source.vehicles) : [],
       drivers: Array.isArray(source.drivers) ? deepCopy(source.drivers) : [],
       routes: Array.isArray(source.routes) ? deepCopy(source.routes) : []
     };
   }
   return transportConfigDraft;
+}
+
+function normalizeTransportPlan(value) {
+  if (!value || typeof value !== 'object' || String(value.provider || '') !== 'naver') return null;
+  const distanceMeters = Math.max(0, Number(value.distanceMeters) || 0);
+  const driveMinutes = Math.max(0, Number(value.driveMinutes) || 0);
+  const serviceMinutes = Math.max(0, Number(value.serviceMinutes) || 0);
+  const dwellMinutes = Number(value.dwellMinutes);
+  const plannedAt = Math.floor(Number(value.plannedAt) || 0);
+  if (!Number.isSafeInteger(dwellMinutes) || dwellMinutes < 0 || dwellMinutes > 60 ||
+      !Number.isSafeInteger(plannedAt) || plannedAt <= 0) return null;
+  return { provider: 'naver', distanceMeters: distanceMeters, driveMinutes: driveMinutes,
+    serviceMinutes: serviceMinutes, dwellMinutes: dwellMinutes, plannedAt: plannedAt };
+}
+
+function transportPlanSummary(plan) {
+  const safe = normalizeTransportPlan(plan);
+  if (!safe) return '';
+  const km = (safe.distanceMeters / 1000).toFixed(safe.distanceMeters >= 10000 ? 0 : 1);
+  return '네이버 지도 기준 · 약 ' + km + 'km · 주행 ' + safe.driveMinutes + '분 · 정차 포함 ' +
+    safe.serviceMinutes + '분 · 정류장당 ' + safe.dwellMinutes + '분';
+}
+
+function transportOrderedMapAddresses(config, routeRow) {
+  const baseAddress = String(config && config.baseAddress || '').trim();
+  const stopAddresses = (routeRow && Array.isArray(routeRow.stops) ? routeRow.stops : [])
+    .map(stop => String(stop.address || '').trim()).filter(Boolean);
+  if (!baseAddress) return stopAddresses;
+  return String(routeRow && routeRow.direction || '') === 'pickup'
+    ? stopAddresses.concat(baseAddress) : [baseAddress].concat(stopAddresses);
+}
+
+function transportGoogleDirectionsUrl(config, routeRow) {
+  const addresses = transportOrderedMapAddresses(config, routeRow);
+  if (addresses.length < 2) return '';
+  const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin: addresses[0],
+    destination: addresses[addresses.length - 1] });
+  if (addresses.length > 2) params.set('waypoints', addresses.slice(1, -1).join('|'));
+  return 'https://www.google.com/maps/dir/?' + params.toString();
 }
 
 function transportRosterReady() {
@@ -6537,6 +6615,8 @@ function transportCapturedStudentIds(draft, routeId, stopId, select) {
 
 function captureTransportConfig() {
   const draft = ensureTransportDraft();
+  const baseAddress = String((document.querySelector('[data-tc-base-address]') || {}).value || draft.baseAddress || '').trim();
+  const baseAddressChanged = baseAddress !== String(draft.baseAddress || '').trim();
   const vehicles = Array.from(document.querySelectorAll('[data-tc-vehicle]')).map(row => ({
     id: String(row.dataset.id || ''), name: String((row.querySelector('[data-tc-name]') || {}).value || '').trim(),
     plate: String((row.querySelector('[data-tc-plate]') || {}).value || '').trim(),
@@ -6544,21 +6624,44 @@ function captureTransportConfig() {
   }));
   const drivers = (draft.drivers || []).map(driver => ({ id: String(driver.staffId || driver.id || ''),
     staffId: String(driver.staffId || driver.id || ''), name: String(driver.name || '') }));
-  const routes = Array.from(document.querySelectorAll('[data-tc-route]')).map(row => ({
-    id: String(row.dataset.id || ''), name: String((row.querySelector('[data-tc-route-name]') || {}).value || '').trim(),
-    days: Array.from(row.querySelectorAll('[data-tc-day]:checked')).map(input => Number(input.value)).sort(),
-    direction: String((row.querySelector('[data-tc-direction]') || {}).value || ''),
-    startTime: String((row.querySelector('[data-tc-route-time]') || {}).value || ''),
-    vehicleId: String((row.querySelector('[data-tc-vehicle-id]') || {}).value || ''),
-    driverId: String((row.querySelector('[data-tc-driver-id]') || {}).value || ''),
-    active: !!(row.querySelector('[data-tc-active]') || {}).checked,
-    stops: Array.from(row.querySelectorAll('[data-tc-stop]')).map(stop => ({
+  const routes = Array.from(document.querySelectorAll('[data-tc-route]')).map(row => {
+    const id = String(row.dataset.id || '');
+    const previous = (draft.routes || []).find(item => String(item.id) === id) || {};
+    const dwellInput = row.querySelector('[data-tc-dwell]');
+    const previousPlan = normalizeTransportPlan(previous.plan);
+    const previousDwell = transportRouteDwellMinutes.has(id) ? transportRouteDwellMinutes.get(id) :
+      (previousPlan ? previousPlan.dwellMinutes : 3);
+    const dwell = dwellInput ? Math.min(30, Math.max(0, Number(dwellInput.value) || 0)) : previousDwell;
+    if (dwellInput) transportRouteDwellMinutes.set(id, dwell);
+    const direction = String((row.querySelector('[data-tc-direction]') || {}).value || '');
+    const startTime = String((row.querySelector('[data-tc-route-time]') || {}).value || '');
+    const stops = Array.from(row.querySelectorAll('[data-tc-stop]')).map(stop => ({
       id: String(stop.dataset.id || ''), name: String((stop.querySelector('[data-tc-stop-name]') || {}).value || '').trim(),
+      address: String((stop.querySelector('[data-tc-stop-address]') || {}).value || '').trim(),
       time: String((stop.querySelector('[data-tc-stop-time]') || {}).value || ''),
       studentIds: transportCapturedStudentIds(draft, row.dataset.id, stop.dataset.id, stop.querySelector('[data-tc-students]'))
-    }))
-  }));
-  draft.vehicles = vehicles; draft.drivers = drivers; draft.routes = routes;
+    }));
+    const previousStops = Array.isArray(previous.stops) ? previous.stops : [];
+    const routePlanChanged = baseAddressChanged || direction !== String(previous.direction || '') ||
+      startTime !== String(previous.startTime || previous.time || '') || dwell !== previousDwell ||
+      stops.length !== previousStops.length || stops.some((stop, index) => {
+        const old = previousStops[index] || {};
+        return stop.id !== String(old.id || '') || stop.name !== String(old.name || '').trim() ||
+          stop.address !== String(old.address || '').trim() || stop.time !== String(old.time || '');
+      });
+    return {
+      id: id, name: String((row.querySelector('[data-tc-route-name]') || {}).value || '').trim(),
+      days: Array.from(row.querySelectorAll('[data-tc-day]:checked')).map(input => Number(input.value)).sort(),
+      direction: direction,
+      startTime: startTime,
+      vehicleId: String((row.querySelector('[data-tc-vehicle-id]') || {}).value || ''),
+      driverId: String((row.querySelector('[data-tc-driver-id]') || {}).value || ''),
+      active: !!(row.querySelector('[data-tc-active]') || {}).checked,
+      plan: routePlanChanged ? undefined : normalizeTransportPlan(previous.plan) || undefined,
+      stops: stops
+    };
+  });
+  draft.baseAddress = baseAddress; draft.vehicles = vehicles; draft.drivers = drivers; draft.routes = routes;
   return draft;
 }
 
@@ -6590,8 +6693,9 @@ function transportConfigRowHtml(config, locked) {
   const liveStudents = students.filter(student => (!student.start || student.start <= currentMonth) &&
     (!student.end || student.end > currentMonth));
   const rosterReady = transportRosterReady();
+  const mapsReady = !!(transportData && transportData.capabilities && transportData.capabilities.mapsPlanning);
   const disabled = locked ? ' disabled aria-disabled="true"' : '';
-  const saveDisabled = locked || !rosterReady ? ' disabled aria-disabled="true"' : '';
+  const saveDisabled = locked || !rosterReady || transportConfigRevisionConflict ? ' disabled aria-disabled="true"' : '';
   const studentDisabled = locked || !rosterReady ? ' disabled aria-disabled="true"' : '';
   const rosterGate = rosterReady ? '' : rosterErr
     ? '<div class="hint mt8"><b>학생 명단을 불러오지 못했습니다</b> — 기존 학생 배정을 보호하기 위해 전체 설정 저장을 차단했습니다.' +
@@ -6602,33 +6706,64 @@ function transportConfigRowHtml(config, locked) {
       : '<div class="hint mt8"><b>학생 명단이 필요합니다</b> — 기존 학생 배정을 보호하기 위해 전체 설정 저장을 차단했습니다.' +
         '<br><button class="btn btn-sm btn-ghost mt8" data-act="transportrosterretry">학생 명단 불러오기</button></div>';
   let h = '<section class="card transport-config"><div class="between"><div><div class="card-title">차량·노선 설정</div>' +
-    '<div class="card-sub">원장·관리 담당만 전체 설정을 저장합니다. 학생 연락처와 주소는 이 화면에 표시하지 않습니다.</div></div>' +
-    '<button class="btn btn-sm btn-primary" data-act="transportsave"' + saveDisabled + '>전체 설정 저장</button></div>' +
+    '<div class="card-sub">원장·관리 담당만 전체 설정을 저장합니다. 학생 연락처는 표시하지 않으며 지도에는 공동 승하차 지점만 사용합니다.</div></div></div>' +
     (locked ? '<div class="hint mt8"><b>설정 잠김</b> — 현재 탑승 중인 학생이 있어 차량·기사·노선·학생 배정을 바꿀 수 없습니다. 모두 하차·인계한 뒤 수정하세요.</div>' : '') +
+    (transportConfigRevisionConflict ? '<div class="hint mt8"><b>다른 설정 변경이 감지됐습니다</b> — 현재 초안은 보존했습니다. 새로고침으로 최신 설정을 확인한 뒤 다시 반영해 주세요.</div>' : '') +
     rosterGate;
+  h += '<label class="field mt8"><span class="fl">학원 출발·도착 기준 지점</span><input class="in" data-tc-base-address value="' +
+    esc(config.baseAddress || '') + '" placeholder="예: 학원 건물명 또는 공동 승하차 지점"' + disabled + '></label>' +
+    '<div class="small muted mt8">학생 집주소 대신 건물·상가·아파트 정문처럼 함께 쓰는 승하차 지점만 입력하세요.</div>' +
+    (!mapsReady ? '<div class="hint mt8"><b>네이버 예상시간 설정 필요</b> — 전용 Maps 키가 등록되기 전에도 노선 편집과 Google 지도 확인은 사용할 수 있습니다.</div>' : '');
   h += '<details open><summary>차량 · ' + config.vehicles.length + '대</summary><div class="transport-config-list">' + config.vehicles.map(vehicle =>
     '<div class="transport-config-row transport-config-grid" data-tc-vehicle data-id="' + esc(vehicle.id) + '"><label><span class="fl">차량 이름</span><input class="in" data-tc-name value="' + esc(vehicle.name || vehicle.label || '') + '"' + disabled + '></label>' +
       '<label><span class="fl">차량번호</span><input class="in" data-tc-plate value="' + esc(vehicle.plate || '') + '" placeholder="예: 12가3456"' + disabled + '></label>' +
       '<label><span class="fl">정원</span><input class="in" type="number" min="1" max="99" data-tc-capacity value="' + esc(vehicle.capacity || '') + '"' + disabled + '></label>' +
       '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="vehicle" data-id="' + esc(vehicle.id) + '"' + disabled + '>차량 삭제</button></div>').join('') +
     '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="vehicle"' + disabled + '>+ 차량 추가</button></div></details>';
-  h += '<details><summary>기사 후보 · ' + config.drivers.length + '명</summary><div class="transport-config-list"><div class="hint">기사는 보안상 별도 연락처 명단을 만들지 않고 현재 직원 중에서 노선마다 선택합니다. 기사 추가·삭제는 직원 관리에서 재직 상태를 변경하세요.</div>' +
-    config.drivers.map(driver => '<div class="small" style="padding:5px 0">· ' + esc(driver.name || '이름 미입력') + '</div>').join('') + '</div></details>';
-  h += '<details><summary>노선 · ' + config.routes.length + '개</summary><div class="transport-config-list">' + config.routes.map(routeRow => {
+  const targetRoute = (config.routes || []).find(item => String(item.id) === String(transportDriverTargetRoute || ''));
+  h += '<details data-transport-drivers' + (transportDriverTargetRoute ? ' open' : '') + '><summary>기사 후보 · ' + config.drivers.length + '명</summary><div class="transport-config-list">' +
+    '<div class="hint"><b>여기서 바로 기사 등록</b> — 등록한 기사는 직원으로도 등록되며 기존 직원 개인 링크와 같은 태블릿 연결 QR을 사용합니다.' +
+      (targetRoute ? '<br>등록 후 <b>' + esc(targetRoute.name || '선택한 노선') + '</b>의 기사로 자동 선택합니다.' : '') + '</div>' +
+    '<div class="row mt8"><input class="in" data-transport-driver-name data-transport-focus="driver-name" placeholder="기사 이름"' + disabled + '>' +
+      '<button class="btn btn-sm btn-primary" data-act="transportdriveradd"' + disabled + '>기사 등록</button></div>' +
+    config.drivers.map(driver => '<div class="between transport-config-row"><span class="small">' + esc(driver.name || '이름 미입력') + '</span>' +
+      '<button class="btn btn-sm btn-ghost" data-act="transportdriverqr" data-id="' + esc(driver.staffId || driver.id) + '">태블릿 연결 QR</button></div>').join('') + '</div></details>';
+  h += '<details open><summary>노선 · ' + config.routes.length + '개</summary><div class="transport-config-list">' + config.routes.map((routeRow, routeIndex) => {
     const days = Array.isArray(routeRow.days) ? routeRow.days.map(Number) : [];
-    return '<div class="transport-config-row" data-tc-route data-id="' + esc(routeRow.id) + '"><div class="transport-config-grid">' +
-      '<label><span class="fl">노선 이름</span><input class="in" data-tc-route-name value="' + esc(routeRow.name || '') + '"' + disabled + '></label>' +
+    const directionLabel = routeRow.direction === 'pickup' ? '등원' : routeRow.direction === 'dropoff' ? '하원' : '방향 미선택';
+    const planSummary = transportPlanSummary(routeRow.plan);
+    const mapAddressCount = transportOrderedMapAddresses(config, routeRow).length;
+    const routeOpen = String(transportOpenRouteId || '') === String(routeRow.id || '');
+    const plannerBusy = transportPlannerBusyRoute === String(routeRow.id || '');
+    const normalizedPlan = normalizeTransportPlan(routeRow.plan);
+    const dwellMinutes = transportRouteDwellMinutes.has(String(routeRow.id)) ? transportRouteDwellMinutes.get(String(routeRow.id)) :
+      (normalizedPlan ? normalizedPlan.dwellMinutes : 3);
+    return '<details class="transport-config-row transport-route-editor" data-tc-route data-id="' + esc(routeRow.id) + '"' + (routeOpen ? ' open' : '') + '>' +
+      '<summary><span><b>' + (routeIndex + 1) + '. ' + esc(routeRow.name || directionLabel + ' 노선') + '</b><span class="card-sub">' + esc(routeRow.startTime || '출발 시간 미입력') + '</span></span>' +
+        '<span class="pill">' + esc(directionLabel) + ' · ' + (routeRow.stops || []).length + '곳</span></summary><div class="transport-config-grid">' +
+      '<label><span class="fl">노선 이름</span><input class="in" data-tc-route-name data-transport-focus="route:' + esc(routeRow.id) + '" value="' + esc(routeRow.name || '') + '"' + disabled + '></label>' +
       '<label><span class="fl">방향</span><select class="in" data-tc-direction' + disabled + '><option value="">선택</option><option value="pickup"' + (routeRow.direction === 'pickup' ? ' selected' : '') + '>등원</option><option value="dropoff"' + (routeRow.direction === 'dropoff' ? ' selected' : '') + '>하원</option></select></label>' +
       '<label><span class="fl">출발 시간</span><input class="in" type="time" data-tc-route-time value="' + esc(routeRow.startTime || routeRow.time || '') + '"' + disabled + '></label>' +
       '<label><span class="fl">차량</span><select class="in" data-tc-vehicle-id' + disabled + '><option value="">선택</option>' + config.vehicles.map(vehicle => '<option value="' + esc(vehicle.id) + '"' + (String(routeRow.vehicleId || '') === String(vehicle.id) ? ' selected' : '') + '>' + esc(vehicle.name || vehicle.label || '') + ' · ' + esc(vehicle.capacity || '?') + '명</option>').join('') + '</select></label>' +
-      '<label><span class="fl">기사</span><select class="in" data-tc-driver-id' + disabled + '><option value="">선택</option>' + config.drivers.map(driver => '<option value="' + esc(driver.staffId || driver.id) + '"' + (String(routeRow.driverId || '') === String(driver.staffId || driver.id) ? ' selected' : '') + '>' + esc(driver.name || '미지정') + '</option>').join('') + '</select></label>' +
+      '<div><label><span class="fl">기사</span><select class="in" data-tc-driver-id' + disabled + '><option value="">선택</option>' + config.drivers.map(driver => '<option value="' + esc(driver.staffId || driver.id) + '"' + (String(routeRow.driverId || '') === String(driver.staffId || driver.id) ? ' selected' : '') + '>' + esc(driver.name || '미지정') + '</option>').join('') + '</select></label>' +
+        '<button class="btn btn-sm btn-ghost mt8" data-act="transportdriverfocus" data-route="' + esc(routeRow.id) + '"' + disabled + '>+ 기사 바로 등록</button></div>' +
       '<label class="chip"><input type="checkbox" data-tc-active' + (routeRow.active !== false ? ' checked' : '') + disabled + '> 노선 사용</label></div>' +
       '<div class="field mt8"><span class="fl">운행 요일</span><div class="chips">' + [1,2,3,4,5,6,0].map(day => '<label class="chip"><input type="checkbox" data-tc-day value="' + day + '"' + (days.includes(day) ? ' checked' : '') + disabled + '> ' + DOW[day] + '</label>').join('') + '</div></div>' +
+      '<div class="transport-config-grid mt8"><label><span class="fl">정류장당 승하차 여유</span><input class="in" type="number" min="0" max="30" data-tc-dwell value="' + esc(dwellMinutes) + '"' + disabled + '></label>' +
+        '<div><span class="fl">지도 도구</span><div class="ops-actions"><button class="btn btn-sm btn-primary" data-act="transportplan" data-route="' + esc(routeRow.id) + '" data-transport-focus="plan:' + esc(routeRow.id) + '"' + (locked || plannerBusy || !mapsReady ? ' disabled aria-disabled="true"' : '') + '>' + (plannerBusy ? '계산 중…' : mapsReady ? '지도 예상시간 계산' : '네이버 지도 설정 필요') + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="transportgoogle" data-route="' + esc(routeRow.id) + '"' + (mapAddressCount < 2 ? ' disabled aria-disabled="true"' : '') + '>Google 지도에서 확인</button></div></div></div>' +
+      (planSummary ? '<div class="transport-plan-summary"><b>최근 계산</b> · ' + esc(planSummary) + '<div class="small muted">저장 버튼을 누르기 전에는 이 노선 초안에만 적용됩니다.</div></div>' : '') +
+      (mapAddressCount >= 5 ? '<div class="hint mt8">주소 5개 이상 · Google 지도 모바일에서는 일부 경유지가 생략될 수 있어 경로 순서 확인용으로 사용하세요.</div>' : '') +
       '<div class="sect">정류장·학생 배정</div>' + (routeRow.stops || []).map(stop => {
+        const stopIndex = (routeRow.stops || []).indexOf(stop);
         const selectedIds = (stop.studentIds || []).map(String);
         const liveIds = new Set(liveStudents.map(student => String(student.id)));
         const missingIds = selectedIds.filter(studentId => !liveIds.has(studentId));
-        return '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
+        return '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-stop-head"><b>' + (stopIndex + 1) + '번 정류장</b><div class="transport-stop-order" aria-label="정류장 순서 변경">' +
+            '<button class="btn btn-sm btn-ghost" data-act="transportstopmove" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '" data-n="-1" aria-label="' + (stopIndex + 1) + '번 정류장 위로"' + (locked || stopIndex === 0 ? ' disabled aria-disabled="true"' : '') + '>↑</button>' +
+            '<button class="btn btn-sm btn-ghost" data-act="transportstopmove" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '" data-n="1" aria-label="' + (stopIndex + 1) + '번 정류장 아래로"' + (locked || stopIndex === routeRow.stops.length - 1 ? ' disabled aria-disabled="true"' : '') + '>↓</button></div></div>' +
+          '<div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name data-transport-focus="stop:' + esc(stop.id) + '" value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
+          '<label><span class="fl">공동 승하차 지점 주소</span><input class="in" data-tc-stop-address value="' + esc(stop.address || '') + '" placeholder="건물·상가·아파트 정문"' + disabled + '></label>' +
           '<label><span class="fl">도착 시간</span><input class="in" type="time" data-tc-stop-time value="' + esc(stop.time || '') + '"' + disabled + '></label></div>' +
           '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
             liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') +
@@ -6637,14 +6772,19 @@ function transportConfigRowHtml(config, locked) {
           '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigdelete" data-kind="stop" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '"' + disabled + '>정류장 삭제</button></div>';
       }).join('') +
       '<div class="ops-actions"><button class="btn btn-sm btn-ghost" data-act="transportconfigadd" data-kind="stop" data-route="' + esc(routeRow.id) + '"' + disabled + '>+ 정류장 추가</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="route" data-id="' + esc(routeRow.id) + '"' + disabled + '>노선 삭제</button></div></div>';
-  }).join('') + '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="route"' + disabled + '>+ 노선 추가</button></div></details>';
+        '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="route" data-id="' + esc(routeRow.id) + '"' + disabled + '>노선 삭제</button></div></details>';
+  }).join('') + '<div class="ops-actions mt8"><button class="btn btn-sm btn-primary" data-act="transportconfigadd" data-kind="route" data-direction="pickup"' + disabled + '>+ 등원 노선</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="transportconfigadd" data-kind="route" data-direction="dropoff"' + disabled + '>+ 하원 노선</button></div></div></details>';
+  h += '<div class="transport-savebar" role="region" aria-label="차량 설정 저장">' +
+    (transportConfigDirty ? '<div class="small"><b>저장되지 않은 변경이 있습니다.</b> 지도 계산 결과와 정류장 순서를 포함해 아래 버튼으로 확정하세요.</div>' : '<div class="small muted">설정을 바꾼 뒤 전체 설정 저장을 눌러야 운영에 반영됩니다.</div>') +
+    '<button class="btn btn-primary" data-act="transportsave"' + saveDisabled + '>전체 설정 저장</button></div>';
   return h + '</section>';
 }
 
 async function saveTransportConfig(button) {
   if (!session.isAdmin) return;
   if (transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 저장할 수 없습니다');
+  if (transportConfigRevisionConflict) return toast('서버의 최신 차량 설정을 새로고침한 뒤 다시 반영해 주세요');
   if (!transportRosterReady()) {
     if (!rosterLoading && !rosterErr) loadRoster();
     return toast(rosterErr ? '학생 명단을 다시 불러온 뒤 저장해 주세요' : '학생 명단을 불러온 뒤 저장해 주세요');
@@ -6658,6 +6798,7 @@ async function saveTransportConfig(button) {
   try {
     await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'replace', config: config,
       revision: Number(transportData && transportData.revision) || 0 });
+    transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false;
     await loadTransport(transportDate, true);
     toast('차량 전체 설정을 저장했습니다');
   } catch (error) {
@@ -6668,16 +6809,164 @@ async function saveTransportConfig(button) {
   }
 }
 
-function mutateTransportConfig(kind, action, id, routeId) {
+function transportDiscardDraft(question) {
+  if (!transportConfigDirty) return true;
+  return confirm((question || '저장하지 않은 차량 설정이 있습니다.') + '\n변경 내용을 버리고 계속할까요?');
+}
+
+function moveTransportStop(routeId, stopId, delta) {
+  if (!session.isAdmin || transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 변경할 수 없습니다');
+  const config = captureTransportConfig();
+  const routeRow = (config.routes || []).find(item => String(item.id) === String(routeId));
+  if (!routeRow) return toast('노선을 다시 확인해 주세요');
+  const index = (routeRow.stops || []).findIndex(item => String(item.id) === String(stopId));
+  const next = index + Number(delta || 0);
+  if (index < 0 || next < 0 || next >= routeRow.stops.length) return;
+  const moved = routeRow.stops.splice(index, 1)[0];
+  routeRow.stops.splice(next, 0, moved);
+  routeRow.plan = undefined;
+  transportConfigDraft = config; transportConfigDirty = true; transportOpenRouteId = String(routeId);
+  transportRestoreFocus = 'stop:' + String(stopId);
+  render();
+}
+
+async function planTransportRoute(button) {
+  if (!session.isAdmin || transportHasRiders() || transportPlannerBusyRoute) return;
+  if (!(transportData && transportData.capabilities && transportData.capabilities.mapsPlanning)) {
+    return toast('네이버 지도 전용 키 설정이 필요합니다 — Google 지도 확인은 바로 사용할 수 있습니다');
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const config = captureTransportConfig();
+  const routeId = String(button.dataset.route || '');
+  const routeRow = (config.routes || []).find(item => String(item.id) === routeId);
+  if (!routeRow) return toast('노선을 다시 확인해 주세요');
+  const baseAddress = String(config.baseAddress || '').trim();
+  const stops = (routeRow.stops || []).map(stop => ({ id: String(stop.id || ''),
+    name: String(stop.name || '').trim(), address: String(stop.address || '').trim() }));
+  if (!baseAddress) return toast('학원 출발·도착 기준 지점을 입력해 주세요');
+  if (!routeRow.direction || !routeRow.startTime) return toast('방향과 출발 시간을 입력해 주세요');
+  if (!stops.length || stops.some(stop => !stop.name || !stop.address)) {
+    return toast('모든 정류장의 이름과 공동 승하차 지점 주소를 입력해 주세요');
+  }
+  const dwellMinutes = Math.min(30, Math.max(0, Number(transportRouteDwellMinutes.get(routeId)) || 0));
+  transportConfigDraft = config; transportConfigDirty = true; transportOpenRouteId = routeId;
+  transportPlannerBusyRoute = routeId; transportRestoreFocus = 'plan:' + routeId;
+  render();
+  try {
+    const result = await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'plan',
+      baseAddress: baseAddress, direction: routeRow.direction, startTime: routeRow.startTime,
+      dwellMinutes: dwellMinutes, stops: stops });
+    const plan = normalizeTransportPlan(result && result.plan);
+    const suggestedStops = result && Array.isArray(result.suggestedStops) ? result.suggestedStops : [];
+    if (!plan || suggestedStops.length !== stops.length) throw new Error('지도 계산 결과 형식을 확인해 주세요');
+    const byId = new Map(suggestedStops.map(stop => [String(stop.id || ''), stop]));
+    routeRow.stops.forEach(stop => {
+      const suggested = byId.get(String(stop.id || ''));
+      if (!suggested || !/^\d{2}:\d{2}$/.test(String(suggested.time || ''))) throw new Error('정류장 예상시간을 확인하지 못했습니다');
+      stop.time = String(suggested.time);
+      if (String(suggested.address || '').trim()) stop.address = String(suggested.address).trim();
+    });
+    routeRow.plan = plan;
+    transportConfigDraft = config; transportConfigDirty = true;
+    const trafficBased = result && (result.trafficBased === true || (result.plan && result.plan.trafficBased === true));
+    toast((trafficBased ? '실시간 교통량을 반영한' : '지도 기준') + ' 예상시간을 초안에 적용했습니다 — 전체 설정 저장으로 확정하세요');
+  } catch (error) {
+    toast('지도 예상시간 계산 실패 — ' + String(error && error.message || error));
+  } finally {
+    transportPlannerBusyRoute = '';
+    if (route === 'transport') render();
+  }
+}
+
+function openTransportGoogleMap(button) {
+  const config = captureTransportConfig();
+  const routeRow = (config.routes || []).find(item => String(item.id) === String(button.dataset.route || ''));
+  const url = transportGoogleDirectionsUrl(config, routeRow);
+  if (!url) return toast('학원 기준 지점과 정류장 주소를 두 곳 이상 입력해 주세요');
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+async function addTransportDriver(button) {
+  if (!session.isAdmin || transportHasRiders()) return toast('탑승 중인 학생이 있어 기사를 등록할 수 없습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('원장·관리 담당 동기화 인증이 필요합니다');
+  const input = document.querySelector('[data-transport-driver-name]');
+  const name = String(input && input.value || '').trim();
+  if (!name) return toast('기사 이름을 입력해 주세요');
+  if (transportDriverPending.has(name)) return;
+  const config = captureTransportConfig();
+  const sameMatches = liveStaff().filter(staff => staff.name === name);
+  if (sameMatches.length > 1) return toast('같은 이름의 재직 직원이 여러 명입니다 — 직원 관리에서 정확한 기사를 확인해 주세요');
+  const same = sameMatches[0];
+  if (same && !confirm(name + ' 님은 이미 재직 직원으로 등록되어 있습니다.\n기존 직원을 기사로 재사용할까요?')) return;
+  const pendingId = same ? same.id : uid();
+  const originalRevision = Number(transportData && transportData.revision) || 0;
+  const pending = (async () => {
+    if (button) button.disabled = true;
+    try {
+      if (!same) {
+        const stamp = now();
+        state.staff.push({ id: pendingId, name: name, createdAt: stamp, updatedAt: stamp, deleted: false });
+        save(); sync.dirty = true;
+      }
+      clearTimeout(sync.timer); sync.timer = null;
+      for (let i = 0; sync.busy && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 50));
+      const synced = await sync.run();
+      if (!synced || sync.err) throw new Error(sync.err || '직원 동기화 결과를 확인하지 못했습니다');
+      const latest = await sync.post('/transport', { app: SYNC_APP, auth: auth, action: 'list', date: transportDate });
+      const serverConfig = latest && latest.config && typeof latest.config === 'object' ? latest.config : {};
+      const serverDrivers = Array.isArray(serverConfig.drivers) ? serverConfig.drivers : [];
+      const driver = serverDrivers.find(item => String(item.staffId || item.id || '') === String(pendingId));
+      if (!driver) throw new Error('서버 기사 후보 반영을 확인하지 못했습니다');
+      config.drivers = serverDrivers.map(item => ({ id: String(item.staffId || item.id || ''),
+        staffId: String(item.staffId || item.id || ''), name: String(item.name || '') }));
+      if (transportDriverTargetRoute) {
+        const target = (config.routes || []).find(item => String(item.id) === String(transportDriverTargetRoute));
+        if (target) target.driverId = String(pendingId);
+      }
+      transportConfigDraft = config; transportConfigDirty = true;
+      const latestRevision = Number(latest.revision ?? latest.configRevision) || 0;
+      const revisionChanged = latestRevision !== originalRevision;
+      if (revisionChanged) transportConfigRevisionConflict = true;
+      transportDriverTargetRoute = 'open'; transportRestoreFocus = 'driver-name';
+      render();
+      toast(revisionChanged
+        ? name + ' 기사 등록 완료 — 서버 설정 변경도 감지되어 현재 초안을 보존했습니다. 새로고침 후 다시 반영해 주세요'
+        : name + ' 기사 등록 완료 — 직원 개인 링크도 함께 사용할 수 있습니다');
+    } catch (error) {
+      transportConfigDraft = config;
+      toast('기사 등록 실패 — ' + String(error && error.message || error));
+    } finally {
+      transportDriverPending.delete(name);
+      if (button && button.isConnected) button.disabled = false;
+    }
+  })();
+  transportDriverPending.set(name, { id: pendingId, promise: pending });
+  await pending;
+}
+
+function mutateTransportConfig(kind, action, id, routeId, direction) {
   if (!session.isAdmin || transportHasRiders()) return toast('탑승 중인 학생이 있어 설정을 변경할 수 없습니다');
   const config = captureTransportConfig();
   if (action === 'add') {
     if (kind === 'vehicle') config.vehicles.push({ id: transportSafeId('vehicle'), name: '', plate: '', capacity: 9 });
     else if (kind === 'driver') config.drivers.push({ id: transportSafeId('driver'), staffId: '', name: '' });
-    else if (kind === 'route') config.routes.push({ id: transportSafeId('route'), name: '', days: [], direction: '', startTime: '', vehicleId: '', driverId: '', stops: [], active: true });
+    else if (kind === 'route') {
+      const newId = transportSafeId('route');
+      const pickedDirection = direction === 'pickup' ? 'pickup' : direction === 'dropoff' ? 'dropoff' : '';
+      config.routes.push({ id: newId, name: pickedDirection === 'pickup' ? '등원 노선' : pickedDirection === 'dropoff' ? '하원 노선' : '',
+        days: [], direction: pickedDirection, startTime: '', vehicleId: '', driverId: '',
+        stops: [{ id: transportSafeId('stop'), name: '', address: '', time: '', studentIds: [] }], active: true });
+      transportOpenRouteId = newId; transportRestoreFocus = 'route:' + newId;
+    }
     else if (kind === 'stop') {
       const routeRow = config.routes.find(item => String(item.id) === String(routeId));
-      if (routeRow) (routeRow.stops || (routeRow.stops = [])).push({ id: transportSafeId('stop'), name: '', time: '', studentIds: [] });
+      if (routeRow) {
+        const stopId = transportSafeId('stop');
+        (routeRow.stops || (routeRow.stops = [])).push({ id: stopId, name: '', address: '', time: '', studentIds: [] });
+        routeRow.plan = undefined; transportOpenRouteId = String(routeId); transportRestoreFocus = 'stop:' + stopId;
+      }
     }
   } else {
     if (!confirm('이 ' + ({ vehicle: '차량', driver: '기사', route: '노선', stop: '정류장' }[kind] || '항목') + '을 삭제할까요? 저장 전까지 서버에는 반영되지 않습니다.')) return;
@@ -6686,10 +6975,13 @@ function mutateTransportConfig(kind, action, id, routeId) {
     else if (kind === 'route') config.routes = config.routes.filter(item => String(item.id) !== String(id));
     else if (kind === 'stop') {
       const routeRow = config.routes.find(item => String(item.id) === String(routeId));
-      if (routeRow) routeRow.stops = (routeRow.stops || []).filter(item => String(item.id) !== String(id));
+      if (routeRow) {
+        routeRow.stops = (routeRow.stops || []).filter(item => String(item.id) !== String(id));
+        routeRow.plan = undefined;
+      }
     }
   }
-  transportConfigDraft = config;
+  transportConfigDraft = config; transportConfigDirty = true;
   render();
 }
 
@@ -6730,7 +7022,12 @@ function viewTransport() {
       esc(row.studentId || row.student_id || '') + '" data-rev="' + (Number(row.revision) || 0) + '">확인 후 상태 정리</button></div>').join('') : '') + '</section>';
   const stateByRoute = new Map();
   rows.forEach(row => { if (!stateByRoute.has(row.routeId)) stateByRoute.set(row.routeId, []); stateByRoute.get(row.routeId).push(row); });
-  h += '<div class="transport-route-grid">' + routes.map(routeRow => transportRouteCard(routeRow, stateByRoute.get(String(routeRow.id || routeRow.routeId || '')) || [])).join('') + '</div>';
+  const displayRoutes = routes.slice().sort((a, b) => {
+    const aRows = stateByRoute.get(String(a.id || a.routeId || '')) || [];
+    const bRows = stateByRoute.get(String(b.id || b.routeId || '')) || [];
+    return (bRows.some(row => row.status === 'boarded') ? 1 : 0) - (aRows.some(row => row.status === 'boarded') ? 1 : 0);
+  });
+  h += '<div class="transport-route-grid">' + displayRoutes.map(routeRow => transportRouteCard(routeRow, stateByRoute.get(String(routeRow.id || routeRow.routeId || '')) || [])).join('') + '</div>';
   if (!routes.length) h += '<section class="card"><div class="empty"><b>🚐</b>이 날짜에 운행하는 노선이 없습니다.</div></section>';
   if (session.isAdmin) h += transportConfigRowHtml(ensureTransportDraft(), transportHasRiders());
   return h;
@@ -8783,18 +9080,43 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'bookissuetransition': transitionBookIssue(el); break;
-    case 'transportrefresh': rosterErr = ''; loadRoster(); transportError = ''; loadTransport(transportDate, true); break;
+    case 'transportrefresh':
+      if (!transportDiscardDraft('새로고침하면 저장하지 않은 차량 설정이 사라집니다.')) break;
+      transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false; rosterErr = ''; loadRoster(); transportError = ''; loadTransport(transportDate, true); break;
     case 'transportrosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'transportday': {
+      if (!transportDiscardDraft('날짜를 이동하면 저장하지 않은 차량 설정이 사라집니다.')) break;
       transportDate = addDays(transportDate, Number(el.dataset.n) || 0);
-      transportError = ''; transportConfigDraft = null;
+      transportError = ''; transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false;
       render();
       break;
     }
-    case 'transporttoday': transportDate = today(); transportError = ''; transportConfigDraft = null; render(); break;
+    case 'transporttoday':
+      if (!transportDiscardDraft('오늘로 이동하면 저장하지 않은 차량 설정이 사라집니다.')) break;
+      transportDate = today(); transportError = ''; transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false; render(); break;
     case 'transportstate': transitionTransportState(el); break;
-    case 'transportconfigadd': mutateTransportConfig(el.dataset.kind, 'add', '', el.dataset.route); break;
+    case 'transportconfigadd': mutateTransportConfig(el.dataset.kind, 'add', '', el.dataset.route, el.dataset.direction); break;
     case 'transportconfigdelete': mutateTransportConfig(el.dataset.kind, 'delete', id, el.dataset.route); break;
+    case 'transportstopmove': moveTransportStop(el.dataset.route, id, Number(el.dataset.n)); break;
+    case 'transportdriverfocus': {
+      if (!session.isAdmin) break;
+      transportConfigDraft = captureTransportConfig(); transportConfigDirty = true;
+      transportDriverTargetRoute = String(el.dataset.route || ''); transportOpenRouteId = transportDriverTargetRoute;
+      transportRestoreFocus = 'driver-name'; render(); break;
+    }
+    case 'transportdriveradd': addTransportDriver(el); break;
+    case 'transportdriverqr': {
+      if (!session.isAdmin) break;
+      const driver = staffById(id);
+      if (!driver) return toast('기사 직원을 다시 확인해 주세요');
+      modal(driver.name + ' 기사 · 태블릿 연결', '<div class="card-sub">연결 링크를 만드는 중…</div>');
+      issueLinkCode(id).then(() => showLinkQr(driver)).catch(error => {
+        closeModal(); toast('링크를 만들지 못했습니다 — ' + error.message);
+      });
+      break;
+    }
+    case 'transportplan': planTransportRoute(el); break;
+    case 'transportgoogle': openTransportGoogleMap(el); break;
     case 'transportsave': saveTransportConfig(el); break;
     case 'onbadd': {
       if (!session.isAdmin || !rosterDb) break;
@@ -9693,9 +10015,21 @@ document.addEventListener('click', ev => {
   }
 });
 
+function captureTransportDraftFromEvent(target) {
+  if (route !== 'transport' || !session.isAdmin || !target) return false;
+  const field = target.matches && target.matches('[data-tc-base-address], [data-tc-name], [data-tc-plate], [data-tc-capacity], [data-tc-route-name], [data-tc-direction], [data-tc-route-time], [data-tc-vehicle-id], [data-tc-driver-id], [data-tc-active], [data-tc-day], [data-tc-dwell], [data-tc-stop-name], [data-tc-stop-address], [data-tc-stop-time], [data-tc-students]');
+  if (!field) return false;
+  transportConfigDraft = captureTransportConfig();
+  transportConfigDirty = true;
+  const routeRow = target.closest('[data-tc-route]');
+  if (routeRow) transportOpenRouteId = String(routeRow.dataset.id || '');
+  return true;
+}
+
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (captureTransportDraftFromEvent(ev.target)) return;
   const bookIssueSearch = ev.target.closest('[data-book-issue-search]');
   if (bookIssueSearch) {
     applyBookIssueSearch(bookIssueSearch.value);
@@ -9754,6 +10088,7 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (captureTransportDraftFromEvent(ev.target)) return;
   const onboardingDate = ev.target.closest('[data-onboarding-date]');
   if (onboardingDate) {
     if (!session.isAdmin) return;
@@ -9815,6 +10150,7 @@ document.addEventListener('keydown', ev => {
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
   if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
+  if (t.matches('[data-transport-driver-name]')) document.querySelector('[data-act="transportdriveradd"]')?.click();
   if (t.id === 'qAdd')  document.querySelector('[data-act="qadd"]')?.click();
 });
 
@@ -9864,7 +10200,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.1';
+const APP_VER = '2026-08-12.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
