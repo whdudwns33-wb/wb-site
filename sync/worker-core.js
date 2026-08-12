@@ -45,6 +45,7 @@
  */
 
 import { handleLessonCreate } from './lesson-create.js';
+import { handleLessonAssignmentRequest, handleLessonAssignmentReview } from './lesson-assignment-request.js';
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
 import { handleBookOrderSend } from './book-order-send.js';
@@ -1360,6 +1361,16 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleLessonCreate(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/lesson-assignment-request') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonAssignmentRequest(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/lesson-assignment-review') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonAssignmentReview(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
       if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
