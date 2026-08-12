@@ -108,7 +108,7 @@ Gmail·Drive의 주 사용처였고, 13개 스킬이 의존하고 있었다.
 | B-1. 이름만 오기 | 21 | → `agent-cs`·`agent-google` 등 정식 명칭 |
 | B-2. n8n 4종 · `agent-idea` | 19 | → `agent-cto` / `agent-strategy` |
 | C. 계획만 있던 것 | 22 | → `skill-creator`·`agent-google`·`agent-cto` |
-| D. `agent-crisis` | 2 | → COO 직접 접수 + 영준님 즉시 보고 |
+| D. `agent-crisis` | 2 | 라우팅 행 삭제 (위기 발화는 COO 디폴트 처리로 편입) |
 
 갈래별 근거와 판단 이유는 [`GHOST-REFS.md`](./GHOST-REFS.md)에 있다.
 
@@ -138,7 +138,7 @@ Gmail·Drive의 주 사용처였고, 13개 스킬이 의존하고 있었다.
    `agent-consultation-summary-builder` → `agent-consult`로 변경.
    `control-tower`를 호출하는 n8n 트리거가 있다면 `agent-coo`로 변경.
 2. **삭제** — [`DELETE-LIST.md`](./DELETE-LIST.md)의 26개를 claude.ai 스킬 설정에서 제거.
-3. **교체** — 전달된 zip의 `skills-modified/` 49개 `SKILL.md`로 기존 스킬 내용 교체.
+3. **교체** — 전달된 zip의 `skills-modified/` 52개 `SKILL.md`로 기존 스킬 내용 교체.
 4. **확인** — 새 세션을 열어 `agent-coo`, `agent-consult`, `agent-booking`이 정상 호출되는지 점검.
 
 되돌려야 하면 zip의 `_archive/`에 제거된 26개 원본이 그대로 있다.
