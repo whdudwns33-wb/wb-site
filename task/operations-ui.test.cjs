@@ -223,7 +223,18 @@ test('transport keeps draft students missing from a stale roster while honoring 
 });
 
 test('transport quick driver registration preserves the route draft and uses synced active staff', async () => {
+  const configView = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
   const source = block('async function addTransportDriver(', 'function mutateTransportConfig(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  assert.match(configView, /<summary>기사 등록<\/summary>/);
+  assert.match(configView, /기존 직원은 각 노선의 기사 선택에서 바로 고르고/);
+  assert.match(configView, /data-transport-driver-name/);
+  assert.match(configView, /data-act="transportdriveradd"/);
+  assert.match(configView, /data-act="transportdriverfocus"/);
+  assert.match(configView, /data-tc-driver-id/);
+  assert.doesNotMatch(configView, /기사 후보|data-act="transportdriverqr"/);
+  assert.doesNotMatch(actions, /case 'transportdriverqr'/);
+  assert.match(html, /data-act="qrlink"/);
   assert.match(source, /const config = captureTransportConfig\(\)/);
   assert.match(source, /sameMatches\.length > 1/);
   assert.match(source, /clearTimeout\(sync\.timer\); sync\.timer = null/);

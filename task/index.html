@@ -669,10 +669,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-12.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.2"></script>
-<script src="./asset-core.js?v=2026-08-12.2"></script>
-<script src="./qr-core.js?v=2026-08-12.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.3"></script>
+<script src="./asset-core.js?v=2026-08-12.3"></script>
+<script src="./qr-core.js?v=2026-08-12.3"></script>
 <script>
 "use strict";
 
@@ -6721,13 +6721,11 @@ function transportConfigRowHtml(config, locked) {
       '<button class="btn btn-sm btn-ghost" data-act="transportconfigdelete" data-kind="vehicle" data-id="' + esc(vehicle.id) + '"' + disabled + '>차량 삭제</button></div>').join('') +
     '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigadd" data-kind="vehicle"' + disabled + '>+ 차량 추가</button></div></details>';
   const targetRoute = (config.routes || []).find(item => String(item.id) === String(transportDriverTargetRoute || ''));
-  h += '<details data-transport-drivers' + (transportDriverTargetRoute ? ' open' : '') + '><summary>기사 후보 · ' + config.drivers.length + '명</summary><div class="transport-config-list">' +
-    '<div class="hint"><b>여기서 바로 기사 등록</b> — 등록한 기사는 직원으로도 등록되며 기존 직원 개인 링크와 같은 태블릿 연결 QR을 사용합니다.' +
+  h += '<details data-transport-drivers' + (transportDriverTargetRoute ? ' open' : '') + '><summary>기사 등록</summary><div class="transport-config-list">' +
+    '<div class="hint">신규 기사만 여기서 직원으로 등록합니다. 기존 직원은 각 노선의 기사 선택에서 바로 고르고, 태블릿 연결 QR은 직원 관리에서 발급합니다.' +
       (targetRoute ? '<br>등록 후 <b>' + esc(targetRoute.name || '선택한 노선') + '</b>의 기사로 자동 선택합니다.' : '') + '</div>' +
     '<div class="row mt8"><input class="in" data-transport-driver-name data-transport-focus="driver-name" placeholder="기사 이름"' + disabled + '>' +
-      '<button class="btn btn-sm btn-primary" data-act="transportdriveradd"' + disabled + '>기사 등록</button></div>' +
-    config.drivers.map(driver => '<div class="between transport-config-row"><span class="small">' + esc(driver.name || '이름 미입력') + '</span>' +
-      '<button class="btn btn-sm btn-ghost" data-act="transportdriverqr" data-id="' + esc(driver.staffId || driver.id) + '">태블릿 연결 QR</button></div>').join('') + '</div></details>';
+      '<button class="btn btn-sm btn-primary" data-act="transportdriveradd"' + disabled + '>기사 등록</button></div></div></details>';
   h += '<details open><summary>노선 · ' + config.routes.length + '개</summary><div class="transport-config-list">' + config.routes.map((routeRow, routeIndex) => {
     const days = Array.isArray(routeRow.days) ? routeRow.days.map(Number) : [];
     const directionLabel = routeRow.direction === 'pickup' ? '등원' : routeRow.direction === 'dropoff' ? '하원' : '방향 미선택';
@@ -6918,7 +6916,7 @@ async function addTransportDriver(button) {
       const serverConfig = latest && latest.config && typeof latest.config === 'object' ? latest.config : {};
       const serverDrivers = Array.isArray(serverConfig.drivers) ? serverConfig.drivers : [];
       const driver = serverDrivers.find(item => String(item.staffId || item.id || '') === String(pendingId));
-      if (!driver) throw new Error('서버 기사 후보 반영을 확인하지 못했습니다');
+      if (!driver) throw new Error('서버 기사 등록 반영을 확인하지 못했습니다');
       config.drivers = serverDrivers.map(item => ({ id: String(item.staffId || item.id || ''),
         staffId: String(item.staffId || item.id || ''), name: String(item.name || '') }));
       if (transportDriverTargetRoute) {
@@ -9105,16 +9103,6 @@ document.addEventListener('click', ev => {
       transportRestoreFocus = 'driver-name'; render(); break;
     }
     case 'transportdriveradd': addTransportDriver(el); break;
-    case 'transportdriverqr': {
-      if (!session.isAdmin) break;
-      const driver = staffById(id);
-      if (!driver) return toast('기사 직원을 다시 확인해 주세요');
-      modal(driver.name + ' 기사 · 태블릿 연결', '<div class="card-sub">연결 링크를 만드는 중…</div>');
-      issueLinkCode(id).then(() => showLinkQr(driver)).catch(error => {
-        closeModal(); toast('링크를 만들지 못했습니다 — ' + error.message);
-      });
-      break;
-    }
     case 'transportplan': planTransportRoute(el); break;
     case 'transportgoogle': openTransportGoogleMap(el); break;
     case 'transportsave': saveTransportConfig(el); break;
@@ -10200,7 +10188,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.2';
+const APP_VER = '2026-08-12.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
