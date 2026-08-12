@@ -7,80 +7,90 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
-    --blue:#1E9DD6; --deep-blue:#0F7AAB; --navy:#1B3A5C; --navy-deep:#0d2a47;
-    --coral:#E85D4A; --ivory:#FAF8F3; --dark:#2D2D2D; --mid:#6B7280;
-    --light:#F3F4F6; --line:#e5e7eb; --white:#fff; --blue-soft:#7FD0F0;
+    --serif:'Noto Serif KR','Nanum Myeongjo',AppleMyungjo,'UnBatang',serif;
+    --ivory:#F4EFE4; --paper-deep:#EAE2CF; --white:#FDFBF5; --surface:#FDFBF5;
+    --dark:#23272E; --mid:#6E675A; --line:#D8CFBB;
+    --navy:#23272E; --navy-deep:#17191E; --ink-fill:#23272E;
+    --blue:#2F5B7E; --deep-blue:#24465F; --blue-soft:#9DB6C6;
+    --coral:#BC4B2A; --light:#EFE9DB;
   }
   html{scroll-behavior:smooth}
-  body{font-family:'Noto Sans KR',sans-serif;color:var(--dark);background:var(--ivory);line-height:1.75}
+  body{font-family:'Noto Sans KR',sans-serif;color:var(--dark);background:var(--ivory);line-height:1.78}
   .wrap{max-width:880px;margin:0 auto;padding:0 22px}
-  .section{padding:52px 0}
-  .section-light{background:var(--white)}
-  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:12px}
-  h1{font-size:clamp(26px,4.4vw,40px);font-weight:900;line-height:1.32;letter-spacing:-.02em;margin-bottom:16px}
-  h2{font-size:clamp(21px,3vw,27px);font-weight:900;margin-bottom:12px;letter-spacing:-.01em}
-  h3{font-size:16.5px;font-weight:800;margin-bottom:6px}
+  .section{padding:56px 0}
+  .section-light{background:var(--surface)}
+  .eyebrow{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--coral);margin-bottom:12px;border-top:2px solid var(--coral);padding-top:7px}
+  h1{font-family:var(--serif);font-size:clamp(28px,4.4vw,42px);font-weight:900;line-height:1.34;letter-spacing:-.015em;margin-bottom:16px;text-wrap:balance}
+  h2{font-family:var(--serif);font-size:clamp(22px,3vw,28px);font-weight:900;margin-bottom:12px;letter-spacing:-.01em;text-wrap:balance}
+  h3{font-family:var(--serif);font-size:16.5px;font-weight:700;margin-bottom:6px}
   .lede{font-size:15.5px;color:var(--mid);max-width:62ch}
   .muted{color:var(--mid)}
   .small{font-size:13px}
 
-  /* hero */
-  .hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 60%,var(--deep-blue) 100%);
-    color:#fff;padding:64px 0 56px}
-  .hero .lede{color:rgba(255,255,255,.85)}
-  .hero .eyebrow{color:var(--blue-soft)}
-  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
-  .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:100px;
-    font-size:12.5px;font-weight:700;padding:5px 14px}
+  /* 표제부 — 인쇄 문서의 첫 장처럼 */
+  .hero{background:var(--ivory);color:var(--dark);padding:72px 0 52px;position:relative;
+    border-bottom:2px solid var(--dark)}
+  .hero .lede{color:var(--mid)}
+  .hero .wrap{position:relative}
+  .hero .wrap::after{content:"三者 協業";position:absolute;top:-10px;right:20px;width:86px;height:86px;
+    border:2.5px solid rgba(188,75,42,.5);border-radius:100px;color:rgba(188,75,42,.62);
+    font-family:var(--serif);font-weight:900;font-size:13px;letter-spacing:.08em;
+    display:flex;align-items:center;justify-content:center;transform:rotate(-11deg);pointer-events:none}
+  @media(max-width:640px){.hero .wrap::after{display:none}}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+  .chip{background:transparent;border:1px solid var(--dark);border-radius:2px;
+    font-size:12.5px;font-weight:700;padding:5px 14px;color:var(--dark)}
 
-  /* partners */
+  /* 파트너 */
   .partner-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
   @media(max-width:760px){.partner-grid{grid-template-columns:1fr}}
-  .partner-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:22px}
-  .partner-card .dot{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-    font-weight:900;color:#fff;font-size:16px;margin-bottom:12px}
-  .partner-card .role{font-size:12px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  .partner-card{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--dark);border-radius:2px;padding:22px}
+  .partner-card .dot{width:40px;height:40px;border-radius:2px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--serif);font-weight:900;color:#fff;font-size:16px;margin-bottom:12px}
+  .partner-card .role{font-size:10.5px;font-weight:800;color:var(--coral);text-transform:uppercase;letter-spacing:.12em;margin-bottom:4px}
   .partner-card p{font-size:13.5px;color:var(--mid);margin-top:8px}
 
-  /* principles */
+  /* 원칙 */
   .principle-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
   @media(max-width:700px){.principle-list{grid-template-columns:1fr}}
-  .principle{background:var(--white);border:1px solid var(--line);border-left:4px solid var(--blue);
-    border-radius:0 10px 10px 0;padding:14px 16px;font-size:13.5px}
-  .principle b{display:block;font-size:14px;margin-bottom:3px}
+  .principle{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--coral);
+    border-radius:0;padding:14px 16px;font-size:13.5px}
+  .principle b{display:block;font-size:14px;margin-bottom:3px;font-family:var(--serif);font-weight:700}
 
-  /* concept cards */
+  /* 방향 카드 */
   .concept-grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:24px}
-  .concept-card{border-radius:16px;padding:26px;color:#fff;background:linear-gradient(135deg,var(--c1),var(--c2))}
-  .concept-card .code{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.8}
-  .concept-card h3{color:#fff;font-size:19px;margin:4px 0 8px}
+  .concept-card{border-radius:2px;padding:26px;color:#fff;background:var(--c2);border-left:6px solid var(--c1)}
+  .concept-card .code{font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;opacity:.8}
+  .concept-card h3{color:#fff;font-size:20px;margin:4px 0 8px}
   .concept-card .tagline{font-size:14px;font-weight:700;opacity:.92;margin-bottom:10px}
-  .concept-card .pos{font-size:13.5px;line-height:1.75;opacity:.92;max-width:70ch}
+  .concept-card .pos{font-size:13.5px;line-height:1.8;opacity:.92;max-width:70ch}
   .concept-card .why{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.25);font-size:13px;opacity:.9}
   .swatches{display:flex;gap:6px;margin-top:14px}
-  .swatch{width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(255,255,255,.5)}
+  .swatch{width:22px;height:22px;border-radius:2px;border:1.5px solid rgba(255,255,255,.5)}
 
-  /* agenda */
+  /* 안건 */
   .agenda{counter-reset:agenda}
-  .agenda-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .agenda-item{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}
   .agenda-item:last-child{border-bottom:none}
-  .agenda-num{flex:none;width:28px;height:28px;border-radius:100px;background:var(--navy);color:#fff;
-    font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
-  .agenda-item b{display:block;font-size:14.5px;margin-bottom:2px}
+  .agenda-num{flex:none;width:28px;height:28px;border-radius:2px;background:var(--ink-fill);color:#fff;
+    font-family:var(--serif);font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center}
+  .agenda-item b{display:block;font-size:14.5px;margin-bottom:2px;font-family:var(--serif);font-weight:700}
   .agenda-item span{font-size:13px;color:var(--mid)}
 
   .footer-note{font-size:12px;color:var(--mid);text-align:center;padding:36px 0 46px}
   .divider{height:1px;background:var(--line);margin:0}
 
   @media print{
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{background:#fff}
     .section{padding:24px 0}
-    .hero{background:var(--navy)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .concept-card{-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid}
+    .hero{background:var(--ivory)!important}
+    .concept-card{break-inside:avoid}
   }
 </style>
 </head>
