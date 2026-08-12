@@ -342,6 +342,8 @@ test('transport run dashboard derives honest course status without extra PII or 
   assert.equal(status(route, rows(['boarded']), '2026-08-12', '2026-08-12', '17:46'), 'attention');
   assert.equal(status(route, rows(['dropped', 'scheduled']), '2026-08-12', '2026-08-12', '17:10'), 'running');
   assert.equal(status(route, [], '2026-08-12', '2026-08-12', '17:10', 1), 'attention');
+  assert.equal(status(route, [], '2026-08-12', '2026-08-12', '17:10', 0, 2), 'attention');
+  assert.equal(status(route, rows(['dropped', 'absent']), '2026-08-12', '2026-08-12', '17:10', 0, 1), 'attention');
   const pickup = { direction: 'pickup', startTime: '17:00', stops: [{ time: '17:30' }] };
   assert.equal(helpers.end(pickup), 17 * 60 + 50);
   assert.equal(helpers.estimated(pickup), true);
@@ -360,12 +362,40 @@ test('transport run dashboard derives honest course status without extra PII or 
   assert.match(source, /종료 시각 미기록/);
   assert.match(source, /new Date\(item\.completionAt\)\.toLocaleTimeString/);
   assert.match(source, /연결 확인 ' \+ item\.orphanBoarded \+ '건/);
+  assert.match(source, /명단 연결 대기 ' \+ item\.pendingCount \+ '명/);
+  assert.match(source, /pendingCount\) return 'attention'/);
   assert.doesNotMatch(source, /guardianPhone|student\.name|\.address/);
   assert.match(view, /orphanBoardedByRoute/);
   assert.match(view, /String\(row\.date \|\| transportDate\) !== transportDate/);
   assert.match(view, /transportRunDashboard\(routes, stateByRoute, orphanBoardedByRoute\)/);
   assert.match(html, /\.transport-run-list \{ display: grid; grid-template-columns: repeat\(2/);
   assert.match(html, /\.transport-run-list \{ grid-template-columns: 1fr; \}/);
+});
+
+test('transport keeps unmatched schedule names admin-only until a stable roster student is linked', () => {
+  const helpersSource = block('function transportPendingStudentNames(', 'function deepCopy(');
+  const admin = new Function('session', helpersSource + '; return {names:transportPendingStudentNames,count:transportRoutePendingCount};')({ isAdmin: true });
+  const staff = new Function('session', helpersSource + '; return transportRoutePendingCount;')({ isAdmin: false });
+  const stop = { pendingStudentNames: [' 연결대기 ', '', '연결대기', '다른학생'] };
+  const route = { stops: [stop], pendingCount: 2 };
+  assert.deepEqual(admin.names(stop), ['연결대기', '다른학생']);
+  assert.equal(admin.count(route), 2);
+  assert.equal(staff(route), 2);
+
+  const capture = block('function transportRosterReady()', 'function transportConfigValidation(');
+  const config = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
+  const removal = block('function removeTransportPendingStudent(', 'function mutateTransportConfig(');
+  const actions = block("case 'rosterretry':", "case 'onbadd':");
+  const routeCard = block('function transportRouteCard(', 'function transportStateSuccessToast(');
+  assert.match(capture, /pendingStudentNames: transportDraftPendingStudentNames\(draft, row\.dataset\.id, stop\.dataset\.id\)/);
+  assert.match(config, /명단 연결 대기 · ' \+ pendingNames\.length \+ '명/);
+  assert.match(config, /data-act="transportpendingremove"/);
+  assert.match(removal, /selectedNames\.has\(name\)/);
+  assert.match(removal, /실제 탑승 대상이 아니어서 대기 명단에서 제외/);
+  assert.match(removal, /stop\.pendingStudentNames = transportPendingStudentNames\(stop\)\.filter/);
+  assert.match(actions, /case 'transportpendingremove': removeTransportPendingStudent\(el\); break/);
+  assert.match(routeCard, /session\.isAdmin && pendingCount \? '<div class="hint mt8"><b>명단 연결 대기/);
+  assert.match(routeCard, /if \(!rows\.length && !pendingCount\)/);
 });
 
 test('transport config fails closed until the private roster is available', () => {

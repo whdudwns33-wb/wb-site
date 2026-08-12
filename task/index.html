@@ -549,6 +549,9 @@
   .transport-plan-summary { margin-top: 8px; padding: 9px 10px; border-radius: 9px; background: #F0F9FF; color: var(--navy); }
   .transport-savebar { position: sticky; bottom: 8px; z-index: 8; display: grid; gap: 7px; margin: 14px -2px -2px; padding: 10px; border: 1px solid #B9DDF0; border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 5px 18px rgba(15,122,171,.16); backdrop-filter: blur(8px); }
   .transport-savebar .btn { width: 100%; }
+  .transport-pending-list { display: grid; gap: 6px; margin-top: 8px; }
+  .transport-pending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border: 1px solid #F4C98B; border-radius: 8px; background: #FFFBEB; }
+  .transport-pending-row > span { min-width: 0; overflow-wrap: anywhere; }
   .transport-unmatched { border-color: #F3B8B0; background: #FFF7F5; }
   .transport-capacity { color: #9E3629; font-weight: 900; }
 
@@ -689,10 +692,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-12.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.5"></script>
-<script src="./asset-core.js?v=2026-08-12.5"></script>
-<script src="./qr-core.js?v=2026-08-12.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.6"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.6"></script>
+<script src="./asset-core.js?v=2026-08-12.6"></script>
+<script src="./qr-core.js?v=2026-08-12.6"></script>
 <script>
 "use strict";
 
@@ -6336,6 +6339,17 @@ const TRANSPORT_RUN_STATUS = {
   attention: ['확인 필요', 'bad'], completed: ['운행 종료', 'ok'], empty: ['배정 없음', '']
 };
 
+function transportPendingStudentNames(stop) {
+  if (!stop || !Array.isArray(stop.pendingStudentNames)) return [];
+  return Array.from(new Set(stop.pendingStudentNames.map(name => String(name || '').trim()).filter(Boolean)));
+}
+
+function transportRoutePendingCount(routeRow) {
+  if (!session.isAdmin) return Math.max(0, Number(routeRow && routeRow.pendingCount) || 0);
+  return (routeRow && Array.isArray(routeRow.stops) ? routeRow.stops : [])
+    .reduce((count, stop) => count + transportPendingStudentNames(stop).length, 0);
+}
+
 function deepCopy(value) { return JSON.parse(JSON.stringify(value || {})); }
 function transportSafeId(prefix) { return prefix + '-' + uid().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24); }
 function transportConfig() {
@@ -6574,9 +6588,11 @@ function transportRouteCompletionAt(rows) {
   }, 0);
 }
 
-function transportRouteRunStatus(routeRow, rows, selectedDate, currentDate, currentTime, orphanBoarded) {
+function transportRouteRunStatus(routeRow, rows, selectedDate, currentDate, currentTime, orphanBoarded, pendingCount) {
   rows = Array.isArray(rows) ? rows : [];
   orphanBoarded = Math.max(0, Number(orphanBoarded) || 0);
+  pendingCount = Math.max(0, Number(pendingCount) || 0);
+  if (pendingCount) return 'attention';
   if (!rows.length && !orphanBoarded) return 'empty';
   if (orphanBoarded) return 'attention';
   if (selectedDate > currentDate) {
@@ -6604,16 +6620,17 @@ function transportRunDashboard(routes, stateByRoute, orphanBoardedByRoute) {
     const routeId = String(routeRow.id || routeRow.routeId || '');
     const rows = stateByRoute.get(routeId) || [];
     const orphanBoarded = Number(orphanBoardedByRoute && orphanBoardedByRoute.get(routeId)) || 0;
-    const key = transportRouteRunStatus(routeRow, rows, transportDate, currentDate, currentTime, orphanBoarded);
+    const pendingCount = transportRoutePendingCount(routeRow);
+    const key = transportRouteRunStatus(routeRow, rows, transportDate, currentDate, currentTime, orphanBoarded, pendingCount);
     const completed = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
-    return { route: routeRow, rows: rows, key: key, completed: completed, orphanBoarded: orphanBoarded,
+    return { route: routeRow, rows: rows, key: key, completed: completed, orphanBoarded: orphanBoarded, pendingCount: pendingCount,
       completionAt: transportRouteCompletionAt(rows) };
   }).sort((a, b) => statusRank[a.key] - statusRank[b.key] ||
     transportTimeMinutes(a.route.startTime || a.route.time) - transportTimeMinutes(b.route.startTime || b.route.time) ||
     String(a.route.name || '').localeCompare(String(b.route.name || ''), 'ko'));
   let h = '<section class="card transport-run-board" aria-labelledby="transportRunBoardTitle"><div class="transport-run-board-head"><div>' +
     '<div class="card-title" id="transportRunBoardTitle">기사·코스별 운행 현황판</div>' +
-    '<div class="card-sub">코스의 전체 학생이 하차 또는 미탑승 처리되면 운행 종료로 표시됩니다. 마지막 갱신 ' + esc(loadedLabel) + '</div></div>' +
+    '<div class="card-sub">코스의 전체 학생이 하차 또는 미탑승 처리되고 명단 연결 대기가 없어야 운행 종료로 표시됩니다. 마지막 갱신 ' + esc(loadedLabel) + '</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="transportrefresh">현황 새로고침</button></div>';
   if (!items.length) return h + '<div class="empty"><b>🚐</b>이 날짜에 확인할 운행이 없습니다.</div></section>';
   h += '<div class="transport-run-list" aria-live="polite">' + items.map(item => {
@@ -6629,11 +6646,12 @@ function transportRunDashboard(routes, stateByRoute, orphanBoardedByRoute) {
         timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit'
       }) : ' · 종료 시각 미기록') : '';
     const orphanWarning = item.orphanBoarded ? ' · 연결 확인 ' + item.orphanBoarded + '건' : '';
+    const pendingWarning = session.isAdmin && item.pendingCount ? ' · 명단 연결 대기 ' + item.pendingCount + '명' : '';
     return '<article class="transport-run-item is-' + item.key + '"><div class="between"><div class="transport-run-title">' +
       esc(routeRow.name || '노선 이름 미입력') + '</div><span class="pill ' + status[1] + '">' + status[0] + '</span></div>' +
       '<div class="transport-run-meta">' + esc(timeRange) + ' · 기사 ' + esc(driver && driver.name || routeRow.driverName || '미지정') +
       ' · 차량 ' + esc(vehicle && (vehicle.name || vehicle.label) || routeRow.vehicleName || '미지정') + '</div>' +
-      '<div class="transport-run-progress">확인 완료 ' + item.completed + '/' + item.rows.length + '명' + esc(completion + orphanWarning) + '</div></article>';
+      '<div class="transport-run-progress">확인 완료 ' + item.completed + '/' + item.rows.length + '명' + esc(completion + orphanWarning + pendingWarning) + '</div></article>';
   }).join('') + '</div></section>';
   return h;
 }
@@ -6711,17 +6729,21 @@ function transportRouteCard(routeRow, rows) {
   const routeId = String(routeRow.id || routeRow.routeId || '');
   const riding = rows.filter(row => row.status === 'boarded').length;
   const done = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
+  const pendingCount = transportRoutePendingCount(routeRow);
   const direction = String(routeRow.direction || '') === 'pickup' ? '등원' : String(routeRow.direction || '') === 'dropoff' ? '하원' : (routeRow.direction || '방향 미입력');
   const capacity = Number(vehicle && vehicle.capacity) || 0;
-  const over = capacity > 0 && rows.length > capacity;
+  const assignedCount = rows.length + pendingCount;
+  const over = capacity > 0 && assignedCount > capacity;
+  const routeComplete = done === rows.length && rows.length && !pendingCount;
   let h = '<article class="card transport-route-card' + (riding ? ' is-riding' : '') + '"><div class="between"><div><div class="card-title">' +
     esc(routeRow.name || '노선 이름 미입력') + '</div><div class="card-sub">' + esc(direction) + ' · ' + esc(routeRow.startTime || routeRow.time || '시간 미입력') + '</div></div>' +
-    '<span class="pill ' + (riding ? 'bad' : done === rows.length && rows.length ? 'ok' : 'warn') + '">' +
-      (riding ? '탑승 중 ' + riding + '명' : done === rows.length && rows.length ? '운행 확인 완료' : '운행 중') + '</span></div>' +
+    '<span class="pill ' + (riding || pendingCount ? 'bad' : routeComplete ? 'ok' : 'warn') + '">' +
+      (riding ? '탑승 중 ' + riding + '명' : pendingCount ? '명단 연결 필요 ' + pendingCount + '명' : routeComplete ? '운행 확인 완료' : '운행 중') + '</span></div>' +
     '<div class="transport-route-meta"><span class="pill">차량 ' + esc(vehicle && (vehicle.name || vehicle.label) || routeRow.vehicleName || '미지정') + '</span>' +
       '<span class="pill">기사 ' + esc(driver && driver.name || routeRow.driverName || '미지정') + '</span>' +
-      '<span class="pill ' + (over ? 'bad' : '') + '">' + rows.length + (capacity ? '/' + capacity : '') + '명</span></div>' +
+      '<span class="pill ' + (over ? 'bad' : '') + '">' + assignedCount + (capacity ? '/' + capacity : '') + '명</span></div>' +
     (riding ? '<div class="hint mt8"><b>가장 먼저 확인</b> — 탑승한 학생이 아직 하차·인계되지 않았습니다.</div>' : '') +
+    (session.isAdmin && pendingCount ? '<div class="hint mt8"><b>명단 연결 대기 ' + pendingCount + '명</b> — 아래 차량·노선 설정에서 실제 원생을 연결해 주세요.</div>' : '') +
     (over ? '<div class="hint mt8 transport-capacity">정원 초과 · 이 노선은 설정 저장이 차단됩니다.</div>' : '');
   const byStop = new Map();
   rows.forEach(row => {
@@ -6729,7 +6751,7 @@ function transportRouteCard(routeRow, rows) {
     if (!byStop.has(key)) byStop.set(key, []);
     byStop.get(key).push(row);
   });
-  if (!rows.length) h += '<div class="empty"><b>🚐</b>오늘 배정된 학생이 없습니다.</div>';
+  if (!rows.length && !pendingCount) h += '<div class="empty"><b>🚐</b>오늘 배정된 학생이 없습니다.</div>';
   byStop.forEach(stopRows => {
     const sample = stopRows[0].student;
     h += '<section class="transport-stop"><div class="between small"><b>' + esc(sample.stopName || '정류장 미입력') + '</b><time>' + esc(sample.stopTime || '') + '</time></div>' +
@@ -6974,6 +6996,12 @@ function transportDraftStudentIds(draft, routeId, stopId) {
   return stopRow && Array.isArray(stopRow.studentIds) ? stopRow.studentIds.map(String) : [];
 }
 
+function transportDraftPendingStudentNames(draft, routeId, stopId) {
+  const routeRow = (draft.routes || []).find(item => String(item.id) === String(routeId));
+  const stopRow = routeRow && (routeRow.stops || []).find(item => String(item.id) === String(stopId));
+  return transportPendingStudentNames(stopRow);
+}
+
 function transportCapturedStudentIds(draft, routeId, stopId, select) {
   const previous = transportDraftStudentIds(draft, routeId, stopId);
   if (!transportRosterReady()) return previous;
@@ -7009,7 +7037,8 @@ function captureTransportConfig() {
       id: String(stop.dataset.id || ''), name: String((stop.querySelector('[data-tc-stop-name]') || {}).value || '').trim(),
       address: String((stop.querySelector('[data-tc-stop-address]') || {}).value || '').trim(),
       time: String((stop.querySelector('[data-tc-stop-time]') || {}).value || ''),
-      studentIds: transportCapturedStudentIds(draft, row.dataset.id, stop.dataset.id, stop.querySelector('[data-tc-students]'))
+      studentIds: transportCapturedStudentIds(draft, row.dataset.id, stop.dataset.id, stop.querySelector('[data-tc-students]')),
+      pendingStudentNames: transportDraftPendingStudentNames(draft, row.dataset.id, stop.dataset.id)
     }));
     const previousStops = Array.isArray(previous.stops) ? previous.stops : [];
     const routePlanChanged = baseAddressChanged || direction !== String(previous.direction || '') ||
@@ -7045,14 +7074,21 @@ function transportConfigValidation(config) {
       errors.push((routeRow.name || '이름 없는 노선') + ': 요일·방향·시간·차량·기사를 모두 입력해 주세요');
     }
     if (!(routeRow.stops || []).length) errors.push((routeRow.name || '이름 없는 노선') + ': 정류장을 하나 이상 추가해 주세요');
-    const assigned = [];
+    const assigned = [], pendingAssigned = [];
     (routeRow.stops || []).forEach(stop => {
       if (!stop.name || !stop.time) errors.push((routeRow.name || '노선') + ': 정류장 이름과 시간을 입력해 주세요');
       assigned.push(...(stop.studentIds || []));
+      pendingAssigned.push(...transportPendingStudentNames(stop));
     });
     if (new Set(assigned).size !== assigned.length) errors.push((routeRow.name || '노선') + ': 한 학생이 여러 정류장에 중복 배정됐습니다');
+    if (new Set(pendingAssigned).size !== pendingAssigned.length) errors.push((routeRow.name || '노선') + ': 명단 연결 대기 학생이 여러 정류장에 중복되었습니다');
+    const assignedNames = new Set(assigned.map(studentId => {
+      const student = rosterDb && (rosterDb.students || []).find(item => String(item.id) === String(studentId));
+      return student && String(student.name || '').trim();
+    }).filter(Boolean));
+    if (pendingAssigned.some(name => assignedNames.has(name))) errors.push((routeRow.name || '노선') + ': 원생 배정이 끝난 이름은 명단 연결 대기에서 완료 처리해 주세요');
     const vehicle = vehicles.get(routeRow.vehicleId);
-    if (vehicle && new Set(assigned).size > Number(vehicle.capacity)) errors.push((routeRow.name || '노선') + ': 차량 정원 ' + vehicle.capacity + '명을 초과했습니다');
+    if (vehicle && new Set(assigned).size + new Set(pendingAssigned).size > Number(vehicle.capacity)) errors.push((routeRow.name || '노선') + ': 차량 정원 ' + vehicle.capacity + '명을 초과했습니다');
   });
   return Array.from(new Set(errors));
 }
@@ -7125,6 +7161,7 @@ function transportConfigRowHtml(config, locked) {
       '<div class="sect">정류장·학생 배정</div>' + (routeRow.stops || []).map(stop => {
         const stopIndex = (routeRow.stops || []).indexOf(stop);
         const selectedIds = (stop.studentIds || []).map(String);
+        const pendingNames = session.isAdmin ? transportPendingStudentNames(stop) : [];
         const liveIds = new Set(liveStudents.map(student => String(student.id)));
         const missingIds = selectedIds.filter(studentId => !liveIds.has(studentId));
         return '<div class="transport-config-row" data-tc-stop data-id="' + esc(stop.id) + '"><div class="transport-stop-head"><b>' + (stopIndex + 1) + '번 정류장</b><div class="transport-stop-order" aria-label="정류장 순서 변경">' +
@@ -7136,6 +7173,9 @@ function transportConfigRowHtml(config, locked) {
           '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
             liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') +
             missingIds.map(studentId => '<option value="' + esc(studentId) + '" selected>명단 없음 · 기존 배정 유지 (' + esc(studentId) + ')</option>').join('') + '</select></label>' +
+          (pendingNames.length ? '<div class="hint mt8"><b>명단 연결 대기 · ' + pendingNames.length + '명</b><div class="small mt8">학생 배정에서 실제 원생을 선택한 뒤 해당 이름을 연결 완료 처리하세요.</div>' +
+            '<div class="transport-pending-list">' + pendingNames.map(name => '<div class="transport-pending-row"><span><b>' + esc(name) + '</b></span>' +
+              '<button class="btn btn-sm btn-ghost" data-act="transportpendingremove" data-route="' + esc(routeRow.id) + '" data-stop="' + esc(stop.id) + '" data-name="' + esc(name) + '"' + studentDisabled + '>연결 완료·제외</button></div>').join('') + '</div></div>' : '') +
           (missingIds.length ? '<div class="hint mt8"><b>학생 명단 새로고침 필요</b> — 명단에서 찾지 못한 기존 배정 ' + missingIds.length + '건을 삭제하지 않고 유지합니다.</div>' : '') +
           '<button class="btn btn-sm btn-ghost mt8" data-act="transportconfigdelete" data-kind="stop" data-route="' + esc(routeRow.id) + '" data-id="' + esc(stop.id) + '"' + disabled + '>정류장 삭제</button></div>';
       }).join('') +
@@ -7312,6 +7352,30 @@ async function addTransportDriver(button) {
   })();
   transportDriverPending.set(name, { id: pendingId, promise: pending });
   await pending;
+}
+
+function removeTransportPendingStudent(button) {
+  if (!session.isAdmin || transportHasRiders()) return toast('탑승 중인 학생이 있어 명단 연결 대기를 변경할 수 없습니다');
+  if (!transportRosterReady()) return toast('학생 명단을 불러온 뒤 연결 상태를 변경해 주세요');
+  const routeId = String(button && button.dataset.route || '');
+  const stopId = String(button && button.dataset.stop || '');
+  const name = String(button && button.dataset.name || '').trim();
+  if (!routeId || !stopId || !name) return toast('명단 연결 대상을 다시 확인해 주세요');
+  const config = captureTransportConfig();
+  const routeRow = (config.routes || []).find(item => String(item.id) === routeId);
+  const stop = routeRow && (routeRow.stops || []).find(item => String(item.id) === stopId);
+  if (!stop || !transportPendingStudentNames(stop).includes(name)) return toast('이미 처리됐거나 최신 설정이 아닙니다');
+  const selectedNames = new Set((stop.studentIds || []).map(studentId => {
+    const student = (rosterDb.students || []).find(item => String(item.id) === String(studentId));
+    return student && String(student.name || '').trim();
+  }).filter(Boolean));
+  const linked = selectedNames.has(name);
+  if (!linked && !confirm(name + ' 학생을 이 정류장의 원생 배정에서 찾지 못했습니다.\n실제 탑승 대상이 아니어서 대기 명단에서 제외하는 경우에만 계속하세요.')) return;
+  stop.pendingStudentNames = transportPendingStudentNames(stop).filter(item => item !== name);
+  transportConfigDraft = config; transportConfigDirty = true; transportOpenRouteId = routeId;
+  transportRestoreFocus = 'stop:' + stopId;
+  render();
+  toast(linked ? name + ' 학생의 명단 연결을 완료했습니다 — 전체 설정 저장으로 확정하세요' : name + ' 학생을 명단 연결 대기에서 제외했습니다 — 전체 설정 저장으로 확정하세요');
 }
 
 function mutateTransportConfig(kind, action, id, routeId, direction) {
@@ -9483,6 +9547,7 @@ document.addEventListener('click', ev => {
       transportRestoreFocus = 'driver-name'; render(); break;
     }
     case 'transportdriveradd': addTransportDriver(el); break;
+    case 'transportpendingremove': removeTransportPendingStudent(el); break;
     case 'transportplan': planTransportRoute(el); break;
     case 'transportgoogle': openTransportGoogleMap(el); break;
     case 'transportsave': saveTransportConfig(el); break;
@@ -10568,7 +10633,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.5';
+const APP_VER = '2026-08-12.6';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

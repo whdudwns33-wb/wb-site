@@ -164,10 +164,14 @@ function vehicle(value, index) {
 
 function stop(value, routeIndex, index) {
   const path = 'config.routes[' + routeIndex + '].stops[' + index + ']';
-  exactKeys(value, ['id', 'name', 'time', 'studentIds'], ['address'], path);
+  exactKeys(value, ['id', 'name', 'time', 'studentIds'], ['address', 'pendingStudentNames'], path);
   if (!HHMM.test(String(value.time || ''))) problem(path + '.time: HH:MM 형식이어야 합니다');
   if (!Array.isArray(value.studentIds) || value.studentIds.length > 100) {
     problem(path + '.studentIds: 최대 100명의 배열이어야 합니다');
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'pendingStudentNames') &&
+      (!Array.isArray(value.pendingStudentNames) || value.pendingStudentNames.length > 100)) {
+    problem(path + '.pendingStudentNames: 최대 100명의 배열이어야 합니다');
   }
   const result = {
     id: cleanId(value.id, path + '.id'),
@@ -177,6 +181,10 @@ function stop(value, routeIndex, index) {
   };
   if (Object.prototype.hasOwnProperty.call(value, 'address')) {
     result.address = cleanText(value.address, path + '.address', 200, true);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'pendingStudentNames')) {
+    result.pendingStudentNames = value.pendingStudentNames.map((name, studentIndex) =>
+      cleanText(name, path + '.pendingStudentNames[' + studentIndex + ']', 40));
   }
   return result;
 }
@@ -255,6 +263,7 @@ export function validateTransportConfig(raw, staffById, rosterById) {
     if (!staffById.has(item.driverId)) problem('config.routes.' + item.id + ': 활성 운전 담당자를 선택해 주세요');
     const stopIds = new Set();
     const routeStudents = new Set();
+    const routePendingStudentNames = new Set();
     let previousStopMinutes = minutesOf(item.startTime);
     for (const itemStop of item.stops) {
       if (stopIds.has(itemStop.id)) problem('config.routes.' + item.id + ': 중복 정류장 ID가 있습니다: ' + itemStop.id);
@@ -276,11 +285,26 @@ export function validateTransportConfig(raw, staffById, rosterById) {
           }
         }
       }
+      for (const pendingName of (itemStop.pendingStudentNames || [])) {
+        if (routePendingStudentNames.has(pendingName)) {
+          problem('config.routes.' + item.id + ': 배정 대기 학생이 두 정류장에 중복됐습니다: ' + pendingName);
+        }
+        routePendingStudentNames.add(pendingName);
+      }
+    }
+    const linkedStudentNames = new Set([...routeStudents].map(studentId => {
+      const student = rosterById.get(studentId);
+      return student && typeof student.name === 'string' ? student.name.trim() : '';
+    }).filter(Boolean));
+    for (const pendingName of routePendingStudentNames) {
+      if (linkedStudentNames.has(pendingName)) {
+        problem('config.routes.' + item.id + ': 이미 명단에 연결된 학생을 배정 대기로 중복 저장할 수 없습니다: ' + pendingName);
+      }
     }
     if (item.plan && minutesOf(item.startTime) + item.plan.serviceMinutes < previousStopMinutes) {
       problem('config.routes.' + item.id + ': 지도 계산 시간이 마지막 정류장 시간보다 짧을 수 없습니다');
     }
-    if (routeStudents.size > assignedVehicle.capacity) {
+    if (routeStudents.size + routePendingStudentNames.size > assignedVehicle.capacity) {
       problem('config.routes.' + item.id + ': 탑승 학생 수가 차량 정원을 초과합니다');
     }
     if (item.plan && minutesOf(item.startTime) + item.plan.serviceMinutes > 1439) {
@@ -375,10 +399,12 @@ function scopedConfig(config, auth, drivers) {
 
 function routeForOwn(item) {
   const { plan: _plan, ...routeItem } = item;
+  const pendingCount = item.stops.reduce((total, stopItem) => total +
+    (Array.isArray(stopItem.pendingStudentNames) ? stopItem.pendingStudentNames.length : 0), 0);
   return {
-    ...routeItem,
+    ...routeItem, pendingCount,
     stops: item.stops.map(stopItem => {
-      const { address: _address, ...safeStop } = stopItem;
+      const { address: _address, pendingStudentNames: _pendingStudentNames, ...safeStop } = stopItem;
       return safeStop;
     })
   };
@@ -640,6 +666,11 @@ async function listTransport(env, body, auth) {
     for (const student of item.students) statusByKey.set(item.id + '|' + student.id, student.status);
   }
   const expected = statusByKey.size;
+  // 명단 ID가 확정되지 않은 탑승자는 실제 승·하차 대상으로 계산하지 않되,
+  // 관리 현황이 완료로 잘못 표시되지 않도록 별도 대기 건수로 계산한다.
+  const pendingAssignments = dayRoutes.reduce((routeTotal, routeItem) => routeTotal +
+    routeItem.stops.reduce((stopTotal, stopItem) => stopTotal +
+      (Array.isArray(stopItem.pendingStudentNames) ? stopItem.pendingStudentNames.length : 0), 0), 0);
   for (const warning of warnings) {
     if (warning.code === 'ORPHAN_BOARDED') {
       statusByKey.set(warning.routeId + '|' + warning.studentId, 'boarded');
@@ -672,7 +703,8 @@ async function listTransport(env, body, auth) {
   const response = {
     ok: true, date, config: scopedConfig(loaded.config, auth, drivers), routes,
     states: rows.map(row => stateView(row, auth.scope === 'all')), revision: loaded.revision,
-    warnings, summary: { expected, ...counts, completed: expected > 0 && counts.scheduled === 0 && counts.boarded === 0 }
+    warnings, summary: { expected, pendingAssignments, ...counts,
+      completed: expected > 0 && pendingAssignments === 0 && counts.scheduled === 0 && counts.boarded === 0 }
   };
   if (auth.scope === 'all') {
     response.unresolved = unresolved;

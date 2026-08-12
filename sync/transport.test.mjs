@@ -208,6 +208,51 @@ test('only all-scope replaces config and validation rejects capacity, inactive r
   assert.equal((await replace(db)).status, 200);
 });
 
+test('pending rider names are bounded, count toward capacity, and stay separate from live riders', async () => {
+  const db = new TestD1(); seed(db);
+  const pendingOnly = configFixture();
+  pendingOnly.routes[0].stops[0].studentIds = [];
+  pendingOnly.routes[0].stops[0].pendingStudentNames = ['명단연결대기'];
+  pendingOnly.routes[1].stops[0].studentIds = [];
+  pendingOnly.routes[1].stops[0].pendingStudentNames = [];
+  const saved = await replace(db, pendingOnly);
+  assert.equal(saved.status, 200);
+
+  const adminView = await call(db, { auth: admin, action: 'list', date: today });
+  assert.deepEqual(adminView.body.config.routes[0].stops[0].pendingStudentNames, ['명단연결대기']);
+  assert.deepEqual(adminView.body.routes[0].stops[0].pendingStudentNames, ['명단연결대기']);
+  assert.equal(adminView.body.summary.expected, 0);
+  assert.equal(adminView.body.summary.pendingAssignments, 1);
+  assert.equal(adminView.body.summary.completed, false);
+
+  const driverView = await call(db, { auth: person('driver-a', 'token-a'), action: 'list', date: today });
+  assert.equal(Object.hasOwn(driverView.body.config.routes[0].stops[0], 'pendingStudentNames'), false);
+  assert.equal(Object.hasOwn(driverView.body.routes[0].stops[0], 'pendingStudentNames'), false);
+  assert.equal(driverView.body.config.routes[0].pendingCount, 1);
+  assert.equal(driverView.body.routes[0].pendingCount, 1);
+  assert.equal(driverView.body.summary.pendingAssignments, 1);
+  assert.doesNotMatch(JSON.stringify(driverView.body), /명단연결대기/);
+
+  const wrongType = configFixture();
+  wrongType.routes[0].stops[0].pendingStudentNames = '배열아님';
+  assert.match((await replace(db, wrongType, saved.body.revision)).body.error, /pendingStudentNames/);
+
+  const overCapacity = configFixture();
+  overCapacity.routes[0].stops[0].pendingStudentNames = ['대기A', '대기B'];
+  assert.match((await replace(db, overCapacity, saved.body.revision)).body.error, /정원/);
+
+  const duplicate = configFixture();
+  duplicate.routes[0].stops.push({
+    id: 'stop-a2', name: '두 번째', time: '19:20', studentIds: [], pendingStudentNames: ['대기학생']
+  });
+  duplicate.routes[0].stops[0].pendingStudentNames = ['대기학생'];
+  assert.match((await replace(db, duplicate, saved.body.revision)).body.error, /배정 대기 학생이 두 정류장에 중복/);
+
+  const alreadyLinked = configFixture();
+  alreadyLinked.routes[0].stops[0].pendingStudentNames = ['가학생'];
+  assert.match((await replace(db, alreadyLinked, saved.body.revision)).body.error, /이미 명단에 연결/);
+});
+
 test('config accepts optional route-planning fields and rejects unsafe schedules and duplicate plates', async () => {
   const db = new TestD1(); seed(db);
   const valid = configFixture();
