@@ -508,6 +508,18 @@
   .transport-datebar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .transport-datebar .btn { min-height: 44px; }
   .transport-datebar strong { color: var(--navy); text-align: center; }
+  .transport-run-board { border-color: #B9DDF0; }
+  .transport-run-board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .transport-run-board-head .btn { min-height: 44px; flex: 0 0 auto; }
+  .transport-run-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .transport-run-item { min-width: 0; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); }
+  .transport-run-item.is-running { border-color: #8DCAE5; background: #F0F9FF; }
+  .transport-run-item.is-attention { border-color: #F3B8B0; background: #FFF7F5; }
+  .transport-run-item.is-completed { border-color: #BBE3C7; background: #F3FBF5; }
+  .transport-run-title { min-width: 0; color: var(--navy); font-size: 13px; font-weight: 900; overflow-wrap: anywhere; }
+  .transport-run-meta { margin-top: 5px; color: var(--mid-gray); font-size: 11px; font-weight: 700; line-height: 1.5; }
+  .transport-run-progress { margin-top: 7px; color: var(--navy); font-size: 11px; font-weight: 800; }
+  .transport-run-item .pill.ok { background: #ECFDF3; color: var(--green); }
   .transport-route-card { margin-bottom: 0; }
   .transport-route-card.is-riding { border: 2px solid var(--coral); box-shadow: 0 5px 16px rgba(232,93,74,.14); }
   .transport-route-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
@@ -616,6 +628,8 @@
     .ops-toolbar .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
     .ops-toolbar .chip { min-height: 44px; padding: 6px 3px; }
     .book-issue-grid, .transport-route-grid { grid-template-columns: 1fr; }
+    .transport-run-list { grid-template-columns: 1fr; }
+    .transport-run-board-head { align-items: stretch; }
     .transport-config-grid { grid-template-columns: 1fr; }
     .session-pack-create, .session-pack-grid { grid-template-columns: 1fr; }
     .session-pack-actions { display: grid; grid-template-columns: 1fr; }
@@ -675,10 +689,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-12.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.4"></script>
-<script src="./asset-core.js?v=2026-08-12.4"></script>
-<script src="./qr-core.js?v=2026-08-12.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.5"></script>
+<script src="./asset-core.js?v=2026-08-12.5"></script>
+<script src="./qr-core.js?v=2026-08-12.5"></script>
 <script>
 "use strict";
 
@@ -1232,7 +1246,7 @@ const onboardingPatchSequence = new Map();
 const onboardingServerConfirmedAt = new Map();
 let bookIssueRows = [], bookIssueLoaded = false, bookIssueLoading = false, bookIssueError = '';
 let bookIssueFilter = 'all', bookIssueSearchQuery = '', bookIssueRestoreFocus = null;
-let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoading = false, transportError = '';
+let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoadedAt = 0, transportLoading = false, transportError = '';
 let transportRestoreFocus = null, transportConfigDraft = null, transportConfigDirty = false, transportConfigRevisionConflict = false;
 let transportOpenRouteId = '', transportDriverTargetRoute = '', transportPlannerBusyRoute = '';
 const transportDriverPending = new Map();
@@ -1301,7 +1315,7 @@ function resetPersonCache(token) {
   beForm = null;
   bookIssueRows = []; bookIssueLoaded = false; bookIssueLoading = false; bookIssueError = '';
   bookIssueFilter = 'all'; bookIssueSearchQuery = ''; bookIssueRestoreFocus = null;
-  transportDate = today(); transportData = null; transportLoadedDate = ''; transportLoading = false;
+  transportDate = today(); transportData = null; transportLoadedDate = ''; transportLoadedAt = 0; transportLoading = false;
   transportError = ''; transportRestoreFocus = null; transportConfigDraft = null; transportConfigDirty = false; transportConfigRevisionConflict = false;
   transportOpenRouteId = ''; transportDriverTargetRoute = ''; transportPlannerBusyRoute = '';
   transportDriverPending.clear(); transportRouteDwellMinutes.clear();
@@ -6317,6 +6331,10 @@ const TRANSPORT_NOTIFICATION_STATUS = {
   skipped: ['카톡 미발송', 'is-alert'],
   blocked: ['카톡 미발송 · 관리자 확인', 'is-alert']
 };
+const TRANSPORT_RUN_STATUS = {
+  upcoming: ['운행 전', 'warn'], running: ['운행 중', ''],
+  attention: ['확인 필요', 'bad'], completed: ['운행 종료', 'ok'], empty: ['배정 없음', '']
+};
 
 function deepCopy(value) { return JSON.parse(JSON.stringify(value || {})); }
 function transportSafeId(prefix) { return prefix + '-' + uid().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24); }
@@ -6481,6 +6499,7 @@ async function loadTransport(date, force, throwOnError) {
       revision: latestRevision
     };
     transportLoadedDate = date;
+    transportLoadedAt = now();
     if (preservedDraft) {
       transportConfigDraft = preservedDraft;
       if (latestRevision !== draftRevision) transportConfigRevisionConflict = true;
@@ -6513,6 +6532,110 @@ function transportProjectedRows() {
     });
   });
   return out;
+}
+
+function transportTimeMinutes(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return -1;
+  const hour = Number(match[1]), minute = Number(match[2]);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? hour * 60 + minute : -1;
+}
+
+function transportMinuteLabel(value) {
+  if (!Number.isFinite(value) || value < 0) return '';
+  const minutes = Math.min(1439, Math.floor(value));
+  return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
+}
+
+function transportRouteEndMinutes(routeRow) {
+  const start = transportTimeMinutes(routeRow && (routeRow.startTime || routeRow.time));
+  let end = start;
+  (routeRow && Array.isArray(routeRow.stops) ? routeRow.stops : []).forEach(stop => {
+    end = Math.max(end, transportTimeMinutes(stop && stop.time));
+  });
+  const serviceMinutes = Number(routeRow && routeRow.plan && routeRow.plan.serviceMinutes);
+  const hasPlan = routeRow && routeRow.plan && Number.isFinite(serviceMinutes) && serviceMinutes >= 0;
+  if (start >= 0 && hasPlan) end = Math.max(end, start + serviceMinutes);
+  else if (String(routeRow && routeRow.direction || '') === 'pickup' && end >= 0) end += 20;
+  return end;
+}
+
+function transportRouteEndIsEstimated(routeRow) {
+  return String(routeRow && routeRow.direction || '') === 'pickup' &&
+    !(routeRow && routeRow.plan && Number.isFinite(Number(routeRow.plan.serviceMinutes)) && Number(routeRow.plan.serviceMinutes) >= 0);
+}
+
+function transportRouteCompletionAt(rows) {
+  return (Array.isArray(rows) ? rows : []).reduce((latest, row) => {
+    const state = row && row.stateRow && typeof row.stateRow === 'object' ? row.stateRow : {};
+    const at = row.status === 'dropped' ? Number(state.droppedAt || state.dropped_at) :
+      row.status === 'absent' ? Number(state.absentAt || state.absent_at) : 0;
+    return Number.isFinite(at) && at > latest ? at : latest;
+  }, 0);
+}
+
+function transportRouteRunStatus(routeRow, rows, selectedDate, currentDate, currentTime, orphanBoarded) {
+  rows = Array.isArray(rows) ? rows : [];
+  orphanBoarded = Math.max(0, Number(orphanBoarded) || 0);
+  if (!rows.length && !orphanBoarded) return 'empty';
+  if (orphanBoarded) return 'attention';
+  if (selectedDate > currentDate) {
+    return rows.some(row => row.status !== 'scheduled') ? 'attention' : 'upcoming';
+  }
+  if (rows.every(row => row.status === 'dropped' || row.status === 'absent')) return 'completed';
+  if (selectedDate < currentDate) return 'attention';
+  const start = transportTimeMinutes(routeRow && (routeRow.startTime || routeRow.time));
+  const end = transportRouteEndMinutes(routeRow);
+  const current = transportTimeMinutes(currentTime);
+  if (start < 0 || end < 0 || current < 0) return 'attention';
+  if (current > end + 15) return 'attention';
+  if (rows.some(row => row.status !== 'scheduled')) return 'running';
+  if (current < start) return 'upcoming';
+  return 'running';
+}
+
+function transportRunDashboard(routes, stateByRoute, orphanBoardedByRoute) {
+  const seoulNow = seoulNowParts(), currentDate = seoulNow.date, currentTime = seoulNow.label;
+  const loadedLabel = transportLoadedAt ? new Date(transportLoadedAt).toLocaleTimeString('ko-KR', {
+    timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit'
+  }) : '확인 중';
+  const statusRank = { attention: 0, running: 1, upcoming: 2, completed: 3, empty: 4 };
+  const items = routes.map(routeRow => {
+    const routeId = String(routeRow.id || routeRow.routeId || '');
+    const rows = stateByRoute.get(routeId) || [];
+    const orphanBoarded = Number(orphanBoardedByRoute && orphanBoardedByRoute.get(routeId)) || 0;
+    const key = transportRouteRunStatus(routeRow, rows, transportDate, currentDate, currentTime, orphanBoarded);
+    const completed = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
+    return { route: routeRow, rows: rows, key: key, completed: completed, orphanBoarded: orphanBoarded,
+      completionAt: transportRouteCompletionAt(rows) };
+  }).sort((a, b) => statusRank[a.key] - statusRank[b.key] ||
+    transportTimeMinutes(a.route.startTime || a.route.time) - transportTimeMinutes(b.route.startTime || b.route.time) ||
+    String(a.route.name || '').localeCompare(String(b.route.name || ''), 'ko'));
+  let h = '<section class="card transport-run-board" aria-labelledby="transportRunBoardTitle"><div class="transport-run-board-head"><div>' +
+    '<div class="card-title" id="transportRunBoardTitle">기사·코스별 운행 현황판</div>' +
+    '<div class="card-sub">코스의 전체 학생이 하차 또는 미탑승 처리되면 운행 종료로 표시됩니다. 마지막 갱신 ' + esc(loadedLabel) + '</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="transportrefresh">현황 새로고침</button></div>';
+  if (!items.length) return h + '<div class="empty"><b>🚐</b>이 날짜에 확인할 운행이 없습니다.</div></section>';
+  h += '<div class="transport-run-list" aria-live="polite">' + items.map(item => {
+    const routeRow = item.route, status = TRANSPORT_RUN_STATUS[item.key];
+    const vehicle = transportVehicle(routeRow), driver = transportDriver(routeRow);
+    const start = transportTimeMinutes(routeRow.startTime || routeRow.time);
+    const end = transportRouteEndMinutes(routeRow);
+    const estimated = transportRouteEndIsEstimated(routeRow);
+    const timeRange = start < 0 ? '시간 미입력' : transportMinuteLabel(start) +
+      (end > start ? '–' + transportMinuteLabel(end) + (estimated ? ' 예상' : '') : '');
+    const completion = item.key === 'completed'
+      ? (item.completionAt ? ' · 종료 ' + new Date(item.completionAt).toLocaleTimeString('ko-KR', {
+        timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit'
+      }) : ' · 종료 시각 미기록') : '';
+    const orphanWarning = item.orphanBoarded ? ' · 연결 확인 ' + item.orphanBoarded + '건' : '';
+    return '<article class="transport-run-item is-' + item.key + '"><div class="between"><div class="transport-run-title">' +
+      esc(routeRow.name || '노선 이름 미입력') + '</div><span class="pill ' + status[1] + '">' + status[0] + '</span></div>' +
+      '<div class="transport-run-meta">' + esc(timeRange) + ' · 기사 ' + esc(driver && driver.name || routeRow.driverName || '미지정') +
+      ' · 차량 ' + esc(vehicle && (vehicle.name || vehicle.label) || routeRow.vehicleName || '미지정') + '</div>' +
+      '<div class="transport-run-progress">확인 완료 ' + item.completed + '/' + item.rows.length + '명' + esc(completion + orphanWarning) + '</div></article>';
+  }).join('') + '</div></section>';
+  return h;
 }
 
 function transportUnmatchedStates() {
@@ -7267,6 +7390,13 @@ function viewTransport() {
       esc(row.studentId || row.student_id || '') + '" data-rev="' + (Number(row.revision) || 0) + '">확인 후 상태 정리</button></div>').join('') : '') + '</section>';
   const stateByRoute = new Map();
   rows.forEach(row => { if (!stateByRoute.has(row.routeId)) stateByRoute.set(row.routeId, []); stateByRoute.get(row.routeId).push(row); });
+  const orphanBoardedByRoute = new Map();
+  unmatched.forEach(row => {
+    if (String(row.date || transportDate) !== transportDate || normalizeTransportStatus(row.status) !== 'boarded') return;
+    const routeId = String(row.routeId || row.route_id || '');
+    if (routeId) orphanBoardedByRoute.set(routeId, (orphanBoardedByRoute.get(routeId) || 0) + 1);
+  });
+  h += transportRunDashboard(routes, stateByRoute, orphanBoardedByRoute);
   const displayRoutes = routes.slice().sort((a, b) => {
     const aRows = stateByRoute.get(String(a.id || a.routeId || '')) || [];
     const bRows = stateByRoute.get(String(b.id || b.routeId || '')) || [];
@@ -10438,7 +10568,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.4';
+const APP_VER = '2026-08-12.5';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

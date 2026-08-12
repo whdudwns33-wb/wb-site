@@ -320,6 +320,54 @@ test('transport prioritizes onboarded students and exposes orphan state and capa
   assert.match(html, /\.package-states \.btn \{ min-width: 0; min-height: 44px/);
 });
 
+test('transport run dashboard derives honest course status without extra PII or storage', () => {
+  const source = block('function transportTimeMinutes(', 'function transportUnmatchedStates(');
+  const view = block('function viewTransport()', '/* ── 원생 현황');
+  const helpers = new Function(source + '; return {status:transportRouteRunStatus,end:transportRouteEndMinutes,' +
+    'estimated:transportRouteEndIsEstimated,completion:transportRouteCompletionAt};')();
+  const status = helpers.status;
+  const route = { startTime: '17:00', stops: [{ time: '17:30' }], plan: { serviceMinutes: 20 } };
+  const rows = values => values.map(value => ({ status: value }));
+
+  assert.equal(status(route, [], '2026-08-12', '2026-08-12', '17:10'), 'empty');
+  assert.equal(status(route, rows(['dropped', 'absent']), '2026-08-11', '2026-08-12', '18:00'), 'completed');
+  assert.equal(status(route, rows(['boarded']), '2026-08-11', '2026-08-12', '18:00'), 'attention');
+  assert.equal(status(route, rows(['scheduled']), '2026-08-11', '2026-08-12', '18:00'), 'attention');
+  assert.equal(status(route, rows(['scheduled']), '2026-08-13', '2026-08-12', '18:00'), 'upcoming');
+  assert.equal(status(route, rows(['dropped']), '2026-08-13', '2026-08-12', '18:00'), 'attention');
+  assert.equal(status(route, rows(['scheduled']), '2026-08-12', '2026-08-12', '16:59'), 'upcoming');
+  assert.equal(status(route, rows(['boarded']), '2026-08-12', '2026-08-12', '16:59'), 'running');
+  assert.equal(status(route, rows(['scheduled']), '2026-08-12', '2026-08-12', '17:10'), 'running');
+  assert.equal(status(route, rows(['scheduled']), '2026-08-12', '2026-08-12', '17:46'), 'attention');
+  assert.equal(status(route, rows(['boarded']), '2026-08-12', '2026-08-12', '17:46'), 'attention');
+  assert.equal(status(route, rows(['dropped', 'scheduled']), '2026-08-12', '2026-08-12', '17:10'), 'running');
+  assert.equal(status(route, [], '2026-08-12', '2026-08-12', '17:10', 1), 'attention');
+  const pickup = { direction: 'pickup', startTime: '17:00', stops: [{ time: '17:30' }] };
+  assert.equal(helpers.end(pickup), 17 * 60 + 50);
+  assert.equal(helpers.estimated(pickup), true);
+  assert.equal(helpers.completion([
+    { status: 'dropped', stateRow: { droppedAt: 1000 } },
+    { status: 'absent', stateRow: { absentAt: 2000 } }
+  ]), 2000);
+
+  assert.match(source, /기사·코스별 운행 현황판/);
+  assert.match(source, /마지막 갱신/);
+  assert.match(source, /const seoulNow = seoulNowParts\(\)/);
+  assert.match(source, /timeZone: 'Asia\/Seoul'/);
+  assert.match(source, /data-act="transportrefresh"/);
+  assert.match(source, /확인 완료 ' \+ item\.completed \+ '\/' \+ item\.rows\.length \+ '명'/);
+  assert.match(source, /예상/);
+  assert.match(source, /종료 시각 미기록/);
+  assert.match(source, /new Date\(item\.completionAt\)\.toLocaleTimeString/);
+  assert.match(source, /연결 확인 ' \+ item\.orphanBoarded \+ '건/);
+  assert.doesNotMatch(source, /guardianPhone|student\.name|\.address/);
+  assert.match(view, /orphanBoardedByRoute/);
+  assert.match(view, /String\(row\.date \|\| transportDate\) !== transportDate/);
+  assert.match(view, /transportRunDashboard\(routes, stateByRoute, orphanBoardedByRoute\)/);
+  assert.match(html, /\.transport-run-list \{ display: grid; grid-template-columns: repeat\(2/);
+  assert.match(html, /\.transport-run-list \{ grid-template-columns: 1fr; \}/);
+});
+
 test('transport config fails closed until the private roster is available', () => {
   const capture = block('function transportRosterReady()', 'function transportConfigValidation(');
   const config = block('function transportConfigRowHtml(', 'async function saveTransportConfig(');
