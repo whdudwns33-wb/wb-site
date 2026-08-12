@@ -23,6 +23,19 @@ test('every QR action in the markup has a handler', () => {
   });
 });
 
+test('staff popups use the browser top layer and stay on the current tab', () => {
+  assert.match(html, /<dialog id="modalHost" class="modal"/);
+  assert.match(html, /typeof host\.showModal === 'function'/);
+  assert.match(html, /host\.showModal\(\)/);
+  assert.match(html, /\.modal\[open\] \{ display: grid; \}/);
+  const modalFn = html.match(/function modal\(title, bodyHtml, footHtml\) \{[\s\S]*?\n\}/);
+  assert.ok(modalFn, 'shared modal function found');
+  assert.doesNotMatch(modalFn[0], /\bgo\(|location\.hash|route\s*=/, 'opening a popup must not navigate away');
+  const manageFn = html.match(/function manageTasks\(staffId\) \{[\s\S]*?\n\}/);
+  assert.ok(manageFn, 'instruction-list popup found');
+  assert.match(manageFn[0], /modal\(/, 'instruction list uses the same top-layer popup');
+});
+
 /* 링크는 1회용 코드를 담는다. 코드를 먼저 발급하지 않으면 이미 소모된
    링크가 QR에 박혀 태블릿에서 연결이 안 된다. */
 test('the QR is drawn only after a fresh code is issued', () => {
