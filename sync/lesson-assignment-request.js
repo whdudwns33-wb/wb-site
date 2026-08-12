@@ -99,8 +99,10 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
     let document;
     try { document = JSON.parse(rosterRow.data || '{}'); } catch (error) { document = null; }
     const student = document && document.roster && Array.isArray(document.roster.students) && document.roster.students.find(item => item && item.id === studentId);
-    if (!student || normalize(student.name) !== normalize(current.student_name) || normalize(student.grade) !== normalize(current.grade)) {
-      return json({ ok: false, error: '요청 내용과 일치하는 현재 원생을 선택해 주세요' }, 409, origin);
+    if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 다시 선택해 주세요' }, 409, origin);
+    const identityMismatch = normalize(student.name) !== normalize(current.student_name) || normalize(student.grade) !== normalize(current.grade);
+    if (identityMismatch && body.confirmIdentityMismatch !== true) {
+      return json({ ok: false, code: 'IDENTITY_CONFIRM_REQUIRED', error: '요청 이름·학년과 선택한 원생이 달라 확인이 필요합니다' }, 409, origin);
     }
     const ids = Array.isArray(student.teacherIds) ? student.teacherIds : [];
     if (!ids.includes(String(current.staff_id))) student.teacherIds = ids.concat(String(current.staff_id));

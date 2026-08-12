@@ -692,10 +692,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-12.6"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.6"></script>
-<script src="./asset-core.js?v=2026-08-12.6"></script>
-<script src="./qr-core.js?v=2026-08-12.6"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.8"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.8"></script>
+<script src="./asset-core.js?v=2026-08-12.8"></script>
+<script src="./qr-core.js?v=2026-08-12.8"></script>
 <script>
 "use strict";
 
@@ -2557,6 +2557,14 @@ async function reviewLessonAssignment(action, button) {
     const select = document.querySelector('[data-lar-student][data-key="' + CSS.escape(key) + '"]');
     body.studentId = select && select.value;
     if (!body.studentId) return toast('현재 원생 명단에서 학생을 선택해 주세요');
+    const request = lessonAssignmentRequests.find(row => row.requestKey === key);
+    const student = rosterDb && (rosterDb.students || []).find(row => String(row.id) === String(body.studentId));
+    if (!request || !student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
+    const same = value => String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
+    if (same(request.studentName) !== same(student.name) || same(request.grade) !== same(student.grade)) {
+      if (!confirm('요청 정보는 “' + request.studentName + ' · ' + request.grade + '”이고 선택한 원생은 “' + student.name + ' · ' + student.grade + '”입니다. 같은 학생이 맞습니까?')) return;
+      body.confirmIdentityMismatch = true;
+    }
   } else {
     const note = prompt('반려 사유를 입력해 주세요');
     if (note == null) return;
@@ -2588,13 +2596,19 @@ function lessonAssignmentReviewHtml() {
   if (!session.isAdmin) return '';
   const pending = lessonAssignmentRequests.filter(row => row.status === 'approval_waiting');
   if (!pending.length) return '';
+  if (!rosterDb) return '<section class="card lesson-review"><div class="card-title">👥 담당 학생 배정 요청</div><div class="card-sub">현재 원생 명단을 불러온 뒤 승인할 수 있습니다.</div>' +
+    (rosterErr ? '<button class="btn btn-primary mt14" data-act="rosterretry">원생 명단 다시 불러오기</button>' : '<div class="hint mt14">원생 명단을 불러오는 중입니다.</div>') + '</section>';
   const students = activeIn(today().slice(0, 7));
   return '<section class="card lesson-review"><div class="between"><div><div class="card-title">👥 담당 학생 배정 요청</div><div class="card-sub">승인하면 해당 선생님 개인 링크의 원생·수업 등록 목록에 즉시 반영됩니다.</div></div><span class="pill warn">' + pending.length + '건</span></div>' +
     pending.map(row => {
       const matches = students.filter(student => String(student.name).normalize('NFKC').replace(/\s+/g, '') === String(row.studentName).normalize('NFKC').replace(/\s+/g, '') && String(student.grade).normalize('NFKC').replace(/\s+/g, '') === String(row.grade).normalize('NFKC').replace(/\s+/g, ''));
-      return '<div class="card mt14"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><div class="small muted mt8">요청 선생님 ID: ' + esc(row.staffId) + '</div>' +
+      const matchIds = new Set(matches.map(student => student.id));
+      const others = students.filter(student => !matchIds.has(student.id)).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+      const teacher = staffById(row.staffId);
+      return '<div class="card mt14"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
         '<select class="in mt8" data-lar-student data-key="' + esc(row.requestKey) + '"><option value="">현재 원생 선택</option>' +
-          matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</select>' +
+          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') +
+          (others.length ? '<optgroup label="그 외 현재 재원생">' + others.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
         '<div class="row mt8"><button class="btn btn-primary" data-act="lessonassignmentapprove" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">승인</button><button class="btn btn-ghost" data-act="lessonassignmentreject" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">반려</button></div></div>';
     }).join('') + '</section>';
 }
@@ -10756,7 +10770,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.7';
+const APP_VER = '2026-08-12.8';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

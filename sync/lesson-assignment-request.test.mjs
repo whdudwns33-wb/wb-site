@@ -75,3 +75,14 @@ test('approval refuses a student identity different from the request', async () 
   assert.equal(response.status, 409);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, []);
 });
+
+test('director can explicitly confirm a different request spelling against a selected stable student', async () => {
+  const db = new DB();
+  const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', { action:'submit', studentName:'학생', grade:'4' }, '*', own, json));
+  const approved = await body(await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:submitted.request.requestKey, revision:1,
+    studentId:'student-1', confirmIdentityMismatch:true
+  }, '*', all, json));
+  assert.equal(approved.ok, true);
+  assert.deepEqual(db.roster.roster.students[0].teacherIds, ['teacher-1']);
+});
