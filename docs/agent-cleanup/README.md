@@ -126,38 +126,20 @@ Gmail·Drive의 주 사용처였고, 13개 스킬이 의존하고 있었다.
 
 ## 남은 정리 후보 (미실행)
 
-### 🔴 유령 참조 — 존재하지 않는 스킬을 가리키는 참조 156회
+### 유령 참조 — [`GHOST-REFS.md`](./GHOST-REFS.md) 참조
 
-정리 후 92개 스킬 전체를 스캔한 결과, **한 번도 존재한 적 없는 스킬 이름 60종을 156회 참조**하고 있다.
-(승계 이력으로 일부러 남긴 폐지 스킬 언급은 제외한 수치다.)
+92개를 전수 스캔해 **존재하지 않는 스킬 27종을 100회 참조**하는 것을 확인했다.
+(초기 보고의 "60종 156회"에는 의도적으로 남긴 승계 이력과 경로 플레이스홀더가 섞여 있었다 — 정정.)
 
-가장 시급한 것부터:
+| 갈래 | 종 | 회 | 상태 |
+|---|---:|---:|---|
+| A. 만들어야 할 것 (채널 4종, agent-design-canva) | 5 | 34 | 판단 필요 |
+| B-1. 이름만 교정 | 7 | 21 | ✅ 적용 완료 |
+| B-2. 통합 대상 (n8n 4종, agent-idea) | 5 | 19 | 판단 필요 |
+| C. 지울 것 (agent-cto 팀맵 계획 스킬) | 8 | 22 | 판단 필요 |
+| D. `agent-crisis` 안전 경로 | 1 | 2 | ✅ 처리 완료 |
 
-| 유령 스킬 | 참조 | 참조하는 곳 | 성격 |
-|---|---:|---|---|
-| **`agent-crisis`** | 2 | agent-coo 라우팅표 | **"위기·자해·신고 → agent-crisis 즉시"** — 안전 관련 경로가 끊겨 있다 |
-| `agent-design-canva` | 13 | agent-cto, agent-design, agent-image-gen, hr-recruiter | agent-image-gen이 "복잡한 레이아웃은 이쪽"이라며 넘김 |
-| 채널 4종<br>(`agent-channel-blog`·`-cafe`·`-insta`·`-karrot`) | 21 | agent-qa, agent-marketing, agent-design, agent-email | agent-qa가 "발행 준비 완료 선언 시" 받는 대상 전부 |
-| n8n 4종 | 13 | agent-cto, agent-make | |
-| 스킬 운영 5종 | 11 | agent-cto | |
-| CS·운영 6종 | 16 | agent-voc | agent-voc의 위임 대상이 전부 없음 |
-| `agent-scanner`·`agent-scan`·`agent-docs-manager` | 17 | agent-cto 외 | |
-| `agent-idea` | 7 | agent-hr, agent-voc | "아이디어:" 캡처 대상 |
-
-**의미** — 이 경로들이 발동하면 Claude는 없는 스킬을 찾다가 흐지부지되거나 직접 처리합니다.
-특히 `agent-crisis`는 위기 대응 경로라 우선 확인이 필요합니다.
-셋 중 하나를 택하면 됩니다: **(a) 해당 스킬을 실제로 만든다 / (b) 참조를 실존 스킬로 바꾼다 / (c) 참조를 지운다.**
-
-### 참조되지 않는 스킬 11개
-
-`agent-voc`, `agent-editor`, `agent-review`, `agent-expansion`,
-`agent-academy-ops-automation-manager`, `agent-center-ops-automation-manager`,
-`agent-center-privacy-guard`, `agent-exam-author`, `daangn-video-ad`,
-`wb-flow-shortform`, `session-start`.
-
-다른 스킬이 라우팅하지 않는다는 뜻일 뿐, 직접 호출형(`daangn-video-ad`, `wb-flow-shortform`,
-`agent-exam-author`, `session-start`)은 정상이다. **`agent-voc`는 검토가 필요하다** —
-아무도 호출하지 않는데 자기 위임 대상 6종도 전부 존재하지 않는다.
+**적용 후 20종 79회 남음.** 갈래별 근거·선택지는 [`GHOST-REFS.md`](./GHOST-REFS.md)에 있다.
 
 ### 기타
 
