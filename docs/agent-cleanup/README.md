@@ -11,9 +11,9 @@ Claude 에이전트 시스템에서 **매 세션 시스템 프롬프트에 상�
 
 | 지표 | 이전 | 이후 | 변화 |
 |---|---:|---:|---:|
-| 스킬 수 | 118 | 93 | −25 |
-| 상시 로드 description | 45,265자 | 27,747자 | **−39%** |
-| 추정 토큰 | ~30,000 | ~18,500 | **−11,500** |
+| 스킬 수 | 118 | 92 | −26 |
+| 상시 로드 description | 45,265자 | 27,567자 | **−39%** |
+| 추정 토큰 | ~30,000 | ~18,400 | **−11,600** |
 | YAML 파싱 실패 스킬 | 5 | 0 | −5 |
 | 손상 파일(널 패딩) | 1 | 0 | −1 |
 
@@ -65,6 +65,17 @@ Claude 에이전트 시스템에서 **매 세션 시스템 프롬프트에 상�
 병합본 구성 — CHO 팀 구성·오케스트레이션 원칙(구 hr-cho) + 공통 본문 0~12장 + 보고 형식 원칙(구 agent-hr).
 양쪽 원본 호출 트리거는 본문 `## 호출 트리거 (원본 보존)`에 모두 남겼다.
 
+### ③-3 비서 계층 → agent-google 통합
+
+`agent-secretary`는 Google Calendar 생성·수정·삭제의 **유일한 주체**이면서
+Gmail·Drive의 주 사용처였고, 13개 스킬이 의존하고 있었다.
+`agent-google`이 이미 Google 생태계 전담이면서 제외목록에 "Calendar·Gmail 관리는 agent-secretary"라고
+적어둔 상태였으므로, 비서를 폐지하면서 그 권한을 agent-google로 옮겼다.
+
+`agent-google`에 **Step 0. Google Workspace 운영** 섹션을 신설해 시간대별 루틴, 아침·야간 브리핑,
+캘린더 관리(캘린더 ID 포함), Gmail 초안, Drive, 외부 모드, 영준님 할일 프로토콜,
+직원 업무 라우팅을 전부 이관했다. 역할 경계와 생태계 현황 블록도 함께 갱신했다.
+
 ### ④ MCP 서버 정리
 
 [`MCP-CLEANUP.md`](./MCP-CLEANUP.md) 참조. 계정 레벨 설정이라 코드로 반영 불가 — claude.ai에서 토글.
@@ -73,7 +84,7 @@ Claude 에이전트 시스템에서 **매 세션 시스템 프롬프트에 상�
 
 - **YAML 파싱 실패 5건 수정** — `description` 평문에 콜론이 들어가 frontmatter가 깨져 있었다
   (`agent-accounting`, `agent-bookkeeping`, `agent-cfo`, `agent-tax-liaison`, `agent-textbook-author`).
-- **삭제된 스킬을 가리키던 참조 25개 파일 갱신** — 후계자 이름으로 교체.
+- **삭제된 스킬을 가리키던 참조 37개 파일 갱신** — 후계자 이름으로 교체.
   특히 `agent-ops`의 워크플로우 정의 15종 중 #1·#2·#14가 폐지된 `consult-input`·`new-booking`을
   트리거로 지정하고 있어 함께 고쳤다.
 - **`agent-secretary/SKILL.md` 손상 발견** — 파일이 8,796바이트에서 잘리고
@@ -107,13 +118,48 @@ Claude 에이전트 시스템에서 **매 세션 시스템 프롬프트에 상�
 1. **선행 조건 하나만 먼저** — n8n 워크플로우 `WF-SUMMARYBUILD01`의 호출 대상을
    `agent-consultation-summary-builder` → `agent-consult`로 변경.
    `control-tower`를 호출하는 n8n 트리거가 있다면 `agent-coo`로 변경.
-2. **삭제** — [`DELETE-LIST.md`](./DELETE-LIST.md)의 24개를 claude.ai 스킬 설정에서 제거.
-3. **교체** — 전달된 zip의 `skills-modified/` 53개 `SKILL.md`로 기존 스킬 내용 교체.
+2. **삭제** — [`DELETE-LIST.md`](./DELETE-LIST.md)의 26개를 claude.ai 스킬 설정에서 제거.
+3. **교체** — 전달된 zip의 `skills-modified/` 49개 `SKILL.md`로 기존 스킬 내용 교체.
 4. **확인** — 새 세션을 열어 `agent-coo`, `agent-consult`, `agent-booking`이 정상 호출되는지 점검.
 
-되돌려야 하면 zip의 `_archive/`에 제거된 24개 원본이 그대로 있다.
+되돌려야 하면 zip의 `_archive/`에 제거된 26개 원본이 그대로 있다.
 
 ## 남은 정리 후보 (미실행)
+
+### 🔴 유령 참조 — 존재하지 않는 스킬을 가리키는 참조 156회
+
+정리 후 92개 스킬 전체를 스캔한 결과, **한 번도 존재한 적 없는 스킬 이름 60종을 156회 참조**하고 있다.
+(승계 이력으로 일부러 남긴 폐지 스킬 언급은 제외한 수치다.)
+
+가장 시급한 것부터:
+
+| 유령 스킬 | 참조 | 참조하는 곳 | 성격 |
+|---|---:|---|---|
+| **`agent-crisis`** | 2 | agent-coo 라우팅표 | **"위기·자해·신고 → agent-crisis 즉시"** — 안전 관련 경로가 끊겨 있다 |
+| `agent-design-canva` | 13 | agent-cto, agent-design, agent-image-gen, hr-recruiter | agent-image-gen이 "복잡한 레이아웃은 이쪽"이라며 넘김 |
+| 채널 4종<br>(`agent-channel-blog`·`-cafe`·`-insta`·`-karrot`) | 21 | agent-qa, agent-marketing, agent-design, agent-email | agent-qa가 "발행 준비 완료 선언 시" 받는 대상 전부 |
+| n8n 4종 | 13 | agent-cto, agent-make | |
+| 스킬 운영 5종 | 11 | agent-cto | |
+| CS·운영 6종 | 16 | agent-voc | agent-voc의 위임 대상이 전부 없음 |
+| `agent-scanner`·`agent-scan`·`agent-docs-manager` | 17 | agent-cto 외 | |
+| `agent-idea` | 7 | agent-hr, agent-voc | "아이디어:" 캡처 대상 |
+
+**의미** — 이 경로들이 발동하면 Claude는 없는 스킬을 찾다가 흐지부지되거나 직접 처리합니다.
+특히 `agent-crisis`는 위기 대응 경로라 우선 확인이 필요합니다.
+셋 중 하나를 택하면 됩니다: **(a) 해당 스킬을 실제로 만든다 / (b) 참조를 실존 스킬로 바꾼다 / (c) 참조를 지운다.**
+
+### 참조되지 않는 스킬 11개
+
+`agent-voc`, `agent-editor`, `agent-review`, `agent-expansion`,
+`agent-academy-ops-automation-manager`, `agent-center-ops-automation-manager`,
+`agent-center-privacy-guard`, `agent-exam-author`, `daangn-video-ad`,
+`wb-flow-shortform`, `session-start`.
+
+다른 스킬이 라우팅하지 않는다는 뜻일 뿐, 직접 호출형(`daangn-video-ad`, `wb-flow-shortform`,
+`agent-exam-author`, `session-start`)은 정상이다. **`agent-voc`는 검토가 필요하다** —
+아무도 호출하지 않는데 자기 위임 대상 6종도 전부 존재하지 않는다.
+
+### 기타
 
 - **`agent-secretary` 잘린 뒷부분 복원** — 위 ⑤ 참조. 내용 유실이라 원장님만 채울 수 있다.
 - **description 300자 초과 39개** — 250자 목표 기준 추가 절감 여지가 있으나 수익 체감 구간.

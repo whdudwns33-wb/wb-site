@@ -1,4 +1,4 @@
-# 삭제 대상 25개
+# 삭제 대상 26개
 
 claude.ai 스킬 설정에서 제거할 목록. 원본은 [`_archive/`](./_archive/)에 보관되어 있다.
 
@@ -94,9 +94,23 @@ agent-hr-cho
 
 ---
 
+## D. 비서 1개
+
+```
+agent-secretary
+```
+
+Google Calendar·Gmail·Drive 권한과 아침·야간 브리핑, 직원 업무 라우팅을
+`agent-google`의 **Step 0** 으로 이관했다.
+`skills-modified/agent-google/SKILL.md`를 **먼저 반영한 뒤** 삭제할 것.
+
+⚠️ 이 파일은 원본이 잘려 있었다(8,796바이트 이후 널바이트). 이관한 내용은 살아 있는 부분 전부다.
+
+---
+
 ## 삭제 후 확인
 
-이 24개를 참조하던 파일은 이미 후계자 이름으로 갱신해 `skills-modified/`에 담아두었다.
+이 26개를 참조하던 파일은 이미 후계자 이름으로 갱신해 `skills-modified/`에 담아두었다.
 반영 후 새 세션에서 아래가 정상 동작하는지 확인한다.
 
 - "예약 잡혔어" → `agent-booking` 단독 호출 (이전엔 `new-booking`과 경합)
@@ -104,3 +118,4 @@ agent-hr-cho
 - "이거 처리해" → `agent-coo` 직행 (이전엔 `control-tower` 경유)
 - "전체 프로젝트 현황" → `agent-coo` Step 0 (이전엔 `agent-pmo`)
 - "강사 채용" → `agent-hr` 단독 호출 (이전엔 `agent-hr-cho`와 경합)
+- "일정 잡아줘" → `agent-google` (이전엔 `agent-secretary`)
