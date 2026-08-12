@@ -24,19 +24,79 @@ test('admin and personal staff get a dedicated makeup route without displacing s
   assert.equal((tabs.match(/\['sessions', '회차', sessionPackAttentionCount\(\)\]/g) || []).length, 2);
 });
 
-test('an A attendance card syncs first and creates one stable source-linked review', () => {
+test('today A attendance auto-syncs first and creates one stable source-linked review', () => {
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
   const request = block('function makeupRequestHtml(task, date, check)', 'function makeupIsDelayed');
   const create = block('async function createMakeupFromAbsence', 'function makeupReasonModal');
+  const click = block("case 'latt':", "case 'fbtext':");
 
   assert.match(panel, /makeupRequestHtml\(t, date, c\)/);
   assert.match(request, /check\.att !== 'A'/);
   assert.match(request, /task\.studentId/);
   assert.match(request, /makeupCaseForSource\(task\.id, date\)/);
   assert.match(request, /data-act="mucreate"/);
-  assert.ok(create.indexOf('await sync.run()') < create.indexOf("sync.post('/makeup'"));
+  assert.ok(create.indexOf('await settleSync()') < create.indexOf("sync.post('/makeup'"));
   assert.match(create, /action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date/);
   assert.match(create, /result\.idempotent/);
+  assert.match(click, /next === 'A' && date === today\(\)/);
+  assert.match(click, /automatic: true, expectedUpdatedAt: savedCheck\.updatedAt/);
+  assert.match(click, /!t\.studentId/);
+});
+
+test('makeup uses the server lesson boundary and never auto-creates from consultation rows', () => {
+  const helpers = block("const isLesson =", '/** 수업 지시서 제목');
+  const request = block('function makeupRequestHtml(task, date, check)', 'function makeupIsDelayed');
+  const create = block('async function createMakeupFromAbsence', 'function makeupReasonModal');
+  const click = block("case 'latt':", "case 'fbtext':");
+
+  assert.match(helpers, /const isMakeupLessonTask =/);
+  assert.match(helpers, /taskKind === 'lesson_instruction'/);
+  assert.match(helpers, /\^\\\[수업\\\]/);
+  assert.doesNotMatch(helpers.match(/const isMakeupLessonTask[\s\S]*?;\n/)[0], /컨설팅/);
+  assert.match(request, /!isMakeupLessonTask\(task\)/);
+  assert.match(create, /!isMakeupLessonTask\(task\)/);
+  assert.match(click, /!isMakeupLessonTask\(t\)/);
+});
+
+test('makeup auto-create never posts after sync failure and preserves a retry state', async () => {
+  const request = block('function makeupRequestHtml(task, date, check)', 'function makeupIsDelayed');
+  const create = block('async function createMakeupFromAbsence', 'function makeupReasonModal');
+
+  assert.match(create, /await settleSync\(\)/);
+  assert.ok(create.indexOf('await settleSync()') < create.indexOf("sync.post('/makeup'"));
+  assert.match(create, /error\.makeupSyncFailed = true/);
+  assert.match(create, /status: error\.makeupSyncFailed \? 'sync_failed' : 'create_failed'/);
+  assert.match(create, /!auth[\s\S]*status: 'sync_failed'/);
+  assert.match(request, /creating\.status === 'sync_failed'/);
+  assert.match(request, /동기화 후 다시 시도/);
+  assert.match(request, /creating\.status === 'create_failed'/);
+  assert.match(request, /출결 저장됨 · 보강 검토 생성 실패/);
+
+  let postCalls = 0;
+  const createStates = new Map();
+  const attendance = { att: 'A', updatedAt: 10 };
+  const runCreate = new Function('state', 'getCheck', 'sync', 'isMakeupLessonTask', 'toast', 'makeupCreateStates',
+    'makeupCreateKey', 'uid', 'settleSync', 'replaceMakeup', 'renderAfterSync', 'refreshMakeupsAfterConflict',
+    `let makeupLiveMessage = '';\n${create}\nreturn createMakeupFromAbsence;`)(
+      { tasks: [{ id: 'lesson-1', studentId: 'student-1' }] },
+      () => attendance,
+      { auth: () => ({ mode: 'person' }), post: async () => { postCalls++; return {}; } },
+      () => true, () => {}, createStates, (taskId, date) => taskId + '|' + date, () => 'operation-1',
+      async () => { throw new Error('SYNC_FAILED'); }, () => {}, () => {}, async () => {}
+    );
+  const result = await runCreate('lesson-1', '2026-08-12', null, { automatic: true, expectedUpdatedAt: 10 });
+  assert.equal(result, false);
+  assert.equal(postCalls, 0);
+  assert.equal(createStates.get('lesson-1|2026-08-12').status, 'sync_failed');
+});
+
+test('automatic creation cancels if the attendance changed while sync was running', () => {
+  const create = block('async function createMakeupFromAbsence', 'function makeupReasonModal');
+
+  assert.match(create, /latestCheck\.att !== 'A'/);
+  assert.match(create, /Number\(latestCheck\.updatedAt\) !== expectedUpdatedAt/);
+  assert.match(create, /currentState\.operationId === operationId/);
+  assert.ok(create.indexOf("latestCheck.att !== 'A'") < create.indexOf("sync.post('/makeup'"));
 });
 
 test('KPI funnel counts review, parent wait, confirmed, today, delayed, and notification states', () => {

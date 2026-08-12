@@ -323,8 +323,8 @@
     .schedule-toolbar .between > .btn { display: none; }
   }
 
-  /* QR 개인 링크는 태블릿 폭이어도 휴대폰과 같은 한 열 화면을 쓴다. */
-  html.person-mobile body { width: min(100%, 480px); min-width: 0; margin: 0 auto; overflow-x: hidden; }
+  /* QR 개인 링크는 같은 화면을 쓰되 실제 기기 폭에 맞춰 휴대폰/태블릿을 반응형으로 나눈다. */
+  html.person-mobile body { width: 100%; min-width: 0; margin: 0 auto; overflow-x: hidden; }
   html.person-mobile .wrap,
   html.person-mobile main,
   html.person-mobile .card { width: 100%; max-width: 100%; min-width: 0; }
@@ -362,7 +362,42 @@
   html.person-mobile .navbtn { width: 44px; height: 44px; }
   html.person-mobile button.box,
   html.person-mobile button.dot { width: 44px; min-width: 44px; height: 44px; line-height: 44px; }
-  html.person-mobile .newver { left: 50%; right: auto; width: min(100%, 480px); transform: translateX(-50%); }
+  html.person-mobile .newver { left: 50%; right: auto; width: min(100%, 760px); transform: translateX(-50%); }
+
+  @media (max-width: 720px) {
+    html.person-mobile body { width: min(100%, 480px); }
+  }
+
+  @media (min-width: 721px) {
+    html.person-mobile .wrap { max-width: 760px; }
+    html.person-mobile .today-task-grid { display: grid; gap: 12px; }
+    html.person-mobile .grid2,
+    html.person-mobile .today-task-grid,
+    html.person-mobile .schedule-card-grid,
+    html.person-mobile .book-issue-grid,
+    html.person-mobile .transport-route-grid,
+    html.person-mobile .transport-config-grid,
+    html.person-mobile .session-pack-grid,
+    html.person-mobile .makeup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html.person-mobile .session-pack-create { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html.person-mobile .session-pack-create > .btn { grid-column: 1 / -1; }
+    html.person-mobile .schedule-kpis,
+    html.person-mobile .ops-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    html.person-mobile .session-mode-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html.person-mobile .makeup-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    html.person-mobile .schedule-week-grid .schedule-day-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; }
+    html.person-mobile .schedule-list-row { grid-template-columns: 84px minmax(0, 1fr); }
+    html.person-mobile .schedule-summary span { flex: 0 1 auto; text-align: left; }
+    html.person-mobile .schedule-timeline-head { display: flex; }
+    html.person-mobile .schedule-legend { justify-content: flex-end; margin-top: 0; }
+    html.person-mobile .schedule-timeline-grid { --teacher-w: 88px; }
+    html.person-mobile .schedule-timeline-teacher b { font-size: 12px; }
+    html.person-mobile .book-series { padding-left: 8px; }
+    html.person-mobile .book-card-main { flex-basis: 260px; }
+    html.person-mobile .book-card-actions { width: auto; }
+    html.person-mobile .ops-toolbar { display: flex; }
+    html.person-mobile .ops-toolbar .chips { display: flex; margin-bottom: 0; }
+  }
 
   /* ─── 교재 목록 ─── */
   .book-search { margin-top: 12px; }
@@ -498,6 +533,14 @@
   .session-pack-card { min-width: 0; margin-bottom: 0; }
   .session-pack-card.is-low { border-left: 4px solid var(--amber); background: #FFFBF3; }
   .session-pack-card.is-empty, .session-pack-card.is-expired { border-left: 4px solid var(--coral); background: #FFF9F7; }
+  .session-mode-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .session-mode-badge { border: 1px solid transparent; }
+  .session-mode-badge.is-monthly { background: #EEF2F7; color: #526175; }
+  .session-mode-badge.is-session { border-color: #B9DDF0; background: #EAF6FC; color: var(--deep-blue); }
+  .session-mode-badge.is-warn { border-color: #F2B85C; background: #FFF7ED; color: #8A4B08; }
+  .session-mode-badge.is-critical, .session-mode-badge.is-error { border-color: #F3B8B0; background: #FEF2F2; color: #9E3629; }
+  .session-pack-warning { margin: -3px 0 10px; padding: 8px 9px; border: 1px solid #F2B85C; border-radius: 9px; background: #FFF7ED; color: #8A4B08; font-size: 12px; font-weight: 900; }
+  .session-pack-warning.is-critical { border-color: #F3B8B0; background: #FEF2F2; color: #9E3629; }
   .session-pack-balance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 12px 0; }
   .session-pack-balance span { padding: 9px 5px; border-radius: 9px; background: var(--light-gray); color: var(--mid-gray); text-align: center; font-size: 11px; font-weight: 700; }
   .session-pack-balance b { display: block; color: var(--navy); font-size: 18px; line-height: 1.15; }
@@ -616,10 +659,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost"></div>
 
-<script src="./lesson-form-core.js?v=2026-08-11.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-11.5"></script>
-<script src="./asset-core.js?v=2026-08-11.5"></script>
-<script src="./qr-core.js?v=2026-08-11.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-12.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-12.1"></script>
+<script src="./asset-core.js?v=2026-08-12.1"></script>
+<script src="./qr-core.js?v=2026-08-12.1"></script>
 <script>
 "use strict";
 
@@ -1179,6 +1222,7 @@ let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false,
 let sessionPackRestoreFocus = null;
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
+const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sync_failed / create_failed
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
@@ -1241,6 +1285,7 @@ function resetPersonCache(token) {
   sessionPackRestoreFocus = null;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
   makeupRestoreFocus = null; makeupLiveMessage = '';
+  makeupCreateStates.clear();
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
   acaflowImportFileName = '';
   guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false;
@@ -1822,6 +1867,7 @@ function viewToday() {
 
   const rel = relLabel(cursor);
   const list = tasksFor(me.id, cursor);
+  ensureSessionModeData(list);
   const p = progress(me.id, cursor);
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
@@ -1882,14 +1928,14 @@ function viewToday() {
 
   if (carry.length) {
     h += '<div class="sect">지난 미완료 — 오늘로 넘어왔습니다</div>' +
-      '<div class="card alert">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
+      '<div class="card alert today-task-grid">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
   }
 
   if (!list.length) {
     if (!carry.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
   } else {
     if (carry.length) h += '<div class="sect">오늘 할 일</div>';
-    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
+    h += '<div class="card today-task-grid">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
   }
 
   if (editable) {
@@ -1929,6 +1975,7 @@ function taskRow(t, date, editable, isCarry) {
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
         (c && c.att && ATT_LABEL[c.att] ? '<span class="tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '') +
+        sessionModeBadgeHtml(t) +
         originTags(t) +
       '</div>';
 
@@ -2008,6 +2055,10 @@ const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'b
 
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
+const isMakeupLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_instruction' ||
+  t.lessonFormVersion || t.intakeVersion || /^\[수업\]/.test(String(t.title || ''))));
+const isSessionLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_instruction' ||
+  t.lessonFormVersion || t.intakeVersion));
 
 /** 수업 지시서 제목에서 학생 이름만 뽑는다: [수업] 이름 (학년) — 과목 */
 const studentOf = t => (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
@@ -3205,11 +3256,84 @@ function sessionPackDaysLeft(expiresOn) {
 function sessionPackIsAttention(pack) {
   if (!pack || pack.status !== 'active') return false;
   const days = sessionPackDaysLeft(pack.expiresOn);
-  return Number(pack.remainingSessions) <= 1 || pack.expired || days <= 14;
+  return Number(pack.remainingSessions) <= 3 || pack.expired || days <= 14;
 }
 
 function sessionPackAttentionCount() {
   return sessionPackRows.filter(sessionPackIsAttention).length;
+}
+
+const SESSION_MODE_BADGE_ROUTES = new Set(['today', 'schedule', 'roster']);
+
+function sessionModeRouteVisible() {
+  return route === 'sessions' || SESSION_MODE_BADGE_ROUTES.has(route);
+}
+
+function sessionModeLessonTask(task) {
+  return isSessionLessonTask(task);
+}
+
+function sessionPackForLessonTask(task) {
+  if (!sessionModeLessonTask(task)) return null;
+  return sessionPackRows.find(pack => pack && pack.status === 'active' &&
+    String(pack.lessonTaskId || '') === String(task.id || '')) || null;
+}
+
+function sessionPackAlertInfo(pack) {
+  if (!pack || pack.status !== 'active') return null;
+  const remaining = Math.max(0, Number(pack.remainingSessions) || 0);
+  const hasValidExpiry = /^\d{4}-\d{2}-\d{2}$/.test(String(pack.expiresOn || ''));
+  const days = hasValidExpiry ? sessionPackDaysLeft(pack.expiresOn) : -9999;
+  if (!hasValidExpiry) return { text: '유효기간 확인 필요', cls: 'is-critical' };
+  if (remaining <= 0) return { text: '잔여 0회 · 재등록 전 수업 여부 확인', cls: 'is-critical' };
+  if (pack.expired || days < 0) return { text: '유효기간 만료 · 연장 확인', cls: 'is-critical' };
+  if (remaining === 1) return { text: '잔여 1회 · 보호자 안내 검토', cls: 'is-critical' };
+  if (remaining <= 3) return { text: '잔여 3회 이하 · 연장 일정 확인', cls: 'is-warn' };
+  if (days <= 14) return { text: '만료 ' + Math.max(0, days) + '일 전 · 연장 일정 확인', cls: 'is-warn' };
+  return null;
+}
+
+function sessionModeBadgeDescriptor(task) {
+  if (!sessionModeLessonTask(task)) return null;
+  if (!sessionPackLoaded) return { text: '수업 형태 확인 중', cls: '' };
+  if (sessionPackError) return { text: '수업 형태 확인 필요', cls: 'is-error' };
+  const pack = sessionPackForLessonTask(task);
+  if (!pack) return { text: '월제', cls: 'is-monthly' };
+  const remaining = Math.max(0, Number(pack.remainingSessions) || 0);
+  const alert = sessionPackAlertInfo(pack);
+  return {
+    text: '회차제 · ' + remaining + '회 남음',
+    cls: 'is-session' + (alert ? ' ' + alert.cls : ''),
+    title: alert ? alert.text : ''
+  };
+}
+
+function sessionModeBadgeHtml(task) {
+  const badge = sessionModeBadgeDescriptor(task);
+  return badge ? '<span class="tag session-mode-badge ' + badge.cls + '"' +
+    (badge.title ? ' title="' + esc(badge.title) + '" aria-label="' + esc(badge.text + ' · ' + badge.title) + '"' : '') +
+    '>' + esc(badge.text) + '</span>' : '';
+}
+
+function sessionModeBadgesHtml(tasks) {
+  const badges = new Map();
+  (tasks || []).filter(sessionModeLessonTask).forEach(task => {
+    const descriptor = sessionModeBadgeDescriptor(task);
+    if (descriptor) badges.set(descriptor.text + '|' + descriptor.cls, sessionModeBadgeHtml(task));
+  });
+  return Array.from(badges.values()).join('');
+}
+
+function sessionModeBadgesForStudent(studentId, referenceDate) {
+  const reference = referenceDate || today();
+  return sessionModeBadgesHtml(state.tasks.filter(task => sessionModeLessonTask(task) &&
+    String(task.studentId || '') === String(studentId || '') &&
+    (!task.start || task.start <= reference) && (!task.end || task.end >= reference)));
+}
+
+function ensureSessionModeData(tasks) {
+  if (!(tasks || []).some(sessionModeLessonTask) || sessionPackLoaded || sessionPackLoading) return;
+  setTimeout(() => loadSessionPacks(false), 0);
 }
 
 function rememberSessionPackFocus(packId, act) {
@@ -3241,11 +3365,11 @@ async function loadSessionPacks(force) {
   const auth = sync.auth();
   if (!auth) {
     sessionPackError = '동기화 인증이 필요합니다'; sessionPackLoaded = true;
-    if (route === 'sessions') render();
+    if (sessionModeRouteVisible()) render();
     return;
   }
   sessionPackLoading = true; sessionPackError = '';
-  if (route === 'sessions') render();
+  if (sessionModeRouteVisible()) render();
   try {
     const result = await sync.post('/session-pack', { app: SYNC_APP, auth: auth, action: 'list' });
     sessionPackRows = Array.isArray(result.packs) ? result.packs : [];
@@ -3255,13 +3379,12 @@ async function loadSessionPacks(force) {
     sessionPackLoaded = true;
   } finally {
     sessionPackLoading = false;
-    if (route === 'sessions') renderAfterSync();
+    if (sessionModeRouteVisible()) renderAfterSync();
   }
 }
 
 function sessionPackLessonOptions() {
-  return state.tasks.filter(task => !task.deleted && task.studentId &&
-    (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion))
+  return state.tasks.filter(task => task.studentId && isSessionLessonTask(task))
     .sort((a, b) => String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko') ||
       String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko'));
 }
@@ -3294,6 +3417,19 @@ function sessionPackKpis(rows) {
     '<div class="ops-kpi' + (expiring ? ' is-alert' : '') + '"><b>' + expiring + '</b><span>14일 내 만료·경과</span></div></div>';
 }
 
+function sessionPackModeKpis(rows) {
+  const reference = today();
+  const lessonIds = new Set(sessionPackLessonOptions()
+    .filter(task => (!task.start || task.start <= reference) && (!task.end || task.end >= reference))
+    .map(task => String(task.id || '')));
+  const activePackIds = new Set(rows.filter(pack => pack.status === 'active' && lessonIds.has(String(pack.lessonTaskId || '')))
+    .map(pack => String(pack.lessonTaskId || '')));
+  const monthly = Array.from(lessonIds).filter(id => !activePackIds.has(id)).length;
+  return '<div class="ops-kpis session-mode-kpis" aria-label="수업 운영 방식 요약">' +
+    '<div class="ops-kpi"><b>' + monthly + '</b><span>월제 학생·수업</span></div>' +
+    '<div class="ops-kpi"><b>' + activePackIds.size + '</b><span>회차제 학생·수업</span></div></div>';
+}
+
 function sessionPackHistoryHtml(pack) {
   const usage = Array.isArray(pack.usage) ? pack.usage.slice().reverse() : [];
   if (!usage.length) return '';
@@ -3308,8 +3444,9 @@ function sessionPackOpsNoticeHtml(pack) {
   if (!session.isAdmin || !pack || pack.status !== 'active') return '';
   const target = opsSessionTarget(pack.packId);
   if (!target) return '';
+  const attention = sessionPackAlertInfo(pack);
   return '<div class="ops-notice-action">' +
-    opsActionButtonHtml(target, 'opssessionnotice', '현재 회차 보호자 안내') +
+    opsActionButtonHtml(target, 'opssessionnotice', attention ? '잔여 회차 보호자 안내 검토' : '현재 회차 보호자 안내') +
     opsNoticeStatusHtml(target, '자동발송 없음 · 수동 접수 전') + '</div>';
 }
 
@@ -3335,6 +3472,7 @@ function sessionPackCard(pack) {
   const days = sessionPackDaysLeft(pack.expiresOn);
   const expired = !!pack.expired || days < 0;
   const cls = remaining <= 0 ? ' is-empty' : expired ? ' is-expired' : remaining <= 3 ? ' is-low' : '';
+  const attention = sessionPackAlertInfo(pack);
   const status = pack.status === 'closed' ? ['종료', ''] : expired ? ['기간 만료', 'bad'] : days <= 14 ? ['만료 ' + Math.max(0, days) + '일 전', 'warn'] : ['운영 중', ''];
   const adminActions = session.isAdmin && pack.status === 'active'
     ? '<div class="session-pack-actions"><button class="btn btn-sm btn-warn" data-act="spadjust" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '" data-delta="1">1회 추가 차감</button>' +
@@ -3345,6 +3483,7 @@ function sessionPackCard(pack) {
       '<div class="card-sub">' + esc([pack.grade, pack.lessonLabel].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + status[0] + '</span></div>' +
     '<div class="session-pack-balance"><span><b>' + Number(pack.totalSessions) + '</b>총 횟수</span><span><b>' + Number(pack.usedSessions) + '</b>사용</span><span><b>' + remaining + '</b>남음</span></div>' +
+    (attention ? '<div class="session-pack-warning ' + attention.cls + '" role="status">' + esc(attention.text) + '</div>' : '') +
     '<div class="small muted">유효기간 ' + esc(pack.validFrom) + ' ~ ' + esc(pack.expiresOn) + ' · 수정본 ' + Number(pack.revision) + '</div>' +
     sessionPackStaffRecordHtml(pack) + adminActions + sessionPackOpsNoticeHtml(pack) + sessionPackHistoryHtml(pack) + '</article>';
 }
@@ -3363,6 +3502,7 @@ function viewSessionPacks() {
   if (sessionPackLoading && !sessionPackLoaded) return h + '<div class="card"><div class="empty"><b>⏳</b>회차 현황을 불러오는 중입니다.</div></div>';
   if (sessionPackError) h += '<div class="card alert" role="alert"><div class="card-title">회차 현황을 불러오지 못했습니다</div><div class="small">' + esc(sessionPackError) + '</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="sprefresh" autofocus>다시 시도</button></div>';
+  if (!sessionPackError) h += sessionPackModeKpis(rows);
   h += sessionPackKpis(rows);
   if (!rows.length) return h + '<div class="card"><div class="empty"><b>🔢</b>지정된 회차제 수업이 없습니다.<br><span class="muted">월제 수업은 정상이며 이 목록에 나타나지 않습니다.</span></div></div>';
   return h + '<div class="session-pack-grid" aria-live="polite">' + rows.map(sessionPackCard).join('') + '</div>';
@@ -3501,12 +3641,29 @@ function makeupCaseForSource(taskId, date) {
   return makeupRows.find(row => row.sourceTaskId === taskId && row.sourceDate === date) || null;
 }
 
+function makeupCreateKey(taskId, date) { return String(taskId || '') + '|' + String(date || ''); }
+
 function makeupRequestHtml(task, date, check) {
   if (!check || check.att !== 'A') return '';
+  if (!isMakeupLessonTask(task)) return '';
   const linked = makeupCaseForSource(task.id, date);
   if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
     esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
-  if (!task.studentId) return '<div class="small muted mt8">보강 검토는 원생 명단의 학생 ID를 수업에 연결한 뒤 요청할 수 있습니다.</div>';
+  if (!task.studentId) return '<div class="small muted mt8">결석 출결은 저장됩니다. 보강 자동 검토는 원생 명단의 학생 ID를 이 수업에 연결한 뒤 만들 수 있습니다.</div>';
+  const creating = makeupCreateStates.get(makeupCreateKey(task.id, date));
+  if (creating && creating.status === 'pending') {
+    return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" disabled>출결 저장 확인 중 · 보강 자동 생성…</button></div>';
+  }
+  if (creating && creating.status === 'sync_failed') {
+    return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
+      esc(task.id) + '" data-date="' + esc(date) + '">동기화 후 다시 시도</button>' +
+      '<span class="small muted">출결은 이 기기에 저장됨 · 서버 동기화 후 보강 검토를 만듭니다.</span></div>';
+  }
+  if (creating && creating.status === 'create_failed') {
+    return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
+      esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 다시 시도</button>' +
+      '<span class="small muted">출결 저장됨 · 보강 검토 생성 실패</span></div>';
+  }
   return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
     esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 요청</button>' +
     '<span class="small muted">결석 출결을 서버에 저장한 뒤 요청됩니다.</span></div>';
@@ -3740,27 +3897,75 @@ async function mutateMakeup(payload, button, successText, focusAct, closeOnSucce
   }
 }
 
-async function createMakeupFromAbsence(taskId, date, button) {
+async function createMakeupFromAbsence(taskId, date, button, options) {
   const task = state.tasks.find(row => row.id === taskId);
   const check = getCheck(taskId, date);
   const auth = sync.auth();
-  if (!task || !task.studentId || !check || check.att !== 'A') return toast('학생 ID가 연결된 수업의 결석 출결을 먼저 기록해 주세요');
-  if (!auth) return toast('동기화 인증이 필요합니다');
+  const automatic = !!(options && options.automatic);
+  const expectedUpdatedAt = Number(options && options.expectedUpdatedAt) || 0;
+  const sourceKey = makeupCreateKey(taskId, date);
+  const operationId = uid();
+  if (!isMakeupLessonTask(task) || !task.studentId || !check || check.att !== 'A') {
+    if (automatic) return false;
+    toast('학생 ID가 연결된 수업의 결석 출결을 먼저 기록해 주세요');
+    return false;
+  }
+  const inFlight = makeupCreateStates.get(sourceKey);
+  if (inFlight && inFlight.status === 'pending') return false;
+  makeupCreateStates.set(sourceKey, { status: 'pending', expectedUpdatedAt: expectedUpdatedAt, operationId: operationId });
+  if (!auth) {
+    makeupCreateStates.set(sourceKey, { status: 'sync_failed', operationId: operationId });
+    if (automatic) {
+      toast('출결은 이 기기에 저장됨 · 동기화 인증 후 보강 검토를 다시 시도해 주세요');
+      renderAfterSync();
+      return false;
+    }
+    toast('동기화 인증이 필요합니다');
+    renderAfterSync();
+    return false;
+  }
   if (button) { button.disabled = true; button.textContent = '출결 저장 중…'; }
   try {
-    const synced = await sync.run();
-    if (!synced) throw new Error('출결 동기화가 끝난 뒤 다시 시도해 주세요');
+    try {
+      await settleSync();
+    } catch (error) {
+      error.makeupSyncFailed = true;
+      throw error;
+    }
+    const latestCheck = getCheck(taskId, date);
+    if (!latestCheck || latestCheck.att !== 'A' || (expectedUpdatedAt && Number(latestCheck.updatedAt) !== expectedUpdatedAt)) {
+      const currentState = makeupCreateStates.get(sourceKey);
+      if (currentState && currentState.operationId === operationId) makeupCreateStates.delete(sourceKey);
+      return false;
+    }
     const result = await sync.post('/makeup', {
       app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date
     });
     replaceMakeup(result.case);
+    const currentState = makeupCreateStates.get(sourceKey);
+    if (currentState && currentState.operationId === operationId) makeupCreateStates.delete(sourceKey);
     makeupLiveMessage = (result.idempotent ? '기존' : '새') + ' 보강 검토 건을 확인했습니다.';
     if (button && button.isConnected) { button.textContent = '보강 요청됨'; button.disabled = true; }
-    toast(result.idempotent ? '이미 등록된 보강 검토 건입니다' : '보강 검토를 요청했습니다');
+    toast(result.idempotent ? '이미 등록된 보강 검토 건입니다' : (automatic ? '결석 출결 저장됨 · 보강 검토가 자동 생성되었습니다' : '보강 검토를 요청했습니다'));
+    renderAfterSync();
+    return true;
   } catch (error) {
-    toast('보강 요청 실패 — ' + (error.message || error));
+    const current = getCheck(taskId, date);
+    const currentState = makeupCreateStates.get(sourceKey);
+    if (currentState && currentState.operationId === operationId) {
+      if (current && current.att === 'A') {
+        makeupCreateStates.set(sourceKey, { status: error.makeupSyncFailed ? 'sync_failed' : 'create_failed', operationId: operationId });
+      } else {
+        makeupCreateStates.delete(sourceKey);
+      }
+    }
+    toast(error.makeupSyncFailed
+      ? '출결은 이 기기에 저장됨 · 서버 동기화 후 보강 검토를 다시 시도해 주세요'
+      : '출결 저장됨 · 보강 검토 생성 실패 — 다시 시도해 주세요');
     if (Number(error && error.status) === 409) await refreshMakeupsAfterConflict(error, '', '');
     if (button && button.isConnected) { button.disabled = false; button.textContent = '보강 검토 요청'; }
+    renderAfterSync();
+    return false;
   }
 }
 
@@ -4223,7 +4428,8 @@ function scheduleTimelineModal(entries, date) {
         ['학부모 요청', task.parentRequest]
       ].filter(row => row[1]);
       return '<div class="task"><div class="task-body"><div class="between"><div class="task-t">' + esc(entry.studentName) +
-        (entry.grade ? ' <span class="pill">' + esc(entry.grade) + '</span>' : '') + '</div><span class="pill ' + att.cls + '">' + esc(att.label) + '</span></div>' +
+        (entry.grade ? ' <span class="pill">' + esc(entry.grade) + '</span>' : '') + '</div><span class="row" style="gap:5px">' +
+        sessionModeBadgeHtml(task) + '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></span></div>' +
         details.map(row => '<div class="schedule-info-row"><b>' + esc(row[0]) + '</b>' + esc(row[1]) + '</div>').join('') + '</div></div>';
     }).join('');
   const foot = first.staffId ? '<button class="btn btn-ghost btn-block mt14" data-act="openstaff" data-id="' + esc(first.staffId) + '">선생님 업무 보기</button>' : '';
@@ -4265,6 +4471,7 @@ function scheduleSessionRow(session, teacherName, timeText, hideTeacher) {
   const tasks = session.entries.map(entry => entry.task || {});
   const subjects = [...new Set(tasks.flatMap(task => [task.subject, task.className]).filter(Boolean))];
   const roles = [...new Set(session.entries.map(entry => entry.role).filter(Boolean))];
+  const modeBadges = sessionModeBadgesHtml(tasks);
   const conflict = session.teacherConflict || session.studentConflict;
   const search = [teacherName].concat(session.entries.flatMap(entry => [
     entry.studentName, entry.grade, entry.role, (entry.task || {}).subject, (entry.task || {}).className
@@ -4274,7 +4481,7 @@ function scheduleSessionRow(session, teacherName, timeText, hideTeacher) {
     '<div class="between"><b>' + esc(shown || '학생 미입력') + '</b>' +
     (conflict ? '<span class="pill bad">겹침</span>' : '') + '</div>' +
     '<div class="schedule-role">' + esc([!hideTeacher && teacherName && teacherName + ' 선생님', subjects.join('·'), roles.join('·')].filter(Boolean).join(' · ')) +
-    '</div></div></div>';
+    '</div>' + (modeBadges ? '<div class="schedule-person-meta">' + modeBadges + '</div>' : '') + '</div></div>';
 }
 
 function scheduleWeekCardsHtml(weekly) {
@@ -4423,6 +4630,7 @@ function scheduleStudentCardsHtml(weekly) {
     const identityProblem = group.scheduleIdentityProblem;
     const conflictCount = group.scheduleConflictCount;
     const sources = scheduleStudentSources(group);
+    const modeBadges = sessionModeBadgesHtml(taskSources.map(entry => entry.task || {}));
     const search = [name, grade, teachers, student.memo || ''].concat(subjects).concat(taskSources.flatMap(entry => {
       const task = entry.task || {};
       return [entry.teacherName, entry.role, task.subject, task.className, task.materials, task.homework,
@@ -4441,6 +4649,7 @@ function scheduleStudentCardsHtml(weekly) {
       '<div class="schedule-person-meta">' +
       (subjects.length ? '<span class="tag time">' + esc(subjects.join('·')) + '</span>' : '') +
       (teachers ? '<span class="tag">' + esc(teachers) + '</span>' : '') +
+      modeBadges +
       (student.memo ? '<span class="tag high">메모 있음</span>' : '') +
       (identityProblem ? '<span class="tag high">학생 식별 확인 필요</span>' : '') +
       (conflictCount ? '<span class="tag high">겹침 ' + conflictCount + '건</span>' : '') +
@@ -4485,6 +4694,7 @@ function viewSchedule() {
   if (!session.isAdmin) return viewToday();
   const core = window.WBScheduleCore;
   if (!core) return '<div class="card"><div class="empty"><b>⚠️</b>수업 현황을 불러오지 못했습니다.<br>새로고침해 주세요.</div></div>';
+  ensureSessionModeData(state.tasks);
   if (!rosterDb && !rosterErr) loadRoster();
 
   const nowKst = seoulNowParts();
@@ -7109,6 +7319,7 @@ function viewRoster() {
   const months = rosterMonths();
   const cur = months[0];
   const curActive = activeIn(cur);
+  ensureSessionModeData(state.tasks);
 
   let h = acaflowImport;
 
@@ -7144,7 +7355,8 @@ function viewRoster() {
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
         mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
           '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span>' +
-          (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span></div>').join('');
+          (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span>' +
+          '<span class="row" style="gap:5px">' + sessionModeBadgesForStudent(s.id, today()) + '</span></div>').join('');
       // 내 학생 월별 변동 (변동 있는 달만)
       let moved = '';
       months.forEach(m => {
@@ -9000,8 +9212,19 @@ document.addEventListener('click', ev => {
       const c = getCheck(id, date);
       const v = el.dataset.v;
       const next = (c && c.att === v) ? '' : v;
-      setCheck(id, date, { att: next });
-      if (next === 'A') toast('결석 — 메모에 사유와 보강 계획을 남겨주세요');
+      const savedCheck = setCheck(id, date, { att: next });
+      const sourceKey = makeupCreateKey(id, date);
+      if (next !== 'A') makeupCreateStates.delete(sourceKey);
+      if (next === 'A' && !isMakeupLessonTask(t)) {
+        toast('결석 출결 저장됨 · 상담 업무는 보강 검토 대상이 아닙니다');
+      } else if (next === 'A' && !t.studentId) {
+        toast('결석 출결 저장됨 · 학생 ID가 연결되지 않아 보강 검토는 자동 생성되지 않습니다');
+      } else if (next === 'A' && date === today()) {
+        toast('결석 출결 저장 중 · 보강 검토를 자동 생성합니다');
+        createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
+      } else if (next === 'A') {
+        toast('결석 — 메모에 사유와 보강 계획을 남겨주세요');
+      }
       render();
       break;
     }
@@ -9641,7 +9864,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-11.5';
+const APP_VER = '2026-08-12.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

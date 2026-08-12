@@ -37,7 +37,7 @@ test('admin create is stable student plus lesson opt-in with total and validity,
   const create = block('async function createSessionPack(button)', 'function sessionPackAdjustmentModal');
 
   assert.match(options, /task\.studentId/);
-  assert.match(options, /taskKind === 'lesson_instruction' \|\| task\.lessonFormVersion \|\| task\.intakeVersion/);
+  assert.match(options, /isSessionLessonTask\(task\)/);
   for (const field of ['spLesson', 'spTotal', 'spFrom', 'spExpires']) assert.match(options, new RegExp(`id="${field}"`));
   assert.match(create, /action: 'create', studentId: task\.studentId, lessonTaskId: task\.id/);
   assert.match(create, /totalSessions: totalSessions, validFrom: validFrom, expiresOn: expiresOn/);
@@ -46,6 +46,7 @@ test('admin create is stable student plus lesson opt-in with total and validity,
 });
 
 test('KPI funnel covers remaining 3, 1, 0 and expiry attention', () => {
+  const attentionSource = block('function sessionPackIsAttention(pack)', 'function sessionPackAttentionCount()');
   const source = block('function sessionPackKpis(rows)', 'function sessionPackHistoryHtml');
   const api = new Function('sessionPackDaysLeft', `${source}\nreturn sessionPackKpis;`)(date => ({ far: 90, soon: 7, old: -1 }[date]));
   const output = api([
@@ -60,6 +61,84 @@ test('KPI funnel covers remaining 3, 1, 0 and expiry attention', () => {
   assert.match(output, /<b>1<\/b><span>잔여 1회 이하/);
   assert.match(output, /<b>1<\/b><span>잔여 0회/);
   assert.match(output, /<b>2<\/b><span>14일 내 만료·경과/);
+  assert.match(attentionSource, /remainingSessions\) <= 3/);
+});
+
+test('lesson mode badges default to monthly only after the scoped pack list succeeds', () => {
+  const source = block('function sessionPackForLessonTask(task)', 'function sessionModeBadgeHtml(task)');
+  const make = (loaded, error, packs) => new Function(
+    'sessionPackLoaded', 'sessionPackError', 'sessionPackRows', 'sessionModeLessonTask', 'sessionPackDaysLeft',
+    `${source}\nreturn sessionModeBadgeDescriptor;`
+  )(loaded, error, packs, task => !!task && !task.deleted, expiry => expiry === '2026-08-18' ? 7 : 90);
+  const lesson = { id: 'lesson-1' };
+
+  assert.deepEqual(make(false, '', [])(lesson), { text: '수업 형태 확인 중', cls: '' });
+  assert.deepEqual(make(true, 'temporary', [])(lesson), { text: '수업 형태 확인 필요', cls: 'is-error' });
+  assert.deepEqual(make(true, '', [])(lesson), { text: '월제', cls: 'is-monthly' });
+  assert.deepEqual(make(true, '', [
+    { status: 'active', lessonTaskId: 'lesson-other', remainingSessions: 8, expiresOn: '2026-12-31' }
+  ])(lesson), { text: '월제', cls: 'is-monthly' });
+
+  const sessionMode = make(true, '', [
+    { status: 'active', lessonTaskId: 'lesson-1', remainingSessions: 1, expiresOn: '2026-08-18' }
+  ])(lesson);
+  assert.equal(sessionMode.text, '회차제 · 1회 남음');
+  assert.match(sessionMode.cls, /is-session/);
+  assert.match(sessionMode.cls, /is-critical/);
+  assert.match(sessionMode.title, /보호자 안내 검토/);
+});
+
+test('session mode badges apply only to structured session-pack eligible lessons', () => {
+  const helpers = block("const isLesson =", '/** 수업 지시서 제목');
+  const source = block('function sessionModeLessonTask(task)', 'function sessionPackForLessonTask(task)');
+  assert.match(helpers, /const isSessionLessonTask =/);
+  assert.match(helpers, /taskKind === 'lesson_instruction'/);
+  assert.doesNotMatch(helpers.match(/const isSessionLessonTask[\s\S]*?;\n/)[0], /\[수업\]|컨설팅/);
+  assert.match(source, /return isSessionLessonTask\(task\)/);
+});
+
+test('session attention makes 3, 1, 0 and expiry states explicit without auto sending', () => {
+  const source = block('function sessionPackAlertInfo(pack)', 'function sessionModeBadgeDescriptor(task)');
+  const alert = new Function('sessionPackDaysLeft', `${source}\nreturn sessionPackAlertInfo;`)(
+    expiry => ({ '2026-12-31': 90, '2026-08-18': 7, '2026-08-01': -1 }[expiry])
+  );
+
+  assert.match(alert({ status: 'active', remainingSessions: 3, expiresOn: '2026-12-31' }).text, /잔여 3회 이하/);
+  assert.match(alert({ status: 'active', remainingSessions: 1, expiresOn: '2026-12-31' }).text, /잔여 1회/);
+  assert.match(alert({ status: 'active', remainingSessions: 0, expiresOn: '2026-12-31' }).text, /잔여 0회/);
+  assert.match(alert({ status: 'active', remainingSessions: 8, expiresOn: '2026-08-01', expired: true }).text, /유효기간 만료/);
+  assert.match(alert({ status: 'active', remainingSessions: 8, expiresOn: '2026-08-18' }).text, /만료 7일 전/);
+
+  const notice = block('function sessionPackOpsNoticeHtml(pack)', 'function sessionPackStaffRecordHtml(pack)');
+  assert.match(notice, /잔여 회차 보호자 안내 검토/);
+  assert.match(notice, /자동발송 없음 · 수동 접수 전/);
+  assert.doesNotMatch(notice, /sync\.post|dispatch|send\(/);
+});
+
+test('monthly and session counts include only lessons active on the reference date', () => {
+  const source = block('function sessionPackModeKpis(rows)', 'function sessionPackHistoryHtml');
+  assert.match(source, /const reference = today\(\)/);
+  assert.match(source, /!task\.start \|\| task\.start <= reference/);
+  assert.match(source, /!task\.end \|\| task\.end >= reference/);
+  assert.match(source, /pack\.status === 'active' && lessonIds\.has/);
+});
+
+test('today, schedule, and own roster cards reuse the scoped session-pack list for mode badges', () => {
+  const loader = block('const SESSION_MODE_BADGE_ROUTES', 'function rememberSessionPackFocus');
+  const today = block('function viewToday()', 'function taskRow');
+  const task = block('function taskRow', 'function taskPanel');
+  const schedule = block('function scheduleTimelineModal', 'function scheduleWeekCardsHtml');
+  const studentCards = block('function scheduleStudentCardsHtml', 'function scheduleIssuesHtml');
+  const roster = block('function viewRoster()', '/* ── 직원 관리');
+
+  assert.match(loader, /new Set\(\['today', 'schedule', 'roster'\]\)/);
+  assert.match(loader, /setTimeout\(\(\) => loadSessionPacks\(false\), 0\)/);
+  assert.match(today, /ensureSessionModeData\(list\)/);
+  assert.match(task, /sessionModeBadgeHtml\(t\)/);
+  assert.match(schedule, /sessionModeBadgeHtml\(task\)/);
+  assert.match(schedule, /sessionModeBadgesHtml\(tasks\)/);
+  assert.match(studentCards, /sessionModeBadgesHtml\(taskSources\.map/);
+  assert.match(roster, /sessionModeBadgesForStudent\(s\.id, today\(\)\)/);
 });
 
 test('own staff record also works for a manager personal link and stays hidden elsewhere', () => {

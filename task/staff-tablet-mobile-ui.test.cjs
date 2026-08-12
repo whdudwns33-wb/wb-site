@@ -5,13 +5,19 @@ const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
-test('personal links use the validated staff query as a tablet mobile-layout switch', () => {
+test('personal links use a phone layout below 721px and a tablet-native layout above it', () => {
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, viewport-fit=cover">/);
   assert.match(html, /const HAS_PERSON_SCOPE = !!SAFE_SCOPE_ID;/);
   assert.match(html, /classList\.toggle\('person-mobile', HAS_PERSON_SCOPE\)/);
-  assert.match(html, /html\.person-mobile body \{ width: min\(100%, 480px\);[^}]*overflow-x: hidden;/);
+  assert.match(html, /html\.person-mobile body \{ width: 100%;[^}]*overflow-x: hidden;/);
+  assert.match(html, /@media \(max-width: 720px\) \{[\s\S]{0,100}html\.person-mobile body \{ width: min\(100%, 480px\); \}/);
   assert.match(html, /html\.person-mobile \.book-issue-grid,[\s\S]{0,140}html\.person-mobile \.transport-config-grid \{ grid-template-columns: 1fr; \}/);
   assert.match(html, /html\.person-mobile \.schedule-kpis,[\s\S]{0,80}html\.person-mobile \.ops-kpis \{ grid-template-columns: repeat\(2,/);
+  assert.match(html, /@media \(min-width: 721px\) \{[\s\S]*?html\.person-mobile \.wrap \{ max-width: 760px; \}/);
+  assert.match(html, /html\.person-mobile \.today-task-grid \{ display: grid; gap: 12px; \}/);
+  assert.match(html, /@media \(min-width: 721px\) \{[\s\S]*?html\.person-mobile \.today-task-grid,[\s\S]*?html\.person-mobile \.book-issue-grid,[\s\S]*?html\.person-mobile \.makeup-grid \{ grid-template-columns: repeat\(2,/);
+  assert.match(html, /@media \(min-width: 721px\) \{[\s\S]*?html\.person-mobile \.schedule-kpis,[\s\S]*?grid-template-columns: repeat\(4,/);
+  assert.match(html, /class="card(?: alert)? today-task-grid"/);
   assert.match(html, /html\.person-mobile \.btn,[\s\S]{0,120}min-height: 44px;/);
 });
 
