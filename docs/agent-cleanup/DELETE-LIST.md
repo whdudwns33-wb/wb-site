@@ -1,4 +1,4 @@
-# 삭제 대상 24개
+# 삭제 대상 25개
 
 claude.ai 스킬 설정에서 제거할 목록. 원본은 [`_archive/`](./_archive/)에 보관되어 있다.
 
@@ -80,6 +80,20 @@ agent-ops
 
 ---
 
+## C. HR 중복 1개
+
+```
+agent-hr-cho
+```
+
+`agent-hr`와 본문 0~12장이 바이트 단위로 동일한 복제였다.
+`skills-modified/agent-hr/SKILL.md`가 통합본 — **이걸 먼저 반영한 뒤** 삭제할 것.
+
+산하 `hr-recruiter`·`hr-onboarding`·`hr-retention`은 **삭제하지 않는다.**
+내용이 서로 다른 실무 매뉴얼이고, 이미 상위를 `agent-hr`로 부르고 있어 수정도 필요 없다.
+
+---
+
 ## 삭제 후 확인
 
 이 24개를 참조하던 파일은 이미 후계자 이름으로 갱신해 `skills-modified/`에 담아두었다.
@@ -89,3 +103,4 @@ agent-ops
 - "상담 끝났어" → `agent-consult` 단독 호출
 - "이거 처리해" → `agent-coo` 직행 (이전엔 `control-tower` 경유)
 - "전체 프로젝트 현황" → `agent-coo` Step 0 (이전엔 `agent-pmo`)
+- "강사 채용" → `agent-hr` 단독 호출 (이전엔 `agent-hr-cho`와 경합)
