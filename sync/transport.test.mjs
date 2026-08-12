@@ -8,6 +8,7 @@ import worker from './worker-core.js';
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/023_transport.sql', import.meta.url), 'utf8');
 const integrityMigration = fs.readFileSync(new URL('./migrations/024_transport_integrity.sql', import.meta.url), 'utf8');
+const notificationMigration = fs.readFileSync(new URL('./migrations/029_transport_notifications.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -169,6 +170,20 @@ test('schema and migration add non-destructive vehicle tables with constrained s
   assert.match(schema, /trg_transport_boarded_insert_guard/);
   assert.match(integrityMigration, /RAISE\(ABORT, 'BOARDING_LOCK'\)/);
   assert.doesNotMatch(integrityMigration, /DROP TABLE|DELETE FROM/i);
+});
+
+test('transport notification migration is additive, append-only, and rejects malformed dates', () => {
+  assert.match(notificationMigration, /transport_notification_sends/);
+  assert.match(notificationMigration, /COALESCE\(length\(transport_date\)/);
+  assert.doesNotMatch(notificationMigration, /DROP TABLE|DELETE FROM/i);
+  const database = new DatabaseSync(':memory:');
+  database.exec(schema);
+  assert.throws(() => database.prepare(
+    'INSERT INTO transport_notification_sends ' +
+    '(app,send_id,idempotency_key,event_state,transport_date,route_id,student_id,source_revision,' +
+    'variables_hash,template_id,created_at,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', 'send-bad', 'a'.repeat(64), 'boarded', '2026-xx-12', 'route-a', 'student-a', 1,
+    'b'.repeat(64), 'TPL', Date.now(), 'director'));
 });
 
 test('only all-scope replaces config and validation rejects capacity, inactive refs, and duplicates', async () => {
@@ -409,14 +424,19 @@ test('driver list is scoped to own route and emits only safe student fields', as
   assert.deepEqual(result.body.routes.map(route => route.id), ['route-a']);
   assert.deepEqual(result.body.config.routes.map(route => route.id), ['route-a']);
   assert.deepEqual(Object.keys(result.body.routes[0].students[0]).sort(),
-    ['grade', 'id', 'name', 'revision', 'status', 'stop']);
+    ['callReady', 'grade', 'guardianPhone', 'id', 'name', 'notification', 'revision', 'status', 'stop']);
+  assert.equal(result.body.routes[0].students[0].guardianPhone, null);
+  assert.equal(result.body.routes[0].students[0].callReady, false);
   assert.equal(Object.hasOwn(result.body.config, 'baseAddress'), false);
   assert.equal(Object.hasOwn(result.body.config.routes[0], 'plan'), false);
   assert.equal(Object.hasOwn(result.body.config.routes[0].stops[0], 'address'), false);
   assert.equal(Object.hasOwn(result.body.routes[0], 'plan'), false);
   assert.equal(Object.hasOwn(result.body.routes[0].stops[0], 'address'), false);
   const serialized = JSON.stringify(result.body);
-  assert.doesNotMatch(serialized, /SECRET|GUARDIAN|010-|공개 학원 주소|공개 정류장 주소|address|phone|memo/i);
+  assert.doesNotMatch(serialized, /SECRET|GUARDIAN SECRET|010\d|010-|공개 학원 주소|공개 정류장 주소|"address"|"memo"/i);
+  const adminView = await call(db, { auth: admin, action: 'list', date: today });
+  assert.equal(Object.hasOwn(adminView.body.routes[0].students[0], 'guardianPhone'), false);
+  assert.equal(Object.hasOwn(adminView.body.routes[0].students[0], 'callReady'), false);
 });
 
 test('state uses strict transitions and CAS blocks double click', async () => {
@@ -437,6 +457,48 @@ test('state uses strict transitions and CAS blocks double click', async () => {
   assert.equal(dropped.status, 200);
   assert.equal(dropped.body.state.status, 'dropped');
   assert.equal(dropped.body.state.revision, 2);
+});
+
+test('state defaults to notification attempt and stays HTTP 200 when the provider result ledger cannot be written', async () => {
+  const db = new TestD1(); seed(db); await replace(db);
+  const guardian = await call(db, { auth: admin, action: 'guardian_set', studentId: 'student-a',
+    phone: '01012345678', confirmNewIdentity: true, callAllowed: true,
+    boardedConsent: true, droppedConsent: true, expectedContactUpdatedAt: 0, expectedConsentUpdatedAt: 0 });
+  assert.equal(guardian.status, 200);
+  const originalPrepare = db.prepare.bind(db);
+  db.prepare = sql => {
+    if (String(sql).startsWith('INSERT OR IGNORE INTO transport_notification_send_events ')) {
+      return { bind() { return this; }, run() { throw new Error('private persistence failure'); } };
+    }
+    return originalPrepare(sql);
+  };
+  let fetches = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    fetches += 1;
+    return Response.json({ groupInfo: { groupId: 'group_1' },
+      messageList: [{ messageId: 'message_1', statusCode: '2000' }] });
+  };
+  try {
+    const result = await call(db, { auth: person('driver-a', 'token-a'), action: 'state', date: today,
+      routeId: 'route-a', studentId: 'student-a', next: 'boarded', revision: 0 }, 'task', {
+      WB_TRANSPORT_NOTIFY_ENABLED: 'true', SOLAPI_KAKAO_API_KEY: 'key', SOLAPI_KAKAO_API_SECRET: 'secret',
+      SOLAPI_KAKAO_PF_ID: 'PF_TEST', SOLAPI_KAKAO_TRANSPORT_BOARDED_APPROVED_TEMPLATE_ID: 'TPL_BOARD',
+      SOLAPI_SENDER_NUMBER: '0212345678'
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.state.status, 'boarded');
+    assert.equal(result.body.notification.status, 'unknown');
+    assert.equal(result.body.notification.code, 'SEND_RESULT_NOT_RECORDED');
+    assert.equal(result.body.notification.retryAllowed, false);
+    assert.equal(fetches, 1);
+    db.prepare = originalPrepare;
+    const refreshed = await call(db, { auth: admin, action: 'list', date: today });
+    const student = refreshed.body.routes.find(route => route.id === 'route-a').students[0];
+    assert.equal(student.notification.status, 'unknown');
+    assert.equal(student.notification.code, 'PRIOR_SEND_UNCERTAIN');
+    assert.equal(student.notification.retryAllowed, false);
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test('own driver cannot modify another route or a non-KST-today record', async () => {

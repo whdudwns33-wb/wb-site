@@ -36,6 +36,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/025_makeup.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/026_session_packs.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/027_parent_portal.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/028_guardian_ops_notifications.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/029_transport_notifications.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -53,6 +54,9 @@ npx wrangler secret put SOLAPI_KAKAO_MAKEUP_CONFIRMED_APPROVED_TEMPLATE_ID
 npx wrangler secret put SOLAPI_KAKAO_MAKEUP_CANCELLED_APPROVED_TEMPLATE_ID
 npx wrangler secret put SOLAPI_KAKAO_SESSION_BALANCE_APPROVED_TEMPLATE_ID
 npx wrangler secret put WB_GUARDIAN_OPS_SEND_ENABLED # 4개 템플릿 승인·별도 동의 확인 뒤에만 true
+npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_BOARDED_APPROVED_TEMPLATE_ID
+npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_DROPPED_APPROVED_TEMPLATE_ID
+npx wrangler secret put WB_TRANSPORT_NOTIFY_ENABLED # 두 템플릿 APPROVED·차량 목적 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
@@ -280,12 +284,33 @@ KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기�
 
 // CAS 상태 변경
 { "app":"task", "auth":{...}, "action":"state", "date":"2026-08-11",
-  "routeId":"route-1", "studentId":"student-1", "next":"boarded", "revision":0 }
+  "routeId":"route-1", "studentId":"student-1", "next":"boarded", "revision":0,
+  "notifyGuardian":true }
+
+// stable studentId별 차량 통화·승하차 알림 동의(전체 관리 권한만)
+{ "app":"task", "auth":{...}, "action":"guardian_get", "studentId":"student-1" }
+{ "app":"task", "auth":{...}, "action":"guardian_set", "studentId":"student-1",
+  "phone":"01012345678", "confirmNewIdentity":true,
+  "callAllowed":true, "boardedConsent":true, "droppedConsent":true,
+  "expectedContactUpdatedAt":0, "expectedConsentUpdatedAt":0 }
 ```
 
 허용 전이는 `scheduled → boarded|absent`, `boarded → dropped`이다. 전체 관리 권한만 `next:"scheduled"`와
 필수 `reason`으로 초기화할 수 있다. 같은 이전 revision의 중복 클릭은 409로 차단된다. 관리자
 조회에는 설정에서 누락됐더라도 `boarded`인 기록을 숨기지 않고 `ORPHAN_BOARDED` 경고로 반환한다.
+
+기사 개인 링크(관리 담당 기사 포함)는 KST 오늘 본인 배정 노선에서만, 별도 `callAllowed` 동의가
+현재 보호자 번호 identity와 일치하는 학생의 번호를 받을 수 있다. 관리자·다른 노선·과거/미래에는
+번호를 응답하지 않는다. 승차/하차 상태 저장 뒤 각각 승인된 고정 Solapi ATA 템플릿으로 알림을
+시도하며 SMS 대체는 끈다. 기존 화면이 `notifyGuardian`을 생략해도 기본 발송을 시도하고,
+명시적 `false`만 보내지 않는다. 연락처·해당 이벤트 동의·전용 gate·승인 템플릿이 없으면 provider를
+호출하지 않고 차단 결과를 남긴다. `accepted`/`unknown`/확정 `rejected` 원장은 같은 날짜·노선·학생·
+상태 revision에서 재발송하지 않는다. 상태 저장과 외부 호출은 한 DB transaction으로 묶지 않으며,
+공급자 호출 전에 append-only 예약을 만들어 exactly-once를 보장한다. 알림 변수는 `학생명`, `운행일`,
+`확인시각`, `노선명`, `확인지점`뿐이고 기사 정보·주소는 포함하지 않는다.
+
+운영 배포는 `029_transport_notifications.sql` D1 migration을 먼저 적용한 뒤 Worker를 배포한다.
+실발송 전 `WB_TRANSPORT_NOTIFY_ENABLED=true`와 탑승/하차 승인 템플릿 ID를 별도로 등록해야 한다.
 
 ### `/makeup` — 전 학생 공통 보강 원장
 

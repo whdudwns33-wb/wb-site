@@ -159,7 +159,146 @@ test('transport list, student transitions, and all-config replace use the agreed
   assert.match(html, /data-next=\"absent\"/);
   assert.match(html, /data-next=\"scheduled\"/);
   assert.doesNotMatch(html, /data-next=\"reset\"/);
-  assert.match(html, /if \(!session\.isAdmin\) return '<span class=\"small muted\">완료된 운행은 관리자만 되돌릴 수 있습니다/);
+  assert.match(html, /else if \(!session\.isAdmin\) action = '<span class=\"small muted\">완료된 운행은 관리자만 되돌릴 수 있습니다/);
+});
+
+test('transport separates saved ride state from guardian notification outcome', () => {
+  const actions = block('function transportStudentActions(', 'function transportRouteCard(');
+  const transition = block('async function transitionTransportState(', 'function transportGuardianModal(');
+  const notification = block('const TRANSPORT_NOTIFICATION_STATUS = {', 'function transportGuardianState(');
+  const success = block('function transportStateSuccessToast(', 'function transportOwnPhoneTarget(');
+  assert.match(actions, />탑승 확인<\/button>/);
+  assert.match(actions, />하차 확인<\/button>/);
+  assert.match(actions, />미탑승 확인<\/button>/);
+  assert.match(transition, /notifyGuardian: stateDate === today\(\) && \(next === 'boarded' \|\| next === 'dropped'\)/);
+  assert.match(transition, /rememberTransportNotification\(stateDate, routeId, studentId, next, result\.notification\)/);
+  assert.match(transition, /await loadTransport\(transportDate, true, true\)/);
+  assert.match(transition, /toast\(transportStateSuccessToast\(next, notification\)\)/);
+  assert.match(notification, /accepted: \['카톡 접수'/);
+  assert.match(notification, /rejected: \['카톡 거절/);
+  assert.match(notification, /unknown: \['카톡 접수 여부 확인 필요/);
+  assert.match(notification, /function transportNotificationStatus\(value\)/);
+  assert.match(notification, /SEND_DISABLED.*TEMPLATE_NOT_APPROVED/);
+  assert.match(notification, /카톡 미발송 · 알림 설정 준비 중/);
+  assert.match(notification, /카톡 미발송 · 연락처·동의 필요/);
+  assert.match(notification, /카톡 미발송 · 관리자 확인/);
+  assert.match(notification, /const status = transportNotificationStatus\(value\)/);
+  assert.match(success, /transportNotificationStatus\(notification \|\| \{ status: 'unknown' \}\)/);
+  assert.match(notification, /row\.student\.notification/);
+});
+
+test('saved transport state is never reported as failed when only refresh fails', async () => {
+  const transition = block('async function transitionTransportState(', 'function transportGuardianModal(');
+  const posts = [], messages = [];
+  const run = new Function(
+    'sync', 'toast', 'validYmd', 'today', 'transportStateKey', 'rememberTransportNotification',
+    'transportStateSuccessToast', 'loadTransport', 'confirm', 'prompt',
+    'const SYNC_APP="task"; let transportDate="2026-08-12", transportRestoreFocus=null; ' + transition +
+      '; return transitionTransportState;'
+  )(
+    { auth: () => ({ mode: 'person' }), post: async (path, payload) => {
+      posts.push({ path, payload }); return { notification: { status: 'accepted', event: 'boarded' } };
+    } },
+    message => messages.push(message), () => false, () => '2026-08-12',
+    (routeId, studentId) => routeId + '|' + studentId,
+    (date, routeId, studentId, next, notification) => notification,
+    () => '탑승 확인 저장 · 카톡 접수', async () => { throw new Error('refresh failed'); },
+    () => true, () => ''
+  );
+  const button = { disabled: false, dataset: { route: 'route-a', student: 'student-a', next: 'boarded', rev: '0' } };
+  await run(button);
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].payload.notifyGuardian, true);
+  assert.deepEqual(messages, [
+    '탑승 확인 저장 · 카톡 접수',
+    '기록은 저장됨 · 화면 새로고침 필요 — 같은 확인 버튼을 다시 누르지 마세요'
+  ]);
+  assert.equal(messages.some(message => message.includes('상태 저장 실패')), false);
+  assert.equal(button.disabled, true);
+});
+
+test('transport notification code families share honest card and toast wording', () => {
+  const source = block('const TRANSPORT_NOTIFICATION_STATUS = {', 'function rememberTransportNotification(');
+  const status = new Function(source + '; return transportNotificationStatus;')();
+  assert.equal(status({ status: 'blocked', code: 'SEND_DISABLED' })[0], '카톡 미발송 · 알림 설정 준비 중');
+  assert.equal(status({ status: 'blocked', code: 'TEMPLATE_NOT_APPROVED' })[0], '카톡 미발송 · 알림 설정 준비 중');
+  assert.equal(status({ status: 'blocked', code: 'GUARDIAN_PHONE_MISSING' })[0], '카톡 미발송 · 연락처·동의 필요');
+  assert.equal(status({ status: 'blocked', code: 'CALL_CONSENT_MISSING' })[0], '카톡 미발송 · 연락처·동의 필요');
+  assert.equal(status({ status: 'blocked', code: 'TRANSPORT_RECONSENT_REQUIRED' })[0], '카톡 미발송 · 연락처·동의 필요');
+  assert.equal(status({ status: 'blocked', code: 'ROUTE_CHANGED' })[0], '카톡 미발송 · 관리자 확인');
+});
+
+test('own driver gets consent-gated tel links and a clear no-show confirmation procedure', () => {
+  const source = block('function transportTelHref(', 'function transportGuardianModal(');
+  const actions = block('function transportStudentActions(', 'function transportRouteCard(');
+  const transition = block('async function transitionTransportState(', 'function transportGuardianModal(');
+  assert.match(source, /\^\\\+\?\\d\{8,15\}\$/);
+  assert.match(actions, /row\.student\.callReady === true/);
+  assert.match(actions, /transportTelHref\(row\.student\.guardianPhone\)/);
+  assert.match(actions, /href=\"' \+ esc\(telHref\)/);
+  assert.match(actions, />전화<\/a>/);
+  assert.match(actions, /data-act=\"transportphone\" data-route=/);
+  assert.match(actions, /data-student=\"' \+ esc\(row\.studentId\)/);
+  assert.match(actions, />번호 확인<\/button>/);
+  assert.doesNotMatch(actions, /data-(?:phone|guardian-phone)/i);
+  assert.match(source, /function transportOwnPhoneTarget\(routeId, studentId\)/);
+  assert.match(actions, /const ownPersonalRoute = session\.isStaffLink && transportDate === today\(\) && hasVerifiedPersonAuth\(\)/);
+  assert.match(actions, /String\(row\.route && \(row\.route\.driverId \|\| row\.route\.driver_id\) \|\| ''\) === session\.staffId/);
+  assert.match(source, /!session\.isStaffLink \|\| transportDate !== today\(\) \|\| !hasVerifiedPersonAuth\(\)/);
+  assert.match(source, /auth\.mode !== 'person' \|\| auth\.id !== session\.staffId/);
+  assert.match(source, /String\(routeRow\.driverId \|\| routeRow\.driver_id \|\| ''\) !== session\.staffId/);
+  assert.match(source, /routeRow\.days\.map\(Number\)\.includes\(dowOf\(today\(\)\)\)/);
+  assert.match(source, /student\.callReady !== true/);
+  assert.match(source, /transportTelHref\(student\.guardianPhone\)/);
+  assert.match(source, /function openTransportPhone\(button\)/);
+  assert.match(source, /esc\(target\.phone\)/);
+  assert.match(source, /href=\"' \+ esc\(target\.href\)/);
+  assert.match(html, /case 'transportphone': openTransportPhone\(el\); break/);
+  assert.match(transition, /전화 버튼으로 보호자에게 탑승 여부를 먼저 확인했나요/);
+  assert.match(transition, /기사 전화 동의 또는 연락처가 없어 전화할 수 없습니다/);
+  assert.match(transition, /확인 후 미탑승으로 기록할까요/);
+
+  const renderActions = new Function(
+    'session', 'transportDate', 'today', 'hasVerifiedPersonAuth', 'sync', 'transportTelHref', 'esc', 'transportStateKey',
+    actions + '; return transportStudentActions;'
+  )(
+    { isStaffLink: true, isAdmin: true, staffId: 'manager-driver' }, '2026-08-12', () => '2026-08-12',
+    () => true, { auth: () => ({ mode: 'person', id: 'manager-driver' }) },
+    value => 'tel:' + value, value => String(value), (routeId, studentId) => routeId + '|' + studentId
+  );
+  const managerDriverHtml = renderActions({
+    routeId: 'route-a', studentId: 'student-a', revision: 0, status: 'scheduled',
+    route: { driverId: 'manager-driver' }, student: { name: '학생', callReady: true, guardianPhone: '01012345678' }
+  });
+  assert.match(managerDriverHtml, />전화<\/a>/);
+  assert.match(managerDriverHtml, />번호 확인<\/button>/);
+});
+
+test('admin lazily manages stable-id transport contact and three separate consents', () => {
+  const actions = block('function transportStudentActions(', 'function transportRouteCard(');
+  const summary = block('function transportGuardianState(', 'function transportRouteStudents(');
+  const open = block('async function openTransportGuardianSettings(', 'async function saveTransportGuardianSettings(');
+  const save = block('async function saveTransportGuardianSettings(', 'function ensureTransportDraft(');
+  assert.match(actions, /data-act=\"transportguardian\" data-student=/);
+  assert.match(actions, /차량 연락·알림 설정/);
+  assert.match(summary, /maskedPhone/);
+  assert.match(summary, /기사 전화/);
+  assert.match(summary, /탑승 알림/);
+  assert.match(summary, /하차 알림/);
+  assert.match(summary, /재동의 필요/);
+  assert.match(open, /action: 'guardian_get', studentId: studentId/);
+  assert.match(save, /action: 'guardian_set', studentId: transportGuardianTarget\.studentId/);
+  assert.match(save, /callAllowed:/);
+  assert.match(save, /boardedConsent:/);
+  assert.match(save, /droppedConsent:/);
+  assert.match(save, /expectedContactUpdatedAt:/);
+  assert.match(save, /expectedConsentUpdatedAt:/);
+  assert.match(save, /confirmNewIdentity: confirmNewIdentity/);
+  assert.match(save, /phone \|\| transportGuardianTarget\.needsReconsent/);
+  assert.match(save, /이 번호의 보호자에게 차량 전화·알림 동의를 직접 확인했는지 체크해 주세요/);
+  assert.match(html, /id="transportGuardianNewIdentity"/);
+  assert.match(save, /if \(phone\) payload\.phone = phone/);
+  assert.doesNotMatch(summary, /guardianPhone|type=\"tel\"|data-(?:phone|guardian-phone)/i);
 });
 
 test('transport prioritizes onboarded students and exposes orphan state and capacity errors', () => {
@@ -322,11 +461,13 @@ test('transport route builder, map planner, and unsaved-draft guards expose the 
   assert.match(html, /\.transport-config \.btn, \.transport-config input, \.transport-config select \{ min-height: 44px/);
 });
 
-test('transport UI remains mobile accessible and excludes guardian PII', () => {
+test('transport UI remains mobile accessible and minimizes guardian PII in the DOM', () => {
   const source = block('/* ── 차량 운행 ──', '/* ── 원생 현황');
   assert.match(html, /\.transport-route-grid \{ grid-template-columns: 1fr; \}/);
   assert.match(html, /\.transport-datebar \.btn \{ min-height: 44px; \}/);
   assert.match(source, /restoreTransportFocus/);
-  assert.match(source, /학생 연락처와 주소는 표시하지 않습니다/);
-  assert.doesNotMatch(source, /guardian|guardianPhone|보호자 전화|도로명|상세주소/);
+  assert.match(source, /주소는 표시하지 않으며, 연락처는 동의가 확인된 오늘 본인 노선에서만 확인할 수 있습니다/);
+  assert.match(source, /명시적 번호 확인 모달과 tel: 링크에서만 일시 표시하며 data\/localStorage\/log에 복제하지 않는다/);
+  assert.doesNotMatch(source, /data-(?:phone|guardian-phone)/i);
+  assert.doesNotMatch(source, /console\.(?:log|warn|error)\([^\n]*(?:guardianPhone|phoneInput)/);
 });

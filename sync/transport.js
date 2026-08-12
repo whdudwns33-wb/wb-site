@@ -1,7 +1,8 @@
 /**
  * 차량 운행 API. 설정은 전체 관리 권한만 교체하고, 기사 개인 링크는 오늘 본인 노선의
- * 승차·하차·결석만 기록한다. 노선 설정의 학원·공개 정류장 주소 외에 전화·보호자 정보나
- * 원생 명단의 개인 주소는 읽지도 응답하지도 않는다.
+ * 승차·하차·결석만 기록한다. 전화번호는 별도 차량 통화 동의가 현재 보호자 identity에
+ * 결합된 경우에만 KST 오늘 본인 배정 노선의 해당 학생에게 공개한다. 관리 화면·다른 노선과
+ * 과거/미래 조회에는 번호를 내리지 않으며, 원생 명단의 개인 주소는 읽거나 응답하지 않는다.
  *
  * POST /transport
  *   { action:'list', date }
@@ -9,6 +10,11 @@
  *   { action:'state', date, routeId, studentId, next, revision, reason? }
  *   { action:'plan', baseAddress, direction, startTime, dwellMinutes, stops }
  */
+
+import {
+  addOwnDriverContacts, getTransportGuardian, notifyTransportGuardian, sendTransportNotification,
+  setTransportGuardian, transportNotificationSummaries
+} from './transport-notify.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -612,6 +618,8 @@ async function listTransport(env, body, auth) {
     }
     return { ...(auth.scope === 'all' ? item : routeForOwn(item)), students };
   });
+  await addOwnDriverContacts(env, date, auth, routes);
+  await transportNotificationSummaries(env, routes, date);
   const warnings = [];
   const configRoutes = new Map(loaded.config.routes.map(item => [item.id, item]));
   if (auth.scope === 'all') {
@@ -828,9 +836,36 @@ export async function handleTransport(env, app, body, origin, auth, json) {
     let result;
     if (action === 'list') result = await listTransport(env, body, auth);
     else if (action === 'replace') result = await replaceConfig(env, body, auth);
-    else if (action === 'state') result = await changeState(env, body, auth);
+    else if (action === 'state') {
+      if (body.notifyGuardian != null && typeof body.notifyGuardian !== 'boolean') {
+        problem('notifyGuardian은 true 또는 false여야 합니다');
+      }
+      result = await changeState(env, body, auth);
+      const event = String(result.state && result.state.status || '');
+      if (event === 'boarded' || event === 'dropped') {
+        const shouldNotify = body.notifyGuardian !== false;
+        if (shouldNotify) {
+          try {
+            result.notification = await sendTransportNotification(env, {
+              date: body.date, routeId: body.routeId, studentId: body.studentId,
+              state: event, revision: result.state.revision
+            }, auth);
+          } catch (error) {
+            // 상태 기록은 성공했다. 발송 시도 결과를 확정할 수 없으므로 상태를 되돌리거나 재발송하지 않는다.
+            result.notification = { status: 'unknown', event, code: 'NOTIFICATION_RESULT_UNCERTAIN',
+              revision: result.state.revision, idempotent: false, retryAllowed: false };
+          }
+        } else {
+          result.notification = { status: 'skipped', event, code: 'NOT_REQUESTED',
+            revision: result.state.revision, idempotent: false, retryAllowed: true };
+        }
+      }
+    }
     else if (action === 'plan') result = await planTransport(env, body, auth);
-    else problem('action은 list, replace, state 또는 plan이어야 합니다');
+    else if (action === 'guardian_get') result = await getTransportGuardian(env, body, auth);
+    else if (action === 'guardian_set') result = await setTransportGuardian(env, body, auth);
+    else if (action === 'notify') result = { ok: true, notification: await notifyTransportGuardian(env, body, auth) };
+    else problem('지원하지 않는 차량 action입니다');
     return json(result, 200, origin);
   } catch (error) {
     const boardingLock = isBoardingLockError(error);
