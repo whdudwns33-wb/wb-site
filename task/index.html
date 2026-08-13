@@ -695,10 +695,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-13.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-13.3"></script>
-<script src="./asset-core.js?v=2026-08-13.3"></script>
-<script src="./qr-core.js?v=2026-08-13.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.4"></script>
+<script src="./asset-core.js?v=2026-08-13.4"></script>
+<script src="./qr-core.js?v=2026-08-13.4"></script>
 <script>
 "use strict";
 
@@ -1788,24 +1788,22 @@ function render() {
   paintStatus();
   renderTabs();
   const v = $('#view');
-  const modalHost = $('#modalHost');
-  const paintView = html => { v.innerHTML = html; if (modalHost) v.appendChild(modalHost); };
 
   if (shouldGatePersonAccess()) {
-    paintView(viewPersonAccess());
+    v.innerHTML = viewPersonAccess();
     return;
   }
 
   if (session.isStaffLink && !staffById(session.staffId)) {
-    paintView('<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
-      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>');
+    v.innerHTML = '<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
+      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>';
     return;
   }
-  if (!session.isStaffLink && !session.isAdmin) { paintView(viewLock()); return; }
+  if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
 
   if (pendingAdd) {
     if (session.isStaffLink && !session.isAdmin) { pendingAdd = null; toast('지시서 등록은 관리자 화면에서만 됩니다'); }
-    else { paintView(viewPendingAdd()); return; }
+    else { v.innerHTML = viewPendingAdd(); return; }
   }
 
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
@@ -1817,7 +1815,7 @@ function render() {
   }
 
   const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
-  paintView((map[route] || viewToday)());
+  v.innerHTML = (map[route] || viewToday)();
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
     applyScheduleSearch(scheduleSearchQuery);
@@ -2590,8 +2588,8 @@ async function reviewLessonAssignment(action, button) {
 function lessonAssignmentRequestHtml() {
   const pending = lessonAssignmentRequests.filter(row => row.status === 'approval_waiting');
   const history = lessonAssignmentRequests.filter(row => row.status !== 'approval_waiting').slice(0, 3);
-  return '<section class="card lesson-review"><div class="card-title">👥 담당 학생 배정 요청</div>' +
-    '<div class="card-sub">내 담당 학생이 아직 연결되지 않았습니다. 이름·학년으로 요청하면 원장 승인 뒤 이 화면의 학생 선택 목록에 자동으로 나타납니다.</div>' +
+  return '<section class="card lesson-review"><div class="card-title">👥 다른 학생 배정 요청</div>' +
+    '<div class="card-sub">새 수업의 학생이 위 담당 목록에 없으면 이름·학년으로 요청하세요. 승인 뒤 학생 선택 목록에 추가됩니다.</div>' +
     '<div class="grid2 mt14"><label class="field"><span class="fl">학생 이름</span><input class="in" data-assignment-request-name maxlength="40"></label>' +
     '<label class="field"><span class="fl">학년</span><input class="in" data-assignment-request-grade maxlength="20" placeholder="예: 초4, 중2"></label></div>' +
     '<button class="btn btn-primary btn-block" data-act="lessonassignmentrequest">담당 학생 배정 요청</button>' +
@@ -2664,8 +2662,8 @@ function viewLessonEntry() {
   if (personal && rosterLoading) return '<div class="card"><div class="empty"><b>⏳</b>담당 학생 명단을 불러오는 중입니다.</div></div>';
   if (personal && rosterErr) return '<div class="card lesson-review"><div class="card-title">담당 학생 명단을 불러오지 못했습니다</div><div class="card-sub">학생을 선택하기 전에는 수업을 등록할 수 없습니다.</div><button class="btn btn-primary mt14" data-act="rosterretry">명단 다시 불러오기</button></div>';
   const personalStudents = personal ? assignedLessonStudents() : [];
+  if (personal && !lessonAssignmentRequestsLoaded && !lessonAssignmentRequestsLoading) setTimeout(() => loadLessonAssignmentRequests(false), 0);
   if (personal && !personalStudents.length) {
-    if (!lessonAssignmentRequestsLoaded && !lessonAssignmentRequestsLoading) setTimeout(() => loadLessonAssignmentRequests(false), 0);
     return lessonAssignmentRequestHtml();
   }
   if (session.isAdmin && !lessonAssignmentRequestsLoaded && !lessonAssignmentRequestsLoading) setTimeout(() => loadLessonAssignmentRequests(false), 0);
@@ -2682,7 +2680,7 @@ function viewLessonEntry() {
       '</select><div class="hint mt8">선택한 담당 학생만 수업·피드백과 연결됩니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
     : '<div class="sect">1. 이름 / 학년</div><div class="grid2">' + lessonTextField('studentName', '학생 이름', 0, '') + lessonTextField('grade', '학년', 0, '예: 초4, 중1, 고3') + '</div>';
-  return lessonAssignmentReviewHtml() + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
+  return (personal ? lessonAssignmentRequestHtml() : lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
     '<div class="card-sub">아래 9개 항목을 채우면 업무지시서와 수업 현황판에 함께 반영됩니다. 없는 항목은 “없음”이라고 적어 주세요.</div></div>' +
     '<div class="card">' + staffSelect +
       (rosterDb ? '<datalist id="lessonStudentNames">' + activeIn(today().slice(0, 7)).map(student =>
@@ -8838,7 +8836,7 @@ function viewSettings() {
    ══════════════════════════════════════════════════════ */
 let modalReturnFocus = null;
 function setModalBackgroundInert(value) {
-  document.querySelectorAll('.topbar, .tabs, #view > :not(#modalHost)').forEach(element => { element.inert = value; });
+  document.querySelectorAll('.topbar, .tabs, #view').forEach(element => { element.inert = value; });
 }
 function modal(title, bodyHtml, footHtml) {
   const host = $('#modalHost');
@@ -10933,7 +10931,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-13.3';
+const APP_VER = '2026-08-13.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
