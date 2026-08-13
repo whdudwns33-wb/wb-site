@@ -140,6 +140,7 @@ test('allowlisted task manager personal auth can issue another teacher QR link',
   }, { TASK_MANAGER_STAFF_IDS: ' other-manager , manager-1 ' });
   assert.equal(result.status, 200);
   assert.match(result.body.code, /^[a-f0-9]{48}$/);
+  assert.equal(result.body.authRole, 'staff');
 });
 
 test('staff.manager metadata and an allowlist substring cannot elevate personal auth', async () => {
@@ -186,6 +187,7 @@ test('allowlisted task manager handoff issues a code only for the same staff id'
   const issued = await post(db, '/handoff', { auth, staffId: 'teacher-2' }, managerEnv);
   assert.equal(issued.status, 200);
   assert.match(issued.body.code, /^[a-f0-9]{48}$/);
+  assert.equal(issued.body.authRole, 'manager');
   assert.ok(issued.body.expiresAt <= Date.now() + 10 * 60 * 1000);
   assert.equal(db.count(
     'SELECT count(*) AS n FROM bootstrap_codes WHERE app=? AND staff_id=?', 'task', 'manager-1'

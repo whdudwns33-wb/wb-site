@@ -631,7 +631,8 @@ async function handleBootstrap(env, app, body, origin) {
   if (!SAFE_ID.test(staffId)) return json({ ok: false, error: '올바른 staffId 필요' }, 400, origin);
   try {
     const issued = await issueBootstrap(env, app, staffId, BOOTSTRAP_TTL_MS);
-    return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+    const authRole = app === 'task' && taskManagerIds(env).has(staffId) ? 'manager' : 'staff';
+    return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt, authRole }, 200, origin);
   } catch (error) {
     return json({ ok: false, error: String(error && error.message || error) }, 409, origin);
   }
@@ -711,7 +712,8 @@ async function handleHandoff(env, app, body, origin) {
     return json({ ok: false, code: 'AUTH_REQUIRED', error: '개인 인증이 필요합니다' }, 401, origin);
   }
   const issued = await issueBootstrap(env, app, auth.id, HANDOFF_TTL_MS);
-  return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+  return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt,
+    authRole: auth.role === 'manager' ? 'manager' : 'staff' }, 200, origin);
 }
 
 async function handleAdminHandoff(env, app, body, origin) {

@@ -696,10 +696,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <dialog id="modalHost" class="modal" data-act="closemodal" aria-labelledby="modalTitle"></dialog>
 
-<script src="./lesson-form-core.js?v=2026-08-12.10"></script>
-<script src="./schedule-board-core.js?v=2026-08-12.10"></script>
-<script src="./asset-core.js?v=2026-08-12.10"></script>
-<script src="./qr-core.js?v=2026-08-12.10"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.1"></script>
+<script src="./asset-core.js?v=2026-08-13.1"></script>
+<script src="./qr-core.js?v=2026-08-13.1"></script>
 <script>
 "use strict";
 
@@ -2606,14 +2606,11 @@ function lessonAssignmentReviewHtml() {
   return '<section class="card lesson-review"><div class="between"><div><div class="card-title">👥 담당 학생 배정 요청</div><div class="card-sub">승인하면 해당 선생님 개인 링크의 원생·수업 등록 목록에 즉시 반영됩니다.</div></div><span class="pill warn">' + pending.length + '건</span></div>' +
     pending.map(row => {
       const matches = students.filter(student => String(student.name).normalize('NFKC').replace(/\s+/g, '') === String(row.studentName).normalize('NFKC').replace(/\s+/g, '') && String(student.grade).normalize('NFKC').replace(/\s+/g, '') === String(row.grade).normalize('NFKC').replace(/\s+/g, ''));
-      const matchIds = new Set(matches.map(student => student.id));
-      const others = students.filter(student => !matchIds.has(student.id)).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
       const teacher = staffById(row.staffId);
       return '<div class="card mt14"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
         (!matches.length ? '<div class="hint mt8">현재 명단에 같은 이름·학년의 원생이 없습니다. 기존 재원생이라면 명단에 먼저 추가할 수 있습니다.</div>' : '') +
         '<select class="in mt8" data-lar-student data-key="' + esc(row.requestKey) + '"><option value="">현재 원생 선택</option>' +
-          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') +
-          (others.length ? '<optgroup label="그 외 현재 재원생">' + others.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
+          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
         '<div class="row wraprow mt8"><button class="btn btn-primary" data-act="lessonassignmentapprove" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">승인</button>' +
           (!matches.length ? '<button class="btn btn-ghost" data-act="lessonassignmentaddexisting" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">기존 원생으로 추가 후 승인</button>' : '') +
           '<button class="btn btn-ghost" data-act="lessonassignmentreject" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">반려</button></div></div>';
@@ -8485,6 +8482,10 @@ function viewStaffAdmin() {
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="payrollmodal">📅 급여용 출퇴근 내보내기</button>' +
     '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출근 이력 (최근 14일)</button>' +
+    (session.isManager && hasVerifiedPersonAuth()
+      ? '<div class="hint mt14"><b>이 관리 권한을 다른 태블릿에 연결</b><br>직원 목록에서 다시 고르지 않고, 현재 확인된 내 관리 담당 계정을 그대로 연결합니다.</div>' +
+        '<button class="btn btn-navy btn-block mt8" data-act="handoffqr">📷 내 관리 담당 태블릿 QR</button>'
+      : '') +
   '</div>' +
   (list.length
     ? list.map(s => '<div class="card"><div class="between">' +
@@ -8864,13 +8865,20 @@ function closeModal() {
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
 
 const linkCodeVault = new Map();
-function storeLinkCode(id, code, expiresAt) {
-  linkCodeVault.set(String(id), { code: String(code || ''), expiresAt: Number(expiresAt) || 0 });
+function storeLinkCode(id, code, expiresAt, authRole) {
+  linkCodeVault.set(String(id), {
+    code: String(code || ''), expiresAt: Number(expiresAt) || 0,
+    authRole: authRole === 'manager' ? 'manager' : 'staff'
+  });
 }
 function linkCodeFor(id) {
   const item = linkCodeVault.get(String(id));
   if (!item || item.expiresAt <= Date.now()) { linkCodeVault.delete(String(id)); return ''; }
   return item.code;
+}
+function linkRoleFor(id) {
+  const item = linkCodeVault.get(String(id));
+  return item && item.expiresAt > Date.now() ? item.authRole : 'staff';
 }
 function clearLinkCode(id) { linkCodeVault.delete(String(id)); }
 
@@ -8889,12 +8897,13 @@ async function issueLinkCode(id) {
     if (sync.err) throw new Error('운영 데이터 연결 실패 — ' + sync.err);
   }
   const issued = await sync.issueBootstrap(id);
-  storeLinkCode(id, issued.code, issued.expiresAt);
+  storeLinkCode(id, issued.code, issued.expiresAt, issued.authRole);
   return issued.code;
 }
 /** 개인 링크를 QR로 띄운다. 태블릿 카메라로 비추면 그 기기가 연결된다. */
 function showLinkQr(s) {
   const link = staffLink(s.id);
+  const managerLink = linkRoleFor(s.id) === 'manager';
   const core = window.WBQRCore;
   if (!core) return void toast('QR 모듈을 불러오지 못했습니다 — 링크 복사를 이용해 주세요');
 
@@ -8906,8 +8915,12 @@ function showLinkQr(s) {
     return void toast('QR을 만들지 못했습니다 — ' + e.message);
   }
 
-  modal(s.name + ' 선생님 · 태블릿 연결',
+  modal(s.name + ' 선생님 · ' + (managerLink ? '관리 담당 태블릿 연결' : '일반 직원 태블릿 연결'),
     '<div style="text-align:center">' + svg + '</div>' +
+    '<div class="hint mt8"><b>' + (managerLink ? '관리 담당 권한 포함' : '일반 직원 권한') + '</b><br>' +
+      (managerLink
+        ? '연결된 태블릿에서도 승인·직원관리 등 관리 담당 기능을 사용할 수 있습니다.'
+        : '연결된 태블릿에서는 본인 업무 기능만 사용할 수 있습니다. 관리 버튼이 필요하면 서버에서 해당 직원 ID를 관리 담당으로 승인해야 합니다.') + '</div>' +
     '<div class="guide mt8"><b>태블릿에서</b>' +
       '1) 카메라 앱을 열고 이 QR을 비춥니다\n' +
       '2) 뜨는 주소를 눌러 크롬으로 엽니다\n' +
@@ -9099,7 +9112,9 @@ async function connectPendingDevice() {
     sync.personVerified = false;
     const verified = await sync.run();
     ensureSyncLoopStarted();
-    if (verified) toast('이 기기의 개인 링크 연결을 완료했습니다');
+    if (verified) toast(sync.accessRole === 'manager'
+      ? '관리 담당 기기로 연결했습니다'
+      : '일반 직원 기기로 연결했습니다 · 관리 기능은 사용할 수 없습니다');
     else toast('기기 연결은 저장했습니다 — 동기화를 다시 확인하고 있습니다');
     return verified;
   } catch (error) {
@@ -9125,7 +9140,7 @@ function useExistingPersonAuth() {
   ensureSyncLoopStarted();
 }
 
-async function createVerifiedHandoffLink() {
+async function createVerifiedHandoffLink(asQr) {
   if (!hasVerifiedPersonAuth()) {
     toast('개인 인증이 확인된 브라우저에서만 새 링크를 만들 수 있습니다');
     return false;
@@ -9145,6 +9160,13 @@ async function createVerifiedHandoffLink() {
   }
   try {
     const issued = await sync.handoff();
+    if (asQr) {
+      const staff = staffById(session.staffId);
+      if (!staff) throw new Error('현재 직원 정보를 찾을 수 없습니다');
+      storeLinkCode(session.staffId, issued.code, issued.expiresAt, issued.authRole);
+      showLinkQr(staff);
+      return true;
+    }
     const url = location.origin + location.pathname + '?u=' + encodeURIComponent(session.staffId) + '#c=' + encodeURIComponent(issued.code);
     const copied = await copy(url, '새 브라우저용 링크를 복사했습니다 · 10분 안에 열어 주세요');
     if (!copied) showText('새 브라우저용 개인 링크', url);
@@ -10351,6 +10373,10 @@ document.addEventListener('click', ev => {
       createVerifiedHandoffLink();
       break;
     }
+    case 'handoffqr': {
+      createVerifiedHandoffLink(true);
+      break;
+    }
     case 'orderText':
       issueLinkCode(id)
         .then(() => showText('카카오톡 지시서 문구', orderText(id, cursor)))
@@ -10906,7 +10932,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-12.10';
+const APP_VER = '2026-08-13.1';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

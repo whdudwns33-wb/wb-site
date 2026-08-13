@@ -17,7 +17,7 @@ test('the QR button sits in staff admin next to the link actions', () => {
 });
 
 test('every QR action in the markup has a handler', () => {
-  ['qrlink', 'copylinktext'].forEach(a => {
+  ['qrlink', 'copylinktext', 'handoffqr'].forEach(a => {
     assert.ok(html.includes('data-act="' + a + '"'), a + ' is rendered');
     assert.ok(html.includes("case '" + a + "':"), a + ' has a handler');
   });
@@ -57,10 +57,20 @@ test('the QR view falls back to copying when the code cannot be scanned', () => 
   assert.ok(fn[0].includes('try {'), 'an encode failure must not blank the screen');
 });
 
-test('the QR view warns about the two things that actually go wrong', () => {
+test('the QR view warns about one-time use and shows the granted role', () => {
   const fn = html.match(/function showLinkQr\(s\) \{[\s\S]*?\n\}\n/)[0];
   assert.ok(fn.includes('한 번만'), '1회용이라는 점을 알려야 재사용 시도를 막는다');
   assert.ok(fn.includes('원장 화면은 열지 마세요'), '태블릿에 관리 비밀번호가 남는 문제');
+  assert.ok(fn.includes('관리 담당 권한 포함'));
+  assert.ok(fn.includes('일반 직원 권한'));
+});
+
+test('a verified manager can hand the same manager identity to a tablet QR', () => {
+  assert.match(html, /내 관리 담당 태블릿 QR/);
+  assert.match(html, /case 'handoffqr':[\s\S]{0,120}createVerifiedHandoffLink\(true\)/);
+  const fn = html.match(/async function createVerifiedHandoffLink\(asQr\)[\s\S]*?\n\}/)?.[0] || '';
+  assert.match(fn, /storeLinkCode\(session\.staffId, issued\.code, issued\.expiresAt, issued\.authRole\)/);
+  assert.match(fn, /showLinkQr\(staff\)/);
 });
 
 /* 실제 개인 링크 길이가 지원 범위에 드는지 — 못 들면 버튼이 늘 실패한다. */
