@@ -27,8 +27,8 @@ test('staff popups use one browser-independent fixed layer and stay on the curre
   assert.match(html, /<div id="modalHost" class="modal"[\s\S]{0,100}role="dialog"[\s\S]{0,100}hidden><\/div>/);
   assert.match(html, /host\.hidden = false/);
   assert.match(html, /setModalBackgroundInert\(true\)/);
-  assert.match(html, /v\.appendChild\(modalHost\)/, 'popup belongs to the currently rendered screen');
-  assert.match(html, /#view > :not\(#modalHost\)/, 'background is inert without disabling the popup itself');
+  assert.match(html, /<\/main>[\s\S]{0,180}<div id="toast"[\s\S]{0,180}<div id="modalHost"/, 'popup is outside the rerendered view');
+  assert.doesNotMatch(html, /v\.appendChild\(modalHost\)/, 'rendering a screen must never remove or move the popup');
   assert.match(html, /\.modal:not\(\[hidden\]\) \{ display: grid; \}/);
   assert.doesNotMatch(html, /showModal\(|<dialog/);
   const modalFn = html.match(/function modal\(title, bodyHtml, footHtml\) \{[\s\S]*?\n\}/);

@@ -19,6 +19,15 @@ test('empty personal roster offers a director-approved assignment request', () =
   assert.match(source, /담당 학생을 연결했습니다/);
 });
 
+test('teachers can request another student even after one student is assigned', () => {
+  assert.match(source, /다른 학생 배정 요청/);
+  assert.match(source, /personal \? lessonAssignmentRequestHtml\(\) : lessonAssignmentReviewHtml\(\)/);
+  assert.match(source, /data-assignment-request-name/);
+  assert.match(source, /data-assignment-request-grade/);
+  const entry = source.match(/function viewLessonEntry\(\)[\s\S]*?\n\}/)?.[0] || '';
+  assert.ok(entry.indexOf('loadLessonAssignmentRequests(false)') < entry.indexOf('if (personal && !personalStudents.length)'));
+});
+
 test('review shows teacher names and only exact roster matches', () => {
   assert.match(source, /요청 선생님: /);
   assert.doesNotMatch(source, /요청 선생님 ID:/);
