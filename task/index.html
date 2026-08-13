@@ -695,10 +695,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-13.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-13.2"></script>
-<script src="./asset-core.js?v=2026-08-13.2"></script>
-<script src="./qr-core.js?v=2026-08-13.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.3"></script>
+<script src="./asset-core.js?v=2026-08-13.3"></script>
+<script src="./qr-core.js?v=2026-08-13.3"></script>
 <script>
 "use strict";
 
@@ -1268,12 +1268,15 @@ const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sy
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
-function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
+function go(r) {
+  if (!$('#modalHost').hidden) closeModal();
+  route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render();
+}
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
   if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
-  if (r && r !== route) { route = r; render(); }
+  if (r && r !== route) { if (!$('#modalHost').hidden) closeModal(); route = r; render(); }
 });
 
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
@@ -1785,22 +1788,24 @@ function render() {
   paintStatus();
   renderTabs();
   const v = $('#view');
+  const modalHost = $('#modalHost');
+  const paintView = html => { v.innerHTML = html; if (modalHost) v.appendChild(modalHost); };
 
   if (shouldGatePersonAccess()) {
-    v.innerHTML = viewPersonAccess();
+    paintView(viewPersonAccess());
     return;
   }
 
   if (session.isStaffLink && !staffById(session.staffId)) {
-    v.innerHTML = '<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
-      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>';
+    paintView('<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
+      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>');
     return;
   }
-  if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
+  if (!session.isStaffLink && !session.isAdmin) { paintView(viewLock()); return; }
 
   if (pendingAdd) {
     if (session.isStaffLink && !session.isAdmin) { pendingAdd = null; toast('지시서 등록은 관리자 화면에서만 됩니다'); }
-    else { v.innerHTML = viewPendingAdd(); return; }
+    else { paintView(viewPendingAdd()); return; }
   }
 
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
@@ -1812,7 +1817,7 @@ function render() {
   }
 
   const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
-  v.innerHTML = (map[route] || viewToday)();
+  paintView((map[route] || viewToday)());
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
     applyScheduleSearch(scheduleSearchQuery);
@@ -8833,7 +8838,7 @@ function viewSettings() {
    ══════════════════════════════════════════════════════ */
 let modalReturnFocus = null;
 function setModalBackgroundInert(value) {
-  document.querySelectorAll('.topbar, .tabs, #view').forEach(element => { element.inert = value; });
+  document.querySelectorAll('.topbar, .tabs, #view > :not(#modalHost)').forEach(element => { element.inert = value; });
 }
 function modal(title, bodyHtml, footHtml) {
   const host = $('#modalHost');
@@ -10928,7 +10933,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-13.2';
+const APP_VER = '2026-08-13.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
