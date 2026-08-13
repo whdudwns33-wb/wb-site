@@ -27,6 +27,8 @@ test('staff popups use one browser-independent fixed layer and stay on the curre
   assert.match(html, /<div id="modalHost" class="modal"[\s\S]{0,100}role="dialog"[\s\S]{0,100}hidden><\/div>/);
   assert.match(html, /host\.hidden = false/);
   assert.match(html, /setModalBackgroundInert\(true\)/);
+  assert.match(html, /v\.appendChild\(modalHost\)/, 'popup belongs to the currently rendered screen');
+  assert.match(html, /#view > :not\(#modalHost\)/, 'background is inert without disabling the popup itself');
   assert.match(html, /\.modal:not\(\[hidden\]\) \{ display: grid; \}/);
   assert.doesNotMatch(html, /showModal\(|<dialog/);
   const modalFn = html.match(/function modal\(title, bodyHtml, footHtml\) \{[\s\S]*?\n\}/);
@@ -35,6 +37,14 @@ test('staff popups use one browser-independent fixed layer and stay on the curre
   const manageFn = html.match(/function manageTasks\(staffId\) \{[\s\S]*?\n\}/);
   assert.ok(manageFn, 'instruction-list popup found');
   assert.match(manageFn[0], /modal\(/, 'instruction list uses the same top-layer popup');
+});
+
+test('a popup cannot follow the user from staff management to the dashboard', () => {
+  const go = html.match(/function go\(r\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const hash = html.match(/window\.addEventListener\('hashchange',[\s\S]*?\n\}\);/)?.[0] || '';
+  assert.match(go, /closeModal\(\)/);
+  assert.ok(go.indexOf('closeModal()') < go.indexOf('route = r'));
+  assert.match(hash, /closeModal\(\)[\s\S]{0,80}route = r/);
 });
 
 /* 링크는 1회용 코드를 담는다. 코드를 먼저 발급하지 않으면 이미 소모된
