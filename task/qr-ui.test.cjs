@@ -23,11 +23,12 @@ test('every QR action in the markup has a handler', () => {
   });
 });
 
-test('staff popups use the browser top layer and stay on the current tab', () => {
-  assert.match(html, /<dialog id="modalHost" class="modal"/);
-  assert.match(html, /typeof host\.showModal === 'function'/);
-  assert.match(html, /host\.showModal\(\)/);
-  assert.match(html, /\.modal\[open\] \{ display: grid; \}/);
+test('staff popups use one browser-independent fixed layer and stay on the current tab', () => {
+  assert.match(html, /<div id="modalHost" class="modal"[\s\S]{0,100}role="dialog"[\s\S]{0,100}hidden><\/div>/);
+  assert.match(html, /host\.hidden = false/);
+  assert.match(html, /setModalBackgroundInert\(true\)/);
+  assert.match(html, /\.modal:not\(\[hidden\]\) \{ display: grid; \}/);
+  assert.doesNotMatch(html, /showModal\(|<dialog/);
   const modalFn = html.match(/function modal\(title, bodyHtml, footHtml\) \{[\s\S]*?\n\}/);
   assert.ok(modalFn, 'shared modal function found');
   assert.doesNotMatch(modalFn[0], /\bgo\(|location\.hash|route\s*=/, 'opening a popup must not navigate away');
