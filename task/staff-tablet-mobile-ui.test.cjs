@@ -43,6 +43,6 @@ test('personal daily and weekly check controls keep 44px touch targets', () => {
 });
 
 test('version reload preserves the personal query and replaces an existing cache key', () => {
-  assert.match(html, /const next = new URL\(location\.href\);[\s\S]{0,160}next\.searchParams\.set\('v', String\(Date\.now\(\)\)\);[\s\S]{0,120}location\.replace\(next\.pathname \+ next\.search \+ next\.hash\)/);
+  assert.match(html, /function reloadVersion\(version\)[\s\S]{0,160}const next = new URL\(location\.href\);[\s\S]{0,100}next\.searchParams\.set\('v', version\);[\s\S]{0,120}location\.replace\(next\.pathname \+ next\.search \+ next\.hash\)/);
   assert.doesNotMatch(html, /location\.search\.replace\(\/\[\?&\]v=/);
 });

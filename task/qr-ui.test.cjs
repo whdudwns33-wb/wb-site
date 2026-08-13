@@ -39,6 +39,14 @@ test('staff popups use one browser-independent fixed layer and stay on the curre
   assert.match(manageFn[0], /modal\(/, 'instruction list uses the same top-layer popup');
 });
 
+test('stale tablet pages automatically reload one cache-busted version', () => {
+  assert.match(html, /const VERSION_RELOAD_KEY = 'wb_task_version_reload'/);
+  assert.match(html, /sessionStorage\.getItem\(VERSION_RELOAD_KEY\) !== d\.v/);
+  assert.match(html, /sessionStorage\.setItem\(VERSION_RELOAD_KEY, d\.v\)[\s\S]{0,100}reloadVersion\(d\.v\)/);
+  assert.match(html, /next\.searchParams\.set\('v', version\)/);
+  assert.match(html, /location\.replace\(next\.pathname \+ next\.search \+ next\.hash\)/, 'personal u and route hash are preserved');
+});
+
 test('a popup cannot follow the user from staff management to the dashboard', () => {
   const go = html.match(/function go\(r\) \{[\s\S]*?\n\}/)?.[0] || '';
   const hash = html.match(/window\.addEventListener\('hashchange',[\s\S]*?\n\}\);/)?.[0] || '';

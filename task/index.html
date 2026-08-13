@@ -695,10 +695,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-13.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-13.4"></script>
-<script src="./asset-core.js?v=2026-08-13.4"></script>
-<script src="./qr-core.js?v=2026-08-13.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.5"></script>
+<script src="./asset-core.js?v=2026-08-13.5"></script>
+<script src="./qr-core.js?v=2026-08-13.5"></script>
 <script>
 "use strict";
 
@@ -10931,22 +10931,31 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-13.4';
+const APP_VER = '2026-08-13.5';
+const VERSION_RELOAD_KEY = 'wb_task_version_reload';
+function reloadVersion(version) {
+  const next = new URL(location.href);
+  next.searchParams.set('v', version);
+  location.replace(next.pathname + next.search + next.hash);
+}
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(d => {
-      if (!d || !d.v || d.v === APP_VER || document.getElementById('newver')) return;
+      if (!d || !d.v) return;
+      if (d.v === APP_VER) { sessionStorage.removeItem(VERSION_RELOAD_KEY); return; }
+      if (sessionStorage.getItem(VERSION_RELOAD_KEY) !== d.v) {
+        sessionStorage.setItem(VERSION_RELOAD_KEY, d.v);
+        reloadVersion(d.v);
+        return;
+      }
+      if (document.getElementById('newver')) return;
       const el = document.createElement('div');
       el.className = 'newver'; el.id = 'newver';
       el.innerHTML = '<span>\uc0c8 \ubc84\uc804\uc774 \uc788\uc2b5\ub2c8\ub2e4 \u2014 \uc0c8\ub85c\uace0\uce68\ud558\uba74 \ubc14\ub85c \uc801\uc6a9\ub429\ub2c8\ub2e4</span>' +
         '<button type="button" id="verReload">\uc0c8\ub85c\uace0\uce68</button>';
       document.body.appendChild(el);
-      document.getElementById('verReload').onclick = () => {
-        const next = new URL(location.href);
-        next.searchParams.set('v', String(Date.now()));
-        location.replace(next.pathname + next.search + next.hash);
-      };
+      document.getElementById('verReload').onclick = () => reloadVersion(d.v);
     })
     .catch(() => {});
 }
