@@ -19,10 +19,11 @@ test('empty personal roster offers a director-approved assignment request', () =
   assert.match(source, /담당 학생을 연결했습니다/);
 });
 
-test('review shows teacher names and every active roster student with explicit mismatch confirmation', () => {
+test('review shows teacher names and only exact roster matches', () => {
   assert.match(source, /요청 선생님: /);
   assert.doesNotMatch(source, /요청 선생님 ID:/);
-  assert.match(source, /그 외 현재 재원생/);
+  assert.doesNotMatch(source, /그 외 현재 재원생/);
+  assert.match(source, /요청과 일치하는 원생/);
   assert.match(source, /body\.confirmIdentityMismatch = true/);
   assert.match(source, /같은 학생이 맞습니까/);
 });

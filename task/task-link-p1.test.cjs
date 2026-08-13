@@ -79,7 +79,7 @@ test('authenticated staff can create a browser handoff link', () => {
   assert.match(html, /async handoff\(\)/);
   assert.match(html, /\/handoff/);
   assert.match(html, /hasVerifiedPersonAuth\(\)/);
-  assert.match(html, /async function createVerifiedHandoffLink/);
+  assert.match(html, /async function createVerifiedHandoffLink\(asQr\)/);
   assert.match(html, /const verified = await sync\.run\(\)/);
   assert.match(html, /개인 인증이 확인된 브라우저에서만/);
 });
@@ -103,7 +103,7 @@ test('only authentication failures discard verified access; transient sync failu
   assert.match(run, /if \(authRejected\) \{[\s\S]{0,160}handlePersonAuthRejection\(e, nextAccessRole === 'manager', problem\)/);
   assert.doesNotMatch(run, /catch \(e\) \{\s*console\.warn\('sync', e\);\s*this\.accessRole = ''/);
   assert.ok(syncCatch.indexOf('if (authRejected)') < syncCatch.indexOf('handlePersonAuthRejection'));
-  const handoff = html.match(/async function createVerifiedHandoffLink\(\)[\s\S]*?\n}/)?.[0] || '';
+  const handoff = html.match(/async function createVerifiedHandoffLink\(asQr\)[\s\S]*?\n}/)?.[0] || '';
   assert.match(handoff, /if \(!verified\)/);
   assert.match(handoff, /동기화 상태를 확인하지 못했습니다 — 잠시 후 다시 시도해 주세요/);
   assert.match(handoff, /authLost/);
@@ -203,7 +203,7 @@ test('manager downgrade and auth rejection purge the full person cache', () => {
 test('direct personal API 401/403 purges sensitive UI once, while sync, root admin, and 5xx keep their paths', () => {
   const post = html.match(/async post\(path, body\) \{[\s\S]*?\n  \},/)?.[0] || '';
   const rejection = html.match(/function handlePersonAuthRejection\(error, managerRoleSeen, knownProblem\) \{[\s\S]*?\n}/)?.[0] || '';
-  const handoff = html.match(/async function createVerifiedHandoffLink\(\)[\s\S]*?\n}/)?.[0] || '';
+  const handoff = html.match(/async function createVerifiedHandoffLink\(asQr\)[\s\S]*?\n}/)?.[0] || '';
   assert.match(post, /body && body\.auth && body\.auth\.mode === 'person'/);
   assert.match(post, /path !== '\/sync' && session\.isStaffLink && personRequest/);
   assert.match(post, /res\.status === 401 \|\| res\.status === 403/);
