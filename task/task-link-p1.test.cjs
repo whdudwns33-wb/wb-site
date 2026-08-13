@@ -84,6 +84,19 @@ test('authenticated staff can create a browser handoff link', () => {
   assert.match(html, /개인 인증이 확인된 브라우저에서만/);
 });
 
+test('a stored device connection can be rechecked without consuming another link', () => {
+  assert.match(html, /data-act="retryexistingauth">이 기기의 기존 연결 상태 확인/);
+  assert.match(html, /data-act="retryexistingauth">이 기기의 기존 연결 다시 확인/);
+  assert.match(html, /data-act="retryexistingauth">🔄 이 기기의 기존 연결 상태 확인/);
+  assert.match(html, /case 'retryexistingauth': retryExistingPersonAuth\(el\)/);
+  const retry = html.match(/async function retryExistingPersonAuth\(button\)[\s\S]*?\n}/)?.[0] || '';
+  assert.match(retry, /hasStoredPersonToken\(\)/);
+  assert.match(retry, /await sync\.run\(\)/);
+  assert.match(retry, /verified && hasVerifiedPersonAuth\(\)/);
+  assert.match(retry, /새 QR 또는 링크가 필요합니다/);
+  assert.doesNotMatch(retry, /exchangeBootstrap|pendingBootstrapCode|issueBootstrap/, 'a used or revoked one-time link must never be resurrected');
+});
+
 test('link and session failures have distinct user guidance', () => {
   for (const code of ['LINK_USED', 'LINK_EXPIRED', 'LINK_REPLACED', 'LINK_INVALID', 'AUTH_REQUIRED']) {
     assert.match(html, new RegExp(code));
