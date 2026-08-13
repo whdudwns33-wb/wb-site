@@ -695,10 +695,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-13.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-13.5"></script>
-<script src="./asset-core.js?v=2026-08-13.5"></script>
-<script src="./qr-core.js?v=2026-08-13.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.6"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.6"></script>
+<script src="./asset-core.js?v=2026-08-13.6"></script>
+<script src="./qr-core.js?v=2026-08-13.6"></script>
 <script>
 "use strict";
 
@@ -1453,7 +1453,7 @@ function viewPersonAccess() {
         '<div class="guide"><b>안전하게 여는 방법</b>1. 아래에서 원본 개인 링크를 복사합니다.<br>2. Safari 또는 Chrome 주소창에 붙여넣습니다.<br>3. 열린 화면에서 <b>이 기기에 연결</b>을 누릅니다.</div>' +
         '<div class="link-actions"><button class="btn btn-primary btn-block" data-act="copyentrylink">원본 개인 링크 복사</button>' +
         (navigator.share ? '<button class="btn btn-ghost btn-block" data-act="shareentrylink">다른 브라우저로 보낼 링크 공유</button>' : '') +
-        (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">이 링크를 쓰지 않고 기존 연결로 열기</button>' : '') +
+        (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
         '</div><div class="hint" style="margin-top:12px">복사나 공유만으로는 코드가 사용되지 않습니다.</div></div>';
     }
     const canRetry = !problem || problem.retryable;
@@ -1463,12 +1463,13 @@ function viewPersonAccess() {
       '<div class="link-actions">' +
       (canRetry ? '<button class="btn btn-primary btn-block" data-act="connectdevice"' + (linkExchangeBusy ? ' disabled' : '') + '>' + (linkExchangeBusy ? '연결하는 중…' : '이 기기에 연결') + '</button>' : '') +
       '<button class="btn btn-ghost btn-block" data-act="copyentrylink">이 개인 링크 다시 복사</button>' +
-      (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">새 코드를 쓰지 않고 기존 연결로 열기</button>' : '') +
+      (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
       '</div></div>';
   }
 
   if (hasStoredPersonToken() && !personAccessProblem) {
-    return '<div class="card link-gate"><div class="empty"><b>⏳</b>이 브라우저의 개인 인증을 확인하는 중입니다.<br>확인이 끝난 뒤 업무를 표시합니다.</div></div>';
+    return '<div class="card link-gate"><div class="empty"><b>⏳</b>이 브라우저의 개인 인증을 확인하는 중입니다.<br>확인이 끝난 뒤 업무를 표시합니다.</div>' +
+      '<button class="btn btn-primary btn-block" data-act="retryexistingauth">이 기기의 기존 연결 다시 확인</button></div>';
   }
   const problem = personAccessProblem || missingPersonLinkProblem();
   return '<div class="card link-gate"><div class="card-title">' + esc(problem.title) + '</div>' +
@@ -1993,7 +1994,8 @@ function viewToday() {
     h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 알림톡</button>';
   }
   if (session.isStaffLink && hasVerifiedPersonAuth()) {
-    h += '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
+    h += '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">이 기기의 기존 연결 상태 확인</button>' +
+      '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
       '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.<br>' +
       '위 링크는 10분 안에 최종 브라우저에서 한 번 열고 <b>이 기기에 연결</b>을 눌러 주세요.</div>';
   } else if (session.isStaffLink) {
@@ -8486,6 +8488,7 @@ function viewStaffAdmin() {
     '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출근 이력 (최근 14일)</button>' +
     (session.isManager && hasVerifiedPersonAuth()
       ? '<div class="hint mt14"><b>이 관리 권한을 다른 태블릿에 연결</b><br>직원 목록에서 다시 고르지 않고, 현재 확인된 내 관리 담당 계정을 그대로 연결합니다.</div>' +
+        '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">🔄 이 기기의 기존 연결 상태 확인</button>' +
         '<button class="btn btn-navy btn-block mt8" data-act="handoffqr">📷 내 관리 담당 태블릿 QR</button>'
       : '') +
   '</div>' +
@@ -9139,6 +9142,25 @@ function useExistingPersonAuth() {
   ensureSyncLoopStarted();
 }
 
+async function retryExistingPersonAuth(button) {
+  if (!session.isStaffLink || !hasStoredPersonToken()) {
+    toast('이 기기에 저장된 연결이 없습니다 — 새 QR 또는 링크로 연결해 주세요');
+    return false;
+  }
+  if (sync.busy) { toast('기존 연결을 확인하고 있습니다'); return false; }
+  if (button) { button.disabled = true; button.textContent = '기존 연결 확인 중…'; }
+  const verified = await sync.run();
+  if (verified && hasVerifiedPersonAuth()) {
+    toast('이 기기의 기존 연결을 확인했습니다');
+    render();
+    return true;
+  }
+  if (hasStoredPersonToken()) toast('서버에 연결하지 못했습니다 — 인터넷을 확인하고 다시 눌러 주세요');
+  else toast('기존 연결이 만료되었거나 해지되었습니다 — 새 QR 또는 링크가 필요합니다');
+  if (button && document.contains(button)) { button.disabled = false; button.textContent = '이 기기의 기존 연결 다시 확인'; }
+  return false;
+}
+
 async function createVerifiedHandoffLink(asQr) {
   if (!hasVerifiedPersonAuth()) {
     toast('개인 인증이 확인된 브라우저에서만 새 링크를 만들 수 있습니다');
@@ -9672,6 +9694,7 @@ document.addEventListener('click', ev => {
     }
     case 'shareentrylink': shareBootstrapLink(); break;
     case 'useexistingauth': useExistingPersonAuth(); break;
+    case 'retryexistingauth': retryExistingPersonAuth(el); break;
     case 'retryauthcheck': startSyncSession(); break;
 
     /* 잠금 */
@@ -10931,7 +10954,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-13.5';
+const APP_VER = '2026-08-13.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
