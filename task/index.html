@@ -657,11 +657,10 @@
     max-width: 90vw; text-align: center;
   }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
-  /* dialog의 top layer를 써야 태블릿의 sticky 탭/스크롤 위에서도 현재 화면에 바로 보인다. */
+  /* 브라우저별 dialog 구현을 쓰지 않고 최상위 고정 레이어 하나로 모든 팝업을 연다. */
   .modal { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; background: rgba(27,58,92,.55); padding: 16px; place-items: center; z-index: 150; }
-  .modal[open] { display: grid; }
-  .modal:not([open]) { display: none; }
-  .modal::backdrop { background: transparent; }
+  .modal:not([hidden]) { display: grid; }
+  .modal[hidden] { display: none; }
   .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
@@ -694,12 +693,12 @@
 <main class="wrap" id="view"></main>
 
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-<dialog id="modalHost" class="modal" data-act="closemodal" aria-labelledby="modalTitle"></dialog>
+<div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-13.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-13.1"></script>
-<script src="./asset-core.js?v=2026-08-13.1"></script>
-<script src="./qr-core.js?v=2026-08-13.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-13.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-13.2"></script>
+<script src="./asset-core.js?v=2026-08-13.2"></script>
+<script src="./qr-core.js?v=2026-08-13.2"></script>
 <script>
 "use strict";
 
@@ -8838,23 +8837,20 @@ function setModalBackgroundInert(value) {
 }
 function modal(title, bodyHtml, footHtml) {
   const host = $('#modalHost');
-  if (!host.open) modalReturnFocus = document.activeElement;
+  if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML =
     '<div class="modal-box">' +
       '<div class="between mb14"><div class="card-title" id="modalTitle">' + esc(title) + '</div>' +
       '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
       bodyHtml + (footHtml || '') +
     '</div>';
-  if (!host.open) {
-    if (typeof host.showModal === 'function') host.showModal();
-    else { host.setAttribute('open', ''); setModalBackgroundInert(true); }
-  }
+  host.hidden = false;
+  setModalBackgroundInert(true);
   requestAnimationFrame(() => $('#modalHost button[data-act="closemodal"]')?.focus());
 }
 function closeModal() {
   const host = $('#modalHost');
-  if (host.open && typeof host.close === 'function') host.close();
-  else host.removeAttribute('open');
+  host.hidden = true;
   host.innerHTML = '';
   setModalBackgroundInert(false);
   const target = modalReturnFocus;
@@ -10877,7 +10873,7 @@ document.addEventListener('change', ev => {
 
 /* 엔터 제출 */
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && $('#modalHost').open) { closeModal(); return; }
+  if (ev.key === 'Escape' && !$('#modalHost').hidden) { closeModal(); return; }
   if (ev.key !== 'Enter') return;
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
@@ -10932,7 +10928,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-13.1';
+const APP_VER = '2026-08-13.2';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

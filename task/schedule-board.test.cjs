@@ -314,11 +314,11 @@ test('dashboard offers weekly day, teacher, and student views with authenticated
   assert.match(html, /data-act="scheduleblock"/);
   assert.match(html, /data-lesson="' \+ esc\(session\.lessonIdentity\)/);
   assert.match(html, /const currentStudentCount = new Set\(current\.map\(entry => core\.studentGroupKey/);
-  assert.match(html, /<dialog id="modalHost" class="modal" data-act="closemodal" aria-labelledby="modalTitle"><\/dialog>/);
-  assert.match(html, /typeof host\.showModal === 'function'/);
+  assert.match(html, /<div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden><\/div>/);
+  assert.match(html, /host\.hidden = false/);
   assert.match(html, /#modalHost button\[data-act="closemodal"\]/);
   assert.match(html, /element\.inert = value/);
-  assert.match(html, /ev\.key === 'Escape' && \$\('#modalHost'\)\.open/);
+  assert.match(html, /ev\.key === 'Escape' && !\$\('#modalHost'\)\.hidden/);
   assert.match(html, /data-schedule-search/);
   assert.match(html, /function scheduleStudentSources\(group\)/);
   assert.match(html, /const editingStudentId = draft\._sourceTaskId \? String\(draft\.studentId \|\| ''\)\.trim\(\) : '';/);
