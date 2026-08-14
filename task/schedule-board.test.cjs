@@ -303,7 +303,7 @@ test('dashboard is admin-only, mobile responsive, and keeps multi-teacher tasks 
 });
 
 test('dashboard offers weekly day, teacher, and student views with authenticated roster loading', () => {
-  assert.match(html, /\['schedule', '현황판'\]/);
+  assert.match(html, /\['schedule', '현황판', managerRequestInboxCount\(\)\]/);
   assert.match(html, /\['day', '오늘 보드'\], \['week', '요일별'\], \['teacher', '선생님별'\], \['student', '학생별'\]/);
   assert.match(html, /function weeklyLessonSchedule\(anchor\)/);
   assert.match(html, /function scheduleWeekCardsHtml\(weekly\)/);
