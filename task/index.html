@@ -2591,7 +2591,9 @@ function showFeedbackPreview(t, date, fields, letterText) {
 }
 
 function todayStaffList() {
-  const rank = name => name === '김혜지' ? 0 : name === '김남기' ? 1 : String(name || '').includes('테스트') ? 3 : 2;
+  const ownName = session.isStaffLink ? String((staffById(session.staffId) || {}).name || '') : '';
+  const firstTwo = ownName === '김남기' ? ['김남기', '김혜지'] : ['김혜지', '김남기'];
+  const rank = name => name === firstTwo[0] ? 0 : name === firstTwo[1] ? 1 : String(name || '').includes('테스트') ? 3 : 2;
   return liveStaff().slice().sort((a, b) => rank(a.name) - rank(b.name) || String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
 }
 

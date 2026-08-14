@@ -25,13 +25,24 @@ test('수업은 저장된 done 플래그가 있어도 5개 체크리스트가 �
   assert.equal(isDone(task.id, '2026-08-14'), true);
 });
 
-test('관리자 오늘 할 일의 선생님 순서는 김혜지, 김남기, 가나다순, 테스트 순이다', () => {
+test('오늘 탭은 개인 태블릿의 담당자를 앞에 두고 나머지 기존 순서를 유지한다', () => {
   const start = source.indexOf('function todayStaffList(');
   const end = source.indexOf('function staffSwitcher(', start);
   const staff = ['테스트 선생님', '박지원', '김남기', '김혜지', '강민지'].map((name, index) => ({ id: String(index), name }));
-  const list = new Function('liveStaff', source.slice(start, end) + '\nreturn todayStaffList;')(() => staff)();
-  assert.deepEqual(list.map(row => row.name), ['김혜지', '김남기', '강민지', '박지원', '테스트 선생님']);
-  assert.notEqual(list, staff, '원본 직원 배열은 변경하지 않아야 한다');
+  const staffById = id => staff.find(row => row.id === id);
+  const factory = session => new Function('liveStaff', 'session', 'staffById',
+    source.slice(start, end) + '\nreturn todayStaffList;')(() => staff, session, staffById);
+
+  const directorList = factory({ isStaffLink: false, staffId: '' })();
+  const namgiList = factory({ isStaffLink: true, staffId: '2' })();
+  const hyejiList = factory({ isStaffLink: true, staffId: '3' })();
+  const otherList = factory({ isStaffLink: true, staffId: '1' })();
+
+  assert.deepEqual(directorList.map(row => row.name), ['김혜지', '김남기', '강민지', '박지원', '테스트 선생님']);
+  assert.deepEqual(namgiList.map(row => row.name), ['김남기', '김혜지', '강민지', '박지원', '테스트 선생님']);
+  assert.deepEqual(hyejiList.map(row => row.name), ['김혜지', '김남기', '강민지', '박지원', '테스트 선생님']);
+  assert.deepEqual(otherList.map(row => row.name), ['김혜지', '김남기', '강민지', '박지원', '테스트 선생님']);
+  assert.notEqual(namgiList, staff, '원본 직원 배열은 변경하지 않아야 한다');
   assert.match(source, /return staffById\(viewStaff\) \|\| todayStaffList\(\)\[0\] \|\| null/);
 });
 
