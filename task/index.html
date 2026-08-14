@@ -722,10 +722,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-14.10"></script>
-<script src="./schedule-board-core.js?v=2026-08-14.10"></script>
-<script src="./asset-core.js?v=2026-08-14.10"></script>
-<script src="./qr-core.js?v=2026-08-14.10"></script>
+<script src="./lesson-form-core.js?v=2026-08-14.11"></script>
+<script src="./schedule-board-core.js?v=2026-08-14.11"></script>
+<script src="./asset-core.js?v=2026-08-14.11"></script>
+<script src="./qr-core.js?v=2026-08-14.11"></script>
 <script>
 "use strict";
 
@@ -1969,7 +1969,7 @@ function renderTabs() {
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['lesson', '수업 등록'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
+         ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -2852,7 +2852,7 @@ function viewLessonEntry() {
       '</select><div class="hint mt8">선택한 담당 학생만 수업·피드백과 연결됩니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
     : '<div class="sect">1. 이름 / 학년</div><div class="grid2">' + lessonTextField('studentName', '학생 이름', 0, '') + lessonTextField('grade', '학년', 0, '예: 초4, 중1, 고3') + '</div>';
-  return (personal ? lessonAssignmentRequestHtml() : lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
+  return (personal ? lessonAssignmentRequestHtml() : viewLessonChangeReview() + lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
     '<div class="card-sub">아래 9개 항목을 채우면 업무지시서와 수업 현황판에 함께 반영됩니다. 없는 항목은 “없음”이라고 적어 주세요.</div></div>' +
     '<div class="card">' + staffSelect +
       (rosterDb ? '<datalist id="lessonStudentNames">' + activeIn(today().slice(0, 7)).map(student =>
@@ -3127,13 +3127,16 @@ function viewFeedbackReview() {
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbrefresh">새로고침</button></div>';
   if (feedbackQueueLoading) h += '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
   else if (feedbackQueueError) h += '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackQueueError) + '</div></div>';
-  else if (!feedbackQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
   else {
-    const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, sent: 3, cancelled: 4 };
-    h += feedbackQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
-      .map(feedbackQueueCard).join('');
+    const visibleQueue = feedbackQueue.filter(item => item.status !== 'cancelled');
+    if (!visibleQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
+    else {
+      const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, sent: 3 };
+      h += visibleQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
+        .map(feedbackQueueCard).join('');
+    }
   }
-  return h + '<hr class="sep">' + viewLessonChangeReview();
+  return h;
 }
 
 /* ── 수업 정보 변경 요청 — 원장이 등록한 지시서는 직원이 직접 못 고치니,
@@ -3160,7 +3163,7 @@ async function loadLessonChangeQueue(force) {
   const auth = sync.auth();
   if (!auth) { lessonChangeQueueError = '동기화 인증이 필요합니다'; lessonChangeQueueLoaded = true; render(); return; }
   lessonChangeQueueLoading = true; lessonChangeQueueError = '';
-  if (route === 'feedback') render();
+  if (route === 'lesson') render();
   try {
     const result = await sync.post('/lesson-change-review', { app: SYNC_APP, auth: auth, action: 'list', limit: 200 });
     lessonChangeQueue = result.requests || [];
@@ -3170,7 +3173,7 @@ async function loadLessonChangeQueue(force) {
     lessonChangeQueueLoaded = true;
   } finally {
     lessonChangeQueueLoading = false;
-    if (route === 'feedback') render();
+    if (route === 'lesson') render();
   }
 }
 
@@ -3222,7 +3225,11 @@ function lessonChangeDiffHtml(task, changes) {
     ['target', '목표 수량', value => empty(value)],
     ['unit', '단위', value => empty(value)]
   ];
-  const rows = fields.filter(field => has(field[0])).map(field => {
+  const rows = fields.filter(field => {
+    if (!has(field[0])) return false;
+    if (!task) return true;
+    return field[2](task[field[0]]) !== field[2](changes[field[0]]);
+  }).map(field => {
     const key = field[0], label = field[1], format = field[2];
     const before = task ? format(task[key]) : '현재 수업 확인 필요';
     const after = format(changes[key]);
@@ -3240,7 +3247,7 @@ function ownLessonChangeCard(item) {
       esc((task && task.title) || item.taskId) + '</div><div class="small muted">수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     lessonChangeDiffHtml(task, item.changes) +
-    (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
+    '<div class="hint mt14"><b>요청 사유</b><br>' + esc(item.note || '입력 없음') + '</div>' +
     (item.reviewNote ? '<div class="hint mt14"><b>원장 반려 사유</b><br>' + esc(item.reviewNote) + '</div>' : '') +
     (item.status === 'rejected'
       ? '<button class="btn btn-sm btn-primary mt14" data-act="lcpropose" data-id="' + item.taskId + '">내용 고쳐 다시 요청</button>'
@@ -3267,7 +3274,7 @@ function lessonChangeQueueCard(item) {
       esc((staff && staff.name) || item.owner) + ' 선생님 · 수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     lessonChangeDiffHtml(task, item.changes) +
-    (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
+    '<div class="hint mt14"><b>요청 사유</b><br>' + esc(item.note || '입력 없음') + '</div>' +
     (item.reviewNote ? '<div class="hint mt14">반려 사유: ' + esc(item.reviewNote) + '</div>' : '') +
     (item.status === 'approval_waiting'
       ? '<div class="row wraprow mt14">' +
@@ -3283,9 +3290,10 @@ function viewLessonChangeReview() {
     '<button class="btn btn-sm btn-ghost mt14" data-act="lcrefresh">새로고침</button></div>';
   if (lessonChangeQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>불러오는 중입니다.</div></div>';
   if (lessonChangeQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(lessonChangeQueueError) + '</div></div>';
-  if (!lessonChangeQueue.length) return h + '<div class="card"><div class="empty"><b>✅</b>검토할 변경 요청이 없습니다.</div></div>';
-  const rank = { approval_waiting: 0, rejected: 1, approved: 2, cancelled: 3 };
-  return h + lessonChangeQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
+  const visibleQueue = lessonChangeQueue.filter(item => item.status !== 'approved');
+  if (!visibleQueue.length) return h + '<div class="card"><div class="empty"><b>✅</b>검토할 변경 요청이 없습니다.</div></div>';
+  const rank = { approval_waiting: 0, rejected: 1, cancelled: 2 };
+  return h + visibleQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
     .map(lessonChangeQueueCard).join('');
 }
 
@@ -5078,7 +5086,7 @@ function managerRequestInboxRows() {
     push('학생 배정', [row.studentName, row.grade].filter(Boolean).join(' · '), '담당 학생 연결 승인', row.staffId, 'lesson', row.updatedAt, 0));
   lessonChangeQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
-    push('수업 변경', (task && (task.studentName || task.title)) || '수업 정보', '요일·시간·진도 변경 승인', row.owner, 'feedback', row.updatedAt, 0);
+    push('수업 변경', (task && (task.studentName || task.title)) || '수업 정보', '요일·시간·진도 변경 승인', row.owner, 'lesson', row.updatedAt, 0);
   });
   feedbackQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
@@ -11462,7 +11470,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-14.10';
+const APP_VER = '2026-08-14.11';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

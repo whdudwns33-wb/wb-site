@@ -124,6 +124,9 @@ test('director sees the pending request and approving it writes into the live ta
 
   const again = await call(db, '/lesson-change-review', { auth: admin, action: 'approve', requestKey, revision: 1 });
   assert.equal(again.body.idempotent, true, '이미 승인된 요청을 다시 승인해도 안전하다');
+  const archived = await call(db, '/lesson-change-review', { auth: admin, action: 'list', status: 'approved' });
+  assert.equal(archived.body.requests.length, 1, '화면에서 숨긴 승인 완료 요청도 서버 기록에는 보관한다');
+  assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30' });
 });
 
 test('server-authorized manager approval records the manager staff id', async () => {
