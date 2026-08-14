@@ -181,6 +181,11 @@
   /* ─── 단계 / 가이드 ─── */
   .opener { display: block; width: 100%; text-align: left; font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
+  .previous-memos > summary { list-style: none; cursor: pointer; }
+  .previous-memos > summary::-webkit-details-marker { display: none; }
+  .previous-memos > summary::before { content: '▸ '; }
+  .previous-memos[open] > summary::before { content: '▾ '; }
+  .previous-memos-body { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
   .guide > summary { min-height: 32px; cursor: pointer; }
@@ -2134,7 +2139,7 @@ function taskRow(t, date, editable, isCarry) {
       (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
   }
   if (isLesson(t)) {
-    h += '<button class="opener" data-act="prevmemos" data-id="' + t.id + '" data-date="' + date + '">▸ 이전 수업 메모 보기</button>';
+    h += previousTaskMemosInline(t.id, date);
   }
   if (open) h += taskPanel(t, date, c, editable);
 
@@ -2153,13 +2158,12 @@ function previousTaskMemos(taskId, beforeDate) {
     .slice(0, 20);
 }
 
-function previousTaskMemosModal(taskId, beforeDate) {
-  const task = state.tasks.find(row => row.id === taskId);
-  if (!task) return toast('수업 정보를 다시 확인해 주세요');
+function previousTaskMemosInline(taskId, beforeDate) {
   const rows = previousTaskMemos(taskId, beforeDate);
-  modal('이전 수업 메모', '<div class="card-sub mb14">' + esc(task.title) + ' · ' + esc(beforeDate) + ' 이전 기록</div>' +
+  return '<details class="previous-memos"><summary class="opener">이전 수업 메모 보기</summary>' +
+    '<div class="previous-memos-body"><div class="card-sub mb14">' + esc(beforeDate) + ' 이전 기록</div>' +
     (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
-      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>'));
+      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
 }
 
 function taskPanel(t, date, c, editable) {
@@ -10225,8 +10229,6 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
-    case 'prevmemos': previousTaskMemosModal(id, date); break;
-
     /* 직원 */
     case 'pickstaff': viewStaff = id; render(); break;
     case 'openstaff': closeModal(); viewStaff = id; go('today'); break;
