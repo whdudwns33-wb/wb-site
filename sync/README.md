@@ -38,6 +38,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/027_parent_portal.s
 npx wrangler d1 execute wb-sync --remote --file=./migrations/028_guardian_ops_notifications.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/029_transport_notifications.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/030_lesson_assignment_requests.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/031_book_order_fulfillments.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -88,6 +89,11 @@ npx wrangler deploy
 원생 이름·연락처를 저장하지 않고 `private_rosters.bookStudents`의 stable 배정 ID·학생 ID·교재
 ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배정을 원생 문서에서 삭제하거나
 다른 학생·교재로 바꾸는 교체 요청은 409로 차단된다.
+
+주문 교재의 4단계 배송 현황과 아카등록 업무를 추가하는 배포에서는
+`031_book_order_fulfillments.sql`을 운영 D1에 먼저 적용한 뒤 Worker, Pages 순서로 배포한다.
+원장에는 주문 task ID, 교재 ID, stable studentId 목록과 단계별 시각만 저장하며 학생 표시명과
+연락처는 저장하지 않는다.
 
 차량 기능은 `023_transport.sql`을 먼저 적용한 뒤 Worker를 배포한다. 설정·상태에는 stable ID와
 운행 정보만 저장하고 전화·주소·보호자 정보는 저장하지 않는다. 날짜와 관계없이 승차 후 미하차 기록이 있는

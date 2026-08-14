@@ -16,11 +16,11 @@ test('새 주문만 저녁 일괄 발송 대상으로 표시한다', () => {
   const source = block('function createOrderTask(', '/** 일괄 주문용 선택 상태');
   assert.match(source, /orderDelivery: 'scheduled_batch_v1'/);
   assert.match(source, /매일 저녁 8시 출판사별 문자 한 통으로 자동 발송/);
-  assert.match(source, /label: '입고 확인'/);
+  assert.match(source, /label: '교재 탭 배송 확인'/);
 });
 
-test('한 권 주문과 묶음 주문은 즉시 발송하지 않고 동기화 대기한다', () => {
-  const single = block("case 'bkorder':", "case 'bkselect':");
+test('한 권 주문과 묶음 주문은 학생 선택 수량으로 저장하고 즉시 발송하지 않는다', () => {
+  const single = block("case 'bkordersubmit':", "case 'bkselect':");
   const batch = block("case 'bkbatchsubmit':", "case 'bkcancelopen':");
   for (const source of [single, batch]) {
     assert.match(source, /createOrderTask/);
@@ -29,6 +29,10 @@ test('한 권 주문과 묶음 주문은 즉시 발송하지 않고 동기화 �
   }
   assert.match(single, /저녁 8시 일괄 발송 대기/);
   assert.match(batch, /저녁 8시 일괄 발송 대기/);
+  assert.match(single, /studentIds: studentIds/);
+  assert.match(batch, /studentIds: selectedOrderStudentIds/);
+  assert.match(batch, /item\.qty = item\.studentIds\.length \+ '권'/);
+  assert.doesNotMatch(html, /id="bq-|placeholder="예: 3권"/);
 });
 
 test('화면에서 즉시 문자 발송 경로를 노출하지 않는다', () => {
