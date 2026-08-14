@@ -181,6 +181,8 @@
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
+  .guide > summary { min-height: 32px; cursor: pointer; }
+  .guide > summary b { display: inline; margin: 0; }
   .step { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; font-size: 13.5px; }
   .sbox {
     width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 1px;
@@ -695,10 +697,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-14.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-14.1"></script>
-<script src="./asset-core.js?v=2026-08-14.1"></script>
-<script src="./qr-core.js?v=2026-08-14.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-14.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-14.2"></script>
+<script src="./asset-core.js?v=2026-08-14.2"></script>
+<script src="./qr-core.js?v=2026-08-14.2"></script>
 <script>
 "use strict";
 
@@ -851,9 +853,56 @@ function setAsset(id, patch) {
   return next;
 }
 
+/** 수업 화면은 생성 시기와 무관하게 같은 운영 5단계를 쓴다.
+ *  예전 단계에 이미 체크한 날짜는 그날 기록을 그대로 보여 주고, 새 날짜부터 표준으로 전환한다. */
+const LESSON_OPERATIONAL_STEP_LABELS = [
+  '지난 숙제·온라인 수행 확인',
+  '교재와 오늘 진도 진행',
+  '이해도·오답·학생 반응 확인',
+  '다음 숙제 안내',
+  '실제 진도와 특이사항 기록'
+];
+
+function usesStandardLessonDisplay(t) {
+  return !!(t && (t.taskKind === 'lesson_instruction' || /^\[수업\]/.test(t.title || '')));
+}
+
+function storedTaskSteps(t) { return t && Array.isArray(t.steps) ? t.steps : []; }
+
+function hasStandardLessonSteps(t) {
+  const steps = storedTaskSteps(t);
+  return steps.length === LESSON_OPERATIONAL_STEP_LABELS.length &&
+    steps.every((step, index) => String(step.label || '') === LESSON_OPERATIONAL_STEP_LABELS[index]);
+}
+
+function taskSteps(t, c) {
+  const stored = storedTaskSteps(t);
+  if (!usesStandardLessonDisplay(t) || hasStandardLessonSteps(t)) return stored;
+  const legacyProgress = c && c.steps && stored.some(step => c.steps[step.id]);
+  if (legacyProgress) return stored;
+  return LESSON_OPERATIONAL_STEP_LABELS.map((label, index) => ({
+    id: String(t.id || 'lesson') + '-standard-step-' + (index + 1), label: label
+  }));
+}
+
+function lessonReferenceSteps(t) {
+  return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
+}
+
+function taskCardDetail(t) {
+  const raw = String(t && t.detail || '').trim();
+  const structured = t && (t.taskKind === 'lesson_instruction' || t.lessonFormVersion || t.intakeVersion);
+  if (!structured) return raw;
+  const subjects = [...new Set([t.subject, t.className].map(value => String(value || '').trim()).filter(Boolean))];
+  const summary = [t.grade, subjects.join(' · '), t.scheduleText,
+    t.onlineProgram && t.onlineProgram !== '없음' ? t.onlineProgram : '']
+    .map(value => String(value || '').trim()).filter(Boolean).join(' · ') || raw.split('\n')[0];
+  return summary.length > 160 ? summary.slice(0, 157) + '…' : summary;
+}
+
 /** 단계·수량을 고려한 개별 업무 진행률 */
 function taskProgress(t, c) {
-  const steps = t.steps || [];
+  const steps = taskSteps(t, c);
   if (steps.length) {
     const done = steps.filter(s => c && c.steps && c.steps[s.id]).length;
     return { done: done, total: steps.length, unit: '단계', pct: Math.round(done / steps.length * 100) };
@@ -881,9 +930,10 @@ const STATUS_LABEL = { todo: '미착수', doing: '진행중', done: '완료', bl
 function syncAuto(t, date) {
   const c = getCheck(t.id, date);
   if (!c) return;
-  const hasSteps = (t.steps || []).length > 0, hasTarget = !!t.target;
+  const steps = taskSteps(t, c);
+  const hasSteps = steps.length > 0, hasTarget = !!t.target;
   if (!hasSteps && !hasTarget) return;
-  const stepsOk = !hasSteps || t.steps.every(s => c.steps && c.steps[s.id]);
+  const stepsOk = !hasSteps || steps.every(s => c.steps && c.steps[s.id]);
   const countOk = !hasTarget || ((c.count || 0) >= t.target);
   const full = stepsOk && countOk;
   if (full && !c.done) setCheck(t.id, date, { done: true, at: now() });
@@ -2040,14 +2090,16 @@ function taskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const st = statusOf(t, date);
   const prog = taskProgress(t, c);
-  const hasDetail = (t.steps || []).length || t.guide || t.target;
+  const steps = taskSteps(t, c);
+  const detail = taskCardDetail(t);
+  const hasDetail = steps.length || t.guide || t.target;
   const open = openPanels.has(t.id + '|' + date);
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
     '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(t.title) + '</div>' +
-      (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
+      (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
       '<div class="meta">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
@@ -2066,7 +2118,7 @@ function taskRow(t, date, editable, isCarry) {
   }
   if (hasDetail) {
     h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
-      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + ((t.steps || []).length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
   }
   if (open) h += taskPanel(t, date, c, editable);
 
@@ -2080,11 +2132,18 @@ function taskRow(t, date, editable, isCarry) {
 
 function taskPanel(t, date, c, editable) {
   let h = '<div class="panel">';
+  const steps = taskSteps(t, c);
+  const references = lessonReferenceSteps(t);
 
-  if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
+  if (usesStandardLessonDisplay(t) && (t.guide || references.length)) {
+    h += '<details class="guide"><summary><b>📘 학생별 수업 참고 열기</b></summary>' +
+      (t.guide ? '<div class="mt8">' + esc(t.guide) + '</div>' : '') +
+      (references.length ? '<div class="mt8"><b>기존 맞춤 지침</b><br>' +
+        references.map(step => '· ' + esc(step.label)).join('<br>') + '</div>' : '') + '</details>';
+  } else if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
 
-  if ((t.steps || []).length) {
-    h += '<div style="margin-top:10px">' + t.steps.map((s, i) => {
+  if (steps.length) {
+    h += '<div style="margin-top:10px">' + steps.map((s, i) => {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
@@ -2125,7 +2184,8 @@ function taskPanel(t, date, c, editable) {
       (canEditLessonTask(t)
         ? '<button class="btn btn-sm btn-ghost" data-act="lessonedit" data-id="' + t.id + '">✏️ 수업 정보 수정</button>'
         : (canEditTask(t)
-          ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>'
+          ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ ' +
+            (isLesson(t) ? '수업 정보 수정' : '업무 수정') + '</button>'
           : (canProposeLessonChange(t) ? '<button class="btn btn-sm btn-ghost" data-act="lcpropose" data-id="' + t.id + '">📝 변경 요청</button>' : ''))) +
     '</div>';
   }
@@ -2137,6 +2197,7 @@ const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'b
 
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
+/** 수업 지시서 세부 형식 판별 */
 const isMakeupLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_instruction' ||
   t.lessonFormVersion || t.intakeVersion || /^\[수업\]/.test(String(t.title || ''))));
 const isSessionLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_instruction' ||
@@ -2404,7 +2465,8 @@ function fbModal() {
 function feedbackText(t, date, genComment) {
   const c = getCheck(t.id, date);
   const student = studentOf(t);
-  const doneSteps = (t.steps || []).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
+  const steps = taskSteps(t, c);
+  const doneSteps = steps.filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
   const seed = t.id + '|' + date;
   // 그날 편지 전체를 감싸는 말투 결 — 내용과 무관하게 학생·날짜 시드로만 정해진다
   const mood = seedPick(FB_MOOD_KEYS, seed, 99);
@@ -2425,7 +2487,7 @@ function feedbackText(t, date, genComment) {
     let stepLine = seedPick(FB_STEP_LEAD, seed, 32) + doneSteps.join(seedPick(FB_STEP_JOIN, seed, 33)) +
       seedPick(FB_STEP_TAIL, seed, 34);
     // 계획한 단계를 다 마쳤는지/일부만 했는지도 실제 체크 여부로만 판단해 한 문장 더 붙인다
-    const total = (t.steps || []).length;
+    const total = steps.length;
     stepLine += ' ' + (total && doneSteps.length >= total
       ? seedPick(FB_STEP_ALLDONE, seed, 43)
       : seedPick(FB_STEP_PARTDONE, seed, 44));
@@ -2465,8 +2527,8 @@ function feedbackText(t, date, genComment) {
  *  최종적으로 나가는 건 이 입력칸에 남아있는 값이라 눌러서 고칠 수 있다. */
 function computeFeedbackFields(t, date, fbCtx) {
   const c = getCheck(t.id, date);
-  const doneSteps = (t.steps || []).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
-  const contentText = doneSteps.length ? doneSteps.join(', ') : (t.detail || '');
+  const doneSteps = taskSteps(t, c).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
+  const contentText = doneSteps.length ? doneSteps.join(', ') : taskCardDetail(t);
   const plusText = ((fbCtx && fbCtx.plus) || []).map(i => FB_PLUS[i][0]).join(', ');
   const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
   const minusText = minusPick === '없음' ? '특별히 없음 — 오늘도 잘 따라왔어요' : minusPick;
@@ -8979,8 +9041,8 @@ function orderText(staffId, date) {
   let txt = '📋 ' + label(date) + ' 업무지시서\n' + (s ? s.name + ' 선생님\n' : '') + '─────────\n';
   txt += list.length
     ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + t.title + (t.priority === 'high' ? ' ⭐' : '') +
-        (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
-        ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
+        (taskCardDetail(t) ? '\n   → ' + taskCardDetail(t).replace(/\n/g, '\n   ') : '') +
+        (taskSteps(t, null).length ? '\n   단계 ' + taskSteps(t, null).length + '개 · 링크에서 확인' : '')).join('\n')
     : '(지시된 업무 없음)';
   txt += '\n─────────\n하는 방법은 링크 안에 있습니다.\n' + staffLink(staffId);
   return txt;
@@ -9381,12 +9443,13 @@ function manageTasks(staffId) {
           '<div class="task-t">' + esc(t.title) + '</div>' +
           '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
           (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
-          ((t.steps || []).length ? '<span class="tag doing">' + t.steps.length + '단계</span>' : '') +
+          (taskSteps(t, null).length ? '<span class="tag doing">' + taskSteps(t, null).length + '단계</span>' : '') +
           originTags(t) + '</div>' +
           '<div class="row" style="gap:6px;margin-top:8px">' +
             (canEditLessonTask(t)
               ? '<button class="btn btn-sm btn-primary" data-act="lessonedit" data-id="' + t.id + '">수업 정보 수정</button>'
-              : '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">수정</button>') +
+              : '<button class="btn btn-sm btn-primary" data-act="etask" data-id="' + t.id + '">' +
+                (isLesson(t) ? '수업 정보 수정' : '업무 수정') + '</button>') +
             '<button class="btn btn-sm btn-danger" data-act="deltask" data-id="' + t.id + '">중단</button>' +
           '</div></div></div>').join('')
       : '<div class="empty">지시된 업무가 없습니다.</div>');
@@ -9407,7 +9470,7 @@ function editTaskModal(id) {
   eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
 
   const who = currentStaff();
-  modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : '업무 수정',
+  modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : (isLesson(t) ? '수업 정보 수정' : '업무 수정'),
     '<div class="field"><label class="fl">업무 내용</label>' +
       '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
 
@@ -9966,7 +10029,7 @@ document.addEventListener('click', ev => {
       const c = getCheck(id, date);
       const turnOn = !(c && c.done);
       const steps = {};
-      (t.steps || []).forEach(s => { steps[s.id] = turnOn; });
+      taskSteps(t, c).forEach(s => { steps[s.id] = turnOn; });
       setCheck(id, date, {
         done: turnOn, at: turnOn ? now() : null,
         steps: steps,
@@ -11028,7 +11091,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-14.1';
+const APP_VER = '2026-08-14.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

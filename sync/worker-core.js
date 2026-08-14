@@ -136,8 +136,8 @@ function randomOpaqueValue() {
 }
 
 function taskManagerIds(env) {
-  return new Set(String(env.TASK_MANAGER_STAFF_IDS || '')
-    .split(',')
+  return new Set([env.TASK_MANAGER_STAFF_IDS, env.TASK_MANAGER_STAFF_IDS_CONFIG]
+    .flatMap(value => String(value || '').split(','))
     .map(id => id.trim())
     .filter(id => SAFE_ID.test(id)));
 }
