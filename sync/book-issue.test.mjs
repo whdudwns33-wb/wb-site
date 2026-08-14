@@ -222,3 +222,66 @@ test('order fulfillment rejects another teacher and cannot receive before an acc
   assert.equal(early.status, 409);
   assert.equal(early.body.code, 'ORDER_NOT_ACCEPTED');
 });
+
+test('accepted legacy order links stable student ids before receipt and locks identity after receipt', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'legacy-order', title: '[주문] 새 교재', deleted: false, orderDelivery: 'scheduled_batch_v1',
+    orderVendor: '테스트출판사', orderItems: [{ title: '새 교재', qty: '2권' }], origin: 'staff', updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 'teacher-a', JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-legacy', 'key-legacy', task.id, '테스트출판사', 1, 'b'.repeat(64), 'accepted', now, now).run();
+
+  const auth = person('teacher-a', 'token-a');
+  const before = await call(db, { auth, action: 'list' });
+  assert.equal(before.body.orders[0].stage, 'ordered');
+  assert.equal(before.body.orders[0].needsStudentLink, true);
+  assert.equal(before.body.orders[0].canLinkStudents, true);
+  assert.equal(before.body.orders[0].students.length, 0);
+
+  const linked = await call(db, { auth, action: 'order_link', taskId: task.id, itemIndex: 0, bookId: 'BK01',
+    studentIds: ['student-a'], expectedUpdatedAt: before.body.orders[0].taskUpdatedAt });
+  assert.equal(linked.status, 200);
+  assert.equal(linked.body.idempotent, false);
+  const stored = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='legacy-order'").first().data);
+  assert.equal(stored.orderItems[0].bookId, 'BK01');
+  assert.deepEqual(stored.orderItems[0].studentIds, ['student-a']);
+  assert.equal(stored.orderItems[0].qty, '1권');
+  assert.equal(JSON.stringify(stored.orderItems[0]).includes('가학생'), false);
+
+  const after = await call(db, { auth, action: 'list' });
+  assert.equal(after.body.orders[0].needsStudentLink, false);
+  assert.equal(after.body.orders[0].canLinkStudents, false);
+  assert.deepEqual(after.body.orders[0].students.map(student => student.id), ['student-a']);
+  const received = await call(db, { auth, action: 'order_transition', taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 });
+  assert.equal(received.status, 200);
+  const relink = await call(db, { auth: admin, action: 'order_link', taskId: task.id, itemIndex: 0, bookId: 'BK01',
+    studentIds: ['student-b'], expectedUpdatedAt: linked.body.taskUpdatedAt });
+  assert.equal(relink.status, 409);
+  assert.equal(relink.body.code, 'ORDER_ALREADY_RECEIVED');
+});
+
+test('order student link enforces owner, accepted result, current assignment scope, and task CAS', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'link-guard', title: '[주문] 새 교재', deleted: false, orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ title: '새 교재', qty: '1권' }], origin: 'staff', updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 'teacher-a', JSON.stringify(task), now, now).run();
+  const request = { action: 'order_link', taskId: task.id, itemIndex: 0, bookId: 'BK01',
+    studentIds: ['student-a'], expectedUpdatedAt: now };
+  assert.equal((await call(db, { auth: person('teacher-b', 'token-b'), ...request })).status, 403);
+  const early = await call(db, { auth: person('teacher-a', 'token-a'), ...request });
+  assert.equal(early.status, 409);
+  assert.equal(early.body.code, 'ORDER_NOT_ACCEPTED');
+
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-guard', 'key-guard', task.id, '테스트출판사', 1, 'c'.repeat(64), 'accepted', now, now).run();
+  const wrongStudent = await call(db, { auth: person('teacher-a', 'token-a'), ...request, studentIds: ['student-b'] });
+  assert.equal(wrongStudent.status, 403);
+  db.prepare("UPDATE tasks SET updated_at=updated_at+1 WHERE app='task' AND id='link-guard'").run();
+  const stale = await call(db, { auth: person('teacher-a', 'token-a'), ...request });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, 'REVISION_CONFLICT');
+});

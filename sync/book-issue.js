@@ -80,7 +80,8 @@ function fulfillmentMatches(row, bookId, studentIds) {
   return String(row.book_id) === bookId && JSON.stringify(storedIds) === JSON.stringify(studentIds);
 }
 
-function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, integrity) {
+function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, integrity,
+    taskUpdatedAt, needsStudentLink, canLinkStudents) {
   const studentIds = orderStudentIds(item);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
     : send.status === 'rejected' ? 'order_failed' : 'order_check';
@@ -93,6 +94,9 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
     quantity: orderQuantity(item, studentIds), vendorName: String(vendorName || '주문처 미등록'),
     owner: owner || null, teacherName: teacherName || '담당 미지정',
     students, sendStatus: send ? String(send.status) : 'waiting', stage,
+    taskUpdatedAt: Number(taskUpdatedAt) || 0,
+    needsStudentLink: !!needsStudentLink,
+    canLinkStudents: !!canLinkStudents,
     revision: row ? Number(row.revision) : 0,
     teacherReceivedAt: row && row.teacher_received_at ? Number(row.teacher_received_at) : null,
     studentHandedAt: row && row.student_handed_at ? Number(row.student_handed_at) : null,
@@ -103,7 +107,7 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
 
 async function listOrderFulfillments(env, app, auth, document) {
   const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, staffResult] = await Promise.all([
-    env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=? ORDER BY updated_at DESC').bind(app).all(),
+    env.DB.prepare('SELECT id,owner,data,updated_at FROM tasks WHERE app=? ORDER BY updated_at DESC').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_sends WHERE app=? ORDER BY created_at DESC').bind(app).all(),
     env.DB.prepare('SELECT task_id,send_id FROM book_order_batch_items WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=?').bind(app).all(),
@@ -139,15 +143,88 @@ async function listOrderFulfillments(env, app, auth, document) {
       const fulfillment = fulfillmentByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const identityMismatch = !fulfillmentMatches(fulfillment, String(item.bookId || ''), studentIds);
       const integrity = invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
+      const needsStudentLink = !String(item.bookId || '') || !studentIds.length || invalidSelection || unauthorized || missing;
+      const send = sendByTask.get(String(taskRow.id)) || null;
+      const canLinkStudents = !fulfillment && !!send && String(send.status) === 'accepted' && needsStudentLink;
       const students = integrity ? [] : studentIds.map(id => studentsById.get(id)).filter(Boolean).map(student => ({
         id: String(student.id), name: String(student.name || '이름 미입력'), grade: String(student.grade || '')
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
-        staffNames.get(String(taskRow.owner || '')), students, sendByTask.get(String(taskRow.id)) || null,
-        fulfillment, integrity));
+        staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, integrity,
+        taskRow.updated_at, needsStudentLink, canLinkStudents));
     }
   }
   return rows;
+}
+
+async function linkOrderStudents(env, app, body, auth, json, origin) {
+  const taskId = String(body.taskId || '');
+  const itemIndex = Number(body.itemIndex);
+  const bookId = String(body.bookId || '');
+  const expectedUpdatedAt = Number(body.expectedUpdatedAt);
+  const requestedIds = Array.isArray(body.studentIds) ? body.studentIds.map(value => String(value || '')) : [];
+  const studentIds = Array.from(new Set(requestedIds.filter(id => SAFE_ID.test(id)))).sort();
+  if (!SAFE_ID.test(taskId) || !Number.isInteger(itemIndex) || itemIndex < 0 || !SAFE_ID.test(bookId) ||
+      !Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 0 || !requestedIds.length || requestedIds.length > 200 ||
+      requestedIds.length !== studentIds.length) {
+    return json({ ok: false, error: 'taskId, itemIndex, bookId, studentIds, expectedUpdatedAt을 확인해 주세요' }, 400, origin);
+  }
+
+  const taskRow = await env.DB.prepare('SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const task = orderTaskData(taskRow);
+  if (!task || !task.orderItems[itemIndex]) return json({ ok: false, error: '현재 주문 항목을 찾을 수 없습니다' }, 404, origin);
+  if (auth.scope === 'own' && String(taskRow.owner || '') !== auth.id) {
+    return json({ ok: false, error: '본인이 주문한 교재만 처리할 수 있습니다' }, 403, origin);
+  }
+
+  const item = task.orderItems[itemIndex];
+  const currentBookId = String(item.bookId || '');
+  if (currentBookId && currentBookId !== bookId) {
+    return json({ ok: false, code: 'ORDER_BOOK_MISMATCH', error: '기존 주문의 교재 연결은 다른 교재로 변경할 수 없습니다' }, 409, origin);
+  }
+  const fulfillment = await env.DB.prepare(
+    'SELECT task_id FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+  ).bind(app, taskId, itemIndex).first();
+  if (fulfillment) {
+    return json({ ok: false, code: 'ORDER_ALREADY_RECEIVED', error: '이미 수령 처리가 시작된 주문의 학생 연결은 변경할 수 없습니다' }, 409, origin);
+  }
+  const send = await latestOrderSend(env, app, taskId);
+  if (!send || String(send.status) !== 'accepted') {
+    return json({ ok: false, code: 'ORDER_NOT_ACCEPTED', error: '주문완료가 확인된 교재만 학생을 연결할 수 있습니다' }, 409, origin);
+  }
+
+  const document = await currentRoster(env, app);
+  if (!document) return json({ ok: false, error: '원생 데이터가 아직 등록되지 않았습니다' }, 404, origin);
+  const studentsById = new Map(document.roster.students.map(student => [String(student.id), student]));
+  if (studentIds.some(id => !studentsById.has(id))) {
+    return json({ ok: false, code: 'ORDER_STUDENT_MISSING', error: '선택한 학생이 현재 원생 명단에 없어 다시 확인해 주세요' }, 409, origin);
+  }
+  if (auth.scope === 'own' && studentIds.some(id => {
+    const student = studentsById.get(id);
+    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
+  })) return json({ ok: false, error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+
+  const currentIds = orderStudentIds(item);
+  if (currentBookId === bookId && validOrderStudentSelection(item, currentIds) &&
+      JSON.stringify(currentIds) === JSON.stringify(studentIds)) {
+    return json({ ok: true, idempotent: true, taskUpdatedAt: Number(taskRow.updated_at) || 0 }, 200, origin);
+  }
+  if (Number(taskRow.updated_at) !== expectedUpdatedAt) {
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다. 새로고침 후 다시 연결해 주세요' }, 409, origin);
+  }
+
+  const now = Date.now();
+  const nextTask = { ...task, orderItems: task.orderItems.slice(), updatedAt: now,
+    lastEditBy: auth.role === 'manager' ? 'manager' : auth.scope === 'all' ? 'admin' : 'staff' };
+  nextTask.orderItems[itemIndex] = { ...item, bookId, studentIds, qty: studentIds.length + '권' };
+  const updated = await env.DB.prepare(
+    'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
+  ).bind(JSON.stringify(nextTask), now, now, app, taskId, expectedUpdatedAt).run();
+  if (!updated.meta || Number(updated.meta.changes || 0) !== 1) {
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다. 새로고침 후 다시 연결해 주세요' }, 409, origin);
+  }
+  return json({ ok: true, idempotent: false, taskUpdatedAt: now }, 200, origin);
 }
 
 function publicIssue(assignment, student, row) {
@@ -466,6 +543,7 @@ export async function handleBookIssue(env, app, body, origin, auth, json) {
   const action = String(body.action || '');
   if (action === 'list') return listIssues(env, app, auth, json, origin);
   if (action === 'transition') return transition(env, app, body, auth, json, origin);
+  if (action === 'order_link') return linkOrderStudents(env, app, body, auth, json, origin);
   if (action === 'order_transition') return transitionOrderFulfillment(env, app, body, auth, json, origin);
   return json({ ok: false, error: '지원하는 교재 처리 action을 확인해 주세요' }, 400, origin);
 }
