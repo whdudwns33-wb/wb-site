@@ -174,13 +174,21 @@ test('task managers elevate only from a verified server role', () => {
   assert.doesNotMatch(html, /origin: session\.isStaffLink \? 'manager'/);
   assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /개인 링크에서는 담당 학생 명단만 확인할 수 있습니다/);
-  for (const action of ['ctlog', 'oplog', 'exlog']) {
+  for (const action of ['oplog', 'exlog']) {
     const block = html.match(new RegExp(`case '${action}':[\\s\\S]{0,220}?break;`))?.[0] || '';
     assert.match(block, /!session\.isAdmin/, action);
   }
-  for (const action of ['exsave', 'opprog', 'opsave', 'ctsave']) {
+  for (const action of ['exsave', 'opprog', 'opsave']) {
     const block = html.match(new RegExp(`case '${action}':[\\s\\S]{0,120}?break;`))?.[0] || '';
     assert.match(block, /!session\.isAdmin/, action);
+  }
+  const contactOpen = html.slice(html.indexOf("case 'ctlog':"), html.indexOf("case 'oplog':"));
+  const contactSave = html.slice(html.indexOf("case 'ctsave':"), html.indexOf("case 'bkopen':"));
+  for (const block of [contactOpen, contactSave]) {
+    assert.match(block, /session\.isStaffLink/);
+    assert.match(block, /t\.staffId === session\.staffId/);
+    assert.match(block, /isLesson\(t\)/);
+    assert.match(block, /!session\.isAdmin && !ownLesson/);
   }
 });
 

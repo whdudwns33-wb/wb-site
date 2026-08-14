@@ -218,6 +218,31 @@ test('staff progress checks still sync normally', async () => {
   assert.equal(db.checks.has('__att__teacher-1|2026-08-04'), true);
 });
 
+test('generic sync ignores server-authored contact rows instead of overwriting them', async () => {
+  const db = new FakeDB();
+  const result = await sync(db, [{
+    table: 'checks', k: '__contact__server-key|2026-08-14', owner: 'teacher-1',
+    data: { taskId: '__contact__server-key', date: '2026-08-14', done: true, updatedAt: 999 },
+    updated_at: 999
+  }]);
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.size, 0);
+  assert.equal(db.batchCalls, 0);
+});
+
+test('server-authored contact rows pull to the same teacher on a new device', async () => {
+  const db = new FakeDB();
+  const key = '__contact__server-key|2026-08-14';
+  db.checks.set(key, { owner: 'teacher-1', data: JSON.stringify({
+    taskId: '__contact__server-key', date: '2026-08-14', updatedAt: 200,
+    contact: { version: 1, studentId: 'student-a', sourceTaskId: 'lesson-1', date: '2026-08-14',
+      type: 'call', note: '', by: '담당교사', byStaffId: 'teacher-1', at: 200 }
+  }), updatedAt: 200, srvAt: 200 });
+  const result = await sync(db, []);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.changes.some(item => item.table === 'checks' && item.key === key), true);
+});
+
 test('own sync rejects checks for another task or embedded special owner', async () => {
   for (const forged of [
     { k: 'victim-task|2026-08-04', data: { taskId: 'victim-task', date: '2026-08-04', done: true } },
