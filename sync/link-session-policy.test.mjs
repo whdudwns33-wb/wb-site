@@ -143,6 +143,25 @@ test('allowlisted task manager personal auth can issue another teacher QR link',
   assert.equal(result.body.authRole, 'staff');
 });
 
+test('config allowlisted task manager has the same QR issuing permission', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'manager-config', 'manager-config', JSON.stringify({
+      id: 'manager-config', name: '관리자선생님', deleted: false
+    }), now, now).run();
+  db.seedStaff('teacher-2');
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('task', 'manager-config-token', 'manager-config', now).run();
+
+  const result = await post(db, '/bootstrap', {
+    auth: { mode: 'person', id: 'manager-config', token: 'manager-config-token' }, staffId: 'teacher-2'
+  }, { TASK_MANAGER_STAFF_IDS: 'other-manager', TASK_MANAGER_STAFF_IDS_CONFIG: 'manager-config' });
+  assert.equal(result.status, 200);
+  assert.match(result.body.code, /^[a-f0-9]{48}$/);
+  assert.equal(result.body.authRole, 'staff');
+});
+
 test('staff.manager metadata and an allowlist substring cannot elevate personal auth', async () => {
   const db = new TestD1();
   const now = Date.now();

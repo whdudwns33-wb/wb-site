@@ -163,6 +163,8 @@ curl https://wb-sync.<계정>.workers.dev/health
 ```
 응답의 `authRole`은 서버가 판정한 `admin | manager | staff` 값이다. task 앱은 이 값을
 권한 표시의 정본으로 사용하며, 수정 가능한 직원 명부의 `manager` 표시는 권한을 부여하지 않는다.
+운영 관리 담당은 기존 secret `TASK_MANAGER_STAFF_IDS`와 배포 설정의
+`TASK_MANAGER_STAFF_IDS_CONFIG`를 합친 정확한 staff ID allowlist로 판정한다.
 
 ```jsonc
 { "ok": true, "now": 1785651111111, "more": false, "authRole": "staff", "changes": [ /* since 이후 바뀐 행 */ ] }

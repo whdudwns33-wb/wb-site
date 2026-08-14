@@ -136,6 +136,18 @@ test('task manager allowlist grants all-scope sync and reports the server role',
   assert.equal(result.body.changes.some(item => item.key === 'other-task'), true);
 });
 
+test('auditable config manager allowlist is additive to the existing secret allowlist', async () => {
+  const db = new FakeDB({ deleted: false, manager: false });
+  db.seedTask({ id: 'other-task', staffId: 'teacher-2', origin: 'admin', title: 'other' }, 'teacher-2');
+  const result = await sync(db, [], {
+    TASK_MANAGER_STAFF_IDS: 'other-manager',
+    TASK_MANAGER_STAFF_IDS_CONFIG: ' teacher-1 '
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.authRole, 'manager');
+  assert.equal(result.body.changes.some(item => item.key === 'other-task'), true);
+});
+
 test('root admin sync reports the server admin role', async () => {
   const db = new FakeDB();
   const result = await sync(db, [], {}, { mode: 'admin', secret: 'admin-secret' });

@@ -10,6 +10,8 @@ const deployScript = fs.readFileSync(new URL('./deploy.ps1', import.meta.url), '
 test('only the task environment allowlist elevates personal auth', () => {
   assert.match(worker, /const staff = await activeStaffData\(env, app, id\)/);
   assert.match(worker, /TASK_MANAGER_STAFF_IDS/);
+  assert.match(worker, /TASK_MANAGER_STAFF_IDS_CONFIG/);
+  assert.match(worker, /\.flatMap\(value => String\(value \|\| ''\)\.split\(','\)\)/);
   assert.match(worker, /app === 'task' && taskManagerIds\(env\)\.has\(id\)/);
   assert.match(worker, /return \{ scope: 'all', id: id, role: 'manager' \}/);
   assert.match(worker, /return \{ scope: 'own', id: id \};/);
