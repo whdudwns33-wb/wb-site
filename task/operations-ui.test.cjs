@@ -109,6 +109,11 @@ test('order delivery board uses four collapsed quantity stages and stable-studen
   assert.match(view, /data-next="receive"[\s\S]{0,160}>수령완료<\/button>/);
   assert.match(view, /data-next="hand"[\s\S]{0,160}>배부완료<\/button>/);
   assert.match(view, /data-next="academy_register"[\s\S]{0,180}>아카등록완료<\/button>/);
+  assert.match(view, /data-act="bookorderlinkopen"[\s\S]{0,180}>학생 연결<\/button>/);
+  assert.match(view, /data-order-link-student/);
+  assert.match(view, /action: 'order_link'/);
+  assert.match(view, /studentIds: studentIds/);
+  assert.match(view, /expectedUpdatedAt:/);
   assert.match(view, /해야 할 업무 · 아카등록/);
   assert.match(view, /action: 'order_transition'/);
   assert.match(picker, /student\.id/);
