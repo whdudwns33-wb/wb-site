@@ -117,6 +117,8 @@
   .lesson-slot .grid2 { margin-top: 10px; }
   .lesson-review { border-color: #F6D6A6; background: #FFFBF3; }
   .lesson-confirmed { border-color: #B9E3C7; background: #F3FCF6; }
+  .lesson-change-diff-row { margin-top: 10px; }
+  .lesson-change-after { border-color: #B9E3C7; background: #F3FCF6; }
 
   /* ─── 날짜 네비 ─── */
   .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
@@ -697,10 +699,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-14.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-14.4"></script>
-<script src="./asset-core.js?v=2026-08-14.4"></script>
-<script src="./qr-core.js?v=2026-08-14.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-14.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-14.5"></script>
+<script src="./asset-core.js?v=2026-08-14.5"></script>
+<script src="./qr-core.js?v=2026-08-14.5"></script>
 <script>
 "use strict";
 
@@ -2131,6 +2133,9 @@ function taskRow(t, date, editable, isCarry) {
     h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
       (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
   }
+  if (isLesson(t)) {
+    h += '<button class="opener" data-act="prevmemos" data-id="' + t.id + '" data-date="' + date + '">▸ 이전 수업 메모 보기</button>';
+  }
   if (open) h += taskPanel(t, date, c, editable);
 
   h += (editable
@@ -2139,6 +2144,22 @@ function taskRow(t, date, editable, isCarry) {
       : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
 
   return h + '</div></div>';
+}
+
+function previousTaskMemos(taskId, beforeDate) {
+  return Object.values(state.checks || {}).filter(row => row && row.taskId === taskId &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) && row.date < beforeDate && String(row.note || '').trim())
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .slice(0, 20);
+}
+
+function previousTaskMemosModal(taskId, beforeDate) {
+  const task = state.tasks.find(row => row.id === taskId);
+  if (!task) return toast('수업 정보를 다시 확인해 주세요');
+  const rows = previousTaskMemos(taskId, beforeDate);
+  modal('이전 수업 메모', '<div class="card-sub mb14">' + esc(task.title) + ' · ' + esc(beforeDate) + ' 이전 기록</div>' +
+    (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
+      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>'));
 }
 
 function taskPanel(t, date, c, editable) {
@@ -3152,13 +3173,39 @@ function lessonChangeSummary(changes) {
   return items.join('<br>');
 }
 
+function lessonChangeDiffHtml(task, changes) {
+  changes = changes || {};
+  const has = key => Object.prototype.hasOwnProperty.call(changes, key);
+  const empty = value => value === undefined || value === null || value === '' ? '(없음)' : String(value);
+  const days = value => Array.isArray(value) && value.length ? value.map(day => DOW[day]).join('·') : '(없음)';
+  const repeat = value => LESSON_CHANGE_REPEAT_LABEL[value] || empty(value);
+  const fields = [
+    ['days', '요일', value => days(value)],
+    ['time', '시간', value => empty(value)],
+    ['repeat', '반복', value => repeat(value)],
+    ['detail', '교재·진도', value => empty(value)],
+    ['guide', '수업 메모', value => empty(value)],
+    ['target', '목표 수량', value => empty(value)],
+    ['unit', '단위', value => empty(value)]
+  ];
+  const rows = fields.filter(field => has(field[0])).map(field => {
+    const key = field[0], label = field[1], format = field[2];
+    const before = task ? format(task[key]) : '현재 수업 확인 필요';
+    const after = format(changes[key]);
+    return '<div class="lesson-change-diff-row"><div class="small muted"><b>' + esc(label) + '</b></div>' +
+      '<div class="grid2"><div class="guide"><b>변경 전</b><br>' + esc(before) + '</div>' +
+      '<div class="guide lesson-change-after"><b>변경 후</b><br>' + esc(after) + '</div></div></div>';
+  });
+  return rows.length ? rows.join('') : '<div class="guide">변경 내용을 확인할 수 없습니다.</div>';
+}
+
 function ownLessonChangeCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const status = LESSON_CHANGE_STATUS_LABEL[item.status] || [item.status, ''];
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
       esc((task && task.title) || item.taskId) + '</div><div class="small muted">수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
-    '<div class="guide">' + lessonChangeSummary(item.changes) + '</div>' +
+    lessonChangeDiffHtml(task, item.changes) +
     (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
     (item.reviewNote ? '<div class="hint mt14"><b>원장 반려 사유</b><br>' + esc(item.reviewNote) + '</div>' : '') +
     (item.status === 'rejected'
@@ -3185,7 +3232,7 @@ function lessonChangeQueueCard(item) {
       esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
       esc((staff && staff.name) || item.owner) + ' 선생님 · 수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
-    '<div class="guide">' + lessonChangeSummary(item.changes) + '</div>' +
+    lessonChangeDiffHtml(task, item.changes) +
     (item.note ? '<div class="small muted mt14">요청 사유 — ' + esc(item.note) + '</div>' : '') +
     (item.reviewNote ? '<div class="hint mt14">반려 사유: ' + esc(item.reviewNote) + '</div>' : '') +
     (item.status === 'approval_waiting'
@@ -4999,16 +5046,10 @@ function managerRequestInboxRows() {
     const task = state.tasks.find(task => task.id === row.taskId);
     push('수업 변경', (task && (task.studentName || task.title)) || '수업 정보', '요일·시간·진도 변경 승인', row.owner, 'feedback', row.updatedAt, 0);
   });
-  feedbackQueue.filter(row => row.status === 'approval_waiting' || row.status === 'content_approved_send_blocked').forEach(row => {
+  feedbackQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
-    const blocked = row.status === 'content_approved_send_blocked';
-    push(blocked ? '피드백 발송' : '피드백 검토', row.studentName || (task && (task.studentName || task.title)) || '수업 피드백',
-      blocked ? '알림톡 발송 상태 확인' : '피드백 문구 승인', row.owner, 'feedback', row.updatedAt, blocked ? 1 : 0);
-  });
-  makeupRows.filter(row => ['review_pending', 'reviewed'].includes(row.status) || row.notificationNeeded).forEach(row => {
-    const detail = row.notificationNeeded ? '보강 알림톡 상태 확인' :
-      row.status === 'review_pending' ? '보강 진행 여부 검토' : '보강 일정 제안 필요';
-    push('보강', row.studentName || '학생 연결 확인 필요', detail, row.sourceTeacherId, 'makeup', row.updatedAt, 0);
+    push('피드백 검토', row.studentName || (task && (task.studentName || task.title)) || '수업 피드백',
+      '피드백 문구 승인', row.owner, 'feedback', row.updatedAt, 0);
   });
   bookAddQueue.filter(row => row.status === 'approval_waiting').forEach(row =>
     push('교재 추가', row.title || '새 교재', '새 교재 등록 승인', row.owner, 'books', row.updatedAt, 0));
@@ -5021,12 +5062,12 @@ function managerRequestInboxRows() {
 function managerRequestInboxCount() { return session.isAdmin ? managerRequestInboxRows().length : 0; }
 
 function managerRequestInboxReady() {
-  return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded && makeupLoaded &&
+  return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded &&
     bookAddQueueLoaded && bookEditQueueLoaded;
 }
 
 function managerRequestInboxErrors() {
-  return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, makeupError, bookAddQueueError, bookEditQueueError]
+  return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError]
     .filter(Boolean);
 }
 
@@ -5037,7 +5078,7 @@ async function loadManagerRequestInbox(force) {
   try {
     await Promise.all([
       loadLessonAssignmentRequests(force), loadLessonChangeQueue(force), loadFeedbackQueue(force),
-      loadMakeups(force), loadBookAddQueue(force), loadBookEditQueue(force)
+      loadBookAddQueue(force), loadBookEditQueue(force)
     ]);
   } finally {
     managerInboxLoading = false;
@@ -5092,7 +5133,7 @@ function viewSchedule() {
   let h = '<div class="datenav">' +
     '<button class="navbtn" data-act="day" data-n="-' + navStep + '" aria-label="이전 ' + navUnit + '">‹</button>' +
     '<div class="d">' + esc(navTitle) + (navRel ? '<em>' + esc(navRel) + '</em>' : '') + '</div>' +
-    '<button class="navbtn" data-act="day" data-n="' + navStep + '" aria-label="다음 ' + navUnit + '">›</button></div>' + managerRequestInboxHtml() + scheduleToolbarHtml();
+    '<button class="navbtn" data-act="day" data-n="' + navStep + '" aria-label="다음 ' + navUnit + '">›</button></div>' + scheduleToolbarHtml();
 
   if (weekly) {
     const isStudentView = scheduleView === 'student';
@@ -5112,7 +5153,7 @@ function viewSchedule() {
     if (scheduleView === 'week') h += scheduleWeekCardsHtml(weekly);
     else if (scheduleView === 'teacher') h += scheduleTeacherCardsHtml(weekly);
     else h += scheduleStudentCardsHtml(weekly);
-    return h + scheduleIssuesHtml(weekly.issues);
+    return h + managerRequestInboxHtml() + scheduleIssuesHtml(weekly.issues);
   }
 
   const daily = dailyLessonSchedule(cursor);
@@ -5136,7 +5177,7 @@ function viewSchedule() {
     [attendanceRecorded + '/' + daily.entries.length, '출결'], [daily.issues.length + conflictCount + '건', '확인 필요']
   ]);
   h += scheduleTimelineHtml(timeline, cursor, nowKst);
-  return h + scheduleIssuesHtml(daily.issues);
+  return h + managerRequestInboxHtml() + scheduleIssuesHtml(daily.issues);
 }
 
 /* ── 기기 대장 ── */
@@ -10184,6 +10225,7 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
+    case 'prevmemos': previousTaskMemosModal(id, date); break;
 
     /* 직원 */
     case 'pickstaff': viewStaff = id; render(); break;
@@ -11203,7 +11245,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-14.4';
+const APP_VER = '2026-08-14.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
