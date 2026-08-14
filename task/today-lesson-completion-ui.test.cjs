@@ -34,3 +34,29 @@ test('관리자 오늘 할 일의 선생님 순서는 김혜지, 김남기, 가�
   assert.notEqual(list, staff, '원본 직원 배열은 변경하지 않아야 한다');
   assert.match(source, /return staffById\(viewStaff\) \|\| todayStaffList\(\)\[0\] \|\| null/);
 });
+
+test('수업 카드에는 같은 opener 스타일의 이전 수업 메모 버튼이 있다', () => {
+  const row = source.slice(source.indexOf('function taskRow('), source.indexOf('function taskPanel(', source.indexOf('function taskRow(')));
+  assert.match(row, /class="opener" data-act="prevmemos"/);
+  assert.match(row, /이전 수업 메모 보기/);
+  assert.match(source, /case 'prevmemos': previousTaskMemosModal\(id, date\)/);
+});
+
+test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순 20개까지 보여준다', () => {
+  const start = source.indexOf('function previousTaskMemos(');
+  const end = source.indexOf('function previousTaskMemosModal(', start);
+  const checks = {};
+  for (let day = 1; day <= 22; day += 1) {
+    const date = '2026-07-' + String(day).padStart(2, '0');
+    checks['lesson-1|' + date] = { taskId: 'lesson-1', date, note: '메모 ' + day };
+  }
+  checks['lesson-1|2026-08-14'] = { taskId: 'lesson-1', date: '2026-08-14', note: '오늘 메모' };
+  checks['lesson-2|2026-07-30'] = { taskId: 'lesson-2', date: '2026-07-30', note: '다른 수업' };
+  checks['lesson-1|2026-07-31'] = { taskId: 'lesson-1', date: '2026-07-31', note: '   ' };
+  const previousTaskMemos = new Function('state', source.slice(start, end) + '\nreturn previousTaskMemos;')({ checks });
+  const rows = previousTaskMemos('lesson-1', '2026-08-14');
+  assert.equal(rows.length, 20);
+  assert.equal(rows[0].date, '2026-07-22');
+  assert.equal(rows.at(-1).date, '2026-07-03');
+  assert.ok(rows.every(row => row.taskId === 'lesson-1' && row.date < '2026-08-14'));
+});
