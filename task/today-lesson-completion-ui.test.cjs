@@ -44,7 +44,7 @@ test('수업 카드의 이전 수업 메모는 팝업 없이 카드 아래에서
   assert.match(source, /\.opener \{ display: block; width: 100%; text-align: left;/);
 });
 
-test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순 20개까지 보여준다', () => {
+test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순 3개까지 보여준다', () => {
   const start = source.indexOf('function previousTaskMemos(');
   const end = source.indexOf('function previousTaskMemosInline(', start);
   const checks = {};
@@ -57,9 +57,9 @@ test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순
   checks['lesson-1|2026-07-31'] = { taskId: 'lesson-1', date: '2026-07-31', note: '   ' };
   const previousTaskMemos = new Function('state', source.slice(start, end) + '\nreturn previousTaskMemos;')({ checks });
   const rows = previousTaskMemos('lesson-1', '2026-08-14');
-  assert.equal(rows.length, 20);
+  assert.equal(rows.length, 3);
   assert.equal(rows[0].date, '2026-07-22');
-  assert.equal(rows.at(-1).date, '2026-07-03');
+  assert.equal(rows.at(-1).date, '2026-07-20');
   assert.ok(rows.every(row => row.taskId === 'lesson-1' && row.date < '2026-08-14'));
 });
 
