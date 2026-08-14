@@ -17,6 +17,7 @@
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /admin-handoff { app:'consult', auth(admin) } → { ok, code } 원장 새 기기 연결
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
+ *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
  *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)
  *   POST /parent-feedback-send { app, auth(admin), requestKey } → 막혔던 발송을 원장이 수동으로 재시도
@@ -61,6 +62,7 @@ import { handleParentPortal } from './parent-portal.js';
 import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
+import { handleContactLog } from './contact-log.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -472,6 +474,9 @@ async function handleSync(env, app, body, origin) {
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
+    // 연락 기록은 서버 검증이 있는 /contact-log에서만 저장한다.
+    // 클라이언트 캐시에 내려온 행이 generic LWW로 되올라와 정본을 덮지 않게 무시한다.
+    if (t === 'checks' && /^__contact__/.test(String(c.k || ''))) continue;
     const onboardingKey = t === 'checks' && /^__onboarding__/.test(String(c.k || ''));
     if (onboardingKey && c.reconcile === true) {
       if (auth.scope === 'all') attemptedOnboardingKeys.add(String(c.k));
@@ -1363,6 +1368,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleLessonCreate(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/contact-log') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleContactLog(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-assignment-request') {
         const auth = await resolveAuth(env, app, body.auth);

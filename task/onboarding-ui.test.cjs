@@ -291,6 +291,7 @@ test('new Pages reload reconciles forged CAS state even when normal collect and 
   const state = { checks: { [key]: forged }, staff: [], tasks: [] };
   const api = new Function('state', `
     const ownerOfCheck = () => null;
+    const isContactCheckKey = key => String(key || '').split('|')[0].startsWith('__contact__');
     const onboardingServerConfirmedAt = new Map();
     const sync = { ${source} };
     ${reconcileSource}
