@@ -42,8 +42,8 @@ test('book issue risks use a real 24 hours and unmatched active records stay vis
   assert.match(html, /출고 후 1일\+ 미수령/);
 });
 
-test('book issue UI has status and admin-only unassigned KPIs, filters, retry, focus restoration, and no contact fields', () => {
-  const view = block('function viewBookIssues()', 'async function transitionBookIssue(');
+test('legacy book issue UI keeps status and admin-only unassigned KPIs, filters, retry, focus restoration, and no contact fields', () => {
+  const view = block('function viewLegacyBookIssues()', 'function bookOrderStageRows(');
   const whole = block('/* ── 학생별 교재 출고·인계 ──', 'function viewBooks()');
   assert.match(view, /미출고/);
   assert.match(view, /출고 후 1일\+ 미수령/);
@@ -88,13 +88,33 @@ test('unassigned book warning uses stable student ids, current enrollment, and f
 });
 
 test('book issue errors keep roster-derived warnings visible and refresh both sources', () => {
-  const view = block('function viewBookIssues()', 'async function transitionBookIssue(');
+  const view = block('function viewLegacyBookIssues()', 'function bookOrderStageRows(');
   const actions = block("case 'rosterretry':", "case 'onbadd':");
   assert.match(view, /const unassignedHtml = bookIssueUnassignedHtml\(unassigned\)/);
   assert.match(view, /if \(bookIssueError\)[\s\S]{0,420}\+ unassignedHtml/);
   assert.match(view, /unassigned === null[\s\S]{0,160}미배정 확인 불가/);
   assert.match(html, /최신 원생 명단을 확인하지 못해 이전 명단의 숫자를 표시하지 않습니다/);
   assert.match(actions, /case 'bookissuerefresh':[\s\S]{0,180}loadRoster\(\); loadBookIssues\(true\)/);
+});
+
+test('order delivery board uses four collapsed quantity stages and stable-student actions', () => {
+  const view = block('function bookOrderStageRows(', 'async function transitionBookIssue(');
+  const picker = block('function orderStudentCandidates()', 'function batchOrderModal(');
+  assert.match(view, /교재 주문 및 배송 현황/);
+  assert.match(view, /1단계 · 주문대기/);
+  assert.match(view, /2단계 · 주문완료 \/ 주문실패/);
+  assert.match(view, /3단계 · 선생님 수령/);
+  assert.match(view, /4단계 · 학생배부 완료/);
+  assert.match(view, /<details class="book-order-stage"><summary>/);
+  assert.match(view, /data-next="receive"[\s\S]{0,160}>수령완료<\/button>/);
+  assert.match(view, /data-next="hand"[\s\S]{0,160}>배부완료<\/button>/);
+  assert.match(view, /data-next="academy_register"[\s\S]{0,180}>아카등록완료<\/button>/);
+  assert.match(view, /해야 할 업무 · 아카등록/);
+  assert.match(view, /action: 'order_transition'/);
+  assert.match(picker, /student\.id/);
+  assert.match(picker, /data-order-student/);
+  assert.match(html, /studentIds: studentIds/);
+  assert.doesNotMatch(picker, /type="number"|placeholder="예: 3권"/);
 });
 
 test('first-day package uses exact stable studentId schedule and shows every honest missing state', () => {

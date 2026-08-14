@@ -425,6 +425,30 @@ CREATE INDEX IF NOT EXISTS idx_book_issues_status
 CREATE INDEX IF NOT EXISTS idx_book_issues_student
   ON book_issues(app, student_id, updated_at);
 
+-- 주문 교재의 수령·배부·아카등록 원장. 표시명·연락처 대신 주문 task의 stable studentId를 저장한다.
+CREATE TABLE IF NOT EXISTS book_order_fulfillments (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  task_id               TEXT    NOT NULL,
+  item_index            INTEGER NOT NULL CHECK (item_index >= 0),
+  book_id               TEXT    NOT NULL,
+  student_ids           TEXT    NOT NULL CHECK (json_valid(student_ids)),
+  status                TEXT    NOT NULL CHECK (status IN ('teacher_received','student_handed','academy_registered')),
+  revision              INTEGER NOT NULL CHECK (revision >= 1),
+  teacher_received_at   INTEGER,
+  teacher_received_by   TEXT,
+  student_handed_at     INTEGER,
+  student_handed_by     TEXT,
+  academy_registered_at INTEGER,
+  academy_registered_by TEXT,
+  created_at             INTEGER NOT NULL,
+  updated_at             INTEGER NOT NULL,
+  PRIMARY KEY (app, task_id, item_index)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_fulfillments_status
+  ON book_order_fulfillments(app, status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_book_order_fulfillments_task
+  ON book_order_fulfillments(app, task_id, updated_at);
+
 -- 차량 노선 설정. 전화·주소·보호자 정보는 저장하지 않는다.
 CREATE TABLE IF NOT EXISTS transport_configs (
   app        TEXT    NOT NULL CHECK (app = 'task'),

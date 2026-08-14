@@ -6,6 +6,7 @@ import worker from './worker-core.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/022_book_issues.sql', import.meta.url), 'utf8');
+const fulfillmentMigration = fs.readFileSync(new URL('./migrations/031_book_order_fulfillments.sql', import.meta.url), 'utf8');
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -63,6 +64,17 @@ test('schema and migration are additive and store no student name or contact', (
     assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
   }
   const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');') + 2);
+  assert.doesNotMatch(table, /student_name|phone|address|memo/i);
+});
+
+test('order fulfillment migration is additive and stores stable ids without display names or contacts', () => {
+  for (const sql of [schema, fulfillmentMigration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_fulfillments/);
+    for (const status of ['teacher_received', 'student_handed', 'academy_registered']) assert.ok(sql.includes("'" + status + "'"));
+    assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
+  }
+  const table = fulfillmentMigration.slice(fulfillmentMigration.indexOf('CREATE TABLE'), fulfillmentMigration.indexOf(');') + 2);
+  assert.match(table, /student_ids/);
   assert.doesNotMatch(table, /student_name|phone|address|memo/i);
 });
 
@@ -151,4 +163,62 @@ test('admin sees orphan/identity warnings while ordinary staff fail closed', asy
   const own = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
   assert.equal(own.body.warnings.length, 0);
   assert.equal(own.body.issues.some(item => item.assignmentId === 'assign-a'), false);
+});
+
+test('new order moves through accepted, teacher received, student handed, and admin academy registration', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = {
+    id: 'order-a', staffId: 'teacher-a', title: '[주문] 새 교재', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트출판사',
+    orderItems: [{ bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'] }],
+    origin: 'staff', createdAt: now, updatedAt: now
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 'teacher-a', JSON.stringify(task), now, now).run();
+
+  const waiting = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  assert.equal(waiting.body.orders[0].stage, 'order_waiting');
+  assert.deepEqual(waiting.body.orders[0].students.map(student => student.id), ['student-a']);
+  assert.equal(JSON.stringify(waiting.body.orders).includes('teacherIds'), false);
+
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-a', 'key-a', 'batch-a', '테스트출판사', 1, 'a'.repeat(64), 'accepted', now, now).run();
+  db.prepare('INSERT INTO book_order_batch_items(app,task_id,send_id,created_at) VALUES(?,?,?,?)')
+    .bind('task', task.id, 'send-a', now).run();
+
+  const accepted = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  assert.equal(accepted.body.orders[0].stage, 'ordered');
+  const received = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 });
+  assert.equal(received.status, 200);
+  assert.equal(received.body.status, 'teacher_received');
+  const handed = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'hand', revision: 1 });
+  assert.equal(handed.body.status, 'student_handed');
+  const staffAcademy = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'academy_register', revision: 2 });
+  assert.equal(staffAcademy.status, 403);
+  const academy = await call(db, { auth: admin, action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'academy_register', revision: 2 });
+  assert.equal(academy.status, 200);
+  assert.equal(academy.body.status, 'academy_registered');
+  const completed = await call(db, { auth: admin, action: 'list' });
+  assert.equal(completed.body.orders[0].stage, 'student_handed');
+  assert.ok(completed.body.orders[0].academyRegisteredAt);
+});
+
+test('order fulfillment rejects another teacher and cannot receive before an accepted order result', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'order-b', title: '[주문] 새 교재', deleted: false, orderDelivery: 'scheduled_batch_v1',
+    orderItems: [{ bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'] }], origin: 'staff' };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 'teacher-a', JSON.stringify(task), now, now).run();
+  assert.equal((await call(db, { auth: person('teacher-b', 'token-b'), action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 })).status, 403);
+  const early = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 });
+  assert.equal(early.status, 409);
+  assert.equal(early.body.code, 'ORDER_NOT_ACCEPTED');
 });
