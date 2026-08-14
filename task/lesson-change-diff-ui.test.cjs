@@ -25,6 +25,15 @@ test('관리자 수업 변경 검토는 요청된 항목만 변경 전과 변경
   assert.doesNotMatch(html, /수업 메모/);
 });
 
+test('변경 전후 값이 같은 요청 항목은 검토 내용에서 숨긴다', () => {
+  const html = diffHtml(
+    { days: [1, 3], time: '16:00', repeat: 'weekly', detail: '기존 진도', guide: '' },
+    { days: [1, 3], time: '17:00', repeat: 'weekly', detail: '기존 진도', guide: '' }
+  );
+  assert.match(html, /시간[\s\S]*16:00[\s\S]*17:00/);
+  assert.doesNotMatch(html, /요일|반복|교재·진도|수업 메모/);
+});
+
 test('관리자 변경 요청 카드는 문장 요약 대신 전후 비교 표를 사용한다', () => {
   const start = source.indexOf('function lessonChangeQueueCard(');
   const end = source.indexOf('function viewLessonChangeReview(', start);
@@ -32,4 +41,21 @@ test('관리자 변경 요청 카드는 문장 요약 대신 전후 비교 표�
   assert.match(card, /lessonChangeDiffHtml\(task, item\.changes\)/);
   assert.doesNotMatch(card, /lessonChangeSummary\(item\.changes\)/);
   assert.match(source, /\.lesson-change-after \{ border-color: #B9E3C7; background: #F3FCF6; \}/);
+});
+
+test('관리자 변경 검토는 수업 등록 및 변경 탭에 있고 승인 완료 기록은 기본 목록에서 숨긴다', () => {
+  const lessonView = source.slice(source.indexOf('function viewLessonEntry()'), source.indexOf('function lessonInputPayload('));
+  const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
+  const reviewView = source.slice(source.indexOf('function viewLessonChangeReview()'), source.indexOf('/* ── 변경 요청 작성 모달'));
+  const card = source.slice(source.indexOf('function lessonChangeQueueCard('), source.indexOf('function viewLessonChangeReview('));
+  assert.match(source, /\['lesson', '수업 등록 및 변경'\]/);
+  assert.match(lessonView, /viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
+  assert.doesNotMatch(feedbackView, /viewLessonChangeReview\(\)/);
+  assert.match(reviewView, /lessonChangeQueue\.filter\(item => item\.status !== 'approved'\)/);
+  assert.match(card, /<b>요청 사유<\/b><br>/);
+});
+
+test('취소된 피드백은 활성 피드백 검토 목록에서 숨긴다', () => {
+  const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
+  assert.match(feedbackView, /feedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
 });

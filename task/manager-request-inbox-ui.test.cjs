@@ -44,6 +44,7 @@ test('관리담당 현황판은 실제 승인 대기만 선생님 이름으로 �
   assert.ok(rows.every(row => / 선생님$/.test(row.requester)));
   assert.ok(rows.every(row => !/teacher-[ab]/.test(row.requester)));
   assert.deepEqual(new Set(rows.map(row => row.route)), new Set(['lesson', 'feedback', 'books']));
+  assert.equal(rows.find(row => row.kind === '수업 변경').route, 'lesson');
 });
 
 test('관리담당이 아니면 통합 요청함 데이터를 만들지 않는다', () => {
