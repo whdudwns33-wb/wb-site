@@ -697,10 +697,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-14.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-14.3"></script>
-<script src="./asset-core.js?v=2026-08-14.3"></script>
-<script src="./qr-core.js?v=2026-08-14.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-14.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-14.4"></script>
+<script src="./asset-core.js?v=2026-08-14.4"></script>
+<script src="./qr-core.js?v=2026-08-14.4"></script>
 <script>
 "use strict";
 
@@ -801,7 +801,15 @@ function tasksFor(staffId, date) {
 
 const ckey = (taskId, date) => taskId + '|' + date;
 const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
-const isDone = (taskId, date) => !!(state.checks[ckey(taskId, date)] || {}).done;
+function isDone(taskId, date) {
+  const c = getCheck(taskId, date);
+  const task = state.tasks.find(row => row.id === taskId);
+  const steps = taskSteps(task, c);
+  if (usesStandardLessonDisplay(task) && steps.length === LESSON_OPERATIONAL_STEP_LABELS.length) {
+    return steps.every(step => c && c.steps && c.steps[step.id]);
+  }
+  return !!(c && c.done);
+}
 
 function setCheck(taskId, date, patch) {
   const k = ckey(taskId, date);
@@ -919,7 +927,7 @@ function taskProgress(t, c) {
 function statusOf(t, date) {
   const c = getCheck(t.id, date);
   if (c && c.blocked) return 'blocked';
-  if (c && c.done) return 'done';
+  if (isDone(t.id, date)) return 'done';
   if (taskProgress(t, c).done > 0) return 'doing';
   return 'todo';
 }
@@ -934,7 +942,8 @@ function syncAuto(t, date) {
   const hasSteps = steps.length > 0, hasTarget = !!t.target;
   if (!hasSteps && !hasTarget) return;
   const stepsOk = !hasSteps || steps.every(s => c.steps && c.steps[s.id]);
-  const countOk = !hasTarget || ((c.count || 0) >= t.target);
+  const standardLesson = usesStandardLessonDisplay(t) && steps.length === LESSON_OPERATIONAL_STEP_LABELS.length;
+  const countOk = standardLesson || !hasTarget || ((c.count || 0) >= t.target);
   const full = stepsOk && countOk;
   if (full && !c.done) setCheck(t.id, date, { done: true, at: now() });
   else if (!full && c.done) setCheck(t.id, date, { done: false, at: null });
@@ -998,7 +1007,7 @@ function alertsToday() {
   liveStaff().forEach(s => tasksFor(s.id, d).forEach(t => {
     const c = getCheck(t.id, d);
     if (c && c.blocked) { blocked++; return; }
-    if (c && c.done) return;
+    if (isDone(t.id, d)) return;
     if (t.time && t.time < hm) overdue++;
   }));
   return { blocked: blocked, overdue: overdue, total: blocked + overdue };
@@ -1861,7 +1870,7 @@ function paintStatus() {
 
 function currentStaff() {
   if (session.isStaffLink && !session.isAdmin) return staffById(session.staffId);
-  return staffById(viewStaff) || liveStaff()[0] || null;
+  return staffById(viewStaff) || todayStaffList()[0] || null;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2095,9 +2104,10 @@ function taskRow(t, date, editable, isCarry) {
   const detail = taskCardDetail(t);
   const hasDetail = steps.length || t.guide || t.target;
   const open = openPanels.has(t.id + '|' + date);
+  const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
-    '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
+    (showFinalBox ? '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' : '') +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(t.title) + '</div>' +
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
@@ -2555,8 +2565,13 @@ function showFeedbackPreview(t, date, fields, letterText) {
     '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">복사하기</button>');
 }
 
+function todayStaffList() {
+  const rank = name => name === '김혜지' ? 0 : name === '김남기' ? 1 : String(name || '').includes('테스트') ? 3 : 2;
+  return liveStaff().slice().sort((a, b) => rank(a.name) - rank(b.name) || String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+}
+
 function staffSwitcher(activeId) {
-  const list = liveStaff();
+  const list = todayStaffList();
   if (list.length < 2) return '';
   return '<div class="chips mb14">' + list.map(s =>
     '<button class="chip ' + (s.id === activeId ? 'on' : '') + '" data-act="pickstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>'
@@ -10123,7 +10138,7 @@ document.addEventListener('click', ev => {
     case 'toggle': {
       const t = task(); if (!t) break;
       const c = getCheck(id, date);
-      const turnOn = !(c && c.done);
+      const turnOn = !isDone(id, date);
       const steps = {};
       taskSteps(t, c).forEach(s => { steps[s.id] = turnOn; });
       setCheck(id, date, {
@@ -11188,7 +11203,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-14.3';
+const APP_VER = '2026-08-14.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
