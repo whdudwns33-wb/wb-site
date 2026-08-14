@@ -88,3 +88,13 @@ test('이전 수업 메모 인라인 보기는 날짜와 메모를 details 본�
   assert.match(html, /분수 복습 완료/);
   assert.doesNotMatch(html, /modalHost|data-act="prevmemos"/);
 });
+
+test('메모는 포커스할 때 커지는 여러 줄 입력과 바로 아래 저장 버튼을 사용한다', () => {
+  const row = source.slice(source.indexOf('function taskRow('), source.indexOf('function previousTaskMemos(', source.indexOf('function taskRow(')));
+  assert.match(row, /<textarea class="note" data-act="note"[^>]+rows="1" enterkeyhint="enter"/);
+  assert.match(row, /<button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave"/);
+  assert.match(source, /\.memo-editor:focus-within textarea\.note \{ min-height: 132px;/);
+  assert.match(source, /\.memo-editor:focus-within \.memo-save \{ display: block; \}/);
+  assert.match(source, /case 'notesave':[\s\S]{0,420}setCheck\(id, date, \{ note: noteEl\.value \}\)/);
+  assert.doesNotMatch(source, /setTimeout\(\(\) => \{\s*setCheck\(noteEl\.dataset\.id/);
+});

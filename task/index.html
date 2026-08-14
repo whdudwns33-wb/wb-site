@@ -166,7 +166,11 @@
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
   .tag.add  { background: #ECFDF5; color: var(--green); }
   .tag.edit { background: #FFF7ED; color: var(--amber); }
-  .note { margin-top: 8px; width: 100%; font-size: 13px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); }
+  .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
+  textarea.note { display: block; min-height: 44px; resize: vertical; transition: min-height .18s ease, border-color .18s ease, background .18s ease; }
+  .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
+  .memo-save { display: none; margin-top: 8px; }
+  .memo-editor:focus-within .memo-save { display: block; }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
   .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
 
@@ -2144,8 +2148,10 @@ function taskRow(t, date, editable, isCarry) {
   if (open) h += taskPanel(t, date, c, editable);
 
   h += (editable
-      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="' +
-        (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">'
+      ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' +
+        (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">' +
+        esc((c && c.note) || '') + '</textarea><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
+        t.id + '" data-date="' + date + '">메모 저장</button></div>'
       : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
 
   return h + '</div></div>';
@@ -10197,6 +10203,16 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
+    case 'notesave': {
+      const editor = el.closest('.memo-editor');
+      const noteEl = editor && editor.querySelector('[data-act="note"]');
+      if (!noteEl) return toast('메모 입력칸을 다시 확인해 주세요');
+      clearTimeout(inputTimer);
+      setCheck(id, date, { note: noteEl.value });
+      toast('메모 저장됨');
+      noteEl.focus();
+      break;
+    }
     case 'step': {
       const t = task(); if (!t) break;
       const c = getCheck(id, date);
@@ -11086,15 +11102,6 @@ document.addEventListener('input', ev => {
   const scheduleSearch = ev.target.closest('[data-schedule-search]');
   if (scheduleSearch) {
     applyScheduleSearch(scheduleSearch.value);
-    return;
-  }
-  const noteEl = ev.target.closest('[data-act="note"]');
-  if (noteEl) {
-    clearTimeout(inputTimer);
-    inputTimer = setTimeout(() => {
-      setCheck(noteEl.dataset.id, noteEl.dataset.date || cursor, { note: noteEl.value });
-      toast('메모 저장됨');
-    }, 700);
     return;
   }
   const cntEl = ev.target.closest('[data-act="cntset"]');
