@@ -66,6 +66,9 @@ async function callAt(db, auth, body, iso) {
   finally { Date.now = original; }
 }
 
+const beforeMakeupSlot = (db, auth, body) =>
+  callAt(db, auth, body, '2026-08-11T12:00:00+09:00');
+
 async function sha256(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -227,14 +230,14 @@ test('state machine uses CAS and emits parent-notification markers for proposal 
   assert.equal(invalid.status, 409);
   assert.equal(invalid.body.code, 'INVALID_TRANSITION');
 
-  const proposed = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const proposed = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
   assert.equal(proposed.status, 200);
   assert.equal(proposed.body.case.proposedDate, '2026-08-12');
   assert.equal(proposed.body.case.status, 'awaiting_parent');
   assert.equal(proposed.body.case.notificationNeeded, true);
   assert.equal(proposed.body.case.notificationEvent, 'proposal');
-  const confirmed = await call(db, all, { action: 'confirm', caseId: reviewed.caseId,
+  const confirmed = await beforeMakeupSlot(db, all, { action: 'confirm', caseId: reviewed.caseId,
     revision: proposed.body.case.revision });
   assert.equal(confirmed.status, 200);
   assert.equal(confirmed.body.case.status, 'confirmed');
@@ -272,7 +275,7 @@ test('state machine uses CAS and emits parent-notification markers for proposal 
 test('latest parent response is visible and a same-revision decline blocks confirmation', async () => {
   const db = new TestD1(); db.database.exec(portalMigration); seed(db);
   const reviewed = await createAndReview(db);
-  const proposed = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const proposed = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
   const revision = proposed.body.case.revision;
   db.prepare(
@@ -283,7 +286,7 @@ test('latest parent response is visible and a same-revision decline blocks confi
   assert.equal(listed.body.cases[0].parentResponse, 'decline');
   assert.equal(listed.body.cases[0].parentResponseRevision, revision);
   assert.equal(listed.body.cases[0].parentRespondedAt, 10);
-  const declined = await call(db, all, { action: 'confirm', caseId: reviewed.caseId, revision });
+  const declined = await beforeMakeupSlot(db, all, { action: 'confirm', caseId: reviewed.caseId, revision });
   assert.equal(declined.status, 409);
   assert.equal(declined.body.code, 'PARENT_DECLINED');
   assert.throws(() => db.prepare(
@@ -505,11 +508,11 @@ test('active pack outside the source date is explicitly not applicable', async (
 test('confirm maps a database-time parent decline race to PARENT_DECLINED', async () => {
   const db = new TestD1(); db.database.exec(portalMigration); seed(db);
   const reviewed = await createAndReview(db);
-  const proposed = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const proposed = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
   db.database.exec("CREATE TRIGGER test_parent_decline_race BEFORE UPDATE OF status ON makeup_cases " +
     "WHEN NEW.status='confirmed' BEGIN SELECT RAISE(ABORT,'PARENT_DECLINED'); END;");
-  const result = await call(db, all, { action: 'confirm', caseId: reviewed.caseId,
+  const result = await beforeMakeupSlot(db, all, { action: 'confirm', caseId: reviewed.caseId,
     revision: proposed.body.case.revision });
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'PARENT_DECLINED');
@@ -523,22 +526,22 @@ test('proposal validates KST date/time, active roster/staff, and regular student
   const invalidIso = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-02-30', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
   assert.equal(invalidIso.status, 400);
-  const studentConflict = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const studentConflict = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
   assert.equal(studentConflict.status, 409);
   assert.equal(studentConflict.body.code, 'STUDENT_SCHEDULE_CONFLICT');
-  const staffConflict = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const staffConflict = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '18:30', endTime: '19:30', staffId: 'teacher-b' });
   assert.equal(staffConflict.status, 409);
   assert.equal(staffConflict.body.code, 'STAFF_SCHEDULE_CONFLICT');
-  const inactiveStaff = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const inactiveStaff = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-inactive' });
   assert.equal(inactiveStaff.status, 409);
   assert.equal(inactiveStaff.body.code, 'STAFF_INACTIVE');
 
   const ended = roster(); ended.roster.students[0].end = '2026-08';
   db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(ended)).run();
-  const inactiveStudent = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+  const inactiveStudent = await beforeMakeupSlot(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
   assert.equal(inactiveStudent.status, 409);
   assert.equal(inactiveStudent.body.code, 'STUDENT_INACTIVE');
@@ -547,12 +550,12 @@ test('proposal validates KST date/time, active roster/staff, and regular student
 test('confirmed makeup conflicts are rechecked and cancel needs a reason', async () => {
   const db = new TestD1(); seed(db);
   const caseB = await createAndReview(db, 'lesson-b', '2026-08-11', own('teacher-b'));
-  const proposedB = await call(db, all, { action: 'propose', caseId: caseB.caseId, revision: caseB.revision,
+  const proposedB = await beforeMakeupSlot(db, all, { action: 'propose', caseId: caseB.caseId, revision: caseB.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
-  const confirmedB = await call(db, all, { action: 'confirm', caseId: caseB.caseId, revision: proposedB.body.case.revision });
+  const confirmedB = await beforeMakeupSlot(db, all, { action: 'confirm', caseId: caseB.caseId, revision: proposedB.body.case.revision });
   assert.equal(confirmedB.status, 200);
   const caseA = await createAndReview(db);
-  const conflict = await call(db, all, { action: 'propose', caseId: caseA.caseId, revision: caseA.revision,
+  const conflict = await beforeMakeupSlot(db, all, { action: 'propose', caseId: caseA.caseId, revision: caseA.revision,
     date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-b' });
   assert.equal(conflict.status, 409);
   assert.equal(conflict.body.code, 'STAFF_MAKEUP_CONFLICT');
@@ -571,7 +574,7 @@ test('database trigger closes the concurrent-confirmation race between different
   const caseA = await createAndReview(db);
   const caseB = await createAndReview(db, 'lesson-b', '2026-08-11', own('teacher-b'));
   for (const item of [caseA, caseB]) {
-    const proposed = await call(db, all, { action: 'propose', caseId: item.caseId, revision: item.revision,
+    const proposed = await beforeMakeupSlot(db, all, { action: 'propose', caseId: item.caseId, revision: item.revision,
       date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
     assert.equal(proposed.status, 200);
   }
