@@ -40,6 +40,7 @@ test('수업 카드에는 같은 opener 스타일의 이전 수업 메모 버튼
   assert.match(row, /class="opener" data-act="prevmemos"/);
   assert.match(row, /이전 수업 메모 보기/);
   assert.match(source, /case 'prevmemos': previousTaskMemosModal\(id, date\)/);
+  assert.match(source, /\.opener \{ display: block; width: 100%; text-align: left;/);
 });
 
 test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순 20개까지 보여준다', () => {

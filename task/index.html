@@ -179,7 +179,7 @@
   .link-actions { display: grid; gap: 8px; margin-top: 14px; }
 
   /* ─── 단계 / 가이드 ─── */
-  .opener { font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
+  .opener { display: block; width: 100%; text-align: left; font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
@@ -699,10 +699,10 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-14.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-14.5"></script>
-<script src="./asset-core.js?v=2026-08-14.5"></script>
-<script src="./qr-core.js?v=2026-08-14.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-14.6"></script>
+<script src="./schedule-board-core.js?v=2026-08-14.6"></script>
+<script src="./asset-core.js?v=2026-08-14.6"></script>
+<script src="./qr-core.js?v=2026-08-14.6"></script>
 <script>
 "use strict";
 
@@ -11245,7 +11245,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-14.5';
+const APP_VER = '2026-08-14.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
