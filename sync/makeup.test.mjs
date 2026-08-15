@@ -53,10 +53,17 @@ const all = { scope: 'all' };
 const responseJson = (object, status) => new Response(JSON.stringify(object), {
   status: status || 200, headers: { 'content-type': 'application/json' }
 });
+const realDateNow = Date.now;
 
 async function call(db, auth, body) {
-  const response = await handleMakeup({ DB: db }, 'task', body, '*', auth, responseJson);
-  return { status: response.status, body: await response.json() };
+  const useFixtureClock = Date.now === realDateNow;
+  if (useFixtureClock) Date.now = () => Date.parse('2026-08-11T12:00:00+09:00');
+  try {
+    const response = await handleMakeup({ DB: db }, 'task', body, '*', auth, responseJson);
+    return { status: response.status, body: await response.json() };
+  } finally {
+    if (useFixtureClock) Date.now = realDateNow;
+  }
 }
 
 async function callAt(db, auth, body, iso) {

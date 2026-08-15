@@ -39,6 +39,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/028_guardian_ops_no
 npx wrangler d1 execute wb-sync --remote --file=./migrations/029_transport_notifications.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/030_lesson_assignment_requests.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/031_book_order_fulfillments.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/032_acaflow_student_links.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET

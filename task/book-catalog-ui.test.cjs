@@ -183,7 +183,7 @@ test('series display never changes publisher batch or outbound order data', () =
 
   assert.match(batch, /b\.vendor === vendorKey/);
   assert.match(batch, /const outsideSearch = booksOutsideSearch\(books, vendorLabel, bookSearchQuery\)/);
-  assert.match(batch, /검색 밖 ' \+ outsideSearch \+ '권 포함/);
+  assert.match(batch, /검색 밖 ' \+ outsideSearch \+ '종 포함/);
   assert.match(batch, /batchDraft = books\.map/);
   assert.match(order, /orderVendor: vendorName \|\| '', orderItems: items, orderDelivery: 'scheduled_batch_v1'/);
   assert.doesNotMatch(order, /series/i);
