@@ -63,7 +63,8 @@ test('WB 수업 기록을 실제 담당자 이름과 함께 아카플로우 입�
   assert.match(html, /function acaflowLessonSummary\(t, date\)/);
   assert.match(html, /'실제 담당: ' \+ \(\(staff && staff\.name\)/);
   assert.match(html, /data-act="acaflowlessoncopy"/);
-  assert.match(html, /아카플로우 입력용 수업 기록을 복사했습니다/);
+  assert.match(html, /아카플로우 코멘트용 복사/);
+  assert.match(html, /학생별 레포트의 코멘트·출결메모 칸에 붙여넣으세요\. 출결은 별도로 선택합니다/);
   const start = html.indexOf('function acaflowLessonSummary(t, date)');
   const end = html.indexOf('\nfunction taskPanel(', start);
   const source = html.slice(start, end);
