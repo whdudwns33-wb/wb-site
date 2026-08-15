@@ -16,6 +16,8 @@
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /admin-handoff { app:'consult', auth(admin) } → { ok, code } 원장 새 기기 연결
+ *   POST /admin-account { app:'consult', auth(admin), action:'set', loginId, password } 원장 계정 설정
+ *   POST /admin-login { app:'consult', loginId, password } → { ok, token } 원장 기기 로그인
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
@@ -74,8 +76,15 @@ const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
 const HANDOFF_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING_BOOTSTRAPS = 3;
 const MAX_ACTIVE_PERSON_SESSIONS = 3;
+const MAX_ACTIVE_ADMIN_SESSIONS = 5;
 const SAFE_BOOTSTRAP_CODE = /^[a-f0-9]{48}$/i;
 const ADMIN_DEVICE_ID = '__admin__';
+const SAFE_ADMIN_LOGIN_ID = /^[A-Za-z0-9._@-]{3,64}$/;
+const ADMIN_PASSWORD_MIN_LENGTH = 8;
+const ADMIN_PASSWORD_MAX_LENGTH = 128;
+const ADMIN_PASSWORD_ITERATIONS = 120000;
+const ADMIN_LOGIN_MAX_FAILURES = 5;
+const ADMIN_LOGIN_LOCK_MS = 5 * 60 * 1000;
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -123,6 +132,21 @@ async function sha256Hex(value) {
   const bytes = new TextEncoder().encode(String(value || ''));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function hexBytes(value) {
+  const pairs = String(value || '').match(/.{2}/g) || [];
+  return new Uint8Array(pairs.map(pair => parseInt(pair, 16)));
+}
+
+async function passwordHash(password, saltHex, iterations) {
+  const material = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(String(password || '')), 'PBKDF2', false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits({
+    name: 'PBKDF2', hash: 'SHA-256', salt: hexBytes(saltHex), iterations
+  }, material, 256);
+  return Array.from(new Uint8Array(bits), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function tokenStorageValue(digest) {
@@ -650,6 +674,7 @@ async function handleExchange(env, app, body, origin) {
     return json({ ok: false, code: 'LINK_INVALID', error: '올바른 개인 링크가 필요합니다' }, 400, origin);
   }
   const adminDevice = app === 'consult' && staffId === ADMIN_DEVICE_ID;
+  const activeSessionLimit = adminDevice ? MAX_ACTIVE_ADMIN_SESSIONS : MAX_ACTIVE_PERSON_SESSIONS;
   if (!adminDevice && !await activeStaff(env, app, staffId)) {
     return json({ ok: false, code: 'LINK_INVALID', error: '접근할 수 없는 개인 링크입니다' }, 401, origin);
   }
@@ -682,7 +707,7 @@ async function handleExchange(env, app, body, origin) {
       'UPDATE tokens SET revoked=1 ' +
       'WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
       'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
-      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_PERSON_SESSIONS - 1) + ') AND EXISTS (' +
+      'ORDER BY created_at DESC, token DESC LIMIT ' + (activeSessionLimit - 1) + ') AND EXISTS (' +
       'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
     ).bind(app, staffId, storedHash, app, staffId, storedHash, app, codeHash, staffId, consumeMarker),
     env.DB.prepare(
@@ -708,7 +733,7 @@ async function handleExchange(env, app, body, origin) {
     return json({ ok: false, code: 'LINK_USED', error: '다른 화면에서 먼저 사용된 개인 링크입니다' }, 409, origin);
   }
   return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS,
-    activeSessionLimit: MAX_ACTIVE_PERSON_SESSIONS }, 200, origin);
+    activeSessionLimit }, 200, origin);
 }
 
 async function handleHandoff(env, app, body, origin) {
@@ -731,6 +756,112 @@ async function handleAdminHandoff(env, app, body, origin) {
   }
   const issued = await issueBootstrap(env, app, ADMIN_DEVICE_ID, HANDOFF_TTL_MS);
   return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
+}
+
+async function issueAdminDeviceToken(env) {
+  const token = randomOpaqueValue();
+  const storedHash = tokenStorageValue(await sha256Hex(token));
+  const createdAt = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
+    ).bind('consult', storedHash, ADMIN_DEVICE_ID, createdAt),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND created_at<?'
+    ).bind('consult', ADMIN_DEVICE_ID, createdAt - TOKEN_TTL_MS),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
+      'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
+      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_ADMIN_SESSIONS - 1) + ')'
+    ).bind('consult', ADMIN_DEVICE_ID, storedHash, 'consult', ADMIN_DEVICE_ID, storedHash)
+  ]);
+  return { token, expiresAt: createdAt + TOKEN_TTL_MS };
+}
+
+function adminLoginId(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function handleAdminAccount(env, app, body, origin) {
+  if (app !== 'consult') {
+    return json({ ok: false, error: '원장 로그인 계정은 consult 앱에서만 사용할 수 있습니다' }, 400, origin);
+  }
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, code: 'AUTH_REQUIRED', error: '원장 인증이 필요합니다' }, 401, origin);
+  }
+  const action = String(body.action || 'get');
+  if (action === 'get') {
+    const row = await env.DB.prepare('SELECT login_id,updated_at FROM admin_accounts WHERE app=? LIMIT 1')
+      .bind('consult').first();
+    return json({ ok: true, configured: !!row, loginId: row ? row.login_id : '',
+      updatedAt: row ? row.updated_at : null }, 200, origin);
+  }
+  if (action !== 'set') return json({ ok: false, error: '올바른 action이 필요합니다' }, 400, origin);
+
+  const loginId = adminLoginId(body.loginId);
+  const password = String(body.password || '');
+  if (!SAFE_ADMIN_LOGIN_ID.test(loginId)) {
+    return json({ ok: false, error: '아이디는 영문·숫자·._@- 조합 3~64자로 입력해 주세요' }, 400, origin);
+  }
+  if (password.length < ADMIN_PASSWORD_MIN_LENGTH || password.length > ADMIN_PASSWORD_MAX_LENGTH) {
+    return json({ ok: false, error: '비밀번호는 8~128자로 입력해 주세요' }, 400, origin);
+  }
+  const salt = randomOpaqueValue();
+  const hash = await passwordHash(password, salt, ADMIN_PASSWORD_ITERATIONS);
+  const updatedAt = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO admin_accounts(app,login_id,password_salt,password_hash,password_iterations,' +
+      'failed_attempts,locked_until,updated_at) VALUES(?,?,?,?,?,0,0,?) ' +
+      'ON CONFLICT(app) DO UPDATE SET login_id=excluded.login_id,password_salt=excluded.password_salt,' +
+      'password_hash=excluded.password_hash,password_iterations=excluded.password_iterations,' +
+      'failed_attempts=0,locked_until=0,updated_at=excluded.updated_at'
+    ).bind('consult', loginId, salt, hash, ADMIN_PASSWORD_ITERATIONS, updatedAt),
+    env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0')
+      .bind('consult', ADMIN_DEVICE_ID)
+  ]);
+  const issued = await issueAdminDeviceToken(env);
+  return json({ ok: true, loginId, token: issued.token, expiresAt: issued.expiresAt,
+    activeSessionLimit: MAX_ACTIVE_ADMIN_SESSIONS }, 200, origin);
+}
+
+async function handleAdminLogin(env, app, body, origin) {
+  if (app !== 'consult') {
+    return json({ ok: false, error: '원장 로그인은 consult 앱에서만 사용할 수 있습니다' }, 400, origin);
+  }
+  const row = await env.DB.prepare(
+    'SELECT login_id,password_salt,password_hash,password_iterations,failed_attempts,locked_until ' +
+    'FROM admin_accounts WHERE app=? LIMIT 1'
+  ).bind('consult').first();
+  if (!row) {
+    return json({ ok: false, code: 'ACCOUNT_NOT_CONFIGURED',
+      error: '기존 원장 기기의 설정에서 로그인 계정을 먼저 만들어 주세요' }, 409, origin);
+  }
+  const now = Date.now();
+  if (Number(row.locked_until || 0) > now) {
+    return json({ ok: false, code: 'LOGIN_LOCKED', error: '시도 횟수가 많습니다. 5분 후 다시 시도해 주세요' }, 429, origin);
+  }
+  const loginId = adminLoginId(body.loginId);
+  const password = String(body.password || '');
+  if (loginId.length > 64 || password.length > ADMIN_PASSWORD_MAX_LENGTH) {
+    return json({ ok: false, code: 'LOGIN_FAILED', error: '아이디 또는 비밀번호가 맞지 않습니다' }, 401, origin);
+  }
+  const hash = await passwordHash(password, row.password_salt, Number(row.password_iterations));
+  const valid = safeEqual(loginId, row.login_id) && safeEqual(hash, row.password_hash);
+  if (!valid) {
+    const failures = Number(row.failed_attempts || 0) + 1;
+    const lockedUntil = failures >= ADMIN_LOGIN_MAX_FAILURES ? now + ADMIN_LOGIN_LOCK_MS : 0;
+    await env.DB.prepare(
+      'UPDATE admin_accounts SET failed_attempts=?,locked_until=? WHERE app=?'
+    ).bind(failures >= ADMIN_LOGIN_MAX_FAILURES ? 0 : failures, lockedUntil, 'consult').run();
+    return json({ ok: false, code: 'LOGIN_FAILED', error: '아이디 또는 비밀번호가 맞지 않습니다' }, 401, origin);
+  }
+  await env.DB.prepare('UPDATE admin_accounts SET failed_attempts=0,locked_until=0 WHERE app=?')
+    .bind('consult').run();
+  const issued = await issueAdminDeviceToken(env);
+  return json({ ok: true, loginId: row.login_id, token: issued.token, expiresAt: issued.expiresAt,
+    activeSessionLimit: MAX_ACTIVE_ADMIN_SESSIONS }, 200, origin);
 }
 
 async function handleRevoke(env, app, body, origin) {
@@ -1362,6 +1493,8 @@ export default {
       if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
       if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
       if (url.pathname === '/admin-handoff') return await handleAdminHandoff(env, app, body, okOrigin);
+      if (url.pathname === '/admin-account') return await handleAdminAccount(env, app, body, okOrigin);
+      if (url.pathname === '/admin-login') return await handleAdminLogin(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
       if (url.pathname === '/staff-deactivate') return await handleStaffDeactivate(env, app, body, okOrigin);
       if (url.pathname === '/lesson-create') {

@@ -55,6 +55,18 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_tokens_staff ON tokens(app, staff_id);
 
+-- consult 원장 로그인 계정. 비밀번호 원문은 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS admin_accounts (
+  app                 TEXT    NOT NULL PRIMARY KEY CHECK (app = 'consult'),
+  login_id            TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+  password_salt       TEXT    NOT NULL,
+  password_hash       TEXT    NOT NULL,
+  password_iterations INTEGER NOT NULL,
+  failed_attempts     INTEGER NOT NULL DEFAULT 0,
+  locked_until        INTEGER NOT NULL DEFAULT 0,
+  updated_at          INTEGER NOT NULL
+);
+
 -- 개인 링크에는 장기 bearer 대신 짧게 유효한 1회용 code만 넣는다.
 CREATE TABLE IF NOT EXISTS bootstrap_codes (
   app         TEXT    NOT NULL,

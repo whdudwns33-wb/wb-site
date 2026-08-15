@@ -5,22 +5,36 @@ const test = require('node:test');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
-test('consult admin password recovery verifies the consult sync secret', () => {
+test('consult admin account recovery verifies the consult sync secret', () => {
   assert.match(html, /data-act="recoverpin"/);
 
   const recovery = html.match(/case 'recoverpinsave':[\s\S]*?\n\s*break;/)?.[0] || '';
-  assert.match(recovery, /sync\.post\('\/sync'/);
-  assert.match(recovery, /app: SYNC_APP/);
-  assert.match(recovery, /auth: \{ mode: 'admin', secret: secret \}/);
-  assert.match(recovery, /state\.settings\.syncSecret/);
-  assert.match(recovery, /state\.settings\.adminPin = pin/);
+  assert.match(recovery, /saveAdminAccount\(loginId, pin/);
+  assert.match(recovery, /\{ mode: 'admin', secret: secret \}/);
+  assert.match(recovery, /state\.settings\.adminToken = d\.token/);
+  assert.match(recovery, /state\.settings\.adminLoginId = d\.loginId/);
   assert.match(recovery, /save\(\); session\.unlock\(\)/);
 });
 
-test('consult reuses a saved sync secret instead of asking for it again', () => {
+test('consult login uses server credentials and stores the returned device token', () => {
+  const login = html.match(/case 'login':[\s\S]*?\n\s*break;/)?.[0] || '';
+  assert.match(login, /sync\.loginAdmin\(loginId, password\)/);
+  assert.match(login, /state\.settings\.adminToken = d\.token/);
+  assert.match(login, /state\.settings\.syncSecret = ''/);
+  assert.match(html, /MAX|90일간/);
+});
+
+test('legacy recovery links cannot overwrite the current local password', () => {
+  const absorb = html.match(/function absorbLinkParams\(\)[\s\S]*?\n}/)?.[0] || '';
+  assert.doesNotMatch(absorb, /state\.settings\.adminPin = cfg\.p/);
+});
+
+test('consult reuses an already saved emergency secret during one-time account migration', () => {
   const modal = html.match(/case 'recoverpin':[\s\S]*?\n\s*break;/)?.[0] || '';
+  const recovery = html.match(/case 'recoverpinsave':[\s\S]*?\n\s*break;/)?.[0] || '';
   assert.match(modal, /hasSavedSecret = !!state\.settings\.syncSecret/);
   assert.match(modal, /hasSavedSecret \? '' : .*id="recoverSecret"/);
+  assert.match(recovery, /state\.settings\.syncSecret/);
 });
 
 test('consult storage and sync identity stay isolated from task', () => {
