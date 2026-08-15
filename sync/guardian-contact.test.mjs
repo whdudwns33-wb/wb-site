@@ -8,6 +8,7 @@ import worker from './worker-core.js';
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/016_parent_feedback_send.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
+const migration032 = fs.readFileSync(new URL('./migrations/032_acaflow_student_links.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -63,6 +64,18 @@ test('schema and migrations add stable-id guardian contacts without guessing leg
   assert.doesNotMatch(migration021, /INSERT INTO guardian_contacts_by_student[\s\S]*SELECT/i);
 });
 
+test('Acaflow link migration stores only immutable IDs and no teacher or contact data', () => {
+  for (const sql of [schema, migration032]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS acaflow_student_links/);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS acaflow_student_links');
+    const table = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.match(table, /external_student_no/);
+    assert.match(table, /UNIQUE \(app, student_id\)/);
+    assert.doesNotMatch(table, /teacher|phone|guardian|student_name/i);
+  }
+  assert.doesNotMatch(migration032, /DROP TABLE|DELETE FROM|UPDATE /i);
+});
+
 test('only the director (admin secret) can manage guardian contacts', async () => {
   const db = new TestD1(); seedStaff(db);
   const staffTry = await call(db, { auth: person('S-kim', 'tok-kim'), action: 'list' });
@@ -85,6 +98,40 @@ test('director can register a phone and toggle consent', async () => {
   assert.equal(list.body.contacts.length, 1);
   assert.equal(list.body.contacts[0].studentId, 'student-test');
   assert.equal(list.body.contacts[0].studentName, '테스트학생');
+});
+
+test('contact import atomically creates and reuses one Acaflow student-number link', async () => {
+  const db = new TestD1(); seedStaff(db);
+  const set = await call(db, {
+    auth: admin, action: 'set', studentId: 'student-test', studentName: '테스트학생',
+    phone: '01012345678', consent: false, externalStudentNo: 'A-100'
+  });
+  assert.equal(set.status, 200);
+  assert.deepEqual(set.body.acaflowLink.studentId, 'student-test');
+  const again = await call(db, {
+    auth: admin, action: 'set', studentId: 'student-test', phone: '01099998888',
+    consent: false, externalStudentNo: 'A-100'
+  });
+  assert.equal(again.status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM acaflow_student_links WHERE app='task'").first().n, 1);
+  const list = await call(db, { auth: admin, action: 'list' });
+  assert.deepEqual(list.body.acaflowLinks.map(row => [row.externalStudentNo, row.studentId]), [['A-100', 'student-test']]);
+});
+
+test('Acaflow student numbers cannot be reassigned or duplicated across WB students', async () => {
+  const db = new TestD1(); seedStaff(db);
+  await call(db, { auth: admin, action: 'set', studentId: 'student-test', phone: '01012345678', consent: false,
+    externalStudentNo: 'A-100' });
+  const rosterRow = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
+  const document = JSON.parse(rosterRow.data);
+  document.roster.students.push({ ...document.roster.students[0], id: 'student-two', name: '두번째학생' });
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+  let conflict = await call(db, { auth: admin, action: 'set', studentId: 'student-two', phone: '01022223333',
+    consent: false, externalStudentNo: 'A-100' });
+  assert.equal(conflict.status, 409);
+  conflict = await call(db, { auth: admin, action: 'set', studentId: 'student-test', phone: '01012345678',
+    consent: false, externalStudentNo: 'A-200' });
+  assert.equal(conflict.status, 409);
 });
 
 test('legacy UI name-only set resolves one roster student to a stable id, but never guesses duplicates', async () => {

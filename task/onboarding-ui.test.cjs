@@ -34,7 +34,7 @@ function onboardingCore() {
 test('admin navigation exposes a dedicated onboarding route and staff links cannot open it', () => {
   const render = block('function render() {', 'function renderTabs()');
   const tabs = block('function renderTabs()', '/* ── 링크로 들어온 지시서 확인');
-  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const view = block('function viewOnboarding()', 'function acaflowSpreadsheetName(file)');
 
   assert.match(render, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.doesNotMatch(render.match(/const allowed = \[[^\]]+\]/)[0], /onboarding/);
@@ -166,7 +166,7 @@ test('cancellation is admin-only and uses the server CAS endpoint for cancel and
 
 test('ended and cancelled rows are history-only and excluded from operational KPIs', () => {
   const filter = block('function onboardingMatchesFilter(row)', 'function onboardingSearchText(student)');
-  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const view = block('function viewOnboarding()', 'function acaflowSpreadsheetName(file)');
   const api = new Function(`${filter}\nreturn status => { onboardingStatusFilter = status; return onboardingMatchesFilter; };`);
   const getFilter = api();
 
@@ -316,8 +316,8 @@ test('new Pages reload reconciles forged CAS state even when normal collect and 
 });
 
 test('UI is searchable, status-driven, accessible, and never sends parent messages', () => {
-  const source = block('/* ── 신규 학생 30일 적응 관리 ──', 'function acaflowCodexPrompt()');
-  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const source = block('/* ── 신규 학생 30일 적응 관리 ──', 'function acaflowSpreadsheetName(file)');
+  const view = block('function viewOnboarding()', 'function acaflowSpreadsheetName(file)');
   const input = block("document.addEventListener('input', ev => {", '/* 수업 등록 폼은');
 
   assert.match(view, /data-onboarding-search aria-label="신규 학생 검색"/);
@@ -336,7 +336,7 @@ test('UI is searchable, status-driven, accessible, and never sends parent messag
 
 test('the compact dashboard prioritizes active records and exposes day, next action, and missing essentials', () => {
   const helpers = block('function onboardingDday(', 'function onboardingCardHtml(');
-  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const view = block('function viewOnboarding()', 'function acaflowSpreadsheetName(file)');
   const api = new Function(`
     const parseYmd = value => new Date(value + 'T00:00:00');
     const today = () => '2026-08-11';
@@ -372,7 +372,7 @@ test('the compact dashboard prioritizes active records and exposes day, next act
 });
 
 test('starting management is folded away and labels existing roster candidates as manual choices', () => {
-  const view = block('function viewOnboarding()', 'function acaflowCodexPrompt()');
+  const view = block('function viewOnboarding()', 'function acaflowSpreadsheetName(file)');
   assert.match(view, /<details class="card onboarding-start">/);
   assert.match(view, /기존 원생 명단에서 신규 관리 시작/);
   assert.match(view, /명단 등록 ≠ 신규 학생/);

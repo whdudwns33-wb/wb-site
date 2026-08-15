@@ -40,6 +40,14 @@ function view(row) {
   };
 }
 
+function viewAcaflowLink(row) {
+  return {
+    externalStudentNo: row.external_student_no,
+    studentId: row.student_id,
+    linkedAt: Number(row.linked_at)
+  };
+}
+
 async function rosterStudents(env, app) {
   const row = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
   if (!row) return [];
@@ -58,10 +66,15 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
 
   const action = String(body.action || 'list');
   if (action === 'list') {
-    const result = await env.DB.prepare(
-      'SELECT * FROM guardian_contacts_by_student WHERE app=? ORDER BY student_name, student_id'
-    ).bind(app).all();
-    return json({ ok: true, contacts: (result.results || []).map(view) }, 200, origin);
+    const results = await Promise.all([
+      env.DB.prepare('SELECT * FROM guardian_contacts_by_student WHERE app=? ORDER BY student_name, student_id').bind(app).all(),
+      env.DB.prepare('SELECT * FROM acaflow_student_links WHERE app=? ORDER BY external_student_no').bind(app).all()
+    ]);
+    return json({
+      ok: true,
+      contacts: (results[0].results || []).map(view),
+      acaflowLinks: (results[1].results || []).map(viewAcaflowLink)
+    }, 200, origin);
   }
 
   if (action !== 'set') return json({ ok: false, error: 'action은 list 또는 set이어야 합니다' }, 400, origin);
@@ -113,16 +126,51 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
     return json({ ok: false, error: '연락처 없이는 발송 동의를 켤 수 없습니다' }, 400, origin);
   }
 
+  const externalStudentNo = normalizeName(body.externalStudentNo);
+  if (externalStudentNo && !/^[A-Za-z0-9._-]{1,128}$/.test(externalStudentNo)) {
+    return json({ ok: false, error: '아카플로우 학생번호 형식을 확인해 주세요' }, 400, origin);
+  }
+  let existingLink = null;
+  if (externalStudentNo) {
+    const links = await env.DB.prepare(
+      'SELECT * FROM acaflow_student_links WHERE app=? AND (external_student_no=? OR student_id=?)'
+    ).bind(app, externalStudentNo, studentId).all();
+    const rows = links.results || [];
+    existingLink = rows.find(row => row.external_student_no === externalStudentNo && row.student_id === studentId) || null;
+    if (rows.some(row => row.external_student_no !== externalStudentNo || row.student_id !== studentId)) {
+      return json({ ok: false, error: '아카플로우 학생번호가 다른 WB 원생과 이미 연결되어 있습니다' }, 409, origin);
+    }
+  }
+
   const now = Date.now();
-  await env.DB.prepare(
+  const contactStatement = env.DB.prepare(
     'INSERT INTO guardian_contacts_by_student ' +
     '(app, student_id, student_name, phone, consent, updated_at, updated_by) VALUES (?,?,?,?,?,?,?) ' +
     'ON CONFLICT (app, student_id) DO UPDATE SET student_name=excluded.student_name, ' +
     'phone=excluded.phone, consent=excluded.consent, updated_at=excluded.updated_at, updated_by=excluded.updated_by'
-  ).bind(app, studentId, studentName, phone, consent, now, auditActor(auth)).run();
+  ).bind(app, studentId, studentName, phone, consent, now, auditActor(auth));
+  try {
+    if (externalStudentNo && !existingLink) {
+      await env.DB.batch([
+        contactStatement,
+        env.DB.prepare(
+          'INSERT INTO acaflow_student_links (app, external_student_no, student_id, linked_at, linked_by) VALUES (?,?,?,?,?)'
+        ).bind(app, externalStudentNo, studentId, now, auditActor(auth))
+      ]);
+    } else {
+      await contactStatement.run();
+    }
+  } catch (error) {
+    if (externalStudentNo) {
+      return json({ ok: false, error: '아카플로우 학생번호 연결이 다른 관리자 작업과 충돌했습니다' }, 409, origin);
+    }
+    throw error;
+  }
 
   const row = await env.DB.prepare(
     'SELECT * FROM guardian_contacts_by_student WHERE app=? AND student_id=? LIMIT 1'
   ).bind(app, studentId).first();
-  return json({ ok: true, contact: view(row) }, 200, origin);
+  return json({ ok: true, contact: view(row), acaflowLink: externalStudentNo ? {
+    externalStudentNo: externalStudentNo, studentId: studentId, linkedAt: existingLink ? Number(existingLink.linked_at) : now
+  } : null }, 200, origin);
 }
