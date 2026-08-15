@@ -722,11 +722,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-15.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-15.1"></script>
-<script src="./asset-core.js?v=2026-08-15.1"></script>
-<script src="./qr-core.js?v=2026-08-15.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-15.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-15.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-15.2"></script>
+<script src="./asset-core.js?v=2026-08-15.2"></script>
+<script src="./qr-core.js?v=2026-08-15.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-15.2"></script>
 <script>
 "use strict";
 
@@ -2255,7 +2255,7 @@ function taskPanel(t, date, c, editable) {
         (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
       (isLesson(t)
         ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>' +
-          '<button class="btn btn-sm btn-ghost" data-act="acaflowlessoncopy" data-id="' + t.id + '" data-date="' + date + '">아카플로우 기록 복사</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="acaflowlessoncopy" data-id="' + t.id + '" data-date="' + date + '">아카플로우 코멘트용 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" data-name="' + esc(t.studentName || studentOf(t)) + '">📞 연락 기록</button>'
         : '') +
       (t.title.startsWith('[주문] ')
@@ -10948,7 +10948,7 @@ document.addEventListener('click', ev => {
     case 'acaflowlessoncopy': {
       const t = task();
       if (!t || !isLesson(t)) return toast('수업 정보를 찾지 못했습니다');
-      copy(acaflowLessonSummary(t, date), '아카플로우 입력용 수업 기록을 복사했습니다');
+      copy(acaflowLessonSummary(t, date), '복사됨 — 학생별 레포트의 코멘트·출결메모 칸에 붙여넣으세요. 출결은 별도로 선택합니다');
       break;
     }
     case 'fbq': {
@@ -11608,7 +11608,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-15.1';
+const APP_VER = '2026-08-15.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
