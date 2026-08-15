@@ -40,6 +40,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/029_transport_notif
 npx wrangler d1 execute wb-sync --remote --file=./migrations/030_lesson_assignment_requests.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/031_book_order_fulfillments.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/032_acaflow_student_links.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/033_consult_admin_accounts.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -69,6 +70,11 @@ npx wrangler secret put NAVER_MAPS_SECRET   # 네이버 지도 API Key (Geocodin
 # 4) 배포
 npx wrangler deploy
 ```
+
+consult 원장 계정 로그인을 추가하는 배포는 `033_consult_admin_accounts.sql`을 먼저
+운영 D1에 적용한 뒤 Worker, Pages 순서로 배포한다. 기존 `task` 인증과 데이터는
+변경하지 않는다. 기존 consult 원장 기기의 설정에서 아이디·비밀번호를 한 번
+저장하면 최대 5대의 기기가 각각 90일간 자동 로그인한다.
 
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은
