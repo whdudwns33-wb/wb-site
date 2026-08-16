@@ -722,11 +722,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-15.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-15.2"></script>
-<script src="./asset-core.js?v=2026-08-15.2"></script>
-<script src="./qr-core.js?v=2026-08-15.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-15.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-16.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-16.1"></script>
+<script src="./asset-core.js?v=2026-08-16.1"></script>
+<script src="./qr-core.js?v=2026-08-16.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-16.1"></script>
 <script>
 "use strict";
 
@@ -9123,6 +9123,7 @@ function viewStaffAdmin() {
  * 알림 Worker가 D1에서 각각 재검증하며, 학생 명단과 연락처는 관리자만 보고 고친다. */
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
+const GUARDIAN_PORTAL_SCOPE_VERSION = 2;
 let guardianOpsConsents = new Map(); // stable studentId -> scope별 {consent,updatedAt,needsReconsent}
 let guardianOpsConsentsError = '';
 let guardianContactsLoaded = false;
@@ -9274,6 +9275,7 @@ async function issueParentPortalInvite(idx, button) {
   const access = student && guardianPortalAccess.get(student.id);
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   if (!contact || !contact.phone) return toast('보호자 연락처를 먼저 저장해 주세요');
+  if (access && access.needsScopeReconsent) return toast('오늘 출결·수업 진행·차량 상태 공개 범위를 다시 확인해 주세요');
   if (access && access.needsReconsent) return toast('보호자 연락처가 변경되어 웹앱 이용 동의를 다시 저장해야 합니다');
   if (!access || !access.enabled) return toast('보호자 웹앱 이용 동의를 먼저 저장해 주세요');
   const auth = sync.auth();
@@ -9308,10 +9310,10 @@ async function saveGuardianPortalAccess(idx, button) {
   try {
     const result = await sync.post('/parent-portal', {
       app: SYNC_APP, auth: auth, action: 'access_set', studentId: student.id,
-      enabled: enabled, expectedUpdatedAt: expectedUpdatedAt
+      enabled: enabled, scopeVersion: GUARDIAN_PORTAL_SCOPE_VERSION, expectedUpdatedAt: expectedUpdatedAt
     });
     guardianPortalAccess.set(student.id, result.access);
-    toast(enabled ? student.name + ' 보호자 웹앱 이용 동의를 저장했습니다' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
+    toast(enabled ? student.name + ' 보호자 앱 공개 범위 v2 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
     render();
   } catch (error) {
     if (error && error.code === 'ACCESS_REVISION_CONFLICT' && error.current) {
@@ -9366,15 +9368,16 @@ function viewGuardianContactPanel() {
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
         (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' +
-        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 웹앱 동의</label>' +
-        (portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
-        '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">웹앱 동의 저장</button>' +
+        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v2</label>' +
+        (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">오늘 출결·수업 진행·차량 상태 공개 재동의 필요</span>' :
+          portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
+        '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">공개 동의 저장</button>' +
         '<button class="btn btn-sm btn-primary" data-act="gcportalinvite" data-idx="' + i + '" ' + (!c.phone || !portal.enabled ? 'disabled' : '') + '>보호자 앱 초대</button>' +
       '</div></div>';
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 웹앱 이용 동의는 각각 확인합니다. 웹앱 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
+    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v2에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백이 포함됩니다. 내부 수업 메모·정류장·주소·연락처는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
     '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }
@@ -11608,7 +11611,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-15.2';
+const APP_VER = '2026-08-16.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

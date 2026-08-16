@@ -1207,6 +1207,7 @@ CREATE TABLE IF NOT EXISTS guardian_portal_access (
   accepted_at INTEGER,
   updated_at  INTEGER NOT NULL,
   updated_by  TEXT    NOT NULL,
+  scope_version INTEGER NOT NULL DEFAULT 1 CHECK (scope_version >= 1),
   CHECK (enabled = 0 OR guardian_identity_hash IS NOT NULL),
   PRIMARY KEY (app, student_id)
 );
@@ -1261,8 +1262,10 @@ CREATE INDEX IF NOT EXISTS idx_guardian_portal_responses_object
 -- 철회 또는 동의 대상 보호자 identity 변경은 기존 초대·세션을 같은 DB
 -- 쓰기 안에서 막는다. 휴대폰 번호가 바뀌면 새 보호자에게 기존 동의를 승계하지 않는다.
 CREATE TRIGGER IF NOT EXISTS trg_guardian_portal_access_revoke
-AFTER UPDATE OF enabled, guardian_identity_hash ON guardian_portal_access
-WHEN NEW.enabled = 0 OR OLD.guardian_identity_hash IS NOT NEW.guardian_identity_hash
+AFTER UPDATE OF enabled, guardian_identity_hash, scope_version ON guardian_portal_access
+WHEN NEW.enabled = 0
+  OR OLD.guardian_identity_hash IS NOT NEW.guardian_identity_hash
+  OR OLD.scope_version IS NOT NEW.scope_version
 BEGIN
   UPDATE guardian_portal_codes SET revoked=1
   WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;

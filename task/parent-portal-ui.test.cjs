@@ -22,7 +22,7 @@ test('보호자 웹앱 동의는 revision CAS로 저장하고 충돌 정본을 �
   const end = html.indexOf('function viewGuardianContactPanel', start);
   const source = html.slice(start, end);
   assert.match(source, /const expectedUpdatedAt\s*=\s*Number\(current && current\.updatedAt\) \|\| 0/);
-  assert.match(source, /enabled: enabled, expectedUpdatedAt: expectedUpdatedAt/);
+  assert.match(source, /scopeVersion: GUARDIAN_PORTAL_SCOPE_VERSION, expectedUpdatedAt: expectedUpdatedAt/);
   assert.match(source, /ACCESS_REVISION_CONFLICT/);
   assert.match(source, /guardianPortalAccess\.set\(student\.id, error\.current\)/);
 });
@@ -39,4 +39,6 @@ test('연락처 변경 후 웹앱 동의를 즉시 재검증하고 재동의 전
   assert.match(inviteSource, /access && access\.needsReconsent/);
   assert.match(html, /portal\.needsReconsent/);
   assert.match(html, /웹앱 재동의 필요/);
+  assert.match(html, /보호자 앱 공개 동의 v2/);
+  assert.match(html, /오늘 출결·수업 진행·차량 상태 공개 재동의 필요/);
 });
