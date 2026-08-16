@@ -1554,7 +1554,7 @@ export default {
         if (publicAction && !parentSameOrigin) {
           return json({ ok: false, error: '보호자 앱과 같은 출처에서만 사용할 수 있습니다' }, 403, okOrigin);
         }
-        const auth = ['invite', 'access_list', 'access_set'].includes(body.action)
+        const auth = ['invite', 'access_list', 'access_set', 'preview'].includes(body.action)
           ? await resolveAuth(env, app, body.auth) : null;
         return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
       }

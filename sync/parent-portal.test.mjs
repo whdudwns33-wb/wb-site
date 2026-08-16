@@ -3,7 +3,7 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import worker from './worker-core.js';
-import { issueGuardianPortalInvite } from './parent-portal.js';
+import { handleParentPortal, issueGuardianPortalInvite } from './parent-portal.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
@@ -255,6 +255,65 @@ test('공개 범위 v2에서만 오늘 수업 진행과 최소 차량 확인을 
   assert.equal(staleAssignment.body.today.lessons.length, 0);
   assert.equal(staleAssignment.body.schedule.length, 0,
     '오늘 수업과 주간 시간표가 같은 현재 assignment 검증을 사용한다');
+});
+
+test('관리자 미리보기는 동의·초대·보호자 세션 없이 같은 공개 정보만 읽는다', async () => {
+  const db = new TestD1(); seed(db); seedToday(db);
+  const taskOrigin = 'https://whdudwns33-wb.github.io';
+  assert.equal((await call(db, { action: 'preview', studentId: 'student-a' }, '', taskOrigin)).status, 403);
+  const own = await handleParentPortal(env(db), 'task', {
+    app: 'task', action: 'preview', auth: { mode: 'person' }, studentId: 'student-a'
+  }, taskOrigin, { scope: 'own', id: 'staff-a' }, (payload, status) => new Response(JSON.stringify(payload), {
+    status, headers: { 'content-type': 'application/json' }
+  }), new Request('https://worker.example/parent-portal'));
+  assert.equal(own.status, 403);
+  assert.equal((await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-a', phone: '01000000000'
+  }, '', taskOrigin)).status, 400);
+  assert.equal((await call(db, {
+    auth: admin, action: 'preview', studentId: 'not safe!'
+  }, '', taskOrigin)).status, 400);
+  assert.equal((await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-missing'
+  }, '', taskOrigin)).status, 409);
+  db.prepare("DELETE FROM guardian_contacts_by_student WHERE app='task' AND student_id='student-a'").run();
+  const changesBeforePreview = db.prepare('SELECT total_changes() count').first().count;
+
+  const preview = await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-a'
+  }, '', taskOrigin);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.cookie, '');
+  assert.deepEqual(preview.body.capabilities, { today: true, scopeVersion: 2, requiredScopeVersion: 2 });
+  assert.equal(preview.body.student.name, '학생A');
+  assert.equal(preview.body.today.lessons.length, 1);
+  assert.equal(preview.body.today.transport.length, 1);
+  assert.doesNotMatch(JSON.stringify(preview.body),
+    /01012345678|외부 비공개|내부 특성|내부 요청|내부 수업지시|학생B|9002|route-a|stop-a|staff-a/);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_access').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_codes').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_sessions').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_responses').first().count, 0);
+  assert.equal(db.prepare('SELECT total_changes() count').first().count, changesBeforePreview,
+    '반복 미리보기는 어떤 운영 테이블에도 쓰지 않는다');
+  const repeated = await call(db, { auth: admin, action: 'preview', studentId: 'student-a' }, '', taskOrigin);
+  assert.equal(repeated.status, 200);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_access').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_codes').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_sessions').first().count, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM guardian_portal_responses').first().count, 0);
+
+  const now = Date.now();
+  db.prepare('INSERT INTO guardian_contacts_by_student(app,student_id,student_name,phone,consent,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)')
+    .bind('task', 'student-a', '학생A', '01012345678', 1, now, 'director').run();
+  const connectedSession = await connected(db);
+  const view = await call(db, { action: 'view' }, connectedSession.cookie);
+  const comparable = value => {
+    const copy = JSON.parse(JSON.stringify(value));
+    delete copy.generatedAt;
+    return copy;
+  };
+  assert.deepEqual(comparable(preview.body), comparable(view.body));
 });
 
 test('같은 보호자 전화번호의 형제도 학생별 동의·초대 없이 자동 결합하지 않는다', async () => {
@@ -548,6 +607,11 @@ test('운영 migration이 빠지면 빈 현황으로 숨기지 않고 준비 중
   const view = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(view.status, 503);
   assert.equal(view.body.code, 'OPERATIONS_NOT_READY');
+  const preview = await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-a'
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(preview.status, 503);
+  assert.equal(preview.body.code, 'OPERATIONS_NOT_READY');
 });
 
 test('활성 회차권도 현재 수업 assignment identity와 담당이 일치할 때만 보호자에게 노출한다', async () => {

@@ -648,27 +648,23 @@ async function publicOperations(env, student) {
   return output;
 }
 
-async function viewPortal(env, body, origin, json, request) {
-  if (!allowedKeys(body, [])) return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
-  const now = Date.now();
-  const session = await portalSession(env, cookieToken(request), now);
-  if (!session) return json({ ok: false, code: 'SESSION_INVALID', error: '보호자 연결이 만료되었습니다. 새 초대 링크를 요청해 주세요' }, 401, origin);
-  const operations = await publicOperations(env, session.student);
-  if (operations.error) return json({ ok: false, code: operations.code, error: operations.error }, 503, origin);
-  const todayEnabled = Number(session.scopeVersion || 1) >= CURRENT_PORTAL_SCOPE_VERSION;
+async function portalViewPayload(env, student, scopeVersion, now) {
+  const operations = await publicOperations(env, student);
+  if (operations.error) return operations;
+  const todayEnabled = Number(scopeVersion || 1) >= CURRENT_PORTAL_SCOPE_VERSION;
   const [today, schedule, feedback, onboarding] = await Promise.all([
-    todayEnabled ? publicToday(env, session.student, now) : Promise.resolve(null),
-    publicSchedule(env, session.student, now),
-    publicFeedback(env, session.student.id),
-    publicOnboarding(env, session.student.id)
+    todayEnabled ? publicToday(env, student, now) : Promise.resolve(null),
+    publicSchedule(env, student, now),
+    publicFeedback(env, student.id),
+    publicOnboarding(env, student.id)
   ]);
   const response = {
     ok: true,
     generatedAt: now,
-    student: { name: text(session.student.name), grade: text(session.student.grade) },
+    student: { name: text(student.name), grade: text(student.grade) },
     capabilities: {
       today: todayEnabled,
-      scopeVersion: Number(session.scopeVersion || 1),
+      scopeVersion: Number(scopeVersion || 1),
       requiredScopeVersion: CURRENT_PORTAL_SCOPE_VERSION
     },
     schedule,
@@ -686,6 +682,33 @@ async function viewPortal(env, body, origin, json, request) {
     response.summary.todayLessons = today.lessons.length;
     response.summary.todayCompleted = today.lessons.filter(row => row.completed).length;
   }
+  return response;
+}
+
+async function viewPortal(env, body, origin, json, request) {
+  if (!allowedKeys(body, [])) return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  const now = Date.now();
+  const session = await portalSession(env, cookieToken(request), now);
+  if (!session) return json({ ok: false, code: 'SESSION_INVALID', error: '보호자 연결이 만료되었습니다. 새 초대 링크를 요청해 주세요' }, 401, origin);
+  const response = await portalViewPayload(env, session.student, session.scopeVersion, now);
+  if (response.error) return json({ ok: false, code: response.code, error: response.error }, 503, origin);
+  return json(response, 200, origin);
+}
+
+async function previewPortal(env, body, auth, origin, json) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '원장·관리 담당만 미리 볼 수 있습니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth', 'studentId'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const studentId = String(body.studentId || '');
+  if (!SAFE_ID.test(studentId)) return json({ ok: false, error: '학생을 확인해 주세요' }, 400, origin);
+  const now = Date.now();
+  const found = await rosterStudent(env, studentId, now);
+  if (found.error) return json({ ok: false, code: found.code, error: found.error }, 409, origin);
+  const response = await portalViewPayload(env, found.student, CURRENT_PORTAL_SCOPE_VERSION, now);
+  if (response.error) return json({ ok: false, code: response.code, error: response.error }, 503, origin);
   return json(response, 200, origin);
 }
 
@@ -889,6 +912,7 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   const action = String(body.action || 'view');
   if (action === 'access_list' || action === 'access_set') return portalAccess(env, body, auth, origin, json);
   if (action === 'invite') return issueInvite(env, body, auth, origin, json);
+  if (action === 'preview') return previewPortal(env, body, auth, origin, json);
   if (action === 'exchange') return exchangeInvite(env, body, origin, json, request);
   if (action === 'view') return viewPortal(env, body, origin, json, request);
   if (action === 'respond') return respondPortal(env, body, origin, json, request);
