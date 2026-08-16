@@ -290,6 +290,63 @@
 const LS_KEY = 'wb_consult_v1';
 const METAMATH_CENTER_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=center';
 const METAMATH_STUDENT_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=student';
+const CLASSCARD_URL = 'https://www.classcard.net/Login';
+const STUDYFORCE_CENTER_URL = 'https://www.studyforce.co.kr/';
+const STUDYFORCE_STUDENT_URL = 'https://www.studyforce.co.kr/user/user_login/?go_url=%2F';
+const LEARNING_SOURCES = Object.freeze({
+  metamath: {
+    icon: '🧮', label: '메타수학', centerUrl: METAMATH_CENTER_URL, studentUrl: METAMATH_STUDENT_URL,
+    centerAction: '교실홈에서 문제 내기', studentAction: '메타수학 문제 풀기',
+    detail: '메타수학 학생홈에서 풀이',
+    guide: '메타수학 학생홈을 열어 문제 풀이와 오답학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
+    steps: ['문제 풀기', '오답학습 마치기'],
+    noteHint: '점수·오답 수 메모 (예: 82점, 오답 6개)'
+  },
+  classcard: {
+    icon: '🔤', label: '클래스카드', centerUrl: CLASSCARD_URL, studentUrl: CLASSCARD_URL,
+    centerAction: '클래스카드 관리 열기', studentAction: '클래스카드 학습하기',
+    detail: '클래스카드에서 영어단어 학습',
+    guide: '클래스카드를 열어 배정된 단어를 암기하고 테스트까지 마친 뒤 단계를 체크하세요.',
+    steps: ['단어 학습하기', '테스트 완료하기'],
+    noteHint: '암기 단어 수·테스트 점수 메모'
+  },
+  studyforce: {
+    icon: '🧠', label: '스터디포스', centerUrl: STUDYFORCE_CENTER_URL, studentUrl: STUDYFORCE_STUDENT_URL,
+    centerAction: '스터디포스 열기', studentAction: '스터디포스 훈련하기',
+    detail: '스터디포스에서 독해력 훈련',
+    guide: '스터디포스를 열어 배정된 독해력 훈련을 마친 뒤 결과를 확인하고 단계를 체크하세요.',
+    steps: ['독해력 훈련 완료하기', '훈련 결과 확인하기'],
+    noteHint: '훈련 회차·결과 메모'
+  },
+  wb_reading: {
+    icon: '📘', label: '자체 독해력 교재',
+    detail: 'WB 자체 독해력 교재 학습',
+    guide: '지정된 범위를 학습하고 채점한 뒤, 틀린 문제를 다시 풀고 단계를 체크하세요.',
+    steps: ['지정 범위 학습하기', '채점하기', '오답 다시 풀기'],
+    noteHint: '학습 쪽수·오답 수 메모'
+  },
+  reading: {
+    icon: '📚', label: '독서',
+    detail: '독서 및 핵심 내용 정리',
+    guide: '지정된 범위를 읽고 가장 중요한 내용이나 느낀 점을 메모로 남기세요.',
+    steps: ['지정 범위 읽기', '핵심 내용 한 줄 남기기'],
+    noteHint: '읽은 쪽수·핵심 내용 메모'
+  },
+  inquiry_report: {
+    icon: '🔎', label: '탐구보고서',
+    detail: '탐구보고서 작성·피드백',
+    guide: '주제를 정하고 자료를 조사한 뒤, 개요와 초안을 작성하고 피드백을 반영해 제출하세요.',
+    steps: ['주제 선정', '자료 조사', '개요 작성', '초안 작성', '수정·제출'],
+    noteHint: '현재 단계·피드백 메모'
+  },
+  exam_material: {
+    icon: '📝', label: '시험대비자료',
+    detail: '받은 시험대비자료 학습',
+    guide: '자료를 열어 문제를 풀고 채점한 뒤, 오답을 다시 풀고 단계를 체크하세요.',
+    steps: ['시험대비자료 풀기', '채점하기', '오답 확인하기'],
+    noteHint: '풀이 범위·점수·오답 수 메모'
+  }
+});
 const DOW = ['일','월','화','수','목','금','토'];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
@@ -795,6 +852,15 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+function safeHttpsUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw.length > 2048) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) return '';
+    return url.href;
+  } catch (e) { return ''; }
+}
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg; t.classList.add('on');
@@ -1026,12 +1092,12 @@ function taskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const st = statusOf(t, date);
   const prog = taskProgress(t, c);
-  const hasDetail = (t.steps || []).length || t.guide || t.target;
+  const learning = LEARNING_SOURCES[t.source] || null;
+  const resourceUrl = safeHttpsUrl(t.resourceUrl);
+  const hasDetail = (t.steps || []).length || t.guide || t.target || resourceUrl;
   const open = openPanels.has(t.id + '|' + date);
-  const metaLate = t.source === 'metamath' && t.start < today() && st !== 'done';
-  const noteHint = t.source === 'metamath'
-    ? '점수·오답 수 메모 (예: 82점, 오답 6개)'
-    : '메모 · 막힌 이유나 특이사항을 남기세요';
+  const learningLate = learning && t.start && t.start < today() && st !== 'done';
+  const noteHint = learning ? learning.noteHint : '메모 · 막힌 이유나 특이사항을 남기세요';
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
     '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
@@ -1040,10 +1106,10 @@ function taskRow(t, date, editable, isCarry) {
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
       '<div class="meta">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
-        (t.source === 'metamath' ? '<span class="tag time">메타수학</span>' : '') +
-        (t.metaKind ? '<span class="tag">' + esc(t.metaKind) + '</span>' : '') +
-        (t.source === 'metamath' && t.start
-          ? '<span class="tag ' + (metaLate ? 'high' : '') + '">' + (metaLate ? '마감 지남 · ' : '') + shortDate(t.start) + ' 마감</span>'
+        (learning ? '<span class="tag time">' + learning.icon + ' ' + esc(learning.label) + '</span>' : '') +
+        ((t.learningKind || t.metaKind) ? '<span class="tag">' + esc(t.learningKind || t.metaKind) + '</span>' : '') +
+        (learning && t.start
+          ? '<span class="tag ' + (learningLate ? 'high' : '') + '">' + (learningLate ? '마감 지남 · ' : '') + shortDate(t.start) + ' 마감</span>'
           : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
@@ -1059,7 +1125,7 @@ function taskRow(t, date, editable, isCarry) {
   }
   if (hasDetail) {
     h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
-      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + ((t.steps || []).length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+      (open ? '▾ 접기' : '▸ ' + (resourceUrl ? '자료 · ' : '') + '하는 방법 · 단계 열기' + ((t.steps || []).length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
   }
   if (open) h += taskPanel(t, date, c, editable);
 
@@ -1072,6 +1138,12 @@ function taskRow(t, date, editable, isCarry) {
 
 function taskPanel(t, date, c, editable) {
   let h = '<div class="panel">';
+  const resourceUrl = safeHttpsUrl(t.resourceUrl);
+
+  if (resourceUrl) {
+    h += '<a class="btn btn-primary mb8" href="' + esc(resourceUrl) + '" target="_blank" rel="noopener noreferrer">' +
+      (t.source === 'exam_material' ? '📎 시험대비자료 열기' : '📎 학습 자료 열기') + ' ↗</a>';
+  }
 
   if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
 
@@ -1690,41 +1762,47 @@ function wnRow(sid, x, editable) {
 }
 
 /* ══════════════════════════════════════════════════════
-   메타수학 — 문제·채점은 학생홈, 일정·완료는 기존 과제로 관리한다.
-   API가 없으므로 계정이나 문제 원문은 저장하지 않는다.
+   학습 허브 — 외부 프로그램·자체 교재·자료를 기존 과제로 관리한다.
+   외부 계정·비밀번호·문제 원문은 저장하지 않는다.
    ══════════════════════════════════════════════════════ */
-function metaMathTasksFor(staffId) {
+function learningTasksFor(staffId) {
   return state.tasks
-    .filter(t => !t.deleted && t.staffId === staffId && t.source === 'metamath')
+    .filter(t => !t.deleted && t.staffId === staffId && !!LEARNING_SOURCES[t.source])
     .sort((a, b) => {
       const ad = isDone(a.id, a.start), bd = isDone(b.id, b.start);
       if (ad !== bd) return ad - bd;
-      return ad ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start);
+      const as = a.start || '', bs = b.start || '';
+      return ad ? bs.localeCompare(as) : as.localeCompare(bs);
     })
-    .slice(0, 10);
+    .slice(0, 20);
 }
 
-function metaMathCard(me, editable) {
+function learningHubCard(me, editable) {
   const director = session.isAdmin;
   const academy = director || isManager();
-  const list = metaMathTasksFor(me.id);
-  const url = academy ? METAMATH_CENTER_URL : METAMATH_STUDENT_URL;
-  const button = academy ? '교실홈에서 문제 내기' : '학생홈에서 문제 풀기';
+  const list = learningTasksFor(me.id);
   const help = director
-    ? '메타수학에서 실제 문제를 배정한 뒤, 이곳에 과제명과 마감일을 남겨주세요.'
+    ? '외부 프로그램 과제, 자체 교재, 독서, 탐구보고서, 시험대비자료를 학생별로 보내고 확인합니다.'
     : academy
-      ? '버튼을 누르면 메타수학 교실홈이 새 화면으로 열립니다. 과제 알림 등록은 원장 화면에서 할 수 있습니다.'
-      : '버튼을 누르면 메타수학 학생홈이 새 화면으로 열립니다. 로그인이 풀렸다면 메타수학 계정으로 로그인하고, 문제와 오답학습을 마친 뒤 여기서 완료를 체크하세요.';
+      ? '학습 사이트는 여기서 열 수 있습니다. 학생 과제·자료 발행은 원장 화면에서 할 수 있습니다.'
+      : '받은 과제나 자료를 열어 학습하고, 단계별 진행 상태와 결과를 남겨주세요.';
+  const links = Object.keys(LEARNING_SOURCES).map(key => LEARNING_SOURCES[key])
+    .filter(source => source.studentUrl)
+    .map(source => {
+      const url = academy && source.centerUrl ? source.centerUrl : source.studentUrl;
+      const action = academy ? source.centerAction : source.studentAction;
+      return '<a class="btn ' + (academy ? 'btn-ghost' : 'btn-primary') + '" href="' + esc(url) +
+        '" target="_blank" rel="noopener noreferrer">' + source.icon + ' ' + esc(action) + ' ↗</a>';
+    }).join('');
 
-  return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 메타수학</div>' +
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">🎯 학습 허브</div>' +
       '<div class="card-sub">' + help + '</div></div></div>' +
     '<div class="row wraprow mb14" style="gap:8px">' +
-      '<a class="btn btn-primary" href="' + url + '" target="_blank" rel="noopener noreferrer">' + button + ' ↗</a>' +
-      (director ? '<button class="btn btn-ghost" data-act="metaadd">＋ 과제 알림 등록</button>' : '') +
+      (director ? '<button class="btn btn-primary" data-act="learnadd">＋ 학습 과제·자료 보내기</button>' : '') + links +
     '</div>' +
     (list.length
       ? list.map(t => taskRow(t, t.start, editable, false)).join('')
-      : '<div class="small muted">등록된 메타수학 과제가 없습니다.</div>') +
+      : '<div class="small muted">등록된 학습 과제가 없습니다.</div>') +
     '</div>';
 }
 
@@ -1736,7 +1814,7 @@ function viewStudy() {
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
-  h += metaMathCard(me, editable);
+  h += learningHubCard(me, editable);
 
   // 오늘 복습할 오답 먼저
   const due = wnDue(me.id);
@@ -1788,21 +1866,25 @@ function rdAddModal() {
     '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
 }
 
-function metaMathTaskModal() {
+function learningTaskModal() {
   if (!session.isAdmin) return;
   const me = currentStaff();
   if (!me) return toast('학생을 먼저 선택해 주세요');
-  modal(me.name + ' — 메타수학 과제 알림',
-    '<div class="guide mb14"><b>등록 순서</b>① 메타수학 교실홈에서 실제 문제를 배정합니다.<br>② 여기에는 학생에게 보여줄 과제명과 마감일만 등록합니다.</div>' +
-    '<div class="field"><label class="fl">학습 종류</label><select class="in" id="metaKind">' +
-      '<option>E-TEST</option><option>일반 문제지</option><option>오답학습</option><option>진단평가</option>' +
-    '</select></div>' +
-    '<div class="field"><label class="fl">과제명</label>' +
-      '<input class="in" id="metaTitle" placeholder="예: 일차방정식 E-TEST 20문항"></div>' +
+  const options = Object.keys(LEARNING_SOURCES).map(key => {
+    const source = LEARNING_SOURCES[key];
+    return '<option value="' + key + '">' + source.icon + ' ' + esc(source.label) + '</option>';
+  }).join('');
+  modal(me.name + ' — 학습 과제·자료 보내기',
+    '<div class="guide mb14"><b>사용 방법</b>학습 종류와 마감일을 정하면 학생 화면에 바로 나타납니다. 시험대비 PDF·문서는 보기 전용 공유 링크를 함께 넣어주세요.</div>' +
+    '<div class="field"><label class="fl">학습 종류</label><select class="in" id="learnSource">' + options + '</select></div>' +
+    '<div class="field"><label class="fl">과제·자료명</label>' +
+      '<input class="in" id="learnTitle" placeholder="예: 중간고사 1회 대비자료, 클래스카드 3세트"></div>' +
     '<div class="field"><label class="fl">마감일</label>' +
-      '<input class="in" id="metaDue" type="date" value="' + addDays(today(), 1) + '"></div>' +
-    '<div class="hint">메타수학 아이디·비밀번호와 문제 내용은 저장하지 않습니다.</div>',
-    '<button class="btn btn-primary btn-block mt14" data-act="metasave">과제 알림 등록</button>');
+      '<input class="in" id="learnDue" type="date" value="' + addDays(today(), 1) + '"></div>' +
+    '<div class="field"><label class="fl">자료 공유 링크 <span class="muted">(선택)</span></label>' +
+      '<input class="in" id="learnUrl" type="url" inputmode="url" placeholder="https://... 보기 전용 링크"></div>' +
+    '<div class="hint">시험대비자료는 HTTPS 보기 전용 링크가 필수입니다. 외부 사이트 아이디·비밀번호와 정답지·개인정보는 저장하지 마세요.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="learnsave">학생에게 보내기</button>');
 }
 function wnAddModal(me) {
   modal('✏️ 오답 추가',
@@ -2419,6 +2501,7 @@ function editTaskModal(id) {
   const isNew = !id;
   const t = isNew ? BLANK_TASK() : state.tasks.find(x => x.id === id);
   if (!t) return;
+  const learning = LEARNING_SOURCES[t.source] || null;
   eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
 
   const who = currentStaff();
@@ -2431,6 +2514,9 @@ function editTaskModal(id) {
 
     '<div class="field"><label class="fl">수행 가이드</label>' +
       '<textarea class="in" id="eGuide" rows="5">' + esc(t.guide || '') + '</textarea></div>' +
+
+    (learning ? '<div class="field"><label class="fl">자료 공유 링크 <span class="muted">(선택)</span></label>' +
+      '<input class="in" id="eResourceUrl" type="url" inputmode="url" value="' + esc(t.resourceUrl || '') + '" placeholder="https://... 보기 전용 링크"></div>' : '') +
 
     '<div class="field"><label class="fl">단계 — 한 줄에 하나씩</label>' +
       '<textarea class="in" id="eSteps" rows="5">' + esc((t.steps || []).map(s => s.label).join('\n')) + '</textarea>' +
@@ -2473,8 +2559,12 @@ function editTaskModal(id) {
 function saveEditedTask() {
   const isNew = !eForm.id;
   const title = ($('#eTitle').value || '').trim();
+  const resourceEl = $('#eResourceUrl');
+  const rawResourceUrl = resourceEl ? (resourceEl.value || '').trim() : '';
+  const resourceUrl = safeHttpsUrl(rawResourceUrl);
   if (!title) return toast('업무 내용을 입력해 주세요');
   if (eForm.repeat === 'days' && !eForm.days.length) return toast('요일을 선택해 주세요');
+  if (resourceEl && rawResourceUrl && !resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
 
   let t;
   if (isNew) {
@@ -2490,6 +2580,7 @@ function saveEditedTask() {
     t = state.tasks.find(x => x.id === eForm.id);
     if (!t) return closeModal();
     if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 수정할 수 없습니다'); }
+    if (t.source === 'exam_material' && resourceEl && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
     if (actor() === 'staff') t.lastEditBy = 'staff';
     else if (t.origin !== 'staff') t.lastEditBy = 'admin';
   }
@@ -2502,6 +2593,7 @@ function saveEditedTask() {
   t.title = title;
   t.detail = ($('#eDetail').value || '').trim();
   t.guide = ($('#eGuide').value || '').trim();
+  if (resourceEl) t.resourceUrl = resourceUrl;
   t.target = Number($('#eTarget').value) || 0;
   t.unit = ($('#eUnit').value || '건').trim();
   t.time = $('#eTime').value || '';
@@ -2843,32 +2935,38 @@ document.addEventListener('click', ev => {
       break;
     }
 
-    /* 메타수학 */
-    case 'metaadd': {
+    /* 학습 허브 */
+    case 'learnadd': {
       if (!session.isAdmin) break;
-      metaMathTaskModal();
+      learningTaskModal();
       break;
     }
-    case 'metasave': {
+    case 'learnsave': {
       if (!session.isAdmin) break;
       const me = currentStaff();
       if (!me) return toast('학생을 먼저 선택해 주세요');
-      const title = ($('#metaTitle').value || '').trim();
-      const due = $('#metaDue').value || '';
-      const kind = $('#metaKind').value || 'E-TEST';
-      if (!title) return toast('과제명을 입력해 주세요');
+      const sourceKey = $('#learnSource').value || '';
+      const source = LEARNING_SOURCES[sourceKey];
+      const title = ($('#learnTitle').value || '').trim();
+      const due = $('#learnDue').value || '';
+      const rawUrl = ($('#learnUrl').value || '').trim();
+      const resourceUrl = safeHttpsUrl(rawUrl);
+      if (!source) return toast('학습 종류를 다시 선택해 주세요');
+      if (!title) return toast('과제·자료명을 입력해 주세요');
       if (!due) return toast('마감일을 선택해 주세요');
+      if (rawUrl && !resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
+      if (sourceKey === 'exam_material' && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
       state.tasks.push({
-        id: uid(), groupId: 'metamath-' + now(), staffId: me.id,
-        source: 'metamath', metaKind: kind,
-        title: title, detail: '메타수학 학생홈에서 풀이',
-        guide: '메타수학 학생홈을 열어 문제 풀이와 오답학습을 마친 뒤, 컨설팅 플래너에서 완료를 체크하세요.',
-        steps: [], target: 0, unit: '건', time: '', priority: 'normal',
+        id: uid(), groupId: 'learning-' + now(), staffId: me.id,
+        source: sourceKey, resourceUrl: resourceUrl,
+        title: title, detail: source.detail, guide: source.guide,
+        steps: source.steps.map(label => ({ id: uid(), label: label })),
+        target: 0, unit: '건', time: '', priority: 'normal',
         repeat: 'once', days: [], start: due, end: '', carry: true,
         origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
       });
       save(); queueSync(); closeModal(); render();
-      toast(me.name + ' — 메타수학 과제를 등록했습니다');
+      toast(me.name + ' — ' + source.label + ' 과제를 보냈습니다');
       break;
     }
 
