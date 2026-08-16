@@ -288,6 +288,8 @@
    1. 저장소
    ══════════════════════════════════════════════════════ */
 const LS_KEY = 'wb_consult_v1';
+const METAMATH_CENTER_URL = 'https://www.mmath.co.kr/n/center/login';
+const METAMATH_STUDENT_URL = 'https://www.mmath.co.kr/n/student/login/login.cshtml';
 const DOW = ['일','월','화','수','목','금','토'];
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Date.now() + Math.random().toString(16).slice(2));
@@ -1026,6 +1028,10 @@ function taskRow(t, date, editable, isCarry) {
   const prog = taskProgress(t, c);
   const hasDetail = (t.steps || []).length || t.guide || t.target;
   const open = openPanels.has(t.id + '|' + date);
+  const metaLate = t.source === 'metamath' && t.start < today() && st !== 'done';
+  const noteHint = t.source === 'metamath'
+    ? '점수·오답 수 메모 (예: 82점, 오답 6개)'
+    : '메모 · 막힌 이유나 특이사항을 남기세요';
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
     '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
@@ -1034,6 +1040,11 @@ function taskRow(t, date, editable, isCarry) {
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
       '<div class="meta">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
+        (t.source === 'metamath' ? '<span class="tag time">메타수학</span>' : '') +
+        (t.metaKind ? '<span class="tag">' + esc(t.metaKind) + '</span>' : '') +
+        (t.source === 'metamath' && t.start
+          ? '<span class="tag ' + (metaLate ? 'high' : '') + '">' + (metaLate ? '마감 지남 · ' : '') + shortDate(t.start) + ' 마감</span>'
+          : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
@@ -1053,7 +1064,7 @@ function taskRow(t, date, editable, isCarry) {
   if (open) h += taskPanel(t, date, c, editable);
 
   h += (editable
-      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">'
+      ? '<input class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" value="' + esc((c && c.note) || '') + '" placeholder="' + noteHint + '">'
       : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
 
   return h + '</div></div>';
@@ -1678,6 +1689,45 @@ function wnRow(sid, x, editable) {
     '</div></div>';
 }
 
+/* ══════════════════════════════════════════════════════
+   메타수학 — 문제·채점은 학생홈, 일정·완료는 기존 과제로 관리한다.
+   API가 없으므로 계정이나 문제 원문은 저장하지 않는다.
+   ══════════════════════════════════════════════════════ */
+function metaMathTasksFor(staffId) {
+  return state.tasks
+    .filter(t => !t.deleted && t.staffId === staffId && t.source === 'metamath')
+    .sort((a, b) => {
+      const ad = isDone(a.id, a.start), bd = isDone(b.id, b.start);
+      if (ad !== bd) return ad - bd;
+      return ad ? b.start.localeCompare(a.start) : a.start.localeCompare(b.start);
+    })
+    .slice(0, 10);
+}
+
+function metaMathCard(me, editable) {
+  const director = session.isAdmin;
+  const academy = director || isManager();
+  const list = metaMathTasksFor(me.id);
+  const url = academy ? METAMATH_CENTER_URL : METAMATH_STUDENT_URL;
+  const button = academy ? '교실홈에서 문제 내기' : '학생홈에서 문제 풀기';
+  const help = director
+    ? '메타수학에서 실제 문제를 배정한 뒤, 이곳에 과제명과 마감일을 남겨주세요.'
+    : academy
+      ? '버튼을 누르면 메타수학 교실홈이 새 화면으로 열립니다. 과제 알림 등록은 원장 화면에서 할 수 있습니다.'
+      : '버튼을 누르면 메타수학 학생홈이 새 화면으로 열립니다. 로그인이 풀렸다면 메타수학 계정으로 로그인하고, 문제와 오답학습을 마친 뒤 여기서 완료를 체크하세요.';
+
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 메타수학</div>' +
+      '<div class="card-sub">' + help + '</div></div></div>' +
+    '<div class="row wraprow mb14" style="gap:8px">' +
+      '<a class="btn btn-primary" href="' + url + '" target="_blank" rel="noopener noreferrer">' + button + ' ↗</a>' +
+      (director ? '<button class="btn btn-ghost" data-act="metaadd">＋ 과제 알림 등록</button>' : '') +
+    '</div>' +
+    (list.length
+      ? list.map(t => taskRow(t, t.start, editable, false)).join('')
+      : '<div class="small muted">등록된 메타수학 과제가 없습니다.</div>') +
+    '</div>';
+}
+
 /* ── 학습 탭 (회독 · 오답노트) ── */
 function viewStudy() {
   const me = currentStaff();
@@ -1685,6 +1735,8 @@ function viewStudy() {
   const editable = session.isStaffLink || session.isAdmin;
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
+
+  h += metaMathCard(me, editable);
 
   // 오늘 복습할 오답 먼저
   const due = wnDue(me.id);
@@ -1734,6 +1786,23 @@ function rdAddModal() {
     '<div class="fl mb8">목표 회독수</div>' +
     '<input class="in" type="number" min="1" max="20" id="rdTarget" value="3" style="max-width:110px">',
     '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
+}
+
+function metaMathTaskModal() {
+  if (!session.isAdmin) return;
+  const me = currentStaff();
+  if (!me) return toast('학생을 먼저 선택해 주세요');
+  modal(me.name + ' — 메타수학 과제 알림',
+    '<div class="guide mb14"><b>등록 순서</b>① 메타수학 교실홈에서 실제 문제를 배정합니다.<br>② 여기에는 학생에게 보여줄 과제명과 마감일만 등록합니다.</div>' +
+    '<div class="field"><label class="fl">학습 종류</label><select class="in" id="metaKind">' +
+      '<option>E-TEST</option><option>일반 문제지</option><option>오답학습</option><option>진단평가</option>' +
+    '</select></div>' +
+    '<div class="field"><label class="fl">과제명</label>' +
+      '<input class="in" id="metaTitle" placeholder="예: 일차방정식 E-TEST 20문항"></div>' +
+    '<div class="field"><label class="fl">마감일</label>' +
+      '<input class="in" id="metaDue" type="date" value="' + addDays(today(), 1) + '"></div>' +
+    '<div class="hint">메타수학 아이디·비밀번호와 문제 내용은 저장하지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="metasave">과제 알림 등록</button>');
 }
 function wnAddModal(me) {
   modal('✏️ 오답 추가',
@@ -2771,6 +2840,35 @@ document.addEventListener('click', ev => {
       }
       stStart(me.id, today(), subj);
       render(); toast(subj + ' 시작!');
+      break;
+    }
+
+    /* 메타수학 */
+    case 'metaadd': {
+      if (!session.isAdmin) break;
+      metaMathTaskModal();
+      break;
+    }
+    case 'metasave': {
+      if (!session.isAdmin) break;
+      const me = currentStaff();
+      if (!me) return toast('학생을 먼저 선택해 주세요');
+      const title = ($('#metaTitle').value || '').trim();
+      const due = $('#metaDue').value || '';
+      const kind = $('#metaKind').value || 'E-TEST';
+      if (!title) return toast('과제명을 입력해 주세요');
+      if (!due) return toast('마감일을 선택해 주세요');
+      state.tasks.push({
+        id: uid(), groupId: 'metamath-' + now(), staffId: me.id,
+        source: 'metamath', metaKind: kind,
+        title: title, detail: '메타수학 학생홈에서 풀이',
+        guide: '메타수학 학생홈을 열어 문제 풀이와 오답학습을 마친 뒤, 컨설팅 플래너에서 완료를 체크하세요.',
+        steps: [], target: 0, unit: '건', time: '', priority: 'normal',
+        repeat: 'once', days: [], start: due, end: '', carry: true,
+        origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
+      });
+      save(); queueSync(); closeModal(); render();
+      toast(me.name + ' — 메타수학 과제를 등록했습니다');
       break;
     }
 
