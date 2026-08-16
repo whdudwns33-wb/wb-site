@@ -689,6 +689,15 @@
   .modal:not([hidden]) { display: grid; }
   .modal[hidden] { display: none; }
   .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .modal-box [data-act="closemodal"] { min-width: 44px; min-height: 44px; }
+  .parent-preview-status { text-align: right; }
+  .parent-preview-feedback { display: block; padding: 11px 0; border-top: 1px solid var(--line); }
+  .parent-preview .mt8 { margin-top: 8px; }
+  .parent-preview-text { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+  @media(max-width:420px) {
+    .parent-preview .between { align-items: flex-start; flex-direction: column; }
+    .parent-preview-status { text-align: left; }
+  }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
@@ -722,11 +731,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-16.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-16.1"></script>
-<script src="./asset-core.js?v=2026-08-16.1"></script>
-<script src="./qr-core.js?v=2026-08-16.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-16.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-16.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-16.2"></script>
+<script src="./asset-core.js?v=2026-08-16.2"></script>
+<script src="./qr-core.js?v=2026-08-16.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-16.2"></script>
 <script>
 "use strict";
 
@@ -9297,6 +9306,92 @@ async function issueParentPortalInvite(idx, button) {
   }
 }
 
+let parentPreviewRequest = 0;
+function parentPreviewClock(value) {
+  return value != null && value !== '' && Number(value) > 0 && Number.isFinite(Number(value))
+    ? new Date(Number(value)).toLocaleTimeString('ko-KR', {
+      timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit'
+    })
+    : '';
+}
+function parentPreviewSection(title, rows, empty) {
+  return '<div class="card mt14"><div class="card-title">' + esc(title) + '</div>' +
+    (rows.length ? rows.join('') : '<div class="small muted mt14">' + esc(empty) + '</div>') + '</div>';
+}
+function parentPreviewHtml(data) {
+  const student = data && data.student || {};
+  const summary = data && data.summary || {};
+  const todayData = data && data.today || {};
+  const attendance = { P: '출석', L: '지각', A: '결석', '': '출결 확인 전' };
+  const ride = { scheduled: '탑승 확인 전', boarded: '탑승 확인', dropped: '하차 확인', absent: '미탑승' };
+  const lessonRows = (todayData.lessons || []).map(row =>
+    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '수업') + '</b>' +
+      '<div class="small muted">' + esc(row.teacherName || '담당 선생님') + ' · ' + esc(row.timeLabel || '시간 확인 중') + '</div></div>' +
+      '<div class="parent-preview-status"><span class="tag">' + esc(attendance[row.attendance] || attendance['']) + '</span>' +
+      '<div class="small muted mt8">' + (row.completed ? '수업 기록 완료' : Number(row.completedSteps || 0) + '/' + Number(row.totalSteps || 0) + '단계') + '</div></div></div>');
+  const transportRows = (todayData.transport || []).map(row => {
+    const statusAt = parentPreviewClock(row.statusAt);
+    return '<div class="row between mt14"><div><b>' + (row.direction === 'dropoff' ? '하원' : '등원') + ' 차량</b>' +
+      '<div class="small muted">예정 ' + esc(row.scheduledTime || '시간 확인 중') + '</div></div>' +
+      '<div class="parent-preview-status"><span class="tag">' + esc(ride[row.status] || ride.scheduled) + '</span>' +
+      (statusAt ? '<div class="small muted mt8">' + esc(statusAt) + '</div>' : '') + '</div></div>';
+  });
+  const scheduleRows = (data.schedule || []).map(row =>
+    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '수업') + '</b>' +
+      '<div class="small muted">' + esc(row.teacherName || '담당 선생님') + '</div></div>' +
+      '<div class="parent-preview-status"><b>' + esc(row.dayLabel || '') + '</b><div class="small muted">' + esc(row.timeLabel || '시간 확인 중') + '</div></div></div>');
+  const makeupRows = (data.makeups || []).map(row =>
+    '<div class="row mt14"><div class="between"><div><b>' + esc(row.subject || '보강 수업') + '</b>' +
+      '<div class="small muted">원 수업 ' + esc(row.sourceDate || '') + '</div></div><span class="tag">' + esc(row.statusLabel || row.status || '확인 중') + '</span></div>' +
+      (row.confirmedDate ? '<div class="small mt8">' + esc(row.confirmedDate) + ' ' + esc(row.confirmedTime || '') + ' · ' + esc(row.teacherName || '담당 확인 중') + '</div>' : '') + '</div>');
+  const packRows = (data.sessionPacks || []).map(row =>
+    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '횟수제 수업') + '</b>' +
+      '<div class="small muted">' + esc(row.validUntil ? row.validUntil + '까지' : '유효기간 확인 중') + '</div>' +
+      '<div class="small muted mt8">등록 ' + Number(row.total || 0) + '회 · 사용 ' + Number(row.used || 0) + '회</div></div>' +
+      '<span class="tag">남음 ' + Number(row.remaining || 0) + '회</span></div>');
+  const feedbackRows = (data.feedback || []).map(row =>
+    '<details class="parent-preview-feedback mt14"><summary><b>' + esc(row.feedbackDate || '수업 피드백') + '</b> <span class="tag">' + esc(row.statusLabel || '접수') + '</span></summary>' +
+      '<div class="parent-preview-text">' + esc(row.message || '') + '</div><div class="small muted">' + esc(row.teacherName || '담당 선생님') + '</div></details>');
+  const checkedAt = parentPreviewClock(data.generatedAt);
+  return '<div class="parent-preview"><div class="hint"><b>관리자 미리보기</b><br>실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>' +
+    '<div class="card mt14"><div class="between"><div><div class="card-title">' + esc(student.name || '학생') +
+      ' <span class="tag">' + esc(student.grade || '') + '</span></div><div class="small muted">' + esc(todayData.dateLabel || '오늘 현황') +
+      (checkedAt ? ' · 확인 ' + esc(checkedAt) : '') + '</div></div><div class="small parent-preview-status">오늘 수업 ' + Number(summary.todayLessons || 0) +
+      '<br>기록 완료 ' + Number(summary.todayCompleted || 0) + '<br>보강 확인 ' + Number(summary.makeupPending || 0) +
+      '<br>남은 회차 ' + Number(summary.sessionRemaining || 0) + '</div></div></div>' +
+    parentPreviewSection('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
+    parentPreviewSection('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') +
+    parentPreviewSection('이번 주 시간표', scheduleRows, '확정된 시간표가 없습니다.') +
+    parentPreviewSection('보강 일정', makeupRows, '확인할 보강 일정이 없습니다.') +
+    parentPreviewSection('횟수제 수업', packRows, '횟수제로 지정된 수업이 없습니다.') +
+    parentPreviewSection('수업 피드백', feedbackRows, '아직 공개된 수업 피드백이 없습니다.') + '</div>';
+}
+
+async function previewParentPortal(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsGuardianStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const requestId = ++parentPreviewRequest;
+  const loadingId = 'parentPreviewLoading-' + requestId;
+  if (button) button.disabled = true;
+  modal(student.name + ' 보호자 화면 미리보기', '<div class="empty" id="' + loadingId + '" role="status"><b>⏳</b>보호자 공개 화면을 불러오는 중입니다.</div>');
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, auth: auth, action: 'preview', studentId: student.id
+    });
+    if (requestId !== parentPreviewRequest || $('#modalHost').hidden || !$('#' + loadingId)) return;
+    modal(student.name + ' 보호자 화면 미리보기', parentPreviewHtml(result));
+  } catch (error) {
+    if (requestId !== parentPreviewRequest || $('#modalHost').hidden || !$('#' + loadingId)) return;
+    modal(student.name + ' 보호자 화면 미리보기',
+      '<div class="hint" role="alert">미리보기를 불러오지 못했습니다 — ' + esc(error.message || error) + '</div>');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function saveGuardianPortalAccess(idx, button) {
   if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
@@ -9373,6 +9468,7 @@ function viewGuardianContactPanel() {
           portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">공개 동의 저장</button>' +
         '<button class="btn btn-sm btn-primary" data-act="gcportalinvite" data-idx="' + i + '" ' + (!c.phone || !portal.enabled ? 'disabled' : '') + '>보호자 앱 초대</button>' +
+        '<button class="btn btn-ghost" style="min-height:44px" data-act="gcportalpreview" data-idx="' + i + '" aria-label="' + esc(s.name) + ' 보호자 화면 미리보기">보호자 화면 미리보기</button>' +
       '</div></div>';
   }).join('');
 
@@ -10333,6 +10429,7 @@ document.addEventListener('click', ev => {
     case 'gcopsconsent': saveGuardianOpsConsent(el.dataset.idx, String(el.dataset.scope || ''), el); break;
     case 'gcportalaccess': saveGuardianPortalAccess(el.dataset.idx, el); break;
     case 'gcportalinvite': issueParentPortalInvite(el.dataset.idx, el); break;
+    case 'gcportalpreview': previewParentPortal(el.dataset.idx, el); break;
 
     /* 회차제 수업 */
     case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
@@ -11611,7 +11708,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-16.1';
+const APP_VER = '2026-08-16.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

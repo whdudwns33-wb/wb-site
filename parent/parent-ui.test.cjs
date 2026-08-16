@@ -46,6 +46,17 @@ test('오늘 우리 아이는 v2 capability에서만 최소 수업·차량 상�
   assert.doesNotMatch(html, /row\.routeName|row\.stopName|row\.address|row\.guardianPhone/);
 });
 
+test('상태 시각이 없는 차량은 자정 epoch 시간을 표시하지 않는다', () => {
+  const start = html.indexOf('function clock(value)');
+  const end = html.indexOf('function todayLessonRows', start);
+  const clock = new Function(html.slice(start, end) + '; return clock;')();
+  assert.equal(clock(null), '');
+  assert.equal(clock(''), '');
+  assert.equal(clock(0), '');
+  assert.equal(clock('not-a-time'), '');
+  assert.notEqual(clock(Date.now()), '');
+});
+
 test('설치된 화면은 복귀·포커스·버튼에서 새로 읽고 마지막 확인 시각을 표시한다', () => {
   assert.match(html, /id="refreshButton"/);
   assert.match(html, /마지막 확인/);
