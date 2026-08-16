@@ -46,6 +46,45 @@ test('오늘 우리 아이는 v2 capability에서만 최소 수업·차량 상�
   assert.doesNotMatch(html, /row\.routeName|row\.stopName|row\.address|row\.guardianPhone/);
 });
 
+test('보호자 화면은 오늘, 정규 시간표, 확인 응답, 이용 현황, 기록 순서로 읽힌다', () => {
+  const start = html.indexOf('function render(data)');
+  const end = html.indexOf('function fail(', start);
+  const source = html.slice(start, end);
+  const labels = ['오늘 현황', '정규 수업 시간표', '확인·응답', '횟수제 수업', '최근 수업 기록'];
+  labels.reduce((previous, label) => {
+    const current = source.indexOf(label);
+    assert.ok(current > previous, `${label} 순서`);
+    return current;
+  }, -1);
+  assert.match(html, /class="summary-grid"/);
+  assert.match(html, /class="day-badge"/);
+  assert.match(html, /class="card info"/);
+  assert.match(html, /\.btn\{min-height:48px/);
+  assert.match(html, /@media\(max-width:430px\)\{\.summary-grid\{grid-template-columns:repeat\(2/);
+});
+
+test('주간 시간표는 서버 배열 순서와 무관하게 월요일부터 정렬한다', () => {
+  const start = html.indexOf("const DAY_ORDER='월화수목금토일'");
+  const end = html.indexOf('function makeupRows', start);
+  const scheduleRows = new Function('esc', html.slice(start, end) + '; return scheduleRows;')(String);
+  const output = scheduleRows([
+    { dayLabel: '토', subject: '토 수업', timeLabel: '10:00' },
+    { dayLabel: '월', subject: '월 수업', timeLabel: '18:00' },
+    { dayLabel: '월', subject: '월 오전', timeLabel: '09:00' }
+  ]).join('');
+  assert.ok(output.indexOf('월 오전') < output.indexOf('월 수업'));
+  assert.ok(output.indexOf('월 수업') < output.indexOf('토 수업'));
+});
+
+test('담당자 이름에는 선생님 호칭을 한 번만 붙인다', () => {
+  const start = html.indexOf('function teacherLabel(value)');
+  const end = html.indexOf('function todayLessonRows', start);
+  const teacherLabel = new Function(html.slice(start, end) + '; return teacherLabel;')();
+  assert.equal(teacherLabel('김동현'), '김동현 선생님');
+  assert.equal(teacherLabel('김동현 선생님'), '김동현 선생님');
+  assert.equal(teacherLabel(''), '담당 선생님');
+});
+
 test('상태 시각이 없는 차량은 자정 epoch 시간을 표시하지 않는다', () => {
   const start = html.indexOf('function clock(value)');
   const end = html.indexOf('function todayLessonRows', start);
@@ -64,6 +103,12 @@ test('설치된 화면은 복귀·포커스·버튼에서 새로 읽고 마지�
   assert.match(html, /window\.addEventListener\('focus'/);
   assert.match(html, /refreshButton\.addEventListener\('click',\(\)=>refresh\(true\)\)/);
   assert.match(html, /if\(refreshing\|\|\(!force&&Date\.now\(\)-lastRefreshAt<1000\)\)return/);
+});
+
+test('새로고침은 화면 전체가 아니라 별도 상태 영역만 알린다', () => {
+  assert.doesNotMatch(html, /<main id="app" aria-live=/);
+  assert.match(html, /id="liveStatus" class="sr" role="status" aria-live="polite" aria-atomic="true"/);
+  assert.match(html, /liveStatus\.textContent='보호자 정보 새로고침 완료'/);
 });
 
 test('출력은 escape하고 인증 오류 시 보호자 화면을 닫는다', () => {

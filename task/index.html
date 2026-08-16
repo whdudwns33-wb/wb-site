@@ -690,13 +690,66 @@
   .modal[hidden] { display: none; }
   .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
   .modal-box [data-act="closemodal"] { min-width: 44px; min-height: 44px; }
-  .parent-preview-status { text-align: right; }
-  .parent-preview-feedback { display: block; padding: 11px 0; border-top: 1px solid var(--line); }
-  .parent-preview .mt8 { margin-top: 8px; }
-  .parent-preview-text { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
-  @media(max-width:420px) {
-    .parent-preview .between { align-items: flex-start; flex-direction: column; }
-    .parent-preview-status { text-align: left; }
+  .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
+  .modal-box:has(.parent-preview-shell) { max-width: 620px; }
+  .modal:has(.parent-preview-shell) { background: rgba(17,40,61,.88); backdrop-filter: blur(8px); }
+  .parent-preview-shell { max-width: 560px; margin: 0 auto; overflow: hidden; border: 1px solid #C9D8E1; border-radius: 20px; background: #F3F6F8; color: #20384C; box-shadow: 0 8px 30px rgba(23,57,87,.14); font-family: system-ui,-apple-system,"Noto Sans KR",sans-serif; line-height: normal; }
+  .parent-preview-appbar { display: flex; align-items: center; justify-content: space-between; min-height: 62px; padding: 11px 14px; background: #173957; color: #FFF; }
+  .parent-preview-brand { font-size: 18px; font-weight: 900; line-height: 1.1; }
+  .parent-preview-brand small { display: block; margin-top: 3px; font-size: 9px; font-weight: 700; letter-spacing: .1em; opacity: .72; }
+  .parent-preview-readonly { padding: 5px 8px; border: 1px solid rgba(255,255,255,.4); border-radius: 999px; font-size: 10px; font-weight: 900; }
+  .parent-preview-main { padding: 12px; }
+  .parent-preview-card { margin-bottom: 12px; padding: 17px; overflow-wrap: anywhere; border: 1px solid #DCE5EA; border-radius: 18px; background: #FFF; box-shadow: 0 5px 18px rgba(23,57,87,.04); }
+  .parent-preview-hero { padding: 19px; border-color: #B9DEED; background: linear-gradient(145deg,#EAF7FD 0,#FFF 70%); }
+  .parent-preview-hero-head, .parent-preview-section-head, .parent-preview-between { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .parent-preview-eyebrow { margin: 0 0 5px; color: #096F9F; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+  .parent-preview-title { margin: 0; color: #173957; font-size: 24px; line-height: 1.25; }
+  .parent-preview-section-title { margin: 0; color: #173957; font-size: 18px; line-height: 1.3; }
+  .parent-preview-date { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; background: #FFF; color: #096F9F; box-shadow: inset 0 0 0 1px #CCE7F2; font-size: 12px; font-weight: 900; }
+  .parent-preview-sub { margin-top: 5px; color: #647684; font-size: 13px; line-height: 1.55; }
+  .parent-preview-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; margin-top: 15px; }
+  .parent-preview-usage { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 15px; }
+  .parent-preview-stat { min-width: 0; padding: 11px 4px; border: 1px solid #D6EBF4; border-radius: 13px; background: #F5FBFE; text-align: center; }
+  .parent-preview-stat b { display: block; color: #173957; font-size: 20px; line-height: 1.15; }
+  .parent-preview-stat span { display: block; margin-top: 4px; color: #647684; font-size: 12px; font-weight: 800; line-height: 1.25; }
+  .parent-preview-section-head { align-items: center; padding-bottom: 12px; border-bottom: 1px solid #DCE5EA; }
+  .parent-preview-count { flex: 0 0 auto; color: #647684; font-size: 12px; font-weight: 800; }
+  .parent-preview-group { padding-top: 13px; }
+  .parent-preview-group + .parent-preview-group { margin-top: 3px; border-top: 1px dashed #DCE5EA; }
+  .parent-preview-group-title { margin-bottom: 2px; color: #647684; font-size: 12px; font-weight: 900; }
+  .parent-preview-row { min-width: 0; padding: 12px 0; border-top: 1px solid #DCE5EA; }
+  .parent-preview-group-title + .parent-preview-row, .parent-preview-card > .parent-preview-row:first-of-type { border-top: 0; }
+  .parent-preview-item { min-width: 0; flex: 1; }
+  .parent-preview-item-title { color: #20384C; font-size: 15px; }
+  .parent-preview-status { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+  .parent-preview-tag { display: inline-block; padding: 5px 8px; border-radius: 999px; background: #EAF6FC; color: #096F9F; font-size: 12px; font-weight: 900; line-height: 1.2; }
+  .parent-preview-tag.ok { background: #E7F6F0; color: #14755E; }
+  .parent-preview-tag.warn { background: #FFF4E6; color: #8A4B08; }
+  .parent-preview-tag.bad { background: #FFF0EF; color: #9B352B; }
+  .parent-preview-tag.muted { background: #EEF2F4; color: #647684; }
+  .parent-preview-day { display: grid; place-items: center; flex: 0 0 42px; min-height: 42px; border-radius: 12px; background: #173957; color: #FFF; font-size: 13px; font-weight: 900; }
+  .parent-preview-schedule { align-items: center; }
+  .parent-preview-time { flex: 0 0 auto; color: #173957; font-size: 14px; font-weight: 900; text-align: right; }
+  .parent-preview-text { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; color: #263F55; font-size: 14px; line-height: 1.65; }
+  .parent-preview-empty { padding: 20px 8px 10px; color: #647684; font-size: 13px; line-height: 1.6; text-align: center; }
+  .parent-preview-feedback { display: block; }
+  .parent-preview-feedback summary { min-height: 44px; padding: 12px 0; border-top: 1px solid #DCE5EA; cursor: pointer; list-style: none; }
+  .parent-preview-feedback:first-of-type summary { border-top: 0; }
+  .parent-preview-feedback summary::-webkit-details-marker { display: none; }
+  .parent-preview-feedback summary::after { content: '보기'; float: right; color: #096F9F; font-size: 12px; font-weight: 900; }
+  .parent-preview-feedback[open] summary::after { content: '닫기'; }
+  .parent-preview-info details { border-top: 1px solid #DCE5EA; }
+  .parent-preview-info details:first-child { border-top: 0; }
+  .parent-preview-info summary { min-height: 44px; padding: 12px 0; color: #173957; font-size: 13px; font-weight: 900; cursor: pointer; }
+  .parent-preview-info .parent-preview-sub { margin: 0 0 12px; }
+  @media(max-width:430px) {
+    .modal-box:has(.parent-preview-shell) { padding: 12px; }
+    .parent-preview-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  }
+  @media(max-width:350px) {
+    .parent-preview-hero-head, .parent-preview-between { flex-direction: column; }
+    .parent-preview-status { justify-content: flex-start; }
+    .parent-preview-time { text-align: left; }
   }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
@@ -731,11 +784,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-16.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-16.2"></script>
-<script src="./asset-core.js?v=2026-08-16.2"></script>
-<script src="./qr-core.js?v=2026-08-16.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-16.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-16.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-16.3"></script>
+<script src="./asset-core.js?v=2026-08-16.3"></script>
+<script src="./qr-core.js?v=2026-08-16.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-16.3"></script>
 <script>
 "use strict";
 
@@ -9314,57 +9367,100 @@ function parentPreviewClock(value) {
     })
     : '';
 }
-function parentPreviewSection(title, rows, empty) {
-  return '<div class="card mt14"><div class="card-title">' + esc(title) + '</div>' +
-    (rows.length ? rows.join('') : '<div class="small muted mt14">' + esc(empty) + '</div>') + '</div>';
+function parentPreviewSection(kicker, title, rows, empty) {
+  return '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">' +
+    esc(kicker) + '</p><h2 class="parent-preview-section-title">' + esc(title) + '</h2></div><span class="parent-preview-count">' +
+    Number(rows.length || 0) + '건</span></div>' +
+    (rows.length ? rows.join('') : '<div class="parent-preview-empty">' + esc(empty) + '</div>') + '</section>';
+}
+function parentPreviewGroup(title, rows, empty) {
+  return '<div class="parent-preview-group"><div class="parent-preview-group-title">' + esc(title) + '</div>' +
+    (rows.length ? rows.join('') : '<div class="parent-preview-empty">' + esc(empty) + '</div>') + '</div>';
+}
+function parentPreviewTeacherLabel(value) {
+  const name = String(value || '').trim();
+  return !name ? '담당 선생님' : /선생님$/.test(name) ? name : name + ' 선생님';
 }
 function parentPreviewHtml(data) {
   const student = data && data.student || {};
   const summary = data && data.summary || {};
+  const capabilities = data && data.capabilities || {};
   const todayData = data && data.today || {};
-  const attendance = { P: '출석', L: '지각', A: '결석', '': '출결 확인 전' };
-  const ride = { scheduled: '탑승 확인 전', boarded: '탑승 확인', dropped: '하차 확인', absent: '미탑승' };
-  const lessonRows = (todayData.lessons || []).map(row =>
-    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '수업') + '</b>' +
-      '<div class="small muted">' + esc(row.teacherName || '담당 선생님') + ' · ' + esc(row.timeLabel || '시간 확인 중') + '</div></div>' +
-      '<div class="parent-preview-status"><span class="tag">' + esc(attendance[row.attendance] || attendance['']) + '</span>' +
-      '<div class="small muted mt8">' + (row.completed ? '수업 기록 완료' : Number(row.completedSteps || 0) + '/' + Number(row.totalSteps || 0) + '단계') + '</div></div></div>');
-  const transportRows = (todayData.transport || []).map(row => {
-    const statusAt = parentPreviewClock(row.statusAt);
-    return '<div class="row between mt14"><div><b>' + (row.direction === 'dropoff' ? '하원' : '등원') + ' 차량</b>' +
-      '<div class="small muted">예정 ' + esc(row.scheduledTime || '시간 확인 중') + '</div></div>' +
-      '<div class="parent-preview-status"><span class="tag">' + esc(ride[row.status] || ride.scheduled) + '</span>' +
-      (statusAt ? '<div class="small muted mt8">' + esc(statusAt) + '</div>' : '') + '</div></div>';
+  const todayEnabled = capabilities.today === true;
+  const dayOrder = '월화수목금토일';
+  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], '': ['출결 확인 전', 'muted'] };
+  const ride = { scheduled: ['탑승 확인 전', 'muted'], boarded: ['탑승 확인', 'warn'], dropped: ['하차 확인', 'ok'], absent: ['미탑승', 'bad'] };
+  const lessonRows = (todayData.lessons || []).map(row => {
+    const state = attendance[row.attendance] || attendance[''];
+    const progress = Number(row.completedSteps || 0) + '/' + Number(row.totalSteps || 0) + '단계';
+    return '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
+      ' · ' + esc(row.timeLabel || '시간 확인 중') + '</div></div><div class="parent-preview-status"><span class="parent-preview-tag ' +
+      state[1] + '">' + state[0] + '</span><span class="parent-preview-tag ' + (row.completed ? 'ok' : 'muted') + '">' +
+      (row.completed ? '수업 기록 완료' : esc(progress)) + '</span></div></div>';
   });
-  const scheduleRows = (data.schedule || []).map(row =>
-    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '수업') + '</b>' +
-      '<div class="small muted">' + esc(row.teacherName || '담당 선생님') + '</div></div>' +
-      '<div class="parent-preview-status"><b>' + esc(row.dayLabel || '') + '</b><div class="small muted">' + esc(row.timeLabel || '시간 확인 중') + '</div></div></div>');
+  const transportRows = (todayData.transport || []).map(row => {
+    const state = ride[row.status] || ride.scheduled;
+    const statusAt = parentPreviewClock(row.statusAt);
+    return '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      (row.direction === 'dropoff' ? '하원' : '등원') + ' 차량</b><div class="parent-preview-sub">예정 ' +
+      esc(row.scheduledTime || '시간 확인 중') + '</div></div><div class="parent-preview-status"><span class="parent-preview-tag ' +
+      state[1] + '">' + state[0] + '</span>' + (statusAt ? '<span class="parent-preview-tag muted">' + esc(statusAt) + '</span>' : '') + '</div></div>';
+  });
+  const scheduleRows = (data.schedule || []).slice().sort((a, b) =>
+    dayOrder.indexOf(String(a.dayLabel || '')[0]) - dayOrder.indexOf(String(b.dayLabel || '')[0]) ||
+    String(a.timeLabel || '').localeCompare(String(b.timeLabel || ''))).map(row =>
+    '<div class="parent-preview-row parent-preview-between parent-preview-schedule"><span class="parent-preview-day">' +
+      esc(row.dayLabel || '요일') + '</span><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
+      '</div></div><div class="parent-preview-time">' + esc(row.timeLabel || '시간 확인 중') + '</div></div>');
   const makeupRows = (data.makeups || []).map(row =>
-    '<div class="row mt14"><div class="between"><div><b>' + esc(row.subject || '보강 수업') + '</b>' +
-      '<div class="small muted">원 수업 ' + esc(row.sourceDate || '') + '</div></div><span class="tag">' + esc(row.statusLabel || row.status || '확인 중') + '</span></div>' +
-      (row.confirmedDate ? '<div class="small mt8">' + esc(row.confirmedDate) + ' ' + esc(row.confirmedTime || '') + ' · ' + esc(row.teacherName || '담당 확인 중') + '</div>' : '') + '</div>');
+    '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || '보강 수업') + '</b><div class="parent-preview-sub">원 수업 ' + esc(row.sourceDate || '') +
+      '</div></div><span class="parent-preview-tag ' + (row.status === 'confirmed' ? 'ok' : 'warn') + '">' +
+      esc(row.statusLabel || row.status || '확인 중') + '</span></div>' + (row.confirmedDate ? '<div class="parent-preview-text">' +
+      esc(row.confirmedDate) + ' ' + esc(row.confirmedTime || '') + ' · ' + esc(row.teacherName ? parentPreviewTeacherLabel(row.teacherName) : '담당 확인 중') + '</div>' : '') + '</div>');
   const packRows = (data.sessionPacks || []).map(row =>
-    '<div class="row between mt14"><div><b>' + esc(row.subject || row.className || '횟수제 수업') + '</b>' +
-      '<div class="small muted">' + esc(row.validUntil ? row.validUntil + '까지' : '유효기간 확인 중') + '</div>' +
-      '<div class="small muted mt8">등록 ' + Number(row.total || 0) + '회 · 사용 ' + Number(row.used || 0) + '회</div></div>' +
-      '<span class="tag">남음 ' + Number(row.remaining || 0) + '회</span></div>');
+    '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '횟수제 수업') + '</b><div class="parent-preview-sub">' +
+      esc(row.validUntil ? row.validUntil + '까지' : '유효기간 확인 중') + '</div></div><span class="parent-preview-tag">남음 ' +
+      Number(row.remaining || 0) + '회</span></div><div class="parent-preview-usage"><div class="parent-preview-stat"><b>' +
+      Number(row.total || 0) + '</b><span>등록</span></div><div class="parent-preview-stat"><b>' + Number(row.used || 0) +
+      '</b><span>사용</span></div></div></div>');
   const feedbackRows = (data.feedback || []).map(row =>
-    '<details class="parent-preview-feedback mt14"><summary><b>' + esc(row.feedbackDate || '수업 피드백') + '</b> <span class="tag">' + esc(row.statusLabel || '접수') + '</span></summary>' +
-      '<div class="parent-preview-text">' + esc(row.message || '') + '</div><div class="small muted">' + esc(row.teacherName || '담당 선생님') + '</div></details>');
+    '<details class="parent-preview-feedback"><summary><b>' + esc(row.feedbackDate || '수업 피드백') + '</b> <span class="parent-preview-tag">' +
+      esc(row.statusLabel || '접수') + '</span></summary><div class="parent-preview-text">' + esc(row.message || '') +
+      '</div><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></details>');
   const checkedAt = parentPreviewClock(data.generatedAt);
-  return '<div class="parent-preview"><div class="hint"><b>관리자 미리보기</b><br>실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>' +
-    '<div class="card mt14"><div class="between"><div><div class="card-title">' + esc(student.name || '학생') +
-      ' <span class="tag">' + esc(student.grade || '') + '</span></div><div class="small muted">' + esc(todayData.dateLabel || '오늘 현황') +
-      (checkedAt ? ' · 확인 ' + esc(checkedAt) : '') + '</div></div><div class="small parent-preview-status">오늘 수업 ' + Number(summary.todayLessons || 0) +
-      '<br>기록 완료 ' + Number(summary.todayCompleted || 0) + '<br>보강 확인 ' + Number(summary.makeupPending || 0) +
-      '<br>남은 회차 ' + Number(summary.sessionRemaining || 0) + '</div></div></div>' +
-    parentPreviewSection('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
-    parentPreviewSection('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') +
-    parentPreviewSection('이번 주 시간표', scheduleRows, '확정된 시간표가 없습니다.') +
-    parentPreviewSection('보강 일정', makeupRows, '확인할 보강 일정이 없습니다.') +
-    parentPreviewSection('횟수제 수업', packRows, '횟수제로 지정된 수업이 없습니다.') +
-    parentPreviewSection('수업 피드백', feedbackRows, '아직 공개된 수업 피드백이 없습니다.') + '</div>';
+  const heroStats = todayEnabled ? '<div class="parent-preview-stat"><b>' + Number(summary.todayLessons || 0) +
+    '</b><span>오늘 수업</span></div><div class="parent-preview-stat"><b>' + Number(summary.todayCompleted || 0) +
+    '</b><span>기록 완료</span></div>' : '';
+  const todaySection = todayEnabled
+    ? '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Today</p>' +
+      '<h2 class="parent-preview-section-title">오늘 현황</h2></div><span class="parent-preview-count">' +
+      Number(lessonRows.length + transportRows.length) + '건</span></div>' +
+      parentPreviewGroup('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
+      parentPreviewGroup('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') + '</section>'
+    : '<section class="parent-preview-card"><p class="parent-preview-eyebrow">확인 필요</p><h2 class="parent-preview-section-title">오늘 현황을 아직 볼 수 없습니다</h2>' +
+      '<p class="parent-preview-sub">오늘 출결·수업 진행·차량 확인은 새 공개 범위 동의 후 제공됩니다. 학원에 새 보호자 앱 초대를 요청해 주세요.</p></section>';
+  return '<div class="parent-preview-shell"><div class="parent-preview-appbar"><div class="parent-preview-brand">WB 보호자' +
+    '<small>WEXLER BRAIN CENTER</small></div><span class="parent-preview-readonly">읽기 전용</span></div><div class="parent-preview-main">' +
+    '<section class="parent-preview-card parent-preview-hero"><div class="parent-preview-hero-head"><div><p class="parent-preview-eyebrow">오늘 우리 아이</p>' +
+      '<h1 class="parent-preview-title">' + esc(student.name || '학생') + ' <span class="parent-preview-tag">' + esc(student.grade || '') +
+      '</span></h1></div><span class="parent-preview-date">' + esc(todayEnabled ? (todayData.dateLabel || '오늘') : '운영 정보') +
+      '</span></div><p class="parent-preview-sub">학원에서 확정된 내용만 보여드립니다.' +
+      (checkedAt ? ' · 마지막 확인 ' + esc(checkedAt) : '') + '</p><div class="parent-preview-summary">' + heroStats +
+      '<div class="parent-preview-stat"><b>' + Number(summary.makeupPending || 0) + '</b><span>보강 확인</span></div>' +
+      '<div class="parent-preview-stat"><b>' + Number(summary.sessionRemaining || 0) + '</b><span>남은 회차</span></div></div></section>' +
+    todaySection +
+    parentPreviewSection('Schedule', '정규 수업 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
+    parentPreviewSection('Action', '확인·응답', makeupRows, '지금 확인하거나 응답할 일정이 없습니다.') +
+    parentPreviewSection('Usage', '횟수제 수업', packRows, '횟수제로 지정된 수업이 없습니다.') +
+    parentPreviewSection('Record', '최근 수업 기록', feedbackRows, '아직 공개된 수업 피드백이 없습니다.') +
+    '<section class="parent-preview-card parent-preview-info"><details><summary>보호자 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
+      '현재 자녀의 확정 수업·출결 확인·수업 기록 진행·차량 확인·보강·회차·피드백만 표시합니다. 내부 수업 메모, 정류장·주소, 연락처는 표시하지 않습니다.</p></details>' +
+      '<details><summary>휴대폰·패드 홈 화면에 추가하기</summary><p class="parent-preview-sub">Chrome 또는 Safari 메뉴에서 “홈 화면에 추가”를 선택하세요. 공용 기기에서는 사용하지 마세요.</p></details></section>' +
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 보호자 공개 v2</b> · 실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>';
 }
 
 async function previewParentPortal(idx, button) {
@@ -11708,7 +11804,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-16.2';
+const APP_VER = '2026-08-16.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
