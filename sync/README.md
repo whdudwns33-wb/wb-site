@@ -41,6 +41,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/030_lesson_assignme
 npx wrangler d1 execute wb-sync --remote --file=./migrations/031_book_order_fulfillments.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/032_acaflow_student_links.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/033_consult_admin_accounts.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/034_parent_portal_scope.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -366,14 +367,16 @@ confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며,
 
 ### `/parent-portal` — 보호자 전용 웹앱
 
-원장·관리 담당이 stable 학생 ID별 웹앱 동의를 별도로 저장하고 1회용 초대코드를 발급한다. 코드는
+원장·관리 담당이 stable 학생 ID별 웹앱 동의를 별도로 저장하고 1회용 초대코드를 발급한다. 공개 범위
+v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·회차·피드백을 포함하며, 기존 v1 동의는
+자동 승계하지 않고 관리자 화면에서 다시 확인한다. 코드는
 교환 즉시 폐기되며 서버에는 해시만 저장된다. 보호자 세션은 한 학생만 볼 수 있고, 확정 시간표·보강
 제안/확정·횟수 잔여·이미 접수된 피드백의 안전한 요약만 반환한다.
 
 ```jsonc
 // 관리자
 { "app":"task", "auth":{...}, "action":"access_set",
-  "studentId":"student-1", "enabled":true, "expectedUpdatedAt":0 }
+  "studentId":"student-1", "enabled":true, "scopeVersion":2, "expectedUpdatedAt":0 }
 { "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
 
 // Worker origin의 보호자 웹앱: /#code=<1회용 코드>를 즉시 지운 뒤 교환한다.

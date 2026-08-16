@@ -9,7 +9,15 @@ const HASH_PREFIX = 'sha256:';
 const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_ACTIVE_SESSIONS = 3;
+const CURRENT_PORTAL_SCOPE_VERSION = 2;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const LESSON_STEP_LABELS = [
+  '지난 숙제·온라인 수행 확인',
+  '교재와 오늘 진도 진행',
+  '이해도·오답·학생 반응 확인',
+  '다음 숙제 안내',
+  '실제 진도와 특이사항 기록'
+];
 const SESSION_COOKIE = '__Host-wb_parent_session';
 
 function text(value) {
@@ -95,9 +103,9 @@ async function revokePortalCredentials(env, studentId) {
   ]);
 }
 
-async function portalAccessReady(env, studentId, currentGuardianIdentityHash) {
+async function portalAccessReady(env, studentId, currentGuardianIdentityHash, requiredScopeVersion = 1) {
   const row = await env.DB.prepare(
-    'SELECT enabled,guardian_identity_hash,updated_at FROM guardian_portal_access ' +
+    'SELECT enabled,guardian_identity_hash,scope_version,updated_at FROM guardian_portal_access ' +
     'WHERE app=? AND student_id=? LIMIT 1'
   ).bind('task', studentId).first();
   if (!row || Number(row.enabled) !== 1) {
@@ -111,7 +119,15 @@ async function portalAccessReady(env, studentId, currentGuardianIdentityHash) {
       code: 'PORTAL_RECONSENT_REQUIRED', needsReconsent: true, updatedAt: Number(row.updated_at)
     };
   }
-  return { ok: true, updatedAt: Number(row.updated_at) };
+  const scopeVersion = Number(row.scope_version || 1);
+  if (scopeVersion < Number(requiredScopeVersion || 1)) {
+    return {
+      error: '보호자 앱의 새 공개 범위 동의를 다시 확인해 주세요',
+      code: 'PORTAL_CONSENT_VERSION_REQUIRED', needsScopeReconsent: true,
+      updatedAt: Number(row.updated_at), scopeVersion
+    };
+  }
+  return { ok: true, updatedAt: Number(row.updated_at), scopeVersion };
 }
 
 function cookieToken(request) {
@@ -167,7 +183,8 @@ export async function issueGuardianPortalInvite(env, options = {}) {
   if (found.error) return { ok: false, status: 409, errorCode: found.code, error: found.error };
   const guardian = await guardianIdentityReady(env, found.student);
   if (guardian.error) return { ok: false, status: 409, errorCode: guardian.code, error: guardian.error };
-  const access = await portalAccessReady(env, studentId, guardian.identityHash);
+  const requiredScopeVersion = Number(options.requiredScopeVersion || CURRENT_PORTAL_SCOPE_VERSION);
+  const access = await portalAccessReady(env, studentId, guardian.identityHash, requiredScopeVersion);
   if (access.error) return { ok: false, status: 409, errorCode: access.code, error: access.error };
 
   const code = randomOpaque();
@@ -180,9 +197,9 @@ export async function issueGuardianPortalInvite(env, options = {}) {
       'created_at,expires_at,consumed_at,revoked,issued_by,claim_id) ' +
       'SELECT ?,?,?,?,?,?,?,NULL,0,?,NULL FROM guardian_portal_access access ' +
       'WHERE access.app=? AND access.student_id=? AND access.enabled=1 AND access.updated_at=? ' +
-      'AND access.guardian_identity_hash=?'
+      'AND access.guardian_identity_hash=? AND access.scope_version>=?'
     ).bind('task', codeHash, studentId, guardian.identityHash, access.updatedAt, now, expiresAt, issuedBy,
-      'task', studentId, access.updatedAt, guardian.identityHash),
+      'task', studentId, access.updatedAt, guardian.identityHash, requiredScopeVersion),
     env.DB.prepare(
       'UPDATE guardian_portal_codes SET revoked=1 WHERE app=? AND student_id=? AND code_hash<>? ' +
       'AND consumed_at IS NULL AND revoked=0 AND EXISTS (' +
@@ -233,7 +250,7 @@ async function exchangeInvite(env, body, origin, json, request) {
     await revokePortalCredentials(env, studentId);
     return json({ ok: false, code: 'LINK_INVALID', error: '보호자 이용 준비 상태를 확인해 주세요' }, 410, origin);
   }
-  const access = await portalAccessReady(env, studentId, guardian.identityHash);
+  const access = await portalAccessReady(env, studentId, guardian.identityHash, 1);
   if (access.error || access.updatedAt !== Number(codeRow.access_updated_at)) {
     await env.DB.prepare('UPDATE guardian_portal_codes SET revoked=1 WHERE app=? AND code_hash=?').bind('task', codeHash).run();
     return json({ ok: false, code: 'LINK_INVALID', error: '보호자 이용 동의를 확인해 주세요' }, 410, origin);
@@ -334,7 +351,7 @@ async function portalSession(env, rawToken, now) {
     await revokePortalCredentials(env, row.student_id);
     return null;
   }
-  const access = await portalAccessReady(env, row.student_id, guardian.identityHash);
+  const access = await portalAccessReady(env, row.student_id, guardian.identityHash, 1);
   if (access.error || access.updatedAt !== Number(row.access_updated_at)) {
     await env.DB.prepare('UPDATE guardian_portal_sessions SET revoked=1 WHERE app=? AND token_hash=?')
       .bind('task', tokenHash).run();
@@ -345,7 +362,7 @@ async function portalSession(env, rawToken, now) {
       'UPDATE guardian_portal_sessions SET last_seen_at=? WHERE app=? AND token_hash=? AND revoked=0'
     ).bind(now, 'task', tokenHash).run();
   }
-  return { tokenHash, student: found.student };
+  return { tokenHash, student: found.student, scopeVersion: access.scopeVersion };
 }
 
 function parseJson(value) {
@@ -362,18 +379,142 @@ async function staffNames(env) {
   return names;
 }
 
-async function publicSchedule(env, studentId, now) {
-  const today = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+function kstDate(now) {
+  return new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function activeTaskOnDate(task, date) {
+  return !!task && task.scheduleStatus === 'confirmed' &&
+    (!task.start || String(task.start) <= date) && (!task.end || String(task.end) >= date);
+}
+
+function activeSlotOnDate(slot, date, weekday) {
+  if (!slot || !Array.isArray(slot.days) || !slot.days.map(Number).includes(weekday) ||
+      !/^\d{2}:\d{2}$/.test(String(slot.startTime || '')) ||
+      !/^\d{2}:\d{2}$/.test(String(slot.endTime || ''))) return false;
+  const validFrom = String(slot.validFrom || slot.startDate || '');
+  const validTo = String(slot.validTo || slot.endDate || '');
+  return (!validFrom || validFrom <= date) && (!validTo || validTo >= date);
+}
+
+function lessonStepIds(task, check) {
+  const stored = Array.isArray(task.steps) ? task.steps.filter(step => step && step.id) : [];
+  const standardStored = stored.length === LESSON_STEP_LABELS.length &&
+    stored.every((step, index) => String(step.label || '') === LESSON_STEP_LABELS[index]);
+  const legacyProgress = check && check.steps && stored.some(step => check.steps[step.id]);
+  if (standardStored || legacyProgress) return stored.map(step => String(step.id));
+  return LESSON_STEP_LABELS.map((label, index) => String(task.id) + '-standard-step-' + (index + 1));
+}
+
+async function publicTodayLessons(env, student, now) {
+  const studentId = String(student && student.id || '');
+  const date = kstDate(now);
+  const weekday = new Date(Number(now) + 9 * 60 * 60 * 1000).getUTCDay();
   const result = await env.DB.prepare(
-    "SELECT owner,data FROM tasks WHERE app=? AND json_extract(data,'$.studentId')=? " +
+    "SELECT id,owner,data FROM tasks WHERE app=? AND json_extract(data,'$.studentId')=? " +
     "AND COALESCE(json_extract(data,'$.deleted'),0)=0 AND json_extract(data,'$.taskKind')='lesson_instruction'"
   ).bind('task', studentId).all();
   const names = await staffNames(env);
   const rows = [];
   for (const row of result.results || []) {
     const task = parseJson(row.data);
-    if (!task || task.scheduleStatus !== 'confirmed' || !Array.isArray(task.scheduleSlots)) continue;
-    if ((task.start && String(task.start) > today) || (task.end && String(task.end) < today)) continue;
+    const owner = String(row.owner || '');
+    if (!task || (task.id && String(task.id) !== String(row.id)) ||
+        String(task.staffId || '') !== owner || !names.has(owner) ||
+        !Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(owner) ||
+        !activeTaskOnDate(task, date) ||
+        !Array.isArray(task.scheduleSlots)) continue;
+    const slots = task.scheduleSlots.filter(slot => activeSlotOnDate(slot, date, weekday));
+    if (!slots.length) continue;
+    const checkRow = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1')
+      .bind('task', String(row.id) + '|' + date).first();
+    const parsedCheck = checkRow && parseJson(checkRow.data);
+    const check = parsedCheck && String(checkRow.owner || '') === owner &&
+      String(parsedCheck.taskId || '') === String(row.id) &&
+      String(parsedCheck.date || '') === date ? parsedCheck : null;
+    const stepIds = lessonStepIds({ ...task, id: String(row.id) }, check);
+    const completedSteps = stepIds.filter(id => !!(check && check.steps && check.steps[id])).length;
+    const attendance = check && ['P', 'L', 'A'].includes(String(check.att || '')) ? String(check.att) : '';
+    for (const slot of slots) rows.push({
+      subject: text(task.subject),
+      className: text(task.className),
+      teacherName: names.get(owner),
+      timeLabel: String(slot.startTime) + '–' + String(slot.endTime),
+      attendance,
+      completedSteps,
+      totalSteps: stepIds.length,
+      completed: stepIds.length ? completedSteps === stepIds.length : !!(check && check.done)
+    });
+  }
+  return rows.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel, 'ko') ||
+    String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko'));
+}
+
+async function publicTodayTransport(env, studentId, now) {
+  const date = kstDate(now);
+  const weekday = new Date(Number(now) + 9 * 60 * 60 * 1000).getUTCDay();
+  const configRow = await env.DB.prepare('SELECT data FROM transport_configs WHERE app=? LIMIT 1').bind('task').first();
+  const config = configRow && parseJson(configRow.data);
+  if (!config || !Array.isArray(config.routes)) return [];
+  const stateResult = await env.DB.prepare(
+    'SELECT route_id,status,boarded_at,dropped_at,absent_at FROM transport_states ' +
+    'WHERE app=? AND date=? AND student_id=?'
+  ).bind('task', date, studentId).all();
+  const states = new Map((stateResult.results || []).map(row => [String(row.route_id), row]));
+  const rows = [];
+  for (const route of config.routes) {
+    if (!route || route.active !== true || !Array.isArray(route.days) ||
+        !route.days.map(Number).includes(weekday) || !Array.isArray(route.stops)) continue;
+    const stop = route.stops.find(item => item && Array.isArray(item.studentIds) &&
+      item.studentIds.some(id => String(id) === studentId));
+    if (!stop) continue;
+    const state = states.get(String(route.id || '')) || null;
+    const status = state && ['scheduled', 'boarded', 'dropped', 'absent'].includes(String(state.status || ''))
+      ? String(state.status) : 'scheduled';
+    const statusAt = status === 'boarded' ? state && state.boarded_at :
+      status === 'dropped' ? state && state.dropped_at : status === 'absent' ? state && state.absent_at : null;
+    rows.push({
+      direction: route.direction === 'dropoff' ? 'dropoff' : 'pickup',
+      scheduledTime: /^\d{2}:\d{2}$/.test(String(stop.time || '')) ? String(stop.time) :
+        /^\d{2}:\d{2}$/.test(String(route.startTime || '')) ? String(route.startTime) : '',
+      status,
+      statusAt: statusAt == null ? null : Number(statusAt)
+    });
+  }
+  return rows.sort((a, b) => (a.scheduledTime || '99:99').localeCompare(b.scheduledTime || '99:99'));
+}
+
+async function publicToday(env, student, now) {
+  const date = kstDate(now);
+  const [lessons, transport] = await Promise.all([
+    publicTodayLessons(env, student, now),
+    publicTodayTransport(env, String(student && student.id || ''), now)
+  ]);
+  const day = new Date(Number(now) + 9 * 60 * 60 * 1000).getUTCDay();
+  return {
+    date,
+    dateLabel: Number(date.slice(5, 7)) + '월 ' + Number(date.slice(8, 10)) + '일 (' + DAY_LABELS[day] + ')',
+    lessons,
+    transport
+  };
+}
+
+async function publicSchedule(env, student, now) {
+  const studentId = String(student && student.id || '');
+  const today = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await env.DB.prepare(
+    "SELECT id,owner,data FROM tasks WHERE app=? AND json_extract(data,'$.studentId')=? " +
+    "AND COALESCE(json_extract(data,'$.deleted'),0)=0 AND json_extract(data,'$.taskKind')='lesson_instruction'"
+  ).bind('task', studentId).all();
+  const names = await staffNames(env);
+  const rows = [];
+  for (const row of result.results || []) {
+    const task = parseJson(row.data);
+    const owner = String(row.owner || '');
+    if (!task || (task.id && String(task.id) !== String(row.id)) ||
+        String(task.staffId || '') !== owner || !names.has(owner) ||
+        !Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(owner) ||
+        !activeTaskOnDate(task, today) || !Array.isArray(task.scheduleSlots)) continue;
     for (const slot of task.scheduleSlots) {
       if (!Array.isArray(slot.days) || !slot.startTime || !slot.endTime) continue;
       const validFrom = String(slot.validFrom || slot.startDate || '');
@@ -382,7 +523,7 @@ async function publicSchedule(env, studentId, now) {
       rows.push({
         subject: text(task.subject),
         className: text(task.className),
-        teacherName: names.get(String(row.owner || '')) || '담당 선생님',
+        teacherName: names.get(owner),
         dayLabel: slot.days.map(day => DAY_LABELS[Number(day)] || '').filter(Boolean).join('·'),
         timeLabel: String(slot.startTime) + '–' + String(slot.endTime)
       });
@@ -514,19 +655,38 @@ async function viewPortal(env, body, origin, json, request) {
   if (!session) return json({ ok: false, code: 'SESSION_INVALID', error: '보호자 연결이 만료되었습니다. 새 초대 링크를 요청해 주세요' }, 401, origin);
   const operations = await publicOperations(env, session.student);
   if (operations.error) return json({ ok: false, code: operations.code, error: operations.error }, 503, origin);
-  return json({
+  const todayEnabled = Number(session.scopeVersion || 1) >= CURRENT_PORTAL_SCOPE_VERSION;
+  const [today, schedule, feedback, onboarding] = await Promise.all([
+    todayEnabled ? publicToday(env, session.student, now) : Promise.resolve(null),
+    publicSchedule(env, session.student, now),
+    publicFeedback(env, session.student.id),
+    publicOnboarding(env, session.student.id)
+  ]);
+  const response = {
     ok: true,
+    generatedAt: now,
     student: { name: text(session.student.name), grade: text(session.student.grade) },
-    schedule: await publicSchedule(env, session.student.id, now),
-    feedback: await publicFeedback(env, session.student.id),
-    onboarding: await publicOnboarding(env, session.student.id),
+    capabilities: {
+      today: todayEnabled,
+      scopeVersion: Number(session.scopeVersion || 1),
+      requiredScopeVersion: CURRENT_PORTAL_SCOPE_VERSION
+    },
+    schedule,
+    feedback,
+    onboarding,
     makeups: operations.makeups,
     sessionPacks: operations.sessionPacks,
     summary: {
       makeupPending: operations.makeups.filter(row => !['completed', 'cancelled', 'denied'].includes(row.status)).length,
       sessionRemaining: operations.sessionPacks.reduce((sum, row) => sum + row.remaining, 0)
     }
-  }, 200, origin);
+  };
+  if (todayEnabled) {
+    response.today = today;
+    response.summary.todayLessons = today.lessons.length;
+    response.summary.todayCompleted = today.lessons.filter(row => row.completed).length;
+  }
+  return json(response, 200, origin);
 }
 
 async function respondPortal(env, body, origin, json, request) {
@@ -599,7 +759,7 @@ async function portalAccess(env, body, auth, origin, json) {
   if (action === 'access_list') {
     if (!allowedKeys(body, ['auth'])) return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
     const result = await env.DB.prepare(
-      'SELECT student_id,enabled,guardian_identity_hash,accepted_at,updated_at ' +
+      'SELECT student_id,enabled,guardian_identity_hash,scope_version,accepted_at,updated_at ' +
       'FROM guardian_portal_access WHERE app=? ORDER BY student_id'
     ).bind('task').all();
     const access = [];
@@ -608,6 +768,8 @@ async function portalAccess(env, body, auth, origin, json) {
       const storedEnabled = Number(row.enabled) === 1;
       let enabled = storedEnabled;
       let needsReconsent = false;
+      let needsScopeReconsent = false;
+      let reconsentReason = '';
       if (storedEnabled) {
         const found = await rosterStudent(env, studentId, Date.now());
         const guardian = found.error ? found : await guardianIdentityReady(env, found.student);
@@ -615,18 +777,25 @@ async function portalAccess(env, body, auth, origin, json) {
             String(row.guardian_identity_hash || '') !== String(guardian.identityHash || '')) {
           enabled = false;
           needsReconsent = true;
+          reconsentReason = 'identity';
           await revokePortalCredentials(env, studentId);
+        } else if (Number(row.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION) {
+          enabled = false;
+          needsReconsent = true;
+          needsScopeReconsent = true;
+          reconsentReason = 'scope';
         }
       }
       access.push({
-        studentId, enabled, needsReconsent,
+        studentId, enabled, needsReconsent, needsScopeReconsent, reconsentReason,
+        scopeVersion: Number(row.scope_version || 1),
         acceptedAt: row.accepted_at == null ? null : Number(row.accepted_at),
         updatedAt: Number(row.updated_at)
       });
     }
     return json({ ok: true, access }, 200, origin);
   }
-  if (!allowedKeys(body, ['auth', 'studentId', 'enabled', 'expectedUpdatedAt'])) {
+  if (!allowedKeys(body, ['auth', 'studentId', 'enabled', 'scopeVersion', 'expectedUpdatedAt'])) {
     return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
   }
   const studentId = String(body.studentId || '');
@@ -635,19 +804,33 @@ async function portalAccess(env, body, auth, origin, json) {
       !Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 0) {
     return json({ ok: false, error: '학생과 이용 동의를 확인해 주세요' }, 400, origin);
   }
+  if (body.enabled && Number(body.scopeVersion) !== CURRENT_PORTAL_SCOPE_VERSION) {
+    return json({ ok: false, code: 'PORTAL_CONSENT_VERSION_REQUIRED',
+      error: '오늘 출결·수업 진행·차량 상태를 포함한 새 공개 범위 동의를 확인해 주세요' }, 409, origin);
+  }
   const before = await env.DB.prepare(
-    'SELECT enabled,guardian_identity_hash,accepted_at,updated_at FROM guardian_portal_access ' +
+    'SELECT enabled,guardian_identity_hash,scope_version,accepted_at,updated_at FROM guardian_portal_access ' +
     'WHERE app=? AND student_id=? LIMIT 1'
   ).bind('task', studentId).first();
   if ((!before && expectedUpdatedAt !== 0) || (before && Number(before.updated_at) !== expectedUpdatedAt)) {
     return json({ ok: false, code: 'ACCESS_REVISION_CONFLICT',
       error: '보호자 웹앱 동의 상태가 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
-      current: before ? { studentId, enabled: Number(before.enabled) === 1,
+      current: before ? { studentId,
+        enabled: Number(before.enabled) === 1 && Number(before.scope_version || 1) >= CURRENT_PORTAL_SCOPE_VERSION,
+        needsReconsent: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+        needsScopeReconsent: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+        reconsentReason: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION ? 'scope' : '',
+        scopeVersion: Number(before.scope_version || 1),
         acceptedAt: before.accepted_at == null ? null : Number(before.accepted_at),
         updatedAt: Number(before.updated_at) } : null }, 409, origin);
   }
   const beforeAccess = before ? {
-    studentId, enabled: Number(before.enabled) === 1,
+    studentId,
+    enabled: Number(before.enabled) === 1 && Number(before.scope_version || 1) >= CURRENT_PORTAL_SCOPE_VERSION,
+    needsReconsent: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+    needsScopeReconsent: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+    reconsentReason: Number(before.enabled) === 1 && Number(before.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION ? 'scope' : '',
+    scopeVersion: Number(before.scope_version || 1),
     acceptedAt: before.accepted_at == null ? null : Number(before.accepted_at),
     updatedAt: Number(before.updated_at)
   } : null;
@@ -663,31 +846,39 @@ async function portalAccess(env, body, auth, origin, json) {
     if (guardian.error) return json({ ok: false, code: guardian.code, error: guardian.error }, 409, origin);
     guardianIdentityHash = guardian.identityHash;
   }
-  if (beforeAccess && beforeAccess.enabled === body.enabled &&
-      (!body.enabled || String(before.guardian_identity_hash || '') === guardianIdentityHash)) {
+  if (beforeAccess && (Number(before.enabled) === 1) === body.enabled &&
+      (!body.enabled || (String(before.guardian_identity_hash || '') === guardianIdentityHash &&
+        Number(before.scope_version || 1) === CURRENT_PORTAL_SCOPE_VERSION))) {
     return json({ ok: true, idempotent: true, access: { ...beforeAccess, needsReconsent: false } }, 200, origin);
   }
   const updatedBy = auth.role === 'manager' && SAFE_ID.test(String(auth.id || '')) ? auth.id : 'director';
   const saved = await env.DB.prepare(
-    'INSERT INTO guardian_portal_access(app,student_id,enabled,guardian_identity_hash,accepted_at,updated_at,updated_by) ' +
-    'VALUES(?,?,?,?,?,?,?) ON CONFLICT(app,student_id) DO UPDATE SET enabled=excluded.enabled,' +
-    'guardian_identity_hash=excluded.guardian_identity_hash,accepted_at=excluded.accepted_at,' +
+    'INSERT INTO guardian_portal_access(app,student_id,enabled,guardian_identity_hash,scope_version,accepted_at,updated_at,updated_by) ' +
+    'VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(app,student_id) DO UPDATE SET enabled=excluded.enabled,' +
+    'guardian_identity_hash=excluded.guardian_identity_hash,scope_version=excluded.scope_version,accepted_at=excluded.accepted_at,' +
     'updated_at=excluded.updated_at,updated_by=excluded.updated_by ' +
     'WHERE guardian_portal_access.updated_at=?'
-  ).bind('task', studentId, body.enabled ? 1 : 0, guardianIdentityHash, body.enabled ? now : null, now, updatedBy,
+  ).bind('task', studentId, body.enabled ? 1 : 0, guardianIdentityHash, CURRENT_PORTAL_SCOPE_VERSION,
+    body.enabled ? now : null, now, updatedBy,
     expectedUpdatedAt).run();
   if (changes(saved) !== 1) {
     const current = await env.DB.prepare(
-      'SELECT enabled,accepted_at,updated_at FROM guardian_portal_access WHERE app=? AND student_id=? LIMIT 1'
+      'SELECT enabled,scope_version,accepted_at,updated_at FROM guardian_portal_access WHERE app=? AND student_id=? LIMIT 1'
     ).bind('task', studentId).first();
     return json({ ok: false, code: 'ACCESS_REVISION_CONFLICT',
       error: '보호자 웹앱 동의 상태가 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
-      current: current ? { studentId, enabled: Number(current.enabled) === 1,
+      current: current ? { studentId,
+        enabled: Number(current.enabled) === 1 && Number(current.scope_version || 1) >= CURRENT_PORTAL_SCOPE_VERSION,
+        needsReconsent: Number(current.enabled) === 1 && Number(current.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+        needsScopeReconsent: Number(current.enabled) === 1 && Number(current.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION,
+        reconsentReason: Number(current.enabled) === 1 && Number(current.scope_version || 1) < CURRENT_PORTAL_SCOPE_VERSION ? 'scope' : '',
+        scopeVersion: Number(current.scope_version || 1),
         acceptedAt: current.accepted_at == null ? null : Number(current.accepted_at),
         updatedAt: Number(current.updated_at) } : null }, 409, origin);
   }
   return json({ ok: true, access: {
-    studentId, enabled: body.enabled, needsReconsent: false,
+    studentId, enabled: body.enabled, needsReconsent: false, needsScopeReconsent: false,
+    reconsentReason: '', scopeVersion: CURRENT_PORTAL_SCOPE_VERSION,
     acceptedAt: body.enabled ? now : null, updatedAt: now
   } }, 200, origin);
 }

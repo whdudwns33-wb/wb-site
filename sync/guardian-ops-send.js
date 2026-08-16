@@ -187,15 +187,17 @@ async function contactFor(env, app, student, scope) {
 async function portalAccessForProposal(env, app, target, guardian) {
   if (target.eventType !== 'makeup_proposal') return { ok: true };
   const row = await env.DB.prepare(
-    'SELECT enabled,guardian_identity_hash,updated_at FROM guardian_portal_access ' +
+    'SELECT enabled,guardian_identity_hash,scope_version,updated_at FROM guardian_portal_access ' +
     'WHERE app=? AND student_id=? LIMIT 1'
   ).bind(app, target.student.id).first();
   if (!row || Number(row.enabled) !== 1) return { error: 'PORTAL_ACCESS_MISSING' };
+  if (Number(row.scope_version || 1) < 1) return { error: 'PORTAL_ACCESS_MISSING' };
   if (!guardian || guardian.error ||
       String(row.guardian_identity_hash || '') !== String(guardian.portalIdentityHash || '')) {
     return { error: 'PORTAL_RECONSENT_REQUIRED' };
   }
-  return { ok: true, updatedAt: Number(row.updated_at), identityHash: String(row.guardian_identity_hash) };
+  return { ok: true, updatedAt: Number(row.updated_at), identityHash: String(row.guardian_identity_hash),
+    scopeVersion: Number(row.scope_version || 1) };
 }
 
 function portalInviteUrl(baseUrl, code) {
@@ -392,7 +394,7 @@ async function latestTargetState(env, app, target) {
   };
 }
 
-async function reserveSend(env, app, target, guardian, config, auth) {
+async function reserveSend(env, app, target, guardian, portal, config, auth) {
   const now = Date.now();
   const sendId = randomId('gos_');
   const variablesHash = await sha256Hex(JSON.stringify(target.variables));
@@ -426,7 +428,8 @@ async function reserveSend(env, app, target, guardian, config, auth) {
     'AND current_consent.consent=1 AND current_consent.guardian_identity_hash=?) ' +
     "AND (?<>'makeup_proposal' OR EXISTS (SELECT 1 FROM guardian_portal_access portal_access " +
     'WHERE portal_access.app=? AND portal_access.student_id=? AND portal_access.enabled=1 ' +
-    'AND portal_access.guardian_identity_hash=?)) ' +
+    'AND portal_access.guardian_identity_hash=? AND portal_access.updated_at=? ' +
+    'AND portal_access.scope_version=?)) ' +
     sourceClause +
     'AND NOT EXISTS (SELECT 1 FROM guardian_ops_notification_sends prior ' +
     'LEFT JOIN guardian_ops_notification_send_events outcome ON outcome.app=prior.app AND outcome.send_id=prior.send_id ' +
@@ -439,6 +442,7 @@ async function reserveSend(env, app, target, guardian, config, auth) {
     app, now - 24 * 60 * 60 * 1000,
     app, target.student.id, target.scope, guardian.identityHash,
     target.eventType, app, target.student.id, guardian.portalIdentityHash,
+    Number(portal && portal.updatedAt || 0), Number(portal && portal.scopeVersion || 1),
     ...sourceBindings,
     app, target.eventType, target.sourceId, target.revision
   ).run();
@@ -488,7 +492,7 @@ async function dispatchSnapshot(env, app, target, guardian, portal, config, vari
   }
   const currentPortal = await portalAccessForProposal(env, app, target, currentGuardian);
   if (currentPortal.error || currentPortal.updatedAt !== portal.updatedAt ||
-      currentPortal.identityHash !== portal.identityHash) {
+      currentPortal.identityHash !== portal.identityHash || currentPortal.scopeVersion !== portal.scopeVersion) {
     return { error: 'PORTAL_ACCESS_REVOKED_BEFORE_DISPATCH' };
   }
   const source = await revalidateAuthoritativeSource(env, app, target, config, variablesHash);
@@ -679,7 +683,7 @@ async function send(env, app, body, auth, origin, json) {
   const portal = await portalAccessForProposal(env, app, target, guardian);
   if (portal.error) return json({ ok: false, code: portal.error, error: blockerMessage(portal.error) }, 409, origin);
 
-  const reservation = await reserveSend(env, app, target, guardian, config, auth);
+  const reservation = await reserveSend(env, app, target, guardian, portal, config, auth);
   if (!reservation) {
     const raced = await latestTargetState(env, app, target);
     if (raced && raced.status === 'accepted') {
@@ -700,7 +704,7 @@ async function send(env, app, body, auth, origin, json) {
     }
     const currentPortal = await portalAccessForProposal(env, app, target, currentGuardian);
     if (currentPortal.error || currentPortal.updatedAt !== portal.updatedAt ||
-        currentPortal.identityHash !== portal.identityHash) {
+        currentPortal.identityHash !== portal.identityHash || currentPortal.scopeVersion !== portal.scopeVersion) {
       const code = currentPortal.error || 'PORTAL_ACCESS_REVOKED_BEFORE_DISPATCH';
       return json({ ok: false, code, error: blockerMessage(code) }, 409, origin);
     }
@@ -726,7 +730,8 @@ async function send(env, app, body, auth, origin, json) {
   if (target.eventType === 'makeup_proposal') {
     const invite = await issueGuardianPortalInvite(env, {
       studentId: target.student.id,
-      issuedBy: actor(auth)
+      issuedBy: actor(auth),
+      requiredScopeVersion: 1
     });
     if (!invite.ok) {
       const inviteRejectionCode = String(invite.errorCode || '').startsWith('PORTAL_')

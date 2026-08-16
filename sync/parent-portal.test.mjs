@@ -7,6 +7,7 @@ import { issueGuardianPortalInvite } from './parent-portal.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
+const scopeMigration = fs.readFileSync(new URL('./migrations/034_parent_portal_scope.sql', import.meta.url), 'utf8');
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -22,6 +23,7 @@ class TestD1 {
     this.database.exec('DROP TABLE IF EXISTS guardian_portal_responses; DROP TABLE IF EXISTS guardian_portal_sessions; ' +
       'DROP TABLE IF EXISTS guardian_portal_codes; DROP TABLE IF EXISTS guardian_portal_access;');
     this.database.exec(migration);
+    this.database.exec(scopeMigration);
   }
   prepare(sql) { return new Statement(this.database, sql); }
   batch(statements) { return Promise.all(statements.map(statement => statement.run())); }
@@ -69,6 +71,49 @@ function seed(db) {
     .bind('task', other.id, 'staff-b', JSON.stringify(other), now, now).run();
 }
 
+function seedToday(db) {
+  const now = Date.now();
+  const shifted = new Date(now + 9 * 60 * 60 * 1000);
+  const date = shifted.toISOString().slice(0, 10);
+  const weekday = shifted.getUTCDay();
+  const taskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const task = JSON.parse(taskRow.data);
+  task.scheduleSlots = [{ days: [weekday], startTime: '16:00', endTime: '17:00' }];
+  db.prepare("UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app='task' AND id='lesson-a'")
+    .bind(JSON.stringify(task), now + 1, now + 1).run();
+  const steps = {
+    'lesson-a-standard-step-1': true,
+    'lesson-a-standard-step-2': true
+  };
+  db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'lesson-a|' + date, 'staff-a', JSON.stringify({
+      taskId: 'lesson-a', date, att: 'P', steps,
+      note: '보호자에게 숨길 당일 내부 메모', blocked: '내부 차단 사유'
+    }), now, now).run();
+  const config = {
+    baseAddress: '외부 비공개 학원 주소',
+    vehicles: [{ id: 'vehicle-a', name: '8호차', plate: '9002', capacity: 11 }],
+    routes: [{
+      id: 'route-a', name: '학생 이름이 들어갈 수 있는 내부 노선명', active: true,
+      direction: 'pickup', days: [weekday], startTime: '15:00',
+      vehicleId: 'vehicle-a', driverId: 'staff-a',
+      stops: [
+        { id: 'stop-a', name: '외부 비공개 정류장명', address: '외부 비공개 정류장 주소',
+          time: '15:20', studentIds: ['student-a'] },
+        { id: 'stop-b', name: '학생B 집 앞', address: '학생B 주소', time: '15:30', studentIds: ['student-b'] }
+      ]
+    }]
+  };
+  db.prepare('INSERT INTO transport_configs(app,data,updated_at,updated_by) VALUES(?,?,?,?)')
+    .bind('task', JSON.stringify(config), now, 'director').run();
+  db.prepare(
+    'INSERT INTO transport_states(app,date,route_id,student_id,status,revision,boarded_at,boarded_by,' +
+    'history,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', date, 'route-a', 'student-a', 'boarded', 1, now, 'staff-a',
+    JSON.stringify([{ event: 'boarded', note: '외부 비공개 운행 메모' }]), now).run();
+  return { date, now };
+}
+
 function seedAwaitingMakeup(db, caseId = 'mu_parent_case') {
   const now = Date.now();
   const sourceDate = caseId.includes('confirm') ? '2026-08-11' : '2026-08-10';
@@ -86,7 +131,7 @@ function seedAwaitingMakeup(db, caseId = 'mu_parent_case') {
 async function connected(db) {
   const current = db.prepare("SELECT updated_at FROM guardian_portal_access WHERE student_id='student-a'").first();
   const allowed = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    expectedUpdatedAt: current ? Number(current.updated_at) : 0 }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 2, expectedUpdatedAt: current ? Number(current.updated_at) : 0 }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const invited = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(invited.status, 200);
@@ -102,13 +147,30 @@ async function connected(db) {
   return { code: invited.body.code, cookie: exchanged.cookie.split(';')[0] };
 }
 
+test('신규 schema와 운영 027→034 적용 결과의 보호자 공개 동의 구조가 같다', () => {
+  const fresh = new DatabaseSync(':memory:');
+  const upgraded = new DatabaseSync(':memory:');
+  fresh.exec(schema);
+  const marker = schema.indexOf('-- 보호자 웹앱 초대·세션·정형 응답.');
+  upgraded.exec(schema.slice(0, marker));
+  upgraded.exec(migration);
+  upgraded.exec(scopeMigration);
+  const columns = database => database.prepare('PRAGMA table_info(guardian_portal_access)').all()
+    .map(row => [row.name, row.type, row.notnull, row.dflt_value, row.pk]);
+  assert.deepEqual(columns(upgraded), columns(fresh));
+  const trigger = database => database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='trg_guardian_portal_access_revoke'"
+  ).get().sql.replace(/IF NOT EXISTS\s*/i, '').replace(/\s+/g, ' ').trim();
+  assert.equal(trigger(upgraded), trigger(fresh));
+});
+
 test('원장만 동의·연락처가 준비된 stable 학생 초대를 발급한다', async () => {
   const db = new TestD1(); seed(db);
   assert.equal((await call(db, { action: 'invite', studentId: 'student-a' })).status, 403);
   assert.equal((await call(db, { auth: admin, action: 'invite', studentId: 'student-b' })).status, 409);
   assert.equal((await call(db, { auth: admin, action: 'invite', studentId: 'student-a' })).status, 409,
     '보호자 앱 동의는 피드백 발송 동의와 별도로 받아야 한다');
-  assert.equal((await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io')).status, 200);
+  assert.equal((await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 2, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io')).status, 200);
   const invite = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(invite.status, 200);
   const stored = db.prepare('SELECT code_hash FROM guardian_portal_codes').first().code_hash;
@@ -119,7 +181,7 @@ test('원장만 동의·연락처가 준비된 stable 학생 초대를 발급한
 test('직원 초대 API와 내부 발송 helper가 같은 24시간·기존 unused revoke 계약을 사용한다', async () => {
   const db = new TestD1(); seed(db);
   const allowed = await call(db, {
-    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, expectedUpdatedAt: 0
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 2, expectedUpdatedAt: 0
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const now = Date.now();
@@ -150,11 +212,129 @@ test('초대 코드는 한 번만 교환되고 세션은 해당 학생 공개 �
 
   const view = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(view.status, 200);
+  assert.equal(Number.isFinite(view.body.generatedAt), true);
   assert.equal(view.body.student.name, '학생A');
   assert.equal(view.body.schedule.length, 1);
   assert.equal(view.body.schedule[0].teacherName, '담당A');
   const raw = JSON.stringify(view.body);
   assert.doesNotMatch(raw, /01012345678|외부 비공개|내부 특성|내부 요청|내부 수업지시|학생B/);
+});
+
+test('공개 범위 v2에서만 오늘 수업 진행과 최소 차량 확인을 stable 학생 ID로 본다', async () => {
+  const db = new TestD1(); seed(db); const today = seedToday(db);
+  const auth = await connected(db);
+  const view = await call(db, { action: 'view' }, auth.cookie);
+  assert.equal(view.status, 200);
+  assert.deepEqual(view.body.capabilities, { today: true, scopeVersion: 2, requiredScopeVersion: 2 });
+  assert.equal(view.body.today.date, today.date);
+  assert.equal(view.body.today.lessons.length, 1);
+  assert.deepEqual(view.body.today.lessons[0], {
+    subject: '독해', className: '기초반', teacherName: '담당A', timeLabel: '16:00–17:00',
+    attendance: 'P', completedSteps: 2, totalSteps: 5, completed: false
+  });
+  assert.deepEqual(view.body.today.transport, [{
+    direction: 'pickup', scheduledTime: '15:20', status: 'boarded', statusAt: today.now
+  }]);
+  assert.equal(view.body.summary.todayLessons, 1);
+  assert.equal(view.body.summary.todayCompleted, 0);
+  const raw = JSON.stringify(view.body);
+  assert.doesNotMatch(raw, /01012345678|당일 내부 메모|내부 차단 사유|외부 비공개|학생B|9002|route-a|stop-a|staff-a|운행 메모/);
+
+  db.prepare("UPDATE checks SET owner='staff-b' WHERE app='task' AND k=?").bind('lesson-a|' + today.date).run();
+  const wrongOwner = await call(db, { action: 'view' }, auth.cookie);
+  assert.equal(wrongOwner.status, 200);
+  assert.equal(wrongOwner.body.today.lessons[0].attendance, '');
+  assert.equal(wrongOwner.body.today.lessons[0].completedSteps, 0);
+
+  const staleTaskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const staleTask = JSON.parse(staleTaskRow.data);
+  staleTask.staffId = 'staff-b';
+  db.prepare("UPDATE tasks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE app='task' AND id='lesson-a'")
+    .bind(JSON.stringify(staleTask)).run();
+  const staleAssignment = await call(db, { action: 'view' }, auth.cookie);
+  assert.equal(staleAssignment.body.today.lessons.length, 0);
+  assert.equal(staleAssignment.body.schedule.length, 0,
+    '오늘 수업과 주간 시간표가 같은 현재 assignment 검증을 사용한다');
+});
+
+test('같은 보호자 전화번호의 형제도 학생별 동의·초대 없이 자동 결합하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  db.prepare(
+    'INSERT INTO guardian_contacts_by_student(app,student_id,student_name,phone,consent,updated_at,updated_by) ' +
+    'VALUES(?,?,?,?,?,?,?)'
+  ).bind('task', 'student-b', '학생B', '01012345678', 1, Date.now(), 'director').run();
+  const a = await connected(db);
+  const allowedB = await call(db, {
+    auth: admin, action: 'access_set', studentId: 'student-b', enabled: true,
+    scopeVersion: 2, expectedUpdatedAt: 0
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(allowedB.status, 200);
+  const inviteB = await call(db, {
+    auth: admin, action: 'invite', studentId: 'student-b'
+  }, '', 'https://whdudwns33-wb.github.io');
+  const exchangedB = await call(db, { action: 'exchange', code: inviteB.body.code });
+  const bCookie = exchangedB.cookie.split(';')[0];
+  const viewA = await call(db, { action: 'view' }, a.cookie);
+  const viewB = await call(db, { action: 'view' }, bCookie);
+  assert.equal(viewA.body.student.name, '학생A');
+  assert.equal(viewB.body.student.name, '학생B');
+  assert.doesNotMatch(JSON.stringify(viewA.body), /학생B/);
+  assert.doesNotMatch(JSON.stringify(viewB.body), /학생A/);
+});
+
+test('기존 v1 연결은 기존 정보만 유지하고 v2 재동의 뒤 새 세션에서만 오늘 현황을 연다', async () => {
+  const db = new TestD1(); seed(db); seedToday(db);
+  const initial = await call(db, {
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
+    scopeVersion: 2, expectedUpdatedAt: 0
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(initial.status, 200);
+  db.prepare(
+    "UPDATE guardian_portal_access SET scope_version=1,updated_at=updated_at+1 WHERE app='task' AND student_id='student-a'"
+  ).run();
+  const revision = db.prepare(
+    "SELECT updated_at FROM guardian_portal_access WHERE app='task' AND student_id='student-a'"
+  ).first().updated_at;
+
+  const directInvite = await call(db, {
+    auth: admin, action: 'invite', studentId: 'student-a'
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(directInvite.status, 409);
+  assert.equal(directInvite.body.code, 'PORTAL_CONSENT_VERSION_REQUIRED');
+
+  const legacyInvite = await issueGuardianPortalInvite({ DB: db }, {
+    studentId: 'student-a', issuedBy: 'director', requiredScopeVersion: 1
+  });
+  assert.equal(legacyInvite.ok, true);
+  const legacyExchange = await call(db, { action: 'exchange', code: legacyInvite.code });
+  const legacyCookie = legacyExchange.cookie.split(';')[0];
+  const legacyView = await call(db, { action: 'view' }, legacyCookie);
+  assert.equal(legacyView.status, 200);
+  assert.deepEqual(legacyView.body.capabilities, { today: false, scopeVersion: 1, requiredScopeVersion: 2 });
+  assert.equal('today' in legacyView.body, false);
+  assert.equal('todayLessons' in legacyView.body.summary, false);
+  assert.equal(legacyView.body.schedule.length, 1);
+
+  const listed = await call(db, { auth: admin, action: 'access_list' }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(listed.body.access[0].enabled, false);
+  assert.equal(listed.body.access[0].needsScopeReconsent, true);
+  assert.equal((await call(db, { action: 'view' }, legacyCookie)).status, 200,
+    '목적 범위 재동의 안내만으로 기존 v1 세션을 강제 종료하지 않는다');
+
+  const oldClient = await call(db, {
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, expectedUpdatedAt: revision
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(oldClient.status, 409);
+  assert.equal(oldClient.body.code, 'PORTAL_CONSENT_VERSION_REQUIRED');
+  assert.equal(db.prepare("SELECT scope_version FROM guardian_portal_access WHERE student_id='student-a'").first().scope_version, 1);
+
+  const upgraded = await call(db, {
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
+    scopeVersion: 2, expectedUpdatedAt: revision
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(upgraded.status, 200);
+  assert.equal(upgraded.body.access.scopeVersion, 2);
+  assert.equal((await call(db, { action: 'view' }, legacyCookie)).status, 401);
 });
 
 test('만료·로그아웃 세션은 다시 사용할 수 없다', async () => {
@@ -206,7 +386,7 @@ test('동일한 이용 동의 저장은 idempotent이고, 해제는 명단·연�
   ).first();
   const same = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    expectedUpdatedAt: before.updated_at
+    scopeVersion: 2, expectedUpdatedAt: before.updated_at
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(same.status, 200);
   assert.equal(same.body.idempotent, true);
@@ -266,7 +446,7 @@ test('보호자 전화가 바뀌면 기존 동의를 승계하지 않고 재동�
 
   const renewed = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    expectedUpdatedAt: accessBefore.updated_at
+    scopeVersion: 2, expectedUpdatedAt: accessBefore.updated_at
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(renewed.status, 200);
   assert.equal(renewed.body.idempotent, undefined);
@@ -302,7 +482,7 @@ test('보호자 연락처나 동의 revision이 바뀌면 기존 세션을 폐�
   db.prepare("UPDATE guardian_contacts_by_student SET phone='01012345678',updated_at=updated_at+1 WHERE student_id='student-a'").run();
   const access = db.prepare("SELECT updated_at FROM guardian_portal_access WHERE student_id='student-a'").first();
   const toggled = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    expectedUpdatedAt: access.updated_at }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 2, expectedUpdatedAt: access.updated_at }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(toggled.status, 200);
   assert.equal((await call(db, { action: 'view' }, auth.cookie)).status, 401);
 });
@@ -330,7 +510,7 @@ test('동의 저장은 CAS이고 네 번째 교환 뒤 활성 세션은 세 개�
 test('같은 1회 코드를 동시에 교환해도 세션은 하나만 생긴다', async () => {
   const db = new TestD1(); seed(db);
   const allowed = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 2, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const invited = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   const results = await Promise.all([

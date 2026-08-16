@@ -12,6 +12,7 @@ const migration025 = fs.readFileSync(new URL('./migrations/025_makeup.sql', impo
 const migration026 = fs.readFileSync(new URL('./migrations/026_session_packs.sql', import.meta.url), 'utf8');
 const migration027 = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
 const migration028 = fs.readFileSync(new URL('./migrations/028_guardian_ops_notifications.sql', import.meta.url), 'utf8');
+const migration034 = fs.readFileSync(new URL('./migrations/034_parent_portal_scope.sql', import.meta.url), 'utf8');
 const schemaBeforeParentPortal = schema.slice(0, schema.indexOf('-- 보호자 웹앱 초대·세션·정형 응답.'));
 
 class D1Statement {
@@ -32,6 +33,7 @@ class TestD1 {
     this.database.exec(migration025);
     this.database.exec(migration026);
     this.database.exec(migration027);
+    this.database.exec(migration034);
     this.database.exec(migration028);
   }
   prepare(sql) { return new D1Statement(this.database, sql); }
@@ -632,7 +634,7 @@ test('guardian identity change after reservation blocks provider fetch and invit
   assert.equal(originalPrepare('SELECT COUNT(*) AS count FROM guardian_portal_codes').first().count, 0);
 });
 
-test('guardian portal access revision change after reservation blocks provider fetch and invite issuance', async () => {
+test('guardian portal access scope/revision change after reservation blocks provider fetch and invite issuance', async () => {
   const db = new TestD1();
   seedBase(db); seedMakeup(db); setConsent(db, 'makeup');
   const originalPrepare = db.prepare.bind(db);
@@ -644,7 +646,7 @@ test('guardian portal access revision change after reservation blocks provider f
         const result = originalRun();
         if (Number(result.meta.changes) === 1) {
           originalPrepare(
-            "UPDATE guardian_portal_access SET updated_at=updated_at+1,updated_by='other-manager' " +
+            "UPDATE guardian_portal_access SET scope_version=2,updated_at=updated_at+1,updated_by='other-manager' " +
             "WHERE app='task' AND student_id='student-1'"
           ).run();
         }
