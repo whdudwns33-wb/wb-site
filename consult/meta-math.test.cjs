@@ -6,8 +6,8 @@ const test = require('node:test');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
 test('MetaMath uses fixed official links without storing credentials', () => {
-  assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmath\.co\.kr\/n\/center\/login'/);
-  assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmath\.co\.kr\/n\/student\/login\/login\.cshtml'/);
+  assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=center'/);
+  assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=student'/);
 
   const card = html.match(/function metaMathCard\(me, editable\) \{[\s\S]*?\n}/)?.[0] || '';
   assert.match(card, /target="_blank" rel="noopener noreferrer"/);
