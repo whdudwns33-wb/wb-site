@@ -428,6 +428,9 @@
   .material-type-option:has(input:checked) { border-color: var(--blue); background: #EEF6FD; color: var(--deep-blue); font-weight: 800; }
   .material-preview { padding: 12px; border-radius: 12px; background: #EEF5FC; color: var(--navy); font-size: 12.5px; line-height: 1.65; }
   .request-queue-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .exam-plan-list { margin-top: 10px; }
+  .exam-plan-row { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--light-gray); font-size: 12px; }
+  .exam-plan-row:last-child { border-bottom: 0; }
 
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
@@ -532,6 +535,7 @@
     .academic-item-head > :last-child { grid-column: 1 / -1; }
     .academic-actions .btn { flex: 1 1 130px; min-height: 44px; }
     .material-types { grid-template-columns: 1fr; }
+    .exam-plan-row { grid-template-columns: 1fr; gap: 2px; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -628,6 +632,12 @@ const ACADEMIC_TYPES = Object.freeze({
 });
 const MATERIAL_TYPES = Object.freeze([
   '개념 요약', '기본 유형', '학교시험형', '서술형', '고난도', '실전 모의', '오답 보충', '기타'
+]);
+const EXAM_PLAN_PHASES = Object.freeze([
+  { key: 'concept', label: '개념·범위 정리', weight: .30, guide: '시험범위의 핵심 개념과 공식을 교과서·수업자료 기준으로 정리하세요.', steps: ['핵심 개념 확인', '시험범위 요약'] },
+  { key: 'practice', label: '문제풀이', weight: .35, guide: '시험범위 문제를 시간 안에 풀고 바로 채점하세요.', steps: ['시험범위 문제풀이', '채점'] },
+  { key: 'correction', label: '오답 보완', weight: .20, guide: '틀린 이유를 확인하고 같은 유형을 다시 풀어 해결하세요.', steps: ['오답 원인 확인', '다시 풀기'] },
+  { key: 'review', label: '실전·최종 점검', weight: .15, guide: '실전처럼 점검한 뒤 시험 직전 볼 내용만 마지막으로 정리하세요.', steps: ['실전 점검', '최종 복습'] }
 ]);
 const STUDY_SUBJECTS = Object.freeze({
   korean:  { label: '국어', className: 'subject-korean' },
@@ -3594,6 +3604,218 @@ function materialRequestSearchText(req) {
     .concat(req.materialTypes || []).concat([req.level]).filter(Boolean).join(' ');
 }
 
+function examPlanSessions(settings) {
+  const sessionMin = Number(settings && settings.sessionMin);
+  if (!Number.isInteger(sessionMin) || sessionMin < 20 || sessionMin > 180) return [];
+  const counts = EXAM_PLAN_PHASES.map(phase => Number(settings[phase.key + 'Count']));
+  if (counts.some(count => !Number.isInteger(count) || count < 0 || count > 100)) return [];
+  let seq = 0;
+  return EXAM_PLAN_PHASES.flatMap((phase, phaseIndex) => {
+    const count = counts[phaseIndex];
+    return Array.from({ length: count }, (_, index) => ({
+      seq: ++seq, phase: phase.key, planItemKey: phase.key + '-' + (index + 1),
+      title: phase.label + ' ' + (index + 1) + '/' + count,
+      guide: phase.guide, steps: phase.steps.slice(), min: sessionMin, _span: sessionMin
+    }));
+  });
+}
+
+function examPlanPhaseCounts(total) {
+  total = Math.max(4, Math.min(100, Math.round(Number(total) || 0)));
+  const counts = EXAM_PLAN_PHASES.map(() => 1);
+  while (counts.reduce((sum, value) => sum + value, 0) < total) {
+    let best = 0, score = -Infinity;
+    EXAM_PLAN_PHASES.forEach((phase, index) => {
+      const gap = phase.weight * total - counts[index];
+      if (gap > score) { score = gap; best = index; }
+    });
+    counts[best]++;
+  }
+  const out = {};
+  EXAM_PLAN_PHASES.forEach((phase, index) => { out[phase.key + 'Count'] = counts[index]; });
+  return out;
+}
+
+function examPlanTasks(examId) {
+  return state.tasks.filter(task => !task.deleted && task.auto === 'exam-plan-v1' && task.examId === examId);
+}
+
+function examPlanReplaceable(task, examId, from) {
+  const hasCheck = typeof getCheck === 'function' && !!getCheck(task.id, task.start);
+  return !!task && !task.deleted && task.auto === 'exam-plan-v1' && task.examId === examId &&
+    task.start >= from && !isDone(task.id, task.start) && !hasCheck && !task.lastEditBy;
+}
+
+function examPlanFixedKeys(examId, from) {
+  return new Set(examPlanTasks(examId).filter(task => !examPlanReplaceable(task, examId, from))
+    .map(task => task.planItemKey).filter(Boolean));
+}
+
+function examPlanLockedTasks(staffId, date, examId, from) {
+  return state.tasks.filter(task => {
+    if (task.deleted || task.auto !== 'exam-plan-v1' || task.staffId !== staffId || task.start !== date) return false;
+    return !examPlanReplaceable(task, examId, from);
+  });
+}
+
+function examPlanFreeSlots(staffId, date, examId, from, baseSlots) {
+  const busy = examPlanLockedTasks(staffId, date, examId, from).map(task => ({
+    s: ingHmMin(task.slotStart || task.time), e: ingHmMin(task.slotEnd)
+  })).filter(slot => slot.s !== null && slot.e > slot.s);
+  return (baseSlots || []).flatMap(slot => ingFreeIntervals(Number(slot.s), Number(slot.e), busy));
+}
+
+function examPlanPreview(staffId, exam, settings) {
+  const sessions = examPlanSessions(settings || {});
+  const empty = reason => ({ items: [], remaining: sessions.length, complete: false, finishDate: null,
+    reason: reason, warning: reason ? reason : '' });
+  if (!exam || exam.staffId !== staffId || exam.academicType !== 'exam') return empty('시험 정보를 확인해 주세요');
+  if (!ingAvail(staffId).configured) return empty('주간 일정 미설정');
+  const examDate = academicDateOf(exam);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) return empty('시험 날짜를 확인해 주세요');
+  const from = [today(), exam.periodStart || today(), settings.start || ''].filter(Boolean).sort().pop();
+  const until = addDays(examDate, -1);
+  const perDay = Number(settings.perDay);
+  const weekdays = Array.isArray(settings.weekdays) ? [...new Set(settings.weekdays.filter(day => ING_WEEK_DAYS.includes(day)))] : ING_WEEK_DAYS.slice();
+  if (settings.totalHours != null && (!Number.isFinite(Number(settings.totalHours)) || Number(settings.totalHours) < 2 || Number(settings.totalHours) > 100)) {
+    return empty('총 준비시간을 2~100시간으로 입력해 주세요');
+  }
+  if (settings.totalHours != null) {
+    const requested = Math.ceil(Number(settings.totalHours) * 60 / Number(settings.sessionMin));
+    if (requested < EXAM_PLAN_PHASES.length) return empty('4단계 학습을 위해 총 준비시간을 더 늘려 주세요');
+    if (requested > 100) return empty('학습 횟수는 최대 100회까지 만들 수 있습니다');
+  }
+  if (!sessions.length || !Number.isInteger(perDay) || perDay < 1 || perDay > 12) return empty('준비 횟수와 하루 학습량을 확인해 주세요');
+  if (from > until) return empty('시험 전날까지 배정할 수 있는 날짜가 없습니다');
+  if (!weekdays.length) return empty('학습 가능 요일을 선택해 주세요');
+  const fixedKeys = typeof examPlanFixedKeys === 'function' ? examPlanFixedKeys(exam.id, from) : new Set();
+  const remainingSessions = sessions.filter(item => !fixedKeys.has(item.planItemKey));
+  const packed = ingPackSchedule(remainingSessions, from, until, weekdays, perDay,
+    date => {
+      const base = ingFreeForDate(staffId, date, true);
+      return typeof examPlanFreeSlots === 'function' ? examPlanFreeSlots(staffId, date, exam.id, from, base) : base;
+    },
+    date => typeof examPlanLockedTasks === 'function' ? examPlanLockedTasks(staffId, date, exam.id, from).length : 0);
+  const bySeq = new Map(remainingSessions.map(item => [item.seq, item]));
+  const items = packed.items.map(item => Object.assign({}, item, bySeq.get(item.seq) || {}));
+  const warning = packed.remaining ? '가용시간이 부족합니다 · ' + packed.remaining + '회 (' +
+    packed.remaining * Number(settings.sessionMin) + '분) 미배정' : '';
+  return Object.assign({}, packed, {
+    items: items, warning: warning, reason: '', fixedCount: fixedKeys.size,
+    totalSessions: sessions.length, settings: Object.assign({}, settings), staffId: staffId, examId: exam.id, from: from
+  });
+}
+
+function commitExamPlan(staffId, exam, draft) {
+  const stamp = now();
+  const replaceFrom = /^\d{4}-\d{2}-\d{2}$/.test(draft.from || '') && draft.from >= today() ? draft.from : today();
+  state.tasks.forEach(task => {
+    if (task.staffId === staffId && examPlanReplaceable(task, exam.id, replaceFrom)) {
+      task.deleted = true; task.updatedAt = stamp;
+    }
+  });
+  (draft.items || []).forEach(item => {
+    const taskId = 'exam-plan-' + exam.id + '-' + item.planItemKey;
+    const existing = state.tasks.find(task => task.id === taskId);
+    const next = {
+      id: taskId, groupId: 'exam-plan-' + exam.id, staffId: staffId,
+      auto: 'exam-plan-v1', examId: exam.id, examPhase: item.phase,
+      planItemKey: item.planItemKey, estimateMin: Number(item.min) || 0,
+      slotStart: item.s || '', slotEnd: item.e || '',
+      title: (item.title || '시험대비 학습') + ' · ' + exam.title,
+      studySubject: exam.studySubject || '',
+      detail: [exam.title, exam.unit, exam.range].filter(Boolean).join(' · '),
+      guide: item.guide || '',
+      steps: (item.steps || []).map((label, index) => ({ id: item.planItemKey + '-step-' + (index + 1), label: label })),
+      target: 0, unit: '회', time: item.s || '', priority: 'high',
+      repeat: 'once', days: [], start: item.date, end: '', carry: true,
+      origin: 'admin', requiresClaim: false, createdAt: existing ? existing.createdAt : stamp, updatedAt: stamp, deleted: false
+    };
+    if (existing) Object.assign(existing, next);
+    else state.tasks.push(next);
+  });
+  exam.examPlan = Object.assign({}, draft.settings || {}, {
+    generatedAt: stamp, finishDate: draft.finishDate || '', totalSessions: draft.totalSessions || (draft.items || []).length
+  });
+  exam.updatedAt = stamp;
+  return (draft.items || []).length;
+}
+
+function examPlanSummary(exam) {
+  const tasks = examPlanTasks(exam.id);
+  const done = tasks.filter(task => isDone(task.id, task.start)).length;
+  const finishDate = tasks.map(task => task.start).sort().pop() || '';
+  return { total: tasks.length, done: done, finishDate: finishDate };
+}
+
+let examPlanDraft = null;
+
+function examPlanSettingsFromForm() {
+  const sessionMin = Number((($('#examPlanSessionMin') || {}).value)) || 50;
+  const hours = Number((($('#examPlanHours') || {}).value)) || 0;
+  const total = Math.ceil(hours * 60 / sessionMin);
+  return Object.assign(examPlanPhaseCounts(total), {
+    sessionMin: sessionMin,
+    totalHours: hours,
+    perDay: Number((($('#examPlanPerDay') || {}).value)) || 2,
+    start: (($('#examPlanStart') || {}).value) || today(),
+    weekdays: Array.from(document.querySelectorAll('[data-act="examplandow"].on')).map(button => Number(button.dataset.v))
+  });
+}
+
+function examPlanModal(exam) {
+  if (!session.isAdmin || !exam || exam.academicType !== 'exam') return;
+  const previous = exam.examPlan || {};
+  const sessionMin = Number(previous.sessionMin) || 50;
+  const totalSessions = Number(previous.totalSessions) || 12;
+  const hours = Number(previous.totalHours) || Math.max(2, Math.ceil(totalSessions * sessionMin / 60));
+  const start = [today(), exam.periodStart || today(), previous.start || ''].filter(Boolean).sort().pop();
+  const days = Array.isArray(previous.weekdays) && previous.weekdays.length ? previous.weekdays : ING_WEEK_DAYS;
+  modal('🗓 ' + exam.title + ' 시험대비 플랜',
+    '<div class="material-preview mb14"><b>' + esc(STUDY_SUBJECTS[exam.studySubject] ? STUDY_SUBJECTS[exam.studySubject].label : '') +
+      ' · ' + esc(exam.unit || '') + '</b><br>' + esc(exam.range || '') + '<br>시험일 ' + esc(academicDateOf(exam)) + '</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">준비 시작일</label><input class="in" id="examPlanStart" type="date" min="' + today() + '" max="' + addDays(academicDateOf(exam), -1) + '" value="' + esc(previous.start || start) + '"></div>' +
+      '<div class="field"><label class="fl">총 준비시간 (시간)</label><input class="in" id="examPlanHours" type="number" min="2" max="100" step="0.5" value="' + hours + '"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">한 번에 공부</label><select class="in" id="examPlanSessionMin">' +
+      [30, 40, 50, 60, 80, 90].map(value => '<option value="' + value + '"' + (value === sessionMin ? ' selected' : '') + '>' + value + '분</option>').join('') + '</select></div>' +
+      '<div class="field"><label class="fl">하루 최대</label><select class="in" id="examPlanPerDay">' +
+      [1, 2, 3, 4, 5, 6].map(value => '<option value="' + value + '"' + (value === (Number(previous.perDay) || 2) ? ' selected' : '') + '>' + value + '회</option>').join('') + '</select></div></div>' +
+    '<div class="field"><label class="fl">학습 가능 요일</label><div class="chips">' + ING_WEEK_DAYS.map(day =>
+      '<button type="button" class="chip dow ' + (days.includes(day) ? 'on' : '') + '" data-act="examplandow" data-v="' + day + '">' + DOW[day] + '</button>').join('') + '</div></div>' +
+    '<div class="hint mb14">개념 30% → 문제풀이 35% → 오답 20% → 최종점검 15% 순서로 시험 전날까지 배치합니다.</div>' +
+    '<button class="btn btn-navy btn-block" data-act="examplanpreview" data-id="' + exam.id + '">빈 시간으로 다시 계산</button>' +
+    '<div id="examPlanPreview" class="mt14" data-exam="' + exam.id + '" aria-live="polite"></div>');
+  renderExamPlanPreview(exam.id);
+}
+
+function renderExamPlanPreview(examId) {
+  const box = $('#examPlanPreview');
+  const exam = state.tasks.find(task => !task.deleted && task.id === examId && task.academicType === 'exam');
+  if (!box || !exam) return;
+  const settings = examPlanSettingsFromForm();
+  const draft = examPlanPreview(exam.staffId, exam, settings);
+  examPlanDraft = Object.assign({}, draft, { examId: exam.id, staffId: exam.staffId });
+  if (draft.reason) {
+    box.innerHTML = '<div class="hint bad"><b>' + esc(draft.reason) + '</b>' +
+      (draft.reason === '주간 일정 미설정' ? '<br>활동시간과 학교·학원 일정을 먼저 등록해 주세요.<button class="btn btn-ghost btn-block mt8" data-act="ingavopen">주간 일정 설정하기</button>' : '') + '</div>';
+    return;
+  }
+  const phaseCounts = EXAM_PLAN_PHASES.map(phase => phase.label + ' ' + Number(settings[phase.key + 'Count'] || 0) + '회').join(' · ');
+  box.innerHTML = '<div class="material-preview"><div class="between"><b>자동배정 결과</b><span class="pill ' + (draft.warning ? 'bad' : '') + '">' +
+      (draft.complete ? '배정 가능' : '시간 부족') + '</span></div>' +
+      '<div class="small mt8">전체 ' + draft.totalSessions + '회 (' + fmtDur(draft.totalSessions * Number(settings.sessionMin) * 60) + ') · 새 배정 ' + draft.items.length + '회' +
+        (draft.fixedCount ? ' · 기존 완료·과거 ' + draft.fixedCount + '회 유지' : '') +
+        (draft.finishDate ? ' · ' + shortDate(draft.finishDate) + ' 완료 예정' : '') + '</div>' +
+      '<div class="small muted mt8">' + esc(phaseCounts) + '</div>' +
+      (draft.warning ? '<div class="hint bad mt8">' + esc(draft.warning) + '<br>총 시간을 줄이거나 시작일·요일·하루 횟수를 조정해 주세요.</div>' : '') + '</div>' +
+    '<div class="exam-plan-list">' + draft.items.slice(0, 8).map(item =>
+      '<div class="exam-plan-row"><b>' + shortDate(item.date) + ' ' + esc(item.s) + '~' + esc(item.e) + '</b><span>' + esc(item.title) + '</span></div>').join('') +
+      (draft.items.length > 8 ? '<div class="small muted mt8">외 ' + (draft.items.length - 8) + '회</div>' : '') + '</div>' +
+    (draft.complete && draft.items.length ? '<button class="btn btn-primary btn-block mt14" data-act="examplanconfirm" data-id="' + exam.id + '">' +
+      (examPlanTasks(exam.id).length ? '기존 미래 일정 교체하고 재계획' : '이 계획으로 확정') + '</button>' :
+      (!draft.items.length && draft.complete ? '<div class="hint mt8">이미 필요한 시험대비 일정이 모두 완료·고정되어 있습니다.</div>' : ''));
+}
+
 function academicEventModal(type) {
   if (!session.isAdmin) return;
   const me = currentStaff();
@@ -3789,6 +4011,7 @@ function academicItemCard(item, studentCanRequest) {
   const date = academicDateOf(item);
   const check = getCheck(item.id, date);
   const prog = taskProgress(item, check);
+  const plan = item.academicType === 'exam' ? examPlanSummary(item) : null;
   const canCheck = session.isStaffLink && item.staffId === session.staffId;
   return '<div class="academic-item"><div class="academic-item-head"><div class="academic-icon">' + type.icon + '</div><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(item.title) + '</b>' + taskStudySubjectTag(item) + '<span class="pill warn">' + esc(monthDday(date)) + '</span></div>' +
@@ -3798,12 +4021,16 @@ function academicItemCard(item, studentCanRequest) {
       (item.unit ? '<span class="tag">' + esc(item.unit) + '</span>' : '') + (item.pages ? '<span class="tag">' + esc(item.pages) + '</span>' : '') +
       (item.goalScore ? '<span class="tag doing">목표 ' + Number(item.goalScore) + '점</span>' : '') +
       (item.weight ? '<span class="tag doing">반영 ' + Number(item.weight) + '%</span>' : '') + '</div>' +
-    (item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') + '</div>' +
+    (item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') +
+    (plan && plan.total ? '<div class="hint mt8"><b>시험플랜 ' + plan.done + '/' + plan.total + '회 완료</b>' +
+      (plan.finishDate ? ' · ' + shortDate(plan.finishDate) + '까지 계획' : '') + '</div>' : '') + '</div>' +
     (session.isAdmin ? '<button class="btn btn-sm btn-danger" data-act="academicdelete" data-id="' + item.id + '">삭제</button>' : '') + '</div>' +
     ((item.steps || []).length ? '<div style="margin-top:10px"><div class="bar mini"><i style="width:' + prog.pct + '%"></i></div>' +
       item.steps.map((step, index) => '<div class="step ' + (check && check.steps && check.steps[step.id] ? 'on' : '') + '"><button class="sbox" ' +
         (canCheck ? 'data-act="step" data-id="' + item.id + '" data-date="' + date + '" data-step="' + step.id + '"' : 'disabled') + '>✓</button><span>' + (index + 1) + '. ' + esc(step.label) + '</span></div>').join('') + '</div>' : '') +
     '<div class="academic-actions">' +
+      (session.isAdmin && item.academicType === 'exam' ? '<button class="btn btn-navy" data-act="examplanopen" data-id="' + item.id + '">' +
+        (plan && plan.total ? '시험플랜 재계획' : '시험대비 플랜 만들기') + '</button>' : '') +
       (studentCanRequest && item.academicType === 'exam' ? '<button class="btn btn-primary" data-act="matrequestopen" data-exam="' + item.id + '">시험대비 자료 요청</button>' : '') +
     '</div></div>';
 }
@@ -4837,8 +5064,57 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const item = state.tasks.find(t => t.id === id && t.kind === 'academic_event' && !t.deleted);
       if (!item || !confirm(item.title + ' 일정을 삭제할까요? 기존 자료 요청 기록은 남습니다.')) break;
-      item.deleted = true; item.updatedAt = now();
+      const stamp = now();
+      item.deleted = true; item.updatedAt = stamp;
+      state.tasks.forEach(task => {
+        if (examPlanReplaceable(task, item.id, today())) {
+          task.deleted = true; task.updatedAt = stamp;
+        }
+      });
       save(); queueSync(); render(); toast('학사 일정을 삭제했습니다');
+      break;
+    }
+    case 'examplanopen': {
+      if (!session.isAdmin) break;
+      const exam = state.tasks.find(task => !task.deleted && task.id === id && task.kind === 'academic_event' && task.academicType === 'exam');
+      if (!exam) return toast('시험 일정을 찾지 못했습니다');
+      examPlanModal(exam);
+      break;
+    }
+    case 'examplanpreview': {
+      if (!session.isAdmin) break;
+      const exam = state.tasks.find(task => !task.deleted && task.id === id && task.kind === 'academic_event' && task.academicType === 'exam');
+      if (!exam) return toast('시험 일정을 찾지 못했습니다');
+      renderExamPlanPreview(exam.id);
+      break;
+    }
+    case 'examplandow': {
+      if (!session.isAdmin) break;
+      el.classList.toggle('on');
+      const preview = $('#examPlanPreview');
+      if (preview) renderExamPlanPreview(preview.dataset.exam);
+      break;
+    }
+    case 'examplanconfirm': {
+      if (!session.isAdmin) break;
+      const exam = state.tasks.find(task => !task.deleted && task.id === id && task.kind === 'academic_event' && task.academicType === 'exam');
+      const shown = examPlanDraft;
+      if (!exam || !shown || shown.examId !== exam.id || shown.staffId !== exam.staffId) return toast('계획을 다시 계산해 주세요');
+      const fresh = examPlanPreview(exam.staffId, exam, shown.settings || {});
+      const planKey = plan => JSON.stringify({ complete: plan.complete, remaining: plan.remaining,
+        items: (plan.items || []).map(item => [item.planItemKey, item.date, item.s, item.e]) });
+      if (planKey(fresh) !== planKey(shown)) {
+        renderExamPlanPreview(exam.id);
+        toast('변경된 일정을 반영했습니다. 새 미리보기를 확인해 주세요');
+        break;
+      }
+      const draft = Object.assign({}, fresh, { examId: exam.id, staffId: exam.staffId });
+      if (!draft.complete || !draft.items.length) return toast(draft.warning || draft.reason || '확정할 새 일정이 없습니다');
+      const existing = examPlanTasks(exam.id).filter(task => examPlanReplaceable(task, exam.id, draft.from || today()));
+      if (existing.length && !confirm('기존 미래 미완료 ' + existing.length + '회를 새 계획으로 교체할까요? 완료·지난 일정은 유지됩니다.')) break;
+      const count = commitExamPlan(exam.staffId, exam, draft);
+      save(); queueSync(); examPlanDraft = null; closeModal(); render();
+      toast(count + '회 시험대비 일정을 확정했습니다');
       break;
     }
     case 'matrequestopen': {
@@ -5352,6 +5628,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       const t = task();
       if (!me || !t || t.staffId !== me.id || t.repeat !== 'once') return toast('이 공부는 요일을 변경할 수 없습니다');
+      if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
       weekMoveModal(t, date, mondayOf(cursor));
       break;
     }
@@ -5461,6 +5738,7 @@ document.addEventListener('click', ev => {
       const t = task();
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부의 날짜를 변경할 수 없습니다');
+      if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
       monthMoveModal(t, date);
       break;
     }
@@ -5479,6 +5757,7 @@ document.addEventListener('click', ev => {
       const t = task();
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부를 이월할 수 없습니다');
+      if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
       moveMonthOccurrence(t, date, el.dataset.to || today());
       break;
     }
@@ -5884,6 +6163,11 @@ document.addEventListener('click', ev => {
 let inputTimer = null;
 document.addEventListener('input', ev => {
   if (ev.target.id === 'ingText') { ingPasteSeq++; ingShowParsePreview(); return; }
+  if (ev.target.id.startsWith('examPlan')) {
+    const preview = $('#examPlanPreview');
+    if (preview) renderExamPlanPreview(preview.dataset.exam);
+    return;
+  }
   if ($('#materialRequestPreview') && (ev.target.id.startsWith('material') || ev.target.matches('[data-material-type]'))) {
     renderMaterialRequestPreview();
     return;
@@ -5975,7 +6259,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.3';
+const APP_VER = '2026-08-18.4';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
