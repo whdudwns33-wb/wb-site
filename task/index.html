@@ -171,6 +171,16 @@
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
   .memo-save { display: none; margin-top: 8px; }
   .memo-editor:focus-within .memo-save { display: block; }
+  .guardian-publication { margin-top: 10px; padding: 12px; border: 1px solid #B9E3C7; border-radius: 10px; background: #F3FCF6; }
+  .guardian-publication-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .guardian-publication .field { margin-top: 10px; margin-bottom: 0; }
+  .guardian-publication .fl { display: block; margin-bottom: 5px; color: var(--mid-gray); font-size: 12.5px; font-weight: 700; }
+  .guardian-publication textarea { min-height: 72px; resize: vertical; }
+  .guardian-publication .btn, .guardian-publication-retry { min-height: 44px; }
+  .guardian-publication-status { margin-top: 8px; color: var(--mid-gray); font-size: 12px; font-weight: 700; }
+  .guardian-publication-status.is-error { color: #9E3629; }
+  .manager-guardian-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .manager-guardian-actions .btn { min-height: 44px; }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
   .empty b { display: block; font-size: 30px; margin-bottom: 8px; }
 
@@ -642,6 +652,11 @@
     .onboarding-board-row > [data-label]::before { content: attr(data-label) ' · '; color: var(--mid-gray); font-size: 10.5px; font-weight: 900; }
   }
   @media (max-width: 600px) {
+    .guardian-publication-head { display: block; }
+    .guardian-publication-head .tag { display: inline-block; margin-top: 7px; }
+    .manager-guardian-actions { display: grid; width: 100%; grid-template-columns: 1fr; }
+    .manager-guardian-actions .btn { width: 100%; }
+    .manager-guardian-request { flex-direction: column; }
     .onboarding-enrol { grid-template-columns: 1fr; }
     .onboarding-enrol .btn { min-height: 44px; }
     .onboarding-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -731,6 +746,10 @@
   .parent-preview-schedule { align-items: center; }
   .parent-preview-time { flex: 0 0 auto; color: #173957; font-size: 14px; font-weight: 900; text-align: right; }
   .parent-preview-text { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; color: #263F55; font-size: 14px; line-height: 1.65; }
+  .parent-preview-publication { margin-top: 9px; padding: 10px; border: 1px solid #B9E3C7; border-radius: 12px; background: #F3FCF6; }
+  .parent-preview-publication b { display: block; color: #14755E; font-size: 12px; }
+  .parent-preview-request-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; padding-top: 13px; }
+  .parent-preview-request-actions button { min-height: 44px; padding: 8px; border: 1px solid #DCE5EA; border-radius: 10px; background: #F3F6F8; color: #647684; font: inherit; font-size: 12px; font-weight: 900; }
   .parent-preview-empty { padding: 20px 8px 10px; color: #647684; font-size: 13px; line-height: 1.6; text-align: center; }
   .parent-preview-feedback { display: block; }
   .parent-preview-feedback summary { min-height: 44px; padding: 12px 0; border-top: 1px solid #DCE5EA; cursor: pointer; list-style: none; }
@@ -745,6 +764,7 @@
   @media(max-width:430px) {
     .modal-box:has(.parent-preview-shell) { padding: 12px; }
     .parent-preview-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .parent-preview-request-actions { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
     .parent-preview-hero-head, .parent-preview-between { flex-direction: column; }
@@ -784,11 +804,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-16.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-16.3"></script>
-<script src="./asset-core.js?v=2026-08-16.3"></script>
-<script src="./qr-core.js?v=2026-08-16.3"></script>
-<script src="./acaflow-import-core.js?v=2026-08-16.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-17.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-17.1"></script>
+<script src="./asset-core.js?v=2026-08-17.1"></script>
+<script src="./qr-core.js?v=2026-08-17.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-17.1"></script>
 <script>
 "use strict";
 
@@ -1425,6 +1445,14 @@ let sessionPackRestoreFocus = null;
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
 let managerInboxLoading = false;
+let guardianRequestRows = [], guardianRequestsLoaded = false, guardianRequestsLoading = false, guardianRequestsError = '';
+const guardianRequestPending = new Set();
+let guardianLessonPublications = new Map();
+const guardianPublicationLoadedDates = new Set();
+const guardianPublicationLoadingDates = new Set();
+const guardianPublicationErrors = new Map();
+const guardianPublicationDrafts = new Map();
+const guardianPublicationSaving = new Set();
 const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sync_failed / create_failed
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
@@ -1495,6 +1523,10 @@ function resetPersonCache(token) {
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
   makeupRestoreFocus = null; makeupLiveMessage = '';
   makeupCreateStates.clear();
+  guardianRequestRows = []; guardianRequestsLoaded = false; guardianRequestsLoading = false; guardianRequestsError = '';
+  guardianRequestPending.clear();
+  guardianLessonPublications = new Map(); guardianPublicationLoadedDates.clear(); guardianPublicationLoadingDates.clear();
+  guardianPublicationErrors.clear(); guardianPublicationDrafts.clear(); guardianPublicationSaving.clear();
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
   acaflowImportFileName = ''; acaflowImportRows = []; acaflowImportPreview = null;
   acaflowImportSelection.clear(); acaflowImportError = ''; acaflowImportBusy = false;
@@ -2232,6 +2264,9 @@ function taskRow(t, date, editable, isCarry) {
   if (isLesson(t)) {
     h += previousTaskMemosInline(t.id, date);
   }
+  if (canEditGuardianPublication(t, date)) {
+    h += guardianPublicationHtml(t, date);
+  }
   if (open) h += taskPanel(t, date, c, editable);
 
   h += (editable
@@ -2257,6 +2292,138 @@ function previousTaskMemosInline(taskId, beforeDate) {
     '<div class="previous-memos-body"><div class="card-sub mb14">' + esc(beforeDate) + ' 이전 기록</div>' +
     (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
       '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
+}
+
+/* 보호자 공개 내용은 내부 수업 메모와 완전히 분리해 서버의 수업일 정본에 저장한다. */
+function guardianPublicationKey(taskId, lessonDate) {
+  return String(taskId || '') + '|' + String(lessonDate || '');
+}
+
+function canEditGuardianPublication(task, lessonDate) {
+  return !!(task && task.studentId && lessonDate === today() && session.isStaffLink &&
+    hasVerifiedPersonAuth() && task.staffId === session.staffId && isSessionLessonTask(task));
+}
+
+function normalizeGuardianPublication(row) {
+  if (!row || !row.taskId || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.lessonDate || ''))) return null;
+  return {
+    publicationId: String(row.publicationId || ''), taskId: String(row.taskId), lessonDate: String(row.lessonDate),
+    status: row.status === 'published' ? 'published' : 'withdrawn',
+    publicHomework: String(row.publicHomework || '').slice(0, 500),
+    publicReadiness: String(row.publicReadiness || '').slice(0, 500),
+    revision: Math.max(0, Number(row.revision) || 0), updatedAt: Number(row.updatedAt) || 0
+  };
+}
+
+async function loadGuardianPublications(lessonDate, force) {
+  const date = String(lessonDate || '');
+  if (!session.isStaffLink || !hasVerifiedPersonAuth() || date !== today() ||
+      guardianPublicationLoadingDates.has(date) || (guardianPublicationLoadedDates.has(date) && !force)) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  guardianPublicationLoadingDates.add(date);
+  guardianPublicationErrors.delete(date);
+  if (route === 'today') renderAfterSync();
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, action: 'publication_list', auth: auth, lessonDate: date
+    });
+    Array.from(guardianLessonPublications.keys()).forEach(key => {
+      if (key.endsWith('|' + date)) guardianLessonPublications.delete(key);
+    });
+    (result.publications || []).forEach(value => {
+      const row = normalizeGuardianPublication(value);
+      if (row && row.lessonDate === date) guardianLessonPublications.set(guardianPublicationKey(row.taskId, date), row);
+    });
+    guardianPublicationLoadedDates.add(date);
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    guardianPublicationErrors.set(date, '보호자 공개 내용을 불러오지 못했습니다. 다시 시도해 주세요.');
+  } finally {
+    guardianPublicationLoadingDates.delete(date);
+    if (route === 'today') renderAfterSync();
+  }
+}
+
+function guardianPublicationHtml(task, lessonDate) {
+  const date = String(lessonDate || '');
+  const key = guardianPublicationKey(task.id, date);
+  const loading = guardianPublicationLoadingDates.has(date);
+  const loaded = guardianPublicationLoadedDates.has(date);
+  const error = guardianPublicationErrors.get(date) || '';
+  if (!loaded && !loading && !error) setTimeout(() => loadGuardianPublications(date, false), 0);
+  if (!loaded) {
+    return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
+      '<div class="guardian-publication-head"><div><div class="card-title">보호자 공개 숙제·준비물</div>' +
+      '<div class="card-sub">내부 수업 메모와 분리해 보호자 앱에만 공개합니다.</div></div></div>' +
+      (error
+        ? '<div class="guardian-publication-status is-error" role="alert">' + esc(error) + '</div>' +
+          '<button class="btn btn-ghost btn-block guardian-publication-retry" data-act="guardianpublicationretry" data-date="' + esc(date) + '">다시 불러오기</button>'
+        : '<div class="guardian-publication-status" role="status" aria-live="polite">공개 내용을 불러오는 중입니다.</div>') + '</section>';
+  }
+  const row = guardianLessonPublications.get(key) || {
+    taskId: task.id, lessonDate: date, status: 'withdrawn', publicHomework: '', publicReadiness: '', revision: 0
+  };
+  const draft = guardianPublicationDrafts.get(key);
+  const homework = draft ? draft.publicHomework : row.publicHomework;
+  const readiness = draft ? draft.publicReadiness : row.publicReadiness;
+  const saving = guardianPublicationSaving.has(key);
+  const statusError = guardianPublicationErrors.get(key) || '';
+  return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
+    '<div class="guardian-publication-head"><div><div class="card-title">보호자 공개 숙제·준비물</div>' +
+    '<div class="card-sub">이 칸에 저장한 내용만 보호자 앱에 표시됩니다. 내부 메모는 공개되지 않습니다.</div></div>' +
+    '<span class="tag ' + (row.status === 'published' ? 'ok' : '') + '">' +
+    (row.status === 'published' ? '공개 중 · 수정본 ' + Number(row.revision) : '공개 전') + '</span></div>' +
+    '<label class="field"><span class="fl">숙제</span><textarea class="in" maxlength="500" data-public-homework placeholder="예) 워크북 12~14쪽 풀기">' + esc(homework) + '</textarea></label>' +
+    '<label class="field"><span class="fl">준비물</span><textarea class="in" maxlength="500" data-public-readiness placeholder="예) 리딩 교재와 단어장 가져오기">' + esc(readiness) + '</textarea></label>' +
+    (statusError ? '<div class="guardian-publication-status is-error" role="alert">' + esc(statusError) + '</div>' : '') +
+    '<button class="btn btn-primary btn-block mt14" data-act="guardianpublicationsave"' + (saving ? ' disabled' : '') + '>' +
+    (saving ? '보호자 화면에 저장 중…' : '보호자 화면에 저장') + '</button></section>';
+}
+
+async function saveGuardianPublication(container, button) {
+  if (!container) return toast('공개 입력칸을 다시 확인해 주세요');
+  const taskId = String(container.dataset.task || ''), lessonDate = String(container.dataset.date || '');
+  const task = state.tasks.find(row => row.id === taskId);
+  if (!canEditGuardianPublication(task, lessonDate)) return toast('오늘 내 담당 수업만 보호자에게 공개할 수 있습니다');
+  const homework = String((container.querySelector('[data-public-homework]') || {}).value || '').normalize('NFKC').trim();
+  const readiness = String((container.querySelector('[data-public-readiness]') || {}).value || '').normalize('NFKC').trim();
+  if (homework.length > 500 || readiness.length > 500) return toast('숙제와 준비물은 각각 500자까지 입력할 수 있습니다');
+  const key = guardianPublicationKey(taskId, lessonDate);
+  const current = guardianLessonPublications.get(key) || { status: 'withdrawn', revision: 0 };
+  const published = !!(homework || readiness);
+  if (!published && current.status === 'published' && !confirm('보호자 앱에서 숙제·준비물 공개 내용을 지울까요?')) return;
+  const auth = sync.auth();
+  if (!auth) return toast('개인 링크 인증이 필요합니다');
+  guardianPublicationDrafts.set(key, { publicHomework: homework, publicReadiness: readiness });
+  guardianPublicationErrors.delete(key);
+  guardianPublicationSaving.add(key);
+  if (button) { button.disabled = true; button.textContent = '보호자 화면에 저장 중…'; }
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, action: 'publication_set', auth: auth, taskId: taskId, lessonDate: lessonDate,
+      publicHomework: homework, publicReadiness: readiness, published: published,
+      expectedRevision: Number(current.revision) || 0
+    });
+    const saved = normalizeGuardianPublication(result.publication);
+    if (!saved || saved.taskId !== taskId || saved.lessonDate !== lessonDate) throw new Error('PUBLICATION_RESPONSE_INVALID');
+    guardianLessonPublications.set(key, saved);
+    guardianPublicationDrafts.delete(key);
+    toast(published ? '보호자 앱에 숙제·준비물을 공개했습니다' : '보호자 공개 내용을 지웠습니다');
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    if (error && error.code === 'STALE_REVISION' && error.current) {
+      const latest = normalizeGuardianPublication(error.current);
+      if (latest) guardianLessonPublications.set(key, latest);
+      guardianPublicationDrafts.delete(key);
+      guardianPublicationErrors.set(key, '다른 화면에서 먼저 수정했습니다. 최신 내용을 확인해 주세요.');
+    } else {
+      guardianPublicationErrors.set(key, '저장하지 못했습니다. 입력 내용은 유지했으니 다시 시도해 주세요.');
+    }
+  } finally {
+    guardianPublicationSaving.delete(key);
+    if (route === 'today') renderAfterSync();
+  }
 }
 
 function acaflowLessonSummary(t, date) {
@@ -5146,10 +5313,110 @@ function scheduleIssuesHtml(issues) {
 }
 
 /* ── 관리담당 통합 요청함 ──
- * 승인 로직을 현황판에 복제하지 않고, 기존 CAS 검토 화면으로 연결한다. */
+ * 기존 승인 화면으로 이동하거나 보호자 요청은 이 자리에서 CAS로 처리한다. */
 function managerRequestTeacher(staffId) {
   const staff = staffById(String(staffId || ''));
   return staff && staff.name ? staff.name + ' 선생님' : '요청 선생님 확인 필요';
+}
+
+const GUARDIAN_REQUEST_TYPE_LABELS = Object.freeze({
+  consultation: '상담 요청', schedule_check: '일정 확인', info_correction: '정보 수정 요청'
+});
+const GUARDIAN_REQUEST_STATUS_LABELS = Object.freeze({
+  open: '처리 대기', resolved: '처리 완료', dismissed: '확인 종료'
+});
+
+function normalizeGuardianRequest(row) {
+  const requestId = String(row && row.requestId || '');
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) return null;
+  const requestType = Object.prototype.hasOwnProperty.call(GUARDIAN_REQUEST_TYPE_LABELS, String(row.requestType || ''))
+    ? String(row.requestType) : '';
+  const status = Object.prototype.hasOwnProperty.call(GUARDIAN_REQUEST_STATUS_LABELS, String(row.status || ''))
+    ? String(row.status) : '';
+  return {
+    requestId: requestId, studentId: String(row.studentId || ''),
+    studentName: String(row.studentName || '학생').slice(0, 80), grade: String(row.grade || '').slice(0, 40),
+    requestType: requestType, status: status, revision: Math.max(0, Number(row.revision) || 0),
+    createdAt: Number(row.createdAt) || 0, updatedAt: Number(row.updatedAt) || 0
+  };
+}
+
+async function loadGuardianRequests(force) {
+  if (!session.isAdmin || guardianRequestsLoading || (guardianRequestsLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) {
+    guardianRequestsLoaded = true;
+    guardianRequestsError = '관리 인증을 확인해 주세요.';
+    return;
+  }
+  guardianRequestsLoading = true;
+  guardianRequestsError = '';
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, action: 'request_list', auth: auth, status: 'open'
+    });
+    guardianRequestRows = (result.requests || []).map(normalizeGuardianRequest).filter(Boolean);
+    guardianRequestsLoaded = true;
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    guardianRequestsLoaded = true;
+    guardianRequestsError = '보호자 요청을 불러오지 못했습니다.';
+  } finally {
+    guardianRequestsLoading = false;
+  }
+}
+
+function guardianRequestControlsHtml(row) {
+  if (!row.guardianRequestId || row.guardianRequestStatus !== 'open') return '';
+  const busy = guardianRequestPending.has(row.guardianRequestId);
+  const base = ' data-request="' + esc(row.guardianRequestId) + '" data-rev="' + Number(row.guardianRequestRevision) + '"';
+  return '<div class="manager-guardian-actions" aria-label="보호자 요청 처리">' +
+    '<button class="btn btn-sm btn-primary" data-act="guardianrequestresolve" data-resolution="resolved"' + base +
+      (busy ? ' disabled' : '') + '>' + (busy ? '처리 중…' : '처리 완료') + '</button>' +
+    '<button class="btn btn-sm btn-ghost" data-act="guardianrequestresolve" data-resolution="dismissed"' + base +
+      (busy ? ' disabled' : '') + '>확인 종료</button></div>';
+}
+
+async function resolveGuardianRequest(requestId, resolution, expectedRevision, button) {
+  if (!session.isAdmin || !['resolved', 'dismissed'].includes(resolution)) return;
+  const id = String(requestId || '');
+  const current = guardianRequestRows.find(row => row.requestId === id);
+  if (!current || current.status !== 'open' || Number(current.revision) !== Number(expectedRevision)) {
+    return toast('보호자 요청의 최신 상태를 다시 확인해 주세요');
+  }
+  const confirmation = resolution === 'resolved'
+    ? '보호자에게 필요한 처리를 마쳤으며 이 요청을 처리 완료로 표시할까요?'
+    : '이 요청을 별도 처리 없이 확인 종료할까요?';
+  if (!confirm(confirmation)) return;
+  const auth = sync.auth();
+  if (!auth) return toast('관리 인증이 필요합니다');
+  guardianRequestPending.add(id);
+  guardianRequestsError = '';
+  if (button) button.disabled = true;
+  renderAfterSync();
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, action: 'request_resolve', auth: auth, requestId: id,
+      resolution: resolution, expectedRevision: Number(expectedRevision)
+    });
+    const saved = normalizeGuardianRequest(result.request);
+    if (!saved || saved.requestId !== id) throw new Error('REQUEST_RESPONSE_INVALID');
+    guardianRequestRows = guardianRequestRows.map(row => row.requestId === id ? saved : row);
+    toast(resolution === 'resolved' ? '보호자 요청을 처리 완료했습니다' : '보호자 요청을 확인 종료했습니다');
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    if (error && error.code === 'STALE_REVISION') {
+      const latest = normalizeGuardianRequest(error.current);
+      if (latest) guardianRequestRows = guardianRequestRows.map(row => row.requestId === id ? latest : row);
+      else guardianRequestsLoaded = false;
+      toast('다른 화면에서 먼저 처리했습니다. 최신 상태를 반영했습니다');
+    } else {
+      guardianRequestsError = '보호자 요청을 처리하지 못했습니다. 다시 시도해 주세요.';
+    }
+  } finally {
+    guardianRequestPending.delete(id);
+    if (route === 'schedule') renderAfterSync();
+  }
 }
 
 function managerRequestInboxRows() {
@@ -5178,6 +5445,17 @@ function managerRequestInboxRows() {
   bookOrderRows.filter(row => row.stage === 'student_handed' && !row.academyRegisteredAt).forEach(row =>
     push('아카등록', (row.title || '교재 정보') + ' · ' + Number(row.quantity || 0) + '권',
       '4단계 학생배부 완료 · 아카등록 필요', row.owner, 'books', row.studentHandedAt || row.taskUpdatedAt, 0));
+  guardianRequestRows.filter(row => row.status === 'open').forEach(row => {
+    const typeLabel = GUARDIAN_REQUEST_TYPE_LABELS[row.requestType] || '요청 유형 확인 필요';
+    const statusLabel = GUARDIAN_REQUEST_STATUS_LABELS[row.status] || '상태 확인 필요';
+    rows.push({
+      kind: '보호자 요청', title: (row.studentName || '학생') + ' · ' + typeLabel,
+      detail: [row.grade, statusLabel].filter(Boolean).join(' · '), requester: '보호자 앱', route: '',
+      updatedAt: Number(row.updatedAt) || Number(row.createdAt) || 0, priority: -1,
+      guardianRequestId: row.requestId, guardianRequestStatus: row.status,
+      guardianRequestRevision: Number(row.revision) || 0
+    });
+  });
 
   return rows.sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt || a.kind.localeCompare(b.kind, 'ko'));
 }
@@ -5186,11 +5464,12 @@ function managerRequestInboxCount() { return session.isAdmin ? managerRequestInb
 
 function managerRequestInboxReady() {
   return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded &&
-    bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded;
+    bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded && guardianRequestsLoaded;
 }
 
 function managerRequestInboxErrors() {
-  return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError, bookIssueError]
+  return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError,
+    bookIssueError, guardianRequestsError]
     .filter(Boolean);
 }
 
@@ -5201,7 +5480,7 @@ async function loadManagerRequestInbox(force) {
   try {
     await Promise.all([
       loadLessonAssignmentRequests(force), loadLessonChangeQueue(force), loadFeedbackQueue(force),
-      loadBookAddQueue(force), loadBookEditQueue(force), loadBookIssues(force)
+      loadBookAddQueue(force), loadBookEditQueue(force), loadBookIssues(force), loadGuardianRequests(force)
     ]);
   } finally {
     managerInboxLoading = false;
@@ -5214,7 +5493,7 @@ function managerRequestInboxHtml() {
   const rows = managerRequestInboxRows();
   const errors = managerRequestInboxErrors();
   let h = '<section class="card lesson-review" data-manager-inbox><div class="between"><div><div class="card-title">📥 관리담당 통합 요청함</div>' +
-    '<div class="card-sub">모든 선생님의 승인·처리 대기 항목입니다. 처리는 기존 검토 화면에서 안전하게 진행됩니다.</div></div>' +
+    '<div class="card-sub">모든 선생님의 승인·처리 대기 항목입니다. 기존 검토 화면으로 이동하거나 보호자 요청은 여기서 안전하게 처리합니다.</div></div>' +
     '<span class="pill ' + (rows.length ? 'warn' : '') + '">' + rows.length + '건</span></div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="managerinboxrefresh"' + (managerInboxLoading ? ' disabled' : '') + '>' +
       (managerInboxLoading ? '불러오는 중…' : '모두 새로고침') + '</button>';
@@ -5226,9 +5505,10 @@ function managerRequestInboxHtml() {
   }
   if (rows.length) {
     h += '<div class="mt14" aria-live="polite">' + rows.map(row =>
-      '<div class="task"><div class="task-body"><div class="between"><div class="task-t">' + esc(row.title) + '</div><span class="tag high">' + esc(row.kind) + '</span></div>' +
+      '<div class="task' + (row.guardianRequestId ? ' manager-guardian-request' : '') + '"><div class="task-body"><div class="between"><div class="task-t">' + esc(row.title) + '</div><span class="tag high">' + esc(row.kind) + '</span></div>' +
       '<div class="meta"><span class="tag">' + esc(row.requester) + '</span><span class="tag">' + esc(row.detail) + '</span></div></div>' +
-      '<button class="btn btn-sm btn-primary" data-go="' + esc(row.route) + '">검토하기</button></div>'
+      (row.guardianRequestId ? guardianRequestControlsHtml(row) :
+        '<button class="btn btn-sm btn-primary" data-go="' + esc(row.route) + '">검토하기</button>') + '</div>'
     ).join('') + '</div>';
   } else if (managerRequestInboxReady() && !errors.length) {
     h += '<div class="empty mt14"><b>✅</b>지금 승인·처리할 요청이 없습니다.</div>';
@@ -9185,7 +9465,7 @@ function viewStaffAdmin() {
  * 알림 Worker가 D1에서 각각 재검증하며, 학생 명단과 연락처는 관리자만 보고 고친다. */
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
-const GUARDIAN_PORTAL_SCOPE_VERSION = 2;
+const GUARDIAN_PORTAL_SCOPE_VERSION = 3;
 let guardianOpsConsents = new Map(); // stable studentId -> scope별 {consent,updatedAt,needsReconsent}
 let guardianOpsConsentsError = '';
 let guardianContactsLoaded = false;
@@ -9337,7 +9617,7 @@ async function issueParentPortalInvite(idx, button) {
   const access = student && guardianPortalAccess.get(student.id);
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   if (!contact || !contact.phone) return toast('보호자 연락처를 먼저 저장해 주세요');
-  if (access && access.needsScopeReconsent) return toast('오늘 출결·수업 진행·차량 상태 공개 범위를 다시 확인해 주세요');
+  if (access && access.needsScopeReconsent) return toast('숙제·준비물 공개와 보호자 요청 기능을 포함한 새 범위를 다시 확인해 주세요');
   if (access && access.needsReconsent) return toast('보호자 연락처가 변경되어 웹앱 이용 동의를 다시 저장해야 합니다');
   if (!access || !access.enabled) return toast('보호자 웹앱 이용 동의를 먼저 저장해 주세요');
   const auth = sync.auth();
@@ -9381,6 +9661,13 @@ function parentPreviewTeacherLabel(value) {
   const name = String(value || '').trim();
   return !name ? '담당 선생님' : /선생님$/.test(name) ? name : name + ' 선생님';
 }
+function parentPreviewStamp(value) {
+  return value != null && value !== '' && Number(value) > 0 && Number.isFinite(Number(value))
+    ? new Date(Number(value)).toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+    : '';
+}
 function parentPreviewHtml(data) {
   const student = data && data.student || {};
   const summary = data && data.summary || {};
@@ -9414,6 +9701,18 @@ function parentPreviewHtml(data) {
       esc(row.dayLabel || '요일') + '</span><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
       '</div></div><div class="parent-preview-time">' + esc(row.timeLabel || '시간 확인 중') + '</div></div>');
+  const publicLessonRows = (capabilities.publicLessons === true ? (data.publicLessons || []) : []).filter(Boolean).map(row => {
+    const publicParts = [
+      row.publicHomework ? '<b>숙제</b><div class="parent-preview-text">' + esc(row.publicHomework) + '</div>' : '',
+      row.publicReadiness ? '<b class="mt14">준비물</b><div class="parent-preview-text">' + esc(row.publicReadiness) + '</div>' : ''
+    ].filter(Boolean).join('');
+    return '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(row.lessonDate || '수업일 확인 중') +
+      ' · ' + esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></div><span class="parent-preview-tag ok">공개</span></div>' +
+      (publicParts ? '<div class="parent-preview-publication">' + publicParts + '</div>' : '') + '</div>';
+  });
+  const publicLessonSection = capabilities.publicLessons === true
+    ? parentPreviewSection('Learning', '숙제·준비물', publicLessonRows, '공개된 숙제나 준비물이 없습니다.') : '';
   const makeupRows = (data.makeups || []).map(row =>
     '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || '보강 수업') + '</b><div class="parent-preview-sub">원 수업 ' + esc(row.sourceDate || '') +
@@ -9431,6 +9730,26 @@ function parentPreviewHtml(data) {
     '<details class="parent-preview-feedback"><summary><b>' + esc(row.feedbackDate || '수업 피드백') + '</b> <span class="parent-preview-tag">' +
       esc(row.statusLabel || '접수') + '</span></summary><div class="parent-preview-text">' + esc(row.message || '') +
       '</div><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></details>');
+  const requestTypeLabels = { consultation: '상담 요청', schedule_check: '일정 확인', info_correction: '정보 수정 요청' };
+  const requestStatusLabels = { open: '처리 중', resolved: '처리 완료', dismissed: '확인 종료' };
+  const guardianRequests = capabilities.guardianRequests === true ? (data.guardianRequests || []).filter(Boolean) : [];
+  const openRequestTypes = new Set(guardianRequests.filter(row => row.status === 'open').map(row => row.requestType));
+  const guardianRequestRows = guardianRequests.map(row => {
+    const created = parentPreviewStamp(row.createdAt);
+    const updated = parentPreviewStamp(row.updatedAt);
+    return '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(requestTypeLabels[row.requestType] || '요청 유형 확인 필요') + '</b><div class="parent-preview-sub">요청 ' +
+      esc(created || '시각 확인 중') + (updated && updated !== created ? ' · 최근 처리 ' + esc(updated) : '') +
+      '</div></div><span class="parent-preview-tag ' + (row.status === 'resolved' ? 'ok' : row.status === 'dismissed' ? 'muted' : 'warn') + '">' +
+      esc(requestStatusLabels[row.status] || '상태 확인 필요') + '</span></div>';
+  });
+  const requestPreviewButtons = Object.entries(requestTypeLabels).map(([type, label]) =>
+    '<button disabled>' + esc(label + (openRequestTypes.has(type) ? ' 접수됨' : '')) + '</button>').join('');
+  const guardianRequestSection = capabilities.guardianRequests === true
+    ? '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Request</p>' +
+      '<h2 class="parent-preview-section-title">보호자 요청</h2></div><span class="parent-preview-count">읽기 전용</span></div>' +
+      '<div class="parent-preview-request-actions" aria-label="보호자 요청 버튼 미리보기">' + requestPreviewButtons + '</div>' +
+      parentPreviewGroup('요청 처리 현황', guardianRequestRows, '접수된 보호자 요청이 없습니다.') + '</section>' : '';
   const checkedAt = parentPreviewClock(data.generatedAt);
   const heroStats = todayEnabled ? '<div class="parent-preview-stat"><b>' + Number(summary.todayLessons || 0) +
     '</b><span>오늘 수업</span></div><div class="parent-preview-stat"><b>' + Number(summary.todayCompleted || 0) +
@@ -9453,14 +9772,16 @@ function parentPreviewHtml(data) {
       '<div class="parent-preview-stat"><b>' + Number(summary.makeupPending || 0) + '</b><span>보강 확인</span></div>' +
       '<div class="parent-preview-stat"><b>' + Number(summary.sessionRemaining || 0) + '</b><span>남은 회차</span></div></div></section>' +
     todaySection +
+    publicLessonSection +
     parentPreviewSection('Schedule', '정규 수업 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
     parentPreviewSection('Action', '확인·응답', makeupRows, '지금 확인하거나 응답할 일정이 없습니다.') +
+    guardianRequestSection +
     parentPreviewSection('Usage', '횟수제 수업', packRows, '횟수제로 지정된 수업이 없습니다.') +
     parentPreviewSection('Record', '최근 수업 기록', feedbackRows, '아직 공개된 수업 피드백이 없습니다.') +
     '<section class="parent-preview-card parent-preview-info"><details><summary>보호자 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
-      '현재 자녀의 확정 수업·출결 확인·수업 기록 진행·차량 확인·보강·회차·피드백만 표시합니다. 내부 수업 메모, 정류장·주소, 연락처는 표시하지 않습니다.</p></details>' +
+      '현재 자녀의 확정 수업·출결 확인·수업 기록 진행·차량 확인·보강·회차·피드백과 선생님이 공개한 숙제·준비물, 보호자 요청 처리 상태만 표시합니다. 내부 수업 메모, 정류장·주소, 연락처는 표시하지 않습니다.</p></details>' +
       '<details><summary>휴대폰·패드 홈 화면에 추가하기</summary><p class="parent-preview-sub">Chrome 또는 Safari 메뉴에서 “홈 화면에 추가”를 선택하세요. 공용 기기에서는 사용하지 마세요.</p></details></section>' +
-    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 보호자 공개 v2</b> · 실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>';
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 보호자 공개 v3</b> · 실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>';
 }
 
 async function previewParentPortal(idx, button) {
@@ -9504,7 +9825,7 @@ async function saveGuardianPortalAccess(idx, button) {
       enabled: enabled, scopeVersion: GUARDIAN_PORTAL_SCOPE_VERSION, expectedUpdatedAt: expectedUpdatedAt
     });
     guardianPortalAccess.set(student.id, result.access);
-    toast(enabled ? student.name + ' 보호자 앱 공개 범위 v2 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
+    toast(enabled ? student.name + ' 보호자 앱 공개 범위 v3 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
     render();
   } catch (error) {
     if (error && error.code === 'ACCESS_REVISION_CONFLICT' && error.current) {
@@ -9559,8 +9880,8 @@ function viewGuardianContactPanel() {
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
         (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' +
-        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v2</label>' +
-        (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">오늘 출결·수업 진행·차량 상태 공개 재동의 필요</span>' :
+        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v3</label>' +
+        (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">숙제·준비물 공개와 보호자 요청 기능 재동의 필요</span>' :
           portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">공개 동의 저장</button>' +
         '<button class="btn btn-sm btn-primary" data-act="gcportalinvite" data-idx="' + i + '" ' + (!c.phone || !portal.enabled ? 'disabled' : '') + '>보호자 앱 초대</button>' +
@@ -9569,7 +9890,7 @@ function viewGuardianContactPanel() {
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v2에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백이 포함됩니다. 내부 수업 메모·정류장·주소·연락처는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
+    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v3에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백과 선생님이 따로 공개한 숙제·준비물, 보호자 요청 처리 상태가 포함됩니다. 내부 수업 메모·정류장·주소·연락처는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
     '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }
@@ -10751,6 +11072,8 @@ document.addEventListener('click', ev => {
       noteEl.focus();
       break;
     }
+    case 'guardianpublicationretry': loadGuardianPublications(String(el.dataset.date || ''), true); break;
+    case 'guardianpublicationsave': saveGuardianPublication(el.closest('[data-guardian-publication]'), el); break;
     case 'step': {
       const t = task(); if (!t) break;
       const c = getCheck(id, date);
@@ -11172,6 +11495,7 @@ document.addEventListener('click', ev => {
     case 'feedbacksubmit': submitFeedbackForReview(el); break;
     case 'fbrefresh': feedbackQueueLoaded = false; loadFeedbackQueue(true); break;
     case 'managerinboxrefresh': loadManagerRequestInbox(true); break;
+    case 'guardianrequestresolve': resolveGuardianRequest(el.dataset.request, el.dataset.resolution, Number(el.dataset.rev), el); break;
     case 'fbownrefresh': ownFeedbackQueueLoaded = false; loadOwnFeedbackQueue(true); break;
     case 'fbeditrequest': {
       const item = ownFeedbackQueue.find(row => row.requestKey === el.dataset.key);
@@ -11804,7 +12128,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-16.3';
+const APP_VER = '2026-08-17.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

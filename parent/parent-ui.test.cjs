@@ -46,6 +46,80 @@ test('오늘 우리 아이는 v2 capability에서만 최소 수업·차량 상�
   assert.doesNotMatch(html, /row\.routeName|row\.stopName|row\.address|row\.guardianPhone/);
 });
 
+test('공개 숙제와 준비물은 v3 전용 최신 목록 한 곳에만 안전하게 표시된다', () => {
+  const escapeHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+  const detailsStart = html.indexOf('function publicLessonDetails');
+  const detailsEnd = html.indexOf('function todayLessonRows', detailsStart);
+  const lessonDateLabel = value => value === '2026-08-16' ? '8월 16일 안내' : '최근 수업 안내';
+  const publicLessonDetails = new Function('esc', 'lessonDateLabel',
+    html.slice(detailsStart, detailsEnd) + '; return publicLessonDetails;')(escapeHtml, lessonDateLabel);
+  const rowsStart = detailsEnd;
+  const rowsEnd = html.indexOf('function todayTransportRows', rowsStart);
+  const [todayLessonRows, publicLessonRows] = new Function('ATTENDANCE', 'esc', 'teacherLabel', 'publicLessonDetails', 'lessonDateLabel',
+    html.slice(rowsStart, rowsEnd) + '; return [todayLessonRows,publicLessonRows];')(
+    { P: ['출석', 'ok'], '': ['출결 확인 전', 'muted'] }, escapeHtml, value => value, publicLessonDetails, lessonDateLabel
+  );
+  const lessons = [{ lessonRef: 'public-ref-a', subject: '영어', teacherName: '담당', attendance: 'P' }];
+  const publications = [
+    { lessonRef: 'public-ref-a', lessonDate: '2026-08-16', subject: '영어', teacherName: '담당', publicHomework: '<b>2쪽</b>', publicReadiness: '연필 & 지우개' },
+    { lessonRef: 'wrong-ref', lessonDate: '2026-08-17', subject: '수학', teacherName: '다른 담당', publicHomework: '다른 수업 비공개' }
+  ];
+  const output = todayLessonRows(lessons).join('');
+  assert.doesNotMatch(output, /lesson-public|숙제|준비물|2쪽/);
+  const latest = publicLessonRows(publications).join('');
+  assert.match(latest, /영어/);
+  assert.match(latest, /수학/);
+  assert.match(latest, /&lt;b&gt;2쪽&lt;\/b&gt;/);
+  assert.match(latest, /연필 &amp; 지우개/);
+  assert.doesNotMatch(latest, /<b>2쪽<\/b>/);
+  assert.match(html, /section\('Learning','숙제·준비물',publicLessonRows\(data\.publicLessons\)/);
+  assert.match(html, /capability\(capabilities,'publicLessons'\)/);
+});
+
+test('보호자 요청은 scope v3의 guardianRequests capability에서만 세 가지 enum과 처리 이력을 보여준다', () => {
+  const start = html.indexOf('function requestRows');
+  const end = html.indexOf('function render(data)', start);
+  const requestTypes = { consultation: '상담 요청', schedule_check: '일정 확인', info_correction: '정보 수정 요청' };
+  const requestStatus = { open: ['처리 중', 'warn'], resolved: ['처리 완료', 'ok'], dismissed: ['확인 종료', 'muted'] };
+  const capability = (capabilities, name) => !!capabilities && capabilities[name] === true && Number(capabilities.scopeVersion || 0) >= 3;
+  const [requestRows, requestSection] = new Function('REQUEST_TYPES', 'REQUEST_STATUS', 'stamp', 'esc', 'capability',
+    html.slice(start, end) + '; return [requestRows,requestSection];')(
+    requestTypes, requestStatus, value => String(value || ''), String, capability
+  );
+  const history = [
+    { requestType: 'consultation', status: 'open', createdAt: 1, updatedAt: 1 },
+    { requestType: 'schedule_check', status: 'resolved', createdAt: 2, updatedAt: 3 },
+    { requestType: 'not_allowed', status: 'open', createdAt: 4, updatedAt: 4 }
+  ];
+  assert.equal(requestSection({ guardianRequests: true, scopeVersion: 2 }, history), '');
+  assert.equal(requestSection({ guardianRequests: false, scopeVersion: 3 }, history), '');
+  const output = requestSection({ guardianRequests: true, scopeVersion: 3 }, history);
+  assert.match(output, /data-request-type="consultation"/);
+  assert.match(output, /data-request-type="schedule_check"/);
+  assert.match(output, /data-request-type="info_correction"/);
+  assert.match(output, /상담 요청 접수됨/);
+  assert.match(output, /처리 중/);
+  assert.match(output, /처리 완료/);
+  assert.doesNotMatch(output, /not_allowed|<input|<textarea|type="file"|contenteditable/);
+  assert.equal(requestRows(history).length, 2);
+});
+
+test('보호자 요청 제출은 확인 후 정형 enum과 재사용 가능한 멱등 키만 전송한다', () => {
+  const start = html.indexOf('async function submitGuardianRequest');
+  const end = html.indexOf('async function boot', start);
+  const source = html.slice(start, end);
+  assert.match(source, /window\.confirm/);
+  assert.match(source, /pendingRequestIds\.get\(requestType\)/);
+  assert.match(source, /pendingRequestIds\.set\(requestType,clientRequestId\)/);
+  assert.match(source, /post\(\{action:'submit_request',requestType,clientRequestId\}\)/);
+  assert.doesNotMatch(source, /studentId|lessonId|freeText|phone|attachment|FormData/);
+  assert.match(html, /crypto\.getRandomValues\(new Uint8Array\(16\)\)/);
+  assert.match(html, /id="requestMessage"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(html, /setAttribute\('role',isError\?'alert':'status'\)/);
+});
+
 test('보호자 화면은 오늘, 정규 시간표, 확인 응답, 이용 현황, 기록 순서로 읽힌다', () => {
   const start = html.indexOf('function render(data)');
   const end = html.indexOf('function fail(', start);

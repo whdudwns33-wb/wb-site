@@ -9,7 +9,22 @@ const HASH_PREFIX = 'sha256:';
 const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_ACTIVE_SESSIONS = 3;
-const CURRENT_PORTAL_SCOPE_VERSION = 2;
+const CURRENT_PORTAL_SCOPE_VERSION = 3;
+const TODAY_SCOPE_VERSION = 2;
+const PHASE2_SCOPE_VERSION = 3;
+const MAX_PUBLIC_TEXT = 500;
+const PUBLICATION_VISIBLE_DAYS = 14;
+const SAFE_CLIENT_REQUEST_ID = /^[A-Za-z0-9_-]{16,64}$/;
+const REQUEST_TYPES = new Map([
+  ['consultation', '상담 요청'],
+  ['schedule_check', '일정 확인 요청'],
+  ['info_correction', '정보 수정 요청']
+]);
+const REQUEST_STATUSES = new Map([
+  ['open', '확인 대기'],
+  ['resolved', '처리 완료'],
+  ['dismissed', '처리 종료']
+]);
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const LESSON_STEP_LABELS = [
   '지난 숙제·온라인 수행 확인',
@@ -24,12 +39,24 @@ function text(value) {
   return String(value == null ? '' : value).normalize('NFKC').trim();
 }
 
+function publicText(value) {
+  if (typeof value !== 'string') return null;
+  return value.normalize('NFKC').replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function identity(value) {
   return text(value).replace(/\s+/g, '').toLocaleLowerCase('ko-KR');
 }
 
 function changes(result) {
   return Number(result && result.meta && result.meta.changes || 0);
+}
+
+function uniqueConstraintOn(error, table) {
+  const message = String(error && error.message || error || '');
+  return /unique constraint|constraint_unique/i.test(message) && message.includes(table);
 }
 
 async function sha256Hex(value) {
@@ -397,6 +424,88 @@ function activeSlotOnDate(slot, date, weekday) {
   return (!validFrom || validFrom <= date) && (!validTo || validTo >= date);
 }
 
+function validDate(value) {
+  const date = String(value || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    new Date(date + 'T00:00:00.000Z').toISOString().slice(0, 10) === date;
+}
+
+function staffActor(auth) {
+  return auth && auth.role === 'manager' && SAFE_ID.test(String(auth.id || ''))
+    ? String(auth.id) : auth && auth.scope === 'own' && SAFE_ID.test(String(auth.id || ''))
+      ? String(auth.id) : 'director';
+}
+
+function publicationActorId(auth) {
+  const id = String(auth && auth.id || '');
+  return SAFE_ID.test(id) && (auth.scope === 'own' || auth.role === 'manager') ? id : '';
+}
+
+async function publicLessonIdentity(task, owner) {
+  const studentId = String(task && task.studentId || '');
+  const taskId = String(task && task.id || '');
+  const assignmentKey = String(task && (task.lessonAssignmentKey || task.lessonDedupeKey || task.id) || '');
+  const [studentIdentityHash, taskIdentityHash] = await Promise.all([
+    sha256Hex('student-id\n' + studentId),
+    sha256Hex(['lesson-task', taskId, owner, studentId, assignmentKey].join('\n'))
+  ]);
+  return {
+    studentIdentityHash,
+    taskIdentityHash,
+    lessonRef: 'lr_' + taskIdentityHash.slice(0, 32)
+  };
+}
+
+async function currentPublicationTask(env, row, now) {
+  const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind('task', row.source_task_id).first();
+  const task = taskRow && parseJson(taskRow.data);
+  const owner = String(taskRow && taskRow.owner || '');
+  const found = task && SAFE_ID.test(String(task.studentId || ''))
+    ? await rosterStudent(env, String(task.studentId), now) : null;
+  const names = found && !found.error ? await staffNames(env) : new Map();
+  if (!task || String(task.id || '') !== String(row.source_task_id) || task.deleted ||
+      task.taskKind !== 'lesson_instruction' || task.scheduleStatus !== 'confirmed' ||
+      String(task.staffId || '') !== owner || String(row.task_owner || '') !== owner ||
+      String(task.studentId || '') !== String(row.student_id || '') || !found || found.error ||
+      !Array.isArray(found.student.teacherIds) || !found.student.teacherIds.map(String).includes(owner) ||
+      !names.has(owner) || !activeTaskOnDate(task, String(row.lesson_date || '')) || !activeTaskOnDate(task, kstDate(now)) ||
+      !Array.isArray(task.scheduleSlots)) return null;
+  const weekday = new Date(String(row.lesson_date) + 'T00:00:00.000Z').getUTCDay();
+  if (!task.scheduleSlots.some(slot => activeSlotOnDate(slot, String(row.lesson_date), weekday))) return null;
+  const identity = await publicLessonIdentity(task, owner);
+  if (identity.studentIdentityHash !== String(row.student_identity_hash || '') ||
+      identity.taskIdentityHash !== String(row.task_identity_hash || '')) return null;
+  return { task, owner, student: found.student, teacherName: names.get(owner), ...identity };
+}
+
+async function publicationTaskForWrite(env, auth, taskId, lessonDate, now) {
+  const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind('task', taskId).first();
+  const task = row && parseJson(row.data);
+  const owner = String(row && row.owner || '');
+  if (!task || String(task.id || '') !== taskId || task.deleted || task.taskKind !== 'lesson_instruction' ||
+      task.scheduleStatus !== 'confirmed' || String(task.staffId || '') !== owner || !SAFE_ID.test(owner)) {
+    return { error: '공개할 수업을 확인해 주세요', code: 'LESSON_INVALID', status: 409 };
+  }
+  if (publicationActorId(auth) !== owner) {
+    return { error: '본인 담당 수업만 공개할 수 있습니다', code: 'FORBIDDEN', status: 403 };
+  }
+  const found = await rosterStudent(env, String(task.studentId || ''), now);
+  const names = found.error ? new Map() : await staffNames(env);
+  if (found.error || !Array.isArray(found.student.teacherIds) ||
+      !found.student.teacherIds.map(String).includes(owner) || !names.has(owner) ||
+      !activeTaskOnDate(task, lessonDate) || !Array.isArray(task.scheduleSlots)) {
+    return { error: '현재 담당 학생의 확정 수업만 공개할 수 있습니다', code: 'ASSIGNMENT_CHANGED', status: 409 };
+  }
+  const weekday = new Date(lessonDate + 'T00:00:00.000Z').getUTCDay();
+  if (!task.scheduleSlots.some(slot => activeSlotOnDate(slot, lessonDate, weekday))) {
+    return { error: '해당 날짜의 확정 수업을 찾을 수 없습니다', code: 'LESSON_DATE_INVALID', status: 409 };
+  }
+  return { ok: true, task, owner, student: found.student, teacherName: names.get(owner),
+    ...await publicLessonIdentity(task, owner) };
+}
+
 function lessonStepIds(task, check) {
   const stored = Array.isArray(task.steps) ? task.steps.filter(step => step && step.id) : [];
   const standardStored = stored.length === LESSON_STEP_LABELS.length &&
@@ -435,7 +544,9 @@ async function publicTodayLessons(env, student, now) {
     const stepIds = lessonStepIds({ ...task, id: String(row.id) }, check);
     const completedSteps = stepIds.filter(id => !!(check && check.steps && check.steps[id])).length;
     const attendance = check && ['P', 'L', 'A'].includes(String(check.att || '')) ? String(check.att) : '';
+    const lessonRef = (await publicLessonIdentity({ ...task, id: String(row.id) }, owner)).lessonRef;
     for (const slot of slots) rows.push({
+      lessonRef,
       subject: text(task.subject),
       className: text(task.className),
       teacherName: names.get(owner),
@@ -562,6 +673,404 @@ async function tableExists(env, name) {
   return !!row;
 }
 
+function publicationStaffView(row) {
+  return {
+    publicationId: String(row.publication_id || ''),
+    taskId: String(row.source_task_id || ''),
+    lessonDate: String(row.lesson_date || ''),
+    status: String(row.status || ''),
+    publicHomework: String(row.public_homework || ''),
+    publicReadiness: String(row.public_readiness || ''),
+    revision: Number(row.revision || 0),
+    updatedAt: Number(row.updated_at || 0)
+  };
+}
+
+function requestView(row) {
+  const requestType = String(row.request_type || '');
+  const status = String(row.status || '');
+  return {
+    requestId: String(row.request_id || ''),
+    requestType,
+    requestTypeLabel: REQUEST_TYPES.get(requestType) || '확인 요청',
+    status,
+    statusLabel: REQUEST_STATUSES.get(status) || '확인 중',
+    revision: Number(row.revision || 0),
+    createdAt: Number(row.created_at || 0),
+    updatedAt: Number(row.updated_at || 0)
+  };
+}
+
+async function requestStaffView(env, row, now = Date.now()) {
+  const found = await rosterStudent(env, String(row.student_id || ''), now);
+  return {
+    ...requestView(row),
+    studentId: String(row.student_id || ''),
+    studentName: found.error ? '원생 정보 확인 필요' : text(found.student.name),
+    grade: found.error ? '' : text(found.student.grade)
+  };
+}
+
+async function publicLessonPublications(env, student, now) {
+  if (!await tableExists(env, 'guardian_lesson_publications')) {
+    return { error: '보호자 공개 숙제·준비물을 준비하고 있습니다', code: 'PORTAL_PHASE2_NOT_READY' };
+  }
+  const today = kstDate(now);
+  const oldest = kstDate(now - PUBLICATION_VISIBLE_DAYS * 24 * 60 * 60 * 1000);
+  const result = await env.DB.prepare(
+    'SELECT * FROM guardian_lesson_publications WHERE app=? AND student_id=? AND lesson_date BETWEEN ? AND ? ' +
+    'ORDER BY lesson_date DESC,updated_at DESC LIMIT 100'
+  ).bind('task', student.id, oldest, today).all();
+  const seen = new Set();
+  const output = [];
+  for (const row of result.results || []) {
+    const identityKey = String(row.task_identity_hash || '');
+    if (!identityKey || seen.has(identityKey)) continue;
+    seen.add(identityKey);
+    if (String(row.status || '') !== 'published') continue;
+    const current = await currentPublicationTask(env, row, now);
+    if (!current || String(current.student.id) !== String(student.id)) continue;
+    output.push({
+      publicationId: String(row.publication_id || ''),
+      lessonRef: current.lessonRef,
+      lessonDate: String(row.lesson_date || ''),
+      subject: text(current.task.subject),
+      className: text(current.task.className),
+      teacherName: current.teacherName,
+      publicHomework: String(row.public_homework || ''),
+      publicReadiness: String(row.public_readiness || ''),
+      revision: Number(row.revision || 0),
+      updatedAt: Number(row.updated_at || 0)
+    });
+    if (output.length >= 20) break;
+  }
+  return { rows: output };
+}
+
+async function publicGuardianRequests(env, studentId) {
+  if (!await tableExists(env, 'guardian_requests')) {
+    return { error: '보호자 요청함을 준비하고 있습니다', code: 'PORTAL_PHASE2_NOT_READY' };
+  }
+  const result = await env.DB.prepare(
+    "SELECT * FROM guardian_requests WHERE app=? AND student_id=? " +
+    "ORDER BY CASE WHEN status='open' THEN 0 ELSE 1 END,created_at DESC LIMIT 20"
+  ).bind('task', studentId).all();
+  return { rows: (result.results || []).map(requestView) };
+}
+
+async function publicationList(env, body, auth, origin, json) {
+  const actorId = publicationActorId(auth);
+  if (!actorId) {
+    return json({ ok: false, error: '수업 담당 인증이 필요합니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth', 'lessonDate']) || !validDate(body.lessonDate)) {
+    return json({ ok: false, error: '수업 날짜를 확인해 주세요' }, 400, origin);
+  }
+  if (!await tableExists(env, 'guardian_lesson_publications')) {
+    return json({ ok: false, code: 'PORTAL_PHASE2_NOT_READY', error: '공개 숙제·준비물 기능을 준비하고 있습니다' }, 503, origin);
+  }
+  const lessonDate = String(body.lessonDate);
+  if (lessonDate !== kstDate(Date.now())) {
+    return json({ ok: false, code: 'LESSON_DATE_INVALID', error: '오늘 수업의 공개 내용만 확인할 수 있습니다' }, 409, origin);
+  }
+  const result = await env.DB.prepare(
+    'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_owner=? AND lesson_date=? ORDER BY updated_at DESC'
+  ).bind('task', actorId, lessonDate).all();
+  const publications = [];
+  for (const row of result.results || []) {
+    const current = await currentPublicationTask(env, row, Date.now());
+    if (!current || current.owner !== actorId) continue;
+    publications.push(publicationStaffView(row));
+  }
+  return json({ ok: true, publications }, 200, origin);
+}
+
+async function publicationSet(env, body, auth, origin, json) {
+  if (!publicationActorId(auth)) {
+    return json({ ok: false, error: '수업 담당 인증이 필요합니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth', 'taskId', 'lessonDate', 'publicHomework', 'publicReadiness',
+    'published', 'expectedRevision'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const taskId = String(body.taskId || '');
+  const lessonDate = String(body.lessonDate || '');
+  const expectedRevision = Number(body.expectedRevision);
+  const homework = publicText(body.publicHomework);
+  const readiness = publicText(body.publicReadiness);
+  if (!SAFE_ID.test(taskId) || !validDate(lessonDate) || typeof body.published !== 'boolean' ||
+      !Number.isInteger(expectedRevision) || expectedRevision < 0 || homework == null || readiness == null) {
+    return json({ ok: false, error: '공개할 수업과 내용을 확인해 주세요' }, 400, origin);
+  }
+  if (homework.length > MAX_PUBLIC_TEXT || readiness.length > MAX_PUBLIC_TEXT) {
+    return json({ ok: false, error: '숙제와 준비물은 각각 500자까지 입력할 수 있습니다' }, 413, origin);
+  }
+  if ((body.published && !homework && !readiness) || (!body.published && (homework || readiness))) {
+    return json({ ok: false, error: body.published ? '숙제 또는 준비물을 입력해 주세요' :
+      '공개를 철회할 때는 숙제와 준비물을 비워 주세요' }, 400, origin);
+  }
+  if (!await tableExists(env, 'guardian_lesson_publications')) {
+    return json({ ok: false, code: 'PORTAL_PHASE2_NOT_READY', error: '공개 숙제·준비물 기능을 준비하고 있습니다' }, 503, origin);
+  }
+  const now = Date.now();
+  if (lessonDate !== kstDate(now)) {
+    return json({ ok: false, code: 'LESSON_DATE_INVALID', error: '오늘 수업의 공개 내용만 저장할 수 있습니다' }, 409, origin);
+  }
+  const checked = await publicationTaskForWrite(env, auth, taskId, lessonDate, now);
+  if (checked.error) return json({ ok: false, code: checked.code, error: checked.error }, checked.status, origin);
+  const before = await env.DB.prepare(
+    'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
+  ).bind('task', checked.taskIdentityHash, lessonDate).first();
+  const status = body.published ? 'published' : 'withdrawn';
+  if ((!before && expectedRevision !== 0) || (before && Number(before.revision) !== expectedRevision)) {
+    if (before && String(before.status) === status && String(before.public_homework) === homework &&
+        String(before.public_readiness) === readiness) {
+      return json({ ok: true, idempotent: true, publication: publicationStaffView(before) }, 200, origin);
+    }
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '공개 내용이 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: before ? publicationStaffView(before) : null }, 409, origin);
+  }
+  if (before && String(before.status) === status && String(before.public_homework) === homework &&
+      String(before.public_readiness) === readiness) {
+    return json({ ok: true, idempotent: true, publication: publicationStaffView(before) }, 200, origin);
+  }
+  const publicationId = before ? String(before.publication_id) :
+    'glp_' + (await sha256Hex([checked.taskIdentityHash, lessonDate].join('\u001f'))).slice(0, 48);
+  const revision = expectedRevision + 1;
+  const updatedAt = Math.max(now, Number(before && before.updated_at || 0) + 1);
+  const actor = staffActor(auth);
+  const eventType = status === 'withdrawn' ? 'withdrawn' : before ? 'updated' : 'published';
+  const eventId = 'gle_' + (await sha256Hex([publicationId, revision, eventType].join('\u001f'))).slice(0, 48);
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO guardian_lesson_publications(app,publication_id,source_task_id,task_owner,student_id,' +
+        'student_identity_hash,task_identity_hash,lesson_date,status,public_homework,public_readiness,revision,updated_at,updated_by) ' +
+        'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(app,task_identity_hash,lesson_date) DO UPDATE SET ' +
+        'status=excluded.status,public_homework=excluded.public_homework,public_readiness=excluded.public_readiness,' +
+        'revision=excluded.revision,updated_at=excluded.updated_at,updated_by=excluded.updated_by ' +
+        'WHERE guardian_lesson_publications.revision=?'
+      ).bind('task', publicationId, taskId, checked.owner, checked.student.id, checked.studentIdentityHash,
+        checked.taskIdentityHash, lessonDate, status, homework, readiness, revision, updatedAt, actor, expectedRevision),
+      env.DB.prepare(
+        'INSERT INTO guardian_lesson_publication_events(app,event_id,publication_id,revision,event_type,' +
+        'public_homework,public_readiness,created_at,created_by) ' +
+        'SELECT ?,?,?,?,?,?,?,?,? FROM guardian_lesson_publications current WHERE current.app=? ' +
+        'AND current.publication_id=? AND current.revision=? AND current.updated_at=?'
+      ).bind('task', eventId, publicationId, revision, eventType, homework, readiness, updatedAt, actor,
+        'task', publicationId, revision, updatedAt)
+    ]);
+  } catch (error) {
+    if (!uniqueConstraintOn(error, 'guardian_lesson_publication_events')) throw error;
+    const raced = await env.DB.prepare(
+      'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
+    ).bind('task', checked.taskIdentityHash, lessonDate).first();
+    if (raced && String(raced.status) === status && String(raced.public_homework) === homework &&
+        String(raced.public_readiness) === readiness) {
+      return json({ ok: true, idempotent: true, publication: publicationStaffView(raced) }, 200, origin);
+    }
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '공개 내용이 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: raced ? publicationStaffView(raced) : null }, 409, origin);
+  }
+  if (changes(results[0]) !== 1 || changes(results[1]) !== 1) {
+    const current = await env.DB.prepare(
+      'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
+    ).bind('task', checked.taskIdentityHash, lessonDate).first();
+    if (current && String(current.status) === status && String(current.public_homework) === homework &&
+        String(current.public_readiness) === readiness) {
+      return json({ ok: true, idempotent: true, publication: publicationStaffView(current) }, 200, origin);
+    }
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '공개 내용이 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: current ? publicationStaffView(current) : null }, 409, origin);
+  }
+  const saved = await env.DB.prepare(
+    'SELECT * FROM guardian_lesson_publications WHERE app=? AND publication_id=? LIMIT 1'
+  ).bind('task', publicationId).first();
+  return json({ ok: true, idempotent: false, publication: publicationStaffView(saved) }, 200, origin);
+}
+
+async function submitGuardianRequest(env, body, origin, json, request) {
+  if (!allowedKeys(body, ['requestType', 'clientRequestId'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const session = await portalSession(env, cookieToken(request), Date.now());
+  if (!session) return json({ ok: false, code: 'SESSION_INVALID', error: '보호자 연결이 만료되었습니다' }, 401, origin);
+  if (Number(session.scopeVersion || 1) < PHASE2_SCOPE_VERSION) {
+    return json({ ok: false, code: 'SCOPE_VERSION_REQUIRED',
+      error: '보호자 요청 기능 이용 동의를 다시 확인해 주세요' }, 409, origin);
+  }
+  const requestType = String(body.requestType || '');
+  const clientRequestId = String(body.clientRequestId || '');
+  if (!REQUEST_TYPES.has(requestType) || !SAFE_CLIENT_REQUEST_ID.test(clientRequestId)) {
+    return json({ ok: false, error: '요청 종류와 재시도 식별자를 확인해 주세요' }, 400, origin);
+  }
+  if (!await tableExists(env, 'guardian_requests')) {
+    return json({ ok: false, code: 'PORTAL_PHASE2_NOT_READY', error: '보호자 요청함을 준비하고 있습니다' }, 503, origin);
+  }
+  const studentId = String(session.student.id);
+  const existing = await env.DB.prepare(
+    'SELECT * FROM guardian_requests WHERE app=? AND student_id=? AND client_request_id=? LIMIT 1'
+  ).bind('task', studentId, clientRequestId).first();
+  if (existing) {
+    if (String(existing.request_type) !== requestType) {
+      return json({ ok: false, code: 'REQUEST_CONFLICT', error: '같은 재시도 식별자로 다른 요청을 보낼 수 없습니다' }, 409, origin);
+    }
+    return json({ ok: true, idempotent: true, request: requestView(existing) }, 200, origin);
+  }
+  const openSameType = await env.DB.prepare(
+    "SELECT * FROM guardian_requests WHERE app=? AND student_id=? AND request_type=? AND status='open' LIMIT 1"
+  ).bind('task', studentId, requestType).first();
+  if (openSameType) {
+    return json({ ok: true, idempotent: true, duplicateOpen: true, request: requestView(openSameType) }, 200, origin);
+  }
+  const now = Date.now();
+  const recent = await env.DB.prepare(
+    'SELECT COUNT(*) count FROM guardian_requests WHERE app=? AND student_id=? AND created_at>=?'
+  ).bind('task', studentId, now - 24 * 60 * 60 * 1000).first();
+  if (Number(recent && recent.count || 0) >= 5) {
+    return json({ ok: false, code: 'RATE_LIMITED', error: '요청이 많습니다. 잠시 후 다시 시도해 주세요' }, 429, origin);
+  }
+  const requestId = 'grq_' + (await sha256Hex([studentId, clientRequestId].join('\u001f'))).slice(0, 48);
+  const eventId = 'gre_' + (await sha256Hex([requestId, 1, 'submitted'].join('\u001f'))).slice(0, 48);
+  let results;
+  let ledgerRace = false;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        'INSERT OR IGNORE INTO guardian_requests(app,request_id,student_id,client_request_id,request_type,status,' +
+        "revision,created_at,updated_at,resolved_at,resolved_by) VALUES(?,?,?,?,?,'open',1,?,?,NULL,NULL)"
+      ).bind('task', requestId, studentId, clientRequestId, requestType, now, now),
+      env.DB.prepare(
+        'INSERT INTO guardian_request_events(app,event_id,request_id,revision,event_type,created_at,created_by) ' +
+        "SELECT ?,?,?,1,'submitted',?,? FROM guardian_requests current WHERE current.app=? " +
+        'AND current.request_id=? AND current.student_id=? AND current.client_request_id=? AND current.request_type=?'
+      ).bind('task', eventId, requestId, now,
+        'gsr_' + (await sha256Hex(session.tokenHash)).slice(0, 32),
+        'task', requestId, studentId, clientRequestId, requestType)
+    ]);
+  } catch (error) {
+    if (/GUARDIAN_REQUEST_RATE_LIMIT/.test(String(error && error.message || error))) {
+      return json({ ok: false, code: 'RATE_LIMITED', error: '요청이 많습니다. 잠시 후 다시 시도해 주세요' }, 429, origin);
+    }
+    if (!uniqueConstraintOn(error, 'guardian_request_events')) throw error;
+    ledgerRace = true;
+  }
+  let saved = await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? AND request_id=? LIMIT 1')
+    .bind('task', requestId).first();
+  if (!saved) {
+    saved = await env.DB.prepare(
+      "SELECT * FROM guardian_requests WHERE app=? AND student_id=? AND request_type=? AND status='open' LIMIT 1"
+    ).bind('task', studentId, requestType).first();
+    if (saved) return json({ ok: true, idempotent: true, duplicateOpen: true, request: requestView(saved) }, 200, origin);
+  }
+  if (!saved || String(saved.request_type) !== requestType) {
+    return json({ ok: false, code: 'REQUEST_CONFLICT', error: '요청을 저장하지 못했습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
+  }
+  return json({ ok: true, idempotent: ledgerRace || changes(results && results[0]) !== 1,
+    request: requestView(saved) }, 200, origin);
+}
+
+async function guardianRequestList(env, body, auth, origin, json) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '원장·관리 담당만 보호자 요청을 확인할 수 있습니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth', 'status'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const status = body.status == null ? 'open' : String(body.status);
+  if (![...REQUEST_STATUSES.keys(), 'all'].includes(status)) {
+    return json({ ok: false, error: '요청 상태를 확인해 주세요' }, 400, origin);
+  }
+  if (!await tableExists(env, 'guardian_requests')) {
+    return json({ ok: false, code: 'PORTAL_PHASE2_NOT_READY', error: '보호자 요청함을 준비하고 있습니다' }, 503, origin);
+  }
+  const result = status === 'all'
+    ? await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? ORDER BY updated_at DESC LIMIT 200')
+      .bind('task').all()
+    : await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? AND status=? ORDER BY updated_at DESC LIMIT 200')
+      .bind('task', status).all();
+  const requests = [];
+  const now = Date.now();
+  for (const row of result.results || []) {
+    requests.push(await requestStaffView(env, row, now));
+  }
+  return json({ ok: true, requests }, 200, origin);
+}
+
+async function guardianRequestResolve(env, body, auth, origin, json) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '원장·관리 담당만 보호자 요청을 처리할 수 있습니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth', 'requestId', 'resolution', 'expectedRevision'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const requestId = String(body.requestId || '');
+  const resolution = String(body.resolution || '');
+  const expectedRevision = Number(body.expectedRevision);
+  if (!SAFE_ID.test(requestId) || !['resolved', 'dismissed'].includes(resolution) ||
+      !Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    return json({ ok: false, error: '요청과 처리 상태를 확인해 주세요' }, 400, origin);
+  }
+  if (!await tableExists(env, 'guardian_requests')) {
+    return json({ ok: false, code: 'PORTAL_PHASE2_NOT_READY', error: '보호자 요청함을 준비하고 있습니다' }, 503, origin);
+  }
+  const current = await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? AND request_id=? LIMIT 1')
+    .bind('task', requestId).first();
+  if (!current) return json({ ok: false, error: '보호자 요청을 찾을 수 없습니다' }, 404, origin);
+  if (String(current.status) === resolution) {
+    return json({ ok: true, idempotent: true,
+      request: await requestStaffView(env, current) }, 200, origin);
+  }
+  if (String(current.status) !== 'open' || Number(current.revision) !== expectedRevision) {
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '요청 상태가 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: requestView(current) }, 409, origin);
+  }
+  const now = Math.max(Date.now(), Number(current.updated_at || 0) + 1);
+  const actor = staffActor(auth);
+  const revision = expectedRevision + 1;
+  const eventId = 'gre_' + (await sha256Hex([requestId, revision, resolution].join('\u001f'))).slice(0, 48);
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE guardian_requests SET status=?,revision=?,updated_at=?,resolved_at=?,resolved_by=? ' +
+        "WHERE app=? AND request_id=? AND status='open' AND revision=?"
+      ).bind(resolution, revision, now, now, actor, 'task', requestId, expectedRevision),
+      env.DB.prepare(
+        'INSERT INTO guardian_request_events(app,event_id,request_id,revision,event_type,created_at,created_by) ' +
+        'SELECT ?,?,?,?,?,?,? FROM guardian_requests current WHERE current.app=? AND current.request_id=? ' +
+        'AND current.status=? AND current.revision=? AND current.resolved_by=?'
+      ).bind('task', eventId, requestId, revision, resolution, now, actor,
+        'task', requestId, resolution, revision, actor)
+    ]);
+  } catch (error) {
+    if (!uniqueConstraintOn(error, 'guardian_request_events')) throw error;
+    const raced = await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? AND request_id=? LIMIT 1')
+      .bind('task', requestId).first();
+    if (raced && String(raced.status) === resolution) {
+      return json({ ok: true, idempotent: true,
+        request: await requestStaffView(env, raced) }, 200, origin);
+    }
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '요청 상태가 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: raced ? requestView(raced) : null }, 409, origin);
+  }
+  const saved = await env.DB.prepare('SELECT * FROM guardian_requests WHERE app=? AND request_id=? LIMIT 1')
+    .bind('task', requestId).first();
+  if (changes(results[0]) !== 1 || changes(results[1]) !== 1) {
+    return json({ ok: false, code: 'STALE_REVISION',
+      error: '요청 상태가 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요',
+      current: saved ? requestView(saved) : null }, 409, origin);
+  }
+  return json({ ok: true, idempotent: false,
+    request: await requestStaffView(env, saved, now) }, 200, origin);
+}
+
 // ponytail: 보강·회차 migration이 아직 없는 전환 구간만 빈 배열로 보인다. 배포 후에는 두 table이 항상 존재한다.
 async function currentSessionPackTask(env, student, row, activeStaff) {
   const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
@@ -651,19 +1160,26 @@ async function publicOperations(env, student) {
 async function portalViewPayload(env, student, scopeVersion, now) {
   const operations = await publicOperations(env, student);
   if (operations.error) return operations;
-  const todayEnabled = Number(scopeVersion || 1) >= CURRENT_PORTAL_SCOPE_VERSION;
-  const [today, schedule, feedback, onboarding] = await Promise.all([
+  const todayEnabled = Number(scopeVersion || 1) >= TODAY_SCOPE_VERSION;
+  const phase2Enabled = Number(scopeVersion || 1) >= PHASE2_SCOPE_VERSION;
+  const [today, schedule, feedback, onboarding, publications, guardianRequests] = await Promise.all([
     todayEnabled ? publicToday(env, student, now) : Promise.resolve(null),
     publicSchedule(env, student, now),
     publicFeedback(env, student.id),
-    publicOnboarding(env, student.id)
+    publicOnboarding(env, student.id),
+    phase2Enabled ? publicLessonPublications(env, student, now) : Promise.resolve(null),
+    phase2Enabled ? publicGuardianRequests(env, student.id) : Promise.resolve(null)
   ]);
+  if (publications && publications.error) return publications;
+  if (guardianRequests && guardianRequests.error) return guardianRequests;
   const response = {
     ok: true,
     generatedAt: now,
     student: { name: text(student.name), grade: text(student.grade) },
     capabilities: {
       today: todayEnabled,
+      publicLessons: phase2Enabled,
+      guardianRequests: phase2Enabled,
       scopeVersion: Number(scopeVersion || 1),
       requiredScopeVersion: CURRENT_PORTAL_SCOPE_VERSION
     },
@@ -681,6 +1197,11 @@ async function portalViewPayload(env, student, scopeVersion, now) {
     response.today = today;
     response.summary.todayLessons = today.lessons.length;
     response.summary.todayCompleted = today.lessons.filter(row => row.completed).length;
+  }
+  if (phase2Enabled) {
+    response.publicLessons = publications.rows;
+    response.guardianRequests = guardianRequests.rows;
+    response.summary.guardianRequestOpen = guardianRequests.rows.filter(row => row.status === 'open').length;
   }
   return response;
 }
@@ -829,7 +1350,7 @@ async function portalAccess(env, body, auth, origin, json) {
   }
   if (body.enabled && Number(body.scopeVersion) !== CURRENT_PORTAL_SCOPE_VERSION) {
     return json({ ok: false, code: 'PORTAL_CONSENT_VERSION_REQUIRED',
-      error: '오늘 출결·수업 진행·차량 상태를 포함한 새 공개 범위 동의를 확인해 주세요' }, 409, origin);
+      error: '공개 숙제·준비물과 정형 보호자 요청을 포함한 새 이용 범위 동의를 확인해 주세요' }, 409, origin);
   }
   const before = await env.DB.prepare(
     'SELECT enabled,guardian_identity_hash,scope_version,accepted_at,updated_at FROM guardian_portal_access ' +
@@ -909,13 +1430,18 @@ async function portalAccess(env, body, auth, origin, json) {
 export async function handleParentPortal(env, app, body, origin, auth, json, request) {
   if (app !== 'task') return json({ ok: false, error: '보호자 웹앱은 task에서만 사용할 수 있습니다' }, 400, origin);
   body = body && typeof body === 'object' ? body : {};
-  const action = String(body.action || 'view');
+  const action = String(body.action || '');
   if (action === 'access_list' || action === 'access_set') return portalAccess(env, body, auth, origin, json);
   if (action === 'invite') return issueInvite(env, body, auth, origin, json);
   if (action === 'preview') return previewPortal(env, body, auth, origin, json);
+  if (action === 'publication_list') return publicationList(env, body, auth, origin, json);
+  if (action === 'publication_set') return publicationSet(env, body, auth, origin, json);
+  if (action === 'request_list') return guardianRequestList(env, body, auth, origin, json);
+  if (action === 'request_resolve') return guardianRequestResolve(env, body, auth, origin, json);
   if (action === 'exchange') return exchangeInvite(env, body, origin, json, request);
   if (action === 'view') return viewPortal(env, body, origin, json, request);
   if (action === 'respond') return respondPortal(env, body, origin, json, request);
+  if (action === 'submit_request') return submitGuardianRequest(env, body, origin, json, request);
   if (action === 'logout') return logoutPortal(env, body, origin, json, request);
   return json({ ok: false, error: '지원하지 않는 보호자 웹앱 작업입니다' }, 400, origin);
 }

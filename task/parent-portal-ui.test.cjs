@@ -40,8 +40,8 @@ test('연락처 변경 후 웹앱 동의를 즉시 재검증하고 재동의 전
   assert.match(inviteSource, /access && access\.needsReconsent/);
   assert.match(html, /portal\.needsReconsent/);
   assert.match(html, /웹앱 재동의 필요/);
-  assert.match(html, /보호자 앱 공개 동의 v2/);
-  assert.match(html, /오늘 출결·수업 진행·차량 상태 공개 재동의 필요/);
+  assert.match(html, /보호자 앱 공개 동의 v3/);
+  assert.match(html, /숙제·준비물 공개와 보호자 요청 기능 재동의 필요/);
 });
 
 test('관리자 미리보기는 기존 모달에서 공개 DTO만 읽고 보호자 연결을 만들지 않는다', () => {
@@ -81,8 +81,8 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   const source = html.slice(start, end);
   const factoryStart = html.indexOf('let parentPreviewRequest = 0');
   const parentPreviewHtml = new Function('esc', html.slice(factoryStart, end) + '; return parentPreviewHtml;')(String);
-  const output = parentPreviewHtml({ capabilities: { today: true }, today: {}, summary: {}, student: {} });
-  const labels = ['오늘 현황', '정규 수업 시간표', '확인·응답', '횟수제 수업', '최근 수업 기록'];
+  const output = parentPreviewHtml({ capabilities: { today: true, publicLessons: true, guardianRequests: true }, today: {}, summary: {}, student: {} });
+  const labels = ['오늘 현황', '숙제·준비물', '정규 수업 시간표', '확인·응답', '보호자 요청', '횟수제 수업', '최근 수업 기록'];
   labels.reduce((previous, label) => {
     const current = output.indexOf(label);
     assert.ok(current > previous, `${label} 미리보기 순서`);
@@ -95,7 +95,7 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   assert.match(html, /class="parent-preview-day"/);
   assert.match(html, /parent-preview-tag ' \+ \(row\.status === 'confirmed' \? 'ok' : 'warn'\)/);
   assert.match(html, /parent-preview-info/);
-  assert.match(html, /보호자 공개 v2/);
+  assert.match(html, /보호자 공개 v3/);
   assert.doesNotMatch(source, /data-response|참석 가능|일정 재조율/);
 });
 
@@ -112,15 +112,18 @@ test('보호자 미리보기의 모든 서버 문자열은 HTML로 이스케이�
   const output = parentPreviewHtml({
     generatedAt: Date.now(), student: { name: attack, grade: attack },
     summary: { todayLessons: 1, todayCompleted: 0 },
-    capabilities: { today: true },
+    capabilities: { today: true, publicLessons: true, guardianRequests: true },
     today: {
       dateLabel: attack,
-      lessons: [{ subject: attack, teacherName: attack, timeLabel: attack, attendance: 'P', completedSteps: 1, totalSteps: 5 }],
+      date: '2026-08-17',
+      lessons: [{ lessonRef: 'lesson-ref', subject: attack, teacherName: attack, timeLabel: attack, attendance: 'P', completedSteps: 1, totalSteps: 5 }],
       transport: [{ direction: 'pickup', scheduledTime: attack, status: 'scheduled' }]
     },
     schedule: [{ subject: attack, teacherName: attack, dayLabel: attack, timeLabel: attack }],
     makeups: [{ subject: attack, sourceDate: attack, statusLabel: attack }],
     sessionPacks: [{ subject: attack, validUntil: attack, remaining: 2 }],
+    publicLessons: [{ lessonRef: 'lesson-ref', lessonDate: attack, subject: attack, teacherName: attack, publicHomework: attack, publicReadiness: attack }],
+    guardianRequests: [{ requestId: 'req-1', requestType: 'consultation', status: 'open', createdAt: 1 }],
     feedback: [{ feedbackDate: attack, statusLabel: attack, message: attack, teacherName: attack }]
   });
   assert.doesNotMatch(output, /<img\b/i);
@@ -164,4 +167,23 @@ test('미리보기의 상태 시각이 없으면 09:00으로 오표시하지 않
   assert.equal(parentPreviewClock(0), '');
   assert.equal(parentPreviewClock('not-a-time'), '');
   assert.notEqual(parentPreviewClock(Date.now()), '');
+});
+
+test('관리자 미리보기는 공개 숙제를 한 번만 표시하고 열린 보호자 요청을 접수됨으로 보여준다', () => {
+  const start = html.indexOf('let parentPreviewRequest = 0');
+  const end = html.indexOf('async function saveGuardianPortalAccess', start);
+  const escapeHtml = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const { parentPreviewHtml } = new Function('esc', html.slice(start, end) + '; return { parentPreviewHtml };')(escapeHtml);
+  const output = parentPreviewHtml({
+    generatedAt: Date.now(), student: { name: '학생', grade: '중2' }, summary: {},
+    capabilities: { today: true, publicLessons: true, guardianRequests: true },
+    today: { lessons: [{ lessonRef: 'lesson-1', subject: '영어', teacherName: '담당', totalSteps: 5 }], transport: [] },
+    publicLessons: [{ lessonRef: 'lesson-1', lessonDate: '2026-08-17', subject: '영어', teacherName: '담당', publicHomework: '공개 숙제 한 번' }],
+    guardianRequests: [{ requestId: 'req-1', requestType: 'consultation', status: 'open', createdAt: Date.now(), updatedAt: Date.now() }]
+  });
+  assert.equal(output.split('공개 숙제 한 번').length - 1, 1);
+  assert.match(output, /상담 요청 접수됨/);
+  assert.match(output, /요청 [^<]+/);
 });
