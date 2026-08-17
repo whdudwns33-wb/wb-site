@@ -4,6 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const consultVersion = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf8')).v;
 
 test('consult admin account recovery verifies the consult sync secret', () => {
   assert.match(html, /data-act="recoverpin"/);
@@ -41,4 +42,7 @@ test('consult storage and sync identity stay isolated from task', () => {
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
   assert.doesNotMatch(html, /const LS_KEY = 'wb_taskboard_v1'/);
+  assert.ok(html.includes("const APP_VER = '" + consultVersion + "'"));
+  assert.match(html, /fetch\('\.\/version\.json\?t='/);
+  assert.doesNotMatch(html, /fetch\('\.\.\/version\.json\?t='/);
 });

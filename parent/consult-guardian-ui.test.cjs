@@ -27,9 +27,14 @@ test('fragment 초대 코드를 화면 시작 즉시 지운 뒤 same-origin exch
   const bootStart = script.indexOf('async function boot()');
   const bootEnd = script.indexOf("app.addEventListener('click'", bootStart);
   const boot = script.slice(bootStart, bootEnd);
+  const connectStart = script.indexOf('async function connectPortal()');
+  const connectEnd = script.indexOf('async function boot()', connectStart);
+  const connect = script.slice(connectStart, connectEnd);
   assert.match(script, /const API='\/consult-guardian'/);
   assert.match(boot, /const fragment=location\.hash,code=new URLSearchParams\(fragment\.replace\(\/\^#\/,''\)\)\.get\('code'\)\|\|'';/);
-  assert.ok(boot.indexOf("history.replaceState(null,'',location.pathname+location.search)") < boot.indexOf("await post({action:'exchange',code})"));
+  assert.match(boot, /if\(code\)pendingInviteCode=code/);
+  assert.match(boot, /history\.replaceState\(null,'',location\.pathname\+location\.search\)/);
+  assert.match(connect, /code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
   assert.match(script, /credentials:'include',cache:'no-store'/);
   assert.match(script, /Object\.assign\(\{app:'consult'\},body\)/);
   assert.doesNotMatch(html, /localStorage|sessionStorage|document\.cookie|Authorization|Bearer|location\.search.*code/);
@@ -39,6 +44,19 @@ test('exchange는 view 포함 응답과 ok 전용 응답을 모두 처리한다'
   assert.match(script, /let data=code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
   assert.match(script, /if\(!Array\.isArray\(data\.reports\)\)data=await post\(\{action:'view'\}\)/);
   assert.match(script, /data\.ok!==true/);
+});
+
+test('일시적 교환 실패는 초대 코드를 메모리에만 남겨 같은 링크로 재시도한다', () => {
+  const start = script.indexOf('async function connectPortal()');
+  const end = script.indexOf('async function boot()', start);
+  const connect = script.slice(start, end);
+  assert.match(script, /pendingInviteCode=''/);
+  assert.match(connect, /const code=pendingInviteCode/);
+  assert.match(connect, /const terminal=\[400,401,403,404,409,410,422\]\.includes\(Number\(error\.status\)\)/);
+  assert.match(connect, /if\(terminal\)pendingInviteCode=''/);
+  assert.doesNotMatch(connect, /catch\(error\)[\s\S]*pendingInviteCode=''[\s\S]*fail\(error\.message,false\)/);
+  assert.match(script, /data-retry[\s\S]*pendingInviteCode\?connectPortal\(\):refresh\(true\)/);
+  assert.doesNotMatch(html, /localStorage|sessionStorage/);
 });
 
 test('서버 목록에서도 최신 주간 한 건과 월간 한 건만 선택한다', () => {
@@ -120,6 +138,7 @@ test('로딩·빈 결과·오류·로그아웃과 모바일 접근성 상태를 
   assert.match(html, /아직 발행된 리포트가 없습니다/);
   assert.match(html, /role="alert" tabindex="-1"/);
   assert.match(html, /aria-live="polite" aria-atomic="true"/);
+  assert.match(html, /id="portalNotice" class="notice screen-only" role="alert" hidden/);
   assert.match(html, /aria-busy="true"/);
   assert.match(html, /@media\(max-width:580px\)/);
   assert.match(html, /min-height:44px/);

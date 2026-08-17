@@ -22,6 +22,22 @@ test('new admin device exchanges the code once and stores only its device token'
   assert.match(connect, /session\.unlock\(\)/);
 });
 
+test('temporary admin handoff failures keep only a volatile retry code', () => {
+  const connect = html.match(/async function connectAdminDevice\(\)[\s\S]*?\n}/)?.[0] || '';
+  const lock = html.match(/function viewLock\(\)[\s\S]*?\n}/)?.[0] || '';
+  const retry = html.match(/case 'adminretry':[\s\S]*?break;/)?.[0] || '';
+  assert.match(connect, /if \(!code \|\| adminConnectBusy\) return/);
+  assert.ok(connect.indexOf("pendingAdminCode = ''") > connect.indexOf('await sync.exchangeAdmin(code)'),
+    '교환 응답 전에 1회 코드를 버리지 않는다');
+  assert.match(connect, /const terminal = \[400, 401, 403, 404, 409, 410, 422\]/);
+  assert.match(connect, /if \(terminal\) pendingAdminCode = ''/);
+  assert.match(connect, /finally[\s\S]*if \(!session\.isAdmin\) render\(\)/,
+    '확정 실패 뒤에는 오래된 재시도 카드를 제거한다');
+  assert.match(lock, /data-act="adminretry"/);
+  assert.match(retry, /connectAdminDevice\(\)/);
+  assert.doesNotMatch(connect, /localStorage|sessionStorage/);
+});
+
 test('admin device authentication remains isolated to consult', () => {
   assert.match(html, /const SYNC_APP = 'consult'/);
   assert.match(html, /mode: 'admin_device', token: t/);

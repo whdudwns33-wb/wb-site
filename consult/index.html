@@ -63,6 +63,7 @@
   }
   .whoami i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); font-style: normal; }
   .whoami.off i { background: var(--mid-gray); }
+  .whoami.err i { background: var(--coral); }
 
   /* ─── 탭 ─── */
   .tabs { background: rgba(255,255,255,.94); border-bottom: 1px solid var(--line); position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 40; backdrop-filter: blur(14px); }
@@ -367,8 +368,13 @@
     max-width: 90vw; text-align: center;
   }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .storage-alert { position: sticky; top: calc(104px + env(safe-area-inset-top)); z-index: 39; background: #FFF1EF; border-bottom: 1px solid #F5B8B0; color: #8F2F23; }
+  .storage-alert[hidden] { display: none; }
+  .storage-alert .wrap { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 7px; padding-bottom: 7px; font-size: 12.5px; font-weight: 750; }
+  .storage-alert .btn { flex: 0 0 auto; }
   .modal { position: fixed; inset: 0; background: rgba(27,58,92,.58); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); z-index: 150; backdrop-filter: blur(4px); }
   .modal-box { background: var(--white); border-radius: 18px; padding: 20px; width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow-md); }
+  .modal-box:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
@@ -563,6 +569,9 @@
     .wrap { padding-left: 12px; padding-right: 12px; }
     main { padding-top: 12px; }
     .card { padding: 15px; border-radius: 15px; }
+    .storage-alert .wrap { align-items: stretch; flex-direction: column; }
+    .storage-alert .row { display: grid; grid-template-columns: 1fr 1fr; }
+    .storage-alert .btn, .modal-box .btn-sm { min-height: 44px; }
     .modal { place-items: end center; padding-left: 0; padding-right: 0; padding-bottom: 0; }
     .modal-box { max-width: none; max-height: 92vh; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
     #toast { bottom: calc(18px + env(safe-area-inset-bottom)); }
@@ -628,6 +637,8 @@
 </header>
 
 <nav class="tabs"><div class="wrap" id="tabs"></div></nav>
+
+<div id="storageAlert" class="storage-alert" role="alert" hidden></div>
 
 <main class="wrap" id="view"></main>
 
@@ -802,6 +813,9 @@ function mergeImportedState(imported, current) {
 }
 
 let state = blankState();
+let storageError = '';
+let saveFailedThisTurn = false;
+let storageRecoveryPending = false;
 
 function load() {
   try {
@@ -814,9 +828,56 @@ function load() {
   } catch (e) { console.warn('load failed', e); }
 }
 
+function canExportBackup(auth) {
+  const current = auth || (typeof session === 'undefined' ? null : session);
+  return !!(current && current.isAdmin && !current.isStaffLink);
+}
+
+function paintStorageAlert(auth) {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const el = document.getElementById('storageAlert');
+  if (!el) return;
+  const mayBackup = canExportBackup(auth);
+  el.hidden = !storageError;
+  el.innerHTML = storageError ? '<div class="wrap"><span>이 기기에 저장하지 못했습니다. 화면을 닫지 말고 ' +
+    (mayBackup ? '백업하거나 ' : '') + '동기화를 다시 시도해 주세요.</span>' +
+    '<span class="row" style="gap:6px"><button class="btn btn-sm btn-danger" data-act="storageretry">기기 저장 재시도</button>' +
+    (mayBackup ? '<button class="btn btn-sm btn-ghost" data-act="export">백업</button>' : '') +
+    (sync && sync.enabled && sync.enabled() ? '<button class="btn btn-sm btn-danger" data-act="syncretry">동기화 재시도</button>' : '') + '</span></div>' : '';
+}
+
+function lockStorageFailureControls(locked) {
+  if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+  document.querySelectorAll('#modalHost button[data-act]:not([data-act="closemodal"])').forEach(button => {
+    if (locked && !button.disabled) { button.disabled = true; button.dataset.storageDisabled = '1'; }
+    else if (!locked && button.dataset.storageDisabled === '1') { button.disabled = false; delete button.dataset.storageDisabled; }
+  });
+}
+
 function save() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
-  catch (e) { toast('저장 공간이 부족합니다'); }
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    const recovered = storageRecoveryPending;
+    storageError = '';
+    storageRecoveryPending = false;
+    saveFailedThisTurn = false;
+    lockStorageFailureControls(false);
+    paintStorageAlert();
+    if (recovered) Promise.resolve().then(() => {
+      const host = typeof document !== 'undefined' && typeof document.getElementById === 'function' && document.getElementById('modalHost');
+      if (host && host.firstElementChild) { closeModal(); render(); toast('기기 저장을 다시 완료했습니다'); }
+    });
+    return true;
+  } catch (e) {
+    storageError = 'LOCAL_SAVE_FAILED';
+    storageRecoveryPending = true;
+    saveFailedThisTurn = true;
+    Promise.resolve().then(() => { saveFailedThisTurn = false; });
+    lockStorageFailureControls(true);
+    paintStorageAlert();
+    if (typeof paintStatus === 'function' && typeof document.getElementById === 'function' && document.getElementById('whoami')) paintStatus();
+    return false;
+  }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -912,12 +973,17 @@ const isDone = (taskId, date) => !!(state.checks[ckey(taskId, date)] || {}).done
 
 function setCheck(taskId, date, patch) {
   const k = ckey(taskId, date);
+  if (storageError) {
+    paintStorageAlert();
+    toast('먼저 기기 저장을 재시도해 주세요');
+    return null;
+  }
   const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '', steps: {}, count: 0, blocked: false };
   const next = Object.assign({}, cur, patch, { updatedAt: now() });
   state.checks[k] = next;
-  save();
+  const stored = save();
   queueSync();
-  return next;
+  return stored ? next : null;
 }
 
 /** 단계·수량을 고려한 개별 업무 진행률 */
@@ -1057,7 +1123,7 @@ function ownerOfCheck(key) {
 }
 
 const sync = {
-  busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
+  busy: false, dirty: false, last: null, timer: null, loud: false, err: '', pendingRender: false,
 
   url() { return SYNC_URL; },
 
@@ -1132,23 +1198,36 @@ const sync = {
     try {
       const t0 = now();
       const pending = this.collect(Number(state.settings.pushAt) || 0);
-      let guard = 0, again = true;
-      while (again && guard++ < 60) {
+      let more = true, pullPages = 0, localCursorSaved = false, applied = 0;
+      while (pending.length || more) {
         const batch = pending.splice(0, 400);
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
-        this.apply(d.changes);
+        applied += this.apply(d.changes);
         state.settings.pullAt = d.now;
-        again = !!d.more || pending.length > 0;
+        more = !!d.more;
+        if (!pending.length && !localCursorSaved) {
+          // 로컬 변경을 모두 보낸 뒤에만 전송 커서를 전진시킨다. 24,000건을 넘어도 누락하지 않는다.
+          state.settings.pushAt = t0;
+          save();
+          localCursorSaved = true;
+        }
+        if (more && ++pullPages >= 60 && !pending.length) {
+          save();
+          throw new Error('받을 데이터가 많습니다. 동기화를 다시 눌러 이어서 받아 주세요');
+        }
       }
-      // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
-      state.settings.pushAt = t0;
+      if (!localCursorSaved) state.settings.pushAt = t0;
+      // 마지막 pullAt과 마지막 페이지의 원격 변경까지 오프라인 재시작에 남긴다.
       save();
-      this.last = now(); this.dirty = false; this.err = '';
-      render();
+      this.last = now();
+      this.dirty = this.collect(Number(state.settings.pushAt) || 0).length > 0;
+      this.err = '';
+      if (applied) renderAfterSync();
+      if (this.dirty) queueSync();
     } catch (e) {
       console.warn('sync', e);
       if (auth.mode === 'admin_device' && e.status === 401) {
@@ -1226,6 +1305,7 @@ let ymCursor = today().slice(0, 7);   // 월간 플래너가 보고 있는 달
 let agendaDate = today();
 let agendaFilter = 'all';
 let viewStaff = '';
+let viewInputDirty = false;
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
@@ -1241,6 +1321,7 @@ function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g
 
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingAdminCode = ''; // 새 원장 기기에서 한 번만 교환할 연결 코드
+let adminConnectBusy = false;
 
 /** 링크에 담겨 온 것들을 흡수한다.
  *  s=  동기화 설정 (학생 기기 세팅 대신)
@@ -1291,11 +1372,12 @@ function absorbLinkParams() {
 
 async function connectAdminDevice() {
   const code = pendingAdminCode;
-  if (!code) return;
-  pendingAdminCode = '';
+  if (!code || adminConnectBusy) return;
+  adminConnectBusy = true;
   toast('새 컴퓨터 연결 중…');
   try {
     const d = await sync.exchangeAdmin(code);
+    pendingAdminCode = '';
     state.settings.adminToken = d.token;
     state.settings.syncSecret = '';
     state.settings.pullAt = 0;
@@ -1305,7 +1387,14 @@ async function connectAdminDevice() {
     await sync.run();
     toast('새 컴퓨터 연결 완료');
   } catch (e) {
-    toast('연결 링크를 사용할 수 없습니다 — ' + e.message);
+    const terminal = [400, 401, 403, 404, 409, 410, 422].includes(Number(e && e.status));
+    if (terminal) pendingAdminCode = '';
+    toast(terminal
+      ? '연결 링크를 사용할 수 없습니다 — ' + e.message
+      : '인터넷 연결을 확인한 뒤 아래 버튼으로 다시 시도해 주세요');
+  } finally {
+    adminConnectBusy = false;
+    if (!session.isAdmin) render();
   }
 }
 
@@ -1328,6 +1417,7 @@ function safeHttpsUrl(value) {
 }
 function toast(msg) {
   const t = $('#toast');
+  if (storageError) msg = '기기 저장 실패 · 화면을 닫지 말고 백업하거나 동기화해 주세요';
   t.textContent = msg; t.classList.add('on');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.classList.remove('on'), 2400);
@@ -1376,9 +1466,28 @@ function paintStatus() {
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
   if (sync.busy) text += ' · 동기화중';
+  else if (storageError) text += ' · 저장 실패';
+  else if (sync.enabled() && sync.err) text += ' · 동기화 실패 · 다시 시도';
   else if (sync.enabled() && sync.dirty) text += ' · 대기';
   el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
   el.classList.toggle('off', !on);
+  el.classList.toggle('err', !!(storageError || (sync.enabled() && sync.err)));
+  if (storageError) el.dataset.act = 'storagehelp';
+  else if (sync.enabled() && sync.err) el.dataset.act = 'syncretry';
+  else delete el.dataset.act;
+  el.title = storageError ? '기기 저장 실패 안내 보기' : (sync.enabled() && sync.err ? '동기화를 다시 시도합니다' : '');
+}
+
+function activeViewEditor() {
+  const active = document.activeElement;
+  return viewInputDirty || !!(active && active.closest && active.closest('#view') &&
+    active.matches('input, textarea, select, [contenteditable="true"]'));
+}
+
+function renderAfterSync() {
+  if (activeViewEditor()) { sync.pendingRender = true; paintStatus(); return; }
+  sync.pendingRender = false;
+  render();
 }
 
 function currentStaff() {
@@ -1390,6 +1499,8 @@ function currentStaff() {
    7. 뷰
    ══════════════════════════════════════════════════════ */
 function render() {
+  sync.pendingRender = false;
+  viewInputDirty = false;
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -1469,7 +1580,10 @@ function viewPendingAdd() {
 
 /* ── 잠금 ── */
 function viewLock() {
-  return '<div class="card mt14">' +
+  return (pendingAdminCode ? '<div class="card alert mt14"><div class="card-title">새 컴퓨터 연결이 완료되지 않았습니다</div>' +
+    '<div class="card-sub mb14">인터넷 연결을 확인한 뒤 같은 연결 링크로 다시 시도할 수 있습니다.</div>' +
+    '<button class="btn btn-primary btn-block" data-act="adminretry"' + (adminConnectBusy ? ' disabled' : '') + '>기기 연결 다시 시도</button></div>' : '') +
+  '<div class="card mt14">' +
     '<div class="card-title">원장 로그인</div>' +
     '<div class="card-sub mb14">처음 한 번만 로그인하면 이 기기에서 90일간 자동으로 연결됩니다.</div>' +
     '<div class="field"><input class="in" id="loginId" inputmode="text" placeholder="아이디" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(state.settings.adminLoginId || '') + '"></div>' +
@@ -3071,7 +3185,7 @@ async function loadSubmissions(owner, force) {
     if (loadId !== submissionLoadSeq) return;
     submissionCache.loading = false;
     const me = currentStaff();
-    if ((me && me.id === owner) || (owner === '*' && route === 'board')) render();
+    if ((me && me.id === owner) || (owner === '*' && route === 'board')) renderAfterSync();
   }
 }
 
@@ -4919,6 +5033,25 @@ function viewAcademic() {
 /* ── 지시서 작성 ── */
 let draft = [];
 const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '', carry: true, evidenceMode: false };
+const WRITE_INPUT_IDS = ['wSubject', 'wTitle', 'wDetail', 'wGuide', 'wSteps', 'wTarget', 'wUnit', 'wTime', 'wPri', 'wStart', 'wEnd'];
+
+function writeInputSnapshot() {
+  if (route !== 'write') return null;
+  const values = {};
+  WRITE_INPUT_IDS.forEach(id => { const field = $('#' + id); if (field) values[id] = field.value; });
+  const active = document.activeElement;
+  return { values: values, activeId: active && WRITE_INPUT_IDS.includes(active.id) ? active.id : '' };
+}
+
+function renderWritePreservingInputs() {
+  const snapshot = writeInputSnapshot();
+  render();
+  if (!snapshot) return;
+  WRITE_INPUT_IDS.forEach(id => { const field = $('#' + id); if (field && Object.prototype.hasOwnProperty.call(snapshot.values, id)) field.value = snapshot.values[id]; });
+  viewInputDirty = true;
+  const active = snapshot.activeId && $('#' + snapshot.activeId);
+  if (active) active.focus();
+}
 
 function viewWrite() {
   const list = liveStaff();
@@ -5442,19 +5575,55 @@ function viewSettings() {
 /* ══════════════════════════════════════════════════════
    8. 모달 · 텍스트 생성
    ══════════════════════════════════════════════════════ */
+let modalReturnFocus = null;
+let modalReturnHint = null;
+
+function rememberModalReturnFocus(el) {
+  modalReturnFocus = el && typeof el.focus === 'function' ? el : null;
+  modalReturnHint = el && el.dataset ? {
+    id: el.id || '', act: el.dataset.act || '', rowId: el.dataset.id || '', go: el.dataset.go || ''
+  } : null;
+}
+
+function restoreModalReturnFocus() {
+  const direct = modalReturnFocus;
+  const hint = modalReturnHint;
+  modalReturnFocus = null; modalReturnHint = null;
+  requestAnimationFrame(() => {
+    if (direct && direct.isConnected) return direct.focus();
+    if (!hint) return;
+    const candidates = Array.from(document.querySelectorAll('button, a, input, select, textarea'));
+    const target = candidates.find(el =>
+      (!hint.id || el.id === hint.id) && (!hint.act || el.dataset.act === hint.act) &&
+      (!hint.rowId || el.dataset.id === hint.rowId) && (!hint.go || el.dataset.go === hint.go));
+    if (target) target.focus();
+  });
+}
+
 function modal(title, bodyHtml, footHtml) {
-  $('#modalHost').innerHTML =
-    '<div class="modal" data-act="closemodal"><div class="modal-box">' +
-      '<div class="between mb14"><div class="card-title">' + esc(title) + '</div>' +
-      '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
+  const host = $('#modalHost');
+  if (!host.firstElementChild) rememberModalReturnFocus(document.activeElement);
+  host.innerHTML =
+    '<div class="modal" data-act="closemodal"><div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">' +
+      '<div class="between mb14"><div class="card-title" id="modalTitle">' + esc(title) + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="closemodal" aria-label="' + esc(title) + ' 닫기">닫기</button></div>' +
       bodyHtml + (footHtml || '') +
     '</div></div>';
+  if (storageError) lockStorageFailureControls(true);
+  requestAnimationFrame(() => {
+    const box = host.querySelector('.modal-box');
+    const first = box && box.querySelector('input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])');
+    if (first) first.focus(); else if (box) box.focus();
+  });
 }
 function closeModal() {
+  if (saveFailedThisTurn) return false;
   clearSubmissionPreview();
   submissionForm = null; submissionReviewDraft = null;
   clearGuardianShareUi();
   $('#modalHost').innerHTML = '';
+  restoreModalReturnFocus();
+  return true;
 }
 
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
@@ -5727,8 +5896,9 @@ function saveEditedTask() {
   if (session.isAdmin) t.evidenceMode = eForm.evidenceMode ? 'photo' : '';
   t.updatedAt = now();
 
-  eForm = null;
-  save(); queueSync(); closeModal(); render();
+  const stored = save(); queueSync();
+  if (!stored) return;
+  eForm = null; closeModal(); render();
   toast(isNew ? '추가했습니다' : '수정했습니다');
 }
 
@@ -5945,6 +6115,12 @@ document.addEventListener('click', ev => {
       && !ev.target.closest('button[data-act="closemodal"]')) return;
 
   const act = el.dataset.act;
+  const storageSafeActions = ['closemodal', 'storageretry', 'syncretry', 'syncnow', 'storagehelp', 'export'];
+  if (storageError && !storageSafeActions.includes(act)) {
+    paintStorageAlert();
+    toast('먼저 기기 저장을 재시도해 주세요');
+    return;
+  }
   const id = el.dataset.id;
   const date = el.dataset.date || cursor;
   const task = () => state.tasks.find(x => x.id === id);
@@ -5952,6 +6128,7 @@ document.addEventListener('click', ev => {
   switch (act) {
 
     /* 잠금 */
+    case 'adminretry': connectAdminDevice(); break;
     case 'login': {
       const loginId = ($('#loginId').value || '').trim();
       const password = $('#pin').value || '';
@@ -6189,7 +6366,9 @@ document.addEventListener('click', ev => {
       const existing = examPlanTasks(exam.id).filter(task => examPlanReplaceable(task, exam.id, draft.from || today()));
       if (existing.length && !confirm('기존 미래 미완료 ' + existing.length + '회를 새 계획으로 교체할까요? 완료·지난 일정은 유지됩니다.')) break;
       const count = commitExamPlan(exam.staffId, exam, draft);
-      save(); queueSync(); examPlanDraft = null; closeModal(); render();
+      const stored = save(); queueSync();
+      if (!stored) break;
+      examPlanDraft = null; closeModal(); render();
       toast(count + '회 시험대비 일정을 확정했습니다');
       break;
     }
@@ -7218,8 +7397,9 @@ document.addEventListener('click', ev => {
       if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 중단할 수 없습니다'); }
       if (!confirm('이 업무를 중단할까요? 지난 기록은 유지됩니다.')) return;
       t.deleted = true; t.updatedAt = now();
-      eForm = null;
-      save(); queueSync(); closeModal(); render(); toast('중단했습니다');
+      const stored = save(); queueSync();
+      if (!stored) break;
+      eForm = null; closeModal(); render(); toast('중단했습니다');
       break;
     }
     case 'erepeat': {
@@ -7283,10 +7463,18 @@ document.addEventListener('click', ev => {
       el.classList.toggle('on');
       break;
     }
-    case 'wcarry': { wForm.carry = !wForm.carry; render(); break; }
+    case 'wcarry': {
+      wForm.carry = !wForm.carry;
+      el.classList.toggle('on', wForm.carry);
+      el.textContent = (wForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월';
+      break;
+    }
     case 'wevidence': {
       if (!session.isAdmin) break;
-      wForm.evidenceMode = !wForm.evidenceMode; render(); break;
+      wForm.evidenceMode = !wForm.evidenceMode;
+      el.classList.toggle('on', wForm.evidenceMode);
+      el.textContent = (wForm.evidenceMode ? '☑' : '☐') + ' 완료할 때 인증사진 받기';
+      break;
     }
     case 'wadd': {
       const title = ($('#wTitle').value || '').trim();
@@ -7321,8 +7509,8 @@ document.addEventListener('click', ev => {
       toast('목록에 담았습니다 (' + draft.length + '건)');
       break;
     }
-    case 'wdel': draft.splice(Number(el.dataset.i), 1); render(); break;
-    case 'wclear': draft = []; render(); break;
+    case 'wdel': draft.splice(Number(el.dataset.i), 1); renderWritePreservingInputs(); break;
+    case 'wclear': draft = []; renderWritePreservingInputs(); break;
     case 'wpublish': {
       if (!draft.length) return;
       const gid = uid(), touched = new Set();
@@ -7393,13 +7581,31 @@ document.addEventListener('click', ev => {
       if (state.settings.syncSecret) { sync.loud = true; sync.run(); }
       break;
     }
+    case 'syncretry': {
+      if (!sync.enabled()) return toast('먼저 로그인하거나 동기화 연결을 복구해 주세요');
+      sync.loud = true; sync.run(); toast('동기화를 다시 시도합니다…');
+      break;
+    }
+    case 'storagehelp': {
+      if (session.isAdmin) go('settings');
+      else toast('기기 저장 실패 · 화면을 닫지 말고 원장에게 알려 주세요');
+      break;
+    }
+    case 'storageretry': {
+      if (!save()) break;
+      queueSync(); closeModal(); render(); toast('기기 저장을 다시 완료했습니다');
+      break;
+    }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
     case 'export': {
+      if (!session.isAdmin || session.isStaffLink) return toast('백업은 원장 화면에서만 할 수 있습니다');
       const blob = new Blob([JSON.stringify(sanitizedBackupState(state), null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      a.href = url;
       a.download = 'wb-컨설팅플래너-' + today() + '.json';
-      a.click(); URL.revokeObjectURL(a.href);
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       break;
     }
     case 'import': {
@@ -7441,6 +7647,9 @@ document.addEventListener('change', ev => {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select, [contenteditable="true"]')) {
+    viewInputDirty = true;
+  }
   if (ev.target.id === 'ingText') { ingPasteSeq++; ingShowParsePreview(); return; }
   if (ev.target.id.startsWith('examPlan')) {
     const preview = $('#examPlanPreview');
@@ -7459,8 +7668,8 @@ document.addEventListener('input', ev => {
   if (noteEl) {
     clearTimeout(inputTimer);
     inputTimer = setTimeout(() => {
-      setCheck(noteEl.dataset.id, noteEl.dataset.date || cursor, { note: noteEl.value });
-      toast('메모 저장됨');
+      const stored = setCheck(noteEl.dataset.id, noteEl.dataset.date || cursor, { note: noteEl.value });
+      if (stored) { viewInputDirty = false; toast('메모 저장됨'); }
     }, 700);
     return;
   }
@@ -7477,8 +7686,32 @@ document.addEventListener('input', ev => {
   }
 });
 
-/* 엔터 제출 */
+document.addEventListener('change', ev => {
+  if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select')) viewInputDirty = true;
+});
+
+/* 모달 키보드 이동 · 엔터 제출 */
 document.addEventListener('keydown', ev => {
+  const box = document.querySelector('#modalHost .modal-box');
+  if (box) {
+    if (ev.key === 'Escape') { ev.preventDefault(); closeModal(); return; }
+    if (ev.key === 'Tab') {
+      const focusable = Array.from(box.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )).filter(el => {
+        const style = window.getComputedStyle(el);
+        return !el.hidden && el.getAttribute('aria-hidden') !== 'true' && style.display !== 'none' && style.visibility !== 'hidden';
+      });
+      if (!focusable.length) { ev.preventDefault(); box.focus(); return; }
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (ev.shiftKey && (document.activeElement === first || !box.contains(document.activeElement))) {
+        ev.preventDefault(); last.focus(); return;
+      }
+      if (!ev.shiftKey && (document.activeElement === last || !box.contains(document.activeElement))) {
+        ev.preventDefault(); first.focus(); return;
+      }
+    }
+  }
   if (ev.key !== 'Enter') return;
   const t = ev.target;
   if (t.id === 'pin' || t.id === 'loginId') document.querySelector('[data-act="login"]')?.click();
@@ -7489,7 +7722,10 @@ document.addEventListener('keydown', ev => {
 /* 복귀 시 최신화 */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
-  if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
+  if (!cursorPinned && cursor !== today()) {
+    cursor = today();
+    if (activeViewEditor()) sync.pendingRender = true; else render();
+  }
   sync.run();
 });
 
@@ -7536,11 +7772,10 @@ setInterval(() => {
 }, 1000);
 
 /* ── 새 버전 감지 ──
- * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
- * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.8';
+ * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
+const APP_VER = '2026-08-18.9';
 function checkVersion() {
-  fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
+  fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(d => {
       if (!d || !d.v || d.v === APP_VER || document.getElementById('newver')) return;
