@@ -66,23 +66,43 @@ test('quick add, task edit, and batch issue require and persist a subject', () =
   });
 });
 
-test('planner combines the checklist with fixed-category study-time bars', () => {
+test('paper planner separates subject, study detail, completion, and the daily timetable', () => {
   const planner = section('function studyPlannerCard(', 'function taskRow(');
-  const timer = section('function studyTimePanel(', 'function stCard(');
+  const compactRow = section('function plannerTaskRow(', 'function taskRow(');
   const css = section('<style>', '</style>');
 
   assert.match(planner, /aria-label="오늘 공부 체크리스트"/);
   assert.match(planner, /aria-label="과목별 순공시간"/);
   assert.match(planner, /TODAY STUDY PLANNER/);
   assert.match(planner, /PURE STUDY TIME/);
+  assert.match(planner, /<span>과목<\/span><span>세부 공부내용<\/span><span>완료<\/span>/);
+  assert.match(planner, /TIME TABLE/);
+  assert.match(planner, /05–24시 · 10분 단위/);
   assert.match(planner, /studyTimePanel\(me, editable, true\)/);
-  assert.match(timer, /STUDY_SUBJECT_KEYS\.map/);
-  assert.match(timer, /data-stbar=/);
-  assert.match(timer, /chartMax \/ 600/);
-  assert.match(timer, /10분 단위 순공시간 기록/);
+  assert.match(compactRow, /planner-task-subject/);
+  assert.match(compactRow, /planner-task-detail/);
+  assert.match(compactRow, /planner-check-wrap/);
+  assert.match(compactRow, /data-act="sttask"/);
   assert.match(css, /\.study-paper-head/);
-  assert.match(css, /background-size: calc\(100% \/ var\(--planner-slots, 18\)\) 100%/);
+  assert.match(css, /grid-template-columns: 62px minmax\(0, 1fr\) 38px/);
+  assert.match(css, /\.study-timeline-row \{[^}]*repeat\(6,/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
+});
+
+test('timer closes real start-end segments and paints six ten-minute cells per hour', () => {
+  const timerData = section('function stStoredSegments(', 'function studyTimePanel(');
+  const timerPanel = section('function studyTimePanel(', 'function stCard(');
+  const handlers = section("case 'sttask':", '/* 날짜 */');
+
+  assert.match(timerData, /segments\.push\(\{ subj: r\.subj, taskId: r\.taskId \|\| '', start: Number\(r\.since\), end: end \}\)/);
+  assert.match(timerData, /segments: stFreezeSegments\(sid, date\)/);
+  assert.match(timerData, /\[0, 10, 20, 30, 40, 50\]/);
+  assert.match(timerData, /for \(let hour = ST_TIMELINE_START; hour < ST_TIMELINE_END; hour\+\+\)/);
+  assert.match(timerData, /study-timeline-cell/);
+  assert.match(timerPanel, /id="studyTimeline"/);
+  assert.match(handlers, /stStart\(me\.id, today\(\), subj, t\.id\)/);
+  assert.match(handlers, /if \(stRunning\(me\.id, today\(\)\)\) stStop/);
+  assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, today\(\)\)/);
 });
 
 test('consult storage and sync app identity remain unchanged', () => {
