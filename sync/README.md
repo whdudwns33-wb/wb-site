@@ -22,6 +22,10 @@ cd sync
 # 1) D1 데이터베이스 생성 → 출력된 database_id를 wrangler.toml에 붙여넣는다
 npx wrangler d1 create wb-sync
 
+# consult 인증사진·질문 JPEG를 저장할 private R2 버킷 (r2.dev/public access를 켜지 않는다)
+npx wrangler r2 bucket create wb-consult-private
+npx --yes wrangler@4 r2 bucket lifecycle add wb-consult-private consult-media-90d consult/ --expire-days 90 --force
+
 # 2-a) 새 데이터베이스는 전체 스키마 적용 (원격)
 npx wrangler d1 execute wb-sync --remote --file=./schema.sql
 
@@ -48,6 +52,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_iden
 npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/040_student_lesson_self_checks.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/041_consult_submissions.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -91,6 +96,12 @@ consult 원장 계정 로그인을 추가하는 배포는 `033_consult_admin_acc
 운영 D1에 적용한 뒤 Worker, Pages 순서로 배포한다. 기존 `task` 인증과 데이터는
 변경하지 않는다. 기존 consult 원장 기기의 설정에서 아이디·비밀번호를 한 번
 저장하면 최대 5대의 기기가 각각 90일간 자동 로그인한다.
+
+consult 인증사진·질문 제출함은 `041_consult_submissions.sql` 적용과 private
+`wb-consult-private` R2 버킷 준비를 마친 뒤 보호자·직원 Worker와 consult Pages 순서로
+배포한다. 버킷의 public development URL과 custom domain은 사용하지 않으며, R2 설정에서
+`consult/` prefix 객체를 90일 뒤 삭제하는 lifecycle rule을 반드시 켠다. 사진은 인증된
+`POST /consult-submission` 조회를 통해서만 제공하며 task·학생 전용 Worker는 변경하지 않는다.
 
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은

@@ -69,6 +69,7 @@ import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
+import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1564,6 +1565,11 @@ export default {
     if (request.method !== 'POST') return json({ ok: false, error: 'POST만 허용' }, 405, okOrigin);
     if (okOrigin === null) return json({ ok: false, error: '허용되지 않은 출처' }, 403, '*');
 
+    // multipart는 request.json()으로 읽을 수 없으므로 이 한 경로만 먼저 분기한다.
+    if (url.pathname === '/consult-submission-upload') {
+      return await handleConsultSubmissionUpload(request, env, okOrigin, resolveAuth, json);
+    }
+
     let body;
     try { body = await request.json(); }
     catch (e) { return json({ ok: false, error: '본문을 읽을 수 없습니다' }, 400, okOrigin); }
@@ -1591,6 +1597,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleContactLog(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/consult-submission') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleConsultSubmission(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-assignment-request') {
         const auth = await resolveAuth(env, app, body.auth);
