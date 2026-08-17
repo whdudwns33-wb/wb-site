@@ -42,7 +42,7 @@ test('director study stays outside the checklist until the student claims it', (
   const quick = section("case 'qadd':", '/* 카톡 문장 붙여넣기 */');
 
   assert.match(filters, /task\.requiresClaim/);
-  assert.match(filters, /filter\(task => isStudyClaimed\(task, date\)\)/);
+  assert.match(filters, /filter\(task => isStudyClaimed\(task, date\) && !\(getCheck\(task\.id, date\) \|\| \{\}\)\.dropped\)/);
   assert.match(claim, /session\.isStaffLink/);
   assert.match(claim, /t\.staffId !== session\.staffId/);
   assert.match(claim, /setCheck\(id, date, \{ claimed: true, claimedAt: now\(\) \}\)/);
