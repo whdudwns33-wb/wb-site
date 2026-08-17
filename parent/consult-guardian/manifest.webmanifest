@@ -1,0 +1,19 @@
+{
+  "name": "WB 보호자 학습 리포트",
+  "short_name": "WB 리포트",
+  "description": "학원에서 발행한 최신 주간·월간 학습 리포트를 확인하는 보호자 웹앱",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#203c63",
+  "icons": [
+    {
+      "src": "../icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

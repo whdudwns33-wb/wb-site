@@ -39,6 +39,7 @@
  *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
+ *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
@@ -70,6 +71,7 @@ import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
+import { handleConsultGuardian } from './consult-guardian.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1551,7 +1553,8 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const allowed = (env.ALLOW_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
     const parentSameOrigin = url.pathname === '/parent-portal' && origin === url.origin;
-    const okOrigin = parentSameOrigin || !allowed.length || allowed.includes(origin) ? (origin || '*') : null;
+    const consultGuardianSameOrigin = url.pathname === '/consult-guardian' && origin === url.origin;
+    const okOrigin = parentSameOrigin || consultGuardianSameOrigin || !allowed.length || allowed.includes(origin) ? (origin || '*') : null;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(okOrigin || 'null') });
@@ -1657,6 +1660,15 @@ export default {
         }
         const auth = authenticatedActions.has(action) ? await resolveAuth(env, app, body.auth) : null;
         return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
+      }
+      if (url.pathname === '/consult-guardian') {
+        const authenticatedActions = new Set(['access_list', 'access_set', 'invite', 'preview']);
+        const action = String(body.action || '');
+        if (!authenticatedActions.has(action) && !consultGuardianSameOrigin) {
+          return json({ ok: false, error: '보호자 앱과 같은 출처에서만 사용할 수 있습니다' }, 403, okOrigin);
+        }
+        const auth = authenticatedActions.has(action) ? await resolveAuth(env, app, body.auth) : null;
+        return await handleConsultGuardian(env, app, body, okOrigin, auth, json, request);
       }
       if (url.pathname === '/student-portal') {
         const authenticatedActions = new Set([
