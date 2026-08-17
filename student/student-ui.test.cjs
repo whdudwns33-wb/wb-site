@@ -38,12 +38,30 @@ test('기존 학생 세션에서 새 초대를 열면 코드를 메모리에만 
   assert.doesNotMatch(script, /localStorage|sessionStorage/);
 });
 
-test('학생에게 필요한 읽기 전용 여섯 영역만 보여준다', () => {
-  for (const label of ['오늘 수업', '5단계', '숙제·준비물', '오늘 차량', '교재 준비·수령', '주간 시간표']) {
+test('학생에게 필요한 읽기 전용 영역과 외부 학습 도구만 보여준다', () => {
+  for (const label of ['오늘 수업', '5단계', '숙제·준비물', '오늘 차량', '교재 준비·수령', '주간 시간표', '바로 학습하기']) {
     assert.match(html, new RegExp(label));
   }
   assert.doesNotMatch(script, /data\.feedback|guardianRequests|submit_request|action:'respond'|makeups|sessionPacks|announcements|onboarding/);
   assert.doesNotMatch(html, /<input|<textarea|type="file"|contenteditable|data-response|data-request-type/);
+});
+
+test('메타수학과 클래스카드는 공식 화면만 안전하게 새 창으로 연다', () => {
+  const start = script.indexOf('function studySection(');
+  const end = script.indexOf('function group(', start);
+  const studySection = new Function(script.slice(start, end) + ';return studySection;')();
+  const legacy = studySection(false), enabled = studySection(true);
+  assert.equal(legacy, '');
+  assert.match(enabled, /href="https:\/\/new\.mmath\.co\.kr\/Pages\/student\/"/);
+  assert.match(enabled, /href="https:\/\/www\.classcard\.net\/Login"/);
+  assert.equal((enabled.match(/class="study-link"/g) || []).length, 2);
+  assert.equal((enabled.match(/target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"/g) || []).length, 2);
+  assert.match(enabled, /새 창\/탭에서 열림/);
+  assert.match(enabled, /기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다/);
+  assert.match(enabled, /외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다/);
+  assert.doesNotMatch(enabled, /<iframe|name="(?:id|password)"|autocomplete="(?:username|current-password)"/i);
+  assert.doesNotMatch(script, /fetch\(['"]https:\/\/(?:new\.mmath|www\.classcard)/);
+  assert.match(script, /studySection\(capabilities\.externalLearning===true\)/);
 });
 
 test('5단계 진행은 서버 숫자를 0~5로 제한해 표시한다', () => {
@@ -141,9 +159,12 @@ test('로딩·빈 목록·오류·수동 및 자동 새로고침 상태를 제�
 test('모바일 조작과 긴 공개 문장을 접근 가능하게 표시한다', () => {
   assert.match(html, /name="viewport"/);
   assert.match(html, /\.headbtn\{min-width:44px;min-height:44px/);
+  assert.match(html, /\.study-link\{display:flex;min-height:72px/);
   assert.match(html, /\.info summary\{min-height:48px/);
   assert.match(html, /white-space:pre-wrap/);
-  assert.match(html, /button:focus-visible,summary:focus-visible/);
+  assert.match(html, /button:focus-visible,a:focus-visible,summary:focus-visible/);
+  assert.match(html, /outline:3px solid #087ba6/);
+  assert.match(html, /\.headbtn:focus-visible\{outline-color:#fff\}/);
   assert.match(html, /aria-busy="true"/);
 });
 

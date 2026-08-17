@@ -747,6 +747,14 @@
   .student-preview-steps i.done { background: #14755E; }
   .student-preview-steps-label { margin-top: 5px; color: #647684; font-size: 12px; font-weight: 800; }
   .student-preview-shell .parent-preview-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .student-preview-study-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 13px; }
+  .student-preview-study-link { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 13px; border: 1px solid #C9E5EF; border-radius: 14px; background: #F5FBFE; color: #173957; text-decoration: none; }
+  .student-preview-study-link b, .student-preview-study-link small { display: block; }
+  .student-preview-study-link b { font-size: 15px; }
+  .student-preview-study-link small { margin-top: 4px; color: #647684; font-size: 12px; line-height: 1.4; }
+  .student-preview-study-link strong { flex: 0 0 auto; color: #087BA6; font-size: 20px; }
+  .student-preview-study-link:focus-visible { outline: 3px solid #087BA6; outline-offset: 2px; }
+  .student-preview-study-note { margin-top: 10px; color: #647684; font-size: 12px; line-height: 1.55; }
   .student-portal-settings button, .student-portal-settings label { min-height: 44px; }
   .parent-preview-day { display: grid; place-items: center; flex: 0 0 42px; min-height: 42px; border-radius: 12px; background: #173957; color: #FFF; font-size: 13px; font-weight: 900; }
   .parent-preview-schedule { align-items: center; }
@@ -773,7 +781,7 @@
     .parent-preview-request-actions { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
-    .student-preview-shell .parent-preview-summary { grid-template-columns: 1fr; }
+    .student-preview-shell .parent-preview-summary, .student-preview-study-grid { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
     .parent-preview-hero-head, .parent-preview-between { flex-direction: column; }
@@ -813,11 +821,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-17.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-17.2"></script>
-<script src="./asset-core.js?v=2026-08-17.2"></script>
-<script src="./qr-core.js?v=2026-08-17.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-17.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.1"></script>
+<script src="./asset-core.js?v=2026-08-18.1"></script>
+<script src="./qr-core.js?v=2026-08-18.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.1"></script>
 <script>
 "use strict";
 
@@ -9741,6 +9749,7 @@ async function transitionGuardianAnnouncement(announcementId, action, expectedRe
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
 const GUARDIAN_PORTAL_SCOPE_VERSION = 4;
+const STUDENT_PORTAL_SCOPE_VERSION = 2;
 let studentPortalAccess = new Map(); // 학생 앱은 보호자 앱과 별도 동의·세션을 사용한다.
 let studentPortalLoaded = false;
 let studentPortalLoading = false;
@@ -9829,7 +9838,7 @@ async function saveStudentPortalAccess(idx, button) {
       if (checkbox) checkbox.checked = !!current.enabled;
       return toast('먼저 위에서 보호자 연락처를 저장해 주세요');
     }
-    if (!confirm('보호자에게 학생 앱 공개 범위(오늘 수업·출결·5단계·차량, 공개 숙제·준비물, 배정 교재, 주간 시간표)를 안내하고 동의를 확인했나요?')) {
+    if (!confirm('보호자에게 학생 앱 공개 범위 v2(오늘 수업·출결·5단계·차량, 공개 숙제·준비물, 배정 교재, 주간 시간표, 메타수학·클래스카드 공식 외부 화면 이동)를 안내하고 동의를 확인했나요?\n\n링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다.')) {
       if (checkbox) checkbox.checked = !!current.enabled;
       return;
     }
@@ -9843,10 +9852,11 @@ async function saveStudentPortalAccess(idx, button) {
   try {
     const result = await sync.post('/student-portal', {
       app: SYNC_APP, auth: auth, action: 'access_set', studentId: student.id,
-      enabled: enabled, consentConfirmed: enabled, expectedUpdatedAt: Number(current.updatedAt) || 0
+      enabled: enabled, consentConfirmed: enabled, scopeVersion: STUDENT_PORTAL_SCOPE_VERSION,
+      expectedUpdatedAt: Number(current.updatedAt) || 0
     });
     studentPortalAccess.set(student.id, result.access);
-    toast(enabled ? student.name + ' 학생 앱 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 학생 앱 연결을 해지했습니다');
+    toast(enabled ? student.name + ' 학생 앱 공개 범위 v2 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 학생 앱 연결을 해지했습니다');
     render();
   } catch (error) {
     if (error && error.code === 'ACCESS_REVISION_CONFLICT') {
@@ -10249,6 +10259,13 @@ function studentPreviewHtml(data) {
       esc(row.dayLabel || '요일') + '</span><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
       '</div></div><div class="parent-preview-time">' + esc(row.timeLabel || '시간 확인 중') + '</div></div>');
+  const externalLearningEnabled = !!(data && data.capabilities && data.capabilities.externalLearning === true);
+  const studySection = externalLearningEnabled
+    ? '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Study</p><h2 class="parent-preview-section-title">바로 학습하기</h2></div><span class="parent-preview-tag">외부 학습</span></div>' +
+      '<div class="student-preview-study-grid"><a class="student-preview-study-link" href="https://new.mmath.co.kr/Pages/student/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="메타수학 학생홈 열기, 새 창/탭에서 열림"><span><b>메타수학</b><small>수학 문제 풀기·채점</small></span><strong aria-hidden="true">↗</strong></a>' +
+      '<a class="student-preview-study-link" href="https://www.classcard.net/Login" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="클래스카드 열기, 새 창/탭에서 열림"><span><b>클래스카드</b><small>단어·문장 학습하기</small></span><strong aria-hidden="true">↗</strong></a></div>' +
+      '<p class="student-preview-study-note">링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다.</p></section>'
+    : '';
   const checkedAt = parentPreviewClock(data.generatedAt);
   return '<div class="parent-preview-shell student-preview-shell"><div class="parent-preview-appbar"><div class="parent-preview-brand">WB 학생' +
     '<small>WEXLER BRAIN CENTER</small></div><span class="parent-preview-readonly">읽기 전용</span></div><div class="parent-preview-main">' +
@@ -10263,12 +10280,13 @@ function studentPreviewHtml(data) {
     '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Today</p><h2 class="parent-preview-section-title">오늘 현황</h2></div></div>' +
     parentPreviewGroup('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
     parentPreviewGroup('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') + '</section>' +
+    studySection +
     parentPreviewSection('Learning', '최근 공개 숙제·준비물', publicRows, '최근 14일 공개 기록이 없습니다.') +
     parentPreviewSection('Book', '교재 준비·수령', bookRows, '현재 진행 중인 배정 교재가 없습니다.') +
     parentPreviewSection('Schedule', '주간 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
     '<section class="parent-preview-card parent-preview-info"><details><summary>학생 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
     '내 수업·출결·5단계 진행, 최근 14일 중 학생 공개를 체크한 숙제·준비물, 오늘 차량 상태, 배정 교재 상태와 주간 시간표만 표시합니다. 보호자 연락처·주소·정류장·내부 메모·보호자 전용 기능은 표시하지 않습니다.</p></details></section>' +
-    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 학생 공개 v1</b> · 실제 학생 연결·동의를 만들지 않습니다.</div>';
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 학생 공개 v2</b> · 실제 학생 연결·동의를 만들지 않습니다.</div>';
 }
 
 async function previewStudentPortal(idx, button) {
@@ -10407,8 +10425,8 @@ function viewStudentPortalPanel() {
     return '<div class="mt14"><div class="fl">' + esc(student.name) + ' <span class="muted">(' + esc(student.grade) + ' · ' +
       esc(student.teacher || '미지정') + ')</span></div><div class="row wraprow" style="gap:8px">' +
       '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="spAccess-' + index + '" ' +
-        (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v1</label>' +
-      (reconnect ? '<span class="small" style="color:var(--coral)">보호자 연락처 또는 학생 정보 변경 · 재동의 필요</span>' : '') +
+        (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v2</label>' +
+      (reconnect ? '<span class="small" style="color:var(--coral)">외부 학습 공개 추가 또는 보호자·학생 정보 변경 · 재동의 필요</span>' : '') +
       (!contact || !contact.phone ? '<span class="small muted">위 보호자 연락처를 먼저 저장해 주세요</span>' : '') +
       '<button class="btn btn-sm btn-ghost" data-act="studentportalaccess" data-idx="' + index + '"' + disabled + '>학생 앱 동의 저장</button>' +
       '<button class="btn btn-sm btn-primary" data-act="studentportalinvite" data-idx="' + index + '"' + inviteDisabled + '>학생 앱 초대</button>' +
@@ -10419,9 +10437,11 @@ function viewStudentPortalPanel() {
 
   return '<div class="card student-portal-settings"><div class="card-title">🎒 학생 앱 이용·초대</div>' +
     '<div class="card-sub mb14">학생 앱은 보호자 앱과 분리된 읽기 전용 화면입니다. 오늘 수업·출결·5단계 진행·오늘 차량, ' +
-    '선생님이 최근 14일 안에 <b>학생 앱에도 공개</b>를 선택한 숙제·준비물 기록, 배정 교재 상태와 주간 시간표만 표시합니다. ' +
+    '선생님이 최근 14일 안에 <b>학생 앱에도 공개</b>를 선택한 숙제·준비물 기록, 배정 교재 상태, 주간 시간표와 메타수학·클래스카드 공식 외부 학습 화면 링크만 표시합니다. ' +
+    '링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. ' +
+    'WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다. ' +
     '보호자 연락처·주소·정류장·내부 메모·보호자 요청·보강·회차·공지·주문 정보는 표시하지 않습니다.<br>' +
-    '<b>먼저 위에서 보호자 연락처를 저장하고, 보호자에게 이 공개 범위를 안내해 동의를 확인한 뒤 저장하세요.</b> ' +
+    '<b>먼저 위에서 보호자 연락처를 저장하고, 보호자에게 공개 범위 v2와 외부 서비스 이동·처리 내용을 안내해 동의를 확인한 뒤 저장하세요.</b> ' +
     '동의를 끄면 기존 학생 링크와 로그인도 즉시 해지됩니다.</div>' + notice + body + '</div>';
 }
 
@@ -12662,7 +12682,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-17.2';
+const APP_VER = '2026-08-18.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

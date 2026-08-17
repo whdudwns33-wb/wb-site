@@ -88,10 +88,14 @@ test('deployment helper never writes admin secrets into the repository', () => {
 
 test('기존 운영 DB의 포털 배포는 중복 migration과 역순 배포를 차단한다', () => {
   assert.match(portalRunbook, /deploy\.ps1.*새 설치 전용/);
+  assert.match(portalRunbook, /--command "\$PORTAL_PROBE_SQL"/);
+  assert.match(portalRunbook, /sed '\/\^\[\[:space:\]\]\*--\/d'/);
+  assert.doesNotMatch(portalRunbook, /--file=\.\/portal-release-probe\.sql/);
   assert.ok(portalRunbook.indexOf('036_guardian_announcements.sql') < portalRunbook.indexOf('037_book_order_identity_snapshots.sql'));
   assert.ok(portalRunbook.indexOf('037_book_order_identity_snapshots.sql') < portalRunbook.indexOf('038_student_portal.sql'));
-  assert.match(portalRunbook, /`038`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다/);
-  assert.match(portalRunbook, /`10\/10`, `21\/21`, `10\/10`, `2\/2`/);
+  assert.ok(portalRunbook.indexOf('038_student_portal.sql') < portalRunbook.indexOf('039_student_portal_scope_v2.sql'));
+  assert.match(portalRunbook, /`038`과 `039`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다/);
+  assert.match(portalRunbook, /`10\/10`, `21\/21`, `10\/10`, `2\/2`, `4\/4`, `4\/4`/);
   assert.match(portalRunbook, /연결을 끈 뒤.*모두 접근이 거절/s);
   assert.match(portalRunbook, /Origin: https:\/\/whdudwns33-wb\.github\.io/);
   assert.match(portalRunbook, /학생 앱 전용 주소/);
@@ -100,11 +104,13 @@ test('기존 운영 DB의 포털 배포는 중복 migration과 역순 배포를 
   assert.match(portalProbe, /'migration_037_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
   assert.match(portalProbe, /'migration_038_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
   assert.match(portalProbe, /'migration_038_columns'.*COUNT\(found\.column_name\).*COUNT\(\*\)/s);
+  assert.match(portalProbe, /'migration_039_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
+  assert.match(portalProbe, /'migration_039_columns'.*COUNT\(found\.column_name\).*COUNT\(\*\)/s);
   assert.match(mainWrangler, /WB_STUDENT_PORTAL_BASE_URL\s*=\s*"https:\/\/wb-student\.whdudwns33\.workers\.dev\/"/);
   assert.match(studentWrangler, /WB_STUDENT_PORTAL_BASE_URL\s*=\s*"https:\/\/wb-student\.whdudwns33\.workers\.dev\/"/);
 });
 
-test('포털 배포 probe는 fresh schema의 선행 구조와 036~038 객체를 정확히 센다', () => {
+test('포털 배포 probe는 fresh schema의 선행 구조와 036~039 객체를 정확히 센다', () => {
   const database = new DatabaseSync(':memory:');
   database.exec(schema);
   const rows = portalProbe.split(';').map(statement => statement.trim()).filter(Boolean)
@@ -114,6 +120,8 @@ test('포털 배포 probe는 fresh schema의 선행 구조와 036~038 객체를 
     ['migration_036_objects', 10, 10],
     ['migration_037_objects', 21, 21],
     ['migration_038_objects', 10, 10],
-    ['migration_038_columns', 2, 2]
+    ['migration_038_columns', 2, 2],
+    ['migration_039_objects', 4, 4],
+    ['migration_039_columns', 4, 4]
   ]);
 });

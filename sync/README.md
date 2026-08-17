@@ -46,6 +46,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/035_parent_portal_p
 npx wrangler d1 execute wb-sync --remote --file=./migrations/036_guardian_announcements.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_identity_snapshots.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -492,13 +493,16 @@ task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 �
 
 학생 앱은 보호자 앱과 다른 Worker origin과 `__Host-wb_student_session` 쿠키를 사용한다. 관리자 화면에서
 현재 보호자 연락처를 먼저 저장한 뒤, 보호자에게 공개 범위를 안내하고 별도 동의를 확인해야 access를
-활성화할 수 있다. access·초대코드·세션에는 현재 stable 학생 identity와 보호자 identity, scope v1,
+활성화할 수 있다. access·초대코드·세션에는 현재 stable 학생 identity와 보호자 identity, 동의 scope,
 동의 시각을 함께 봉인한다. 학생 이름이나 보호자 연락처가 바뀌면 기존 코드와 세션을 즉시 폐기한다.
+외부학습 이동을 포함한 현재 공개 범위는 scope v2다. 기존 v1 세션은 종전 읽기 정보만 유지하며
+`capabilities.externalLearning=false`를 받는다. v2는 보호자에게 범위를 다시 안내·확인한 뒤에만 저장하고,
+저장 즉시 v1 코드·세션을 폐기해 새 초대 링크로 연결한다.
 
 ```jsonc
 // 직원·보호자 Worker의 원장·관리 담당 인증 경로
 { "app":"task", "auth":{...}, "action":"access_set", "studentId":"student-1",
-  "enabled":true, "consentConfirmed":true, "expectedUpdatedAt":0 }
+  "enabled":true, "consentConfirmed":true, "scopeVersion":2, "expectedUpdatedAt":0 }
 { "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
 { "app":"task", "auth":{...}, "action":"preview", "studentId":"student-1" }
 
@@ -512,6 +516,9 @@ task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 �
 최근 14일 중 선생님이 `학생 앱에도 공개`를 명시한 숙제·준비물 기록, identity가 검증된 배정 교재 상태만 표시한다.
 보호자 연락처·주소·정류장·기사 정보·내부 메모·보호자 요청·보강·회차·공지·수업 피드백·교재 주문
 상태는 반환하지 않는다. 기존 보호자 공개 숙제는 `student_visible=0`으로 유지되어 자동 승계되지 않는다.
+외부 서비스 URL도 API DTO에 넣지 않고, scope v2 세션과 관리자 미리보기에만
+`capabilities.externalLearning=true`를 반환한다. 정적 학생 화면은 이 boolean이 true일 때만 사전에 검토한
+공식 학습 링크를 표시한다.
 학생 앱 정적 파일은 `student/`, 전용 Worker 설정은 `sync/wrangler.student.toml`에 있다. 한 학생 기기에
 다른 초대코드를 연결하려면 먼저 로그아웃해야 하며, 유효 세션이 있으면 코드를 소비하지 않고 409로 막는다.
 
