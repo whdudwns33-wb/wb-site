@@ -86,3 +86,31 @@ WITH expected(table_name, column_name) AS (VALUES
 SELECT 'migration_038_columns' AS check_name, COUNT(found.column_name) AS found, COUNT(*) AS expected
 FROM expected
 LEFT JOIN found ON found.table_name=expected.table_name AND found.column_name=expected.column_name;
+
+-- 039는 구 Worker용 scope_version=1 열을 유지하고 실제 v1·v2 동의 범위 열을 추가한다.
+-- 세 테이블이나 범위 보호 trigger 중 일부만 바뀌면 Worker를 배포하지 않는다.
+WITH expected(type, name) AS (VALUES
+  ('trigger','trg_student_portal_code_scope_insert'),
+  ('trigger','trg_student_portal_session_scope_insert'),
+  ('trigger','trg_student_portal_access_disable_scope'),
+  ('trigger','trg_student_portal_access_scope_mismatch')
+)
+SELECT 'migration_039_objects' AS check_name, COUNT(schema.name) AS found, COUNT(*) AS expected
+FROM expected
+LEFT JOIN sqlite_master schema ON schema.type=expected.type AND schema.name=expected.name;
+
+WITH expected(table_name, column_name) AS (VALUES
+  ('student_portal_access','effective_scope_version'),
+  ('student_portal_access','scope_confirmed_at'),
+  ('student_portal_codes','effective_scope_version'),
+  ('student_portal_sessions','effective_scope_version')
+), found(table_name, column_name) AS (
+  SELECT 'student_portal_access', name FROM pragma_table_info('student_portal_access')
+  UNION ALL
+  SELECT 'student_portal_codes', name FROM pragma_table_info('student_portal_codes')
+  UNION ALL
+  SELECT 'student_portal_sessions', name FROM pragma_table_info('student_portal_sessions')
+)
+SELECT 'migration_039_columns' AS check_name, COUNT(found.column_name) AS found, COUNT(*) AS expected
+FROM expected
+LEFT JOIN found ON found.table_name=expected.table_name AND found.column_name=expected.column_name;

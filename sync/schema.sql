@@ -2114,6 +2114,8 @@ CREATE TABLE IF NOT EXISTS student_portal_access (
   accepted_at           INTEGER,
   updated_at            INTEGER NOT NULL,
   updated_by            TEXT    NOT NULL,
+  effective_scope_version INTEGER NOT NULL DEFAULT 1 CHECK (effective_scope_version IN (1,2)),
+  scope_confirmed_at    INTEGER CHECK (scope_confirmed_at IS NULL OR scope_confirmed_at>0),
   CHECK (enabled = 0 OR (
     student_identity_hash IS NOT NULL AND guardian_identity_hash IS NOT NULL
     AND scope_version = 1 AND accepted_at IS NOT NULL
@@ -2135,6 +2137,7 @@ CREATE TABLE IF NOT EXISTS student_portal_codes (
   revoked               INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
   issued_by             TEXT    NOT NULL,
   claim_id              TEXT CHECK (claim_id IS NULL OR length(claim_id) = 48),
+  effective_scope_version INTEGER NOT NULL DEFAULT 1 CHECK (effective_scope_version IN (1,2)),
   PRIMARY KEY (app, code_hash)
 );
 CREATE INDEX IF NOT EXISTS idx_student_portal_codes_student
@@ -2152,22 +2155,75 @@ CREATE TABLE IF NOT EXISTS student_portal_sessions (
   expires_at            INTEGER NOT NULL,
   last_seen_at          INTEGER NOT NULL,
   revoked               INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  effective_scope_version INTEGER NOT NULL DEFAULT 1 CHECK (effective_scope_version IN (1,2)),
   PRIMARY KEY (app, token_hash)
 );
 CREATE INDEX IF NOT EXISTS idx_student_portal_sessions_student
   ON student_portal_sessions(app, student_id, revoked, expires_at);
 
 CREATE TRIGGER IF NOT EXISTS trg_student_portal_access_revoke
-AFTER UPDATE OF enabled, student_identity_hash, guardian_identity_hash, scope_version ON student_portal_access
+AFTER UPDATE OF enabled, student_identity_hash, guardian_identity_hash,
+  scope_version, effective_scope_version, scope_confirmed_at ON student_portal_access
 WHEN NEW.enabled=0
   OR OLD.student_identity_hash IS NOT NEW.student_identity_hash
   OR OLD.guardian_identity_hash IS NOT NEW.guardian_identity_hash
   OR OLD.scope_version IS NOT NEW.scope_version
+  OR OLD.effective_scope_version IS NOT NEW.effective_scope_version
+  OR OLD.scope_confirmed_at IS NOT NEW.scope_confirmed_at
 BEGIN
   UPDATE student_portal_codes SET revoked=1
   WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
   UPDATE student_portal_sessions SET revoked=1
   WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_code_scope_insert
+BEFORE INSERT ON student_portal_codes
+WHEN NOT EXISTS (
+  SELECT 1 FROM student_portal_access access
+  WHERE access.app=NEW.app AND access.student_id=NEW.student_id AND access.enabled=1
+    AND access.student_identity_hash=NEW.student_identity_hash
+    AND access.guardian_identity_hash=NEW.guardian_identity_hash
+    AND access.updated_at=NEW.access_updated_at
+    AND access.scope_version=1
+    AND access.effective_scope_version=NEW.effective_scope_version
+    AND (access.effective_scope_version=1 OR access.scope_confirmed_at=access.updated_at)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_PORTAL_CODE_SCOPE_MISMATCH');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_session_scope_insert
+BEFORE INSERT ON student_portal_sessions
+WHEN NOT EXISTS (
+  SELECT 1 FROM student_portal_access access
+  WHERE access.app=NEW.app AND access.student_id=NEW.student_id AND access.enabled=1
+    AND access.student_identity_hash=NEW.student_identity_hash
+    AND access.guardian_identity_hash=NEW.guardian_identity_hash
+    AND access.updated_at=NEW.access_updated_at
+    AND access.scope_version=1
+    AND access.effective_scope_version=NEW.effective_scope_version
+    AND (access.effective_scope_version=1 OR access.scope_confirmed_at=access.updated_at)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_PORTAL_SESSION_SCOPE_MISMATCH');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_access_disable_scope
+AFTER UPDATE OF enabled ON student_portal_access
+WHEN NEW.enabled=0 AND NEW.effective_scope_version<>1
+BEGIN
+  UPDATE student_portal_access SET effective_scope_version=1,scope_confirmed_at=NULL
+  WHERE app=NEW.app AND student_id=NEW.student_id AND effective_scope_version<>1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_access_scope_mismatch
+AFTER UPDATE OF updated_at ON student_portal_access
+WHEN NEW.enabled=1 AND NEW.effective_scope_version=2
+  AND NEW.scope_confirmed_at IS NOT NEW.updated_at
+BEGIN
+  UPDATE student_portal_access SET effective_scope_version=1,scope_confirmed_at=NULL
+  WHERE app=NEW.app AND student_id=NEW.student_id AND effective_scope_version=2;
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_student_portal_roster_identity_update

@@ -180,11 +180,85 @@ test('availability is opt-in and the planner UI is wired for students and direct
   assert.match(html, /가용시간 부족/);
   assert.match(html, /session\.isStaffLink \|\| admin/);
   assert.match(html, /if \(!\(session\.isAdmin \|\| isManager\(\)\)\) break/);
-  assert.match(html, /x\.type === 'free' && canManage && date >= today\(\)/);
+  assert.match(html, /x\.type === 'free' && canManage && d\.date >= today\(\)/);
   assert.match(html, /if \(start < today\(\)\) return \{ error: '시작일은 오늘 이후로 선택해 주세요' \}/);
   assert.match(html, /ingPlan\(me\.id, d\)\.concat\(buckets\[d\]\)/);
   assert.match(html, /!ds\.length && data\.result\.remaining/);
-  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-week \{ grid-template-columns: 1fr; min-width: 0; \}/);
+  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-cal-head:not\(\.active\), \.ing-cal-day:not\(\.active\) \{ display: none; \}/);
+});
+
+test('weekly lecture schedule uses calendar geometry and a mobile day selector', () => {
+  const source = between('function ingCalendarPosition(', '\n\nfunction ingWeekCard(');
+  const position = Function('const ING_CAL_HOUR_PX=60; ' + source + '\nreturn ingCalendarPosition;')();
+  assert.deepEqual(position(540, 630, 420, 1380), { top: 120, height: 90 });
+  assert.deepEqual(position(390, 480, 420, 1380), { top: 0, height: 60 });
+  assert.deepEqual(position(540, 600, 540, 600, 240), { top: 0, height: 240 });
+  assert.equal(position(1380, 1440, 420, 1380), null);
+  assert.equal(position(600, 600, 420, 1380), null);
+
+  assert.match(html, /grid-template-columns: 44px repeat\(7, minmax\(92px, 1fr\)\)/);
+  assert.match(html, /background-size: 100% var\(--ing-cal-hour-px, 60px\)/);
+  assert.match(html, /class="ing-cal-tabs"[\s\S]*?data-act="ingcalday"/);
+  assert.match(html, /class="ing-cal-head-row"[\s\S]*?class="ing-cal-body"/);
+  assert.match(html, /role="region" tabindex="0" aria-label="주간 인강 캘린더"/);
+  assert.match(html, /x\.conflict \? ' conflict' : ''/);
+  const dayCase = between("case 'ingcalday':", "case 'ingavopen':");
+  assert.match(dayCase, /ingCalDay = i; render\(\)/);
+  assert.doesNotMatch(dayCase, /setCheck|save\(|queueSync|localStorage/);
+
+  const weekSource = between('function ingCalendarPosition(', '\n\nfunction ingAvailRowHtml(');
+  const renderWeek = Function(`${dateHelpers}
+    const ING_CAL_HOUR_PX=60, ING_MIN_TOUCH_PX=44, DOW=['일','월','화','수','목','금','토'];
+    let ingCalDay=2, ingWeekAnchor='2026-08-23';
+    function today(){return '2026-08-19';}
+    function mondayOf(){return '2026-08-17';}
+    function ingAvail(sid){
+      if(sid==='short') return {configured:true,start:'07:00',end:'23:00',blocks:[]};
+      if(sid==='conflict') return {configured:true,start:'09:00',end:'10:00',blocks:[
+        {days:[1,2,3,4,5,6,0],s:'09:00',e:'10:00',label:'수학 학원'}
+      ]};
+      return {configured:true,start:'09:00',end:'10:00',blocks:[]};
+    }
+    function ingWeeklyFreeMin(){return 420;}
+    function ingHourText(min){return min+'분';}
+    function ingHmMin(v){const [h,m]=v.split(':').map(Number);return h*60+m;}
+    function shortDate(v){return v.slice(5).replace('-', '.');}
+    function esc(v){return String(v);}
+    function tbOf(){return [];}
+    function ingPlan(sid){return sid==='conflict'?[{s:'09:00',e:'10:00',cid:'course',seq:1}]:[];}
+    function ingLec(sid){return sid==='conflict'?{course:{name:'개념 인강'}}:null;}
+    function ingFreeForDate(sid){
+      if(sid==='short') return [{s:540,e:560}];
+      if(sid==='conflict') return [];
+      return [{s:540,e:600}];
+    }
+    ${weekSource}
+    return ingWeekCard;`)();
+  const directorHtml = renderWeek({id:'student'}, true, true);
+  const studentHtml = renderWeek({id:'student'}, true, false);
+  assert.equal((directorHtml.match(/class="ing-cal-head /g) || []).length, 7);
+  assert.equal((directorHtml.match(/data-act="ingcalday"/g) || []).length, 7);
+  assert.equal((directorHtml.match(/data-act="ingslot"/g) || []).length, 5);
+  assert.equal((studentHtml.match(/data-act="ingslot"/g) || []).length, 0);
+  assert.match(directorHtml, /--ing-cal-height:240px;--ing-cal-hour-px:240px/);
+  assert.match(directorHtml, /style="top:0px;height:240px"/);
+  assert.match(directorHtml, /class="ing-cal-time-label start" style="top:0">09:00/);
+  assert.match(directorHtml, /class="ing-cal-time-label end" style="top:240px">10:00/);
+
+  const shortHtml = renderWeek({id:'short'}, true, true);
+  assert.equal((shortHtml.match(/class="btn btn-ghost ing-short-slot-action"/g) || []).length, 5);
+  assert.equal((shortHtml.match(/<button type="button" class="ing-cal-event free/g) || []).length, 0);
+  assert.equal((shortHtml.match(/data-act="ingslot"/g) || []).length, 5);
+  assert.match(html, /\.ing-short-slot-action \{ min-height: 44px/);
+  assert.match(html, /outline: 3px solid var\(--deep-blue\)/);
+  const focusRgb = html.match(/--deep-blue:\s*#([0-9A-F]{6})/i)[1].match(/../g).map(x => parseInt(x, 16));
+  const luminance = rgb => rgb.map(v => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  assert.ok((luminance([255, 255, 255]) + 0.05) / (luminance(focusRgb) + 0.05) >= 3);
+
+  const conflictHtml = renderWeek({id:'conflict'}, true, true);
+  assert.match(conflictHtml, /aria-label="겹친 일정"/);
+  assert.match(conflictHtml, /고정 일정 · 수학 학원 ↔ 인강 · 개념 인강 1강/);
 });
 
 test('five official course sites have safe direct links and smart-paste fallback', () => {
@@ -237,6 +311,12 @@ test('director-only lecture mutations are guarded and student checks stay self-s
   assert.match(between("case 'ingdel':", "case 'ingassign':"), director);
   assert.match(between("case 'ingcatchup':", "case 'ingshift':"), director);
   assert.match(between("case 'ingshift':", '/* 순공시간 타이머 */'), director);
+  const slotOpen = between("case 'ingslot':", "case 'ingslotsave':");
+  const slotSave = between("case 'ingslotsave':", "case 'ingadd':");
+  assert.match(slotOpen, director);
+  assert.match(slotSave, director);
+  assert.match(slotOpen, /el\.dataset\.date < today\(\)/);
+  assert.match(slotSave, /el\.dataset\.date < today\(\)/);
   const check = between("case 'ingcheck':", "case 'ingreview':");
   assert.match(check, /const me = currentStaff\(\)/);
   assert.match(check, /me\.id !== el\.dataset\.sid/);

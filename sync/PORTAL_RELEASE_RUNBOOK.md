@@ -1,36 +1,39 @@
 # 보호자·학생 앱 운영 배포 및 실제 기기 확인
 
-이 문서는 **기존 운영 D1**에 보호자 앱 Phase 3·4와 학생 앱을 처음 반영할 때만 사용한다.
+이 문서는 **기존 운영 D1**에 보호자 앱 Phase 3·4와 학생 앱 공개 v1·v2를 반영할 때 사용한다.
 학생 이름, 전화번호, 초대코드, 세션값, 관리자 비밀키는 터미널·채팅·검증 기록에 남기지 않는다.
 
 ## 완료 기준
 
-- 운영 D1에 필요한 `036 → 037 → 038` 구조가 정확히 존재한다.
+- 운영 D1에 필요한 `036 → 037 → 038 → 039` 구조가 정확히 존재한다.
 - 보호자·직원 Worker, 학생 전용 Worker, task 화면이 이 순서로 배포된다.
 - 관리자 미리보기는 DB 행이나 쿠키를 만들지 않는다.
 - 동의받은 시험 학생 한 명이 휴대폰과 태블릿에서 학생 앱을 연다.
 - 학생 앱에는 오늘 수업·출결·5단계, 오늘 차량, 최근 14일 공개 숙제·준비물,
   배정 교재 상태, 주간 시간표만 보인다.
+- 기존 학생 공개 v1 세션에는 외부 학습 링크가 보이지 않고, 보호자가 v2 범위를 다시 확인한
+  학생에게만 메타수학·클래스카드 공식 화면 링크 두 개가 보인다.
 - 보호자 요청, 보강, 회차, 공지, 주문 상태, 연락처, 주소, 내부 메모, 다른 학생 정보는 보이지 않는다.
 - 연결을 끄면 기존 초대코드와 모든 학생 세션이 즉시 사용할 수 없게 된다.
 
-## 2026-08-17 KST 읽기 전용 사전 점검
+## 2026-08-18 KST 읽기 전용 사전 점검
 
 운영 변경 없이 확인한 기준 상태다. 실제 배포 직전에는 2절의 probe를 다시 실행한다.
 
 | 점검 | 현재 운영 상태 |
 |---|---|
 | 선행 테이블 | `9/9` |
-| 036 객체 | `0/10` — 미적용 |
-| 037 객체 | `0/21` — 미적용 |
-| 038 객체·열 | `0/10`, `0/2` — 미적용 |
+| 036 객체 | `10/10` — 적용됨 |
+| 037 객체 | `21/21` — 적용됨 |
+| 038 객체·열 | `10/10`, `2/2` — 적용됨 |
+| 039 객체·열 | `0/4`, `0/4` — 미적용 |
 | 보호자·직원 Worker health | HTTP `200` |
-| 학생 Worker health/root | HTTP `404` / Cloudflare `1042` — 미배포 |
-| 원격 task/version | `2026-08-17.1` |
-| 이 작업트리의 배포 예정 버전 | `2026-08-17.2` |
+| 학생 Worker health | HTTP `200` |
+| 원격 task/version | `2026-08-17.2` |
+| 이 작업트리의 다음 배포 버전 | 배포 직전 task·consult·version을 함께 상승 |
 
-D1 조회 결과는 `rows_written: 0`, `changed_db: false`였다. 따라서 현재 필요한 운영 순서는
-세 migration을 각각 한 번 적용한 뒤 두 Worker와 task 화면을 배포하는 정상 경로다.
+D1 조회 결과는 `rows_written: 0`, `changed_db: false`였다. 따라서 036~038은 다시 실행하지 않고,
+039만 한 번 적용한 뒤 두 Worker와 학생·task 화면을 배포해야 한다.
 
 ## 1. 코드 검증
 
@@ -65,8 +68,13 @@ npx wrangler deploy --config wrangler.student.toml --dry-run
 
 ```bash
 cd sync
-npx wrangler d1 execute wb-sync --remote --file=./portal-release-probe.sql
+PORTAL_PROBE_SQL="$(sed '/^[[:space:]]*--/d' ./portal-release-probe.sql)"
+npx wrangler d1 execute wb-sync --remote --command "$PORTAL_PROBE_SQL"
+unset PORTAL_PROBE_SQL
 ```
+
+probe는 설명 주석을 뺀 뒤 읽기 전용 `--command`로 실행한다. `--file`은 Wrangler의 import 경로를
+사용해 읽기 전용 점검에도 운영 DB 일시 잠금과 별도 인증을 요구할 수 있으므로 probe에는 쓰지 않는다.
 
 판정은 다음과 같이 한다.
 
@@ -75,9 +83,13 @@ npx wrangler d1 execute wb-sync --remote --file=./portal-release-probe.sql
 - `migration_037_objects`는 `0/21`이면 037을 한 번 적용하고, `21/21`이면 건너뛴다.
 - `migration_038_objects`와 `migration_038_columns`는 각각 `0/10`, `0/2`일 때만 038을
   한 번 적용하고, 각각 `10/10`, `2/2`이면 건너뛴다.
+- `migration_039_objects`와 `migration_039_columns`는 각각 `0/4`, `0/4`일 때만 039를
+  한 번 적용하고, 각각 `4/4`, `4/4`이면 건너뛴다.
 - 일부만 있으면 **중단**한다. 같은 파일을 다시 실행하거나 스키마를 손으로 고치지 않는다.
 - 036은 테이블 2 + 인덱스 2 + 트리거 6, 037은 테이블 3 + 인덱스 4 + 트리거 14,
-  038은 테이블 3 + 인덱스 2 + 트리거 5와 열 2가 완전한 상태다.
+  038은 테이블 3 + 인덱스 2 + 트리거 5와 열 2, 039는 학생 access/code/session의
+  `effective_scope_version` 열 3개, access의 `scope_confirmed_at` 열 1개와 범위 보호 트리거
+  4개가 완전한 상태다.
 - 이 저장소는 과거에 SQL 파일을 직접 적용한 이력이 있으므로 `d1_migrations` 기록만으로
   적용 여부를 판단하지 않는다.
 
@@ -89,16 +101,19 @@ npx wrangler d1 execute wb-sync --remote --file=./portal-release-probe.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/036_guardian_announcements.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_identity_snapshots.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
 ```
 
-`038`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다. 적용 직후 probe를 다시
-실행하고 `9/9`, `10/10`, `21/21`, `10/10`, `2/2`를 모두 확인한다.
+`038`과 `039`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다. 적용 직후 probe를 다시
+실행하고 `9/9`, `10/10`, `21/21`, `10/10`, `2/2`, `4/4`, `4/4`을 모두 확인한다.
 
 - `guardian_announcements`, `guardian_announcement_events`
 - `book_order_student_snapshots`, `book_order_active_targets`, `book_order_cancellations`
 - `student_portal_access`, `student_portal_codes`, `student_portal_sessions`
 - `guardian_lesson_publications.student_visible`
 - `guardian_lesson_publication_events.student_visible`
+- `student_portal_access/codes/sessions.effective_scope_version`
+- `student_portal_access.scope_confirmed_at`
 
 어느 하나라도 빠지면 Worker를 배포하지 않는다.
 
@@ -114,7 +129,7 @@ npx wrangler deploy --config wrangler.student.toml
 
 배포 순서는 반드시 다음과 같다.
 
-1. 운영 D1 `036 → 037 → 038`
+1. 운영 D1 `036 → 037 → 038 → 039`
 2. 보호자·직원 Worker (`wrangler.toml`)
 3. 학생 전용 Worker (`wrangler.student.toml`)
 4. task Pages와 `version.json`
@@ -161,7 +176,9 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 ## 6. 실제 휴대폰·태블릿 확인
 
-반드시 보호자에게 학생 앱 공개 범위를 설명하고 동의를 받은 시험 학생으로 진행한다.
+반드시 보호자에게 학생 앱 공개 v2 범위와 외부 서비스 이동 시 처리될 수 있는 기기·접속 기록·
+서비스 쿠키를 설명하고 동의를 받은 시험 학생으로 진행한다. WB는 외부 아이디·비밀번호·학습 결과를
+받거나 저장하지 않는다.
 
 1. 관리자 화면에서 보호자 연락처 연결 상태를 확인한다.
 2. 학생 앱 공개 동의 확인란을 선택해 연결을 켠다.
@@ -169,13 +186,16 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 4. 학생 휴대폰 Chrome 또는 Safari에서 링크를 연다.
 5. 주소창에서 초대 fragment가 즉시 사라지고 화면이 열린 것을 확인한다.
 6. 오늘 수업·차량·최근 공개 기록·배정 교재·주간 시간표를 각각 확인한다.
-7. 앱을 백그라운드로 보냈다가 다시 열고, 새로고침 후에도 같은 학생만 보이는지 확인한다.
-8. 태블릿에도 별도로 연결해 같은 항목과 모바일 배치를 확인한다.
-9. 이미 연결된 기기에서 새 링크를 열면 기존 연결 안내와 로그아웃 동작이 보이고,
+7. 메타수학·클래스카드 링크가 정확히 두 개만 보이고, 새 창/탭의 공식 HTTPS 주소로 열리는지 확인한다.
+8. 앱을 백그라운드로 보냈다가 다시 열고, 새로고침 후에도 같은 학생만 보이는지 확인한다.
+9. 태블릿에도 별도로 연결해 같은 항목과 모바일 배치를 확인한다.
+10. 이미 연결된 기기에서 새 링크를 열면 기존 연결 안내와 로그아웃 동작이 보이고,
    로그아웃 뒤 새 링크가 정상 교환되는지 확인한다.
-10. 관리자 화면에서 연결을 끈 뒤 휴대폰·태블릿을 새로고침해 모두 접근이 거절되는지 확인한다.
+11. 관리자 화면에서 연결을 끈 뒤 휴대폰·태블릿을 새로고침해 모두 접근이 거절되는지 확인한다.
 
-학생 앱에서 수정·응답·자유 입력·전화 걸기·외부 링크가 보이면 실패로 판정한다.
+학생 앱에서 수정·응답·자유 입력·전화 걸기가 보이면 실패로 판정한다. 기존 v1 세션에 외부 링크가
+보이거나, v2 화면에 승인된 메타수학·클래스카드 공식 HTTPS 주소 외의 링크·iframe·자동 로그인이
+있어도 실패로 판정한다.
 
 ## 7. 보호자 앱 회귀 확인
 
@@ -190,7 +210,7 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 - 잘못된 학생 또는 잘못된 보호자 동의를 발견하면 가장 먼저 관리자 화면에서 해당 학생의
   학생 앱 연결을 끈다. 코드와 세션이 모두 해지된 뒤 원인을 확인한다.
-- Worker나 화면 오류는 직전 배포로 되돌릴 수 있다. `036~038`은 additive schema이므로
+- Worker나 화면 오류는 직전 배포로 되돌릴 수 있다. `036~039`는 기존 데이터를 보존하는 schema이므로
   운영 테이블을 삭제하거나 데이터를 되돌리지 않는다.
 - `SESSION_ALREADY_ACTIVE`는 발급 실패가 아니다. 기존 기기에서 로그아웃한 뒤 같은 새 링크를
   교환한다.
@@ -203,13 +223,14 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 ```text
 배포일시(KST):
-D1 036/037/038: 적용/기적용
+D1 036/037/038/039: 적용/기적용
 보호자·직원 Worker health: 통과/실패
 학생 Worker health: 통과/실패
 관리자 미리보기 무부작용: 통과/실패
 휴대폰 연결: 통과/실패
 태블릿 연결: 통과/실패
 허용 정보만 표시: 통과/실패
+v1 외부 링크 비노출·v2 공식 링크 2개: 통과/실패
 연결 해제 후 세션 차단: 통과/실패
 남은 문제(민감정보 제외):
 ```
