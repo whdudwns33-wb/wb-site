@@ -261,13 +261,32 @@
   /* ─── 오늘 배부 공부 / 스터디 플래너 ─── */
   .study-offer { border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; padding: 12px; margin-top: 9px; background: linear-gradient(90deg, var(--subject-bg), #fff 42%); }
   .study-offer:first-of-type { margin-top: 12px; }
-  .study-planner { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(235px, .85fr); gap: 16px; align-items: start; }
-  .study-planner-pane { min-width: 0; }
-  .study-planner-pane + .study-planner-pane { border-left: 1px solid var(--line); padding-left: 16px; }
+  .study-paper { overflow: hidden; padding: 0; background: #FFFEF8; border-color: #DDD8C9; box-shadow: 0 10px 30px rgba(70,63,45,.08); }
+  .study-paper-head { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(160px, 1.2fr) minmax(145px, 1fr); align-items: end; gap: 16px; padding: 18px 20px 15px; border-bottom: 2px solid #B9B29F; background: linear-gradient(180deg, #FFFEFB, #FAF7ED); }
+  .study-paper-date { color: #343434; font-size: 23px; font-weight: 500; letter-spacing: -.04em; line-height: 1.1; }
+  .study-paper-date em { margin-left: 5px; color: var(--mid-gray); font-size: 13px; font-style: normal; font-weight: 900; letter-spacing: .06em; }
+  .study-paper-title { color: #736C5A; font-size: 12px; font-weight: 900; letter-spacing: .11em; text-align: center; }
+  .study-paper-total { text-align: right; color: var(--navy); }
+  .study-paper-total span { display: block; color: #827B69; font-size: 11px; font-weight: 900; letter-spacing: .08em; }
+  .study-paper-total b { display: block; font-size: 24px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .study-planner { display: grid; grid-template-columns: minmax(0, 1.28fr) minmax(255px, .92fr); align-items: stretch; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 53px, rgba(183,177,159,.16) 54px); }
+  .study-planner-pane { min-width: 0; padding: 14px 16px 18px; }
+  .study-planner-pane + .study-planner-pane { border-left: 2px solid #CFC9B7; }
+  .study-paper-col-title { min-height: 30px; padding-bottom: 8px; border-bottom: 1px solid #D7D1C0; color: #736C5A; font-size: 11px; font-weight: 900; letter-spacing: .08em; }
+  .study-paper-col-title span { float: right; color: #A09A89; font-size: 10px; letter-spacing: 0; }
+  .study-paper .task { min-height: 54px; padding: 10px 3px; border-bottom-color: #E7E2D5; }
+  .study-paper .task-t { font-size: 14px; }
+  .study-paper .task-d { font-size: 12px; }
+  .study-paper .box { width: 21px; height: 21px; margin-top: 3px; border-radius: 50%; border-color: #D6A0AC; background: transparent; }
+  .study-paper .task.done .box { background: #D98FA0; border-color: #D98FA0; }
+  .study-paper .meta { margin-top: 5px; }
   .study-time-total { font-size: 32px; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-  .study-time-row { margin-top: 11px; }
-  .study-time-track { height: 13px; border-radius: 999px; background: var(--light-gray); overflow: hidden; margin-top: 5px; }
-  .study-time-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--subject-color); transition: width .25s ease; }
+  .study-time-controls { padding: 10px 0 4px; border-bottom: 1px dashed #D7D1C0; }
+  .study-time-scale { display: flex; justify-content: space-between; margin: 9px 0 0; color: #9A9484; font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .study-time-row { min-height: 54px; padding: 8px 0; }
+  .study-time-track { position: relative; height: 24px; overflow: hidden; margin-top: 4px; border: 1px solid #D8D3C5; border-radius: 2px; background-color: rgba(255,255,255,.72); background-image: linear-gradient(to right, rgba(182,176,158,.34) 1px, transparent 1px); background-size: calc(100% / var(--planner-slots, 18)) 100%; }
+  .study-time-track::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 49%, rgba(182,176,158,.16) 50%, transparent 52%); pointer-events: none; }
+  .study-time-track i { display: block; width: 0; height: 100%; border-radius: 1px; background: var(--subject-color); opacity: .9; transition: width .25s ease; }
   .quick-add-grid { display: grid; grid-template-columns: 118px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 
   :is(button, input, select, textarea, [tabindex]):focus-visible {
@@ -284,8 +303,13 @@
     .modal { place-items: end center; padding-left: 0; padding-right: 0; padding-bottom: 0; }
     .modal-box { max-width: none; max-height: 92vh; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
     #toast { bottom: calc(18px + env(safe-area-inset-bottom)); }
-    .study-planner { grid-template-columns: 1fr; }
-    .study-planner-pane + .study-planner-pane { border-left: none; border-top: 1px solid var(--line); padding-left: 0; padding-top: 16px; }
+    .study-paper-head { grid-template-columns: 1fr auto; gap: 8px; padding: 15px 14px 12px; }
+    .study-paper-date { font-size: 20px; }
+    .study-paper-title { display: none; }
+    .study-paper-total b { font-size: 20px; }
+    .study-planner { grid-template-columns: 1fr; background-image: none; }
+    .study-planner-pane { padding: 13px 14px 16px; }
+    .study-planner-pane + .study-planner-pane { border-left: none; border-top: 2px solid #CFC9B7; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -1186,6 +1210,9 @@ function studyOffersCard(me, date, offers) {
 }
 
 function studyPlannerCard(me, date, list, carry, editable) {
+  const dateObj = new Date(date + 'T00:00:00');
+  const dayName = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dateObj.getDay()];
+  const studyTotal = stTotal(me.id, date);
   const checklist = (carry.length
     ? '<div class="small" style="font-weight:900;color:var(--coral);margin-bottom:5px">지난 미완료</div>' +
       carry.map(x => taskRow(x.t, x.date, editable, true)).join('')
@@ -1195,13 +1222,17 @@ function studyPlannerCard(me, date, list, carry, editable) {
         list.map(task => taskRow(task, date, editable, false)).join('')
       : (!carry.length ? '<div class="small muted" style="padding:16px 0">배부 공부를 가져오거나 아래에서 직접 추가해 주세요.</div>' : ''));
 
-  return '<div class="card" id="studyPlanner"><div class="between mb14"><div>' +
-      '<div class="card-title">🗒 스터디 플래너</div>' +
-      '<div class="card-sub">왼쪽에서 실제 공부를 체크하고, 오른쪽에서 과목별 순공시간을 기록합니다.</div>' +
-    '</div><span class="pill">체크리스트 ' + (list.length + carry.length) + '개</span></div>' +
+  return '<div class="card study-paper" id="studyPlanner">' +
+    '<div class="study-paper-head">' +
+      '<div class="study-paper-date">' + date.replace(/-/g, '.') + '<em>' + dayName + '</em></div>' +
+      '<div class="study-paper-title">TODAY STUDY PLANNER</div>' +
+      '<div class="study-paper-total"><span>PURE STUDY TIME</span><b id="stTot">' + fmtHMS(studyTotal) + '</b></div>' +
+    '</div>' +
     '<div class="study-planner">' +
-      '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' + checklist + '</section>' +
-      '<section class="study-planner-pane" aria-label="과목별 순공시간">' + studyTimePanel(me, editable) + '</section>' +
+      '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' +
+        '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (list.length + carry.length) + ' TASKS</span></div>' + checklist + '</section>' +
+      '<section class="study-planner-pane" aria-label="과목별 순공시간">' +
+        '<div class="study-paper-col-title">SUBJECT STUDY TIME <span>10분 단위</span></div>' + studyTimePanel(me, editable, true) + '</section>' +
     '</div></div>';
 }
 
@@ -1371,26 +1402,35 @@ function stCategorySecs(secs) {
   return out;
 }
 
-function studyTimePanel(me, editable) {
+function studyTimePanel(me, editable, paperMode) {
   const date = today();
   const secs = stSecs(me.id, date);
   const total = Object.values(secs).reduce((a, b) => a + b, 0);
   const byCategory = stCategorySecs(secs);
   const maxCategory = Math.max(1, ...Object.values(byCategory));
+  const chartMax = Math.max(3 * 3600, Math.ceil(maxCategory / 3600) * 3600);
+  const chartSlots = chartMax / 600;
   const goal = stGoalMin(me.id) * 60;
   const pct = goal ? Math.min(100, Math.round(total / goal * 100)) : 0;
   const r = stRunning(me.id, date);
   const on = r ? r.subj : '';
   const timerSubjects = on && !ST_DEFAULT.includes(on) ? ST_DEFAULT.concat(on) : ST_DEFAULT;
 
-  return '<div class="between mb8"><div class="card-title">⏱ 순공시간</div>' +
+  return '<div class="study-time-controls">' +
+    (paperMode
+      ? '<div class="between mb8">' +
+          (goal ? '<span class="pill ' + (pct >= 100 ? '' : 'warn') + '">목표 ' + fmtDur(goal) + ' · ' + pct + '%</span>' : '<span class="small muted">순공 타이머</span>') +
+          (editable ? '<div class="row" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="stgoal" aria-label="순공시간 목표 설정">🎯</button>' +
+            '<button class="btn btn-sm btn-ghost" data-act="stedit" aria-label="순공시간 수정">✏️</button></div>' : '') +
+        '</div>'
+      : '<div class="between mb8"><div class="card-title">⏱ 순공시간</div>' +
       '<div class="row" style="gap:6px">' +
         (goal ? '<span class="pill ' + (pct >= 100 ? '' : 'warn') + '">목표 ' + fmtDur(goal) + ' · ' + pct + '%</span>' : '') +
         (editable ? '<button class="btn btn-sm btn-ghost" data-act="stgoal" aria-label="순공시간 목표 설정">🎯</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="stedit" aria-label="순공시간 수정">✏️</button>' : '') +
-      '</div></div>' +
-    '<div style="text-align:center;padding:3px 0 12px">' +
-      '<div id="stTot" class="study-time-total">' + fmtHMS(total) + '</div>' +
+      '</div></div>') +
+    '<div style="text-align:center;padding:' + (paperMode ? '2px 0 9px' : '3px 0 12px') + '">' +
+      (paperMode ? '' : '<div id="stTot" class="study-time-total">' + fmtHMS(total) + '</div>') +
       (on
         ? '<div class="small" style="color:var(--blue);font-weight:800">▶ ' + esc(on) + ' 공부 중 — 다시 누르면 정지</div>'
         : '<div class="small muted">' + (editable ? '과목을 눌러 시작하세요' : '학생이 기록한 실제 순공시간입니다') + '</div>') +
@@ -1403,11 +1443,13 @@ function studyTimePanel(me, editable) {
           (on === s ? ' id="stChipOn"' : '') + '>' +
           (on === s ? '⏸ ' : '▶ ') + esc(s) +
           (secs[s] ? ' ' + fmtHM(secs[s]) : '') + '</button>';
-      }).join('') + '</div>' : '') +
-    '<div class="study-time-bars">' + STUDY_SUBJECT_KEYS.map(key => {
+      }).join('') + '</div>' : '') + '</div>' +
+    '<div class="study-time-bars" data-stbar-max="' + chartMax + '" style="--planner-slots:' + chartSlots + '" role="img" aria-label="과목별 10분 단위 순공시간 기록">' +
+      '<div class="study-time-scale"><span>0</span><span data-st-scale-mid>' + fmtDur(chartMax / 2) + '</span><span data-st-scale-end>' + fmtDur(chartMax) + '</span></div>' +
+      STUDY_SUBJECT_KEYS.map(key => {
       const subject = STUDY_SUBJECTS[key];
       const value = byCategory[key];
-      const width = value ? Math.max(4, Math.round(value / maxCategory * 100)) : 0;
+      const width = value ? Math.min(100, Math.max(3, Math.round(value / chartMax * 100))) : 0;
       return '<div class="study-time-row ' + subject.className + '" data-stbar="' + key + '">' +
         '<div class="between small"><b>' + subject.label + '</b><span data-stbar-time>' + fmtDur(value) + '</span></div>' +
         '<div class="study-time-track"><i style="width:' + width + '%"></i></div></div>';
@@ -3811,11 +3853,21 @@ setInterval(() => {
   el.textContent = fmtHMS(Object.values(secs).reduce((a, b) => a + b, 0));
   const byCategory = stCategorySecs(secs);
   const maxCategory = Math.max(1, ...Object.values(byCategory));
+  const chartMax = Math.max(3 * 3600, Math.ceil(maxCategory / 3600) * 3600);
+  const bars = document.querySelector('.study-time-bars[data-stbar-max]');
+  if (bars) {
+    bars.dataset.stbarMax = chartMax;
+    bars.style.setProperty('--planner-slots', chartMax / 600);
+    const mid = bars.querySelector('[data-st-scale-mid]');
+    const end = bars.querySelector('[data-st-scale-end]');
+    if (mid) mid.textContent = fmtDur(chartMax / 2);
+    if (end) end.textContent = fmtDur(chartMax);
+  }
   document.querySelectorAll('[data-stbar]').forEach(row => {
     const value = byCategory[row.dataset.stbar] || 0;
     const bar = row.querySelector('i');
     const time = row.querySelector('[data-stbar-time]');
-    if (bar) bar.style.width = (value ? Math.max(4, Math.round(value / maxCategory * 100)) : 0) + '%';
+    if (bar) bar.style.width = (value ? Math.min(100, Math.max(3, Math.round(value / chartMax * 100))) : 0) + '%';
     if (time) time.textContent = fmtDur(value);
   });
   const chip = $('#stChipOn');
