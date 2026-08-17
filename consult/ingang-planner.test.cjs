@@ -158,6 +158,79 @@ test('review count only includes fully schedulable repeat rounds', () => {
     'past free time must not be counted as a future replay');
 });
 
+test('whole-schedule shift previews and moves only future incomplete lectures safely', () => {
+  const source = between('function ingShift(sid, from, n) {', '\n/** 오늘 화면용');
+  const create = Function(`return function create() {
+    ${dateHelpers}
+    let writes = 0;
+    const plans = {
+      '2026-08-17': [{ cid:'past', seq:1, done:false, s:'09:00', e:'10:00' }],
+      '2026-08-18': [
+        { cid:'done', seq:1, done:true, s:'08:00', e:'09:00' },
+        { cid:'math', seq:2, done:false, s:'10:00', e:'11:00', auto:'free-v1' }
+      ],
+      '2026-08-20': [{ cid:'eng', seq:3, done:false, s:'13:00', e:'14:00', auto:'slot-v1' }],
+      '2026-08-27': [{ cid:'kept', seq:1, done:true, s:'16:00', e:'17:00' }]
+    };
+    function today() { return '2026-08-18'; }
+    function ingPlanDates() { return Object.keys(plans).sort(); }
+    function ingPlan(_sid, date) { return plans[date] || []; }
+    function ingSavePlan(_sid, date, items) { writes++; plans[date] = items; }
+    ${source}
+    return { ingShift, ingShiftInfo, plans, writes: () => writes };
+  }`)();
+
+  const forward = create();
+  assert.deepEqual(forward.ingShiftInfo('student', '2026-08-18', 7), {
+    count: 2, first: '2026-08-18', last: '2026-08-20',
+    nextFirst: '2026-08-25', nextLast: '2026-08-27', beforeToday: false
+  });
+  assert.equal(forward.ingShiftInfo('student', '2026-08-28', 7).count, 0, 'an empty range stays empty');
+  assert.equal(forward.ingShiftInfo('student', '2026-08-18', 0).count, 0);
+  assert.equal(forward.ingShiftInfo('student', '2026-08-18', 1.5).count, 0);
+  assert.equal(forward.writes(), 0, 'preview must stay read-only');
+  assert.equal(forward.ingShift('student', '2026-08-18', -1), 0, 'a move into the past must be blocked');
+  assert.equal(forward.ingShift('student', '2026-08-18', 366), 0, 'the root function must enforce the 365-day limit');
+  assert.equal(forward.writes(), 0, 'invalid moves must not write');
+  assert.equal(forward.ingShift('student', '2026-08-18', 7), 2);
+  assert.deepEqual(forward.plans['2026-08-17'].map(x => x.cid), ['past']);
+  assert.deepEqual(forward.plans['2026-08-18'].map(x => x.cid), ['done']);
+  assert.deepEqual(forward.plans['2026-08-25'][0],
+    { cid:'math', seq:2, done:false, s:'10:00', e:'11:00', auto:'free-v1' },
+    'moving a date must keep its visible calendar time');
+  assert.deepEqual(forward.plans['2026-08-27'].map(x => x.cid), ['kept', 'eng']);
+  assert.equal(forward.plans['2026-08-27'][1].s, '13:00');
+
+  const earlier = create();
+  assert.equal(earlier.ingShift('student', '2026-08-20', -1), 1);
+  assert.equal(earlier.plans['2026-08-19'][0].cid, 'eng');
+  assert.equal(earlier.plans['2026-08-19'][0].e, '14:00');
+});
+
+test('whole-schedule shift uses a labeled preview modal instead of a signed-number prompt', () => {
+  const modalSource = between('function ingShiftDraft(', '\n\n/** 오늘 화면용');
+  assert.match(modalSource, /id="ingShiftFrom" type="date"/);
+  assert.match(modalSource, /id="ingShiftDays" type="number" min="1" max="365"/);
+  assert.match(modalSource, /뒤로 미루기/);
+  assert.match(modalSource, /앞으로 당기기/);
+  assert.match(modalSource, /aria-live="polite"/);
+  assert.match(modalSource, /현재 일정/);
+  assert.match(modalSource, /이동 후/);
+  assert.match(modalSource, /기준일 전 일정과 완료한 강의는 이동하지 않습니다/);
+  assert.match(modalSource, /기존 시간도 함께 옮기며/);
+  assert.match(modalSource, /선택한 기준일 이후에 이동할 미완료 강의가 없습니다/);
+  assert.match(modalSource, /오늘 이후 이동할 미완료 강의가 없습니다/);
+  assert.match(modalSource, /apply\.disabled = info\.beforeToday/);
+
+  const openCase = between("case 'ingshift':", "case 'ingshiftdir':");
+  assert.doesNotMatch(openCase, /prompt\(/);
+  assert.match(openCase, /ingShiftModal\(me\.id\)/);
+  const applyCase = between("case 'ingshiftapply':", '/* 순공시간 타이머 */');
+  assert.match(applyCase, /me\.id !== el\.dataset\.sid/);
+  assert.match(applyCase, /draft\.info\.beforeToday/);
+  assert.match(html, /ev\.target\.id === 'ingShiftFrom' \|\| ev\.target\.id === 'ingShiftDays'/);
+});
+
 test('availability is opt-in and the planner UI is wired for students and directors', () => {
   const availSource = between('function ingAvail(sid) {', '\nfunction ingSaveAvail(');
   const ingAvail = Function(`
@@ -345,7 +418,10 @@ test('director-only lecture mutations are guarded and student checks stay self-s
   assert.match(between("case 'ingsave':", "case 'ingdel':"), director);
   assert.match(between("case 'ingdel':", "case 'ingassign':"), director);
   assert.match(between("case 'ingcatchup':", "case 'ingshift':"), director);
-  assert.match(between("case 'ingshift':", '/* 순공시간 타이머 */'), director);
+  assert.match(between("case 'ingshift':", "case 'ingshiftdir':"), director);
+  assert.match(between("case 'ingshiftdir':", "case 'ingshiftquick':"), director);
+  assert.match(between("case 'ingshiftquick':", "case 'ingshiftapply':"), director);
+  assert.match(between("case 'ingshiftapply':", '/* 순공시간 타이머 */'), director);
   const slotOpen = between("case 'ingslot':", "case 'ingslotsave':");
   const slotSave = between("case 'ingslotsave':", "case 'ingadd':");
   assert.match(slotOpen, director);
