@@ -53,6 +53,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.
 npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/040_student_lesson_self_checks.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/041_consult_submissions.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/042_consult_guardian_portal.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -102,6 +103,12 @@ consult 인증사진·질문 제출함은 `041_consult_submissions.sql` 적용�
 배포한다. 버킷의 public development URL과 custom domain은 사용하지 않으며, R2 설정에서
 `consult/` prefix 객체를 90일 뒤 삭제하는 lifecycle rule을 반드시 켠다. 사진은 인증된
 `POST /consult-submission` 조회를 통해서만 제공하며 task·학생 전용 Worker는 변경하지 않는다.
+
+consult 보호자 리포트 공유는 운영 D1에 `042_consult_guardian_portal.sql`을 먼저 적용하고,
+신규 표 4개와 `trg_consult_guardian_*` 트리거를 확인한 뒤 보호자·직원 Worker, consult Pages
+순서로 배포한다. 기존 `/parent-portal` 표와 쿠키는 사용하지 않으므로 task 보호자 앱은 이
+마이그레이션의 대상이 아니다. 배포 후 원장 화면에서 테스트 학생의 공유 동의 → 초대 링크 →
+휴대폰 조회 → 확인 기록 → 공유 끄기 순서로 점검한다.
 
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은
@@ -500,6 +507,34 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 교재 상태는 현재 원생 명단의 학생 identity snapshot과 일치하는 배정·인계 원장만 공개한다. 과거 주문
 task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 추정해 표시하지 않는다. 공지는 게시 당시
 대상 학생 identity를 저장하고 게시 직전과 보호자 조회 때 현재 재원 명단을 다시 확인한다.
+
+### `/consult-guardian` — consult 보호자 학습 리포트
+
+원장 전체 권한만 학생별 공유 동의를 켜고 24시간 1회용 초대 링크를 만들 수 있다. 대표·관리자
+계정은 공유 대상에서 제외한다. 공개 화면은 Worker와 exact same-origin에서만 동작하며
+`__Host-wb_consult_guardian` HttpOnly·Secure·SameSite=Strict 쿠키를 사용한다. 세션은 90일,
+학생별 최근 3대까지만 유지한다.
+
+```jsonc
+// 원장 Pages
+{ "app":"consult", "auth":{...}, "action":"access_list" }
+{ "app":"consult", "auth":{...}, "action":"access_set", "staffId":"student-1",
+  "enabled":true, "consentConfirmed":true, "expectedUpdatedAt":0 }
+{ "app":"consult", "auth":{...}, "action":"invite", "staffId":"student-1" }
+{ "app":"consult", "auth":{...}, "action":"preview", "staffId":"student-1" }
+
+// 같은 Worker origin의 /consult-guardian/ 정적 화면
+{ "app":"consult", "action":"exchange", "code":"..." }
+{ "app":"consult", "action":"view" }
+{ "app":"consult", "action":"ack", "reportId":"cgr_...", "reportRevision":2 }
+{ "app":"consult", "action":"logout" }
+```
+
+보호자에게는 학생별·기간별 최신 `admin` 발행 리포트만 반환하며 최신 revision이 철회 상태면
+그 기간은 숨긴다. 학생 ID, 내부 task ID·origin, URL·설정, 인증사진·질문 원문은 DTO에서 제외한다.
+과목·수행·공부시간·학생 회고·원장 피드백·다음 집중 목표만 길이 제한과 URL 제거 후 공개한다.
+확인 기록은 현재 공개 중인 정확한 리포트 revision에만 멱등 저장한다. 공유 해제, 학생 이름·역할·
+활성 identity 변경, 공개 scope 상향은 기존 코드·세션을 폐기하며 새 동의를 요구한다.
 
 ### `/student-portal` — 학생 전용 최소권한 앱
 

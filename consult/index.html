@@ -479,6 +479,14 @@
   .submission-preview img, .submission-photo { display: block; max-width: 100%; max-height: 68vh; margin: auto; border-radius: 10px; object-fit: contain; }
   .submission-privacy { padding: 10px 12px; border-radius: 10px; background: #EEF5FC; color: #315A7D; font-size: 11.5px; line-height: 1.55; }
 
+  /* ─── 보호자 읽기 전용 공유 ─── */
+  .guardian-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
+  .guardian-stat { min-width: 0; padding: 10px; border-radius: 11px; background: #F6F8FB; color: var(--mid-gray); font-size: 10.5px; }
+  .guardian-stat b { display: block; margin-top: 2px; overflow-wrap: anywhere; color: var(--navy); font-size: 13px; }
+  .guardian-report { padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
+  .guardian-report:last-child { border-bottom: 0; }
+  .guardian-invite { padding: 12px; margin-top: 10px; border: 1px solid #A9D8BC; border-radius: 12px; background: #F4FBF6; }
+
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -594,6 +602,7 @@
     .exam-plan-row { grid-template-columns: 1fr; gap: 2px; }
     .submission-actions { display: grid; grid-template-columns: 1fr; }
     .submission-actions .btn { width: 100%; }
+    .guardian-status { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -1049,6 +1058,8 @@ function ownerOfCheck(key) {
 
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '',
+
+  url() { return SYNC_URL; },
 
   /** 원장은 연결된 기기 토큰(구형 기기는 비밀키), 학생은 개인 토큰으로 접속한다 */
   auth() {
@@ -5140,8 +5151,222 @@ function staffCard(s) {
     '</div></div>';
 }
 
+/* ── 보호자 읽기 전용 공유 ── */
+const guardianShareUi = {
+  seq: 0, staffId: '', loading: false, busy: '', error: '', access: null,
+  student: null, reports: [], invite: null
+};
+
+function clearGuardianShareUi() {
+  const seq = guardianShareUi.seq + 1;
+  Object.assign(guardianShareUi, {
+    seq: seq, staffId: '', loading: false, busy: '', error: '', access: null,
+    student: null, reports: [], invite: null
+  });
+}
+
+function guardianPost(action, body) {
+  if (!session.isAdmin || session.isStaffLink) return Promise.reject(new Error('원장 화면에서만 사용할 수 있습니다'));
+  const auth = sync.auth();
+  if (!auth) return Promise.reject(new Error('이 기기의 동기화 연결을 먼저 복구해 주세요'));
+  return sync.post('/consult-guardian', Object.assign({
+    app: SYNC_APP, auth: auth, action: action
+  }, body || {}));
+}
+
+function guardianNormalizeAccess(value, staffId, fallbackEnabled) {
+  const row = value && typeof value === 'object' ? value : {};
+  return {
+    staffId: staffId,
+    enabled: row.enabled == null ? !!fallbackEnabled : row.enabled === true,
+    updatedAt: row.updatedAt || 0,
+    activeSessions: Math.max(0, Number(row.activeSessions) || 0),
+    lastAckAt: row.lastAckAt || 0
+  };
+}
+
+function guardianDateTime(value) {
+  if (!value) return '없음';
+  const raw = typeof value === 'number' && value > 0 && value < 1e12 ? value * 1000 : value;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? '없음' : date.toLocaleString('ko-KR');
+}
+
+function guardianInviteLink(data) {
+  const returned = safeHttpsUrl(data && data.link);
+  if (returned) return returned;
+  const code = String(data && data.code || '').trim();
+  return code ? sync.url().replace(/\/$/, '') + '/consult-guardian/#code=' + encodeURIComponent(code) : '';
+}
+
+function guardianReportCard(report) {
+  const row = report && typeof report === 'object' ? report : {};
+  const snapshot = row.snapshot && typeof row.snapshot === 'object' ? row.snapshot : {};
+  const kind = row.reportType || row.periodType;
+  const title = row.title || row.reportTitle || (kind === 'month' ? '월간 리포트' : '주간 리포트');
+  const period = row.periodLabel || [row.periodStart || snapshot.periodStart, row.periodEnd || snapshot.periodEnd].filter(Boolean).join(' ~ ') || row.periodKey || '기간 정보 없음';
+  const summary = row.summary && typeof row.summary === 'object' ? row.summary :
+    (snapshot.summary && typeof snapshot.summary === 'object' ? snapshot.summary : {});
+  const pct = Number.isFinite(Number(summary.pct)) ? Math.max(0, Math.min(100, Number(summary.pct))) : null;
+  const ackAt = row.acknowledgedAt || row.lastAckAt || 0;
+  return '<div class="guardian-report"><div class="between"><div><b>' + esc(title) + '</b>' +
+    '<div class="small muted">' + esc(period) + (row.publishedAt ? ' · 발행 ' + esc(guardianDateTime(row.publishedAt)) : '') + '</div></div>' +
+    '<span class="pill ' + (ackAt ? '' : 'warn') + '">' + (ackAt ? '확인함' : '미확인') + '</span></div>' +
+    (pct == null ? '' : '<div class="small mt14">완료율 <b>' + pct + '%</b>' +
+      (Number.isFinite(Number(summary.studySecs)) ? ' · 공부 ' + esc(fmtDur(Number(summary.studySecs) || 0)) : '') + '</div>') + '</div>';
+}
+
+function guardianShareModal() {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const staff = staffById(guardianShareUi.staffId);
+  if (!staff || staff.deleted || staff.owner || staff.manager) return;
+  const access = guardianShareUi.access || guardianNormalizeAccess(null, staff.id, false);
+  const enabled = access.enabled;
+  const disabled = guardianShareUi.busy ? ' disabled' : '';
+  const reports = Array.isArray(guardianShareUi.reports) ? guardianShareUi.reports.slice(0, 12) : [];
+  let body = '<div class="card-sub"><b>' + esc(staff.name) + '</b> 학생의 발행된 리포트만 보호자에게 읽기 전용으로 공유합니다.</div>' +
+    '<div class="guardian-status"><div class="guardian-stat">공유 상태<b>' + (enabled ? '사용 중' : '사용 안 함') + '</b></div>' +
+      '<div class="guardian-stat">연결된 기기<b>' + access.activeSessions + '대</b></div>' +
+      '<div class="guardian-stat">최근 보호자 확인<b>' + esc(guardianDateTime(access.lastAckAt)) + '</b></div></div>';
+
+  if (guardianShareUi.loading) {
+    body += '<div class="hint">보호자 공유 상태와 미리보기를 불러오는 중…</div>';
+  } else if (guardianShareUi.error) {
+    body += '<div class="hint" style="color:var(--coral)">불러오지 못했습니다 — ' + esc(guardianShareUi.error) + '</div>' +
+      '<button class="btn btn-ghost btn-block mt14" data-act="guardianretry" data-id="' + esc(staff.id) + '">다시 시도</button>';
+  } else {
+    if (guardianShareUi.busy) body += '<div class="hint mb8" role="status">요청을 안전하게 처리하는 중…</div>';
+    if (!enabled) {
+      body += '<label class="material-type-option"><input type="checkbox" id="guardianConsent">' +
+        '<span>보호자에게 학습 리포트를 공유하는 것에 보호자와 확인했습니다.</span></label>' +
+        '<button class="btn btn-primary btn-block mt14" data-act="guardianenable" data-id="' + esc(staff.id) + '"' + disabled + '>동의 확인 후 공유 켜기</button>';
+    } else {
+      body += '<div class="row wraprow" style="gap:7px"><button class="btn btn-primary" data-act="guardianinvite" data-id="' + esc(staff.id) + '"' + disabled + '>일회용 초대 링크 만들기</button>' +
+        '<button class="btn btn-ghost" data-act="guardianpreview" data-id="' + esc(staff.id) + '"' + disabled + '>미리보기 새로고침</button>' +
+        '<button class="btn btn-danger" data-act="guardiandisable" data-id="' + esc(staff.id) + '"' + disabled + '>공유 끄기</button></div>';
+    }
+
+    if (guardianShareUi.invite && guardianShareUi.invite.link) {
+      body += '<div class="guardian-invite"><b>보호자에게 보낼 일회용 링크</b>' +
+        '<div class="small muted mb8">한 번 사용하거나 만료되면 새 링크를 만들어야 합니다. 만료: ' + esc(guardianDateTime(guardianShareUi.invite.expiresAt)) + '</div>' +
+        '<input class="in" id="guardianInviteLink" value="' + esc(guardianShareUi.invite.link) + '" readonly>' +
+        '<button class="btn btn-navy btn-block mt14" data-act="guardiancopy" data-id="' + esc(staff.id) + '">링크 복사</button></div>';
+    }
+
+    body += '<hr class="sep"><div class="between mb8"><div><b>보호자 화면 미리보기</b><div class="small muted">발행된 주간·월간 리포트만 표시됩니다.</div></div><span class="pill">' + reports.length + '건</span></div>' +
+      (reports.length ? reports.map(guardianReportCard).join('') : '<div class="small muted">보호자에게 공개할 발행 리포트가 없습니다.</div>');
+  }
+
+  body += '<div class="submission-privacy mt14">🔒 보호자는 수정할 수 없습니다. 공유를 끄면 기존 보호자 접속도 즉시 종료됩니다.<br>' +
+    '이 기능은 서버 동기화 연결이 필요하며, 미동기화 상태에서는 조회·변경할 수 없습니다.</div>';
+  modal('보호자 공유', body);
+}
+
+async function guardianOpen(staffId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const staff = staffById(staffId);
+  if (!staff || staff.deleted || staff.owner || staff.manager) return toast('보호자 공유 대상을 찾을 수 없습니다');
+  const seq = guardianShareUi.seq + 1;
+  Object.assign(guardianShareUi, {
+    seq: seq, staffId: staffId, loading: true, busy: '', error: '', access: null,
+    student: null, reports: [], invite: null
+  });
+  guardianShareModal();
+  try {
+    const result = await Promise.all([
+      guardianPost('access_list'),
+      guardianPost('preview', { staffId: staffId })
+    ]);
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    const accesses = Array.isArray(result[0].accesses) ? result[0].accesses : [];
+    const found = accesses.find(row => row && row.staffId === staffId);
+    guardianShareUi.access = guardianNormalizeAccess(found, staffId, false);
+    guardianShareUi.student = result[1].student || null;
+    guardianShareUi.reports = Array.isArray(result[1].reports) ? result[1].reports : [];
+    guardianShareUi.loading = false;
+    guardianShareModal();
+  } catch (error) {
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.loading = false;
+    guardianShareUi.error = String(error && error.message || error);
+    guardianShareModal();
+  }
+}
+
+async function guardianSetAccess(staffId, enabled) {
+  if (!session.isAdmin || session.isStaffLink || guardianShareUi.staffId !== staffId) return;
+  if (enabled) {
+    const consent = $('#guardianConsent');
+    if (!consent || !consent.checked) return toast('보호자와 공유 동의를 확인해 주세요');
+  } else if (!confirm('보호자 공유를 끌까요? 연결된 보호자 기기도 바로 로그아웃됩니다.')) return;
+  const seq = guardianShareUi.seq;
+  guardianShareUi.busy = 'access'; guardianShareUi.error = ''; guardianShareModal();
+  try {
+    const current = guardianShareUi.access || {};
+    const data = await guardianPost('access_set', {
+      staffId: staffId, enabled: !!enabled,
+      expectedUpdatedAt: Number(current.updatedAt) || 0,
+      consentConfirmed: enabled === true
+    });
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.access = guardianNormalizeAccess(data.access, staffId, enabled);
+    guardianShareUi.busy = '';
+    if (!enabled) guardianShareUi.invite = null;
+    guardianShareModal();
+    toast(enabled ? '보호자 공유를 켰습니다' : '보호자 공유를 끄고 접속을 종료했습니다');
+  } catch (error) {
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.busy = '';
+    guardianShareUi.error = String(error && error.message || error);
+    guardianShareModal();
+  }
+}
+
+async function guardianCreateInvite(staffId) {
+  if (!session.isAdmin || session.isStaffLink || guardianShareUi.staffId !== staffId) return;
+  if (!guardianShareUi.access || !guardianShareUi.access.enabled) return toast('보호자 공유를 먼저 켜 주세요');
+  const seq = guardianShareUi.seq;
+  guardianShareUi.busy = 'invite'; guardianShareUi.error = ''; guardianShareModal();
+  try {
+    const data = await guardianPost('invite', { staffId: staffId });
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    const link = guardianInviteLink(data);
+    if (!link) throw new Error('초대 링크를 받지 못했습니다');
+    guardianShareUi.invite = { link: link, expiresAt: data.expiresAt || 0 };
+    guardianShareUi.busy = '';
+    guardianShareModal();
+    toast('일회용 초대 링크를 만들었습니다');
+  } catch (error) {
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.busy = '';
+    guardianShareUi.error = String(error && error.message || error);
+    guardianShareModal();
+  }
+}
+
+async function guardianRefreshPreview(staffId) {
+  if (!session.isAdmin || session.isStaffLink || guardianShareUi.staffId !== staffId) return;
+  const seq = guardianShareUi.seq;
+  guardianShareUi.busy = 'preview'; guardianShareUi.error = ''; guardianShareModal();
+  try {
+    const data = await guardianPost('preview', { staffId: staffId });
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.student = data.student || null;
+    guardianShareUi.reports = Array.isArray(data.reports) ? data.reports : [];
+    guardianShareUi.busy = '';
+    guardianShareModal();
+    toast('보호자 화면 미리보기를 새로고침했습니다');
+  } catch (error) {
+    if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
+    guardianShareUi.busy = '';
+    guardianShareUi.error = String(error && error.message || error);
+    guardianShareModal();
+  }
+}
+
 /* ── 학생 관리 ── */
 function viewStaffAdmin() {
+  if (!session.isAdmin || session.isStaffLink) return '';
   const list = liveStaff();
   return '<div class="card">' +
     '<div class="card-title">학생 등록</div>' +
@@ -5164,6 +5389,7 @@ function viewStaffAdmin() {
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + s.id + '">지시 목록 관리</button>' +
+          (!s.owner && !s.manager ? '<button class="btn btn-sm btn-ghost" data-act="guardianopen" data-id="' + s.id + '">보호자 공유</button>' : '') +
           '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + s.id + '">' +
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
@@ -5227,6 +5453,7 @@ function modal(title, bodyHtml, footHtml) {
 function closeModal() {
   clearSubmissionPreview();
   submissionForm = null; submissionReviewDraft = null;
+  clearGuardianShareUi();
   $('#modalHost').innerHTML = '';
 }
 
@@ -6872,6 +7099,44 @@ document.addEventListener('click', ev => {
         : s.name + ' — 관리자 해제');
       break;
     }
+    case 'guardianopen': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianOpen(id);
+      break;
+    }
+    case 'guardianretry': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianOpen(id);
+      break;
+    }
+    case 'guardianenable': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianSetAccess(id, true);
+      break;
+    }
+    case 'guardiandisable': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianSetAccess(id, false);
+      break;
+    }
+    case 'guardianinvite': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianCreateInvite(id);
+      break;
+    }
+    case 'guardianpreview': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      guardianRefreshPreview(id);
+      break;
+    }
+    case 'guardiancopy': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      if (guardianShareUi.staffId !== id || !guardianShareUi.invite || !guardianShareUi.invite.link) {
+        toast('초대 링크를 다시 만들어 주세요'); break;
+      }
+      copy(guardianShareUi.invite.link);
+      break;
+    }
     case 'copylink': {
       ensureToken(id)
         .then(() => copy(staffLink(id)))
@@ -7273,7 +7538,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.7';
+const APP_VER = '2026-08-18.8';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
