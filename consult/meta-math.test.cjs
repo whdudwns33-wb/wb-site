@@ -10,9 +10,9 @@ const section = (start, end) => {
   return from >= 0 && to > from ? html.slice(from, to) : '';
 };
 
-test('learning hub supports all seven study sources and keeps legacy MetaMath tasks', () => {
+test('study screen renders seven separate source cards and keeps legacy MetaMath tasks', () => {
   const sources = section('const LEARNING_SOURCES', 'const DOW');
-  [
+  const expected = [
     ['metamath', '메타수학'],
     ['classcard', '클래스카드'],
     ['studyforce', '스터디포스'],
@@ -20,37 +20,52 @@ test('learning hub supports all seven study sources and keeps legacy MetaMath ta
     ['reading', '독서'],
     ['inquiry_report', '탐구보고서'],
     ['exam_material', '시험대비자료']
-  ].forEach(([key, label]) => {
+  ];
+  assert.deepEqual([...sources.matchAll(/^  ([a-z_]+): \{/gm)].map(match => match[1]), expected.map(x => x[0]));
+  expected.forEach(([key, label]) => {
     assert.match(sources, new RegExp('\\b' + key + ': \\{'));
     assert.ok(sources.includes("label: '" + label + "'"));
   });
 
   const rows = section('function taskRow(', 'function taskPanel(');
+  const study = section('function viewStudy(', 'function rdAddModal(');
   assert.match(rows, /LEARNING_SOURCES\[t\.source\]/);
   assert.match(rows, /t\.learningKind \|\| t\.metaKind/);
+  assert.match(study, /Object\.keys\(LEARNING_SOURCES\)\.map\(key => learningSourceCard\(me, editable, key\)\)/);
+  assert.match(study, /원장 관리 화면/);
+  assert.match(study, /학생 화면/);
 });
 
 test('external study services use fixed official links without embedded login', () => {
   assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=center'/);
   assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=student'/);
   assert.match(html, /const CLASSCARD_URL = 'https:\/\/www\.classcard\.net\/Login'/);
-  assert.match(html, /const STUDYFORCE_STUDENT_URL = 'https:\/\/www\.studyforce\.co\.kr\/user\/user_login\/\?go_url=%2F'/);
+  assert.match(html, /const STUDYFORCE_URL = 'https:\/\/hol\.sfcenter\.co\.kr\/'/);
+  assert.match(html, /centerUrl: STUDYFORCE_URL, studentUrl: STUDYFORCE_URL/);
+  assert.doesNotMatch(html, /www\.studyforce\.co\.kr/);
 
-  const card = section('function learningHubCard(', '/* ── 학습 탭');
+  const card = section('function learningSourceCard(', '/* ── 학습 탭');
   assert.match(card, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(card, /iframe|fetch\(|type="password"/i);
 });
 
 test('learning tasks stay student-scoped and only the director can send them', () => {
-  const list = section('function learningTasksFor(', 'function learningHubCard(');
-  const card = section('function learningHubCard(', '/* ── 학습 탭');
+  const list = section('function learningTasksFor(', 'function learningSourceCard(');
+  const card = section('function learningSourceCard(', '/* ── 학습 탭');
+  const modal = section('function learningTaskModal(', 'function wnAddModal(');
+  const add = section("case 'learnadd':", "case 'learnsave':");
   const save = section("case 'learnsave':", '/* 회독 */');
   assert.match(list, /t\.staffId === staffId/);
-  assert.match(list, /!!LEARNING_SOURCES\[t\.source\]/);
-  assert.match(card, /learningTasksFor\(me\.id\)/);
+  assert.match(list, /t\.source === sourceKey/);
+  assert.match(card, /learningTasksFor\(me\.id, sourceKey\)/);
   assert.match(card, /taskRow\(t, t\.start, editable, false\)/);
   assert.match(card, /director \? '<button[^']*data-act="learnadd"/);
-  assert.match(card, /학생 과제·자료 발행은 원장 화면에서/);
+  assert.match(card, /data-source="' \+ esc\(sourceKey\)/);
+  assert.match(add, /const sourceKey = el\.dataset\.source/);
+  assert.match(add, /!LEARNING_SOURCES\[sourceKey\]/);
+  assert.match(add, /learningTaskModal\(sourceKey\)/);
+  assert.match(modal, /id="learnSource" value="' \+ esc\(sourceKey\)/);
+  assert.doesNotMatch(modal, /<select[^>]+id="learnSource"/);
 
   assert.match(save, /if \(!session\.isAdmin\) break/);
   assert.match(save, /state\.tasks\.push\(/);
