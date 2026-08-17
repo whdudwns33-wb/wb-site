@@ -60,6 +60,9 @@ class TestD1 {
         consumed_at INTEGER, revoked INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (app, code_hash)
       );
+      CREATE TABLE book_order_student_snapshots (
+        app TEXT NOT NULL, task_id TEXT NOT NULL
+      );
     `);
   }
 

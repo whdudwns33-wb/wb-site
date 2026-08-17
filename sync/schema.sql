@@ -478,6 +478,299 @@ CREATE INDEX IF NOT EXISTS idx_book_order_fulfillments_status
 CREATE INDEX IF NOT EXISTS idx_book_order_fulfillments_task
   ON book_order_fulfillments(app, task_id, updated_at);
 
+-- 새 주문 생성 시점의 학생 정체성 봉인. 이름 원문은 저장하지 않으며 과거 주문은 자동 이관하지 않는다.
+CREATE TABLE IF NOT EXISTS book_order_student_snapshots (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  task_id               TEXT    NOT NULL CHECK (
+    length(task_id) BETWEEN 12 AND 124 AND task_id GLOB 'ord_*'
+    AND task_id NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  item_index            INTEGER NOT NULL CHECK (item_index >= 0),
+  owner_id              TEXT    NOT NULL CHECK (
+    owner_id = '' OR (length(owner_id) BETWEEN 1 AND 128 AND owner_id NOT GLOB '*[^A-Za-z0-9_-]*')
+  ),
+  book_id               TEXT    NOT NULL CHECK (
+    length(book_id) BETWEEN 1 AND 128 AND book_id NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  public_title          TEXT    NOT NULL CHECK (public_title = '주문 교재'),
+  student_id            TEXT    NOT NULL CHECK (
+    length(student_id) BETWEEN 1 AND 128 AND student_id NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  student_identity_hash TEXT    NOT NULL CHECK (
+    length(student_identity_hash) = 64 AND student_identity_hash NOT GLOB '*[^a-f0-9]*'
+  ),
+  student_set_hash      TEXT    NOT NULL CHECK (
+    length(student_set_hash) = 64 AND student_set_hash NOT GLOB '*[^a-f0-9]*'
+  ),
+  item_identity_hash    TEXT    NOT NULL CHECK (
+    length(item_identity_hash) = 64 AND item_identity_hash NOT GLOB '*[^a-f0-9]*'
+  ),
+  task_identity_hash    TEXT    NOT NULL CHECK (
+    length(task_identity_hash) = 64 AND task_identity_hash NOT GLOB '*[^a-f0-9]*'
+  ),
+  expected_item_count   INTEGER NOT NULL CHECK (expected_item_count BETWEEN 1 AND 50),
+  expected_row_count    INTEGER NOT NULL CHECK (expected_row_count BETWEEN 1 AND 200),
+  created_at            INTEGER NOT NULL,
+  PRIMARY KEY (app, task_id, item_index, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_student_snapshots_student
+  ON book_order_student_snapshots(app, student_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_book_order_student_snapshots_task
+  ON book_order_student_snapshots(app, task_id, item_index);
+
+-- 같은 학생·같은 교재의 미완료 주문을 DB 수준에서 하나로 제한한다.
+CREATE TABLE IF NOT EXISTS book_order_active_targets (
+  app        TEXT    NOT NULL CHECK (app = 'task'),
+  book_id    TEXT    NOT NULL,
+  student_id TEXT    NOT NULL,
+  task_id    TEXT    NOT NULL,
+  item_index INTEGER NOT NULL CHECK (item_index >= 0),
+  created_at INTEGER NOT NULL,
+  active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  PRIMARY KEY (app, task_id, item_index, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_active_targets_task
+  ON book_order_active_targets(app, task_id, item_index);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_book_order_one_active_target
+  ON book_order_active_targets(app, book_id, student_id) WHERE active=1;
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_active_targets_no_delete
+BEFORE DELETE ON book_order_active_targets
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ACTIVE_TARGET_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_active_targets_release_only
+BEFORE UPDATE ON book_order_active_targets
+WHEN NOT (
+  OLD.active=1 AND NEW.active=0
+  AND NEW.app IS OLD.app AND NEW.book_id IS OLD.book_id AND NEW.student_id IS OLD.student_id
+  AND NEW.task_id IS OLD.task_id AND NEW.item_index IS OLD.item_index AND NEW.created_at IS OLD.created_at
+)
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ACTIVE_TARGET_APPEND_ONLY');
+END;
+
+CREATE TABLE IF NOT EXISTS book_order_cancellations (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  task_id      TEXT    NOT NULL,
+  cancelled_at INTEGER NOT NULL,
+  PRIMARY KEY (app, task_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_snapshots_no_update
+BEFORE UPDATE ON book_order_student_snapshots
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_SNAPSHOT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_snapshots_no_delete
+BEFORE DELETE ON book_order_student_snapshots
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_SNAPSHOT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_snapshot_activate
+AFTER INSERT ON book_order_student_snapshots
+BEGIN
+  INSERT INTO book_order_active_targets(app,book_id,student_id,task_id,item_index,created_at,active)
+  VALUES(NEW.app,NEW.book_id,NEW.student_id,NEW.task_id,NEW.item_index,NEW.created_at,1);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_fulfillment_deactivate_insert
+AFTER INSERT ON book_order_fulfillments
+WHEN NEW.status IN ('student_handed','academy_registered')
+  AND json_valid(NEW.student_ids)
+  AND (SELECT COUNT(*) FROM book_order_student_snapshots snapshot
+       WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id AND snapshot.item_index=NEW.item_index
+         AND snapshot.book_id=NEW.book_id) = json_array_length(NEW.student_ids)
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id AND snapshot.item_index=NEW.item_index
+      AND snapshot.book_id=NEW.book_id
+      AND NOT EXISTS (SELECT 1 FROM json_each(NEW.student_ids) student WHERE student.value=snapshot.student_id)
+  )
+BEGIN
+  UPDATE book_order_active_targets SET active=0
+  WHERE app=NEW.app AND task_id=NEW.task_id AND item_index=NEW.item_index AND active=1;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_fulfillment_deactivate_update
+AFTER UPDATE OF status ON book_order_fulfillments
+WHEN NEW.status IN ('student_handed','academy_registered')
+  AND OLD.status NOT IN ('student_handed','academy_registered')
+  AND json_valid(NEW.student_ids)
+  AND (SELECT COUNT(*) FROM book_order_student_snapshots snapshot
+       WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id AND snapshot.item_index=NEW.item_index
+         AND snapshot.book_id=NEW.book_id) = json_array_length(NEW.student_ids)
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id AND snapshot.item_index=NEW.item_index
+      AND snapshot.book_id=NEW.book_id
+      AND NOT EXISTS (SELECT 1 FROM json_each(NEW.student_ids) student WHERE student.value=snapshot.student_id)
+  )
+BEGIN
+  UPDATE book_order_active_targets SET active=0
+  WHERE app=NEW.app AND task_id=NEW.task_id AND item_index=NEW.item_index AND active=1;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_cancellations_no_update
+BEFORE UPDATE ON book_order_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_CANCELLATION_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_cancellations_no_delete
+BEFORE DELETE ON book_order_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_CANCELLATION_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_sealed_task_update
+BEFORE UPDATE OF data ON tasks
+WHEN EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=OLD.app AND snapshot.task_id=OLD.id
+  )
+  AND NOT (
+    COALESCE(json_extract(OLD.data, '$.deleted'), 0) = 0
+    AND json_extract(NEW.data, '$.deleted') = 1
+    AND json_extract(NEW.data, '$.orderCancelledAt') = NEW.updated_at
+    AND json_remove(NEW.data, '$.deleted', '$.updatedAt', '$.lastEditBy', '$.orderCancelledAt')
+        = json_remove(OLD.data, '$.deleted', '$.updatedAt', '$.lastEditBy', '$.orderCancelledAt')
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_SEALED');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_sealed_task_cancel_busy
+BEFORE UPDATE OF data ON tasks
+WHEN EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=OLD.app AND snapshot.task_id=OLD.id
+  )
+  AND COALESCE(json_extract(OLD.data, '$.deleted'), 0) = 0
+  AND json_extract(NEW.data, '$.deleted') = 1
+  AND (
+    EXISTS (
+      SELECT 1 FROM book_order_dispatch_lock dispatch
+      WHERE dispatch.app=OLD.app AND dispatch.owner NOT LIKE 'cancel_%'
+        AND dispatch.lease_until > CAST(json_extract(NEW.data, '$.orderCancelledAt') AS INTEGER)
+    )
+    OR EXISTS (
+      SELECT 1 FROM book_order_sends send
+      LEFT JOIN book_order_batch_items item
+        ON item.app=send.app AND item.send_id=send.send_id
+      WHERE send.app=OLD.app
+        AND (item.task_id=OLD.id OR (send.task_id=OLD.id AND send.task_id LIKE 'ord_%'))
+        AND send.status IN ('reserved','dispatching','accepted','unknown')
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_SEND_ACTIVE');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_sealed_task_cancel
+AFTER UPDATE OF data ON tasks
+WHEN EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.id
+  )
+  AND COALESCE(json_extract(OLD.data, '$.deleted'), 0) = 0
+  AND json_extract(NEW.data, '$.deleted') = 1
+BEGIN
+  INSERT INTO book_order_cancellations(app, task_id, cancelled_at)
+  VALUES(
+    NEW.app,
+    NEW.id,
+    CAST(json_extract(NEW.data, '$.orderCancelledAt') AS INTEGER)
+  );
+  UPDATE book_order_active_targets SET active=0 WHERE app=NEW.app AND task_id=NEW.id AND active=1;
+END;
+
+-- 생성과 명단 수정이 엇갈려도 봉인된 학생 ID/이름/재원 상태가 바뀌지 않게 DB에서 직렬화한다.
+-- 학생 전달 후에도 아카플로우 등록까지는 같은 정체성을 유지해야 한다.
+CREATE TRIGGER IF NOT EXISTS trg_book_order_roster_identity_update
+BEFORE UPDATE OF data ON private_rosters
+WHEN OLD.app='task' AND EXISTS (
+  SELECT 1 FROM book_order_student_snapshots snapshot
+  WHERE snapshot.app=OLD.app
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_cancellations cancellation
+      WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_fulfillments fulfillment
+      WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id
+        AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id
+        AND fulfillment.status='academy_registered' AND json_valid(fulfillment.student_ids)
+        AND (SELECT COUNT(*) FROM book_order_student_snapshots expected
+             WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id
+               AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id)
+            = json_array_length(fulfillment.student_ids)
+        AND NOT EXISTS (
+          SELECT 1 FROM book_order_student_snapshots expected
+          WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id
+            AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id
+            AND NOT EXISTS (
+              SELECT 1 FROM json_each(fulfillment.student_ids) selected
+              WHERE selected.value=expected.student_id
+            )
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM json_each(OLD.data, '$.roster.students') old_student
+      JOIN json_each(NEW.data, '$.roster.students') new_student
+        ON CAST(json_extract(new_student.value, '$.id') AS TEXT)=snapshot.student_id
+      WHERE CAST(json_extract(old_student.value, '$.id') AS TEXT)=snapshot.student_id
+        AND CAST(json_extract(new_student.value, '$.name') AS TEXT)
+            = CAST(json_extract(old_student.value, '$.name') AS TEXT)
+        AND (
+          (
+            CAST(json_extract(new_student.value, '$.start') AS TEXT) <= strftime('%Y-%m','now','+9 hours')
+            AND (
+              COALESCE(CAST(json_extract(new_student.value, '$.end') AS TEXT),'')=''
+              OR CAST(json_extract(new_student.value, '$.end') AS TEXT) > strftime('%Y-%m','now','+9 hours')
+            )
+          )
+          OR (
+            CAST(json_extract(new_student.value, '$.start') AS TEXT)
+                = CAST(json_extract(old_student.value, '$.start') AS TEXT)
+            AND COALESCE(CAST(json_extract(new_student.value, '$.end') AS TEXT),'')
+                = COALESCE(CAST(json_extract(old_student.value, '$.end') AS TEXT),'')
+          )
+        )
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ACTIVE_BOOK_ORDER_CONFLICT');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_roster_identity_delete
+BEFORE DELETE ON private_rosters
+WHEN OLD.app='task' AND EXISTS (
+  SELECT 1 FROM book_order_student_snapshots snapshot
+  WHERE snapshot.app=OLD.app
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_cancellations cancellation
+      WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_fulfillments fulfillment
+      WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id
+        AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id
+        AND fulfillment.status='academy_registered' AND json_valid(fulfillment.student_ids)
+        AND (SELECT COUNT(*) FROM book_order_student_snapshots expected
+             WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id
+               AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id)
+            = json_array_length(fulfillment.student_ids)
+        AND NOT EXISTS (
+          SELECT 1 FROM book_order_student_snapshots expected
+          WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id
+            AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id
+            AND NOT EXISTS (
+              SELECT 1 FROM json_each(fulfillment.student_ids) selected
+              WHERE selected.value=expected.student_id
+            )
+        )
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ACTIVE_BOOK_ORDER_CONFLICT');
+END;
+
 -- 차량 노선 설정. 전화·주소·보호자 정보는 저장하지 않는다.
 CREATE TABLE IF NOT EXISTS transport_configs (
   app        TEXT    NOT NULL CHECK (app = 'task'),
@@ -1487,6 +1780,7 @@ CREATE TABLE IF NOT EXISTS guardian_lesson_publications (
   revision              INTEGER NOT NULL CHECK (revision >= 1),
   updated_at            INTEGER NOT NULL,
   updated_by            TEXT    NOT NULL,
+  student_visible       INTEGER NOT NULL DEFAULT 0 CHECK (student_visible IN (0,1)),
   CHECK (
     (status = 'published' AND (length(public_homework) > 0 OR length(public_readiness) > 0))
     OR (status = 'withdrawn' AND public_homework = '' AND public_readiness = '')
@@ -1509,6 +1803,7 @@ CREATE TABLE IF NOT EXISTS guardian_lesson_publication_events (
   public_readiness TEXT    NOT NULL CHECK (length(public_readiness) <= 500),
   created_at       INTEGER NOT NULL,
   created_by       TEXT    NOT NULL,
+  student_visible  INTEGER NOT NULL DEFAULT 0 CHECK (student_visible IN (0,1)),
   PRIMARY KEY (app, event_id),
   UNIQUE (app, publication_id, revision),
   FOREIGN KEY (app, publication_id) REFERENCES guardian_lesson_publications(app, publication_id)
@@ -1649,4 +1944,284 @@ CREATE TRIGGER IF NOT EXISTS trg_guardian_portal_responses_no_delete
 BEFORE DELETE ON guardian_portal_responses
 BEGIN
   SELECT RAISE(ABORT, 'GUARDIAN_PORTAL_RESPONSE_APPEND_ONLY');
+END;
+
+-- 보호자 공지는 관리자만 작성·게시·종료하고 대상 학생의 활성 세션에는 공개 필드만 보낸다.
+CREATE TABLE IF NOT EXISTS guardian_announcements (
+  app                TEXT    NOT NULL CHECK (app = 'task'),
+  announcement_id    TEXT    NOT NULL,
+  title              TEXT    NOT NULL CHECK (length(title) BETWEEN 1 AND 100),
+  body               TEXT    NOT NULL CHECK (length(body) BETWEEN 1 AND 2000),
+  publish_date       TEXT    NOT NULL CHECK (
+    COALESCE(length(publish_date) = 10 AND strftime('%Y-%m-%d', publish_date) = publish_date, 0) = 1
+  ),
+  expires_date       TEXT    NOT NULL CHECK (
+    COALESCE(length(expires_date) = 10 AND strftime('%Y-%m-%d', expires_date) = expires_date, 0) = 1
+    AND expires_date >= publish_date
+  ),
+  target_type        TEXT    NOT NULL CHECK (target_type IN ('all','students')),
+  target_students    TEXT    NOT NULL CHECK (
+    CASE WHEN json_valid(target_students) THEN
+      json_type(target_students) = 'array'
+      AND (
+        (target_type = 'all' AND json_array_length(target_students) = 0)
+        OR (target_type = 'students' AND json_array_length(target_students) BETWEEN 1 AND 200)
+      )
+    ELSE 0 END
+  ),
+  status             TEXT    NOT NULL CHECK (status IN ('draft','published','ended')),
+  revision           INTEGER NOT NULL CHECK (revision >= 1),
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  updated_by         TEXT    NOT NULL,
+  PRIMARY KEY (app, announcement_id)
+);
+CREATE INDEX IF NOT EXISTS idx_guardian_announcements_active
+  ON guardian_announcements(app, status, publish_date, expires_date);
+CREATE INDEX IF NOT EXISTS idx_guardian_announcements_updated
+  ON guardian_announcements(app, updated_at);
+
+CREATE TABLE IF NOT EXISTS guardian_announcement_events (
+  app                TEXT    NOT NULL CHECK (app = 'task'),
+  event_id           TEXT    NOT NULL,
+  announcement_id    TEXT    NOT NULL,
+  revision           INTEGER NOT NULL CHECK (revision >= 1),
+  event_type         TEXT    NOT NULL CHECK (event_type IN ('created','updated','published','ended')),
+  status             TEXT    NOT NULL CHECK (status IN ('draft','published','ended')),
+  title              TEXT    NOT NULL CHECK (length(title) BETWEEN 1 AND 100),
+  body               TEXT    NOT NULL CHECK (length(body) BETWEEN 1 AND 2000),
+  publish_date       TEXT    NOT NULL CHECK (
+    COALESCE(length(publish_date) = 10 AND strftime('%Y-%m-%d', publish_date) = publish_date, 0) = 1
+  ),
+  expires_date       TEXT    NOT NULL CHECK (
+    COALESCE(length(expires_date) = 10 AND strftime('%Y-%m-%d', expires_date) = expires_date, 0) = 1
+    AND expires_date >= publish_date
+  ),
+  target_type        TEXT    NOT NULL CHECK (target_type IN ('all','students')),
+  target_students    TEXT    NOT NULL CHECK (
+    CASE WHEN json_valid(target_students) THEN
+      json_type(target_students) = 'array'
+      AND (
+        (target_type = 'all' AND json_array_length(target_students) = 0)
+        OR (target_type = 'students' AND json_array_length(target_students) BETWEEN 1 AND 200)
+      )
+    ELSE 0 END
+  ),
+  created_at         INTEGER NOT NULL,
+  created_by         TEXT    NOT NULL,
+  PRIMARY KEY (app, event_id),
+  UNIQUE (app, announcement_id, revision),
+  FOREIGN KEY (app, announcement_id) REFERENCES guardian_announcements(app, announcement_id),
+  CHECK (
+    (event_type IN ('created','updated') AND status = 'draft')
+    OR (event_type = 'published' AND status = 'published')
+    OR (event_type = 'ended' AND status = 'ended')
+  )
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcements_targets_insert
+BEFORE INSERT ON guardian_announcements
+WHEN CASE WHEN json_valid(NEW.target_students) THEN
+  EXISTS (
+    SELECT 1 FROM json_each(NEW.target_students) target
+    WHERE target.type <> 'object'
+      OR json_type(target.value, '$.id') <> 'text'
+      OR length(json_extract(target.value, '$.id')) NOT BETWEEN 1 AND 128
+      OR json_extract(target.value, '$.id') GLOB '*[^A-Za-z0-9_-]*'
+      OR json_type(target.value, '$.identityHash') <> 'text'
+      OR length(json_extract(target.value, '$.identityHash')) <> 64
+      OR json_extract(target.value, '$.identityHash') GLOB '*[^a-f0-9]*'
+      OR (SELECT COUNT(*) FROM json_each(target.value)) <> 2
+  ) OR (
+    SELECT COUNT(*) <> COUNT(DISTINCT json_extract(value, '$.id')) FROM json_each(NEW.target_students)
+  )
+ELSE 0 END
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_TARGET_INVALID');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcements_targets_update
+BEFORE UPDATE ON guardian_announcements
+WHEN CASE WHEN json_valid(NEW.target_students) THEN
+  EXISTS (
+    SELECT 1 FROM json_each(NEW.target_students) target
+    WHERE target.type <> 'object'
+      OR json_type(target.value, '$.id') <> 'text'
+      OR length(json_extract(target.value, '$.id')) NOT BETWEEN 1 AND 128
+      OR json_extract(target.value, '$.id') GLOB '*[^A-Za-z0-9_-]*'
+      OR json_type(target.value, '$.identityHash') <> 'text'
+      OR length(json_extract(target.value, '$.identityHash')) <> 64
+      OR json_extract(target.value, '$.identityHash') GLOB '*[^a-f0-9]*'
+      OR (SELECT COUNT(*) FROM json_each(target.value)) <> 2
+  ) OR (
+    SELECT COUNT(*) <> COUNT(DISTINCT json_extract(value, '$.id')) FROM json_each(NEW.target_students)
+  )
+ELSE 0 END
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_TARGET_INVALID');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcements_update
+BEFORE UPDATE ON guardian_announcements
+WHEN NEW.announcement_id IS NOT OLD.announcement_id
+  OR NEW.created_at IS NOT OLD.created_at
+  OR NEW.revision <> OLD.revision + 1
+  OR NEW.updated_at <= OLD.updated_at
+  OR NOT (
+    (OLD.status = 'draft' AND NEW.status IN ('draft','published'))
+    OR (OLD.status = 'published' AND NEW.status = 'ended')
+  )
+  OR (
+    (NEW.title IS NOT OLD.title OR NEW.body IS NOT OLD.body
+      OR NEW.publish_date IS NOT OLD.publish_date OR NEW.expires_date IS NOT OLD.expires_date
+      OR NEW.target_type IS NOT OLD.target_type
+      OR NEW.target_students IS NOT OLD.target_students)
+    AND NOT (OLD.status = 'draft' AND NEW.status = 'draft')
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_INVALID_TRANSITION');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcements_no_delete
+BEFORE DELETE ON guardian_announcements
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcement_events_no_update
+BEFORE UPDATE ON guardian_announcement_events
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_EVENT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_guardian_announcement_events_no_delete
+BEFORE DELETE ON guardian_announcement_events
+BEGIN
+  SELECT RAISE(ABORT, 'GUARDIAN_ANNOUNCEMENT_EVENT_APPEND_ONLY');
+END;
+
+-- 학생 웹앱은 보호자 인증과 분리된 stable studentId 전용 읽기 세션을 사용한다.
+CREATE TABLE IF NOT EXISTS student_portal_access (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  student_id            TEXT    NOT NULL,
+  enabled               INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0,1)),
+  student_identity_hash TEXT CHECK (
+    student_identity_hash IS NULL OR (
+      length(student_identity_hash) = 64 AND student_identity_hash NOT GLOB '*[^a-f0-9]*'
+    )
+  ),
+  guardian_identity_hash TEXT CHECK (
+    guardian_identity_hash IS NULL OR (
+      length(guardian_identity_hash) = 64 AND guardian_identity_hash NOT GLOB '*[^a-f0-9]*'
+    )
+  ),
+  scope_version         INTEGER NOT NULL DEFAULT 1 CHECK (scope_version = 1),
+  accepted_at           INTEGER,
+  updated_at            INTEGER NOT NULL,
+  updated_by            TEXT    NOT NULL,
+  CHECK (enabled = 0 OR (
+    student_identity_hash IS NOT NULL AND guardian_identity_hash IS NOT NULL
+    AND scope_version = 1 AND accepted_at IS NOT NULL
+  )),
+  PRIMARY KEY (app, student_id)
+);
+
+CREATE TABLE IF NOT EXISTS student_portal_codes (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  code_hash             TEXT    NOT NULL CHECK (length(code_hash) = 71 AND code_hash LIKE 'sha256:%'),
+  student_id            TEXT    NOT NULL,
+  student_identity_hash TEXT    NOT NULL CHECK (length(student_identity_hash) = 64),
+  guardian_identity_hash TEXT   NOT NULL CHECK (length(guardian_identity_hash) = 64),
+  scope_version         INTEGER NOT NULL CHECK (scope_version = 1),
+  access_updated_at     INTEGER NOT NULL,
+  created_at            INTEGER NOT NULL,
+  expires_at            INTEGER NOT NULL,
+  consumed_at           INTEGER,
+  revoked               INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  issued_by             TEXT    NOT NULL,
+  claim_id              TEXT CHECK (claim_id IS NULL OR length(claim_id) = 48),
+  PRIMARY KEY (app, code_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_student_portal_codes_student
+  ON student_portal_codes(app, student_id, revoked, expires_at);
+
+CREATE TABLE IF NOT EXISTS student_portal_sessions (
+  app                   TEXT    NOT NULL CHECK (app = 'task'),
+  token_hash            TEXT    NOT NULL CHECK (length(token_hash) = 71 AND token_hash LIKE 'sha256:%'),
+  student_id            TEXT    NOT NULL,
+  student_identity_hash TEXT    NOT NULL CHECK (length(student_identity_hash) = 64),
+  guardian_identity_hash TEXT   NOT NULL CHECK (length(guardian_identity_hash) = 64),
+  scope_version         INTEGER NOT NULL CHECK (scope_version = 1),
+  access_updated_at     INTEGER NOT NULL,
+  created_at            INTEGER NOT NULL,
+  expires_at            INTEGER NOT NULL,
+  last_seen_at          INTEGER NOT NULL,
+  revoked               INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  PRIMARY KEY (app, token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_student_portal_sessions_student
+  ON student_portal_sessions(app, student_id, revoked, expires_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_access_revoke
+AFTER UPDATE OF enabled, student_identity_hash, guardian_identity_hash, scope_version ON student_portal_access
+WHEN NEW.enabled=0
+  OR OLD.student_identity_hash IS NOT NEW.student_identity_hash
+  OR OLD.guardian_identity_hash IS NOT NEW.guardian_identity_hash
+  OR OLD.scope_version IS NOT NEW.scope_version
+BEGIN
+  UPDATE student_portal_codes SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+  UPDATE student_portal_sessions SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_roster_identity_update
+AFTER UPDATE OF data ON private_rosters
+WHEN NEW.app='task'
+BEGIN
+  UPDATE student_portal_codes SET revoked=1
+  WHERE app=NEW.app AND revoked=0 AND NOT EXISTS (
+    SELECT 1
+    FROM json_each(OLD.data, '$.roster.students') old_student
+    JOIN json_each(NEW.data, '$.roster.students') new_student
+      ON json_extract(new_student.value, '$.id')=student_portal_codes.student_id
+    WHERE json_extract(old_student.value, '$.id')=student_portal_codes.student_id
+      AND json_extract(new_student.value, '$.name') IS json_extract(old_student.value, '$.name')
+      AND json_extract(new_student.value, '$.start') IS json_extract(old_student.value, '$.start')
+      AND json_extract(new_student.value, '$.end') IS json_extract(old_student.value, '$.end')
+  );
+  UPDATE student_portal_sessions SET revoked=1
+  WHERE app=NEW.app AND revoked=0 AND NOT EXISTS (
+    SELECT 1
+    FROM json_each(OLD.data, '$.roster.students') old_student
+    JOIN json_each(NEW.data, '$.roster.students') new_student
+      ON json_extract(new_student.value, '$.id')=student_portal_sessions.student_id
+    WHERE json_extract(old_student.value, '$.id')=student_portal_sessions.student_id
+      AND json_extract(new_student.value, '$.name') IS json_extract(old_student.value, '$.name')
+      AND json_extract(new_student.value, '$.start') IS json_extract(old_student.value, '$.start')
+      AND json_extract(new_student.value, '$.end') IS json_extract(old_student.value, '$.end')
+  );
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_roster_delete
+AFTER DELETE ON private_rosters
+WHEN OLD.app='task'
+BEGIN
+  UPDATE student_portal_codes SET revoked=1 WHERE app=OLD.app AND revoked=0;
+  UPDATE student_portal_sessions SET revoked=1 WHERE app=OLD.app AND revoked=0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_guardian_identity_update
+AFTER UPDATE OF student_name, phone ON guardian_contacts_by_student
+WHEN NEW.app='task' AND (OLD.student_name IS NOT NEW.student_name OR OLD.phone IS NOT NEW.phone)
+BEGIN
+  UPDATE student_portal_codes SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+  UPDATE student_portal_sessions SET revoked=1
+  WHERE app=NEW.app AND student_id=NEW.student_id AND revoked=0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_portal_guardian_identity_delete
+AFTER DELETE ON guardian_contacts_by_student
+WHEN OLD.app='task'
+BEGIN
+  UPDATE student_portal_codes SET revoked=1
+  WHERE app=OLD.app AND student_id=OLD.student_id AND revoked=0;
+  UPDATE student_portal_sessions SET revoked=1
+  WHERE app=OLD.app AND student_id=OLD.student_id AND revoked=0;
 END;

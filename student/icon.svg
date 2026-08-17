@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="WB 학생">
+  <rect width="192" height="192" rx="42" fill="#173957"/>
+  <path d="M42 58h22l12 61 12-45h18l12 45 12-61h22l-23 78h-22L97 99l-10 37H65z" fill="#fff"/>
+  <circle cx="150" cy="45" r="13" fill="#55b8e5"/>
+</svg>

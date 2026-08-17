@@ -1,4 +1,5 @@
 import { validateRosterDocument } from './roster.js';
+import { loadOrderSnapshotRows, verifyOrderTaskSnapshotRows } from './book-order-create.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
@@ -69,7 +70,9 @@ function orderTaskData(row) {
 async function latestOrderSend(env, app, taskId) {
   return await env.DB.prepare(
     'SELECT s.* FROM book_order_sends s LEFT JOIN book_order_batch_items i ' +
-    'ON i.app=s.app AND i.send_id=s.send_id WHERE s.app=? AND (s.task_id=? OR i.task_id=?) ' +
+    'ON i.app=s.app AND i.send_id=s.send_id WHERE s.app=? AND (i.task_id=? OR ' +
+    "(s.task_id=? AND s.task_id NOT LIKE 'batch_%' AND s.task_id NOT LIKE 'retry_%' " +
+      "AND s.task_id NOT LIKE 'sample:%')) " +
     'ORDER BY s.created_at DESC LIMIT 1'
   ).bind(app, taskId, taskId).first();
 }
@@ -106,19 +109,29 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
 }
 
 async function listOrderFulfillments(env, app, auth, document) {
-  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, staffResult] = await Promise.all([
+  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, staffResult, snapshotResult] = await Promise.all([
     env.DB.prepare('SELECT id,owner,data,updated_at FROM tasks WHERE app=? ORDER BY updated_at DESC').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_sends WHERE app=? ORDER BY created_at DESC').bind(app).all(),
     env.DB.prepare('SELECT task_id,send_id FROM book_order_batch_items WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=?').bind(app).all(),
-    env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all()
+    env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all(),
+    env.DB.prepare('SELECT * FROM book_order_student_snapshots WHERE app=? ORDER BY task_id,item_index,student_id').bind(app).all()
   ]);
   const sendsById = new Map((sendsResult.results || []).map(row => [String(row.send_id), row]));
+  const mappedSendIds = new Set((mappingsResult.results || []).map(row => String(row.send_id || '')));
   const sendByTask = new Map();
-  for (const row of sendsResult.results || []) if (!sendByTask.has(String(row.task_id))) sendByTask.set(String(row.task_id), row);
+  for (const row of sendsResult.results || []) {
+    const taskId = String(row.task_id || '');
+    if (mappedSendIds.has(String(row.send_id || '')) || /^(?:batch_|retry_)|^sample:/.test(taskId)) continue;
+    if (!sendByTask.has(taskId)) sendByTask.set(taskId, row);
+  }
   for (const mapping of mappingsResult.results || []) {
     const send = sendsById.get(String(mapping.send_id));
-    if (send) sendByTask.set(String(mapping.task_id), send);
+    const taskId = String(mapping.task_id);
+    const current = sendByTask.get(taskId);
+    if (send && (!current || Number(send.created_at || 0) > Number(current.created_at || 0) ||
+        (Number(send.created_at || 0) === Number(current.created_at || 0) &&
+          Number(send.updated_at || 0) > Number(current.updated_at || 0)))) sendByTask.set(taskId, send);
   }
   const fulfillmentByItem = new Map((fulfillmentsResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
   const staffNames = new Map((staffResult.results || []).map(row => {
@@ -131,6 +144,11 @@ async function listOrderFulfillments(env, app, auth, document) {
     if (auth.scope === 'own' && String(taskRow.owner || '') !== auth.id) continue;
     const task = orderTaskData(taskRow);
     if (!task) continue;
+    const send = sendByTask.get(String(taskRow.id)) || null;
+    const sealedIdentity = await verifyOrderTaskSnapshotRows(
+      String(taskRow.id), taskRow.owner, task, snapshotResult.results || [], document, Date.now(),
+      !send || String(send.status) !== 'accepted'
+    );
     for (let itemIndex = 0; itemIndex < task.orderItems.length; itemIndex++) {
       const item = task.orderItems[itemIndex] || {};
       const studentIds = orderStudentIds(item);
@@ -142,10 +160,10 @@ async function listOrderFulfillments(env, app, auth, document) {
       const missing = studentIds.some(id => !studentsById.has(id));
       const fulfillment = fulfillmentByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const identityMismatch = !fulfillmentMatches(fulfillment, String(item.bookId || ''), studentIds);
-      const integrity = invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
+      const integrity = sealedIdentity.sealed && !sealedIdentity.valid ? 'identity_mismatch' :
+        invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
       const needsStudentLink = !String(item.bookId || '') || !studentIds.length || invalidSelection || unauthorized || missing;
-      const send = sendByTask.get(String(taskRow.id)) || null;
-      const canLinkStudents = !fulfillment && !!send && String(send.status) === 'accepted' && needsStudentLink;
+      const canLinkStudents = !integrity && !fulfillment && !!send && String(send.status) === 'accepted' && needsStudentLink;
       const students = integrity ? [] : studentIds.map(id => studentsById.get(id)).filter(Boolean).map(student => ({
         id: String(student.id), name: String(student.name || '이름 미입력'), grade: String(student.grade || '')
       }));
@@ -204,6 +222,19 @@ async function linkOrderStudents(env, app, body, auth, json, origin) {
     const student = studentsById.get(id);
     return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
   })) return json({ ok: false, error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+
+  const snapshots = await loadOrderSnapshotRows(env, app, taskId);
+  const sealedIdentity = await verifyOrderTaskSnapshotRows(
+    taskId, taskRow.owner, task, snapshots, document, Date.now(), false
+  );
+  if (sealedIdentity.sealed) {
+    const currentIds = orderStudentIds(item);
+    if (sealedIdentity.valid && currentBookId === bookId && validOrderStudentSelection(item, currentIds) &&
+        JSON.stringify(currentIds) === JSON.stringify(studentIds)) {
+      return json({ ok: true, idempotent: true, taskUpdatedAt: Number(taskRow.updated_at) || 0 }, 200, origin);
+    }
+    return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '봉인된 주문의 학생·교재 연결은 변경할 수 없습니다' }, 409, origin);
+  }
 
   const currentIds = orderStudentIds(item);
   if (currentBookId === bookId && validOrderStudentSelection(item, currentIds) &&
@@ -376,6 +407,16 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
     return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
   })) return json({ ok: false, error: '담당 학생의 주문만 처리할 수 있습니다' }, 403, origin);
 
+  const send = await latestOrderSend(env, app, taskId);
+  const accepted = !!send && String(send.status) === 'accepted';
+  const snapshots = await loadOrderSnapshotRows(env, app, taskId);
+  const sealedIdentity = await verifyOrderTaskSnapshotRows(
+    taskId, taskRow.owner, task, snapshots, document, Date.now(), !accepted
+  );
+  if (sealedIdentity.sealed && !sealedIdentity.valid) {
+    return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '봉인된 주문의 학생 또는 교재 정체성이 일치하지 않습니다' }, 409, origin);
+  }
+
   let row = await env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=? LIMIT 1')
     .bind(app, taskId, itemIndex).first();
   if (!fulfillmentMatches(row, bookId, studentIds)) {
@@ -393,11 +434,8 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
       (row.status === 'student_handed' && next !== 'academy_register') || row.status === 'academy_registered')) {
     return json({ ok: false, code: 'INVALID_TRANSITION', error: '현재 상태에서는 요청한 변경을 할 수 없습니다' }, 409, origin);
   }
-  if (next === 'receive') {
-    const send = await latestOrderSend(env, app, taskId);
-    if (!send || String(send.status) !== 'accepted') {
-      return json({ ok: false, code: 'ORDER_NOT_ACCEPTED', error: '주문완료가 확인된 뒤 수령 처리할 수 있습니다' }, 409, origin);
-    }
+  if (!accepted) {
+    return json({ ok: false, code: 'ORDER_NOT_ACCEPTED', error: '주문완료가 확인된 뒤 수령·배부 처리할 수 있습니다' }, 409, origin);
   }
   const now = Date.now();
   const actor = actorId(auth);

@@ -42,7 +42,7 @@ test('오늘 우리 아이는 v2 capability에서만 최소 수업·차량 상�
   assert.match(html, /하차 확인/);
   assert.doesNotMatch(html, /하차·인계 완료|안전 귀가|실시간 위치/);
   assert.match(html, /timeZone:'Asia\/Seoul'/);
-  assert.match(html, /내부 수업 메모, 정류장·주소, 연락처는 표시하지 않습니다/);
+  assert.match(html, /내부 수업 메모, 정류장·주소, 연락처와 주문 업체 정보는 표시하지 않습니다/);
   assert.doesNotMatch(html, /row\.routeName|row\.stopName|row\.address|row\.guardianPhone/);
 });
 
@@ -120,14 +120,34 @@ test('보호자 요청 제출은 확인 후 정형 enum과 재사용 가능한 �
   assert.match(html, /setAttribute\('role',isError\?'alert':'status'\)/);
 });
 
-test('보호자 화면은 오늘, 정규 시간표, 확인 응답, 이용 현황, 기록 순서로 읽힌다', () => {
+test('학원 공지와 교재 상태는 scope v4에서만 안전한 공개 필드로 표시한다', () => {
+  assert.match(html, /const PHASE3_SCOPE_VERSION=4/);
+  assert.match(html, /capability\(capabilities,'announcements',PHASE3_SCOPE_VERSION\)/);
+  assert.match(html, /capability\(capabilities,'bookStatus',PHASE3_SCOPE_VERSION\)/);
+  const start = html.indexOf('function announcementRows');
+  const end = html.indexOf('function render(data)', start);
+  const [announcementRows, bookStatusRows] = new Function('esc', 'stamp',
+    html.slice(start, end) + '; return [announcementRows,bookStatusRows];')(
+    value => String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;'), value => String(value || '')
+  );
+  const attack = '<img src=x onerror=alert(1)>';
+  const notice = announcementRows([{ title: attack, body: attack, publishDate: '2026-08-17', expiresDate: '2026-08-20' }]).join('');
+  const book = bookStatusRows([{ kind: 'distribution', title: attack, stage: 'handed', label: attack, updatedAt: 1 }]).join('');
+  assert.doesNotMatch(notice + book, /<img\b/);
+  assert.match(notice + book, /&lt;img/);
+  assert.doesNotMatch(notice + book, /studentId|bookId|taskId|assignmentId|vendor|provider|updatedBy/);
+});
+
+test('보호자 화면은 공지, 오늘, 학습, 교재, 시간표, 응답, 이용 현황, 기록 순서로 읽힌다', () => {
   const start = html.indexOf('function render(data)');
   const end = html.indexOf('function fail(', start);
   const source = html.slice(start, end);
-  const labels = ['오늘 현황', '정규 수업 시간표', '확인·응답', '횟수제 수업', '최근 수업 기록'];
-  labels.reduce((previous, label) => {
-    const current = source.indexOf(label);
-    assert.ok(current > previous, `${label} 순서`);
+  const assembly = source.slice(source.indexOf('app.innerHTML='));
+  const tokens = ['+announcementSection+', '+todaySections+', '+publicLessonSection+', '+bookStatusSection+',
+    "section('Schedule','정규 수업 시간표'", "section('Action','확인·응답'", "section('Usage','횟수제 수업'", "section('Record','최근 수업 기록'"];
+  tokens.reduce((previous, token) => {
+    const current = assembly.indexOf(token);
+    assert.ok(current > previous, `${token} 순서`);
     return current;
   }, -1);
   assert.match(html, /class="summary-grid"/);

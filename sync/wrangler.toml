@@ -7,6 +7,7 @@ compatibility_date = "2026-08-01"
 [vars]
 ALLOW_ORIGIN = "https://whdudwns33-wb.github.io"
 WB_PARENT_PORTAL_BASE_URL = "https://wb-sync.whdudwns33.workers.dev/"
+WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"
 # 감사 가능한 배포 설정의 관리 담당. 기존 비밀 allowlist와 합쳐 적용한다.
 # 김남기, 김혜지 선생님은 QR 발급을 포함해 동일한 task 관리 권한을 가진다.
 TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479"

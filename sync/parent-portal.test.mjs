@@ -9,6 +9,7 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
 const scopeMigration = fs.readFileSync(new URL('./migrations/034_parent_portal_scope.sql', import.meta.url), 'utf8');
 const phase2Migration = fs.readFileSync(new URL('./migrations/035_parent_portal_phase2.sql', import.meta.url), 'utf8');
+const studentPortalMigration = fs.readFileSync(new URL('./migrations/038_student_portal.sql', import.meta.url), 'utf8');
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -84,8 +85,10 @@ function seed(db) {
   const now = Date.now();
   const month = new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
   const roster = { roster: { updated: month + '-01', baseline: month, students: [
-    { id: 'student-a', name: '학생A', grade: '초2', start: month, end: '', teacherIds: ['staff-a'], memo: '외부 비공개' },
-    { id: 'student-b', name: '학생B', grade: '초3', start: month, end: '', teacherIds: ['staff-b'] }
+    { id: 'student-a', name: '학생A', grade: '초2', teacher: '담당A', subject: '독해', start: month, end: '',
+      reason: '', teacherIds: ['staff-a'], memo: '외부 비공개' },
+    { id: 'student-b', name: '학생B', grade: '초3', teacher: '담당B', subject: '독해', start: month, end: '',
+      reason: '', teacherIds: ['staff-b'] }
   ] }, bookStudents: [] };
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster), now).run();
@@ -149,6 +152,24 @@ function seedToday(db) {
   return { date, now };
 }
 
+async function seedGuardianBookIssue(db) {
+  const row = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
+  const document = JSON.parse(row.data);
+  document.bookStudents.push({
+    id: 'assignment-parent', studentId: 'student-a', name: '학생A', teacher: '담당A',
+    bookId: 'book-parent', at: '', perWeek: 2, goal: '', teacherIds: ['staff-a']
+  });
+  db.prepare("UPDATE private_rosters SET data=?,updated_at=updated_at+1 WHERE app='task'")
+    .bind(JSON.stringify(document)).run();
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO book_issues(app,assignment_id,student_id,book_id,student_identity_hash,status,cycle,revision,' +
+    'prepared_at,prepared_by,issued_at,issued_by,history,created_at,updated_at) VALUES(?,?,?,?,?,' +
+    "'issued',1,2,?,?,?,?,'[]',?,?)"
+  ).bind('task', 'assignment-parent', 'student-a', 'book-parent', await sha256Hex('student-a\n학생A'),
+    now - 1000, 'staff-a', now, 'staff-a', now - 1000, now).run();
+}
+
 function seedAwaitingMakeup(db, caseId = 'mu_parent_case') {
   const now = Date.now();
   const sourceDate = caseId.includes('confirm') ? '2026-08-11' : '2026-08-10';
@@ -184,7 +205,7 @@ async function seedPublicLesson(db, lessonDate, suffix) {
 async function connected(db) {
   const current = db.prepare("SELECT updated_at FROM guardian_portal_access WHERE student_id='student-a'").first();
   const allowed = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: current ? Number(current.updated_at) : 0 }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 4, expectedUpdatedAt: current ? Number(current.updated_at) : 0 }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const invited = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(invited.status, 200);
@@ -209,6 +230,7 @@ test('신규 schema와 운영 027→035 적용 결과의 보호자 공개 구조
   upgraded.exec(migration);
   upgraded.exec(scopeMigration);
   upgraded.exec(phase2Migration);
+  upgraded.exec(studentPortalMigration);
   const columns = database => database.prepare('PRAGMA table_info(guardian_portal_access)').all()
     .map(row => [row.name, row.type, row.notnull, row.dflt_value, row.pk]);
   assert.deepEqual(columns(upgraded), columns(fresh));
@@ -235,7 +257,7 @@ test('원장만 동의·연락처가 준비된 stable 학생 초대를 발급한
   assert.equal((await call(db, { auth: admin, action: 'invite', studentId: 'student-b' })).status, 409);
   assert.equal((await call(db, { auth: admin, action: 'invite', studentId: 'student-a' })).status, 409,
     '보호자 앱 동의는 피드백 발송 동의와 별도로 받아야 한다');
-  assert.equal((await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 3, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io')).status, 200);
+  assert.equal((await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io')).status, 200);
   const invite = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(invite.status, 200);
   const stored = db.prepare('SELECT code_hash FROM guardian_portal_codes').first().code_hash;
@@ -246,7 +268,7 @@ test('원장만 동의·연락처가 준비된 stable 학생 초대를 발급한
 test('직원 초대 API와 내부 발송 helper가 같은 24시간·기존 unused revoke 계약을 사용한다', async () => {
   const db = new TestD1(); seed(db);
   const allowed = await call(db, {
-    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 3, expectedUpdatedAt: 0
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const now = Date.now();
@@ -285,13 +307,13 @@ test('초대 코드는 한 번만 교환되고 세션은 해당 학생 공개 �
   assert.doesNotMatch(raw, /01012345678|외부 비공개|내부 특성|내부 요청|내부 수업지시|학생B/);
 });
 
-test('공개 범위 v3에서도 v2 오늘 수업 진행과 최소 차량 확인을 stable 학생 ID로 본다', async () => {
+test('공개 범위 v4에서도 v2 오늘 수업 진행과 최소 차량 확인을 stable 학생 ID로 본다', async () => {
   const db = new TestD1(); seed(db); const today = seedToday(db);
   const auth = await connected(db);
   const view = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(view.status, 200);
   assert.deepEqual(view.body.capabilities, { today: true, publicLessons: true, guardianRequests: true,
-    scopeVersion: 3, requiredScopeVersion: 3 });
+    bookStatus: true, announcements: true, scopeVersion: 4, requiredScopeVersion: 4 });
   assert.equal(view.body.today.date, today.date);
   assert.equal(view.body.today.lessons.length, 1);
   assert.match(view.body.today.lessons[0].lessonRef, /^lr_[a-f0-9]{32}$/);
@@ -325,6 +347,41 @@ test('공개 범위 v3에서도 v2 오늘 수업 진행과 최소 차량 확인�
     '오늘 수업과 주간 시간표가 같은 현재 assignment 검증을 사용한다');
 });
 
+test('v4 실제 화면과 관리자 미리보기는 같은 공지·검증된 교재 상태만 공개한다', async () => {
+  const db = new TestD1(); seed(db); await seedGuardianBookIssue(db);
+  const date = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const saved = await call(db, {
+    auth: admin, action: 'announcement_save', announcementId: 'notice-parent', expectedRevision: 0,
+    title: '방학 운영 안내', body: '다음 주 운영 시간을 확인해 주세요.',
+    publishDate: date, expiresDate: date, targetType: 'students', studentIds: ['student-a']
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(saved.status, 200);
+  const published = await call(db, {
+    auth: admin, action: 'announcement_publish', announcementId: 'notice-parent',
+    expectedRevision: saved.body.announcement.revision
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(published.status, 200);
+
+  const auth = await connected(db);
+  const view = await call(db, { action: 'view' }, auth.cookie);
+  const preview = await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-a'
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(view.status, 200);
+  assert.equal(preview.status, 200);
+  assert.deepEqual(view.body.announcements, preview.body.announcements);
+  assert.deepEqual(view.body.bookStatus, preview.body.bookStatus);
+  assert.deepEqual(view.body.announcements, [{
+    title: '방학 운영 안내', body: '다음 주 운영 시간을 확인해 주세요.',
+    publishDate: date, expiresDate: date
+  }]);
+  assert.deepEqual(view.body.bookStatus.map(row => [row.kind, row.title, row.stage, row.label]), [
+    ['distribution', '배정 교재', 'ready_for_handoff', '학생 전달 준비']
+  ]);
+  const raw = JSON.stringify({ announcements: view.body.announcements, bookStatus: view.body.bookStatus });
+  assert.doesNotMatch(raw, /student-a|assignment-parent|book-parent|staff-a|announcementId|studentIds|targetType|updatedBy|provider|vendor/);
+});
+
 test('담당 수업의 오늘 공개 숙제·준비물만 전용 projection에 CAS 저장하고 철회 이력을 남긴다', async () => {
   const db = new TestD1(); seed(db); const today = seedToday(db);
   const rootBlocked = await call(db, {
@@ -348,10 +405,12 @@ test('담당 수업의 오늘 공개 숙제·준비물만 전용 projection에 C
 
   const published = await directCall(db, {
     action: 'publication_set', taskId: 'lesson-a', lessonDate: today.date,
-    publicHomework: '  2쪽\u0000\r\n문제 풀기  ', publicReadiness: ' 연필 ', published: true, expectedRevision: 0
+    publicHomework: '  2쪽\u0000\r\n문제 풀기  ', publicReadiness: ' 연필 ', published: true,
+    studentVisible: true, expectedRevision: 0
   }, { scope: 'all', id: 'staff-a', role: 'manager' });
   assert.equal(published.status, 200);
   assert.equal(published.body.publication.publicHomework, '2쪽\n문제 풀기');
+  assert.equal(published.body.publication.studentVisible, true);
   assert.equal(published.body.publication.revision, 1);
   assert.equal(db.prepare('SELECT updated_by FROM guardian_lesson_publications').first().updated_by, 'staff-a');
   const lostResponseRetry = await directCall(db, {
@@ -360,6 +419,8 @@ test('담당 수업의 오늘 공개 숙제·준비물만 전용 projection에 C
   }, { scope: 'own', id: 'staff-a', role: 'staff' });
   assert.equal(lostResponseRetry.status, 200);
   assert.equal(lostResponseRetry.body.idempotent, true);
+  assert.equal(lostResponseRetry.body.publication.studentVisible, true,
+    '구형 client가 studentVisible을 생략해도 기존 학생 공개 선택을 보존한다');
 
   const listed = await directCall(db, { action: 'publication_list', lessonDate: today.date },
     { scope: 'all', id: 'staff-a', role: 'manager' });
@@ -614,7 +675,7 @@ test('관리자 미리보기는 동의·초대·보호자 세션 없이 같은 �
   assert.equal(preview.status, 200);
   assert.equal(preview.cookie, '');
   assert.deepEqual(preview.body.capabilities, { today: true, publicLessons: true, guardianRequests: true,
-    scopeVersion: 3, requiredScopeVersion: 3 });
+    bookStatus: true, announcements: true, scopeVersion: 4, requiredScopeVersion: 4 });
   assert.equal(preview.body.student.name, '학생A');
   assert.equal(preview.body.today.lessons.length, 1);
   assert.equal(preview.body.today.transport.length, 1);
@@ -655,7 +716,7 @@ test('같은 보호자 전화번호의 형제도 학생별 동의·초대 없이
   const a = await connected(db);
   const allowedB = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-b', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: 0
+    scopeVersion: 4, expectedUpdatedAt: 0
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowedB.status, 200);
   const inviteB = await call(db, {
@@ -671,11 +732,11 @@ test('같은 보호자 전화번호의 형제도 학생별 동의·초대 없이
   assert.doesNotMatch(JSON.stringify(viewB.body), /학생A/);
 });
 
-test('기존 v2 연결은 오늘 현황을 유지하고 v3 재동의 뒤 새 기능을 연다', async () => {
+test('기존 v2·v3 연결은 원래 기능을 유지하고 v4 재동의 뒤 공지·교재를 연다', async () => {
   const db = new TestD1(); seed(db); seedToday(db);
   const initial = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: 0
+    scopeVersion: 4, expectedUpdatedAt: 0
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(initial.status, 200);
   db.prepare(
@@ -700,10 +761,12 @@ test('기존 v2 연결은 오늘 현황을 유지하고 v3 재동의 뒤 새 기
   const legacyView = await call(db, { action: 'view' }, legacyCookie);
   assert.equal(legacyView.status, 200);
   assert.deepEqual(legacyView.body.capabilities, { today: true, publicLessons: false, guardianRequests: false,
-    scopeVersion: 2, requiredScopeVersion: 3 });
+    bookStatus: false, announcements: false, scopeVersion: 2, requiredScopeVersion: 4 });
   assert.equal(legacyView.body.today.lessons.length, 1);
   assert.equal('publicLessons' in legacyView.body, false);
   assert.equal('guardianRequests' in legacyView.body, false);
+  assert.equal('bookStatus' in legacyView.body, false);
+  assert.equal('announcements' in legacyView.body, false);
   const blockedRequest = await call(db, {
     action: 'submit_request', requestType: 'consultation', clientRequestId: 'legacy_request_0001'
   }, legacyCookie);
@@ -725,13 +788,41 @@ test('기존 v2 연결은 오늘 현황을 유지하고 v3 재동의 뒤 새 기
   assert.equal(oldClient.body.code, 'PORTAL_CONSENT_VERSION_REQUIRED');
   assert.equal(db.prepare("SELECT scope_version FROM guardian_portal_access WHERE student_id='student-a'").first().scope_version, 2);
 
-  const upgraded = await call(db, {
+  const upgradedToV4 = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: revision
+    scopeVersion: 4, expectedUpdatedAt: revision
   }, '', 'https://whdudwns33-wb.github.io');
-  assert.equal(upgraded.status, 200);
-  assert.equal(upgraded.body.access.scopeVersion, 3);
+  assert.equal(upgradedToV4.status, 200);
+  assert.equal(upgradedToV4.body.access.scopeVersion, 4);
   assert.equal((await call(db, { action: 'view' }, legacyCookie)).status, 401);
+
+  db.prepare(
+    "UPDATE guardian_portal_access SET scope_version=3,updated_at=updated_at+1 WHERE app='task' AND student_id='student-a'"
+  ).run();
+  const v3Revision = db.prepare(
+    "SELECT updated_at FROM guardian_portal_access WHERE app='task' AND student_id='student-a'"
+  ).first().updated_at;
+  const v3Invite = await issueGuardianPortalInvite({ DB: db }, {
+    studentId: 'student-a', issuedBy: 'director', requiredScopeVersion: 3
+  });
+  assert.equal(v3Invite.ok, true);
+  const v3Exchange = await call(db, { action: 'exchange', code: v3Invite.code });
+  const v3Cookie = v3Exchange.cookie.split(';')[0];
+  const v3View = await call(db, { action: 'view' }, v3Cookie);
+  assert.equal(v3View.status, 200);
+  assert.deepEqual(v3View.body.capabilities, {
+    today: true, publicLessons: true, guardianRequests: true,
+    bookStatus: false, announcements: false, scopeVersion: 3, requiredScopeVersion: 4
+  });
+  assert.equal('bookStatus' in v3View.body, false);
+  assert.equal('announcements' in v3View.body, false);
+
+  const finalUpgrade = await call(db, {
+    auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
+    scopeVersion: 4, expectedUpdatedAt: v3Revision
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(finalUpgrade.status, 200);
+  assert.equal((await call(db, { action: 'view' }, v3Cookie)).status, 401);
 });
 
 test('만료·로그아웃 세션은 다시 사용할 수 없다', async () => {
@@ -783,7 +874,7 @@ test('동일한 이용 동의 저장은 idempotent이고, 해제는 명단·연�
   ).first();
   const same = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: before.updated_at
+    scopeVersion: 4, expectedUpdatedAt: before.updated_at
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(same.status, 200);
   assert.equal(same.body.idempotent, true);
@@ -843,7 +934,7 @@ test('보호자 전화가 바뀌면 기존 동의를 승계하지 않고 재동�
 
   const renewed = await call(db, {
     auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: accessBefore.updated_at
+    scopeVersion: 4, expectedUpdatedAt: accessBefore.updated_at
   }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(renewed.status, 200);
   assert.equal(renewed.body.idempotent, undefined);
@@ -882,7 +973,7 @@ test('보호자 연락처나 동의 revision이 바뀌면 기존 세션을 폐�
   db.prepare("UPDATE guardian_contacts_by_student SET phone='01012345678',updated_at=updated_at+1 WHERE student_id='student-a'").run();
   const access = db.prepare("SELECT updated_at FROM guardian_portal_access WHERE student_id='student-a'").first();
   const toggled = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: access.updated_at }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 4, expectedUpdatedAt: access.updated_at }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(toggled.status, 200);
   assert.equal((await call(db, { action: 'view' }, auth.cookie)).status, 401);
 });
@@ -910,7 +1001,7 @@ test('동의 저장은 CAS이고 네 번째 교환 뒤 활성 세션은 세 개�
 test('같은 1회 코드를 동시에 교환해도 세션은 하나만 생긴다', async () => {
   const db = new TestD1(); seed(db);
   const allowed = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
-    scopeVersion: 3, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io');
+    scopeVersion: 4, expectedUpdatedAt: 0 }, '', 'https://whdudwns33-wb.github.io');
   assert.equal(allowed.status, 200);
   const invited = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
   const results = await Promise.all([
@@ -959,6 +1050,20 @@ test('운영 migration이 빠지면 빈 현황으로 숨기지 않고 준비 중
   assert.equal(preview.body.code, 'OPERATIONS_NOT_READY');
 });
 
+test('v4 공지·교재 migration이 빠지면 빈 목록으로 오인하지 않고 준비 중으로 막는다', async () => {
+  const noticeDb = new TestD1(); seed(noticeDb); const noticeAuth = await connected(noticeDb);
+  noticeDb.database.exec('DROP TABLE guardian_announcement_events; DROP TABLE guardian_announcements');
+  const noNotice = await call(noticeDb, { action: 'view' }, noticeAuth.cookie);
+  assert.equal(noNotice.status, 503);
+  assert.equal(noNotice.body.code, 'ANNOUNCEMENTS_NOT_READY');
+
+  const bookDb = new TestD1(); seed(bookDb); const bookAuth = await connected(bookDb);
+  bookDb.database.exec('DROP TABLE book_issues');
+  const noBook = await call(bookDb, { action: 'view' }, bookAuth.cookie);
+  assert.equal(noBook.status, 503);
+  assert.equal(noBook.body.code, 'BOOK_STATUS_NOT_READY');
+});
+
 test('활성 회차권도 현재 수업 assignment identity와 담당이 일치할 때만 보호자에게 노출한다', async () => {
   const db = new TestD1(); seed(db); const auth = await connected(db);
   const now = Date.now();
@@ -991,7 +1096,7 @@ test('활성 회차권도 현재 수업 assignment identity와 담당이 일치�
   db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
   const rosterRow = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
   const roster = JSON.parse(rosterRow.data);
-  roster.roster.students.find(student => student.id === 'student-a').teacherIds = [];
+  roster.roster.students.find(student => student.id === 'student-a').teacherIds = ['staff-b'];
   db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(roster)).run();
   view = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(view.status, 200);

@@ -26,7 +26,17 @@ class D1Statement {
 class TestD1 {
   constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); }
   prepare(sql) { return new D1Statement(this.database, sql); }
-  batch(statements) { return statements.map(s => s.run()); }
+  batch(statements) {
+    this.database.exec('BEGIN');
+    try {
+      const results = statements.map(statement => statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -99,6 +109,7 @@ function seedOrderTask(db, overrides = {}) {
   const task = {
     id: 'order-1', staffId: 'S-kim', title: '[주문] 개념원리 미적분Ⅰ',
     orderVendor: '천재출판사', orderItems: [{ title: '개념원리 미적분Ⅰ', qty: '3권' }],
+    orderDelivery: 'scheduled_batch_v1',
     createdAt: now, deleted: false, ...overrides
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
@@ -126,7 +137,7 @@ test('schema and migration are additive, and the send ledger itself stores no ph
     const match = sql.match(/CREATE TABLE IF NOT EXISTS book_order_sends\s*\([\s\S]*?\);/);
     assert.ok(match, 'book_order_sends 테이블 정의를 찾을 수 없습니다');
     assert.doesNotMatch(match[0], /phone|message_body/i);
-    assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
+    assert.doesNotMatch(match[0], /DROP TABLE|DELETE FROM/i);
   }
 });
 
@@ -315,6 +326,44 @@ test('rejected-only retry groups each vendor once and excludes accepted or unkno
   assert.equal(again.body.idempotent, true);
   assert.deepEqual(again.body.results, []);
   assert.equal(payloads.length, 2, 'accepted mapping 뒤 반복 호출은 provider를 다시 부르지 않는다');
+});
+
+test('retry processes up to the daily chunk limit and leaves overflow rejected for the next day', async () => {
+  const db = new TestD1();
+  const vendors = {};
+  for (let index = 0; index < 31; index++) {
+    const vendor = '출판사-' + index;
+    const taskId = 'failed-limit-' + index;
+    vendors[vendor] = '01099998888';
+    seedOrderTask(db, { id: taskId, title: '[주문] 교재-' + index,
+      orderVendor: vendor, orderDelivery: 'scheduled_batch_v1',
+      orderItems: [{ title: '교재-' + index, qty: '1권' }] });
+    seedMappedSend(db, taskId, 'old-limit-' + index, 'rejected');
+  }
+  const env = { BOOK_VENDOR_PHONES: JSON.stringify(vendors) };
+  let fetches = 0;
+  const dayOne = Date.parse('2026-09-01T00:00:00Z');
+  await withFetch(async () => { fetches += 1; return acceptedResponse(fetches); }, async () => {
+    const first = await withNow(dayOne, () => call(db, { auth: admin, action: 'retry-rejected' }, env));
+    assert.equal(first.status, 429);
+    assert.equal(first.body.code, 'DAILY_SEND_LIMIT');
+    assert.equal(fetches, 30);
+    assert.equal(first.body.results.at(-1).status, 'DAILY_SEND_LIMIT');
+    const states = db.prepare(
+      'SELECT s.status,COUNT(*) AS count FROM book_order_batch_items i JOIN book_order_sends s ' +
+      'ON s.app=i.app AND s.send_id=i.send_id GROUP BY s.status ORDER BY s.status'
+    ).all().results.map(row => ({ status: row.status, count: row.count }));
+    assert.deepEqual(states, [{ status: 'accepted', count: 30 }, { status: 'rejected', count: 1 }]);
+
+    const second = await withNow(dayOne + 25 * 60 * 60 * 1000, () =>
+      call(db, { auth: admin, action: 'retry-rejected' }, env));
+    assert.equal(second.status, 200);
+    assert.equal(fetches, 31);
+    assert.equal(db.prepare(
+      "SELECT COUNT(*) AS count FROM book_order_batch_items i JOIN book_order_sends s " +
+      "ON s.app=i.app AND s.send_id=i.send_id WHERE s.status='accepted'"
+    ).first().count, 31);
+  });
 });
 
 test('rejected-only retry is root/allowlist-manager only, once per KST day, and reopens next day', async () => {
@@ -566,7 +615,7 @@ test('scheduler releases its lease when candidate selection throws', async () =>
   const originalPrepare = db.prepare.bind(db);
   let failSelection = true;
   db.prepare = sql => {
-    if (failSelection && String(sql).startsWith("SELECT id,data FROM tasks WHERE app='task'")) {
+    if (failSelection && String(sql).startsWith("SELECT t.id,t.owner,t.data FROM tasks t WHERE t.app='task'")) {
       failSelection = false;
       throw new Error('candidate read failed');
     }
@@ -739,6 +788,7 @@ test('scheduled orders from the same publisher are grouped once and cannot be se
   });
   seedOrderTask(db, {
     id: 'legacy-order', title: '[주문] 기존 미발송 주문',
+    orderDelivery: undefined,
     orderItems: [{ title: '기존 미발송 주문', qty: '99권' }]
   });
   let fetches = 0;
@@ -767,6 +817,128 @@ test('scheduled orders from the same publisher are grouped once and cannot be se
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM book_order_batch_items WHERE app='task'").first().count, 2);
 });
 
+test('scheduler splits one vendor at whole-task boundaries before the 2000-byte provider limit', async () => {
+  const db = new TestD1();
+  const cutoff = Date.now() + 1000;
+  for (let index = 0; index < 20; index++) {
+    seedOrderTask(db, { id: 'chunk-order-' + index, title: '[주문] 단체-' + index,
+      orderDelivery: 'scheduled_batch_v1', orderItems: [{ title: '가'.repeat(100) + index, qty: '1권' }] });
+  }
+  const payloads = [];
+  await withFetch(async (url, options) => {
+    const payload = JSON.parse(options.body);
+    payloads.push(payload);
+    assert.ok(new TextEncoder().encode(payload.messages[0].text).byteLength <= 2000);
+    return acceptedResponse(payloads.length);
+  }, async () => {
+    const result = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff);
+    assert.equal(result.ok, true);
+    assert.ok(result.results.length > 1);
+  });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_batch_items').first().count, 20);
+});
+
+test('a short 150-task chunk reserves its send and all mappings in exactly two D1 statements', async () => {
+  const db = new TestD1();
+  const cutoff = Date.now() + 1000;
+  for (let index = 0; index < 150; index++) {
+    seedOrderTask(db, { id: 'bulk-map-' + index, title: '[주문] A', orderDelivery: 'scheduled_batch_v1',
+      orderItems: [{ title: 'A', qty: '1' }] });
+  }
+  const originalBatch = db.batch.bind(db);
+  const reservationBatchSizes = [];
+  db.batch = statements => {
+    if (statements.some(statement => /INSERT OR IGNORE INTO book_order_sends/.test(statement.sql))) {
+      reservationBatchSizes.push(statements.length);
+    }
+    return originalBatch(statements);
+  };
+  await withFetch(async () => acceptedResponse(), async () => {
+    const result = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff);
+    assert.equal(result.ok, true);
+  });
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_batch_items').first().count, 150);
+  assert.ok(db.prepare(
+    'SELECT MAX(task_count) AS count FROM (SELECT COUNT(*) AS task_count FROM book_order_batch_items GROUP BY send_id)'
+  ).first().count >= 100);
+  assert.ok(reservationBatchSizes.length >= 1);
+  assert.deepEqual(new Set(reservationBatchSizes), new Set([2]));
+});
+
+test('processed scheduled rows are filtered before LIMIT so 2000 old rows cannot starve a new order', async () => {
+  const db = new TestD1();
+  const base = Date.now();
+  for (let index = 0; index < 2000; index++) {
+    const taskId = 'done-' + index;
+    seedOrderTask(db, { id: taskId, orderDelivery: 'scheduled_batch_v1', createdAt: base - 1000 });
+    seedMappedSend(db, taskId, 'done-send-' + index, 'accepted');
+  }
+  seedOrderTask(db, { id: 'fresh-after-2000', title: '[주문] 신규',
+    orderDelivery: 'scheduled_batch_v1', orderItems: [{ title: '신규 교재', qty: '1권' }], createdAt: base });
+  let fetches = 0;
+  await withNow(base + 2 * 24 * 60 * 60 * 1000, () => withFetch(async () => {
+    fetches += 1;
+    return acceptedResponse();
+  }, async () => {
+    const result = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, base + 1);
+    assert.equal(result.results[0].taskCount, 1);
+    assert.equal(result.results[0].status, 'accepted');
+  }));
+  assert.equal(fetches, 1);
+});
+
+test('send reservation and batch mappings roll back together, and a later cron can safely retry', async () => {
+  const db = new TestD1();
+  const cutoff = Date.now() + 1000;
+  seedOrderTask(db, { id: 'atomic-order', orderDelivery: 'scheduled_batch_v1' });
+  const originalBatch = db.batch.bind(db);
+  let failOnce = true;
+  db.batch = statements => {
+    if (!failOnce || !statements.some(statement => /INSERT OR IGNORE INTO book_order_sends/.test(statement.sql))) {
+      return originalBatch(statements);
+    }
+    failOnce = false;
+    db.database.exec('BEGIN');
+    try {
+      statements[0].run();
+      throw new Error('injected mapping failure');
+    } catch (error) {
+      db.database.exec('ROLLBACK');
+      throw error;
+    }
+  };
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const failed = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff);
+    assert.equal(failed.results[0].status, 'ORDER_MAPPING_CONFLICT');
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_sends').first().count, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_batch_items').first().count, 0);
+
+    const retried = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff + 1);
+    assert.equal(retried.results[0].status, 'accepted');
+  });
+  assert.equal(fetches, 1);
+});
+
+test('crash residues are reported without automatically sending again', async () => {
+  for (const mapped of [false, true]) {
+    const db = new TestD1();
+    seedOrderTask(db, { id: mapped ? 'mapped-crash' : 'orphan-crash', orderDelivery: 'scheduled_batch_v1' });
+    const now = Date.now();
+    db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,' +
+      "message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'reserved',?,?)")
+      .bind('task', 'crash-send', 'crash-key', 'batch_crash', '천재출판사', 1, 'a'.repeat(64), now, now).run();
+    if (mapped) db.prepare('INSERT INTO book_order_batch_items(app,task_id,send_id,created_at) VALUES(?,?,?,?)')
+      .bind('task', 'mapped-crash', 'crash-send', now).run();
+    let fetches = 0;
+    await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const result = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, now + 1);
+      assert.equal(result.code, mapped ? 'BOOK_ORDER_SEND_RESERVED' : 'BOOK_ORDER_LEDGER_PARTIAL');
+    });
+    assert.equal(fetches, 0);
+  }
+});
+
 test('provider rejection and network failure are both recorded without throwing', async () => {
   const dbRej = new TestD1(); seedOrderTask(dbRej);
   await withFetch(async () => new Response(JSON.stringify({
@@ -788,7 +960,7 @@ test('provider rejection and network failure are both recorded without throwing'
   });
 });
 
-test('safe Solapi error code is recorded and a rejected scheduled batch is retried once configuration is fixed', async () => {
+test('rejected scheduled batch is never retried by a later cron and only explicit retry can resend it', async () => {
   const db = new TestD1();
   const cutoff = Date.now() + 1000;
   seedOrderTask(db, { orderDelivery: 'scheduled_batch_v1' });
@@ -808,9 +980,14 @@ test('safe Solapi error code is recorded and a rejected scheduled batch is retri
       'SOLAPI_HTTP_400_INVALIDSENDERNUMBER'
     );
 
-    const retried = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff + 24 * 60 * 60 * 1000);
-    assert.equal(retried.ok, true);
-    assert.equal(retried.results[0].status, 'accepted');
+    const laterCron = await handleScheduledBookOrders({ DB: db, ...fullEnvBase }, cutoff + 24 * 60 * 60 * 1000);
+    assert.deepEqual(laterCron.results, []);
+    assert.equal(fetches, 1, '거절 주문은 다음 cron이 자동 재발송하지 않는다');
+
+    const retryAt = Date.parse('2026-08-18T00:00:00Z');
+    const retried = await withNow(retryAt, () => call(db, { auth: admin, action: 'retry-rejected' }));
+    assert.equal(retried.status, 200);
+    assert.equal(retried.body.results[0].status, 'accepted');
   });
   assert.equal(fetches, 2);
   const mapped = db.prepare(

@@ -742,6 +742,12 @@
   .parent-preview-tag.warn { background: #FFF4E6; color: #8A4B08; }
   .parent-preview-tag.bad { background: #FFF0EF; color: #9B352B; }
   .parent-preview-tag.muted { background: #EEF2F4; color: #647684; }
+  .student-preview-steps { display: grid; grid-template-columns: repeat(5,1fr); gap: 4px; margin-top: 10px; }
+  .student-preview-steps i { height: 7px; border-radius: 999px; background: #DFE8EC; }
+  .student-preview-steps i.done { background: #14755E; }
+  .student-preview-steps-label { margin-top: 5px; color: #647684; font-size: 12px; font-weight: 800; }
+  .student-preview-shell .parent-preview-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .student-portal-settings button, .student-portal-settings label { min-height: 44px; }
   .parent-preview-day { display: grid; place-items: center; flex: 0 0 42px; min-height: 42px; border-radius: 12px; background: #173957; color: #FFF; font-size: 13px; font-weight: 900; }
   .parent-preview-schedule { align-items: center; }
   .parent-preview-time { flex: 0 0 auto; color: #173957; font-size: 14px; font-weight: 900; text-align: right; }
@@ -765,6 +771,9 @@
     .modal-box:has(.parent-preview-shell) { padding: 12px; }
     .parent-preview-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .parent-preview-request-actions { grid-template-columns: 1fr; }
+  }
+  @media(max-width:350px) {
+    .student-preview-shell .parent-preview-summary { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
     .parent-preview-hero-head, .parent-preview-between { flex-direction: column; }
@@ -804,11 +813,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-17.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-17.1"></script>
-<script src="./asset-core.js?v=2026-08-17.1"></script>
-<script src="./qr-core.js?v=2026-08-17.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-17.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-17.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-17.2"></script>
+<script src="./asset-core.js?v=2026-08-17.2"></script>
+<script src="./qr-core.js?v=2026-08-17.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-17.2"></script>
 <script>
 "use strict";
 
@@ -1447,6 +1456,8 @@ let makeupRestoreFocus = null, makeupLiveMessage = '';
 let managerInboxLoading = false;
 let guardianRequestRows = [], guardianRequestsLoaded = false, guardianRequestsLoading = false, guardianRequestsError = '';
 const guardianRequestPending = new Set();
+let guardianAnnouncementRows = [], guardianAnnouncementsLoaded = false, guardianAnnouncementsLoading = false, guardianAnnouncementsError = '';
+const guardianAnnouncementPending = new Set();
 let guardianLessonPublications = new Map();
 const guardianPublicationLoadedDates = new Set();
 const guardianPublicationLoadingDates = new Set();
@@ -1505,7 +1516,7 @@ function resetPersonCache(token) {
   bookDb = null; bookDbErr = ''; bookDbLoading = false;
   approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false;
   approvedBookEdits = null; approvedBookEditsLoaded = false; approvedBookEditsLoading = false;
-  batchSelection.clear(); batchDraft = null; batchVendorName = '';
+  batchSelection.clear(); batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
   bookAddQueue = []; bookAddQueueLoaded = false; bookAddQueueLoading = false; bookAddQueueError = '';
   ownBookAddQueue = []; ownBookAddQueueLoaded = false; ownBookAddQueueLoading = false; ownBookAddQueueError = '';
   bookEditQueue = []; bookEditQueueLoaded = false; bookEditQueueLoading = false; bookEditQueueError = '';
@@ -1525,6 +1536,8 @@ function resetPersonCache(token) {
   makeupCreateStates.clear();
   guardianRequestRows = []; guardianRequestsLoaded = false; guardianRequestsLoading = false; guardianRequestsError = '';
   guardianRequestPending.clear();
+  guardianAnnouncementRows = []; guardianAnnouncementsLoaded = false; guardianAnnouncementsLoading = false; guardianAnnouncementsError = '';
+  guardianAnnouncementPending.clear();
   guardianLessonPublications = new Map(); guardianPublicationLoadedDates.clear(); guardianPublicationLoadingDates.clear();
   guardianPublicationErrors.clear(); guardianPublicationDrafts.clear(); guardianPublicationSaving.clear();
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
@@ -2311,6 +2324,7 @@ function normalizeGuardianPublication(row) {
     status: row.status === 'published' ? 'published' : 'withdrawn',
     publicHomework: String(row.publicHomework || '').slice(0, 500),
     publicReadiness: String(row.publicReadiness || '').slice(0, 500),
+    studentVisible: !!row.studentVisible,
     revision: Math.max(0, Number(row.revision) || 0), updatedAt: Number(row.updatedAt) || 0
   };
 }
@@ -2354,31 +2368,33 @@ function guardianPublicationHtml(task, lessonDate) {
   if (!loaded && !loading && !error) setTimeout(() => loadGuardianPublications(date, false), 0);
   if (!loaded) {
     return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
-      '<div class="guardian-publication-head"><div><div class="card-title">보호자 공개 숙제·준비물</div>' +
-      '<div class="card-sub">내부 수업 메모와 분리해 보호자 앱에만 공개합니다.</div></div></div>' +
+      '<div class="guardian-publication-head"><div><div class="card-title">보호자·학생 공개 숙제·준비물</div>' +
+      '<div class="card-sub">내부 수업 메모와 분리한 공개 내용만 관리합니다.</div></div></div>' +
       (error
         ? '<div class="guardian-publication-status is-error" role="alert">' + esc(error) + '</div>' +
           '<button class="btn btn-ghost btn-block guardian-publication-retry" data-act="guardianpublicationretry" data-date="' + esc(date) + '">다시 불러오기</button>'
         : '<div class="guardian-publication-status" role="status" aria-live="polite">공개 내용을 불러오는 중입니다.</div>') + '</section>';
   }
   const row = guardianLessonPublications.get(key) || {
-    taskId: task.id, lessonDate: date, status: 'withdrawn', publicHomework: '', publicReadiness: '', revision: 0
+    taskId: task.id, lessonDate: date, status: 'withdrawn', publicHomework: '', publicReadiness: '', studentVisible: false, revision: 0
   };
   const draft = guardianPublicationDrafts.get(key);
   const homework = draft ? draft.publicHomework : row.publicHomework;
   const readiness = draft ? draft.publicReadiness : row.publicReadiness;
+  const studentVisible = draft ? !!draft.studentVisible : !!row.studentVisible;
   const saving = guardianPublicationSaving.has(key);
   const statusError = guardianPublicationErrors.get(key) || '';
   return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
-    '<div class="guardian-publication-head"><div><div class="card-title">보호자 공개 숙제·준비물</div>' +
-    '<div class="card-sub">이 칸에 저장한 내용만 보호자 앱에 표시됩니다. 내부 메모는 공개되지 않습니다.</div></div>' +
+    '<div class="guardian-publication-head"><div><div class="card-title">보호자·학생 공개 숙제·준비물</div>' +
+    '<div class="card-sub">이 칸의 내용은 보호자 앱에 표시되며, 아래를 체크한 경우에만 학생 앱에도 같은 내용이 표시됩니다. 내부 메모는 공개되지 않습니다.</div></div>' +
     '<span class="tag ' + (row.status === 'published' ? 'ok' : '') + '">' +
     (row.status === 'published' ? '공개 중 · 수정본 ' + Number(row.revision) : '공개 전') + '</span></div>' +
     '<label class="field"><span class="fl">숙제</span><textarea class="in" maxlength="500" data-public-homework placeholder="예) 워크북 12~14쪽 풀기">' + esc(homework) + '</textarea></label>' +
     '<label class="field"><span class="fl">준비물</span><textarea class="in" maxlength="500" data-public-readiness placeholder="예) 리딩 교재와 단어장 가져오기">' + esc(readiness) + '</textarea></label>' +
+    '<label class="row small" style="gap:7px;align-items:center"><input type="checkbox" data-student-visible ' + (studentVisible ? 'checked' : '') + '> 학생 앱에도 같은 숙제·준비물 공개</label>' +
     (statusError ? '<div class="guardian-publication-status is-error" role="alert">' + esc(statusError) + '</div>' : '') +
     '<button class="btn btn-primary btn-block mt14" data-act="guardianpublicationsave"' + (saving ? ' disabled' : '') + '>' +
-    (saving ? '보호자 화면에 저장 중…' : '보호자 화면에 저장') + '</button></section>';
+    (saving ? '공개 내용 저장 중…' : '공개 내용 저장') + '</button></section>';
 }
 
 async function saveGuardianPublication(container, button) {
@@ -2388,6 +2404,7 @@ async function saveGuardianPublication(container, button) {
   if (!canEditGuardianPublication(task, lessonDate)) return toast('오늘 내 담당 수업만 보호자에게 공개할 수 있습니다');
   const homework = String((container.querySelector('[data-public-homework]') || {}).value || '').normalize('NFKC').trim();
   const readiness = String((container.querySelector('[data-public-readiness]') || {}).value || '').normalize('NFKC').trim();
+  const studentVisible = !!(container.querySelector('[data-student-visible]') || {}).checked;
   if (homework.length > 500 || readiness.length > 500) return toast('숙제와 준비물은 각각 500자까지 입력할 수 있습니다');
   const key = guardianPublicationKey(taskId, lessonDate);
   const current = guardianLessonPublications.get(key) || { status: 'withdrawn', revision: 0 };
@@ -2395,7 +2412,7 @@ async function saveGuardianPublication(container, button) {
   if (!published && current.status === 'published' && !confirm('보호자 앱에서 숙제·준비물 공개 내용을 지울까요?')) return;
   const auth = sync.auth();
   if (!auth) return toast('개인 링크 인증이 필요합니다');
-  guardianPublicationDrafts.set(key, { publicHomework: homework, publicReadiness: readiness });
+  guardianPublicationDrafts.set(key, { publicHomework: homework, publicReadiness: readiness, studentVisible: published && studentVisible });
   guardianPublicationErrors.delete(key);
   guardianPublicationSaving.add(key);
   if (button) { button.disabled = true; button.textContent = '보호자 화면에 저장 중…'; }
@@ -2403,13 +2420,14 @@ async function saveGuardianPublication(container, button) {
     const result = await sync.post('/parent-portal', {
       app: SYNC_APP, action: 'publication_set', auth: auth, taskId: taskId, lessonDate: lessonDate,
       publicHomework: homework, publicReadiness: readiness, published: published,
+      studentVisible: published && studentVisible,
       expectedRevision: Number(current.revision) || 0
     });
     const saved = normalizeGuardianPublication(result.publication);
     if (!saved || saved.taskId !== taskId || saved.lessonDate !== lessonDate) throw new Error('PUBLICATION_RESPONSE_INVALID');
     guardianLessonPublications.set(key, saved);
     guardianPublicationDrafts.delete(key);
-    toast(published ? '보호자 앱에 숙제·준비물을 공개했습니다' : '보호자 공개 내용을 지웠습니다');
+    toast(published ? (studentVisible ? '보호자·학생 앱에 숙제·준비물을 공개했습니다' : '보호자 앱에 숙제·준비물을 공개했습니다') : '공개 내용을 지웠습니다');
   } catch (error) {
     if (error && error.personAuthHandled) return;
     if (error && error.code === 'STALE_REVISION' && error.current) {
@@ -6276,53 +6294,44 @@ function bookPendingOrderCount(b) {
 /** 이 책이 걸린 미완료 주문 — 책 하나짜리 주문(옛 방식 포함)과, 이 책이 포함된 일괄 주문 둘 다 잡는다 */
 function bookPendingOrders(b) {
   const orders = state.tasks.filter(t => !t.deleted && t.title.startsWith('[주문] ') &&
-    (t.title === '[주문] ' + b.title || (Array.isArray(t.orderItems) && t.orderItems.some(it => it.title === b.title))));
-  return orders.filter(t =>
-    !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done));
+    (t.title === '[주문] ' + b.title || (Array.isArray(t.orderItems) && t.orderItems.some(it =>
+      String(it.bookId || '') === String(b.id) || (!it.bookId && it.title === b.title)))));
+  return orders.filter(t => {
+    if (Number(t.orderIdentityVersion) === 1 && Array.isArray(t.orderItems)) {
+      const itemIndexes = t.orderItems.map((item, index) => ({ item, index })).filter(row =>
+        String(row.item.bookId || '') === String(b.id) || (!row.item.bookId && row.item.title === b.title));
+      return !bookIssueLoaded || !itemIndexes.length || !itemIndexes.every(row =>
+        bookOrderRows.some(status => String(status.taskId) === String(t.id) &&
+          Number(status.itemIndex) === row.index && status.stage === 'student_handed'));
+    }
+    return !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done);
+  });
+}
+
+/** 같은 교재를 아직 배부받지 못한 학생 ID만 중복 주문 차단에 쓴다. */
+function activeBookOrderStudentIds(bookId) {
+  const ids = new Set();
+  state.tasks.filter(task => !task.deleted && Number(task.orderIdentityVersion) === 1 &&
+    Array.isArray(task.orderItems)).forEach(task => {
+    task.orderItems.forEach((item, itemIndex) => {
+      if (String(item.bookId || '') !== String(bookId)) return;
+      const handed = bookIssueLoaded && bookOrderRows.some(status => String(status.taskId) === String(task.id) &&
+        Number(status.itemIndex) === itemIndex && status.stage === 'student_handed');
+      if (!handed) (Array.isArray(item.studentIds) ? item.studentIds : []).forEach(id => ids.add(String(id)));
+    });
+  });
+  return ids;
 }
 /** 이 주문을 취소할 수 있는가 — 원장은 전부, 직원은 본인에게 배정된 것만 */
 function canCancelOrder(t) {
   return !!t && (session.isAdmin || (session.isStaffLink && t.staffId === session.staffId));
 }
 
-/** 개인 태블릿 주문은 관리 담당 링크까지 stable staffId에 남겨 본인 수령·배부 버튼을 제한한다. */
-function orderAssignee() {
-  return session.isStaffLink ? session.staffId : null;
-}
-
-/** 주문 지시서 하나를 만든다 — 책 한 권짜리도, 여러 권 묶은 것도 같은 모양으로 */
-function createOrderTask(vendorName, items, sid) {
-  const vend = ((bookDb.vendors || []).find(v => (v.name || v) === vendorName)) || null;
-  const titleMain = items.length > 1 ? (vendorName || '교재') + ' — ' + items.length + '권' : items[0].title;
-  const order = {
-    id: uid(), groupId: 'order-' + now(), staffId: sid,
-    title: '[주문] ' + titleMain,
-    detail: items.map(it => it.title + ': ' + it.qty).join(' · ') + (vendorName ? ' · 주문처: ' + vendorName : ''),
-    guide: '재고 부족으로 요청된 교재 주문입니다.\n■ 목록\n' +
-      items.map(it => '· ' + it.title + ': ' + it.qty).join('\n') + '\n' +
-      (vendorName ? '■ 주문처: ' + vendorName + (vend && vend.type === 'online' ? ' (온라인 직접 주문)' : '') + '\n'
-        : '■ 주문처: 미등록 — 거래 업체(' + ((bookDb.vendors || []).map(v => v.name || v).join('·') || '') + ') 중 확인해 메모에 남겨주세요 (교재 DB에 반영됩니다)\n') +
-      (vend && vend.type === 'online'
-        ? '1) 주문 사이트에서 직접 주문\n2) 교재 탭에서 수령완료와 배부완료 처리\n'
-        : '1) 매일 저녁 8시 출판사별 문자 한 통으로 자동 발송\n2) 교재 탭에서 수령완료와 배부완료 처리\n') +
-      '※ 주문이 불가하거나 지연되면 막힘으로 신고하세요.',
-    steps: vend && vend.type === 'online'
-      ? [{ id: uid(), label: '온라인 주문' }, { id: uid(), label: '교재 탭 배송 확인' }]
-      : [{ id: uid(), label: '교재 탭 배송 확인' }],
-    target: 0, unit: '건', time: '', priority: 'normal',
-    repeat: 'once', days: [], start: today(), end: '', carry: true,
-    // 자동 발송(book-order-send)이 읽는 구조화된 필드 — 자유 텍스트가 아니라 이 값으로만 문자를 만든다
-    orderVendor: vendorName || '', orderItems: items, orderDelivery: 'scheduled_batch_v1',
-    origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
-  };
-  state.tasks.push(order);
-  return order;
-}
-
 /** 일괄 주문용 선택 상태 — 책 id 집합. 거래처 섹션마다 그 안의 선택분만 쓴다 */
 const batchSelection = new Set();
 let batchDraft = null;     // 모달에 띄운 선택 책 목록 [{id,title}]
 let batchVendorName = '';
+let batchOrderTaskId = ''; // 응답 유실 시 같은 ID로 재시도해 중복 주문을 막는다
 
 function orderStudentCandidates() {
   if (!rosterDb || !Array.isArray(rosterDb.students)) return [];
@@ -6349,6 +6358,7 @@ function selectedOrderStudentIds(bookId) {
 function singleOrderModal(book) {
   batchDraft = [{ id: book.id, title: book.title }];
   batchVendorName = book.vendor || '';
+  batchOrderTaskId = '';
   modal('교재 주문 — ' + book.title,
     '<div class="hint mb14">사용할 학생을 선택하면 선택 인원이 주문 수량이 됩니다. 학생 이름이 아닌 stable studentId로 주문에 연결합니다.</div>' +
     orderStudentPicker(batchDraft[0]),
@@ -6365,11 +6375,114 @@ function batchOrderModal(vendorKey) {
   const outsideSearch = booksOutsideSearch(books, vendorLabel, bookSearchQuery);
   batchDraft = books.map(b => ({ id: b.id, title: b.title }));
   batchVendorName = isUnassigned ? '' : vendorKey;
+  batchOrderTaskId = '';
   modal(vendorLabel + ' — ' + books.length + '종 한번에 주문',
     '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 등록합니다. 저녁 8시에 다른 주문과 함께 문자 한 통으로 발송됩니다.' +
       (outsideSearch ? '<br><b>검색 밖 ' + outsideSearch + '종 포함</b> — 아래 전체 ' + books.length + '종을 확인해 주세요.' : '') + '</div>' +
     batchDraft.map(row => '<div class="field"><label class="fl">' + esc(row.title) + '</label>' + orderStudentPicker(row) + '</div>').join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">선택 학생 수량으로 주문대기 등록</button>');
+}
+
+/** 온라인 직접 주문은 문자 발송·보호자 자동 현황과 분리한 내부 수동 업무로만 남긴다. */
+function saveManualOnlineBookOrder(items) {
+  const at = now();
+  const orderItems = items.map(item => ({
+    bookId: item.bookId, title: item.title, studentIds: item.studentIds,
+    qty: item.studentIds.length + '권'
+  }));
+  const titleMain = orderItems.length > 1 ? batchVendorName + ' — ' + orderItems.length + '권' : orderItems[0].title;
+  const task = {
+    id: batchOrderTaskId || uid(), groupId: 'order-' + at,
+    staffId: session.isStaffLink ? session.staffId : null,
+    title: '[주문] ' + titleMain,
+    detail: orderItems.map(item => item.title + ': ' + item.qty).join(' · ') + ' · 주문처: ' + batchVendorName,
+    guide: '온라인 사이트에서 직접 주문하는 교재입니다.\n' +
+      '1) 주문 사이트에서 직접 주문\n2) 배송 확인 후 수령·배부 처리\n' +
+      '※ 문자 자동 발송·보호자 자동 상태 공개 대상이 아닙니다.',
+    steps: [{ id: uid(), label: '온라인 직접 주문' }, { id: uid(), label: '배송 확인' }],
+    target: 0, unit: '건', time: '', priority: 'normal',
+    repeat: 'once', days: [], start: today(), end: '', carry: true,
+    orderVendor: batchVendorName, orderItems: orderItems, orderDelivery: 'manual_online_v1',
+    origin: actor(), createdAt: at, updatedAt: at, deleted: false
+  };
+  state.tasks.push(task);
+  items.forEach(item => batchSelection.delete(item.bookId));
+  const totalQty = items.reduce((sum, item) => sum + item.studentIds.length, 0);
+  batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
+  save(); queueSync(); closeModal(); render();
+  toast(totalQty + '권 저장 · 온라인 사이트에서 직접 주문해 주세요');
+}
+
+/** 새 주문은 서버가 현재 재원·담당 범위와 학생 정체성을 봉인한 뒤에만 로컬에 반영한다. */
+async function submitBookOrder(items, button) {
+  const duplicateStudent = items.some(item => {
+    const activeIds = activeBookOrderStudentIds(item.bookId);
+    return (Array.isArray(item.studentIds) ? item.studentIds : []).some(id => activeIds.has(String(id)));
+  });
+  if (duplicateStudent) return toast('선택한 학생 중 같은 교재 주문이 이미 진행 중인 학생이 있습니다 — 주문 현황을 확인해 주세요');
+  if (!batchVendorName) return toast('교재 정보에서 주문처를 먼저 등록해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const vendor = ((bookDb && bookDb.vendors) || []).find(item => (item.name || item) === batchVendorName);
+  if (vendor && vendor.type === 'online') return saveManualOnlineBookOrder(items);
+  if (!batchOrderTaskId) batchOrderTaskId = 'ord_' + uid();
+  const taskId = batchOrderTaskId;
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/book-order', {
+      app: SYNC_APP, auth: auth, action: 'create', taskId: taskId,
+      vendorName: batchVendorName,
+      items: items.map(item => ({
+        bookId: item.bookId, title: item.title, studentIds: item.studentIds
+      }))
+    });
+    if (!result.task || result.task.id !== taskId || result.task.orderDelivery !== 'scheduled_batch_v1' ||
+        Number(result.task.orderIdentityVersion) !== 1) {
+      throw new Error('서버의 주문 등록 결과를 확인하지 못했습니다');
+    }
+    applyCreatedLesson(result.task);
+    items.forEach(item => batchSelection.delete(item.bookId));
+    const totalQty = items.reduce((sum, item) => sum + item.studentIds.length, 0);
+    batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
+    bookIssueLoaded = false;
+    closeModal(); render(); loadBookIssues(true);
+    toast(totalQty + '권 저장 · 저녁 8시 일괄 발송 대기');
+  } catch (error) {
+    toast('주문 등록 실패 — ' + String(error && error.message || error));
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+async function cancelSealedBookOrder(task, button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/book-order', {
+      app: SYNC_APP, auth: auth, action: 'cancel', taskId: task.id,
+      expectedUpdatedAt: Number(task.updatedAt) || 0
+    });
+    if (!result.task || result.task.id !== task.id || !result.task.deleted ||
+        Number(result.task.orderIdentityVersion) !== 1 ||
+        !Number.isInteger(Number(result.task.orderCancelledAt)) || Number(result.task.orderCancelledAt) <= 0) {
+      throw new Error('서버의 주문 취소 결과를 확인하지 못했습니다');
+    }
+    applyCreatedLesson(result.task);
+    bookIssueLoaded = false;
+    closeModal(); render(); loadBookIssues(true);
+    toast('주문을 취소했습니다');
+  } catch (error) {
+    if (error && error.code === 'ORDER_CANCEL_SEND_ACTIVE') {
+      toast('발송 중·접수 완료된 주문은 취소하지 않았습니다 — 주문 현황을 확인해 주세요');
+      bookIssueLoaded = false; loadBookIssues(true);
+    } else if (error && error.code === 'REVISION_CONFLICT') {
+      toast('주문 상태가 다른 기기에서 바뀌었습니다 — 새로고침 후 다시 확인해 주세요');
+      state.settings.pullAt = 0; save(); sync.dirty = true; sync.run();
+    } else {
+      toast('주문 취소 실패 — ' + String(error && error.message || error));
+    }
+    if (button && button.isConnected) button.disabled = false;
+  }
 }
 
 function cancelOrderModal(bookId) {
@@ -9460,12 +9573,179 @@ function viewStaffAdmin() {
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
 }
 
+/* ── 보호자 공지 ── */
+const GUARDIAN_ANNOUNCEMENT_STATUS_LABELS = Object.freeze({ draft: '작성 중', published: '게시 중', ended: '종료' });
+
+function normalizeGuardianAnnouncement(row) {
+  const announcementId = String(row && row.announcementId || '');
+  const status = String(row && row.status || '');
+  const targetType = String(row && row.targetType || '');
+  const studentIds = Array.isArray(row && row.studentIds)
+    ? row.studentIds.map(String).filter(id => /^[A-Za-z0-9_-]{1,128}$/.test(id)) : [];
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(announcementId) || !GUARDIAN_ANNOUNCEMENT_STATUS_LABELS[status] ||
+      !['all', 'students'].includes(targetType)) return null;
+  return {
+    announcementId, status, targetType, studentIds,
+    title: String(row.title || '').slice(0, 100), body: String(row.body || '').slice(0, 2000),
+    publishDate: String(row.publishDate || ''), expiresDate: String(row.expiresDate || ''),
+    revision: Math.max(0, Number(row.revision) || 0), createdAt: Number(row.createdAt) || 0,
+    updatedAt: Number(row.updatedAt) || 0
+  };
+}
+
+async function loadGuardianAnnouncements(force) {
+  if (!session.isAdmin || guardianAnnouncementsLoading || (guardianAnnouncementsLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { guardianAnnouncementsLoaded = true; guardianAnnouncementsError = '관리 인증을 확인해 주세요.'; return; }
+  guardianAnnouncementsLoading = true; guardianAnnouncementsError = '';
+  try {
+    const result = await sync.post('/parent-portal', { app: SYNC_APP, action: 'announcement_list', auth });
+    guardianAnnouncementRows = (result.announcements || []).map(normalizeGuardianAnnouncement).filter(Boolean);
+    guardianAnnouncementsLoaded = true;
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    guardianAnnouncementsLoaded = true;
+    guardianAnnouncementsError = '보호자 공지를 불러오지 못했습니다.';
+  } finally {
+    guardianAnnouncementsLoading = false;
+    if (route === 'settings') renderAfterSync();
+  }
+}
+
+function guardianAnnouncementsHtml() {
+  if (!session.isAdmin) return '';
+  if (!guardianAnnouncementsLoaded && !guardianAnnouncementsLoading) setTimeout(() => loadGuardianAnnouncements(false), 0);
+  let body = '';
+  if (guardianAnnouncementsLoading && !guardianAnnouncementsLoaded) {
+    body = '<div class="empty" role="status"><b>⏳</b>보호자 공지를 불러오는 중입니다.</div>';
+  } else if (guardianAnnouncementsError) {
+    body = '<div class="hint" role="alert">' + esc(guardianAnnouncementsError) +
+      ' <button class="btn btn-sm btn-ghost" data-act="garefresh">다시 시도</button></div>';
+  } else if (!guardianAnnouncementRows.length) {
+    body = '<div class="empty">작성한 보호자 공지가 없습니다.</div>';
+  } else {
+    body = guardianAnnouncementRows.map(row => {
+      const busy = guardianAnnouncementPending.has(row.announcementId);
+      const statusClass = row.status === 'published' ? 'ok' : row.status === 'draft' ? 'warn' : '';
+      const target = row.targetType === 'all' ? '전체 보호자' : '선택 학생 ' + row.studentIds.length + '명';
+      const base = ' data-announcement="' + esc(row.announcementId) + '" data-rev="' + Number(row.revision) + '"';
+      const actions = row.status === 'draft'
+        ? '<button class="btn btn-sm btn-ghost" data-act="gaedit"' + base + (busy ? ' disabled' : '') + '>수정</button>' +
+          '<button class="btn btn-sm btn-primary" data-act="gapublish"' + base + (busy ? ' disabled' : '') + '>게시</button>'
+        : row.status === 'published'
+          ? '<button class="btn btn-sm btn-ghost" data-act="gaend"' + base + (busy ? ' disabled' : '') + '>게시 종료</button>' : '';
+      return '<article class="hint mt14"><div class="between"><div><b>' + esc(row.title) + '</b>' +
+        '<div class="small muted">' + esc(row.publishDate) + '–' + esc(row.expiresDate) + ' · ' + esc(target) + '</div></div>' +
+        '<span class="pill ' + statusClass + '">' + esc(GUARDIAN_ANNOUNCEMENT_STATUS_LABELS[row.status]) + '</span></div>' +
+        '<div class="small mt8" style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(row.body) + '</div>' +
+        (actions ? '<div class="row wraprow mt8" style="gap:8px">' + actions + '</div>' : '') + '</article>';
+    }).join('');
+  }
+  return '<section class="card" data-guardian-announcements><div class="between"><div><div class="card-title">📢 보호자 공지</div>' +
+    '<div class="card-sub">전체 또는 선택한 학생의 보호자 앱에만 게시합니다. 첨부·댓글·읽음 확인은 없습니다.</div></div>' +
+    '<span class="pill">' + guardianAnnouncementRows.filter(row => row.status === 'published').length + '건 게시</span></div>' +
+    '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-primary" data-act="gaadd">+ 공지 작성</button>' +
+    '<button class="btn btn-ghost" data-act="garefresh"' + (guardianAnnouncementsLoading ? ' disabled' : '') + '>새로고침</button></div>' + body + '</section>';
+}
+
+function guardianAnnouncementModal(announcementId) {
+  if (!session.isAdmin) return;
+  const current = guardianAnnouncementRows.find(row => row.announcementId === String(announcementId || '')) || null;
+  if (current && current.status !== 'draft') return toast('작성 중인 공지만 수정할 수 있습니다');
+  const students = (rosterDb ? activeIn(today().slice(0, 7)) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const selected = new Set(current ? current.studentIds : []);
+  const targetType = current ? current.targetType : 'students';
+  const id = current ? current.announcementId : 'announcement-' + uid();
+  const options = students.map(student => '<label class="row" style="gap:8px;align-items:center;min-height:44px">' +
+    '<input type="checkbox" data-ga-student value="' + esc(student.id) + '" ' + (selected.has(student.id) ? 'checked' : '') + '>' +
+    '<span>' + esc(student.name) + ' <span class="muted">' + esc(student.grade || '') + '</span></span></label>').join('');
+  modal(current ? '보호자 공지 수정' : '보호자 공지 작성',
+    '<input type="hidden" id="gaId" value="' + esc(id) + '"><input type="hidden" id="gaRevision" value="' + Number(current && current.revision || 0) + '">' +
+    '<div class="field"><label class="fl">공지 제목</label><input class="in" id="gaTitle" maxlength="100" value="' + esc(current && current.title || '') + '"></div>' +
+    '<div class="field"><label class="fl">공지 내용</label><textarea class="in" id="gaBody" rows="7" maxlength="2000">' + esc(current && current.body || '') + '</textarea></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">게시 시작일</span><input class="in" id="gaPublishDate" type="date" value="' + esc(current && current.publishDate || today()) + '"></label>' +
+    '<label class="field"><span class="fl">게시 종료일</span><input class="in" id="gaExpiresDate" type="date" value="' + esc(current && current.expiresDate || addDays(today(), 7)) + '"></label></div>' +
+    '<div class="field"><label class="fl">공개 대상</label><select class="in" id="gaTargetType"><option value="students"' + (targetType === 'students' ? ' selected' : '') + '>선택 학생 보호자</option>' +
+    '<option value="all"' + (targetType === 'all' ? ' selected' : '') + '>전체 보호자</option></select></div>' +
+    '<div class="hint"><b>선택 학생 보호자</b>를 사용할 때 아래에서 한 명 이상 선택하세요. 전체 보호자는 게시할 때 다시 확인합니다.<br>' +
+      '<b>모든 공지는 일정·운영·준비 안내용입니다. 연락처·주소·상담/내부 수업 메모를 입력하지 마세요.</b><br>' +
+      '<b>전체 공지에는 학생 이름도 입력하지 마세요.</b></div>' +
+    '<div style="max-height:260px;overflow:auto">' + (options || '<div class="empty">현재 재원생 명단을 먼저 확인해 주세요.</div>') + '</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="gasave">작성 내용 저장</button>');
+}
+
+async function saveGuardianAnnouncement(button) {
+  if (!session.isAdmin) return;
+  const announcementId = String(($('#gaId') || {}).value || '');
+  const expectedRevision = Number(($('#gaRevision') || {}).value || 0);
+  const title = String(($('#gaTitle') || {}).value || '').trim();
+  const body = String(($('#gaBody') || {}).value || '').trim();
+  const publishDate = String(($('#gaPublishDate') || {}).value || '');
+  const expiresDate = String(($('#gaExpiresDate') || {}).value || '');
+  const targetType = String(($('#gaTargetType') || {}).value || 'students');
+  const selectedIds = Array.from(document.querySelectorAll('[data-ga-student]:checked')).map(element => String(element.value));
+  const studentIds = targetType === 'all' ? [] : selectedIds;
+  if (!title || !body || !publishDate || !expiresDate || expiresDate < publishDate) return toast('공지 제목·내용·게시 기간을 확인해 주세요');
+  if (targetType === 'students' && !studentIds.length) return toast('공지를 볼 학생을 한 명 이상 선택해 주세요');
+  const auth = sync.auth(); if (!auth) return toast('관리 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/parent-portal', { app: SYNC_APP, action: 'announcement_save', auth,
+      announcementId, expectedRevision, title, body, publishDate, expiresDate, targetType, studentIds });
+    const saved = normalizeGuardianAnnouncement(result.announcement);
+    if (!saved) throw new Error('공지 저장 응답을 확인해 주세요');
+    guardianAnnouncementRows = guardianAnnouncementRows.filter(row => row.announcementId !== saved.announcementId).concat(saved);
+    closeModal(); toast('보호자 공지 작성 내용을 저장했습니다'); render();
+  } catch (error) {
+    if (error && error.code === 'STALE_REVISION' && error.current) {
+      const current = normalizeGuardianAnnouncement(error.current);
+      if (current) guardianAnnouncementRows = guardianAnnouncementRows.filter(row => row.announcementId !== current.announcementId).concat(current);
+      toast('다른 화면에서 공지가 먼저 변경됐습니다. 최신 내용을 확인해 주세요'); closeModal(); render(); return;
+    }
+    toast('공지 저장 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function transitionGuardianAnnouncement(announcementId, action, expectedRevision, button) {
+  if (!session.isAdmin || !['announcement_publish', 'announcement_end'].includes(action)) return;
+  const current = guardianAnnouncementRows.find(row => row.announcementId === String(announcementId || ''));
+  if (!current || Number(current.revision) !== Number(expectedRevision)) return toast('공지의 최신 상태를 다시 확인해 주세요');
+  const prompt = action === 'announcement_publish'
+    ? (current.targetType === 'all' ? '이 공지를 전체 보호자에게 공개할까요?' : '선택한 학생 ' + current.studentIds.length + '명의 보호자에게 공지를 공개할까요?')
+    : '이 공지 게시를 종료할까요?';
+  if (!confirm(prompt)) return;
+  const auth = sync.auth(); if (!auth) return toast('관리 인증이 필요합니다');
+  guardianAnnouncementPending.add(current.announcementId); if (button) button.disabled = true; renderAfterSync();
+  try {
+    const result = await sync.post('/parent-portal', { app: SYNC_APP, action, auth,
+      announcementId: current.announcementId, expectedRevision: Number(expectedRevision) });
+    const saved = normalizeGuardianAnnouncement(result.announcement);
+    if (!saved) throw new Error('공지 상태 응답을 확인해 주세요');
+    guardianAnnouncementRows = guardianAnnouncementRows.map(row => row.announcementId === saved.announcementId ? saved : row);
+    toast(action === 'announcement_publish' ? '보호자 공지를 게시했습니다' : '보호자 공지 게시를 종료했습니다');
+  } catch (error) {
+    if (error && error.code === 'STALE_REVISION' && error.current) {
+      const fresh = normalizeGuardianAnnouncement(error.current);
+      if (fresh) guardianAnnouncementRows = guardianAnnouncementRows.map(row => row.announcementId === fresh.announcementId ? fresh : row);
+      toast('다른 화면에서 공지가 먼저 변경됐습니다. 최신 상태를 반영했습니다');
+    } else toast('공지 상태 변경 실패 — ' + (error.message || error));
+  } finally {
+    guardianAnnouncementPending.delete(current.announcementId); renderAfterSync();
+  }
+}
+
 /* ── 보호자 연락처·발송 동의 ──
  * 화면은 stable studentId와 동의 범위만 서버로 보낸다. 실제 수신번호 조회는 피드백·운영
  * 알림 Worker가 D1에서 각각 재검증하며, 학생 명단과 연락처는 관리자만 보고 고친다. */
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
-const GUARDIAN_PORTAL_SCOPE_VERSION = 3;
+const GUARDIAN_PORTAL_SCOPE_VERSION = 4;
+let studentPortalAccess = new Map(); // 학생 앱은 보호자 앱과 별도 동의·세션을 사용한다.
+let studentPortalLoaded = false;
+let studentPortalLoading = false;
+let studentPortalError = '';
+let settingsStudentPortalStudents = [];
 let guardianOpsConsents = new Map(); // stable studentId -> scope별 {consent,updatedAt,needsReconsent}
 let guardianOpsConsentsError = '';
 let guardianContactsLoaded = false;
@@ -9513,6 +9793,100 @@ async function refreshGuardianPortalAccess(auth) {
     app: SYNC_APP, auth: auth, action: 'access_list'
   });
   guardianPortalAccess = new Map((result.access || []).map(row => [row.studentId, row]));
+}
+
+async function loadStudentPortalAccess(force) {
+  if (!session.isAdmin || studentPortalLoading || (studentPortalLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) { studentPortalError = '동기화 인증이 필요합니다'; studentPortalLoaded = true; return; }
+  studentPortalLoading = true; studentPortalError = '';
+  if (route === 'settings') render();
+  try {
+    const result = await sync.post('/student-portal', {
+      app: SYNC_APP, auth: auth, action: 'access_list'
+    });
+    studentPortalAccess = new Map((result.access || []).map(row => [row.studentId, row]));
+    studentPortalLoaded = true;
+  } catch (error) {
+    studentPortalError = String(error && error.message || error);
+    studentPortalLoaded = true;
+  } finally {
+    studentPortalLoading = false;
+    if (route === 'settings') render();
+  }
+}
+
+async function saveStudentPortalAccess(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsStudentPortalStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  const checkbox = $('#spAccess-' + idx);
+  const enabled = !!((checkbox || {}).checked);
+  const current = studentPortalAccess.get(student.id) || {};
+  if (enabled) {
+    const contact = guardianContacts && guardianContacts.get(student.id);
+    if (!contact || !contact.phone) {
+      if (checkbox) checkbox.checked = !!current.enabled;
+      return toast('먼저 위에서 보호자 연락처를 저장해 주세요');
+    }
+    if (!confirm('보호자에게 학생 앱 공개 범위(오늘 수업·출결·5단계·차량, 공개 숙제·준비물, 배정 교재, 주간 시간표)를 안내하고 동의를 확인했나요?')) {
+      if (checkbox) checkbox.checked = !!current.enabled;
+      return;
+    }
+  } else if (current.enabled && !confirm('학생 앱 연결을 해지할까요? 기존 학생 링크와 로그인은 즉시 사용할 수 없게 됩니다.')) {
+    if (checkbox) checkbox.checked = true;
+    return;
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/student-portal', {
+      app: SYNC_APP, auth: auth, action: 'access_set', studentId: student.id,
+      enabled: enabled, consentConfirmed: enabled, expectedUpdatedAt: Number(current.updatedAt) || 0
+    });
+    studentPortalAccess.set(student.id, result.access);
+    toast(enabled ? student.name + ' 학생 앱 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 학생 앱 연결을 해지했습니다');
+    render();
+  } catch (error) {
+    if (error && error.code === 'ACCESS_REVISION_CONFLICT') {
+      studentPortalLoaded = false;
+      toast('다른 화면에서 학생 앱 설정이 먼저 변경됐습니다 — 최신 상태를 다시 불러옵니다');
+      await loadStudentPortalAccess(true);
+      return;
+    }
+    toast('학생 앱 동의 저장 실패 — ' + (error.message || error));
+    if (button) button.disabled = false;
+  }
+}
+
+async function issueStudentPortalInvite(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsStudentPortalStudents[Number(idx)];
+  const access = student && studentPortalAccess.get(student.id);
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  if (!access || !access.enabled) return toast('학생 앱 이용 동의를 먼저 저장해 주세요');
+  if (access.needsReconnect) return toast('보호자 연락처 또는 학생 정보가 변경되어 동의를 다시 저장해야 합니다');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/student-portal', {
+      app: SYNC_APP, auth: auth, action: 'invite', studentId: student.id
+    });
+    const code = String(result.code || '');
+    const baseUrl = new URL(String(result.baseUrl || ''));
+    if (!/^[a-f0-9]{48}$/.test(code) || baseUrl.protocol !== 'https:' || baseUrl.pathname !== '/' ||
+        baseUrl.search || baseUrl.hash || baseUrl.username || baseUrl.password) {
+      throw new Error('학생 초대 링크 응답을 확인해 주세요');
+    }
+    baseUrl.hash = new URLSearchParams({ code: code }).toString();
+    await copy(baseUrl.toString(), student.name + ' 학생 앱 초대 링크를 복사했습니다');
+  } catch (error) {
+    toast('학생 초대 링크 발급 실패 — ' + (error.message || error));
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function loadGuardianContacts(force) {
@@ -9617,7 +9991,7 @@ async function issueParentPortalInvite(idx, button) {
   const access = student && guardianPortalAccess.get(student.id);
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   if (!contact || !contact.phone) return toast('보호자 연락처를 먼저 저장해 주세요');
-  if (access && access.needsScopeReconsent) return toast('숙제·준비물 공개와 보호자 요청 기능을 포함한 새 범위를 다시 확인해 주세요');
+  if (access && access.needsScopeReconsent) return toast('학원 공지·교재 상태까지 포함한 새 공개 범위를 다시 확인해 주세요');
   if (access && access.needsReconsent) return toast('보호자 연락처가 변경되어 웹앱 이용 동의를 다시 저장해야 합니다');
   if (!access || !access.enabled) return toast('보호자 웹앱 이용 동의를 먼저 저장해 주세요');
   const auth = sync.auth();
@@ -9713,6 +10087,22 @@ function parentPreviewHtml(data) {
   });
   const publicLessonSection = capabilities.publicLessons === true
     ? parentPreviewSection('Learning', '숙제·준비물', publicLessonRows, '공개된 숙제나 준비물이 없습니다.') : '';
+  const announcementRows = (capabilities.announcements === true ? (data.announcements || []) : []).map(row =>
+    '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.title || '학원 공지') + '</b><div class="parent-preview-sub">' + esc(row.publishDate || '게시일 확인 중') +
+      (row.expiresDate ? ' · ' + esc(row.expiresDate) + '까지' : '') + '</div></div><span class="parent-preview-tag">공지</span></div>' +
+      '<div class="parent-preview-text">' + esc(row.body || '') + '</div></div>');
+  const announcementSection = capabilities.announcements === true
+    ? parentPreviewSection('Notice', '학원 공지', announcementRows, '현재 게시된 공지가 없습니다.') : '';
+  const bookClasses = { order_waiting: 'muted', ordered: '', order_check: 'warn', order_failed: 'warn',
+    academy_received: 'warn', ready_for_handoff: 'warn', handed: 'ok', cancelled: 'muted' };
+  const bookStatusRows = (capabilities.bookStatus === true ? (data.bookStatus || []) : []).map(row =>
+    '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.title || '교재') + '</b><div class="parent-preview-sub">' + (row.kind === 'order' ? '주문 교재' : '배정 교재') +
+      (row.updatedAt ? ' · ' + esc(parentPreviewStamp(row.updatedAt)) : '') + '</div></div><span class="parent-preview-tag ' +
+      (bookClasses[row.stage] || '') + '">' + esc(row.label || '상태 확인 중') + '</span></div>');
+  const bookStatusSection = capabilities.bookStatus === true
+    ? parentPreviewSection('Book', '교재 준비·수령', bookStatusRows, '현재 진행 중인 교재가 없습니다.') : '';
   const makeupRows = (data.makeups || []).map(row =>
     '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || '보강 수업') + '</b><div class="parent-preview-sub">원 수업 ' + esc(row.sourceDate || '') +
@@ -9771,17 +10161,19 @@ function parentPreviewHtml(data) {
       (checkedAt ? ' · 마지막 확인 ' + esc(checkedAt) : '') + '</p><div class="parent-preview-summary">' + heroStats +
       '<div class="parent-preview-stat"><b>' + Number(summary.makeupPending || 0) + '</b><span>보강 확인</span></div>' +
       '<div class="parent-preview-stat"><b>' + Number(summary.sessionRemaining || 0) + '</b><span>남은 회차</span></div></div></section>' +
+    announcementSection +
     todaySection +
     publicLessonSection +
+    bookStatusSection +
     parentPreviewSection('Schedule', '정규 수업 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
     parentPreviewSection('Action', '확인·응답', makeupRows, '지금 확인하거나 응답할 일정이 없습니다.') +
     guardianRequestSection +
     parentPreviewSection('Usage', '횟수제 수업', packRows, '횟수제로 지정된 수업이 없습니다.') +
     parentPreviewSection('Record', '최근 수업 기록', feedbackRows, '아직 공개된 수업 피드백이 없습니다.') +
     '<section class="parent-preview-card parent-preview-info"><details><summary>보호자 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
-      '현재 자녀의 확정 수업·출결 확인·수업 기록 진행·차량 확인·보강·회차·피드백과 선생님이 공개한 숙제·준비물, 보호자 요청 처리 상태만 표시합니다. 내부 수업 메모, 정류장·주소, 연락처는 표시하지 않습니다.</p></details>' +
+      '현재 자녀의 확정 수업·출결 확인·수업 기록 진행·차량 확인·보강·회차·피드백과 선생님이 공개한 숙제·준비물, 보호자 요청 처리 상태, 학원 공지와 교재 준비·수령 상태만 표시합니다. 내부 수업 메모, 정류장·주소, 연락처, 주문 업체 정보는 표시하지 않습니다.</p></details>' +
       '<details><summary>휴대폰·패드 홈 화면에 추가하기</summary><p class="parent-preview-sub">Chrome 또는 Safari 메뉴에서 “홈 화면에 추가”를 선택하세요. 공용 기기에서는 사용하지 마세요.</p></details></section>' +
-    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 보호자 공개 v3</b> · 실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>';
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 보호자 공개 v4</b> · 실제 보호자 연결·동의·알림 발송은 만들지 않습니다. 보호자에게 공개되는 항목만 읽기 전용으로 표시합니다.</div>';
 }
 
 async function previewParentPortal(idx, button) {
@@ -9809,6 +10201,99 @@ async function previewParentPortal(idx, button) {
   }
 }
 
+let studentPreviewRequest = 0;
+function studentPreviewHtml(data) {
+  const student = data && data.student || {}, todayData = data && data.today || {};
+  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], '': ['출결 확인 전', 'muted'] };
+  const ride = { scheduled: ['탑승 확인 전', 'muted'], boarded: ['탑승 확인', 'warn'], dropped: ['하차 확인', 'ok'], absent: ['미탑승', 'bad'] };
+  const lessonRows = (todayData.lessons || []).map(row => {
+    const state = attendance[row.attendance] || attendance[''];
+    const done = row.completed ? 5 : Math.max(0, Math.min(5, Number(row.completedSteps || 0)));
+    const steps = Array.from({ length: 5 }, (_, index) => '<i class="' + (index < done ? 'done' : '') + '"></i>').join('');
+    return '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
+      ' · ' + esc(row.timeLabel || '시간 확인 중') + '</div></div><div class="parent-preview-status"><span class="parent-preview-tag ' + state[1] + '">' +
+      state[0] + '</span><span class="parent-preview-tag ' + (row.completed ? 'ok' : 'muted') + '">' +
+      (row.completed ? '수업 완료' : '진행 중') + '</span></div></div><div class="student-preview-steps" aria-label="5단계 중 ' + done +
+      '단계 완료">' + steps + '</div><div class="student-preview-steps-label">5단계 중 ' + done + '단계 완료</div></div>';
+  });
+  const transportRows = (todayData.transport || []).map(row => {
+    const state = ride[row.status] || ride.scheduled, at = parentPreviewClock(row.statusAt);
+    return '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      (row.direction === 'dropoff' ? '하원' : '등원') + ' 차량</b><div class="parent-preview-sub">예정 ' +
+      esc(row.scheduledTime || '시간 확인 중') + '</div></div><div class="parent-preview-status"><span class="parent-preview-tag ' + state[1] + '">' +
+      state[0] + '</span>' + (at ? '<span class="parent-preview-tag muted">' + esc(at) + '</span>' : '') + '</div></div>';
+  });
+  const publicRows = (data.publicLessons || []).map(row => {
+    const homework = String(row.publicHomework || '').trim(), readiness = String(row.publicReadiness || '').trim();
+    if (!homework && !readiness) return '';
+    return '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(row.lessonDate || '최근 수업') + ' · ' +
+      esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></div><span class="parent-preview-tag">공개 기록</span></div>' +
+      (homework ? '<b class="mt14">숙제</b><div class="parent-preview-text">' + esc(homework) + '</div>' : '') +
+      (readiness ? '<b class="mt14">준비물</b><div class="parent-preview-text">' + esc(readiness) + '</div>' : '') + '</div>';
+  }).filter(Boolean);
+  const bookRows = (data.bookStatus || []).filter(row => row && row.kind === 'distribution').map(row =>
+    '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.title || '배정 교재') + '</b><div class="parent-preview-sub">' + esc(parentPreviewStamp(row.updatedAt) || '상태 확인') +
+      '</div></div><span class="parent-preview-tag ' + (row.stage === 'handed' ? 'ok' : row.stage === 'cancelled' ? 'muted' : 'warn') + '">' +
+      esc(row.label || '상태 확인 중') + '</span></div>');
+  const dayOrder = '월화수목금토일';
+  const scheduleRows = (data.schedule || []).slice().sort((a, b) => {
+    const left = dayOrder.indexOf(String(a.dayLabel || '')[0]);
+    const right = dayOrder.indexOf(String(b.dayLabel || '')[0]);
+    return (left < 0 ? 99 : left) - (right < 0 ? 99 : right) ||
+      String(a.timeLabel || '').localeCompare(String(b.timeLabel || ''));
+  }).map(row =>
+    '<div class="parent-preview-row parent-preview-between parent-preview-schedule"><span class="parent-preview-day">' +
+      esc(row.dayLabel || '요일') + '</span><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
+      '</div></div><div class="parent-preview-time">' + esc(row.timeLabel || '시간 확인 중') + '</div></div>');
+  const checkedAt = parentPreviewClock(data.generatedAt);
+  return '<div class="parent-preview-shell student-preview-shell"><div class="parent-preview-appbar"><div class="parent-preview-brand">WB 학생' +
+    '<small>WEXLER BRAIN CENTER</small></div><span class="parent-preview-readonly">읽기 전용</span></div><div class="parent-preview-main">' +
+    '<section class="parent-preview-card parent-preview-hero"><div class="parent-preview-hero-head"><div><p class="parent-preview-eyebrow">My learning</p>' +
+    '<h1 class="parent-preview-title">' + esc(student.name || '학생') + ' <span class="parent-preview-tag">' + esc(student.grade || '') +
+    '</span></h1></div><span class="parent-preview-date">' + esc(todayData.dateLabel || '오늘') + '</span></div>' +
+    '<p class="parent-preview-sub">학원에서 학생에게 명시적으로 공개한 정보만 보여드립니다.' +
+    (checkedAt ? ' · 마지막 확인 ' + esc(checkedAt) : '') + '</p><div class="parent-preview-summary"><div class="parent-preview-stat"><b>' +
+    lessonRows.length + '</b><span>오늘 수업</span></div><div class="parent-preview-stat"><b>' +
+    (todayData.lessons || []).filter(row => row && row.completed).length + '</b><span>완료 수업</span></div><div class="parent-preview-stat"><b>' +
+    publicRows.length + '</b><span>공개 기록</span></div></div></section>' +
+    '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Today</p><h2 class="parent-preview-section-title">오늘 현황</h2></div></div>' +
+    parentPreviewGroup('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
+    parentPreviewGroup('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') + '</section>' +
+    parentPreviewSection('Learning', '최근 공개 숙제·준비물', publicRows, '최근 14일 공개 기록이 없습니다.') +
+    parentPreviewSection('Book', '교재 준비·수령', bookRows, '현재 진행 중인 배정 교재가 없습니다.') +
+    parentPreviewSection('Schedule', '주간 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
+    '<section class="parent-preview-card parent-preview-info"><details><summary>학생 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
+    '내 수업·출결·5단계 진행, 최근 14일 중 학생 공개를 체크한 숙제·준비물, 오늘 차량 상태, 배정 교재 상태와 주간 시간표만 표시합니다. 보호자 연락처·주소·정류장·내부 메모·보호자 전용 기능은 표시하지 않습니다.</p></details></section>' +
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 학생 공개 v1</b> · 실제 학생 연결·동의를 만들지 않습니다.</div>';
+}
+
+async function previewStudentPortal(idx, button) {
+  if (!session.isAdmin) return;
+  const student = settingsStudentPortalStudents[Number(idx)];
+  if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const requestId = ++studentPreviewRequest, loadingId = 'studentPreviewLoading-' + requestId;
+  if (button) button.disabled = true;
+  modal(student.name + ' 학생 화면 미리보기', '<div class="empty" id="' + loadingId + '" role="status"><b>⏳</b>학생 공개 화면을 불러오는 중입니다.</div>');
+  try {
+    const result = await sync.post('/student-portal', {
+      app: SYNC_APP, auth: auth, action: 'preview', studentId: student.id
+    });
+    if (requestId !== studentPreviewRequest || $('#modalHost').hidden || !$('#' + loadingId)) return;
+    modal(student.name + ' 학생 화면 미리보기', studentPreviewHtml(result));
+  } catch (error) {
+    if (requestId !== studentPreviewRequest || $('#modalHost').hidden || !$('#' + loadingId)) return;
+    modal(student.name + ' 학생 화면 미리보기', '<div class="hint" role="alert">미리보기를 불러오지 못했습니다 — ' + esc(error.message || error) + '</div>');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function saveGuardianPortalAccess(idx, button) {
   if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
@@ -9825,7 +10310,7 @@ async function saveGuardianPortalAccess(idx, button) {
       enabled: enabled, scopeVersion: GUARDIAN_PORTAL_SCOPE_VERSION, expectedUpdatedAt: expectedUpdatedAt
     });
     guardianPortalAccess.set(student.id, result.access);
-    toast(enabled ? student.name + ' 보호자 앱 공개 범위 v3 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
+    toast(enabled ? student.name + ' 보호자 앱 공개 범위 v4 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 보호자 웹앱 연결을 해지했습니다');
     render();
   } catch (error) {
     if (error && error.code === 'ACCESS_REVISION_CONFLICT' && error.current) {
@@ -9880,8 +10365,8 @@ function viewGuardianContactPanel() {
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
         (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' +
-        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v3</label>' +
-        (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">숙제·준비물 공개와 보호자 요청 기능 재동의 필요</span>' :
+        '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v4</label>' +
+        (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">학원 공지·교재 상태 공개를 포함한 재동의 필요</span>' :
           portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
         '<button class="btn btn-sm btn-ghost" data-act="gcportalaccess" data-idx="' + i + '">공개 동의 저장</button>' +
         '<button class="btn btn-sm btn-primary" data-act="gcportalinvite" data-idx="' + i + '" ' + (!c.phone || !portal.enabled ? 'disabled' : '') + '>보호자 앱 초대</button>' +
@@ -9890,9 +10375,54 @@ function viewGuardianContactPanel() {
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v3에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백과 선생님이 따로 공개한 숙제·준비물, 보호자 요청 처리 상태가 포함됩니다. 내부 수업 메모·정류장·주소·연락처는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
+    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v4에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백·공개 숙제와 준비물·보호자 요청 상태·학원 공지·교재 준비와 수령 상태가 포함됩니다. 내부 수업 메모·정류장·주소·연락처·주문 업체 정보는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
     '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
+}
+
+function viewStudentPortalPanel() {
+  if (!rosterDb && !rosterErr) loadRoster();
+  if (!studentPortalLoaded && !studentPortalLoading) setTimeout(() => loadStudentPortalAccess(false), 0);
+  const cur = today().slice(0, 7);
+  const students = (rosterDb ? activeIn(cur) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  settingsStudentPortalStudents = students.slice();
+
+  let notice = '';
+  if (studentPortalError) {
+    notice = '<div class="hint mb14"><b>학생 앱 설정을 불러오지 못했습니다</b> — ' + esc(studentPortalError) +
+      ' <button class="btn btn-sm btn-ghost" data-act="studentportalrefresh">다시 시도</button></div>';
+  }
+
+  let body;
+  if (!rosterDb && !rosterErr) body = '<div class="empty"><b>⏳</b>원생 명단을 불러오는 중입니다.</div>';
+  else if (rosterErr) body = '<div class="small" style="color:var(--coral)">원생 명단을 불러오지 못했습니다 — ' + esc(rosterErr) + '</div>';
+  else if (studentPortalLoading) body = '<div class="empty"><b>⏳</b>학생 앱 설정을 불러오는 중입니다.</div>';
+  else if (!students.length) body = '<div class="empty">현재 재원생이 없습니다.</div>';
+  else body = students.map((student, index) => {
+    const access = studentPortalAccess.get(student.id) || { enabled: false };
+    const contact = guardianContacts && guardianContacts.get(student.id);
+    const reconnect = !!(access.needsReconnect || access.needsScopeReconsent);
+    const disabled = studentPortalError ? ' disabled' : '';
+    const inviteDisabled = (!access.enabled || reconnect || !contact || !contact.phone || studentPortalError) ? ' disabled' : '';
+    return '<div class="mt14"><div class="fl">' + esc(student.name) + ' <span class="muted">(' + esc(student.grade) + ' · ' +
+      esc(student.teacher || '미지정') + ')</span></div><div class="row wraprow" style="gap:8px">' +
+      '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="spAccess-' + index + '" ' +
+        (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v1</label>' +
+      (reconnect ? '<span class="small" style="color:var(--coral)">보호자 연락처 또는 학생 정보 변경 · 재동의 필요</span>' : '') +
+      (!contact || !contact.phone ? '<span class="small muted">위 보호자 연락처를 먼저 저장해 주세요</span>' : '') +
+      '<button class="btn btn-sm btn-ghost" data-act="studentportalaccess" data-idx="' + index + '"' + disabled + '>학생 앱 동의 저장</button>' +
+      '<button class="btn btn-sm btn-primary" data-act="studentportalinvite" data-idx="' + index + '"' + inviteDisabled + '>학생 앱 초대</button>' +
+      '<button class="btn btn-ghost" style="min-height:44px" data-act="studentportalpreview" data-idx="' + index + '" aria-label="' +
+        esc(student.name) + ' 학생 화면 미리보기">학생 화면 미리보기</button>' +
+      '</div></div>';
+  }).join('');
+
+  return '<div class="card student-portal-settings"><div class="card-title">🎒 학생 앱 이용·초대</div>' +
+    '<div class="card-sub mb14">학생 앱은 보호자 앱과 분리된 읽기 전용 화면입니다. 오늘 수업·출결·5단계 진행·오늘 차량, ' +
+    '선생님이 최근 14일 안에 <b>학생 앱에도 공개</b>를 선택한 숙제·준비물 기록, 배정 교재 상태와 주간 시간표만 표시합니다. ' +
+    '보호자 연락처·주소·정류장·내부 메모·보호자 요청·보강·회차·공지·주문 정보는 표시하지 않습니다.<br>' +
+    '<b>먼저 위에서 보호자 연락처를 저장하고, 보호자에게 이 공개 범위를 안내해 동의를 확인한 뒤 저장하세요.</b> ' +
+    '동의를 끄면 기존 학생 링크와 로그인도 즉시 해지됩니다.</div>' + notice + body + '</div>';
 }
 
 /* ── 설정 ── */
@@ -9913,7 +10443,7 @@ function viewSettings() {
       '<div class="small muted">마지막 동기화: ' + esc(lastTxt) + '</div>' +
       '<div class="hint mt14">잠그면 이 기기의 개인 토큰과 업무 캐시를 모두 지웁니다. 다시 열려면 새 개인 링크가 필요합니다.</div>' +
       '<button class="btn btn-ghost btn-block mt14" data-act="logout">이 기기 잠그기</button>' +
-    '</div>' + backupCard + viewGuardianContactPanel();
+    '</div>' + backupCard + guardianAnnouncementsHtml() + viewGuardianContactPanel() + viewStudentPortalPanel();
   }
   return '<div class="card">' +
     '<div class="card-title">여러 기기에서 함께 보기</div>' +
@@ -9940,6 +10470,8 @@ function viewSettings() {
 
   backupCard +
 
+  guardianAnnouncementsHtml() +
+
   '<div class="card">' +
     '<div class="card-title">관리 비밀번호</div>' +
     '<div class="card-sub mb14">원장 화면 진입 비밀번호를 바꿉니다.</div>' +
@@ -9949,7 +10481,9 @@ function viewSettings() {
       '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
   '</div>' +
 
-  viewGuardianContactPanel();
+  viewGuardianContactPanel() +
+
+  viewStudentPortalPanel();
 }
 
 /* ══════════════════════════════════════════════════════
@@ -10847,6 +11381,16 @@ document.addEventListener('click', ev => {
     case 'gcportalaccess': saveGuardianPortalAccess(el.dataset.idx, el); break;
     case 'gcportalinvite': issueParentPortalInvite(el.dataset.idx, el); break;
     case 'gcportalpreview': previewParentPortal(el.dataset.idx, el); break;
+    case 'studentportalrefresh': studentPortalLoaded = false; loadStudentPortalAccess(true); break;
+    case 'studentportalaccess': saveStudentPortalAccess(el.dataset.idx, el); break;
+    case 'studentportalinvite': issueStudentPortalInvite(el.dataset.idx, el); break;
+    case 'studentportalpreview': previewStudentPortal(el.dataset.idx, el); break;
+    case 'garefresh': guardianAnnouncementsLoaded = false; loadGuardianAnnouncements(true); break;
+    case 'gaadd': guardianAnnouncementModal(''); break;
+    case 'gaedit': guardianAnnouncementModal(el.dataset.announcement); break;
+    case 'gasave': saveGuardianAnnouncement(el); break;
+    case 'gapublish': transitionGuardianAnnouncement(el.dataset.announcement, 'announcement_publish', Number(el.dataset.rev), el); break;
+    case 'gaend': transitionGuardianAnnouncement(el.dataset.announcement, 'announcement_end', Number(el.dataset.rev), el); break;
 
     /* 회차제 수업 */
     case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
@@ -11352,11 +11896,7 @@ document.addEventListener('click', ev => {
       const row = batchDraft[0];
       const studentIds = selectedOrderStudentIds(row.id);
       if (!studentIds.length) return toast('이 교재를 사용할 학생을 한 명 이상 선택해 주세요');
-      const sid = orderAssignee();
-      const order = createOrderTask(batchVendorName, [{ bookId: row.id, title: row.title, studentIds: studentIds, qty: studentIds.length + '권' }], sid);
-      batchDraft = null; batchVendorName = '';
-      save(); queueSync(); closeModal(); render();
-      toast(order.orderVendor ? '주문 저장 · 저녁 8시 일괄 발송 대기' : '주문 저장 · 거래처를 먼저 등록해 주세요');
+      submitBookOrder([{ bookId: row.id, title: row.title, studentIds: studentIds }], el);
       break;
     }
     case 'bkselect': {
@@ -11367,23 +11907,13 @@ document.addEventListener('click', ev => {
     case 'bkbatch': batchOrderModal(el.dataset.key); break;
     case 'bkbatchsubmit': {
       if (!batchDraft || !batchDraft.length) break;
-      const sid = orderAssignee();
       const items = batchDraft.map(row => ({
         bookId: row.id,
         title: row.title,
         studentIds: selectedOrderStudentIds(row.id)
       }));
       if (items.some(item => !item.studentIds.length)) return toast('각 교재마다 사용할 학생을 한 명 이상 선택해 주세요');
-      items.forEach(item => { item.qty = item.studentIds.length + '권'; });
-      const order = createOrderTask(batchVendorName, items, sid);
-      items.forEach(it => {
-        const b = (bookDb.books || []).find(x => x.id === it.bookId);
-        if (b) batchSelection.delete(b.id);
-      });
-      batchDraft = null; batchVendorName = '';
-      save(); queueSync(); closeModal(); render();
-      const totalQty = items.reduce((sum, item) => sum + item.studentIds.length, 0);
-      toast(order.orderVendor ? totalQty + '권 저장 · 저녁 8시 일괄 발송 대기' : '주문 저장 · 거래처를 먼저 등록해 주세요');
+      submitBookOrder(items, el);
       break;
     }
     case 'bkcancelopen': cancelOrderModal(id); break;
@@ -11392,6 +11922,10 @@ document.addEventListener('click', ev => {
       if (!t) break;
       if (!canCancelOrder(t)) { closeModal(); return toast('이 주문은 취소할 권한이 없습니다'); }
       if (!confirm('이 주문을 취소할까요?')) return;
+      if (Number(t.orderIdentityVersion) === 1) {
+        cancelSealedBookOrder(t, el);
+        break;
+      }
       t.deleted = true; t.updatedAt = now();
       save(); queueSync(); closeModal(); render();
       toast('주문을 취소했습니다');
@@ -12128,7 +12662,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-17.1';
+const APP_VER = '2026-08-17.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

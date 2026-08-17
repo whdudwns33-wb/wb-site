@@ -37,6 +37,9 @@ class FakeDB {
     throw new Error('Unhandled first SQL: ' + sql);
   }
   async all(sql, args) {
+    if (sql.startsWith('SELECT DISTINCT snapshot.task_id,task.data FROM book_order_student_snapshots')) {
+      return { results: [] };
+    }
     if (sql.startsWith('SELECT id,data FROM tasks WHERE app=? AND owner=?')) {
       const owner = args[1];
       const ids = new Set(args.slice(2).map(String));
