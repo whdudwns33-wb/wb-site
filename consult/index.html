@@ -403,6 +403,24 @@
   .month-event-progress i { display: block; height: 100%; background: var(--blue); }
   .month-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .month-review-grid .wide { grid-column: 1 / -1; }
+  .report-panel { border-color: #D8D0F0; background: linear-gradient(180deg, #FCFAFF, #FFFFFF); }
+  .report-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .report-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+  .report-sheet { max-width: 720px; margin: 0 auto; color: var(--dark-gray); background: var(--white); }
+  .report-sheet-head { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 2px solid var(--navy); }
+  .report-sheet-head h2 { color: var(--navy); font-size: 22px; line-height: 1.35; }
+  .report-sheet-head p { margin-top: 4px; color: var(--mid-gray); font-size: 12px; }
+  .report-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+  .report-kpi { padding: 11px 8px; border-radius: 11px; background: var(--light-gray); text-align: center; }
+  .report-kpi span { display: block; color: var(--mid-gray); font-size: 10.5px; }
+  .report-kpi b { display: block; margin-top: 3px; color: var(--navy); font-size: 15px; }
+  .report-section { margin-top: 16px; break-inside: avoid; }
+  .report-section h3 { margin-bottom: 7px; color: var(--navy); font-size: 14px; }
+  .report-subject-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--light-gray); font-size: 12px; }
+  .report-note { min-height: 46px; padding: 10px 12px; border-radius: 9px; background: #F8FAFC; white-space: pre-wrap; font-size: 12.5px; }
+  .report-task-list { display: grid; gap: 5px; }
+  .report-task { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--light-gray); font-size: 11.5px; }
+  #reportPrintHost { display: none; }
   .agenda-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
   .agenda-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
   .agenda-filters .chip { min-height: 44px; flex: 0 0 auto; }
@@ -559,6 +577,11 @@
     .month-event-row > :last-child, .month-backlog-row > :last-child { grid-column: 1 / -1; }
     .month-review-grid { grid-template-columns: 1fr; }
     .month-review-grid .wide { grid-column: auto; }
+    .report-actions { display: grid; grid-template-columns: 1fr; }
+    .report-actions .btn { width: 100%; min-height: 44px; }
+    .report-kpis { grid-template-columns: 1fr 1fr; }
+    .report-task { grid-template-columns: 54px minmax(0, 1fr); }
+    .report-task > :last-child { grid-column: 2; }
     .agenda-head { display: grid; grid-template-columns: 1fr; }
     .agenda-item { grid-template-columns: 56px minmax(0, 1fr); }
     .agenda-actions { grid-column: 1 / -1; justify-content: stretch; }
@@ -577,6 +600,13 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
   }
+  @media print {
+    @page { size: A4; margin: 12mm; }
+    body.report-printing { padding: 0; background: #fff; }
+    body.report-printing > * { display: none !important; }
+    body.report-printing > #reportPrintHost { display: block !important; }
+    #reportPrintHost .report-sheet { display: block; max-width: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
@@ -594,6 +624,7 @@
 
 <div id="toast"></div>
 <div id="modalHost"></div>
+<div id="reportPrintHost"></div>
 
 <script>
 "use strict";
@@ -825,6 +856,7 @@ const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim()
 function occursOn(task, date) {
   if (task.deleted) return false;
   if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
+  if (task.kind === 'report_snapshot') return false;
   if (task.kind === 'academic_event' || task.kind === 'material_request') return false;
   if (task.kind === 'material_response' && task.status !== 'provided') return false;
   if (task.start && date < task.start) return false;
@@ -3421,7 +3453,7 @@ function wnAddModal(me) {
 const weekPlanKey = staffId => '__weekplan__' + staffId;
 function weekPlanOf(staffId, anchor) {
   const c = state.checks[weekPlanKey(staffId) + '|' + mondayOf(anchor)];
-  return Object.assign({ subjectGoals: {}, reflection: '', directorNote: '' }, (c && c.plan) || {});
+  return Object.assign({ subjectGoals: {}, reflection: '', directorNote: '', nextFocus: '' }, (c && c.plan) || {});
 }
 function weekSubjectActual(staffId, days) {
   const totals = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, 0]));
@@ -3569,8 +3601,11 @@ function viewWeek() {
     '<div class="week-review-grid"><div class="field"><label class="fl">학생 한 줄 회고</label><textarea class="in" id="weekReflection" ' +
       (session.isStaffLink ? '' : 'readonly') + ' placeholder="잘한 점과 다음 주에 바꿀 점">' + esc(plan.reflection || '') + '</textarea></div>' +
       '<div class="field"><label class="fl">원장 피드백</label><textarea class="in" id="weekDirectorNote" ' +
-        (session.isAdmin ? '' : 'readonly') + ' placeholder="원장이 확인 후 남기는 피드백">' + esc(plan.directorNote || '') + '</textarea></div></div>' +
+        (session.isAdmin ? '' : 'readonly') + ' placeholder="원장이 확인 후 남기는 피드백">' + esc(plan.directorNote || '') + '</textarea></div>' +
+      '<div class="field" style="grid-column:1/-1"><label class="fl">다음 주 집중</label><textarea class="in" id="weekNextFocus" ' +
+        (session.isAdmin ? '' : 'readonly') + ' placeholder="다음 주 우선순위와 권장 공부량">' + esc(plan.nextFocus || '') + '</textarea></div></div>' +
     (editable ? '<button class="btn btn-primary btn-block" data-act="weekreviewsave" data-mon="' + mon + '">주간 기록 저장</button>' : '') + '</div>';
+  h += reportPanel('week', me, mon);
   return h;
 }
 
@@ -3625,6 +3660,239 @@ function monthBacklog(staffId, ym) {
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/* ── 발행형 주간·월간 리포트 ──
+ * 초안은 저장하지 않는다. 원장이 발행할 때마다 admin-origin task를 새로 추가해
+ * 지난 발행본을 그대로 보존하고, 학생은 최신 발행본만 읽는다. */
+const REPORT_SCHEMA_VERSION = 1;
+
+function reportPeriod(periodType, periodKey) {
+  if (periodType === 'week' && /^\d{4}-\d{2}-\d{2}$/.test(periodKey || '') &&
+      ymd(parseYmd(periodKey)) === periodKey && mondayOf(periodKey) === periodKey) {
+    return { start: periodKey, end: addDays(periodKey, 6) };
+  }
+  if (periodType === 'month' && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodKey || '')) {
+    const dates = monthDates(periodKey);
+    return dates.length ? { start: dates[0], end: dates[dates.length - 1] } : null;
+  }
+  return null;
+}
+
+function buildReportSnapshot(staffId, periodType, periodKey, asOf) {
+  const student = staffById(staffId);
+  const period = reportPeriod(periodType, periodKey);
+  const at = Number(asOf == null ? now() : asOf);
+  if (!student || student.deleted || !period || !Number.isFinite(at)) return null;
+  const asOfDate = ymd(new Date(at));
+  const cutoff = asOfDate < period.end ? asOfDate : period.end;
+  const subjects = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, { done: 0, total: 0, studySecs: 0 }]));
+  const rows = [], days = [];
+  let done = 0, total = 0, blocked = 0, studySecs = 0, goalDays = 0;
+  const goalSecs = stGoalMin(staffId) * 60;
+
+  if (cutoff >= period.start) {
+    let date = period.start, guard = 0;
+    while (date <= cutoff && guard++ < 370) {
+      const dailyTasks = checklistTasksFor(staffId, date);
+      const dailySecs = stCategorySecs(stSecs(staffId, date));
+      const dailyTotalSecs = STUDY_SUBJECT_KEYS.reduce((sum, key) => {
+        const value = Math.max(0, Number(dailySecs[key]) || 0);
+        subjects[key].studySecs += value;
+        return sum + value;
+      }, 0);
+      let dailyDone = 0;
+      dailyTasks.forEach(task => {
+        const status = statusOf(task, date);
+        const subjectKey = taskStudySubjectKey(task);
+        total++; subjects[subjectKey].total++;
+        if (status === 'done') { done++; dailyDone++; subjects[subjectKey].done++; }
+        if (status === 'blocked') blocked++;
+        rows.push({
+          taskId: task.id, date: date, title: String(task.title || ''),
+          subject: subjectKey, origin: task.origin === 'staff' ? 'staff' : 'admin', status: status
+        });
+      });
+      studySecs += dailyTotalSecs;
+      if (goalSecs && dailyTotalSecs >= goalSecs) goalDays++;
+      days.push({ date: date, done: dailyDone, total: dailyTasks.length, studySecs: dailyTotalSecs });
+      date = addDays(date, 1);
+    }
+  }
+
+  const plan = periodType === 'week' ? weekPlanOf(staffId, periodKey) : monthPlanOf(staffId, periodKey);
+  return {
+    schemaVersion: REPORT_SCHEMA_VERSION,
+    periodType: periodType, periodKey: periodKey,
+    periodStart: period.start, periodEnd: period.end,
+    asOf: at, isPartial: cutoff < period.end,
+    student: { id: student.id, name: String(student.name || '') },
+    summary: {
+      done: done, total: total, pct: total ? Math.round(done / total * 100) : 0,
+      blocked: blocked, studySecs: studySecs, goalDays: goalDays
+    },
+    subjects: subjects, rows: rows, days: days,
+    elapsedDays: days.length, dailyGoalMin: stGoalMin(staffId),
+    reflection: String(plan.reflection || ''),
+    directorNote: String(plan.directorNote || ''),
+    nextFocus: String(plan.nextFocus || '')
+  };
+}
+
+function reportSnapshotsFor(staffId, periodType, periodKey) {
+  return state.tasks.filter(task => !task.deleted && task.kind === 'report_snapshot' && task.origin === 'admin' &&
+      task.staffId === staffId && task.reportType === periodType && task.periodKey === periodKey)
+    .sort((a, b) => (Number(b.reportRevision) || 0) - (Number(a.reportRevision) || 0) ||
+      (Number(b.publishedAt || b.createdAt) || 0) - (Number(a.publishedAt || a.createdAt) || 0) ||
+      String(b.id || '').localeCompare(String(a.id || '')));
+}
+
+function currentReportSnapshot(staffId, periodType, periodKey) {
+  const latest = reportSnapshotsFor(staffId, periodType, periodKey)[0] || null;
+  return latest && latest.reportStatus === 'published' && latest.snapshot ? latest : null;
+}
+
+function publishReportSnapshot(staffId, periodType, periodKey, asOf) {
+  if (!session.isAdmin) return null;
+  const at = Number(asOf == null ? now() : asOf);
+  const snapshot = buildReportSnapshot(staffId, periodType, periodKey, at);
+  if (!snapshot || snapshot.periodStart > ymd(new Date(at))) return null;
+  const previous = reportSnapshotsFor(staffId, periodType, periodKey)[0] || null;
+  const revision = previous ? (Number(previous.reportRevision) || 0) + 1 : 1;
+  const task = {
+    id: uid(), staffId: staffId, kind: 'report_snapshot',
+    title: (periodType === 'week' ? '주간' : '월간') + ' 학습 리포트 ' + periodKey,
+    reportType: periodType, periodKey: periodKey,
+    periodStart: snapshot.periodStart, periodEnd: snapshot.periodEnd, asOf: at,
+    reportStatus: 'published', reportRevision: revision,
+    seriesKey: periodType + ':' + staffId + ':' + periodKey,
+    supersedesId: previous ? previous.id : '', action: 'publish',
+    snapshot: JSON.parse(JSON.stringify(snapshot)), publishedAt: at,
+    origin: 'admin', repeat: 'none', days: [], start: '', end: '', carry: false,
+    createdAt: at, updatedAt: at, deleted: false
+  };
+  state.tasks.push(task); save(); queueSync();
+  return task;
+}
+
+function withdrawReportSnapshot(staffId, periodType, periodKey, at) {
+  if (!session.isAdmin) return null;
+  const previous = reportSnapshotsFor(staffId, periodType, periodKey)[0] || null;
+  if (!previous || previous.reportStatus !== 'published') return null;
+  const time = Number(at == null ? now() : at);
+  if (!Number.isFinite(time)) return null;
+  const task = {
+    id: uid(), staffId: staffId, kind: 'report_snapshot', title: previous.title,
+    reportType: periodType, periodKey: periodKey,
+    periodStart: previous.periodStart, periodEnd: previous.periodEnd, asOf: time,
+    reportStatus: 'withdrawn', reportRevision: (Number(previous.reportRevision) || 0) + 1,
+    seriesKey: previous.seriesKey || (periodType + ':' + staffId + ':' + periodKey),
+    supersedesId: previous.id, action: 'revoke', snapshot: null, withdrawnAt: time,
+    origin: 'admin', repeat: 'none', days: [], start: '', end: '', carry: false,
+    createdAt: time, updatedAt: time, deleted: false
+  };
+  state.tasks.push(task); save(); queueSync();
+  return task;
+}
+
+function reportSafeText(value) {
+  return String(value == null ? '' : value)
+    .replace(/https?:\/\/\S+|www\.\S+/gi, '[외부 링크 제외]')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+}
+
+function reportPrintHtml(snapshot) {
+  const s = snapshot || {};
+  const summary = s.summary || {};
+  const subjects = s.subjects || {};
+  const studentName = reportSafeText((s.student || {}).name);
+  const typeLabel = s.periodType === 'month' ? '월간' : '주간';
+  const periodLabel = (s.periodStart && s.periodEnd) ? shortDate(s.periodStart) + ' ~ ' + shortDate(s.periodEnd) : reportSafeText(s.periodKey);
+  const taskValue = Number(summary.total) ? (Number(summary.done) || 0) + '/' + Number(summary.total) + ' · ' + (Number(summary.pct) || 0) + '%' : '기록 없음';
+  const subjectRows = STUDY_SUBJECT_KEYS.map(key => {
+    const row = subjects[key] || {};
+    return '<div class="report-subject-row"><b>' + esc(STUDY_SUBJECTS[key].label) + '</b>' +
+      '<span>' + esc(fmtDur(Number(row.studySecs) || 0)) + '</span><span>' + (Number(row.total) ? (Number(row.done) || 0) + '/' + Number(row.total) + ' 완료' : '과제 없음') + '</span></div>';
+  }).join('');
+  const taskRows = (Array.isArray(s.rows) ? s.rows : []).slice(0, 80).map(row =>
+    '<div class="report-task"><span>' + esc(shortDate(row.date)) + '</span><span>' + esc(reportSafeText(row.title)) + '</span>' +
+    '<b>' + esc(STATUS_LABEL[row.status] || '') + '</b></div>').join('');
+  const note = (labelText, value) => '<div class="report-section"><h3>' + esc(labelText) + '</h3><div class="report-note">' +
+    esc(reportSafeText(value) || '기록 없음') + '</div></div>';
+  return '<section class="report-sheet"><div class="report-sheet-head"><h2>' + esc(studentName) + ' ' + typeLabel + ' 학습 리포트</h2>' +
+    '<p>' + esc(periodLabel) + ' · ' + (s.isPartial ? '중간 리포트' : '최종 리포트') + ' · 발행 시점 학생 기록 기준</p></div>' +
+    '<div class="report-kpis"><div class="report-kpi"><span>완료·달성률</span><b>' + taskValue + '</b></div>' +
+      '<div class="report-kpi"><span>총 순공시간</span><b>' + esc(fmtDur(Number(summary.studySecs) || 0)) + '</b></div>' +
+      '<div class="report-kpi"><span>하루 평균</span><b>' + esc(fmtDur(s.elapsedDays ? Math.round((Number(summary.studySecs) || 0) / s.elapsedDays) : 0)) + '</b></div>' +
+      '<div class="report-kpi"><span>목표 달성일</span><b>' + (Number(s.dailyGoalMin) ? (Number(summary.goalDays) || 0) + '일' : '목표 미설정') + '</b></div>' +
+      '<div class="report-kpi"><span>막힌 공부</span><b>' + (Number(summary.blocked) || 0) + '건</b></div></div>' +
+    '<div class="report-section"><h3>과목별 학습</h3>' + subjectRows + '</div>' +
+    (taskRows ? '<div class="report-section"><h3>공부 수행 내역</h3><div class="report-task-list">' + taskRows + '</div></div>' : '') +
+    note('학생 회고', s.reflection) + note('원장 피드백', s.directorNote) + note('다음 집중 목표', s.nextFocus) + '</section>';
+}
+
+function printReportSnapshot(snapshot) {
+  const host = $('#reportPrintHost');
+  if (!host || !snapshot) return;
+  host.innerHTML = reportPrintHtml(snapshot);
+  document.body.classList.add('report-printing');
+  window.print();
+  setTimeout(() => { document.body.classList.remove('report-printing'); host.innerHTML = ''; }, 0);
+}
+
+function showReportSnapshot(task, snapshot, preview) {
+  if (!snapshot) return toast('표시할 리포트가 없습니다');
+  const titleText = (snapshot.periodType === 'month' ? '월간' : '주간') + ' 리포트' + (preview ? ' 미리보기' : ' 발행본');
+  modal(titleText,
+    (preview ? '<div class="hint mb14">미발행 미리보기입니다. 발행하기 전에는 학생에게 보이지 않습니다.</div>' : '') + reportPrintHtml(snapshot),
+    '<button class="btn btn-navy btn-block mt14" data-act="reportprint"' + (task ? ' data-id="' + esc(task.id) + '"' : ' data-preview="1"') + '>인쇄 / PDF 저장</button>');
+  const box = $('#modalHost .modal-box'); if (box) box.style.maxWidth = '760px';
+}
+
+let reportPreviewSnapshot = null;
+function reportPanel(periodType, student, periodKey) {
+  if (!student) return '';
+  const latest = reportSnapshotsFor(student.id, periodType, periodKey)[0] || null;
+  const published = latest && latest.reportStatus === 'published' && latest.snapshot;
+  const typeLabel = periodType === 'month' ? '월간' : '주간';
+  let status = '<span class="pill">미발행</span>';
+  if (published) status = '<span class="pill">발행 ' + (Number(latest.reportRevision) || 1) + '차</span>';
+  else if (latest && latest.reportStatus === 'withdrawn') status = '<span class="pill bad">철회됨</span>';
+  let actions = '';
+  if (session.isAdmin) {
+    actions = '<button class="btn btn-ghost" data-act="reportpreview" data-type="' + periodType + '" data-key="' + periodKey + '">현재 기록 미리보기</button>' +
+      '<button class="btn btn-primary" data-act="reportpublish" data-type="' + periodType + '" data-key="' + periodKey + '">' +
+        (published ? '최신 데이터로 다시 발행' : '리포트 발행하기') + '</button>' +
+      (published ? '<button class="btn btn-ghost" data-act="reportopen" data-id="' + latest.id + '">발행본 보기</button>' +
+        '<button class="btn btn-ghost" data-act="reportprint" data-id="' + latest.id + '">인쇄 / PDF 저장</button>' +
+        '<button class="btn btn-danger" data-act="reportwithdraw" data-type="' + periodType + '" data-key="' + periodKey + '">발행 철회</button>' : '');
+  } else if (published) {
+    actions = '<button class="btn btn-primary" data-act="reportopen" data-id="' + latest.id + '">발행본 보기</button>' +
+      '<button class="btn btn-ghost" data-act="reportprint" data-id="' + latest.id + '">인쇄 / PDF 저장</button>';
+  }
+  return '<div class="card report-panel"><div class="between"><div><div class="card-title">📄 ' + typeLabel + ' 리포트</div>' +
+    '<div class="card-sub">발행한 내용은 이후 기록이 바뀌어도 그대로 보존됩니다.</div></div><div class="report-status">' + status + '</div></div>' +
+    (actions ? '<div class="report-actions">' + actions + '</div>' : '<div class="hint mt14">아직 원장이 발행한 리포트가 없습니다.</div>') + '</div>';
+}
+
+function saveVisibleReportNotes(staffId, periodType, periodKey) {
+  if (!session.isAdmin) return;
+  if (periodType === 'week') {
+    const plan = weekPlanOf(staffId, periodKey);
+    const director = $('#weekDirectorNote'), focus = $('#weekNextFocus');
+    setCheck(weekPlanKey(staffId), periodKey, { plan: Object.assign({}, plan, {
+      directorNote: director ? director.value.trim() : plan.directorNote,
+      nextFocus: focus ? focus.value.trim() : plan.nextFocus
+    }), done: true });
+  } else if (periodType === 'month') {
+    const plan = monthPlanOf(staffId, periodKey);
+    const director = $('#monthDirectorNote'), focus = $('#monthNextFocus');
+    setCheck(monthPlanKey(staffId), periodKey, { plan: Object.assign({}, plan, {
+      directorNote: director ? director.value.trim() : plan.directorNote,
+      nextFocus: focus ? focus.value.trim() : plan.nextFocus
+    }), done: true });
+  }
+}
+
 function monthDday(date) {
   const diff = Math.round((parseYmd(date) - parseYmd(today())) / 86400000);
   if (diff === 0) return 'D-DAY';
@@ -4094,6 +4362,7 @@ function viewMonth() {
       '<div class="field wide"><label class="fl">다음 달 권장사항</label><textarea class="in" id="monthNextFocus" ' +
         (session.isAdmin ? '' : 'readonly') + ' placeholder="다음 달 우선순위와 권장 공부량">' + esc(plan.nextFocus || '') + '</textarea></div></div>' +
     (editable ? '<button class="btn btn-primary btn-block" data-act="monthreviewsave" data-ym="' + ym + '">월간 기록 저장</button>' : '') + '</div>';
+  h += reportPanel('month', me, ym);
 
   return h;
 }
@@ -4887,7 +5156,7 @@ function viewStaffAdmin() {
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted).length + '건' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot').length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
@@ -5089,7 +5358,7 @@ function showText(title, text) {
 
 function manageTasks(staffId) {
   const s = staffById(staffId);
-  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted)
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && t.kind !== 'report_snapshot')
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   modal((s ? s.name : '') + ' 지시 목록',
     list.length
@@ -6248,12 +6517,72 @@ document.addEventListener('click', ev => {
       const plan = weekPlanOf(me.id, mon);
       const reflectionEl = $('#weekReflection');
       const noteEl = $('#weekDirectorNote');
+      const focusEl = $('#weekNextFocus');
       const next = Object.assign({}, plan, {
         reflection: session.isAdmin ? plan.reflection : ((reflectionEl && reflectionEl.value) || '').trim(),
-        directorNote: session.isAdmin ? ((noteEl && noteEl.value) || '').trim() : plan.directorNote
+        directorNote: session.isAdmin ? ((noteEl && noteEl.value) || '').trim() : plan.directorNote,
+        nextFocus: session.isAdmin ? ((focusEl && focusEl.value) || '').trim() : plan.nextFocus
       });
       setCheck(weekPlanKey(me.id), mon, { plan: next, done: true });
       render(); toast('주간 기록을 저장했습니다');
+      break;
+    }
+
+    /* 발행형 주간·월간 리포트 */
+    case 'reportpreview': {
+      if (!session.isAdmin) break;
+      const me = currentStaff(); if (!me) break;
+      const type = el.dataset.type, key = el.dataset.key;
+      saveVisibleReportNotes(me.id, type, key);
+      reportPreviewSnapshot = buildReportSnapshot(me.id, type, key, now());
+      if (!reportPreviewSnapshot) return toast('리포트 기간을 다시 확인해 주세요');
+      showReportSnapshot(null, reportPreviewSnapshot, true);
+      break;
+    }
+    case 'reportpublish': {
+      if (!session.isAdmin) break;
+      const me = currentStaff(); if (!me) break;
+      const type = el.dataset.type, key = el.dataset.key;
+      saveVisibleReportNotes(me.id, type, key);
+      const preview = buildReportSnapshot(me.id, type, key, now());
+      if (!preview) return toast('리포트 기간을 다시 확인해 주세요');
+      if (preview.isPartial && !confirm('아직 진행 중인 기간입니다. 현재까지의 기록으로 중간 리포트를 발행할까요?')) return;
+      const published = publishReportSnapshot(me.id, type, key, now());
+      if (!published) return toast('이 기간은 아직 발행할 수 없습니다');
+      reportPreviewSnapshot = null; render(); toast('리포트를 발행했습니다');
+      break;
+    }
+    case 'reportopen': {
+      const me = currentStaff(); if (!me) break;
+      const row = state.tasks.find(item => item.id === id && item.kind === 'report_snapshot' && item.origin === 'admin' &&
+        item.staffId === me.id && item.reportStatus === 'published' && item.snapshot);
+      if (!row) return toast('발행본을 다시 확인해 주세요');
+      const latest = currentReportSnapshot(me.id, row.reportType, row.periodKey);
+      if (!session.isAdmin && (!latest || latest.id !== row.id)) return toast('현재 공개된 발행본이 아닙니다');
+      showReportSnapshot(row, row.snapshot, false);
+      break;
+    }
+    case 'reportwithdraw': {
+      if (!session.isAdmin) break;
+      const me = currentStaff(); if (!me) break;
+      if (!confirm('현재 공개된 리포트를 철회할까요? 이전 발행 이력은 보존됩니다.')) return;
+      const withdrawn = withdrawReportSnapshot(me.id, el.dataset.type, el.dataset.key, now());
+      if (!withdrawn) return toast('철회할 발행본이 없습니다');
+      render(); toast('리포트 공개를 철회했습니다');
+      break;
+    }
+    case 'reportprint': {
+      if (el.dataset.preview === '1') {
+        if (session.isAdmin && reportPreviewSnapshot) printReportSnapshot(reportPreviewSnapshot);
+        break;
+      }
+      const me = currentStaff(); if (!me) break;
+      const row = state.tasks.find(item => item.id === id && item.kind === 'report_snapshot' && item.origin === 'admin' &&
+        item.staffId === me.id && item.reportStatus === 'published' && item.snapshot);
+      if (!row) return toast('인쇄할 발행본이 없습니다');
+      const latest = currentReportSnapshot(me.id, row.reportType, row.periodKey);
+      if (!session.isAdmin && (!latest || latest.id !== row.id)) return toast('현재 공개된 발행본이 아닙니다');
+      printReportSnapshot(row.snapshot);
       break;
     }
 
@@ -6944,7 +7273,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.6';
+const APP_VER = '2026-08-18.7';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
