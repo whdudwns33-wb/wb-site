@@ -291,8 +291,7 @@ const LS_KEY = 'wb_consult_v1';
 const METAMATH_CENTER_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=center';
 const METAMATH_STUDENT_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=student';
 const CLASSCARD_URL = 'https://www.classcard.net/Login';
-const STUDYFORCE_CENTER_URL = 'https://www.studyforce.co.kr/';
-const STUDYFORCE_STUDENT_URL = 'https://www.studyforce.co.kr/user/user_login/?go_url=%2F';
+const STUDYFORCE_URL = 'https://hol.sfcenter.co.kr/';
 const LEARNING_SOURCES = Object.freeze({
   metamath: {
     icon: '🧮', label: '메타수학', centerUrl: METAMATH_CENTER_URL, studentUrl: METAMATH_STUDENT_URL,
@@ -311,7 +310,7 @@ const LEARNING_SOURCES = Object.freeze({
     noteHint: '암기 단어 수·테스트 점수 메모'
   },
   studyforce: {
-    icon: '🧠', label: '스터디포스', centerUrl: STUDYFORCE_CENTER_URL, studentUrl: STUDYFORCE_STUDENT_URL,
+    icon: '🧠', label: '스터디포스', centerUrl: STUDYFORCE_URL, studentUrl: STUDYFORCE_URL,
     centerAction: '스터디포스 열기', studentAction: '스터디포스 훈련하기',
     detail: '스터디포스에서 독해력 훈련',
     guide: '스터디포스를 열어 배정된 독해력 훈련을 마친 뒤 결과를 확인하고 단계를 체크하세요.',
@@ -1762,47 +1761,50 @@ function wnRow(sid, x, editable) {
 }
 
 /* ══════════════════════════════════════════════════════
-   학습 허브 — 외부 프로그램·자체 교재·자료를 기존 과제로 관리한다.
+   학습 카드 — 외부 프로그램·자체 교재·자료를 종류별로 관리한다.
    외부 계정·비밀번호·문제 원문은 저장하지 않는다.
    ══════════════════════════════════════════════════════ */
-function learningTasksFor(staffId) {
+function learningTasksFor(staffId, sourceKey) {
+  if (!LEARNING_SOURCES[sourceKey]) return [];
   return state.tasks
-    .filter(t => !t.deleted && t.staffId === staffId && !!LEARNING_SOURCES[t.source])
+    .filter(t => !t.deleted && t.staffId === staffId && t.source === sourceKey)
     .sort((a, b) => {
       const ad = isDone(a.id, a.start), bd = isDone(b.id, b.start);
       if (ad !== bd) return ad - bd;
       const as = a.start || '', bs = b.start || '';
       return ad ? bs.localeCompare(as) : as.localeCompare(bs);
     })
-    .slice(0, 20);
+    .slice(0, 10);
 }
 
-function learningHubCard(me, editable) {
+function learningSourceCard(me, editable, sourceKey) {
+  const source = LEARNING_SOURCES[sourceKey];
+  if (!source) return '';
   const director = session.isAdmin;
   const academy = director || isManager();
-  const list = learningTasksFor(me.id);
+  const list = learningTasksFor(me.id, sourceKey);
   const help = director
-    ? '외부 프로그램 과제, 자체 교재, 독서, 탐구보고서, 시험대비자료를 학생별로 보내고 확인합니다.'
+    ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
     : academy
-      ? '학습 사이트는 여기서 열 수 있습니다. 학생 과제·자료 발행은 원장 화면에서 할 수 있습니다.'
-      : '받은 과제나 자료를 열어 학습하고, 단계별 진행 상태와 결과를 남겨주세요.';
-  const links = Object.keys(LEARNING_SOURCES).map(key => LEARNING_SOURCES[key])
-    .filter(source => source.studentUrl)
-    .map(source => {
-      const url = academy && source.centerUrl ? source.centerUrl : source.studentUrl;
-      const action = academy ? source.centerAction : source.studentAction;
-      return '<a class="btn ' + (academy ? 'btn-ghost' : 'btn-primary') + '" href="' + esc(url) +
-        '" target="_blank" rel="noopener noreferrer">' + source.icon + ' ' + esc(action) + ' ↗</a>';
-    }).join('');
+      ? esc(source.detail) + (source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
+      : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
+  const url = academy && source.centerUrl ? source.centerUrl : source.studentUrl;
+  const action = academy ? source.centerAction : source.studentAction;
+  const link = url
+    ? '<a class="btn ' + (academy ? 'btn-ghost' : 'btn-primary') + '" href="' + esc(url) +
+      '" target="_blank" rel="noopener noreferrer">' + source.icon + ' ' + esc(action) + ' ↗</a>'
+    : '';
+  const addLabel = sourceKey === 'exam_material' ? '＋ 자료 보내기' : '＋ 과제 보내기';
 
-  return '<div class="card"><div class="between mb8"><div><div class="card-title">🎯 학습 허브</div>' +
+  return '<div class="card" data-learning-source="' + esc(sourceKey) + '"><div class="between mb8"><div>' +
+      '<div class="card-title">' + source.icon + ' ' + esc(source.label) + '</div>' +
       '<div class="card-sub">' + help + '</div></div></div>' +
     '<div class="row wraprow mb14" style="gap:8px">' +
-      (director ? '<button class="btn btn-primary" data-act="learnadd">＋ 학습 과제·자료 보내기</button>' : '') + links +
+      (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
     '</div>' +
     (list.length
       ? list.map(t => taskRow(t, t.start, editable, false)).join('')
-      : '<div class="small muted">등록된 학습 과제가 없습니다.</div>') +
+      : '<div class="small muted">등록된 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
     '</div>';
 }
 
@@ -1814,7 +1816,12 @@ function viewStudy() {
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
-  h += learningHubCard(me, editable);
+  const roleLabel = session.isAdmin ? '👀 원장 관리 화면' : isManager() ? '👤 관리자 개인 화면' : '👤 학생 화면';
+  const roleHelp = session.isAdmin
+    ? '현재 선택: ' + esc(me.name) + ' · 선택한 대상의 학습 현황을 관리하는 화면입니다.'
+    : esc(me.name) + ' 본인의 학습 현황입니다.';
+  h += '<div class="guide mb14"><b>' + roleLabel + '</b>' + roleHelp + '</div>';
+  h += Object.keys(LEARNING_SOURCES).map(key => learningSourceCard(me, editable, key)).join('');
 
   // 오늘 복습할 오답 먼저
   const due = wnDue(me.id);
@@ -1866,17 +1873,15 @@ function rdAddModal() {
     '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
 }
 
-function learningTaskModal() {
+function learningTaskModal(sourceKey) {
   if (!session.isAdmin) return;
   const me = currentStaff();
   if (!me) return toast('학생을 먼저 선택해 주세요');
-  const options = Object.keys(LEARNING_SOURCES).map(key => {
-    const source = LEARNING_SOURCES[key];
-    return '<option value="' + key + '">' + source.icon + ' ' + esc(source.label) + '</option>';
-  }).join('');
-  modal(me.name + ' — 학습 과제·자료 보내기',
-    '<div class="guide mb14"><b>사용 방법</b>학습 종류와 마감일을 정하면 학생 화면에 바로 나타납니다. 시험대비 PDF·문서는 보기 전용 공유 링크를 함께 넣어주세요.</div>' +
-    '<div class="field"><label class="fl">학습 종류</label><select class="in" id="learnSource">' + options + '</select></div>' +
+  const source = LEARNING_SOURCES[sourceKey];
+  if (!source) return toast('학습 종류를 다시 선택해 주세요');
+  modal(me.name + ' — ' + source.icon + ' ' + source.label,
+    '<input type="hidden" id="learnSource" value="' + esc(sourceKey) + '">' +
+    '<div class="guide mb14"><b>' + source.icon + ' ' + esc(source.label) + ' 보내기</b>과제명과 마감일을 입력하면 선택한 학생의 ' + esc(source.label) + ' 카드에 바로 나타납니다.</div>' +
     '<div class="field"><label class="fl">과제·자료명</label>' +
       '<input class="in" id="learnTitle" placeholder="예: 중간고사 1회 대비자료, 클래스카드 3세트"></div>' +
     '<div class="field"><label class="fl">마감일</label>' +
@@ -2935,10 +2940,12 @@ document.addEventListener('click', ev => {
       break;
     }
 
-    /* 학습 허브 */
+    /* 학습 카드 */
     case 'learnadd': {
       if (!session.isAdmin) break;
-      learningTaskModal();
+      const sourceKey = el.dataset.source || '';
+      if (!LEARNING_SOURCES[sourceKey]) return toast('학습 종류를 다시 선택해 주세요');
+      learningTaskModal(sourceKey);
       break;
     }
     case 'learnsave': {
