@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 
 const worker = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/004_security_access_v1.sql', import.meta.url), 'utf8');
 const deployScript = fs.readFileSync(new URL('./deploy.ps1', import.meta.url), 'utf8');
+const portalRunbook = fs.readFileSync(new URL('./PORTAL_RELEASE_RUNBOOK.md', import.meta.url), 'utf8');
+const portalProbe = fs.readFileSync(new URL('./portal-release-probe.sql', import.meta.url), 'utf8');
+const mainWrangler = fs.readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
+const studentWrangler = fs.readFileSync(new URL('./wrangler.student.toml', import.meta.url), 'utf8');
 
 test('only the task environment allowlist elevates personal auth', () => {
   assert.match(worker, /const staff = await activeStaffData\(env, app, id\)/);
@@ -79,4 +84,36 @@ test('sensitive responses use no-store and no-referrer', () => {
 test('deployment helper never writes admin secrets into the repository', () => {
   assert.doesNotMatch(deployScript, /Set-Content\s+\.\\배포결과\.txt/);
   assert.doesNotMatch(deployScript, /클로드에게 그대로 붙여넣/);
+});
+
+test('기존 운영 DB의 포털 배포는 중복 migration과 역순 배포를 차단한다', () => {
+  assert.match(portalRunbook, /deploy\.ps1.*새 설치 전용/);
+  assert.ok(portalRunbook.indexOf('036_guardian_announcements.sql') < portalRunbook.indexOf('037_book_order_identity_snapshots.sql'));
+  assert.ok(portalRunbook.indexOf('037_book_order_identity_snapshots.sql') < portalRunbook.indexOf('038_student_portal.sql'));
+  assert.match(portalRunbook, /`038`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다/);
+  assert.match(portalRunbook, /`10\/10`, `21\/21`, `10\/10`, `2\/2`/);
+  assert.match(portalRunbook, /연결을 끈 뒤.*모두 접근이 거절/s);
+  assert.match(portalRunbook, /Origin: https:\/\/whdudwns33-wb\.github\.io/);
+  assert.match(portalRunbook, /학생 앱 전용 주소/);
+  assert.match(portalProbe, /idx_book_order_one_active_target/);
+  assert.match(portalProbe, /'migration_036_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
+  assert.match(portalProbe, /'migration_037_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
+  assert.match(portalProbe, /'migration_038_objects'.*COUNT\(schema\.name\).*COUNT\(\*\)/s);
+  assert.match(portalProbe, /'migration_038_columns'.*COUNT\(found\.column_name\).*COUNT\(\*\)/s);
+  assert.match(mainWrangler, /WB_STUDENT_PORTAL_BASE_URL\s*=\s*"https:\/\/wb-student\.whdudwns33\.workers\.dev\/"/);
+  assert.match(studentWrangler, /WB_STUDENT_PORTAL_BASE_URL\s*=\s*"https:\/\/wb-student\.whdudwns33\.workers\.dev\/"/);
+});
+
+test('포털 배포 probe는 fresh schema의 선행 구조와 036~038 객체를 정확히 센다', () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(schema);
+  const rows = portalProbe.split(';').map(statement => statement.trim()).filter(Boolean)
+    .map(statement => database.prepare(statement).get());
+  assert.deepEqual(rows.map(row => [row.check_name, Number(row.found), Number(row.expected)]), [
+    ['prerequisite_tables', 9, 9],
+    ['migration_036_objects', 10, 10],
+    ['migration_037_objects', 21, 21],
+    ['migration_038_objects', 10, 10],
+    ['migration_038_columns', 2, 2]
+  ]);
 });

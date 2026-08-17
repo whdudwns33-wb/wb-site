@@ -1,0 +1,17 @@
+name = "wb-student"
+main = "student-worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"
+
+# 학생 앱은 보호자·직원 앱과 다른 origin에서만 학생 세션 쿠키를 사용한다.
+[assets]
+directory = "../student"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wb-sync"
+database_id = "5d65c2e2-47d9-4947-b402-704719914fd3"

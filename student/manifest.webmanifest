@@ -1,0 +1,14 @@
+{
+  "name": "WB 학생",
+  "short_name": "WB 학생",
+  "description": "WB 학생용 수업·학습 확인 앱",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f7f8",
+  "theme_color": "#173957",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

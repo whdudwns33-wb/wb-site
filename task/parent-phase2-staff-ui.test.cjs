@@ -45,15 +45,16 @@ test('숙제·준비물은 내부 메모 파싱 없이 전용 필드와 CAS API�
   const save = slice('async function saveGuardianPublication(', 'function acaflowLessonSummary(');
   assert.match(block, /data-public-homework/);
   assert.match(block, /data-public-readiness/);
+  assert.match(block, /data-student-visible/);
   assert.match(block, /action: 'publication_list'/);
   assert.match(save, /action: 'publication_set'/);
   assert.match(save, /taskId: taskId, lessonDate: lessonDate/);
-  assert.match(save, /publicHomework: homework, publicReadiness: readiness, published: published/);
+  assert.match(save, /publicHomework: homework, publicReadiness: readiness, published: published,[\s\S]*studentVisible: published && studentVisible/);
   assert.match(save, /expectedRevision: Number\(current\.revision\) \|\| 0/);
   assert.match(save, /error\.code === 'STALE_REVISION'/);
   assert.match(save, /guardianPublicationDrafts\.set/);
   assert.doesNotMatch(block, /c\.note|\.note\b|task\.homework|guardianPhone|phone:/);
-  assert.match(source, /const GUARDIAN_PORTAL_SCOPE_VERSION = 3/);
+  assert.match(source, /const GUARDIAN_PORTAL_SCOPE_VERSION = 4/);
 });
 
 test('공개 입력은 로딩·오류·escape 상태와 44px 모바일 조작을 제공한다', () => {

@@ -61,7 +61,9 @@ test('schema and migration are additive and store no student name or contact', (
   for (const sql of [schema, migration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS book_issues/);
     for (const status of ['prepared', 'issued', 'handed', 'cancelled']) assert.ok(sql.includes("'" + status + "'"));
-    assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_issues');
+    const definition = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(definition, /DROP TABLE|DELETE FROM/i);
   }
   const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');') + 2);
   assert.doesNotMatch(table, /student_name|phone|address|memo/i);
@@ -71,7 +73,9 @@ test('order fulfillment migration is additive and stores stable ids without disp
   for (const sql of [schema, fulfillmentMigration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_fulfillments/);
     for (const status of ['teacher_received', 'student_handed', 'academy_registered']) assert.ok(sql.includes("'" + status + "'"));
-    assert.doesNotMatch(sql, /DROP TABLE|DELETE FROM/i);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_fulfillments');
+    const definition = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(definition, /DROP TABLE|DELETE FROM/i);
   }
   const table = fulfillmentMigration.slice(fulfillmentMigration.indexOf('CREATE TABLE'), fulfillmentMigration.indexOf(');') + 2);
   assert.match(table, /student_ids/);

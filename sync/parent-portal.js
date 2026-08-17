@@ -3,15 +3,22 @@
  * 전화번호는 초대 자격 확인에만 쓰고 응답/세션/화면에는 절대 포함하지 않는다.
  */
 
+import { readPublicBookStatus } from './public-book-status.js';
+import {
+  handleGuardianAnnouncements,
+  listActiveGuardianAnnouncements
+} from './guardian-announcements.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_OPAQUE = /^[a-f0-9]{48}$/i;
 const HASH_PREFIX = 'sha256:';
 const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_ACTIVE_SESSIONS = 3;
-const CURRENT_PORTAL_SCOPE_VERSION = 3;
+const CURRENT_PORTAL_SCOPE_VERSION = 4;
 const TODAY_SCOPE_VERSION = 2;
 const PHASE2_SCOPE_VERSION = 3;
+const PHASE3_SCOPE_VERSION = 4;
 const MAX_PUBLIC_TEXT = 500;
 const PUBLICATION_VISIBLE_DAYS = 14;
 const SAFE_CLIENT_REQUEST_ID = /^[A-Za-z0-9_-]{16,64}$/;
@@ -85,7 +92,7 @@ function activeInMonth(student, month) {
     (!student.end || String(student.end) > month);
 }
 
-async function rosterStudent(env, studentId, now) {
+export async function rosterStudent(env, studentId, now) {
   const row = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind('task').first();
   if (!row) return { error: '원생 명단이 준비되지 않았습니다', code: 'ROSTER_UNAVAILABLE' };
   try {
@@ -101,7 +108,7 @@ async function rosterStudent(env, studentId, now) {
   }
 }
 
-async function guardianIdentityReady(env, student) {
+export async function guardianIdentityReady(env, student) {
   const row = await env.DB.prepare(
     'SELECT student_name,phone,consent FROM guardian_contacts_by_student WHERE app=? AND student_id=? LIMIT 1'
   ).bind('task', student.id).first();
@@ -595,7 +602,7 @@ async function publicTodayTransport(env, studentId, now) {
   return rows.sort((a, b) => (a.scheduledTime || '99:99').localeCompare(b.scheduledTime || '99:99'));
 }
 
-async function publicToday(env, student, now) {
+export async function publicToday(env, student, now) {
   const date = kstDate(now);
   const [lessons, transport] = await Promise.all([
     publicTodayLessons(env, student, now),
@@ -610,7 +617,7 @@ async function publicToday(env, student, now) {
   };
 }
 
-async function publicSchedule(env, student, now) {
+export async function publicSchedule(env, student, now) {
   const studentId = String(student && student.id || '');
   const today = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const result = await env.DB.prepare(
@@ -681,6 +688,7 @@ function publicationStaffView(row) {
     status: String(row.status || ''),
     publicHomework: String(row.public_homework || ''),
     publicReadiness: String(row.public_readiness || ''),
+    studentVisible: Number(row.student_visible) === 1,
     revision: Number(row.revision || 0),
     updatedAt: Number(row.updated_at || 0)
   };
@@ -711,14 +719,15 @@ async function requestStaffView(env, row, now = Date.now()) {
   };
 }
 
-async function publicLessonPublications(env, student, now) {
+export async function publicLessonPublications(env, student, now, audience = 'guardian') {
   if (!await tableExists(env, 'guardian_lesson_publications')) {
     return { error: '보호자 공개 숙제·준비물을 준비하고 있습니다', code: 'PORTAL_PHASE2_NOT_READY' };
   }
   const today = kstDate(now);
   const oldest = kstDate(now - PUBLICATION_VISIBLE_DAYS * 24 * 60 * 60 * 1000);
   const result = await env.DB.prepare(
-    'SELECT * FROM guardian_lesson_publications WHERE app=? AND student_id=? AND lesson_date BETWEEN ? AND ? ' +
+    'SELECT * FROM guardian_lesson_publications WHERE app=? AND student_id=? AND lesson_date BETWEEN ? AND ?' +
+    (audience === 'student' ? ' AND student_visible=1' : '') + ' ' +
     'ORDER BY lesson_date DESC,updated_at DESC LIMIT 100'
   ).bind('task', student.id, oldest, today).all();
   const seen = new Set();
@@ -790,7 +799,7 @@ async function publicationSet(env, body, auth, origin, json) {
     return json({ ok: false, error: '수업 담당 인증이 필요합니다' }, 403, origin);
   }
   if (!allowedKeys(body, ['auth', 'taskId', 'lessonDate', 'publicHomework', 'publicReadiness',
-    'published', 'expectedRevision'])) {
+    'published', 'studentVisible', 'expectedRevision'])) {
     return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
   }
   const taskId = String(body.taskId || '');
@@ -799,6 +808,7 @@ async function publicationSet(env, body, auth, origin, json) {
   const homework = publicText(body.publicHomework);
   const readiness = publicText(body.publicReadiness);
   if (!SAFE_ID.test(taskId) || !validDate(lessonDate) || typeof body.published !== 'boolean' ||
+      (body.studentVisible != null && typeof body.studentVisible !== 'boolean') ||
       !Number.isInteger(expectedRevision) || expectedRevision < 0 || homework == null || readiness == null) {
     return json({ ok: false, error: '공개할 수업과 내용을 확인해 주세요' }, 400, origin);
   }
@@ -822,9 +832,11 @@ async function publicationSet(env, body, auth, origin, json) {
     'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
   ).bind('task', checked.taskIdentityHash, lessonDate).first();
   const status = body.published ? 'published' : 'withdrawn';
+  const studentVisible = body.published && (body.studentVisible == null
+    ? Number(before && before.student_visible) === 1 : body.studentVisible === true);
   if ((!before && expectedRevision !== 0) || (before && Number(before.revision) !== expectedRevision)) {
     if (before && String(before.status) === status && String(before.public_homework) === homework &&
-        String(before.public_readiness) === readiness) {
+        String(before.public_readiness) === readiness && Number(before.student_visible) === Number(studentVisible)) {
       return json({ ok: true, idempotent: true, publication: publicationStaffView(before) }, 200, origin);
     }
     return json({ ok: false, code: 'STALE_REVISION',
@@ -832,7 +844,7 @@ async function publicationSet(env, body, auth, origin, json) {
       current: before ? publicationStaffView(before) : null }, 409, origin);
   }
   if (before && String(before.status) === status && String(before.public_homework) === homework &&
-      String(before.public_readiness) === readiness) {
+      String(before.public_readiness) === readiness && Number(before.student_visible) === Number(studentVisible)) {
     return json({ ok: true, idempotent: true, publication: publicationStaffView(before) }, 200, origin);
   }
   const publicationId = before ? String(before.publication_id) :
@@ -847,19 +859,23 @@ async function publicationSet(env, body, auth, origin, json) {
     results = await env.DB.batch([
       env.DB.prepare(
         'INSERT INTO guardian_lesson_publications(app,publication_id,source_task_id,task_owner,student_id,' +
-        'student_identity_hash,task_identity_hash,lesson_date,status,public_homework,public_readiness,revision,updated_at,updated_by) ' +
-        'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(app,task_identity_hash,lesson_date) DO UPDATE SET ' +
+        'student_identity_hash,task_identity_hash,lesson_date,status,public_homework,public_readiness,student_visible,' +
+        'revision,updated_at,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+        'ON CONFLICT(app,task_identity_hash,lesson_date) DO UPDATE SET ' +
         'status=excluded.status,public_homework=excluded.public_homework,public_readiness=excluded.public_readiness,' +
+        'student_visible=excluded.student_visible,' +
         'revision=excluded.revision,updated_at=excluded.updated_at,updated_by=excluded.updated_by ' +
         'WHERE guardian_lesson_publications.revision=?'
       ).bind('task', publicationId, taskId, checked.owner, checked.student.id, checked.studentIdentityHash,
-        checked.taskIdentityHash, lessonDate, status, homework, readiness, revision, updatedAt, actor, expectedRevision),
+        checked.taskIdentityHash, lessonDate, status, homework, readiness, studentVisible ? 1 : 0,
+        revision, updatedAt, actor, expectedRevision),
       env.DB.prepare(
         'INSERT INTO guardian_lesson_publication_events(app,event_id,publication_id,revision,event_type,' +
-        'public_homework,public_readiness,created_at,created_by) ' +
-        'SELECT ?,?,?,?,?,?,?,?,? FROM guardian_lesson_publications current WHERE current.app=? ' +
+        'public_homework,public_readiness,student_visible,created_at,created_by) ' +
+        'SELECT ?,?,?,?,?,?,?,?,?,? FROM guardian_lesson_publications current WHERE current.app=? ' +
         'AND current.publication_id=? AND current.revision=? AND current.updated_at=?'
-      ).bind('task', eventId, publicationId, revision, eventType, homework, readiness, updatedAt, actor,
+      ).bind('task', eventId, publicationId, revision, eventType, homework, readiness, studentVisible ? 1 : 0,
+        updatedAt, actor,
         'task', publicationId, revision, updatedAt)
     ]);
   } catch (error) {
@@ -868,7 +884,7 @@ async function publicationSet(env, body, auth, origin, json) {
       'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
     ).bind('task', checked.taskIdentityHash, lessonDate).first();
     if (raced && String(raced.status) === status && String(raced.public_homework) === homework &&
-        String(raced.public_readiness) === readiness) {
+        String(raced.public_readiness) === readiness && Number(raced.student_visible) === Number(studentVisible)) {
       return json({ ok: true, idempotent: true, publication: publicationStaffView(raced) }, 200, origin);
     }
     return json({ ok: false, code: 'STALE_REVISION',
@@ -880,7 +896,7 @@ async function publicationSet(env, body, auth, origin, json) {
       'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
     ).bind('task', checked.taskIdentityHash, lessonDate).first();
     if (current && String(current.status) === status && String(current.public_homework) === homework &&
-        String(current.public_readiness) === readiness) {
+        String(current.public_readiness) === readiness && Number(current.student_visible) === Number(studentVisible)) {
       return json({ ok: true, idempotent: true, publication: publicationStaffView(current) }, 200, origin);
     }
     return json({ ok: false, code: 'STALE_REVISION',
@@ -1162,16 +1178,21 @@ async function portalViewPayload(env, student, scopeVersion, now) {
   if (operations.error) return operations;
   const todayEnabled = Number(scopeVersion || 1) >= TODAY_SCOPE_VERSION;
   const phase2Enabled = Number(scopeVersion || 1) >= PHASE2_SCOPE_VERSION;
-  const [today, schedule, feedback, onboarding, publications, guardianRequests] = await Promise.all([
+  const phase3Enabled = Number(scopeVersion || 1) >= PHASE3_SCOPE_VERSION;
+  const [today, schedule, feedback, onboarding, publications, guardianRequests, books, notices] = await Promise.all([
     todayEnabled ? publicToday(env, student, now) : Promise.resolve(null),
     publicSchedule(env, student, now),
     publicFeedback(env, student.id),
     publicOnboarding(env, student.id),
     phase2Enabled ? publicLessonPublications(env, student, now) : Promise.resolve(null),
-    phase2Enabled ? publicGuardianRequests(env, student.id) : Promise.resolve(null)
+    phase2Enabled ? publicGuardianRequests(env, student.id) : Promise.resolve(null),
+    phase3Enabled ? readPublicBookStatus(env, student.id, now) : Promise.resolve(null),
+    phase3Enabled ? listActiveGuardianAnnouncements(env, student.id, now) : Promise.resolve(null)
   ]);
   if (publications && publications.error) return publications;
   if (guardianRequests && guardianRequests.error) return guardianRequests;
+  if (books && books.error) return books;
+  if (notices && notices.error) return notices;
   const response = {
     ok: true,
     generatedAt: now,
@@ -1180,6 +1201,8 @@ async function portalViewPayload(env, student, scopeVersion, now) {
       today: todayEnabled,
       publicLessons: phase2Enabled,
       guardianRequests: phase2Enabled,
+      bookStatus: phase3Enabled,
+      announcements: phase3Enabled,
       scopeVersion: Number(scopeVersion || 1),
       requiredScopeVersion: CURRENT_PORTAL_SCOPE_VERSION
     },
@@ -1202,6 +1225,10 @@ async function portalViewPayload(env, student, scopeVersion, now) {
     response.publicLessons = publications.rows;
     response.guardianRequests = guardianRequests.rows;
     response.summary.guardianRequestOpen = guardianRequests.rows.filter(row => row.status === 'open').length;
+  }
+  if (phase3Enabled) {
+    response.bookStatus = books.rows;
+    response.announcements = notices.announcements;
   }
   return response;
 }
@@ -1350,7 +1377,7 @@ async function portalAccess(env, body, auth, origin, json) {
   }
   if (body.enabled && Number(body.scopeVersion) !== CURRENT_PORTAL_SCOPE_VERSION) {
     return json({ ok: false, code: 'PORTAL_CONSENT_VERSION_REQUIRED',
-      error: '공개 숙제·준비물과 정형 보호자 요청을 포함한 새 이용 범위 동의를 확인해 주세요' }, 409, origin);
+      error: '학원 공지와 교재 준비·수령 상태까지 포함한 새 이용 범위 동의를 확인해 주세요' }, 409, origin);
   }
   const before = await env.DB.prepare(
     'SELECT enabled,guardian_identity_hash,scope_version,accepted_at,updated_at FROM guardian_portal_access ' +
@@ -1438,6 +1465,9 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   if (action === 'publication_set') return publicationSet(env, body, auth, origin, json);
   if (action === 'request_list') return guardianRequestList(env, body, auth, origin, json);
   if (action === 'request_resolve') return guardianRequestResolve(env, body, auth, origin, json);
+  if (['announcement_list', 'announcement_save', 'announcement_publish', 'announcement_end'].includes(action)) {
+    return handleGuardianAnnouncements(env, app, body, origin, auth, json);
+  }
   if (action === 'exchange') return exchangeInvite(env, body, origin, json, request);
   if (action === 'view') return viewPortal(env, body, origin, json, request);
   if (action === 'respond') return respondPortal(env, body, origin, json, request);

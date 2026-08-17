@@ -40,8 +40,8 @@ test('연락처 변경 후 웹앱 동의를 즉시 재검증하고 재동의 전
   assert.match(inviteSource, /access && access\.needsReconsent/);
   assert.match(html, /portal\.needsReconsent/);
   assert.match(html, /웹앱 재동의 필요/);
-  assert.match(html, /보호자 앱 공개 동의 v3/);
-  assert.match(html, /숙제·준비물 공개와 보호자 요청 기능 재동의 필요/);
+  assert.match(html, /보호자 앱 공개 동의 v4/);
+  assert.match(html, /학원 공지·교재 상태 공개를 포함한 재동의 필요/);
 });
 
 test('관리자 미리보기는 기존 모달에서 공개 DTO만 읽고 보호자 연결을 만들지 않는다', () => {
@@ -81,8 +81,8 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   const source = html.slice(start, end);
   const factoryStart = html.indexOf('let parentPreviewRequest = 0');
   const parentPreviewHtml = new Function('esc', html.slice(factoryStart, end) + '; return parentPreviewHtml;')(String);
-  const output = parentPreviewHtml({ capabilities: { today: true, publicLessons: true, guardianRequests: true }, today: {}, summary: {}, student: {} });
-  const labels = ['오늘 현황', '숙제·준비물', '정규 수업 시간표', '확인·응답', '보호자 요청', '횟수제 수업', '최근 수업 기록'];
+  const output = parentPreviewHtml({ capabilities: { today: true, publicLessons: true, guardianRequests: true, announcements: true, bookStatus: true }, today: {}, summary: {}, student: {} });
+  const labels = ['학원 공지', '오늘 현황', '숙제·준비물', '교재 준비·수령', '정규 수업 시간표', '확인·응답', '보호자 요청', '횟수제 수업', '최근 수업 기록'];
   labels.reduce((previous, label) => {
     const current = output.indexOf(label);
     assert.ok(current > previous, `${label} 미리보기 순서`);
@@ -95,7 +95,7 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   assert.match(html, /class="parent-preview-day"/);
   assert.match(html, /parent-preview-tag ' \+ \(row\.status === 'confirmed' \? 'ok' : 'warn'\)/);
   assert.match(html, /parent-preview-info/);
-  assert.match(html, /보호자 공개 v3/);
+  assert.match(html, /보호자 공개 v4/);
   assert.doesNotMatch(source, /data-response|참석 가능|일정 재조율/);
 });
 
@@ -112,7 +112,7 @@ test('보호자 미리보기의 모든 서버 문자열은 HTML로 이스케이�
   const output = parentPreviewHtml({
     generatedAt: Date.now(), student: { name: attack, grade: attack },
     summary: { todayLessons: 1, todayCompleted: 0 },
-    capabilities: { today: true, publicLessons: true, guardianRequests: true },
+    capabilities: { today: true, publicLessons: true, guardianRequests: true, announcements: true, bookStatus: true },
     today: {
       dateLabel: attack,
       date: '2026-08-17',
@@ -123,6 +123,8 @@ test('보호자 미리보기의 모든 서버 문자열은 HTML로 이스케이�
     makeups: [{ subject: attack, sourceDate: attack, statusLabel: attack }],
     sessionPacks: [{ subject: attack, validUntil: attack, remaining: 2 }],
     publicLessons: [{ lessonRef: 'lesson-ref', lessonDate: attack, subject: attack, teacherName: attack, publicHomework: attack, publicReadiness: attack }],
+    announcements: [{ title: attack, body: attack, publishDate: attack, expiresDate: attack }],
+    bookStatus: [{ kind: 'distribution', title: attack, stage: 'handed', label: attack, updatedAt: 1 }],
     guardianRequests: [{ requestId: 'req-1', requestType: 'consultation', status: 'open', createdAt: 1 }],
     feedback: [{ feedbackDate: attack, statusLabel: attack, message: attack, teacherName: attack }]
   });

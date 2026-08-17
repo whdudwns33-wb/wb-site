@@ -9,6 +9,10 @@ function isBoardingLockError(error) {
   return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
 }
 
+function isActiveBookOrderConflictError(error) {
+  return /ACTIVE_BOOK_ORDER_CONFLICT/.test(String(error && error.message || error || ''));
+}
+
 function fail(path, message) {
   throw new Error(path + ': ' + message);
 }
@@ -208,6 +212,51 @@ async function activeBookIssueConflicts(env, app, document) {
   return conflicts;
 }
 
+async function activeBookOrderConflicts(env, app, document) {
+  const [result, currentRow] = await Promise.all([
+    env.DB.prepare(
+    'SELECT DISTINCT snapshot.task_id,snapshot.student_id,snapshot.student_identity_hash ' +
+    'FROM book_order_student_snapshots snapshot WHERE snapshot.app=? ' +
+    'AND NOT EXISTS (SELECT 1 FROM book_order_cancellations cancellation ' +
+      'WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id) ' +
+    'AND NOT EXISTS (SELECT 1 FROM book_order_fulfillments fulfillment ' +
+      'WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id ' +
+        'AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id ' +
+        "AND fulfillment.status='academy_registered' AND json_valid(fulfillment.student_ids) " +
+        'AND (SELECT COUNT(*) FROM book_order_student_snapshots expected ' +
+          'WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id ' +
+            'AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id) ' +
+          '=json_array_length(fulfillment.student_ids) ' +
+        'AND NOT EXISTS (SELECT 1 FROM book_order_student_snapshots expected ' +
+          'WHERE expected.app=snapshot.app AND expected.task_id=snapshot.task_id ' +
+            'AND expected.item_index=snapshot.item_index AND expected.book_id=snapshot.book_id ' +
+            'AND NOT EXISTS (SELECT 1 FROM json_each(fulfillment.student_ids) selected ' +
+              'WHERE selected.value=expected.student_id)))'
+    ).bind(app).all(),
+    env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first()
+  ]);
+  const students = new Map(document.roster.students.map(item => [item.id, item]));
+  let currentStudents = new Map();
+  try {
+    const current = currentRow && validateRosterDocument(JSON.parse(currentRow.data));
+    currentStudents = new Map((current && current.roster.students || []).map(item => [item.id, item]));
+  } catch (error) { /* 손상된 현재 명단은 pending identity 변경을 허용하지 않는다 */ }
+  const month = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
+  const conflicts = [];
+  for (const row of result.results || []) {
+    const student = students.get(String(row.student_id));
+    const active = student && student.start <= month && (!student.end || student.end > month);
+    const current = currentStudents.get(String(row.student_id));
+    const unchangedEnrollmentWindow = student && current && student.start === current.start && student.end === current.end;
+    const hash = student ? await studentIdentityHash(student.id, student.name) : '';
+    if ((!active && !unchangedEnrollmentWindow) || hash !== String(row.student_identity_hash || '')) {
+      conflicts.push({ taskId: String(row.task_id), studentId: String(row.student_id),
+        reason: student ? 'identity_changed_or_inactivated' : 'removed' });
+    }
+  }
+  return conflicts;
+}
+
 async function inactiveTeacherIds(env, app, document) {
   const used = new Set();
   document.roster.students.forEach(item => item.teacherIds.forEach(id => used.add(id)));
@@ -304,9 +353,21 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (boardedConflicts.length) return json({ ok: false, code: 'BOARDING_LOCK', error: '탑승 후 미하차 상태인 학생 정보는 지금 변경할 수 없습니다' }, 409, origin);
     const issueConflicts = await activeBookIssueConflicts(env, app, document);
     if (issueConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ISSUE_CONFLICT', error: '출고 진행 중인 교재가 있어 이름 또는 배정 정보를 지금 변경할 수 없습니다' }, 409, origin);
+    const orderConflicts = await activeBookOrderConflicts(env, app, document);
+    if (orderConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
+      error: '미완료 교재 주문이 있어 학생 이름이나 재원 상태를 지금 변경할 수 없습니다' }, 409, origin);
     const updatedAt = Date.now();
-    const changed = await env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
-      .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt).run();
+    let changed;
+    try {
+      changed = await env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+        .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt).run();
+    } catch (error) {
+      if (isActiveBookOrderConflictError(error)) {
+        return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
+          error: '미완료 교재 주문이 있어 학생 이름이나 재원 상태를 지금 변경할 수 없습니다' }, 409, origin);
+      }
+      throw error;
+    }
     if (Number(changed.meta && changed.meta.changes || 0) !== 1) {
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
     }
@@ -339,6 +400,13 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         conflicts: issueConflicts
       }, 409, origin);
     }
+    const orderConflicts = await activeBookOrderConflicts(env, app, document);
+    if (orderConflicts.length) {
+      return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
+        error: '미완료 교재 주문의 학생은 명단에서 삭제·비활성화하거나 이름을 바꿀 수 없습니다',
+        conflicts: orderConflicts
+      }, 409, origin);
+    }
     const updatedAt = Date.now();
     try {
       await env.DB.prepare(
@@ -352,6 +420,10 @@ export async function handleRoster(env, app, body, origin, auth, json) {
           code: 'BOARDING_LOCK',
           error: '탑승 후 미하차 상태인 학생은 명단에서 제거하거나 해당 운행월에 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
         }, 409, origin);
+      }
+      if (isActiveBookOrderConflictError(error)) {
+        return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
+          error: '미완료 교재 주문의 학생은 명단에서 삭제·비활성화하거나 이름을 바꿀 수 없습니다' }, 409, origin);
       }
       throw error;
     }

@@ -17,13 +17,25 @@
  *   POST /book-order-send { app, auth, action:'retry-rejected' } → 확정 거절 배치만 당일 1회 재시도
  */
 
+import {
+  acquireBookOrderDispatchLock,
+  releaseBookOrderDispatchLockSafely,
+  renewBookOrderDispatchLock
+} from './book-order-lock.js';
+import {
+  buildBookOrderMessage,
+  loadOrderIdentityRoster,
+  loadOrderSnapshotRows,
+  MAX_BOOK_ORDER_MESSAGE_BYTES,
+  verifyOrderTaskSnapshot,
+  verifyOrderTaskSnapshotRows
+} from './book-order-create.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 const GLOBAL_DAILY_LIMIT = 30;
-const MAX_MESSAGE_BYTES = 2000;
-const BOOK_ORDER_DISPATCH_LEASE_MS = 10 * 60 * 1000;
 const SAMPLE_RECIPIENT_SLOT = 'TEST-SMS-001';
 const SAMPLE_IDEMPOTENCY_VERSION = 'BOOK_ORDER_SAMPLE_V1';
 const SAMPLE_TASK_PREFIX = 'sample:book-order:';
@@ -121,40 +133,6 @@ export function isRetryCronWindow(ms) {
   return minutes >= 19 * 60 + 45 && minutes <= 20 * 60 + 30;
 }
 
-async function acquireBookOrderDispatchLock(env, app, kind, now) {
-  const owner = String(kind || 'send') + '_' + crypto.randomUUID();
-  const leaseUntil = now + BOOK_ORDER_DISPATCH_LEASE_MS;
-  const result = await env.DB.prepare(
-    'INSERT INTO book_order_dispatch_lock(app,owner,lease_until,updated_at) VALUES(?,?,?,?) ' +
-    'ON CONFLICT(app) DO UPDATE SET owner=excluded.owner, lease_until=excluded.lease_until, ' +
-      'updated_at=excluded.updated_at WHERE book_order_dispatch_lock.lease_until<=?'
-  ).bind(app, owner, leaseUntil, now, now).run();
-  return Number(result && result.meta && result.meta.changes || 0) === 1
-    ? { owner, leaseUntil } : null;
-}
-
-async function releaseBookOrderDispatchLock(env, app, lock) {
-  if (!lock) return;
-  await env.DB.prepare('DELETE FROM book_order_dispatch_lock WHERE app=? AND owner=?')
-    .bind(app, lock.owner).run();
-}
-
-async function renewBookOrderDispatchLock(env, app, lock, now) {
-  const leaseUntil = now + BOOK_ORDER_DISPATCH_LEASE_MS;
-  const result = await env.DB.prepare(
-    'UPDATE book_order_dispatch_lock SET lease_until=?,updated_at=? ' +
-    'WHERE app=? AND owner=? AND lease_until>?'
-  ).bind(leaseUntil, now, app, lock.owner, now).run();
-  if (Number(result && result.meta && result.meta.changes || 0) !== 1) return false;
-  lock.leaseUntil = leaseUntil;
-  return true;
-}
-
-async function releaseBookOrderDispatchLockSafely(env, app, lock) {
-  try { await releaseBookOrderDispatchLock(env, app, lock); }
-  catch (error) { console.error('BOOK_ORDER_DISPATCH_LOCK_RELEASE_FAILED'); }
-}
-
 function canOperateBookOrder(auth) {
   const rootAdmin = auth && auth.scope === 'all' && !auth.role && !auth.id && !auth.device;
   const manager = auth && auth.scope === 'all' && auth.role === 'manager' &&
@@ -173,12 +151,6 @@ function vendorPhone(env, vendorName) {
   return /^01[016789]\d{7,8}$/.test(phone) ? phone : null;
 }
 
-function buildOrderMessage(vendorName, items) {
-  const lines = items.map(item => '· ' + item.title + ': ' + item.qty);
-  return '안녕하세요, WB 웩슬러브레인센터(독해력학원)입니다.\n교재 주문 부탁드립니다.\n\n' +
-    lines.join('\n') + '\n\n입고 예정일 회신 부탁드립니다. 감사합니다.';
-}
-
 async function loadOrderTask(env, app, taskId, auth) {
   const row = await env.DB.prepare('SELECT owner, data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, taskId).first();
@@ -187,6 +159,14 @@ async function loadOrderTask(env, app, taskId, auth) {
   try { data = JSON.parse(row.data || '{}'); } catch (error) { return { error: '지시서 데이터가 올바르지 않습니다', status: 409 }; }
   if (data.deleted) return { error: '삭제된 지시서입니다', status: 409 };
   if (!String(data.title || '').startsWith('[주문] ')) return { error: '교재 주문 지시서가 아닙니다', status: 409 };
+  if (data.orderDelivery !== 'scheduled_batch_v1') {
+    return { error: '자동 문자 주문 대상이 아닙니다', status: 409, code: 'ORDER_DELIVERY_UNSUPPORTED' };
+  }
+  const identity = await verifyOrderTaskSnapshot(env, app, taskId, row.owner, data);
+  if (identity.sealed && !identity.valid) {
+    return { error: '봉인된 주문 내용과 현재 원생 정체성이 일치하지 않습니다', status: 409,
+      code: identity.code || 'ORDER_IDENTITY_MISMATCH' };
+  }
   const vendorName = String(data.orderVendor || '').trim();
   const items = Array.isArray(data.orderItems) ? data.orderItems : [];
   const cleanItems = items
@@ -198,7 +178,7 @@ async function loadOrderTask(env, app, taskId, auth) {
   if (auth.scope === 'own' && row.owner !== auth.id) {
     return { error: '본인에게 배정된 주문만 발송할 수 있습니다', status: 403 };
   }
-  return { vendorName, items: cleanItems, owner: row.owner };
+  return { vendorName, items: cleanItems, owner: row.owner, sealed: identity.sealed };
 }
 
 function safeProviderId(value) {
@@ -276,12 +256,42 @@ async function findBatchSendForTask(env, app, taskId) {
   ).bind(app, taskId).first();
 }
 
-async function saveBatchItems(env, app, sendId, taskIds, now) {
-  if (!taskIds.length) return;
-  await env.DB.batch(taskIds.map(taskId => env.DB.prepare(
-    'INSERT INTO book_order_batch_items(app,task_id,send_id,created_at) VALUES(?,?,?,?) ' +
-    'ON CONFLICT(app,task_id) DO UPDATE SET send_id=excluded.send_id, created_at=excluded.created_at'
-  ).bind(app, taskId, sendId, now)));
+async function unsafeOrphanBatchSend(env, app) {
+  return env.DB.prepare(
+    'SELECT status FROM book_order_sends send WHERE send.app=? ' +
+    "AND (send.task_id LIKE 'batch_%' OR send.task_id LIKE 'retry_%') " +
+    "AND send.status IN ('reserved','dispatching','accepted','unknown') " +
+    'AND NOT EXISTS (SELECT 1 FROM book_order_batch_items item ' +
+      'WHERE item.app=send.app AND item.send_id=send.send_id) LIMIT 1'
+  ).bind(app).first();
+}
+
+async function preDispatchReservedBatchSend(env, app) {
+  return env.DB.prepare(
+    "SELECT 1 AS found FROM book_order_sends send WHERE send.app=? AND send.status='reserved' " +
+    'AND send.dispatch_started_at IS NULL AND EXISTS (' +
+      'SELECT 1 FROM book_order_batch_items item WHERE item.app=send.app AND item.send_id=send.send_id) LIMIT 1'
+  ).bind(app).first();
+}
+
+function taskBoundaryChunks(vendorName, entries) {
+  const chunks = [];
+  let current = { taskIds: [], items: [] };
+  for (const entry of entries) {
+    const singleBytes = new TextEncoder().encode(buildBookOrderMessage(vendorName, entry.items)).byteLength;
+    if (singleBytes > MAX_BOOK_ORDER_MESSAGE_BYTES) return null;
+    const combined = [...current.items, ...entry.items];
+    if (current.taskIds.length &&
+        new TextEncoder().encode(buildBookOrderMessage(vendorName, combined)).byteLength >
+          MAX_BOOK_ORDER_MESSAGE_BYTES) {
+      chunks.push(current);
+      current = { taskIds: [], items: [] };
+    }
+    current.taskIds.push(entry.taskId);
+    current.items.push(...entry.items);
+  }
+  if (current.taskIds.length) chunks.push(current);
+  return chunks;
 }
 
 async function updateLedger(env, app, sendId, status, provider, safeErrorCode, now) {
@@ -312,8 +322,8 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
     }, 409, origin);
   }
 
-  const messageText = (sample ? '[테스트 발송 · 실제 주문 아님]\n' : '') + buildOrderMessage(vendorName, items);
-  if (new TextEncoder().encode(messageText).byteLength > MAX_MESSAGE_BYTES) {
+  const messageText = (sample ? '[테스트 발송 · 실제 주문 아님]\n' : '') + buildBookOrderMessage(vendorName, items);
+  if (new TextEncoder().encode(messageText).byteLength > MAX_BOOK_ORDER_MESSAGE_BYTES) {
     return json({ ok: false, error: '주문 목록이 너무 많아 문자 한 통에 안 들어갑니다 — 나눠서 주문해 주세요' }, 413, origin);
   }
   const messageHash = await sha256Hex(messageText);
@@ -323,7 +333,7 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
   const sendId = (sample ? 'boss_' : 'bos_') + idempotencyKey.slice(0, 48);
   const now = Date.now();
 
-  const inserted = await env.DB.prepare(
+  const insertSend = env.DB.prepare(
     'INSERT OR IGNORE INTO book_order_sends ' +
     '(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) ' +
     "SELECT ?,?,?,?,?,?,?,'reserved',?,? " +
@@ -332,18 +342,46 @@ async function dispatchOrderMessage(env, app, taskId, vendorName, items, batchTa
   ).bind(
     app, sendId, idempotencyKey, taskId, vendorName, items.length, messageHash, now, now,
     sample ? 1 : 0, app, now - 24 * 60 * 60 * 1000, SAMPLE_TASK_PREFIX + '%'
-  ).run();
+  );
+  let inserted;
+  try {
+    if (batchTaskIds.length) {
+      const mappingTaskIds = [...new Set(batchTaskIds.map(String))].sort();
+      const mappings = env.DB.prepare(
+        'INSERT INTO book_order_batch_items(app,task_id,send_id,created_at) ' +
+        'SELECT ?,CAST(value AS TEXT),?,? FROM json_each(?) WHERE EXISTS (' +
+          'SELECT 1 FROM book_order_sends WHERE app=? AND send_id=?) ' +
+        (mode === 'retry'
+          ? 'ON CONFLICT(app,task_id) DO UPDATE SET send_id=excluded.send_id,created_at=excluded.created_at'
+          : '')
+      ).bind(app, sendId, now, JSON.stringify(mappingTaskIds), app, sendId);
+      [inserted] = await env.DB.batch([insertSend, mappings]);
+    } else {
+      inserted = await insertSend.run();
+    }
+  } catch (error) {
+    return json({ ok: false, code: 'ORDER_MAPPING_CONFLICT',
+      error: '주문 발송 원장 연결을 확인해 주세요' }, 409, origin);
+  }
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
     const existing = await findByIdempotency(env, app, idempotencyKey);
     if (existing) {
-      await saveBatchItems(env, app, existing.send_id, batchTaskIds, now);
+      if (batchTaskIds.length) {
+        const mapped = await env.DB.prepare(
+          'SELECT task_id FROM book_order_batch_items WHERE app=? AND send_id=? ORDER BY task_id'
+        ).bind(app, existing.send_id).all();
+        const actual = (mapped.results || []).map(row => String(row.task_id)).sort();
+        const expected = [...batchTaskIds].map(String).sort();
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          return json({ ok: false, code: 'ORDER_MAPPING_CONFLICT',
+            error: '주문 발송 원장 연결을 확인해 주세요' }, 409, origin);
+        }
+      }
       return json(publicResult(existing, true), responseStatusFor(existing.status), origin);
     }
     return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다', vendorName }, 429, origin);
   }
-
-  await saveBatchItems(env, app, sendId, batchTaskIds, now);
 
   const dispatchAt = Date.now();
   const dispatch = await env.DB.prepare(
@@ -437,6 +475,14 @@ async function retryRejectedBookOrders(env, app, origin, json) {
 }
 
 async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) {
+  if (await unsafeOrphanBatchSend(env, app)) {
+    return json({ ok: false, code: 'BOOK_ORDER_LEDGER_PARTIAL',
+      error: '발송 중인 주문 원장을 먼저 확인해 주세요' }, 409, origin);
+  }
+  if (await preDispatchReservedBatchSend(env, app)) {
+    return json({ ok: false, code: 'BOOK_ORDER_SEND_RESERVED',
+      error: '발송 전 예약 상태의 주문 원장을 먼저 확인해 주세요' }, 409, origin);
+  }
   const retryDate = kstDate(now).replace(/-/g, '');
   const retryPrefix = 'retry_' + retryDate + '_';
 
@@ -461,7 +507,7 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
   }));
 
   const selected = await env.DB.prepare(
-    "SELECT t.id,t.data FROM book_order_batch_items i " +
+    "SELECT DISTINCT t.id,t.owner,t.data FROM book_order_batch_items i " +
     "JOIN book_order_sends failed ON failed.app=i.app AND failed.send_id=i.send_id " +
     "JOIN tasks t ON t.app=i.app AND t.id=i.task_id " +
     "WHERE i.app=? AND failed.status='rejected' " +
@@ -472,23 +518,31 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
     'ORDER BY t.updated_at,t.id LIMIT 2000'
   ).bind(app, retryPrefix + '%').all();
 
+  const snapshotRows = await loadOrderSnapshotRows(env, app);
+  const identityRoster = snapshotRows.length ? (await loadOrderIdentityRoster(env, app) || false) : null;
   const groups = new Map();
+  let identityFailures = 0;
   const cutoff = now;
   for (const row of selected.results || []) {
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
+    const identity = await verifyOrderTaskSnapshotRows(row.id, row.owner, task, snapshotRows, identityRoster, now);
+    if (identity.sealed && !identity.valid) { identityFailures++; continue; }
     const vendorName = String(task.orderVendor || '').trim();
     const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
       .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
       .filter(item => item.title);
     if (!vendorName || !items.length) continue;
-    if (!groups.has(vendorName)) groups.set(vendorName, { taskIds: [], items: [] });
-    groups.get(vendorName).taskIds.push(row.id);
-    groups.get(vendorName).items.push(...items);
+    if (!groups.has(vendorName)) groups.set(vendorName, []);
+    groups.get(vendorName).push({ taskId: row.id, items });
   }
 
   if (!groups.size) {
+    if (identityFailures) {
+      return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH',
+        error: '봉인된 주문의 학생 또는 교재 정체성을 확인해 주세요', action: 'retry-rejected', results: [] }, 409, origin);
+    }
     if (alreadyResults.length) {
       return json({
         ok: false,
@@ -505,28 +559,35 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
   }
 
   const previews = [];
-  for (const [vendorName, group] of groups) {
+  for (const [vendorName, entries] of groups) {
     if (!vendorPhone(env, vendorName)) {
       return json({ ok: false, code: 'VENDOR_PHONE_MISSING', error: '거래처 번호 등록을 먼저 확인해 주세요' }, 409, origin);
     }
-    const messageBytes = new TextEncoder().encode(buildOrderMessage(vendorName, group.items)).byteLength;
-    if (messageBytes > MAX_MESSAGE_BYTES) {
+    const chunks = taskBoundaryChunks(vendorName, entries);
+    if (!chunks) {
       return json({ ok: false, code: 'MESSAGE_TOO_LARGE', error: '주문 목록이 너무 많아 문자 한 통에 안 들어갑니다' }, 413, origin);
     }
-    previews.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length, messageBytes });
+    for (const chunk of chunks) previews.push({ vendorName, chunk,
+      taskCount: chunk.taskIds.length, itemCount: chunk.items.length,
+      messageBytes: new TextEncoder().encode(buildBookOrderMessage(vendorName, chunk.items)).byteLength });
   }
 
   const recent = await env.DB.prepare(
     "SELECT COUNT(*) AS count FROM book_order_sends WHERE app=? AND created_at>? AND task_id NOT LIKE ?"
   ).bind(app, now - 24 * 60 * 60 * 1000, SAMPLE_TASK_PREFIX + '%').first();
-  if ((Number(recent && recent.count) || 0) + groups.size > GLOBAL_DAILY_LIMIT) {
+  const available = Math.max(0, GLOBAL_DAILY_LIMIT - (Number(recent && recent.count) || 0));
+  if (!available) {
     return json({ ok: false, code: 'DAILY_SEND_LIMIT', error: '오늘 발송 한도에 도달했습니다' }, 429, origin);
   }
+  const runnable = previews.slice(0, available);
+  const deferred = previews.slice(available);
 
   const results = alreadyResults.slice();
-  for (let i = 0; i < previews.length; i++) {
-    const preview = previews[i];
-    const group = groups.get(preview.vendorName);
+  if (identityFailures) results.push({ taskCount: identityFailures, itemCount: 0,
+    idempotent: false, status: 'ORDER_IDENTITY_MISMATCH' });
+  for (let i = 0; i < runnable.length; i++) {
+    const preview = runnable[i];
+    const group = preview.chunk;
     if (!await renewBookOrderDispatchLock(env, app, lock, Date.now())) {
       results.push({ ...preview, idempotent: false, status: 'BOOK_ORDER_SEND_BUSY' });
       break;
@@ -535,21 +596,28 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
     const key = await sha256Hex([REJECTED_RETRY_VERSION, retryDate, preview.vendorName, ...taskIds].join('\u001f'));
     const retryBatchId = 'retry_' + retryDate + '_' + key.slice(0, 40);
     const response = await dispatchOrderMessage(
-      env, app, retryBatchId, preview.vendorName, group.items, taskIds, origin, json
+      env, app, retryBatchId, preview.vendorName, group.items, taskIds, origin, json, 'retry'
     );
     const result = await response.json();
-    results.push({ ...preview, idempotent: !!result.idempotent,
+    const { chunk, ...safePreview } = preview;
+    results.push({ ...safePreview, idempotent: !!result.idempotent,
       status: result && result.send && result.send.status || result.code || 'failed' });
   }
+  if (deferred.length) results.push({ taskCount: deferred.reduce((sum, item) => sum + item.taskCount, 0),
+    itemCount: deferred.reduce((sum, item) => sum + item.itemCount, 0), idempotent: false,
+    status: 'DAILY_SEND_LIMIT' });
 
   const rejected = results.some(result => result.status === 'rejected');
   const uncertain = results.some(result => result.status !== 'accepted' && result.status !== 'rejected');
   return json({ ok: !rejected && !uncertain,
-    ...(alreadyResults.length ? {
+    ...(deferred.length ? {
+      code: 'DAILY_SEND_LIMIT',
+      error: '오늘 발송 한도까지 처리했습니다. 남은 거절 주문은 다음날 재시도해 주세요'
+    } : alreadyResults.length ? {
       code: 'ALREADY_RETRIED_TODAY',
       error: '오늘 이미 재시도했지만 거절된 주문은 다음날 다시 시도해 주세요'
     } : {}), action: 'retry-rejected', results },
-    rejected ? 502 : uncertain ? 202 : 200, origin);
+    deferred.length ? 429 : rejected ? 502 : uncertain ? 202 : 200, origin);
 }
 
 export async function handleBookOrderSend(env, app, body, origin, auth, json) {
@@ -583,9 +651,13 @@ export async function handleBookOrderSend(env, app, body, origin, auth, json) {
   }
   try {
     const loaded = await loadOrderTask(env, app, taskId, auth);
-    if (loaded.error) return json({ ok: false, error: loaded.error }, loaded.status, origin);
+    if (loaded.error) return json({ ok: false, ...(loaded.code ? { code: loaded.code } : {}), error: loaded.error }, loaded.status, origin);
     const batchSend = await findBatchSendForTask(env, app, taskId);
     if (batchSend) return json(publicResult(batchSend, true), responseStatusFor(batchSend.status), origin);
+    if (loaded.sealed) {
+      return json({ ok: false, code: 'ORDER_SCHEDULED_ONLY',
+        error: '봉인된 주문은 20시 일괄 발송으로만 처리합니다' }, 409, origin);
+    }
     return await dispatchOrderMessage(env, app, taskId, loaded.vendorName, loaded.items, [], origin, json);
   } finally {
     await releaseBookOrderDispatchLockSafely(env, app, lock);
@@ -612,49 +684,81 @@ export async function handleScheduledBookOrders(env, scheduledTime) {
 }
 
 async function handleScheduledBookOrdersLocked(env, cutoff, lock) {
-  const [taskResult, batchResult, directResult] = await Promise.all([
-    env.DB.prepare("SELECT id,data FROM tasks WHERE app='task' ORDER BY updated_at LIMIT 2000").all(),
+  if (await unsafeOrphanBatchSend(env, 'task')) {
+    return { ok: false, code: 'BOOK_ORDER_LEDGER_PARTIAL', cutoff,
+      results: [{ status: 'BOOK_ORDER_LEDGER_PARTIAL', taskCount: 0, itemCount: 0 }] };
+  }
+  if (await preDispatchReservedBatchSend(env, 'task')) {
+    return { ok: false, code: 'BOOK_ORDER_SEND_RESERVED', cutoff,
+      results: [{ status: 'BOOK_ORDER_SEND_RESERVED', taskCount: 0, itemCount: 0 }] };
+  }
+  const [taskResult, batchResult, directResult, snapshotResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT t.id,t.owner,t.data FROM tasks t WHERE t.app='task' " +
+      "AND COALESCE(json_extract(t.data,'$.deleted'),0)=0 " +
+      "AND json_extract(t.data,'$.orderDelivery')='scheduled_batch_v1' " +
+      "AND CAST(json_extract(t.data,'$.createdAt') AS INTEGER)<=? " +
+      "AND NOT EXISTS (SELECT 1 FROM book_order_batch_items mapped " +
+        "WHERE mapped.app=t.app AND mapped.task_id=t.id) " +
+      "AND NOT EXISTS (SELECT 1 FROM book_order_sends direct " +
+        "WHERE direct.app=t.app AND direct.task_id=t.id) " +
+      "ORDER BY t.updated_at LIMIT 2000"
+    ).bind(cutoff).all(),
     env.DB.prepare(
       "SELECT i.task_id FROM book_order_batch_items i JOIN book_order_sends s " +
-      "ON s.app=i.app AND s.send_id=i.send_id WHERE i.app='task' AND s.status<>'rejected'"
+      "ON s.app=i.app AND s.send_id=i.send_id WHERE i.app='task'"
     ).all(),
     env.DB.prepare(
-      "SELECT task_id FROM book_order_sends WHERE app='task' AND status IN ('reserved','dispatching','accepted','unknown')"
-    ).all()
+      "SELECT task_id FROM book_order_sends WHERE app='task'"
+    ).all(),
+    env.DB.prepare("SELECT * FROM book_order_student_snapshots WHERE app='task' ORDER BY task_id,item_index,student_id").all()
   ]);
+  const snapshotRows = snapshotResult.results || [];
+  const identityRoster = snapshotRows.length ? (await loadOrderIdentityRoster(env, 'task') || false) : null;
   const done = new Set([...(batchResult.results || []), ...(directResult.results || [])].map(row => row.task_id));
   const groups = new Map();
+  let identityFailures = 0;
 
   for (const row of taskResult.results || []) {
     if (done.has(row.id)) continue;
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
+    const identity = await verifyOrderTaskSnapshotRows(row.id, row.owner, task, snapshotRows, identityRoster, cutoff);
+    if (identity.sealed && !identity.valid) { identityFailures++; continue; }
     const vendorName = String(task.orderVendor || '').trim();
     const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
       .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
       .filter(item => item.title);
     if (!vendorName || !items.length) continue;
-    if (!groups.has(vendorName)) groups.set(vendorName, { taskIds: [], items: [] });
-    groups.get(vendorName).taskIds.push(row.id);
-    groups.get(vendorName).items.push(...items);
+    if (!groups.has(vendorName)) groups.set(vendorName, []);
+    groups.get(vendorName).push({ taskId: row.id, items });
   }
 
-  const results = [];
-  for (const [vendorName, group] of groups) {
-    if (!await renewBookOrderDispatchLock(env, 'task', lock, Date.now())) {
-      results.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length,
-        status: 'BOOK_ORDER_SEND_BUSY' });
-      break;
+  const results = identityFailures ? [{ vendorName: '', taskCount: identityFailures, itemCount: 0,
+    status: 'ORDER_IDENTITY_MISMATCH' }] : [];
+  for (const [vendorName, entries] of groups) {
+    const chunks = taskBoundaryChunks(vendorName, entries);
+    if (!chunks) {
+      results.push({ vendorName, taskCount: 1, itemCount: 0, status: 'MESSAGE_TOO_LARGE' });
+      continue;
     }
-    const batchKey = await sha256Hex([cutoff, vendorName, ...group.taskIds.sort()].join('\u001f'));
-    const batchId = 'batch_' + batchKey.slice(0, 48);
-    const response = await dispatchOrderMessage(
-      env, 'task', batchId, vendorName, group.items, group.taskIds, '*', scheduledJson
-    );
-    const result = await response.json();
-    results.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length,
-      status: result && result.send && result.send.status || result.code || 'failed' });
+    for (const group of chunks) {
+      if (!await renewBookOrderDispatchLock(env, 'task', lock, Date.now())) {
+        results.push({ vendorName, taskCount: group.taskIds.length, itemCount: group.items.length,
+          status: 'BOOK_ORDER_SEND_BUSY' });
+        break;
+      }
+      const taskIds = group.taskIds.slice().sort();
+      const batchKey = await sha256Hex([cutoff, vendorName, ...taskIds].join('\u001f'));
+      const batchId = 'batch_' + batchKey.slice(0, 48);
+      const response = await dispatchOrderMessage(
+        env, 'task', batchId, vendorName, group.items, taskIds, '*', scheduledJson, 'scheduled'
+      );
+      const result = await response.json();
+      results.push({ vendorName, taskCount: taskIds.length, itemCount: group.items.length,
+        status: result && result.send && result.send.status || result.code || 'failed' });
+    }
   }
   const busy = results.some(result => result.status === 'BOOK_ORDER_SEND_BUSY');
   return { ok: results.every(result => result.status === 'accepted'),

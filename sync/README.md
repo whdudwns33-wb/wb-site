@@ -43,6 +43,9 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/032_acaflow_student
 npx wrangler d1 execute wb-sync --remote --file=./migrations/033_consult_admin_accounts.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/034_parent_portal_scope.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/035_parent_portal_phase2.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/036_guardian_announcements.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_identity_snapshots.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -69,9 +72,18 @@ npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
 npx wrangler secret put NAVER_MAPS_SECRET   # 네이버 지도 API Key (Geocoding + Directions 5)
 
-# 4) 배포
+# 4) 보호자·직원 Worker 배포 후, 별도 origin의 학생 Worker 배포
 npx wrangler deploy
+npx wrangler deploy --config wrangler.student.toml
 ```
+
+학생 앱을 포함한 기존 운영 DB 배포는 반드시 `036 → 037 → 038` 마이그레이션을 모두 적용한 뒤
+각 마이그레이션의 신규 객체와 `student_visible` 열을 확인하고, `wrangler.toml`의 보호자·직원 Worker,
+`wrangler.student.toml`의 학생 Worker, 마지막으로 task Pages 순서로 진행한다. 학생 Worker를 생략하면
+관리자 화면에서 초대 링크를 만들 수 있어도 학생 화면은 열리지 않는다. 두 설정의
+`WB_STUDENT_PORTAL_BASE_URL`은 query/hash 없는 동일한 학생 Worker HTTPS 루트여야 한다.
+기존 운영 DB의 사전 확인, 중복 적용 방지, 휴대폰·태블릿 연결과 해제 확인은
+[`PORTAL_RELEASE_RUNBOOK.md`](./PORTAL_RELEASE_RUNBOOK.md)를 그대로 따른다.
 
 consult 원장 계정 로그인을 추가하는 배포는 `033_consult_admin_accounts.sql`을 먼저
 운영 D1에 적용한 뒤 Worker, Pages 순서로 배포한다. 기존 `task` 인증과 데이터는
@@ -120,11 +132,23 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 
 보강·회차제·보호자 웹앱 배포는 `025_makeup.sql` → `026_session_packs.sql` →
 `027_parent_portal.sql` → `028_guardian_ops_notifications.sql` → `034_parent_portal_scope.sql` →
-`035_parent_portal_phase2.sql` 순서로 먼저 적용하고 Worker를
+`035_parent_portal_phase2.sql` → `036_guardian_announcements.sql` →
+`037_book_order_identity_snapshots.sql` 순서로 먼저 적용하고 Worker를
 배포한 뒤 Pages를 배포한다. 월제 수업은
 회차권 행을 만들지 않으며, 실제 횟수제 학생·수업만 원장이 명시적으로 등록한다. 보호자 웹앱 동의는
 기존 수업 피드백 알림톡 동의와 별도이고, 꺼지면 해당 학생의 초대코드와 세션이 모두 해지된다.
 보호자 앱에는 전화번호·학생 특징·상담 메모·다른 학생 정보가 반환되지 않는다.
+특정 학생 공지는 지정 당시 stable 학생 ID와 이름의 비가역 identity snapshot을 함께 저장하며,
+보호자가 읽을 때 현재 활성 원생 명단과 다시 일치하는 경우에만 공개한다.
+
+보호자 교재 주문 현황을 추가하는 배포는 반드시
+`037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새
+`/book-order create`만 현재 재원생 ID·이름 해시와 교재·학생 집합을 불변
+원장에 봉인한다. 기존 주문은 오연결 위험 때문에 자동 이관하지 않고 보호자에게
+표시하지 않는다. `BOOK_VENDOR_PHONES`의 유효한 문자 주문처만 봉인할 수 있으며,
+쿠팡 등 온라인 직접 주문은 기존 `manual_online_v1` 경로를 유지하고 보호자 주문
+현황에는 표시하지 않는다. 보호자에는 서버 교재 DB 정본이 없는 현재 단계에서
+임의 교재명을 보내지 않고 `주문 교재`로만 표시한다.
 
 보강·회차 운영 알림톡은 기존 수업 피드백 알림톡 동의를 재사용하지 않는다. 원장이 학생별
 `makeup`·`session` 동의를 따로 저장하고, 위 4개 템플릿이 Solapi에서 `APPROVED`이며 변수 계약이
@@ -224,9 +248,48 @@ curl https://wb-sync.<계정>.workers.dev/health
 → { "ok": true, "updatedAt": 178..., "roster": { ... }, "bookStudents": [ ... ] }
 ```
 
+### `/book-order` — 보호자 공개 가능한 봉인 주문
+
+새 문자 주문은 generic `/sync`로 지시서를 먼저 만들지 않고 이 API를 사용한다.
+`taskId`는 `ord_`로 시작하는 전용 ID이며 클라이언트가 한 번 생성해 재시도할 때 같은 값을 쓴다. 서버는 재원
+원생·담당 범위·문자 주문처를 확인한 뒤 canonical task와 identity snapshot을 한
+D1 batch로 저장한다. 같은 학생·교재의 미완료 주문은 DB 고유 제약으로 동시에 두 개
+생성되지 않으며, 취소나 학생 전달 완료 후에만 다시 주문할 수 있다.
+
+```jsonc
+{
+  "app": "task", "auth": { /* admin | person */ }, "action": "create",
+  "taskId": "ord_01examplestable", "vendorName": "출판사",
+  "items": [{ "bookId": "BK01", "title": "교재명", "studentIds": ["student-001"] }]
+}
+→ { "ok": true, "idempotent": false, "task": { "orderIdentityVersion": 1 /* ... */ } }
+```
+
+같은 `taskId`·같은 payload 재시도는 `idempotent:true` 정본 task를 돌려준다.
+다른 payload의 ID 재사용은 `ORDER_ID_CONFLICT`, 미완료 중복은
+`ORDER_ALREADY_ACTIVE`, 서버 주문처 미설정은 `ORDER_VENDOR_NOT_CONFIGURED`,
+문자 2,000바이트를 넘는 단일 주문은 `ORDER_MESSAGE_TOO_LARGE`로 차단한다.
+검증 뒤 저장 사이 원생 명단이 바뀌면 부분 원장을 남기지 않고
+`ROSTER_REVISION_CONFLICT`로 재시도를 요청한다. 봉인 학생은 취소되거나
+아카플로우 등록 완료가 확인될 때까지 이름 변경·삭제·현재월 비활성화를 막는다.
+
+봉인된 주문 취소도 generic LWW가 아니라 공용 발송 lease를 획득하는 전용 action을
+사용한다. `reserved`, `dispatching`, `accepted`, `unknown` 발송이 있거나 배치
+발송 중이면 `ORDER_CANCEL_SEND_ACTIVE`로 차단한다.
+
+```jsonc
+{
+  "app": "task", "auth": { /* admin | person */ }, "action": "cancel",
+  "taskId": "ord_01examplestable", "expectedUpdatedAt": 178...
+}
+→ { "ok": true, "idempotent": false, "task": { "deleted": true, "orderCancelledAt": 178... } }
+```
+
 ### `/book-order-send` — 교재 주문 문자
 
-실제 주문은 앱의 주문 `taskId`만 보내며, 수신번호와 문구는 서버가 결정한다.
+실제 주문은 수신번호와 문구를 서버가 결정한다. 새 `orderIdentityVersion:1`
+주문은 개별 `taskId` 발송을 전원 `ORDER_SCHEDULED_ONLY`로 차단하고 20시
+일괄 발송으로만 처리한다. 아래 `taskId` 형식은 배포 전 기존 legacy 주문 호환용이다.
 
 ```jsonc
 { "app":"task", "auth":{...}, "taskId":"order-task-id" }
@@ -246,7 +309,10 @@ curl https://wb-sync.<계정>.workers.dev/health
 거래처·번호·문구·주문 ID를 지정할 수 없으며, 서버가 현재 장부의 `rejected` 매핑만 다시 읽어
 거래처별 한 통으로 묶는다. `accepted`, `unknown`, `reserved`, `dispatching`은 제외하고,
 KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 요청도 실제 발송은 한 번뿐이다. 재시도,
-20시 예약 발송, 개별 즉시 발송은 동일한 D1 lease를 사용해 동시에 Solapi를 호출하지 않는다.
+20시 예약 발송, legacy 개별 발송은 동일한 D1 lease를 사용해 동시에 Solapi를
+호출하지 않는다. 20시 배치가 거절되어도 다음 cron은 자동 재발송하지 않고 이 action만
+재시도한다. 거래처 문자가 2,000바이트를 넘으면 주문 task 경계로 나누며,
+하루 30통 한도 밖의 거절 주문은 기존 `rejected` 매핑을 유지해 다음날 이어서 처리한다.
 
 ```jsonc
 { "app":"task", "auth":{...}, "action":"retry-rejected" }
@@ -371,7 +437,8 @@ confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며,
 
 원장·관리 담당이 stable 학생 ID별 웹앱 동의를 별도로 저장하고 1회용 초대코드를 발급한다. 공개 범위
 v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·회차·피드백을 포함한다. v3는 내부 메모와
-분리된 공개 숙제·준비물과 정형 보호자 요청을 추가한다. 기존 v1/v2 동의는 자동 승계하지 않고 관리자
+분리된 공개 숙제·준비물과 정형 보호자 요청을 추가하고, v4는 학원 공지와 교재 준비·인계 상태를 추가한다.
+기존 v1~v3 동의는 자동 승계하지 않고 관리자
 화면에서 다시 확인하되, 이미 연결된 세션은 기존 동의 범위 안에서 계속 읽을 수 있다. 코드는
 교환 즉시 폐기되며 서버에는 해시만 저장된다. 보호자 세션은 한 학생만 볼 수 있고, 확정 시간표·보강
 제안/확정·횟수 잔여·이미 접수된 피드백의 안전한 요약만 반환한다.
@@ -379,7 +446,7 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 ```jsonc
 // 관리자
 { "app":"task", "auth":{...}, "action":"access_set",
-  "studentId":"student-1", "enabled":true, "scopeVersion":3, "expectedUpdatedAt":0 }
+  "studentId":"student-1", "enabled":true, "scopeVersion":4, "expectedUpdatedAt":0 }
 { "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
 
 // 담당 선생님: 서버 KST 오늘의 확정·현재 담당 수업만 공개한다.
@@ -392,6 +459,13 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 { "app":"task", "auth":{...}, "action":"request_list", "status":"open" }
 { "app":"task", "auth":{...}, "action":"request_resolve", "requestId":"grq_...",
   "resolution":"resolved", "expectedRevision":1 }
+
+// 원장·관리 담당: 공지 초안 저장 뒤 revision CAS로 게시한다.
+{ "app":"task", "auth":{...}, "action":"announcement_save", "announcementId":"notice-...",
+  "expectedRevision":0, "title":"운영 안내", "body":"준비 안내", "publishDate":"2026-08-17",
+  "expiresDate":"2026-08-24", "targetType":"students", "studentIds":["student-1"] }
+{ "app":"task", "auth":{...}, "action":"announcement_publish",
+  "announcementId":"notice-...", "expectedRevision":1 }
 
 // Worker origin의 보호자 웹앱: /#code=<1회용 코드>를 즉시 지운 뒤 교환한다.
 // exchange 응답은 HttpOnly·Secure·SameSite=Strict 쿠키를 설정한다.
@@ -410,6 +484,36 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 보호자 요청 종류는 `consultation`, `schedule_check`, `info_correction`뿐이며 학생 ID는 세션에서만
 결정한다. 자유문구·전화번호·주소·첨부는 받지 않는다. 같은 종류의 open 요청은 하나로 합치고 학생별
 24시간 5건으로 제한한다. 공개 숙제·준비물은 현재 assignment의 최근 14일 최신 1건만 보인다.
+교재 상태는 현재 원생 명단의 학생 identity snapshot과 일치하는 배정·인계 원장만 공개한다. 과거 주문
+task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 추정해 표시하지 않는다. 공지는 게시 당시
+대상 학생 identity를 저장하고 게시 직전과 보호자 조회 때 현재 재원 명단을 다시 확인한다.
+
+### `/student-portal` — 학생 전용 읽기 앱
+
+학생 앱은 보호자 앱과 다른 Worker origin과 `__Host-wb_student_session` 쿠키를 사용한다. 관리자 화면에서
+현재 보호자 연락처를 먼저 저장한 뒤, 보호자에게 공개 범위를 안내하고 별도 동의를 확인해야 access를
+활성화할 수 있다. access·초대코드·세션에는 현재 stable 학생 identity와 보호자 identity, scope v1,
+동의 시각을 함께 봉인한다. 학생 이름이나 보호자 연락처가 바뀌면 기존 코드와 세션을 즉시 폐기한다.
+
+```jsonc
+// 직원·보호자 Worker의 원장·관리 담당 인증 경로
+{ "app":"task", "auth":{...}, "action":"access_set", "studentId":"student-1",
+  "enabled":true, "consentConfirmed":true, "expectedUpdatedAt":0 }
+{ "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
+{ "app":"task", "auth":{...}, "action":"preview", "studentId":"student-1" }
+
+// 별도 학생 Worker의 exact same-origin 경로
+{ "app":"task", "action":"exchange", "code":"..." }
+{ "app":"task", "action":"view" }
+{ "app":"task", "action":"logout" }
+```
+
+학생 화면에는 오늘 수업·출결·5단계 진행, 오늘 차량의 방향·예정 시각·안전 상태, 주간 시간표,
+최근 14일 중 선생님이 `학생 앱에도 공개`를 명시한 숙제·준비물 기록, identity가 검증된 배정 교재 상태만 표시한다.
+보호자 연락처·주소·정류장·기사 정보·내부 메모·보호자 요청·보강·회차·공지·수업 피드백·교재 주문
+상태는 반환하지 않는다. 기존 보호자 공개 숙제는 `student_visible=0`으로 유지되어 자동 승계되지 않는다.
+학생 앱 정적 파일은 `student/`, 전용 Worker 설정은 `sync/wrangler.student.toml`에 있다. 한 학생 기기에
+다른 초대코드를 연결하려면 먼저 로그아웃해야 하며, 유효 세션이 있으면 코드를 소비하지 않고 409로 막는다.
 
 ### `/guardian-ops-send` — 보강·회차 운영 알림톡
 

@@ -177,7 +177,7 @@ test('background book overlays defer render while the search input is active', (
 
 test('series display never changes publisher batch or outbound order data', () => {
   const batch = block('function batchOrderModal(', 'function cancelOrderModal(');
-  const order = block('function createOrderTask(', '/** 일괄 주문용 선택 상태');
+  const order = block('async function submitBookOrder(', 'function cancelOrderModal(');
   const view = block('function viewBooks()', '/* ── 원생 현황');
   const toggle = block("case 'seriestoggle':", "case 'baopen':");
 
@@ -185,7 +185,8 @@ test('series display never changes publisher batch or outbound order data', () =
   assert.match(batch, /const outsideSearch = booksOutsideSearch\(books, vendorLabel, bookSearchQuery\)/);
   assert.match(batch, /검색 밖 ' \+ outsideSearch \+ '종 포함/);
   assert.match(batch, /batchDraft = books\.map/);
-  assert.match(order, /orderVendor: vendorName \|\| '', orderItems: items, orderDelivery: 'scheduled_batch_v1'/);
+  assert.match(order, /vendorName: batchVendorName/);
+  assert.match(order, /bookId: item\.bookId, title: item\.title, studentIds: item\.studentIds/);
   assert.doesNotMatch(order, /series/i);
   assert.match(view, /const selectedHere = sec\.books\.filter\(b => batchSelection\.has\(b\.id\)\)/);
   assert.match(view, /data-book-batch-outside/);

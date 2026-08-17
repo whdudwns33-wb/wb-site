@@ -28,6 +28,7 @@
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 고정된 원장 수신처 카카오 알림톡
  *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
+ *   POST /book-order { app, auth, action:'create'|'cancel', ... } → 학생 정체성이 봉인된 주문 생성·취소
  *   POST /book-add-request { app, auth, ... }     → 직원, 새 교재를 교재 목록에 추가해 달라고 신청
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
  *   POST /book-edit-request { app, auth, ... }     → 직원, 기존 교재 정보를 고쳐 달라고 신청
@@ -38,6 +39,7 @@
  *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
+ *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
@@ -52,6 +54,7 @@ import { handleLessonAssignmentRequest, handleLessonAssignmentReview } from './l
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
 import { handleBookOrderSend } from './book-order-send.js';
+import { handleBookOrderCreate } from './book-order-create.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
 import { handleBookEditRequest, handleBookEditReview } from './book-edit-request.js';
 import { handleGuardianContact } from './guardian-contact.js';
@@ -61,6 +64,7 @@ import { handleBookIssue } from './book-issue.js';
 import { handleTransport } from './transport.js';
 import { handleOnboardingPatch } from './onboarding.js';
 import { handleParentPortal } from './parent-portal.js';
+import { handleStudentPortal } from './student-portal.js';
 import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
@@ -268,6 +272,68 @@ function sameTaskJson(stored, incoming) {
   } catch (error) {
     return false;
   }
+}
+
+async function inspectSealedOrderChanges(env, app, entries) {
+  const taskEntries = entries.filter(entry => entry.table === 'tasks');
+  if (!taskEntries.length) return { skip: new Set() };
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  const sealed = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT DISTINCT snapshot.task_id,task.data FROM book_order_student_snapshots snapshot ' +
+      'LEFT JOIN tasks task ON task.app=snapshot.app AND task.id=snapshot.task_id ' +
+      'WHERE snapshot.app=? AND snapshot.task_id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) sealed.set(String(row.task_id), row.data);
+  }
+  const skip = new Set();
+  for (const entry of taskEntries) {
+    const stored = sealed.get(String(entry.change.id || ''));
+    if (stored === undefined) continue;
+    if (stored && sameTaskJson(stored, entry.change.data)) skip.add(entry);
+    else return { error: '봉인된 교재 주문은 전용 주문 화면에서만 변경할 수 있습니다' };
+  }
+  return { skip };
+}
+
+function sameLegacyOrderCancellation(stored, incoming) {
+  let current;
+  try { current = typeof stored === 'string' ? JSON.parse(stored) : stored; }
+  catch (error) { return false; }
+  if (!current || current.deleted || !incoming || incoming.deleted !== true) return false;
+  const withoutCancellation = value => {
+    const clean = { ...value };
+    for (const key of ['deleted', 'updatedAt', 'lastEditBy', 'orderCancelledAt']) delete clean[key];
+    return canonicalJson(clean);
+  };
+  return JSON.stringify(withoutCancellation(current)) === JSON.stringify(withoutCancellation(incoming));
+}
+
+async function hasUnsafeGenericScheduledOrder(env, app, entries) {
+  const scheduled = entries.filter(entry => entry.table === 'tasks' && entry.change &&
+    entry.change.data && entry.change.data.orderDelivery === 'scheduled_batch_v1');
+  const ids = [...new Set(scheduled.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  if (!ids.length) return false;
+  const existing = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) existing.set(String(row.id), row);
+  }
+  return scheduled.some(entry => {
+    const row = existing.get(String(entry.change.id || ''));
+    let current;
+    try { current = row && JSON.parse(row.data || '{}'); } catch (error) { current = null; }
+    return !row || !current || current.orderDelivery !== 'scheduled_batch_v1' ||
+      String(row.owner || '') !== String(entry.change.owner || '') ||
+      (!sameTaskJson(row.data, entry.change.data) && !sameLegacyOrderCancellation(row.data, entry.change.data));
+  });
 }
 
 async function inspectOwnTaskChanges(env, app, owner, entries) {
@@ -541,6 +607,22 @@ async function handleSync(env, app, body, origin) {
     const checkError = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
     if (checkError) return json({ ok: false, error: checkError }, 403, origin);
   }
+  let sealedInspection;
+  try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted); }
+  catch (error) {
+    if (/no such table.*book_order_student_snapshots/i.test(String(error && error.message || error))) {
+      return json({ ok: false, code: 'ORDER_LEDGER_NOT_READY', error: '교재 주문 원장을 준비하고 있습니다' }, 503, origin);
+    }
+    throw error;
+  }
+  if (sealedInspection.error) {
+    return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: sealedInspection.error }, 409, origin);
+  }
+  for (const entry of sealedInspection.skip) skipped.add(entry);
+  if (app === 'task' && await hasUnsafeGenericScheduledOrder(env, app, accepted)) {
+    return json({ ok: false, code: 'BOOK_ORDER_CREATE_REQUIRED',
+      error: '자동 발송 교재 주문은 전용 주문 화면에서 등록해 주세요' }, 409, origin);
+  }
   const writeEntries = foldStaffEntries(accepted.filter(entry => !skipped.has(entry)));
   const deactivations = await effectiveStaffDeactivations(env, app, writeEntries);
   const boardedDrivers = await boardedDriverConflicts(env, app, deactivations);
@@ -558,6 +640,9 @@ async function handleSync(env, app, body, origin) {
     try { await env.DB.batch(stmts); }
     catch (error) {
       if (isBoardingLockError(error)) return boardingLockResponse(origin);
+      if (/BOOK_ORDER_SEALED|BOOK_ORDER_SEND_ACTIVE/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: '봉인된 교재 주문은 전용 주문 화면에서만 변경할 수 있습니다' }, 409, origin);
+      }
       throw error;
     }
   }
@@ -1552,7 +1637,8 @@ export default {
       if (url.pathname === '/parent-portal') {
         const authenticatedActions = new Set([
           'invite', 'access_list', 'access_set', 'preview',
-          'publication_list', 'publication_set', 'request_list', 'request_resolve'
+          'publication_list', 'publication_set', 'request_list', 'request_resolve',
+          'announcement_list', 'announcement_save', 'announcement_publish', 'announcement_end'
         ]);
         const action = String(body.action || '');
         if (!authenticatedActions.has(action) && !parentSameOrigin) {
@@ -1560,6 +1646,16 @@ export default {
         }
         const auth = authenticatedActions.has(action) ? await resolveAuth(env, app, body.auth) : null;
         return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
+      }
+      if (url.pathname === '/student-portal') {
+        const authenticatedActions = new Set(['access_list', 'access_set', 'invite', 'preview']);
+        const action = String(body.action || '');
+        if (!authenticatedActions.has(action)) {
+          return json({ ok: false, error: '학생 연결 작업은 학생 앱 전용 주소에서만 사용할 수 있습니다' }, 403, okOrigin);
+        }
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentPortal(env, app, body, okOrigin, auth, json, request);
       }
       if (url.pathname === '/makeup') {
         const auth = await resolveAuth(env, app, body.auth);
@@ -1595,6 +1691,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleBookOrderSend(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/book-order') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookOrderCreate(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-add-request') {
         const auth = await resolveAuth(env, app, body.auth);
