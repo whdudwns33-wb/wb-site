@@ -219,6 +219,22 @@
   .ing-hero-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
   .ing-hero .btn-primary { background: var(--white); color: var(--navy); }
   .ing-hero .btn-ghost { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.1); color: var(--white); }
+  .ing-shift-intro { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border-radius: 12px; background: linear-gradient(135deg, #F3EEFF, #F8FAFC); }
+  .ing-shift-intro b, .ing-shift-intro span { display: block; }
+  .ing-shift-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ing-shift-choice .chip { min-height: 54px; border-radius: 11px; flex-direction: column; line-height: 1.35; }
+  .ing-shift-choice small { font-size: 10px; font-weight: 500; opacity: .78; }
+  .ing-shift-days { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: end; }
+  .ing-shift-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .ing-shift-quick .chip { min-width: 0; padding-left: 4px; padding-right: 4px; }
+  .ing-shift-preview { margin-top: 14px; padding: 13px; border: 1px solid #C7DDF6; border-radius: 12px; background: #F5FAFF; }
+  .ing-shift-preview.warn { border-color: #F5B8AF; background: #FFF9F8; color: #B93827; }
+  .ing-shift-route { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .ing-shift-route > div { min-width: 0; padding: 9px; border-radius: 9px; background: var(--white); text-align: center; }
+  .ing-shift-route span { display: block; color: var(--mid-gray); font-size: 10px; font-weight: 700; }
+  .ing-shift-route b { display: block; overflow-wrap: anywhere; color: var(--navy); font-size: 13px; }
+  .ing-shift-arrow { color: var(--deep-blue); font-size: 18px; font-weight: 900; }
+  .ing-shift-result { margin-top: 9px; text-align: center; font-size: 12px; }
   .ing-calendar-card { padding-bottom: 14px; }
   .ing-cal-tabs { display: none; gap: 6px; overflow-x: auto; padding: 2px 0 10px; }
   .ing-week-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; min-width: 0; }
@@ -2160,21 +2176,106 @@ function ingCatchup(sid) {
 }
 /** 기준일 이후 미완료를 통째로 ±N일 이동 — 시험기간용 */
 function ingShift(sid, from, n) {
+  const info = ingShiftInfo(sid, from, n);
+  if (!info.count || info.beforeToday) return 0;
   const buckets = {};
   let cnt = 0;
-  ingPlanDates(sid).forEach(d => {
-    if (d < from) return;
-    const items = ingPlan(sid, d);
-    const move = items.filter(x => !x.done);
-    if (!move.length) return;
-    ingSavePlan(sid, d, items.filter(x => x.done));
-    const nd = addDays(d, n);
+  ingShiftRows(sid, from).forEach(row => {
+    ingSavePlan(sid, row.date, row.items.filter(x => x.done));
+    const nd = addDays(row.date, n);
     (buckets[nd] = buckets[nd] || []).push.apply(buckets[nd],
-      move.map(x => Object.assign({}, x, { s: '', e: '', auto: '' })));
-    cnt += move.length;
+      row.move.map(x => Object.assign({}, x)));
+    cnt += row.move.length;
   });
   Object.keys(buckets).forEach(d => ingSavePlan(sid, d, ingPlan(sid, d).concat(buckets[d])));
   return cnt;
+}
+
+function ingShiftRows(sid, from) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || from < today()) return [];
+  return ingPlanDates(sid).filter(date => date >= from).map(date => {
+    const items = ingPlan(sid, date);
+    return { date: date, items: items, move: items.filter(item => !item.done) };
+  }).filter(row => row.move.length);
+}
+
+function ingShiftInfo(sid, from, n) {
+  const validShift = Number.isInteger(n) && n !== 0 && Math.abs(n) <= 365;
+  const rows = validShift ? ingShiftRows(sid, from) : [];
+  const first = rows.length ? rows[0].date : '';
+  const last = rows.length ? rows[rows.length - 1].date : '';
+  const nextFirst = first ? addDays(first, n) : '';
+  const nextLast = last ? addDays(last, n) : '';
+  return {
+    count: rows.reduce((sum, row) => sum + row.move.length, 0),
+    first: first, last: last, nextFirst: nextFirst, nextLast: nextLast,
+    beforeToday: !!nextFirst && nextFirst < today()
+  };
+}
+
+function ingShiftDraft(sid) {
+  const from = ($('#ingShiftFrom') && $('#ingShiftFrom').value) || '';
+  const days = Number($('#ingShiftDays') && $('#ingShiftDays').value);
+  const picked = document.querySelector('#ingShiftDirection .chip.on');
+  const direction = picked && Number(picked.dataset.n) === -1 ? -1 : 1;
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(from) && from >= today() &&
+    Number.isInteger(days) && days >= 1 && days <= 365;
+  return { from: from, days: days, n: direction * days, valid: valid,
+    info: valid ? ingShiftInfo(sid, from, direction * days) : null };
+}
+
+function ingShiftRender(sid) {
+  const box = $('#ingShiftPreview'), apply = $('#ingShiftApply');
+  if (!box || !apply) return;
+  const draft = ingShiftDraft(sid);
+  document.querySelectorAll('.ing-shift-quick .chip').forEach(chip => {
+    const on = draft.valid && Number(chip.dataset.days) === draft.days;
+    chip.classList.toggle('on', on); chip.setAttribute('aria-pressed', String(on));
+  });
+  if (!draft.valid) {
+    box.className = 'ing-shift-preview warn';
+    box.textContent = '기준일과 이동 일수를 확인해 주세요. 이동 일수는 1~365일입니다.';
+    apply.disabled = true; apply.textContent = '날짜를 확인해 주세요'; return;
+  }
+  const info = draft.info;
+  if (!info.count) {
+    box.className = 'ing-shift-preview';
+    box.textContent = '선택한 기준일 이후에 이동할 미완료 강의가 없습니다.';
+    apply.disabled = true; apply.textContent = '이동할 일정이 없습니다'; return;
+  }
+  const moveText = draft.n > 0 ? draft.days + '일 뒤로' : draft.days + '일 앞으로';
+  box.className = 'ing-shift-preview' + (info.beforeToday ? ' warn' : '');
+  box.innerHTML = '<div class="ing-shift-route"><div><span>현재 일정</span><b>' + shortDate(info.first) +
+    (info.first === info.last ? '' : ' ~ ' + shortDate(info.last)) + '</b></div>' +
+    '<div class="ing-shift-arrow" aria-hidden="true">→</div><div><span>이동 후</span><b>' + shortDate(info.nextFirst) +
+    (info.nextFirst === info.nextLast ? '' : ' ~ ' + shortDate(info.nextLast)) + '</b></div></div>' +
+    '<div class="ing-shift-result">미완료 <b>' + info.count + '강</b>을 <b>' + moveText + '</b> 이동합니다.</div>' +
+    (info.beforeToday ? '<div class="hint" style="color:var(--coral)">이동 후 첫 일정이 오늘 이전입니다. 이동 일수를 줄여주세요.</div>' : '');
+  apply.disabled = info.beforeToday;
+  apply.textContent = info.beforeToday ? '오늘 이전으로는 이동할 수 없습니다' : info.count + '강 · ' + moveText + ' 이동';
+}
+
+function ingShiftModal(sid) {
+  const info = ingShiftInfo(sid, today(), 7);
+  if (!info.count) return toast('오늘 이후 이동할 미완료 강의가 없습니다');
+  modal('↔ 전체 일정 날짜 이동',
+    '<div class="ing-shift-intro mb14"><div><b>오늘 이후 미완료 일정</b><span class="small muted">완료한 강의는 그대로 둡니다.</span></div>' +
+      '<span class="pill">' + info.count + '강</span></div>' +
+    '<div class="field"><label class="fl" for="ingShiftFrom">어느 날짜부터 옮길까요?</label>' +
+      '<input class="in" id="ingShiftFrom" type="date" min="' + today() + '" value="' + today() + '"></div>' +
+    '<div class="fl mb8">이동 방향</div><div class="ing-shift-choice mb14" id="ingShiftDirection">' +
+      '<button type="button" class="chip on" data-act="ingshiftdir" data-n="1" aria-pressed="true"><b>→ 뒤로 미루기</b><small>일정을 늦출 때</small></button>' +
+      '<button type="button" class="chip" data-act="ingshiftdir" data-n="-1" aria-pressed="false"><b>← 앞으로 당기기</b><small>일정을 앞당길 때</small></button></div>' +
+    '<div class="ing-shift-days"><div class="field"><label class="fl" for="ingShiftDays">이동 일수</label>' +
+      '<input class="in" id="ingShiftDays" type="number" min="1" max="365" inputmode="numeric" value="7"></div>' +
+      '<div class="field"><div class="fl">빠른 선택</div><div class="ing-shift-quick">' +
+        [1, 3, 7, 14].map(day => '<button type="button" class="chip' + (day === 7 ? ' on' : '') + '" data-act="ingshiftquick" data-days="' + day +
+          '" aria-pressed="' + (day === 7) + '">' + day + '일</button>').join('') +
+      '</div></div></div>' +
+    '<div id="ingShiftPreview" data-sid="' + esc(sid) + '" aria-live="polite"></div>' +
+    '<div class="hint mt14">기준일 전 일정과 완료한 강의는 이동하지 않습니다. 기존 시간도 함께 옮기며, 새 날짜의 고정 일정과 겹치면 주간 시간표에 경고로 표시됩니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" id="ingShiftApply" data-act="ingshiftapply" data-sid="' + esc(sid) + '" disabled>미리보기 계산 중</button>');
+  ingShiftRender(sid);
 }
 
 /** 오늘 화면용 — 밀린 것과 오늘 것 */
@@ -4584,12 +4685,36 @@ document.addEventListener('click', ev => {
     case 'ingshift': {
       if (!(session.isAdmin || isManager())) break;
       const me = currentStaff(); if (!me) break;
-      const v = prompt('오늘 이후의 미완료 인강을 며칠 밀까요?\n(앞당기려면 -3 처럼 음수를 넣으세요)', '7');
-      if (v === null) break;
-      const n = Number(v);
-      if (!n) return toast('숫자를 넣어주세요');
-      const cnt = ingShift(me.id, today(), n);
-      render(); toast(cnt + '강을 ' + (n > 0 ? n + '일 뒤로' : (-n) + '일 앞으로') + ' 옮겼습니다');
+      ingShiftModal(me.id);
+      break;
+    }
+    case 'ingshiftdir': {
+      if (!(session.isAdmin || isManager())) break;
+      document.querySelectorAll('#ingShiftDirection .chip').forEach(chip => {
+        const on = chip === el;
+        chip.classList.toggle('on', on); chip.setAttribute('aria-pressed', String(on));
+      });
+      const preview = $('#ingShiftPreview'); if (preview) ingShiftRender(preview.dataset.sid);
+      break;
+    }
+    case 'ingshiftquick': {
+      if (!(session.isAdmin || isManager())) break;
+      const days = Number(el.dataset.days), input = $('#ingShiftDays');
+      if (input && Number.isInteger(days)) input.value = days;
+      const preview = $('#ingShiftPreview'); if (preview) ingShiftRender(preview.dataset.sid);
+      break;
+    }
+    case 'ingshiftapply': {
+      if (!(session.isAdmin || isManager())) break;
+      const me = currentStaff();
+      if (!me || me.id !== el.dataset.sid) return toast('이 학생의 일정을 이동할 수 없습니다');
+      const draft = ingShiftDraft(me.id);
+      if (!draft.valid) return toast('기준일과 이동 일수를 확인해 주세요');
+      if (!draft.info.count) return toast('이동할 미완료 강의가 없습니다');
+      if (draft.info.beforeToday) return toast('오늘 이전으로는 이동할 수 없습니다');
+      const cnt = ingShift(me.id, draft.from, draft.n);
+      closeModal(); render();
+      toast(cnt + '강을 ' + (draft.n > 0 ? draft.days + '일 뒤로' : draft.days + '일 앞으로') + ' 이동했습니다');
       break;
     }
     /* 순공시간 타이머 */
@@ -5206,6 +5331,10 @@ document.addEventListener('click', ev => {
 let inputTimer = null;
 document.addEventListener('input', ev => {
   if (ev.target.id === 'ingText') { ingPasteSeq++; ingShowParsePreview(); return; }
+  if (ev.target.id === 'ingShiftFrom' || ev.target.id === 'ingShiftDays') {
+    const preview = $('#ingShiftPreview'); if (preview) ingShiftRender(preview.dataset.sid);
+    return;
+  }
   const noteEl = ev.target.closest('[data-act="note"]');
   if (noteEl) {
     clearTimeout(inputTimer);
