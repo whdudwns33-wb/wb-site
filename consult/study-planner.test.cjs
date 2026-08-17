@@ -10,16 +10,17 @@ const section = (start, end) => {
   return from >= 0 && to > from ? html.slice(from, to) : '';
 };
 
-test('study subjects use the requested fixed pastel palette including gray other', () => {
+test('study subjects use the requested pastel palette with separate social and science', () => {
   const css = section('<style>', '</style>');
   const subjects = section('const STUDY_SUBJECTS', 'const STUDY_SUBJECT_KEYS');
 
   assert.match(css, /--subject-korean:\s+#7FB3F4/);
   assert.match(css, /--subject-english:\s+#F49ABC/);
   assert.match(css, /--subject-math:\s+#82CFA2/);
-  assert.match(css, /--subject-explore:\s+#E7C85C/);
+  assert.match(css, /--subject-social:\s+#E7C85C/);
+  assert.match(css, /--subject-science:\s+#B9A7F5/);
   assert.match(css, /--subject-other:\s+#A8AFB8/);
-  [['korean', '국어'], ['english', '영어'], ['math', '수학'], ['explore', '탐구'], ['other', '기타']]
+  [['korean', '국어'], ['english', '영어'], ['math', '수학'], ['social', '사회'], ['science', '과학'], ['other', '기타']]
     .forEach(([key, label]) => {
       assert.match(subjects, new RegExp('\\b' + key + ":\\s+\\{ label: '" + label + "'"));
     });
@@ -27,13 +28,46 @@ test('study subjects use the requested fixed pastel palette including gray other
 
 test('today places distributed study before the planner and quick add', () => {
   const today = section('function viewToday()', 'function studyOffersCard(');
+  const totalAt = today.indexOf('studyTotalHeroCard(me, cursor)');
   const offerAt = today.indexOf('studyOffersCard(me, cursor, offers)');
   const plannerAt = today.indexOf('studyPlannerCard(me, cursor, list, carry, editable)');
   const quickAt = today.indexOf('id="qSubject"');
 
-  assert.ok(offerAt >= 0, 'distributed study card must render');
+  assert.ok(totalAt >= 0, 'large total study time must render');
+  assert.ok(offerAt > totalAt, 'distributed study must follow total study time');
   assert.ok(plannerAt > offerAt, 'planner must follow distributed study');
   assert.ok(quickAt > plannerAt, 'quick add must follow the planner');
+});
+
+test('today restores a large live total study time between student summary and distributed study', () => {
+  const today = section('function viewToday()', 'function studyOffersCard(');
+  const hero = section('function studyTotalHeroCard(', 'function studyOffersCard(');
+  const ticker = section('let lastTimelineMinute', '/* ── 새 버전 감지 ──');
+  const css = section('<style>', '</style>');
+
+  assert.ok(today.indexOf('studyTotalHeroCard(me, cursor)') < today.indexOf('studyOffersCard(me, cursor, offers)'));
+  assert.match(hero, /TOTAL PURE STUDY TIME/);
+  assert.match(hero, /data-st-total/);
+  assert.match(hero, /fmtHMS\(total\)/);
+  assert.match(css, /\.study-total-hero \.study-time-total \{ font-size: clamp\(38px, 10vw, 54px\)/);
+  assert.match(ticker, /querySelectorAll\('\[data-st-total\]\[data-st-date=/);
+  assert.match(ticker, /totalEls\.forEach/);
+});
+
+test('legacy explore remains compatible while tasks split into social and science', () => {
+  const subjects = section('function studySubjectKey(', 'function studySubjectOptions(');
+  const timer = section('const ST_DEFAULT', 'const stGoalMin');
+  const stats = section('function monthSubjectStats(', 'function monthReport(');
+  const handler = section("case 'sttask':", "case 'stsubjadd':");
+
+  assert.match(subjects, /raw === 'explore' \|\| raw === '탐구'/);
+  assert.match(subjects, /return 'social'/);
+  assert.match(subjects, /과학\|과탐\|물리\|화학\|생명\|생물\|지구과학/);
+  assert.match(subjects, /\? 'science' : 'social'/);
+  assert.match(timer, /\['국어', '영어', '수학', '사회', '과학', '기타'\]/);
+  assert.match(timer, /split\.push\('사회', '과학'\)/);
+  assert.match(stats, /taskStudySubjectKey\(task\)/);
+  assert.match(handler, /taskStudySubject\(t\)\.label/);
 });
 
 test('director study stays outside the checklist until the student claims it', () => {
