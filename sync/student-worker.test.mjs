@@ -16,7 +16,7 @@ test('학생 Worker는 GET 정적 자산만 전용 ASSETS로 넘긴다', async (
   assert.equal(seen, '/');
 });
 
-test('학생 세션 API는 exact same-origin과 세 public action만 허용한다', async () => {
+test('학생 세션 API는 exact same-origin과 네 public action만 허용한다', async () => {
   const configured = { WB_STUDENT_PORTAL_BASE_URL: 'https://student.example/' };
   const foreign = await worker.fetch(request('/student-portal', {
     method: 'POST', headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' },
@@ -42,6 +42,13 @@ test('학생 세션 API는 exact same-origin과 세 public action만 허용한�
     body: JSON.stringify({ app: 'task', action: 'view' })
   }), configured);
   assert.equal(alias.status, 403);
+
+  const selfCheck = await worker.fetch(request('/student-portal', {
+    method: 'POST', headers: { Origin: 'https://student.example', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app: 'task', action: 'self_check_set', activityId: 'publication-a',
+      publicationRevision: 1, response: 'completed', expectedRevision: 0 })
+  }), configured);
+  assert.equal(selfCheck.status, 503);
 });
 
 test('학생 Worker는 누락·null·유사 Origin을 거부하고 기본 Worker는 public 학생 action을 거부한다', async () => {
@@ -63,6 +70,13 @@ test('학생 Worker는 누락·null·유사 Origin을 거부하고 기본 Worker
   }), { ALLOW_ORIGIN: 'https://student.example' });
   assert.equal(mainResponse.status, 403);
   assert.match(await mainResponse.text(), /학생 앱 전용 주소/);
+  const mainSelfCheck = await mainWorker.fetch(request('/student-portal', {
+    method: 'POST',
+    headers: { Origin: 'https://student.example', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app: 'task', action: 'self_check_set', activityId: 'publication-a',
+      publicationRevision: 1, response: 'completed', expectedRevision: 0 })
+  }), { ALLOW_ORIGIN: 'https://student.example' });
+  assert.equal(mainSelfCheck.status, 403);
 });
 
 test('학생 Worker의 오류는 내부 예외와 업무 API를 노출하지 않는다', async () => {

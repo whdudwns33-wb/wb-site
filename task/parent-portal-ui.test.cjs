@@ -6,6 +6,15 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const parentHtml = fs.readFileSync(path.join(__dirname, '..', 'parent', 'index.html'), 'utf8');
 
+function assertBalancedLayout(markup) {
+  const stack = [];
+  for (const match of markup.matchAll(/<(\/)?(article|div|section)\b[^>]*>/g)) {
+    if (!match[1]) stack.push(match[2]);
+    else assert.equal(stack.pop(), match[2], `닫힘 ${match[2]} 태그는 가장 안쪽 열림 태그와 같아야 한다`);
+  }
+  assert.deepEqual(stack, []);
+}
+
 test('보호자 초대 링크는 Worker origin의 code-only fragment를 쓴다', () => {
   const start = html.indexOf('async function issueParentPortalInvite');
   const end = html.indexOf('async function saveGuardianPortalAccess', start);
@@ -97,6 +106,22 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   assert.match(html, /parent-preview-info/);
   assert.match(html, /보호자 공개 v4/);
   assert.doesNotMatch(source, /data-response|참석 가능|일정 재조율/);
+});
+
+test('보호자 공개 row는 같은 article 태그로 닫히고 후속 section을 내부에 삼키지 않는다', () => {
+  const start = html.indexOf('let parentPreviewRequest = 0');
+  const end = html.indexOf('async function saveGuardianPortalAccess', start);
+  const { parentPreviewHtml } = new Function('esc', html.slice(start, end) + '; return { parentPreviewHtml };')(String);
+  const output = parentPreviewHtml({
+    capabilities: { publicLessons: true, bookStatus: true }, today: {}, summary: {}, student: {},
+    publicLessons: [{ lessonDate: '2026-08-18', subject: '영어', publicHomework: '숙제' }],
+    bookStatus: []
+  });
+  assertBalancedLayout(output);
+  const rowStart = output.indexOf('<article class="parent-preview-row">');
+  const rowEnd = output.indexOf('</article>', rowStart);
+  const nextSection = output.indexOf('<section', rowStart);
+  assert.ok(rowStart >= 0 && rowEnd > rowStart && nextSection > rowEnd, '공개 row가 닫힌 뒤 다음 section이 시작해야 한다');
 });
 
 test('보호자 미리보기의 모든 서버 문자열은 HTML로 이스케이프한다', () => {

@@ -114,3 +114,41 @@ WITH expected(table_name, column_name) AS (VALUES
 SELECT 'migration_039_columns' AS check_name, COUNT(found.column_name) AS found, COUNT(*) AS expected
 FROM expected
 LEFT JOIN found ON found.table_name=expected.table_name AND found.column_name=expected.column_name;
+
+-- 040은 v2 봉인에 자기 체크 동의 비트를 합성하고, current CAS + append-only event를 추가한다.
+WITH expected(type, name) AS (VALUES
+  ('table','student_lesson_self_checks'),
+  ('table','student_lesson_self_check_events'),
+  ('index','idx_student_lesson_self_checks_student'),
+  ('index','idx_student_lesson_self_check_events_rate'),
+  ('trigger','trg_student_portal_self_check_access_revoke'),
+  ('trigger','trg_student_portal_self_check_code_scope_insert'),
+  ('trigger','trg_student_portal_self_check_session_scope_insert'),
+  ('trigger','trg_student_portal_self_check_disable_scope'),
+  ('trigger','trg_student_portal_self_check_scope_mismatch'),
+  ('trigger','trg_student_lesson_self_checks_rate_insert'),
+  ('trigger','trg_student_lesson_self_checks_update_guard'),
+  ('trigger','trg_student_lesson_self_checks_rate_update'),
+  ('trigger','trg_student_lesson_self_checks_no_delete'),
+  ('trigger','trg_student_lesson_self_check_events_no_update'),
+  ('trigger','trg_student_lesson_self_check_events_no_delete')
+)
+SELECT 'migration_040_objects' AS check_name, COUNT(schema.name) AS found, COUNT(*) AS expected
+FROM expected
+LEFT JOIN sqlite_master schema ON schema.type=expected.type AND schema.name=expected.name;
+
+WITH expected(table_name, column_name) AS (VALUES
+  ('student_portal_access','self_check_enabled'),
+  ('student_portal_access','self_check_confirmed_at'),
+  ('student_portal_codes','self_check_enabled'),
+  ('student_portal_sessions','self_check_enabled')
+), found(table_name, column_name) AS (
+  SELECT 'student_portal_access', name FROM pragma_table_info('student_portal_access')
+  UNION ALL
+  SELECT 'student_portal_codes', name FROM pragma_table_info('student_portal_codes')
+  UNION ALL
+  SELECT 'student_portal_sessions', name FROM pragma_table_info('student_portal_sessions')
+)
+SELECT 'migration_040_columns' AS check_name, COUNT(found.column_name) AS found, COUNT(*) AS expected
+FROM expected
+LEFT JOIN found ON found.table_name=expected.table_name AND found.column_name=expected.column_name;

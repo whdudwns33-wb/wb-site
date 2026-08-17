@@ -47,6 +47,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/036_guardian_announ
 npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_identity_snapshots.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/040_student_lesson_self_checks.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -78,7 +79,7 @@ npx wrangler deploy
 npx wrangler deploy --config wrangler.student.toml
 ```
 
-학생 앱을 포함한 기존 운영 DB 배포는 반드시 `036 → 037 → 038` 마이그레이션을 모두 적용한 뒤
+학생 앱을 포함한 기존 운영 DB 배포는 반드시 `036 → 037 → 038 → 039 → 040` 마이그레이션을 모두 적용한 뒤
 각 마이그레이션의 신규 객체와 `student_visible` 열을 확인하고, `wrangler.toml`의 보호자·직원 Worker,
 `wrangler.student.toml`의 학생 Worker, 마지막으로 task Pages 순서로 진행한다. 학생 Worker를 생략하면
 관리자 화면에서 초대 링크를 만들 수 있어도 학생 화면은 열리지 않는다. 두 설정의
@@ -489,26 +490,33 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 추정해 표시하지 않는다. 공지는 게시 당시
 대상 학생 identity를 저장하고 게시 직전과 보호자 조회 때 현재 재원 명단을 다시 확인한다.
 
-### `/student-portal` — 학생 전용 읽기 앱
+### `/student-portal` — 학생 전용 최소권한 앱
 
 학생 앱은 보호자 앱과 다른 Worker origin과 `__Host-wb_student_session` 쿠키를 사용한다. 관리자 화면에서
 현재 보호자 연락처를 먼저 저장한 뒤, 보호자에게 공개 범위를 안내하고 별도 동의를 확인해야 access를
 활성화할 수 있다. access·초대코드·세션에는 현재 stable 학생 identity와 보호자 identity, 동의 scope,
 동의 시각을 함께 봉인한다. 학생 이름이나 보호자 연락처가 바뀌면 기존 코드와 세션을 즉시 폐기한다.
-외부학습 이동을 포함한 현재 공개 범위는 scope v2다. 기존 v1 세션은 종전 읽기 정보만 유지하며
-`capabilities.externalLearning=false`를 받는다. v2는 보호자에게 범위를 다시 안내·확인한 뒤에만 저장하고,
-저장 즉시 v1 코드·세션을 폐기해 새 초대 링크로 연결한다.
+외부학습 이동은 scope v2, 오늘 할 일 자기 체크는 scope v3다. 기존 v1 세션은 종전 읽기 정보만,
+v2 세션은 외부학습 링크까지 유지하며 자기 체크 필드와 쓰기 capability는 받지 않는다. v3는 보호자에게
+학생 선택과 담당 선생님 확인 범위를 다시 안내·확인한 뒤에만 저장하고, 기존 코드·세션을 폐기해 새
+초대 링크로 연결한다. 기존 `effective_scope_version IN (1,2)` 열은 재작성하지 않고 v3 자기 체크 동의
+비트와 확인 시각을 별도로 봉인한다.
 
 ```jsonc
 // 직원·보호자 Worker의 원장·관리 담당 인증 경로
 { "app":"task", "auth":{...}, "action":"access_set", "studentId":"student-1",
-  "enabled":true, "consentConfirmed":true, "scopeVersion":2, "expectedUpdatedAt":0 }
+  "enabled":true, "consentConfirmed":true, "scopeVersion":3, "expectedUpdatedAt":0 }
 { "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
 { "app":"task", "auth":{...}, "action":"preview", "studentId":"student-1" }
+{ "app":"task", "auth":{...}, "action":"self_check_list", "lessonDate":"YYYY-MM-DD" }
+{ "app":"task", "auth":{...}, "action":"self_check_confirm",
+  "activityId":"glp_...", "expectedRevision":1 }
 
 // 별도 학생 Worker의 exact same-origin 경로
 { "app":"task", "action":"exchange", "code":"..." }
 { "app":"task", "action":"view" }
+{ "app":"task", "action":"self_check_set", "activityId":"glp_...", "publicationRevision":1,
+  "response":"completed", "expectedRevision":0 }
 { "app":"task", "action":"logout" }
 ```
 
@@ -519,6 +527,14 @@ task에는 불변 학생 identity snapshot이 없으므로 보호자 화면에 �
 외부 서비스 URL도 API DTO에 넣지 않고, scope v2 세션과 관리자 미리보기에만
 `capabilities.externalLearning=true`를 반환한다. 정적 학생 화면은 이 boolean이 true일 때만 사전에 검토한
 공식 학습 링크를 표시한다.
+scope v3의 자기 체크는 KST 오늘의 `published + student_visible=1` 공개 수업에만 붙는다. 학생 ID는
+세션에서만 결정하고 입력값은 `completed` 또는 `help_needed`뿐이다. 학생 선택은 업무지시서의 출결이나
+5단계 체크를 바꾸지 않으며, 담당 선생님의 개인 인증으로 확인하기 전에는 최종 완료가 아니다. 관리
+담당도 자신의 수업만 확인할 수 있고 원장 비밀키는 담당자 흉내 내기에 사용할 수 없다. 학생 변경은
+24시간 30회로 제한하며 current 행은 CAS, 이력은 UPDATE/DELETE 불가 event로 보존한다. 공개 내용이
+수정·철회되면 이전 선택은 표시·확인할 수 없고 현재 공개 revision에 다시 선택해야 한다.
+같은 공개 revision에서 담당자가 확인한 `completed`는 최종 상태라 학생이 되돌릴 수 없다. 확인된
+`help_needed`는 학생이 `completed`로 바꿀 수 있지만 다시 담당 확인 대기가 된다.
 학생 앱 정적 파일은 `student/`, 전용 Worker 설정은 `sync/wrangler.student.toml`에 있다. 한 학생 기기에
 다른 초대코드를 연결하려면 먼저 로그아웃해야 하며, 유효 세션이 있으면 코드를 소비하지 않고 409로 막는다.
 

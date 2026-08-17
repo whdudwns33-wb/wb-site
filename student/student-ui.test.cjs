@@ -38,7 +38,7 @@ test('기존 학생 세션에서 새 초대를 열면 코드를 메모리에만 
   assert.doesNotMatch(script, /localStorage|sessionStorage/);
 });
 
-test('학생에게 필요한 읽기 전용 영역과 외부 학습 도구만 보여준다', () => {
+test('학생에게 필요한 공개 영역과 제한된 자기 체크·외부 학습 도구만 보여준다', () => {
   for (const label of ['오늘 수업', '5단계', '숙제·준비물', '오늘 차량', '교재 준비·수령', '주간 시간표', '바로 학습하기']) {
     assert.match(html, new RegExp(label));
   }
@@ -90,7 +90,108 @@ test('공개 숙제·준비물은 HTML을 실행하지 않고 빈 공개 기록�
   assert.doesNotMatch(output, /빈 수업/);
   assert.match(html, /최근 공개 숙제·준비물/);
   assert.match(html, /최근 14일 공개 기록이 없습니다/);
-  assert.match(html, /<span>공개 기록<\/span>/);
+  assert.match(html, /공개 기록/);
+});
+
+test('오늘 할 일은 v3 capability와 서버 오늘 날짜가 모두 맞을 때만 두 선택지를 표시한다', () => {
+  const start = script.indexOf('function normalizeSelfCheckRow');
+  const end = script.indexOf('function publicLessonRows', start);
+  const api = new Function('rows', 'esc', 'teacher', script.slice(start, end) +
+    ';return {normalizeSelfCheckRow,selfCheckRows};')(
+    value => Array.isArray(value) ? value : [],
+    value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]), String
+  );
+  const today = '2026-08-18';
+  const row = {
+    activityId: 'activity_12345678', publicationRevision: 2, lessonDate: today,
+    subject: '<수학>', teacherName: '<선생>', publicHomework: '<img src=x onerror=1>', publicReadiness: '연필 & 지우개',
+    selfCheck: { response: 'help_needed', reviewStatus: 'confirmed', revision: 3, updatedAt: 1, confirmedAt: 2, finalCompleted: false }
+  };
+  assert.equal(api.normalizeSelfCheckRow(row, today, false), null);
+  assert.equal(api.normalizeSelfCheckRow(row, '2026-08-17', true), null);
+  assert.equal(api.normalizeSelfCheckRow({ ...row, activityId: 'bad!' }, today, true), null);
+  assert.equal(api.normalizeSelfCheckRow({ ...row, selfCheck: { ...row.selfCheck, revision: 0 } }, today, true), null);
+  assert.equal(api.normalizeSelfCheckRow({ ...row, selfCheck: { ...row.selfCheck, finalCompleted: true } }, today, true), null);
+  const item = api.normalizeSelfCheckRow(row, today, true);
+  const output = api.selfCheckRows([item]).join('');
+  assert.match(output, /오늘 할 일 상태 선택/);
+  assert.match(output, /data-self-check-choice="completed"/);
+  assert.match(output, /data-self-check-choice="help_needed"/);
+  assert.match(output, /도움 필요 · 선생님 확인함/);
+  assert.match(output, /도움 필요를 확인받은 뒤에는 완료로 바꿀 수 있습니다/);
+  assert.doesNotMatch(output, /<img\b|<input|<textarea|contenteditable/);
+  assert.doesNotMatch(output, /data-self-check-choice="(?:completed|help_needed)"[^>]*disabled/);
+  assert.match(output, /&lt;img src=x onerror=1&gt;/);
+  assert.match(output, /연필 &amp; 지우개/);
+  const completed = { ...row, selfCheck: { ...row.selfCheck, response: 'completed', finalCompleted: true } };
+  const completedOutput = api.selfCheckRows([api.normalizeSelfCheckRow(completed, today, true)]).join('');
+  assert.match(completedOutput, /완료 · 선생님 확인 완료/);
+  assert.equal((completedOutput.match(/ disabled/g) || []).length, 2);
+  assert.match(completedOutput, /선생님 확인까지 끝나 최종 완료되었습니다/);
+});
+
+test('자기 체크 저장은 자유문자 없이 opaque activity와 두 CAS revision만 보낸다', () => {
+  const start = script.indexOf('async function submitSelfCheck(');
+  const end = script.indexOf('async function boot(', start);
+  const code = script.slice(start, end);
+  assert.match(script, /selfCheckEnabled=capabilities\.selfCheck===true/);
+  assert.match(script, /row\.lessonDate!==todayDate/);
+  assert.match(script, /publicLessonRows\(rows\(data\.publicLessons\)\.filter\(row=>!selfCheckIds\.has/);
+  assert.match(code, /\['completed','help_needed'\]\.includes\(response\)/);
+  assert.match(code, /post\(\{action:'self_check_set',activityId:activityId,publicationRevision:publicationRevision,response:response,expectedRevision:expectedRevision\}\)/);
+  assert.match(code, /source\.selfCheck=result\.selfCheck;render\(lastStudentData\)/);
+  assert.match(code, /checked\.finalCompleted/);
+  assert.match(code, /let saved=false/);
+  assert.match(code, /saved=true/);
+  assert.match(code, /if\(saved\)\{[\s\S]*choices\.forEach\(item=>item\.disabled=true\)[\s\S]*선택은 저장됨 · 화면 새로고침 필요/);
+  assert.match(code, /\['SELF_CHECK_FINALIZED','SELF_CHECK_REVISION_CONFLICT','SELF_CHECK_NOT_AVAILABLE'\]\.includes\(error\.code\)/);
+  assert.match(code, /choices\.forEach\(item=>item\.disabled=false\)/);
+  assert.doesNotMatch(code, /expectedRevision\s*\+\s*1/);
+  const payload = code.match(/post\((\{action:'self_check_set'[^}]+\})\)/)[1];
+  assert.doesNotMatch(payload, /freeText|message|memo|note|studentId|taskId|clientRequestId|localStorage|sessionStorage/);
+});
+
+test('교사가 먼저 최종 확인한 race와 revision 충돌은 재시도 버튼을 열지 않고 최신 상태를 다시 불러온다', async () => {
+  const start = script.indexOf('async function submitSelfCheck(');
+  const end = script.indexOf('async function boot(', start);
+  const code = script.slice(start, end);
+  for (const failureCode of ['SELF_CHECK_FINALIZED', 'SELF_CHECK_REVISION_CONFLICT']) {
+    const refreshCalls = [], choices = [{ disabled: false }, { disabled: false }];
+    const status = { className: '', textContent: '' };
+    const row = {
+      dataset: { activity: 'activity_12345678', publicationRevision: '4', revision: '2' },
+      querySelectorAll: () => choices,
+      querySelector: () => status
+    };
+    const button = { dataset: { selfCheckChoice: 'help_needed' }, closest: () => row };
+    const result = await new Function('post', 'refresh', 'button', `
+      let selfCheckEnabled = true;
+      const pendingSelfChecks = new Set(), liveStatus = { textContent: '' };
+      const source = { activityId: 'activity_12345678', publicationRevision: 4,
+        selfCheck: { response: 'completed', reviewStatus: 'pending', revision: 2, finalCompleted: false } };
+      const lastStudentData = { today: { date: '2026-08-18' }, publicLessons: [source] };
+      const rows = value => Array.isArray(value) ? value : [];
+      const normalizeSelfCheckRow = item => item ? {
+        publicationRevision: item.publicationRevision,
+        revision: item.selfCheck.revision,
+        finalCompleted: item.selfCheck.finalCompleted
+      } : null;
+      const render = () => {};
+      ${code}
+      return submitSelfCheck(button).then(() => ({ liveStatus, pendingSelfChecks }));
+    `)(
+      async () => { const error = new Error('stale'); error.code = failureCode; throw error; },
+      async force => { refreshCalls.push(force); return true; },
+      button
+    );
+    assert.deepEqual(refreshCalls, [true]);
+    assert.deepEqual(choices.map(choice => choice.disabled), [true, true]);
+    assert.equal(result.pendingSelfChecks.size, 0);
+    assert.match(result.liveStatus.textContent, /최신 선택 상태/);
+    assert.notEqual(status.textContent, '저장 실패 · 다시 선택해 주세요');
+  }
 });
 
 test('차량에는 안전 상태와 예정 시각만 표시하고 노선·정류장·연락처를 사용하지 않는다', () => {

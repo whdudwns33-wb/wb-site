@@ -1648,7 +1648,9 @@ export default {
         return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
       }
       if (url.pathname === '/student-portal') {
-        const authenticatedActions = new Set(['access_list', 'access_set', 'invite', 'preview']);
+        const authenticatedActions = new Set([
+          'access_list', 'access_set', 'invite', 'preview', 'self_check_list', 'self_check_confirm'
+        ]);
         const action = String(body.action || '');
         if (!authenticatedActions.has(action)) {
           return json({ ok: false, error: '학생 연결 작업은 학생 앱 전용 주소에서만 사용할 수 있습니다' }, 403, okOrigin);

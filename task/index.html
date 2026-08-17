@@ -179,6 +179,11 @@
   .guardian-publication .btn, .guardian-publication-retry { min-height: 44px; }
   .guardian-publication-status { margin-top: 8px; color: var(--mid-gray); font-size: 12px; font-weight: 700; }
   .guardian-publication-status.is-error { color: #9E3629; }
+  .student-self-check-review { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #B9E3C7; }
+  .student-self-check-review .btn { min-height: 44px; }
+  .student-self-check-review-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .student-self-check-review-status { margin-top: 7px; color: var(--mid-gray); font-size: 12.5px; line-height: 1.55; }
+  .student-self-check-review-status.is-error { color: #9E3629; }
   .manager-guardian-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .manager-guardian-actions .btn { min-height: 44px; }
   .empty { text-align: center; padding: 40px 16px; color: var(--mid-gray); font-size: 14px; }
@@ -755,6 +760,17 @@
   .student-preview-study-link strong { flex: 0 0 auto; color: #087BA6; font-size: 20px; }
   .student-preview-study-link:focus-visible { outline: 3px solid #087BA6; outline-offset: 2px; }
   .student-preview-study-note { margin-top: 10px; color: #647684; font-size: 12px; line-height: 1.55; }
+  .student-preview-self-check-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 12px; }
+  .student-preview-self-check-choice { min-height: 48px; padding: 9px; border: 1px solid #BFD7E1; border-radius: 12px; background: #FFF; color: #173957; font: inherit; font-weight: 900; opacity: 1; }
+  .student-preview-self-check-choice.is-selected { border-color: #087BA6; background: #EAF7FB; box-shadow: inset 0 0 0 1px #087BA6; }
+  .student-preview-self-check-choice.help.is-selected { border-color: #B56A16; background: #FFF4E6; color: #7A4308; box-shadow: inset 0 0 0 1px #B56A16; }
+  .student-preview-self-check-choice.is-locked { opacity: .7; }
+  .student-preview-self-check-note { margin-top: 9px; color: #647684; font-size: 12px; line-height: 1.55; }
+  .student-preview-public-box { margin-top: 10px; padding: 11px 12px; border: 1px solid #D6EBF4; border-radius: 12px; background: #F5FBFE; }
+  .student-preview-public-line { display: grid; grid-template-columns: 52px minmax(0,1fr); gap: 8px; font-size: 13px; line-height: 1.6; }
+  .student-preview-public-line + .student-preview-public-line { margin-top: 7px; }
+  .student-preview-public-label { color: #087BA6; font-weight: 900; }
+  .student-preview-public-copy { margin-top: 8px; white-space: pre-wrap; color: #263F55; font-size: 14px; line-height: 1.65; }
   .student-portal-settings button, .student-portal-settings label { min-height: 44px; }
   .parent-preview-day { display: grid; place-items: center; flex: 0 0 42px; min-height: 42px; border-radius: 12px; background: #173957; color: #FFF; font-size: 13px; font-weight: 900; }
   .parent-preview-schedule { align-items: center; }
@@ -781,7 +797,7 @@
     .parent-preview-request-actions { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
-    .student-preview-shell .parent-preview-summary, .student-preview-study-grid { grid-template-columns: 1fr; }
+    .student-preview-shell .parent-preview-summary, .student-preview-study-grid, .student-preview-self-check-actions { grid-template-columns: 1fr; }
   }
   @media(max-width:350px) {
     .parent-preview-hero-head, .parent-preview-between { flex-direction: column; }
@@ -821,11 +837,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.1"></script>
-<script src="./asset-core.js?v=2026-08-18.1"></script>
-<script src="./qr-core.js?v=2026-08-18.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.2"></script>
+<script src="./asset-core.js?v=2026-08-18.2"></script>
+<script src="./qr-core.js?v=2026-08-18.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.2"></script>
 <script>
 "use strict";
 
@@ -1472,6 +1488,11 @@ const guardianPublicationLoadingDates = new Set();
 const guardianPublicationErrors = new Map();
 const guardianPublicationDrafts = new Map();
 const guardianPublicationSaving = new Set();
+let studentSelfChecks = new Map();
+const studentSelfCheckLoadedDates = new Set();
+const studentSelfCheckLoadingDates = new Set();
+const studentSelfCheckErrors = new Map();
+const studentSelfCheckConfirming = new Set();
 const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sync_failed / create_failed
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
@@ -1548,6 +1569,8 @@ function resetPersonCache(token) {
   guardianAnnouncementPending.clear();
   guardianLessonPublications = new Map(); guardianPublicationLoadedDates.clear(); guardianPublicationLoadingDates.clear();
   guardianPublicationErrors.clear(); guardianPublicationDrafts.clear(); guardianPublicationSaving.clear();
+  studentSelfChecks = new Map(); studentSelfCheckLoadedDates.clear(); studentSelfCheckLoadingDates.clear();
+  studentSelfCheckErrors.clear(); studentSelfCheckConfirming.clear();
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
   acaflowImportFileName = ''; acaflowImportRows = []; acaflowImportPreview = null;
   acaflowImportSelection.clear(); acaflowImportError = ''; acaflowImportBusy = false;
@@ -2337,6 +2360,111 @@ function normalizeGuardianPublication(row) {
   };
 }
 
+function normalizeStudentSelfCheck(row) {
+  const activityId = String(row && row.activityId || ''), taskId = String(row && row.taskId || '');
+  const lessonDate = String(row && row.lessonDate || ''), publicationRevision = Number(row && row.publicationRevision);
+  const revision = Number(row && row.revision), response = String(row && row.response || '');
+  const reviewStatus = String(row && row.reviewStatus || ''), finalCompleted = row && row.finalCompleted;
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(activityId) || !taskId || !/^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ||
+      !Number.isInteger(publicationRevision) || publicationRevision < 1 || !Number.isInteger(revision) || revision < 0 ||
+      !['', 'completed', 'help_needed'].includes(response) || !['', 'pending', 'confirmed'].includes(reviewStatus) ||
+      typeof finalCompleted !== 'boolean' || (response === '' && (revision !== 0 || reviewStatus !== '' || finalCompleted)) ||
+      (response !== '' && (revision < 1 || !['pending', 'confirmed'].includes(reviewStatus))) ||
+      (reviewStatus === 'confirmed' && finalCompleted !== (response === 'completed')) ||
+      (reviewStatus !== 'confirmed' && finalCompleted)) return null;
+  return {
+    activityId: activityId, publicationRevision: publicationRevision, taskId: taskId, lessonDate: lessonDate,
+    studentName: String(row.studentName || ''), subject: String(row.subject || ''), className: String(row.className || ''),
+    response: response, reviewStatus: reviewStatus, revision: revision,
+    updatedAt: Number(row.updatedAt) || 0, confirmedAt: Number(row.confirmedAt) || 0, finalCompleted: finalCompleted
+  };
+}
+
+async function loadStudentSelfChecks(lessonDate, force) {
+  const date = String(lessonDate || '');
+  if (!session.isStaffLink || !hasVerifiedPersonAuth() || date !== today() ||
+      studentSelfCheckLoadingDates.has(date) || (studentSelfCheckLoadedDates.has(date) && !force) ||
+      (studentSelfCheckErrors.has(date) && !force)) return;
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person') return;
+  if (force) studentSelfCheckLoadedDates.delete(date);
+  studentSelfCheckLoadingDates.add(date); studentSelfCheckErrors.delete(date);
+  if (route === 'today') renderAfterSync();
+  try {
+    const result = await sync.post('/student-portal', {
+      app: SYNC_APP, action: 'self_check_list', auth: auth, lessonDate: date
+    });
+    Array.from(studentSelfChecks.keys()).forEach(key => { if (key.endsWith('|' + date)) studentSelfChecks.delete(key); });
+    (result.selfChecks || []).forEach(value => {
+      const row = normalizeStudentSelfCheck(value);
+      if (row && row.lessonDate === date) studentSelfChecks.set(guardianPublicationKey(row.taskId, date), row);
+    });
+    studentSelfCheckLoadedDates.add(date);
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    studentSelfCheckErrors.set(date, '학생 자기 체크를 불러오지 못했습니다. 다시 시도해 주세요.');
+  } finally {
+    studentSelfCheckLoadingDates.delete(date);
+    if (route === 'today') renderAfterSync();
+  }
+}
+
+function studentSelfCheckReviewHtml(task, lessonDate, publication) {
+  if (!publication || publication.status !== 'published' || !publication.studentVisible || lessonDate !== today() ||
+      !session.isStaffLink || !hasVerifiedPersonAuth()) return '';
+  const key = guardianPublicationKey(task.id, lessonDate), loading = studentSelfCheckLoadingDates.has(lessonDate);
+  const loaded = studentSelfCheckLoadedDates.has(lessonDate), error = studentSelfCheckErrors.get(key) || studentSelfCheckErrors.get(lessonDate) || '';
+  if (!loaded && !loading && !error) setTimeout(() => loadStudentSelfChecks(lessonDate, false), 0);
+  const refresh = '<button type="button" class="btn btn-sm btn-ghost" data-act="studentselfcheckrefresh" data-date="' + esc(lessonDate) + '">새로고침</button>';
+  if (!loaded) return '<div class="student-self-check-review"><div class="student-self-check-review-head"><b>학생 자기 체크</b>' + refresh + '</div>' +
+    (error ? '<div class="student-self-check-review-status is-error" role="alert">' + esc(error) + '</div>' :
+      '<div class="student-self-check-review-status" role="status">학생 선택을 확인하고 있습니다.</div>') + '</div>';
+  const row = studentSelfChecks.get(key);
+  if (!row || !row.response) return '<div class="student-self-check-review"><div class="student-self-check-review-head"><b>학생 자기 체크</b>' + refresh + '</div>' +
+    '<div class="student-self-check-review-status">학생이 아직 완료 또는 도움 필요를 선택하지 않았습니다.</div></div>';
+  const responseLabel = row.response === 'completed' ? '완료' : '도움 필요';
+  if (row.reviewStatus === 'confirmed') return '<div class="student-self-check-review"><div class="student-self-check-review-head"><b>학생 자기 체크</b>' + refresh + '</div>' +
+    '<div class="student-self-check-review-status"><span class="tag ' + (row.finalCompleted ? 'ok' : 'high') + '">' + responseLabel + '</span> · 선생님 확인 완료' +
+    (row.finalCompleted ? ' · 최종 완료' : ' · 도움 요청 확인') + '</div></div>';
+  const confirming = studentSelfCheckConfirming.has(row.activityId);
+  const actionLabel = row.response === 'completed' ? '최종 완료 확인' : '도움 요청 확인';
+  return '<div class="student-self-check-review"><div class="student-self-check-review-head"><b>학생 자기 체크</b>' + refresh + '</div>' +
+    '<div class="student-self-check-review-status"><span class="tag ' + (row.response === 'completed' ? 'ok' : 'high') + '">' + responseLabel + '</span> · 선생님 확인 전</div>' +
+    '<button type="button" class="btn btn-primary btn-block mt8" data-act="studentselfcheckconfirm" data-id="' + esc(task.id) +
+    '" data-date="' + esc(lessonDate) + '"' + (confirming ? ' disabled' : '') + '>' + actionLabel + (confirming ? ' 중…' : '') + '</button></div>';
+}
+
+async function confirmStudentSelfCheck(taskId, lessonDate, button) {
+  const date = String(lessonDate || ''), task = state.tasks.find(row => row.id === taskId);
+  if (!task || date !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
+      task.staffId !== session.staffId || !isSessionLessonTask(task)) return toast('오늘 내 담당 수업만 확인할 수 있습니다');
+  const key = guardianPublicationKey(taskId, date), row = studentSelfChecks.get(key);
+  if (!row || !row.response || row.reviewStatus !== 'pending') return toast('확인할 최신 학생 선택이 없습니다');
+  if (studentSelfCheckConfirming.has(row.activityId)) return;
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person') return toast('개인 링크 인증이 필요합니다');
+  if (row.response === 'completed' && !confirm('이 선택을 최종 완료로 확인할까요?\n\n같은 공개 내용에서는 학생이 다시 도움 필요로 바꿀 수 없습니다.')) return;
+  studentSelfCheckConfirming.add(row.activityId); studentSelfCheckErrors.delete(key);
+  if (button) button.disabled = true;
+  if (route === 'today') renderAfterSync();
+  try {
+    await sync.post('/student-portal', {
+      app: SYNC_APP, action: 'self_check_confirm', auth: auth,
+      activityId: row.activityId, expectedRevision: row.revision
+    });
+    await loadStudentSelfChecks(date, true);
+    toast(row.response === 'completed' ? '학생의 완료 선택을 최종 확인했습니다' : '학생의 도움 요청을 확인했습니다');
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    studentSelfCheckErrors.set(key, '확인을 저장하지 못했습니다. 최신 상태를 새로고침해 주세요.');
+    await loadStudentSelfChecks(date, true);
+    toast('학생 선택 확인 실패 — ' + (error.message || error));
+  } finally {
+    studentSelfCheckConfirming.delete(row.activityId);
+    if (route === 'today') renderAfterSync();
+  }
+}
+
 async function loadGuardianPublications(lessonDate, force) {
   const date = String(lessonDate || '');
   if (!session.isStaffLink || !hasVerifiedPersonAuth() || date !== today() ||
@@ -2402,7 +2530,8 @@ function guardianPublicationHtml(task, lessonDate) {
     '<label class="row small" style="gap:7px;align-items:center"><input type="checkbox" data-student-visible ' + (studentVisible ? 'checked' : '') + '> 학생 앱에도 같은 숙제·준비물 공개</label>' +
     (statusError ? '<div class="guardian-publication-status is-error" role="alert">' + esc(statusError) + '</div>' : '') +
     '<button class="btn btn-primary btn-block mt14" data-act="guardianpublicationsave"' + (saving ? ' disabled' : '') + '>' +
-    (saving ? '공개 내용 저장 중…' : '공개 내용 저장') + '</button></section>';
+    (saving ? '공개 내용 저장 중…' : '공개 내용 저장') + '</button>' +
+    studentSelfCheckReviewHtml(task, date, row) + '</section>';
 }
 
 async function saveGuardianPublication(container, button) {
@@ -9749,7 +9878,7 @@ async function transitionGuardianAnnouncement(announcementId, action, expectedRe
 let guardianContacts = null;      // Map stable studentId -> {phone, consent, updatedAt}
 let guardianPortalAccess = new Map(); // 보호자 웹앱 동의는 피드백 알림 수신 동의와 분리한다.
 const GUARDIAN_PORTAL_SCOPE_VERSION = 4;
-const STUDENT_PORTAL_SCOPE_VERSION = 2;
+const STUDENT_PORTAL_SCOPE_VERSION = 3;
 let studentPortalAccess = new Map(); // 학생 앱은 보호자 앱과 별도 동의·세션을 사용한다.
 let studentPortalLoaded = false;
 let studentPortalLoading = false;
@@ -9838,7 +9967,7 @@ async function saveStudentPortalAccess(idx, button) {
       if (checkbox) checkbox.checked = !!current.enabled;
       return toast('먼저 위에서 보호자 연락처를 저장해 주세요');
     }
-    if (!confirm('보호자에게 학생 앱 공개 범위 v2(오늘 수업·출결·5단계·차량, 공개 숙제·준비물, 배정 교재, 주간 시간표, 메타수학·클래스카드 공식 외부 화면 이동)를 안내하고 동의를 확인했나요?\n\n링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다.')) {
+    if (!confirm('보호자에게 학생 앱 공개 범위 v3(오늘 수업·출결·5단계·차량, 공개 숙제·준비물, 완료·도움 필요 자기 체크와 선생님 확인, 배정 교재, 주간 시간표, 메타수학·클래스카드 공식 외부 화면 이동)를 안내하고 동의를 확인했나요?\n\n학생은 자유 문장 없이 완료 또는 도움 필요만 선택합니다. 링크를 누르면 새 창/탭에서 외부 서비스로 이동하며 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다.')) {
       if (checkbox) checkbox.checked = !!current.enabled;
       return;
     }
@@ -9856,7 +9985,7 @@ async function saveStudentPortalAccess(idx, button) {
       expectedUpdatedAt: Number(current.updatedAt) || 0
     });
     studentPortalAccess.set(student.id, result.access);
-    toast(enabled ? student.name + ' 학생 앱 공개 범위 v2 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 학생 앱 연결을 해지했습니다');
+    toast(enabled ? student.name + ' 학생 앱 공개 범위 v3 동의를 저장했습니다 — 새 초대 링크로 연결해 주세요' : student.name + ' 학생 앱 연결을 해지했습니다');
     render();
   } catch (error) {
     if (error && error.code === 'ACCESS_REVISION_CONFLICT') {
@@ -10090,10 +10219,10 @@ function parentPreviewHtml(data) {
       row.publicHomework ? '<b>숙제</b><div class="parent-preview-text">' + esc(row.publicHomework) + '</div>' : '',
       row.publicReadiness ? '<b class="mt14">준비물</b><div class="parent-preview-text">' + esc(row.publicReadiness) + '</div>' : ''
     ].filter(Boolean).join('');
-    return '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+    return '<article class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(row.lessonDate || '수업일 확인 중') +
       ' · ' + esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></div><span class="parent-preview-tag ok">공개</span></div>' +
-      (publicParts ? '<div class="parent-preview-publication">' + publicParts + '</div>' : '') + '</div>';
+      (publicParts ? '<div class="parent-preview-publication">' + publicParts + '</div>' : '') + '</article>';
   });
   const publicLessonSection = capabilities.publicLessons === true
     ? parentPreviewSection('Learning', '숙제·준비물', publicLessonRows, '공개된 숙제나 준비물이 없습니다.') : '';
@@ -10214,6 +10343,8 @@ async function previewParentPortal(idx, button) {
 let studentPreviewRequest = 0;
 function studentPreviewHtml(data) {
   const student = data && data.student || {}, todayData = data && data.today || {};
+  const externalLearningEnabled = !!(data && data.capabilities && data.capabilities.externalLearning === true);
+  const selfCheckEnabled = !!(data && data.capabilities && data.capabilities.selfCheck === true);
   const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], '': ['출결 확인 전', 'muted'] };
   const ride = { scheduled: ['탑승 확인 전', 'muted'], boarded: ['탑승 확인', 'warn'], dropped: ['하차 확인', 'ok'], absent: ['미탑승', 'bad'] };
   const lessonRows = (todayData.lessons || []).map(row => {
@@ -10234,19 +10365,55 @@ function studentPreviewHtml(data) {
       esc(row.scheduledTime || '시간 확인 중') + '</div></div><div class="parent-preview-status"><span class="parent-preview-tag ' + state[1] + '">' +
       state[0] + '</span>' + (at ? '<span class="parent-preview-tag muted">' + esc(at) + '</span>' : '') + '</div></div>';
   });
-  const publicRows = (data.publicLessons || []).map(row => {
+  const todayDate = String(todayData.date || '');
+  const selfCheckItems = selfCheckEnabled && /^\d{4}-\d{2}-\d{2}$/.test(todayDate) ? (data.publicLessons || []).map(row => {
+    const check = row && row.selfCheck, activityId = String(row && row.activityId || '');
+    const publicationRevision = Number(row && row.publicationRevision), revision = Number(check && check.revision);
+    const response = String(check && check.response || ''), reviewStatus = String(check && check.reviewStatus || '');
+    const finalCompleted = check && check.finalCompleted;
+    if (!row || row.lessonDate !== todayDate || !check || !/^[A-Za-z0-9_-]{8,100}$/.test(activityId) ||
+        !Number.isInteger(publicationRevision) || publicationRevision < 1 || !Number.isInteger(revision) || revision < 0 ||
+        !['', 'completed', 'help_needed'].includes(response) || !['', 'pending', 'confirmed'].includes(reviewStatus) ||
+        typeof finalCompleted !== 'boolean' || (response === '' && (revision !== 0 || reviewStatus !== '' || finalCompleted)) ||
+        (response !== '' && (revision < 1 || !['pending', 'confirmed'].includes(reviewStatus))) ||
+        (reviewStatus === 'confirmed' && finalCompleted !== (response === 'completed')) ||
+        (reviewStatus !== 'confirmed' && finalCompleted)) return null;
+    return { row: row, activityId: activityId, response: response, reviewStatus: reviewStatus, finalCompleted: finalCompleted };
+  }).filter(Boolean) : [];
+  const selfCheckActivityIds = new Set(selfCheckItems.map(item => item.activityId));
+  const selfCheckRows = selfCheckItems.map(item => {
+    const row = item.row, confirmed = item.reviewStatus === 'confirmed';
+    const status = confirmed ? (item.finalCompleted ? ['완료 · 선생님 확인 완료', 'ok'] : ['도움 필요 · 선생님 확인함', 'warn']) :
+      item.response ? (item.response === 'completed' ? ['완료 선택 · 선생님 확인 전', 'warn'] : ['도움 필요 · 선생님 확인 전', 'warn']) :
+        ['아직 선택하지 않았어요', 'muted'];
+    const homework = String(row.publicHomework || '').trim(), readiness = String(row.publicReadiness || '').trim();
+    return '<article class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+      esc(row.subject || row.className || '오늘 숙제·준비물') + '</b><div class="parent-preview-sub">' +
+      esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></div><span class="parent-preview-tag ' + status[1] + '" role="status" aria-live="polite">' + status[0] + '</span></div>' +
+      '<div class="student-preview-public-box">' + (homework ? '<div class="student-preview-public-line"><span class="student-preview-public-label">숙제</span><span class="student-preview-public-copy">' + esc(homework) + '</span></div>' : '') +
+      (readiness ? '<div class="student-preview-public-line"><span class="student-preview-public-label">준비물</span><span class="student-preview-public-copy">' + esc(readiness) + '</span></div>' : '') + '</div>' +
+      '<div class="student-preview-self-check-actions" aria-label="오늘 할 일 상태 선택"><button type="button" class="student-preview-self-check-choice' +
+      (item.response === 'completed' ? ' is-selected' : '') + (item.finalCompleted ? ' is-locked' : '') + '" aria-pressed="' + (item.response === 'completed') + '" disabled>✓ 완료</button>' +
+      '<button type="button" class="student-preview-self-check-choice help' + (item.response === 'help_needed' ? ' is-selected' : '') + (item.finalCompleted ? ' is-locked' : '') +
+      '" aria-pressed="' + (item.response === 'help_needed') + '" disabled>도움 필요</button></div>' +
+      '<p class="student-preview-self-check-note">' + (item.finalCompleted ?
+        '선생님 확인까지 끝나 최종 완료되었습니다. 공개 내용이 수정되면 새 할 일로 다시 선택할 수 있습니다.' :
+        '선택하면 선생님이 확인합니다. 도움 필요를 확인받은 뒤에는 완료로 바꿀 수 있습니다. 자유 메모나 연락처는 전송되지 않습니다.') + '</p></article>';
+  });
+  const publicRows = (data.publicLessons || []).filter(row => !selfCheckActivityIds.has(String(row && row.activityId || ''))).map(row => {
     const homework = String(row.publicHomework || '').trim(), readiness = String(row.publicReadiness || '').trim();
     if (!homework && !readiness) return '';
-    return '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
+    return '<article class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(row.lessonDate || '최근 수업') + ' · ' +
       esc(parentPreviewTeacherLabel(row.teacherName)) + '</div></div><span class="parent-preview-tag">공개 기록</span></div>' +
-      (homework ? '<b class="mt14">숙제</b><div class="parent-preview-text">' + esc(homework) + '</div>' : '') +
-      (readiness ? '<b class="mt14">준비물</b><div class="parent-preview-text">' + esc(readiness) + '</div>' : '') + '</div>';
+      '<div class="student-preview-public-box">' + (homework ? '<div class="student-preview-public-line"><span class="student-preview-public-label">숙제</span><span class="student-preview-public-copy">' + esc(homework) + '</span></div>' : '') +
+      (readiness ? '<div class="student-preview-public-line"><span class="student-preview-public-label">준비물</span><span class="student-preview-public-copy">' + esc(readiness) + '</span></div>' : '') + '</div></article>';
   }).filter(Boolean);
+  const bookClass = { preparing: 'muted', ready_for_handoff: 'warn', handed: 'ok', cancelled: 'muted' };
   const bookRows = (data.bookStatus || []).filter(row => row && row.kind === 'distribution').map(row =>
     '<div class="parent-preview-row parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
-      esc(row.title || '배정 교재') + '</b><div class="parent-preview-sub">' + esc(parentPreviewStamp(row.updatedAt) || '상태 확인') +
-      '</div></div><span class="parent-preview-tag ' + (row.stage === 'handed' ? 'ok' : row.stage === 'cancelled' ? 'muted' : 'warn') + '">' +
+      esc(row.title || '교재') + '</b><div class="parent-preview-sub">배정 교재' + (row.updatedAt ? ' · ' + esc(parentPreviewStamp(row.updatedAt)) : '') +
+      '</div></div><span class="parent-preview-tag ' + (bookClass[row.stage] || 'muted') + '">' +
       esc(row.label || '상태 확인 중') + '</span></div>');
   const dayOrder = '월화수목금토일';
   const scheduleRows = (data.schedule || []).slice().sort((a, b) => {
@@ -10259,7 +10426,6 @@ function studentPreviewHtml(data) {
       esc(row.dayLabel || '요일') + '</span><div class="parent-preview-item"><b class="parent-preview-item-title">' +
       esc(row.subject || row.className || '수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewTeacherLabel(row.teacherName)) +
       '</div></div><div class="parent-preview-time">' + esc(row.timeLabel || '시간 확인 중') + '</div></div>');
-  const externalLearningEnabled = !!(data && data.capabilities && data.capabilities.externalLearning === true);
   const studySection = externalLearningEnabled
     ? '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Study</p><h2 class="parent-preview-section-title">바로 학습하기</h2></div><span class="parent-preview-tag">외부 학습</span></div>' +
       '<div class="student-preview-study-grid"><a class="student-preview-study-link" href="https://new.mmath.co.kr/Pages/student/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="메타수학 학생홈 열기, 새 창/탭에서 열림"><span><b>메타수학</b><small>수학 문제 풀기·채점</small></span><strong aria-hidden="true">↗</strong></a>' +
@@ -10267,26 +10433,31 @@ function studentPreviewHtml(data) {
       '<p class="student-preview-study-note">링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다.</p></section>'
     : '';
   const checkedAt = parentPreviewClock(data.generatedAt);
+  const selfCheckInfo = selfCheckEnabled ? ' 오늘 공개된 할 일은 완료 또는 도움 필요만 선택하며 선생님이 확인합니다.' : '';
   return '<div class="parent-preview-shell student-preview-shell"><div class="parent-preview-appbar"><div class="parent-preview-brand">WB 학생' +
     '<small>WEXLER BRAIN CENTER</small></div><span class="parent-preview-readonly">읽기 전용</span></div><div class="parent-preview-main">' +
     '<section class="parent-preview-card parent-preview-hero"><div class="parent-preview-hero-head"><div><p class="parent-preview-eyebrow">My learning</p>' +
     '<h1 class="parent-preview-title">' + esc(student.name || '학생') + ' <span class="parent-preview-tag">' + esc(student.grade || '') +
     '</span></h1></div><span class="parent-preview-date">' + esc(todayData.dateLabel || '오늘') + '</span></div>' +
-    '<p class="parent-preview-sub">학원에서 학생에게 명시적으로 공개한 정보만 보여드립니다.' +
+    '<p class="parent-preview-sub">학원에서 공개한 학습 정보만 보여드립니다.' +
     (checkedAt ? ' · 마지막 확인 ' + esc(checkedAt) : '') + '</p><div class="parent-preview-summary"><div class="parent-preview-stat"><b>' +
     lessonRows.length + '</b><span>오늘 수업</span></div><div class="parent-preview-stat"><b>' +
     (todayData.lessons || []).filter(row => row && row.completed).length + '</b><span>완료 수업</span></div><div class="parent-preview-stat"><b>' +
-    publicRows.length + '</b><span>공개 기록</span></div></div></section>' +
-    '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Today</p><h2 class="parent-preview-section-title">오늘 현황</h2></div></div>' +
+    (selfCheckEnabled ? selfCheckRows.length : publicRows.length) + '</b><span>' + (selfCheckEnabled ? '오늘 할 일' : '공개 기록') + '</span></div></div></section>' +
+    (selfCheckEnabled ? parentPreviewSection('Plan', '오늘 할 일', selfCheckRows, '오늘 공개된 숙제·준비물이 없습니다.') : '') +
+    '<section class="parent-preview-card"><div class="parent-preview-section-head"><div><p class="parent-preview-eyebrow">Today</p><h2 class="parent-preview-section-title">오늘 현황</h2></div><span class="parent-preview-count">' +
+    (lessonRows.length + transportRows.length) + '건</span></div>' +
     parentPreviewGroup('오늘 수업', lessonRows, '오늘 예정된 수업이 없습니다.') +
     parentPreviewGroup('오늘 차량', transportRows, '오늘 이용 예정인 차량이 없습니다.') + '</section>' +
     studySection +
     parentPreviewSection('Learning', '최근 공개 숙제·준비물', publicRows, '최근 14일 공개 기록이 없습니다.') +
-    parentPreviewSection('Book', '교재 준비·수령', bookRows, '현재 진행 중인 배정 교재가 없습니다.') +
+    parentPreviewSection('Book', '교재 준비·수령', bookRows, '현재 진행 중인 교재가 없습니다.') +
     parentPreviewSection('Schedule', '주간 시간표', scheduleRows, '확정된 정규 수업이 없습니다.') +
     '<section class="parent-preview-card parent-preview-info"><details><summary>학생 앱에서 볼 수 있는 정보</summary><p class="parent-preview-sub">' +
-    '내 수업·출결·5단계 진행, 최근 14일 중 학생 공개를 체크한 숙제·준비물, 오늘 차량 상태, 배정 교재 상태와 주간 시간표만 표시합니다. 보호자 연락처·주소·정류장·내부 메모·보호자 전용 기능은 표시하지 않습니다.</p></details></section>' +
-    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 학생 공개 v2</b> · 실제 학생 연결·동의를 만들지 않습니다.</div>';
+    '내 수업·출결·5단계 진행, 최근 14일 중 학생 공개가 확인된 숙제·준비물, 차량 탑승 상태, 교재 진행 상태와 시간표를 확인할 수 있습니다.' + selfCheckInfo +
+    ' 연락처·주소·정류장·내부 메모와 보호자 전용 기능은 표시하지 않습니다.</p></details></section>' +
+    '</div></div><div class="parent-preview-note"><b>관리자 미리보기 · 학생 공개 ' + (selfCheckEnabled ? 'v3' : '기존 범위') +
+    '</b> · ' + (selfCheckEnabled ? '자기 체크 버튼은 읽기 전용이며 ' : '') + '실제 학생 연결·동의·응답을 만들지 않습니다.</div>';
 }
 
 async function previewStudentPortal(idx, button) {
@@ -10425,8 +10596,8 @@ function viewStudentPortalPanel() {
     return '<div class="mt14"><div class="fl">' + esc(student.name) + ' <span class="muted">(' + esc(student.grade) + ' · ' +
       esc(student.teacher || '미지정') + ')</span></div><div class="row wraprow" style="gap:8px">' +
       '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="spAccess-' + index + '" ' +
-        (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v2</label>' +
-      (reconnect ? '<span class="small" style="color:var(--coral)">외부 학습 공개 추가 또는 보호자·학생 정보 변경 · 재동의 필요</span>' : '') +
+        (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v3</label>' +
+      (reconnect ? '<span class="small" style="color:var(--coral)">오늘 할 일 자기 체크 추가 또는 보호자·학생 정보 변경 · 재동의 필요</span>' : '') +
       (!contact || !contact.phone ? '<span class="small muted">위 보호자 연락처를 먼저 저장해 주세요</span>' : '') +
       '<button class="btn btn-sm btn-ghost" data-act="studentportalaccess" data-idx="' + index + '"' + disabled + '>학생 앱 동의 저장</button>' +
       '<button class="btn btn-sm btn-primary" data-act="studentportalinvite" data-idx="' + index + '"' + inviteDisabled + '>학생 앱 초대</button>' +
@@ -10436,12 +10607,12 @@ function viewStudentPortalPanel() {
   }).join('');
 
   return '<div class="card student-portal-settings"><div class="card-title">🎒 학생 앱 이용·초대</div>' +
-    '<div class="card-sub mb14">학생 앱은 보호자 앱과 분리된 읽기 전용 화면입니다. 오늘 수업·출결·5단계 진행·오늘 차량, ' +
-    '선생님이 최근 14일 안에 <b>학생 앱에도 공개</b>를 선택한 숙제·준비물 기록, 배정 교재 상태, 주간 시간표와 메타수학·클래스카드 공식 외부 학습 화면 링크만 표시합니다. ' +
+    '<div class="card-sub mb14">학생 앱은 보호자 앱과 분리된 학생 전용 화면입니다. 오늘 수업·출결·5단계 진행·오늘 차량, ' +
+    '선생님이 최근 14일 안에 <b>학생 앱에도 공개</b>를 선택한 숙제·준비물 기록, 오늘 공개된 할 일의 완료·도움 필요 자기 체크와 선생님 확인 상태, 배정 교재 상태, 주간 시간표와 메타수학·클래스카드 공식 외부 학습 화면 링크만 표시합니다. ' +
     '링크를 누르면 새 창/탭에서 외부 서비스로 이동합니다. 해당 서비스가 기기 정보·접속 기록·서비스 쿠키를 처리할 수 있습니다. ' +
     'WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않습니다. ' +
     '보호자 연락처·주소·정류장·내부 메모·보호자 요청·보강·회차·공지·주문 정보는 표시하지 않습니다.<br>' +
-    '<b>먼저 위에서 보호자 연락처를 저장하고, 보호자에게 공개 범위 v2와 외부 서비스 이동·처리 내용을 안내해 동의를 확인한 뒤 저장하세요.</b> ' +
+    '<b>먼저 위에서 보호자 연락처를 저장하고, 보호자에게 공개 범위 v3의 제한된 자기 체크와 외부 서비스 이동·처리 내용을 안내해 동의를 확인한 뒤 저장하세요.</b> ' +
     '동의를 끄면 기존 학생 링크와 로그인도 즉시 해지됩니다.</div>' + notice + body + '</div>';
 }
 
@@ -11638,6 +11809,8 @@ document.addEventListener('click', ev => {
     }
     case 'guardianpublicationretry': loadGuardianPublications(String(el.dataset.date || ''), true); break;
     case 'guardianpublicationsave': saveGuardianPublication(el.closest('[data-guardian-publication]'), el); break;
+    case 'studentselfcheckrefresh': loadStudentSelfChecks(String(el.dataset.date || ''), true); break;
+    case 'studentselfcheckconfirm': confirmStudentSelfCheck(String(id || ''), String(date || ''), el); break;
     case 'step': {
       const t = task(); if (!t) break;
       const c = getCheck(id, date);
@@ -12640,6 +12813,8 @@ document.addEventListener('keydown', ev => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
+  const auth = sync.auth();
+  if (session.isStaffLink && hasVerifiedPersonAuth() && auth && auth.mode === 'person') loadStudentSelfChecks(today(), true);
   sync.run();
 });
 
@@ -12682,7 +12857,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.1';
+const APP_VER = '2026-08-18.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
