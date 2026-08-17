@@ -247,6 +247,7 @@
             justify-content: center; gap: 1px; cursor: pointer; }
   .calday b { font-size: 13px; color: var(--dark-gray); }
   .calday small { font-size: 9px; color: var(--mid-gray); }
+  .calday .cal-study { font-size: 8px; font-weight: 900; color: var(--deep-blue); }
   .calday.has { background: var(--light-gray); }
   .calday.done { background: #EAF6FC; border-color: var(--blue); }
   .calday.done b, .calday.done small { color: var(--deep-blue); }
@@ -255,6 +256,19 @@
   .calday.miss { background: #FEF2F2; border-color: #FECACA; }
   .calday.miss small { color: var(--coral); }
   .calday.today { outline: 2px solid var(--navy); outline-offset: -1px; }
+  .month-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .month-kpi { padding: 12px 8px; border-radius: 12px; background: var(--light-gray); text-align: center; }
+  .month-kpi b { display: block; margin-top: 4px; color: var(--navy); font-size: 16px; }
+  .month-subject-grid { display: grid; gap: 10px; }
+  .month-subject-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+  .month-subject-track { height: 11px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
+  .month-subject-track i { display: block; height: 100%; border-radius: inherit; background: var(--subject-color); }
+  .month-event-row, .month-backlog-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
+  .month-event-row:last-child, .month-backlog-row:last-child { border-bottom: 0; }
+  .month-event-progress { height: 7px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
+  .month-event-progress i { display: block; height: 100%; background: var(--blue); }
+  .month-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .month-review-grid .wide { grid-column: 1 / -1; }
 
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
@@ -344,6 +358,13 @@
     .week-review-grid { grid-template-columns: 1fr; }
     .week-backlog-row, .week-offer-row { grid-template-columns: 52px minmax(0, 1fr); }
     .week-backlog-row > :last-child, .week-offer-row > :last-child { grid-column: 1 / -1; }
+    .month-kpis { grid-template-columns: 1fr 1fr; }
+    .month-subject-row { grid-template-columns: 52px minmax(0, 1fr); }
+    .month-subject-row > :last-child { grid-column: 2; }
+    .month-event-row, .month-backlog-row { grid-template-columns: auto minmax(0, 1fr); }
+    .month-event-row > :last-child, .month-backlog-row > :last-child { grid-column: 1 / -1; }
+    .month-review-grid { grid-template-columns: 1fr; }
+    .month-review-grid .wide { grid-column: auto; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -572,7 +593,8 @@ function tasksFor(staffId, date) {
 /** 새 배부 공부만 학생이 직접 체크리스트에 담는다. 기존 업무는 이전처럼 바로 보인다. */
 const isStudyOffer = task => !!(task && task.requiresClaim && task.origin !== 'staff');
 const isStudyClaimed = (task, date) => !isStudyOffer(task) || !!(getCheck(task.id, date) || {}).claimed;
-const checklistTasksFor = (staffId, date) => tasksFor(staffId, date).filter(task => isStudyClaimed(task, date));
+const checklistTasksFor = (staffId, date) => tasksFor(staffId, date)
+  .filter(task => isStudyClaimed(task, date) && !(getCheck(task.id, date) || {}).dropped);
 const studyOffersFor = (staffId, date) => tasksFor(staffId, date).filter(isStudyOffer);
 
 const ckey = (taskId, date) => taskId + '|' + date;
@@ -2405,6 +2427,125 @@ function viewWeek() {
 }
 
 /* ── 월간 플래너 ── */
+const monthPlanKey = staffId => '__monthplan__' + staffId;
+const MONTH_EVENT_KINDS = Object.freeze({ exam: '시험', mock: '모의고사', apply: '원서·접수', consult: '상담', other: '기타' });
+function monthPlanOf(staffId, ym) {
+  const c = state.checks[monthPlanKey(staffId) + '|' + ym];
+  const plan = Object.assign({ subjectGoals: {}, events: [], reflection: '', directorNote: '', nextFocus: '' }, (c && c.plan) || {});
+  plan.events = Array.isArray(plan.events) ? plan.events.filter(event =>
+    event && event.id && event.title && /^\d{4}-\d{2}-\d{2}$/.test(event.date || '')) : [];
+  return plan;
+}
+function monthSubjectStats(staffId, ym) {
+  const stats = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, { secs: 0, done: 0, total: 0 }]));
+  monthDates(ym).forEach(date => {
+    const daily = stCategorySecs(stSecs(staffId, date));
+    STUDY_SUBJECT_KEYS.forEach(key => { stats[key].secs += daily[key] || 0; });
+    checklistTasksFor(staffId, date).forEach(task => {
+      const item = stats[studySubjectKey(task.studySubject)];
+      item.total++;
+      if (isDone(task.id, date)) item.done++;
+    });
+  });
+  return stats;
+}
+function monthReport(staffId, ym, stats) {
+  const dates = monthDates(ym);
+  const elapsed = dates.filter(date => date <= today());
+  const totalSecs = STUDY_SUBJECT_KEYS.reduce((sum, key) => sum + stats[key].secs, 0);
+  const totalTasks = STUDY_SUBJECT_KEYS.reduce((sum, key) => sum + stats[key].total, 0);
+  const doneTasks = STUDY_SUBJECT_KEYS.reduce((sum, key) => sum + stats[key].done, 0);
+  const dailyGoal = stGoalMin(staffId) * 60;
+  const goalDays = dailyGoal ? elapsed.filter(date => stTotal(staffId, date) >= dailyGoal).length : 0;
+  const topKey = STUDY_SUBJECT_KEYS.slice().sort((a, b) => stats[b].secs - stats[a].secs)[0];
+  return {
+    totalSecs: totalSecs,
+    avgSecs: elapsed.length ? Math.round(totalSecs / elapsed.length) : 0,
+    doneTasks: doneTasks,
+    totalTasks: totalTasks,
+    goalDays: goalDays,
+    elapsedDays: elapsed.length,
+    topKey: totalSecs ? topKey : ''
+  };
+}
+function monthBacklog(staffId, ym) {
+  const out = [];
+  monthDates(ym).filter(date => date < today()).forEach(date => {
+    checklistTasksFor(staffId, date).forEach(task => {
+      if (task.carry && !isDone(task.id, date)) out.push({ t: task, date: date });
+    });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+function monthDday(date) {
+  const diff = Math.round((parseYmd(date) - parseYmd(today())) / 86400000);
+  if (diff === 0) return 'D-DAY';
+  return diff > 0 ? 'D-' + diff : 'D+' + Math.abs(diff);
+}
+function monthSubjectGoalModal(me, ym) {
+  const plan = monthPlanOf(me.id, ym);
+  modal('🎯 월간 과목별 목표시간',
+    '<div class="hint mb14">한 달 동안 공부할 목표시간을 분 단위로 입력하세요.</div>' +
+    STUDY_SUBJECT_KEYS.map(key => {
+      const subject = STUDY_SUBJECTS[key];
+      return '<div class="between mb8 ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+        '<div class="row" style="gap:6px"><input class="in" type="number" min="0" step="30" inputmode="numeric" data-monthgoal="' + key + '" value="' +
+          (Number(plan.subjectGoals[key]) || '') + '" style="max-width:120px"><span class="small muted">분</span></div></div>';
+    }).join(''),
+    '<button class="btn btn-primary btn-block mt14" data-act="monthgoalsave" data-ym="' + ym + '">저장</button>');
+}
+function monthEventModal(ym) {
+  modal('📌 시험·중요 일정 추가',
+    '<div class="field"><label class="fl">일정 종류</label><select class="in" id="mEventKind">' +
+      Object.keys(MONTH_EVENT_KINDS).map(key => '<option value="' + key + '">' + MONTH_EVENT_KINDS[key] + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label class="fl">일정 이름</label><input class="in" id="mEventTitle" placeholder="예: 9월 모의고사"></div>' +
+    '<div class="field"><label class="fl">날짜</label><input class="in" type="date" id="mEventDate" value="' + ym + '-01"></div>' +
+    '<div class="field"><label class="fl">시험 범위·준비 내용</label><textarea class="in" id="mEventRange" placeholder="예: 수학 미적분 전 범위"></textarea></div>' +
+    '<div class="field"><label class="fl">목표점수 (선택)</label><input class="in" type="number" min="0" max="100" id="mEventScore" placeholder="90"></div>',
+    '<button class="btn btn-primary btn-block" data-act="montheventsave" data-ym="' + ym + '">추가</button>');
+}
+let monthMoveDraft = null;
+function monthMoveModal(task, from) {
+  const existing = weekMovesFor(task.staffId).find(move => move.taskId === task.id && move.to === from);
+  monthMoveDraft = { taskId: task.id, staffId: task.staffId, from: existing ? existing.from : from, current: from };
+  const suggested = addDays(from, 1) < today() ? today() : addDays(from, 1);
+  modal('↪ 미완료 공부 날짜 변경',
+    '<div class="hint mb14">기존 진행 기록을 유지하면서 선택한 날짜의 오늘 플래너로 옮깁니다.</div>' +
+    '<div class="field"><label class="fl">이동할 날짜</label><input class="in" type="date" id="monthMoveDate" min="' + today() + '" value="' + suggested + '"></div>',
+    '<button class="btn btn-primary btn-block" data-act="monthmovesave">날짜 변경</button>');
+}
+function monthCarryCheckPatch(check) {
+  return {
+    claimed: check ? !!check.claimed : false,
+    note: check ? (check.note || '') : '',
+    steps: check ? Object.assign({}, check.steps || {}) : {},
+    count: check ? (check.count || 0) : 0,
+    blocked: false, done: false, at: null, dropped: false
+  };
+}
+function moveMonthOccurrence(task, from, to) {
+  if (!task || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < today()) return toast('오늘 이후 날짜를 선택해 주세요');
+  const oldCheck = getCheck(task.id, from);
+  if (task.repeat === 'once') {
+    const existing = weekMovesFor(task.staffId).find(move => move.taskId === task.id && move.to === from);
+    const original = existing ? existing.from : from;
+    const moves = weekMovesFor(task.staffId).filter(move => !(move.taskId === task.id && move.from === original));
+    if (to !== original) moves.push({ taskId: task.id, from: original, to: to, movedAt: now() });
+    setCheck(task.id, to, monthCarryCheckPatch(oldCheck));
+    setCheck(weekMoveKey(task.staffId), 'all', { moves: moves, done: true });
+  } else {
+    const carried = Object.assign({}, task, {
+      id: uid(), groupId: 'month-carry-' + now(), repeat: 'once', days: [], start: to, end: '',
+      carry: true, createdAt: now(), updatedAt: now(), deleted: false
+    });
+    state.tasks.push(carried);
+    save(); queueSync();
+    setCheck(carried.id, to, monthCarryCheckPatch(oldCheck));
+    setCheck(task.id, from, { dropped: true, dropReason: 'rescheduled', droppedAt: now() });
+  }
+  render(); toast('공부 날짜를 변경했습니다');
+}
+
 function viewMonth() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -2412,6 +2553,12 @@ function viewMonth() {
   const dates = monthDates(ym);
   const mp = monthProgress(me.id, ym);
   const goals = goalsFor(me.id, ym);
+  const plan = monthPlanOf(me.id, ym);
+  const stats = monthSubjectStats(me.id, ym);
+  const previousStats = monthSubjectStats(me.id, ymAdd(ym, -1));
+  const report = monthReport(me.id, ym, stats);
+  const backlog = monthBacklog(me.id, ym);
+  const events = plan.events.slice().sort((a, b) => a.date.localeCompare(b.date));
   const editable = session.isStaffLink || session.isAdmin;
 
   let h = '';
@@ -2422,17 +2569,45 @@ function viewMonth() {
     '<div class="d">' + ymLabel(ym) + '</div>' +
     '<button class="navbtn" data-act="mnav" data-n="1">›</button></div>';
 
+  /* 시험 · 중요 일정 */
+  h += '<div class="card"><div class="between mb8"><div><div class="card-title">📌 시험·중요 일정</div>' +
+    '<div class="card-sub">시험일과 준비 진행률을 함께 관리합니다.</div></div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="montheventadd">＋ 일정</button>' : '') + '</div>';
+  if (!events.length) h += '<div class="empty" style="padding:22px 12px"><b>🗓</b>등록된 시험이나 중요 일정이 없습니다.</div>';
+  h += events.map(event => {
+    const kind = MONTH_EVENT_KINDS[event.kind] || MONTH_EVENT_KINDS.other;
+    const progressValue = Math.max(0, Math.min(100, Number(event.progress) || 0));
+    return '<div class="month-event-row"><span class="pill ' + (event.date < today() ? '' : 'warn') + '">' + monthDday(event.date) + '</span>' +
+      '<div><div class="row wraprow" style="gap:6px"><b>' + esc(event.title) + '</b><span class="tag">' + kind + '</span>' +
+        (event.goalScore ? '<span class="tag doing">목표 ' + Number(event.goalScore) + '점</span>' : '') + '</div>' +
+        '<div class="small muted">' + label(event.date) + (event.range ? ' · ' + esc(event.range) : '') + '</div>' +
+        '<div class="month-event-progress"><i style="width:' + progressValue + '%"></i></div><div class="small muted">준비 ' + progressValue + '%</div></div>' +
+      (editable ? '<div class="row wraprow" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="-10">－</button>' +
+        '<button class="btn btn-sm" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="10">＋10%</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="montheventdel" data-id="' + esc(event.id) + '">삭제</button></div>' : '') + '</div>';
+  }).join('') + '</div>';
+
   /* 이달의 목표 */
-  h += '<div class="card"><div class="between mb8"><div class="card-title">🎯 이달의 목표</div>' +
-    (goals.length ? '<div class="pill">' + goals.filter(g => isDone(g.id, ym)).length + ' / ' + goals.length + '</div>' : '') +
-    '</div>';
+  h += '<div class="card"><div class="between mb8"><div><div class="card-title">🎯 이달의 목표</div>' +
+    '<div class="card-sub">과목별 시간 목표와 교재·인강 진도 목표를 관리합니다.</div></div><div class="row" style="gap:6px">' +
+    (goals.length ? '<span class="pill">' + goals.filter(g => isDone(g.id, ym)).length + ' / ' + goals.length + '</span>' : '') +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="monthgoal">시간 목표</button>' : '') + '</div></div>';
+  h += '<div class="month-subject-grid mb14">' + STUDY_SUBJECT_KEYS.map(key => {
+    const subject = STUDY_SUBJECTS[key];
+    const goalSecs = (Number(plan.subjectGoals[key]) || 0) * 60;
+    const actualSecs = stats[key].secs;
+    const pct = goalSecs ? Math.min(100, Math.round(actualSecs / goalSecs * 100)) : (actualSecs ? 100 : 0);
+    return '<div class="month-subject-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+      '<div class="month-subject-track"><i style="width:' + pct + '%"></i></div><span class="small">' + fmtDur(actualSecs) +
+      (goalSecs ? ' / ' + fmtDur(goalSecs) : '') + '</span></div>';
+  }).join('') + '</div><hr class="sep">';
   if (!goals.length) h += '<div class="card-sub mb8">이번 달에 이루고 싶은 목표를 적어두세요. (예: 책 2권 읽기, 수학 오답 30개)</div>';
   h += goals.map(g => {
     const c = getCheck(g.id, ym);
     const p = taskProgress(g, c);
     const done = c && c.done;
     return '<div class="task' + (done ? ' done' : '') + '"><div class="task-body">' +
-      '<div class="task-t">' + esc(g.title) + '</div>' +
+      '<div class="row wraprow" style="gap:6px">' + studySubjectTag(g.studySubject) + '<div class="task-t">' + esc(g.title) + '</div></div>' +
       '<div class="meta">' +
         (g.target ? '<span class="tag ' + (done ? 'ok' : 'doing') + '">' + p.done + ' / ' + p.total + (g.unit || '') + '</span>' : '') +
         (g.origin === 'staff' ? '<span class="tag add">학생 추가</span>' : '') +
@@ -2450,7 +2625,8 @@ function viewMonth() {
   }).join('');
   if (editable) {
     h += '<hr class="sep">' +
-      '<div class="field"><input class="in" id="gTitle" placeholder="목표 (예: 책 2권 읽기)"></div>' +
+      '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="gSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">목표</label><input class="in" id="gTitle" placeholder="예: 수학 오답 30개"></div></div>' +
       '<div class="row">' +
         '<input class="in" id="gTarget" type="number" inputmode="numeric" placeholder="목표 수량 (선택)">' +
         '<input class="in" id="gUnit" placeholder="단위 (권·회·쪽)" style="max-width:110px">' +
@@ -2460,18 +2636,16 @@ function viewMonth() {
   }
   h += '</div>';
 
-  /* 이번 달 달성률 */
-  h += '<div class="card"><div class="between mb8">' +
-    '<div class="card-title">이번 달 달성률</div>' +
-    '<div class="pill">' + mp.done + ' / ' + mp.total + '건 · ' + mp.pct + '%</div></div>' +
-    '<div class="bar"><i style="width:' + mp.pct + '%"></i></div></div>';
-
-  /* 달력 */
+  /* 순공시간 농도 달력 */
+  const maxStudySecs = Math.max.apply(null, dates.map(date => stTotal(me.id, date)).concat(1));
   const firstDow = (dowOf(dates[0]) + 6) % 7;   // 월요일 시작
   let cells = [];
   for (let i = 0; i < firstDow; i++) cells.push('<td></td>');
   dates.forEach(d => {
     const p = progress(me.id, d);
+    const secs = stTotal(me.id, d);
+    const studyMinutes = Math.round(secs / 60);
+    const studyShort = studyMinutes >= 60 ? Math.floor(studyMinutes / 60) + 'h ' + (studyMinutes % 60) + 'm' : studyMinutes + 'm';
     let cls = '', mark = '';
     if (p.total > 0) {
       if (p.done >= p.total) { cls = 'done'; mark = p.done; }
@@ -2479,17 +2653,71 @@ function viewMonth() {
       else if (p.done > 0) { cls = 'doing'; mark = p.done + '/' + p.total; }
       else { cls = 'has'; mark = p.total; }
     }
-    cells.push('<td><button class="calday ' + cls + (d === today() ? ' today' : '') + '" data-act="daypick" data-date="' + d + '">' +
-      '<b>' + Number(d.slice(8)) + '</b>' + (mark !== '' ? '<small>' + mark + '</small>' : '') + '</button></td>');
+    const alpha = secs ? (.12 + Math.min(.62, secs / maxStudySecs * .62)).toFixed(2) : 0;
+    cells.push('<td><button class="calday ' + cls + (d === today() ? ' today' : '') + '" data-act="daypick" data-date="' + d + '"' +
+      (secs ? ' style="background:rgba(127,179,244,' + alpha + ')"' : '') + ' aria-label="' + esc(label(d) + ' 순공 ' + fmtDur(secs) + ' 완료 ' + p.done + '/' + p.total) + '">' +
+      '<b>' + Number(d.slice(8)) + '</b>' + (secs ? '<span class="cal-study">' + studyShort + '</span>' : '') +
+      (mark !== '' ? '<small>' + mark + '</small>' : '') + '</button></td>');
   });
   while (cells.length % 7) cells.push('<td></td>');
   const rows = [];
   for (let i = 0; i < cells.length; i += 7) rows.push('<tr>' + cells.slice(i, i + 7).join('') + '</tr>');
 
-  h += '<div class="card"><div class="card-title mb8">달력</div>' +
+  h += '<div class="card"><div class="card-title">🗓 월간 공부 달력</div><div class="card-sub mb8">파란색이 진할수록 실제 순공시간이 깁니다.</div>' +
     '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead>' +
     '<tbody>' + rows.join('') + '</tbody></table>' +
-    '<div class="hint">날짜를 누르면 그날의 할 일로 이동합니다. 🔵 전부 완료 · 🟠 진행중 · 🩷 미완료 · 회색 숫자는 할 일 개수.</div></div>';
+    '<div class="hint">날짜를 누르면 그날의 오늘 플래너로 이동합니다. 테두리와 숫자는 할 일 달성 상태를 표시합니다.</div></div>';
+
+  /* 과목별 분석 */
+  const totalSubjectSecs = report.totalSecs;
+  const topShare = report.topKey && totalSubjectSecs ? Math.round(stats[report.topKey].secs / totalSubjectSecs * 100) : 0;
+  h += '<div class="card"><div class="card-title">📊 과목별 분석</div><div class="card-sub mb14">지난달 순공시간과 이번 달 공부 완료율을 비교합니다.</div>' +
+    '<div class="month-subject-grid">' + STUDY_SUBJECT_KEYS.map(key => {
+      const subject = STUDY_SUBJECTS[key];
+      const current = stats[key];
+      const previous = previousStats[key].secs;
+      const diff = previous ? Math.round((current.secs - previous) / previous * 100) : (current.secs ? null : 0);
+      const max = Math.max.apply(null, STUDY_SUBJECT_KEYS.map(k => stats[k].secs).concat(1));
+      const width = Math.round(current.secs / max * 100);
+      const compare = diff == null ? '지난달 기록 없음' : (diff > 0 ? '지난달보다 +' : '지난달보다 ') + diff + '%';
+      return '<div class="month-subject-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+        '<div><div class="month-subject-track"><i style="width:' + width + '%"></i></div><div class="small muted">' + compare + ' · 공부 ' + current.done + '/' + current.total + '건 완료</div></div>' +
+        '<b class="small">' + fmtDur(current.secs) + '</b></div>';
+    }).join('') + '</div>' +
+    (topShare >= 60 ? '<div class="hint" style="margin-top:12px;color:var(--amber)">⚠ ' + STUDY_SUBJECTS[report.topKey].label + '에 전체 순공시간의 ' + topShare + '%가 집중되어 있습니다.</div>' : '') + '</div>';
+
+  /* 미완료 공부 */
+  h += '<div class="card' + (backlog.length ? ' alert' : '') + '"><div class="between mb8"><div><div class="card-title">↪ 이번 달 미완료 공부</div>' +
+    '<div class="card-sub">이월이 켜진 공부만 모아 날짜를 다시 정할 수 있습니다.</div></div><span class="pill ' + (backlog.length ? 'bad' : '') + '">' + backlog.length + '개</span></div>';
+  if (!backlog.length) h += '<div class="small muted">현재 이월할 미완료 공부가 없습니다.</div>';
+  const nextMonthStart = ymAdd(ym, 1) + '-01';
+  const rolloverDate = nextMonthStart < today() ? today() : nextMonthStart;
+  h += backlog.map(item => {
+    const subject = studySubject(item.t.studySubject);
+    return '<div class="month-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+      '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
+      (editable ? '<div class="row wraprow" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="monthmove" data-id="' + item.t.id + '" data-date="' + item.date + '">날짜 변경</button>' +
+        '<button class="btn btn-sm" data-act="monthnext" data-id="' + item.t.id + '" data-date="' + item.date + '" data-to="' + rolloverDate + '">' +
+          (nextMonthStart < today() ? '오늘로 이월' : '다음 달 이월') + '</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="monthdrop" data-id="' + item.t.id + '" data-date="' + item.date + '">종료</button></div>' : '') + '</div>';
+  }).join('') + '</div>';
+
+  /* 월간 리포트 · 회고 */
+  h += '<div class="card"><div class="between mb14"><div><div class="card-title">📝 월간 리포트</div>' +
+    '<div class="card-sub">이번 달 결과를 정리하고 다음 달 방향을 정합니다.</div></div><span class="pill">달성률 ' + mp.pct + '%</span></div>' +
+    '<div class="month-kpis mb14"><div class="month-kpi"><span class="small muted">총 순공시간</span><b>' + fmtDur(report.totalSecs) + '</b></div>' +
+      '<div class="month-kpi"><span class="small muted">하루 평균</span><b>' + fmtDur(report.avgSecs) + '</b></div>' +
+      '<div class="month-kpi"><span class="small muted">목표 달성일</span><b>' + report.goalDays + '일</b></div>' +
+      '<div class="month-kpi"><span class="small muted">완료한 공부</span><b>' + report.doneTasks + '/' + report.totalTasks + '</b></div></div>' +
+    '<div class="hint mb14">가장 많이 공부한 과목: <b>' + (report.topKey ? STUDY_SUBJECTS[report.topKey].label : '기록 없음') + '</b>' +
+      (stGoalMin(me.id) ? ' · 일일 목표 ' + stGoalMin(me.id) + '분 기준 ' + report.goalDays + '/' + report.elapsedDays + '일 달성' : '') + '</div>' +
+    '<div class="month-review-grid"><div class="field"><label class="fl">학생 월간 회고</label><textarea class="in" id="monthReflection" ' +
+      (session.isStaffLink ? '' : 'readonly') + ' placeholder="잘한 점과 아쉬운 점을 적어보세요">' + esc(plan.reflection || '') + '</textarea></div>' +
+      '<div class="field"><label class="fl">원장 종합 피드백</label><textarea class="in" id="monthDirectorNote" ' +
+        (session.isAdmin ? '' : 'readonly') + ' placeholder="이번 달 학습에 대한 피드백">' + esc(plan.directorNote || '') + '</textarea></div>' +
+      '<div class="field wide"><label class="fl">다음 달 권장사항</label><textarea class="in" id="monthNextFocus" ' +
+        (session.isAdmin ? '' : 'readonly') + ' placeholder="다음 달 우선순위와 권장 공부량">' + esc(plan.nextFocus || '') + '</textarea></div></div>' +
+    (editable ? '<button class="btn btn-primary btn-block" data-act="monthreviewsave" data-ym="' + ym + '">월간 기록 저장</button>' : '') + '</div>';
 
   return h;
 }
@@ -3772,6 +4000,111 @@ document.addEventListener('click', ev => {
       break;
     }
 
+    /* 월간 목표 · 일정 · 이월 · 회고 */
+    case 'monthgoal': {
+      const me = currentStaff(); if (!me) break;
+      monthSubjectGoalModal(me, ymCursor);
+      break;
+    }
+    case 'monthgoalsave': {
+      const me = currentStaff(); if (!me) break;
+      const ym = el.dataset.ym || ymCursor;
+      const plan = monthPlanOf(me.id, ym);
+      const subjectGoals = {};
+      document.querySelectorAll('[data-monthgoal]').forEach(input => {
+        const mins = Math.max(0, Number(input.value) || 0);
+        if (mins) subjectGoals[input.dataset.monthgoal] = mins;
+      });
+      setCheck(monthPlanKey(me.id), ym, { plan: Object.assign({}, plan, { subjectGoals: subjectGoals }), done: true });
+      closeModal(); render(); toast('월간 시간 목표를 저장했습니다');
+      break;
+    }
+    case 'montheventadd': monthEventModal(ymCursor); break;
+    case 'montheventsave': {
+      const me = currentStaff(); if (!me) break;
+      const ym = el.dataset.ym || ymCursor;
+      const title = ($('#mEventTitle').value || '').trim();
+      const eventDate = $('#mEventDate').value || '';
+      if (!title) return toast('일정 이름을 입력해 주세요');
+      if (!eventDate || ymOf(eventDate) !== ym) return toast('현재 월에 해당하는 날짜를 선택해 주세요');
+      const plan = monthPlanOf(me.id, ym);
+      plan.events.push({
+        id: uid(), kind: $('#mEventKind').value || 'other', title: title, date: eventDate,
+        range: ($('#mEventRange').value || '').trim(),
+        goalScore: Math.max(0, Math.min(100, Number($('#mEventScore').value) || 0)),
+        progress: 0, createdAt: now()
+      });
+      setCheck(monthPlanKey(me.id), ym, { plan: plan, done: true });
+      closeModal(); render(); toast('중요 일정을 추가했습니다');
+      break;
+    }
+    case 'montheventprogress': {
+      const me = currentStaff(); if (!me) break;
+      const plan = monthPlanOf(me.id, ymCursor);
+      const event = plan.events.find(item => item.id === id);
+      if (!event) break;
+      event.progress = Math.max(0, Math.min(100, (Number(event.progress) || 0) + Number(el.dataset.n)));
+      setCheck(monthPlanKey(me.id), ymCursor, { plan: plan, done: true });
+      render();
+      break;
+    }
+    case 'montheventdel': {
+      const me = currentStaff(); if (!me) break;
+      if (!confirm('이 일정을 삭제할까요?')) return;
+      const plan = monthPlanOf(me.id, ymCursor);
+      plan.events = plan.events.filter(item => item.id !== id);
+      setCheck(monthPlanKey(me.id), ymCursor, { plan: plan, done: true });
+      render();
+      break;
+    }
+    case 'monthmove': {
+      const t = task();
+      const me = currentStaff();
+      if (!t || !me || t.staffId !== me.id) return toast('이 공부의 날짜를 변경할 수 없습니다');
+      monthMoveModal(t, date);
+      break;
+    }
+    case 'monthmovesave': {
+      if (!monthMoveDraft) break;
+      const t = state.tasks.find(item => item.id === monthMoveDraft.taskId);
+      const to = ($('#monthMoveDate') && $('#monthMoveDate').value) || '';
+      if (!t || t.staffId !== monthMoveDraft.staffId) return toast('이 공부의 날짜를 변경할 수 없습니다');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || to < today()) return toast('오늘 이후 날짜를 선택해 주세요');
+      closeModal();
+      moveMonthOccurrence(t, monthMoveDraft.current, to);
+      monthMoveDraft = null;
+      break;
+    }
+    case 'monthnext': {
+      const t = task();
+      const me = currentStaff();
+      if (!t || !me || t.staffId !== me.id) return toast('이 공부를 이월할 수 없습니다');
+      moveMonthOccurrence(t, date, el.dataset.to || today());
+      break;
+    }
+    case 'monthdrop': {
+      const t = task();
+      const me = currentStaff();
+      if (!t || !me || t.staffId !== me.id) break;
+      if (!confirm('이 날짜의 미완료 공부를 종료할까요? 기록은 남고 체크리스트에서는 제외됩니다.')) return;
+      setCheck(t.id, date, { dropped: true, dropReason: 'monthly-close', droppedAt: now(), blocked: false });
+      render(); toast('미완료 공부를 종료했습니다');
+      break;
+    }
+    case 'monthreviewsave': {
+      const me = currentStaff(); if (!me) break;
+      const ym = el.dataset.ym || ymCursor;
+      const plan = monthPlanOf(me.id, ym);
+      const next = Object.assign({}, plan, {
+        reflection: session.isAdmin ? plan.reflection : (($('#monthReflection') && $('#monthReflection').value) || '').trim(),
+        directorNote: session.isAdmin ? (($('#monthDirectorNote') && $('#monthDirectorNote').value) || '').trim() : plan.directorNote,
+        nextFocus: session.isAdmin ? (($('#monthNextFocus') && $('#monthNextFocus').value) || '').trim() : plan.nextFocus
+      });
+      setCheck(monthPlanKey(me.id), ym, { plan: next, done: true });
+      render(); toast('월간 기록을 저장했습니다');
+      break;
+    }
+
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
@@ -3782,13 +4115,15 @@ document.addEventListener('click', ev => {
     case 'gadd': {
       const title = ($('#gTitle').value || '').trim();
       if (!title) return toast('목표를 입력해 주세요');
+      const subjectKey = $('#gSubject').value || '';
+      if (!subjectKey || !STUDY_SUBJECTS[subjectKey]) return toast('과목을 선택해 주세요');
       const me = currentStaff(); if (!me) break;
       const target = Math.max(0, Number($('#gTarget').value) || 0);
       const unit = ($('#gUnit').value || '').trim() || '회';
       state.tasks.push({
         id: uid(), groupId: 'goal-' + now(), staffId: me.id,
         kind: 'mgoal', month: ymCursor,
-        title: title, detail: '', guide: '', steps: [], target: target, unit: unit,
+        title: title, detail: '', guide: '', steps: [], target: target, unit: unit, studySubject: subjectKey,
         time: '', priority: 'normal', repeat: 'once', days: [], start: ymCursor + '-01', end: '', carry: false,
         origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
       });
