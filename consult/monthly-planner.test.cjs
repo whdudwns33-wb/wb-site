@@ -13,9 +13,9 @@ const section = (start, end) => {
 test('monthly planner follows the agreed information order', () => {
   const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
   const labels = [
+    'agendaCalendarCard(me, ym)',
     '시험·중요 일정',
     '이달의 목표',
-    '월간 공부 달력',
     '과목별 분석',
     '이번 달 미완료 공부',
     '월간 리포트'
@@ -44,12 +44,14 @@ test('monthly subject goals and analysis reuse real timer and checklist data', (
 
 test('monthly calendar paints study-time intensity and opens the selected day', () => {
   const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
+  const agenda = section('function agendaCalendarCard(', 'function monthSubjectGoalModal(');
 
-  assert.match(month, /maxStudySecs/);
-  assert.match(month, /stTotal\(me\.id, d\)/);
-  assert.match(month, /rgba\(127,179,244,/);
-  assert.match(month, /data-act="daypick"/);
-  assert.match(month, /파란색이 진할수록 실제 순공시간이 깁니다/);
+  assert.match(month, /agendaCalendarCard\(me, ym\)/);
+  assert.match(agenda, /maxStudySecs/);
+  assert.match(agenda, /stTotal\(me\.id, date\)/);
+  assert.match(agenda, /rgba\(127,179,244,/);
+  assert.match(agenda, /data-act="agendapick"/);
+  assert.match(agenda, /통합 일정/);
 });
 
 test('monthly important events include D-day, scope, score, and preparation progress', () => {
