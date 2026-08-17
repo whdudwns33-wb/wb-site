@@ -37,7 +37,7 @@
  *   POST /onboarding-patch { app, auth, ... }       → 신규 학생 30일 기록 CAS 수정
  *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
- *   POST /parent-portal { app, action, ... }         → 보호자 초대·학생 범위 웹앱
+ *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
@@ -1550,12 +1550,15 @@ export default {
         return await handleOnboardingPatch(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/parent-portal') {
-        const publicAction = ['exchange', 'view', 'respond', 'logout'].includes(String(body.action || ''));
-        if (publicAction && !parentSameOrigin) {
+        const authenticatedActions = new Set([
+          'invite', 'access_list', 'access_set', 'preview',
+          'publication_list', 'publication_set', 'request_list', 'request_resolve'
+        ]);
+        const action = String(body.action || '');
+        if (!authenticatedActions.has(action) && !parentSameOrigin) {
           return json({ ok: false, error: '보호자 앱과 같은 출처에서만 사용할 수 있습니다' }, 403, okOrigin);
         }
-        const auth = ['invite', 'access_list', 'access_set', 'preview'].includes(body.action)
-          ? await resolveAuth(env, app, body.auth) : null;
+        const auth = authenticatedActions.has(action) ? await resolveAuth(env, app, body.auth) : null;
         return await handleParentPortal(env, app, body, okOrigin, auth, json, request);
       }
       if (url.pathname === '/makeup') {

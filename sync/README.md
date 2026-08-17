@@ -42,6 +42,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/031_book_order_fulf
 npx wrangler d1 execute wb-sync --remote --file=./migrations/032_acaflow_student_links.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/033_consult_admin_accounts.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/034_parent_portal_scope.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/035_parent_portal_phase2.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -118,7 +119,8 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 버튼을 설정 필요 상태로 잠근다. 실시간 교통량을 반영한 제안이므로 저장 전에 정류장 순서와 시간을 확인한다.
 
 보강·회차제·보호자 웹앱 배포는 `025_makeup.sql` → `026_session_packs.sql` →
-`027_parent_portal.sql` → `028_guardian_ops_notifications.sql` 순서로 먼저 적용하고 Worker를
+`027_parent_portal.sql` → `028_guardian_ops_notifications.sql` → `034_parent_portal_scope.sql` →
+`035_parent_portal_phase2.sql` 순서로 먼저 적용하고 Worker를
 배포한 뒤 Pages를 배포한다. 월제 수업은
 회차권 행을 만들지 않으며, 실제 횟수제 학생·수업만 원장이 명시적으로 등록한다. 보호자 웹앱 동의는
 기존 수업 피드백 알림톡 동의와 별도이고, 꺼지면 해당 학생의 초대코드와 세션이 모두 해지된다.
@@ -368,16 +370,28 @@ confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며,
 ### `/parent-portal` — 보호자 전용 웹앱
 
 원장·관리 담당이 stable 학생 ID별 웹앱 동의를 별도로 저장하고 1회용 초대코드를 발급한다. 공개 범위
-v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·회차·피드백을 포함하며, 기존 v1 동의는
-자동 승계하지 않고 관리자 화면에서 다시 확인한다. 코드는
+v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·회차·피드백을 포함한다. v3는 내부 메모와
+분리된 공개 숙제·준비물과 정형 보호자 요청을 추가한다. 기존 v1/v2 동의는 자동 승계하지 않고 관리자
+화면에서 다시 확인하되, 이미 연결된 세션은 기존 동의 범위 안에서 계속 읽을 수 있다. 코드는
 교환 즉시 폐기되며 서버에는 해시만 저장된다. 보호자 세션은 한 학생만 볼 수 있고, 확정 시간표·보강
 제안/확정·횟수 잔여·이미 접수된 피드백의 안전한 요약만 반환한다.
 
 ```jsonc
 // 관리자
 { "app":"task", "auth":{...}, "action":"access_set",
-  "studentId":"student-1", "enabled":true, "scopeVersion":2, "expectedUpdatedAt":0 }
+  "studentId":"student-1", "enabled":true, "scopeVersion":3, "expectedUpdatedAt":0 }
 { "app":"task", "auth":{...}, "action":"invite", "studentId":"student-1" }
+
+// 담당 선생님: 서버 KST 오늘의 확정·현재 담당 수업만 공개한다.
+{ "app":"task", "auth":{...}, "action":"publication_list", "lessonDate":"2026-08-17" }
+{ "app":"task", "auth":{...}, "action":"publication_set", "taskId":"lesson-1",
+  "lessonDate":"2026-08-17", "publicHomework":"2쪽 풀기", "publicReadiness":"연필",
+  "published":true, "expectedRevision":0 }
+
+// 원장·관리 담당: 보호자 요청함 조회와 CAS 처리.
+{ "app":"task", "auth":{...}, "action":"request_list", "status":"open" }
+{ "app":"task", "auth":{...}, "action":"request_resolve", "requestId":"grq_...",
+  "resolution":"resolved", "expectedRevision":1 }
 
 // Worker origin의 보호자 웹앱: /#code=<1회용 코드>를 즉시 지운 뒤 교환한다.
 // exchange 응답은 HttpOnly·Secure·SameSite=Strict 쿠키를 설정한다.
@@ -385,12 +399,17 @@ v2는 확정 수업·오늘 출결/수업 기록 진행·차량 확인·보강·
 { "app":"task", "action":"view" }
 { "app":"task", "action":"respond",
   "caseId":"mu_...", "revision":3, "response":"accept" }
+{ "app":"task", "action":"submit_request",
+  "requestType":"consultation", "clientRequestId":"req_20260817_a1b2c3d4" }
 ```
 
 보호자 앱 정적 파일과 API는 같은 Worker origin에서 제공하고, 직원 GitHub Pages와 origin을
 분리한다. 초대·세션 원문, 전화번호, 내부 메모는 응답이나 장부에 저장하지 않으며 세션 토큰은
 자바스크립트나 localStorage에 노출하지 않는다. 오프라인 캐시는 사용하지 않고, 웹앱 동의나
 보호자 연락처 연결이 바뀌면 기존 코드·세션을 즉시 무효화한다.
+보호자 요청 종류는 `consultation`, `schedule_check`, `info_correction`뿐이며 학생 ID는 세션에서만
+결정한다. 자유문구·전화번호·주소·첨부는 받지 않는다. 같은 종류의 open 요청은 하나로 합치고 학생별
+24시간 5건으로 제한한다. 공개 숙제·준비물은 현재 assignment의 최근 14일 최신 1건만 보인다.
 
 ### `/guardian-ops-send` — 보강·회차 운영 알림톡
 

@@ -29,6 +29,7 @@ function inboxRowsFor(overrides = {}) {
       { stage: 'student_handed', academyRegisteredAt: null, title: '배부 교재', quantity: 2, owner: 'teacher-a', studentHandedAt: 7 },
       { stage: 'student_handed', academyRegisteredAt: 8, title: '등록 완료 교재', quantity: 1, owner: 'teacher-b', studentHandedAt: 6 }
     ],
+    guardianRequestRows: [],
     state: { tasks: [{ id: 'lesson-a', studentName: '학생A', title: '수업A' }] },
     ...overrides
   };
@@ -59,18 +60,36 @@ test('관리담당이 아니면 통합 요청함 데이터를 만들지 않는�
   assert.deepEqual(inboxRowsFor({ session: { isAdmin: false } }), []);
 });
 
-test('통합 요청함은 선생님별 수업 흐름 아래에 있고 필요한 6개 목록만 새로고침한다', () => {
+test('통합 요청함은 선생님별 수업 흐름 아래에 있고 필요한 7개 목록만 새로고침한다', () => {
   const schedule = source.slice(source.indexOf('function viewSchedule()'), source.indexOf('/* ── 기기 대장 ──'));
   assert.match(schedule, /scheduleTimelineHtml\(timeline, cursor, nowKst\);\s*return h \+ managerRequestInboxHtml\(\)/);
   assert.doesNotMatch(schedule, /managerRequestInboxHtml\(\) \+ scheduleToolbarHtml\(\)/);
   const loader = source.slice(source.indexOf('async function loadManagerRequestInbox'), source.indexOf('function managerRequestInboxHtml'));
-  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadBookIssues']) {
+  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadBookIssues', 'loadGuardianRequests']) {
     assert.match(loader, new RegExp(name + '\\(force\\)'));
   }
-  assert.match(source, /bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded/);
-  assert.match(source, /bookEditQueueError, bookIssueError/);
+  assert.match(source, /bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded && guardianRequestsLoaded/);
+  assert.match(source, /bookIssueError, guardianRequestsError/);
   assert.match(source, /route === 'books' \|\| route === 'schedule'/);
   assert.doesNotMatch(loader, /loadMakeups\(force\)/);
   assert.match(source, /\['schedule', '현황판', managerRequestInboxCount\(\)\]/);
   assert.match(source, /case 'managerinboxrefresh': loadManagerRequestInbox\(true\)/);
+  assert.match(source, /기존 검토 화면으로 이동하거나 보호자 요청은 여기서 안전하게 처리합니다\./);
+  assert.doesNotMatch(source, /처리는 기존 검토 화면에서 안전하게 진행됩니다\./);
+});
+
+test('보호자 요청은 서버 문구 대신 안전한 enum 라벨과 CAS 식별자로 통합 요청함에 들어간다', () => {
+  const rows = inboxRowsFor({
+    guardianRequestRows: [
+      { requestId: 'req-1', studentName: '학생C', grade: '중2', requestType: 'consultation', status: 'open', revision: 3, updatedAt: 9 },
+      { requestId: 'req-2', studentName: '학생D', grade: '초5', requestType: 'server_html', requestTypeLabel: '<img src=x>', status: 'open', revision: 1, updatedAt: 8 }
+    ]
+  });
+  const guardian = rows.filter(row => row.kind === '보호자 요청');
+  assert.equal(guardian.length, 2);
+  assert.equal(guardian[0].title, '학생C · 상담 요청');
+  assert.equal(guardian[0].requester, '보호자 앱');
+  assert.equal(guardian[0].guardianRequestRevision, 3);
+  assert.equal(guardian[1].title, '학생D · 요청 유형 확인 필요');
+  assert.doesNotMatch(guardian.map(row => row.title).join(' '), /<img|server_html/);
 });
