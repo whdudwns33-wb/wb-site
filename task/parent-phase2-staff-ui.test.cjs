@@ -66,9 +66,9 @@ test('공개 입력은 로딩·오류·escape 상태와 44px 모바일 조작을
     const rows = new Map(row ? [['lesson-1|2026-08-17', row]] : []);
     return new Function('guardianPublicationKey', 'guardianPublicationLoadingDates', 'guardianPublicationLoadedDates',
       'guardianPublicationErrors', 'guardianPublicationDrafts', 'guardianPublicationSaving', 'guardianLessonPublications',
-      'setTimeout', 'loadGuardianPublications', 'esc', `${code}\nreturn guardianPublicationHtml;`)(
+      'setTimeout', 'loadGuardianPublications', 'esc', 'studentSelfCheckReviewHtml', `${code}\nreturn guardianPublicationHtml;`)(
         (taskId, date) => `${taskId}|${date}`, loadingDates, loadedDates, errors, new Map(), new Set(), rows,
-        () => {}, () => {}, escapeHtml
+        () => {}, () => {}, escapeHtml, () => ''
       )({ id: 'lesson-1' }, '2026-08-17');
   };
 

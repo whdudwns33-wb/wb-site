@@ -443,7 +443,7 @@ function staffActor(auth) {
       ? String(auth.id) : 'director';
 }
 
-function publicationActorId(auth) {
+export function publicationActorId(auth) {
   const id = String(auth && auth.id || '');
   return SAFE_ID.test(id) && (auth.scope === 'own' || auth.role === 'manager') ? id : '';
 }
@@ -463,7 +463,7 @@ async function publicLessonIdentity(task, owner) {
   };
 }
 
-async function currentPublicationTask(env, row, now) {
+export async function currentPublicationTask(env, row, now) {
   const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind('task', row.source_task_id).first();
   const task = taskRow && parseJson(taskRow.data);

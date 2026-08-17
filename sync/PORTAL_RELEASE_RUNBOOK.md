@@ -1,11 +1,11 @@
 # 보호자·학생 앱 운영 배포 및 실제 기기 확인
 
-이 문서는 **기존 운영 D1**에 보호자 앱 Phase 3·4와 학생 앱 공개 v1·v2를 반영할 때 사용한다.
+이 문서는 **기존 운영 D1**에 보호자 앱 Phase 3·4와 학생 앱 공개 v1·v2·v3를 반영할 때 사용한다.
 학생 이름, 전화번호, 초대코드, 세션값, 관리자 비밀키는 터미널·채팅·검증 기록에 남기지 않는다.
 
 ## 완료 기준
 
-- 운영 D1에 필요한 `036 → 037 → 038 → 039` 구조가 정확히 존재한다.
+- 운영 D1에 필요한 `036 → 037 → 038 → 039 → 040` 구조가 정확히 존재한다.
 - 보호자·직원 Worker, 학생 전용 Worker, task 화면이 이 순서로 배포된다.
 - 관리자 미리보기는 DB 행이나 쿠키를 만들지 않는다.
 - 동의받은 시험 학생 한 명이 휴대폰과 태블릿에서 학생 앱을 연다.
@@ -13,6 +13,8 @@
   배정 교재 상태, 주간 시간표만 보인다.
 - 기존 학생 공개 v1 세션에는 외부 학습 링크가 보이지 않고, 보호자가 v2 범위를 다시 확인한
   학생에게만 메타수학·클래스카드 공식 화면 링크 두 개가 보인다.
+- v1·v2 세션에는 자기 체크가 보이지 않는다. 보호자가 v3 범위를 다시 확인한 학생만 오늘 공개
+  숙제에서 `완료`·`도움 필요`를 선택하고, 담당 선생님 개인 연결의 확인 뒤에만 최종 완료된다.
 - 보호자 요청, 보강, 회차, 공지, 주문 상태, 연락처, 주소, 내부 메모, 다른 학생 정보는 보이지 않는다.
 - 연결을 끄면 기존 초대코드와 모든 학생 세션이 즉시 사용할 수 없게 된다.
 
@@ -36,6 +38,10 @@
 사후 probe는 `rows_written: 0`, `changed_db: false`였고 두 Worker health와 공개 Origin 경계도
 정상이다. `036`~`039`는 모두 운영에 적용됐으므로 재실행하지 않는다. 이후 변경은 새 migration으로만
 추가한다.
+
+`040_student_lesson_self_checks.sql`은 위 2026-08-18 배포에 포함되지 않은 신규 migration이다.
+아래 probe에서 `0/15`, `0/4`인 것을 확인한 경우에만 한 번 적용한다. 이 문서만 보고 이미 적용됐다고
+추정하지 않는다.
 
 ## 1. 코드 검증
 
@@ -71,7 +77,7 @@ npx wrangler deploy --config wrangler.student.toml --dry-run
 ```bash
 cd sync
 PORTAL_PROBE_SQL="$(sed '/^[[:space:]]*--/d' ./portal-release-probe.sql)"
-npx wrangler d1 execute wb-sync --remote --command "$PORTAL_PROBE_SQL"
+npx wrangler d1 execute wb-sync --remote --command="$PORTAL_PROBE_SQL"
 unset PORTAL_PROBE_SQL
 ```
 
@@ -87,11 +93,14 @@ probe는 설명 주석을 뺀 뒤 읽기 전용 `--command`로 실행한다. `--
   한 번 적용하고, 각각 `10/10`, `2/2`이면 건너뛴다.
 - `migration_039_objects`와 `migration_039_columns`는 각각 `0/4`, `0/4`일 때만 039를
   한 번 적용하고, 각각 `4/4`, `4/4`이면 건너뛴다.
+- `migration_040_objects`와 `migration_040_columns`는 각각 `0/15`, `0/4`일 때만 040을
+  한 번 적용하고, 각각 `15/15`, `4/4`이면 건너뛴다.
 - 일부만 있으면 **중단**한다. 같은 파일을 다시 실행하거나 스키마를 손으로 고치지 않는다.
 - 036은 테이블 2 + 인덱스 2 + 트리거 6, 037은 테이블 3 + 인덱스 4 + 트리거 14,
   038은 테이블 3 + 인덱스 2 + 트리거 5와 열 2, 039는 학생 access/code/session의
   `effective_scope_version` 열 3개, access의 `scope_confirmed_at` 열 1개와 범위 보호 트리거
-  4개가 완전한 상태다.
+  4개가 완전한 상태다. 040은 자기 체크 current/event 테이블 2개, 인덱스 2개, 동의 봉인·CAS·
+  24시간 상한·불변 이력 트리거 11개와 자기 체크 동의 열 4개가 완전한 상태다.
 - 이 저장소는 과거에 SQL 파일을 직접 적용한 이력이 있으므로 `d1_migrations` 기록만으로
   적용 여부를 판단하지 않는다.
 
@@ -104,10 +113,12 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/036_guardian_announ
 npx wrangler d1 execute wb-sync --remote --file=./migrations/037_book_order_identity_snapshots.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/038_student_portal.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_scope_v2.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/040_student_lesson_self_checks.sql
 ```
 
-`038`과 `039`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다. 적용 직후 probe를 다시
-실행하고 `9/9`, `10/10`, `21/21`, `10/10`, `2/2`, `4/4`, `4/4`을 모두 확인한다.
+`038`~`040`에는 `ALTER TABLE`이 있으므로 맹목적으로 재실행하면 안 된다. 특히 040은 한 번 적용한 뒤
+같은 파일을 재실행하면 duplicate column 오류가 나는 것이 정상이다. 적용 직후 probe를 다시 실행하고
+`9/9`, `10/10`, `21/21`, `10/10`, `2/2`, `4/4`, `4/4`, `15/15`, `4/4`을 모두 확인한다.
 
 - `guardian_announcements`, `guardian_announcement_events`
 - `book_order_student_snapshots`, `book_order_active_targets`, `book_order_cancellations`
@@ -116,6 +127,9 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/039_student_portal_
 - `guardian_lesson_publication_events.student_visible`
 - `student_portal_access/codes/sessions.effective_scope_version`
 - `student_portal_access.scope_confirmed_at`
+- `student_portal_access.self_check_enabled/self_check_confirmed_at`
+- `student_portal_codes/sessions.self_check_enabled`
+- `student_lesson_self_checks`, `student_lesson_self_check_events`
 
 어느 하나라도 빠지면 Worker를 배포하지 않는다.
 
@@ -131,7 +145,7 @@ npx wrangler deploy --config wrangler.student.toml
 
 배포 순서는 반드시 다음과 같다.
 
-1. 운영 D1 `036 → 037 → 038 → 039`
+1. 운영 D1 `036 → 037 → 038 → 039 → 040`
 2. 보호자·직원 Worker (`wrangler.toml`)
 3. 학생 전용 Worker (`wrangler.student.toml`)
 4. task Pages와 `version.json`
@@ -178,9 +192,9 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 ## 6. 실제 휴대폰·태블릿 확인
 
-반드시 보호자에게 학생 앱 공개 v2 범위와 외부 서비스 이동 시 처리될 수 있는 기기·접속 기록·
-서비스 쿠키를 설명하고 동의를 받은 시험 학생으로 진행한다. WB는 외부 아이디·비밀번호·학습 결과를
-받거나 저장하지 않는다.
+반드시 보호자에게 학생 앱 공개 v3 범위, 학생의 `완료`·`도움 필요` 선택, 담당 선생님 확인, 외부
+서비스 이동 시 처리될 수 있는 기기·접속 기록·서비스 쿠키를 설명하고 동의를 받은 시험 학생으로
+진행한다. WB는 외부 아이디·비밀번호·학습 결과를 받거나 저장하지 않는다.
 
 1. 관리자 화면에서 보호자 연락처 연결 상태를 확인한다.
 2. 학생 앱 공개 동의 확인란을 선택해 연결을 켠다.
@@ -189,15 +203,21 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 5. 주소창에서 초대 fragment가 즉시 사라지고 화면이 열린 것을 확인한다.
 6. 오늘 수업·차량·최근 공개 기록·배정 교재·주간 시간표를 각각 확인한다.
 7. 메타수학·클래스카드 링크가 정확히 두 개만 보이고, 새 창/탭의 공식 HTTPS 주소로 열리는지 확인한다.
-8. 앱을 백그라운드로 보냈다가 다시 열고, 새로고침 후에도 같은 학생만 보이는지 확인한다.
-9. 태블릿에도 별도로 연결해 같은 항목과 모바일 배치를 확인한다.
-10. 이미 연결된 기기에서 새 링크를 열면 기존 연결 안내와 로그아웃 동작이 보이고,
+8. 오늘 공개 숙제에서 `도움 필요`를 선택한다. 다른 학생 ID·자유문자·연락처 입력칸이 없어야 한다.
+9. 담당 선생님 개인 연결의 오늘 할 일에서 같은 건을 확인한다. 관리 담당도 본인 수업만 확인해야 한다.
+10. `도움 필요` 확인은 접수만 되고 최종 완료가 아닌지 확인한다. 이어 학생이 `완료`로 바꾸면 다시
+    확인 대기가 되고, 담당 확인 뒤에만 최종 완료가 되는지 확인한다.
+11. 최종 완료된 같은 공개 revision을 학생이 `도움 필요`로 되돌릴 수 없는지 확인한다. 선생님이 공개
+    숙제를 수정하면 이전 완료는 적용되지 않고 새 내용에 다시 선택해야 한다.
+12. 앱을 백그라운드로 보냈다가 다시 열고, 새로고침 후에도 같은 학생만 보이는지 확인한다.
+13. 태블릿에도 별도로 연결해 같은 항목과 모바일 배치를 확인한다.
+14. 이미 연결된 기기에서 새 링크를 열면 기존 연결 안내와 로그아웃 동작이 보이고,
    로그아웃 뒤 새 링크가 정상 교환되는지 확인한다.
-11. 관리자 화면에서 연결을 끈 뒤 휴대폰·태블릿을 새로고침해 모두 접근이 거절되는지 확인한다.
+15. 관리자 화면에서 연결을 끈 뒤 휴대폰·태블릿을 새로고침해 모두 접근이 거절되는지 확인한다.
 
-학생 앱에서 수정·응답·자유 입력·전화 걸기가 보이면 실패로 판정한다. 기존 v1 세션에 외부 링크가
-보이거나, v2 화면에 승인된 메타수학·클래스카드 공식 HTTPS 주소 외의 링크·iframe·자동 로그인이
-있어도 실패로 판정한다.
+학생 앱에서 공개 숙제의 두 정형 선택 외 수정·자유 입력·전화 걸기가 보이면 실패로 판정한다. 기존 v1
+세션에 외부 링크가 보이거나, v1·v2 화면에 자기 체크가 보이거나, v2·v3 화면에 승인된 메타수학·
+클래스카드 공식 HTTPS 주소 외의 링크·iframe·자동 로그인이 있어도 실패로 판정한다.
 
 ## 7. 보호자 앱 회귀 확인
 
@@ -222,8 +242,13 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 - 잘못된 학생 또는 잘못된 보호자 동의를 발견하면 가장 먼저 관리자 화면에서 해당 학생의
   학생 앱 연결을 끈다. 코드와 세션이 모두 해지된 뒤 원인을 확인한다.
-- Worker나 화면 오류는 직전 배포로 되돌릴 수 있다. `036~039`는 기존 데이터를 보존하는 schema이므로
-  운영 테이블을 삭제하거나 데이터를 되돌리지 않는다.
+- Worker나 화면 오류는 직전 배포로 되돌릴 수 있다. `036~040`은 기존 데이터를 보존하는 schema이므로
+  운영 테이블을 삭제하거나 데이터를 되돌리지 않는다. 특히 040 schema는 삭제하지 않고,
+  가능하면 v3 새 Worker를 forward-fix한다.
+- 부득이하게 039 기준의 구 Worker를 오래 운영해야 하면, 해당 학생의 연결을 관리자 화면에서 먼저
+  OFF하여 기존 코드·세션을 해지하고 self-check 범위를 닫는다. 이후 보호자에게 v2 공개 범위를
+  다시 안내하고 동의를 받은 뒤 ON→새 초대 순서로 재연결한다. 기존 v3 상태를 유지한 채
+  구 Worker에서 그대로 재초대하지 않는다.
 - `SESSION_ALREADY_ACTIVE`는 발급 실패가 아니다. 기존 기기에서 로그아웃한 뒤 같은 새 링크를
   교환한다.
 - `STUDENT_PORTAL_NOT_READY`는 마이그레이션 구조가 불완전하다는 뜻이다. 재배포나 재실행으로
@@ -235,7 +260,7 @@ curl -fsSI https://wb-student.whdudwns33.workers.dev/
 
 ```text
 배포일시(KST):
-D1 036/037/038/039: 적용/기적용
+D1 036/037/038/039/040: 적용/기적용
 보호자·직원 Worker health: 통과/실패
 학생 Worker health: 통과/실패
 관리자 미리보기 무부작용: 통과/실패
@@ -246,6 +271,8 @@ D1 036/037/038/039: 적용/기적용
 태블릿 연결: 통과/실패
 허용 정보만 표시: 통과/실패
 v1 외부 링크 비노출·v2 공식 링크 2개: 통과/실패
+v1·v2 자기 체크 비노출·v3 오늘 자기 체크: 통과/실패
+담당자 본인 확인·최종 완료 terminal: 통과/실패
 연결 해제 후 세션 차단: 통과/실패
 남은 문제(민감정보 제외):
 ```

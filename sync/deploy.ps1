@@ -32,7 +32,7 @@ try { $beforeRows = @($beforeRaw | ConvertFrom-Json) }
 catch { Die 'D1 목록 응답을 읽지 못했습니다. 안전을 위해 배포를 중단합니다.' }
 $existingDb = @($beforeRows | Where-Object { $_.name -eq 'wb-sync' }).Count -gt 0
 if ($existingDb) {
-  Die '기존 wb-sync 운영 DB가 있습니다. 이 최초 설치 도우미를 실행하면 안 됩니다. README의 036 → 037 → 038 수동 migration과 두 Worker 배포 순서를 사용해 주세요.'
+  Die '기존 wb-sync 운영 DB가 있습니다. 이 최초 설치 도우미를 실행하면 안 됩니다. README의 036 → 037 → 038 → 039 → 040 수동 migration과 두 Worker 배포 순서를 사용해 주세요.'
 }
 npx --yes $W d1 create wb-sync 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { Die '새 D1 데이터베이스 생성에 실패했습니다.' }

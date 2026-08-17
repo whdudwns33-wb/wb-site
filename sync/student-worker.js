@@ -1,7 +1,7 @@
-/** 학생 앱 전용 Worker — 정적 자산과 학생 세션의 세 public action만 제공한다. */
+/** 학생 앱 전용 Worker — 정적 자산과 학생 세션의 public action만 제공한다. */
 import { handleStudentPortal } from './student-portal.js';
 
-const PUBLIC_ACTIONS = new Set(['exchange', 'view', 'logout']);
+const PUBLIC_ACTIONS = new Set(['exchange', 'view', 'logout', 'self_check_set']);
 
 function headers(origin) {
   return {
