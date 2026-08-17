@@ -198,9 +198,10 @@
 
   /* ─── 주간 그리드 ─── */
   .weekwrap { overflow-x: auto; }
-  table.week { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
-  table.week th, table.week td { border: 1px solid var(--line); padding: 7px 6px; text-align: center; }
-  table.week th.n, table.week td.n { text-align: left; width: 38%; font-weight: 700; }
+  table.week { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 720px; }
+  table.week th, table.week td { border: 1px solid var(--line); padding: 7px 5px; text-align: center; }
+  table.week th.subj, table.week td.subj { width: 62px; padding: 5px; font-weight: 900; }
+  table.week th.n, table.week td.n { text-align: left; width: 30%; font-weight: 700; }
   table.week thead th { background: var(--light-gray); font-size: 12px; color: var(--mid-gray); font-weight: 700; }
   table.week thead th.today { background: var(--navy); color: var(--white); }
   .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
@@ -209,6 +210,16 @@
   .dot.blocked { background: var(--coral); color: var(--white); }
   .dot.miss { background: #FDE8E4; }
   .dot.none { background: transparent; }
+  .week-cell-actions { display: flex; justify-content: center; align-items: center; gap: 3px; }
+  .week-move { min-width: 32px; min-height: 32px; border-radius: 7px; color: var(--mid-gray); font-size: 12px; font-weight: 900; }
+  .week-move:hover { background: #EEF2F7; color: var(--navy); }
+  .week-goal-grid { display: grid; gap: 9px; }
+  .week-goal-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+  .week-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
+  .week-goal-track i { display: block; height: 100%; border-radius: inherit; background: var(--subject-color); }
+  .week-backlog-row, .week-offer-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--light-gray); }
+  .week-backlog-row:last-child, .week-offer-row:last-child { border-bottom: 0; }
+  .week-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
   /* ─── 학생 현황 ─── */
   .staffcard { display: flex; gap: 14px; align-items: center; }
@@ -330,6 +341,9 @@
     .study-planner-pane + .study-planner-pane { border-left: none; border-top: 2px solid #CFC9B7; }
     .planner-list-head, .planner-task-row { grid-template-columns: 54px minmax(0, 1fr) 34px; }
     .planner-task-detail { padding-left: 7px; padding-right: 7px; }
+    .week-review-grid { grid-template-columns: 1fr; }
+    .week-backlog-row, .week-offer-row { grid-template-columns: 52px minmax(0, 1fr); }
+    .week-backlog-row > :last-child, .week-offer-row > :last-child { grid-column: 1 / -1; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -535,9 +549,21 @@ function occursOn(task, date) {
   }
 }
 
+const weekMoveKey = staffId => '__weekmove__' + staffId;
+function weekMovesFor(staffId) {
+  const c = state.checks[weekMoveKey(staffId) + '|all'];
+  return (c && Array.isArray(c.moves)) ? c.moves.filter(move => move && move.taskId && move.from && move.to) : [];
+}
+function effectiveOccursOn(task, date) {
+  const moves = weekMovesFor(task.staffId, date);
+  if (moves.some(move => move.taskId === task.id && move.to === date)) return true;
+  if (moves.some(move => move.taskId === task.id && move.from === date)) return false;
+  return occursOn(task, date);
+}
+
 function tasksFor(staffId, date) {
   return state.tasks
-    .filter(t => t.staffId === staffId && occursOn(t, date))
+    .filter(t => t.staffId === staffId && effectiveOccursOn(t, date))
     .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
                  || (b.priority === 'high') - (a.priority === 'high')
                  || (a.createdAt || 0) - (b.createdAt || 0));
@@ -2222,6 +2248,62 @@ function wnAddModal(me) {
 }
 
 /* ── 주간 플래너 ── */
+const weekPlanKey = staffId => '__weekplan__' + staffId;
+function weekPlanOf(staffId, anchor) {
+  const c = state.checks[weekPlanKey(staffId) + '|' + mondayOf(anchor)];
+  return Object.assign({ subjectGoals: {}, reflection: '', directorNote: '' }, (c && c.plan) || {});
+}
+function weekSubjectActual(staffId, days) {
+  const totals = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, 0]));
+  days.forEach(date => {
+    const daily = stCategorySecs(stSecs(staffId, date));
+    STUDY_SUBJECT_KEYS.forEach(key => { totals[key] += daily[key] || 0; });
+  });
+  return totals;
+}
+function weekUnclaimedOffers(staffId, days) {
+  const out = [];
+  days.forEach(date => studyOffersFor(staffId, date).forEach(task => {
+    if (!isStudyClaimed(task, date)) out.push({ t: task, date: date });
+  }));
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+function weekBacklog(staffId, days) {
+  const found = new Map();
+  const moves = weekMovesFor(staffId, days[0]);
+  carryOver(staffId, days[0]).forEach(item => found.set(item.t.id + '|' + item.date, item));
+  days.filter(date => date < today()).forEach(date => checklistTasksFor(staffId, date).forEach(task => {
+    if (task.carry && !isDone(task.id, date)) found.set(task.id + '|' + date, { t: task, date: date });
+  }));
+  return [...found.values()]
+    .filter(item => !moves.some(move => move.taskId === item.t.id && move.from === item.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+let weekMoveDraft = null;
+function weekGoalModal(me, mon) {
+  const plan = weekPlanOf(me.id, mon);
+  modal('🎯 주간 과목별 목표시간',
+    '<div class="hint mb14">이번 주 목표를 분 단위로 입력하세요. 예: 300분 = 5시간</div>' +
+    STUDY_SUBJECT_KEYS.map(key => {
+      const subject = STUDY_SUBJECTS[key];
+      return '<div class="between mb8 ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+        '<div class="row" style="gap:6px"><input class="in" type="number" min="0" step="10" inputmode="numeric" data-weekgoal="' + key + '" value="' +
+          (Number(plan.subjectGoals[key]) || '') + '" style="max-width:120px"><span class="small muted">분</span></div></div>';
+    }).join(''),
+    '<button class="btn btn-primary btn-block mt14" data-act="weekgoalsave" data-mon="' + mon + '">저장</button>');
+}
+function weekMoveModal(task, from, mon) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const existing = weekMovesFor(task.staffId, mon).find(move => move.taskId === task.id && move.to === from);
+  weekMoveDraft = { taskId: task.id, staffId: task.staffId, from: existing ? existing.from : from, current: from, mon: mon };
+  modal('요일 변경 · ' + task.title,
+    '<div class="hint mb14">이 공부를 배치할 요일을 선택하세요. 오늘 플래너에도 같은 날짜로 반영됩니다.</div>' +
+    '<div class="chips">' + days.map(date => '<button class="chip ' + (date === from ? 'on' : '') + '" data-act="weekmoveto" data-date="' + date + '">' +
+      DOW[dowOf(date)] + ' ' + parseYmd(date).getDate() + '일</button>').join('') + '</div>',
+    (existing ? '<button class="btn btn-ghost btn-block mt14" data-act="weekmoveundo">원래 날짜로 되돌리기</button>' : ''));
+}
+
 function viewWeek() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -2231,6 +2313,10 @@ function viewWeek() {
   days.forEach(d => checklistTasksFor(me.id, d).forEach(t => { rows[t.id] = t; }));
   const list = Object.values(rows);
   const wp = weekProgress(me.id, cursor);
+  const plan = weekPlanOf(me.id, mon);
+  const actual = weekSubjectActual(me.id, days);
+  const offers = weekUnclaimedOffers(me.id, days);
+  const backlog = weekBacklog(me.id, days);
   const editable = session.isStaffLink || session.isAdmin;
 
   let h = '';
@@ -2246,23 +2332,75 @@ function viewWeek() {
     '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
     '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
 
+  h += '<div class="card"><div class="between mb14"><div><div class="card-title">🎯 과목별 목표시간</div>' +
+    '<div class="card-sub">이번 주 목표와 실제 순공시간을 비교합니다.</div></div>' +
+    (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekgoal" data-mon="' + mon + '">목표 설정</button>' : '') + '</div>' +
+    '<div class="week-goal-grid">' + STUDY_SUBJECT_KEYS.map(key => {
+      const subject = STUDY_SUBJECTS[key];
+      const goalSec = (Number(plan.subjectGoals[key]) || 0) * 60;
+      const actualSec = actual[key] || 0;
+      const pct = goalSec ? Math.min(100, Math.round(actualSec / goalSec * 100)) : (actualSec ? 100 : 0);
+      return '<div class="week-goal-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+        '<div class="week-goal-track"><i style="width:' + pct + '%"></i></div>' +
+        '<span class="small">' + fmtDur(actualSec) + (goalSec ? ' / ' + fmtDur(goalSec) : '') + '</span></div>';
+    }).join('') + '</div></div>';
+
   h += stWeekCard(me, days);
 
-  if (!list.length) return h + '<div class="card"><div class="empty"><b>📋</b>이 주에 지시된 업무가 없습니다.</div></div>';
+  if (list.length) {
+    h += '<div class="card weekwrap"><div class="between mb8"><div><div class="card-title">📅 월~일 공부 배치</div>' +
+      '<div class="card-sub">완료 체크와 오늘 플래너가 같은 기록을 사용합니다.</div></div></div>' +
+      '<table class="week"><thead><tr><th class="subj">과목</th><th class="n">세부 공부내용</th>' +
+      days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
+      '</tr></thead><tbody>' +
+      list.map(t => {
+        const subject = studySubject(t.studySubject);
+        return '<tr><td class="subj ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span></td>' +
+          '<td class="n">' + esc(t.title) + (t.detail ? '<div class="small muted">' + esc(t.detail) + '</div>' : '') + '</td>' +
+          days.map(d => {
+            if (!effectiveOccursOn(t, d) || !isStudyClaimed(t, d)) return '<td><span class="dot none">·</span></td>';
+            const st = statusOf(t, d);
+            const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
+            return '<td><div class="week-cell-actions"><button class="dot ' + cls + '" ' +
+              (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button>' +
+              (editable && t.repeat === 'once' && st !== 'done' ? '<button class="week-move" data-act="weekmove" data-id="' + t.id + '" data-date="' + d + '" aria-label="요일 변경">↔</button>' : '') +
+              '</div></td>';
+          }).join('') + '</tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료 · ↔ 한 번 하는 공부의 요일 변경</div>';
+  } else {
+    h += '<div class="card"><div class="empty"><b>📋</b>이 주의 체크리스트가 비어 있습니다.</div></div>';
+  }
 
-  h += '<div class="card weekwrap"><table class="week"><thead><tr><th class="n">업무</th>' +
-    days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
-    '</tr></thead><tbody>' +
-    list.map(t => '<tr><td class="n">' + esc(t.title) + '</td>' +
-      days.map(d => {
-        if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
-        const st = statusOf(t, d);
-        const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
-        return '<td><button class="dot ' + cls + '" ' +
-          (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
-      }).join('') + '</tr>').join('') +
-    '</tbody></table></div>' +
-    '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
+  if (backlog.length) {
+    h += '<div class="card alert"><div class="between mb8"><div><div class="card-title">↪ 밀린 공부</div>' +
+      '<div class="card-sub">완료하지 못해 이월 대상이 된 공부입니다.</div></div><span class="pill bad">' + backlog.length + '개</span></div>' +
+      backlog.map(item => {
+        const subject = studySubject(item.t.studySubject);
+        return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+          '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
+          (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
+      }).join('') + '</div>';
+  }
+
+  if (offers.length) {
+    h += '<div class="card"><div class="between mb8"><div><div class="card-title">📨 아직 가져오지 않은 배부 공부</div>' +
+      '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div><span class="pill warn">' + offers.length + '개</span></div>' +
+      offers.map(item => {
+        const subject = studySubject(item.t.studySubject);
+        return '<div class="week-offer-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+          '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + DOW[dowOf(item.date)] + ' ' + shortDate(item.date) + '</div></div>' +
+          (session.isStaffLink ? '<button class="btn btn-sm btn-primary" data-act="studyclaim" data-id="' + item.t.id + '" data-date="' + item.date + '">체크리스트로 가져오기</button>' : '<span class="pill bad">가져오기 전</span>') + '</div>';
+      }).join('') + '</div>';
+  }
+
+  h += '<div class="card"><div class="card-title">📝 주간 마무리</div><div class="card-sub mb14">이번 주를 돌아보고 다음 주에 조정할 점을 남깁니다.</div>' +
+    '<div class="week-review-grid"><div class="field"><label class="fl">학생 한 줄 회고</label><textarea class="in" id="weekReflection" ' +
+      (session.isStaffLink ? '' : 'readonly') + ' placeholder="잘한 점과 다음 주에 바꿀 점">' + esc(plan.reflection || '') + '</textarea></div>' +
+      '<div class="field"><label class="fl">원장 피드백</label><textarea class="in" id="weekDirectorNote" ' +
+        (session.isAdmin ? '' : 'readonly') + ' placeholder="원장이 확인 후 남기는 피드백">' + esc(plan.directorNote || '') + '</textarea></div></div>' +
+    (editable ? '<button class="btn btn-primary btn-block" data-act="weekreviewsave" data-mon="' + mon + '">주간 기록 저장</button>' : '') + '</div>';
   return h;
 }
 
@@ -3563,6 +3701,77 @@ document.addEventListener('click', ev => {
       break;
     }
 
+    /* 주간 목표 · 요일 재배치 · 회고 */
+    case 'weekgoal': {
+      const me = currentStaff(); if (!me) break;
+      weekGoalModal(me, el.dataset.mon || mondayOf(cursor));
+      break;
+    }
+    case 'weekgoalsave': {
+      const me = currentStaff(); if (!me) break;
+      const mon = el.dataset.mon || mondayOf(cursor);
+      const plan = weekPlanOf(me.id, mon);
+      const subjectGoals = {};
+      document.querySelectorAll('[data-weekgoal]').forEach(input => {
+        const mins = Math.max(0, Number(input.value) || 0);
+        if (mins) subjectGoals[input.dataset.weekgoal] = mins;
+      });
+      setCheck(weekPlanKey(me.id), mon, { plan: Object.assign({}, plan, { subjectGoals: subjectGoals }), done: true });
+      closeModal(); render(); toast('주간 목표를 저장했습니다');
+      break;
+    }
+    case 'weekmove': {
+      const me = currentStaff();
+      const t = task();
+      if (!me || !t || t.staffId !== me.id || t.repeat !== 'once') return toast('이 공부는 요일을 변경할 수 없습니다');
+      weekMoveModal(t, date, mondayOf(cursor));
+      break;
+    }
+    case 'weekmoveto': {
+      if (!weekMoveDraft) break;
+      const me = currentStaff();
+      const t = state.tasks.find(item => item.id === weekMoveDraft.taskId);
+      if (!me || !t || t.staffId !== me.id) return toast('요일을 변경할 수 없습니다');
+      const to = el.dataset.date;
+      let moves = weekMovesFor(me.id, weekMoveDraft.mon)
+        .filter(move => !(move.taskId === t.id && move.from === weekMoveDraft.from));
+      if (to !== weekMoveDraft.from) moves.push({ taskId: t.id, from: weekMoveDraft.from, to: to, movedAt: now() });
+      const oldCheck = getCheck(t.id, weekMoveDraft.current);
+      if (oldCheck && to !== weekMoveDraft.current) setCheck(t.id, to, Object.assign({}, oldCheck, { date: to }));
+      setCheck(weekMoveKey(me.id), 'all', { moves: moves, done: true });
+      weekMoveDraft = null; closeModal(); render(); toast('공부 요일을 변경했습니다');
+      break;
+    }
+    case 'weekmoveundo': {
+      if (!weekMoveDraft) break;
+      const me = currentStaff();
+      const t = state.tasks.find(item => item.id === weekMoveDraft.taskId);
+      if (!me || !t || t.staffId !== me.id) break;
+      const moves = weekMovesFor(me.id, weekMoveDraft.mon)
+        .filter(move => !(move.taskId === t.id && move.from === weekMoveDraft.from));
+      const currentCheck = getCheck(t.id, weekMoveDraft.current);
+      if (currentCheck && weekMoveDraft.current !== weekMoveDraft.from) {
+        setCheck(t.id, weekMoveDraft.from, Object.assign({}, currentCheck, { date: weekMoveDraft.from }));
+      }
+      setCheck(weekMoveKey(me.id), 'all', { moves: moves, done: true });
+      weekMoveDraft = null; closeModal(); render(); toast('원래 날짜로 되돌렸습니다');
+      break;
+    }
+    case 'weekreviewsave': {
+      const me = currentStaff(); if (!me) break;
+      const mon = el.dataset.mon || mondayOf(cursor);
+      const plan = weekPlanOf(me.id, mon);
+      const reflectionEl = $('#weekReflection');
+      const noteEl = $('#weekDirectorNote');
+      const next = Object.assign({}, plan, {
+        reflection: session.isAdmin ? plan.reflection : ((reflectionEl && reflectionEl.value) || '').trim(),
+        directorNote: session.isAdmin ? ((noteEl && noteEl.value) || '').trim() : plan.directorNote
+      });
+      setCheck(weekPlanKey(me.id), mon, { plan: next, done: true });
+      render(); toast('주간 기록을 저장했습니다');
+      break;
+    }
+
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
@@ -3598,7 +3807,7 @@ document.addEventListener('click', ev => {
     /* 체크 · 단계 · 수량 · 막힘 */
     case 'studyclaim': {
       const t = task();
-      if (!session.isStaffLink || !t || t.staffId !== session.staffId || !isStudyOffer(t) || !occursOn(t, date)) {
+      if (!session.isStaffLink || !t || t.staffId !== session.staffId || !isStudyOffer(t) || !effectiveOccursOn(t, date)) {
         return toast('이 공부를 체크리스트에 담을 수 없습니다');
       }
       setCheck(id, date, { claimed: true, claimedAt: now() });

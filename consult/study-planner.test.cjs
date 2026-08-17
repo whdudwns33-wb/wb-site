@@ -105,6 +105,56 @@ test('timer closes real start-end segments and paints six ten-minute cells per h
   assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, today\(\)\)/);
 });
 
+test('weekly planner compares subject goals with recorded study time', () => {
+  const helpers = section('const weekPlanKey', 'function weekBacklog(');
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+  const handlers = section("case 'weekgoal':", "case 'weekmove':");
+
+  assert.match(helpers, /subjectGoals: \{\}, reflection: '', directorNote: ''/);
+  assert.match(helpers, /stCategorySecs\(stSecs\(staffId, date\)\)/);
+  assert.match(week, /과목별 목표시간/);
+  assert.match(week, /actualSec \/ goalSec/);
+  assert.match(week, /stWeekCard\(me, days\)/);
+  assert.match(handlers, /data-weekgoal/);
+  assert.match(handlers, /setCheck\(weekPlanKey\(me\.id\), mon/);
+});
+
+test('weekly planner uses the daily checklist and supports one-time task rescheduling', () => {
+  const occurrence = section('const weekMoveKey', '/** 새 배부 공부만');
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+  const handlers = section("case 'weekmove':", "case 'weekreviewsave':");
+
+  assert.match(occurrence, /function effectiveOccursOn/);
+  assert.match(occurrence, /filter\(t => t\.staffId === staffId && effectiveOccursOn\(t, date\)\)/);
+  assert.match(week, /<th class="subj">과목<\/th><th class="n">세부 공부내용<\/th>/);
+  assert.match(week, /data-act="toggle"/);
+  assert.match(week, /data-act="weekmove"/);
+  assert.match(handlers, /t\.repeat !== 'once'/);
+  assert.match(handlers, /setCheck\(weekMoveKey\(me\.id\), 'all'/);
+});
+
+test('weekly planner separates rollover work from unclaimed distributed study', () => {
+  const helpers = section('function weekUnclaimedOffers(', 'let weekMoveDraft');
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+
+  assert.match(helpers, /studyOffersFor\(staffId, date\)/);
+  assert.match(helpers, /carryOver\(staffId, days\[0\]\)/);
+  assert.match(helpers, /move\.from === item\.date/);
+  assert.match(week, /밀린 공부/);
+  assert.match(week, /아직 가져오지 않은 배부 공부/);
+  assert.match(week, /data-act="studyclaim"/);
+});
+
+test('student reflection and director feedback keep separate edit permissions', () => {
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+  const handlers = section("case 'weekreviewsave':", '/* 날짜 */');
+
+  assert.match(week, /id="weekReflection"[\s\S]*?session\.isStaffLink/);
+  assert.match(week, /id="weekDirectorNote"[\s\S]*?session\.isAdmin/);
+  assert.match(handlers, /reflection: session\.isAdmin \? plan\.reflection/);
+  assert.match(handlers, /directorNote: session\.isAdmin/);
+});
+
 test('consult storage and sync app identity remain unchanged', () => {
   assert.match(html, /wb_consult_v1/);
   assert.match(html, /const SYNC_APP = 'consult'/);
