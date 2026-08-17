@@ -73,9 +73,15 @@ test('planner combines the checklist with fixed-category study-time bars', () =>
 
   assert.match(planner, /aria-label="오늘 공부 체크리스트"/);
   assert.match(planner, /aria-label="과목별 순공시간"/);
-  assert.match(planner, /studyTimePanel\(me, editable\)/);
+  assert.match(planner, /TODAY STUDY PLANNER/);
+  assert.match(planner, /PURE STUDY TIME/);
+  assert.match(planner, /studyTimePanel\(me, editable, true\)/);
   assert.match(timer, /STUDY_SUBJECT_KEYS\.map/);
   assert.match(timer, /data-stbar=/);
+  assert.match(timer, /chartMax \/ 600/);
+  assert.match(timer, /10분 단위 순공시간 기록/);
+  assert.match(css, /\.study-paper-head/);
+  assert.match(css, /background-size: calc\(100% \/ var\(--planner-slots, 18\)\) 100%/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
 
