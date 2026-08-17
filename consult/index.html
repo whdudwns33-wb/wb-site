@@ -404,6 +404,31 @@
   .month-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .month-review-grid .wide { grid-column: 1 / -1; }
 
+  /* ─── 학사관리 · 자료 요청 ─── */
+  .academic-hero { overflow: hidden; color: #fff; background: linear-gradient(135deg, #23476E, #4477A9); }
+  .academic-hero .card-title, .academic-hero .card-sub { color: inherit; }
+  .academic-hero .card-sub { opacity: .82; }
+  .academic-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .academic-kpi { padding: 11px 10px; border-radius: 12px; background: rgba(255,255,255,.13); }
+  .academic-kpi span { display: block; font-size: 10.5px; opacity: .8; }
+  .academic-kpi b { display: block; margin-top: 3px; font-size: 18px; }
+  .academic-item { padding: 14px 0; border-bottom: 1px solid var(--light-gray); }
+  .academic-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .academic-item:first-child { padding-top: 4px; }
+  .academic-item-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+  .academic-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: #EEF5FC; font-size: 18px; }
+  .academic-details { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .academic-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .material-request { padding: 12px; margin-top: 9px; border: 1px solid var(--line); border-radius: 12px; background: #FBFCFE; }
+  .material-request.needs_info { border-color: #F6C86B; background: #FFF9EE; }
+  .material-request.provided { border-color: #A9DDBB; background: #F2FBF5; }
+  .material-summary { margin-top: 8px; color: var(--dark-gray); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; }
+  .material-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .material-type-option { display: flex; align-items: center; gap: 7px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; cursor: pointer; }
+  .material-type-option:has(input:checked) { border-color: var(--blue); background: #EEF6FD; color: var(--deep-blue); font-weight: 800; }
+  .material-preview { padding: 12px; border-radius: 12px; background: #EEF5FC; color: var(--navy); font-size: 12.5px; line-height: 1.65; }
+  .request-queue-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -502,6 +527,11 @@
     .month-event-row > :last-child, .month-backlog-row > :last-child { grid-column: 1 / -1; }
     .month-review-grid { grid-template-columns: 1fr; }
     .month-review-grid .wide { grid-column: auto; }
+    .academic-kpis { grid-template-columns: 1fr 1fr; }
+    .academic-item-head { grid-template-columns: auto minmax(0, 1fr); }
+    .academic-item-head > :last-child { grid-column: 1 / -1; }
+    .academic-actions .btn { flex: 1 1 130px; min-height: 44px; }
+    .material-types { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -592,6 +622,13 @@ const LEARNING_SOURCES = Object.freeze({
   }
 });
 const DOW = ['일','월','화','수','목','금','토'];
+const ACADEMIC_TYPES = Object.freeze({
+  exam: { icon: '📝', label: '시험' },
+  performance: { icon: '🎯', label: '수행평가' }
+});
+const MATERIAL_TYPES = Object.freeze([
+  '개념 요약', '기본 유형', '학교시험형', '서술형', '고난도', '실전 모의', '오답 보충', '기타'
+]);
 const STUDY_SUBJECTS = Object.freeze({
   korean:  { label: '국어', className: 'subject-korean' },
   english: { label: '영어', className: 'subject-english' },
@@ -645,6 +682,38 @@ function blankState() {
     checks: {},
     settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터' }
   };
+}
+
+const LOCAL_AUTH_SETTINGS = Object.freeze([
+  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt'
+]);
+function sanitizedBackupState(source) {
+  const copy = JSON.parse(JSON.stringify(source || blankState()));
+  copy.settings = Object.assign({}, copy.settings || {});
+  LOCAL_AUTH_SETTINGS.forEach(key => { delete copy.settings[key]; });
+  copy.staff = (Array.isArray(copy.staff) ? copy.staff : []).map(staff => {
+    const clean = Object.assign({}, staff);
+    delete clean.token;
+    return clean;
+  });
+  return copy;
+}
+function mergeImportedState(imported, current) {
+  const base = blankState();
+  const safe = sanitizedBackupState(imported || {});
+  const currentSettings = Object.assign({}, (current && current.settings) || {});
+  const local = {};
+  LOCAL_AUTH_SETTINGS.forEach(key => {
+    if (Object.prototype.hasOwnProperty.call(currentSettings, key)) local[key] = currentSettings[key];
+  });
+  const currentTokens = new Map(((current && current.staff) || [])
+    .filter(staff => staff && staff.id && staff.token).map(staff => [staff.id, staff.token]));
+  const staff = (safe.staff || []).map(item => currentTokens.has(item.id)
+    ? Object.assign({}, item, { token: currentTokens.get(item.id) }) : item);
+  return Object.assign(base, safe, {
+    staff: staff,
+    settings: Object.assign({}, base.settings, safe.settings || {}, local, { pullAt: 0, pushAt: 0 })
+  });
 }
 
 let state = blankState();
@@ -711,6 +780,8 @@ const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim()
 function occursOn(task, date) {
   if (task.deleted) return false;
   if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
+  if (task.kind === 'academic_event' || task.kind === 'material_request') return false;
+  if (task.kind === 'material_response' && task.status !== 'provided') return false;
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
   switch (task.repeat) {
@@ -1246,11 +1317,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'ingang', 'study'];
+    const allowed = isManager() ? ['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'academic', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -1258,10 +1329,10 @@ function renderTabs() {
   const a = alertsToday();
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['ingang', '인강'], ['study', '학습']])
+        ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '월간 플래너'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '월간'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '지시서 작성'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -3449,6 +3520,327 @@ function viewMonth() {
   return h;
 }
 
+/* ══════════════════════════════════════════════════════
+   학사관리 — 공식 시험·수행평가와 시험대비 자료 요청
+   ══════════════════════════════════════════════════════ */
+const MATERIAL_STATUS = Object.freeze({
+  requested: '요청됨', needs_info: '보완 필요', resubmitted: '보완 제출됨',
+  preparing: '자료 찾는 중', provided: '자료 도착', unavailable: '제공 어려움', cancelled: '취소'
+});
+const academicDateOf = item => item.dueDate || item.examDate || item.start || '';
+
+function academicItemsFor(staffId) {
+  return state.tasks.filter(t => !t.deleted && t.kind === 'academic_event' && t.staffId === staffId)
+    .sort((a, b) => academicDateOf(a).localeCompare(academicDateOf(b)) || (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function materialRequestsFor(staffId) {
+  return state.tasks.filter(t => !t.deleted && t.kind === 'material_request' && t.staffId === staffId)
+    .sort((a, b) => String(a.neededBy || '').localeCompare(String(b.neededBy || '')) || (a.requestedAt || 0) - (b.requestedAt || 0));
+}
+
+function allMaterialRequests() {
+  return teamStaff().flatMap(staff => materialRequestsFor(staff.id));
+}
+
+function materialRequestById(requestId) {
+  return state.tasks.find(t => !t.deleted && t.kind === 'material_request' && t.id === requestId) || null;
+}
+
+function materialResponseFor(requestId) {
+  return state.tasks.find(t => !t.deleted && t.kind === 'material_response' && t.materialRequestId === requestId) || null;
+}
+
+function materialProvidedTask(requestId) {
+  const response = materialResponseFor(requestId);
+  return response && response.status === 'provided' && response.source === 'exam_material' ? response : null;
+}
+
+function materialRequestStatus(req) {
+  const provided = materialProvidedTask(req.id);
+  if (provided) return 'provided';
+  if (req.cancelledAt) return 'cancelled';
+  const response = materialResponseFor(req.id);
+  if (response && response.status === 'needs_info' && (req.requestRevision || 1) > (response.requestRevision || 0)) return 'resubmitted';
+  if (response && MATERIAL_STATUS[response.status]) return response.status;
+  return 'requested';
+}
+
+function materialRequestFingerprint(req) {
+  const norm = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return [req.staffId, req.examId, req.subject, req.publisher, req.textbook, req.unit,
+    (req.materialTypes || []).slice().sort().join(',')].map(norm).join('|');
+}
+
+function buildMaterialRequestSummary(req) {
+  const book = [req.publisher, req.textbook].filter(Boolean).join(' ');
+  const scope = [req.unit, req.pages, req.schoolHandout].filter(Boolean).join(', ');
+  return [
+    '[' + [req.grade, req.semester, req.subject].filter(Boolean).join(' ') + (book ? ' / ' + book : '') + ']',
+    [req.examName, req.examDate].filter(Boolean).join(' '),
+    scope,
+    (req.materialTypes || []).length ? '자료: ' + req.materialTypes.join('·') : '',
+    req.level ? '난이도: ' + req.level : '',
+    req.amount ? '분량: ' + req.amount : '',
+    req.explanation ? '해설: ' + req.explanation : '',
+    req.weakness ? '어려운 부분: ' + req.weakness : '',
+    req.neededBy ? req.neededBy + '까지 필요' : '',
+    req.note ? '기타: ' + req.note : ''
+  ].filter(Boolean).join(' · ');
+}
+
+function materialRequestSearchText(req) {
+  return [req.grade, req.semester, req.subject, req.publisher, req.textbook, req.unit]
+    .concat(req.materialTypes || []).concat([req.level]).filter(Boolean).join(' ');
+}
+
+function academicEventModal(type) {
+  if (!session.isAdmin) return;
+  const me = currentStaff();
+  const meta = ACADEMIC_TYPES[type];
+  if (!me || !meta) return toast('학생과 일정 종류를 확인해 주세요');
+  const isExam = type === 'exam';
+  const defaultSteps = isExam ? '' : '평가 내용 확인\n자료 조사\n개요 작성\n초안 작성\n피드백 반영\n최종본 제출';
+  modal(me.name + ' — ' + meta.icon + ' ' + meta.label + ' 등록',
+    '<input type="hidden" id="academicType" value="' + type + '">' +
+    '<div class="grid2"><div class="field"><label class="fl">학년</label><input class="in" id="academicGrade" placeholder="예: 중2"></div>' +
+      '<div class="field"><label class="fl">학기</label><select class="in" id="academicSemester"><option value="1학기">1학기</option><option value="2학기">2학기</option><option value="기타">기타</option></select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="academicSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">' + (isExam ? '시험일' : '제출일') + '</label><input class="in" id="academicDate" type="date" value="' + addDays(today(), 14) + '"></div></div>' +
+    '<div class="field"><label class="fl">' + meta.label + '명</label><input class="in" id="academicTitle" placeholder="예: 2학기 중간고사, 과학 탐구보고서"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">출판사 <span class="muted">(선택)</span></label><input class="in" id="academicPublisher" placeholder="예: 천재교육"></div>' +
+      '<div class="field"><label class="fl">교과서·교재명 <span class="muted">(선택)</span></label><input class="in" id="academicTextbook" placeholder="예: 수학2"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">단원</label><input class="in" id="academicUnit" placeholder="예: 3단원 일차함수"></div>' +
+      '<div class="field"><label class="fl">쪽수 <span class="muted">(선택)</span></label><input class="in" id="academicPages" placeholder="예: 82~105쪽"></div></div>' +
+    '<div class="field"><label class="fl">' + (isExam ? '시험범위' : '평가 안내') + '</label><textarea class="in" id="academicRange" placeholder="세부 범위와 요구사항을 입력하세요"></textarea></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">' + (isExam ? '목표점수' : '반영비율') + ' <span class="muted">(선택)</span></label>' +
+      '<input class="in" id="academicMetric" type="number" min="0" max="100" placeholder="' + (isExam ? '90' : '20') + '"></div>' +
+      '<div class="field"><label class="fl">' + (isExam ? '준비 시작일' : '제출 형식') + '</label>' +
+      (isExam ? '<input class="in" id="academicStart" type="date" value="' + today() + '">' : '<input class="in" id="academicFormat" placeholder="예: PDF 보고서, 발표">') + '</div></div>' +
+    '<div class="field"><label class="fl">준비 단계 <span class="muted">(한 줄에 하나)</span></label><textarea class="in" id="academicSteps" rows="5">' + defaultSteps + '</textarea></div>',
+    '<button class="btn btn-primary btn-block" data-act="academicsave">등록하기</button>');
+}
+
+function materialRequestFromForm(exam, existing) {
+  const types = [...document.querySelectorAll('[data-material-type]:checked')].map(input => input.value);
+  const other = (($('#materialOther') && $('#materialOther').value) || '').trim();
+  if (types.includes('기타') && other) types[types.indexOf('기타')] = '기타: ' + other;
+  const subject = STUDY_SUBJECTS[exam.studySubject] ? STUDY_SUBJECTS[exam.studySubject].label : (exam.studySubject || '기타');
+  return Object.assign({}, existing || {}, {
+    examId: exam.id, examName: exam.title, examDate: academicDateOf(exam),
+    grade: (($('#materialGrade') && $('#materialGrade').value) || exam.grade || '').trim(),
+    semester: (($('#materialSemester') && $('#materialSemester').value) || exam.semester || '').trim(),
+    subject: subject,
+    publisher: (($('#materialPublisher') && $('#materialPublisher').value) || '').trim(),
+    textbook: (($('#materialTextbook') && $('#materialTextbook').value) || '').trim(),
+    unit: (($('#materialUnit') && $('#materialUnit').value) || '').trim(),
+    pages: (($('#materialPages') && $('#materialPages').value) || '').trim(),
+    schoolHandout: (($('#materialHandout') && $('#materialHandout').value) || '').trim(),
+    materialTypes: types,
+    level: (($('#materialLevel') && $('#materialLevel').value) || '').trim(),
+    amount: (($('#materialAmount') && $('#materialAmount').value) || '').trim(),
+    explanation: (($('#materialExplanation') && $('#materialExplanation').value) || '').trim(),
+    weakness: (($('#materialWeakness') && $('#materialWeakness').value) || '').trim(),
+    neededBy: (($('#materialNeededBy') && $('#materialNeededBy').value) || '').trim(),
+    note: (($('#materialNote') && $('#materialNote').value) || '').trim()
+  });
+}
+
+function renderMaterialRequestPreview() {
+  const preview = $('#materialRequestPreview');
+  if (!preview) return;
+  const exam = state.tasks.find(t => t.id === preview.dataset.exam);
+  if (!exam) return;
+  preview.textContent = buildMaterialRequestSummary(materialRequestFromForm(exam, null)) || '필요한 정보를 입력하면 요청 문장이 여기에 만들어집니다.';
+}
+
+function materialRequestModal(exam, existing) {
+  if (!session.isStaffLink || isManager() || !exam || exam.kind !== 'academic_event' || exam.academicType !== 'exam' || exam.staffId !== session.staffId) {
+    return toast('본인의 시험 자료만 요청할 수 있어요');
+  }
+  const req = existing || {};
+  const selectedTypes = req.materialTypes || [];
+  const defaultNeeded = academicDateOf(exam) > today() ? addDays(academicDateOf(exam), -3) : today();
+  modal('📥 시험대비 자료 요청',
+    '<input type="hidden" id="materialRequestId" value="' + esc(req.id || '') + '">' +
+    '<div class="guide mb14"><b>' + esc(exam.title) + ' · ' + esc(STUDY_SUBJECTS[exam.studySubject]?.label || exam.studySubject) + '</b>' +
+      esc(academicDateOf(exam)) + ' 시험 · 출판사·교재·단원을 구체적으로 적으면 필요한 자료를 더 빨리 찾을 수 있어요.</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">학년</label><input class="in" id="materialGrade" value="' + esc(req.grade || exam.grade || '') + '" placeholder="예: 중2"></div>' +
+      '<div class="field"><label class="fl">학기</label><input class="in" id="materialSemester" value="' + esc(req.semester || exam.semester || '') + '" placeholder="예: 2학기"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">출판사</label><input class="in" id="materialPublisher" value="' + esc(req.publisher || exam.publisher || '') + '" placeholder="예: 천재교육, 모름"></div>' +
+      '<div class="field"><label class="fl">교과서·교재명</label><input class="in" id="materialTextbook" value="' + esc(req.textbook || exam.textbook || '') + '" placeholder="예: 수학2"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">단원</label><input class="in" id="materialUnit" value="' + esc(req.unit || exam.unit || '') + '" placeholder="예: 3단원 일차함수"></div>' +
+      '<div class="field"><label class="fl">교과서 쪽수</label><input class="in" id="materialPages" value="' + esc(req.pages || exam.pages || '') + '" placeholder="예: 82~105쪽"></div></div>' +
+    '<div class="field"><label class="fl">학교 프린트·추가 범위 <span class="muted">(선택)</span></label><input class="in" id="materialHandout" value="' + esc(req.schoolHandout || '') + '" placeholder="예: 학교 프린트 3~5장"></div>' +
+    '<div class="field"><label class="fl">필요한 자료 종류</label><div class="material-types">' + MATERIAL_TYPES.map(type => {
+      const checked = selectedTypes.some(value => value === type || value.startsWith(type + ':'));
+      return '<label class="material-type-option"><input type="checkbox" data-material-type value="' + esc(type) + '"' + (checked ? ' checked' : '') + '> ' + esc(type) + '</label>';
+    }).join('') + '</div></div>' +
+    '<div class="field"><label class="fl">기타 자료 설명 <span class="muted">(기타 선택 시)</span></label><input class="in" id="materialOther" value="' + esc((selectedTypes.find(x => x.startsWith('기타: ')) || '').replace('기타: ', '')) + '" placeholder="예: 학교 선생님 스타일 유사문제"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">난이도</label><select class="in" id="materialLevel">' +
+      ['기초', '표준', '심화', '표준~심화', '혼합'].map(value => '<option' + (req.level === value ? ' selected' : '') + '>' + value + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label class="fl">희망 분량</label><select class="in" id="materialAmount">' +
+      ['10문항', '20문항', '30문항', '20분 분량', '40분 분량', '60분 분량'].map(value => '<option' + (req.amount === value ? ' selected' : '') + '>' + value + '</option>').join('') + '</select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">원하는 해설</label><select class="in" id="materialExplanation">' +
+      ['정답만', '간단 해설', '전 문항 상세 해설', '어려운 문제 상세 해설'].map(value => '<option' + (req.explanation === value ? ' selected' : '') + '>' + value + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label class="fl">필요한 날짜</label><input class="in" id="materialNeededBy" type="date" max="' + academicDateOf(exam) + '" value="' + esc(req.neededBy || defaultNeeded) + '"></div></div>' +
+    '<div class="field"><label class="fl">특히 어려운 부분</label><textarea class="in" id="materialWeakness" placeholder="예: 그래프 해석과 식 세우기">' + esc(req.weakness || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">기타 요청사항 <span class="muted">(선택)</span></label><textarea class="in" id="materialNote" placeholder="예: 풀이 공간을 넓게 해주세요">' + esc(req.note || '') + '</textarea></div>' +
+    '<div class="fl mb8">자동 요청 요약</div><div class="material-preview" id="materialRequestPreview" data-exam="' + exam.id + '" aria-live="polite"></div>',
+    '<button class="btn btn-primary btn-block" data-act="matrequestsave" data-exam="' + exam.id + '">' + (existing ? '보완 제출' : '자료 요청하기') + '</button>');
+  renderMaterialRequestPreview();
+}
+
+function setMaterialResponse(req, status, note) {
+  let response = materialResponseFor(req.id);
+  if (!response) {
+    response = {
+      id: 'material-response-' + req.id, groupId: 'material-response-' + req.id,
+      kind: 'material_response', materialRequestId: req.id, staffId: req.staffId,
+      title: '자료요청 처리 · ' + (req.subject || ''), origin: 'admin',
+      repeat: 'once', days: [], start: req.neededBy || today(), end: '', carry: false,
+      createdAt: now(), deleted: false
+    };
+    state.tasks.push(response);
+  }
+  response.status = status;
+  response.responseNote = String(note || '').trim().slice(0, 300);
+  response.requestRevision = req.requestRevision || 1;
+  response.requestSnapshot = JSON.parse(JSON.stringify(req));
+  response.updatedAt = now();
+  save(); queueSync();
+  return response;
+}
+
+function provideMaterialRequest(req, resourceUrl, due) {
+  const existing = materialProvidedTask(req.id);
+  if (existing) return existing;
+  let task = materialResponseFor(req.id);
+  if (!task) {
+    task = {
+      id: 'material-response-' + req.id, groupId: 'material-response-' + req.id,
+      kind: 'material_response', materialRequestId: req.id,
+      staffId: req.staffId, origin: 'admin', createdAt: now(), deleted: false
+    };
+    state.tasks.push(task);
+  }
+  Object.assign(task, {
+    status: 'provided', source: 'exam_material', resourceUrl: resourceUrl,
+    title: '시험대비자료 · ' + [req.subject, req.unit].filter(Boolean).join(' '),
+    studySubject: req.studySubject || '', detail: buildMaterialRequestSummary(req),
+    guide: LEARNING_SOURCES.exam_material.guide,
+    steps: (task.steps && task.steps.length) ? task.steps : LEARNING_SOURCES.exam_material.steps.map(label => ({ id: uid(), label: label })),
+    target: 0, unit: '건', time: '', priority: 'high', repeat: 'once', days: [],
+    start: due, end: '', carry: true, requestRevision: req.requestRevision || 1,
+    requestSnapshot: JSON.parse(JSON.stringify(req)), responseNote: '자료를 제공했습니다', updatedAt: now()
+  });
+  save(); queueSync();
+  return task;
+}
+
+function materialProvideModal(req) {
+  const latest = materialProvidedTask(req.id);
+  if (latest) return toast('이미 제공한 자료가 있습니다');
+  const defaultDue = req.neededBy && req.neededBy >= today() ? req.neededBy : today();
+  modal('📎 시험대비 자료 제공',
+    '<div class="material-preview mb14">' + esc(buildMaterialRequestSummary(req)) + '</div>' +
+    '<div class="field"><label class="fl">보기 전용 HTTPS 링크</label><input class="in" id="materialResourceUrl" type="url" inputmode="url" placeholder="https://..."></div>' +
+    '<div class="field"><label class="fl">학습 마감일</label><input class="in" id="materialStudyDue" type="date" min="' + today() + '" max="' + esc(req.examDate || '') + '" value="' + esc(defaultDue) + '"></div>' +
+    '<div class="hint">정답지·개인정보가 포함된 공개 링크는 사용하지 마세요. 앱 직접 PDF 업로드는 비공개 파일 저장소 도입 후 추가됩니다.</div>',
+    '<button class="btn btn-primary btn-block" data-act="matprovide" data-id="' + req.id + '">자료 제공하기</button>');
+}
+
+function materialStatusModal(req, status) {
+  const labels = { needs_info: '보완 필요', unavailable: '제공 어려움' };
+  modal(labels[status] || '요청 상태',
+    '<div class="material-preview mb14">' + esc(buildMaterialRequestSummary(req)) + '</div>' +
+    '<div class="field"><label class="fl">학생에게 안내할 내용</label><textarea class="in" id="materialStatusNote" placeholder="' +
+      (status === 'needs_info' ? '예: 출판사와 교과서 쪽수를 확인해 주세요' : '제공이 어려운 이유') + '"></textarea></div>',
+    '<button class="btn btn-primary btn-block" data-act="matstatussave" data-id="' + req.id + '" data-status="' + status + '">저장</button>');
+}
+
+function materialRequestCard(req, admin) {
+  const staff = staffById(req.staffId);
+  const status = materialRequestStatus(req);
+  const response = materialResponseFor(req.id);
+  const provided = materialProvidedTask(req.id);
+  const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && (status === 'requested' || status === 'needs_info' || status === 'resubmitted');
+  return '<div class="material-request ' + status + '"><div class="request-queue-head"><div><div class="row wraprow" style="gap:6px"><b>' +
+      esc(admin && staff ? staff.name + ' · ' : '') + esc(req.subject || '과목 미지정') + '</b><span class="pill ' +
+      (status === 'provided' ? '' : status === 'needs_info' || status === 'unavailable' ? 'bad' : 'warn') + '">' + esc(MATERIAL_STATUS[status] || status) + '</span></div>' +
+      '<div class="small muted">' + esc(req.examName || '') + (req.examDate ? ' · ' + esc(req.examDate) : '') + (req.neededBy ? ' · ' + esc(req.neededBy) + '까지' : '') + '</div></div>' +
+      '<span class="pill">' + esc((req.materialTypes || []).join('·') || '자료') + '</span></div>' +
+    '<div class="material-summary">' + esc(buildMaterialRequestSummary(req)) + '</div>' +
+    (response && response.responseNote ? '<div class="hint mt8"><b>학원 안내:</b> ' + esc(response.responseNote) + '</div>' : '') +
+    '<div class="academic-actions">' +
+      (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="matrequestopen" data-id="' + req.id + '">요청 보완</button>' : '') +
+      (canEdit && !response ? '<button class="btn btn-sm btn-danger" data-act="matrequestcancel" data-id="' + req.id + '">취소</button>' : '') +
+      (provided ? '<button class="btn btn-sm btn-primary" data-go="study">자료 학습하기</button>' : '') +
+      (admin && status !== 'provided' ? '<button class="btn btn-sm btn-ghost" data-act="matrequeststatus" data-id="' + req.id + '" data-status="needs_info">보완 요청</button>' +
+        '<button class="btn btn-sm" data-act="matrequeststatus" data-id="' + req.id + '" data-status="preparing">자료 찾는 중</button>' +
+        '<button class="btn btn-sm btn-primary" data-act="matrequeststatus" data-id="' + req.id + '" data-status="provide">자료 제공</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="matrequeststatus" data-id="' + req.id + '" data-status="unavailable">제공 어려움</button>' : '') +
+      (admin ? '<button class="btn btn-sm btn-ghost" data-act="matcopy" data-id="' + req.id + '">검색어 복사</button>' : '') +
+    '</div></div>';
+}
+
+function academicItemCard(item, studentCanRequest) {
+  const type = ACADEMIC_TYPES[item.academicType] || ACADEMIC_TYPES.exam;
+  const date = academicDateOf(item);
+  const check = getCheck(item.id, date);
+  const prog = taskProgress(item, check);
+  const canCheck = session.isStaffLink && item.staffId === session.staffId;
+  return '<div class="academic-item"><div class="academic-item-head"><div class="academic-icon">' + type.icon + '</div><div>' +
+    '<div class="row wraprow" style="gap:6px"><b>' + esc(item.title) + '</b>' + taskStudySubjectTag(item) + '<span class="pill warn">' + esc(monthDday(date)) + '</span></div>' +
+    '<div class="small muted">' + esc(date) + (item.grade ? ' · ' + esc(item.grade) : '') + (item.semester ? ' · ' + esc(item.semester) : '') + '</div>' +
+    '<div class="academic-details">' +
+      (item.publisher ? '<span class="tag">' + esc(item.publisher) + '</span>' : '') + (item.textbook ? '<span class="tag">' + esc(item.textbook) + '</span>' : '') +
+      (item.unit ? '<span class="tag">' + esc(item.unit) + '</span>' : '') + (item.pages ? '<span class="tag">' + esc(item.pages) + '</span>' : '') +
+      (item.goalScore ? '<span class="tag doing">목표 ' + Number(item.goalScore) + '점</span>' : '') +
+      (item.weight ? '<span class="tag doing">반영 ' + Number(item.weight) + '%</span>' : '') + '</div>' +
+    (item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') + '</div>' +
+    (session.isAdmin ? '<button class="btn btn-sm btn-danger" data-act="academicdelete" data-id="' + item.id + '">삭제</button>' : '') + '</div>' +
+    ((item.steps || []).length ? '<div style="margin-top:10px"><div class="bar mini"><i style="width:' + prog.pct + '%"></i></div>' +
+      item.steps.map((step, index) => '<div class="step ' + (check && check.steps && check.steps[step.id] ? 'on' : '') + '"><button class="sbox" ' +
+        (canCheck ? 'data-act="step" data-id="' + item.id + '" data-date="' + date + '" data-step="' + step.id + '"' : 'disabled') + '>✓</button><span>' + (index + 1) + '. ' + esc(step.label) + '</span></div>').join('') + '</div>' : '') +
+    '<div class="academic-actions">' +
+      (studentCanRequest && item.academicType === 'exam' ? '<button class="btn btn-primary" data-act="matrequestopen" data-exam="' + item.id + '">시험대비 자료 요청</button>' : '') +
+    '</div></div>';
+}
+
+function viewAcademic() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const items = academicItemsFor(me.id);
+  const upcoming = items.filter(item => academicDateOf(item) >= today());
+  const requests = materialRequestsFor(me.id);
+  const studentCanRequest = session.isStaffLink && !isManager();
+  const openRequests = requests.filter(req => !['provided', 'unavailable', 'cancelled'].includes(materialRequestStatus(req)));
+  let h = '';
+  if (!session.isStaffLink) h += staffSwitcher(me.id);
+  h += '<div class="card academic-hero"><div class="between"><div><div class="card-title">🎓 학사관리</div>' +
+    '<div class="card-sub">시험·수행평가·필요한 자료를 한곳에서 관리합니다.</div></div>' +
+    (session.isAdmin ? '<div class="row wraprow" style="gap:6px"><button class="btn btn-sm" data-act="acadadd" data-type="exam">＋ 시험</button><button class="btn btn-sm" data-act="acadadd" data-type="performance">＋ 수행평가</button></div>' : '') + '</div>' +
+    '<div class="academic-kpis"><div class="academic-kpi"><span>다가오는 시험·평가</span><b>' + upcoming.length + '건</b></div>' +
+      '<div class="academic-kpi"><span>자료 요청 처리 중</span><b>' + openRequests.length + '건</b></div>' +
+      '<div class="academic-kpi"><span>자료 학습 완료</span><b>' + requests.filter(req => { const task = materialProvidedTask(req.id); return task && isDone(task.id, task.start); }).length + '건</b></div></div></div>';
+
+  if (session.isAdmin) {
+    const queue = allMaterialRequests().filter(req => !['provided', 'unavailable', 'cancelled'].includes(materialRequestStatus(req)));
+    h += '<div class="card"><div class="between mb8"><div><div class="card-title">📥 전체 자료 요청함</div><div class="card-sub">필요일과 시험일이 빠른 요청부터 확인하세요.</div></div><span class="pill ' + (queue.length ? 'warn' : '') + '">' + queue.length + '건</span></div>' +
+      (queue.length ? queue.map(req => materialRequestCard(req, true)).join('') : '<div class="small muted">처리할 자료 요청이 없습니다.</div>') + '</div>';
+  }
+
+  h += '<div class="card"><div class="between mb8"><div><div class="card-title">📅 원장 발행 시험·수행평가</div><div class="card-sub">월간 플래너의 기존 개인 일정은 그대로 유지됩니다.</div></div><span class="pill">' + items.length + '건</span></div>' +
+    (items.length ? items.map(item => academicItemCard(item, studentCanRequest)).join('') : '<div class="empty"><b>🗓</b>등록된 시험·수행평가가 없습니다.</div>') + '</div>';
+
+  h += '<div class="card"><div class="between mb8"><div><div class="card-title">📚 ' + esc(me.name) + ' 자료 요청</div>' +
+    '<div class="card-sub">출판사·교재·단원·난이도까지 구체적으로 남긴 요청입니다.</div></div><span class="pill">' + requests.length + '건</span></div>' +
+    (requests.length ? requests.map(req => materialRequestCard(req, session.isAdmin)).join('') : '<div class="small muted">' +
+      (studentCanRequest ? '시험 카드의 ‘시험대비 자료 요청’을 눌러 필요한 자료를 남겨보세요.' : '등록된 요청이 없습니다.') + '</div>') + '</div>';
+  return h;
+}
+
 /* ── 지시서 작성 ── */
 let draft = [];
 const wForm = { staff: [], repeat: 'once', days: [], start: today(), end: '', carry: true };
@@ -4399,6 +4791,167 @@ document.addEventListener('click', ev => {
       break;
     }
 
+    /* 학사관리 · 시험대비 자료 요청 */
+    case 'acadadd': {
+      if (!session.isAdmin) break;
+      academicEventModal(el.dataset.type || 'exam');
+      break;
+    }
+    case 'academicsave': {
+      if (!session.isAdmin) break;
+      const me = currentStaff();
+      const type = ($('#academicType') && $('#academicType').value) || '';
+      const title = (($('#academicTitle') && $('#academicTitle').value) || '').trim();
+      const subject = ($('#academicSubject') && $('#academicSubject').value) || '';
+      const dueDate = ($('#academicDate') && $('#academicDate').value) || '';
+      const grade = (($('#academicGrade') && $('#academicGrade').value) || '').trim();
+      const semester = ($('#academicSemester') && $('#academicSemester').value) || '';
+      const unit = (($('#academicUnit') && $('#academicUnit').value) || '').trim();
+      const range = (($('#academicRange') && $('#academicRange').value) || '').trim();
+      if (!me || !ACADEMIC_TYPES[type]) return toast('학생과 일정 종류를 확인해 주세요');
+      if (!title || !subject || !grade || !semester || !unit || !range) return toast('학년·학기·과목·단원·세부 범위를 모두 입력해 주세요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || dueDate < today()) return toast('오늘 이후 날짜를 선택해 주세요');
+      const startEl = $('#academicStart');
+      const periodStart = startEl ? (startEl.value || today()) : today();
+      if (periodStart > dueDate) return toast('준비 시작일은 시험일보다 늦을 수 없습니다');
+      const metric = Math.max(0, Math.min(100, Number((($('#academicMetric') || {}).value)) || 0));
+      const steps = (($('#academicSteps') && $('#academicSteps').value) || '').split('\n').map(x => x.trim()).filter(Boolean)
+        .map(label => ({ id: uid(), label: label }));
+      state.tasks.push({
+        id: uid(), groupId: 'academic-' + now(), kind: 'academic_event', academicType: type,
+        staffId: me.id, title: title, studySubject: subject, grade: grade, semester: semester,
+        dueDate: dueDate, examDate: type === 'exam' ? dueDate : '', periodStart: periodStart,
+        publisher: (($('#academicPublisher') && $('#academicPublisher').value) || '').trim(),
+        textbook: (($('#academicTextbook') && $('#academicTextbook').value) || '').trim(),
+        unit: unit, pages: (($('#academicPages') && $('#academicPages').value) || '').trim(),
+        range: range, goalScore: type === 'exam' ? metric : 0, weight: type === 'performance' ? metric : 0,
+        submissionFormat: type === 'performance' ? ((($('#academicFormat') || {}).value) || '').trim() : '',
+        detail: range, guide: '', steps: steps, target: 0, time: '', priority: 'high',
+        repeat: 'once', days: [], start: periodStart, end: '', carry: false,
+        origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
+      });
+      save(); queueSync(); closeModal(); render(); toast(ACADEMIC_TYPES[type].label + '를 등록했습니다');
+      break;
+    }
+    case 'academicdelete': {
+      if (!session.isAdmin) break;
+      const item = state.tasks.find(t => t.id === id && t.kind === 'academic_event' && !t.deleted);
+      if (!item || !confirm(item.title + ' 일정을 삭제할까요? 기존 자료 요청 기록은 남습니다.')) break;
+      item.deleted = true; item.updatedAt = now();
+      save(); queueSync(); render(); toast('학사 일정을 삭제했습니다');
+      break;
+    }
+    case 'matrequestopen': {
+      if (!session.isStaffLink) break;
+      if (isManager()) return toast('자료 요청은 학생 본인 링크에서 할 수 있어요');
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const existing = id ? materialRequestById(id) : null;
+      if (existing && existing.staffId !== me.id) return toast('본인의 요청만 수정할 수 있어요');
+      if (existing && !['requested', 'needs_info', 'resubmitted'].includes(materialRequestStatus(existing))) return toast('현재 상태에서는 요청을 수정할 수 없어요');
+      const examId = (existing && existing.examId) || el.dataset.exam;
+      const exam = state.tasks.find(t => !t.deleted && t.kind === 'academic_event' && t.academicType === 'exam' && t.id === examId && t.staffId === me.id);
+      if (!exam) return toast('연결된 시험 일정을 찾지 못했습니다');
+      materialRequestModal(exam, existing);
+      break;
+    }
+    case 'matrequestsave': {
+      if (!session.isStaffLink) break;
+      if (isManager()) return toast('자료 요청은 학생 본인 링크에서 할 수 있어요');
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const examId = el.dataset.exam || '';
+      const exam = state.tasks.find(t => !t.deleted && t.kind === 'academic_event' && t.academicType === 'exam' && t.id === examId && t.staffId === me.id);
+      if (!exam) return toast('연결된 시험 일정을 찾지 못했습니다');
+      const existingId = (($('#materialRequestId') && $('#materialRequestId').value) || '').trim();
+      const existing = existingId ? materialRequestById(existingId) : null;
+      if (existing && existing.staffId !== me.id) return toast('본인의 요청만 수정할 수 있어요');
+      if (existing && !['requested', 'needs_info', 'resubmitted'].includes(materialRequestStatus(existing))) return toast('현재 상태에서는 요청을 수정할 수 없어요');
+      const fields = materialRequestFromForm(exam, null);
+      if (!fields.grade || !fields.semester || !fields.publisher || !fields.textbook || !fields.unit) return toast('학년·학기·출판사·교재명·단원을 모두 입력해 주세요');
+      if (!fields.pages && !fields.schoolHandout) return toast('교과서 쪽수 또는 학교 프린트 범위를 입력해 주세요');
+      if (!fields.materialTypes.length || fields.materialTypes.includes('기타')) return toast('필요한 자료 종류를 구체적으로 선택해 주세요');
+      if (!fields.weakness) return toast('특히 어려운 부분을 적어주세요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.neededBy) || fields.neededBy < today() || fields.neededBy > fields.examDate) return toast('필요한 날짜는 오늘부터 시험일 사이로 선택해 주세요');
+      const probe = Object.assign({ staffId: me.id }, fields);
+      const duplicate = materialRequestsFor(me.id).find(req => req.id !== existingId &&
+        ['requested', 'needs_info', 'resubmitted', 'preparing'].includes(materialRequestStatus(req)) &&
+        materialRequestFingerprint(req) === materialRequestFingerprint(probe));
+      if (duplicate) return toast('같은 범위와 자료 종류로 처리 중인 요청이 있습니다');
+      let req = existing;
+      if (!req) {
+        req = {
+          id: uid(), groupId: 'material-request-' + now(), kind: 'material_request',
+          staffId: me.id, origin: 'staff', repeat: 'once', days: [], end: '', carry: false,
+          createdAt: now(), requestedAt: now(), deleted: false
+        };
+        state.tasks.push(req);
+      }
+      Object.assign(req, fields, {
+        title: '시험대비 자료 요청 · ' + [fields.subject, fields.unit].filter(Boolean).join(' '),
+        studySubject: exam.studySubject || '', detail: buildMaterialRequestSummary(fields),
+        guide: '', steps: [], target: 0, time: '', priority: 'normal', start: fields.neededBy,
+        requestRevision: (req.requestRevision || 0) + 1, cancelledAt: null, updatedAt: now()
+      });
+      req.requestKey = materialRequestFingerprint(req);
+      save(); queueSync(); closeModal(); render(); toast(existing ? '보완 내용을 다시 보냈습니다' : '자료 요청을 보냈습니다');
+      break;
+    }
+    case 'matrequestcancel': {
+      if (!session.isStaffLink) break;
+      const me = currentStaff();
+      const req = materialRequestById(id);
+      if (!me || me.id !== session.staffId || !req || req.staffId !== me.id || materialResponseFor(req.id)) return toast('이 요청은 취소할 수 없습니다');
+      if (!confirm('자료 요청을 취소할까요?')) break;
+      req.cancelledAt = now(); req.updatedAt = now();
+      save(); queueSync(); render(); toast('자료 요청을 취소했습니다');
+      break;
+    }
+    case 'matprovide': {
+      if (!session.isAdmin) break;
+      const req = materialRequestById(id);
+      const rawUrl = (($('#materialResourceUrl') && $('#materialResourceUrl').value) || '').trim();
+      const resourceUrl = safeHttpsUrl(rawUrl);
+      const due = ($('#materialStudyDue') && $('#materialStudyDue').value) || '';
+      if (!req || req.cancelledAt) return toast('처리할 요청을 찾지 못했습니다');
+      if (!resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || due < today() || (req.examDate && due > req.examDate)) return toast('학습 마감일은 오늘부터 시험일 사이로 선택해 주세요');
+      provideMaterialRequest(req, resourceUrl, due);
+      closeModal(); render(); toast('자료를 보내고 학습 과제를 만들었습니다');
+      break;
+    }
+    case 'matrequeststatus': {
+      if (!session.isAdmin) break;
+      const req = materialRequestById(id);
+      const status = el.dataset.status || '';
+      if (!req || req.cancelledAt || materialProvidedTask(req.id)) return toast('처리할 요청을 찾지 못했습니다');
+      if (status === 'provide') return materialProvideModal(req);
+      if (status === 'preparing') {
+        setMaterialResponse(req, 'preparing', '요청하신 자료를 찾고 있습니다');
+        render(); toast('자료 찾는 중으로 표시했습니다');
+        break;
+      }
+      if (status === 'needs_info' || status === 'unavailable') materialStatusModal(req, status);
+      break;
+    }
+    case 'matstatussave': {
+      if (!session.isAdmin) break;
+      const req = materialRequestById(id);
+      const status = el.dataset.status || '';
+      const note = (($('#materialStatusNote') && $('#materialStatusNote').value) || '').trim();
+      if (!req || !['needs_info', 'unavailable'].includes(status)) break;
+      if (!note) return toast('학생에게 안내할 내용을 입력해 주세요');
+      setMaterialResponse(req, status, note);
+      closeModal(); render(); toast(MATERIAL_STATUS[status] + ' 상태로 저장했습니다');
+      break;
+    }
+    case 'matcopy': {
+      if (!session.isAdmin) break;
+      const req = materialRequestById(id);
+      if (req) copy(materialRequestSearchText(req));
+      break;
+    }
+
     /* 회독 */
     case 'rdadd': rdAddModal(); break;
     case 'rdsave': {
@@ -5296,7 +5849,7 @@ document.addEventListener('click', ev => {
     }
     case 'syncnow': sync.loud = true; sync.run(); toast('동기화 중…'); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(sanitizedBackupState(state), null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'wb-컨설팅플래너-' + today() + '.json';
@@ -5314,7 +5867,7 @@ document.addEventListener('click', ev => {
             const p = JSON.parse(r.result);
             if (!p || !Array.isArray(p.staff)) throw new Error('형식 오류');
             if (!confirm('현재 데이터를 덮어씁니다. 계속할까요?')) return;
-            state = Object.assign(blankState(), p);
+            state = mergeImportedState(p, state);
             save(); render(); toast('불러왔습니다');
           } catch (e) { toast('파일을 읽을 수 없습니다'); }
         };
@@ -5331,6 +5884,10 @@ document.addEventListener('click', ev => {
 let inputTimer = null;
 document.addEventListener('input', ev => {
   if (ev.target.id === 'ingText') { ingPasteSeq++; ingShowParsePreview(); return; }
+  if ($('#materialRequestPreview') && (ev.target.id.startsWith('material') || ev.target.matches('[data-material-type]'))) {
+    renderMaterialRequestPreview();
+    return;
+  }
   if (ev.target.id === 'ingShiftFrom' || ev.target.id === 'ingShiftDays') {
     const preview = $('#ingShiftPreview'); if (preview) ingShiftRender(preview.dataset.sid);
     return;
@@ -5380,7 +5937,7 @@ load();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
-if (session.isStaffLink && !['today', 'week'].includes(route)) route = 'today';
+if (session.isStaffLink && !['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
 
@@ -5418,7 +5975,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.2';
+const APP_VER = '2026-08-18.3';
 function checkVersion() {
   fetch('../version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
