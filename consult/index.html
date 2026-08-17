@@ -206,19 +206,42 @@
   table.week th.n, table.week td.n { text-align: left; width: 30%; font-weight: 700; }
   table.week thead th { background: var(--light-gray); font-size: 12px; color: var(--mid-gray); font-weight: 700; }
   table.week thead th.today { background: var(--navy); color: var(--white); }
+  .ing-hero { position: relative; overflow: hidden; border: 0; color: var(--white); background: linear-gradient(135deg, var(--navy), #3B2667); box-shadow: 0 18px 42px rgba(27,58,92,.2); }
+  .ing-hero::after { content: ''; position: absolute; right: -54px; top: -72px; width: 190px; height: 190px; border-radius: 50%; background: rgba(255,255,255,.08); }
+  .ing-hero-top { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ing-hero-kicker { margin-bottom: 3px; color: #D8C9FF; font-size: 10px; font-weight: 900; letter-spacing: .13em; }
+  .ing-hero-title { font-size: 21px; font-weight: 900; letter-spacing: -.03em; }
+  .ing-hero-sub { margin-top: 3px; color: rgba(255,255,255,.72); font-size: 12px; }
+  .ing-hero-alert { position: relative; z-index: 1; flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; color: #FFF; background: rgba(232,93,74,.9); font-size: 11px; font-weight: 900; }
+  .ing-overview-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .ing-overview-stat { min-width: 0; padding: 11px 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 11px; background: rgba(255,255,255,.09); color: rgba(255,255,255,.72); font-size: 11px; }
+  .ing-overview-stat b { display: block; margin-bottom: 1px; color: var(--white); font-size: 18px; line-height: 1.25; }
+  .ing-hero-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .ing-hero .btn-primary { background: var(--white); color: var(--navy); }
+  .ing-hero .btn-ghost { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.1); color: var(--white); }
+  .ing-calendar-card { padding-bottom: 14px; }
   .ing-cal-tabs { display: none; gap: 6px; overflow-x: auto; padding: 2px 0 10px; }
   .ing-week-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; min-width: 0; }
   .ing-cal-tabs .chip { flex: 0 0 auto; min-width: 48px; min-height: 44px; }
-  .ing-cal-scroll { overflow-x: auto; padding-bottom: 4px; }
-  .ing-calendar { min-width: 688px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
+  .ing-calendar-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .ing-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--mid-gray); font-size: 11px; }
+  .ing-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .ing-legend i { width: 9px; height: 9px; border-radius: 3px; }
+  .ing-legend .busy { background: #D1D5DB; }
+  .ing-legend .free { background: #6EE7B7; }
+  .ing-legend .lecture { background: #7DD3FC; }
+  .ing-cal-scroll { max-height: 590px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; scrollbar-width: thin; }
+  .ing-calendar { min-width: 688px; background: var(--white); }
   .ing-cal-head-row, .ing-cal-body { display: grid; grid-template-columns: 44px repeat(7, minmax(92px, 1fr)); }
+  .ing-cal-head-row { position: sticky; top: 0; z-index: 7; }
   .ing-cal-corner, .ing-cal-head { min-height: 48px; padding: 8px 4px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #F8FAFC; }
+  .ing-cal-corner { position: sticky; left: 0; z-index: 8; }
   .ing-cal-head { text-align: center; color: var(--navy); font-size: 11px; font-weight: 800; }
   .ing-cal-head b { display: block; margin-bottom: 2px; font-size: 12px; }
   .ing-cal-head.today { background: #EAF6FC; color: var(--deep-blue); }
   .ing-cal-body { height: var(--ing-cal-height); }
   .ing-cal-time-axis, .ing-cal-day { position: relative; min-height: 100%; border-right: 1px solid var(--line); }
-  .ing-cal-time-axis { background: #F8FAFC; }
+  .ing-cal-time-axis { position: sticky; left: 0; z-index: 5; background: #F8FAFC; }
   .ing-cal-time-label { position: absolute; right: 5px; color: var(--mid-gray); font-size: 9px; transform: translateY(-50%); }
   .ing-cal-time-label.start { transform: none; }
   .ing-cal-time-label.end { transform: translateY(-100%); }
@@ -248,6 +271,7 @@
     outline: 3px solid var(--deep-blue); outline-offset: 2px;
   }
   .ing-conflict-list { margin-top: 10px; padding: 9px 10px; border: 1px solid #F5B8AF; border-radius: 9px; background: #FFF9F8; }
+  .ing-conflict-list summary, .ing-short-slot-list summary { cursor: pointer; font-size: 12px; font-weight: 900; }
   .ing-conflict-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; margin-top: 5px; color: var(--dark-gray); font-size: 11px; line-height: 1.45; }
   .ing-conflict-row b { color: #B93827; }
   .ing-short-slot-list { margin-top: 10px; padding: 9px 10px; border: 1px solid #A7E8CD; border-radius: 9px; background: #F5FFFA; }
@@ -258,19 +282,45 @@
   .ing-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
   .ing-plan-stat { background: var(--light-gray); border-radius: 9px; padding: 9px; font-size: 12px; }
   .ing-plan-stat b { display: block; color: var(--navy); margin-bottom: 2px; }
+  .ing-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 22px 3px 10px; }
+  .ing-section-head h3 { color: var(--navy); font-size: 17px; letter-spacing: -.02em; }
+  .ing-section-head span { color: var(--mid-gray); font-size: 12px; }
+  .ing-upcoming-card { background: #FBFCFE; }
+  .ing-upcoming-card .wraprow { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .ing-course-card { position: relative; overflow: hidden; padding-left: 21px; }
+  .ing-course-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ing-course-color); }
+  .ing-course-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ing-course-top > div:first-child { min-width: 0; }
+  .ing-course-name { overflow-wrap: anywhere; color: var(--navy); font-size: 17px; font-weight: 900; letter-spacing: -.02em; }
+  .ing-course-meta { margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .ing-course-link { color: var(--deep-blue); font-weight: 800; text-decoration: none; }
+  .ing-course-bar i { background: var(--ing-course-color); }
+  .ing-course-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ing-course-actions { display: flex; gap: 6px; }
   button.tag { border: 0; cursor: pointer; }
   @media (max-width: 640px) {
-    .ing-plan-grid { grid-template-columns: 1fr; }
+    .ing-overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ing-overview-stat { padding: 9px 8px; }
+    .ing-overview-stat b { font-size: 16px; }
+    .ing-hero-actions .btn { flex: 1 1 calc(50% - 4px); min-height: 44px; }
+    .ing-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ing-plan-grid .ing-plan-stat:last-child { grid-column: 1 / -1; }
     .ing-week-toolbar { grid-template-columns: 1fr; }
     .ing-week-toolbar > * { min-width: 0; }
     .ing-week-toolbar > .row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; justify-self: stretch; width: 100%; max-width: 100%; margin: 8px 0 0; }
-    .ing-cal-tabs { display: flex; width: 100%; max-width: 100%; }
-    .ing-cal-scroll { overflow: visible; }
+    .ing-cal-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%; max-width: 100%; }
+    .ing-cal-tabs .chip { min-width: 0; padding: 6px 2px; font-size: 11px; line-height: 1.25; }
+    .ing-calendar-bar { align-items: flex-start; }
+    .ing-calendar-bar .btn { flex: 0 0 auto; }
+    .ing-cal-scroll { max-height: 510px; overflow: auto; }
     .ing-calendar { min-width: 0; }
     .ing-cal-head-row, .ing-cal-body { grid-template-columns: 44px minmax(0, 1fr); }
     .ing-cal-head:not(.active), .ing-cal-day:not(.active) { display: none; }
     .ing-cal-event { font-size: 11px; }
     .ing-conflict-row, .ing-short-slot-actions { grid-template-columns: 1fr; }
+    .ing-course-foot { align-items: stretch; flex-direction: column; }
+    .ing-course-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .ing-course-actions .btn { width: 100%; min-height: 44px; }
   }
   .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
   .dot.done { background: var(--blue); color: var(--white); }
@@ -2189,6 +2239,33 @@ function ingHourText(min) {
   return (h ? h + '시간 ' : '') + (m ? m + '분' : (h ? '' : '0분'));
 }
 
+function ingWeekSummary(sid, mon) {
+  const out = { total: 0, done: 0 };
+  for (let i = 0; i < 7; i++) ingPlan(sid, addDays(mon, i)).forEach(item => {
+    out.total++; if (item.done) out.done++;
+  });
+  return out;
+}
+
+function ingOverviewCard(me, editable, admin, courses, overdue) {
+  const mon = mondayOf(today()), summary = ingWeekSummary(me.id, mon), avail = ingAvail(me.id);
+  const free = avail.configured ? ingHourText(ingWeeklyFreeMin(me.id, mon)) : '미설정';
+  return '<div class="card ing-hero"><div class="ing-hero-top"><div>' +
+    '<div class="ing-hero-kicker">WEEKLY LECTURE PLAN</div>' +
+    '<div class="ing-hero-title">' + esc(me.name) + ' 인강 플래너</div>' +
+    '<div class="ing-hero-sub">등록 강좌 ' + courses.length + '개 · ' + shortDate(mon) + ' ~ ' + shortDate(addDays(mon, 6)) + '</div></div>' +
+    (overdue ? '<span class="ing-hero-alert">밀림 ' + overdue + '강</span>' : '') + '</div>' +
+    '<div class="ing-overview-grid"><div class="ing-overview-stat"><b>' + summary.total + '강</b>이번 주 배정</div>' +
+      '<div class="ing-overview-stat"><b>' + summary.done + '강</b>이번 주 완료</div>' +
+      '<div class="ing-overview-stat"><b>' + esc(free) + '</b>남은 빈 시간</div></div>' +
+    '<div class="ing-hero-actions">' +
+      (admin ? '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' : '') +
+      (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">' +
+        (avail.configured ? '주간 일정 수정' : '주간 일정 설정') + '</button>' : '') +
+      (admin ? '<button class="btn btn-sm btn-ghost" data-act="ingshift">전체 일정 날짜 이동</button>' : '') +
+    '</div></div>';
+}
+
 function ingCalendarPosition(start, end, calStart, calEnd, hourPx) {
   const s = Math.max(Number(start), Number(calStart));
   const e = Math.min(Number(end), Number(calEnd));
@@ -2204,8 +2281,8 @@ function ingWeekCard(me, editable, canManage) {
   const avail = ingAvail(me.id);
   const mon = mondayOf(ingWeekAnchor);
   const sun = addDays(mon, 6);
-  let h = '<div class="card"><div class="ing-week-toolbar mb8"><div>' +
-    '<div class="card-title">🗓 주간 일정과 빈 시간</div>' +
+  let h = '<div class="card ing-calendar-card"><div class="ing-week-toolbar mb8"><div>' +
+    '<div class="card-title">🗓 주간 시간표</div>' +
     '<div class="small muted">' + shortDate(mon) + ' ~ ' + shortDate(sun) +
       (avail.configured ? ' · 빈 시간 ' + ingHourText(ingWeeklyFreeMin(me.id, mon)) : ' · 일정 미설정') + '</div></div>' +
     '<div class="row" style="gap:6px">' +
@@ -2218,8 +2295,9 @@ function ingWeekCard(me, editable, canManage) {
       (editable ? '<button class="btn btn-primary btn-block mt14" data-act="ingavopen">주간 일정 설정</button>' : '') + '</div>';
     return h;
   }
-  h += '<div class="between mb8"><div class="small muted">활동 가능 ' + esc(avail.start) + '~' + esc(avail.end) +
-      ' · 회색 고정 일정 · 초록 빈 시간 · 파랑 인강</div>' +
+  h += '<div class="ing-calendar-bar"><div><div class="small muted mb8">활동 가능 ' + esc(avail.start) + '~' + esc(avail.end) + '</div>' +
+      '<div class="ing-legend"><span><i class="busy"></i>고정 일정</span><span><i class="free"></i>빈 시간</span>' +
+        '<span><i class="lecture"></i>배정 인강</span></div></div>' +
       (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">일정 수정</button>' : '') + '</div>';
   const calStart = ingHmMin(avail.start), calEnd = ingHmMin(avail.end);
   const calMinutes = calEnd - calStart;
@@ -2294,11 +2372,11 @@ function ingWeekCard(me, editable, canManage) {
               : '<span' + attrs + '>' + body + '</span>';
           }).join('') + '</div>').join('') +
       '</div></div></div>' +
-    (conflicts.length ? '<div class="ing-conflict-list" role="note" aria-label="겹친 일정"><b class="small">⚠ 겹친 일정</b>' +
+    (conflicts.length ? '<details class="ing-conflict-list"><summary>⚠ 겹친 일정 ' + conflicts.length + '건</summary>' +
       conflicts.map(c => '<div class="ing-conflict-row"><b>' + DOW[c.day] + ' ' + shortDate(c.date) + ' ' +
         ingMinHm(c.s) + '~' + ingMinHm(c.e) + '</b><span>' + esc(c.left) + ' ↔ ' + esc(c.right) + '</span></div>').join('') +
-      '</div>' : '') +
-    (shortSlots.length ? '<div class="ing-short-slot-list"><b class="small">짧은 빈 시간 배정</b>' +
+      '</details>' : '') +
+    (shortSlots.length ? '<details class="ing-short-slot-list"><summary>짧은 빈 시간 ' + shortSlots.length + '개</summary>' +
       '<div class="small muted">달력에서 누르기 어려운 짧은 빈 시간은 아래 큰 버튼으로 배정하세요.</div>' +
       '<div class="ing-short-slot-actions">' + shortSlots.map(({ d, x }) => {
         const time = ingMinHm(x.s) + '~' + ingMinHm(x.e);
@@ -2306,7 +2384,7 @@ function ingWeekCard(me, editable, canManage) {
           '" data-s="' + ingMinHm(x.s) + '" data-e="' + ingMinHm(x.e) + '" aria-label="' + DOW[d.day] + ' ' +
           shortDate(d.date) + ' ' + time + ' 빈 시간에 인강 배정"><b>' + DOW[d.day] + ' ' + shortDate(d.date) +
           '</b><span>' + time + ' · ' + ingHourText(x.e - x.s) + '</span></button>';
-      }).join('') + '</div></div>' : '') +
+      }).join('') + '</div></details>' : '') +
     (canManage ? '<div class="hint mt14">달력의 초록 빈 시간을 누르거나, 짧은 빈 시간은 위 큰 버튼을 눌러 다음 미배정 강의를 넣을 수 있습니다.</div>' : '') +
     '</div>';
   return h;
@@ -2384,6 +2462,7 @@ function viewIngang() {
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
   const { overdue } = ingTodayItems(me.id);
+  h += ingOverviewCard(me, editable, admin, courses, overdue.length);
   if (overdue.length) {
     h += '<div class="card alert"><div class="between">' +
       '<div class="card-title" style="color:var(--coral)">밀린 인강 ' + overdue.length + '강</div>' +
@@ -2392,16 +2471,6 @@ function viewIngang() {
   }
 
   h += ingWeekCard(me, editable, admin);
-
-  if (admin) {
-    h += '<div class="card"><div class="card-title mb8">강좌 관리</div>' +
-      '<div class="card-sub mb14">최근 자동배정 기본값 · ' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '요일 미설정') +
-        ' · 하루 최대 ' + set.perDay + '강</div>' +
-      '<div class="row wraprow" style="gap:8px">' +
-        '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="ingshift">📅 일정 밀기</button>' +
-      '</div></div>';
-  }
 
   if (!courses.length) {
     return h + '<div class="card"><div class="empty"><b>🎬</b>등록된 강좌가 없습니다.' +
@@ -2417,7 +2486,7 @@ function viewIngang() {
       if (items.length) up.push({ d: d, n: items.length, done: items.filter(x => x.done).length });
     }
     const total = up.reduce((a, x) => a + x.n, 0);
-    h += '<div class="card"><div class="between mb8">' +
+    h += '<div class="card ing-upcoming-card"><div class="between mb8">' +
       '<div class="card-title">📅 앞으로 2주</div>' +
       '<div class="pill' + (total ? '' : ' warn') + '">' + (total ? total + '강 예정' : '예정 없음') + '</div></div>' +
       (up.length
@@ -2430,18 +2499,23 @@ function viewIngang() {
       '</div>';
   }
 
-  courses.forEach(c => {
+  h += '<div class="ing-section-head"><div><h3>강좌별 학습 계획</h3>' +
+    '<span>진도와 완강 예상일을 확인하고 미배정 강의를 자동으로 넣으세요.</span></div>' +
+    '<span>' + courses.length + '개 강좌</span></div>';
+  const courseColors = ['#7C3AED', '#0EA5E9', '#16A34A', '#D97706', '#DB2777', '#4F46E5'];
+  courses.forEach((c, index) => {
     const s = ingStats(me.id, c, asg);
-    h += '<div class="card"><div class="between mb8">' +
-      '<div><div class="card-title">' + esc(c.name) + '</div>' +
-      '<div class="small muted">' + esc(c.platform || '') + ' · 총 ' + s.total + '강' +
-        (safeHttpsUrl(c.sourceUrl) ? ' · <a href="' + esc(safeHttpsUrl(c.sourceUrl)) + '" target="_blank" rel="noopener noreferrer">강좌 열기</a>' : '') + '</div></div>' +
+    const color = courseColors[index % courseColors.length];
+    h += '<div class="card ing-course-card" style="--ing-course-color:' + color + '"><div class="ing-course-top mb8">' +
+      '<div><div class="ing-course-name">' + esc(c.name) + '</div>' +
+      '<div class="ing-course-meta">' + esc(c.platform || '기타') + ' · 총 ' + s.total + '강' +
+        (safeHttpsUrl(c.sourceUrl) ? ' · <a class="ing-course-link" href="' + esc(safeHttpsUrl(c.sourceUrl)) + '" target="_blank" rel="noopener noreferrer">학습 사이트 열기 ↗</a>' : '') + '</div></div>' +
       '<div class="pill' + (s.pct >= 100 ? '' : s.pct >= 50 ? ' warn' : ' bad') + '">' + s.pct + '%</div></div>' +
-      '<div class="bar mb8"><i style="width:' + s.pct + '%"></i></div>' +
-      '<div class="between small"><span class="muted">완료 ' + s.done + ' · 배정 ' + s.assigned +
+      '<div class="bar mb8 ing-course-bar"><i style="width:' + s.pct + '%"></i></div>' +
+      '<div class="ing-course-foot small"><span class="muted">완료 ' + s.done + ' · 배정 ' + s.assigned +
         ' · <b>미배정 ' + s.unassigned + '</b></span>' +
       (admin
-        ? '<span class="row" style="gap:6px">' +
+        ? '<span class="ing-course-actions">' +
             '<button class="btn btn-sm btn-primary" data-act="ingassign" data-cid="' + esc(c.id) + '">계획·자동배정</button>' +
             '<button class="btn btn-sm btn-ghost" data-act="ingdel" data-cid="' + esc(c.id) + '">삭제</button></span>'
         : '') +

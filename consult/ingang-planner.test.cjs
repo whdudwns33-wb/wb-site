@@ -171,7 +171,7 @@ test('availability is opt-in and the planner UI is wired for students and direct
   assert.equal(ingAvail.read('s').configured, true);
 
   assert.match(html, /const ING_WEEK_DAYS = \[1, 2, 3, 4, 5, 6, 0\]/);
-  assert.match(html, /주간 일정과 빈 시간/);
+  assert.match(html, /주간 시간표/);
   assert.match(html, /id="ingAvailStart" type="time"/);
   assert.match(html, /id="ingEnd" value=[\s\S]*?type="date"|type="date" id="ingEnd"|id="ingEnd"[^>]*type="date"/);
   assert.match(html, /완강 예상/);
@@ -257,8 +257,43 @@ test('weekly lecture schedule uses calendar geometry and a mobile day selector',
   assert.ok((luminance([255, 255, 255]) + 0.05) / (luminance(focusRgb) + 0.05) >= 3);
 
   const conflictHtml = renderWeek({id:'conflict'}, true, true);
-  assert.match(conflictHtml, /aria-label="겹친 일정"/);
+  assert.match(conflictHtml, /<details class="ing-conflict-list"><summary>⚠ 겹친 일정 7건<\/summary>/);
   assert.match(conflictHtml, /고정 일정 · 수학 학원 ↔ 인강 · 개념 인강 1강/);
+});
+
+test('weekly overview is read-only and summarizes Monday through Sunday only', () => {
+  const source = between('function ingWeekSummary(', '\n\nfunction ingOverviewCard(');
+  const ingWeekSummary = Function(`${dateHelpers}
+    const plans={
+      '2026-08-17':[{done:true},{done:false}],
+      '2026-08-23':[{done:false}],
+      '2026-08-24':[{done:true}]
+    };
+    function ingPlan(_sid,date) { return plans[date] || []; }
+    ${source}
+    return ingWeekSummary;`)();
+
+  assert.deepEqual(ingWeekSummary('student', '2026-08-17'), { total: 3, done: 1 });
+  assert.doesNotMatch(source, /setCheck|save\(|queueSync|localStorage/);
+});
+
+test('final lecture UI keeps bounded calendar and mobile action contracts', () => {
+  assert.match(html, /\.ing-cal-scroll \{ max-height: 590px; overflow: auto;/);
+  assert.match(html, /\.ing-cal-head-row \{ position: sticky; top: 0; z-index: 7; \}/);
+  const calendarRule = html.match(/\.ing-calendar \{([^}]*)\}/);
+  assert.ok(calendarRule);
+  assert.doesNotMatch(calendarRule[1], /overflow:/);
+  assert.match(html, /\.ing-upcoming-card \.wraprow \{ flex-wrap: nowrap; overflow-x: auto;/);
+  assert.match(html, /\.ing-hero-actions \.btn \{[^}]*min-height: 44px/);
+  assert.match(html, /\.ing-course-actions \.btn \{[^}]*min-height: 44px/);
+  assert.doesNotMatch(html, /\.ing-course-actions \.btn-primary \{[^}]*var\(--ing-course-color\)/);
+  assert.match(html, /\.ing-plan-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
+  assert.match(html, /class="card ing-hero"/);
+  assert.match(html, /class="card ing-course-card"/);
+  assert.match(html, /avail\.configured \? '주간 일정 수정' : '주간 일정 설정'/);
+  assert.match(html, /const ingKey = sid => '__ing__' \+ sid/);
+  assert.match(html, /const ingPlanKey = sid => '__ingp__' \+ sid/);
+  assert.match(html, /const ingAvailKey = sid => '__ingavail__' \+ sid/);
 });
 
 test('five official course sites have safe direct links and smart-paste fallback', () => {
