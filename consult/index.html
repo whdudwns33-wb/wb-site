@@ -32,7 +32,8 @@
     --subject-korean:  #7FB3F4;
     --subject-english: #F49ABC;
     --subject-math:    #82CFA2;
-    --subject-explore: #E7C85C;
+    --subject-social:  #E7C85C;
+    --subject-science: #B9A7F5;
     --subject-other:   #A8AFB8;
   }
 
@@ -172,7 +173,8 @@
   .subject-korean { --subject-color: var(--subject-korean); --subject-bg: #E8F2FF; --subject-text: #285B91; }
   .subject-english { --subject-color: var(--subject-english); --subject-bg: #FFEAF2; --subject-text: #8E3E5E; }
   .subject-math { --subject-color: var(--subject-math); --subject-bg: #E7F7EE; --subject-text: #2E6E49; }
-  .subject-explore { --subject-color: var(--subject-explore); --subject-bg: #FFF7D7; --subject-text: #755E0A; }
+  .subject-social { --subject-color: var(--subject-social); --subject-bg: #FFF7D7; --subject-text: #755E0A; }
+  .subject-science { --subject-color: var(--subject-science); --subject-bg: #F1ECFF; --subject-text: #5B3E8D; }
   .subject-other { --subject-color: var(--subject-other); --subject-bg: #F0F2F4; --subject-text: #555D67; }
   .subject-tag, .subject-chip { background: var(--subject-bg); color: var(--subject-text); border-color: var(--subject-color); }
   .subject-chip.on { background: var(--subject-color); color: #24303B; border-color: var(--subject-color); box-shadow: 0 0 0 3px rgba(27,58,92,.10); }
@@ -317,6 +319,9 @@
   .planner-task-extra { grid-column: 1 / -1; padding: 0 8px 9px; border-top: 1px dashed #E2DDCF; background: rgba(255,255,255,.72); }
   .planner-divider { padding: 7px 8px 5px; border-bottom: 1px solid #DED9CA; color: var(--coral); font-size: 10.5px; font-weight: 900; }
   .study-time-total { font-size: 32px; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .study-total-hero { text-align: center; padding: 20px 17px; }
+  .study-total-hero .study-time-total { font-size: clamp(38px, 10vw, 54px); line-height: 1.15; margin: 5px 0 7px; }
+  .study-total-hero .study-total-label { color: var(--mid-gray); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
   .study-time-controls { padding: 10px 0 4px; border-bottom: 1px dashed #D7D1C0; }
   .study-timeline { margin-top: 9px; border-top: 1px solid #BDB6A3; border-left: 1px solid #D5CFBE; background: rgba(255,255,255,.62); }
   .study-timeline-row { display: grid; grid-template-columns: 31px repeat(6, minmax(0, 1fr)); min-height: 22px; }
@@ -459,20 +464,35 @@ const STUDY_SUBJECTS = Object.freeze({
   korean:  { label: '국어', className: 'subject-korean' },
   english: { label: '영어', className: 'subject-english' },
   math:    { label: '수학', className: 'subject-math' },
-  explore: { label: '탐구', className: 'subject-explore' },
+  social:  { label: '사회', className: 'subject-social' },
+  science: { label: '과학', className: 'subject-science' },
   other:   { label: '기타', className: 'subject-other' }
 });
 const STUDY_SUBJECT_KEYS = Object.keys(STUDY_SUBJECTS);
 
 function studySubjectKey(value) {
   const raw = String(value || '').trim();
+  if (raw === 'explore' || raw === '탐구') return 'social';
   if (STUDY_SUBJECTS[raw]) return raw;
   const found = STUDY_SUBJECT_KEYS.find(key => STUDY_SUBJECTS[key].label === raw);
   return found || 'other';
 }
 function studySubject(value) { return STUDY_SUBJECTS[studySubjectKey(value)]; }
+function taskStudySubjectKey(task) {
+  const raw = String((task && task.studySubject) || '').trim();
+  if (raw === 'explore' || raw === '탐구') {
+    const text = [task.title, task.detail, task.guide, task.learningKind, task.metaKind].filter(Boolean).join(' ');
+    return /(과학|과탐|물리|화학|생명|생물|지구과학)/.test(text) ? 'science' : 'social';
+  }
+  return studySubjectKey(raw);
+}
+function taskStudySubject(task) { return STUDY_SUBJECTS[taskStudySubjectKey(task)]; }
 function studySubjectTag(value) {
   const subject = studySubject(value);
+  return '<span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>';
+}
+function taskStudySubjectTag(task) {
+  const subject = taskStudySubject(task);
   return '<span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>';
 }
 function studySubjectOptions(selected, emptyLabel) {
@@ -1205,6 +1225,8 @@ function viewToday() {
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
 
+  h += studyTotalHeroCard(me, cursor);
+
   if (cursor === today()) {
     h += studyOffersCard(me, cursor, offers);
     h += studyPlannerCard(me, cursor, list, carry, editable);
@@ -1245,12 +1267,28 @@ function viewToday() {
   return h;
 }
 
+function studyTotalHeroCard(me, date) {
+  const total = stTotal(me.id, date);
+  const goal = stGoalMin(me.id) * 60;
+  const pct = goal ? Math.min(100, Math.round(total / goal * 100)) : 0;
+  const running = date === today() ? stRunning(me.id, date) : null;
+  const runningLabel = running ? ((running.subj === '탐구' || running.subj === 'explore') ? '사회' : running.subj) : '';
+  return '<div class="card study-total-hero" id="studyTotalHero">' +
+    '<div class="study-total-label">TOTAL PURE STUDY TIME</div>' +
+    '<div class="study-time-total" data-st-total data-st-date="' + date + '">' + fmtHMS(total) + '</div>' +
+    (running
+      ? '<div class="small" style="color:var(--blue);font-weight:800">▶ ' + esc(runningLabel) + ' 공부 중</div>'
+      : '<div class="small muted">' + (date === today() ? '오늘 기록한 전체 순공시간' : label(date) + ' 전체 순공시간') + '</div>') +
+    (goal ? '<div class="bar mt14"><i style="width:' + pct + '%"></i></div><div class="small muted" style="margin-top:6px">목표 ' + fmtDur(goal) + ' · ' + pct + '%</div>' : '') +
+    '</div>';
+}
+
 function studyOffersCard(me, date, offers) {
   const rows = offers.map(task => {
     const check = getCheck(task.id, date);
     const claimed = !!(check && check.claimed);
     const done = !!(check && check.done);
-    const subject = studySubject(task.studySubject);
+    const subject = taskStudySubject(task);
     const status = done ? '<span class="pill">완료</span>'
       : claimed ? '<span class="pill warn">체크리스트에 담음</span>'
       : '<span class="pill bad">가져오기 전</span>';
@@ -1260,7 +1298,7 @@ function studyOffersCard(me, date, offers) {
       : status;
     return '<div class="study-offer ' + subject.className + '">' +
       '<div class="between"><div style="min-width:0">' +
-        '<div class="row wraprow" style="gap:6px">' + studySubjectTag(task.studySubject) +
+        '<div class="row wraprow" style="gap:6px">' + taskStudySubjectTag(task) +
           (task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') + '</div>' +
         '<div class="task-t" style="margin-top:6px">' + esc(task.title) + '</div>' +
         (task.detail ? '<div class="task-d">' + esc(task.detail) + '</div>' : '') +
@@ -1295,7 +1333,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
     '<div class="study-paper-head">' +
       '<div class="study-paper-date">' + date.replace(/-/g, '.') + '<em>' + dayName + '</em></div>' +
       '<div class="study-paper-title">TODAY STUDY PLANNER</div>' +
-      '<div class="study-paper-total"><span>PURE STUDY TIME</span><b id="stTot">' + fmtHMS(studyTotal) + '</b></div>' +
+      '<div class="study-paper-total"><span>PURE STUDY TIME</span><b data-st-total data-st-date="' + date + '">' + fmtHMS(studyTotal) + '</b></div>' +
     '</div>' +
     '<div class="study-planner">' +
       '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' +
@@ -1308,7 +1346,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
 function plannerTaskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const status = statusOf(t, date);
-  const subject = studySubject(t.studySubject);
+  const subject = taskStudySubject(t);
   const open = openPanels.has(t.id + '|' + date);
   const resourceUrl = safeHttpsUrl(t.resourceUrl);
   const hasDetail = (t.steps || []).length || t.guide || t.target || resourceUrl;
@@ -1362,7 +1400,7 @@ function taskRow(t, date, editable, isCarry) {
       '<div class="task-t">' + esc(t.title) + '</div>' +
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
       '<div class="meta">' +
-        studySubjectTag(t.studySubject) +
+        taskStudySubjectTag(t) +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
         (learning ? '<span class="tag time">' + learning.icon + ' ' + esc(learning.label) + '</span>' : '') +
         ((t.learningKind || t.metaKind) ? '<span class="tag">' + esc(t.learningKind || t.metaKind) + '</span>' : '') +
@@ -1452,7 +1490,7 @@ function emptyStaffCard() {
    과목 칩을 누르면 시작, 다시 누르면 정지. 시작 시각만 저장하므로
    앱을 닫아도 시간이 계속 흐르고, 기기를 바꿔도 이어진다.
    ══════════════════════════════════════════════════════ */
-const ST_DEFAULT = ['국어', '영어', '수학', '탐구', '기타'];
+const ST_DEFAULT = ['국어', '영어', '수학', '사회', '과학', '기타'];
 const ST_MAX_RUN = 6 * 3600;   // 한 번에 인정하는 최대 시간 — 정지를 깜빡해도 밤새 쌓이지 않는다
 const ST_TIMELINE_START = 5;
 const ST_TIMELINE_END = 24;
@@ -1462,7 +1500,13 @@ const stKey = sid => '__st__' + sid;
 const stOf = (sid, date) => state.checks[stKey(sid) + '|' + date] || null;
 const stSubjects = sid => {
   const c = state.checks['__stsubj__' + sid + '|all'];
-  return (c && Array.isArray(c.list) && c.list.length) ? c.list : ST_DEFAULT;
+  const source = (c && Array.isArray(c.list) && c.list.length) ? c.list : ST_DEFAULT;
+  const split = [];
+  source.forEach(name => {
+    if (name === '탐구' || name === 'explore') split.push('사회', '과학');
+    else split.push(name);
+  });
+  return [...new Set(split)];
 };
 const stGoalMin = sid => {
   const c = state.checks['__stgoal__' + sid + '|all'];
@@ -1605,8 +1649,10 @@ function studyTimePanel(me, editable, paperMode) {
   const goal = stGoalMin(me.id) * 60;
   const pct = goal ? Math.min(100, Math.round(total / goal * 100)) : 0;
   const r = stRunning(me.id, date);
-  const on = r ? r.subj : '';
-  const timerSubjects = on && !ST_DEFAULT.includes(on) ? ST_DEFAULT.concat(on) : ST_DEFAULT;
+  const on = r ? studySubject(r.subj).label : '';
+  const categorySecs = stCategorySecs(secs);
+  const baseSubjects = stSubjects(me.id);
+  const timerSubjects = on && !baseSubjects.includes(on) ? baseSubjects.concat(on) : baseSubjects;
 
   return '<div class="study-time-controls">' +
     (paperMode
@@ -1622,7 +1668,7 @@ function studyTimePanel(me, editable, paperMode) {
           '<button class="btn btn-sm btn-ghost" data-act="stedit" aria-label="순공시간 수정">✏️</button>' : '') +
       '</div></div>') +
     '<div style="text-align:center;padding:' + (paperMode ? '2px 0 9px' : '3px 0 12px') + '">' +
-      (paperMode ? '' : '<div id="stTot" class="study-time-total">' + fmtHMS(total) + '</div>') +
+      (paperMode ? '' : '<div class="study-time-total" data-st-total data-st-date="' + date + '">' + fmtHMS(total) + '</div>') +
       (on
         ? '<div class="small" style="color:var(--blue);font-weight:800">▶ ' + esc(on) + ' 공부 중 — 다시 누르면 정지</div>'
         : '<div class="small muted">' + (editable ? '과목을 눌러 시작하세요' : '학생이 기록한 실제 순공시간입니다') + '</div>') +
@@ -1631,10 +1677,12 @@ function studyTimePanel(me, editable, paperMode) {
     (editable ? '<div class="chips mb14">' +
       timerSubjects.map(s => {
         const subject = studySubject(s);
+        const key = studySubjectKey(s);
+        const shownSecs = STUDY_SUBJECTS[key].label === s ? categorySecs[key] : secs[s];
         return '<button class="chip subject-chip ' + subject.className + ' ' + (on === s ? 'on' : '') + '" data-act="sttoggle" data-subj="' + esc(s) + '"' +
           (on === s ? ' id="stChipOn"' : '') + '>' +
           (on === s ? '⏸ ' : '▶ ') + esc(s) +
-          (secs[s] ? ' ' + fmtHM(secs[s]) : '') + '</button>';
+          (shownSecs ? ' ' + fmtHM(shownSecs) : '') + '</button>';
       }).join('') + '</div>' : '') + '</div>' +
     '<div class="study-timeline" id="studyTimeline" role="img" aria-label="05시부터 24시까지 10분 단위 실제 순공시간">' +
       studyTimelineRows(me.id, date) + '</div>';
@@ -1650,10 +1698,10 @@ function stWeekCard(me, days) {
   const sum = per.reduce((a, x) => a + x.secs, 0);
   if (!sum) return '';
   const max = Math.max.apply(null, per.map(x => x.secs)) || 1;
-  const bySubj = {};
+  const bySubj = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, 0]));
   days.forEach(d => {
-    const s = stSecs(me.id, d);
-    Object.keys(s).forEach(k => { bySubj[k] = (bySubj[k] || 0) + s[k]; });
+    const daily = stCategorySecs(stSecs(me.id, d));
+    STUDY_SUBJECT_KEYS.forEach(key => { bySubj[key] += daily[key] || 0; });
   });
   const goal = stGoalMin(me.id) * 60;
   const met = goal ? per.filter(x => x.secs >= goal).length : 0;
@@ -1672,9 +1720,9 @@ function stWeekCard(me, days) {
     '<div class="small muted" style="text-align:center;margin-bottom:10px">하루 평균 ' +
       fmtDur(Math.round(sum / 7)) + (goal ? ' · 목표 달성 ' + met + '일' : '') + '</div>' +
     '<hr class="sep">' +
-    Object.keys(bySubj).sort((a, b) => bySubj[b] - bySubj[a]).map(k =>
-      '<div class="between small" style="padding:3px 0"><span>' + esc(k) + '</span>' +
-      '<span class="pill">' + fmtDur(bySubj[k]) + '</span></div>').join('') +
+    STUDY_SUBJECT_KEYS.filter(key => bySubj[key] > 0).sort((a, b) => bySubj[b] - bySubj[a]).map(key =>
+      '<div class="between small" style="padding:3px 0"><span>' + STUDY_SUBJECTS[key].label + '</span>' +
+      '<span class="pill">' + fmtDur(bySubj[key]) + '</span></div>').join('') +
     '</div>';
 }
 
@@ -1682,12 +1730,16 @@ function stWeekCard(me, days) {
 function stEditModal(sid) {
   const date = today();
   const secs = stSecs(sid, date);
+  const categories = stCategorySecs(secs);
   modal('⏱ 오늘 공부시간 수정',
     '<div class="hint mb14">분 단위로 고칠 수 있습니다. 타이머 정지를 깜빡했거나, 앱 없이 공부한 시간을 넣을 때 쓰세요.</div>' +
-    stSubjects(sid).map(s =>
-      '<div class="between mb8"><span class="small">' + esc(s) + '</span>' +
+    stSubjects(sid).map(s => {
+      const key = studySubjectKey(s);
+      const value = STUDY_SUBJECTS[key].label === s ? categories[key] : (secs[s] || 0);
+      return '<div class="between mb8"><span class="small">' + esc(s) + '</span>' +
       '<input class="in" type="number" min="0" style="max-width:120px" data-stedit="' + esc(s) + '" value="' +
-        Math.round((secs[s] || 0) / 60) + '"><span class="small muted">분</span></div>').join(''),
+        Math.round(value / 60) + '"><span class="small muted">분</span></div>';
+    }).join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="stsave">저장</button>');
 }
 
@@ -2376,7 +2428,7 @@ function viewWeek() {
       days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
       '</tr></thead><tbody>' +
       list.map(t => {
-        const subject = studySubject(t.studySubject);
+        const subject = taskStudySubject(t);
         return '<tr><td class="subj ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span></td>' +
           '<td class="n">' + esc(t.title) + (t.detail ? '<div class="small muted">' + esc(t.detail) + '</div>' : '') + '</td>' +
           days.map(d => {
@@ -2399,7 +2451,7 @@ function viewWeek() {
     h += '<div class="card alert"><div class="between mb8"><div><div class="card-title">↪ 밀린 공부</div>' +
       '<div class="card-sub">완료하지 못해 이월 대상이 된 공부입니다.</div></div><span class="pill bad">' + backlog.length + '개</span></div>' +
       backlog.map(item => {
-        const subject = studySubject(item.t.studySubject);
+        const subject = taskStudySubject(item.t);
         return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
           '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
           (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
@@ -2410,7 +2462,7 @@ function viewWeek() {
     h += '<div class="card"><div class="between mb8"><div><div class="card-title">📨 아직 가져오지 않은 배부 공부</div>' +
       '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div><span class="pill warn">' + offers.length + '개</span></div>' +
       offers.map(item => {
-        const subject = studySubject(item.t.studySubject);
+        const subject = taskStudySubject(item.t);
         return '<div class="week-offer-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
           '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + DOW[dowOf(item.date)] + ' ' + shortDate(item.date) + '</div></div>' +
           (session.isStaffLink ? '<button class="btn btn-sm btn-primary" data-act="studyclaim" data-id="' + item.t.id + '" data-date="' + item.date + '">체크리스트로 가져오기</button>' : '<span class="pill bad">가져오기 전</span>') + '</div>';
@@ -2442,7 +2494,7 @@ function monthSubjectStats(staffId, ym) {
     const daily = stCategorySecs(stSecs(staffId, date));
     STUDY_SUBJECT_KEYS.forEach(key => { stats[key].secs += daily[key] || 0; });
     checklistTasksFor(staffId, date).forEach(task => {
-      const item = stats[studySubjectKey(task.studySubject)];
+      const item = stats[taskStudySubjectKey(task)];
       item.total++;
       if (isDone(task.id, date)) item.done++;
     });
@@ -2607,7 +2659,7 @@ function viewMonth() {
     const p = taskProgress(g, c);
     const done = c && c.done;
     return '<div class="task' + (done ? ' done' : '') + '"><div class="task-body">' +
-      '<div class="row wraprow" style="gap:6px">' + studySubjectTag(g.studySubject) + '<div class="task-t">' + esc(g.title) + '</div></div>' +
+      '<div class="row wraprow" style="gap:6px">' + taskStudySubjectTag(g) + '<div class="task-t">' + esc(g.title) + '</div></div>' +
       '<div class="meta">' +
         (g.target ? '<span class="tag ' + (done ? 'ok' : 'doing') + '">' + p.done + ' / ' + p.total + (g.unit || '') + '</span>' : '') +
         (g.origin === 'staff' ? '<span class="tag add">학생 추가</span>' : '') +
@@ -2693,7 +2745,7 @@ function viewMonth() {
   const nextMonthStart = ymAdd(ym, 1) + '-01';
   const rolloverDate = nextMonthStart < today() ? today() : nextMonthStart;
   h += backlog.map(item => {
-    const subject = studySubject(item.t.studySubject);
+    const subject = taskStudySubject(item.t);
     return '<div class="month-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
       '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
       (editable ? '<div class="row wraprow" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="monthmove" data-id="' + item.t.id + '" data-date="' + item.date + '">날짜 변경</button>' +
@@ -3201,7 +3253,7 @@ function editTaskModal(id) {
   const who = currentStaff();
   modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : '업무 수정',
     '<div class="field"><label class="fl">과목 카테고리</label>' +
-      '<select class="in" id="eSubject">' + studySubjectOptions(isNew ? '' : (t.studySubject || 'other'), isNew ? '과목 선택' : '') + '</select></div>' +
+      '<select class="in" id="eSubject">' + studySubjectOptions(isNew ? '' : taskStudySubjectKey(t), isNew ? '과목 선택' : '') + '</select></div>' +
 
     '<div class="field"><label class="fl">업무 내용</label>' +
       '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
@@ -3876,7 +3928,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       const t = task();
       if (!me || !t || t.staffId !== me.id) return toast('이 공부의 타이머를 시작할 수 없습니다');
-      const subj = studySubject(t.studySubject).label;
+      const subj = taskStudySubject(t).label;
       const r = stRunning(me.id, today());
       if (r && r.taskId === t.id) { stStop(me.id, today()); toast(t.title + ' 공부 정지'); }
       else { stStart(me.id, today(), subj, t.id); toast(t.title + ' 공부 시작!'); }
@@ -3887,7 +3939,8 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me) break;
       const subj = el.dataset.subj;
       const r = stRunning(me.id, today());
-      if (r && r.subj === subj) { stStop(me.id, today()); toast(subj + ' 정지 — 수고했어요'); }
+      const runningSubject = r && (r.subj === '탐구' || r.subj === 'explore') ? '사회' : (r && r.subj);
+      if (r && runningSubject === subj) { stStop(me.id, today()); toast(subj + ' 정지 — 수고했어요'); }
       else { stStart(me.id, today(), subj, ''); toast(subj + ' 시작!'); }
       render();
       break;
@@ -4540,12 +4593,13 @@ setInterval(() => sync.run(), 45000);
 /* 순공시간 초 단위 표시 — 숫자는 매초, 시간표는 분이 바뀔 때만 갱신한다 */
 let lastTimelineMinute = -1;
 setInterval(() => {
-  const el = $('#stTot');
-  if (!el) return;
+  const totalEls = document.querySelectorAll('[data-st-total][data-st-date="' + today() + '"]');
+  if (!totalEls.length) return;
   const me = currentStaff();
   if (!me || !stRunning(me.id, today())) return;
   const secs = stSecs(me.id, today());
-  el.textContent = fmtHMS(Object.values(secs).reduce((a, b) => a + b, 0));
+  const totalText = fmtHMS(Object.values(secs).reduce((a, b) => a + b, 0));
+  totalEls.forEach(el => { el.textContent = totalText; });
   const minuteNow = Math.floor(now() / 60000);
   const timeline = $('#studyTimeline');
   if (timeline && minuteNow !== lastTimelineMinute) {
@@ -4554,7 +4608,12 @@ setInterval(() => {
   }
   const chip = $('#stChipOn');
   const r = stRunning(me.id, today());
-  if (chip && r) chip.textContent = '⏸ ' + r.subj + (secs[r.subj] ? ' ' + fmtHM(secs[r.subj]) : '');
+  if (chip && r) {
+    const shown = (r.subj === '탐구' || r.subj === 'explore') ? '사회' : r.subj;
+    const key = studySubjectKey(shown);
+    const shownSecs = STUDY_SUBJECTS[key].label === shown ? stCategorySecs(secs)[key] : secs[r.subj];
+    chip.textContent = '⏸ ' + shown + (shownSecs ? ' ' + fmtHM(shownSecs) : '');
+  }
 }, 1000);
 
 /* ── 새 버전 감지 ──
