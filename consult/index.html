@@ -85,6 +85,22 @@
   .card.alert { border-color: var(--coral); background: #FFF9F8; }
   .card-title { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
   .card-sub { font-size: 13px; color: var(--mid-gray); }
+  .today-fold-card { padding: 0; overflow: hidden; }
+  .today-fold-head {
+    width: 100%; min-height: 74px; padding: 15px 17px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px; text-align: left; background: transparent;
+  }
+  .today-fold-head:hover { background: rgba(243,244,246,.55); }
+  .today-fold-copy { flex: 1; min-width: 0; }
+  .today-fold-meta { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+  .today-fold-chevron {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    flex-shrink: 0; background: var(--light-gray); color: var(--mid-gray); font-size: 15px; font-weight: 900;
+  }
+  .today-fold-body { padding: 0 17px 17px; border-top: 1px solid var(--light-gray); }
+  .today-fold-body > :first-child { margin-top: 10px; }
+  .today-fold-card.is-folded .today-fold-head { min-height: 66px; }
+  .today-fold-section + .today-fold-section { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--light-gray); }
   main { padding-top: 16px; }
 
   .row { display: flex; align-items: center; gap: 10px; }
@@ -1355,6 +1371,7 @@ let monthSection = 'calendar';
 let viewStaff = '';
 let viewInputDirty = false;
 const openPanels = new Set();     // 펼쳐진 업무 패널
+const todayFoldState = { studyOffers: false, lectures: false }; // true면 오늘 화면 카드 접힘
 
 function go(r) {
   if (r === 'month' && route !== 'month') monthSection = 'calendar';
@@ -1690,6 +1707,7 @@ function viewToday() {
 
   if (cursor === today()) {
     h += studyOffersCard(me, cursor, offers);
+    h += ingTodayCard(me, editable);
     if (editable) {
       h += '<div class="card" style="padding:12px">' +
         '<div class="quick-add-grid">' +
@@ -1700,7 +1718,6 @@ function viewToday() {
     }
     h += studyPlannerCard(me, cursor, list, carry, editable);
     h += tbCard(me, editable);
-    h += ingTodayCard(me, editable);
   } else {
     h += tbCard(me, editable);
   }
@@ -1744,6 +1761,7 @@ function studyTotalHeroCard(me, date) {
 }
 
 function studyOffersCard(me, date, offers) {
+  const folded = todayFoldState.studyOffers;
   const rows = offers.map(task => {
     const check = getCheck(task.id, date);
     const claimed = !!(check && check.claimed);
@@ -1765,13 +1783,16 @@ function studyOffersCard(me, date, offers) {
       '</div>' + action + '</div></div>';
   }).join('');
 
-  return '<div class="card" id="studyOffers">' +
-    '<div class="between mb8"><div><div class="card-title">📚 오늘 배부된 공부</div>' +
-      '<div class="card-sub">' + (session.isStaffLink
-        ? '원장이 보낸 목록에서 공부를 내 체크리스트로 가져오세요.'
-        : '학생에게 배부한 공부와 체크리스트로 가져간 상태입니다.') + '</div></div>' +
-      '<span class="pill">' + offers.length + '개</span></div>' +
-    (rows || '<div class="small muted" style="padding:10px 0 2px">오늘 새로 배부된 공부가 없습니다.</div>') +
+  return '<div class="card today-fold-card' + (folded ? ' is-folded' : '') + '" id="studyOffers">' +
+    '<button type="button" class="today-fold-head" data-act="todayfold" data-section="studyOffers" aria-expanded="' + (!folded) + '" aria-controls="studyOffersBody">' +
+      '<span class="today-fold-copy"><span class="card-title" style="display:block">📚 오늘 배부된 공부</span>' +
+        '<span class="card-sub">' + (session.isStaffLink
+          ? '원장이 보낸 목록에서 공부를 내 체크리스트로 가져오세요.'
+          : '학생에게 배부한 공부와 체크리스트로 가져간 상태입니다.') + '</span></span>' +
+      '<span class="today-fold-meta"><span class="pill">' + offers.length + '개</span>' +
+        '<span class="today-fold-chevron" aria-hidden="true">' + (folded ? '⌄' : '⌃') + '</span></span></button>' +
+    '<div class="today-fold-body" id="studyOffersBody"' + (folded ? ' hidden' : '') + '>' +
+      (rows || '<div class="small muted" style="padding:10px 0 2px">오늘 새로 배부된 공부가 없습니다.</div>') + '</div>' +
     '</div>';
 }
 
@@ -2647,23 +2668,33 @@ function ingRow(sid, it, editable) {
 /** 오늘 화면에 붙는 인강 카드 */
 function ingTodayCard(me, editable) {
   const { overdue, todays } = ingTodayItems(me.id);
-  if (!overdue.length && !todays.length) return '';
+  const folded = todayFoldState.lectures;
   const bad = overdue.filter(x => Math.round((parseYmd(today()) - parseYmd(x.date)) / 86400000) >= ING_LATE_WARN).length;
-  let h = '';
+  const done = todays.filter(x => x.done).length;
+  let body = '';
   if (overdue.length) {
-    h += '<div class="card alert"><div class="between mb8">' +
+    body += '<div class="today-fold-section"><div class="between mb8">' +
       '<div class="card-title" style="color:var(--coral)">🎬 먼저 듣자! — 밀린 인강 ' + overdue.length + '강</div>' +
       (bad ? '<span class="pill bad">' + ING_LATE_WARN + '일 이상 ' + bad + '강</span>' : '') + '</div>' +
       overdue.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
   }
   if (todays.length) {
-    const done = todays.filter(x => x.done).length;
-    h += '<div class="card"><div class="between mb8">' +
-      '<div class="card-title">🎬 오늘 인강</div>' +
-      '<div class="pill' + (done === todays.length ? '' : ' warn') + '">' + done + ' / ' + todays.length + '강</div></div>' +
+    body += '<div class="today-fold-section"><div class="card-title">오늘 들을 인강</div>' +
       todays.map(x => ingRow(me.id, x, editable)).join('') + '</div>';
   }
-  return h;
+  if (!body) body = '<div class="small muted" style="padding:10px 0 2px">오늘 배정되거나 밀린 인강이 없습니다.</div>';
+
+  return '<div class="card today-fold-card' + (folded ? ' is-folded' : '') + '" id="todayLectures">' +
+    '<button type="button" class="today-fold-head" data-act="todayfold" data-section="lectures" aria-expanded="' + (!folded) + '" aria-controls="todayLecturesBody">' +
+      '<span class="today-fold-copy"><span class="card-title" style="display:block">🎬 인강</span>' +
+        '<span class="card-sub">오늘 들을 강의와 밀린 강의를 확인하고 완료를 기록하세요.</span></span>' +
+      '<span class="today-fold-meta">' +
+        (overdue.length ? '<span class="pill bad">밀림 ' + overdue.length + '강</span>' : '') +
+        (todays.length ? '<span class="pill' + (done === todays.length ? '' : ' warn') + '">' + done + ' / ' + todays.length + '강</span>' :
+          '<span class="pill">0강</span>') +
+        '<span class="today-fold-chevron" aria-hidden="true">' + (folded ? '⌄' : '⌃') + '</span></span></button>' +
+    '<div class="today-fold-body" id="todayLecturesBody"' + (folded ? ' hidden' : '') + '>' + body + '</div>' +
+    '</div>';
 }
 
 /* ── 인강 탭 ── */
@@ -7301,7 +7332,14 @@ document.addEventListener('click', ev => {
       break;
     }
 
-    /* 체크 · 단계 · 수량 · 막힘 */
+    /* 오늘 화면 접기 · 체크 · 단계 · 수량 · 막힘 */
+    case 'todayfold': {
+      const section = el.dataset.section;
+      if (!Object.prototype.hasOwnProperty.call(todayFoldState, section)) break;
+      todayFoldState[section] = !todayFoldState[section];
+      render();
+      break;
+    }
     case 'studyclaim': {
       const t = task();
       if (!session.isStaffLink || !t || t.staffId !== session.staffId || !isStudyOffer(t) || !effectiveOccursOn(t, date)) {
@@ -7904,7 +7942,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.15';
+const APP_VER = '2026-08-18.17';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
