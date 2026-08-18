@@ -59,10 +59,25 @@ test('monthly subject goals and analysis reuse real timer and checklist data', (
   assert.match(helpers, /stCategorySecs\(stSecs\(staffId, date\)\)/);
   assert.match(helpers, /checklistTasksFor\(staffId, date\)/);
   assert.match(month, /monthSubjectStats\(me\.id, ymAdd\(ym, -1\)\)/);
-  assert.match(month, /지난달보다/);
+  assert.match(month, /previousStats\[key\]\.secs/);
   assert.match(month, /전체 순공시간의/);
   assert.match(handlers, /data-monthgoal/);
   assert.match(handlers, /setCheck\(monthPlanKey\(me\.id\), ym/);
+});
+
+test('monthly analysis uses a distribution summary and comparison table instead of goal progress rows', () => {
+  const analysis = section('/* 과목별 분석 */', '/* 미완료 공부 */');
+
+  assert.match(analysis, /month-share-track/);
+  assert.match(analysis, /이번 달 과목 비중/);
+  assert.match(analysis, /100 - subjectReportRows\.reduce/,
+    'displayed whole-number subject shares must add up to 100%');
+  assert.match(analysis, /과목별 월간 비교표/);
+  ['과목', '이번 달', '지난달', '증감', '완료율'].forEach(label =>
+    assert.match(analysis, new RegExp('<th>' + label + '<\\/th>')));
+  assert.match(analysis, /row\.completion \+ '% · ' \+ row\.current\.done \+ '\/' \+ row\.current\.total \+ '건'/);
+  assert.doesNotMatch(analysis, /month-subject-(?:grid|row|track)/,
+    'analysis must not visually reuse the goal progress component');
 });
 
 test('monthly calendar focuses on important dates and opens the selected day', () => {

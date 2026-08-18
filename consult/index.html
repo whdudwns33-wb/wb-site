@@ -403,6 +403,25 @@
   .month-subject-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
   .month-subject-track { height: 11px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
   .month-subject-track i { display: block; height: 100%; border-radius: inherit; background: var(--subject-color); }
+  .month-share-summary { padding: 12px; margin-bottom: 14px; border-radius: 12px; background: #F8FAFC; }
+  .month-share-track { height: 16px; display: flex; overflow: hidden; margin: 9px 0 10px; border-radius: 999px; background: var(--light-gray); }
+  .month-share-track i { display: block; height: 100%; background: var(--subject-color); }
+  .month-share-track i + i { border-left: 2px solid var(--white); }
+  .month-share-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 10px; }
+  .month-share-key { min-width: 0; display: flex; align-items: center; gap: 5px; color: var(--mid-gray); font-size: 10.5px; }
+  .month-share-key i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--subject-color); }
+  .month-share-key b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dark-gray); font-weight: 800; }
+  .month-compare-wrap { overflow-x: auto; }
+  .month-compare-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .month-compare-table th, .month-compare-table td { padding: 9px 6px; border-bottom: 1px solid var(--light-gray); text-align: right; font-size: 11px; }
+  .month-compare-table th { color: var(--mid-gray); font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+  .month-compare-table th:first-child, .month-compare-table td:first-child { width: 72px; text-align: left; }
+  .month-compare-table tbody tr:last-child td { border-bottom: 0; }
+  .month-delta { font-weight: 900; white-space: nowrap; }
+  .month-delta.up { color: var(--green); }
+  .month-delta.down { color: var(--coral); }
+  .month-delta.flat { color: var(--mid-gray); }
+  .month-completion { font-weight: 800; white-space: nowrap; }
   .month-event-row, .month-backlog-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
   .month-event-row:last-child, .month-backlog-row:last-child { border-bottom: 0; }
   .month-event-progress { height: 7px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
@@ -609,6 +628,14 @@
     .month-kpis { grid-template-columns: 1fr 1fr; }
     .month-subject-row { grid-template-columns: 52px minmax(0, 1fr); }
     .month-subject-row > :last-child { grid-column: 2; }
+    .month-share-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .month-compare-wrap { overflow: visible; }
+    .month-compare-table, .month-compare-table tbody { display: block; }
+    .month-compare-table thead { display: none; }
+    .month-compare-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 11px; margin-top: 8px; border: 1px solid var(--line); border-radius: 11px; background: #FBFCFE; }
+    .month-compare-table td { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; border: 0; text-align: right; font-size: 11px; }
+    .month-compare-table td:first-child { width: auto; grid-column: 1 / -1; padding-bottom: 7px; border-bottom: 1px solid var(--light-gray); }
+    .month-compare-table td:not(:first-child)::before { content: attr(data-label); color: var(--mid-gray); font-size: 10px; font-weight: 700; }
     .month-event-row, .month-backlog-row { grid-template-columns: auto minmax(0, 1fr); }
     .month-event-row > :last-child, .month-backlog-row > :last-child { grid-column: 1 / -1; }
     .month-review-grid { grid-template-columns: 1fr; }
@@ -4497,19 +4524,34 @@ function viewMonth() {
   if (monthSection === 'report') {
   const totalSubjectSecs = report.totalSecs;
   const topShare = report.topKey && totalSubjectSecs ? Math.round(stats[report.topKey].secs / totalSubjectSecs * 100) : 0;
-  h += '<div class="card"><div class="card-title">📊 과목별 분석</div><div class="card-sub mb14">지난달 순공시간과 이번 달 공부 완료율을 비교합니다.</div>' +
-    '<div class="month-subject-grid">' + STUDY_SUBJECT_KEYS.map(key => {
+  const subjectReportRows = STUDY_SUBJECT_KEYS.map(key => {
       const subject = STUDY_SUBJECTS[key];
       const current = stats[key];
       const previous = previousStats[key].secs;
       const diff = previous ? Math.round((current.secs - previous) / previous * 100) : (current.secs ? null : 0);
-      const max = Math.max.apply(null, STUDY_SUBJECT_KEYS.map(k => stats[k].secs).concat(1));
-      const width = Math.round(current.secs / max * 100);
-      const compare = diff == null ? '지난달 기록 없음' : (diff > 0 ? '지난달보다 +' : '지난달보다 ') + diff + '%';
-      return '<div class="month-subject-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
-        '<div><div class="month-subject-track"><i style="width:' + width + '%"></i></div><div class="small muted">' + compare + ' · 공부 ' + current.done + '/' + current.total + '건 완료</div></div>' +
-        '<b class="small">' + fmtDur(current.secs) + '</b></div>';
-    }).join('') + '</div>' +
+      const exactShare = totalSubjectSecs ? current.secs / totalSubjectSecs * 100 : 0;
+      const share = Math.floor(exactShare);
+      const completion = current.total ? Math.round(current.done / current.total * 100) : null;
+      const deltaText = !previous && !current.secs ? '—' : diff == null ? '신규' : (diff > 0 ? '+' : '') + diff + '%';
+      const deltaClass = diff == null || diff === 0 ? 'flat' : diff > 0 ? 'up' : 'down';
+      return { key: key, subject: subject, current: current, previous: previous, share: share, exactShare: exactShare,
+        completion: completion, deltaText: deltaText, deltaClass: deltaClass };
+    });
+  const remainingShare = totalSubjectSecs ? 100 - subjectReportRows.reduce((sum, row) => sum + row.share, 0) : 0;
+  subjectReportRows.filter(row => row.current.secs).sort((a, b) => (b.exactShare - b.share) - (a.exactShare - a.share))
+    .slice(0, remainingShare).forEach(row => { row.share++; });
+  h += '<div class="card"><div class="card-title">📊 과목별 분석</div><div class="card-sub mb14">실제 결과를 과목 비중·지난달 증감·완료율로 비교합니다.</div>' +
+    '<div class="month-share-summary"><div class="between"><b class="small">이번 달 과목 비중</b><span class="small muted">총 ' + fmtDur(totalSubjectSecs) + '</span></div>' +
+      (totalSubjectSecs ? '<div class="month-share-track" role="img" aria-label="이번 달 과목별 순공시간 비중">' + subjectReportRows.filter(row => row.current.secs).map(row =>
+        '<i class="' + row.subject.className + '" style="width:' + (row.current.secs / totalSubjectSecs * 100).toFixed(2) + '%" title="' + esc(row.subject.label + ' ' + row.share + '%') + '"></i>').join('') + '</div>' +
+        '<div class="month-share-legend">' + subjectReportRows.filter(row => row.current.secs).map(row => '<span class="month-share-key ' + row.subject.className + '"><i></i><b>' +
+          row.subject.label + '</b> ' + row.share + '%</span>').join('') + '</div>' : '<div class="small muted mt8">이번 달 순공시간 기록이 없습니다.</div>') + '</div>' +
+    '<div class="month-compare-wrap" role="region" aria-label="과목별 월간 비교표" tabindex="0"><table class="month-compare-table"><thead><tr><th>과목</th><th>이번 달</th><th>지난달</th><th>증감</th><th>완료율</th></tr></thead><tbody>' +
+      subjectReportRows.map(row => '<tr><td><span class="tag subject-tag ' + row.subject.className + '">' + row.subject.label + '</span></td>' +
+        '<td data-label="이번 달"><b>' + fmtDur(row.current.secs) + '</b></td><td data-label="지난달">' + fmtDur(row.previous) + '</td>' +
+        '<td data-label="증감"><span class="month-delta ' + row.deltaClass + '">' + row.deltaText + '</span></td>' +
+        '<td data-label="완료율"><span class="month-completion">' + (row.completion == null ? '—' : row.completion + '% · ' + row.current.done + '/' + row.current.total + '건') + '</span></td></tr>').join('') +
+      '</tbody></table></div>' +
     (topShare >= 60 ? '<div class="hint" style="margin-top:12px;color:var(--amber)">⚠ ' + STUDY_SUBJECTS[report.topKey].label + '에 전체 순공시간의 ' + topShare + '%가 집중되어 있습니다.</div>' : '') + '</div>';
   }
 
@@ -7862,7 +7904,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.14';
+const APP_VER = '2026-08-18.15';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
