@@ -539,6 +539,10 @@
   .book-order-stage-list { display: grid; gap: 8px; padding: 10px; }
   .book-order-row { padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
   .book-order-money { margin-top: 8px; color: var(--navy); font-size: 12px; font-weight: 900; }
+  .book-order-price-entry { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding: 10px; border: 1px solid #f0d39a; border-radius: 10px; background: #fffaf0; }
+  .book-order-price-entry label { display: grid; gap: 5px; flex: 1 1 180px; color: var(--navy); font-size: 12px; font-weight: 900; }
+  .book-order-price-entry .in { min-width: 0; }
+  .book-order-price-note { flex-basis: 100%; color: var(--muted); font-size: 11px; }
   .book-order-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
   .book-order-date { min-width: 0; padding: 7px 8px; border-radius: 8px; background: var(--light-gray); }
   .book-order-date b { display: block; color: var(--navy); font-size: 10.5px; }
@@ -858,11 +862,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.13"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.13"></script>
-<script src="./asset-core.js?v=2026-08-18.13"></script>
-<script src="./qr-core.js?v=2026-08-18.13"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.13"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.16"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.16"></script>
+<script src="./asset-core.js?v=2026-08-18.16"></script>
+<script src="./qr-core.js?v=2026-08-18.16"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.16"></script>
 <script>
 "use strict";
 
@@ -7468,6 +7472,16 @@ function bookOrderMoneyHtml(row) {
     '원 · 합계 ' + (unitPrice * quantity).toLocaleString('ko-KR') + '원</div>';
 }
 
+function bookOrderPriceEntryHtml(row) {
+  if (!row.canSetUnitPrice) return '';
+  return '<div class="book-order-price-entry"><label><span>1회성 교재 금액 (1권 기준)</span>' +
+    '<input class="in" type="number" inputmode="numeric" min="1" max="10000000" step="1" ' +
+      'data-book-order-price-input aria-label="' + esc(row.title) + ' 권당 교재 금액" placeholder="예: 15000"></label>' +
+    '<button class="btn btn-sm btn-primary" data-act="bookorderpricesave" data-task="' + esc(row.taskId) +
+      '" data-item="' + Number(row.itemIndex) + '">금액 저장</button>' +
+    '<div class="book-order-price-note">한 번 저장하면 변경할 수 없습니다.</div></div>';
+}
+
 function bookOrderDatesHtml(row) {
   return '<div class="book-order-dates" aria-label="교재 주문 단계별 날짜">' + [
     ['주문요청', row.orderRequestedAt],
@@ -7482,7 +7496,7 @@ function bookOrderRowHtml(row) {
   const students = Array.isArray(row.students) ? row.students : [];
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(row.vendorName || '미등록') + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
-    bookOrderMoneyHtml(row) + bookOrderDatesHtml(row) +
+    bookOrderMoneyHtml(row) + bookOrderPriceEntryHtml(row) + bookOrderDatesHtml(row) +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' + esc(student.name) +
       (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
@@ -7582,6 +7596,32 @@ async function transitionBookOrder(button) {
   } catch (error) {
     button.disabled = false;
     toast('교재 단계 저장 실패 — ' + (error.message || error));
+    loadBookIssues(true);
+  }
+}
+
+async function saveLegacyBookOrderPrice(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const box = button.closest('.book-order-price-entry');
+  const input = box && box.querySelector('[data-book-order-price-input]');
+  const unitPrice = Number(input && input.value);
+  if (!Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > 10000000) {
+    if (input) input.focus();
+    return toast('1원부터 1,000만원 사이의 권당 금액을 입력해 주세요');
+  }
+  if (!confirm('권당 ' + unitPrice.toLocaleString('ko-KR') + '원으로 저장할까요? 저장 후에는 변경할 수 없습니다.')) return;
+  button.disabled = true;
+  if (input) input.disabled = true;
+  try {
+    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: 'order_price_set',
+      taskId: String(button.dataset.task || ''), itemIndex: Number(button.dataset.item), unitPrice: unitPrice });
+    await loadBookIssues(true);
+    toast('교재 금액을 저장했습니다');
+  } catch (error) {
+    button.disabled = false;
+    if (input) { input.disabled = false; input.focus(); }
+    toast('교재 금액 저장 실패 — ' + (error.message || error));
     loadBookIssues(true);
   }
 }
@@ -11904,6 +11944,7 @@ document.addEventListener('click', ev => {
     case 'bookissuetransition': transitionBookIssue(el); break;
     case 'bookorderlinkopen': openBookOrderStudentLink(el); break;
     case 'bookorderlinksave': saveBookOrderStudentLink(el); break;
+    case 'bookorderpricesave': saveLegacyBookOrderPrice(el); break;
     case 'bookordertransition': transitionBookOrder(el); break;
     case 'transportrefresh':
       if (!transportDiscardDraft('새로고침하면 저장하지 않은 차량 설정이 사라집니다.')) break;
@@ -13099,7 +13140,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.13';
+const APP_VER = '2026-08-18.16';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
