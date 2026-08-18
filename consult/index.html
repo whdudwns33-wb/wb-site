@@ -433,22 +433,18 @@
   .month-section-btn.on { background: var(--white); color: var(--navy); box-shadow: 0 2px 8px rgba(27,58,92,.1); }
   .month-section-btn .badge { margin-left: 3px; }
   .month-section-intro { margin: -2px 2px 12px; color: var(--mid-gray); font-size: 12px; line-height: 1.5; }
-  .agenda-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-  .agenda-filters .chip { min-height: 44px; flex: 0 0 auto; }
-  .agenda-filters::-webkit-scrollbar { display: none; }
-  .agenda-legend { display: flex; gap: 10px; overflow-x: auto; margin: 6px 0 10px; padding: 2px 1px 4px; color: var(--mid-gray); font-size: 10.5px; white-space: nowrap; scrollbar-width: none; }
-  .agenda-legend::-webkit-scrollbar { display: none; }
+  .agenda-upcoming-list { display: grid; gap: 7px; margin-top: 12px; }
+  .agenda-upcoming-row { width: 100%; min-height: 52px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid var(--line); border-radius: 11px; background: #FBFCFE; text-align: left; }
+  .agenda-upcoming-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dark-gray); font-size: 12.5px; }
+  .agenda-upcoming-row time { color: var(--mid-gray); font-size: 10.5px; font-weight: 700; }
+  .agenda-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 10px; padding: 2px 1px; color: var(--mid-gray); font-size: 10.5px; }
   .agenda-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .agenda-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
-  .agenda-legend i.academic { background: var(--coral); }
-  .agenda-legend i.ingang { background: #8B5CF6; }
-  .agenda-legend i.schedule { background: var(--green); }
-  .agenda-legend i.study { width: 13px; border-radius: 3px; background: rgba(127,179,244,.62); }
+  .agenda-legend i.exam, .agenda-dot.exam { background: var(--coral); }
+  .agenda-legend i.performance, .agenda-dot.performance { background: var(--amber); }
+  .agenda-legend i.important, .agenda-dot.important { background: #3B82F6; }
   .agenda-dots { display: flex; gap: 3px; min-height: 6px; }
   .agenda-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); }
-  .agenda-dot.academic { background: var(--coral); }
-  .agenda-dot.ingang { background: #8B5CF6; }
-  .agenda-dot.schedule { background: var(--green); }
   .calday.agenda-selected { outline: 2px solid var(--blue); outline-offset: -2px; }
   .agenda-list { display: grid; gap: 8px; margin-top: 10px; }
   .agenda-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: #FBFCFE; }
@@ -460,7 +456,6 @@
   .agenda-item-more > summary::-webkit-details-marker { display: none; }
   .agenda-item-more[open] > summary { background: var(--light-gray); }
   .agenda-item-more .agenda-actions { margin-top: 6px; }
-  .agenda-reminders { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .agenda-note { padding: 10px 12px; margin-top: 10px; border-radius: 10px; background: #F6F8FB; color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
   .agenda-more { margin-top: 12px; border-top: 1px solid var(--light-gray); }
   .agenda-more summary { min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--mid-gray); font-size: 12px; font-weight: 800; cursor: pointer; list-style: none; }
@@ -1329,7 +1324,6 @@ let cursor = today();
 let cursorPinned = false;
 let ymCursor = today().slice(0, 7);   // 월간 플래너가 보고 있는 달
 let agendaDate = today();
-let agendaFilter = 'all';
 let monthSection = 'calendar';
 let viewStaff = '';
 let viewInputDirty = false;
@@ -3786,7 +3780,7 @@ function viewWeek() {
 
 /* ── 월간 플래너 ── */
 const monthPlanKey = staffId => '__monthplan__' + staffId;
-const MONTH_EVENT_KINDS = Object.freeze({ exam: '시험', mock: '모의고사', apply: '원서·접수', consult: '상담', other: '기타' });
+const MONTH_EVENT_KINDS = Object.freeze({ exam: '시험', mock: '모의고사', performance: '수행평가', apply: '원서·접수', consult: '상담', other: '기타' });
 function monthPlanOf(staffId, ym) {
   const c = state.checks[monthPlanKey(staffId) + '|' + ym];
   const plan = Object.assign({ subjectGoals: {}, events: [], reflection: '', directorNote: '', nextFocus: '' }, (c && c.plan) || {});
@@ -4074,8 +4068,6 @@ function monthDday(date) {
   return diff > 0 ? 'D-' + diff : 'D+' + Math.abs(diff);
 }
 
-const AGENDA_FILTERS = Object.freeze({ all: '전체', exam: '시험', performance: '수행', task: '할 일', ingang: '인강', schedule: '시간표' });
-
 function agendaDday(date, anchor) {
   const diff = Math.round((parseYmd(date) - parseYmd(anchor || today())) / 86400000);
   if (diff === 0) return 'D-DAY';
@@ -4123,7 +4115,7 @@ function agendaItemsFor(staffId, start, end) {
         key: 'personal:' + event.id + ':' + date, source: 'personal', sourceId: event.id,
         title: event.title, date: date, startTime: '', endTime: '', allDay: true,
         type: event.kind === 'exam' || event.kind === 'mock' ? 'exam' : 'personal',
-        detail: event.range || '', done: false, quiet: false, personal: true
+        detail: event.range || '', done: false, quiet: false, personal: true, importantKind: event.kind || 'other'
       }));
 
     checklistTasksFor(staffId, date).forEach(task => {
@@ -4175,18 +4167,6 @@ function agendaItemsFor(staffId, start, end) {
     .sort((a, b) => a.date.localeCompare(b.date) || Number(a.done) - Number(b.done) ||
     (priority[a.type] ?? 9) - (priority[b.type] ?? 9) ||
     (a.allDay ? '00:00' : a.startTime || '99:99').localeCompare(b.allDay ? '00:00' : b.startTime || '99:99') || a.title.localeCompare(b.title));
-}
-
-function agendaMatchesFilter(item, filter) {
-  if (!filter || filter === 'all') return true;
-  if (filter === 'task') return item.type === 'task' || item.type === 'exam-plan';
-  if (filter === 'schedule') return item.type === 'personal' || item.type === 'timeblock' || item.type === 'fixed';
-  return item.type === filter;
-}
-
-function agendaTypeLabel(item) {
-  if (item.personal) return '개인 일정';
-  return { exam: '시험', performance: '수행평가', task: '할 일', 'exam-plan': '시험계획', ingang: '인강', timeblock: '시간표', fixed: '고정 일정', personal: '개인 일정' }[item.type] || '일정';
 }
 
 function googleCalendarUrl(item) {
@@ -4263,42 +4243,43 @@ function downloadAgendaIcs(items, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function agendaReminderItems(staffId) {
-  const candidates = agendaItemsFor(staffId, addDays(today(), -30), addDays(today(), 7)).filter(item => {
-    if (item.done || item.quiet || item.type === 'timeblock' || item.type === 'fixed' || item.type === 'personal') return false;
-    const diff = Math.round((parseYmd(item.date) - parseYmd(today())) / 86400000);
-    return (item.type === 'exam' || item.type === 'performance') ? diff >= 0 && diff <= 7 : diff <= 0;
-  });
-  const academic = candidates.filter(item => item.type === 'exam' || item.type === 'performance')
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const work = candidates.filter(item => item.type !== 'exam' && item.type !== 'performance')
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const picked = academic.slice(0, 3);
-  return picked.concat(work.slice(0, 6 - picked.length));
+function agendaImportantKind(item) {
+  if (!item) return '';
+  if (item.type === 'performance' || (item.personal && item.importantKind === 'performance')) return 'performance';
+  if (item.type === 'exam') return 'exam';
+  if (item.personal) return 'important';
+  return '';
+}
+
+function agendaImportantLabel(item) {
+  return { exam: '시험', performance: '수행평가', important: '중요 일정' }[agendaImportantKind(item)] || '중요 일정';
+}
+
+function agendaImportantItemsFor(staffId, start, end) {
+  return agendaItemsFor(staffId, start, end).filter(item => !!agendaImportantKind(item));
+}
+
+function agendaUpcomingImportantItems(staffId) {
+  return agendaImportantItemsFor(staffId, today(), addDays(today(), 90)).slice(0, 5);
 }
 
 function agendaCalendarCard(me, ym) {
   if (!agendaDate.startsWith(ym)) agendaDate = ym === today().slice(0, 7) ? today() : ym + '-01';
   const dates = monthDates(ym);
-  const monthItems = agendaItemsFor(me.id, dates[0], dates[dates.length - 1]);
-  const visible = monthItems.filter(item => agendaMatchesFilter(item, agendaFilter));
-  const byDate = new Map(dates.map(date => [date, visible.filter(item => item.date === date)]));
+  const monthItems = agendaImportantItemsFor(me.id, dates[0], dates[dates.length - 1]);
+  const byDate = new Map(dates.map(date => [date, monthItems.filter(item => item.date === date)]));
   const selected = byDate.get(agendaDate) || [];
-  const reminders = agendaReminderItems(me.id);
-  const maxStudySecs = Math.max.apply(null, dates.map(date => stTotal(me.id, date)).concat(1));
+  const upcoming = agendaUpcomingImportantItems(me.id);
   const firstDow = (dowOf(dates[0]) + 6) % 7;
   const cells = Array.from({ length: firstDow }, () => '<td></td>');
   dates.forEach(date => {
     const items = byDate.get(date) || [];
-    const secs = stTotal(me.id, date);
-    const alpha = secs ? (.12 + Math.min(.62, secs / maxStudySecs * .62)).toFixed(2) : 0;
-    const groupOf = item => item.type === 'exam' || item.type === 'performance' ? 'academic' :
-      item.type === 'ingang' ? 'ingang' : ['personal', 'timeblock', 'fixed'].includes(item.type) ? 'schedule' : 'task';
-    const groups = [...new Set(items.map(groupOf))].slice(0, 3);
-    const counts = groups.map(group => group + ' ' + items.filter(item => groupOf(item) === group).length + '건').join(', ');
+    const groups = [...new Set(items.map(agendaImportantKind))];
+    const counts = groups.map(group => ({ exam: '시험', performance: '수행평가', important: '중요 일정' }[group]) + ' ' +
+      items.filter(item => agendaImportantKind(item) === group).length + '건').join(', ');
     cells.push('<td><button class="calday ' + (date === today() ? 'today ' : '') + (date === agendaDate ? 'agenda-selected' : '') + '" data-act="agendapick" data-date="' + date + '"' +
-      (date === agendaDate ? ' aria-current="date"' : '') + (secs ? ' style="background:rgba(127,179,244,' + alpha + ')"' : '') +
-      ' aria-label="' + esc(label(date) + (counts ? ' · ' + counts : ' · 일정 없음')) + '"><b>' + Number(date.slice(8)) + '</b>' +
+      (date === agendaDate ? ' aria-current="date"' : '') +
+      ' aria-label="' + esc(label(date) + (counts ? ' · ' + counts : ' · 중요한 일정 없음')) + '"><b>' + Number(date.slice(8)) + '</b>' +
       '<span class="agenda-dots">' + groups.map(group => '<i class="agenda-dot ' + group + '"></i>').join('') + '</span>' +
       (items.length ? '<small>' + items.length + '건</small>' : '') + '</button></td>');
   });
@@ -4306,32 +4287,30 @@ function agendaCalendarCard(me, ym) {
   const rows = [];
   for (let i = 0; i < cells.length; i += 7) rows.push('<tr>' + cells.slice(i, i + 7).join('') + '</tr>');
 
-  const filterButtons = Object.keys(AGENDA_FILTERS).map(key => '<button class="chip ' + (agendaFilter === key ? 'on' : '') + '" data-act="agendafilter" data-v="' + key + '" aria-pressed="' + (agendaFilter === key) + '">' + AGENDA_FILTERS[key] + '</button>').join('');
   const exportable = monthItems;
-  let h = '<div class="card"><div class="agenda-head"><div><div class="card-title">🗓 월간 공부 달력 · 통합 일정</div>' +
-    '<div class="card-sub">시험·수행평가·할 일·인강을 한 날짜에서 확인합니다.</div></div></div>' +
-    '<div class="agenda-filters mb8">' + filterButtons + '</div>' +
-    '<div class="agenda-legend" aria-label="캘린더 색상 안내"><span><i></i>할 일</span><span><i class="academic"></i>시험·수행</span>' +
-      '<span><i class="ingang"></i>인강</span><span><i class="schedule"></i>시간표</span><span><i class="study"></i>진할수록 순공시간 많음</span></div>' +
+  let h = upcoming.length ? '<div class="card"><div class="between"><div><div class="card-title">⏰ 다가오는 일정</div>' +
+    '<div class="card-sub">앞으로 90일 중 가까운 중요한 일정입니다.</div></div><span class="pill warn">' + upcoming.length + '건</span></div>' +
+    '<div class="agenda-upcoming-list">' + upcoming.map(item => '<button class="agenda-upcoming-row" data-act="agendapick" data-date="' + item.date + '">' +
+      '<span class="pill ' + (item.date === today() ? 'bad' : 'warn') + '">' + esc(agendaDday(item.date)) + '</span>' +
+      '<b>' + esc(agendaImportantLabel(item) + ' · ' + item.title) + '</b><time datetime="' + item.date + '">' + esc(shortDate(item.date)) + '</time></button>').join('') + '</div></div>' : '';
+  h += '<div class="card"><div class="agenda-head"><div><div class="card-title">📅 중요한 일정</div>' +
+    '<div class="card-sub">시험·수행평가·원장이 지정한 중요 일정만 보여줍니다.</div></div></div>' +
+    '<div class="agenda-legend" aria-label="캘린더 색상 안내"><span><i class="exam"></i>시험</span>' +
+      '<span><i class="performance"></i>수행평가</span><span><i class="important"></i>중요 일정</span></div>' +
     '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>' +
     '<div class="between mt14"><button class="navbtn" data-act="agendaday" data-n="-1" aria-label="이전 날짜">‹</button><div><b>' + esc(label(agendaDate)) + '</b><div class="small muted" style="text-align:center">' + selected.length + '건</div></div><button class="navbtn" data-act="agendaday" data-n="1" aria-label="다음 날짜">›</button></div>' +
     '<div class="agenda-list" aria-live="polite">' + (selected.length ? selected.map(item => {
-      const type = agendaTypeLabel(item);
-      const endLabel = (item.endDate || item.date) > item.date ? '다음날 ' + (item.endTime || '') : (item.endTime || agendaEndTime(item.startTime, 30));
-      const when = item.allDay ? '종일' : esc(item.startTime + '~' + endLabel);
-      return '<div class="agenda-item ' + (item.done ? 'done' : '') + '"><div class="agenda-time">' + when + '</div><div><div class="row wraprow" style="gap:5px"><span class="tag">' + esc(type) + '</span>' +
-        '<b class="small">' + esc(item.title) + '</b>' + (item.done ? '<span class="pill">완료</span>' : '') + '</div>' +
+      const type = agendaImportantLabel(item);
+      return '<div class="agenda-item"><div class="agenda-time">' + esc(agendaDday(item.date)) + '</div><div><div class="row wraprow" style="gap:5px"><span class="tag">' + esc(type) + '</span>' +
+        '<b class="small">' + esc(item.title) + '</b></div>' +
         (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') + '</div><details class="agenda-item-more"><summary class="btn btn-sm btn-ghost">내보내기</summary><div class="agenda-actions">' +
         '<a class="btn btn-sm btn-ghost" href="' + esc(googleCalendarUrl(item)) + '" target="_blank" rel="noopener noreferrer">Google에서 확인 후 저장</a>' +
         '<button class="btn btn-sm" data-act="agendaics" data-key="' + esc(item.key) + '" data-date="' + item.date + '">.ics 받기</button></div></details></div>';
-    }).join('') : '<div class="small muted">선택한 날짜에 표시할 일정이 없습니다.</div>') + '</div>' +
+    }).join('') : '<div class="small muted">선택한 날짜에 중요한 일정이 없습니다.</div>') + '</div>' +
     '<button class="btn btn-ghost btn-block mt14" data-act="agendaopen" data-date="' + agendaDate + '">이 날짜의 오늘 플래너 자세히 보기</button>' +
     '<details class="agenda-more"><summary>캘린더 내보내기</summary><div class="agenda-export-actions"><button class="btn btn-sm btn-ghost" data-act="agendamonthics"' +
       (exportable.length ? '' : ' disabled') + '>이번 달 전체 .ics</button></div>' +
-      '<div class="agenda-note">외부 캘린더로 한 번 내보내는 기능입니다. 앱에서 이후 변경한 내용은 자동으로 수정되지 않으며, Google 화면에서 알림 시각을 확인한 뒤 저장하세요.</div></details></div>';
-
-  if (reminders.length) h += '<div class="card alert"><div class="between"><div><div class="card-title">🔔 확인할 일정</div><div class="card-sub">임박한 시험과 아직 끝내지 못한 항목만 모았습니다.</div></div><span class="pill warn">' + reminders.length + '건</span></div>' +
-    '<div class="agenda-reminders">' + reminders.map(item => '<span class="tag ' + (item.date < today() ? 'bad' : 'doing') + '">' + esc(agendaDday(item.date)) + ' · ' + esc(item.title) + '</span>').join('') + '</div></div>';
+      '<div class="agenda-note">중요한 일정만 외부 캘린더로 한 번 내보냅니다. 앱에서 이후 변경한 내용은 자동으로 수정되지 않으며, Google 화면에서 알림 시각을 확인한 뒤 저장하세요.</div></details></div>';
   return h;
 }
 function monthSubjectGoalModal(me, ym) {
@@ -4399,7 +4378,7 @@ function moveMonthOccurrence(task, from, to) {
 }
 
 const MONTH_SECTIONS = Object.freeze({
-  calendar: { label: '캘린더', description: '이번 달 일정과 선택한 날짜의 할 일을 확인합니다.' },
+  calendar: { label: '캘린더', description: '이번 달 중요한 일정과 선택한 날짜의 상세를 확인합니다.' },
   plan: { label: '월간 계획', description: '시험·목표·미완료 공부를 한곳에서 조정합니다.' },
   report: { label: '분석·리포트', description: '과목별 공부 결과와 월간 피드백을 확인합니다.' }
 });
@@ -7105,12 +7084,6 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
-    case 'agendafilter': {
-      if (!Object.prototype.hasOwnProperty.call(AGENDA_FILTERS, el.dataset.v)) break;
-      agendaFilter = el.dataset.v;
-      render();
-      break;
-    }
     case 'agendaday': {
       agendaDate = addDays(agendaDate, Number(el.dataset.n) || 0);
       ymCursor = agendaDate.slice(0, 7);
@@ -7127,7 +7100,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       const date = el.dataset.date;
       if (!me || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) break;
-      const item = agendaItemsFor(me.id, date, date).find(row => row.key === el.dataset.key);
+      const item = agendaImportantItemsFor(me.id, date, date).find(row => row.key === el.dataset.key);
       if (!item) return toast('일정을 다시 확인해 주세요');
       downloadAgendaIcs([item], 'wb-일정-' + date + '.ics');
       break;
@@ -7135,7 +7108,7 @@ document.addEventListener('click', ev => {
     case 'agendamonthics': {
       const me = currentStaff(); if (!me) break;
       const dates = monthDates(ymCursor);
-      const items = agendaItemsFor(me.id, dates[0], dates[dates.length - 1]);
+      const items = agendaImportantItemsFor(me.id, dates[0], dates[dates.length - 1]);
       downloadAgendaIcs(items, 'wb-일정-' + ymCursor + '.ics');
       break;
     }
@@ -7886,7 +7859,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.12';
+const APP_VER = '2026-08-18.13';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

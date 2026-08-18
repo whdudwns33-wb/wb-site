@@ -119,13 +119,13 @@ test('the existing month tab becomes the shared schedule for admin and student r
     'director, manager, and student tab sets all expose the same schedule');
   assert.doesNotMatch(html, /\['calendar',/);
 
-  assert.match(calendar, /통합 (?:일정|캘린더)/);
+  assert.match(calendar, /중요한 일정/);
   assert.ok(month.indexOf('agendaCalendarCard') < month.indexOf('이달의 목표'),
     'the integrated calendar should be the first monthly section');
   assert.match(month, /const me = currentStaff\(\)/);
-  assert.match(calendar, /agendaItemsFor\(me\.id/);
+  assert.match(calendar, /agendaImportantItemsFor\(me\.id/);
   assert.match(month, /!session\.isStaffLink[\s\S]*?staffSwitcher\(me\.id\)/);
-  ['agendapick', 'agendaday', 'agendafilter', 'agendaics', 'agendamonthics']
+  ['agendapick', 'agendaday', 'agendaics', 'agendamonthics']
     .forEach(action => assert.match(calendar, new RegExp('data-act="' + action + '"')));
   assert.match(calendar, /data-n="-1"/);
   assert.match(calendar, /data-n="1"/);
@@ -292,39 +292,29 @@ test('ICS uses RFC text escaping, exclusive all-day ends, CRLF, and Asia/Seoul t
     'MIME method must match the ICS METHOD property');
 });
 
-test('the six-item reminder cap cannot hide a nearer exam behind older overdue tasks', () => {
-  const source = functionSource('agendaReminderItems');
-  assert.match(source, /addDays\(today\(\), -30\)/,
-    'recent overdue work must not disappear after only seven days');
-  const agendaReminderItems = Function(`${dateHelpers}
-    function today() { return '2026-08-20'; }
-    function agendaItemsFor() {
-      return [
-        {sourceId:'old-7',type:'task',title:'7일 지연',date:'2026-08-13',done:false,quiet:false},
-        {sourceId:'old-6',type:'task',title:'6일 지연',date:'2026-08-14',done:false,quiet:false},
-        {sourceId:'old-5',type:'task',title:'5일 지연',date:'2026-08-15',done:false,quiet:false},
-        {sourceId:'old-4',type:'task',title:'4일 지연',date:'2026-08-16',done:false,quiet:false},
-        {sourceId:'old-3',type:'task',title:'3일 지연',date:'2026-08-17',done:false,quiet:false},
-        {sourceId:'old-2',type:'task',title:'2일 지연',date:'2026-08-18',done:false,quiet:false},
-        {sourceId:'old-1',type:'task',title:'1일 지연',date:'2026-08-19',done:false,quiet:false},
-        {sourceId:'exam',type:'exam',title:'내일 시험',date:'2026-08-21',done:false,quiet:false}
-      ];
-    }
-    ${source}
-    return agendaReminderItems;`)();
-  const reminders = agendaReminderItems('student-1');
-  assert.ok(reminders.length <= 6);
-  assert.ok(reminders.some(item => item.sourceId === 'exam'));
+test('the calendar keeps only exams, performance assessments, and designated important dates', () => {
+  const agendaImportantKind = Function(`${functionSource('agendaImportantKind')}
+    return agendaImportantKind;`)();
+  assert.equal(agendaImportantKind({type:'exam'}), 'exam');
+  assert.equal(agendaImportantKind({type:'performance'}), 'performance');
+  assert.equal(agendaImportantKind({type:'personal',personal:true,importantKind:'performance'}), 'performance');
+  assert.equal(agendaImportantKind({type:'personal',personal:true,importantKind:'consult'}), 'important');
+  assert.equal(agendaImportantKind({type:'task'}), '');
+  assert.equal(agendaImportantKind({type:'ingang'}), '');
+  assert.equal(agendaImportantKind({type:'timeblock'}), '');
+
+  const upcomingSource = functionSource('agendaUpcomingImportantItems');
+  assert.match(upcomingSource, /addDays\(today\(\), 90\)/);
+  assert.match(upcomingSource, /slice\(0, 5\)/);
 });
 
 test('schedule navigation is transient and ICS export stays scoped to currentStaff for both roles', () => {
   const pick = eventCase('agendapick');
   const day = eventCase('agendaday');
-  const filter = eventCase('agendafilter');
   const open = eventCase('agendaopen');
   const download = [eventCase('agendaics'), eventCase('agendamonthics')];
 
-  [pick, day, filter, open].forEach(source => {
+  [pick, day, open].forEach(source => {
     assert.ok(source, 'agenda action case must exist');
     assert.doesNotMatch(source, /if \(!session\.isAdmin\)|setCheck\(|save\(\)|queueSync\(\)/);
     assert.match(source, /render\(\)|go\('today'\)/);
@@ -332,18 +322,19 @@ test('schedule navigation is transient and ICS export stays scoped to currentSta
   download.forEach(source => {
     assert.ok(source, 'agenda ICS action case must exist');
     assert.match(source, /const me = currentStaff\(\)/);
-    assert.match(source, /agendaItemsFor\(me\.id/);
+    assert.match(source, /agendaImportantItemsFor\(me\.id/);
     assert.match(source, /downloadAgendaIcs\(/);
     assert.match(source, /\.ics/);
     assert.doesNotMatch(source, /if \(!session\.isAdmin\)|el\.dataset\.sid|session\.staffId/);
   });
   const monthDownload = eventCase('agendamonthics');
   assert.doesNotMatch(monthDownload, /agendaFilter|agendaMatchesFilter|!item\.quiet/,
-    'the button labeled as a full-month export must not silently use the active display filter');
+    'the month export must use the same important-date scope as the calendar');
   const calendar = functionSource('agendaCalendarCard');
   assert.match(calendar, /이번 달 전체 \.ics/);
-  assert.match(calendar, /const items = byDate\.get\(date\) \|\| \[\]/,
-    'fixed schedule blocks must remain visible in calendar cells');
+  assert.match(calendar, /const monthItems = agendaImportantItemsFor/);
+  assert.doesNotMatch(calendar, /agendaFilter|maxStudySecs|stTotal\(me\.id|timeblock|ingang/,
+    'routine work, timetables, lectures, and study heat must stay out of the simplified calendar');
   const helper = functionSource('downloadAgendaIcs');
   assert.match(helper, /text\/calendar/);
   assert.match(helper, /URL\.createObjectURL/);
