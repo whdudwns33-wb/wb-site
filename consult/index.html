@@ -369,6 +369,21 @@
   .week-goal-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
   .week-goal-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--light-gray); }
   .week-goal-track i { display: block; height: 100%; border-radius: inherit; background: var(--subject-color); }
+  .week-key { margin: 0 0 10px; }
+  .week-key > summary { width: max-content; min-height: 36px; display: flex; align-items: center; margin-left: auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--mid-gray); cursor: pointer; font-size: 11px; font-weight: 900; list-style: none; }
+  .week-key > summary::-webkit-details-marker, .week-action-summary::-webkit-details-marker { display: none; }
+  .week-key > summary::after { content: '⌄'; margin-left: 5px; }
+  .week-key[open] > summary::after { content: '⌃'; }
+  .week-key-body { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; padding: 9px 11px; border-radius: 9px; background: var(--light-gray); color: var(--mid-gray); font-size: 11px; font-weight: 800; }
+  .week-action-card { overflow: hidden; padding: 0; }
+  .week-action-summary { min-height: 68px; display: flex; align-items: center; gap: 12px; padding: 14px 17px; cursor: pointer; list-style: none; }
+  .week-action-copy { min-width: 0; flex: 1; }
+  .week-action-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+  .week-action-summary::after { content: '⌄'; color: var(--mid-gray); font-weight: 900; }
+  .week-action-card[open] .week-action-summary::after { content: '⌃'; }
+  .week-action-body { padding: 4px 17px 14px; border-top: 1px solid var(--light-gray); }
+  .week-action-section { padding-top: 12px; }
+  .week-action-section + .week-action-section { margin-top: 8px; border-top: 1px dashed var(--line); }
   .week-backlog-row, .week-offer-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--light-gray); }
   .week-backlog-row:last-child, .week-offer-row:last-child { border-bottom: 0; }
   .week-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -641,6 +656,8 @@
     .planner-list-head, .planner-task-row { grid-template-columns: 54px minmax(0, 1fr) 34px; }
     .planner-task-detail { padding-left: 7px; padding-right: 7px; }
     .week-review-grid { grid-template-columns: 1fr; }
+    .week-action-summary { align-items: flex-start; }
+    .week-action-counts { justify-content: flex-start; }
     .week-backlog-row, .week-offer-row { grid-template-columns: 52px minmax(0, 1fr); }
     .week-backlog-row > :last-child, .week-offer-row > :last-child { grid-column: 1 / -1; }
     .month-kpis { grid-template-columns: 1fr 1fr; }
@@ -3901,6 +3918,9 @@ function viewWeek() {
   if (list.length) {
     h += '<div class="card weekwrap"><div class="between mb8"><div><div class="card-title">📅 월~일 공부 배치</div>' +
       '<div class="card-sub">완료 체크와 오늘 플래너가 같은 기록을 사용합니다.</div></div></div>' +
+      '<details class="week-key"><summary>표시 설명</summary>' +
+        '<div class="week-key-body"><span>🔵 완료</span><span>🟠 진행 중</span><span>🔴 막힘</span>' +
+        '<span>🩷 지난 날짜 미완료</span><span>↔ 한 번 하는 공부의 요일 변경</span></div></details>' +
       '<table class="week"><thead><tr><th class="subj">과목</th><th class="n">세부 공부내용</th>' +
       days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
       '</tr></thead><tbody>' +
@@ -3918,32 +3938,36 @@ function viewWeek() {
               '</div></td>';
           }).join('') + '</tr>';
       }).join('') +
-      '</tbody></table></div>' +
-      '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료 · ↔ 한 번 하는 공부의 요일 변경</div>';
+      '</tbody></table></div>';
   } else {
     h += '<div class="card"><div class="empty"><b>📋</b>이 주의 체크리스트가 비어 있습니다.</div></div>';
   }
 
-  if (backlog.length) {
-    h += '<div class="card alert"><div class="between mb8"><div><div class="card-title">↪ 밀린 공부</div>' +
-      '<div class="card-sub">완료하지 못해 이월 대상이 된 공부입니다.</div></div><span class="pill bad">' + backlog.length + '개</span></div>' +
-      backlog.map(item => {
-        const subject = taskStudySubject(item.t);
-        return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
-          '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
-          (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
-      }).join('') + '</div>';
-  }
-
-  if (offers.length) {
-    h += '<div class="card"><div class="between mb8"><div><div class="card-title">📨 아직 가져오지 않은 배부 공부</div>' +
-      '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div><span class="pill warn">' + offers.length + '개</span></div>' +
-      offers.map(item => {
-        const subject = taskStudySubject(item.t);
-        return '<div class="week-offer-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
-          '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + DOW[dowOf(item.date)] + ' ' + shortDate(item.date) + '</div></div>' +
-          (session.isStaffLink ? '<button class="btn btn-sm btn-primary" data-act="studyclaim" data-id="' + item.t.id + '" data-date="' + item.date + '">체크리스트로 가져오기</button>' : '<span class="pill bad">가져오기 전</span>') + '</div>';
-      }).join('') + '</div>';
+  if (backlog.length || offers.length) {
+    h += '<details class="card week-action-card"><summary class="week-action-summary">' +
+      '<span class="week-action-copy"><span class="card-title" style="display:block">📌 이번 주 정리할 공부</span>' +
+        '<span class="card-sub">밀린 공부와 아직 가져오지 않은 공부를 한곳에서 확인합니다.</span></span>' +
+      '<span class="week-action-counts">' +
+        (backlog.length ? '<span class="pill bad">밀린 공부 ' + backlog.length + '개</span>' : '') +
+        (offers.length ? '<span class="pill warn">가져오기 전 ' + offers.length + '개</span>' : '') +
+      '</span></summary><div class="week-action-body">' +
+      (backlog.length ? '<section class="week-action-section"><div class="between mb8"><div><b>↪ 밀린 공부</b>' +
+        '<div class="card-sub">완료하지 못해 이월 대상이 된 공부입니다.</div></div></div>' +
+        backlog.map(item => {
+          const subject = taskStudySubject(item.t);
+          return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+            '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
+            (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
+        }).join('') + '</section>' : '') +
+      (offers.length ? '<section class="week-action-section"><div class="between mb8"><div><b>📨 아직 가져오지 않은 배부 공부</b>' +
+        '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div></div>' +
+        offers.map(item => {
+          const subject = taskStudySubject(item.t);
+          return '<div class="week-offer-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
+            '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + DOW[dowOf(item.date)] + ' ' + shortDate(item.date) + '</div></div>' +
+            (session.isStaffLink ? '<button class="btn btn-sm btn-primary" data-act="studyclaim" data-id="' + item.t.id + '" data-date="' + item.date + '">체크리스트로 가져오기</button>' : '<span class="pill bad">가져오기 전</span>') + '</div>';
+        }).join('') + '</section>' : '') +
+      '</div></details>';
   }
 
   h += '<div class="card"><div class="card-title">📝 주간 마무리</div><div class="card-sub mb14">이번 주를 돌아보고 다음 주에 조정할 점을 남깁니다.</div>' +
@@ -8156,7 +8180,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.22';
+const APP_VER = '2026-08-18.23';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

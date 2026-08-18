@@ -234,6 +234,12 @@ test('weekly planner separates rollover work from unclaimed distributed study', 
   assert.match(week, /밀린 공부/);
   assert.match(week, /아직 가져오지 않은 배부 공부/);
   assert.match(week, /data-act="studyclaim"/);
+  assert.match(week, /<details class="week-key"><summary>표시 설명<\/summary>/);
+  assert.match(week, /<details class="card week-action-card">/);
+  assert.match(week, /이번 주 정리할 공부/);
+  assert.ok(week.indexOf('week-key') < week.indexOf('<table class="week">'), 'the legend belongs to the weekly placement card');
+  assert.ok(week.indexOf('week-action-card') < week.indexOf('📝 주간 마무리'), 'weekly action items belong immediately before the wrap-up');
+  assert.doesNotMatch(week, /<div class="hint">🔵 완료/);
 });
 
 test('student reflection and director feedback keep separate edit permissions', () => {
