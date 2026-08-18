@@ -862,11 +862,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.16"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.16"></script>
-<script src="./asset-core.js?v=2026-08-18.16"></script>
-<script src="./qr-core.js?v=2026-08-18.16"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.16"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.17"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.17"></script>
+<script src="./asset-core.js?v=2026-08-18.17"></script>
+<script src="./qr-core.js?v=2026-08-18.17"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.17"></script>
 <script>
 "use strict";
 
@@ -1596,7 +1596,7 @@ function resetPersonCache(token) {
   guardianPublicationErrors.clear(); guardianPublicationDrafts.clear(); guardianPublicationSaving.clear();
   studentSelfChecks = new Map(); studentSelfCheckLoadedDates.clear(); studentSelfCheckLoadingDates.clear();
   studentSelfCheckErrors.clear(); studentSelfCheckConfirming.clear();
-  rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = [];
+  rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = []; rosterStudentSelectionScope = 'assigned';
   acaflowImportFileName = ''; acaflowImportRows = []; acaflowImportPreview = null;
   acaflowImportSelection.clear(); acaflowImportError = ''; acaflowImportBusy = false;
   acaflowStudentLinks.clear();
@@ -3130,12 +3130,11 @@ function currentLessonDraft() {
 }
 
 function assignedLessonStudents() {
-  return activeIn(today().slice(0, 7));
+  return studentLinkCandidates(today().slice(0, 7));
 }
 
 function lessonFormStudents() {
-  return activeIn(today().slice(0, 7)).slice().sort((a, b) =>
-    String(a.name || '').localeCompare(String(b.name || ''), 'ko') || String(a.grade || '').localeCompare(String(b.grade || ''), 'ko'));
+  return studentLinkCandidates(today().slice(0, 7));
 }
 
 async function loadPublicationReadiness(force) {
@@ -3323,15 +3322,18 @@ function lessonAssignmentReviewHtml() {
   if (!pending.length) return '';
   if (!rosterDb) return '<section class="card lesson-review"><div class="card-title">👥 담당 학생 배정 요청</div><div class="card-sub">현재 원생 명단을 불러온 뒤 승인할 수 있습니다.</div>' +
     (rosterErr ? '<button class="btn btn-primary mt14" data-act="rosterretry">원생 명단 다시 불러오기</button>' : '<div class="hint mt14">원생 명단을 불러오는 중입니다.</div>') + '</section>';
-  const students = activeIn(today().slice(0, 7));
+  const students = studentLinkCandidates(today().slice(0, 7));
   return '<section class="card lesson-review"><div class="between"><div><div class="card-title">👥 담당 학생 배정 요청</div><div class="card-sub">승인하면 해당 선생님 개인 링크의 원생·수업 등록 목록에 즉시 반영됩니다.</div></div><span class="pill warn">' + pending.length + '건</span></div>' +
     pending.map(row => {
       const matches = students.filter(student => String(student.name).normalize('NFKC').replace(/\s+/g, '') === String(row.studentName).normalize('NFKC').replace(/\s+/g, '') && String(student.grade).normalize('NFKC').replace(/\s+/g, '') === String(row.grade).normalize('NFKC').replace(/\s+/g, ''));
+      const matchIds = new Set(matches.map(student => String(student.id)));
+      const others = students.filter(student => !matchIds.has(String(student.id)));
       const teacher = staffById(row.staffId);
       return '<div class="card mt14"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
-        (!matches.length ? '<div class="hint mt8">현재 명단에 같은 이름·학년의 원생이 없습니다. 기존 재원생이라면 명단에 먼저 추가할 수 있습니다.</div>' : '') +
+        (!matches.length ? '<div class="hint mt8">같은 이름·학년의 원생이 없습니다. 아래 재원생 전체에서 직접 선택하거나, 명단에 없는 학생이면 기존 원생으로 추가하세요.</div>' : '') +
         '<select class="in mt8" data-lar-student data-key="' + esc(row.requestKey) + '"><option value="">현재 원생 선택</option>' +
-          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
+          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') +
+          (others.length ? '<optgroup label="재원생 전체">' + others.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
         '<div class="row wraprow mt8"><button class="btn btn-primary" data-act="lessonassignmentapprove" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">승인</button>' +
           (!matches.length ? '<button class="btn btn-ghost" data-act="lessonassignmentaddexisting" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">기존 원생으로 추가 후 승인</button>' : '') +
           '<button class="btn btn-ghost" data-act="lessonassignmentreject" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">반려</button></div></div>';
@@ -3399,7 +3401,7 @@ function viewLessonEntry() {
       personalStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
       '</select><div class="hint mt8">선택한 담당 학생만 수업·피드백과 연결됩니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
-    : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">현재 재원 원생</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
+    : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '');
@@ -6618,16 +6620,13 @@ let batchVendorName = '';
 let batchOrderTaskId = ''; // 응답 유실 시 같은 ID로 재시도해 중복 주문을 막는다
 
 function orderStudentCandidates() {
-  if (!rosterDb || !Array.isArray(rosterDb.students)) return [];
-  const month = today().slice(0, 7);
-  return rosterDb.students.filter(student => student && student.id && student.start <= month &&
-    (!student.end || student.end > month)).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+  return studentLinkCandidates(today().slice(0, 7));
 }
 
 function orderStudentPicker(row) {
   const students = orderStudentCandidates();
   if (!students.length) return '<div class="hint">주문 학생을 고르려면 최신 재원 명단을 먼저 확인해 주세요.</div>';
-  return '<details class="book-order-picker"><summary>사용 학생 선택 · 선택 인원이 주문 수량</summary>' +
+  return '<details class="book-order-picker"><summary>사용 학생 선택 · ' + esc(studentLinkScopeText()) + ' · 선택 인원이 주문 수량</summary>' +
     '<div class="book-order-picker-list">' + students.map(student =>
       '<label class="book-order-picker-option"><input type="checkbox" data-order-student data-book="' + esc(row.id) + '" value="' + esc(student.id) + '">' +
       '<span>' + esc(student.name || '이름 미입력') + '<small class="card-sub">' + esc(student.grade || '학년 미지정') + '</small></span></label>').join('') +
@@ -7548,7 +7547,7 @@ function openBookOrderStudentLink(button) {
   const students = orderStudentCandidates();
   if (!students.length) return toast('연결할 수 있는 현재 재원 학생이 없습니다');
   modal('학생 연결 — ' + row.title,
-    '<div class="hint mb14">이 교재를 사용할 학생을 선택해 주세요. 학생 이름이 아닌 stable studentId로 연결되며, 선택 인원이 교재 수량이 됩니다.</div>' +
+    '<div class="hint mb14">' + esc(studentLinkScopeText()) + '에서 이 교재를 사용할 학생을 선택해 주세요. 학생 이름이 아닌 stable studentId로 연결되며, 선택 인원이 교재 수량이 됩니다.</div>' +
     '<div class="book-order-picker-list">' + students.map(student =>
       '<label class="book-order-picker-option"><input type="checkbox" data-order-link-student value="' + esc(student.id) + '">' +
       '<span>' + esc(student.name || '이름 미입력') + '<small class="card-sub">' + esc(student.grade || '학년 미지정') + '</small></span></label>').join('') + '</div>',
@@ -8522,10 +8521,7 @@ function transportConfigValidation(config) {
 }
 
 function transportConfigRowHtml(config, locked) {
-  const students = rosterDb && Array.isArray(rosterDb.students) ? rosterDb.students : [];
-  const currentMonth = today().slice(0, 7);
-  const liveStudents = students.filter(student => (!student.start || student.start <= currentMonth) &&
-    (!student.end || student.end > currentMonth));
+  const liveStudents = studentLinkCandidates(today().slice(0, 7));
   const rosterReady = transportRosterReady();
   const mapsReady = !!(transportData && transportData.capabilities && transportData.capabilities.mapsPlanning);
   const disabled = locked ? ' disabled aria-disabled="true"' : '';
@@ -8598,7 +8594,7 @@ function transportConfigRowHtml(config, locked) {
           '<div class="transport-config-grid"><label><span class="fl">정류장 이름</span><input class="in" data-tc-stop-name data-transport-focus="stop:' + esc(stop.id) + '" value="' + esc(stop.name || '') + '"' + disabled + '></label>' +
           '<label><span class="fl">공동 승하차 지점 주소</span><input class="in" data-tc-stop-address value="' + esc(stop.address || '') + '" placeholder="건물·상가·아파트 정문"' + disabled + '></label>' +
           '<label><span class="fl">도착 시간</span><input class="in" type="time" data-tc-stop-time value="' + esc(stop.time || '') + '"' + disabled + '></label></div>' +
-          '<label class="mt8"><span class="fl">학생 배정 (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
+          '<label class="mt8"><span class="fl">학생 배정 · ' + esc(studentLinkScopeText()) + ' (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
             liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') +
             missingIds.map(studentId => '<option value="' + esc(studentId) + '" selected>명단 없음 · 기존 배정 유지 (' + esc(studentId) + ')</option>').join('') + '</select></label>' +
           (pendingNames.length ? '<div class="hint mt8"><b>명단 연결 대기 · ' + pendingNames.length + '명</b><div class="small mt8">학생 배정에서 실제 원생을 선택한 뒤 해당 이름을 연결 완료 처리하세요.</div>' +
@@ -8904,6 +8900,7 @@ function viewTransport() {
  * 학생 개인정보는 인증된 Worker에서만 받고, 개인 링크에는 담당 학생만 내려온다.
  */
 let rosterDb = null, rosterErr = '', rosterLoading = false, privateBookStudents = [];
+let rosterStudentSelectionScope = 'assigned';
 let acaflowImportFileName = '', acaflowImportRows = [], acaflowImportPreview = null;
 let acaflowImportSelection = new Set(), acaflowImportError = '', acaflowImportBusy = false;
 let acaflowStudentLinks = new Map();
@@ -8929,6 +8926,7 @@ function loadRoster() {
     .then(result => {
       if (!validRosterPayload(result.roster)) throw new Error('원생 데이터 형식을 확인해 주세요');
       rosterDb = Object.assign({}, result.roster, { updatedAt: Number(result.updatedAt) || 0 });
+      rosterStudentSelectionScope = result.studentSelectionScope === 'all_active' ? 'all_active' : 'assigned';
       privateBookStudents = Array.isArray(result.bookStudents) ? result.bookStudents : [];
       if (bookDb) bookDb.students = privateBookStudents.slice();
       rosterErr = '';
@@ -8952,6 +8950,16 @@ function rosterMonths() {
 function activeIn(m) {
   return ((rosterDb && rosterDb.students) || []).filter(s =>
     s.start <= m && (!s.end || s.end > m));
+}
+function studentLinkCandidates(referenceMonth, includeFuture) {
+  const month = String(referenceMonth || today().slice(0, 7));
+  return ((rosterDb && rosterDb.students) || []).filter(student => student && student.id &&
+    (includeFuture || !student.start || student.start <= month) && (!student.end || student.end > month))
+    .slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko') ||
+      String(a.grade || '').localeCompare(String(b.grade || ''), 'ko'));
+}
+function studentLinkScopeText() {
+  return rosterStudentSelectionScope === 'all_active' ? '재원생 전체' : '담당 재원생';
 }
 function activeDuringWeek(days) {
   const months = [...new Set((days || []).map(date => String(date).slice(0, 7)).filter(Boolean))];
@@ -9557,7 +9565,7 @@ function viewOnboarding() {
   h += '<details class="card onboarding-start"><summary class="between"><span><b>기존 원생 명단에서 신규 관리 시작</b>' +
     '<span class="card-sub">필요할 때만 열어 직접 등록합니다.</span></span><span class="pill">수동 등록</span></summary>' +
     '<div class="hint mt14"><b>명단 등록 ≠ 신규 학생</b> — 학생을 선택하는 것만으로 신규가 되지 않으며, 실제 첫 등원일을 입력하고 ‘30일 관리 시작’을 눌러야 현황판에 추가됩니다. 명단 시작월은 참고 정보이며 첫 등원일로 자동 사용하지 않습니다.</div>' +
-    '<div class="onboarding-enrol mt14"><label><span class="fl">관리할 학생 선택</span><select class="in" id="onbStudent">' +
+    '<div class="onboarding-enrol mt14"><label><span class="fl">관리할 학생 선택 · ' + esc(studentLinkScopeText()) + '</span><select class="in" id="onbStudent">' +
       '<option value="">학생 선택</option>' +
       (recentCandidates.length ? '<optgroup label="명단 시작월 이번 달·예정 (참고만)">' + candidateOptions(recentCandidates) + '</optgroup>' : '') +
       (existingCandidates.length ? '<optgroup label="그 외 재원생 (수동 선택)">' + candidateOptions(existingCandidates) + '</optgroup>' : '') +
@@ -10063,7 +10071,7 @@ function guardianAnnouncementModal(announcementId) {
   if (!session.isAdmin) return;
   const current = guardianAnnouncementRows.find(row => row.announcementId === String(announcementId || '')) || null;
   if (current && current.status !== 'draft') return toast('작성 중인 공지만 수정할 수 있습니다');
-  const students = (rosterDb ? activeIn(today().slice(0, 7)) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const students = studentLinkCandidates(today().slice(0, 7));
   const selected = new Set(current ? current.studentIds : []);
   const targetType = current ? current.targetType : 'students';
   const id = current ? current.announcementId : 'announcement-' + uid();
@@ -10078,7 +10086,7 @@ function guardianAnnouncementModal(announcementId) {
     '<label class="field"><span class="fl">게시 종료일</span><input class="in" id="gaExpiresDate" type="date" value="' + esc(current && current.expiresDate || addDays(today(), 7)) + '"></label></div>' +
     '<div class="field"><label class="fl">공개 대상</label><select class="in" id="gaTargetType"><option value="students"' + (targetType === 'students' ? ' selected' : '') + '>선택 학생 보호자</option>' +
     '<option value="all"' + (targetType === 'all' ? ' selected' : '') + '>전체 보호자</option></select></div>' +
-    '<div class="hint"><b>선택 학생 보호자</b>를 사용할 때 아래에서 한 명 이상 선택하세요. 전체 보호자는 게시할 때 다시 확인합니다.<br>' +
+    '<div class="hint"><b>선택 학생 보호자</b>를 사용할 때 아래 ' + esc(studentLinkScopeText()) + '에서 한 명 이상 선택하세요. 전체 보호자는 게시할 때 다시 확인합니다.<br>' +
       '<b>모든 공지는 일정·운영·준비 안내용입니다. 연락처·주소·상담/내부 수업 메모를 입력하지 마세요.</b><br>' +
       '<b>전체 공지에는 학생 이름도 입력하지 마세요.</b></div>' +
     '<div style="max-height:260px;overflow:auto">' + (options || '<div class="empty">현재 재원생 명단을 먼저 확인해 주세요.</div>') + '</div>',
@@ -10791,7 +10799,7 @@ function viewGuardianContactPanel() {
   if (!rosterDb && !rosterErr) loadRoster();
   if (!guardianContactsLoaded && !guardianContactsLoading) setTimeout(() => loadGuardianContacts(false), 0);
   const cur = today().slice(0, 7);
-  const students = (rosterDb ? activeIn(cur) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const students = studentLinkCandidates(cur);
   settingsGuardianStudents = students.slice();
 
   let body;
@@ -10847,7 +10855,7 @@ function viewStudentPortalPanel() {
   if (!rosterDb && !rosterErr) loadRoster();
   if (!studentPortalLoaded && !studentPortalLoading) setTimeout(() => loadStudentPortalAccess(false), 0);
   const cur = today().slice(0, 7);
-  const students = (rosterDb ? activeIn(cur) : []).slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const students = studentLinkCandidates(cur);
   settingsStudentPortalStudents = students.slice();
 
   let notice = '';
@@ -13140,7 +13148,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.16';
+const APP_VER = '2026-08-18.17';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
