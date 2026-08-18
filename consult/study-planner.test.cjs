@@ -97,6 +97,15 @@ test('director study stays outside the checklist until the student claims it', (
   assert.match(quick, /requiresClaim: actor\(\) !== 'staff'/);
 });
 
+test('completed distributed study is crossed out in both the offer list and checklist', () => {
+  const offers = section('function studyOffersCard(', 'function studyPlannerCard(');
+  const css = section('<style>', '</style>');
+
+  assert.match(offers, /subject\.className \+ \(done \? ' done' : ''\)/);
+  assert.match(css, /\.study-offer\.done \.task-t, \.study-offer\.done \.task-d \{[^}]*text-decoration: line-through/);
+  assert.match(css, /\.planner-task-row\.done \.planner-task-title \{[^}]*text-decoration: line-through/);
+});
+
 test('quick add, task edit, and batch issue require and persist a subject', () => {
   const today = section('function viewToday()', 'function studyOffersCard(');
   const modal = section('function editTaskModal(', 'function saveEditedTask(');

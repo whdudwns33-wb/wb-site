@@ -564,6 +564,7 @@
   /* ─── 오늘 배부 공부 / 스터디 플래너 ─── */
   .study-offer { border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; padding: 12px; margin-top: 9px; background: linear-gradient(90deg, var(--subject-bg), #fff 42%); }
   .study-offer:first-of-type { margin-top: 12px; }
+  .study-offer.done .task-t, .study-offer.done .task-d { color: var(--mid-gray); text-decoration: line-through; }
   .study-paper { overflow: hidden; padding: 0; background: #FFFEF8; border-color: #DDD8C9; box-shadow: 0 10px 30px rgba(70,63,45,.08); }
   .study-paper-head { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(160px, 1.2fr) minmax(145px, 1fr); align-items: end; gap: 16px; padding: 18px 20px 15px; border-bottom: 2px solid #B9B29F; background: linear-gradient(180deg, #FFFEFB, #FAF7ED); }
   .study-paper-date { color: #343434; font-size: 23px; font-weight: 500; letter-spacing: -.04em; line-height: 1.1; }
@@ -1796,7 +1797,7 @@ function studyOffersCard(me, date, offers) {
       ? '<button class="btn btn-sm ' + (claimed ? 'btn-ghost' : 'btn-primary') + '" data-act="studyclaim" data-id="' + task.id + '" data-date="' + date + '"' +
         (claimed ? ' disabled' : '') + '>' + (claimed ? '✓ 내 체크리스트에 담음' : '내 체크리스트로 가져오기') + '</button>'
       : status;
-    return '<div class="study-offer ' + subject.className + '">' +
+    return '<div class="study-offer ' + subject.className + (done ? ' done' : '') + '">' +
       '<div class="between"><div style="min-width:0">' +
         '<div class="row wraprow" style="gap:6px">' + taskStudySubjectTag(task) +
           (task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') + '</div>' +
@@ -8155,7 +8156,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.21';
+const APP_VER = '2026-08-18.22';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
