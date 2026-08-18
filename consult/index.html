@@ -2717,19 +2717,14 @@ function ingRow(sid, it, editable) {
   const f = ingLec(sid, it.cid, it.seq);
   const late = it.date < today() ? Math.round((parseYmd(today()) - parseYmd(it.date)) / 86400000) : 0;
   const claimed = ingIsClaimed(it);
-  const canClaim = session.isStaffLink && it.date === today() && !claimed;
-  const canComplete = editable && (claimed || late || !session.isStaffLink);
-  const claimStatus = it.date === today()
-    ? (session.isStaffLink
-        ? '<button class="btn btn-sm ' + (claimed ? 'btn-ghost' : 'btn-primary') + '" data-act="ingclaim" data-sid="' + esc(sid) +
-          '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"' +
-          (canClaim ? '' : ' disabled') + '>' + (claimed ? '✓ 체크리스트에 담음' : '내 체크리스트로 가져오기') + '</button>'
-        : '<span class="pill ' + (claimed ? '' : 'bad') + '">' + (claimed ? '체크리스트에 담음' : '가져오기 전') + '</span>')
-    : '';
-  return '<div class="task ' + (it.done ? 'done' : '') + '">' +
-    '<button class="box" ' + (canComplete
-      ? 'data-act="ingcheck" data-sid="' + sid + '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"'
-      : 'disabled title="체크리스트로 가져온 뒤 완료할 수 있습니다"') + '>✓</button>' +
+  const canClaim = session.isStaffLink && (late || !claimed);
+  const claimStatus = session.isStaffLink
+    ? '<button class="btn btn-sm ' + (claimed && !late ? 'btn-ghost' : 'btn-primary') + '" data-act="ingclaim" data-sid="' + esc(sid) +
+      '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"' +
+      (canClaim ? '' : ' disabled') + '>' + (late ? '오늘 체크리스트로 가져오기' : claimed ? '✓ 체크리스트에 담음' : '내 체크리스트로 가져오기') + '</button>'
+    : '<span class="pill ' + (claimed && !late ? '' : 'bad') + '">' +
+      (late ? '오늘로 옮기기 전' : claimed ? '체크리스트에 담음' : '가져오기 전') + '</span>';
+  return '<div class="task ing-today-row ' + (it.done ? 'done' : '') + '">' +
     '<div class="task-body"><div class="task-t">' +
       (f ? esc(f.course.name) + ' ' + it.seq + '강' : '(삭제된 강좌) ' + it.seq + '강') + '</div>' +
       (f && f.lec.title ? '<div class="task-d">' + esc(f.lec.title) + '</div>' : '') +
@@ -3076,7 +3071,7 @@ function viewIngang() {
 
 function ingAddModal() {
   modal('🎬 강좌 등록',
-    '<div class="field"><label class="fl" for="ingSubject">과목 카테고리</label>' +
+    '<div class="field"><label class="fl" for="ingSubject">과목 · 스터디 플래너 색상</label>' +
       '<select class="in" id="ingSubject">' + studySubjectOptions(null, '과목 선택') + '</select></div>' +
     '<input class="in mb8" id="ingName" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
     '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
@@ -6805,12 +6800,25 @@ document.addEventListener('click', ev => {
     case 'ingclaim': {
       const me = currentStaff();
       const planDate = el.dataset.date;
-      if (!session.isStaffLink || !me || me.id !== el.dataset.sid || planDate !== today()) {
-        return toast('오늘 내 인강만 체크리스트로 가져올 수 있습니다');
+      if (!session.isStaffLink || !me || me.id !== el.dataset.sid || !/^\d{4}-\d{2}-\d{2}$/.test(planDate || '') || planDate > today()) {
+        return toast('오늘 또는 밀린 내 인강만 체크리스트로 가져올 수 있습니다');
       }
       const item = ingPlan(me.id, planDate).find(x =>
         x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
       if (!item) return toast('배정된 인강을 찾지 못했습니다');
+      if (planDate < today()) {
+        ingSavePlan(me.id, planDate, ingPlan(me.id, planDate).filter(x =>
+          !(x.cid === item.cid && Number(x.seq) === Number(item.seq))));
+        const moved = Object.assign({}, item, { s: '', e: '', auto: '', claimed: true, claimedAt: now() });
+        const todays = ingPlan(me.id, today());
+        const duplicate = todays.some(x => x.cid === item.cid && Number(x.seq) === Number(item.seq));
+        ingSavePlan(me.id, today(), duplicate
+          ? todays.map(x => x.cid === item.cid && Number(x.seq) === Number(item.seq)
+            ? Object.assign({}, moved, x, { claimed: true, claimedAt: now() }) : x)
+          : todays.concat(moved));
+        render(); toast('밀린 인강을 오늘 스터디 플래너로 옮겼습니다');
+        break;
+      }
       if (ingIsClaimed(item)) return toast('이미 체크리스트에 담은 인강입니다');
       ingPatchItem(me.id, planDate, item.cid, Number(item.seq), { claimed: true, claimedAt: now() });
       render(); toast('스터디 플래너 체크리스트에 담았습니다');
@@ -8080,7 +8088,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.19';
+const APP_VER = '2026-08-18.20';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

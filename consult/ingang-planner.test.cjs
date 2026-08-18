@@ -448,6 +448,7 @@ test('lecture courses persist a study subject for planner colors while legacy na
   assert.match(helpers, /수학\|수리\|미적분/);
   assert.match(helpers, /사회\|사탐\|한국사/);
   assert.match(addModal, /id="ingSubject"/);
+  assert.match(addModal, /과목 · 스터디 플래너 색상/);
   assert.match(assignModal, /id="ingCourseSubject"/);
   assert.match(save, /과목 카테고리를 선택해 주세요/);
   assert.match(save, /studySubject: subjectKey/);

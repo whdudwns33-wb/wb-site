@@ -153,10 +153,14 @@ test('student claims a scheduled lecture into the study planner with shared prog
   assert.match(lectureData, /const ingTimerTaskId = \(cid, seq\) => 'ing:'/);
   assert.match(lectureToggle, /claimed: true, claimedAt: now\(\)/);
   assert.match(todayLecture, /내 체크리스트로 가져오기/);
+  assert.match(todayLecture, /오늘 체크리스트로 가져오기/);
   assert.match(todayLecture, /data-act="ingclaim"/);
+  assert.doesNotMatch(todayLecture, /class="box"|data-act="ingcheck"/);
   assert.match(handlers, /session\.isStaffLink/);
-  assert.match(handlers, /planDate !== today\(\)/);
+  assert.match(handlers, /planDate > today\(\)/);
   assert.match(handlers, /ingPatchItem[\s\S]*?claimed: true, claimedAt: now\(\)/);
+  assert.match(handlers, /planDate < today\(\)[\s\S]*?ingSavePlan\(me\.id, planDate/);
+  assert.match(handlers, /밀린 인강을 오늘 스터디 플래너로 옮겼습니다/);
   assert.match(lectureRow, /data-act="ingsttask"/);
   assert.match(lectureRow, /data-act="ingcheck"/);
   assert.match(lectureRow, /ingCourseSubject\(found\.course\)/);
