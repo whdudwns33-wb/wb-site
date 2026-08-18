@@ -710,6 +710,15 @@
   .modal[hidden] { display: none; }
   .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
   .modal-box [data-act="closemodal"] { min-width: 44px; min-height: 44px; }
+  .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+  .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
+  .student-info-name:focus-visible { outline: 3px solid var(--deep-blue); outline-offset: 2px; border-radius: 5px; }
+  .student-info-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+  .student-info-field { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 11px; background: #FAFCFD; }
+  .student-info-field.wide { grid-column: 1 / -1; }
+  .student-info-field b, .student-info-field span { display: block; overflow-wrap: anywhere; }
+  .student-info-field b { margin-bottom: 5px; color: var(--mid-gray); font-size: 11px; }
+  .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
   .modal-box:has(.parent-preview-shell) { max-width: 620px; }
   .modal:has(.parent-preview-shell) { background: rgba(17,40,61,.88); backdrop-filter: blur(8px); }
@@ -793,6 +802,8 @@
   .parent-preview-info .parent-preview-sub { margin: 0 0 12px; }
   @media(max-width:430px) {
     .modal-box:has(.parent-preview-shell) { padding: 12px; }
+    .student-info-grid { grid-template-columns: 1fr; }
+    .student-info-field.wide { grid-column: auto; }
     .parent-preview-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .parent-preview-request-actions { grid-template-columns: 1fr; }
   }
@@ -8747,6 +8758,37 @@ function rosterStudentId(name, grade, reference) {
   return matches.length === 1 ? matches[0].id : '';
 }
 
+function rosterStudentInfoStatus(student) {
+  const month = today().slice(0, 7);
+  if (student.start > month) return ['등록 예정', 'warn'];
+  if (student.end && student.end <= month) return ['재원 종료', 'bad'];
+  return ['재원 중', ''];
+}
+
+function rosterStudentInfoHtml(student) {
+  const status = rosterStudentInfoStatus(student);
+  const field = (label, value, wide) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
+    esc(label) + '</b><span>' + esc(value || '미지정') + '</span></div>';
+  const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
+  return '<div class="between mb14"><div><div class="card-title">' + esc(student.name) + '</div>' +
+    '<div class="card-sub">원생 명단에 등록된 기본 정보입니다.</div></div><span class="pill ' + status[1] + '">' +
+    status[0] + '</span></div><div class="student-info-grid">' +
+    field('학년', student.grade) + field('과목·분야', student.subject) +
+    field('담당 선생님', student.teacher, true) + field('재원 기간', period, true) +
+    (student.reason ? field('종료 사유', student.reason, true) : '') +
+    (student.memo ? field('내부 메모', student.memo, true) : '') + '</div>';
+}
+
+function showRosterStudentInfo(studentId) {
+  const student = rosterDb && Array.isArray(rosterDb.students) &&
+    rosterDb.students.find(item => String(item.id) === String(studentId));
+  if (!student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
+  modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student),
+    session.isAdmin
+      ? '<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>'
+      : '');
+}
+
 let rosterStudentEditor = null;
 function rosterStudentEditorHtml(student, assignment) {
   const selected = new Set(student.teacherIds || []);
@@ -9484,7 +9526,7 @@ function viewRoster() {
       '<button class="btn btn-primary" data-act="rosterstudentadd">기존 원생 추가</button></div>' +
       '<div class="hint mt8">여기서 추가해도 신규 학생 30일 관리에는 들어가지 않습니다. 신규 관리는 ‘신규 학생’ 탭에서 별도로 시작합니다.</div>' +
       '<details class="mt14"><summary><b>등록 원생 ' + managed.length + '명 · 기본 정보 수정</b></summary><div class="mt8">' +
-        managed.map(student => '<div class="between small" style="padding:5px 0"><span>· ' + esc(student.name) + ' <span class="muted">(' + esc(student.grade) + ' · ' + esc(student.teacher || '담당 미지정') + ' · ' + esc(student.subject || '과목 미지정') + ')</span></span>' +
+        managed.map(student => '<div class="between small" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> <span class="muted">(' + esc(student.grade) + ' · ' + esc(student.teacher || '담당 미지정') + ' · ' + esc(student.subject || '과목 미지정') + ')</span></span>' +
           '<button class="btn btn-sm btn-ghost" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">수정</button></div>').join('') +
       '</div></details></section>';
   }
@@ -9520,7 +9562,7 @@ function viewRoster() {
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
         mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
-          '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span>' +
+          '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.subject) + ')</span>' +
           (s.memo ? ' <span class="pill warn">' + esc(s.memo) + '</span>' : '') + '</span>' +
           '<span class="row" style="gap:5px">' + sessionModeBadgesForStudent(s.id, today()) + '</span></div>').join('');
       // 내 학생 월별 변동 (변동 있는 달만)
@@ -11655,6 +11697,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
+    case 'rosterstudentinfo': showRosterStudentInfo(String(id || '')); break;
     case 'rosterstudentadd': openRosterStudentEditor('', null); break;
     case 'rosterstudentedit': openRosterStudentEditor(String(id || ''), null); break;
     case 'rosterstudentsave': saveRosterStudent(el); break;
