@@ -26,17 +26,31 @@ test('study subjects use the requested pastel palette with separate social and s
     });
 });
 
-test('today places quick add between distributed study and the planner', () => {
+test('today places collapsible lectures directly below collapsible distributed study', () => {
   const today = section('function viewToday()', 'function studyOffersCard(');
   const totalAt = today.indexOf('studyTotalHeroCard(me, cursor)');
   const offerAt = today.indexOf('studyOffersCard(me, cursor, offers)');
+  const lectureAt = today.indexOf('ingTodayCard(me, editable)');
   const plannerAt = today.indexOf('studyPlannerCard(me, cursor, list, carry, editable)');
   const quickAt = today.indexOf('id="qSubject"');
 
   assert.ok(totalAt >= 0, 'large total study time must render');
   assert.ok(offerAt > totalAt, 'distributed study must follow total study time');
-  assert.ok(quickAt > offerAt, 'quick add must follow distributed study');
+  assert.ok(lectureAt > offerAt, 'lectures must immediately follow distributed study');
+  assert.ok(quickAt > lectureAt, 'quick add must follow lectures');
   assert.ok(plannerAt > quickAt, 'planner must follow quick add');
+
+  const offers = section('function studyOffersCard(', 'function studyPlannerCard(');
+  const lectures = section('function ingTodayCard(', '/* ── 인강 탭 ── */');
+  const handler = section("case 'todayfold':", "case 'studyclaim':");
+  const css = section('<style>', '</style>');
+  [offers, lectures].forEach(source => {
+    assert.match(source, /today-fold-card/);
+    assert.match(source, /data-act="todayfold"/);
+    assert.match(source, /aria-expanded/);
+  });
+  assert.match(handler, /todayFoldState\[section\] = !todayFoldState\[section\]/);
+  assert.match(css, /\.today-fold-head/);
 });
 
 test('today restores a large live total study time between student summary and distributed study', () => {
