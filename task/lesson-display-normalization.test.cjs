@@ -62,9 +62,11 @@ test('structured lesson cards derive a short summary instead of repeating the ni
   assert.ok(detail.length <= 160);
 });
 
-test('lesson references are folded and every editable lesson button uses the same wording', () => {
+test('lesson references leave the lesson panel and every editable lesson button uses the same wording', () => {
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
-  assert.match(panel, /<details class="guide"><summary><b>📘 학생별 수업 참고 열기<\/b><\/summary>/);
+  assert.doesNotMatch(panel, /학생별 수업 참고 열기|lessonReferenceSteps\(t\)/);
+  assert.match(panel, /!usesStandardLessonDisplay\(t\) && t\.guide/,
+    '일반 업무 안내는 수업 참고 이동과 무관하므로 유지한다');
   assert.match(panel, /isLesson\(t\) \? '수업 정보 수정' : '업무 수정'/);
   const editor = block('function editTaskModal(id)', 'function saveEditedTask()');
   assert.match(editor, /isLesson\(t\) \? '수업 정보 수정' : '업무 수정'/);
