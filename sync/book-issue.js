@@ -6,6 +6,8 @@ const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
 const NEXT = new Set([...STATES, 'reissue']);
 const ORDER_NEXT = new Set(['receive', 'hand', 'academy_register']);
 const MAX_UNIT_PRICE = 10000000;
+const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
+const WORDMASTER_BASIC_TITLE = '워드마스터중등베이직';
 
 function cleanReason(value) {
   const reason = String(value || '').trim();
@@ -66,6 +68,24 @@ function orderUnitPrice(item) {
   return Number.isInteger(value) && value >= 1 && value <= MAX_UNIT_PRICE ? value : null;
 }
 
+function storedOrderUnitPrice(item, priceRow) {
+  const taskPrice = orderUnitPrice(item);
+  if (taskPrice !== null) return taskPrice;
+  const value = Number(priceRow && priceRow.unit_price);
+  return Number.isInteger(value) && value >= 1 && value <= MAX_UNIT_PRICE ? value : null;
+}
+
+function normalizedBookTitle(value) {
+  return normalizedName(value).replace(/\s+/g, '');
+}
+
+function canSetLegacyOrderPrice(owner, item, send, fulfillment, integrity, storedPrice) {
+  if (String(owner || '') !== KIM_NAMGI_STAFF_ID || orderUnitPrice(item) !== null || storedPrice !== null || integrity) return false;
+  if (!send || String(send.status) !== 'accepted') return false;
+  if (fulfillment && ['student_handed', 'academy_registered'].includes(String(fulfillment.status))) return true;
+  return !fulfillment && normalizedBookTitle(item && item.title) === WORDMASTER_BASIC_TITLE;
+}
+
 function orderTaskData(row) {
   const task = parseJson(row && row.data || '{}', null);
   if (!task || task.deleted || !String(task.title || '').startsWith('[주문] ') ||
@@ -89,9 +109,10 @@ function fulfillmentMatches(row, bookId, studentIds) {
   return String(row.book_id) === bookId && JSON.stringify(storedIds) === JSON.stringify(studentIds);
 }
 
-function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, integrity,
+function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, integrity,
     taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents) {
   const studentIds = orderStudentIds(item);
+  const unitPrice = storedOrderUnitPrice(item, priceRow);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
     : send.status === 'rejected' ? 'order_failed' : 'order_check';
   if (row && !integrity) {
@@ -101,7 +122,9 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
   return {
     taskId, itemIndex, bookId: String(item.bookId || ''), title: String(item.title || '교재명 미입력'),
     quantity: orderQuantity(item, studentIds), vendorName: String(vendorName || '주문처 미등록'),
-    unitPrice: orderUnitPrice(item),
+    unitPrice,
+    priceBackfilledAt: priceRow && priceRow.created_at ? Number(priceRow.created_at) : null,
+    canSetUnitPrice: canSetLegacyOrderPrice(owner, item, send, row, integrity, unitPrice),
     owner: owner || null, teacherName: teacherName || '담당 미지정',
     students, sendStatus: send ? String(send.status) : 'waiting', stage,
     taskUpdatedAt: Number(taskUpdatedAt) || 0,
@@ -119,11 +142,12 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
 }
 
 async function listOrderFulfillments(env, app, auth, document) {
-  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, staffResult, snapshotResult] = await Promise.all([
+  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, pricesResult, staffResult, snapshotResult] = await Promise.all([
     env.DB.prepare('SELECT id,owner,data,updated_at FROM tasks WHERE app=? ORDER BY updated_at DESC').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_sends WHERE app=? ORDER BY created_at DESC').bind(app).all(),
     env.DB.prepare('SELECT task_id,send_id FROM book_order_batch_items WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=?').bind(app).all(),
+    env.DB.prepare('SELECT task_id,item_index,unit_price,created_at FROM book_order_item_prices WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_student_snapshots WHERE app=? ORDER BY task_id,item_index,student_id').bind(app).all()
   ]);
@@ -144,6 +168,7 @@ async function listOrderFulfillments(env, app, auth, document) {
           Number(send.updated_at || 0) > Number(current.updated_at || 0)))) sendByTask.set(taskId, send);
   }
   const fulfillmentByItem = new Map((fulfillmentsResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
+  const priceByItem = new Map((pricesResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
   const staffNames = new Map((staffResult.results || []).map(row => {
     const data = parseJson(row.data || '{}', {});
     return [String(row.id), String(data.name || row.id)];
@@ -169,6 +194,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       });
       const missing = studentIds.some(id => !studentsById.has(id));
       const fulfillment = fulfillmentByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
+      const priceRow = priceByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const identityMismatch = !fulfillmentMatches(fulfillment, String(item.bookId || ''), studentIds);
       const integrity = sealedIdentity.sealed && !sealedIdentity.valid ? 'identity_mismatch' :
         invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
@@ -178,11 +204,70 @@ async function listOrderFulfillments(env, app, auth, document) {
         id: String(student.id), name: String(student.name || '이름 미입력'), grade: String(student.grade || '')
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
-        staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, integrity,
+        staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, integrity,
         task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents));
     }
   }
   return rows;
+}
+
+async function setLegacyOrderPrice(env, app, body, auth, json, origin) {
+  const taskId = String(body.taskId || '');
+  const itemIndex = Number(body.itemIndex);
+  const unitPrice = Number(body.unitPrice);
+  if (!SAFE_ID.test(taskId) || !Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex > 49 ||
+      !Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > MAX_UNIT_PRICE) {
+    return json({ ok: false, error: 'taskId, itemIndex, unitPrice를 확인해 주세요' }, 400, origin);
+  }
+
+  const taskRow = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const task = orderTaskData(taskRow);
+  if (!task || !task.orderItems[itemIndex]) return json({ ok: false, error: '현재 주문 항목을 찾을 수 없습니다' }, 404, origin);
+  if (auth.scope === 'own' && String(taskRow.owner || '') !== auth.id) {
+    return json({ ok: false, error: '본인이 주문한 교재 금액만 처리할 수 있습니다' }, 403, origin);
+  }
+  if (String(taskRow.owner || '') !== KIM_NAMGI_STAFF_ID) {
+    return json({ ok: false, code: 'ORDER_PRICE_NOT_ELIGIBLE', error: '1회성 금액 입력 대상 주문이 아닙니다' }, 409, origin);
+  }
+
+  const item = task.orderItems[itemIndex];
+  if (orderUnitPrice(item) !== null) {
+    return json({ ok: false, code: 'ORDER_PRICE_ALREADY_SET', error: '이미 교재 금액이 기록된 주문입니다' }, 409, origin);
+  }
+  const existing = await env.DB.prepare(
+    'SELECT unit_price,created_at FROM book_order_item_prices WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+  ).bind(app, taskId, itemIndex).first();
+  if (existing) {
+    if (Number(existing.unit_price) === unitPrice) {
+      return json({ ok: true, idempotent: true, unitPrice, createdAt: Number(existing.created_at) }, 200, origin);
+    }
+    return json({ ok: false, code: 'ORDER_PRICE_ALREADY_SET', error: '교재 금액은 한 번 저장한 뒤 변경할 수 없습니다' }, 409, origin);
+  }
+
+  const [send, fulfillment] = await Promise.all([
+    latestOrderSend(env, app, taskId),
+    env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=? LIMIT 1')
+      .bind(app, taskId, itemIndex).first()
+  ]);
+  if (!fulfillmentMatches(fulfillment, String(item.bookId || ''), orderStudentIds(item)) ||
+      !canSetLegacyOrderPrice(taskRow.owner, item, send, fulfillment, '', null)) {
+    return json({ ok: false, code: 'ORDER_PRICE_NOT_ELIGIBLE', error: '1회성 금액 입력 대상 주문이 아닙니다' }, 409, origin);
+  }
+
+  const now = Date.now();
+  const actor = actorId(auth);
+  if (!SAFE_ID.test(actor)) return json({ ok: false, error: '처리자 정보를 확인해 주세요' }, 403, origin);
+  await env.DB.prepare(
+    'INSERT OR IGNORE INTO book_order_item_prices(app,task_id,item_index,unit_price,created_at,created_by) VALUES(?,?,?,?,?,?)'
+  ).bind(app, taskId, itemIndex, unitPrice, now, actor).run();
+  const stored = await env.DB.prepare(
+    'SELECT unit_price,created_at FROM book_order_item_prices WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+  ).bind(app, taskId, itemIndex).first();
+  if (stored && Number(stored.unit_price) === unitPrice) {
+    return json({ ok: true, idempotent: Number(stored.created_at) !== now, unitPrice, createdAt: Number(stored.created_at) }, 200, origin);
+  }
+  return json({ ok: false, code: 'ORDER_PRICE_ALREADY_SET', error: '다른 기기에서 교재 금액이 먼저 저장되었습니다' }, 409, origin);
 }
 
 async function linkOrderStudents(env, app, body, auth, json, origin) {
@@ -592,6 +677,7 @@ export async function handleBookIssue(env, app, body, origin, auth, json) {
   if (action === 'list') return listIssues(env, app, auth, json, origin);
   if (action === 'transition') return transition(env, app, body, auth, json, origin);
   if (action === 'order_link') return linkOrderStudents(env, app, body, auth, json, origin);
+  if (action === 'order_price_set') return setLegacyOrderPrice(env, app, body, auth, json, origin);
   if (action === 'order_transition') return transitionOrderFulfillment(env, app, body, auth, json, origin);
   return json({ ok: false, error: '지원하는 교재 처리 action을 확인해 주세요' }, 400, origin);
 }

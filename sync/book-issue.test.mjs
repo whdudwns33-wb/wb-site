@@ -7,6 +7,8 @@ import worker from './worker-core.js';
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/022_book_issues.sql', import.meta.url), 'utf8');
 const fulfillmentMigration = fs.readFileSync(new URL('./migrations/031_book_order_fulfillments.sql', import.meta.url), 'utf8');
+const priceMigration = fs.readFileSync(new URL('./migrations/043_book_order_item_prices.sql', import.meta.url), 'utf8');
+const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -27,7 +29,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 function roster() {
   return {
     roster: { updated: '2026-08-11', baseline: '2026-08', students: [
-      { id: 'student-a', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학', start: '2026-08', end: '', reason: '', teacherIds: ['teacher-a'] },
+      { id: 'student-a', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학', start: '2026-08', end: '', reason: '', teacherIds: ['teacher-a', KIM_NAMGI_STAFF_ID] },
       { id: 'student-b', name: '나학생', grade: '중2', teacher: '나선생', subject: '국어', start: '2026-08', end: '', reason: '', teacherIds: ['teacher-b'] }
     ] },
     bookStudents: [
@@ -39,7 +41,7 @@ function roster() {
 
 function seed(db) {
   const now = Date.now();
-  for (const [id, token] of [['teacher-a', 'token-a'], ['teacher-b', 'token-b']]) {
+  for (const [id, token] of [['teacher-a', 'token-a'], ['teacher-b', 'token-b'], [KIM_NAMGI_STAFF_ID, 'token-kim']]) {
     db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .bind('task', id, id, JSON.stringify({ id, name: id, deleted: false }), now, now).run();
     db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
@@ -223,6 +225,23 @@ test('new order moves through accepted, teacher received, student handed, and ad
   assert.ok(completed.body.orders[0].academyRegisteredAt);
 });
 
+test('legacy order price migration is additive, contains no student data, and is append-only', () => {
+  for (const sql of [schema, priceMigration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_item_prices/);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_item_prices');
+    const definition = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(definition, /DROP TABLE|DELETE FROM|student|phone|address|memo/i);
+  }
+  const db = new TestD1();
+  db.database.exec(priceMigration);
+  db.prepare('INSERT INTO book_order_item_prices(app,task_id,item_index,unit_price,created_at,created_by) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'legacy-price', 0, 15000, Date.now(), 'director').run();
+  assert.throws(() => db.prepare("UPDATE book_order_item_prices SET unit_price=16000 WHERE task_id='legacy-price'").run(),
+    /BOOK_ORDER_ITEM_PRICE_APPEND_ONLY/);
+  assert.throws(() => db.prepare("DELETE FROM book_order_item_prices WHERE task_id='legacy-price'").run(),
+    /BOOK_ORDER_ITEM_PRICE_APPEND_ONLY/);
+});
+
 test('order fulfillment rejects another teacher and cannot receive before an accepted order result', async () => {
   const db = new TestD1(); seed(db);
   const now = Date.now();
@@ -299,4 +318,73 @@ test('order student link enforces owner, accepted result, current assignment sco
   const stale = await call(db, { auth: person('teacher-a', 'token-a'), ...request });
   assert.equal(stale.status, 409);
   assert.equal(stale.body.code, 'REVISION_CONFLICT');
+});
+
+test('Kim Namgi can record the accepted legacy Wordmaster price once without mutating the sealed task', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'legacy-wordmaster', title: '[주문] 워드마스터', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트출판사',
+    orderItems: [{ bookId: 'BK01', title: '워드마스터 중등 베이직', qty: '2권', studentIds: ['student-a'] }],
+    origin: 'staff', createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, KIM_NAMGI_STAFF_ID, JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-wordmaster', 'key-wordmaster', task.id, '테스트출판사', 1, 'd'.repeat(64), 'accepted', now, now).run();
+
+  const auth = person(KIM_NAMGI_STAFF_ID, 'token-kim');
+  const before = await call(db, { auth, action: 'list' });
+  const beforeRow = before.body.orders.find(row => row.taskId === task.id);
+  assert.equal(beforeRow.stage, 'ordered');
+  assert.equal(beforeRow.unitPrice, null);
+  assert.equal(beforeRow.canSetUnitPrice, true);
+
+  const saved = await call(db, { auth, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 17000 });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.idempotent, false);
+  const after = await call(db, { auth, action: 'list' });
+  const afterRow = after.body.orders.find(row => row.taskId === task.id);
+  assert.equal(afterRow.unitPrice, 17000);
+  assert.equal(afterRow.canSetUnitPrice, false);
+  assert.ok(afterRow.priceBackfilledAt);
+  const unchanged = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='legacy-wordmaster'").first().data);
+  assert.equal(Object.hasOwn(unchanged.orderItems[0], 'unitPrice'), false);
+
+  const duplicate = await call(db, { auth, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 17000 });
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.idempotent, true);
+  const changed = await call(db, { auth, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 18000 });
+  assert.equal(changed.status, 409);
+  assert.equal(changed.body.code, 'ORDER_PRICE_ALREADY_SET');
+});
+
+test('one-time price accepts Kim Namgi student-handed legacy books and rejects other orders', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const insertOrder = (id, owner, title, unitPrice) => {
+    const item = { bookId: 'BK01', title, qty: '1권', studentIds: ['student-a'] };
+    if (unitPrice) item.unitPrice = unitPrice;
+    const task = { id, title: '[주문] ' + title, deleted: false, orderDelivery: 'scheduled_batch_v1',
+      orderVendor: '테스트출판사', orderItems: [item], origin: 'staff', createdAt: now, updatedAt: now };
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', id, owner, JSON.stringify(task), now, now).run();
+    db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .bind('task', 'send-' + id, 'key-' + id, id, '테스트출판사', 1, id.padEnd(64, 'e').slice(0, 64), 'accepted', now, now).run();
+  };
+  insertOrder('legacy-handed', KIM_NAMGI_STAFF_ID, '다른 교재', null);
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,teacher_received_at,teacher_received_by,student_handed_at,student_handed_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'legacy-handed', 0, 'BK01', JSON.stringify(['student-a']), 'student_handed', 2,
+      now - 1000, KIM_NAMGI_STAFF_ID, now, KIM_NAMGI_STAFF_ID, now - 1000, now).run();
+  const handed = await call(db, { auth: admin, action: 'order_price_set', taskId: 'legacy-handed', itemIndex: 0, unitPrice: 12000 });
+  assert.equal(handed.status, 200);
+
+  insertOrder('other-owner', 'teacher-a', '워드마스터 중등베이직', null);
+  const otherOwner = await call(db, { auth: admin, action: 'order_price_set', taskId: 'other-owner', itemIndex: 0, unitPrice: 12000 });
+  assert.equal(otherOwner.status, 409);
+  assert.equal(otherOwner.body.code, 'ORDER_PRICE_NOT_ELIGIBLE');
+
+  insertOrder('already-priced', KIM_NAMGI_STAFF_ID, '워드마스터 중등베이직', 13000);
+  const alreadyPriced = await call(db, { auth: admin, action: 'order_price_set', taskId: 'already-priced', itemIndex: 0, unitPrice: 14000 });
+  assert.equal(alreadyPriced.status, 409);
+  assert.equal(alreadyPriced.body.code, 'ORDER_PRICE_ALREADY_SET');
 });
