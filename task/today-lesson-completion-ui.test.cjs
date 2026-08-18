@@ -73,6 +73,12 @@ test('학생정보 업무지시는 stable studentId로 원생 탭과 같은 정�
   assert.doesNotMatch(briefing, /rosterStudentMatches|studentName\).*find|studentOf\(task\).*find/);
 });
 
+test('학생정보 업무지시 팝업은 구형 태블릿에서도 세로 터치 스크롤이 된다', () => {
+  assert.match(source, /\.modal \{[^}]*overflow-y: auto;[^}]*-webkit-overflow-scrolling: touch;/);
+  assert.match(source, /\.modal-box \{[^}]*min-height: 0;[^}]*max-height: calc\(100vh - 32px\);[^}]*max-height: calc\(100dvh - 32px\);/);
+  assert.match(source, /\.modal-box \{[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*-webkit-overflow-scrolling: touch;[^}]*touch-action: pan-y;/);
+});
+
 test('수업진행은 출결을 최상단에 두고 기존 교사 기능을 모두 안으로 옮긴다', () => {
   const panel = source.slice(source.indexOf('function taskPanel('), source.indexOf('/** 수업 출결 표시용 */'));
   const attendance = panel.indexOf('lesson-attendance');
