@@ -65,20 +65,24 @@ test('monthly subject goals and analysis reuse real timer and checklist data', (
   assert.match(handlers, /setCheck\(monthPlanKey\(me\.id\), ym/);
 });
 
-test('monthly calendar paints study-time intensity and opens the selected day', () => {
+test('monthly calendar focuses on important dates and opens the selected day', () => {
   const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
   const agenda = section('function agendaCalendarCard(', 'function monthSubjectGoalModal(');
 
   assert.match(month, /agendaCalendarCard\(me, ym\)/);
-  assert.match(agenda, /maxStudySecs/);
-  assert.match(agenda, /stTotal\(me\.id, date\)/);
-  assert.match(agenda, /rgba\(127,179,244,/);
+  assert.match(agenda, /const monthItems = agendaImportantItemsFor/);
+  assert.match(agenda, /agendaUpcomingImportantItems/);
+  assert.doesNotMatch(agenda, /maxStudySecs|stTotal\(me\.id, date\)|rgba\(127,179,244,|agendaFilter/);
   assert.match(agenda, /data-act="agendapick"/);
-  assert.match(agenda, /통합 일정/);
+  assert.match(agenda, /중요한 일정/);
+  assert.match(agenda, /시험·수행평가·원장이 지정한 중요 일정만/);
+  assert.match(agenda, /다가오는 일정/);
   assert.match(agenda, /캘린더 색상 안내/);
-  assert.match(agenda, /진할수록 순공시간 많음/);
-  assert.match(agenda, /if \(reminders\.length\)/,
-    'empty reminder cards should stay hidden');
+  assert.match(agenda, /class="exam"><\/i>시험/);
+  assert.match(agenda, /class="performance"><\/i>수행평가/);
+  assert.match(agenda, /class="important"><\/i>중요 일정/);
+  assert.match(agenda, /const editable = session\.isStaffLink \|\| session\.isAdmin/);
+  assert.match(agenda, /data-act="montheventadd" data-date="' \+ agendaDate/);
   assert.match(agenda, /<details class="agenda-more">/);
 });
 
@@ -90,7 +94,10 @@ test('monthly important events include D-day, scope, score, and preparation prog
   assert.match(helpers, /function monthDday/);
   assert.match(helpers, /mEventRange/);
   assert.match(helpers, /mEventScore/);
+  assert.match(helpers, /function monthEventModal\(ym, selectedDate\)/);
+  assert.match(helpers, /ymOf\(selectedDate\) === ym \? selectedDate : ym \+ '-01'/);
   assert.match(month, /준비 ' \+ progressValue \+ '%/);
+  assert.match(handlers, /monthEventModal\(ymCursor, el\.dataset\.date \|\| ''\)/);
   assert.match(handlers, /event\.progress = Math\.max\(0, Math\.min\(100/);
   assert.match(handlers, /plan\.events\.push/);
 });
