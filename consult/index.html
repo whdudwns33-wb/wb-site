@@ -428,9 +428,22 @@
   .report-task { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--light-gray); font-size: 11.5px; }
   #reportPrintHost { display: none; }
   .agenda-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .month-section-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 14px; padding: 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--light-gray); }
+  .month-section-btn { min-width: 0; min-height: 44px; padding: 8px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--mid-gray); font-size: 12.5px; font-weight: 800; letter-spacing: -.02em; }
+  .month-section-btn.on { background: var(--white); color: var(--navy); box-shadow: 0 2px 8px rgba(27,58,92,.1); }
+  .month-section-btn .badge { margin-left: 3px; }
+  .month-section-intro { margin: -2px 2px 12px; color: var(--mid-gray); font-size: 12px; line-height: 1.5; }
   .agenda-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
   .agenda-filters .chip { min-height: 44px; flex: 0 0 auto; }
   .agenda-filters::-webkit-scrollbar { display: none; }
+  .agenda-legend { display: flex; gap: 10px; overflow-x: auto; margin: 6px 0 10px; padding: 2px 1px 4px; color: var(--mid-gray); font-size: 10.5px; white-space: nowrap; scrollbar-width: none; }
+  .agenda-legend::-webkit-scrollbar { display: none; }
+  .agenda-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .agenda-legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+  .agenda-legend i.academic { background: var(--coral); }
+  .agenda-legend i.ingang { background: #8B5CF6; }
+  .agenda-legend i.schedule { background: var(--green); }
+  .agenda-legend i.study { width: 13px; border-radius: 3px; background: rgba(127,179,244,.62); }
   .agenda-dots { display: flex; gap: 3px; min-height: 6px; }
   .agenda-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); }
   .agenda-dot.academic { background: var(--coral); }
@@ -442,8 +455,19 @@
   .agenda-item.done { opacity: .62; }
   .agenda-time { color: var(--navy); font-size: 11.5px; font-weight: 900; font-variant-numeric: tabular-nums; }
   .agenda-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+  .agenda-item-more { min-width: 0; }
+  .agenda-item-more > summary { list-style: none; cursor: pointer; }
+  .agenda-item-more > summary::-webkit-details-marker { display: none; }
+  .agenda-item-more[open] > summary { background: var(--light-gray); }
+  .agenda-item-more .agenda-actions { margin-top: 6px; }
   .agenda-reminders { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .agenda-note { padding: 10px 12px; margin-top: 10px; border-radius: 10px; background: #F6F8FB; color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .agenda-more { margin-top: 12px; border-top: 1px solid var(--light-gray); }
+  .agenda-more summary { min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--mid-gray); font-size: 12px; font-weight: 800; cursor: pointer; list-style: none; }
+  .agenda-more summary::-webkit-details-marker { display: none; }
+  .agenda-more summary::after { content: '⌄'; margin-left: 5px; }
+  .agenda-more[open] summary::after { content: '⌃'; }
+  .agenda-export-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 8px; }
 
   /* ─── 학사관리 · 자료 요청 ─── */
   .academic-hero { overflow: hidden; color: #fff; background: linear-gradient(135deg, #23476E, #4477A9); }
@@ -601,6 +625,8 @@
     .report-task > :last-child { grid-column: 2; }
     .agenda-head { display: grid; grid-template-columns: 1fr; }
     .agenda-item { grid-template-columns: 56px minmax(0, 1fr); }
+    .agenda-item-more { grid-column: 1 / -1; }
+    .agenda-item-more > summary { width: 100%; min-height: 40px; }
     .agenda-actions { grid-column: 1 / -1; justify-content: stretch; }
     .agenda-actions .btn { flex: 1 1 120px; min-height: 44px; }
     .academic-kpis { grid-template-columns: 1fr 1fr; }
@@ -1304,17 +1330,24 @@ let cursorPinned = false;
 let ymCursor = today().slice(0, 7);   // 월간 플래너가 보고 있는 달
 let agendaDate = today();
 let agendaFilter = 'all';
+let monthSection = 'calendar';
 let viewStaff = '';
 let viewInputDirty = false;
 const openPanels = new Set();     // 펼쳐진 업무 패널
 
-function go(r) { route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render(); }
+function go(r) {
+  if (r === 'month' && route !== 'month') monthSection = 'calendar';
+  route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render();
+}
 window.addEventListener('hashchange', () => {
   if (/[#&]admin=/.test(location.hash)) { absorbLinkParams(); connectAdminDevice(); return; }
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
   if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
   const r = location.hash.replace('#/', '');
-  if (r && r !== route) { route = r; render(); }
+  if (r && r !== route) {
+    if (r === 'month') monthSection = 'calendar';
+    route = r; render();
+  }
 });
 
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
@@ -4277,9 +4310,10 @@ function agendaCalendarCard(me, ym) {
   const filterButtons = Object.keys(AGENDA_FILTERS).map(key => '<button class="chip ' + (agendaFilter === key ? 'on' : '') + '" data-act="agendafilter" data-v="' + key + '" aria-pressed="' + (agendaFilter === key) + '">' + AGENDA_FILTERS[key] + '</button>').join('');
   const exportable = monthItems;
   let h = '<div class="card"><div class="agenda-head"><div><div class="card-title">🗓 월간 공부 달력 · 통합 일정</div>' +
-    '<div class="card-sub">시험·수행평가·할 일·인강을 한 날짜에서 확인합니다.</div></div><button class="btn btn-sm btn-ghost" data-act="agendamonthics"' +
-      (exportable.length ? '' : ' disabled') + '>이번 달 전체 .ics</button></div>' +
+    '<div class="card-sub">시험·수행평가·할 일·인강을 한 날짜에서 확인합니다.</div></div></div>' +
     '<div class="agenda-filters mb8">' + filterButtons + '</div>' +
+    '<div class="agenda-legend" aria-label="캘린더 색상 안내"><span><i></i>할 일</span><span><i class="academic"></i>시험·수행</span>' +
+      '<span><i class="ingang"></i>인강</span><span><i class="schedule"></i>시간표</span><span><i class="study"></i>진할수록 순공시간 많음</span></div>' +
     '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>' +
     '<div class="between mt14"><button class="navbtn" data-act="agendaday" data-n="-1" aria-label="이전 날짜">‹</button><div><b>' + esc(label(agendaDate)) + '</b><div class="small muted" style="text-align:center">' + selected.length + '건</div></div><button class="navbtn" data-act="agendaday" data-n="1" aria-label="다음 날짜">›</button></div>' +
     '<div class="agenda-list" aria-live="polite">' + (selected.length ? selected.map(item => {
@@ -4288,15 +4322,17 @@ function agendaCalendarCard(me, ym) {
       const when = item.allDay ? '종일' : esc(item.startTime + '~' + endLabel);
       return '<div class="agenda-item ' + (item.done ? 'done' : '') + '"><div class="agenda-time">' + when + '</div><div><div class="row wraprow" style="gap:5px"><span class="tag">' + esc(type) + '</span>' +
         '<b class="small">' + esc(item.title) + '</b>' + (item.done ? '<span class="pill">완료</span>' : '') + '</div>' +
-        (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') + '</div><div class="agenda-actions">' +
+        (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') + '</div><details class="agenda-item-more"><summary class="btn btn-sm btn-ghost">내보내기</summary><div class="agenda-actions">' +
         '<a class="btn btn-sm btn-ghost" href="' + esc(googleCalendarUrl(item)) + '" target="_blank" rel="noopener noreferrer">Google에서 확인 후 저장</a>' +
-        '<button class="btn btn-sm" data-act="agendaics" data-key="' + esc(item.key) + '" data-date="' + item.date + '">.ics 받기</button></div></div>';
+        '<button class="btn btn-sm" data-act="agendaics" data-key="' + esc(item.key) + '" data-date="' + item.date + '">.ics 받기</button></div></details></div>';
     }).join('') : '<div class="small muted">선택한 날짜에 표시할 일정이 없습니다.</div>') + '</div>' +
     '<button class="btn btn-ghost btn-block mt14" data-act="agendaopen" data-date="' + agendaDate + '">이 날짜의 오늘 플래너 자세히 보기</button>' +
-    '<div class="agenda-note">외부 캘린더로 한 번 내보내는 기능입니다. 앱에서 이후 변경한 내용은 자동으로 수정되지 않으며, Google 화면에서 알림 시각을 확인한 뒤 저장하세요.</div></div>';
+    '<details class="agenda-more"><summary>캘린더 내보내기</summary><div class="agenda-export-actions"><button class="btn btn-sm btn-ghost" data-act="agendamonthics"' +
+      (exportable.length ? '' : ' disabled') + '>이번 달 전체 .ics</button></div>' +
+      '<div class="agenda-note">외부 캘린더로 한 번 내보내는 기능입니다. 앱에서 이후 변경한 내용은 자동으로 수정되지 않으며, Google 화면에서 알림 시각을 확인한 뒤 저장하세요.</div></details></div>';
 
-  h += '<div class="card"><div class="between"><div><div class="card-title">🔔 다가오는 알림</div><div class="card-sub">시험은 7일 전부터, 할 일·인강은 당일과 최근 30일 지연 항목을 보여줍니다.</div></div><span class="pill ' + (reminders.length ? 'warn' : '') + '">' + reminders.length + '건</span></div>' +
-    (reminders.length ? '<div class="agenda-reminders">' + reminders.map(item => '<span class="tag ' + (item.date < today() ? 'bad' : 'doing') + '">' + esc(agendaDday(item.date)) + ' · ' + esc(item.title) + '</span>').join('') + '</div>' : '<div class="small muted mt14">현재 확인할 알림이 없습니다.</div>') + '</div>';
+  if (reminders.length) h += '<div class="card alert"><div class="between"><div><div class="card-title">🔔 확인할 일정</div><div class="card-sub">임박한 시험과 아직 끝내지 못한 항목만 모았습니다.</div></div><span class="pill warn">' + reminders.length + '건</span></div>' +
+    '<div class="agenda-reminders">' + reminders.map(item => '<span class="tag ' + (item.date < today() ? 'bad' : 'doing') + '">' + esc(agendaDday(item.date)) + ' · ' + esc(item.title) + '</span>').join('') + '</div></div>';
   return h;
 }
 function monthSubjectGoalModal(me, ym) {
@@ -4363,6 +4399,21 @@ function moveMonthOccurrence(task, from, to) {
   render(); toast('공부 날짜를 변경했습니다');
 }
 
+const MONTH_SECTIONS = Object.freeze({
+  calendar: { label: '캘린더', description: '이번 달 일정과 선택한 날짜의 할 일을 확인합니다.' },
+  plan: { label: '월간 계획', description: '시험·목표·미완료 공부를 한곳에서 조정합니다.' },
+  report: { label: '분석·리포트', description: '과목별 공부 결과와 월간 피드백을 확인합니다.' }
+});
+
+function monthSectionNav(backlogCount) {
+  return '<div class="month-section-nav" role="tablist" aria-label="월간 화면 선택">' +
+    Object.keys(MONTH_SECTIONS).map(key => {
+      const section = MONTH_SECTIONS[key];
+      const badge = key === 'plan' && backlogCount ? '<span class="badge">' + backlogCount + '</span>' : '';
+      return '<button class="month-section-btn ' + (monthSection === key ? 'on' : '') + '" data-act="monthsection" data-v="' + key + '" role="tab" aria-selected="' + (monthSection === key) + '">' + section.label + badge + '</button>';
+    }).join('') + '</div><div class="month-section-intro">' + MONTH_SECTIONS[monthSection].description + '</div>';
+}
+
 function viewMonth() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -4386,9 +4437,14 @@ function viewMonth() {
     '<div class="d">' + ymLabel(ym) + '</div>' +
     '<button class="navbtn" data-act="mnav" data-n="1">›</button></div>';
 
-  h += agendaCalendarCard(me, ym);
+  h += monthSectionNav(backlog.length);
+  if (monthSection === 'calendar') {
+    h += agendaCalendarCard(me, ym);
+    return h;
+  }
 
   /* 시험 · 중요 일정 */
+  if (monthSection === 'plan') {
   h += '<div class="card"><div class="between mb8"><div><div class="card-title">📌 시험·중요 일정</div>' +
     '<div class="card-sub">시험일과 준비 진행률을 함께 관리합니다.</div></div>' +
     (editable ? '<button class="btn btn-sm btn-ghost" data-act="montheventadd">＋ 일정</button>' : '') + '</div>';
@@ -4454,8 +4510,10 @@ function viewMonth() {
       '<div class="hint">수량을 넣으면 ＋1 버튼으로 세면서 채웁니다. 다 채우면 자동 완료.</div>';
   }
   h += '</div>';
+  }
 
   /* 과목별 분석 */
+  if (monthSection === 'report') {
   const totalSubjectSecs = report.totalSecs;
   const topShare = report.topKey && totalSubjectSecs ? Math.round(stats[report.topKey].secs / totalSubjectSecs * 100) : 0;
   h += '<div class="card"><div class="card-title">📊 과목별 분석</div><div class="card-sub mb14">지난달 순공시간과 이번 달 공부 완료율을 비교합니다.</div>' +
@@ -4472,8 +4530,10 @@ function viewMonth() {
         '<b class="small">' + fmtDur(current.secs) + '</b></div>';
     }).join('') + '</div>' +
     (topShare >= 60 ? '<div class="hint" style="margin-top:12px;color:var(--amber)">⚠ ' + STUDY_SUBJECTS[report.topKey].label + '에 전체 순공시간의 ' + topShare + '%가 집중되어 있습니다.</div>' : '') + '</div>';
+  }
 
   /* 미완료 공부 */
+  if (monthSection === 'plan') {
   h += '<div class="card' + (backlog.length ? ' alert' : '') + '"><div class="between mb8"><div><div class="card-title">↪ 이번 달 미완료 공부</div>' +
     '<div class="card-sub">이월이 켜진 공부만 모아 날짜를 다시 정할 수 있습니다.</div></div><span class="pill ' + (backlog.length ? 'bad' : '') + '">' + backlog.length + '개</span></div>';
   if (!backlog.length) h += '<div class="small muted">현재 이월할 미완료 공부가 없습니다.</div>';
@@ -4488,8 +4548,10 @@ function viewMonth() {
           (nextMonthStart < today() ? '오늘로 이월' : '다음 달 이월') + '</button>' +
         '<button class="btn btn-sm btn-danger" data-act="monthdrop" data-id="' + item.t.id + '" data-date="' + item.date + '">종료</button></div>' : '') + '</div>';
   }).join('') + '</div>';
+  }
 
   /* 월간 리포트 · 회고 */
+  if (monthSection === 'report') {
   h += '<div class="card"><div class="between mb14"><div><div class="card-title">📝 월간 리포트</div>' +
     '<div class="card-sub">이번 달 결과를 정리하고 다음 달 방향을 정합니다.</div></div><span class="pill">달성률 ' + mp.pct + '%</span></div>' +
     '<div class="month-kpis mb14"><div class="month-kpi"><span class="small muted">총 순공시간</span><b>' + fmtDur(report.totalSecs) + '</b></div>' +
@@ -4506,6 +4568,7 @@ function viewMonth() {
         (session.isAdmin ? '' : 'readonly') + ' placeholder="다음 달 우선순위와 권장 공부량">' + esc(plan.nextFocus || '') + '</textarea></div></div>' +
     (editable ? '<button class="btn btn-primary btn-block" data-act="monthreviewsave" data-ym="' + ym + '">월간 기록 저장</button>' : '') + '</div>';
   h += reportPanel('month', me, ym);
+  }
 
   return h;
 }
@@ -7028,6 +7091,14 @@ document.addEventListener('click', ev => {
     }
 
     /* 월간 목표 · 일정 · 이월 · 회고 */
+    case 'monthsection': {
+      const nextSection = el.dataset.v;
+      if (!Object.prototype.hasOwnProperty.call(MONTH_SECTIONS, nextSection)) break;
+      monthSection = nextSection;
+      window.scrollTo(0, 0);
+      render();
+      break;
+    }
     case 'agendapick': {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(el.dataset.date || '')) break;
       agendaDate = el.dataset.date;
@@ -7816,7 +7887,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.10';
+const APP_VER = '2026-08-18.11';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

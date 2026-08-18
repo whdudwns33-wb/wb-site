@@ -28,6 +28,29 @@ test('monthly planner follows the agreed information order', () => {
   });
 });
 
+test('monthly information is split into three focused transient views', () => {
+  const month = section('function viewMonth()', '/* ══════════════════════════════════════════════════════\n   학사관리');
+  const nav = section('const MONTH_SECTIONS', 'function viewMonth()');
+  const handlers = section("case 'monthsection':", "case 'agendapick':");
+
+  assert.match(html, /let monthSection = 'calendar'/);
+  assert.match(nav, /calendar: \{ label: '캘린더'/);
+  assert.match(nav, /plan: \{ label: '월간 계획'/);
+  assert.match(nav, /report: \{ label: '분석·리포트'/);
+  assert.match(nav, /role="tablist"/);
+  assert.match(nav, /aria-selected=/);
+  assert.match(month, /monthSectionNav\(backlog\.length\)/);
+  assert.match(month, /monthSection === 'calendar'[\s\S]*?agendaCalendarCard\(me, ym\)[\s\S]*?return h/);
+  assert.ok((month.match(/monthSection === 'plan'/g) || []).length >= 2,
+    'planning cards and unfinished work must share the planning view');
+  assert.ok((month.match(/monthSection === 'report'/g) || []).length >= 2,
+    'analysis and report cards must share the report view');
+  assert.match(handlers, /hasOwnProperty\.call\(MONTH_SECTIONS, nextSection\)/);
+  assert.match(handlers, /monthSection = nextSection/);
+  assert.doesNotMatch(handlers, /save\(|setCheck\(|queueSync\(/,
+    'switching the presentation must not mutate consult data');
+});
+
 test('monthly subject goals and analysis reuse real timer and checklist data', () => {
   const helpers = section('const monthPlanKey', 'function monthBacklog(');
   const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
@@ -52,6 +75,11 @@ test('monthly calendar paints study-time intensity and opens the selected day', 
   assert.match(agenda, /rgba\(127,179,244,/);
   assert.match(agenda, /data-act="agendapick"/);
   assert.match(agenda, /통합 일정/);
+  assert.match(agenda, /캘린더 색상 안내/);
+  assert.match(agenda, /진할수록 순공시간 많음/);
+  assert.match(agenda, /if \(reminders\.length\)/,
+    'empty reminder cards should stay hidden');
+  assert.match(agenda, /<details class="agenda-more">/);
 });
 
 test('monthly important events include D-day, scope, score, and preparation progress', () => {
