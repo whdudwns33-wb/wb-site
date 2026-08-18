@@ -174,6 +174,7 @@ function withoutTeacherIds(item) {
 function responseDocument(document, auth) {
   const allowed = item => auth.scope === 'all' || item.teacherIds.includes(auth.id);
   return {
+    studentSelectionScope: auth.scope === 'all' ? 'all_active' : 'assigned',
     roster: {
       ...document.roster,
       students: document.roster.students.filter(allowed).map(withoutTeacherIds)
