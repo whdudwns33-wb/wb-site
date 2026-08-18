@@ -125,8 +125,10 @@ test('the existing month tab becomes the shared schedule for admin and student r
   assert.match(month, /const me = currentStaff\(\)/);
   assert.match(calendar, /agendaImportantItemsFor\(me\.id/);
   assert.match(month, /!session\.isStaffLink[\s\S]*?staffSwitcher\(me\.id\)/);
-  ['agendapick', 'agendaday', 'agendaics', 'agendamonthics']
+  ['agendapick', 'agendaday', 'agendaics', 'agendamonthics', 'montheventadd']
     .forEach(action => assert.match(calendar, new RegExp('data-act="' + action + '"')));
+  assert.match(calendar, /data-act="montheventadd" data-date="' \+ agendaDate/,
+    'calendar entry should default to the currently selected date');
   assert.match(calendar, /data-n="-1"/);
   assert.match(calendar, /data-n="1"/);
   assert.match(calendar, /googleCalendarUrl\(/);

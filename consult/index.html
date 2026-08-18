@@ -4265,6 +4265,7 @@ function agendaUpcomingImportantItems(staffId) {
 
 function agendaCalendarCard(me, ym) {
   if (!agendaDate.startsWith(ym)) agendaDate = ym === today().slice(0, 7) ? today() : ym + '-01';
+  const editable = session.isStaffLink || session.isAdmin;
   const dates = monthDates(ym);
   const monthItems = agendaImportantItemsFor(me.id, dates[0], dates[dates.length - 1]);
   const byDate = new Map(dates.map(date => [date, monthItems.filter(item => item.date === date)]));
@@ -4294,7 +4295,8 @@ function agendaCalendarCard(me, ym) {
       '<span class="pill ' + (item.date === today() ? 'bad' : 'warn') + '">' + esc(agendaDday(item.date)) + '</span>' +
       '<b>' + esc(agendaImportantLabel(item) + ' · ' + item.title) + '</b><time datetime="' + item.date + '">' + esc(shortDate(item.date)) + '</time></button>').join('') + '</div></div>' : '';
   h += '<div class="card"><div class="agenda-head"><div><div class="card-title">📅 중요한 일정</div>' +
-    '<div class="card-sub">시험·수행평가·원장이 지정한 중요 일정만 보여줍니다.</div></div></div>' +
+    '<div class="card-sub">시험·수행평가·원장이 지정한 중요 일정만 보여줍니다.</div></div>' +
+    (editable ? '<button class="btn btn-sm btn-primary" data-act="montheventadd" data-date="' + agendaDate + '">＋ 일정 추가</button>' : '') + '</div>' +
     '<div class="agenda-legend" aria-label="캘린더 색상 안내"><span><i class="exam"></i>시험</span>' +
       '<span><i class="performance"></i>수행평가</span><span><i class="important"></i>중요 일정</span></div>' +
     '<table class="cal"><thead><tr>' + ['월','화','수','목','금','토','일'].map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>' +
@@ -4325,12 +4327,13 @@ function monthSubjectGoalModal(me, ym) {
     }).join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="monthgoalsave" data-ym="' + ym + '">저장</button>');
 }
-function monthEventModal(ym) {
+function monthEventModal(ym, selectedDate) {
+  const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate || '') && ymOf(selectedDate) === ym ? selectedDate : ym + '-01';
   modal('📌 시험·중요 일정 추가',
     '<div class="field"><label class="fl">일정 종류</label><select class="in" id="mEventKind">' +
       Object.keys(MONTH_EVENT_KINDS).map(key => '<option value="' + key + '">' + MONTH_EVENT_KINDS[key] + '</option>').join('') + '</select></div>' +
     '<div class="field"><label class="fl">일정 이름</label><input class="in" id="mEventTitle" placeholder="예: 9월 모의고사"></div>' +
-    '<div class="field"><label class="fl">날짜</label><input class="in" type="date" id="mEventDate" value="' + ym + '-01"></div>' +
+    '<div class="field"><label class="fl">날짜</label><input class="in" type="date" id="mEventDate" value="' + initialDate + '"></div>' +
     '<div class="field"><label class="fl">시험 범위·준비 내용</label><textarea class="in" id="mEventRange" placeholder="예: 수학 미적분 전 범위"></textarea></div>' +
     '<div class="field"><label class="fl">목표점수 (선택)</label><input class="in" type="number" min="0" max="100" id="mEventScore" placeholder="90"></div>',
     '<button class="btn btn-primary btn-block" data-act="montheventsave" data-ym="' + ym + '">추가</button>');
@@ -7130,7 +7133,7 @@ document.addEventListener('click', ev => {
       closeModal(); render(); toast('월간 시간 목표를 저장했습니다');
       break;
     }
-    case 'montheventadd': monthEventModal(ymCursor); break;
+    case 'montheventadd': monthEventModal(ymCursor, el.dataset.date || ''); break;
     case 'montheventsave': {
       const me = currentStaff(); if (!me) break;
       const ym = el.dataset.ym || ymCursor;
@@ -7859,7 +7862,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.13';
+const APP_VER = '2026-08-18.14';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
