@@ -37,19 +37,42 @@ test('학생 정보 팝업은 기본 정보를 escape하고 연락처를 만들�
   const html = render({
     id: 'student-safe', name: attack, grade: attack, subject: attack, teacher: attack,
     start: '2026-08', end: '', reason: '', memo: attack
-  });
+  }, [attack]);
   assert.doesNotMatch(html, /<img\b/i);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
-  for (const label of ['학년', '과목·분야', '담당 선생님', '재원 기간', '내부 메모']) {
+  for (const label of ['학년', '과목·분야', '담당 선생님', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
   assert.doesNotMatch(code, /phone|contact|guardian/i);
+});
+
+test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 한 번만 남긴다', () => {
+  const code = block('function studentLessonReferenceItems(', 'function rosterStudentInfoHtml(');
+  const tasks = [
+    { id: 'lesson-a', studentId: 'student-safe', guide: '숙제  루틴: 매일\n학생 특징: 꼼꼼함', refs: [
+      { label: '교재 진도 확인' }, { label: '학생 특징: 꼼꼼함' }
+    ] },
+    { id: 'lesson-b', studentId: 'student-safe', guide: '숙제 루틴: 매일\n지금 목표: 독해', refs: [
+      { label: '교재 진도 확인' }, { label: '오답 확인' }
+    ] },
+    { id: 'lesson-deleted', studentId: 'student-safe', guide: '삭제된 참고', refs: [], deleted: true },
+    { id: 'lesson-other', studentId: 'student-other', guide: '다른 학생 참고', refs: [] }
+  ];
+  const collect = new Function('state', 'isLesson', 'lessonReferenceSteps',
+    `${code}\nreturn studentLessonReferenceItems;`)(
+      { tasks }, () => true, task => task.refs || []
+    );
+  assert.deepEqual(collect('student-safe'), [
+    '숙제 루틴: 매일', '학생 특징: 꼼꼼함', '교재 진도 확인', '지금 목표: 독해', '오답 확인'
+  ]);
+  assert.deepEqual(collect(''), []);
 });
 
 test('팝업은 이름 추측 없이 현재 권한 범위의 stable studentId만 조회한다', () => {
   const code = block('function showRosterStudentInfo(', 'let rosterStudentEditor');
   assert.match(code, /rosterDb\.students\.find\(item => String\(item\.id\) === String\(studentId\)\)/);
   assert.doesNotMatch(code, /find\([^\n]*name|student\.name\s*===/);
+  assert.match(code, /studentLessonReferenceItems\(student\.id\)/);
   assert.match(code, /session\.isAdmin[\s\S]*data-act="rosterstudentedit"/);
   assert.match(source, /\.student-info-name \{[^}]*min-height: 44px/);
   assert.match(source, /\.student-info-name:focus-visible/);

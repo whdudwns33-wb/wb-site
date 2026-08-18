@@ -2607,14 +2607,10 @@ function acaflowLessonSummary(t, date) {
 function taskPanel(t, date, c, editable) {
   let h = '<div class="panel">';
   const steps = taskSteps(t, c);
-  const references = lessonReferenceSteps(t);
 
-  if (usesStandardLessonDisplay(t) && (t.guide || references.length)) {
-    h += '<details class="guide"><summary><b>📘 학생별 수업 참고 열기</b></summary>' +
-      (t.guide ? '<div class="mt8">' + esc(t.guide) + '</div>' : '') +
-      (references.length ? '<div class="mt8"><b>기존 맞춤 지침</b><br>' +
-        references.map(step => '· ' + esc(step.label)).join('<br>') + '</div>' : '') + '</details>';
-  } else if (t.guide) h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
+  if (!usesStandardLessonDisplay(t) && t.guide) {
+    h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
+  }
 
   if (steps.length) {
     h += '<div style="margin-top:10px">' + steps.map((s, i) => {
@@ -8765,25 +8761,45 @@ function rosterStudentInfoStatus(student) {
   return ['재원 중', ''];
 }
 
-function rosterStudentInfoHtml(student) {
+function studentLessonReferenceItems(studentId) {
+  const stableId = String(studentId || '');
+  if (!stableId) return [];
+  const seen = new Set(), items = [];
+  const add = value => String(value || '').split(/\r?\n/).forEach(line => {
+    const text = line.normalize('NFKC').trim().replace(/\s+/g, ' ');
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    items.push(text);
+  });
+  (state.tasks || []).forEach(task => {
+    if (!task || task.deleted || !isLesson(task) || String(task.studentId || '') !== stableId) return;
+    add(task.guide);
+    lessonReferenceSteps(task).forEach(step => add(step && step.label));
+  });
+  return items;
+}
+
+function rosterStudentInfoHtml(student, lessonReferences) {
   const status = rosterStudentInfoStatus(student);
   const field = (label, value, wide) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
     esc(label) + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
+  const references = Array.isArray(lessonReferences) ? lessonReferences : [];
   return '<div class="between mb14"><div><div class="card-title">' + esc(student.name) + '</div>' +
-    '<div class="card-sub">원생 명단에 등록된 기본 정보입니다.</div></div><span class="pill ' + status[1] + '">' +
+    '<div class="card-sub">원생 명단 기본 정보' + (references.length ? '와 연결된 수업 참고' : '') + '입니다.</div></div><span class="pill ' + status[1] + '">' +
     status[0] + '</span></div><div class="student-info-grid">' +
     field('학년', student.grade) + field('과목·분야', student.subject) +
     field('담당 선생님', student.teacher, true) + field('재원 기간', period, true) +
     (student.reason ? field('종료 사유', student.reason, true) : '') +
-    (student.memo ? field('내부 메모', student.memo, true) : '') + '</div>';
+    (student.memo ? field('내부 메모', student.memo, true) : '') +
+    (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true) : '') + '</div>';
 }
 
 function showRosterStudentInfo(studentId) {
   const student = rosterDb && Array.isArray(rosterDb.students) &&
     rosterDb.students.find(item => String(item.id) === String(studentId));
   if (!student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
-  modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student),
+  modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)),
     session.isAdmin
       ? '<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>'
       : '');
