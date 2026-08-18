@@ -67,7 +67,12 @@ test('lesson references leave the lesson panel and every editable lesson button 
   assert.doesNotMatch(panel, /학생별 수업 참고 열기|lessonReferenceSteps\(t\)/);
   assert.match(panel, /!usesStandardLessonDisplay\(t\) && t\.guide/,
     '일반 업무 안내는 수업 참고 이동과 무관하므로 유지한다');
-  assert.match(panel, /isLesson\(t\) \? '수업 정보 수정' : '업무 수정'/);
+  assert.doesNotMatch(panel, /data-act="lessonedit"/,
+    '수업 정보 수정은 학생정보 · 업무지시 팝업으로 이동한다');
+  assert.match(panel, /data-act="etask"[\s\S]{0,120}업무 수정/,
+    '일반 업무 수정은 기존 수업진행 외 업무 패널에 유지한다');
+  const briefing = block('function showTodayLessonBriefing(taskId, lessonDate)', '/* 보호자 공개 내용은');
+  assert.match(briefing, /data-act="lessonedit"[\s\S]{0,120}수업 정보 수정/);
   const editor = block('function editTaskModal(id)', 'function saveEditedTask()');
   assert.match(editor, /isLesson\(t\) \? '수업 정보 수정' : '업무 수정'/);
   const order = block('function orderText(staffId, date)', '/** 방금 추가한 한 건을');
