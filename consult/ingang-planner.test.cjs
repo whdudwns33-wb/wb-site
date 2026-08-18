@@ -66,6 +66,30 @@ test('quick creation builds a parseable 1-to-N curriculum without OCR', () => {
   assert.match(html, /case 'ingquick':[\s\S]*?confirm\('현재 커리큘럼을 빠른 생성 내용으로 바꿀까요\?'\)/);
 });
 
+test('course editing preserves identity and blocks removal of scheduled lecture numbers', () => {
+  const courseCard = between('function viewIngang()', '\nfunction ingAddModal()');
+  const editModal = between('function ingEditModal(', '\n\nfunction ingAssignModal(');
+  const editOpen = between("case 'ingedit':", "case 'ingeditsave':");
+  const editSave = between("case 'ingeditsave':", "case 'ingdel':");
+
+  assert.match(courseCard, /data-act="ingedit"/);
+  assert.match(editModal, /id="ingEditSubject"/);
+  assert.match(editModal, /id="ingEditName"/);
+  assert.match(editModal, /id="ingEditPlatform"/);
+  assert.match(editModal, /id="ingEditUrl"/);
+  assert.match(editModal, /id="ingEditText"/);
+  assert.match(editModal, /ingCourseText\(course\)/);
+  assert.match(editOpen, /session\.isAdmin \|\| isManager\(\)/);
+  assert.match(editSave, /session\.isAdmin \|\| isManager\(\)/);
+  assert.match(editSave, /ingCourseItems\(me\.id, course\.id\)/);
+  assert.match(editSave, /missingProtected\.length/);
+  assert.match(editSave, /item\.id === course\.id/);
+  assert.match(editSave, /Object\.assign\(\{\}, item/);
+  assert.match(editSave, /lectures: lectures/);
+  assert.doesNotMatch(editSave, /id: uid\(\)/);
+  assert.doesNotMatch(editSave, /ingSavePlan/);
+});
+
 test('free-time subtraction merges overlaps and packer uses exact-fit slots', () => {
   const freeSource = between('function ingFreeIntervals(', '\nfunction ingFreeForDate(');
   const packSource = between('function ingPackSchedule(', '\nfunction ingBuildSchedule(');
@@ -416,6 +440,8 @@ test('director-only lecture mutations are guarded and student checks stay self-s
   const director = /session\.isAdmin \|\| isManager\(\)/;
   assert.match(between("case 'ingadd':", "case 'ingpf':"), director);
   assert.match(between("case 'ingsave':", "case 'ingdel':"), director);
+  assert.match(between("case 'ingedit':", "case 'ingeditsave':"), director);
+  assert.match(between("case 'ingeditsave':", "case 'ingdel':"), director);
   assert.match(between("case 'ingdel':", "case 'ingassign':"), director);
   assert.match(between("case 'ingcatchup':", "case 'ingshift':"), director);
   assert.match(between("case 'ingshift':", "case 'ingshiftdir':"), director);
