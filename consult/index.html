@@ -1686,6 +1686,10 @@ function viewToday() {
   const list = checklistTasksFor(me.id, cursor);
   const offers = studyOffersFor(me.id, cursor);
   const p = progress(me.id, cursor);
+  const lectureChecklist = cursor === today() ? ingChecklistItems(me.id, cursor) : [];
+  const checklistTotal = p.total + lectureChecklist.length;
+  const checklistDone = p.done + lectureChecklist.filter(item => item.done).length;
+  const checklistPct = checklistTotal ? Math.round(checklistDone / checklistTotal * 100) : 0;
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
 
@@ -1699,19 +1703,25 @@ function viewToday() {
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   list.forEach(t => counts[statusOf(t, cursor)]++);
+  const running = cursor === today() ? stRunning(me.id, cursor) : null;
+  lectureChecklist.forEach(item => {
+    if (item.done) counts.done++;
+    else if (running && running.taskId === ingTimerTaskId(item.cid, item.seq)) counts.doing++;
+    else counts.todo++;
+  });
 
   h += '<div class="card"><div class="prog">' +
-    '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
+    '<div class="ring" style="--p:' + checklistPct + '"><b>' + checklistPct + '%</b></div>' +
     '<div style="flex:1">' +
       '<div class="card-title">' + esc(me.name) + ' 학생</div>' +
       '<div class="card-sub mb8">' +
-        (list.length
+        (checklistTotal
           ? '완료 ' + counts.done + ' · 진행중 ' + counts.doing + ' · 미착수 ' + counts.todo +
             (counts.blocked ? ' · <b style="color:var(--coral)">막힘 ' + counts.blocked + '</b>' : '') +
-            (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '')
+            (checklistDone === checklistTotal ? ' · 오늘 완료 🎉' : '')
           : (offers.length ? '배부된 공부를 체크리스트에 담아 시작해 보세요' : '체크리스트가 비어 있습니다')) +
       '</div>' +
-      '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
+      '<div class="bar"><i style="width:' + checklistPct + '%"></i></div>' +
     '</div></div></div>';
 
   h += studyTotalHeroCard(me, cursor);
@@ -1811,14 +1821,17 @@ function studyPlannerCard(me, date, list, carry, editable) {
   const dateObj = new Date(date + 'T00:00:00');
   const dayName = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dateObj.getDay()];
   const studyTotal = stTotal(me.id, date);
+  const lectures = ingChecklistItems(me.id, date);
+  const todayCount = list.length + lectures.length;
   const checklist = '<div class="planner-list-head"><span>과목</span><span>세부 공부내용</span><span>완료</span></div>' +
     (carry.length
     ? '<div class="planner-divider">지난 미완료 · 오늘 이어서 공부해요</div>' +
       carry.map(x => plannerTaskRow(x.t, x.date, editable, true)).join('')
     : '') +
-    (list.length
+    (todayCount
       ? (carry.length ? '<div class="planner-divider" style="color:#736C5A">오늘 체크리스트</div>' : '') +
-        list.map(task => plannerTaskRow(task, date, editable, false)).join('')
+        list.map(task => plannerTaskRow(task, date, editable, false)).join('') +
+        lectures.map(item => plannerLectureRow(me.id, item, editable)).join('')
       : (!carry.length ? '<div class="small muted" style="padding:16px 8px">배부 공부를 가져오거나 아래에서 직접 추가해 주세요.</div>' : ''));
 
   return '<div class="card study-paper" id="studyPlanner">' +
@@ -1829,7 +1842,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
     '</div>' +
     '<div class="study-planner">' +
       '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' +
-        '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (list.length + carry.length) + ' TASKS</span></div>' + checklist + '</section>' +
+        '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (todayCount + carry.length) + ' TASKS</span></div>' + checklist + '</section>' +
       '<section class="study-planner-pane" aria-label="과목별 순공시간">' +
         '<div class="study-paper-col-title">TIME TABLE <span>05–24시 · 10분 단위</span></div>' + studyTimePanel(me, editable, true) + '</section>' +
     '</div></div>';
@@ -1874,6 +1887,34 @@ function plannerTaskRow(t, date, editable, isCarry) {
       '</div>';
   }
   return h + '</div>';
+}
+
+function plannerLectureRow(sid, item, editable) {
+  const found = ingLec(sid, item.cid, item.seq);
+  const subject = found ? ingCourseSubject(found.course) : STUDY_SUBJECTS.other;
+  const taskId = ingTimerTaskId(item.cid, item.seq);
+  const running = stRunning(sid, today());
+  const timingThis = !!(running && running.taskId === taskId);
+  const title = found ? found.course.name + ' ' + item.seq + '강' : '인강 ' + item.seq + '강';
+
+  return '<div class="planner-task-row ' + subject.className + ' ' + (item.done ? 'done' : 'todo') + '" data-ing-task="' + esc(taskId) + '">' +
+    '<div class="planner-task-subject">' + subject.label + '</div>' +
+    '<div class="planner-task-detail">' +
+      '<div class="planner-task-title">' + esc(title) + '</div>' +
+      (found && found.lec.title ? '<div class="planner-task-desc">' + esc(found.lec.title) + '</div>' : '') +
+      '<div class="planner-task-actions"><span class="tag doing">🎬 인강</span>' +
+        (item.s && item.e ? '<span class="tag time">' + esc(item.s) + '~' + esc(item.e) + '</span>' : '') +
+        (found && found.lec.min ? '<span class="tag time">예상 ' + found.lec.min + '분</span>' : '') +
+        (found && found.course.platform ? '<span class="tag">' + esc(found.course.platform) + '</span>' : '') +
+        (editable && !item.done
+          ? '<button class="btn ' + (timingThis ? 'btn-warn' : 'btn-ghost') + '" data-act="ingsttask" data-sid="' + esc(sid) +
+            '" data-date="' + item.date + '" data-cid="' + esc(item.cid) + '" data-seq="' + item.seq + '">' +
+            (timingThis ? '⏸ 공부 정지' : '▶ 공부 시작') + '</button>'
+          : '') +
+      '</div></div>' +
+    '<div class="planner-check-wrap"><button class="planner-check" ' +
+      (editable ? 'data-act="ingcheck" data-sid="' + esc(sid) + '" data-date="' + item.date + '" data-cid="' + esc(item.cid) + '" data-seq="' + item.seq + '"' : 'disabled') +
+      '>✓</button></div></div>';
 }
 
 function taskRow(t, date, editable, isCarry) {
@@ -2373,6 +2414,23 @@ function ingLec(sid, cid, seq) {
   const l = (c.lectures || []).find(x => Number(x.seq) === Number(seq));
   return l ? { course: c, lec: l } : null;
 }
+function ingCourseSubjectKey(course) {
+  const stored = String((course && course.studySubject) || '').trim();
+  if (stored) return studySubjectKey(stored);
+  const text = String((course && course.name) || '');
+  if (/(과학|과탐|물리|화학|생명|생물|지구과학)/.test(text)) return 'science';
+  if (/(국어|독서|문학|화법|작문|언어와매체|언매)/.test(text)) return 'korean';
+  if (/(영어|영단어|어법|구문)/.test(text)) return 'english';
+  if (/(수학|수리|미적분|확률과통계|확통|기하)/.test(text)) return 'math';
+  if (/(사회|사탐|한국사|세계사|윤리|지리|정치|경제)/.test(text)) return 'social';
+  return 'other';
+}
+function ingCourseSubject(course) { return STUDY_SUBJECTS[ingCourseSubjectKey(course)]; }
+const ingTimerTaskId = (cid, seq) => 'ing:' + String(cid || '') + ':' + Number(seq);
+const ingIsClaimed = item => !!(item && (item.claimed || item.done));
+function ingChecklistItems(sid, date) {
+  return ingPlan(sid, date).filter(ingIsClaimed).map(item => Object.assign({}, item, { date: date }));
+}
 function ingStats(sid, c, asg) {
   asg = asg || ingAssigned(sid);
   const lecs = c.lectures || [];
@@ -2516,7 +2574,9 @@ function ingParse(text) {
 
 function ingToggle(sid, date, cid, seq) {
   const items = ingPlan(sid, date).map(x =>
-    (x.cid === cid && Number(x.seq) === Number(seq)) ? Object.assign({}, x, { done: !x.done }) : x);
+    (x.cid === cid && Number(x.seq) === Number(seq))
+      ? Object.assign({}, x, { done: !x.done }, !x.done && !x.claimed ? { claimed: true, claimedAt: now() } : {})
+      : x);
   ingSavePlan(sid, date, items);
 }
 function ingPatchItem(sid, date, cid, seq, patch) {
@@ -2656,14 +2716,25 @@ function ingTodayItems(sid) {
 function ingRow(sid, it, editable) {
   const f = ingLec(sid, it.cid, it.seq);
   const late = it.date < today() ? Math.round((parseYmd(today()) - parseYmd(it.date)) / 86400000) : 0;
+  const claimed = ingIsClaimed(it);
+  const canClaim = session.isStaffLink && it.date === today() && !claimed;
+  const canComplete = editable && (claimed || late || !session.isStaffLink);
+  const claimStatus = it.date === today()
+    ? (session.isStaffLink
+        ? '<button class="btn btn-sm ' + (claimed ? 'btn-ghost' : 'btn-primary') + '" data-act="ingclaim" data-sid="' + esc(sid) +
+          '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"' +
+          (canClaim ? '' : ' disabled') + '>' + (claimed ? '✓ 체크리스트에 담음' : '내 체크리스트로 가져오기') + '</button>'
+        : '<span class="pill ' + (claimed ? '' : 'bad') + '">' + (claimed ? '체크리스트에 담음' : '가져오기 전') + '</span>')
+    : '';
   return '<div class="task ' + (it.done ? 'done' : '') + '">' +
-    '<button class="box" ' + (editable
+    '<button class="box" ' + (canComplete
       ? 'data-act="ingcheck" data-sid="' + sid + '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '"'
-      : 'disabled') + '>✓</button>' +
+      : 'disabled title="체크리스트로 가져온 뒤 완료할 수 있습니다"') + '>✓</button>' +
     '<div class="task-body"><div class="task-t">' +
       (f ? esc(f.course.name) + ' ' + it.seq + '강' : '(삭제된 강좌) ' + it.seq + '강') + '</div>' +
       (f && f.lec.title ? '<div class="task-d">' + esc(f.lec.title) + '</div>' : '') +
       '<div class="meta">' +
+        (f ? studySubjectTag(ingCourseSubjectKey(f.course)) : studySubjectTag('other')) +
         (it.s && it.e ? '<span class="tag time">' + esc(it.s) + '~' + esc(it.e) + '</span>' : '') +
         (f && f.lec.min ? '<span class="tag time">' + f.lec.min + '분</span>' : '') +
         (f && f.course.platform ? '<span class="tag">' + esc(f.course.platform) + '</span>' : '') +
@@ -2673,6 +2744,7 @@ function ingRow(sid, it, editable) {
           ' data-sid="' + sid + '" data-date="' + it.date + '" data-cid="' + esc(it.cid) + '" data-seq="' + it.seq + '">' +
           (it.review ? '★ 복습 필요' : '☆ 복습 표시') + '</button>' :
           (it.review ? '<span class="tag high">★ 복습 필요</span>' : '')) +
+        claimStatus +
       '</div></div></div>';
 }
 
@@ -2698,7 +2770,7 @@ function ingTodayCard(me, editable) {
   return '<div class="card today-fold-card' + (folded ? ' is-folded' : '') + '" id="todayLectures">' +
     '<button type="button" class="today-fold-head" data-act="todayfold" data-section="lectures" aria-expanded="' + (!folded) + '" aria-controls="todayLecturesBody">' +
       '<span class="today-fold-copy"><span class="card-title" style="display:block">🎬 인강</span>' +
-        '<span class="card-sub">오늘 들을 강의와 밀린 강의를 확인하고 완료를 기록하세요.</span></span>' +
+        '<span class="card-sub">오늘 들을 강의를 체크리스트로 가져와 스터디 플래너에서 기록하세요.</span></span>' +
       '<span class="today-fold-meta">' +
         (overdue.length ? '<span class="pill bad">밀림 ' + overdue.length + '강</span>' : '') +
         (todays.length ? '<span class="pill' + (done === todays.length ? '' : ' warn') + '">' + done + ' / ' + todays.length + '강</span>' :
@@ -2983,7 +3055,7 @@ function viewIngang() {
     const color = courseColors[index % courseColors.length];
     h += '<div class="card ing-course-card" style="--ing-course-color:' + color + '"><div class="ing-course-top mb8">' +
       '<div><div class="ing-course-name">' + esc(c.name) + '</div>' +
-      '<div class="ing-course-meta">' + esc(c.platform || '기타') + ' · 총 ' + s.total + '강' +
+      '<div class="ing-course-meta">' + studySubjectTag(ingCourseSubjectKey(c)) + ' ' + esc(c.platform || '기타') + ' · 총 ' + s.total + '강' +
         (safeHttpsUrl(c.sourceUrl) ? ' · <a class="ing-course-link" href="' + esc(safeHttpsUrl(c.sourceUrl)) + '" target="_blank" rel="noopener noreferrer">학습 사이트 열기 ↗</a>' : '') + '</div></div>' +
       '<div class="pill' + (s.pct >= 100 ? '' : s.pct >= 50 ? ' warn' : ' bad') + '">' + s.pct + '%</div></div>' +
       '<div class="bar mb8 ing-course-bar"><i style="width:' + s.pct + '%"></i></div>' +
@@ -3004,6 +3076,8 @@ function viewIngang() {
 
 function ingAddModal() {
   modal('🎬 강좌 등록',
+    '<div class="field"><label class="fl" for="ingSubject">과목 카테고리</label>' +
+      '<select class="in" id="ingSubject">' + studySubjectOptions(null, '과목 선택') + '</select></div>' +
     '<input class="in mb8" id="ingName" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
     '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
       ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
@@ -3057,6 +3131,8 @@ function ingAssignModal(sid, cid) {
   const avail = ingAvail(sid);
   modal('📅 ' + c.name + ' 계획',
     '<div class="card-sub mb14">미배정 <b>' + left.length + '강</b>을 실제 빈 시간에 넣고, 완강일과 회독 수를 계산합니다.</div>' +
+    '<div class="field"><label class="fl" for="ingCourseSubject">과목 카테고리</label>' +
+      '<select class="in" id="ingCourseSubject">' + studySubjectOptions(ingCourseSubjectKey(c)) + '</select></div>' +
     (!avail.configured ? '<div class="panel mb14"><b class="small">주간 일정이 먼저 필요합니다.</b>' +
       '<div class="hint">활동시간과 고정 일정을 저장한 뒤 다시 자동배정해 주세요.</div>' +
       '<button class="btn btn-sm btn-primary mt14" data-act="ingavopen">주간 일정 설정</button></div>' : '') +
@@ -6726,9 +6802,30 @@ document.addEventListener('click', ev => {
     }
 
     /* 인강 플래너 */
+    case 'ingclaim': {
+      const me = currentStaff();
+      const planDate = el.dataset.date;
+      if (!session.isStaffLink || !me || me.id !== el.dataset.sid || planDate !== today()) {
+        return toast('오늘 내 인강만 체크리스트로 가져올 수 있습니다');
+      }
+      const item = ingPlan(me.id, planDate).find(x =>
+        x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
+      if (!item) return toast('배정된 인강을 찾지 못했습니다');
+      if (ingIsClaimed(item)) return toast('이미 체크리스트에 담은 인강입니다');
+      ingPatchItem(me.id, planDate, item.cid, Number(item.seq), { claimed: true, claimedAt: now() });
+      render(); toast('스터디 플래너 체크리스트에 담았습니다');
+      break;
+    }
     case 'ingcheck': {
       const me = currentStaff(); if (!me || me.id !== el.dataset.sid) break;
-      ingToggle(me.id, el.dataset.date, el.dataset.cid, Number(el.dataset.seq));
+      const planDate = el.dataset.date;
+      const item = ingPlan(me.id, planDate).find(x =>
+        x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
+      if (!item) break;
+      const turnOn = !item.done;
+      ingToggle(me.id, planDate, item.cid, Number(item.seq));
+      const running = stRunning(me.id, today());
+      if (turnOn && running && running.taskId === ingTimerTaskId(item.cid, item.seq)) stStop(me.id, today());
       render();
       break;
     }
@@ -6841,7 +6938,9 @@ document.addEventListener('click', ev => {
     case 'ingsave': {
       if (!(session.isAdmin || isManager())) break;
       const me = currentStaff(); if (!me) break;
+      const subjectKey = ($('#ingSubject') && $('#ingSubject').value) || '';
       const name = ($('#ingName').value || '').trim();
+      if (!subjectKey || !STUDY_SUBJECTS[subjectKey]) return toast('과목 카테고리를 선택해 주세요');
       if (!name) return toast('강좌 이름을 입력해 주세요');
       const lectures = ingParse($('#ingText').value);
       if (!lectures.length) return toast('커리큘럼을 읽지 못했습니다 — 회차 번호로 시작하는 줄이 필요합니다');
@@ -6852,7 +6951,7 @@ document.addEventListener('click', ev => {
       if (sourceUrl && !ingProviderUrlMatches(platform, sourceUrl)) return toast(platform + ' 공식 주소와 일치하지 않습니다. 주소를 지우거나 플랫폼을 기타로 선택해 주세요');
       ingSaveCourses(me.id, ingCourses(me.id).concat({
         id: uid(), name: name, platform: platform, sourceUrl: sourceUrl || ING_PROVIDER_URLS[platform] || '',
-        importedAt: now(), lectures: lectures
+        studySubject: subjectKey, importedAt: now(), lectures: lectures
       }));
       closeModal(); render();
       toast(name + ' — ' + lectures.length + '강 등록 완료');
@@ -6912,8 +7011,10 @@ document.addEventListener('click', ev => {
       if (!ingAvail(me.id).configured && data.result.remaining) return toast('주간 일정을 먼저 설정해 주세요');
       const goalDate = ($('#ingEnd').value || ''), nextName = ($('#ingNextName').value || '').trim();
       const defaultMin = Math.max(10, Number($('#ingDefaultMin').value) || ING_DEFAULT_MIN);
+      const subjectKey = ($('#ingCourseSubject') && $('#ingCourseSubject').value) || '';
+      if (!subjectKey || !STUDY_SUBJECTS[subjectKey]) return toast('과목 카테고리를 선택해 주세요');
       ingSaveCourses(me.id, ingCourses(me.id).map(x => x.id === c.id
-        ? Object.assign({}, x, { goalDate: goalDate, nextName: nextName, defaultMin: defaultMin }) : x));
+        ? Object.assign({}, x, { goalDate: goalDate, nextName: nextName, defaultMin: defaultMin, studySubject: subjectKey }) : x));
       const buckets = {};
       data.result.items.forEach(item => {
         const d = item.date;
@@ -6974,6 +7075,23 @@ document.addEventListener('click', ev => {
       break;
     }
     /* 순공시간 타이머 */
+    case 'ingsttask': {
+      const me = currentStaff();
+      const planDate = el.dataset.date;
+      if (!me || me.id !== el.dataset.sid || planDate !== today()) return toast('오늘 인강만 시간을 기록할 수 있습니다');
+      const item = ingPlan(me.id, planDate).find(x =>
+        x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
+      if (!item || !ingIsClaimed(item) || item.done) return toast('체크리스트에 담은 미완료 인강만 시작할 수 있습니다');
+      const found = ingLec(me.id, item.cid, item.seq);
+      const subject = found ? ingCourseSubject(found.course).label : '기타';
+      const title = found ? found.course.name + ' ' + item.seq + '강' : '인강 ' + item.seq + '강';
+      const taskId = ingTimerTaskId(item.cid, item.seq);
+      const running = stRunning(me.id, today());
+      if (running && running.taskId === taskId) { stStop(me.id, today()); toast(title + ' 공부 정지'); }
+      else { stStart(me.id, today(), subject, taskId); toast(title + ' 공부 시작!'); }
+      render();
+      break;
+    }
     case 'sttask': {
       const me = currentStaff();
       const t = task();
@@ -7962,7 +8080,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.18';
+const APP_VER = '2026-08-18.19';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

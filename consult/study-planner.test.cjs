@@ -127,6 +127,8 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(planner, /TIME TABLE/);
   assert.match(planner, /05–24시 · 10분 단위/);
   assert.match(planner, /studyTimePanel\(me, editable, true\)/);
+  assert.match(planner, /ingChecklistItems\(me\.id, date\)/);
+  assert.match(planner, /lectures\.map\(item => plannerLectureRow\(me\.id, item, editable\)\)/);
   assert.match(compactRow, /planner-task-subject/);
   assert.match(compactRow, /planner-task-detail/);
   assert.match(compactRow, /planner-check-wrap/);
@@ -135,6 +137,34 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /grid-template-columns: 62px minmax\(0, 1fr\) 38px/);
   assert.match(css, /\.study-timeline-row \{[^}]*repeat\(6,/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
+});
+
+test('student claims a scheduled lecture into the study planner with shared progress and timer data', () => {
+  const lectureData = section('function ingCourseSubjectKey(', 'function ingStats(');
+  const lectureToggle = section('function ingToggle(', '/** 오늘 이전 미완료를 전부 오늘로');
+  const lectureRow = section('function plannerLectureRow(', 'function taskRow(');
+  const todayLecture = section('function ingRow(', '/** 오늘 화면에 붙는 인강 카드 */');
+  const handlers = section("case 'ingclaim':", "case 'ingreview':");
+  const timer = section("case 'ingsttask':", "case 'sttask':");
+  const today = section('function viewToday()', 'function studyOffersCard(');
+
+  assert.match(lectureData, /const ingIsClaimed = item => !!\(item && \(item\.claimed \|\| item\.done\)\)/);
+  assert.match(lectureData, /ingPlan\(sid, date\)\.filter\(ingIsClaimed\)/);
+  assert.match(lectureData, /const ingTimerTaskId = \(cid, seq\) => 'ing:'/);
+  assert.match(lectureToggle, /claimed: true, claimedAt: now\(\)/);
+  assert.match(todayLecture, /내 체크리스트로 가져오기/);
+  assert.match(todayLecture, /data-act="ingclaim"/);
+  assert.match(handlers, /session\.isStaffLink/);
+  assert.match(handlers, /planDate !== today\(\)/);
+  assert.match(handlers, /ingPatchItem[\s\S]*?claimed: true, claimedAt: now\(\)/);
+  assert.match(lectureRow, /data-act="ingsttask"/);
+  assert.match(lectureRow, /data-act="ingcheck"/);
+  assert.match(lectureRow, /ingCourseSubject\(found\.course\)/);
+  assert.match(timer, /stStart\(me\.id, today\(\), subject, taskId\)/);
+  assert.match(timer, /ingIsClaimed\(item\)/);
+  assert.match(handlers, /running\.taskId === ingTimerTaskId\(item\.cid, item\.seq\)/);
+  assert.match(today, /checklistTotal = p\.total \+ lectureChecklist\.length/);
+  assert.match(today, /checklistDone = p\.done \+ lectureChecklist\.filter\(item => item\.done\)\.length/);
 });
 
 test('timer closes real start-end segments and paints six ten-minute cells per hour', () => {
