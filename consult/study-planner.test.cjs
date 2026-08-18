@@ -26,7 +26,7 @@ test('study subjects use the requested pastel palette with separate social and s
     });
 });
 
-test('today places distributed study before the planner and quick add', () => {
+test('today places quick add between distributed study and the planner', () => {
   const today = section('function viewToday()', 'function studyOffersCard(');
   const totalAt = today.indexOf('studyTotalHeroCard(me, cursor)');
   const offerAt = today.indexOf('studyOffersCard(me, cursor, offers)');
@@ -35,8 +35,8 @@ test('today places distributed study before the planner and quick add', () => {
 
   assert.ok(totalAt >= 0, 'large total study time must render');
   assert.ok(offerAt > totalAt, 'distributed study must follow total study time');
-  assert.ok(plannerAt > offerAt, 'planner must follow distributed study');
-  assert.ok(quickAt > plannerAt, 'quick add must follow the planner');
+  assert.ok(quickAt > offerAt, 'quick add must follow distributed study');
+  assert.ok(plannerAt > quickAt, 'planner must follow quick add');
 });
 
 test('today restores a large live total study time between student summary and distributed study', () => {

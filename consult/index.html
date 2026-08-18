@@ -1669,20 +1669,19 @@ function viewToday() {
 
   if (cursor === today()) {
     h += studyOffersCard(me, cursor, offers);
+    if (editable) {
+      h += '<div class="card" style="padding:12px">' +
+        '<div class="quick-add-grid">' +
+          '<select class="in" id="qSubject" aria-label="빠른 추가 과목">' + studySubjectOptions('', '과목 선택') + '</select>' +
+          '<input class="in" id="qAdd" placeholder="빠른 추가 — 예) 수학 오답 10문제">' +
+          '<button class="btn btn-primary" data-act="qadd">추가</button>' +
+        '</div></div>';
+    }
     h += studyPlannerCard(me, cursor, list, carry, editable);
     h += tbCard(me, editable);
     h += ingTodayCard(me, editable);
   } else {
     h += tbCard(me, editable);
-  }
-
-  if (editable && cursor === today()) {
-    h += '<div class="card" style="padding:12px">' +
-      '<div class="quick-add-grid">' +
-        '<select class="in" id="qSubject" aria-label="빠른 추가 과목">' + studySubjectOptions('', '과목 선택') + '</select>' +
-        '<input class="in" id="qAdd" placeholder="빠른 추가 — 예) 수학 오답 10문제">' +
-        '<button class="btn btn-primary" data-act="qadd">추가</button>' +
-      '</div></div>';
   }
 
   if (cursor !== today() && carry.length) {
