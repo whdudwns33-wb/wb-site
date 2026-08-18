@@ -28,13 +28,26 @@ test('teachers can request another student even after one student is assigned', 
   assert.ok(entry.indexOf('loadLessonAssignmentRequests(false)') < entry.indexOf('if (personal && !personalStudents.length)'));
 });
 
-test('review shows teacher names and only exact roster matches', () => {
+test('review shows teacher names, exact matches first, and every other active roster student', () => {
   assert.match(source, /요청 선생님: /);
   assert.doesNotMatch(source, /요청 선생님 ID:/);
-  assert.doesNotMatch(source, /그 외 현재 재원생/);
   assert.match(source, /요청과 일치하는 원생/);
+  assert.match(source, /const others = students\.filter\(student => !matchIds\.has\(String\(student\.id\)\)\)/);
+  assert.match(source, /<optgroup label="재원생 전체">/);
   assert.match(source, /body\.confirmIdentityMismatch = true/);
   assert.match(source, /같은 학생이 맞습니까/);
+});
+
+test('student-link selectors share one active stable-id candidate list', () => {
+  assert.match(source, /let rosterStudentSelectionScope = 'assigned'/);
+  assert.match(source, /result\.studentSelectionScope === 'all_active' \? 'all_active' : 'assigned'/);
+  assert.match(source, /function studentLinkCandidates\(referenceMonth, includeFuture\)/);
+  assert.match(source, /student && student\.id/);
+  assert.match(source, /!student\.end \|\| student\.end > month/);
+  assert.match(source, /function assignedLessonStudents\(\) \{\s*return studentLinkCandidates/);
+  assert.match(source, /function lessonFormStudents\(\) \{\s*return studentLinkCandidates/);
+  assert.match(source, /function orderStudentCandidates\(\) \{\s*return studentLinkCandidates/);
+  assert.match(source, /const liveStudents = studentLinkCandidates\(today\(\)\.slice\(0, 7\)\)/);
 });
 
 test('a missing roster student can be added as an existing student and approved', () => {

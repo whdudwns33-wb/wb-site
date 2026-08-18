@@ -31,6 +31,10 @@ class TestD1 {
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = (id, token) => ({ mode: 'person', id, token });
 const clone = value => JSON.parse(JSON.stringify(value));
+const taskManagers = [
+  ['84349fea-f2f0-4fc3-b32a-aaef1e466d54', 'manager-token-a'],
+  ['ef0af47e-f9d2-4dfc-bd95-887991ee9479', 'manager-token-b']
+];
 
 function documentFixture() {
   return {
@@ -77,7 +81,9 @@ function seedAuth(db) {
   for (const [id, name, deleted, token] of [
     ['teacher-a', '가선생', false, 'token-a'],
     ['teacher-b', '나선생', false, 'token-b'],
-    ['teacher-deleted', '퇴사선생', true, 'token-deleted']
+    ['teacher-deleted', '퇴사선생', true, 'token-deleted'],
+    [taskManagers[0][0], '관리담당A', false, taskManagers[0][1]],
+    [taskManagers[1][0], '관리담당B', false, taskManagers[1][1]]
   ]) {
     db.prepare('INSERT INTO staff (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
       .bind('task', id, id, JSON.stringify({ id, name, deleted }), now, now).run();
@@ -86,11 +92,11 @@ function seedAuth(db) {
   }
 }
 
-async function call(db, body, app = 'task') {
+async function call(db, body, app = 'task', envOverrides = {}) {
   const response = await worker.fetch(new Request('https://worker.example/roster', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ app, ...body })
-  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
+  }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...envOverrides });
   return { status: response.status, headers: response.headers, body: await response.json() };
 }
 
@@ -128,6 +134,7 @@ test('director replaces and reads the full document without exposing teacherIds'
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.roster.students.map(item => item.id), ['student-a', 'student-b', 'student-shared']);
   assert.deepEqual(result.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-b', 'book-row-shared']);
+  assert.equal(result.body.studentSelectionScope, 'all_active');
   assert.equal(JSON.stringify(result.body).includes('teacherIds'), false);
   assert.equal(result.headers.get('cache-control'), 'no-store');
 });
@@ -187,11 +194,25 @@ test('person receives only assigned and co-taught roster and book rows', async (
   assert.equal(teacherA.status, 200);
   assert.deepEqual(teacherA.body.roster.students.map(item => item.id), ['student-a', 'student-shared']);
   assert.deepEqual(teacherA.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-shared']);
+  assert.equal(teacherA.body.studentSelectionScope, 'assigned');
   assert.equal(JSON.stringify(teacherA.body).includes('teacherIds'), false);
 
   const teacherB = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
   assert.deepEqual(teacherB.body.roster.students.map(item => item.id), ['student-b', 'student-shared']);
   assert.deepEqual(teacherB.body.bookStudents.map(item => item.id), ['book-row-b', 'book-row-shared']);
+});
+
+test('both configured task managers receive the full roster for stable-id student selection', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const managerConfig = { TASK_MANAGER_STAFF_IDS_CONFIG: taskManagers.map(([id]) => id).join(',') };
+  for (const [managerId, token] of taskManagers) {
+    const result = await call(db, { auth: person(managerId, token), action: 'get' }, 'task', managerConfig);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.studentSelectionScope, 'all_active');
+    assert.deepEqual(result.body.roster.students.map(item => item.id), ['student-a', 'student-b', 'student-shared']);
+    assert.deepEqual(result.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-b', 'book-row-shared']);
+    assert.equal(JSON.stringify(result.body).includes('teacherIds'), false);
+  }
 });
 
 test('person cannot replace, forge another id, or use a deleted staff session', async () => {
