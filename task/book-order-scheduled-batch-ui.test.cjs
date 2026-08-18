@@ -55,8 +55,25 @@ test('학생 선택창 위에서 교재 단가를 받고 주문부터 아카등�
     assert.match(dates, new RegExp('row\\.' + field));
   }
   for (const label of ['주문요청', '주문완료', '수령완료', '배부완료']) assert.match(dates, new RegExp(label));
-  assert.match(row, /bookOrderMoneyHtml\(row\) \+ bookOrderDatesHtml\(row\)/);
+  assert.match(row, /bookOrderMoneyHtml\(row\) \+ bookOrderPriceEntryHtml\(row\) \+ bookOrderDatesHtml\(row\)/);
   assert.match(row, /row\.stage === 'student_handed'[\s\S]*해야 할 업무 · 아카등록/);
+});
+
+test('대상 과거 주문은 1회성 권당 금액 입력칸을 보이고 저장 뒤 서버 목록으로 갱신한다', () => {
+  const input = block('function bookOrderPriceEntryHtml(', 'function bookOrderDatesHtml(');
+  const save = block('async function saveLegacyBookOrderPrice(', 'async function transitionBookIssue(');
+  const click = block("case 'bookorderlinkopen':", "case 'transportrefresh':");
+
+  assert.match(input, /if \(!row\.canSetUnitPrice\) return ''/);
+  assert.match(input, /type="number"[\s\S]*data-book-order-price-input/);
+  assert.match(input, /1회성 교재 금액 \(1권 기준\)/);
+  assert.match(input, /data-act="bookorderpricesave"/);
+  assert.match(input, /한 번 저장하면 변경할 수 없습니다/);
+  assert.match(save, /action: 'order_price_set'/);
+  assert.match(save, /unitPrice: unitPrice/);
+  assert.match(save, /저장 후에는 변경할 수 없습니다/);
+  assert.match(save, /await loadBookIssues\(true\)/);
+  assert.match(click, /case 'bookorderpricesave': saveLegacyBookOrderPrice\(el\)/);
 });
 
 test('서버 확인 전에는 성공 처리하지 않고 실패 시 같은 주문 ID와 입력을 보존한다', () => {
