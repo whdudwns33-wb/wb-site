@@ -81,6 +81,8 @@ test('monthly calendar focuses on important dates and opens the selected day', (
   assert.match(agenda, /class="exam"><\/i>시험/);
   assert.match(agenda, /class="performance"><\/i>수행평가/);
   assert.match(agenda, /class="important"><\/i>중요 일정/);
+  assert.match(agenda, /const editable = session\.isStaffLink \|\| session\.isAdmin/);
+  assert.match(agenda, /data-act="montheventadd" data-date="' \+ agendaDate/);
   assert.match(agenda, /<details class="agenda-more">/);
 });
 
@@ -92,7 +94,10 @@ test('monthly important events include D-day, scope, score, and preparation prog
   assert.match(helpers, /function monthDday/);
   assert.match(helpers, /mEventRange/);
   assert.match(helpers, /mEventScore/);
+  assert.match(helpers, /function monthEventModal\(ym, selectedDate\)/);
+  assert.match(helpers, /ymOf\(selectedDate\) === ym \? selectedDate : ym \+ '-01'/);
   assert.match(month, /준비 ' \+ progressValue \+ '%/);
+  assert.match(handlers, /monthEventModal\(ymCursor, el\.dataset\.date \|\| ''\)/);
   assert.match(handlers, /event\.progress = Math\.max\(0, Math\.min\(100/);
   assert.match(handlers, /plan\.events\.push/);
 });
