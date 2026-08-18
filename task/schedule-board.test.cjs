@@ -321,7 +321,7 @@ test('dashboard offers weekly day, teacher, and student views with authenticated
   assert.match(html, /ev\.key === 'Escape' && !\$\('#modalHost'\)\.hidden/);
   assert.match(html, /data-schedule-search/);
   assert.match(html, /function scheduleStudentSources\(group\)/);
-  assert.match(html, /const editingStudentId = draft\._sourceTaskId \? String\(draft\.studentId \|\| ''\)\.trim\(\) : '';/);
+  assert.match(html, /lessonFormStudents\(\)[\s\S]{0,160}String\(student\.id\) === String\(draft\.studentId\)/);
   assert.match(html, /conflictEntries\.has\(entry\.date \+ '\|' \+ entry\.key\)/);
   assert.match(html, /rosterStudentId\(studentName, grade, date\)/);
   assert.match(html, /const names = scheduleSessionNames\(session\);/);
