@@ -89,6 +89,33 @@ test('student submits only their own proof/question while review and answer stay
   assert.match(eventCase('submissionproof'), /row\.staffId === session\.staffId/);
 });
 
+test('students can attach their own performance instructions as text or a straight-on photo', () => {
+  const linked = functionSource('performanceSubmissionFor');
+  const modal = functionSource('submissionModal');
+  const card = functionSource('academicItemCard');
+  const action = eventCase('performanceinstruction');
+
+  assert.match(linked, /item\.academicType !== 'performance'/);
+  assert.match(linked, /row\.kind === 'question'/);
+  assert.match(linked, /row\.taskId === item\.id/);
+  assert.match(linked, /row\.taskDate === date/);
+  assert.match(modal, /task\.kind === 'academic_event'/);
+  assert.match(modal, /task\.academicType === 'performance'/);
+  assert.match(modal, /academicDateOf\(task\) !== taskDate/);
+  assert.match(modal, /평가 안내 및 선생님 지시사항/);
+  assert.match(modal, /글로 적거나 안내문 사진을 올리면 됩니다/);
+  assert.match(modal, /당일에 급하게 준비하기 어렵습니다/);
+  assert.match(modal, /최대한 정확하게 정면에서/);
+  assert.match(modal, /빛 반사·그림자·흔들림/);
+  assert.match(card, /data-act="performanceinstruction"/);
+  assert.match(card, /직접 적기 · 사진 올리기/);
+  assert.match(action, /if \(!session\.isStaffLink \|\| isManager\(\)\) break/);
+  assert.match(action, /row\.staffId === session\.staffId/);
+  assert.match(action, /row\.kind === 'academic_event'/);
+  assert.match(action, /row\.academicType === 'performance'/);
+  assert.match(action, /submissionModal\('question', task\.id, academicDateOf\(task\)\)/);
+});
+
 test('director inbox requests pending submissions and never hides loading errors', () => {
   const load = functionSource('loadSubmissions');
   const inbox = functionSource('submissionBoardInbox');
@@ -119,6 +146,9 @@ test('submission requests keep consult auth in FormData or JSON bodies and never
     'the browser must add the multipart boundary');
   assert.match(submit, /submissionForm\.kind === 'proof' && !rawFile/);
   assert.match(submit, /submissionForm\.kind === 'question' && !(?:rawText|bodyText) && !rawFile/);
+  assert.match(submit, /taskId:\s*submissionForm\.taskId/);
+  assert.match(submit, /taskDate:\s*submissionForm\.taskDate/,
+    'text-only performance instructions must stay linked to their assessment');
 
   assert.match(photo, /action: 'read_media', id: id/);
   assert.match(photo, /JSON\.stringify\(\{ app: SYNC_APP, auth: auth/);

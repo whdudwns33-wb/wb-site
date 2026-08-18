@@ -3203,6 +3203,13 @@ function latestProof(taskId, date) {
     .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
 }
 
+function performanceSubmissionFor(item) {
+  if (!item || item.academicType !== 'performance') return null;
+  const date = academicDateOf(item);
+  return submissionCache.items.filter(row => row.kind === 'question' && row.taskId === item.id && row.taskDate === date && row.status !== 'cancelled')
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null;
+}
+
 function submissionStatusTag(item) {
   const cls = item.status === 'approved' || item.status === 'answered' ? 'ok' : item.status === 'rejected' ? 'high' : 'doing';
   return '<span class="tag ' + cls + '">' + esc(SUBMISSION_STATUS[item.status] || item.status) + '</span>';
@@ -3210,7 +3217,9 @@ function submissionStatusTag(item) {
 
 function submissionItemCard(item) {
   const task = item.taskId ? state.tasks.find(row => row.id === item.taskId) : null;
-  const title = item.kind === 'proof' ? '📷 ' + (task ? task.title : '할 일 인증사진') : '❓ 모르는 문제 질문';
+  const performance = task && task.kind === 'academic_event' && task.academicType === 'performance';
+  const title = item.kind === 'proof' ? '📷 ' + (task ? task.title : '할 일 인증사진')
+    : performance ? '🎯 ' + task.title + ' · 평가 안내' : '❓ 모르는 문제 질문';
   const when = item.taskDate ? label(item.taskDate) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('ko-KR') : '');
   let actions = '';
   if (item.hasImage) actions += '<button class="btn btn-sm btn-ghost" data-act="submissionview" data-id="' + esc(item.id) + '">사진 보기</button>';
@@ -3289,9 +3298,15 @@ function submissionModal(kind, taskId, taskDate) {
   if (!session.isStaffLink) return toast('학생 개인 화면에서 제출할 수 있습니다');
   const task = taskId ? state.tasks.find(row => row.id === taskId && row.staffId === session.staffId) : null;
   if (kind === 'proof' && (!task || task.evidenceMode !== 'photo')) return toast('인증이 필요한 할 일을 다시 확인해 주세요');
-  submissionForm = { kind: kind, taskId: taskId || '', taskDate: taskDate || '', clientRequestId: uid() };
+  const performance = kind === 'question' && task && task.kind === 'academic_event' && task.academicType === 'performance';
+  if (kind === 'question' && taskId && (!performance || academicDateOf(task) !== taskDate)) return toast('수행평가 일정을 다시 확인해 주세요');
+  submissionForm = { kind: kind, taskId: taskId || '', taskDate: taskDate || '', clientRequestId: uid(), performance: !!performance };
   clearSubmissionPreview();
-  const body = (kind === 'question'
+  const body = (performance
+    ? '<div class="hint mb14"><b>수행평가는 당일에 급하게 준비하기 어렵습니다.</b><br>안내를 받은 날 바로 등록하고, 제출일까지 나누어 준비하세요.</div>' +
+      '<div class="field"><label class="fl">평가 안내 및 선생님 지시사항</label><textarea class="in" id="submissionText" rows="6" placeholder="학교 선생님이 안내한 내용과 제출 조건을 직접 적어주세요."></textarea>' +
+      '<div class="hint mt8">글로 적거나 안내문 사진을 올리면 됩니다. 둘 중 하나만 입력해도 제출할 수 있어요.</div></div>'
+    : kind === 'question'
     ? '<div class="field"><label class="fl">과목</label><select class="in" id="submissionSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
       '<div class="field"><label class="fl">어떤 문제가 궁금한가요?</label><textarea class="in" id="submissionText" rows="5" placeholder="문제 번호, 어디까지 풀었는지, 막힌 부분을 적어주세요."></textarea></div>'
     : '<div class="hint mb14"><b>' + esc(task.title) + '</b>' + esc(label(taskDate)) + ' 수행 결과가 잘 보이도록 찍어주세요.</div>' +
@@ -3299,9 +3314,10 @@ function submissionModal(kind, taskId, taskDate) {
     '<div class="field"><label class="fl">사진 ' + (kind === 'proof' ? '(필수)' : '(선택)') + '</label>' +
       '<input class="in" id="submissionFile" type="file" accept="image/*" capture="environment"></div>' +
     '<div class="submission-preview" id="submissionPreview"><span class="small muted">촬영하거나 앨범에서 사진을 선택하세요.</span></div>' +
+    (performance ? '<div class="hint bad mt14">사진은 안내문 전체가 잘리지 않도록 <b>최대한 정확하게 정면에서</b> 찍어 주세요. 빛 반사·그림자·흔들림도 확인해 주세요.</div>' : '') +
     '<div class="submission-privacy mt14">업로드 전에 긴 변 1600px 이하 JPEG로 다시 만들어 위치정보를 제거합니다. 원본 파일명은 서버에 저장하지 않습니다.</div>';
-  modal(kind === 'question' ? '❓ 모르는 문제 질문' : '📷 인증사진 제출', body,
-    '<button class="btn btn-primary btn-block mt14" data-act="submissionsubmit">' + (kind === 'question' ? '질문 보내기' : '인증사진 보내기') + '</button>');
+  modal(performance ? '🎯 수행평가 안내 등록' : kind === 'question' ? '❓ 모르는 문제 질문' : '📷 인증사진 제출', body,
+    '<button class="btn btn-primary btn-block mt14" data-act="submissionsubmit">' + (performance ? '평가 안내 보내기' : kind === 'question' ? '질문 보내기' : '인증사진 보내기') + '</button>');
 }
 
 async function prepareSubmissionImage(file) {
@@ -3346,6 +3362,7 @@ async function submitSubmissionForm(button) {
   if (!submissionForm || !session.isStaffLink) return;
   const auth = sync.auth();
   if (!auth) return toast('로그인과 동기화 연결이 필요합니다');
+  const performance = !!submissionForm.performance;
   const textEl = $('#submissionText');
   const rawText = (textEl && textEl.value || '').trim();
   let bodyText = rawText;
@@ -3354,12 +3371,13 @@ async function submitSubmissionForm(button) {
   const fileEl = $('#submissionFile');
   const rawFile = fileEl && fileEl.files && fileEl.files[0];
   if (submissionForm.kind === 'proof' && !rawFile) return toast('인증사진을 선택해 주세요');
-  if (submissionForm.kind === 'question' && !rawText && !rawFile) return toast('질문 내용이나 사진 중 하나를 넣어주세요');
+  if (submissionForm.kind === 'question' && !rawText && !rawFile) return toast(performance ? '평가 안내 내용이나 사진 중 하나를 넣어주세요' : '질문 내용이나 사진 중 하나를 넣어주세요');
   button.disabled = true; button.textContent = '사진 준비 중…';
   try {
     if (submissionForm.kind === 'question' && !rawFile) {
-      button.textContent = '질문 전송 중…';
-      await submissionPost({ action: 'submit_question', clientRequestId: submissionForm.clientRequestId, bodyText: bodyText });
+      button.textContent = performance ? '평가 안내 전송 중…' : '질문 전송 중…';
+      await submissionPost({ action: 'submit_question', clientRequestId: submissionForm.clientRequestId,
+        taskId: submissionForm.taskId, taskDate: submissionForm.taskDate, bodyText: bodyText });
     } else {
       const file = await prepareSubmissionImage(rawFile);
       const form = new FormData();
@@ -3376,7 +3394,7 @@ async function submitSubmissionForm(button) {
     await loadSubmissions(owner, true); render(); toast('안전하게 제출했습니다');
   } catch (error) {
     toast('제출 실패 — ' + String(error && error.message || error));
-    button.disabled = false; button.textContent = submissionForm && submissionForm.kind === 'question' ? '질문 보내기' : '인증사진 보내기';
+    button.disabled = false; button.textContent = performance ? '평가 안내 보내기' : submissionForm && submissionForm.kind === 'question' ? '질문 보내기' : '인증사진 보내기';
   }
 }
 
@@ -4063,7 +4081,7 @@ function agendaItemsFor(staffId, start, end) {
       key: 'academic:' + item.id + ':' + date, source: 'academic', sourceId: item.id,
       title: item.title, date: date, startTime: '', endTime: '', allDay: true,
       type: item.academicType === 'performance' ? 'performance' : 'exam',
-      detail: [item.unit, item.range].filter(Boolean).join(' · '), done: false, quiet: false
+      detail: item.academicType === 'performance' ? '' : [item.unit, item.range].filter(Boolean).join(' · '), done: false, quiet: false
     }));
 
     const month = date.slice(0, 7);
@@ -4784,24 +4802,24 @@ function academicEventModal(type) {
   const meta = ACADEMIC_TYPES[type];
   if (!me || !meta) return toast('학생과 일정 종류를 확인해 주세요');
   const isExam = type === 'exam';
-  const defaultSteps = isExam ? '' : '평가 내용 확인\n자료 조사\n개요 작성\n초안 작성\n피드백 반영\n최종본 제출';
   modal(me.name + ' — ' + meta.icon + ' ' + meta.label + ' 등록',
     '<input type="hidden" id="academicType" value="' + type + '">' +
-    '<div class="grid2"><div class="field"><label class="fl">학년</label><input class="in" id="academicGrade" placeholder="예: 중2"></div>' +
-      '<div class="field"><label class="fl">학기</label><select class="in" id="academicSemester"><option value="1학기">1학기</option><option value="2학기">2학기</option><option value="기타">기타</option></select></div></div>' +
     '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="academicSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
       '<div class="field"><label class="fl">' + (isExam ? '시험일' : '제출일') + '</label><input class="in" id="academicDate" type="date" value="' + addDays(today(), 14) + '"></div></div>' +
     '<div class="field"><label class="fl">' + meta.label + '명</label><input class="in" id="academicTitle" placeholder="예: 2학기 중간고사, 과학 탐구보고서"></div>' +
-    '<div class="grid2"><div class="field"><label class="fl">출판사 <span class="muted">(선택)</span></label><input class="in" id="academicPublisher" placeholder="예: 천재교육"></div>' +
+    (isExam ? '<div class="grid2"><div class="field"><label class="fl">학년</label><input class="in" id="academicGrade" placeholder="예: 중2"></div>' +
+      '<div class="field"><label class="fl">학기</label><select class="in" id="academicSemester"><option value="1학기">1학기</option><option value="2학기">2학기</option><option value="기타">기타</option></select></div></div>' +
+      '<div class="grid2"><div class="field"><label class="fl">출판사 <span class="muted">(선택)</span></label><input class="in" id="academicPublisher" placeholder="예: 천재교육"></div>' +
       '<div class="field"><label class="fl">교과서·교재명 <span class="muted">(선택)</span></label><input class="in" id="academicTextbook" placeholder="예: 수학2"></div></div>' +
-    '<div class="grid2"><div class="field"><label class="fl">단원</label><input class="in" id="academicUnit" placeholder="예: 3단원 일차함수"></div>' +
+      '<div class="grid2"><div class="field"><label class="fl">단원</label><input class="in" id="academicUnit" placeholder="예: 3단원 일차함수"></div>' +
       '<div class="field"><label class="fl">쪽수 <span class="muted">(선택)</span></label><input class="in" id="academicPages" placeholder="예: 82~105쪽"></div></div>' +
-    '<div class="field"><label class="fl">' + (isExam ? '시험범위' : '평가 안내') + '</label><textarea class="in" id="academicRange" placeholder="세부 범위와 요구사항을 입력하세요"></textarea></div>' +
-    '<div class="grid2"><div class="field"><label class="fl">' + (isExam ? '목표점수' : '반영비율') + ' <span class="muted">(선택)</span></label>' +
-      '<input class="in" id="academicMetric" type="number" min="0" max="100" placeholder="' + (isExam ? '90' : '20') + '"></div>' +
-      '<div class="field"><label class="fl">' + (isExam ? '준비 시작일' : '제출 형식') + '</label>' +
-      (isExam ? '<input class="in" id="academicStart" type="date" value="' + today() + '">' : '<input class="in" id="academicFormat" placeholder="예: PDF 보고서, 발표">') + '</div></div>' +
-    '<div class="field"><label class="fl">준비 단계 <span class="muted">(한 줄에 하나)</span></label><textarea class="in" id="academicSteps" rows="5">' + defaultSteps + '</textarea></div>',
+      '<div class="field"><label class="fl">시험범위</label><textarea class="in" id="academicRange" placeholder="세부 범위와 요구사항을 입력하세요"></textarea></div>' +
+      '<div class="grid2"><div class="field"><label class="fl">목표점수 <span class="muted">(선택)</span></label><input class="in" id="academicMetric" type="number" min="0" max="100" placeholder="90"></div>' +
+      '<div class="field"><label class="fl">준비 시작일</label><input class="in" id="academicStart" type="date" value="' + today() + '"></div></div>' +
+      '<div class="field"><label class="fl">준비 단계 <span class="muted">(한 줄에 하나)</span></label><textarea class="in" id="academicSteps" rows="5"></textarea></div>'
+    : '<div class="field"><label class="fl">제출 형식 <span class="muted">(선택)</span></label><input class="in" id="academicFormat" placeholder="예: 보고서, 발표, 만들기"></div>' +
+      '<div class="guide"><b>평가 안내 및 선생님 지시사항은 학생이 등록합니다.</b><br>학생 화면에서 직접 글로 적거나 안내문 사진을 올릴 수 있습니다.</div>' +
+      '<div class="hint bad mt14"><b>수행평가는 당일에 급하게 준비하기 어렵습니다.</b><br>안내를 받은 날 바로 등록하고, 제출일까지 나누어 준비하도록 알려주세요.</div>'),
     '<button class="btn btn-primary btn-block" data-act="academicsave">등록하기</button>');
 }
 
@@ -4971,35 +4989,50 @@ function materialRequestCard(req, admin) {
 function academicItemCard(item, studentCanRequest) {
   const type = ACADEMIC_TYPES[item.academicType] || ACADEMIC_TYPES.exam;
   const date = academicDateOf(item);
+  const isExam = item.academicType === 'exam';
+  const isPerformance = item.academicType === 'performance';
   const check = getCheck(item.id, date);
   const prog = taskProgress(item, check);
-  const plan = item.academicType === 'exam' ? examPlanSummary(item) : null;
+  const plan = isExam ? examPlanSummary(item) : null;
   const canCheck = session.isStaffLink && item.staffId === session.staffId;
+  const performanceReady = isPerformance && submissionCache.owner === item.staffId && submissionCache.loaded;
+  const performanceSubmission = performanceReady ? performanceSubmissionFor(item) : null;
+  const canAddPerformanceInfo = isPerformance && studentCanRequest && item.staffId === session.staffId &&
+    (!performanceSubmission || performanceSubmission.status === 'rejected' || performanceSubmission.status === 'answered');
   return '<div class="academic-item"><div class="academic-item-head"><div class="academic-icon">' + type.icon + '</div><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(item.title) + '</b>' + taskStudySubjectTag(item) + '<span class="pill warn">' + esc(monthDday(date)) + '</span></div>' +
-    '<div class="small muted">' + esc(date) + (item.grade ? ' · ' + esc(item.grade) : '') + (item.semester ? ' · ' + esc(item.semester) : '') + '</div>' +
+    '<div class="small muted">' + esc(date) + (isExam && item.grade ? ' · ' + esc(item.grade) : '') + (isExam && item.semester ? ' · ' + esc(item.semester) : '') + '</div>' +
     '<div class="academic-details">' +
-      (item.publisher ? '<span class="tag">' + esc(item.publisher) + '</span>' : '') + (item.textbook ? '<span class="tag">' + esc(item.textbook) + '</span>' : '') +
-      (item.unit ? '<span class="tag">' + esc(item.unit) + '</span>' : '') + (item.pages ? '<span class="tag">' + esc(item.pages) + '</span>' : '') +
-      (item.goalScore ? '<span class="tag doing">목표 ' + Number(item.goalScore) + '점</span>' : '') +
-      (item.weight ? '<span class="tag doing">반영 ' + Number(item.weight) + '%</span>' : '') + '</div>' +
-    (item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') +
+      (isExam && item.publisher ? '<span class="tag">' + esc(item.publisher) + '</span>' : '') + (isExam && item.textbook ? '<span class="tag">' + esc(item.textbook) + '</span>' : '') +
+      (isExam && item.unit ? '<span class="tag">' + esc(item.unit) + '</span>' : '') + (isExam && item.pages ? '<span class="tag">' + esc(item.pages) + '</span>' : '') +
+      (isExam && item.goalScore ? '<span class="tag doing">목표 ' + Number(item.goalScore) + '점</span>' : '') +
+      (isPerformance && item.submissionFormat ? '<span class="tag">' + esc(item.submissionFormat) + '</span>' : '') + '</div>' +
+    (isExam && item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') +
     (plan && plan.total ? '<div class="hint mt8"><b>시험플랜 ' + plan.done + '/' + plan.total + '회 완료</b>' +
       (plan.finishDate ? ' · ' + shortDate(plan.finishDate) + '까지 계획' : '') + '</div>' : '') + '</div>' +
     (session.isAdmin ? '<button class="btn btn-sm btn-danger" data-act="academicdelete" data-id="' + item.id + '">삭제</button>' : '') + '</div>' +
-    ((item.steps || []).length ? '<div style="margin-top:10px"><div class="bar mini"><i style="width:' + prog.pct + '%"></i></div>' +
+    (isExam && (item.steps || []).length ? '<div style="margin-top:10px"><div class="bar mini"><i style="width:' + prog.pct + '%"></i></div>' +
       item.steps.map((step, index) => '<div class="step ' + (check && check.steps && check.steps[step.id] ? 'on' : '') + '"><button class="sbox" ' +
         (canCheck ? 'data-act="step" data-id="' + item.id + '" data-date="' + date + '" data-step="' + step.id + '"' : 'disabled') + '>✓</button><span>' + (index + 1) + '. ' + esc(step.label) + '</span></div>').join('') + '</div>' : '') +
+    (isPerformance ? '<div class="guide mt14"><b>평가 안내 및 선생님 지시사항</b>' +
+      '<div class="hint mt8">수행평가는 당일에 급하게 준비하기 어렵습니다. 안내를 받은 날 바로 등록하고 제출일까지 나누어 준비하세요.</div>' +
+      (!performanceReady ? '<div class="small muted mt8">학생이 올린 안내를 불러오는 중입니다…</div>'
+        : submissionCache.error ? '<div class="hint bad mt8">' + esc(submissionCache.error) + '</div>'
+        : performanceSubmission ? '<div class="submission-list">' + submissionItemCard(performanceSubmission) + '</div>'
+        : '<div class="small muted mt8">아직 학생이 등록한 안내가 없습니다.</div>') +
+      (canAddPerformanceInfo ? '<button class="btn btn-primary btn-block mt14" data-act="performanceinstruction" data-id="' + item.id + '">' +
+        (performanceSubmission ? '안내 다시 적기 · 사진 올리기' : '직접 적기 · 사진 올리기') + '</button>' : '') + '</div>' : '') +
     '<div class="academic-actions">' +
-      (session.isAdmin && item.academicType === 'exam' ? '<button class="btn btn-navy" data-act="examplanopen" data-id="' + item.id + '">' +
+      (session.isAdmin && isExam ? '<button class="btn btn-navy" data-act="examplanopen" data-id="' + item.id + '">' +
         (plan && plan.total ? '시험플랜 재계획' : '시험대비 플랜 만들기') + '</button>' : '') +
-      (studentCanRequest && item.academicType === 'exam' ? '<button class="btn btn-primary" data-act="matrequestopen" data-exam="' + item.id + '">시험대비 자료 요청</button>' : '') +
+      (studentCanRequest && isExam ? '<button class="btn btn-primary" data-act="matrequestopen" data-exam="' + item.id + '">시험대비 자료 요청</button>' : '') +
     '</div></div>';
 }
 
 function viewAcademic() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
+  ensureSubmissionLoad(me.id);
   const items = academicItemsFor(me.id);
   const upcoming = items.filter(item => academicDateOf(item) >= today());
   const requests = materialRequestsFor(me.id);
@@ -6281,31 +6314,33 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const me = currentStaff();
       const type = ($('#academicType') && $('#academicType').value) || '';
+      const isExam = type === 'exam';
       const title = (($('#academicTitle') && $('#academicTitle').value) || '').trim();
       const subject = ($('#academicSubject') && $('#academicSubject').value) || '';
       const dueDate = ($('#academicDate') && $('#academicDate').value) || '';
-      const grade = (($('#academicGrade') && $('#academicGrade').value) || '').trim();
-      const semester = ($('#academicSemester') && $('#academicSemester').value) || '';
-      const unit = (($('#academicUnit') && $('#academicUnit').value) || '').trim();
-      const range = (($('#academicRange') && $('#academicRange').value) || '').trim();
+      const grade = isExam ? (($('#academicGrade') && $('#academicGrade').value) || '').trim() : '';
+      const semester = isExam ? (($('#academicSemester') && $('#academicSemester').value) || '') : '';
+      const unit = isExam ? (($('#academicUnit') && $('#academicUnit').value) || '').trim() : '';
+      const range = isExam ? (($('#academicRange') && $('#academicRange').value) || '').trim() : '';
       if (!me || !ACADEMIC_TYPES[type]) return toast('학생과 일정 종류를 확인해 주세요');
-      if (!title || !subject || !grade || !semester || !unit || !range) return toast('학년·학기·과목·단원·세부 범위를 모두 입력해 주세요');
+      if (!title || !subject) return toast('과목과 ' + ACADEMIC_TYPES[type].label + '명을 입력해 주세요');
+      if (isExam && (!grade || !semester || !unit || !range)) return toast('시험은 학년·학기·단원·시험범위를 모두 입력해 주세요');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || dueDate < today()) return toast('오늘 이후 날짜를 선택해 주세요');
       const startEl = $('#academicStart');
       const periodStart = startEl ? (startEl.value || today()) : today();
       if (periodStart > dueDate) return toast('준비 시작일은 시험일보다 늦을 수 없습니다');
-      const metric = Math.max(0, Math.min(100, Number((($('#academicMetric') || {}).value)) || 0));
-      const steps = (($('#academicSteps') && $('#academicSteps').value) || '').split('\n').map(x => x.trim()).filter(Boolean)
-        .map(label => ({ id: uid(), label: label }));
+      const metric = isExam ? Math.max(0, Math.min(100, Number((($('#academicMetric') || {}).value)) || 0)) : 0;
+      const steps = isExam ? (($('#academicSteps') && $('#academicSteps').value) || '').split('\n').map(x => x.trim()).filter(Boolean)
+        .map(label => ({ id: uid(), label: label })) : [];
       state.tasks.push({
         id: uid(), groupId: 'academic-' + now(), kind: 'academic_event', academicType: type,
         staffId: me.id, title: title, studySubject: subject, grade: grade, semester: semester,
-        dueDate: dueDate, examDate: type === 'exam' ? dueDate : '', periodStart: periodStart,
-        publisher: (($('#academicPublisher') && $('#academicPublisher').value) || '').trim(),
-        textbook: (($('#academicTextbook') && $('#academicTextbook').value) || '').trim(),
-        unit: unit, pages: (($('#academicPages') && $('#academicPages').value) || '').trim(),
-        range: range, goalScore: type === 'exam' ? metric : 0, weight: type === 'performance' ? metric : 0,
-        submissionFormat: type === 'performance' ? ((($('#academicFormat') || {}).value) || '').trim() : '',
+        dueDate: dueDate, examDate: isExam ? dueDate : '', periodStart: periodStart,
+        publisher: isExam ? ((($('#academicPublisher') && $('#academicPublisher').value) || '').trim()) : '',
+        textbook: isExam ? ((($('#academicTextbook') && $('#academicTextbook').value) || '').trim()) : '',
+        unit: unit, pages: isExam ? ((($('#academicPages') && $('#academicPages').value) || '').trim()) : '',
+        range: range, goalScore: isExam ? metric : 0, weight: 0,
+        submissionFormat: !isExam ? ((($('#academicFormat') || {}).value) || '').trim() : '',
         detail: range, guide: '', steps: steps, target: 0, time: '', priority: 'high',
         repeat: 'once', days: [], start: periodStart, end: '', carry: false,
         origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
@@ -7544,6 +7579,14 @@ document.addEventListener('click', ev => {
       submissionModal('question', '', '');
       break;
     }
+    case 'performanceinstruction': {
+      if (!session.isStaffLink || isManager()) break;
+      const task = state.tasks.find(row => !row.deleted && row.id === id && row.staffId === session.staffId &&
+        row.kind === 'academic_event' && row.academicType === 'performance');
+      if (!task) return toast('수행평가 일정을 다시 확인해 주세요');
+      submissionModal('question', task.id, academicDateOf(task));
+      break;
+    }
     case 'submissionproof': {
       if (!session.isStaffLink) break;
       const task = state.tasks.find(row => row.id === el.dataset.id && row.staffId === session.staffId);
@@ -7773,7 +7816,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.9';
+const APP_VER = '2026-08-18.10';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

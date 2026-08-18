@@ -65,7 +65,7 @@ function createAgendaApi() {
       if (sid !== 'student-1') return [{id:'leak-academic',staffId:sid,title:'다른 학생 시험',academicType:'exam',dueDate:'2026-08-20'}];
       return [
         {id:'exam',staffId:sid,title:'2학기 중간고사',academicType:'exam',studySubject:'math',dueDate:'2026-08-20',range:'일차함수'},
-        {id:'performance',staffId:sid,title:'독서 발표',academicType:'performance',studySubject:'korean',dueDate:'2026-08-22',range:'발표 자료'},
+        {id:'performance',staffId:sid,title:'독서 발표',academicType:'performance',studySubject:'korean',dueDate:'2026-08-22',unit:'과거 단원',range:'과거 평가 안내'},
         {id:'outside',staffId:sid,title:'다음 달 시험',academicType:'exam',dueDate:'2026-09-01'}
       ];
     }
@@ -179,6 +179,7 @@ test('agenda projection merges every existing source while keeping one student i
   assert.equal(byType.exam.sourceId, 'exam');
   assert.equal(byType.exam.date, '2026-08-20');
   assert.equal(byType.performance.sourceId, 'performance');
+  assert.equal(byType.performance.detail, '', 'removed legacy performance fields stay hidden from the calendar');
   assert.equal(byType.task.sourceId, 'task');
   assert.equal(byType['exam-plan'].sourceId, 'plan');
   assert.equal(byType['exam-plan'].startTime, '11:00');

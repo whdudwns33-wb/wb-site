@@ -347,6 +347,76 @@ test('proof is accepted only for a director-assigned photo-evidence task', async
   assert.equal(r2.puts.length, 0, 'an unapproved task must be rejected before private storage');
 });
 
+test('a student can link text or a photo only to their own active performance due date', async () => {
+  const db = new TestD1();
+  const r2 = new FakeR2();
+  seedPerson(db, 'student-a', 'token-a');
+  seedPerson(db, 'student-b', 'token-b');
+  seedTask(db, 'performance-a', 'student-a', '2026-08-18', {
+    kind: 'academic_event', academicType: 'performance', dueDate: '2026-08-25',
+    evidenceMode: '', origin: 'admin'
+  });
+  seedTask(db, 'performance-b', 'student-b', '2026-08-18', {
+    kind: 'academic_event', academicType: 'performance', dueDate: '2026-08-25',
+    evidenceMode: '', origin: 'admin'
+  });
+  seedTask(db, 'exam-a', 'student-a', '2026-08-18', {
+    kind: 'academic_event', academicType: 'exam', dueDate: '2026-08-25',
+    evidenceMode: '', origin: 'admin'
+  });
+  seedTask(db, 'deleted-performance', 'student-a', '2026-08-18', {
+    kind: 'academic_event', academicType: 'performance', dueDate: '2026-08-25',
+    evidenceMode: '', origin: 'admin', deleted: true
+  });
+  seedTask(db, 'student-performance', 'student-a', '2026-08-18', {
+    kind: 'academic_event', academicType: 'performance', dueDate: '2026-08-25',
+    evidenceMode: '', origin: 'staff'
+  });
+  const own = person('student-a', 'token-a');
+
+  const textResult = await jsonCall(db, r2, {
+    app: 'consult', auth: own, action: 'submit_question', clientRequestId: 'performance-text',
+    taskId: 'performance-a', taskDate: '2026-08-25', bodyText: '발표 자료는 A3 한 장으로 준비합니다.'
+  });
+  assert.equal(textResult.status, 200, JSON.stringify(textResult.body));
+  assert.equal(textResult.body.submission.taskId, 'performance-a');
+  assert.equal(textResult.body.submission.taskDate, '2026-08-25');
+  assert.equal(textResult.body.submission.hasImage, false);
+
+  const photoResult = await upload(db, r2, {
+    auth: own, kind: 'question', clientRequestId: 'performance-photo',
+    taskId: 'performance-a', taskDate: '2026-08-25', bodyText: ''
+  });
+  assert.equal(photoResult.status, 200, JSON.stringify(photoResult.body));
+  assert.equal(photoResult.body.submission.taskId, 'performance-a');
+  assert.equal(photoResult.body.submission.hasImage, true);
+  assert.equal(r2.puts.length, 1);
+
+  const forbidden = [
+    ['wrong-date', 'performance-a', '2026-08-24', 409],
+    ['exam', 'exam-a', '2026-08-25', 409],
+    ['deleted', 'deleted-performance', '2026-08-25', 404],
+    ['student-created', 'student-performance', '2026-08-25', 409],
+    ['cross-owner', 'performance-b', '2026-08-25', 404]
+  ];
+  for (const [name, taskId, taskDate, status] of forbidden) {
+    const before = r2.puts.length;
+    const result = await upload(db, r2, {
+      auth: own, kind: 'question', clientRequestId: 'performance-' + name,
+      taskId, taskDate
+    });
+    assert.equal(result.status, status, name);
+    assert.equal(r2.puts.length, before, name + ' must be rejected before R2');
+  }
+
+  const proof = await upload(db, r2, {
+    auth: own, kind: 'proof', clientRequestId: 'performance-proof',
+    taskId: 'performance-a', taskDate: '2026-08-25'
+  });
+  assert.equal(proof.status, 403);
+  assert.equal(r2.puts.length, 1, 'performance instructions must not weaken proof authorization');
+});
+
 test('only the director can approve or reject proof and answer questions; stale CAS is rejected', async () => {
   const db = new TestD1();
   const r2 = new FakeR2();

@@ -101,6 +101,45 @@ test('students can request only for themselves and only the director manages off
   assert.match(status, /if \(!session\.isAdmin\) break/);
 });
 
+test('performance assessment keeps only the essential fields while exam fields stay intact', () => {
+  const source = functionSource('academicEventModal');
+  const captures = [];
+  const open = Function('captures', `
+    const session={isAdmin:true};
+    const ACADEMIC_TYPES={exam:{icon:'📝',label:'시험'},performance:{icon:'🎯',label:'수행평가'}};
+    function currentStaff(){return {id:'student-1',name:'학생'};}
+    function toast(){}
+    function today(){return '2026-08-18';}
+    function addDays(){return '2026-09-01';}
+    function studySubjectOptions(){return '<option>수학</option>';}
+    function modal(title,body,foot){captures.push({title,body,foot});}
+    ${source}
+    return academicEventModal;
+  `)(captures);
+
+  open('performance');
+  open('exam');
+  const performance = captures[0].body;
+  const exam = captures[1].body;
+  for (const id of ['academicGrade', 'academicSemester', 'academicPublisher', 'academicTextbook',
+    'academicUnit', 'academicPages', 'academicRange', 'academicMetric', 'academicStart', 'academicSteps']) {
+    assert.ok(!performance.includes('id="' + id + '"'), id + ' must be absent from performance');
+    assert.ok(exam.includes('id="' + id + '"'), id + ' must remain available for exams');
+  }
+  for (const id of ['academicSubject', 'academicDate', 'academicTitle', 'academicFormat']) {
+    assert.ok(performance.includes('id="' + id + '"'), id + ' must remain in performance');
+  }
+  assert.match(performance, /평가 안내 및 선생님 지시사항은 학생이 등록/);
+  assert.match(performance, /당일에 급하게 준비하기 어렵습니다/);
+
+  const save = eventCase('academicsave');
+  assert.match(save, /const isExam = type === 'exam'/);
+  assert.match(save, /if \(isExam && \(!grade \|\| !semester \|\| !unit \|\| !range\)\)/);
+  assert.match(save, /weight:\s*0/);
+  assert.match(save, /steps:\s*steps/);
+  assert.match(save, /const steps = isExam[\s\S]*?: \[\]/);
+});
+
 test('the generated material request summary contains every concrete lookup field', () => {
   const source = functionSource('buildMaterialRequestSummary');
   const build = Function(source + '\nreturn buildMaterialRequestSummary;')();
