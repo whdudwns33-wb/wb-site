@@ -16,7 +16,7 @@ test('새 주문은 학생 정체성을 검증하는 서버 전용 경로로만 
   const source = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
   assert.match(source, /await sync\.post\('\/book-order', \{/);
   assert.match(source, /action: 'create', taskId: taskId/);
-  assert.match(source, /items: items\.map\(item => \(\{[\s\S]*bookId: item\.bookId, title: item\.title, studentIds: item\.studentIds/);
+  assert.match(source, /items: items\.map\(item => \(\{[\s\S]*bookId: item\.bookId, title: item\.title, studentIds: item\.studentIds, unitPrice: item\.unitPrice/);
   assert.match(source, /result\.task\.id !== taskId \|\| result\.task\.orderDelivery !== 'scheduled_batch_v1'/);
   assert.match(source, /Number\(result\.task\.orderIdentityVersion\) !== 1/);
   assert.match(source, /applyCreatedLesson\(result\.task\)/);
@@ -32,9 +32,31 @@ test('한 권 주문과 묶음 주문은 학생 선택을 전용 서버 경로�
     assert.doesNotMatch(source, /book-order-send|sendBookOrder/);
   }
   assert.match(single, /studentIds: studentIds/);
+  assert.match(single, /unitPrice: unitPrice/);
   assert.match(batch, /studentIds: selectedOrderStudentIds/);
+  assert.match(batch, /unitPrice: selectedOrderUnitPrice/);
   assert.doesNotMatch(batch, /item\.qty/);
   assert.doesNotMatch(html, /id="bq-|placeholder="예: 3권"/);
+});
+
+test('학생 선택창 위에서 교재 단가를 받고 주문부터 아카등록까지 금액과 네 단계 날짜를 표시한다', () => {
+  const priceInput = block('function orderPriceInput(', 'function selectedOrderStudentIds(');
+  const singleModal = block('function singleOrderModal(', 'function batchOrderModal(');
+  const batchModal = block('function batchOrderModal(', '/** 온라인 직접 주문은');
+  const dates = block('function bookOrderDateText(', 'function bookOrderRowHtml(');
+  const row = block('function bookOrderRowHtml(', 'function bookOrderStageHtml(');
+
+  assert.match(priceInput, /교재 금액 \(1권 기준\)/);
+  assert.match(priceInput, /type="number"[\s\S]*data-order-unit-price/);
+  assert.ok(singleModal.indexOf('orderPriceInput(batchDraft[0])') < singleModal.indexOf('orderStudentPicker(batchDraft[0])'));
+  assert.match(batchModal, /orderPriceInput\(row\) \+ orderStudentPicker\(row\)/);
+  assert.match(dates, /권당[\s\S]*합계/);
+  for (const field of ['orderRequestedAt', 'orderCompletedAt', 'teacherReceivedAt', 'studentHandedAt']) {
+    assert.match(dates, new RegExp('row\\.' + field));
+  }
+  for (const label of ['주문요청', '주문완료', '수령완료', '배부완료']) assert.match(dates, new RegExp(label));
+  assert.match(row, /bookOrderMoneyHtml\(row\) \+ bookOrderDatesHtml\(row\)/);
+  assert.match(row, /row\.stage === 'student_handed'[\s\S]*해야 할 업무 · 아카등록/);
 });
 
 test('서버 확인 전에는 성공 처리하지 않고 실패 시 같은 주문 ID와 입력을 보존한다', () => {
