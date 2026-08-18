@@ -43,6 +43,8 @@ test('보호자 공개 입력은 개인 링크의 오늘 본인 structured 수�
 test('숙제·준비물은 내부 메모 파싱 없이 전용 필드와 CAS API만 사용한다', () => {
   const block = slice('/* 보호자 공개 내용은', 'function acaflowLessonSummary(');
   const save = slice('async function saveGuardianPublication(', 'function acaflowLessonSummary(');
+  assert.equal((block.match(/숙제, 준비물 \(보호자, 학생 공개\)/g) || []).length, 2);
+  assert.doesNotMatch(block, /보호자·학생 공개 숙제·준비물/);
   assert.match(block, /data-public-homework/);
   assert.match(block, /data-public-readiness/);
   assert.match(block, /data-student-visible/);

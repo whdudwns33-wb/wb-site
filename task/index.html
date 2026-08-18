@@ -2504,7 +2504,7 @@ function guardianPublicationHtml(task, lessonDate) {
   if (!loaded && !loading && !error) setTimeout(() => loadGuardianPublications(date, false), 0);
   if (!loaded) {
     return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
-      '<div class="guardian-publication-head"><div><div class="card-title">보호자·학생 공개 숙제·준비물</div>' +
+      '<div class="guardian-publication-head"><div><div class="card-title">숙제, 준비물 (보호자, 학생 공개)</div>' +
       '<div class="card-sub">내부 수업 메모와 분리한 공개 내용만 관리합니다.</div></div></div>' +
       (error
         ? '<div class="guardian-publication-status is-error" role="alert">' + esc(error) + '</div>' +
@@ -2521,7 +2521,7 @@ function guardianPublicationHtml(task, lessonDate) {
   const saving = guardianPublicationSaving.has(key);
   const statusError = guardianPublicationErrors.get(key) || '';
   return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
-    '<div class="guardian-publication-head"><div><div class="card-title">보호자·학생 공개 숙제·준비물</div>' +
+    '<div class="guardian-publication-head"><div><div class="card-title">숙제, 준비물 (보호자, 학생 공개)</div>' +
     '<div class="card-sub">이 칸의 내용은 보호자 앱에 표시되며, 아래를 체크한 경우에만 학생 앱에도 같은 내용이 표시됩니다. 내부 메모는 공개되지 않습니다.</div></div>' +
     '<span class="tag ' + (row.status === 'published' ? 'ok' : '') + '">' +
     (row.status === 'published' ? '공개 중 · 수정본 ' + Number(row.revision) : '공개 전') + '</span></div>' +
