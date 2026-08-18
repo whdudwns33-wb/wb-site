@@ -52,7 +52,7 @@ test('makeup uses the server lesson boundary and never auto-creates from consult
   assert.match(helpers, /const isMakeupLessonTask =/);
   assert.match(helpers, /taskKind === 'lesson_instruction'/);
   assert.match(helpers, /\^\\\[수업\\\]/);
-  assert.doesNotMatch(helpers.match(/const isMakeupLessonTask[\s\S]*?;\n/)[0], /컨설팅/);
+  assert.doesNotMatch(helpers.match(/const isMakeupLessonTask[\s\S]*?;\r?\n/)[0], /컨설팅/);
   assert.match(request, /!isMakeupLessonTask\(task\)/);
   assert.match(create, /!isMakeupLessonTask\(task\)/);
   assert.match(click, /!isMakeupLessonTask\(t\)/);

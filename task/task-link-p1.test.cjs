@@ -310,7 +310,7 @@ test('manager authorship stays distinct from root admin and staff edits', () => 
 });
 
 test('manager deep links survive startup until the server role is known; verified staff remains allowlisted', () => {
-  const startupAt = html.indexOf('\nload();\nabsorbLinkParams();');
+  const startupAt = html.indexOf('load();');
   const startup = html.slice(startupAt, html.indexOf('let syncLoopStarted', startupAt));
   const renderFn = html.match(/function render\(\) \{[\s\S]*?\n}/)?.[0] || '';
   assert.match(startup, /if \(h && !\/\(\^\|&\)c=\/\.test\(h\)\) route = h/);

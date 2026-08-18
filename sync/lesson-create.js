@@ -383,6 +383,10 @@ function isLessonIntake(task) {
   return task && (task.lessonFormVersion || task.intakeVersion || task.intakeSource === 'teacher_9_field_form');
 }
 
+function isLegacyLessonTask(task) {
+  return !!task && !task.deleted && /^\[수업\]/.test(String(task.title || ''));
+}
+
 async function findAssignmentRows(env, app, staffId, candidate) {
   const direct = parseTaskRow(await env.DB.prepare(
     'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
@@ -439,7 +443,7 @@ function correctedTask(candidate, current, serverNow, actorRole) {
     ...candidate,
     id,
     groupId: current.groupId || candidate.groupId,
-    staffId: current.staffId,
+    staffId: candidate.staffId,
     steps: candidate.steps.map((step, index) => ({ ...step, id: id + '-step-' + (index + 1) })),
     origin: current.origin,
     createdAt: current.createdAt,
@@ -505,8 +509,9 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
     ).bind(app, sourceTaskId, staffId).first());
     if (!sourceRow) return json({ ok: false, error: '수정할 수업을 찾을 수 없습니다' }, 404, origin);
-    if (!isLessonIntake(sourceRow.task) || sourceRow.task.staffId !== staffId) {
-      return json({ ok: false, error: '9항목 수업 등록에서 만든 수업만 이 경로로 수정할 수 있습니다' }, 409, origin);
+    if ((!isLessonIntake(sourceRow.task) && !(auth.scope === 'all' && isLegacyLessonTask(sourceRow.task))) ||
+        (auth.scope !== 'all' && sourceRow.task.staffId && sourceRow.task.staffId !== staffId)) {
+      return json({ ok: false, error: '이 수업은 수업 등록 및 변경 화면에서 정정할 수 없습니다' }, 409, origin);
     }
     const identityRows = await findAssignmentRows(env, app, staffId, task);
     if (identityRows.some(row => row.task.id !== sourceTaskId)) {
