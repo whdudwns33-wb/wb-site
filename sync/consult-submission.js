@@ -49,7 +49,7 @@ function baseOccurrence(task, date) {
   return false;
 }
 
-async function requireOwnedOccurrence(env, owner, taskId, taskDate, requirePhotoEvidence) {
+async function requireOwnedOccurrence(env, owner, taskId, taskDate, requirePhotoEvidence, allowPerformanceQuestion = false) {
   if (!SAFE_ID.test(taskId) || !validDate(taskDate)) {
     throw new PublicError(400, '업무와 수행 날짜를 확인해 주세요');
   }
@@ -64,6 +64,8 @@ async function requireOwnedOccurrence(env, owner, taskId, taskDate, requirePhoto
   if (requirePhotoEvidence && (task.evidenceMode !== 'photo' || task.origin === 'staff')) {
     throw new PublicError(403, '원장이 인증사진 제출을 지정한 업무만 제출할 수 있습니다');
   }
+  if (allowPerformanceQuestion && task.origin !== 'staff' && task.kind === 'academic_event' && task.academicType === 'performance' &&
+      String(task.dueDate || task.start || '') === taskDate) return;
 
   let moves = [];
   const moveRow = await env.DB.prepare('SELECT data FROM checks WHERE app=? AND k=? LIMIT 1')
@@ -201,7 +203,7 @@ async function validateOptionalOccurrence(env, owner, taskIdValue, taskDateValue
   const taskDate = String(taskDateValue || '');
   if (!taskId && !taskDate) return { taskId: null, taskDate: null };
   if (!taskId || !taskDate) throw new PublicError(400, '업무와 수행 날짜를 함께 입력해 주세요');
-  await requireOwnedOccurrence(env, owner, taskId, taskDate, false);
+  await requireOwnedOccurrence(env, owner, taskId, taskDate, false, true);
   return { taskId, taskDate };
 }
 
