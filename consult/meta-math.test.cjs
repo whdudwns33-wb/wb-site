@@ -39,7 +39,9 @@ test('study screen renders seven separate source cards and keeps legacy MetaMath
 test('external study services use fixed official links without embedded login', () => {
   assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=center'/);
   assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=student'/);
-  assert.match(html, /const CLASSCARD_URL = 'https:\/\/www\.classcard\.net\/Login'/);
+  assert.match(html, /const CLASSCARD_ANDROID_APP_URL = 'https:\/\/play\.google\.com\/store\/apps\/details\?id=classcard\.net'/);
+  assert.match(html, /const CLASSCARD_IOS_APP_URL = 'https:\/\/apps\.apple\.com\/kr\/app\/id1176435331'/);
+  assert.doesNotMatch(html, /www\.classcard\.net\/Login/);
   assert.match(html, /const STUDYFORCE_URL = 'https:\/\/hol\.sfcenter\.co\.kr\/'/);
   assert.match(html, /centerUrl: STUDYFORCE_URL, studentUrl: STUDYFORCE_URL/);
   assert.doesNotMatch(html, /www\.studyforce\.co\.kr/);
@@ -47,6 +49,32 @@ test('external study services use fixed official links without embedded login', 
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   assert.match(card, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(card, /iframe|fetch\(|type="password"/i);
+});
+
+test('ClassCard opens the native app store route only on supported mobile devices', () => {
+  const source = html.match(/function classcardAppUrl\(userAgent, maxTouchPoints\) \{[\s\S]*?\n\}/)?.[0] || '';
+  assert.ok(source, 'classcardAppUrl function must exist');
+  const classcardAppUrl = Function(
+    "const CLASSCARD_ANDROID_APP_URL='https://play.google.com/store/apps/details?id=classcard.net';" +
+    "const CLASSCARD_IOS_APP_URL='https://apps.apple.com/kr/app/id1176435331';" +
+    source + '\nreturn classcardAppUrl;'
+  )();
+
+  assert.equal(classcardAppUrl('Mozilla/5.0 (Linux; Android 14)', 5), 'https://play.google.com/store/apps/details?id=classcard.net');
+  assert.equal(classcardAppUrl('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)', 5), 'https://apps.apple.com/kr/app/id1176435331');
+  assert.equal(classcardAppUrl('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 5), 'https://apps.apple.com/kr/app/id1176435331');
+  assert.equal(classcardAppUrl('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 0), '');
+  assert.equal(classcardAppUrl('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 0), '');
+
+  const classcard = section('  classcard: {', '  studyforce: {');
+  const card = section('function learningSourceCard(', '/* ── 학습 탭');
+  assert.match(classcard, /appOnly: true/);
+  assert.doesNotMatch(classcard, /centerUrl|studentUrl/);
+  assert.match(card, /classcardAppUrl\(navigator\.userAgent, navigator\.maxTouchPoints\)/);
+  assert.match(card, /공식 앱 스토어 화면으로 이동합니다/);
+  assert.match(card, /이미 설치했다면 ‘열기’를 눌러 주세요/);
+  assert.match(card, /클래스카드 앱 연결은 휴대폰에서 이 화면을 열어 이용하세요/);
+  assert.doesNotMatch(classcard, /https:\/\//);
 });
 
 test('learning tasks stay student-scoped and only the director can send them', () => {
