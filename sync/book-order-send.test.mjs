@@ -984,7 +984,8 @@ test('rejected scheduled batch is never retried by a later cron and only explici
     assert.deepEqual(laterCron.results, []);
     assert.equal(fetches, 1, '거절 주문은 다음 cron이 자동 재발송하지 않는다');
 
-    const retryAt = Date.parse('2026-08-18T00:00:00Z');
+    const cutoffKstDate = new Date(cutoff + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const retryAt = Date.parse(cutoffKstDate + 'T00:00:00Z') + 24 * 60 * 60 * 1000;
     const retried = await withNow(retryAt, () => call(db, { auth: admin, action: 'retry-rejected' }));
     assert.equal(retried.status, 200);
     assert.equal(retried.body.results[0].status, 'accepted');

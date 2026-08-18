@@ -767,6 +767,126 @@ async function publicGuardianRequests(env, studentId) {
   return { rows: (result.results || []).map(requestView) };
 }
 
+function validPublicationScheduleSlot(slot) {
+  if (!slot || !Array.isArray(slot.days) || !slot.days.length ||
+      !slot.days.every(day => Number.isInteger(Number(day)) && Number(day) >= 0 && Number(day) <= 6) ||
+      !/^\d{2}:\d{2}$/.test(String(slot.startTime || '')) ||
+      !/^\d{2}:\d{2}$/.test(String(slot.endTime || '')) ||
+      String(slot.startTime) >= String(slot.endTime)) return false;
+  const validFrom = String(slot.validFrom || slot.startDate || '');
+  const validTo = String(slot.validTo || slot.endDate || '');
+  return (!validFrom || validDate(validFrom)) && (!validTo || validDate(validTo)) &&
+    (!validFrom || !validTo || validFrom <= validTo);
+}
+
+export function publicationReadinessForTask(task, owner, activeStaff, activeStudents, date) {
+  const reasons = [];
+  const taskStudentId = String(task && task.studentId || '');
+  const taskStaffId = String(task && task.staffId || '');
+  const student = SAFE_ID.test(taskStudentId) ? activeStudents.get(taskStudentId) : null;
+  const ownerId = String(owner || '');
+
+  if (!taskStudentId) {
+    reasons.push({ code: 'student_id_missing', field: 'studentId', message: 'studentId가 연결되지 않았습니다' });
+  } else if (!SAFE_ID.test(taskStudentId) || !student) {
+    reasons.push({ code: 'student_not_active', field: 'studentId', message: 'studentId가 현재 재원 명단과 일치하지 않습니다' });
+  }
+
+  if (!SAFE_ID.test(ownerId)) {
+    reasons.push({ code: 'task_owner_missing', field: 'staffId', message: '수업 저장 담당자를 확인할 수 없습니다' });
+  } else if (!activeStaff.has(ownerId)) {
+    reasons.push({ code: 'staff_inactive', field: 'staffId', message: '수업 저장 담당자가 현재 직원 명단에 없습니다' });
+  }
+  if (!taskStaffId) {
+    reasons.push({ code: 'staff_id_missing', field: 'staffId', message: '수업의 담당자 ID가 빠져 있습니다' });
+  } else if (taskStaffId !== ownerId) {
+    reasons.push({ code: 'staff_owner_mismatch', field: 'staffId', message: '수업 담당자와 저장 담당자가 서로 다릅니다' });
+  }
+  if (student && SAFE_ID.test(ownerId) &&
+      (!Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(ownerId))) {
+    reasons.push({ code: 'student_teacher_missing', field: 'staffId', message: '선택 원생의 실제 담당자에 이 선생님이 배정되지 않았습니다' });
+  }
+
+  if (!task || task.taskKind !== 'lesson_instruction') {
+    reasons.push({ code: 'lesson_format_missing', field: 'schedule', message: '표준 수업 등록 형식으로 변환해야 합니다' });
+  }
+  const slots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  if (task && task.scheduleStatus !== 'confirmed') {
+    reasons.push({ code: 'schedule_unconfirmed', field: 'schedule', message: '요일·시작·종료 시간이 아직 확정되지 않았습니다' });
+  }
+  if (!slots.length) {
+    reasons.push({ code: 'schedule_slots_missing', field: 'schedule', message: '구조화된 수업 시간표가 없습니다' });
+  } else if (!slots.every(validPublicationScheduleSlot)) {
+    reasons.push({ code: 'schedule_slots_invalid', field: 'schedule', message: '시간표의 요일 또는 시작·종료 시간을 다시 확인해야 합니다' });
+  }
+
+  const ready = reasons.length === 0;
+  const weekday = validDate(date) ? new Date(date + 'T00:00:00.000Z').getUTCDay() : -1;
+  return {
+    ready,
+    activeToday: ready && activeTaskOnDate(task, date) &&
+      slots.some(slot => activeSlotOnDate(slot, date, weekday)),
+    reasons
+  };
+}
+
+async function publicationReadinessList(env, body, auth, origin, json) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '원장·관리 담당만 확인할 수 있습니다' }, 403, origin);
+  }
+  if (!allowedKeys(body, ['auth'])) {
+    return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  }
+  const now = Date.now();
+  const date = kstDate(now);
+  const month = date.slice(0, 7);
+  const rosterRow = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind('task').first();
+  if (!rosterRow) {
+    return json({ ok: false, code: 'ROSTER_UNAVAILABLE', error: '원생 명단이 준비되지 않았습니다' }, 503, origin);
+  }
+  let students;
+  try {
+    const document = JSON.parse(rosterRow.data || '{}');
+    students = document && document.roster && document.roster.students;
+    if (!Array.isArray(students)) throw new Error('ROSTER_INVALID');
+  } catch (error) {
+    return json({ ok: false, code: 'ROSTER_INVALID', error: '원생 명단을 확인해 주세요' }, 503, origin);
+  }
+  const activeStudents = new Map(students.filter(student => activeInMonth(student, month))
+    .map(student => [String(student.id), student]));
+  const activeStaff = await staffNames(env);
+  const taskRows = await env.DB.prepare(
+    'SELECT id,owner,data,updated_at FROM tasks WHERE app=? ORDER BY updated_at DESC LIMIT 2000'
+  ).bind('task').all();
+  const lessons = [];
+  for (const row of taskRows.results || []) {
+    const task = parseJson(row.data);
+    if (!task || task.deleted || String(task.id || '') !== String(row.id || '') ||
+        !(task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion ||
+          /^\[수업\]/.test(String(task.title || ''))) ||
+        (task.start && String(task.start) > date) || (task.end && String(task.end) < date)) continue;
+    const owner = String(row.owner || '');
+    const readiness = publicationReadinessForTask(task, owner, activeStaff, activeStudents, date);
+    lessons.push({
+      taskId: String(task.id), updatedAt: Number(task.updatedAt || row.updated_at || 0),
+      taskOwner: SAFE_ID.test(owner) ? owner : '',
+      title: text(task.title).slice(0, 180), studentId: SAFE_ID.test(String(task.studentId || '')) ? String(task.studentId) : '',
+      studentName: text(task.studentName).slice(0, 80), grade: text(task.grade).slice(0, 40),
+      staffId: SAFE_ID.test(String(task.staffId || '')) ? String(task.staffId) : '',
+      teacherName: activeStaff.get(owner) || '', subject: text(task.subject).slice(0, 80),
+      className: text(task.className).slice(0, 80), scheduleText: text(task.scheduleText).slice(0, 240),
+      scheduleStatus: String(task.scheduleStatus || ''), ready: readiness.ready,
+      activeToday: readiness.activeToday, reasons: readiness.reasons
+    });
+  }
+  lessons.sort((a, b) => Number(a.ready) - Number(b.ready) ||
+    a.teacherName.localeCompare(b.teacherName, 'ko') || a.studentName.localeCompare(b.studentName, 'ko') ||
+    a.taskId.localeCompare(b.taskId));
+  return json({ ok: true, date, lessons,
+    missingCount: lessons.filter(row => !row.ready).length,
+    readyCount: lessons.filter(row => row.ready).length }, 200, origin);
+}
+
 async function publicationList(env, body, auth, origin, json) {
   const actorId = publicationActorId(auth);
   if (!actorId) {
@@ -1461,6 +1581,7 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   if (action === 'access_list' || action === 'access_set') return portalAccess(env, body, auth, origin, json);
   if (action === 'invite') return issueInvite(env, body, auth, origin, json);
   if (action === 'preview') return previewPortal(env, body, auth, origin, json);
+  if (action === 'publication_readiness_list') return publicationReadinessList(env, body, auth, origin, json);
   if (action === 'publication_list') return publicationList(env, body, auth, origin, json);
   if (action === 'publication_set') return publicationSet(env, body, auth, origin, json);
   if (action === 'request_list') return guardianRequestList(env, body, auth, origin, json);

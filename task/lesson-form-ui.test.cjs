@@ -21,10 +21,32 @@ test('teachers get an own-scope nine-field lesson route', () => {
   assert.match(html, /staffId: session\.isStaffLink && !session\.isAdmin \? session\.staffId : ''/);
   assert.match(html, /if \(session\.isStaffLink && !session\.isAdmin\) lessonDraft\.staffId = session\.staffId/);
   assert.match(html, /sync\.post\('\/lesson-create'/);
-  for (const key of ['studentName', 'grade', 'subject', 'className', 'scheduleText', 'materials',
+  for (const key of ['subject', 'className', 'scheduleText', 'materials',
     'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) {
     assert.ok(html.includes(`lessonTextField('${key}'`), key);
   }
+  assert.match(html, /data-lesson-student/);
+  assert.match(html, /stable studentId로 연결합니다/);
+});
+
+test('admin publication readiness audit uses server reasons and an explicit stable-student repair flow', () => {
+  assert.match(html, /action: 'publication_readiness_list'/);
+  assert.match(html, /숙제·준비물 공개 설정 누락 수업/);
+  assert.match(html, /publicationReadinessReasonHtml\(row, 'studentId', 'studentId'/);
+  assert.match(html, /publicationReadinessReasonHtml\(row, 'staffId', '담당자'/);
+  assert.match(html, /publicationReadinessReasonHtml\(row, 'schedule', '시간표'/);
+  assert.match(html, /data-publication-student/);
+  assert.match(html, /data-act="publicationlessonfix"/);
+  assert.match(html, /lessonDraft\.studentId = student\.id/);
+  assert.match(html, /lessonDraft\.staffId = row\.taskOwner/);
+});
+
+test('guardian publication editor activates only for a confirmed structured slot on today', () => {
+  assert.match(html, /task\.taskKind !== 'lesson_instruction'/);
+  assert.match(html, /task\.scheduleStatus !== 'confirmed'/);
+  assert.match(html, /assignedLessonStudents\(\)\.some\(student => String\(student\.id\) === String\(task\.studentId\)\)/);
+  assert.match(html, /task\.scheduleSlots\.some\(slot =>/);
+  assert.match(html, /slot\.days\.map\(Number\)\.includes\(weekday\)/);
 });
 
 test('lesson edits send sourceTaskId as top-level optimistic-update metadata', () => {

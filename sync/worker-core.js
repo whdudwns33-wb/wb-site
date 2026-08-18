@@ -1651,7 +1651,7 @@ export default {
       if (url.pathname === '/parent-portal') {
         const authenticatedActions = new Set([
           'invite', 'access_list', 'access_set', 'preview',
-          'publication_list', 'publication_set', 'request_list', 'request_resolve',
+          'publication_readiness_list', 'publication_list', 'publication_set', 'request_list', 'request_resolve',
           'announcement_list', 'announcement_save', 'announcement_publish', 'announcement_end'
         ]);
         const action = String(body.action || '');

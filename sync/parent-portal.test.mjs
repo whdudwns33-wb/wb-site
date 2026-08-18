@@ -466,6 +466,39 @@ test('담당 수업의 오늘 공개 숙제·준비물만 전용 projection에 C
     /GUARDIAN_PUBLICATION_APPEND_ONLY/);
 });
 
+test('관리자 공개 준비 목록은 stable 학생·담당자·시간표 누락 사유를 서버 정본으로 진단한다', async () => {
+  const db = new TestD1();
+  seed(db);
+  const now = Date.now();
+  const broken = {
+    id: 'lesson-missing', title: '[수업] 연결 확인 필요', staffId: 'staff-a', studentName: '이름만 있는 학생',
+    grade: '초4', scheduleStatus: 'needs_review', scheduleText: '시간 미정', scheduleSlots: [],
+    start: new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10), deleted: false, updatedAt: now
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', broken.id, 'staff-a', JSON.stringify(broken), now, now).run();
+
+  const result = await call(db, {
+    auth: admin, action: 'publication_readiness_list'
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(result.status, 200);
+  const ready = result.body.lessons.find(row => row.taskId === 'lesson-a');
+  assert.equal(ready.ready, true);
+  const missing = result.body.lessons.find(row => row.taskId === broken.id);
+  assert.equal(missing.ready, false);
+  assert.deepEqual(new Set(missing.reasons.map(reason => reason.field)), new Set(['studentId', 'schedule']));
+  assert.ok(missing.reasons.some(reason => reason.code === 'student_id_missing'));
+  assert.ok(missing.reasons.some(reason => reason.code === 'lesson_format_missing'));
+  assert.ok(missing.reasons.some(reason => reason.code === 'schedule_unconfirmed'));
+  assert.ok(missing.reasons.some(reason => reason.code === 'schedule_slots_missing'));
+  assert.equal(result.body.missingCount, 2, 'staff-b 저장 수업의 담당 불일치도 함께 진단한다');
+  assert.equal(result.body.readyCount, 1);
+
+  const staffBlocked = await directCall(db, { action: 'publication_readiness_list' },
+    { scope: 'own', id: 'staff-a', role: 'staff' });
+  assert.equal(staffBlocked.status, 403);
+});
+
 test('공개 숙제는 오늘 기준 14일 경계까지만 보이고 종료·미래·오래된 행은 숨긴다', async () => {
   const now = Date.now();
   const dateAgo = days => new Date(now + 9 * 60 * 60 * 1000 - days * 86400000).toISOString().slice(0, 10);
