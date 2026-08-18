@@ -433,3 +433,43 @@ test('director-only lecture mutations are guarded and student checks stay self-s
   assert.match(check, /me\.id !== el\.dataset\.sid/);
   assert.match(check, /ingToggle\(me\.id/);
 });
+
+test('lecture courses persist a study subject for planner colors while legacy names are inferred', () => {
+  const helpers = between('function ingCourseSubjectKey(', '\nfunction ingStats(');
+  const addModal = between('function ingAddModal()', '\n\nlet ingPasteSeq');
+  const assignModal = between('function ingAssignModal(', '\n\nfunction ingScheduleFromForm(');
+  const save = between("case 'ingsave':", "case 'ingdel':");
+  const apply = between("case 'ingdo':", "case 'ingcatchup':");
+
+  assert.match(helpers, /course\.studySubject/);
+  assert.match(helpers, /과학\|과탐\|물리\|화학/);
+  assert.match(helpers, /국어\|독서\|문학/);
+  assert.match(helpers, /영어\|영단어\|어법/);
+  assert.match(helpers, /수학\|수리\|미적분/);
+  assert.match(helpers, /사회\|사탐\|한국사/);
+  assert.match(addModal, /id="ingSubject"/);
+  assert.match(assignModal, /id="ingCourseSubject"/);
+  assert.match(save, /과목 카테고리를 선택해 주세요/);
+  assert.match(save, /studySubject: subjectKey/);
+  assert.match(apply, /studySubject: subjectKey/);
+
+  const api = Function(`
+    const STUDY_SUBJECTS = {
+      korean:{label:'국어'}, english:{label:'영어'}, math:{label:'수학'},
+      social:{label:'사회'}, science:{label:'과학'}, other:{label:'기타'}
+    };
+    function studySubjectKey(value) { return STUDY_SUBJECTS[value] ? value : 'other'; }
+    function ingPlan() { return [
+      {cid:'a',seq:1,claimed:true,done:false},
+      {cid:'a',seq:2,done:true},
+      {cid:'a',seq:3,done:false}
+    ]; }
+    ${helpers}
+    return { ingCourseSubjectKey, ingChecklistItems, ingTimerTaskId };
+  `)();
+  assert.equal(api.ingCourseSubjectKey({ studySubject: 'science', name: '통합과정' }), 'science');
+  assert.equal(api.ingCourseSubjectKey({ name: '수학 미적분 개념' }), 'math');
+  assert.equal(api.ingCourseSubjectKey({ name: '한국사 기출' }), 'social');
+  assert.deepEqual(api.ingChecklistItems('s1', '2026-08-18').map(item => item.seq), [1, 2]);
+  assert.equal(api.ingTimerTaskId('course-a', 2), 'ing:course-a:2');
+});
