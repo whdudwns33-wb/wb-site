@@ -68,11 +68,17 @@ function orderUnitPrice(item) {
   return Number.isInteger(value) && value >= 1 && value <= MAX_UNIT_PRICE ? value : null;
 }
 
-function storedOrderUnitPrice(item, priceRow) {
+function storedOrderUnitPrice(item, priceRow, correctionRow) {
   const taskPrice = orderUnitPrice(item);
   if (taskPrice !== null) return taskPrice;
-  const value = Number(priceRow && priceRow.unit_price);
-  return Number.isInteger(value) && value >= 1 && value <= MAX_UNIT_PRICE ? value : null;
+  const original = Number(priceRow && priceRow.unit_price);
+  if (!Number.isInteger(original) || original < 1 || original > MAX_UNIT_PRICE) return null;
+  const previous = Number(correctionRow && correctionRow.previous_unit_price);
+  const corrected = Number(correctionRow && correctionRow.corrected_unit_price);
+  if (previous === original && Number.isInteger(corrected) && corrected >= 1 && corrected <= MAX_UNIT_PRICE && corrected !== original) {
+    return corrected;
+  }
+  return original;
 }
 
 function normalizedBookTitle(value) {
@@ -109,10 +115,10 @@ function fulfillmentMatches(row, bookId, studentIds) {
   return String(row.book_id) === bookId && JSON.stringify(storedIds) === JSON.stringify(studentIds);
 }
 
-function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, integrity,
+function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, correctionRow, integrity,
     taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents) {
   const studentIds = orderStudentIds(item);
-  const unitPrice = storedOrderUnitPrice(item, priceRow);
+  const unitPrice = storedOrderUnitPrice(item, priceRow, correctionRow);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
     : send.status === 'rejected' ? 'order_failed' : 'order_check';
   if (row && !integrity) {
@@ -124,6 +130,7 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
     quantity: orderQuantity(item, studentIds), vendorName: String(vendorName || '주문처 미등록'),
     unitPrice,
     priceBackfilledAt: priceRow && priceRow.created_at ? Number(priceRow.created_at) : null,
+    priceCorrectedAt: correctionRow && correctionRow.created_at ? Number(correctionRow.created_at) : null,
     canSetUnitPrice: canSetLegacyOrderPrice(owner, item, send, row, integrity, unitPrice),
     owner: owner || null, teacherName: teacherName || '담당 미지정',
     students, sendStatus: send ? String(send.status) : 'waiting', stage,
@@ -142,12 +149,13 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
 }
 
 async function listOrderFulfillments(env, app, auth, document) {
-  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, pricesResult, staffResult, snapshotResult] = await Promise.all([
+  const [tasksResult, sendsResult, mappingsResult, fulfillmentsResult, pricesResult, correctionsResult, staffResult, snapshotResult] = await Promise.all([
     env.DB.prepare('SELECT id,owner,data,updated_at FROM tasks WHERE app=? ORDER BY updated_at DESC').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_sends WHERE app=? ORDER BY created_at DESC').bind(app).all(),
     env.DB.prepare('SELECT task_id,send_id FROM book_order_batch_items WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT task_id,item_index,unit_price,created_at FROM book_order_item_prices WHERE app=?').bind(app).all(),
+    env.DB.prepare('SELECT task_id,item_index,previous_unit_price,corrected_unit_price,created_at FROM book_order_item_price_corrections WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_student_snapshots WHERE app=? ORDER BY task_id,item_index,student_id').bind(app).all()
   ]);
@@ -169,6 +177,7 @@ async function listOrderFulfillments(env, app, auth, document) {
   }
   const fulfillmentByItem = new Map((fulfillmentsResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
   const priceByItem = new Map((pricesResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
+  const correctionByItem = new Map((correctionsResult.results || []).map(row => [String(row.task_id) + '|' + Number(row.item_index), row]));
   const staffNames = new Map((staffResult.results || []).map(row => {
     const data = parseJson(row.data || '{}', {});
     return [String(row.id), String(data.name || row.id)];
@@ -195,6 +204,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       const missing = studentIds.some(id => !studentsById.has(id));
       const fulfillment = fulfillmentByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const priceRow = priceByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
+      const correctionRow = correctionByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const identityMismatch = !fulfillmentMatches(fulfillment, String(item.bookId || ''), studentIds);
       const integrity = sealedIdentity.sealed && !sealedIdentity.valid ? 'identity_mismatch' :
         invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
@@ -204,7 +214,7 @@ async function listOrderFulfillments(env, app, auth, document) {
         id: String(student.id), name: String(student.name || '이름 미입력'), grade: String(student.grade || '')
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
-        staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, integrity,
+        staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, correctionRow, integrity,
         task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents));
     }
   }
@@ -236,11 +246,15 @@ async function setLegacyOrderPrice(env, app, body, auth, json, origin) {
     return json({ ok: false, code: 'ORDER_PRICE_ALREADY_SET', error: '이미 교재 금액이 기록된 주문입니다' }, 409, origin);
   }
   const existing = await env.DB.prepare(
-    'SELECT unit_price,created_at FROM book_order_item_prices WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+    'SELECT p.unit_price,p.created_at,c.previous_unit_price,c.corrected_unit_price,c.created_at AS corrected_at ' +
+    'FROM book_order_item_prices p LEFT JOIN book_order_item_price_corrections c ' +
+    'ON c.app=p.app AND c.task_id=p.task_id AND c.item_index=p.item_index ' +
+    'WHERE p.app=? AND p.task_id=? AND p.item_index=? LIMIT 1'
   ).bind(app, taskId, itemIndex).first();
   if (existing) {
-    if (Number(existing.unit_price) === unitPrice) {
-      return json({ ok: true, idempotent: true, unitPrice, createdAt: Number(existing.created_at) }, 200, origin);
+    const effectivePrice = storedOrderUnitPrice(null, existing, existing);
+    if (effectivePrice === unitPrice) {
+      return json({ ok: true, idempotent: true, unitPrice, createdAt: Number(existing.corrected_at || existing.created_at) }, 200, origin);
     }
     return json({ ok: false, code: 'ORDER_PRICE_ALREADY_SET', error: '교재 금액은 한 번 저장한 뒤 변경할 수 없습니다' }, 409, origin);
   }

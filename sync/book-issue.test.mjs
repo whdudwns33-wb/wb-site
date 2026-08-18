@@ -8,6 +8,7 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/022_book_issues.sql', import.meta.url), 'utf8');
 const fulfillmentMigration = fs.readFileSync(new URL('./migrations/031_book_order_fulfillments.sql', import.meta.url), 'utf8');
 const priceMigration = fs.readFileSync(new URL('./migrations/043_book_order_item_prices.sql', import.meta.url), 'utf8');
+const correctionMigration = fs.readFileSync(new URL('./migrations/044_book_order_item_price_corrections.sql', import.meta.url), 'utf8');
 const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 
 class Statement {
@@ -242,6 +243,41 @@ test('legacy order price migration is additive, contains no student data, and is
     /BOOK_ORDER_ITEM_PRICE_APPEND_ONLY/);
 });
 
+test('price correction migration preserves 16,000 won and appends the exact 17,000 won correction once', () => {
+  for (const sql of [schema, correctionMigration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_item_price_corrections/);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_item_price_corrections');
+    const definition = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(definition, /DROP TABLE|DELETE FROM|student|phone|address|memo/i);
+  }
+  assert.doesNotMatch(correctionMigration, /UPDATE\s+book_order_item_prices|DELETE\s+FROM\s+book_order_item_prices/i);
+
+  const db = new TestD1();
+  const now = Date.now();
+  const task = { id: '7905db2c-0b17-40bd-bbd7-fbb698f19542', title: '[주문] 최고수준 S 초3-2', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderItems: [{ bookId: 'BK01', title: '최고수준 S 초3-2', studentIds: ['student-a'] }] };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, KIM_NAMGI_STAFF_ID, JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_item_prices(app,task_id,item_index,unit_price,created_at,created_by) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 16000, now, 'director').run();
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,teacher_received_at,teacher_received_by,student_handed_at,student_handed_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 'BK01', JSON.stringify(['student-a']), 'student_handed', 2,
+      now - 1000, KIM_NAMGI_STAFF_ID, now, KIM_NAMGI_STAFF_ID, now - 1000, now).run();
+  db.database.exec(correctionMigration);
+
+  const original = db.prepare('SELECT unit_price FROM book_order_item_prices WHERE app=? AND task_id=? AND item_index=0')
+    .bind('task', task.id).first();
+  const correction = db.prepare('SELECT * FROM book_order_item_price_corrections WHERE app=? AND task_id=? AND item_index=0')
+    .bind('task', task.id).first();
+  assert.equal(original.unit_price, 16000);
+  assert.equal(correction.previous_unit_price, 16000);
+  assert.equal(correction.corrected_unit_price, 17000);
+  assert.throws(() => db.prepare('UPDATE book_order_item_price_corrections SET corrected_unit_price=18000 WHERE task_id=?')
+    .bind(task.id).run(), /BOOK_ORDER_ITEM_PRICE_CORRECTION_APPEND_ONLY/);
+  assert.throws(() => db.prepare('DELETE FROM book_order_item_price_corrections WHERE task_id=?')
+    .bind(task.id).run(), /BOOK_ORDER_ITEM_PRICE_CORRECTION_APPEND_ONLY/);
+});
+
 test('order fulfillment rejects another teacher and cannot receive before an accepted order result', async () => {
   const db = new TestD1(); seed(db);
   const now = Date.now();
@@ -356,6 +392,38 @@ test('Kim Namgi can record the accepted legacy Wordmaster price once without mut
   const changed = await call(db, { auth, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 18000 });
   assert.equal(changed.status, 409);
   assert.equal(changed.body.code, 'ORDER_PRICE_ALREADY_SET');
+});
+
+test('a matching immutable correction becomes the displayed and idempotent effective price', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'corrected-price', title: '[주문] 교재', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트출판사',
+    orderItems: [{ bookId: 'BK01', title: '다른 교재', qty: '1권', studentIds: ['student-a'] }],
+    origin: 'staff', createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, KIM_NAMGI_STAFF_ID, JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-corrected', 'key-corrected', task.id, '테스트출판사', 1, 'f'.repeat(64), 'accepted', now, now).run();
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,teacher_received_at,teacher_received_by,student_handed_at,student_handed_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 'BK01', JSON.stringify(['student-a']), 'student_handed', 2,
+      now - 1000, KIM_NAMGI_STAFF_ID, now, KIM_NAMGI_STAFF_ID, now - 1000, now).run();
+  db.prepare('INSERT INTO book_order_item_prices(app,task_id,item_index,unit_price,created_at,created_by) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 16000, now - 500, 'director').run();
+  db.prepare('INSERT INTO book_order_item_price_corrections(app,task_id,item_index,previous_unit_price,corrected_unit_price,reason_code,created_at,created_by) VALUES(?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 16000, 17000, 'director_amount_correction', now, 'director').run();
+
+  const listed = await call(db, { auth: admin, action: 'list' });
+  const row = listed.body.orders.find(item => item.taskId === task.id);
+  assert.equal(row.unitPrice, 17000);
+  assert.equal(row.priceCorrectedAt, now);
+  assert.equal(row.canSetUnitPrice, false);
+  const duplicate = await call(db, { auth: admin, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 17000 });
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.idempotent, true);
+  const oldValue = await call(db, { auth: admin, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 16000 });
+  assert.equal(oldValue.status, 409);
+  assert.equal(oldValue.body.code, 'ORDER_PRICE_ALREADY_SET');
 });
 
 test('one-time price accepts Kim Namgi student-handed legacy books and rejects other orders', async () => {
