@@ -723,10 +723,10 @@
   }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
   /* 브라우저별 dialog 구현을 쓰지 않고 최상위 고정 레이어 하나로 모든 팝업을 연다. */
-  .modal { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; background: rgba(27,58,92,.55); padding: 16px; place-items: center; z-index: 150; }
+  .modal { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; background: rgba(27,58,92,.55); padding: 16px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; place-items: center; z-index: 150; }
   .modal:not([hidden]) { display: grid; }
   .modal[hidden] { display: none; }
-  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; min-height: 0; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
   .modal-box [data-act="closemodal"] { min-width: 44px; min-height: 44px; }
   .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
   .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
@@ -866,11 +866,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.18"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.18"></script>
-<script src="./asset-core.js?v=2026-08-18.18"></script>
-<script src="./qr-core.js?v=2026-08-18.18"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.18"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.19"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.19"></script>
+<script src="./asset-core.js?v=2026-08-18.19"></script>
+<script src="./qr-core.js?v=2026-08-18.19"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.19"></script>
 <script>
 "use strict";
 
@@ -13224,7 +13224,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.18';
+const APP_VER = '2026-08-18.19';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
