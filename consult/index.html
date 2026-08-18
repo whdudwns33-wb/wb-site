@@ -719,8 +719,19 @@
 const LS_KEY = 'wb_consult_v1';
 const METAMATH_CENTER_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=center';
 const METAMATH_STUDENT_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=student';
-const CLASSCARD_URL = 'https://www.classcard.net/Login';
+const CLASSCARD_ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=classcard.net';
+const CLASSCARD_IOS_APP_URL = 'https://apps.apple.com/kr/app/id1176435331';
 const STUDYFORCE_URL = 'https://hol.sfcenter.co.kr/';
+
+function classcardAppUrl(userAgent, maxTouchPoints) {
+  const ua = String(userAgent || '');
+  if (/Android/i.test(ua)) return CLASSCARD_ANDROID_APP_URL;
+  if (/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && Number(maxTouchPoints) > 1)) {
+    return CLASSCARD_IOS_APP_URL;
+  }
+  return '';
+}
+
 const LEARNING_SOURCES = Object.freeze({
   metamath: {
     icon: '🧮', label: '메타수학', centerUrl: METAMATH_CENTER_URL, studentUrl: METAMATH_STUDENT_URL,
@@ -731,8 +742,8 @@ const LEARNING_SOURCES = Object.freeze({
     noteHint: '점수·오답 수 메모 (예: 82점, 오답 6개)'
   },
   classcard: {
-    icon: '🔤', label: '클래스카드', centerUrl: CLASSCARD_URL, studentUrl: CLASSCARD_URL,
-    centerAction: '클래스카드 관리 열기', studentAction: '클래스카드 학습하기',
+    icon: '🔤', label: '클래스카드', appOnly: true,
+    centerAction: '스토어에서 클래스카드 열기', studentAction: '스토어에서 클래스카드 열기',
     detail: '클래스카드에서 영어단어 학습',
     guide: '클래스카드를 열어 배정된 단어를 암기하고 테스트까지 마친 뒤 단계를 체크하세요.',
     steps: ['단어 학습하기', '테스트 완료하기'],
@@ -3555,17 +3566,25 @@ function learningSourceCard(me, editable, sourceKey) {
   if (!source) return '';
   const director = session.isAdmin;
   const academy = director || isManager();
+  const appOnly = source.appOnly === true;
   const list = learningTasksFor(me.id, sourceKey);
   const help = director
     ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
     : academy
-      ? esc(source.detail) + (source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
+      ? esc(source.detail) + (appOnly ? ' 앱 연결은 휴대폰에서 이용합니다.' : source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
       : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
-  const url = academy && source.centerUrl ? source.centerUrl : source.studentUrl;
+  const url = appOnly
+    ? classcardAppUrl(navigator.userAgent, navigator.maxTouchPoints)
+    : academy && source.centerUrl ? source.centerUrl : source.studentUrl;
   const action = academy ? source.centerAction : source.studentAction;
   const link = url
-    ? '<a class="btn ' + (academy ? 'btn-ghost' : 'btn-primary') + '" href="' + esc(url) +
-      '" target="_blank" rel="noopener noreferrer">' + source.icon + ' ' + esc(action) + ' ↗</a>'
+    ? '<a class="btn ' + (academy ? 'btn-ghost' : 'btn-primary') + '" href="' + esc(url) + '"' +
+      (appOnly ? '' : ' target="_blank" rel="noopener noreferrer"') + '>' + source.icon + ' ' + esc(action) + (appOnly ? '' : ' ↗') + '</a>'
+    : '';
+  const appHint = appOnly
+    ? '<div class="small muted mb8">' + (url
+        ? '공식 앱 스토어 화면으로 이동합니다. 이미 설치했다면 ‘열기’를 눌러 주세요.'
+        : '클래스카드 앱 연결은 휴대폰에서 이 화면을 열어 이용하세요.') + '</div>'
     : '';
   const addLabel = sourceKey === 'exam_material' ? '＋ 자료 보내기' : '＋ 과제 보내기';
 
@@ -3575,6 +3594,7 @@ function learningSourceCard(me, editable, sourceKey) {
     '<div class="row wraprow mb14" style="gap:8px">' +
       (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
     '</div>' +
+    appHint +
     (list.length
       ? list.map(t => taskRow(t, t.start, editable, false)).join('')
       : '<div class="small muted">등록된 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
@@ -7942,7 +7962,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.17';
+const APP_VER = '2026-08-18.18';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
