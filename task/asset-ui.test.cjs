@@ -92,7 +92,7 @@ test('detail panel starts collapsed and has a toggle', () => {
 
 /* 티어 문자와 배치 이름을 함께 띄우면 같은 것을 두 이름으로 부르게 된다. */
 test('the row shows placement names, not tier letters', () => {
-  const row = html.match(/function deviceRow\(a\) \{[\s\S]*?\n\}\n/);
+  const row = html.match(/function deviceRow\(a\) \{[\s\S]*?\r?\n\}\r?\n/);
   assert.ok(row, 'deviceRow found');
   assert.ok(row[0].includes('core.placeLabel('), 'placement is shown by name');
   assert.ok(!/rec\.tier/.test(row[0]), 'tier letters stay out of the operating screen');

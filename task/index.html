@@ -203,11 +203,15 @@
   /* ─── 단계 / 가이드 ─── */
   .opener { display: block; width: 100%; text-align: left; font-size: 12.5px; font-weight: 700; color: var(--deep-blue); padding: 4px 0; margin-top: 6px; }
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
-  .previous-memos > summary { list-style: none; cursor: pointer; }
-  .previous-memos > summary::-webkit-details-marker { display: none; }
-  .previous-memos > summary::before { content: '▸ '; }
-  .previous-memos[open] > summary::before { content: '▾ '; }
-  .previous-memos-body { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
+  .lesson-card-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .lesson-card-tab { min-height: 44px; border: 1px solid #B9D8E7; border-radius: 10px; padding: 9px 10px; background: #F5FBFE; color: var(--deep-blue); font-size: 12.5px; font-weight: 800; text-align: center; }
+  .lesson-card-tab[aria-expanded="true"] { border-color: var(--blue); background: #EAF7FC; box-shadow: inset 0 0 0 1px var(--blue); }
+  .lesson-progress-panel { padding-top: 0; overflow: hidden; }
+  .lesson-progress-section { padding-top: 12px; }
+  .lesson-progress-section + .lesson-progress-section { margin-top: 12px; border-top: 1px solid var(--line); }
+  .lesson-progress-section-title { margin-bottom: 8px; color: var(--deep-blue); font-size: 13px; font-weight: 800; }
+  .previous-memos-body { display: grid; gap: 8px; }
+  .lesson-briefing-instructions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
   .guide > summary { min-height: 32px; cursor: pointer; }
@@ -862,11 +866,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.17"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.17"></script>
-<script src="./asset-core.js?v=2026-08-18.17"></script>
-<script src="./qr-core.js?v=2026-08-18.17"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.17"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.18"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.18"></script>
+<script src="./asset-core.js?v=2026-08-18.18"></script>
+<script src="./qr-core.js?v=2026-08-18.18"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.18"></script>
 <script>
 "use strict";
 
@@ -2207,6 +2211,7 @@ function viewToday() {
 
   const rel = relLabel(cursor);
   const list = tasksFor(me.id, cursor);
+  if (list.some(isLesson) && !rosterDb && !rosterErr && !rosterLoading) loadRoster();
   ensureSessionModeData(list);
   const p = progress(me.id, cursor);
   const editable = session.isStaffLink || session.isAdmin;
@@ -2302,6 +2307,7 @@ function taskRow(t, date, editable, isCarry) {
   const steps = taskSteps(t, c);
   const detail = taskCardDetail(t);
   const hasDetail = steps.length || t.guide || t.target;
+  const lesson = isLesson(t);
   const open = openPanels.has(t.id + '|' + date);
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
 
@@ -2326,26 +2332,31 @@ function taskRow(t, date, editable, isCarry) {
   if (hasDetail && st !== 'done') {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
-  if (hasDetail) {
-    h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
-      (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+  if (lesson) {
+    h += '<div class="lesson-card-tabs" role="group" aria-label="수업 상세 보기">' +
+      '<button type="button" class="lesson-card-tab" data-act="lessonbriefing" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-haspopup="dialog">학생정보 · 업무지시</button>' +
+      '<button type="button" class="lesson-card-tab" data-act="panel" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
+        (open ? '수업진행 접기' : '수업진행' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button></div>';
+    if (open) h += taskPanel(t, date, c, editable);
+  } else {
+    if (hasDetail) {
+      h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
+        (open ? '▾ 접기' : '▸ 하는 방법 · 단계 열기' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button>';
+    }
+    if (open) h += taskPanel(t, date, c, editable);
+    h += taskMemoEditorHtml(t, date, c, editable);
   }
-  if (isLesson(t)) {
-    h += previousTaskMemosInline(t.id, date);
-  }
-  if (canEditGuardianPublication(t, date)) {
-    h += guardianPublicationHtml(t, date);
-  }
-  if (open) h += taskPanel(t, date, c, editable);
-
-  h += (editable
-      ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' +
-        (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">' +
-        esc((c && c.note) || '') + '</textarea><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
-        t.id + '" data-date="' + date + '">메모 저장</button></div>'
-      : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : ''));
 
   return h + '</div></div>';
+}
+
+function taskMemoEditorHtml(t, date, c, editable) {
+  return editable
+    ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' +
+      (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">' +
+      esc((c && c.note) || '') + '</textarea><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
+      t.id + '" data-date="' + date + '">메모 저장</button></div>'
+    : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : '');
 }
 
 function previousTaskMemos(taskId, beforeDate) {
@@ -2355,12 +2366,68 @@ function previousTaskMemos(taskId, beforeDate) {
     .slice(0, 3);
 }
 
-function previousTaskMemosInline(taskId, beforeDate) {
+function previousTaskMemosProgressHtml(taskId, beforeDate) {
   const rows = previousTaskMemos(taskId, beforeDate);
-  return '<details class="previous-memos"><summary class="opener">이전 수업 메모 보기</summary>' +
-    '<div class="previous-memos-body"><div class="card-sub mb14">' + esc(beforeDate) + ' 이전 기록</div>' +
+  return '<section class="lesson-progress-section previous-memos"><div class="lesson-progress-section-title">이전 수업 메모</div>' +
+    '<div class="previous-memos-body"><div class="card-sub">' + esc(beforeDate) + ' 이전 기록 · 최신순 3개</div>' +
     (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
-      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
+      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></section>';
+}
+
+function lessonWorkInstructionHtml(task, lessonDate) {
+  const field = (label, value) => '<div class="student-info-field wide"><b>' + esc(label) + '</b><span>' + esc(value || '미지정') + '</span></div>';
+  const referenceSteps = lessonReferenceSteps(task).map(step => String(step && step.label || '').trim()).filter(Boolean);
+  const rows = [
+    ['업무 제목', task.title],
+    ['수업일', lessonDate],
+    ['과목·반', [task.subject, task.className].filter(Boolean).join(' · ')],
+    ['수업 요일·시간', task.scheduleText],
+    ['등록 시간', task.time],
+    ['업무 상세', task.detail],
+    ['교재·현재 진도', task.materials],
+    ['온라인 프로그램', task.onlineProgram],
+    ['숙제 루틴과 수행률', task.homework],
+    ['학생 특징', task.studentTraits],
+    ['목표', task.goal],
+    ['특이사항·학부모 요청', task.parentRequest],
+    ['업무지시', task.guide],
+    ['기존 수업 참고 단계', referenceSteps.join('\n')],
+    ['목표 수량', task.target ? task.target + (task.unit || '건') : '']
+  ].filter(row => String(row[1] || '').trim());
+  return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
+    '<div class="card-sub mb14">관리자가 등록한 현재 수업 정보입니다. 선생님의 진행 기록은 수업 카드의 수업진행에서 입력합니다.</div>' +
+    '<div class="student-info-grid">' + (rows.length ? rows.map(row => field(row[0], row[1])).join('') :
+      '<div class="empty">등록된 추가 업무지시가 없습니다.</div>') + '</div></section>';
+}
+
+function showTodayLessonBriefing(taskId, lessonDate) {
+  const task = state.tasks.find(row => row.id === String(taskId || '') && !row.deleted);
+  if (!task || !isLesson(task)) return toast('수업 정보를 다시 불러와 주세요');
+  const stableStudentId = String(task.studentId || '');
+  const student = stableStudentId && rosterDb && Array.isArray(rosterDb.students)
+    ? rosterDb.students.find(row => String(row.id) === stableStudentId) : null;
+  let studentHtml;
+  if (student) {
+    studentHtml = rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id));
+  } else if (!stableStudentId) {
+    studentHtml = '<div class="hint"><b>학생 정보 연결 필요</b><br>이 수업에 stable studentId가 연결되지 않아 이름으로 학생을 추측하지 않습니다. 수업 등록 및 변경에서 실제 원생을 연결해 주세요.</div>';
+  } else if (rosterLoading) {
+    studentHtml = '<div class="hint"><b>학생 정보를 불러오는 중입니다</b><br>잠시 후 이 탭을 다시 열어 주세요.</div>';
+  } else if (rosterErr) {
+    studentHtml = '<div class="hint"><b>학생 정보를 불러오지 못했습니다</b><br>' + esc(rosterErr) + '</div>';
+  } else {
+    studentHtml = '<div class="hint"><b>현재 권한 범위에서 학생 정보를 찾지 못했습니다</b><br>원생 명단과 수업의 stable studentId 연결을 확인해 주세요.</div>';
+  }
+  const actions = [];
+  if (student && session.isAdmin) {
+    actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">원생 기본 정보 수정</button>');
+  }
+  if (canEditLessonTask(task)) {
+    actions.push('<button class="btn btn-ghost btn-block mt8" data-act="lessonedit" data-id="' + esc(task.id) + '">수업 정보 수정</button>');
+  } else if (canEditTask(task)) {
+    actions.push('<button class="btn btn-ghost btn-block mt8" data-act="etask" data-id="' + esc(task.id) + '">업무지시 수정</button>');
+  }
+  modal('학생정보 · 업무지시', studentHtml + lessonWorkInstructionHtml(task, lessonDate), actions.join(''));
 }
 
 /* 보호자 공개 내용은 내부 수업 메모와 완전히 분리해 서버의 수업일 정본에 저장한다. */
@@ -2630,46 +2697,57 @@ function acaflowLessonSummary(t, date) {
 }
 
 function taskPanel(t, date, c, editable) {
-  let h = '<div class="panel">';
+  const lesson = isLesson(t);
+  let h = '<div class="panel' + (lesson ? ' lesson-progress-panel' : '') + '">';
   const steps = taskSteps(t, c);
 
-  if (!usesStandardLessonDisplay(t) && t.guide) {
+  if (lesson && editable) {
+    const att = (c && c.att) || '';
+    h += '<section class="lesson-progress-section lesson-attendance"><div class="lesson-progress-section-title">학생 출결</div>' +
+      '<div class="row wraprow" style="gap:6px">' +
+      [['P', '출석'], ['L', '지각'], ['A', '결석']].map(([v, l]) =>
+        '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
+      ).join('') + '</div>' + makeupRequestHtml(t, date, c) + '</section>';
+  }
+
+  if (!lesson && !usesStandardLessonDisplay(t) && t.guide) {
     h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
   }
 
   if (steps.length) {
-    h += '<div style="margin-top:10px">' + steps.map((s, i) => {
+    h += (lesson ? '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 5단계 진행</div>' : '<div style="margin-top:10px">') + steps.map((s, i) => {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
         '<span>' + (i + 1) + '. ' + esc(s.label) + '</span></div>';
-    }).join('') + '</div>';
+    }).join('') + (lesson ? '</section>' : '</div>');
   }
 
   if (t.target) {
-    h += '<div class="counter"><span>진행 수량</span>' +
+    h += (lesson ? '<section class="lesson-progress-section">' : '') + '<div class="counter"><span>진행 수량</span>' +
       '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="-1"' : 'disabled') + '>−</button>' +
       '<input class="in" type="number" min="0" ' + (editable ? 'data-act="cntset" data-id="' + t.id + '" data-date="' + date + '"' : 'readonly') + ' value="' + ((c && c.count) || 0) + '">' +
       '<button class="btn btn-sm btn-ghost" ' + (editable ? 'data-act="cnt" data-id="' + t.id + '" data-date="' + date + '" data-n="1"' : 'disabled') + '>＋</button>' +
-      '<span class="muted">/ ' + t.target + esc(t.unit || '건') + '</span></div>';
+      '<span class="muted">/ ' + t.target + esc(t.unit || '건') + '</span></div>' + (lesson ? '</section>' : '');
   }
 
-  if (editable && isLesson(t)) {
-    const att = (c && c.att) || '';
-    h += '<div class="row wraprow mt14" style="gap:6px"><span class="fl" style="margin:0">학생 출결</span>' +
-      [['P', '출석'], ['L', '지각'], ['A', '결석']].map(([v, l]) =>
-        '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
-      ).join('') + '</div>';
-    h += makeupRequestHtml(t, date, c);
+  if (lesson) {
+    h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모</div>' +
+      taskMemoEditorHtml(t, date, c, editable) + '</section>';
+    if (canEditGuardianPublication(t, date)) {
+      h += '<section class="lesson-progress-section">' + guardianPublicationHtml(t, date) + '</section>';
+    }
+    h += previousTaskMemosProgressHtml(t.id, date);
   }
 
   if (editable) {
     const blocked = !!(c && c.blocked);
-    h += '<div class="row wraprow mt14" style="gap:8px">' +
+    h += (lesson ? '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 후속 업무</div>' : '') +
+      '<div class="row wraprow mt14" style="gap:8px">' +
       '<button class="btn btn-sm ' + (blocked ? 'btn-danger' : 'btn-warn') + '" ' +
         'data-act="block" data-id="' + t.id + '" data-date="' + date + '">' +
         (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
-      (isLesson(t)
+      (lesson
         ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="acaflowlessoncopy" data-id="' + t.id + '" data-date="' + date + '">아카플로우 코멘트용 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" data-name="' + esc(t.studentName || studentOf(t)) + '">📞 연락 기록</button>'
@@ -2677,13 +2755,10 @@ function taskPanel(t, date, c, editable) {
       (t.title.startsWith('[주문] ')
         ? '<button class="btn btn-sm btn-navy" data-act="ordermsg" data-id="' + t.id + '">📱 발주 문자 보내기</button>'
         : '') +
-      (canEditLessonTask(t)
-        ? '<button class="btn btn-sm btn-ghost" data-act="lessonedit" data-id="' + t.id + '">✏️ 수업 정보 수정</button>'
-        : (canEditTask(t)
-          ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ ' +
-            (isLesson(t) ? '수업 정보 수정' : '업무 수정') + '</button>'
-          : (canProposeLessonChange(t) ? '<button class="btn btn-sm btn-ghost" data-act="lcpropose" data-id="' + t.id + '">📝 변경 요청</button>' : ''))) +
-    '</div>';
+      (lesson
+        ? (canProposeLessonChange(t) ? '<button class="btn btn-sm btn-ghost" data-act="lcpropose" data-id="' + t.id + '">📝 변경 요청</button>' : '')
+        : (canEditTask(t) ? '<button class="btn btn-sm btn-ghost" data-act="etask" data-id="' + t.id + '">✏️ 업무 수정</button>' : '')) +
+      '</div>' + (lesson ? '</section>' : '');
   }
   return h + '</div>';
 }
@@ -12081,6 +12156,7 @@ document.addEventListener('click', ev => {
       render();
       break;
     }
+    case 'lessonbriefing': showTodayLessonBriefing(String(id || ''), String(date || cursor)); break;
     case 'notesave': {
       const editor = el.closest('.memo-editor');
       const noteEl = editor && editor.querySelector('[data-act="note"]');
@@ -13148,7 +13224,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.17';
+const APP_VER = '2026-08-18.18';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
