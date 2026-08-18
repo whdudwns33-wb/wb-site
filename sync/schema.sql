@@ -506,6 +506,37 @@ BEGIN
   SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_PRICE_APPEND_ONLY');
 END;
 
+-- 승인된 금액 정정을 원기록과 분리해 한 번만 남기는 불변 원장.
+CREATE TABLE IF NOT EXISTS book_order_item_price_corrections (
+  app                  TEXT    NOT NULL CHECK (app = 'task'),
+  task_id              TEXT    NOT NULL CHECK (
+    length(task_id) BETWEEN 1 AND 128 AND task_id NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  item_index           INTEGER NOT NULL CHECK (item_index BETWEEN 0 AND 49),
+  previous_unit_price  INTEGER NOT NULL CHECK (previous_unit_price BETWEEN 1 AND 10000000),
+  corrected_unit_price INTEGER NOT NULL CHECK (
+    corrected_unit_price BETWEEN 1 AND 10000000 AND corrected_unit_price <> previous_unit_price
+  ),
+  reason_code          TEXT    NOT NULL CHECK (reason_code = 'director_amount_correction'),
+  created_at           INTEGER NOT NULL CHECK (created_at > 0),
+  created_by           TEXT    NOT NULL CHECK (
+    length(created_by) BETWEEN 1 AND 128 AND created_by NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  PRIMARY KEY (app, task_id, item_index)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_price_corrections_no_update
+BEFORE UPDATE ON book_order_item_price_corrections
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_PRICE_CORRECTION_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_price_corrections_no_delete
+BEFORE DELETE ON book_order_item_price_corrections
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_PRICE_CORRECTION_APPEND_ONLY');
+END;
+
 -- 새 주문 생성 시점의 학생 정체성 봉인. 이름 원문은 저장하지 않으며 과거 주문은 자동 이관하지 않는다.
 CREATE TABLE IF NOT EXISTS book_order_student_snapshots (
   app                   TEXT    NOT NULL CHECK (app = 'task'),
