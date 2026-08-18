@@ -175,7 +175,7 @@ test('new order moves through accepted, teacher received, student handed, and ad
   const task = {
     id: 'order-a', staffId: 'teacher-a', title: '[주문] 새 교재', deleted: false,
     orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트출판사',
-    orderItems: [{ bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'] }],
+    orderItems: [{ bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'], unitPrice: 15000 }],
     origin: 'staff', createdAt: now, updatedAt: now
   };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
@@ -183,6 +183,11 @@ test('new order moves through accepted, teacher received, student handed, and ad
 
   const waiting = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
   assert.equal(waiting.body.orders[0].stage, 'order_waiting');
+  assert.equal(waiting.body.orders[0].unitPrice, 15000);
+  assert.equal(waiting.body.orders[0].orderRequestedAt, now);
+  assert.equal(waiting.body.orders[0].orderCompletedAt, null);
+  assert.equal(waiting.body.orders[0].teacherReceivedAt, null);
+  assert.equal(waiting.body.orders[0].studentHandedAt, null);
   assert.deepEqual(waiting.body.orders[0].students.map(student => student.id), ['student-a']);
   assert.equal(JSON.stringify(waiting.body.orders).includes('teacherIds'), false);
 
@@ -193,6 +198,7 @@ test('new order moves through accepted, teacher received, student handed, and ad
 
   const accepted = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
   assert.equal(accepted.body.orders[0].stage, 'ordered');
+  assert.equal(accepted.body.orders[0].orderCompletedAt, now);
   const received = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
     taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 });
   assert.equal(received.status, 200);
@@ -209,6 +215,11 @@ test('new order moves through accepted, teacher received, student handed, and ad
   assert.equal(academy.body.status, 'academy_registered');
   const completed = await call(db, { auth: admin, action: 'list' });
   assert.equal(completed.body.orders[0].stage, 'student_handed');
+  assert.equal(completed.body.orders[0].unitPrice, 15000);
+  assert.equal(completed.body.orders[0].orderRequestedAt, now);
+  assert.equal(completed.body.orders[0].orderCompletedAt, now);
+  assert.ok(completed.body.orders[0].teacherReceivedAt);
+  assert.ok(completed.body.orders[0].studentHandedAt);
   assert.ok(completed.body.orders[0].academyRegisteredAt);
 });
 

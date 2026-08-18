@@ -538,8 +538,14 @@
   .book-order-stage[open] > summary { border-bottom: 1px solid var(--light-gray); background: #F8FBFD; }
   .book-order-stage-list { display: grid; gap: 8px; padding: 10px; }
   .book-order-row { padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .book-order-money { margin-top: 8px; color: var(--navy); font-size: 12px; font-weight: 900; }
+  .book-order-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+  .book-order-date { min-width: 0; padding: 7px 8px; border-radius: 8px; background: var(--light-gray); }
+  .book-order-date b { display: block; color: var(--navy); font-size: 10.5px; }
+  .book-order-date span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 10.5px; font-weight: 700; overflow-wrap: anywhere; }
   .book-order-student-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
   .book-order-student { padding: 4px 7px; border-radius: 999px; background: var(--light-gray); color: var(--navy); font-size: 11px; font-weight: 800; }
+  .book-order-price { margin: 9px 0; }
   .book-order-picker { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFD; }
   .book-order-picker > summary { min-height: 46px; padding: 11px; cursor: pointer; color: var(--navy); font-weight: 900; }
   .book-order-picker-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 0 10px 10px; }
@@ -680,6 +686,7 @@
     .ops-toolbar .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
     .ops-toolbar .chip { min-height: 44px; padding: 6px 3px; }
     .book-issue-grid, .transport-route-grid { grid-template-columns: 1fr; }
+    .book-order-dates { grid-template-columns: 1fr; }
     .book-order-picker-list { grid-template-columns: 1fr; }
     .transport-run-list { grid-template-columns: 1fr; }
     .transport-run-board-head { align-items: stretch; }
@@ -851,11 +858,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.12"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.12"></script>
-<script src="./asset-core.js?v=2026-08-18.12"></script>
-<script src="./qr-core.js?v=2026-08-18.12"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.12"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.13"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.13"></script>
+<script src="./asset-core.js?v=2026-08-18.13"></script>
+<script src="./qr-core.js?v=2026-08-18.13"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.13"></script>
 <script>
 "use strict";
 
@@ -6623,9 +6630,22 @@ function orderStudentPicker(row) {
     '</div></details>';
 }
 
+function orderPriceInput(row) {
+  return '<div class="book-order-price"><label class="fl">교재 금액 (1권 기준)</label>' +
+    '<input class="in" type="number" min="1" max="10000000" step="100" inputmode="numeric" autocomplete="off" ' +
+      'data-order-unit-price data-book="' + esc(row.id) + '" aria-label="' + esc(row.title) + ' 1권 금액" placeholder="예: 15000">' +
+    '<div class="small muted mt8">선택 학생 수에 따라 전체 주문 금액을 자동 계산합니다.</div></div>';
+}
+
 function selectedOrderStudentIds(bookId) {
   return Array.from(document.querySelectorAll('[data-order-student][data-book="' + CSS.escape(String(bookId)) + '"]:checked'))
     .map(input => String(input.value || '')).filter(Boolean);
+}
+
+function selectedOrderUnitPrice(bookId) {
+  const input = document.querySelector('[data-order-unit-price][data-book="' + CSS.escape(String(bookId)) + '"]');
+  const value = Number(input && input.value);
+  return Number.isInteger(value) && value >= 1 && value <= 10000000 ? value : null;
 }
 
 function singleOrderModal(book) {
@@ -6634,7 +6654,7 @@ function singleOrderModal(book) {
   batchOrderTaskId = '';
   modal('교재 주문 — ' + book.title,
     '<div class="hint mb14">사용할 학생을 선택하면 선택 인원이 주문 수량이 됩니다. 학생 이름이 아닌 stable studentId로 주문에 연결합니다.</div>' +
-    orderStudentPicker(batchDraft[0]),
+    orderPriceInput(batchDraft[0]) + orderStudentPicker(batchDraft[0]),
     '<button class="btn btn-primary btn-block mt14" data-act="bkordersubmit">선택 학생 수량으로 주문대기 등록</button>');
 }
 
@@ -6652,7 +6672,7 @@ function batchOrderModal(vendorKey) {
   modal(vendorLabel + ' — ' + books.length + '종 한번에 주문',
     '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 등록합니다. 저녁 8시에 다른 주문과 함께 문자 한 통으로 발송됩니다.' +
       (outsideSearch ? '<br><b>검색 밖 ' + outsideSearch + '종 포함</b> — 아래 전체 ' + books.length + '종을 확인해 주세요.' : '') + '</div>' +
-    batchDraft.map(row => '<div class="field"><label class="fl">' + esc(row.title) + '</label>' + orderStudentPicker(row) + '</div>').join(''),
+    batchDraft.map(row => '<div class="field"><label class="fl">' + esc(row.title) + '</label>' + orderPriceInput(row) + orderStudentPicker(row) + '</div>').join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">선택 학생 수량으로 주문대기 등록</button>');
 }
 
@@ -6661,7 +6681,7 @@ function saveManualOnlineBookOrder(items) {
   const at = now();
   const orderItems = items.map(item => ({
     bookId: item.bookId, title: item.title, studentIds: item.studentIds,
-    qty: item.studentIds.length + '권'
+    qty: item.studentIds.length + '권', unitPrice: item.unitPrice
   }));
   const titleMain = orderItems.length > 1 ? batchVendorName + ' — ' + orderItems.length + '권' : orderItems[0].title;
   const task = {
@@ -6706,7 +6726,7 @@ async function submitBookOrder(items, button) {
       app: SYNC_APP, auth: auth, action: 'create', taskId: taskId,
       vendorName: batchVendorName,
       items: items.map(item => ({
-        bookId: item.bookId, title: item.title, studentIds: item.studentIds
+        bookId: item.bookId, title: item.title, studentIds: item.studentIds, unitPrice: item.unitPrice
       }))
     });
     if (!result.task || result.task.id !== taskId || result.task.orderDelivery !== 'scheduled_batch_v1' ||
@@ -7431,11 +7451,38 @@ function bookOrderActionButtons(row) {
   return '';
 }
 
+function bookOrderDateText(value) {
+  const at = Number(value);
+  if (!Number.isFinite(at) || at <= 0) return '미완료';
+  const date = new Date(at);
+  return Number.isNaN(date.getTime()) ? '미완료' : date.toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function bookOrderMoneyHtml(row) {
+  const unitPrice = Number(row.unitPrice);
+  if (!Number.isInteger(unitPrice) || unitPrice < 1) return '<div class="book-order-money">교재 금액 · 미입력</div>';
+  const quantity = Math.max(0, Number(row.quantity || 0));
+  return '<div class="book-order-money">교재 금액 · 권당 ' + unitPrice.toLocaleString('ko-KR') +
+    '원 · 합계 ' + (unitPrice * quantity).toLocaleString('ko-KR') + '원</div>';
+}
+
+function bookOrderDatesHtml(row) {
+  return '<div class="book-order-dates" aria-label="교재 주문 단계별 날짜">' + [
+    ['주문요청', row.orderRequestedAt],
+    ['주문완료', row.orderCompletedAt],
+    ['수령완료', row.teacherReceivedAt],
+    ['배부완료', row.studentHandedAt]
+  ].map(item => '<div class="book-order-date"><b>' + item[0] + '</b><span>' + bookOrderDateText(item[1]) + '</span></div>').join('') + '</div>';
+}
+
 function bookOrderRowHtml(row) {
   const label = bookOrderStatusLabel(row);
   const students = Array.isArray(row.students) ? row.students : [];
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(row.vendorName || '미등록') + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
+    bookOrderMoneyHtml(row) + bookOrderDatesHtml(row) +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' + esc(student.name) +
       (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
@@ -12275,9 +12322,11 @@ document.addEventListener('click', ev => {
     case 'bkordersubmit': {
       if (!batchDraft || batchDraft.length !== 1) break;
       const row = batchDraft[0];
+      const unitPrice = selectedOrderUnitPrice(row.id);
+      if (!unitPrice) return toast('교재 1권 금액을 1원 이상 정확히 입력해 주세요');
       const studentIds = selectedOrderStudentIds(row.id);
       if (!studentIds.length) return toast('이 교재를 사용할 학생을 한 명 이상 선택해 주세요');
-      submitBookOrder([{ bookId: row.id, title: row.title, studentIds: studentIds }], el);
+      submitBookOrder([{ bookId: row.id, title: row.title, studentIds: studentIds, unitPrice: unitPrice }], el);
       break;
     }
     case 'bkselect': {
@@ -12291,8 +12340,10 @@ document.addEventListener('click', ev => {
       const items = batchDraft.map(row => ({
         bookId: row.id,
         title: row.title,
-        studentIds: selectedOrderStudentIds(row.id)
+        studentIds: selectedOrderStudentIds(row.id),
+        unitPrice: selectedOrderUnitPrice(row.id)
       }));
+      if (items.some(item => !item.unitPrice)) return toast('각 교재의 1권 금액을 모두 정확히 입력해 주세요');
       if (items.some(item => !item.studentIds.length)) return toast('각 교재마다 사용할 학생을 한 명 이상 선택해 주세요');
       submitBookOrder(items, el);
       break;
@@ -13048,7 +13099,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.12';
+const APP_VER = '2026-08-18.13';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
