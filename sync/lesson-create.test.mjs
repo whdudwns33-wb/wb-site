@@ -408,6 +408,27 @@ test('a legacy nine-field task is corrected in place instead of duplicated', asy
   assert.equal(db.tasks.size, 1);
 });
 
+test('admin can convert an owner-scoped legacy lesson and restore its missing staff id', async () => {
+  const db = new FakeDB();
+  const legacy = {
+    id: 'legacy-title-lesson', title: '[수업] 기존 학생 수업', staffId: '', origin: 'admin',
+    createdAt: 50, updatedAt: 100, deleted: false, steps: [], groupId: 'legacy-title-group'
+  };
+  db.tasks.set(legacy.id, {
+    owner: 'teacher-1', data: JSON.stringify(legacy), updatedAt: legacy.updatedAt, srvAt: legacy.updatedAt
+  });
+  const result = await call(db, {
+    staffId: 'teacher-1', sourceTaskId: legacy.id,
+    lesson: validLesson({ studentId: 'student-a' }), expectedUpdatedAt: legacy.updatedAt
+  }, { scope: 'all' });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.task.id, legacy.id);
+  assert.equal(result.data.task.staffId, 'teacher-1');
+  assert.equal(result.data.task.studentId, 'student-a');
+  assert.equal(result.data.task.taskKind, 'lesson_instruction');
+  assert.equal(result.data.task.scheduleStatus, 'confirmed');
+});
+
 test('staff cannot overwrite a manager-created assignment', async () => {
   const db = new FakeDB();
   const managed = await buildLessonTask(assignedLesson(), 'teacher-1', 'manager', 100);

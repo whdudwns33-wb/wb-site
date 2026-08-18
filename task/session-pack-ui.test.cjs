@@ -93,7 +93,7 @@ test('session mode badges apply only to structured session-pack eligible lessons
   const source = block('function sessionModeLessonTask(task)', 'function sessionPackForLessonTask(task)');
   assert.match(helpers, /const isSessionLessonTask =/);
   assert.match(helpers, /taskKind === 'lesson_instruction'/);
-  assert.doesNotMatch(helpers.match(/const isSessionLessonTask[\s\S]*?;\n/)[0], /\[수업\]|컨설팅/);
+  assert.doesNotMatch(helpers.match(/const isSessionLessonTask[\s\S]*?;\r?\n/)[0], /\[수업\]|컨설팅/);
   assert.match(source, /return isSessionLessonTask\(task\)/);
 });
 

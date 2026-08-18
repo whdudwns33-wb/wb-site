@@ -5,9 +5,10 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_ORDER_TASK_ID = /^ord_[A-Za-z0-9_-]{8,120}$/;
 const MAX_ITEMS = 50;
 const MAX_STUDENTS = 200;
+const MAX_UNIT_PRICE = 10000000;
 export const MAX_BOOK_ORDER_MESSAGE_BYTES = 2000;
 const ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'vendorName', 'items', 'expectedUpdatedAt']);
-const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds']);
+const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds', 'unitPrice']);
 
 function text(value, max, empty) {
   const cleaned = String(value == null ? '' : value).normalize('NFKC').trim();
@@ -57,11 +58,19 @@ async function itemIdentity(item) {
   const bookId = String(item && item.bookId || '');
   const title = text(item && item.title, 160, false);
   const studentIds = normalizedStudentIds(item);
-  if (!SAFE_ID.test(bookId) || !title || !studentIds) return null;
+  const hasUnitPrice = !!item && Object.prototype.hasOwnProperty.call(item, 'unitPrice');
+  const unitPrice = hasUnitPrice ? Number(item.unitPrice) : null;
+  if (!SAFE_ID.test(bookId) || !title || !studentIds ||
+      (hasUnitPrice && (!Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > MAX_UNIT_PRICE))) return null;
   const qty = studentIds.length + '권';
   const studentSetHash = await sha256Hex(JSON.stringify(studentIds));
-  const itemIdentityHash = await sha256Hex(JSON.stringify([bookId, title, qty, studentSetHash]));
-  return { bookId, title, studentIds, qty, studentSetHash, itemIdentityHash };
+  const identityFields = [bookId, title, qty, studentSetHash];
+  if (hasUnitPrice) identityFields.push(unitPrice);
+  const itemIdentityHash = await sha256Hex(JSON.stringify(identityFields));
+  return {
+    bookId, title, studentIds, qty, studentSetHash, itemIdentityHash,
+    ...(hasUnitPrice ? { unitPrice } : {})
+  };
 }
 
 async function taskIdentityHash(taskId, ownerId, vendorName, items) {
@@ -188,7 +197,9 @@ function requestError(body) {
       !SAFE_ORDER_TASK_ID.test(String(body.taskId || '')) || !Array.isArray(body.items) ||
       !body.items.length || body.items.length > MAX_ITEMS) return true;
   return body.items.some(item => !item || typeof item !== 'object' || Array.isArray(item) ||
-    Object.keys(item).some(key => !ALLOWED_ITEM_KEYS.has(key)));
+    Object.keys(item).some(key => !ALLOWED_ITEM_KEYS.has(key)) ||
+    !Object.prototype.hasOwnProperty.call(item, 'unitPrice') ||
+    !Number.isInteger(item.unitPrice) || item.unitPrice < 1 || item.unitPrice > MAX_UNIT_PRICE);
 }
 
 function cancelRequestError(body) {
@@ -236,7 +247,8 @@ function canonicalTask(taskId, ownerId, vendorName, items, now) {
     carry: true,
     orderVendor: vendorName,
     orderItems: items.map(item => ({
-      bookId: item.bookId, title: item.title, studentIds: item.studentIds, qty: item.qty
+      bookId: item.bookId, title: item.title, studentIds: item.studentIds, qty: item.qty,
+      unitPrice: item.unitPrice
     })),
     orderDelivery: 'scheduled_batch_v1',
     orderIdentityVersion: 1,

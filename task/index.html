@@ -179,6 +179,9 @@
   .guardian-publication .btn, .guardian-publication-retry { min-height: 44px; }
   .guardian-publication-status { margin-top: 8px; color: var(--mid-gray); font-size: 12px; font-weight: 700; }
   .guardian-publication-status.is-error { color: #9E3629; }
+  .publication-audit-item { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .publication-audit-reason { margin-top: 7px; padding: 8px 10px; border-radius: 9px; background: #FFF5EA; color: #8A4B16; font-size: 12.5px; font-weight: 700; }
+  .publication-audit-reason b { display: inline-block; min-width: 62px; color: #68350E; }
   .student-self-check-review { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #B9E3C7; }
   .student-self-check-review .btn { min-height: 44px; }
   .student-self-check-review-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -535,8 +538,14 @@
   .book-order-stage[open] > summary { border-bottom: 1px solid var(--light-gray); background: #F8FBFD; }
   .book-order-stage-list { display: grid; gap: 8px; padding: 10px; }
   .book-order-row { padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .book-order-money { margin-top: 8px; color: var(--navy); font-size: 12px; font-weight: 900; }
+  .book-order-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; }
+  .book-order-date { min-width: 0; padding: 7px 8px; border-radius: 8px; background: var(--light-gray); }
+  .book-order-date b { display: block; color: var(--navy); font-size: 10.5px; }
+  .book-order-date span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 10.5px; font-weight: 700; overflow-wrap: anywhere; }
   .book-order-student-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
   .book-order-student { padding: 4px 7px; border-radius: 999px; background: var(--light-gray); color: var(--navy); font-size: 11px; font-weight: 800; }
+  .book-order-price { margin: 9px 0; }
   .book-order-picker { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFD; }
   .book-order-picker > summary { min-height: 46px; padding: 11px; cursor: pointer; color: var(--navy); font-weight: 900; }
   .book-order-picker-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 0 10px 10px; }
@@ -677,6 +686,7 @@
     .ops-toolbar .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 8px; }
     .ops-toolbar .chip { min-height: 44px; padding: 6px 3px; }
     .book-issue-grid, .transport-route-grid { grid-template-columns: 1fr; }
+    .book-order-dates { grid-template-columns: 1fr; }
     .book-order-picker-list { grid-template-columns: 1fr; }
     .transport-run-list { grid-template-columns: 1fr; }
     .transport-run-board-head { align-items: stretch; }
@@ -848,11 +858,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-18.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-18.4"></script>
-<script src="./asset-core.js?v=2026-08-18.4"></script>
-<script src="./qr-core.js?v=2026-08-18.4"></script>
-<script src="./acaflow-import-core.js?v=2026-08-18.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-18.13"></script>
+<script src="./schedule-board-core.js?v=2026-08-18.13"></script>
+<script src="./asset-core.js?v=2026-08-18.13"></script>
+<script src="./qr-core.js?v=2026-08-18.13"></script>
+<script src="./acaflow-import-core.js?v=2026-08-18.13"></script>
 <script>
 "use strict";
 
@@ -2355,8 +2365,19 @@ function guardianPublicationKey(taskId, lessonDate) {
 }
 
 function canEditGuardianPublication(task, lessonDate) {
-  return !!(task && task.studentId && lessonDate === today() && session.isStaffLink &&
-    hasVerifiedPersonAuth() && task.staffId === session.staffId && isSessionLessonTask(task));
+  if (!task || lessonDate !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
+      task.staffId !== session.staffId || task.taskKind !== 'lesson_instruction' ||
+      task.scheduleStatus !== 'confirmed' || !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) ||
+      !rosterDb || !assignedLessonStudents().some(student => String(student.id) === String(task.studentId)) ||
+      !Array.isArray(task.scheduleSlots)) return false;
+  const weekday = dowOf(lessonDate);
+  return task.scheduleSlots.some(slot => {
+    const validFrom = String(slot && (slot.validFrom || slot.startDate) || '');
+    const validTo = String(slot && (slot.validTo || slot.endDate) || '');
+    return slot && Array.isArray(slot.days) && slot.days.map(Number).includes(weekday) &&
+      /^\d{2}:\d{2}$/.test(String(slot.startTime || '')) && /^\d{2}:\d{2}$/.test(String(slot.endTime || '')) &&
+      (!validFrom || validFrom <= lessonDate) && (!validTo || validTo >= lessonDate);
+  });
 }
 
 function normalizeGuardianPublication(row) {
@@ -3056,6 +3077,11 @@ let lessonAssignmentRequests = [];
 let lessonAssignmentRequestsLoaded = false;
 let lessonAssignmentRequestsLoading = false;
 let lessonAssignmentRequestsError = '';
+let publicationReadinessRows = [];
+let publicationReadinessLoaded = false;
+let publicationReadinessLoading = false;
+let publicationReadinessError = '';
+let publicationReadinessSummary = { missingCount: 0, readyCount: 0, date: '' };
 
 function lessonDraftStorageKey() {
   return 'wb_task_lesson_draft_v1:' + (session.isStaffLink ? session.staffId : 'admin');
@@ -3101,6 +3127,116 @@ function currentLessonDraft() {
 
 function assignedLessonStudents() {
   return activeIn(today().slice(0, 7));
+}
+
+function lessonFormStudents() {
+  return activeIn(today().slice(0, 7)).slice().sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'ko') || String(a.grade || '').localeCompare(String(b.grade || ''), 'ko'));
+}
+
+async function loadPublicationReadiness(force) {
+  if (!session.isAdmin || publicationReadinessLoading || (publicationReadinessLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  publicationReadinessLoading = true;
+  publicationReadinessError = '';
+  if (route === 'lesson') renderAfterSync();
+  try {
+    const result = await sync.post('/parent-portal', {
+      app: SYNC_APP, action: 'publication_readiness_list', auth: auth
+    });
+    publicationReadinessRows = Array.isArray(result.lessons) ? result.lessons.filter(row => row && row.taskId) : [];
+    publicationReadinessSummary = {
+      missingCount: Number(result.missingCount) || 0,
+      readyCount: Number(result.readyCount) || 0,
+      date: String(result.date || '')
+    };
+    publicationReadinessLoaded = true;
+  } catch (error) {
+    publicationReadinessError = String(error && error.message || error);
+  } finally {
+    publicationReadinessLoading = false;
+    if (route === 'lesson') renderAfterSync();
+  }
+}
+
+function publicationReadinessReasonHtml(row, field, labelText, readyText) {
+  const reasons = (row.reasons || []).filter(reason => reason && reason.field === field);
+  if (!reasons.length) return '<div class="small muted mt8"><b>' + esc(labelText) + '</b> · ' + esc(readyText) + '</div>';
+  return reasons.map(reason => '<div class="publication-audit-reason"><b>' + esc(labelText) + '</b>' + esc(reason.message || '확인 필요') + '</div>').join('');
+}
+
+function publicationReadinessHtml() {
+  if (!session.isAdmin) return '';
+  if (!publicationReadinessLoaded && !publicationReadinessLoading && !publicationReadinessError) {
+    setTimeout(() => loadPublicationReadiness(false), 0);
+  }
+  const head = '<section class="card lesson-review"><div class="between"><div><div class="card-title">숙제·준비물 공개 설정 누락 수업</div>' +
+    '<div class="card-sub">studentId·담당자·확정 시간표를 서버 기준으로 점검합니다. 모두 충족되면 해당 선생님의 실제 수업일 입력 화면이 자동으로 열립니다.</div></div>' +
+    (publicationReadinessLoaded ? '<span class="pill ' + (publicationReadinessSummary.missingCount ? 'warn' : '') + '">' + publicationReadinessSummary.missingCount + '건</span>' : '') + '</div>';
+  if (publicationReadinessLoading && !publicationReadinessLoaded) {
+    return head + '<div class="hint mt14">현재 수업 연결 상태를 확인하고 있습니다.</div></section>';
+  }
+  if (publicationReadinessError) {
+    return head + '<div class="hint mt14">목록을 불러오지 못했습니다. ' + esc(publicationReadinessError) + '</div>' +
+      '<button class="btn btn-primary mt14" data-act="publicationreadinessrefresh">다시 불러오기</button></section>';
+  }
+  const missing = publicationReadinessRows.filter(row => !row.ready);
+  if (!missing.length) {
+    return head + '<div class="guide mt14"><b>설정 완료</b>현재 활성 수업 ' + publicationReadinessSummary.readyCount +
+      '건이 공개 입력 조건을 충족합니다. 각 수업 요일에 담당 선생님 오늘 탭에서 자동으로 표시됩니다.</div>' +
+      '<button class="btn btn-ghost mt14" data-act="publicationreadinessrefresh">새로고침</button></section>';
+  }
+  const students = lessonFormStudents();
+  return head + '<div class="small muted mt8">설정 완료 ' + publicationReadinessSummary.readyCount + '건 · 아래에는 보완이 필요한 수업만 표시됩니다.</div>' +
+    missing.map(row => {
+      const linkedStudent = students.find(student => String(student.id) === String(row.studentId || ''));
+      const task = state.tasks.find(item => item.id === row.taskId && !item.deleted);
+      const owner = row.taskOwner && staffById(row.taskOwner);
+      const canRepair = !!(task && owner && !owner.deleted);
+      return '<article class="publication-audit-item" data-publication-audit-task="' + esc(row.taskId) + '"><div class="between"><div><b>' +
+        esc(row.studentName || row.title || '학생 연결 필요') + (row.grade ? ' · ' + esc(row.grade) : '') + '</b><div class="small muted mt8">' +
+        esc(row.teacherName || '담당자 확인 필요') + (row.subject || row.className ? ' · ' + esc([row.subject, row.className].filter(Boolean).join(' · ')) : '') +
+        '</div></div><span class="tag high">보완 필요</span></div>' +
+        publicationReadinessReasonHtml(row, 'studentId', 'studentId', linkedStudent ? linkedStudent.name + ' 연결됨' : '현재 재원 명단 연결됨') +
+        publicationReadinessReasonHtml(row, 'staffId', '담당자', row.teacherName || '담당자 연결됨') +
+        publicationReadinessReasonHtml(row, 'schedule', '시간표', row.scheduleText || '확정 시간표 연결됨') +
+        '<label class="field mt14"><span class="fl">실제 원생 직접 선택</span><select class="in" data-publication-student><option value="">원생을 선택하세요</option>' +
+        students.map(student => '<option value="' + esc(student.id) + '"' + (linkedStudent && linkedStudent.id === student.id ? ' selected' : '') + '>' +
+          esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') + '</select></label>' +
+        '<button class="btn btn-primary btn-block" data-act="publicationlessonfix" data-id="' + esc(row.taskId) + '"' + (canRepair ? '' : ' disabled') +
+        '>선택 원생 연결 · 수업 정보 보완</button>' +
+        '<div class="hint mt8">버튼을 누른 뒤 담당자와 시간표를 확인하고 수업 정보 저장을 완료하면 연결이 적용됩니다.</div></article>';
+    }).join('') + '<button class="btn btn-ghost mt14" data-act="publicationreadinessrefresh">목록 새로고침</button></section>';
+}
+
+function openPublicationLessonFix(button) {
+  if (!session.isAdmin) return toast('원장·관리 담당만 수업 연결을 보완할 수 있습니다');
+  const taskId = String(button && button.dataset.id || '');
+  const row = publicationReadinessRows.find(item => item.taskId === taskId);
+  const task = state.tasks.find(item => item.id === taskId && !item.deleted);
+  const container = button && button.closest('[data-publication-audit-task]');
+  const studentId = String(((container && container.querySelector('[data-publication-student]')) || {}).value || '');
+  const student = lessonFormStudents().find(item => String(item.id) === studentId);
+  const owner = row && staffById(row.taskOwner);
+  if (!row || !task) return toast('수업을 새로고침한 뒤 다시 시도해 주세요');
+  if (!student) return toast('연결할 실제 원생을 선택해 주세요');
+  if (!owner || owner.deleted) return toast('수업 저장 담당자가 현재 직원 명단에 없어 먼저 담당자를 정리해야 합니다');
+  lessonDraft = lessonDraftFromTask(task);
+  lessonDraft.staffId = row.taskOwner;
+  lessonDraft.studentId = student.id;
+  lessonDraft.studentName = student.name;
+  lessonDraft.grade = student.grade;
+  lessonPreviewPayload = null;
+  lessonPreviewTask = null;
+  lessonPreviewExpectedUpdatedAt = Number(row.updatedAt || task.updatedAt || 0);
+  persistLessonDraft();
+  render();
+  requestAnimationFrame(() => {
+    const formStudent = document.querySelector('[data-lesson-student]');
+    if (formStudent) formStudent.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  toast('실제 원생을 연결했습니다 — 담당자·시간표를 확인한 뒤 미리보기에서 저장해 주세요');
 }
 
 async function loadLessonAssignmentRequests(force) {
@@ -3241,6 +3377,7 @@ function viewLessonEntry() {
   if (personal && rosterLoading) return '<div class="card"><div class="empty"><b>⏳</b>담당 학생 명단을 불러오는 중입니다.</div></div>';
   if (personal && rosterErr) return '<div class="card lesson-review"><div class="card-title">담당 학생 명단을 불러오지 못했습니다</div><div class="card-sub">학생을 선택하기 전에는 수업을 등록할 수 없습니다.</div><button class="btn btn-primary mt14" data-act="rosterretry">명단 다시 불러오기</button></div>';
   const personalStudents = personal ? assignedLessonStudents() : [];
+  const selectableStudents = personal ? personalStudents : lessonFormStudents();
   if (personal && !lessonAssignmentRequestsLoaded && !lessonAssignmentRequestsLoading) setTimeout(() => loadLessonAssignmentRequests(false), 0);
   if (personal && !personalStudents.length) {
     return lessonAssignmentRequestHtml();
@@ -3258,12 +3395,13 @@ function viewLessonEntry() {
       personalStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
       '</select><div class="hint mt8">선택한 담당 학생만 수업·피드백과 연결됩니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
-    : '<div class="sect">1. 이름 / 학년</div><div class="grid2">' + lessonTextField('studentName', '학생 이름', 0, '') + lessonTextField('grade', '학년', 0, '예: 초4, 중1, 고3') + '</div>';
-  return (personal ? lessonAssignmentRequestHtml() : viewLessonChangeReview() + lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
+    : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">현재 재원 원생</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
+      selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
+      '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' +
+      (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '');
+  return (personal ? lessonAssignmentRequestHtml() : publicationReadinessHtml() + viewLessonChangeReview() + lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
     '<div class="card-sub">아래 9개 항목을 채우면 업무지시서와 수업 현황판에 함께 반영됩니다. 없는 항목은 “없음”이라고 적어 주세요.</div></div>' +
     '<div class="card">' + staffSelect +
-      (rosterDb ? '<datalist id="lessonStudentNames">' + activeIn(today().slice(0, 7)).map(student =>
-        '<option value="' + esc(student.name) + '">' + esc(student.grade || '') + '</option>').join('') + '</datalist>' : '') +
       studentFields +
       '<div class="sect">2. 과목·반</div><div class="grid2">' +
         lessonTextField('subject', '과목', 0, '예: 국어, 영어, 수학') + lessonTextField('className', '반 / 수업 역할', 0, '예: 블렌디드, 비문학, 문제풀이') + '</div>' +
@@ -3298,16 +3436,12 @@ function previewLessonRegistration() {
   if (!core) return toast('수업 등록 모듈을 불러오지 못했습니다 — 새로고침해 주세요');
   const draft = lessonInputPayload();
   if (session.isAdmin && !draft.staffId) return toast('담당 선생님을 선택해 주세요');
-  if (session.isStaffLink && !session.isAdmin) {
-    const selected = assignedLessonStudents().find(student => String(student.id) === String(draft.studentId));
-    if (!selected) return toast('내 담당 학생을 선택해 주세요');
-    draft.studentName = selected.name;
-    draft.grade = selected.grade;
-  }
-  const identityMatches = rosterStudentMatches(draft.studentName, draft.grade, draft.start || today());
-  const editingStudentId = draft._sourceTaskId ? String(draft.studentId || '').trim() : '';
-  if (!editingStudentId && identityMatches.length > 1) return toast('동명이인 학생입니다. 원생 명단에서 학생 식별값을 먼저 확인해 주세요');
-  draft.studentId = editingStudentId || (identityMatches.length === 1 ? identityMatches[0].id : '');
+  const selected = (session.isStaffLink && !session.isAdmin ? assignedLessonStudents() : lessonFormStudents())
+    .find(student => String(student.id) === String(draft.studentId));
+  if (!selected) return toast(session.isStaffLink && !session.isAdmin ? '내 담당 학생을 선택해 주세요' : '현재 재원 원생을 선택해 주세요');
+  draft.studentId = selected.id;
+  draft.studentName = selected.name;
+  draft.grade = selected.grade;
   const validation = core.validateLessonInput(draft);
   if (!validation.valid) return toast(validation.errors[0].message);
   let taskBody;
@@ -3380,6 +3514,8 @@ async function saveLessonRegistration(button) {
       lesson: lessonPreviewPayload
     });
     applyCreatedLesson(result.task);
+    publicationReadinessLoaded = false;
+    publicationReadinessRows = [];
     clearLessonDraft();
     lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = 0;
     if (session.isAdmin) viewStaff = targetStaffId;
@@ -6494,9 +6630,22 @@ function orderStudentPicker(row) {
     '</div></details>';
 }
 
+function orderPriceInput(row) {
+  return '<div class="book-order-price"><label class="fl">교재 금액 (1권 기준)</label>' +
+    '<input class="in" type="number" min="1" max="10000000" step="100" inputmode="numeric" autocomplete="off" ' +
+      'data-order-unit-price data-book="' + esc(row.id) + '" aria-label="' + esc(row.title) + ' 1권 금액" placeholder="예: 15000">' +
+    '<div class="small muted mt8">선택 학생 수에 따라 전체 주문 금액을 자동 계산합니다.</div></div>';
+}
+
 function selectedOrderStudentIds(bookId) {
   return Array.from(document.querySelectorAll('[data-order-student][data-book="' + CSS.escape(String(bookId)) + '"]:checked'))
     .map(input => String(input.value || '')).filter(Boolean);
+}
+
+function selectedOrderUnitPrice(bookId) {
+  const input = document.querySelector('[data-order-unit-price][data-book="' + CSS.escape(String(bookId)) + '"]');
+  const value = Number(input && input.value);
+  return Number.isInteger(value) && value >= 1 && value <= 10000000 ? value : null;
 }
 
 function singleOrderModal(book) {
@@ -6505,7 +6654,7 @@ function singleOrderModal(book) {
   batchOrderTaskId = '';
   modal('교재 주문 — ' + book.title,
     '<div class="hint mb14">사용할 학생을 선택하면 선택 인원이 주문 수량이 됩니다. 학생 이름이 아닌 stable studentId로 주문에 연결합니다.</div>' +
-    orderStudentPicker(batchDraft[0]),
+    orderPriceInput(batchDraft[0]) + orderStudentPicker(batchDraft[0]),
     '<button class="btn btn-primary btn-block mt14" data-act="bkordersubmit">선택 학생 수량으로 주문대기 등록</button>');
 }
 
@@ -6523,7 +6672,7 @@ function batchOrderModal(vendorKey) {
   modal(vendorLabel + ' — ' + books.length + '종 한번에 주문',
     '<div class="hint mb14">같은 출판사의 여러 권을 한 주문으로 등록합니다. 저녁 8시에 다른 주문과 함께 문자 한 통으로 발송됩니다.' +
       (outsideSearch ? '<br><b>검색 밖 ' + outsideSearch + '종 포함</b> — 아래 전체 ' + books.length + '종을 확인해 주세요.' : '') + '</div>' +
-    batchDraft.map(row => '<div class="field"><label class="fl">' + esc(row.title) + '</label>' + orderStudentPicker(row) + '</div>').join(''),
+    batchDraft.map(row => '<div class="field"><label class="fl">' + esc(row.title) + '</label>' + orderPriceInput(row) + orderStudentPicker(row) + '</div>').join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">선택 학생 수량으로 주문대기 등록</button>');
 }
 
@@ -6532,7 +6681,7 @@ function saveManualOnlineBookOrder(items) {
   const at = now();
   const orderItems = items.map(item => ({
     bookId: item.bookId, title: item.title, studentIds: item.studentIds,
-    qty: item.studentIds.length + '권'
+    qty: item.studentIds.length + '권', unitPrice: item.unitPrice
   }));
   const titleMain = orderItems.length > 1 ? batchVendorName + ' — ' + orderItems.length + '권' : orderItems[0].title;
   const task = {
@@ -6577,7 +6726,7 @@ async function submitBookOrder(items, button) {
       app: SYNC_APP, auth: auth, action: 'create', taskId: taskId,
       vendorName: batchVendorName,
       items: items.map(item => ({
-        bookId: item.bookId, title: item.title, studentIds: item.studentIds
+        bookId: item.bookId, title: item.title, studentIds: item.studentIds, unitPrice: item.unitPrice
       }))
     });
     if (!result.task || result.task.id !== taskId || result.task.orderDelivery !== 'scheduled_batch_v1' ||
@@ -7302,11 +7451,38 @@ function bookOrderActionButtons(row) {
   return '';
 }
 
+function bookOrderDateText(value) {
+  const at = Number(value);
+  if (!Number.isFinite(at) || at <= 0) return '미완료';
+  const date = new Date(at);
+  return Number.isNaN(date.getTime()) ? '미완료' : date.toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function bookOrderMoneyHtml(row) {
+  const unitPrice = Number(row.unitPrice);
+  if (!Number.isInteger(unitPrice) || unitPrice < 1) return '<div class="book-order-money">교재 금액 · 미입력</div>';
+  const quantity = Math.max(0, Number(row.quantity || 0));
+  return '<div class="book-order-money">교재 금액 · 권당 ' + unitPrice.toLocaleString('ko-KR') +
+    '원 · 합계 ' + (unitPrice * quantity).toLocaleString('ko-KR') + '원</div>';
+}
+
+function bookOrderDatesHtml(row) {
+  return '<div class="book-order-dates" aria-label="교재 주문 단계별 날짜">' + [
+    ['주문요청', row.orderRequestedAt],
+    ['주문완료', row.orderCompletedAt],
+    ['수령완료', row.teacherReceivedAt],
+    ['배부완료', row.studentHandedAt]
+  ].map(item => '<div class="book-order-date"><b>' + item[0] + '</b><span>' + bookOrderDateText(item[1]) + '</span></div>').join('') + '</div>';
+}
+
 function bookOrderRowHtml(row) {
   const label = bookOrderStatusLabel(row);
   const students = Array.isArray(row.students) ? row.students : [];
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(row.vendorName || '미등록') + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
+    bookOrderMoneyHtml(row) + bookOrderDatesHtml(row) +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' + esc(student.name) +
       (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
@@ -12146,9 +12322,11 @@ document.addEventListener('click', ev => {
     case 'bkordersubmit': {
       if (!batchDraft || batchDraft.length !== 1) break;
       const row = batchDraft[0];
+      const unitPrice = selectedOrderUnitPrice(row.id);
+      if (!unitPrice) return toast('교재 1권 금액을 1원 이상 정확히 입력해 주세요');
       const studentIds = selectedOrderStudentIds(row.id);
       if (!studentIds.length) return toast('이 교재를 사용할 학생을 한 명 이상 선택해 주세요');
-      submitBookOrder([{ bookId: row.id, title: row.title, studentIds: studentIds }], el);
+      submitBookOrder([{ bookId: row.id, title: row.title, studentIds: studentIds, unitPrice: unitPrice }], el);
       break;
     }
     case 'bkselect': {
@@ -12162,8 +12340,10 @@ document.addEventListener('click', ev => {
       const items = batchDraft.map(row => ({
         bookId: row.id,
         title: row.title,
-        studentIds: selectedOrderStudentIds(row.id)
+        studentIds: selectedOrderStudentIds(row.id),
+        unitPrice: selectedOrderUnitPrice(row.id)
       }));
+      if (items.some(item => !item.unitPrice)) return toast('각 교재의 1권 금액을 모두 정확히 입력해 주세요');
       if (items.some(item => !item.studentIds.length)) return toast('각 교재마다 사용할 학생을 한 명 이상 선택해 주세요');
       submitBookOrder(items, el);
       break;
@@ -12414,6 +12594,8 @@ document.addEventListener('click', ev => {
       toast('수업 정보를 불러왔습니다 — 수정 후 미리보기를 확인해 주세요');
       break;
     }
+    case 'publicationreadinessrefresh': publicationReadinessLoaded = false; loadPublicationReadiness(true); break;
+    case 'publicationlessonfix': openPublicationLessonFix(el); break;
     case 'lessonpreview': previewLessonRegistration(); break;
     case 'lessonsave': saveLessonRegistration(el); break;
     case 'lessonassignmentrequest': submitLessonAssignmentRequest(); break;
@@ -12796,8 +12978,9 @@ document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
   const lessonStudent = ev.target.closest('[data-lesson-student]');
   if (lessonStudent) {
-    if (!(session.isStaffLink && !session.isAdmin)) return;
-    const student = assignedLessonStudents().find(item => String(item.id) === String(lessonStudent.value));
+    if (!session.isAdmin && !(session.isStaffLink && !session.isAdmin)) return;
+    const student = (session.isStaffLink && !session.isAdmin ? assignedLessonStudents() : lessonFormStudents())
+      .find(item => String(item.id) === String(lessonStudent.value));
     const draft = currentLessonDraft();
     draft.studentId = student ? student.id : '';
     draft.studentName = student ? student.name : '';
@@ -12916,7 +13099,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-18.4';
+const APP_VER = '2026-08-18.13';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -73,7 +73,7 @@ async function call(db, body, path = '/book-order', extra = {}) {
 
 function createBody(taskId = 'ord_safe_a123') {
   return { auth: person, action: 'create', taskId, vendorName: '문자출판사', items: [
-    { bookId: 'BK01', title: '리딩바이트 Grade 2', studentIds: ['student-a'] }
+    { bookId: 'BK01', title: '리딩바이트 Grade 2', studentIds: ['student-a'], unitPrice: 15000 }
   ] };
 }
 
@@ -97,6 +97,7 @@ test('create atomically writes a canonical task and immutable per-student identi
   assert.equal(result.body.task.origin, 'staff');
   assert.equal(result.body.task.staffId, 'teacher-a');
   assert.equal(result.body.task.orderItems[0].qty, '1권');
+  assert.equal(result.body.task.orderItems[0].unitPrice, 15000);
   const rows = db.database.prepare('SELECT * FROM book_order_student_snapshots').all();
   assert.equal(rows.length, 1);
   assert.equal(rows[0].public_title, '주문 교재');
@@ -109,6 +110,22 @@ test('create atomically writes a canonical task and immutable per-student identi
   assert.throws(() => db.database.prepare('DELETE FROM book_order_active_targets').run(), /APPEND_ONLY/);
 });
 
+test('new orders require a positive whole-won unit price within the supported range', async () => {
+  const db = new TestD1(); seed(db);
+  for (const [taskId, unitPrice] of [
+    ['ord_price_missing', undefined], ['ord_price_zero', 0], ['ord_price_decimal', 15000.5],
+    ['ord_price_large', 10000001], ['ord_price_text', '15000']
+  ]) {
+    const body = createBody(taskId);
+    if (unitPrice === undefined) delete body.items[0].unitPrice;
+    else body.items[0].unitPrice = unitPrice;
+    const result = await call(db, body);
+    assert.equal(result.status, 400, taskId);
+    assert.equal(result.body.code, 'ORDER_INVALID', taskId);
+  }
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+});
+
 test('same taskId and exact payload is idempotent; collision, tampering, and races fail closed', async () => {
   const db = new TestD1(); seed(db);
   const [first, second] = await Promise.all([call(db, createBody()), call(db, createBody())]);
@@ -117,6 +134,8 @@ test('same taskId and exact payload is idempotent; collision, tampering, and rac
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 1);
   const conflict = createBody(); conflict.items[0].title = '다른 교재';
   assert.equal((await call(db, conflict)).body.code, 'ORDER_ID_CONFLICT');
+  const priceConflict = createBody(); priceConflict.items[0].unitPrice = 16000;
+  assert.equal((await call(db, priceConflict)).body.code, 'ORDER_ID_CONFLICT');
 
   const taskRow = db.database.prepare("SELECT data,updated_at FROM tasks WHERE app='task' AND id='ord_safe_a123'").get();
   const task = JSON.parse(taskRow.data); task.orderItems[0].studentIds = ['student-b']; task.updatedAt += 1;
@@ -297,7 +316,8 @@ test('the documented 200-student ceiling is stored with only two D1 batch statem
   let statementCount = 0;
   db.batch = statements => { statementCount = statements.length; return originalBatch(statements); };
   const result = await call(db, { auth: person, action: 'create', taskId: 'ord_bulk_200x',
-    vendorName: '문자출판사', items: [{ bookId: 'BK-BULK', title: '단체 교재', studentIds: students.map(item => item.id) }] });
+    vendorName: '문자출판사', items: [{ bookId: 'BK-BULK', title: '단체 교재',
+      studentIds: students.map(item => item.id), unitPrice: 12000 }] });
   assert.equal(result.status, 201);
   assert.equal(statementCount, 2);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 200);
@@ -312,12 +332,12 @@ test('create validates configured message vendor, exact current membership, acti
   const duplicate = createBody('ord_duplicate1'); duplicate.items[0].studentIds = ['student-a', 'student-a'];
   assert.equal((await call(db, duplicate)).body.code, 'ORDER_INVALID');
   const duplicateBook = createBody('ord_duplicate2'); duplicateBook.items.push({
-    bookId: 'BK01', title: '같은 교재', studentIds: ['student-a']
+    bookId: 'BK01', title: '같은 교재', studentIds: ['student-a'], unitPrice: 15000
   });
   assert.equal((await call(db, duplicateBook)).body.code, 'ORDER_INVALID');
   const tooLarge = createBody('ord_too_large1');
   tooLarge.items = Array.from({ length: 50 }, (_, index) => ({
-    bookId: 'BK' + index, title: '가'.repeat(160), studentIds: ['student-a']
+    bookId: 'BK' + index, title: '가'.repeat(160), studentIds: ['student-a'], unitPrice: 15000
   }));
   const oversized = await call(db, tooLarge);
   assert.equal(oversized.status, 413);
@@ -339,7 +359,7 @@ test('manager and root use the same sealed create contract while ordinary staff 
     .bind('task', 'token-manager', 'manager-a', now).run();
   const managerBody = createBody('ord_manager12');
   managerBody.auth = { mode: 'person', id: 'manager-a', token: 'token-manager' };
-  managerBody.items[0] = { bookId: 'BK-MANAGER', title: '관리 교재', studentIds: ['student-b'] };
+  managerBody.items[0] = { bookId: 'BK-MANAGER', title: '관리 교재', studentIds: ['student-b'], unitPrice: 17000 };
   const manager = await call(db, managerBody, '/book-order', { TASK_MANAGER_STAFF_IDS: 'manager-a' });
   assert.equal(manager.status, 201);
   assert.equal(manager.body.task.origin, 'manager');
@@ -347,7 +367,7 @@ test('manager and root use the same sealed create contract while ordinary staff 
 
   const rootBody = createBody('ord_root_1234');
   rootBody.auth = admin;
-  rootBody.items[0] = { bookId: 'BK-ROOT', title: '원장 교재', studentIds: ['student-a'] };
+  rootBody.items[0] = { bookId: 'BK-ROOT', title: '원장 교재', studentIds: ['student-a'], unitPrice: 18000 };
   const root = await call(db, rootBody);
   assert.equal(root.status, 201);
   assert.equal(root.body.task.origin, 'admin');

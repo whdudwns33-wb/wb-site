@@ -6,6 +6,7 @@ const test = require('node:test');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const consultHtml = fs.readFileSync(path.join(__dirname, '..', 'consult', 'index.html'), 'utf8');
 const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
+const consultVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'consult', 'version.json'), 'utf8'));
 
 function functionSource(name) {
   const start = html.indexOf('function ' + name + '(');
@@ -92,17 +93,16 @@ test('bounded sync settlement blocks send when latest checks are not confirmed',
   assert.match(settle, /if \(sync\.dirty \|\| sync\.err\) throw new Error\('SYNC_FAILED'\)/);
 });
 
-test('report send UI contains no embedded phone number or secret and versions remain aligned', () => {
+test('report send UI contains no embedded phone number or secret and each app version is aligned', () => {
   const summary = functionSource('directorReportSummaryText');
   const payload = functionSource('directorReportRequestPayload');
   const send = functionSource('submitDirectorReport');
   const addedSurface = summary + payload + send;
   assert.doesNotMatch(addedSurface, /01[016789][ -]?\d{3,4}[ -]?\d{4}|SOLAPI_(?:API_)?(?:KEY|SECRET)|TASK_ADMIN_SECRET/);
-  /* version.json 은 task 와 consult 가 함께 쓴다. 한쪽만 올리면
-     다른 쪽 사용자에게 '새 버전' 배너가 영구히 뜬다. */
   assert.match(version.v, /^\d{4}-\d{2}-\d{2}\.\d+$/);
+  assert.match(consultVersion.v, /^\d{4}-\d{2}-\d{2}\.\d+$/);
   assert.ok(html.includes("const APP_VER = '" + version.v + "'"), 'task APP_VER');
-  assert.ok(consultHtml.includes("const APP_VER = '" + version.v + "'"), 'consult APP_VER');
+  assert.ok(consultHtml.includes("const APP_VER = '" + consultVersion.v + "'"), 'consult APP_VER');
   assert.ok(html.includes('lesson-form-core.js?v=' + version.v), 'lesson-form-core 캐시버스터');
   assert.ok(html.includes('schedule-board-core.js?v=' + version.v), 'schedule-board-core 캐시버스터');
 });

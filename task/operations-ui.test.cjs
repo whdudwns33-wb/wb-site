@@ -118,8 +118,9 @@ test('order delivery board uses four collapsed quantity stages and stable-studen
   assert.match(view, /action: 'order_transition'/);
   assert.match(picker, /student\.id/);
   assert.match(picker, /data-order-student/);
+  assert.match(picker, /data-order-unit-price/);
   assert.match(html, /studentIds: studentIds/);
-  assert.doesNotMatch(picker, /type="number"|placeholder="예: 3권"/);
+  assert.doesNotMatch(picker, /data-order-qty|placeholder="예: 3권"/);
 });
 
 test('first-day package uses exact stable studentId schedule and shows every honest missing state', () => {

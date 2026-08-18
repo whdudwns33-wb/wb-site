@@ -5,6 +5,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
 const NEXT = new Set([...STATES, 'reissue']);
 const ORDER_NEXT = new Set(['receive', 'hand', 'academy_register']);
+const MAX_UNIT_PRICE = 10000000;
 
 function cleanReason(value) {
   const reason = String(value || '').trim();
@@ -60,6 +61,11 @@ function orderQuantity(item, studentIds) {
   return Math.max(1, Math.min(999, Number(match && match[0]) || 1));
 }
 
+function orderUnitPrice(item) {
+  const value = Number(item && item.unitPrice);
+  return Number.isInteger(value) && value >= 1 && value <= MAX_UNIT_PRICE ? value : null;
+}
+
 function orderTaskData(row) {
   const task = parseJson(row && row.data || '{}', null);
   if (!task || task.deleted || !String(task.title || '').startsWith('[주문] ') ||
@@ -84,7 +90,7 @@ function fulfillmentMatches(row, bookId, studentIds) {
 }
 
 function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, integrity,
-    taskUpdatedAt, needsStudentLink, canLinkStudents) {
+    taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents) {
   const studentIds = orderStudentIds(item);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
     : send.status === 'rejected' ? 'order_failed' : 'order_check';
@@ -95,9 +101,13 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
   return {
     taskId, itemIndex, bookId: String(item.bookId || ''), title: String(item.title || '교재명 미입력'),
     quantity: orderQuantity(item, studentIds), vendorName: String(vendorName || '주문처 미등록'),
+    unitPrice: orderUnitPrice(item),
     owner: owner || null, teacherName: teacherName || '담당 미지정',
     students, sendStatus: send ? String(send.status) : 'waiting', stage,
     taskUpdatedAt: Number(taskUpdatedAt) || 0,
+    orderRequestedAt: Number(taskCreatedAt) || Number(taskUpdatedAt) || null,
+    orderCompletedAt: send && String(send.status) === 'accepted'
+      ? Number(send.updated_at || send.created_at) || null : null,
     needsStudentLink: !!needsStudentLink,
     canLinkStudents: !!canLinkStudents,
     revision: row ? Number(row.revision) : 0,
@@ -169,7 +179,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
         staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, integrity,
-        taskRow.updated_at, needsStudentLink, canLinkStudents));
+        task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents));
     }
   }
   return rows;
