@@ -31,7 +31,12 @@ test('study screen renders seven separate source cards and keeps legacy MetaMath
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.match(rows, /LEARNING_SOURCES\[t\.source\]/);
   assert.match(rows, /t\.learningKind \|\| t\.metaKind/);
-  assert.match(study, /Object\.keys\(LEARNING_SOURCES\)\.map\(key => learningSourceCard\(me, editable, key\)\)/);
+  assert.match(study, /const sourceKeys = Object\.keys\(LEARNING_SOURCES\)/);
+  assert.match(study, /group\.keys\.map\(key => learningSourceCard\(me, editable, key\)\)/);
+  assert.match(study, /온라인 학습/);
+  assert.match(study, /자기주도 학습/);
+  assert.match(study, /시험 준비/);
+  assert.match(study, /study-hub-hero/);
   assert.match(study, /원장 관리 화면/);
   assert.match(study, /학생 화면/);
 });
@@ -86,7 +91,9 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(list, /t\.staffId === staffId/);
   assert.match(list, /t\.source === sourceKey/);
   assert.match(card, /learningTasksFor\(me\.id, sourceKey\)/);
-  assert.match(card, /taskRow\(t, t\.start, editable, false\)/);
+  assert.match(card, /taskRow\(t, learningTaskDate\(t\), editable, false\)/);
+  assert.match(card, /<details class="card study-source-card"/);
+  assert.match(card, /완료 기록/);
   assert.match(card, /director \? '<button[^']*data-act="learnadd"/);
   assert.match(card, /data-source="' \+ esc\(sourceKey\)/);
   assert.match(add, /const sourceKey = el\.dataset\.source/);
@@ -101,9 +108,49 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(save, /source: sourceKey/);
   assert.match(save, /origin: 'admin'/);
   assert.match(save, /repeat: 'once'/);
-  assert.match(save, /start: due/);
+  assert.match(save, /studySubject: subjectKey/);
+  assert.match(save, /dueDate: due/);
+  assert.match(save, /estimatedMin: estimatedMin/);
+  assert.match(save, /academicEventId: linkedExam \? linkedExam\.id : ''/);
+  assert.match(save, /start: planned/);
   assert.match(save, /steps: source\.steps\.map/);
   assert.match(save, /save\(\); queueSync\(\)/);
+});
+
+test('learning schedule, deadline, subject and weekly move stay distinct across tabs', () => {
+  const helpers = section('function learningTaskDate(', 'function learningTasksFor(');
+  const modal = section('function learningTaskModal(', 'function wnAddModal(');
+  const edit = section('function saveEditedTask(', '8-1. 말로 쓴 지시를 업무로');
+  const rows = section('function taskRow(', 'function taskPanel(');
+  assert.match(helpers, /weekMovesFor\(task\.staffId\)/);
+  assert.match(helpers, /return move \? move\.to : \(task\.start \|\| ''\)/);
+  assert.match(helpers, /task\.dueDate \|\| task\.start/);
+  assert.match(modal, /id="learnSubject"/);
+  assert.match(modal, /id="learnEstimatedMin"/);
+  assert.match(modal, /id="learnStudyDate"/);
+  assert.match(modal, /id="learnDueDate"/);
+  assert.match(modal, /id="learnAcademicEvent"/);
+  assert.match(edit, /마감일은 학습 예정일보다 빠를 수 없습니다/);
+  assert.match(edit, /moveCheck\.moves\.filter\(move => move\.taskId !== t\.id\)/);
+  assert.match(rows, /learningDueDate\(t\)/);
+  assert.match(rows, /예상 /);
+  assert.match(rows, /linkedExam\.title/);
+});
+
+test('wrong answers and reading rounds can become timed today checklist tasks', () => {
+  const review = section('function rdDue(', 'function wnRow(');
+  const today = section('function viewToday(', 'function studyOffersCard(');
+  const handlers = section("case 'rdsave':", '/* 인강 플래너 */');
+  assert.match(today, /studyReviewOffersCard\(me\)/);
+  assert.match(review, /function studyReviewOffersCard\(me\)/);
+  assert.match(review, /data-act="wnclaim"/);
+  assert.match(review, /data-act="rdclaim"/);
+  assert.match(review, /function syncLinkedStudyTask\(task, date\)/);
+  assert.match(review, /stTimelineSegments\(task\.staffId, date\)/);
+  assert.match(handlers, /source: 'reading_round'/);
+  assert.match(handlers, /source: 'wrong_note_review'/);
+  assert.match(handlers, /nextReviewDate: addDays\(d, WN_REVIEW\[0\]\)/);
+  assert.match(handlers, /history\.push/);
 });
 
 test('exam materials accept only safe HTTPS links and open without leaking the student URL', () => {

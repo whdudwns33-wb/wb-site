@@ -682,6 +682,39 @@
   .submission-preview img, .submission-photo { display: block; max-width: 100%; max-height: 68vh; margin: auto; border-radius: 10px; object-fit: contain; }
   .submission-privacy { padding: 10px 12px; border-radius: 10px; background: #EEF5FC; color: #315A7D; font-size: 11.5px; line-height: 1.55; }
 
+  /* ─── 학습 허브 ─── */
+  .study-hub-hero { color: #fff; background: linear-gradient(135deg, var(--navy), #315F87); border: 0; }
+  .study-hub-hero .card-title, .study-hub-hero .card-sub { color: #fff; }
+  .study-hub-hero .card-sub { opacity: .82; }
+  .study-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .study-kpi { padding: 10px 8px; border-radius: 11px; background: rgba(255,255,255,.13); text-align: center; }
+  .study-kpi span { display: block; font-size: 10px; opacity: .78; }
+  .study-kpi b { display: block; margin-top: 2px; font-size: 17px; }
+  .study-group-title { margin: 20px 3px 8px; color: var(--navy); font-size: 13px; font-weight: 900; }
+  details.study-source-card { padding: 0; overflow: hidden; }
+  .study-source-summary { min-height: 68px; padding: 14px 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+  .study-source-summary::-webkit-details-marker { display: none; }
+  .study-source-summary::after { content: '⌄'; color: var(--mid-gray); font-weight: 900; }
+  details.study-source-card[open] .study-source-summary::after { content: '⌃'; }
+  .study-source-head { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .study-source-icon { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; background: #F1ECFF; font-size: 18px; }
+  .study-source-copy { min-width: 0; }
+  .study-source-copy b { display: block; font-size: 14px; }
+  .study-source-copy span { display: block; color: var(--mid-gray); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .study-source-count { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .study-source-body { padding: 0 17px 17px; border-top: 1px solid var(--light-gray); }
+  .study-source-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .study-completed { margin-top: 10px; border-top: 1px solid var(--light-gray); }
+  .study-completed summary { padding: 11px 2px; color: var(--mid-gray); cursor: pointer; font-size: 12px; font-weight: 800; }
+  .study-review-offer { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-review-offer:last-child { border-bottom: 0; padding-bottom: 0; }
+  .study-review-copy b, .study-review-copy span { display: block; }
+  .study-review-copy b { font-size: 13.5px; }
+  .study-review-copy span { color: var(--mid-gray); font-size: 11.5px; }
+  .study-reading-row { padding: 12px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-reading-row:last-child { border-bottom: 0; }
+  .study-reading-history { margin-top: 7px; color: var(--mid-gray); font-size: 11.5px; }
+
   /* ─── 보호자 읽기 전용 공유 ─── */
   .guardian-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
   .guardian-stat { min-width: 0; padding: 10px; border-radius: 11px; background: #F6F8FB; color: var(--mid-gray); font-size: 10.5px; }
@@ -835,6 +868,9 @@
     .exam-plan-row { grid-template-columns: 1fr; gap: 2px; }
     .submission-actions { display: grid; grid-template-columns: 1fr; }
     .submission-actions .btn { width: 100%; }
+    .study-kpis { grid-template-columns: 1fr 1fr; }
+    .study-review-offer { grid-template-columns: auto minmax(0, 1fr); }
+    .study-review-offer > :last-child { grid-column: 1 / -1; width: 100%; }
     .guardian-status { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
@@ -996,7 +1032,7 @@ function taskStudySubjectTag(task) {
   return '<span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>';
 }
 function studySubjectOptions(selected, emptyLabel) {
-  const value = selected == null ? '' : studySubjectKey(selected);
+  const value = selected == null || String(selected).trim() === '' ? '' : studySubjectKey(selected);
   return (emptyLabel ? '<option value="">' + esc(emptyLabel) + '</option>' : '') +
     STUDY_SUBJECT_KEYS.map(key => '<option value="' + key + '"' + (value === key ? ' selected' : '') + '>' +
       STUDY_SUBJECTS[key].label + '</option>').join('');
@@ -1925,6 +1961,7 @@ function viewToday() {
   if (cursor === today()) {
     h += studyOffersCard(me, cursor, offers);
     h += ingTodayCard(me, editable);
+    h += studyReviewOffersCard(me);
     if (editable) {
       h += '<div class="card" style="padding:12px">' +
         '<div class="quick-add-grid">' +
@@ -2034,6 +2071,8 @@ function plannerTaskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const status = statusOf(t, date);
   const subject = taskStudySubject(t);
+  const learning = LEARNING_SOURCES[t.source] || null;
+  const learningDue = learning ? learningDueDate(t) : '';
   const open = openPanels.has(t.id + '|' + date);
   const resourceUrl = safeHttpsUrl(t.resourceUrl);
   const hasDetail = (t.steps || []).length || t.guide || t.target || resourceUrl || t.evidenceMode === 'photo';
@@ -2048,6 +2087,8 @@ function plannerTaskRow(t, date, editable, isCarry) {
       '<div class="planner-task-actions">' +
         (isCarry ? '<span class="tag carry">' + shortDate(date) + ' 이월</span>' : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+        (learning && t.estimatedMin ? '<span class="tag time">예상 ' + Number(t.estimatedMin) + '분</span>' : '') +
+        (learning && learningDue && learningDue !== date ? '<span class="tag">마감 ' + shortDate(learningDue) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (t.evidenceMode === 'photo' ? '<span class="tag doing">📷 인증 필요</span>' : '') +
         (editable && status !== 'done'
@@ -2105,9 +2146,11 @@ function taskRow(t, date, editable, isCarry) {
   const prog = taskProgress(t, c);
   const learning = LEARNING_SOURCES[t.source] || null;
   const resourceUrl = safeHttpsUrl(t.resourceUrl);
+  const learningDue = learning ? learningDueDate(t) : '';
+  const linkedExam = learning ? learningAcademicEvent(t) : null;
   const hasDetail = (t.steps || []).length || t.guide || t.target || resourceUrl || t.evidenceMode === 'photo';
   const open = openPanels.has(t.id + '|' + date);
-  const learningLate = learning && t.start && t.start < today() && st !== 'done';
+  const learningLate = learning && learningDue && learningDue < today() && st !== 'done';
   const noteHint = learning ? learning.noteHint : '메모 · 막힌 이유나 특이사항을 남기세요';
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
@@ -2120,9 +2163,12 @@ function taskRow(t, date, editable, isCarry) {
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
         (learning ? '<span class="tag time">' + learning.icon + ' ' + esc(learning.label) + '</span>' : '') +
         ((t.learningKind || t.metaKind) ? '<span class="tag">' + esc(t.learningKind || t.metaKind) + '</span>' : '') +
-        (learning && t.start
-          ? '<span class="tag ' + (learningLate ? 'high' : '') + '">' + (learningLate ? '마감 지남 · ' : '') + shortDate(t.start) + ' 마감</span>'
+        (learning && date ? '<span class="tag time">학습 ' + shortDate(date) + '</span>' : '') +
+        (learning && learningDue
+          ? '<span class="tag ' + (learningLate ? 'high' : '') + '">' + (learningLate ? '마감 지남 · ' : '') + shortDate(learningDue) + ' 마감</span>'
           : '') +
+        (learning && t.estimatedMin ? '<span class="tag time">예상 ' + Number(t.estimatedMin) + '분</span>' : '') +
+        (linkedExam ? '<span class="tag high">시험 · ' + esc(linkedExam.title) + '</span>' : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (t.evidenceMode === 'photo' ? '<span class="tag doing">📷 인증 필요</span>' : '') +
@@ -3675,6 +3721,14 @@ function tbAddModal(me) {
 const rdKey = sid => '__rd__' + sid;
 const rdItems = sid => ((state.checks[rdKey(sid) + '|all'] || {}).items) || [];
 const rdSave = (sid, items) => setCheck(rdKey(sid), 'all', { items: items, done: true });
+function rdDue(sid) {
+  return rdItems(sid).filter(item => {
+    if (!item.nextDate || item.nextDate > today() || Number(item.done || 0) >= Number(item.target || 0)) return false;
+    if (!item.plannedTaskId) return true;
+    const planned = state.tasks.find(task => !task.deleted && task.id === item.plannedTaskId);
+    return !planned;
+  });
+}
 
 /* ══════════════════════════════════════════════════════
    오답노트 — 틀린 문제를 기록하고 3일·7일 뒤에 다시 띄운다.
@@ -3698,13 +3752,72 @@ function wnDue(sid) {
   return wnAll(sid).filter(x => {
     if (x.fixed) return false;
     const rv = x.rv || 0;
-    return rv < WN_REVIEW.length && addDays(x.date, WN_REVIEW[rv]) <= t;
+    if (rv >= WN_REVIEW.length) return false;
+    if (x.reviewTaskId) {
+      const planned = state.tasks.find(task => !task.deleted && task.id === x.reviewTaskId);
+      if (planned) return false;
+    }
+    return (x.nextReviewDate || addDays(x.date, WN_REVIEW[rv])) <= t;
   });
 }
 function wnPatch(sid, date, id, patch) {
   wnOf(sid, date).length && setCheck(wnKey(sid), date, {
     items: wnOf(sid, date).map(x => x.id === id ? Object.assign({}, x, patch) : x), done: true
   });
+}
+
+function syncLinkedStudyTask(task, date) {
+  if (!task || !isDone(task.id, date)) return;
+  if (task.wrongNoteId && task.wrongNoteDate) {
+    const item = wnOf(task.staffId, task.wrongNoteDate).find(row => row.id === task.wrongNoteId);
+    if (!item) return;
+    const history = Array.isArray(item.reviewHistory) ? item.reviewHistory.slice() : [];
+    if (history.some(row => row.taskId === task.id)) return;
+    const round = Math.min(WN_REVIEW.length, Math.max(Number(item.rv || 0) + 1, Number(task.wrongNoteRound || 1)));
+    history.push({ taskId: task.id, date: date, at: now() });
+    wnPatch(task.staffId, task.wrongNoteDate, task.wrongNoteId, {
+      rv: round, reviewHistory: history, lastReviewedAt: date, reviewTaskId: '',
+      nextReviewDate: round < WN_REVIEW.length ? addDays(date, WN_REVIEW[round]) : '',
+      fixed: round >= WN_REVIEW.length
+    });
+    return;
+  }
+  if (task.readingRoundId) {
+    const list = rdItems(task.staffId);
+    const index = list.findIndex(item => item.id === task.readingRoundId);
+    if (index < 0) return;
+    const item = list[index];
+    const history = Array.isArray(item.history) ? item.history.slice() : [];
+    if (history.some(row => row.taskId === task.id)) return;
+    const done = Math.min(Number(item.target || 1), Number(item.done || 0) + 1);
+    const taskMinutes = Math.round(stTimelineSegments(task.staffId, date)
+      .filter(segment => segment.taskId === task.id)
+      .reduce((sum, segment) => sum + Math.max(0, Number(segment.end) - Number(segment.start)), 0) / 60000);
+    history.push({ taskId: task.id, date: date, range: '', minutes: taskMinutes, at: now() });
+    list[index] = Object.assign({}, item, {
+      done: done, history: history, plannedTaskId: '', lastDate: date,
+      nextDate: done < Number(item.target || 1) ? addDays(date, 7) : ''
+    });
+    rdSave(task.staffId, list);
+  }
+}
+
+function studyReviewOffersCard(me) {
+  const wrong = wnDue(me.id);
+  const rounds = rdDue(me.id);
+  if (!wrong.length && !rounds.length) return '';
+  const canClaim = session.isStaffLink && session.staffId === me.id;
+  return '<div class="card alert"><div class="between"><div><div class="card-title">🔁 오늘 복습할 학습</div>' +
+    '<div class="card-sub">오답과 회독을 오늘 체크리스트에 담아 시간까지 기록하세요.</div></div>' +
+    '<span class="pill bad">' + (wrong.length + rounds.length) + '건</span></div>' +
+    wrong.map(item => '<div class="study-review-offer">' + taskStudySubjectTag({ studySubject: studySubjectKey(item.subj) }) +
+      '<div class="study-review-copy"><b>오답 복습 · ' + esc(item.note) + '</b><span>' +
+        esc(item.src || '출처 미입력') + ' · ' + ((item.rv || 0) + 1) + '차 복습</span></div>' +
+      (canClaim ? '<button class="btn btn-sm btn-primary" data-act="wnclaim" data-date="' + item.date + '" data-id="' + esc(item.id) + '">체크리스트에 담기</button>' : '<span class="pill warn">학생 담기 대기</span>') + '</div>').join('') +
+    rounds.map(item => '<div class="study-review-offer">' + studySubjectTag(item.subject || 'other') +
+      '<div class="study-review-copy"><b>회독 · ' + esc(item.name) + '</b><span>' + (Number(item.done || 0) + 1) + '/' + Number(item.target || 1) + '회독</span></div>' +
+      (canClaim ? '<button class="btn btn-sm btn-primary" data-act="rdclaim" data-id="' + esc(item.id) + '">체크리스트에 담기</button>' : '<span class="pill warn">학생 담기 대기</span>') + '</div>').join('') +
+    '</div>';
 }
 
 function wnRow(sid, x, editable) {
@@ -3719,8 +3832,10 @@ function wnRow(sid, x, editable) {
         '<span class="tag time">' + shortDate(x.date) + '</span>' +
         (x.fixed ? '<span class="tag ok">해결</span>'
           : '<span class="tag ' + (rv ? 'doing' : '') + '">복습 ' + rv + '/' + WN_REVIEW.length + '</span>') +
+        (!x.fixed && x.nextReviewDate ? '<span class="tag time">다음 ' + shortDate(x.nextReviewDate) + '</span>' : '') +
+        (x.reviewTaskId ? '<span class="tag doing">오늘 체크리스트 진행 중</span>' : '') +
       '</div>' +
-      (editable && !x.fixed && (x.rv || 0) < WN_REVIEW.length
+      (editable && !x.fixed && !x.reviewTaskId && (x.rv || 0) < WN_REVIEW.length
         ? '<button class="btn btn-sm btn-ghost mt8" data-act="wnrv" data-date="' + x.date + '" data-id="' + esc(x.id) + '">다시 봤어요</button>'
         : '') +
     '</div></div>';
@@ -3843,17 +3958,18 @@ function submissionHubCard(me) {
   const ready = submissionCache.owner === me.id && submissionCache.loaded;
   const items = ready ? submissionCache.items.filter(item => item.status !== 'cancelled') : [];
   const pending = items.filter(item => item.status === 'pending').length;
-  let h = '<div class="card"><div class="between"><div><div class="card-title">❓ 질문 · 인증사진</div>' +
-    '<div class="card-sub">모르는 문제를 글이나 사진으로 묻고, 인증이 필요한 할 일을 확인합니다.</div></div>' +
-    '<span class="pill ' + (pending ? 'warn' : '') + '">' + pending + '건 대기</span></div>' +
-    '<div class="row wraprow mt14" style="gap:8px">' +
+  let h = '<details class="card study-source-card"' + (pending || submissionCache.error ? ' open' : '') + '>' +
+    '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">❓</span>' +
+    '<span class="study-source-copy"><b>질문 · 인증사진</b><span>모르는 문제 질문과 인증 제출을 모아 봅니다.</span></span></span>' +
+    '<span class="study-source-count"><span class="pill ' + (pending ? 'warn' : '') + '">' + pending + '건 대기</span></span></summary>' +
+    '<div class="study-source-body"><div class="study-source-actions">' +
       (session.isStaffLink ? '<button class="btn btn-primary" data-act="submissionquestion">＋ 모르는 문제 질문</button>' : '') +
       '<button class="btn btn-ghost" data-act="submissionrefresh">새로고침</button></div>' +
     '<div class="submission-privacy mt14">사진은 비공개로 저장되며 학생 본인과 원장만 볼 수 있습니다. 위치정보를 제거한 JPEG로 압축하고 90일 뒤 자동 삭제합니다.</div>';
   if (!ready) h += '<div class="small muted mt14">' + (submissionCache.loading ? '질문·인증 기록을 불러오는 중입니다…' : '기록을 준비하는 중입니다…') + '</div>';
   else if (submissionCache.error) h += '<div class="hint mt14">' + esc(submissionCache.error) + '</div>';
   else h += items.length ? '<div class="submission-list">' + items.map(submissionItemCard).join('') + '</div>' : '<div class="small muted mt14">아직 등록된 질문이나 인증사진이 없습니다.</div>';
-  return h + '</div>';
+  return h + '</div></details>';
 }
 
 function submissionBoardInbox() {
@@ -4046,17 +4162,40 @@ async function cancelSubmission(item) {
   } catch (error) { toast('취소 실패 — ' + String(error && error.message || error)); }
 }
 
+function learningTaskDate(task) {
+  if (!task) return '';
+  const move = weekMovesFor(task.staffId).find(row => row.taskId === task.id);
+  return move ? move.to : (task.start || '');
+}
+
+function learningDueDate(task) {
+  return String((task && (task.dueDate || task.start)) || '');
+}
+
+function learningAcademicEvent(task) {
+  if (!task || !task.academicEventId) return null;
+  return state.tasks.find(row => !row.deleted && row.id === task.academicEventId &&
+    row.kind === 'academic_event' && row.staffId === task.staffId) || null;
+}
+
+function learningExamOptions(staffId, selected) {
+  const exams = academicItemsFor(staffId).filter(item => item.academicType === 'exam');
+  return '<option value="">연결 안 함</option>' + exams.map(item =>
+    '<option value="' + esc(item.id) + '"' + (item.id === selected ? ' selected' : '') + '>' +
+      esc(item.title) + ' · ' + shortDate(academicDateOf(item)) + '</option>').join('');
+}
+
 function learningTasksFor(staffId, sourceKey) {
   if (!LEARNING_SOURCES[sourceKey]) return [];
   return state.tasks
     .filter(t => !t.deleted && t.staffId === staffId && t.source === sourceKey)
     .sort((a, b) => {
-      const ad = isDone(a.id, a.start), bd = isDone(b.id, b.start);
+      const aDate = learningTaskDate(a), bDate = learningTaskDate(b);
+      const ad = isDone(a.id, aDate), bd = isDone(b.id, bDate);
       if (ad !== bd) return ad - bd;
-      const as = a.start || '', bs = b.start || '';
+      const as = aDate || '', bs = bDate || '';
       return ad ? bs.localeCompare(as) : as.localeCompare(bs);
-    })
-    .slice(0, 10);
+    });
 }
 
 function learningSourceCard(me, editable, sourceKey) {
@@ -4085,18 +4224,26 @@ function learningSourceCard(me, editable, sourceKey) {
         : '클래스카드 앱 연결은 휴대폰에서 이 화면을 열어 이용하세요.') + '</div>'
     : '';
   const addLabel = sourceKey === 'exam_material' ? '＋ 자료 보내기' : '＋ 과제 보내기';
+  const active = list.filter(task => !isDone(task.id, learningTaskDate(task)));
+  const completed = list.filter(task => isDone(task.id, learningTaskDate(task)));
+  const late = active.filter(task => learningDueDate(task) && learningDueDate(task) < today()).length;
 
-  return '<div class="card" data-learning-source="' + esc(sourceKey) + '"><div class="between mb8"><div>' +
-      '<div class="card-title">' + source.icon + ' ' + esc(source.label) + '</div>' +
-      '<div class="card-sub">' + help + '</div></div></div>' +
-    '<div class="row wraprow mb14" style="gap:8px">' +
+  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late ? ' open' : '') + '>' +
+    '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
+      '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
+      '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
+        '<span class="pill' + (active.length ? ' warn' : '') + '">' + active.length + '건</span></span></summary>' +
+    '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
+    '<div class="study-source-actions">' +
       (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
     '</div>' +
     appHint +
-    (list.length
-      ? list.map(t => taskRow(t, t.start, editable, false)).join('')
-      : '<div class="small muted">등록된 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
-    '</div>';
+    (active.length
+      ? active.map(t => taskRow(t, learningTaskDate(t), editable, false)).join('')
+      : '<div class="small muted">진행할 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
+    (completed.length ? '<details class="study-completed"><summary>완료 기록 ' + completed.length + '건 보기</summary>' +
+      completed.slice(0, 10).map(t => taskRow(t, learningTaskDate(t), editable, false)).join('') + '</details>' : '') +
+    '</div></details>';
 }
 
 /* ── 학습 탭 (회독 · 오답노트) ── */
@@ -4111,58 +4258,104 @@ function viewStudy() {
   const roleHelp = session.isAdmin
     ? '현재 선택: ' + esc(me.name) + ' · 선택한 대상의 학습 현황을 관리하는 화면입니다.'
     : esc(me.name) + ' 본인의 학습 현황입니다.';
-  h += '<div class="guide mb14"><b>' + roleLabel + '</b>' + roleHelp + '</div>';
-  h += submissionHubCard(me);
-  h += Object.keys(LEARNING_SOURCES).map(key => learningSourceCard(me, editable, key)).join('');
+  const sourceKeys = Object.keys(LEARNING_SOURCES);
+  const learningTasks = sourceKeys.flatMap(key => learningTasksFor(me.id, key));
+  const activeTasks = learningTasks.filter(task => !isDone(task.id, learningTaskDate(task)));
+  const lateTasks = activeTasks.filter(task => learningDueDate(task) && learningDueDate(task) < today());
+  const todayTasks = activeTasks.filter(task => learningTaskDate(task) <= today());
+  const dueWrong = wnDue(me.id);
+  const dueRounds = rdDue(me.id);
+  h += '<div class="card study-hub-hero"><div class="card-title">' + roleLabel + ' · 학습 허브</div>' +
+    '<div class="card-sub">' + roleHelp + ' 오늘 실행은 오늘 탭에서, 상세 과제와 기록 관리는 이곳에서 합니다.</div>' +
+    '<div class="study-kpis"><div class="study-kpi"><span>진행 과제</span><b>' + activeTasks.length + '건</b></div>' +
+      '<div class="study-kpi"><span>오늘·밀림</span><b>' + todayTasks.length + '건</b></div>' +
+      '<div class="study-kpi"><span>마감 지연</span><b>' + lateTasks.length + '건</b></div>' +
+      '<div class="study-kpi"><span>복습 대기</span><b>' + (dueWrong.length + dueRounds.length) + '건</b></div></div></div>';
 
-  // 오늘 복습할 오답 먼저
-  const due = wnDue(me.id);
-  if (due.length) {
-    h += '<div class="card alert"><div class="card-title mb8" style="color:var(--coral)">' +
-      '🔁 오늘 다시 볼 오답 ' + due.length + '개</div>' +
-      due.map(x => wnRow(me.id, x, editable)).join('') + '</div>';
+  if (dueWrong.length || dueRounds.length) {
+    h += '<div class="card alert"><div class="between"><div><div class="card-title">🔁 오늘 복습 대기</div>' +
+      '<div class="card-sub">오늘 탭에서 체크리스트에 담아 순공시간까지 기록할 수 있습니다.</div></div>' +
+      '<span class="pill bad">' + (dueWrong.length + dueRounds.length) + '건</span></div>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="daypick" data-date="' + today() + '">오늘 탭에서 시작</button></div>';
   }
+
+  h += submissionHubCard(me);
+  [
+    { title: '온라인 학습', help: '외부 학습 서비스 과제와 진행 상태', keys: ['metamath', 'classcard', 'studyforce'] },
+    { title: '자기주도 학습', help: '독해·독서·탐구 결과와 단계 기록', keys: ['wb_reading', 'reading', 'inquiry_report'] },
+    { title: '시험 준비', help: '시험 일정과 연결된 제공 자료', keys: ['exam_material'] }
+  ].forEach(group => {
+    h += '<div class="study-group-title">' + group.title + ' <span class="muted">· ' + group.help + '</span></div>' +
+      group.keys.map(key => learningSourceCard(me, editable, key)).join('');
+  });
 
   // 회독
   const items = rdItems(me.id);
-  h += '<div class="card"><div class="between mb8"><div class="card-title">📚 회독</div>' +
-    (editable ? '<button class="btn btn-sm btn-ghost" data-act="rdadd">＋ 교재</button>' : '') + '</div>' +
+  h += '<details class="card study-source-card"' + (dueRounds.length ? ' open' : '') + '><summary class="study-source-summary">' +
+    '<span class="study-source-head"><span class="study-source-icon">📚</span><span class="study-source-copy"><b>회독 기록</b><span>교재별 횟수·범위·다음 학습일</span></span></span>' +
+    '<span class="study-source-count"><span class="pill' + (dueRounds.length ? ' warn' : '') + '">' + dueRounds.length + '건 예정</span></span></summary>' +
+    '<div class="study-source-body"><div class="study-source-actions">' +
+    (editable ? '<button class="btn btn-primary" data-act="rdadd">＋ 교재 추가</button>' : '') + '</div>' +
     (items.length
       ? items.map((it, i) => {
           const pct = it.target ? Math.min(100, Math.round(it.done / it.target * 100)) : 0;
-          return '<div style="padding:7px 0">' +
-            '<div class="between mb8"><span>' + esc(it.name) + '</span>' +
+          const history = Array.isArray(it.history) ? it.history : [];
+          const last = history.length ? history[history.length - 1] : null;
+          return '<div class="study-reading-row">' +
+            '<div class="between mb8"><span>' + studySubjectTag(it.subject || 'other') + ' <b>' + esc(it.name) + '</b></span>' +
             '<span class="row" style="gap:6px"><span class="pill' + (pct >= 100 ? '' : ' warn') + '">' +
               it.done + ' / ' + it.target + '회독</span>' +
             (editable
-              ? '<button class="btn btn-sm btn-primary" data-act="rdup" data-i="' + i + '">＋1</button>' +
-                '<button class="btn btn-sm btn-ghost" data-act="rddel" data-i="' + i + '">×</button>'
+              ? (it.plannedTaskId ? '<span class="tag doing">체크리스트 진행 중</span>' :
+                  '<button class="btn btn-sm btn-primary" data-act="rdup" data-i="' + i + '">＋1 기록</button>') +
+                (!it.plannedTaskId ? '<button class="btn btn-sm btn-ghost" data-act="rddel" data-i="' + i + '">×</button>' : '')
               : '') + '</span></div>' +
-            '<div class="bar mini"><i style="width:' + pct + '%"></i></div></div>';
+            '<div class="bar mini"><i style="width:' + pct + '%"></i></div>' +
+            '<div class="study-reading-history">' +
+              (it.nextDate ? '다음 예정 ' + label(it.nextDate) : pct >= 100 ? '목표 달성' : '다음 예정일 미정') +
+              (last ? ' · 최근 ' + shortDate(last.date) + (last.range ? ' · ' + esc(last.range) : '') + (last.minutes ? ' · ' + Number(last.minutes) + '분' : '') : '') +
+            '</div></div>';
         }).join('')
-      : '<div class="small muted">등록된 교재가 없습니다. 몇 회독을 목표로 할지 정해두면 진행이 보입니다.</div>') +
-    '</div>';
+      : '<div class="small muted">등록된 교재가 없습니다. 과목과 첫 학습일을 정하면 오늘 체크리스트에 연결됩니다.</div>') +
+    '</div></details>';
 
   // 오답노트 전체
   const all = wnAll(me.id);
   const open = all.filter(x => !x.fixed);
-  h += '<div class="card"><div class="between mb8"><div class="card-title">✏️ 오답노트</div>' +
-    '<span class="row" style="gap:6px"><span class="pill' + (open.length ? ' warn' : '') + '">미해결 ' + open.length + '</span>' +
-    (editable ? '<button class="btn btn-sm btn-ghost" data-act="wnadd">＋ 오답</button>' : '') + '</span></div>' +
+  h += '<details class="card study-source-card"' + (dueWrong.length ? ' open' : '') + '><summary class="study-source-summary">' +
+    '<span class="study-source-head"><span class="study-source-icon">✏️</span><span class="study-source-copy"><b>오답노트</b><span>3일·7일 복습과 해결 기록</span></span></span>' +
+    '<span class="study-source-count"><span class="pill' + (open.length ? ' warn' : '') + '">미해결 ' + open.length + '</span></span></summary>' +
+    '<div class="study-source-body"><div class="study-source-actions">' +
+    (editable ? '<button class="btn btn-primary" data-act="wnadd">＋ 오답 추가</button>' : '') + '</div>' +
     (all.length
       ? all.slice(0, 30).map(x => wnRow(me.id, x, editable)).join('')
       : '<div class="small muted">틀린 문제를 한 줄로 남겨두면 3일·7일 뒤에 다시 띄워줍니다.</div>') +
-    '</div>';
+    '</div></details>';
 
   return h;
 }
 
 function rdAddModal() {
   modal('📚 회독 교재 추가',
-    '<input class="in mb14" id="rdName" placeholder="교재 이름 (예: 수학의 정석 상)">' +
-    '<div class="fl mb8">목표 회독수</div>' +
-    '<input class="in" type="number" min="1" max="20" id="rdTarget" value="3" style="max-width:110px">',
+    '<div class="field"><label class="fl">교재 이름</label><input class="in" id="rdName" placeholder="예: 수학의 정석 상"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="rdSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">목표 회독수</label><input class="in" type="number" min="1" max="20" id="rdTarget" value="3"></div></div>' +
+    '<div class="field"><label class="fl">첫 학습 예정일</label><input class="in" type="date" id="rdNextDate" min="' + today() + '" value="' + today() + '"></div>' +
+    '<div class="hint">예정일이 되면 오늘 탭에서 체크리스트로 가져올 수 있고, 완료 후 다음 회독은 7일 뒤로 자동 예약됩니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="rdsave">추가</button>');
+}
+
+function rdLogModal(index) {
+  const me = currentStaff();
+  const item = me && rdItems(me.id)[index];
+  if (!item) return toast('회독 교재를 다시 확인해 주세요');
+  modal('📖 회독 기록 · ' + item.name,
+    '<input type="hidden" id="rdLogIndex" value="' + index + '">' +
+    '<div class="grid2"><div class="field"><label class="fl">학습일</label><input class="in" type="date" id="rdLogDate" value="' + today() + '"></div>' +
+      '<div class="field"><label class="fl">공부시간 <span class="muted">(선택)</span></label><input class="in" type="number" min="0" max="600" id="rdLogMinutes" placeholder="분"></div></div>' +
+    '<div class="field"><label class="fl">공부한 범위 <span class="muted">(선택)</span></label><input class="in" id="rdLogRange" placeholder="예: 1~3단원, 20~85쪽"></div>' +
+    '<div class="field"><label class="fl">다음 회독 예정일 <span class="muted">(선택)</span></label><input class="in" type="date" id="rdLogNextDate" min="' + today() + '" value="' + addDays(today(), 7) + '"></div>',
+    '<button class="btn btn-primary btn-block" data-act="rdlogsave">회독 완료 기록</button>');
 }
 
 function learningTaskModal(sourceKey) {
@@ -4171,25 +4364,33 @@ function learningTaskModal(sourceKey) {
   if (!me) return toast('학생을 먼저 선택해 주세요');
   const source = LEARNING_SOURCES[sourceKey];
   if (!source) return toast('학습 종류를 다시 선택해 주세요');
+  const planned = addDays(today(), 1);
   modal(me.name + ' — ' + source.icon + ' ' + source.label,
     '<input type="hidden" id="learnSource" value="' + esc(sourceKey) + '">' +
-    '<div class="guide mb14"><b>' + source.icon + ' ' + esc(source.label) + ' 보내기</b>과제명과 마감일을 입력하면 선택한 학생의 ' + esc(source.label) + ' 카드에 바로 나타납니다.</div>' +
+    '<div class="guide mb14"><b>' + source.icon + ' ' + esc(source.label) + ' 보내기</b>과목·학습 예정일·마감일을 정하면 오늘·주간·학습 탭에 같은 일정으로 나타납니다.</div>' +
     '<div class="field"><label class="fl">과제·자료명</label>' +
       '<input class="in" id="learnTitle" placeholder="예: 중간고사 1회 대비자료, 클래스카드 3세트"></div>' +
-    '<div class="field"><label class="fl">마감일</label>' +
-      '<input class="in" id="learnDue" type="date" value="' + addDays(today(), 1) + '"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="learnSubject">' +
+      studySubjectOptions('', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">예상 학습시간</label><select class="in" id="learnEstimatedMin">' +
+        [20, 30, 40, 50, 60, 80, 90, 120].map(value => '<option value="' + value + '"' + (value === 50 ? ' selected' : '') + '>' + value + '분</option>').join('') +
+      '</select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">학습 예정일</label>' +
+      '<input class="in" id="learnStudyDate" type="date" min="' + today() + '" value="' + planned + '"></div>' +
+      '<div class="field"><label class="fl">마감일</label>' +
+      '<input class="in" id="learnDueDate" type="date" min="' + today() + '" value="' + planned + '"></div></div>' +
+    (sourceKey === 'exam_material' ? '<div class="field"><label class="fl">연결할 시험 <span class="muted">(선택)</span></label>' +
+      '<select class="in" id="learnAcademicEvent">' + learningExamOptions(me.id, '') + '</select></div>' : '') +
     '<div class="field"><label class="fl">자료 공유 링크 <span class="muted">(선택)</span></label>' +
       '<input class="in" id="learnUrl" type="url" inputmode="url" placeholder="https://... 보기 전용 링크"></div>' +
-    '<div class="hint">시험대비자료는 HTTPS 보기 전용 링크가 필수입니다. 외부 사이트 아이디·비밀번호와 정답지·개인정보는 저장하지 마세요.</div>',
+    '<div class="hint">예정일에는 오늘 체크리스트에 나타나고, 마감일까지 끝내지 못하면 지연으로 표시됩니다. 시험대비자료는 HTTPS 보기 전용 링크가 필수입니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="learnsave">학생에게 보내기</button>');
 }
 function wnAddModal(me) {
   modal('✏️ 오답 추가',
     '<input class="in mb14" id="wnNote" placeholder="어떤 문제였는지 한 줄로 (예: 이차함수 최댓값 조건 놓침)">' +
     '<input class="in mb14" id="wnSrc" placeholder="출처 (예: 쎈 3단원 42번) — 선택">' +
-    '<div class="fl mb8">과목</div><div class="chips" id="wnSubj">' +
-      stSubjects(me.id).map(s => '<button type="button" class="chip" data-act="wnsubj" data-v="' + esc(s) + '">' + esc(s) + '</button>').join('') +
-    '</div>' +
+    '<div class="field"><label class="fl">과목</label><select class="in" id="wnSubject">' + studySubjectOptions('', '과목 선택') + '</select></div>' +
     '<div class="hint">등록하면 3일 뒤, 7일 뒤에 자동으로 다시 띄워줍니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="wnsave">추가</button>');
 }
@@ -6187,7 +6388,7 @@ function materialRequestFromForm(exam, existing) {
     examId: exam.id, examName: exam.title, examDate: academicDateOf(exam),
     grade: (($('#materialGrade') && $('#materialGrade').value) || exam.grade || '').trim(),
     semester: (($('#materialSemester') && $('#materialSemester').value) || exam.semester || '').trim(),
-    subject: subject,
+    subject: subject, studySubject: exam.studySubject || '',
     publisher: (($('#materialPublisher') && $('#materialPublisher').value) || '').trim(),
     textbook: (($('#materialTextbook') && $('#materialTextbook').value) || '').trim(),
     unit: (($('#materialUnit') && $('#materialUnit').value) || '').trim(),
@@ -6285,6 +6486,7 @@ function provideMaterialRequest(req, resourceUrl, due) {
     status: 'provided', source: 'exam_material', resourceUrl: resourceUrl,
     title: '시험대비자료 · ' + [req.subject, req.unit].filter(Boolean).join(' '),
     studySubject: req.studySubject || '', detail: buildMaterialRequestSummary(req),
+    academicEventId: req.examId || '', dueDate: req.examDate || due, estimatedMin: 50,
     guide: LEARNING_SOURCES.exam_material.guide,
     steps: (task.steps && task.steps.length) ? task.steps : LEARNING_SOURCES.exam_material.steps.map(label => ({ id: uid(), label: label })),
     target: 0, unit: '건', time: '', priority: 'high', repeat: 'once', days: [],
@@ -6302,7 +6504,7 @@ function materialProvideModal(req) {
   modal('📎 시험대비 자료 제공',
     '<div class="material-preview mb14">' + esc(buildMaterialRequestSummary(req)) + '</div>' +
     '<div class="field"><label class="fl">보기 전용 HTTPS 링크</label><input class="in" id="materialResourceUrl" type="url" inputmode="url" placeholder="https://..."></div>' +
-    '<div class="field"><label class="fl">학습 마감일</label><input class="in" id="materialStudyDue" type="date" min="' + today() + '" max="' + esc(req.examDate || '') + '" value="' + esc(defaultDue) + '"></div>' +
+    '<div class="field"><label class="fl">학습 예정일</label><input class="in" id="materialStudyDue" type="date" min="' + today() + '" max="' + esc(req.examDate || '') + '" value="' + esc(defaultDue) + '"></div>' +
     '<div class="hint">정답지·개인정보가 포함된 공개 링크는 사용하지 마세요. 앱 직접 PDF 업로드는 비공개 파일 저장소 도입 후 추가됩니다.</div>',
     '<button class="btn btn-primary btn-block" data-act="matprovide" data-id="' + req.id + '">자료 제공하기</button>');
 }
@@ -7205,7 +7407,9 @@ function editTaskModal(id) {
       '<textarea class="in" id="eGuide" rows="5">' + esc(t.guide || '') + '</textarea></div>' +
 
     (learning ? '<div class="field"><label class="fl">자료 공유 링크 <span class="muted">(선택)</span></label>' +
-      '<input class="in" id="eResourceUrl" type="url" inputmode="url" value="' + esc(t.resourceUrl || '') + '" placeholder="https://... 보기 전용 링크"></div>' : '') +
+      '<input class="in" id="eResourceUrl" type="url" inputmode="url" value="' + esc(t.resourceUrl || '') + '" placeholder="https://... 보기 전용 링크"></div>' +
+      '<div class="grid2"><div class="field"><label class="fl">예상 학습시간</label><input class="in" id="eEstimatedMin" type="number" min="10" max="600" step="10" value="' + (Number(t.estimatedMin) || 50) + '"></div>' +
+      (t.source === 'exam_material' ? '<div class="field"><label class="fl">연결할 시험</label><select class="in" id="eAcademicEvent">' + learningExamOptions(t.staffId, t.academicEventId || '') + '</select></div>' : '<div></div>') + '</div>' : '') +
 
     '<div class="field"><label class="fl">단계 — 한 줄에 하나씩</label>' +
       '<textarea class="in" id="eSteps" rows="5">' + esc((t.steps || []).map(s => s.label).join('\n')) + '</textarea>' +
@@ -7233,10 +7437,11 @@ function editTaskModal(id) {
       '<div class="chips">' + DOW.map((d, i) =>
         '<button type="button" class="chip dow ' + (eForm.days.includes(i) ? 'on' : '') + '" data-act="edow" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
 
-    '<div class="grid2">' +
-      '<div class="field"><label class="fl">시작일</label><input class="in" id="eStart" type="date" value="' + esc(t.start || today()) + '"></div>' +
-      '<div class="field"><label class="fl">종료일 (선택)</label><input class="in" id="eEnd" type="date" value="' + esc(t.end || '') + '"></div>' +
-    '</div>' +
+    (learning
+      ? '<div class="grid2"><div class="field"><label class="fl">학습 예정일</label><input class="in" id="eStart" type="date" value="' + esc(learningTaskDate(t) || today()) + '"></div>' +
+        '<div class="field"><label class="fl">마감일</label><input class="in" id="eLearningDue" type="date" value="' + esc(learningDueDate(t) || t.start || today()) + '"></div></div>'
+      : '<div class="grid2"><div class="field"><label class="fl">시작일</label><input class="in" id="eStart" type="date" value="' + esc(t.start || today()) + '"></div>' +
+        '<div class="field"><label class="fl">종료일 (선택)</label><input class="in" id="eEnd" type="date" value="' + esc(t.end || '') + '"></div></div>') +
 
     '<div class="field"><button type="button" class="chip ' + (eForm.carry ? 'on' : '') + '" data-act="ecarry">' +
       (eForm.carry ? '☑' : '☐') + ' 못 끝내면 다음날로 이월</button></div>' +
@@ -7278,6 +7483,16 @@ function saveEditedTask() {
     else if (t.origin !== 'staff') t.lastEditBy = 'admin';
   }
 
+  const learningTask = LEARNING_SOURCES[t.source] || null;
+  const learningStart = $('#eStart').value || today();
+  const learningDue = learningTask ? (($('#eLearningDue') && $('#eLearningDue').value) || learningStart) : '';
+  if (learningTask && learningDue < learningStart) return toast('마감일은 학습 예정일보다 빠를 수 없습니다');
+  const learningEstimatedMin = learningTask
+    ? Math.max(10, Math.min(600, Number((($('#eEstimatedMin') || {}).value)) || 50)) : 0;
+  const academicId = learningTask ? (($('#eAcademicEvent') && $('#eAcademicEvent').value) || '') : '';
+  const linkedExam = academicId ? state.tasks.find(row => !row.deleted && row.id === academicId &&
+    row.kind === 'academic_event' && row.staffId === t.staffId) : null;
+
   // 같은 순서의 단계는 id를 물려줘서 이미 체크한 진행 상태를 잃지 않게 한다
   const oldSteps = t.steps || [];
   const labels = ($('#eSteps').value || '').split('\n').map(x => x.trim()).filter(Boolean);
@@ -7294,8 +7509,24 @@ function saveEditedTask() {
   t.priority = $('#ePri').value;
   t.repeat = eForm.repeat;
   t.days = eForm.days.slice().sort();
-  t.start = $('#eStart').value || today();
-  t.end = $('#eEnd').value || '';
+  if (learningTask) {
+    const moveKey = weekMoveKey(t.staffId) + '|all';
+    const moveCheck = state.checks[moveKey];
+    if (moveCheck && Array.isArray(moveCheck.moves) && moveCheck.moves.some(move => move.taskId === t.id)) {
+      state.checks[moveKey] = Object.assign({}, moveCheck, {
+        moves: moveCheck.moves.filter(move => move.taskId !== t.id), updatedAt: now()
+      });
+    }
+  }
+  t.start = learningStart;
+  if (learningTask) {
+    t.dueDate = learningDue;
+    t.estimatedMin = learningEstimatedMin;
+    t.academicEventId = linkedExam ? linkedExam.id : '';
+    t.end = '';
+  } else {
+    t.end = $('#eEnd').value || '';
+  }
   t.carry = eForm.carry;
   if (session.isAdmin) t.evidenceMode = eForm.evidenceMode ? 'photo' : '';
   t.updatedAt = now();
@@ -7653,21 +7884,31 @@ document.addEventListener('click', ev => {
       const sourceKey = $('#learnSource').value || '';
       const source = LEARNING_SOURCES[sourceKey];
       const title = ($('#learnTitle').value || '').trim();
-      const due = $('#learnDue').value || '';
+      const subjectKey = $('#learnSubject').value || '';
+      const planned = $('#learnStudyDate').value || '';
+      const due = $('#learnDueDate').value || '';
+      const estimatedMin = Math.max(10, Math.min(600, Number($('#learnEstimatedMin').value) || 50));
+      const academicId = (($('#learnAcademicEvent') && $('#learnAcademicEvent').value) || '');
+      const linkedExam = academicId ? state.tasks.find(row => !row.deleted && row.id === academicId &&
+        row.kind === 'academic_event' && row.academicType === 'exam' && row.staffId === me.id) : null;
       const rawUrl = ($('#learnUrl').value || '').trim();
       const resourceUrl = safeHttpsUrl(rawUrl);
       if (!source) return toast('학습 종류를 다시 선택해 주세요');
       if (!title) return toast('과제·자료명을 입력해 주세요');
+      if (!STUDY_SUBJECTS[subjectKey]) return toast('과목을 선택해 주세요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(planned) || planned < today()) return toast('학습 예정일을 오늘 이후로 선택해 주세요');
       if (!due) return toast('마감일을 선택해 주세요');
+      if (due < planned) return toast('마감일은 학습 예정일보다 빠를 수 없습니다');
       if (rawUrl && !resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
       if (sourceKey === 'exam_material' && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
       state.tasks.push({
         id: uid(), groupId: 'learning-' + now(), staffId: me.id,
-        source: sourceKey, resourceUrl: resourceUrl,
+        source: sourceKey, resourceUrl: resourceUrl, studySubject: subjectKey,
+        dueDate: due, estimatedMin: estimatedMin, academicEventId: linkedExam ? linkedExam.id : '',
         title: title, detail: source.detail, guide: source.guide,
         steps: source.steps.map(label => ({ id: uid(), label: label })),
         target: 0, unit: '건', time: '', priority: 'normal',
-        repeat: 'once', days: [], start: due, end: '', carry: true,
+        repeat: 'once', days: [], start: planned, end: '', carry: true,
         origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
       });
       save(); queueSync(); closeModal(); render();
@@ -7894,26 +8135,69 @@ document.addEventListener('click', ev => {
     case 'rdsave': {
       const me = currentStaff(); if (!me) break;
       const name = ($('#rdName').value || '').trim();
+      const subject = $('#rdSubject').value || '';
       if (!name) return toast('교재 이름을 넣어주세요');
+      if (!STUDY_SUBJECTS[subject]) return toast('과목을 선택해 주세요');
       rdSave(me.id, rdItems(me.id).concat({
-        id: uid(), name: name, target: Math.max(1, Number($('#rdTarget').value) || 1), done: 0
+        id: uid(), name: name, subject: subject,
+        target: Math.max(1, Number($('#rdTarget').value) || 1), done: 0,
+        history: [], nextDate: $('#rdNextDate').value || ''
       }));
       closeModal(); render(); toast('추가했습니다');
       break;
     }
     case 'rdup': {
+      const me = currentStaff();
+      const item = me && rdItems(me.id)[Number(el.dataset.i)];
+      if (!item) return toast('회독 교재를 다시 확인해 주세요');
+      if (item.plannedTaskId) return toast('오늘 체크리스트의 회독을 먼저 완료해 주세요');
+      rdLogModal(Number(el.dataset.i));
+      break;
+    }
+    case 'rdlogsave': {
       const me = currentStaff(); if (!me) break;
-      const i = Number(el.dataset.i);
-      const list = rdItems(me.id).map((x, n) =>
-        n === i ? Object.assign({}, x, { done: Math.min(x.target, (x.done || 0) + 1) }) : x);
-      rdSave(me.id, list); render();
-      const it = list[i];
-      if (it && it.done >= it.target) toast(it.name + ' — 목표 회독 달성 🎉');
+      const index = Number($('#rdLogIndex').value);
+      const list = rdItems(me.id).slice();
+      const item = list[index];
+      if (!item) return toast('회독 교재를 다시 확인해 주세요');
+      const logDate = $('#rdLogDate').value || today();
+      const history = Array.isArray(item.history) ? item.history.slice() : [];
+      history.push({ id: uid(), date: logDate, range: ($('#rdLogRange').value || '').trim(), minutes: Math.max(0, Number($('#rdLogMinutes').value) || 0), at: now() });
+      const done = Math.min(Number(item.target || 1), Number(item.done || 0) + 1);
+      list[index] = Object.assign({}, item, {
+        done: done, history: history, lastDate: logDate, plannedTaskId: '',
+        nextDate: done < Number(item.target || 1) ? ($('#rdLogNextDate').value || '') : ''
+      });
+      rdSave(me.id, list); closeModal(); render();
+      toast(done >= Number(item.target || 1) ? item.name + ' — 목표 회독 달성 🎉' : '회독 기록을 저장했습니다');
+      break;
+    }
+    case 'rdclaim': {
+      const me = currentStaff();
+      if (!session.isStaffLink || !me || me.id !== session.staffId) return toast('학생 개인 화면에서 가져올 수 있습니다');
+      const list = rdItems(me.id).slice();
+      const index = list.findIndex(item => item.id === id);
+      const item = list[index];
+      if (!item || !rdDue(me.id).some(row => row.id === item.id)) return toast('가져올 회독 학습을 다시 확인해 주세요');
+      const taskId = uid();
+      state.tasks.push({
+        id: taskId, groupId: 'reading-round-' + item.id, staffId: me.id,
+        source: 'reading_round', readingRoundId: item.id, learningKind: '회독',
+        studySubject: item.subject || 'other', title: '회독 · ' + item.name,
+        detail: (Number(item.done || 0) + 1) + '/' + Number(item.target || 1) + '회독',
+        guide: '예정한 범위를 읽거나 문제를 풀고, 완료 후 범위와 시간을 확인하세요.',
+        steps: [{ id: uid(), label: '예정 범위 학습' }, { id: uid(), label: '핵심 내용·오답 확인' }],
+        target: 0, unit: '건', time: '', priority: 'normal', repeat: 'once', days: [],
+        start: today(), end: '', carry: true, origin: 'staff', createdAt: now(), updatedAt: now(), deleted: false
+      });
+      list[index] = Object.assign({}, item, { plannedTaskId: taskId });
+      rdSave(me.id, list); render(); toast('오늘 체크리스트에 회독을 담았습니다');
       break;
     }
     case 'rddel': {
       const me = currentStaff(); if (!me) break;
       const list = rdItems(me.id).slice();
+      if (!list[Number(el.dataset.i)] || list[Number(el.dataset.i)].plannedTaskId) return toast('체크리스트에 담은 회독은 완료 후 정리할 수 있습니다');
       if (!confirm(list[Number(el.dataset.i)].name + ' 을(를) 삭제할까요?')) return;
       list.splice(Number(el.dataset.i), 1);
       rdSave(me.id, list); render();
@@ -7930,12 +8214,14 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me) break;
       const note = ($('#wnNote').value || '').trim();
       if (!note) return toast('어떤 문제였는지 한 줄만 적어주세요');
-      const pick = document.querySelector('#wnSubj .chip.on');
+      const subject = $('#wnSubject').value || '';
+      if (!STUDY_SUBJECTS[subject]) return toast('과목을 선택해 주세요');
       const d = today();
       setCheck(wnKey(me.id), d, {
         items: wnOf(me.id, d).concat({
           id: uid(), note: note, src: ($('#wnSrc').value || '').trim(),
-          subj: pick ? pick.dataset.v : '', rv: 0, fixed: false
+          subj: subject, rv: 0, fixed: false,
+          reviewHistory: [], nextReviewDate: addDays(d, WN_REVIEW[0]), reviewTaskId: ''
         }), done: true
       });
       closeModal(); render(); toast('오답을 등록했습니다 — 3일 뒤에 다시 띄워드릴게요');
@@ -7945,9 +8231,37 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me) break;
       const x = wnOf(me.id, el.dataset.date).find(i => i.id === el.dataset.id);
       if (!x) break;
-      wnPatch(me.id, el.dataset.date, el.dataset.id, { rv: (x.rv || 0) + 1 });
+      const round = Math.min(WN_REVIEW.length, (x.rv || 0) + 1);
+      const history = Array.isArray(x.reviewHistory) ? x.reviewHistory.slice() : [];
+      history.push({ id: uid(), date: today(), at: now(), manual: true });
+      wnPatch(me.id, el.dataset.date, el.dataset.id, {
+        rv: round, reviewHistory: history, lastReviewedAt: today(), reviewTaskId: '',
+        nextReviewDate: round < WN_REVIEW.length ? addDays(today(), WN_REVIEW[round]) : '',
+        fixed: round >= WN_REVIEW.length
+      });
       render();
-      toast((x.rv || 0) + 1 >= WN_REVIEW.length ? '복습 완료 — 이제 해결로 체크해도 좋아요' : '다음 복습일에 다시 띄워드릴게요');
+      toast(round >= WN_REVIEW.length ? '오답 복습을 모두 마쳤습니다' : '다음 복습일에 다시 띄워드릴게요');
+      break;
+    }
+    case 'wnclaim': {
+      const me = currentStaff();
+      if (!session.isStaffLink || !me || me.id !== session.staffId) return toast('학생 개인 화면에서 가져올 수 있습니다');
+      const sourceDate = el.dataset.date || '';
+      const item = wnOf(me.id, sourceDate).find(row => row.id === id);
+      if (!item || !wnDue(me.id).some(row => row.id === item.id && row.date === sourceDate)) return toast('가져올 오답을 다시 확인해 주세요');
+      const taskId = uid();
+      state.tasks.push({
+        id: taskId, groupId: 'wrong-note-' + item.id, staffId: me.id,
+        source: 'wrong_note_review', wrongNoteId: item.id, wrongNoteDate: sourceDate,
+        wrongNoteRound: Number(item.rv || 0) + 1, learningKind: '오답 복습',
+        studySubject: studySubjectKey(item.subj), title: '오답 복습 · ' + item.note,
+        detail: item.src || '', guide: '틀린 이유를 확인한 뒤 답을 보지 않고 다시 풀어보세요.',
+        steps: [{ id: uid(), label: '틀린 이유 확인' }, { id: uid(), label: '답을 보지 않고 다시 풀기' }],
+        target: 0, unit: '건', time: '', priority: 'high', repeat: 'once', days: [],
+        start: today(), end: '', carry: true, origin: 'staff', createdAt: now(), updatedAt: now(), deleted: false
+      });
+      wnPatch(me.id, sourceDate, item.id, { reviewTaskId: taskId });
+      render(); toast('오늘 체크리스트에 오답 복습을 담았습니다');
       break;
     }
     case 'wnfix': {
@@ -9072,8 +9386,9 @@ document.addEventListener('click', ev => {
         count: t.target ? (turnOn ? t.target : 0) : ((c && c.count) || 0),
         blocked: turnOn ? false : (c ? c.blocked : false)
       });
-      const running = stRunning(t.staffId, today());
-      if (turnOn && running && running.taskId === t.id) stStop(t.staffId, today());
+      const running = stRunning(t.staffId, date);
+      if (turnOn && running && running.taskId === t.id) stStop(t.staffId, date);
+      if (turnOn) syncLinkedStudyTask(t, date);
       render();
       break;
     }
@@ -9085,6 +9400,11 @@ document.addEventListener('click', ev => {
       cur[k] = !cur[k];
       setCheck(id, date, { steps: cur, blocked: false });
       syncAuto(t, date);
+      if (isDone(t.id, date)) {
+        const running = stRunning(t.staffId, date);
+        if (running && running.taskId === t.id) stStop(t.staffId, date);
+        syncLinkedStudyTask(t, date);
+      }
       render();
       break;
     }
@@ -9094,6 +9414,11 @@ document.addEventListener('click', ev => {
       const n = Math.max(0, ((c && c.count) || 0) + Number(el.dataset.n));
       setCheck(id, date, { count: n, blocked: false });
       syncAuto(t, date);
+      if (isDone(t.id, date)) {
+        const running = stRunning(t.staffId, date);
+        if (running && running.taskId === t.id) stStop(t.staffId, date);
+        syncLinkedStudyTask(t, date);
+      }
       render();
       break;
     }
@@ -9701,7 +10026,14 @@ document.addEventListener('input', ev => {
       const t = state.tasks.find(x => x.id === cntEl.dataset.id);
       const d = cntEl.dataset.date || cursor;
       setCheck(cntEl.dataset.id, d, { count: Math.max(0, Number(cntEl.value) || 0), blocked: false });
-      if (t) syncAuto(t, d);
+      if (t) {
+        syncAuto(t, d);
+        if (isDone(t.id, d)) {
+          const running = stRunning(t.staffId, d);
+          if (running && running.taskId === t.id) stStop(t.staffId, d);
+          syncLinkedStudyTask(t, d);
+        }
+      }
       render();
     }, 600);
   }
@@ -9794,7 +10126,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.32';
+const APP_VER = '2026-08-19.33';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
