@@ -208,13 +208,22 @@ test('stable student ids keep same-name students separate', () => {
   assert.ok(rows.every(row => !row.sessions[0].studentConflict));
 });
 
-test('duplicate same-student entries in one group session still warn', () => {
+test('duplicate same-student entries in one group session do not warn', () => {
   const session = core.timelineRows([
     timelineEntry('김선생', '학생A', 900, 960, '중1'),
     timelineEntry('김선생', '학생A', 900, 960, '중1')
   ])[0].sessions[0];
   assert.equal(session.entries.length, 2);
-  assert.equal(session.studentConflict, true);
+  assert.equal(session.studentConflict, false);
+});
+
+test('one student in different overlapping classes still warns under the same teacher', () => {
+  const sessions = core.timelineRows([
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { subject: '영어', className: '문법' } }),
+    timelineEntry('김선생', '학생A', 930, 990, '중1', { task: { subject: '수학', className: '대수' } })
+  ])[0].sessions;
+  assert.equal(sessions.length, 2);
+  assert.ok(sessions.every(session => session.studentConflict));
 });
 
 test('timeline range adds context and keeps at least four hours visible', () => {
@@ -269,13 +278,13 @@ test('weekly teacher summary preserves conflicts, unique students, and date-time
   assert.ok(kim.sessions[0].teacherConflict && kim.sessions[0].studentConflict);
   assert.ok(kim.sessions[1].teacherConflict);
   assert.ok(park.sessions[0].studentConflict);
-  assert.equal(kim.conflictCount, 2);
+  assert.equal(kim.conflictCount, 1);
   assert.equal(park.conflictCount, 1);
   assert.equal(kim.studentCount, 4);
   assert.equal(summary.totals.studentCount, 4);
   assert.equal(summary.totals.sessionCount, 5);
   assert.equal(summary.totals.durationMinutes, 300);
-  assert.equal(summary.totals.conflictCount, 3);
+  assert.equal(summary.totals.conflictCount, 2);
 });
 
 test('Kim Deokjae real-data samples produce the expected current student counts', () => {
@@ -329,7 +338,9 @@ test('dashboard offers weekly day, teacher, and student views with authenticated
   assert.match(html, /data-schedule-search aria-label="시간표 검색"/);
   assert.match(html, /data-schedule-timeline role="region" aria-label="선생님별 일간 시간표" tabindex="0"/);
   assert.match(html, /const noSchedule = weekly\.monday >= mondayOf\(today\(\)\)/);
-  assert.match(html, /const affected = session\.teacherConflict \? session\.entries : session\.studentConflictEntries;/);
+  assert.match(html, /if \(!session\.studentConflict\) return;/);
+  assert.match(html, /const conflict = session\.studentConflict;/);
+  assert.doesNotMatch(html, /const conflict = session\.teacherConflict \|\| session\.studentConflict;/);
   assert.match(html, /aria-label="이전 ' \+ navUnit/);
   assert.match(html, /aria-label="다음 ' \+ navUnit/);
   assert.match(html, /\['교재·진도', task\.materials\]/);
@@ -356,7 +367,7 @@ test('schedule UI prioritizes warnings and collapses secondary detail without br
   assert.match(html, /추가 수업 ' \+\s*\(rows\.length - 4\) \+ '개 보기/);
   assert.match(html, /전체 지표는 유지됩니다 · ' \+ shown \+ '개 카드가 검색되었습니다\./);
   assert.match(html, /data-act="lessonedit" data-id="' \+ esc\(task\.id\)/);
-  assert.match(html, /\[pendingCount \+ ' · ' \+ conflictCount, '미확정 · 겹침 블록'/);
+  assert.match(html, /\[pendingCount \+ ' · ' \+ conflictCount, '미확정 · 학생 겹침'/);
   assert.match(html, /scheduleView === 'day' && session\.isAdmin && cursor === seoulNowParts\(\)\.date/);
 });
 

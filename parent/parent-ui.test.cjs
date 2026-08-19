@@ -38,6 +38,7 @@ test('오늘 우리 아이는 v2 capability에서만 최소 수업·차량 상�
   assert.match(html, /오늘 수업/);
   assert.match(html, /오늘 차량/);
   assert.match(html, /출결 확인 전/);
+  assert.match(html, /E:\['조퇴','warn'\]/);
   assert.match(html, /탑승 확인 전/);
   assert.match(html, /하차 확인/);
   assert.doesNotMatch(html, /하차·인계 완료|안전 귀가|실시간 위치/);

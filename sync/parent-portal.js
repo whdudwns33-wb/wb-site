@@ -553,7 +553,7 @@ async function publicTodayLessons(env, student, now) {
       String(parsedCheck.date || '') === date ? parsedCheck : null;
     const stepIds = lessonStepIds({ ...task, id: String(row.id) }, check);
     const completedSteps = stepIds.filter(id => !!(check && check.steps && check.steps[id])).length;
-    const attendance = check && ['P', 'L', 'A'].includes(String(check.att || '')) ? String(check.att) : '';
+    const attendance = check && ['P', 'L', 'A', 'E'].includes(String(check.att || '')) ? String(check.att) : '';
     const lessonRef = (await publicLessonIdentity({ ...task, id: String(row.id) }, owner)).lessonRef;
     for (const slot of slots) rows.push({
       lessonRef,

@@ -35,7 +35,7 @@
   }
   function section(kicker,title,rows,empty){return '<section class="card"><div class="section-head"><div><p class="eyebrow">'+esc(kicker)+'</p><h2>'+esc(title)+'</h2></div><span class="section-count">'+Number(rows&&rows.length||0)+'건</span></div>'+(rows&&rows.length?rows.join(''):'<div class="empty">'+esc(empty)+'</div>')+'</section>'}
   function group(title,rows,empty){return '<div class="group"><div class="group-title">'+esc(title)+'</div>'+(rows&&rows.length?rows.join(''):'<div class="empty">'+esc(empty)+'</div>')+'</div>'}
-  const ATTENDANCE={P:['출석','ok'],L:['지각','warn'],A:['결석','bad'],'':['출결 확인 전','muted']};
+  const ATTENDANCE={P:['출석','ok'],L:['지각','warn'],A:['결석','bad'],E:['조퇴','warn'],'':['출결 확인 전','muted']};
   const RIDE_STATUS={scheduled:['탑승 확인 전','muted'],boarded:['탑승 확인','warn'],dropped:['하차 확인','ok'],absent:['미탑승','bad']};
   const DAY_ORDER='월화수목금토일';
   const WRITE_SCOPE_VERSION=3;
