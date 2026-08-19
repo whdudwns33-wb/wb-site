@@ -230,9 +230,10 @@
   .ing-hero-title { font-size: 21px; font-weight: 900; letter-spacing: -.03em; }
   .ing-hero-sub { margin-top: 3px; color: rgba(255,255,255,.72); font-size: 12px; }
   .ing-hero-alert { position: relative; z-index: 1; flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; color: #FFF; background: rgba(232,93,74,.9); font-size: 11px; font-weight: 900; }
-  .ing-overview-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .ing-overview-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
   .ing-overview-stat { min-width: 0; padding: 11px 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 11px; background: rgba(255,255,255,.09); color: rgba(255,255,255,.72); font-size: 11px; }
   .ing-overview-stat b { display: block; margin-bottom: 1px; color: var(--white); font-size: 18px; line-height: 1.25; }
+  .ing-hero-time { position: relative; z-index: 1; margin-top: 9px; color: rgba(255,255,255,.78); font-size: 11px; font-weight: 800; }
   .ing-hero-actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
   .ing-hero .btn-primary { background: var(--white); color: var(--navy); }
   .ing-hero .btn-ghost { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.1); color: var(--white); }
@@ -345,27 +346,86 @@
   .ing-conflict-list summary { cursor: pointer; font-size: 12px; font-weight: 900; }
   .ing-conflict-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; margin-top: 5px; color: var(--dark-gray); font-size: 11px; line-height: 1.45; }
   .ing-conflict-row b { color: #B93827; }
-  .ing-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-  .ing-plan-stat { background: var(--light-gray); border-radius: 9px; padding: 9px; font-size: 12px; }
-  .ing-plan-stat b { display: block; color: var(--navy); margin-bottom: 2px; }
   .ing-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 22px 3px 10px; }
   .ing-section-head h3 { color: var(--navy); font-size: 17px; letter-spacing: -.02em; }
   .ing-section-head span { color: var(--mid-gray); font-size: 12px; }
-  .ing-upcoming-card { background: #FBFCFE; }
-  .ing-upcoming-card .wraprow { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
-  .ing-course-card { position: relative; overflow: hidden; padding-left: 21px; }
+  .ing-attention-card { background: linear-gradient(135deg, #FFF9F7, #FFFDFB); }
+  .ing-attention-card.is-clear { display: flex; align-items: center; gap: 12px; border-color: #CDEBDD; background: #F7FFFB; }
+  .ing-attention-icon { display: grid; place-items: center; flex: 0 0 auto; width: 42px; height: 42px; border-radius: 13px; background: #DDF7E9; color: #138258; font-size: 20px; font-weight: 900; }
+  .ing-attention-list { display: grid; gap: 7px; }
+  .ing-attention-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 54px; padding: 9px 12px; border: 1px solid #F0D1CB; border-radius: 10px; background: var(--white); color: var(--navy); text-align: left; }
+  .ing-attention-row:hover { border-color: #E8A99E; background: #FFF9F7; }
+  .ing-attention-row b, .ing-attention-row small { display: block; }
+  .ing-attention-row small { margin-top: 2px; color: #B94E3D; font-size: 10px; }
+  .ing-library-filter { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding: 2px 1px 5px; scrollbar-width: thin; }
+  .ing-library-filter .chip { flex: 0 0 auto; min-height: 42px; }
+  .ing-library-filter .chip b { margin-left: 3px; }
+  .ing-course-card { --ing-course-color: var(--subject-color); position: relative; overflow: hidden; padding-left: 21px; }
   .ing-course-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ing-course-color); }
+  .ing-course-card.is-open { border-color: var(--ing-course-color); box-shadow: 0 12px 28px rgba(27,58,92,.11); }
   .ing-course-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .ing-course-top > div:first-child { min-width: 0; }
   .ing-course-name { overflow-wrap: anywhere; color: var(--navy); font-size: 17px; font-weight: 900; letter-spacing: -.02em; }
   .ing-course-meta { margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
-  .ing-course-link { color: var(--deep-blue); font-weight: 800; text-decoration: none; }
   .ing-course-bar i { background: var(--ing-course-color); }
-  .ing-course-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .ing-course-actions { display: flex; gap: 6px; }
+  .ing-course-progress { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--mid-gray); font-size: 11px; }
+  .ing-course-progress b { color: var(--navy); }
+  .ing-course-message { margin: 9px 0; padding: 8px 10px; border-radius: 8px; background: var(--subject-bg); color: var(--subject-text); font-size: 11px; font-weight: 700; }
+  .ing-course-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ing-course-detail { margin: 15px -5px -5px; padding: 15px 5px 5px; border-top: 1px solid var(--line); }
+  .ing-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .ing-detail-stats > div { min-width: 0; padding: 10px; border: 1px solid #E4E9EE; border-radius: 9px; background: #FAFBFC; }
+  .ing-detail-stats b, .ing-detail-stats span { display: block; overflow-wrap: anywhere; }
+  .ing-detail-stats b { color: var(--navy); font-size: 13px; }
+  .ing-detail-stats span { margin-top: 2px; color: var(--mid-gray); font-size: 9px; }
+  .ing-course-roadmap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 8px; }
+  .ing-course-roadmap > div { padding: 9px 10px; border-radius: 9px; background: var(--subject-bg); }
+  .ing-course-roadmap b, .ing-course-roadmap span { display: block; overflow-wrap: anywhere; }
+  .ing-course-roadmap b { color: var(--subject-text); font-size: 10px; }
+  .ing-course-roadmap span { margin-top: 2px; color: var(--dark-gray); font-size: 10px; }
+  .ing-resource-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 11px; border: 1px solid #DDE7F1; border-radius: 10px; background: #F8FBFF; }
+  .ing-resource-strip > div { min-width: 0; }
+  .ing-resource-strip b { display: block; margin-bottom: 4px; color: var(--navy); font-size: 11px; }
+  .ing-resource-strip span, .ing-resource-strip a { display: inline-block; margin-right: 10px; color: var(--mid-gray); font-size: 10px; }
+  .ing-resource-strip a { color: var(--deep-blue); font-weight: 800; text-decoration: none; }
+  .ing-curriculum-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin: 16px 2px 8px; }
+  .ing-curriculum-head b, .ing-curriculum-head span { display: block; }
+  .ing-curriculum-head b { color: var(--navy); font-size: 13px; }
+  .ing-curriculum-head > div > span { margin-top: 2px; color: var(--mid-gray); font-size: 10px; }
+  .ing-lecture-list { display: grid; gap: 6px; max-height: 540px; overflow-y: auto; padding: 2px; scrollbar-width: thin; }
+  .ing-lecture-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; min-height: 58px; padding: 8px 10px; border: 1px solid #E2E7EC; border-radius: 9px; background: var(--white); text-align: left; }
+  .ing-lecture-row:hover { border-color: #AFC8DF; background: #FBFDFF; }
+  .ing-lecture-row.overdue { border-color: #F2BBB2; background: #FFF9F8; }
+  .ing-lecture-row.review { border-color: #EED28C; background: #FFFCF3; }
+  .ing-lecture-row.done { background: #F8FAF9; }
+  .ing-lecture-seq { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--subject-bg); color: var(--subject-text); font-size: 11px; font-weight: 900; }
+  .ing-lecture-copy { min-width: 0; }
+  .ing-lecture-copy b, .ing-lecture-copy small { display: block; overflow-wrap: anywhere; }
+  .ing-lecture-copy b { color: var(--navy); font-size: 12px; }
+  .ing-lecture-copy small { margin-top: 2px; color: var(--mid-gray); font-size: 9px; }
+  .ing-lecture-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  .ing-lecture-status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 7px; border-radius: 999px; background: #EEF1F4; color: #66707B; font-size: 9px; font-weight: 900; white-space: nowrap; }
+  .ing-lecture-status.done { background: #DFF5E9; color: #167352; }
+  .ing-lecture-status.overdue { background: #FDE5E0; color: #B33A29; }
+  .ing-lecture-status.review { background: #FFF0C8; color: #8B6500; }
+  .ing-lecture-status.today { background: #DFEFFB; color: #256A99; }
+  .ing-lecture-status.scheduled { background: #EAF1F8; color: #506A82; }
+  .ing-detail-danger { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .ing-note-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 8px; }
+  .ing-note-heading b { color: var(--navy); }
+  .ing-answer-box, .ing-question-read { margin-top: 10px; padding: 11px 12px; border: 1px solid #CFE2F3; border-radius: 10px; background: #F5FAFF; }
+  .ing-answer-box b, .ing-question-read b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; }
+  .ing-answer-box div, .ing-question-read div { color: var(--dark-gray); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ing-question-read small { display: block; margin-top: 5px; color: var(--mid-gray); }
+  .ing-aux-card > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: pointer; list-style: none; }
+  .ing-aux-card > summary::-webkit-details-marker { display: none; }
+  .ing-aux-card > summary b, .ing-aux-card > summary small { display: block; }
+  .ing-aux-card > summary b { color: var(--navy); font-size: 13px; }
+  .ing-aux-card > summary small { margin-top: 3px; color: var(--mid-gray); font-size: 10px; font-weight: 500; }
+  .ing-aux-body .ing-calendar-card { margin: 12px 0 0; border: 1px solid var(--line); box-shadow: none; }
   button.tag { border: 0; cursor: pointer; }
   @media (max-width: 640px) {
-    .ing-overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ing-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ing-overview-stat { padding: 9px 8px; }
     .ing-overview-stat b { font-size: 16px; }
     .ing-hero-actions .btn { flex: 1 1 calc(50% - 4px); min-height: 44px; }
@@ -389,18 +449,23 @@
     .ing-day-counts { justify-content: flex-start; }
     .ing-agenda-list { padding: 9px; }
     .ing-agenda-item { grid-template-columns: 66px minmax(0, 1fr); gap: 8px; min-height: 68px; padding-right: 9px; }
-    .ing-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .ing-plan-grid .ing-plan-stat:last-child { grid-column: 1 / -1; }
     .ing-week-toolbar { grid-template-columns: 1fr; }
     .ing-week-toolbar > * { min-width: 0; }
     .ing-week-toolbar > .row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; justify-self: stretch; width: 100%; max-width: 100%; margin: 8px 0 0; }
     .ing-calendar-bar { align-items: flex-start; }
     .ing-calendar-bar .btn { flex: 0 0 auto; }
     .ing-conflict-row { grid-template-columns: 1fr; }
-    .ing-course-foot { align-items: stretch; flex-direction: column; }
+    .ing-attention-card:not(.is-clear) > .between { align-items: stretch; flex-direction: column; }
+    .ing-attention-card:not(.is-clear) > .between > .row { justify-content: flex-start; }
     .ing-course-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ing-course-actions .btn-primary { grid-column: 1 / -1; }
     .ing-course-actions .btn { width: 100%; min-height: 44px; }
+    .ing-detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ing-resource-strip { align-items: stretch; flex-direction: column; }
+    .ing-resource-strip .btn { width: 100%; min-height: 40px; }
+    .ing-curriculum-head { align-items: flex-start; flex-direction: column; }
+    .ing-lecture-row { grid-template-columns: 42px minmax(0, 1fr); }
+    .ing-lecture-badges { grid-column: 2; justify-content: flex-start; }
   }
   .dot { width: 20px; height: 20px; border-radius: 6px; display: inline-block; background: var(--light-gray); line-height: 20px; color: transparent; font-size: 12px; font-weight: 900; }
   .dot.done { background: var(--blue); color: var(--white); }
@@ -2429,6 +2494,8 @@ const ING_BUFFER_MIN = 10;
 const ING_MIN_FREE = 20;
 let ingWeekAnchor = today();
 let ingCalDay = (dowOf(today()) + 6) % 7;
+let ingLibraryFilter = 'active';
+let ingOpenCourseId = '';
 
 function ingProviderUrlMatches(platform, url) {
   if (!url || platform === '기타') return true;
@@ -2445,6 +2512,7 @@ function ingProviderUrlMatches(platform, url) {
 const ingKey = sid => '__ing__' + sid;          // 강좌·강의 목록
 const ingPlanKey = sid => '__ingp__' + sid;     // 날짜별 배정
 const ingAvailKey = sid => '__ingavail__' + sid; // 반복 주간 고정 일정
+const ingNoteKey = sid => '__ingnote__' + sid;  // 회차별 학생 질문·메모
 const ingCourses = sid => ((state.checks[ingKey(sid) + '|all'] || {}).courses) || [];
 const ingPlan = (sid, date) => ((state.checks[ingPlanKey(sid) + '|' + date] || {}).items) || [];
 const ingSet = sid => Object.assign({ days: [1, 2, 3, 4, 5], perDay: 2 },
@@ -2524,7 +2592,9 @@ const ingPlanDates = sid => {
 function ingAssigned(sid) {
   const map = {};
   ingPlanDates(sid).forEach(d => {
-    ingPlan(sid, d).forEach(it => { map[it.cid + '|' + it.seq] = { date: d, done: !!it.done }; });
+    ingPlan(sid, d).forEach(it => {
+      map[it.cid + '|' + it.seq] = Object.assign({}, it, { date: d, done: !!it.done });
+    });
   });
   return map;
 }
@@ -2569,6 +2639,47 @@ function ingCourseItems(sid, cid) {
     if (it.cid === cid) out.push(Object.assign({}, it, { date: date }));
   }));
   return out.sort((a, b) => a.date.localeCompare(b.date) || Number(a.seq) - Number(b.seq));
+}
+
+function ingLectureNote(sid, cid, seq) {
+  return state.checks[ingNoteKey(sid) + '|' + String(cid || '') + ':' + Number(seq)] || {};
+}
+
+function ingSaveLectureNote(sid, cid, seq, patch) {
+  return setCheck(ingNoteKey(sid), String(cid || '') + ':' + Number(seq),
+    Object.assign({}, patch, { done: true }));
+}
+
+function ingCourseStudySeconds(sid, course) {
+  const taskIds = new Set(((course && course.lectures) || []).map(lecture =>
+    ingTimerTaskId(course.id, lecture.seq)));
+  return ingPlanDates(sid).reduce((sum, date) => sum + stTimelineSegments(sid, date).reduce((daily, segment) =>
+    daily + (taskIds.has(segment.taskId) ? Math.max(0, Number(segment.end) - Number(segment.start)) / 1000 : 0), 0), 0);
+}
+
+function ingCourseState(sid, course, asg) {
+  const stats = ingStats(sid, course, asg);
+  const items = ingCourseItems(sid, course.id);
+  const notes = (course.lectures || []).map(lecture => ingLectureNote(sid, course.id, lecture.seq));
+  const overdue = items.filter(item => !item.done && item.date < today()).length;
+  const review = items.filter(item => item.review).length;
+  const unanswered = notes.filter(note => {
+    const question = String(note.question || '').trim(), answer = String(note.answer || '').trim();
+    return question && (!answer || String(note.answeredQuestion || '').trim() !== question);
+  }).length;
+  const completed = stats.total > 0 && stats.done >= stats.total;
+  const paused = !completed && course.status === 'paused';
+  const lastDone = items.filter(item => item.done).map(item => item.date).sort().pop() || '';
+  const importedDate = Number(course.importedAt) ? ymd(new Date(Number(course.importedAt))) : '';
+  const lastActivity = lastDone || importedDate;
+  const stalled = !completed && !paused && !!lastActivity && lastActivity < addDays(today(), -7);
+  const seconds = Math.round(ingCourseStudySeconds(sid, course));
+  const status = completed ? 'completed' : paused ? 'paused' : 'active';
+  return {
+    stats: stats, items: items, overdue: overdue, review: review, unanswered: unanswered,
+    completed: completed, paused: paused, stalled: stalled, seconds: seconds, status: status,
+    attention: overdue + review + unanswered + (stalled ? 1 : 0)
+  };
 }
 
 /** 순수 배치 코어 — 날짜별 빈 구간에 강의를 순서대로, 쪼개지 않고 넣는다. */
@@ -2907,29 +3018,30 @@ function ingHourText(min) {
   return (h ? h + '시간 ' : '') + (m ? m + '분' : (h ? '' : '0분'));
 }
 
-function ingWeekSummary(sid, mon) {
-  const out = { total: 0, done: 0 };
-  for (let i = 0; i < 7; i++) ingPlan(sid, addDays(mon, i)).forEach(item => {
-    out.total++; if (item.done) out.done++;
-  });
-  return out;
-}
-
-function ingOverviewCard(me, editable, admin, courses, overdue) {
-  const mon = mondayOf(today()), summary = ingWeekSummary(me.id, mon), avail = ingAvail(me.id);
-  const free = avail.configured ? ingHourText(ingWeeklyFreeMin(me.id, mon)) : '미설정';
+function ingOverviewCard(me, editable, admin, courses, states) {
+  const active = states.filter(state => state.status === 'active').length;
+  const total = states.reduce((sum, state) => sum + state.stats.total, 0);
+  const done = states.reduce((sum, state) => sum + state.stats.done, 0);
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const attention = states.reduce((sum, state) => sum + state.overdue + state.review, 0);
+  const questions = states.reduce((sum, state) => sum + state.unanswered, 0);
+  const seconds = states.reduce((sum, state) => sum + state.seconds, 0);
+  const overdue = states.reduce((sum, state) => sum + state.overdue, 0);
+  const avail = ingAvail(me.id);
   return '<div class="card ing-hero"><div class="ing-hero-top"><div>' +
-    '<div class="ing-hero-kicker">WEEKLY LECTURE PLAN</div>' +
-    '<div class="ing-hero-title">' + esc(me.name) + ' 인강 플래너</div>' +
-    '<div class="ing-hero-sub">등록 강좌 ' + courses.length + '개 · ' + shortDate(mon) + ' ~ ' + shortDate(addDays(mon, 6)) + '</div></div>' +
+    '<div class="ing-hero-kicker">LECTURE LIBRARY</div>' +
+    '<div class="ing-hero-title">' + esc(me.name) + ' 인강 관리실</div>' +
+    '<div class="ing-hero-sub">강좌·회차·질문을 한곳에서 관리합니다 · 등록 강좌 ' + courses.length + '개</div></div>' +
     (overdue ? '<span class="ing-hero-alert">밀림 ' + overdue + '강</span>' : '') + '</div>' +
-    '<div class="ing-overview-grid"><div class="ing-overview-stat"><b>' + summary.total + '강</b>이번 주 배정</div>' +
-      '<div class="ing-overview-stat"><b>' + summary.done + '강</b>이번 주 완료</div>' +
-      '<div class="ing-overview-stat"><b>' + esc(free) + '</b>남은 빈 시간</div></div>' +
+    '<div class="ing-overview-grid"><div class="ing-overview-stat"><b>' + active + '개</b>수강 중 강좌</div>' +
+      '<div class="ing-overview-stat"><b>' + pct + '%</b>전체 완강률</div>' +
+      '<div class="ing-overview-stat"><b>' + attention + '강</b>지연·복습</div>' +
+      '<div class="ing-overview-stat"><b>' + questions + '개</b>답변 대기 질문</div></div>' +
+    (seconds ? '<div class="ing-hero-time">⏱ 인강 타이머 누적 ' + fmtDur(seconds) + '</div>' : '') +
     '<div class="ing-hero-actions">' +
       (admin ? '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' : '') +
       (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">' +
-        (avail.configured ? '주간 시간표 수정' : '주간 시간표 입력') + '</button>' : '') +
+        (avail.configured ? '자동배정 시간 수정' : '자동배정 시간 입력') + '</button>' : '') +
       (admin ? '<button class="btn btn-sm btn-ghost" data-act="ingshift">전체 일정 날짜 이동</button>' : '') +
     '</div></div>';
 }
@@ -3126,7 +3238,8 @@ function ingAvailModal(sid) {
 
 function ingSlotModal(sid, date, start, end) {
   const asg = ingAssigned(sid);
-  const courses = ingCourses(sid).filter(c => (c.lectures || []).some(l => !asg[c.id + '|' + l.seq]));
+  const courses = ingCourses(sid).filter(c => c.status !== 'paused' &&
+    (c.lectures || []).some(l => !asg[c.id + '|' + l.seq]));
   if (!courses.length) return toast('먼저 미배정 강의가 있는 강좌를 등록해 주세요');
   modal('🎬 빈 시간에 인강 넣기',
     '<div class="card-sub mb14">' + label(date) + ' · ' + esc(start) + '~' + esc(end) + '</div>' +
@@ -3137,25 +3250,156 @@ function ingSlotModal(sid, date, start, end) {
       '" data-date="' + date + '" data-s="' + esc(start) + '" data-e="' + esc(end) + '">이 시간에 배정</button>');
 }
 
-function ingForecastHtml(sid, course) {
-  const f = ingForecast(sid, course), avail = ingAvail(sid);
-  const reviewItems = ingCourseItems(sid, course.id).filter(x => x.review);
-  const nextStart = course.nextName && f.finishDate && !f.review && !f.overdue ? addDays(f.finishDate, 1) : '';
-  const finish = f.overdue ? '밀린 ' + f.overdue + '강 재배정 필요' : f.finishDate ? shortDate(f.finishDate) :
-    (!avail.configured ? '주간 일정 필요' : (f.remaining ? '가용시간 부족' : '계획 없음'));
-  const rounds = course.goalDate
-    ? (f.rounds ? '총 ' + f.rounds + '회독 가능' : '목표일까지 완강 어려움')
-    : '목표일을 설정하세요';
-  return '<div class="ing-plan-grid">' +
-    '<div class="ing-plan-stat"><b>완강 예상</b>' + esc(finish) + '</div>' +
-    '<div class="ing-plan-stat"><b>' + (course.goalDate ? shortDate(course.goalDate) + '까지' : '예상 회독') + '</b>' + esc(rounds) + '</div>' +
-    '<div class="ing-plan-stat"><b>다음 과정</b>' + esc(course.nextName || '미설정') +
-      (nextStart ? '<div class="small">예상 전환 ' + shortDate(nextStart) + '</div>' : '') +
-      '<div class="small muted">' + esc(f.next) + '</div></div></div>' +
-    (reviewItems.length ? '<div class="panel"><b class="small">★ 복습할 강의</b><div class="chips mt14">' +
-      reviewItems.map(it => '<button class="chip on" data-act="ingreview" data-sid="' + esc(sid) +
-        '" data-date="' + it.date + '" data-cid="' + esc(course.id) + '" data-seq="' + it.seq + '">' +
-        it.seq + '강 복습 완료</button>').join('') + '</div></div>' : '');
+function ingCourseStatusLabel(state) {
+  if (state.completed) return '완강';
+  if (state.paused) return '일시 정지';
+  if (state.overdue) return '지연 ' + state.overdue + '강';
+  if (state.stalled) return '7일 정체';
+  return '수강 중';
+}
+
+function ingCourseFilterMatch(state, filter) {
+  if (filter === 'attention') return state.attention > 0;
+  if (filter === 'paused') return state.paused;
+  if (filter === 'completed') return state.completed;
+  if (filter === 'all') return true;
+  return state.status === 'active';
+}
+
+function ingAttentionCard(me, courseStates, admin) {
+  const issues = courseStates.filter(row => row.state.attention > 0);
+  const overdue = courseStates.reduce((sum, row) => sum + row.state.overdue, 0);
+  if (!issues.length) return '<div class="card ing-attention-card is-clear"><div class="ing-attention-icon">✓</div>' +
+    '<div><div class="card-title">관리할 인강이 없습니다</div><div class="card-sub">지연·복습·답변 대기 없이 잘 진행되고 있습니다.</div></div></div>';
+  return '<div class="card ing-attention-card"><div class="between mb8"><div><div class="card-title">🔔 지금 관리할 강좌</div>' +
+    '<div class="card-sub">날짜가 아니라 강좌별 문제를 먼저 확인하세요.</div></div><div class="row" style="gap:5px"><span class="pill bad">' + issues.length + '개 강좌</span>' +
+      (admin && overdue ? '<button class="btn btn-sm btn-warn" data-act="ingcatchup">밀린 강의 오늘로</button>' : '') + '</div></div>' +
+    '<div class="ing-attention-list">' + issues.map(row => {
+      const state = row.state, tags = [];
+      if (state.overdue) tags.push('지연 ' + state.overdue + '강');
+      if (state.review) tags.push('복습 ' + state.review + '강');
+      if (state.unanswered) tags.push('답변 대기 ' + state.unanswered + '개');
+      if (state.stalled) tags.push('7일 정체');
+      return '<button type="button" class="ing-attention-row" data-act="ingcourseopen" data-cid="' + esc(row.course.id) + '">' +
+        '<span><b>' + esc(row.course.name) + '</b><small>' + tags.join(' · ') + '</small></span><span aria-hidden="true">›</span></button>';
+    }).join('') + '</div></div>';
+}
+
+function ingLectureStatusInfo(plan) {
+  if (!plan) return { key: 'unassigned', label: '미배정' };
+  if (plan.review) return { key: 'review', label: '복습 필요' };
+  if (plan.done) return { key: 'done', label: '완료' };
+  if (plan.date < today()) return { key: 'overdue', label: '지연' };
+  if (plan.date === today()) return { key: 'today', label: '오늘' };
+  return { key: 'scheduled', label: shortDate(plan.date) + ' 예정' };
+}
+
+function ingCourseDetailHtml(me, course, state, admin, asg) {
+  const forecast = ingForecast(me.id, course);
+  const avg = state.stats.done && state.seconds ? Math.round(state.seconds / state.stats.done) : 0;
+  const sourceUrl = safeHttpsUrl(course.sourceUrl), materialUrl = safeHttpsUrl(course.materialUrl);
+  const resources = [
+    course.textbook ? '<span>📘 ' + esc(course.textbook) + '</span>' : '',
+    sourceUrl ? '<a href="' + esc(sourceUrl) + '" target="_blank" rel="noopener noreferrer">강좌 사이트 ↗</a>' : '',
+    materialUrl ? '<a href="' + esc(materialUrl) + '" target="_blank" rel="noopener noreferrer">강의 자료 ↗</a>' : ''
+  ].filter(Boolean);
+  const nextStart = course.nextName && forecast.finishDate && !forecast.review && !forecast.overdue ? addDays(forecast.finishDate, 1) : '';
+  const rounds = course.goalDate ? (forecast.rounds ? '총 ' + forecast.rounds + '회독 가능' : '목표일까지 완강 어려움') : '목표일 미설정';
+  return '<div class="ing-course-detail"><div class="ing-detail-stats">' +
+      '<div><b>' + state.stats.done + ' / ' + state.stats.total + '강</b><span>완료 회차</span></div>' +
+      '<div><b>' + (state.seconds ? fmtDur(state.seconds) : '기록 전') + '</b><span>인강 타이머</span></div>' +
+      '<div><b>' + (avg ? fmtDur(avg) : '기록 전') + '</b><span>완료 1강 평균</span></div>' +
+      '<div><b>' + (forecast.finishDate ? shortDate(forecast.finishDate) : forecast.overdue ? '재배정 필요' : '계획 필요') + '</b><span>예상 완강</span></div>' +
+    '</div>' +
+    '<div class="ing-course-roadmap"><div><b>목표·회독</b><span>' + (course.goalDate ? shortDate(course.goalDate) + '까지 · ' : '') + esc(rounds) + '</span></div>' +
+      '<div><b>다음 과정</b><span>' + esc(course.nextName || '미설정') + (nextStart ? ' · 예상 전환 ' + shortDate(nextStart) : '') + '</span></div></div>' +
+    '<div class="ing-resource-strip"><div><b>교재·자료</b><span>' +
+      (resources.length ? resources.join('') : '등록된 교재나 자료가 없습니다.') + '</span></div>' +
+      (admin ? '<button class="btn btn-sm btn-ghost" data-act="ingedit" data-cid="' + esc(course.id) + '">교재·강좌 정보 수정</button>' : '') + '</div>' +
+    '<div class="ing-curriculum-head"><div><b>회차별 진도</b><span>회차를 누르면 질문·복습 메모와 교재 페이지를 기록할 수 있습니다.</span></div>' +
+      '<div class="row" style="gap:5px">' + (state.review ? '<span class="pill warn">복습 ' + state.review + '</span>' : '') +
+        (state.unanswered ? '<span class="pill bad">답변 대기 ' + state.unanswered + '</span>' : '') + '</div></div>' +
+    '<div class="ing-lecture-list" aria-label="' + esc(course.name) + ' 회차별 진도">' +
+      (course.lectures || []).map(lecture => {
+        const plan = asg[course.id + '|' + lecture.seq], info = ingLectureStatusInfo(plan);
+        const note = ingLectureNote(me.id, course.id, lecture.seq);
+        const question = String(note.question || '').trim(), hasQuestion = !!question;
+        const answered = hasQuestion && !!String(note.answer || '').trim() && String(note.answeredQuestion || '').trim() === question;
+        const hasMemo = !!String(note.memo || '').trim() || !!String(note.page || '').trim();
+        const timing = plan && plan.s && plan.e ? plan.s + '~' + plan.e : '';
+        return '<button type="button" class="ing-lecture-row ' + info.key + '" data-act="ingnote" data-sid="' + esc(me.id) +
+          '" data-cid="' + esc(course.id) + '" data-seq="' + lecture.seq + '"><span class="ing-lecture-seq">' + lecture.seq + '</span>' +
+          '<span class="ing-lecture-copy"><b>' + esc(lecture.title || (lecture.seq + '강')) + '</b><small>' +
+            (lecture.min ? lecture.min + '분' : '시간 미등록') + (plan ? ' · ' + shortDate(plan.date) + (timing ? ' ' + timing : '') : '') + '</small></span>' +
+          '<span class="ing-lecture-badges"><span class="ing-lecture-status ' + info.key + '">' + info.label + '</span>' +
+            (hasQuestion ? '<span class="tag ' + (answered ? '' : 'high') + '">' + (answered ? '답변 완료' : '질문 있음') + '</span>' : '') +
+            (hasMemo ? '<span class="tag">메모</span>' : '') + '</span></button>';
+      }).join('') + '</div>' +
+    (admin ? '<div class="ing-detail-danger"><button class="btn btn-sm btn-ghost" data-act="ingdel" data-cid="' + esc(course.id) + '">강좌 삭제</button></div>' : '') +
+    '</div>';
+}
+
+function ingCourseCardHtml(me, course, state, admin, asg) {
+  const open = ingOpenCourseId === course.id;
+  const subject = ingCourseSubject(course);
+  const forecast = ingForecast(me.id, course);
+  const statusClass = state.completed ? '' : state.paused ? ' warn' : state.attention ? ' bad' : '';
+  const planText = state.overdue ? '밀린 강의를 재배정해야 합니다.' : state.paused ? '새 자동배정이 중지된 강좌입니다.' :
+    state.completed ? '완강했습니다. 필요한 회차는 복습함에서 다시 확인하세요.' :
+    forecast.finishDate ? '현재 속도라면 ' + shortDate(forecast.finishDate) + ' 완강 예상' : '목표일과 자동배정 계획을 설정해 주세요.';
+  return '<article class="card ing-course-card ' + subject.className + (open ? ' is-open' : '') + '">' +
+    '<div class="ing-course-top mb8"><div><div class="ing-course-name">' + esc(course.name) + '</div>' +
+      '<div class="ing-course-meta">' + studySubjectTag(ingCourseSubjectKey(course)) + ' ' + esc(course.platform || '기타') +
+        ' · 총 ' + state.stats.total + '강' + (course.textbook ? ' · ' + esc(course.textbook) : '') + '</div></div>' +
+      '<span class="pill' + statusClass + '">' + ingCourseStatusLabel(state) + '</span></div>' +
+    '<div class="bar mb8 ing-course-bar"><i style="width:' + state.stats.pct + '%"></i></div>' +
+    '<div class="ing-course-progress"><span><b>' + state.stats.pct + '%</b> 완료 ' + state.stats.done + '강</span>' +
+      '<span>배정 ' + state.stats.assigned + ' · 미배정 ' + state.stats.unassigned + '</span></div>' +
+    '<div class="ing-course-message">' + esc(planText) + '</div>' +
+    '<div class="ing-course-actions">' +
+      '<button class="btn btn-sm ' + (open ? 'btn-navy' : 'btn-ghost') + '" data-act="ingcourseopen" data-cid="' + esc(course.id) +
+        '" aria-expanded="' + open + '">' + (open ? '접기' : '회차·질문 보기') + '</button>' +
+      (admin && !state.paused && !state.completed ? '<button class="btn btn-sm btn-primary" data-act="ingassign" data-cid="' + esc(course.id) + '">계획·자동배정</button>' : '') +
+      (admin ? '<button class="btn btn-sm btn-ghost" data-act="ingedit" data-cid="' + esc(course.id) + '">강좌 수정</button>' : '') +
+    '</div>' + (open ? ingCourseDetailHtml(me, course, state, admin, asg) : '') + '</article>';
+}
+
+function ingLectureNoteModal(sid, cid, seq) {
+  const me = currentStaff();
+  if (!me || me.id !== sid) return toast('이 학생의 인강 기록만 확인할 수 있습니다');
+  const found = ingLec(sid, cid, seq);
+  if (!found) return toast('강의 정보를 찾지 못했습니다');
+  const note = ingLectureNote(sid, cid, seq), plan = ingAssigned(sid)[cid + '|' + seq];
+  const info = ingLectureStatusInfo(plan), student = session.isStaffLink;
+  const savedQuestion = String(note.question || '').trim();
+  const answerCurrent = !!String(note.answer || '').trim() && String(note.answeredQuestion || '').trim() === savedQuestion;
+  const heading = '<div class="ing-note-heading">' + studySubjectTag(ingCourseSubjectKey(found.course)) +
+    '<b>' + esc(found.course.name) + ' ' + seq + '강</b><span class="ing-lecture-status ' + info.key + '">' + info.label + '</span></div>' +
+    '<div class="guide mb14">' + esc(found.lec.title || (seq + '강')) + (found.lec.min ? ' · ' + found.lec.min + '분' : '') + '</div>';
+  if (student) {
+    modal('📝 인강 질문·복습 메모', heading +
+      '<div class="field"><label class="fl" for="ingNoteQuestion">선생님에게 물어볼 질문</label>' +
+        '<textarea class="in" id="ingNoteQuestion" rows="4" maxlength="1000" placeholder="이해하지 못한 개념이나 다시 설명이 필요한 부분">' + esc(note.question || '') + '</textarea></div>' +
+      '<div class="field"><label class="fl" for="ingNoteMemo">내 복습 메모</label>' +
+        '<textarea class="in" id="ingNoteMemo" rows="4" maxlength="1000" placeholder="다시 들을 구간, 핵심 내용, 틀린 이유">' + esc(note.memo || '') + '</textarea></div>' +
+      '<div class="field"><label class="fl" for="ingNotePage">관련 교재 페이지</label>' +
+        '<input class="in" id="ingNotePage" maxlength="80" value="' + esc(note.page || '') + '" placeholder="예: 개념서 42~45쪽"></div>' +
+      (note.answer ? '<div class="ing-answer-box"><b>' + (answerCurrent ? '원장 답변' : '이전 질문에 대한 답변 · 새 질문 답변 대기') +
+        '</b><div>' + esc(note.answer) + '</div></div>' : ''),
+      '<div class="grid2">' + (plan ? '<button class="btn btn-ghost" data-act="ingnotereview" data-sid="' + esc(sid) + '" data-date="' + plan.date +
+        '" data-cid="' + esc(cid) + '" data-seq="' + seq + '">' + (plan.review ? '복습 표시 해제' : '★ 복습 필요') + '</button>' : '<span></span>') +
+        '<button class="btn btn-primary" data-act="ingnotesave" data-sid="' + esc(sid) + '" data-cid="' + esc(cid) + '" data-seq="' + seq + '">질문·메모 저장</button></div>');
+    return;
+  }
+  modal('💬 학생 질문 답변', heading +
+    '<div class="ing-question-read"><b>학생 질문</b><div>' + (note.question ? esc(note.question) : '등록된 질문이 없습니다.') + '</div></div>' +
+    '<div class="ing-question-read"><b>학생 복습 메모</b><div>' + (note.memo ? esc(note.memo) : '등록된 메모가 없습니다.') +
+      (note.page ? '<small>교재 ' + esc(note.page) + '</small>' : '') + '</div></div>' +
+    '<div class="field"><label class="fl" for="ingNoteAnswer">원장 답변</label>' +
+      '<textarea class="in" id="ingNoteAnswer" rows="5" maxlength="1200" placeholder="질문에 대한 답변과 다음 학습 지시">' + esc(note.answer || '') + '</textarea></div>',
+    '<div class="grid2">' + (plan ? '<button class="btn btn-ghost" data-act="ingnotereview" data-sid="' + esc(sid) + '" data-date="' + plan.date +
+      '" data-cid="' + esc(cid) + '" data-seq="' + seq + '">' + (plan.review ? '복습 표시 해제' : '★ 복습 필요') + '</button>' : '<span></span>') +
+      '<button class="btn btn-primary" data-act="inganswersave" data-sid="' + esc(sid) + '" data-cid="' + esc(cid) + '" data-seq="' + seq + '">답변 저장</button></div>');
 }
 
 function viewIngang() {
@@ -3165,75 +3409,39 @@ function viewIngang() {
   const editable = session.isStaffLink || admin;
   const courses = ingCourses(me.id);
   const asg = ingAssigned(me.id);
-  const set = ingSet(me.id);
+  const courseStates = courses.map(course => ({ course: course, state: ingCourseState(me.id, course, asg) }));
 
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
-  const { overdue } = ingTodayItems(me.id);
-  h += ingOverviewCard(me, editable, admin, courses, overdue.length);
-  if (overdue.length) {
-    h += '<div class="card alert"><div class="between">' +
-      '<div class="card-title" style="color:var(--coral)">밀린 인강 ' + overdue.length + '강</div>' +
-      (admin ? '<button class="btn btn-sm btn-warn" data-act="ingcatchup">전부 오늘로</button>' : '') +
-      '</div></div>';
-  }
-
-  h += ingWeekCard(me, editable, admin);
+  h += ingOverviewCard(me, editable, admin, courses, courseStates.map(row => row.state));
 
   if (!courses.length) {
     return h + '<div class="card"><div class="empty"><b>🎬</b>등록된 강좌가 없습니다.' +
       (admin ? '<br>강좌를 등록하고 커리큘럼을 붙여넣으세요.' : '') + '</div></div>';
   }
 
-  // 앞으로 2주 일정 — 배정이 실제로 언제 잡혔는지 눈으로 확인할 수 있어야 한다
-  {
-    const up = [];
-    for (let i = 0; i < 14; i++) {
-      const d = addDays(today(), i);
-      const items = ingPlan(me.id, d);
-      if (items.length) up.push({ d: d, n: items.length, done: items.filter(x => x.done).length });
-    }
-    const total = up.reduce((a, x) => a + x.n, 0);
-    h += '<div class="card ing-upcoming-card"><div class="between mb8">' +
-      '<div class="card-title">📅 앞으로 2주</div>' +
-      '<div class="pill' + (total ? '' : ' warn') + '">' + (total ? total + '강 예정' : '예정 없음') + '</div></div>' +
-      (up.length
-        ? '<div class="row wraprow" style="gap:6px">' + up.map(x =>
-            '<button class="chip' + (x.d === today() ? ' on' : '') + '" data-act="daypick" data-date="' + x.d + '">' +
-            shortDate(x.d) + '(' + DOW[dowOf(x.d)] + ') ' + x.done + '/' + x.n + '</button>').join('') + '</div>' +
-          '<div class="hint" style="margin-top:10px">날짜를 누르면 그날 할 일 화면으로 갑니다.</div>'
-        : '<div class="small muted">배정된 강의가 앞으로 2주 안에 없습니다. ' +
-          '배정 요일(' + (set.days.length ? set.days.map(d => DOW[d]).join('·') : '미설정') + ')을 확인해 보세요.</div>') +
-      '</div>';
-  }
-
-  h += '<div class="ing-section-head"><div><h3>강좌별 학습 계획</h3>' +
-    '<span>진도와 완강 예상일을 확인하고 미배정 강의를 자동으로 넣으세요.</span></div>' +
-    '<span>' + courses.length + '개 강좌</span></div>';
-  const courseColors = ['#7C3AED', '#0EA5E9', '#16A34A', '#D97706', '#DB2777', '#4F46E5'];
-  courses.forEach((c, index) => {
-    const s = ingStats(me.id, c, asg);
-    const color = courseColors[index % courseColors.length];
-    h += '<div class="card ing-course-card" style="--ing-course-color:' + color + '"><div class="ing-course-top mb8">' +
-      '<div><div class="ing-course-name">' + esc(c.name) + '</div>' +
-      '<div class="ing-course-meta">' + studySubjectTag(ingCourseSubjectKey(c)) + ' ' + esc(c.platform || '기타') + ' · 총 ' + s.total + '강' +
-        (safeHttpsUrl(c.sourceUrl) ? ' · <a class="ing-course-link" href="' + esc(safeHttpsUrl(c.sourceUrl)) + '" target="_blank" rel="noopener noreferrer">학습 사이트 열기 ↗</a>' : '') + '</div></div>' +
-      '<div class="pill' + (s.pct >= 100 ? '' : s.pct >= 50 ? ' warn' : ' bad') + '">' + s.pct + '%</div></div>' +
-      '<div class="bar mb8 ing-course-bar"><i style="width:' + s.pct + '%"></i></div>' +
-      '<div class="ing-course-foot small"><span class="muted">완료 ' + s.done + ' · 배정 ' + s.assigned +
-        ' · <b>미배정 ' + s.unassigned + '</b></span>' +
-      (admin
-        ? '<span class="ing-course-actions">' +
-            '<button class="btn btn-sm btn-primary" data-act="ingassign" data-cid="' + esc(c.id) + '">계획·자동배정</button>' +
-            '<button class="btn btn-sm btn-ghost" data-act="ingedit" data-cid="' + esc(c.id) + '">수정</button>' +
-            '<button class="btn btn-sm btn-ghost" data-act="ingdel" data-cid="' + esc(c.id) + '">삭제</button></span>'
-        : '') +
-      '</div>' + ingForecastHtml(me.id, c) + '</div>';
-  });
-
-  h += '<div class="hint">미배정 = 강의는 등록됐지만 아직 들을 날짜와 시간이 안 잡힌 것입니다. ' +
-    '[계획·자동배정]을 누르면 학생의 실제 빈 시간에 맞춰 미배정 강의만 추가합니다.</div>';
+  h += ingAttentionCard(me, courseStates, admin);
+  const filters = [
+    { key: 'active', label: '수강 중' }, { key: 'attention', label: '관리 필요' },
+    { key: 'paused', label: '일시 정지' }, { key: 'completed', label: '완강' }, { key: 'all', label: '전체' }
+  ];
+  const counts = Object.fromEntries(filters.map(filter => [filter.key,
+    courseStates.filter(row => ingCourseFilterMatch(row.state, filter.key)).length]));
+  if (!filters.some(filter => filter.key === ingLibraryFilter)) ingLibraryFilter = 'active';
+  if (ingLibraryFilter === 'active' && !counts.active && counts.completed) ingLibraryFilter = 'completed';
+  h += '<div class="ing-section-head"><div><h3>강좌 보관함</h3><span>강좌를 펼쳐 회차별 진도와 질문을 확인하세요.</span></div>' +
+    '<span>' + courses.length + '개 강좌</span></div>' +
+    '<div class="ing-library-filter" role="tablist" aria-label="강좌 상태 필터">' + filters.map(filter =>
+      '<button type="button" role="tab" class="chip' + (ingLibraryFilter === filter.key ? ' on' : '') + '" data-act="ingfilter" data-v="' + filter.key +
+        '" aria-selected="' + (ingLibraryFilter === filter.key) + '">' + filter.label + ' <b>' + counts[filter.key] + '</b></button>').join('') + '</div>';
+  const visible = courseStates.filter(row => ingCourseFilterMatch(row.state, ingLibraryFilter)).sort((a, b) =>
+    b.state.attention - a.state.attention || a.course.name.localeCompare(b.course.name, 'ko'));
+  h += visible.length ? visible.map(row => ingCourseCardHtml(me, row.course, row.state, admin, asg)).join('') :
+    '<div class="card"><div class="empty"><b>✓</b>이 상태에 해당하는 강좌가 없습니다.</div></div>';
+  h += '<details class="card ing-aux-card"><summary><span><b>🗓 자동배정용 주간 시간표</b>' +
+      '<small>학교·학원 시간을 제외하고 인강을 넣을 때만 사용합니다.</small></span><span aria-hidden="true">⌄</span></summary>' +
+    '<div class="ing-aux-body">' + ingWeekCard(me, editable, admin) + '</div></details>';
   return h;
 }
 
@@ -3253,6 +3461,10 @@ function ingAddModal() {
         '아이디·비밀번호는 우리 앱에 저장하지 않습니다.</div></div>' +
     '<div class="fl mb8">② 강좌 상세 주소 (선택)</div>' +
     '<input class="in mb14" id="ingUrl" placeholder="https://... · 나중에 강좌를 다시 여는 용도">' +
+    '<div class="grid2 mb14"><div><label class="fl mb8" for="ingTextbook">교재명 (선택)</label>' +
+      '<input class="in" id="ingTextbook" maxlength="100" placeholder="예: 수학의 정석 기본편"></div>' +
+      '<div><label class="fl mb8" for="ingMaterialUrl">강의 자료 주소 (선택)</label>' +
+      '<input class="in" id="ingMaterialUrl" type="url" placeholder="https://..."></div></div>' +
     '<div class="panel mb14"><div class="fl mb8">③ 목차 없이 빠른 생성</div>' +
       '<div class="grid2 mb8"><input class="in" id="ingQuickCount" type="number" min="1" max="999" placeholder="총 강의 수">' +
         '<input class="in" id="ingQuickMin" type="number" min="10" max="240" value="50" placeholder="평균 강의시간(분)"></div>' +
@@ -3299,6 +3511,13 @@ function ingEditModal(sid, cid) {
         '<option value="' + esc(p) + '"' + (p === platform ? ' selected' : '') + '>' + esc(p) + '</option>').join('') + '</select></div>' +
     '<div class="field"><label class="fl" for="ingEditUrl">강좌 상세 주소</label>' +
       '<input class="in" id="ingEditUrl" type="url" value="' + esc(safeHttpsUrl(course.sourceUrl)) + '" placeholder="https://..."></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="ingEditTextbook">교재명</label>' +
+      '<input class="in" id="ingEditTextbook" maxlength="100" value="' + esc(course.textbook || '') + '" placeholder="사용 교재"></div>' +
+      '<div class="field"><label class="fl" for="ingEditMaterialUrl">강의 자료 주소</label>' +
+      '<input class="in" id="ingEditMaterialUrl" type="url" value="' + esc(safeHttpsUrl(course.materialUrl)) + '" placeholder="https://..."></div></div>' +
+    '<div class="field"><label class="fl" for="ingEditStatus">수강 상태</label>' +
+      '<select class="in" id="ingEditStatus"><option value="active"' + (course.status !== 'paused' ? ' selected' : '') + '>수강 중</option>' +
+      '<option value="paused"' + (course.status === 'paused' ? ' selected' : '') + '>일시 정지 · 새 자동배정 중단</option></select></div>' +
     '<div class="between mb8"><label class="fl" for="ingEditText">강의별 번호 · 제목 · 시간</label>' +
       '<span class="small muted">한 줄에 한 강의</span></div>' +
     '<textarea class="in" id="ingEditText" rows="10" placeholder="1강 다항식 52분">' + esc(ingCourseText(course)) + '</textarea>' +
@@ -7772,6 +7991,58 @@ document.addEventListener('click', ev => {
       render(); toast(item.review ? '복습 표시를 해제했습니다' : '복습할 강의로 표시했습니다');
       break;
     }
+    case 'ingfilter': {
+      if (['active', 'attention', 'paused', 'completed', 'all'].includes(el.dataset.v)) {
+        ingLibraryFilter = el.dataset.v; ingOpenCourseId = ''; render();
+      }
+      break;
+    }
+    case 'ingcourseopen': {
+      const me = currentStaff();
+      if (!me || !ingCourses(me.id).some(course => course.id === el.dataset.cid)) break;
+      ingOpenCourseId = ingOpenCourseId === el.dataset.cid ? '' : el.dataset.cid;
+      if (ingOpenCourseId) ingLibraryFilter = 'all';
+      render();
+      break;
+    }
+    case 'ingnote': {
+      const me = currentStaff();
+      if (!me || me.id !== el.dataset.sid) break;
+      ingLectureNoteModal(me.id, el.dataset.cid, Number(el.dataset.seq));
+      break;
+    }
+    case 'ingnotereview': {
+      const me = currentStaff(); if (!me || me.id !== el.dataset.sid) break;
+      const item = ingPlan(me.id, el.dataset.date).find(row =>
+        row.cid === el.dataset.cid && Number(row.seq) === Number(el.dataset.seq));
+      if (!item) break;
+      ingPatchItem(me.id, el.dataset.date, el.dataset.cid, Number(el.dataset.seq), { review: !item.review });
+      closeModal(); render(); toast(item.review ? '복습 표시를 해제했습니다' : '복습할 강의로 표시했습니다');
+      break;
+    }
+    case 'ingnotesave': {
+      if (!session.isStaffLink) break;
+      const me = currentStaff();
+      if (!me || me.id !== el.dataset.sid || !ingLec(me.id, el.dataset.cid, Number(el.dataset.seq))) break;
+      const question = (($('#ingNoteQuestion') && $('#ingNoteQuestion').value) || '').trim().slice(0, 1000);
+      const memo = (($('#ingNoteMemo') && $('#ingNoteMemo').value) || '').trim().slice(0, 1000);
+      const page = (($('#ingNotePage') && $('#ingNotePage').value) || '').trim().slice(0, 80);
+      ingSaveLectureNote(me.id, el.dataset.cid, Number(el.dataset.seq), { question: question, memo: memo, page: page });
+      closeModal(); render(); toast('질문과 복습 메모를 저장했습니다');
+      break;
+    }
+    case 'inganswersave': {
+      if (!(session.isAdmin || isManager())) break;
+      const me = currentStaff();
+      if (!me || me.id !== el.dataset.sid || !ingLec(me.id, el.dataset.cid, Number(el.dataset.seq))) break;
+      const current = ingLectureNote(me.id, el.dataset.cid, Number(el.dataset.seq));
+      const answer = (($('#ingNoteAnswer') && $('#ingNoteAnswer').value) || '').trim().slice(0, 1200);
+      ingSaveLectureNote(me.id, el.dataset.cid, Number(el.dataset.seq), {
+        answer: answer, answeredQuestion: answer ? String(current.question || '').trim() : '', answeredAt: answer ? now() : null
+      });
+      closeModal(); render(); toast(answer ? '학생 질문에 답변했습니다' : '답변을 비웠습니다');
+      break;
+    }
     case 'ingweek': ingWeekAnchor = addDays(ingWeekAnchor, Number(el.dataset.n) || 0); render(); break;
     case 'ingweektoday':
       ingWeekAnchor = today();
@@ -7872,6 +8143,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me || me.id !== el.dataset.sid) break;
       const course = ingCourses(me.id).find(c => c.id === $('#ingSlotCourse').value);
       if (!course) break;
+      if (course.status === 'paused') return toast('일시 정지한 강좌는 수강 중으로 바꾼 뒤 배정해 주세요');
       const asg = ingAssigned(me.id);
       const lecture = (course.lectures || []).find(l => !asg[course.id + '|' + l.seq]);
       if (!lecture) return toast('이 강좌에는 미배정 강의가 없습니다');
@@ -7929,10 +8201,15 @@ document.addEventListener('click', ev => {
       const pf = (document.querySelector('#ingPf .chip.on') || {}).dataset;
       const platform = (pf && pf.v) || '기타';
       const rawUrl = ($('#ingUrl').value || '').trim(), sourceUrl = safeHttpsUrl(rawUrl);
+      const textbook = (($('#ingTextbook') && $('#ingTextbook').value) || '').trim().slice(0, 100);
+      const rawMaterialUrl = (($('#ingMaterialUrl') && $('#ingMaterialUrl').value) || '').trim();
+      const materialUrl = safeHttpsUrl(rawMaterialUrl);
       if (rawUrl && !sourceUrl) return toast('강좌 주소는 https://로 시작하는 안전한 주소만 저장할 수 있습니다');
+      if (rawMaterialUrl && !materialUrl) return toast('강의 자료 주소는 https://로 시작하는 안전한 주소만 저장할 수 있습니다');
       if (sourceUrl && !ingProviderUrlMatches(platform, sourceUrl)) return toast(platform + ' 공식 주소와 일치하지 않습니다. 주소를 지우거나 플랫폼을 기타로 선택해 주세요');
       ingSaveCourses(me.id, ingCourses(me.id).concat({
         id: uid(), name: name, platform: platform, sourceUrl: sourceUrl || ING_PROVIDER_URLS[platform] || '',
+        materialUrl: materialUrl, textbook: textbook, status: 'active',
         studySubject: subjectKey, importedAt: now(), lectures: lectures
       }));
       closeModal(); render();
@@ -7964,11 +8241,17 @@ document.addEventListener('click', ev => {
       const platform = ING_PLATFORMS.includes(selectedPlatform) ? selectedPlatform : '기타';
       const rawUrl = (($('#ingEditUrl') && $('#ingEditUrl').value) || '').trim();
       const sourceUrl = safeHttpsUrl(rawUrl);
+      const textbook = (($('#ingEditTextbook') && $('#ingEditTextbook').value) || '').trim().slice(0, 100);
+      const rawMaterialUrl = (($('#ingEditMaterialUrl') && $('#ingEditMaterialUrl').value) || '').trim();
+      const materialUrl = safeHttpsUrl(rawMaterialUrl);
+      const status = (($('#ingEditStatus') && $('#ingEditStatus').value) || 'active') === 'paused' ? 'paused' : 'active';
       if (rawUrl && !sourceUrl) return toast('강좌 주소는 https://로 시작하는 안전한 주소만 저장할 수 있습니다');
+      if (rawMaterialUrl && !materialUrl) return toast('강의 자료 주소는 https://로 시작하는 안전한 주소만 저장할 수 있습니다');
       if (sourceUrl && !ingProviderUrlMatches(platform, sourceUrl)) return toast(platform + ' 공식 주소와 일치하지 않습니다. 주소를 지우거나 플랫폼을 기타로 선택해 주세요');
       ingSaveCourses(me.id, ingCourses(me.id).map(item => item.id === course.id
         ? Object.assign({}, item, {
             name: name, platform: platform, sourceUrl: sourceUrl || ING_PROVIDER_URLS[platform] || '',
+            materialUrl: materialUrl, textbook: textbook, status: status,
             studySubject: subjectKey, lectures: lectures, updatedAt: now()
           })
         : item));
@@ -7991,7 +8274,10 @@ document.addEventListener('click', ev => {
     }
     case 'ingassign': {
       if (!(session.isAdmin || isManager())) break;
-      const me = currentStaff(); if (me) ingAssignModal(me.id, el.dataset.cid);
+      const me = currentStaff(); if (!me) break;
+      const course = ingCourses(me.id).find(item => item.id === el.dataset.cid);
+      if (course && course.status === 'paused') return toast('일시 정지한 강좌는 수강 중으로 바꾼 뒤 자동배정해 주세요');
+      if (course) ingAssignModal(me.id, course.id);
       break;
     }
     case 'ingday': el.classList.toggle('on'); break;
@@ -8025,6 +8311,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me) break;
       const c = ingCourses(me.id).find(x => x.id === el.dataset.cid);
       if (!c) break;
+      if (c.status === 'paused') return toast('일시 정지한 강좌는 수강 중으로 바꾼 뒤 자동배정해 주세요');
       const data = ingScheduleFromForm(me.id, c.id);
       if (!data || data.error) return toast((data && data.error) || '일정을 계산하지 못했습니다');
       if (!ingAvail(me.id).configured && data.result.remaining) return toast('주간 일정을 먼저 설정해 주세요');
@@ -8808,7 +9095,12 @@ document.addEventListener('click', ev => {
     }
 
     /* 학생 */
-    case 'pickstaff': viewStaff = id; render(); break;
+    case 'pickstaff':
+      viewStaff = id;
+      ingOpenCourseId = '';
+      ingLibraryFilter = 'active';
+      render();
+      break;
     case 'openstaff': viewStaff = id; go('today'); break;
     case 'addstaff': {
       const name = ($('#sName').value || '').trim();
@@ -9484,7 +9776,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.29';
+const APP_VER = '2026-08-19.30';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
