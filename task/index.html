@@ -898,11 +898,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-19.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-19.4"></script>
-<script src="./asset-core.js?v=2026-08-19.4"></script>
-<script src="./qr-core.js?v=2026-08-19.4"></script>
-<script src="./acaflow-import-core.js?v=2026-08-19.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-19.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-19.5"></script>
+<script src="./asset-core.js?v=2026-08-19.5"></script>
+<script src="./qr-core.js?v=2026-08-19.5"></script>
+<script src="./acaflow-import-core.js?v=2026-08-19.5"></script>
 <script>
 "use strict";
 
@@ -3278,10 +3278,20 @@ function currentLessonRosterDraft() {
   return lessonRosterDraft;
 }
 
+function lessonSubjectSelectionHtml() {
+  const info = currentLessonRosterDraft();
+  const selectedSubjects = new Set(info ? info.subjects || [] : []);
+  return '<div class="sect">2. 등록과목</div><div class="field"><span class="fl">등록과목 · 중복 선택 가능</span><div class="chips">' +
+    ROSTER_SUBJECT_OPTIONS.map(subject => '<label class="chip"><input type="checkbox" data-lesson-roster-subject value="' + esc(subject) + '"' +
+      (selectedSubjects.has(subject) ? ' checked' : '') + (info ? '' : ' disabled') + '> ' + esc(subject) + '</label>').join('') + '</div>' +
+    (info ? '<div class="small muted mt8">선택한 과목은 원생 정보와 이번 수업 정보에 함께 반영됩니다.</div>' :
+      '<div class="small muted mt8">실제 원생을 먼저 선택하면 과목을 선택할 수 있습니다.</div>') + '</div>';
+}
+
 function lessonRosterInformationHtml() {
   const info = currentLessonRosterDraft();
   if (!info) return '<div class="hint mt14">실제 원생을 선택하면 신규 원생 추가와 같은 기본 정보 입력칸이 열립니다.</div>';
-  const selectedSubjects = new Set(info.subjects || []), selectedTeachers = new Set(info.teacherIds || []);
+  const selectedTeachers = new Set(info.teacherIds || []);
   return '<div class="sect">원생 기본 정보 · 신규 원생 추가와 동일 항목</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-lesson-roster-field="name" maxlength="40" value="' + esc(info.name) + '"></label>' +
     '<label class="field"><span class="fl">학교</span><input class="in" data-lesson-roster-field="school" maxlength="80" value="' + esc(info.school) + '"></label></div>' +
@@ -3289,8 +3299,6 @@ function lessonRosterInformationHtml() {
     '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneSelf" maxlength="30" value="' + esc(info.phoneSelf) + '"></label>' +
     '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneFather" maxlength="30" value="' + esc(info.phoneFather) + '"></label></div>' +
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneMother" maxlength="30" value="' + esc(info.phoneMother) + '"></label>' +
-    '<div class="field"><span class="fl">등록과목 · 중복 선택 가능</span><div class="chips">' + ROSTER_SUBJECT_OPTIONS.map(subject =>
-      '<label class="chip"><input type="checkbox" data-lesson-roster-subject value="' + esc(subject) + '"' + (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
     '<div class="field"><span class="fl">담당 선생님</span><div class="chips">' + liveStaff().map(teacher =>
       '<label class="chip"><input type="checkbox" data-lesson-roster-teacher value="' + esc(teacher.id) + '"' + (selectedTeachers.has(teacher.id) ? ' checked' : '') + '> ' + esc(teacher.name) + '</label>').join('') + '</div>' +
       '<div class="small muted mt8">이 수업의 담당 선생님은 저장할 때 원생 담당에도 자동 포함됩니다.</div></div>' +
@@ -3596,19 +3604,19 @@ function viewLessonEntry() {
     '<div class="card">' + staffSelect +
       studentFields +
       (personal ? '<div class="sect">2. 과목·반</div><div class="grid2">' +
-        lessonTextField('subject', '과목', 0, '예: 국어, 영어, 수학') + lessonTextField('className', '반 / 수업 역할', 0, '예: 블렌디드, 비문학, 문제풀이') + '</div>' : '') +
-      '<div class="sect">' + (personal ? '3' : '2') + '. 수업 요일·시간</div>' +
+        lessonTextField('subject', '과목', 0, '예: 국어, 영어, 수학') + lessonTextField('className', '반 / 수업 역할', 0, '예: 블렌디드, 비문학, 문제풀이') + '</div>' : lessonSubjectSelectionHtml()) +
+      '<div class="sect">3. 수업 요일·시간</div>' +
         (personal ? lessonTextField('scheduleText', '원문 그대로', 2, '예: 월·수 17:00-19:00 / 일 12:00-14:00') : '') +
         '<div class="hint mb8">현황판에 확정 표시하려면 아래에 요일·시작·종료를 넣으세요. 불명확하면 비워도 등록되며 원장 확인 필요로 표시됩니다.</div>' +
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
       '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></div>' +
-      '<div class="sect">' + (personal ? '4' : '3') + '. 교재와 현재 진도</div>' + lessonTextField('materials', '교재·진도', 3, '') +
-      '<div class="sect">' + (personal ? '5' : '4') + '. 온라인 프로그램</div>' + lessonTextField('onlineProgram', '온라인 프로그램', 2, '없으면 “없음”') +
-      '<div class="sect">' + (personal ? '6' : '5') + '. 숙제 루틴과 수행률</div>' + lessonTextField('homework', '숙제', 3, '') +
-      '<div class="sect">' + (personal ? '7' : '6') + '. 학생 특징</div>' + lessonTextField('studentTraits', '학생 특징', 3, '') +
-      '<div class="sect">' + (personal ? '8' : '7') + '. 지금 목표</div>' + lessonTextField('goal', '현재 목표', 3, '') +
-      '<div class="sect">' + (personal ? '9' : '8') + '. 특이사항·학부모 요청</div>' + lessonTextField('parentRequest', '특이사항·요청', 3, '없으면 “없음”') +
+      '<div class="sect">4. 교재와 현재 진도</div>' + lessonTextField('materials', '교재·진도', 3, '') +
+      '<div class="sect">5. 온라인 프로그램</div>' + lessonTextField('onlineProgram', '온라인 프로그램', 2, '없으면 “없음”') +
+      '<div class="sect">6. 숙제 루틴과 수행률</div>' + lessonTextField('homework', '숙제', 3, '') +
+      '<div class="sect">7. 학생 특징</div>' + lessonTextField('studentTraits', '학생 특징', 3, '') +
+      '<div class="sect">8. 지금 목표</div>' + lessonTextField('goal', '현재 목표', 3, '') +
+      '<div class="sect">9. 특이사항·학부모 요청</div>' + lessonTextField('parentRequest', '특이사항·요청', 3, '없으면 “없음”') +
       '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">등록 내용 미리보기</button>' +
     '</div>';
 }
@@ -3636,8 +3644,9 @@ function previewLessonRegistration() {
   catch (error) { return toast(error.message || '원생 기본 정보를 확인해 주세요'); }
   draft.studentName = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.name : selected.name;
   draft.grade = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.grade : selected.grade;
-  if (!draft.subject && lessonPreviewRosterStudent && lessonPreviewRosterStudent.subjects.length) {
-    draft.subject = lessonPreviewRosterStudent.subjects[0];
+  if (lessonPreviewRosterStudent && lessonPreviewRosterStudent.subjects.length) {
+    draft.subject = lessonPreviewRosterStudent.subjects.join('·');
+    draft.className = '';
   }
   const validation = core.validateLessonInput(draft);
   if (!validation.valid) return toast(validation.errors[0].message);
@@ -13536,9 +13545,14 @@ document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
   const lessonRosterSubject = ev.target.closest('[data-lesson-roster-subject]');
   if (lessonRosterSubject) {
+    const subjects = Array.from(document.querySelectorAll('[data-lesson-roster-subject]:checked')).map(input => String(input.value));
     const info = currentLessonRosterDraft();
-    if (info) info.subjects = Array.from(document.querySelectorAll('[data-lesson-roster-subject]:checked')).map(input => String(input.value));
+    if (info) info.subjects = subjects;
+    const draft = currentLessonDraft();
+    draft.subject = subjects.join('·');
+    draft.className = '';
     lessonPreviewRosterStudent = null;
+    persistLessonDraft();
     return;
   }
   const lessonRosterTeacher = ev.target.closest('[data-lesson-roster-teacher]');
@@ -13558,6 +13572,10 @@ document.addEventListener('change', async ev => {
     draft.studentName = student ? student.name : '';
     draft.grade = student ? student.grade : '';
     setLessonRosterDraft(student || null);
+    if (session.isAdmin) {
+      draft.subject = student ? rosterStudentSubjects(student).join('·') : '';
+      draft.className = '';
+    }
     persistLessonDraft(); render();
     return;
   }
@@ -13679,7 +13697,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-19.4';
+const APP_VER = '2026-08-19.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
