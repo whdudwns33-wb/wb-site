@@ -9,6 +9,7 @@
   const compact = value => text(value).replace(/\s+/g, '');
   const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
   const mobile = value => /^01[016789]\d{7,8}$/.test(digits(value));
+  const MANUAL_NAME_REVIEW = new Set(['김예린']);
 
   function xmlText(value) {
     return String(value || '').replace(/<[^>]+>/g, '')
@@ -97,10 +98,12 @@
 
   function gradeMatches(source, rosterGrade) {
     const left = gradeKey(source.grade, source.school), right = gradeKey(rosterGrade, '');
-    if (!left || !right) return true;
+    if (!left || !right) return false;
     if (left === right) return true;
     const leftNumber = (left.match(/\d+/) || [])[0], rightNumber = (right.match(/\d+/) || [])[0];
-    return !/[유초중고]/.test(left) && leftNumber && leftNumber === rightNumber;
+    const leftLevel = (left.match(/[유초중고]/) || [])[0] || '';
+    const rightLevel = (right.match(/[유초중고]/) || [])[0] || '';
+    return !!(leftNumber && leftNumber === rightNumber && (!leftLevel || !rightLevel));
   }
 
   function maskPhone(value) {
@@ -128,11 +131,13 @@
       const key = compact(source.name).toLocaleLowerCase('ko');
       const linkedStudentId = linkMap.get(text(source.externalStudentNo)) || '';
       const linkedStudent = linkedStudentId ? byId.get(linkedStudentId) : null;
+      const manualNameReview = MANUAL_NAME_REVIEW.has(compact(source.name));
       const candidates = linkedStudent ? [linkedStudent]
         : (byName.get(key) || []).filter(student => gradeMatches(source, student.grade));
       let status = 'unmatched', student = null, currentContact = null;
       if (!mobile(source.phone)) status = 'invalid_phone';
       else if (linkedStudentId && !linkedStudent) status = 'link_orphan';
+      else if (manualNameReview && !linkedStudent) status = 'ambiguous';
       else if (candidates.length > 1) status = 'ambiguous';
       else if (candidates.length === 1) {
         student = candidates[0];
@@ -152,6 +157,8 @@
         maskedPhone: maskPhone(source.phone), status,
         currentConsent: !!(currentContact && currentContact.consent),
         linkedByStudentNo: !!linkedStudent,
+        matchedByNameGrade: !!(student && !linkedStudent),
+        manualNameReview: !!(manualNameReview && !linkedStudent),
         rosterNameDiffers: !!(linkedStudent && compact(source.name).toLocaleLowerCase('ko') !==
           compact(linkedStudent.name).toLocaleLowerCase('ko'))
       };
@@ -161,5 +168,5 @@
     return { entries, counts };
   }
 
-  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits };
+  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits, MANUAL_NAME_REVIEW };
 });
