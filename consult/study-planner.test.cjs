@@ -214,8 +214,13 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(compactRow, /planner-task-detail/);
   assert.match(compactRow, /planner-check-wrap/);
   assert.match(compactRow, /data-act="sttask"/);
+  assert.match(compactRow, /plannerTaskMark\(t, date, c, isCarry\)/);
   assert.match(css, /\.study-paper-head/);
   assert.match(css, /grid-template-columns: 62px minmax\(0, 1fr\) 38px/);
+  assert.match(css, /\.planner-task-row \{[^}]*background: var\(--subject-bg/);
+  assert.match(css, /\.planner-task-subject \{[^}]*background: var\(--subject-color\)/);
+  assert.match(css, /\.planner-check\.is-carry \{[^}]*background: var\(--subject-bg\)/);
+  assert.match(css, /\.planner-check\.is-negative \{[^}]*background: #FDEBEB/);
   assert.match(css, /\.study-timeline-row \{[^}]*repeat\(6,/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
@@ -285,14 +290,31 @@ test('today ends with a mandatory closeout funnel instead of a standalone report
 
 test('past dates show the full planner read-only and return to today after closeout', () => {
   const today = section('function viewToday()', 'function studyTotalHeroCard(');
+  const history = section('/** 과거 플래너는', 'const ckey');
   const finish = section("case 'dailyreportfinish':", "case 'brief':");
 
+  assert.match(today, /const pastDate = cursor < today\(\)/);
+  assert.match(today, /pastDate \? historicalPlannerTasks\(me\.id, cursor\) : checklistTasksFor\(me\.id, cursor\)/);
   assert.match(today, /const lectureChecklist = ingChecklistItems\(me\.id, cursor\)/);
   assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, list, \[\], false\)[\s\S]*?tbCard\(me, false\)/);
   assert.match(today, /editable && cursor === today\(\)/);
   assert.doesNotMatch(today, /list\.map\(t => taskRow\(t, cursor, editable, false\)\)/);
+  assert.match(history, /new Map\(tasksFor\(staffId, date\)/);
+  assert.match(history, /weekMovesFor\(staffId, date\)\.filter\(move => move\.from === date\)/);
+  assert.match(history, /dailyCloseOf\(staffId, date\)\.itemSnapshot/);
+  assert.match(history, /item\.type === 'task'/);
   assert.match(finish, /const closedPastDate = cursor < today\(\)/);
   assert.match(finish, /if \(closedPastDate\) \{ cursor = today\(\); cursorPinned = false; \}/);
+});
+
+test('planner completion cell distinguishes completed, carried, blocked, and closed study', () => {
+  const rowAndMark = section('function plannerTaskRow(', 'function plannerLectureRow(');
+
+  assert.match(rowAndMark, /check && check\.done[\s\S]*?symbol: '✓'/);
+  assert.match(rowAndMark, /resolution\.type === 'carry' \|\| isCarry \|\| task\.dailyCarrySourceDate[\s\S]*?symbol: '→'/);
+  assert.match(rowAndMark, /resolution\.type === 'closed' \|\| \(check && check\.dropped\)[\s\S]*?symbol: '×'/);
+  assert.match(rowAndMark, /resolution\.type === 'blocked' \|\| \(check && check\.blocked\)[\s\S]*?symbol: '×'/);
+  assert.match(rowAndMark, /aria-label="' \+ mark\.label/);
 });
 
 test('daily closeout requires every unfinished item and event to be reviewed after the timer stops', () => {

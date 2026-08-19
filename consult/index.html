@@ -779,17 +779,20 @@
   .planner-list-head { min-height: 27px; border-bottom: 1px solid #BDB6A3; color: #98917F; font-size: 10px; font-weight: 900; text-align: center; }
   .planner-list-head span { display: grid; place-items: center; border-right: 1px solid #DED9CA; }
   .planner-list-head span:last-child { border-right: 0; }
-  .planner-task-row { position: relative; min-height: 58px; border-bottom: 1px solid #DED9CA; background: rgba(255,255,255,.3); }
+  .planner-task-row { position: relative; min-height: 58px; border-bottom: 1px solid #DED9CA; background: var(--subject-bg, rgba(255,255,255,.3)); }
   .planner-task-row.done .planner-task-title { color: #999386; text-decoration: line-through; }
-  .planner-task-subject { display: grid; place-items: center; padding: 6px 4px; border-right: 1px solid #DED9CA; background: var(--subject-bg); color: var(--subject-text); font-size: 12px; font-weight: 900; text-align: center; }
-  .planner-task-detail { min-width: 0; padding: 7px 8px 6px; }
+  .planner-task-subject { display: grid; place-items: center; padding: 6px 4px; border-right: 1px solid rgba(126,120,103,.24); background: var(--subject-color); color: var(--subject-text); font-size: 12px; font-weight: 900; text-align: center; }
+  .planner-task-detail { min-width: 0; padding: 7px 8px 6px; background: rgba(255,255,255,.24); }
   .planner-task-title { color: #343434; font-size: 13.5px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
   .planner-task-desc { margin-top: 2px; color: #817B6C; font-size: 11px; line-height: 1.4; white-space: pre-wrap; }
   .planner-task-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
   .planner-task-actions .btn { min-height: 29px; padding: 4px 7px; font-size: 10.5px; border-radius: 7px; }
-  .planner-check-wrap { display: grid; place-items: center; border-left: 1px solid #DED9CA; }
-  .planner-check { width: 21px; height: 21px; border: 2px solid #D897A6; border-radius: 50%; background: transparent; color: transparent; font-size: 12px; font-weight: 900; }
-  .planner-task-row.done .planner-check { background: #D98FA0; border-color: #D98FA0; color: #fff; }
+  .planner-check-wrap { display: grid; place-items: center; border-left: 1px solid rgba(126,120,103,.24); background: rgba(255,255,255,.18); }
+  .planner-check { width: 23px; height: 23px; border: 2px solid var(--subject-color, #D897A6); border-radius: 50%; background: rgba(255,255,255,.55); color: transparent; font-size: 14px; font-weight: 900; line-height: 1; }
+  .planner-task-row.done .planner-check, .planner-check.is-done { background: var(--subject-color); border-color: var(--subject-color); color: var(--subject-text); }
+  .planner-check.is-carry { border-color: var(--subject-color); background: var(--subject-bg); color: var(--subject-text); font-size: 17px; }
+  .planner-check.is-negative { border-color: #E8A5A5; background: #FDEBEB; color: #A84444; font-size: 17px; }
+  .planner-task-row.planner-closed .planner-task-title { color: #817B6C; }
   .planner-task-extra { grid-column: 1 / -1; padding: 0 8px 9px; border-top: 1px dashed #E2DDCF; background: rgba(255,255,255,.72); }
   .planner-divider { padding: 7px 8px 5px; border-bottom: 1px solid #DED9CA; color: var(--coral); font-size: 10.5px; font-weight: 900; }
   .study-time-total { font-size: 32px; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
@@ -1268,6 +1271,27 @@ const isStudyClaimed = (task, date) => !isStudyOffer(task) || !!(getCheck(task.i
 const checklistTasksFor = (staffId, date) => tasksFor(staffId, date)
   .filter(task => isStudyClaimed(task, date) && !(getCheck(task.id, date) || {}).dropped);
 const studyOffersFor = (staffId, date) => tasksFor(staffId, date).filter(isStudyOffer);
+
+/** 과거 플래너는 마감 당시 항목과 이후 다른 날짜로 옮긴 항목까지 보존해서 보여준다. */
+function historicalPlannerTasks(staffId, date) {
+  const rows = new Map(tasksFor(staffId, date).map(task => [task.id, task]));
+  weekMovesFor(staffId, date).filter(move => move.from === date).forEach(move => {
+    const task = state.tasks.find(item => item.id === move.taskId && item.staffId === staffId);
+    if (task) rows.set(task.id, task);
+  });
+
+  const snapshot = dailyCloseOf(staffId, date).itemSnapshot || [];
+  snapshot.filter(item => item.type === 'task' && String(item.key || '').startsWith('task:')).forEach(item => {
+    const id = String(item.key).slice(5);
+    const task = state.tasks.find(row => row.id === id && row.staffId === staffId) || {
+      id: id, staffId: staffId, title: item.label || '기록된 공부', detail: item.detail || '',
+      studySubject: item.subjectKey || 'other', repeat: 'once', start: date,
+      requiresClaim: false, plannerSnapshot: true
+    };
+    rows.set(id, task);
+  });
+  return [...rows.values()];
+}
 
 const ckey = (taskId, date) => taskId + '|' + date;
 const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
@@ -1915,9 +1939,12 @@ function viewToday() {
   if (!me) return emptyStaffCard();
 
   const rel = relLabel(cursor);
-  const list = checklistTasksFor(me.id, cursor);
+  const pastDate = cursor < today();
+  const list = pastDate ? historicalPlannerTasks(me.id, cursor) : checklistTasksFor(me.id, cursor);
   const offers = studyOffersFor(me.id, cursor);
-  const p = progress(me.id, cursor);
+  const p = pastDate
+    ? { total: list.length, done: list.filter(task => isDone(task.id, cursor)).length }
+    : progress(me.id, cursor);
   const lectureChecklist = ingChecklistItems(me.id, cursor);
   const checklistTotal = p.total + lectureChecklist.length;
   const checklistDone = p.done + lectureChecklist.filter(item => item.done).length;
@@ -2107,6 +2134,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
 function plannerTaskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const status = statusOf(t, date);
+  const mark = plannerTaskMark(t, date, c, isCarry);
   const subject = taskStudySubject(t);
   const learning = LEARNING_SOURCES[t.source] || null;
   const learningDue = learning ? learningDueDate(t) : '';
@@ -2116,7 +2144,7 @@ function plannerTaskRow(t, date, editable, isCarry) {
   const running = stRunning(t.staffId, today());
   const timingThis = !!(running && running.taskId === t.id);
 
-  let h = '<div class="planner-task-row ' + subject.className + ' ' + status + '" data-task="' + t.id + '">' +
+  let h = '<div class="planner-task-row ' + subject.className + ' ' + status + ' ' + mark.rowClass + '" data-task="' + t.id + '">' +
     '<div class="planner-task-subject">' + subject.label + '</div>' +
     '<div class="planner-task-detail">' +
       '<div class="planner-task-title">' + esc(t.title) + '</div>' +
@@ -2137,8 +2165,8 @@ function plannerTaskRow(t, date, editable, isCarry) {
           (open ? '▾ 접기' : '▸ 상세') + '</button>' : '') +
       '</div>' +
     '</div>' +
-    '<div class="planner-check-wrap"><button class="planner-check" ' +
-      (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button></div>';
+    '<div class="planner-check-wrap"><button class="planner-check ' + mark.className + '" aria-label="' + mark.label + '" title="' + mark.label + '" ' +
+      (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>' + mark.symbol + '</button></div>';
 
   if (open) {
     h += '<div class="planner-task-extra">' + taskPanel(t, date, c, editable) +
@@ -2148,6 +2176,23 @@ function plannerTaskRow(t, date, editable, isCarry) {
       '</div>';
   }
   return h + '</div>';
+}
+
+function plannerTaskMark(task, date, check, isCarry) {
+  if (check && check.done) {
+    return { symbol: '✓', label: '완료', className: 'is-done', rowClass: 'planner-done' };
+  }
+  const resolution = (dailyCloseOf(task.staffId, date).resolutions || {})['task:' + task.id] || {};
+  if (resolution.type === 'carry' || isCarry || task.dailyCarrySourceDate) {
+    return { symbol: '→', label: '다음 날짜로 이월', className: 'is-carry', rowClass: 'planner-carried' };
+  }
+  if (resolution.type === 'closed' || (check && check.dropped)) {
+    return { symbol: '×', label: '오늘 학습에서 종료', className: 'is-negative', rowClass: 'planner-closed' };
+  }
+  if (resolution.type === 'blocked' || (check && check.blocked)) {
+    return { symbol: '×', label: '막힘', className: 'is-negative', rowClass: 'planner-blocked' };
+  }
+  return { symbol: '✓', label: '미완료', className: '', rowClass: '' };
 }
 
 function plannerLectureRow(sid, item, editable) {
@@ -10391,7 +10436,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.35';
+const APP_VER = '2026-08-19.36';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
