@@ -173,6 +173,39 @@ test('director adds an existing student and edits one record with roster CAS', a
   assert.equal(stale.body.code, 'ROSTER_REVISION_CONFLICT');
 });
 
+test('director stores new-student school, contacts, dates, and fixed multi-subject choices for assigned staff', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const before = await call(db, { auth: admin, action: 'get' });
+  const created = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
+    student: {
+      id: 'student-new', name: '신규학생', school: '새학교', grade: '초6',
+      phoneSelf: '010-1111-2222', phoneFather: '010-2222-3333', phoneMother: '010-3333-4444',
+      registrationDate: '2026-08-19', firstClassDate: '2026-08-21',
+      teacher: '가선생', subject: '영어·독해력수업', subjects: ['영어', '독해력수업'],
+      start: '2026-08', end: '', reason: '', memo: '', entryType: 'new', teacherIds: ['teacher-a']
+    }
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.student.entryType, 'new');
+  assert.deepEqual(created.body.student.subjects, ['영어', '독해력수업']);
+  assert.equal(created.body.student.subject, '영어·독해력수업');
+  assert.equal(created.body.student.school, '새학교');
+  assert.equal(created.body.student.firstClassDate, '2026-08-21');
+
+  const teacher = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  const visible = teacher.body.roster.students.find(item => item.id === 'student-new');
+  assert.equal(visible.phoneMother, '010-3333-4444');
+  assert.equal('teacherIds' in visible, false);
+
+  const invalid = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: created.body.updatedAt,
+    student: { ...created.body.student, subjects: ['영어', '코딩'], subject: '영어·코딩', teacherIds: ['teacher-a'] }
+  });
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.body.error, /등록할 수 없는 과목/);
+});
+
 test('student maintenance is admin-only and refuses a duplicate name and grade', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const current = await call(db, { auth: admin, action: 'get' });

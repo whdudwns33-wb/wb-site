@@ -123,7 +123,7 @@ test('monthly and session counts include only lessons active on the reference da
   assert.match(source, /pack\.status === 'active' && lessonIds\.has/);
 });
 
-test('today, schedule, and own roster cards reuse the scoped session-pack list for mode badges', () => {
+test('today and schedule reuse session-pack badges while the own-roster list stays name-and-grade only', () => {
   const loader = block('const SESSION_MODE_BADGE_ROUTES', 'function rememberSessionPackFocus');
   const today = block('function viewToday()', 'function taskRow');
   const task = block('function taskRow', 'function taskPanel');
@@ -131,14 +131,15 @@ test('today, schedule, and own roster cards reuse the scoped session-pack list f
   const studentCards = block('function scheduleStudentCardsHtml', 'function scheduleIssuesHtml');
   const roster = block('function viewRoster()', '/* ── 직원 관리');
 
-  assert.match(loader, /new Set\(\['today', 'schedule', 'roster'\]\)/);
+  assert.match(loader, /new Set\(\['today', 'schedule'\]\)/);
   assert.match(loader, /setTimeout\(\(\) => loadSessionPacks\(false\), 0\)/);
   assert.match(today, /ensureSessionModeData\(list\)/);
   assert.match(task, /sessionModeBadgeHtml\(t\)/);
   assert.match(schedule, /sessionModeBadgeHtml\(task\)/);
   assert.match(schedule, /sessionModeBadgesHtml\(tasks\)/);
   assert.match(studentCards, /sessionModeBadgesHtml\(taskSources\.map/);
-  assert.match(roster, /sessionModeBadgesForStudent\(s\.id, today\(\)\)/);
+  assert.doesNotMatch(roster, /sessionModeBadgesForStudent\(s\.id, today\(\)\)/);
+  assert.match(roster, /mineActive\.map[\s\S]*esc\(s\.name\)[\s\S]*esc\(s\.grade\)/);
 });
 
 test('own staff record also works for a manager personal link and stays hidden elsewhere', () => {

@@ -28,22 +28,41 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
   assert.match(source, /case 'rosterstudentinfo': showRosterStudentInfo\(String\(id \|\| ''\)\)/);
 });
 
-test('학생 정보 팝업은 기본 정보를 escape하고 연락처를 만들지 않는다', () => {
+test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentInfoStatus(', 'function showRosterStudentInfo(');
   const render = new Function('today', 'esc', `${code}\nreturn rosterStudentInfoHtml;`)(
     () => '2026-08-18', escapeHtml
   );
   const attack = '<img src=x onerror=alert(1)>';
   const html = render({
-    id: 'student-safe', name: attack, grade: attack, subject: attack, teacher: attack,
+    id: 'student-safe', name: attack, school: attack, grade: attack, subject: attack, teacher: attack,
+    phoneSelf: attack, phoneFather: attack, phoneMother: attack,
+    registrationDate: '2026-08-18', firstClassDate: '2026-08-19',
     start: '2026-08', end: '', reason: '', memo: attack
   }, [attack]);
   assert.doesNotMatch(html, /<img\b/i);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
-  for (const label of ['학년', '과목·분야', '담당 선생님', '재원 기간', '내부 메모', '수업 참고']) {
+  for (const label of ['학교', '학년', '연락처\\(본인\\)', '연락처\\(부\\)', '연락처\\(모\\)',
+    '등록과목', '신규 등록일', '첫 수업 시작일', '담당 선생님', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
-  assert.doesNotMatch(code, /phone|contact|guardian/i);
+});
+
+test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제공하고 교사 목록은 이름·학년만 표시한다', () => {
+  const view = block('function viewRoster()', '/* ── 직원 관리');
+  const editor = block('const ROSTER_SUBJECT_OPTIONS', '/* ── 신규 학생 30일 적응 관리');
+  assert.match(view, /data-act="rosterstudentadd">기존 원생 추가<\/[\s\S]*data-act="rosterstudentnew">신규 원생 추가/);
+  for (const field of ['data-rse-name', 'data-rse-school', 'data-rse-grade', 'data-rse-phone-self',
+    'data-rse-phone-father', 'data-rse-phone-mother', 'data-rse-registration-date', 'data-rse-first-class-date']) {
+    assert.match(editor, new RegExp(field));
+  }
+  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
+    assert.match(editor, new RegExp(subject));
+  }
+  assert.match(editor, /data-rse-subject/);
+  const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));
+  assert.match(mineList, /mineActive\.map[\s\S]*s\.name[\s\S]*s\.grade/);
+  assert.doesNotMatch(mineList, /s\.subject|s\.memo|sessionModeBadgesForStudent/);
 });
 
 test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 한 번만 남긴다', () => {
