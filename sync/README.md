@@ -56,6 +56,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/041_consult_submiss
 npx wrangler d1 execute wb-sync --remote --file=./migrations/042_consult_guardian_portal.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/043_book_order_item_prices.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/044_book_order_item_price_corrections.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/045_student_change_history.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -147,6 +148,12 @@ DB 트리거로 차단한다. 기존 주문 task와 학생 연결 봉인 데이�
 별도 불변 원장에 남긴다. 운영 D1 적용 뒤 Worker를 배포하며, 정정 전·후 금액과 고정 사유 코드만
 보관한다. 대상 주문·담당 stable ID·교재명·현재 단계·기존 금액이 모두 일치하지 않으면 정정 행은
 생성되지 않으므로 배포를 중단하고 대상 상태를 다시 확인한다.
+
+수업 담당 변경·퇴원·휴원과 학생정보/업무지시 수정 확인 기능은
+`045_student_change_history.sql`을 운영 D1에 먼저 적용한 뒤 Worker, task Pages 순서로 배포한다.
+이력은 stable studentId로 누적하고 원장·관리 담당·각 선생님의 확인 상태는 서로 독립적으로
+append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보관하며 학생 변경 이력 API와 화면에는
+노출하지 않는다.
 
 차량 기능은 `023_transport.sql`을 먼저 적용한 뒤 Worker를 배포한다. 설정·상태에는 stable ID와
 운행 정보만 저장하고 전화·주소·보호자 정보는 저장하지 않는다. 날짜와 관계없이 승차 후 미하차 기록이 있는

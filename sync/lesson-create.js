@@ -1,3 +1,5 @@
+import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+
 const LESSON_TEXT_LIMITS = {
   studentName: 80,
   grade: 24,
@@ -583,6 +585,26 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
         'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
       ).bind(app, current.id, staffId).first());
       return revisionConflict(json, origin, latestRow ? latestRow.task : current);
+    }
+    if (auth.scope === 'all' && SAFE_ID_RE.test(String(corrected.studentId || ''))) {
+      const tracked = [
+        'studentName', 'grade', 'subject', 'className', 'scheduleText', 'scheduleSlots', 'start',
+        'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'guide'
+      ];
+      const changedFields = tracked.filter(key => JSON.stringify(current[key] || '') !== JSON.stringify(corrected[key] || ''));
+      if (changedFields.length) {
+        const eventId = await studentChangeEventId('lesson-create\n' + corrected.id + '\n' + corrected.lessonRevision);
+        await studentChangeEventStatement(env, app, {
+          eventId, studentId: String(corrected.studentId), taskId: corrected.id,
+          eventType: 'work_instruction', changedFields,
+          details: {
+            before: Object.fromEntries(changedFields.map(key => [key, current[key] == null ? '' : current[key]])),
+            after: Object.fromEntries(changedFields.map(key => [key, corrected[key] == null ? '' : corrected[key]]))
+          },
+          audienceStaffIds: [staffId], requiresAck: true, changedAt: corrected.updatedAt,
+          changedBy: studentChangeActorKey(auth)
+        }).run();
+      }
     }
     return json({
       ok: true,
