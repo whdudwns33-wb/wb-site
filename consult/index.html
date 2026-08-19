@@ -1340,6 +1340,7 @@ function carryOver(staffId, date) {
     const d = addDays(date, -i);
     checklistTasksFor(staffId, d).forEach(t => {
       if (!t.carry || isDone(t.id, d)) return;
+      if (state.tasks.some(row => !row.deleted && row.dailyCarryFrom === t.id + '|' + d)) return;
       out.push({ t: t, date: d });
     });
   }
@@ -1492,6 +1493,7 @@ const sync = {
         }
       }
       if (!localCursorSaved) state.settings.pushAt = t0;
+      if (ensureRecentDailyCarryTasks()) applied++;
       // 마지막 pullAt과 마지막 페이지의 원격 변경까지 오프라인 재시작에 남긴다.
       save();
       this.last = now();
@@ -2085,7 +2087,8 @@ function plannerTaskRow(t, date, editable, isCarry) {
       '<div class="planner-task-title">' + esc(t.title) + '</div>' +
       (t.detail ? '<div class="planner-task-desc">' + esc(t.detail) + '</div>' : '') +
       '<div class="planner-task-actions">' +
-        (isCarry ? '<span class="tag carry">' + shortDate(date) + ' 이월</span>' : '') +
+        (isCarry ? '<span class="tag carry">' + shortDate(date) + ' 이월</span>'
+          : t.dailyCarrySourceDate ? '<span class="tag carry">' + shortDate(t.dailyCarrySourceDate) + ' 이월</span>' : '') +
         (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
         (learning && t.estimatedMin ? '<span class="tag time">예상 ' + Number(t.estimatedMin) + '분</span>' : '') +
         (learning && learningDue && learningDue !== date ? '<span class="tag">마감 ' + shortDate(learningDue) + '</span>' : '') +
@@ -2160,7 +2163,8 @@ function taskRow(t, date, editable, isCarry) {
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
       '<div class="meta">' +
         taskStudySubjectTag(t) +
-        (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
+        (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>'
+          : t.dailyCarrySourceDate ? '<span class="tag carry">' + shortDate(t.dailyCarrySourceDate) + ' 이월</span>' : '') +
         (learning ? '<span class="tag time">' + learning.icon + ' ' + esc(learning.label) + '</span>' : '') +
         ((t.learningKind || t.metaKind) ? '<span class="tag">' + esc(t.learningKind || t.metaKind) + '</span>' : '') +
         (learning && date ? '<span class="tag time">학습 ' + shortDate(date) + '</span>' : '') +
@@ -5099,6 +5103,7 @@ function dailyCloseStudyItems(staffId, date) {
     return {
       key: 'task:' + task.id, type: 'task', id: task.id, task: task,
       label: task.title, detail: task.detail || '', subjectKey: taskStudySubjectKey(task),
+      carriedFromDate: task.dailyCarrySourceDate || '', carryOriginDate: task.dailyCarryOriginDate || '',
       done: !!(check && check.done), blocked: !!(check && check.blocked), dropped: !!(check && check.dropped)
     };
   });
@@ -5241,6 +5246,7 @@ function dailyCloseModal(staffId, date) {
     const saved = data.close.resolutions[item.key] || {};
     return '<div class="daily-close-item ' + studySubject(item.subjectKey).className + '">' +
       '<div class="row wraprow" style="gap:6px">' + studySubjectTag(item.subjectKey) +
+        (item.carriedFromDate ? '<span class="tag carry">' + shortDate(item.carriedFromDate) + ' 이월</span>' : '') +
         '<b class="small">' + esc(item.label) + '</b></div>' +
       (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') +
       '<div class="daily-close-item-grid"><select class="in" data-daily-resolution data-key="' + esc(item.key) + '">' +
@@ -5269,17 +5275,67 @@ function dailyCloseModal(staffId, date) {
     '<button class="btn btn-primary btn-block mt14" data-act="dailyclosesave">마무리 내용 저장</button>');
 }
 
-function dailyCarryTask(task, date) {
-  if (task.carry) return;
-  const nextDate = date < today() ? today() : addDays(date, 1);
-  const exists = state.tasks.some(row => !row.deleted && row.dailyCarryFrom === task.id + '|' + date);
-  if (exists) return;
-  state.tasks.push(Object.assign({}, task, {
-    id: uid(), groupId: 'daily-carry-' + now(), repeat: 'once', days: [], start: nextDate, end: '',
-    carry: true, requiresClaim: false, dailyCarryFrom: task.id + '|' + date,
-    createdAt: now(), updatedAt: now(), deleted: false
-  }));
-  save(); queueSync();
+function dailyCarryTask(task, date, targetDate) {
+  const carryFrom = task.id + '|' + date;
+  const existing = state.tasks.find(row => !row.deleted && row.dailyCarryFrom === carryFrom);
+  if (existing) return existing;
+  const nextDate = targetDate || (date < today() ? today() : addDays(date, 1));
+  const stamp = now();
+  const rootId = task.dailyCarryRootId || task.id;
+  const carried = Object.assign({}, task, {
+    id: 'daily-carry-' + rootId + '-' + date, groupId: task.groupId || ('daily-carry-' + stamp),
+    repeat: 'once', days: [], start: nextDate, end: '', carry: true, requiresClaim: false,
+    dailyCarryFrom: carryFrom, dailyCarryRootId: rootId, dailyCarrySourceDate: date,
+    dailyCarryOriginDate: task.dailyCarryOriginDate || task.dailyCarrySourceDate || date,
+    dailyCarryDepth: Number(task.dailyCarryDepth || 0) + 1,
+    createdAt: stamp, updatedAt: stamp, deleted: false
+  });
+  state.tasks.push(carried);
+  return carried;
+}
+
+/** 이전 버전에서 원래 날짜에 완료 처리된 이월 기록을 실제 완료 날짜의 항목으로 옮긴다. */
+function ensureRecentDailyCarryTasks() {
+  let changed = false;
+  const oldest = addDays(today(), -7);
+  liveStaff().forEach(student => {
+    const prefix = dailyCloseKey(student.id) + '|';
+    Object.keys(state.checks).filter(key => key.startsWith(prefix)).forEach(key => {
+      const sourceDate = key.slice(prefix.length);
+      if (sourceDate < oldest || sourceDate >= today()) return;
+      const close = dailyCloseOf(student.id, sourceDate);
+      Object.entries(close.resolutions || {}).forEach(([itemKey, resolution]) => {
+        if (!resolution || resolution.type !== 'carry' || !itemKey.startsWith('task:')) return;
+        const taskId = itemKey.slice(5);
+        const task = state.tasks.find(row => !row.deleted && row.id === taskId && row.staffId === student.id);
+        if (!task) return;
+        const sourceCheck = getCheck(task.id, sourceDate);
+        let completedDate = '';
+        if (sourceCheck && sourceCheck.done && Number(sourceCheck.at || sourceCheck.updatedAt)) {
+          const candidate = ymd(new Date(Number(sourceCheck.at || sourceCheck.updatedAt)));
+          if (candidate > sourceDate && candidate <= today()) completedDate = candidate;
+        }
+        const before = state.tasks.length;
+        const carried = dailyCarryTask(task, sourceDate, completedDate || today());
+        if (state.tasks.length > before) changed = true;
+        if (completedDate && carried && !isDone(carried.id, completedDate)) {
+          const steps = {};
+          (carried.steps || []).forEach(step => { steps[step.id] = true; });
+          state.checks[ckey(carried.id, completedDate)] = {
+            taskId: carried.id, date: completedDate, done: true,
+            at: sourceCheck.at || sourceCheck.updatedAt || now(), steps: steps,
+            count: carried.target || 0, blocked: false, migratedFromCarry: true, updatedAt: now()
+          };
+          state.checks[ckey(task.id, sourceDate)] = Object.assign({}, sourceCheck, {
+            done: false, at: null, blocked: false, dropped: false, steps: {}, count: 0,
+            migratedToCarryTask: carried.id, updatedAt: now()
+          });
+          changed = true;
+        }
+      });
+    });
+  });
+  return changed;
 }
 
 function dailyCarryLecture(staffId, date, cid, seq) {
@@ -7265,7 +7321,8 @@ function reportText(staffId, date) {
   const currentItems = dailyCloseStudyItems(staffId, date);
   const list = close.itemSnapshot.length ? close.itemSnapshot : currentItems.map(item => ({
     key: item.key, type: item.type, label: item.label, detail: item.detail,
-    subjectKey: item.subjectKey, done: item.done
+    subjectKey: item.subjectKey, carriedFromDate: item.carriedFromDate || '',
+    carryOriginDate: item.carryOriginDate || '', done: item.done
   }));
   const done = list.filter(item => item.done).length;
   const pct = list.length ? Math.round(done / list.length * 100) : 0;
@@ -7275,8 +7332,12 @@ function reportText(staffId, date) {
   txt += list.map(item => {
     const resolution = close.resolutions[item.key] || {};
     const mark = item.done ? '✅' : resolution.type === 'carry' ? '↪' : resolution.type === 'blocked' ? '🚧' : resolution.type === 'closed' ? '⏹' : '⬜';
-    const result = resolution.type === 'carry' ? ' [내일로 이월]' : resolution.type === 'blocked' ? ' [막힘]' : resolution.type === 'closed' ? ' [오늘 종료]' : '';
-    return mark + ' ' + item.label + result + (resolution.note ? '\n   · ' + resolution.note : '');
+    const carriedDone = item.done && item.carriedFromDate ? ' [' + shortDate(item.carriedFromDate) + ' 이월 완료]' : '';
+    const result = resolution.type === 'carry'
+      ? (item.carriedFromDate ? ' [미완료 · 다시 이월]' : ' [미완료 · 내일로 이월]')
+      : resolution.type === 'blocked' ? ' [미완료 · 막힘]'
+      : resolution.type === 'closed' ? ' [미완료 · 오늘 종료]' : '';
+    return mark + ' ' + item.label + carriedDone + result + (resolution.note ? '\n   · ' + resolution.note : '');
   }).join('\n') || '(체크리스트가 비어 있음)';
   const events = dailyCloseEventRefs(staffId, date);
   if (events.length) {
@@ -9597,7 +9658,8 @@ document.addEventListener('click', ev => {
 
       const snapshot = data.items.map(item => ({
         key: item.key, type: item.type, label: item.label, detail: item.detail || '',
-        subjectKey: item.subjectKey, done: item.done
+        subjectKey: item.subjectKey, carriedFromDate: item.carriedFromDate || '',
+        carryOriginDate: item.carryOriginDate || '', done: item.done
       }));
       Object.keys(nextResolutions).forEach(key => {
         if (snapshot.some(item => item.key === key)) return;
@@ -10086,6 +10148,7 @@ document.addEventListener('visibilitychange', () => {
    11. 시작
    ══════════════════════════════════════════════════════ */
 load();
+if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h) route = h;
@@ -10126,7 +10189,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.33';
+const APP_VER = '2026-08-19.34';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

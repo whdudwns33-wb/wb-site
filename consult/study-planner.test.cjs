@@ -250,9 +250,10 @@ test('student report contains closeout results and cannot finish until a success
 
   assert.match(report, /순공시간/);
   assert.match(report, /dailyCloseStudyItems/);
-  assert.match(report, /\[내일로 이월\]/);
-  assert.match(report, /\[막힘\]/);
-  assert.match(report, /\[오늘 종료\]/);
+  assert.match(report, /\[미완료 · 내일로 이월\]/);
+  assert.match(report, /\[미완료 · 막힘\]/);
+  assert.match(report, /\[미완료 · 오늘 종료\]/);
+  assert.match(report, /이월 완료/);
   assert.match(report, /시험·중요 일정 준비율/);
   assert.match(handlers, /dailyUnclosedDates\(me\.id, cursor\)/);
   assert.match(handlers, /이전 미마감 날짜를 먼저 마무리해 주세요/);
@@ -260,6 +261,46 @@ test('student report contains closeout results and cannot finish until a success
   assert.match(handlers, /if \(!copied\) return/);
   assert.match(handlers, /copySignature !== data\.signature/);
   assert.match(handlers, /status: 'complete', finalizedAt: now\(\), signature: data\.signature/);
+});
+
+test('carried study becomes a unique next-day task and appears in both daily reports correctly', () => {
+  const source = html.match(/function dailyCarryTask\(task, date, targetDate\) \{[\s\S]*?\n\}/)?.[0] || '';
+  assert.ok(source, 'dailyCarryTask function must exist');
+  const state = { tasks: [] };
+  const dailyCarryTask = Function('state', 'today', 'addDays', 'now',
+    source + '\nreturn dailyCarryTask;')(state, () => '2026-08-19', (_date, _days) => '2026-08-20', () => 1234);
+  const original = {
+    id: 'task-a', groupId: 'group-a', staffId: 'student-a', title: '수학 오답 20문제',
+    repeat: 'once', days: [], start: '2026-08-18', carry: true, createdAt: 100, updatedAt: 100
+  };
+  const carried = dailyCarryTask(original, '2026-08-18', '2026-08-19');
+  assert.equal(state.tasks.length, 1);
+  assert.notEqual(carried.id, original.id);
+  assert.equal(carried.start, '2026-08-19');
+  assert.equal(carried.dailyCarryFrom, 'task-a|2026-08-18');
+  assert.equal(carried.dailyCarrySourceDate, '2026-08-18');
+  assert.equal(carried.requiresClaim, false);
+  assert.equal(dailyCarryTask(original, '2026-08-18', '2026-08-19'), carried);
+  assert.equal(state.tasks.length, 1);
+
+  const dailyItems = section('function dailyCloseStudyItems(', 'function dailyCloseEventRefs(');
+  const save = section("case 'dailyclosesave':", "case 'report':");
+  const report = section('function reportText(', 'function briefText(');
+  assert.match(dailyItems, /carriedFromDate: task\.dailyCarrySourceDate/);
+  assert.match(save, /dailyCarryTask\(item\.task, cursor\)/);
+  assert.match(save, /carriedFromDate: item\.carriedFromDate/);
+  assert.match(report, /shortDate\(item\.carriedFromDate\).*이월 완료/);
+  assert.match(report, /미완료 · 다시 이월/);
+});
+
+test('recent legacy carry completions migrate from the original date to the actual completion date', () => {
+  const migration = section('function ensureRecentDailyCarryTasks(', 'function dailyCarryLecture(');
+  assert.match(migration, /resolution\.type !== 'carry'/);
+  assert.match(migration, /candidate > sourceDate && candidate <= today\(\)/);
+  assert.match(migration, /dailyCarryTask\(task, sourceDate, completedDate \|\| today\(\)\)/);
+  assert.match(migration, /migratedFromCarry: true/);
+  assert.match(migration, /done: false, at: null/);
+  assert.match(html, /load\(\);\nif \(ensureRecentDailyCarryTasks\(\)\) \{ save\(\); queueSync\(\); \}/);
 });
 
 test('weekly planner leads with daily closeout outcomes and keeps detailed placement secondary', () => {
