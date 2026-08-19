@@ -196,6 +196,70 @@ test('timer closes real start-end segments and paints six ten-minute cells per h
   assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, today\(\)\)/);
 });
 
+test('today ends with a mandatory closeout funnel instead of a standalone report shortcut', () => {
+  const today = section('function viewToday()', 'function studyTotalHeroCard(');
+  const closeCard = section('function dailyClosureCard(', 'function dailyResolutionOptions(');
+
+  assert.match(today, /cursor >= DAILY_CLOSE_START && cursor <= today\(\)[\s\S]*?dailyClosureCard\(me, cursor\)/);
+  assert.doesNotMatch(today, /오늘 수행 보고 문자 만들기/);
+  assert.match(closeCard, /1 · 공부 종료/);
+  assert.match(closeCard, /2 · 미완료 정리/);
+  assert.match(closeCard, /3 · 일정 준비율/);
+  assert.match(closeCard, /이전 미마감[\s\S]*?먼저 마무리/);
+  assert.match(closeCard, /data-act="report"/);
+});
+
+test('daily closeout requires every unfinished item and event to be reviewed after the timer stops', () => {
+  const data = section('const DAILY_CLOSE_START', 'function dailyCloseStatusLabel(');
+  const modal = section('function dailyResolutionOptions(', 'function dailyCarryTask(');
+  const save = section("case 'dailyclosesave':", "case 'report':");
+
+  assert.match(data, /const dailyCloseKey = staffId => '__dailyclose__' \+ staffId/);
+  assert.match(data, /incomplete = items\.filter\(item => !item\.done\)/);
+  assert.match(data, /unresolved = incomplete\.filter/);
+  assert.match(data, /unconfirmedEvents = events\.filter/);
+  assert.match(data, /canReport: !running && !unresolved\.length && !unconfirmedEvents\.length && reviewCurrent/);
+  assert.match(modal, /내일로 이월/);
+  assert.match(modal, /막힘 · 사유 남기기/);
+  assert.match(modal, /오늘 종료 · 사유 남기기/);
+  assert.match(modal, /data-daily-note/);
+  assert.match(modal, /data-daily-event/);
+  assert.match(save, /공부 타이머를 먼저 정지해 주세요/);
+  assert.match(save, /처리 방법을 선택해 주세요/);
+  assert.match(save, /사유를 입력해 주세요/);
+});
+
+test('student report contains closeout results and cannot finish until a successful copy', () => {
+  const report = section('function reportText(', 'function briefText(');
+  const handlers = section("case 'report':", "case 'brief':");
+
+  assert.match(report, /순공시간/);
+  assert.match(report, /dailyCloseStudyItems/);
+  assert.match(report, /\[내일로 이월\]/);
+  assert.match(report, /\[막힘\]/);
+  assert.match(report, /\[오늘 종료\]/);
+  assert.match(report, /시험·중요 일정 준비율/);
+  assert.match(handlers, /dailyUnclosedDates\(me\.id, cursor\)/);
+  assert.match(handlers, /이전 미마감 날짜를 먼저 마무리해 주세요/);
+  assert.match(handlers, /copy\(\$\('#mText'\)\.value\)\.then\(copied/);
+  assert.match(handlers, /if \(!copied\) return/);
+  assert.match(handlers, /copySignature !== data\.signature/);
+  assert.match(handlers, /status: 'complete', finalizedAt: now\(\), signature: data\.signature/);
+});
+
+test('weekly planner leads with daily closeout outcomes and keeps detailed placement secondary', () => {
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+
+  assert.match(week, /✅ 월~일 학습·마감/);
+  assert.match(week, /class="week-close-table"/);
+  assert.match(week, /<th>마감<\/th><th>공부 완료<\/th><th>순공시간<\/th><th>시험 준비 확인<\/th>/);
+  assert.match(week, /dailyCloseStatusLabel\(me\.id, date\)/);
+  assert.match(week, /closeData\.close\.eventProgress/);
+  assert.match(week, /<details class="card week-detail-card">/);
+  assert.match(week, /📅 상세 공부 배치 보기/);
+  assert.ok(week.indexOf('✅ 월~일 학습·마감') < week.indexOf('📅 상세 공부 배치 보기'));
+});
+
 test('weekly planner compares subject goals with recorded study time', () => {
   const helpers = section('const weekPlanKey', 'function weekBacklog(');
   const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
