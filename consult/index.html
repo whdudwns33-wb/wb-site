@@ -253,6 +253,39 @@
   .ing-shift-arrow { color: var(--deep-blue); font-size: 18px; font-weight: 900; }
   .ing-shift-result { margin-top: 9px; text-align: center; font-size: 12px; }
   .ing-calendar-card { padding-bottom: 14px; }
+  .ing-avail-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 13px 14px; border: 1px solid #CFE1F3; border-radius: 13px; background: linear-gradient(135deg, #F5FAFF, #FBF8FF); }
+  .ing-avail-intro b { display: block; color: var(--navy); font-size: 13px; }
+  .ing-avail-intro span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11px; line-height: 1.5; }
+  .ing-avail-step { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: var(--white); background: var(--navy); font-size: 12px; font-weight: 900; }
+  .ing-avail-section { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: #FBFCFE; }
+  .ing-avail-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .ing-avail-section-head b { color: var(--navy); font-size: 13px; }
+  .ing-avail-window-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
+  .ing-avail-window-grid label, .ing-avail-time-grid label { display: grid; gap: 5px; color: var(--mid-gray); font-size: 10px; font-weight: 800; }
+  .ing-avail-arrow { padding-bottom: 12px; color: var(--mid-gray); font-weight: 900; }
+  .ing-avail-presets, .ing-avail-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .ing-avail-presets .chip, .ing-avail-quick .chip { min-height: 38px; }
+  .ing-avail-quick .chip { border-color: #D7E5F3; background: var(--white); }
+  .ing-avail-list { display: grid; gap: 10px; }
+  .ing-avail-row { padding: 12px; border: 1px solid #DCE4EC; border-radius: 12px; background: var(--white); box-shadow: 0 4px 12px rgba(27,58,92,.04); }
+  .ing-avail-row-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
+  .ing-avail-row-actions { display: flex; gap: 5px; }
+  .ing-avail-day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 7px; }
+  .ing-avail-day-head > span { color: var(--mid-gray); font-size: 10px; font-weight: 800; }
+  .ing-avail-day-presets { display: flex; gap: 4px; }
+  .ing-avail-day-presets .btn { min-height: 32px; padding: 5px 8px; font-size: 10px; }
+  .ing-avail-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .ing-avail-days .chip { min-width: 0; min-height: 38px; padding: 6px 2px; }
+  .ing-avail-time-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; margin-top: 10px; }
+  .ing-avail-preview { margin-top: 14px; padding: 12px; border: 1px solid #CDEBDD; border-radius: 13px; background: #F7FFFB; }
+  .ing-avail-preview-grid { display: grid; grid-template-columns: repeat(7, minmax(88px, 1fr)); gap: 6px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; }
+  .ing-avail-preview-day { min-height: 84px; padding: 8px; border: 1px solid #D9EEE4; border-radius: 9px; background: var(--white); }
+  .ing-avail-preview-day.conflict { border-color: #F1AAA0; background: #FFF7F6; }
+  .ing-avail-preview-day > b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; }
+  .ing-avail-preview-item { display: block; margin-top: 4px; color: var(--dark-gray); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+  .ing-avail-preview-item em { display: block; color: var(--mid-gray); font-size: 9px; font-style: normal; }
+  .ing-avail-preview-empty { color: var(--mid-gray); font-size: 10px; }
+  .ing-avail-add { min-height: 46px; border-style: dashed; }
   .ing-cal-tabs { display: none; gap: 6px; overflow-x: auto; padding: 2px 0 10px; }
   .ing-week-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; min-width: 0; }
   .ing-cal-tabs .chip { flex: 0 0 auto; min-width: 48px; min-height: 44px; }
@@ -336,6 +369,19 @@
     .ing-overview-stat { padding: 9px 8px; }
     .ing-overview-stat b { font-size: 16px; }
     .ing-hero-actions .btn { flex: 1 1 calc(50% - 4px); min-height: 44px; }
+    .ing-avail-intro { grid-template-columns: minmax(0, 1fr) auto; }
+    .ing-avail-section { padding: 12px; }
+    .ing-avail-section-head { align-items: flex-start; flex-direction: column; }
+    .ing-avail-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+    .ing-avail-quick .chip { min-width: 0; padding: 7px 3px; }
+    .ing-avail-row-top { grid-template-columns: 1fr; }
+    .ing-avail-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ing-avail-row-actions .btn { min-height: 38px; }
+    .ing-avail-day-head { align-items: flex-start; flex-direction: column; }
+    .ing-avail-day-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+    .ing-avail-day-presets .btn { min-height: 36px; }
+    .ing-avail-days .chip { min-height: 42px; }
+    .ing-avail-preview-grid { grid-template-columns: repeat(7, minmax(100px, 1fr)); }
     .ing-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ing-plan-grid .ing-plan-stat:last-child { grid-column: 1 / -1; }
     .ing-week-toolbar { grid-template-columns: 1fr; }
@@ -2885,7 +2931,7 @@ function ingOverviewCard(me, editable, admin, courses, overdue) {
     '<div class="ing-hero-actions">' +
       (admin ? '<button class="btn btn-sm btn-primary" data-act="ingadd">＋ 강좌 등록</button>' : '') +
       (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">' +
-        (avail.configured ? '주간 일정 수정' : '주간 일정 설정') + '</button>' : '') +
+        (avail.configured ? '주간 시간표 수정' : '주간 시간표 입력') + '</button>' : '') +
       (admin ? '<button class="btn btn-sm btn-ghost" data-act="ingshift">전체 일정 날짜 이동</button>' : '') +
     '</div></div>';
 }
@@ -2916,13 +2962,13 @@ function ingWeekCard(me, editable, canManage) {
   if (!avail.configured) {
     h += '<div class="hint">학생의 활동 가능 시간과 학교·학원 같은 고정 일정을 먼저 넣어주세요. ' +
       '저장하기 전에는 빈 시간으로 계산하지 않습니다.</div>' +
-      (editable ? '<button class="btn btn-primary btn-block mt14" data-act="ingavopen">주간 일정 설정</button>' : '') + '</div>';
+      (editable ? '<button class="btn btn-primary btn-block mt14" data-act="ingavopen">주간 시간표 입력</button>' : '') + '</div>';
     return h;
   }
   h += '<div class="ing-calendar-bar"><div><div class="small muted mb8">활동 가능 ' + esc(avail.start) + '~' + esc(avail.end) + '</div>' +
       '<div class="ing-legend"><span><i class="busy"></i>고정 일정</span><span><i class="free"></i>빈 시간</span>' +
         '<span><i class="lecture"></i>배정 인강</span></div></div>' +
-      (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">일정 수정</button>' : '') + '</div>';
+      (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">시간표 수정</button>' : '') + '</div>';
   const calStart = ingHmMin(avail.start), calEnd = ingHmMin(avail.end);
   const calMinutes = calEnd - calStart;
   const calHourPx = Math.max(ING_CAL_HOUR_PX, 240 * 60 / calMinutes);
@@ -3014,29 +3060,91 @@ function ingWeekCard(me, editable, canManage) {
   return h;
 }
 
+const ING_AVAIL_QUICK = Object.freeze({
+  school: { label: '학교', s: '08:00', e: '16:00', days: [1, 2, 3, 4, 5] },
+  academy: { label: '학원', s: '17:00', e: '19:00', days: [1, 2, 3, 4, 5] },
+  meal: { label: '식사', s: '12:00', e: '13:00', days: ING_WEEK_DAYS.slice() },
+  commute: { label: '이동', s: '16:00', e: '17:00', days: [1, 2, 3, 4, 5] },
+  exercise: { label: '운동', s: '20:00', e: '21:00', days: [1, 3, 5] }
+});
+
+function ingAvailQuickBlock(kind) {
+  const preset = ING_AVAIL_QUICK[kind] || { label: '', s: '16:00', e: '18:00', days: [1, 2, 3, 4, 5] };
+  return { id: uid(), label: preset.label, s: preset.s, e: preset.e, days: preset.days.slice() };
+}
+
 function ingAvailRowHtml(block) {
-  block = block || { id: uid(), label: '', s: '16:00', e: '18:00', days: [1, 2, 3, 4, 5] };
-  return '<div class="panel" data-ing-block="' + esc(block.id) + '">' +
-    '<div class="between mb8"><b class="small">고정 일정</b>' +
-      '<button type="button" class="btn btn-sm btn-ghost" data-act="ingavrowdel">삭제</button></div>' +
-    '<input class="in mb8" data-ing-label placeholder="학교·학원·식사·이동" value="' + esc(block.label || '') + '">' +
-    '<div class="grid2 mb8"><input class="in" type="time" data-ing-s value="' + esc(block.s || '16:00') + '">' +
-      '<input class="in" type="time" data-ing-e value="' + esc(block.e || '18:00') + '"></div>' +
-    '<div class="chips">' + ING_WEEK_DAYS.map(day =>
-      '<button type="button" class="chip ' + ((block.days || []).includes(day) ? 'on' : '') +
-        '" data-act="ingavday" data-v="' + day + '">' + DOW[day] + '</button>').join('') + '</div></div>';
+  block = block || ingAvailQuickBlock('');
+  const selectedDays = Array.isArray(block.days) ? block.days : [];
+  return '<div class="ing-avail-row" data-ing-block="' + esc(block.id) + '">' +
+    '<div class="ing-avail-row-top"><input class="in" data-ing-label aria-label="고정 일정 이름" placeholder="예: 수학 학원" value="' + esc(block.label || '') + '">' +
+      '<div class="ing-avail-row-actions"><button type="button" class="btn btn-sm btn-ghost" data-act="ingavrowcopy">같은 일정 복사</button>' +
+        '<button type="button" class="btn btn-sm btn-danger" data-act="ingavrowdel">삭제</button></div></div>' +
+    '<div class="ing-avail-day-head"><span>반복 요일</span><div class="ing-avail-day-presets">' +
+      '<button type="button" class="btn btn-sm btn-ghost" data-act="ingavdays" data-days="weekday">평일</button>' +
+      '<button type="button" class="btn btn-sm btn-ghost" data-act="ingavdays" data-days="weekend">주말</button>' +
+      '<button type="button" class="btn btn-sm btn-ghost" data-act="ingavdays" data-days="all">매일</button></div></div>' +
+    '<div class="ing-avail-days" role="group" aria-label="반복 요일 선택">' + ING_WEEK_DAYS.map(day => {
+      const on = selectedDays.includes(day);
+      return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-act="ingavday" data-v="' + day +
+        '" aria-pressed="' + on + '">' + DOW[day] + '</button>';
+    }).join('') + '</div>' +
+    '<div class="ing-avail-time-grid"><label>시작<input class="in" type="time" data-ing-s aria-label="일정 시작 시각" value="' + esc(block.s || '16:00') + '"></label>' +
+      '<span class="ing-avail-arrow">→</span><label>종료<input class="in" type="time" data-ing-e aria-label="일정 종료 시각" value="' + esc(block.e || '18:00') + '"></label></div></div>';
+}
+
+function ingAvailDraftRows() {
+  return [...document.querySelectorAll('[data-ing-block]')].map(row => ({
+    id: row.dataset.ingBlock || '',
+    label: ((row.querySelector('[data-ing-label]') || {}).value || '').trim(),
+    s: ((row.querySelector('[data-ing-s]') || {}).value || ''),
+    e: ((row.querySelector('[data-ing-e]') || {}).value || ''),
+    days: [...row.querySelectorAll('[data-act="ingavday"].on')].map(button => Number(button.dataset.v))
+  }));
+}
+
+function ingAvailPreviewHtml(rows) {
+  return '<div class="ing-avail-preview-grid">' + ING_WEEK_DAYS.map(day => {
+    const items = rows.filter(row => row.days.includes(day) && row.label).sort((a, b) => a.s.localeCompare(b.s));
+    const conflict = items.some((item, index) => items.slice(index + 1).some(next =>
+      ingHmMin(item.s) !== null && ingHmMin(next.s) !== null && ingHmMin(item.s) < ingHmMin(next.e) && ingHmMin(next.s) < ingHmMin(item.e)));
+    return '<div class="ing-avail-preview-day' + (conflict ? ' conflict' : '') + '"><b>' + DOW[day] + (conflict ? ' · 겹침' : '') + '</b>' +
+      (items.length ? items.map(item => '<span class="ing-avail-preview-item">' + esc(item.label) + '<em>' + esc(item.s) + '~' + esc(item.e) + '</em></span>').join('') :
+        '<span class="ing-avail-preview-empty">고정 일정 없음</span>') + '</div>';
+  }).join('') + '</div>';
+}
+
+function ingAvailRefreshPreview() {
+  const preview = $('#ingAvailPreview');
+  if (!preview) return;
+  const rows = ingAvailDraftRows();
+  const count = $('#ingAvailCount');
+  if (count) count.textContent = rows.length + '개';
+  preview.innerHTML = ingAvailPreviewHtml(rows);
 }
 
 function ingAvailModal(sid) {
   const avail = ingAvail(sid);
-  modal('🗓 주간 일정 설정',
-    '<div class="hint mb14">월~일에 반복되는 일정만 넣으세요. 시험·병원처럼 한 번만 있는 일정은 오늘 화면의 시간표에 넣으면 함께 제외됩니다.</div>' +
-    '<div class="fl mb8">하루 활동 가능 시간</div><div class="grid2 mb14">' +
-      '<input class="in" id="ingAvailStart" type="time" value="' + esc(avail.start) + '">' +
-      '<input class="in" id="ingAvailEnd" type="time" value="' + esc(avail.end) + '"></div>' +
-    '<div id="ingAvailRows">' + avail.blocks.map(ingAvailRowHtml).join('') + '</div>' +
-    '<button type="button" class="btn btn-sm btn-ghost mt14" data-act="ingavrowadd">＋ 고정 일정 추가</button>',
-    '<button class="btn btn-primary btn-block" data-act="ingavsave" data-sid="' + esc(sid) + '">저장하고 빈 시간 계산</button>');
+  modal('🗓 주간 시간표 입력',
+    '<div id="ingAvailEditor">' +
+    '<div class="ing-avail-intro"><div><b>한 번 입력하면 매주 반복됩니다.</b><span>학교·학원처럼 반복되는 시간만 넣으세요. 시험·병원 같은 일회성 일정은 오늘 시간표에서 입력합니다.</span></div><i class="ing-avail-step">✓</i></div>' +
+    '<section class="ing-avail-section"><div class="ing-avail-section-head"><b>1 · 하루 활동 가능 시간</b><span class="small muted">잠자는 시간을 제외한 범위</span></div>' +
+      '<div class="ing-avail-window-grid"><label>시작<input class="in" id="ingAvailStart" type="time" value="' + esc(avail.start) + '"></label>' +
+        '<span class="ing-avail-arrow">→</span><label>종료<input class="in" id="ingAvailEnd" type="time" value="' + esc(avail.end) + '"></label></div>' +
+      '<div class="ing-avail-presets" aria-label="활동 시간 빠른 선택">' +
+        '<button type="button" class="chip" data-act="ingavwindow" data-s="07:00" data-e="23:00">07시~23시</button>' +
+        '<button type="button" class="chip" data-act="ingavwindow" data-s="08:00" data-e="22:00">08시~22시</button>' +
+        '<button type="button" class="chip" data-act="ingavwindow" data-s="16:00" data-e="23:00">방과 후만</button></div></section>' +
+    '<section class="ing-avail-section"><div class="ing-avail-section-head"><b>2 · 반복 고정 일정 <span class="pill" id="ingAvailCount">' + avail.blocks.length + '개</span></b>' +
+      '<span class="small muted">종류를 누르면 바로 추가됩니다</span></div>' +
+      '<div class="ing-avail-quick" aria-label="고정 일정 빠른 추가">' +
+        Object.entries(ING_AVAIL_QUICK).map(([kind, preset]) => '<button type="button" class="chip" data-act="ingavquickadd" data-kind="' + kind + '">＋ ' + preset.label + '</button>').join('') + '</div>' +
+      '<div class="ing-avail-list mt14" id="ingAvailRows">' + avail.blocks.map(ingAvailRowHtml).join('') + '</div>' +
+      '<button type="button" class="btn btn-ghost btn-block ing-avail-add mt14" data-act="ingavrowadd">＋ 직접 일정 추가</button></section>' +
+    '<section class="ing-avail-preview"><div class="ing-avail-section-head"><b>3 · 저장 전 주간 확인</b><span class="small muted">겹친 시간은 빨간색으로 표시</span></div>' +
+      '<div id="ingAvailPreview"></div></section></div>',
+    '<button class="btn btn-primary btn-block" data-act="ingavsave" data-sid="' + esc(sid) + '">이 시간표로 저장하고 빈 시간 계산</button>');
+  ingAvailRefreshPreview();
 }
 
 function ingSlotModal(sid, date, start, end) {
@@ -7695,13 +7803,57 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'ingavopen': { const me = currentStaff(); if (me) ingAvailModal(me.id); break; }
+    case 'ingavwindow': {
+      const start = $('#ingAvailStart'), end = $('#ingAvailEnd');
+      if (start && end) { start.value = el.dataset.s || start.value; end.value = el.dataset.e || end.value; ingAvailRefreshPreview(); }
+      break;
+    }
+    case 'ingavquickadd': {
+      const rows = $('#ingAvailRows');
+      if (!rows) break;
+      rows.insertAdjacentHTML('beforeend', ingAvailRowHtml(ingAvailQuickBlock(el.dataset.kind)));
+      ingAvailRefreshPreview();
+      break;
+    }
     case 'ingavrowadd': {
       const rows = $('#ingAvailRows');
       if (rows) rows.insertAdjacentHTML('beforeend', ingAvailRowHtml());
+      ingAvailRefreshPreview();
+      const added = rows && rows.lastElementChild && rows.lastElementChild.querySelector('[data-ing-label]');
+      if (added) added.focus();
       break;
     }
-    case 'ingavrowdel': { const row = el.closest('[data-ing-block]'); if (row) row.remove(); break; }
-    case 'ingavday': el.classList.toggle('on'); break;
+    case 'ingavrowcopy': {
+      const row = el.closest('[data-ing-block]'); if (!row) break;
+      const block = {
+        id: uid(), label: (row.querySelector('[data-ing-label]').value || '').trim(),
+        s: row.querySelector('[data-ing-s]').value, e: row.querySelector('[data-ing-e]').value,
+        days: [...row.querySelectorAll('[data-act="ingavday"].on')].map(button => Number(button.dataset.v))
+      };
+      row.insertAdjacentHTML('afterend', ingAvailRowHtml(block));
+      ingAvailRefreshPreview();
+      break;
+    }
+    case 'ingavrowdel': {
+      const row = el.closest('[data-ing-block]');
+      if (row) { row.remove(); ingAvailRefreshPreview(); }
+      break;
+    }
+    case 'ingavdays': {
+      const row = el.closest('[data-ing-block]'); if (!row) break;
+      const selected = el.dataset.days === 'weekend' ? [6, 0] : el.dataset.days === 'all' ? ING_WEEK_DAYS : [1, 2, 3, 4, 5];
+      row.querySelectorAll('[data-act="ingavday"]').forEach(button => {
+        const on = selected.includes(Number(button.dataset.v));
+        button.classList.toggle('on', on); button.setAttribute('aria-pressed', String(on));
+      });
+      ingAvailRefreshPreview();
+      break;
+    }
+    case 'ingavday': {
+      el.classList.toggle('on'); el.setAttribute('aria-pressed', String(el.classList.contains('on')));
+      ingAvailRefreshPreview();
+      break;
+    }
     case 'ingavsave': {
       const me = currentStaff(); if (!me) break;
       const start = $('#ingAvailStart').value, end = $('#ingAvailEnd').value;
@@ -9228,6 +9380,7 @@ document.addEventListener('input', ev => {
     viewInputDirty = true;
   }
   if (ev.target.id === 'ingText') { ingPasteSeq++; ingShowParsePreview(); return; }
+  if (ev.target.closest && ev.target.closest('#ingAvailEditor')) { ingAvailRefreshPreview(); return; }
   if (ev.target.id.startsWith('examPlan')) {
     const preview = $('#examPlanPreview');
     if (preview) renderExamPlanPreview(preview.dataset.exam);
@@ -9350,7 +9503,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.27';
+const APP_VER = '2026-08-19.28';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

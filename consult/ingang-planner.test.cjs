@@ -284,6 +284,36 @@ test('availability is opt-in and the planner UI is wired for students and direct
   assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-cal-head:not\(\.active\), \.ing-cal-day:not\(\.active\) \{ display: none; \}/);
 });
 
+test('weekly timetable editor supports fast recurring input with a live seven-day preview', () => {
+  const editor = between('const ING_AVAIL_QUICK', '\nfunction ingSlotModal(');
+  const handlers = between("case 'ingavopen':", "case 'ingavsave':");
+  const input = between("document.addEventListener('input', ev => {", "document.addEventListener('change', ev => {");
+
+  ['학교', '학원', '식사', '이동', '운동'].forEach(label => assert.match(editor, new RegExp("label: '" + label + "'")));
+  assert.match(editor, /주간 시간표 입력/);
+  assert.match(editor, /하루 활동 가능 시간/);
+  assert.match(editor, /data-act="ingavwindow"/);
+  assert.match(editor, /data-act="ingavquickadd"/);
+  assert.match(editor, /data-act="ingavdays" data-days="weekday"/);
+  assert.match(editor, /data-act="ingavdays" data-days="weekend"/);
+  assert.match(editor, /data-act="ingavdays" data-days="all"/);
+  assert.match(editor, /data-act="ingavrowcopy"/);
+  assert.match(editor, /role="group" aria-label="반복 요일 선택"/);
+  assert.match(editor, /function ingAvailPreviewHtml/);
+  assert.match(editor, /class="ing-avail-preview-day/);
+  assert.match(editor, /겹침/);
+  assert.match(editor, /id="ingAvailPreview"/);
+  assert.match(handlers, /ingAvailQuickBlock\(el\.dataset\.kind\)/);
+  assert.match(handlers, /selected\.includes\(Number\(button\.dataset\.v\)\)/);
+  assert.match(handlers, /setAttribute\('aria-pressed'/);
+  assert.match(handlers, /ingAvailRefreshPreview\(\)/);
+  assert.doesNotMatch(handlers, /setCheck|ingSaveAvail|queueSync|localStorage/,
+    'editing the draft must stay transient until the explicit save action');
+  assert.match(input, /closest\('#ingAvailEditor'\)[\s\S]*?ingAvailRefreshPreview\(\)/);
+  assert.match(html, /\.ing-avail-days \{ display: grid; grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-avail-quick \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+});
+
 test('weekly lecture schedule uses calendar geometry and a mobile day selector', () => {
   const source = between('function ingCalendarPosition(', '\n\nfunction ingWeekCard(');
   const position = Function('const ING_CAL_HOUR_PX=60; ' + source + '\nreturn ingCalendarPosition;')();
@@ -387,7 +417,7 @@ test('final lecture UI keeps bounded calendar and mobile action contracts', () =
   assert.match(html, /\.ing-plan-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
   assert.match(html, /class="card ing-hero"/);
   assert.match(html, /class="card ing-course-card"/);
-  assert.match(html, /avail\.configured \? '주간 일정 수정' : '주간 일정 설정'/);
+  assert.match(html, /avail\.configured \? '주간 시간표 수정' : '주간 시간표 입력'/);
   assert.match(html, /const ingKey = sid => '__ing__' \+ sid/);
   assert.match(html, /const ingPlanKey = sid => '__ingp__' \+ sid/);
   assert.match(html, /const ingAvailKey = sid => '__ingavail__' \+ sid/);
