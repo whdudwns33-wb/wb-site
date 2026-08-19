@@ -67,7 +67,7 @@ test('quick creation builds a parseable 1-to-N curriculum without OCR', () => {
 });
 
 test('course editing preserves identity and blocks removal of scheduled lecture numbers', () => {
-  const courseCard = between('function viewIngang()', '\nfunction ingAddModal()');
+  const courseCard = between('function ingCourseCardHtml(', '\n\nfunction ingLectureNoteModal(');
   const editModal = between('function ingEditModal(', '\n\nfunction ingAssignModal(');
   const editOpen = between("case 'ingedit':", "case 'ingeditsave':");
   const editSave = between("case 'ingeditsave':", "case 'ingdel':");
@@ -77,6 +77,9 @@ test('course editing preserves identity and blocks removal of scheduled lecture 
   assert.match(editModal, /id="ingEditName"/);
   assert.match(editModal, /id="ingEditPlatform"/);
   assert.match(editModal, /id="ingEditUrl"/);
+  assert.match(editModal, /id="ingEditTextbook"/);
+  assert.match(editModal, /id="ingEditMaterialUrl"/);
+  assert.match(editModal, /id="ingEditStatus"/);
   assert.match(editModal, /id="ingEditText"/);
   assert.match(editModal, /ingCourseText\(course\)/);
   assert.match(editOpen, /session\.isAdmin \|\| isManager\(\)/);
@@ -86,6 +89,7 @@ test('course editing preserves identity and blocks removal of scheduled lecture 
   assert.match(editSave, /item\.id === course\.id/);
   assert.match(editSave, /Object\.assign\(\{\}, item/);
   assert.match(editSave, /lectures: lectures/);
+  assert.match(editSave, /materialUrl: materialUrl, textbook: textbook, status: status/);
   assert.doesNotMatch(editSave, /id: uid\(\)/);
   assert.doesNotMatch(editSave, /ingSavePlan/);
 });
@@ -273,7 +277,7 @@ test('availability is opt-in and the planner UI is wired for students and direct
   assert.match(html, /id="ingEnd" value=[\s\S]*?type="date"|type="date" id="ingEnd"|id="ingEnd"[^>]*type="date"/);
   assert.match(html, /완강 예상/);
   assert.match(html, /예상 전환/);
-  assert.match(html, /총 ' \+ f\.rounds \+ '회독 가능/);
+  assert.match(html, /총 ' \+ forecast\.rounds \+ '회독 가능/);
   assert.match(html, /가용시간 부족/);
   assert.match(html, /session\.isStaffLink \|\| admin/);
   assert.match(html, /if \(!\(session\.isAdmin \|\| isManager\(\)\)\) break/);
@@ -394,20 +398,64 @@ test('weekly lecture calendar focuses on one selected day with large chronologic
   assert.match(conflictHtml, /고정 일정 · 수학 학원 ↔ 인강 · 개념 인강 1강/);
 });
 
-test('weekly overview is read-only and summarizes Monday through Sunday only', () => {
-  const source = between('function ingWeekSummary(', '\n\nfunction ingOverviewCard(');
-  const ingWeekSummary = Function(`${dateHelpers}
-    const plans={
-      '2026-08-17':[{done:true},{done:false}],
-      '2026-08-23':[{done:false}],
-      '2026-08-24':[{done:true}]
-    };
-    function ingPlan(_sid,date) { return plans[date] || []; }
-    ${source}
-    return ingWeekSummary;`)();
+test('lecture tab is a course management hub rather than another dated agenda', () => {
+  const helpers = between('function ingCourseStatusLabel(', '\n\nfunction ingAttentionCard(');
+  const view = between('function viewIngang()', '\nfunction ingAddModal()');
+  const detail = between('function ingCourseDetailHtml(', '\n\nfunction ingCourseCardHtml(');
+  const api = Function(helpers + '\nreturn { ingCourseStatusLabel, ingCourseFilterMatch };')();
+  const active = { completed:false, paused:false, overdue:0, stalled:false, status:'active', attention:0 };
+  const attention = { ...active, overdue:2, attention:2 };
+  const completed = { ...active, completed:true, status:'completed' };
 
-  assert.deepEqual(ingWeekSummary('student', '2026-08-17'), { total: 3, done: 1 });
-  assert.doesNotMatch(source, /setCheck|save\(|queueSync|localStorage/);
+  assert.equal(api.ingCourseStatusLabel(active), '수강 중');
+  assert.equal(api.ingCourseStatusLabel(attention), '지연 2강');
+  assert.equal(api.ingCourseFilterMatch(attention, 'attention'), true);
+  assert.equal(api.ingCourseFilterMatch(completed, 'completed'), true);
+  assert.match(view, /강좌 보관함/);
+  assert.match(view, /수강 중/);
+  assert.match(view, /관리 필요/);
+  assert.match(view, /일시 정지/);
+  assert.match(view, /완강/);
+  assert.match(view, /class="card ing-aux-card"/);
+  assert.doesNotMatch(view, /앞으로 2주|data-act="daypick"/);
+  assert.match(detail, /회차별 진도/);
+  assert.match(detail, /완료 1강 평균/);
+  assert.match(detail, /교재·자료/);
+  assert.match(detail, /질문·복습 메모/);
+});
+
+test('course management state separates active, paused, completed, and attention signals', () => {
+  const source = between('function ingCourseState(', '\n\n/** 순수 배치 코어');
+  const ingCourseState = Function(`${dateHelpers}
+    function today(){return '2026-08-19';}
+    function ingStats(_sid,course){return course.stats;}
+    function ingCourseItems(_sid,cid){
+      if(cid==='active') return [
+        {seq:1,date:'2026-08-16',done:true},
+        {seq:2,date:'2026-08-18',done:false,review:true}
+      ];
+      return [];
+    }
+    function ingLectureNote(_sid,cid,seq){
+      if(cid==='active'&&seq===2) return {question:'왜 이렇게 되나요?',answer:'이전 답변',answeredQuestion:'다른 질문'};
+      if(cid==='answered'&&seq===1) return {question:'같은 질문',answer:'답변',answeredQuestion:'같은 질문'};
+      return {};
+    }
+    function ingCourseStudySeconds(){return 3600;}
+    ${source}
+    return ingCourseState;`)();
+  const active = ingCourseState('S1', {id:'active',importedAt:Date.parse('2026-08-18'),lectures:[{seq:1},{seq:2},{seq:3}],stats:{total:3,done:1}}, {});
+  assert.equal(active.status, 'active');
+  assert.equal(active.overdue, 1);
+  assert.equal(active.review, 1);
+  assert.equal(active.unanswered, 1);
+  assert.equal(active.attention, 3);
+  const paused = ingCourseState('S1', {id:'paused',status:'paused',lectures:[{seq:1}],stats:{total:1,done:0}}, {});
+  assert.equal(paused.status, 'paused');
+  const complete = ingCourseState('S1', {id:'done',status:'paused',lectures:[{seq:1}],stats:{total:1,done:1}}, {});
+  assert.equal(complete.status, 'completed', 'completion takes precedence over a stale paused flag');
+  const answered = ingCourseState('S1', {id:'answered',lectures:[{seq:1}],stats:{total:1,done:0}}, {});
+  assert.equal(answered.unanswered, 0);
 });
 
 test('final lecture UI keeps a readable day board and mobile action contracts', () => {
@@ -415,17 +463,52 @@ test('final lecture UI keeps a readable day board and mobile action contracts', 
   assert.match(html, /\.ing-day-tab \{[^}]*min-height: 72px/);
   assert.match(html, /button\.ing-agenda-item\.free \{ cursor: pointer; \}/);
   assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-agenda-item \{ grid-template-columns: 66px minmax\(0, 1fr\)/);
-  assert.match(html, /\.ing-upcoming-card \.wraprow \{ flex-wrap: nowrap; overflow-x: auto;/);
+  assert.match(html, /\.ing-library-filter \{ display: flex;[^}]*overflow-x: auto;/);
+  assert.match(html, /\.ing-lecture-list \{[^}]*max-height: 540px; overflow-y: auto;/);
+  assert.match(html, /\.ing-lecture-row \{[^}]*min-height: 58px/);
   assert.match(html, /\.ing-hero-actions \.btn \{[^}]*min-height: 44px/);
   assert.match(html, /\.ing-course-actions \.btn \{[^}]*min-height: 44px/);
   assert.doesNotMatch(html, /\.ing-course-actions \.btn-primary \{[^}]*var\(--ing-course-color\)/);
-  assert.match(html, /\.ing-plan-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
   assert.match(html, /class="card ing-hero"/);
-  assert.match(html, /class="card ing-course-card"/);
-  assert.match(html, /avail\.configured \? '주간 시간표 수정' : '주간 시간표 입력'/);
+  assert.match(html, /class="card ing-course-card /);
+  assert.match(html, /avail\.configured \? '자동배정 시간 수정' : '자동배정 시간 입력'/);
   assert.match(html, /const ingKey = sid => '__ing__' \+ sid/);
   assert.match(html, /const ingPlanKey = sid => '__ingp__' \+ sid/);
   assert.match(html, /const ingAvailKey = sid => '__ingavail__' \+ sid/);
+  assert.match(html, /const ingNoteKey = sid => '__ingnote__' \+ sid/);
+});
+
+test('lecture questions and notes sync under the student owner and keep answers tied to the exact question', () => {
+  const noteSource = between('function ingLectureNote(', '\n\nfunction ingCourseStudySeconds(');
+  const api = Function(`
+    const state={checks:{}}, writes=[];
+    const ingNoteKey=sid=>'__ingnote__'+sid;
+    function setCheck(key,date,patch){ writes.push({key,date,patch}); state.checks[key+'|'+date]=patch; return patch; }
+    ${noteSource}
+    return { state, writes, ingLectureNote, ingSaveLectureNote };
+  `)();
+  api.ingSaveLectureNote('S1', 'course-a', 3, { question:'왜 이렇게 되나요?', memo:'18분 다시 듣기' });
+  assert.deepEqual(api.writes[0], {
+    key:'__ingnote__S1', date:'course-a:3',
+    patch:{ question:'왜 이렇게 되나요?', memo:'18분 다시 듣기', done:true }
+  });
+  assert.equal(api.ingLectureNote('S1', 'course-a', 3).question, '왜 이렇게 되나요?');
+
+  const ownerSource = between('function ownerOfCheck(key) {', '\n\nconst sync =');
+  const ownerOfCheck = Function(`const state={tasks:[]}; ${ownerSource}; return ownerOfCheck;`)();
+  assert.equal(ownerOfCheck('__ingnote__S1|course-a:3'), 'S1');
+
+  const modal = between('function ingLectureNoteModal(', '\n\nfunction viewIngang(');
+  const studentSave = between("case 'ingnotesave':", "case 'inganswersave':");
+  const answerSave = between("case 'inganswersave':", "case 'ingweek':");
+  assert.match(modal, /id="ingNoteQuestion"/);
+  assert.match(modal, /id="ingNoteMemo"/);
+  assert.match(modal, /id="ingNotePage"/);
+  assert.match(modal, /id="ingNoteAnswer"/);
+  assert.match(studentSave, /if \(!session\.isStaffLink\) break/);
+  assert.match(studentSave, /me\.id !== el\.dataset\.sid/);
+  assert.match(answerSave, /session\.isAdmin \|\| isManager\(\)/);
+  assert.match(answerSave, /answeredQuestion: answer \? String\(current\.question/);
 });
 
 test('five official course sites have safe direct links and smart-paste fallback', () => {
