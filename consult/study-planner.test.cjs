@@ -207,6 +207,20 @@ test('today ends with a mandatory closeout funnel instead of a standalone report
   assert.match(closeCard, /3 · 일정 준비율/);
   assert.match(closeCard, /이전 미마감[\s\S]*?먼저 마무리/);
   assert.match(closeCard, /data-act="report"/);
+  assert.match(today, /오늘 학습은 잠시 잠겨 있습니다/);
+  assert.match(today, /priorCloseDates\.length[\s\S]*?return h/);
+});
+
+test('past dates show the full planner read-only and return to today after closeout', () => {
+  const today = section('function viewToday()', 'function studyTotalHeroCard(');
+  const finish = section("case 'dailyreportfinish':", "case 'brief':");
+
+  assert.match(today, /const lectureChecklist = ingChecklistItems\(me\.id, cursor\)/);
+  assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, list, \[\], false\)[\s\S]*?tbCard\(me, false\)/);
+  assert.match(today, /editable && cursor === today\(\)/);
+  assert.doesNotMatch(today, /list\.map\(t => taskRow\(t, cursor, editable, false\)\)/);
+  assert.match(finish, /const closedPastDate = cursor < today\(\)/);
+  assert.match(finish, /if \(closedPastDate\) \{ cursor = today\(\); cursorPinned = false; \}/);
 });
 
 test('daily closeout requires every unfinished item and event to be reviewed after the timer stops', () => {
@@ -215,6 +229,7 @@ test('daily closeout requires every unfinished item and event to be reviewed aft
   const save = section("case 'dailyclosesave':", "case 'report':");
 
   assert.match(data, /const dailyCloseKey = staffId => '__dailyclose__' \+ staffId/);
+  assert.match(data, /const DAILY_CLOSE_START = '2026-08-18'/);
   assert.match(data, /incomplete = items\.filter\(item => !item\.done\)/);
   assert.match(data, /unresolved = incomplete\.filter/);
   assert.match(data, /unconfirmedEvents = events\.filter/);
