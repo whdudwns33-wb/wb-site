@@ -115,7 +115,7 @@ test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순
   assert.ok(rows.every(row => row.taskId === 'lesson-1' && row.date < '2026-08-14'));
 });
 
-test('이전 수업 메모는 수업진행 안에서 날짜와 메모를 최신순 3개로 렌더링한다', () => {
+test('이전 수업 메모는 기본 접힘 상태이며 제목을 누르면 최신순 3개가 펼쳐진다', () => {
   const start = source.indexOf('function previousTaskMemos(');
   const end = source.indexOf('function lessonWorkInstructionHtml(', start);
   const state = { checks: {
@@ -124,11 +124,13 @@ test('이전 수업 메모는 수업진행 안에서 날짜와 메모를 최신�
   const esc = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const render = new Function('state', 'esc', source.slice(start, end) + '\nreturn previousTaskMemosProgressHtml;')(state, esc);
   const html = render('lesson-1', '2026-08-14');
-  assert.match(html, /^<section class="lesson-progress-section previous-memos">/);
+  assert.match(html, /^<details class="lesson-progress-section previous-memos"><summary>이전 수업 메모<\/summary>/);
   assert.match(html, /2026-08-13/);
   assert.match(html, /분수 복습 완료/);
   assert.match(html, /최신순 3개/);
-  assert.doesNotMatch(html, /<details|data-act="prevmemos"/);
+  assert.doesNotMatch(html, /<details[^>]*\sopen(?:\s|>)/);
+  assert.doesNotMatch(html, /data-act="prevmemos"/);
+  assert.match(source, /\.previous-memos > summary::after \{ content: '펼치기'/);
 });
 
 test('메모는 포커스할 때 커지는 여러 줄 입력과 바로 아래 저장 버튼을 사용한다', () => {
