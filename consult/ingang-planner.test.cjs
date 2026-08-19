@@ -281,11 +281,11 @@ test('availability is opt-in and the planner UI is wired for students and direct
   assert.match(html, /가용시간 부족/);
   assert.match(html, /session\.isStaffLink \|\| admin/);
   assert.match(html, /if \(!\(session\.isAdmin \|\| isManager\(\)\)\) break/);
-  assert.match(html, /item\.type === 'free' && canManage && selected\.date >= today\(\)/);
+  assert.match(html, /x\.type === 'free' && canManage && d\.date >= today\(\)/);
   assert.match(html, /if \(start < today\(\)\) return \{ error: '시작일은 오늘 이후로 선택해 주세요' \}/);
   assert.match(html, /ingPlan\(me\.id, d\)\.concat\(buckets\[d\]\)/);
   assert.match(html, /!ds\.length && data\.result\.remaining/);
-  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-day-tab \{ min-height: 62px/);
+  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-cal-head:not\(\.active\), \.ing-cal-day:not\(\.active\) \{ display: none; \}/);
 });
 
 test('weekly timetable editor supports fast recurring input with a live seven-day preview', () => {
@@ -318,20 +318,23 @@ test('weekly timetable editor supports fast recurring input with a live seven-da
   assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-avail-quick \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
 });
 
-test('weekly lecture calendar focuses on one selected day with large chronological cards', () => {
-  const cardSource = between('function ingWeekCard(', '\n\nfunction ingAvailRowHtml(');
+test('weekly lecture schedule uses the seven-day time-axis calendar with a mobile day selector', () => {
+  const source = between('function ingCalendarPosition(', '\n\nfunction ingAvailRowHtml(');
+  const position = Function('const ING_CAL_HOUR_PX=60; ' +
+    between('function ingCalendarPosition(', '\n\nfunction ingWeekCard(') + '\nreturn ingCalendarPosition;')();
+  assert.deepEqual(position(540, 630, 420, 1380), { top: 120, height: 90 });
+  assert.deepEqual(position(390, 480, 420, 1380), { top: 0, height: 60 });
+  assert.deepEqual(position(540, 600, 540, 600, 240), { top: 0, height: 240 });
+  assert.equal(position(1380, 1440, 420, 1380), null);
+  assert.equal(position(600, 600, 420, 1380), null);
 
-  assert.match(html, /\.ing-week-days \{ display: grid; grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
-  assert.match(cardSource, /role="tablist" aria-label="주간 요일 선택"/);
-  assert.match(cardSource, /role="tab" class="ing-day-tab/);
-  assert.match(cardSource, /role="tabpanel"/);
-  assert.match(cardSource, /class="ing-agenda-list"/);
-  assert.match(cardSource, /고정 일정/);
-  assert.match(cardSource, /배정 인강/);
-  assert.match(cardSource, /빈 시간/);
-  assert.match(cardSource, /item\.conflict \? ' conflict' : ''/);
-  assert.doesNotMatch(cardSource, /ingCalendarPosition\(/,
-    'the visible calendar should not return to narrow absolute-positioned columns');
+  assert.match(html, /grid-template-columns: 44px repeat\(7, minmax\(92px, 1fr\)\)/);
+  assert.match(html, /background-size: 100% var\(--ing-cal-hour-px, 60px\)/);
+  assert.match(source, /class="ing-cal-tabs"[\s\S]*?data-act="ingcalday"/);
+  assert.match(source, /class="ing-cal-head-row"[\s\S]*?class="ing-cal-body"/);
+  assert.match(source, /role="region" tabindex="0" aria-label="주간 인강 캘린더"/);
+  assert.match(source, /x\.subjectClass \? ' ' \+ x\.subjectClass/);
+  assert.match(source, /x\.conflict \? ' conflict' : ''/);
   const dayCase = between("case 'ingcalday':", "case 'ingavopen':");
   assert.match(dayCase, /ingCalDay = i; render\(\)/);
   assert.doesNotMatch(dayCase, /setCheck|save\(|queueSync|localStorage/);
@@ -339,9 +342,8 @@ test('weekly lecture calendar focuses on one selected day with large chronologic
   assert.match(todayCase, /ingWeekAnchor = today\(\)/);
   assert.match(todayCase, /ingCalDay = \(dowOf\(today\(\)\) \+ 6\) % 7/);
 
-  const weekSource = between('function ingWeekCard(', '\n\nfunction ingAvailRowHtml(');
   const renderWeek = Function(`${dateHelpers}
-    const DOW=['일','월','화','수','목','금','토'];
+    const ING_CAL_HOUR_PX=60, ING_MIN_TOUCH_PX=44, DOW=['일','월','화','수','목','금','토'];
     let ingCalDay=2, ingWeekAnchor='2026-08-23';
     function today(){return '2026-08-19';}
     function mondayOf(){return '2026-08-17';}
@@ -367,24 +369,24 @@ test('weekly lecture calendar focuses on one selected day with large chronologic
       if(sid==='conflict') return [];
       return [{s:540,e:600}];
     }
-    ${weekSource}
+    ${source}
     return ingWeekCard;`)();
   const directorHtml = renderWeek({id:'student'}, true, true);
   const studentHtml = renderWeek({id:'student'}, true, false);
-  assert.equal((directorHtml.match(/class="ing-day-tab/g) || []).length, 7);
+  assert.equal((directorHtml.match(/class="ing-cal-head /g) || []).length, 7);
   assert.equal((directorHtml.match(/data-act="ingcalday"/g) || []).length, 7);
-  assert.equal((directorHtml.match(/data-act="ingslot"/g) || []).length, 1);
+  assert.equal((directorHtml.match(/data-act="ingslot"/g) || []).length, 5);
   assert.equal((studentHtml.match(/data-act="ingslot"/g) || []).length, 0);
-  assert.match(directorHtml, /class="ing-day-board"/);
-  assert.match(directorHtml, /수요일 08\.19/);
-  assert.match(directorHtml, /class="ing-agenda-item free"/);
-  assert.match(directorHtml, /눌러서 다음 미배정 강의 넣기/);
+  assert.match(directorHtml, /--ing-cal-height:240px;--ing-cal-hour-px:240px/);
+  assert.match(directorHtml, /style="top:0px;height:240px"/);
+  assert.match(directorHtml, /class="ing-cal-time-label start" style="top:0">09:00/);
+  assert.match(directorHtml, /class="ing-cal-time-label end" style="top:240px">10:00/);
 
   const shortHtml = renderWeek({id:'short'}, true, true);
-  assert.equal((shortHtml.match(/data-act="ingslot"/g) || []).length, 1);
-  assert.match(shortHtml, /09:00~09:20/);
-  assert.match(shortHtml, /20분/);
-  assert.match(html, /\.ing-agenda-item \{[^}]*min-height: 64px/);
+  assert.equal((shortHtml.match(/class="btn btn-ghost ing-short-slot-action"/g) || []).length, 5);
+  assert.equal((shortHtml.match(/<button type="button" class="ing-cal-event free/g) || []).length, 0);
+  assert.equal((shortHtml.match(/data-act="ingslot"/g) || []).length, 5);
+  assert.match(html, /\.ing-short-slot-action \{ min-height: 44px/);
   assert.match(html, /outline: 3px solid var\(--deep-blue\)/);
   const focusRgb = html.match(/--deep-blue:\s*#([0-9A-F]{6})/i)[1].match(/../g).map(x => parseInt(x, 16));
   const luminance = rgb => rgb.map(v => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
@@ -393,8 +395,7 @@ test('weekly lecture calendar focuses on one selected day with large chronologic
 
   const conflictHtml = renderWeek({id:'conflict'}, true, true);
   assert.match(conflictHtml, /<details class="ing-conflict-list"><summary>⚠ 겹친 일정 7건<\/summary>/);
-  assert.match(conflictHtml, /선택한 날에 겹친 일정이 1건/);
-  assert.match(conflictHtml, /ing-agenda-item lecture subject-math conflict/);
+  assert.match(conflictHtml, /ing-cal-event lecture subject-math conflict/);
   assert.match(conflictHtml, /고정 일정 · 수학 학원 ↔ 인강 · 개념 인강 1강/);
 });
 
@@ -460,11 +461,11 @@ test('course management state separates active, paused, completed, and attention
   assert.equal(answered.unanswered, 0);
 });
 
-test('final lecture UI keeps a readable day board and mobile action contracts', () => {
-  assert.match(html, /\.ing-day-board \{[^}]*border-radius: 14px/);
-  assert.match(html, /\.ing-day-tab \{[^}]*min-height: 72px/);
-  assert.match(html, /button\.ing-agenda-item\.free \{ cursor: pointer; \}/);
-  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-agenda-item \{ grid-template-columns: 66px minmax\(0, 1fr\)/);
+test('final lecture UI keeps the bounded calendar and mobile action contracts', () => {
+  assert.match(html, /\.ing-cal-scroll \{ max-height: 590px; overflow: auto;/);
+  assert.match(html, /\.ing-cal-head-row \{ position: sticky; top: 0; z-index: 7; \}/);
+  assert.match(html, /\.ing-calendar \{ min-width: 688px; background: var\(--white\); \}/);
+  assert.match(html, /@media \(max-width: 640px\)[\s\S]*?\.ing-calendar \{ min-width: 0; \}/);
   assert.match(html, /\.ing-library-filter \{ display: flex;[^}]*overflow-x: auto;/);
   assert.match(html, /\.ing-lecture-list \{[^}]*max-height: 540px; overflow-y: auto;/);
   assert.match(html, /\.ing-lecture-row \{[^}]*min-height: 58px/);

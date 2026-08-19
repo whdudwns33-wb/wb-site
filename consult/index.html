@@ -287,51 +287,9 @@
   .ing-avail-preview-item em { display: block; color: var(--mid-gray); font-size: 9px; font-style: normal; }
   .ing-avail-preview-empty { color: var(--mid-gray); font-size: 10px; }
   .ing-avail-add { min-height: 46px; border-style: dashed; }
-  .ing-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 12px 0; }
-  .ing-day-tab { min-width: 0; min-height: 72px; padding: 8px 3px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); color: var(--mid-gray); text-align: center; }
-  .ing-day-tab b, .ing-day-tab span, .ing-day-tab small { display: block; }
-  .ing-day-tab b { color: var(--navy); font-size: 12px; }
-  .ing-day-tab span { margin-top: 1px; font-size: 10px; }
-  .ing-day-tab small { margin-top: 3px; font-size: 9px; font-weight: 800; }
-  .ing-day-tab.today { border-color: #9BC4EE; box-shadow: inset 0 0 0 1px #C9E1F7; }
-  .ing-day-tab.active { border-color: var(--navy); background: var(--navy); color: rgba(255,255,255,.72); box-shadow: 0 7px 16px rgba(27,58,92,.18); }
-  .ing-day-tab.active b { color: var(--white); }
-  .ing-day-tab:focus-visible { outline: 3px solid var(--deep-blue); outline-offset: 2px; }
-  .ing-day-board { overflow: hidden; border: 1px solid #DCE5EE; border-radius: 14px; background: #FBFCFE; }
-  .ing-day-board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px; border-bottom: 1px solid #E6EBF0; background: linear-gradient(135deg, #F6FAFF, #FBF9FF); }
-  .ing-day-board-title { display: flex; align-items: center; gap: 7px; color: var(--navy); font-size: 15px; font-weight: 900; }
-  .ing-day-board-sub { margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
-  .ing-day-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
-  .ing-day-counts .pill { white-space: nowrap; }
-  .ing-agenda-list { display: grid; gap: 8px; padding: 12px; }
-  .ing-agenda-item { position: relative; display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 11px; align-items: center; width: 100%; min-height: 64px; overflow: hidden; padding: 10px 12px 10px 15px; border: 1px solid #E0E6EC; border-radius: 11px; background: var(--white); text-align: left; }
-  .ing-agenda-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: #C7CDD5; }
-  .ing-agenda-item.busy { background: #F7F8FA; color: #59636F; }
-  .ing-agenda-item.free { border-color: #B9E8D2; background: #F5FFF9; color: #047857; }
-  .ing-agenda-item.free::before { background: #34D399; }
-  button.ing-agenda-item.free { cursor: pointer; }
-  button.ing-agenda-item.free:hover { border-color: #5BD5A1; background: #EDFFF5; transform: translateY(-1px); }
-  .ing-agenda-item.lecture { border-color: #CFE4F0; background: #F5FBFE; color: var(--deep-blue); }
-  .ing-agenda-item.lecture::before { background: var(--blue); }
-  .ing-agenda-item.lecture.subject-korean::before { background: var(--subject-korean); }
-  .ing-agenda-item.lecture.subject-english::before { background: var(--subject-english); }
-  .ing-agenda-item.lecture.subject-math::before { background: var(--subject-math); }
-  .ing-agenda-item.lecture.subject-social::before { background: var(--subject-social); }
-  .ing-agenda-item.lecture.subject-science::before { background: var(--subject-science); }
-  .ing-agenda-item.lecture.subject-other::before { background: var(--subject-other); }
-  .ing-agenda-item.done { opacity: .7; }
-  .ing-agenda-item.conflict { border-color: #F0A59A; background: #FFF7F6; box-shadow: inset 0 0 0 1px #F8C8C1; }
-  .ing-agenda-time b { display: block; color: var(--navy); font-size: 12px; }
-  .ing-agenda-time span { display: block; margin-top: 2px; color: var(--mid-gray); font-size: 9px; }
-  .ing-agenda-copy { min-width: 0; }
-  .ing-agenda-copy-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .ing-agenda-copy strong { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
-  .ing-agenda-copy .tag { flex: 0 0 auto; }
-  .ing-agenda-note { margin-top: 3px; color: var(--mid-gray); font-size: 10px; }
-  .ing-day-empty { padding: 28px 14px; color: var(--mid-gray); text-align: center; font-size: 12px; }
-  .ing-day-empty b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 18px; }
-  .ing-day-conflict { margin: 0 12px 12px; padding: 9px 10px; border: 1px solid #F3B3AA; border-radius: 9px; background: #FFF8F7; color: #B93827; font-size: 11px; }
+  .ing-cal-tabs { display: none; gap: 6px; overflow-x: auto; padding: 2px 0 10px; }
   .ing-week-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; width: 100%; min-width: 0; }
+  .ing-cal-tabs .chip { flex: 0 0 auto; min-width: 48px; min-height: 44px; }
   .ing-calendar-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
   .ing-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--mid-gray); font-size: 11px; }
   .ing-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -339,13 +297,56 @@
   .ing-legend .busy { background: #D1D5DB; }
   .ing-legend .free { background: #6EE7B7; }
   .ing-legend .lecture { background: #7DD3FC; }
-  .ing-week-toolbar button:focus-visible {
+  .ing-cal-scroll { max-height: 590px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; scrollbar-width: thin; }
+  .ing-calendar { min-width: 688px; background: var(--white); }
+  .ing-cal-head-row, .ing-cal-body { display: grid; grid-template-columns: 44px repeat(7, minmax(92px, 1fr)); }
+  .ing-cal-head-row { position: sticky; top: 0; z-index: 7; }
+  .ing-cal-corner, .ing-cal-head { min-height: 48px; padding: 8px 4px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #F8FAFC; }
+  .ing-cal-corner { position: sticky; left: 0; z-index: 8; }
+  .ing-cal-head { text-align: center; color: var(--navy); font-size: 11px; font-weight: 800; }
+  .ing-cal-head b { display: block; margin-bottom: 2px; font-size: 12px; }
+  .ing-cal-head.today { background: #EAF6FC; color: var(--deep-blue); }
+  .ing-cal-body { height: var(--ing-cal-height); }
+  .ing-cal-time-axis, .ing-cal-day { position: relative; min-height: 100%; border-right: 1px solid var(--line); }
+  .ing-cal-time-axis { position: sticky; left: 0; z-index: 5; background: #F8FAFC; }
+  .ing-cal-time-label { position: absolute; right: 5px; color: var(--mid-gray); font-size: 9px; transform: translateY(-50%); }
+  .ing-cal-time-label.start { transform: none; }
+  .ing-cal-time-label.end { transform: translateY(-100%); }
+  .ing-cal-day {
+    background-color: var(--white);
+    background-image: linear-gradient(to bottom,
+      transparent 0,
+      transparent calc(50% - 1px),
+      #EEF2F6 calc(50% - 1px),
+      #EEF2F6 50%,
+      transparent 50%,
+      transparent calc(100% - 1px),
+      #DDE4EA calc(100% - 1px),
+      #DDE4EA 100%);
+    background-size: 100% var(--ing-cal-hour-px, 60px);
+  }
+  .ing-cal-day.today { background-color: #FBFDFF; }
+  .ing-cal-event { position: absolute; left: 3px; right: 3px; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; width: calc(100% - 6px); min-height: 6px; overflow: hidden; border: 0; border-radius: 6px; padding: 3px 5px; text-align: left; font-size: 10px; line-height: 1.25; }
+  .ing-cal-event b { display: block; font-size: 9px; }
+  .ing-cal-event.busy { z-index: 2; background: #E5E7EB; color: #5F6975; }
+  .ing-cal-event.free { background: #ECFDF5; color: #047857; }
+  button.ing-cal-event.free { cursor: pointer; border: 1px dashed #34D399; }
+  .ing-cal-event.lecture { z-index: 3; background: var(--subject-bg, #DDF1FA); color: var(--subject-text, var(--deep-blue)); box-shadow: inset 3px 0 0 var(--subject-color, var(--blue)); }
+  .ing-cal-event.done { opacity: .7; }
+  .ing-cal-event.conflict { z-index: 4; outline: 2px solid var(--coral); outline-offset: -2px; }
+  .ing-cal-event:focus-visible, .ing-cal-tabs .chip:focus-visible,
+  .ing-week-toolbar button:focus-visible, .ing-short-slot-action:focus-visible {
     outline: 3px solid var(--deep-blue); outline-offset: 2px;
   }
   .ing-conflict-list { margin-top: 10px; padding: 9px 10px; border: 1px solid #F5B8AF; border-radius: 9px; background: #FFF9F8; }
-  .ing-conflict-list summary { cursor: pointer; font-size: 12px; font-weight: 900; }
+  .ing-conflict-list summary, .ing-short-slot-list summary { cursor: pointer; font-size: 12px; font-weight: 900; }
   .ing-conflict-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; margin-top: 5px; color: var(--dark-gray); font-size: 11px; line-height: 1.45; }
   .ing-conflict-row b { color: #B93827; }
+  .ing-short-slot-list { margin-top: 10px; padding: 9px 10px; border: 1px solid #A7E8CD; border-radius: 9px; background: #F5FFFA; }
+  .ing-short-slot-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 7px; }
+  .ing-short-slot-action { min-height: 44px; padding: 7px 9px; text-align: left; line-height: 1.35; }
+  .ing-short-slot-action b { display: block; color: var(--navy); font-size: 11px; }
+  .ing-short-slot-action span { color: #047857; font-size: 11px; }
   .ing-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 22px 3px 10px; }
   .ing-section-head h3 { color: var(--navy); font-size: 17px; letter-spacing: -.02em; }
   .ing-section-head span { color: var(--mid-gray); font-size: 12px; }
@@ -436,19 +437,19 @@
     .ing-avail-day-presets .btn { min-height: 36px; }
     .ing-avail-days .chip { min-height: 42px; }
     .ing-avail-preview-grid { grid-template-columns: repeat(7, minmax(100px, 1fr)); }
-    .ing-week-days { gap: 4px; }
-    .ing-day-tab { min-height: 62px; padding: 7px 1px; border-radius: 9px; }
-    .ing-day-tab small { display: none; }
-    .ing-day-board-head { align-items: stretch; flex-direction: column; }
-    .ing-day-counts { justify-content: flex-start; }
-    .ing-agenda-list { padding: 9px; }
-    .ing-agenda-item { grid-template-columns: 66px minmax(0, 1fr); gap: 8px; min-height: 68px; padding-right: 9px; }
     .ing-week-toolbar { grid-template-columns: 1fr; }
     .ing-week-toolbar > * { min-width: 0; }
     .ing-week-toolbar > .row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; justify-self: stretch; width: 100%; max-width: 100%; margin: 8px 0 0; }
+    .ing-cal-tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%; max-width: 100%; }
+    .ing-cal-tabs .chip { min-width: 0; padding: 6px 2px; font-size: 11px; line-height: 1.25; }
     .ing-calendar-bar { align-items: flex-start; }
     .ing-calendar-bar .btn { flex: 0 0 auto; }
-    .ing-conflict-row { grid-template-columns: 1fr; }
+    .ing-cal-scroll { max-height: 510px; overflow: auto; }
+    .ing-calendar { min-width: 0; }
+    .ing-cal-head-row, .ing-cal-body { grid-template-columns: 44px minmax(0, 1fr); }
+    .ing-cal-head:not(.active), .ing-cal-day:not(.active) { display: none; }
+    .ing-cal-event { font-size: 11px; }
+    .ing-conflict-row, .ing-short-slot-actions { grid-template-columns: 1fr; }
     .ing-attention-card:not(.is-clear) > .between { align-items: stretch; flex-direction: column; }
     .ing-attention-card:not(.is-clear) > .between > .row { justify-content: flex-start; }
     .ing-course-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2486,6 +2487,8 @@ const ING_WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // 월 ~ 일
 const ING_DEFAULT_MIN = 50;
 const ING_BUFFER_MIN = 10;
 const ING_MIN_FREE = 20;
+const ING_CAL_HOUR_PX = 60;
+const ING_MIN_TOUCH_PX = 44;
 let ingWeekAnchor = today();
 let ingCalDay = (dowOf(today()) + 6) % 7;
 let ingLibraryFilter = 'active';
@@ -3040,6 +3043,17 @@ function ingOverviewCard(me, editable, admin, courses, states) {
     '</div></div>';
 }
 
+function ingCalendarPosition(start, end, calStart, calEnd, hourPx) {
+  const s = Math.max(Number(start), Number(calStart));
+  const e = Math.min(Number(end), Number(calEnd));
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return null;
+  const px = Number(hourPx) > 0 ? Number(hourPx) : ING_CAL_HOUR_PX;
+  return {
+    top: Math.round((s - calStart) / 60 * px),
+    height: Math.max(6, Math.round((e - s) / 60 * px))
+  };
+}
+
 function ingWeekCard(me, editable, canManage) {
   const avail = ingAvail(me.id);
   const mon = mondayOf(ingWeekAnchor);
@@ -3062,6 +3076,10 @@ function ingWeekCard(me, editable, canManage) {
       '<div class="ing-legend"><span><i class="busy"></i>고정 일정</span><span><i class="free"></i>빈 시간</span>' +
         '<span><i class="lecture"></i>배정 인강</span></div></div>' +
       (editable ? '<button class="btn btn-sm btn-ghost" data-act="ingavopen">시간표 수정</button>' : '') + '</div>';
+  const calStart = ingHmMin(avail.start), calEnd = ingHmMin(avail.end);
+  const calMinutes = calEnd - calStart;
+  const calHourPx = Math.max(ING_CAL_HOUR_PX, 240 * 60 / calMinutes);
+  const calHeight = Math.round(calMinutes / 60 * calHourPx);
   const days = [], conflicts = [];
   for (let i = 0; i < 7; i++) {
     const date = addDays(mon, i), day = dowOf(date);
@@ -3093,52 +3111,60 @@ function ingWeekCard(me, editable, canManage) {
     }
     days.push({ date: date, day: day, blocks: blocks });
   }
-  const selectedIndex = Number.isInteger(ingCalDay) && ingCalDay >= 0 && ingCalDay < days.length ? ingCalDay : 0;
-  const selected = days[selectedIndex];
-  const selectedFixed = selected.blocks.filter(item => item.type === 'busy');
-  const selectedLectures = selected.blocks.filter(item => item.type === 'lecture');
-  const selectedFree = selected.blocks.filter(item => item.type === 'free');
-  const selectedFreeMin = selectedFree.reduce((sum, item) => sum + item.e - item.s, 0);
-  const selectedConflicts = conflicts.filter(item => item.date === selected.date);
-  h += '<div class="ing-week-days" role="tablist" aria-label="주간 요일 선택">' + days.map((d, i) => {
-      const lectures = d.blocks.filter(item => item.type === 'lecture');
-      const freeMin = d.blocks.filter(item => item.type === 'free').reduce((sum, item) => sum + item.e - item.s, 0);
-      return '<button type="button" role="tab" class="ing-day-tab' + (i === selectedIndex ? ' active' : '') +
-        (d.date === today() ? ' today' : '') + '" data-act="ingcalday" data-i="' + i + '" aria-selected="' + (i === selectedIndex) +
-        '" aria-controls="ingDayBoard"><b>' + DOW[d.day] + '</b><span>' + shortDate(d.date) + '</span><small>' +
-        lectures.length + '강 · ' + ingHourText(freeMin) + '</small></button>';
-    }).join('') + '</div>' +
-    '<section class="ing-day-board" id="ingDayBoard" role="tabpanel" aria-label="' + DOW[selected.day] + ' ' + shortDate(selected.date) + ' 일정">' +
-      '<div class="ing-day-board-head"><div><div class="ing-day-board-title">' + DOW[selected.day] + '요일 ' + shortDate(selected.date) +
-        (selected.date === today() ? '<span class="pill">오늘</span>' : '') + '</div>' +
-        '<div class="ing-day-board-sub">활동 가능 ' + esc(avail.start) + '~' + esc(avail.end) + ' · 시간순으로 확인하세요</div></div>' +
-        '<div class="ing-day-counts"><span class="pill">고정 ' + selectedFixed.length + '</span><span class="pill warn">인강 ' + selectedLectures.length + '</span>' +
-          '<span class="pill">빈 시간 ' + ingHourText(selectedFreeMin) + '</span></div></div>' +
-      (selected.blocks.length ? '<div class="ing-agenda-list">' + selected.blocks.map(item => {
-        const time = ingMinHm(item.s) + '~' + ingMinHm(item.e);
-        const duration = ingHourText(item.e - item.s);
-        const typeLabel = item.type === 'busy' ? '고정 일정' : item.type === 'lecture' ? '배정 인강' : '빈 시간';
-        const note = item.type === 'busy' ? '인강 자동 배정에서 제외' : item.type === 'lecture' ?
-          (item.done ? '수강 완료' : '오늘 탭 체크리스트와 연결') :
-          (canManage && selected.date >= today() ? '눌러서 다음 미배정 강의 넣기' : '인강을 배정할 수 있는 시간');
-        const body = '<span class="ing-agenda-time"><b>' + time + '</b><span>' + duration + '</span></span>' +
-          '<span class="ing-agenda-copy"><span class="ing-agenda-copy-top"><strong>' + (item.conflict ? '⚠ ' : '') + esc(item.label) +
-          '</strong><span class="tag">' + typeLabel + '</span></span><span class="ing-agenda-note">' + note + '</span></span>';
-        const classes = 'ing-agenda-item ' + item.type + (item.subjectClass ? ' ' + item.subjectClass : '') +
-          (item.done ? ' done' : '') + (item.conflict ? ' conflict' : '');
-        return item.type === 'free' && canManage && selected.date >= today()
-          ? '<button type="button" class="' + classes + '" data-act="ingslot" data-date="' + selected.date + '" data-s="' +
-              ingMinHm(item.s) + '" data-e="' + ingMinHm(item.e) + '" aria-label="' + DOW[selected.day] + ' ' + shortDate(selected.date) +
-              ' ' + time + ' 빈 시간에 인강 배정">' + body + '</button>'
-          : '<div class="' + classes + '">' + body + '</div>';
-      }).join('') + '</div>' : '<div class="ing-day-empty"><b>비어 있는 하루</b>활동 가능 시간이나 고정 일정을 시간표 수정에서 확인해 주세요.</div>') +
-      (selectedConflicts.length ? '<div class="ing-day-conflict">⚠ 선택한 날에 겹친 일정이 ' + selectedConflicts.length + '건 있습니다. 아래 충돌 목록을 확인해 주세요.</div>' : '') +
-    '</section>' +
+  let timeLabels = '<span class="ing-cal-time-label start" style="top:0">' + esc(avail.start) + '</span>';
+  for (let min = Math.ceil((calStart + 1) / 60) * 60; min < calEnd; min += 60) {
+    const top = Math.round((min - calStart) / 60 * calHourPx);
+    timeLabels += '<span class="ing-cal-time-label" style="top:' + top + 'px">' + ingMinHm(min) + '</span>';
+  }
+  timeLabels += '<span class="ing-cal-time-label end" style="top:' + calHeight + 'px">' + esc(avail.end) + '</span>';
+  const shortSlots = [];
+  if (canManage) days.forEach(d => {
+    if (d.date < today()) return;
+    d.blocks.forEach(x => {
+      const pos = x.type === 'free' ? ingCalendarPosition(x.s, x.e, calStart, calEnd, calHourPx) : null;
+      if (pos && pos.height < ING_MIN_TOUCH_PX) shortSlots.push({ d: d, x: x });
+    });
+  });
+  h += '<div class="ing-cal-tabs" aria-label="요일 선택">' + days.map((d, i) =>
+      '<button type="button" class="chip ' + (i === ingCalDay ? 'on' : '') + '" data-act="ingcalday" data-i="' + i +
+        '" aria-pressed="' + (i === ingCalDay) + '" aria-label="' + DOW[d.day] + ' ' + shortDate(d.date) + '">' +
+        DOW[d.day] + '<br>' + shortDate(d.date) + '</button>').join('') +
+    '</div><div class="ing-cal-scroll" role="region" tabindex="0" aria-label="주간 인강 캘린더"><div class="ing-calendar" style="--ing-cal-height:' + calHeight + 'px;--ing-cal-hour-px:' + calHourPx + 'px">' +
+      '<div class="ing-cal-head-row"><div class="ing-cal-corner" aria-hidden="true"></div>' +
+        days.map((d, i) => '<div class="ing-cal-head ' + (i === ingCalDay ? 'active ' : '') +
+          (d.date === today() ? 'today' : '') + '"><b>' + DOW[d.day] + '</b>' + shortDate(d.date) + '</div>').join('') +
+      '</div><div class="ing-cal-body"><div class="ing-cal-time-axis">' + timeLabels + '</div>' +
+        days.map((d, i) => '<div class="ing-cal-day ' + (i === ingCalDay ? 'active ' : '') +
+          (d.date === today() ? 'today' : '') + '">' + d.blocks.map(x => {
+            const pos = ingCalendarPosition(x.s, x.e, calStart, calEnd, calHourPx);
+            if (!pos) return '';
+            const time = ingMinHm(x.s) + '~' + ingMinHm(x.e);
+            const body = '<b>' + time + '</b>' + (x.conflict ? '⚠ ' : '') + esc(x.label) +
+              (x.type === 'free' ? ' · ' + ingHourText(x.e - x.s) : '');
+            const attrs = ' class="ing-cal-event ' + x.type + (x.subjectClass ? ' ' + x.subjectClass : '') +
+              (x.done ? ' done' : '') + (x.conflict ? ' conflict' : '') + '" style="top:' + pos.top + 'px;height:' + pos.height +
+              'px" title="' + esc(time + ' ' + x.label) + '"';
+            return x.type === 'free' && canManage && d.date >= today() && pos.height >= ING_MIN_TOUCH_PX
+              ? '<button type="button"' + attrs + ' data-act="ingslot" data-date="' + d.date + '" data-s="' +
+                  ingMinHm(x.s) + '" data-e="' + ingMinHm(x.e) + '" aria-label="' + DOW[d.day] + ' ' + shortDate(d.date) +
+                  ' ' + time + ' 빈 시간에 인강 배정">' + body + '</button>'
+              : '<span' + attrs + '>' + body + '</span>';
+          }).join('') + '</div>').join('') +
+      '</div></div></div>' +
     (conflicts.length ? '<details class="ing-conflict-list"><summary>⚠ 겹친 일정 ' + conflicts.length + '건</summary>' +
       conflicts.map(c => '<div class="ing-conflict-row"><b>' + DOW[c.day] + ' ' + shortDate(c.date) + ' ' +
         ingMinHm(c.s) + '~' + ingMinHm(c.e) + '</b><span>' + esc(c.left) + ' ↔ ' + esc(c.right) + '</span></div>').join('') +
       '</details>' : '') +
-    (canManage ? '<div class="hint mt14">요일을 고른 뒤 초록색 빈 시간 카드를 누르면 다음 미배정 강의를 넣을 수 있습니다.</div>' : '') +
+    (shortSlots.length ? '<details class="ing-short-slot-list"><summary>짧은 빈 시간 ' + shortSlots.length + '개</summary>' +
+      '<div class="small muted">달력에서 누르기 어려운 짧은 빈 시간은 아래 큰 버튼으로 배정하세요.</div>' +
+      '<div class="ing-short-slot-actions">' + shortSlots.map(({ d, x }) => {
+        const time = ingMinHm(x.s) + '~' + ingMinHm(x.e);
+        return '<button type="button" class="btn btn-ghost ing-short-slot-action" data-act="ingslot" data-date="' + d.date +
+          '" data-s="' + ingMinHm(x.s) + '" data-e="' + ingMinHm(x.e) + '" aria-label="' + DOW[d.day] + ' ' +
+          shortDate(d.date) + ' ' + time + ' 빈 시간에 인강 배정"><b>' + DOW[d.day] + ' ' + shortDate(d.date) +
+          '</b><span>' + time + ' · ' + ingHourText(x.e - x.s) + '</span></button>';
+      }).join('') + '</div></details>' : '') +
+    (canManage ? '<div class="hint mt14">달력의 초록 빈 시간을 누르거나, 짧은 빈 시간은 위 큰 버튼을 눌러 다음 미배정 강의를 넣을 수 있습니다.</div>' : '') +
     '</div>';
   return h;
 }
@@ -9768,7 +9794,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.31';
+const APP_VER = '2026-08-19.32';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
