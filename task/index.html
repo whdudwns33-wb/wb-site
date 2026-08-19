@@ -205,6 +205,7 @@
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
   .lesson-card-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
   .lesson-card-tab { min-height: 44px; border: 1px solid #B9D8E7; border-radius: 10px; padding: 9px 10px; background: #F5FBFE; color: var(--deep-blue); font-size: 12.5px; font-weight: 800; text-align: center; }
+  .lesson-card-tab.has-new::after { content:'N'; display:inline-grid; place-items:center; width:19px; height:19px; margin-left:5px; border-radius:50%; background:#D92D20; color:#fff; font-size:11px; font-weight:900; line-height:1; vertical-align:middle; }
   .lesson-card-tab[aria-expanded="true"] { border-color: var(--blue); background: #EAF7FC; box-shadow: inset 0 0 0 1px var(--blue); }
   .lesson-progress-panel { padding-top: 0; overflow: hidden; }
   .lesson-progress-section { padding-top: 12px; }
@@ -737,6 +738,8 @@
   .student-info-field b, .student-info-field span { display: block; overflow-wrap: anywhere; }
   .student-info-field b { margin-bottom: 5px; color: var(--mid-gray); font-size: 11px; }
   .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+  .new-marker { display:inline-grid; place-items:center; width:19px; height:19px; margin-left:5px; border-radius:50%; background:#D92D20; color:#fff; font-size:11px; font-weight:900; line-height:1; vertical-align:middle; }
+  .student-change-history { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
   .modal-box:has(.parent-preview-shell) { max-width: 620px; }
   .modal:has(.parent-preview-shell) { background: rgba(17,40,61,.88); backdrop-filter: blur(8px); }
@@ -1601,6 +1604,7 @@ function resetPersonCache(token) {
   studentSelfChecks = new Map(); studentSelfCheckLoadedDates.clear(); studentSelfCheckLoadingDates.clear();
   studentSelfCheckErrors.clear(); studentSelfCheckConfirming.clear();
   rosterDb = null; rosterErr = ''; rosterLoading = false; privateBookStudents = []; rosterStudentSelectionScope = 'assigned';
+  studentChangeEvents = []; studentChangeLoaded = false; studentChangeLoading = false; studentChangeError = '';
   acaflowImportFileName = ''; acaflowImportRows = []; acaflowImportPreview = null;
   acaflowImportSelection.clear(); acaflowImportError = ''; acaflowImportBusy = false;
   acaflowStudentLinks.clear();
@@ -2333,8 +2337,11 @@ function taskRow(t, date, editable, isCarry) {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
   if (lesson) {
+    const lessonStudentId = String(t.studentId || '');
+    const lessonHasNewStudentInfo = lessonStudentId && pendingStudentChanges(lessonStudentId, t.id).length;
     h += '<div class="lesson-card-tabs" role="group" aria-label="수업 상세 보기">' +
-      '<button type="button" class="lesson-card-tab" data-act="lessonbriefing" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-haspopup="dialog">학생정보 · 업무지시</button>' +
+      '<button type="button" class="lesson-card-tab' + (lessonHasNewStudentInfo ? ' has-new' : '') + '" data-act="lessonbriefing" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-haspopup="dialog"' +
+        (lessonHasNewStudentInfo ? ' aria-label="학생정보 · 업무지시 · 새 변경사항"' : '') + '>학생정보 · 업무지시</button>' +
       '<button type="button" class="lesson-card-tab" data-act="panel" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
         (open ? '수업진행 접기' : '수업진행' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button></div>';
     if (open) h += taskPanel(t, date, c, editable);
@@ -2375,28 +2382,30 @@ function previousTaskMemosProgressHtml(taskId, beforeDate) {
 }
 
 function lessonWorkInstructionHtml(task, lessonDate) {
-  const field = (label, value) => '<div class="student-info-field wide"><b>' + esc(label) + '</b><span>' + esc(value || '미지정') + '</span></div>';
+  const changed = studentChangedFieldSet(task.studentId, task.id);
+  const field = (label, value, keys) => '<div class="student-info-field wide"><b>' + esc(label) +
+    ((keys || []).some(key => changed.has(key)) ? newMarker('수정된 ' + label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const referenceSteps = lessonReferenceSteps(task).map(step => String(step && step.label || '').trim()).filter(Boolean);
   const rows = [
-    ['업무 제목', task.title],
-    ['수업일', lessonDate],
-    ['과목·반', [task.subject, task.className].filter(Boolean).join(' · ')],
-    ['수업 요일·시간', task.scheduleText],
-    ['등록 시간', task.time],
-    ['업무 상세', task.detail],
-    ['교재·현재 진도', task.materials],
-    ['온라인 프로그램', task.onlineProgram],
-    ['숙제 루틴과 수행률', task.homework],
-    ['학생 특징', task.studentTraits],
-    ['목표', task.goal],
-    ['특이사항·학부모 요청', task.parentRequest],
-    ['업무지시', task.guide],
-    ['기존 수업 참고 단계', referenceSteps.join('\n')],
-    ['목표 수량', task.target ? task.target + (task.unit || '건') : '']
+    ['업무 제목', task.title, ['title']],
+    ['수업일', lessonDate, []],
+    ['과목·반', [task.subject, task.className].filter(Boolean).join(' · '), ['subject', 'className']],
+    ['수업 요일·시간', task.scheduleText, ['scheduleText', 'scheduleSlots', 'days', 'repeat']],
+    ['등록 시간', task.time, ['time']],
+    ['업무 상세', task.detail, ['detail']],
+    ['교재·현재 진도', task.materials, ['materials']],
+    ['온라인 프로그램', task.onlineProgram, ['onlineProgram']],
+    ['숙제 루틴과 수행률', task.homework, ['homework']],
+    ['학생 특징', task.studentTraits, ['studentTraits']],
+    ['목표', task.goal, ['goal']],
+    ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']],
+    ['업무지시', task.guide, ['guide']],
+    ['기존 수업 참고 단계', referenceSteps.join('\n'), ['guide', 'steps']],
+    ['목표 수량', task.target ? task.target + (task.unit || '건') : '', ['target', 'unit']]
   ].filter(row => String(row[1] || '').trim());
   return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
     '<div class="card-sub mb14">관리자가 등록한 현재 수업 정보입니다. 선생님의 진행 기록은 수업 카드의 수업진행에서 입력합니다.</div>' +
-    '<div class="student-info-grid">' + (rows.length ? rows.map(row => field(row[0], row[1])).join('') :
+    '<div class="student-info-grid">' + (rows.length ? rows.map(row => field(row[0], row[1], row[2])).join('') :
       '<div class="empty">등록된 추가 업무지시가 없습니다.</div>') + '</div></section>';
 }
 
@@ -2426,6 +2435,12 @@ function showTodayLessonBriefing(taskId, lessonDate) {
     actions.push('<button class="btn btn-ghost btn-block mt8" data-act="lessonedit" data-id="' + esc(task.id) + '">수업 정보 수정</button>');
   } else if (canEditTask(task)) {
     actions.push('<button class="btn btn-ghost btn-block mt8" data-act="etask" data-id="' + esc(task.id) + '">업무지시 수정</button>');
+  }
+  if (student && session.isStaffLink && !session.isAdmin) {
+    actions.push('<button class="btn btn-ghost btn-block mt8" data-act="studentinforequest" data-id="' + esc(task.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
+  }
+  if (student && pendingStudentChanges(student.id).length) {
+    actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   }
   modal('학생정보 · 업무지시', studentHtml + lessonWorkInstructionHtml(task, lessonDate), actions.join(''));
 }
@@ -3595,6 +3610,7 @@ async function saveLessonRegistration(button) {
       lesson: lessonPreviewPayload
     });
     applyCreatedLesson(result.task);
+    if (result.updated && session.isAdmin) { studentChangeLoaded = false; loadStudentChanges(true); }
     publicationReadinessLoaded = false;
     publicationReadinessRows = [];
     clearLessonDraft();
@@ -3823,6 +3839,11 @@ async function loadOwnLessonChangeQueue(force) {
 /** 승인 대기 중인 제안 내용을 사람이 읽을 문장으로 — 값은 여기서 이스케이프한다 */
 function lessonChangeSummary(changes) {
   changes = changes || {};
+  if (changes.operation === 'teacher_assignment') return '담당선생님 변경';
+  if (changes.operation === 'withdrawal') return '퇴원 · ' + esc(changes.effectiveDate || '날짜 확인 필요');
+  if (changes.operation === 'leave') return '휴원 · ' + esc(changes.effectiveDate || '날짜 확인 필요');
+  if (changes.operation === 'lesson_delete') return '수업삭제 · ' + esc(changes.effectiveDate || '날짜 확인 필요');
+  if (changes.operation === 'information_request') return '학생 정보 수정 요청<br>' + esc(changes.informationRequest || '');
   const items = [];
   if (changes.days) items.push('요일 → ' + (changes.days.length ? esc(changes.days.map(d => DOW[d]).join('·')) : '(없음)'));
   if (changes.time !== undefined) items.push('시간 → ' + esc(changes.time || '(없음)'));
@@ -3836,6 +3857,14 @@ function lessonChangeSummary(changes) {
 
 function lessonChangeDiffHtml(task, changes) {
   changes = changes || {};
+  if (changes.operation === 'teacher_assignment') return '<div class="guide"><b>담당선생님 변경</b><br>승인할 선생님은 관리자 승인 화면에서 직접 선택합니다.</div>';
+  if (changes.operation === 'withdrawal' || changes.operation === 'leave' || changes.operation === 'lesson_delete') {
+    const labels = { withdrawal: '퇴원', leave: '휴원', lesson_delete: '수업삭제' };
+    return '<div class="guide"><b>' + labels[changes.operation] + '</b><br>적용 날짜: ' + esc(changes.effectiveDate || '확인 필요') + '</div>';
+  }
+  if (changes.operation === 'information_request') {
+    return '<div class="guide"><b>학생 정보 수정 요청</b><br>' + esc(changes.informationRequest || '입력 내용 없음') + '</div>';
+  }
   const has = key => Object.prototype.hasOwnProperty.call(changes, key);
   const empty = value => value === undefined || value === null || value === '' ? '(없음)' : String(value);
   const days = value => Array.isArray(value) && value.length ? value.map(day => DOW[day]).join('·') : '(없음)';
@@ -3886,7 +3915,8 @@ function viewOwnLessonChangeRequests() {
   if (ownLessonChangeQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>불러오는 중입니다.</div></div>';
   if (ownLessonChangeQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownLessonChangeQueueError) + '</div></div>';
   if (!ownLessonChangeQueue.length) return h + '<div class="card"><div class="empty"><b>📅</b>아직 요청한 변경이 없습니다. 수업 카드의 "변경 요청" 버튼으로 제안할 수 있습니다.</div></div>';
-  return h + ownLessonChangeQueue.map(ownLessonChangeCard).join('');
+  const visible = ownLessonChangeQueue.filter(item => !(item.status === 'approved' && item.changes && item.changes.operation === 'lesson_delete'));
+  return visible.length ? h + visible.map(ownLessonChangeCard).join('') : h + '<div class="card"><div class="empty"><b>✅</b>현재 표시할 변경 요청이 없습니다.</div></div>';
 }
 
 function lessonChangeQueueCard(item) {
@@ -3899,6 +3929,10 @@ function lessonChangeQueueCard(item) {
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     lessonChangeDiffHtml(task, item.changes) +
     '<div class="hint mt14"><b>요청 사유</b><br>' + esc(item.note || '입력 없음') + '</div>' +
+    (item.status === 'approval_waiting' && item.changes && item.changes.operation === 'teacher_assignment'
+      ? '<label class="field mt14"><span class="fl">변경할 담당 선생님</span><select class="in" data-lc-teacher data-key="' + esc(item.requestKey) + '">' +
+        '<option value="">선생님을 선택하세요</option>' + liveStaff().filter(row => !task || row.id !== task.staffId).map(row =>
+          '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>').join('') + '</select></label>' : '') +
     (item.reviewNote ? '<div class="hint mt14">반려 사유: ' + esc(item.reviewNote) + '</div>' : '') +
     (item.status === 'approval_waiting'
       ? '<div class="row wraprow mt14">' +
@@ -3910,7 +3944,7 @@ function lessonChangeQueueCard(item) {
 function viewLessonChangeReview() {
   if (!lessonChangeQueueLoaded && !lessonChangeQueueLoading) setTimeout(() => loadLessonChangeQueue(false), 0);
   let h = '<div class="card lesson-review"><div class="card-title">📅 수업 정보 변경 요청 검토</div>' +
-    '<div class="card-sub">직원이 제안한 요일·시간·진도 변경입니다. 승인하면 바로 지시서에 반영됩니다.</div>' +
+    '<div class="card-sub">수업 정보·담당 선생님·퇴원·휴원·수업삭제와 학생 정보 수정 요청을 검토합니다.</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="lcrefresh">새로고침</button></div>';
   if (lessonChangeQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>불러오는 중입니다.</div></div>';
   if (lessonChangeQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(lessonChangeQueueError) + '</div></div>';
@@ -3927,9 +3961,13 @@ let lcForm = null;
 function lessonChangeModal(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
   if (!t) return;
-  lcForm = { taskId: taskId, repeat: t.repeat || 'once', days: (t.days || []).slice() };
+  lcForm = { taskId: taskId, repeat: t.repeat || 'once', days: (t.days || []).slice(), operation: 'lesson_fields' };
   modal('수업 정보 변경 요청',
     '<div class="hint mb14">여기서 고치는 건 원장님께 제안일 뿐입니다. 승인해야 실제 지시서가 바뀝니다.</div>' +
+    '<div class="field"><label class="fl">요청 종류</label><div class="chips">' +
+      [['lesson_fields','수업정보 변경'],['teacher_assignment','담당선생님 변경'],['withdrawal','퇴원'],['leave','휴원'],['lesson_delete','수업삭제']].map(row =>
+        '<button type="button" class="chip' + (row[0] === 'lesson_fields' ? ' on' : '') + '" data-act="lcoperation" data-operation="' + row[0] + '">' + row[1] + '</button>').join('') + '</div></div>' +
+    '<div data-lc-fields>' +
     '<div class="grid2">' +
       '<div class="field"><label class="fl">시간</label><input class="in" id="lcTime" type="time" value="' + esc(t.time || '') + '"></div>' +
       '<div class="field"><label class="fl">목표 수량</label><input class="in" id="lcTarget" type="number" min="0" value="' + (t.target || '') + '"></div>' +
@@ -3943,24 +3981,32 @@ function lessonChangeModal(taskId) {
       '<div class="chips">' + DOW.map((d, i) =>
         '<button type="button" class="chip dow ' + (lcForm.days.includes(i) ? 'on' : '') + '" data-act="lcday" data-d="' + i + '">' + d + '</button>').join('') + '</div></div>' +
     '<div class="field"><label class="fl">교재/진도</label><textarea class="in" id="lcDetail" rows="3">' + esc(t.detail || '') + '</textarea></div>' +
-    '<div class="field"><label class="fl">수업 메모</label><textarea class="in" id="lcGuide" rows="4">' + esc(t.guide || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">수업 메모</label><textarea class="in" id="lcGuide" rows="4">' + esc(t.guide || '') + '</textarea></div></div>' +
+    '<div class="hint mb14" data-lc-teacher-note hidden><b>담당선생님 변경</b><br>원장님 승인 화면에서 변경할 선생님을 선택합니다.</div>' +
+    '<label class="field" data-lc-date hidden><span class="fl">적용 날짜</span><input class="in" id="lcEffectiveDate" type="date" value="' + today() + '"></label>' +
     '<div class="field"><label class="fl">요청 사유 (원장님께 전달됩니다)</label><textarea class="in" id="lcNote" rows="2" placeholder="예: 학생 사정으로 화목반으로 옮겨주세요"></textarea></div>',
     '<button class="btn btn-primary btn-block mt14" data-act="lcsubmit">원장님께 요청 보내기</button>');
 }
 
 async function submitLessonChange(button) {
   if (!lcForm) return;
-  if (lcForm.repeat === 'days' && !lcForm.days.length) return toast('요일을 선택해 주세요');
+  if (lcForm.operation === 'lesson_fields' && lcForm.repeat === 'days' && !lcForm.days.length) return toast('요일을 선택해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
-  const changes = {
-    time: $('#lcTime').value || '',
-    target: Number($('#lcTarget').value) || 0,
-    repeat: lcForm.repeat,
-    days: lcForm.repeat === 'days' ? lcForm.days.slice().sort() : [],
-    detail: ($('#lcDetail').value || '').trim(),
-    guide: ($('#lcGuide').value || '').trim()
-  };
+  let changes;
+  if (lcForm.operation === 'lesson_fields') {
+    changes = {
+      time: $('#lcTime').value || '', target: Number($('#lcTarget').value) || 0,
+      repeat: lcForm.repeat, days: lcForm.repeat === 'days' ? lcForm.days.slice().sort() : [],
+      detail: ($('#lcDetail').value || '').trim(), guide: ($('#lcGuide').value || '').trim()
+    };
+  } else {
+    changes = { operation: lcForm.operation };
+    if (['withdrawal', 'leave', 'lesson_delete'].includes(lcForm.operation)) {
+      changes.effectiveDate = ($('#lcEffectiveDate') || {}).value || '';
+      if (!changes.effectiveDate) return toast('적용 날짜를 선택해 주세요');
+    }
+  }
   const note = ($('#lcNote').value || '').trim();
   if (button) button.disabled = true;
   try {
@@ -3981,6 +4027,14 @@ async function reviewLessonChange(action, key, revision) {
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   const body = { app: SYNC_APP, auth: auth, action: action, requestKey: key, revision: Number(revision) };
+  if (action === 'approve') {
+    const request = lessonChangeQueue.find(item => item.requestKey === key);
+    if (request && request.changes && request.changes.operation === 'teacher_assignment') {
+      const select = document.querySelector('[data-lc-teacher][data-key="' + key + '"]');
+      body.selectedStaffId = String(select && select.value || '');
+      if (!body.selectedStaffId) return toast('변경할 담당 선생님을 선택해 주세요');
+    }
+  }
   if (action === 'reject') {
     const note = prompt('선생님에게 전달할 반려 사유를 적어 주세요');
     if (note === null) return;
@@ -3990,7 +4044,8 @@ async function reviewLessonChange(action, key, revision) {
     const result = await sync.post('/lesson-change-review', body);
     const index = lessonChangeQueue.findIndex(item => item.requestKey === key);
     if (index >= 0) lessonChangeQueue[index] = result.request;
-    render();
+    lessonChangeQueueLoaded = false; studentChangeLoaded = false; rosterDb = null; rosterErr = '';
+    loadRoster(); loadLessonChangeQueue(true); render();
     toast(action === 'approve' ? '승인했습니다 · 지시서에 반영됐습니다' : '반려했습니다');
   } catch (error) {
     toast('검토 실패 — ' + (error.message || error));
@@ -8976,9 +9031,94 @@ function viewTransport() {
  */
 let rosterDb = null, rosterErr = '', rosterLoading = false, privateBookStudents = [];
 let rosterStudentSelectionScope = 'assigned';
+let studentChangeEvents = [], studentChangeLoaded = false, studentChangeLoading = false, studentChangeError = '';
 let acaflowImportFileName = '', acaflowImportRows = [], acaflowImportPreview = null;
 let acaflowImportSelection = new Set(), acaflowImportError = '', acaflowImportBusy = false;
 let acaflowStudentLinks = new Map();
+function newMarker(label) {
+  return '<span class="new-marker" aria-label="' + esc(label || '새 변경사항') + '">N</span>';
+}
+
+function setLessonChangeOperation(operation) {
+  if (!lcForm || !['lesson_fields', 'teacher_assignment', 'withdrawal', 'leave', 'lesson_delete'].includes(operation)) return;
+  lcForm.operation = operation;
+  document.querySelectorAll('[data-act="lcoperation"]').forEach(button => button.classList.toggle('on', button.dataset.operation === operation));
+  const fields = document.querySelector('[data-lc-fields]');
+  const teacherNote = document.querySelector('[data-lc-teacher-note]');
+  const date = document.querySelector('[data-lc-date]');
+  if (fields) fields.hidden = operation !== 'lesson_fields';
+  if (teacherNote) teacherNote.hidden = operation !== 'teacher_assignment';
+  if (date) date.hidden = !['withdrawal', 'leave', 'lesson_delete'].includes(operation);
+}
+function pendingStudentChanges(studentId, taskId) {
+  const stableId = String(studentId || '');
+  return studentChangeEvents.filter(event => event.requiresAck && !event.acknowledged &&
+    String(event.studentId) === stableId && (!taskId || !event.taskId || String(event.taskId) === String(taskId)));
+}
+function studentChangedFieldSet(studentId, taskId) {
+  const fields = new Set();
+  pendingStudentChanges(studentId, taskId).forEach(event => (event.changedFields || []).forEach(field => fields.add(String(field))));
+  return fields;
+}
+function studentChangeHistoryHtml(studentId) {
+  const labels = { teacher_assignment: '담당 선생님 변경', withdrawal: '퇴원', leave: '휴원' };
+  const rows = studentChangeEvents.filter(event => String(event.studentId) === String(studentId) && labels[event.eventType]);
+  if (!rows.length) return '';
+  return '<section class="student-change-history"><div class="card-title">학생 변경 이력</div><div class="card-sub mb8">날짜와 함께 누적 보관됩니다.</div>' +
+    rows.map(event => {
+      const detail = event.details || {};
+      const text = event.eventType === 'teacher_assignment'
+        ? esc((detail.beforeStaffName || '이전 담당') + ' → ' + (detail.afterStaffName || '변경 담당'))
+        : esc((event.effectiveDate || '') + ' · ' + labels[event.eventType]);
+      return '<div class="guide mb8"><b>' + esc(labels[event.eventType]) + '</b><br>' + text +
+        '<div class="small muted mt8">변경 ' + esc(new Date(event.changedAt).toLocaleDateString('ko-KR')) + '</div></div>';
+    }).join('') + '</section>';
+}
+async function loadStudentChanges(force) {
+  if (studentChangeLoading || (studentChangeLoaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  studentChangeLoading = true; studentChangeError = '';
+  try {
+    const result = await sync.post('/student-change', { app: SYNC_APP, auth: auth, action: 'list' });
+    studentChangeEvents = Array.isArray(result.events) ? result.events : [];
+    if (session.isStaffLink && !session.isAdmin) {
+      const latestAssignments = new Map();
+      studentChangeEvents.forEach(event => {
+        if (event.eventType === 'teacher_assignment' && event.taskId && !latestAssignments.has(String(event.taskId))) {
+          latestAssignments.set(String(event.taskId), event);
+        }
+      });
+      let hidReassignedTask = false;
+      latestAssignments.forEach((event, taskId) => {
+        const detail = event.details || {};
+        if (String(detail.beforeStaffId || '') !== String(session.staffId || '') ||
+            String(detail.afterStaffId || '') === String(session.staffId || '')) return;
+        const task = (state.tasks || []).find(row => String(row.id) === taskId && String(row.staffId || '') === String(session.staffId || ''));
+        if (task && !task.deleted) { task.deleted = true; task.reassigned = true; hidReassignedTask = true; }
+      });
+      if (hidReassignedTask) save();
+    }
+    studentChangeLoaded = true;
+  } catch (error) {
+    studentChangeError = String(error && error.message || error); studentChangeLoaded = true;
+  } finally {
+    studentChangeLoading = false; renderAfterSync();
+  }
+}
+async function acknowledgeStudentChanges(studentId, button) {
+  const auth = sync.auth();
+  if (!auth) return toast('인증을 확인해 주세요');
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/student-change', { app: SYNC_APP, auth: auth, action: 'acknowledge', studentId: String(studentId) });
+    await loadStudentChanges(true);
+    closeModal(); render(); toast('수정 내용을 확인했습니다');
+  } catch (error) {
+    if (button) button.disabled = false;
+    toast('확인 저장 실패 — ' + (error.message || error));
+  }
+}
 function validRosterPayload(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.students)) return false;
   const ids = new Set();
@@ -9006,6 +9146,7 @@ function loadRoster() {
       if (bookDb) bookDb.students = privateBookStudents.slice();
       rosterErr = '';
       rosterLoading = false;
+      loadStudentChanges(false);
       renderAfterSync();
     })
     .catch(e => { rosterErr = String(e); rosterLoading = false; if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') renderAfterSync(); })
@@ -9078,30 +9219,68 @@ function studentLessonReferenceItems(studentId) {
   return items;
 }
 
-function rosterStudentInfoHtml(student, lessonReferences) {
+function rosterStudentInfoHtml(student, lessonReferences, taskId) {
   const status = rosterStudentInfoStatus(student);
-  const field = (label, value, wide) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
-    esc(label) + '</b><span>' + esc(value || '미지정') + '</span></div>';
+  const changed = typeof studentChangedFieldSet === 'function' ? studentChangedFieldSet(student.id, taskId) : new Set();
+  const marker = label => typeof newMarker === 'function' ? newMarker('수정된 ' + label) : '';
+  const field = (label, value, wide, keys) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
+    esc(label) + ((keys || []).some(key => changed.has(key)) ? marker(label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
   const references = Array.isArray(lessonReferences) ? lessonReferences : [];
-  return '<div class="between mb14"><div><div class="card-title">' + esc(student.name) + '</div>' +
+  return '<div class="between mb14"><div><div class="card-title">' + esc(student.name) + (changed.has('name') ? marker('이름') : '') + '</div>' +
     '<div class="card-sub">원생 명단 기본 정보' + (references.length ? '와 연결된 수업 참고' : '') + '입니다.</div></div><span class="pill ' + status[1] + '">' +
     status[0] + '</span></div><div class="student-info-grid">' +
-    field('학년', student.grade) + field('과목·분야', student.subject) +
-    field('담당 선생님', student.teacher, true) + field('재원 기간', period, true) +
-    (student.reason ? field('종료 사유', student.reason, true) : '') +
-    (student.memo ? field('내부 메모', student.memo, true) : '') +
-    (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true) : '') + '</div>';
+    field('학년', student.grade, false, ['grade']) + field('과목·분야', student.subject, false, ['subject']) +
+    field('담당 선생님', student.teacher, true, ['teacherIds']) + field('재원 기간', period, true, ['start', 'end']) +
+    (student.reason ? field('종료 사유', student.reason, true, ['reason']) : '') +
+    (student.memo ? field('내부 메모', student.memo, true, ['memo']) : '') +
+    (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true, ['guide', 'steps', 'lessonReferences']) : '') + '</div>' +
+    (typeof studentChangeHistoryHtml === 'function' ? studentChangeHistoryHtml(student.id) : '');
 }
 
 function showRosterStudentInfo(studentId) {
   const student = rosterDb && Array.isArray(rosterDb.students) &&
     rosterDb.students.find(item => String(item.id) === String(studentId));
   if (!student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
-  modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)),
-    session.isAdmin
-      ? '<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>'
-      : '');
+  const requestTask = (state.tasks || []).find(task => !task.deleted && isLesson(task) && String(task.studentId || '') === String(student.id) &&
+    (session.isAdmin || String(task.staffId || '') === String(session.staffId || '')));
+  const actions = [];
+  if (session.isAdmin) actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>');
+  else if (requestTask) actions.push('<button class="btn btn-ghost btn-block mt14" data-act="studentinforequest" data-id="' + esc(requestTask.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
+  if (pendingStudentChanges(student.id).length) actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
+  modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)), actions.join(''));
+}
+
+let studentInfoRequestContext = null;
+function showStudentInfoRequest(taskId, studentId) {
+  const task = (state.tasks || []).find(row => String(row.id) === String(taskId) && !row.deleted);
+  if (!task || String(task.studentId || '') !== String(studentId || '') || !session.isStaffLink || session.isAdmin) {
+    return toast('요청할 학생 수업을 다시 선택해 주세요');
+  }
+  studentInfoRequestContext = { taskId: String(task.id), studentId: String(studentId) };
+  modal('학생 정보 수정 요청', '<div class="hint mb14">바꿔야 할 항목과 정확한 내용을 자세히 적어 주세요.</div>' +
+    '<label class="field"><span class="fl">변경 요청 내용</span><textarea class="in" rows="6" maxlength="2400" data-student-info-request placeholder="예: 학년, 담당, 학생 특징 중 바꿀 내용"></textarea></label>',
+    '<button class="btn btn-primary btn-block mt14" data-act="studentinforequestsubmit">원장님께 요청 보내기</button>');
+}
+
+async function submitStudentInfoRequest(button) {
+  if (!studentInfoRequestContext) return;
+  const request = String((document.querySelector('[data-student-info-request]') || {}).value || '').trim();
+  if (!request) return toast('변경 요청 내용을 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('인증을 확인해 주세요');
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/lesson-change-request', {
+      app: SYNC_APP, auth: auth, action: 'submit', taskId: studentInfoRequestContext.taskId,
+      changes: { operation: 'information_request', informationRequest: request }, note: request
+    });
+    studentInfoRequestContext = null; ownLessonChangeQueueLoaded = false; closeModal();
+    toast('원장님께 정보 수정 요청을 보냈습니다');
+  } catch (error) {
+    if (button) button.disabled = false;
+    toast('요청 실패 — ' + (error.message || error));
+  }
 }
 
 let rosterStudentEditor = null;
@@ -9189,7 +9368,7 @@ async function saveRosterStudent(button) {
         return toast('기존 원생은 등록했습니다 · 배정 승인은 목록에서 다시 눌러 주세요');
       }
     }
-    closeModal(); rosterStudentEditor = null; rosterDb = null; rosterErr = ''; loadRoster();
+    closeModal(); rosterStudentEditor = null; rosterDb = null; rosterErr = ''; studentChangeLoaded = false; loadRoster(); loadStudentChanges(true);
     lessonAssignmentRequestsLoaded = false; loadLessonAssignmentRequests(true);
     toast(assignment ? '기존 원생 등록과 담당 연결을 완료했습니다' : (editor.student._editing ? '원생 기본 정보를 수정했습니다' : '기존 원생으로 추가했습니다'));
   } catch (error) {
@@ -12013,6 +12192,9 @@ document.addEventListener('click', ev => {
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'rosterstudentinfo': showRosterStudentInfo(String(id || '')); break;
+    case 'studentinforequest': showStudentInfoRequest(String(id || ''), String(el.dataset.studentId || '')); break;
+    case 'studentinforequestsubmit': submitStudentInfoRequest(el); break;
+    case 'studentchangeack': acknowledgeStudentChanges(String(el.dataset.studentId || ''), el); break;
     case 'rosterstudentadd': openRosterStudentEditor('', null); break;
     case 'rosterstudentedit': openRosterStudentEditor(String(id || ''), null); break;
     case 'rosterstudentsave': saveRosterStudent(el); break;
@@ -12601,6 +12783,7 @@ document.addEventListener('click', ev => {
     case 'fbreviewrevise': reviewFeedbackRequest('request_revision', el.dataset.key, el.dataset.rev); break;
     case 'fbsend': sendParentFeedback(el.dataset.key, el); break;
     case 'lcpropose': lessonChangeModal(id); break;
+    case 'lcoperation': setLessonChangeOperation(String(el.dataset.operation || '')); break;
     case 'lcrepeat': {
       lcForm.repeat = el.dataset.v;
       document.querySelectorAll('#lcRepeat .chip').forEach(c => c.classList.toggle('on', c.dataset.v === lcForm.repeat));

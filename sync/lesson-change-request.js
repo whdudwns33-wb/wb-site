@@ -15,7 +15,14 @@
  */
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+import { validateRosterDocument } from './roster.js';
+import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
+const REQUEST_OPERATIONS = new Set([
+  'lesson_fields', 'teacher_assignment', 'withdrawal', 'leave', 'lesson_delete', 'information_request'
+]);
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const REPEAT_VALUES = new Set(['once', 'daily', 'weekday', 'days']);
 const MAX_LESSON_TEXT = 2400;
 const MAX_UNIT = 20;
@@ -37,12 +44,59 @@ function auditActor(auth) {
   return auth.role === 'manager' ? String(auth.id) : 'director';
 }
 
+function validIsoDate(value) {
+  const text = normalizeText(value);
+  const date = new Date(text + 'T00:00:00Z');
+  return ISO_DATE.test(text) && !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
+function nextMonthForDate(value) {
+  const date = new Date(value + 'T00:00:00Z');
+  date.setUTCMonth(date.getUTCMonth() + 1, 1);
+  return date.toISOString().slice(0, 7);
+}
+
+async function activeStaff(env, app, staffId) {
+  if (!SAFE_ID.test(staffId)) return null;
+  const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1').bind(app, staffId).first();
+  if (!row) return null;
+  try {
+    const data = JSON.parse(row.data || '{}');
+    return data && !data.deleted ? data : null;
+  } catch (error) { return null; }
+}
+
+async function rosterContext(env, app, studentId) {
+  const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+  if (!row) return null;
+  try {
+    const document = validateRosterDocument(JSON.parse(row.data));
+    const index = document.roster.students.findIndex(student => student.id === studentId);
+    return index < 0 ? null : { row, document, index, student: document.roster.students[index] };
+  } catch (error) { return null; }
+}
+
 /** 화이트리스트 밖 필드는 조용히 버리고, 안에 있는 값만 형식을 검사해 정리한다 */
 function sanitizeLessonChanges(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     const error = new Error('변경할 항목이 올바르지 않습니다'); error.status = 400; throw error;
   }
-  const out = {};
+  const operation = REQUEST_OPERATIONS.has(String(raw.operation || '')) ? String(raw.operation) : 'lesson_fields';
+  const out = operation === 'lesson_fields' ? {} : { operation };
+  if (['withdrawal', 'leave', 'lesson_delete'].includes(operation)) {
+    const effectiveDate = normalizeText(raw.effectiveDate);
+    if (!validIsoDate(effectiveDate)) { const e = new Error('적용 날짜를 선택해 주세요'); e.status = 400; throw e; }
+    out.effectiveDate = effectiveDate;
+    return out;
+  }
+  if (operation === 'teacher_assignment') return out;
+  if (operation === 'information_request') {
+    const informationRequest = normalizeText(raw.informationRequest);
+    if (!informationRequest) { const e = new Error('변경 요청 내용을 자세히 입력해 주세요'); e.status = 400; throw e; }
+    if (informationRequest.length > MAX_LESSON_TEXT) { const e = new Error('변경 요청 내용이 너무 깁니다'); e.status = 413; throw e; }
+    out.informationRequest = informationRequest;
+    return out;
+  }
   for (const key of Object.keys(raw)) {
     if (!LESSON_CHANGE_FIELDS.includes(key)) continue;
     const value = raw[key];
@@ -172,6 +226,9 @@ export async function handleLessonChangeRequest(env, app, body, origin, auth, js
   let changes;
   try { changes = sanitizeLessonChanges(body.changes); }
   catch (error) { return json({ ok: false, error: String(error.message || error) }, error.status || 400, origin); }
+  if ((changes.operation || 'lesson_fields') !== 'lesson_fields' && !SAFE_ID.test(String(task.data.studentId || ''))) {
+    return json({ ok: false, error: '실제 원생의 stable studentId가 연결된 수업에서만 이 요청을 보낼 수 있습니다' }, 409, origin);
+  }
   const note = normalizeText(body.note);
   if (note.length > MAX_NOTE) return json({ ok: false, error: '요청 사유는 ' + MAX_NOTE + '자까지 입력할 수 있습니다' }, 413, origin);
   const changesHash = await sha256Hex(canonicalChangesJson(changes));
@@ -271,7 +328,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     let changes;
     try { changes = JSON.parse(current.changes || '{}'); } catch (error) { changes = {}; }
 
-    const taskRow = await env.DB.prepare('SELECT data, updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    const taskRow = await env.DB.prepare('SELECT owner, data, updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
       .bind(app, current.task_id).first();
     if (!taskRow) return json({ ok: false, error: '지시서를 찾을 수 없습니다' }, 404, origin);
     let taskData;
@@ -279,23 +336,151 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (!taskData || taskData.deleted) {
       return json({ ok: false, error: '삭제된 지시서는 반영할 수 없습니다' }, 409, origin);
     }
-    const merged = Object.assign({}, taskData, changes, {
-      updatedAt: now,
-      lastEditBy: auth.role === 'manager' ? 'manager' : 'admin'
-    });
+    const operation = REQUEST_OPERATIONS.has(String(changes.operation || '')) ? String(changes.operation) : 'lesson_fields';
+    const studentId = String(taskData.studentId || '');
+    if (operation !== 'lesson_fields' && !SAFE_ID.test(studentId)) {
+      return json({ ok: false, error: 'stable studentId 연결을 확인한 뒤 승인해 주세요' }, 409, origin);
+    }
 
-    const applied = await env.DB.batch([
-      env.DB.prepare(
+    let targetStaff = null;
+    if (operation === 'teacher_assignment') {
+      const selectedStaffId = String(body.selectedStaffId || '');
+      targetStaff = await activeStaff(env, app, selectedStaffId);
+      if (!targetStaff) return json({ ok: false, error: '변경할 재직 선생님을 선택해 주세요' }, 400, origin);
+      if (selectedStaffId === String(taskRow.owner)) {
+        return json({ ok: false, error: '현재 담당자와 다른 선생님을 선택해 주세요' }, 409, origin);
+      }
+    }
+
+    const statements = [];
+    const requiredChangeIndexes = [];
+    const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
+    let eventType = 'work_instruction';
+    let changedFields = [];
+    let details = {};
+    let effectiveDate = changes.effectiveDate || null;
+    let requiresAck = operation !== 'information_request' && operation !== 'lesson_delete';
+    let audienceStaffIds = [String(taskRow.owner || '')];
+    let roster = null;
+
+    if (operation !== 'lesson_fields') {
+      roster = await rosterContext(env, app, studentId);
+      if (!roster) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 409, origin);
+      audienceStaffIds.push(...(roster.student.teacherIds || []));
+    }
+
+    if (operation === 'lesson_fields') {
+      const patch = {};
+      LESSON_CHANGE_FIELDS.forEach(key => { if (Object.prototype.hasOwnProperty.call(changes, key)) patch[key] = changes[key]; });
+      changedFields = Object.keys(patch).filter(key => JSON.stringify(taskData[key] || '') !== JSON.stringify(patch[key] || ''));
+      details = {
+        before: Object.fromEntries(changedFields.map(key => [key, taskData[key] == null ? '' : taskData[key]])),
+        after: Object.fromEntries(changedFields.map(key => [key, patch[key] == null ? '' : patch[key]]))
+      };
+      const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
+      const merged = Object.assign({}, taskData, patch, { updatedAt, lastEditBy: actorRole });
+      requiredChangeIndexes.push(statements.length);
+      statements.push(env.DB.prepare(
         'UPDATE tasks SET data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND updated_at=?'
-      ).bind(JSON.stringify(merged), now, now, app, current.task_id, taskRow.updated_at),
-      env.DB.prepare(
-        "UPDATE lesson_change_requests SET status='approved', updated_at=?, reviewed_at=?, " +
-        "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
-      ).bind(now, now, reviewedBy, app, requestKey, expectedRevision)
-    ]);
-    const taskChanged = Number(applied[0] && applied[0].meta && applied[0].meta.changes || 0);
-    const reqChanged = Number(applied[1] && applied[1].meta && applied[1].meta.changes || 0);
-    if (taskChanged !== 1 || reqChanged !== 1) {
+      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+    } else if (operation === 'teacher_assignment') {
+      eventType = 'teacher_assignment'; changedFields = ['teacherIds'];
+      const selectedStaffId = String(body.selectedStaffId);
+      audienceStaffIds.push(selectedStaffId);
+      const previousStaff = await activeStaff(env, app, String(taskRow.owner || ''));
+      details = {
+        beforeStaffId: String(taskRow.owner || ''), beforeStaffName: previousStaff && previousStaff.name || '',
+        afterStaffId: selectedStaffId, afterStaffName: String(targetStaff.name || '')
+      };
+      const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
+      const merged = Object.assign({}, taskData, { staffId: selectedStaffId, updatedAt, lastEditBy: actorRole });
+      requiredChangeIndexes.push(statements.length);
+      statements.push(env.DB.prepare(
+        'UPDATE tasks SET owner=?, data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND updated_at=?'
+      ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+
+      const oldStaffId = String(taskRow.owner || '');
+      const otherOldLesson = await env.DB.prepare(
+        "SELECT id FROM tasks WHERE app=? AND id<>? AND owner=? AND json_valid(data) " +
+        "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0 LIMIT 1"
+      ).bind(app, current.task_id, oldStaffId, studentId).first();
+      if (!otherOldLesson) roster.student.teacherIds = roster.student.teacherIds.filter(id => id !== oldStaffId);
+      if (!roster.student.teacherIds.includes(selectedStaffId)) roster.student.teacherIds.push(selectedStaffId);
+      for (const assignment of roster.document.bookStudents) {
+        if (assignment.studentId !== studentId) continue;
+        if (!otherOldLesson) assignment.teacherIds = assignment.teacherIds.filter(id => id !== oldStaffId);
+        if (!assignment.teacherIds.includes(selectedStaffId)) assignment.teacherIds.push(selectedStaffId);
+      }
+      const teacherNames = [];
+      for (const teacherId of roster.student.teacherIds) {
+        const teacher = await activeStaff(env, app, teacherId);
+        if (teacher && teacher.name) teacherNames.push(String(teacher.name));
+      }
+      roster.student.teacher = teacherNames.join('·') || roster.student.teacher;
+    } else if (operation === 'withdrawal' || operation === 'leave') {
+      eventType = operation;
+      changedFields = ['end', 'reason'];
+      details = { effectiveDate, label: operation === 'withdrawal' ? '퇴원' : '휴원' };
+      roster.student.end = nextMonthForDate(effectiveDate);
+      roster.student.reason = (operation === 'withdrawal' ? '퇴원 ' : '휴원 ') + effectiveDate;
+      const lessonRows = await env.DB.prepare(
+        "SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND json_valid(data) " +
+        "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+      ).bind(app, studentId).all();
+      for (const row of lessonRows.results || []) {
+        let data;
+        try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+        const updatedAt = Math.max(now, Number(row.updated_at || 0) + 1);
+        data.end = effectiveDate; data.updatedAt = updatedAt; data.lastEditBy = actorRole;
+        requiredChangeIndexes.push(statements.length);
+        statements.push(env.DB.prepare(
+          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
+        ).bind(JSON.stringify(data), updatedAt, updatedAt, app, row.id, row.updated_at));
+        audienceStaffIds.push(String(row.owner || ''));
+      }
+    } else if (operation === 'lesson_delete') {
+      eventType = 'lesson_delete'; changedFields = ['deleted']; requiresAck = false;
+      details = { effectiveDate };
+      const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
+      const merged = Object.assign({}, taskData, { deleted: true, end: effectiveDate, updatedAt, lastEditBy: actorRole });
+      requiredChangeIndexes.push(statements.length);
+      statements.push(env.DB.prepare(
+        'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
+      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+    } else {
+      eventType = 'information_request'; changedFields = ['informationRequest']; requiresAck = false;
+      details = { request: String(changes.informationRequest || ''), note: String(current.note || '') };
+    }
+
+    if (roster && ['teacher_assignment', 'withdrawal', 'leave'].includes(operation)) {
+      roster.document.roster.updated = new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      try { roster.document = validateRosterDocument(roster.document); }
+      catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 409, origin); }
+      const rosterUpdatedAt = Math.max(now, Number(roster.row.updated_at || 0) + 1);
+      requiredChangeIndexes.push(statements.length);
+      statements.push(env.DB.prepare(
+        'UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?'
+      ).bind(JSON.stringify(roster.document), rosterUpdatedAt, app, roster.row.updated_at));
+    }
+
+    if (SAFE_ID.test(studentId)) {
+      const eventId = await studentChangeEventId('lesson-request\n' + requestKey + '\n' + expectedRevision);
+      statements.push(studentChangeEventStatement(env, app, {
+        eventId, studentId, taskId: current.task_id, eventType, changedFields, details,
+        audienceStaffIds, effectiveDate, requiresAck, requestKey, requestRevision: expectedRevision,
+        changedAt: now, changedBy: studentChangeActorKey(auth)
+      }));
+    }
+    const requestUpdateIndex = statements.length;
+    statements.push(env.DB.prepare(
+      "UPDATE lesson_change_requests SET status='approved', updated_at=?, reviewed_at=?, " +
+      "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
+    ).bind(now, now, reviewedBy, app, requestKey, expectedRevision));
+
+    const applied = await env.DB.batch(statements);
+    const reqChanged = Number(applied[requestUpdateIndex] && applied[requestUpdateIndex].meta && applied[requestUpdateIndex].meta.changes || 0);
+    const requiredChanged = requiredChangeIndexes.every(index => Number(applied[index] && applied[index].meta && applied[index].meta.changes || 0) === 1);
+    if (!requiredChanged || reqChanged !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }
   } else {
