@@ -6,6 +6,11 @@ const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const studentHtml = fs.readFileSync(path.join(__dirname, '..', 'student', 'index.html'), 'utf8');
 
+test('학생 앱과 관리자 미리보기는 조퇴 출결을 표시한다', () => {
+  assert.match(studentHtml, /E:\['조퇴','warn'\]/);
+  assert.match(source, /E: \['조퇴', 'warn'\]/);
+});
+
 function slice(startText, endText) {
   const start = source.indexOf(startText);
   const end = source.indexOf(endText, start);

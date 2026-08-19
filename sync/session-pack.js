@@ -253,7 +253,7 @@ async function checkEvidence(env, app, task, owner, key, expectedAttendance) {
   if (!row || String(row.owner || '') !== owner) return { error: '담당 수업의 출결 근거를 찾을 수 없습니다', code: 'CHECK_NOT_FOUND' };
   let check;
   try { check = JSON.parse(row.data); } catch (error) { return { error: '출결 근거 형식을 확인해 주세요', code: 'CHECK_INVALID' }; }
-  if (check.taskId !== task.id || check.date !== key.slice(-10) || !['P', 'L', 'A'].includes(check.att) ||
+  if (check.taskId !== task.id || check.date !== key.slice(-10) || !['P', 'L', 'A', 'E'].includes(check.att) ||
       (expectedAttendance && check.att !== expectedAttendance)) {
     return { error: '현재 출결과 회차 기록 근거가 일치하지 않습니다', code: 'CHECK_IDENTITY_MISMATCH' };
   }
@@ -330,7 +330,7 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
   }
   if (pack.status !== 'active') return reply(json, origin, { ok: false, code: 'PACK_NOT_ACTIVE', error: '닫힌 회차권에는 기록할 수 없습니다' }, 409);
 
-  let sourceDate, event, delta, evidence;
+  let sourceDate, event, delta, evidence, reasonCode = null;
   if (sourceType === 'regular') {
     evidence = await checkEvidence(env, app, context.task, context.owner, sourceRef);
     if (evidence.error) return reply(json, origin, { ok: false, code: evidence.code, error: evidence.error }, 409);
@@ -338,7 +338,10 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
     const expectedGroup = await consumptionGroup(app, context.task.id, sourceDate);
     if (suppliedGroup !== expectedGroup) return reply(json, origin, { ok: false, code: 'CONSUMPTION_GROUP_MISMATCH', error: '출결 날짜의 소비 그룹이 일치하지 않습니다' }, 409);
     if (!activeOn(context.student, sourceDate)) return reply(json, origin, { ok: false, error: '해당 날짜에 재원 중인 학생이 아닙니다' }, 409);
-    if (evidence.check.att === 'P') { event = 'present'; delta = 1; }
+    if (evidence.check.att === 'P' || evidence.check.att === 'E') {
+      event = 'present'; delta = 1;
+      if (evidence.check.att === 'E') reasonCode = 'early_leave';
+    }
     else if (evidence.check.att === 'L') { event = 'late'; delta = 1; }
     else {
       event = String(evidence.check.absenceType || evidence.check.absenceReasonCode || '');
@@ -378,7 +381,7 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
 
   const duplicate = await existingSource(env, app, sourceType, sourceRef);
   if (duplicate) {
-    if (!duplicateMatches(duplicate, packId, event, delta, suppliedGroup, null)) {
+    if (!duplicateMatches(duplicate, packId, event, delta, suppliedGroup, reasonCode)) {
       return reply(json, origin, { ok: false, code: 'SOURCE_ALREADY_USED', error: '이 출결 근거가 다른 회차 기록에 이미 사용되었습니다' }, 409);
     }
     return reply(json, origin, { ok: true, idempotent: true, pack: await packView(env, app, pack, context) });
@@ -389,11 +392,11 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
   try {
     await insertUsage(env, app, {
       packId, revision, sourceType, sourceRef, sourceDate, event, delta, groupId: suppliedGroup,
-      reasonCode: null, actorId: actor(auth), now: Date.now()
+      reasonCode, actorId: actor(auth), now: Date.now()
     });
   } catch (error) {
     const raced = await existingSource(env, app, sourceType, sourceRef);
-    if (duplicateMatches(raced, packId, event, delta, suppliedGroup, null)) {
+    if (duplicateMatches(raced, packId, event, delta, suppliedGroup, reasonCode)) {
       const current = await loadPack(env, app, packId);
       return reply(json, origin, { ok: true, idempotent: true, pack: await packView(env, app, current, context) });
     }

@@ -172,7 +172,7 @@ test('record requires the assigned person even with all scope; root admin adjust
   assert.equal(adjusted.body.pack.usedSessions, 0);
 });
 
-test('present, late, and absence policies use actual checks and CAS; duplicate source is idempotent', async () => {
+test('present, late, early leave, and absence policies use actual checks and CAS; duplicate source is idempotent', async () => {
   const db = seed();
   let pack = (await create(db, { totalSessions: 6 })).body.pack;
   putCheck(db, 'lesson-a', 'teacher-a', '2026-08-03', 'P');
@@ -193,15 +193,22 @@ test('present, late, and absence policies use actual checks and CAS; duplicate s
   assert.equal(result.body.pack.usedSessions, 2);
 
   pack = result.body.pack;
-  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-05', 'A', 'approved_absence');
+  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-05', 'E');
   result = await record(db, pack, 'lesson-a', '2026-08-05');
-  assert.equal(result.body.pack.usedSessions, 2);
+  assert.equal(result.body.pack.usedSessions, 3);
+  assert.equal(result.body.pack.usage.at(-1).event, 'present');
+  assert.equal(result.body.pack.usage.at(-1).reasonCode, 'early_leave');
+
+  pack = result.body.pack;
+  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-06', 'A', 'approved_absence');
+  result = await record(db, pack, 'lesson-a', '2026-08-06');
+  assert.equal(result.body.pack.usedSessions, 3);
   assert.equal(result.body.pack.usage.at(-1).delta, 0);
 
   pack = result.body.pack;
-  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-06', 'A', 'same_day');
-  result = await record(db, pack, 'lesson-a', '2026-08-06');
-  assert.equal(result.body.pack.usedSessions, 3);
+  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-07', 'A', 'same_day');
+  result = await record(db, pack, 'lesson-a', '2026-08-07');
+  assert.equal(result.body.pack.usedSessions, 4);
   assert.equal(result.body.pack.usage.at(-1).event, 'same_day');
 });
 

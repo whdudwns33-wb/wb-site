@@ -330,6 +330,14 @@ test('공개 범위 v4에서도 v2 오늘 수업 진행과 최소 차량 확인�
   const raw = JSON.stringify(view.body);
   assert.doesNotMatch(raw, /01012345678|당일 내부 메모|내부 차단 사유|외부 비공개|학생B|9002|route-a|stop-a|staff-a|운행 메모/);
 
+  const earlyRow = db.prepare("SELECT data FROM checks WHERE app='task' AND k=?").bind('lesson-a|' + today.date).first();
+  const earlyCheck = JSON.parse(earlyRow.data);
+  earlyCheck.att = 'E';
+  db.prepare("UPDATE checks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE app='task' AND k=?")
+    .bind(JSON.stringify(earlyCheck), 'lesson-a|' + today.date).run();
+  const earlyLeave = await call(db, { action: 'view' }, auth.cookie);
+  assert.equal(earlyLeave.body.today.lessons[0].attendance, 'E');
+
   db.prepare("UPDATE checks SET owner='staff-b' WHERE app='task' AND k=?").bind('lesson-a|' + today.date).run();
   const wrongOwner = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(wrongOwner.status, 200);
