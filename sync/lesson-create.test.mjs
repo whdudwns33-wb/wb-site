@@ -99,6 +99,9 @@ class FakeDB {
           db.tasks.set(id, { owner, data, updatedAt, srvAt });
           return { meta: { changes: 1 } };
         }
+        if (sql.startsWith('INSERT OR IGNORE INTO student_change_events')) {
+          return { meta: { changes: 1 } };
+        }
         throw new Error('unexpected run SQL: ' + sql);
       }
     };

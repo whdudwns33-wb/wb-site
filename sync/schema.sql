@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS lesson_change_requests (
   request_key  TEXT    NOT NULL,
   task_id      TEXT    NOT NULL,
   owner        TEXT    NOT NULL,          -- 제안한 직원(=지시서 담당 staffId)
-  changes      TEXT    NOT NULL,          -- JSON. 허용된 필드만: days,time,repeat,detail,guide,target,unit
+  changes      TEXT    NOT NULL,          -- JSON. 일반 수업 필드 또는 서버가 검증한 operation/effectiveDate
   changes_hash TEXT    NOT NULL,
   note         TEXT,                      -- 직원이 남기는 사유
   revision     INTEGER NOT NULL DEFAULT 1,
@@ -198,6 +198,70 @@ CREATE INDEX IF NOT EXISTS idx_lesson_change_requests_owner
   ON lesson_change_requests(app, owner, updated_at);
 CREATE INDEX IF NOT EXISTS idx_lesson_change_requests_status
   ON lesson_change_requests(app, status, updated_at);
+
+-- 원생 정보·수업 업무지시 변경의 누적 이력과 사용자별 독립 확인 상태.
+-- lesson_delete 행은 감사 보존용이며 student-change API에서 항상 제외한다.
+CREATE TABLE IF NOT EXISTS student_change_events (
+  app                TEXT    NOT NULL CHECK (app = 'task'),
+  event_id           TEXT    NOT NULL CHECK (length(event_id) BETWEEN 8 AND 80 AND event_id LIKE 'sce_%'),
+  student_id         TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 128),
+  task_id            TEXT    CHECK (task_id IS NULL OR length(task_id) BETWEEN 1 AND 160),
+  event_type         TEXT    NOT NULL CHECK (event_type IN (
+    'student_information','work_instruction','teacher_assignment','withdrawal','leave',
+    'information_request','lesson_delete'
+  )),
+  changed_fields     TEXT    NOT NULL CHECK (json_valid(changed_fields) AND json_type(changed_fields) = 'array'),
+  details            TEXT    NOT NULL CHECK (json_valid(details) AND json_type(details) = 'object'),
+  audience_staff_ids TEXT    NOT NULL CHECK (json_valid(audience_staff_ids) AND json_type(audience_staff_ids) = 'array'),
+  effective_date     TEXT    CHECK (effective_date IS NULL OR length(effective_date) = 10),
+  requires_ack       INTEGER NOT NULL DEFAULT 0 CHECK (requires_ack IN (0,1)),
+  request_key        TEXT,
+  request_revision   INTEGER CHECK (request_revision IS NULL OR request_revision >= 1),
+  changed_at         INTEGER NOT NULL CHECK (changed_at > 0),
+  changed_by         TEXT    NOT NULL CHECK (length(changed_by) BETWEEN 1 AND 128),
+  PRIMARY KEY (app, event_id),
+  UNIQUE (app, request_key, request_revision),
+  CHECK ((request_key IS NULL AND request_revision IS NULL) OR
+         (request_key IS NOT NULL AND request_revision IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_student_change_events_student
+  ON student_change_events(app, student_id, changed_at);
+CREATE INDEX IF NOT EXISTS idx_student_change_events_task
+  ON student_change_events(app, task_id, changed_at);
+
+CREATE TABLE IF NOT EXISTS student_change_acknowledgements (
+  app                TEXT    NOT NULL CHECK (app = 'task'),
+  acknowledgement_id TEXT   NOT NULL CHECK (length(acknowledgement_id) BETWEEN 8 AND 80 AND acknowledgement_id LIKE 'sca_%'),
+  event_id           TEXT    NOT NULL,
+  actor_key          TEXT    NOT NULL CHECK (length(actor_key) BETWEEN 1 AND 160),
+  acknowledged_at    INTEGER NOT NULL CHECK (acknowledged_at > 0),
+  PRIMARY KEY (app, acknowledgement_id),
+  UNIQUE (app, event_id, actor_key),
+  FOREIGN KEY (app, event_id) REFERENCES student_change_events(app, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_student_change_ack_actor
+  ON student_change_acknowledgements(app, actor_key, acknowledged_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_student_change_events_no_update
+BEFORE UPDATE ON student_change_events
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_CHANGE_EVENT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_student_change_events_no_delete
+BEFORE DELETE ON student_change_events
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_CHANGE_EVENT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_student_change_ack_no_update
+BEFORE UPDATE ON student_change_acknowledgements
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_CHANGE_ACK_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_student_change_ack_no_delete
+BEFORE DELETE ON student_change_acknowledgements
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_CHANGE_ACK_APPEND_ONLY');
+END;
 
 -- 교재 주문 문자를 거래처(출판사)에 실제로 보낸 이력.
 -- 전화번호·문구는 저장하지 않는다 — 어느 거래처에 몇 건 보냈는지와 결과만 남긴다.

@@ -61,6 +61,7 @@ import { handleBookEditRequest, handleBookEditReview } from './book-edit-request
 import { handleGuardianContact } from './guardian-contact.js';
 import { handleParentFeedbackSend, attemptParentFeedbackSend, resolveStudentName } from './parent-feedback-send.js';
 import { handleRoster } from './roster.js';
+import { handleStudentChange } from './student-change.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleTransport } from './transport.js';
 import { handleOnboardingPatch } from './onboarding.js';
@@ -1632,6 +1633,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleRoster(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/student-change') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentChange(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);
