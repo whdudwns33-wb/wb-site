@@ -182,3 +182,78 @@ test('monthly data stays in consult checks and keeps the existing storage identi
   assert.match(html, /wb_consult_v1/);
   assert.match(html, /const SYNC_APP = 'consult'/);
 });
+
+test('month-end closeout is stored in consult checks and summarizes actual monthly records', () => {
+  const helpers = section('const MONTH_CLOSE_START', 'function monthResolutionOptions(');
+
+  assert.match(helpers, /const MONTH_CLOSE_START = '2026-08'/);
+  assert.match(helpers, /const monthCloseKey = staffId => '__monthclose__' \+ staffId/);
+  assert.match(helpers, /const monthLastDate =/);
+  assert.match(helpers, /function monthCloseSummary/);
+  assert.match(helpers, /monthSubjectStats\(staffId, ym\)/);
+  assert.match(helpers, /stTotal\(staffId, date\)/);
+  assert.match(helpers, /dailyCloseState\(staffId, date\)\.complete/);
+  assert.match(helpers, /goalsDone:/);
+  assert.match(helpers, /function monthHadActivity/);
+  assert.match(helpers, /if \(!monthHadActivity\(staffId, ym\)\)/,
+    'months without any consult activity must not lock the student');
+});
+
+test('the last daily closeout continues through weekly and monthly closeout in order', () => {
+  const card = section('function dailyClosureCard(', 'function dailyResolutionOptions(');
+  const modal = section('function dailyReportModal(', '/* ── 발행형 주간·월간 리포트');
+  const dailyFinish = section("case 'dailyreportfinish':", "case 'brief':");
+  const weeklyFinish = section("case 'weekclosefinish':", "case 'weekoverrideopen':");
+
+  assert.match(card, /date === monthLastDate\(monthYm\)/);
+  assert.match(card, /\? '5' : '4'/);
+  assert.match(card, /월간 마무리/);
+  assert.ok(card.indexOf('weeklyRequired') < card.indexOf('monthlyRequired'));
+  assert.match(modal, /주간 마무리와 월간 마무리까지 순서대로/);
+  assert.match(dailyFinish, /needsWeeklyClose[\s\S]*?else if \(needsMonthlyClose/);
+  assert.match(dailyFinish, /monthCloseModal\(me\.id, monthYm\)/);
+  assert.match(weeklyFinish, /weekEnd === monthLastDate\(monthYm\)/);
+  assert.match(weeklyFinish, /monthCloseModal\(me\.id, monthYm\)/);
+});
+
+test('an unfinished previous month locks Today until the monthly report is sent', () => {
+  const helpers = section('const MONTH_CLOSE_START', 'function monthResolutionOptions(');
+  const today = section('function viewToday()', 'function studyTotalHeroCard(');
+  const handlers = section("case 'monthcloseopen':", "case 'monthreviewsave':");
+
+  assert.match(helpers, /function previousUnclosedMonth/);
+  assert.match(helpers, /monthHadActivity\(staffId, ym\) && !monthCloseComplete\(staffId, ym\)/);
+  assert.match(today, /previousUnclosedMonth\(me\.id, cursor\)/);
+  assert.match(today, /지난달 마무리가 필요합니다/);
+  assert.match(today, /data-act="monthcloseopen" data-ym=/);
+  assert.match(today, /priorMonthYm[\s\S]*?return h/);
+  assert.match(handlers, /monthCloseUnclosedDays/);
+  assert.match(handlers, /monthCloseUnclosedWeeks/);
+  assert.match(handlers, /go\('today'\)/);
+  assert.match(handlers, /go\('week'\)/);
+});
+
+test('monthly closeout requires reflection, next-month decisions, report copy, and a reason for override', () => {
+  const modal = section('function monthResolutionOptions(', '/* ── 학생의 하루 마감 ──');
+  const handlers = section("case 'monthcloseopen':", "case 'monthreviewsave':");
+  const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
+
+  assert.match(modal, /id="monthCloseReflection"/);
+  assert.match(modal, /id="monthCloseDifficulty"/);
+  assert.match(modal, /id="monthCloseStudentFocus"/);
+  assert.match(modal, /다음 달 계속/);
+  assert.match(modal, /원장 도움 요청/);
+  assert.match(modal, /이번 달에서 종료/);
+  assert.match(modal, /월간 수행 보고/);
+  assert.match(handlers, /이번 달 잘한 점을 입력해 주세요/);
+  assert.match(handlers, /다음 달 처리를 선택해 주세요/);
+  assert.match(handlers, /status: 'reviewed'/);
+  assert.match(handlers, /copyToken: fresh\.reviewToken/);
+  assert.match(handlers, /close\.copyToken !== close\.reviewToken/);
+  assert.match(handlers, /status: 'complete'/);
+  assert.match(handlers, /대신 처리 사유를 입력해 주세요/);
+  assert.match(handlers, /status: 'overridden'/);
+  assert.match(month, /monthCloseCard\(me, ym\)/);
+  assert.match(month, /학생이 어려웠던 점/);
+  assert.match(month, /학생의 다음 달 집중/);
+});
