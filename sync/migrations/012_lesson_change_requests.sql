@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS lesson_change_requests (
   request_key  TEXT    NOT NULL,
   task_id      TEXT    NOT NULL,
   owner        TEXT    NOT NULL,          -- 제안한 직원(=지시서 담당 staffId)
-  changes      TEXT    NOT NULL,          -- JSON. 허용된 필드만: days,time,repeat,detail,guide,target,unit
+  changes      TEXT    NOT NULL,          -- JSON. 일반 수업 필드 또는 서버가 검증한 operation/effectiveDate
   changes_hash TEXT    NOT NULL,
   note         TEXT,                      -- 직원이 남기는 사유
   revision     INTEGER NOT NULL DEFAULT 1,

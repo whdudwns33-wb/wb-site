@@ -1,3 +1,5 @@
+import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -330,6 +332,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     try { document = validateRosterDocument(JSON.parse(row.data)); }
     catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
+    const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
     const same = document.roster.students.find(item => item.id !== nextStudent.id &&
       String(item.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') &&
       String(item.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko'));
@@ -371,6 +374,23 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     if (Number(changed.meta && changed.meta.changes || 0) !== 1) {
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+    }
+    if (action === 'student_update' && previousStudent) {
+      const fields = ['name', 'grade', 'subject', 'teacherIds', 'start', 'end', 'reason', 'memo'];
+      const changedFields = fields.filter(key => JSON.stringify(previousStudent[key] || '') !== JSON.stringify(nextStudent[key] || ''));
+      if (changedFields.length) {
+        const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);
+        const audienceStaffIds = [...new Set([...(previousStudent.teacherIds || []), ...(nextStudent.teacherIds || [])])];
+        await studentChangeEventStatement(env, app, {
+          eventId, studentId: nextStudent.id, eventType: 'student_information', changedFields,
+          details: {
+            before: Object.fromEntries(changedFields.map(key => [key, previousStudent[key] == null ? '' : previousStudent[key]])),
+            after: Object.fromEntries(changedFields.map(key => [key, nextStudent[key] == null ? '' : nextStudent[key]]))
+          },
+          audienceStaffIds, requiresAck: true, changedAt: updatedAt,
+          changedBy: studentChangeActorKey(auth)
+        }).run();
+      }
     }
     return json({ ok: true, updatedAt, student: withoutTeacherIds(nextStudent) }, 200, origin);
   }
