@@ -398,7 +398,7 @@ test('weekly lecture calendar focuses on one selected day with large chronologic
   assert.match(conflictHtml, /고정 일정 · 수학 학원 ↔ 인강 · 개념 인강 1강/);
 });
 
-test('lecture tab is a course management hub rather than another dated agenda', () => {
+test('lecture tab keeps the time calendar visible while course management stays separate', () => {
   const helpers = between('function ingCourseStatusLabel(', '\n\nfunction ingAttentionCard(');
   const view = between('function viewIngang()', '\nfunction ingAddModal()');
   const detail = between('function ingCourseDetailHtml(', '\n\nfunction ingCourseCardHtml(');
@@ -416,7 +416,9 @@ test('lecture tab is a course management hub rather than another dated agenda', 
   assert.match(view, /관리 필요/);
   assert.match(view, /일시 정지/);
   assert.match(view, /완강/);
-  assert.match(view, /class="card ing-aux-card"/);
+  assert.match(view, /h \+= ingWeekCard\(me, editable, admin\);/);
+  assert.ok(view.indexOf('ingWeekCard(me, editable, admin)') < view.indexOf('강좌 보관함'));
+  assert.doesNotMatch(view, /ing-aux-card/);
   assert.doesNotMatch(view, /앞으로 2주|data-act="daypick"/);
   assert.match(detail, /회차별 진도/);
   assert.match(detail, /완료 1강 평균/);

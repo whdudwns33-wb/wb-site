@@ -417,12 +417,6 @@
   .ing-answer-box b, .ing-question-read b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 11px; }
   .ing-answer-box div, .ing-question-read div { color: var(--dark-gray); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
   .ing-question-read small { display: block; margin-top: 5px; color: var(--mid-gray); }
-  .ing-aux-card > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: pointer; list-style: none; }
-  .ing-aux-card > summary::-webkit-details-marker { display: none; }
-  .ing-aux-card > summary b, .ing-aux-card > summary small { display: block; }
-  .ing-aux-card > summary b { color: var(--navy); font-size: 13px; }
-  .ing-aux-card > summary small { margin-top: 3px; color: var(--mid-gray); font-size: 10px; font-weight: 500; }
-  .ing-aux-body .ing-calendar-card { margin: 12px 0 0; border: 1px solid var(--line); box-shadow: none; }
   button.tag { border: 0; cursor: pointer; }
   @media (max-width: 640px) {
     .ing-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3415,6 +3409,7 @@ function viewIngang() {
   if (!session.isStaffLink) h += staffSwitcher(me.id);
 
   h += ingOverviewCard(me, editable, admin, courses, courseStates.map(row => row.state));
+  h += ingWeekCard(me, editable, admin);
 
   if (!courses.length) {
     return h + '<div class="card"><div class="empty"><b>🎬</b>등록된 강좌가 없습니다.' +
@@ -3439,9 +3434,6 @@ function viewIngang() {
     b.state.attention - a.state.attention || a.course.name.localeCompare(b.course.name, 'ko'));
   h += visible.length ? visible.map(row => ingCourseCardHtml(me, row.course, row.state, admin, asg)).join('') :
     '<div class="card"><div class="empty"><b>✓</b>이 상태에 해당하는 강좌가 없습니다.</div></div>';
-  h += '<details class="card ing-aux-card"><summary><span><b>🗓 자동배정용 주간 시간표</b>' +
-      '<small>학교·학원 시간을 제외하고 인강을 넣을 때만 사용합니다.</small></span><span aria-hidden="true">⌄</span></summary>' +
-    '<div class="ing-aux-body">' + ingWeekCard(me, editable, admin) + '</div></details>';
   return h;
 }
 
@@ -9776,7 +9768,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.30';
+const APP_VER = '2026-08-19.31';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
