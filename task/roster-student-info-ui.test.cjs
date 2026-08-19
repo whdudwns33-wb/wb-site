@@ -29,7 +29,7 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 });
 
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
-  const code = block('function rosterStudentInfoStatus(', 'function showRosterStudentInfo(');
+  const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
   const render = new Function('today', 'esc', `${code}\nreturn rosterStudentInfoHtml;`)(
     () => '2026-08-18', escapeHtml
   );
@@ -46,6 +46,21 @@ test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모�
     '등록과목', '신규 등록일', '첫 수업 시작일', '담당 선생님', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
+});
+
+test('원생 탭은 휴원생과 퇴원생을 한 줄 요약의 접힌 목록으로 분리한다', () => {
+  const transition = block('function rosterStudentTransition(', 'function activeIn(');
+  const lists = block('function rosterTransitionListsHtml(', 'function showRosterStudentInfo(');
+  const view = block('function viewRoster()', '/* ── 직원 관리');
+  assert.match(transition, /\^\(휴원\|퇴원\)/);
+  assert.match(lists, /section\('leave', '휴원생'/);
+  assert.match(lists, /section\('withdrawal', '퇴원생'/);
+  assert.match(lists, /<details class="roster-transition-item"><summary>/);
+  assert.match(lists, /roster-transition-summary/);
+  assert.doesNotMatch(lists, /<details class="roster-transition-item" open/);
+  assert.match(view, /h \+= rosterTransitionListsHtml\(rosterDb\.students\)/);
+  assert.match(source, /function studentLinkCandidates[\s\S]{0,420}!rosterStudentTransition\(student\)/);
+  assert.match(source, /const curActive = activeIn\(cur\)\.filter\(student => !rosterStudentTransition\(student\)\)/);
 });
 
 test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제공하고 교사 목록은 이름·학년만 표시한다', () => {

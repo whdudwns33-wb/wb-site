@@ -54,6 +54,9 @@ function seed(db) {
   };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-a','teacher-a',?,?,?)")
     .bind(JSON.stringify(task), now, now).run();
+  const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4] };
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-b','teacher-a',?,?,?)")
+    .bind(JSON.stringify(second), now, now).run();
 }
 
 test('migration is additive, append-only, and keeps deletion audit rows private by contract', () => {
@@ -85,6 +88,9 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   assert.equal(JSON.parse(taskRow.data).staffId, 'teacher-b');
   const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
   assert.ok(roster.roster.students[0].teacherIds.includes('teacher-b'));
+  const newTeacherSync = await call(db, '/sync', { auth: person('teacher-b'), since: 0, changes: [] });
+  assert.equal(newTeacherSync.status, 200);
+  assert.ok(newTeacherSync.body.changes.some(change => change.table === 'tasks' && change.key === 'lesson-a'));
 
   const oldTeacher = await call(db, '/student-change', { auth: person('teacher-a'), action: 'list' });
   const newTeacher = await call(db, '/student-change', { auth: person('teacher-b'), action: 'list' });
@@ -103,7 +109,7 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   assert.equal(directorAfter.body.events[0].acknowledged, false);
 });
 
-test('withdrawal updates roster history date while approved lesson deletion remains only in storage', async () => {
+test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
   const db = new TestD1(); seed(db);
   const withdrawal = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
@@ -116,17 +122,46 @@ test('withdrawal updates roster history date while approved lesson deletion rema
   const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
   assert.equal(roster.roster.students[0].end, '2026-09');
   assert.match(roster.roster.students[0].reason, /2026-08-25/);
+  assert.match(roster.roster.students[0].reason, /퇴원/);
+  for (const id of ['lesson-a', 'lesson-b']) {
+    const row = db.prepare('SELECT data FROM tasks WHERE id=?').bind(id).first();
+    const task = JSON.parse(row.data);
+    assert.equal(task.deleted, true);
+    assert.equal(task.end, '2026-08-25');
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE app='task'").first().count, 2,
+    '수업 행은 삭제하지 않고 이력으로 보존한다');
+});
 
+test('approved lesson deletion is hidden from screens but remains in private storage', async () => {
+  const db = new TestD1(); seed(db);
   const deletion = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'lesson_delete', effectiveDate: '2026-08-26' }, note: '수업 종료'
   });
   assert.equal(deletion.status, 200);
   assert.equal((await call(db, '/lesson-change-review', {
-    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 2
+    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 1
   })).status, 200);
   assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-a'").first().data).deleted, true);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE event_type='lesson_delete'").first().count, 1);
   const visible = await call(db, '/student-change', { auth: admin, action: 'list' });
   assert.equal(visible.body.events.some(event => event.eventType === 'lesson_delete'), false);
+});
+
+test('leave uses the same approval flow and records a separate leave roster state', async () => {
+  const db = new TestD1(); seed(db);
+  const leave = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'leave', effectiveDate: '2026-08-27' }, note: '한 달 휴원 요청'
+  });
+  assert.equal(leave.status, 200);
+  assert.equal((await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: leave.body.request.requestKey, revision: 1
+  })).status, 200);
+  const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
+  assert.match(roster.roster.students[0].reason, /^휴원 2026-08-27/);
+  assert.match(roster.roster.students[0].reason, /한 달 휴원 요청/);
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-a'").first().data).deleted, true);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE event_type='leave'").first().count, 1);
 });

@@ -59,3 +59,19 @@ test('취소된 피드백은 활성 피드백 검토 목록에서 숨긴다', ()
   const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
   assert.match(feedbackView, /feedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
 });
+
+test('승인된 담당자 변경·휴원·퇴원·수업삭제는 기존 선생님 로컬 수업에서 제거한다', () => {
+  const start = source.indexOf('function reconcileOwnLessonChangeTasks(');
+  const end = source.indexOf('/** 승인 대기 중인 제안 내용을', start);
+  assert.ok(start >= 0 && end > start);
+  const state = { tasks: [{ id: 'lesson-a' }, { id: 'lesson-b' }] };
+  let saved = 0;
+  const reconcile = new Function('session', 'state', 'save', source.slice(start, end) + '\nreturn reconcileOwnLessonChangeTasks;')(
+    { isStaffLink: true, isAdmin: false }, state, () => { saved += 1; }
+  );
+  assert.equal(reconcile([{ status: 'approved', taskId: 'lesson-a', changes: { operation: 'teacher_assignment' } }]), true);
+  assert.deepEqual(state.tasks.map(task => task.id), ['lesson-b']);
+  assert.equal(saved, 1);
+  assert.match(source, /now\(\) - Number\(ownLessonChangeLastLoadedAt \|\| 0\) >= 30000/);
+  assert.match(source, /await loadOwnLessonChangeQueue\(true\)/);
+});

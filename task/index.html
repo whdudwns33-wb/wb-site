@@ -211,7 +211,11 @@
   .lesson-progress-section { padding-top: 12px; }
   .lesson-progress-section + .lesson-progress-section { margin-top: 12px; border-top: 1px solid var(--line); }
   .lesson-progress-section-title { margin-bottom: 8px; color: var(--deep-blue); font-size: 13px; font-weight: 800; }
-  .previous-memos-body { display: grid; gap: 8px; }
+  .previous-memos > summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; color: var(--deep-blue); font-size: 13px; font-weight: 800; list-style: none; }
+  .previous-memos > summary::-webkit-details-marker { display: none; }
+  .previous-memos > summary::after { content: '펼치기'; color: var(--mid-gray); font-size: 11px; }
+  .previous-memos[open] > summary::after { content: '접기'; }
+  .previous-memos-body { display: grid; gap: 8px; padding-top: 8px; }
   .lesson-briefing-instructions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
@@ -745,6 +749,17 @@
   .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
   .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
   .student-info-name:focus-visible { outline: 3px solid var(--deep-blue); outline-offset: 2px; border-radius: 5px; }
+  .roster-transition-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .roster-transition-list { margin: 0; }
+  .roster-transition-item { border-top: 1px solid var(--line); }
+  .roster-transition-item:first-child { border-top: 0; }
+  .roster-transition-item > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; overflow: hidden; cursor: pointer; list-style: none; }
+  .roster-transition-item > summary::-webkit-details-marker { display: none; }
+  .roster-transition-item > summary::after { content: '펼치기'; flex: 0 0 auto; margin-left: auto; color: var(--deep-blue); font-size: 11px; font-weight: 800; }
+  .roster-transition-item[open] > summary::after { content: '접기'; }
+  .roster-transition-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .roster-transition-detail { padding: 8px 0 14px; }
+  @media(max-width:700px) { .roster-transition-grid { grid-template-columns: 1fr; } }
   .roster-add-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
   .student-info-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
   .student-info-field { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 11px; background: #FAFCFD; }
@@ -883,11 +898,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-19.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-19.2"></script>
-<script src="./asset-core.js?v=2026-08-19.2"></script>
-<script src="./qr-core.js?v=2026-08-19.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-19.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-19.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-19.3"></script>
+<script src="./asset-core.js?v=2026-08-19.3"></script>
+<script src="./qr-core.js?v=2026-08-19.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-19.3"></script>
 <script>
 "use strict";
 
@@ -1405,6 +1420,9 @@ const sync = {
         this.personVerified = true;
         personAccessProblem = null;
       }
+      if (session.isStaffLink && !session.isAdmin && now() - Number(ownLessonChangeLastLoadedAt || 0) >= 30000) {
+        await loadOwnLessonChangeQueue(true);
+      }
       const accessRoleChanged = previousAccessRole !== this.accessRole;
       if (refreshBookOrders) {
         bookIssueLoaded = false;
@@ -1582,11 +1600,12 @@ function resetPersonCache(token) {
   personAccessProblem = null;
   examTarget = null; opTarget = null; fbCtx = null;
   lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null;
+  lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
   lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false;
   feedbackQueue = []; feedbackQueueLoaded = false; feedbackQueueLoading = false; feedbackQueueError = '';
   ownFeedbackQueue = []; ownFeedbackQueueLoaded = false; ownFeedbackQueueLoading = false; ownFeedbackQueueError = '';
   lessonChangeQueue = []; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false; lessonChangeQueueError = '';
-  ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = '';
+  ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = ''; ownLessonChangeLastLoadedAt = 0;
   lcForm = null; draft = [];
   bookDb = null; bookDbErr = ''; bookDbLoading = false;
   approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false;
@@ -2389,10 +2408,10 @@ function previousTaskMemos(taskId, beforeDate) {
 
 function previousTaskMemosProgressHtml(taskId, beforeDate) {
   const rows = previousTaskMemos(taskId, beforeDate);
-  return '<section class="lesson-progress-section previous-memos"><div class="lesson-progress-section-title">이전 수업 메모</div>' +
+  return '<details class="lesson-progress-section previous-memos"><summary>이전 수업 메모</summary>' +
     '<div class="previous-memos-body"><div class="card-sub">' + esc(beforeDate) + ' 이전 기록 · 최신순 3개</div>' +
     (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
-      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></section>';
+      '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
 }
 
 function lessonWorkInstructionHtml(task, lessonDate) {
@@ -3171,6 +3190,9 @@ let lessonDraft = null;
 let lessonPreviewPayload = null;
 let lessonPreviewTask = null;
 let lessonPreviewExpectedUpdatedAt = 0;
+let lessonRosterDraft = null;
+let lessonRosterDraftStudentId = '';
+let lessonPreviewRosterStudent = null;
 let lessonSubmitting = false;
 let lessonAssignmentRequests = [];
 let lessonAssignmentRequestsLoaded = false;
@@ -3230,6 +3252,75 @@ function assignedLessonStudents() {
 
 function lessonFormStudents() {
   return studentLinkCandidates(today().slice(0, 7));
+}
+
+function setLessonRosterDraft(student) {
+  lessonRosterDraftStudentId = String(student && student.id || '');
+  lessonRosterDraft = student ? {
+    id: String(student.id), name: String(student.name || ''), school: String(student.school || ''),
+    grade: String(student.grade || ''), phoneSelf: String(student.phoneSelf || ''),
+    phoneFather: String(student.phoneFather || ''), phoneMother: String(student.phoneMother || ''),
+    registrationDate: String(student.registrationDate || ''), firstClassDate: String(student.firstClassDate || ''),
+    subjects: rosterStudentSubjects(student), teacherIds: Array.isArray(student.teacherIds) ? student.teacherIds.map(String) : [],
+    memo: String(student.memo || '')
+  } : null;
+  lessonPreviewRosterStudent = null;
+}
+
+function currentLessonRosterDraft() {
+  if (!session.isAdmin) return null;
+  const studentId = String(currentLessonDraft().studentId || '');
+  if (!studentId) { setLessonRosterDraft(null); return null; }
+  if (!lessonRosterDraft || lessonRosterDraftStudentId !== studentId) {
+    const student = rosterDb && (rosterDb.students || []).find(row => String(row.id) === studentId);
+    setLessonRosterDraft(student || null);
+  }
+  return lessonRosterDraft;
+}
+
+function lessonRosterInformationHtml() {
+  const info = currentLessonRosterDraft();
+  if (!info) return '<div class="hint mt14">실제 원생을 선택하면 신규 원생 추가와 같은 기본 정보 입력칸이 열립니다.</div>';
+  const selectedSubjects = new Set(info.subjects || []), selectedTeachers = new Set(info.teacherIds || []);
+  return '<div class="sect">원생 기본 정보 · 신규 원생 추가와 동일 항목</div>' +
+    '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-lesson-roster-field="name" maxlength="40" value="' + esc(info.name) + '"></label>' +
+    '<label class="field"><span class="fl">학교</span><input class="in" data-lesson-roster-field="school" maxlength="80" value="' + esc(info.school) + '"></label></div>' +
+    '<label class="field"><span class="fl">학년</span><input class="in" data-lesson-roster-field="grade" maxlength="20" value="' + esc(info.grade) + '"></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneSelf" maxlength="30" value="' + esc(info.phoneSelf) + '"></label>' +
+    '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneFather" maxlength="30" value="' + esc(info.phoneFather) + '"></label></div>' +
+    '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneMother" maxlength="30" value="' + esc(info.phoneMother) + '"></label>' +
+    '<div class="field"><span class="fl">등록과목 · 중복 선택 가능</span><div class="chips">' + ROSTER_SUBJECT_OPTIONS.map(subject =>
+      '<label class="chip"><input type="checkbox" data-lesson-roster-subject value="' + esc(subject) + '"' + (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
+    '<div class="field"><span class="fl">담당 선생님</span><div class="chips">' + liveStaff().map(teacher =>
+      '<label class="chip"><input type="checkbox" data-lesson-roster-teacher value="' + esc(teacher.id) + '"' + (selectedTeachers.has(teacher.id) ? ' checked' : '') + '> ' + esc(teacher.name) + '</label>').join('') + '</div>' +
+      '<div class="small muted mt8">이 수업의 담당 선생님은 저장할 때 원생 담당에도 자동 포함됩니다.</div></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-roster-field="registrationDate" value="' + esc(info.registrationDate) + '"></label>' +
+    '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-roster-field="firstClassDate" value="' + esc(info.firstClassDate) + '"></label></div>' +
+    '<label class="field"><span class="fl">내부 메모</span><textarea class="in" data-lesson-roster-field="memo" maxlength="1000">' + esc(info.memo) + '</textarea></label>';
+}
+
+function lessonRosterStudentPayload(selected, draft) {
+  const info = currentLessonRosterDraft();
+  if (!session.isAdmin || !selected || !info) return null;
+  const teacherIds = [...new Set((info.teacherIds || []).map(String).concat(String(draft.staffId || '')).filter(Boolean))];
+  const subjects = [...new Set((info.subjects || []).filter(subject => ROSTER_SUBJECT_OPTIONS.includes(subject)))];
+  if (!String(info.name || '').trim() || !String(info.grade || '').trim() || !subjects.length || !teacherIds.length) {
+    throw new Error('원생 이름·학년·등록과목·담당 선생님을 모두 확인해 주세요');
+  }
+  return Object.assign({}, selected, {
+    id: selected.id, name: String(info.name).normalize('NFKC').trim(), school: String(info.school || '').normalize('NFKC').trim(),
+    grade: String(info.grade).normalize('NFKC').trim(), phoneSelf: String(info.phoneSelf || '').normalize('NFKC').trim(),
+    phoneFather: String(info.phoneFather || '').normalize('NFKC').trim(), phoneMother: String(info.phoneMother || '').normalize('NFKC').trim(),
+    registrationDate: String(info.registrationDate || ''), firstClassDate: String(info.firstClassDate || ''),
+    teacher: teacherIds.map(id => (staffById(id) || {}).name).filter(Boolean).join('·'),
+    subject: subjects.join('·'), subjects: subjects, teacherIds: teacherIds, memo: String(info.memo || '').normalize('NFKC').trim()
+  });
+}
+
+function lessonRosterStudentChanged(current, next) {
+  if (!current || !next) return false;
+  return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
+    'teacher', 'subject', 'subjects', 'teacherIds', 'memo'].some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
 }
 
 async function loadPublicationReadiness(force) {
@@ -3325,6 +3416,7 @@ function openPublicationLessonFix(button) {
   lessonDraft.studentId = student.id;
   lessonDraft.studentName = student.name;
   lessonDraft.grade = student.grade;
+  setLessonRosterDraft(student);
   lessonPreviewPayload = null;
   lessonPreviewTask = null;
   lessonPreviewExpectedUpdatedAt = Number(row.updatedAt || task.updatedAt || 0);
@@ -3498,10 +3590,9 @@ function viewLessonEntry() {
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
     : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
-      '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' +
-      (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '');
+      '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
   return (personal ? lessonAssignmentRequestHtml() : publicationReadinessHtml() + viewLessonChangeReview() + lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
-    '<div class="card-sub">아래 9개 항목을 채우면 업무지시서와 수업 현황판에 함께 반영됩니다. 없는 항목은 “없음”이라고 적어 주세요.</div></div>' +
+    '<div class="card-sub">관리자는 신규 원생 추가와 동일한 원생 기본 정보를 함께 확인·수정하고, 수업 요일·시간과 진행 정보를 이어서 등록합니다.</div></div>' +
     '<div class="card">' + staffSelect +
       studentFields +
       '<div class="sect">2. 과목·반</div><div class="grid2">' +
@@ -3541,8 +3632,13 @@ function previewLessonRegistration() {
     .find(student => String(student.id) === String(draft.studentId));
   if (!selected) return toast(session.isStaffLink && !session.isAdmin ? '내 담당 학생을 선택해 주세요' : '현재 재원 원생을 선택해 주세요');
   draft.studentId = selected.id;
-  draft.studentName = selected.name;
-  draft.grade = selected.grade;
+  try { lessonPreviewRosterStudent = session.isAdmin ? lessonRosterStudentPayload(selected, draft) : null; }
+  catch (error) { return toast(error.message || '원생 기본 정보를 확인해 주세요'); }
+  draft.studentName = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.name : selected.name;
+  draft.grade = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.grade : selected.grade;
+  if (!draft.subject && lessonPreviewRosterStudent && lessonPreviewRosterStudent.subjects.length) {
+    draft.subject = lessonPreviewRosterStudent.subjects[0];
+  }
   const validation = core.validateLessonInput(draft);
   if (!validation.valid) return toast(validation.errors[0].message);
   let taskBody;
@@ -3575,6 +3671,8 @@ function previewLessonRegistration() {
   modal(existing ? '수업 정보 수정 미리보기' : '수업 등록 미리보기',
     '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
       '<b>담당</b> ' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
+      (lessonPreviewRosterStudent ? '<b>원생 기본 정보</b>' + esc([lessonPreviewRosterStudent.school, lessonPreviewRosterStudent.grade,
+        lessonPreviewRosterStudent.subject, lessonPreviewRosterStudent.registrationDate, lessonPreviewRosterStudent.firstClassDate].filter(Boolean).join(' · ')) + '<br><br>' : '') +
       '<b>1. 이름 / 학년</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
       '<b>2. 과목·반</b><br>' + previewValue([taskBody.subject, taskBody.className].filter(Boolean).join(' / ')) + '<br><br>' +
       '<b>3. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '<br><br>' +
@@ -3605,9 +3703,24 @@ async function saveLessonRegistration(button) {
   if (!auth) return toast('동기화 인증이 필요합니다');
   lessonSubmitting = true;
   if (button) button.disabled = true;
+  let rosterSaved = false;
   try {
     const draft = currentLessonDraft();
     const targetStaffId = session.isStaffLink && !session.isAdmin ? session.staffId : draft.staffId;
+    if (session.isAdmin && lessonPreviewRosterStudent) {
+      const currentStudent = rosterDb && (rosterDb.students || []).find(row => String(row.id) === String(lessonPreviewRosterStudent.id));
+      if (!currentStudent) throw new Error('원생 명단을 새로고침한 뒤 다시 등록해 주세요');
+      if (lessonRosterStudentChanged(currentStudent, lessonPreviewRosterStudent)) {
+        const rosterResult = await sync.post('/roster', {
+          app: SYNC_APP, auth: auth, action: 'student_update', expectedUpdatedAt: Number(rosterDb.updatedAt),
+          student: lessonPreviewRosterStudent
+        });
+        const index = rosterDb.students.findIndex(row => String(row.id) === String(lessonPreviewRosterStudent.id));
+        if (index >= 0) rosterDb.students[index] = Object.assign({}, lessonPreviewRosterStudent);
+        rosterDb.updatedAt = Number(rosterResult.updatedAt) || rosterDb.updatedAt;
+        rosterSaved = true;
+      }
+    }
     const result = await sync.post('/lesson-create', {
       app: SYNC_APP, auth: auth, staffId: targetStaffId,
       sourceTaskId: draft._sourceTaskId || undefined,
@@ -3620,11 +3733,12 @@ async function saveLessonRegistration(button) {
     publicationReadinessRows = [];
     clearLessonDraft();
     lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = 0;
+    lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
     if (session.isAdmin) viewStaff = targetStaffId;
     closeModal(); go('today');
     toast(result.idempotent || result.duplicate ? '변경 사항이 없어 기존 수업을 그대로 유지했습니다' : (result.updated ? '수업 정보를 수정했습니다' : '수업을 등록했습니다'));
   } catch (error) {
-    toast('수업 등록 실패 — ' + (error.message || error));
+    toast((rosterSaved ? '원생 기본 정보는 저장됐습니다 · ' : '') + '수업 등록 실패 — ' + (error.message || error));
     if (button) button.disabled = false;
   } finally {
     lessonSubmitting = false;
@@ -3794,6 +3908,7 @@ let ownLessonChangeQueue = [];
 let ownLessonChangeQueueLoaded = false;
 let ownLessonChangeQueueLoading = false;
 let ownLessonChangeQueueError = '';
+let ownLessonChangeLastLoadedAt = 0;
 
 const LESSON_CHANGE_STATUS_LABEL = {
   approval_waiting: ['원장 검토 대기', 'warn'],
@@ -3831,7 +3946,9 @@ async function loadOwnLessonChangeQueue(force) {
   try {
     const result = await sync.post('/lesson-change-request', { app: SYNC_APP, auth: auth, action: 'list', limit: 100 });
     ownLessonChangeQueue = result.requests || [];
+    reconcileOwnLessonChangeTasks(ownLessonChangeQueue);
     ownLessonChangeQueueLoaded = true;
+    ownLessonChangeLastLoadedAt = now();
   } catch (error) {
     ownLessonChangeQueueError = String(error && error.message || error);
     ownLessonChangeQueueLoaded = true;
@@ -3839,6 +3956,18 @@ async function loadOwnLessonChangeQueue(force) {
     ownLessonChangeQueueLoading = false;
     if (route === 'feedback') render();
   }
+}
+
+function reconcileOwnLessonChangeTasks(requests) {
+  if (!session.isStaffLink || session.isAdmin) return false;
+  const hidden = new Set((requests || []).filter(item => item && item.status === 'approved' && item.changes &&
+    ['teacher_assignment', 'withdrawal', 'leave', 'lesson_delete'].includes(item.changes.operation)).map(item => String(item.taskId || '')));
+  if (!hidden.size) return false;
+  const before = state.tasks.length;
+  state.tasks = state.tasks.filter(task => !hidden.has(String(task.id || '')));
+  if (state.tasks.length === before) return false;
+  save();
+  return true;
 }
 
 /** 승인 대기 중인 제안 내용을 사람이 읽을 문장으로 — 값은 여기서 이스케이프한다 */
@@ -4051,6 +4180,7 @@ async function reviewLessonChange(action, key, revision) {
     const index = lessonChangeQueue.findIndex(item => item.requestKey === key);
     if (index >= 0) lessonChangeQueue[index] = result.request;
     lessonChangeQueueLoaded = false; studentChangeLoaded = false; rosterDb = null; rosterErr = '';
+    if (action === 'approve') await sync.run();
     loadRoster(); loadLessonChangeQueue(true); render();
     toast(action === 'approve' ? '승인했습니다 · 지시서에 반영됐습니다' : '반려했습니다');
   } catch (error) {
@@ -5892,6 +6022,17 @@ async function resolveGuardianRequest(requestId, resolution, expectedRevision, b
   }
 }
 
+function lessonChangeInboxMeta(changes) {
+  const operation = String(changes && changes.operation || 'lesson_fields');
+  const date = String(changes && changes.effectiveDate || '날짜 확인 필요');
+  if (operation === 'withdrawal') return { kind: '퇴원 요청', detail: '퇴원 승인 · 적용일 ' + date };
+  if (operation === 'leave') return { kind: '휴원 요청', detail: '휴원 승인 · 적용일 ' + date };
+  if (operation === 'lesson_delete') return { kind: '수업삭제 요청', detail: '수업 삭제 승인 · 적용일 ' + date };
+  if (operation === 'teacher_assignment') return { kind: '담당자 변경', detail: '새 담당 선생님 선택 · 시작일 ' + date };
+  if (operation === 'information_request') return { kind: '학생정보 요청', detail: '학생 정보 수정 내용 확인' };
+  return { kind: '수업 변경', detail: '요일·시간·진도 변경 승인' };
+}
+
 function managerRequestInboxRows() {
   if (!session.isAdmin) return [];
   const rows = [];
@@ -5904,7 +6045,8 @@ function managerRequestInboxRows() {
     push('학생 배정', [row.studentName, row.grade].filter(Boolean).join(' · '), '담당 학생 연결 승인', row.staffId, 'lesson', row.updatedAt, 0));
   lessonChangeQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
-    push('수업 변경', (task && (task.studentName || task.title)) || '수업 정보', '요일·시간·진도 변경 승인', row.owner, 'lesson', row.updatedAt, 0);
+    const meta = lessonChangeInboxMeta(row.changes);
+    push(meta.kind, (task && (task.studentName || task.title)) || '수업 정보', meta.detail, row.owner, 'lesson', row.updatedAt, 0);
   });
   feedbackQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
@@ -9205,6 +9347,11 @@ function rosterMonths() {
   while (m <= cur && out.length < 36) { out.push(m); m = ymNext(m); }
   return out.reverse();   // 최신 달 먼저
 }
+function rosterStudentTransition(student) {
+  const match = String(student && student.reason || '').match(/^(휴원|퇴원)\s+(\d{4}-\d{2}-\d{2})(?:\s|$)/);
+  if (!match) return null;
+  return { type: match[1] === '휴원' ? 'leave' : 'withdrawal', label: match[1], effectiveDate: match[2] };
+}
 function activeIn(m) {
   return ((rosterDb && rosterDb.students) || []).filter(s =>
     s.start <= m && (!s.end || s.end > m));
@@ -9212,6 +9359,7 @@ function activeIn(m) {
 function studentLinkCandidates(referenceMonth, includeFuture) {
   const month = String(referenceMonth || today().slice(0, 7));
   return ((rosterDb && rosterDb.students) || []).filter(student => student && student.id &&
+    !rosterStudentTransition(student) &&
     (includeFuture || !student.start || student.start <= month) && (!student.end || student.end > month))
     .slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko') ||
       String(a.grade || '').localeCompare(String(b.grade || ''), 'ko'));
@@ -9222,7 +9370,7 @@ function studentLinkScopeText() {
 function activeDuringWeek(days) {
   const months = [...new Set((days || []).map(date => String(date).slice(0, 7)).filter(Boolean))];
   return ((rosterDb && rosterDb.students) || []).filter(student =>
-    months.some(month => student.start <= month && (!student.end || student.end > month)));
+    !rosterStudentTransition(student) && months.some(month => student.start <= month && (!student.end || student.end > month)));
 }
 function rosterStudentMatches(name, grade, reference) {
   const core = window.WBScheduleCore;
@@ -9237,6 +9385,8 @@ function rosterStudentId(name, grade, reference) {
 }
 
 function rosterStudentInfoStatus(student) {
+  const transition = rosterStudentTransition(student);
+  if (transition) return [transition.label + ' · ' + transition.effectiveDate, transition.type === 'withdrawal' ? 'bad' : 'warn'];
   const month = today().slice(0, 7);
   if (student.start > month) return ['등록 예정', 'warn'];
   if (student.end && student.end <= month) return ['재원 종료', 'bad'];
@@ -9284,6 +9434,23 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     (student.memo ? field('내부 메모', student.memo, true, ['memo']) : '') +
     (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true, ['guide', 'steps', 'lessonReferences']) : '') + '</div>' +
     (typeof studentChangeHistoryHtml === 'function' ? studentChangeHistoryHtml(student.id) : '');
+}
+
+function rosterTransitionListsHtml(students) {
+  const rows = (students || []).map(student => ({ student: student, transition: rosterStudentTransition(student) }))
+    .filter(row => row.transition).sort((a, b) => b.transition.effectiveDate.localeCompare(a.transition.effectiveDate) ||
+      String(a.student.name || '').localeCompare(String(b.student.name || ''), 'ko'));
+  const section = (type, title, icon) => {
+    const selected = rows.filter(row => row.transition.type === type);
+    return '<section class="card roster-transition-list"><div class="between mb8"><div class="card-title">' + icon + ' ' + title + '</div>' +
+      '<span class="pill ' + (type === 'withdrawal' && selected.length ? 'bad' : selected.length ? 'warn' : '') + '">' + selected.length + '명</span></div>' +
+      (selected.length ? selected.map(row => '<details class="roster-transition-item"><summary><span class="roster-transition-summary"><b>' +
+        esc(row.student.name) + '</b> · ' + esc([row.student.grade, row.student.teacher || '담당 미지정', row.transition.effectiveDate].filter(Boolean).join(' · ')) +
+        '</span></summary><div class="roster-transition-detail">' + rosterStudentInfoHtml(row.student, studentLessonReferenceItems(row.student.id)) +
+        (session.isAdmin ? '<button class="btn btn-sm btn-ghost mt14" data-act="rosterstudentedit" data-id="' + esc(row.student.id) + '">원생 정보 수정</button>' : '') +
+        '</div></details>').join('') : '<div class="small muted">현재 ' + title + ' 명단이 없습니다.</div>') + '</section>';
+  };
+  return '<div class="roster-transition-grid">' + section('leave', '휴원생', '⏸') + section('withdrawal', '퇴원생', '📁') + '</div>';
 }
 
 function showRosterStudentInfo(studentId) {
@@ -10087,7 +10254,7 @@ function viewRoster() {
   const baseline = rosterDb.baseline;
   const months = rosterMonths();
   const cur = months[0];
-  const curActive = activeIn(cur);
+  const curActive = activeIn(cur).filter(student => !rosterStudentTransition(student));
   ensureSessionModeData(state.tasks);
 
   let h = acaflowImport;
@@ -10104,6 +10271,8 @@ function viewRoster() {
           '<button class="btn btn-sm btn-ghost" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">수정</button></div>').join('') +
       '</div></details></section>';
   }
+
+  h += rosterTransitionListsHtml(rosterDb.students);
 
   // 개인 링크 응답은 서버에서 이미 담당 학생만 잘라 보낸다.
   const myName = session.isStaffLink && !session.isAdmin ? ((meStaff() || {}).name || '') : '';
@@ -10130,7 +10299,7 @@ function viewRoster() {
 
   if (myName) {
     const mine = rosterDb.students.filter(isMine);
-    const mineActive = mine.filter(s => s.start <= cur && (!s.end || s.end > cur));
+    const mineActive = mine.filter(s => !rosterStudentTransition(s) && s.start <= cur && (!s.end || s.end > cur));
     if (mine.length) {
       h += '<div class="card"><div class="between mb8">' +
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
@@ -10239,7 +10408,8 @@ function viewRoster() {
     const act = activeIn(m);
     const joins = rosterDb.students.filter(s => s.start === m && s.entryType !== 'existing');
     const existingAdds = rosterDb.students.filter(s => s.start === m && s.entryType === 'existing');
-    const leaves = rosterDb.students.filter(s => s.end === m);
+    const leaves = rosterDb.students.filter(s => s.end === m && (!rosterStudentTransition(s) || rosterStudentTransition(s).type === 'withdrawal'));
+    const pauses = rosterDb.students.filter(s => s.end === m && rosterStudentTransition(s) && rosterStudentTransition(s).type === 'leave');
     const prevAct = m === baseline ? null : activeIn(months[months.indexOf(m) + 1] || m);
     const keep = prevAct && prevAct.length
       ? Math.round((prevAct.length - leaves.length) / prevAct.length * 100) : null;
@@ -10260,6 +10430,9 @@ function viewRoster() {
       (leaves.length
         ? leaves.map(s => '<div class="small muted">· ' + esc(s.name) + '(' + esc(s.grade) + ')' +
             (s.reason ? ' — ' + esc(s.reason) : '') + '</div>').join('') : '') +
+      '<div class="between small" style="padding:2px 0"><span>⏸ 휴원</span><span>' + (pauses.length ? pauses.length + '명' : '0') + '</span></div>' +
+      (pauses.length ? pauses.map(s => '<div class="small muted">· ' + esc(s.name) + '(' + esc(s.grade) + ')' +
+        (s.reason ? ' — ' + esc(s.reason) : '') + '</div>').join('') : '') +
       '</div>';
   });
 
@@ -12966,6 +13139,7 @@ document.addEventListener('click', ev => {
       const t = task();
       if (!canEditLessonTask(t)) return toast('이 수업 정보는 수정할 수 없습니다');
       lessonDraft = lessonDraftFromTask(t);
+      lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
       lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = Number(t.updatedAt || 0);
       persistLessonDraft(); closeModal(); go('lesson');
       toast('수업 정보를 불러왔습니다 — 수정 후 미리보기를 확인해 주세요');
@@ -13338,6 +13512,13 @@ document.addEventListener('input', ev => {
 
 /* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */
 document.addEventListener('input', ev => {
+  const rosterField = ev.target.closest('[data-lesson-roster-field]');
+  if (rosterField) {
+    const info = currentLessonRosterDraft();
+    if (info) info[rosterField.dataset.lessonRosterField] = rosterField.value;
+    lessonPreviewRosterStudent = null;
+    return;
+  }
   const field = ev.target.closest('[data-lesson-field]');
   if (field) {
     currentLessonDraft()[field.dataset.lessonField] = field.value;
@@ -13353,6 +13534,20 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
+  const lessonRosterSubject = ev.target.closest('[data-lesson-roster-subject]');
+  if (lessonRosterSubject) {
+    const info = currentLessonRosterDraft();
+    if (info) info.subjects = Array.from(document.querySelectorAll('[data-lesson-roster-subject]:checked')).map(input => String(input.value));
+    lessonPreviewRosterStudent = null;
+    return;
+  }
+  const lessonRosterTeacher = ev.target.closest('[data-lesson-roster-teacher]');
+  if (lessonRosterTeacher) {
+    const info = currentLessonRosterDraft();
+    if (info) info.teacherIds = Array.from(document.querySelectorAll('[data-lesson-roster-teacher]:checked')).map(input => String(input.value));
+    lessonPreviewRosterStudent = null;
+    return;
+  }
   const lessonStudent = ev.target.closest('[data-lesson-student]');
   if (lessonStudent) {
     if (!session.isAdmin && !(session.isStaffLink && !session.isAdmin)) return;
@@ -13362,6 +13557,7 @@ document.addEventListener('change', async ev => {
     draft.studentId = student ? student.id : '';
     draft.studentName = student ? student.name : '';
     draft.grade = student ? student.grade : '';
+    setLessonRosterDraft(student || null);
     persistLessonDraft(); render();
     return;
   }
@@ -13399,7 +13595,14 @@ document.addEventListener('change', async ev => {
     render(); return;
   }
   const field = ev.target.closest('[data-lesson-field]');
-  if (field) { currentLessonDraft()[field.dataset.lessonField] = field.value; persistLessonDraft(); }
+  if (field) {
+    currentLessonDraft()[field.dataset.lessonField] = field.value;
+    if (field.dataset.lessonField === 'staffId' && lessonRosterDraft && field.value && !lessonRosterDraft.teacherIds.includes(field.value)) {
+      lessonRosterDraft.teacherIds.push(field.value);
+    }
+    lessonPreviewRosterStudent = null;
+    persistLessonDraft();
+  }
 });
 
 /* 출퇴근 시각 직접 수정 — time input은 값이 확정될 때(change) 저장한다 */
@@ -13476,7 +13679,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-19.2';
+const APP_VER = '2026-08-19.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
