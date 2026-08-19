@@ -87,6 +87,46 @@ test('학생번호가 삭제된 WB 학생을 가리키면 이름으로 재추정
   assert.equal(preview.entries[0].studentId, '');
 });
 
+test('김예린을 제외한 고유 이름·학년 일치는 자동 연결하고 김예린은 확인 대상으로 남긴다', () => {
+  const roster = [
+    { id: 's1', name: '가학생', grade: '중1' },
+    { id: 's2', name: '김예린', grade: '중1' },
+    { id: 's3', name: '김예린', grade: '고1' }
+  ];
+  const rows = [
+    { sourceRow: 2, name: '가학생', grade: '1', school: '예시중', phone: '01011112222' },
+    { sourceRow: 3, name: '김예린', grade: '중1', school: '', phone: '01033334444' }
+  ];
+  const preview = core.buildPreview(rows, roster, new Map());
+  assert.equal(preview.entries[0].studentId, 's1');
+  assert.equal(preview.entries[0].matchedByNameGrade, true);
+  assert.equal(preview.entries[0].status, 'new');
+  assert.equal(preview.entries[1].studentId, '');
+  assert.equal(preview.entries[1].status, 'ambiguous');
+  assert.equal(preview.entries[1].manualNameReview, true);
+});
+
+test('이름이 같아도 학년이 비어 있거나 다른 학교급이면 자동 연결하지 않는다', () => {
+  const roster = [{ id: 's1', name: '가학생', grade: '중1' }];
+  const rows = [
+    { sourceRow: 2, name: '가학생', grade: '', school: '', phone: '01011112222' },
+    { sourceRow: 3, name: '가학생', grade: '고1', school: '', phone: '01033334444' }
+  ];
+  const preview = core.buildPreview(rows, roster, new Map());
+  assert.deepEqual(preview.entries.map(row => row.status), ['unmatched', 'unmatched']);
+  assert.deepEqual(preview.entries.map(row => row.studentId), ['', '']);
+});
+
+test('김예린도 이미 확정된 아카플로우 학생번호 연결은 유지한다', () => {
+  const preview = core.buildPreview(
+    [{ sourceRow: 2, externalStudentNo: 'YE-1', name: '김예린', grade: '중1', school: '', phone: '01011112222' }],
+    [{ id: 's1', name: '김예린', grade: '중1' }], new Map(), new Map([['YE-1', 's1']])
+  );
+  assert.equal(preview.entries[0].studentId, 's1');
+  assert.equal(preview.entries[0].linkedByStudentNo, true);
+  assert.equal(preview.entries[0].manualNameReview, false);
+});
+
 test('원문 전화번호가 마스킹 결과에 노출되지 않는다', () => {
   const masked = core.maskPhone('01012345678');
   assert.equal(masked, '010-****-5678');
