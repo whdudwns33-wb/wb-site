@@ -193,7 +193,7 @@ test('timer closes real start-end segments and paints six ten-minute cells per h
   assert.match(timerPanel, /id="studyTimeline"/);
   assert.match(handlers, /stStart\(me\.id, today\(\), subj, t\.id\)/);
   assert.match(handlers, /if \(stRunning\(me\.id, today\(\)\)\) stStop/);
-  assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, today\(\)\)/);
+  assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, date\)/);
 });
 
 test('today ends with a mandatory closeout funnel instead of a standalone report shortcut', () => {
