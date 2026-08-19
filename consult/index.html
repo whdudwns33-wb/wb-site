@@ -813,14 +813,34 @@
   .study-total-hero .study-time-total { font-size: clamp(38px, 10vw, 54px); line-height: 1.15; margin: 5px 0 7px; }
   .study-total-hero .study-total-label { color: var(--mid-gray); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
   .study-time-controls { padding: 10px 0 4px; border-bottom: 1px dashed #D7D1C0; }
+  .study-plan-panel { margin-top: 9px; padding: 9px; border: 1px solid #E2DDCF; border-radius: 10px; background: rgba(255,255,255,.5); }
+  .study-plan-head, .study-plan-row { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+  .study-plan-head { flex-wrap: wrap; }
+  .study-plan-head b { color: #736C5A; font-size: 10.5px; letter-spacing: .04em; }
+  .study-plan-list { margin-top: 7px; }
+  .study-plan-row { min-height: 34px; padding: 5px 0; border-top: 1px dashed #E5E0D4; }
+  .study-plan-copy { min-width: 0; display: flex; align-items: center; gap: 6px; font-size: 10.5px; }
+  .study-plan-copy b { flex: 0 0 auto; color: var(--navy); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .study-plan-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .study-plan-dot { width: 9px; height: 9px; flex: 0 0 auto; border: 1px solid var(--subject-color); border-radius: 3px; background: var(--subject-bg); }
+  .study-plan-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+  .study-plan-actions .btn, .study-plan-head .btn { min-height: 28px; padding: 3px 6px; font-size: 9.5px; border-radius: 7px; }
+  .study-plan-empty { margin-top: 6px; color: #9A9382; font-size: 10px; }
   .study-timeline { margin-top: 9px; border-top: 1px solid #BDB6A3; border-left: 1px solid #D5CFBE; background: rgba(255,255,255,.62); }
   .study-timeline-row { display: grid; grid-template-columns: 31px repeat(6, minmax(0, 1fr)); min-height: 22px; }
   .study-timeline-row > span { display: grid; place-items: center; border-right: 1px solid #D5CFBE; border-bottom: 1px solid #D5CFBE; }
   .study-timeline-minutes { min-height: 20px; color: #A19A88; font-size: 8px; font-weight: 800; }
   .study-timeline-hour { color: #817A68; font-size: 9px; font-weight: 900; font-variant-numeric: tabular-nums; }
-  .study-timeline-cell { min-width: 0; background: rgba(255,255,255,.45); }
-  .study-timeline-cell.filled { background: var(--subject-bg); box-shadow: inset 0 0 0 1px var(--subject-color); }
-  .study-timeline-cell.running { animation: timelinePulse 1.4s ease-in-out infinite; }
+  .study-timeline-cell { position: relative; min-width: 0; overflow: hidden; background: rgba(255,255,255,.45); }
+  .study-timeline-plan, .study-timeline-actual { position: absolute; border-radius: 2px; pointer-events: none; }
+  .study-timeline-plan { inset: 3px 2px; border: 1px dashed var(--subject-color); background: var(--subject-bg); opacity: .55; }
+  .study-timeline-actual { inset: 2px 1px; border: 2px solid var(--subject-color); background: var(--subject-bg); }
+  .study-timeline-actual.running { animation: timelinePulse 1.4s ease-in-out infinite; }
+  .study-timeline-legend { display: flex; justify-content: flex-end; gap: 9px; margin-top: 7px; color: #8A8372; font-size: 9.5px; font-weight: 800; }
+  .study-timeline-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .study-timeline-legend i { width: 13px; height: 9px; border-radius: 2px; background: #F5F1E8; }
+  .study-timeline-legend .plan { border: 1px dashed #BDB4A0; opacity: .7; }
+  .study-timeline-legend .actual { border: 2px solid #BDB4A0; }
   .study-timeline-note { margin-top: 8px; color: #8A8372; font-size: 10px; line-height: 1.5; }
   .study-subject-summary { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
   .study-subject-summary .tag { font-size: 9.5px; }
@@ -2034,10 +2054,8 @@ function viewToday() {
         '</div></div>';
     }
     h += studyPlannerCard(me, cursor, list, carry, editable);
-    h += tbCard(me, editable);
   } else {
     h += studyPlannerCard(me, cursor, list, [], false);
-    h += tbCard(me, false);
   }
 
   if (editable && cursor === today()) {
@@ -2127,7 +2145,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
       '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' +
         '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (todayCount + carry.length) + ' TASKS</span></div>' + checklist + '</section>' +
       '<section class="study-planner-pane" aria-label="과목별 순공시간">' +
-        '<div class="study-paper-col-title">TIME TABLE <span>05–24시 · 10분 단위</span></div>' + studyTimePanel(me, editable, true) + '</section>' +
+        '<div class="study-paper-col-title">TIME TABLE <span>계획·실제 · 10분 단위</span></div>' + studyTimePanel(me, editable, true, date) + '</section>' +
     '</div></div>';
 }
 
@@ -2458,8 +2476,21 @@ function stTimelineCell(segments, date, hour, minute) {
   return null;
 }
 
+function studyPlanCell(blocks, hour, minute) {
+  const from = hour * 60 + minute;
+  const to = from + 10;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i];
+    const start = ingHmMin(block.s);
+    const end = ingHmMin(block.e);
+    if (start !== null && start < to && end > from) return block;
+  }
+  return null;
+}
+
 function studyTimelineRows(sid, date) {
   const segments = stTimelineSegments(sid, date);
+  const plans = tbOf(sid, date);
   const secs = stSecs(sid, date);
   const byCategory = stCategorySecs(secs);
   let h = '<div class="study-timeline-row study-timeline-minutes"><span></span>' +
@@ -2469,12 +2500,18 @@ function studyTimelineRows(sid, date) {
     h += '<div class="study-timeline-row"><span class="study-timeline-hour">' + pad2(hour) + '</span>';
     for (let minute = 0; minute < 60; minute += 10) {
       const segment = stTimelineCell(segments, date, hour, minute);
-      const subject = segment ? studySubject(segment.subj) : null;
+      const plan = studyPlanCell(plans, hour, minute);
+      const actualSubject = segment ? studySubject(segment.subj) : null;
+      const planSubject = plan ? studySubject(plan.subj || inferStudySubjectFromText(plan.label || '')) : null;
       const timeLabel = pad2(hour) + ':' + pad2(minute);
-      h += '<span class="study-timeline-cell' + (subject ? ' filled ' + subject.className : '') +
-        (segment && segment.running ? ' running' : '') + '" title="' +
-        (subject ? timeLabel + ' ' + subject.label : timeLabel + ' 기록 없음') + '" aria-label="' +
-        (subject ? timeLabel + ' ' + subject.label + ' 공부' : timeLabel + ' 기록 없음') + '"></span>';
+      const descriptions = [];
+      if (plan) descriptions.push('계획 ' + plan.label);
+      if (actualSubject) descriptions.push('실제 ' + actualSubject.label + ' 공부');
+      h += '<span class="study-timeline-cell" title="' + esc(timeLabel + ' ' + (descriptions.join(' · ') || '기록 없음')) + '" aria-label="' +
+        esc(timeLabel + ' ' + (descriptions.join(', ') || '기록 없음')) + '">' +
+        (planSubject ? '<i class="study-timeline-plan ' + planSubject.className + '"></i>' : '') +
+        (actualSubject ? '<b class="study-timeline-actual ' + actualSubject.className + (segment.running ? ' running' : '') + '"></b>' : '') +
+        '</span>';
     }
     h += '</div>';
   }
@@ -2484,15 +2521,16 @@ function studyTimelineRows(sid, date) {
     return '<span class="tag subject-tag ' + subject.className + '">' + subject.label + ' ' + fmtDur(byCategory[key]) + '</span>';
   }).join('');
   h += '<div class="study-subject-summary">' + summary + '</div>';
+  h += '<div class="study-timeline-legend"><span><i class="plan"></i>계획</span><span><i class="actual"></i>실제</span></div>';
   h += '<div class="study-timeline-note">' +
     (!segments.length && stTotal(sid, date)
       ? '기존 누적시간은 합계에 유지됩니다. 실제 시간대는 새 타이머 기록부터 표시됩니다.'
-      : '색칠된 한 칸은 10분입니다. 부분 공부도 해당 시간 칸에 표시됩니다.') + '</div>';
+      : '옅은 점선은 계획, 선명한 테두리는 실제 공부입니다. 한 칸은 10분입니다.') + '</div>';
   return h;
 }
 
-function studyTimePanel(me, editable, paperMode) {
-  const date = today();
+function studyTimePanel(me, editable, paperMode, dateOverride) {
+  const date = dateOverride || today();
   const secs = stSecs(me.id, date);
   const total = Object.values(secs).reduce((a, b) => a + b, 0);
   const goal = stGoalMin(me.id) * 60;
@@ -2533,7 +2571,8 @@ function studyTimePanel(me, editable, paperMode) {
           (on === s ? '⏸ ' : '▶ ') + esc(s) +
           (shownSecs ? ' ' + fmtHM(shownSecs) : '') + '</button>';
       }).join('') + '</div>' : '') + '</div>' +
-    '<div class="study-timeline" id="studyTimeline" role="img" aria-label="05시부터 24시까지 10분 단위 실제 순공시간">' +
+    studyPlanPanel(me, date, editable) +
+    '<div class="study-timeline" id="studyTimeline" role="img" aria-label="05시부터 24시까지 10분 단위 계획과 실제 순공시간">' +
       studyTimelineRows(me.id, date) + '</div>';
 }
 
@@ -3742,8 +3781,7 @@ function ingRenderPreview(sid, cid) {
 }
 
 /* ══════════════════════════════════════════════════════
-   타임블록 — "몇 시에 뭘 할지"를 시간 칸에 배치한다.
-   할 일 목록(체크리스트)과 다른 축이라 따로 둔다.
+   타임블록 — 스터디플래너 안에서 계획과 실제 시간을 겹쳐 보여준다.
    블록을 누르면 그 과목 타이머가 바로 시작돼 계획과 실측이 이어진다.
    ══════════════════════════════════════════════════════ */
 const tbKey = sid => '__tb__' + sid;
@@ -3751,44 +3789,41 @@ const tbOf = (sid, date) => (((state.checks[tbKey(sid) + '|' + date] || {}).bloc
   .slice().sort((a, b) => String(a.s).localeCompare(String(b.s)));
 const tbSave = (sid, date, blocks) => setCheck(tbKey(sid), date, { blocks: blocks, done: true });
 
-function tbCard(me, editable) {
-  const blocks = tbOf(me.id, cursor);
-  const isToday = cursor === today();
+function studyPlanPanel(me, date, editable) {
+  const blocks = tbOf(me.id, date);
+  const isToday = date === today();
   const hm = nowHM();
-  let h = '<div class="card"><div class="between mb8">' +
-    '<div class="card-title">🗓 시간표</div>' +
-    (editable ? '<button class="btn btn-sm btn-ghost" data-act="tbadd">＋ 시간 추가</button>' : '') + '</div>';
+  const plannedMin = blocks.reduce((sum, block) => {
+    const start = ingHmMin(block.s), end = ingHmMin(block.e);
+    return sum + (start !== null && end > start ? end - start : 0);
+  }, 0);
+  let h = '<div class="study-plan-panel"><div class="study-plan-head"><b>' + (isToday ? '오늘' : shortDate(date)) + ' 시간 계획</b>' +
+    '<span class="small muted">계획 ' + fmtDur(plannedMin * 60) + ' · 실제 ' + fmtDur(stTotal(me.id, date)) + '</span>' +
+    (editable ? '<button class="btn btn-ghost" data-act="tbadd">＋ 계획</button>' : '') + '</div>';
 
   if (!blocks.length) {
-    h += '<div class="small muted">아직 짜둔 시간이 없습니다.' +
-      (editable ? ' 몇 시에 무엇을 할지 넣어보세요.' : '') + '</div></div>';
+    h += '<div class="study-plan-empty">' +
+      (editable ? '필요하면 공부할 시간을 먼저 배치해 보세요.' : '짜둔 시간 계획이 없습니다.') + '</div></div>';
     return h;
   }
-  h += blocks.map((b, i) => {
+  h += '<div class="study-plan-list">' + blocks.map((b, i) => {
     const nowOn = isToday && b.s <= hm && hm < b.e;
-    return '<div class="between" style="padding:7px 0;border-bottom:1px solid var(--light-gray)' +
-      (nowOn ? ';background:#EAF6FC;border-radius:8px;padding-left:8px;padding-right:8px' : '') + '">' +
-      '<span class="row" style="gap:10px">' +
-        '<b class="small" style="font-variant-numeric:tabular-nums;color:var(--navy)">' + esc(b.s) + '~' + esc(b.e) + '</b>' +
-        '<span>' + esc(b.label) + (nowOn ? ' <span class="pill">지금</span>' : '') + '</span></span>' +
+    const subject = studySubject(b.subj || inferStudySubjectFromText(b.label || ''));
+    return '<div class="study-plan-row"><div class="study-plan-copy">' +
+      '<i class="study-plan-dot ' + subject.className + '"></i><b>' + esc(b.s) + '~' + esc(b.e) + '</b>' +
+      '<span>' + esc(b.label) + (nowOn ? ' · 지금' : '') + '</span></div>' +
       (editable
-        ? '<span class="row" style="gap:6px">' +
-            (b.subj ? '<button class="btn btn-sm btn-navy" data-act="tbstart" data-subj="' + esc(b.subj) + '">▶ 시작</button>' : '') +
-            '<button class="btn btn-sm btn-ghost" data-act="tbdel" data-i="' + i + '">×</button></span>'
+        ? '<span class="study-plan-actions">' +
+            (b.subj ? '<button class="btn btn-navy" data-act="tbstart" data-subj="' + esc(b.subj) + '">▶</button>' : '') +
+            '<button class="btn btn-ghost" data-act="tbdel" data-i="' + i + '" aria-label="계획 삭제">×</button></span>'
         : '') +
       '</div>';
-  }).join('');
-  const mins = blocks.reduce((a, b) => {
-    const p = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
-    return a + Math.max(0, p(b.e) - p(b.s));
-  }, 0);
-  h += '<div class="small muted" style="margin-top:10px">계획 ' + fmtDur(mins * 60) +
-    (isToday ? ' · 실제 ' + fmtDur(stTotal(me.id, cursor)) : '') + '</div></div>';
-  return h;
+  }).join('') + '</div>';
+  return h + '</div>';
 }
 
 function tbAddModal(me) {
-  modal('🗓 시간 추가',
+  modal('🗓 계획 시간 추가',
     '<div class="row mb14"><input class="in" type="time" id="tbS" value="' + nowHM() + '">' +
       '<span class="muted">~</span><input class="in" type="time" id="tbE"></div>' +
     '<input class="in mb14" id="tbL" placeholder="무엇을 할지 (예: 수학 개념 3단원)">' +
@@ -10439,7 +10474,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.38';
+const APP_VER = '2026-08-19.39';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

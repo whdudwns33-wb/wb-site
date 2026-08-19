@@ -210,8 +210,8 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(planner, /PURE STUDY TIME/);
   assert.match(planner, /<span>과목<\/span><span>세부 공부내용<\/span><span>완료<\/span>/);
   assert.match(planner, /TIME TABLE/);
-  assert.match(planner, /05–24시 · 10분 단위/);
-  assert.match(planner, /studyTimePanel\(me, editable, true\)/);
+  assert.match(planner, /계획·실제 · 10분 단위/);
+  assert.match(planner, /studyTimePanel\(me, editable, true, date\)/);
   assert.match(planner, /ingChecklistItems\(me\.id, date\)/);
   assert.match(planner, /lectures\.map\(item => plannerLectureRow\(me\.id, item, editable\)\)/);
   assert.match(compactRow, /planner-task-subject/);
@@ -226,7 +226,8 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /\.planner-task-row\.done \.planner-check, \.planner-check\.is-done \{[^}]*background: var\(--subject-bg\)/);
   assert.match(css, /\.planner-check\.is-carry \{[^}]*background: var\(--subject-bg\)/);
   assert.match(css, /\.planner-check\.is-negative \{[^}]*background: #FFF3F3/);
-  assert.match(css, /\.study-timeline-cell\.filled \{[^}]*background: var\(--subject-bg\)[^}]*box-shadow: inset 0 0 0 1px var\(--subject-color\)/);
+  assert.match(css, /\.study-timeline-plan \{[^}]*border: 1px dashed var\(--subject-color\)[^}]*background: var\(--subject-bg\)/);
+  assert.match(css, /\.study-timeline-actual \{[^}]*border: 2px solid var\(--subject-color\)[^}]*background: var\(--subject-bg\)/);
   assert.match(css, /\.study-timeline-row \{[^}]*repeat\(6,/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
@@ -266,6 +267,8 @@ test('student claims a scheduled lecture into the study planner with shared prog
 test('timer closes real start-end segments and paints six ten-minute cells per hour', () => {
   const timerData = section('function stStoredSegments(', 'function studyTimePanel(');
   const timerPanel = section('function studyTimePanel(', 'function stCard(');
+  const planPanel = section('function studyPlanPanel(', 'function tbAddModal(');
+  const today = section('function viewToday()', 'function studyTotalHeroCard(');
   const handlers = section("case 'sttask':", '/* 날짜 */');
 
   assert.match(timerData, /segments\.push\(\{ subj: r\.subj, taskId: r\.taskId \|\| '', start: Number\(r\.since\), end: end \}\)/);
@@ -273,7 +276,17 @@ test('timer closes real start-end segments and paints six ten-minute cells per h
   assert.match(timerData, /\[0, 10, 20, 30, 40, 50\]/);
   assert.match(timerData, /for \(let hour = ST_TIMELINE_START; hour < ST_TIMELINE_END; hour\+\+\)/);
   assert.match(timerData, /study-timeline-cell/);
+  assert.match(timerData, /const plans = tbOf\(sid, date\)/);
+  assert.match(timerData, /studyPlanCell\(plans, hour, minute\)/);
+  assert.match(timerData, /study-timeline-plan/);
+  assert.match(timerData, /study-timeline-actual/);
   assert.match(timerPanel, /id="studyTimeline"/);
+  assert.match(timerPanel, /const date = dateOverride \|\| today\(\)/);
+  assert.match(timerPanel, /studyPlanPanel\(me, date, editable\)/);
+  assert.match(planPanel, /data-act="tbadd"/);
+  assert.match(planPanel, /data-act="tbstart"/);
+  assert.match(planPanel, /data-act="tbdel"/);
+  assert.doesNotMatch(today, /tbCard\(/);
   assert.match(handlers, /stStart\(me\.id, today\(\), subj, t\.id\)/);
   assert.match(handlers, /if \(stRunning\(me\.id, today\(\)\)\) stStop/);
   assert.match(html, /if \(turnOn && running && running\.taskId === t\.id\) stStop\(t\.staffId, date\)/);
@@ -302,7 +315,8 @@ test('past dates show the full planner read-only and return to today after close
   assert.match(today, /const pastDate = cursor < today\(\)/);
   assert.match(today, /pastDate \? historicalPlannerTasks\(me\.id, cursor\) : checklistTasksFor\(me\.id, cursor\)/);
   assert.match(today, /const lectureChecklist = ingChecklistItems\(me\.id, cursor\)/);
-  assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, list, \[\], false\)[\s\S]*?tbCard\(me, false\)/);
+  assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, list, \[\], false\)/);
+  assert.doesNotMatch(today, /tbCard\(/);
   assert.match(today, /editable && cursor === today\(\)/);
   assert.doesNotMatch(today, /list\.map\(t => taskRow\(t, cursor, editable, false\)\)/);
   assert.match(history, /new Map\(tasksFor\(staffId, date\)/);
