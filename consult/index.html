@@ -781,17 +781,17 @@
   .planner-list-head span:last-child { border-right: 0; }
   .planner-task-row { position: relative; min-height: 58px; border-bottom: 1px solid #DED9CA; background: var(--subject-bg, rgba(255,255,255,.3)); }
   .planner-task-row.done .planner-task-title { color: #999386; text-decoration: line-through; }
-  .planner-task-subject { display: grid; place-items: center; padding: 6px 4px; border-right: 1px solid rgba(126,120,103,.24); background: var(--subject-color); color: var(--subject-text); font-size: 12px; font-weight: 900; text-align: center; }
-  .planner-task-detail { min-width: 0; padding: 7px 8px 6px; background: rgba(255,255,255,.24); }
+  .planner-task-subject { display: grid; place-items: center; padding: 6px 4px; border-right: 1px solid var(--subject-color); background: var(--subject-bg); color: var(--subject-text); font-size: 12px; font-weight: 900; text-align: center; }
+  .planner-task-detail { min-width: 0; padding: 7px 8px 6px; background: rgba(255,255,255,.55); }
   .planner-task-title { color: #343434; font-size: 13.5px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
   .planner-task-desc { margin-top: 2px; color: #817B6C; font-size: 11px; line-height: 1.4; white-space: pre-wrap; }
   .planner-task-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
   .planner-task-actions .btn { min-height: 29px; padding: 4px 7px; font-size: 10.5px; border-radius: 7px; }
-  .planner-check-wrap { display: grid; place-items: center; border-left: 1px solid rgba(126,120,103,.24); background: rgba(255,255,255,.18); }
+  .planner-check-wrap { display: grid; place-items: center; border-left: 1px solid var(--subject-color); background: rgba(255,255,255,.48); }
   .planner-check { width: 23px; height: 23px; border: 2px solid var(--subject-color, #D897A6); border-radius: 50%; background: rgba(255,255,255,.55); color: transparent; font-size: 14px; font-weight: 900; line-height: 1; }
-  .planner-task-row.done .planner-check, .planner-check.is-done { background: var(--subject-color); border-color: var(--subject-color); color: var(--subject-text); }
+  .planner-task-row.done .planner-check, .planner-check.is-done { background: var(--subject-bg); border-color: var(--subject-color); color: var(--subject-text); }
   .planner-check.is-carry { border-color: var(--subject-color); background: var(--subject-bg); color: var(--subject-text); font-size: 17px; }
-  .planner-check.is-negative { border-color: #E8A5A5; background: #FDEBEB; color: #A84444; font-size: 17px; }
+  .planner-check.is-negative { border-color: #EECACA; background: #FFF3F3; color: #B86767; font-size: 17px; }
   .planner-task-row.planner-closed .planner-task-title { color: #817B6C; }
   .planner-task-extra { grid-column: 1 / -1; padding: 0 8px 9px; border-top: 1px dashed #E2DDCF; background: rgba(255,255,255,.72); }
   .planner-divider { padding: 7px 8px 5px; border-bottom: 1px solid #DED9CA; color: var(--coral); font-size: 10.5px; font-weight: 900; }
@@ -819,7 +819,7 @@
   .study-timeline-minutes { min-height: 20px; color: #A19A88; font-size: 8px; font-weight: 800; }
   .study-timeline-hour { color: #817A68; font-size: 9px; font-weight: 900; font-variant-numeric: tabular-nums; }
   .study-timeline-cell { min-width: 0; background: rgba(255,255,255,.45); }
-  .study-timeline-cell.filled { background: var(--subject-color); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+  .study-timeline-cell.filled { background: var(--subject-bg); box-shadow: inset 0 0 0 1px var(--subject-color); }
   .study-timeline-cell.running { animation: timelinePulse 1.4s ease-in-out infinite; }
   .study-timeline-note { margin-top: 8px; color: #8A8372; font-size: 10px; line-height: 1.5; }
   .study-subject-summary { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
@@ -10439,7 +10439,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.37';
+const APP_VER = '2026-08-19.38';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

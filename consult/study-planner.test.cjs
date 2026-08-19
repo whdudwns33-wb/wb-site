@@ -222,9 +222,11 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /\.study-paper-head/);
   assert.match(css, /grid-template-columns: 62px minmax\(0, 1fr\) 38px/);
   assert.match(css, /\.planner-task-row \{[^}]*background: var\(--subject-bg/);
-  assert.match(css, /\.planner-task-subject \{[^}]*background: var\(--subject-color\)/);
+  assert.match(css, /\.planner-task-subject \{[^}]*background: var\(--subject-bg\)/);
+  assert.match(css, /\.planner-task-row\.done \.planner-check, \.planner-check\.is-done \{[^}]*background: var\(--subject-bg\)/);
   assert.match(css, /\.planner-check\.is-carry \{[^}]*background: var\(--subject-bg\)/);
-  assert.match(css, /\.planner-check\.is-negative \{[^}]*background: #FDEBEB/);
+  assert.match(css, /\.planner-check\.is-negative \{[^}]*background: #FFF3F3/);
+  assert.match(css, /\.study-timeline-cell\.filled \{[^}]*background: var\(--subject-bg\)[^}]*box-shadow: inset 0 0 0 1px var\(--subject-color\)/);
   assert.match(css, /\.study-timeline-row \{[^}]*repeat\(6,/);
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
