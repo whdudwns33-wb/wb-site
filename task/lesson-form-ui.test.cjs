@@ -61,6 +61,26 @@ test('admin lesson registration requires an explicit teacher selection', () => {
   assert.match(html, /if \(session\.isAdmin && !draft\.staffId\) return toast\('담당 선생님을 선택해 주세요'\)/);
 });
 
+test('admin direct lesson registration reuses the new-student information fields and saves roster before lesson', () => {
+  const viewStart = html.indexOf('function lessonRosterInformationHtml(');
+  const viewEnd = html.indexOf('async function loadPublicationReadiness(', viewStart);
+  const fields = html.slice(viewStart, viewEnd);
+  for (const key of ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'memo']) {
+    assert.match(fields, new RegExp(`data-lesson-roster-field="${key}"`), key);
+  }
+  assert.match(fields, /data-lesson-roster-subject/);
+  assert.match(fields, /data-lesson-roster-teacher/);
+  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
+    assert.match(html, new RegExp(subject));
+  }
+  const saveStart = html.indexOf('async function saveLessonRegistration(');
+  const saveEnd = html.indexOf('let feedbackQueue', saveStart);
+  const save = html.slice(saveStart, saveEnd);
+  assert.ok(save.indexOf("sync.post('/roster'") < save.indexOf("sync.post('/lesson-create'"));
+  assert.match(save, /action: 'student_update'/);
+  assert.match(save, /원생 기본 정보는 저장됐습니다/);
+});
+
 test('feedback workflow sends immediately only through the server-side guardian gate', () => {
   assert.match(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
   assert.match(html, /카카오 알림톡 발송 요청을 접수합니다/);
