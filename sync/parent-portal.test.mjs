@@ -466,7 +466,7 @@ test('담당 수업의 오늘 공개 숙제·준비물만 전용 projection에 C
     /GUARDIAN_PUBLICATION_APPEND_ONLY/);
 });
 
-test('관리자 공개 준비 목록은 stable 학생·담당자·시간표 누락 사유를 서버 정본으로 진단한다', async () => {
+test('관리자 공개 준비 목록은 간소화된 stable 학생·담당자 조건만 서버 정본으로 진단한다', async () => {
   const db = new TestD1();
   seed(db);
   const now = Date.now();
@@ -486,11 +486,9 @@ test('관리자 공개 준비 목록은 stable 학생·담당자·시간표 누�
   assert.equal(ready.ready, true);
   const missing = result.body.lessons.find(row => row.taskId === broken.id);
   assert.equal(missing.ready, false);
-  assert.deepEqual(new Set(missing.reasons.map(reason => reason.field)), new Set(['studentId', 'schedule']));
+  assert.deepEqual(new Set(missing.reasons.map(reason => reason.field)), new Set(['studentId']));
   assert.ok(missing.reasons.some(reason => reason.code === 'student_id_missing'));
-  assert.ok(missing.reasons.some(reason => reason.code === 'lesson_format_missing'));
-  assert.ok(missing.reasons.some(reason => reason.code === 'schedule_unconfirmed'));
-  assert.ok(missing.reasons.some(reason => reason.code === 'schedule_slots_missing'));
+  assert.equal(missing.reasons.some(reason => /^schedule_/.test(reason.code)), false);
   assert.equal(result.body.missingCount, 2, 'staff-b 저장 수업의 담당 불일치도 함께 진단한다');
   assert.equal(result.body.readyCount, 1);
 

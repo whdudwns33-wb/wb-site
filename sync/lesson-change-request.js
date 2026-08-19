@@ -83,13 +83,15 @@ function sanitizeLessonChanges(raw) {
   }
   const operation = REQUEST_OPERATIONS.has(String(raw.operation || '')) ? String(raw.operation) : 'lesson_fields';
   const out = operation === 'lesson_fields' ? {} : { operation };
-  if (['withdrawal', 'leave', 'lesson_delete'].includes(operation)) {
+  if (['teacher_assignment', 'withdrawal', 'leave', 'lesson_delete'].includes(operation)) {
     const effectiveDate = normalizeText(raw.effectiveDate);
-    if (!validIsoDate(effectiveDate)) { const e = new Error('적용 날짜를 선택해 주세요'); e.status = 400; throw e; }
+    if (!validIsoDate(effectiveDate)) {
+      const e = new Error(operation === 'teacher_assignment' ? '변경 시작일을 선택해 주세요' : '적용 날짜를 선택해 주세요');
+      e.status = 400; throw e;
+    }
     out.effectiveDate = effectiveDate;
     return out;
   }
-  if (operation === 'teacher_assignment') return out;
   if (operation === 'information_request') {
     const informationRequest = normalizeText(raw.informationRequest);
     if (!informationRequest) { const e = new Error('변경 요청 내용을 자세히 입력해 주세요'); e.status = 400; throw e; }
