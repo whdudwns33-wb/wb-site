@@ -117,6 +117,25 @@ test('monthly important events include D-day, scope, score, and preparation prog
   assert.match(handlers, /plan\.events\.push/);
 });
 
+test('students confirm preparation during daily closeout while only the director can correct it in monthly planning', () => {
+  const month = section('function viewMonth()', '/* ── 지시서 작성 ── */');
+  const progressHandler = section("case 'montheventprogress':", "case 'montheventdel':");
+  const dailySave = section("case 'dailyclosesave':", "case 'report':");
+  const agenda = section('function agendaItemsFor(', 'function agendaImportantItemsFor(');
+
+  assert.match(month, /오늘 학습 마무리/);
+  assert.match(month, /학생 확인/);
+  assert.match(month, /원장 보정/);
+  assert.match(month, /session\.isAdmin \? '<button[\s\S]*?data-act="montheventprogress"/);
+  assert.match(progressHandler, /if \(!session\.isAdmin\) break/);
+  assert.match(progressHandler, /source: 'admin'/);
+  assert.match(dailySave, /source: 'student'/);
+  assert.match(dailySave, /progressConfirmedDate = cursor/);
+  assert.match(dailySave, /setCheck\(monthPlanKey\(me\.id\), ym/);
+  assert.match(agenda, /progress: Math\.max\(0, Math\.min\(100, Number\(event\.progress\)/);
+  assert.match(agenda, /progressConfirmedDate: event\.progressConfirmedDate/);
+});
+
 test('unfinished carried study can move, roll forward, or close without deletion', () => {
   const filters = section('const isStudyOffer', 'const studyOffersFor');
   const helpers = section('function monthBacklog(', 'function viewMonth()');

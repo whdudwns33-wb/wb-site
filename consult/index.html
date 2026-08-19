@@ -384,6 +384,16 @@
   .week-action-body { padding: 4px 17px 14px; border-top: 1px solid var(--light-gray); }
   .week-action-section { padding-top: 12px; }
   .week-action-section + .week-action-section { margin-top: 8px; border-top: 1px dashed var(--line); }
+  .week-close-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 12px; }
+  .week-close-table th, .week-close-table td { padding: 9px 7px; border-bottom: 1px solid var(--light-gray); text-align: center; }
+  .week-close-table th { color: var(--mid-gray); font-size: 11px; }
+  .week-close-table td:nth-child(2) { text-align: left; }
+  .week-detail-card { overflow: hidden; padding: 0; }
+  .week-detail-card > summary { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 13px 17px; cursor: pointer; list-style: none; }
+  .week-detail-card > summary::-webkit-details-marker { display: none; }
+  .week-detail-card > summary::after { content: '⌄'; color: var(--mid-gray); font-weight: 900; }
+  .week-detail-card[open] > summary::after { content: '⌃'; }
+  .week-detail-body { padding: 0 17px 16px; border-top: 1px solid var(--light-gray); }
   .week-backlog-row, .week-offer-row { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--light-gray); }
   .week-backlog-row:last-child, .week-offer-row:last-child { border-bottom: 0; }
   .week-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -611,6 +621,19 @@
   .planner-task-extra { grid-column: 1 / -1; padding: 0 8px 9px; border-top: 1px dashed #E2DDCF; background: rgba(255,255,255,.72); }
   .planner-divider { padding: 7px 8px 5px; border-bottom: 1px solid #DED9CA; color: var(--coral); font-size: 10.5px; font-weight: 900; }
   .study-time-total { font-size: 32px; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .daily-close-card { border: 2px solid #C7D8ED; background: linear-gradient(145deg, #F8FBFF, #FFFFFF); }
+  .daily-close-card.complete { border-color: #B7E3C8; background: linear-gradient(145deg, #F3FCF6, #FFFFFF); }
+  .daily-close-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+  .daily-close-step { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .daily-close-step span { display: block; margin-bottom: 3px; color: var(--mid-gray); font-size: 10px; font-weight: 900; }
+  .daily-close-step b { display: block; color: var(--navy); font-size: 12px; line-height: 1.4; }
+  .daily-close-step.ok { border-color: #B7E3C8; background: #F3FCF6; }
+  .daily-close-step.warn { border-color: #F5D7A8; background: #FFF9EF; }
+  .daily-close-item { padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
+  .daily-close-item:last-child { border-bottom: 0; }
+  .daily-close-item-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .65fr); gap: 8px; margin-top: 7px; }
+  .daily-close-event { padding: 11px; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFF; }
+  .daily-close-event select { margin-top: 8px; }
   .study-total-hero { text-align: center; padding: 20px 17px; }
   .study-total-hero .study-time-total { font-size: clamp(38px, 10vw, 54px); line-height: 1.15; margin: 5px 0 7px; }
   .study-total-hero .study-total-label { color: var(--mid-gray); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
@@ -655,6 +678,7 @@
     .study-planner-pane + .study-planner-pane { border-left: none; border-top: 2px solid #CFC9B7; }
     .planner-list-head, .planner-task-row { grid-template-columns: 54px minmax(0, 1fr) 34px; }
     .planner-task-detail { padding-left: 7px; padding-right: 7px; }
+    .daily-close-steps, .daily-close-item-grid { grid-template-columns: 1fr; }
     .week-review-grid { grid-template-columns: 1fr; }
     .week-action-summary { align-items: flex-start; }
     .week-action-counts { justify-content: flex-start; }
@@ -1711,6 +1735,7 @@ function viewToday() {
   const checklistPct = checklistTotal ? Math.round(checklistDone / checklistTotal * 100) : 0;
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
+  const priorCloseDates = session.isStaffLink && cursor === today() ? dailyUnclosedDates(me.id, cursor) : [];
 
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
@@ -1719,6 +1744,14 @@ function viewToday() {
     '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
     '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+
+  if (priorCloseDates.length) {
+    h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 마무리하지 않은 하루가 있습니다</div>' +
+      '<div class="card-sub">전날 기록을 먼저 정리해야 오늘 수행 보고를 만들 수 있습니다.</div></div>' +
+      '<span class="pill bad">' + priorCloseDates.length + '일</span></div>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="daypick" data-date="' + priorCloseDates[0] + '">' +
+        label(priorCloseDates[0]) + ' 마무리하기</button></div>';
+  }
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   list.forEach(t => counts[statusOf(t, cursor)]++);
@@ -1777,10 +1810,7 @@ function viewToday() {
   if (editable) {
     h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
   }
-  if (session.isStaffLink) {
-    h += '<button class="btn btn-navy btn-block" data-act="report">오늘 수행 보고 문자 만들기</button>' +
-      '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.</div>';
-  }
+  if (cursor >= DAILY_CLOSE_START && cursor <= today()) h += dailyClosureCard(me, cursor);
   return h;
 }
 
@@ -3915,9 +3945,29 @@ function viewWeek() {
 
   h += stWeekCard(me, days);
 
+  h += '<div class="card"><div class="between mb8"><div><div class="card-title">✅ 월~일 학습·마감</div>' +
+    '<div class="card-sub">학생이 오늘 마무리에서 확인한 결과를 날짜별로 보여줍니다.</div></div></div>' +
+    '<div class="weekwrap"><table class="week-close-table"><thead><tr><th>요일</th><th>마감</th><th>공부 완료</th><th>순공시간</th><th>시험 준비 확인</th></tr></thead><tbody>' +
+    days.map(date => {
+      const closeData = dailyCloseState(me.id, date);
+      const closeStatus = dailyCloseStatusLabel(me.id, date);
+      const summaryItems = closeData.close.itemSnapshot.length ? closeData.close.itemSnapshot : closeData.items;
+      const itemDone = summaryItems.filter(item => item.done).length;
+      const eventChecks = closeData.events.filter(ref =>
+        Object.prototype.hasOwnProperty.call(closeData.close.eventProgress, ref.event.id));
+      const eventText = eventChecks.length ? eventChecks.map(ref => esc(ref.event.title) + ' ' +
+        Number(closeData.close.eventProgress[ref.event.id]) + '%').join('<br>') : '—';
+      const statusClass = closeStatus.key === 'complete' ? '' : closeStatus.key === 'future' ? '' : closeStatus.key === 'ready' ? 'warn' : 'bad';
+      return '<tr><td><b>' + DOW[dowOf(date)] + '</b><div class="small muted">' + shortDate(date) + '</div></td>' +
+        '<td><span class="pill ' + statusClass + '">' + closeStatus.label + '</span></td>' +
+        '<td>' + itemDone + '/' + summaryItems.length + '</td><td>' + fmtDur(stTotal(me.id, date)) + '</td>' +
+        '<td class="small">' + eventText + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>';
+
   if (list.length) {
-    h += '<div class="card weekwrap"><div class="between mb8"><div><div class="card-title">📅 월~일 공부 배치</div>' +
-      '<div class="card-sub">완료 체크와 오늘 플래너가 같은 기록을 사용합니다.</div></div></div>' +
+    h += '<details class="card week-detail-card"><summary><span><span class="card-title" style="display:block">📅 상세 공부 배치 보기</span>' +
+      '<span class="card-sub">요일별 공부를 확인하거나 한 번 하는 공부의 날짜를 바꿉니다.</span></span></summary>' +
+      '<div class="week-detail-body"><div class="weekwrap">' +
       '<details class="week-key"><summary>표시 설명</summary>' +
         '<div class="week-key-body"><span>🔵 완료</span><span>🟠 진행 중</span><span>🔴 막힘</span>' +
         '<span>🩷 지난 날짜 미완료</span><span>↔ 한 번 하는 공부의 요일 변경</span></div></details>' +
@@ -3938,7 +3988,7 @@ function viewWeek() {
               '</div></td>';
           }).join('') + '</tr>';
       }).join('') +
-      '</tbody></table></div>';
+      '</tbody></table></div></div></details>';
   } else {
     h += '<div class="card"><div class="empty"><b>📋</b>이 주의 체크리스트가 비어 있습니다.</div></div>';
   }
@@ -4032,6 +4082,218 @@ function monthBacklog(staffId, ym) {
     });
   });
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ── 학생의 하루 마감 ──
+ * 오늘 탭에서 미완료 처리와 시험 준비율 확인을 끝내야 보고 문자를 만들 수 있다. */
+const DAILY_CLOSE_START = '2026-08-19';
+const dailyCloseKey = staffId => '__dailyclose__' + staffId;
+function dailyCloseOf(staffId, date) {
+  const check = state.checks[dailyCloseKey(staffId) + '|' + date];
+  const close = Object.assign({ status: 'open', resolutions: {}, eventProgress: {}, itemSnapshot: [] },
+    (check && check.close) || {});
+  close.resolutions = Object.assign({}, close.resolutions || {});
+  close.eventProgress = Object.assign({}, close.eventProgress || {});
+  close.itemSnapshot = Array.isArray(close.itemSnapshot) ? close.itemSnapshot : [];
+  return close;
+}
+
+function dailyCloseStudyItems(staffId, date) {
+  const tasks = tasksFor(staffId, date).filter(task => isStudyClaimed(task, date)).map(task => {
+    const check = getCheck(task.id, date);
+    return {
+      key: 'task:' + task.id, type: 'task', id: task.id, task: task,
+      label: task.title, detail: task.detail || '', subjectKey: taskStudySubjectKey(task),
+      done: !!(check && check.done), blocked: !!(check && check.blocked), dropped: !!(check && check.dropped)
+    };
+  });
+  const lectures = ingChecklistItems(staffId, date).map(item => {
+    const found = ingLec(staffId, item.cid, item.seq);
+    return {
+      key: 'lecture:' + item.cid + ':' + Number(item.seq), type: 'lecture', cid: item.cid, seq: Number(item.seq), item: item,
+      label: found ? found.course.name + ' ' + item.seq + '강' : '인강 ' + item.seq + '강',
+      detail: found && found.lec.title ? found.lec.title : '',
+      subjectKey: found ? ingCourseSubjectKey(found.course) : 'other', done: !!item.done,
+      blocked: !!item.blocked, dropped: !!item.closed
+    };
+  });
+  return tasks.concat(lectures);
+}
+
+function dailyCloseEventRefs(staffId, date) {
+  const end = addDays(date, 30);
+  const months = [...new Set([ymOf(date), ymOf(end)])];
+  const refs = [];
+  months.forEach(ym => {
+    const plan = monthPlanOf(staffId, ym);
+    plan.events.forEach(event => {
+      if (event.date >= date && event.date <= end) refs.push({ ym: ym, plan: plan, event: event });
+    });
+  });
+  return refs.sort((a, b) => a.event.date.localeCompare(b.event.date)).slice(0, 3);
+}
+
+function dailyCloseSignature(staffId, date, override) {
+  const close = override || dailyCloseOf(staffId, date);
+  const items = dailyCloseStudyItems(staffId, date).map(item => [item.key, item.done, item.blocked, item.dropped]);
+  const events = dailyCloseEventRefs(staffId, date).map(ref => [ref.event.id, Number(ref.event.progress) || 0]);
+  const resolutions = Object.keys(close.resolutions || {}).sort().map(key => {
+    const row = close.resolutions[key] || {};
+    return [key, row.type || '', row.note || ''];
+  });
+  return JSON.stringify([items, events, resolutions, stTotal(staffId, date)]);
+}
+
+function dailyCloseState(staffId, date) {
+  const close = dailyCloseOf(staffId, date);
+  const items = dailyCloseStudyItems(staffId, date);
+  const incomplete = items.filter(item => !item.done);
+  const unresolved = incomplete.filter(item => !(close.resolutions[item.key] || {}).type);
+  const events = dailyCloseEventRefs(staffId, date);
+  const unconfirmedEvents = events.filter(ref =>
+    !Object.prototype.hasOwnProperty.call(close.eventProgress, ref.event.id));
+  const running = date === today() ? stRunning(staffId, date) : null;
+  const signature = dailyCloseSignature(staffId, date, close);
+  const reviewCurrent = !!close.reviewedAt && close.reviewSignature === signature;
+  const complete = close.status === 'complete' && close.signature === signature;
+  return {
+    close: close, items: items, incomplete: incomplete, unresolved: unresolved,
+    events: events, unconfirmedEvents: unconfirmedEvents, running: running,
+    signature: signature, reviewCurrent: reviewCurrent, complete: complete,
+    canReport: !running && !unresolved.length && !unconfirmedEvents.length && reviewCurrent
+  };
+}
+
+function dailyCloseStatusLabel(staffId, date) {
+  if (date < DAILY_CLOSE_START) return { key: 'legacy', label: '도입 전' };
+  const data = dailyCloseState(staffId, date);
+  if (data.complete) return { key: 'complete', label: '마감 완료' };
+  if (date > today()) return { key: 'future', label: '예정' };
+  if (data.canReport) return { key: 'ready', label: '보고 전' };
+  if (data.close.reviewedAt) return { key: 'changed', label: '재확인 필요' };
+  if (date < today()) return { key: 'miss', label: '미마감' };
+  return { key: 'open', label: '진행 중' };
+}
+
+function dailyUnclosedDates(staffId, date) {
+  const out = [];
+  for (let offset = 7; offset >= 1; offset--) {
+    const target = addDays(date, -offset);
+    if (target < DAILY_CLOSE_START) continue;
+    const close = dailyCloseOf(staffId, target);
+    const hadStudy = dailyCloseStudyItems(staffId, target).length || stTotal(staffId, target) > 0 || close.reviewedAt;
+    if (hadStudy && !dailyCloseState(staffId, target).complete) out.push(target);
+  }
+  return out;
+}
+
+function dailyClosureCard(student, date) {
+  const data = dailyCloseState(student.id, date);
+  const total = data.items.length;
+  const done = data.items.filter(item => item.done).length;
+  const eventText = data.events.length
+    ? (data.unconfirmedEvents.length ? data.unconfirmedEvents.length + '개 확인 필요' : data.events.length + '개 확인 완료')
+    : '해당 일정 없음';
+  const status = dailyCloseStatusLabel(student.id, date);
+  const studentMode = session.isStaffLink && session.staffId === student.id;
+  const priorDates = date === today() ? dailyUnclosedDates(student.id, date) : [];
+  let action = '';
+  if (studentMode) {
+    if (priorDates.length) action = '<button class="btn btn-primary btn-block" data-act="daypick" data-date="' + priorDates[0] + '">이전 미마감 ' + priorDates.length + '일 먼저 마무리</button>';
+    else if (data.complete) action = '<button class="btn btn-ghost btn-block" data-act="report">보고 문자 다시 보기</button>';
+    else if (data.canReport) action = '<button class="btn btn-navy btn-block" data-act="report">확인하고 수행 보고 문자 만들기</button>';
+    else action = '<button class="btn btn-primary btn-block" data-act="dailycloseopen">오늘 마무리 확인</button>';
+  }
+  return '<div class="card daily-close-card' + (data.complete ? ' complete' : '') + '" id="dailyCloseCard">' +
+    '<div class="between"><div><div class="card-title">✅ ' + (date === today() ? '오늘' : label(date)) + ' 학습 마무리</div>' +
+      '<div class="card-sub">아래 단계를 확인해야 오늘 보고 문자를 만들 수 있습니다.</div></div>' +
+      '<span class="pill ' + (data.complete && !priorDates.length ? '' : data.canReport && !priorDates.length ? 'warn' : 'bad') + '">' +
+        (priorDates.length ? '이전 마감 필요' : status.label) + '</span></div>' +
+    '<div class="daily-close-steps">' +
+      '<div class="daily-close-step ' + (!data.running ? 'ok' : 'warn') + '"><span>1 · 공부 종료</span><b>' +
+        (data.running ? '타이머 정지 필요' : done + '/' + total + '개 완료') + '</b></div>' +
+      '<div class="daily-close-step ' + (!data.unresolved.length ? 'ok' : 'warn') + '"><span>2 · 미완료 정리</span><b>' +
+        (data.unresolved.length ? data.unresolved.length + '개 처리 필요' : '정리 완료') + '</b></div>' +
+      '<div class="daily-close-step ' + (!data.unconfirmedEvents.length ? 'ok' : 'warn') + '"><span>3 · 일정 준비율</span><b>' + eventText + '</b></div>' +
+    '</div>' + action +
+    (!studentMode ? '<div class="hint">학생이 오늘 탭에서 직접 마무리하고 발송 완료를 확인합니다.</div>' :
+      '<div class="hint" style="text-align:center;margin-top:10px">새로고침해도 마감 단계와 확인 기록은 유지됩니다.</div>') + '</div>';
+}
+
+function dailyResolutionOptions(selected) {
+  return [['', '처리 방법 선택'], ['carry', '내일로 이월'], ['blocked', '막힘 · 사유 남기기'], ['closed', '오늘 종료 · 사유 남기기']]
+    .map(([value, label]) => '<option value="' + value + '"' + (selected === value ? ' selected' : '') + '>' + label + '</option>').join('');
+}
+
+function dailyCloseModal(staffId, date) {
+  const data = dailyCloseState(staffId, date);
+  const rows = data.incomplete.map(item => {
+    const saved = data.close.resolutions[item.key] || {};
+    return '<div class="daily-close-item ' + studySubject(item.subjectKey).className + '">' +
+      '<div class="row wraprow" style="gap:6px">' + studySubjectTag(item.subjectKey) +
+        '<b class="small">' + esc(item.label) + '</b></div>' +
+      (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') +
+      '<div class="daily-close-item-grid"><select class="in" data-daily-resolution data-key="' + esc(item.key) + '">' +
+        dailyResolutionOptions(saved.type || '') + '</select>' +
+        '<input class="in" data-daily-note data-key="' + esc(item.key) + '" value="' + esc(saved.note || '') + '" placeholder="막힘·종료 사유"></div></div>';
+  }).join('');
+  const events = data.events.map(ref => {
+    const event = ref.event;
+    const current = Object.prototype.hasOwnProperty.call(data.close.eventProgress, event.id)
+      ? Number(data.close.eventProgress[event.id]) : Math.max(0, Math.min(100, Number(event.progress) || 0));
+    return '<div class="daily-close-event"><div class="between"><div><b>' + esc(event.title) + '</b>' +
+      '<div class="small muted">' + monthDday(event.date) + (event.range ? ' · ' + esc(event.range) : '') + '</div></div>' +
+      '<span class="pill warn">현재 ' + current + '%</span></div>' +
+      '<select class="in" data-daily-event data-event-id="' + esc(event.id) + '">' +
+        [...new Set(Array.from({ length: 11 }, (_, i) => i * 10).concat(current))].sort((a, b) => a - b).map(value => '<option value="' + value + '"' +
+          (value === current ? ' selected' : '') + '>' + value + '% · ' +
+          (value === 0 ? '준비 전' : value <= 30 ? '시작' : value <= 60 ? '진행 중' : value < 100 ? '마무리 중' : '준비 완료') + '</option>').join('') +
+      '</select></div>';
+  }).join('');
+  modal('✅ ' + (date === today() ? '오늘' : label(date)) + ' 학습 마무리',
+    (data.running ? '<div class="guide mb14"><b>공부 타이머가 실행 중입니다.</b>타이머를 정지한 뒤 마무리할 수 있습니다.</div>' : '') +
+    '<div class="card-sub mb8">1. 미완료 공부 정리</div>' +
+    (rows || '<div class="guide mb14"><b>미완료 공부 정리 완료</b>처리할 공부가 없습니다.</div>') +
+    '<hr class="sep"><div class="card-sub mb8">2. 시험·중요 일정 준비율 확인</div>' +
+    (events || '<div class="guide"><b>확인할 일정 없음</b>30일 안에 예정된 시험·중요 일정이 없습니다.</div>'),
+    '<button class="btn btn-primary btn-block mt14" data-act="dailyclosesave">마무리 내용 저장</button>');
+}
+
+function dailyCarryTask(task, date) {
+  if (task.carry) return;
+  const nextDate = date < today() ? today() : addDays(date, 1);
+  const exists = state.tasks.some(row => !row.deleted && row.dailyCarryFrom === task.id + '|' + date);
+  if (exists) return;
+  state.tasks.push(Object.assign({}, task, {
+    id: uid(), groupId: 'daily-carry-' + now(), repeat: 'once', days: [], start: nextDate, end: '',
+    carry: true, requiresClaim: false, dailyCarryFrom: task.id + '|' + date,
+    createdAt: now(), updatedAt: now(), deleted: false
+  }));
+  save(); queueSync();
+}
+
+function dailyCarryLecture(staffId, date, cid, seq) {
+  const current = ingPlan(staffId, date);
+  const moving = current.find(item => item.cid === cid && Number(item.seq) === Number(seq));
+  if (!moving) return;
+  ingSavePlan(staffId, date, current.filter(item => !(item.cid === cid && Number(item.seq) === Number(seq))));
+  const nextDate = date < today() ? today() : addDays(date, 1);
+  const next = ingPlan(staffId, nextDate);
+  if (!next.some(item => item.cid === cid && Number(item.seq) === Number(seq))) {
+    next.push(Object.assign({}, moving, { s: '', e: '', auto: 'daily-close-v1', done: false }));
+    ingSavePlan(staffId, nextDate, next);
+  }
+}
+
+function dailyReportModal(staffId, date) {
+  const data = dailyCloseState(staffId, date);
+  const copied = data.close.copySignature === data.signature;
+  modal('📨 오늘 수행 보고',
+    '<textarea class="in" rows="15" id="mText" readonly>' + esc(reportText(staffId, date)) + '</textarea>' +
+    '<div class="hint">문자를 복사해 발송한 뒤 아래에서 발송 완료를 확인해야 오늘 마감이 끝납니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="dailyreportcopy">보고 문자 복사</button>' +
+    '<button class="btn btn-navy btn-block mt14" data-act="dailyreportfinish"' + (data.complete || !copied ? ' disabled' : '') + '>' +
+      (data.complete ? '✓ 오늘 마감 완료' : copied ? '복사 완료 · 발송했어요' : '문자를 먼저 복사해 주세요') + '</button>');
 }
 
 /* ── 발행형 주간·월간 리포트 ──
@@ -4319,7 +4581,9 @@ function agendaItemsFor(staffId, start, end) {
         key: 'personal:' + event.id + ':' + date, source: 'personal', sourceId: event.id,
         title: event.title, date: date, startTime: '', endTime: '', allDay: true,
         type: event.kind === 'exam' || event.kind === 'mock' ? 'exam' : 'personal',
-        detail: event.range || '', done: false, quiet: false, personal: true, importantKind: event.kind || 'other'
+        detail: event.range || '', done: false, quiet: false, personal: true, importantKind: event.kind || 'other',
+        progress: Math.max(0, Math.min(100, Number(event.progress) || 0)),
+        progressConfirmedDate: event.progressConfirmedDate || ''
       }));
 
     checklistTasksFor(staffId, date).forEach(task => {
@@ -4497,7 +4761,8 @@ function agendaCalendarCard(me, ym) {
     '<div class="card-sub">앞으로 90일 중 가까운 중요한 일정입니다.</div></div><span class="pill warn">' + upcoming.length + '건</span></div>' +
     '<div class="agenda-upcoming-list">' + upcoming.map(item => '<button class="agenda-upcoming-row" data-act="agendapick" data-date="' + item.date + '">' +
       '<span class="pill ' + (item.date === today() ? 'bad' : 'warn') + '">' + esc(agendaDday(item.date)) + '</span>' +
-      '<b>' + esc(agendaImportantLabel(item) + ' · ' + item.title) + '</b><time datetime="' + item.date + '">' + esc(shortDate(item.date)) + '</time></button>').join('') + '</div></div>' : '';
+      '<b>' + esc(agendaImportantLabel(item) + ' · ' + item.title) + '</b><time datetime="' + item.date + '">' + esc(shortDate(item.date)) +
+        (item.personal ? '<br>준비 ' + Number(item.progress || 0) + '%' : '') + '</time></button>').join('') + '</div></div>' : '';
   h += '<div class="card"><div class="agenda-head"><div><div class="card-title">📅 중요한 일정</div>' +
     '<div class="card-sub">시험·수행평가·원장이 지정한 중요 일정만 보여줍니다.</div></div>' +
     (editable ? '<button class="btn btn-sm btn-primary" data-act="montheventadd" data-date="' + agendaDate + '">＋ 일정 추가</button>' : '') + '</div>' +
@@ -4508,7 +4773,7 @@ function agendaCalendarCard(me, ym) {
     '<div class="agenda-list" aria-live="polite">' + (selected.length ? selected.map(item => {
       const type = agendaImportantLabel(item);
       return '<div class="agenda-item"><div class="agenda-time">' + esc(agendaDday(item.date)) + '</div><div><div class="row wraprow" style="gap:5px"><span class="tag">' + esc(type) + '</span>' +
-        '<b class="small">' + esc(item.title) + '</b></div>' +
+        '<b class="small">' + esc(item.title) + '</b>' + (item.personal ? '<span class="tag doing">준비 ' + Number(item.progress || 0) + '%</span>' : '') + '</div>' +
         (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') + '</div><details class="agenda-item-more"><summary class="btn btn-sm btn-ghost">내보내기</summary><div class="agenda-actions">' +
         '<a class="btn btn-sm btn-ghost" href="' + esc(googleCalendarUrl(item)) + '" target="_blank" rel="noopener noreferrer">Google에서 확인 후 저장</a>' +
         '<button class="btn btn-sm" data-act="agendaics" data-key="' + esc(item.key) + '" data-date="' + item.date + '">.ics 받기</button></div></details></div>';
@@ -4631,19 +4896,27 @@ function viewMonth() {
   /* 시험 · 중요 일정 */
   if (monthSection === 'plan') {
   h += '<div class="card"><div class="between mb8"><div><div class="card-title">📌 시험·중요 일정</div>' +
-    '<div class="card-sub">시험일과 준비 진행률을 함께 관리합니다.</div></div>' +
+    '<div class="card-sub">시험일과 학생이 오늘 마무리에서 확인한 준비율을 함께 관리합니다.</div></div>' +
     (editable ? '<button class="btn btn-sm btn-ghost" data-act="montheventadd">＋ 일정</button>' : '') + '</div>';
+  if (session.isStaffLink) h += '<div class="hint mb14">준비율 변경은 오늘 학습을 마친 뒤 ‘오늘 학습 마무리’ 단계에서 확인합니다.</div>';
   if (!events.length) h += '<div class="empty" style="padding:22px 12px"><b>🗓</b>등록된 시험이나 중요 일정이 없습니다.</div>';
   h += events.map(event => {
     const kind = MONTH_EVENT_KINDS[event.kind] || MONTH_EVENT_KINDS.other;
     const progressValue = Math.max(0, Math.min(100, Number(event.progress) || 0));
+    const history = Array.isArray(event.progressHistory) ? event.progressHistory.filter(row => row && row.date) : [];
+    const latestProgress = history.length ? history.slice().sort((a, b) => Number(b.at || 0) - Number(a.at || 0))[0] : null;
+    const progressSource = latestProgress
+      ? (latestProgress.source === 'student' ? shortDate(latestProgress.date) + ' 학생 확인' : shortDate(latestProgress.date) + ' 원장 보정')
+      : '아직 확인 전';
     return '<div class="month-event-row"><span class="pill ' + (event.date < today() ? '' : 'warn') + '">' + monthDday(event.date) + '</span>' +
       '<div><div class="row wraprow" style="gap:6px"><b>' + esc(event.title) + '</b><span class="tag">' + kind + '</span>' +
         (event.goalScore ? '<span class="tag doing">목표 ' + Number(event.goalScore) + '점</span>' : '') + '</div>' +
         '<div class="small muted">' + label(event.date) + (event.range ? ' · ' + esc(event.range) : '') + '</div>' +
-        '<div class="month-event-progress"><i style="width:' + progressValue + '%"></i></div><div class="small muted">준비 ' + progressValue + '%</div></div>' +
-      (editable ? '<div class="row wraprow" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="-10">－</button>' +
-        '<button class="btn btn-sm" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="10">＋10%</button>' +
+        '<div class="month-event-progress"><i style="width:' + progressValue + '%"></i></div>' +
+        '<div class="small muted">준비 ' + progressValue + '% · ' + progressSource + '</div></div>' +
+      (editable ? '<div class="row wraprow" style="gap:5px">' +
+        (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="-10">원장 －10%</button>' +
+          '<button class="btn btn-sm" data-act="montheventprogress" data-id="' + esc(event.id) + '" data-n="10">원장 ＋10%</button>' : '') +
         '<button class="btn btn-sm btn-danger" data-act="montheventdel" data-id="' + esc(event.id) + '">삭제</button></div>' : '') + '</div>';
   }).join('') + '</div>';
 
@@ -5967,17 +6240,31 @@ function quickText(t) {
 
 function reportText(staffId, date) {
   const s = staffById(staffId);
-  const list = tasksFor(staffId, date);
-  const p = progress(staffId, date);
+  const close = dailyCloseOf(staffId, date);
+  const currentItems = dailyCloseStudyItems(staffId, date);
+  const list = close.itemSnapshot.length ? close.itemSnapshot : currentItems.map(item => ({
+    key: item.key, type: item.type, label: item.label, detail: item.detail,
+    subjectKey: item.subjectKey, done: item.done
+  }));
+  const done = list.filter(item => item.done).length;
+  const pct = list.length ? Math.round(done / list.length * 100) : 0;
   let txt = '✅ ' + label(date) + ' 업무 수행 보고\n' + (s ? s.name + '\n' : '') +
-    '완료 ' + p.done + '/' + p.total + '건 (' + p.pct + '%)\n─────────\n';
-  txt += list.map(t => {
-    const c = getCheck(t.id, date), st = statusOf(t, date), pr = taskProgress(t, c);
-    const mark = st === 'done' ? '✅' : st === 'blocked' ? '🚧' : st === 'doing' ? '🔸' : '⬜';
-    return mark + ' ' + t.title +
-      (st === 'doing' ? ' (' + pr.done + '/' + pr.total + pr.unit + ')' : '') +
-      (c && c.note ? '\n   · ' + c.note : '');
-  }).join('\n') || '(지시된 업무 없음)';
+    '완료 ' + done + '/' + list.length + '건 (' + pct + '%)\n' +
+    '순공시간 ' + fmtDur(stTotal(staffId, date)) + '\n─────────\n';
+  txt += list.map(item => {
+    const resolution = close.resolutions[item.key] || {};
+    const mark = item.done ? '✅' : resolution.type === 'carry' ? '↪' : resolution.type === 'blocked' ? '🚧' : resolution.type === 'closed' ? '⏹' : '⬜';
+    const result = resolution.type === 'carry' ? ' [내일로 이월]' : resolution.type === 'blocked' ? ' [막힘]' : resolution.type === 'closed' ? ' [오늘 종료]' : '';
+    return mark + ' ' + item.label + result + (resolution.note ? '\n   · ' + resolution.note : '');
+  }).join('\n') || '(체크리스트가 비어 있음)';
+  const events = dailyCloseEventRefs(staffId, date);
+  if (events.length) {
+    txt += '\n─────────\n📌 시험·중요 일정 준비율\n' + events.map(ref => {
+      const value = Object.prototype.hasOwnProperty.call(close.eventProgress, ref.event.id)
+        ? Number(close.eventProgress[ref.event.id]) : Number(ref.event.progress) || 0;
+      return '· ' + ref.event.title + ' ' + monthDday(ref.event.date) + ' · 준비 ' + value + '%';
+    }).join('\n');
+  }
   return txt;
 }
 
@@ -6031,14 +6318,16 @@ function briefText(date) {
 }
 
 async function copy(text) {
-  try { await navigator.clipboard.writeText(text); toast('복사했습니다'); }
+  try { await navigator.clipboard.writeText(text); toast('복사했습니다'); return true; }
   catch (e) {
     const ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); toast('복사했습니다'); }
+    let copied = false;
+    try { copied = !!document.execCommand('copy'); toast(copied ? '복사했습니다' : '복사 실패 — 직접 선택해 주세요'); }
     catch (e2) { toast('복사 실패 — 직접 선택해 주세요'); }
     document.body.removeChild(ta);
+    return copied;
   }
 }
 
@@ -7457,18 +7746,22 @@ document.addEventListener('click', ev => {
         id: uid(), kind: $('#mEventKind').value || 'other', title: title, date: eventDate,
         range: ($('#mEventRange').value || '').trim(),
         goalScore: Math.max(0, Math.min(100, Number($('#mEventScore').value) || 0)),
-        progress: 0, createdAt: now()
+        progress: 0, progressHistory: [], createdAt: now()
       });
       setCheck(monthPlanKey(me.id), ym, { plan: plan, done: true });
       closeModal(); render(); toast('중요 일정을 추가했습니다');
       break;
     }
     case 'montheventprogress': {
+      if (!session.isAdmin) break;
       const me = currentStaff(); if (!me) break;
       const plan = monthPlanOf(me.id, ymCursor);
       const event = plan.events.find(item => item.id === id);
       if (!event) break;
       event.progress = Math.max(0, Math.min(100, (Number(event.progress) || 0) + Number(el.dataset.n)));
+      event.progressHistory = (Array.isArray(event.progressHistory) ? event.progressHistory : []).concat({
+        date: today(), value: event.progress, source: 'admin', at: now()
+      });
       setCheck(monthPlanKey(me.id), ymCursor, { plan: plan, done: true });
       render();
       break;
@@ -7737,7 +8030,125 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'orderText': showText('카카오톡 지시서 문구', orderText(id, cursor)); break;
-    case 'report': showText('오늘 수행 보고', reportText(currentStaff().id, cursor)); break;
+    case 'dailycloseopen': {
+      const me = currentStaff();
+      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today()) break;
+      dailyCloseModal(me.id, cursor);
+      break;
+    }
+    case 'dailyclosesave': {
+      const me = currentStaff();
+      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today()) break;
+      const data = dailyCloseState(me.id, cursor);
+      if (data.running) return toast('공부 타이머를 먼저 정지해 주세요');
+      const resolutionEls = [...document.querySelectorAll('[data-daily-resolution]')];
+      const noteEls = [...document.querySelectorAll('[data-daily-note]')];
+      const nextResolutions = Object.assign({}, data.close.resolutions);
+      for (const item of data.incomplete) {
+        const select = resolutionEls.find(input => input.dataset.key === item.key);
+        const noteInput = noteEls.find(input => input.dataset.key === item.key);
+        const type = select ? select.value : ((nextResolutions[item.key] || {}).type || '');
+        const note = noteInput ? noteInput.value.trim() : ((nextResolutions[item.key] || {}).note || '');
+        if (!type) return toast(item.label + '의 처리 방법을 선택해 주세요');
+        if ((type === 'blocked' || type === 'closed') && !note) return toast(item.label + '의 사유를 입력해 주세요');
+        const previous = nextResolutions[item.key] || {};
+        nextResolutions[item.key] = {
+          type: type, note: note, label: item.label, detail: item.detail || '',
+          subjectKey: item.subjectKey, itemType: item.type, at: now()
+        };
+        if (item.type === 'task') {
+          if (type === 'carry' && previous.type !== 'carry') dailyCarryTask(item.task, cursor);
+          if (type === 'carry') setCheck(item.id, cursor, { blocked: false, dropped: false, note: note });
+          if (type === 'blocked') setCheck(item.id, cursor, { blocked: true, dropped: false, note: note });
+          if (type === 'closed') setCheck(item.id, cursor, { blocked: false, dropped: true, dropReason: 'daily-close', droppedAt: now(), note: note });
+        } else {
+          if (type === 'carry' && previous.type !== 'carry') dailyCarryLecture(me.id, cursor, item.cid, item.seq);
+          if (type === 'blocked') ingPatchItem(me.id, cursor, item.cid, item.seq, { blocked: true, closed: false, closeNote: note });
+          if (type === 'closed') ingPatchItem(me.id, cursor, item.cid, item.seq, { blocked: false, closed: true, closeNote: note });
+        }
+      }
+
+      const nextEventProgress = Object.assign({}, data.close.eventProgress);
+      const eventInputs = [...document.querySelectorAll('[data-daily-event]')];
+      const changedPlans = new Map();
+      data.events.forEach(ref => {
+        const input = eventInputs.find(field => field.dataset.eventId === ref.event.id);
+        const value = Math.max(0, Math.min(100, Number(input ? input.value : ref.event.progress) || 0));
+        nextEventProgress[ref.event.id] = value;
+        ref.event.progress = value;
+        const history = Array.isArray(ref.event.progressHistory) ? ref.event.progressHistory.slice() : [];
+        ref.event.progressHistory = history.filter(row => !(row && row.date === cursor && row.source === 'student'))
+          .concat({ date: cursor, value: value, source: 'student', at: now() });
+        ref.event.progressConfirmedAt = now();
+        ref.event.progressConfirmedDate = cursor;
+        changedPlans.set(ref.ym, ref.plan);
+      });
+      changedPlans.forEach((plan, ym) => setCheck(monthPlanKey(me.id), ym, { plan: plan, done: true }));
+
+      const snapshot = data.items.map(item => ({
+        key: item.key, type: item.type, label: item.label, detail: item.detail || '',
+        subjectKey: item.subjectKey, done: item.done
+      }));
+      Object.keys(nextResolutions).forEach(key => {
+        if (snapshot.some(item => item.key === key)) return;
+        const previousItem = data.close.itemSnapshot.find(item => item.key === key);
+        const resolution = nextResolutions[key] || {};
+        snapshot.push(previousItem || {
+          key: key, type: resolution.itemType || 'task', label: resolution.label || '이월한 공부',
+          detail: resolution.detail || '', subjectKey: resolution.subjectKey || 'other', done: false
+        });
+      });
+      const nextClose = Object.assign({}, data.close, {
+        status: 'reviewed', resolutions: nextResolutions, eventProgress: nextEventProgress,
+        itemSnapshot: snapshot, reviewedAt: now(), reportCopiedAt: null, copySignature: '',
+        finalizedAt: null, signature: ''
+      });
+      nextClose.reviewSignature = dailyCloseSignature(me.id, cursor, nextClose);
+      setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
+      closeModal(); render(); toast('오늘 마무리 내용을 저장했습니다');
+      break;
+    }
+    case 'report': {
+      const me = currentStaff(); if (!me) break;
+      if (session.isStaffLink) {
+        const priorDates = cursor === today() ? dailyUnclosedDates(me.id, cursor) : [];
+        if (priorDates.length) {
+          cursor = priorDates[0]; cursorPinned = true; render();
+          return toast('이전 미마감 날짜를 먼저 마무리해 주세요');
+        }
+        const data = dailyCloseState(me.id, cursor);
+        if (!data.canReport && !data.complete) return toast('오늘 마무리 단계를 먼저 완료해 주세요');
+        dailyReportModal(me.id, cursor);
+      } else showText('오늘 수행 보고', reportText(me.id, cursor));
+      break;
+    }
+    case 'dailyreportcopy': {
+      const me = currentStaff(); if (!session.isStaffLink || !me || me.id !== session.staffId) break;
+      const data = dailyCloseState(me.id, cursor);
+      if (!data.canReport && !data.complete) return toast('오늘 마무리 내용을 다시 확인해 주세요');
+      const reportDate = cursor;
+      copy($('#mText').value).then(copied => {
+        if (!copied) return;
+        const fresh = dailyCloseState(me.id, reportDate);
+        if (fresh.signature !== data.signature) return toast('오늘 기록이 바뀌었습니다. 마무리를 다시 확인해 주세요');
+        const nextClose = Object.assign({}, fresh.close, { reportCopiedAt: now(), copySignature: fresh.signature });
+        setCheck(dailyCloseKey(me.id), reportDate, { close: nextClose, done: true });
+        dailyReportModal(me.id, reportDate);
+      });
+      break;
+    }
+    case 'dailyreportfinish': {
+      const me = currentStaff(); if (!session.isStaffLink || !me || me.id !== session.staffId) break;
+      const data = dailyCloseState(me.id, cursor);
+      if (data.close.copySignature !== data.signature) return toast('보고 문자를 먼저 복사해 주세요');
+      if (!data.canReport && !data.complete) return toast('오늘 기록이 바뀌었습니다. 마무리를 다시 확인해 주세요');
+      const nextClose = Object.assign({}, data.close, {
+        status: 'complete', finalizedAt: now(), signature: data.signature
+      });
+      setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
+      closeModal(); render(); toast('오늘 학습 마감을 완료했습니다');
+      break;
+    }
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
     case 'copytext': copy($('#mText').value); break;
     case 'managetasks': manageTasks(id); break;
@@ -8180,7 +8591,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-18.23';
+const APP_VER = '2026-08-19.24';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
