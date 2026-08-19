@@ -226,7 +226,10 @@
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
           const a = items[i], b = items[j];
-          if (overlaps(a, b)) {
+          // 같은 선생님·같은 수업이 중복 등록된 행은 빨간 겹침 경고로 보지 않는다.
+          // 실제로 한 학생이 서로 다른 두 수업에 동시에 배정된 경우만 학생 충돌이다.
+          const duplicateRegistration = a.teacherKey === b.teacherKey && a.lessonIdentity === b.lessonIdentity;
+          if (overlaps(a, b) && !duplicateRegistration) {
             studentConflicts.add(a.index);
             studentConflicts.add(b.index);
           }
@@ -335,8 +338,7 @@
       teacher.studentCount = students.size;
       teacher.durationMinutes = teacher.sessions.reduce((sum, session) =>
         sum + session.endMinute - session.startMinute, 0);
-      teacher.conflictCount = teacher.sessions.filter(session =>
-        session.teacherConflict || session.studentConflict).length;
+      teacher.conflictCount = teacher.sessions.filter(session => session.studentConflict).length;
       return teacher;
     }).sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ko'));
 

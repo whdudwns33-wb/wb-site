@@ -284,6 +284,19 @@
   .schedule-timeline-block.is-conflict { border-color: var(--coral); outline: 2px solid rgba(232,93,74,.26); background: #FFF1EF; color: #9E3629; }
   .schedule-timeline-block.is-conflict::after { content: '!'; position: absolute; top: 2px; right: 3px; display: grid; place-items: center; width: 11px; height: 11px; border-radius: 50%; background: var(--coral); color: var(--white); font-size: 8px; font-weight: 900; }
   .schedule-timeline-block.is-current.is-conflict { background: #B94234; color: var(--white); }
+  .schedule-attendance-overview { padding: 12px 14px 14px; border-top: 1px solid var(--line); background: #F8FAFC; }
+  .schedule-attendance-overview-title { margin-bottom: 8px; color: var(--navy); font-size: 12.5px; font-weight: 900; }
+  .schedule-attendance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+  .schedule-attendance-session { min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .schedule-attendance-session-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: var(--navy); font-size: 11.5px; }
+  .schedule-attendance-session-head span { flex: 0 0 auto; color: var(--mid-gray); font-size: 10.5px; font-weight: 700; }
+  .schedule-attendance-students { display: flex; flex-wrap: wrap; gap: 5px; }
+  .schedule-attendance-pill { display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 999px; background: #F3F4F6; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; }
+  .schedule-attendance-pill.is-present { background: #ECFDF5; color: #047857; }
+  .schedule-attendance-pill.is-late { background: #FFF7ED; color: #9A5708; }
+  .schedule-attendance-pill.is-absent { background: #FEF2F2; color: #B42318; }
+  .schedule-attendance-pill.is-early { background: #F3E8FF; color: #6B21A8; }
+  .schedule-attendance-pill.is-pending { border: 1px dashed #CBD5E1; background: #F8FAFC; color: #64748B; }
   .schedule-now-line { position: absolute; top: 0; bottom: 0; z-index: 1; width: 2px; background: var(--coral); pointer-events: none; }
   .schedule-now-label { position: absolute; top: 1px; z-index: 2; transform: translateX(-50%); padding: 1px 4px; border-radius: 4px; background: var(--coral); color: var(--white); font-size: 9px; font-weight: 900; white-space: nowrap; }
   .schedule-timeline-empty { padding: 30px 16px; }
@@ -870,11 +883,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-19.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-19.1"></script>
-<script src="./asset-core.js?v=2026-08-19.1"></script>
-<script src="./qr-core.js?v=2026-08-19.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-19.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-19.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-19.2"></script>
+<script src="./asset-core.js?v=2026-08-19.2"></script>
+<script src="./qr-core.js?v=2026-08-19.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-19.2"></script>
 <script>
 "use strict";
 
@@ -2712,7 +2725,7 @@ function taskPanel(t, date, c, editable) {
     const att = (c && c.att) || '';
     h += '<section class="lesson-progress-section lesson-attendance"><div class="lesson-progress-section-title">학생 출결</div>' +
       '<div class="row wraprow" style="gap:6px">' +
-      [['P', '출석'], ['L', '지각'], ['A', '결석']].map(([v, l]) =>
+      [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(([v, l]) =>
         '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
       ).join('') + '</div>' + makeupRequestHtml(t, date, c) + '</section>';
   }
@@ -2771,7 +2784,7 @@ function taskPanel(t, date, c, editable) {
 }
 
 /** 수업 출결 표시용 */
-const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'blk'] };
+const ATT_LABEL = { P: ['출석', 'ok'], L: ['지각', 'high'], A: ['결석', 'blk'], E: ['조퇴', 'doing'] };
 
 /** 수업 지시서인가 — 제목 접두어로 판별 */
 const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
@@ -4484,7 +4497,8 @@ function sessionPackHistoryHtml(pack) {
   if (!usage.length) return '';
   return '<details class="session-pack-history"><summary>사용·조정 내역 ' + usage.length + '건</summary>' +
     usage.slice(0, 20).map(row => '<div class="session-pack-history-row"><span>' +
-      esc(row.sourceDate ? shortDate(row.sourceDate) + ' · ' : '') + esc(SESSION_PACK_EVENTS[row.event] || row.event) + '</span><b>' +
+      esc(row.sourceDate ? shortDate(row.sourceDate) + ' · ' : '') +
+      esc(row.reasonCode === 'early_leave' ? '조퇴' : SESSION_PACK_EVENTS[row.event] || row.event) + '</span><b>' +
       (Number(row.delta) > 0 ? Number(row.delta) + '회 차감' : Number(row.delta) < 0 ? Math.abs(Number(row.delta)) + '회 복원' : '비차감') +
       '</b></div>').join('') + '</details>';
 }
@@ -4503,8 +4517,8 @@ function sessionPackStaffRecordHtml(pack) {
   if (!session.isStaffLink || pack.teacherId !== session.staffId || pack.status !== 'active') return '';
   const check = getCheck(pack.lessonTaskId, today());
   const att = check && check.att;
-  const labelText = att === 'P' ? '오늘 출석' : att === 'L' ? '오늘 지각' : att === 'A' ? '오늘 결석' : '오늘 출결 미기록';
-  const unavailable = !['P', 'L', 'A'].includes(att) || pack.expired || today() < pack.validFrom || today() > pack.expiresOn;
+  const labelText = att === 'P' ? '오늘 출석' : att === 'L' ? '오늘 지각' : att === 'A' ? '오늘 결석' : att === 'E' ? '오늘 조퇴' : '오늘 출결 미기록';
+  const unavailable = !['P', 'L', 'A', 'E'].includes(att) || pack.expired || today() < pack.validFrom || today() > pack.expiresOn;
   const absenceSelect = att === 'A' ? '<label class="small" for="spAbsence-' + esc(pack.packId) + '">결석 차감 유형</label>' +
     '<select class="in" id="spAbsence-' + esc(pack.packId) + '"><option value="">유형 선택</option>' +
     [['approved_absence', '사전 인정 결석 · 비차감'], ['same_day', '당일 취소 · 1회 차감'],
@@ -4546,7 +4560,7 @@ function viewSessionPacks() {
   let h = '<section class="card session-pack-hero"><div class="between"><div><div class="card-title">회차제 수업</div>' +
     '<div class="card-sub">보강과 분리된 수업 회차 원장입니다. 지정한 학생·수업만 표시하며 월제 수업은 표시하지 않습니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="sprefresh">새로고침</button></div>' +
-    '<div class="hint mt8">출석·지각 1회, 사전 인정 결석·학원 휴강 0회, 당일 취소·무단결석 1회입니다. 원 결석과 완료 보강은 합쳐 한 번만 차감합니다.</div></section>' +
+    '<div class="hint mt8">출석·지각·조퇴 1회, 사전 인정 결석·학원 휴강 0회, 당일 취소·무단결석 1회입니다. 원 결석과 완료 보강은 합쳐 한 번만 차감합니다.</div></section>' +
     sessionPackCreateHtml();
   if (sessionPackLoading && !sessionPackLoaded) return h + '<div class="card"><div class="empty"><b>⏳</b>회차 현황을 불러오는 중입니다.</div></div>';
   if (sessionPackError) h += '<div class="card alert" role="alert"><div class="card-title">회차 현황을 불러오지 못했습니다</div><div class="small">' + esc(sessionPackError) + '</div>' +
@@ -4646,7 +4660,7 @@ async function recordTodaySessionPack(packId, button) {
   const pack = sessionPackRows.find(row => row.packId === packId);
   if (!pack || pack.teacherId !== session.staffId) return;
   const check = pack && getCheck(pack.lessonTaskId, today());
-  if (!pack || !check || !['P', 'L', 'A'].includes(check.att)) return toast('오늘 실제 출결을 먼저 기록해 주세요');
+  if (!pack || !check || !['P', 'L', 'A', 'E'].includes(check.att)) return toast('오늘 실제 출결을 먼저 기록해 주세요');
   if (check.att === 'A') {
     const absenceType = String(($('#spAbsence-' + packId) || {}).value || '');
     if (!['approved_absence', 'same_day', 'no_show', 'academy_cancel'].includes(absenceType)) return toast('결석 차감 유형을 선택해 주세요');
@@ -5275,7 +5289,35 @@ function scheduleAttendance(entry, date) {
   if (value === 'P') return { value: value, label: '출석', cls: '' };
   if (value === 'L') return { value: value, label: '지각', cls: 'warn' };
   if (value === 'A') return { value: value, label: '결석', cls: 'bad' };
-  return { value: '', label: '출석 미확인', cls: 'warn' };
+  if (value === 'E') return { value: value, label: '조퇴', cls: 'warn' };
+  return { value: '', label: '미완료', cls: 'warn' };
+}
+
+function scheduleAttendanceSummaryText(session, date) {
+  const counts = { P: 0, L: 0, A: 0, E: 0, pending: 0 };
+  session.entries.forEach(entry => {
+    const value = scheduleAttendance(entry, date).value;
+    if (Object.prototype.hasOwnProperty.call(counts, value)) counts[value]++;
+    else counts.pending++;
+  });
+  return [counts.P && '출석 ' + counts.P, counts.L && '지각 ' + counts.L,
+    counts.A && '결석 ' + counts.A, counts.E && '조퇴 ' + counts.E,
+    counts.pending && '미완료 ' + counts.pending].filter(Boolean).join(' · ') || '미완료';
+}
+
+function scheduleAttendanceOverviewHtml(timeline, date) {
+  const classes = { P: 'is-present', L: 'is-late', A: 'is-absent', E: 'is-early', '': 'is-pending' };
+  const cards = timeline.rows.flatMap(row => row.sessions.map(session =>
+    '<div class="schedule-attendance-session"><div class="schedule-attendance-session-head"><b>' + esc(row.teacherName) +
+      ' 선생님</b><span>' + esc(session.label) + '</span></div><div class="schedule-attendance-students">' +
+      session.entries.map(entry => {
+        const att = scheduleAttendance(entry, date);
+        return '<span class="schedule-attendance-pill ' + classes[att.value] + '">' + esc(entry.studentName) + ' · ' +
+          esc(att.label) + '</span>';
+      }).join('') + '</div></div>'
+  ));
+  return '<div class="schedule-attendance-overview"><div class="schedule-attendance-overview-title">수업별 출결 현황</div>' +
+    '<div class="schedule-attendance-grid">' + cards.join('') + '</div></div>';
 }
 
 const SCHEDULE_VIEWS = [
@@ -5419,7 +5461,7 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
     '<span class="schedule-legend-item"><i class="schedule-legend-dot"></i>일반</span>' +
     (todayView ? '<span class="schedule-legend-item"><i class="schedule-legend-dot current"></i>수업 중</span>' +
       '<span class="schedule-legend-item"><i class="schedule-legend-dot next"></i>다음</span>' : '') +
-    '<span class="schedule-legend-item"><i class="schedule-legend-dot conflict"></i>겹침 확인</span></div>';
+    '<span class="schedule-legend-item"><i class="schedule-legend-dot conflict"></i>학생 수업 겹침</span></div>';
   let h = '<div class="card schedule-timeline-card"><div class="schedule-timeline-head">' +
     '<div><div class="card-title">선생님별 수업 흐름</div><div class="card-sub">블록을 누르면 학생·출결 정보를 확인할 수 있습니다.</div></div>' + legend + '</div>';
 
@@ -5445,21 +5487,26 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
       const isCurrent = session.entries.some(entry => entry.clockState === 'current');
       const isEnded = session.entries.every(entry => entry.clockState === 'ended');
       const isNext = nextStart !== null && session.startMinute === nextStart;
-      const conflict = session.teacherConflict || session.studentConflict;
+      const conflict = session.studentConflict;
       const classes = ['schedule-timeline-block', isEnded ? 'is-ended' : '', isNext ? 'is-next' : '', isCurrent ? 'is-current' : '', conflict ? 'is-conflict' : ''].filter(Boolean).join(' ');
       const width = Math.max(38, Math.round((session.endMinute - session.startMinute) * pxPerMinute) - 4);
+      const attendanceText = scheduleAttendanceSummaryText(session, date);
+      const attendanceDetails = session.entries.map(entry => {
+        const att = scheduleAttendance(entry, date);
+        return entry.studentName + ' ' + att.label;
+      }).join(', ');
       const stateText = (isCurrent ? '현재 수업' : isNext ? '다음 수업' : isEnded ? '종료 수업' : '예정 수업') +
-        (conflict ? ' · 겹침 확인 필요' : '');
+        (conflict ? ' · 학생 수업 겹침 확인 필요' : '');
       const title = stateText + ' · ' + row.teacherName + ' 선생님 · ' + session.label + ' · ' + names.join(', ') +
-        (conflict ? ' · 시간이 겹쳐 확인이 필요합니다' : '');
+        ' · ' + attendanceDetails + (conflict ? ' · 같은 학생의 서로 다른 수업 시간이 겹칩니다' : '');
       h += '<button class="' + classes + '" style="left:' + at(session.startMinute) + 'px;top:' + (7 + session.lane * 48) + 'px;width:' + width + 'px"' +
         ' data-act="scheduleblock" data-date="' + esc(date) + '" data-teacher="' + esc(row.teacherKey) + '" data-lesson="' + esc(session.lessonIdentity) + '" data-start="' + session.startMinute + '" data-end="' + session.endMinute + '"' +
         ' title="' + esc(title) + '" aria-label="' + esc(title) + '"><strong>' + esc(shownNames) + '</strong><small>' +
-        esc(session.label + (names.length > 1 ? ' · ' + names.length + '명' : '')) + '</small></button>';
+        esc(attendanceText) + '</small></button>';
     });
     h += '</div>';
   });
-  return h + '</div></div></div>';
+  return h + '</div></div>' + scheduleAttendanceOverviewHtml(timeline, date) + '</div>';
 }
 
 function scheduleTimelineModal(entries, date) {
@@ -5521,7 +5568,7 @@ function scheduleSessionRow(session, teacherName, timeText, hideTeacher) {
   const subjects = [...new Set(tasks.flatMap(task => [task.subject, task.className]).filter(Boolean))];
   const roles = [...new Set(session.entries.map(entry => entry.role).filter(Boolean))];
   const modeBadges = sessionModeBadgesHtml(tasks);
-  const conflict = session.teacherConflict || session.studentConflict;
+  const conflict = session.studentConflict;
   const search = [teacherName].concat(session.entries.flatMap(entry => [
     entry.studentName, entry.grade, entry.role, (entry.task || {}).subject, (entry.task || {}).className
   ])).join(' ');
@@ -5544,7 +5591,7 @@ function scheduleWeekCardsHtml(weekly) {
   return '<div class="schedule-card-grid schedule-week-grid">' + weekly.days.map(date => {
     const sessions = byDate.get(date) || [];
     const pending = weekly.issues.filter(issue => (issue.dates || []).includes(date));
-    const hasConflict = sessions.some(item => item.session.teacherConflict || item.session.studentConflict);
+    const hasConflict = sessions.some(item => item.session.studentConflict);
     const rows = sessions.map(item => scheduleSessionRow(item.session, item.teacher.teacherName, item.session.label));
     return '<div class="card schedule-day-card' + (date === today() ? ' is-today' : '') +
       (pending.length || hasConflict ? ' is-attention' : '') + '"><div class="schedule-day-head">' +
@@ -5630,9 +5677,8 @@ function scheduleStudentWarningCount(group, conflictEntries, identityProblem) {
 function scheduleStudentCardsHtml(weekly) {
   const conflictEntries = new Set();
   window.WBScheduleCore.weeklyTeacherSummary(weekly.entries).teachers.forEach(teacher => teacher.sessions.forEach(session => {
-    if (!session.teacherConflict && !session.studentConflict) return;
-    const affected = session.teacherConflict ? session.entries : session.studentConflictEntries;
-    affected.forEach(entry => conflictEntries.add(session.date + '|' + entry.key));
+    if (!session.studentConflict) return;
+    session.studentConflictEntries.forEach(entry => conflictEntries.add(session.date + '|' + entry.key));
   }));
   const groups = new Map();
   const ensureGroup = (studentId, name, grade, student) => {
@@ -5978,7 +6024,7 @@ function viewSchedule() {
       [isStudentView ? rosterCount : summary.totals.studentCount,
         isStudentView ? '재원 학생' : '시간표 학생'],
       [teacherCount, '담당 선생님'],
-      [pendingCount + ' · ' + conflictCount, '미확정 · 겹침 블록', pendingCount + conflictCount > 0]
+      [pendingCount + ' · ' + conflictCount, '미확정 · 학생 겹침', pendingCount + conflictCount > 0]
     ]);
     if (scheduleView === 'week') h += scheduleWeekCardsHtml(weekly);
     else if (scheduleView === 'teacher') h += scheduleTeacherCardsHtml(weekly);
@@ -5993,7 +6039,7 @@ function viewSchedule() {
   const attendanceRecorded = daily.entries.filter(entry => scheduleAttendance(entry, cursor).value).length;
   const timeline = { rows: core.timelineRows(daily.entries), range: core.timelineRange(daily.entries) };
   const conflictCount = timeline.rows.reduce((count, row) => count + row.sessions.filter(session =>
-    session.teacherConflict || session.studentConflict).length, 0);
+    session.studentConflict).length, 0);
   const isToday = cursor === nowKst.date;
   const future = isToday ? daily.entries.filter(entry => entry.slot.startMinute > nowKst.minute) : [];
   const nextStart = future.length ? Math.min(...future.map(entry => entry.slot.startMinute)) : null;
@@ -6280,7 +6326,7 @@ function staffCard(s) {
     ? pend.map(x => {
         const prog = taskProgress(x.t, x.c);
         const attMark = x.c && x.c.att && ATT_LABEL[x.c.att]
-          ? '<span class="pill ' + (x.c.att === 'A' ? 'bad' : x.c.att === 'L' ? 'warn' : '') + '" style="margin-right:4px">' + ATT_LABEL[x.c.att][0] + '</span>' : '';
+          ? '<span class="pill ' + (x.c.att === 'A' ? 'bad' : ['L', 'E'].includes(x.c.att) ? 'warn' : '') + '" style="margin-right:4px">' + ATT_LABEL[x.c.att][0] + '</span>' : '';
         const badge = attMark + (x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
                     : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
                     : '<span class="pill">미착수</span>');
@@ -10742,7 +10788,7 @@ function parentPreviewHtml(data) {
   const todayData = data && data.today || {};
   const todayEnabled = capabilities.today === true;
   const dayOrder = '월화수목금토일';
-  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], '': ['출결 확인 전', 'muted'] };
+  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], E: ['조퇴', 'warn'], '': ['출결 확인 전', 'muted'] };
   const ride = { scheduled: ['탑승 확인 전', 'muted'], boarded: ['탑승 확인', 'warn'], dropped: ['하차 확인', 'ok'], absent: ['미탑승', 'bad'] };
   const lessonRows = (todayData.lessons || []).map(row => {
     const state = attendance[row.attendance] || attendance[''];
@@ -10899,7 +10945,7 @@ function studentPreviewHtml(data) {
   const student = data && data.student || {}, todayData = data && data.today || {};
   const externalLearningEnabled = !!(data && data.capabilities && data.capabilities.externalLearning === true);
   const selfCheckEnabled = !!(data && data.capabilities && data.capabilities.selfCheck === true);
-  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], '': ['출결 확인 전', 'muted'] };
+  const attendance = { P: ['출석', 'ok'], L: ['지각', 'warn'], A: ['결석', 'bad'], E: ['조퇴', 'warn'], '': ['출결 확인 전', 'muted'] };
   const ride = { scheduled: ['탑승 확인 전', 'muted'], boarded: ['탑승 확인', 'warn'], dropped: ['하차 확인', 'ok'], absent: ['미탑승', 'bad'] };
   const lessonRows = (todayData.lessons || []).map(row => {
     const state = attendance[row.attendance] || attendance[''];
@@ -12731,9 +12777,11 @@ document.addEventListener('click', ev => {
     }
     case 'latt': {
       const t = task(); if (!t) break;
-      const c = getCheck(id, date);
       const v = el.dataset.v;
-      const next = (c && c.att === v) ? '' : v;
+      const attendanceLabel = ATT_LABEL[v] && ATT_LABEL[v][0];
+      if (!attendanceLabel || !['P', 'L', 'A', 'E'].includes(v)) break;
+      if (!confirm(attendanceLabel + '으로 저장하겠습니까?')) break;
+      const next = v;
       const savedCheck = setCheck(id, date, { att: next });
       const sourceKey = makeupCreateKey(id, date);
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
@@ -12746,6 +12794,8 @@ document.addEventListener('click', ev => {
         createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
       } else if (next === 'A') {
         toast('결석 — 메모에 사유와 보강 계획을 남겨주세요');
+      } else {
+        toast(attendanceLabel + '으로 저장했습니다');
       }
       render();
       break;
@@ -13426,7 +13476,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-19.1';
+const APP_VER = '2026-08-19.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

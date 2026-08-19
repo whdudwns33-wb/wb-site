@@ -26,7 +26,7 @@
   'use strict';
   const API='/student-portal';
   const app=document.getElementById('app'),refreshButton=document.getElementById('refreshButton'),logoutButton=document.getElementById('logoutButton'),liveStatus=document.getElementById('liveStatus');
-  const ATTENDANCE={P:['출석','ok'],L:['지각','warn'],A:['결석','bad'],'':['출결 확인 전','muted']};
+  const ATTENDANCE={P:['출석','ok'],L:['지각','warn'],A:['결석','bad'],E:['조퇴','warn'],'':['출결 확인 전','muted']};
   const RIDE_STATUS={scheduled:['탑승 확인 전','muted'],boarded:['탑승 확인','warn'],dropped:['하차 확인','ok'],absent:['미탑승','bad']};
   const BOOK_CLASS={preparing:'muted',ready_for_handoff:'warn',handed:'ok',cancelled:'muted'};
   const DAY_ORDER='월화수목금토일';
