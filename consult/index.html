@@ -1729,7 +1729,7 @@ function viewToday() {
   const list = checklistTasksFor(me.id, cursor);
   const offers = studyOffersFor(me.id, cursor);
   const p = progress(me.id, cursor);
-  const lectureChecklist = cursor === today() ? ingChecklistItems(me.id, cursor) : [];
+  const lectureChecklist = ingChecklistItems(me.id, cursor);
   const checklistTotal = p.total + lectureChecklist.length;
   const checklistDone = p.done + lectureChecklist.filter(item => item.done).length;
   const checklistPct = checklistTotal ? Math.round(checklistDone / checklistTotal * 100) : 0;
@@ -1747,10 +1747,13 @@ function viewToday() {
 
   if (priorCloseDates.length) {
     h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 마무리하지 않은 하루가 있습니다</div>' +
-      '<div class="card-sub">전날 기록을 먼저 정리해야 오늘 수행 보고를 만들 수 있습니다.</div></div>' +
+      '<div class="card-sub">전날 기록을 먼저 마감해야 오늘 학습을 시작할 수 있습니다.</div></div>' +
       '<span class="pill bad">' + priorCloseDates.length + '일</span></div>' +
       '<button class="btn btn-primary btn-block mt14" data-act="daypick" data-date="' + priorCloseDates[0] + '">' +
-        label(priorCloseDates[0]) + ' 마무리하기</button></div>';
+        label(priorCloseDates[0]) + ' 마무리하기</button></div>' +
+      '<div class="card"><div class="empty"><b>🔒</b><strong>오늘 학습은 잠시 잠겨 있습니다.</strong><br>' +
+        '이전 날짜의 미완료 공부와 일정 준비율을 확인하고 보고 발송까지 마쳐 주세요.</div></div>';
+    return h;
   }
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
@@ -1792,22 +1795,11 @@ function viewToday() {
     h += studyPlannerCard(me, cursor, list, carry, editable);
     h += tbCard(me, editable);
   } else {
-    h += tbCard(me, editable);
+    h += studyPlannerCard(me, cursor, list, [], false);
+    h += tbCard(me, false);
   }
 
-  if (cursor !== today() && carry.length) {
-    h += '<div class="sect">지난 미완료 — 오늘로 넘어왔습니다</div>' +
-      '<div class="card alert">' + carry.map(x => taskRow(x.t, x.date, editable, true)).join('') + '</div>';
-  }
-
-  if (cursor !== today() && !list.length) {
-    if (!carry.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜의 체크리스트가 비어 있습니다.</div></div>';
-  } else if (cursor !== today()) {
-    if (carry.length) h += '<div class="sect">오늘 할 일</div>';
-    h += '<div class="card">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
-  }
-
-  if (editable) {
+  if (editable && cursor === today()) {
     h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
   }
   if (cursor >= DAILY_CLOSE_START && cursor <= today()) h += dailyClosureCard(me, cursor);
@@ -4086,7 +4078,7 @@ function monthBacklog(staffId, ym) {
 
 /* ── 학생의 하루 마감 ──
  * 오늘 탭에서 미완료 처리와 시험 준비율 확인을 끝내야 보고 문자를 만들 수 있다. */
-const DAILY_CLOSE_START = '2026-08-19';
+const DAILY_CLOSE_START = '2026-08-18';
 const dailyCloseKey = staffId => '__dailyclose__' + staffId;
 function dailyCloseOf(staffId, date) {
   const check = state.checks[dailyCloseKey(staffId) + '|' + date];
@@ -8146,7 +8138,10 @@ document.addEventListener('click', ev => {
         status: 'complete', finalizedAt: now(), signature: data.signature
       });
       setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
-      closeModal(); render(); toast('오늘 학습 마감을 완료했습니다');
+      const closedPastDate = cursor < today();
+      closeModal();
+      if (closedPastDate) { cursor = today(); cursorPinned = false; }
+      render(); toast(closedPastDate ? '이전 학습 마감을 완료해 오늘로 이동했습니다' : '오늘 학습 마감을 완료했습니다');
       break;
     }
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
@@ -8591,7 +8586,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.24';
+const APP_VER = '2026-08-19.25';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
