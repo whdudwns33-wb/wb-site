@@ -422,6 +422,15 @@ function activeTaskOnDate(task, date) {
     (!task.start || String(task.start) <= date) && (!task.end || String(task.end) >= date);
 }
 
+function activePublicationTaskOnDate(task, date) {
+  return !!task && (!task.start || String(task.start) <= date) && (!task.end || String(task.end) >= date);
+}
+
+function isPublicationLessonTask(task) {
+  return !!task && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion ||
+    /^\[수업\]/.test(String(task.title || '')));
+}
+
 function activeSlotOnDate(slot, date, weekday) {
   if (!slot || !Array.isArray(slot.days) || !slot.days.map(Number).includes(weekday) ||
       !/^\d{2}:\d{2}$/.test(String(slot.startTime || '')) ||
@@ -472,14 +481,12 @@ export async function currentPublicationTask(env, row, now) {
     ? await rosterStudent(env, String(task.studentId), now) : null;
   const names = found && !found.error ? await staffNames(env) : new Map();
   if (!task || String(task.id || '') !== String(row.source_task_id) || task.deleted ||
-      task.taskKind !== 'lesson_instruction' || task.scheduleStatus !== 'confirmed' ||
+      !isPublicationLessonTask(task) ||
       String(task.staffId || '') !== owner || String(row.task_owner || '') !== owner ||
       String(task.studentId || '') !== String(row.student_id || '') || !found || found.error ||
       !Array.isArray(found.student.teacherIds) || !found.student.teacherIds.map(String).includes(owner) ||
-      !names.has(owner) || !activeTaskOnDate(task, String(row.lesson_date || '')) || !activeTaskOnDate(task, kstDate(now)) ||
-      !Array.isArray(task.scheduleSlots)) return null;
-  const weekday = new Date(String(row.lesson_date) + 'T00:00:00.000Z').getUTCDay();
-  if (!task.scheduleSlots.some(slot => activeSlotOnDate(slot, String(row.lesson_date), weekday))) return null;
+      !names.has(owner) || !activePublicationTaskOnDate(task, String(row.lesson_date || '')) ||
+      !activePublicationTaskOnDate(task, kstDate(now))) return null;
   const identity = await publicLessonIdentity(task, owner);
   if (identity.studentIdentityHash !== String(row.student_identity_hash || '') ||
       identity.taskIdentityHash !== String(row.task_identity_hash || '')) return null;
@@ -491,8 +498,8 @@ async function publicationTaskForWrite(env, auth, taskId, lessonDate, now) {
     .bind('task', taskId).first();
   const task = row && parseJson(row.data);
   const owner = String(row && row.owner || '');
-  if (!task || String(task.id || '') !== taskId || task.deleted || task.taskKind !== 'lesson_instruction' ||
-      task.scheduleStatus !== 'confirmed' || String(task.staffId || '') !== owner || !SAFE_ID.test(owner)) {
+  if (!task || String(task.id || '') !== taskId || task.deleted || !isPublicationLessonTask(task) ||
+      String(task.staffId || '') !== owner || !SAFE_ID.test(owner)) {
     return { error: '공개할 수업을 확인해 주세요', code: 'LESSON_INVALID', status: 409 };
   }
   if (publicationActorId(auth) !== owner) {
@@ -502,12 +509,8 @@ async function publicationTaskForWrite(env, auth, taskId, lessonDate, now) {
   const names = found.error ? new Map() : await staffNames(env);
   if (found.error || !Array.isArray(found.student.teacherIds) ||
       !found.student.teacherIds.map(String).includes(owner) || !names.has(owner) ||
-      !activeTaskOnDate(task, lessonDate) || !Array.isArray(task.scheduleSlots)) {
-    return { error: '현재 담당 학생의 확정 수업만 공개할 수 있습니다', code: 'ASSIGNMENT_CHANGED', status: 409 };
-  }
-  const weekday = new Date(lessonDate + 'T00:00:00.000Z').getUTCDay();
-  if (!task.scheduleSlots.some(slot => activeSlotOnDate(slot, lessonDate, weekday))) {
-    return { error: '해당 날짜의 확정 수업을 찾을 수 없습니다', code: 'LESSON_DATE_INVALID', status: 409 };
+      !activePublicationTaskOnDate(task, lessonDate)) {
+    return { error: '현재 담당 학생의 수업만 공개할 수 있습니다', code: 'ASSIGNMENT_CHANGED', status: 409 };
   }
   return { ok: true, task, owner, student: found.student, teacherName: names.get(owner),
     ...await publicLessonIdentity(task, owner) };
@@ -767,18 +770,6 @@ async function publicGuardianRequests(env, studentId) {
   return { rows: (result.results || []).map(requestView) };
 }
 
-function validPublicationScheduleSlot(slot) {
-  if (!slot || !Array.isArray(slot.days) || !slot.days.length ||
-      !slot.days.every(day => Number.isInteger(Number(day)) && Number(day) >= 0 && Number(day) <= 6) ||
-      !/^\d{2}:\d{2}$/.test(String(slot.startTime || '')) ||
-      !/^\d{2}:\d{2}$/.test(String(slot.endTime || '')) ||
-      String(slot.startTime) >= String(slot.endTime)) return false;
-  const validFrom = String(slot.validFrom || slot.startDate || '');
-  const validTo = String(slot.validTo || slot.endDate || '');
-  return (!validFrom || validDate(validFrom)) && (!validTo || validDate(validTo)) &&
-    (!validFrom || !validTo || validFrom <= validTo);
-}
-
 export function publicationReadinessForTask(task, owner, activeStaff, activeStudents, date) {
   const reasons = [];
   const taskStudentId = String(task && task.studentId || '');
@@ -807,25 +798,14 @@ export function publicationReadinessForTask(task, owner, activeStaff, activeStud
     reasons.push({ code: 'student_teacher_missing', field: 'staffId', message: '선택 원생의 실제 담당자에 이 선생님이 배정되지 않았습니다' });
   }
 
-  if (!task || task.taskKind !== 'lesson_instruction') {
+  if (!isPublicationLessonTask(task)) {
     reasons.push({ code: 'lesson_format_missing', field: 'schedule', message: '표준 수업 등록 형식으로 변환해야 합니다' });
-  }
-  const slots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
-  if (task && task.scheduleStatus !== 'confirmed') {
-    reasons.push({ code: 'schedule_unconfirmed', field: 'schedule', message: '요일·시작·종료 시간이 아직 확정되지 않았습니다' });
-  }
-  if (!slots.length) {
-    reasons.push({ code: 'schedule_slots_missing', field: 'schedule', message: '구조화된 수업 시간표가 없습니다' });
-  } else if (!slots.every(validPublicationScheduleSlot)) {
-    reasons.push({ code: 'schedule_slots_invalid', field: 'schedule', message: '시간표의 요일 또는 시작·종료 시간을 다시 확인해야 합니다' });
   }
 
   const ready = reasons.length === 0;
-  const weekday = validDate(date) ? new Date(date + 'T00:00:00.000Z').getUTCDay() : -1;
   return {
     ready,
-    activeToday: ready && activeTaskOnDate(task, date) &&
-      slots.some(slot => activeSlotOnDate(slot, date, weekday)),
+    activeToday: ready && activePublicationTaskOnDate(task, date),
     reasons
   };
 }

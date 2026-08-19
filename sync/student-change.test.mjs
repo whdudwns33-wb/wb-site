@@ -67,7 +67,7 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   const db = new TestD1(); seed(db);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
-    changes: { operation: 'teacher_assignment' }, note: '담당 변경 요청'
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }, note: '담당 변경 요청'
   });
   assert.equal(submit.status, 200);
   const missing = await call(db, '/lesson-change-review', {
@@ -93,6 +93,7 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
     assert.equal(result.status, 200);
     assert.equal(result.body.events[0].studentId, 'student-a');
     assert.equal(result.body.events[0].eventType, 'teacher_assignment');
+    assert.equal(result.body.events[0].effectiveDate, '2026-08-24');
     assert.equal(result.body.events[0].acknowledged, false);
   }
   await call(db, '/student-change', { auth: person('teacher-a'), action: 'acknowledge', studentId: 'student-a' });
