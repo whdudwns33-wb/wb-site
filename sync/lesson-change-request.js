@@ -421,10 +421,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       roster.student.teacher = teacherNames.join('·') || roster.student.teacher;
     } else if (operation === 'withdrawal' || operation === 'leave') {
       eventType = operation;
-      changedFields = ['end', 'reason'];
-      details = { effectiveDate, label: operation === 'withdrawal' ? '퇴원' : '휴원' };
+      changedFields = ['end', 'reason', 'deleted'];
+      const transitionLabel = operation === 'withdrawal' ? '퇴원' : '휴원';
+      const requestReason = normalizeText(current.note).slice(0, 430);
+      details = { effectiveDate, label: transitionLabel, note: requestReason };
       roster.student.end = nextMonthForDate(effectiveDate);
-      roster.student.reason = (operation === 'withdrawal' ? '퇴원 ' : '휴원 ') + effectiveDate;
+      roster.student.reason = transitionLabel + ' ' + effectiveDate + (requestReason ? ' · ' + requestReason : '');
       const lessonRows = await env.DB.prepare(
         "SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND json_valid(data) " +
         "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
@@ -432,8 +434,9 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       for (const row of lessonRows.results || []) {
         let data;
         try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+        if (!(data.taskKind === 'lesson_instruction' || data.lessonFormVersion || data.intakeVersion || /^\[수업\]/.test(String(data.title || '')))) continue;
         const updatedAt = Math.max(now, Number(row.updated_at || 0) + 1);
-        data.end = effectiveDate; data.updatedAt = updatedAt; data.lastEditBy = actorRole;
+        data.end = effectiveDate; data.deleted = true; data.updatedAt = updatedAt; data.lastEditBy = actorRole;
         requiredChangeIndexes.push(statements.length);
         statements.push(env.DB.prepare(
           'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'

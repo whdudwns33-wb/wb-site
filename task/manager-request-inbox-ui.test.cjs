@@ -60,6 +60,27 @@ test('관리담당이 아니면 통합 요청함 데이터를 만들지 않는�
   assert.deepEqual(inboxRowsFor({ session: { isAdmin: false } }), []);
 });
 
+test('퇴원·휴원·수업삭제·담당자 변경 요청은 현황판에서 종류와 적용일이 구분된다', () => {
+  const operations = [
+    ['withdrawal', '퇴원 요청', '퇴원 승인'],
+    ['leave', '휴원 요청', '휴원 승인'],
+    ['lesson_delete', '수업삭제 요청', '수업 삭제 승인'],
+    ['teacher_assignment', '담당자 변경', '새 담당 선생님 선택']
+  ];
+  for (const [operation, kind, detail] of operations) {
+    const rows = inboxRowsFor({
+      lessonAssignmentRequests: [], feedbackQueue: [], bookAddQueue: [], bookEditQueue: [], bookOrderRows: [],
+      lessonChangeQueue: [{ status: 'approval_waiting', taskId: 'lesson-a', owner: 'teacher-b', updatedAt: 5,
+        changes: { operation, effectiveDate: '2026-08-25' } }]
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].kind, kind);
+    assert.match(rows[0].detail, new RegExp(detail));
+    assert.match(rows[0].detail, /2026-08-25/);
+    assert.equal(rows[0].route, 'lesson');
+  }
+});
+
 test('통합 요청함은 선생님별 수업 흐름 아래에 있고 필요한 7개 목록만 새로고침한다', () => {
   const schedule = source.slice(source.indexOf('function viewSchedule()'), source.indexOf('/* ── 기기 대장 ──'));
   assert.match(schedule, /scheduleTimelineHtml\(timeline, cursor, nowKst\);\s*return h \+ managerRequestInboxHtml\(\)/);
