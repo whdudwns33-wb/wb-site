@@ -18,12 +18,12 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-test('보호자 공개 입력은 개인 링크의 오늘 본인 structured 수업에만 열린다', () => {
+test('보호자 공개 입력은 확정 시간표 슬롯 없이도 개인 링크의 오늘 본인 담당 원생 수업에 열린다', () => {
   const code = slice('function canEditGuardianPublication(', 'function normalizeGuardianPublication(');
-  const permission = session => new Function('today', 'session', 'hasVerifiedPersonAuth', 'rosterDb', 'assignedLessonStudents', 'dowOf',
+  const permission = session => new Function('today', 'session', 'hasVerifiedPersonAuth', 'rosterDb', 'assignedLessonStudents', 'isLesson',
     `${code}\nreturn canEditGuardianPublication;`)(
       () => '2026-08-17', session, () => session.verified === true, {},
-      () => [{ id: 'student-1' }], () => 1
+      () => [{ id: 'student-1' }], task => task.taskKind === 'lesson_instruction'
     );
   const own = {
     id: 'lesson-1', studentId: 'student-1', staffId: 'teacher-1', lessonFormVersion: 1,
@@ -40,12 +40,11 @@ test('보호자 공개 입력은 개인 링크의 오늘 본인 structured 수�
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: false })(own, '2026-08-17'), false);
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, taskKind: '' }, '2026-08-17'), false);
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, studentId: '' }, '2026-08-17'), false);
-  assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, scheduleStatus: 'needs_review' }, '2026-08-17'), false);
+  assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, scheduleStatus: 'needs_review', scheduleSlots: [] }, '2026-08-17'), true);
   assert.match(code, /task\.staffId !== session\.staffId/);
-  assert.match(code, /task\.taskKind !== 'lesson_instruction'/);
-  assert.match(code, /task\.scheduleStatus !== 'confirmed'/);
+  assert.match(code, /!isLesson\(task\)/);
   assert.match(code, /assignedLessonStudents\(\)\.some/);
-  assert.match(code, /task\.scheduleSlots\.some/);
+  assert.doesNotMatch(code, /scheduleStatus|scheduleSlots|dowOf/);
 });
 
 test('숙제·준비물은 내부 메모 파싱 없이 전용 필드와 CAS API만 사용한다', () => {

@@ -6,6 +6,9 @@ const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_STUDENTS = 2000;
 const MAX_BOOK_STUDENTS = 5000;
+const ROSTER_SUBJECTS = new Set([
+  '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답'
+]);
 
 function isBoardingLockError(error) {
   return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
@@ -64,6 +67,31 @@ function month(value, path, empty) {
   return result;
 }
 
+function optionalIsoDate(value, path) {
+  if (typeof value !== 'string') fail(path, '문자열이어야 합니다');
+  return value.trim() ? isoDate(value, path) : '';
+}
+
+function phone(value, path) {
+  const result = text(value, path, 30, true);
+  if (!result) return '';
+  const digits = result.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15 || /[^0-9+()\-\s]/.test(result)) {
+    fail(path, '8~15자리 연락처를 확인해 주세요');
+  }
+  return result;
+}
+
+function subjects(value, path) {
+  if (!Array.isArray(value) || !value.length || value.length > ROSTER_SUBJECTS.size) {
+    fail(path, '등록과목을 1개 이상 선택해 주세요');
+  }
+  const result = value.map((item, index) => text(item, path + '[' + index + ']', 20, false));
+  if (new Set(result).size !== result.length) fail(path, '중복 과목이 있습니다');
+  if (result.some(item => !ROSTER_SUBJECTS.has(item))) fail(path, '등록할 수 없는 과목이 있습니다');
+  return result;
+}
+
 function teacherIds(value, path) {
   if (!Array.isArray(value) || !value.length || value.length > 20) fail(path, '1~20개의 직원 ID 배열이어야 합니다');
   const result = value.map((item, index) => id(item, path + '[' + index + ']'));
@@ -75,7 +103,8 @@ function rosterStudent(value, index) {
   const path = 'document.roster.students[' + index + ']';
   shape(value,
     ['id', 'name', 'grade', 'teacher', 'subject', 'start', 'end', 'reason', 'teacherIds'],
-    ['memo', 'entryType'], path);
+    ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
+      'registrationDate', 'firstClassDate', 'subjects'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -91,6 +120,20 @@ function rosterStudent(value, index) {
     teacherIds: teacherIds(value.teacherIds, path + '.teacherIds')
   };
   if (Object.prototype.hasOwnProperty.call(value, 'memo')) result.memo = text(value.memo, path + '.memo', 1000, true);
+  if (Object.prototype.hasOwnProperty.call(value, 'school')) result.school = text(value.school, path + '.school', 80, true);
+  if (Object.prototype.hasOwnProperty.call(value, 'phoneSelf')) result.phoneSelf = phone(value.phoneSelf, path + '.phoneSelf');
+  if (Object.prototype.hasOwnProperty.call(value, 'phoneFather')) result.phoneFather = phone(value.phoneFather, path + '.phoneFather');
+  if (Object.prototype.hasOwnProperty.call(value, 'phoneMother')) result.phoneMother = phone(value.phoneMother, path + '.phoneMother');
+  if (Object.prototype.hasOwnProperty.call(value, 'registrationDate')) {
+    result.registrationDate = optionalIsoDate(value.registrationDate, path + '.registrationDate');
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'firstClassDate')) {
+    result.firstClassDate = optionalIsoDate(value.firstClassDate, path + '.firstClassDate');
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'subjects')) {
+    result.subjects = subjects(value.subjects, path + '.subjects');
+    result.subject = result.subjects.join('·');
+  }
   if (Object.prototype.hasOwnProperty.call(value, 'entryType')) {
     if (!['existing', 'new'].includes(value.entryType)) fail(path + '.entryType', 'existing 또는 new여야 합니다');
     result.entryType = value.entryType;
@@ -376,7 +419,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
     }
     if (action === 'student_update' && previousStudent) {
-      const fields = ['name', 'grade', 'subject', 'teacherIds', 'start', 'end', 'reason', 'memo'];
+      const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
+        'registrationDate', 'firstClassDate', 'subject', 'subjects', 'teacherIds', 'start', 'end', 'reason', 'memo'];
       const changedFields = fields.filter(key => JSON.stringify(previousStudent[key] || '') !== JSON.stringify(nextStudent[key] || ''));
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);

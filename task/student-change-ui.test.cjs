@@ -11,7 +11,14 @@ test('teacher lesson request exposes assignment, withdrawal, leave, and deletion
   const block = source.slice(start, end);
   for (const text of ['담당선생님 변경', '퇴원', '휴원', '수업삭제', 'lcEffectiveDate']) assert.match(block, new RegExp(text));
   assert.match(source, /case 'lcoperation': setLessonChangeOperation/);
-  assert.match(source, /changes\.effectiveDate/);
+  assert.match(source, /\['teacher_assignment', 'withdrawal', 'leave', 'lesson_delete'\]\.includes\(lcForm\.operation\)/);
+  assert.match(source, /data-lc-date-label/);
+  assert.match(source, /변경 시작일/);
+});
+
+test('담당선생님 변경 이력은 선택한 변경 시작일을 학생 정보에 표시한다', () => {
+  assert.match(source, /event\.effectiveDate \? event\.effectiveDate \+ '부터 · '/);
+  assert.match(source, /변경 시작일: ' \+/);
 });
 
 test('admin review selects an active teacher and sends selectedStaffId only on approval', () => {
