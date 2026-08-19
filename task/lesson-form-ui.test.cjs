@@ -81,6 +81,16 @@ test('admin direct lesson registration reuses the new-student information fields
   assert.match(save, /원생 기본 정보는 저장됐습니다/);
 });
 
+test('admin direct lesson registration removes duplicate subject fields and free-text schedule input', () => {
+  const viewStart = html.indexOf('function viewLessonEntry()');
+  const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
+  const view = html.slice(viewStart, viewEnd);
+  assert.match(view, /personal \? '<div class="sect">2\. 과목·반/);
+  assert.match(view, /personal \? lessonTextField\('scheduleText',[\s\S]{0,160} : ''/);
+  assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
+  assert.match(view, /\(personal \? '3' : '2'\) \+ '\. 수업 요일·시간/);
+});
+
 test('feedback workflow sends immediately only through the server-side guardian gate', () => {
   assert.match(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
   assert.match(html, /카카오 알림톡 발송 요청을 접수합니다/);
