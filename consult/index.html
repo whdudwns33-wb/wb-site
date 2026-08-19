@@ -1635,7 +1635,7 @@ let monthSection = 'calendar';
 let viewStaff = '';
 let viewInputDirty = false;
 const openPanels = new Set();     // 펼쳐진 업무 패널
-const todayFoldState = { studyOffers: false, lectures: false }; // true면 오늘 화면 카드 접힘
+const todayFoldState = { studyOffers: true, lectures: true }; // 처음부터 접고, 필요할 때만 펼친다
 
 function go(r) {
   if (r === 'month' && route !== 'month') monthSection = 'calendar';
@@ -8559,11 +8559,13 @@ document.addEventListener('click', ev => {
           ? todays.map(x => x.cid === item.cid && Number(x.seq) === Number(item.seq)
             ? Object.assign({}, moved, x, { claimed: true, claimedAt: now() }) : x)
           : todays.concat(moved));
+        todayFoldState.lectures = true;
         render(); toast('밀린 인강을 오늘 스터디 플래너로 옮겼습니다');
         break;
       }
       if (ingIsClaimed(item)) return toast('이미 체크리스트에 담은 인강입니다');
       ingPatchItem(me.id, planDate, item.cid, Number(item.seq), { claimed: true, claimedAt: now() });
+      todayFoldState.lectures = true;
       render(); toast('스터디 플래너 체크리스트에 담았습니다');
       break;
     }
@@ -9637,6 +9639,7 @@ document.addEventListener('click', ev => {
         return toast('이 공부를 체크리스트에 담을 수 없습니다');
       }
       setCheck(id, date, { claimed: true, claimedAt: now() });
+      todayFoldState.studyOffers = true;
       render(); toast('내 체크리스트에 담았습니다');
       break;
     }
@@ -10436,7 +10439,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.36';
+const APP_VER = '2026-08-19.37';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

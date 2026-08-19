@@ -27,6 +27,7 @@ test('study subjects use the requested pastel palette with separate social and s
 });
 
 test('today places collapsible lectures directly below collapsible distributed study', () => {
+  const state = section('let route =', 'function go(');
   const today = section('function viewToday()', 'function studyOffersCard(');
   const totalAt = today.indexOf('studyTotalHeroCard(me, cursor)');
   const offerAt = today.indexOf('studyOffersCard(me, cursor, offers)');
@@ -49,7 +50,10 @@ test('today places collapsible lectures directly below collapsible distributed s
     assert.match(source, /data-act="todayfold"/);
     assert.match(source, /aria-expanded/);
   });
+  assert.match(state, /const todayFoldState = \{ studyOffers: true, lectures: true \}/);
   assert.match(handler, /todayFoldState\[section\] = !todayFoldState\[section\]/);
+  assert.match(html, /setCheck\(id, date, \{ claimed: true, claimedAt: now\(\) \}\);\s+todayFoldState\.studyOffers = true/);
+  assert.match(html, /ingPatchItem\(me\.id, planDate, item\.cid, Number\(item\.seq\), \{ claimed: true, claimedAt: now\(\) \}\);\s+todayFoldState\.lectures = true/);
   assert.match(css, /\.today-fold-head/);
 });
 
