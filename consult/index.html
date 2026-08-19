@@ -388,6 +388,15 @@
   .week-close-table th, .week-close-table td { padding: 9px 7px; border-bottom: 1px solid var(--light-gray); text-align: center; }
   .week-close-table th { color: var(--mid-gray); font-size: 11px; }
   .week-close-table td:nth-child(2) { text-align: left; }
+  .week-close-card { border: 2px solid #D9E8F7; background: linear-gradient(145deg, #FFFFFF 0%, #F5FAFF 100%); }
+  .week-close-card.complete { border-color: #BDE7CF; background: linear-gradient(145deg, #FFFFFF 0%, #F2FBF6 100%); }
+  .week-close-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+  .week-close-summary > div { padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.82); text-align: center; }
+  .week-close-summary span { display: block; color: var(--mid-gray); font-size: 10px; font-weight: 800; }
+  .week-close-summary b { display: block; margin-top: 4px; color: var(--navy); font-size: 14px; }
+  .week-followup-row { padding: 11px 0; border-bottom: 1px solid var(--light-gray); }
+  .week-followup-row:last-child { border-bottom: 0; }
+  .week-followup-grid { display: grid; grid-template-columns: minmax(150px, .75fr) minmax(180px, 1.25fr); gap: 8px; margin-top: 8px; }
   .week-detail-card { overflow: hidden; padding: 0; }
   .week-detail-card > summary { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 13px 17px; cursor: pointer; list-style: none; }
   .week-detail-card > summary::-webkit-details-marker { display: none; }
@@ -623,7 +632,7 @@
   .study-time-total { font-size: 32px; font-weight: 900; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
   .daily-close-card { border: 2px solid #C7D8ED; background: linear-gradient(145deg, #F8FBFF, #FFFFFF); }
   .daily-close-card.complete { border-color: #B7E3C8; background: linear-gradient(145deg, #F3FCF6, #FFFFFF); }
-  .daily-close-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+  .daily-close-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 14px 0; }
   .daily-close-step { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
   .daily-close-step span { display: block; margin-bottom: 3px; color: var(--mid-gray); font-size: 10px; font-weight: 900; }
   .daily-close-step b { display: block; color: var(--navy); font-size: 12px; line-height: 1.4; }
@@ -678,7 +687,7 @@
     .study-planner-pane + .study-planner-pane { border-left: none; border-top: 2px solid #CFC9B7; }
     .planner-list-head, .planner-task-row { grid-template-columns: 54px minmax(0, 1fr) 34px; }
     .planner-task-detail { padding-left: 7px; padding-right: 7px; }
-    .daily-close-steps, .daily-close-item-grid { grid-template-columns: 1fr; }
+    .daily-close-steps, .daily-close-item-grid, .week-close-summary, .week-followup-grid { grid-template-columns: 1fr; }
     .week-review-grid { grid-template-columns: 1fr; }
     .week-action-summary { align-items: flex-start; }
     .week-action-counts { justify-content: flex-start; }
@@ -1736,6 +1745,7 @@ function viewToday() {
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
   const priorCloseDates = session.isStaffLink && cursor === today() ? dailyUnclosedDates(me.id, cursor) : [];
+  const priorWeekMon = session.isStaffLink && cursor === today() ? previousUnclosedWeek(me.id, cursor) : '';
 
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
@@ -1753,6 +1763,17 @@ function viewToday() {
         label(priorCloseDates[0]) + ' 마무리하기</button></div>' +
       '<div class="card"><div class="empty"><b>🔒</b><strong>오늘 학습은 잠시 잠겨 있습니다.</strong><br>' +
         '이전 날짜의 미완료 공부와 일정 준비율을 확인하고 보고 발송까지 마쳐 주세요.</div></div>';
+    return h;
+  }
+
+  if (priorWeekMon) {
+    h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 지난주 마무리가 필요합니다</div>' +
+      '<div class="card-sub">주간 회고와 보고 발송까지 완료해야 오늘 학습을 시작할 수 있습니다.</div></div>' +
+      '<span class="pill bad">지난주 미마감</span></div>' +
+      '<button class="btn btn-navy btn-block mt14" data-act="weekcloseopen" data-mon="' + priorWeekMon + '">' +
+        shortDate(priorWeekMon) + ' 주간 마무리하기</button></div>' +
+      '<div class="card"><div class="empty"><b>🔒</b><strong>오늘 학습은 잠시 잠겨 있습니다.</strong><br>' +
+        '지난주의 학습 결과를 확인하고 주간 보고 발송을 마쳐 주세요.</div></div>';
     return h;
   }
 
@@ -3843,6 +3864,110 @@ function weekPlanOf(staffId, anchor) {
   const c = state.checks[weekPlanKey(staffId) + '|' + mondayOf(anchor)];
   return Object.assign({ subjectGoals: {}, reflection: '', directorNote: '', nextFocus: '' }, (c && c.plan) || {});
 }
+const WEEK_CLOSE_START = '2026-08-17';
+const weekCloseKey = staffId => '__weekclose__' + staffId;
+function weekCloseOf(staffId, anchor) {
+  const mon = mondayOf(anchor);
+  const check = state.checks[weekCloseKey(staffId) + '|' + mon];
+  const close = Object.assign({
+    status: 'open', difficulty: '', studentNextFocus: '', resolutions: {},
+    itemSnapshot: [], summary: null, reviewToken: '', copyToken: ''
+  }, (check && check.close) || {});
+  close.resolutions = Object.assign({}, close.resolutions || {});
+  close.itemSnapshot = Array.isArray(close.itemSnapshot) ? close.itemSnapshot : [];
+  return close;
+}
+function weekCloseDays(anchor) {
+  const mon = mondayOf(anchor);
+  return Array.from({ length: 7 }, (_, index) => addDays(mon, index));
+}
+function weekCloseFollowups(staffId, anchor) {
+  const out = [];
+  weekCloseDays(anchor).forEach(date => {
+    const daily = dailyCloseOf(staffId, date);
+    const items = daily.itemSnapshot.length ? daily.itemSnapshot : dailyCloseStudyItems(staffId, date);
+    items.filter(item => !item.done).forEach(item => {
+      const dailyResolution = daily.resolutions[item.key] || {};
+      out.push({
+        key: date + '|' + item.key, date: date, itemKey: item.key,
+        label: item.label, detail: item.detail || '', subjectKey: item.subjectKey || 'other',
+        dailyType: dailyResolution.type || '', dailyNote: dailyResolution.note || ''
+      });
+    });
+  });
+  return out;
+}
+function weekCloseSummary(staffId, anchor) {
+  const mon = mondayOf(anchor);
+  const days = weekCloseDays(mon);
+  let done = 0, total = 0, activeDays = 0, closedDays = 0, totalSecs = 0;
+  days.forEach(date => {
+    const daily = dailyCloseOf(staffId, date);
+    const items = daily.itemSnapshot.length ? daily.itemSnapshot : dailyCloseStudyItems(staffId, date);
+    const active = items.length || stTotal(staffId, date) > 0 || daily.reviewedAt;
+    done += items.filter(item => item.done).length;
+    total += items.length;
+    totalSecs += stTotal(staffId, date);
+    if (active && date >= DAILY_CLOSE_START) {
+      activeDays++;
+      if (dailyCloseState(staffId, date).complete) closedDays++;
+    }
+  });
+  const actual = weekSubjectActual(staffId, days);
+  const topKey = STUDY_SUBJECT_KEYS.slice().sort((a, b) => (actual[b] || 0) - (actual[a] || 0))[0] || 'other';
+  const sunday = days[6];
+  const sundayClose = dailyCloseOf(staffId, sunday);
+  const events = dailyCloseEventRefs(staffId, sunday).map(ref => ({
+    id: ref.event.id, title: ref.event.title, date: ref.event.date,
+    progress: Object.prototype.hasOwnProperty.call(sundayClose.eventProgress, ref.event.id)
+      ? Number(sundayClose.eventProgress[ref.event.id]) : Number(ref.event.progress) || 0
+  }));
+  return {
+    mon: mon, sun: sunday, done: done, total: total,
+    pct: total ? Math.round(done / total * 100) : 0,
+    activeDays: activeDays, closedDays: closedDays, totalSecs: totalSecs,
+    actual: actual, topKey: totalSecs ? topKey : '', events: events
+  };
+}
+function weekHadActivity(staffId, anchor) {
+  const summary = weekCloseSummary(staffId, anchor);
+  const plan = weekPlanOf(staffId, anchor);
+  return !!(summary.total || summary.totalSecs || summary.activeDays || (plan.reflection || '').trim());
+}
+function weekCloseUnclosedDays(staffId, anchor) {
+  return weekCloseDays(anchor).filter(date => {
+    if (date < DAILY_CLOSE_START) return false;
+    const close = dailyCloseOf(staffId, date);
+    const active = dailyCloseStudyItems(staffId, date).length || stTotal(staffId, date) > 0 || close.reviewedAt;
+    return active && !dailyCloseState(staffId, date).complete;
+  });
+}
+function weekCloseComplete(staffId, anchor) {
+  return ['complete', 'overridden'].includes(weekCloseOf(staffId, anchor).status);
+}
+function weekCloseAvailable(anchor) {
+  const mon = mondayOf(anchor);
+  return mon >= WEEK_CLOSE_START && today() >= addDays(mon, 6);
+}
+function previousUnclosedWeek(staffId, date) {
+  const currentMon = mondayOf(date);
+  const weeks = [];
+  for (let mon = addDays(currentMon, -7), guard = 0; mon >= WEEK_CLOSE_START && guard++ < 520; mon = addDays(mon, -7)) {
+    weeks.unshift(mon);
+  }
+  for (const mon of weeks) {
+    if (weekHadActivity(staffId, mon) && !weekCloseComplete(staffId, mon)) return mon;
+  }
+  return '';
+}
+function weekCloseStatusLabel(staffId, anchor) {
+  const close = weekCloseOf(staffId, anchor);
+  if (close.status === 'complete') return { key: 'complete', label: '주간 마감 완료' };
+  if (close.status === 'overridden') return { key: 'complete', label: '원장 대신 마감' };
+  if (!weekCloseAvailable(anchor)) return { key: 'future', label: '일요일 마감 예정' };
+  if (close.status === 'reviewed') return { key: 'ready', label: '보고 전' };
+  return { key: 'open', label: '주간 마감 필요' };
+}
 function weekSubjectActual(staffId, days) {
   const totals = Object.fromEntries(STUDY_SUBJECT_KEYS.map(key => [key, 0]));
   days.forEach(date => {
@@ -3894,6 +4019,122 @@ function weekMoveModal(task, from, mon) {
     (existing ? '<button class="btn btn-ghost btn-block mt14" data-act="weekmoveundo">원래 날짜로 되돌리기</button>' : ''));
 }
 
+function weekResolutionOptions(selected) {
+  return [['', '다음 주 처리 선택'], ['next', '다음 주 계속'], ['help', '원장 도움 요청'], ['closed', '이번 주에서 종료']]
+    .map(([value, label]) => '<option value="' + value + '"' + (selected === value ? ' selected' : '') + '>' + label + '</option>').join('');
+}
+
+function weekCloseCard(student, mon) {
+  const close = weekCloseOf(student.id, mon);
+  const status = weekCloseStatusLabel(student.id, mon);
+  const summary = close.summary || weekCloseSummary(student.id, mon);
+  const studentMode = session.isStaffLink && session.staffId === student.id;
+  const complete = weekCloseComplete(student.id, mon);
+  let action = '';
+  if (studentMode) {
+    if (complete) action = '<button class="btn btn-ghost btn-block" data-act="weekreportopen" data-mon="' + mon + '">주간 보고 다시 보기</button>';
+    else if (weekCloseAvailable(mon)) action = '<button class="btn btn-navy btn-block" data-act="weekcloseopen" data-mon="' + mon + '">주간 마무리 시작</button>';
+  } else if (session.isAdmin) {
+    action = complete
+      ? '<button class="btn btn-ghost btn-block" data-act="weekreportopen" data-mon="' + mon + '">주간 마감 기록 보기</button>'
+      : (weekCloseAvailable(mon) ? '<button class="btn btn-ghost btn-block" data-act="weekoverrideopen" data-mon="' + mon + '">원장이 대신 마감</button>' : '');
+  }
+  return '<div class="card week-close-card' + (complete ? ' complete' : '') + '">' +
+    '<div class="between"><div><div class="card-title">🔐 이번 주 최종 마감</div>' +
+      '<div class="card-sub">일요일 하루 마감 뒤 주간 회고와 보고 발송까지 완료합니다.</div></div>' +
+      '<span class="pill ' + (status.key === 'complete' ? '' : status.key === 'future' ? 'warn' : 'bad') + '">' + status.label + '</span></div>' +
+    '<div class="week-close-summary">' +
+      '<div><span>학습 완료</span><b>' + summary.done + '/' + summary.total + ' · ' + summary.pct + '%</b></div>' +
+      '<div><span>주간 순공</span><b>' + fmtDur(summary.totalSecs) + '</b></div>' +
+      '<div><span>활동일 마감</span><b>' + summary.closedDays + '/' + summary.activeDays + '일</b></div>' +
+      '<div><span>미완료 정리</span><b>' + (close.itemSnapshot.length || weekCloseFollowups(student.id, mon).length) + '건</b></div>' +
+    '</div>' +
+    (close.status === 'overridden' && close.overrideReason ? '<div class="hint mb14">원장 대신 처리 사유: ' + esc(close.overrideReason) + '</div>' : '') +
+    (action || '<div class="hint">일요일 학습을 마감한 뒤 이 단계가 열립니다.</div>') + '</div>';
+}
+
+function weekCloseModal(staffId, mon) {
+  const close = weekCloseOf(staffId, mon);
+  const plan = weekPlanOf(staffId, mon);
+  const summary = weekCloseSummary(staffId, mon);
+  const followups = weekCloseFollowups(staffId, mon);
+  const rows = followups.map(item => {
+    const saved = close.resolutions[item.key] || {};
+    const inferred = item.dailyType === 'carry' ? 'next' : item.dailyType === 'blocked' ? 'help' : item.dailyType === 'closed' ? 'closed' : '';
+    return '<div class="week-followup-row ' + studySubject(item.subjectKey).className + '">' +
+      '<div class="row wraprow" style="gap:6px">' + studySubjectTag(item.subjectKey) + '<b class="small">' + esc(item.label) + '</b>' +
+        '<span class="small muted">' + shortDate(item.date) + '</span></div>' +
+      (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') +
+      (item.dailyNote ? '<div class="small muted mt8">하루 마감: ' + esc(item.dailyNote) + '</div>' : '') +
+      '<div class="week-followup-grid"><select class="in" data-week-resolution data-key="' + esc(item.key) + '">' +
+        weekResolutionOptions(saved.type || inferred) + '</select>' +
+        '<input class="in" data-week-note data-key="' + esc(item.key) + '" value="' + esc(saved.note || '') + '" placeholder="도움 요청·종료 이유"></div></div>';
+  }).join('');
+  modal('🔐 ' + shortDate(mon) + ' 주간 마무리',
+    '<div class="week-close-summary">' +
+      '<div><span>학습 완료</span><b>' + summary.done + '/' + summary.total + ' · ' + summary.pct + '%</b></div>' +
+      '<div><span>주간 순공</span><b>' + fmtDur(summary.totalSecs) + '</b></div>' +
+      '<div><span>활동일 마감</span><b>' + summary.closedDays + '/' + summary.activeDays + '일</b></div>' +
+      '<div><span>가장 많이 공부</span><b>' + (summary.topKey ? STUDY_SUBJECTS[summary.topKey].label : '—') + '</b></div></div>' +
+    '<div class="field"><label class="fl">이번 주 잘한 점 <span class="bad">필수</span></label>' +
+      '<textarea class="in" id="weekCloseReflection" placeholder="이번 주에 잘 지킨 공부와 습관">' + esc(plan.reflection || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">이번 주 어려웠던 점 <span class="bad">필수</span></label>' +
+      '<textarea class="in" id="weekCloseDifficulty" placeholder="막히거나 계획대로 되지 않은 이유">' + esc(close.difficulty || '') + '</textarea></div>' +
+    '<div class="field"><label class="fl">다음 주 집중할 것 <span class="bad">필수</span></label>' +
+      '<textarea class="in" id="weekCloseStudentFocus" placeholder="다음 주 가장 먼저 챙길 과목과 공부">' + esc(close.studentNextFocus || '') + '</textarea></div>' +
+    '<hr class="sep"><div class="card-sub mb8">미완료·이월 공부 최종 확인</div>' +
+    (rows || '<div class="guide"><b>정리할 미완료 공부가 없습니다.</b>이번 주 하루 마감에서 모두 처리했습니다.</div>'),
+    '<button class="btn btn-primary btn-block mt14" data-act="weekclosesave" data-mon="' + mon + '">주간 마무리 저장하고 보고 만들기</button>');
+}
+
+function weekReportText(staffId, mon) {
+  const student = staffById(staffId);
+  const close = weekCloseOf(staffId, mon);
+  const summary = close.summary || weekCloseSummary(staffId, mon);
+  const items = close.itemSnapshot.length ? close.itemSnapshot : weekCloseFollowups(staffId, mon);
+  let txt = '📊 ' + shortDate(mon) + ' ~ ' + shortDate(addDays(mon, 6)) + ' 주간 수행 보고\n' +
+    (student ? student.name + '\n' : '') +
+    '학습 완료 ' + summary.done + '/' + summary.total + '건 (' + summary.pct + '%)\n' +
+    '주간 순공시간 ' + fmtDur(summary.totalSecs) + '\n' +
+    '활동일 마감 ' + summary.closedDays + '/' + summary.activeDays + '일\n─────────\n' +
+    STUDY_SUBJECT_KEYS.filter(key => Number((summary.actual || {})[key]) > 0)
+      .map(key => '· ' + STUDY_SUBJECTS[key].label + ' ' + fmtDur(summary.actual[key])).join('\n');
+  txt += '\n─────────\n📝 학생 주간 회고\n· 잘한 점: ' + (close.reflection || weekPlanOf(staffId, mon).reflection || '—') +
+    '\n· 어려웠던 점: ' + (close.difficulty || '—') +
+    '\n· 다음 주 집중: ' + (close.studentNextFocus || '—');
+  if (items.length) {
+    txt += '\n─────────\n↪ 미완료 공부 정리\n' + items.map(item => {
+      const resolution = close.resolutions[item.key] || {};
+      const result = resolution.type === 'next' ? '다음 주 계속' : resolution.type === 'help' ? '원장 도움 요청' : '이번 주 종료';
+      return '· ' + item.label + ' [' + result + ']' + (resolution.note ? ' — ' + resolution.note : '');
+    }).join('\n');
+  }
+  if ((summary.events || []).length) txt += '\n─────────\n📌 시험·중요 일정 준비율\n' +
+    summary.events.map(event => '· ' + event.title + ' · 준비 ' + event.progress + '%').join('\n');
+  return txt;
+}
+
+function weekReportModal(staffId, mon) {
+  const close = weekCloseOf(staffId, mon);
+  const copied = close.copyToken && close.copyToken === close.reviewToken;
+  const complete = weekCloseComplete(staffId, mon);
+  modal('📊 주간 수행 보고',
+    '<textarea class="in" rows="18" id="weekReportText" readonly>' + esc(weekReportText(staffId, mon)) + '</textarea>' +
+    (session.isStaffLink && !complete ? '<div class="hint">문자를 복사해 발송한 뒤 발송 완료를 확인해야 다음 주 오늘 화면이 열립니다.</div>' : ''),
+    (session.isStaffLink && !complete
+      ? '<button class="btn btn-primary btn-block mt14" data-act="weekreportcopy" data-mon="' + mon + '">주간 보고 문자 복사</button>' +
+        '<button class="btn btn-navy btn-block mt14" data-act="weekclosefinish" data-mon="' + mon + '"' + (!copied ? ' disabled' : '') + '>' +
+          (copied ? '복사 완료 · 발송했어요' : '문자를 먼저 복사해 주세요') + '</button>'
+      : ''));
+}
+
+function weekOverrideModal(mon) {
+  modal('원장이 주간 마감 대신 처리',
+    '<div class="hint bad mb14"><b>학생이 직접 마무리하기 어려운 경우에만 사용하세요.</b><br>사유는 주간 마감 기록에 남습니다.</div>' +
+    '<textarea class="in" id="weekOverrideReason" placeholder="예: 휴원, 기기 고장, 학생 부재"></textarea>',
+    '<button class="btn btn-danger btn-block mt14" data-act="weekoverridefinish" data-mon="' + mon + '">사유를 남기고 대신 마감</button>');
+}
+
 function viewWeek() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -3904,6 +4145,7 @@ function viewWeek() {
   const list = Object.values(rows);
   const wp = weekProgress(me.id, cursor);
   const plan = weekPlanOf(me.id, mon);
+  const weekClose = weekCloseOf(me.id, mon);
   const actual = weekSubjectActual(me.id, days);
   const offers = weekUnclaimedOffers(me.id, days);
   const backlog = weekBacklog(me.id, days);
@@ -4012,9 +4254,13 @@ function viewWeek() {
       '</div></details>';
   }
 
-  h += '<div class="card"><div class="card-title">📝 주간 마무리</div><div class="card-sub mb14">이번 주를 돌아보고 다음 주에 조정할 점을 남깁니다.</div>' +
+  h += weekCloseCard(me, mon);
+
+  h += '<div class="card"><div class="card-title">📝 회고와 원장 피드백</div><div class="card-sub mb14">학생 주간 마감 내용과 원장의 다음 주 지도를 함께 확인합니다.</div>' +
     '<div class="week-review-grid"><div class="field"><label class="fl">학생 한 줄 회고</label><textarea class="in" id="weekReflection" ' +
       (session.isStaffLink ? '' : 'readonly') + ' placeholder="잘한 점과 다음 주에 바꿀 점">' + esc(plan.reflection || '') + '</textarea></div>' +
+      '<div class="field"><label class="fl">학생이 어려웠던 점</label><textarea class="in" readonly>' + esc(weekClose.difficulty || '') + '</textarea></div>' +
+      '<div class="field" style="grid-column:1/-1"><label class="fl">학생의 다음 주 집중</label><textarea class="in" readonly>' + esc(weekClose.studentNextFocus || '') + '</textarea></div>' +
       '<div class="field"><label class="fl">원장 피드백</label><textarea class="in" id="weekDirectorNote" ' +
         (session.isAdmin ? '' : 'readonly') + ' placeholder="원장이 확인 후 남기는 피드백">' + esc(plan.directorNote || '') + '</textarea></div>' +
       '<div class="field" style="grid-column:1/-1"><label class="fl">다음 주 집중</label><textarea class="in" id="weekNextFocus" ' +
@@ -4189,24 +4435,30 @@ function dailyClosureCard(student, date) {
   const status = dailyCloseStatusLabel(student.id, date);
   const studentMode = session.isStaffLink && session.staffId === student.id;
   const priorDates = date === today() ? dailyUnclosedDates(student.id, date) : [];
+  const weekMon = mondayOf(date);
+  const weeklyRequired = date === addDays(weekMon, 6) && weekCloseAvailable(weekMon) &&
+    weekHadActivity(student.id, weekMon) && !weekCloseComplete(student.id, weekMon);
   let action = '';
   if (studentMode) {
     if (priorDates.length) action = '<button class="btn btn-primary btn-block" data-act="daypick" data-date="' + priorDates[0] + '">이전 미마감 ' + priorDates.length + '일 먼저 마무리</button>';
+    else if (data.complete && weeklyRequired) action = '<button class="btn btn-navy btn-block" data-act="weekcloseopen" data-mon="' + weekMon + '">일요일 주간 마무리 계속</button>';
     else if (data.complete) action = '<button class="btn btn-ghost btn-block" data-act="report">보고 문자 다시 보기</button>';
     else if (data.canReport) action = '<button class="btn btn-navy btn-block" data-act="report">확인하고 수행 보고 문자 만들기</button>';
     else action = '<button class="btn btn-primary btn-block" data-act="dailycloseopen">오늘 마무리 확인</button>';
   }
-  return '<div class="card daily-close-card' + (data.complete ? ' complete' : '') + '" id="dailyCloseCard">' +
+  return '<div class="card daily-close-card' + (data.complete && !weeklyRequired ? ' complete' : '') + '" id="dailyCloseCard">' +
     '<div class="between"><div><div class="card-title">✅ ' + (date === today() ? '오늘' : label(date)) + ' 학습 마무리</div>' +
-      '<div class="card-sub">아래 단계를 확인해야 오늘 보고 문자를 만들 수 있습니다.</div></div>' +
-      '<span class="pill ' + (data.complete && !priorDates.length ? '' : data.canReport && !priorDates.length ? 'warn' : 'bad') + '">' +
-        (priorDates.length ? '이전 마감 필요' : status.label) + '</span></div>' +
+      '<div class="card-sub">아래 단계를 확인해야 오늘 최종 마감을 완료할 수 있습니다.</div></div>' +
+      '<span class="pill ' + (data.complete && !weeklyRequired && !priorDates.length ? '' : data.canReport && !priorDates.length ? 'warn' : 'bad') + '">' +
+        (priorDates.length ? '이전 마감 필요' : weeklyRequired ? '주간 마무리 필요' : status.label) + '</span></div>' +
     '<div class="daily-close-steps">' +
       '<div class="daily-close-step ' + (!data.running ? 'ok' : 'warn') + '"><span>1 · 공부 종료</span><b>' +
         (data.running ? '타이머 정지 필요' : done + '/' + total + '개 완료') + '</b></div>' +
       '<div class="daily-close-step ' + (!data.unresolved.length ? 'ok' : 'warn') + '"><span>2 · 미완료 정리</span><b>' +
         (data.unresolved.length ? data.unresolved.length + '개 처리 필요' : '정리 완료') + '</b></div>' +
       '<div class="daily-close-step ' + (!data.unconfirmedEvents.length ? 'ok' : 'warn') + '"><span>3 · 일정 준비율</span><b>' + eventText + '</b></div>' +
+      (date === addDays(weekMon, 6) ? '<div class="daily-close-step ' + (weekCloseComplete(student.id, weekMon) ? 'ok' : 'warn') + '"><span>4 · 주간 마무리</span><b>' +
+        (weekCloseComplete(student.id, weekMon) ? '마감 완료' : '회고·보고 필요') + '</b></div>' : '') +
     '</div>' + action +
     (!studentMode ? '<div class="hint">학생이 오늘 탭에서 직접 마무리하고 발송 완료를 확인합니다.</div>' :
       '<div class="hint" style="text-align:center;margin-top:10px">새로고침해도 마감 단계와 확인 기록은 유지됩니다.</div>') + '</div>';
@@ -4280,9 +4532,12 @@ function dailyCarryLecture(staffId, date, cid, seq) {
 function dailyReportModal(staffId, date) {
   const data = dailyCloseState(staffId, date);
   const copied = data.close.copySignature === data.signature;
+  const sunday = date === addDays(mondayOf(date), 6);
   modal('📨 오늘 수행 보고',
     '<textarea class="in" rows="15" id="mText" readonly>' + esc(reportText(staffId, date)) + '</textarea>' +
-    '<div class="hint">문자를 복사해 발송한 뒤 아래에서 발송 완료를 확인해야 오늘 마감이 끝납니다.</div>',
+    '<div class="hint">' + (sunday
+      ? '하루 보고를 발송한 뒤 주간 회고와 주간 보고까지 완료해야 일요일 최종 마감이 끝납니다.'
+      : '문자를 복사해 발송한 뒤 아래에서 발송 완료를 확인해야 오늘 마감이 끝납니다.') + '</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="dailyreportcopy">보고 문자 복사</button>' +
     '<button class="btn btn-navy btn-block mt14" data-act="dailyreportfinish"' + (data.complete || !copied ? ' disabled' : '') + '>' +
       (data.complete ? '✓ 오늘 마감 완료' : copied ? '복사 완료 · 발송했어요' : '문자를 먼저 복사해 주세요') + '</button>');
@@ -7604,6 +7859,120 @@ document.addEventListener('click', ev => {
       render(); toast('주간 기록을 저장했습니다');
       break;
     }
+    case 'weekcloseopen': {
+      const me = currentStaff();
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!session.isStaffLink || !me || me.id !== session.staffId || mon < WEEK_CLOSE_START) break;
+      if (weekCloseComplete(me.id, mon)) { weekReportModal(me.id, mon); break; }
+      if (!weekCloseAvailable(mon)) return toast('주간 마무리는 일요일부터 할 수 있습니다');
+      const unclosedDays = weekCloseUnclosedDays(me.id, mon);
+      if (unclosedDays.length) {
+        cursor = unclosedDays[0]; cursorPinned = true; go('today');
+        return toast('주간 마무리 전에 남은 하루 마감부터 완료해 주세요');
+      }
+      weekCloseModal(me.id, mon);
+      break;
+    }
+    case 'weekclosesave': {
+      const me = currentStaff();
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!session.isStaffLink || !me || me.id !== session.staffId || !weekCloseAvailable(mon)) break;
+      if (weekCloseUnclosedDays(me.id, mon).length) return toast('남은 하루 마감부터 완료해 주세요');
+      const reflection = (($('#weekCloseReflection') || {}).value || '').trim();
+      const difficulty = (($('#weekCloseDifficulty') || {}).value || '').trim();
+      const studentNextFocus = (($('#weekCloseStudentFocus') || {}).value || '').trim();
+      if (!reflection) return toast('이번 주 잘한 점을 입력해 주세요');
+      if (!difficulty) return toast('이번 주 어려웠던 점을 입력해 주세요');
+      if (!studentNextFocus) return toast('다음 주 집중할 것을 입력해 주세요');
+      const close = weekCloseOf(me.id, mon);
+      const followups = weekCloseFollowups(me.id, mon);
+      const selects = [...document.querySelectorAll('[data-week-resolution]')];
+      const notes = [...document.querySelectorAll('[data-week-note]')];
+      const resolutions = {};
+      for (const item of followups) {
+        const select = selects.find(input => input.dataset.key === item.key);
+        const noteInput = notes.find(input => input.dataset.key === item.key);
+        const type = select ? select.value : '';
+        const note = noteInput ? noteInput.value.trim() : '';
+        if (!type) return toast(item.label + '의 다음 주 처리를 선택해 주세요');
+        if ((type === 'help' || type === 'closed') && !note) return toast(item.label + '의 도움 요청·종료 이유를 입력해 주세요');
+        resolutions[item.key] = { type: type, note: note, at: now() };
+      }
+      const plan = weekPlanOf(me.id, mon);
+      setCheck(weekPlanKey(me.id), mon, { plan: Object.assign({}, plan, { reflection: reflection }), done: true });
+      const reviewToken = uid();
+      const nextClose = Object.assign({}, close, {
+        status: 'reviewed', reflection: reflection, difficulty: difficulty,
+        studentNextFocus: studentNextFocus, resolutions: resolutions,
+        itemSnapshot: followups.map(item => Object.assign({}, item)), summary: weekCloseSummary(me.id, mon),
+        reviewedAt: now(), reviewToken: reviewToken, reportCopiedAt: null, copyToken: '',
+        completedAt: null, overrideReason: ''
+      });
+      setCheck(weekCloseKey(me.id), mon, { close: nextClose, done: true });
+      closeModal(); render(); weekReportModal(me.id, mon);
+      toast('주간 마무리를 저장했습니다. 보고 문자를 발송해 주세요');
+      break;
+    }
+    case 'weekreportopen': {
+      const me = currentStaff();
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!me || (session.isStaffLink && me.id !== session.staffId)) break;
+      weekReportModal(me.id, mon);
+      break;
+    }
+    case 'weekreportcopy': {
+      const me = currentStaff();
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!session.isStaffLink || !me || me.id !== session.staffId) break;
+      const close = weekCloseOf(me.id, mon);
+      if (close.status !== 'reviewed' || !close.reviewToken) return toast('주간 마무리 내용을 먼저 저장해 주세요');
+      copy((($('#weekReportText') || {}).value) || weekReportText(me.id, mon)).then(copied => {
+        if (!copied) return;
+        const fresh = weekCloseOf(me.id, mon);
+        if (fresh.reviewToken !== close.reviewToken) return toast('주간 기록이 바뀌었습니다. 다시 확인해 주세요');
+        const nextClose = Object.assign({}, fresh, { reportCopiedAt: now(), copyToken: fresh.reviewToken });
+        setCheck(weekCloseKey(me.id), mon, { close: nextClose, done: true });
+        weekReportModal(me.id, mon);
+      });
+      break;
+    }
+    case 'weekclosefinish': {
+      const me = currentStaff();
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!session.isStaffLink || !me || me.id !== session.staffId) break;
+      const close = weekCloseOf(me.id, mon);
+      if (!close.reviewToken || close.copyToken !== close.reviewToken) return toast('주간 보고 문자를 먼저 복사해 주세요');
+      if (weekCloseUnclosedDays(me.id, mon).length) return toast('하루 기록이 바뀌었습니다. 남은 마감부터 확인해 주세요');
+      const nextClose = Object.assign({}, close, { status: 'complete', completedAt: now() });
+      setCheck(weekCloseKey(me.id), mon, { close: nextClose, done: true });
+      closeModal(); cursor = today(); cursorPinned = false; render();
+      toast('이번 주 마감을 완료했습니다');
+      break;
+    }
+    case 'weekoverrideopen': {
+      if (!session.isAdmin) break;
+      const me = currentStaff(); if (!me) break;
+      const mon = el.dataset.mon || mondayOf(cursor);
+      if (!weekCloseAvailable(mon) || weekCloseComplete(me.id, mon)) break;
+      weekOverrideModal(mon);
+      break;
+    }
+    case 'weekoverridefinish': {
+      if (!session.isAdmin) break;
+      const me = currentStaff(); if (!me) break;
+      const mon = el.dataset.mon || mondayOf(cursor);
+      const reason = (($('#weekOverrideReason') || {}).value || '').trim();
+      if (!reason) return toast('대신 처리 사유를 입력해 주세요');
+      const close = weekCloseOf(me.id, mon);
+      const nextClose = Object.assign({}, close, {
+        status: 'overridden', overrideReason: reason, overriddenAt: now(), completedAt: now(),
+        summary: close.summary || weekCloseSummary(me.id, mon),
+        itemSnapshot: close.itemSnapshot.length ? close.itemSnapshot : weekCloseFollowups(me.id, mon)
+      });
+      setCheck(weekCloseKey(me.id), mon, { close: nextClose, done: true });
+      closeModal(); render(); toast('원장 대신 주간 마감 처리했습니다');
+      break;
+    }
 
     /* 발행형 주간·월간 리포트 */
     case 'reportpreview': {
@@ -8131,6 +8500,7 @@ document.addEventListener('click', ev => {
     }
     case 'dailyreportfinish': {
       const me = currentStaff(); if (!session.isStaffLink || !me || me.id !== session.staffId) break;
+      const closedDate = cursor;
       const data = dailyCloseState(me.id, cursor);
       if (data.close.copySignature !== data.signature) return toast('보고 문자를 먼저 복사해 주세요');
       if (!data.canReport && !data.complete) return toast('오늘 기록이 바뀌었습니다. 마무리를 다시 확인해 주세요');
@@ -8139,9 +8509,15 @@ document.addEventListener('click', ev => {
       });
       setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
       const closedPastDate = cursor < today();
+      const weekMon = mondayOf(closedDate);
+      const needsWeeklyClose = closedDate === addDays(weekMon, 6) && weekCloseAvailable(weekMon) &&
+        weekHadActivity(me.id, weekMon) && !weekCloseComplete(me.id, weekMon);
       closeModal();
       if (closedPastDate) { cursor = today(); cursorPinned = false; }
-      render(); toast(closedPastDate ? '이전 학습 마감을 완료해 오늘로 이동했습니다' : '오늘 학습 마감을 완료했습니다');
+      render();
+      if (needsWeeklyClose && !weekCloseUnclosedDays(me.id, weekMon).length) weekCloseModal(me.id, weekMon);
+      toast(needsWeeklyClose ? '하루 마감 완료 · 이어서 주간 마무리를 진행해 주세요' :
+        closedPastDate ? '이전 학습 마감을 완료해 오늘로 이동했습니다' : '오늘 학습 마감을 완료했습니다');
       break;
     }
     case 'brief': showText('오늘 마감 브리핑', briefText(cursor)); break;
@@ -8586,7 +8962,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-19.25';
+const APP_VER = '2026-08-19.26';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

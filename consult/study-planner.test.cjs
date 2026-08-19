@@ -275,6 +275,72 @@ test('weekly planner leads with daily closeout outcomes and keeps detailed place
   assert.ok(week.indexOf('✅ 월~일 학습·마감') < week.indexOf('📅 상세 공부 배치 보기'));
 });
 
+test('Sunday daily closeout continues into a required weekly closeout step', () => {
+  const closeCard = section('function dailyClosureCard(', 'function dailyResolutionOptions(');
+  const dailyReport = section('function dailyReportModal(', '/* ── 발행형 주간·월간 리포트');
+  const finish = section("case 'dailyreportfinish':", "case 'brief':");
+
+  assert.match(closeCard, /4 · 주간 마무리/);
+  assert.match(closeCard, /weekCloseAvailable\(weekMon\)/);
+  assert.match(closeCard, /weekHadActivity\(student\.id, weekMon\)/);
+  assert.match(closeCard, /data-act="weekcloseopen"/);
+  assert.match(dailyReport, /일요일 최종 마감/);
+  assert.match(finish, /needsWeeklyClose/);
+  assert.match(finish, /weekCloseModal\(me\.id, weekMon\)/);
+});
+
+test('an unfinished previous week locks the next Today screen before study begins', () => {
+  const helpers = section('const WEEK_CLOSE_START', 'function weekSubjectActual(');
+  const today = section('function viewToday()', 'function studyTotalHeroCard(');
+
+  assert.match(helpers, /const weekCloseKey = staffId => '__weekclose__' \+ staffId/);
+  assert.match(helpers, /function previousUnclosedWeek/);
+  assert.match(helpers, /weekHadActivity\(staffId, mon\) && !weekCloseComplete\(staffId, mon\)/);
+  assert.match(today, /previousUnclosedWeek\(me\.id, cursor\)/);
+  assert.match(today, /지난주 마무리가 필요합니다/);
+  assert.match(today, /주간 회고와 보고 발송까지 완료해야 오늘 학습을 시작할 수 있습니다/);
+  assert.match(today, /data-act="weekcloseopen" data-mon=/);
+  assert.match(today, /priorWeekMon[\s\S]*?return h/);
+});
+
+test('weekly closeout requires reflection, difficulty, next focus, and unfinished-study decisions', () => {
+  const modal = section('function weekResolutionOptions(', 'function weekReportText(');
+  const save = section("case 'weekclosesave':", "case 'weekreportopen':");
+
+  assert.match(modal, /다음 주 계속/);
+  assert.match(modal, /원장 도움 요청/);
+  assert.match(modal, /이번 주에서 종료/);
+  assert.match(modal, /id="weekCloseReflection"/);
+  assert.match(modal, /id="weekCloseDifficulty"/);
+  assert.match(modal, /id="weekCloseStudentFocus"/);
+  assert.match(modal, /data-week-resolution/);
+  assert.match(save, /이번 주 잘한 점을 입력해 주세요/);
+  assert.match(save, /이번 주 어려웠던 점을 입력해 주세요/);
+  assert.match(save, /다음 주 집중할 것을 입력해 주세요/);
+  assert.match(save, /다음 주 처리를 선택해 주세요/);
+  assert.match(save, /status: 'reviewed'/);
+});
+
+test('weekly report copy acknowledgement completes the week and director override requires a reason', () => {
+  const report = section('function weekReportText(', 'function weekOverrideModal(');
+  const handlers = section("case 'weekreportcopy':", '/* 발행형 주간·월간 리포트 */');
+  const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
+
+  assert.match(report, /주간 수행 보고/);
+  assert.match(report, /주간 순공시간/);
+  assert.match(report, /학생 주간 회고/);
+  assert.match(report, /미완료 공부 정리/);
+  assert.match(handlers, /copyToken: fresh\.reviewToken/);
+  assert.match(handlers, /close\.copyToken !== close\.reviewToken/);
+  assert.match(handlers, /status: 'complete'/);
+  assert.match(handlers, /if \(!session\.isAdmin\) break/);
+  assert.match(handlers, /대신 처리 사유를 입력해 주세요/);
+  assert.match(handlers, /status: 'overridden'/);
+  assert.match(week, /weekCloseCard\(me, mon\)/);
+  assert.match(week, /학생이 어려웠던 점/);
+  assert.match(week, /학생의 다음 주 집중/);
+});
+
 test('weekly planner compares subject goals with recorded study time', () => {
   const helpers = section('const weekPlanKey', 'function weekBacklog(');
   const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
@@ -317,7 +383,7 @@ test('weekly planner separates rollover work from unclaimed distributed study', 
   assert.match(week, /<details class="card week-action-card">/);
   assert.match(week, /이번 주 정리할 공부/);
   assert.ok(week.indexOf('week-key') < week.indexOf('<table class="week">'), 'the legend belongs to the weekly placement card');
-  assert.ok(week.indexOf('week-action-card') < week.indexOf('📝 주간 마무리'), 'weekly action items belong immediately before the wrap-up');
+  assert.ok(week.indexOf('week-action-card') < week.indexOf('weekCloseCard(me, mon)'), 'weekly action items belong immediately before the forced closeout');
   assert.doesNotMatch(week, /<div class="hint">🔵 완료/);
 });
 
