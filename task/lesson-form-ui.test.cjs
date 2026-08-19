@@ -68,7 +68,6 @@ test('admin direct lesson registration reuses the new-student information fields
   for (const key of ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'memo']) {
     assert.match(fields, new RegExp(`data-lesson-roster-field="${key}"`), key);
   }
-  assert.match(fields, /data-lesson-roster-subject/);
   assert.match(fields, /data-lesson-roster-teacher/);
   for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
     assert.match(html, new RegExp(subject));
@@ -88,7 +87,24 @@ test('admin direct lesson registration removes duplicate subject fields and free
   assert.match(view, /personal \? '<div class="sect">2\. 과목·반/);
   assert.match(view, /personal \? lessonTextField\('scheduleText',[\s\S]{0,160} : ''/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
-  assert.match(view, /\(personal \? '3' : '2'\) \+ '\. 수업 요일·시간/);
+  assert.match(view, /<div class="sect">3\. 수업 요일·시간/);
+});
+
+test('admin direct lesson registration reuses the new-student multi-subject selector', () => {
+  const subjectStart = html.indexOf('function lessonSubjectSelectionHtml()');
+  const subjectEnd = html.indexOf('function lessonRosterInformationHtml()', subjectStart);
+  const subjectView = html.slice(subjectStart, subjectEnd);
+  assert.match(subjectView, /2\. 등록과목/);
+  assert.match(subjectView, /ROSTER_SUBJECT_OPTIONS\.map/);
+  assert.match(subjectView, /data-lesson-roster-subject/);
+  assert.match(subjectView, /disabled/);
+  assert.match(subjectView, /원생 정보와 이번 수업 정보에 함께 반영/);
+  const changeStart = html.indexOf("const lessonRosterSubject = ev.target.closest('[data-lesson-roster-subject]')");
+  const changeEnd = html.indexOf("const lessonRosterTeacher", changeStart);
+  const change = html.slice(changeStart, changeEnd);
+  assert.match(change, /info\.subjects = subjects/);
+  assert.match(change, /draft\.subject = subjects\.join\('·'\)/);
+  assert.match(html, /draft\.subject = lessonPreviewRosterStudent\.subjects\.join\('·'\)/);
 });
 
 test('feedback workflow sends immediately only through the server-side guardian gate', () => {
