@@ -123,6 +123,78 @@ test('quick add, task edit, and batch issue require and persist a subject', () =
   });
 });
 
+test('learning distribution replaces the legacy employee form with a focused study workflow', () => {
+  const write = section('function viewWrite()', 'function draftCard(');
+  const draft = section('function draftCard()', 'function writePublishedResult(');
+  const publish = section("case 'wadd':", '/* 설정 */');
+  const tabs = section('function renderTabs()', 'function viewPendingAdd');
+  const permissions = section('function canEditTask(', 'function paintStatus(');
+  const deleteCase = section("case 'deltask':", '/* AI 가져오기 */');
+
+  assert.match(tabs, /\['write', '학습 배부'/);
+  assert.match(write, /📚 학습 배부/);
+  assert.match(write, /빠른 학습 배부/);
+  assert.match(write, /id="wEstimatedMin"/);
+  assert.match(write, /write-advanced/);
+  assert.match(write, /data-go="academic"/);
+  assert.match(write, /data-go="ingang"/);
+  assert.match(write, /data-go="study"/);
+  assert.doesNotMatch(write, /스터디포스 구독 CS 전화|받는 직원|업무 지시 직접 추가/);
+  assert.match(draft, /writeDraftLoadRows\(\)/);
+  assert.match(draft, /가능시간 미설정/);
+  assert.match(draft, /data-act="wedit"/);
+  assert.match(draft, /data-act="wcopy"/);
+  assert.match(publish, /estimatedMin: estimatedMin/);
+  assert.match(publish, /origin: session\.isStaffLink \? 'manager' : 'admin'/);
+  assert.match(publish, /requiresClaim: true/);
+  assert.match(publish, /writePublishedResult\(published\)/);
+  assert.match(permissions, /isManager\(\).*t\.origin === 'manager'/);
+  assert.match(deleteCase, /if \(!canEditTask\(t\)\)/);
+});
+
+test('AI and Kakao study imports enter the same reviewed distribution draft', () => {
+  const parser = section('function matchDuration(', '/* ══════════════════════════════════════════════════════\n   9. AI 지시서');
+  const importer = section('function applyAssignments(', '/* ══════════════════════════════════════════════════════\n   10. 이벤트');
+
+  assert.match(parser, /estimatedMin: duration \? duration\.minutes : 50/);
+  assert.match(parser, /studySubject: inferStudySubjectFromText/);
+  assert.match(importer, /등록된 학생 이름을 확인해 주세요/);
+  assert.match(importer, /studySubjectKey\(item\.studySubject \|\| item\.subject \|\| inferStudySubjectFromText/);
+  assert.match(importer, /estimatedMin/);
+  assert.match(importer, /staffIds: \[student\.id\]/);
+  assert.match(importer, /draft\.push\(\.\.\.queued\)/);
+  assert.doesNotMatch(importer, /state\.tasks\.push|save\(\)|queueSync\(\)/);
+  assert.match(html, /"studySubject": "수학"/);
+  assert.match(html, /"estimatedMin": 50/);
+  assert.doesNotMatch(html, /"staff": "김선생"|구독 CS 전화/);
+
+  const source = html.match(/function applyAssignments\(input, preConfirmed\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const queued = [];
+  const messages = [];
+  const apply = Function('draft', 'messages', `
+    let route = 'write';
+    const session = { isAdmin: true };
+    const students = [{ id: 'student-1', name: '김민준', owner: false }];
+    const staffByName = name => students.find(student => student.name === name);
+    const studySubjectKey = value => value === '수학' ? 'math' : value || 'other';
+    const inferStudySubjectFromText = () => 'other';
+    const uid = (() => { let n = 0; return () => 'id-' + (++n); })();
+    const today = () => '2026-08-19';
+    const closeModal = () => {};
+    const render = () => {};
+    const toast = message => messages.push(message);
+    ${source}
+    return applyAssignments;
+  `)(queued, messages);
+  apply({ assignments: [{ staff: '김민준', studySubject: '수학', title: '5단원 문제', estimatedMin: 40,
+    steps: ['개념 확인', '문제 풀기'], repeat: 'once' }] });
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].studySubject, 'math');
+  assert.equal(queued[0].estimatedMin, 40);
+  assert.deepEqual(queued[0].staffIds, ['student-1']);
+  assert.deepEqual(queued[0].steps.map(step => step.label), ['개념 확인', '문제 풀기']);
+});
+
 test('paper planner separates subject, study detail, completion, and the daily timetable', () => {
   const planner = section('function studyPlannerCard(', 'function taskRow(');
   const compactRow = section('function plannerTaskRow(', 'function taskRow(');
@@ -242,6 +314,40 @@ test('daily closeout requires every unfinished item and event to be reviewed aft
   assert.match(save, /공부 타이머를 먼저 정지해 주세요/);
   assert.match(save, /처리 방법을 선택해 주세요/);
   assert.match(save, /사유를 입력해 주세요/);
+});
+
+test('unclaimed distributed study is mandatory in daily closeout and the report', () => {
+  const items = section('function dailyCloseStudyItems(', 'function dailyCloseEventRefs(');
+  const modal = section('function dailyCloseModal(', 'function dailyCarryTask(');
+  const save = section("case 'dailyclosesave':", "case 'report':");
+  const report = section('function reportText(', 'function briefText(');
+
+  assert.match(items, /const tasks = tasksFor\(staffId, date\)\.map/);
+  assert.doesNotMatch(items, /filter\(task => isStudyClaimed/);
+  assert.match(items, /claimed: claimed/);
+  assert.match(modal, /가져오지 않음/);
+  assert.match(save, /claimed: item\.claimed !== false/);
+  assert.match(report, /\[미수락 · 내일로 이월\]/);
+  assert.match(report, /\[미수락 · 막힘\]/);
+  assert.match(report, /\[미수락 · 오늘 종료\]/);
+  assert.match(report, /학습 수행 보고/);
+
+  const source = html.match(/function dailyCloseStudyItems\(staffId, date\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const run = Function(`
+    const tasksFor = () => [{ id: 'task-1', title: '수학 5단원', detail: '', dailyCarrySourceDate: '' }];
+    const getCheck = () => null;
+    const isStudyClaimed = () => false;
+    const taskStudySubjectKey = () => 'math';
+    const ingChecklistItems = () => [];
+    const ingLec = () => null;
+    const ingCourseSubjectKey = () => 'other';
+    ${source}
+    return dailyCloseStudyItems;
+  `)();
+  const result = run('student-1', '2026-08-19');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].claimed, false);
+  assert.equal(result[0].done, false);
 });
 
 test('student report contains closeout results and cannot finish until a successful copy', () => {
