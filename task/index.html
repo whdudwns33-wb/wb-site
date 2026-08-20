@@ -906,11 +906,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.4"></script>
-<script src="./asset-core.js?v=2026-08-21.4"></script>
-<script src="./qr-core.js?v=2026-08-21.4"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.5"></script>
+<script src="./asset-core.js?v=2026-08-21.5"></script>
+<script src="./qr-core.js?v=2026-08-21.5"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.5"></script>
 <script>
 "use strict";
 
@@ -2486,7 +2486,9 @@ function showTodayLessonBriefing(taskId, lessonDate) {
     studentHtml = '<div class="hint"><b>현재 권한 범위에서 학생 정보를 찾지 못했습니다</b><br>원생 명단과 수업의 stable studentId 연결을 확인해 주세요.</div>';
   }
   const actions = [];
-  if (student && session.isAdmin) {
+  if (student && session.isAdmin && canEditLessonTask(task)) {
+    actions.push('<button class="btn btn-primary btn-block mt14" data-act="lessonbriefingedit" data-id="' + esc(task.id) + '" data-student-id="' + esc(student.id) + '">학생정보 · 업무지시 수정</button>');
+  } else if (student && session.isAdmin) {
     actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">원생 기본 정보 수정</button>');
   }
   if (canEditLessonTask(task)) {
@@ -2501,6 +2503,186 @@ function showTodayLessonBriefing(taskId, lessonDate) {
     actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   }
   modal('학생정보 · 업무지시', studentHtml + lessonWorkInstructionHtml(task, lessonDate), actions.join(''));
+}
+
+let lessonBriefingEditor = null;
+let lessonBriefingSaving = false;
+
+function lessonBriefingEditorHtml(student, task) {
+  const selectedSubjects = new Set(rosterStudentSubjects(student));
+  const selectedTeachers = new Set((student.teacherIds || []).map(String));
+  const instructionFields = [
+    ['materials', '교재·현재 진도', 2400],
+    ['onlineProgram', '온라인 프로그램', 600],
+    ['homework', '숙제 루틴과 수행률', 2400],
+    ['studentTraits', '학생 특징', 2400],
+    ['goal', '목표', 1600],
+    ['parentRequest', '특이사항·학부모 요청', 1600]
+  ];
+  const instructionHtml = instructionFields.map(field =>
+    '<label class="field"><span class="fl">' + esc(field[1]) + '</span><textarea class="in" rows="3" maxlength="' + field[2] +
+      '" data-lesson-briefing-instruction="' + field[0] + '">' + esc(task[field[0]] || '') + '</textarea></label>'
+  ).join('');
+  return '<div class="hint mb14"><b>학생 공통 정보와 이 수업의 업무지시를 한 번에 수정합니다.</b><br>' +
+    '학생 공통 정보는 원생 명단 전체에, 아래 업무지시는 현재 수업에 저장됩니다. 출결·수업 메모·보호자 공개 숙제와 준비물은 수업진행에서 입력합니다.</div>' +
+    '<section class="card"><div class="card-title">학생 공통 정보</div>' +
+    '<div class="card-sub mb14">내부 연결 ID: ' + esc(student.id) + ' · 이름은 표시용이며 연결은 이 ID로 유지됩니다.</div>' +
+    '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-lesson-briefing-student="name" maxlength="40" value="' + esc(student.name || '') + '"></label>' +
+    '<label class="field"><span class="fl">학교</span><input class="in" data-lesson-briefing-student="school" maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
+    '<label class="field"><span class="fl">학년</span><input class="in" data-lesson-briefing-student="grade" maxlength="20" value="' + esc(student.grade || '') + '"></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-lesson-briefing-student="phoneSelf" maxlength="30" value="' + esc(student.phoneSelf || '') + '"></label>' +
+    '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-lesson-briefing-student="phoneFather" maxlength="30" value="' + esc(student.phoneFather || '') + '"></label></div>' +
+    '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-briefing-student="phoneMother" maxlength="30" value="' + esc(student.phoneMother || '') + '"></label>' +
+    '<div class="field"><span class="fl">등록과목 · 중복 선택 가능</span><div class="chips">' + ROSTER_SUBJECT_OPTIONS.map(subject =>
+      '<label class="chip"><input type="checkbox" data-lesson-briefing-subject value="' + esc(subject) + '"' +
+        (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
+    '<div class="field"><span class="fl">담당 선생님 · 중복 선택 가능</span><div class="chips">' + liveStaff().map(teacher =>
+      '<label class="chip"><input type="checkbox" data-lesson-briefing-teacher value="' + esc(teacher.id) + '"' +
+        (selectedTeachers.has(String(teacher.id)) ? ' checked' : '') + '> ' + esc(teacher.name) + '</label>').join('') + '</div></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-briefing-student="registrationDate" value="' + esc(student.registrationDate || '') + '"></label>' +
+    '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-briefing-student="firstClassDate" value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-lesson-briefing-student="start" value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
+    '<label class="field"><span class="fl">내부 메모</span><textarea class="in" rows="3" maxlength="1000" data-lesson-briefing-student="memo">' + esc(student.memo || '') + '</textarea></label></section>' +
+    '<section class="card mt14"><div class="card-title">이 수업의 업무지시</div>' +
+    '<div class="card-sub mb14">비운 항목은 저장할 때 ‘없음’으로 정리되며, 업무지시 문장은 아래 여섯 항목으로 자동 생성됩니다.</div>' +
+    instructionHtml + '</section>';
+}
+
+async function openLessonBriefingEditor(taskId, studentId) {
+  if (!session.isAdmin) return toast('관리자만 학생정보와 업무지시를 수정할 수 있습니다');
+  const task = state.tasks.find(row => row.id === String(taskId || '') && !row.deleted);
+  if (!task || !canEditLessonTask(task) || String(task.studentId || '') !== String(studentId || '')) {
+    return toast('수업과 학생 연결을 다시 확인해 주세요');
+  }
+  if (!rosterDb || !Number(rosterDb.updatedAt)) return toast('원생 명단을 새로고침한 뒤 다시 시도해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 확인해 주세요');
+  modal('학생정보 · 업무지시 수정', '<div class="card-sub">최신 학생 정보를 확인하는 중…</div>');
+  try {
+    const result = await sync.post('/roster', { app: SYNC_APP, auth: auth, action: 'student_get', studentId: String(studentId) });
+    const currentTask = state.tasks.find(row => row.id === String(taskId) && !row.deleted);
+    if (!currentTask || String(currentTask.studentId || '') !== String(result.student && result.student.id || '')) {
+      throw new Error('수업과 학생의 stable studentId 연결이 변경되었습니다');
+    }
+    rosterDb.updatedAt = Number(result.updatedAt) || rosterDb.updatedAt;
+    lessonBriefingEditor = {
+      taskId: String(currentTask.id), studentId: String(result.student.id),
+      expectedTaskUpdatedAt: Number(currentTask.updatedAt || 0), expectedRosterUpdatedAt: Number(rosterDb.updatedAt),
+      task: currentTask, student: result.student
+    };
+    modal('학생정보 · 업무지시 수정', lessonBriefingEditorHtml(result.student, currentTask),
+      '<button class="btn btn-primary btn-block mt14" data-act="lessonbriefingsave">학생정보 · 업무지시 저장</button>');
+  } catch (error) {
+    lessonBriefingEditor = null;
+    closeModal();
+    toast('수정 화면을 열지 못했습니다 — ' + (error.message || error));
+  }
+}
+
+function lessonBriefingStudentPayload() {
+  const editor = lessonBriefingEditor;
+  if (!editor) throw new Error('수정할 학생 정보를 다시 열어 주세요');
+  const value = key => String(((document.querySelector('[data-lesson-briefing-student="' + key + '"]') || {}).value) || '').normalize('NFKC').trim();
+  const selectedSubjects = Array.from(document.querySelectorAll('[data-lesson-briefing-subject]:checked')).map(input => String(input.value));
+  const selectedTeachers = Array.from(document.querySelectorAll('[data-lesson-briefing-teacher]:checked')).map(input => String(input.value));
+  const preserveOrder = (previous, selected) => {
+    const before = (previous || []).map(String);
+    return before.length === selected.length && before.every(value => selected.includes(value)) ? before : selected;
+  };
+  const subjects = preserveOrder(rosterStudentSubjects(editor.student), selectedSubjects);
+  const teacherIds = preserveOrder(editor.student.teacherIds || [], selectedTeachers);
+  const student = {
+    id: editor.student.id, name: value('name'), school: value('school'), grade: value('grade'),
+    phoneSelf: value('phoneSelf'), phoneFather: value('phoneFather'), phoneMother: value('phoneMother'),
+    registrationDate: value('registrationDate'), firstClassDate: value('firstClassDate'),
+    teacher: teacherIds.map(id => (staffById(id) || {}).name).filter(Boolean).join('·'),
+    subject: subjects.join('·'), subjects: subjects, teacherIds: teacherIds,
+    start: value('start'), end: String(editor.student.end || ''), reason: String(editor.student.reason || ''),
+    memo: value('memo')
+  };
+  if (editor.student.entryType) student.entryType = editor.student.entryType;
+  if (!student.name || !student.grade || !student.start) throw new Error('이름·학년·명단 기준 시작월을 입력해 주세요');
+  if (!student.teacherIds.includes(String(editor.task.staffId || ''))) {
+    throw new Error('현재 수업 담당 선생님을 학생 공통 담당에서 유지해 주세요');
+  }
+  if (ROSTER_SUBJECT_OPTIONS.includes(String(editor.task.subject || '')) && !student.subjects.includes(String(editor.task.subject))) {
+    throw new Error('현재 수업 과목을 학생 등록과목에서 유지해 주세요');
+  }
+  return student;
+}
+
+function lessonBriefingLessonPayload(student) {
+  const editor = lessonBriefingEditor;
+  const core = window.WBLessonFormCore;
+  if (!editor || !core) throw new Error('수업 등록 모듈을 다시 불러와 주세요');
+  const instruction = key => String(((document.querySelector('[data-lesson-briefing-instruction="' + key + '"]') || {}).value) || '').normalize('NFKC').trim() || '없음';
+  const draft = lessonDraftFromTask(editor.task);
+  draft.studentId = student.id;
+  draft.studentName = student.name;
+  draft.grade = student.grade;
+  draft.lessonRole = draft.className || draft.subject;
+  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) draft[key] = instruction(key);
+  const validation = core.validateLessonInput(draft);
+  if (!validation.valid) throw new Error(validation.errors[0].message);
+  const taskBody = core.buildLessonTaskBody(draft, { staffId: editor.task.staffId, start: draft.start || today() });
+  return lessonPreviewPayloadFromTask(taskBody, validation);
+}
+
+function lessonBriefingStudentChanged(current, next) {
+  return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
+    'teacher', 'subject', 'subjects', 'teacherIds', 'start', 'end', 'reason', 'memo', 'entryType']
+    .some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
+}
+
+async function saveLessonBriefingEditor(button) {
+  if (!session.isAdmin || !lessonBriefingEditor || lessonBriefingSaving || !rosterDb) return;
+  let student, lesson;
+  try {
+    student = lessonBriefingStudentPayload();
+    lesson = lessonBriefingLessonPayload(student);
+  } catch (error) {
+    return toast(error.message || '입력 내용을 확인해 주세요');
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 확인해 주세요');
+  const editor = lessonBriefingEditor;
+  const currentTask = state.tasks.find(row => row.id === editor.taskId && !row.deleted);
+  if (!currentTask || String(currentTask.studentId || '') !== editor.studentId) return toast('수업과 학생 연결을 다시 확인해 주세요');
+  lessonBriefingSaving = true;
+  if (button) { button.disabled = true; button.textContent = '저장 중…'; }
+  let rosterSaved = false;
+  try {
+    if (lessonBriefingStudentChanged(editor.student, student)) {
+      const rosterResult = await sync.post('/roster', {
+        app: SYNC_APP, auth: auth, action: 'student_update', expectedUpdatedAt: editor.expectedRosterUpdatedAt,
+        student: student
+      });
+      const index = rosterDb.students.findIndex(row => String(row.id) === editor.studentId);
+      if (index >= 0) rosterDb.students[index] = Object.assign({}, student);
+      rosterDb.updatedAt = Number(rosterResult.updatedAt) || rosterDb.updatedAt;
+      editor.expectedRosterUpdatedAt = Number(rosterDb.updatedAt);
+      editor.student = Object.assign({}, student);
+      rosterSaved = true;
+    }
+    const result = await sync.post('/lesson-create', {
+      app: SYNC_APP, auth: auth, staffId: editor.task.staffId,
+      sourceTaskId: editor.taskId, expectedUpdatedAt: editor.expectedTaskUpdatedAt,
+      lesson: lesson
+    });
+    applyCreatedLesson(result.task);
+    publicationReadinessLoaded = false;
+    publicationReadinessRows = [];
+    if (rosterSaved || result.updated) { studentChangeLoaded = false; loadStudentChanges(true); }
+    lessonBriefingEditor = null;
+    closeModal();
+    render();
+    toast(result.idempotent || result.duplicate ? '변경 사항이 없어 기존 정보를 유지했습니다' : '학생정보와 업무지시를 저장했습니다');
+  } catch (error) {
+    toast((rosterSaved ? '학생 공통 정보는 저장됐습니다 · ' : '') + '업무지시 저장 실패 — ' + (error.message || error));
+    if (button) { button.disabled = false; button.textContent = '학생정보 · 업무지시 저장'; }
+  } finally {
+    lessonBriefingSaving = false;
+  }
 }
 
 /* 보호자 공개 내용은 내부 수업 메모와 완전히 분리해 서버의 수업일 정본에 저장한다. */
@@ -13167,6 +13349,8 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'lessonbriefing': showTodayLessonBriefing(String(id || ''), String(date || cursor)); break;
+    case 'lessonbriefingedit': openLessonBriefingEditor(String(id || ''), String(el.dataset.studentId || '')); break;
+    case 'lessonbriefingsave': saveLessonBriefingEditor(el); break;
     case 'notesave': {
       const editor = el.closest('.memo-editor');
       const noteEl = editor && editor.querySelector('[data-act="note"]');
@@ -14418,7 +14602,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.4';
+const APP_VER = '2026-08-21.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
