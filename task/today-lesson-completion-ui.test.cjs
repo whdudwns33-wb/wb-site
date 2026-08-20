@@ -71,6 +71,7 @@ test('학생정보 업무지시는 stable studentId로 원생 탭과 같은 정�
   for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청', '관리자 요청사항']) {
     assert.ok(briefing.includes(`['${label}'`), label);
   }
+  assert.match(work, /\['관리자 요청사항', task\.adminRequest \|\| '없음'/);
   for (const duplicate of ['업무 제목', '수업일', '등록 시간', '업무 상세', "['업무지시'", '기존 수업 참고 단계', '목표 수량']) {
     assert.doesNotMatch(work, new RegExp(duplicate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), duplicate);
   }
