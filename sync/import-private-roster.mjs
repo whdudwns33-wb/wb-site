@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { validateRosterDocument } from './roster.js';
+import { allocateNewStudentId, validateRosterDocument } from './roster.js';
 
 const APP = 'task';
 const APP_ORIGIN = 'https://whdudwns33-wb.github.io';
@@ -116,7 +116,8 @@ export function buildPrivateRosterDocument({
   textbooksSource,
   staff,
   existingDocument = null,
-  makeUuid = randomUUID
+  makeUuid = randomUUID,
+  makeStudentId
 }) {
   if (!rosterSource || typeof rosterSource !== 'object' || !Array.isArray(rosterSource.students)) {
     fail('ROSTER_SOURCE_INVALID');
@@ -125,6 +126,7 @@ export function buildPrivateRosterDocument({
     fail('TEXTBOOK_SOURCE_INVALID');
   }
   if (typeof makeUuid !== 'function') fail('ID_GENERATOR_INVALID');
+  if (makeStudentId !== undefined && typeof makeStudentId !== 'function') fail('ID_GENERATOR_INVALID');
 
   const staffNames = staffByName(staff);
   const existing = indexExisting(existingDocument);
@@ -169,7 +171,14 @@ export function buildPrivateRosterDocument({
     const oldRows = existing.studentsByName.get(name) || [];
     const uniqueNameId = oldRows.length === 1 && sourceByName.get(name).length === 1 ? oldRows[0].id : '';
     if (suppliedId && uniqueNameId && suppliedId !== uniqueNameId) fail('ROSTER_ID_MISMATCH');
-    const id = suppliedId || exactId || uniqueNameId || freshId('student-', existing.reservedIds, makeUuid);
+    if (suppliedId && existingDocument === null && !/^[1-9]\d{7}$/.test(suppliedId)) {
+      fail('NEW_STUDENT_ID_INVALID');
+    }
+    let id = suppliedId || exactId || uniqueNameId;
+    if (!id) {
+      try { id = allocateNewStudentId(existing.reservedIds, makeStudentId); }
+      catch (error) { fail(String(error && error.message || error)); }
+    }
     if (existing.studentIds.has(id)) {
       if (claimedExistingIds.has(id)) fail('ROSTER_ID_REUSED');
       claimedExistingIds.add(id);

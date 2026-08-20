@@ -1,6 +1,7 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MAX_DOCUMENT_BYTES = 512 * 1024;
@@ -9,6 +10,26 @@ const MAX_BOOK_STUDENTS = 5000;
 const ROSTER_SUBJECTS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답'
 ]);
+
+function randomEightDigitStudentId() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return String(10000000 + Math.floor((values[0] / 4294967296) * 90000000));
+}
+
+export function allocateNewStudentId(reservedIds, makeCandidate = randomEightDigitStudentId) {
+  if (!(reservedIds instanceof Set) || typeof makeCandidate !== 'function') {
+    throw new Error('STUDENT_ID_GENERATION_INVALID');
+  }
+  for (let attempt = 0; attempt < 128; attempt++) {
+    const candidate = String(makeCandidate());
+    if (NEW_STUDENT_ID.test(candidate) && !reservedIds.has(candidate)) {
+      reservedIds.add(candidate);
+      return candidate;
+    }
+  }
+  throw new Error('STUDENT_ID_GENERATION_FAILED');
+}
 
 function isBoardingLockError(error) {
   return /BOARDING_LOCK/.test(String(error && error.message || error || ''));
@@ -363,9 +384,6 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (!Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 1) {
       return json({ ok: false, error: '원생 명단을 새로고침한 뒤 다시 저장해 주세요' }, 400, origin);
     }
-    let nextStudent;
-    try { nextStudent = rosterStudent(body.student, 0); }
-    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
     const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
     if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
     if (Number(row.updated_at) !== expectedUpdatedAt) {
@@ -374,6 +392,20 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     let document;
     try { document = validateRosterDocument(JSON.parse(row.data)); }
     catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    let nextStudent;
+    try {
+      const input = action === 'student_create'
+        ? { ...record(body.student, 'document.roster.students[0]'),
+          id: allocateNewStudentId(new Set(document.roster.students.map(item => item.id))) }
+        : body.student;
+      nextStudent = rosterStudent(input, 0);
+    } catch (error) {
+      const message = String(error && error.message || error);
+      if (message === 'STUDENT_ID_GENERATION_FAILED') {
+        return json({ ok: false, code: message, error: '새 원생 ID를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요' }, 503, origin);
+      }
+      return json({ ok: false, error: message }, 400, origin);
+    }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
     const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
     const same = document.roster.students.find(item => item.id !== nextStudent.id &&
