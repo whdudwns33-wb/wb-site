@@ -925,7 +925,7 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터' }
+    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0 }
   };
 }
 
@@ -1328,6 +1328,7 @@ const sync = {
       error.status = res.status;
       error.code = String(d && (d.code || d.errorCode || d.reason) || '');
       error.current = d && d.current || null;
+      error.dataGeneration = d && d.dataGeneration;
       error.apiResponse = !!d;
       const personRequest = body && body.auth && body.auth.mode === 'person';
       if (path !== '/sync' && session.isStaffLink && personRequest &&
@@ -1374,9 +1375,11 @@ const sync = {
         const batchReconcileCount = batch.filter(change => change && change.reconcile === true).length;
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
+          dataGeneration: Number(state.settings.dataGeneration) || 0,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
+        if (Number.isSafeInteger(Number(d.dataGeneration))) state.settings.dataGeneration = Number(d.dataGeneration);
         // 개인 잠금 중 완료된 오래된 요청이 민감 캐시를 다시 저장하지 못하게 한다.
         const currentAuth = this.auth();
         if (session.isStaffLink && (!currentAuth || currentAuth.token !== auth.token)) return false;
@@ -1433,6 +1436,19 @@ const sync = {
       return true;
     } catch (e) {
       console.warn('sync', e);
+      if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
+        state.staff = [];
+        state.tasks = [];
+        state.checks = {};
+        state.settings.pullAt = 0;
+        state.settings.pushAt = 0;
+        state.settings.dataGeneration = Number(e.dataGeneration);
+        save();
+        this.dirty = false;
+        this.err = '';
+        if (typeof location !== 'undefined' && typeof location.reload === 'function') location.reload();
+        return false;
+      }
       this.dirty = true; this.err = String(e && e.message || e);
       if (session.isStaffLink) {
         const problem = classifyPersonLinkError(e, 'session');
