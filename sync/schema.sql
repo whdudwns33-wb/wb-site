@@ -359,6 +359,7 @@ CREATE TABLE IF NOT EXISTS book_add_requests (
   reviewed_at  INTEGER,
   reviewed_by  TEXT,
   review_note  TEXT,
+  request_data TEXT,
   PRIMARY KEY (app, request_key)
 );
 CREATE INDEX IF NOT EXISTS idx_book_add_requests_owner
@@ -1870,9 +1871,12 @@ CREATE INDEX IF NOT EXISTS idx_lesson_assignment_requests_staff
   ON lesson_assignment_requests(app, staff_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_lesson_assignment_requests_status
   ON lesson_assignment_requests(app, status, updated_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_assignment_requests_open
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_assignment_requests_open_student
+  ON lesson_assignment_requests(app, staff_id, student_id)
+  WHERE status='approval_waiting' AND student_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_assignment_requests_open_legacy
   ON lesson_assignment_requests(app, staff_id, student_name, grade)
-  WHERE status='approval_waiting';
+  WHERE status='approval_waiting' AND student_id IS NULL;
 
 CREATE TRIGGER IF NOT EXISTS trg_transport_notification_sends_no_update
 BEFORE UPDATE ON transport_notification_sends
