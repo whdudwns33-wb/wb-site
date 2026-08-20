@@ -73,6 +73,25 @@ test('admin lesson registration requires an explicit teacher selection', () => {
   assert.ok(preview.indexOf("return toast('이번 수업 과목을 한 개 선택해 주세요')") < preview.indexOf("return toast('담당 선생님을 선택해 주세요')"));
 });
 
+test('lesson registration teacher choices prioritize Hyeji, Namgi, then Korean name order', () => {
+  const start = html.indexOf('function lessonRegistrationStaffList()');
+  const end = html.indexOf('function staffSwitcher(', start);
+  assert.ok(start >= 0 && end > start);
+  const staff = ['박지원', '김남기', '이다온', '김혜지', '강민지'].map((name, index) => ({ id: String(index), name }));
+  const factory = new Function('liveStaff', html.slice(start, end) + '\nreturn lessonRegistrationStaffList;')(() => staff);
+  assert.deepEqual(factory().map(row => row.name), ['김혜지', '김남기', '강민지', '박지원', '이다온']);
+  assert.notEqual(factory(), staff, '원본 직원 배열은 변경하지 않아야 한다');
+
+  const batchStart = html.indexOf('function lessonBatchEntryHtml(');
+  const batchEnd = html.indexOf('function viewLessonEntry()', batchStart);
+  const batch = html.slice(batchStart, batchEnd);
+  const viewStart = html.indexOf('function viewLessonEntry()');
+  const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
+  const view = html.slice(viewStart, viewEnd);
+  assert.match(batch, /lessonRegistrationStaffList\(\)\.map\(staff/);
+  assert.match(view, /lessonRegistrationStaffList\(\)\.map\(staff/);
+});
+
 test('admin direct lesson registration reuses the new-student information fields and saves roster before lesson', () => {
   const viewStart = html.indexOf('function lessonRosterInformationHtml(');
   const viewEnd = html.indexOf('async function loadPublicationReadiness(', viewStart);

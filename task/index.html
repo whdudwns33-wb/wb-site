@@ -908,11 +908,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.8"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.8"></script>
-<script src="./asset-core.js?v=2026-08-21.8"></script>
-<script src="./qr-core.js?v=2026-08-21.8"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.8"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.9"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.9"></script>
+<script src="./asset-core.js?v=2026-08-21.9"></script>
+<script src="./qr-core.js?v=2026-08-21.9"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.9"></script>
 <script>
 "use strict";
 
@@ -2454,7 +2454,7 @@ function lessonWorkInstructionHtml(task, lessonDate) {
     ['학생 특징', task.studentTraits, ['studentTraits']],
     ['목표', task.goal, ['goal']],
     ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']],
-    ['관리자 요청사항', task.adminRequest, ['adminRequest']]
+    ['관리자 요청사항', task.adminRequest || '없음', ['adminRequest']]
   ].filter(row => String(row[1] || '').trim());
   return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
     '<div class="card-sub mb14">현재 수업의 핵심 정보와 관리자가 입력한 업무지시입니다. 출결·5단계·실제 진도·숙제와 준비물은 수업진행에서 입력합니다.</div>' +
@@ -3405,6 +3405,12 @@ function todayStaffList() {
   return liveStaff().slice().sort((a, b) => rank(a.name) - rank(b.name) || String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
 }
 
+function lessonRegistrationStaffList() {
+  const rank = name => String(name || '').trim() === '김혜지' ? 0 : String(name || '').trim() === '김남기' ? 1 : 2;
+  return liveStaff().slice().sort((a, b) => rank(a.name) - rank(b.name) ||
+    String(a.name || '').localeCompare(String(b.name || ''), 'ko') || String(a.id || '').localeCompare(String(b.id || '')));
+}
+
 function staffSwitcher(activeId) {
   const list = todayStaffList();
   if (list.length < 2) return '';
@@ -4024,7 +4030,7 @@ function lessonBatchEntryHtml(entry, index, count) {
       ROSTER_SUBJECT_OPTIONS.map(subject => '<label class="chip"><input type="radio" name="lesson-batch-subject-' + index + '" data-lesson-batch-subject data-i="' + index + '" value="' + esc(subject) + '"' +
         (String(entry.subject || '') === subject ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
     '<div class="sect">3. 담당 선생님</div><div class="field"><label class="fl">이번 수업 담당 선생님</label><select class="in" data-lesson-batch-field="staffId" data-i="' + index + '"' + (teacherReady ? '' : ' disabled') + '>' +
-      '<option value="">선생님을 선택하세요</option>' + liveStaff().map(staff => '<option value="' + esc(staff.id) + '"' + (String(entry.staffId || '') === String(staff.id) ? ' selected' : '') + '>' + esc(staff.name) + '</option>').join('') + '</select>' +
+      '<option value="">선생님을 선택하세요</option>' + lessonRegistrationStaffList().map(staff => '<option value="' + esc(staff.id) + '"' + (String(entry.staffId || '') === String(staff.id) ? ' selected' : '') + '>' + esc(staff.name) + '</option>').join('') + '</select>' +
       (teacherReady ? '' : '<div class="small muted mt8">수업 과목을 먼저 선택해 주세요.</div>') + '</div>' +
     '<div class="sect">4. 수업 요일·시간</div><div class="hint mb8">요일·시작·종료를 모두 입력해 주세요. 시간대가 다르면 행을 추가할 수 있습니다.</div>' +
       (entry.scheduleSlots || []).map((slot, slotIndex) => lessonBatchSlotHtml(slot, index, slotIndex)).join('') +
@@ -4063,7 +4069,7 @@ function viewLessonEntry() {
   const staffSelect = session.isStaffLink && !session.isAdmin
     ? '<div class="sect">3. 담당 선생님</div><div class="guide mb14"><b>담당 선생님</b>' + esc(((staffById(session.staffId) || {}).name || '본인')) + ' 선생님으로 자동 지정됩니다.</div>'
     : '<div class="sect">3. 담당 선생님</div><div class="field"><label class="fl">이번 수업 담당 선생님</label><select class="in" data-lesson-field="staffId"' + (teacherReady ? '' : ' disabled') + '>' +
-      '<option value="">선생님을 선택하세요</option>' + liveStaff().map(staff =>
+      '<option value="">선생님을 선택하세요</option>' + lessonRegistrationStaffList().map(staff =>
         '<option value="' + staff.id + '"' + (draft.staffId === staff.id ? ' selected' : '') + '>' + esc(staff.name) + '</option>'
       ).join('') + '</select>' + (teacherReady ? '<div class="small muted mt8">선택한 선생님은 원생 담당에도 자동 포함됩니다.</div>' :
         '<div class="small muted mt8">학생과 수업 과목을 먼저 선택해 주세요.</div>') + '</div>';
@@ -14640,7 +14646,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.8';
+const APP_VER = '2026-08-21.9';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
