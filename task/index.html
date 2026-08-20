@@ -205,16 +205,17 @@
   .panel { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FCFDFE; }
   .lesson-card-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
   .lesson-card-tab { min-height: 44px; border: 1px solid #B9D8E7; border-radius: 10px; padding: 9px 10px; background: #F5FBFE; color: var(--deep-blue); font-size: 12.5px; font-weight: 800; text-align: center; }
-  .lesson-card-tab.has-new::after { content:'N'; display:inline-grid; place-items:center; width:19px; height:19px; margin-left:5px; border-radius:50%; background:#D92D20; color:#fff; font-size:11px; font-weight:900; line-height:1; vertical-align:middle; }
+  .lesson-card-tab.has-new::after { content:'N'; display:inline; margin-left:5px; color:#D92D20; font-size:12px; font-weight:900; line-height:1; vertical-align:middle; }
   .lesson-card-tab[aria-expanded="true"] { border-color: var(--blue); background: #EAF7FC; box-shadow: inset 0 0 0 1px var(--blue); }
   .lesson-progress-panel { padding-top: 0; overflow: hidden; }
   .lesson-progress-section { padding-top: 12px; }
   .lesson-progress-section + .lesson-progress-section { margin-top: 12px; border-top: 1px solid var(--line); }
   .lesson-progress-section-title { margin-bottom: 8px; color: var(--deep-blue); font-size: 13px; font-weight: 800; }
-  .previous-memos > summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; color: var(--deep-blue); font-size: 13px; font-weight: 800; list-style: none; }
-  .previous-memos > summary::-webkit-details-marker { display: none; }
-  .previous-memos > summary::after { content: '펼치기'; color: var(--mid-gray); font-size: 11px; }
-  .previous-memos[open] > summary::after { content: '접기'; }
+  .lesson-progress-details > summary, .previous-memos > summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; color: var(--deep-blue); font-size: 13px; font-weight: 800; list-style: none; }
+  .lesson-progress-details > summary::-webkit-details-marker, .previous-memos > summary::-webkit-details-marker { display: none; }
+  .lesson-progress-details > summary::after, .previous-memos > summary::after { content: '펼치기'; color: var(--mid-gray); font-size: 11px; }
+  .lesson-progress-details[open] > summary::after, .previous-memos[open] > summary::after { content: '접기'; }
+  .lesson-progress-details-body { padding-top: 8px; }
   .previous-memos-body { display: grid; gap: 8px; padding-top: 8px; }
   .lesson-briefing-instructions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
@@ -775,7 +776,7 @@
   .student-info-field b, .student-info-field span { display: block; overflow-wrap: anywhere; }
   .student-info-field b { margin-bottom: 5px; color: var(--mid-gray); font-size: 11px; }
   .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
-  .new-marker { display:inline-grid; place-items:center; width:19px; height:19px; margin-left:5px; border-radius:50%; background:#D92D20; color:#fff; font-size:11px; font-weight:900; line-height:1; vertical-align:middle; }
+  .new-marker { display:inline; margin-left:5px; color:#D92D20; font-size:12px; font-weight:900; line-height:1; vertical-align:middle; }
   .student-change-history { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
   .modal-box:has(.parent-preview-shell) { max-width: 620px; }
@@ -906,11 +907,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.5"></script>
-<script src="./asset-core.js?v=2026-08-21.5"></script>
-<script src="./qr-core.js?v=2026-08-21.5"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.6"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.6"></script>
+<script src="./asset-core.js?v=2026-08-21.6"></script>
+<script src="./qr-core.js?v=2026-08-21.6"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.6"></script>
 <script>
 "use strict";
 
@@ -2845,7 +2846,7 @@ async function loadGuardianPublications(lessonDate, force) {
 }
 
 function guardianPublicationHtml(task, lessonDate) {
-  if (typeof GUARDIAN_CONTACT_ENABLED !== 'undefined' && !GUARDIAN_CONTACT_ENABLED) return '';
+  const guardianContactPaused = typeof GUARDIAN_CONTACT_ENABLED !== 'undefined' && !GUARDIAN_CONTACT_ENABLED;
   const date = String(lessonDate || '');
   const key = guardianPublicationKey(task.id, date);
   const loading = guardianPublicationLoadingDates.has(date);
@@ -2855,7 +2856,9 @@ function guardianPublicationHtml(task, lessonDate) {
   if (!loaded) {
     return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
       '<div class="guardian-publication-head"><div><div class="card-title">숙제 · 준비물 (보호자 · 학생 공개)</div>' +
-      '<div class="card-sub">내부 수업 메모와 분리한 공개 내용만 관리합니다.</div></div></div>' +
+      '<div class="card-sub">' + (guardianContactPaused
+        ? '학부모 연락 기능은 중지된 상태이며, 숙제·준비물은 수업 기록으로 저장합니다.'
+        : '내부 수업 메모와 분리한 공개 내용만 관리합니다.') + '</div></div></div>' +
       (error
         ? '<div class="guardian-publication-status is-error" role="alert">' + esc(error) + '</div>' +
           '<button class="btn btn-ghost btn-block guardian-publication-retry" data-act="guardianpublicationretry" data-date="' + esc(date) + '">다시 불러오기</button>'
@@ -2870,22 +2873,26 @@ function guardianPublicationHtml(task, lessonDate) {
   const studentVisible = draft ? !!draft.studentVisible : !!row.studentVisible;
   const saving = guardianPublicationSaving.has(key);
   const statusError = guardianPublicationErrors.get(key) || '';
+  const statusLabel = row.status === 'published'
+    ? (guardianContactPaused ? (studentVisible ? '저장됨 · 학생 공개 · 수정본 ' : '저장됨 · 수정본 ') : '공개 중 · 수정본 ') + Number(row.revision)
+    : '저장 전';
   return '<section class="guardian-publication" data-guardian-publication data-task="' + esc(task.id) + '" data-date="' + esc(date) + '">' +
     '<div class="guardian-publication-head"><div><div class="card-title">숙제 · 준비물 (보호자 · 학생 공개)</div>' +
-    '<div class="card-sub">이 칸의 내용은 보호자 앱에 표시되며, 아래를 체크한 경우에만 학생 앱에도 같은 내용이 표시됩니다. 내부 메모는 공개되지 않습니다.</div></div>' +
+    '<div class="card-sub">' + (guardianContactPaused
+      ? '학부모 메시지와 보호자 앱 전달은 계속 중지됩니다. 아래를 체크한 내용만 학생 앱에 표시되며, 내부 수업 메모는 공개되지 않습니다.'
+      : '이 칸의 내용은 보호자 앱에 표시되며, 아래를 체크한 경우에만 학생 앱에도 같은 내용이 표시됩니다. 내부 메모는 공개되지 않습니다.') + '</div></div>' +
     '<span class="tag ' + (row.status === 'published' ? 'ok' : '') + '">' +
-    (row.status === 'published' ? '공개 중 · 수정본 ' + Number(row.revision) : '공개 전') + '</span></div>' +
+    statusLabel + '</span></div>' +
     '<label class="field"><span class="fl">숙제</span><textarea class="in" maxlength="500" data-public-homework placeholder="예) 워크북 12~14쪽 풀기">' + esc(homework) + '</textarea></label>' +
     '<label class="field"><span class="fl">준비물</span><textarea class="in" maxlength="500" data-public-readiness placeholder="예) 리딩 교재와 단어장 가져오기">' + esc(readiness) + '</textarea></label>' +
     '<label class="row small" style="gap:7px;align-items:center"><input type="checkbox" data-student-visible ' + (studentVisible ? 'checked' : '') + '> 학생 앱에도 같은 숙제·준비물 공개</label>' +
     (statusError ? '<div class="guardian-publication-status is-error" role="alert">' + esc(statusError) + '</div>' : '') +
     '<button class="btn btn-primary btn-block mt14" data-act="guardianpublicationsave"' + (saving ? ' disabled' : '') + '>' +
-    (saving ? '공개 내용 저장 중…' : '공개 내용 저장') + '</button>' +
+    (saving ? '숙제 · 준비물 저장 중…' : '숙제 · 준비물 저장') + '</button>' +
     studentSelfCheckReviewHtml(task, date, row) + '</section>';
 }
 
 async function saveGuardianPublication(container, button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 숙제·준비물 전달 기능은 현재 사용하지 않습니다');
   if (!container) return toast('공개 입력칸을 다시 확인해 주세요');
   const taskId = String(container.dataset.task || ''), lessonDate = String(container.dataset.date || '');
   const task = state.tasks.find(row => row.id === taskId);
@@ -2897,13 +2904,15 @@ async function saveGuardianPublication(container, button) {
   const key = guardianPublicationKey(taskId, lessonDate);
   const current = guardianLessonPublications.get(key) || { status: 'withdrawn', revision: 0 };
   const published = !!(homework || readiness);
-  if (!published && current.status === 'published' && !confirm('보호자 앱에서 숙제·준비물 공개 내용을 지울까요?')) return;
+  if (!published && current.status === 'published' && !confirm(GUARDIAN_CONTACT_ENABLED
+    ? '보호자 앱에서 숙제·준비물 공개 내용을 지울까요?'
+    : '저장된 숙제·준비물 내용을 지울까요?')) return;
   const auth = sync.auth();
   if (!auth) return toast('개인 링크 인증이 필요합니다');
   guardianPublicationDrafts.set(key, { publicHomework: homework, publicReadiness: readiness, studentVisible: published && studentVisible });
   guardianPublicationErrors.delete(key);
   guardianPublicationSaving.add(key);
-  if (button) { button.disabled = true; button.textContent = '보호자 화면에 저장 중…'; }
+  if (button) { button.disabled = true; button.textContent = '숙제 · 준비물 저장 중…'; }
   try {
     const result = await sync.post('/parent-portal', {
       app: SYNC_APP, action: 'publication_set', auth: auth, taskId: taskId, lessonDate: lessonDate,
@@ -2915,7 +2924,11 @@ async function saveGuardianPublication(container, button) {
     if (!saved || saved.taskId !== taskId || saved.lessonDate !== lessonDate) throw new Error('PUBLICATION_RESPONSE_INVALID');
     guardianLessonPublications.set(key, saved);
     guardianPublicationDrafts.delete(key);
-    toast(published ? (studentVisible ? '보호자·학생 앱에 숙제·준비물을 공개했습니다' : '보호자 앱에 숙제·준비물을 공개했습니다') : '공개 내용을 지웠습니다');
+    toast(published
+      ? (!GUARDIAN_CONTACT_ENABLED
+        ? (studentVisible ? '숙제·준비물을 저장하고 학생 앱에 공개했습니다' : '숙제·준비물을 수업 기록에 저장했습니다')
+        : (studentVisible ? '보호자·학생 앱에 숙제·준비물을 공개했습니다' : '보호자 앱에 숙제·준비물을 공개했습니다'))
+      : '숙제·준비물 내용을 지웠습니다');
   } catch (error) {
     if (error && error.personAuthHandled) return;
     if (error && error.code === 'STALE_REVISION' && error.current) {
@@ -2963,12 +2976,12 @@ function taskPanel(t, date, c, editable) {
   }
 
   if (steps.length) {
-    h += (lesson ? '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 5단계 진행</div>' : '<div style="margin-top:10px">') + steps.map((s, i) => {
+    h += (lesson ? '<details class="lesson-progress-section lesson-progress-details"><summary>수업 5단계 진행</summary><div class="lesson-progress-details-body">' : '<div style="margin-top:10px">') + steps.map((s, i) => {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
         '<span>' + (i + 1) + '. ' + esc(s.label) + '</span></div>';
-    }).join('') + (lesson ? '</section>' : '</div>');
+    }).join('') + (lesson ? '</div></details>' : '</div>');
   }
 
   if (t.target) {
@@ -2980,10 +2993,11 @@ function taskPanel(t, date, c, editable) {
   }
 
   if (lesson) {
-    h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모</div>' +
+    h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모(실제 진도 및 특이사항)</div>' +
       taskMemoEditorHtml(t, date, c, editable) + '</section>';
     if (canEditGuardianPublication(t, date)) {
-      h += '<section class="lesson-progress-section">' + guardianPublicationHtml(t, date) + '</section>';
+      h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
+        '<div class="lesson-progress-details-body">' + guardianPublicationHtml(t, date) + '</div></details>';
     }
     h += previousTaskMemosProgressHtml(t.id, date);
   }
@@ -14602,7 +14616,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.5';
+const APP_VER = '2026-08-21.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
