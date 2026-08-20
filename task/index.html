@@ -217,7 +217,7 @@
   .lesson-progress-details[open] > summary::after, .previous-memos[open] > summary::after { content: '접기'; }
   .lesson-progress-details-body { padding-top: 8px; }
   .previous-memos-body { display: grid; gap: 8px; padding-top: 8px; }
-  .lesson-briefing-instructions { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .lesson-briefing-instructions { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
   .guide b { display: block; color: var(--deep-blue); font-size: 12px; margin-bottom: 4px; }
   .guide > summary { min-height: 32px; cursor: pointer; }
@@ -777,6 +777,7 @@
   .student-info-field b { margin-bottom: 5px; color: var(--mid-gray); font-size: 11px; }
   .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .new-marker { display:inline; margin-left:5px; color:#D92D20; font-size:12px; font-weight:900; line-height:1; vertical-align:middle; }
+  .student-info-field .new-marker, .card-title .new-marker { display:inline; color:#D92D20; font-size:12px; line-height:1; white-space:normal; }
   .student-change-history { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
   .modal-box:has(.parent-preview-shell) { max-width: 620px; }
@@ -907,11 +908,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.6"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.6"></script>
-<script src="./asset-core.js?v=2026-08-21.6"></script>
-<script src="./qr-core.js?v=2026-08-21.6"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.6"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.7"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.7"></script>
+<script src="./asset-core.js?v=2026-08-21.7"></script>
+<script src="./qr-core.js?v=2026-08-21.7"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.7"></script>
 <script>
 "use strict";
 
@@ -2444,26 +2445,18 @@ function lessonWorkInstructionHtml(task, lessonDate) {
   const changed = studentChangedFieldSet(task.studentId, task.id);
   const field = (label, value, keys) => '<div class="student-info-field wide"><b>' + esc(label) +
     ((keys || []).some(key => changed.has(key)) ? newMarker('수정된 ' + label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
-  const referenceSteps = lessonReferenceSteps(task).map(step => String(step && step.label || '').trim()).filter(Boolean);
   const rows = [
-    ['업무 제목', task.title, ['title']],
-    ['수업일', lessonDate, []],
     ['과목·반', [task.subject, task.className].filter(Boolean).join(' · '), ['subject', 'className']],
     ['수업 요일·시간', task.scheduleText, ['scheduleText', 'scheduleSlots', 'days', 'repeat']],
-    ['등록 시간', task.time, ['time']],
-    ['업무 상세', task.detail, ['detail']],
     ['교재·현재 진도', task.materials, ['materials']],
     ['온라인 프로그램', task.onlineProgram, ['onlineProgram']],
     ['숙제 루틴과 수행률', task.homework, ['homework']],
     ['학생 특징', task.studentTraits, ['studentTraits']],
     ['목표', task.goal, ['goal']],
-    ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']],
-    ['업무지시', task.guide, ['guide']],
-    ['기존 수업 참고 단계', referenceSteps.join('\n'), ['guide', 'steps']],
-    ['목표 수량', task.target ? task.target + (task.unit || '건') : '', ['target', 'unit']]
+    ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']]
   ].filter(row => String(row[1] || '').trim());
   return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
-    '<div class="card-sub mb14">관리자가 등록한 현재 수업 정보입니다. 선생님의 진행 기록은 수업 카드의 수업진행에서 입력합니다.</div>' +
+    '<div class="card-sub mb14">현재 수업의 핵심 정보와 관리자가 입력한 업무지시입니다. 출결·5단계·실제 진도·숙제와 준비물은 수업진행에서 입력합니다.</div>' +
     '<div class="student-info-grid">' + (rows.length ? rows.map(row => field(row[0], row[1], row[2])).join('') :
       '<div class="empty">등록된 추가 업무지시가 없습니다.</div>') + '</div></section>';
 }
@@ -2476,7 +2469,7 @@ function showTodayLessonBriefing(taskId, lessonDate) {
     ? rosterDb.students.find(row => String(row.id) === stableStudentId) : null;
   let studentHtml;
   if (student) {
-    studentHtml = rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id));
+    studentHtml = rosterStudentInfoHtml(student, [], task.id);
   } else if (!stableStudentId) {
     studentHtml = '<div class="hint"><b>학생 정보 연결 필요</b><br>이 수업에 stable studentId가 연결되지 않아 이름으로 학생을 추측하지 않습니다. 수업 등록 및 변경에서 실제 원생을 연결해 주세요.</div>';
   } else if (rosterLoading) {
@@ -2503,7 +2496,8 @@ function showTodayLessonBriefing(taskId, lessonDate) {
   if (student && pendingStudentChanges(student.id).length) {
     actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   }
-  modal('학생정보 · 업무지시', studentHtml + lessonWorkInstructionHtml(task, lessonDate), actions.join(''));
+  modal('학생정보 · 업무지시', lessonWorkInstructionHtml(task, lessonDate) +
+    '<section class="lesson-briefing-student">' + studentHtml + '</section>', actions.join(''));
 }
 
 let lessonBriefingEditor = null;
@@ -2524,9 +2518,7 @@ function lessonBriefingEditorHtml(student, task) {
     '<label class="field"><span class="fl">' + esc(field[1]) + '</span><textarea class="in" rows="3" maxlength="' + field[2] +
       '" data-lesson-briefing-instruction="' + field[0] + '">' + esc(task[field[0]] || '') + '</textarea></label>'
   ).join('');
-  return '<div class="hint mb14"><b>학생 공통 정보와 이 수업의 업무지시를 한 번에 수정합니다.</b><br>' +
-    '학생 공통 정보는 원생 명단 전체에, 아래 업무지시는 현재 수업에 저장됩니다. 출결·수업 메모·보호자 공개 숙제와 준비물은 수업진행에서 입력합니다.</div>' +
-    '<section class="card"><div class="card-title">학생 공통 정보</div>' +
+  const studentHtml = '<section class="card mt14"><div class="card-title">학생 공통 정보</div>' +
     '<div class="card-sub mb14">내부 연결 ID: ' + esc(student.id) + ' · 이름은 표시용이며 연결은 이 ID로 유지됩니다.</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-lesson-briefing-student="name" maxlength="40" value="' + esc(student.name || '') + '"></label>' +
     '<label class="field"><span class="fl">학교</span><input class="in" data-lesson-briefing-student="school" maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
@@ -2543,10 +2535,13 @@ function lessonBriefingEditorHtml(student, task) {
     '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-briefing-student="registrationDate" value="' + esc(student.registrationDate || '') + '"></label>' +
     '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-briefing-student="firstClassDate" value="' + esc(student.firstClassDate || '') + '"></label></div>' +
     '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-lesson-briefing-student="start" value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
-    '<label class="field"><span class="fl">내부 메모</span><textarea class="in" rows="3" maxlength="1000" data-lesson-briefing-student="memo">' + esc(student.memo || '') + '</textarea></label></section>' +
-    '<section class="card mt14"><div class="card-title">이 수업의 업무지시</div>' +
+    '<label class="field"><span class="fl">내부 메모</span><textarea class="in" rows="3" maxlength="1000" data-lesson-briefing-student="memo">' + esc(student.memo || '') + '</textarea></label></section>';
+  const instructionEditorHtml = '<section class="card"><div class="card-title">이 수업의 업무지시</div>' +
     '<div class="card-sub mb14">비운 항목은 저장할 때 ‘없음’으로 정리되며, 업무지시 문장은 아래 여섯 항목으로 자동 생성됩니다.</div>' +
     instructionHtml + '</section>';
+  return '<div class="hint mb14"><b>이 수업의 업무지시와 학생 공통 정보를 한 번에 수정합니다.</b><br>' +
+    '위 업무지시는 현재 수업에, 아래 학생 공통 정보는 원생 명단 전체에 저장됩니다. 출결·수업 메모·보호자 공개 숙제와 준비물은 수업진행에서 입력합니다.</div>' +
+    instructionEditorHtml + studentHtml;
 }
 
 async function openLessonBriefingEditor(taskId, studentId) {
@@ -2696,6 +2691,18 @@ function canEditGuardianPublication(task, lessonDate) {
       task.staffId !== session.staffId || !isLesson(task) ||
       !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) || !rosterDb) return false;
   return assignedLessonStudents().some(student => String(student.id) === String(task.studentId));
+}
+
+function guardianPublicationAccessHint(task, lessonDate) {
+  if (String(lessonDate || '') !== today()) return '숙제·준비물은 해당 수업일이 오늘인 경우에 담당 선생님이 입력할 수 있습니다.';
+  if (!task || !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || ''))) {
+    return 'stable studentId가 연결된 수업에서만 숙제·준비물을 입력할 수 있습니다.';
+  }
+  if (!session.isStaffLink) return '담당 선생님의 개인 인증 화면에서 숙제·준비물을 입력할 수 있습니다.';
+  if (!hasVerifiedPersonAuth()) return '개인 인증 확인이 끝나면 숙제·준비물 입력칸이 활성화됩니다.';
+  if (String(task.staffId || '') !== String(session.staffId || '')) return '이 수업의 담당 선생님만 숙제·준비물을 입력할 수 있습니다.';
+  if (!rosterDb) return '원생 명단을 불러온 뒤 숙제·준비물 입력칸이 활성화됩니다.';
+  return '현재 담당 원생 연결을 확인한 뒤 숙제·준비물을 입력할 수 있습니다.';
 }
 
 function normalizeGuardianPublication(row) {
@@ -2995,10 +3002,10 @@ function taskPanel(t, date, c, editable) {
   if (lesson) {
     h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모(실제 진도 및 특이사항)</div>' +
       taskMemoEditorHtml(t, date, c, editable) + '</section>';
-    if (canEditGuardianPublication(t, date)) {
-      h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
-        '<div class="lesson-progress-details-body">' + guardianPublicationHtml(t, date) + '</div></details>';
-    }
+    const canEditPublication = canEditGuardianPublication(t, date);
+    h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
+      '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
+        '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
     h += previousTaskMemosProgressHtml(t.id, date);
   }
 
@@ -14616,7 +14623,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.6';
+const APP_VER = '2026-08-21.7';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
