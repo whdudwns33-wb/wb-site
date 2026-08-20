@@ -81,7 +81,7 @@ test('admin direct lesson registration reuses the new-student information fields
     assert.match(fields, new RegExp(`data-lesson-roster-field="${key}"`), key);
   }
   assert.doesNotMatch(fields, /data-lesson-roster-teacher/);
-  assert.match(fields, /info\.teacherIds \|\| \[\]\)\.map\(String\)\.concat\(String\(draft\.staffId/);
+  assert.match(fields, /lessonList\.map\(item => String\(item\.staffId \|\| ''\)\)/);
   for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
     assert.match(html, new RegExp(subject));
   }
@@ -101,11 +101,39 @@ test('direct lesson registration follows student, subject, teacher, schedule ord
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
   assert.match(view, /<div class="sect">4\. 수업 요일·시간/);
   assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
-  assert.match(view, /학생 → 수업 과목 → 담당 선생님 → 수업 요일·시간 순서/);
-  assert.match(view, /admin-collapsible-body">' \+ studentFields \+\s*lessonSubjectSelectionHtml\(\) \+\s*staffSelect \+/);
+  assert.match(view, /학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록/);
+  assert.match(view, /batchMode \? lessonBatchRegistrationHtml\(\) : lessonSubjectSelectionHtml\(\) \+ staffSelect/);
   assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 정보 등록<\/b>/);
   assert.match(view, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
   assert.match(view, /return directRegistration \+ reviews/);
+});
+
+test('admin can compose multiple independent lessons for one student and submit one batch', () => {
+  const batchStart = html.indexOf('function lessonBatchSlotHtml(');
+  const batchEnd = html.indexOf('function viewLessonEntry()', batchStart);
+  const batchView = html.slice(batchStart, batchEnd);
+  assert.match(batchView, /수업 ' \+ \(index \+ 1\)/);
+  assert.match(batchView, /data-lesson-batch-subject/);
+  assert.match(batchView, /data-lesson-batch-field="staffId"/);
+  assert.match(batchView, /data-lesson-batch-slot="startTime"/);
+  assert.match(batchView, /data-act="lessonbatchadd"/);
+  assert.match(batchView, /이 학생의 다른 수업 추가/);
+  assert.match(batchView, /수업 ' \+ entries\.length \+ '건 일괄 등록 미리보기/);
+
+  const previewStart = html.indexOf('function previewLessonBatchRegistration(');
+  const previewEnd = html.indexOf('function previewLessonRegistration()', previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  assert.match(preview, /lessonRosterStudentPayload\(selected, draft, entries\)/);
+  assert.match(preview, /canonicalLessonIdentity/);
+  assert.match(preview, /같은 담당 선생님과 과목의 수업이 중복/);
+  assert.match(preview, /data-act="lessonbatchsave"/);
+
+  const saveStart = html.indexOf('async function saveLessonBatchRegistration(');
+  const saveEnd = html.indexOf('let feedbackQueue', saveStart);
+  const save = html.slice(saveStart, saveEnd);
+  assert.ok(save.indexOf("sync.post('/roster'") < save.indexOf("sync.post('/lesson-create-batch'"));
+  assert.match(save, /result\.tasks\.forEach\(applyCreatedLesson\)/);
+  assert.match(save, /수업 ' \+ result\.createdCount \+ '건을 한 번에 등록했습니다/);
 });
 
 test('lesson registration interactions update only the form panel and preserve its open state', () => {
@@ -137,6 +165,12 @@ test('lesson registration interactions update only the form panel and preserve i
   const studentHandler = html.slice(studentStart, studentEnd);
   assert.doesNotMatch(studentHandler, /\brender\(/);
   assert.match(studentHandler, /refreshLessonDirectEntry\(true\)/);
+
+  const batchAddStart = html.indexOf("case 'lessonbatchadd':");
+  const batchEnd = html.indexOf("case 'lessonedit':", batchAddStart);
+  const batchActions = html.slice(batchAddStart, batchEnd);
+  assert.doesNotMatch(batchActions, /\brender\(/);
+  assert.match(batchActions, /refreshLessonDirectEntry\(true\)/);
 });
 
 test('each lesson selects one subject while preserving the student multi-subject roster', () => {
@@ -160,13 +194,14 @@ test('each lesson selects one subject while preserving the student multi-subject
   const payloadEnd = html.indexOf('function lessonRosterStudentChanged(', payloadStart);
   const payload = html.slice(payloadStart, payloadEnd);
   assert.match(payload, /const rosterSubjects = \(info\.subjects \|\| \[\]\)/);
-  assert.match(payload, /rosterSubjects\.concat\(ROSTER_SUBJECT_OPTIONS\.includes\(lessonSubject\) \? \[lessonSubject\] : \[\]\)/);
+  assert.match(payload, /const lessonSubjects = lessonList\.map/);
+  assert.match(payload, /rosterSubjects\.concat\(lessonSubjects\)/);
   assert.doesNotMatch(html, /draft\.subject = lessonPreviewRosterStudent\.subjects\.join\('·'\)/);
   const studentStart = html.indexOf("const lessonStudent = ev.target.closest('[data-lesson-student]')");
   const studentEnd = html.indexOf('const onboardingDate', studentStart);
   const studentChange = html.slice(studentStart, studentEnd);
   assert.match(studentChange, /if \(studentChanged\)[\s\S]{0,180}draft\.subject = ''/);
-  assert.match(studentChange, /if \(session\.isAdmin\) draft\.staffId = ''/);
+  assert.match(studentChange, /if \(session\.isAdmin\) \{[\s\S]{0,100}draft\.staffId = ''/);
 });
 
 test('feedback workflow is visibly paused and remains blocked in the stale click handler', () => {

@@ -26,6 +26,7 @@ const REQUIRED_TEXT_FIELDS = [
   'parentRequest'
 ];
 const MAX_SCHEDULE_SLOTS = 20;
+const MAX_BATCH_LESSONS = 10;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -637,5 +638,105 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
   return json({
     ok: true, task, created: true, duplicate: false,
     updated: false, idempotent: false, revision: 1
+  }, 200, origin);
+}
+
+export async function handleLessonCreateBatch(env, app, body, origin, auth, json) {
+  if (app !== 'task') return json({ ok: false, error: '업무지시서에서만 등록할 수 있습니다' }, 400, origin);
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '관리자만 수업을 일괄 등록할 수 있습니다' }, 403, origin);
+  }
+  body = body && typeof body === 'object' ? body : {};
+  const requested = Array.isArray(body.lessons) ? body.lessons : [];
+  if (!requested.length || requested.length > MAX_BATCH_LESSONS) {
+    return json({ ok: false, error: '한 번에 등록할 수업은 1건 이상 10건 이하입니다' }, 400, origin);
+  }
+
+  const taskOrigin = auth.role === 'manager' ? 'manager' : 'admin';
+  const serverNow = Date.now();
+  const planned = [];
+  const seenTaskIds = new Set();
+  const activeStaffIds = new Map();
+  let sharedStudentId = '';
+
+  for (let index = 0; index < requested.length; index += 1) {
+    const item = requested[index];
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        Object.keys(item).some(key => !['staffId', 'lesson'].includes(key))) {
+      return json({ ok: false, error: (index + 1) + '번째 수업 형식을 확인해 주세요' }, 400, origin);
+    }
+    const staffId = String(item.staffId || '');
+    if (!SAFE_ID_RE.test(staffId)) {
+      return json({ ok: false, error: (index + 1) + '번째 수업의 담당 선생님을 확인해 주세요' }, 400, origin);
+    }
+    if (!activeStaffIds.has(staffId)) activeStaffIds.set(staffId, await activeStaff(env, app, staffId));
+    if (!activeStaffIds.get(staffId)) {
+      return json({ ok: false, error: (index + 1) + '번째 수업의 활성 담당 선생님을 선택해 주세요' }, 409, origin);
+    }
+
+    let task;
+    try { task = await buildLessonTask(item.lesson, staffId, taskOrigin, serverNow + index); }
+    catch (error) {
+      return json({ ok: false, error: (index + 1) + '번째 수업: ' + String(error && error.message || error) }, Number(error && error.status) || 400, origin);
+    }
+    if (!task.studentId) {
+      return json({ ok: false, error: (index + 1) + '번째 수업의 원생을 studentId로 선택해 주세요' }, 400, origin);
+    }
+    if (!sharedStudentId) sharedStudentId = task.studentId;
+    if (task.studentId !== sharedStudentId) {
+      return json({ ok: false, error: '한 번의 일괄 등록에는 같은 학생의 수업만 넣을 수 있습니다' }, 400, origin);
+    }
+    const studentAccess = await validateLessonStudentAccess(env, app, task, auth);
+    if (studentAccess) {
+      return json({ ok: false, error: (index + 1) + '번째 수업: ' + studentAccess.error }, studentAccess.status, origin);
+    }
+    if (seenTaskIds.has(task.id)) {
+      return json({ ok: false, error: '같은 담당자·과목의 수업이 일괄 등록 안에 중복되어 있습니다' }, 409, origin);
+    }
+    seenTaskIds.add(task.id);
+
+    const matches = await findAssignmentRows(env, app, staffId, task);
+    if (matches.length > 1) {
+      return json({ ok: false, error: (index + 1) + '번째 수업과 같은 배정이 여러 건입니다. 중복을 먼저 정리해 주세요' }, 409, origin);
+    }
+    if (matches.length === 1) {
+      const current = matches[0].task;
+      if (current.deleted) {
+        return json({ ok: false, error: (index + 1) + '번째 수업은 삭제된 수업과 같은 배정입니다' }, 409, origin);
+      }
+      if (await contentHashForTask(current) !== task.lessonContentHash) {
+        return json({ ok: false, error: (index + 1) + '번째 수업은 이미 등록되어 있고 내용이 다릅니다' }, 409, origin);
+      }
+      planned.push({ task: current, created: false });
+    } else {
+      planned.push({ task, created: true });
+    }
+  }
+
+  const created = planned.filter(item => item.created);
+  if (created.length) {
+    if (!env.DB || typeof env.DB.batch !== 'function') {
+      return json({ ok: false, error: '일괄 저장 기능을 사용할 수 없습니다' }, 503, origin);
+    }
+    const statements = created.map(item => env.DB.prepare(
+      'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+    ).bind(app, item.task.id, item.task.staffId, JSON.stringify(item.task), item.task.updatedAt, item.task.updatedAt));
+    try {
+      const results = await env.DB.batch(statements);
+      if (!Array.isArray(results) || results.length !== statements.length ||
+          results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+        throw new Error('batch_insert_incomplete');
+      }
+    } catch (error) {
+      return json({ ok: false, error: '수업 일괄 저장 중 다른 등록과 충돌했습니다. 새로고침 후 다시 확인해 주세요' }, 409, origin);
+    }
+  }
+
+  return json({
+    ok: true,
+    tasks: planned.map(item => item.task),
+    createdCount: created.length,
+    duplicateCount: planned.length - created.length,
+    idempotent: created.length === 0
   }, 200, origin);
 }

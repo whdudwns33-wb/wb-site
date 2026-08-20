@@ -18,7 +18,8 @@
  *   POST /admin-handoff { app:'consult', auth(admin) } → { ok, code } 원장 새 기기 연결
  *   POST /admin-account { app:'consult', auth(admin), action:'set', loginId, password } 원장 계정 설정
  *   POST /admin-login { app:'consult', loginId, password } → { ok, token } 원장 기기 로그인
- *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 9항목 등록
+ *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
+ *   POST /lesson-create-batch { app, auth, lessons } → 한 학생의 수업 최대 10건 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
  *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)
@@ -50,7 +51,7 @@
  *   auth = { mode:'person', id, token }         → 본인 범위(task allowlist 관리 담당은 전체)
  */
 
-import { handleLessonCreate } from './lesson-create.js';
+import { handleLessonCreate, handleLessonCreateBatch } from './lesson-create.js';
 import { handleLessonAssignmentRequest, handleLessonAssignmentReview } from './lesson-assignment-request.js';
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
@@ -1617,6 +1618,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleLessonCreate(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/lesson-create-batch') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonCreateBatch(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/contact-log') {
         const auth = await resolveAuth(env, app, body.auth);
