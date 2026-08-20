@@ -68,7 +68,7 @@ test('학생정보 업무지시는 stable studentId로 원생 탭과 같은 정�
   assert.match(briefing, /modal\('학생정보 · 업무지시'/);
   assert.match(briefing, /data-act="lessonbriefingedit"[\s\S]{0,180}학생정보 · 업무지시 수정/);
   assert.match(briefing, /수업 정보 수정/);
-  for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청']) {
+  for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청', '관리자 요청사항']) {
     assert.ok(briefing.includes(`['${label}'`), label);
   }
   for (const duplicate of ['업무 제목', '수업일', '등록 시간', '업무 상세', "['업무지시'", '기존 수업 참고 단계', '목표 수량']) {
@@ -89,7 +89,7 @@ test('관리자는 학생 공통 정보와 현재 수업 업무지시를 한 화
   assert.match(editor, /data-lesson-briefing-subject/);
   assert.match(editor, /data-lesson-briefing-teacher/);
   assert.match(editor, /data-lesson-briefing-instruction=/);
-  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) {
+  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest']) {
     assert.match(editor, new RegExp(`'${key}'`), key);
   }
   assert.match(editor, /action: 'student_get', studentId: String\(studentId\)/);

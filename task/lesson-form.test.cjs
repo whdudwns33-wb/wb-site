@@ -17,7 +17,8 @@ function validInput(overrides = {}) {
     homework: '없음',
     studentTraits: '궁금한 점을 잘 질문함',
     goal: '교재 빠르게 마무리',
-    parentRequest: '없음'
+    parentRequest: '없음',
+    adminRequest: '수업 후 진도표 확인'
   }, overrides);
 }
 
@@ -193,6 +194,8 @@ test('builds a deterministic task body with current task-app compatibility field
   assert.equal(first.title, '[수업] 테스트학생 (초4) — 국어 · 비문학');
   assert.match(first.detail, /교재와 현재 진도:/);
   assert.match(first.guide, /특이사항·학부모 요청:/);
+  assert.match(first.guide, /관리자 요청사항: 수업 후 진도표 확인/);
+  assert.equal(first.adminRequest, '수업 후 진도표 확인');
   assert.deepEqual(first.steps.map(step => step.id), ['lesson-progress', 'lesson-homework', 'lesson-goal']);
   assert.equal(first.repeat, 'days');
   assert.deepEqual(first.days, [0, 1, 3]);

@@ -33,8 +33,12 @@ function isDate(value) {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
+function kstDateAt(value) {
+  return new Date(Number(value) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function kstToday() {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return kstDateAt(Date.now());
 }
 
 function containsSensitiveKey(value, seen = new Set()) {
@@ -277,6 +281,16 @@ function duplicateMatches(row, packId, event, delta, groupId, reasonCode) {
     String(row.reason_code || '') === String(reasonCode || '');
 }
 
+function regularAttendanceUsage(check) {
+  if (check.att === 'P' || check.att === 'E') {
+    return { event: 'present', delta: 1, reasonCode: check.att === 'E' ? 'early_leave' : null };
+  }
+  if (check.att === 'L') return { event: 'late', delta: 1, reasonCode: null };
+  const event = String(check.absenceType || check.absenceReasonCode || '');
+  if (!ABSENCE_EVENTS.has(event)) return { error: 'ABSENCE_POLICY_REQUIRED' };
+  return { event, delta: event === 'same_day' || event === 'no_show' ? 1 : 0, reasonCode: null };
+}
+
 async function insertUsage(env, app, input) {
   const entryId = 'su_' + crypto.randomUUID().replace(/-/g, '');
   await env.DB.prepare(
@@ -338,18 +352,11 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
     const expectedGroup = await consumptionGroup(app, context.task.id, sourceDate);
     if (suppliedGroup !== expectedGroup) return reply(json, origin, { ok: false, code: 'CONSUMPTION_GROUP_MISMATCH', error: '출결 날짜의 소비 그룹이 일치하지 않습니다' }, 409);
     if (!activeOn(context.student, sourceDate)) return reply(json, origin, { ok: false, error: '해당 날짜에 재원 중인 학생이 아닙니다' }, 409);
-    if (evidence.check.att === 'P' || evidence.check.att === 'E') {
-      event = 'present'; delta = 1;
-      if (evidence.check.att === 'E') reasonCode = 'early_leave';
+    const usage = regularAttendanceUsage(evidence.check);
+    if (usage.error) {
+      return reply(json, origin, { ok: false, code: usage.error, error: '결석 차감 유형을 먼저 확정해 주세요' }, 409);
     }
-    else if (evidence.check.att === 'L') { event = 'late'; delta = 1; }
-    else {
-      event = String(evidence.check.absenceType || evidence.check.absenceReasonCode || '');
-      if (!ABSENCE_EVENTS.has(event)) {
-        return reply(json, origin, { ok: false, code: 'ABSENCE_POLICY_REQUIRED', error: '결석 차감 유형을 먼저 확정해 주세요' }, 409);
-      }
-      delta = event === 'same_day' || event === 'no_show' ? 1 : 0;
-    }
+    event = usage.event; delta = usage.delta; reasonCode = usage.reasonCode;
   } else {
     if (!/^mu_[a-f0-9]{48}$/.test(sourceRef)) return reply(json, origin, { ok: false, error: '보강 건 ID를 확인해 주세요' }, 400);
     const makeup = await env.DB.prepare(
@@ -470,6 +477,81 @@ async function closePack(env, app, body, auth, document, json, origin) {
   const current = await loadPack(env, app, packId);
   return reply(json, origin, { ok: true, pack: await packView(env, app, current,
     context.error ? null : context, context.error ? context.code : undefined) });
+}
+
+/** 매일 23:50 KST에 그날의 최종 출결을 회차 원장에 한 번만 반영한다. */
+export async function handleScheduledSessionPackAttendance(env, scheduledTime) {
+  const cutoff = Number(scheduledTime) || Date.now();
+  const sourceDate = kstDateAt(cutoff);
+  const summary = { ok: true, sourceDate, processed: 0, idempotent: 0, skipped: 0, failed: 0 };
+  const roster = await rosterDocument(env, 'task');
+  if (roster.error) return { ...summary, ok: false, code: 'ROSTER_NOT_READY' };
+
+  let rows;
+  try {
+    const result = await env.DB.prepare(
+      "SELECT * FROM session_packs WHERE app='task' AND status='active' " +
+      'AND valid_from<=? AND expires_on>=? ORDER BY pack_id'
+    ).bind(sourceDate, sourceDate).all();
+    rows = result.results || [];
+  } catch (error) {
+    return { ...summary, ok: false, code: 'SESSION_PACK_LEDGER_NOT_READY' };
+  }
+
+  for (const listed of rows) {
+    const context = await verifySessionPackIdentity(env, 'task', roster.document, listed);
+    if (context.error || !occursOn(context.task, sourceDate) || !activeOn(context.student, sourceDate)) {
+      summary.skipped++;
+      continue;
+    }
+    const sourceRef = context.task.id + '|' + sourceDate;
+    const evidence = await checkEvidence(env, 'task', context.task, context.owner, sourceRef);
+    if (evidence.error) {
+      summary.skipped++;
+      continue;
+    }
+    const usage = regularAttendanceUsage(evidence.check);
+    if (usage.error) {
+      summary.skipped++;
+      continue;
+    }
+    const groupId = await consumptionGroup('task', context.task.id, sourceDate);
+    const duplicate = await existingSource(env, 'task', 'regular', sourceRef);
+    if (duplicate) {
+      if (duplicateMatches(duplicate, String(listed.pack_id), usage.event, usage.delta, groupId, usage.reasonCode)) {
+        summary.idempotent++;
+      } else {
+        summary.failed++;
+      }
+      continue;
+    }
+
+    let current = await loadPack(env, 'task', String(listed.pack_id));
+    let recorded = false;
+    for (let attempt = 0; attempt < 2 && current && current.status === 'active'; attempt++) {
+      try {
+        await insertUsage(env, 'task', {
+          packId: String(current.pack_id), revision: Number(current.revision), sourceType: 'regular',
+          sourceRef, sourceDate, event: usage.event, delta: usage.delta, groupId,
+          reasonCode: usage.reasonCode, actorId: 'system-session-cutoff', now: cutoff
+        });
+        summary.processed++;
+        recorded = true;
+        break;
+      } catch (error) {
+        const raced = await existingSource(env, 'task', 'regular', sourceRef);
+        if (duplicateMatches(raced, String(current.pack_id), usage.event, usage.delta, groupId, usage.reasonCode)) {
+          summary.idempotent++;
+          recorded = true;
+          break;
+        }
+        if (!/SESSION_PACK_REVISION_CONFLICT/.test(String(error && error.message || error))) break;
+        current = await loadPack(env, 'task', String(current.pack_id));
+      }
+    }
+    if (!recorded) summary.failed++;
+  }
+  return summary;
 }
 
 export async function handleSessionPack(env, app, body, origin, auth, json) {

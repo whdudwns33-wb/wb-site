@@ -24,7 +24,7 @@ test('admin and staff both get a dedicated session route without opening other a
 });
 
 test('the list uses only the private session-pack endpoint and explicitly omits monthly lessons', () => {
-  const source = block('async function loadSessionPacks(force)', 'async function sessionPackConsumptionGroup');
+  const source = block('async function loadSessionPacks(force)', 'async function createSessionPack');
 
   assert.match(source, /sync\.post\('\/session-pack', \{ app: SYNC_APP, auth: auth, action: 'list' \}\)/);
   assert.match(source, /지정하지 않은 월제 수업은 아래 목록에 나타나지 않습니다/);
@@ -142,29 +142,32 @@ test('today and schedule reuse session-pack badges while the own-roster list sta
   assert.match(roster, /mineActive\.map[\s\S]*esc\(s\.name\)[\s\S]*esc\(s\.grade\)/);
 });
 
-test('own staff record also works for a manager personal link and stays hidden elsewhere', () => {
+test('session attendance stays editable until the 23:50 cutoff and is then locked for automatic recording', () => {
   const card = block('function sessionPackStaffRecordHtml(pack)', 'function sessionPackCard(pack)');
-  const record = block('async function recordTodaySessionPack(packId, button)', '/* ── 주간 플래너');
-  const hash = block('async function sessionPackConsumptionGroup(taskId, date)', 'async function createSessionPack');
+  const cutoff = block('const SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE', 'function sessionPackAlertInfo(pack)');
+  const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
+  const changes = block("document.addEventListener('change', async ev =>", "document.addEventListener('toggle'");
 
   assert.match(card, /getCheck\(pack\.lessonTaskId, today\(\)\)/);
   assert.match(card, /if \(!session\.isStaffLink \|\| pack\.teacherId !== session\.staffId/);
   assert.doesNotMatch(card, /session\.isAdmin/);
-  for (const type of ['approved_absence', 'same_day', 'no_show', 'academy_cancel']) assert.match(card, new RegExp(type));
-  assert.match(record, /if \(!session\.isStaffLink\) return/);
-  assert.match(record, /if \(!pack \|\| pack\.teacherId !== session\.staffId\) return/);
-  assert.doesNotMatch(record, /session\.isAdmin/);
-  assert.match(record, /setCheck\(pack\.lessonTaskId, today\(\), \{ absenceType: absenceType \}\)/);
-  assert.ok(record.indexOf('await sync.run()') < record.indexOf("sync.post('/session-pack'"));
-  assert.match(record, /action: 'record'.*revision: Number\(pack\.revision\)/s);
-  assert.match(record, /sourceType: 'regular'.*sourceKey: pack\.lessonTaskId \+ '\|' \+ today\(\)/s);
-  assert.match(hash, /SYNC_APP \+ '\\n' \+ taskId \+ '\\n' \+ date/);
-  assert.match(hash, /'mc_' \+ hex\.slice\(0, 48\)/);
+  assert.match(card, /sessionPackAttendanceHintHtml/);
+  assert.doesNotMatch(card, /sprecord|오늘 출결로 회차 반영|sync\.post/);
+  assert.match(cutoff, /23 \* 60 \+ 50/);
+  assert.match(cutoff, /row\.sourceType === 'regular' && row\.sourceKey === sourceKey/);
+  assert.match(cutoff, /date === current\.date && current\.minute >= SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE/);
+  assert.match(cutoff, /당일 23:50 기준 출결이 회차 원장에 반영되어 마감됐습니다/);
+  for (const type of ['approved_absence', 'same_day', 'no_show', 'academy_cancel']) assert.match(cutoff, new RegExp(type));
+  assert.match(panel, /attendanceLocked \? ' disabled' : ''/);
+  assert.match(panel, /sessionPackAttendanceHintHtml\(t, date, c, sessionAttendance\)/);
+  assert.match(changes, /data-session-pack-absence/);
+  assert.match(changes, /setCheck\(taskId, date, \{ absenceType \}\)/);
+  assert.match(changes, /settleSync\(\)\.catch/);
 });
 
 test('admin adjustment records a reason code, uses CAS, and close preserves history', () => {
   const adjust = block('function sessionPackAdjustmentModal', 'async function closeSessionPack');
-  const close = block('async function closeSessionPack', 'async function recordTodaySessionPack');
+  const close = block('async function closeSessionPack', '/* ── 주간 플래너');
 
   assert.match(adjust, /id="spAdjustReason" autofocus/);
   assert.match(adjust, /action: 'adjust'.*revision: revision.*delta: delta/s);
@@ -177,7 +180,7 @@ test('admin adjustment records a reason code, uses CAS, and close preserves hist
 
 test('errors offer retry and focus is restored after async card mutations', () => {
   const source = block('function rememberSessionPackFocus', 'function replaceSessionPack');
-  const view = block('function viewSessionPacks()', 'async function sessionPackConsumptionGroup');
+  const view = block('function viewSessionPacks()', 'async function createSessionPack');
   const mutations = block('async function createSessionPack(button)', '/* ── 주간 플래너');
 
   assert.match(source, /focus\(\{ preventScroll: true \}\)/);
@@ -197,9 +200,10 @@ test('mobile and QR layouts are one column with 44px controls', () => {
   assert.match(css, /html\.person-mobile \.btn,[\s\S]*?min-height: 44px/);
 });
 
-test('click routing covers refresh, create, adjust, close, and actual attendance record', () => {
+test('click routing covers refresh, create, adjust, and close while regular attendance is automatic', () => {
   const click = block("case 'sprefresh':", '/* 날짜 */');
-  for (const action of ['sprefresh', 'spcreate', 'spadjust', 'spadjustsubmit', 'spclose', 'sprecord']) {
+  for (const action of ['sprefresh', 'spcreate', 'spadjust', 'spadjustsubmit', 'spclose']) {
     assert.match(click, new RegExp(`case '${action}'`));
   }
+  assert.doesNotMatch(click, /case 'sprecord'/);
 });
