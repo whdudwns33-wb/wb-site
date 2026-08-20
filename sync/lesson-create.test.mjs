@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { buildLessonTask, handleLessonCreate } from './lesson-create.js';
+import { buildLessonTask, handleLessonCreate, handleLessonCreateBatch } from './lesson-create.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -44,6 +44,7 @@ class FakeDB {
       ['inactive', { id: 'inactive', deleted: true }]
     ]);
     this.tasks = new Map();
+    this.failBatchAt = -1;
     this.privateRoster = {
       roster: { students: [
         { id: 'student-a', name: '테스트학생', grade: '초4', teacherIds: ['teacher-1'] },
@@ -84,6 +85,12 @@ class FakeDB {
         };
       },
       async run() {
+        if (sql.startsWith('INSERT INTO tasks')) {
+          const [, id, owner, data, updatedAt, srvAt] = this.args;
+          if (db.tasks.has(id)) throw new Error('task conflict');
+          db.tasks.set(id, { owner, data, updatedAt, srvAt });
+          return { meta: { changes: 1 } };
+        }
         if (sql.startsWith('INSERT OR IGNORE INTO tasks')) {
           const [, id, owner, data, updatedAt, srvAt] = this.args;
           if (db.tasks.has(id)) return { meta: { changes: 0 } };
@@ -106,10 +113,30 @@ class FakeDB {
       }
     };
   }
+
+  async batch(statements) {
+    const snapshot = new Map(this.tasks);
+    const results = [];
+    try {
+      for (let index = 0; index < statements.length; index += 1) {
+        if (this.failBatchAt === index) throw new Error('simulated batch failure');
+        results.push(await statements[index].run());
+      }
+      return results;
+    } catch (error) {
+      this.tasks = snapshot;
+      throw error;
+    }
+  }
 }
 
 async function call(db, body, auth) {
   const response = await handleLessonCreate({ DB: db }, 'task', body, '*', auth, json);
+  return { response, data: await response.json() };
+}
+
+async function callBatch(db, lessons, auth = { scope: 'all', role: 'admin' }) {
+  const response = await handleLessonCreateBatch({ DB: db }, 'task', { lessons }, '*', auth, json);
   return { response, data: await response.json() };
 }
 
@@ -530,6 +557,83 @@ test('unconfirmed schedules cannot leak partial structured slots', async () => {
   assert.equal(task.repeat, 'once');
 });
 
+test('admin atomically creates multiple independent lessons for one stable student', async () => {
+  const db = new FakeDB();
+  const result = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어',
+      scheduleText: '화·목 18:00-19:50 / 금 19:00-19:50',
+      scheduleSlots: [
+        { days: [2, 4], startTime: '18:00', endTime: '19:50' },
+        { days: [5], startTime: '19:00', endTime: '19:50' }
+      ] }) }
+  ]);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.createdCount, 2);
+  assert.equal(result.data.duplicateCount, 0);
+  assert.equal(result.data.tasks.length, 2);
+  assert.equal(db.tasks.size, 2);
+  assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a']));
+  assert.deepEqual(new Set(result.data.tasks.map(task => task.subject)), new Set(['수학', '영어']));
+});
+
+test('batch validation failure creates no lesson and rejects mixed students or duplicate assignments', async () => {
+  const db = new FakeDB();
+  const invalid = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어', scheduleText: '', scheduleSlots: [] }) }
+  ]);
+  assert.equal(invalid.response.status, 400);
+  assert.equal(db.tasks.size, 0);
+
+  const mixed = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ studentId: 'student-b', subject: '영어', className: '', lessonRole: '영어' }) }
+  ]);
+  assert.equal(mixed.response.status, 400);
+  assert.equal(db.tasks.size, 0);
+
+  const duplicateLesson = assignedLesson({ subject: '수학', className: '', lessonRole: '수학' });
+  const duplicate = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: duplicateLesson },
+    { staffId: 'teacher-1', lesson: duplicateLesson }
+  ]);
+  assert.equal(duplicate.response.status, 409);
+  assert.equal(db.tasks.size, 0);
+});
+
+test('batch database failure rolls every lesson back and an exact retry is idempotent', async () => {
+  const lessons = [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' }) }
+  ];
+  const failingDb = new FakeDB();
+  failingDb.failBatchAt = 1;
+  const failed = await callBatch(failingDb, lessons);
+  assert.equal(failed.response.status, 409);
+  assert.equal(failingDb.tasks.size, 0);
+
+  const db = new FakeDB();
+  const first = await callBatch(db, lessons);
+  assert.equal(first.response.status, 200);
+  assert.equal(first.data.createdCount, 2);
+  const retried = await callBatch(db, lessons);
+  assert.equal(retried.response.status, 200);
+  assert.equal(retried.data.createdCount, 0);
+  assert.equal(retried.data.duplicateCount, 2);
+  assert.equal(retried.data.idempotent, true);
+  assert.equal(db.tasks.size, 2);
+});
+
+test('teachers cannot use the multi-teacher batch registration endpoint', async () => {
+  const db = new FakeDB();
+  const result = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson() }
+  ], { scope: 'own', id: 'teacher-1' });
+  assert.equal(result.response.status, 403);
+  assert.equal(db.tasks.size, 0);
+});
+
 test('invalid, overlapping, and excessive structured slots are rejected', async () => {
   await assert.rejects(
     () => buildLessonTask(validLesson({ scheduleSlots: [{ days: [1], startTime: '19:00', endTime: '18:00' }] }), 'teacher-1', 'staff', 1),
@@ -556,5 +660,6 @@ test('route is wired and no Solapi send code is introduced', () => {
   const worker = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
   const source = fs.readFileSync(new URL('./lesson-create.js', import.meta.url), 'utf8');
   assert.match(worker, /\/lesson-create/);
+  assert.match(worker, /\/lesson-create-batch/);
   assert.doesNotMatch(source, /api\.solapi\.com|SOLAPI_SECRET|phone|recipient/i);
 });
