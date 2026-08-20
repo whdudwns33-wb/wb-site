@@ -12,6 +12,7 @@ const LESSON_TEXT_LIMITS = {
   studentTraits: 2400,
   goal: 1600,
   parentRequest: 1600,
+  adminRequest: 1600,
   scheduleReviewReason: 300
 };
 
@@ -214,6 +215,7 @@ function contentIdentityText(input, slots, scheduleStatus, scheduleReviewReason)
     start: input.start
   };
   if (input.studentId) content.studentId = input.studentId;
+  if (input.adminRequest !== '없음') content.adminRequest = input.adminRequest;
   return JSON.stringify(content);
 }
 
@@ -224,7 +226,8 @@ function lessonGuide(input) {
     '■ 숙제 루틴과 수행률\n' + input.homework,
     '■ 학생 특징\n' + input.studentTraits,
     '■ 지금 목표\n' + input.goal,
-    '■ 특이사항·학부모 요청\n' + input.parentRequest
+    '■ 특이사항·학부모 요청\n' + input.parentRequest,
+    '■ 관리자 요청사항\n' + input.adminRequest
   ].join('\n\n');
 }
 
@@ -247,6 +250,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   for (const [key, limit] of Object.entries(LESSON_TEXT_LIMITS)) {
     input[key] = textValue(raw[key], limit, REQUIRED_TEXT_FIELDS.includes(key));
   }
+  input.adminRequest = input.adminRequest || '없음';
   if (!input.subject && !input.className) throw new Error('과목 또는 반을 입력해 주세요');
   input.start = dateValue(raw.start);
   input.lessonRole = textValue(raw.lessonRole || input.className || input.subject, 120, true);
@@ -327,6 +331,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
     studentTraits: input.studentTraits,
     goal: input.goal,
     parentRequest: input.parentRequest,
+    adminRequest: input.adminRequest,
     taskKind: 'lesson_instruction',
     lessonFormVersion: 1,
     intakeVersion: 1,
@@ -590,7 +595,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     if (auth.scope === 'all' && SAFE_ID_RE.test(String(corrected.studentId || ''))) {
       const tracked = [
         'studentName', 'grade', 'subject', 'className', 'scheduleText', 'scheduleSlots', 'start',
-        'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'guide'
+        'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest', 'guide'
       ];
       const changedFields = tracked.filter(key => JSON.stringify(current[key] || '') !== JSON.stringify(corrected[key] || ''));
       if (changedFields.length) {

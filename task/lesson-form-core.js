@@ -55,6 +55,7 @@
       studentTraits: text(source.studentTraits),
       goal: text(source.goal),
       parentRequest: text(source.parentRequest),
+      adminRequest: text(source.adminRequest) || '없음',
       start: text(source.start),
       end: text(source.end)
     };
@@ -437,7 +438,8 @@
       '숙제 루틴과 수행률: ' + input.homework,
       '학생 특징: ' + input.studentTraits,
       '지금 목표: ' + input.goal,
-      '특이사항·학부모 요청: ' + input.parentRequest
+      '특이사항·학부모 요청: ' + input.parentRequest,
+      '관리자 요청사항: ' + input.adminRequest
     ].join('\n');
 
     return {
@@ -459,6 +461,7 @@
       studentTraits: input.studentTraits,
       goal: input.goal,
       parentRequest: input.parentRequest,
+      adminRequest: input.adminRequest,
       title: '[수업] ' + input.studentName + ' (' + input.grade + ') — ' + subjectClassLabel(input),
       detail: detail,
       guide: guide,

@@ -507,7 +507,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
           subject: selectedSubjects.join('·'), className: '', lessonRole: selectedSubjects.join('·'),
           scheduleText: '', scheduleSlots: body.scheduleSlots, start: effectiveDate,
           materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음',
-          goal: '없음', parentRequest: '없음', scheduleReviewReason: ''
+          goal: '없음', parentRequest: '없음', adminRequest: '없음', scheduleReviewReason: ''
         }, staff.id, actorRole, now);
       } catch (error) {
         return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin);

@@ -28,7 +28,8 @@ function validLesson(overrides = {}) {
     homework: '없음',
     studentTraits: '질문을 잘함',
     goal: '교재 마무리',
-    parentRequest: '없음'
+    parentRequest: '없음',
+    adminRequest: '수업 후 진도표 확인'
   }, overrides);
 }
 
@@ -216,7 +217,7 @@ test('student id is an explicitly validated input field, not a server-owned fiel
 });
 
 test('legacy student-name identity hashes remain byte compatible without student id', async () => {
-  const task = await buildLessonTask(validLesson(), 'teacher-1', 'staff', 1234);
+  const task = await buildLessonTask(validLesson({ adminRequest: '없음' }), 'teacher-1', 'staff', 1234);
   assert.equal(task.id, 'lesson-1eb0da14754100ea367b49314a88594d');
   assert.equal(task.lessonAssignmentKey, 'sha256:1eb0da14754100ea367b49314a88594d7dfeaffe0300f61c9a8d84bce05c508e');
   assert.equal(task.lessonContentHash, 'sha256:0c6ae535f01cfebe01c67ea34e7d111ec12c39689fef7c23d016fe6030d6a614');
@@ -247,6 +248,8 @@ test('all nine form groups are enforced and literal 없음 is accepted', async (
     studentTraits: '없음', goal: '없음', parentRequest: '없음'
   }), 'teacher-1', 'staff', 1);
   assert.equal(task.goal, '없음');
+  assert.equal((await buildLessonTask(validLesson({ adminRequest: '' }), 'teacher-1', 'staff', 1)).adminRequest, '없음');
+  assert.match((await buildLessonTask(validLesson(), 'teacher-1', 'staff', 1)).guide, /■ 관리자 요청사항\n수업 후 진도표 확인/);
 });
 
 test('person auth cannot target another teacher', async () => {
