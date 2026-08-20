@@ -78,9 +78,20 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
   assert.match(editor, /화면에서는 이름으로 구분하며, 내부 연결용 studentId는 서버가 8자리 숫자로 자동 발급합니다/);
   assert.match(editor, /showRosterStudentEditor\(\{[\s\S]{0,180}id: ''/);
   assert.doesNotMatch(editor, /id: 'student_' \+ uid\(\)/);
+  assert.match(editor, /if \(!student\.name \|\| !student\.start\)/);
+  assert.doesNotMatch(editor, /!student\.grade \|\| !student\.subject/);
   const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));
   assert.match(mineList, /mineActive\.map[\s\S]*s\.name[\s\S]*s\.grade/);
   assert.doesNotMatch(mineList, /s\.subject|s\.memo|sessionModeBadgesForStudent/);
+});
+
+test('동명이인은 이름을 바꾸지 않고 학교·학년과 필요한 경우 마스킹 보호자 번호로 구분한다', () => {
+  const identity = block('function rosterIdentityPart(', 'function studentLinkCandidates(');
+  assert.match(identity, /student\.school/);
+  assert.match(identity, /student\.grade/);
+  assert.match(identity, /digits\.slice\(-4\)/);
+  assert.match(identity, /rosterStudentIdentityLabel/);
+  assert.match(source, /selectableStudents\.map\(student =>[\s\S]{0,220}rosterStudentIdentityLabel\(student\)/);
 });
 
 test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 한 번만 남긴다', () => {

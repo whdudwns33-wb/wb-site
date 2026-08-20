@@ -235,6 +235,44 @@ test('student maintenance is admin-only and refuses a duplicate name and grade',
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
 });
 
+test('unassigned students may omit school, grade, subjects, and teachers before lesson placement', async () => {
+  const db = new TestD1(); seedAuth(db);
+  const document = documentFixture();
+  document.roster.students = [{
+    id: '10000001', name: '미배정학생', school: '', grade: '', teacher: '', subject: '', subjects: [],
+    phoneSelf: '', phoneFather: '', phoneMother: '010-1111-2222', start: '2026-08', end: '', reason: '',
+    entryType: 'existing', teacherIds: []
+  }];
+  document.bookStudents = [];
+  const saved = await replace(db, document);
+  assert.equal(saved.status, 200);
+  const director = await call(db, { auth: admin, action: 'get' });
+  assert.equal(director.body.roster.students[0].grade, '');
+  const teacher = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  assert.equal(teacher.body.roster.students.length, 0);
+});
+
+test('same-name students are separated by school and grade, then by parent contacts', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  let current = await call(db, { auth: admin, action: 'get' });
+  const create = async student => call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
+    student: { id: 'client-id', teacher: '', subject: '', start: '2026-08', end: '', reason: '', teacherIds: [], ...student }
+  });
+  const first = await create({ name: '김예린', school: '초', grade: '6', phoneMother: '010-1111-1111' });
+  assert.equal(first.status, 200);
+  current = first;
+  const second = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-2222-2222' });
+  assert.equal(second.status, 200);
+  current = second;
+  const third = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
+  assert.equal(third.status, 200);
+  current = third;
+  const duplicate = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
+});
+
 test('person receives only assigned and co-taught roster and book rows', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const teacherA = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });

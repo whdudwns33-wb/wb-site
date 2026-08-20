@@ -12,7 +12,7 @@ test('task inline application script parses', () => {
   assert.doesNotThrow(() => new Function(html.slice(start, end)));
 });
 
-test('teachers get an own-scope nine-field lesson route', () => {
+test('teachers get an own-scope three-section lesson route', () => {
   assert.match(html, /\['today', '오늘 할 일'\],[\s\S]{0,180}\['lesson', '수업 등록'\]/);
   assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /\['feedback', '피드백 상태'\]/);
@@ -21,10 +21,17 @@ test('teachers get an own-scope nine-field lesson route', () => {
   assert.match(html, /staffId: session\.isStaffLink && !session\.isAdmin \? session\.staffId : ''/);
   assert.match(html, /if \(session\.isStaffLink && !session\.isAdmin\) lessonDraft\.staffId = session\.staffId/);
   assert.match(html, /sync\.post\('\/lesson-create'/);
-  for (const key of ['subject', 'className', 'scheduleText', 'materials',
-    'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) {
+  for (const key of ['subject', 'className', 'scheduleText']) {
     assert.ok(html.includes(`lessonTextField('${key}'`), key);
   }
+  const viewStart = html.indexOf('function viewLessonEntry()');
+  const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
+  const view = html.slice(viewStart, viewEnd);
+  for (const section of ['4. 교재와 현재 진도', '5. 온라인 프로그램', '6. 숙제 루틴과 수행률',
+    '7. 학생 특징', '8. 지금 목표', '9. 특이사항·학부모 요청']) {
+    assert.doesNotMatch(view, new RegExp(section.replace('.', '\\.')));
+  }
+  assert.match(html, /materials: draft\._sourceTaskId \? \(draft\.materials \|\| '없음'\) : '없음'/);
   assert.match(html, /data-lesson-student/);
   assert.match(html, /stable studentId로 연결합니다/);
 });
@@ -88,6 +95,7 @@ test('admin direct lesson registration removes duplicate subject fields and free
   assert.match(view, /personal \? lessonTextField\('scheduleText',[\s\S]{0,160} : ''/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
   assert.match(view, /<div class="sect">3\. 수업 요일·시간/);
+  assert.doesNotMatch(view, /<div class="sect">[4-9]\./);
 });
 
 test('admin direct lesson registration reuses the new-student multi-subject selector', () => {
