@@ -126,6 +126,9 @@ function portalBaseUrl(value) {
 }
 
 function sendConfiguration(env, eventType, requireEnabled = true) {
+  if (text(env.WB_GUARDIAN_CONTACT_ENABLED) === 'false') {
+    return { error: 'SEND_DISABLED' };
+  }
   if (requireEnabled && text(env.WB_GUARDIAN_OPS_SEND_ENABLED) !== 'true') {
     return { error: 'SEND_DISABLED' };
   }

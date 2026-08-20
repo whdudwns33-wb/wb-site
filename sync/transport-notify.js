@@ -188,6 +188,7 @@ export async function setTransportGuardian(env, body, auth) {
 }
 
 export async function addOwnDriverContacts(env, date, auth, routes) {
+  if (text(env.WB_GUARDIAN_CONTACT_ENABLED) === 'false') return routes;
   const personalDriver = auth && SAFE_ID.test(String(auth.id || '')) &&
     (auth.scope === 'own' || auth.role === 'manager');
   if (!personalDriver || date !== kstToday()) return routes;
@@ -205,6 +206,7 @@ export async function addOwnDriverContacts(env, date, auth, routes) {
 }
 
 function sendConfig(env, event) {
+  if (text(env.WB_GUARDIAN_CONTACT_ENABLED) === 'false') return { error: 'SEND_DISABLED' };
   if (text(env.WB_TRANSPORT_NOTIFY_ENABLED) !== 'true') return { error: 'SEND_DISABLED' };
   const apiKey = text(env.SOLAPI_KAKAO_API_KEY), apiSecret = text(env.SOLAPI_KAKAO_API_SECRET);
   const pfId = text(env.SOLAPI_KAKAO_PF_ID), templateId = text(env[TEMPLATE_ENV[event]]);

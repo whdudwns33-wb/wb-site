@@ -1558,6 +1558,14 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   if (app !== 'task') return json({ ok: false, error: '보호자 웹앱은 task에서만 사용할 수 있습니다' }, 400, origin);
   body = body && typeof body === 'object' ? body : {};
   const action = String(body.action || '');
+  const disabledActions = new Set([
+    'access_set', 'invite', 'publication_set', 'announcement_save', 'announcement_publish',
+    'exchange', 'view', 'respond', 'submit_request'
+  ]);
+  if (String(env.WB_GUARDIAN_CONTACT_ENABLED || '').trim() === 'false' && disabledActions.has(action)) {
+    return json({ ok: false, code: 'GUARDIAN_CONTACT_DISABLED',
+      error: '학부모 연락 기능은 현재 사용하지 않습니다' }, 503, origin);
+  }
   if (action === 'access_list' || action === 'access_set') return portalAccess(env, body, auth, origin, json);
   if (action === 'invite') return issueInvite(env, body, auth, origin, json);
   if (action === 'preview') return previewPortal(env, body, auth, origin, json);
