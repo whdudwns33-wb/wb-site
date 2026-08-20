@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 
-import { handleSessionPack } from './session-pack.js';
+import { handleScheduledSessionPackAttendance, handleSessionPack } from './session-pack.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const makeupMigration = fs.readFileSync(new URL('./migrations/025_makeup.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/026_session_packs.sql', import.meta.url), 'utf8');
+const workerEntry = fs.readFileSync(new URL('./worker.js', import.meta.url), 'utf8');
+const wrangler = fs.readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
 const admin = { scope: 'all' };
 const own = id => ({ scope: 'own', id });
 const manager = id => ({ scope: 'all', id, role: 'manager' });
@@ -210,6 +212,35 @@ test('present, late, early leave, and absence policies use actual checks and CAS
   result = await record(db, pack, 'lesson-a', '2026-08-07');
   assert.equal(result.body.pack.usedSessions, 4);
   assert.equal(result.body.pack.usage.at(-1).event, 'same_day');
+});
+
+test('23:50 KST cron records the latest attendance once after teachers can revise it beforehand', async () => {
+  const db = seed();
+  const pack = (await create(db)).body.pack;
+  const sourceDate = '2026-08-21';
+  putCheck(db, 'lesson-a', 'teacher-a', sourceDate, 'A', 'same_day');
+  const corrected = { taskId: 'lesson-a', date: sourceDate, att: 'P', absenceType: '' };
+  db.prepare("UPDATE checks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE app='task' AND k=?")
+    .bind(JSON.stringify(corrected), 'lesson-a|' + sourceDate).run();
+
+  const scheduledTime = Date.parse('2026-08-21T14:50:00Z');
+  const first = await handleScheduledSessionPackAttendance({ DB: db }, scheduledTime);
+  assert.deepEqual(first, { ok: true, sourceDate, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
+  const usage = db.database.prepare(
+    "SELECT attendance_event,delta,actor_id,source_date FROM session_pack_usage WHERE app='task' AND pack_id=?"
+  ).get(pack.packId);
+  assert.deepEqual({ ...usage }, { attendance_event: 'present', delta: 1, actor_id: 'system-session-cutoff', source_date: sourceDate });
+
+  const duplicate = await handleScheduledSessionPackAttendance({ DB: db }, scheduledTime);
+  assert.equal(duplicate.processed, 0);
+  assert.equal(duplicate.idempotent, 1);
+  assert.equal(db.database.prepare("SELECT COUNT(*) count FROM session_pack_usage WHERE app='task'").get().count, 1);
+});
+
+test('Worker schedules book orders at 20:00 and session attendance finalization at 23:50 KST', () => {
+  assert.match(wrangler, /crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*"\]/);
+  assert.match(workerEntry, /controller\.cron === SESSION_PACK_ATTENDANCE_CRON[\s\S]{0,160}handleScheduledSessionPackAttendance/);
+  assert.match(workerEntry, /controller\.cron === BOOK_ORDER_CRON[\s\S]{0,160}handleScheduledBookOrders/);
 });
 
 test('an absence without a structured policy or a fabricated check fails closed', async () => {

@@ -23,9 +23,9 @@ directory = "../parent"
 binding = "ASSETS"
 run_worker_first = true
 
-# Cloudflare Cron은 UTC 기준이다. 11:00 UTC = 20:00 KST.
+# Cloudflare Cron은 UTC 기준이다. 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
 [triggers]
-crons = ["0 11 * * *"]
+crons = ["0 11 * * *", "50 14 * * *"]
 
 [[d1_databases]]
 binding = "DB"
