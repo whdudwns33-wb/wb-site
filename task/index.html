@@ -906,11 +906,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.2"></script>
-<script src="./asset-core.js?v=2026-08-21.2"></script>
-<script src="./qr-core.js?v=2026-08-21.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.3"></script>
+<script src="./asset-core.js?v=2026-08-21.3"></script>
+<script src="./qr-core.js?v=2026-08-21.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.3"></script>
 <script>
 "use strict";
 
@@ -3311,19 +3311,22 @@ function currentLessonRosterDraft() {
 }
 
 function lessonSubjectSelectionHtml() {
-  const info = currentLessonRosterDraft();
-  const selectedSubjects = new Set(info ? info.subjects || [] : []);
-  return '<div class="sect">2. 등록과목</div><div class="field"><span class="fl">등록과목 · 중복 선택 가능</span><div class="chips">' +
-    ROSTER_SUBJECT_OPTIONS.map(subject => '<label class="chip"><input type="checkbox" data-lesson-roster-subject value="' + esc(subject) + '"' +
-      (selectedSubjects.has(subject) ? ' checked' : '') + (info ? '' : ' disabled') + '> ' + esc(subject) + '</label>').join('') + '</div>' +
-    (info ? '<div class="small muted mt8">선택한 과목은 원생 정보와 이번 수업 정보에 함께 반영됩니다.</div>' :
-      '<div class="small muted mt8">실제 원생을 먼저 선택하면 과목을 선택할 수 있습니다.</div>') + '</div>';
+  const draft = currentLessonDraft();
+  const student = (session.isStaffLink && !session.isAdmin ? assignedLessonStudents() : lessonFormStudents())
+    .find(row => String(row.id) === String(draft.studentId));
+  const registeredSubjects = student ? rosterStudentSubjects(student) : [];
+  const selectedSubject = ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || '')) ? String(draft.subject) : '';
+  return '<div class="sect">2. 수업 과목 선택</div><div class="field"><span class="fl">이번 수업 과목 · 한 과목만 선택</span><div class="chips">' +
+    ROSTER_SUBJECT_OPTIONS.map(subject => '<label class="chip"><input type="radio" name="lesson-course-subject" data-lesson-subject value="' + esc(subject) + '"' +
+      (selectedSubject === subject ? ' checked' : '') + (student ? '' : ' disabled') + '> ' + esc(subject) + '</label>').join('') + '</div>' +
+    (student ? '<div class="small muted mt8">현재 원생 등록과목: ' + esc(registeredSubjects.join(' · ') || '미지정') +
+      ' · 이번에 선택한 과목이 등록과목에 없으면 자동으로 추가됩니다.</div>' :
+      '<div class="small muted mt8">학생을 먼저 선택하면 수업 과목을 선택할 수 있습니다.</div>') + '</div>';
 }
 
 function lessonRosterInformationHtml() {
   const info = currentLessonRosterDraft();
   if (!info) return '<div class="hint mt14">실제 원생을 선택하면 신규 원생 추가와 같은 기본 정보 입력칸이 열립니다.</div>';
-  const selectedTeachers = new Set(info.teacherIds || []);
   return '<div class="sect">원생 기본 정보 · 신규 원생 추가와 동일 항목</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-lesson-roster-field="name" maxlength="40" value="' + esc(info.name) + '"></label>' +
     '<label class="field"><span class="fl">학교</span><input class="in" data-lesson-roster-field="school" maxlength="80" value="' + esc(info.school) + '"></label></div>' +
@@ -3331,9 +3334,6 @@ function lessonRosterInformationHtml() {
     '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneSelf" maxlength="30" value="' + esc(info.phoneSelf) + '"></label>' +
     '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneFather" maxlength="30" value="' + esc(info.phoneFather) + '"></label></div>' +
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneMother" maxlength="30" value="' + esc(info.phoneMother) + '"></label>' +
-    '<div class="field"><span class="fl">담당 선생님</span><div class="chips">' + liveStaff().map(teacher =>
-      '<label class="chip"><input type="checkbox" data-lesson-roster-teacher value="' + esc(teacher.id) + '"' + (selectedTeachers.has(teacher.id) ? ' checked' : '') + '> ' + esc(teacher.name) + '</label>').join('') + '</div>' +
-      '<div class="small muted mt8">이 수업의 담당 선생님은 저장할 때 원생 담당에도 자동 포함됩니다.</div></div>' +
     '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-roster-field="registrationDate" value="' + esc(info.registrationDate) + '"></label>' +
     '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-roster-field="firstClassDate" value="' + esc(info.firstClassDate) + '"></label></div>' +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" data-lesson-roster-field="memo" maxlength="1000">' + esc(info.memo) + '</textarea></label>';
@@ -3343,9 +3343,11 @@ function lessonRosterStudentPayload(selected, draft) {
   const info = currentLessonRosterDraft();
   if (!session.isAdmin || !selected || !info) return null;
   const teacherIds = [...new Set((info.teacherIds || []).map(String).concat(String(draft.staffId || '')).filter(Boolean))];
-  const subjects = [...new Set((info.subjects || []).filter(subject => ROSTER_SUBJECT_OPTIONS.includes(subject)))];
+  const rosterSubjects = (info.subjects || []).filter(subject => ROSTER_SUBJECT_OPTIONS.includes(subject));
+  const lessonSubject = String(draft.subject || '');
+  const subjects = [...new Set(rosterSubjects.concat(ROSTER_SUBJECT_OPTIONS.includes(lessonSubject) ? [lessonSubject] : []))];
   if (!String(info.name || '').trim() || !String(info.grade || '').trim() || !subjects.length || !teacherIds.length) {
-    throw new Error('원생 이름·학년·등록과목·담당 선생님을 모두 확인해 주세요');
+    throw new Error('원생 이름·학년·수업 과목·담당 선생님을 모두 확인해 주세요');
   }
   return Object.assign({}, selected, {
     id: selected.id, name: String(info.name).normalize('NFKC').trim(), school: String(info.school || '').normalize('NFKC').trim(),
@@ -3769,12 +3771,14 @@ function viewLessonEntry() {
     return lessonAssignmentRequestHtml();
   }
   if (session.isAdmin && !lessonAssignmentRequestsLoaded && !lessonAssignmentRequestsLoading) setTimeout(() => loadLessonAssignmentRequests(false), 0);
+  const teacherReady = !!draft.studentId && ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''));
   const staffSelect = session.isStaffLink && !session.isAdmin
-    ? '<div class="guide mb14"><b>담당 선생님</b>' + esc(((staffById(session.staffId) || {}).name || '본인')) + ' 선생님으로만 등록됩니다.</div>'
-    : '<div class="field"><label class="fl">담당 선생님</label><select class="in" data-lesson-field="staffId">' +
+    ? '<div class="sect">3. 담당 선생님</div><div class="guide mb14"><b>담당 선생님</b>' + esc(((staffById(session.staffId) || {}).name || '본인')) + ' 선생님으로 자동 지정됩니다.</div>'
+    : '<div class="sect">3. 담당 선생님</div><div class="field"><label class="fl">이번 수업 담당 선생님</label><select class="in" data-lesson-field="staffId"' + (teacherReady ? '' : ' disabled') + '>' +
       '<option value="">선생님을 선택하세요</option>' + liveStaff().map(staff =>
         '<option value="' + staff.id + '"' + (draft.staffId === staff.id ? ' selected' : '') + '>' + esc(staff.name) + '</option>'
-      ).join('') + '</select></div>';
+      ).join('') + '</select>' + (teacherReady ? '<div class="small muted mt8">선택한 선생님은 원생 담당에도 자동 포함됩니다.</div>' :
+        '<div class="small muted mt8">학생과 수업 과목을 먼저 선택해 주세요.</div>') + '</div>';
 
   const studentFields = personal
     ? '<div class="sect">1. 담당 학생 선택</div><div class="field"><label class="fl">내 담당 학생</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
@@ -3785,12 +3789,11 @@ function viewLessonEntry() {
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
   const directRegistration = '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 정보 등록</b>' +
-    '<span class="card-sub">원생 기본 정보와 담당·과목을 확인한 뒤 수업 요일·시간까지 3단계로 등록합니다.</span></span></summary>' +
-    '<div class="admin-collapsible-body">' + staffSelect +
-      studentFields +
-      (personal ? '<div class="sect">2. 과목·반</div><div class="grid2">' +
-        lessonTextField('subject', '과목', 0, '예: 국어, 영어, 수학') + lessonTextField('className', '반 / 수업 역할', 0, '예: 블렌디드, 비문학, 문제풀이') + '</div>' : lessonSubjectSelectionHtml()) +
-      '<div class="sect">3. 수업 요일·시간</div>' +
+    '<span class="card-sub">학생 → 수업 과목 → 담당 선생님 → 수업 요일·시간 순서로 등록합니다.</span></span></summary>' +
+    '<div class="admin-collapsible-body">' + studentFields +
+      lessonSubjectSelectionHtml() +
+      staffSelect +
+      '<div class="sect">4. 수업 요일·시간</div>' +
         (personal ? lessonTextField('scheduleText', '원문 그대로', 2, '예: 월·수 17:00-19:00 / 일 12:00-14:00') : '') +
         '<div class="hint mb8">현황판에 확정 표시하려면 아래에 요일·시작·종료를 넣으세요. 불명확하면 비워도 등록되며 원장 확인 필요로 표시됩니다.</div>' +
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
@@ -3834,19 +3837,16 @@ function previewLessonRegistration() {
   const core = window.WBLessonFormCore;
   if (!core) return toast('수업 등록 모듈을 불러오지 못했습니다 — 새로고침해 주세요');
   const draft = lessonInputPayload();
-  if (session.isAdmin && !draft.staffId) return toast('담당 선생님을 선택해 주세요');
   const selected = (session.isStaffLink && !session.isAdmin ? assignedLessonStudents() : lessonFormStudents())
     .find(student => String(student.id) === String(draft.studentId));
   if (!selected) return toast(session.isStaffLink && !session.isAdmin ? '내 담당 학생을 선택해 주세요' : '현재 재원 원생을 선택해 주세요');
+  if (!ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''))) return toast('이번 수업 과목을 한 개 선택해 주세요');
+  if (session.isAdmin && !draft.staffId) return toast('담당 선생님을 선택해 주세요');
   draft.studentId = selected.id;
   try { lessonPreviewRosterStudent = session.isAdmin ? lessonRosterStudentPayload(selected, draft) : null; }
   catch (error) { return toast(error.message || '원생 기본 정보를 확인해 주세요'); }
   draft.studentName = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.name : selected.name;
   draft.grade = lessonPreviewRosterStudent ? lessonPreviewRosterStudent.grade : selected.grade;
-  if (lessonPreviewRosterStudent && lessonPreviewRosterStudent.subjects.length) {
-    draft.subject = lessonPreviewRosterStudent.subjects.join('·');
-    draft.className = '';
-  }
   const validation = core.validateLessonInput(draft);
   if (!validation.valid) return toast(validation.errors[0].message);
   let taskBody;
@@ -3878,12 +3878,12 @@ function previewLessonRegistration() {
   lessonPreviewExpectedUpdatedAt = existing ? Number(existing.updatedAt || draft._sourceUpdatedAt || 0) : 0;
   modal(existing ? '수업 정보 수정 미리보기' : '수업 등록 미리보기',
     '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
-      '<b>담당</b> ' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
       (lessonPreviewRosterStudent ? '<b>원생 기본 정보</b>' + esc([lessonPreviewRosterStudent.school, lessonPreviewRosterStudent.grade,
         lessonPreviewRosterStudent.subject, lessonPreviewRosterStudent.registrationDate, lessonPreviewRosterStudent.firstClassDate].filter(Boolean).join(' · ')) + '<br><br>' : '') +
-      '<b>1. 이름 / 학년</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
-      '<b>2. 과목·반</b><br>' + previewValue([taskBody.subject, taskBody.className].filter(Boolean).join(' / ')) + '<br><br>' +
-      '<b>3. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '</div>' +
+      '<b>1. 학생</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
+      '<b>2. 수업 과목</b><br>' + previewValue(taskBody.subject) + '<br><br>' +
+      '<b>3. 담당 선생님</b><br>' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
+      '<b>4. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '</div>' +
     '<div class="card ' + (review ? 'lesson-review' : 'lesson-confirmed') + ' mt14"><b>' +
       (review ? '⚠️ 시간 확인 필요' : '✅ 현황판 시간 확정') + '</b><div class="small muted">' +
       (review ? esc(lessonPreviewPayload.scheduleReviewReason || '요일·시작·종료 확인 필요') : esc(slotSummary)) + '</div></div>',
@@ -13998,23 +13998,15 @@ document.addEventListener('change', async ev => {
     currentLessonAssignmentDraft().subjects = Array.from(document.querySelectorAll('[data-assignment-subject]:checked')).map(input => String(input.value));
     return;
   }
-  const lessonRosterSubject = ev.target.closest('[data-lesson-roster-subject]');
-  if (lessonRosterSubject) {
-    const subjects = Array.from(document.querySelectorAll('[data-lesson-roster-subject]:checked')).map(input => String(input.value));
-    const info = currentLessonRosterDraft();
-    if (info) info.subjects = subjects;
+  const lessonSubject = ev.target.closest('[data-lesson-subject]');
+  if (lessonSubject) {
     const draft = currentLessonDraft();
-    draft.subject = subjects.join('·');
+    if (String(draft.subject || '') !== String(lessonSubject.value) && session.isAdmin) draft.staffId = '';
+    draft.subject = String(lessonSubject.value);
     draft.className = '';
     lessonPreviewRosterStudent = null;
     persistLessonDraft();
-    return;
-  }
-  const lessonRosterTeacher = ev.target.closest('[data-lesson-roster-teacher]');
-  if (lessonRosterTeacher) {
-    const info = currentLessonRosterDraft();
-    if (info) info.teacherIds = Array.from(document.querySelectorAll('[data-lesson-roster-teacher]:checked')).map(input => String(input.value));
-    lessonPreviewRosterStudent = null;
+    refreshLessonDirectEntry(true);
     return;
   }
   const lessonStudent = ev.target.closest('[data-lesson-student]');
@@ -14023,13 +14015,15 @@ document.addEventListener('change', async ev => {
     const student = (session.isStaffLink && !session.isAdmin ? assignedLessonStudents() : lessonFormStudents())
       .find(item => String(item.id) === String(lessonStudent.value));
     const draft = currentLessonDraft();
+    const studentChanged = String(draft.studentId || '') !== String(student && student.id || '');
     draft.studentId = student ? student.id : '';
     draft.studentName = student ? student.name : '';
     draft.grade = student ? student.grade : '';
     setLessonRosterDraft(student || null);
-    if (session.isAdmin) {
-      draft.subject = student ? rosterStudentSubjects(student).join('·') : '';
+    if (studentChanged) {
+      draft.subject = '';
       draft.className = '';
+      if (session.isAdmin) draft.staffId = '';
     }
     persistLessonDraft(); refreshLessonDirectEntry(true);
     return;
@@ -14158,7 +14152,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.2';
+const APP_VER = '2026-08-21.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
