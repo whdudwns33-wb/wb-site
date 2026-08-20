@@ -9542,7 +9542,7 @@ function rosterStudentEditorHtml(student, assignment) {
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
-    (isCreate ? '저장한 학생은 stable studentId로 명단에 등록됩니다. 신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다.' :
+    (isCreate ? '화면에서는 이름으로 구분하며, 내부 연결용 studentId는 서버가 8자리 숫자로 자동 발급합니다. 신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다.' :
       '학교·연락처·등록과목과 재원 정보를 수정할 수 있습니다.') + '</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-rse-name maxlength="40" value="' + esc(student.name || '') + '"></label>' +
     '<label class="field"><span class="fl">학교</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
@@ -9576,7 +9576,7 @@ async function openRosterStudentEditor(studentId, assignment, entryType) {
   if (!studentId) {
     const teacherId = assignment ? String(assignment.staffId || '') : '';
     showRosterStudentEditor({
-      id: 'student_' + uid(), name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
+      id: '', name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
       school: '', phoneSelf: '', phoneFather: '', phoneMother: '', registrationDate: '', firstClassDate: '',
       teacher: '', subject: '', subjects: [], start: today().slice(0, 7), end: '', reason: '', memo: '',
       entryType: entryType === 'new' ? 'new' : 'existing', teacherIds: teacherId ? [teacherId] : [], _editing: false

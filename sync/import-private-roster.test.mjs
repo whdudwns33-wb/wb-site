@@ -31,6 +31,11 @@ function uuids() {
   return () => '00000000-0000-4000-8000-' + String(++next).padStart(12, '0');
 }
 
+function studentIds() {
+  let next = 10000000;
+  return () => String(++next);
+}
+
 test('build preserves stable ids, maps exact teachers, and does not mutate sources', () => {
   const input = sources();
   const before = JSON.parse(JSON.stringify(input));
@@ -40,14 +45,14 @@ test('build preserves stable ids, maps exact teachers, and does not mutate sourc
       id: 'book-existing', studentId: 'student-existing', name: '가학생', teacher: '나선생', bookId: 'BK01'
     }]
   };
-  const first = buildPrivateRosterDocument({ ...input, staff, existingDocument, makeUuid: uuids() });
+  const first = buildPrivateRosterDocument({ ...input, staff, existingDocument, makeUuid: uuids(), makeStudentId: studentIds() });
   assert.deepEqual(input, before);
   assert.equal(first.roster.students[0].id, 'student-existing');
   assert.deepEqual(first.roster.students[1].teacherIds, ['teacher-a', 'teacher-b']);
   assert.equal(first.bookStudents[0].id, 'book-existing');
   assert.equal(first.bookStudents[0].studentId, 'student-existing');
   assert.deepEqual(first.bookStudents[1].teacherIds, ['teacher-b']);
-  assert.match(first.roster.students[1].id, /^student-[A-Za-z0-9_-]+$/);
+  assert.match(first.roster.students[1].id, /^[1-9]\d{7}$/);
   assert.match(first.bookStudents[1].id, /^book-[A-Za-z0-9_-]+$/);
 
   const second = buildPrivateRosterDocument({ ...input, staff, existingDocument: first, makeUuid: () => { throw new Error('unused'); } });
@@ -134,9 +139,18 @@ test('a genuinely new student receives a fresh id on a later import', () => {
     name: '새학생', grade: '중1', teacher: '가선생', subject: '수학', start: '2026-08', end: '', reason: ''
   });
   const second = buildPrivateRosterDocument({
-    ...input, staff, existingDocument: first, makeUuid: () => 'fresh-student'
+    ...input, staff, existingDocument: first, makeUuid: () => 'fresh-book', makeStudentId: () => '87654321'
   });
-  assert.equal(second.roster.students[2].id, 'student-fresh-student');
+  assert.equal(second.roster.students[2].id, '87654321');
+});
+
+test('a supplied id for a fresh roster must be an eight-digit number', () => {
+  const input = sources();
+  input.rosterSource.students[0].id = 'student-custom';
+  assert.throws(
+    () => buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids(), makeStudentId: studentIds() }),
+    { message: 'NEW_STUDENT_ID_INVALID' }
+  );
 });
 
 test('build rejects a missing teacher without putting the name in the error', () => {

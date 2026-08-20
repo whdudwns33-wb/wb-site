@@ -75,6 +75,9 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
     assert.match(editor, new RegExp(subject));
   }
   assert.match(editor, /data-rse-subject/);
+  assert.match(editor, /화면에서는 이름으로 구분하며, 내부 연결용 studentId는 서버가 8자리 숫자로 자동 발급합니다/);
+  assert.match(editor, /showRosterStudentEditor\(\{[\s\S]{0,180}id: ''/);
+  assert.doesNotMatch(editor, /id: 'student_' \+ uid\(\)/);
   const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));
   assert.match(mineList, /mineActive\.map[\s\S]*s\.name[\s\S]*s\.grade/);
   assert.doesNotMatch(mineList, /s\.subject|s\.memo|sessionModeBadgesForStudent/);
