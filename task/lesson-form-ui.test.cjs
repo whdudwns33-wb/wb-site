@@ -115,10 +115,11 @@ test('admin direct lesson registration reuses the new-student multi-subject sele
   assert.match(html, /draft\.subject = lessonPreviewRosterStudent\.subjects\.join\('·'\)/);
 });
 
-test('feedback workflow sends immediately only through the server-side guardian gate', () => {
-  assert.match(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
-  assert.match(html, /카카오 알림톡 발송 요청을 접수합니다/);
-  assert.match(html, /보호자 연락처·발송 동의가 등록된 학생만 접수/);
+test('feedback workflow is visibly paused and remains blocked in the stale click handler', () => {
+  assert.match(html, /const GUARDIAN_CONTACT_ENABLED = false/);
+  assert.doesNotMatch(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
+  assert.match(html, /학부모 연락 기능 사용 중지/);
+  assert.match(html, /if \(!GUARDIAN_CONTACT_ENABLED\) return toast\('학부모 메시지 발송 기능은 현재 사용하지 않습니다'\)/);
   assert.match(html, /sync\.post\('\/feedback-request'/);
   assert.match(html, /sync\.post\('\/feedback-review'/);
   assert.match(html, /action: 'list', limit: 100/);
