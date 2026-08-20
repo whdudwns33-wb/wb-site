@@ -167,6 +167,21 @@ test('send is disabled by default even with valid credentials unless the explici
   assert.equal(fetches, 0);
 });
 
+test('global guardian pause overrides an enabled feedback delivery switch', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db);
+  registerGuardian(db, '테스트학생');
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const r = await call(db, { auth: admin, requestKey }, {
+      ...fullEnvBase, WB_PARENT_FEEDBACK_SEND_ENABLED: 'true', WB_GUARDIAN_CONTACT_ENABLED: 'false'
+    });
+    assert.equal(r.status, 503);
+    assert.equal(r.body.code, 'SEND_DISABLED');
+  });
+  assert.equal(fetches, 0);
+});
+
 test('only the director can trigger a manual retry, not the submitting teacher', async () => {
   const db = new TestD1();
   const { requestKey } = seedFeedback(db);

@@ -27,6 +27,17 @@ class TestD1 {
     this.database.exec(schema);
   }
   prepare(sql) { return new D1Statement(this.database, sql); }
+  batch(statements) {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const results = statements.map(statement => statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -233,6 +244,57 @@ test('student maintenance is admin-only and refuses a duplicate name and grade',
     expectedUpdatedAt: current.body.updatedAt, student });
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
+});
+
+test('admin directly moves a student to leave and returns them with a newly assigned lesson', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const initial = await call(db, { auth: admin, action: 'get' });
+  const oldTask = {
+    id: 'old-lesson-a', staffId: 'teacher-a', studentId: 'student-a', studentName: '가학생', grade: '중1',
+    title: '[수업] 가학생 (중1) — 수학', taskKind: 'lesson_instruction', deleted: false, start: '2026-08-01',
+    updatedAt: 100, createdAt: 100, steps: []
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', oldTask.id, 'teacher-a', JSON.stringify(oldTask), 100, 100).run();
+
+  const forbidden = await call(db, {
+    auth: person('teacher-a', 'token-a'), action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20'
+  });
+  assert.equal(forbidden.status, 403);
+
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20', note: '가정 일정'
+  });
+  assert.equal(leave.status, 200);
+  assert.equal(leave.body.student.end, '2026-09');
+  assert.match(leave.body.student.reason, /^휴원 2026-08-20/);
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='old-lesson-a'").first().data).deleted, true);
+  const leaveEvent = db.prepare("SELECT event_type,details FROM student_change_events WHERE app='task' AND student_id='student-a' ORDER BY changed_at DESC LIMIT 1").first();
+  assert.equal(leaveEvent.event_type, 'leave');
+  assert.equal(JSON.parse(leaveEvent.details).direct, true);
+
+  const returned = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: leave.body.updatedAt,
+    studentId: 'student-a', operation: 'return', effectiveDate: '2026-08-25', staffId: 'teacher-b',
+    subjects: ['수학'], scheduleSlots: [{ days: [1, 3], startTime: '16:00', endTime: '17:00' }]
+  });
+  assert.equal(returned.status, 200);
+  assert.equal(returned.body.student.end, '');
+  assert.equal(returned.body.student.reason, '');
+  assert.equal(returned.body.student.teacher, '나선생');
+  assert.equal(returned.body.task.staffId, 'teacher-b');
+  assert.equal(returned.body.task.deleted, false);
+  assert.deepEqual(returned.body.task.days, [1, 3]);
+  const activeTask = db.prepare("SELECT owner,data FROM tasks WHERE app='task' AND id=?").bind(returned.body.task.id).first();
+  assert.equal(activeTask.owner, 'teacher-b');
+  assert.equal(JSON.parse(activeTask.data).studentId, 'student-a');
+  const returnEvent = db.prepare("SELECT event_type,details FROM student_change_events WHERE app='task' AND student_id='student-a' ORDER BY changed_at DESC LIMIT 1").first();
+  assert.equal(returnEvent.event_type, 'student_information');
+  assert.equal(JSON.parse(returnEvent.details).operation, 'return');
+  const teacherView = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
+  assert.deepEqual(teacherView.body.roster.students.map(student => student.id), ['student-a', 'student-b', 'student-shared']);
 });
 
 test('unassigned students may omit school, grade, subjects, and teachers before lesson placement', async () => {

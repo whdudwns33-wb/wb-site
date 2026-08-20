@@ -164,6 +164,9 @@ test('driver phone is exposed only for KST today, exact driver route, call conse
   const future = config().routes.map(route => ({ ...route, students: [{ id: 'student-a', name: '가학생' }] }));
   await addOwnDriverContacts({ DB: db }, tomorrow.toISOString().slice(0, 10), driver, future);
   assert.equal(Object.hasOwn(future[0].students[0], 'guardianPhone'), false);
+  const globallyDisabled = config().routes.map(route => ({ ...route, students: [{ id: 'student-a', name: '가학생' }] }));
+  await addOwnDriverContacts({ DB: db, WB_GUARDIAN_CONTACT_ENABLED: 'false' }, today, driver, globallyDisabled);
+  assert.equal(Object.hasOwn(globallyDisabled[0].students[0], 'guardianPhone'), false);
 });
 
 test('notification is fail-closed before fetch when gate is off and blocks non-today admin sends', async () => {
