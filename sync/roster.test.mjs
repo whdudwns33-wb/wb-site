@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
+import { allocateNewStudentId } from './roster.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/019_private_roster.sql', import.meta.url), 'utf8');
@@ -114,6 +115,14 @@ test('schema and migration add one private JSON document table without destructi
   assert.doesNotMatch(source, /fetch\s*\(|roster\.json|textbooks\.json/);
 });
 
+test('new student ids are unique eight-digit numbers without a leading zero', () => {
+  const reserved = new Set(['12345678']);
+  const candidates = ['12345678', '01234567', '87654321'];
+  const studentId = allocateNewStudentId(reserved, () => candidates.shift());
+  assert.equal(studentId, '87654321');
+  assert.equal(reserved.has(studentId), true);
+});
+
 test('unauthenticated and consult requests are rejected', async () => {
   const db = new TestD1(); seedAuth(db);
   assert.equal((await call(db, { action: 'get' })).status, 401);
@@ -150,11 +159,14 @@ test('director adds an existing student and edits one record with roster CAS', a
     }
   });
   assert.equal(created.status, 200);
+  assert.match(created.body.student.id, /^[1-9]\d{7}$/);
+  assert.notEqual(created.body.student.id, 'student-existing');
   assert.equal(created.body.student.entryType, 'existing');
+  const createdId = created.body.student.id;
   const stored = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
-  assert.equal(stored.roster.students.find(item => item.id === 'student-existing').entryType, 'existing');
+  assert.equal(stored.roster.students.find(item => item.id === createdId).entryType, 'existing');
 
-  const detail = await call(db, { auth: admin, action: 'student_get', studentId: 'student-existing' });
+  const detail = await call(db, { auth: admin, action: 'student_get', studentId: createdId });
   assert.deepEqual(detail.body.student.teacherIds, ['teacher-a']);
   const updated = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
@@ -163,7 +175,7 @@ test('director adds an existing student and edits one record with roster CAS', a
   assert.equal(updated.status, 200);
   assert.equal(updated.body.student.grade, '초6');
   assert.equal(JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
-    .roster.students.find(item => item.id === 'student-existing').subject, '영어·독해');
+    .roster.students.find(item => item.id === createdId).subject, '영어·독해');
 
   const stale = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
@@ -187,6 +199,8 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
     }
   });
   assert.equal(created.status, 200);
+  assert.match(created.body.student.id, /^[1-9]\d{7}$/);
+  assert.notEqual(created.body.student.id, 'student-new');
   assert.equal(created.body.student.entryType, 'new');
   assert.deepEqual(created.body.student.subjects, ['영어', '독해력수업']);
   assert.equal(created.body.student.subject, '영어·독해력수업');
@@ -194,7 +208,7 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
   assert.equal(created.body.student.firstClassDate, '2026-08-21');
 
   const teacher = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
-  const visible = teacher.body.roster.students.find(item => item.id === 'student-new');
+  const visible = teacher.body.roster.students.find(item => item.id === created.body.student.id);
   assert.equal(visible.phoneMother, '010-3333-4444');
   assert.equal('teacherIds' in visible, false);
 
@@ -217,6 +231,44 @@ test('student maintenance is admin-only and refuses a duplicate name and grade',
     expectedUpdatedAt: current.body.updatedAt, student })).status, 403);
   const duplicate = await call(db, { auth: admin, action: 'student_create',
     expectedUpdatedAt: current.body.updatedAt, student });
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
+});
+
+test('unassigned students may omit school, grade, subjects, and teachers before lesson placement', async () => {
+  const db = new TestD1(); seedAuth(db);
+  const document = documentFixture();
+  document.roster.students = [{
+    id: '10000001', name: '미배정학생', school: '', grade: '', teacher: '', subject: '', subjects: [],
+    phoneSelf: '', phoneFather: '', phoneMother: '010-1111-2222', start: '2026-08', end: '', reason: '',
+    entryType: 'existing', teacherIds: []
+  }];
+  document.bookStudents = [];
+  const saved = await replace(db, document);
+  assert.equal(saved.status, 200);
+  const director = await call(db, { auth: admin, action: 'get' });
+  assert.equal(director.body.roster.students[0].grade, '');
+  const teacher = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  assert.equal(teacher.body.roster.students.length, 0);
+});
+
+test('same-name students are separated by school and grade, then by parent contacts', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  let current = await call(db, { auth: admin, action: 'get' });
+  const create = async student => call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
+    student: { id: 'client-id', teacher: '', subject: '', start: '2026-08', end: '', reason: '', teacherIds: [], ...student }
+  });
+  const first = await create({ name: '김예린', school: '초', grade: '6', phoneMother: '010-1111-1111' });
+  assert.equal(first.status, 200);
+  current = first;
+  const second = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-2222-2222' });
+  assert.equal(second.status, 200);
+  current = second;
+  const third = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
+  assert.equal(third.status, 200);
+  current = third;
+  const duplicate = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
 });

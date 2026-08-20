@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { validateRosterDocument } from './roster.js';
+import { allocateNewStudentId, studentRegistrationIdentityKey, validateRosterDocument } from './roster.js';
 
 const APP = 'task';
 const APP_ORIGIN = 'https://whdudwns33-wb.github.io';
@@ -56,7 +56,7 @@ function teacherIdentity(value, staffNames) {
   return { teacher: names.join('·'), teacherIds: ids };
 }
 
-const studentKey = (name, grade) => name + '\u0000' + grade;
+const studentKey = student => studentRegistrationIdentityKey(student);
 const assignmentKey = (studentId, bookId) => studentId + '\u0000' + bookId;
 
 function indexExisting(existingDocument) {
@@ -74,12 +74,12 @@ function indexExisting(existingDocument) {
     const id = safeId(row && row.id, 'EXISTING_DOCUMENT_INVALID');
     const name = requiredText(row && row.name, 'EXISTING_DOCUMENT_INVALID');
     const grade = requiredText(row && row.grade, 'EXISTING_DOCUMENT_INVALID');
-    const key = studentKey(name, grade);
+    const key = studentKey(row);
     if (byStudent.has(key)) fail('EXISTING_STUDENT_COLLISION');
     if (reservedIds.has(id)) fail('EXISTING_ID_COLLISION');
     byStudent.set(key, id);
     if (!studentsByName.has(name)) studentsByName.set(name, []);
-    studentsByName.get(name).push({ id, name, grade });
+    studentsByName.get(name).push({ id, name, grade, key });
     existingStudentIds.add(id);
     studentIds.add(id);
     reservedIds.add(id);
@@ -116,7 +116,8 @@ export function buildPrivateRosterDocument({
   textbooksSource,
   staff,
   existingDocument = null,
-  makeUuid = randomUUID
+  makeUuid = randomUUID,
+  makeStudentId
 }) {
   if (!rosterSource || typeof rosterSource !== 'object' || !Array.isArray(rosterSource.students)) {
     fail('ROSTER_SOURCE_INVALID');
@@ -125,6 +126,7 @@ export function buildPrivateRosterDocument({
     fail('TEXTBOOK_SOURCE_INVALID');
   }
   if (typeof makeUuid !== 'function') fail('ID_GENERATOR_INVALID');
+  if (makeStudentId !== undefined && typeof makeStudentId !== 'function') fail('ID_GENERATOR_INVALID');
 
   const staffNames = staffByName(staff);
   const existing = indexExisting(existingDocument);
@@ -136,7 +138,7 @@ export function buildPrivateRosterDocument({
     if (!row || typeof row !== 'object') fail('ROSTER_STUDENT_INVALID');
     const name = requiredText(row.name, 'ROSTER_STUDENT_INVALID');
     const grade = requiredText(row.grade, 'ROSTER_STUDENT_INVALID');
-    const key = studentKey(name, grade);
+    const key = studentKey(row);
     if (sourceStudentKeys.has(key)) fail('ROSTER_IDENTITY_COLLISION');
     sourceStudentKeys.add(key);
     const suppliedId = Object.prototype.hasOwnProperty.call(row, 'id')
@@ -150,9 +152,9 @@ export function buildPrivateRosterDocument({
   sourceByName.forEach((sourceRows, name) => {
     const oldRows = existing.studentsByName.get(name) || [];
     if (!oldRows.length || (oldRows.length === 1 && sourceRows.length === 1)) return;
-    const sameGrades = oldRows.length === sourceRows.length &&
-      oldRows.every(oldRow => sourceRows.some(sourceRow => sourceRow.grade === oldRow.grade));
-    if (!sameGrades && sourceRows.some(sourceRow => !sourceRow.suppliedId)) {
+    const sameIdentities = oldRows.length === sourceRows.length &&
+      oldRows.every(oldRow => sourceRows.some(sourceRow => sourceRow.key === oldRow.key));
+    if (!sameIdentities && sourceRows.some(sourceRow => !sourceRow.suppliedId)) {
       fail('ROSTER_IDENTITY_AMBIGUOUS');
     }
   });
@@ -169,7 +171,14 @@ export function buildPrivateRosterDocument({
     const oldRows = existing.studentsByName.get(name) || [];
     const uniqueNameId = oldRows.length === 1 && sourceByName.get(name).length === 1 ? oldRows[0].id : '';
     if (suppliedId && uniqueNameId && suppliedId !== uniqueNameId) fail('ROSTER_ID_MISMATCH');
-    const id = suppliedId || exactId || uniqueNameId || freshId('student-', existing.reservedIds, makeUuid);
+    if (suppliedId && existingDocument === null && !/^[1-9]\d{7}$/.test(suppliedId)) {
+      fail('NEW_STUDENT_ID_INVALID');
+    }
+    let id = suppliedId || exactId || uniqueNameId;
+    if (!id) {
+      try { id = allocateNewStudentId(existing.reservedIds, makeStudentId); }
+      catch (error) { fail(String(error && error.message || error)); }
+    }
     if (existing.studentIds.has(id)) {
       if (claimedExistingIds.has(id)) fail('ROSTER_ID_REUSED');
       claimedExistingIds.add(id);
@@ -187,6 +196,9 @@ export function buildPrivateRosterDocument({
       teacherIds: teacher.teacherIds
     };
     if (Object.prototype.hasOwnProperty.call(row, 'memo')) result.memo = row.memo;
+    for (const field of ['school', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'entryType', 'subjects']) {
+      if (Object.prototype.hasOwnProperty.call(row, field)) result[field] = row[field];
+    }
     if (!rosterByName.has(name)) rosterByName.set(name, []);
     rosterByName.get(name).push(result);
     return result;
