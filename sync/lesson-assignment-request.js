@@ -128,7 +128,7 @@ async function normalizedRequestDetails(student, body, staffId) {
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
     subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), scheduleText: '',
     scheduleSlots: body.scheduleSlots, start: body.startDate,
-    materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음'
+    materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음', adminRequest: '없음'
   }, staffId, 'staff', Date.now());
   return {
     subjects,
@@ -143,7 +143,7 @@ async function requestedLesson(student, details, staffId, serverNow) {
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
     subject: details.subjects.join('·'), className: '', lessonRole: details.subjects.join('·'), scheduleText: '',
     scheduleSlots: details.scheduleSlots, start: details.startDate,
-    materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음'
+    materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음', adminRequest: '없음'
   }, staffId, 'manager', serverNow);
 }
 

@@ -908,11 +908,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.7"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.7"></script>
-<script src="./asset-core.js?v=2026-08-21.7"></script>
-<script src="./qr-core.js?v=2026-08-21.7"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.7"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.8"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.8"></script>
+<script src="./asset-core.js?v=2026-08-21.8"></script>
+<script src="./qr-core.js?v=2026-08-21.8"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.8"></script>
 <script>
 "use strict";
 
@@ -2453,7 +2453,8 @@ function lessonWorkInstructionHtml(task, lessonDate) {
     ['숙제 루틴과 수행률', task.homework, ['homework']],
     ['학생 특징', task.studentTraits, ['studentTraits']],
     ['목표', task.goal, ['goal']],
-    ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']]
+    ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']],
+    ['관리자 요청사항', task.adminRequest, ['adminRequest']]
   ].filter(row => String(row[1] || '').trim());
   return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
     '<div class="card-sub mb14">현재 수업의 핵심 정보와 관리자가 입력한 업무지시입니다. 출결·5단계·실제 진도·숙제와 준비물은 수업진행에서 입력합니다.</div>' +
@@ -2512,7 +2513,8 @@ function lessonBriefingEditorHtml(student, task) {
     ['homework', '숙제 루틴과 수행률', 2400],
     ['studentTraits', '학생 특징', 2400],
     ['goal', '목표', 1600],
-    ['parentRequest', '특이사항·학부모 요청', 1600]
+    ['parentRequest', '특이사항·학부모 요청', 1600],
+    ['adminRequest', '관리자 요청사항', 1600]
   ];
   const instructionHtml = instructionFields.map(field =>
     '<label class="field"><span class="fl">' + esc(field[1]) + '</span><textarea class="in" rows="3" maxlength="' + field[2] +
@@ -2617,7 +2619,7 @@ function lessonBriefingLessonPayload(student) {
   draft.studentName = student.name;
   draft.grade = student.grade;
   draft.lessonRole = draft.className || draft.subject;
-  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) draft[key] = instruction(key);
+  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest']) draft[key] = instruction(key);
   const validation = core.validateLessonInput(draft);
   if (!validation.valid) throw new Error(validation.errors[0].message);
   const taskBody = core.buildLessonTaskBody(draft, { staffId: editor.task.staffId, start: draft.start || today() });
@@ -2971,11 +2973,14 @@ function taskPanel(t, date, c, editable) {
 
   if (lesson && editable) {
     const att = (c && c.att) || '';
+    const sessionAttendance = sessionPackAttendanceState(t, date);
+    const attendanceLocked = !!(sessionAttendance && sessionAttendance.locked);
     h += '<section class="lesson-progress-section lesson-attendance"><div class="lesson-progress-section-title">학생 출결</div>' +
       '<div class="row wraprow" style="gap:6px">' +
       [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(([v, l]) =>
-        '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '">' + l + '</button>'
-      ).join('') + '</div>' + makeupRequestHtml(t, date, c) + '</section>';
+        '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '"' +
+          (attendanceLocked ? ' disabled' : '') + '>' + l + '</button>'
+      ).join('') + '</div>' + sessionPackAttendanceHintHtml(t, date, c, sessionAttendance) + makeupRequestHtml(t, date, c) + '</section>';
   }
 
   if (!lesson && !usesStandardLessonDisplay(t) && t.guide) {
@@ -3492,7 +3497,7 @@ function newLessonDraft() {
     studentId: '', studentName: '', grade: '', subject: '', className: '',
     scheduleText: '', scheduleSlots: [{ days: [], startTime: '', endTime: '' }],
     materials: '', onlineProgram: '', homework: '', studentTraits: '',
-    goal: '', parentRequest: '', start: today(), lessonEntries: []
+    goal: '', parentRequest: '', adminRequest: '', start: today(), lessonEntries: []
   };
 }
 
@@ -3973,7 +3978,7 @@ function lessonDraftFromTask(t) {
       : [{ days: [], startTime: '', endTime: '' }],
     materials: t.materials || '', onlineProgram: t.onlineProgram || (t.onlinePrograms || []).join(', '),
     homework: t.homework || '', studentTraits: t.studentTraits || '', goal: t.goal || '',
-    parentRequest: t.parentRequest || '', start: t.start || today(),
+    parentRequest: t.parentRequest || '', adminRequest: t.adminRequest || '없음', start: t.start || today(),
     _sourceTaskId: t.id, _sourceUpdatedAt: Number(t.updatedAt || 0)
   };
 }
@@ -4111,7 +4116,8 @@ function lessonInputPayload() {
     homework: draft._sourceTaskId ? (draft.homework || '없음') : '없음',
     studentTraits: draft._sourceTaskId ? (draft.studentTraits || '없음') : '없음',
     goal: draft._sourceTaskId ? (draft.goal || '없음') : '없음',
-    parentRequest: draft._sourceTaskId ? (draft.parentRequest || '없음') : '없음'
+    parentRequest: draft._sourceTaskId ? (draft.parentRequest || '없음') : '없음',
+    adminRequest: draft._sourceTaskId ? (draft.adminRequest || '없음') : '없음'
   });
 }
 
@@ -4124,7 +4130,8 @@ function lessonPreviewPayloadFromTask(taskBody, validation) {
     scheduleReviewReason: validation.warnings.map(item => item.message).join(' / '),
     start: taskBody.start || today(), materials: taskBody.materials,
     onlineProgram: taskBody.onlineProgram, homework: taskBody.homework,
-    studentTraits: taskBody.studentTraits, goal: taskBody.goal, parentRequest: taskBody.parentRequest
+    studentTraits: taskBody.studentTraits, goal: taskBody.goal, parentRequest: taskBody.parentRequest,
+    adminRequest: taskBody.adminRequest
   };
 }
 
@@ -4136,7 +4143,7 @@ function lessonBatchInputPayload(entry, student) {
       (slot.days || []).length || slot.startTime || slot.endTime),
     scheduleStatus: '', scheduleReviewReason: '', start: entry.start || today(),
     materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음',
-    goal: '없음', parentRequest: '없음'
+    goal: '없음', parentRequest: '없음', adminRequest: '없음'
   };
 }
 
@@ -5076,6 +5083,36 @@ function sessionPackForLessonTask(task) {
     String(pack.lessonTaskId || '') === String(task.id || '')) || null;
 }
 
+const SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE = 23 * 60 + 50;
+const SESSION_PACK_ABSENCE_OPTIONS = [
+  ['approved_absence', '사전 인정 결석 · 비차감'], ['same_day', '당일 취소 · 1회 차감'],
+  ['no_show', '무단결석 · 1회 차감'], ['academy_cancel', '학원 휴강 · 비차감']
+];
+
+function sessionPackAttendanceState(task, date) {
+  const pack = sessionPackForLessonTask(task);
+  if (!pack || date < String(pack.validFrom || '') || date > String(pack.expiresOn || '')) return null;
+  const sourceKey = String(task.id || '') + '|' + String(date || '');
+  const reflected = (pack.usage || []).some(row => row && row.sourceType === 'regular' && row.sourceKey === sourceKey);
+  const current = seoulNowParts();
+  const cutoffReached = date < current.date || (date === current.date && current.minute >= SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE);
+  return { pack, reflected, cutoffReached, locked: reflected || cutoffReached };
+}
+
+function sessionPackAttendanceHintHtml(task, date, check, attendanceState) {
+  if (!attendanceState) return '';
+  const locked = attendanceState.locked;
+  const absence = check && check.att === 'A'
+    ? '<label class="field mt8"><span class="fl">결석 차감 유형</span><select class="in" data-session-pack-absence data-id="' + esc(task.id) + '" data-date="' + esc(date) + '"' +
+      (locked ? ' disabled' : '') + '><option value="">유형 선택</option>' + SESSION_PACK_ABSENCE_OPTIONS.map(item =>
+        '<option value="' + item[0] + '"' + (String(check.absenceType || '') === item[0] ? ' selected' : '') + '>' + item[1] + '</option>').join('') +
+      '</select></label>' : '';
+  const message = locked
+    ? (attendanceState.reflected ? '당일 23:50 기준 출결이 회차 원장에 반영되어 마감됐습니다.' : '당일 출결 변경 가능 시간이 23:50에 마감됐습니다.')
+    : '회차제 출결은 당일 23:50에 자동 반영됩니다. 그 전까지 출결 상태와 결석 차감 유형을 변경할 수 있습니다.';
+  return absence + '<div class="small muted mt8">' + message + '</div>';
+}
+
 function sessionPackAlertInfo(pack) {
   if (!pack || pack.status !== 'active') return null;
   const remaining = Math.max(0, Number(pack.remainingSessions) || 0);
@@ -5250,19 +5287,13 @@ function sessionPackOpsNoticeHtml(pack) {
 
 function sessionPackStaffRecordHtml(pack) {
   if (!session.isStaffLink || pack.teacherId !== session.staffId || pack.status !== 'active') return '';
-  const check = getCheck(pack.lessonTaskId, today());
+  const task = state.tasks.find(row => String(row.id || '') === String(pack.lessonTaskId || ''));
+  const check = task && getCheck(pack.lessonTaskId, today());
   const att = check && check.att;
   const labelText = att === 'P' ? '오늘 출석' : att === 'L' ? '오늘 지각' : att === 'A' ? '오늘 결석' : att === 'E' ? '오늘 조퇴' : '오늘 출결 미기록';
-  const unavailable = !['P', 'L', 'A', 'E'].includes(att) || pack.expired || today() < pack.validFrom || today() > pack.expiresOn;
-  const absenceSelect = att === 'A' ? '<label class="small" for="spAbsence-' + esc(pack.packId) + '">결석 차감 유형</label>' +
-    '<select class="in" id="spAbsence-' + esc(pack.packId) + '"><option value="">유형 선택</option>' +
-    [['approved_absence', '사전 인정 결석 · 비차감'], ['same_day', '당일 취소 · 1회 차감'],
-      ['no_show', '무단결석 · 1회 차감'], ['academy_cancel', '학원 휴강 · 비차감']]
-      .map(item => '<option value="' + item[0] + '"' + (check.absenceType === item[0] ? ' selected' : '') + '>' + item[1] + '</option>').join('') + '</select>' : '';
   return '<div class="session-pack-record"><div class="between"><b>' + labelText + '</b><span class="pill">' + esc(shortDate(today())) + '</span></div>' +
-    absenceSelect + '<button class="btn btn-primary btn-block mt14" data-act="sprecord" data-session-pack-action data-pack="' + esc(pack.packId) + '"' +
-    (unavailable ? ' disabled' : '') + '>오늘 출결로 회차 반영</button>' +
-    (!att ? '<div class="small muted mt8">오늘 수업 카드에서 출결을 먼저 기록해 주세요.</div>' : '') + '</div>';
+    (task ? sessionPackAttendanceHintHtml(task, today(), check, sessionPackAttendanceState(task, today())) : '') +
+    (!att ? '<div class="small muted mt8">오늘 수업 카드에서 23:50 전까지 출결을 기록해 주세요.</div>' : '') + '</div>';
 }
 
 function sessionPackCard(pack) {
@@ -5304,12 +5335,6 @@ function viewSessionPacks() {
   h += sessionPackKpis(rows);
   if (!rows.length) return h + '<div class="card"><div class="empty"><b>🔢</b>지정된 회차제 수업이 없습니다.<br><span class="muted">월제 수업은 정상이며 이 목록에 나타나지 않습니다.</span></div></div>';
   return h + '<div class="session-pack-grid" aria-live="polite">' + rows.map(sessionPackCard).join('') + '</div>';
-}
-
-async function sessionPackConsumptionGroup(taskId, date) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SYNC_APP + '\n' + taskId + '\n' + date));
-  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-  return 'mc_' + hex.slice(0, 48);
 }
 
 async function createSessionPack(button) {
@@ -5385,38 +5410,6 @@ async function closeSessionPack(packId, revision, button) {
     replaceSessionPack(result.pack); rememberSessionPackFocus(packId, ''); render(); toast('회차권을 종료했습니다');
   } catch (error) {
     toast('회차권 종료 실패 — ' + (error.message || error));
-    if (Number(error && error.status) === 409) { sessionPackLoaded = false; loadSessionPacks(true); }
-    if (button && button.isConnected) button.disabled = false;
-  }
-}
-
-async function recordTodaySessionPack(packId, button) {
-  if (!session.isStaffLink) return;
-  const pack = sessionPackRows.find(row => row.packId === packId);
-  if (!pack || pack.teacherId !== session.staffId) return;
-  const check = pack && getCheck(pack.lessonTaskId, today());
-  if (!pack || !check || !['P', 'L', 'A', 'E'].includes(check.att)) return toast('오늘 실제 출결을 먼저 기록해 주세요');
-  if (check.att === 'A') {
-    const absenceType = String(($('#spAbsence-' + packId) || {}).value || '');
-    if (!['approved_absence', 'same_day', 'no_show', 'academy_cancel'].includes(absenceType)) return toast('결석 차감 유형을 선택해 주세요');
-    setCheck(pack.lessonTaskId, today(), { absenceType: absenceType });
-  }
-  const auth = sync.auth();
-  if (!auth) return toast('동기화 인증이 필요합니다');
-  if (button) button.disabled = true;
-  rememberSessionPackFocus(packId, 'sprecord');
-  try {
-    const synced = await sync.run();
-    if (!synced) throw new Error('출결 동기화가 끝난 뒤 다시 시도해 주세요');
-    const result = await sync.post('/session-pack', {
-      app: SYNC_APP, auth: auth, action: 'record', packId: packId, revision: Number(pack.revision),
-      sourceType: 'regular', sourceKey: pack.lessonTaskId + '|' + today(),
-      consumptionGroupId: await sessionPackConsumptionGroup(pack.lessonTaskId, today())
-    });
-    replaceSessionPack(result.pack); render();
-    toast(result.idempotent ? '오늘 출결이 이미 회차에 반영되어 있습니다' : '오늘 출결을 회차에 반영했습니다');
-  } catch (error) {
-    toast('회차 반영 실패 — ' + (error.message || error));
     if (Number(error && error.status) === 409) { sessionPackLoaded = false; loadSessionPacks(true); }
     if (button && button.isConnected) button.disabled = false;
   }
@@ -13139,7 +13132,6 @@ document.addEventListener('click', ev => {
     case 'spadjust': sessionPackAdjustmentModal(String(el.dataset.pack || ''), Number(el.dataset.rev), Number(el.dataset.delta)); break;
     case 'spadjustsubmit': submitSessionPackAdjustment(el); break;
     case 'spclose': closeSessionPack(String(el.dataset.pack || ''), Number(el.dataset.rev), el); break;
-    case 'sprecord': recordTodaySessionPack(String(el.dataset.pack || ''), el); break;
     case 'opssessionnotice': requestGuardianOpsSend(opsSessionTarget(String(el.dataset.pack || ''))); break;
 
     /* 보강 */
@@ -13748,9 +13740,16 @@ document.addEventListener('click', ev => {
       const v = el.dataset.v;
       const attendanceLabel = ATT_LABEL[v] && ATT_LABEL[v][0];
       if (!attendanceLabel || !['P', 'L', 'A', 'E'].includes(v)) break;
+      const attendanceState = sessionPackAttendanceState(t, date);
+      if (attendanceState && attendanceState.locked) {
+        toast('회차제 출결은 당일 23:50에 마감되어 변경할 수 없습니다');
+        render();
+        break;
+      }
       if (!confirm(attendanceLabel + '으로 저장하겠습니까?')) break;
       const next = v;
-      const savedCheck = setCheck(id, date, { att: next });
+      const savedCheck = setCheck(id, date, { att: next, absenceType: '' });
+      settleSync().catch(() => toast('출결은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요'));
       const sourceKey = makeupCreateKey(id, date);
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
       if (next === 'A' && !isMakeupLessonTask(t)) {
@@ -14423,6 +14422,24 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
+  const sessionAbsence = ev.target.closest('[data-session-pack-absence]');
+  if (sessionAbsence) {
+    const taskId = String(sessionAbsence.dataset.id || '');
+    const date = String(sessionAbsence.dataset.date || '');
+    const task = state.tasks.find(row => String(row.id || '') === taskId);
+    const attendanceState = task && sessionPackAttendanceState(task, date);
+    if (!task || !attendanceState || attendanceState.locked) {
+      toast('회차제 출결은 당일 23:50에 마감되어 변경할 수 없습니다');
+      render();
+      return;
+    }
+    const absenceType = String(sessionAbsence.value || '');
+    if (absenceType && !SESSION_PACK_ABSENCE_OPTIONS.some(item => item[0] === absenceType)) return;
+    setCheck(taskId, date, { absenceType });
+    settleSync().catch(() => toast('결석 차감 유형은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요'));
+    toast(absenceType ? '결석 차감 유형을 저장했습니다' : '결석 차감 유형 선택을 지웠습니다');
+    return;
+  }
   const assignmentStudent = ev.target.closest('[data-assignment-request-student]');
   if (assignmentStudent) {
     const draft = currentLessonAssignmentDraft();
@@ -14623,7 +14640,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.7';
+const APP_VER = '2026-08-21.8';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

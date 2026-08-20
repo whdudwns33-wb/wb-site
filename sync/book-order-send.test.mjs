@@ -141,9 +141,10 @@ test('schema and migration are additive, and the send ledger itself stores no ph
   }
 });
 
-test('20:00 KST cron and additive batch mapping are configured without storing phone or message text', () => {
-  assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*"\]/);
+test('20:00 KST book cron remains configured with the 23:50 session cutoff cron', () => {
+  assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*"\]/);
   assert.match(entry, /async scheduled\(controller, env, ctx\)/);
+  assert.match(entry, /controller\.cron === BOOK_ORDER_CRON/);
   assert.match(entry, /handleScheduledBookOrders\(env, controller\.scheduledTime\)/);
   assert.match(batchMigration, /CREATE TABLE IF NOT EXISTS book_order_batch_items/);
   assert.doesNotMatch(batchMigration, /phone|message_body|DROP TABLE|DELETE FROM/i);
