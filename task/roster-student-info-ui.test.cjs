@@ -94,6 +94,20 @@ test('동명이인은 이름을 바꾸지 않고 학교·학년과 필요한 경
   assert.match(source, /selectableStudents\.map\(student =>[\s\S]{0,220}rosterStudentIdentityLabel\(student\)/);
 });
 
+test('관리자 원생 탭의 연락·온라인 프로그램·정기 평가 현황은 기본 접힘 상태다', () => {
+  const view = block('function viewRoster()', '/* ── 직원 관리');
+  for (const [className, title] of [
+    ['roster-contact-status', '연락 현황'],
+    ['roster-online-program', '온라인 프로그램'],
+    ['roster-regular-exam', '정기 평가']
+  ]) {
+    assert.match(view, new RegExp(`<details class="card admin-collapsible ${className}"><summary>[\\s\\S]{0,120}${title}`));
+    assert.doesNotMatch(view, new RegExp(`<details class="card admin-collapsible ${className}" open`));
+  }
+  assert.match(source, /\.admin-collapsible > summary::after \{ content: '펼치기'/);
+  assert.match(source, /\.admin-collapsible\[open\] > summary::after \{ content: '접기'/);
+});
+
 test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 한 번만 남긴다', () => {
   const code = block('function studentLessonReferenceItems(', 'function rosterStudentInfoHtml(');
   const tasks = [
