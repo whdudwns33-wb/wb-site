@@ -62,6 +62,9 @@ test('숙제·준비물은 내부 메모 파싱 없이 전용 필드와 CAS API�
   assert.match(save, /expectedRevision: Number\(current\.revision\) \|\| 0/);
   assert.match(save, /error\.code === 'STALE_REVISION'/);
   assert.match(save, /guardianPublicationDrafts\.set/);
+  assert.doesNotMatch(block, /!GUARDIAN_CONTACT_ENABLED\) return ''/);
+  assert.doesNotMatch(save, /!GUARDIAN_CONTACT_ENABLED\) return toast/);
+  assert.match(block, /학부모 메시지와 보호자 앱 전달은 계속 중지됩니다/);
   assert.doesNotMatch(block, /c\.note|\.note\b|task\.homework|guardianPhone|phone:/);
   assert.match(source, /const GUARDIAN_PORTAL_SCOPE_VERSION = 4/);
 });

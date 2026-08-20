@@ -221,8 +221,8 @@ async function connected(db) {
   return { code: invited.body.code, cookie: exchanged.cookie.split(';')[0] };
 }
 
-test('global guardian pause blocks parent delivery and public sessions before stored access is evaluated', async () => {
-  const db = new TestD1(); seed(db);
+test('global guardian pause blocks parent delivery and sessions but keeps teacher homework storage available', async () => {
+  const db = new TestD1(); seed(db); const today = seedToday(db);
   const disabledEnv = { ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false' };
   const invoke = async (action, body = {}, auth = null) => {
     const response = await handleParentPortal(disabledEnv, 'task', { app: 'task', action, ...body },
@@ -231,7 +231,13 @@ test('global guardian pause blocks parent delivery and public sessions before st
       new Request('https://worker.example/parent-portal'));
     return { status: response.status, body: await response.json() };
   };
-  for (const action of ['invite', 'publication_set', 'announcement_publish', 'exchange', 'view', 'respond', 'submit_request']) {
+  const stored = await invoke('publication_set', {
+    taskId: 'lesson-a', lessonDate: today.date, publicHomework: '연산 2쪽', publicReadiness: '연필',
+    published: true, studentVisible: false, expectedRevision: 0
+  }, { scope: 'own', id: 'staff-a', role: 'staff' });
+  assert.equal(stored.status, 200);
+  assert.equal(stored.body.publication.publicHomework, '연산 2쪽');
+  for (const action of ['invite', 'announcement_publish', 'exchange', 'view', 'respond', 'submit_request']) {
     const result = await invoke(action, {}, action === 'invite' ? { scope: 'all' } : null);
     assert.equal(result.status, 503, action);
     assert.equal(result.body.code, 'GUARDIAN_CONTACT_DISABLED', action);
