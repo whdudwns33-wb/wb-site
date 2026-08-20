@@ -85,6 +85,34 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
   assert.doesNotMatch(mineList, /s\.subject|s\.memo|sessionModeBadgesForStudent/);
 });
 
+test('관리자 원생 수정은 승인 없는 휴원·퇴원·복귀와 복귀 수업 지정을 제공한다', () => {
+  const editor = block('let rosterStudentEditor = null;', '/* ── 신규 학생 30일 적응 관리');
+  assert.match(editor, /data-act="rostertransitionopen" data-operation="leave">휴원/);
+  assert.match(editor, /data-act="rostertransitionopen" data-operation="withdrawal">퇴원/);
+  assert.match(editor, /data-act="rostertransitionopen" data-operation="return">복귀/);
+  assert.match(editor, /if \(!session\.isAdmin/);
+  assert.match(editor, /data-roster-transition-staff/);
+  assert.match(editor, /data-roster-return-subject/);
+  assert.match(editor, /data-roster-return-day/);
+  assert.match(editor, /data-roster-return-time="startTime"/);
+  assert.match(editor, /data-roster-return-time="endTime"/);
+  assert.match(editor, /action: 'student_transition'/);
+  assert.match(editor, /if \(result\.task\) applyCreatedLesson\(result\.task\)/);
+  assert.match(source, /case 'rostertransitionsubmit': submitRosterTransition\(el\)/);
+  assert.match(source, /event\.details\.operation === 'return'/);
+  assert.match(source, /eventLabel === '복귀'/);
+});
+
+test('재원생 목록은 수업 미지정 학생을 가나다순으로 먼저 표시한다', () => {
+  const view = block('function viewRoster()', '/* ── 직원 관리');
+  assert.match(view, /<summary><b>재원생 ' \+ managed\.length \+ '명 · 기본 정보 수정/);
+  assert.match(view, /const hasAssignedLesson = student =>/);
+  assert.match(view, /Number\(hasAssignedLesson\(a\)\) - Number\(hasAssignedLesson\(b\)\)/);
+  assert.match(view, /localeCompare\(String\(b\.name \|\| ''\), 'ko'\)/);
+  assert.match(view, /!assigned \? '<span class="tag warn">수업 미지정<\/span>/);
+  assert.doesNotMatch(view, /등록 원생/);
+});
+
 test('동명이인은 이름을 바꾸지 않고 학교·학년과 필요한 경우 마스킹 보호자 번호로 구분한다', () => {
   const identity = block('function rosterIdentityPart(', 'function studentLinkCandidates(');
   assert.match(identity, /student\.school/);

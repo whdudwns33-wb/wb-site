@@ -96,7 +96,8 @@ function validateRequestShape(body) {
  *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
  *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
 function sendConfiguration(env) {
-  if (!safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
+  if (safeEqual(env.WB_GUARDIAN_CONTACT_ENABLED, 'false') ||
+      !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
       !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
       !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_TEMPLATE_ID || !env.SOLAPI_SENDER_NUMBER) {
     return null;

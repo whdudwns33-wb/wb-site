@@ -221,6 +221,23 @@ async function connected(db) {
   return { code: invited.body.code, cookie: exchanged.cookie.split(';')[0] };
 }
 
+test('global guardian pause blocks parent delivery and public sessions before stored access is evaluated', async () => {
+  const db = new TestD1(); seed(db);
+  const disabledEnv = { ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false' };
+  const invoke = async (action, body = {}, auth = null) => {
+    const response = await handleParentPortal(disabledEnv, 'task', { app: 'task', action, ...body },
+      'https://whdudwns33-wb.github.io', auth,
+      (payload, status) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } }),
+      new Request('https://worker.example/parent-portal'));
+    return { status: response.status, body: await response.json() };
+  };
+  for (const action of ['invite', 'publication_set', 'announcement_publish', 'exchange', 'view', 'respond', 'submit_request']) {
+    const result = await invoke(action, {}, action === 'invite' ? { scope: 'all' } : null);
+    assert.equal(result.status, 503, action);
+    assert.equal(result.body.code, 'GUARDIAN_CONTACT_DISABLED', action);
+  }
+});
+
 test('신규 schema와 운영 027→035 적용 결과의 보호자 공개 구조가 같다', () => {
   const fresh = new DatabaseSync(':memory:');
   const upgraded = new DatabaseSync(':memory:');

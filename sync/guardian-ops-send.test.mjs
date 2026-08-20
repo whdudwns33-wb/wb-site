@@ -951,6 +951,11 @@ test('gate is fail-closed and rolling 24-hour send reservations are capped at 15
   }, { WB_GUARDIAN_OPS_SEND_ENABLED: 'false' });
   assert.equal(disabled.status, 503);
   assert.equal(disabled.body.code, 'SEND_DISABLED');
+  const globallyDisabled = await call(disabledDb, {
+    action: 'send', eventType: 'makeup_proposal', sourceId: 'mu_case1', revision: 2
+  }, { WB_GUARDIAN_OPS_SEND_ENABLED: 'true', WB_GUARDIAN_CONTACT_ENABLED: 'false' });
+  assert.equal(globallyDisabled.status, 503);
+  assert.equal(globallyDisabled.body.code, 'SEND_DISABLED');
 
   const db = new TestD1();
   const { now } = seedBase(db); seedMakeup(db); setConsent(db, 'makeup');

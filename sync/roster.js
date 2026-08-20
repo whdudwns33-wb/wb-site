@@ -1,4 +1,5 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { buildLessonTask } from './lesson-create.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
@@ -10,6 +11,33 @@ const MAX_BOOK_STUDENTS = 5000;
 const ROSTER_SUBJECTS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답'
 ]);
+
+function nextMonthForDate(value) {
+  const [year, monthValue] = String(value || '').slice(0, 7).split('-').map(Number);
+  const monthIndex = year * 12 + monthValue;
+  return String(Math.floor(monthIndex / 12)) + '-' + String(monthIndex % 12 + 1).padStart(2, '0');
+}
+
+function rosterTransition(student) {
+  const match = String(student && student.reason || '').match(/^(휴원|퇴원)\s+(\d{4}-\d{2}-\d{2})(?:\s*·\s*(.*))?$/);
+  if (!match) return null;
+  return { operation: match[1] === '휴원' ? 'leave' : 'withdrawal', effectiveDate: match[2], note: match[3] || '' };
+}
+
+function isLessonTask(value) {
+  return !!value && (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion ||
+    /^\[수업\]/.test(String(value.title || '')));
+}
+
+async function activeStaffRecord(env, app, staffId) {
+  if (!SAFE_ID.test(String(staffId || ''))) return null;
+  const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1').bind(app, staffId).first();
+  if (!row) return null;
+  try {
+    const data = JSON.parse(row.data || '{}');
+    return data && !data.deleted && String(data.name || '').trim() ? { id: String(staffId), name: String(data.name).trim() } : null;
+  } catch (error) { return null; }
+}
 
 function randomEightDigitStudentId() {
   const values = new Uint32Array(1);
@@ -375,7 +403,7 @@ async function boardedStudentConflicts(env, app, document) {
 export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
-  if (!['get', 'replace', 'student_get', 'student_create', 'student_update'].includes(action)) {
+  if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_transition'].includes(action)) {
     return json({ ok: false, error: '지원하지 않는 원생 명단 작업입니다' }, 400, origin);
   }
 
@@ -391,6 +419,172 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const student = document.roster.students.find(item => item.id === studentId);
     if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
     return json({ ok: true, updatedAt: Number(row.updated_at), student }, 200, origin);
+  }
+
+  if (action === 'student_transition') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '휴원·퇴원·복귀는 관리자만 직접 처리할 수 있습니다' }, 403, origin);
+    const expectedUpdatedAt = Number(body.expectedUpdatedAt);
+    const studentId = String(body.studentId || '');
+    const operation = String(body.operation || '');
+    if (!Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 1 || !SAFE_ID.test(studentId)) {
+      return json({ ok: false, error: '원생 명단을 새로고침한 뒤 다시 처리해 주세요' }, 400, origin);
+    }
+    if (!['leave', 'withdrawal', 'return'].includes(operation)) {
+      return json({ ok: false, error: '휴원·퇴원·복귀 중 처리할 상태를 선택해 주세요' }, 400, origin);
+    }
+    let effectiveDate;
+    try { effectiveDate = isoDate(body.effectiveDate, 'effectiveDate'); }
+    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+    const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
+    if (Number(row.updated_at) !== expectedUpdatedAt) {
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
+    }
+    let document;
+    try { document = validateRosterDocument(JSON.parse(row.data)); }
+    catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    const student = document.roster.students.find(item => item.id === studentId);
+    if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
+    const currentTransition = rosterTransition(student);
+    const now = Date.now();
+    const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
+    const audienceStaffIds = [...student.teacherIds];
+    const statements = [];
+    const requiredIndexes = [];
+    let responseTask = null;
+    let eventType = operation;
+    let changedFields;
+    let details;
+
+    if (operation === 'leave' || operation === 'withdrawal') {
+      if (currentTransition) return json({ ok: false, error: '이미 휴원 또는 퇴원 처리된 학생입니다' }, 409, origin);
+      let note;
+      try { note = text(String(body.note || ''), 'note', 430, true); }
+      catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+      const label = operation === 'leave' ? '휴원' : '퇴원';
+      student.end = nextMonthForDate(effectiveDate);
+      student.reason = label + ' ' + effectiveDate + (note ? ' · ' + note : '');
+      changedFields = ['end', 'reason', 'deleted'];
+      details = { effectiveDate, label, note, direct: true };
+      const lessons = await env.DB.prepare(
+        "SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND json_valid(data) " +
+        "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+      ).bind(app, studentId).all();
+      for (const lessonRow of lessons.results || []) {
+        let lesson;
+        try { lesson = JSON.parse(lessonRow.data || '{}'); } catch (error) { continue; }
+        if (!isLessonTask(lesson)) continue;
+        const taskUpdatedAt = Math.max(now, Number(lessonRow.updated_at || 0) + 1);
+        lesson.end = effectiveDate;
+        lesson.deleted = true;
+        lesson.updatedAt = taskUpdatedAt;
+        lesson.lastEditBy = actorRole;
+        requiredIndexes.push(statements.length);
+        statements.push(env.DB.prepare(
+          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
+        ).bind(JSON.stringify(lesson), taskUpdatedAt, taskUpdatedAt, app, lessonRow.id, lessonRow.updated_at));
+        audienceStaffIds.push(String(lessonRow.owner || ''));
+      }
+    } else {
+      if (!currentTransition) return json({ ok: false, error: '휴원생 또는 퇴원생만 복귀 처리할 수 있습니다' }, 409, origin);
+      const staffId = String(body.staffId || '');
+      const staff = await activeStaffRecord(env, app, staffId);
+      if (!staff) return json({ ok: false, error: '복귀 수업을 담당할 재직 선생님을 선택해 주세요' }, 400, origin);
+      let selectedSubjects;
+      try { selectedSubjects = subjects(body.subjects, 'subjects'); }
+      catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+      if (!selectedSubjects.length) return json({ ok: false, error: '복귀 수업 과목을 한 개 이상 선택해 주세요' }, 400, origin);
+      if (!String(student.grade || '').trim()) return json({ ok: false, error: '복귀 전에 원생 기본 정보에서 학년을 입력해 주세요' }, 409, origin);
+      const activeLesson = await env.DB.prepare(
+        "SELECT id FROM tasks WHERE app=? AND json_valid(data) AND json_extract(data,'$.studentId')=? " +
+        "AND COALESCE(json_extract(data,'$.deleted'),0)=0 LIMIT 1"
+      ).bind(app, studentId).first();
+      if (activeLesson) return json({ ok: false, error: '이미 활성 수업이 있습니다. 수업 정보를 확인한 뒤 다시 처리해 주세요' }, 409, origin);
+      let lesson;
+      try {
+        lesson = await buildLessonTask({
+          studentId: student.id, studentName: student.name, grade: student.grade,
+          subject: selectedSubjects.join('·'), className: '', lessonRole: selectedSubjects.join('·'),
+          scheduleText: '', scheduleSlots: body.scheduleSlots, start: effectiveDate,
+          materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음',
+          goal: '없음', parentRequest: '없음', scheduleReviewReason: ''
+        }, staff.id, actorRole, now);
+      } catch (error) {
+        return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin);
+      }
+      const oldTask = await env.DB.prepare('SELECT data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+        .bind(app, lesson.id).first();
+      if (oldTask) {
+        let oldData;
+        try { oldData = JSON.parse(oldTask.data || '{}'); } catch (error) { oldData = null; }
+        if (!oldData || !oldData.deleted) return json({ ok: false, error: '같은 복귀 수업이 이미 등록되어 있습니다' }, 409, origin);
+        lesson.createdAt = Number(oldData.createdAt) || now;
+        lesson.updatedAt = Math.max(now, Number(oldTask.updated_at || 0) + 1);
+        requiredIndexes.push(statements.length);
+        statements.push(env.DB.prepare(
+          'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
+        ).bind(staff.id, JSON.stringify(lesson), lesson.updatedAt, lesson.updatedAt, app, lesson.id, oldTask.updated_at));
+      } else {
+        requiredIndexes.push(statements.length);
+        statements.push(env.DB.prepare(
+          'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+        ).bind(app, lesson.id, staff.id, JSON.stringify(lesson), lesson.updatedAt, lesson.updatedAt));
+      }
+      student.end = '';
+      student.reason = '';
+      student.teacherIds = [staff.id];
+      student.teacher = staff.name;
+      student.subjects = selectedSubjects;
+      student.subject = selectedSubjects.join('·');
+      document.bookStudents.forEach(assignment => {
+        if (assignment.studentId !== studentId) return;
+        assignment.teacherIds = [staff.id];
+        assignment.teacher = staff.name;
+      });
+      audienceStaffIds.push(staff.id);
+      eventType = 'student_information';
+      changedFields = ['end', 'reason', 'teacherIds', 'subject', 'subjects', 'scheduleSlots'];
+      details = {
+        operation: 'return', effectiveDate, label: '복귀', afterStaffName: staff.name,
+        subjects: selectedSubjects, scheduleText: lesson.scheduleText, direct: true,
+        beforeStatus: currentTransition.operation
+      };
+      responseTask = lesson;
+    }
+
+    document.roster.updated = new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try { document = validateRosterDocument(document); }
+    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 409, origin); }
+    const inactiveIds = await inactiveTeacherIds(env, app, document);
+    if (inactiveIds.length) return json({ ok: false, error: '재직 중인 담당 선생님만 선택해 주세요' }, 400, origin);
+    const boardedConflicts = await boardedStudentConflicts(env, app, document);
+    if (boardedConflicts.length) return json({ ok: false, code: 'BOARDING_LOCK', error: '탑승 후 미하차 상태인 학생은 지금 변경할 수 없습니다' }, 409, origin);
+    const issueConflicts = await activeBookIssueConflicts(env, app, document);
+    if (issueConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ISSUE_CONFLICT', error: '출고 진행 중인 교재가 있어 지금 변경할 수 없습니다' }, 409, origin);
+    const orderConflicts = await activeBookOrderConflicts(env, app, document);
+    if (orderConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT', error: '미완료 교재 주문이 있어 지금 변경할 수 없습니다' }, 409, origin);
+    const rosterUpdatedAt = Math.max(now, Number(row.updated_at || 0) + 1);
+    requiredIndexes.push(statements.length);
+    statements.push(env.DB.prepare(
+      'UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?'
+    ).bind(JSON.stringify(document), rosterUpdatedAt, app, row.updated_at));
+    const eventId = await studentChangeEventId('roster-transition\n' + studentId + '\n' + operation + '\n' + expectedUpdatedAt + '\n' + rosterUpdatedAt);
+    statements.push(studentChangeEventStatement(env, app, {
+      eventId, studentId, taskId: responseTask && responseTask.id || null, eventType, changedFields, details,
+      audienceStaffIds, effectiveDate, requiresAck: true, changedAt: rosterUpdatedAt,
+      changedBy: studentChangeActorKey(auth)
+    }));
+    let applied;
+    try { applied = await env.DB.batch(statements); }
+    catch (error) {
+      if (isBoardingLockError(error)) return json({ ok: false, code: 'BOARDING_LOCK', error: '탑승 후 미하차 상태인 학생은 지금 변경할 수 없습니다' }, 409, origin);
+      if (isActiveBookOrderConflictError(error)) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT', error: '미완료 교재 주문이 있어 지금 변경할 수 없습니다' }, 409, origin);
+      throw error;
+    }
+    if (!requiredIndexes.every(index => Number(applied[index] && applied[index].meta && applied[index].meta.changes || 0) === 1)) {
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
+    }
+    return json({ ok: true, updatedAt: rosterUpdatedAt, student: withoutTeacherIds(student), task: responseTask }, 200, origin);
   }
 
   if (action === 'student_create' || action === 'student_update') {
