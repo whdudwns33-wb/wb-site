@@ -104,8 +104,8 @@ function phone(value, path) {
 }
 
 function subjects(value, path) {
-  if (!Array.isArray(value) || !value.length || value.length > ROSTER_SUBJECTS.size) {
-    fail(path, '등록과목을 1개 이상 선택해 주세요');
+  if (!Array.isArray(value) || value.length > ROSTER_SUBJECTS.size) {
+    fail(path, '등록과목 배열을 확인해 주세요');
   }
   const result = value.map((item, index) => text(item, path + '[' + index + ']', 20, false));
   if (new Set(result).size !== result.length) fail(path, '중복 과목이 있습니다');
@@ -113,11 +113,26 @@ function subjects(value, path) {
   return result;
 }
 
-function teacherIds(value, path) {
-  if (!Array.isArray(value) || !value.length || value.length > 20) fail(path, '1~20개의 직원 ID 배열이어야 합니다');
+function teacherIds(value, path, empty) {
+  if (!Array.isArray(value) || (!empty && !value.length) || value.length > 20) {
+    fail(path, (empty ? '0~20개' : '1~20개') + '의 직원 ID 배열이어야 합니다');
+  }
   const result = value.map((item, index) => id(item, path + '[' + index + ']'));
   if (new Set(result).size !== result.length) fail(path, '중복 ID가 있습니다');
   return result;
+}
+
+function identityText(value) {
+  return String(value == null ? '' : value).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
+}
+
+function identityPhone(value) {
+  return String(value == null ? '' : value).replace(/\D/g, '');
+}
+
+export function studentRegistrationIdentityKey(value) {
+  const parentPhones = [...new Set([identityPhone(value && value.phoneFather), identityPhone(value && value.phoneMother)].filter(Boolean))].sort();
+  return [identityText(value && value.name), identityText(value && value.school), identityText(value && value.grade), parentPhones.join(',')].join('\u0000');
 }
 
 function rosterStudent(value, index) {
@@ -132,13 +147,13 @@ function rosterStudent(value, index) {
   const result = {
     id: id(value.id, path + '.id'),
     name: text(value.name, path + '.name', 40, false),
-    grade: text(value.grade, path + '.grade', 20, false),
-    teacher: text(value.teacher, path + '.teacher', 200, false),
-    subject: text(value.subject, path + '.subject', 200, false),
+    grade: text(value.grade, path + '.grade', 20, true),
+    teacher: text(value.teacher, path + '.teacher', 200, true),
+    subject: text(value.subject, path + '.subject', 200, true),
     start,
     end,
     reason: text(value.reason, path + '.reason', 500, true),
-    teacherIds: teacherIds(value.teacherIds, path + '.teacherIds')
+    teacherIds: teacherIds(value.teacherIds, path + '.teacherIds', true)
   };
   if (Object.prototype.hasOwnProperty.call(value, 'memo')) result.memo = text(value.memo, path + '.memo', 1000, true);
   if (Object.prototype.hasOwnProperty.call(value, 'school')) result.school = text(value.school, path + '.school', 80, true);
@@ -408,10 +423,11 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
     const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
+    const nextIdentityKey = studentRegistrationIdentityKey(nextStudent);
     const same = document.roster.students.find(item => item.id !== nextStudent.id &&
-      String(item.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.name).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') &&
-      String(item.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko') === String(nextStudent.grade).normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko'));
-    if (same) return json({ ok: false, code: 'STUDENT_ALREADY_EXISTS', error: '같은 이름과 학년의 원생이 이미 있습니다. 기존 원생을 선택해 주세요', studentId: same.id }, 409, origin);
+      studentRegistrationIdentityKey(item) === nextIdentityKey);
+    if (same) return json({ ok: false, code: 'STUDENT_ALREADY_EXISTS',
+      error: '같은 이름·학교·학년·보호자 연락처의 원생이 이미 있습니다. 기존 원생을 선택해 주세요', studentId: same.id }, 409, origin);
     if (action === 'student_create') {
       if (index >= 0) return json({ ok: false, code: 'STUDENT_ID_EXISTS', error: '이미 등록된 원생 ID입니다. 명단을 새로고침해 주세요' }, 409, origin);
       document.roster.students.push(nextStudent);

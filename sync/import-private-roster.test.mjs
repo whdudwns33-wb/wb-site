@@ -153,6 +153,25 @@ test('a supplied id for a fresh roster must be an eight-digit number', () => {
   );
 });
 
+test('same-name students use school, grade, then parent contacts as their registration identity', () => {
+  const input = sources();
+  input.rosterSource.students = [
+    { name: '동명학생', school: '가초', grade: '3', phoneMother: '010-1111-1111', teacher: '가선생', subject: '', start: '2026-08', end: '', reason: '' },
+    { name: '동명학생', school: '나초', grade: '3', phoneMother: '010-2222-2222', teacher: '가선생', subject: '', start: '2026-08', end: '', reason: '' },
+    { name: '동명학생', school: '나초', grade: '3', phoneMother: '010-3333-3333', teacher: '가선생', subject: '', start: '2026-08', end: '', reason: '' }
+  ];
+  input.textbooksSource.students = [];
+  const document = buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids(), makeStudentId: studentIds() });
+  assert.equal(document.roster.students.length, 3);
+  assert.deepEqual(document.roster.students.map(row => row.name), ['동명학생', '동명학생', '동명학생']);
+
+  input.rosterSource.students.push({ ...input.rosterSource.students[2] });
+  assert.throws(
+    () => buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids(), makeStudentId: studentIds() }),
+    { message: 'ROSTER_IDENTITY_COLLISION' }
+  );
+});
+
 test('build rejects a missing teacher without putting the name in the error', () => {
   const input = sources();
   input.rosterSource.students[0].teacher = '없는선생';
