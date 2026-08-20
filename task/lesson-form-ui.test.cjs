@@ -12,7 +12,7 @@ test('task inline application script parses', () => {
   assert.doesNotThrow(() => new Function(html.slice(start, end)));
 });
 
-test('teachers get an own-scope three-section lesson route', () => {
+test('teachers get an own-scope four-step lesson route', () => {
   assert.match(html, /\['today', '오늘 할 일'\],[\s\S]{0,180}\['lesson', '수업 등록'\]/);
   assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /\['feedback', '피드백 상태'\]/);
@@ -21,9 +21,10 @@ test('teachers get an own-scope three-section lesson route', () => {
   assert.match(html, /staffId: session\.isStaffLink && !session\.isAdmin \? session\.staffId : ''/);
   assert.match(html, /if \(session\.isStaffLink && !session\.isAdmin\) lessonDraft\.staffId = session\.staffId/);
   assert.match(html, /sync\.post\('\/lesson-create'/);
-  for (const key of ['subject', 'className', 'scheduleText']) {
+  for (const key of ['scheduleText']) {
     assert.ok(html.includes(`lessonTextField('${key}'`), key);
   }
+  assert.match(html, /data-lesson-subject/);
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
   const view = html.slice(viewStart, viewEnd);
@@ -61,7 +62,15 @@ test('lesson edits send sourceTaskId as top-level optimistic-update metadata', (
 
 test('admin lesson registration requires an explicit teacher selection', () => {
   assert.match(html, /<option value="">선생님을 선택하세요<\/option>/);
+  assert.match(html, /const teacherReady = !!draft\.studentId && ROSTER_SUBJECT_OPTIONS\.includes/);
+  assert.match(html, /data-lesson-field="staffId"' \+ \(teacherReady \? '' : ' disabled'\)/);
   assert.match(html, /if \(session\.isAdmin && !draft\.staffId\) return toast\('담당 선생님을 선택해 주세요'\)/);
+  assert.match(html, /선생님으로 자동 지정됩니다/);
+  const previewStart = html.indexOf('function previewLessonRegistration()');
+  const previewEnd = html.indexOf('function applyCreatedLesson(', previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  assert.ok(preview.indexOf('if (!selected)') < preview.indexOf("return toast('이번 수업 과목을 한 개 선택해 주세요')"));
+  assert.ok(preview.indexOf("return toast('이번 수업 과목을 한 개 선택해 주세요')") < preview.indexOf("return toast('담당 선생님을 선택해 주세요')"));
 });
 
 test('admin direct lesson registration reuses the new-student information fields and saves roster before lesson', () => {
@@ -71,7 +80,8 @@ test('admin direct lesson registration reuses the new-student information fields
   for (const key of ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'memo']) {
     assert.match(fields, new RegExp(`data-lesson-roster-field="${key}"`), key);
   }
-  assert.match(fields, /data-lesson-roster-teacher/);
+  assert.doesNotMatch(fields, /data-lesson-roster-teacher/);
+  assert.match(fields, /info\.teacherIds \|\| \[\]\)\.map\(String\)\.concat\(String\(draft\.staffId/);
   for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
     assert.match(html, new RegExp(subject));
   }
@@ -83,15 +93,16 @@ test('admin direct lesson registration reuses the new-student information fields
   assert.match(save, /원생 기본 정보는 저장됐습니다/);
 });
 
-test('admin direct lesson registration removes duplicate subject fields and free-text schedule input', () => {
+test('direct lesson registration follows student, subject, teacher, schedule order', () => {
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
   const view = html.slice(viewStart, viewEnd);
-  assert.match(view, /personal \? '<div class="sect">2\. 과목·반/);
   assert.match(view, /personal \? lessonTextField\('scheduleText',[\s\S]{0,160} : ''/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
-  assert.match(view, /<div class="sect">3\. 수업 요일·시간/);
-  assert.doesNotMatch(view, /<div class="sect">[4-9]\./);
+  assert.match(view, /<div class="sect">4\. 수업 요일·시간/);
+  assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
+  assert.match(view, /학생 → 수업 과목 → 담당 선생님 → 수업 요일·시간 순서/);
+  assert.match(view, /admin-collapsible-body">' \+ studentFields \+\s*lessonSubjectSelectionHtml\(\) \+\s*staffSelect \+/);
   assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 정보 등록<\/b>/);
   assert.match(view, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
   assert.match(view, /return directRegistration \+ reviews/);
@@ -128,21 +139,34 @@ test('lesson registration interactions update only the form panel and preserve i
   assert.match(studentHandler, /refreshLessonDirectEntry\(true\)/);
 });
 
-test('admin direct lesson registration reuses the new-student multi-subject selector', () => {
+test('each lesson selects one subject while preserving the student multi-subject roster', () => {
   const subjectStart = html.indexOf('function lessonSubjectSelectionHtml()');
   const subjectEnd = html.indexOf('function lessonRosterInformationHtml()', subjectStart);
   const subjectView = html.slice(subjectStart, subjectEnd);
-  assert.match(subjectView, /2\. 등록과목/);
+  assert.match(subjectView, /2\. 수업 과목 선택/);
   assert.match(subjectView, /ROSTER_SUBJECT_OPTIONS\.map/);
-  assert.match(subjectView, /data-lesson-roster-subject/);
+  assert.match(subjectView, /type="radio" name="lesson-course-subject" data-lesson-subject/);
   assert.match(subjectView, /disabled/);
-  assert.match(subjectView, /원생 정보와 이번 수업 정보에 함께 반영/);
-  const changeStart = html.indexOf("const lessonRosterSubject = ev.target.closest('[data-lesson-roster-subject]')");
-  const changeEnd = html.indexOf("const lessonRosterTeacher", changeStart);
+  assert.match(subjectView, /현재 원생 등록과목/);
+  assert.match(subjectView, /한 과목만 선택/);
+  const changeStart = html.indexOf("const lessonSubject = ev.target.closest('[data-lesson-subject]')");
+  const changeEnd = html.indexOf("const lessonStudent", changeStart);
   const change = html.slice(changeStart, changeEnd);
-  assert.match(change, /info\.subjects = subjects/);
-  assert.match(change, /draft\.subject = subjects\.join\('·'\)/);
-  assert.match(html, /draft\.subject = lessonPreviewRosterStudent\.subjects\.join\('·'\)/);
+  assert.match(change, /draft\.subject = String\(lessonSubject\.value\)/);
+  assert.match(change, /session\.isAdmin\) draft\.staffId = ''/);
+  assert.match(change, /refreshLessonDirectEntry\(true\)/);
+  assert.doesNotMatch(change, /\brender\(/);
+  const payloadStart = html.indexOf('function lessonRosterStudentPayload(');
+  const payloadEnd = html.indexOf('function lessonRosterStudentChanged(', payloadStart);
+  const payload = html.slice(payloadStart, payloadEnd);
+  assert.match(payload, /const rosterSubjects = \(info\.subjects \|\| \[\]\)/);
+  assert.match(payload, /rosterSubjects\.concat\(ROSTER_SUBJECT_OPTIONS\.includes\(lessonSubject\) \? \[lessonSubject\] : \[\]\)/);
+  assert.doesNotMatch(html, /draft\.subject = lessonPreviewRosterStudent\.subjects\.join\('·'\)/);
+  const studentStart = html.indexOf("const lessonStudent = ev.target.closest('[data-lesson-student]')");
+  const studentEnd = html.indexOf('const onboardingDate', studentStart);
+  const studentChange = html.slice(studentStart, studentEnd);
+  assert.match(studentChange, /if \(studentChanged\)[\s\S]{0,180}draft\.subject = ''/);
+  assert.match(studentChange, /if \(session\.isAdmin\) draft\.staffId = ''/);
 });
 
 test('feedback workflow is visibly paused and remains blocked in the stale click handler', () => {
