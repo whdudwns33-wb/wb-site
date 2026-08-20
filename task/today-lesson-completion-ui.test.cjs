@@ -61,15 +61,20 @@ test('학생정보 업무지시는 stable studentId로 원생 탭과 같은 정�
   const start = source.indexOf('function lessonWorkInstructionHtml(');
   const end = source.indexOf('/* 보호자 공개 내용은', start);
   const briefing = source.slice(start, end);
+  const work = source.slice(start, source.indexOf('function showTodayLessonBriefing(', start));
   assert.match(briefing, /const stableStudentId = String\(task\.studentId \|\| ''\)/);
   assert.match(briefing, /String\(row\.id\) === stableStudentId/);
-  assert.match(briefing, /rosterStudentInfoHtml\(student, studentLessonReferenceItems\(student\.id\)\)/);
+  assert.match(briefing, /rosterStudentInfoHtml\(student, \[\], task\.id\)/);
   assert.match(briefing, /modal\('학생정보 · 업무지시'/);
   assert.match(briefing, /data-act="lessonbriefingedit"[\s\S]{0,180}학생정보 · 업무지시 수정/);
   assert.match(briefing, /수업 정보 수정/);
-  for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청', '업무지시']) {
+  for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청']) {
     assert.ok(briefing.includes(`['${label}'`), label);
   }
+  for (const duplicate of ['업무 제목', '수업일', '등록 시간', '업무 상세', "['업무지시'", '기존 수업 참고 단계', '목표 수량']) {
+    assert.doesNotMatch(work, new RegExp(duplicate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), duplicate);
+  }
+  assert.ok(briefing.indexOf('lessonWorkInstructionHtml(task, lessonDate)') < briefing.indexOf('lesson-briefing-student'));
   assert.doesNotMatch(briefing, /rosterStudentMatches|studentName\).*find|studentOf\(task\).*find/);
 });
 
@@ -77,7 +82,7 @@ test('관리자는 학생 공통 정보와 현재 수업 업무지시를 한 화
   const start = source.indexOf('let lessonBriefingEditor = null;');
   const end = source.indexOf('/* 보호자 공개 내용은', start);
   const editor = source.slice(start, end);
-  assert.match(editor, /학생 공통 정보와 이 수업의 업무지시를 한 번에 수정합니다/);
+  assert.match(editor, /이 수업의 업무지시와 학생 공통 정보를 한 번에 수정합니다/);
   for (const key of ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'start', 'memo']) {
     assert.match(editor, new RegExp(`data-lesson-briefing-student="${key}"`), key);
   }
@@ -94,6 +99,7 @@ test('관리자는 학생 공통 정보와 현재 수업 업무지시를 한 화
   assert.ok(editor.indexOf("sync.post('/roster'") < editor.indexOf("sync.post('/lesson-create'"));
   assert.match(editor, /\|\| '없음'/);
   assert.match(editor, /출결·수업 메모·보호자 공개 숙제와 준비물은 수업진행에서 입력합니다/);
+  assert.match(editor, /instructionEditorHtml \+ studentHtml/);
   assert.match(source, /case 'lessonbriefingedit': openLessonBriefingEditor/);
   assert.match(source, /case 'lessonbriefingsave': saveLessonBriefingEditor/);
 });
@@ -120,6 +126,8 @@ test('수업진행은 출결을 최상단에 두고 기존 교사 기능을 모�
   assert.match(panel, /<details class="lesson-progress-section lesson-progress-details"><summary>수업 5단계 진행<\/summary>/);
   assert.match(panel, /수업 메모\(실제 진도 및 특이사항\)/);
   assert.match(panel, /<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 \(보호자 · 학생 공개\)<\/summary>/);
+  assert.match(panel, /canEditPublication \? guardianPublicationHtml\(t, date\) :[\s\S]{0,160}guardianPublicationAccessHint\(t, date\)/);
+  assert.doesNotMatch(panel, /if \(canEditGuardianPublication\(t, date\)\)/);
   assert.doesNotMatch(panel, /<details class="lesson-progress-section lesson-progress-details"\s+open/);
   assert.doesNotMatch(panel, /data-act="lessonedit"/);
   assert.match(panel, /lesson\s*\? \(canProposeLessonChange\(t\)[\s\S]{0,240}: \(canEditTask\(t\)/);
