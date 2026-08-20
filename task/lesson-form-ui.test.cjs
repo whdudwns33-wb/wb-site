@@ -36,16 +36,12 @@ test('teachers get an own-scope three-section lesson route', () => {
   assert.match(html, /stable studentId로 연결합니다/);
 });
 
-test('admin publication readiness audit uses simplified server reasons and an explicit stable-student repair flow', () => {
-  assert.match(html, /action: 'publication_readiness_list'/);
-  assert.match(html, /숙제·준비물 공개 설정 누락 수업/);
-  assert.match(html, /publicationReadinessReasonHtml\(row, 'studentId', 'studentId'/);
-  assert.match(html, /publicationReadinessReasonHtml\(row, 'staffId', '담당자'/);
-  assert.match(html, /publicationReadinessReasonHtml\(row, 'schedule', '수업 형식'/);
-  assert.match(html, /data-publication-student/);
-  assert.match(html, /data-act="publicationlessonfix"/);
-  assert.match(html, /lessonDraft\.studentId = student\.id/);
-  assert.match(html, /lessonDraft\.staffId = row\.taskOwner/);
+test('admin lesson screen omits the publication-readiness audit', () => {
+  const viewStart = html.indexOf('function viewLessonEntry()');
+  const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
+  const view = html.slice(viewStart, viewEnd);
+  assert.doesNotMatch(view, /publicationReadinessHtml\(\)/);
+  assert.doesNotMatch(view, /숙제·준비물 공개 설정 누락 수업/);
 });
 
 test('guardian publication editor activates for an assigned stable-student lesson today without schedule-slot requirements', () => {
@@ -96,6 +92,10 @@ test('admin direct lesson registration removes duplicate subject fields and free
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
   assert.match(view, /<div class="sect">3\. 수업 요일·시간/);
   assert.doesNotMatch(view, /<div class="sect">[4-9]\./);
+  assert.match(view, /<details class="card admin-collapsible lesson-direct-entry"><summary><span><b>수업 정보 등록<\/b>/);
+  assert.doesNotMatch(view, /lesson-direct-entry" open/);
+  assert.match(view, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
+  assert.match(view, /return directRegistration \+ reviews/);
 });
 
 test('admin direct lesson registration reuses the new-student multi-subject selector', () => {

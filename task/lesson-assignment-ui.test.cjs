@@ -21,7 +21,7 @@ test('empty personal roster offers a director-approved assignment request', () =
 
 test('teachers can request another student even after one student is assigned', () => {
   assert.match(source, /다른 학생 배정 요청/);
-  assert.match(source, /personal \? lessonAssignmentRequestHtml\(\) : publicationReadinessHtml\(\) \+ viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
+  assert.match(source, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
   assert.match(source, /data-assignment-request-name/);
   assert.match(source, /data-assignment-request-grade/);
   const entry = source.match(/function viewLessonEntry\(\)[\s\S]*?\n\}/)?.[0] || '';
