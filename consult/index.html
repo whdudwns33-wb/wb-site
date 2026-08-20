@@ -1083,12 +1083,12 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터' }
+    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0 }
   };
 }
 
 const LOCAL_AUTH_SETTINGS = Object.freeze([
-  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt'
+  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt', 'dataGeneration'
 ]);
 function sanitizedBackupState(source) {
   const copy = JSON.parse(JSON.stringify(source || blankState()));
@@ -1515,6 +1515,7 @@ const sync = {
       const error = new Error((d && d.error) || ('HTTP ' + res.status));
       error.status = res.status;
       error.code = d && d.code;
+      error.dataGeneration = d && d.dataGeneration;
       throw error;
     }
     return d;
@@ -1532,9 +1533,11 @@ const sync = {
         const batch = pending.splice(0, 400);
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
+          dataGeneration: Number(state.settings.dataGeneration) || 0,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
+        if (Number.isSafeInteger(Number(d.dataGeneration))) state.settings.dataGeneration = Number(d.dataGeneration);
         applied += this.apply(d.changes);
         state.settings.pullAt = d.now;
         more = !!d.more;
@@ -1560,6 +1563,19 @@ const sync = {
       if (this.dirty) queueSync();
     } catch (e) {
       console.warn('sync', e);
+      if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
+        state.staff = [];
+        state.tasks = [];
+        state.checks = {};
+        state.settings.pullAt = 0;
+        state.settings.pushAt = 0;
+        state.settings.dataGeneration = Number(e.dataGeneration);
+        save();
+        this.dirty = false;
+        this.err = '';
+        if (typeof location !== 'undefined' && typeof location.reload === 'function') location.reload();
+        return;
+      }
       if (auth.mode === 'admin_device' && e.status === 401) {
         state.settings.adminToken = '';
         save(); session.lock(); render();
