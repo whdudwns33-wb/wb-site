@@ -552,6 +552,27 @@ async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
 
+  let dataGeneration = 0;
+  try {
+    const generationRow = await env.DB.prepare(
+      'SELECT generation FROM app_data_generations WHERE app=? LIMIT 1'
+    ).bind(app).first();
+    const storedGeneration = Number(generationRow && generationRow.generation);
+    dataGeneration = Number.isSafeInteger(storedGeneration) && storedGeneration >= 0 ? storedGeneration : 0;
+  } catch (error) {
+    // migration 적용 전의 로컬 테스트 DB만 기존 0세대로 호환한다.
+    if (!/no such table.*app_data_generations/i.test(String(error && error.message || error))) throw error;
+  }
+  const requestedGeneration = body.dataGeneration == null ? 0 : Number(body.dataGeneration);
+  if (!Number.isSafeInteger(requestedGeneration) || requestedGeneration < 0 || requestedGeneration !== dataGeneration) {
+    return json({
+      ok: false,
+      code: 'DATA_GENERATION_MISMATCH',
+      dataGeneration,
+      error: '운영 데이터가 새 세대로 전환되었습니다. 기기 캐시를 비운 뒤 다시 동기화합니다'
+    }, 409, origin);
+  }
+
   const now = Date.now();
   const since = Number(body.since) || 0;
   const changes = Array.isArray(body.changes) ? body.changes : [];
@@ -681,7 +702,7 @@ async function handleSync(env, app, body, origin) {
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
   const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
-  return json({ ok: true, now: nextSince, more: more, changes: out, authRole }, 200, origin);
+  return json({ ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration }, 200, origin);
 }
 
 async function handleToken(env, app, body, origin) {

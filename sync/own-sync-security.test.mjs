@@ -28,6 +28,9 @@ class FakeDB {
   }
   task(id) { return JSON.parse(this.tasks.get(id).data); }
   async first(sql, args) {
+    if (sql.startsWith('SELECT generation FROM app_data_generations')) {
+      return { generation: 0 };
+    }
     if (sql.startsWith('SELECT staff_id FROM tokens')) {
       return args[2] === 'teacher-token' ? { staff_id: 'teacher-1' } : null;
     }
