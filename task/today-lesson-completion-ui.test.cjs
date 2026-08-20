@@ -65,12 +65,37 @@ test('학생정보 업무지시는 stable studentId로 원생 탭과 같은 정�
   assert.match(briefing, /String\(row\.id\) === stableStudentId/);
   assert.match(briefing, /rosterStudentInfoHtml\(student, studentLessonReferenceItems\(student\.id\)\)/);
   assert.match(briefing, /modal\('학생정보 · 업무지시'/);
-  assert.match(briefing, /원생 기본 정보 수정/);
+  assert.match(briefing, /data-act="lessonbriefingedit"[\s\S]{0,180}학생정보 · 업무지시 수정/);
   assert.match(briefing, /수업 정보 수정/);
   for (const label of ['과목·반', '수업 요일·시간', '교재·현재 진도', '온라인 프로그램', '숙제 루틴과 수행률', '학생 특징', '목표', '특이사항·학부모 요청', '업무지시']) {
     assert.ok(briefing.includes(`['${label}'`), label);
   }
   assert.doesNotMatch(briefing, /rosterStudentMatches|studentName\).*find|studentOf\(task\).*find/);
+});
+
+test('관리자는 학생 공통 정보와 현재 수업 업무지시를 한 화면에서 수정한다', () => {
+  const start = source.indexOf('let lessonBriefingEditor = null;');
+  const end = source.indexOf('/* 보호자 공개 내용은', start);
+  const editor = source.slice(start, end);
+  assert.match(editor, /학생 공통 정보와 이 수업의 업무지시를 한 번에 수정합니다/);
+  for (const key of ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'start', 'memo']) {
+    assert.match(editor, new RegExp(`data-lesson-briefing-student="${key}"`), key);
+  }
+  assert.match(editor, /data-lesson-briefing-subject/);
+  assert.match(editor, /data-lesson-briefing-teacher/);
+  assert.match(editor, /data-lesson-briefing-instruction=/);
+  for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) {
+    assert.match(editor, new RegExp(`'${key}'`), key);
+  }
+  assert.match(editor, /action: 'student_get', studentId: String\(studentId\)/);
+  assert.match(editor, /String\(currentTask\.studentId \|\| ''\) !== String\(result\.student && result\.student\.id \|\| ''\)/);
+  assert.match(editor, /action: 'student_update', expectedUpdatedAt: editor\.expectedRosterUpdatedAt/);
+  assert.match(editor, /sourceTaskId: editor\.taskId, expectedUpdatedAt: editor\.expectedTaskUpdatedAt/);
+  assert.ok(editor.indexOf("sync.post('/roster'") < editor.indexOf("sync.post('/lesson-create'"));
+  assert.match(editor, /\|\| '없음'/);
+  assert.match(editor, /출결·수업 메모·보호자 공개 숙제와 준비물은 수업진행에서 입력합니다/);
+  assert.match(source, /case 'lessonbriefingedit': openLessonBriefingEditor/);
+  assert.match(source, /case 'lessonbriefingsave': saveLessonBriefingEditor/);
 });
 
 test('학생정보 업무지시 팝업은 구형 태블릿에서도 세로 터치 스크롤이 된다', () => {
