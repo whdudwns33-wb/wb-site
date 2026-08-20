@@ -12,25 +12,42 @@ test('personal lesson entry requires selecting an assigned stable student', () =
 });
 
 test('empty personal roster offers a director-approved assignment request', () => {
-  assert.match(source, /담당 학생 배정 요청/);
+  assert.match(source, /담당 원생 배정 요청/);
   assert.match(source, /\/lesson-assignment-request/);
   assert.match(source, /\/lesson-assignment-review/);
   assert.match(source, /data-lar-student/);
-  assert.match(source, /담당 학생을 연결했습니다/);
+  assert.match(source, /담당 원생을 연결하고 수업을 생성했습니다/);
 });
 
-test('teachers can request another student even after one student is assigned', () => {
-  assert.match(source, /다른 학생 배정 요청/);
+test('teachers select an active stable student and request a complete lesson assignment', () => {
+  assert.match(source, /data-assignment-request-student/);
+  assert.match(source, /data-assignment-search/);
+  assert.match(source, /data-assignment-subject/);
+  assert.match(source, /data-assignment-slot/);
+  assert.match(source, /data-assignment-start/);
+  assert.match(source, /data-assignment-reason/);
+  assert.match(source, /studentId: selected\.id/);
+  assert.match(source, /subjects: draft\.subjects, scheduleSlots: draft\.scheduleSlots, startDate: draft\.startDate/);
+  assert.match(source, /승인되면 담당 원생 연결과 수업 생성이 함께 완료됩니다/);
   assert.match(source, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
-  assert.match(source, /data-assignment-request-name/);
-  assert.match(source, /data-assignment-request-grade/);
+  assert.doesNotMatch(source, /data-assignment-request-name/);
   const entry = source.match(/function viewLessonEntry\(\)[\s\S]*?\n\}/)?.[0] || '';
   assert.ok(entry.indexOf('loadLessonAssignmentRequests(false)') < entry.indexOf('if (personal && !personalStudents.length)'));
+});
+
+test('teachers can send a separate missing-roster request without creating a student', () => {
+  assert.match(source, /원생 명단에 없음/);
+  assert.match(source, /data-assignment-missing="missingName"/);
+  assert.match(source, /data-assignment-missing="missingSchool"/);
+  assert.match(source, /data-assignment-missing="missingGrade"/);
+  assert.match(source, /action: 'submit_missing'/);
 });
 
 test('review shows teacher names, exact matches first, and every other active roster student', () => {
   assert.match(source, /요청 선생님: /);
   assert.doesNotMatch(source, /요청 선생님 ID:/);
+  assert.match(source, /담당 연결 · 수업 생성 승인/);
+  assert.match(source, /if \(details\)/);
   assert.match(source, /요청과 일치하는 원생/);
   assert.match(source, /const others = students\.filter\(student => !matchIds\.has\(String\(student\.id\)\)\)/);
   assert.match(source, /<optgroup label="재원생 전체">/);
