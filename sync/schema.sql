@@ -81,6 +81,17 @@ CREATE TABLE IF NOT EXISTS bootstrap_codes (
 CREATE INDEX IF NOT EXISTS idx_bootstrap_staff
   ON bootstrap_codes(app, staff_id, revoked, expires_at);
 
+-- 학생 체계 초기화 세대. 다른 세대의 generic sync 쓰기는 적용 전에 거절한다.
+CREATE TABLE IF NOT EXISTS app_data_generations (
+  app TEXT PRIMARY KEY CHECK (app IN ('task', 'consult')),
+  generation INTEGER NOT NULL DEFAULT 0 CHECK (generation >= 0),
+  updated_at INTEGER NOT NULL
+);
+
+INSERT OR IGNORE INTO app_data_generations(app, generation, updated_at) VALUES
+  ('task', 0, 0),
+  ('consult', 0, 0);
+
 -- 학부모 피드백 문구의 검토 요청 원장.
 -- 원장 지시(2026-08)로 별도 승인 클릭 없이 제출 즉시 카카오 알림톡 실발송을 시도한다.
 -- status는 그 시도 결과다 — 'sent'는 성공, 'content_approved_send_blocked'는 "아직 안 나감"
