@@ -37,8 +37,12 @@ test('student information request and independent change acknowledgement are ava
   assert.match(source, /action: 'acknowledge', studentId: String\(studentId\)/);
 });
 
-test('red N is rendered for pending student or work-instruction fields and disappears without pending events', () => {
-  assert.match(source, /\.new-marker \{[^}]*background:#D92D20/);
+test('plain red N is rendered for pending student or work-instruction fields and disappears without pending events', () => {
+  assert.match(source, /\.new-marker \{[^}]*color:#D92D20/);
+  assert.doesNotMatch(source, /\.new-marker \{[^}]*border-radius:50%/);
+  assert.doesNotMatch(source, /\.new-marker \{[^}]*background:#D92D20/);
+  assert.match(source, /\.lesson-card-tab\.has-new::after \{[^}]*content:'N'[^}]*color:#D92D20/);
+  assert.doesNotMatch(source, /\.lesson-card-tab\.has-new::after \{[^}]*border-radius:50%/);
   assert.match(source, /pendingStudentChanges\(lessonStudentId, t\.id\)\.length/);
   assert.match(source, /studentChangedFieldSet\(task\.studentId, task\.id\)/);
   assert.match(source, /requiresAck && !event\.acknowledged/);
