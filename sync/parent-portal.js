@@ -1558,8 +1558,9 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   if (app !== 'task') return json({ ok: false, error: '보호자 웹앱은 task에서만 사용할 수 있습니다' }, 400, origin);
   body = body && typeof body === 'object' ? body : {};
   const action = String(body.action || '');
+  // publication_set은 담당 선생님의 내부 수업 기록 저장이며, 보호자 접근은 아래 view·exchange 차단으로 계속 막는다.
   const disabledActions = new Set([
-    'access_set', 'invite', 'publication_set', 'announcement_save', 'announcement_publish',
+    'access_set', 'invite', 'announcement_save', 'announcement_publish',
     'exchange', 'view', 'respond', 'submit_request'
   ]);
   if (String(env.WB_GUARDIAN_CONTACT_ENABLED || '').trim() === 'false' && disabledActions.has(action)) {
