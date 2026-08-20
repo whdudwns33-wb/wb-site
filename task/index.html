@@ -898,11 +898,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-19.6"></script>
-<script src="./schedule-board-core.js?v=2026-08-19.6"></script>
-<script src="./asset-core.js?v=2026-08-19.6"></script>
-<script src="./qr-core.js?v=2026-08-19.6"></script>
-<script src="./acaflow-import-core.js?v=2026-08-19.6"></script>
+<script src="./lesson-form-core.js?v=2026-08-20.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-20.1"></script>
+<script src="./asset-core.js?v=2026-08-20.1"></script>
+<script src="./qr-core.js?v=2026-08-20.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-20.1"></script>
 <script>
 "use strict";
 
@@ -3416,7 +3416,7 @@ function publicationReadinessHtml() {
         publicationReadinessReasonHtml(row, 'schedule', '수업 형식', '수업 정보 연결됨') +
         '<label class="field mt14"><span class="fl">실제 원생 직접 선택</span><select class="in" data-publication-student><option value="">원생을 선택하세요</option>' +
         students.map(student => '<option value="' + esc(student.id) + '"' + (linkedStudent && linkedStudent.id === student.id ? ' selected' : '') + '>' +
-          esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') + '</select></label>' +
+          esc(rosterStudentIdentityLabel(student)) + '</option>').join('') + '</select></label>' +
         '<button class="btn btn-primary btn-block" data-act="publicationlessonfix" data-id="' + esc(row.taskId) + '"' + (canRepair ? '' : ' disabled') +
         '>선택 원생 연결 · 수업 정보 보완</button>' +
         '<div class="hint mt8">버튼을 누른 뒤 실제 원생과 담당자를 확인하고 수업 정보 저장을 완료하면 연결이 적용됩니다.</div></article>';
@@ -3543,8 +3543,8 @@ function lessonAssignmentReviewHtml() {
       return '<div class="card mt14"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
         (!matches.length ? '<div class="hint mt8">같은 이름·학년의 원생이 없습니다. 아래 재원생 전체에서 직접 선택하거나, 명단에 없는 학생이면 기존 원생으로 추가하세요.</div>' : '') +
         '<select class="in mt8" data-lar-student data-key="' + esc(row.requestKey) + '"><option value="">현재 원생 선택</option>' +
-          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') +
-          (others.length ? '<optgroup label="재원생 전체">' + others.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
+          (matches.length ? '<optgroup label="요청과 일치하는 원생">' + matches.map(student => '<option value="' + esc(student.id) + '">' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') + '</optgroup>' : '') +
+          (others.length ? '<optgroup label="재원생 전체">' + others.map(student => '<option value="' + esc(student.id) + '">' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') + '</optgroup>' : '') + '</select>' +
         '<div class="row wraprow mt8"><button class="btn btn-primary" data-act="lessonassignmentapprove" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">승인</button>' +
           (!matches.length ? '<button class="btn btn-ghost" data-act="lessonassignmentaddexisting" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">기존 원생으로 추가 후 승인</button>' : '') +
           '<button class="btn btn-ghost" data-act="lessonassignmentreject" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">반려</button></div></div>';
@@ -3609,14 +3609,14 @@ function viewLessonEntry() {
 
   const studentFields = personal
     ? '<div class="sect">1. 담당 학생 선택</div><div class="field"><label class="fl">내 담당 학생</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
-      personalStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
+      personalStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">선택한 담당 학생만 수업·피드백과 연결됩니다.</div></div>' +
       (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
     : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
-      selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade) + '</option>').join('') +
+      selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
   return (personal ? lessonAssignmentRequestHtml() : publicationReadinessHtml() + viewLessonChangeReview() + lessonAssignmentReviewHtml()) + '<div class="card"><div class="card-title">🧑‍🏫 수업 정보 직접 등록</div>' +
-    '<div class="card-sub">관리자는 신규 원생 추가와 동일한 원생 기본 정보를 함께 확인·수정하고, 수업 요일·시간과 진행 정보를 이어서 등록합니다.</div></div>' +
+    '<div class="card-sub">원생 기본 정보와 담당·과목을 확인한 뒤 수업 요일·시간까지 3단계로 등록합니다.</div></div>' +
     '<div class="card">' + staffSelect +
       studentFields +
       (personal ? '<div class="sect">2. 과목·반</div><div class="grid2">' +
@@ -3627,12 +3627,6 @@ function viewLessonEntry() {
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
       '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></div>' +
-      '<div class="sect">4. 교재와 현재 진도</div>' + lessonTextField('materials', '교재·진도', 3, '') +
-      '<div class="sect">5. 온라인 프로그램</div>' + lessonTextField('onlineProgram', '온라인 프로그램', 2, '없으면 “없음”') +
-      '<div class="sect">6. 숙제 루틴과 수행률</div>' + lessonTextField('homework', '숙제', 3, '') +
-      '<div class="sect">7. 학생 특징</div>' + lessonTextField('studentTraits', '학생 특징', 3, '') +
-      '<div class="sect">8. 지금 목표</div>' + lessonTextField('goal', '현재 목표', 3, '') +
-      '<div class="sect">9. 특이사항·학부모 요청</div>' + lessonTextField('parentRequest', '특이사항·요청', 3, '없으면 “없음”') +
       '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">등록 내용 미리보기</button>' +
     '</div>';
 }
@@ -3643,7 +3637,13 @@ function lessonInputPayload() {
     (slot.days || []).length || slot.startTime || slot.endTime);
   return Object.assign({}, draft, {
     lessonRole: draft.className || draft.subject,
-    scheduleSlots: slots
+    scheduleSlots: slots,
+    materials: draft._sourceTaskId ? (draft.materials || '없음') : '없음',
+    onlineProgram: draft._sourceTaskId ? (draft.onlineProgram || '없음') : '없음',
+    homework: draft._sourceTaskId ? (draft.homework || '없음') : '없음',
+    studentTraits: draft._sourceTaskId ? (draft.studentTraits || '없음') : '없음',
+    goal: draft._sourceTaskId ? (draft.goal || '없음') : '없음',
+    parentRequest: draft._sourceTaskId ? (draft.parentRequest || '없음') : '없음'
   });
 }
 
@@ -3700,13 +3700,7 @@ function previewLessonRegistration() {
         lessonPreviewRosterStudent.subject, lessonPreviewRosterStudent.registrationDate, lessonPreviewRosterStudent.firstClassDate].filter(Boolean).join(' · ')) + '<br><br>' : '') +
       '<b>1. 이름 / 학년</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
       '<b>2. 과목·반</b><br>' + previewValue([taskBody.subject, taskBody.className].filter(Boolean).join(' / ')) + '<br><br>' +
-      '<b>3. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '<br><br>' +
-      '<b>4. 교재와 현재 진도</b><br>' + previewValue(taskBody.materials) + '<br><br>' +
-      '<b>5. 온라인 프로그램</b><br>' + previewValue(taskBody.onlineProgram) + '<br><br>' +
-      '<b>6. 숙제 루틴과 수행률</b><br>' + previewValue(taskBody.homework) + '<br><br>' +
-      '<b>7. 학생 특징</b><br>' + previewValue(taskBody.studentTraits) + '<br><br>' +
-      '<b>8. 지금 목표</b><br>' + previewValue(taskBody.goal) + '<br><br>' +
-      '<b>9. 특이사항·학부모 요청</b><br>' + previewValue(taskBody.parentRequest) + '</div>' +
+      '<b>3. 수업 요일·시간</b><br>' + previewValue(taskBody.scheduleText) + '</div>' +
     '<div class="card ' + (review ? 'lesson-review' : 'lesson-confirmed') + ' mt14"><b>' +
       (review ? '⚠️ 시간 확인 필요' : '✅ 현황판 시간 확정') + '</b><div class="small muted">' +
       (review ? esc(lessonPreviewPayload.scheduleReviewReason || '요일·시작·종료 확인 필요') : esc(slotSummary)) + '</div></div>',
@@ -8931,7 +8925,7 @@ function transportConfigRowHtml(config, locked) {
           '<label><span class="fl">공동 승하차 지점 주소</span><input class="in" data-tc-stop-address value="' + esc(stop.address || '') + '" placeholder="건물·상가·아파트 정문"' + disabled + '></label>' +
           '<label><span class="fl">도착 시간</span><input class="in" type="time" data-tc-stop-time value="' + esc(stop.time || '') + '"' + disabled + '></label></div>' +
           '<label class="mt8"><span class="fl">학생 배정 · ' + esc(studentLinkScopeText()) + ' (여러 명 선택 가능)</span><select class="in" multiple size="5" data-tc-students aria-label="' + esc((stop.name || '정류장') + ' 학생 배정') + '"' + studentDisabled + '>' +
-            liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(student.name) + ' · ' + esc(student.grade || '') + '</option>').join('') +
+            liveStudents.map(student => '<option value="' + esc(student.id) + '"' + (selectedIds.includes(String(student.id)) ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
             missingIds.map(studentId => '<option value="' + esc(studentId) + '" selected>명단 없음 · 기존 배정 유지 (' + esc(studentId) + ')</option>').join('') + '</select></label>' +
           (pendingNames.length ? '<div class="hint mt8"><b>명단 연결 대기 · ' + pendingNames.length + '명</b><div class="small mt8">학생 배정에서 실제 원생을 선택한 뒤 해당 이름을 연결 완료 처리하세요.</div>' +
             '<div class="transport-pending-list">' + pendingNames.map(name => '<div class="transport-pending-row"><span><b>' + esc(name) + '</b></span>' +
@@ -9381,13 +9375,35 @@ function activeIn(m) {
   return ((rosterDb && rosterDb.students) || []).filter(s =>
     s.start <= m && (!s.end || s.end > m));
 }
+function rosterIdentityPart(value, fallback) {
+  const normalized = String(value || '').normalize('NFKC').trim();
+  return normalized || fallback;
+}
+function rosterParentContactSuffix(student) {
+  const siblings = ((rosterDb && rosterDb.students) || []).filter(row => row && row.id !== student.id &&
+    rosterIdentityPart(row.name, '') === rosterIdentityPart(student.name, '') &&
+    rosterIdentityPart(row.school, '') === rosterIdentityPart(student.school, '') &&
+    rosterIdentityPart(row.grade, '') === rosterIdentityPart(student.grade, ''));
+  if (!siblings.length) return '';
+  const contacts = [['부', student.phoneFather], ['모', student.phoneMother]].map(item => {
+    const digits = String(item[1] || '').replace(/\D/g, '');
+    return digits ? item[0] + ' 끝 ' + digits.slice(-4) : '';
+  }).filter(Boolean);
+  return contacts.length ? ' · ' + contacts.join(' · ') : '';
+}
+function rosterStudentIdentityLabel(student) {
+  return rosterIdentityPart(student && student.name, '이름 미입력') + ' · ' +
+    rosterIdentityPart(student && student.school, '학교 미입력') + ' · ' +
+    rosterIdentityPart(student && student.grade, '학년 미입력') + rosterParentContactSuffix(student || {});
+}
 function studentLinkCandidates(referenceMonth, includeFuture) {
   const month = String(referenceMonth || today().slice(0, 7));
   return ((rosterDb && rosterDb.students) || []).filter(student => student && student.id &&
     !rosterStudentTransition(student) &&
     (includeFuture || !student.start || student.start <= month) && (!student.end || student.end > month))
     .slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko') ||
-      String(a.grade || '').localeCompare(String(b.grade || ''), 'ko'));
+      String(a.school || '').localeCompare(String(b.school || ''), 'ko') ||
+      String(a.grade || '').localeCompare(String(b.grade || ''), 'ko') || String(a.id || '').localeCompare(String(b.id || '')));
 }
 function studentLinkScopeText() {
   return rosterStudentSelectionScope === 'all_active' ? '재원생 전체' : '담당 재원생';
@@ -9542,7 +9558,7 @@ function rosterStudentEditorHtml(student, assignment) {
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
-    (isCreate ? '저장한 학생은 stable studentId로 명단에 등록됩니다. 신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다.' :
+    (isCreate ? '화면에서는 이름으로 구분하며, 내부 연결용 studentId는 서버가 8자리 숫자로 자동 발급합니다. 학교·학년·과목·담당은 나중에 입력해도 됩니다. 신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다.' :
       '학교·연락처·등록과목과 재원 정보를 수정할 수 있습니다.') + '</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-rse-name maxlength="40" value="' + esc(student.name || '') + '"></label>' +
     '<label class="field"><span class="fl">학교</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
@@ -9576,7 +9592,7 @@ async function openRosterStudentEditor(studentId, assignment, entryType) {
   if (!studentId) {
     const teacherId = assignment ? String(assignment.staffId || '') : '';
     showRosterStudentEditor({
-      id: 'student_' + uid(), name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
+      id: '', name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
       school: '', phoneSelf: '', phoneFather: '', phoneMother: '', registrationDate: '', firstClassDate: '',
       teacher: '', subject: '', subjects: [], start: today().slice(0, 7), end: '', reason: '', memo: '',
       entryType: entryType === 'new' ? 'new' : 'existing', teacherIds: teacherId ? [teacherId] : [], _editing: false
@@ -9613,8 +9629,8 @@ async function saveRosterStudent(button) {
     memo: value('[data-rse-memo]'), teacherIds: teacherIds
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
-  if (!student.name || !student.grade || !student.subject || !student.start || !teacherIds.length) {
-    return toast('이름·학년·과목·시작월·담당 선생님을 모두 입력해 주세요');
+  if (!student.name || !student.start) {
+    return toast('이름과 시작월을 입력해 주세요');
   }
   if (isNew && (!registrationDate || !firstClassDate)) return toast('신규 등록일과 첫 수업 시작일을 모두 입력해 주세요');
   const auth = sync.auth();
@@ -10064,8 +10080,8 @@ function viewOnboarding() {
     String(b.start || '').localeCompare(String(a.start || '')) || a.name.localeCompare(b.name, 'ko'));
   const recentCandidates = candidates.filter(onboardingCandidateStartIsRecent);
   const existingCandidates = candidates.filter(student => !onboardingCandidateStartIsRecent(student));
-  const candidateOptions = group => group.map(student => '<option value="' + esc(student.id) + '">' + esc(student.name) + ' · ' +
-    esc(student.grade || '학년 미지정') + ' · 명단 시작 ' + esc(student.start || '미기록') + '</option>').join('');
+  const candidateOptions = group => group.map(student => '<option value="' + esc(student.id) + '">' + esc(rosterStudentIdentityLabel(student)) +
+    ' · 명단 시작 ' + esc(student.start || '미기록') + '</option>').join('');
   const operationalRows = rows.filter(row => row.status.key !== 'closed' && row.status.key !== 'cancelled');
   const currentMonth = today().slice(0, 7);
   const dashboardRows = operationalRows.filter(row => row.status.key !== 'done' || onboardingCompletionDate(row.record).slice(0, 7) === currentMonth);
@@ -10294,7 +10310,7 @@ function viewRoster() {
       '<button class="btn btn-primary" data-act="rosterstudentnew">신규 원생 추가</button></div></div>' +
       '<div class="hint mt8">여기서 추가해도 신규 학생 30일 관리에는 들어가지 않습니다. 신규 관리는 ‘신규 학생’ 탭에서 별도로 시작합니다.</div>' +
       '<details class="mt14"><summary><b>등록 원생 ' + managed.length + '명 · 기본 정보 수정</b></summary><div class="mt8">' +
-        managed.map(student => '<div class="between small" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> <span class="muted">(' + esc(student.grade) + ' · ' + esc(student.teacher || '담당 미지정') + ' · ' + esc(student.subject || '과목 미지정') + ')</span></span>' +
+        managed.map(student => '<div class="between small" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> <span class="muted">(' + esc([student.school || '학교 미입력', student.grade || '학년 미입력', student.teacher || '담당 미지정', student.subject || '과목 미지정'].join(' · ')) + rosterParentContactSuffix(student) + ')</span></span>' +
           '<button class="btn btn-sm btn-ghost" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">수정</button></div>').join('') +
       '</div></details></section>';
   }
@@ -10332,7 +10348,7 @@ function viewRoster() {
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
         mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
-          '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' + esc(s.grade) + ')</span></span></div>').join('');
+          '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' + esc([s.school || '학교 미입력', s.grade || '학년 미입력'].join(' · ')) + rosterParentContactSuffix(s) + ')</span></span></div>').join('');
       h += '</div>';
     }
   }
@@ -11343,7 +11359,7 @@ function viewGuardianContactPanel() {
     const makeupOps = ops.makeup || emptyGuardianOpsConsent();
     const sessionOps = ops.session || emptyGuardianOpsConsent();
     const opsDisabled = guardianOpsConsentsError ? ' disabled' : '';
-    return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(s.teacher || '미지정') + ')</span></div>' +
+    return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc([s.school || '학교 미입력', s.grade || '학년 미입력', s.teacher || '미지정'].join(' · ')) + rosterParentContactSuffix(s) + ')</span></div>' +
       '<div class="row wraprow" style="gap:8px">' +
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + i + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcConsent-' + i + '" ' + (c.consent ? 'checked' : '') + '> 수업 피드백 알림톡 동의</label>' +
@@ -13715,7 +13731,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-19.6';
+const APP_VER = '2026-08-20.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
