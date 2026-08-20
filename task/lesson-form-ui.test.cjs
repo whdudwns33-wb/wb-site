@@ -92,10 +92,40 @@ test('admin direct lesson registration removes duplicate subject fields and free
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
   assert.match(view, /<div class="sect">3\. 수업 요일·시간/);
   assert.doesNotMatch(view, /<div class="sect">[4-9]\./);
-  assert.match(view, /<details class="card admin-collapsible lesson-direct-entry"><summary><span><b>수업 정보 등록<\/b>/);
-  assert.doesNotMatch(view, /lesson-direct-entry" open/);
+  assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 정보 등록<\/b>/);
   assert.match(view, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
   assert.match(view, /return directRegistration \+ reviews/);
+});
+
+test('lesson registration interactions update only the form panel and preserve its open state', () => {
+  assert.match(html, /let lessonDirectEntryOpen = false/);
+  assert.match(html, /function refreshLessonDirectEntry\(forceOpen\)[\s\S]{0,600}current\.replaceWith\(next\)/);
+  assert.match(html, /document\.addEventListener\('toggle',[\s\S]{0,260}lessonDirectEntryOpen = ev\.target\.open/);
+
+  const dayStart = html.indexOf("case 'lessonday':");
+  const addStart = html.indexOf("case 'lessonslotadd':", dayStart);
+  const deleteStart = html.indexOf("case 'lessonslotdel':", addStart);
+  const editStart = html.indexOf("case 'lessonedit':", deleteStart);
+  assert.ok(dayStart >= 0 && addStart > dayStart && deleteStart > addStart && editStart > deleteStart);
+
+  const dayHandler = html.slice(dayStart, addStart);
+  assert.doesNotMatch(dayHandler, /\brender\(/);
+  assert.match(dayHandler, /classList\.toggle\('on'/);
+
+  const addHandler = html.slice(addStart, deleteStart);
+  assert.doesNotMatch(addHandler, /\brender\(/);
+  assert.match(addHandler, /insertAdjacentHTML\('beforebegin'/);
+
+  const deleteHandler = html.slice(deleteStart, editStart);
+  assert.doesNotMatch(deleteHandler, /\brender\(/);
+  assert.match(deleteHandler, /refreshLessonDirectEntry\(true\)/);
+
+  const studentStart = html.indexOf("const lessonStudent = ev.target.closest('[data-lesson-student]')");
+  const studentEnd = html.indexOf("const onboardingDate", studentStart);
+  assert.ok(studentStart >= 0 && studentEnd > studentStart);
+  const studentHandler = html.slice(studentStart, studentEnd);
+  assert.doesNotMatch(studentHandler, /\brender\(/);
+  assert.match(studentHandler, /refreshLessonDirectEntry\(true\)/);
 });
 
 test('admin direct lesson registration reuses the new-student multi-subject selector', () => {

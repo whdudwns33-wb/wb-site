@@ -906,11 +906,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.1"></script>
-<script src="./asset-core.js?v=2026-08-21.1"></script>
-<script src="./qr-core.js?v=2026-08-21.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.2"></script>
+<script src="./asset-core.js?v=2026-08-21.2"></script>
+<script src="./qr-core.js?v=2026-08-21.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.2"></script>
 <script>
 "use strict";
 
@@ -3220,6 +3220,7 @@ let lessonRosterDraft = null;
 let lessonRosterDraftStudentId = '';
 let lessonPreviewRosterStudent = null;
 let lessonSubmitting = false;
+let lessonDirectEntryOpen = false;
 let lessonAssignmentRequests = [];
 let lessonAssignmentCandidates = [];
 let lessonAssignmentRequestsLoaded = false;
@@ -3460,7 +3461,8 @@ function openPublicationLessonFix(button) {
   lessonPreviewTask = null;
   lessonPreviewExpectedUpdatedAt = Number(row.updatedAt || task.updatedAt || 0);
   persistLessonDraft();
-  render();
+  lessonDirectEntryOpen = true;
+  refreshLessonDirectEntry(true);
   requestAnimationFrame(() => {
     const formStudent = document.querySelector('[data-lesson-student]');
     if (formStudent) formStudent.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3782,7 +3784,7 @@ function viewLessonEntry() {
     : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
-  const directRegistration = '<details class="card admin-collapsible lesson-direct-entry"><summary><span><b>수업 정보 등록</b>' +
+  const directRegistration = '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 정보 등록</b>' +
     '<span class="card-sub">원생 기본 정보와 담당·과목을 확인한 뒤 수업 요일·시간까지 3단계로 등록합니다.</span></span></summary>' +
     '<div class="admin-collapsible-body">' + staffSelect +
       studentFields +
@@ -3798,6 +3800,18 @@ function viewLessonEntry() {
     '</div></details>';
   const reviews = personal ? lessonAssignmentRequestHtml() : viewLessonChangeReview() + lessonAssignmentReviewHtml();
   return directRegistration + reviews;
+}
+
+function refreshLessonDirectEntry(forceOpen) {
+  const current = document.querySelector('.lesson-direct-entry');
+  if (!current) return;
+  lessonDirectEntryOpen = forceOpen === true || current.open;
+  const holder = document.createElement('div');
+  holder.innerHTML = viewLessonEntry();
+  const next = holder.querySelector('.lesson-direct-entry');
+  if (!next) return;
+  next.open = lessonDirectEntryOpen;
+  current.replaceWith(next);
 }
 
 function lessonInputPayload() {
@@ -13503,16 +13517,22 @@ document.addEventListener('click', ev => {
       if (!slot) break;
       const day = Number(el.dataset.d), at = slot.days.indexOf(day);
       if (at < 0) slot.days.push(day); else slot.days.splice(at, 1);
-      slot.days.sort((a, b) => a - b); persistLessonDraft(); render();
+      slot.days.sort((a, b) => a - b); persistLessonDraft();
+      el.classList.toggle('on', slot.days.includes(day));
       break;
     }
-    case 'lessonslotadd':
-      currentLessonDraft().scheduleSlots.push({ days: [], startTime: '', endTime: '' }); persistLessonDraft(); render(); break;
+    case 'lessonslotadd': {
+      const draft = currentLessonDraft();
+      const slot = { days: [], startTime: '', endTime: '' };
+      draft.scheduleSlots.push(slot); persistLessonDraft();
+      el.insertAdjacentHTML('beforebegin', lessonSlotHtml(slot, draft.scheduleSlots.length - 1));
+      break;
+    }
     case 'lessonslotdel': {
       const draft = currentLessonDraft();
       draft.scheduleSlots.splice(Number(el.dataset.i), 1);
       if (!draft.scheduleSlots.length) draft.scheduleSlots.push({ days: [], startTime: '', endTime: '' });
-      persistLessonDraft(); render(); break;
+      persistLessonDraft(); refreshLessonDirectEntry(true); break;
     }
     case 'lessonedit': {
       const t = task();
@@ -13520,6 +13540,7 @@ document.addEventListener('click', ev => {
       lessonDraft = lessonDraftFromTask(t);
       lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
       lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewExpectedUpdatedAt = Number(t.updatedAt || 0);
+      lessonDirectEntryOpen = true;
       persistLessonDraft(); closeModal(); go('lesson');
       toast('수업 정보를 불러왔습니다 — 수정 후 미리보기를 확인해 주세요');
       break;
@@ -14010,7 +14031,7 @@ document.addEventListener('change', async ev => {
       draft.subject = student ? rosterStudentSubjects(student).join('·') : '';
       draft.className = '';
     }
-    persistLessonDraft(); render();
+    persistLessonDraft(); refreshLessonDirectEntry(true);
     return;
   }
   const onboardingDate = ev.target.closest('[data-onboarding-date]');
@@ -14056,6 +14077,12 @@ document.addEventListener('change', async ev => {
     persistLessonDraft();
   }
 });
+
+document.addEventListener('toggle', ev => {
+  if (ev.target && ev.target.matches && ev.target.matches('.lesson-direct-entry')) {
+    lessonDirectEntryOpen = ev.target.open;
+  }
+}, true);
 
 /* 출퇴근 시각 직접 수정 — time input은 값이 확정될 때(change) 저장한다 */
 document.addEventListener('change', ev => {
@@ -14131,7 +14158,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.1';
+const APP_VER = '2026-08-21.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
