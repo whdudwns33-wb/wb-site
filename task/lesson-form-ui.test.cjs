@@ -21,9 +21,7 @@ test('teachers get an own-scope four-step lesson route', () => {
   assert.match(html, /staffId: session\.isStaffLink && !session\.isAdmin \? session\.staffId : ''/);
   assert.match(html, /if \(session\.isStaffLink && !session\.isAdmin\) lessonDraft\.staffId = session\.staffId/);
   assert.match(html, /sync\.post\('\/lesson-create'/);
-  for (const key of ['scheduleText']) {
-    assert.ok(html.includes(`lessonTextField('${key}'`), key);
-  }
+  assert.doesNotMatch(html, /lessonTextField\('scheduleText'/);
   assert.match(html, /data-lesson-subject/);
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
@@ -116,7 +114,7 @@ test('direct lesson registration follows student, subject, teacher, schedule ord
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
   const view = html.slice(viewStart, viewEnd);
-  assert.match(view, /personal \? lessonTextField\('scheduleText',[\s\S]{0,160} : ''/);
+  assert.doesNotMatch(view, /lessonTextField\('scheduleText'/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
   assert.match(view, /<div class="sect">4\. 수업 요일·시간/);
   assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
