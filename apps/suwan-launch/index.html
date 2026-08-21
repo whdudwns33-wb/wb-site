@@ -2542,6 +2542,33 @@ const SAMPLE_OPS = {
   sessionHours: 2,     // 1회 수업 시간
   perWeek: 2,          // 주 2회
 };
+const SAMPLE_FIN = {
+  fee: 28,             // 만원 · 과목당 월 수강료 (인터뷰 확정값)
+  fillRate: 0.75,      // 개원 6개월차 가동률 가정
+  testPerMonth: 5,     // 월 검사 건수 가정
+  testPrice: 35,       // 통합검사 정가 (할인 없음)
+};
+const SAMPLE_COST = [
+  { name:'임차료',            amt:350,  note:'80평 · 평당 약 4.4만 원 가정 (실제 계약 시 확정)' },
+  { name:'관리비·공과금',      amt:130,  note:'관리비 50 + 전기·수도·냉난방 80' },
+  { name:'전임강사 6인 급여',  amt:1920, note:'국어 2 · 영어 2 · 수학 2 × 320만 원' },
+  { name:'데스크 1인 급여',    amt:230,  note:'상근 1인' },
+  { name:'4대보험 사업자부담', amt:215,  note:'급여 합계의 약 10%' },
+  { name:'교재·인쇄·소모품',   amt:100,  note:'국영수 교재 회전 + 출력물' },
+  { name:'마케팅',            amt:200,  note:'블로그·맘카페·지역 타겟 광고' },
+  { name:'시스템·통신',        amt:60,   note:'학원관리 SW · 알림톡 · 인터넷·전화' },
+  { name:'예비비',            amt:100,  note:'수리·경조·잡비' },
+];
+const SAMPLE_INVEST = [
+  { name:'임차보증금',      amt:5000, note:'월세 350 기준 · 회수 가능 자산' },
+  { name:'인테리어·시공',    amt:9600, note:'80평 × 평당 120만 원 · 방음·전기 증설·냉난방 포함' },
+  { name:'집기·비품',       amt:2000, note:'책걸상 48세트 · 전자칠판 6 · 사물함 · 정수기 · 공기청정기' },
+  { name:'간판·사인',       amt:500,  note:'외부 간판 + 실내 사인 + 옥외광고물 신고' },
+  { name:'시스템·IT',       amt:500,  note:'PC·복합기·CCTV 8ch·네트워크·학원관리 SW 도입' },
+  { name:'교재·교구 초도',   amt:400,  note:'국영수 레벨별 교재 + 진단 도구' },
+  { name:'개원 마케팅',      amt:1000, note:'오픈 8주 역산 캠페인' },
+  { name:'예비비',          amt:1000, note:'인허가 지연·추가 공사 대비 (총액의 5%)' },
+];
 const OPEN_PREP = [
   { cat:'① 인허가·행정', items:[
     { id:'p1',  t:'건축물대장 용도 확인',      w:'D-150', n:'학원은 바닥면적 500㎡ 미만이면 제2종 근린생활시설로 가능. 264.5㎡라 해당되지만, 현 용도가 다르면 용도변경이 선행돼야 한다.' },
@@ -2549,7 +2576,7 @@ const OPEN_PREP = [
     { id:'p3',  t:'강의실 시설 기준 충족 확인', w:'D-120', n:'동시수용 인원당 강의실 면적 기준이 시·도 조례로 정해진다. 광주 조례 기준을 교육지원청에 직접 확인할 것 — 이 모델은 1인당 2.5㎡ 이상이라 통상 기준에는 여유가 있다.' },
     { id:'p4',  t:'소방시설 완비 증명',        w:'D-45',  n:'소방서 확인 후 발급. 인테리어 공사와 병행해야 일정이 밀리지 않는다.' },
     { id:'p5',  t:'사업자등록',               w:'D-40',  n:'학원 교습 용역은 부가가치세 면세. 센터(과세 포함)와 사업자를 분리할지 세무사와 먼저 정리.' },
-    { id:'p6',  t:'교습비 결정·게시 및 신고',  w:'D-30',  n:'교습비를 교육청에 신고하고 학원 내부에 게시. 신고액을 초과해 받을 수 없으므로 이 단계에서 금액을 확정해야 한다.' },
+    { id:'p6',  t:'교습비 결정·게시 및 신고',  w:'D-30',  n:'교습비를 교육청에 신고하고 학원 내부에 게시. 신고액을 초과해 받을 수 없으므로 28만 원 기준을 여기서 확정.' },
     { id:'p7',  t:'학원 배상책임보험 가입',    w:'D-21',  n:'법정 의무. 등록 절차와 함께 처리.' },
     { id:'p8',  t:'강사 결격사유 조회',        w:'D-30',  n:'성범죄 경력 및 아동학대 관련 범죄 전력 조회는 채용 전 필수.' },
     { id:'p9',  t:'개인정보 처리방침·동의서',  w:'D-45',  n:'리더스 졸업생 명단을 넘겨받으려면 학부모 개별 동의가 전제. 동의서 양식을 3자가 함께 확정해야 한다.' },
@@ -2557,7 +2584,7 @@ const OPEN_PREP = [
     { id:'p11', t:'옥외광고물 신고',           w:'D-21',  n:'간판 규격·조명에 따라 광산구청 신고 대상.' },
   ]},
   { cat:'② 임대차·시설', items:[
-    { id:'f1', t:'임대차 계약 체결',    w:'D-150', n:'용도변경·소방 설비 책임 소재를 특약으로 명시. 임대 조건은 실제 협의 결과를 따른다.' },
+    { id:'f1', t:'임대차 계약 체결',    w:'D-150', n:'보증금 5,000 / 월 350 가정. 용도변경·소방 설비 책임 소재를 특약으로 명시.' },
     { id:'f2', t:'도면 설계·시공사 선정', w:'D-130', n:'강의실 6 + 상담실 + 탕비실 배치 확정. 견적 3곳 비교.' },
     { id:'f3', t:'인테리어 시공',       w:'D-120~D-45', n:'6~8주 소요. 방음(강의실 간·상담실), 전기 증설, 냉난방, 환기.' },
     { id:'f4', t:'소방 감리·준공',      w:'D-50',  n:'스프링클러·비상구·유도등·소화기.' },
@@ -2635,18 +2662,34 @@ function sampleStats(){
   Object.values(bySubj).forEach(s => s.teachers = Math.ceil(s.hours / TEACHER_MAX_HOURS));
   const teachers = Object.values(bySubj).reduce((a,v)=>a+v.teachers, 0);
   const hours    = Object.values(bySubj).reduce((a,v)=>a+v.hours, 0);
+  const F = SAMPLE_FIN;
+  const enrolled  = Math.round(seats * F.fillRate);          // 가동률 반영 수강건
+  const studentsAt = Math.round(enrolled / O.subjPer);        // 가동률 기준 실인원
+  const tuition = enrolled * F.fee;
+  const testRev = F.testPerMonth * F.testPrice;
+  const revenue = tuition + testRev;
+  const cost    = SAMPLE_COST.reduce((a,c)=>a+c.amt, 0);
+  const profit  = revenue - cost;
+  const bepEnroll   = Math.ceil(cost / F.fee);
+  const bepStudents = Math.ceil(bepEnroll / O.subjPer);
+  const invest  = SAMPLE_INVEST.reduce((a,i)=>a+i.amt, 0);
+  const payback = profit > 0 ? invest / profit : null;
   const totalArea = AREA_PLAN.reduce((a,x)=>a + x.count*x.each, 0);
   const classArea = AREA_PLAN.filter(x=>x.name.startsWith('강의실')).reduce((a,x)=>a + x.count*x.each, 0);
   const slotsTotal = SAMPLE_ROOMS.length * SAMPLE_BLOCKS.length * SAMPLE_PAIRS.length;
   const prepDone  = OPEN_PREP.reduce((a,c)=>a + c.items.filter(i=>S.openPrep && S.openPrep[i.id]).length, 0);
   const prepTotal = OPEN_PREP.reduce((a,c)=>a + c.items.length, 0);
-  return { classes, seats, students, bySubj, teachers, hours, totalArea, classArea, slotsTotal, prepDone, prepTotal };
+  return { classes, seats, students, studentsAt, enrolled, tuition, testRev, revenue, cost, profit,
+           bepEnroll, bepStudents, invest, payback,
+           bySubj, teachers, hours, totalArea, classArea, slotsTotal, prepDone, prepTotal };
 }
 function roomById(id){ return SAMPLE_ROOMS.find(r=>r.id===id); }
 function renderSample(){
   const st = sampleStats();
   const won = n => n.toLocaleString('ko-KR');
-  const tabs = [['space','공간 배치'],['time','시간표·편성'],['prep','오픈 준비']];
+  // 만 단위가 1억을 넘으면 억으로 끊어 읽기 쉽게
+  const eok = n => n >= 10000 ? (Math.floor(n/10000) + '억' + (n%10000 ? ' ' + won(n%10000) + '만' : '')) : (won(n) + '만');
+  const tabs = [['space','공간 배치'],['time','시간표·편성'],['money','수익 모델'],['prep','오픈 준비'],['invest','투자 내역']];
 
   const fpHtml = FP_LAYOUT.map(row => row.map(cell => {
     if(cell[0] === 'HALL') return `<div class="rm hall" style="grid-column:span ${cell[1]}">복 도 · 동 선 13평</div>`;
@@ -2746,6 +2789,69 @@ function renderSample(){
       <p style="margin-top:6px">상담실이 하나뿐이라 검사와 상담이 같은 자리를 나눠 씁니다. 웩슬러 검사 1건에 실시·해석까지 2시간 안팎, 결과 상담은 1시간을 잡으면 <b>하루 3~4건이 상한</b>입니다.</p>
       <p class="small muted" style="margin-top:8px">모집 시즌(11~2월)에 문의가 몰리면 이 자리가 가장 먼저 막힙니다. 검사는 오전, 상담은 저녁으로 시간대를 갈라 두거나, 성수기에는 강의실 한 곳을 상담용으로 임시 전환하는 안을 미리 정해 두시는 게 좋습니다.</p>
     </div>`;
+  } else if(sampleTab === 'money'){
+    const F = SAMPLE_FIN;
+    body = `
+    <div class="grid3">
+      <div class="card tight"><div class="stat-lbl">만석 기준 수강건</div><div class="stat-num">${won(st.seats)}</div>
+        <div class="small muted">${st.classes}개 반 정원 합계</div></div>
+      <div class="card tight"><div class="stat-lbl">가동률 ${Math.round(F.fillRate*100)}% 기준</div><div class="stat-num">${won(st.enrolled)}</div>
+        <div class="small muted">실인원 약 ${won(st.studentsAt)}명 (1인 ${SAMPLE_OPS.subjPer}과목 가정)</div></div>
+      <div class="card tight"><div class="stat-lbl">월 영업이익</div><div class="stat-num">${won(st.profit)}만</div>
+        <div class="small muted">매출 ${won(st.revenue)}만 − 비용 ${won(st.cost)}만</div></div>
+    </div>
+    <div class="card">
+      <h3>월 매출</h3>
+      <table class="grid-tbl">
+        <thead><tr><th>항목</th><th style="width:110px">금액</th><th>산출 근거</th></tr></thead>
+        <tbody>
+          <tr><td><b>수강료</b></td><td class="num">${won(st.tuition)}만</td>
+            <td class="small muted">${won(st.enrolled)} 수강건 × ${F.fee}만 원 (과목당 월 수강료 · 인터뷰 확정값)</td></tr>
+          <tr><td><b>검사</b></td><td class="num">${won(st.testRev)}만</td>
+            <td class="small muted">월 ${F.testPerMonth}건 × 통합검사 ${F.testPrice}만 원 정가 · 할인 없음</td></tr>
+          <tr class="total"><td>합계</td><td class="num">${won(st.revenue)}만</td><td class="small">연 환산 약 ${eok(st.revenue*12)} 원</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>월 고정비</h3>
+      <table class="grid-tbl">
+        <thead><tr><th>항목</th><th style="width:110px">금액</th><th>비고</th></tr></thead>
+        <tbody>
+          ${SAMPLE_COST.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td class="num">${won(c.amt)}만</td>
+            <td class="small muted">${esc(c.note)}</td></tr>`).join('')}
+          <tr class="total"><td>합계</td><td class="num">${won(st.cost)}만</td><td class="small">원장 급여는 제외 — 영업이익에서 배분</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>손익분기</h3>
+      <p style="margin-top:6px">고정비 ${won(st.cost)}만 원을 넘기려면 <b>월 ${won(st.bepEnroll)} 수강건</b>, 실인원으로 <b>약 ${won(st.bepStudents)}명</b>이 필요합니다.
+      만석 정원의 ${Math.round(st.bepEnroll/st.seats*100)}% 수준이라, 정원 대비 여유를 두고 손익분기를 넘길 수 있는 구조입니다.</p>
+      <p class="small muted" style="margin-top:10px">${st.payback ? `투자 ${eok(st.invest)} 원 기준 단순 회수기간은 약 <b>${st.payback.toFixed(1)}개월</b>입니다. 다만 개원 직후부터 이 인원이 차지는 않으므로, 실제 회수 시점은 📈 손익 시뮬레이션의 성장 곡선으로 보시는 게 정확합니다.` : '현재 가정으로는 영업이익이 나지 않습니다.'}</p>
+    </div>`;
+  } else if(sampleTab === 'invest'){
+    body = `
+    <div class="card">
+      <h3>초기 투자 내역</h3>
+      <p class="small muted" style="margin:4px 0 0">인터뷰에서 정하신 투자 규모 ${eok(st.invest)} 원을 80평 기준으로 쪼갠 안입니다.</p>
+      <table class="grid-tbl">
+        <thead><tr><th>항목</th><th style="width:110px">금액</th><th style="width:64px">비중</th><th>비고</th></tr></thead>
+        <tbody>
+          ${SAMPLE_INVEST.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="num">${won(i.amt)}만</td>
+            <td class="num">${Math.round(i.amt/st.invest*100)}%</td>
+            <td class="small muted">${esc(i.note)}</td></tr>`).join('')}
+          <tr class="total"><td>합계</td><td class="num">${eok(st.invest)}</td><td class="num">100%</td>
+            <td class="small">보증금 ${won(SAMPLE_INVEST[0].amt)}만 원은 회수 가능 자산이라, 실제로 소진되는 비용은 ${eok(st.invest-SAMPLE_INVEST[0].amt)} 원</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>자금 집행 순서</h3>
+      <p style="margin-top:6px">임대차 계약금과 보증금이 가장 먼저 나가고, 인테리어 대금이 착공·중도·준공 3회로 나뉩니다. 집기와 시스템은 준공 직전에 몰리고, 개원 마케팅비는 D-56부터 8주에 걸쳐 집행됩니다.</p>
+      <p style="margin-top:8px">결과적으로 <b>개원 2개월 전 시점에 현금이 가장 많이 필요합니다.</b> 이 구간에 수입은 아직 없으므로, 운영 첫 3개월치 고정비(약 ${won(st.cost*3)}만 원)를 투자금과 별도로 확보해 두시는 편이 안전합니다.</p>
+      <p class="small muted" style="margin-top:10px">3자 투자 비율은 아직 정해지지 않았습니다(합의 트래커 a4·a5). 이 표는 총액 기준이며, 누가 얼마를 넣는지는 합의 후에 채워야 합니다.</p>
+    </div>`;
   } else {
     const pct = st.prepTotal ? Math.round(st.prepDone/st.prepTotal*100) : 0;
     body = `
@@ -2783,7 +2889,7 @@ function renderSample(){
       <div class="card tight" style="margin:0"><div class="stat-lbl">주간 반</div><div class="stat-num">${st.classes}</div><div class="small muted">6개 강의실 · 4블록</div></div>
       <div class="card tight" style="margin:0"><div class="stat-lbl">정원 (수강건)</div><div class="stat-num">${won(st.seats)}</div><div class="small muted">실인원 약 ${won(st.students)}명</div></div>
       <div class="card tight" style="margin:0"><div class="stat-lbl">필요 강사</div><div class="stat-num">${st.teachers}</div><div class="small muted">전임 · 원장 제외</div></div>
-      <div class="card tight" style="margin:0"><div class="stat-lbl">오픈 준비</div><div class="stat-num">${st.prepDone}/${st.prepTotal}</div><div class="small muted">체크리스트 항목</div></div>
+      <div class="card tight" style="margin:0"><div class="stat-lbl">월 영업이익</div><div class="stat-num">${won(st.profit)}만</div><div class="small muted">가동률 ${Math.round(SAMPLE_FIN.fillRate*100)}% 가정</div></div>
     </div>
 
     <div class="sm-tabs no-print">
@@ -2793,8 +2899,8 @@ function renderSample(){
 
     <div class="card" style="border-left:3px solid var(--coral)">
       <h3>이 모델을 볼 때 유의할 점</h3>
-      <p class="small" style="margin-top:6px">이 화면은 <b>공간과 편성만 다룹니다.</b> 금액과 관련된 계산은 ⑤ 시나리오 계산기와 📈 손익 시뮬레이션에서 한 벌로 관리합니다.</p>
-      <p class="small muted" style="margin-top:8px">정원·반 수·강사 수는 강의실 크기와 시간표에서 그대로 계산된 값입니다. 다만 <b>1인당 ${SAMPLE_OPS.subjPer}과목, 강사 1인 주 ${TEACHER_MAX_HOURS}시간은 이 화면에서 세운 가정</b>이라, 실제 등록 패턴과 근로조건이 정해지면 바꿔야 합니다.</p>
+      <p class="small" style="margin-top:6px">수강료 28만 원, 투자 2억 원, 검사 정가(웩슬러 15 · 성향기질 20 · 통합 35만 원)는 인터뷰에서 확정하신 값입니다. 반면 <b>가동률 75%, 1인당 ${SAMPLE_OPS.subjPer}과목, 평당 임차료 4.4만 원, 인테리어 평당 120만 원, 강사 1인 주 ${TEACHER_MAX_HOURS}시간은 이 화면에서 세운 가정</b>입니다. 임대차 조건과 시공 견적이 나오면 실제 숫자로 바꿔야 합니다.</p>
+      <p class="small muted" style="margin-top:8px">정원·반 수·강사 수는 강의실 크기와 시간표에서 그대로 계산된 값입니다. 손익 추정은 이 화면의 편성을 전제로 한 것이라, 개원 직후의 성장 곡선까지 보시려면 📈 손익 시뮬레이션을 함께 보셔야 합니다.</p>
       <p class="small muted" style="margin-top:8px">인허가 요건 중 강의실 면적 기준과 소방 기준은 지역 조례·건물 상태에 따라 달라집니다. 계약 전에 광주광역시 서부교육지원청과 관할 소방서에 직접 확인하시는 것을 전제로 작성했습니다.</p>
     </div>
   </section>`;
