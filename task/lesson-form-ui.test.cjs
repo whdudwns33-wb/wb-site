@@ -253,7 +253,10 @@ test('admin can select multiple stable students and register one shared lesson i
   const saveStart = html.indexOf('async function saveLessonBatchRegistration(');
   const saveEnd = html.indexOf('let feedbackQueue', saveStart);
   const save = html.slice(saveStart, saveEnd);
-  assert.match(save, /batchKind: lessonPreviewRosterStudents\.length \? 'students' : 'lessons'/);
+  assert.match(preview, /lessonPreviewBatchKind = 'students'/);
+  assert.match(save, /const previewBatchKind = lessonPreviewBatchKind/);
+  assert.ok(save.indexOf('const previewBatchKind = lessonPreviewBatchKind') < save.indexOf("sync.post('/roster'"));
+  assert.match(save, /batchKind: previewBatchKind/);
   assert.match(save, /for \(const rosterStudent of rosterCandidates\)/);
 });
 
