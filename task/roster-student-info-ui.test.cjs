@@ -97,6 +97,7 @@ test('관리자 원생 수정은 승인 없는 휴원·퇴원·복귀와 복귀 
   assert.match(editor, /if \(!session\.isAdmin/);
   assert.match(editor, /data-roster-transition-staff/);
   assert.match(editor, /data-roster-return-subject/);
+  assert.match(editor, /data-roster-return-hours/);
   assert.match(editor, /data-roster-return-day/);
   assert.match(editor, /data-roster-return-time="startTime"/);
   assert.match(editor, /data-roster-return-time="endTime"/);
@@ -175,24 +176,25 @@ test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 
 test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업을 확인하고 수정할 수 있다', () => {
   const code = block('function rosterStudentLessonTasks(', 'function rosterStudentInfoHtml(');
   const tasks = [
-    { id: 'lesson-math', studentId: 'student-safe', subject: '수학', staffId: 'teacher-a', scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:50' }], start: '2026-08-21', lessonFormVersion: 1 },
+    { id: 'lesson-math', studentId: 'student-safe', subject: '수학', lessonHours: '2T', staffId: 'teacher-a', scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:50' }], start: '2026-08-21', lessonFormVersion: 1 },
     { id: 'lesson-eng', studentId: 'student-safe', subject: '영어', staffId: 'teacher-b', scheduleText: '금 19:00-19:50', lessonFormVersion: 1 },
     { id: 'lesson-deleted', studentId: 'student-safe', subject: '국어', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
     { id: 'lesson-other', studentId: 'student-other', subject: '과학', staffId: 'teacher-a', lessonFormVersion: 1 },
     { id: 'general-task', studentId: 'student-safe', subject: '사회', staffId: 'teacher-a' }
   ];
   const staff = { 'teacher-a': { name: '김남기' }, 'teacher-b': { name: '김혜지' } };
-  const helpers = new Function('state', 'isLesson', 'staffById', 'lessonAssignmentScheduleText', 'canEditLessonTask', 'esc',
+  const helpers = new Function('state', 'isLesson', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
       { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null,
       slots => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime).join(' / '),
-      task => !!task.lessonFormVersion, escapeHtml
+      value => value || '', task => !!task.lessonFormVersion, escapeHtml
     );
   assert.deepEqual(helpers.rosterStudentLessonTasks('student-safe').map(task => task.id), ['lesson-math', 'lesson-eng']);
   assert.deepEqual(helpers.rosterStudentLessonTasks(''), []);
   const rendered = helpers.rosterStudentLessonsHtml({ id: 'student-safe' });
   assert.match(rendered, /수학/);
   assert.match(rendered, /김남기 선생님/);
+  assert.match(rendered, /2T/);
   assert.match(rendered, /1·3 18:00-19:50/);
   assert.match(rendered, /data-act="lessonedit" data-id="lesson-math">이 수업 정보 수정/);
   assert.doesNotMatch(rendered, /lesson-deleted|lesson-other|general-task/);

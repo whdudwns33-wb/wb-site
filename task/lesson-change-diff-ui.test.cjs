@@ -8,10 +8,11 @@ const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 function diffHtml(task, changes) {
   const start = source.indexOf('function lessonChangeDiffHtml(');
   const end = source.indexOf('function ownLessonChangeCard(', start);
-  const factory = new Function('DOW', 'LESSON_CHANGE_REPEAT_LABEL', 'esc',
+  const factory = new Function('DOW', 'LESSON_CHANGE_REPEAT_LABEL', 'daysForDisplay', 'esc',
     source.slice(start, end) + '\nreturn lessonChangeDiffHtml;');
   const esc = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
-  return factory(['일', '월', '화', '수', '목', '금', '토'], { weekly: '매주' }, esc)(task, changes);
+  const daysForDisplay = days => (days || []).slice().sort((left, right) => ({ 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 })[left] - ({ 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 })[right]);
+  return factory(['일', '월', '화', '수', '목', '금', '토'], { weekly: '매주' }, daysForDisplay, esc)(task, changes);
 }
 
 test('관리자 수업 변경 검토는 요청된 항목만 변경 전과 변경 후로 나란히 표시한다', () => {

@@ -9,11 +9,13 @@
   const RANGE_RE = /((?:[01]?\d|2[0-3]):[0-5]\d)\s*(?:-|–|—|−|~|～)\s*((?:[01]?\d|2[0-3]):[0-5]\d)/g;
   const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+  const LESSON_HOURS = ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T'];
   const DAY_BY_KO = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
   const DAY_BY_EN = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const REQUIRED_FIELDS = [
     { key: 'student', fields: ['studentName', 'grade'], message: '학생 이름과 학년을 입력해 주세요' },
     { key: 'subjectClass', fields: ['subject', 'className'], any: true, message: '과목 또는 반을 입력해 주세요' },
+    { key: 'lessonHours', fields: ['lessonHours'], message: '수업시수를 선택해 주세요' },
     { key: 'schedule', fields: ['scheduleText', 'scheduleSlots'], any: true, message: '수업 요일과 시간을 입력해 주세요' },
     { key: 'materials', fields: ['materials'], message: '교재와 현재 진도를 입력해 주세요' },
     { key: 'onlineProgram', fields: ['onlineProgram'], message: '온라인 프로그램을 입력해 주세요 (없으면 없음)' },
@@ -47,6 +49,7 @@
       subject: text(source.subject),
       className: text(source.className),
       lessonRole: text(source.lessonRole),
+      lessonHours: text(source.lessonHours),
       scheduleText: text(source.scheduleText),
       scheduleSlots: Array.isArray(source.scheduleSlots) ? source.scheduleSlots.slice() : [],
       materials: text(source.materials),
@@ -316,6 +319,9 @@
     if (input.studentId && !SAFE_ID_RE.test(input.studentId)) {
       errors.push({ field: 'studentId', message: '학생 식별자를 확인해 주세요' });
     }
+    if (input.lessonHours && !LESSON_HOURS.includes(input.lessonHours)) {
+      errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요' });
+    }
     const schedule = resolveSchedule(input);
     return {
       valid: errors.length === 0,
@@ -385,8 +391,13 @@
 
   function scheduleTextFromSlots(slots) {
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-    return slots.map(slot =>
-      slot.days.map(day => dayNames[day]).join('·') + ' ' + slot.startTime + '-' + slot.endTime
+    const displayRank = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+    return slots.slice().sort((left, right) =>
+      Math.min.apply(null, left.days.map(day => displayRank[day])) - Math.min.apply(null, right.days.map(day => displayRank[day])) ||
+      left.startTime.localeCompare(right.startTime) || left.endTime.localeCompare(right.endTime)
+    ).map(slot =>
+      slot.days.slice().sort((left, right) => displayRank[left] - displayRank[right]).map(day => dayNames[day]).join('·') +
+        ' ' + slot.startTime + '-' + slot.endTime
     ).join(' / ');
   }
 
@@ -431,6 +442,7 @@
       subject: input.subject,
       className: input.className,
       lessonRole: role,
+      lessonHours: input.lessonHours,
       scheduleText: scheduleText,
       scheduleSlots: schedule.scheduleSlots,
       scheduleStatus: schedule.scheduleStatus,
@@ -464,6 +476,7 @@
 
   return {
     REQUIRED_FIELDS: REQUIRED_FIELDS,
+    LESSON_HOURS: LESSON_HOURS,
     normalizeLessonInput: normalizeLessonInput,
     normalizeDays: normalizeDays,
     resolveSchedule: resolveSchedule,

@@ -16,6 +16,7 @@ function validLesson(overrides = {}) {
     subject: '국어',
     className: '비문학',
     lessonRole: '독해력',
+    lessonHours: '2T',
     scheduleText: '월·수 17:00–19:00 / 일 12:00–14:00',
     scheduleSlots: [
       { days: [1, 3], startTime: '17:00', endTime: '19:00' },
@@ -159,6 +160,7 @@ test('server builds an owned lesson with stable assignment and audit fields', as
   assert.equal(task.repeat, 'days');
   assert.equal(task.lessonFormVersion, 1);
   assert.equal(task.lessonRevision, 1);
+  assert.equal(task.lessonHours, '2T');
   assert.match(task.lessonAssignmentKey, /^sha256:/);
   assert.match(task.lessonContentHash, /^sha256:/);
   assert.equal(task.scheduleStatus, 'confirmed');
@@ -220,8 +222,8 @@ test('legacy student-name assignment identity stays byte compatible while schedu
   const task = await buildLessonTask(validLesson({ adminRequest: '없음' }), 'teacher-1', 'staff', 1234);
   assert.equal(task.id, 'lesson-1eb0da14754100ea367b49314a88594d');
   assert.equal(task.lessonAssignmentKey, 'sha256:1eb0da14754100ea367b49314a88594d7dfeaffe0300f61c9a8d84bce05c508e');
-  assert.equal(task.scheduleText, '일 12:00-14:00 / 월·수 17:00-19:00');
-  assert.equal(task.lessonContentHash, 'sha256:77ffd295180c0bc9bbc1b3b266d188f85feaa0fb5c1ea970c6ad2de4c94e032a');
+  assert.equal(task.scheduleText, '월·수 17:00-19:00 / 일 12:00-14:00');
+  assert.equal(task.lessonContentHash, 'sha256:e533d05ef236bf4a150c313ee196f78f41e1ca967ae0f170d2e6a2aed8ea21c9');
 });
 test('structured schedule alone is canonicalized and produces schedule text', async () => {
   const task = await buildLessonTask(validLesson({
@@ -237,7 +239,15 @@ test('structured schedule alone is canonicalized and produces schedule text', as
   assert.deepEqual(task.scheduleSlots.map(slot => slot.slotId), ['slot-1', 'slot-2']);
 });
 
-test('all nine form groups are enforced and literal 없음 is accepted', async () => {
+test('all lesson form groups including independent lesson hours are enforced and literal 없음 is accepted', async () => {
+  await assert.rejects(
+    () => buildLessonTask(validLesson({ lessonHours: '' }), 'teacher-1', 'staff', 1),
+    /필수 항목/
+  );
+  await assert.rejects(
+    () => buildLessonTask(validLesson({ lessonHours: '110분' }), 'teacher-1', 'staff', 1),
+    /수업시수/
+  );
   for (const field of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest']) {
     await assert.rejects(
       () => buildLessonTask(validLesson({ [field]: '' }), 'teacher-1', 'staff', 1),
@@ -545,7 +555,7 @@ test('structured slots replace stale prose schedule text', async () => {
   assert.equal(task.scheduleStatus, 'confirmed');
   assert.equal(task.scheduleSlots.length, 2);
   assert.equal(task.repeat, 'days');
-  assert.equal(task.scheduleText, '일 12:00-14:00 / 월·수 17:00-19:00');
+  assert.equal(task.scheduleText, '월·수 17:00-19:00 / 일 12:00-14:00');
   assert.equal(task.scheduleReviewReason, '');
 });
 
