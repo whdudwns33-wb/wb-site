@@ -45,11 +45,35 @@ function view(row) {
     eventType: String(row.event_type),
     changedFields: parsed(row.changed_fields, []),
     details: parsed(row.details, {}),
+    audienceStaffIds: parsed(row.audience_staff_ids, []),
     effectiveDate: row.effective_date == null ? '' : String(row.effective_date),
     requiresAck: Number(row.requires_ack) === 1,
     acknowledged: Number(row.acknowledged) === 1,
-    changedAt: Number(row.changed_at)
+    changedAt: Number(row.changed_at),
+    changedBy: String(row.changed_by || '')
   };
+}
+
+async function adminAudienceStatuses(env, app, events) {
+  const result = await env.DB.prepare(
+    'SELECT event_id,actor_key,acknowledged_at FROM student_change_acknowledgements ' +
+    'WHERE app=? ORDER BY acknowledged_at DESC LIMIT 5000'
+  ).bind(app).all();
+  const acknowledgement = new Map();
+  for (const row of result.results || []) {
+    const actorKey = String(row.actor_key || '');
+    const match = /^(?:staff|manager):([A-Za-z0-9_-]{1,160})$/.exec(actorKey);
+    if (!match) continue;
+    const key = String(row.event_id) + '\u001f' + match[1];
+    if (!acknowledgement.has(key)) acknowledgement.set(key, Number(row.acknowledged_at));
+  }
+  return events.map(event => ({
+    ...event,
+    audienceStatus: event.audienceStaffIds.map(staffId => ({
+      staffId: String(staffId),
+      acknowledgedAt: acknowledgement.get(event.eventId + '\u001f' + String(staffId)) || null
+    }))
+  }));
 }
 
 async function visibleEvents(env, app, auth, actorKey, studentId, pendingOnly) {
@@ -80,7 +104,9 @@ export async function handleStudentChange(env, app, body, origin, auth, json) {
   const actorKey = studentChangeActorKey(auth);
   if (action === 'list') {
     const rows = await visibleEvents(env, app, auth, actorKey, '', false);
-    return json({ ok: true, events: rows.map(view) }, 200, origin);
+    const events = rows.map(view);
+    return json({ ok: true, events: auth.scope === 'all'
+      ? await adminAudienceStatuses(env, app, events) : events }, 200, origin);
   }
 
   const studentId = String(body.studentId || '');
