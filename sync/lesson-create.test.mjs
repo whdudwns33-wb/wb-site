@@ -629,6 +629,32 @@ test('admin atomically registers one shared lesson for multiple stable students'
   assert.deepEqual(new Set(result.data.tasks.map(task => task.staffId)), new Set(['teacher-1']));
 });
 
+test('server safely recognizes multiple students even when a stale client sends the old batch kind', async () => {
+  const db = new FakeDB();
+  db.privateRoster.roster.students[0].name = '가학생';
+  db.privateRoster.roster.students[1].name = '나학생';
+  db.privateRoster.roster.students[1].grade = '초5';
+  db.privateRoster.roster.students.push({ id: 'student-c', name: '다학생', grade: '초6', teacherIds: [] });
+  const sharedClass = {
+    lessonHours: '1.5T',
+    scheduleText: '토 12:00-13:20 · 1.5T',
+    scheduleSlots: [{ days: [6], startTime: '12:00', endTime: '13:20', lessonHours: '1.5T' }]
+  };
+  const response = await handleLessonCreateBatch({ DB: db }, 'task', {
+    batchKind: 'lessons',
+    lessons: [
+      { staffId: 'teacher-1', lesson: assignedLesson({ ...sharedClass, studentId: 'student-a', studentName: '가학생', grade: '초4' }) },
+      { staffId: 'teacher-1', lesson: assignedLesson({ ...sharedClass, studentId: 'student-b', studentName: '나학생', grade: '초5' }) },
+      { staffId: 'teacher-1', lesson: assignedLesson({ ...sharedClass, studentId: 'student-c', studentName: '다학생', grade: '초6' }) }
+    ]
+  }, '*', { scope: 'all', role: 'admin' }, json);
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(data.batchKind, 'students');
+  assert.equal(data.createdCount, 3);
+  assert.equal(db.tasks.size, 3);
+});
+
 test('multi-student batch rejects duplicate students or differing class templates', async () => {
   const duplicateDb = new FakeDB();
   const duplicate = await callStudentBatch(duplicateDb, [

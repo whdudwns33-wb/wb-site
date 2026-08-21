@@ -619,11 +619,13 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
     return json({ ok: false, error: '관리자만 수업을 일괄 등록할 수 있습니다' }, 403, origin);
   }
   body = body && typeof body === 'object' ? body : {};
-  const batchKind = body.batchKind == null || body.batchKind === '' ? 'lessons' : String(body.batchKind);
-  if (!['lessons', 'students'].includes(batchKind)) {
+  const requested = Array.isArray(body.lessons) ? body.lessons : [];
+  const declaredBatchKind = body.batchKind == null || body.batchKind === '' ? 'lessons' : String(body.batchKind);
+  if (!['lessons', 'students'].includes(declaredBatchKind)) {
     return json({ ok: false, error: '수업 일괄 등록 방식을 확인해 주세요' }, 400, origin);
   }
-  const requested = Array.isArray(body.lessons) ? body.lessons : [];
+  const requestedStudentIds = new Set(requested.map(item => String(item && item.lesson && item.lesson.studentId || '')).filter(Boolean));
+  const batchKind = requestedStudentIds.size > 1 ? 'students' : declaredBatchKind;
   const maxBatchLessons = batchKind === 'students' ? MAX_STUDENT_BATCH_LESSONS : MAX_BATCH_LESSONS;
   if (!requested.length || requested.length > maxBatchLessons) {
     return json({ ok: false, error: '한 번에 등록할 수업은 1건 이상 ' + maxBatchLessons + '건 이하입니다' }, 400, origin);
