@@ -99,7 +99,7 @@ test('admin direct lesson registration reuses the new-student information fields
   }
   assert.doesNotMatch(fields, /data-lesson-roster-teacher/);
   assert.match(fields, /lessonList\.map\(item => String\(item\.staffId \|\| ''\)\)/);
-  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
+  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉']) {
     assert.match(html, new RegExp(subject));
   }
   const saveStart = html.indexOf('async function saveLessonRegistration(');

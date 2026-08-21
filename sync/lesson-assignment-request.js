@@ -5,7 +5,7 @@ const MAX_NAME = 40;
 const MAX_GRADE = 20;
 const MAX_NOTE = 500;
 const SUBJECT_OPTIONS = new Set([
-  '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답'
+  '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);
 
 const text = (value, max) => String(value == null ? '' : value).normalize('NFKC').trim().slice(0, max);

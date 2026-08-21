@@ -99,7 +99,7 @@ async function body(response) { return response.json(); }
 const own = { scope: 'own', id: 'teacher-1', role: 'staff' };
 const all = { scope: 'all', id: 'manager-1', role: 'manager' };
 const request = {
-  action:'submit', studentId:'student-1', subjects:['수학'], startDate:'2026-08-25', reason:'신규 수업 배정',
+  action:'submit', studentId:'student-1', subjects:['클리닉'], startDate:'2026-08-25', reason:'클리닉 수업 배정',
   scheduleSlots:[{days:[1,3],startTime:'16:00',endTime:'17:00'}]
 };
 
@@ -130,13 +130,14 @@ test('modern approval assigns the stable student and creates the requested lesso
   const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', request, '*', own, json));
   assert.equal(submitted.ok, true);
   assert.equal(submitted.request.studentId, 'student-1');
-  assert.deepEqual(submitted.request.details.subjects, ['수학']);
+  assert.deepEqual(submitted.request.details.subjects, ['클리닉']);
   const approved = await body(await handleLessonAssignmentReview({ DB: db }, 'task', {
     action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
   }, '*', all, json));
   assert.equal(approved.ok, true);
   assert.equal(approved.task.studentId, 'student-1');
   assert.equal(approved.task.staffId, 'teacher-1');
+  assert.equal(approved.task.subject, '클리닉');
   assert.deepEqual(approved.task.scheduleSlots[0].days, [1,3]);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, ['teacher-1']);
   assert.equal(db.tasks.size, 1);
