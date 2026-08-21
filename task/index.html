@@ -779,6 +779,14 @@
   .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .new-marker { display:inline; margin-left:5px; color:#D92D20; font-size:12px; font-weight:900; line-height:1; vertical-align:middle; }
   .student-info-field .new-marker, .card-title .new-marker { display:inline; color:#D92D20; font-size:12px; line-height:1; white-space:normal; }
+  .admin-directive-card { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #FAFCFD; }
+  .admin-directive-card + .admin-directive-card { margin-top: 8px; }
+  .admin-directive-card.is-important { border-color: #F2B8B0; background: #FFF8F6; }
+  .admin-directive-body { margin-top: 7px; color: var(--navy); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .admin-directive-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .admin-directive-history { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .admin-directive-history > summary { min-height: 40px; cursor: pointer; color: var(--deep-blue); font-size: 12px; font-weight: 900; }
+  .admin-directive-sound { border-color: #B9DDF0; background: #F4FBFF; }
   .student-change-history { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .parent-preview-note { max-width: 420px; margin: 10px auto 0; color: var(--mid-gray); font-size: 12px; line-height: 1.55; text-align: center; }
   .modal-box:has(.parent-preview-shell) { max-width: 620px; }
@@ -909,11 +917,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.18"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.18"></script>
-<script src="./asset-core.js?v=2026-08-21.18"></script>
-<script src="./qr-core.js?v=2026-08-21.18"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.18"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.19"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.19"></script>
+<script src="./asset-core.js?v=2026-08-21.19"></script>
+<script src="./qr-core.js?v=2026-08-21.19"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.19"></script>
 <script>
 "use strict";
 
@@ -2360,6 +2368,8 @@ function viewToday() {
       '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
     '</div></div></div>';
 
+  if (session.isStaffLink && me.id === session.staffId) h += adminDirectiveSoundPromptHtml();
+
   if (session.isStaffLink && me.id === session.staffId && cursor === today()) {
     const att = attOf(me.id, cursor);
     let attUi;
@@ -2511,11 +2521,12 @@ function lessonWorkInstructionHtml(task, lessonDate) {
     ['목표', task.goal, ['goal']],
     ['특이사항·학부모 요청', task.parentRequest, ['parentRequest']],
     ['관리자 요청사항', task.adminRequest || '없음', ['adminRequest']]
-  ].filter(row => String(row[1] || '').trim());
+  ].filter(row => row[0] !== '관리자 요청사항' && String(row[1] || '').trim());
   return '<section class="lesson-briefing-instructions"><div class="card-title">업무지시</div>' +
     '<div class="card-sub mb14">현재 수업의 핵심 정보와 관리자가 입력한 업무지시입니다. 출결·5단계·실제 진도·숙제와 준비물은 수업진행에서 입력합니다.</div>' +
     '<div class="student-info-grid">' + (rows.length ? rows.map(row => field(row[0], row[1], row[2])).join('') :
-      '<div class="empty">등록된 추가 업무지시가 없습니다.</div>') + '</div></section>';
+      '<div class="empty">등록된 추가 업무지시가 없습니다.</div>') + '</div>' +
+    '<div aria-label="관리자 요청사항">' + lessonAdminRequestsHtml(task) + '</div></section>';
 }
 
 function showTodayLessonBriefing(taskId, lessonDate) {
@@ -4287,7 +4298,7 @@ function viewLessonEntry() {
       '</div></details>' + lessonAssignmentRequestHtml();
   }
   const editing = !!draft._sourceTaskId;
-  const registration = '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
+  const registration = adminDirectiveManagerHtml() + '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
     '<span class="card-sub">학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록할 수 있습니다.</span></span></summary>' +
     '<div class="admin-collapsible-body">' + (editing
       ? '<div class="hint">현재 기존 수업을 수정 중입니다. 기존 수업 변경에서 수정을 마치거나 취소해 주세요.</div>'
@@ -6917,6 +6928,23 @@ function managerRequestInboxRows() {
       guardianRequestRevision: Number(row.revision) || 0
     });
   });
+  const directiveInboxRows = typeof adminDirectiveManageRows === 'undefined' ? [] : adminDirectiveManageRows;
+  directiveInboxRows.filter(row => row.isCurrent && row.directiveStatus === 'active').forEach(row => {
+    const pending = typeof adminDirectiveAudienceSummary === 'function' ? adminDirectiveAudienceSummary(row).pending : [];
+    if (pending.length) push('공통 요청 미확인', row.title,
+      '미확인: ' + pending.map(item => item.staffName || managerRequestTeacher(item.staffId)).join(', '), '', 'lesson', row.updatedAt, -2);
+  });
+  const studentChangeInboxEvents = typeof studentChangeEvents === 'undefined' ? [] : studentChangeEvents;
+  studentChangeInboxEvents.filter(event => event.requiresAck && Array.isArray(event.audienceStatus)).forEach(event => {
+    const pending = event.audienceStatus.filter(item => !item.acknowledgedAt);
+    if (!pending.length) return;
+    const task = state.tasks.find(row => String(row.id) === String(event.taskId || ''));
+    const student = rosterDb && rosterDb.students && rosterDb.students.find(row => String(row.id) === String(event.studentId || ''));
+    push(event.eventType === 'student_information' ? '학생정보 미확인' : '업무지시 미확인',
+      (student && student.name) || (task && task.studentName) || '학생 정보',
+      '미확인: ' + pending.map(item => managerRequestTeacher(item.staffId)).join(', '), '',
+      event.eventType === 'student_information' ? 'roster' : 'lesson', event.changedAt, -1);
+  });
 
   return rows.sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt || a.kind.localeCompare(b.kind, 'ko'));
 }
@@ -6925,12 +6953,13 @@ function managerRequestInboxCount() { return session.isAdmin ? managerRequestInb
 
 function managerRequestInboxReady() {
   return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded &&
-    bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded && guardianRequestsLoaded;
+    bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded && guardianRequestsLoaded &&
+    studentChangeLoaded && adminDirectiveManageLoaded;
 }
 
 function managerRequestInboxErrors() {
   return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError,
-    bookIssueError, guardianRequestsError]
+    bookIssueError, guardianRequestsError, studentChangeError, adminDirectiveError]
     .filter(Boolean);
 }
 
@@ -6941,7 +6970,8 @@ async function loadManagerRequestInbox(force) {
   try {
     await Promise.all([
       loadLessonAssignmentRequests(force), loadLessonChangeQueue(force), loadFeedbackQueue(force),
-      loadBookAddQueue(force), loadBookEditQueue(force), loadBookIssues(force), loadGuardianRequests(force)
+      loadBookAddQueue(force), loadBookEditQueue(force), loadBookIssues(force), loadGuardianRequests(force),
+      loadStudentChanges(force), loadAdminDirectives(force, false)
     ]);
   } finally {
     managerInboxLoading = false;
@@ -10156,6 +10186,343 @@ async function acknowledgeStudentChanges(studentId, button) {
     toast('확인 저장 실패 — ' + (error.message || error));
   }
 }
+
+/* ── 관리자 공통 요청 · 선생님별 확인 이력 ── */
+let adminDirectiveManageRows = [], adminDirectiveOwnRows = [];
+let adminDirectiveManageLoaded = false, adminDirectiveOwnLoaded = false;
+let adminDirectiveLoading = false, adminDirectiveError = '', adminDirectiveSaving = false;
+let adminDirectiveEditor = null, adminDirectiveAudioContext = null;
+
+function normalizeAdminDirective(row) {
+  if (!row || !/^adr_[A-Za-z0-9_-]+$/.test(String(row.directiveId || ''))) return null;
+  return {
+    directiveId: String(row.directiveId), revision: Number(row.revision) || 0,
+    currentRevision: Number(row.currentRevision) || 0, isCurrent: !!row.isCurrent,
+    directiveStatus: String(row.directiveStatus || ''), displayStatus: String(row.displayStatus || ''),
+    title: String(row.title || ''), body: String(row.body || ''),
+    priority: row.priority === 'important' ? 'important' : 'normal',
+    startsDate: String(row.startsDate || ''), expiresDate: String(row.expiresDate || ''),
+    audienceStaffIds: Array.isArray(row.audienceStaffIds) ? row.audienceStaffIds.map(String) : [],
+    audienceStatus: Array.isArray(row.audienceStatus) ? row.audienceStatus.map(status => ({
+      staffId: String(status.staffId || ''), staffName: String(status.staffName || ''),
+      openedAt: Number(status.openedAt) || null, acknowledgedAt: Number(status.acknowledgedAt) || null
+    })) : [],
+    openedAt: Number(row.openedAt) || null, acknowledgedAt: Number(row.acknowledgedAt) || null,
+    createdAt: Number(row.createdAt) || 0, updatedAt: Number(row.updatedAt) || 0,
+    endedAt: Number(row.endedAt) || null
+  };
+}
+
+async function loadAdminDirectives(force, allowPopup) {
+  if (adminDirectiveLoading) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  const needManage = session.isAdmin && (force || !adminDirectiveManageLoaded);
+  const needOwn = session.isStaffLink && session.staffId && (force || !adminDirectiveOwnLoaded);
+  if (!needManage && !needOwn) {
+    if (allowPopup) showPendingAdminDirectivePopup();
+    return;
+  }
+  adminDirectiveLoading = true; adminDirectiveError = '';
+  try {
+    const results = await Promise.all([
+      needManage ? sync.post('/admin-directive', { app: SYNC_APP, auth: auth, action: 'list', view: 'manage' }) : null,
+      needOwn ? sync.post('/admin-directive', { app: SYNC_APP, auth: auth, action: 'list', view: 'own' }) : null
+    ]);
+    if (results[0]) {
+      adminDirectiveManageRows = (results[0].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      adminDirectiveManageLoaded = true;
+    }
+    if (results[1]) {
+      adminDirectiveOwnRows = (results[1].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      adminDirectiveOwnLoaded = true;
+    }
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    adminDirectiveError = String(error && error.message || error);
+    if (needManage) adminDirectiveManageLoaded = true;
+    if (needOwn) adminDirectiveOwnLoaded = true;
+  } finally {
+    adminDirectiveLoading = false;
+    renderAfterSync();
+    if (allowPopup) showPendingAdminDirectivePopup();
+  }
+}
+
+function adminDirectiveRowsForStaff(staffId) {
+  const stableId = String(staffId || '');
+  const source = session.isStaffLink && stableId === String(session.staffId || '') && adminDirectiveOwnLoaded
+    ? adminDirectiveOwnRows : adminDirectiveManageRows.filter(row => row.audienceStaffIds.includes(stableId));
+  return source.slice().sort((a, b) => b.createdAt - a.createdAt || b.revision - a.revision);
+}
+
+function currentAdminDirectiveRows(staffId) {
+  return adminDirectiveRowsForStaff(staffId).filter(row => row.isCurrent &&
+    (row.displayStatus === 'active' || row.displayStatus === 'scheduled'));
+}
+
+function pastAdminDirectiveRows(staffId) {
+  return adminDirectiveRowsForStaff(staffId).filter(row => !row.isCurrent ||
+    ['ended', 'expired'].includes(row.displayStatus)).slice(0, 3);
+}
+
+function lessonAdminRequestHistory(task) {
+  const seen = new Set();
+  return studentChangeEvents.filter(event => event.eventType === 'work_instruction' &&
+    String(event.taskId || '') === String(task.id || '') &&
+    (event.changedFields || []).map(String).includes('adminRequest'))
+    .sort((a, b) => Number(b.changedAt) - Number(a.changedAt)).map(event => ({
+      body: String(event.details && event.details.before && event.details.before.adminRequest || '').trim(),
+      changedAt: Number(event.changedAt) || 0
+    })).filter(row => row.body && !seen.has(row.body) && seen.add(row.body)).slice(0, 3);
+}
+
+function adminDirectiveDateText(row) {
+  return row.startsDate + (row.expiresDate ? ' ~ ' + row.expiresDate : '부터') +
+    (row.displayStatus === 'scheduled' ? ' · 예정' : '');
+}
+
+function adminDirectiveLessonCard(row, acknowledge) {
+  const pending = acknowledge && !row.acknowledgedAt;
+  return '<div class="admin-directive-card' + (row.priority === 'important' ? ' is-important' : '') + '">' +
+    '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 공통 요청') : '') + '</b>' +
+      (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">공통</span>') + '</div>' +
+    '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
+    '<div class="small muted mt8">' + esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div>' +
+    (pending ? '<button class="btn btn-sm btn-primary mt8" data-act="adminDirectiveAck" data-directive="' +
+      esc(row.directiveId) + '" data-rev="' + row.revision + '">이 공통 요청 확인</button>' : '') + '</div>';
+}
+
+function lessonAdminRequestsHtml(task) {
+  const lessonPending = studentChangedFieldSet(task.studentId, task.id).has('adminRequest');
+  const lessonHistory = lessonAdminRequestHistory(task);
+  const commonCurrent = currentAdminDirectiveRows(task.staffId);
+  const commonPast = pastAdminDirectiveRows(task.staffId);
+  const canAcknowledge = session.isStaffLink && String(session.staffId || '') === String(task.staffId || '');
+  return '<section class="mt14"><div class="card-title">관리자 요청사항' +
+    ((lessonPending || commonCurrent.some(row => canAcknowledge && !row.acknowledgedAt)) ? newMarker('확인하지 않은 관리자 요청') : '') + '</div>' +
+    '<div class="card-sub mb8">수업별 요청과 여러 선생님에게 전달한 공통 요청을 나누어 표시합니다.</div>' +
+    '<div class="admin-directive-card"><div class="between"><b>현재 수업 요청' +
+      (lessonPending ? newMarker('수정된 수업 요청') : '') + '</b><span class="tag">수업</span></div>' +
+      '<div class="admin-directive-body">' + esc(String(task.adminRequest || '').trim() || '등록된 요청이 없습니다.') + '</div></div>' +
+    '<details class="admin-directive-history"><summary>지난 수업 요청 보기 · 최신 3개</summary>' +
+      (lessonHistory.length ? lessonHistory.map(row => '<div class="guide mb8"><b>' +
+        esc(new Date(row.changedAt).toLocaleDateString('ko-KR')) + '</b><br>' + esc(row.body) + '</div>').join('') :
+        '<div class="small muted">지난 수업 요청이 없습니다.</div>') + '</details>' +
+    '<div class="sect">현재 공통 요청</div>' +
+      (commonCurrent.length ? commonCurrent.map(row => adminDirectiveLessonCard(row, canAcknowledge)).join('') :
+        '<div class="small muted">현재 전달된 공통 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 공통 요청 보기 · 최신 3개</summary>' +
+      (commonPast.length ? commonPast.map(row => adminDirectiveLessonCard(row, false)).join('') :
+        '<div class="small muted">지난 공통 요청이 없습니다.</div>') + '</details></section>';
+}
+
+function adminDirectiveSoundKey() {
+  return 'wb_admin_directive_sound_' + String(session.staffId || '');
+}
+
+function adminDirectiveSoundEnabled() {
+  try { return !!session.staffId && localStorage.getItem(adminDirectiveSoundKey()) === '1'; }
+  catch (error) { return false; }
+}
+
+function adminDirectiveSoundPromptHtml() {
+  if (!session.isStaffLink || !session.staffId || adminDirectiveSoundEnabled()) return '';
+  return '<div class="card admin-directive-sound"><div class="between"><div><div class="card-title">🔔 관리자 요청 알림</div>' +
+    '<div class="card-sub">버튼을 한 번 누르면 새 공통 요청 팝업과 함께 알림음이 울립니다.</div></div>' +
+    '<button class="btn btn-sm btn-primary" data-act="adminDirectiveSound">알림음 켜기</button></div></div>';
+}
+
+function ensureAdminDirectiveAudio() {
+  if (!adminDirectiveAudioContext) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) adminDirectiveAudioContext = new AudioContext();
+  }
+  if (adminDirectiveAudioContext && adminDirectiveAudioContext.state === 'suspended') {
+    adminDirectiveAudioContext.resume().catch(() => {});
+  }
+  return adminDirectiveAudioContext;
+}
+
+function playAdminDirectiveSound() {
+  if (!adminDirectiveSoundEnabled()) return;
+  const context = ensureAdminDirectiveAudio();
+  if (!context || context.state !== 'running') return;
+  const start = context.currentTime;
+  [0, .18].forEach((delay, index) => {
+    const oscillator = context.createOscillator(), gain = context.createGain();
+    oscillator.type = 'sine'; oscillator.frequency.value = index ? 880 : 660;
+    gain.gain.setValueAtTime(.0001, start + delay);
+    gain.gain.exponentialRampToValueAtTime(.12, start + delay + .015);
+    gain.gain.exponentialRampToValueAtTime(.0001, start + delay + .14);
+    oscillator.connect(gain); gain.connect(context.destination);
+    oscillator.start(start + delay); oscillator.stop(start + delay + .15);
+  });
+}
+
+function showPendingAdminDirectivePopup() {
+  if (!session.isStaffLink || !session.staffId || !adminDirectiveOwnLoaded || !$('#modalHost').hidden) return;
+  const row = adminDirectiveOwnRows.find(item => item.isCurrent && item.displayStatus === 'active' && !item.acknowledgedAt);
+  if (!row) return;
+  const shownKey = 'wb_admin_directive_popup_' + session.staffId + '_' + row.directiveId + '_' + row.revision;
+  if (sessionStorage.getItem(shownKey)) return;
+  sessionStorage.setItem(shownKey, '1');
+  sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'opened',
+    directiveId: row.directiveId, revision: row.revision }).catch(() => {});
+  playAdminDirectiveSound();
+  modal('관리자 공통 요청', adminDirectiveLessonCard(row, false),
+    '<button class="btn btn-primary btn-block mt14" data-act="adminDirectiveAck" data-directive="' +
+    esc(row.directiveId) + '" data-rev="' + row.revision + '" data-popup="true">확인했습니다</button>');
+}
+
+async function acknowledgeAdminDirective(directiveId, revision, button, fromPopup) {
+  const auth = sync.auth();
+  if (!auth) return toast('개인 인증을 확인해 주세요');
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/admin-directive', { app: SYNC_APP, auth: auth, action: 'acknowledge',
+      directiveId: String(directiveId), revision: Number(revision) });
+    if (!$('#modalHost').hidden) closeModal();
+    await loadAdminDirectives(true, false);
+    toast('공통 요청을 확인했습니다');
+    if (fromPopup) setTimeout(showPendingAdminDirectivePopup, 120);
+  } catch (error) {
+    if (button) button.disabled = false;
+    toast('확인 저장 실패 — ' + (error.message || error));
+  }
+}
+
+function adminDirectiveAudienceSummary(row) {
+  const total = row.audienceStatus.length;
+  const confirmed = row.audienceStatus.filter(status => status.acknowledgedAt).length;
+  return { total, confirmed, pending: row.audienceStatus.filter(status => !status.acknowledgedAt) };
+}
+
+function adminDirectiveManageCard(row, historical) {
+  const status = adminDirectiveAudienceSummary(row);
+  return '<div class="admin-directive-card' + (row.priority === 'important' ? ' is-important' : '') + '">' +
+    '<div class="between"><div><b>' + esc(row.title) + '</b><div class="small muted">' +
+      esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div></div>' +
+      '<span class="pill ' + (status.confirmed < status.total && !historical ? 'warn' : 'ok') + '">확인 ' + status.confirmed + '/' + status.total + '</span></div>' +
+    '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
+    '<details class="admin-directive-history"><summary>선생님별 확인 현황</summary>' +
+      row.audienceStatus.map(item => '<div class="small mt8"><b>' + esc(item.staffName || managerRequestTeacher(item.staffId)) + '</b> · ' +
+        (item.acknowledgedAt ? '확인 ' + esc(new Date(item.acknowledgedAt).toLocaleString('ko-KR')) :
+          item.openedAt ? '열어봄 · 확인 버튼 미완료' : '미확인') + '</div>').join('') + '</details>' +
+    (!historical && row.directiveStatus === 'active' ? '<div class="row mt8" style="gap:6px"><button class="btn btn-sm btn-ghost" data-act="adminDirectiveEdit" data-directive="' +
+      esc(row.directiveId) + '">수정</button><button class="btn btn-sm btn-danger" data-act="adminDirectiveEnd" data-directive="' +
+      esc(row.directiveId) + '" data-rev="' + row.revision + '">종료</button></div>' : '') + '</div>';
+}
+
+function studentChangeAcknowledgementStatusHtml() {
+  const rows = studentChangeEvents.filter(event => event.requiresAck && Array.isArray(event.audienceStatus)).slice(0, 30);
+  return '<details class="admin-directive-history"><summary>학생정보·업무지시 확인 현황 · 최근 ' + rows.length + '건</summary>' +
+    (rows.length ? rows.map(event => {
+      const statuses = event.audienceStatus || [];
+      const done = statuses.filter(item => item.acknowledgedAt).length;
+      const student = rosterDb && rosterDb.students && rosterDb.students.find(item => String(item.id) === String(event.studentId));
+      const title = event.eventType === 'student_information' ? '학생정보 수정' : '업무지시 수정';
+      return '<div class="guide mb8"><b>' + esc((student && student.name || '학생') + ' · ' + title) + '</b><br>' +
+        '확인 ' + done + '/' + statuses.length +
+        (statuses.length ? '<div class="small muted mt8">미확인: ' + esc(statuses.filter(item => !item.acknowledgedAt)
+          .map(item => managerRequestTeacher(item.staffId)).join(', ') || '없음') + '</div>' : '') + '</div>';
+    }).join('') : '<div class="small muted">표시할 변경 이력이 없습니다.</div>') + '</details>';
+}
+
+function adminDirectiveManagerHtml() {
+  if (!session.isAdmin) return '';
+  if ((!adminDirectiveManageLoaded || !studentChangeLoaded) && !adminDirectiveLoading) {
+    setTimeout(() => Promise.all([loadAdminDirectives(false, false), loadStudentChanges(false)]), 0);
+  }
+  const current = adminDirectiveManageRows.filter(row => row.isCurrent && row.directiveStatus === 'active');
+  const history = adminDirectiveManageRows.filter(row => !row.isCurrent || row.directiveStatus === 'ended');
+  const pending = current.reduce((sum, row) => sum + adminDirectiveAudienceSummary(row).pending.length, 0);
+  return '<details class="card admin-collapsible admin-directive-manager"><summary><span><b>📣 공통 관리자 요청</b>' +
+    '<span class="card-sub">전체 또는 여러 선생님에게 전달하고 확인 여부를 관리합니다.</span></span><span class="pill ' +
+    (pending ? 'warn' : '') + '">미확인 ' + pending + '명</span></summary><div class="admin-collapsible-body">' +
+    '<button class="btn btn-primary btn-block mb14" data-act="adminDirectiveAdd">새 공통 요청 작성</button>' +
+    (adminDirectiveError ? '<div class="hint mb14" role="alert">' + esc(adminDirectiveError) +
+      '<button class="btn btn-sm btn-ghost mt8" data-act="adminDirectiveRefresh">다시 불러오기</button></div>' : '') +
+    (current.length ? current.map(row => adminDirectiveManageCard(row, false)).join('') :
+      '<div class="empty"><b>📣</b>현재 전달 중인 공통 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 공통 요청 전체 기록 · ' + history.length + '건</summary>' +
+      (history.length ? history.map(row => adminDirectiveManageCard(row, true)).join('') :
+        '<div class="small muted">지난 기록이 없습니다.</div>') + '</details>' +
+    studentChangeAcknowledgementStatusHtml() + '</div></details>';
+}
+
+function openAdminDirectiveEditor(directiveId) {
+  const current = directiveId ? adminDirectiveManageRows.find(row => row.directiveId === directiveId && row.isCurrent) : null;
+  const activeIds = teamStaff().map(staff => String(staff.id)).sort();
+  const audience = current ? current.audienceStaffIds.slice().sort() : [];
+  adminDirectiveEditor = {
+    directiveId: current ? current.directiveId : 'adr_' + uid(), expectedRevision: current ? current.revision : 0,
+    title: current ? current.title : '', body: current ? current.body : '',
+    priority: current ? current.priority : 'normal', startsDate: current ? current.startsDate : today(),
+    expiresDate: current ? current.expiresDate : '',
+    targetType: current && (audience.length !== activeIds.length || audience.some((id, index) => id !== activeIds[index])) ? 'staff' : 'all',
+    staffIds: audience
+  };
+  adminDirectiveEditorModal();
+}
+
+function adminDirectiveEditorModal() {
+  const draft = adminDirectiveEditor;
+  if (!draft) return;
+  const selected = new Set(draft.staffIds || []);
+  modal(draft.expectedRevision ? '공통 관리자 요청 수정' : '새 공통 관리자 요청',
+    '<label class="field"><span class="fl">제목</span><input class="in" id="adTitle" maxlength="100" value="' + esc(draft.title) + '" placeholder="예: 오늘 수업 전 확인"></label>' +
+    '<label class="field"><span class="fl">요청 내용</span><textarea class="in" id="adBody" rows="6" maxlength="2000" placeholder="선생님이 바로 실행할 수 있도록 적어 주세요.">' + esc(draft.body) + '</textarea></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">중요도</span><select class="in" id="adPriority"><option value="normal"' +
+      (draft.priority === 'normal' ? ' selected' : '') + '>일반</option><option value="important"' + (draft.priority === 'important' ? ' selected' : '') + '>중요</option></select></label>' +
+    '<label class="field"><span class="fl">전달 시작일</span><input class="in" id="adStarts" type="date" value="' + esc(draft.startsDate) + '"></label></div>' +
+    '<label class="field"><span class="fl">종료일 · 선택</span><input class="in" id="adExpires" type="date" value="' + esc(draft.expiresDate) + '"></label>' +
+    '<label class="field"><span class="fl">전달 대상</span><select class="in" id="adTargetType" data-admin-directive-target><option value="all"' +
+      (draft.targetType === 'all' ? ' selected' : '') + '>모든 선생님</option><option value="staff"' + (draft.targetType === 'staff' ? ' selected' : '') + '>일부 선생님 중복 선택</option></select></label>' +
+    '<div class="field"><span class="fl">선생님 선택</span><div class="chips">' + teamStaff().map(staff =>
+      '<label class="chip"><input type="checkbox" data-admin-directive-staff value="' + esc(staff.id) + '"' +
+      (selected.has(String(staff.id)) ? ' checked' : '') + (draft.targetType === 'all' ? ' disabled' : '') + '> ' + esc(staff.name) + '</label>').join('') + '</div>' +
+      '<div class="small muted mt8">모든 선생님은 저장 시점의 활성 직원 ID를 대상으로 고정합니다.</div></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="adminDirectiveSave"' + (adminDirectiveSaving ? ' disabled' : '') + '>' +
+      (adminDirectiveSaving ? '저장 중…' : draft.expectedRevision ? '수정본 전달' : '요청 전달') + '</button>');
+}
+
+async function saveAdminDirective(button) {
+  if (!adminDirectiveEditor || adminDirectiveSaving) return;
+  const targetType = $('#adTargetType').value;
+  const staffIds = targetType === 'staff' ? Array.from(document.querySelectorAll('[data-admin-directive-staff]:checked')).map(input => input.value) : [];
+  const payload = {
+    action: 'save', directiveId: adminDirectiveEditor.directiveId,
+    expectedRevision: adminDirectiveEditor.expectedRevision,
+    title: $('#adTitle').value, body: $('#adBody').value, priority: $('#adPriority').value,
+    startsDate: $('#adStarts').value, expiresDate: $('#adExpires').value,
+    targetType, staffIds
+  };
+  if (!payload.title.trim() || !payload.body.trim() || !payload.startsDate || (targetType === 'staff' && !staffIds.length)) {
+    return toast('제목·내용·시작일·대상 선생님을 확인해 주세요');
+  }
+  if (payload.expiresDate && payload.expiresDate < payload.startsDate) return toast('종료일은 시작일보다 빠를 수 없습니다');
+  adminDirectiveSaving = true; if (button) button.disabled = true;
+  try {
+    await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), ...payload });
+    adminDirectiveEditor = null; closeModal();
+    await loadAdminDirectives(true, false); render(); toast(payload.expectedRevision ? '공통 요청 수정본을 전달했습니다' : '공통 요청을 전달했습니다');
+  } catch (error) {
+    toast('공통 요청 저장 실패 — ' + (error.message || error));
+    if (error && error.code === 'STALE_REVISION') { closeModal(); await loadAdminDirectives(true, false); }
+  } finally { adminDirectiveSaving = false; if (button) button.disabled = false; }
+}
+
+async function endAdminDirective(directiveId, revision, button) {
+  if (!confirm('이 공통 요청을 종료할까요? 지난 기록과 확인 내역은 유지됩니다.')) return;
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'end',
+      directiveId: String(directiveId), expectedRevision: Number(revision) });
+    await loadAdminDirectives(true, false); render(); toast('공통 요청을 종료했습니다');
+  } catch (error) { if (button) button.disabled = false; toast('종료 실패 — ' + (error.message || error)); }
+}
+
 function validRosterPayload(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.students)) return false;
   const ids = new Set();
@@ -13388,6 +13755,7 @@ function applyAssignments(input, preConfirmed) {
    10. 이벤트
    ══════════════════════════════════════════════════════ */
 document.addEventListener('click', ev => {
+  if (adminDirectiveSoundEnabled()) ensureAdminDirectiveAudio();
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
@@ -13458,6 +13826,17 @@ document.addEventListener('click', ev => {
     case 'gasave': saveGuardianAnnouncement(el); break;
     case 'gapublish': transitionGuardianAnnouncement(el.dataset.announcement, 'announcement_publish', Number(el.dataset.rev), el); break;
     case 'gaend': transitionGuardianAnnouncement(el.dataset.announcement, 'announcement_end', Number(el.dataset.rev), el); break;
+    case 'adminDirectiveAdd': openAdminDirectiveEditor(''); break;
+    case 'adminDirectiveEdit': openAdminDirectiveEditor(String(el.dataset.directive || '')); break;
+    case 'adminDirectiveSave': saveAdminDirective(el); break;
+    case 'adminDirectiveEnd': endAdminDirective(String(el.dataset.directive || ''), Number(el.dataset.rev), el); break;
+    case 'adminDirectiveAck': acknowledgeAdminDirective(String(el.dataset.directive || ''), Number(el.dataset.rev), el, el.dataset.popup === 'true'); break;
+    case 'adminDirectiveRefresh': adminDirectiveManageLoaded = false; adminDirectiveOwnLoaded = false; loadAdminDirectives(true, false); break;
+    case 'adminDirectiveSound': {
+      try { localStorage.setItem(adminDirectiveSoundKey(), '1'); } catch (error) { /* 팝업 알림은 계속 사용한다. */ }
+      ensureAdminDirectiveAudio(); playAdminDirectiveSound(); render(); toast('관리자 요청 알림음을 켰습니다');
+      break;
+    }
 
     /* 회차제 수업 */
     case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
@@ -14928,6 +15307,13 @@ document.addEventListener('toggle', ev => {
   }
 }, true);
 
+document.addEventListener('change', ev => {
+  const target = ev.target.closest('[data-admin-directive-target]');
+  if (!target) return;
+  const disabled = target.value === 'all';
+  document.querySelectorAll('[data-admin-directive-staff]').forEach(input => { input.disabled = disabled; });
+});
+
 /* 출퇴근 시각 직접 수정 — time input은 값이 확정될 때(change) 저장한다 */
 document.addEventListener('change', ev => {
   const el = ev.target.closest('[data-act="attedit-in"],[data-act="attedit-out"]');
@@ -14960,6 +15346,10 @@ document.addEventListener('visibilitychange', () => {
   if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
   const auth = sync.auth();
   if (session.isStaffLink && hasVerifiedPersonAuth() && auth && auth.mode === 'person') loadStudentSelfChecks(today(), true);
+  if (auth && (session.isAdmin || session.isStaffLink)) {
+    loadAdminDirectives(true, true);
+    loadStudentChanges(true);
+  }
   sync.run();
 });
 
@@ -15001,14 +15391,23 @@ async function startSyncSession() {
   }
   const verified = await sync.run();
   if (sync.enabled()) ensureSyncLoopStarted();
+  if (verified && (session.isAdmin || session.isStaffLink)) {
+    loadStudentChanges(false);
+    loadAdminDirectives(false, true);
+  }
   return verified;
 }
 startSyncSession();
+setInterval(() => {
+  if (document.visibilityState === 'visible' && sync.auth() && (session.isAdmin || session.isStaffLink)) {
+    loadAdminDirectives(true, true);
+  }
+}, 15000);
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.18';
+const APP_VER = '2026-08-21.19';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -107,6 +107,10 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   const directorAfter = await call(db, '/student-change', { auth: admin, action: 'list' });
   assert.equal(oldAfter.body.events[0].acknowledged, true);
   assert.equal(directorAfter.body.events[0].acknowledged, false);
+  assert.ok(directorAfter.body.events[0].audienceStatus.find(row =>
+    row.staffId === 'teacher-a' && row.acknowledgedAt));
+  assert.equal(directorAfter.body.events[0].audienceStatus.find(row =>
+    row.staffId === 'teacher-b').acknowledgedAt, null);
 });
 
 test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
