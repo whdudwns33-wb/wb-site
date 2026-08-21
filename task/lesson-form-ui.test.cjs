@@ -191,24 +191,41 @@ test('lesson registration interactions update only the form panel and preserve i
 });
 
 test('lesson time inputs sync on input, change, and immediately before preview', () => {
-  const helperStart = html.indexOf('function syncRenderedLessonScheduleField(');
+  const helperStart = html.indexOf('function lessonClockLabel(');
   const helperEnd = html.indexOf('function captureRenderedLessonScheduleInputs()', helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const singleDraft = { scheduleSlots: [{ days: [6], startTime: '', endTime: '' }] };
   const batchEntries = [{ scheduleSlots: [{ days: [0], startTime: '', endTime: '' }] }];
-  const syncField = new Function('currentLessonDraft', 'lessonBatchEntries',
-    html.slice(helperStart, helperEnd) + '\nreturn syncRenderedLessonScheduleField;')(
-      () => singleDraft, () => batchEntries);
-  const target = (selector, dataset, value) => ({
+  const helpers = new Function('currentLessonDraft', 'lessonBatchEntries', 'DOW', 'esc',
+    html.slice(helperStart, helperEnd) + '\nreturn { lessonClockLabel, lessonClockSummary, lessonSlotHtml, lessonBatchSlotHtml, syncRenderedLessonScheduleField };')(
+      () => singleDraft, () => batchEntries, ['일', '월', '화', '수', '목', '금', '토'], value => String(value || ''));
+  assert.equal(helpers.lessonClockLabel('00:00'), '오전 12:00 (00:00)');
+  assert.equal(helpers.lessonClockLabel('12:00'), '오후 12:00 (12:00)');
+  assert.equal(helpers.lessonClockLabel('18:50'), '오후 6:50 (18:50)');
+  assert.equal(helpers.lessonClockLabel(''), '미선택');
+  assert.match(helpers.lessonSlotHtml({ days: [1], startTime: '09:00', endTime: '10:50' }, 0),
+    /data-lesson-time-display aria-live="polite">선택 결과 · 오전 9:00 \(09:00\) → 오전 10:50 \(10:50\)/);
+  assert.match(helpers.lessonBatchSlotHtml({ days: [2], startTime: '13:00', endTime: '14:50' }, 0, 0),
+    /data-lesson-time-display aria-live="polite">선택 결과 · 오후 1:00 \(13:00\) → 오후 2:50 \(14:50\)/);
+  const target = (selector, dataset, value) => {
+    const display = { textContent: '' };
+    const row = { querySelector(query) { return query === '[data-lesson-time-display]' ? display : null; } };
+    return {
     dataset, value,
-    closest(query) { return query === selector ? this : null; }
-  });
-  assert.equal(syncField(target('[data-lesson-slot]', { i: '0', lessonSlot: 'startTime' }, '10:00')), true);
+      display,
+      closest(query) { return query === selector ? this : query === '.lesson-slot' ? row : null; }
+    };
+  };
+  const singleField = target('[data-lesson-slot]', { i: '0', lessonSlot: 'startTime' }, '10:00');
+  assert.equal(helpers.syncRenderedLessonScheduleField(singleField), true);
   assert.equal(singleDraft.scheduleSlots[0].startTime, '10:00');
-  assert.equal(syncField(target('[data-lesson-batch-slot]', {
+  assert.equal(singleField.display.textContent, '선택 결과 · 오전 10:00 (10:00) → 미선택');
+  const batchField = target('[data-lesson-batch-slot]', {
     lessonI: '0', slotI: '0', lessonBatchSlot: 'endTime'
-  }, '11:50')), true);
+  }, '11:50');
+  assert.equal(helpers.syncRenderedLessonScheduleField(batchField), true);
   assert.equal(batchEntries[0].scheduleSlots[0].endTime, '11:50');
+  assert.equal(batchField.display.textContent, '선택 결과 · 미선택 → 오전 11:50 (11:50)');
 
   const captureStart = helperEnd;
   const previewStart = html.indexOf('function previewLessonRegistration()', captureStart);
@@ -218,6 +235,7 @@ test('lesson time inputs sync on input, change, and immediately before preview',
   assert.ok(preview.indexOf('captureRenderedLessonScheduleInputs()') < preview.indexOf('const draft = lessonInputPayload()'));
   assert.equal((html.match(/syncRenderedLessonScheduleField\(ev\.target\)/g) || []).length, 2,
     'input과 change 이벤트가 모두 시간값을 저장해야 한다');
+  assert.match(html, /\.lesson-time-display \{[^}]*font-size: 15px;[^}]*font-weight: 900/);
 });
 
 test('each lesson selects one subject while preserving the student multi-subject roster', () => {
