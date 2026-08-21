@@ -142,6 +142,11 @@ async function callBatch(db, lessons, auth = { scope: 'all', role: 'admin' }) {
   return { response, data: await response.json() };
 }
 
+async function callStudentBatch(db, lessons, auth = { scope: 'all', role: 'admin' }) {
+  const response = await handleLessonCreateBatch({ DB: db }, 'task', { batchKind: 'students', lessons }, '*', auth, json);
+  return { response, data: await response.json() };
+}
+
 function seed(db, task) {
   db.tasks.set(task.id, {
     owner: task.staffId,
@@ -605,6 +610,42 @@ test('admin atomically creates multiple independent lessons for one stable stude
   assert.equal(db.tasks.size, 2);
   assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a']));
   assert.deepEqual(new Set(result.data.tasks.map(task => task.subject)), new Set(['수학', '영어']));
+});
+
+test('admin atomically registers one shared lesson for multiple stable students', async () => {
+  const db = new FakeDB();
+  db.privateRoster.roster.students[0].name = '가학생';
+  db.privateRoster.roster.students[1].name = '나학생';
+  db.privateRoster.roster.students[1].grade = '초5';
+  const result = await callStudentBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-a', studentName: '가학생', grade: '초4' }) },
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-b', studentName: '나학생', grade: '초5' }) }
+  ]);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.batchKind, 'students');
+  assert.equal(result.data.createdCount, 2);
+  assert.equal(result.data.tasks.length, 2);
+  assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a', 'student-b']));
+  assert.deepEqual(new Set(result.data.tasks.map(task => task.staffId)), new Set(['teacher-1']));
+});
+
+test('multi-student batch rejects duplicate students or differing class templates', async () => {
+  const duplicateDb = new FakeDB();
+  const duplicate = await callStudentBatch(duplicateDb, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-a' }) },
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-a' }) }
+  ]);
+  assert.equal(duplicate.response.status, 409);
+  assert.equal(duplicateDb.tasks.size, 0);
+
+  const mixedDb = new FakeDB();
+  const mixed = await callStudentBatch(mixedDb, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-a', subject: '수학', lessonRole: '수학' }) },
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-b', subject: '영어', lessonRole: '영어' }) }
+  ]);
+  assert.equal(mixed.response.status, 400);
+  assert.match(mixed.data.error, /같은 수업/);
+  assert.equal(mixedDb.tasks.size, 0);
 });
 
 test('batch validation failure creates no lesson and rejects mixed students or duplicate assignments', async () => {
