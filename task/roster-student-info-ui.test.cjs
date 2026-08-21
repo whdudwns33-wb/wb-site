@@ -71,7 +71,7 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
     'data-rse-phone-father', 'data-rse-phone-mother', 'data-rse-registration-date', 'data-rse-first-class-date']) {
     assert.match(editor, new RegExp(field));
   }
-  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답']) {
+  for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉']) {
     assert.match(editor, new RegExp(subject));
   }
   assert.match(editor, /data-rse-subject/);
