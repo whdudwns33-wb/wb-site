@@ -9,7 +9,7 @@ const MAX_DOCUMENT_BYTES = 512 * 1024;
 const MAX_STUDENTS = 2000;
 const MAX_BOOK_STUDENTS = 5000;
 const ROSTER_SUBJECTS = new Set([
-  '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답'
+  '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);
 
 function nextMonthForDate(value) {
