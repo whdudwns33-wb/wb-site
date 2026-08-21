@@ -110,14 +110,16 @@ test('admin direct lesson registration reuses the new-student information fields
   assert.match(save, /원생 기본 정보는 저장됐습니다/);
 });
 
-test('direct lesson registration follows student, subject, teacher, schedule order', () => {
+test('direct lesson registration follows student, subject, teacher, lesson hours, schedule order', () => {
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
   const view = html.slice(viewStart, viewEnd);
   assert.doesNotMatch(view, /lessonTextField\('scheduleText'/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
-  assert.match(view, /<div class="sect">4\. 수업 요일·시간/);
-  assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
+  assert.match(view, /<div class="sect">4\. 수업시수/);
+  assert.match(view, /data-lesson-field="lessonHours"/);
+  assert.match(view, /<div class="sect">5\. 수업 요일·시간/);
+  assert.doesNotMatch(view, /<div class="sect">[6-9]\./);
   assert.match(view, /학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록/);
   assert.match(view, /batchMode \? lessonBatchRegistrationHtml\(\) : lessonSubjectSelectionHtml\(\) \+ staffSelect/);
   assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 등록<\/b>/);
@@ -125,6 +127,26 @@ test('direct lesson registration follows student, subject, teacher, schedule ord
   assert.match(view, /registration[\s\S]*lessonAssignmentReviewHtml\(\)/);
   assert.match(view, /existingChange[\s\S]*viewLessonChangeReview\(\)/);
   assert.match(view, /return registration \+ existingChange/);
+});
+
+test('all lesson registration paths use fixed independent lesson hours and Monday-first weekday controls', () => {
+  for (const option of ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']) {
+    assert.match(html, new RegExp(`['"]${option.replace('.', '\\.')}['"]`), option);
+  }
+  assert.match(html, /data-lesson-batch-field="lessonHours"/);
+  assert.match(html, /data-lesson-briefing-hours/);
+  assert.match(html, /id="eLessonHours"/);
+  assert.match(html, /lessonHours: taskBody\.lessonHours/);
+  assert.match(html, /const DOW_DISPLAY_ORDER = \[1, 2, 3, 4, 5, 6, 0\]/);
+  assert.match(html, /function scheduleSlotsForDisplay\(slots\)/);
+  assert.match(html, /scheduleSlotsForDisplay\(item\.taskBody\.scheduleSlots\)/);
+  assert.match(html, /scheduleSlotsForDisplay\(taskBody\.scheduleSlots\)/);
+});
+
+test('lesson card metadata places independent lesson hours between clock time and weekly repeat', () => {
+  const card = html.slice(html.indexOf("const lesson = isLesson(t);"), html.indexOf("'<div class=\"task-actions\">", html.indexOf("const lesson = isLesson(t);")));
+  assert.ok(card.indexOf("esc(t.time)") < card.indexOf("lessonHoursValue(t.lessonHours)"));
+  assert.ok(card.indexOf("lessonHoursValue(t.lessonHours)") < card.indexOf("repeatLabel(t)"));
 });
 
 test('admin lesson registration and existing changes are separate collapsed panels with a blank default', () => {
@@ -251,9 +273,9 @@ test('lesson time inputs sync on input, change, and immediately before preview',
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const singleDraft = { scheduleSlots: [{ days: [6], startTime: '', endTime: '' }] };
   const batchEntries = [{ scheduleSlots: [{ days: [0], startTime: '', endTime: '' }] }];
-  const helpers = new Function('currentLessonDraft', 'lessonBatchEntries', 'DOW', 'esc',
+  const helpers = new Function('currentLessonDraft', 'lessonBatchEntries', 'DOW', 'DOW_DISPLAY_ORDER', 'esc',
     html.slice(helperStart, helperEnd) + '\nreturn { lessonClockLabel, lessonClockSummary, lessonSlotHtml, lessonBatchSlotHtml, syncRenderedLessonScheduleField };')(
-      () => singleDraft, () => batchEntries, ['일', '월', '화', '수', '목', '금', '토'], value => String(value || ''));
+      () => singleDraft, () => batchEntries, ['일', '월', '화', '수', '목', '금', '토'], [1, 2, 3, 4, 5, 6, 0], value => String(value || ''));
   assert.equal(helpers.lessonClockLabel('00:00'), '오전 12:00 (00:00)');
   assert.equal(helpers.lessonClockLabel('12:00'), '오후 12:00 (12:00)');
   assert.equal(helpers.lessonClockLabel('18:50'), '오후 6:50 (18:50)');
