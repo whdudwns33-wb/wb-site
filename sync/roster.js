@@ -163,6 +163,60 @@ export function studentRegistrationIdentityKey(value) {
   return [identityText(value && value.name), identityText(value && value.school), identityText(value && value.grade), parentPhones.join(',')].join('\u0000');
 }
 
+function studentRegistrationBaseKey(value) {
+  return [identityText(value && value.name), identityText(value && value.school), identityText(value && value.grade)].join('\u0000');
+}
+
+function studentParentIdentityKey(value) {
+  return [...new Set([identityPhone(value && value.phoneFather), identityPhone(value && value.phoneMother)].filter(Boolean))].sort().join(',');
+}
+
+function minimalStudentForDeletion(value) {
+  if (!identityText(value && value.name) || !identityText(value && value.school) || !identityText(value && value.grade)) return false;
+  if ((value.teacherIds || []).length || (value.subjects || []).length) return false;
+  return ![
+    value.teacher, value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
+    value.registrationDate, value.firstClassDate, value.end, value.reason, value.memo
+  ].some(item => String(item || '').trim());
+}
+
+const STUDENT_REFERENCE_TABLES = [
+  'feedback_requests', 'student_change_events', 'guardian_contacts_by_student', 'acaflow_student_links',
+  'parent_feedback_sends', 'book_issues', 'book_order_student_snapshots', 'book_order_active_targets',
+  'transport_states', 'makeup_cases', 'session_packs', 'guardian_portal_access', 'guardian_portal_codes',
+  'guardian_portal_sessions', 'guardian_portal_responses', 'guardian_ops_notification_consents',
+  'guardian_ops_notification_sends', 'transport_notification_sends', 'lesson_assignment_requests',
+  'guardian_lesson_publications', 'guardian_requests', 'student_portal_access', 'student_portal_codes',
+  'student_portal_sessions', 'student_lesson_self_checks', 'student_lesson_self_check_events'
+];
+
+function studentReferenceGuard(app, studentId) {
+  const clauses = [
+    "EXISTS (SELECT 1 FROM tasks linked_task WHERE linked_task.app=? AND json_extract(linked_task.data,'$.studentId')=? LIMIT 1)",
+    "EXISTS (SELECT 1 FROM checks linked_check WHERE linked_check.app=? AND json_extract(linked_check.data,'$.studentId')=? LIMIT 1)",
+    'EXISTS (SELECT 1 FROM book_order_fulfillments linked_fulfillment, json_each(linked_fulfillment.student_ids) selected_student ' +
+      'WHERE linked_fulfillment.app=? AND CAST(selected_student.value AS TEXT)=? LIMIT 1)',
+    "EXISTS (SELECT 1 FROM transport_configs linked_config, json_each(linked_config.data,'$.routes') linked_route, " +
+      "json_each(linked_route.value,'$.stops') linked_stop, json_each(linked_stop.value,'$.studentIds') selected_student " +
+      'WHERE linked_config.app=? AND CAST(selected_student.value AS TEXT)=? LIMIT 1)',
+    'EXISTS (SELECT 1 FROM guardian_announcements linked_announcement, json_each(linked_announcement.target_students) selected_student ' +
+      "WHERE linked_announcement.app=? AND CAST(json_extract(selected_student.value,'$.id') AS TEXT)=? LIMIT 1)",
+    'EXISTS (SELECT 1 FROM guardian_announcement_events linked_announcement_event, json_each(linked_announcement_event.target_students) selected_student ' +
+      "WHERE linked_announcement_event.app=? AND CAST(json_extract(selected_student.value,'$.id') AS TEXT)=? LIMIT 1)"
+  ];
+  STUDENT_REFERENCE_TABLES.forEach(table => clauses.push(
+    'EXISTS (SELECT 1 FROM ' + table + ' linked_row WHERE linked_row.app=? AND linked_row.student_id=? LIMIT 1)'
+  ));
+  return { sql: clauses.join(' OR '), binds: clauses.flatMap(() => [app, studentId]) };
+}
+
+async function studentHasReferences(env, app, studentId) {
+  const guard = studentReferenceGuard(app, studentId);
+  const row = await env.DB.prepare('SELECT CASE WHEN ' + guard.sql + ' THEN 1 ELSE 0 END linked')
+    .bind(...guard.binds).first();
+  return Number(row && row.linked || 0) === 1;
+}
+
 function rosterStudent(value, index) {
   const path = 'document.roster.students[' + index + ']';
   shape(value,
@@ -403,7 +457,7 @@ async function boardedStudentConflicts(env, app, document) {
 export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
-  if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_transition'].includes(action)) {
+  if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_delete', 'student_transition'].includes(action)) {
     return json({ ok: false, error: '지원하지 않는 원생 명단 작업입니다' }, 400, origin);
   }
 
@@ -419,6 +473,58 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const student = document.roster.students.find(item => item.id === studentId);
     if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
     return json({ ok: true, updatedAt: Number(row.updated_at), student }, 200, origin);
+  }
+
+  if (action === 'student_delete') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '원생 완전 삭제는 관리자만 처리할 수 있습니다' }, 403, origin);
+    const expectedUpdatedAt = Number(body.expectedUpdatedAt);
+    const studentId = String(body.studentId || '');
+    if (!Number.isInteger(expectedUpdatedAt) || expectedUpdatedAt < 1 || !SAFE_ID.test(studentId)) {
+      return json({ ok: false, error: '원생 명단을 새로고침한 뒤 삭제할 학생을 다시 선택해 주세요' }, 400, origin);
+    }
+    const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
+    if (Number(row.updated_at) !== expectedUpdatedAt) {
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
+    }
+    let document;
+    try { document = validateRosterDocument(JSON.parse(row.data)); }
+    catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    const index = document.roster.students.findIndex(student => student.id === studentId);
+    if (index < 0) return json({ ok: false, error: '삭제할 원생을 현재 명단에서 찾을 수 없습니다' }, 404, origin);
+    const student = document.roster.students[index];
+    if (!minimalStudentForDeletion(student)) {
+      return json({ ok: false, code: 'STUDENT_DELETE_NOT_MINIMAL',
+        error: '이름·학교·학년 외 정보가 있는 원생은 완전 삭제할 수 없습니다. 퇴원 처리를 사용해 주세요' }, 409, origin);
+    }
+    if (document.bookStudents.some(item => String(item.studentId) === studentId) ||
+        await studentHasReferences(env, app, studentId)) {
+      return json({ ok: false, code: 'STUDENT_DELETE_LINKED',
+        error: '수업이나 운영 기록에 연결된 원생은 완전 삭제할 수 없습니다. 퇴원 처리를 사용해 주세요' }, 409, origin);
+    }
+    document.roster.students.splice(index, 1);
+    document.roster.updated = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try { document = validateRosterDocument(document); }
+    catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
+    const updatedAt = Date.now();
+    const guard = studentReferenceGuard(app, studentId);
+    let changed;
+    try {
+      changed = await env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=? AND NOT (' + guard.sql + ')')
+        .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt, ...guard.binds).run();
+    } catch (error) {
+      if (isBoardingLockError(error) || isActiveBookOrderConflictError(error)) {
+        return json({ ok: false, code: 'STUDENT_DELETE_LINKED', error: '운영 기록에 연결된 원생은 완전 삭제할 수 없습니다' }, 409, origin);
+      }
+      throw error;
+    }
+    if (Number(changed.meta && changed.meta.changes || 0) !== 1) {
+      if (await studentHasReferences(env, app, studentId)) {
+        return json({ ok: false, code: 'STUDENT_DELETE_LINKED', error: '삭제 처리 중 운영 기록 연결이 확인되어 중단했습니다' }, 409, origin);
+      }
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '원생 명단이 다른 기기에서 변경되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
+    }
+    return json({ ok: true, updatedAt, deletedStudentId: studentId }, 200, origin);
   }
 
   if (action === 'student_transition') {
@@ -617,11 +723,18 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
     const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
+    if (action === 'student_create' && (!identityText(nextStudent.school) || !identityText(nextStudent.grade))) {
+      return json({ ok: false, code: 'STUDENT_REQUIRED_FIELDS', error: '이름·학교·학년을 모두 입력해 주세요' }, 400, origin);
+    }
     const nextIdentityKey = studentRegistrationIdentityKey(nextStudent);
-    const same = document.roster.students.find(item => item.id !== nextStudent.id &&
-      studentRegistrationIdentityKey(item) === nextIdentityKey);
-    if (same) return json({ ok: false, code: 'STUDENT_ALREADY_EXISTS',
-      error: '같은 이름·학교·학년·보호자 연락처의 원생이 이미 있습니다. 기존 원생을 선택해 주세요', studentId: same.id }, 409, origin);
+    const sameBase = document.roster.students.filter(item => item.id !== nextStudent.id &&
+      studentRegistrationBaseKey(item) === studentRegistrationBaseKey(nextStudent));
+    const nextParentIdentity = studentParentIdentityKey(nextStudent);
+    const same = sameBase.find(item => studentRegistrationIdentityKey(item) === nextIdentityKey);
+    const ambiguous = sameBase.length && (!nextParentIdentity || sameBase.some(item => !studentParentIdentityKey(item)));
+    if (same || ambiguous) return json({ ok: false, code: 'STUDENT_ALREADY_EXISTS',
+      error: '같은 이름·학교·학년의 원생이 이미 있거나 보호자 연락처 없이 구분할 수 없습니다. 기존 원생을 선택해 주세요',
+      studentId: same ? same.id : undefined }, 409, origin);
     if (action === 'student_create') {
       if (index >= 0) return json({ ok: false, code: 'STUDENT_ID_EXISTS', error: '이미 등록된 원생 ID입니다. 명단을 새로고침해 주세요' }, 409, origin);
       document.roster.students.push(nextStudent);
