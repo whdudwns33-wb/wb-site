@@ -190,6 +190,36 @@ test('lesson registration interactions update only the form panel and preserve i
   assert.match(batchActions, /refreshLessonDirectEntry\(true\)/);
 });
 
+test('lesson time inputs sync on input, change, and immediately before preview', () => {
+  const helperStart = html.indexOf('function syncRenderedLessonScheduleField(');
+  const helperEnd = html.indexOf('function captureRenderedLessonScheduleInputs()', helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const singleDraft = { scheduleSlots: [{ days: [6], startTime: '', endTime: '' }] };
+  const batchEntries = [{ scheduleSlots: [{ days: [0], startTime: '', endTime: '' }] }];
+  const syncField = new Function('currentLessonDraft', 'lessonBatchEntries',
+    html.slice(helperStart, helperEnd) + '\nreturn syncRenderedLessonScheduleField;')(
+      () => singleDraft, () => batchEntries);
+  const target = (selector, dataset, value) => ({
+    dataset, value,
+    closest(query) { return query === selector ? this : null; }
+  });
+  assert.equal(syncField(target('[data-lesson-slot]', { i: '0', lessonSlot: 'startTime' }, '10:00')), true);
+  assert.equal(singleDraft.scheduleSlots[0].startTime, '10:00');
+  assert.equal(syncField(target('[data-lesson-batch-slot]', {
+    lessonI: '0', slotI: '0', lessonBatchSlot: 'endTime'
+  }, '11:50')), true);
+  assert.equal(batchEntries[0].scheduleSlots[0].endTime, '11:50');
+
+  const captureStart = helperEnd;
+  const previewStart = html.indexOf('function previewLessonRegistration()', captureStart);
+  const previewEnd = html.indexOf('function applyCreatedLesson(', previewStart);
+  assert.match(html.slice(captureStart, previewStart), /querySelectorAll\('\.lesson-direct-entry \[data-lesson-slot\], \.lesson-direct-entry \[data-lesson-batch-slot\]'\)/);
+  const preview = html.slice(previewStart, previewEnd);
+  assert.ok(preview.indexOf('captureRenderedLessonScheduleInputs()') < preview.indexOf('const draft = lessonInputPayload()'));
+  assert.equal((html.match(/syncRenderedLessonScheduleField\(ev\.target\)/g) || []).length, 2,
+    'input과 change 이벤트가 모두 시간값을 저장해야 한다');
+});
+
 test('each lesson selects one subject while preserving the student multi-subject roster', () => {
   const subjectStart = html.indexOf('function lessonSubjectSelectionHtml()');
   const subjectEnd = html.indexOf('function lessonRosterInformationHtml()', subjectStart);

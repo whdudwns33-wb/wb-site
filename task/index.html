@@ -908,11 +908,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.11"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.11"></script>
-<script src="./asset-core.js?v=2026-08-21.11"></script>
-<script src="./qr-core.js?v=2026-08-21.11"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.11"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.12"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.12"></script>
+<script src="./asset-core.js?v=2026-08-21.12"></script>
+<script src="./qr-core.js?v=2026-08-21.12"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.12"></script>
 <script>
 "use strict";
 
@@ -4126,6 +4126,32 @@ function lessonInputPayload() {
   });
 }
 
+function syncRenderedLessonScheduleField(target) {
+  if (!target || !target.closest) return false;
+  const slotField = target.closest('[data-lesson-slot]');
+  if (slotField) {
+    const slot = currentLessonDraft().scheduleSlots[Number(slotField.dataset.i)];
+    if (slot) slot[slotField.dataset.lessonSlot] = slotField.value;
+    return !!slot;
+  }
+  const batchField = target.closest('[data-lesson-batch-slot]');
+  if (batchField) {
+    const entry = lessonBatchEntries()[Number(batchField.dataset.lessonI)];
+    const slot = entry && entry.scheduleSlots[Number(batchField.dataset.slotI)];
+    if (slot) slot[batchField.dataset.lessonBatchSlot] = batchField.value;
+    return !!slot;
+  }
+  return false;
+}
+
+function captureRenderedLessonScheduleInputs() {
+  let captured = false;
+  document.querySelectorAll('.lesson-direct-entry [data-lesson-slot], .lesson-direct-entry [data-lesson-batch-slot]').forEach(field => {
+    if (syncRenderedLessonScheduleField(field)) captured = true;
+  });
+  if (captured) persistLessonDraft();
+}
+
 function lessonPreviewPayloadFromTask(taskBody, validation) {
   return {
     studentId: taskBody.studentId, studentName: taskBody.studentName, grade: taskBody.grade,
@@ -4205,6 +4231,7 @@ function previewLessonBatchRegistration(core, draft, selected) {
 }
 
 function previewLessonRegistration() {
+  captureRenderedLessonScheduleInputs();
   const core = window.WBLessonFormCore;
   if (!core) return toast('수업 등록 모듈을 불러오지 못했습니다 — 새로고침해 주세요');
   const draft = lessonInputPayload();
@@ -14445,6 +14472,10 @@ document.addEventListener('input', ev => {
     if (slot) slot[assignmentSlot.dataset.assignmentSlot] = assignmentSlot.value;
     return;
   }
+  if (syncRenderedLessonScheduleField(ev.target)) {
+    persistLessonDraft();
+    return;
+  }
   const rosterField = ev.target.closest('[data-lesson-roster-field]');
   if (rosterField) {
     const info = currentLessonRosterDraft();
@@ -14458,15 +14489,14 @@ document.addEventListener('input', ev => {
     persistLessonDraft();
     return;
   }
-  const slotField = ev.target.closest('[data-lesson-slot]');
-  if (slotField) {
-    const slot = currentLessonDraft().scheduleSlots[Number(slotField.dataset.i)];
-    if (slot) { slot[slotField.dataset.lessonSlot] = slotField.value; persistLessonDraft(); }
-  }
 });
 
 document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
+  if (syncRenderedLessonScheduleField(ev.target)) {
+    persistLessonDraft();
+    return;
+  }
   const sessionAbsence = ev.target.closest('[data-session-pack-absence]');
   if (sessionAbsence) {
     const taskId = String(sessionAbsence.dataset.id || '');
@@ -14518,13 +14548,6 @@ document.addEventListener('change', async ev => {
       lessonPreviewRosterStudent = null;
       persistLessonDraft();
     }
-    return;
-  }
-  const lessonBatchSlot = ev.target.closest('[data-lesson-batch-slot]');
-  if (lessonBatchSlot) {
-    const entry = lessonBatchEntries()[Number(lessonBatchSlot.dataset.lessonI)];
-    const slot = entry && entry.scheduleSlots[Number(lessonBatchSlot.dataset.slotI)];
-    if (slot) { slot[lessonBatchSlot.dataset.lessonBatchSlot] = lessonBatchSlot.value; persistLessonDraft(); }
     return;
   }
   const lessonSubject = ev.target.closest('[data-lesson-subject]');
@@ -14685,7 +14708,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.11';
+const APP_VER = '2026-08-21.12';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
