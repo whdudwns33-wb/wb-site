@@ -11,6 +11,7 @@ function validInput(overrides = {}) {
     subject: '국어',
     className: '비문학',
     lessonRole: '독해력',
+    lessonHours: '2T',
     scheduleText: '월, 수 17:00-19:00 / 일요일 12:00-14:00',
     materials: '초등 문해력 독해가 힘이다 / 3주 4일',
     onlineProgram: '없음',
@@ -28,7 +29,7 @@ test('exports a CommonJS/browser-friendly lesson form core', () => {
   assert.equal(typeof core.buildLessonTaskBody, 'function');
 });
 
-test('validates the nine teacher-input groups without treating 없음 as blank', () => {
+test('validates every teacher-input group including independent lesson hours without treating 없음 as blank', () => {
   const valid = core.validateLessonInput(validInput());
   assert.equal(valid.valid, true);
   assert.deepEqual(valid.errors, []);
@@ -37,6 +38,7 @@ test('validates the nine teacher-input groups without treating 없음 as blank',
     [{ studentName: '' }, 'student'],
     [{ grade: '' }, 'student'],
     [{ subject: '', className: '' }, 'subjectClass'],
+    [{ lessonHours: '' }, 'lessonHours'],
     [{ scheduleText: '', scheduleSlots: [] }, 'schedule'],
     [{ materials: '' }, 'materials'],
     [{ onlineProgram: '' }, 'onlineProgram'],
@@ -50,6 +52,17 @@ test('validates the nine teacher-input groups without treating 없음 as blank',
     assert.equal(result.valid, false, field);
     assert.ok(result.errors.some(item => item.field === field), field);
   });
+});
+
+test('accepts only the fixed independent lesson-hour choices', () => {
+  for (const lessonHours of core.LESSON_HOURS) {
+    assert.equal(core.validateLessonInput(validInput({ lessonHours })).valid, true, lessonHours);
+  }
+  for (const lessonHours of ['50분', '1.6T', '2시간', '7T']) {
+    const result = core.validateLessonInput(validInput({ lessonHours }));
+    assert.equal(result.valid, false, lessonHours);
+    assert.ok(result.errors.some(item => item.field === 'lessonHours'), lessonHours);
+  }
 });
 
 test('parses only unambiguous free-text day and clock ranges', () => {
@@ -124,7 +137,7 @@ test('structured rows are authoritative over legacy schedule text', () => {
     scheduleText: '토 10:00-11:50',
     scheduleSlots: [{ days: [0, 6], startTime: '10:00', endTime: '11:50' }]
   }), { start: '2026-08-21' });
-  assert.equal(body.scheduleText, '일·토 10:00-11:50');
+  assert.equal(body.scheduleText, '토·일 10:00-11:50');
   assert.equal(body.scheduleStatus, 'normal');
 });
 
@@ -201,6 +214,7 @@ test('builds a deterministic task body with current task-app compatibility field
 
   assert.deepEqual(first, second);
   assert.equal(first.title, '[수업] 테스트학생 (초4) — 국어 · 비문학');
+  assert.equal(first.lessonHours, '2T');
   assert.match(first.detail, /교재와 현재 진도:/);
   assert.match(first.guide, /특이사항·학부모 요청:/);
   assert.match(first.guide, /관리자 요청사항: 수업 후 진도표 확인/);

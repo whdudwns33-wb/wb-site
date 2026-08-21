@@ -4,6 +4,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_NAME = 40;
 const MAX_GRADE = 20;
 const MAX_NOTE = 500;
+const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']);
 const SUBJECT_OPTIONS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);
@@ -22,8 +23,9 @@ function parseDetails(value) {
     startTime: text(slot && slot.startTime, 5), endTime: text(slot && slot.endTime, 5)
   })) : [];
   const startDate = text(parsed.startDate, 10);
-  if (!subjects.length || !scheduleSlots.length || !startDate) return null;
-  return { subjects, scheduleSlots, startDate, reason: text(parsed.reason, MAX_NOTE) };
+  const lessonHours = text(parsed.lessonHours, 4);
+  if (!subjects.length || !scheduleSlots.length || !startDate || !LESSON_HOURS.has(lessonHours)) return null;
+  return { subjects, lessonHours, scheduleSlots, startDate, reason: text(parsed.reason, MAX_NOTE) };
 }
 
 function parseMissingDetails(value) {
@@ -124,14 +126,16 @@ async function normalizedRequestDetails(student, body, staffId) {
   if (!text(student.grade, MAX_GRADE)) throw new Error('관리자가 원생 정보에 학년을 먼저 입력해야 합니다');
   const reason = text(body.reason, MAX_NOTE);
   if (!reason) throw new Error('배정 요청 사유를 입력해 주세요');
+  const lessonHours = text(body.lessonHours, 4);
+  if (!LESSON_HOURS.has(lessonHours)) throw new Error('수업시수를 선택해 주세요');
   const task = await buildLessonTask({
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
-    subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), scheduleText: '',
+    subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), lessonHours, scheduleText: '',
     scheduleSlots: body.scheduleSlots, start: body.startDate,
     materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음', adminRequest: '없음'
   }, staffId, 'staff', Date.now());
   return {
-    subjects,
+    subjects, lessonHours,
     scheduleSlots: task.scheduleSlots.map(slot => ({ days: slot.days, startTime: slot.startTime, endTime: slot.endTime })),
     startDate: task.start,
     reason
@@ -141,7 +145,7 @@ async function normalizedRequestDetails(student, body, staffId) {
 async function requestedLesson(student, details, staffId, serverNow) {
   return buildLessonTask({
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
-    subject: details.subjects.join('·'), className: '', lessonRole: details.subjects.join('·'), scheduleText: '',
+    subject: details.subjects.join('·'), className: '', lessonRole: details.subjects.join('·'), lessonHours: details.lessonHours, scheduleText: '',
     scheduleSlots: details.scheduleSlots, start: details.startDate,
     materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음', adminRequest: '없음'
   }, staffId, 'manager', serverNow);
@@ -266,6 +270,9 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   const details = parseDetails(current.request_data);
   const missing = parseMissingDetails(current.request_data);
   const modernStudentId = String(current.student_id || '');
+  if (modernStudentId && !details) {
+    return json({ ok: false, error: '이 요청에는 수업시수가 없습니다. 선생님이 요청을 취소한 뒤 다시 제출해 주세요' }, 409, origin);
+  }
   const studentId = modernStudentId || String(body.studentId || '');
   if (!SAFE_ID.test(studentId)) return json({ ok: false, error: '원생 명단에서 학생을 선택해 주세요' }, 400, origin);
   const staff = await activeStaffRecord(env, app, String(current.staff_id));
