@@ -1120,7 +1120,7 @@ function taskCardDetail(t) {
   const subjects = [...new Set([t.subject, t.className].map(value => String(value || '').trim()).filter(Boolean))];
   const scheduleDisplay = Array.isArray(t.scheduleSlots) && t.scheduleSlots.length
     ? lessonAssignmentScheduleText(t.scheduleSlots) : t.scheduleText;
-  const summary = [t.grade, subjects.join(' · '), scheduleDisplay,
+  const summary = [subjects.join(' · '), scheduleDisplay,
     t.onlineProgram && t.onlineProgram !== '없음' ? t.onlineProgram : '']
     .map(value => String(value || '').trim()).filter(Boolean).join(' · ') || raw.split('\n')[0];
   return summary.length > 160 ? summary.slice(0, 157) + '…' : summary;
@@ -5378,6 +5378,7 @@ function sessionModeBadgeDescriptor(task) {
 }
 
 function sessionModeBadgeHtml(task) {
+  if (!session.isAdmin) return '';
   const badge = sessionModeBadgeDescriptor(task);
   return badge ? '<span class="tag session-mode-badge ' + badge.cls + '"' +
     (badge.title ? ' title="' + esc(badge.title) + '" aria-label="' + esc(badge.text + ' · ' + badge.title) + '"' : '') +

@@ -88,6 +88,17 @@ test('lesson mode badges default to monthly only after the scoped pack list succ
   assert.match(sessionMode.title, /보호자 안내 검토/);
 });
 
+test('monthly and session badges render for administrators only', () => {
+  const source = block('function sessionModeBadgeHtml(task)', 'function sessionModeBadgesHtml(tasks)');
+  const make = isAdmin => new Function('session', 'sessionModeBadgeDescriptor', 'esc',
+    `${source}\nreturn sessionModeBadgeHtml;`)(
+      { isAdmin }, () => ({ text: '월제', cls: 'is-monthly' }), value => String(value || '')
+    );
+  assert.equal(make(false)({ id: 'lesson-1' }), '');
+  assert.match(make(true)({ id: 'lesson-1' }), />월제<\/span>/);
+  assert.match(source, /if \(!session\.isAdmin\) return ''/);
+});
+
 test('session mode badges apply only to structured session-pack eligible lessons', () => {
   const helpers = block("const isLesson =", '/** 수업 지시서 제목');
   const source = block('function sessionModeLessonTask(task)', 'function sessionPackForLessonTask(task)');
