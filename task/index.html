@@ -1113,16 +1113,20 @@ function lessonReferenceSteps(t) {
   return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
 }
 
+function lessonTimeRangeLabel(task) {
+  const ranges = [...new Set((Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [])
+    .map(slot => {
+      const startTime = String((slot && slot.startTime) || '').trim();
+      const endTime = String((slot && slot.endTime) || '').trim();
+      return startTime && endTime ? startTime + '–' + endTime : startTime;
+    }).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return ranges.join(' / ') || String((task && task.time) || '').trim();
+}
+
 function taskCardDetail(t) {
-  const raw = String(t && t.detail || '').trim();
   const structured = t && (t.taskKind === 'lesson_instruction' || t.lessonFormVersion || t.intakeVersion);
-  if (!structured) return raw;
-  const subjects = [...new Set([t.subject, t.className].map(value => String(value || '').trim()).filter(Boolean))];
-  const scheduleDisplay = Array.isArray(t.scheduleSlots) && t.scheduleSlots.length
-    ? lessonAssignmentScheduleText(t.scheduleSlots) : t.scheduleText;
-  const summary = [subjects.join(' · '), scheduleDisplay,
-    t.onlineProgram && t.onlineProgram !== '없음' ? t.onlineProgram : '']
-    .map(value => String(value || '').trim()).filter(Boolean).join(' · ') || raw.split('\n')[0];
+  if (!structured) return String(t && t.detail || '').trim();
+  const summary = String(t.onlineProgram && t.onlineProgram !== '없음' ? t.onlineProgram : '').trim();
   return summary.length > 160 ? summary.slice(0, 157) + '…' : summary;
 }
 
@@ -2404,6 +2408,7 @@ function taskRow(t, date, editable, isCarry) {
   const detail = taskCardDetail(t);
   const hasDetail = steps.length || t.guide || t.target;
   const lesson = isLesson(t);
+  const timeDisplay = lesson ? lessonTimeRangeLabel(t) : String(t.time || '').trim();
   const open = openPanels.has(t.id + '|' + date);
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
 
@@ -2414,7 +2419,7 @@ function taskRow(t, date, editable, isCarry) {
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
       '<div class="meta">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
-        (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
+        (timeDisplay ? '<span class="tag time">' + esc(timeDisplay) + '</span>' : '') +
         (lesson && lessonHoursValue(t.lessonHours) ? '<span class="tag time">' + esc(lessonHoursValue(t.lessonHours)) + '</span>' : '') +
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +

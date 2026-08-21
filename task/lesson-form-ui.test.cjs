@@ -145,7 +145,7 @@ test('all lesson registration paths use fixed independent lesson hours and Monda
 
 test('lesson card metadata places independent lesson hours between clock time and weekly repeat', () => {
   const card = html.slice(html.indexOf("const lesson = isLesson(t);"), html.indexOf("'<div class=\"task-actions\">", html.indexOf("const lesson = isLesson(t);")));
-  assert.ok(card.indexOf("esc(t.time)") < card.indexOf("lessonHoursValue(t.lessonHours)"));
+  assert.ok(card.indexOf("lessonTimeRangeLabel(t)") < card.indexOf("lessonHoursValue(t.lessonHours)"));
   assert.ok(card.indexOf("lessonHoursValue(t.lessonHours)") < card.indexOf("repeatLabel(t)"));
 });
 
