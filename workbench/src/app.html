@@ -1,0 +1,1615 @@
+<title>WB 컨설팅 워크벤치</title>
+<style>
+:root{
+  --bg:#F6F7F4; --panel:#FFFFFF; --ink:#1C2B2A; --ink2:#5A6B68; --line:#E2E6E1;
+  --accent:#0F6B5C; --accent-soft:#E3F0EC; --accent-ink:#0A4A40;
+  --ok:#2E7D32; --warn:#B26A00; --danger:#B3261E; --warn-soft:#FFF4E0; --danger-soft:#FBEAE9; --ok-soft:#E8F3E8;
+  --chip:#EEF1ED; --shadow:0 1px 3px rgba(28,43,42,.08);
+}
+:root:not([data-theme="light"]) { }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141917; --panel:#1D2422; --ink:#E8ECE9; --ink2:#9DABA6; --line:#2C3532;
+    --accent:#4CC2A9; --accent-soft:#1E332E; --accent-ink:#8FE0CE;
+    --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
+    --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141917; --panel:#1D2422; --ink:#E8ECE9; --ink2:#9DABA6; --line:#2C3532;
+  --accent:#4CC2A9; --accent-soft:#1E332E; --accent-ink:#8FE0CE;
+  --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
+  --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  font-size:14px;line-height:1.55;}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;padding:0}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{resize:vertical;min-height:90px;line-height:1.6}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+h1,h2,h3,h4{margin:0;line-height:1.3;text-wrap:balance}
+.app{display:flex;min-height:100vh}
+/* ── 사이드바 ── */
+.side{width:230px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);padding:14px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;cursor:pointer}
+.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:-.5px}
+.brand b{font-size:15px;letter-spacing:-.3px}
+.brand small{display:block;color:var(--ink2);font-weight:400;font-size:11px}
+.navbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--ink2);font-weight:600}
+.navbtn:hover{background:var(--chip)}
+.navbtn.on{background:var(--accent-soft);color:var(--accent-ink)}
+.side .grp{margin-top:10px;padding:6px 10px 2px;font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.08em}
+.stubtn{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:8px;color:var(--ink)}
+.stubtn:hover{background:var(--chip)}
+.stubtn.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
+.stubtn .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.stubtn .cnt{margin-left:auto;font-size:11px;color:var(--ink2)}
+.side .foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+/* ── 본문 ── */
+.main{flex:1;min-width:0;padding:22px 26px 60px;max-width:1060px}
+.crumb{color:var(--ink2);font-size:12px;margin-bottom:4px}
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.pagehead h1{font-size:22px;letter-spacing:-.4px}
+.pagehead .sub{color:var(--ink2);margin-top:3px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-weight:600;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
+a.btn{text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.sm{padding:4px 10px;font-size:12.5px;box-shadow:none}
+.btn.ghost{border-color:transparent;box-shadow:none;color:var(--ink2)}
+.btn.ghost:hover{color:var(--danger)}
+/* 카드/그리드 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.cols3{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.grid.cols2{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+.chip.acc{background:var(--accent-soft);color:var(--accent-ink)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.danger{background:var(--danger-soft);color:var(--danger)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.sec{margin-top:26px}
+.sec>h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sec>h2 .n{color:var(--ink2);font-weight:500;font-size:13px}
+/* 학생 카드 */
+.stucard{cursor:pointer;transition:border-color .15s}
+.stucard:hover{border-color:var(--accent)}
+.stucard h3{font-size:15px;display:flex;align-items:center;gap:7px}
+.stucard .meta{color:var(--ink2);font-size:12.5px;margin:6px 0 10px;min-height:2.6em}
+.stucard .chips{display:flex;flex-wrap:wrap;gap:5px}
+/* 마감 스트립 */
+.duer{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
+.duer:last-child{border-bottom:none}
+.duer .dd{font-variant-numeric:tabular-nums;font-weight:800;width:52px;text-align:center;border-radius:8px;padding:3px 0;font-size:12.5px}
+.duer .who{font-weight:700;width:70px}
+.duer .what{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.duer .st{font-size:11.5px}
+/* 탭 */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tab{padding:9px 14px;font-weight:600;color:var(--ink2);border-bottom:2px solid transparent;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--accent-ink);border-bottom-color:var(--accent)}
+/* 폼 */
+.frow{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;align-items:center;margin-bottom:8px}
+.frow label{font-size:12.5px;font-weight:600;color:var(--ink2)}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+@media(max-width:760px){.formgrid{grid-template-columns:1fr}.main{padding:16px}.side{width:64px}.side .txt,.side .grp,.brand small,.brand b{display:none}}
+/* 생기부 에디터 */
+.charbar{height:5px;border-radius:3px;background:var(--chip);overflow:hidden;margin-top:6px}
+.charbar i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.charbar.over i{background:var(--danger)}
+.cntline{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-top:4px;font-variant-numeric:tabular-nums}
+.flag{background:var(--danger-soft);color:var(--danger);border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;display:inline-block;margin:2px 4px 2px 0}
+.guide3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+@media(max-width:860px){.guide3{grid-template-columns:1fr}}
+.guide3 .g{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.guide3 .g b{display:block;font-size:12px;color:var(--accent-ink);margin-bottom:3px}
+.guide3 .g span{font-size:12px;color:var(--ink2)}
+/* 체크리스트 */
+.ck{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer}
+.ck input{width:auto;margin-top:3px}
+.ck.done span{color:var(--ink2);text-decoration:line-through}
+/* 수행평가 */
+.statuses{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.stpill{padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--chip);color:var(--ink2)}
+.taskrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.taskrow:hover{background:var(--chip)}
+.taskrow .subj{font-weight:700;width:84px;flex-shrink:0}
+.taskrow .top{flex:1;min-width:0}
+.taskrow .due{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink2);width:88px;text-align:right}
+/* 기록 타임라인 */
+.rec{border-left:2px solid var(--line);padding:2px 0 14px 14px;margin-left:6px;position:relative}
+.rec::before{content:"";position:absolute;left:-5px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.rec .rh{display:flex;gap:8px;align-items:baseline}
+.rec .rh b{font-size:13.5px}
+.rec .rh time{color:var(--ink2);font-size:12px;font-variant-numeric:tabular-nums}
+.rec dl{margin:6px 0 0;display:grid;grid-template-columns:78px 1fr;gap:3px 10px;font-size:13px}
+.rec dt{color:var(--ink2);font-weight:600}
+.rec dd{margin:0;white-space:pre-wrap}
+/* 노하우 */
+.kh{border-left:3px solid var(--accent);padding:2px 0 2px 14px;margin-bottom:18px}
+.kh h3{font-size:14px;margin-bottom:6px}
+.kh p,.kh ul{margin:4px 0;color:var(--ink);font-size:13.5px}
+.kh ul{padding-left:18px}
+.kh .src{font-size:11.5px;color:var(--ink2)}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{text-align:left;color:var(--ink2);font-weight:600;font-size:12px;border-bottom:1px solid var(--line);padding:5px 8px}
+table.t td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
+.tablewrap{overflow-x:auto}
+/* 마크다운 뷰 */
+.mdv{font-size:13.5px}
+.mdv h1{font-size:17px;margin:14px 0 6px}.mdv h2{font-size:15px;margin:14px 0 6px}.mdv h3{font-size:13.5px;margin:10px 0 4px}
+.mdv table{width:100%;border-collapse:collapse;margin:8px 0}
+.mdv th,.mdv td{border:1px solid var(--line);padding:4px 8px;text-align:left;font-size:12.5px}
+.mdv th{background:var(--chip)}
+.mdv ul{padding-left:20px;margin:4px 0}
+.mdv code{background:var(--chip);border-radius:4px;padding:1px 5px;font-size:12px}
+.empty{color:var(--ink2);text-align:center;padding:34px 10px}
+.empty b{display:block;color:var(--ink);margin-bottom:4px}
+/* 토스트/모달 */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+#toast.show{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(10,16,15,.45);display:none;place-items:center;z-index:50;padding:20px}
+.modal.open{display:grid}
+.modal .box{background:var(--panel);border-radius:14px;padding:20px;width:min(560px,100%);max-height:88vh;overflow-y:auto}
+.modal .box h2{font-size:16px;margin-bottom:14px}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+details.acc2{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px;background:var(--panel)}
+details.acc2 summary{cursor:pointer;font-weight:700;font-size:13.5px}
+details.acc2[open]{padding-bottom:14px}
+/* 월간 캘린더 */
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.calhead{text-align:center;font-size:11px;font-weight:700;color:var(--ink2);padding:4px 0}
+.calcell{min-height:76px;border:1px solid var(--line);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.calcell.pad{border:none}
+.calcell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.calcell .dnum{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.calev{font-size:10.5px;text-align:left;border-radius:5px;padding:1px 5px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none}
+.calev.warn{background:var(--warn-soft);color:var(--warn)}
+.calev.danger{background:var(--danger-soft);color:var(--danger)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <nav class="side" id="side"></nav>
+  <main class="main" id="main"></main>
+</div>
+<div id="toast" role="status"></div>
+<div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
+
+<script>
+/* ═══════════ WB 컨설팅 워크벤치 ═══════════
+   데이터는 이 브라우저의 localStorage에만 저장된다.
+   학생 데이터 시드는 별도 JSON 가져오기로 주입한다. */
+const LS="wb-consulting-v1";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toISOString().slice(0,10);
+
+/* ── 노하우 상수 (WB 컨설팅 1~5 작업 + agent-consulting + 운영가이드에서 추출) ── */
+const LIMITS={"세특":500,"개인세특":500,"자율":500,"동아리":500,"진로":700,"행특":500};
+const CATS=Object.keys(LIMITS);
+const BANNED=[
+  {re:/(서울대|연세대|고려대|성균관|한양대|카이스트|KAIST|포스텍|의대\s*진학|약대\s*진학)/g,label:"특정 대학명"},
+  {re:/(토익|토플|텝스|TOEIC|TOEFL|TEPS|HSK|JLPT|아이엘츠|IELTS)/gi,label:"공인어학시험"},
+  {re:/(교외\s*(대회|수상|경시)|올림피아드|전국\s*대회)/g,label:"교외 수상·대회"},
+  {re:/(아버지|어머니|부모님?)(가|이|은|는|의)\s*[^\s]{0,10}(의사|변호사|교수|대표|사업)/g,label:"부모 배경"},
+  {re:/(학원|과외|인강|컨설팅|웩슬러브레인)/g,label:"사교육 기관 언급"},
+];
+const LCSI={
+  "주도형":"목표 수치를 명확히 제시하고 주도권을 준다. 결과 중심 피드백.",
+  "표출형":"성과 공유·칭찬 포인트를 미리 준비한다. 분위기를 살리는 도입.",
+  "분석형":"계획의 논리를 설명하고 데이터 중심으로 피드백한다.",
+  "우호형":"부담 없는 목표 설정, 격려 중심. 관계 안정이 우선.",
+  "미파악":"LCSI 미실시 — 상담에서 파악 필요."
+};
+const TASK_STATUS=["공지수신","자료수집","초안작성","검토중","제출완료"];
+const TASK_CK={
+  "공통":["수행평가 공지 원문/사진 확보","분량·형식·마감 요건 확인","학생 프로파일에서 진로 키워드 확인"],
+  "초안":["진로 연결 서론 포함","심화 키워드 3개 이상","생기부 기재 가능 문장으로 마무리 방향 제시","24~48시간 내 초안 전달"],
+  "발표":["PPT 슬라이드 구성 확인","발표 대본·큐카드 준비","리허설 1회 이상 (시간 측정)","예상 질문 3개 준비"]
+};
+
+/* ── 상태 ── */
+let db=load();
+db.meta=db.meta||{};if(!db.meta.suneung)db.meta.suneung="2026-11-19";
+let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
+function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
+  return {students:[],meta:{created:today()}};}
+function save(){localStorage.setItem(LS,JSON.stringify(db));}
+function stu(){return db.students.find(s=>s.id===view.stuId);}
+
+/* ── 미니 마크다운 렌더러 (프로파일 원문 표시용) ── */
+function md(src){
+  if(!src)return"";
+  const lines=String(src).split(/\r?\n/);let out="",inUl=false,inTable=false;
+  const inline=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`(.+?)`/g,"<code>$1</code>");
+  for(let i=0;i<lines.length;i++){const L=lines[i];
+    if(/^\|.*\|/.test(L)){ if(/^\|[\s:|-]+\|$/.test(L))continue;
+      const cells=L.split("|").slice(1,-1).map(c=>c.trim());
+      if(!inTable){out+="<table>";inTable=true;out+="<tr>"+cells.map(c=>"<th>"+inline(c)+"</th>").join("")+"</tr>";}
+      else out+="<tr>"+cells.map(c=>"<td>"+inline(c)+"</td>").join("")+"</tr>";
+      continue;}
+    if(inTable){out+="</table>";inTable=false;}
+    if(/^[-*] /.test(L)){if(!inUl){out+="<ul>";inUl=true;}out+="<li>"+inline(L.slice(2))+"</li>";continue;}
+    if(inUl){out+="</ul>";inUl=false;}
+    const h=L.match(/^(#{1,3}) (.*)/);
+    if(h){out+=`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`;continue;}
+    if(L.trim()==="")continue;
+    out+="<p>"+inline(L)+"</p>";}
+  if(inUl)out+="</ul>";if(inTable)out+="</table>";
+  return out;}
+
+/* ── 공용 UI ── */
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function modal(html){$("#modalbox").innerHTML=html;$("#modal").classList.add("open");}
+function closeModal(){$("#modal").classList.remove("open");}
+$("#modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal();});
+async function copy(t){try{await navigator.clipboard.writeText(t);toast("복사했습니다 — Cowork에 붙여넣으세요");}
+  catch(e){modal(`<h2>수동 복사</h2><textarea rows=12>${esc(t)}</textarea><div class=mfoot><button class=btn onclick=closeModal()>닫기</button></div>`);}}
+async function saveFile(name,data){
+  if(window.claude&&window.claude.downloads){try{await window.claude.downloads.save({filename:name,data});toast(name+" 저장");return;}catch(e){if(e&&e.code==="user_denied")return;}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"text/plain"}));a.download=name;a.click();}
+function dday(d){if(!d)return null;const diff=Math.ceil((new Date(d)-new Date(today()))/864e5);return diff;}
+function ddayChip(d){const n=dday(d);if(n===null)return"";
+  const cls=n<0?"danger":n<=3?"danger":n<=7?"warn":"ok";
+  return `<span class="dd chip ${cls}">${n<0?"지남":n===0?"D-DAY":"D-"+n}</span>`;}
+
+/* ── 정기 상담 주기 계산 ── */
+const DAYS=["일","월","화","수","목","금","토"];
+function nthWeekday(y,m,week,dayIdx){ // m: 0-based, week: 1~4
+  const first=new Date(y,m,1);
+  const d=1+((dayIdx-first.getDay()+7)%7)+(week-1)*7;
+  const dt=new Date(y,m,d);
+  return dt.getMonth()===m?dt:null;}
+function fmtDate(dt){const p=n=>String(n).padStart(2,"0");return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;}
+function nextConsult(s){
+  const c=s.consult||{};
+  if(c.nextOverride)return c.nextOverride;
+  if(c.week==null||c.week===""||c.day==null||c.day==="")return null;
+  const now=new Date(today());
+  for(let k=0;k<3;k++){
+    const dt=nthWeekday(now.getFullYear(),now.getMonth()+k,+c.week,+c.day);
+    if(dt&&dt>=now)return fmtDate(dt);}
+  return null;}
+function lastRecordDate(s){const rs=(s.records||[]).map(r=>r.date).filter(Boolean).sort();return rs[rs.length-1]||null;}
+function overdueDays(s){const d=lastRecordDate(s);if(!d)return null;return Math.floor((new Date(today())-new Date(d))/864e5);}
+function odChip(s){const od=overdueDays(s);
+  if(od===null)return `<span class="chip danger">상담 기록 없음</span>`;
+  if(od>40)return `<span class="chip danger">마지막 상담 ${od}일 전</span>`;
+  return `<span class="chip">마지막 상담 ${od}일 전</span>`;}
+function focusList(){
+  return db.students.map(s=>{
+    const reasons=[];let score=0;
+    const od=overdueDays(s);
+    if(od===null){score+=3;reasons.push(["상담 기록 없음","danger"]);}
+    else if(od>40){score+=3;reasons.push([`상담 ${od}일 경과`,"danger"]);}
+    if(!nextConsult(s)){score+=1;reasons.push(["주기 미등록","warn"]);}
+    const urgent=(s.tasks||[]).filter(t=>t.status!=="제출완료"&&t.due&&dday(t.due)!==null&&dday(t.due)>=0&&dday(t.due)<=7);
+    if(urgent.length){score+=2*Math.min(urgent.length,2);reasons.push([`수행 마감 ${urgent.length}건`,"warn"]);}
+    const ex=(s.exams||[]).filter(e=>e.date&&dday(e.date)!==null&&dday(e.date)>=0&&dday(e.date)<=14)
+      .sort((a,b)=>a.date<b.date?-1:1);
+    if(ex.length){score+=3;reasons.push([`${ex[0].name} D-${dday(ex[0].date)}`,"danger"]);}
+    const cd=s.consult&&s.consult.contractEnd?dday(s.consult.contractEnd):null;
+    if(cd!==null&&cd>=0&&cd<=60){score+=2;reasons.push([`계약 D-${cd}`,"warn"]);}
+    return {s,score,reasons};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);}
+
+/* ═══════════ 사이드바 ═══════════ */
+function renderSide(){
+  const grades=["고3","고2","고1"];
+  $("#side").innerHTML=`
+  <div class="brand" onclick="go('home')"><div class="mark">WB</div><div><b>컨설팅 워크벤치</b><small>웩슬러브레인센터</small></div></div>
+  <button class="navbtn ${view.page==='home'?'on':''}" onclick="go('home')">🏠 <span class="txt">대시보드</span></button>
+  <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
+  <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
+  <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
+  <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
+  ${grades.map(g=>{
+    const list=db.students.filter(s=>s.grade===g);
+    if(!list.length)return"";
+    return `<div class="grp">${g} · ${list.length}명</div>`+list.map(s=>{
+      const nTask=(s.tasks||[]).filter(t=>t.status!=="제출완료").length;
+      return `<button class="stubtn ${view.page==='stu'&&view.stuId===s.id?'on':''}" onclick="openStu('${s.id}')">
+        <span class="dot" style="background:${s.profileMd?'var(--ok)':'var(--warn)'}"></span>
+        <span class="txt">${esc(s.name)}</span>${nTask?`<span class="cnt">${nTask}</span>`:""}</button>`;}).join("");
+  }).join("")}
+  <div class="foot">
+    <button class="navbtn" onclick="addStudent()">＋ <span class="txt">학생 추가</span></button>
+    <button class="navbtn" onclick="importJson()">📥 <span class="txt">가져오기 (시드)</span></button>
+    <button class="navbtn" onclick="exportJson()">📤 <span class="txt">백업 내보내기</span></button>
+    ${(()=>{const lb=db.meta&&db.meta.lastExport;const n=lb?Math.floor((new Date(today())-new Date(lb))/864e5):null;
+      return `<div class="txt" style="padding:2px 10px;font-size:10.5px;color:${n===null||n>7?'var(--danger)':'var(--ink2)'}">${n===null?"⚠ 백업한 적 없음":n===0?"오늘 백업함":`마지막 백업 ${n}일 전`}</div>`;})()}
+  </div>`;}
+
+function go(p){view.page=p;view.stuId=p==="stu"?view.stuId:null;render();}
+function openStu(id){view.page="stu";view.stuId=id;view.tab="overview";view.editDraft=null;view.editTask=null;view.editInq=null;render();}
+
+/* ═══════════ 대시보드 ═══════════ */
+function renderHome(){
+  const allTasks=db.students.flatMap(s=>(s.tasks||[]).filter(t=>t.status!=="제출완료").map(t=>({...t,stu:s})));
+  allTasks.sort((a,b)=>(a.due||"9999")<(b.due||"9999")?-1:1);
+  const drafts=db.students.reduce((n,s)=>n+(s.saenggibu||[]).length,0);
+  $("#main").innerHTML=`
+  <div class="pagehead"><div>
+    <h1>컨설팅 대시보드</h1>
+    <div class="sub">학생 ${db.students.length}명 · 진행 중 수행평가 ${allTasks.length}건 · 생기부 초안 ${drafts}건 — ${today()}</div>
+  </div><button class="btn pri" onclick="addStudent()">＋ 학생 추가</button></div>
+
+  ${db.students.length===0?`<div class="card empty"><b>학생 데이터가 비어 있습니다</b>
+    좌측 하단 <u>가져오기</u>로 시드 JSON(students.json)을 불러오거나, 학생을 직접 추가하세요.<br>
+    모든 데이터는 이 브라우저에만 저장됩니다.</div>`:`
+
+  <div class="sec"><h2>⏰ 마감 임박 수행평가 <span class="n">전체 학생</span></h2>
+  <div class="card">${allTasks.length?allTasks.slice(0,8).map(t=>`
+    <div class="duer" onclick="openStu('${t.stu.id}');view.tab='tasks';render()">
+      ${ddayChip(t.due)}
+      <span class="who">${esc(t.stu.name)}</span>
+      <span class="what">${esc(t.subject)} · ${esc(t.topic)}</span>
+      <span class="st chip">${esc(t.status)}</span>
+    </div>`).join(""):`<div class="empty">진행 중 수행평가가 없습니다</div>`}</div></div>
+
+  ${db.students.some(s=>s.grade==="고3")?(()=>{const d=dday(db.meta.suneung);
+    const g3=db.students.filter(s=>s.grade==="고3").map(s=>esc(s.name)).join(" · ");
+    return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:4px;border-color:var(--danger)">
+    <span style="font-size:22px">🎯</span>
+    <div style="flex:1"><b style="font-size:16px">수능 ${d!==null&&d>=0?"D-"+d:"날짜 확인 필요"}</b>
+    <div style="font-size:12px;color:var(--ink2)">고3: ${g3}</div></div>
+    <input type=date value="${esc(db.meta.suneung)}" style="width:150px" onchange="db.meta.suneung=this.value;save();render()">
+    </div>`;})():""}
+
+  <div class="sec"><h2>🔥 이번 주 포커스 <span class="n">관리 필요도 상위 — 자동 산출</span></h2>
+  <div class="card">${(()=>{const f=focusList();return f.length?f.map(({s,reasons})=>`
+    <div class="duer" onclick="openStu('${s.id}')">
+      <span class="who">${esc(s.name)}</span>
+      <span class="what" style="display:flex;gap:5px;flex-wrap:wrap;white-space:normal">${reasons.map(([l,c])=>`<span class="chip ${c}">${esc(l)}</span>`).join("")}</span>
+    </div>`).join(""):`<div class="empty" style="padding:14px"><b>전원 관리 상태 양호</b>밀린 상담·임박 마감·임박 시험이 없습니다.</div>`})()}</div></div>
+
+  <div class="sec"><h2>📅 상담 레이더 <span class="n">정기 상담 사이클</span></h2>
+  <div class="card">${db.students.map(s=>({s,next:nextConsult(s),od:overdueDays(s)}))
+    .sort((a,b)=>((a.next||"9999")<(b.next||"9999"))?-1:1)
+    .map(({s,next,od})=>`
+    <div class="duer" onclick="openStu('${s.id}');view.tab='records';render()">
+      ${next?ddayChip(next):`<span class="dd chip danger">주기없음</span>`}
+      <span class="who">${esc(s.name)}</span>
+      <span class="what">${next?`다음 상담 ${next}`:"정기 주기 미등록 — 상담 관리 탭에서 설정"}${s.consult&&s.consult.time?` ${esc(s.consult.time)}`:""}</span>
+      <span class="st">${od===null?`<span class="chip danger">기록 없음</span>`:od>40?`<span class="chip danger">${od}일 경과</span>`:`<span class="chip ok">${od}일 전</span>`}</span>
+    </div>`).join("")}</div></div>
+
+  <div class="sec"><h2>👥 학생별 현황</h2>
+  <div class="grid cols3">${db.students.map(s=>{
+    const nT=(s.tasks||[]).filter(t=>t.status!=="제출완료").length;
+    const nS=(s.saenggibu||[]).length;
+    return `<div class="card stucard" onclick="openStu('${s.id}')">
+      <h3>${esc(s.name)} <span class="chip">${esc(s.grade)}</span></h3>
+      <div class="meta">${esc(s.career||s.school||"프로파일 미입력")}</div>
+      <div class="chips">
+        <span class="chip ${s.lcsi&&s.lcsi!=="미파악"?"acc":""}">${esc(s.lcsi||"LCSI 미파악")}</span>
+        ${nT?`<span class="chip warn">수행 ${nT}</span>`:""}
+        ${nS?`<span class="chip">생기부 ${nS}</span>`:""}
+        ${!s.profileMd?`<span class="chip danger">프로파일 필요</span>`:""}
+      </div></div>`;}).join("")}</div></div>`}`;}
+
+/* ═══════════ 학생 화면 ═══════════ */
+function renderStu(){
+  const s=stu();if(!s){go("home");return;}
+  const tabs=[["overview","프로파일"],["acad","학업 관리"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["adm","진학사 통"],["plan","월간 계획"]];
+  $("#main").innerHTML=`
+  <div class="crumb">학생 / ${esc(s.grade)}</div>
+  <div class="pagehead"><div>
+    <h1>${esc(s.name)}</h1>
+    <div class="sub">${esc(s.school||"학교 미입력")} · ${esc(s.career||"진로 미입력")} · <b>${esc(s.lcsi||"LCSI 미파악")}</b>
+    · <span title="이 학생의 정본 폴더 — 앱에서 저장하는 파일은 전부 이 폴더 규칙 이름으로 나갑니다">📁 코워크/컨설팅/${esc(s.name)}/</span></div>
+  </div><div style="display:flex;gap:8px">
+    <button class="btn sm" onclick="copyBriefing()">📋 상담 브리핑 프롬프트</button>
+    <button class="btn ghost sm" onclick="delStudent()">삭제</button>
+  </div></div>
+  ${(()=>{ // 360° 신호등
+    const profN=[s.school,s.career,(s.lcsi&&s.lcsi!=="미파악"),s.profileMd].filter(Boolean).length;
+    const nxt=nextConsult(s),od=overdueDays(s);
+    const act=(s.tasks||[]).filter(t=>t.status!=="제출완료");
+    const urgent=act.filter(t=>t.due&&dday(t.due)!==null&&dday(t.due)<=7).length;
+    const sg=(s.saenggibu||[]).length;
+    const cdd=s.consult&&s.consult.contractEnd?dday(s.consult.contractEnd):null;
+    const c360=(l,st,x)=>`<span class="chip ${st}">${l} ${x}</span>`;
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 12px">
+      ${c360("프로파일",profN===4?"ok":profN>=2?"warn":"danger",profN+"/4")}
+      ${c360("상담",(nxt&&od!==null&&od<=40)?"ok":nxt?"warn":"danger",nxt?"다음 "+nxt.slice(5):"주기없음")}
+      ${c360("수행",urgent?"warn":"ok",act.length+"건"+(urgent?" · 임박 "+urgent:""))}
+      ${c360("생기부",sg?"ok":"warn",sg+"건")}
+      ${c360("계약",cdd===null?"warn":cdd<=30?"danger":cdd<=60?"warn":"ok",cdd===null?"미입력":"D-"+cdd)}
+      ${s.grade==="고3"?(()=>{const d=dday(db.meta.suneung);return d!==null&&d>=0?c360("수능",d<=100?"danger":"warn","D-"+d):"";})():""}
+    </div>`;})()}
+  <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${view.tab===k?'on':''}" onclick="view.tab='${k}';render()">${l}</button>`).join("")}</div>
+  <div id="tabbody"></div>`;
+  ({overview:tabOverview,acad:tabAcad,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
+}
+
+/* ── 프로파일 탭 ── */
+function tabOverview(){
+  const s=stu();
+  $("#tabbody").innerHTML=`
+  <div class="card"><h2 style="font-size:14px;margin-bottom:12px">기본 정보</h2>
+    <div class="formgrid">
+      ${[["name","이름"],["grade","학년"],["school","학교"],["career","진로 목표"],["targetUniv","목표 대학/학과"],["lcsi","LCSI 유형"]].map(([k,l])=>`
+      <div class="frow"><label>${l}</label>${
+        k==="grade"?`<select onchange="upStu('${k}',this.value)">${["고1","고2","고3"].map(g=>`<option ${s.grade===g?"selected":""}>${g}</option>`).join("")}</select>`
+        :k==="lcsi"?`<select onchange="upStu('${k}',this.value)">${Object.keys(LCSI).map(g=>`<option ${s.lcsi===g?"selected":""}>${g}</option>`).join("")}</select>`
+        :`<input value="${esc(s[k]||"")}" onchange="upStu('${k}',this.value)">`}</div>`).join("")}
+    </div>
+    <div class="frow" style="grid-template-columns:110px 1fr;margin-top:4px"><label>세특 서사 공식</label>
+      <input value="${esc(s.narrative||"")}" placeholder="[교과 개념] → [진로 맥락] → [사회적 의미] — 학생별 변형" onchange="upStu('narrative',this.value)"></div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>접근·특이사항</label>
+      <textarea rows=2 onchange="upStu('notes',this.value)">${esc(s.notes||"")}</textarea></div>
+    ${s.lcsi&&LCSI[s.lcsi]?`<p style="margin:8px 0 0;font-size:12.5px;color:var(--accent-ink)">💡 ${esc(s.lcsi)} 접근: ${esc(LCSI[s.lcsi])}</p>`:""}
+  </div>
+  <div class="sec"><h2>📈 성적 기록 <span class="n">내신·모의고사 통합 — 브리핑 프롬프트에 최근 추이 자동 포함</span></h2>
+  <div class="card">
+    ${(s.grades||[]).length?`<div class="tablewrap"><table class="t">
+      <tr><th>날짜</th><th>시험</th><th>과목</th><th>점수/등급</th><th></th></tr>
+      ${s.grades.map((g,i)=>`<tr><td>${esc(g.date)}</td><td>${esc(g.exam)}</td><td>${esc(g.subject)}</td><td>${esc(g.score)}</td>
+        <td><button class="btn ghost sm" onclick="stu().grades.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">기록이 없습니다. 상담에서 성적이 언급되면 바로 추가하세요 — 성취 추이 공유가 자신감 관리의 핵심입니다.</p>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <input type=date id=g_date style="width:140px">
+      <input id=g_exam placeholder="시험 (예: 6월 모의고사)" style="width:170px">
+      <input id=g_subject placeholder="과목" style="width:100px">
+      <input id=g_score placeholder="점수/등급" style="width:110px">
+      <button class="btn sm" onclick="addGrade()">추가</button>
+    </div>
+  </div></div>
+  <div class="sec"><h2>프로파일 원문 <span class="n">00_학생프로파일.md</span>
+    <button class="btn sm" style="margin-left:auto" onclick="editProfileMd()">편집</button>
+    <button class="btn sm" onclick="saveFile('00_학생프로파일.md',stu().profileMd||'')">📁 폴더용 저장</button></h2>
+    <div class="card mdv">${s.profileMd?md(s.profileMd):`<div class="empty"><b>프로파일 원문이 없습니다</b>Drive의 00_학생프로파일.md 내용을 붙여넣어 두면 모든 프롬프트에 자동 포함됩니다.</div>`}</div></div>`;}
+function upStu(k,v){stu()[k]=v;save();renderSide();}
+function addGrade(){const s=stu();s.grades=s.grades||[];
+  const g={date:$("#g_date").value||today(),exam:$("#g_exam").value.trim(),subject:$("#g_subject").value.trim(),score:$("#g_score").value.trim()};
+  if(!g.exam&&!g.score){toast("시험명 또는 점수를 입력하세요");return;}
+  s.grades.push(g);s.grades.sort((a,b)=>a.date<b.date?-1:1);save();render();}
+function editProfileMd(){const s=stu();
+  modal(`<h2>${esc(s.name)} — 프로파일 원문 (markdown)</h2>
+  <textarea id=pmd rows=18>${esc(s.profileMd||"")}</textarea>
+  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+  <button class="btn pri" onclick="stu().profileMd=$('#pmd').value;save();closeModal();render()">저장</button></div>`);}
+
+/* ── 생기부 탭 ── */
+function tabSaenggibu(){
+  const s=stu();const list=s.saenggibu||[];
+  if(view.editDraft!==null){return editorSaenggibu();}
+  $("#tabbody").innerHTML=`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="statuses">${CATS.map(c=>`<span class="stpill">${c} ${list.filter(d=>d.category===c).length||""}</span>`).join("")}</div>
+    <button class="btn pri sm" onclick="newDraft()">＋ 새 초안</button></div>
+  ${list.length?`<div class="card">${list.map((d,i)=>`
+    <div class="taskrow" onclick="view.editDraft=${i};render()">
+      <span class="chip acc">${esc(d.category)}</span>
+      <span class="subj">${esc(d.subject||"")}</span>
+      <span class="top">${esc(d.title)}</span>
+      <span class="due">${esc((d.draft||"").length)}자 · ${esc(d.updatedAt||"")}</span>
+    </div>`).join("")}</div>`
+  :`<div class="card empty"><b>생기부 초안이 없습니다</b>세특·자율·동아리·진로·행특 초안을 여기서 관리합니다.</div>`}`;}
+function newDraft(){const s=stu();s.saenggibu=s.saenggibu||[];
+  s.saenggibu.unshift({id:uid(),category:"세특",subject:"",title:"",draft:"",status:"작성중",updatedAt:today()});
+  save();view.editDraft=0;render();}
+function editorSaenggibu(){
+  const s=stu();const d=s.saenggibu[view.editDraft];
+  const lim=LIMITS[d.category]||500;const len=(d.draft||"").length;
+  const flags=scanBanned(d.draft||"");
+  $("#tabbody").innerHTML=`
+  <button class="btn sm" onclick="view.editDraft=null;render()">← 목록</button>
+  <div class="card" style="margin-top:10px">
+    <div class="formgrid">
+      <div class="frow"><label>항목</label><select onchange="upDraft('category',this.value)">${CATS.map(c=>`<option ${d.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
+      <div class="frow"><label>과목/영역</label><input value="${esc(d.subject)}" placeholder="예: 사회문화, 자율활동" onchange="upDraft('subject',this.value)"></div>
+    </div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>활동/주제</label>
+      <input value="${esc(d.title)}" placeholder="예: 사회적 불평등 보고서 발표" onchange="upDraft('title',this.value)"></div>
+
+    <div class="guide3">
+      <div class="g"><b>1. 교과 개념</b><span>수업에서 다룬 개념·활동에서 출발</span></div>
+      <div class="g"><b>2. 진로 맥락</b><span>${esc(s.career||"학생 진로")}와 연결 — 심화 키워드 3개 이상</span></div>
+      <div class="g"><b>3. 사회적 의미</b><span>확장된 시각·후속 탐구로 마무리</span></div>
+    </div>
+
+    <textarea id="dtext" rows=9 placeholder="개조식 종결(-함/-임/-보임), 학생 주어 생략, 관찰자(교사) 시점으로 작성"
+      oninput="liveCount(this.value)">${esc(d.draft)}</textarea>
+    <div class="charbar ${len>lim?'over':''}" id="cbar"><i style="width:${Math.min(100,len/lim*100)}%"></i></div>
+    <div class="cntline"><span id="ccnt">${len} / ${lim}자 (${d.category} NEIS 상한)</span><span>공백 포함 기준</span></div>
+    <div id="cflags" style="margin-top:6px">${flags.map(f=>`<span class="flag">⚠ ${esc(f)}</span>`).join("")}</div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn pri" onclick="saveDraft()">저장</button>
+      <button class="btn" onclick="copyDraftPrompt()">🤖 Claude 초안 프롬프트 복사</button>
+      <button class="btn" onclick="qcheck()">✓ 품질 검사</button>
+      <button class="btn" onclick="saveDraftFile()">📁 폴더용 저장</button>
+      <button class="btn ghost" onclick="delDraft()">삭제</button>
+    </div>
+  </div>`;
+  window.liveCount=v=>{const l=v.length;$("#ccnt").textContent=`${l} / ${lim}자 (${d.category} NEIS 상한)`;
+    $("#cbar").className="charbar"+(l>lim?" over":"");$("#cbar i").style.width=Math.min(100,l/lim*100)+"%";
+    $("#cflags").innerHTML=scanBanned(v).map(f=>`<span class="flag">⚠ ${esc(f)}</span>`).join("");};
+}
+function upDraft(k,v){const d=stu().saenggibu[view.editDraft];
+  const ta=$("#dtext");if(ta)d.draft=ta.value; // 항목 변경 시 입력 중이던 초안 보존
+  d[k]=v;save();render();}
+function saveDraft(){const d=stu().saenggibu[view.editDraft];d.draft=$("#dtext").value;d.updatedAt=today();save();toast("저장했습니다");render();}
+function delDraft(){stu().saenggibu.splice(view.editDraft,1);view.editDraft=null;save();render();}
+function saveDraftFile(){const s=stu();const d=s.saenggibu[view.editDraft];const ym=today().slice(0,7);
+  const body=`# ${s.name} 생기부 ${d.category} 초안\n\n- 과목/영역: ${d.subject||"-"}\n- 활동/주제: ${d.title||"-"}\n- 작성일: ${today()} / 글자수: ${(d.draft||"").length}자\n\n---\n\n${$("#dtext")?$("#dtext").value:d.draft||""}\n`;
+  saveFile(`${ym}_생기부_${d.category}${d.subject?"_"+d.subject:""}_초안.md`,body);}
+function scanBanned(t){const out=[];for(const b of BANNED){b.re.lastIndex=0;const m=t.match(b.re);if(m)out.push(`${b.label}: ${[...new Set(m)].join(", ")}`);}return out;}
+function qcheck(){
+  const d=stu().saenggibu[view.editDraft];const t=$("#dtext").value;const s=stu();
+  const checks=[
+    [t.length>0&&t.length<=(LIMITS[d.category]||500),`글자수 ${t.length}자 — 상한 ${LIMITS[d.category]}자 이내`],
+    [scanBanned(t).length===0,"금지 표현 없음 (대학명·공인시험·교외수상·부모배경·기관명)"],
+    [/(함|임|음|됨|보임)\.?\s*$/.test(t.trim()),"개조식 종결(-함/-임)로 마무리"],
+    [s.career?t.includes(s.career.slice(0,2))||/진로|희망|관심/.test(t):true,"진로 연결 확인 (수동 확인 권장)"],
+    [!/나는|저는|내가/.test(t),"1인칭 표현 없음 (관찰자 시점)"],
+  ];
+  modal(`<h2>품질 검사 — ${esc(d.category)}</h2>
+  ${checks.map(([ok,l])=>`<div class="ck ${ok?'done':''}"><input type=checkbox disabled ${ok?"checked":""}><span>${ok?"":"❗ "}${esc(l)}</span></div>`).join("")}
+  <p style="font-size:12.5px;color:var(--ink2);margin-top:10px">기준: 진로 연결 서론 · 심화 키워드 3개 이상 · 생기부 기재 가능 문장 (운영가이드 §3 초안 품질 기준)</p>
+  <div class=mfoot><button class="btn pri" onclick=closeModal()>확인</button></div>`);}
+
+/* ── 수행평가 탭 ── */
+function tabTasks(){
+  const s=stu();const list=s.tasks||[];
+  if(view.editTask!==null)return editorTask();
+  $("#tabbody").innerHTML=`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="statuses">${TASK_STATUS.map(st=>{const n=list.filter(t=>t.status===st).length;return n?`<span class="stpill">${st} ${n}</span>`:""}).join("")}</div>
+    <button class="btn pri sm" onclick="newTask()">＋ 수행평가 등록</button></div>
+  <details class="acc2" ${s.taskStrategy&&s.taskStrategy.content?"":"open"}>
+    <summary>🧠 학기 수행 전략 ${s.taskStrategy&&s.taskStrategy.updated?`<span style="font-weight:400;color:var(--ink2)">(${esc(s.taskStrategy.updated)} 수립)</span>`:`<span class="chip warn">미수립</span>`}</summary>
+    <p style="font-size:12px;color:var(--ink2);margin:8px 0">수행은 다 잘하는 게 아니라 <b>세특에 걸리는 것에 걸고, 나머지는 기본만</b> — 전략 프롬프트 결과를 여기 저장해 두면 학기 내내 기준이 됩니다.</p>
+    <textarea id="tstr" rows=5 placeholder="과목별 우선순위 / 수행별 공략 각도 / 일정 배분 / 세특 전환 계획 / 버릴 것">${esc(s.taskStrategy&&s.taskStrategy.content||"")}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn sm pri" onclick="copyTaskStrategy()">🧠 전략 수립 프롬프트</button>
+      <button class="btn sm" onclick="saveTaskStrategy()">전략 저장</button>
+    </div>
+  </details>
+  ${list.length?`<div class="card">${list.map((t,i)=>`
+    <div class="taskrow" onclick="view.editTask=${i};render()">
+      ${ddayChip(t.due)}
+      <span class="subj">${esc(t.subject)}</span>
+      <span class="top">${esc(t.topic)} <span class="chip" style="margin-left:6px">${esc(t.type||"")}</span></span>
+      <span class="chip ${t.status==="제출완료"?"ok":t.status==="공지수신"?"warn":"acc"}">${esc(t.status)}</span>
+    </div>`).join("")}</div>`
+  :`<div class="card empty"><b>등록된 수행평가가 없습니다</b>공지 수신 즉시 등록 → 24~48시간 내 초안이 원칙입니다.</div>`}`;}
+function newTask(){const s=stu();s.tasks=s.tasks||[];
+  s.tasks.unshift({id:uid(),subject:"",topic:"",type:"보고서",due:"",status:"공지수신",ck:{},notes:""});
+  save();view.editTask=0;render();}
+function editorTask(){
+  const s=stu();const t=s.tasks[view.editTask];
+  const ckList=[...TASK_CK["공통"],...TASK_CK["초안"],...(t.type==="발표"?TASK_CK["발표"]:[])];
+  $("#tabbody").innerHTML=`
+  <button class="btn sm" onclick="view.editTask=null;render()">← 목록</button>
+  <div class="card" style="margin-top:10px">
+    <div class="formgrid">
+      <div class="frow"><label>과목</label><input value="${esc(t.subject)}" onchange="upTask('subject',this.value)"></div>
+      <div class="frow"><label>유형</label><select onchange="upTask('type',this.value)">${["보고서","발표","실험","논술","포트폴리오"].map(x=>`<option ${t.type===x?"selected":""}>${x}</option>`).join("")}</select></div>
+      <div class="frow"><label>마감일</label><input type=date value="${esc(t.due)}" onchange="upTask('due',this.value)"></div>
+      <div class="frow"><label>상태</label><select onchange="upTask('status',this.value)">${TASK_STATUS.map(x=>`<option ${t.status===x?"selected":""}>${x}</option>`).join("")}</select></div>
+    </div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>주제</label>
+      <input value="${esc(t.topic)}" placeholder="예: 사회적 불평등" onchange="upTask('topic',this.value)"></div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>메모</label>
+      <textarea rows=3 placeholder="분량·형식 요건, 교사 강조점, 자료 링크" onchange="upTask('notes',this.value)">${esc(t.notes||"")}</textarea></div>
+
+    <h3 style="font-size:13.5px;margin:14px 0 4px">원스톱 체크리스트 <span style="font-weight:400;color:var(--ink2)">(공지 → 24~48h 초안 → 리허설)</span></h3>
+    ${ckList.map((c,i)=>`<label class="ck ${t.ck[i]?'done':''}"><input type=checkbox ${t.ck[i]?"checked":""} onchange="stu().tasks[${view.editTask}].ck[${i}]=this.checked;save();render()"><span>${esc(c)}</span></label>`).join("")}
+
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn" onclick="copyTaskPrompt()">🤖 Claude 초안 프롬프트 복사</button>
+      <button class="btn" onclick="taskToDraft()">✍ 생기부 소재로 전환</button>
+      <button class="btn ghost" onclick="stu().tasks.splice(view.editTask,1);view.editTask=null;save();render()">삭제</button>
+    </div>
+    ${t.status==="제출완료"?"":`<p style="margin:8px 0 0;font-size:12px;color:var(--ink2)">💡 제출이 끝나면 반드시 "생기부 소재로 전환"까지 — 수행평가의 진짜 목적은 세특 소재 확보입니다.</p>`}
+  </div>`;}
+function upTask(k,v){stu().tasks[view.editTask][k]=v;save();renderSide();}
+function taskToDraft(){const s=stu();const t=s.tasks[view.editTask];
+  s.saenggibu=s.saenggibu||[];
+  s.saenggibu.unshift({id:uid(),category:"세특",subject:t.subject||"",title:`${t.topic||""} (수행평가 연계)`,draft:"",status:"작성중",updatedAt:today()});
+  save();view.editTask=null;view.tab="saenggibu";view.editDraft=0;render();
+  toast("생기부 초안으로 전환 — 프롬프트 복사로 초안을 받으세요");}
+
+/* ── 수행 전략 ── */
+function saveTaskStrategy(){const s=stu();s.taskStrategy={content:$("#tstr").value,updated:today()};save();toast("전략 저장");render();}
+function copyTaskStrategy(){const s=stu();
+ const tasks=(s.tasks||[]).map(t=>`- ${t.subject} ${t.topic} [${t.type}/${t.status}] 마감 ${t.due||"미정"}`).join("\n")||"- 등록된 수행 없음";
+ const sg=CATS.map(c=>`${c} ${(s.saenggibu||[]).filter(d=>d.category===c).length}건`).join(" / ");
+ const inq=(s.inquiries||[]).map(q=>`- ${q.subject} ${q.topic} [${q.status}]`).join("\n")||"- 없음";
+ const exams=(s.exams||[]).filter(e=>e.date&&dday(e.date)>=0).map(e=>`- ${e.name} ${e.date} (D-${dday(e.date)})`).join("\n")||"- 미등록";
+ copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade})의 이번 학기 수행평가 전략을 수립하라.
+
+${stuContext(s)}
+
+[등록된 수행평가]
+${tasks}
+
+[생기부 축적 현황] ${sg}
+[탐구보고서 진행]
+${inq}
+[시험 일정]
+${exams}
+
+[전략 수립 요구 — WB 노하우]
+1. 과목별 우선순위 — 세특 연결 가치 기준. 진로(${s.career||"미입력"}) 직결 과목이 상위, 각 과목에 상·중·하 등급과 근거 1줄
+2. 수행별 공략 각도 — 등록된 수행마다 심화 키워드 후보와 진로 연결 포인트 1줄씩
+3. 일정 전략 — 시험기간에 월 8개까지 몰리는 패턴 대비. 시험 2주 전 구간과 겹치는 수행은 미리 앞당길 것 지정
+4. 세특 전환 계획 — 어떤 수행을 생기부 어느 항목(세특/자율/동아리/진로)으로 연결할지 매핑
+5. 버릴 것 — 투자 대비 세특 가치가 낮은 수행은 "기본만" 등급으로 명시 (모든 수행에 전력하지 않는 것이 전략이다)
+6. 출력 마지막에 "전략 요약 5줄" — 워크벤치 수행평가 탭 전략 메모에 저장할 형태로`);}
+
+/* ── 학업 관리 탭 ── */
+function tabAcad(){
+  const s=stu();const exams=(s.exams||[]).slice().sort((a,b)=>(a.date||"")<(b.date||"")?-1:1);
+  const subs=s.subjectsMgmt||[];
+  $("#tabbody").innerHTML=`
+  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">🗓 시험 일정 <span style="font-weight:400;color:var(--ink2)">월간 캘린더·이번 주 포커스에 자동 반영</span></h2>
+    ${exams.length?exams.map(e=>{const idx=s.exams.indexOf(e);return `
+      <div class="duer">${ddayChip(e.date)}
+        <span class="who" style="width:auto;min-width:86px">${esc(e.name)}</span>
+        <span class="what">${esc(e.date)} ${esc(e.memo||"")}</span>
+        ${dday(e.date)!==null&&dday(e.date)>=0?`<button class="btn sm" onclick="copyExamPrep(${idx})">📚 대비 전략</button>`
+          :`<button class="btn sm" onclick="examReview(${idx})">📝 리뷰${e.review?" ✓":""}</button>`}
+        <button class="btn ghost sm" onclick="stu().exams.splice(${idx},1);save();render()">✕</button>
+      </div>`;}).join(""):`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">등록된 시험이 없습니다. 시험이 상담·수행·플래너의 기준점입니다 — 학기 초에 전부 넣어두세요.</p>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <select id=ex_name style="width:130px">${["중간고사","기말고사","모의고사","수능","수행집중기","기타"].map(x=>`<option>${x}</option>`).join("")}</select>
+      <input type=date id=ex_date style="width:150px">
+      <input id=ex_memo placeholder="범위·비고 (선택)" style="flex:1;min-width:150px">
+      <button class="btn sm" onclick="addExam()">추가</button></div>
+  </div>
+  <div class="sec"><h2>📖 과목별 관리 <span class="n">목표 vs 현재 — 갭이 곧 우선순위</span></h2>
+  <div class="card">
+    ${subs.length?`<div class="tablewrap"><table class="t">
+      <tr><th>과목</th><th>목표</th><th>현재</th><th>교재·진도</th><th>약점 메모</th><th></th></tr>
+      ${subs.map((x,i)=>`<tr>
+        <td><b>${esc(x.subject)}</b></td>
+        <td><input value="${esc(x.goal||"")}" placeholder="2등급" style="width:64px" onchange="stu().subjectsMgmt[${i}].goal=this.value;save()"></td>
+        <td><input value="${esc(x.now||"")}" placeholder="3등급" style="width:64px" onchange="stu().subjectsMgmt[${i}].now=this.value;save()"></td>
+        <td><input value="${esc(x.prog||"")}" style="min-width:120px" onchange="stu().subjectsMgmt[${i}].prog=this.value;save()"></td>
+        <td><input value="${esc(x.weak||"")}" style="min-width:140px" onchange="stu().subjectsMgmt[${i}].weak=this.value;save()"></td>
+        <td><button class="btn ghost sm" onclick="stu().subjectsMgmt.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">과목을 등록하면 시험 대비 전략 프롬프트가 이 표를 근거로 작성됩니다.</p>`}
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input id=sb_name placeholder="과목 (예: 수학)" style="width:150px">
+      <button class="btn sm" onclick="addSubj()">추가</button></div>
+  </div></div>
+  <div class="sec"><h2>🧭 학업 전략 메모</h2>
+  <div class="card">
+    <textarea id="acmemo" rows=5 placeholder="시험 대비 전략 결과·학습 방향 결정 사항을 여기에 축적">${esc(s.acadMemo||"")}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn sm pri" onclick="stu().acadMemo=$('#acmemo').value;save();toast('저장했습니다')">저장</button>
+    </div>
+  </div></div>`;}
+function addExam(){const s=stu();s.exams=s.exams||[];
+  const d=$("#ex_date").value;if(!d){toast("날짜를 선택하세요");return;}
+  s.exams.push({name:$("#ex_name").value,date:d,memo:$("#ex_memo").value.trim()});save();render();}
+function addSubj(){const s=stu();s.subjectsMgmt=s.subjectsMgmt||[];
+  const n=$("#sb_name").value.trim();if(!n){toast("과목명을 입력하세요");return;}
+  s.subjectsMgmt.push({subject:n,goal:"",now:"",prog:"",weak:""});save();render();}
+function copyExamPrep(i){const s=stu();const e=s.exams[i];
+  const subs=(s.subjectsMgmt||[]).map(x=>`- ${x.subject}: 목표 ${x.goal||"-"} / 현재 ${x.now||"-"} / 진도 ${x.prog||"-"} / 약점 ${x.weak||"-"}`).join("\n")||"- (과목별 관리 미등록)";
+  const gr=(s.grades||[]).slice(-4).map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n")||"- 기록 없음";
+  const dd=dday(e.date);
+  copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade})의 ${e.name}(${e.date}${dd!==null?", D-"+dd:""}) 대비 전략을 세워라.
+
+${stuContext(s)}
+
+[과목별 현황 — 목표 vs 현재]
+${subs}
+
+[최근 성적]
+${gr}
+${e.memo?`\n[시험 범위·비고] ${e.memo}`:""}
+
+[WB 노하우 — 반드시 반영]
+- 내신은 부교재 비중부터 확인한다 (교과서 30 : 부교재 70인 학교가 있다)
+- 국영수 집중으로 통합사회·통합과학이 새는 패턴 주의 — 학교 기출로 선제 진단
+- 어휘 일 50개 루틴은 시험기간에도 유지, 영어 변형 문제는 지문 동일·형태 변형 전제
+- 첫 모의고사는 시간 무제한 진단이 원칙 (심리 부담 제거)
+- 시험 2주 전부터 플래너를 시험 역산 모드로 전환, 수행평가와 겹치면 수행을 앞당긴다
+
+[요구]
+1. D-day 역산 주차별 계획 (지금부터 시험일까지)
+2. 과목별 목표·전략 — 목표와 현재의 갭이 큰 과목에 시간 우선 배분
+3. 취약 과목 보완 우선순위와 구체 방법 (교재·기출 단위로)
+4. 학생 플래너에 바로 넣을 주간 체크리스트
+5. LCSI ${s.lcsi||"미파악"} 유형에 맞는 동기 관리 멘트 2개`);}
+
+/* ── 시험 리뷰 · 방학 로드맵 · 공유 페이지 ── */
+function examReview(i){const s=stu();const e=s.exams[i];
+  modal(`<h2>📝 ${esc(e.name)} 리뷰 (${esc(e.date)})</h2>
+  <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">시험 직후가 골든타임 — 리뷰 프롬프트 결과를 여기 저장하면 다음 시험 대비 전략이 이걸 근거로 씁니다.</p>
+  <textarea id=exrev rows=10 placeholder="오답 유형 분석·교정 포인트 붙여넣기">${esc(e.review||"")}</textarea>
+  <div class=mfoot><button class=btn onclick=closeModal()>닫기</button>
+  <button class="btn" onclick="copyExamReview(${i})">🤖 리뷰 프롬프트 복사</button>
+  <button class="btn pri" onclick="stu().exams[${i}].review=$('#exrev').value;save();closeModal();render();toast('리뷰 저장')">저장</button></div>`);}
+function copyExamReview(i){const s=stu();const e=s.exams[i];
+  const gr=(s.grades||[]).filter(g=>g.date>=e.date).map(g=>`- ${g.exam} ${g.subject}: ${g.score}`).join("\n")
+    ||(s.grades||[]).slice(-4).map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n")||"- (성적 미입력 — 먼저 프로파일 탭에 성적을 기록하라)";
+  const subs=(s.subjectsMgmt||[]).map(x=>`- ${x.subject}: 목표 ${x.goal||"-"} / 약점 ${x.weak||"-"}`).join("\n")||"- 미등록";
+  copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade})의 ${e.name}(${e.date}) 결과를 리뷰하고 교정 전략을 세워라.
+
+${stuContext(s)}
+
+[이번 시험 성적]
+${gr}
+
+[과목별 목표·약점]
+${subs}
+
+[리뷰 요구 — WB 노하우]
+1. 과목별 결과 진단 — 목표 대비 달성/미달, 미달이면 원인 가설
+2. 오답 유형 분류 — 학생과 함께 오답을 4유형으로 나눠라: ① 개념 미이해 ② 실수(계산·표기) ③ 시간 부족 ④ 유형 생소
+   각 유형별 교정법이 다르다: ①은 개념 재학습, ②는 검산 루틴, ③은 시간 배분 훈련, ④는 기출 노출 확대
+3. 다음 시험까지의 교정 우선순위 3가지 (구체적으로 — 교재·기출 단위)
+4. 잘한 것 2가지 — 반드시 포함 (성취 인정이 자신감 관리의 핵심, LCSI ${s.lcsi||"미파악"} 유형 반영)
+5. 플래너 반영 항목 — 주간 루틴에 추가할 것 2~3개
+6. 출력 마지막에 "리뷰 요약 5줄" — 워크벤치 시험 리뷰 칸에 저장할 형태로`);}
+function genVacationPrompt(){
+ modal(`<h2>🏖 방학 로드맵 프롬프트</h2>
+ <div class="frow" style="grid-template-columns:70px 1fr"><label>방학</label>
+  <select id=vc_season><option>여름방학</option><option>겨울방학</option></select></div>
+ <div class="frow" style="grid-template-columns:70px 1fr"><label>기간</label>
+  <input id=vc_range placeholder="예: 2026-07-20 ~ 2026-08-16"></div>
+ <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+ <button class="btn pri" onclick="doVacationPrompt()">프롬프트 복사</button></div>`);}
+function doVacationPrompt(){const s=stu();const season=$("#vc_season").value;const range=$("#vc_range").value.trim()||"기간 미정";closeModal();
+ const subs=(s.subjectsMgmt||[]).map(x=>`- ${x.subject}: 목표 ${x.goal||"-"} / 현재 ${x.now||"-"} / 약점 ${x.weak||"-"}`).join("\n")||"- 미등록";
+ const inq=(s.inquiries||[]).filter(q=>q.status!=="완성").map(q=>`- ${q.subject} ${q.topic} [${q.status}]`).join("\n")||"- 없음";
+ copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade})의 ${season} 로드맵(${range})을 설계하라.
+
+${stuContext(s)}
+
+[과목별 현황 — 목표 vs 현재]
+${subs}
+
+[진행 중 탐구보고서]
+${inq}
+
+[설계 규칙 — WB 노하우]
+1. 방학은 4블록으로 설계한다: ① 취약 보완(내신 갭) ② 선행(다음 학기) ③ 탐구·독서(생기부 소재 — 학기 중엔 못 하는 것) ④ 루틴 유지(어휘 일 50개 등)
+2. 블록별 주간 배분표(주차×요일 골격)와 각 블록의 완료 기준을 명시
+3. 진행 중 탐구보고서를 방학 중 완성 일정에 배치
+4. 개학 D-7은 마무리 주간 — 학기 준비 체크리스트로 마감
+5. LCSI ${s.lcsi||"미파악"} 유형 동기 관리 포함
+6. 출력은 그대로 플래너에 넣을 수 있는 마크다운 표 형식 — 받으면 월간 계획 탭에 저장한다`);}
+function genSharePage(){
+  const s=stu();const ym=today().slice(0,7);
+  const p=(s.planners||[])[0];
+  const tasks=(s.tasks||[]).filter(t=>t.status!=="제출완료"&&t.due&&dday(t.due)>=0).sort((a,b)=>a.due<b.due?-1:1).slice(0,8);
+  const exams=(s.exams||[]).filter(e=>e.date&&dday(e.date)>=0).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
+  const sd=(s.grade==="고3")?dday(db.meta.suneung):null;
+  const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.name)} 플래너</title>
+<style>body{font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#1C2B2A;background:#F6F7F4}
+h1{font-size:20px}h2{font-size:15px;border-left:3px solid #0F6B5C;padding-left:8px;margin-top:22px}
+.chip{display:inline-block;background:#E3F0EC;color:#0A4A40;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;margin-right:6px}
+.red{background:#FBEAE9;color:#B3261E}
+pre{background:#fff;border:1px solid #E2E6E1;border-radius:10px;padding:14px;white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.7}
+li{margin:4px 0}footer{color:#5A6B68;font-size:11.5px;margin-top:24px}</style></head><body>
+<h1>${esc(s.name)} 학습 플래너 <span class="chip">${esc(ym)}</span>${sd!==null&&sd>=0?`<span class="chip red">수능 D-${sd}</span>`:""}</h1>
+${exams.length?`<h2>다가오는 시험</h2><ul>${exams.map(e=>`<li><b>${esc(e.name)}</b> ${esc(e.date)} (D-${dday(e.date)})</li>`).join("")}</ul>`:""}
+${tasks.length?`<h2>수행평가 마감</h2><ul>${tasks.map(t=>`<li>${esc(t.subject)} ${esc(t.topic)} — ${esc(t.due)} (D-${dday(t.due)})</li>`).join("")}</ul>`:""}
+<h2>플래너</h2><pre>${p?esc(p.content):"이번 달 플래너가 아직 없습니다."}</pre>
+<footer>WB 웩슬러브레인센터 컨설팅 · 읽기 전용 공유본 (${today()} 기준)</footer></body></html>`;
+  saveFile(`${s.name}_플래너공유_${ym}.html`,html);}
+
+/* ── 상담 관리 탭 ── */
+function upConsult(k,v){const s=stu();s.consult=s.consult||{};s.consult[k]=v;save();render();}
+function upPrep(k,v){const s=stu();s.consult=s.consult||{};s.consult.prep=Object.assign({},s.consult.prep,{[k]:v});save();render();}
+function copySms(){
+  const s=stu();const c=s.consult||{};const next=nextConsult(s)||"{날짜}";
+  copy(`안녕하세요, ${s.name} 학생 어머니/아버지!
+이번 달 컨설팅 상담 일정 안내드립니다.
+
+일시: ${next} ${c.time||"{시간}"}
+방식: ${c.mode==="Zoom"?"Zoom 화상 상담\n링크: {링크}":"센터 대면 상담"}
+
+상담 전 ${s.name} 학생이 이번 달 수행평가 현황을
+간단히 메모해 두면 더 알찬 상담이 가능합니다.
+
+WB 웩슬러브레인센터 드림`);}
+function nextCycle(){const s=stu();s.consult=s.consult||{};s.consult.nextOverride="";s.consult.prep={};save();render();toast("다음 회차로 초기화했습니다");}
+function tabRecords(){
+  const s=stu();const list=s.records||[];
+  const c=s.consult||{};const next=nextConsult(s);const prep=c.prep||{};
+  const cd=c.contractEnd?dday(c.contractEnd):null;
+  $("#tabbody").innerHTML=`
+  <div class="card" style="margin-bottom:14px"><h2 style="font-size:14px;margin-bottom:10px">📅 정기 상담 사이클 <span style="font-weight:400;color:var(--ink2)">D-7 안내 → D-1 브리핑 → 당일 → D+1 기록</span></h2>
+    <div class="formgrid">
+      <div class="frow"><label>매월 주차</label><select onchange="upConsult('week',this.value)">
+        <option value="">미설정</option>${[1,2,3,4].map(w=>`<option value="${w}" ${String(c.week)===String(w)?"selected":""}>${w}주차</option>`).join("")}</select></div>
+      <div class="frow"><label>요일</label><select onchange="upConsult('day',this.value)">
+        <option value="">미설정</option>${DAYS.map((d,i)=>`<option value="${i}" ${String(c.day)===String(i)?"selected":""}>${d}요일</option>`).join("")}</select></div>
+      <div class="frow"><label>시간</label><input value="${esc(c.time||"")}" placeholder="15:00" onchange="upConsult('time',this.value)"></div>
+      <div class="frow"><label>방식</label><select onchange="upConsult('mode',this.value)">
+        ${["대면","Zoom","전화"].map(m=>`<option ${c.mode===m?"selected":""}>${m}</option>`).join("")}</select></div>
+      <div class="frow"><label>다음 상담</label><div style="display:flex;align-items:center;gap:8px">
+        ${next?`${ddayChip(next)} <b>${next}</b>`:`<span class="chip danger">주기 미등록</span>`}</div></div>
+      <div class="frow"><label>수동 지정</label><input type=date value="${esc(c.nextOverride||"")}" onchange="upConsult('nextOverride',this.value)"></div>
+    </div>
+    <div style="margin:10px 0 4px">
+      <label class="ck ${prep.sms?'done':''}"><input type=checkbox ${prep.sms?"checked":""} onchange="upPrep('sms',this.checked)"><span>D-7 학부모 안내 문자 발송</span></label>
+      <label class="ck ${prep.brief?'done':''}"><input type=checkbox ${prep.brief?"checked":""} onchange="upPrep('brief',this.checked)"><span>D-1 상담 브리핑 생성</span></label>
+      <label class="ck"><input type=checkbox disabled ${next&&lastRecordDate(s)>=next?"checked":""}><span>당일 기록 완료 (아래 기록 저장 시 자동)</span></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" onclick="copySms()">📩 안내 문자 복사</button>
+      <button class="btn sm" onclick="copyBriefing()">📋 브리핑 프롬프트 복사</button>
+      <button class="btn ghost sm" onclick="nextCycle()">다음 회차로 (체크 초기화)</button>
+    </div>
+    <div class="formgrid" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+      <div class="frow"><label>계약 시작</label><input type=date value="${esc(c.contractStart||"")}" onchange="upConsult('contractStart',this.value)"></div>
+      <div class="frow"><label>계약 만료</label><div style="display:flex;gap:8px;align-items:center">
+        <input type=date value="${esc(c.contractEnd||"")}" onchange="upConsult('contractEnd',this.value)" style="flex:1">
+        ${cd!==null?(cd<=60?`<span class="chip ${cd<=30?"danger":"warn"}">갱신 D-${cd}</span>`:`<span class="chip ok">D-${cd}</span>`):""}</div></div>
+    </div>
+    ${cd!==null&&cd<=60?`<p style="margin:6px 0 0;font-size:12.5px;color:var(--warn)">💡 계약 만료 60일 이내 — 다음 상담 아젠다에 갱신 논의를 추가하세요.</p>`:""}
+  </div>
+  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">새 기록 <span style="font-weight:400;color:var(--ink2)">(Zoom 피드백 기록 형식)</span></h2>
+    <div class="formgrid">
+      <div class="frow"><label>날짜</label><input type=date id=r_date value="${today()}"></div>
+      <div class="frow"><label>세션 유형</label><select id=r_type>${["Zoom 피드백","대면 상담","자료 검토","성과 공유","전화"].map(x=>`<option>${x}</option>`).join("")}</select></div>
+    </div>
+    ${[["r_main","주요 내용","이번 세션 핵심"],["r_next","다음 과제","학생이 해올 것"],["r_sess","다음 세션","예정 날짜/내용"],["r_etc","특이사항","있으면 기재"]].map(([id,l,p])=>`
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>${l}</label><textarea id=${id} rows=2 placeholder="${p}"></textarea></div>`).join("")}
+    <div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="addRecord()">기록 저장</button></div>
+  </div>
+  <div class="sec"><h2>기록 타임라인 <span class="n">${list.length}건</span></h2>
+  ${list.length?list.map(r=>`
+    <div class="rec"><div class="rh"><b>${esc(r.type)}</b><time>${esc(r.date)}</time>
+      <button class="btn sm" style="margin-left:auto" onclick="event.stopPropagation();saveRecordFile(${JSON.stringify(list.indexOf(r))})">📁</button></div>
+    <dl>${r.main?`<dt>주요 내용</dt><dd>${esc(r.main)}</dd>`:""}${r.next?`<dt>다음 과제</dt><dd>${esc(r.next)}</dd>`:""}
+    ${r.sess?`<dt>다음 세션</dt><dd>${esc(r.sess)}</dd>`:""}${r.etc?`<dt>특이사항</dt><dd>${esc(r.etc)}</dd>`:""}</dl></div>`).join("")
+  :`<div class="card empty"><b>기록이 없습니다</b>상담 후에는 즉시 기록 — 프로파일이 살아있어야 다음 작업이 빨라집니다.</div>`}</div>
+  <div class="sec"><h2>📱 학부모 소통 로그 <span class="n">문자·전화·카톡 접점 — 리포트·재계약 근거</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input type=date id=cl_date value="${today()}" style="width:145px">
+      <select id=cl_ch style="width:100px">${["문자","전화","카톡","대면","이메일"].map(x=>`<option>${x}</option>`).join("")}</select>
+      <input id=cl_sum placeholder="내용 요약 (예: 6모 결과 안내, 상담 일정 조율)" style="flex:1;min-width:180px">
+      <button class="btn sm" onclick="addCommLog()">기록</button></div>
+    ${(s.commLogs||[]).map((l,i)=>`<div class="duer">
+      <span class="due" style="text-align:left;width:90px">${esc(l.date)}</span>
+      <span class="chip">${esc(l.ch)}</span>
+      <span class="what" style="white-space:normal">${esc(l.sum)}</span>
+      <button class="btn ghost sm" onclick="stu().commLogs.splice(${i},1);save();render()">✕</button></div>`).join("")
+    ||`<p style="color:var(--ink2);font-size:12.5px;margin:0">기록 없음 — 학부모와의 모든 접점을 한 줄씩 남기면 월간 리포트와 재계약 근거가 됩니다.</p>`}
+  </div></div>`;}
+function addCommLog(){const s=stu();s.commLogs=s.commLogs||[];
+  const sum=$("#cl_sum").value.trim();if(!sum){toast("내용을 입력하세요");return;}
+  s.commLogs.unshift({date:$("#cl_date").value||today(),ch:$("#cl_ch").value,sum});save();render();}
+function saveRecordFile(i){const s=stu();const r=(s.records||[])[i];if(!r)return;
+  const body=`날짜: ${r.date}\n학생: ${s.name} (${s.grade})\n세션 유형: ${r.type}\n주요 내용: ${r.main||"-"}\n다음 과제: ${r.next||"-"}\n다음 세션: ${r.sess||"-"}\n특이사항: ${r.etc||"-"}\n`;
+  saveFile(`${r.date}_수업기록.md`,body);}
+function addRecord(){const s=stu();s.records=s.records||[];
+  s.records.unshift({date:$("#r_date").value,type:$("#r_type").value,main:$("#r_main").value,next:$("#r_next").value,sess:$("#r_sess").value,etc:$("#r_etc").value});
+  save();toast("기록 저장");render();}
+
+/* ── 월간 계획 탭 ── */
+function tabPlan(){
+  const s=stu();const ym=new Date().toISOString().slice(0,7);
+  $("#tabbody").innerHTML=`
+  <div class="grid cols2">
+    <div class="card"><h2 style="font-size:14px">진도계획표 생성</h2>
+      <p style="font-size:12.5px;color:var(--ink2)">프로파일·미완료 과제를 반영한 ${ym} 진도계획표 초안 템플릿을 만듭니다.</p>
+      <button class="btn pri sm" onclick="genPlan('진도계획표')">템플릿 생성</button></div>
+    <div class="card"><h2 style="font-size:14px">주간 플래너 생성</h2>
+      <p style="font-size:12.5px;color:var(--ink2)">주별 체크리스트 형식 — 학생 발송용.</p>
+      <button class="btn pri sm" onclick="genPlan('주간플래너')">템플릿 생성</button></div>
+    <div class="card"><h2 style="font-size:14px">학부모 월간 리포트</h2>
+      <p style="font-size:12.5px;color:var(--ink2)">이번 달 상담·수행평가·성적을 발송용 문안으로 자동 조립합니다.</p>
+      <button class="btn pri sm" onclick="genParentReport()">리포트 생성</button></div>
+    <div class="card"><h2 style="font-size:14px">🏖 방학 로드맵</h2>
+      <p style="font-size:12.5px;color:var(--ink2)">취약 보완·선행·탐구/독서·루틴 4블록으로 방학을 설계합니다.</p>
+      <button class="btn pri sm" onclick="genVacationPrompt()">로드맵 프롬프트</button></div>
+    <div class="card"><h2 style="font-size:14px">🔗 학생 공유 페이지</h2>
+      <p style="font-size:12.5px;color:var(--ink2)">플래너·시험·마감만 담긴 읽기전용 HTML — 카톡으로 학생에게 전달.</p>
+      <button class="btn pri sm" onclick="genSharePage()">공유 파일 생성</button></div>
+  </div>
+  <div class="sec"><h2>생성된 계획 <span class="n">${(s.planners||[]).length}건</span></h2>
+  ${(s.planners||[]).map((p,i)=>`<details class="acc2"><summary>${esc(p.month)} ${esc(p.type)}</summary>
+    <textarea rows=14 onchange="stu().planners[${i}].content=this.value;save()">${esc(p.content)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn sm" onclick="copy(stu().planners[${i}].content)">복사</button>
+      <button class="btn sm" onclick="saveFile('${esc(p.month)}_${esc(p.type)}.md',stu().planners[${i}].content)">📁 폴더용 저장</button>
+      <button class="btn ghost sm" onclick="stu().planners.splice(${i},1);save();render()">삭제</button>
+    </div></details>`).join("")||`<div class="card empty"><b>아직 없습니다</b></div>`}</div>`;}
+function genPlan(type){
+  const s=stu();const ym=new Date().toISOString().slice(0,7);
+  const carry=(s.tasks||[]).filter(t=>t.status!=="제출완료").map(t=>`- [ ] ${t.subject} ${t.topic} (마감 ${t.due||"미정"})`).join("\n")||"- (없음)";
+  let c;
+  if(type==="진도계획표")c=`# ${s.name} ${ym} 진도 계획표\n\n## 이번 달 목표\n- \n- \n\n## 주별 계획\n| 주차 | 기간 | 교과목 | 내용 | 과제 |\n|-----|------|--------|------|------|\n| 1주 |  |  |  |  |\n| 2주 |  |  |  |  |\n| 3주 |  |  |  |  |\n| 4주 |  |  |  |  |\n\n## 수행평가·생기부 일정\n${carry}\n\n## 전월 미완료 이월\n- [ ] `;
+  else c=`# ${s.name} ${ym} 주간 플래너\n\n## 이번 달 핵심 3가지\n1. \n2. \n3. \n\n## 1주차\n- [ ] 월: \n- [ ] 화: \n- [ ] 수: \n- [ ] 목: \n- [ ] 금: \n- [ ] 주말: \n\n## 2주차\n- [ ] 월: \n- [ ] 화: \n- [ ] 수: \n- [ ] 목: \n- [ ] 금: \n- [ ] 주말: \n\n## 3주차\n- [ ] 월: \n- [ ] 화: \n- [ ] 수: \n- [ ] 목: \n- [ ] 금: \n- [ ] 주말: \n\n## 4주차\n- [ ] 월: \n- [ ] 화: \n- [ ] 수: \n- [ ] 목: \n- [ ] 금: \n- [ ] 주말: \n\n## 이번 주 수행평가 체크\n${carry}`;
+  s.planners=s.planners||[];s.planners.unshift({month:ym,type,content:c});save();render();}
+
+/* ═══════════ 탐구보고서 탭 (Perplexity 조사 → 초안 → Gamma PPT) ═══════════ */
+const INQ_STAGES=["주제선정","자료조사","초안","검증","완성"];
+function tabInquiry(){
+  const s=stu();const list=s.inquiries||[];
+  if(view.editInq!=null)return editorInquiry();
+  $("#tabbody").innerHTML=`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="statuses">${INQ_STAGES.map(st=>{const n=list.filter(q=>q.status===st).length;return n?`<span class="stpill">${st} ${n}</span>`:""}).join("")}</div>
+    <button class="btn pri sm" onclick="newInquiry()">＋ 탐구보고서</button></div>
+  ${list.length?`<div class="card">${list.map((q,i)=>`
+    <div class="taskrow" onclick="view.editInq=${i};render()">
+      <span class="chip ${q.status==="완성"?"ok":"acc"}">${esc(q.status)}</span>
+      <span class="subj">${esc(q.subject||"")}</span>
+      <span class="top">${esc(q.topic||"(주제 미정)")} <span class="chip" style="margin-left:6px">${esc(q.type)}</span></span>
+      <span class="due">${esc(q.updatedAt||"")}</span>
+    </div>`).join("")}</div>`
+  :`<div class="card empty"><b>탐구보고서가 없습니다</b>주제선정 → Perplexity 자료조사 → 초안 → 검증 → 완성(PPT는 Gamma).<br>진로 연계 탐구가 세특의 최상급 소재입니다.</div>`}`;}
+function newInquiry(){const s=stu();s.inquiries=s.inquiries||[];
+  s.inquiries.unshift({id:uid(),subject:"",topic:"",type:"보고서",status:"주제선정",research:"",notes:"",updatedAt:today()});
+  save();view.editInq=0;render();}
+function upInq(k,v){const q=stu().inquiries[view.editInq];
+  const r=$("#inqres");if(r)q.research=r.value;const n=$("#inqnote");if(n)q.notes=n.value;
+  q[k]=v;q.updatedAt=today();save();render();}
+function saveInq(){const q=stu().inquiries[view.editInq];
+  q.research=$("#inqres").value;q.notes=$("#inqnote").value;q.updatedAt=today();save();toast("저장했습니다");}
+function editorInquiry(){
+  const s=stu();const q=s.inquiries[view.editInq];
+  $("#tabbody").innerHTML=`
+  <button class="btn sm" onclick="view.editInq=null;render()">← 목록</button>
+  <div class="card" style="margin-top:10px">
+    <div class="statuses" style="margin-bottom:12px">${INQ_STAGES.map(st=>`<button class="stpill" style="${q.status===st?'background:var(--accent);color:#fff':''}" onclick="upInq('status','${st}')">${st}</button>`).join("")}</div>
+    <div class="formgrid">
+      <div class="frow"><label>과목</label><input value="${esc(q.subject)}" onchange="upInq('subject',this.value)"></div>
+      <div class="frow"><label>산출 형태</label><select onchange="upInq('type',this.value)">${["보고서","PPT발표","포스터"].map(x=>`<option ${q.type===x?"selected":""}>${x}</option>`).join("")}</select></div>
+    </div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>탐구 주제</label>
+      <input value="${esc(q.topic)}" placeholder="예: 배터리 열폭주의 화학적 원리와 안전 설계" onchange="upInq('topic',this.value)"></div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>조사 결과</label>
+      <textarea id="inqres" rows=6 placeholder="Perplexity 조사 프롬프트 실행 결과(출처 번호 포함)를 여기 붙여넣어 보관 — 초안·PPT 프롬프트에 자동 포함됩니다">${esc(q.research||"")}</textarea></div>
+    <div class="frow" style="grid-template-columns:110px 1fr"><label>메모</label>
+      <textarea id="inqnote" rows=2>${esc(q.notes||"")}</textarea></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn pri" onclick="saveInq()">저장</button>
+      <button class="btn" onclick="copyInqTopic()">💡 주제 추천</button>
+      <button class="btn" onclick="copyInqResearch()">🔍 Perplexity 조사</button>
+      <button class="btn" onclick="copyInqDraft()">📝 보고서 초안</button>
+      <button class="btn ${q.type==="PPT발표"?"pri":""}" onclick="copyInqGamma()">🎞 Gamma PPT</button>
+      <button class="btn" onclick="saveInqFile()">📁 폴더용 저장</button>
+      <button class="btn ghost" onclick="stu().inquiries.splice(view.editInq,1);view.editInq=null;save();render()">삭제</button>
+    </div>
+    <p style="margin:8px 0 0;font-size:12px;color:var(--ink2)">버튼은 전부 Cowork에 붙여넣는 프롬프트입니다 (Perplexity·Gamma가 연결된 곳에서 실행).
+    완성되면 수행평가처럼 생기부 탭에서 세특 소재로 연결하세요.</p>
+  </div>`;}
+function copyInqTopic(){const s=stu();const q=s.inquiries[view.editInq];
+ copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade}) 학생의 ${q.subject||"교과"} 탐구보고서 주제를 추천하라.
+
+${stuContext(s)}
+
+[요구]
+1. 진로(${s.career||"미입력"})와 교과를 잇는 탐구 주제 5개 — 각각 한 줄 근거
+2. 각 주제의 심화 키워드 3개와 예상 난이도
+3. 고교 수준에서 실제 수행 가능한 탐구 방법(실험/문헌/데이터분석) 명시
+4. 최근 학종 평가 방향(주도성·연계성·후속탐구)에서 유리한 순으로 정렬`);}
+function copyInqResearch(){const s=stu();const q=s.inquiries[view.editInq];
+ copy(`너는 WB 컨설팅 에이전트다. Perplexity 도구(perplexity_research — 없으면 perplexity_search)로 아래 탐구 주제의 사실 자료를 조사하라.
+
+학생 진로: ${s.career||"미입력"} / 과목: ${q.subject||"-"} / 산출: ${q.type}
+탐구 주제: ${q.topic||"(미정 — 먼저 주제를 정하라)"}
+
+[요구]
+1. 신뢰 가능한 출처 5개 이상(논문·공공기관·언론) — 각 출처 URL + 핵심 요약 2줄
+2. 보고서에 인용할 수치·통계 3개 이상 (출처 번호 명기)
+3. 교과 개념과의 연결점 / 진로와의 연결점 각 2개
+4. 반론·한계점 1개 이상 (탐구의 비판적 시각용)
+5. 출력은 마크다운, 출처는 [1][2] 번호 체계 — 초안 단계에서 이 출처만 인용한다`);}
+function copyInqDraft(){const s=stu();const q=s.inquiries[view.editInq];
+ const res=$("#inqres")?$("#inqres").value:q.research||"";
+ copy(`너는 WB 컨설팅 에이전트다. 아래 조사 자료만을 근거로 ${s.name}(${s.grade}) 학생의 탐구보고서 초안을 작성하라.
+
+${stuContext(s)}
+
+[탐구] 과목: ${q.subject||"-"} / 주제: ${q.topic||"-"} / 산출: ${q.type}
+
+[조사 자료 — 이 출처만 사용, 여기 없는 사실·수치를 지어내지 마라]
+${res||"(조사 자료 없음 — 먼저 Perplexity 조사 프롬프트를 실행하라)"}
+
+[작성 규칙 — WB 노하우]
+1. 구성: 탐구 동기(진로 연결) → 이론적 배경 → 탐구 방법 → 결과·분석(수치는 출처 번호와 함께) → 결론·후속 탐구 → 참고문헌
+2. 서사: [교과 개념] → [진로(${s.career||"학생 진로"}) 맥락] → [사회적 의미]
+3. 고교생이 쓴 문체 — 전문용어는 풀어 쓰되 심화 키워드 3개 이상 유지
+4. 자료가 부족한 부분은 "추가 조사 필요"로 표시 (임의 보충 금지)
+5. 마지막에 "생기부 기재 예상 문장" 2~3개를 개조식(-함/-임)으로 제시
+6. 완성본은 코워크/컨설팅/${s.name}/탐구보고서/ 폴더에 저장하라 (없으면 생성)`);}
+function copyInqGamma(){const s=stu();const q=s.inquiries[view.editInq];
+ const res=$("#inqres")?$("#inqres").value:q.research||"";
+ copy(`너는 WB 컨설팅 에이전트다. Gamma 도구(generate)로 ${s.name} 학생의 탐구 발표자료(PPT)를 생성하라.
+
+[탐구] 과목: ${q.subject||"-"} / 주제: ${q.topic||"-"}
+[근거 자료 — 이 내용만 사용]
+${res?res.slice(0,3000):"(먼저 조사·초안을 준비하라)"}
+
+[Gamma 생성 지시]
+1. format: presentation, 8~12장, 한국어
+2. 구성: 표지(주제+${s.name}) → 탐구 동기(진로 연결) → 이론 배경 → 탐구 방법 → 결과(수치·차트 중심) → 결론·후속 탐구 → 참고문헌
+3. 장표당 텍스트 3줄 이내 발표용, 수치는 반드시 출처와 함께
+4. 학생 발표용이므로 화려함보다 가독성 — 차분한 테마 선택
+5. 생성 후 export_gamma로 PPTX 내보내기까지 실행하고 다운로드 링크를 보고하라
+6. 장표별 발표 대본 개요(말할 내용 2줄씩)를 텍스트로 함께 제공하라`);}
+function saveInqFile(){const s=stu();const q=s.inquiries[view.editInq];
+ const ym=today().slice(0,7);
+ saveFile(`${ym}_탐구_${q.subject||"과목"}_${(q.topic||"주제").slice(0,20).replace(/\s+/g,"")}.md`,
+`# ${s.name} 탐구보고서 — ${q.topic}
+
+- 과목: ${q.subject} / 형태: ${q.type} / 상태: ${q.status}
+- 진로 연결: ${s.career||""}
+
+## 조사 자료
+${$("#inqres")?$("#inqres").value:q.research||""}
+
+## 메모
+${$("#inqnote")?$("#inqnote").value:q.notes||""}
+`);}
+
+/* ═══════════ 입시 관리 탭 (대학어디가 · 진학사 통) ═══════════ */
+function tabAdm(){
+  const s=stu();const univs=s.univs||[];const logs=s.tongLogs||[];
+  $("#tabbody").innerHTML=`
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <a class="btn sm" href="https://tong.jinhak.com" target="_blank" rel="noopener">📊 진학사 통 열기</a>
+    <button class="btn sm" onclick="copyTongFetch()">📥 통 자료 수집 프롬프트</button>
+    <button class="btn sm pri" onclick="copyAdmStrategy()">🧭 입시 전략 프롬프트</button>
+    <span style="font-size:11.5px;color:var(--ink2);align-self:center">공식 입결·전형 데이터는 좌측 "어디가 데이터"에서 관리</span>
+  </div>
+  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">🎯 관심 대학 <span style="font-weight:400;color:var(--ink2)">어디가·통에서 확인한 내용을 여기에 축적</span></h2>
+    ${univs.length?`<div class="tablewrap"><table class="t">
+      <tr><th>대학</th><th>학과</th><th>전형</th><th>통 예측/등급컷</th><th>확인일</th><th></th></tr>
+      ${univs.map((u,i)=>`<tr>
+        <td>${esc(u.univ)}</td><td>${esc(u.major)}</td><td>${esc(u.track||"")}</td>
+        <td><input value="${esc(u.tong||"")}" style="min-width:120px" onchange="stu().univs[${i}].tong=this.value;stu().univs[${i}].checked=today();save()"></td>
+        <td style="font-size:12px;color:var(--ink2)">${esc(u.checked||"-")}</td>
+        <td><button class="btn ghost sm" onclick="stu().univs.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">관심 대학이 없습니다. 목표 대학·학과를 등록하고 통 예측을 축적하세요 — 추이가 상담 자산이 됩니다.</p>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <input id=u_univ placeholder="대학" style="width:130px"><input id=u_major placeholder="학과" style="width:150px">
+      <input id=u_track placeholder="전형 (학종/교과/논술/정시)" style="width:170px">
+      <button class="btn sm" onclick="addUniv()">추가</button>
+    </div></div>
+  <div class="sec"><h2>📊 진학사 통 기록 <span class="n">모의지원·합격예측 스냅샷 (유료 데이터의 우리쪽 사본)</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <input type=date id=tg_date value="${today()}" style="width:150px">
+      <input id=tg_note placeholder="예: 6모 기준 모의지원 — OO대 안정, XX대 소신" style="flex:1;min-width:200px">
+      <button class="btn sm" onclick="addTong()">기록</button></div>
+    ${logs.length?logs.map((l,i)=>`<div class="duer"><span class="due" style="text-align:left;width:90px">${esc(l.date)}</span>
+      <span class="what" style="white-space:normal">${esc(l.note)}</span>
+      <button class="btn ghost sm" onclick="stu().tongLogs.splice(${i},1);save();render()">✕</button></div>`).join("")
+    :`<div class="empty" style="padding:14px"><b>기록 없음</b>상담 때마다 통 예측 스냅샷을 남기면 추이가 자산이 됩니다.</div>`}
+  </div></div>`;}
+function addUniv(){const s=stu();s.univs=s.univs||[];
+  const u={univ:$("#u_univ").value.trim(),major:$("#u_major").value.trim(),track:$("#u_track").value.trim(),tong:"",checked:""};
+  if(!u.univ){toast("대학명을 입력하세요");return;}
+  s.univs.push(u);save();render();}
+function addTong(){const s=stu();s.tongLogs=s.tongLogs||[];
+  const note=$("#tg_note").value.trim();if(!note){toast("내용을 입력하세요");return;}
+  s.tongLogs.unshift({date:$("#tg_date").value||today(),note});save();render();}
+function copyTongFetch(){const s=stu();
+ copy(`Chrome 브라우저 제어로 tong.jinhak.com 에 접속해 ${s.name}(${s.grade}) 학생의 입시 자료를 수집하라. (센터가 유료 결제한 계정이다)
+
+절차:
+1. tong.jinhak.com 로그인 상태 확인 — 안 돼 있으면 멈추고 로그인을 요청하라
+2. ${s.name} 학생 성적 기준으로 조회: 합격예측/모의지원 결과, 관심 대학(${(s.univs||[]).map(u=>`${u.univ} ${u.major}`).join(", ")||"미등록"})의 등급컷·경쟁률·전형 변경사항
+3. 화면의 수치를 표로 정리: 대학 / 학과 / 전형 / 예측결과 / 등급컷 / 경쟁률
+4. 결과를 코워크/컨설팅/${s.name}/ 폴더에 ${today()}_통_스냅샷.md 로 저장
+5. 핵심 3줄 요약 보고
+금지: 조회만 한다 — 지원·신청·결제 버튼은 절대 누르지 마라. 다른 학생 정보 조회 금지.`);}
+function copyAdmStrategy(){const s=stu();
+ const trends=(db.trends||[]).slice(0,3).map(t=>`- [${t.date}] ${t.title}: ${(t.content||"").slice(0,200)}`).join("\n")||"- (동향 노트 없음 — 노하우 랩에서 먼저 수집)";
+ const univs=(s.univs||[]).map(u=>`- ${u.univ} ${u.major} (${u.track||"전형 미정"}) 통 예측: ${u.tong||"-"}`).join("\n")||"- 미등록";
+ const gr=(s.grades||[]).slice(-4).map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n")||"- 기록 없음";
+ const tong=(s.tongLogs||[]).slice(0,3).map(l=>`- ${l.date} ${l.note}`).join("\n")||"- 없음";
+ const myUnivs=(s.univs||[]).map(u=>u.univ);
+ const adiga=(db.adiga||[]).filter(n=>myUnivs.some(u=>u&&n.univ&&(n.univ.includes(u)||u.includes(n.univ)))).slice(0,4)
+   .map(n=>`- [${n.date}] ${n.univ} ${n.major||""}: ${(n.content||"").slice(0,250)}`).join("\n")||"- (해당 대학 공식 데이터 미수집 — 어디가 데이터 섹션에서 수집)";
+ copy(`너는 WB 컨설팅 에이전트다. ${s.name}(${s.grade}) 학생의 입시 전략 브리프를 작성하라.
+
+${stuContext(s)}
+
+[최근 성적]
+${gr}
+
+[관심 대학·통 예측 (진학사 유료 데이터)]
+${univs}
+
+[통(진학사) 최근 기록]
+${tong}
+
+[관심 대학 공식 입결·전형 (어디가 수집 데이터)]
+${adiga}
+
+[최근 입시 동향 — 워크벤치 노하우 랩 축적분]
+${trends}
+
+[요구]
+1. 현 위치 진단 — 성적 추이 vs 관심 대학 통 예측의 간극
+2. 전형별 유불리 (학종/교과/논술/정시) — 생기부·탐구 축적 현황 반영
+3. 남은 기간 우선순위 3가지 — 세특·수행·탐구보고서 소재 제안 포함
+4. 다음 상담에서 학부모에게 전달할 핵심 메시지 2가지
+5. 추가 확인 목록 — 대학어디가(공식 전형계획)·진학사 통(예측)에서 조회할 항목`);}
+
+/* ═══════════ 노하우 랩 (동향 수집 + 학습 루틴) ═══════════ */
+function renderLab(){
+  const trends=db.trends||[];const lessons=db.lessons||[];
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>노하우 랩</h1>
+  <div class="sub">입시 동향 수집 + 컨설팅·수행평가 노하우 학습 — 축적분은 입시 전략 프롬프트에 자동 반영</div></div></div>
+
+  <div class="card"><h2 style="font-size:14px;margin-bottom:6px">📡 입시 동향 노트 <span style="font-weight:400;color:var(--ink2)">주 1회 권장 (월요일 아침 5분)</span></h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn sm pri" onclick="copyTrendScan()">📡 동향 스캔 프롬프트 (Perplexity)</button>
+      <button class="btn sm" onclick="copyDeepDive()">🎓 심화 학습 프롬프트 (딥리서치)</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      <input id=tr_title placeholder="제목 (예: 2026-08 2주차 동향)" style="width:220px">
+      <input id=tr_src placeholder="출처 도구 (예: Perplexity)" style="width:150px">
+      <button class="btn sm" onclick="addTrend()">저장</button></div>
+    <textarea id=tr_content rows=4 placeholder="스캔 결과를 여기 붙여넣고 저장 — 최근 3건이 학생별 입시 전략 프롬프트에 자동 포함됩니다"></textarea>
+    <div style="margin-top:10px">${trends.map((t,i)=>`<details class="acc2"><summary>[${esc(t.date)}] ${esc(t.title)} <span style="color:var(--ink2);font-weight:400">${esc(t.source||"")}</span></summary>
+      <div style="white-space:pre-wrap;font-size:13px;margin-top:8px">${esc(t.content)}</div>
+      <button class="btn ghost sm" style="margin-top:6px" onclick="db.trends.splice(${i},1);save();render()">삭제</button></details>`).join("")||`<p style="color:var(--ink2);font-size:12.5px">아직 없습니다. 스캔 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
+  </div>
+
+  <div class="sec"><h2>🎓 노하우 노트 <span class="n">상담·수행에서 배운 것을 한 문장씩 축적</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      <select id=ls_cat style="width:130px">${["컨설팅","수행평가","생기부","탐구","입시","기타"].map(c=>`<option>${c}</option>`).join("")}</select>
+      <input id=ls_content placeholder="예: 발표형 수행은 리허설 1회 녹화가 완성도를 크게 올린다" style="flex:1;min-width:200px">
+      <button class="btn sm" onclick="addLesson()">추가</button></div>
+    ${lessons.map((l,i)=>`<div class="duer"><span class="chip acc">${esc(l.cat)}</span>
+      <span class="what" style="white-space:normal">${esc(l.content)}</span>
+      <span class="due">${esc(l.date)}</span>
+      <button class="btn ghost sm" onclick="db.lessons.splice(${i},1);save();render()">✕</button></div>`).join("")||`<p style="color:var(--ink2);font-size:12.5px;margin:4px 0 0">축적된 노하우가 없습니다. 심화 학습 결과의 "실행 노하우 5개"를 여기에 옮기세요.</p>`}
+  </div></div>
+
+  <div class="sec"><h2>🧰 도구 배치 가이드</h2>
+  <div class="card"><div class="tablewrap"><table class="t">
+    <tr><th>용도</th><th>1순위 도구</th><th>이유·방법</th></tr>
+    <tr><td>주간 입시 동향</td><td><b>Claude(Cowork)+Perplexity</b></td><td>계정에 이미 연결됨. 스캔 프롬프트 실행 → 결과를 동향 노트에 저장. 원하면 매주 자동 루틴화 가능</td></tr>
+    <tr><td>월간 심층 학습</td><td>Gemini Deep Research 또는 Claude+perplexity_research</td><td>Gemini는 장문 종합에 강하나 수동 복붙 / Claude 경로는 폴더 저장까지 자동 — 병행 권장</td></tr>
+    <tr><td>탐구 자료 조사</td><td>Perplexity (research)</td><td>출처 번호 체계로 조사 → 초안이 그 출처만 인용 (환각 차단이 핵심)</td></tr>
+    <tr><td>발표자료(PPT)</td><td><b>Gamma</b></td><td>연결됨. 탐구보고서 탭 Gamma 프롬프트 → 생성+PPTX 내보내기까지 한 번에</td></tr>
+    <tr><td>공식 입시 정보</td><td>대학어디가 (adiga.kr)</td><td>공식 API는 없지만 공개 입결 페이지(로그인 불필요)는 수집 가능 — "어디가 데이터" 섹션의 파이프라인으로 축적. 대학·학과 기본정보는 대학알리미·커리어넷 공공 API(무료)로 보완</td></tr>
+    <tr><td>유료 예측 데이터</td><td>진학사 통 (tong.jinhak.com)</td><td>API 없음 — Cowork+Chrome 제어 수집 프롬프트로 조회·폴더 저장, 또는 수동 기록</td></tr>
+    <tr><td>축적 자료 질의</td><td>NotebookLM</td><td>동향·상담 노트가 쌓이면 업로드해 "우리 자료" 근거로 답변받기</td></tr>
+  </table></div>
+  <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">권장 리듬 — 매주 월: 동향 스캔(5분) · 매월 1회: 심화 학습(30분) · 분기 1회: 노하우 노트 정리 → 라이브러리 반영. 자동화를 원하면 주간 스캔은 예약 루틴으로 만들 수 있습니다.</p>
+  </div></div>`;}
+function addTrend(){db.trends=db.trends||[];
+  const t={date:today(),title:$("#tr_title").value.trim()||("동향 "+today()),source:$("#tr_src").value.trim(),content:$("#tr_content").value.trim()};
+  if(!t.content){toast("내용을 붙여넣으세요");return;}
+  db.trends.unshift(t);save();render();toast("동향 저장");}
+function addLesson(){db.lessons=db.lessons||[];
+  const c=$("#ls_content").value.trim();if(!c){toast("내용을 입력하세요");return;}
+  db.lessons.unshift({date:today(),cat:$("#ls_cat").value,content:c});save();render();}
+function copyTrendScan(){
+ copy(`너는 WB 컨설팅 에이전트다. Perplexity 도구(perplexity_search, search_recency_filter: "week")로 최근 1~2주 한국 대입 동향을 스캔하라.
+
+[스캔 항목]
+1. 교육부·평가원 발표 (수능/내신/대입 정책)
+2. 주요 대학 전형 변경 발표 (수시/정시 비율, 학종 평가 기준)
+3. 학생부종합전형 평가 트렌드 (세특·탐구 평가 방향)
+4. 광주·전남 지역 입시 이슈
+5. 고교학점제·2028 대입 개편 후속 보도
+
+[출력]
+- 항목별 핵심 5줄 이내 + 출처 URL
+- 마지막에 "WB 컨설팅 시사점" 2가지 — 고등 컨설팅 14명 운영에 바로 적용할 문장으로
+- 제목: "YYYY-MM N주차 입시 동향"
+- 이 결과를 워크벤치 앱 노하우 랩 → 동향 노트에 붙여넣어 저장한다`);}
+function copyDeepDive(){
+ modal(`<h2>심화 학습 프롬프트</h2>
+ <div class="frow" style="grid-template-columns:70px 1fr"><label>주제</label>
+   <input id=dd_topic placeholder="예: 세특에서 대학이 실제로 평가하는 것"></div>
+ <p style="font-size:12px;color:var(--ink2)">Gemini Deep Research에 붙여넣거나, Cowork(Claude)에서 실행하면 폴더 저장까지 자동입니다.</p>
+ <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+ <button class="btn pri" onclick="doDeepDive()">프롬프트 복사</button></div>`);}
+function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅 노하우 심화";closeModal();
+ copy(`[심화 학습 리서치] 주제: ${topic}
+
+이 프롬프트를 Gemini Deep Research에 그대로 넣거나, Claude(Cowork)라면 perplexity_research(reasoning_effort: high)로 실행하라.
+
+[요구]
+1. 최신 근거 기반 종합 (출처 명기, 2025년 이후 자료 우선)
+2. 대학 입학사정관·교육 전문가의 실제 발언·평가 기준 인용
+3. 현장의 흔한 오해 3가지와 교정
+4. WB 고등 컨설팅(14명 — 세특·수행평가·탐구보고서 지원)에 적용할 실행 노하우 5개
+   — 각각 "언제 · 무엇을 · 어떻게" 형식의 실행 문장으로
+5. 마무리 지시: 실행 노하우 5개를 워크벤치 앱 "노하우 랩 → 노하우 노트"에 저장하고,
+   다음 달 상담 아젠다에 반영할 1개를 고른다`);}
+
+/* ═══════════ 어디가 데이터 (공식 입결·전형 학습 파이프라인) ═══════════ */
+function renderAdiga(){
+  const notes=db.adiga||[];
+  const univFilter=view.adigaFilter||"";
+  const shown=univFilter?notes.filter(n=>(n.univ||"").includes(univFilter)):notes;
+  const allUnivs=[...new Set(db.students.flatMap(s=>(s.univs||[]).map(u=>u.univ)))];
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>어디가 데이터</h1>
+  <div class="sub">대학어디가(adiga.kr) 공식 입결·전형 데이터를 수집·축적 — 쌓인 노트는 학생별 입시 전략 프롬프트에 자동 주입</div></div>
+  <a class="btn sm" href="https://www.adiga.kr" target="_blank" rel="noopener">🏛 어디가 열기</a></div>
+
+  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">📥 데이터 수집 (3가지 경로)</h2>
+    <div class="tablewrap"><table class="t">
+      <tr><th>경로</th><th>내용</th><th>로그인</th></tr>
+      <tr><td><b>① 공개 입결 페이지</b></td><td>어디가 "전형 평가기준·전년도 결과공개" — 대학별 표준화 입결(50·70%컷)·평가기준. 아래 수집 프롬프트로 즉시 가능</td><td>불필요</td></tr>
+      <tr><td><b>② 공공데이터 API</b></td><td>대교협 대학알리미(대학·학과정보)·커리어넷(학과·진로) 무료 API — 인증키 자동승인. 1회 세팅 후 자동 조회</td><td>키 발급</td></tr>
+      <tr><td>③ 환산점수·성적분석</td><td>학생 성적 입력 후 대학별 환산점수 — Chrome 제어 조회 (통과 동일 패턴)</td><td>필요</td></tr>
+    </table></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn sm pri" onclick="copyAdigaCollect()">📥 ① 입결·평가기준 수집 프롬프트</button>
+      <button class="btn sm" onclick="copyAdigaApi()">🔑 ② 공공 API 세팅 프롬프트</button>
+      <button class="btn sm" onclick="copyAdigaBulk()">📦 관심대학 전체 일괄 수집</button>
+    </div>
+    <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">수집 결과는 Drive <code>코워크/컨설팅/_입시데이터/</code>에 정본 저장 + 아래 노트에 요약 축적. 노트가 쌓일수록 전략 프롬프트가 정확해집니다.</p>
+  </div>
+
+  <div class="sec"><h2>🗂 대학 데이터 노트 <span class="n">${notes.length}건 — 학생 관심대학과 이름이 일치하면 전략 프롬프트에 자동 포함</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input id=ad_univ placeholder="대학" style="width:130px" list="univlist">
+      <datalist id="univlist">${allUnivs.map(u=>`<option value="${esc(u)}">`).join("")}</datalist>
+      <input id=ad_major placeholder="학과 (선택)" style="width:140px">
+      <input id=ad_src placeholder="출처 (예: 어디가 2026 결과공개)" style="width:200px">
+      <button class="btn sm" onclick="addAdiga()">저장</button>
+    </div>
+    <textarea id=ad_content rows=4 placeholder="수집 결과를 붙여넣기 — 예: 2026 학종 OO전형 70%컷 2.8등급, 경쟁률 8.4:1, 수능최저 2합5, 전년 대비 모집 5명 감소"></textarea>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:10px">
+      <input placeholder="대학명으로 필터" value="${esc(univFilter)}" style="width:180px" oninput="view.adigaFilter=this.value;render()">
+      ${univFilter?`<button class="btn ghost sm" onclick="view.adigaFilter='';render()">필터 해제</button>`:""}
+    </div>
+    <div style="margin-top:8px">${shown.map((n,i)=>{const idx=notes.indexOf(n);return `
+      <details class="acc2"><summary><b>${esc(n.univ)}</b> ${esc(n.major||"")} <span style="color:var(--ink2);font-weight:400">[${esc(n.date)}] ${esc(n.source||"")}</span></summary>
+      <div style="white-space:pre-wrap;font-size:13px;margin-top:8px">${esc(n.content)}</div>
+      <button class="btn ghost sm" style="margin-top:6px" onclick="db.adiga.splice(${idx},1);save();render()">삭제</button></details>`;}).join("")
+    ||`<p style="color:var(--ink2);font-size:12.5px">노트가 없습니다. 수집 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
+  </div></div>`;}
+function addAdiga(){db.adiga=db.adiga||[];
+  const n={date:today(),univ:$("#ad_univ").value.trim(),major:$("#ad_major").value.trim(),source:$("#ad_src").value.trim(),content:$("#ad_content").value.trim()};
+  if(!n.univ||!n.content){toast("대학명과 내용을 입력하세요");return;}
+  db.adiga.unshift(n);save();render();toast("데이터 노트 저장");}
+function copyAdigaCollect(){
+ modal(`<h2>입결·평가기준 수집 프롬프트</h2>
+ <div class="frow" style="grid-template-columns:70px 1fr"><label>대학</label><input id=ac_univ placeholder="예: 전남대학교"></div>
+ <div class="frow" style="grid-template-columns:70px 1fr"><label>학과</label><input id=ac_major placeholder="예: 의예과 (비우면 전체)"></div>
+ <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+ <button class="btn pri" onclick="doAdigaCollect()">프롬프트 복사</button></div>`);}
+function doAdigaCollect(){const u=$("#ac_univ").value.trim()||"{대학명}";const m=$("#ac_major").value.trim();closeModal();
+ copy(`너는 WB 컨설팅 에이전트다. 대학어디가(adiga.kr)의 공개 자료에서 ${u}${m?" "+m:""}의 입시 데이터를 수집·학습하라.
+
+[수집 경로 — 로그인 불필요 공개 페이지]
+1. WebFetch로 어디가 "전형 평가기준 및 전년도 결과공개" 페이지 조회:
+   https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000
+   → ${u} 항목에서 대학 공식 공개 자료(평가기준·전년도 입결) 확인
+2. 어디가 대학정보에서 ${u}의 2026 경쟁률·입학정원·전형정보 확인:
+   https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000
+3. 부족한 부분은 WebSearch "${u}${m?" "+m:""} 2026 입시결과 어디가 등급컷"으로 보강 — 대학 공식 발표·어디가 출처만 신뢰
+
+[정리 형식 — 표준 구조]
+| 항목 | 값 | 출처·연도 |
+전형별로: 전형명 / 모집인원(전년 대비 증감) / 경쟁률 / 50%컷·70%컷 / 수능최저 / 전년 대비 변경사항
++ 평가기준 요약 3줄 (학종이면 서류·면접 평가요소 비중)
+
+[저장·학습]
+1. 정본: 코워크/컨설팅/_입시데이터/${u.replace(/\s/g,"")}_${today().slice(0,7)}.md 로 저장 (없으면 폴더 생성)
+2. 요약 5줄을 보고하라 — 나는 이것을 워크벤치 "어디가 데이터 노트"에 저장한다
+3. 수치가 확인 안 되는 항목은 "미확인"으로 표시 — 추정 금지`);}
+function copyAdigaBulk(){
+ const univs=[...new Set(db.students.flatMap(s=>(s.univs||[]).map(u=>`${u.univ} ${u.major}`.trim())))];
+ copy(`너는 WB 컨설팅 에이전트다. 아래 관심 대학 전체의 입시 데이터를 대학어디가(adiga.kr) 공개 자료에서 일괄 수집·학습하라.
+
+[대상 — 컨설팅 학생들의 관심 대학 전체]
+${univs.length?univs.map(u=>"- "+u).join("\n"):"- (관심 대학 미등록 — 먼저 학생별 진학사 통 탭에서 관심 대학을 등록하라)"}
+
+[수집 절차 — 대학마다 반복]
+1. WebFetch: https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000 에서 해당 대학 공개 입결·평가기준
+2. WebFetch: https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000 에서 경쟁률·정원·전형정보
+3. WebSearch로 보강 (대학 공식 발표·어디가 출처만)
+
+[정리·저장]
+- 대학별 표준 구조(전형/모집인원/경쟁률/50·70%컷/수능최저/변경사항)로 정리
+- 정본: 코워크/컨설팅/_입시데이터/ 에 대학별 파일로 저장
+- 마지막에 대학별 핵심 3줄 요약 목록을 보고 — 워크벤치 "어디가 데이터 노트"에 넣을 수 있는 형태로
+- 수치 미확인 항목은 "미확인" 표시, 추정 금지. 시간이 오래 걸리면 대학별로 중간 보고하라`);}
+function copyAdigaApi(){
+ copy(`너는 WB 컨설팅 에이전트(CTO 역할)다. 공공데이터 API로 대학·학과 정보를 자동 조회하는 환경을 세팅하라.
+
+[배경 — 조사 완료된 사실]
+- 대학어디가 자체는 공식 API가 없다. 대신 아래 무료 공공 API가 있다 (전부 자동승인):
+  1. 한국대학교육협의회_대학알리미 대학 기본 정보 (data.go.kr/data/15037507) — REST/XML
+  2. 한국대학교육협의회_대학별 학과정보 (data.go.kr/data/15116892) — 학과·학위과정·수업연한
+  3. 교육부_커리어넷 오픈API (career.go.kr) — 대학 학과정보·진로정보 (별도 인증키)
+- 대학알리미 파일데이터(CSV)는 로그인 없이도 다운로드 가능
+
+[할 일]
+1. 공공데이터포털(data.go.kr) 회원가입 → 위 1·2번 활용신청 (자동승인, 무료) → 인증키 확보
+   커리어넷은 career.go.kr 오픈API 메뉴에서 인증키 발급
+2. 인증키를 받으면: 관심 대학들의 기본정보·학과정보를 API로 조회하는 스크립트를 작성해
+   코워크/컨설팅/_입시데이터/공공API/ 에 조회 결과를 저장하는 루틴을 만든다
+3. 키 발급까지는 영준님 계정 필요 — 가입·신청 단계는 화면을 안내하며 영준님과 함께 진행하라
+4. 주의: 입결(등급컷)은 이 API에 없다 — 입결은 어디가 공개 페이지 수집 경로를 계속 쓴다`);}
+
+/* ═══════════ 프롬프트 조립기 (노하우 주입) ═══════════ */
+function stuContext(s){
+  return `[학생 정보]
+이름: ${s.name} / 학년: ${s.grade} / 학교: ${s.school||"미입력"}
+진로 목표: ${s.career||"미입력"} / 목표 대학·학과: ${s.targetUniv||"미입력"}
+LCSI: ${s.lcsi||"미파악"}${s.lcsi&&LCSI[s.lcsi]?` — 접근법: ${LCSI[s.lcsi]}`:""}
+세특 서사 공식: ${s.narrative||"[교과 개념] → [진로 맥락] → [사회적 의미]"}
+특이사항: ${s.notes||"없음"}
+${s.profileMd?`\n[프로파일 원문]\n${s.profileMd}`:""}`;}
+function copyDraftPrompt(){
+  const s=stu();const d=s.saenggibu[view.editDraft];const lim=LIMITS[d.category]||500;
+  copy(`너는 WB 웩슬러브레인센터의 컨설팅 에이전트다. 아래 학생의 생기부 ${d.category} 초안을 작성하라.
+
+${stuContext(s)}
+
+[작성 대상]
+항목: ${d.category} / 과목·영역: ${d.subject||"미지정"}
+활동·주제: ${d.title||"미지정"}
+${d.draft?`\n[현재 초안 — 개선 대상]\n${d.draft}`:""}
+
+[작성 규칙 — WB 노하우]
+1. 서사 공식 3단계를 따른다: [교과 개념에서 출발] → [진로(${s.career||"학생 진로"}) 맥락으로 심화] → [사회적 의미·후속 탐구로 확장].
+2. 교과서 수준을 넘는 심화 키워드를 3개 이상 자연스럽게 녹인다.
+3. 개조식 종결(-함/-임/-보임), 학생 주어 생략, 교사 관찰자 시점.
+4. ${lim}자 이내 (공백 포함, NEIS 기준).
+5. 금지: 특정 대학명, 공인어학시험, 교외 수상·대회, 부모의 사회경제적 배경, 학원·컨설팅 등 사교육 기관 언급.
+6. 결과물은 초안 본문만 출력하고, 심화 키워드 3개를 마지막 줄에 별도 표기하라.
+7. 완성 초안은 코워크/컨설팅/${s.name}/생기부/ 폴더에 저장하라 (없으면 생성).`);}
+function copyTaskPrompt(){
+  const s=stu();const t=s.tasks[view.editTask];
+  copy(`너는 WB 웩슬러브레인센터의 컨설팅 에이전트다. 아래 학생의 수행평가 초안을 작성하라.
+
+${stuContext(s)}
+
+[수행평가]
+과목: ${t.subject||"미지정"} / 유형: ${t.type||"보고서"} / 마감: ${t.due||"미정"}
+주제: ${t.topic||"미지정"}
+요건 메모: ${t.notes||"없음"}
+
+[작성 규칙 — WB 노하우]
+1. 학생 진로(${s.career||"미입력"})와 주제를 연결한 차별화 포인트를 서론에 반영한다.
+2. 구성: 목차 → 서론 → 본론 개요 → 결론 방향. ${t.type==="발표"?"발표용이므로 슬라이드 구성안(장표별 핵심 문장)과 발표 대본 개요를 포함한다.":""}
+3. 교과서 수준을 넘는 심화 키워드 3개 이상 포함.
+4. 마지막에 "생기부 기재 예상 문장" 2~3개를 개조식(-함/-임)으로 제시한다 — 이 수행이 세특으로 이어지는 것이 목적이다.
+5. LCSI ${s.lcsi||"미파악"} 유형에 맞는 서술 방식을 적용한다.
+6. 24~48시간 내 학생에게 전달할 수 있는 완성도로 작성한다.
+7. 완성 초안은 코워크/컨설팅/${s.name}/수행평가/${new Date().toISOString().slice(0,7)}_${t.subject||"과목"}_${(t.topic||"주제").replace(/\s+/g,"")}_초안.md 로 저장하고, 00_학생프로파일.md의 수행평가 이력 표를 갱신하라.`);}
+function copyBriefing(){
+  const s=stu();
+  const tasks=(s.tasks||[]).map(t=>`- ${t.subject} ${t.topic} [${t.status}] 마감 ${t.due||"미정"}`).join("\n")||"- 없음";
+  const lastRec=(s.records||[])[0];
+  const grades=(s.grades||[]).slice(-4).map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n")||"- 기록 없음";
+  const c=s.consult||{};const cd=c.contractEnd?dday(c.contractEnd):null;
+  copy(`너는 WB 웩슬러브레인센터의 컨설팅 에이전트다. ${s.name} 학생의 이번 달 상담 브리핑을 작성하라.
+
+${stuContext(s)}
+
+[이전 상담]
+${lastRec?`${lastRec.date} ${lastRec.type}\n주요 내용: ${lastRec.main||"-"}\n다음 과제: ${lastRec.next||"-"}`:"기록 없음"}
+
+[수행평가 현황]
+${tasks}
+
+[최근 성적 추이]
+${grades}
+
+[브리핑 구성 — 운영가이드 §4]
+1. 이전 상담 요약 (결정사항 + 이번 달 안건)
+2. 이번 달 수행평가 현황 (완료/진행/예정)
+3. 학습플래너 달성 여부 + 성적 추이 한 줄 평가 (성취 공유 = 자신감 관리)
+4. 제안 상담 아젠다 3~5개 — LCSI ${s.lcsi||"미파악"} 접근법 반영${cd!==null&&cd<=60?`
+5. ⚠️ 계약 만료 D-${cd} — 갱신 논의를 아젠다에 반드시 포함하라`:""}`);}
+
+/* ═══════════ 월간 캘린더 ═══════════ */
+function consultDateInMonth(s,y,m){
+  const c=s.consult||{};const ym=`${y}-${String(m+1).padStart(2,"0")}`;
+  if(c.nextOverride&&c.nextOverride.slice(0,7)===ym)return c.nextOverride;
+  if(c.week==null||c.week===""||c.day==null||c.day==="")return null;
+  const dt=nthWeekday(y,m,+c.week,+c.day);
+  return dt?fmtDate(dt):null;}
+function renderCal(){
+  view.calOffset=view.calOffset||0;
+  const base=new Date(today());
+  const m=new Date(base.getFullYear(),base.getMonth()+view.calOffset,1);
+  const y=m.getFullYear(),mo=m.getMonth();
+  const ym=`${y}-${String(mo+1).padStart(2,"0")}`;
+  const ev={};
+  for(const s of db.students){
+    const cd=consultDateInMonth(s,y,mo);
+    if(cd)(ev[cd]=ev[cd]||[]).push({label:`상담 ${s.name}${s.consult&&s.consult.time?" "+s.consult.time:""}`,cls:"",id:s.id});
+    for(const t of (s.tasks||[]))
+      if(t.due&&t.due.slice(0,7)===ym&&t.status!=="제출완료")
+        (ev[t.due]=ev[t.due]||[]).push({label:`${s.name} ${t.subject||""} 마감`,cls:"warn",id:s.id});
+    for(const e of (s.exams||[]))
+      if(e.date&&e.date.slice(0,7)===ym)
+        (ev[e.date]=ev[e.date]||[]).push({label:`${s.name} ${e.name}`,cls:"danger",id:s.id});
+  }
+  const startPad=new Date(y,mo,1).getDay();
+  const daysIn=new Date(y,mo+1,0).getDate();
+  let cells="";
+  for(let i=0;i<startPad;i++)cells+=`<div class="calcell pad"></div>`;
+  for(let d=1;d<=daysIn;d++){
+    const ds=`${ym}-${String(d).padStart(2,"0")}`;
+    cells+=`<div class="calcell ${ds===today()?'today':''}"><span class="dnum">${d}</span>
+      ${(ev[ds]||[]).map(e=>`<button class="calev ${e.cls}" onclick="openStu('${e.id}')">${esc(e.label)}</button>`).join("")}</div>`;}
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>월간 캘린더</h1><div class="sub">정기 상담 + 수행평가 마감</div></div>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button class="btn sm" onclick="view.calOffset--;render()">←</button>
+    <b style="min-width:92px;text-align:center;font-variant-numeric:tabular-nums">${y}년 ${mo+1}월</b>
+    <button class="btn sm" onclick="view.calOffset++;render()">→</button>
+    ${view.calOffset?`<button class="btn ghost sm" onclick="view.calOffset=0;render()">이번 달</button>`:""}
+  </div></div>
+  <div class="card" style="padding:12px">
+    <div class="calgrid">${DAYS.map(d=>`<div class="calhead">${d}</div>`).join("")}${cells}</div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">
+    <span class="chip acc">상담</span> <span class="chip warn">수행평가 마감</span> <span class="chip danger">시험</span> · 정기 주기를 등록한 학생만 상담이 표시됩니다. 항목을 누르면 그 학생으로 이동.</p>
+  </div>`;}
+
+/* ═══════════ 학부모 월간 리포트 ═══════════ */
+function genParentReport(){
+  const s=stu();const ym=today().slice(0,7);
+  const recs=(s.records||[]).filter(r=>r.date&&r.date.slice(0,7)===ym);
+  const done=(s.tasks||[]).filter(t=>t.status==="제출완료");
+  const act=(s.tasks||[]).filter(t=>t.status!=="제출완료");
+  const gr=(s.grades||[]).slice(-3);
+  const next=nextConsult(s);
+  const txt=`# ${s.name} 컨설팅 월간 리포트 (${ym})
+
+## 1. 이번 달 상담
+${recs.length?recs.map(r=>`- ${r.date} ${r.type}: ${r.main||""}`).join("\n"):"- (이번 달 상담 기록 없음)"}
+
+## 2. 수행평가
+- 완료: ${done.length?done.map(t=>`${t.subject} ${t.topic}`).join(", "):"없음"}
+- 진행 중: ${act.length?act.map(t=>`${t.subject} ${t.topic} (마감 ${t.due||"미정"})`).join(", "):"없음"}
+
+## 3. 최근 성적
+${gr.length?gr.map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n"):"- (기록 없음)"}
+
+## 4. 다음 달 안내
+- 다음 정기 상담: ${next||"일정 협의 예정"}${s.consult&&s.consult.time?" "+s.consult.time:""}
+- 상세 학습 계획은 진도계획표를 참조해 주세요.
+
+WB 웩슬러브레인센터 드림`;
+  modal(`<h2>학부모 월간 리포트 (${ym})</h2>
+  <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">발송 전 문안을 다듬어 주세요 — 기록·성적에서 자동 조립된 초안입니다.</p>
+  <textarea id=prept rows=15>${esc(txt)}</textarea>
+  <div class=mfoot><button class=btn onclick=closeModal()>닫기</button>
+  <button class="btn" onclick="saveFile('${ym}_월간리포트.md',$('#prept').value)">📁 파일 저장</button>
+  <button class="btn pri" onclick="copy($('#prept').value)">복사</button></div>`);}
+
+/* ═══════════ 노하우 라이브러리 ═══════════ */
+function renderKnowhow(){
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>노하우 라이브러리</h1>
+  <div class="sub">WB 컨설팅 1~5 작업 + agent-consulting + 운영가이드에서 추출한 작업 원칙</div></div></div>
+
+  <div class="kh"><h3>세특 서사 공식</h3>
+    <p><b>[교과 개념] → [진로 맥락] → [사회적 의미]</b></p>
+    <ul><li>수업에서 다룬 개념·활동에서 반드시 출발한다 (근거 없는 활동 금지)</li>
+    <li>학생 진로 키워드로 심화 — 교과서를 넘는 심화 키워드 3개 이상</li>
+    <li>사회적 의미·후속 탐구 계획으로 확장하며 마무리</li>
+    <li>문체: 개조식 종결(-함/-임/-보임), 학생 주어 생략, 교사 관찰자 시점</li></ul>
+    <p class="src">출처: agent-consulting §2 수행평가 작성 프로세스</p></div>
+
+  <div class="kh"><h3>NEIS 글자수 상한 (고교, 공백 포함)</h3>
+    <div class="tablewrap"><table class="t"><tr><th>항목</th><th>상한</th><th>비고</th></tr>
+    <tr><td>교과 세특</td><td>과목당 500자</td><td>개인별 세특도 500자</td></tr>
+    <tr><td>자율·자치활동</td><td>500자</td><td rowspan=3>창의적 체험활동</td></tr>
+    <tr><td>동아리활동</td><td>500자</td></tr>
+    <tr><td>진로활동</td><td>700자</td></tr>
+    <tr><td>행동특성 및 종합의견</td><td>500자</td><td>담임 작성</td></tr>
+    <tr><td>독서활동</td><td>도서명·저자만</td><td>대입 미반영이나 세특 연계 활용</td></tr></table></div></div>
+
+  <div class="kh"><h3>생기부 기재 금지 표현</h3>
+    <ul><li>특정 대학명·고교명 (진학 희망 표현 포함)</li>
+    <li>공인어학시험 점수 (토익·토플·텝스·HSK 등)</li>
+    <li>교외 대회 수상·참가 (올림피아드 포함)</li>
+    <li>부모의 사회경제적 지위 암시</li>
+    <li>학원·과외·인강·컨설팅 등 사교육 언급</li></ul>
+    <p class="src">에디터가 자동 검사하지만, 최종 검토는 항상 사람이 한다</p></div>
+
+  <div class="kh"><h3>수행평가 원스톱 프로세스</h3>
+    <ul><li><b>공지 수신 즉시</b> 사진 전송 프로세스 — 학생·학부모가 공지를 받는 즉시 사진으로 공유</li>
+    <li><b>24~48시간 내</b> PPT/원고/참고문헌 패키지 제공</li>
+    <li>발표형: 리허설 체크리스트 (시간 측정 1회 이상 + 예상 질문 3개)</li>
+    <li>초안 품질 기준: 진로 연결 서론 · 심화 키워드 3개+ · 생기부 기재 가능 문장으로 마무리</li>
+    <li>수행 완료 = 끝이 아니라 <b>세특 소재 확보</b> — 완료 즉시 생기부 탭에 초안 생성</li></ul>
+    <p class="src">출처: 컨설팅 상담 세션 노트 (2026-01) + 운영가이드 §3</p></div>
+
+  <div class="kh"><h3>LCSI 유형별 접근 전략</h3>
+    <div class="tablewrap"><table class="t"><tr><th>유형</th><th>접근</th></tr>
+    ${Object.entries(LCSI).filter(([k])=>k!=="미파악").map(([k,v])=>`<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join("")}</table></div>
+    <p class="src">출처: agent-consulting §Step 5 — 월간 수업 준비 루틴</p></div>
+
+  <div class="kh"><h3>내신·모의고사 운영 원칙 (상담 노트에서)</h3>
+    <ul><li>첫 모의고사는 <b>시간 제한 없이</b> 2일간 풀게 한다 — 실력 진단이 목적, 심리 부담 제거</li>
+    <li>영어 변형 문제는 지문 동일·형태 변형 — 어휘(일 50개)·독해 루틴이 핵심</li>
+    <li>내신은 부교재 비중 확인이 먼저 (교과서 30% : 부교재 70%인 학교도 있음)</li>
+    <li>국영수 집중으로 통합사회·통합과학이 새는 패턴 주의 — 학교 기출로 선제 진단</li>
+    <li>수행평가는 시험기간에 월 8개까지 몰림 — 마감 역산 일정 필수</li>
+    <li>성취 기록표(점수·오답 감소·암기량)를 매주 공유해 자신감 관리</li></ul></div>
+
+  <div class="kh"><h3>상담 운영 루틴</h3>
+    <ul><li>월 1회 1시간 대면(센터) 원칙, 대안 Zoom/전화</li>
+    <li>상담 전: 자동 브리핑 (이전 요약 → 수행 현황 → 플래너 달성 → 아젠다 3~5개)</li>
+    <li>상담 후: <b>즉시</b> 기록 + 프로파일 업데이트 — 기록이 다음 작업 속도를 결정한다</li>
+    <li>학부모 안내 문자 템플릿:</li></ul>
+    <div class="card" style="font-size:12.5px;white-space:pre-wrap;margin-top:6px">안녕하세요, {학생명} 학생 어머니/아버지!
+이번 달 컨설팅 상담 일정 안내드립니다.
+
+일시: {날짜} {시간}
+방식: Zoom 화상 상담
+링크: {링크}
+
+상담 전 {학생명} 학생이 이번 달 수행평가 현황을
+간단히 메모해 두면 더 알찬 상담이 가능합니다.
+
+WB 웩슬러브레인센터 드림</div></div>`;}
+
+/* ═══════════ 학생 추가/삭제, 데이터 IO ═══════════ */
+function addStudent(){
+  modal(`<h2>학생 추가</h2>
+  <div class="frow"><label>이름</label><input id=ns_name></div>
+  <div class="frow"><label>학년</label><select id=ns_grade><option>고1</option><option>고2</option><option>고3</option></select></div>
+  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+  <button class="btn pri" onclick="doAddStudent()">추가</button></div>`);}
+function doAddStudent(){
+  const n=$("#ns_name").value.trim();if(!n){toast("이름을 입력하세요");return;}
+  db.students.push({id:uid(),name:n,grade:$("#ns_grade").value,school:"",career:"",targetUniv:"",lcsi:"미파악",narrative:"",notes:"",profileMd:"",saenggibu:[],tasks:[],records:[],planners:[]});
+  save();closeModal();render();}
+function delStudent(){
+  const s=stu();
+  modal(`<h2>${esc(s.name)} 삭제</h2><p>이 학생의 모든 초안·기록이 함께 삭제됩니다. 먼저 백업 내보내기를 권장합니다.</p>
+  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+  <button class="btn pri" style="background:var(--danger);border-color:var(--danger)" onclick="db.students=db.students.filter(x=>x.id!=='${s.id}');save();closeModal();go('home')">삭제</button></div>`);}
+function exportJson(){db.meta=db.meta||{};db.meta.lastExport=today();save();renderSide();
+  saveFile(`wb-consulting-backup-${today()}.json`,JSON.stringify(db,null,2));}
+function importJson(){
+  modal(`<h2>데이터 가져오기</h2>
+  <p style="font-size:12.5px;color:var(--ink2)">시드 파일(students.json) 또는 백업 파일을 선택하세요. 같은 이름의 학생은 병합(기존 초안·기록 유지)됩니다.</p>
+  <input type=file id=impf accept=".json">
+  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
+  <button class="btn pri" onclick="doImport()">가져오기</button></div>`);}
+function doImport(){
+  const f=$("#impf").files[0];if(!f){toast("파일을 선택하세요");return;}
+  const r=new FileReader();
+  r.onload=()=>{try{
+    const j=JSON.parse(r.result);
+    const incoming=j.students||[];let added=0,merged=0;
+    for(const inc of incoming){
+      const ex=db.students.find(s=>s.name===inc.name);
+      if(ex){Object.assign(ex,{...inc,id:ex.id,saenggibu:ex.saenggibu||[],tasks:ex.tasks||inc.tasks||[],records:ex.records||inc.records||[],planners:ex.planners||[]});merged++;}
+      else{db.students.push({saenggibu:[],tasks:[],records:[],planners:[],lcsi:"미파악",...inc,id:inc.id||uid()});added++;}
+    }
+    save();closeModal();render();toast(`가져오기 완료 — 신규 ${added}명, 병합 ${merged}명`);
+  }catch(e){toast("JSON 파싱 실패: "+e.message);}};
+  r.readAsText(f);}
+
+/* ═══════════ 렌더 루트 ═══════════ */
+function render(){
+  renderSide();
+  if(view.page==="home")renderHome();
+  else if(view.page==="knowhow")renderKnowhow();
+  else if(view.page==="cal")renderCal();
+  else if(view.page==="lab")renderLab();
+  else if(view.page==="adiga")renderAdiga();
+  else renderStu();
+}
+render();
+</script>
