@@ -58,14 +58,15 @@ test('already standard lessons preserve their stored IDs and do not duplicate re
   assert.deepEqual(core.lessonReferenceSteps(lesson), []);
 });
 
-test('structured lesson cards derive a short summary instead of repeating the nine-field intake', () => {
+test('structured lesson cards omit the grade already shown in the lesson title', () => {
   const core = displayCore();
   const detail = core.taskCardDetail({
     title: '[수업] 학생 — 영어', taskKind: 'lesson_instruction', grade: '중1', subject: '영어',
     className: '블렌디드', scheduleText: '월·수·금 18:00-20:00', onlineProgram: '클래스카드',
     detail: '1. 이름 / 학년: 학생 / 중1\n2. 과목·반: 블렌디드\n3. 아주 긴 이전 입력'
   });
-  assert.equal(detail, '중1 · 영어 · 블렌디드 · 월·수·금 18:00-20:00 · 클래스카드');
+  assert.equal(detail, '영어 · 블렌디드 · 월·수·금 18:00-20:00 · 클래스카드');
+  assert.doesNotMatch(detail, /중1/);
   assert.doesNotMatch(detail, /1\. 이름/);
   assert.ok(detail.length <= 160);
 });
