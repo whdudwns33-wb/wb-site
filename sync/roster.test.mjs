@@ -205,7 +205,7 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
       id: 'student-new', name: '신규학생', school: '새학교', grade: '초6',
       phoneSelf: '010-1111-2222', phoneFather: '010-2222-3333', phoneMother: '010-3333-4444',
       registrationDate: '2026-08-19', firstClassDate: '2026-08-21',
-      teacher: '가선생', subject: '영어·독해력수업', subjects: ['영어', '독해력수업'],
+      teacher: '가선생', subject: '영어·독해력수업·클리닉', subjects: ['영어', '독해력수업', '클리닉'],
       start: '2026-08', end: '', reason: '', memo: '', entryType: 'new', teacherIds: ['teacher-a']
     }
   });
@@ -213,8 +213,8 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
   assert.match(created.body.student.id, /^[1-9]\d{7}$/);
   assert.notEqual(created.body.student.id, 'student-new');
   assert.equal(created.body.student.entryType, 'new');
-  assert.deepEqual(created.body.student.subjects, ['영어', '독해력수업']);
-  assert.equal(created.body.student.subject, '영어·독해력수업');
+  assert.deepEqual(created.body.student.subjects, ['영어', '독해력수업', '클리닉']);
+  assert.equal(created.body.student.subject, '영어·독해력수업·클리닉');
   assert.equal(created.body.student.school, '새학교');
   assert.equal(created.body.student.firstClassDate, '2026-08-21');
 
