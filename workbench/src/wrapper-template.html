@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>WB 워크벤치</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#F6F7F4;
+ font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#1C2B2A}
+.card{background:#fff;border:1px solid #E2E6E1;border-radius:16px;padding:34px 30px;width:min(340px,88vw);
+ box-shadow:0 2px 10px rgba(28,43,42,.08);text-align:center}
+.mark{width:46px;height:46px;border-radius:12px;background:#0F6B5C;color:#fff;display:inline-grid;place-items:center;
+ font-weight:800;font-size:18px;margin-bottom:12px}
+h1{font-size:17px;margin:0 0 4px}
+p{font-size:12.5px;color:#5A6B68;margin:0 0 18px}
+input[type=password]{width:100%;box-sizing:border-box;font:inherit;padding:11px 12px;border:1px solid #E2E6E1;
+ border-radius:9px;text-align:center;letter-spacing:2px;background:#fff;color:#1C2B2A}
+input:focus{outline:2px solid #0F6B5C}
+label{display:flex;gap:6px;align-items:center;justify-content:center;font-size:12px;color:#5A6B68;margin:12px 0}
+button{width:100%;font:inherit;font-weight:700;padding:11px;border:none;border-radius:9px;background:#0F6B5C;color:#fff;cursor:pointer}
+button:disabled{opacity:.6}
+.err{color:#B3261E;font-size:12.5px;min-height:1.2em;margin-top:10px}
+@media(prefers-color-scheme:dark){body{background:#141917;color:#E8ECE9}
+ .card{background:#1D2422;border-color:#2C3532}input[type=password]{background:#141917;color:#E8ECE9;border-color:#2C3532}}
+</style></head><body>
+<div class="card">
+ <div class="mark">WB</div>
+ <h1>컨설팅 워크벤치</h1>
+ <p>비밀번호를 입력하세요</p>
+ <form id="f">
+  <input type="password" id="pw" autocomplete="current-password" autofocus>
+  <label><input type="checkbox" id="rm" checked> 이 기기에서 기억하기</label>
+  <button id="btn">열기</button>
+  <div class="err" id="err"></div>
+ </form>
+</div>
+<script>
+const P=__PAYLOAD__;
+const b2a=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function derive(pw){
+ const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+ return crypto.subtle.deriveKey({name:"PBKDF2",salt:b2a(P.s),iterations:P.it,hash:"SHA-256"},km,
+  {name:"AES-GCM",length:256},true,["decrypt"]);}
+async function open_(key){
+ const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b2a(P.i)},key,b2a(P.c));
+ const html=new TextDecoder().decode(pt);
+ document.open();document.write(html);document.close();}
+async function tryStored(){
+ const raw=localStorage.getItem("wb-wb-key");if(!raw)return;
+ try{const key=await crypto.subtle.importKey("raw",b2a(raw),{name:"AES-GCM"},true,["decrypt"]);
+  await open_(key);}catch(e){localStorage.removeItem("wb-wb-key");}}
+tryStored();
+document.getElementById("f").addEventListener("submit",async ev=>{
+ ev.preventDefault();
+ const btn=document.getElementById("btn");btn.disabled=true;
+ document.getElementById("err").textContent="";
+ try{
+  const key=await derive(document.getElementById("pw").value);
+  if(document.getElementById("rm").checked){
+   const raw=new Uint8Array(await crypto.subtle.exportKey("raw",key));
+   localStorage.setItem("wb-wb-key",btoa(String.fromCharCode(...raw)));}
+  await open_(key);
+ }catch(e){
+  document.getElementById("err").textContent="비밀번호가 올바르지 않습니다";
+  localStorage.removeItem("wb-wb-key");btn.disabled=false;}
+});
+</script></body></html>
