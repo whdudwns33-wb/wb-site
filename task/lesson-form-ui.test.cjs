@@ -258,6 +258,9 @@ test('admin can select multiple stable students and register one shared lesson i
   assert.ok(save.indexOf('const previewBatchKind = lessonPreviewBatchKind') < save.indexOf("sync.post('/roster'"));
   assert.match(save, /batchKind: previewBatchKind/);
   assert.match(save, /for \(const rosterStudent of rosterCandidates\)/);
+  assert.match(save, /previewBatchKind === 'students' \? \[\]/);
+  assert.match(save, /previewBatchKind === 'students' \|\| result\.rosterUpdated/);
+  assert.match(save, /rosterDb = null/);
 });
 
 test('lesson registration interactions update only the form panel and preserve its open state', () => {
