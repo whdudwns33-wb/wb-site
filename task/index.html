@@ -908,11 +908,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.9"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.9"></script>
-<script src="./asset-core.js?v=2026-08-21.9"></script>
-<script src="./qr-core.js?v=2026-08-21.9"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.9"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.10"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.10"></script>
+<script src="./asset-core.js?v=2026-08-21.10"></script>
+<script src="./qr-core.js?v=2026-08-21.10"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.10"></script>
 <script>
 "use strict";
 
@@ -10139,6 +10139,16 @@ function rosterStudentSubjects(student) {
   return [...new Set(values.map(value => String(value || '').trim()).filter(value => ROSTER_SUBJECT_OPTIONS.includes(value)))];
 }
 
+function rosterStudentCanDelete(student) {
+  if (!String(student && student.name || '').trim() || !String(student && student.school || '').trim() ||
+      !String(student && student.grade || '').trim()) return false;
+  if ((student.teacherIds || []).length || rosterStudentSubjects(student).length) return false;
+  return ![
+    student.teacher, student.subject, student.phoneSelf, student.phoneFather, student.phoneMother,
+    student.registrationDate, student.firstClassDate, student.end, student.reason, student.memo
+  ].some(value => String(value || '').trim());
+}
+
 function rosterStudentEditorHtml(student, assignment) {
   const selected = new Set(student.teacherIds || []);
   const selectedSubjects = new Set(rosterStudentSubjects(student));
@@ -10149,11 +10159,11 @@ function rosterStudentEditorHtml(student, assignment) {
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
-    (isCreate ? '화면에서는 이름으로 구분하며, 내부 연결용 studentId는 서버가 8자리 숫자로 자동 발급합니다. 학교·학년·과목·담당은 나중에 입력해도 됩니다. 신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다.' :
+    (isCreate ? '이름·학교·학년만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다. 날짜·연락처·과목·담당은 나중에 입력할 수 있습니다. 신규 학생 30일 관리는 첫 수업 시작일을 입력한 뒤 시작합니다.' :
       '학교·연락처·등록과목과 재원 정보를 수정할 수 있습니다.') + '</div>' +
-    '<div class="grid2"><label class="field"><span class="fl">이름</span><input class="in" data-rse-name maxlength="40" value="' + esc(student.name || '') + '"></label>' +
-    '<label class="field"><span class="fl">학교</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
-    '<label class="field"><span class="fl">학년</span><input class="in" data-rse-grade maxlength="20" value="' + esc(student.grade || '') + '"></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">이름 · 필수</span><input class="in" data-rse-name maxlength="40" value="' + esc(student.name || '') + '"></label>' +
+    '<label class="field"><span class="fl">학교 · 필수</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
+    '<label class="field"><span class="fl">학년 · 필수</span><input class="in" data-rse-grade maxlength="20" value="' + esc(student.grade || '') + '"></label>' +
     '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-self maxlength="30" value="' + esc(student.phoneSelf || '') + '"></label>' +
     '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-father maxlength="30" value="' + esc(student.phoneFather || '') + '"></label></div>' +
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-mother maxlength="30" value="' + esc(student.phoneMother || '') + '"></label>' +
@@ -10161,8 +10171,8 @@ function rosterStudentEditorHtml(student, assignment) {
       '<label class="chip"><input type="checkbox" data-rse-subject value="' + esc(subject) + '"' + (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div>' + legacySubject + '</div>' +
     '<div class="field"><span class="fl">담당 선생님</span><div class="chips">' + teachers.map(teacher =>
       '<label class="chip"><input type="checkbox" data-rse-teacher value="' + esc(teacher.id) + '"' + (selected.has(teacher.id) ? ' checked' : '') + '> ' + esc(teacher.name) + '</label>').join('') + '</div></div>' +
-    '<div class="grid2"><label class="field"><span class="fl">신규 등록일' + (isNew ? '' : ' (선택)') + '</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
-    '<label class="field"><span class="fl">첫 수업 시작일' + (isNew ? '' : ' (선택)') + '</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규 등록일 (선택)</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
+    '<label class="field"><span class="fl">첫 수업 시작일 (선택)</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
     (isNew ? '' : '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-rse-start value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<input type="hidden" data-rse-end value="' + esc(student.end || '') + '"><input type="hidden" data-rse-reason value="' + esc(student.reason || '') + '">' +
     (student._editing ? '<div class="hint mb14">현재 상태: <b>' + esc(transition ? transition.label + ' · ' + transition.effectiveDate : '재원') +
@@ -10179,9 +10189,11 @@ function showRosterStudentEditor(student, assignment) {
       ? '<button class="btn btn-primary btn-block mt14" data-act="rostertransitionopen" data-operation="return">복귀</button>'
       : '<div class="grid2 mt14"><button class="btn btn-ghost" data-act="rostertransitionopen" data-operation="leave">휴원</button>' +
         '<button class="btn btn-danger" data-act="rostertransitionopen" data-operation="withdrawal">퇴원</button></div>') : '';
+  const deleteAction = student._editing && !assignment && session.isAdmin && rosterStudentCanDelete(student)
+    ? '<button class="btn btn-danger btn-block mt14" data-act="rosterstudentdelete">원생 완전 삭제</button>' : '';
   modal(student._editing ? student.name + ' 기본 정보 수정' : (student.entryType === 'new' ? '신규 원생 추가' : '기존 원생 추가'),
     rosterStudentEditorHtml(student, assignment),
-    '<button class="btn btn-primary btn-block mt14" data-act="rosterstudentsave">' + (assignment ? '기존 원생 추가 후 승인' : '저장') + '</button>' + directActions);
+    '<button class="btn btn-primary btn-block mt14" data-act="rosterstudentsave">' + (assignment ? '기존 원생 추가 후 승인' : '저장') + '</button>' + directActions + deleteAction);
 }
 
 function rosterReturnScheduleHtml() {
@@ -10319,15 +10331,15 @@ async function saveRosterStudent(button) {
     phoneSelf: value('[data-rse-phone-self]'), phoneFather: value('[data-rse-phone-father]'),
     phoneMother: value('[data-rse-phone-mother]'), registrationDate: registrationDate, firstClassDate: firstClassDate,
     teacher: teachers.map(item => item.name).join('·'), subject: subjects.join('·'), subjects: subjects,
-    start: isNew ? registrationDate.slice(0, 7) : value('[data-rse-start]'),
+    start: isNew ? (registrationDate.slice(0, 7) || today().slice(0, 7)) : value('[data-rse-start]'),
     end: isNew ? '' : value('[data-rse-end]'), reason: isNew ? '' : value('[data-rse-reason]'),
     memo: value('[data-rse-memo]'), teacherIds: teacherIds
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
-  if (!student.name || !student.start) {
-    return toast('이름과 시작월을 입력해 주세요');
+  if (!student.name || !student.school || !student.grade) {
+    return toast('이름·학교·학년을 모두 입력해 주세요');
   }
-  if (isNew && (!registrationDate || !firstClassDate)) return toast('신규 등록일과 첫 수업 시작일을 모두 입력해 주세요');
+  if (!student.start) return toast('시작월을 입력해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('관리자 인증을 확인해 주세요');
   button.disabled = true; button.textContent = '저장 중…';
@@ -10356,6 +10368,33 @@ async function saveRosterStudent(button) {
   } catch (error) {
     button.disabled = false; button.textContent = editor.assignment ? '기존 원생 추가 후 승인' : '저장';
     toast('원생 저장 실패 — ' + (error.message || error));
+  }
+}
+
+async function deleteRosterStudent(button) {
+  const editor = rosterStudentEditor;
+  if (!session.isAdmin || !editor || !editor.student._editing || !rosterDb || !rosterStudentCanDelete(editor.student)) {
+    return toast('이름·학교·학년만 있고 연결 기록이 없는 원생만 완전 삭제할 수 있습니다');
+  }
+  const typedName = prompt('완전 삭제하면 복구할 수 없습니다. 계속하려면 학생 이름을 입력해 주세요.', '');
+  if (String(typedName || '').normalize('NFKC').trim() !== String(editor.student.name || '').normalize('NFKC').trim()) {
+    if (typedName != null) toast('학생 이름이 일치하지 않아 삭제하지 않았습니다');
+    return;
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 확인해 주세요');
+  if (button) { button.disabled = true; button.textContent = '삭제 확인 중…'; }
+  try {
+    await sync.post('/roster', {
+      app: SYNC_APP, auth, action: 'student_delete', expectedUpdatedAt: Number(rosterDb.updatedAt),
+      studentId: String(editor.student.id || '')
+    });
+    closeModal(); rosterStudentEditor = null; rosterDb = null; rosterErr = ''; studentChangeLoaded = false;
+    lessonAssignmentRequestsLoaded = false; loadRoster(); loadStudentChanges(true); loadLessonAssignmentRequests(true); render();
+    toast('원생을 완전 삭제했습니다');
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '원생 완전 삭제'; }
+    toast('원생 삭제 실패 — ' + (error.message || error));
   }
 }
 
@@ -13211,6 +13250,7 @@ document.addEventListener('click', ev => {
     case 'rosterstudentnew': openRosterStudentEditor('', null, 'new'); break;
     case 'rosterstudentedit': openRosterStudentEditor(String(id || ''), null); break;
     case 'rosterstudentsave': saveRosterStudent(el); break;
+    case 'rosterstudentdelete': deleteRosterStudent(el); break;
     case 'rostertransitionopen': openRosterTransition(String(el.dataset.operation || '')); break;
     case 'rosterreturnslotadd':
       captureRosterTransitionDraft();
@@ -14646,7 +14686,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.9';
+const APP_VER = '2026-08-21.10';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

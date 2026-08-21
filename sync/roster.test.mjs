@@ -165,7 +165,7 @@ test('director adds an existing student and edits one record with roster CAS', a
   const created = await call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
     student: {
-      id: 'student-existing', name: '기존학생', grade: '초5', teacher: '가선생', subject: '영어',
+      id: 'student-existing', name: '기존학생', school: '기존초', grade: '초5', teacher: '가선생', subject: '영어',
       start: '2026-08', end: '', reason: '', memo: '', entryType: 'existing', teacherIds: ['teacher-a']
     }
   });
@@ -231,11 +231,90 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
   assert.match(invalid.body.error, /등록할 수 없는 과목/);
 });
 
-test('student maintenance is admin-only and refuses a duplicate name and grade', async () => {
+test('director creates a stable eight-digit student from only name, school, and grade and can delete that untouched record', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
+  const before = await call(db, { auth: admin, action: 'get' });
+  const missingSchool = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
+    student: {
+      id: 'ignored-by-server', name: '학교누락', school: '', grade: '초3',
+      teacher: '', subject: '', start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: []
+    }
+  });
+  assert.equal(missingSchool.status, 400);
+  assert.equal(missingSchool.body.code, 'STUDENT_REQUIRED_FIELDS');
+  const created = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
+    student: {
+      id: 'ignored-by-server', name: '최소원생', school: '치평초', grade: '초3',
+      teacher: '', subject: '', start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: []
+    }
+  });
+  assert.equal(created.status, 200);
+  assert.match(created.body.student.id, /^[1-9]\d{7}$/);
+  assert.equal(created.body.student.school, '치평초');
+  assert.equal(created.body.student.grade, '초3');
+
+  const forbidden = await call(db, {
+    auth: person('teacher-a', 'token-a'), action: 'student_delete', expectedUpdatedAt: created.body.updatedAt,
+    studentId: created.body.student.id
+  });
+  assert.equal(forbidden.status, 403);
+
+  const deleted = await call(db, {
+    auth: admin, action: 'student_delete', expectedUpdatedAt: created.body.updatedAt,
+    studentId: created.body.student.id
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.deletedStudentId, created.body.student.id);
+  const after = await call(db, { auth: admin, action: 'get' });
+  assert.equal(after.body.roster.students.some(student => student.id === created.body.student.id), false);
+});
+
+test('minimal student deletion fails closed for extra profile data or any stable-id operation link', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const create = async (expectedUpdatedAt, name, extra = {}) => await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt,
+    student: {
+      id: 'ignored-by-server', name, school: '치평초', grade: '초3', teacher: '', subject: '',
+      start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: [], ...extra
+    }
+  });
+  let current = await call(db, { auth: admin, action: 'get' });
+  const withMemo = await create(current.body.updatedAt, '메모원생', { memo: '추가 정보' });
+  const profileBlocked = await call(db, {
+    auth: admin, action: 'student_delete', expectedUpdatedAt: withMemo.body.updatedAt, studentId: withMemo.body.student.id
+  });
+  assert.equal(profileBlocked.status, 409);
+  assert.equal(profileBlocked.body.code, 'STUDENT_DELETE_NOT_MINIMAL');
+
+  const linked = await create(withMemo.body.updatedAt, '연결원생');
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'linked-minimal-task', 'teacher-a', JSON.stringify({ studentId: linked.body.student.id }), 1, 1).run();
+  const taskBlocked = await call(db, {
+    auth: admin, action: 'student_delete', expectedUpdatedAt: linked.body.updatedAt, studentId: linked.body.student.id
+  });
+  assert.equal(taskBlocked.status, 409);
+  assert.equal(taskBlocked.body.code, 'STUDENT_DELETE_LINKED');
+
+  const contacted = await create(linked.body.updatedAt, '연락원생');
+  db.prepare('INSERT INTO guardian_contacts_by_student(app,student_id,student_name,phone,consent,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)')
+    .bind('task', contacted.body.student.id, contacted.body.student.name, '', 0, 1, 'director').run();
+  const contactBlocked = await call(db, {
+    auth: admin, action: 'student_delete', expectedUpdatedAt: contacted.body.updatedAt, studentId: contacted.body.student.id
+  });
+  assert.equal(contactBlocked.status, 409);
+  assert.equal(contactBlocked.body.code, 'STUDENT_DELETE_LINKED');
+});
+
+test('student maintenance is admin-only and refuses a duplicate name, school, and grade', async () => {
+  const db = new TestD1(); seedAuth(db);
+  const document = documentFixture();
+  document.roster.students[0].school = '기존중';
+  await replace(db, document);
   const current = await call(db, { auth: admin, action: 'get' });
   const student = {
-    id: 'duplicate-id', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학',
+    id: 'duplicate-id', name: '가학생', school: '기존중', grade: '중1', teacher: '가선생', subject: '수학',
     start: '2026-08', end: '', reason: '', entryType: 'existing', teacherIds: ['teacher-a']
   };
   assert.equal((await call(db, { auth: person('teacher-a', 'token-a'), action: 'student_create',
@@ -333,6 +412,9 @@ test('same-name students are separated by school and grade, then by parent conta
   const duplicate = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
+  const ambiguousWithoutPhone = await create({ name: '김예린', school: '치평초', grade: '3' });
+  assert.equal(ambiguousWithoutPhone.status, 409);
+  assert.equal(ambiguousWithoutPhone.body.code, 'STUDENT_ALREADY_EXISTS');
 });
 
 test('person receives only assigned and co-taught roster and book rows', async () => {
