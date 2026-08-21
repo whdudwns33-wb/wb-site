@@ -33,6 +33,7 @@ const MAX_STUDENT_BATCH_LESSONS = 50;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const DAY_DISPLAY_RANK = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
 const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T']);
+const ROSTER_SUBJECTS = new Set(['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉']);
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 function textValue(value, limit, required) {
@@ -313,8 +314,11 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
 async function activeStaff(env, app, staffId) {
   const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
     .bind(app, staffId).first();
-  if (!row) return false;
-  try { return !JSON.parse(row.data).deleted; } catch (error) { return false; }
+  if (!row) return null;
+  try {
+    const staff = JSON.parse(row.data);
+    return staff && !staff.deleted ? staff : null;
+  } catch (error) { return null; }
 }
 
 function normalizedRosterText(value) {
@@ -347,6 +351,69 @@ async function validateLessonStudentAccess(env, app, task, auth) {
     return { status: 409, error: '원생 명단의 이름·학년과 수업 정보가 일치하지 않습니다' };
   }
   return null;
+}
+
+function batchRosterLabels(value) {
+  return String(value || '').split(/[·,]/).map(label => label.trim()).filter(Boolean);
+}
+
+function batchRosterKstDate(now) {
+  const values = {};
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date(now)).forEach(part => {
+    if (part.type !== 'literal') values[part.type] = part.value;
+  });
+  return values.year + '-' + values.month + '-' + values.day;
+}
+
+async function planBatchRosterLinks(env, app, planned, staffRecords, serverNow) {
+  const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1')
+    .bind(app).first();
+  if (!row) return { error: '원생 명단이 아직 준비되지 않았습니다', status: 409 };
+  let document;
+  try { document = JSON.parse(row.data || '{}'); }
+  catch (error) { return { error: '저장된 원생 명단을 확인해 주세요', status: 500 }; }
+  const students = document && document.roster && document.roster.students;
+  if (!Array.isArray(students)) return { error: '저장된 원생 명단을 확인해 주세요', status: 500 };
+  const byId = new Map(students.map(student => [String(student && student.id || ''), student]));
+  const beforeByStudentId = new Map();
+
+  for (const item of planned) {
+    const task = item.task;
+    const student = byId.get(String(task.studentId || ''));
+    if (!student || !Array.isArray(student.teacherIds)) {
+      return { error: '원생 명단에서 학생 식별자를 찾을 수 없습니다', status: 409 };
+    }
+    if (!beforeByStudentId.has(task.studentId)) {
+      beforeByStudentId.set(task.studentId, JSON.stringify([student.teacherIds, student.subjects, student.teacher, student.subject]));
+    }
+    student.teacherIds = [...new Set(student.teacherIds.map(String).concat(task.staffId).filter(Boolean))];
+    const subjects = Array.isArray(student.subjects) ? student.subjects.map(String) : batchRosterLabels(student.subject);
+    if (ROSTER_SUBJECTS.has(task.subject)) subjects.push(task.subject);
+    student.subjects = [...new Set(subjects.filter(subject => ROSTER_SUBJECTS.has(subject)))];
+    const teacherNames = batchRosterLabels(student.teacher);
+    const staff = staffRecords.get(task.staffId);
+    if (staff && staff.name) teacherNames.push(String(staff.name).trim());
+    student.teacher = [...new Set(teacherNames.filter(Boolean))].join('·');
+    student.subject = student.subjects.join('·');
+  }
+
+  const updatedCount = [...beforeByStudentId].filter(([studentId, before]) => {
+    const student = byId.get(studentId);
+    return JSON.stringify([student.teacherIds, student.subjects, student.teacher, student.subject]) !== before;
+  }).length;
+  if (!updatedCount) return { changed: false, updatedCount: 0 };
+  document.roster.updated = batchRosterKstDate(serverNow);
+  const expectedUpdatedAt = Number(row.updated_at);
+  const updatedAt = Math.max(serverNow + planned.length, expectedUpdatedAt + 1);
+  return {
+    changed: true,
+    updatedCount,
+    updatedAt,
+    statement: env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+      .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt)
+  };
 }
 
 function parseTaskRow(row) {
@@ -725,13 +792,17 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
   }
 
   const created = planned.filter(item => item.created);
-  if (created.length) {
+  const rosterPlan = await planBatchRosterLinks(env, app, planned, activeStaffIds, serverNow);
+  if (rosterPlan.error) return json({ ok: false, error: rosterPlan.error }, rosterPlan.status, origin);
+  if (created.length || rosterPlan.changed) {
     if (!env.DB || typeof env.DB.batch !== 'function') {
       return json({ ok: false, error: '일괄 저장 기능을 사용할 수 없습니다' }, 503, origin);
     }
-    const statements = created.map(item => env.DB.prepare(
+    const statements = [];
+    if (rosterPlan.changed) statements.push(rosterPlan.statement);
+    statements.push(...created.map(item => env.DB.prepare(
       'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
-    ).bind(app, item.task.id, item.task.staffId, JSON.stringify(item.task), item.task.updatedAt, item.task.updatedAt));
+    ).bind(app, item.task.id, item.task.staffId, JSON.stringify(item.task), item.task.updatedAt, item.task.updatedAt)));
     try {
       const results = await env.DB.batch(statements);
       if (!Array.isArray(results) || results.length !== statements.length ||
@@ -749,6 +820,9 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
     tasks: planned.map(item => item.task),
     createdCount: created.length,
     duplicateCount: planned.length - created.length,
-    idempotent: created.length === 0
+    rosterUpdated: !!rosterPlan.changed,
+    rosterUpdatedCount: rosterPlan.updatedCount || 0,
+    rosterUpdatedAt: rosterPlan.updatedAt || 0,
+    idempotent: created.length === 0 && !rosterPlan.changed
   }, 200, origin);
 }
