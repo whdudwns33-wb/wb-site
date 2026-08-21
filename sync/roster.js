@@ -611,6 +611,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         lesson = await buildLessonTask({
           studentId: student.id, studentName: student.name, grade: student.grade,
           subject: selectedSubjects.join('·'), className: '', lessonRole: selectedSubjects.join('·'),
+          lessonHours: body.lessonHours,
           scheduleText: '', scheduleSlots: body.scheduleSlots, start: effectiveDate,
           materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음',
           goal: '없음', parentRequest: '없음', adminRequest: '없음', scheduleReviewReason: ''
@@ -649,10 +650,10 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       });
       audienceStaffIds.push(staff.id);
       eventType = 'student_information';
-      changedFields = ['end', 'reason', 'teacherIds', 'subject', 'subjects', 'scheduleSlots'];
+      changedFields = ['end', 'reason', 'teacherIds', 'subject', 'subjects', 'lessonHours', 'scheduleSlots'];
       details = {
         operation: 'return', effectiveDate, label: '복귀', afterStaffName: staff.name,
-        subjects: selectedSubjects, scheduleText: lesson.scheduleText, direct: true,
+        subjects: selectedSubjects, lessonHours: lesson.lessonHours, scheduleText: lesson.scheduleText, direct: true,
         beforeStatus: currentTransition.operation
       };
       responseTask = lesson;

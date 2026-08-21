@@ -99,7 +99,7 @@ async function body(response) { return response.json(); }
 const own = { scope: 'own', id: 'teacher-1', role: 'staff' };
 const all = { scope: 'all', id: 'manager-1', role: 'manager' };
 const request = {
-  action:'submit', studentId:'student-1', subjects:['클리닉'], startDate:'2026-08-25', reason:'클리닉 수업 배정',
+  action:'submit', studentId:'student-1', subjects:['클리닉'], lessonHours:'1T', startDate:'2026-08-25', reason:'클리닉 수업 배정',
   scheduleSlots:[{days:[1,3],startTime:'16:00',endTime:'17:00'}]
 };
 
@@ -131,6 +131,7 @@ test('modern approval assigns the stable student and creates the requested lesso
   assert.equal(submitted.ok, true);
   assert.equal(submitted.request.studentId, 'student-1');
   assert.deepEqual(submitted.request.details.subjects, ['클리닉']);
+  assert.equal(submitted.request.details.lessonHours, '1T');
   const approved = await body(await handleLessonAssignmentReview({ DB: db }, 'task', {
     action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
   }, '*', all, json));
@@ -138,9 +139,19 @@ test('modern approval assigns the stable student and creates the requested lesso
   assert.equal(approved.task.studentId, 'student-1');
   assert.equal(approved.task.staffId, 'teacher-1');
   assert.equal(approved.task.subject, '클리닉');
+  assert.equal(approved.task.lessonHours, '1T');
   assert.deepEqual(approved.task.scheduleSlots[0].days, [1,3]);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, ['teacher-1']);
   assert.equal(db.tasks.size, 1);
+});
+
+test('teacher assignment request rejects missing or derived lesson hours', async () => {
+  for (const lessonHours of ['', '50분', '1.6T']) {
+    const db = new DB();
+    const response = await handleLessonAssignmentRequest({ DB: db }, 'task', { ...request, lessonHours }, '*', own, json);
+    assert.equal(response.status, 400, lessonHours || 'empty');
+    assert.equal(db.rows.size, 0);
+  }
 });
 
 test('a teacher cannot request an already assigned student', async () => {
@@ -171,4 +182,17 @@ test('legacy request still requires explicit identity confirmation', async () =>
   }, '*', all, json);
   assert.equal(response.status, 409);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, []);
+});
+
+test('an older stable-student request without lesson hours cannot silently approve only the link', async () => {
+  const db = new DB();
+  db.rows.set('lar_old_modern', { app:'task',request_key:'lar_old_modern',staff_id:'teacher-1',student_name:'가학생',grade:'초4',
+    student_id:'student-1',revision:1,status:'approval_waiting',created_at:1,updated_at:1,reviewed_at:null,reviewed_by:null,review_note:null,
+    request_data:JSON.stringify({ subjects:['수학'], startDate:'2026-08-25', scheduleSlots:[{days:[1],startTime:'16:00',endTime:'17:00'}] }) });
+  const response = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:'lar_old_modern', revision:1
+  }, '*', all, json);
+  assert.equal(response.status, 409);
+  assert.deepEqual(db.roster.roster.students[0].teacherIds, []);
+  assert.equal(db.tasks.size, 0);
 });

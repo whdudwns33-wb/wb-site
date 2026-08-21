@@ -5,6 +5,7 @@ const LESSON_TEXT_LIMITS = {
   grade: 24,
   subject: 60,
   className: 100,
+  lessonHours: 4,
   scheduleText: 600,
   materials: 2400,
   onlineProgram: 600,
@@ -19,6 +20,7 @@ const LESSON_TEXT_LIMITS = {
 const REQUIRED_TEXT_FIELDS = [
   'studentName',
   'grade',
+  'lessonHours',
   'materials',
   'onlineProgram',
   'homework',
@@ -29,6 +31,8 @@ const REQUIRED_TEXT_FIELDS = [
 const MAX_SCHEDULE_SLOTS = 20;
 const MAX_BATCH_LESSONS = 10;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const DAY_DISPLAY_RANK = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']);
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 function textValue(value, limit, required) {
@@ -122,8 +126,12 @@ function normalizeSlots(rawSlots, validFrom, lessonRole) {
 }
 
 function scheduleTextFromSlots(slots) {
-  return slots.map(slot =>
-    slot.days.map(day => DAY_LABELS[day]).join('·') + ' ' + slot.startTime + '-' + slot.endTime
+  return slots.slice().sort((left, right) =>
+    Math.min(...left.days.map(day => DAY_DISPLAY_RANK[day])) - Math.min(...right.days.map(day => DAY_DISPLAY_RANK[day])) ||
+    left.startTime.localeCompare(right.startTime) || left.endTime.localeCompare(right.endTime)
+  ).map(slot =>
+    slot.days.slice().sort((left, right) => DAY_DISPLAY_RANK[left] - DAY_DISPLAY_RANK[right])
+      .map(day => DAY_LABELS[day]).join('·') + ' ' + slot.startTime + '-' + slot.endTime
   ).join(' / ');
 }
 
@@ -154,6 +162,7 @@ function contentIdentityText(input, slots, scheduleStatus, scheduleReviewReason)
     subject: input.subject,
     className: input.className,
     lessonRole: input.lessonRole,
+    lessonHours: input.lessonHours,
     scheduleText: input.scheduleText,
     slots: slots.map(slot => [slot.days, slot.startTime, slot.endTime]),
     scheduleStatus,
@@ -204,6 +213,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   }
   input.adminRequest = input.adminRequest || '없음';
   if (!input.subject && !input.className) throw new Error('과목 또는 반을 입력해 주세요');
+  if (!LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요');
   input.start = dateValue(raw.start);
   input.lessonRole = textValue(raw.lessonRole || input.className || input.subject, 120, true);
 
@@ -265,6 +275,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
     subject: input.subject,
     className: input.className,
     lessonRole: input.lessonRole,
+    lessonHours: input.lessonHours,
     scheduleText: input.scheduleText,
     scheduleSlots: slots,
     scheduleStatus,
@@ -539,7 +550,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     }
     if (auth.scope === 'all' && SAFE_ID_RE.test(String(corrected.studentId || ''))) {
       const tracked = [
-        'studentName', 'grade', 'subject', 'className', 'scheduleText', 'scheduleSlots', 'start',
+        'studentName', 'grade', 'subject', 'className', 'lessonHours', 'scheduleText', 'scheduleSlots', 'start',
         'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest', 'guide'
       ];
       const changedFields = tracked.filter(key => JSON.stringify(current[key] || '') !== JSON.stringify(corrected[key] || ''));

@@ -18,12 +18,13 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 import { validateRosterDocument } from './roster.js';
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 
-const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
+const LESSON_CHANGE_FIELDS = ['days', 'time', 'lessonHours', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
   'lesson_fields', 'teacher_assignment', 'withdrawal', 'leave', 'lesson_delete', 'information_request'
 ]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const REPEAT_VALUES = new Set(['once', 'daily', 'weekday', 'days']);
+const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']);
 const MAX_LESSON_TEXT = 2400;
 const MAX_UNIT = 20;
 const MAX_NOTE = 500;
@@ -111,6 +112,10 @@ function sanitizeLessonChanges(raw) {
         const e = new Error('시간 형식을 확인해 주세요 (예: 18:00)'); e.status = 400; throw e;
       }
       out.time = text;
+    } else if (key === 'lessonHours') {
+      const text = normalizeText(value);
+      if (!LESSON_HOURS.has(text)) { const e = new Error('수업시수를 선택해 주세요'); e.status = 400; throw e; }
+      out.lessonHours = text;
     } else if (key === 'repeat') {
       const text = String(value || '');
       if (!REPEAT_VALUES.has(text)) { const e = new Error('반복 방식을 확인해 주세요'); e.status = 400; throw e; }
