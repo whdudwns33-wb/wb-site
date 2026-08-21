@@ -23,14 +23,12 @@ test('teachers select an active stable student and request a complete lesson ass
   assert.match(source, /data-assignment-request-student/);
   assert.match(source, /data-assignment-search/);
   assert.match(source, /data-assignment-subject/);
-  assert.match(source, /data-assignment-hours/);
-  assert.match(source, /data-assignment-slot/);
+  assert.match(source, /data-assignment-slot="lessonHours"/);
   assert.match(source, /data-assignment-start/);
   assert.match(source, /data-assignment-reason/);
   assert.match(source, /studentId: selected\.id/);
-  assert.match(source, /subjects: draft\.subjects, lessonHours: draft\.lessonHours, scheduleSlots: draft\.scheduleSlots, startDate: draft\.startDate/);
-  assert.match(source, /<div class="sect">3\. 수업시수/);
-  assert.match(source, /<div class="sect">4\. 수업 요일·시간/);
+  assert.match(source, /subjects: draft\.subjects, scheduleSlots: draft\.scheduleSlots, startDate: draft\.startDate/);
+  assert.match(source, /<div class="sect">3\. 수업 요일·시간·시수/);
   assert.match(source, /승인되면 담당 원생 연결과 수업 생성이 함께 완료됩니다/);
   assert.match(source, /if \(personal\) \{[\s\S]{0,500}lessonAssignmentRequestHtml\(\)/);
   assert.match(source, /const registration =[\s\S]{0,700}lessonAssignmentReviewHtml\(\)/);

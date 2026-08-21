@@ -15,7 +15,6 @@
   const REQUIRED_FIELDS = [
     { key: 'student', fields: ['studentName', 'grade'], message: '학생 이름과 학년을 입력해 주세요' },
     { key: 'subjectClass', fields: ['subject', 'className'], any: true, message: '과목 또는 반을 입력해 주세요' },
-    { key: 'lessonHours', fields: ['lessonHours'], message: '수업시수를 선택해 주세요' },
     { key: 'schedule', fields: ['scheduleText', 'scheduleSlots'], any: true, message: '수업 요일과 시간을 입력해 주세요' },
     { key: 'materials', fields: ['materials'], message: '교재와 현재 진도를 입력해 주세요' },
     { key: 'onlineProgram', fields: ['onlineProgram'], message: '온라인 프로그램을 입력해 주세요 (없으면 없음)' },
@@ -147,13 +146,14 @@
     const days = normalizeDays(source.days == null ? source.day : source.days);
     const startMinute = parseClockMinute(source.startTime);
     const endMinute = parseClockMinute(source.endTime);
-    if (!days.length || startMinute === null || endMinute === null || endMinute <= startMinute) {
+    const lessonHours = text(source.lessonHours);
+    if (!days.length || startMinute === null || endMinute === null || endMinute <= startMinute || !LESSON_HOURS.includes(lessonHours)) {
       return {
         slot: null,
         issue: slotIssue(
           'invalid_slot',
-          '각 시간대의 요일·시작·종료 시간을 확인해 주세요',
-          JSON.stringify({ days: source.days, startTime: source.startTime, endTime: source.endTime })
+          '각 시간대의 요일·시작·종료·수업시수를 확인해 주세요',
+          JSON.stringify({ days: source.days, startTime: source.startTime, endTime: source.endTime, lessonHours: source.lessonHours })
         )
       };
     }
@@ -178,6 +178,7 @@
         days: days,
         startTime: startTime,
         endTime: endTime,
+        lessonHours: lessonHours,
         lessonRole: text(source.lessonRole),
         validFrom: validFrom,
         validTo: validTo
@@ -186,7 +187,7 @@
     };
   }
 
-  function parseFreeTextSlot(segment, index) {
+  function parseFreeTextSlot(segment, index, fallbackLessonHours) {
     const ranges = [];
     let match;
     RANGE_RE.lastIndex = 0;
@@ -221,7 +222,8 @@
       slotId: 'slot-' + (index + 1),
       days: parsedDays.days,
       startTime: range.startTime,
-      endTime: range.endTime
+      endTime: range.endTime,
+      lessonHours: fallbackLessonHours
     }, index);
   }
 
@@ -253,7 +255,7 @@
     const seen = new Set();
     return slots
       .filter(slot => {
-        const key = [slot.days.join(','), slot.startTime, slot.endTime, slot.lessonRole, slot.validFrom, slot.validTo].join('|');
+        const key = [slot.days.join(','), slot.startTime, slot.endTime, slot.lessonHours, slot.lessonRole, slot.validFrom, slot.validTo].join('|');
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -266,12 +268,12 @@
       );
   }
 
-  function parseTextSchedule(scheduleText) {
+  function parseTextSchedule(scheduleText, fallbackLessonHours) {
     const issues = [];
     const slots = [];
     const segments = text(scheduleText).split(/(?:\/|;|\n)+/).map(item => text(item)).filter(Boolean);
     segments.forEach((segment, index) => {
-      const result = parseFreeTextSlot(segment, index);
+      const result = parseFreeTextSlot(segment, index, fallbackLessonHours);
       if (result.issue) issues.push(result.issue);
       if (result.slot) slots.push(result.slot);
     });
@@ -288,14 +290,16 @@
     if (input.scheduleSlots.length) {
       const structuredSlots = [];
       input.scheduleSlots.forEach((item, index) => {
-        const result = normalizeStructuredSlot(item, index);
+        const result = normalizeStructuredSlot(Object.assign({}, item, {
+          lessonHours: text(item && item.lessonHours) || input.lessonHours
+        }), index);
         if (result.issue) issues.push(result.issue);
         if (result.slot) structuredSlots.push(result.slot);
       });
       normalizedSlots = canonicalizeSlots(structuredSlots);
       issues.push.apply(issues, findConflicts(normalizedSlots));
     } else if (input.scheduleText) {
-      const parsedText = parseTextSchedule(input.scheduleText);
+      const parsedText = parseTextSchedule(input.scheduleText, input.lessonHours);
       normalizedSlots = parsedText.slots;
       issues.push.apply(issues, parsedText.issues);
     } else {
@@ -323,6 +327,9 @@
       errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요' });
     }
     const schedule = resolveSchedule(input);
+    if (input.scheduleSlots.length && schedule.issues.some(issue => issue.code === 'invalid_slot')) {
+      errors.push({ field: 'schedule', message: schedule.issues.find(issue => issue.code === 'invalid_slot').message });
+    }
     return {
       valid: errors.length === 0,
       errors: errors,
@@ -392,12 +399,20 @@
   function scheduleTextFromSlots(slots) {
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
     const displayRank = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
-    return slots.slice().sort((left, right) =>
+    const grouped = new Map();
+    slots.forEach(slot => {
+      const key = [slot.startTime, slot.endTime, slot.lessonHours].join('|');
+      const current = grouped.get(key) || { days: [], startTime: slot.startTime, endTime: slot.endTime, lessonHours: slot.lessonHours };
+      current.days.push.apply(current.days, slot.days);
+      current.days = [...new Set(current.days)];
+      grouped.set(key, current);
+    });
+    return Array.from(grouped.values()).sort((left, right) =>
       Math.min.apply(null, left.days.map(day => displayRank[day])) - Math.min.apply(null, right.days.map(day => displayRank[day])) ||
       left.startTime.localeCompare(right.startTime) || left.endTime.localeCompare(right.endTime)
     ).map(slot =>
       slot.days.slice().sort((left, right) => displayRank[left] - displayRank[right]).map(day => dayNames[day]).join('·') +
-        ' ' + slot.startTime + '-' + slot.endTime
+        ' ' + slot.startTime + '-' + slot.endTime + ' · ' + slot.lessonHours
     ).join(' / ');
   }
 
@@ -416,6 +431,7 @@
     const compatibility = scheduleCompatibility(schedule);
     const dedupeKey = buildDedupeIdentity(input, opts);
     const role = input.lessonRole || input.className || input.subject;
+    const slotLessonHours = [...new Set(schedule.scheduleSlots.map(slot => slot.lessonHours).filter(Boolean))];
     const scheduleText = schedule.scheduleSlots.length
       ? scheduleTextFromSlots(schedule.scheduleSlots)
       : input.scheduleText;
@@ -442,7 +458,7 @@
       subject: input.subject,
       className: input.className,
       lessonRole: role,
-      lessonHours: input.lessonHours,
+      lessonHours: slotLessonHours.length === 1 ? slotLessonHours[0] : '',
       scheduleText: scheduleText,
       scheduleSlots: schedule.scheduleSlots,
       scheduleStatus: schedule.scheduleStatus,

@@ -20,11 +20,13 @@ function parseDetails(value) {
     ? [...new Set(parsed.subjects.map(item => text(item, 40)).filter(item => SUBJECT_OPTIONS.has(item)))] : [];
   const scheduleSlots = Array.isArray(parsed.scheduleSlots) ? parsed.scheduleSlots.slice(0, 20).map(slot => ({
     days: Array.isArray(slot && slot.days) ? [...new Set(slot.days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b) : [],
-    startTime: text(slot && slot.startTime, 5), endTime: text(slot && slot.endTime, 5)
+    startTime: text(slot && slot.startTime, 5), endTime: text(slot && slot.endTime, 5),
+    lessonHours: text(slot && slot.lessonHours || parsed.lessonHours, 4)
   })) : [];
   const startDate = text(parsed.startDate, 10);
-  const lessonHours = text(parsed.lessonHours, 4);
-  if (!subjects.length || !scheduleSlots.length || !startDate || !LESSON_HOURS.has(lessonHours)) return null;
+  if (!subjects.length || !scheduleSlots.length || !startDate || scheduleSlots.some(slot => !LESSON_HOURS.has(slot.lessonHours))) return null;
+  const distinctHours = [...new Set(scheduleSlots.map(slot => slot.lessonHours))];
+  const lessonHours = distinctHours.length === 1 ? distinctHours[0] : '';
   return { subjects, lessonHours, scheduleSlots, startDate, reason: text(parsed.reason, MAX_NOTE) };
 }
 
@@ -126,17 +128,15 @@ async function normalizedRequestDetails(student, body, staffId) {
   if (!text(student.grade, MAX_GRADE)) throw new Error('관리자가 원생 정보에 학년을 먼저 입력해야 합니다');
   const reason = text(body.reason, MAX_NOTE);
   if (!reason) throw new Error('배정 요청 사유를 입력해 주세요');
-  const lessonHours = text(body.lessonHours, 4);
-  if (!LESSON_HOURS.has(lessonHours)) throw new Error('수업시수를 선택해 주세요');
   const task = await buildLessonTask({
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
-    subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), lessonHours, scheduleText: '',
+    subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), lessonHours: text(body.lessonHours, 4), scheduleText: '',
     scheduleSlots: body.scheduleSlots, start: body.startDate,
     materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음', adminRequest: '없음'
   }, staffId, 'staff', Date.now());
   return {
-    subjects, lessonHours,
-    scheduleSlots: task.scheduleSlots.map(slot => ({ days: slot.days, startTime: slot.startTime, endTime: slot.endTime })),
+    subjects, lessonHours: task.lessonHours,
+    scheduleSlots: task.scheduleSlots.map(slot => ({ days: slot.days, startTime: slot.startTime, endTime: slot.endTime, lessonHours: slot.lessonHours })),
     startDate: task.start,
     reason
   };

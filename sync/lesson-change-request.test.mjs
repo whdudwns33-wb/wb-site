@@ -79,11 +79,10 @@ test('staff can propose a change and it does not touch the live task until appro
   const db = new TestD1(); seed(db);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1',
-    changes: { days: [2, 4], time: '19:30', lessonHours: '1.5T', staffId: 'hacker', id: 'evil' }, note: '화목반으로 옮겨주세요'
+    changes: { days: [2, 4], time: '19:30', staffId: 'hacker', id: 'evil' }, note: '화목반으로 옮겨주세요'
   });
   assert.equal(submit.status, 200);
   assert.equal(submit.body.request.changes.days.join(','), '2,4');
-  assert.equal(submit.body.request.changes.lessonHours, '1.5T');
   assert.ok(!('staffId' in submit.body.request.changes), '화이트리스트 밖 필드는 저장되지 않는다');
 
   const liveTask = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
@@ -106,7 +105,7 @@ test('submitting for a missing task 404s, and for someone else\'s task 403s', as
 test('director sees the pending request and approving it writes into the live task', async () => {
   const db = new TestD1(); seed(db);
   const submit = await call(db, '/lesson-change-request', {
-    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { days: [2, 4], time: '19:30', lessonHours: '1.5T' }
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { days: [2, 4], time: '19:30' }
   });
   const { requestKey } = submit.body.request;
 
@@ -121,17 +120,16 @@ test('director sees the pending request and approving it writes into the live ta
   const applied = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
   assert.equal(applied.days.join(','), '2,4');
   assert.equal(applied.time, '19:30');
-  assert.equal(applied.lessonHours, '1.5T');
   assert.equal(applied.title, '[수업] 예시학생 (중2) — 수학', '화이트리스트 밖 필드는 보존된다');
 
   const again = await call(db, '/lesson-change-review', { auth: admin, action: 'approve', requestKey, revision: 1 });
   assert.equal(again.body.idempotent, true, '이미 승인된 요청을 다시 승인해도 안전하다');
   const archived = await call(db, '/lesson-change-review', { auth: admin, action: 'list', status: 'approved' });
   assert.equal(archived.body.requests.length, 1, '화면에서 숨긴 승인 완료 요청도 서버 기록에는 보관한다');
-  assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30', lessonHours: '1.5T' });
+  assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30' });
 });
 
-test('lesson change rejects a value outside the fixed lesson-hour choices', async () => {
+test('legacy top-level lesson hours cannot be changed through the old simple change route', async () => {
   const db = new TestD1(); seed(db);
   const response = await call(db, '/lesson-change-request', {
     auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { lessonHours: '110분' }
