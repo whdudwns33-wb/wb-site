@@ -29,7 +29,9 @@ test('teachers select an active stable student and request a complete lesson ass
   assert.match(source, /studentId: selected\.id/);
   assert.match(source, /subjects: draft\.subjects, scheduleSlots: draft\.scheduleSlots, startDate: draft\.startDate/);
   assert.match(source, /승인되면 담당 원생 연결과 수업 생성이 함께 완료됩니다/);
-  assert.match(source, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
+  assert.match(source, /if \(personal\) \{[\s\S]{0,500}lessonAssignmentRequestHtml\(\)/);
+  assert.match(source, /const registration =[\s\S]{0,700}lessonAssignmentReviewHtml\(\)/);
+  assert.match(source, /const existingChange =[\s\S]{0,1000}viewLessonChangeReview\(\)/);
   assert.doesNotMatch(source, /data-assignment-request-name/);
   const entry = source.match(/function viewLessonEntry\(\)[\s\S]*?\n\}/)?.[0] || '';
   assert.ok(entry.indexOf('loadLessonAssignmentRequests(false)') < entry.indexOf('if (personal && !personalStudents.length)'));

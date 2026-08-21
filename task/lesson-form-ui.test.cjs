@@ -120,9 +120,62 @@ test('direct lesson registration follows student, subject, teacher, schedule ord
   assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
   assert.match(view, /학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록/);
   assert.match(view, /batchMode \? lessonBatchRegistrationHtml\(\) : lessonSubjectSelectionHtml\(\) \+ staffSelect/);
-  assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 정보 등록<\/b>/);
-  assert.match(view, /const reviews = personal \? lessonAssignmentRequestHtml\(\) : viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
-  assert.match(view, /return directRegistration \+ reviews/);
+  assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 등록<\/b>/);
+  assert.match(view, /lesson-existing-change"' \+ \(lessonExistingChangeOpen \|\| editing \? ' open' : ''\) \+ '><summary><span><b>기존 수업 변경<\/b>/);
+  assert.match(view, /registration[\s\S]*lessonAssignmentReviewHtml\(\)/);
+  assert.match(view, /existingChange[\s\S]*viewLessonChangeReview\(\)/);
+  assert.match(view, /return registration \+ existingChange/);
+});
+
+test('admin lesson registration and existing changes are separate collapsed panels with a blank default', () => {
+  const viewStart = html.indexOf('function viewLessonEntry()');
+  const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
+  const view = html.slice(viewStart, viewEnd);
+  assert.match(html, /let lessonDirectEntryOpen = false;[\s\S]{0,100}let lessonExistingChangeOpen = false;[\s\S]{0,100}let lessonExistingSearchQuery = ''/);
+  assert.match(html, /function resetLessonRegistrationDraft\(\)[\s\S]{0,420}lessonDraft = newLessonDraft\(\)/);
+  assert.match(html, /function prepareAdminLessonRoute\(nextRoute\)[\s\S]{0,500}resetLessonRegistrationDraft\(\)[\s\S]{0,200}lessonExistingSearchQuery = ''/);
+  assert.match(view, /<b>수업 등록<\/b>/);
+  assert.match(view, /<b>기존 수업 변경<\/b>/);
+  assert.match(view, /data-lesson-existing-search/);
+  assert.match(view, /placeholder="선생님 이름 또는 학생 이름"/);
+  assert.match(html, /case 'lessonedit':[\s\S]{0,500}lessonDirectEntryOpen = false;[\s\S]{0,100}lessonExistingChangeOpen = true/);
+  assert.match(html, /case 'lessoneditcancel':[\s\S]{0,300}resetLessonRegistrationDraft\(\)/);
+});
+
+test('existing lesson search finds editable tasks by teacher or student name and edits by task id', () => {
+  const start = html.indexOf('function lessonExistingSearchKey(');
+  const end = html.indexOf('function viewLessonEntry()', start);
+  assert.ok(start >= 0 && end > start);
+  const tasks = [
+    { id: 'lesson-a', studentId: 'student-a', studentName: 'Legacy Alpha', staffId: 'teacher-a', subject: '수학', scheduleText: '월 18:00-19:50', lessonFormVersion: 1 },
+    { id: 'lesson-b', studentId: 'student-b', studentName: 'Student Beta', staffId: 'teacher-b', subject: '영어', scheduleText: '화 19:00-20:00', lessonFormVersion: 1 },
+    { id: 'deleted', studentId: 'student-a', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
+    { id: 'general', studentId: 'student-a', staffId: 'teacher-a' }
+  ];
+  const students = [
+    { id: 'student-a', name: 'Student Alpha', school: 'WB Middle', grade: 'G2' },
+    { id: 'student-b', name: 'Student Beta', school: 'WB Primary', grade: 'G6' },
+    { id: 'student-same-name', name: 'Student Alpha', school: 'Other School', grade: 'G3' }
+  ];
+  const staff = { 'teacher-a': { name: 'Teacher One' }, 'teacher-b': { name: 'Teacher Two' } };
+  const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'canEditLessonTask', 'staffById', 'studentOf',
+    'lessonAssignmentScheduleText', 'esc', html.slice(start, end) +
+    '\nreturn { lessonExistingChangeRows, lessonExistingChangeResultsHtml };')(
+      { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion,
+      id => staff[id] || null, task => task.studentName || '', () => '', value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    );
+  assert.deepEqual(helpers.lessonExistingChangeRows('Teacher One').map(row => row.task.id), ['lesson-a']);
+  assert.deepEqual(helpers.lessonExistingChangeRows('Student Alpha').map(row => row.task.id), ['lesson-a']);
+  assert.deepEqual(helpers.lessonExistingChangeRows('Teacher Two').map(row => row.task.id), ['lesson-b']);
+  assert.deepEqual(helpers.lessonExistingChangeRows('').map(row => row.task.id), []);
+  const rendered = helpers.lessonExistingChangeResultsHtml('Student Alpha');
+  assert.match(rendered, /Student Alpha · WB Middle · G2/);
+  assert.match(rendered, /Teacher One 선생님/);
+  assert.match(rendered, /data-act="lessonedit" data-id="lesson-a"/);
+  assert.doesNotMatch(rendered, /Other School|deleted|general/);
+  const helperSource = html.slice(start, end);
+  assert.match(helperSource, /students\.find\(item => String\(item\.id\) === String\(task\.studentId \|\| ''\)\)/);
+  assert.doesNotMatch(helperSource, /students\.find\([^\n]*name/);
 });
 
 test('admin can compose multiple independent lessons for one student and submit one batch', () => {
@@ -155,8 +208,10 @@ test('admin can compose multiple independent lessons for one student and submit 
 
 test('lesson registration interactions update only the form panel and preserve its open state', () => {
   assert.match(html, /let lessonDirectEntryOpen = false/);
-  assert.match(html, /function refreshLessonDirectEntry\(forceOpen\)[\s\S]{0,600}current\.replaceWith\(next\)/);
-  assert.match(html, /document\.addEventListener\('toggle',[\s\S]{0,260}lessonDirectEntryOpen = ev\.target\.open/);
+  assert.match(html, /function refreshLessonDirectEntry\(forceOpen\)[\s\S]{0,900}current\.replaceWith\(next\)/);
+  assert.match(html, /document\.addEventListener\('toggle',[\s\S]{0,700}lessonDirectEntryOpen = ev\.target\.open/);
+  assert.match(html, /document\.addEventListener\('toggle',[\s\S]{0,900}lessonExistingChangeOpen = ev\.target\.open/);
+  assert.match(html, /querySelector\('\.lesson-form-panel'\)/);
 
   const dayStart = html.indexOf("case 'lessonday':");
   const addStart = html.indexOf("case 'lessonslotadd':", dayStart);
@@ -230,7 +285,7 @@ test('lesson time inputs sync on input, change, and immediately before preview',
   const captureStart = helperEnd;
   const previewStart = html.indexOf('function previewLessonRegistration()', captureStart);
   const previewEnd = html.indexOf('function applyCreatedLesson(', previewStart);
-  assert.match(html.slice(captureStart, previewStart), /querySelectorAll\('\.lesson-direct-entry \[data-lesson-slot\], \.lesson-direct-entry \[data-lesson-batch-slot\]'\)/);
+  assert.match(html.slice(captureStart, previewStart), /querySelectorAll\('\.lesson-form-panel \[data-lesson-slot\], \.lesson-form-panel \[data-lesson-batch-slot\]'\)/);
   const preview = html.slice(previewStart, previewEnd);
   assert.ok(preview.indexOf('captureRenderedLessonScheduleInputs()') < preview.indexOf('const draft = lessonInputPayload()'));
   assert.equal((html.match(/syncRenderedLessonScheduleField\(ev\.target\)/g) || []).length, 2,
