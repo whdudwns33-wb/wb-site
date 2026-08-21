@@ -277,17 +277,6 @@
     return { slots: normalized, issues: issues };
   }
 
-  function slotCoverage(slots) {
-    return slots.flatMap(slot => slot.days.map(day =>
-      [day, slot.startTime, slot.endTime].join('|'))).sort();
-  }
-
-  function sameCoverage(left, right) {
-    const a = slotCoverage(left);
-    const b = slotCoverage(right);
-    return a.length === b.length && a.every((value, index) => value === b[index]);
-  }
-
   function resolveSchedule(raw) {
     const input = normalizeLessonInput(raw);
     const issues = [];
@@ -302,18 +291,6 @@
       });
       normalizedSlots = canonicalizeSlots(structuredSlots);
       issues.push.apply(issues, findConflicts(normalizedSlots));
-
-      if (input.scheduleText) {
-        const parsedText = parseTextSchedule(input.scheduleText);
-        issues.push.apply(issues, parsedText.issues);
-        if (!parsedText.issues.length && !sameCoverage(normalizedSlots, parsedText.slots)) {
-          issues.push(slotIssue(
-            'schedule_text_mismatch',
-            '원문 시간과 확정 시간대가 서로 다릅니다',
-            input.scheduleText
-          ));
-        }
-      }
     } else if (input.scheduleText) {
       const parsedText = parseTextSchedule(input.scheduleText);
       normalizedSlots = parsedText.slots;
@@ -428,7 +405,9 @@
     const compatibility = scheduleCompatibility(schedule);
     const dedupeKey = buildDedupeIdentity(input, opts);
     const role = input.lessonRole || input.className || input.subject;
-    const scheduleText = input.scheduleText || scheduleTextFromSlots(schedule.scheduleSlots);
+    const scheduleText = schedule.scheduleSlots.length
+      ? scheduleTextFromSlots(schedule.scheduleSlots)
+      : input.scheduleText;
     const detail = [
       '수업 요일·시간: ' + scheduleText,
       '교재와 현재 진도: ' + input.materials,
