@@ -115,6 +115,7 @@
   /* ─── 수업 등록 폼 ─── */
   .lesson-slot { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #FCFDFE; }
   .lesson-slot .grid2 { margin-top: 10px; }
+  .lesson-time-display { margin-top: 2px; padding: 10px 12px; border: 2px solid #8CCCE8; border-radius: 10px; background: #EAF7FD; color: var(--navy); font-size: 15px; font-weight: 900; line-height: 1.45; }
   .lesson-review { border-color: #F6D6A6; background: #FFFBF3; }
   .lesson-confirmed { border-color: #B9E3C7; background: #F3FCF6; }
   .lesson-change-diff-row { margin-top: 10px; }
@@ -908,11 +909,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.12"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.12"></script>
-<script src="./asset-core.js?v=2026-08-21.12"></script>
-<script src="./qr-core.js?v=2026-08-21.12"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.12"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.13"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.13"></script>
+<script src="./asset-core.js?v=2026-08-21.13"></script>
+<script src="./qr-core.js?v=2026-08-21.13"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.13"></script>
 <script>
 "use strict";
 
@@ -3999,6 +4000,18 @@ function lessonTextField(key, labelText, rows, hint) {
     (hint ? '<div class="hint" style="margin-top:5px">' + esc(hint) + '</div>' : '') + '</div>';
 }
 
+function lessonClockLabel(value) {
+  const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return '미선택';
+  const hour = Number(match[1]);
+  return (hour < 12 ? '오전 ' : '오후 ') + (hour % 12 || 12) + ':' + match[2] + ' (' + match[0] + ')';
+}
+
+function lessonClockSummary(slot) {
+  slot = slot || {};
+  return '선택 결과 · ' + lessonClockLabel(slot.startTime) + ' → ' + lessonClockLabel(slot.endTime);
+}
+
 function lessonSlotHtml(slot, index) {
   slot = slot || { days: [], startTime: '', endTime: '' };
   return '<div class="lesson-slot"><div class="between mb8"><b>확정 시간 ' + (index + 1) + '</b>' +
@@ -4007,7 +4020,8 @@ function lessonSlotHtml(slot, index) {
       '<button type="button" class="chip dow ' + ((slot.days || []).includes(dayIndex) ? 'on' : '') + '" data-act="lessonday" data-i="' + index + '" data-d="' + dayIndex + '">' + day + '</button>'
     ).join('') + '</div>' +
     '<div class="grid2"><div class="field"><label class="fl">시작</label><input class="in" type="time" data-lesson-slot="startTime" data-i="' + index + '" value="' + esc(slot.startTime || '') + '"></div>' +
-    '<div class="field"><label class="fl">종료</label><input class="in" type="time" data-lesson-slot="endTime" data-i="' + index + '" value="' + esc(slot.endTime || '') + '"></div></div></div>';
+    '<div class="field"><label class="fl">종료</label><input class="in" type="time" data-lesson-slot="endTime" data-i="' + index + '" value="' + esc(slot.endTime || '') + '"></div></div>' +
+    '<div class="lesson-time-display" data-lesson-time-display aria-live="polite">' + esc(lessonClockSummary(slot)) + '</div></div>';
 }
 
 function lessonBatchSlotHtml(slot, lessonIndex, slotIndex) {
@@ -4018,7 +4032,8 @@ function lessonBatchSlotHtml(slot, lessonIndex, slotIndex) {
       '<button type="button" class="chip dow ' + ((slot.days || []).includes(dayIndex) ? 'on' : '') + '" data-act="lessonbatchday" data-lesson-i="' + lessonIndex + '" data-slot-i="' + slotIndex + '" data-d="' + dayIndex + '">' + day + '</button>'
     ).join('') + '</div>' +
     '<div class="grid2"><div class="field"><label class="fl">시작</label><input class="in" type="time" data-lesson-batch-slot="startTime" data-lesson-i="' + lessonIndex + '" data-slot-i="' + slotIndex + '" value="' + esc(slot.startTime || '') + '"></div>' +
-    '<div class="field"><label class="fl">종료</label><input class="in" type="time" data-lesson-batch-slot="endTime" data-lesson-i="' + lessonIndex + '" data-slot-i="' + slotIndex + '" value="' + esc(slot.endTime || '') + '"></div></div></div>';
+    '<div class="field"><label class="fl">종료</label><input class="in" type="time" data-lesson-batch-slot="endTime" data-lesson-i="' + lessonIndex + '" data-slot-i="' + slotIndex + '" value="' + esc(slot.endTime || '') + '"></div></div>' +
+    '<div class="lesson-time-display" data-lesson-time-display aria-live="polite">' + esc(lessonClockSummary(slot)) + '</div></div>';
 }
 
 function lessonBatchEntryHtml(entry, index, count) {
@@ -4131,14 +4146,24 @@ function syncRenderedLessonScheduleField(target) {
   const slotField = target.closest('[data-lesson-slot]');
   if (slotField) {
     const slot = currentLessonDraft().scheduleSlots[Number(slotField.dataset.i)];
-    if (slot) slot[slotField.dataset.lessonSlot] = slotField.value;
+    if (slot) {
+      slot[slotField.dataset.lessonSlot] = slotField.value;
+      const row = slotField.closest('.lesson-slot');
+      const display = row && row.querySelector('[data-lesson-time-display]');
+      if (display) display.textContent = lessonClockSummary(slot);
+    }
     return !!slot;
   }
   const batchField = target.closest('[data-lesson-batch-slot]');
   if (batchField) {
     const entry = lessonBatchEntries()[Number(batchField.dataset.lessonI)];
     const slot = entry && entry.scheduleSlots[Number(batchField.dataset.slotI)];
-    if (slot) slot[batchField.dataset.lessonBatchSlot] = batchField.value;
+    if (slot) {
+      slot[batchField.dataset.lessonBatchSlot] = batchField.value;
+      const row = batchField.closest('.lesson-slot');
+      const display = row && row.querySelector('[data-lesson-time-display]');
+      if (display) display.textContent = lessonClockSummary(slot);
+    }
     return !!slot;
   }
   return false;
@@ -10070,6 +10095,36 @@ function studentLessonReferenceItems(studentId) {
   return items;
 }
 
+function rosterStudentLessonTasks(studentId) {
+  const stableId = String(studentId || '');
+  if (!stableId) return [];
+  return (state.tasks || []).filter(task => task && !task.deleted && isLesson(task) &&
+    String(task.studentId || '') === stableId).slice().sort((a, b) => {
+      const teacherA = (staffById(a.staffId) || {}).name || '';
+      const teacherB = (staffById(b.staffId) || {}).name || '';
+      return String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko') ||
+        teacherA.localeCompare(teacherB, 'ko') || String(a.id || '').localeCompare(String(b.id || ''));
+    });
+}
+
+function rosterStudentLessonsHtml(student) {
+  const lessons = rosterStudentLessonTasks(student.id);
+  if (!lessons.length) return '<div class="empty"><b>등록된 수업이 없습니다</b>수업 등록 및 변경 탭에서 이 학생의 수업을 등록해 주세요.</div>';
+  return lessons.map((task, index) => {
+    const teacher = staffById(task.staffId);
+    const schedule = lessonAssignmentScheduleText(task.scheduleSlots) || task.scheduleText || '요일·시간 미지정';
+    const subject = task.subject || task.className || task.lessonRole || '과목 미지정';
+    return '<section class="card' + (index ? ' mt14' : '') + '"><div class="between"><div><div class="card-title">' +
+      esc(subject) + '</div><div class="card-sub">' + esc((teacher && teacher.name) || '담당 미지정') + ' 선생님</div></div>' +
+      '<span class="pill">수업 ' + (index + 1) + '</span></div><div class="student-info-grid mt14">' +
+      '<div class="student-info-field wide"><b>요일·시간</b><span>' + esc(schedule) + '</span></div>' +
+      '<div class="student-info-field"><b>적용 시작일</b><span>' + esc(task.start || '미지정') + '</span></div>' +
+      '<div class="student-info-field"><b>담당 선생님</b><span>' + esc((teacher && teacher.name) || '미지정') + '</span></div></div>' +
+      (canEditLessonTask(task) ? '<button class="btn btn-primary btn-block mt14" data-act="lessonedit" data-id="' + esc(task.id) + '">이 수업 정보 수정</button>' :
+        '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>') + '</section>';
+  }).join('');
+}
+
 function rosterStudentInfoHtml(student, lessonReferences, taskId) {
   const status = rosterStudentInfoStatus(student);
   const changed = typeof studentChangedFieldSet === 'function' ? studentChangedFieldSet(student.id, taskId) : new Set();
@@ -10119,10 +10174,22 @@ function showRosterStudentInfo(studentId) {
   const requestTask = (state.tasks || []).find(task => !task.deleted && isLesson(task) && String(task.studentId || '') === String(student.id) &&
     (session.isAdmin || String(task.staffId || '') === String(session.staffId || '')));
   const actions = [];
-  if (session.isAdmin) actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>');
+  if (session.isAdmin) {
+    actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>');
+    actions.push('<button class="btn btn-ghost btn-block mt8" data-act="rosterstudentlessons" data-id="' + esc(student.id) + '">수업 정보 확인 및 수정</button>');
+  }
   else if (requestTask) actions.push('<button class="btn btn-ghost btn-block mt14" data-act="studentinforequest" data-id="' + esc(requestTask.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
   if (pendingStudentChanges(student.id).length) actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)), actions.join(''));
+}
+
+function showRosterStudentLessons(studentId) {
+  if (!session.isAdmin) return toast('관리자만 수업 정보를 수정할 수 있습니다');
+  const student = rosterDb && Array.isArray(rosterDb.students) &&
+    rosterDb.students.find(item => String(item.id) === String(studentId));
+  if (!student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
+  modal(student.name + ' 수업 정보', rosterStudentLessonsHtml(student),
+    '<button class="btn btn-ghost btn-block mt14" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '">학생 정보로 돌아가기</button>');
 }
 
 let studentInfoRequestContext = null;
@@ -13269,6 +13336,7 @@ document.addEventListener('click', ev => {
     }
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'rosterstudentinfo': showRosterStudentInfo(String(id || '')); break;
+    case 'rosterstudentlessons': showRosterStudentLessons(String(id || '')); break;
     case 'studentinforequest': showStudentInfoRequest(String(id || ''), String(el.dataset.studentId || '')); break;
     case 'studentinforequestsubmit': submitStudentInfoRequest(el); break;
     case 'studentchangeack': acknowledgeStudentChanges(String(el.dataset.studentId || ''), el); break;
@@ -14708,7 +14776,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.12';
+const APP_VER = '2026-08-21.13';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
