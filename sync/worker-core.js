@@ -19,7 +19,7 @@
  *   POST /admin-account { app:'consult', auth(admin), action:'set', loginId, password } 원장 계정 설정
  *   POST /admin-login { app:'consult', loginId, password } → { ok, token } 원장 기기 로그인
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
- *   POST /lesson-create-batch { app, auth, lessons } → 한 학생의 수업 최대 10건 원자적 등록
+ *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
  *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)

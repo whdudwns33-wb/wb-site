@@ -41,8 +41,8 @@ function assignedLesson(overrides = {}) {
 class FakeDB {
   constructor() {
     this.staff = new Map([
-      ['teacher-1', { id: 'teacher-1', deleted: false }],
-      ['teacher-2', { id: 'teacher-2', deleted: false }],
+      ['teacher-1', { id: 'teacher-1', name: '가선생', deleted: false }],
+      ['teacher-2', { id: 'teacher-2', name: '나선생', deleted: false }],
       ['inactive', { id: 'inactive', deleted: true }]
     ]);
     this.tasks = new Map();
@@ -54,6 +54,7 @@ class FakeDB {
       ] },
       bookStudents: []
     };
+    this.privateRosterUpdatedAt = 100;
   }
 
   prepare(sql) {
@@ -62,6 +63,9 @@ class FakeDB {
       args: [],
       bind(...args) { this.args = args; return this; },
       async first() {
+        if (sql.startsWith('SELECT data,updated_at FROM private_rosters')) {
+          return db.privateRoster ? { data: JSON.stringify(db.privateRoster), updated_at: db.privateRosterUpdatedAt } : null;
+        }
         if (sql.startsWith('SELECT data FROM private_rosters')) {
           return db.privateRoster ? { data: JSON.stringify(db.privateRoster) } : null;
         }
@@ -87,6 +91,13 @@ class FakeDB {
         };
       },
       async run() {
+        if (sql.startsWith('UPDATE private_rosters SET data=')) {
+          const [data, updatedAt, , expectedUpdatedAt] = this.args;
+          if (db.privateRosterUpdatedAt !== expectedUpdatedAt) return { meta: { changes: 0 } };
+          db.privateRoster = JSON.parse(data);
+          db.privateRosterUpdatedAt = updatedAt;
+          return { meta: { changes: 1 } };
+        }
         if (sql.startsWith('INSERT INTO tasks')) {
           const [, id, owner, data, updatedAt, srvAt] = this.args;
           if (db.tasks.has(id)) throw new Error('task conflict');
@@ -118,6 +129,8 @@ class FakeDB {
 
   async batch(statements) {
     const snapshot = new Map(this.tasks);
+    const rosterSnapshot = JSON.parse(JSON.stringify(this.privateRoster));
+    const rosterUpdatedAtSnapshot = this.privateRosterUpdatedAt;
     const results = [];
     try {
       for (let index = 0; index < statements.length; index += 1) {
@@ -127,6 +140,8 @@ class FakeDB {
       return results;
     } catch (error) {
       this.tasks = snapshot;
+      this.privateRoster = rosterSnapshot;
+      this.privateRosterUpdatedAt = rosterUpdatedAtSnapshot;
       throw error;
     }
   }
@@ -605,11 +620,15 @@ test('admin atomically creates multiple independent lessons for one stable stude
   ]);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.createdCount, 2);
+  assert.equal(result.data.rosterUpdated, true);
+  assert.equal(result.data.rosterUpdatedCount, 1);
   assert.equal(result.data.duplicateCount, 0);
   assert.equal(result.data.tasks.length, 2);
   assert.equal(db.tasks.size, 2);
   assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a']));
   assert.deepEqual(new Set(result.data.tasks.map(task => task.subject)), new Set(['수학', '영어']));
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1', 'teacher-2']);
+  assert.deepEqual(db.privateRoster.roster.students[0].subjects, ['수학', '영어']);
 });
 
 test('admin atomically registers one shared lesson for multiple stable students', async () => {
@@ -624,9 +643,15 @@ test('admin atomically registers one shared lesson for multiple stable students'
   assert.equal(result.response.status, 200);
   assert.equal(result.data.batchKind, 'students');
   assert.equal(result.data.createdCount, 2);
+  assert.equal(result.data.rosterUpdated, true);
+  assert.equal(result.data.rosterUpdatedCount, 2);
   assert.equal(result.data.tasks.length, 2);
   assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a', 'student-b']));
   assert.deepEqual(new Set(result.data.tasks.map(task => task.staffId)), new Set(['teacher-1']));
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
+  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2', 'teacher-1']);
+  assert.deepEqual(db.privateRoster.roster.students[0].subjects, ['국어']);
+  assert.deepEqual(db.privateRoster.roster.students[1].subjects, ['국어']);
 });
 
 test('server safely recognizes multiple students even when a stale client sends the old batch kind', async () => {
@@ -653,6 +678,33 @@ test('server safely recognizes multiple students even when a stale client sends 
   assert.equal(data.batchKind, 'students');
   assert.equal(data.createdCount, 3);
   assert.equal(db.tasks.size, 3);
+  assert.equal(data.rosterUpdatedCount, 3);
+  assert.equal(db.privateRoster.roster.students.every(student => student.teacherIds.includes('teacher-1')), true);
+  assert.equal(db.privateRoster.roster.students.every(student => student.subjects.includes('국어')), true);
+});
+
+test('an exact retry repairs missing roster links without recreating existing lessons', async () => {
+  const db = new FakeDB();
+  db.privateRoster.roster.students[0].name = '가학생';
+  db.privateRoster.roster.students[1].name = '나학생';
+  db.privateRoster.roster.students[1].grade = '초5';
+  const lessons = [
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-a', studentName: '가학생', grade: '초4' }) },
+    { staffId: 'teacher-1', lesson: assignedLesson({ studentId: 'student-b', studentName: '나학생', grade: '초5' }) }
+  ];
+  for (let index = 0; index < lessons.length; index += 1) {
+    seed(db, await buildLessonTask(lessons[index].lesson, lessons[index].staffId, 'admin', 1000 + index));
+  }
+  const result = await callStudentBatch(db, lessons);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.createdCount, 0);
+  assert.equal(result.data.duplicateCount, 2);
+  assert.equal(result.data.rosterUpdated, true);
+  assert.equal(result.data.rosterUpdatedCount, 2);
+  assert.equal(result.data.idempotent, false);
+  assert.equal(db.tasks.size, 2);
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
+  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2', 'teacher-1']);
 });
 
 test('multi-student batch rejects duplicate students or differing class templates', async () => {
@@ -709,6 +761,8 @@ test('batch database failure rolls every lesson back and an exact retry is idemp
   const failed = await callBatch(failingDb, lessons);
   assert.equal(failed.response.status, 409);
   assert.equal(failingDb.tasks.size, 0);
+  assert.deepEqual(failingDb.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
+  assert.equal(failingDb.privateRoster.roster.students[0].subjects, undefined);
 
   const db = new FakeDB();
   const first = await callBatch(db, lessons);
