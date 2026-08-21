@@ -909,11 +909,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.15"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.15"></script>
-<script src="./asset-core.js?v=2026-08-21.15"></script>
-<script src="./qr-core.js?v=2026-08-21.15"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.15"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.16"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.16"></script>
+<script src="./asset-core.js?v=2026-08-21.16"></script>
+<script src="./qr-core.js?v=2026-08-21.16"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.16"></script>
 <script>
 "use strict";
 
@@ -2381,7 +2381,7 @@ function taskRow(t, date, editable, isCarry) {
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
     (showFinalBox ? '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' : '') +
     '<div class="task-body">' +
-      '<div class="task-t">' + esc(t.title) + '</div>' +
+      '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
       '<div class="meta">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
@@ -3053,6 +3053,59 @@ const isSessionLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_i
 
 /** 수업 지시서 제목에서 학생 이름만 뽑는다: [수업] 이름 (학년) — 과목 */
 const studentOf = t => (t.title || '').replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
+
+/** 제목 말머리는 데이터 판별용으로 보존하고 화면에서만 감춘다. */
+function taskTitlePrefix(t) {
+  const matched = String(t && t.title || '').match(/^\[(수업|주문)\]\s*/);
+  return matched ? matched[0].trim() : '';
+}
+
+function taskTitleWithoutPrefix(t) {
+  return String(t && t.title || '').replace(/^\[(수업|주문)\]\s*/, '').trim();
+}
+
+/** 학교 이름에서 확실히 확인되는 학교급만 반환한다. */
+function schoolLevelLabel(school) {
+  const value = String(school || '').normalize('NFKC').replace(/\s+/g, '');
+  if (/(초등학교|초등|초교|초)$/.test(value)) return '초';
+  if (/(중학교|중등|중교|중)$/.test(value)) return '중';
+  if (/(고등학교|고등|고교|고)$/.test(value)) return '고';
+  return '';
+}
+
+/** 원본 학년은 바꾸지 않고 화면 표시만 초4·중2·고1 형식으로 표준화한다. */
+function schoolGradeDisplayLabel(school, grade) {
+  const value = String(grade || '').normalize('NFKC').trim();
+  if (!value) return '';
+  const alreadyQualified = value.match(/^(초|중|고)(?:등)?\s*([1-6])(?:\s*학년)?$/);
+  if (alreadyQualified) return alreadyQualified[1] + alreadyQualified[2];
+  const numeric = value.match(/^([1-6])(?:\s*학년)?$/);
+  if (!numeric) return value;
+  const level = schoolLevelLabel(school);
+  return level ? level + numeric[1] : value;
+}
+
+function taskRosterStudent(t) {
+  const stableId = String(t && t.studentId || '');
+  const students = rosterDb && Array.isArray(rosterDb.students) ? rosterDb.students : [];
+  return stableId ? students.find(student => String(student.id || '') === stableId) || null : null;
+}
+
+function taskDisplayTitle(t) {
+  const raw = String(t && t.title || '');
+  if (!/^\[수업\]\s*/.test(raw)) return taskTitleWithoutPrefix(t);
+  let visible = taskTitleWithoutPrefix(t);
+  const student = taskRosterStudent(t);
+  const grade = schoolGradeDisplayLabel(student && student.school, (student && student.grade) || (t && t.grade));
+  if (!grade) return visible;
+  const separator = visible.indexOf('—');
+  let studentPart = separator >= 0 ? visible.slice(0, separator).trim() : visible;
+  const subjectPart = separator >= 0 ? visible.slice(separator).trim() : '';
+  studentPart = /\([^)]*\)/.test(studentPart)
+    ? studentPart.replace(/\([^)]*\)/, '(' + grade + ')')
+    : studentPart + ' (' + grade + ')';
+  return [studentPart, subjectPart].filter(Boolean).join(' ');
+}
 
 /* ── 인터뷰형 코멘트 생성 ──
  * 선생님은 보기만 고르고, 문장은 문장 은행에서 학생·날짜 시드로 조합한다.
@@ -4570,7 +4623,7 @@ function ownFeedbackCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const status = feedbackSendState(item).label;
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">' +
       esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     (item.studentName
@@ -4602,7 +4655,7 @@ function feedbackQueueCard(item) {
   const sendState = feedbackSendState(item);
   const status = sendState.label;
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">' +
       esc((staff && staff.name) || item.owner) + ' 선생님 · ' + esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     (item.studentName
@@ -4779,7 +4832,7 @@ function ownLessonChangeCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const status = LESSON_CHANGE_STATUS_LABEL[item.status] || [item.status, ''];
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc((task && task.title) || item.taskId) + '</div><div class="small muted">수정본 ' + item.revision + '</div></div>' +
+      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     lessonChangeDiffHtml(task, item.changes) +
     '<div class="hint mt14"><b>요청 사유</b><br>' + esc(item.note || '입력 없음') + '</div>' +
@@ -4806,7 +4859,7 @@ function lessonChangeQueueCard(item) {
   const staff = staffById(item.owner);
   const status = LESSON_CHANGE_STATUS_LABEL[item.status] || [item.status, ''];
   return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc((task && task.title) || item.taskId) + '</div><div class="small muted">' +
+      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">' +
       esc((staff && staff.name) || item.owner) + ' 선생님 · 수정본 ' + item.revision + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
     lessonChangeDiffHtml(task, item.changes) +
@@ -5973,7 +6026,7 @@ function viewWeek() {
   h += '<div class="card weekwrap"><table class="week"><thead><tr><th class="n">업무</th>' +
     days.map(d => '<th class="' + (d === today() ? 'today' : '') + '">' + DOW[dowOf(d)] + '<br>' + parseYmd(d).getDate() + '</th>').join('') +
     '</tr></thead><tbody>' +
-    list.map(t => '<tr><td class="n">' + esc(t.title) + '</td>' +
+    list.map(t => '<tr><td class="n">' + esc(taskDisplayTitle(t)) + '</td>' +
       days.map(d => {
         if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
         const st = statusOf(t, d);
@@ -6782,11 +6835,11 @@ function managerRequestInboxRows() {
   lessonChangeQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
     const meta = lessonChangeInboxMeta(row.changes);
-    push(meta.kind, (task && (task.studentName || task.title)) || '수업 정보', meta.detail, row.owner, 'lesson', row.updatedAt, 0);
+    push(meta.kind, (task && (task.studentName || taskDisplayTitle(task))) || '수업 정보', meta.detail, row.owner, 'lesson', row.updatedAt, 0);
   });
   feedbackQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
-    push('피드백 검토', row.studentName || (task && (task.studentName || task.title)) || '수업 피드백',
+    push('피드백 검토', row.studentName || (task && (task.studentName || taskDisplayTitle(task))) || '수업 피드백',
       '피드백 문구 승인', row.owner, 'feedback', row.updatedAt, 0);
   });
   bookAddQueue.filter(row => row.status === 'approval_waiting').forEach(row =>
@@ -7128,7 +7181,7 @@ function viewBoard() {
   }));
   if (blocked.length) {
     h += '<div class="card alert"><div class="card-title" style="color:var(--coral)">🚧 막힘 ' + blocked.length + '건 — 원장님 확인 필요</div>' +
-      blocked.map(x => '<div class="small mt14"><b>' + esc(x.s.name) + '</b> · ' + esc(x.t.title) +
+      blocked.map(x => '<div class="small mt14"><b>' + esc(x.s.name) + '</b> · ' + esc(taskDisplayTitle(x.t)) +
         (x.c && x.c.note ? '<br><span class="muted">“' + esc(x.c.note) + '”</span>' : '<br><span class="muted">사유 미기재</span>') +
         '</div>').join('') + '</div>';
   }
@@ -7150,7 +7203,7 @@ function viewBoard() {
         byStaff[n].map(x => {
           const st = statusOf(x.t, x.date);
           return '<div class="between small" style="padding:3px 0">' +
-            '<span class="muted">· ' + esc(x.t.title) + ' <span style="opacity:.7">(' + shortDate(x.date) + ')</span></span>' +
+            '<span class="muted">· ' + esc(taskDisplayTitle(x.t)) + ' <span style="opacity:.7">(' + shortDate(x.date) + ')</span></span>' +
             (st === 'done' ? '<span class="pill">완료</span>'
               : st === 'blocked' ? '<span class="pill bad">막힘</span>'
               : st === 'doing' ? '<span class="pill warn">진행중</span>' : '<span class="pill warn">미완료</span>') +
@@ -7208,13 +7261,13 @@ function staffCard(s) {
         const badge = attMark + (x.st === 'blocked' ? '<span class="pill bad">막힘</span>'
                     : x.st === 'doing' ? '<span class="pill warn">' + prog.done + '/' + prog.total + prog.unit + '</span>'
                     : '<span class="pill">미착수</span>');
-        return '<div class="between small" style="padding:4px 0"><span>· ' + esc(x.t.title) +
+        return '<div class="between small" style="padding:4px 0"><span>· ' + esc(taskDisplayTitle(x.t)) +
           (x.t.time ? ' <span class="muted">(' + esc(x.t.time) + ')</span>' : '') + '</span>' + badge + '</div>';
       }).join('')
     : '<div class="small" style="color:var(--green);font-weight:700">✓ 지시 업무 모두 완료</div>') +
     (notes.length
     ? '<hr class="sep">' + notes.map(x =>
-        '<div class="small mb8"><b>' + esc(x.t.title) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
+        '<div class="small mb8"><b>' + esc(taskDisplayTitle(x.t)) + '</b><br><span class="muted">“' + esc(x.c.note) + '”</span></div>').join('')
     : '') +
     '<hr class="sep">' +
     '<div class="row wraprow" style="gap:8px">' +
@@ -12546,7 +12599,7 @@ function orderText(staffId, date) {
   const list = tasksFor(staffId, date);
   let txt = '📋 ' + label(date) + ' 업무지시서\n' + (s ? s.name + ' 선생님\n' : '') + '─────────\n';
   txt += list.length
-    ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + t.title + (t.priority === 'high' ? ' ⭐' : '') +
+    ? list.map((t, i) => (i + 1) + '. ' + (t.time ? '[' + t.time + '] ' : '') + taskDisplayTitle(t) + (t.priority === 'high' ? ' ⭐' : '') +
         (taskCardDetail(t) ? '\n   → ' + taskCardDetail(t).replace(/\n/g, '\n   ') : '') +
         (taskSteps(t, null).length ? '\n   단계 ' + taskSteps(t, null).length + '개 · 링크에서 확인' : '')).join('\n')
     : '(지시된 업무 없음)';
@@ -12559,7 +12612,7 @@ function quickText(t) {
   const s = staffById(t.staffId);
   return '📌 ' + (s ? s.name + ' 선생님\n' : '') +
     (t.start !== today() ? label(t.start) + ' ' : '') +
-    (t.time ? '[' + t.time + '] ' : '') + t.title +
+    (t.time ? '[' + t.time + '] ' : '') + taskDisplayTitle(t) +
     (t.priority === 'high' ? ' ⭐' : '') +
     '\n\n지시서에 올려뒀습니다. 끝나면 체크 부탁드려요.\n' + staffLink(t.staffId);
 }
@@ -12603,7 +12656,7 @@ function reportText(staffId, date) {
   txt += list.map(t => {
     const c = getCheck(t.id, date), st = statusOf(t, date), pr = taskProgress(t, c);
     const mark = st === 'done' ? '✅' : st === 'blocked' ? '🚧' : st === 'doing' ? '🔸' : '⬜';
-    return mark + ' ' + t.title +
+    return mark + ' ' + taskDisplayTitle(t) +
       (st === 'doing' ? ' (' + pr.done + '/' + pr.total + pr.unit + ')' : '') +
       (c && c.note ? '\n   · ' + c.note : '');
   }).join('\n') || '(지시된 업무 없음)';
@@ -12622,7 +12675,7 @@ function briefText(date) {
       const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
       if (st === 'done') return;
       hasPend = true;
-      const line = '· ' + s.name + ' — ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+      const line = '· ' + s.name + ' — ' + taskDisplayTitle(t) + (t.time ? ' (' + t.time + ')' : '') +
         (st === 'doing' ? ' [진행 ' + pr.done + '/' + pr.total + pr.unit + ']' : '') +
         (c && c.note ? '\n   “' + c.note + '”' : '');
       (st === 'blocked' ? blocked : pend).push(line);
@@ -12642,7 +12695,7 @@ function briefText(date) {
   list.forEach(s => tasksFor(s.id, date).forEach(t => {
     if (t.origin !== 'staff') return;
     const st = statusOf(t, date);
-    own.push('· ' + s.name + ' — ' + t.title + ' [' + STATUS_LABEL[st] + ']');
+    own.push('· ' + s.name + ' — ' + taskDisplayTitle(t) + ' [' + STATUS_LABEL[st] + ']');
   }));
   if (own.length) txt += '─────────\n＋ 직원 추가 업무 ' + own.length + '건\n' + own.join('\n') + '\n';
 
@@ -12650,7 +12703,7 @@ function briefText(date) {
   const mineLines = [];
   owners().forEach(s => tasksFor(s.id, date).forEach(t => {
     const st = statusOf(t, date), c = getCheck(t.id, date), pr = taskProgress(t, c);
-    mineLines.push('· ' + t.title + (t.time ? ' (' + t.time + ')' : '') +
+    mineLines.push('· ' + taskDisplayTitle(t) + (t.time ? ' (' + t.time + ')' : '') +
       ' [' + STATUS_LABEL[st] + (st === 'doing' ? ' ' + pr.done + '/' + pr.total + pr.unit : '') + ']' +
       (c && c.note ? '\n   “' + c.note + '”' : ''));
   }));
@@ -12946,7 +12999,7 @@ function manageTasks(staffId) {
   modal((s ? s.name : '') + ' 지시 목록',
     list.length
       ? list.map(t => '<div class="task"><div class="task-body">' +
-          '<div class="task-t">' + esc(t.title) + '</div>' +
+          '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
           '<div class="meta"><span class="tag">' + esc(repeatLabel(t)) + '</span>' +
           (t.time ? '<span class="tag time">' + esc(t.time) + '</span>' : '') +
           (taskSteps(t, null).length ? '<span class="tag doing">' + taskSteps(t, null).length + '단계</span>' : '') +
@@ -12973,12 +13026,13 @@ function editTaskModal(id) {
   const isNew = !id;
   const t = isNew ? BLANK_TASK() : state.tasks.find(x => x.id === id);
   if (!t) return;
-  eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false };
+  eForm = { id: id || null, repeat: t.repeat || 'once', days: (t.days || []).slice(), carry: t.carry !== false,
+    titlePrefix: taskTitlePrefix(t) };
 
   const who = currentStaff();
   modal(isNew ? (who ? who.name + ' — 업무 추가' : '업무 추가') : (isLesson(t) ? '수업 정보 수정' : '업무 수정'),
     '<div class="field"><label class="fl">업무 내용</label>' +
-      '<input class="in" id="eTitle" value="' + esc(t.title) + '"></div>' +
+      '<input class="in" id="eTitle" value="' + esc(taskTitleWithoutPrefix(t)) + '"></div>' +
 
     '<div class="field"><label class="fl">한 줄 설명</label>' +
       '<textarea class="in" id="eDetail">' + esc(t.detail || '') + '</textarea></div>' +
@@ -13026,8 +13080,10 @@ function editTaskModal(id) {
 
 function saveEditedTask() {
   const isNew = !eForm.id;
-  const title = ($('#eTitle').value || '').trim();
-  if (!title) return toast('업무 내용을 입력해 주세요');
+  const visibleTitle = ($('#eTitle').value || '').trim();
+  if (!visibleTitle) return toast('업무 내용을 입력해 주세요');
+  const title = eForm.titlePrefix && !visibleTitle.startsWith(eForm.titlePrefix)
+    ? eForm.titlePrefix + ' ' + visibleTitle : visibleTitle;
   if (eForm.repeat === 'days' && !eForm.days.length) return toast('요일을 선택해 주세요');
 
   let t;
@@ -14894,7 +14950,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.15';
+const APP_VER = '2026-08-21.16';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
