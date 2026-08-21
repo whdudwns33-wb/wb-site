@@ -909,11 +909,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-21.14"></script>
-<script src="./schedule-board-core.js?v=2026-08-21.14"></script>
-<script src="./asset-core.js?v=2026-08-21.14"></script>
-<script src="./qr-core.js?v=2026-08-21.14"></script>
-<script src="./acaflow-import-core.js?v=2026-08-21.14"></script>
+<script src="./lesson-form-core.js?v=2026-08-21.15"></script>
+<script src="./schedule-board-core.js?v=2026-08-21.15"></script>
+<script src="./asset-core.js?v=2026-08-21.15"></script>
+<script src="./qr-core.js?v=2026-08-21.15"></script>
+<script src="./acaflow-import-core.js?v=2026-08-21.15"></script>
 <script>
 "use strict";
 
@@ -1591,13 +1591,14 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 
 function go(r) {
   if (!$('#modalHost').hidden) closeModal();
+  prepareAdminLessonRoute(r);
   route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render();
 }
 window.addEventListener('hashchange', () => {
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
   if (/[#&](?:add|c)=/.test(location.hash)) { absorbLinkParams(); render(); startSyncSession(); return; }
   const r = location.hash.replace('#/', '');
-  if (r && r !== route) { if (!$('#modalHost').hidden) closeModal(); route = r; render(); }
+  if (r && r !== route) { if (!$('#modalHost').hidden) closeModal(); prepareAdminLessonRoute(r); route = r; render(); }
 });
 
 function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g, '+').replace(/_/g, '/')))); }
@@ -1629,7 +1630,8 @@ function resetPersonCache(token) {
   examTarget = null; opTarget = null; fbCtx = null;
   lessonDraft = null; lessonPreviewPayload = null; lessonPreviewTask = null;
   lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
-  lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false;
+  lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false; lessonDirectEntryOpen = false;
+  lessonExistingChangeOpen = false; lessonExistingSearchQuery = '';
   feedbackQueue = []; feedbackQueueLoaded = false; feedbackQueueLoading = false; feedbackQueueError = '';
   ownFeedbackQueue = []; ownFeedbackQueueLoaded = false; ownFeedbackQueueLoading = false; ownFeedbackQueueError = '';
   lessonChangeQueue = []; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false; lessonChangeQueueError = '';
@@ -3437,6 +3439,8 @@ let lessonRosterDraftStudentId = '';
 let lessonPreviewRosterStudent = null;
 let lessonSubmitting = false;
 let lessonDirectEntryOpen = false;
+let lessonExistingChangeOpen = false;
+let lessonExistingSearchQuery = '';
 let lessonAssignmentRequests = [];
 let lessonAssignmentCandidates = [];
 let lessonAssignmentRequestsLoaded = false;
@@ -3506,6 +3510,26 @@ function newLessonDraft() {
     materials: '', onlineProgram: '', homework: '', studentTraits: '',
     goal: '', parentRequest: '', adminRequest: '', start: today(), lessonEntries: []
   };
+}
+
+function resetLessonRegistrationDraft() {
+  clearLessonDraft();
+  lessonDraft = newLessonDraft();
+  lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewBatchPayload = []; lessonPreviewExpectedUpdatedAt = 0;
+  lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
+}
+
+function prepareAdminLessonRoute(nextRoute) {
+  if (nextRoute !== 'lesson' || route === 'lesson' || !session.isAdmin) return;
+  if (lessonDraft && lessonDraft._sourceTaskId) {
+    lessonDirectEntryOpen = false;
+    lessonExistingChangeOpen = true;
+    return;
+  }
+  resetLessonRegistrationDraft();
+  lessonDirectEntryOpen = false;
+  lessonExistingChangeOpen = false;
+  lessonExistingSearchQuery = '';
 }
 
 function currentLessonDraft() {
@@ -3716,8 +3740,9 @@ function openPublicationLessonFix(button) {
   lessonPreviewBatchPayload = [];
   lessonPreviewExpectedUpdatedAt = Number(row.updatedAt || task.updatedAt || 0);
   persistLessonDraft();
-  lessonDirectEntryOpen = true;
-  refreshLessonDirectEntry(true);
+  lessonDirectEntryOpen = false;
+  lessonExistingChangeOpen = true;
+  render();
   requestAnimationFrame(() => {
     const formStudent = document.querySelector('[data-lesson-student]');
     if (formStudent) formStudent.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4066,6 +4091,45 @@ function lessonBatchRegistrationHtml() {
     '<button class="btn btn-primary btn-block" data-act="lessonpreview">수업 ' + entries.length + '건 일괄 등록 미리보기</button>';
 }
 
+function lessonExistingSearchKey(value) {
+  return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
+}
+
+function lessonExistingChangeRows(query) {
+  const key = lessonExistingSearchKey(query);
+  if (!key || !session.isAdmin) return [];
+  const students = (rosterDb && Array.isArray(rosterDb.students)) ? rosterDb.students : [];
+  return (state.tasks || []).filter(task => task && !task.deleted && isLesson(task) && canEditLessonTask(task)).map(task => {
+    const teacher = staffById(task.staffId);
+    const student = students.find(item => String(item.id) === String(task.studentId || ''));
+    const studentName = String((student && student.name) || task.studentName || studentOf(task) || '학생 미지정');
+    const studentLabel = student
+      ? [student.name, student.school || '학교 미입력', student.grade || '학년 미입력'].join(' · ')
+      : [studentName, task.grade || '학년 미입력'].join(' · ');
+    const teacherName = String((teacher && teacher.name) || '담당 미지정');
+    return {
+      task: task, studentName: studentName, studentLabel: studentLabel, teacherName: teacherName,
+      subject: String(task.subject || task.className || task.lessonRole || '과목 미지정'),
+      schedule: lessonAssignmentScheduleText(task.scheduleSlots) || task.scheduleText || '요일·시간 미지정'
+    };
+  }).filter(row => lessonExistingSearchKey(row.studentName).includes(key) || lessonExistingSearchKey(row.teacherName).includes(key))
+    .sort((a, b) => a.studentLabel.localeCompare(b.studentLabel, 'ko') || a.teacherName.localeCompare(b.teacherName, 'ko') ||
+      a.subject.localeCompare(b.subject, 'ko') || String(a.task.id || '').localeCompare(String(b.task.id || '')));
+}
+
+function lessonExistingChangeResultsHtml(query) {
+  const key = lessonExistingSearchKey(query);
+  if (!key) return '<div class="hint" data-lesson-existing-results>선생님 이름이나 학생 이름을 입력하면 기존 수업만 조회됩니다.</div>';
+  const rows = lessonExistingChangeRows(query);
+  if (!rows.length) return '<div class="empty" data-lesson-existing-results><b>조회 결과가 없습니다</b>이름을 다시 확인해 주세요.</div>';
+  return '<div data-lesson-existing-results aria-live="polite">' + rows.map(row =>
+    '<article class="card lesson-existing-result mt14"><div class="between"><div><div class="card-title">' + esc(row.studentLabel) +
+      '</div><div class="card-sub">' + esc(row.subject) + ' · ' + esc(row.teacherName) + ' 선생님</div></div><span class="pill">기존 수업</span></div>' +
+      '<div class="small muted mt8"><b>요일·시간</b> ' + esc(row.schedule) + '</div>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="lessonedit" data-id="' + esc(row.task.id) + '">수업 정보 확인 및 수정</button></article>'
+  ).join('') + '</div>';
+}
+
 function viewLessonEntry() {
   if (!rosterDb && !rosterErr && !rosterLoading) loadRoster();
   const draft = currentLessonDraft();
@@ -4097,30 +4161,47 @@ function viewLessonEntry() {
     : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
-  const directRegistration = '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 정보 등록</b>' +
-    '<span class="card-sub">학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록할 수 있습니다.</span></span></summary>' +
-    '<div class="admin-collapsible-body">' + studentFields +
+  const formBody = studentFields +
       (batchMode ? lessonBatchRegistrationHtml() : lessonSubjectSelectionHtml() + staffSelect +
       '<div class="sect">4. 수업 요일·시간</div>' +
         '<div class="hint mb8">요일·시작·종료를 모두 입력해 주세요. 표시용 시간 문장은 확정 시간표에서 자동으로 만들어집니다.</div>' +
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
       '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></div>' +
-      '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">등록 내용 미리보기</button>') +
-    '</div></details>';
-  const reviews = personal ? lessonAssignmentRequestHtml() : viewLessonChangeReview() + lessonAssignmentReviewHtml();
-  return directRegistration + reviews;
+      '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">' + (draft._sourceTaskId ? '수정 내용 미리보기' : '등록 내용 미리보기') + '</button>');
+  const formPanel = '<div class="lesson-form-panel">' + formBody + '</div>';
+  if (personal) {
+    return '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 정보 등록</b>' +
+      '<span class="card-sub">담당 학생의 수업 정보를 등록합니다.</span></span></summary><div class="admin-collapsible-body">' + formPanel +
+      '</div></details>' + lessonAssignmentRequestHtml();
+  }
+  const editing = !!draft._sourceTaskId;
+  const registration = '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
+    '<span class="card-sub">학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록할 수 있습니다.</span></span></summary>' +
+    '<div class="admin-collapsible-body">' + (editing
+      ? '<div class="hint">현재 기존 수업을 수정 중입니다. 기존 수업 변경에서 수정을 마치거나 취소해 주세요.</div>'
+      : formPanel) + lessonAssignmentReviewHtml() + '</div></details>';
+  const existingChange = '<details class="card admin-collapsible lesson-existing-change"' + (lessonExistingChangeOpen || editing ? ' open' : '') + '><summary><span><b>기존 수업 변경</b>' +
+    '<span class="card-sub">선생님 이름이나 학생 이름으로 기존 수업을 찾아 현재 수정 기능을 사용합니다.</span></span></summary>' +
+    '<div class="admin-collapsible-body"><label class="field"><span class="fl">기존 수업 조회</span><input class="in" data-lesson-existing-search value="' +
+      esc(lessonExistingSearchQuery) + '" placeholder="선생님 이름 또는 학생 이름"></label>' + lessonExistingChangeResultsHtml(lessonExistingSearchQuery) +
+      (editing ? '<div class="guide mt14"><b>기존 수업 수정 중</b>' + esc([draft.studentName, draft.subject, (staffById(draft.staffId) || {}).name].filter(Boolean).join(' · ')) +
+        '<button class="btn btn-sm btn-ghost mt14" data-act="lessoneditcancel">수정 취소 · 다시 조회</button></div>' + formPanel : '') +
+      '<div class="mt14">' + viewLessonChangeReview() + '</div></div></details>';
+  return registration + existingChange;
 }
 
 function refreshLessonDirectEntry(forceOpen) {
-  const current = document.querySelector('.lesson-direct-entry');
+  const current = document.querySelector('.lesson-form-panel');
   if (!current) return;
-  lessonDirectEntryOpen = forceOpen === true || current.open;
+  const directDetails = current.closest('.lesson-direct-entry');
+  const existingDetails = current.closest('.lesson-existing-change');
+  if (directDetails) lessonDirectEntryOpen = forceOpen === true || directDetails.open;
+  if (existingDetails) lessonExistingChangeOpen = forceOpen === true || existingDetails.open;
   const holder = document.createElement('div');
   holder.innerHTML = viewLessonEntry();
-  const next = holder.querySelector('.lesson-direct-entry');
+  const next = holder.querySelector('.lesson-form-panel');
   if (!next) return;
-  next.open = lessonDirectEntryOpen;
   current.replaceWith(next);
 }
 
@@ -4171,7 +4252,7 @@ function syncRenderedLessonScheduleField(target) {
 
 function captureRenderedLessonScheduleInputs() {
   let captured = false;
-  document.querySelectorAll('.lesson-direct-entry [data-lesson-slot], .lesson-direct-entry [data-lesson-batch-slot]').forEach(field => {
+  document.querySelectorAll('.lesson-form-panel [data-lesson-slot], .lesson-form-panel [data-lesson-batch-slot]').forEach(field => {
     if (syncRenderedLessonScheduleField(field)) captured = true;
   });
   if (captured) persistLessonDraft();
@@ -14117,11 +14198,20 @@ document.addEventListener('click', ev => {
       lessonDraft = lessonDraftFromTask(t);
       lessonRosterDraft = null; lessonRosterDraftStudentId = ''; lessonPreviewRosterStudent = null;
       lessonPreviewPayload = null; lessonPreviewTask = null; lessonPreviewBatchPayload = []; lessonPreviewExpectedUpdatedAt = Number(t.updatedAt || 0);
-      lessonDirectEntryOpen = true;
+      lessonDirectEntryOpen = false;
+      lessonExistingChangeOpen = true;
       persistLessonDraft(); closeModal(); go('lesson');
       toast('수업 정보를 불러왔습니다 — 수정 후 미리보기를 확인해 주세요');
       break;
     }
+    case 'lessoneditcancel':
+      if (!session.isAdmin) break;
+      resetLessonRegistrationDraft();
+      lessonDirectEntryOpen = false;
+      lessonExistingChangeOpen = true;
+      render();
+      toast('수업 정보 수정을 취소했습니다');
+      break;
     case 'publicationreadinessrefresh': publicationReadinessLoaded = false; loadPublicationReadiness(true); break;
     case 'publicationlessonfix': openPublicationLessonFix(el); break;
     case 'lessonpreview': previewLessonRegistration(); break;
@@ -14512,6 +14602,19 @@ document.addEventListener('input', ev => {
 
 /* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */
 document.addEventListener('input', ev => {
+  const existingLessonSearch = ev.target.closest('[data-lesson-existing-search]');
+  if (existingLessonSearch) {
+    lessonExistingSearchQuery = existingLessonSearch.value;
+    const host = existingLessonSearch.closest('.lesson-existing-change');
+    const current = host && host.querySelector('[data-lesson-existing-results]');
+    if (current) {
+      const holder = document.createElement('div');
+      holder.innerHTML = lessonExistingChangeResultsHtml(lessonExistingSearchQuery);
+      const next = holder.firstElementChild;
+      if (next) current.replaceWith(next);
+    }
+    return;
+  }
   const assignmentSearch = ev.target.closest('[data-assignment-search]');
   if (assignmentSearch) {
     const draft = currentLessonAssignmentDraft();
@@ -14698,7 +14801,16 @@ document.addEventListener('change', async ev => {
 
 document.addEventListener('toggle', ev => {
   if (ev.target && ev.target.matches && ev.target.matches('.lesson-direct-entry')) {
+    const wasOpen = lessonDirectEntryOpen;
     lessonDirectEntryOpen = ev.target.open;
+    if (session.isAdmin && ev.target.open && !wasOpen && !currentLessonDraft()._sourceTaskId) {
+      resetLessonRegistrationDraft();
+      lessonDirectEntryOpen = true;
+      refreshLessonDirectEntry(true);
+    }
+  }
+  if (ev.target && ev.target.matches && ev.target.matches('.lesson-existing-change')) {
+    lessonExistingChangeOpen = ev.target.open;
   }
 }, true);
 
@@ -14744,6 +14856,12 @@ load();
 absorbLinkParams();
 const h = location.hash.replace('#/', '');
 if (h && !/(^|&)c=/.test(h)) route = h;
+if (route === 'lesson' && session.isAdmin) {
+  resetLessonRegistrationDraft();
+  lessonDirectEntryOpen = false;
+  lessonExistingChangeOpen = false;
+  lessonExistingSearchQuery = '';
+}
 render();
 
 let syncLoopStarted = false;
@@ -14776,7 +14894,7 @@ startSyncSession();
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-21.14';
+const APP_VER = '2026-08-21.15';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

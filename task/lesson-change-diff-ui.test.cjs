@@ -49,7 +49,8 @@ test('관리자 변경 검토는 수업 등록 및 변경 탭에 있고 승인 �
   const reviewView = source.slice(source.indexOf('function viewLessonChangeReview()'), source.indexOf('/* ── 변경 요청 작성 모달'));
   const card = source.slice(source.indexOf('function lessonChangeQueueCard('), source.indexOf('function viewLessonChangeReview('));
   assert.match(source, /\['lesson', '수업 등록 및 변경'\]/);
-  assert.match(lessonView, /viewLessonChangeReview\(\) \+ lessonAssignmentReviewHtml\(\)/);
+  assert.match(lessonView, /const registration =[\s\S]{0,700}lessonAssignmentReviewHtml\(\)/);
+  assert.match(lessonView, /const existingChange =[\s\S]{0,1000}viewLessonChangeReview\(\)/);
   assert.doesNotMatch(feedbackView, /viewLessonChangeReview\(\)/);
   assert.match(reviewView, /lessonChangeQueue\.filter\(item => item\.status !== 'approved'\)/);
   assert.match(card, /<b>요청 사유<\/b><br>/);
