@@ -127,54 +127,6 @@ function scheduleTextFromSlots(slots) {
   ).join(' / ');
 }
 
-function parseDayPrefix(value) {
-  let source = String(value || '').normalize('NFKC').replace(/\s+/g, '');
-  const days = [];
-  if (source.includes('매일')) {
-    days.push(0, 1, 2, 3, 4, 5, 6);
-    source = source.replace(/매일/g, '');
-  }
-  if (source.includes('평일')) {
-    days.push(1, 2, 3, 4, 5);
-    source = source.replace(/평일/g, '');
-  }
-  source = source.replace(/방학(?:중|동안)/g, '').replace(/매주/g, '').replace(/수업/g, '').replace(/요일/g, '');
-  const dayIndex = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
-  source = source.replace(/[일월화수목금토]/g, day => { days.push(dayIndex[day]); return ''; });
-  source = source.replace(/[\s,·&+()]/g, '').replace(/(?:및|와|과)/g, '');
-  return source === '' && days.length ? [...new Set(days)].sort((a, b) => a - b) : null;
-}
-
-function scheduleTextCoverage(value) {
-  const segments = String(value || '').split(new RegExp('(?:/|;|\\n)+')).map(item => item.trim()).filter(Boolean);
-  if (!segments.length) return null;
-  const coverage = [];
-  for (const segment of segments) {
-    const rangeRe = /((?:[01]?\d|2[0-3]):[0-5]\d)\s*(?:-|–|—|−|~|～)\s*((?:[01]?\d|2[0-3]):[0-5]\d)/g;
-    const ranges = [...segment.matchAll(rangeRe)];
-    if (ranges.length !== 1) return null;
-    const match = ranges[0];
-    const days = parseDayPrefix(segment.slice(0, match.index));
-    const suffix = segment.slice(Number(match.index) + match[0].length)
-      .replace(/[\s,·.()]/g, '').replace(/수업$/g, '');
-    const startMinute = clockMinute(match[1]);
-    const endMinute = clockMinute(match[2]);
-    if (!days || suffix || startMinute === null || endMinute === null || endMinute <= startMinute) return null;
-    const start = clockText(startMinute);
-    const end = clockText(endMinute);
-    days.forEach(day => coverage.push([day, start, end].join('|')));
-  }
-  return coverage.sort();
-}
-
-function slotCoverage(slots) {
-  return slots.flatMap(slot => slot.days.map(day => [day, slot.startTime, slot.endTime].join('|'))).sort();
-}
-
-function sameCoverage(left, right) {
-  return Array.isArray(left) && left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
 async function sha256Hex(value) {
   const bytes = new TextEncoder().encode(String(value));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -260,18 +212,11 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   if (requestedStatus === 'needs_review' && slots.length) {
     throw new Error('확인 필요 시간표에는 일부 확정 시간을 함께 저장할 수 없습니다');
   }
-  if (!input.scheduleText) {
-    if (!slots.length) throw new Error('수업 요일과 시간을 입력해 주세요');
+  if (slots.length) {
     input.scheduleText = scheduleTextFromSlots(slots);
-  } else if (slots.length) {
-    const textCoverage = scheduleTextCoverage(input.scheduleText);
-    if (!sameCoverage(textCoverage, slotCoverage(slots))) {
-      slots = [];
-      input.scheduleReviewReason = [
-        input.scheduleReviewReason,
-        '원문 시간과 확정 시간대가 달라 원장 확인이 필요합니다'
-      ].filter(Boolean).join(' / ');
-    }
+    input.scheduleReviewReason = '';
+  } else if (!input.scheduleText) {
+    throw new Error('수업 요일과 시간을 입력해 주세요');
   }
   const scheduleStatus = slots.length ? 'confirmed' : 'needs_review';
   const scheduleReviewReason = scheduleStatus === 'needs_review'

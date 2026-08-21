@@ -216,11 +216,12 @@ test('student id is an explicitly validated input field, not a server-owned fiel
   );
 });
 
-test('legacy student-name identity hashes remain byte compatible without student id', async () => {
+test('legacy student-name assignment identity stays byte compatible while schedule text is canonicalized', async () => {
   const task = await buildLessonTask(validLesson({ adminRequest: '없음' }), 'teacher-1', 'staff', 1234);
   assert.equal(task.id, 'lesson-1eb0da14754100ea367b49314a88594d');
   assert.equal(task.lessonAssignmentKey, 'sha256:1eb0da14754100ea367b49314a88594d7dfeaffe0300f61c9a8d84bce05c508e');
-  assert.equal(task.lessonContentHash, 'sha256:0c6ae535f01cfebe01c67ea34e7d111ec12c39689fef7c23d016fe6030d6a614');
+  assert.equal(task.scheduleText, '일 12:00-14:00 / 월·수 17:00-19:00');
+  assert.equal(task.lessonContentHash, 'sha256:77ffd295180c0bc9bbc1b3b266d188f85feaa0fb5c1ea970c6ad2de4c94e032a');
 });
 test('structured schedule alone is canonicalized and produces schedule text', async () => {
   const task = await buildLessonTask(validLesson({
@@ -536,16 +537,16 @@ test('sourceTaskId cannot change identity onto an existing assignment', async ()
   assert.equal(db.tasks.size, 2);
 });
 
-test('schedule text and structured slot mismatch becomes needs review', async () => {
+test('structured slots replace stale prose schedule text', async () => {
   const task = await buildLessonTask(validLesson({
     scheduleText: '화 18:00-19:00',
     scheduleReviewReason: '입력자 메모'
   }), 'teacher-1', 'staff', 100);
-  assert.equal(task.scheduleStatus, 'needs_review');
-  assert.deepEqual(task.scheduleSlots, []);
-  assert.equal(task.repeat, 'once');
-  assert.match(task.scheduleReviewReason, /입력자 메모/);
-  assert.match(task.scheduleReviewReason, /원문 시간과 확정 시간대/);
+  assert.equal(task.scheduleStatus, 'confirmed');
+  assert.equal(task.scheduleSlots.length, 2);
+  assert.equal(task.repeat, 'days');
+  assert.equal(task.scheduleText, '일 12:00-14:00 / 월·수 17:00-19:00');
+  assert.equal(task.scheduleReviewReason, '');
 });
 
 test('unconfirmed schedules cannot leak partial structured slots', async () => {

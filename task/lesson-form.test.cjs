@@ -99,14 +99,16 @@ test('supports explicit multi-slot UI rows and derives legacy repeat fields', ()
   assert.equal(body.start, '2026-08-04');
 });
 
-test('structured rows must match a parseable schedule text before confirmation', () => {
+test('structured rows are authoritative over legacy schedule text', () => {
   const mismatch = core.resolveSchedule(validInput({
     scheduleText: '월수 18:00-19:50 / 금 18:00-19:00',
     scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:50' }]
   }));
-  assert.equal(mismatch.scheduleStatus, 'needs_review');
-  assert.deepEqual(mismatch.scheduleSlots, []);
-  assert.ok(mismatch.issues.some(item => item.code === 'schedule_text_mismatch'));
+  assert.equal(mismatch.scheduleStatus, 'normal');
+  assert.deepEqual(mismatch.scheduleSlots.map(slot => [slot.days, slot.startTime, slot.endTime]), [
+    [[1, 3], '18:00', '19:50']
+  ]);
+  assert.deepEqual(mismatch.issues, []);
 
   const ambiguous = core.resolveSchedule(validInput({
     scheduleText: '월수금 18:00-19:50, 월수 2시간/ 금 1시간',
@@ -115,8 +117,15 @@ test('structured rows must match a parseable schedule text before confirmation',
       { days: [5], startTime: '18:00', endTime: '19:00' }
     ]
   }));
-  assert.equal(ambiguous.scheduleStatus, 'needs_review');
-  assert.deepEqual(ambiguous.scheduleSlots, []);
+  assert.equal(ambiguous.scheduleStatus, 'normal');
+  assert.equal(ambiguous.scheduleSlots.length, 2);
+
+  const body = core.buildLessonTaskBody(validInput({
+    scheduleText: '토 10:00-11:50',
+    scheduleSlots: [{ days: [0, 6], startTime: '10:00', endTime: '11:50' }]
+  }), { start: '2026-08-21' });
+  assert.equal(body.scheduleText, '일·토 10:00-11:50');
+  assert.equal(body.scheduleStatus, 'normal');
 });
 
 test('structured-only schedule derives a readable schedule text', () => {
