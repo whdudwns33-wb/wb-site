@@ -71,7 +71,7 @@ test('a missing roster student can be added as an existing student and approved'
   assert.match(source, /data-act="lessonassignmentaddexisting"/);
   assert.match(source, /기존 원생으로 추가 후 승인/);
   assert.match(source, /entryType: entryType === 'new' \? 'new' : 'existing'/);
-  assert.match(source, /신규 학생 30일 관리는 신규 학생 탭에서 별도로 시작합니다/);
+  assert.match(source, /신규 학생 30일 관리는 첫 수업 시작일을 입력한 뒤 시작합니다/);
   assert.match(source, /action: editor\.student\._editing \? 'student_update' : 'student_create'/);
   assert.match(source, /action: 'approve', requestKey: assignment\.requestKey/);
   assert.match(source, /기존 원생 등록과 담당 연결을 완료했습니다/);
