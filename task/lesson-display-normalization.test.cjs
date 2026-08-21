@@ -17,6 +17,14 @@ function displayCore() {
   return new Function(`${source}\nreturn { LESSON_OPERATIONAL_STEP_LABELS, taskSteps, lessonReferenceSteps, taskCardDetail };`)();
 }
 
+function titleDisplayCore() {
+  const source = block('/** 제목 말머리는 데이터 판별용으로 보존하고 화면에서만 감춘다. */', '/* ── 인터뷰형 코멘트 생성 ──');
+  return new Function(`let rosterDb = null;\n${source}\nreturn {
+    schoolGradeDisplayLabel, taskTitlePrefix, taskTitleWithoutPrefix, taskDisplayTitle,
+    setRoster(value) { rosterDb = value; }
+  };`)();
+}
+
 const legacyLesson = () => ({
   id: 'legacy-lesson', title: '[수업] 학생 (중1) — 영어',
   steps: [1, 2, 3].map(index => ({ id: `legacy-${index}`, label: `기존 맞춤 ${index}` }))
@@ -62,6 +70,46 @@ test('structured lesson cards derive a short summary instead of repeating the ni
   assert.ok(detail.length <= 160);
 });
 
+test('lesson and order prefixes stay in stored data but are hidden from display titles', () => {
+  const core = titleDisplayCore();
+  const lesson = { title: '[수업] 학생 (2) — 수학', grade: '2' };
+  const order = { title: '[주문] 수학 교재' };
+  assert.equal(core.taskDisplayTitle(lesson), '학생 (2) — 수학');
+  assert.equal(core.taskDisplayTitle(order), '수학 교재');
+  assert.equal(lesson.title, '[수업] 학생 (2) — 수학');
+  assert.equal(order.title, '[주문] 수학 교재');
+  assert.equal(core.taskTitlePrefix(lesson), '[수업]');
+  assert.equal(core.taskTitlePrefix(order), '[주문]');
+  assert.equal(core.taskDisplayTitle({ title: '[컨설팅] 학생' }), '[컨설팅] 학생');
+});
+
+test('lesson display grade uses the stable student roster school without changing original values', () => {
+  const core = titleDisplayCore();
+  const roster = { students: [
+    { id: '10000001', school: '치평중', grade: '2' },
+    { id: '10000002', school: '서석고등학교', grade: '1학년' },
+    { id: '10000003', school: '유안초', grade: '초 4학년' }
+  ] };
+  core.setRoster(roster);
+  assert.equal(core.taskDisplayTitle({
+    title: '[수업] 가학생 (2) — 수학', studentId: '10000001', grade: '2'
+  }), '가학생 (중2) — 수학');
+  assert.equal(core.taskDisplayTitle({
+    title: '[수업] 나학생 (1) — 영어', studentId: '10000002', grade: '1'
+  }), '나학생 (고1) — 영어');
+  assert.equal(core.taskDisplayTitle({
+    title: '[수업] 다학생 — 국어', studentId: '10000003', grade: '4'
+  }), '다학생 (초4) — 국어');
+  assert.deepEqual(roster.students.map(student => student.grade), ['2', '1학년', '초 4학년']);
+});
+
+test('grade display does not guess a school level when school information is unavailable', () => {
+  const core = titleDisplayCore();
+  assert.equal(core.schoolGradeDisplayLabel('', '2'), '2');
+  assert.equal(core.schoolGradeDisplayLabel('학교급 확인 필요', '2'), '2');
+  assert.equal(core.schoolGradeDisplayLabel('치평중', '중 2학년'), '중2');
+});
+
 test('lesson references leave the lesson panel and every editable lesson button uses the same wording', () => {
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
   assert.doesNotMatch(panel, /학생별 수업 참고 열기|lessonReferenceSteps\(t\)/);
@@ -75,6 +123,11 @@ test('lesson references leave the lesson panel and every editable lesson button 
   assert.match(briefing, /data-act="lessonedit"[\s\S]{0,120}수업 정보 수정/);
   const editor = block('function editTaskModal(id)', 'function saveEditedTask()');
   assert.match(editor, /isLesson\(t\) \? '수업 정보 수정' : '업무 수정'/);
+  assert.match(editor, /titlePrefix: taskTitlePrefix\(t\)/);
+  assert.match(editor, /taskTitleWithoutPrefix\(t\)/);
+  const saveEditor = block('function saveEditedTask()', '/* ══════════════════════════════════════════════════════');
+  assert.match(saveEditor, /eForm\.titlePrefix && !visibleTitle\.startsWith\(eForm\.titlePrefix\)/);
+  assert.match(saveEditor, /eForm\.titlePrefix \+ ' ' \+ visibleTitle : visibleTitle/);
   const order = block('function orderText(staffId, date)', '/** 방금 추가한 한 건을');
   const feedback = block('function computeFeedbackFields(t, date, fbCtx)', '/** 실제 발송');
   assert.match(order, /taskCardDetail\(t\)/);
