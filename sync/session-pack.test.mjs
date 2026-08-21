@@ -217,13 +217,13 @@ test('present, late, early leave, and absence policies use actual checks and CAS
 test('23:50 KST cron records the latest attendance once after teachers can revise it beforehand', async () => {
   const db = seed();
   const pack = (await create(db)).body.pack;
-  const sourceDate = '2026-08-21';
+  const sourceDate = new Date(Date.now() + 2 * 86400000 + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   putCheck(db, 'lesson-a', 'teacher-a', sourceDate, 'A', 'same_day');
   const corrected = { taskId: 'lesson-a', date: sourceDate, att: 'P', absenceType: '' };
   db.prepare("UPDATE checks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE app='task' AND k=?")
     .bind(JSON.stringify(corrected), 'lesson-a|' + sourceDate).run();
 
-  const scheduledTime = Date.parse('2026-08-21T14:50:00Z');
+  const scheduledTime = Date.parse(sourceDate + 'T14:50:00Z');
   const first = await handleScheduledSessionPackAttendance({ DB: db }, scheduledTime);
   assert.deepEqual(first, { ok: true, sourceDate, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
   const usage = db.database.prepare(
