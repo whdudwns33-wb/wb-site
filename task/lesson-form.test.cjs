@@ -29,7 +29,7 @@ test('exports a CommonJS/browser-friendly lesson form core', () => {
   assert.equal(typeof core.buildLessonTaskBody, 'function');
 });
 
-test('validates every teacher-input group including independent lesson hours without treating 없음 as blank', () => {
+test('validates every teacher-input group including hours on each confirmed time without treating 없음 as blank', () => {
   const valid = core.validateLessonInput(validInput());
   assert.equal(valid.valid, true);
   assert.deepEqual(valid.errors, []);
@@ -38,7 +38,6 @@ test('validates every teacher-input group including independent lesson hours wit
     [{ studentName: '' }, 'student'],
     [{ grade: '' }, 'student'],
     [{ subject: '', className: '' }, 'subjectClass'],
-    [{ lessonHours: '' }, 'lessonHours'],
     [{ scheduleText: '', scheduleSlots: [] }, 'schedule'],
     [{ materials: '' }, 'materials'],
     [{ onlineProgram: '' }, 'onlineProgram'],
@@ -52,16 +51,29 @@ test('validates every teacher-input group including independent lesson hours wit
     assert.equal(result.valid, false, field);
     assert.ok(result.errors.some(item => item.field === field), field);
   });
+
+  const missingHours = core.validateLessonInput(validInput({
+    lessonHours: '', scheduleText: '',
+    scheduleSlots: [{ days: [1], startTime: '17:00', endTime: '19:00', lessonHours: '' }]
+  }));
+  assert.equal(missingHours.valid, false);
+  assert.ok(missingHours.errors.some(item => item.field === 'schedule'));
 });
 
-test('accepts only the fixed independent lesson-hour choices', () => {
+test('accepts only the fixed lesson-hour choices on each confirmed time', () => {
   for (const lessonHours of core.LESSON_HOURS) {
-    assert.equal(core.validateLessonInput(validInput({ lessonHours })).valid, true, lessonHours);
+    assert.equal(core.validateLessonInput(validInput({
+      lessonHours: '', scheduleText: '',
+      scheduleSlots: [{ days: [1], startTime: '17:00', endTime: '19:00', lessonHours }]
+    })).valid, true, lessonHours);
   }
   for (const lessonHours of ['50분', '1.6T', '2시간', '7T']) {
-    const result = core.validateLessonInput(validInput({ lessonHours }));
+    const result = core.validateLessonInput(validInput({
+      lessonHours: '', scheduleText: '',
+      scheduleSlots: [{ days: [1], startTime: '17:00', endTime: '19:00', lessonHours }]
+    }));
     assert.equal(result.valid, false, lessonHours);
-    assert.ok(result.errors.some(item => item.field === 'lessonHours'), lessonHours);
+    assert.ok(result.errors.some(item => item.field === 'schedule'), lessonHours);
   }
 });
 
@@ -71,11 +83,11 @@ test('parses only unambiguous free-text day and clock ranges', () => {
   assert.deepEqual(result.scheduleSlots, [
     {
       slotId: 'slot-2', days: [0], startTime: '12:00', endTime: '14:00',
-      lessonRole: '', validFrom: '', validTo: ''
+      lessonHours: '2T', lessonRole: '', validFrom: '', validTo: ''
     },
     {
       slotId: 'slot-1', days: [1, 3], startTime: '17:00', endTime: '19:00',
-      lessonRole: '', validFrom: '', validTo: ''
+      lessonHours: '2T', lessonRole: '', validFrom: '', validTo: ''
     }
   ]);
 });
@@ -137,7 +149,7 @@ test('structured rows are authoritative over legacy schedule text', () => {
     scheduleText: '토 10:00-11:50',
     scheduleSlots: [{ days: [0, 6], startTime: '10:00', endTime: '11:50' }]
   }), { start: '2026-08-21' });
-  assert.equal(body.scheduleText, '토·일 10:00-11:50');
+  assert.equal(body.scheduleText, '토·일 10:00-11:50 · 2T');
   assert.equal(body.scheduleStatus, 'normal');
 });
 
@@ -147,8 +159,25 @@ test('structured-only schedule derives a readable schedule text', () => {
     scheduleSlots: [{ days: [1, 3], startTime: '17:00', endTime: '19:00' }]
   }), { start: '2026-08-04' });
   assert.equal(body.scheduleStatus, 'normal');
-  assert.equal(body.scheduleText, '월·수 17:00-19:00');
-  assert.match(body.detail, /월·수 17:00-19:00/);
+  assert.equal(body.scheduleText, '월·수 17:00-19:00 · 2T');
+  assert.match(body.detail, /월·수 17:00-19:00 · 2T/);
+});
+
+test('groups equal confirmed times and separates different times with their own lesson hours', () => {
+  const body = core.buildLessonTaskBody(validInput({
+    lessonHours: '', scheduleText: '',
+    scheduleSlots: [
+      { days: [1], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+      { days: [3], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+      { days: [5], startTime: '20:00', endTime: '20:50', lessonHours: '1T' }
+    ]
+  }), { start: '2026-08-21' });
+
+  assert.equal(body.scheduleText, '월·수 18:00-19:50 · 2T / 금 20:00-20:50 · 1T');
+  assert.equal(body.lessonHours, '');
+  assert.deepEqual(body.scheduleSlots.map(slot => [slot.days, slot.lessonHours]), [
+    [[1], '2T'], [[3], '2T'], [[5], '1T']
+  ]);
 });
 
 test('rejects overlapping structured rows as one needs-review schedule', () => {

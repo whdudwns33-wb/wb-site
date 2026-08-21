@@ -20,7 +20,6 @@ const LESSON_TEXT_LIMITS = {
 const REQUIRED_TEXT_FIELDS = [
   'studentName',
   'grade',
-  'lessonHours',
   'materials',
   'onlineProgram',
   'homework',
@@ -75,7 +74,7 @@ function normalizeWords(value) {
   return String(value || '').normalize('NFKC').toLowerCase().replace(/[‐‑‒–—―−~～]/g, '-').replace(/\s+/g, ' ').trim();
 }
 
-function normalizeSlots(rawSlots, validFrom, lessonRole) {
+function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
   if (!Array.isArray(rawSlots)) return [];
   if (rawSlots.length > MAX_SCHEDULE_SLOTS) throw new Error('확정 시간은 최대 20개까지 입력할 수 있습니다');
 
@@ -84,13 +83,15 @@ function normalizeSlots(rawSlots, validFrom, lessonRole) {
       .map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b);
     const startMinute = clockMinute(raw && raw.startTime);
     const endMinute = clockMinute(raw && raw.endTime);
-    if (!days.length || startMinute === null || endMinute === null || endMinute <= startMinute) {
-      throw new Error((index + 1) + '번째 확정 시간의 요일·시작·종료를 확인해 주세요');
+    const lessonHours = textValue(raw && raw.lessonHours || fallbackLessonHours, 4, false);
+    if (!days.length || startMinute === null || endMinute === null || endMinute <= startMinute || !LESSON_HOURS.has(lessonHours)) {
+      throw new Error((index + 1) + '번째 확정 시간의 요일·시작·종료·수업시수를 확인해 주세요');
     }
     return {
       days,
       startTime: clockText(startMinute),
       endTime: clockText(endMinute),
+      lessonHours,
       validFrom,
       lessonRole,
       status: 'normal'
@@ -99,7 +100,7 @@ function normalizeSlots(rawSlots, validFrom, lessonRole) {
 
   const seen = new Set();
   const canonical = normalized.filter(slot => {
-    const key = [slot.days.join(','), slot.startTime, slot.endTime].join('|');
+    const key = [slot.days.join(','), slot.startTime, slot.endTime, slot.lessonHours].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -126,12 +127,20 @@ function normalizeSlots(rawSlots, validFrom, lessonRole) {
 }
 
 function scheduleTextFromSlots(slots) {
-  return slots.slice().sort((left, right) =>
+  const grouped = new Map();
+  slots.forEach(slot => {
+    const key = [slot.startTime, slot.endTime, slot.lessonHours].join('|');
+    const current = grouped.get(key) || { days: [], startTime: slot.startTime, endTime: slot.endTime, lessonHours: slot.lessonHours };
+    current.days.push(...slot.days);
+    current.days = [...new Set(current.days)];
+    grouped.set(key, current);
+  });
+  return Array.from(grouped.values()).sort((left, right) =>
     Math.min(...left.days.map(day => DAY_DISPLAY_RANK[day])) - Math.min(...right.days.map(day => DAY_DISPLAY_RANK[day])) ||
     left.startTime.localeCompare(right.startTime) || left.endTime.localeCompare(right.endTime)
   ).map(slot =>
     slot.days.slice().sort((left, right) => DAY_DISPLAY_RANK[left] - DAY_DISPLAY_RANK[right])
-      .map(day => DAY_LABELS[day]).join('·') + ' ' + slot.startTime + '-' + slot.endTime
+      .map(day => DAY_LABELS[day]).join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + slot.lessonHours
   ).join(' / ');
 }
 
@@ -162,9 +171,8 @@ function contentIdentityText(input, slots, scheduleStatus, scheduleReviewReason)
     subject: input.subject,
     className: input.className,
     lessonRole: input.lessonRole,
-    lessonHours: input.lessonHours,
     scheduleText: input.scheduleText,
-    slots: slots.map(slot => [slot.days, slot.startTime, slot.endTime]),
+    slots: slots.map(slot => [slot.days, slot.startTime, slot.endTime, slot.lessonHours]),
     scheduleStatus,
     scheduleReviewReason,
     materials: input.materials,
@@ -213,12 +221,12 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   }
   input.adminRequest = input.adminRequest || '없음';
   if (!input.subject && !input.className) throw new Error('과목 또는 반을 입력해 주세요');
-  if (!LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요');
+  if (input.lessonHours && !LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요');
   input.start = dateValue(raw.start);
   input.lessonRole = textValue(raw.lessonRole || input.className || input.subject, 120, true);
 
   const requestedStatus = String(raw.scheduleStatus || '');
-  let slots = normalizeSlots(raw.scheduleSlots, input.start, input.lessonRole);
+  let slots = normalizeSlots(raw.scheduleSlots, input.start, input.lessonRole, input.lessonHours);
   if (requestedStatus === 'needs_review' && slots.length) {
     throw new Error('확인 필요 시간표에는 일부 확정 시간을 함께 저장할 수 없습니다');
   }
@@ -229,6 +237,8 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
     throw new Error('수업 요일과 시간을 입력해 주세요');
   }
   const scheduleStatus = slots.length ? 'confirmed' : 'needs_review';
+  const slotLessonHours = [...new Set(slots.map(slot => slot.lessonHours).filter(Boolean))];
+  input.lessonHours = slotLessonHours.length === 1 ? slotLessonHours[0] : '';
   const scheduleReviewReason = scheduleStatus === 'needs_review'
     ? (input.scheduleReviewReason || '구조화된 요일·시작·종료 시간이 아직 확정되지 않았습니다') : '';
 
@@ -373,7 +383,7 @@ async function contentHashForTask(task) {
   }
   try {
     const role = task.lessonRole || task.className || task.subject;
-    const slots = normalizeSlots(task.scheduleSlots || [], task.start, role);
+    const slots = normalizeSlots(task.scheduleSlots || [], task.start, role, task.lessonHours);
     const status = slots.length ? 'confirmed' : 'needs_review';
     const reason = status === 'needs_review'
       ? (task.scheduleReviewReason || '구조화된 요일·시작·종료 시간이 아직 확정되지 않았습니다') : '';

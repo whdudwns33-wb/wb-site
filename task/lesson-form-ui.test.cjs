@@ -110,16 +110,16 @@ test('admin direct lesson registration reuses the new-student information fields
   assert.match(save, /원생 기본 정보는 저장됐습니다/);
 });
 
-test('direct lesson registration follows student, subject, teacher, lesson hours, schedule order', () => {
+test('direct lesson registration puts lesson hours inside every confirmed-time row', () => {
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
   const view = html.slice(viewStart, viewEnd);
   assert.doesNotMatch(view, /lessonTextField\('scheduleText'/);
   assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
-  assert.match(view, /<div class="sect">4\. 수업시수/);
-  assert.match(view, /data-lesson-field="lessonHours"/);
-  assert.match(view, /<div class="sect">5\. 수업 요일·시간/);
-  assert.doesNotMatch(view, /<div class="sect">[6-9]\./);
+  assert.match(view, /<div class="sect">4\. 수업 요일·시간·시수/);
+  assert.doesNotMatch(view, /data-lesson-field="lessonHours"/);
+  assert.match(html, /data-lesson-slot="lessonHours"/);
+  assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
   assert.match(view, /학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록/);
   assert.match(view, /batchMode \? lessonBatchRegistrationHtml\(\) : lessonSubjectSelectionHtml\(\) \+ staffSelect/);
   assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 등록<\/b>/);
@@ -129,24 +129,24 @@ test('direct lesson registration follows student, subject, teacher, lesson hours
   assert.match(view, /return registration \+ existingChange/);
 });
 
-test('all lesson registration paths use fixed independent lesson hours and Monday-first weekday controls', () => {
+test('all lesson registration paths use per-time lesson hours and Monday-first weekday controls', () => {
   for (const option of ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']) {
     assert.match(html, new RegExp(`['"]${option.replace('.', '\\.')}['"]`), option);
   }
-  assert.match(html, /data-lesson-batch-field="lessonHours"/);
-  assert.match(html, /data-lesson-briefing-hours/);
-  assert.match(html, /id="eLessonHours"/);
-  assert.match(html, /lessonHours: taskBody\.lessonHours/);
+  assert.match(html, /data-lesson-slot="lessonHours"/);
+  assert.match(html, /data-lesson-batch-slot="lessonHours"/);
+  assert.match(html, /data-assignment-slot="lessonHours"/);
+  assert.match(html, /data-roster-return-hours/);
+  assert.doesNotMatch(html, /data-lesson-briefing-hours|id="eLessonHours"|data-assignment-hours/);
   assert.match(html, /const DOW_DISPLAY_ORDER = \[1, 2, 3, 4, 5, 6, 0\]/);
-  assert.match(html, /function scheduleSlotsForDisplay\(slots\)/);
-  assert.match(html, /scheduleSlotsForDisplay\(item\.taskBody\.scheduleSlots\)/);
-  assert.match(html, /scheduleSlotsForDisplay\(taskBody\.scheduleSlots\)/);
+  assert.match(html, /function groupedScheduleSlotsForDisplay\(slots, fallbackLessonHours\)/);
+  assert.match(html, /lessonAssignmentScheduleText\(taskBody\.scheduleSlots, taskBody\.lessonHours\)/);
 });
 
-test('lesson card metadata places independent lesson hours between clock time and weekly repeat', () => {
+test('lesson card metadata renders each grouped weekday-time-hours schedule', () => {
   const card = html.slice(html.indexOf("const lesson = isLesson(t);"), html.indexOf("'<div class=\"task-actions\">", html.indexOf("const lesson = isLesson(t);")));
-  assert.ok(card.indexOf("lessonTimeRangeLabel(t)") < card.indexOf("lessonHoursValue(t.lessonHours)"));
-  assert.ok(card.indexOf("lessonHoursValue(t.lessonHours)") < card.indexOf("repeatLabel(t)"));
+  assert.match(card, /lessonScheduleMetaHtml\(t\)/);
+  assert.match(html, /groupedScheduleSlotsForDisplay\(task && task\.scheduleSlots, task && task\.lessonHours\)/);
 });
 
 test('admin lesson registration and existing changes are separate collapsed panels with a blank default', () => {
@@ -271,19 +271,24 @@ test('lesson time inputs sync on input, change, and immediately before preview',
   const helperStart = html.indexOf('function lessonClockLabel(');
   const helperEnd = html.indexOf('function captureRenderedLessonScheduleInputs()', helperStart);
   assert.ok(helperStart >= 0 && helperEnd > helperStart);
-  const singleDraft = { scheduleSlots: [{ days: [6], startTime: '', endTime: '' }] };
-  const batchEntries = [{ scheduleSlots: [{ days: [0], startTime: '', endTime: '' }] }];
-  const helpers = new Function('currentLessonDraft', 'lessonBatchEntries', 'DOW', 'DOW_DISPLAY_ORDER', 'esc',
+  const singleDraft = { scheduleSlots: [{ days: [6], startTime: '', endTime: '', lessonHours: '' }] };
+  const batchEntries = [{ scheduleSlots: [{ days: [0], startTime: '', endTime: '', lessonHours: '' }] }];
+  const helpers = new Function('currentLessonDraft', 'lessonBatchEntries', 'DOW', 'DOW_DISPLAY_ORDER', 'esc', 'lessonHoursOptionsHtml',
     html.slice(helperStart, helperEnd) + '\nreturn { lessonClockLabel, lessonClockSummary, lessonSlotHtml, lessonBatchSlotHtml, syncRenderedLessonScheduleField };')(
-      () => singleDraft, () => batchEntries, ['일', '월', '화', '수', '목', '금', '토'], [1, 2, 3, 4, 5, 6, 0], value => String(value || ''));
+      () => singleDraft, () => batchEntries, ['일', '월', '화', '수', '목', '금', '토'], [1, 2, 3, 4, 5, 6, 0], value => String(value || ''),
+      value => '<option>' + String(value || '') + '</option>');
   assert.equal(helpers.lessonClockLabel('00:00'), '오전 12:00 (00:00)');
   assert.equal(helpers.lessonClockLabel('12:00'), '오후 12:00 (12:00)');
   assert.equal(helpers.lessonClockLabel('18:50'), '오후 6:50 (18:50)');
   assert.equal(helpers.lessonClockLabel(''), '미선택');
   assert.match(helpers.lessonSlotHtml({ days: [1], startTime: '09:00', endTime: '10:50' }, 0),
     /data-lesson-time-display aria-live="polite">선택 결과 · 오전 9:00 \(09:00\) → 오전 10:50 \(10:50\)/);
+  assert.match(helpers.lessonSlotHtml({ days: [1], startTime: '09:00', endTime: '10:50', lessonHours: '2T' }, 0),
+    /data-lesson-slot="lessonHours"/);
   assert.match(helpers.lessonBatchSlotHtml({ days: [2], startTime: '13:00', endTime: '14:50' }, 0, 0),
     /data-lesson-time-display aria-live="polite">선택 결과 · 오후 1:00 \(13:00\) → 오후 2:50 \(14:50\)/);
+  assert.match(helpers.lessonBatchSlotHtml({ days: [2], startTime: '13:00', endTime: '14:50', lessonHours: '2T' }, 0, 0),
+    /data-lesson-batch-slot="lessonHours"/);
   const target = (selector, dataset, value) => {
     const display = { textContent: '' };
     const row = { querySelector(query) { return query === '[data-lesson-time-display]' ? display : null; } };
@@ -303,6 +308,9 @@ test('lesson time inputs sync on input, change, and immediately before preview',
   assert.equal(helpers.syncRenderedLessonScheduleField(batchField), true);
   assert.equal(batchEntries[0].scheduleSlots[0].endTime, '11:50');
   assert.equal(batchField.display.textContent, '선택 결과 · 미선택 → 오전 11:50 (11:50)');
+  const hoursField = target('[data-lesson-slot]', { i: '0', lessonSlot: 'lessonHours' }, '1.5T');
+  assert.equal(helpers.syncRenderedLessonScheduleField(hoursField), true);
+  assert.equal(singleDraft.scheduleSlots[0].lessonHours, '1.5T');
 
   const captureStart = helperEnd;
   const previewStart = html.indexOf('function previewLessonRegistration()', captureStart);
