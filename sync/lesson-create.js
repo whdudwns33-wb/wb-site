@@ -29,9 +29,10 @@ const REQUIRED_TEXT_FIELDS = [
 ];
 const MAX_SCHEDULE_SLOTS = 20;
 const MAX_BATCH_LESSONS = 10;
+const MAX_STUDENT_BATCH_LESSONS = 50;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const DAY_DISPLAY_RANK = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
-const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']);
+const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T']);
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 function textValue(value, limit, required) {
@@ -221,7 +222,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   }
   input.adminRequest = input.adminRequest || '없음';
   if (!input.subject && !input.className) throw new Error('과목 또는 반을 입력해 주세요');
-  if (input.lessonHours && !LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요');
+  if (input.lessonHours && !LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 2.5T, 3T, 3.5T, 4T, 4.5T, 5T, 6T 중에서 선택해 주세요');
   input.start = dateValue(raw.start);
   input.lessonRole = textValue(raw.lessonRole || input.className || input.subject, 120, true);
 
@@ -618,17 +619,24 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
     return json({ ok: false, error: '관리자만 수업을 일괄 등록할 수 있습니다' }, 403, origin);
   }
   body = body && typeof body === 'object' ? body : {};
+  const batchKind = body.batchKind == null || body.batchKind === '' ? 'lessons' : String(body.batchKind);
+  if (!['lessons', 'students'].includes(batchKind)) {
+    return json({ ok: false, error: '수업 일괄 등록 방식을 확인해 주세요' }, 400, origin);
+  }
   const requested = Array.isArray(body.lessons) ? body.lessons : [];
-  if (!requested.length || requested.length > MAX_BATCH_LESSONS) {
-    return json({ ok: false, error: '한 번에 등록할 수업은 1건 이상 10건 이하입니다' }, 400, origin);
+  const maxBatchLessons = batchKind === 'students' ? MAX_STUDENT_BATCH_LESSONS : MAX_BATCH_LESSONS;
+  if (!requested.length || requested.length > maxBatchLessons) {
+    return json({ ok: false, error: '한 번에 등록할 수업은 1건 이상 ' + maxBatchLessons + '건 이하입니다' }, 400, origin);
   }
 
   const taskOrigin = auth.role === 'manager' ? 'manager' : 'admin';
   const serverNow = Date.now();
   const planned = [];
   const seenTaskIds = new Set();
+  const seenStudentIds = new Set();
   const activeStaffIds = new Map();
   let sharedStudentId = '';
+  let sharedTemplateKey = '';
 
   for (let index = 0; index < requested.length; index += 1) {
     const item = requested[index];
@@ -653,9 +661,39 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
     if (!task.studentId) {
       return json({ ok: false, error: (index + 1) + '번째 수업의 원생을 studentId로 선택해 주세요' }, 400, origin);
     }
-    if (!sharedStudentId) sharedStudentId = task.studentId;
-    if (task.studentId !== sharedStudentId) {
-      return json({ ok: false, error: '한 번의 일괄 등록에는 같은 학생의 수업만 넣을 수 있습니다' }, 400, origin);
+    if (batchKind === 'students') {
+      if (seenStudentIds.has(task.studentId)) {
+        return json({ ok: false, error: '같은 학생이 수업 일괄 등록 안에 중복되어 있습니다' }, 409, origin);
+      }
+      seenStudentIds.add(task.studentId);
+      const templateKey = JSON.stringify({
+        staffId: task.staffId,
+        subject: task.subject,
+        className: task.className,
+        lessonRole: task.lessonRole,
+        lessonHours: task.lessonHours,
+        scheduleText: task.scheduleText,
+        scheduleSlots: task.scheduleSlots,
+        scheduleStatus: task.scheduleStatus,
+        materials: task.materials,
+        onlineProgram: task.onlineProgram,
+        homework: task.homework,
+        studentTraits: task.studentTraits,
+        goal: task.goal,
+        parentRequest: task.parentRequest,
+        adminRequest: task.adminRequest,
+        start: task.start,
+        end: task.end
+      });
+      if (!sharedTemplateKey) sharedTemplateKey = templateKey;
+      if (templateKey !== sharedTemplateKey) {
+        return json({ ok: false, error: '여러 학생 일괄 등록에는 담당자·과목·요일·시간·시수가 같은 수업만 넣을 수 있습니다' }, 400, origin);
+      }
+    } else {
+      if (!sharedStudentId) sharedStudentId = task.studentId;
+      if (task.studentId !== sharedStudentId) {
+        return json({ ok: false, error: '한 번의 일괄 등록에는 같은 학생의 수업만 넣을 수 있습니다' }, 400, origin);
+      }
     }
     const studentAccess = await validateLessonStudentAccess(env, app, task, auth);
     if (studentAccess) {
@@ -705,6 +743,7 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
 
   return json({
     ok: true,
+    batchKind,
     tasks: planned.map(item => item.task),
     createdCount: created.length,
     duplicateCount: planned.length - created.length,

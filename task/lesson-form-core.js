@@ -9,7 +9,7 @@
   const RANGE_RE = /((?:[01]?\d|2[0-3]):[0-5]\d)\s*(?:-|–|—|−|~|～)\s*((?:[01]?\d|2[0-3]):[0-5]\d)/g;
   const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
-  const LESSON_HOURS = ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T'];
+  const LESSON_HOURS = ['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T'];
   const DAY_BY_KO = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
   const DAY_BY_EN = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
   const REQUIRED_FIELDS = [
@@ -324,7 +324,7 @@
       errors.push({ field: 'studentId', message: '학생 식별자를 확인해 주세요' });
     }
     if (input.lessonHours && !LESSON_HOURS.includes(input.lessonHours)) {
-      errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 3T, 4T, 5T, 6T 중에서 선택해 주세요' });
+      errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 2.5T, 3T, 3.5T, 4T, 4.5T, 5T, 6T 중에서 선택해 주세요' });
     }
     const schedule = resolveSchedule(input);
     if (input.scheduleSlots.length && schedule.issues.some(issue => issue.code === 'invalid_slot')) {

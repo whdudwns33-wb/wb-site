@@ -120,8 +120,8 @@ test('direct lesson registration puts lesson hours inside every confirmed-time r
   assert.doesNotMatch(view, /data-lesson-field="lessonHours"/);
   assert.match(html, /data-lesson-slot="lessonHours"/);
   assert.doesNotMatch(view, /<div class="sect">[5-9]\./);
-  assert.match(view, /학생을 한 번 선택하고 과목·담당·시간표가 다른 수업을 여러 건 일괄 등록/);
-  assert.match(view, /batchMode \? lessonBatchRegistrationHtml\(\) : lessonSubjectSelectionHtml\(\) \+ staffSelect/);
+  assert.match(view, /학생 1명의 여러 수업 또는 한 개 수업의 여러 학생을 선택해 일괄 등록/);
+  assert.match(view, /studentBatchMode \? lessonStudentBatchRegistrationHtml\(\) : studentFields/);
   assert.match(view, /lesson-direct-entry"' \+ \(lessonDirectEntryOpen \? ' open' : ''\) \+ '><summary><span><b>수업 등록<\/b>/);
   assert.match(view, /lesson-existing-change"' \+ \(lessonExistingChangeOpen \|\| editing \? ' open' : ''\) \+ '><summary><span><b>기존 수업 변경<\/b>/);
   assert.match(view, /registration[\s\S]*lessonAssignmentReviewHtml\(\)/);
@@ -130,7 +130,7 @@ test('direct lesson registration puts lesson hours inside every confirmed-time r
 });
 
 test('all lesson registration paths use per-time lesson hours and Monday-first weekday controls', () => {
-  for (const option of ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']) {
+  for (const option of ['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T']) {
     assert.match(html, new RegExp(`['"]${option.replace('.', '\\.')}['"]`), option);
   }
   assert.match(html, /data-lesson-slot="lessonHours"/);
@@ -226,6 +226,35 @@ test('admin can compose multiple independent lessons for one student and submit 
   assert.ok(save.indexOf("sync.post('/roster'") < save.indexOf("sync.post('/lesson-create-batch'"));
   assert.match(save, /result\.tasks\.forEach\(applyCreatedLesson\)/);
   assert.match(save, /수업 ' \+ result\.createdCount \+ '건을 한 번에 등록했습니다/);
+});
+
+test('admin can select multiple stable students and register one shared lesson in a batch', () => {
+  const batchStart = html.indexOf('function lessonRegistrationModeHtml(');
+  const batchEnd = html.indexOf('function lessonExistingSearchKey(', batchStart);
+  const view = html.slice(batchStart, batchEnd);
+  assert.match(view, /data-act="lessonregistrationmode" data-mode="students"/);
+  assert.match(view, /수업 일괄 등록 · 여러 학생/);
+  assert.match(view, /data-lesson-bulk-search/);
+  assert.match(view, /data-lesson-bulk-student value=/);
+  assert.match(view, /rosterStudentIdentityLabel\(student\)/);
+  assert.match(view, /한 번에 최대 50명/);
+  assert.match(view, /data-act="lessonbulkselectvisible"/);
+  assert.match(view, /data-act="lessonbulkclear"/);
+  assert.match(view, /\(draft\.scheduleSlots \|\| \[\]\)\.map\(lessonSlotHtml\)/);
+
+  const previewStart = html.indexOf('function previewLessonStudentBatchRegistration(');
+  const previewEnd = html.indexOf('function previewLessonBatchRegistration(', previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  assert.match(preview, /new Set\(\(draft\.bulkStudentIds \|\| \[\]\)\.map\(String\)\)/);
+  assert.match(preview, /lessonStudentBatchRosterPayload\(student, draft\)/);
+  assert.match(preview, /lessonBatchInputPayload\(draft, student\)/);
+  assert.match(preview, /선택 ' \+ studentNames\.length \+ '명에게 수업 일괄 등록/);
+
+  const saveStart = html.indexOf('async function saveLessonBatchRegistration(');
+  const saveEnd = html.indexOf('let feedbackQueue', saveStart);
+  const save = html.slice(saveStart, saveEnd);
+  assert.match(save, /batchKind: lessonPreviewRosterStudents\.length \? 'students' : 'lessons'/);
+  assert.match(save, /for \(const rosterStudent of rosterCandidates\)/);
 });
 
 test('lesson registration interactions update only the form panel and preserve its open state', () => {
