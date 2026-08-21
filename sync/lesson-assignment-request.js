@@ -4,7 +4,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_NAME = 40;
 const MAX_GRADE = 20;
 const MAX_NOTE = 500;
-const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '3T', '4T', '5T', '6T']);
+const LESSON_HOURS = new Set(['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T']);
 const SUBJECT_OPTIONS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);

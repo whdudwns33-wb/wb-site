@@ -22,7 +22,7 @@ function scheduleDisplayCore() {
   return new Function('DOW_DISPLAY_RANK', 'LESSON_HOURS', 'DOW',
     `${source}\nreturn { groupedScheduleSlotsForDisplay, lessonScheduleSlotLabel };`)(
       { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 },
-      ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T'],
+      ['1T', '1.5T', '2T', '2.5T', '3T', '3.5T', '4T', '4.5T', '5T', '6T'],
       ['일', '월', '화', '수', '목', '금', '토']
     );
 }
