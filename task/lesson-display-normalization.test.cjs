@@ -17,6 +17,16 @@ function displayCore() {
   return new Function(`${source}\nreturn { LESSON_OPERATIONAL_STEP_LABELS, taskSteps, lessonReferenceSteps, taskCardDetail };`)();
 }
 
+function scheduleDisplayCore() {
+  const source = block('function daysForDisplay(days)', 'const initials =');
+  return new Function('DOW_DISPLAY_RANK', 'LESSON_HOURS', 'DOW',
+    `${source}\nreturn { groupedScheduleSlotsForDisplay, lessonScheduleSlotLabel };`)(
+      { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 },
+      ['1T', '1.5T', '2T', '3T', '4T', '5T', '6T'],
+      ['일', '월', '화', '수', '목', '금', '토']
+    );
+}
+
 function titleDisplayCore() {
   const source = block('/** 제목 말머리는 데이터 판별용으로 보존하고 화면에서만 감춘다. */', '/* ── 인터뷰형 코멘트 생성 ──');
   return new Function(`let rosterDb = null;\n${source}\nreturn {
@@ -58,16 +68,34 @@ test('already standard lessons preserve their stored IDs and do not duplicate re
   assert.deepEqual(core.lessonReferenceSteps(lesson), []);
 });
 
-test('structured lesson cards derive a short summary instead of repeating the nine-field intake', () => {
+test('structured lesson cards omit title and schedule duplicates from the second line', () => {
   const core = displayCore();
   const detail = core.taskCardDetail({
     title: '[수업] 학생 — 영어', taskKind: 'lesson_instruction', grade: '중1', subject: '영어',
     className: '블렌디드', scheduleText: '월·수·금 18:00-20:00', onlineProgram: '클래스카드',
     detail: '1. 이름 / 학년: 학생 / 중1\n2. 과목·반: 블렌디드\n3. 아주 긴 이전 입력'
   });
-  assert.equal(detail, '중1 · 영어 · 블렌디드 · 월·수·금 18:00-20:00 · 클래스카드');
+  assert.equal(detail, '클래스카드');
+  assert.doesNotMatch(detail, /중1|영어|블렌디드|월·수·금|18:00/);
   assert.doesNotMatch(detail, /1\. 이름/);
   assert.ok(detail.length <= 160);
+  assert.equal(core.taskCardDetail({ taskKind: 'lesson_instruction', detail: '기존 입력', onlineProgram: '없음' }), '');
+});
+
+test('lesson metadata groups equal time and hours while separating different schedules', () => {
+  const core = scheduleDisplayCore();
+  const grouped = core.groupedScheduleSlotsForDisplay([
+    { days: [3], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+    { days: [1], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+    { days: [5], startTime: '20:00', endTime: '20:50', lessonHours: '1T' }
+  ]);
+  assert.deepEqual(grouped, [
+    { days: [1, 3], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+    { days: [5], startTime: '20:00', endTime: '20:50', lessonHours: '1T' }
+  ]);
+  assert.deepEqual(grouped.map(core.lessonScheduleSlotLabel), [
+    '월·수 18:00–19:50 · 2T', '금 20:00–20:50 · 1T'
+  ]);
 });
 
 test('lesson and order prefixes stay in stored data but are hidden from display titles', () => {

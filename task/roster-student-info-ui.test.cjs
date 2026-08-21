@@ -176,7 +176,7 @@ test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 
 test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업을 확인하고 수정할 수 있다', () => {
   const code = block('function rosterStudentLessonTasks(', 'function rosterStudentInfoHtml(');
   const tasks = [
-    { id: 'lesson-math', studentId: 'student-safe', subject: '수학', lessonHours: '2T', staffId: 'teacher-a', scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:50' }], start: '2026-08-21', lessonFormVersion: 1 },
+    { id: 'lesson-math', studentId: 'student-safe', subject: '수학', staffId: 'teacher-a', scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:50', lessonHours: '2T' }], start: '2026-08-21', lessonFormVersion: 1 },
     { id: 'lesson-eng', studentId: 'student-safe', subject: '영어', staffId: 'teacher-b', scheduleText: '금 19:00-19:50', lessonFormVersion: 1 },
     { id: 'lesson-deleted', studentId: 'student-safe', subject: '국어', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
     { id: 'lesson-other', studentId: 'student-other', subject: '과학', staffId: 'teacher-a', lessonFormVersion: 1 },
@@ -186,7 +186,7 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   const helpers = new Function('state', 'isLesson', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
       { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null,
-      slots => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime).join(' / '),
+      (slots, fallback) => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + (slot.lessonHours || fallback || '')).join(' / '),
       value => value || '', task => !!task.lessonFormVersion, escapeHtml
     );
   assert.deepEqual(helpers.rosterStudentLessonTasks('student-safe').map(task => task.id), ['lesson-math', 'lesson-eng']);
