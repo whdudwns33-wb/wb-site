@@ -357,23 +357,28 @@ test('admin directly moves a student to leave and returns them with a newly assi
   const returned = await call(db, {
     auth: admin, action: 'student_transition', expectedUpdatedAt: leave.body.updatedAt,
     studentId: 'student-a', operation: 'return', effectiveDate: '2026-08-25', staffId: 'teacher-b',
-    subjects: ['수학'], lessonHours: '1.5T', scheduleSlots: [{ days: [1, 3], startTime: '16:00', endTime: '17:00' }]
+    subjects: ['수학'], scheduleSlots: [
+      { days: [1, 3], startTime: '16:00', endTime: '17:00', lessonHours: '1.5T' },
+      { days: [5], startTime: '18:00', endTime: '18:50', lessonHours: '1T' }
+    ]
   });
   assert.equal(returned.status, 200);
   assert.equal(returned.body.student.end, '');
   assert.equal(returned.body.student.reason, '');
   assert.equal(returned.body.student.teacher, '나선생');
   assert.equal(returned.body.task.staffId, 'teacher-b');
-  assert.equal(returned.body.task.lessonHours, '1.5T');
+  assert.equal(returned.body.task.lessonHours, '');
+  assert.deepEqual(returned.body.task.scheduleSlots.map(slot => slot.lessonHours), ['1.5T', '1T']);
   assert.equal(returned.body.task.deleted, false);
-  assert.deepEqual(returned.body.task.days, [1, 3]);
+  assert.deepEqual(returned.body.task.days, [1, 3, 5]);
   const activeTask = db.prepare("SELECT owner,data FROM tasks WHERE app='task' AND id=?").bind(returned.body.task.id).first();
   assert.equal(activeTask.owner, 'teacher-b');
   assert.equal(JSON.parse(activeTask.data).studentId, 'student-a');
   const returnEvent = db.prepare("SELECT event_type,details FROM student_change_events WHERE app='task' AND student_id='student-a' ORDER BY changed_at DESC LIMIT 1").first();
   assert.equal(returnEvent.event_type, 'student_information');
   assert.equal(JSON.parse(returnEvent.details).operation, 'return');
-  assert.equal(JSON.parse(returnEvent.details).lessonHours, '1.5T');
+  assert.equal(JSON.parse(returnEvent.details).lessonHours, '');
+  assert.equal(JSON.parse(returnEvent.details).scheduleText, '월·수 16:00-17:00 · 1.5T / 금 18:00-18:50 · 1T');
   const teacherView = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
   assert.deepEqual(teacherView.body.roster.students.map(student => student.id), ['student-a', 'student-b', 'student-shared']);
 });

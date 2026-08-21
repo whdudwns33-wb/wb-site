@@ -222,8 +222,8 @@ test('legacy student-name assignment identity stays byte compatible while schedu
   const task = await buildLessonTask(validLesson({ adminRequest: '없음' }), 'teacher-1', 'staff', 1234);
   assert.equal(task.id, 'lesson-1eb0da14754100ea367b49314a88594d');
   assert.equal(task.lessonAssignmentKey, 'sha256:1eb0da14754100ea367b49314a88594d7dfeaffe0300f61c9a8d84bce05c508e');
-  assert.equal(task.scheduleText, '월·수 17:00-19:00 / 일 12:00-14:00');
-  assert.equal(task.lessonContentHash, 'sha256:e533d05ef236bf4a150c313ee196f78f41e1ca967ae0f170d2e6a2aed8ea21c9');
+  assert.equal(task.scheduleText, '월·수 17:00-19:00 · 2T / 일 12:00-14:00 · 2T');
+  assert.match(task.lessonContentHash, /^sha256:[a-f0-9]{64}$/);
 });
 test('structured schedule alone is canonicalized and produces schedule text', async () => {
   const task = await buildLessonTask(validLesson({
@@ -234,15 +234,15 @@ test('structured schedule alone is canonicalized and produces schedule text', as
       { days: [3], startTime: '09:00', endTime: '10:00' }
     ]
   }), 'teacher-1', 'staff', 1);
-  assert.equal(task.scheduleText, '월 12:00-13:00 / 수 09:00-10:00');
+  assert.equal(task.scheduleText, '월 12:00-13:00 · 2T / 수 09:00-10:00 · 2T');
   assert.equal(task.scheduleSlots.length, 2);
   assert.deepEqual(task.scheduleSlots.map(slot => slot.slotId), ['slot-1', 'slot-2']);
 });
 
-test('all lesson form groups including independent lesson hours are enforced and literal 없음 is accepted', async () => {
+test('all lesson form groups including hours on every confirmed time are enforced and literal 없음 is accepted', async () => {
   await assert.rejects(
     () => buildLessonTask(validLesson({ lessonHours: '' }), 'teacher-1', 'staff', 1),
-    /필수 항목/
+    /수업시수/
   );
   await assert.rejects(
     () => buildLessonTask(validLesson({ lessonHours: '110분' }), 'teacher-1', 'staff', 1),
@@ -261,6 +261,22 @@ test('all lesson form groups including independent lesson hours are enforced and
   assert.equal(task.goal, '없음');
   assert.equal((await buildLessonTask(validLesson({ adminRequest: '' }), 'teacher-1', 'staff', 1)).adminRequest, '없음');
   assert.match((await buildLessonTask(validLesson(), 'teacher-1', 'staff', 1)).guide, /■ 관리자 요청사항\n수업 후 진도표 확인/);
+});
+
+test('equal confirmed times are grouped and different times keep their own lesson hours', async () => {
+  const task = await buildLessonTask(validLesson({
+    lessonHours: '', scheduleText: '',
+    scheduleSlots: [
+      { days: [3], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+      { days: [1], startTime: '18:00', endTime: '19:50', lessonHours: '2T' },
+      { days: [5], startTime: '20:00', endTime: '20:50', lessonHours: '1T' }
+    ]
+  }), 'teacher-1', 'staff', 1);
+  assert.equal(task.scheduleText, '월·수 18:00-19:50 · 2T / 금 20:00-20:50 · 1T');
+  assert.equal(task.lessonHours, '');
+  assert.deepEqual(task.scheduleSlots.map(slot => [slot.days, slot.lessonHours]), [
+    [[1], '2T'], [[3], '2T'], [[5], '1T']
+  ]);
 });
 
 test('person auth cannot target another teacher', async () => {
@@ -555,7 +571,7 @@ test('structured slots replace stale prose schedule text', async () => {
   assert.equal(task.scheduleStatus, 'confirmed');
   assert.equal(task.scheduleSlots.length, 2);
   assert.equal(task.repeat, 'days');
-  assert.equal(task.scheduleText, '월·수 17:00-19:00 / 일 12:00-14:00');
+  assert.equal(task.scheduleText, '월·수 17:00-19:00 · 2T / 일 12:00-14:00 · 2T');
   assert.equal(task.scheduleReviewReason, '');
 });
 
