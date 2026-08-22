@@ -94,6 +94,23 @@ test('sync keeps all local changes, exposes retry, and does not erase active for
     '명시적 화면 전환·저장 렌더에서만 보류 상태를 해소한다');
 });
 
+test('student links refresh expired tokens only after a successful sync', () => {
+  const helpers = between('async function ensureTokens(ids) {', '\n\nfunction orderText');
+  assert.match(helpers, /await sync\.run\(\)/);
+  assert.match(helpers, /if \(sync\.err\) throw/);
+  assert.match(helpers, /Promise\.all\(list\.map\(s => sync\.issueToken\(s\.id\)\)\)/);
+  assert.doesNotMatch(helpers, /if \(s\.token\) return/,
+    '저장된 토큰은 만료·해제됐을 수 있으므로 새 링크에 재사용하지 않는다');
+  const allLinks = between("    case 'alllinks':", "    case 'adminlink':");
+  assert.match(allLinks, /ensureTokens\(list\.map\(s => s\.id\)\)/);
+  assert.doesNotMatch(allLinks, /catch\(\(\) => null\)/,
+    '일부 발급 실패를 숨긴 채 토큰 없는 링크를 복사하지 않는다');
+  const textLinks = between("    case 'orderText':", "    case 'dailycloseopen':");
+  assert.match(textLinks, /ensureToken\(id\)/);
+  assert.match(html, /setTimeout\(\(\) => ensureToken\(t\.staffId\)/,
+    '안내 문자에도 발급이 확인된 학생 링크만 넣는다');
+});
+
 test('backup export is fail-closed for student links', () => {
   const exportCase = between("    case 'export':", "    case 'import':");
   const guard = exportCase.indexOf('if (!session.isAdmin || session.isStaffLink)');
