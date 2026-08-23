@@ -129,7 +129,7 @@ test('schema and routing are additive, consult-only, scope-versioned, and indepe
     assert.match(sql, /trg_consult_guardian_report_no_delete/);
     assert.doesNotMatch(sql, /DROP\s+TABLE|DELETE\s+FROM/i);
   }
-  assert.match(source, /CONSULT_GUARDIAN_SCOPE_VERSION = 1/);
+  assert.match(source, /CONSULT_GUARDIAN_SCOPE_VERSION = 2/);
   assert.match(source, /__Host-wb_consult_guardian/);
   assert.match(coreSource, /handleConsultGuardian/);
   assert.match(coreSource, /url\.pathname === '\/consult-guardian'/);

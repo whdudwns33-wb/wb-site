@@ -744,6 +744,12 @@
   .guardian-report { padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
   .guardian-report:last-child { border-bottom: 0; }
   .guardian-invite { padding: 12px; margin-top: 10px; border: 1px solid #A9D8BC; border-radius: 12px; background: #F4FBF6; }
+  .result-upload { border-color: #D8D1EA; background: linear-gradient(145deg, #F7F3FF, #fff 72%); }
+  .result-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .result-item { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+  .result-subject { display: inline-block; margin-bottom: 7px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; }
+  .result-subject.english { color: #8B3D67; background: #FCE8F2; }
+  .result-subject.math { color: #237052; background: #E6F6ED; }
 
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
@@ -899,6 +905,7 @@
     .study-review-offer { grid-template-columns: auto minmax(0, 1fr); }
     .study-review-offer > :last-child { grid-column: 1 / -1; width: 100%; }
     .guardian-status { grid-template-columns: 1fr; }
+    .result-list { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
   }
@@ -1876,7 +1883,7 @@ function render() {
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
 }
 
@@ -1887,7 +1894,7 @@ function renderTabs() {
         ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
         : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -7093,17 +7100,149 @@ function staffCard(s) {
     '</div></div>';
 }
 
+/* ── 영어·수학 PDF 결과지 ── */
+const resultSheetUi = { owner: '', items: [], loaded: false, loading: false, error: '', seq: 0 };
+
+async function resultSheetPost(body) {
+  const auth = sync.auth();
+  if (!auth) throw new Error('로그인과 동기화 연결이 필요합니다');
+  return await sync.post('/consult-result', Object.assign({ app: SYNC_APP, auth: auth }, body));
+}
+
+async function loadResultSheets(owner, force) {
+  if (!owner || (resultSheetUi.loading && resultSheetUi.owner === owner)) return;
+  if (!force && resultSheetUi.loaded && resultSheetUi.owner === owner) return;
+  const seq = ++resultSheetUi.seq;
+  Object.assign(resultSheetUi, { owner: owner, loading: true, error: '' });
+  try {
+    const data = await resultSheetPost({ action: 'list', staffId: owner });
+    if (seq !== resultSheetUi.seq || owner !== resultSheetUi.owner) return;
+    resultSheetUi.items = Array.isArray(data.results) ? data.results : [];
+    resultSheetUi.loaded = true;
+  } catch (error) {
+    if (seq === resultSheetUi.seq && owner === resultSheetUi.owner) {
+      resultSheetUi.items = []; resultSheetUi.loaded = true;
+      resultSheetUi.error = String(error && error.message || error);
+    }
+  } finally {
+    if (seq !== resultSheetUi.seq) return;
+    resultSheetUi.loading = false;
+    if (route === 'results') renderAfterSync();
+  }
+}
+
+function ensureResultSheets(owner) {
+  if (resultSheetUi.owner !== owner) {
+    resultSheetUi.seq++;
+    Object.assign(resultSheetUi, { owner: owner, items: [], loaded: false, loading: false, error: '' });
+  }
+  if (!resultSheetUi.loaded && !resultSheetUi.loading) setTimeout(() => loadResultSheets(owner, false), 0);
+}
+
+function resultSheetCard(item) {
+  const subject = item.subject === 'math' ? 'math' : 'english';
+  const labelText = subject === 'math' ? '수학' : '영어';
+  const size = Number(item.mediaBytes) > 1024 * 1024
+    ? (Number(item.mediaBytes) / 1024 / 1024).toFixed(1) + 'MB' : Math.max(1, Math.ceil(Number(item.mediaBytes) / 1024)) + 'KB';
+  return '<div class="result-item"><span class="result-subject ' + subject + '">' + labelText + '</span>' +
+    '<div class="card-title">' + esc(item.title || labelText + ' 결과지') + '</div>' +
+    '<div class="small muted mt8">' + esc(item.resultDate || '') + ' · PDF ' + esc(size) + '</div>' +
+    '<div class="row wraprow mt14" style="gap:7px"><button class="btn btn-sm btn-primary" data-act="resultview" data-id="' + esc(item.id) + '">PDF 보기</button>' +
+      '<button class="btn btn-sm btn-danger" data-act="resultarchive" data-id="' + esc(item.id) + '" data-v="' + Number(item.revision || 1) + '">잘못 올린 파일 보관</button></div></div>';
+}
+
+function viewResults() {
+  if (!session.isAdmin || session.isStaffLink) return '';
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  ensureResultSheets(me.id);
+  const ready = resultSheetUi.owner === me.id && resultSheetUi.loaded;
+  const items = ready ? resultSheetUi.items : [];
+  let h = staffSwitcher(me.id);
+  h += '<div class="card result-upload"><div class="between"><div><div class="card-title">📄 영어·수학 결과지</div>' +
+    '<div class="card-sub">' + esc(me.name) + ' 학생의 PDF를 올리면 보호자는 읽기 전용으로 확인합니다.</div></div><span class="pill">비공개</span></div>' +
+    '<div class="grid2 mt14"><div class="field"><label class="fl">과목</label><select class="in" id="resultSubject"><option value="english">영어</option><option value="math">수학</option></select></div>' +
+      '<div class="field"><label class="fl">결과 날짜</label><input class="in" id="resultDate" type="date" value="' + today() + '"></div></div>' +
+    '<div class="field"><label class="fl">결과지 제목</label><input class="in" id="resultTitle" maxlength="200" placeholder="예: 8월 영어 월말평가"></div>' +
+    '<div class="field"><label class="fl">PDF 파일 · 최대 10MB</label><input class="in" id="resultFile" type="file" accept="application/pdf,.pdf"></div>' +
+    '<button class="btn btn-primary btn-block mt14" data-act="resultupload" data-id="' + esc(me.id) + '">보호자 결과지로 올리기</button>' +
+    '<div class="submission-privacy mt14">🔒 파일은 공개 주소나 기기 저장소에 남기지 않습니다. 원장과 공유 동의를 마친 보호자만 열 수 있습니다.</div></div>' +
+    '<div class="card"><div class="between"><div><div class="card-title">등록된 결과지</div><div class="card-sub">잘못 올린 파일은 보관 처리하면 보호자 화면에서 즉시 사라집니다.</div></div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="resultrefresh" data-id="' + esc(me.id) + '">새로고침</button></div>' +
+    (!ready ? '<div class="small muted mt14">결과지를 불러오는 중입니다…</div>' : resultSheetUi.error
+      ? '<div class="hint mt14">' + esc(resultSheetUi.error) + '</div>'
+      : items.length ? '<div class="result-list">' + items.map(resultSheetCard).join('') + '</div>'
+      : '<div class="empty"><b>📄</b>아직 등록한 결과지가 없습니다.</div>') + '</div>';
+  return h;
+}
+
+async function uploadResultSheet(staffId, button) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const auth = sync.auth(); if (!auth) return toast('로그인과 동기화 연결이 필요합니다');
+  const subject = ($('#resultSubject') && $('#resultSubject').value) || '';
+  const resultDate = ($('#resultDate') && $('#resultDate').value) || '';
+  const title = ($('#resultTitle') && $('#resultTitle').value || '').trim();
+  const fileInput = $('#resultFile'), file = fileInput && fileInput.files && fileInput.files[0];
+  if (!['english', 'math'].includes(subject)) return toast('영어 또는 수학을 선택해 주세요');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(resultDate)) return toast('결과 날짜를 선택해 주세요');
+  if (!title) return toast('결과지 제목을 입력해 주세요');
+  if (!file || !/\.pdf$/i.test(file.name || '')) return toast('PDF 파일을 선택해 주세요');
+  if (file.size > 10 * 1024 * 1024) return toast('PDF는 10MB 이하로 올려 주세요');
+  button.disabled = true; button.textContent = 'PDF 올리는 중…';
+  try {
+    const form = new FormData();
+    form.set('app', SYNC_APP); form.set('auth', JSON.stringify(auth)); form.set('staffId', staffId);
+    form.set('subject', subject); form.set('resultDate', resultDate); form.set('title', title); form.set('file', file);
+    const response = await fetch(SYNC_URL + '/consult-result-upload', { method: 'POST', body: form });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || data.ok !== true) throw new Error((data && data.error) || ('HTTP ' + response.status));
+    await loadResultSheets(staffId, true); render(); toast('보호자 결과지를 등록했습니다');
+  } catch (error) {
+    toast('결과지 등록 실패 — ' + String(error && error.message || error));
+    button.disabled = false; button.textContent = '보호자 결과지로 올리기';
+  }
+}
+
+async function showResultSheet(id) {
+  const auth = sync.auth(); if (!auth) return toast('로그인이 필요합니다');
+  const popup = window.open('', '_blank');
+  if (popup) popup.document.write('<p style="font-family:sans-serif;padding:20px">PDF를 불러오는 중입니다…</p>');
+  try {
+    const response = await fetch(SYNC_URL + '/consult-result', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app: SYNC_APP, auth: auth, action: 'read_media', id: id })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null); throw new Error((data && data.error) || ('HTTP ' + response.status));
+    }
+    const url = URL.createObjectURL(await response.blob());
+    if (popup) popup.location.replace(url); else location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+  } catch (error) {
+    if (popup) popup.close();
+    toast('PDF를 열 수 없습니다 — ' + String(error && error.message || error));
+  }
+}
+
+async function archiveResultSheet(id, revision) {
+  if (!session.isAdmin || !confirm('잘못 올린 결과지를 보관할까요? 보호자 화면에서 즉시 사라집니다.')) return;
+  try {
+    await resultSheetPost({ action: 'archive', id: id, revision: revision });
+    await loadResultSheets(resultSheetUi.owner, true); render(); toast('결과지를 보관했습니다');
+  } catch (error) { toast('결과지를 보관하지 못했습니다 — ' + String(error && error.message || error)); }
+}
+
 /* ── 보호자 읽기 전용 공유 ── */
 const guardianShareUi = {
   seq: 0, staffId: '', loading: false, busy: '', error: '', access: null,
-  student: null, reports: [], invite: null
+  student: null, reports: [], results: [], invite: null
 };
 
 function clearGuardianShareUi() {
   const seq = guardianShareUi.seq + 1;
   Object.assign(guardianShareUi, {
     seq: seq, staffId: '', loading: false, busy: '', error: '', access: null,
-    student: null, reports: [], invite: null
+    student: null, reports: [], results: [], invite: null
   });
 }
 
@@ -7158,6 +7297,13 @@ function guardianReportCard(report) {
       (Number.isFinite(Number(summary.studySecs)) ? ' · 공부 ' + esc(fmtDur(Number(summary.studySecs) || 0)) : '') + '</div>') + '</div>';
 }
 
+function guardianResultCard(result) {
+  const row = result && typeof result === 'object' ? result : {};
+  const subject = row.subject === 'math' ? 'math' : 'english';
+  return '<div class="guardian-report"><span class="result-subject ' + subject + '">' + (subject === 'math' ? '수학' : '영어') + '</span>' +
+    '<div><b>' + esc(row.title || '결과지') + '</b><div class="small muted">' + esc(row.resultDate || '') + ' · PDF 읽기 전용</div></div></div>';
+}
+
 function guardianShareModal() {
   if (!session.isAdmin || session.isStaffLink) return;
   const staff = staffById(guardianShareUi.staffId);
@@ -7166,7 +7312,8 @@ function guardianShareModal() {
   const enabled = access.enabled;
   const disabled = guardianShareUi.busy ? ' disabled' : '';
   const reports = Array.isArray(guardianShareUi.reports) ? guardianShareUi.reports.slice(0, 12) : [];
-  let body = '<div class="card-sub"><b>' + esc(staff.name) + '</b> 학생의 발행된 리포트만 보호자에게 읽기 전용으로 공유합니다.</div>' +
+  const results = Array.isArray(guardianShareUi.results) ? guardianShareUi.results.slice(0, 20) : [];
+  let body = '<div class="card-sub"><b>' + esc(staff.name) + '</b> 학생의 학습 리포트와 영·수 결과지를 보호자에게 읽기 전용으로 공유합니다.</div>' +
     '<div class="guardian-status"><div class="guardian-stat">공유 상태<b>' + (enabled ? '사용 중' : '사용 안 함') + '</b></div>' +
       '<div class="guardian-stat">연결된 기기<b>' + access.activeSessions + '대</b></div>' +
       '<div class="guardian-stat">최근 보호자 확인<b>' + esc(guardianDateTime(access.lastAckAt)) + '</b></div></div>';
@@ -7180,7 +7327,7 @@ function guardianShareModal() {
     if (guardianShareUi.busy) body += '<div class="hint mb8" role="status">요청을 안전하게 처리하는 중…</div>';
     if (!enabled) {
       body += '<label class="material-type-option"><input type="checkbox" id="guardianConsent">' +
-        '<span>보호자에게 학습 리포트를 공유하는 것에 보호자와 확인했습니다.</span></label>' +
+        '<span>보호자에게 학습 리포트와 영·수 결과지를 공유하는 것에 보호자와 확인했습니다.</span></label>' +
         '<button class="btn btn-primary btn-block mt14" data-act="guardianenable" data-id="' + esc(staff.id) + '"' + disabled + '>동의 확인 후 공유 켜기</button>';
     } else {
       body += '<div class="row wraprow" style="gap:7px"><button class="btn btn-primary" data-act="guardianinvite" data-id="' + esc(staff.id) + '"' + disabled + '>일회용 초대 링크 만들기</button>' +
@@ -7195,8 +7342,10 @@ function guardianShareModal() {
         '<button class="btn btn-navy btn-block mt14" data-act="guardiancopy" data-id="' + esc(staff.id) + '">링크 복사</button></div>';
     }
 
-    body += '<hr class="sep"><div class="between mb8"><div><b>보호자 화면 미리보기</b><div class="small muted">발행된 주간·월간 리포트만 표시됩니다.</div></div><span class="pill">' + reports.length + '건</span></div>' +
-      (reports.length ? reports.map(guardianReportCard).join('') : '<div class="small muted">보호자에게 공개할 발행 리포트가 없습니다.</div>');
+    body += '<hr class="sep"><div class="between mb8"><div><b>보호자 화면 미리보기</b><div class="small muted">발행 리포트와 등록한 영·수 결과지만 표시됩니다.</div></div><span class="pill">' + (reports.length + results.length) + '건</span></div>' +
+      (reports.length ? reports.map(guardianReportCard).join('') : '<div class="small muted">공개할 발행 리포트가 없습니다.</div>') +
+      '<div class="sect">영어·수학 결과지</div>' +
+      (results.length ? results.map(guardianResultCard).join('') : '<div class="small muted">등록된 결과지가 없습니다.</div>');
   }
 
   body += '<div class="submission-privacy mt14">🔒 보호자는 수정할 수 없습니다. 공유를 끄면 기존 보호자 접속도 즉시 종료됩니다.<br>' +
@@ -7211,7 +7360,7 @@ async function guardianOpen(staffId) {
   const seq = guardianShareUi.seq + 1;
   Object.assign(guardianShareUi, {
     seq: seq, staffId: staffId, loading: true, busy: '', error: '', access: null,
-    student: null, reports: [], invite: null
+    student: null, reports: [], results: [], invite: null
   });
   guardianShareModal();
   try {
@@ -7225,6 +7374,7 @@ async function guardianOpen(staffId) {
     guardianShareUi.access = guardianNormalizeAccess(found, staffId, false);
     guardianShareUi.student = result[1].student || null;
     guardianShareUi.reports = Array.isArray(result[1].reports) ? result[1].reports : [];
+    guardianShareUi.results = Array.isArray(result[1].results) ? result[1].results : [];
     guardianShareUi.loading = false;
     guardianShareModal();
   } catch (error) {
@@ -7295,6 +7445,7 @@ async function guardianRefreshPreview(staffId) {
     if (guardianShareUi.seq !== seq || guardianShareUi.staffId !== staffId) return;
     guardianShareUi.student = data.student || null;
     guardianShareUi.reports = Array.isArray(data.reports) ? data.reports : [];
+    guardianShareUi.results = Array.isArray(data.results) ? data.results : [];
     guardianShareUi.busy = '';
     guardianShareModal();
     toast('보호자 화면 미리보기를 새로고침했습니다');
@@ -9700,6 +9851,26 @@ document.addEventListener('click', ev => {
       ingLibraryFilter = 'active';
       render();
       break;
+    case 'resultupload': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      uploadResultSheet(id, el);
+      break;
+    }
+    case 'resultrefresh': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      loadResultSheets(id, true);
+      break;
+    }
+    case 'resultview': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      showResultSheet(id);
+      break;
+    }
+    case 'resultarchive': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      archiveResultSheet(id, Number(el.dataset.v));
+      break;
+    }
     case 'openstaff': viewStaff = id; go('today'); break;
     case 'addstaff': {
       const name = ($('#sName').value || '').trim();
@@ -10434,7 +10605,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-22.41';
+const APP_VER = '2026-08-23.42';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

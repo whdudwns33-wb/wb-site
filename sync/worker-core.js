@@ -75,6 +75,7 @@ import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
+import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1596,6 +1597,9 @@ export default {
     if (url.pathname === '/consult-submission-upload') {
       return await handleConsultSubmissionUpload(request, env, okOrigin, resolveAuth, json);
     }
+    if (url.pathname === '/consult-result-upload') {
+      return await handleConsultResultUpload(request, env, okOrigin, resolveAuth, json);
+    }
 
     let body;
     try { body = await request.json(); }
@@ -1634,6 +1638,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleConsultSubmission(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/consult-result') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleConsultResults(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-assignment-request') {
         const auth = await resolveAuth(env, app, body.auth);
