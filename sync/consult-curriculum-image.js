@@ -32,7 +32,7 @@ export function normalizeCurriculumImageText(value) {
     .slice(0, 60000);
 }
 
-async function isDirectorOrManager(env, auth) {
+export async function isConsultDirectorOrManager(env, auth) {
   if (auth.scope === 'all') return true;
   if (auth.scope !== 'own' || !auth.id) return false;
   const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
@@ -64,7 +64,7 @@ export async function handleConsultCurriculumImage(request, env, origin, resolve
   catch (error) { return json({ ok: false, error: '인증 정보를 읽을 수 없습니다' }, 400, origin); }
   const auth = await resolveAuth(env, 'consult', authBody);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
-  if (!await isDirectorOrManager(env, auth)) {
+  if (!await isConsultDirectorOrManager(env, auth)) {
     return json({ ok: false, error: '원장 또는 관리자만 목차 사진을 읽을 수 있습니다' }, 403, origin);
   }
   if (!env.AI || typeof env.AI.run !== 'function') {
@@ -100,7 +100,9 @@ export async function handleConsultCurriculumImage(request, env, origin, resolve
         max_tokens: 4096,
         stream: false
       });
-      const text = normalizeCurriculumImageText(result && result.answer);
+      const answer = result && typeof result.answer === 'string' ? result.answer
+        : result && result.result && typeof result.result.answer === 'string' ? result.result.answer : '';
+      const text = normalizeCurriculumImageText(answer);
       if (text) pages.push(text);
     }
   } catch (error) {

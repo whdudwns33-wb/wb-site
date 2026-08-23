@@ -42,6 +42,7 @@
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
+ *   POST /consult-curriculum-url { app:'consult', auth, url } → 공개 강좌 주소 목차 인식
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
@@ -77,7 +78,7 @@ import { handleContactLog } from './contact-log.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
-import { handleConsultCurriculumImage } from './consult-curriculum-image.js';
+import { handleConsultCurriculumImage, isConsultDirectorOrManager } from './consult-curriculum-image.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1478,7 +1479,17 @@ function publicUrlOrNull(raw) {
 
 /** 한국 강의 사이트는 아직 euc-kr을 쓰는 곳이 있어 인코딩을 판별해 읽는다 */
 async function fetchPage(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'ko,en;q=0.8' } });
+  let target = publicUrlOrNull(url), res;
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    res = await fetch(target, {
+      redirect: 'manual', headers: { 'User-Agent': UA, 'Accept-Language': 'ko,en;q=0.8' }
+    });
+    if (res.status < 300 || res.status >= 400) break;
+    const location = res.headers.get('location');
+    target = location && publicUrlOrNull(new URL(location, target).toString());
+    if (!target) throw new Error('안전하지 않은 이동 주소입니다');
+    if (redirects === 3) throw new Error('페이지 이동 횟수가 너무 많습니다');
+  }
   if (!res.ok) throw new Error('페이지를 가져오지 못했습니다 (HTTP ' + res.status + ')');
   const buf = await res.arrayBuffer();
   const dec = enc => { try { return new TextDecoder(enc).decode(buf); } catch (e) { return null; } };
@@ -1558,8 +1569,8 @@ async function handleSearch(env, app, body, origin) {
   return json({ ok: true, items: out.slice(0, 8) }, 200, origin);
 }
 
-async function handleCurriculum(env, app, body, origin) {
-  const auth = await resolveAuth(env, app, body.auth);
+async function handleCurriculum(env, app, body, origin, resolvedAuth) {
+  const auth = resolvedAuth || await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
   const url = publicUrlOrNull(body.url);
   if (!url) return json({ ok: false, error: '주소가 올바르지 않습니다' }, 400, origin);
@@ -1794,6 +1805,15 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleBookEditReview(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/consult-curriculum-url') {
+        if (app !== 'consult') return json({ ok: false, error: '컨설팅 앱에서만 사용할 수 있습니다' }, 400, okOrigin);
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        if (!await isConsultDirectorOrManager(env, auth)) {
+          return json({ ok: false, error: '원장 또는 관리자만 목차 주소를 읽을 수 있습니다' }, 403, okOrigin);
+        }
+        return await handleCurriculum(env, app, body, okOrigin, auth);
       }
       if (url.pathname === '/search') return await handleSearch(env, app, body, okOrigin);
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);

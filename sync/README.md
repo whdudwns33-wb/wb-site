@@ -129,6 +129,8 @@ D1 마이그레이션이나 R2 저장은 없으며, 브라우저에서 압축·�
 최대 6장만 받아 인식 결과 텍스트를 반환하고 사진은 보관하지 않는다. `/consult-curriculum-image`는
 consult 원장과 지정 관리자만 사용할 수 있고 `task` 요청은 거부한다. 이 기능 배포는 보호자·직원
 Worker를 먼저 배포한 뒤 consult Pages를 배포하며 학생 전용 Worker와 task Pages는 변경하지 않는다.
+로그인 없이 공개되는 강좌 상세 주소는 `/consult-curriculum-url`에서 목차를 가져오며, 로그인·자바스크립트가
+필요한 페이지는 서버가 읽을 수 없으므로 같은 등록 화면의 사진 가져오기를 사용한다.
 
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은

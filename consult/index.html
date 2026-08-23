@@ -3638,7 +3638,9 @@ function ingAddModal() {
       '<div class="hint">사이트 열기 → 로그인 → 강좌 상세의 강의목차 전체 복사 → 이 화면으로 돌아와 붙여넣기. ' +
         '아이디·비밀번호는 우리 앱에 저장하지 않습니다.</div></div>' +
     '<div class="fl mb8">③ 강좌 상세 주소 (선택)</div>' +
-    '<input class="in mb14" id="ingUrl" placeholder="https://... · 나중에 강좌를 다시 여는 용도">' +
+    '<div class="row wraprow mb8"><input class="in" id="ingUrl" style="flex:1;min-width:220px" placeholder="https://... · 공개 강좌 상세 주소">' +
+      '<button type="button" class="btn btn-sm btn-ghost" data-act="ingfetchurl">주소에서 목차 읽기</button></div>' +
+    '<div class="small muted mb14" id="ingUrlOut">로그인 없이 열리는 강좌 상세 주소에서 회차·제목·시간을 가져옵니다.</div>' +
     '<div class="grid2 mb14"><div><label class="fl mb8" for="ingTextbook">교재명 (선택)</label>' +
       '<input class="in" id="ingTextbook" maxlength="100" placeholder="예: 수학의 정석 기본편"></div>' +
       '<div><label class="fl mb8" for="ingMaterialUrl">강의 자료 주소 (선택)</label>' +
@@ -3704,6 +3706,40 @@ async function ingImportImages(button) {
   } catch (error) {
     if (requestId === ingImageSeq && status && status.isConnected) status.textContent = '읽기 실패 — 사진을 선명하게 찍거나 나누어 다시 선택해 주세요.';
     toast('목차 사진 읽기 실패 — ' + String(error && error.message || error));
+  } finally {
+    if (button.isConnected) { button.disabled = false; button.textContent = originalLabel; }
+  }
+}
+
+async function ingFetchCurriculumUrl(button) {
+  if (!(session.isAdmin || isManager())) return;
+  const urlInput = $('#ingUrl'), box = $('#ingText'), status = $('#ingUrlOut');
+  const sourceUrl = safeHttpsUrl(urlInput && urlInput.value);
+  if (!sourceUrl) return toast('https://로 시작하는 공개 강좌 상세 주소를 넣어주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('원장 또는 관리자 로그인이 필요합니다');
+  const initial = box.value;
+  if (initial.trim() && !confirm('현재 목차를 주소에서 읽은 내용으로 바꿀까요?')) return;
+
+  const originalLabel = button.textContent;
+  button.disabled = true; button.textContent = '주소 읽는 중…';
+  if (status) status.textContent = '강좌 상세 페이지에서 목차를 찾고 있습니다…';
+  try {
+    const data = await sync.post('/consult-curriculum-url', {
+      app: SYNC_APP, auth: auth, url: sourceUrl
+    });
+    if (!data.text) throw new Error(data.hint || '이 주소에서 강의 목차를 찾지 못했습니다');
+    if (!box.isConnected) return;
+    if (box.value !== initial && !confirm('주소를 읽는 동안 직접 수정한 내용이 있습니다. 가져온 목차로 바꿀까요?')) return;
+    const lectures = ingParse(data.text);
+    if (!lectures.length) throw new Error('강의 번호가 있는 목차를 찾지 못했습니다');
+    box.value = ingCourseText({ lectures: lectures });
+    ingPasteSeq++; ingShowParsePreview();
+    if (status) status.textContent = '✓ ' + lectures.length + '강을 읽었습니다. 아래에서 제목과 시간을 확인하세요.';
+    toast(lectures.length + '강을 가져왔습니다 — 틀린 내용만 고친 뒤 등록하세요');
+  } catch (error) {
+    if (status && status.isConnected) status.textContent = '가져오기 실패 — 로그인이 필요한 페이지라면 목차 사진을 사용해 주세요.';
+    toast('강좌 주소 읽기 실패 — ' + String(error && error.message || error));
   } finally {
     if (button.isConnected) { button.disabled = false; button.textContent = originalLabel; }
   }
@@ -8952,6 +8988,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'ingimage': ingImportImages(el); break;
+    case 'ingfetchurl': ingFetchCurriculumUrl(el); break;
     case 'ingpaste': {
       const box = $('#ingText');
       if (!box || !navigator.clipboard || !navigator.clipboard.readText) return toast('커리큘럼 칸을 길게 눌러 붙여넣어 주세요');
@@ -10662,7 +10699,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-23.43';
+const APP_VER = '2026-08-23.44';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
