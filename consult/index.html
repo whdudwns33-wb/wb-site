@@ -3625,24 +3625,30 @@ function ingAddModal() {
     '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
       ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
         '" data-act="ingpf" data-v="' + p + '">' + p + '</button>').join('') + '</div>' +
-    '<hr class="sep"><div class="panel mb14"><div class="fl mb8">① 공식 사이트에서 강좌 찾기</div>' +
+    '<hr class="sep"><div class="panel mb14"><div class="fl mb8">① 목차 사진으로 가져오기 <span class="tag edit">추천</span></div>' +
+      '<input class="in mb8" id="ingImages" type="file" accept="image/*" multiple>' +
+      '<div class="between wraprow"><div class="small muted" id="ingImageOut">스크린샷·사진을 순서대로 최대 6장 선택하세요.</div>' +
+        '<button type="button" class="btn btn-sm btn-primary" data-act="ingimage">사진에서 목차 읽기</button></div>' +
+      '<div class="hint mt14">사진은 전송 전에 작게 압축하고 위치정보를 제거합니다. 서버에 사진을 저장하지 않으며, ' +
+        '읽은 결과는 아래 목차 칸에서 고친 뒤 등록할 수 있습니다.</div></div>' +
+    '<div class="panel mb14"><div class="fl mb8">② 공식 사이트에서 강좌 찾기</div>' +
       '<div class="chips mb8">' + Object.keys(ING_PROVIDER_URLS).map(p =>
         '<a class="chip" href="' + esc(ING_PROVIDER_URLS[p]) + '" target="_blank" rel="noopener noreferrer"' +
           ' data-act="ingprovider" data-v="' + esc(p) + '">' + esc(p) + ' 열기 ↗</a>').join('') + '</div>' +
       '<div class="hint">사이트 열기 → 로그인 → 강좌 상세의 강의목차 전체 복사 → 이 화면으로 돌아와 붙여넣기. ' +
         '아이디·비밀번호는 우리 앱에 저장하지 않습니다.</div></div>' +
-    '<div class="fl mb8">② 강좌 상세 주소 (선택)</div>' +
+    '<div class="fl mb8">③ 강좌 상세 주소 (선택)</div>' +
     '<input class="in mb14" id="ingUrl" placeholder="https://... · 나중에 강좌를 다시 여는 용도">' +
     '<div class="grid2 mb14"><div><label class="fl mb8" for="ingTextbook">교재명 (선택)</label>' +
       '<input class="in" id="ingTextbook" maxlength="100" placeholder="예: 수학의 정석 기본편"></div>' +
       '<div><label class="fl mb8" for="ingMaterialUrl">강의 자료 주소 (선택)</label>' +
       '<input class="in" id="ingMaterialUrl" type="url" placeholder="https://..."></div></div>' +
-    '<div class="panel mb14"><div class="fl mb8">③ 목차 없이 빠른 생성</div>' +
+    '<div class="panel mb14"><div class="fl mb8">④ 목차 없이 빠른 생성</div>' +
       '<div class="grid2 mb8"><input class="in" id="ingQuickCount" type="number" min="1" max="999" placeholder="총 강의 수">' +
         '<input class="in" id="ingQuickMin" type="number" min="10" max="240" value="50" placeholder="평균 강의시간(분)"></div>' +
       '<button type="button" class="btn btn-sm btn-ghost" data-act="ingquick">1강부터 자동 생성</button>' +
       '<div class="hint mt14">생성된 강의명은 아래 칸에서 등록 전에 고칠 수 있습니다.</div></div>' +
-    '<div class="between mb8"><div class="fl">④ 목차 스마트 붙여넣기</div><div class="row" style="gap:6px">' +
+    '<div class="between mb8"><div class="fl">⑤ 목차 스마트 붙여넣기</div><div class="row" style="gap:6px">' +
       '<button type="button" class="btn btn-sm btn-ghost" data-act="ingpaste">클립보드 붙여넣기</button>' +
       '<button type="button" class="btn btn-sm btn-ghost" data-act="ingparsepreview">목차 확인</button></div></div>' +
     '<textarea class="in" id="ingText" rows="8" placeholder="1강 다항식의 덧셈과 뺄셈 52분&#10;2강 다항식의 곱셈 47분&#10;3강 곱셈 공식 (51:20)"></textarea>' +
@@ -3659,6 +3665,48 @@ function ingShowParsePreview() {
   box.textContent = parsed.length
     ? '✓ ' + parsed.length + '강 인식 · ' + parsed.slice(0, 3).map(x => x.seq + '강 ' + x.title).join(' / ')
     : '인식한 강의가 없습니다. 각 줄이 1강, 2강처럼 회차 번호로 시작하는지 확인해 주세요.';
+}
+
+let ingImageSeq = 0;
+async function ingImportImages(button) {
+  if (!(session.isAdmin || isManager())) return;
+  const input = $('#ingImages'), box = $('#ingText'), status = $('#ingImageOut');
+  const files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) return toast('목차 스크린샷이나 사진을 선택해 주세요');
+  if (files.length > 6) return toast('목차 사진은 한 번에 6장까지 선택할 수 있습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('원장 또는 관리자 로그인이 필요합니다');
+  const initial = box.value;
+  if (initial.trim() && !confirm('현재 목차를 사진에서 읽은 내용으로 바꿀까요?')) return;
+
+  const requestId = ++ingImageSeq, originalLabel = button.textContent;
+  button.disabled = true; button.textContent = '사진 준비 중…';
+  try {
+    const form = new FormData();
+    form.set('app', SYNC_APP); form.set('auth', JSON.stringify(auth));
+    for (let i = 0; i < files.length; i++) {
+      if (status) status.textContent = (i + 1) + '/' + files.length + '장 압축 중…';
+      form.append('files', await prepareSubmissionImage(files[i]), 'curriculum-' + (i + 1) + '.jpg');
+    }
+    button.textContent = '목차 읽는 중…';
+    if (status) status.textContent = files.length + '장 목차를 읽고 있습니다…';
+    const response = await fetch(SYNC_URL + '/consult-curriculum-image', { method: 'POST', body: form });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || data.ok !== true) throw new Error((data && data.error) || ('HTTP ' + response.status));
+    if (requestId !== ingImageSeq || !box.isConnected) return;
+    if (box.value !== initial && !confirm('목차를 읽는 동안 직접 수정한 내용이 있습니다. 사진 인식 결과로 바꿀까요?')) return;
+    const lectures = ingParse(data.text);
+    if (!lectures.length) throw new Error('강의 번호가 있는 목차를 찾지 못했습니다');
+    box.value = ingCourseText({ lectures: lectures });
+    ingPasteSeq++; ingShowParsePreview();
+    if (status) status.textContent = '✓ ' + files.length + '장에서 ' + lectures.length + '강을 읽었습니다. 아래에서 제목과 시간을 확인하세요.';
+    toast(lectures.length + '강을 읽었습니다 — 틀린 내용만 고친 뒤 등록하세요');
+  } catch (error) {
+    if (requestId === ingImageSeq && status && status.isConnected) status.textContent = '읽기 실패 — 사진을 선명하게 찍거나 나누어 다시 선택해 주세요.';
+    toast('목차 사진 읽기 실패 — ' + String(error && error.message || error));
+  } finally {
+    if (button.isConnected) { button.disabled = false; button.textContent = originalLabel; }
+  }
 }
 
 function ingQuickText(count, minutes, courseName) {
@@ -8903,6 +8951,7 @@ document.addEventListener('click', ev => {
       document.querySelectorAll('#ingPf .chip').forEach(c => c.classList.toggle('on', c.dataset.v === el.dataset.v));
       break;
     }
+    case 'ingimage': ingImportImages(el); break;
     case 'ingpaste': {
       const box = $('#ingText');
       if (!box || !navigator.clipboard || !navigator.clipboard.readText) return toast('커리큘럼 칸을 길게 눌러 붙여넣어 주세요');
@@ -10456,6 +10505,14 @@ document.addEventListener('click', ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'ingImages') {
+    const files = ev.target.files ? Array.from(ev.target.files) : [];
+    const out = $('#ingImageOut');
+    if (out) out.textContent = files.length
+      ? (files.length > 6 ? '사진은 최대 6장까지 선택할 수 있습니다.' : files.length + '장 선택됨 · 선택한 순서대로 읽습니다.')
+      : '스크린샷·사진을 순서대로 최대 6장 선택하세요.';
+    return;
+  }
   if (ev.target.id !== 'submissionFile') return;
   clearSubmissionPreview();
   const file = ev.target.files && ev.target.files[0];
@@ -10605,7 +10662,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-23.42';
+const APP_VER = '2026-08-23.43';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
