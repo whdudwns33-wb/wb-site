@@ -35,7 +35,7 @@ class FakeAI {
     this.calls.push({ model, input });
     const answer = this.answers.length ? this.answers.shift() : '';
     if (answer instanceof Error) throw answer;
-    return { answer };
+    return answer && typeof answer === 'object' ? answer : { answer };
   }
 }
 
@@ -71,6 +71,14 @@ async function upload(db, ai, {
   return { response, status: response.status, body: await response.clone().json().catch(() => null) };
 }
 
+async function jsonCall(db, ai, body, path = '/consult-curriculum-url') {
+  const response = await worker.fetch(new Request(WORKER_ORIGIN + path, {
+    method: 'POST', headers: { origin: ADMIN_ORIGIN, 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  }), env(db, ai));
+  return { response, status: response.status, body: await response.clone().json().catch(() => null) };
+}
+
 test('curriculum image route is consult-only multipart before JSON parsing with an AI binding', () => {
   const route = coreSource.indexOf("url.pathname === '/consult-curriculum-image'");
   assert.ok(route >= 0 && route < coreSource.indexOf('await request.json()'));
@@ -87,7 +95,7 @@ test('curriculum image route is consult-only multipart before JSON parsing with 
 test('director reads multiple images transiently and receives editable lecture lines', async () => {
   const db = new TestD1();
   const ai = new FakeAI([
-    '1강 다항식 52분\n2강 방정식 51:20',
+    { result: { answer: '1강 다항식 52분\n2강 방정식 51:20' } },
     '| 3강 | 부등식 | 00:47:30 |'
   ]);
   const result = await upload(db, ai, { files: [
@@ -141,4 +149,48 @@ test('image count, type, size, AI availability and empty recognition are bounded
   assert.equal(result.status, 422);
   result = await upload(db, null);
   assert.equal(result.status, 503);
+});
+
+test('admin device reads a public curriculum URL while student, task, and private addresses are blocked', async () => {
+  const db = new TestD1(), ai = new FakeAI();
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('consult', 'device-token', '__admin__', Date.now()).run();
+  seedPerson(db, 'student-a', 'student-token');
+  const auth = { mode: 'admin_device', token: 'device-token' };
+  const originalFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = async url => {
+    fetched++;
+    if (String(url) === 'https://example.com/redirect') {
+      return new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/private' } });
+    }
+    assert.equal(String(url), 'https://example.com/course');
+    return new Response('<table><tr><td>1강 다항식</td><td>52:30</td></tr>' +
+      '<tr><td>2강 방정식</td><td>47:10</td></tr></table>', {
+      status: 200, headers: { 'content-type': 'text/html;charset=utf-8' }
+    });
+  };
+  try {
+    let result = await jsonCall(db, ai, { app: 'consult', auth, url: 'https://example.com/course' });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.text, '1강 다항식 52:30\n2강 방정식 47:10');
+    assert.equal(fetched, 1);
+
+    result = await jsonCall(db, ai, {
+      app: 'consult', auth: { mode: 'person', id: 'student-a', token: 'student-token' },
+      url: 'https://example.com/course'
+    });
+    assert.equal(result.status, 403);
+    result = await jsonCall(db, ai, {
+      app: 'task', auth: { mode: 'admin', secret: 'task-secret' }, url: 'https://example.com/course'
+    });
+    assert.equal(result.status, 400);
+    result = await jsonCall(db, ai, { app: 'consult', auth, url: 'http://127.0.0.1/private' });
+    assert.equal(result.status, 400);
+    result = await jsonCall(db, ai, { app: 'consult', auth, url: 'https://example.com/redirect' });
+    assert.equal(result.status, 502);
+    assert.equal(fetched, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

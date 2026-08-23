@@ -541,6 +541,8 @@ test('five official course sites have safe direct links and smart-paste fallback
   assert.match(modal, /id="ingImages" type="file" accept="image\/\*" multiple/);
   assert.match(modal, /data-act="ingimage"/);
   assert.match(modal, /서버에 사진을 저장하지 않으며/);
+  assert.match(modal, /data-act="ingfetchurl"/);
+  assert.match(modal, /주소에서 목차 읽기/);
   assert.match(modal, /data-act="ingpaste"/);
   assert.doesNotMatch(modal, /iframe|type="password"|document\.cookie/i);
   assert.doesNotMatch(modal, /\/search|\/curriculum|data-act="ingfetch"|data-act="ingsearch"/);
@@ -549,6 +551,8 @@ test('five official course sites have safe direct links and smart-paste fallback
   assert.match(html, /form\.set\('app', SYNC_APP\)/);
   assert.match(html, /prepareSubmissionImage\(files\[i\]\)/);
   assert.match(html, /box\.value = ingCourseText\(\{ lectures: lectures \}\)/);
+  assert.match(html, /sync\.post\('\/consult-curriculum-url'/);
+  assert.match(html, /로그인이 필요한 페이지라면 목차 사진을 사용해 주세요/);
   assert.match(html, /sourceUrl: sourceUrl/);
   assert.match(html, /case 'ingprovider':[\s\S]*?c\.dataset\.v === el\.dataset\.v/);
   assert.match(html, /const SYNC_APP = 'consult'/);
