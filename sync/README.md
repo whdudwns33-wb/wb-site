@@ -124,6 +124,12 @@ custom domain을 사용하지 않는다. `consult/` 인증사진용 90일 lifecy
 `consult-results/`에 확대 적용하지 않는다. 결과지 공유 범위가 추가되므로 기존 보호자 공유는
 원장 화면에서 새 범위 동의를 다시 확인한 뒤 새 일회용 초대 링크를 발급한다.
 
+consult 인강 목차 사진 인식은 `wrangler.toml`의 Workers AI `AI` binding을 사용한다.
+D1 마이그레이션이나 R2 저장은 없으며, 브라우저에서 압축·메타데이터 제거한 사진을 한 번에
+최대 6장만 받아 인식 결과 텍스트를 반환하고 사진은 보관하지 않는다. `/consult-curriculum-image`는
+consult 원장과 지정 관리자만 사용할 수 있고 `task` 요청은 거부한다. 이 기능 배포는 보호자·직원
+Worker를 먼저 배포한 뒤 consult Pages를 배포하며 학생 전용 Worker와 task Pages는 변경하지 않는다.
+
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은
 저장소에 커밋하지 않는다. 운영 배포에 `deploy.ps1`을 다시 실행하면 관리자 비밀키가 교체되므로

@@ -41,6 +41,7 @@
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
+ *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
@@ -76,6 +77,7 @@ import { handleContactLog } from './contact-log.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
+import { handleConsultCurriculumImage } from './consult-curriculum-image.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1599,6 +1601,9 @@ export default {
     }
     if (url.pathname === '/consult-result-upload') {
       return await handleConsultResultUpload(request, env, okOrigin, resolveAuth, json);
+    }
+    if (url.pathname === '/consult-curriculum-image') {
+      return await handleConsultCurriculumImage(request, env, okOrigin, resolveAuth, json);
     }
 
     let body;

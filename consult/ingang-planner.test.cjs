@@ -538,10 +538,17 @@ test('five official course sites have safe direct links and smart-paste fallback
   const modal = between('function ingAddModal()', '\nfunction ingShowParsePreview(');
   assert.match(modal, /target="_blank" rel="noopener noreferrer"/);
   assert.match(modal, /사이트 열기 → 로그인 → 강좌 상세의 강의목차 전체 복사/);
+  assert.match(modal, /id="ingImages" type="file" accept="image\/\*" multiple/);
+  assert.match(modal, /data-act="ingimage"/);
+  assert.match(modal, /서버에 사진을 저장하지 않으며/);
   assert.match(modal, /data-act="ingpaste"/);
   assert.doesNotMatch(modal, /iframe|type="password"|document\.cookie/i);
   assert.doesNotMatch(modal, /\/search|\/curriculum|data-act="ingfetch"|data-act="ingsearch"/);
   assert.match(html, /box\.textContent = parsed\.length/);
+  assert.match(html, /SYNC_URL \+ '\/consult-curriculum-image'/);
+  assert.match(html, /form\.set\('app', SYNC_APP\)/);
+  assert.match(html, /prepareSubmissionImage\(files\[i\]\)/);
+  assert.match(html, /box\.value = ingCourseText\(\{ lectures: lectures \}\)/);
   assert.match(html, /sourceUrl: sourceUrl/);
   assert.match(html, /case 'ingprovider':[\s\S]*?c\.dataset\.v === el\.dataset\.v/);
   assert.match(html, /const SYNC_APP = 'consult'/);
@@ -560,6 +567,7 @@ test('every rendered ingang action has one event case', () => {
 test('director-only lecture mutations are guarded and student checks stay self-scoped', () => {
   const director = /session\.isAdmin \|\| isManager\(\)/;
   assert.match(between("case 'ingadd':", "case 'ingpf':"), director);
+  assert.match(between('async function ingImportImages(', '\n\nfunction ingQuickText('), director);
   assert.match(between("case 'ingsave':", "case 'ingdel':"), director);
   assert.match(between("case 'ingedit':", "case 'ingeditsave':"), director);
   assert.match(between("case 'ingeditsave':", "case 'ingdel':"), director);
