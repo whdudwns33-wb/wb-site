@@ -59,6 +59,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/044_book_order_item
 npx wrangler d1 execute wb-sync --remote --file=./migrations/045_student_change_history.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/046_app_data_generations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/047_lesson_assignment_details.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/048_admin_directives.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/049_consult_result_sheets.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -114,6 +116,13 @@ consult 보호자 리포트 공유는 운영 D1에 `042_consult_guardian_portal.
 순서로 배포한다. 기존 `/parent-portal` 표와 쿠키는 사용하지 않으므로 task 보호자 앱은 이
 마이그레이션의 대상이 아니다. 배포 후 원장 화면에서 테스트 학생의 공유 동의 → 초대 링크 →
 휴대폰 조회 → 확인 기록 → 공유 끄기 순서로 점검한다.
+
+consult 영어·수학 PDF 결과지는 운영 D1에 `049_consult_result_sheets.sql`을 먼저 적용하고,
+보호자·직원 Worker, consult Pages 순서로 배포한다. PDF는 기존 private
+`wb-consult-private` 버킷의 `consult-results/` prefix에 저장하며 public development URL과
+custom domain을 사용하지 않는다. `consult/` 인증사진용 90일 lifecycle rule은
+`consult-results/`에 확대 적용하지 않는다. 결과지 공유 범위가 추가되므로 기존 보호자 공유는
+원장 화면에서 새 범위 동의를 다시 확인한 뒤 새 일회용 초대 링크를 발급한다.
 
 원생 정적 파일을 제거하는 배포에서는 `019_private_roster.sql` 적용 → Worker 배포 → 관리자
 `/roster replace` 등록·조회 확인 → 프런트 전환 순서를 지킨다. 비공개 원생 데이터나 seed SQL은

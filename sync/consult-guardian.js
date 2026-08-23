@@ -3,10 +3,11 @@
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_OPAQUE = /^[a-f0-9]{48}$/i;
 const SAFE_REPORT_REF = /^cgr_[a-f0-9]{48}$/i;
+const SAFE_RESULT_REF = /^cgs_[a-f0-9]{48}$/i;
 const HASH_PREFIX = 'sha256:';
 const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const CONSULT_GUARDIAN_SCOPE_VERSION = 1;
+const CONSULT_GUARDIAN_SCOPE_VERSION = 2;
 const SESSION_COOKIE = '__Host-wb_consult_guardian';
 const SUBJECTS = new Set(['korean', 'english', 'math', 'social', 'science', 'other']);
 const REPORT_STATUSES = new Set(['done', 'blocked', 'doing', 'todo']);
@@ -379,9 +380,32 @@ async function reportDtos(env, student) {
   }));
 }
 
+async function resultDtos(env, student) {
+  const rows = await env.DB.prepare(
+    "SELECT result_id,subject,title,result_date,object_key,media_bytes,created_at FROM consult_result_sheets " +
+    "WHERE app='consult' AND owner=? AND status='active' ORDER BY result_date DESC,created_at DESC LIMIT 100"
+  ).bind(student.id).all();
+  return await Promise.all((rows.results || []).map(async row => ({
+    sourceResultId: String(row.result_id), objectKey: String(row.object_key),
+    dto: {
+      id: 'cgs_' + (await sha256Hex([
+        'consult-guardian-result-v1', student.id, String(row.result_id)
+      ].join('\u001f'))).slice(0, 48),
+      subject: row.subject === 'math' ? 'math' : 'english',
+      title: publicText(row.title, 200),
+      resultDate: validDate(row.result_date),
+      mediaBytes: safeInt(row.media_bytes, 10 * 1024 * 1024),
+      createdAt: safeInt(row.created_at, Number.MAX_SAFE_INTEGER)
+    }
+  })));
+}
+
 async function portalPayload(env, student) {
-  const reports = await reportDtos(env, student);
-  return { ok: true, student: { name: student.name }, reports: reports.map(record => record.dto) };
+  const [reports, results] = await Promise.all([reportDtos(env, student), resultDtos(env, student)]);
+  return {
+    ok: true, student: { name: student.name },
+    reports: reports.map(record => record.dto), results: results.map(record => record.dto)
+  };
 }
 
 async function portalSession(env, request, now) {
@@ -490,6 +514,30 @@ async function view(env, body, origin, json, request) {
   return json(await portalPayload(env, session.student), 200, origin);
 }
 
+async function resultMedia(env, body, origin, json, request) {
+  if (!allowedKeys(body, ['resultId'])) return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
+  const resultId = String(body.resultId || '');
+  if (!SAFE_RESULT_REF.test(resultId)) return json({ ok: false, error: '올바른 결과지를 선택해 주세요' }, 400, origin);
+  const session = await portalSession(env, request, Date.now());
+  if (!session) return json({ ok: false, code: 'SESSION_INVALID', error: '보호자 연결이 만료되었습니다' }, 401, origin);
+  const results = await resultDtos(env, session.student);
+  const selected = results.find(record => record.dto.id === resultId);
+  if (!selected) return json({ ok: false, error: '결과지가 변경되거나 보관되었습니다. 새로고침해 주세요' }, 404, origin);
+  if (!env.CONSULT_MEDIA) return json({ ok: false, error: '결과지 저장소를 준비하고 있습니다' }, 503, origin);
+  const object = await env.CONSULT_MEDIA.get(selected.objectKey);
+  if (!object) return json({ ok: false, error: '결과지 파일을 찾을 수 없습니다' }, 410, origin);
+  return new Response(object.body, { status: 200, headers: {
+    'Access-Control-Allow-Origin': origin || 'null',
+    'Cache-Control': 'private, no-store',
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'inline; filename="result.pdf"',
+    'Content-Security-Policy': 'sandbox',
+    'Referrer-Policy': 'no-referrer',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff'
+  } });
+}
+
 async function preview(env, body, auth, origin, json) {
   if (!auth || auth.scope !== 'all') return json({ ok: false, error: '원장만 미리 볼 수 있습니다' }, 403, origin);
   if (!allowedKeys(body, ['auth', 'staffId'])) return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
@@ -550,12 +598,13 @@ export async function handleConsultGuardian(env, app, body, origin, auth, json, 
     if (action === 'preview') return await preview(env, body, auth, origin, json);
     if (action === 'exchange') return await exchange(env, body, origin, json, request);
     if (action === 'view') return await view(env, body, origin, json, request);
+    if (action === 'result_media') return await resultMedia(env, body, origin, json, request);
     if (action === 'ack') return await acknowledge(env, body, origin, json, request);
     if (action === 'logout') return await logout(env, body, origin, json, request);
     return json({ ok: false, error: '지원하지 않는 보호자 공유 작업입니다' }, 400, origin);
   } catch (error) {
     const message = String(error && error.message || error || '');
-    if (/no such table.*consult_guardian/i.test(message)) {
+    if (/no such table.*(?:consult_guardian|consult_result_sheets)/i.test(message)) {
       return json({ ok: false, code: 'CONSULT_GUARDIAN_NOT_READY', error: '보호자 공유 기능을 준비하고 있습니다' }, 503, origin);
     }
     console.error('consult-guardian', error && error.name || 'Error');
