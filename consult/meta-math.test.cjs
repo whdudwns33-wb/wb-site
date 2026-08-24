@@ -10,9 +10,10 @@ const section = (start, end) => {
   return from >= 0 && to > from ? html.slice(from, to) : '';
 };
 
-test('study screen renders seven separate source cards and keeps legacy MetaMath tasks', () => {
+test('study screen renders eight separate source cards and keeps legacy MetaMath tasks', () => {
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const expected = [
+    ['leaders_eye', '리더스아이'],
     ['metamath', '메타수학'],
     ['classcard', '클래스카드'],
     ['studyforce', '스터디포스'],
@@ -42,6 +43,8 @@ test('study screen renders seven separate source cards and keeps legacy MetaMath
 });
 
 test('external study services use fixed official links without embedded login', () => {
+  assert.match(html, /const LEADERS_EYE_URL = 'https:\/\/www\.eyestudent\.com\/login'/);
+  assert.match(html, /centerUrl: LEADERS_EYE_URL, studentUrl: LEADERS_EYE_URL/);
   assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=center'/);
   assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=student'/);
   assert.match(html, /const CLASSCARD_ANDROID_APP_URL = 'https:\/\/play\.google\.com\/store\/apps\/details\?id=classcard\.net'/);
@@ -54,6 +57,13 @@ test('external study services use fixed official links without embedded login', 
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   assert.match(card, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(card, /iframe|fetch\(|type="password"/i);
+});
+
+test('Leaders Eye is the first online learning card directly above MetaMath', () => {
+  const sources = section('const LEARNING_SOURCES', 'const DOW');
+  const study = section('function viewStudy(', 'function rdAddModal(');
+  assert.ok(sources.indexOf('  leaders_eye: {') < sources.indexOf('  metamath: {'));
+  assert.match(study, /keys: \['leaders_eye', 'metamath', 'classcard', 'studyforce'\]/);
 });
 
 test('ClassCard opens the native app store route only on supported mobile devices', () => {
