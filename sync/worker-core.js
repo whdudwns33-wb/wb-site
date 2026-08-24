@@ -21,6 +21,7 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
+ *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
  *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)
  *   POST /parent-feedback-send { app, auth(admin), requestKey } → 막혔던 발송을 원장이 수동으로 재시도
@@ -75,6 +76,7 @@ import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
+import { handleWeekendVisit } from './weekend-visit.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
@@ -1649,6 +1651,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleContactLog(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/weekend-visit') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleWeekendVisit(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/consult-submission') {
         const auth = await resolveAuth(env, app, body.auth);

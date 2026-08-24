@@ -27,8 +27,8 @@ function functionSource(name) {
 
 test('student management sorts Korean names in 가나다 order', () => {
   const compare = Function(functionSource('studentNameCompare') + '; return studentNameCompare;')();
-  const names = [{ name: '이재후' }, { name: '김민준' }, { name: '박하은' }].sort(compare).map(row => row.name);
-  assert.deepEqual(names, ['김민준', '박하은', '이재후']);
+  const names = [{ name: '테스트다' }, { name: '테스트가' }, { name: '테스트나' }].sort(compare).map(row => row.name);
+  assert.deepEqual(names, ['테스트가', '테스트나', '테스트다']);
   assert.match(functionSource('viewStaffAdmin'), /liveStaff\(\)\.slice\(\)\.sort\(studentNameCompare\)/);
 });
 
