@@ -42,7 +42,7 @@ test('schedule attendance uses early leave and the exact incomplete label', () =
   });
 });
 
-test('today board includes a visible student-by-student attendance overview', () => {
+test('teacher flow keeps student-by-student attendance while the redundant overview stays hidden', () => {
   const source = block('function scheduleAttendance(entry, date)', 'const SCHEDULE_VIEWS');
   const checks = { present: { att: 'P' }, late: { att: 'L' }, absent: { att: 'A' }, early: { att: 'E' } };
   const helpers = new Function('getCheck', 'esc', source +
@@ -70,6 +70,10 @@ test('today board includes a visible student-by-student attendance overview', ()
   assert.match(overview, /esc\(entry\.studentName\)/);
   assert.match(overview, /esc\(att\.label\)/);
   assert.match(timeline, /scheduleAttendanceSummaryText\(session, date\)/);
-  assert.match(timeline, /scheduleAttendanceOverviewHtml\(timeline, date\)/);
-  assert.match(html, /\.schedule-attendance-pill\.is-pending/);
+  assert.doesNotMatch(timeline, /scheduleAttendanceOverviewHtml\(timeline, date\)/);
+  assert.match(timeline, /scheduleSessionAttendanceRows\(session, date\)/);
+  assert.match(timeline, /visual\.attendanceRows\.map/);
+  for (const cls of ['is-present', 'is-late', 'is-absent', 'is-early', 'is-pending']) {
+    assert.match(html, new RegExp('\\.schedule-flow-attendance\\.' + cls));
+  }
 });

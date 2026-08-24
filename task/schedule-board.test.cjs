@@ -349,6 +349,21 @@ test('dashboard offers weekly day, teacher, and student views with authenticated
   assert.match(html, /data-act="rosterretry"/);
 });
 
+test('daily teacher flow shows every student with five distinct attendance colors and no redundant overview', () => {
+  const timelineStart = html.indexOf('function scheduleTimelineHtml(');
+  const timelineEnd = html.indexOf('function scheduleTimelineModal(', timelineStart);
+  const timeline = html.slice(timelineStart, timelineEnd);
+  const rowStart = html.indexOf('function scheduleSessionRow(');
+  const rowEnd = html.indexOf('function scheduleWeekCardsHtml(', rowStart);
+  const row = html.slice(rowStart, rowEnd);
+  assert.match(timeline, /scheduleSessionAttendanceRows\(session, date\)/);
+  assert.match(timeline, /is-present[\s\S]*is-late[\s\S]*is-absent[\s\S]*is-early[\s\S]*is-pending/);
+  assert.doesNotMatch(timeline, /scheduleAttendanceOverviewHtml\(/);
+  assert.match(row, /const shown = names\.join\(', '\)/);
+  assert.doesNotMatch(row, /외 ' \+ \(names\.length/);
+  assert.match(html, /\.schedule-flow-attendance\.is-pending \{ background: #FEE2E2; color: #B91C1C; \}/);
+});
+
 test('schedule search keeps aggregate teacher matches spread across multiple rows', () => {
   const source = functionSource('scheduleSearchPlan');
   const match = (value, terms) => terms.every(term => String(value || '').toLowerCase().includes(term));

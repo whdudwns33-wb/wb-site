@@ -116,7 +116,9 @@ test('publisher-series-book accordion is searchable and mobile-friendly', () => 
   assert.match(view, /data-book-series data-expanded/);
   assert.match(view, /data-act="seriestoggle"/);
   assert.match(view, /const closed = vendorClosed\.has\(sec\.key\)/);
-  assert.match(view, /seriesExpansion\.has\(seriesKey\)[\s\S]{0,100}\? seriesExpansion\.get\(seriesKey\) : !!\(selected \|\| groupPending\)/);
+  assert.match(view, /seriesExpansion\.has\(seriesKey\)[\s\S]{0,100}\? seriesExpansion\.get\(seriesKey\) : true/);
+  assert.match(view, /data-act="booksearch">검색<\/button>/);
+  assert.match(view, /extraVendorNames[\s\S]*type: 'other'/);
   assert.match(view, /선택 ' \+ selected/);
   assert.match(view, /주문 ' \+ groupPending/);
   assert.match(view, /data-book-entry data-book-selected/);
@@ -124,7 +126,7 @@ test('publisher-series-book accordion is searchable and mobile-friendly', () => 
   assert.match(view, /기타·개별 교재/);
   assert.match(card, /aria-label="' \+ esc\(b\.title\) \+ ' 일괄 주문 선택/);
   assert.match(card, /book-card-actions/);
-  assert.match(html, /@media \(max-width: 600px\)[\s\S]{0,220}\.book-card-actions \{ width: 100%; \}[\s\S]{0,100}min-height: 44px/);
+  assert.match(html, /@media \(max-width: 600px\)[\s\S]{0,420}\.book-card-actions \{ width: 100%; \}[\s\S]{0,100}min-height: 44px/);
   assert.match(input, /applyBookSearch\(bookSearch\.value\)/);
 
   assert.match(search, /const expanded = hasQuery \? count > 0 : series\.dataset\.expanded === 'true'/);
