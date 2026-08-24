@@ -47,6 +47,7 @@
  *   POST /consult-curriculum-url { app:'consult', auth, url } → 공개 강좌 주소 목차 인식
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
+ *   POST /consult-link-send { app:'consult', auth(admin), action, ... } → 학생 개인 링크 연락처·알림톡 접수
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -83,6 +84,7 @@ import { handleConsultSubmission, handleConsultSubmissionUpload } from './consul
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
 import { handleConsultCurriculumImage, isConsultDirectorOrManager } from './consult-curriculum-image.js';
+import { handleConsultLinkSend } from './consult-link-send.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -772,6 +774,19 @@ async function issueBootstrap(env, app, staffId, ttlMs) {
     ).bind(app, staffId, codeHash, app, staffId, codeHash, createdAt)
   ]);
   return { code, expiresAt };
+}
+
+// 알림톡이 확정 거절되거나 발송 직전 정본이 바뀐 경우, 방금 만든 그 코드만 폐기한다.
+// 원문 코드는 저장·반환하지 않고 기존 bootstrap 저장 형식과 같은 hash로만 찾는다.
+async function revokeIssuedBootstrap(env, app, staffId, code) {
+  if (!APPS.includes(app) || !SAFE_ID.test(String(staffId || '')) ||
+      !SAFE_BOOTSTRAP_CODE.test(String(code || ''))) return false;
+  const codeHash = tokenStorageValue(await sha256Hex(code));
+  const result = await env.DB.prepare(
+    'UPDATE bootstrap_codes SET revoked=1 ' +
+    'WHERE app=? AND staff_id=? AND code_hash=? AND revoked=0 AND consumed_at IS NULL'
+  ).bind(app, staffId, codeHash).run();
+  return Number(result && result.meta && result.meta.changes || 0) === 1;
 }
 
 async function handleBootstrap(env, app, body, origin) {
@@ -1825,6 +1840,15 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleGuardianOpsSend(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/consult-link-send') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleConsultLinkSend(
+          env, app, body, okOrigin, auth, json,
+          staffId => issueBootstrap(env, 'consult', staffId, BOOTSTRAP_TTL_MS),
+          (staffId, code) => revokeIssuedBootstrap(env, 'consult', staffId, code)
+        );
       }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);
