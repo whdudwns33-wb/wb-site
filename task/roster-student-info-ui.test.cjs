@@ -75,13 +75,13 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
     assert.match(editor, new RegExp(subject));
   }
   assert.match(editor, /data-rse-subject/);
-  assert.match(editor, /이름·학교·학년만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다/);
+  assert.match(editor, /이름만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다/);
   assert.match(editor, /showRosterStudentEditor\(\{[\s\S]{0,180}id: ''/);
   assert.doesNotMatch(editor, /id: 'student_' \+ uid\(\)/);
-  assert.match(editor, /if \(!student\.name \|\| !student\.school \|\| !student\.grade\)/);
+  assert.match(editor, /if \(!student\.name\) return toast\('이름을 입력해 주세요'\)/);
   assert.match(editor, /registrationDate\.slice\(0, 7\) \|\| today\(\)\.slice\(0, 7\)/);
   assert.doesNotMatch(editor, /isNew && \(!registrationDate \|\| !firstClassDate\)/);
-  for (const label of ['이름 · 필수', '학교 · 필수', '학년 · 필수', '신규 등록일 (선택)', '첫 수업 시작일 (선택)']) {
+  for (const label of ['이름 · 필수', '학교 (선택)', '학년 (선택)', '신규 등록일 (선택)', '첫 수업 시작일 (선택)']) {
     assert.match(editor, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));
@@ -108,9 +108,11 @@ test('관리자 원생 수정은 승인 없는 휴원·퇴원·복귀와 복귀 
   assert.match(source, /eventLabel === '복귀'/);
 });
 
-test('이름·학교·학년 외 정보가 없는 원생만 관리자 완전 삭제를 요청할 수 있다', () => {
+test('이름만 등록한 원생도 운영 연결이 없으면 관리자 완전 삭제를 요청할 수 있다', () => {
   const editor = block('let rosterStudentEditor = null;', '/* ── 신규 학생 30일 적응 관리');
-  assert.match(editor, /function rosterStudentCanDelete\(student\)/);
+  const canDelete = block('function rosterStudentCanDelete(student)', 'function rosterStudentEditorHtml');
+  assert.match(canDelete, /if \(!String\(student && student\.name \|\| ''\)\.trim\(\)\) return false/);
+  assert.doesNotMatch(canDelete, /student && student\.school[\s\S]*return false/);
   assert.match(editor, /\(student\.teacherIds \|\| \[\]\)\.length \|\| rosterStudentSubjects\(student\)\.length/);
   assert.match(editor, /data-act="rosterstudentdelete">원생 완전 삭제/);
   assert.match(editor, /action: 'student_delete'/);
