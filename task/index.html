@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-24.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-24.1"></script>
-<script src="./asset-core.js?v=2026-08-24.1"></script>
-<script src="./qr-core.js?v=2026-08-24.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-24.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-24.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-24.2"></script>
+<script src="./asset-core.js?v=2026-08-24.2"></script>
+<script src="./qr-core.js?v=2026-08-24.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-24.2"></script>
 <script>
 "use strict";
 
@@ -11262,8 +11262,7 @@ function rosterStudentSubjects(student) {
 }
 
 function rosterStudentCanDelete(student) {
-  if (!String(student && student.name || '').trim() || !String(student && student.school || '').trim() ||
-      !String(student && student.grade || '').trim()) return false;
+  if (!String(student && student.name || '').trim()) return false;
   if ((student.teacherIds || []).length || rosterStudentSubjects(student).length) return false;
   return ![
     student.teacher, student.subject, student.phoneSelf, student.phoneFather, student.phoneMother,
@@ -11281,11 +11280,11 @@ function rosterStudentEditorHtml(student, assignment) {
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
-    (isCreate ? '이름·학교·학년만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다. 날짜·연락처·과목·담당은 나중에 입력할 수 있습니다. 신규 학생 30일 관리는 첫 수업 시작일을 입력한 뒤 시작합니다.' :
+    (isCreate ? '이름만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다. 학교·학년·날짜·연락처·과목·담당은 나중에 입력할 수 있습니다. 신규 학생 30일 관리는 첫 수업 시작일을 입력한 뒤 시작합니다.' :
       '학교·연락처·등록과목과 재원 정보를 수정할 수 있습니다.') + '</div>' +
-    '<div class="grid2"><label class="field"><span class="fl">이름 · 필수</span><input class="in" data-rse-name maxlength="40" value="' + esc(student.name || '') + '"></label>' +
-    '<label class="field"><span class="fl">학교 · 필수</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
-    '<label class="field"><span class="fl">학년 · 필수</span><input class="in" data-rse-grade maxlength="20" value="' + esc(student.grade || '') + '"></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">이름 · 필수</span><input class="in" data-rse-name maxlength="40" required aria-required="true" value="' + esc(student.name || '') + '"></label>' +
+    '<label class="field"><span class="fl">학교 (선택)</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
+    '<label class="field"><span class="fl">학년 (선택)</span><input class="in" data-rse-grade maxlength="20" value="' + esc(student.grade || '') + '"></label>' +
     '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-self maxlength="30" value="' + esc(student.phoneSelf || '') + '"></label>' +
     '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-father maxlength="30" value="' + esc(student.phoneFather || '') + '"></label></div>' +
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-rse-phone-mother maxlength="30" value="' + esc(student.phoneMother || '') + '"></label>' +
@@ -11460,9 +11459,7 @@ async function saveRosterStudent(button) {
     memo: value('[data-rse-memo]'), teacherIds: teacherIds
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
-  if (!student.name || !student.school || !student.grade) {
-    return toast('이름·학교·학년을 모두 입력해 주세요');
-  }
+  if (!student.name) return toast('이름을 입력해 주세요');
   if (!student.start) return toast('시작월을 입력해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('관리자 인증을 확인해 주세요');
@@ -11498,7 +11495,7 @@ async function saveRosterStudent(button) {
 async function deleteRosterStudent(button) {
   const editor = rosterStudentEditor;
   if (!session.isAdmin || !editor || !editor.student._editing || !rosterDb || !rosterStudentCanDelete(editor.student)) {
-    return toast('이름·학교·학년만 있고 연결 기록이 없는 원생만 완전 삭제할 수 있습니다');
+    return toast('이름과 선택 입력한 학교·학년 외 정보나 연결 기록이 없는 원생만 완전 삭제할 수 있습니다');
   }
   const typedName = prompt('완전 삭제하면 복구할 수 없습니다. 계속하려면 학생 이름을 입력해 주세요.', '');
   if (String(typedName || '').normalize('NFKC').trim() !== String(editor.student.name || '').normalize('NFKC').trim()) {
@@ -16005,7 +16002,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-24.1';
+const APP_VER = '2026-08-24.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -172,7 +172,7 @@ function studentParentIdentityKey(value) {
 }
 
 function minimalStudentForDeletion(value) {
-  if (!identityText(value && value.name) || !identityText(value && value.school) || !identityText(value && value.grade)) return false;
+  if (!identityText(value && value.name)) return false;
   if ((value.teacherIds || []).length || (value.subjects || []).length) return false;
   return ![
     value.teacher, value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
@@ -495,7 +495,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const student = document.roster.students[index];
     if (!minimalStudentForDeletion(student)) {
       return json({ ok: false, code: 'STUDENT_DELETE_NOT_MINIMAL',
-        error: '이름·학교·학년 외 정보가 있는 원생은 완전 삭제할 수 없습니다. 퇴원 처리를 사용해 주세요' }, 409, origin);
+        error: '이름과 선택 입력한 학교·학년 외 정보가 있는 원생은 완전 삭제할 수 없습니다. 퇴원 처리를 사용해 주세요' }, 409, origin);
     }
     if (document.bookStudents.some(item => String(item.studentId) === studentId) ||
         await studentHasReferences(env, app, studentId)) {
@@ -714,6 +714,9 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         ? { ...record(body.student, 'document.roster.students[0]'),
           id: allocateNewStudentId(new Set(document.roster.students.map(item => item.id))) }
         : body.student;
+      if (action === 'student_create' && (typeof input.name !== 'string' || !identityText(input.name))) {
+        return json({ ok: false, code: 'STUDENT_REQUIRED_FIELDS', error: '이름을 입력해 주세요' }, 400, origin);
+      }
       nextStudent = rosterStudent(input, 0);
     } catch (error) {
       const message = String(error && error.message || error);
@@ -724,9 +727,6 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
     const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
-    if (action === 'student_create' && (!identityText(nextStudent.school) || !identityText(nextStudent.grade))) {
-      return json({ ok: false, code: 'STUDENT_REQUIRED_FIELDS', error: '이름·학교·학년을 모두 입력해 주세요' }, 400, origin);
-    }
     const nextIdentityKey = studentRegistrationIdentityKey(nextStudent);
     const sameBase = document.roster.students.filter(item => item.id !== nextStudent.id &&
       studentRegistrationBaseKey(item) === studentRegistrationBaseKey(nextStudent));
