@@ -186,6 +186,15 @@
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
   .tag.add  { background: #ECFDF5; color: var(--green); }
   .tag.edit { background: #FFF7ED; color: var(--amber); }
+  .tag.usage-today { background: #E7F7EE; color: #2E6E49; }
+  .tag.usage-recent { background: #FFF7D7; color: #755E0A; }
+  .tag.usage-idle { background: #F0F2F4; color: #626B75; }
+  .student-usage-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .student-usage-summary > div { padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFF; text-align: center; }
+  .student-usage-summary span, .student-usage-summary b { display: block; }
+  .student-usage-summary span { color: var(--mid-gray); font-size: 10px; font-weight: 800; }
+  .student-usage-summary b { margin-top: 3px; color: var(--navy); font-size: 16px; }
+  .student-usage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 7px; }
   .subject-tag { border: 1px solid transparent; }
   .subject-korean { --subject-color: var(--subject-korean); --subject-bg: #E8F2FF; --subject-text: #285B91; }
   .subject-english { --subject-color: var(--subject-english); --subject-bg: #FFEAF2; --subject-text: #8E3E5E; }
@@ -7542,14 +7551,79 @@ async function guardianRefreshPreview(staffId) {
 }
 
 /* ── 학생 관리 ── */
+function studentNameCompare(a, b) {
+  return String(a && a.name || '').localeCompare(String(b && b.name || ''), 'ko', { numeric: true });
+}
+
+function isStudentActivityCheck(key, row) {
+  if (!row) return false;
+  const id = String(key || '').split('|')[0];
+  if (!id.startsWith('__')) {
+    return !!(row.claimed || row.done || row.blocked || row.dropped || Number(row.count) > 0 ||
+      String(row.note || '').trim() || Object.values(row.steps || {}).some(Boolean));
+  }
+  if (id.startsWith('__st__')) {
+    return !!(row.run || (row.segments || []).length || Object.values(row.secs || {}).some(Number));
+  }
+  if (id.startsWith('__dailyclose__') || id.startsWith('__weekclose__') || id.startsWith('__monthclose__')) {
+    const close = row.close || {};
+    return !!(close.reviewedAt || close.completedAt || close.difficulty || close.studentNextFocus ||
+      Object.keys(close.resolutions || {}).length);
+  }
+  if (id.startsWith('__ingp__')) {
+    return (row.items || []).some(item => item && (item.claimed || item.done || item.review));
+  }
+  if (id.startsWith('__ingnote__')) return !!(row.question || row.memo || row.page);
+  if (id.startsWith('__rd__') || id.startsWith('__wn__')) return !!(row.items || []).length;
+  return false;
+}
+
+function studentUsage(staffId) {
+  let lastAt = 0;
+  Object.entries(state.checks || {}).forEach(([key, row]) => {
+    if (ownerOfCheck(key) === staffId && isStudentActivityCheck(key, row)) {
+      lastAt = Math.max(lastAt, Number(row.updatedAt) || 0);
+    }
+  });
+  (state.tasks || []).forEach(task => {
+    if (!task.deleted && task.staffId === staffId && task.origin === 'staff') {
+      lastAt = Math.max(lastAt, Number(task.updatedAt) || 0);
+    }
+  });
+  const date = lastAt ? ymd(new Date(lastAt)) : '';
+  const days = date ? Math.max(0, Math.round((parseYmd(today()) - parseYmd(date)) / 86400000)) : Infinity;
+  const p = progress(staffId, today());
+  return {
+    status: days === 0 ? 'today' : days <= 7 ? 'recent' : 'idle',
+    lastLabel: !date ? '학습 기록 없음' : days === 0 ? '오늘' : days === 1 ? '어제' : shortDate(date) + ' · ' + days + '일 전',
+    done: p.done, total: p.total, secs: stTotal(staffId, today()),
+    closed: dailyCloseState(staffId, today()).complete
+  };
+}
+
+function studentUsageLine(student) {
+  if (student.owner || student.manager) return '';
+  const usage = studentUsage(student.id);
+  const label = usage.status === 'today' ? '● 오늘 학습' : usage.status === 'recent' ? '● 최근 학습' : '● 확인 필요';
+  return '<div class="student-usage-line"><span class="tag usage-' + usage.status + '">' + label + '</span>' +
+    '<span class="small muted">최근 기록 ' + usage.lastLabel + ' · 오늘 순공 ' + fmtDur(usage.secs) +
+    ' · 체크 ' + usage.done + '/' + usage.total + ' · 하루 마감 ' + (usage.closed ? '완료' : '미완료') + '</span></div>';
+}
+
 function viewStaffAdmin() {
   if (!session.isAdmin || session.isStaffLink) return '';
-  const list = liveStaff();
+  const list = liveStaff().slice().sort(studentNameCompare);
+  const usage = list.filter(s => !s.owner && !s.manager).map(s => studentUsage(s.id));
+  const todayUsers = usage.filter(item => item.status === 'today').length;
+  const recentUsers = usage.filter(item => item.status === 'recent').length;
+  const idleUsers = usage.filter(item => item.status === 'idle').length;
   return '<div class="card">' +
     '<div class="card-title">학생 등록</div>' +
     '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 학생은 링크만 열면 됩니다.</div>' +
     '<div class="row"><input class="in" id="sName" placeholder="학생 이름 (예: 김민준)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
+    (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
+      '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
   '</div>' +
   (list.length
@@ -7560,7 +7634,7 @@ function viewStaffAdmin() {
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot').length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
-          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div></div></div>' +
+          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
@@ -10699,7 +10773,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-23.44';
+const APP_VER = '2026-08-24.45';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
