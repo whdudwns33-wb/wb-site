@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
 
   :root {
     --blue:       #1E9DD6;
@@ -280,11 +281,20 @@
   .schedule-timeline-teacher b { display: block; color: var(--navy); font-size: 12px; line-height: 1.35; word-break: keep-all; }
   .schedule-timeline-teacher span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 9.5px; }
   .schedule-timeline-track { position: relative; min-height: 60px; border-top: 1px solid var(--line); background-color: #FCFDFE; background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(var(--half-hour) - 1px), #EDF0F3 calc(var(--half-hour) - 1px), #EDF0F3 var(--half-hour)); }
-  .schedule-timeline-block { position: absolute; z-index: 2; height: 42px; min-width: 38px; overflow: hidden; padding: 5px 7px; border: 1px solid #8DCAE5; border-radius: 8px; background: #EAF6FC; color: var(--navy); text-align: left; box-shadow: 0 2px 5px rgba(27,58,92,.08); }
+  .schedule-timeline-block { position: absolute; z-index: 2; min-width: 38px; overflow: hidden; padding: 5px 7px; border: 1px solid #8DCAE5; border-radius: 8px; background: #EAF6FC; color: var(--navy); text-align: left; box-shadow: 0 2px 5px rgba(27,58,92,.08); }
   .schedule-timeline-block strong, .schedule-timeline-block small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .schedule-timeline-block strong { font-size: 11.5px; line-height: 1.35; }
   .schedule-timeline-block small { margin-top: 2px; font-size: 9.5px; line-height: 1.2; opacity: .82; }
-  .schedule-timeline-block.is-ended { border-color: #D1D5DB; background: #F3F4F6; color: var(--mid-gray); opacity: .62; box-shadow: none; }
+  .schedule-flow-attendance-list { display: grid; gap: 2px; }
+  .schedule-flow-attendance { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 4px; padding: 1px 4px; border-radius: 5px; font-size: 9.5px; font-weight: 900; line-height: 15px; }
+  .schedule-flow-attendance b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .schedule-flow-attendance i { flex: 0 0 auto; font-style: normal; }
+  .schedule-flow-attendance.is-present { background: #D1FAE5; color: #047857; }
+  .schedule-flow-attendance.is-late { background: #FFEDD5; color: #C2410C; }
+  .schedule-flow-attendance.is-absent { background: #DBEAFE; color: #1D4ED8; }
+  .schedule-flow-attendance.is-early { background: #F3E8FF; color: #7E22CE; }
+  .schedule-flow-attendance.is-pending { background: #FEE2E2; color: #B91C1C; }
+  .schedule-timeline-block.is-ended { border-color: #D1D5DB; background: #F3F4F6; color: var(--mid-gray); box-shadow: none; }
   .schedule-timeline-block.is-next { border-color: #F2B85C; background: #FFF7E8; color: #8A4B05; }
   .schedule-timeline-block.is-current { border-color: var(--deep-blue); background: var(--deep-blue); color: var(--white); box-shadow: 0 3px 10px rgba(15,122,171,.28); }
   .schedule-timeline-block.is-conflict { border-color: var(--coral); outline: 2px solid rgba(232,93,74,.26); background: #FFF1EF; color: #9E3629; }
@@ -456,6 +466,8 @@
 
   /* ─── 교재 목록 ─── */
   .book-search { margin-top: 12px; }
+  .book-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin-top: 12px; }
+  .book-search-row .book-search { margin-top: 0; }
   .book-vendor { margin-bottom: 16px; }
   .book-vendor-toggle { width: 100%; min-height: 44px; text-align: left; }
   .book-vendor-toggle:disabled, .book-series-toggle:disabled { cursor: default; }
@@ -471,10 +483,30 @@
   .book-card-main .card-title { overflow-wrap: anywhere; }
   .book-card-actions { flex-wrap: wrap; justify-content: flex-end; }
   @media (max-width: 600px) {
+    .book-search-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .book-search-row [data-act="booksearchclear"] { grid-column: 1 / -1; }
     .book-series { padding-left: 6px; }
     .book-card-main { flex-basis: 100%; }
     .book-card-actions { width: 100%; }
     .book-card-actions .btn { flex: 1 1 auto; min-height: 44px; }
+  }
+
+  /* ─── 주말 실제 등·하원 ─── */
+  .weekend-visit-card { border-color: #B9DDF0; background: linear-gradient(135deg, #F3FAFE 0%, var(--white) 72%); }
+  .weekend-visit-card > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; }
+  .weekend-visit-card > summary::-webkit-details-marker { display: none; }
+  .weekend-visit-card > summary b, .weekend-visit-card > summary .card-sub { display: block; }
+  .weekend-visit-card > summary::after { content: '펼치기'; margin-left: auto; color: var(--deep-blue); font-size: 11px; font-weight: 900; }
+  .weekend-visit-card[open] > summary::after { content: '접기'; }
+  .weekend-visit-list { display: grid; gap: 8px; margin-top: 12px; }
+  .weekend-visit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); }
+  .weekend-visit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .weekend-visit-live { border-color: #86C5DF; background: #F0F9FF; }
+  .weekend-visit-complete { border-color: #A7D7C5; background: #F3FBF7; }
+  .weekend-visit-time { color: var(--deep-blue); font-weight: 900; }
+  @media (max-width: 600px) {
+    .weekend-visit-row { grid-template-columns: 1fr; }
+    .weekend-visit-actions { justify-content: flex-start; }
   }
 
   /* ─── 신규 학생 30일 적응 관리 ─── */
@@ -917,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-22.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-22.2"></script>
-<script src="./asset-core.js?v=2026-08-22.2"></script>
-<script src="./qr-core.js?v=2026-08-22.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-22.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-24.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-24.1"></script>
+<script src="./asset-core.js?v=2026-08-24.1"></script>
+<script src="./qr-core.js?v=2026-08-24.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-24.1"></script>
 <script>
 "use strict";
 
@@ -1603,6 +1635,9 @@ const studentSelfCheckConfirming = new Set();
 const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sync_failed / create_failed
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
+const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가 직접 정한 details 열림/닫힘 상태 유지
+let weekendVisitRows = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
+let weekendVisitEditTarget = null;
 
 function go(r) {
   if (!$('#modalHost').hidden) closeModal();
@@ -1637,6 +1672,7 @@ function resetPersonCache(token) {
   if (keepToken) state.settings.myToken = keepToken;
   if (keepToken || !removed) save();
   viewStaff = ''; scheduleSearchQuery = ''; onboardingSearchQuery = ''; onboardingStatusFilter = 'active'; onboardingRestoreFocus = null; openPanels.clear();
+  persistentDetailsState.clear();
   onboardingPatchSequence.clear();
   onboardingServerConfirmedAt.clear();
   pendingAdd = null;
@@ -1653,8 +1689,8 @@ function resetPersonCache(token) {
   ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = ''; ownLessonChangeLastLoadedAt = 0;
   lcForm = null; draft = [];
   bookDb = null; bookDbErr = ''; bookDbLoading = false;
-  approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false;
-  approvedBookEdits = null; approvedBookEditsLoaded = false; approvedBookEditsLoading = false;
+  approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false; approvedBookAdditionsError = '';
+  approvedBookEdits = null; approvedBookEditsLoaded = false; approvedBookEditsLoading = false; approvedBookEditsError = '';
   batchSelection.clear(); batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
   bookAddQueue = []; bookAddQueueLoaded = false; bookAddQueueLoading = false; bookAddQueueError = '';
   ownBookAddQueue = []; ownBookAddQueueLoaded = false; ownBookAddQueueLoading = false; ownBookAddQueueError = '';
@@ -1670,6 +1706,7 @@ function resetPersonCache(token) {
   transportNotificationStates.clear(); transportGuardianStates.clear(); transportGuardianTarget = null;
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
+  weekendVisitRows = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = ''; weekendVisitEditTarget = null;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
   makeupRestoreFocus = null; makeupLiveMessage = '';
   makeupCreateStates.clear();
@@ -2202,6 +2239,55 @@ function currentStaff() {
   return staffById(viewStaff) || todayStaffList()[0] || null;
 }
 
+/**
+ * 화면 전체가 다시 그려져도 사용자가 직접 펼친 details는 유지한다.
+ * 숫자·날짜처럼 계속 바뀌는 summary 부분은 키에서 정규화하고, 같은 제목은 DOM 순서로 구분한다.
+ */
+function persistentDetailsKey(details, root) {
+  if (!details || !root) return '';
+  const explicit = String(details.dataset.persistKey || '');
+  if (explicit) return (root.dataset.renderedRoute || route) + '|explicit|' + explicit;
+  const summary = details.querySelector(':scope > summary');
+  const summaryKey = String(summary && summary.textContent || '')
+    .normalize('NFKC').replace(/\d{4}-\d{2}-\d{2}|\d+/g, '#').replace(/\s+/g, ' ').trim().slice(0, 100);
+  const task = details.closest('[data-task]');
+  const classes = Array.from(details.classList).sort().join('.');
+  const base = [root.dataset.renderedRoute || route, task ? task.dataset.task : '', classes, summaryKey].join('|');
+  const peers = Array.from(root.querySelectorAll('details')).filter(item => {
+    const itemSummary = item.querySelector(':scope > summary');
+    const itemSummaryKey = String(itemSummary && itemSummary.textContent || '')
+      .normalize('NFKC').replace(/\d{4}-\d{2}-\d{2}|\d+/g, '#').replace(/\s+/g, ' ').trim().slice(0, 100);
+    const itemTask = item.closest('[data-task]');
+    return [root.dataset.renderedRoute || route, itemTask ? itemTask.dataset.task : '',
+      Array.from(item.classList).sort().join('.'), itemSummaryKey].join('|') === base;
+  });
+  return base + '|' + Math.max(0, peers.indexOf(details));
+}
+
+function capturePersistentDetails(root) {
+  if (!root) return;
+  root.querySelectorAll('details').forEach(details => {
+    const key = persistentDetailsKey(details, root);
+    if (!key) return;
+    persistentDetailsState.set(key, details.open);
+  });
+}
+
+function restorePersistentDetails(root) {
+  if (!root) return;
+  root.querySelectorAll('details').forEach(details => {
+    const key = persistentDetailsKey(details, root);
+    if (key && persistentDetailsState.has(key)) details.open = persistentDetailsState.get(key);
+  });
+}
+
+function replaceView(root, html) {
+  capturePersistentDetails(root);
+  root.innerHTML = html;
+  root.dataset.renderedRoute = route;
+  restorePersistentDetails(root);
+}
+
 /* ══════════════════════════════════════════════════════
    7. 뷰
    ══════════════════════════════════════════════════════ */
@@ -2212,20 +2298,20 @@ function render() {
   const v = $('#view');
 
   if (shouldGatePersonAccess()) {
-    v.innerHTML = viewPersonAccess();
+    replaceView(v, viewPersonAccess());
     return;
   }
 
   if (session.isStaffLink && !staffById(session.staffId)) {
-    v.innerHTML = '<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
-      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>';
+    replaceView(v, '<div class="card link-gate"><div class="card-title">개인 링크의 선생님 정보를 찾지 못했습니다</div>' +
+      '<div class="card-sub">인증은 확인됐지만 현재 운영 명단에 대상이 없습니다. 원장님께 이름과 최신 링크를 확인해 달라고 요청해 주세요.</div></div>');
     return;
   }
-  if (!session.isStaffLink && !session.isAdmin) { v.innerHTML = viewLock(); return; }
+  if (!session.isStaffLink && !session.isAdmin) { replaceView(v, viewLock()); return; }
 
   if (pendingAdd) {
     if (session.isStaffLink && !session.isAdmin) { pendingAdd = null; toast('지시서 등록은 관리자 화면에서만 됩니다'); }
-    else { v.innerHTML = viewPendingAdd(); return; }
+    else { replaceView(v, viewPendingAdd()); return; }
   }
 
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
@@ -2237,7 +2323,7 @@ function render() {
   }
 
   const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
-  v.innerHTML = (map[route] || viewToday)();
+  replaceView(v, (map[route] || viewToday)());
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
     applyScheduleSearch(scheduleSearchQuery);
@@ -2330,6 +2416,197 @@ function viewLock() {
   '</div>';
 }
 
+/* ── 토·일 실제 등·하원 ──
+ * 예정 시간표·기존 출결·회차 원장은 건드리지 않고 Worker/D1의 별도 원장만 사용한다. */
+function isWeekendVisitDate(date) {
+  const day = dowOf(date);
+  return day === 0 || day === 6;
+}
+
+function taskHasWeekendSchedule(task) {
+  const slots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  if (slots.some(slot => Array.isArray(slot && slot.days) && slot.days.map(Number).some(day => day === 0 || day === 6))) return true;
+  return Array.isArray(task && task.days) && task.days.map(Number).some(day => day === 0 || day === 6);
+}
+
+function weekendVisitScopeKey(date, staffId) {
+  return String(date) + '|' + (staffId ? String(staffId) : '*');
+}
+
+function weekendVisitScopeStaffId() {
+  if (session.isStaffLink && !session.isAdmin) return session.staffId;
+  if (route === 'today') return String((currentStaff() || {}).id || '');
+  return '';
+}
+
+async function loadWeekendVisits(date, staffId, force) {
+  if (!isWeekendVisitDate(date) || weekendVisitLoading) return;
+  const key = weekendVisitScopeKey(date, staffId);
+  if (!force && weekendVisitLoadedKey === key) return;
+  const auth = sync.auth();
+  if (!auth) { weekendVisitError = '동기화 인증을 확인해 주세요'; return; }
+  weekendVisitLoading = true;
+  weekendVisitError = '';
+  try {
+    const result = await sync.post('/weekend-visit', {
+      app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
+    });
+    weekendVisitRows = result.visits || [];
+    weekendVisitLoadedKey = key;
+  } catch (error) {
+    weekendVisitError = String(error && error.message || error || '불러오기 실패');
+  } finally {
+    weekendVisitLoading = false;
+    if ((route === 'today' || route === 'board') && cursor === date) renderAfterSync();
+  }
+}
+
+function weekendLessonCandidates(staffId, date) {
+  return (state.tasks || []).filter(task => !task.deleted && isLesson(task) && String(task.staffId || '') === String(staffId || '') &&
+    String(task.studentId || '') && taskHasWeekendSchedule(task) &&
+    (!task.start || task.start <= date) && (!task.end || task.end >= date))
+    .sort((a, b) => String(a.studentName || studentOf(a)).localeCompare(String(b.studentName || studentOf(b)), 'ko') ||
+      String(a.subject || '').localeCompare(String(b.subject || ''), 'ko'));
+}
+
+function weekendVisitRosterStudent(studentId) {
+  return rosterDb && Array.isArray(rosterDb.students)
+    ? rosterDb.students.find(student => String(student.id || '') === String(studentId || '')) : null;
+}
+
+function weekendVisitStudentLabel(task, row) {
+  const studentId = String(task && task.studentId || row && row.studentId || '');
+  const student = weekendVisitRosterStudent(studentId);
+  const name = String(student && student.name || task && (task.studentName || studentOf(task)) || '학생 정보 확인 필요');
+  const schoolGrade = [student && student.school, student && student.grade || task && lessonGradeOf(task)].filter(Boolean).join(' · ');
+  return { name: name, detail: schoolGrade, student: student };
+}
+
+function weekendVisitTimeText(row) {
+  if (!row) return '기록 전';
+  return fmtTime(row.checkInAt) + (row.checkOutAt ? '–' + fmtTime(row.checkOutAt) : '–등원 중');
+}
+
+function weekendVisitDuration(row) {
+  if (!row || !row.checkOutAt) return '';
+  const minutes = Math.max(0, Math.round((Number(row.checkOutAt) - Number(row.checkInAt)) / 60000));
+  return scheduleDurationText(minutes);
+}
+
+function weekendVisitRowHtml(task, row, editable) {
+  const identity = weekendVisitStudentLabel(task, row);
+  const schedule = task ? (lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '주말 시간 확인 필요') : '';
+  const subject = String(task && (task.subject || task.className) || '수업 정보 확인');
+  const active = row && row.status === 'active';
+  const completed = row && row.status === 'completed';
+  const canRecordNow = editable && cursor === today() && isWeekendVisitDate(cursor);
+  let actions = '';
+  if (!row && canRecordNow && task) {
+    actions = '<button class="btn btn-sm btn-primary" data-act="weekendcheckin" data-task="' + esc(task.id) +
+      '" data-student-id="' + esc(task.studentId) + '">등원</button>';
+  } else if (active) {
+    actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
+      '" data-rev="' + row.revision + '">하원</button>' : '') +
+      (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' : '');
+  } else if (completed && editable) {
+    actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
+      '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>';
+  }
+  return '<div class="weekend-visit-row' + (active ? ' weekend-visit-live' : completed ? ' weekend-visit-complete' : '') + '">' +
+    '<div><div class="card-title">' + esc(identity.name) + (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
+    '<div class="card-sub">' + esc(subject) + (schedule ? ' · 예정 ' + esc(schedule) : '') + '</div>' +
+    (row ? '<div class="weekend-visit-time mt8">실제 ' + esc(weekendVisitTimeText(row)) +
+      (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' : '') + '</div>' +
+    (actions ? '<div class="weekend-visit-actions">' + actions + '</div>' : '') + '</div>';
+}
+
+function weekendVisitTeacherHtml(staff, date) {
+  if (!staff || !isWeekendVisitDate(date)) return '';
+  if (!rosterDb && !rosterErr && !rosterLoading) loadRoster();
+  const key = weekendVisitScopeKey(date, staff.id);
+  if (weekendVisitLoadedKey !== key && !weekendVisitLoading) setTimeout(() => loadWeekendVisits(date, staff.id, false), 0);
+  const candidates = weekendLessonCandidates(staff.id, date);
+  const scopedRows = weekendVisitLoadedKey === key ? weekendVisitRows : [];
+  const byTask = new Map(scopedRows.map(row => [String(row.lessonTaskId), row]));
+  const candidateIds = new Set(candidates.map(task => String(task.id)));
+  const orphanRows = scopedRows.filter(row => !candidateIds.has(String(row.lessonTaskId)));
+  let body;
+  if (weekendVisitError) {
+    body = '<div class="hint" style="color:var(--coral)">불러오지 못했습니다 · ' + esc(weekendVisitError) + '</div>' +
+      '<button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button>';
+  } else if (weekendVisitLoading && weekendVisitLoadedKey !== key) {
+    body = '<div class="empty"><b>🕘</b>실제 등·하원 기록을 불러오는 중…</div>';
+  } else {
+    const rows = candidates.map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)) || null, true))
+      .concat(orphanRows.map(row => weekendVisitRowHtml(state.tasks.find(task => task.id === row.lessonTaskId) || null, row, true)));
+    body = rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' :
+      '<div class="empty"><b>🗓️</b>담당 토·일 수업이 없습니다.</div>';
+  }
+  return '<details class="card weekend-visit-card" data-persist-key="weekend-actual-visits"><summary><span><b>주말 실제 등·하원</b>' +
+    '<span class="card-sub">예정 시간표는 그대로 두고 실제 방문 시간만 별도로 기록합니다.</span></span></summary>' + body + '</details>';
+}
+
+function weekendVisitBoardHtml(date) {
+  if (!session.isAdmin || !isWeekendVisitDate(date)) return '';
+  const key = weekendVisitScopeKey(date, '');
+  if (weekendVisitLoadedKey !== key && !weekendVisitLoading) setTimeout(() => loadWeekendVisits(date, '', false), 0);
+  if (weekendVisitError) return '<div class="card alert"><div class="card-title">주말 실제 등·하원 불러오기 실패</div>' +
+    '<div class="card-sub">' + esc(weekendVisitError) + '</div><button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button></div>';
+  const scopedRows = weekendVisitLoadedKey === key ? weekendVisitRows : [];
+  const active = scopedRows.filter(row => row.status === 'active').length;
+  const complete = scopedRows.filter(row => row.status === 'completed').length;
+  const rows = scopedRows.map(row => {
+    const task = state.tasks.find(item => String(item.id) === String(row.lessonTaskId));
+    const teacher = staffById(row.staffId);
+    return '<div class="weekend-visit-row ' + (row.status === 'active' ? 'weekend-visit-live' : 'weekend-visit-complete') + '"><div>' +
+      '<div class="card-title">' + esc(weekendVisitStudentLabel(task, row).name) + ' <span class="pill">' + esc(teacher && teacher.name || '담당 확인') + '</span></div>' +
+      '<div class="weekend-visit-time">실제 ' + esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' +
+      '</div><div class="weekend-visit-actions"><button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button></div></div>';
+  });
+  return '<details class="card weekend-visit-card" data-persist-key="weekend-board"><summary><span><b>주말 실제 등·하원 현황</b>' +
+    '<span class="card-sub">등원 중 ' + active + '명 · 하원 완료 ' + complete + '명</span></span></summary>' +
+    (weekendVisitLoading && weekendVisitLoadedKey !== key ? '<div class="empty"><b>🕘</b>불러오는 중…</div>' :
+      rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '<div class="empty">아직 기록이 없습니다.</div>') + '</details>';
+}
+
+function weekendVisitEditModal(visitId) {
+  const row = weekendVisitRows.find(item => String(item.visitId) === String(visitId));
+  if (!row) return toast('등·하원 기록을 다시 불러와 주세요');
+  weekendVisitEditTarget = row;
+  modal('주말 실제 등·하원 시간 수정',
+    '<div class="card-sub mb14">예정 시간표는 변경되지 않습니다. 실제 방문 시간만 정정하며 이전 기록도 보존됩니다.</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">실제 등원</label><input class="in" id="weekendVisitIn" type="time" value="' + esc(fmtTime(row.checkInAt)) + '"></div>' +
+    '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time" value="' + esc(row.checkOutAt ? fmtTime(row.checkOutAt) : '') + '"></div></div>' +
+    '<div class="field"><label class="fl">수정 사유</label><input class="in" id="weekendVisitReason" maxlength="200" placeholder="예: 버튼을 늦게 눌러 실제 시간으로 정정"></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="weekendsave">수정 저장</button>');
+}
+
+function weekendVisitTimestamp(date, hm) {
+  if (!/^\d{2}:\d{2}$/.test(String(hm || ''))) return null;
+  const value = Date.parse(date + 'T' + hm + ':00+09:00');
+  return Number.isFinite(value) ? value : null;
+}
+
+async function submitWeekendVisit(button, payload, successMessage) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증을 확인해 주세요');
+  button.disabled = true;
+  try {
+    await sync.post('/weekend-visit', Object.assign({ app: SYNC_APP, auth: auth }, payload));
+    closeModal();
+    const staffId = weekendVisitScopeStaffId();
+    weekendVisitLoadedKey = '';
+    await loadWeekendVisits(cursor, staffId, true);
+    toast(successMessage);
+  } catch (error) {
+    button.disabled = false;
+    toast('저장하지 못했습니다 — ' + String(error && error.message || error));
+    weekendVisitLoadedKey = '';
+    loadWeekendVisits(cursor, weekendVisitScopeStaffId(), true);
+  }
+}
+
 /* ── 오늘 ── */
 function viewToday() {
   const me = currentStaff();
@@ -2390,6 +2667,8 @@ function viewToday() {
     if (!rosterDb && !rosterErr) loadRoster();
     h += '<div class="card"><div class="small muted">담당 수업의 연락 기록은 각 수업 카드에서 입력할 수 있습니다. 평가·온라인 프로그램 기록은 관리 화면에서 관리합니다.</div></div>';
   }
+
+  if (isWeekendVisitDate(cursor)) h += weekendVisitTeacherHtml(me, cursor);
 
   if (editable && cursor === today()) {
     h += '<div class="card" style="padding:12px">' +
@@ -6540,7 +6819,6 @@ function applyScheduleSearch(value) {
       details.open = true;
       details.dataset.searchOpened = '1';
     } else if (!terms.length && details.dataset.searchOpened === '1') {
-      details.open = false;
       delete details.dataset.searchOpened;
     }
   });
@@ -6595,7 +6873,12 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
     '<span class="schedule-legend-item"><i class="schedule-legend-dot"></i>일반</span>' +
     (todayView ? '<span class="schedule-legend-item"><i class="schedule-legend-dot current"></i>수업 중</span>' +
       '<span class="schedule-legend-item"><i class="schedule-legend-dot next"></i>다음</span>' : '') +
-    '<span class="schedule-legend-item"><i class="schedule-legend-dot conflict"></i>학생 수업 겹침</span></div>';
+    '<span class="schedule-legend-item"><i class="schedule-legend-dot conflict"></i>학생 수업 겹침</span>' +
+    '<span class="schedule-flow-attendance is-present">출석</span>' +
+    '<span class="schedule-flow-attendance is-late">지각</span>' +
+    '<span class="schedule-flow-attendance is-absent">결석</span>' +
+    '<span class="schedule-flow-attendance is-early">조퇴</span>' +
+    '<span class="schedule-flow-attendance is-pending">미완료</span></div>';
   let h = '<div class="card schedule-timeline-card"><div class="schedule-timeline-head">' +
     '<div><div class="card-title">선생님별 수업 흐름</div><div class="card-sub">블록을 누르면 학생·출결 정보를 확인할 수 있습니다.</div></div>' + legend + '</div>';
 
@@ -6611,13 +6894,20 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
     (showNow ? '<span class="schedule-now-label" style="left:' + at(nowKst.minute) + 'px">지금 ' + esc(nowKst.label) + '</span>' : '') + '</div>';
 
   timeline.rows.forEach(row => {
-    const rowHeight = Math.max(60, row.laneCount * 48 + 12);
+    const visuals = row.sessions.map(session => {
+      const attendanceRows = scheduleSessionAttendanceRows(session, date);
+      return { session: session, attendanceRows: attendanceRows, height: Math.max(42, attendanceRows.length * 19 + 10) };
+    });
+    const laneHeights = Array.from({ length: Math.max(1, row.laneCount) }, () => 42);
+    visuals.forEach(item => { laneHeights[item.session.lane] = Math.max(laneHeights[item.session.lane], item.height); });
+    const laneOffsets = laneHeights.map((height, index) => laneHeights.slice(0, index).reduce((sum, value) => sum + value + 6, 0));
+    const rowHeight = Math.max(60, laneHeights.reduce((sum, value) => sum + value, 0) + Math.max(0, laneHeights.length - 1) * 6 + 14);
     h += '<div class="schedule-timeline-teacher" style="height:' + rowHeight + 'px"><div><b>' + esc(row.teacherName) + '</b><span>' +
       row.sessions.length + '타임</span></div></div><div class="schedule-timeline-track" style="height:' + rowHeight + 'px">' +
       (showNow ? '<i class="schedule-now-line" style="left:' + at(nowKst.minute) + 'px"></i>' : '');
-    row.sessions.forEach(session => {
+    visuals.forEach(visual => {
+      const session = visual.session;
       const names = scheduleSessionNames(session);
-      const shownNames = names[0] + (names.length > 1 ? ' +' + (names.length - 1) : '');
       const isCurrent = session.entries.some(entry => entry.clockState === 'current');
       const isEnded = session.entries.every(entry => entry.clockState === 'ended');
       const isNext = nextStart !== null && session.startMinute === nextStart;
@@ -6633,14 +6923,15 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
         (conflict ? ' · 학생 수업 겹침 확인 필요' : '');
       const title = stateText + ' · ' + row.teacherName + ' 선생님 · ' + session.label + ' · ' + names.join(', ') +
         ' · ' + attendanceDetails + (conflict ? ' · 같은 학생의 서로 다른 수업 시간이 겹칩니다' : '');
-      h += '<button class="' + classes + '" style="left:' + at(session.startMinute) + 'px;top:' + (7 + session.lane * 48) + 'px;width:' + width + 'px"' +
+      h += '<button class="' + classes + '" style="left:' + at(session.startMinute) + 'px;top:' + (7 + laneOffsets[session.lane]) + 'px;width:' + width + 'px;height:' + visual.height + 'px"' +
         ' data-act="scheduleblock" data-date="' + esc(date) + '" data-teacher="' + esc(row.teacherKey) + '" data-lesson="' + esc(session.lessonIdentity) + '" data-start="' + session.startMinute + '" data-end="' + session.endMinute + '"' +
-        ' title="' + esc(title) + '" aria-label="' + esc(title) + '"><strong>' + esc(shownNames) + '</strong><small>' +
-        esc(attendanceText) + '</small></button>';
+        ' title="' + esc(title) + '" aria-label="' + esc(title) + '"><span class="schedule-flow-attendance-list">' +
+        visual.attendanceRows.map(item => '<span class="schedule-flow-attendance ' + item.cls + '"><b>' + esc(item.name) + '</b><i>' + esc(item.label) + '</i></span>').join('') +
+        '</span><small class="sr-only">' + esc(attendanceText) + '</small></button>';
     });
     h += '</div>';
   });
-  return h + '</div></div>' + scheduleAttendanceOverviewHtml(timeline, date) + '</div>';
+  return h + '</div></div></div>';
 }
 
 function scheduleTimelineModal(entries, date) {
@@ -6695,9 +6986,23 @@ function scheduleSessionNames(session) {
   return names;
 }
 
+function scheduleSessionAttendanceRows(session, date) {
+  const rows = new Map();
+  const classes = { P: 'is-present', L: 'is-late', A: 'is-absent', E: 'is-early', '': 'is-pending' };
+  (session.entries || []).forEach(entry => {
+    const key = window.WBScheduleCore.studentGroupKey(entry.studentName, entry.grade, entry.studentId);
+    const attendance = scheduleAttendance(entry, date);
+    const current = rows.get(key);
+    if (!current || (!current.value && attendance.value)) rows.set(key, {
+      name: entry.studentName, value: attendance.value, label: attendance.label, cls: classes[attendance.value]
+    });
+  });
+  return Array.from(rows.values());
+}
+
 function scheduleSessionRow(session, teacherName, timeText, hideTeacher) {
   const names = scheduleSessionNames(session);
-  const shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ' 외 ' + (names.length - 2) + '명' : '');
+  const shown = names.join(', ');
   const tasks = session.entries.map(entry => entry.task || {});
   const subjects = [...new Set(tasks.flatMap(task => [task.subject, task.className]).filter(Boolean))];
   const roles = [...new Set(session.entries.map(entry => entry.role).filter(Boolean))];
@@ -7408,6 +7713,8 @@ function viewBoard() {
     '<div class="d">' + label(cursor) + (relLabel(cursor) ? '<em>' + relLabel(cursor) + '</em>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
 
+  h += weekendVisitBoardHtml(cursor);
+
   // 막힘 먼저
   const blocked = [];
   liveStaff().forEach(s => tasksFor(s.id, cursor).forEach(t => {
@@ -7662,6 +7969,7 @@ function applyBookOverlays() { mergeBookAdditions(); mergeBookEdits(); }
 let approvedBookAdditions = null;
 let approvedBookAdditionsLoaded = false;
 let approvedBookAdditionsLoading = false;
+let approvedBookAdditionsError = '';
 
 /** 승인된 신청을 bookDb.books에 얹는다 — 이미 있는 id는 건너뛰어 중복을 막는다 */
 function mergeBookAdditions() {
@@ -7683,6 +7991,7 @@ async function loadApprovedBookAdditions(force) {
   const auth = sync.auth();
   if (!auth) { approvedBookAdditionsLoaded = true; return; }
   approvedBookAdditionsLoading = true;
+  approvedBookAdditionsError = '';
   try {
     const result = await sync.post('/book-add-request', { app: SYNC_APP, auth: auth, action: 'list_approved', limit: 300 });
     approvedBookAdditions = result.books || [];
@@ -7690,7 +7999,8 @@ async function loadApprovedBookAdditions(force) {
     applyBookOverlays();
   } catch (error) {
     approvedBookAdditions = approvedBookAdditions || [];
-    approvedBookAdditionsLoaded = true;
+    approvedBookAdditionsLoaded = false;
+    approvedBookAdditionsError = String(error && error.message || error || '승인 교재 불러오기 실패');
   } finally {
     approvedBookAdditionsLoading = false;
     if (route === 'books') renderAfterSync();
@@ -7700,6 +8010,7 @@ async function loadApprovedBookAdditions(force) {
 let approvedBookEdits = null;
 let approvedBookEditsLoaded = false;
 let approvedBookEditsLoading = false;
+let approvedBookEditsError = '';
 
 /** 승인된 수정을 대상 책 위에 그대로 덮어쓴다(최종 상태 스냅샷) — 대상이 아직 없으면(오탈자 등) 건너뛴다 */
 function mergeBookEdits() {
@@ -7723,6 +8034,7 @@ async function loadApprovedBookEdits(force) {
   const auth = sync.auth();
   if (!auth) { approvedBookEditsLoaded = true; return; }
   approvedBookEditsLoading = true;
+  approvedBookEditsError = '';
   try {
     const result = await sync.post('/book-edit-request', { app: SYNC_APP, auth: auth, action: 'list_approved', limit: 300 });
     approvedBookEdits = result.edits || [];
@@ -7730,7 +8042,8 @@ async function loadApprovedBookEdits(force) {
     applyBookOverlays();
   } catch (error) {
     approvedBookEdits = approvedBookEdits || [];
-    approvedBookEditsLoaded = true;
+    approvedBookEditsLoaded = false;
+    approvedBookEditsError = String(error && error.message || error || '교재 분류 불러오기 실패');
   } finally {
     approvedBookEditsLoading = false;
     if (route === 'books') renderAfterSync();
@@ -7903,6 +8216,7 @@ function applyBookSearch(value) {
 
 function vendorTypeBadge(vend) {
   if (!vend) return '';
+  if (vend.type === 'other') return '<span class="tag" style="color:var(--navy)">등록 주문처</span>';
   return vend.type === 'online'
     ? '<span class="tag" style="color:var(--navy)">🌐 온라인 직접 주문</span>'
     : '<span class="tag" style="color:var(--navy)">📞 전화·문자 주문</span>';
@@ -9001,21 +9315,31 @@ function viewBooks() {
     '시리즈명이 확인되지 않은 교재는 잘못 추정하지 않고 "기타·개별 교재"에 둡니다.<br>' +
     '개별 주문도 매일 저녁 8시에 출판사별 문자 한 통으로 자동 묶입니다. 여러 권을 한 번에 입력하려면 왼쪽 체크박스를 사용하세요.<br>' +
     '기준일 ' + esc(bookDb.updated || '') + ' · 각 교재 카드의 "✏ 수정" 버튼으로 정보를 고칠 수 있습니다.</div>' +
-    '<input class="in book-search" type="search" data-book-search-input aria-label="교재 검색" ' +
+    '<div class="book-search-row"><input class="in book-search" type="search" data-book-search-input aria-label="교재 검색" ' +
       'placeholder="교재명·시리즈·과목·학년·주문처 검색" value="' + esc(bookSearchQuery) + '">' +
+      '<button type="button" class="btn btn-primary" data-act="booksearch">검색</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="booksearchclear">전체 보기</button></div>' +
     '<div class="small muted mt8" data-book-search-status role="status" aria-live="polite">전체 ' +
       (bookDb.books || []).length + '권</div>' +
+    ((approvedBookAdditionsLoading || approvedBookEditsLoading) ? '<div class="hint mt8">주문처 분류 정보를 불러오는 중입니다.</div>' : '') +
+    ((approvedBookAdditionsError || approvedBookEditsError) ? '<div class="hint mt8" style="color:var(--coral)">주문처 분류 정보를 모두 불러오지 못했습니다. ' +
+      '<button type="button" class="btn btn-sm btn-ghost" data-act="bookoverlayretry">다시 불러오기</button></div>' : '') +
     '<button class="btn btn-sm btn-primary mt14" data-act="baopen">+ 새 교재 추가 신청</button></div>';
 
   if (session.isAdmin) h += viewBookAddReview() + viewBookEditReview();
   if (session.isStaffLink && !session.isAdmin) h += viewOwnBookAddRequests() + viewOwnBookEditRequests();
 
   const searching = !!normalizeBookSearch(bookSearchQuery);
-  const vendors = bookDb.vendors || [];
+  const configuredVendors = bookDb.vendors || [];
+  const configuredNames = new Set(configuredVendors.map(vendor => String(vendor.name || vendor)));
+  const extraVendorNames = Array.from(new Set((bookDb.books || []).map(book => String(book.vendor || '').trim())
+    .filter(name => name && !configuredNames.has(name))));
+  const vendors = configuredVendors.concat(extraVendorNames.map(name => ({ name: name, type: 'other', brands: [] })));
   const byVendor = new Map(vendors.map(v => [v.name, []]));
   const unassigned = [];
   (bookDb.books || []).forEach(b => {
-    if (b.vendor && byVendor.has(b.vendor)) byVendor.get(b.vendor).push(b);
+    const vendorName = String(b.vendor || '').trim();
+    if (vendorName && byVendor.has(vendorName)) byVendor.get(vendorName).push(b);
     else unassigned.push(b);
   });
 
@@ -9051,7 +9375,7 @@ function viewBooks() {
       const groupPending = group.books.reduce((sum, book) => sum + bookPendingOrderCount(book), 0);
       const seriesKey = sec.key + '::' + group.name;
       const expanded = seriesExpansion.has(seriesKey)
-        ? seriesExpansion.get(seriesKey) : !!(selected || groupPending);
+        ? seriesExpansion.get(seriesKey) : true;
       h += '<section class="book-series" data-book-series data-expanded="' + String(expanded) + '">' +
         '<button type="button" class="between book-series-toggle" data-act="seriestoggle" data-key="' + esc(seriesKey) +
         '" aria-expanded="' + String(expanded) + '"' + (searching ? ' disabled' : '') + '>' +
@@ -14325,6 +14649,49 @@ document.addEventListener('click', ev => {
         : s.name + ' — 관리 담당 표시 해제');
       break;
     }
+    case 'weekendrefresh': {
+      weekendVisitLoadedKey = '';
+      loadWeekendVisits(cursor, weekendVisitScopeStaffId(), true);
+      break;
+    }
+    case 'weekendcheckin': {
+      const taskId = String(el.dataset.task || '');
+      const studentId = String(el.dataset.studentId || '');
+      const taskRow = state.tasks.find(item => String(item.id) === taskId);
+      if (!taskRow || !studentId) return toast('학생과 수업 정보를 다시 확인해 주세요');
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, lessonTaskId: taskId, studentId: studentId }, '실제 등원 시간을 저장했습니다');
+      break;
+    }
+    case 'weekendcheckout': {
+      const visitId = String(el.dataset.visit || '');
+      if (!confirm('실제 하원 시간을 지금으로 저장할까요?')) break;
+      submitWeekendVisit(el, { action: 'check_out', visitId: visitId, revision: Number(el.dataset.rev) }, '실제 하원 시간을 저장했습니다');
+      break;
+    }
+    case 'weekendedit': weekendVisitEditModal(el.dataset.visit); break;
+    case 'weekendsave': {
+      const row = weekendVisitEditTarget;
+      if (!row) return toast('수정할 등·하원 기록을 다시 선택해 주세요');
+      const inValue = String(($('#weekendVisitIn') || {}).value || '');
+      const outValue = String(($('#weekendVisitOut') || {}).value || '');
+      const reason = String(($('#weekendVisitReason') || {}).value || '').trim();
+      const checkInAt = weekendVisitTimestamp(row.visitDate, inValue);
+      const checkOutAt = outValue ? weekendVisitTimestamp(row.visitDate, outValue) : null;
+      if (!checkInAt || (outValue && !checkOutAt) || (checkOutAt && checkOutAt < checkInAt)) return toast('등원·하원 시간을 올바르게 입력해 주세요');
+      if (!reason) return toast('수정 사유를 입력해 주세요');
+      submitWeekendVisit(el, { action: 'correct', visitId: row.visitId, revision: row.revision,
+        checkInAt: checkInAt, checkOutAt: checkOutAt, reason: reason }, '실제 등·하원 시간을 수정했습니다');
+      break;
+    }
+    case 'weekendcancel': {
+      const reason = String(prompt('기록을 취소하는 사유를 입력해 주세요', '') || '').trim();
+      if (!reason) break;
+      if (!confirm('이 실제 등·하원 기록을 취소할까요? 기록은 감사 이력으로 보존됩니다.')) break;
+      submitWeekendVisit(el, { action: 'cancel', visitId: String(el.dataset.visit || ''),
+        revision: Number(el.dataset.rev), reason: reason }, '실제 등·하원 기록을 취소했습니다');
+      break;
+    }
     case 'attcheck': {
       if (!session.isStaffLink) break;
       const me = currentStaff(); if (!me) break;
@@ -14491,6 +14858,23 @@ document.addEventListener('click', ev => {
       seriesExpansion.set(el.dataset.key, el.getAttribute('aria-expanded') !== 'true');
       rememberBookToggleFocus(el);
       render();
+      break;
+    }
+    case 'booksearch': {
+      const input = document.querySelector('[data-book-search-input]');
+      applyBookSearch(input ? input.value : bookSearchQuery);
+      break;
+    }
+    case 'booksearchclear': {
+      const input = document.querySelector('[data-book-search-input]');
+      if (input) { input.value = ''; input.focus(); }
+      applyBookSearch('');
+      break;
+    }
+    case 'bookoverlayretry': {
+      approvedBookAdditionsLoaded = false; approvedBookEditsLoaded = false;
+      approvedBookAdditionsError = ''; approvedBookEditsError = '';
+      loadApprovedBookAdditions(true); loadApprovedBookEdits(true);
       break;
     }
     case 'baopen': bookAddModal(); break;
@@ -15621,7 +16005,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-22.2';
+const APP_VER = '2026-08-24.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
