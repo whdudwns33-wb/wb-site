@@ -231,29 +231,39 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
   assert.match(invalid.body.error, /등록할 수 없는 과목/);
 });
 
-test('director creates a stable eight-digit student from only name, school, and grade and can delete that untouched record', async () => {
+test('director creates a stable eight-digit student from name only and can delete that untouched record', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const before = await call(db, { auth: admin, action: 'get' });
-  const missingSchool = await call(db, {
+  const missingName = await call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
     student: {
-      id: 'ignored-by-server', name: '학교누락', school: '', grade: '초3',
+      id: 'ignored-by-server', name: '', school: '', grade: '',
       teacher: '', subject: '', start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: []
     }
   });
-  assert.equal(missingSchool.status, 400);
-  assert.equal(missingSchool.body.code, 'STUDENT_REQUIRED_FIELDS');
+  assert.equal(missingName.status, 400);
+  assert.equal(missingName.body.code, 'STUDENT_REQUIRED_FIELDS');
   const created = await call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt: before.body.updatedAt,
     student: {
-      id: 'ignored-by-server', name: '최소원생', school: '치평초', grade: '초3',
+      id: 'ignored-by-server', name: '최소원생', school: '', grade: '',
       teacher: '', subject: '', start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: []
     }
   });
   assert.equal(created.status, 200);
   assert.match(created.body.student.id, /^[1-9]\d{7}$/);
-  assert.equal(created.body.student.school, '치평초');
-  assert.equal(created.body.student.grade, '초3');
+  assert.equal(created.body.student.school, '');
+  assert.equal(created.body.student.grade, '');
+
+  const duplicate = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: created.body.updatedAt,
+    student: {
+      id: 'ignored-by-server', name: '최소원생', school: '', grade: '',
+      teacher: '', subject: '', start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: []
+    }
+  });
+  assert.equal(duplicate.status, 409);
+  assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
 
   const forbidden = await call(db, {
     auth: person('teacher-a', 'token-a'), action: 'student_delete', expectedUpdatedAt: created.body.updatedAt,
