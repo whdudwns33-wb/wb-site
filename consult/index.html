@@ -956,6 +956,7 @@
    1. 저장소
    ══════════════════════════════════════════════════════ */
 const LS_KEY = 'wb_consult_v1';
+const LEADERS_EYE_URL = 'https://www.eyestudent.com/login';
 const METAMATH_CENTER_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=center';
 const METAMATH_STUDENT_URL = 'https://www.mmatht.co.kr/Pages/home2/login.cshtml?kind=student';
 const CLASSCARD_ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=classcard.net';
@@ -972,6 +973,14 @@ function classcardAppUrl(userAgent, maxTouchPoints) {
 }
 
 const LEARNING_SOURCES = Object.freeze({
+  leaders_eye: {
+    icon: '👁️', label: '리더스아이', centerUrl: LEADERS_EYE_URL, studentUrl: LEADERS_EYE_URL,
+    centerAction: '리더스아이 열기', studentAction: '리더스아이 학습하기',
+    detail: '리더스아이 온라인 학습',
+    guide: '리더스아이에서 배정된 온라인 학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
+    steps: ['온라인 학습 완료하기', '학습 결과 확인하기'],
+    noteHint: '학습 회차·결과 메모'
+  },
   metamath: {
     icon: '🧮', label: '메타수학', centerUrl: METAMATH_CENTER_URL, studentUrl: METAMATH_STUDENT_URL,
     centerAction: '교실홈에서 문제 내기', studentAction: '메타수학 문제 풀기',
@@ -4445,7 +4454,7 @@ function viewStudy() {
 
   h += submissionHubCard(me);
   [
-    { title: '온라인 학습', help: '외부 학습 서비스 과제와 진행 상태', keys: ['metamath', 'classcard', 'studyforce'] },
+    { title: '온라인 학습', help: '외부 학습 서비스 과제와 진행 상태', keys: ['leaders_eye', 'metamath', 'classcard', 'studyforce'] },
     { title: '자기주도 학습', help: '독해·독서·탐구 결과와 단계 기록', keys: ['wb_reading', 'reading', 'inquiry_report'] },
     { title: '시험 준비', help: '시험 일정과 연결된 제공 자료', keys: ['exam_material'] }
   ].forEach(group => {
@@ -10773,7 +10782,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-24.45';
+const APP_VER = '2026-08-24.46';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
