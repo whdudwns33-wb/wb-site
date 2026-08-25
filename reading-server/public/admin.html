@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>WB 진로독서 · 관리</title>
+  <style>
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}
+    header b{font-size:17px}header small{opacity:.75}
+    header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1080px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}
+    button{font:inherit;cursor:pointer}
+    input,select{font:inherit;min-height:42px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2f4;color:var(--muted)}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+    .stat{flex:1;min-width:120px;padding:12px;border:1px solid #d6ebf4;border-radius:12px;background:#f5fbfe;text-align:center}
+    .stat b{display:block;font-size:22px;color:var(--navy)}
+    .stat span{font-size:12px;color:var(--muted);font-weight:800}
+    .tbl{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+    th{position:sticky;top:0;background:#f0f5f7;color:var(--navy);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+    tr:hover td{background:#f8fcfe}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
+    .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;align-items:end}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    dialog{border:1px solid var(--line);border-radius:14px;max-width:520px;width:92%;padding:18px}
+    dialog::backdrop{background:#17395766}
+  </style>
+</head>
+<body>
+<header><b>WB 진로독서 · 관리</b><small>강사용 현황판</small><span class="sp"></span>
+  <button class="hbtn" id="linkReview" onclick="location.href='/review.html'">지문 검수</button>
+  <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
+  <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
+</header>
+<main id="app"></main>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let DATA=null,FILTER='전체';
+const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
+
+async function api(path,opt){
+  const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+function renderLogin(msg){
+  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;
+  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">관리 PIN을 입력하세요.</p>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
+    <button class="btn" id="doLogin">로그인</button></div>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
+  $('#doLogin').onclick=async()=>{
+    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);refresh();}
+    catch(e){renderLogin(e.message);}
+  };
+  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+}
+function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;
+  if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
+function render(){
+  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  const all=DATA.students.slice();
+  const classes=['전체',...new Set(all.map(s=>s.cls).filter(Boolean))];
+  let list=FILTER==='전체'?all:all.filter(s=>s.cls===FILTER);
+  list.sort((a,b)=>(a.today===b.today?0:a.today?1:-1)||(b.streak-a.streak));
+  const linked=all.filter(s=>s.linked);
+  const doneToday=linked.filter(s=>s.today).length;
+  $('#app').innerHTML=`
+  <div class="card"><h2>오늘 현황</h2><div class="stats">
+    <div class="stat"><b>${all.length}</b><span>등록 학생</span></div>
+    <div class="stat"><b>${linked.length}</b><span>앱 연동</span></div>
+    <div class="stat"><b>${doneToday} / ${linked.length}</b><span>오늘의 1지문 완료</span></div>
+    <div class="stat"><b>${linked.length-doneToday}</b><span>오늘 미수행</span></div>
+  </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다.</p></div>
+  <div class="card"><h2>학생 현황판</h2>
+    <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
+    <div class="tbl"><table><thead><tr>
+      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>보고서</th><th>붉은책</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
+      ${list.map(s=>`<tr>
+        <td><b>${esc(s.name||'(미등록)')}</b> <span class="muted">${esc(s.code)}</span></td>
+        <td>${esc(s.cls||'—')}</td>
+        <td><select data-lv="${esc(s.code)}" ${s.name?'':'disabled'}>
+          ${['','L2','L3','L4'].map(l=>`<option value="${l}" ${s.level===l?'selected':''}>${l?LV[l]:'—'}</option>`).join('')}</select>
+          ${s.appLevel&&s.appLevel!==s.level&&s.level?`<span class="tag warn">앱:${s.appLevel}</span>`:''}</td>
+        <td>${s.linked?(s.today?'<span class="tag ok">완료</span>':'<span class="tag bad">미수행</span>'):'<span class="tag muted">미연동</span>'}</td>
+        <td>${s.streak}일</td><td>${s.week}/7</td><td>${s.reads}</td>
+        <td>${s.acc==null?'—':s.acc+'%'}</td><td>${s.vocab}</td><td>${s.reports}</td><td>${s.redbook}</td><td>${s.train}</td>
+        <td>${fmtLast(s.lastActive)}</td></tr>`).join('')||'<tr><td colspan="13" class="muted">학생이 없습니다. 아래에서 등록하세요.</td></tr>'}
+    </tbody></table></div></div>
+  <div class="card"><h2>학생 등록 / 수정</h2>
+    <p class="muted">같은 코드로 저장하면 수정됩니다. 학생은 앱 설정 → 선생님 연동에서 이 코드를 입력합니다.</p>
+    <div class="grid-form" style="margin-top:8px">
+      <label>코드<br><input id="fCode" placeholder="예: wb-101" style="width:100%"></label>
+      <label>이름<br><input id="fName" style="width:100%"></label>
+      <label>학년<br><input id="fGrade" placeholder="예: 중2" style="width:100%"></label>
+      <label>반<br><input id="fCls" placeholder="예: 월수금A" style="width:100%"></label>
+      <label>레벨<br><select id="fLv" style="width:100%"><option value="">자동</option><option value="L2">초등 심화</option><option value="L3">중등</option><option value="L4">고등</option></select></label>
+      <button class="btn" id="fSave">저장</button>
+    </div><p class="err" id="fErr"></p></div>`;
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
+  document.querySelectorAll('select[data-lv]').forEach(sel=>sel.onchange=async()=>{
+    if(!sel.value)return;
+    try{await api('/admin/level',{method:'POST',body:JSON.stringify({code:sel.dataset.lv,level:sel.value})});refresh();}
+    catch(e){alert(e.message);}
+  });
+  $('#fSave').onclick=async()=>{
+    try{$('#fErr').textContent='';
+      await api('/admin/students',{method:'POST',body:JSON.stringify({code:$('#fCode').value,name:$('#fName').value,grade:$('#fGrade').value,cls:$('#fCls').value,level:$('#fLv').value})});
+      refresh();}
+    catch(e){$('#fErr').textContent=e.message;}
+  };
+}
+async function refresh(){
+  try{DATA=await api('/admin/overview');render();}
+  catch(e){if(e.message!=='auth')renderLogin(e.message);}
+}
+$('#btnRefresh').onclick=refresh;
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+if(TOKEN)refresh();else renderLogin();
+setInterval(()=>{if(TOKEN&&DATA)refresh();},60000);
+</script>
+</body>
+</html>
