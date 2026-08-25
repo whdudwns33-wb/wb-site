@@ -230,12 +230,18 @@ if(!db.meta.seedDbV1){
   db.meta.seedDbV1=true;save();
 }
 /* 학생별 관심대학 시드 — 빌드 시 주입 (공개 소스에는 비어 있음) */
-const SEED_UNIVS={}; /*BUILD:PRIVATE_SEED*/
-(()=>{let ch=false;
+const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
+(()=>{let ch=false;const SU=SEED_PRIV.univs||{},SP=SEED_PRIV.profiles||{};
   for(const s of db.students){
-    if(!s.univSeeded&&(!s.univs||!s.univs.length)&&SEED_UNIVS[s.name]){
-      s.univs=SEED_UNIVS[s.name].map(u=>({univ:u[0],major:u[1],track:u[2]||"",tong:"",checked:""}));
-      s.univSeeded=true;ch=true;}}
+    if(!s.univSeeded&&(!s.univs||!s.univs.length)&&SU[s.name]){
+      s.univs=SU[s.name].map(u=>({univ:u[0],major:u[1],track:u[2]||"",tong:"",checked:""}));
+      s.univSeeded=true;ch=true;}
+    if(!s.profileSeeded&&SP[s.name]){
+      const pf=SP[s.name];
+      for(const k of ["school","career","targetUniv","notes"])if(!s[k]&&pf[k]){s[k]=pf[k];ch=true;}
+      if(!s.profileMd&&pf.profileMd){s.profileMd=pf.profileMd;ch=true;}
+      s.profileSeeded=true;}
+  }
   if(ch)save();})();
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
