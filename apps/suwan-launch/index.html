@@ -637,7 +637,9 @@ const defaultState = () => ({
   recipes: null,           // 레시피 출판실 — null이면 RECIPE_SEED [카드]
   rhythm: null,            // 화요일 연구실 — null이면 {ritualDay:2, sessions:[]}
   lessonPlan: null,        // 강의계획서 {cls,subject,level,weeks,start,rows:[{topic,mat,hw}]}
-  policyKit: {}            // 운영 정책 선택 {homework, attendance, makeup}
+  policyKit: {},           // 운영 정책 선택 {homework, attendance, makeup}
+  lastBackupAt: '',        // 마지막 JSON 내보내기 날짜 (YYYY-MM-DD)
+  saveCount: 0             // 마지막 백업 이후 저장 횟수 — 잃을 수 있는 작업량의 척도
 });
 let S = load();
 function migrate(st){
@@ -667,6 +669,8 @@ function migrate(st){
   if(!st.rhythm) merged.rhythm = null;
   if(!st.lessonPlan) merged.lessonPlan = null;
   if(!st.policyKit || typeof st.policyKit !== 'object') merged.policyKit = {};
+  if(typeof st.lastBackupAt !== 'string') merged.lastBackupAt = '';
+  if(typeof st.saveCount !== 'number') merged.saveCount = 0;
   return merged;
 }
 function load(){
@@ -679,7 +683,12 @@ function load(){
   }catch(e){}
   return defaultState();
 }
-function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+function save(opts){
+  try{
+    if(!(opts && opts.silent)) S.saveCount = (S.saveCount||0) + 1;
+    localStorage.setItem(LS_KEY, JSON.stringify(S));
+  }catch(e){}
+}
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -2697,19 +2706,42 @@ function renderSimulator(){
 /* ══════════════════ 데이터 관리 ══════════════════ */
 function renderData(){
   const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  const bk = backupStatus();
+  const counts = dataCounts();
+  const totalRecords = Object.keys(counts).reduce((a,k)=>a+counts[k],0);
+  const activeKinds = Object.keys(counts).filter(k=>counts[k]>0).length;
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">Data</div>
     <h2>데이터 관리</h2>
     <p class="lede">모든 입력은 이 브라우저의 localStorage에 저장됩니다. 다른 기기와 공유하거나 백업하려면 JSON으로 내보내세요.
     이 데이터가 쌓이면 오픈 후 운영 프로그램(원생·수납·리포트 관리)으로 이어지는 출발점이 됩니다.</p>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+      <div class="hq-tile" style="--acc:${bk.level==='bad'?'var(--bad)':bk.level==='warn'?'var(--warn)':'var(--ok)'}">
+        <div class="lbl">마지막 백업</div>
+        <div class="big" style="font-size:${bk.days===null?'20px':'30px'};${bk.days===null?'line-height:1.4;padding-top:6px':''}">${bk.days===null?'없음':(bk.days===0?'오늘':bk.days+'일 전')}</div>
+        <div class="sub">${bk.pending>0?'그 이후 '+num(bk.pending)+'번 저장됨':'저장 이후 변경 없음'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">보관 중인 기록</div><div class="big">${num(totalRecords)}</div>
+        <div class="sub">${activeKinds}개 항목 종류</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">저장 위치</div>
+        <div class="big" style="font-size:18px;line-height:1.4;padding-top:6px">이 브라우저</div>
+        <div class="sub">서버에 사본이 없습니다 — 백업이 유일한 안전망</div>
+      </div>
+    </div>
     <div class="card">
-      <h3>현재 상태</h3>
-      <div class="res-item"><span>인터뷰 답변</span><b>${iv.done}/${iv.total}</b></div>
-      <div class="res-item"><span>선택 컨셉</span><b>${S.selectedConcept?S.selectedConcept+'안':'미선택'}</b></div>
-      <div class="res-item"><span>전략 액션 완료</span><b>${bd.done}/${bd.total}</b></div>
-      <div class="res-item"><span>실행 작업 완료</span><b>${tk.done}/${tk.total}</b></div>
-      <div class="res-item"><span>오픈 목표일</span><b>${S.openDate||'미설정'}</b></div>
+      <h3>보관 중인 데이터</h3>
+      <table class="grid-tbl">
+        <thead><tr><th>항목</th><th style="width:90px">건수</th></tr></thead>
+        <tbody>
+          ${Object.keys(counts).map(k=>`<tr><td>${esc(k)}</td><td class="num">${counts[k]?'<b>'+num(counts[k])+'</b>':'—'}</td></tr>`).join('')}
+          <tr class="total"><td>합계</td><td class="num">${num(totalRecords)}</td></tr>
+        </tbody>
+      </table>
+      <p class="small muted" style="margin-top:10px">선택 컨셉 ${S.selectedConcept?S.selectedConcept+'안':'미선택'} · 오픈 목표일 ${S.openDate||'미설정'} · 전략 액션 ${bd.done}/${bd.total} · 실행 작업 ${tk.done}/${tk.total}</p>
     </div>
     <div class="card no-print">
       <h3>백업 · 공유</h3>
@@ -2719,7 +2751,8 @@ function renderData(){
         <button class="btn sm ghost" onclick="window.print()">보고서 인쇄 (현재 화면)</button>
         <button class="btn sm ghost" style="color:var(--bad);border-color:var(--bad)" onclick="resetAll()">전체 초기화</button>
       </div>
-      <p class="small muted" style="margin-top:10px">인쇄 팁: 컨셉 상세나 전략 보드 화면을 연 상태에서 브라우저 인쇄(Ctrl/Cmd+P)를 누르면 그 화면이 보고서 형태로 출력됩니다.</p>
+      <p class="small muted" style="margin-top:10px"><b>권장 루틴</b> — 화요일 연구 세션 끝에 한 번씩 내보내고, 받은 파일을 메일이나 클라우드에 보관하세요. 기기를 바꾸거나 브라우저를 정리하면 이 보드의 기록은 복구할 방법이 없습니다.</p>
+      <p class="small muted" style="margin-top:6px">인쇄 팁: 컨셉 상세나 전략 보드 화면을 연 상태에서 브라우저 인쇄(Ctrl/Cmd+P)를 누르면 그 화면이 보고서 형태로 출력됩니다.</p>
     </div>
     <div class="card">
       <h3>메모</h3>
@@ -2729,13 +2762,18 @@ function renderData(){
   </section>`;
 }
 function exportJson(){
-  const blob = new Blob([JSON.stringify({exportedAt:new Date().toISOString(), state:S}, null, 2)], {type:'application/json'});
+  const stamp = todayStr();
+  const counts = dataCounts();
+  const payload = { app:'wb-strategy-board', exportedAt:new Date().toISOString(), exportedDate:stamp, counts, state:S };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'wb-suwan-launch-백업.json';
+  a.download = 'WB전략보드_백업_' + stamp + '.json';
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-  toast('JSON 내보내기 완료');
+  S.lastBackupAt = stamp; S.saveCount = 0; save({silent:true});
+  toast('백업 파일을 내려받았습니다 — 클라우드나 메일에 한 부 보관하세요');
+  render();
 }
 function importJson(input){
   const f = input.files && input.files[0]; if(!f) return;
@@ -2744,14 +2782,27 @@ function importJson(input){
     try{
       const obj = JSON.parse(r.result);
       const st = obj.state || obj;
-      if(!st || Array.isArray(st) || typeof st !== 'object' || !st.answers) throw new Error('형식 오류');
+      if(!st || Array.isArray(st) || typeof st !== 'object') throw new Error('형식 오류');
+      const when = obj.exportedDate || (obj.exportedAt||'').slice(0,10) || '알 수 없음';
+      const c = obj.counts;
+      const summary = c ? Object.keys(c).filter(k=>c[k]>0).map(k=>k+' '+c[k]).join(' · ') : '(요약 정보가 없는 이전 형식)';
+      const cur = dataCounts();
+      const curSum = Object.keys(cur).filter(k=>cur[k]>0).map(k=>k+' '+cur[k]).join(' · ') || '(비어 있음)';
+      if(!confirm('가져올 백업\n· 내보낸 날짜: '+when+'\n· 담긴 내용: '+summary+
+                  '\n\n지금 이 브라우저의 데이터\n· '+curSum+
+                  '\n\n위 백업으로 완전히 교체합니다. 현재 데이터는 사라집니다.\n계속할까요?')){ input.value=''; return; }
       S = migrate(st);
-      save(); render(); toast('가져오기 완료');
+      S.lastBackupAt = when.length===10 ? when : S.lastBackupAt;
+      S.saveCount = 0; save({silent:true});
+      render(); toast(when+' 백업으로 교체했습니다');
     }catch(e){ toast('가져오기 실패 — 파일 형식을 확인하세요'); }
+    input.value = '';
   };
   r.readAsText(f);
 }
 function resetAll(){
+  const bk = backupStatus();
+  if(bk.pending>0 && !confirm('아직 백업하지 않은 변경이 '+bk.pending+'건 있습니다.\n초기화하면 복구할 수 없습니다.\n\n그래도 계속할까요? (취소하고 먼저 내보내기를 권합니다)')) return;
   if(!confirm('모든 답변·선택·작업 상태를 삭제합니다. 계속할까요?')) return;
   localStorage.removeItem(LS_KEY);
   S = defaultState(); ivIdx = 0; cIdx = null; chFilter='all';
@@ -3183,6 +3234,35 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6
 // 로컬(기기 시간대) 기준 YYYY-MM-DD — toISOString은 UTC라 한국에서 자정~오전 9시에 전날이 나온다
 function fmtYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function todayStr(){ return fmtYmd(new Date()); }
+/* 이 보드의 기록은 브라우저 localStorage에만 있다. 캐시 삭제·기기 변경으로 통째로
+   사라질 수 있으므로, 마지막 백업 이후 얼마나 쌓였는지를 계속 눈에 보이게 한다. */
+function dataCounts(){
+  const L = S.expLab||{}, R = S.recon||{}, Rh = S.rhythm||{};
+  return {
+    '인터뷰 답변': Object.keys(S.answers||{}).length,
+    '전략 목표': (S.goals||[]).reduce((a,g)=>a+(g.items||[]).length,0),
+    'KPI 기록': (S.kpiEntries||[]).length,
+    '의사결정': (S.decisions||[]).length,
+    '가설': (L.hypotheses||[]).length,
+    '실험': (L.experiments||[]).length,
+    '표준(SOP)': (L.sops||[]).length,
+    '정찰 관찰': (R.observations||[]).length,
+    '레시피': (S.recipes||[]).length,
+    '연구 세션': (Rh.sessions||[]).length,
+    '실행 작업': (S.tasks||[]).length,
+    '퍼널 기록': (S.funnelEntries||[]).length,
+    '오픈 준비 체크': Object.keys(S.openPrep||{}).filter(k=>S.openPrep[k]).length,
+  };
+}
+function backupStatus(){
+  const pending = S.saveCount||0;
+  const last = S.lastBackupAt||'';
+  if(!last) return { days:null, pending, level: pending>=10?'bad':(pending>0?'warn':'ok'), label:'백업한 적 없음' };
+  const days = Math.max(0, Math.round((new Date(todayStr()+'T00:00:00') - new Date(last+'T00:00:00'))/86400000));
+  let level = 'ok';
+  if(pending>0) level = (days>=14 || pending>=60) ? 'bad' : (days>=7 || pending>=25 ? 'warn' : 'ok');
+  return { days, pending, level, label: days===0?'오늘 백업함':(days+'일 전 백업') };
+}
 
 const BIZ_UNITS = [
   { id:'center',  name:'WB 웩슬러브레인센터', role:'웩슬러 검사 · 상담 · 데이터 허브', status:'운영중' },
@@ -3264,7 +3344,13 @@ function latestKpi(biz){
   return rows.length ? rows[rows.length-1] : null;
 }
 function setHqFocus(v){ if(!S.hq) S.hq={focus:''}; S.hq.focus = v; save(); }
+function isFreshBoard(){
+  const L = S.expLab||{}, R = S.recon||{}, Rh = S.rhythm||{};
+  return (S.kpiEntries||[]).length===0 && (L.experiments||[]).length===0
+      && (Rh.sessions||[]).length===0 && (R.observations||[]).length===0;
+}
 function renderHq(){
+  const bk = backupStatus();
   const sp = suwanProgress();
   const dd = dday();
   const decs = decisionsState();
@@ -3288,6 +3374,24 @@ function renderHq(){
       <div class="date">${dateStr}</div>
     </div>
 
+    ${bk.level==='bad' ? `<div class="card tight no-print" style="border-left:3px solid var(--bad);margin-bottom:14px">
+      <b class="small">백업이 밀렸습니다 — ${esc(bk.label)}${bk.pending?' · 이후 '+num(bk.pending)+'번 저장됨':''}</b>
+      <p class="small muted" style="margin-top:4px">이 보드의 기록은 이 브라우저에만 있습니다. 캐시를 지우거나 기기를 바꾸면 그대로 사라집니다.</p>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn xs" onclick="exportJson()">지금 백업 내보내기</button>
+        <button class="btn xs ghost" onclick="nav('data')">데이터 화면 열기</button>
+      </div>
+    </div>` : ''}
+    ${isFreshBoard() ? `<div class="card no-print" style="border-left:3px solid var(--blue);margin-bottom:14px">
+      <h3>여기서 시작하세요</h3>
+      <p class="small muted" style="margin:4px 0 10px">화면이 많아 보이지만, 실제로 매주 쓰는 곳은 세 군데입니다. 순서대로 한 번씩만 해보시면 보드가 살아납니다.</p>
+      <div class="hq-dec-row"><span class="t"><b>①</b> 이번 달 실적을 한 줄 넣기 — 재원생 수 하나만으로도 추이가 시작됩니다</span>
+        <button class="btn xs no-print" onclick="nav('kpi')">KPI 열기</button></div>
+      <div class="hq-dec-row"><span class="t"><b>②</b> 연구 세션 한 번 돌리기 — 15분이면 됩니다</span>
+        <button class="btn xs no-print" onclick="nav('rhythm')">화요일 연구실</button></div>
+      <div class="hq-dec-row"><span class="t"><b>③</b> 회고에 적은 "실험할 것"을 가설로 보내기</span>
+        <button class="btn xs no-print" onclick="nav('explab')">운영실험실</button></div>
+    </div>` : ''}
     <div class="hq-strip">
       <div class="hq-tile" style="--acc:var(--coral)">
         <div class="lbl">수완 오픈</div>
@@ -3758,7 +3862,7 @@ function iceScore(h){ return (h.ice.i||0)+(h.ice.c||0)+(h.ice.e||0); }
 function addHypothesis(){
   const L = expLabState();
   const intervention = prompt('① 개입 — 무엇을 바꿉니까?\n예: 국어 숙제를 지문형→요약형으로 변경'); if(!intervention) return;
-  const list = EXP_METRICS.map((m,i)=>`${i+1}. ${m.label}`).join('\n');
+  const list = EXP_METRICS.map((m,i)=>`${i+1}. ${m.label}${m.src==='kpi'?' (KPI 연동)':''}`).join('\n');
   const mi = parseInt(prompt('② 지표 — 무엇이 변합니까? 번호 선택:\n'+list),10);
   const metric = EXP_METRICS[mi-1]; if(!metric){ toast('지표 번호가 올바르지 않습니다'); return; }
   let metricLabel = metric.label;
@@ -3821,6 +3925,30 @@ function addObservation(expId){
   e.observations.push({ date, value:v, note });
   save(); renderExpLab();
 }
+function pullKpiObservations(expId){
+  const L = expLabState();
+  const e = L.experiments.find(x=>x.id===expId); if(!e) return;
+  const m = EXP_METRICS.find(x=>x.key===e.metricKey);
+  if(!m || m.src!=='kpi'){ toast('이 지표는 KPI 화면에 없는 항목입니다 — 관측을 직접 기록하세요'); return; }
+  const bi = prompt('어느 사업체의 KPI에서 가져올까요?\n'+BIZ_UNITS.map((b,i)=>`${i+1}. ${b.name}`).join('\n'), '2');
+  if(bi===null) return;
+  const biz = BIZ_UNITS[parseInt(bi,10)-1]; if(!biz){ toast('번호를 확인해주세요'); return; }
+  const fromMonth = e.startDate.slice(0,7);
+  const rows = (S.kpiEntries||[])
+    .filter(x=>x.biz===biz.id && x[e.metricKey]!=null && x.month >= fromMonth)
+    .sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
+  if(!rows.length){ toast(biz.name+'의 '+fromMonth+' 이후 '+m.label+' 실적이 아직 없습니다'); return; }
+  let added = 0;
+  rows.forEach(row=>{
+    const date = row.month+'-01';
+    if(e.observations.some(o=>o.date===date && o.src==='kpi')) return;
+    e.observations.push({ date, value:row[e.metricKey], note:'KPI 자동 — '+biz.name+' '+row.month, src:'kpi' });
+    added++;
+  });
+  if(!added){ toast('이미 가져온 실적입니다'); return; }
+  e.observations.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  save(); toast(m.label+' 실적 '+added+'건을 관측으로 가져왔습니다'); renderExpLab();
+}
 function judgeExperiment(expId){
   const L = expLabState();
   const e = L.experiments.find(x=>x.id===expId); if(!e) return;
@@ -3880,6 +4008,7 @@ function renderExpLab(){
       <h4><span>${esc(e.intervention)}</span>
         <span class="small muted no-print" style="font-weight:400;white-space:nowrap">
           ${mode==='running'?`<button class="btn xs" onclick="addObservation('${e.id}')">관측 기록</button>`:''}
+          ${mode!=='archive' && (EXP_METRICS.find(m=>m.key===e.metricKey)||{}).src==='kpi'?`<button class="btn xs ghost" onclick="pullKpiObservations('${e.id}')">KPI에서 가져오기</button>`:''}
           ${mode!=='archive'?`<button class="btn xs ${mode==='verdict'?'':'ghost'}" onclick="judgeExperiment('${e.id}')">판정</button>`:''}
         </span></h4>
       <div class="bg">지표 <b>${esc(e.metricLabel)}</b> · 기대 ${esc(e.expected)} · 기간 ${esc(e.startDate)} ~ ${esc(e.endDate)}${e.extended?' (1회 연장됨)':''}</div>
