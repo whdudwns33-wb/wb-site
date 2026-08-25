@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173957">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <title>WB 진로독서</title>
@@ -184,6 +184,8 @@ let DB=null;
 let S=loadState();
 let view={name:'boot'};
 let sess={}; // 화면 임시 상태 (진단/퀴즈 진행 등)
+let deferredPrompt=null; // PWA 설치 프롬프트
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
 function loadState(){
   try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(s&&s.v===1)return s;}}catch(e){}
@@ -559,6 +561,17 @@ function vSettings(){
     <select id="lvSel" data-act-change="level">${LEVELS.map(l=>`<option value="${l}" ${p.level===l?'selected':''}>${LEVEL_LABEL[l]}</option>`).join('')}</select></div>
     <div class="card"><h2>관심 분야</h2><p class="sub">1~3개를 골라 주세요.</p>
     <div class="pick-grid">${INTERESTS.map(([v,l,d])=>`<button class="pick" data-act="set-int" data-v="${v}" aria-pressed="${p.interests.includes(v)}">${l}<small>${d}</small></button>`).join('')}</div></div>
+    <div class="card"><h2>앱으로 쓰기</h2>
+    ${isStandalone()
+      ?'<p class="sub" style="margin-top:9px">앱으로 실행 중이에요 ✓ 오프라인에서도 읽던 글을 열 수 있어요.</p>'
+      :deferredPrompt
+      ?`<p class="sub" style="margin-top:9px">홈 화면에 설치하면 앱처럼 바로 열리고, 오프라인에서도 읽을 수 있어요.</p>
+        <button class="btn sm" data-act="pwa-install">홈 화면에 설치</button>`
+      :`<p class="sub" style="margin-top:9px">브라우저 메뉴로 설치할 수 있어요.<br>
+        · 안드로이드 크롬: 메뉴(⋮) → <b>앱 설치</b> 또는 <b>홈 화면에 추가</b><br>
+        · 아이폰 사파리: 공유 버튼 → <b>홈 화면에 추가</b><br>
+        설치하면 오프라인에서도 읽던 글이 열려요.</p>`}
+    </div>
     <div class="card"><h2>데이터</h2><p class="sub">읽기 기록은 이 기기 브라우저에만 저장돼요.</p>
     ${sess.confirmReset?`<div class="note">정말 모든 기록을 지울까요? 되돌릴 수 없어요.</div>
       <div class="row2"><button class="btn sm ghost" data-act="reset-no" style="margin-top:9px">취소</button>
@@ -637,6 +650,7 @@ document.addEventListener('click',e=>{
     render();}
   else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
     if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
+  else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
   else if(act==='reset-ask'){sess.confirmReset=true;render();}
   else if(act==='reset-no'){sess.confirmReset=false;render();}
   else if(act==='reset-yes'){localStorage.removeItem(KEY);S=loadState();go('onboard');}
@@ -650,6 +664,19 @@ window.addEventListener('scroll',()=>{
 document.addEventListener('change',e=>{
   const t=e.target.closest('[data-act-change]');if(!t)return;
   if(t.dataset.actChange==='level'){S.profile.level=t.value;save();render();announce('레벨 변경: '+LEVEL_LABEL[t.value]);}
+});
+
+/* ───────────────────────── PWA ───────────────────────── */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  if(view.name==='settings')render();
+});
+window.addEventListener('appinstalled',()=>{
+  deferredPrompt=null;announce('앱 설치 완료!');
+  if(view.name==='settings')render();
 });
 
 /* ───────────────────────── 부팅 ───────────────────────── */
