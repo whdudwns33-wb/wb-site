@@ -440,6 +440,18 @@
   .add-dashed{width:100%;text-align:center;cursor:pointer;background:transparent;color:var(--mid);
     border:1px dashed var(--mid);border-radius:2px;padding:16px;font-size:12.5px;font-weight:500}
   .add-dashed:hover{color:var(--dark);border-color:var(--dark)}
+  /* ─── 마스트헤드 접이식 (수완 그룹) ─── */
+  .subnav{flex-basis:100%;display:flex;flex-wrap:wrap;gap:2px;align-items:flex-end;
+    border-top:1px solid var(--line);margin-top:4px;padding-top:4px}
+  .subnav.collapsed{display:none}
+  .subnav-toggle{border:1px solid var(--line)!important;border-radius:2px;background:var(--paper-deep);
+    font-weight:700;padding:5px 11px!important;margin:0 0 7px 8px;align-self:center;color:var(--dark)!important}
+  .subnav-toggle:hover{border-color:var(--dark)!important}
+  .subnav-toggle .cnt{color:var(--mid);font-weight:600;margin-left:4px}
+  @media(max-width:700px){
+    .subnav,.subnav.collapsed{display:contents}
+    .subnav-toggle{display:none}
+  }
   /* ─── 샘플 모델 (장신로 144 · 80평) ─── */
   .fp{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin:14px 0 6px}
   .fp .rm{border:1px solid var(--line);background:var(--surface);border-radius:2px;padding:10px 9px;min-height:78px}
@@ -500,7 +512,8 @@
   <span class="nav-sep"></span>
   <button class="navbtn" data-nav="data">데이터</button>
   <button class="navbtn no-print" onclick="logout()" style="color:var(--coral)">로그아웃</button>
-  <span class="nav-break"></span>
+  <button class="navbtn subnav-toggle no-print" id="subnavToggle" onclick="toggleSubnav()">수완 오픈<span class="cnt" id="subnavCnt">▸</span></button>
+  <div class="subnav collapsed" id="subnav">
   <span class="nav-group">수완 오픈</span>
   <button class="navbtn" data-nav="home">프로젝트 홈</button>
   <button class="navbtn" data-nav="interview">① 인터뷰</button>
@@ -526,6 +539,7 @@
   <button class="navbtn" data-nav="sample">🏢 샘플 모델 (장신로 144)</button>
   <span class="nav-sep"></span>
   <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
+  </div>
 </nav>
 
 <main id="app" class="wrap"></main>
@@ -659,8 +673,23 @@ function ensureTasks(){
 /* ══════════════════ 라우팅 ══════════════════ */
 const app = document.getElementById('app');
 let currentView = 'hq';
+const SUWAN_VIEWS = ['home','interview','concepts','board','tasks','calc','schedule','report','manual',
+  'subjects','simulator','opsmanual','staffmanual','competitors','brochure','timeline','pnl',
+  'agreements','duediligence','funnel','sample'];
+let subnavOpen = false;
+function updateSubnav(){
+  const el = document.getElementById('subnav'), tg = document.getElementById('subnavCnt');
+  if(!el) return;
+  el.classList.toggle('collapsed', !subnavOpen);
+  if(tg) tg.textContent = subnavOpen ? '▾' : '▸';
+}
+function toggleSubnav(){ subnavOpen = !subnavOpen; updateSubnav(); }
 function nav(v){
   currentView = v;
+  // 수완 화면으로 가면 수완 그룹을 펼치고, 총괄로 돌아오면 접는다 (데이터 화면은 중립)
+  if(SUWAN_VIEWS.includes(v)) subnavOpen = true;
+  else if(v !== 'data') subnavOpen = false;
+  updateSubnav();
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.nav===v));
   window.scrollTo({top:0});
   render();
@@ -773,27 +802,29 @@ function renderHome(){
       </div>
     </div>
 
-    <div class="grid3">
-      <div class="card tight">
-        <div class="stat-lbl">① 전략 인터뷰</div>
-        <div class="stat-num">${iv.pct}%</div>
-        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${iv.pct}%"></i></div>
-        <div class="small muted">${iv.done}/${iv.total} 문항 답변</div>
-        <button class="btn sm" style="margin-top:10px" onclick="nav('interview')">이어서 진행</button>
+    <div class="hq-strip">
+      <div class="hq-tile" style="--acc:var(--coral)">
+        <div class="lbl">오픈까지</div>
+        <div class="big">${dd===null?'미설정':(dd>=0?'D-'+dd:'D+'+(-dd))}</div>
+        <div class="sub">${S.openDate?esc(S.openDate)+' 목표 · 임시값':'아래에서 목표일 설정'}</div>
       </div>
-      <div class="card tight">
-        <div class="stat-lbl">③ 연계전략 보드</div>
-        <div class="stat-num">${bd.pct}%</div>
-        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${bd.pct}%;background:var(--ok)"></i></div>
-        <div class="small muted">${bd.done}/${bd.total} 액션 완료</div>
-        <button class="btn sm" style="margin-top:10px" onclick="nav('board')">보드 열기</button>
+      <div class="hq-tile" style="--acc:var(--blue);cursor:pointer" onclick="nav('interview')">
+        <div class="lbl">① 전략 인터뷰</div>
+        <div class="big">${iv.pct}%</div>
+        <div class="progressbar"><i style="width:${iv.pct}%"></i></div>
+        <div class="sub">${iv.done}/${iv.total} 문항 답변 → 이어서</div>
       </div>
-      <div class="card tight">
-        <div class="stat-lbl">④ 실행 작업</div>
-        <div class="stat-num">${tk.pct}%</div>
-        <div class="progressbar" style="margin:8px 0 10px"><i style="width:${tk.pct}%;background:var(--coral)"></i></div>
-        <div class="small muted">${tk.done}/${tk.total} 작업 완료</div>
-        <button class="btn sm" style="margin-top:10px" onclick="nav('tasks')">작업 보기</button>
+      <div class="hq-tile" style="--acc:var(--ok);cursor:pointer" onclick="nav('board')">
+        <div class="lbl">③ 연계전략 보드</div>
+        <div class="big">${bd.pct}%</div>
+        <div class="progressbar"><i style="width:${bd.pct}%;background:var(--ok)"></i></div>
+        <div class="sub">${bd.done}/${bd.total} 액션 완료 → 보드 열기</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--warn);cursor:pointer" onclick="nav('tasks')">
+        <div class="lbl">④ 실행 작업</div>
+        <div class="big">${tk.pct}%</div>
+        <div class="progressbar"><i style="width:${tk.pct}%;background:var(--warn)"></i></div>
+        <div class="sub">${tk.done}/${tk.total} 작업 완료 → 작업 보기</div>
       </div>
     </div>
 
@@ -882,9 +913,20 @@ function renderInterview(){
     <div class="eyebrow">Step 1 · Strategy Interview</div>
     <h2>전략 인터뷰</h2>
     <p class="lede">기획서와 2월 회의 내용을 바탕으로 만든 질문입니다. 한 번에 다 하지 않아도 됩니다 — 답은 즉시 저장됩니다.</p>
-    <div style="display:flex;align-items:center;gap:12px;margin:14px 0 22px">
-      <div class="progressbar" style="flex:1"><i style="width:${iv.pct}%"></i></div>
-      <span class="small muted"><b>${iv.pct}%</b> (${iv.done}/${iv.total})</span>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin:16px 0 22px">
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">진행률</div><div class="big">${iv.pct}%</div>
+        <div class="progressbar"><i style="width:${iv.pct}%"></i></div>
+        <div class="sub">${iv.done}/${iv.total} 문항 답변</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">섹션</div><div class="big">${ivIdx+1}/${secs.length}</div>
+        <div class="sub">${esc(sec.title)}</div>
+      </div>
+      <div class="hq-tile" style="--acc:${iv.total-iv.done>0?'var(--warn)':'var(--ok)'}">
+        <div class="lbl">남은 문항</div><div class="big">${iv.total-iv.done}개</div>
+        <div class="sub">${iv.total-iv.done>0?'답은 즉시 저장됩니다':'모든 문항 답변 완료'}</div>
+      </div>
     </div>
     <div class="iv-layout">
       <div class="iv-steps no-print">
@@ -1053,6 +1095,9 @@ function renderBoard(){
   const m = DATA.matrix;
   if(!m.channels.length){ app.innerHTML = '<section class="view"><div class="card">전략 보드 데이터가 없습니다.</div></section>'; return; }
   const bd = boardProgress();
+  const acts = allActions();
+  const doing = acts.filter(a=>(S.actionState[a.key]||0)===1).length;
+  const waiting = acts.length - doing - bd.done;
   const chs = m.channels;
   app.innerHTML = `
   <section class="view">
@@ -1060,6 +1105,21 @@ function renderBoard(){
     <h2>학생 연계·전환 전략 보드</h2>
     <p class="lede">4개 채널 × 단기/중기/장기 — 파트너 합의 위에서의 연계·전환 실행 계획입니다. 각 액션을 눌러 <b>대기 → 진행중 → 완료</b>로 굴리세요. 직접 액션을 추가할 수도 있습니다.</p>
 
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin-top:16px">
+      <div class="hq-tile" style="--acc:var(--ok)">
+        <div class="lbl">완료 액션</div><div class="big">${bd.done}</div>
+        <div class="progressbar"><i style="width:${bd.pct}%;background:var(--ok)"></i></div>
+        <div class="sub">전체 ${bd.total}개 중 ${bd.pct}%</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">진행 중</div><div class="big">${doing}</div>
+        <div class="sub">지금 굴러가는 액션</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">대기</div><div class="big">${waiting}</div>
+        <div class="sub">클릭으로 대기 → 진행중 → 완료</div>
+      </div>
+    </div>
     <div class="card tight" style="margin-top:14px">
       <b class="small">공통 원칙</b>
       <div class="opt-row" style="margin-top:8px">${(m.principles||[]).map(p=>`<span class="pill warn">${esc(p)}</span>`).join('')}</div>
@@ -1124,12 +1184,18 @@ function delAction(id){
 /* ══════════════════ ④ 실행 작업 (칸반) ══════════════════ */
 function renderTasks(){
   const cols = [['todo','할 일'],['doing','진행 중'],['done','완료']];
+  const tkCount = id => (S.tasks||[]).filter(t=>t.col===id).length;
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">Step 4 · Execution Tasks</div>
     <h2>실행 작업 보드</h2>
     <p class="lede">2월 회의 액션아이템에서 출발한 작업 목록입니다. 새 작업을 추가하고, 단계별로 옮기며 오픈까지 관리하세요.</p>
-    <div style="margin:14px 0" class="no-print">
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin:16px 0 14px">
+      <div class="hq-tile" style="--acc:var(--dark)"><div class="lbl">할 일</div><div class="big">${tkCount('todo')}</div><div class="sub">대기 중인 작업</div></div>
+      <div class="hq-tile" style="--acc:var(--blue)"><div class="lbl">진행 중</div><div class="big">${tkCount('doing')}</div><div class="sub">지금 굴러가는 작업</div></div>
+      <div class="hq-tile" style="--acc:var(--ok)"><div class="lbl">완료</div><div class="big">${tkCount('done')}</div><div class="sub">전체 ${(S.tasks||[]).length}개 중</div></div>
+    </div>
+    <div style="margin:0 0 14px" class="no-print">
       <button class="btn sm" onclick="addTask()">＋ 새 작업</button>
     </div>
     <div class="kanban">
@@ -1386,6 +1452,15 @@ function renderSchedule(){
     <p class="lede"><b>${esc(concept.conceptName)}</b>의 커리큘럼 라인과 인터뷰 답변(정원 정책·운영시간대·강사 수·목표 원생 수)을 조합해
       반편성표와 주간 시간표 초안을 자동으로 만듭니다. 아래 값을 바꾸면 즉시 다시 계산됩니다 — 매물·강사 채용이 확정되면 숫자를 갱신하세요.</p>
 
+    <div class="hq-strip" style="margin:16px 0 14px">
+      <div class="hq-tile" style="--acc:var(--blue)"><div class="lbl">편성 반</div><div class="big">${grid.cells.length}반</div><div class="sub">${plan.rows.length}개 라인</div></div>
+      <div class="hq-tile" style="--acc:var(--dark)"><div class="lbl">수용 정원</div><div class="big">${plan.totalCovered}명</div><div class="sub">목표 ${gen.target}명 ${gapVal>=0?'+'+gapVal:gapVal}</div></div>
+      <div class="hq-tile" style="--acc:var(--ok)"><div class="lbl">투입 강사</div><div class="big">${gen.teacherCount}명</div><div class="sub">강의실 ${gen.rooms}실 동시 운영</div></div>
+      <div class="hq-tile" style="--acc:${grid.unplaced.length?'var(--bad)':'var(--ok)'}">
+        <div class="lbl">미배치 반</div><div class="big">${grid.unplaced.length}개</div>
+        <div class="sub">${grid.unplaced.length?'강의실·시간 부족 — 조건 조정 필요':'전 반 배치 완료'}</div>
+      </div>
+    </div>
     <div class="card no-print">
       <h3>생성 조건</h3>
       <div class="gen-form">
@@ -1790,14 +1865,29 @@ function renderTimeline(){
   const openD = addDays(openDate, 0);
   const openMonth = openD.getMonth()+1;
   const seasonState = (openMonth>=11||openMonth<=2) ? 'in' : (openMonth>=9 ? 'pre' : 'off');
+  const nextItem = items.find(it=>!it.isPast);
+  const dd2 = dday();
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">Launch Timeline</div>
     <h2>오픈 타임라인</h2>
     <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 프로젝트 홈에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
-    <div class="card tight" style="margin-bottom:16px">
-      <span class="pill ${seasonState==='off'?'warn':'ok'}">${seasonState==='in' ? '✓ 모집 시즌(11~2월) 한복판 오픈' : seasonState==='pre' ? '✓ 모집 시즌 직전 진입 — 하반기 목표와 정합' : '⚠ 모집 시즌(11~2월)과 어긋남 — 날짜 재검토 권장'}</span>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+      <div class="hq-tile" style="--acc:var(--coral)">
+        <div class="lbl">오픈까지</div><div class="big">${dd2===null?'—':(dd2>=0?'D-'+dd2:'D+'+(-dd2))}</div>
+        <div class="sub">${esc(fmtDate(openD))}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">다음 마일스톤</div>
+        <div class="big" style="font-size:16px;line-height:1.4;padding-top:6px">${nextItem?esc(nextItem.title):'전체 완료'}</div>
+        <div class="sub">${nextItem?esc(fmtDate(nextItem.date)):''}</div>
+      </div>
+      <div class="hq-tile" style="--acc:${seasonState==='off'?'var(--warn)':'var(--ok)'}">
+        <div class="lbl">모집 시즌 정합</div>
+        <div class="big" style="font-size:16px;line-height:1.4;padding-top:6px">${seasonState==='in'?'시즌 한복판':seasonState==='pre'?'시즌 직전':'시즌과 어긋남'}</div>
+        <div class="sub">${seasonState==='off'?'11~2월과 어긋남 — 날짜 재검토 권장':'11~2월 모집 시즌과 정합'}</div>
+      </div>
     </div>
     <div class="card">
       <div class="tl-track">
@@ -1968,15 +2058,22 @@ function delAgreement(id){
 function renderAgreements(){
   const list = agreementsState();
   const done = list.filter(a=>a.status==='합의완료').length;
+  const talking = list.filter(a=>a.status==='논의중').length;
+  const untouched = list.length - done - talking;
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">3-Party Agreement Tracker</div>
     <h2>3자 합의 트래커</h2>
     <p class="lede">대표·리더스 원장·리드앤톡 원장이 실제로 합의해야 할 항목들의 진행 상태입니다. partner-brief 페이지의 논의 안건과 연결되어 있습니다. <span class="pill bad">🔒 내부용</span></p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄</button> <button class="btn sm ghost" onclick="addAgreement()">＋ 항목 추가</button></div>
-    <div class="card tight" style="margin-bottom:16px">
-      <div class="progressbar"><i style="width:${Math.round(done/list.length*100)}%;background:var(--ok)"></i></div>
-      <p class="small muted" style="margin-top:8px">${done}/${list.length} 합의 완료</p>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+      <div class="hq-tile" style="--acc:var(--ok)">
+        <div class="lbl">합의완료</div><div class="big">${done}건</div>
+        <div class="progressbar"><i style="width:${Math.round(done/Math.max(1,list.length)*100)}%;background:var(--ok)"></i></div>
+        <div class="sub">전체 ${list.length}건 중</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--blue)"><div class="lbl">논의중</div><div class="big">${talking}건</div><div class="sub">대화가 시작된 항목</div></div>
+      <div class="hq-tile" style="--acc:var(--warn)"><div class="lbl">미논의</div><div class="big">${untouched}건</div><div class="sub">3자 미팅 안건으로</div></div>
     </div>
     ${list.map(a=>`<div class="agr-item">
       <div class="agr-top">
@@ -2045,9 +2142,14 @@ function renderDueDiligence(){
     <h2>인수 실사 체크리스트</h2>
     <p class="lede">확정 진입 방식(기존 학원 인수)에 맞춘 실사 항목입니다. 인수 이탈률은 통상 20~40%로 알려져 있어, 이 체크가 부실하면 승계 초기 이탈로 직결됩니다.</p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄</button></div>
-    <div class="card tight" style="margin-bottom:16px">
-      <div class="progressbar"><i style="width:${Math.round(doneCount/allKeys.length*100)}%;background:var(--ok)"></i></div>
-      <p class="small muted" style="margin-top:8px">${doneCount}/${allKeys.length} 확인 완료</p>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+      <div class="hq-tile" style="--acc:var(--ok)">
+        <div class="lbl">확인 완료</div><div class="big">${Math.round(doneCount/allKeys.length*100)}%</div>
+        <div class="progressbar"><i style="width:${Math.round(doneCount/allKeys.length*100)}%;background:var(--ok)"></i></div>
+        <div class="sub">${doneCount}/${allKeys.length} 항목</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--warn)"><div class="lbl">남은 항목</div><div class="big">${allKeys.length-doneCount}개</div><div class="sub">계약 전 전 항목 확인 권장</div></div>
+      <div class="hq-tile" style="--acc:var(--dark)"><div class="lbl">분류</div><div class="big">${DD_CATEGORIES.length}개</div><div class="sub">재무 · 학생 · 인력 · 시설 · 법률</div></div>
     </div>
     ${DD_CATEGORIES.map((c,ci)=>`
       <div class="card dd-cat">
@@ -2094,6 +2196,16 @@ function renderFunnel(){
     <p class="lede">문의→검사예약→검사실시→결과상담→등록, 실제 진행 건수를 월별로 기록하고 전환율을 추적합니다. 오픈 전에는 예상치를, 오픈 후에는 실측치를 입력하세요.</p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="addFunnelEntry()">＋ 월별 실적 입력</button></div>
 
+    ${entries.length ? `<div class="hq-strip">
+      <div class="hq-tile" style="--acc:var(--blue)"><div class="lbl">누적 문의</div><div class="big">${num(totals.inquiry||0)}</div><div class="sub">${entries.length}개월 합산</div></div>
+      <div class="hq-tile" style="--acc:var(--ok)"><div class="lbl">누적 등록</div><div class="big">${num(totals.enrolled||0)}</div><div class="sub">최종 전환 인원</div></div>
+      <div class="hq-tile" style="--acc:var(--dark)"><div class="lbl">문의→등록 전환율</div><div class="big">${totals.inquiry?Math.round((totals.enrolled||0)/totals.inquiry*100)+'%':'—'}</div><div class="sub">누적 기준</div></div>
+      <div class="hq-tile" style="--acc:var(--coral)">
+        <div class="lbl">3개월 목표 대비</div><div class="big">${Math.round((totals.enrolled||0)/target3mo*100)}%</div>
+        <div class="progressbar"><i style="width:${Math.min(100,Math.round((totals.enrolled||0)/target3mo*100))}%;background:var(--coral)"></i></div>
+        <div class="sub">${num(totals.enrolled||0)}/${num(target3mo)}명</div>
+      </div>
+    </div>` : ''}
     ${!entries.length ? `<div class="card"><p class="small muted">아직 입력된 실적이 없습니다. "월별 실적 입력"으로 첫 데이터를 추가하세요.</p></div>` : `
     <div class="card">
       <h3>누적 퍼널 (${entries[0].month} ~ ${entries[entries.length-1].month})</h3>
@@ -3007,11 +3119,11 @@ function renderSample(){
     <p class="lede">${esc(SITE.addr)} (${esc(SITE.area)}) · 전용 ${SITE.pyeong}평 ${SITE.sqm}㎡ · 강의실 6 · 상담실 1 · 탕비실 1 기준으로
     국어·영어·수학 종합학원을 실제로 연다고 가정하고 공간·시간표·오픈 준비를 한 벌로 맞춘 예시입니다.</p>
 
-    <div class="grid4" style="margin:18px 0 20px">
-      <div class="card tight" style="margin:0"><div class="stat-lbl">주간 반</div><div class="stat-num">${st.classes}</div><div class="small muted">6개 강의실 · 4블록</div></div>
-      <div class="card tight" style="margin:0"><div class="stat-lbl">정원 (수강건)</div><div class="stat-num">${won(st.seats)}</div><div class="small muted">실인원 약 ${won(st.students)}명</div></div>
-      <div class="card tight" style="margin:0"><div class="stat-lbl">필요 강사</div><div class="stat-num">${st.teachers}</div><div class="small muted">전임 · 원장 제외</div></div>
-      <div class="card tight" style="margin:0"><div class="stat-lbl">월 영업이익</div><div class="stat-num">${won(st.profit)}만</div><div class="small muted">가동률 ${Math.round(SAMPLE_FIN.fillRate*100)}% 가정</div></div>
+    <div class="hq-strip" style="margin:18px 0 20px">
+      <div class="hq-tile" style="--acc:var(--blue)"><div class="lbl">주간 반</div><div class="big">${st.classes}</div><div class="sub">6개 강의실 · 4블록</div></div>
+      <div class="hq-tile" style="--acc:var(--dark)"><div class="lbl">정원 (수강건)</div><div class="big">${won(st.seats)}</div><div class="sub">실인원 약 ${won(st.students)}명</div></div>
+      <div class="hq-tile" style="--acc:var(--ok)"><div class="lbl">필요 강사</div><div class="big">${st.teachers}</div><div class="sub">전임 · 원장 제외</div></div>
+      <div class="hq-tile" style="--acc:var(--coral)"><div class="lbl">월 영업이익</div><div class="big">${won(st.profit)}만</div><div class="sub">가동률 ${Math.round(SAMPLE_FIN.fillRate*100)}% 가정</div></div>
     </div>
 
     <div class="sm-tabs no-print">
