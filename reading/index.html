@@ -147,12 +147,18 @@
     .en-only .para{display:none}
     .en-only .para-en{margin:0 0 18px;padding:0;border-left:0;background:transparent;font-size:17px;line-height:1.9;color:#22303d}
     .vw-en{border-bottom-color:var(--ok)}
+    .seg-ctl{display:inline-flex;border:1.5px solid #bfd7e1;border-radius:999px;overflow:hidden;background:#fff}
+    .seg-ctl button{min-height:40px;padding:6px 13px;border:0;background:none;color:var(--muted);font-size:12.5px;font-weight:850}
+    .seg-ctl button+button{border-left:1.5px solid #e2ebef}
+    .seg-ctl button[aria-pressed="true"]{background:var(--sky);color:var(--navy)}
     .lang-en-tag{display:inline-block;padding:2px 7px;border-radius:6px;background:#e7f6f0;color:var(--ok);font-size:11px;font-weight:900;vertical-align:2px;margin-right:5px}
     .deep{margin-top:14px;padding:14px 15px;border:1px solid #d6ebf4;border-radius:14px;background:#f8fcfe}
     .deep h3{margin-bottom:4px}
     .deep-item{display:block;width:100%;margin-top:9px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;text-align:left;text-decoration:none;color:var(--ink)}
     .deep-item b{display:block;color:var(--navy);font-size:13.5px;line-height:1.5}
     .deep-item small{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.5}
+    .deep-link{display:block;text-decoration:none;color:inherit}
+    .deep-mini{display:inline-block;margin-top:8px;padding:6px 11px;border-radius:999px;background:#fff0ef;color:#9b352b;font-size:11.5px;font-weight:850;text-decoration:none}
     .train-num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:13px;font-weight:900;margin-right:8px}
     .tokenwrap{display:flex;flex-wrap:wrap;align-items:center;row-gap:10px;margin-top:14px;font-size:16.5px;line-height:1.6}
     .tok{color:var(--ink)}
@@ -456,7 +462,7 @@ function vReader(){
       }
       return `<span class="seg">${html!=null?html:esc(seg)}</span>`;
     }).join('');
-    const enP=(enMode>0&&b.en&&b.en[pi])?`<p class="para-en" lang="en">${renderEnPara(b.en[pi],b.envocab||[],linkedEn,a.id)}</p>`:'';
+    const enP=(enMode>0&&b.en&&b.en[pi])?`<p class="para-en" lang="en">${renderEnPara(b.en[pi],(b.enseg||[])[pi],b.envocab||[],linkedEn,a.id,chunk)}</p>`:'';
     return `<p class="para" id="para-${pi}">${segs}</p>${enP}`;
   }).join('');
   const fs=S.prefs.fs||1;
@@ -466,7 +472,7 @@ function vReader(){
       <h1 style="margin-top:8px">${esc(b.title)}</h1>
       <div class="rd-tools">
         <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk}">∕ 끊어 읽기</button>
-        ${hasEn?`<button class="toolbtn" data-act="toggle-en" aria-pressed="${enMode>0}">${enMode===0?'EN 대역':enMode===1?'한·영 보기 ✓':'EN만 읽기 ✓'}</button>`:''}
+        ${hasEn?`<span class="seg-ctl" role="group" aria-label="언어 보기">${[[0,'한글'],[1,'한·영'],[2,'EN만']].map(([m,l])=>`<button data-act="en-mode" data-m="${m}" aria-pressed="${enMode===m}">${l}</button>`).join('')}</span>`:''}
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         <span class="toolbtn" style="cursor:default;border-style:dashed">밑줄 단어를 누르면 뜻이 나와요</span>
@@ -474,9 +480,10 @@ function vReader(){
       <div class="rd-body">${paras}</div>
       <div class="src"><b>이 글은 아래 자료를 참고해 학생 눈높이로 새로 쓴 글이에요.</b><br>
         ${a.sources.map(s=>`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)} ↗</a>`).join(' · ')}</div>
-      ${((a.papers&&a.papers.length)||(a.books&&a.books.length))?`<div class="deep"><h3>더 깊이 보기</h3>
-        ${(a.papers||[]).map(p=>`<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`).join('')}
-        ${(a.books||[]).map(bk=>`<a class="deep-item" href="${naverBook(bk)}" target="_blank" rel="noopener noreferrer"><b>📚 ${esc(bk.title)} ↗</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책에서 보기</small></a>`).join('')}
+      ${((a.videos&&a.videos.length)||(a.papers&&a.papers.length)||(a.books&&a.books.length))?`<div class="deep"><h3>더 깊이 보기</h3>
+        ${(a.videos||[]).map(videoHtml).join('')}
+        ${(a.papers||[]).map(paperHtml).join('')}
+        ${(a.books||[]).map(bookHtml).join('')}
       </div>`:''}
       ${!done?`<button class="btn" data-act="read-done">다 읽었어요</button>`:''}
       ${done&&!sess.evalDone?`<h3 style="margin-top:16px">오늘 글, 어땠어요?</h3>
@@ -907,8 +914,9 @@ function vLab(){
   if(step===4){
     const deeps=[];
     L.mats.forEach(id=>{const a=DB.articles.find(x=>x.id===id);if(!a)return;
-      (a.papers||[]).forEach(p=>deeps.push(`<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`));
-      (a.books||[]).forEach(bk=>deeps.push(`<a class="deep-item" href="${naverBook(bk)}" target="_blank" rel="noopener noreferrer"><b>📚 ${esc(bk.title)} ↗</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책</small></a>`));});
+      (a.videos||[]).forEach(v=>deeps.push(videoHtml(v)));
+      (a.papers||[]).forEach(p=>deeps.push(paperHtml(p)));
+      (a.books||[]).forEach(bk=>deeps.push(bookHtml(bk)));});
     return `<div class="card">${head}
       <div class="guide">더 찾아본 것이 있으면 적어요. (선택 — 없으면 그냥 다음)</div>
       ${deeps.length?`<p class="sub" style="margin-top:10px;font-weight:800">고른 글과 이어지는 자료</p>${deeps.join('')}`:''}
@@ -932,23 +940,30 @@ function vLab(){
 }
 
 /* ───────────────────────── 어휘 시트 ───────────────────────── */
-function renderEnPara(text,vocabList,linked,articleId){
-  const hits=[];
-  for(const ev of vocabList){
-    if(linked.has(ev.word))continue;
-    const i=text.indexOf(ev.word);
-    if(i>=0){hits.push([i,ev.word]);linked.add(ev.word);}
-  }
-  hits.sort((x,y)=>x[0]-y[0]);
-  let out='',pos=0;
-  for(const [i,w] of hits){
-    if(i<pos)continue;
-    out+=esc(text.slice(pos,i))+`<button class="vw vw-en" data-act="vocab-en" data-id="${articleId}" data-w="${esc(w)}">${esc(w)}</button>`;
-    pos=i+w.length;
-  }
-  return out+esc(text.slice(pos));
+function renderEnPara(text,segArr,vocabList,linked,articleId,chunkOn){
+  const chunks=(chunkOn&&Array.isArray(segArr)&&segArr.join('')===text)?segArr:[text];
+  return chunks.map(c=>{
+    const hits=[];
+    for(const ev of vocabList){
+      if(linked.has(ev.word))continue;
+      const i=c.indexOf(ev.word);
+      if(i>=0){hits.push([i,ev.word]);linked.add(ev.word);}
+    }
+    hits.sort((x,y)=>x[0]-y[0]);
+    let out='',pos=0;
+    for(const [i,w] of hits){
+      if(i<pos)continue;
+      out+=esc(c.slice(pos,i))+`<button class="vw vw-en" data-act="vocab-en" data-id="${articleId}" data-w="${esc(w)}">${esc(w)}</button>`;
+      pos=i+w.length;
+    }
+    out+=esc(c.slice(pos));
+    return `<span class="seg">${out}</span>`;
+  }).join('');
 }
 function naverBook(bk){return 'https://search.naver.com/search.naver?where=book&query='+encodeURIComponent(bk.title+(bk.author?' '+bk.author:''));}
+function videoHtml(v){return `<a class="deep-item" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer"><b><span style="color:#c9503c">▶</span> ${esc(v.title)} ↗</b><small>${esc(v.channel||'')}${v.note?' — '+esc(v.note):''} · 유튜브</small></a>`;}
+function paperHtml(p){return `<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`;}
+function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="${bk.url?esc(bk.url):naverBook(bk)}" target="_blank" rel="noopener noreferrer"><b>📚 ${esc(bk.title)} ↗</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책 소개 보기</small></a>${bk.video?`<a class="deep-mini" href="${esc(bk.video.url)}" target="_blank" rel="noopener noreferrer">▶ 책 소개 영상 · ${esc(bk.video.channel||'')}</a>`:''}</div>`;}
 function openVocabEn(articleId,word){
   const a=DB.articles.find(x=>x.id===articleId);
   const b=levelBody(a,myLevel());
@@ -1036,7 +1051,7 @@ document.addEventListener('click',e=>{
   else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
     if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
-  else if(act==='toggle-en'){const lv=myLevel();S.prefs.en[lv]=((S.prefs.en[lv]||0)+1)%3;save();render();}
+  else if(act==='en-mode'){const lv=myLevel();S.prefs.en[lv]=+t.dataset.m;save();render();}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
     const a=DB.articles.find(x=>x.id===id);const b=levelBody(a,myLevel());

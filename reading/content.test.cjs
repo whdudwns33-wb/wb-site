@@ -116,6 +116,22 @@ const ids = new Set();
   });
   (a.books || []).forEach((b, i) => {
     if (!b.title || !b.author) E(`${tag}: books[${i}] title/author 누락`);
+    if (b.url != null && !/^https:\/\//.test(b.url)) E(`${tag}: books[${i}] url https 아님`);
+    if (b.video != null && !/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(b.video.url || '')) E(`${tag}: books[${i}] video URL 유튜브 아님`);
+  });
+  (a.videos || []).forEach((v, i) => {
+    if (!v.title || !/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(v.url || '')) E(`${tag}: videos[${i}] title/유튜브 URL 오류`);
+  });
+  ['L3', 'L4'].forEach(lv => {
+    const b = a.levels && a.levels[lv];
+    if (!b || b.enseg == null) return;
+    if (!Array.isArray(b.enseg) || b.enseg.length !== (b.en || []).length) {
+      E(`${tag}/${lv}: enseg 문단 수 불일치`); return;
+    }
+    b.enseg.forEach((segs, i) => {
+      if (!Array.isArray(segs) || segs.join('') !== b.en[i])
+        E(`${tag}/${lv}: enseg[${i}] 조각 이어붙이기가 en 원문과 다름`);
+    });
   });
 });
 ['L2', 'L3', 'L4'].forEach(lv => {
