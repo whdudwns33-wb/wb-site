@@ -389,6 +389,44 @@
   .proj-status.s완료{border-color:var(--ok);color:var(--ok)}
   .proj-status.s보류{border-color:var(--warn,#A0761B);color:var(--warn,#A0761B)}
 
+  /* ─── 총괄 대시보드 v2 (피그마 개선안) ─── */
+  .hq-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .hq-head .date{margin-left:auto;font-size:12.5px;color:var(--mid);white-space:nowrap}
+  .hq-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  @media(max-width:900px){.hq-strip{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.hq-strip{grid-template-columns:1fr}}
+  .hq-tile{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--acc,var(--dark));
+    border-radius:2px;padding:12px 16px 14px}
+  .hq-tile .lbl{font-size:11px;font-weight:600;color:var(--mid);letter-spacing:.06em}
+  .hq-tile .big{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.25;
+    color:var(--acc,var(--dark));font-variant-numeric:tabular-nums}
+  .hq-tile .sub{font-size:11.5px;color:var(--mid);margin-top:2px}
+  .hq-tile .progressbar{margin:6px 0 4px}
+  .hq-body{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+  @media(max-width:980px){.hq-body{grid-template-columns:1fr}}
+  .hq-biz{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  @media(max-width:700px){.hq-biz{grid-template-columns:1fr}}
+  .hq-biz-card{background:var(--surface);border:1px solid var(--bc,var(--line));border-radius:2px;padding:12px 14px}
+  .hq-biz-card .hr{display:flex;align-items:center;gap:8px}
+  .hq-biz-card .hr b{font-size:13.5px;font-weight:600}
+  .hq-biz-card .hr .st{margin-left:auto;font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--bc,var(--mid));white-space:nowrap}
+  .hq-biz-card .role,.hq-biz-card .kv{font-size:11.5px;color:var(--mid);margin-top:4px}
+  .hq-biz-card .kv b{color:var(--dark);font-variant-numeric:tabular-nums}
+  .hq-biz-card .progressbar{margin-top:8px}
+  .hq-goal-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+  .hq-goal-row .nm{flex:none;width:190px;font-size:12.5px;font-weight:500;cursor:pointer}
+  .hq-goal-row .nm:hover{color:var(--deep-blue)}
+  .hq-goal-row .progressbar{flex:1}
+  .hq-goal-row .ct{flex:none;font-size:11.5px;color:var(--mid);font-variant-numeric:tabular-nums}
+  @media(max-width:560px){.hq-goal-row .nm{width:130px}}
+  .hq-dec-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .hq-dec-row:last-child{border-bottom:none}
+  .hq-dec-row .t{flex:1;font-size:12px;font-weight:500}
+  .hq-quick{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;
+    background:var(--light);border:none;border-radius:2px;padding:9px 12px;margin-top:8px;color:var(--dark)}
+  .hq-quick:hover{background:var(--paper-deep)}
+  .hq-quick b{font-size:12px;font-weight:600}
+  .hq-quick span{margin-left:auto;font-size:10.5px;color:var(--mid);text-align:right}
   /* ─── 샘플 모델 (장신로 144 · 80평) ─── */
   .fp{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin:14px 0 6px}
   .fp .rm{border:1px solid var(--line);background:var(--surface);border-radius:2px;padding:10px 9px;min-height:78px}
@@ -3068,93 +3106,117 @@ function renderHq(){
   const dd = dday();
   const decs = decisionsState();
   const openDecs = decs.filter(d=>d.status==='open');
-  const projs = projectsState();
-  const running = projs.filter(p=>p.status==='진행중').length;
   const goals = goalsState();
-  const agrOpen = agreementsState().filter(a=>a.status!=='합의완료').length;
+  const agr = agreementsState();
+  const agrOpen = agr.filter(a=>a.status!=='합의완료').length;
+  const agrDist = ['합의완료','논의중','미논의'].map(s=>`${s} ${agr.filter(a=>a.status===s).length}`).join(' · ');
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0,10) + ' ' + ['일','월','화','수','목','금','토'][today.getDay()];
+
+  const BIZ_COLOR = { center:'var(--ok)', academy:'var(--ok)', consult:'var(--ok)', suwan:'var(--coral)' };
 
   app.innerHTML = `
   <section class="view">
-    <div class="hero-launch">
-      <div class="eyebrow">Strategy HQ · 學院 經營</div>
-      <h1>학원 운영 전략 총괄</h1>
-      <p class="lede">센터 · 독해력학원 · 컨설팅 · 수완 신규 거점을 한 화면에서 총괄합니다.
-      목표를 정하고 → 지표로 확인하고 → 결정을 기록합니다. 수완 오픈은 아래 프로젝트 중 하나입니다.</p>
-      <div class="chip-row">
-        <span class="chip">진행 프로젝트 ${running}건</span>
-        <span class="chip">${dd===null?'수완 오픈일 미설정':(dd>=0?'수완 오픈 D-'+dd:'수완 오픈 D+'+(-dd))}</span>
-        <span class="chip">의사결정 대기 ${openDecs.length}건</span>
-        <span class="chip">3자 합의 미완 ${agrOpen}건</span>
+    <div class="hq-head">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Strategy HQ · 學院 經營</div>
+        <h1 style="font-size:26px;margin-bottom:0">학원 운영 전략 총괄</h1>
+      </div>
+      <div class="date">${dateStr}</div>
+    </div>
+
+    <div class="hq-strip">
+      <div class="hq-tile" style="--acc:var(--coral)">
+        <div class="lbl">수완 오픈</div>
+        <div class="big">${dd===null?'미설정':(dd>=0?'D-'+dd:'D+'+(-dd))}</div>
+        <div class="sub">${S.openDate ? esc(S.openDate)+' 목표 · 임시값' : '오픈 목표일을 설정하세요'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">수완 통합 진행률</div>
+        <div class="big">${sp.pct}%</div>
+        <div class="progressbar"><i style="width:${sp.pct}%"></i></div>
+        <div class="sub">${sp.parts.map(p=>`${p[0]} ${p[1]}`).join(' · ')}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--warn)">
+        <div class="lbl">의사결정 대기</div>
+        <div class="big">${openDecs.length}건</div>
+        <div class="sub">${openDecs.length?'가장 오래된 건: '+esc(openDecs[0].title):'대기 중인 결정 없음'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">3자 합의 미완</div>
+        <div class="big">${agrOpen}건</div>
+        <div class="sub">${agrDist}</div>
       </div>
     </div>
 
-    <div class="card">
-      <h3>사업 포트폴리오</h3>
-      <div class="biz-grid" style="margin-top:12px">
-        ${BIZ_UNITS.map(b=>{
-          const k = latestKpi(b.id);
-          const prep = b.status==='준비중';
-          return `<div class="biz-card ${prep?'prep':''}">
-            <div class="bz-head">
-              <div><h4>${esc(b.name)}</h4><div class="role">${esc(b.role)}</div></div>
-              <span class="bz-status ${prep?'prep':''}">${esc(b.status)}</span>
-            </div>
-            ${b.id==='suwan' ? `
-              <div class="progressbar" style="margin-top:12px"><i style="width:${sp.pct}%"></i></div>
-              <div class="bz-kpi" style="border-top:none;padding-top:6px;margin-top:4px">통합 진행률 <b>${sp.pct}%</b> — ${sp.parts.map(p=>`${p[0]} ${p[1]}%`).join(' · ')}</div>
-              <button class="btn sm" style="margin-top:10px" onclick="nav('home')">프로젝트 열기</button>`
-            : k ? `
-              <div class="bz-kpi">${esc(k.month)} 기준 — 재원생 <b>${k.students==null?'—':num(k.students)+'명'}</b> · 신규 문의 <b>${k.inquiries==null?'—':num(k.inquiries)}</b> · 등록 <b>${k.enrolled==null?'—':num(k.enrolled)}</b> · 검사 <b>${k.tests==null?'—':num(k.tests)+'건'}</b></div>`
-            : `
-              <div class="bz-kpi">지표 미입력 — 📊 KPI 화면에서 월별 실적을 입력하면 여기 요약됩니다.</div>`}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
+    <div class="hq-body">
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>사업 포트폴리오</h3>
+          <div class="hq-biz">
+            ${BIZ_UNITS.map(b=>{
+              const k = latestKpi(b.id);
+              const isSuwan = b.id==='suwan';
+              return `<div class="hq-biz-card" style="--bc:${BIZ_COLOR[b.id]}">
+                <div class="hr"><b>${esc(b.name)}</b><span class="st">${esc(b.status)}${isSuwan&&dd!==null?' D-'+dd:''}</span></div>
+                <div class="role">${esc(b.role)}</div>
+                ${isSuwan ? `
+                  <div class="progressbar"><i style="width:${sp.pct}%;background:var(--coral)"></i></div>
+                  <button class="btn xs" style="margin-top:8px" onclick="nav('home')">통합 진행률 ${sp.pct}% → 프로젝트 열기</button>`
+                : k ? `
+                  <div class="kv">${esc(k.month)} — 재원생 <b>${k.students==null?'—':num(k.students)}</b> · 문의 <b>${k.inquiries==null?'—':num(k.inquiries)}</b> · 등록 <b>${k.enrolled==null?'—':num(k.enrolled)}</b> · 검사 <b>${k.tests==null?'—':num(k.tests)}</b></div>`
+                : `
+                  <div class="kv">지표 미입력 — <a style="color:var(--deep-blue);cursor:pointer;font-weight:600" onclick="nav('kpi')">KPI에서 입력</a></div>`}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
 
-    <div class="grid2">
-      <div class="card" style="margin-bottom:0">
-        <h3>이번 주 포커스</h3>
-        <p class="small muted" style="margin:4px 0 10px">이번 주에 대표가 직접 움직일 한두 가지만 적습니다.</p>
-        <textarea class="q-input" style="min-height:96px" placeholder="예: 리드앤톡 원장과 지분 구조 1차 협의 / 장신로 144 실측 방문"
-          onchange="setHqFocus(this.value)">${esc(S.hq && S.hq.focus || '')}</textarea>
+        <div class="card" style="margin-bottom:0">
+          <h3>전략 목표 진행</h3>
+          <div style="margin-top:8px">
+            ${goals.map(g=>{
+              const total=g.items.length, done=g.items.filter(i=>i.done).length;
+              const pct = total?Math.round(done/total*100):0;
+              return `<div class="hq-goal-row">
+                <span class="nm" onclick="nav('goals')" title="전략 목표 열기">${esc(g.theme)}</span>
+                <div class="progressbar"><i style="width:${pct}%"></i></div>
+                <span class="ct">${done}/${total}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
       </div>
-      <div class="card" style="margin-bottom:0">
-        <h3>의사결정 대기 <span class="pill warn" style="margin-left:6px">${openDecs.length}건</span></h3>
-        ${openDecs.length ? `<ul style="list-style:none;margin-top:8px">
-          ${openDecs.slice(0,4).map(d=>`<li class="small" style="padding:6px 0;border-bottom:1px solid var(--line)">⚖ ${esc(d.title)}</li>`).join('')}
-        </ul>` : '<p class="small muted" style="margin-top:8px">대기 중인 결정이 없습니다.</p>'}
-        <button class="btn sm ghost" style="margin-top:12px" onclick="nav('decisions')">의사결정 로그 열기</button>
-      </div>
-    </div>
 
-    <div class="card" style="margin-top:16px">
-      <h3>전략 목표 진행</h3>
-      <div class="grid2" style="margin-top:12px">
-        ${goals.map(g=>{
-          const total = g.items.length, done = g.items.filter(i=>i.done).length;
-          const pct = total ? Math.round(done/total*100) : 0;
-          return `<div>
-            <div class="small" style="display:flex;justify-content:space-between;font-weight:700"><span>${esc(g.theme)}</span><span class="muted">${done}/${total}</span></div>
-            <div class="progressbar" style="margin-top:6px"><i style="width:${pct}%"></i></div>
-          </div>`;
-        }).join('')}
-      </div>
-      <button class="btn sm ghost" style="margin-top:14px" onclick="nav('goals')">전략 목표 열기</button>
-    </div>
+      <div>
+        <div class="card" style="border-left:3px solid var(--coral);margin-bottom:16px">
+          <h3>이번 주 포커스</h3>
+          <textarea class="q-input" style="min-height:84px;margin-top:8px" placeholder="이번 주에 대표가 직접 움직일 한두 가지만 — 예: 리드앤톡 원장과 지분 구조 1차 협의"
+            onchange="setHqFocus(this.value)">${esc(S.hq && S.hq.focus || '')}</textarea>
+        </div>
 
-    <div class="card">
-      <h3>수완 오픈 바로가기</h3>
-      <div class="grid4" style="margin-top:12px">
-        ${[['home','프로젝트 홈','인터뷰·컨셉·전략 요약'],['sample','샘플 모델','장신로 144 · 80평'],
-           ['agreements','3자 합의 트래커',agreementsState().length+'건 중 '+agrOpen+'건 미완'],['timeline','오픈 타임라인','역산 마일스톤']]
-          .map(([v,t,d])=>`<button class="card tight" style="text-align:left;cursor:pointer;margin:0" onclick="nav('${v}')">
-            <b class="small" style="font-weight:800">${t}</b><div class="small muted" style="margin-top:2px">${d}</div></button>`).join('')}
+        <div class="card" style="border-left:3px solid var(--warn);margin-bottom:16px">
+          <h3>의사결정 대기 <span class="pill warn" style="margin-left:4px">${openDecs.length}건</span></h3>
+          <div style="margin-top:6px">
+            ${openDecs.length ? openDecs.map(d=>`<div class="hq-dec-row">
+                <span class="t">${esc(d.title)}</span>
+                <button class="btn xs no-print" onclick="decideDecision('${d.id}')">기록</button>
+              </div>`).join('')
+            : '<p class="small muted">대기 중인 결정이 없습니다.</p>'}
+          </div>
+          <button class="btn xs ghost no-print" style="margin-top:10px" onclick="nav('decisions')">로그 전체 보기</button>
+        </div>
+
+        <div class="card" style="margin-bottom:0">
+          <h3>수완 오픈 바로가기</h3>
+          ${[['home','프로젝트 홈','인터뷰·컨셉·전략'],['sample','샘플 모델','장신로 144 · 80평'],
+             ['agreements','3자 합의 트래커',agr.length+'건 중 '+agrOpen+'건 미완'],['timeline','오픈 타임라인','역산 마일스톤']]
+            .map(([v,t,d])=>`<button class="hq-quick" onclick="nav('${v}')"><b>${t}</b><span>${d}</span></button>`).join('')}
+        </div>
       </div>
     </div>
   </section>`;
 }
-
 /* ── 전략 목표 ── */
 function toggleGoalItem(gid, iid){
   const g = goalsState().find(x=>x.id===gid); if(!g) return;
@@ -3343,7 +3405,7 @@ function decideDecision(id){
   d.decision = decision;
   d.decidedAt = new Date().toISOString().slice(0,10);
   d.status = 'decided';
-  save(); renderDecisions();
+  save(); render();   // 대시보드·결정 로그 어디서 불러도 현재 화면 기준으로 다시 그린다
 }
 function reopenDecision(id){
   const d = decisionsState().find(x=>x.id===id); if(!d) return;
