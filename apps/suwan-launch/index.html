@@ -427,6 +427,19 @@
   .hq-quick:hover{background:var(--paper-deep)}
   .hq-quick b{font-size:12px;font-weight:600}
   .hq-quick span{margin-left:auto;font-size:10.5px;color:var(--mid);text-align:right}
+  /* ─── 總括 화면 v2 공통 ─── */
+  .goal-grid,.proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.goal-grid,.proj-grid{grid-template-columns:1fr}}
+  .goal-card .ghead{display:flex;align-items:center;gap:10px}
+  .goal-card .ghead .progressbar{flex:1;margin:0}
+  .proj-axes{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+  .proj-axes .ax{flex:1;min-width:130px}
+  .proj-axes .ax .axh{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px}
+  .dec-body{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+  @media(max-width:980px){.dec-body{grid-template-columns:1fr}}
+  .add-dashed{width:100%;text-align:center;cursor:pointer;background:transparent;color:var(--mid);
+    border:1px dashed var(--mid);border-radius:2px;padding:16px;font-size:12.5px;font-weight:500}
+  .add-dashed:hover{color:var(--dark);border-color:var(--dark)}
   /* ─── 샘플 모델 (장신로 144 · 80평) ─── */
   .fp{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin:14px 0 6px}
   .fp .rm{border:1px solid var(--line);background:var(--surface);border-radius:2px;padding:10px 9px;min-height:78px}
@@ -3240,25 +3253,56 @@ function addGoalTheme(){
 }
 function renderGoals(){
   const goals = goalsState();
+  const total = goals.reduce((a,g)=>a+g.items.length,0);
+  const done  = goals.reduce((a,g)=>a+g.items.filter(i=>i.done).length,0);
+  const pct   = total?Math.round(done/total*100):0;
+  const lowest = goals.slice().sort((a,b)=>{
+    const pa=a.items.length?a.items.filter(i=>i.done).length/a.items.length:1;
+    const pb=b.items.length?b.items.filter(i=>i.done).length/b.items.length:1;
+    return pa-pb;
+  })[0];
   app.innerHTML = `
   <section class="view">
-    <div class="eyebrow">Strategy Goals</div>
-    <h1>전략 목표</h1>
-    <p class="lede">연간 전략 테마와 그 아래 실행 목표입니다. 체크 상태는 이 브라우저에 저장되고, 총괄 대시보드에 진행률로 집계됩니다.</p>
-    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addGoalTheme()">+ 테마 추가</button></div>
-    ${goals.map(g=>{
-      const total=g.items.length, done=g.items.filter(i=>i.done).length;
-      return `<div class="goal-card">
-        <h4><span>${esc(g.theme)}</span><span class="small muted" style="font-weight:400">${done}/${total}</span></h4>
-        ${g.why?`<div class="why">${esc(g.why)}</div>`:''}
-        ${g.items.map(i=>`<div class="goal-item ${i.done?'done':''}">
-          <input type="checkbox" ${i.done?'checked':''} onchange="toggleGoalItem('${g.id}','${i.id}')" aria-label="${esc(i.t)}">
-          <span style="flex:1">${esc(i.t)}</span>
-          <button class="btn xs ghost no-print" onclick="delGoalItem('${g.id}','${i.id}')">삭제</button>
-        </div>`).join('') || '<p class="small muted">하위 목표가 없습니다.</p>'}
-        <button class="btn xs ghost no-print" style="margin-top:10px" onclick="addGoalItem('${g.id}')">+ 하위 목표</button>
-      </div>`;
-    }).join('')}
+    <div class="hq-head">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Strategy Goals</div>
+        <h1 style="font-size:26px;margin-bottom:0">전략 목표</h1>
+      </div>
+      <button class="btn sm ghost no-print" style="margin-left:auto" onclick="addGoalTheme()">+ 테마 추가</button>
+    </div>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr)">
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">전체 달성률</div><div class="big">${pct}%</div>
+        <div class="progressbar"><i style="width:${pct}%"></i></div>
+        <div class="sub">${done}/${total} 하위 목표 완료</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">테마</div><div class="big">${goals.length}개</div>
+        <div class="sub">${goals.map(g=>esc(g.theme.split(' ')[0])).join(' · ')}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--warn)">
+        <div class="lbl">가장 뒤처진 테마</div>
+        <div class="big" style="font-size:16px;line-height:1.4;padding-top:6px">${lowest?esc(lowest.theme):'—'}</div>
+        <div class="sub">${lowest?lowest.items.filter(i=>i.done).length+'/'+lowest.items.length+' — 여기부터 움직이면 됩니다':''}</div>
+      </div>
+    </div>
+    <div class="goal-grid">
+      ${goals.map(g=>{
+        const t=g.items.length, d=g.items.filter(i=>i.done).length;
+        const gp=t?Math.round(d/t*100):0;
+        return `<div class="goal-card" style="margin-bottom:0">
+          <h4><span>${esc(g.theme)}</span><span class="small muted" style="font-weight:400">${d}/${t}</span></h4>
+          <div class="ghead" style="margin:6px 0 8px"><div class="progressbar"><i style="width:${gp}%"></i></div></div>
+          ${g.why?`<div class="why">${esc(g.why)}</div>`:''}
+          ${g.items.map(i=>`<div class="goal-item ${i.done?'done':''}">
+            <input type="checkbox" ${i.done?'checked':''} onchange="toggleGoalItem('${g.id}','${i.id}')" aria-label="${esc(i.t)}">
+            <span style="flex:1">${esc(i.t)}</span>
+            <button class="btn xs ghost no-print" onclick="delGoalItem('${g.id}','${i.id}')">삭제</button>
+          </div>`).join('') || '<p class="small muted">하위 목표가 없습니다.</p>'}
+          <button class="btn xs ghost no-print" style="margin-top:10px" onclick="addGoalItem('${g.id}')">+ 하위 목표</button>
+        </div>`;
+      }).join('')}
+    </div>
   </section>`;
 }
 
@@ -3298,19 +3342,46 @@ function renderKpi(){
   const rows = S.kpiEntries.filter(e=>e.biz===kpiBiz).sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
   const last = rows[rows.length-1], prev = rows[rows.length-2];
   const delta = (last && prev && last.students!=null && prev.students!=null) ? last.students - prev.students : null;
+  const last3 = rows.slice(-3);
+  const sum3 = key => { const vs = last3.map(r=>r[key]).filter(v=>v!=null); return vs.length ? vs.reduce((a,v)=>a+v,0) : null; };
+  const enr3 = sum3('enrolled'), wd3 = sum3('withdrawn');
   app.innerHTML = `
   <section class="view">
-    <div class="eyebrow">KPI Tracker</div>
-    <h1>KPI 지표</h1>
-    <p class="lede">사업체별 월간 실적을 직접 입력합니다. 이 보드는 실적을 지어내지 않습니다 — 입력한 값만 총괄 대시보드에 요약됩니다.</p>
-    <div class="sm-tabs no-print" style="margin-top:16px">
+    <div class="hq-head">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">KPI Tracker</div>
+        <h1 style="font-size:26px;margin-bottom:0">KPI 지표</h1>
+      </div>
+      <div class="date">입력한 값만 집계 — 실적을 지어내지 않습니다</div>
+    </div>
+    <div class="sm-tabs no-print" style="margin-bottom:16px">
       ${BIZ_UNITS.map(b=>`<button class="sm-tab ${b.id===kpiBiz?'active':''}" onclick="setKpiBiz('${b.id}')">${esc(b.name)}</button>`).join('')}
+    </div>
+    <div class="hq-strip">
+      <div class="hq-tile" style="--acc:var(--blue)">
+        <div class="lbl">최신 재원생${last?' ('+esc(last.month)+')':''}</div>
+        <div class="big">${last && last.students!=null ? num(last.students)+'명' : '—'}</div>
+        <div class="sub">${last?'월말 기준 입력값':'아직 입력이 없습니다'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:${delta==null?'var(--dark)':(delta>=0?'var(--ok)':'var(--bad)')}">
+        <div class="lbl">전월 대비</div>
+        <div class="big">${delta==null?'—':(delta>=0?'+':'')+num(delta)+'명'}</div>
+        <div class="sub">${delta!=null?esc(prev.month)+' '+num(prev.students)+'명 → '+num(last.students)+'명':'두 달 이상 입력 시 표시'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--dark)">
+        <div class="lbl">최근 3개월 신규 등록</div>
+        <div class="big">${enr3==null?'—':num(enr3)+'명'}</div>
+        <div class="sub">입력된 월만 합산</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--warn)">
+        <div class="lbl">최근 3개월 퇴원</div>
+        <div class="big">${wd3==null?'—':num(wd3)+'명'}</div>
+        <div class="sub">사유는 메모에 기록 — 리텐션 원자료</div>
+      </div>
     </div>
     <div class="card">
       <h3>${esc(biz.name)} — 월간 지표</h3>
       ${rows.length ? `
-        ${delta!==null ? `<p class="small" style="margin-top:6px">재원생 전월 대비
-          <span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'+':''}${num(delta)}명</span></p>` : ''}
         ${kpiSpark(rows)}
         <div style="overflow-x:auto"><table class="grid-tbl" style="min-width:640px">
           <thead><tr><th>월</th><th style="width:76px">재원생</th><th style="width:76px">문의</th><th style="width:76px">등록</th>
@@ -3326,16 +3397,9 @@ function renderKpi(){
             <td class="no-print"><button class="btn xs ghost" onclick="delKpiEntry('${e.id}')">삭제</button></td>
           </tr>`).join('')}</tbody>
         </table></div>`
-      : `<p class="small muted" style="margin-top:8px">아직 입력이 없습니다. 아래 버튼으로 첫 달 실적을 넣어주세요 — 재원생 수 하나만 넣어도 추이가 쌓이기 시작합니다.</p>`}
+      : `<p class="small muted" style="margin-top:8px">아직 입력이 없습니다. 재원생 수 하나만 넣어도 추이가 쌓이기 시작합니다.</p>`}
       <button class="btn sm no-print" style="margin-top:14px" onclick="addKpiEntry()">+ 월 실적 입력</button>
-    </div>
-    <div class="card">
-      <h3>기록 원칙</h3>
-      <ul style="list-style:none;margin-top:8px">
-        <li class="small" style="padding:4px 0">· 매월 말일 기준으로 한 번씩. 추정치를 넣지 말고, 모르는 칸은 비워둡니다.</li>
-        <li class="small" style="padding:4px 0">· 퇴원 칸에는 숫자와 함께 메모에 사유를 남기면 전략 목표 「재원생 유지·성장」의 원자료가 됩니다.</li>
-        <li class="small" style="padding:4px 0">· 수완 신규 학원은 개원 후부터 이 화면에 입력 — 개원 전 모집 지표는 🎯 모집 퍼널 대시보드를 씁니다.</li>
-      </ul>
+      <p class="small muted" style="margin-top:12px">매월 말일 기준 한 번씩 · 추정치 대신 빈칸 · 수완 신규 학원은 개원 후부터 (개원 전 모집 지표는 🎯 모집 퍼널 대시보드)</p>
     </div>
   </section>`;
 }
@@ -3361,33 +3425,55 @@ function renderProjects(){
   const projs = projectsState();
   const sp = suwanProgress();
   const dd = dday();
+  const counts = {};
+  PROJECT_STATUSES.forEach(s=>counts[s]=projs.filter(p=>p.status===s));
+  const STATUS_ACC = {'진행중':'var(--blue)','구상중':'var(--dark)','보류':'var(--warn)','완료':'var(--ok)'};
+  const suwan = projs.find(p=>p.builtin);
+  const others = projs.filter(p=>!p.builtin);
   app.innerHTML = `
   <section class="view">
-    <div class="eyebrow">Project Portfolio</div>
-    <h1>프로젝트</h1>
-    <p class="lede">진행 중인 전략 프로젝트 목록입니다. 상태 배지를 누르면 구상중 → 진행중 → 보류 → 완료 순으로 바뀝니다.</p>
-    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addProject()">+ 프로젝트 추가</button></div>
-    ${projs.map(p=>`<div class="proj-card">
-      <h4>${esc(p.name)}
-        <span class="proj-status s${esc(p.status)}" ${p.builtin?'':`onclick="cycleProject('${p.id}')"`}>${esc(p.status)}</span>
-        ${p.builtin ? `<span class="pill blue">내장 프로젝트</span>` : ''}
-      </h4>
-      ${p.memo?`<p class="small muted" style="margin-top:6px">${esc(p.memo)}</p>`:''}
-      ${p.builtin ? `
-        <div class="progressbar" style="margin-top:12px"><i style="width:${sp.pct}%"></i></div>
-        <p class="small muted" style="margin-top:6px">통합 진행률 ${sp.pct}% — ${sp.parts.map(x=>`${x[0]} ${x[1]}%`).join(' · ')} · ${dd===null?'오픈일 미설정':(dd>=0?'D-'+dd:'D+'+(-dd))}</p>
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn sm" onclick="nav('home')">프로젝트 홈</button>
-          <button class="btn sm ghost" onclick="nav('timeline')">타임라인</button>
-          <button class="btn sm ghost" onclick="nav('sample')">샘플 모델</button>
-        </div>`
-      : `<div style="margin-top:10px"><button class="btn xs ghost no-print" onclick="delProject('${p.id}')">삭제</button></div>`}
-    </div>`).join('')}
-    <div class="card" style="border-left:3px solid var(--coral)">
-      <h3>프로젝트로 등록할 만한 것</h3>
-      <p class="small muted" style="margin-top:6px">한 번의 결정이 아니라 몇 주 이상 굴러가는 일이면 프로젝트입니다 —
-      예: 여수·순천 확장 타당성 검토, 센터 홈페이지 개편, 학원관리 시스템 교체. 단발 결정은 ⚖ 의사결정 로그에 적는 편이 맞습니다.</p>
+    <div class="hq-head">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Project Portfolio</div>
+        <h1 style="font-size:26px;margin-bottom:0">프로젝트</h1>
+      </div>
+      <div class="date">상태 배지 클릭 → 구상중 · 진행중 · 보류 · 완료 순환</div>
     </div>
+    <div class="hq-strip">
+      ${PROJECT_STATUSES.map(s=>`<div class="hq-tile" style="--acc:${STATUS_ACC[s]}">
+        <div class="lbl">${s}</div><div class="big">${counts[s].length}</div>
+        <div class="sub">${counts[s].length?esc(counts[s][0].name)+(counts[s].length>1?' 외 '+(counts[s].length-1):''):'—'}</div>
+      </div>`).join('')}
+    </div>
+    ${suwan?`<div class="proj-card" style="border-left:3px solid var(--coral)">
+      <h4>${esc(suwan.name)}
+        <span class="proj-status s${esc(suwan.status)}">${esc(suwan.status)}${dd!==null?' · D-'+dd:''}</span>
+        <span class="pill blue">내장 프로젝트</span>
+        <span style="margin-left:auto;font-weight:700;color:var(--deep-blue)">통합 ${sp.pct}%</span>
+      </h4>
+      ${suwan.memo?`<p class="small muted" style="margin-top:6px">${esc(suwan.memo)}</p>`:''}
+      <div class="proj-axes">
+        ${sp.parts.map(([nm,p])=>`<div class="ax">
+          <div class="axh"><span>${esc(nm)}</span><b style="color:${p>0?'var(--deep-blue)':'var(--mid)'}">${p}%</b></div>
+          <div class="progressbar"><i style="width:${p}%"></i></div>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" onclick="nav('home')">프로젝트 홈</button>
+        <button class="btn sm ghost" onclick="nav('timeline')">타임라인</button>
+        <button class="btn sm ghost" onclick="nav('sample')">샘플 모델</button>
+      </div>
+    </div>`:''}
+    ${others.length?`<div class="proj-grid" style="margin-bottom:14px">
+      ${others.map(p=>`<div class="proj-card" style="margin-bottom:0">
+        <h4>${esc(p.name)}
+          <span class="proj-status s${esc(p.status)}" onclick="cycleProject('${p.id}')">${esc(p.status)}</span>
+        </h4>
+        ${p.memo?`<p class="small muted" style="margin-top:6px">${esc(p.memo)}</p>`:''}
+        <div style="margin-top:10px"><button class="btn xs ghost no-print" onclick="delProject('${p.id}')">삭제</button></div>
+      </div>`).join('')}
+    </div>`:''}
+    <button class="add-dashed no-print" onclick="addProject()">+ 프로젝트 추가 — 몇 주 이상 굴러가는 일이면 프로젝트, 단발 결정은 ⚖ 의사결정 로그로</button>
   </section>`;
 }
 
@@ -3420,7 +3506,8 @@ function delDecision(id){
 function renderDecisions(){
   const decs = decisionsState();
   const open = decs.filter(d=>d.status==='open'), done = decs.filter(d=>d.status==='decided');
-  const card = d => `<div class="dec-card ${d.status==='decided'?'decided':''}">
+  const recent = done.slice().sort((a,b)=>a.decidedAt<b.decidedAt?1:-1)[0];
+  const card = d => `<div class="dec-card ${d.status==='decided'?'decided':''}" style="margin-bottom:12px">
     <h4><span>${esc(d.title)}</span>
       <span class="small muted no-print" style="font-weight:400;white-space:nowrap">
         ${d.status==='open'
@@ -3434,19 +3521,41 @@ function renderDecisions(){
   </div>`;
   app.innerHTML = `
   <section class="view">
-    <div class="eyebrow">Decision Log</div>
-    <h1>의사결정 로그</h1>
-    <p class="lede">사업의 굵직한 결정을 배경·선택지·결정·날짜와 함께 남깁니다.
-    나중에 "왜 그렇게 했더라"를 찾는 시간이 없어지고, 파트너와의 논의도 이 기록 위에서 시작할 수 있습니다.</p>
-    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addDecision()">+ 사안 추가</button></div>
-    <h2 style="font-size:18px">대기 중 <span class="pill warn">${open.length}건</span></h2>
-    <div style="margin-top:10px">${open.map(card).join('') || '<p class="small muted">대기 중인 결정이 없습니다.</p>'}</div>
-    <h2 style="font-size:18px;margin-top:28px">결정됨 <span class="pill ok">${done.length}건</span></h2>
-    <div style="margin-top:10px">${done.map(card).join('') || '<p class="small muted">아직 기록된 결정이 없습니다.</p>'}</div>
-    <div class="card" style="border-left:3px solid var(--coral);margin-top:20px">
-      <h3>3자 합의와의 관계</h3>
-      <p class="small muted" style="margin-top:6px">리더스·리드앤톡과 함께 정해야 하는 항목은 🤝 3자 합의 트래커에서 관리합니다.
-      이 로그는 대표가 단독으로 내리는 결정용입니다. 같은 사안이 양쪽에 걸치면 — 예: 수익 배분 — 합의 트래커를 원본으로 두고 여기엔 결과만 기록하세요.</p>
+    <div class="hq-head">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Decision Log</div>
+        <h1 style="font-size:26px;margin-bottom:0">의사결정 로그</h1>
+      </div>
+      <button class="btn sm ghost no-print" style="margin-left:auto" onclick="addDecision()">+ 사안 추가</button>
+    </div>
+    <div class="hq-strip" style="grid-template-columns:repeat(3,1fr)">
+      <div class="hq-tile" style="--acc:var(--warn)">
+        <div class="lbl">대기 중</div><div class="big">${open.length}건</div>
+        <div class="sub">${open.length?'가장 오래된 건: '+esc(open[0].title):'대기 중인 결정 없음'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--ok)">
+        <div class="lbl">결정됨</div><div class="big">${done.length}건</div>
+        <div class="sub">${recent?'최근: '+esc(recent.decidedAt)+' '+esc(recent.title):'아직 기록된 결정이 없습니다'}</div>
+      </div>
+      <div class="hq-tile" style="--acc:var(--coral)">
+        <div class="lbl">최우선</div>
+        <div class="big" style="font-size:16px;line-height:1.4;padding-top:6px">${open.length?esc(open[0].title):'—'}</div>
+        <div class="sub">${open.length?'배경·선택지는 아래 카드에서':''}</div>
+      </div>
+    </div>
+    <div class="dec-body">
+      <div>
+        <h2 style="font-size:17px;margin-bottom:10px">대기 중</h2>
+        ${open.map(card).join('') || '<p class="small muted">대기 중인 결정이 없습니다.</p>'}
+      </div>
+      <div>
+        <h2 style="font-size:17px;margin-bottom:10px">결정됨</h2>
+        ${done.map(card).join('') || '<p class="small muted">아직 기록된 결정이 없습니다.</p>'}
+        <div class="card" style="border-left:3px solid var(--coral);margin-top:4px">
+          <h3 style="font-size:14px">3자 합의와의 관계</h3>
+          <p class="small muted" style="margin-top:6px">리더스·리드앤톡과 함께 정하는 항목은 🤝 3자 합의 트래커가 원본입니다. 이 로그는 대표 단독 결정용 — 같은 사안이 걸치면 여기엔 결과만 기록하세요.</p>
+        </div>
+      </div>
     </div>
   </section>`;
 }
