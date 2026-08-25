@@ -565,6 +565,68 @@ const DATA = {"concepts":[{"code":"A","conceptName":"WB 리딩 브릿지 — 검
 
 /* ══════════════════ 상태 관리 ══════════════════ */
 const LS_KEY = 'wb-suwan-launch-v1';
+/* 자가 백업 — 사용자가 아무것도 누르지 않아도 앱이 스스로 사본을 남긴다.
+   ① 미러: 저장할 때마다 다른 키에 같은 내용을 한 벌 더 (한쪽이 깨져도 복구)
+   ② 스냅샷: 날짜별 1개씩 최근 10일치 (실수로 지우거나 덮어써도 되돌리기)
+   단, 셋 다 같은 브라우저 안이라 캐시 전체 삭제·기기 변경은 막지 못한다 —
+   그건 데이터 화면의 JSON 내보내기(외부 사본)만이 막을 수 있다. */
+const MIRROR_KEY = LS_KEY + '-mirror';
+const SNAP_KEY = LS_KEY + '-snapshots';
+const SNAP_MAX = 10;
+function snapshots(){
+  try{ const a = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+const SNAP_BUDGET = 2 * 1024 * 1024;   // 스냅샷 전체가 차지할 상한(약 2MB)
+/* 오래된 것부터 버린다. 단 pin이 붙은 것(되돌리기 직전·초기화 직전처럼
+   사고 복구용으로 일부러 남긴 사본)은 마지막까지 지키고, 더 버릴 게
+   없을 때만 손댄다. */
+function trimSnapshots(list, maxCount){
+  const dropOldest = () => {
+    let i = list.findIndex(s => !s.pin);
+    if(i < 0) i = 0;
+    list.splice(i, 1);
+  };
+  while(list.length > maxCount) dropOldest();
+  while(list.length > 1 && JSON.stringify(list).length > SNAP_BUDGET) dropOldest();
+  return list;
+}
+function writeSnapshots(list){
+  trimSnapshots(list, SNAP_MAX);
+  try{ localStorage.setItem(SNAP_KEY, JSON.stringify(list)); return true; }
+  catch(e){
+    // 그래도 용량 초과 — 하나씩 더 버리며 재시도
+    while(list.length > 1){
+      list.splice(list.findIndex(s=>!s.pin) < 0 ? 0 : list.findIndex(s=>!s.pin), 1);
+      try{ localStorage.setItem(SNAP_KEY, JSON.stringify(list)); return true; }catch(e2){}
+    }
+    return false;
+  }
+}
+/* 하루 1개 원칙. 단 pin이 붙은 사본은 덮어쓰지 않고 그 뒤에 새로 쌓는다 —
+   되돌리기 직전 상태가 바로 다음 저장에 지워지면 되돌리기를 되돌릴 수 없다. */
+function autoSnapshot(payload){
+  try{
+    const today = todayStr();
+    const list = snapshots();
+    const last = list[list.length-1];
+    if(last && last.date === today && !last.pin){
+      if(last.data === payload) return;      // 그날 마지막 상태와 같으면 건너뜀
+      last.data = payload; last.at = new Date().toISOString();
+    } else {
+      list.push({ date: today, at: new Date().toISOString(), data: payload });
+    }
+    writeSnapshots(list);
+  }catch(e){}
+}
+/* 사고 직전 상태를 별도 사본으로 못박는다(하루 1개 규칙과 무관하게 보존) */
+function pinSnapshot(payload, label){
+  try{
+    const list = snapshots();
+    list.push({ date: todayStr(), at: new Date().toISOString(), data: payload, pin: label });
+    writeSnapshots(list);
+  }catch(e){}
+}
 // 2026-08-07 대표 인터뷰 확정 답변 — 실사용 기본값으로 반영.
 // 점수 검증: A=24 · B=26 · C=41 → C안(데이터 러닝랩) 채택, 실제로는
 // "C안 커리큘럼 + B안 파트너십 구조(리드앤톡 운영위탁) + A안 프리미엄 요소" 혼합.
@@ -674,19 +736,31 @@ function migrate(st){
   return merged;
 }
 function load(){
-  try{
-    const raw = localStorage.getItem(LS_KEY);
-    if(raw){
-      const st = JSON.parse(raw);
-      if(st && typeof st === 'object' && !Array.isArray(st)) return migrate(st);
-    }
-  }catch(e){}
+  const parse = raw => {
+    if(!raw) return null;
+    try{ const st = JSON.parse(raw); return (st && typeof st === 'object' && !Array.isArray(st)) ? st : null; }
+    catch(e){ return null; }
+  };
+  let st = parse(localStorage.getItem(LS_KEY));
+  if(st) return migrate(st);
+  // 본 저장소 손상·유실 — 미러 사본으로
+  st = parse(localStorage.getItem(MIRROR_KEY));
+  if(st){ setTimeout(()=>toast('저장소가 비어 있어 미러 사본에서 복구했습니다'), 700); return migrate(st); }
+  // 미러도 없으면 가장 최근 스냅샷으로
+  const list = snapshots();
+  for(let i=list.length-1; i>=0; i--){
+    st = parse(list[i].data);
+    if(st){ const d = list[i].date; setTimeout(()=>toast(d+' 스냅샷에서 복구했습니다'), 700); return migrate(st); }
+  }
   return defaultState();
 }
 function save(opts){
   try{
     if(!(opts && opts.silent)) S.saveCount = (S.saveCount||0) + 1;
-    localStorage.setItem(LS_KEY, JSON.stringify(S));
+    const payload = JSON.stringify(S);
+    localStorage.setItem(LS_KEY, payload);
+    try{ localStorage.setItem(MIRROR_KEY, payload); }catch(e){}
+    autoSnapshot(payload);
   }catch(e){}
 }
 function toast(msg){
@@ -2710,6 +2784,8 @@ function renderData(){
   const counts = dataCounts();
   const totalRecords = Object.keys(counts).reduce((a,k)=>a+counts[k],0);
   const activeKinds = Object.keys(counts).filter(k=>counts[k]>0).length;
+  const snapList = snapshots();
+  const snapDays = new Set(snapList.map(s=>s.date)).size;
   app.innerHTML = `
   <section class="view">
     <div class="eyebrow">Data</div>
@@ -2727,9 +2803,9 @@ function renderData(){
         <div class="sub">${activeKinds}개 항목 종류</div>
       </div>
       <div class="hq-tile" style="--acc:var(--blue)">
-        <div class="lbl">저장 위치</div>
-        <div class="big" style="font-size:18px;line-height:1.4;padding-top:6px">이 브라우저</div>
-        <div class="sub">서버에 사본이 없습니다 — 백업이 유일한 안전망</div>
+        <div class="lbl">자동 스냅샷</div>
+        <div class="big">${snapDays}일치</div>
+        <div class="sub">사본 ${snapList.length}개 · 브라우저 안에만 있어 캐시 삭제엔 무력 — 외부 백업 필요</div>
       </div>
     </div>
     <div class="card">
@@ -2754,12 +2830,58 @@ function renderData(){
       <p class="small muted" style="margin-top:10px"><b>권장 루틴</b> — 화요일 연구 세션 끝에 한 번씩 내보내고, 받은 파일을 메일이나 클라우드에 보관하세요. 기기를 바꾸거나 브라우저를 정리하면 이 보드의 기록은 복구할 방법이 없습니다.</p>
       <p class="small muted" style="margin-top:6px">인쇄 팁: 컨셉 상세나 전략 보드 화면을 연 상태에서 브라우저 인쇄(Ctrl/Cmd+P)를 누르면 그 화면이 보고서 형태로 출력됩니다.</p>
     </div>
+    <div class="card no-print">
+      <h3>자동 스냅샷 <span class="small muted" style="font-weight:400">— 앱이 스스로 남기는 사본</span></h3>
+      <p class="small muted" style="margin:4px 0 10px">저장할 때마다 미러 사본을 한 벌 더 두고, 날짜별로 최근 ${SNAP_MAX}일치를 보관합니다.
+      되돌리기·초기화 직전 상태는 하루 1개 규칙과 무관하게 따로 못박아 둡니다(<span class="pill bad">직전</span> 표시).
+      실수로 지우거나 덮어썼을 때 되돌릴 수 있습니다. 다만 <b>같은 브라우저 안</b>이라, 캐시를 통째로 지우거나 기기를 바꾸면 함께 사라집니다 — 그건 위의 JSON 내보내기만이 막습니다.</p>
+      ${snapList.length ? `<table class="grid-tbl">
+        <thead><tr><th>날짜</th><th style="width:150px">기록 시각</th><th style="width:110px">크기</th><th style="width:90px" class="no-print"></th></tr></thead>
+        <tbody>${snapList.map((s,i)=>({s,i})).reverse().map(({s,i})=>`<tr>
+          <td><b>${esc(s.date)}</b> <span class="small muted">${esc(relDay(s.date))}</span>
+            ${s.pin?`<span class="pill bad">${esc(s.pin)}</span>`:''}</td>
+          <td class="small muted">${esc(fmtSnapTime(s.at))}</td>
+          <td class="num small muted">${num(Math.round((s.data||'').length/1024))} KB</td>
+          <td class="no-print"><button class="btn xs ghost" onclick="restoreSnapshot(${i})">되돌리기</button></td>
+        </tr>`).join('')}</tbody>
+      </table>` : '<p class="small muted">아직 스냅샷이 없습니다. 무언가 저장하면 오늘 자로 하나 생깁니다.</p>'}
+    </div>
     <div class="card">
       <h3>메모</h3>
       <textarea class="q-input" style="min-height:110px" placeholder="회의 중 결정사항, 다음에 할 일 등을 자유롭게"
         onchange="S.memo=this.value;save();toast('메모 저장')">${esc(S.memo||'')}</textarea>
     </div>
   </section>`;
+}
+function relDay(ymd){
+  try{
+    const [y,m,d] = ymd.split('-').map(Number);
+    const a = new Date(y, m-1, d), b = new Date();
+    const diff = Math.round((new Date(b.getFullYear(),b.getMonth(),b.getDate()) - a) / 86400000);
+    if(diff === 0) return '오늘';
+    if(diff === 1) return '어제';
+    if(diff > 1) return diff + '일 전';
+    return '';
+  }catch(e){ return ''; }
+}
+function fmtSnapTime(iso){
+  try{
+    const d = new Date(iso);
+    if(isNaN(d)) return '';
+    return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }catch(e){ return ''; }
+}
+function restoreSnapshot(idx){
+  const list = snapshots();
+  const snap = list[idx]; if(!snap) return;
+  const date = snap.date + (snap.pin ? ' ('+snap.pin+')' : '');
+  let st = null;
+  try{ st = JSON.parse(snap.data); }catch(e){}
+  if(!st){ toast('스냅샷을 읽을 수 없습니다'); return; }
+  if(!confirm(date+' 시점으로 되돌립니다.\n지금 화면의 데이터는 「되돌리기 직전」 사본으로 따로 남으니,\n마음에 안 들면 그걸로 다시 돌아올 수 있습니다.\n\n계속할까요?')) return;
+  pinSnapshot(JSON.stringify(S), '되돌리기 직전');
+  S = migrate(st); save();
+  render(); toast(date+' 스냅샷으로 되돌렸습니다 — 직전 상태도 사본으로 남았습니다');
 }
 function exportJson(){
   const stamp = todayStr();
@@ -2804,9 +2926,12 @@ function resetAll(){
   const bk = backupStatus();
   if(bk.pending>0 && !confirm('아직 백업하지 않은 변경이 '+bk.pending+'건 있습니다.\n초기화하면 복구할 수 없습니다.\n\n그래도 계속할까요? (취소하고 먼저 내보내기를 권합니다)')) return;
   if(!confirm('모든 답변·선택·작업 상태를 삭제합니다. 계속할까요?')) return;
+  pinSnapshot(JSON.stringify(S), '초기화 직전');   // 되돌릴 여지를 남긴다
   localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(MIRROR_KEY);
   S = defaultState(); ivIdx = 0; cIdx = null; chFilter='all';
-  render(); toast('초기화 완료');
+  save();
+  render(); toast('초기화 완료 — 직전 상태는 자동 스냅샷에 남아 있습니다');
 }
 
 /* ══════════════════ 접근 게이트 ══════════════════
