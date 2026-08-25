@@ -285,10 +285,10 @@
   .schedule-timeline-block strong, .schedule-timeline-block small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .schedule-timeline-block strong { font-size: 11.5px; line-height: 1.35; }
   .schedule-timeline-block small { margin-top: 2px; font-size: 9.5px; line-height: 1.2; opacity: .82; }
-  .schedule-flow-attendance-list { display: grid; gap: 2px; }
-  .schedule-flow-attendance { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 4px; padding: 1px 4px; border-radius: 5px; font-size: 9.5px; font-weight: 900; line-height: 15px; }
-  .schedule-flow-attendance b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .schedule-flow-attendance i { flex: 0 0 auto; font-style: normal; }
+  .schedule-flow-attendance-list { display: grid; gap: 3px; }
+  .schedule-flow-attendance { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); justify-items: stretch; gap: 0; padding: 2px 3px; border-radius: 5px; font-size: 9.5px; font-weight: 900; line-height: 1.2; text-align: center; }
+  .schedule-flow-attendance b { display: block; min-width: 0; overflow: visible; text-overflow: clip; white-space: nowrap; font-size: 10px; line-height: 13px; }
+  .schedule-flow-attendance i { display: block; min-width: 0; font-size: 9px; font-style: normal; line-height: 12px; white-space: nowrap; }
   .schedule-flow-attendance.is-present { background: #D1FAE5; color: #047857; }
   .schedule-flow-attendance.is-late { background: #FFEDD5; color: #C2410C; }
   .schedule-flow-attendance.is-absent { background: #DBEAFE; color: #1D4ED8; }
@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-24.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-24.2"></script>
-<script src="./asset-core.js?v=2026-08-24.2"></script>
-<script src="./qr-core.js?v=2026-08-24.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-24.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-25.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-25.1"></script>
+<script src="./asset-core.js?v=2026-08-25.1"></script>
+<script src="./qr-core.js?v=2026-08-25.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-25.1"></script>
 <script>
 "use strict";
 
@@ -6896,7 +6896,7 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
   timeline.rows.forEach(row => {
     const visuals = row.sessions.map(session => {
       const attendanceRows = scheduleSessionAttendanceRows(session, date);
-      return { session: session, attendanceRows: attendanceRows, height: Math.max(42, attendanceRows.length * 19 + 10) };
+      return { session: session, attendanceRows: attendanceRows, height: Math.max(42, attendanceRows.length * 32 + 10) };
     });
     const laneHeights = Array.from({ length: Math.max(1, row.laneCount) }, () => 42);
     visuals.forEach(item => { laneHeights[item.session.lane] = Math.max(laneHeights[item.session.lane], item.height); });
@@ -16002,7 +16002,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-24.2';
+const APP_VER = '2026-08-25.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
