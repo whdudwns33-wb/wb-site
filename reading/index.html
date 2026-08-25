@@ -151,6 +151,14 @@
     .seg-ctl button{min-height:40px;padding:6px 13px;border:0;background:none;color:var(--muted);font-size:12.5px;font-weight:850}
     .seg-ctl button+button{border-left:1.5px solid #e2ebef}
     .seg-ctl button[aria-pressed="true"]{background:var(--sky);color:var(--navy)}
+    /* 자동 읽기 (SentenceMask) */
+    .autoread .rd-body .seg{opacity:.13;transition:opacity .18s}
+    .autoread .rd-body .seg.now{opacity:1}
+    .autoread .rd-body .vw{pointer-events:none}
+    .autoread.chunked .seg:not(:last-child)::after{opacity:.15}
+    .autoread .seg.now::after{opacity:.95}
+    .auto-bar{position:fixed;left:0;right:0;bottom:0;z-index:9;background:#fff;border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #17395722}
+    .auto-in{display:flex;max-width:560px;margin:auto;gap:7px;align-items:center;flex-wrap:wrap}
     .lang-en-tag{display:inline-block;padding:2px 7px;border-radius:6px;background:#e7f6f0;color:var(--ok);font-size:11px;font-weight:900;vertical-align:2px;margin-right:5px}
     .deep{margin-top:14px;padding:14px 15px;border:1px solid #d6ebf4;border-radius:14px;background:#f8fcfe}
     .deep h3{margin-bottom:4px}
@@ -315,6 +323,7 @@ function render(){
   app.removeAttribute('aria-busy');
   $('#tabbar').hidden=!S.profile||['reader','quiz','onboard'].includes(view.name);
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.v===view.name?'true':'false'));
+  if(sess.auto&&view.name==='reader'){const rc=document.getElementById('readerCard');if(rc)rc.classList.add('autoread');}
   if(view.name==='reader'||view.name==='quiz'){
     $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="home">홈으로</button>';
   }else if(view.name==='settings'){
@@ -324,7 +333,7 @@ function render(){
   }else{$('#headActions').innerHTML='';}
   window.scrollTo(0,0);
 }
-function go(name,extra){view=Object.assign({name},extra||{});sess={};render();}
+function go(name,extra){if(sess.auto)autoStop(false);view=Object.assign({name},extra||{});sess={};render();}
 
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
@@ -472,6 +481,7 @@ function vReader(){
       <h1 style="margin-top:8px">${esc(b.title)}</h1>
       <div class="rd-tools">
         <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk}">∕ 끊어 읽기</button>
+        <button class="toolbtn" data-act="auto-start">▶ 자동 읽기</button>
         ${hasEn?`<span class="seg-ctl" role="group" aria-label="언어 보기">${[[0,'한글'],[1,'한·영'],[2,'EN만']].map(([m,l])=>`<button data-act="en-mode" data-m="${m}" aria-pressed="${enMode===m}">${l}</button>`).join('')}</span>`:''}
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
@@ -941,7 +951,7 @@ function vLab(){
 
 /* ───────────────────────── 어휘 시트 ───────────────────────── */
 function renderEnPara(text,segArr,vocabList,linked,articleId,chunkOn){
-  const chunks=(chunkOn&&Array.isArray(segArr)&&segArr.join('')===text)?segArr:[text];
+  const chunks=(Array.isArray(segArr)&&segArr.join('')===text)?segArr:[text];
   return chunks.map(c=>{
     const hits=[];
     for(const ev of vocabList){
@@ -964,6 +974,43 @@ function naverBook(bk){return 'https://search.naver.com/search.naver?where=book&
 function videoHtml(v){return `<a class="deep-item" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer"><b><span style="color:#c9503c">▶</span> ${esc(v.title)} ↗</b><small>${esc(v.channel||'')}${v.note?' — '+esc(v.note):''} · 유튜브</small></a>`;}
 function paperHtml(p){return `<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`;}
 function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="${bk.url?esc(bk.url):naverBook(bk)}" target="_blank" rel="noopener noreferrer"><b>📚 ${esc(bk.title)} ↗</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책 소개 보기</small></a>${bk.video?`<a class="deep-mini" href="${esc(bk.video.url)}" target="_blank" rel="noopener noreferrer">▶ 책 소개 영상 · ${esc(bk.video.channel||'')}</a>`:''}</div>`;}
+/* ── 자동 읽기 (SentenceMask) ── */
+function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg'));}
+function autoDelay(el){
+  const len=(el.textContent||'').trim().length;
+  const per=[240,165,110][sess.auto?sess.auto.speed:1];
+  return Math.max(700,len*per);
+}
+function autoTick(){
+  const a=sess.auto;if(!a||!a.playing)return;
+  const segs=autoSegs();
+  if(a.idx>=segs.length){autoStop(true);return;}
+  segs.forEach((s,i)=>s.classList.toggle('now',i===a.idx));
+  const el=segs[a.idx];
+  if(el)el.scrollIntoView({block:'center',behavior:'smooth'});
+  a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(el));
+}
+function autoStop(done){
+  if(sess.auto&&sess.auto.timer)clearTimeout(sess.auto.timer);
+  sess.auto=null;
+  const c=document.getElementById('readerCard');if(c)c.classList.remove('autoread');
+  document.querySelectorAll('.seg.now').forEach(s=>s.classList.remove('now'));
+  const bar=document.getElementById('autoBar');if(bar)bar.remove();
+  if(done)announce('자동 읽기 완료! 눈이 의미 단위를 따라갔어요.');
+}
+function autoStart(){
+  if(sess.auto)return;
+  sess.auto={idx:0,playing:true,speed:1,timer:null};
+  const c=document.getElementById('readerCard');if(c)c.classList.add('autoread');
+  const bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
+  bar.innerHTML=`<div class="auto-in">
+    <button class="toolbtn" data-act="auto-pp" id="autoPP">⏸ 정지</button>
+    <span class="seg-ctl">${['느리게','보통','빠르게'].map((l,i)=>`<button data-act="auto-speed" data-i="${i}" aria-pressed="${i===1}">${l}</button>`).join('')}</span>
+    <span style="flex:1"></span>
+    <button class="toolbtn" data-act="auto-exit">끝내기 ✕</button></div>`;
+  document.body.appendChild(bar);
+  autoTick();
+}
 function openVocabEn(articleId,word){
   const a=DB.articles.find(x=>x.id===articleId);
   const b=levelBody(a,myLevel());
@@ -1051,7 +1098,16 @@ document.addEventListener('click',e=>{
   else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
     if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
-  else if(act==='en-mode'){const lv=myLevel();S.prefs.en[lv]=+t.dataset.m;save();render();}
+  else if(act==='en-mode'){const lv=myLevel();if(sess.auto)autoStop(false);S.prefs.en[lv]=+t.dataset.m;save();render();}
+  else if(act==='auto-start'){autoStart();}
+  else if(act==='auto-pp'){const a=sess.auto;if(!a)return;
+    a.playing=!a.playing;
+    const pp=document.getElementById('autoPP');if(pp)pp.textContent=a.playing?'⏸ 정지':'▶ 계속';
+    if(a.playing)autoTick();else if(a.timer)clearTimeout(a.timer);}
+  else if(act==='auto-speed'){const a=sess.auto;if(!a)return;
+    a.speed=+t.dataset.i;
+    document.querySelectorAll('#autoBar .seg-ctl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));}
+  else if(act==='auto-exit'){autoStop(false);}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
     const a=DB.articles.find(x=>x.id===id);const b=levelBody(a,myLevel());
