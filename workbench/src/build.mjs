@@ -20,9 +20,9 @@ let htmlStr = readFileSync(join(HERE, "app.html"), "utf8");
 // 비공개 시드(학생별 관심대학) 주입 — private-seed.json 은 저장소에 커밋하지 않는다
 try {
   const seed = readFileSync(join(HERE, "private-seed.json"), "utf8");
-  const marker = "const SEED_UNIVS={}; /*BUILD:PRIVATE_SEED*/";
+  const marker = "const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/";
   if (htmlStr.includes(marker)) {
-    htmlStr = htmlStr.replace(marker, `const SEED_UNIVS=${seed.trim()}; /*BUILD:PRIVATE_SEED*/`);
+    htmlStr = htmlStr.replace(marker, `const SEED_PRIV=${seed.trim()}; /*BUILD:PRIVATE_SEED*/`);
     console.log("비공개 시드 주입됨");
   }
 } catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
