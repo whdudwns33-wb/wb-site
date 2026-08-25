@@ -16,7 +16,17 @@ if (!PASSWORD) {
   process.exit(1);
 }
 
-const html = readFileSync(join(HERE, "app.html"));
+let htmlStr = readFileSync(join(HERE, "app.html"), "utf8");
+// 비공개 시드(학생별 관심대학) 주입 — private-seed.json 은 저장소에 커밋하지 않는다
+try {
+  const seed = readFileSync(join(HERE, "private-seed.json"), "utf8");
+  const marker = "const SEED_UNIVS={}; /*BUILD:PRIVATE_SEED*/";
+  if (htmlStr.includes(marker)) {
+    htmlStr = htmlStr.replace(marker, `const SEED_UNIVS=${seed.trim()}; /*BUILD:PRIVATE_SEED*/`);
+    console.log("비공개 시드 주입됨");
+  }
+} catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
+const html = Buffer.from(htmlStr, "utf8");
 const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
 const key = crypto.pbkdf2Sync(PASSWORD, salt, ITER, 32, "sha256");
 const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
