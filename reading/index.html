@@ -975,7 +975,7 @@ function videoHtml(v){return `<a class="deep-item" href="${esc(v.url)}" target="
 function paperHtml(p){return `<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`;}
 function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="${bk.url?esc(bk.url):naverBook(bk)}" target="_blank" rel="noopener noreferrer"><b>📚 ${esc(bk.title)} ↗</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책 소개 보기</small></a>${bk.video?`<a class="deep-mini" href="${esc(bk.video.url)}" target="_blank" rel="noopener noreferrer">▶ 책 소개 영상 · ${esc(bk.video.channel||'')}</a>`:''}</div>`;}
 /* ── 자동 읽기 (SentenceMask) ── */
-function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg'));}
+function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg')).filter(el=>el.offsetParent!==null);}
 function autoDelay(el){
   const len=(el.textContent||'').trim().length;
   const per=[240,165,110][sess.auto?sess.auto.speed:1];
