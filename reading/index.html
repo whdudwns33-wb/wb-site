@@ -101,6 +101,47 @@
     .grow.open .meaning{display:block}
     textarea{width:100%;min-height:64px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:14px;resize:vertical}
     select{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;background:#fff;font:inherit;font-size:15px;font-weight:700;color:var(--navy)}
+    /* ── v1.1 피그마 시안 반영 ── */
+    .greet{display:flex;align-items:center;gap:10px;margin:2px 2px 13px}
+    .greet .g-l{flex:1;min-width:0}
+    .g-date{color:var(--muted);font-size:12px;font-weight:600}
+    .greet h1{font-size:22px}
+    .streak-chip{flex:0 0 auto;display:flex;gap:5px;align-items:center;padding:7px 12px;border-radius:999px;background:#fbeae6;color:var(--coral);font-size:13px;font-weight:900}
+    .hero2{padding:0;overflow:hidden;border-color:#b9deed}
+    .hero2 .band{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 18px;font-size:13px;font-weight:900}
+    .hero2 .band small{font-size:12px;font-weight:600;color:var(--muted)}
+    .band.c-science{background:#e7f2fb;color:#155d94}.band.c-society{background:#fdf0e4;color:#8a5a12}.band.c-history{background:#f4ece1;color:#7a5230}.band.c-humanities{background:#f3ecf8;color:#6b4390}.band.c-environment{background:#e7f6ec;color:#20714a}
+    .hero2 .hbody{padding:15px 18px 18px}
+    .weekhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .weekdots{display:flex;justify-content:space-between;margin-top:12px}
+    .wd{display:grid;justify-items:center;gap:5px;font-size:10.5px;color:var(--muted);font-weight:700}
+    .wd i{width:30px;height:30px;border-radius:999px;background:#e4edf1}
+    .wd i.done{background:var(--ok)}
+    .wd.today i{background:#fff;box-shadow:inset 0 0 0 2.5px var(--blue)}
+    .wd.today{color:var(--blue);font-weight:900}
+    .rowdot{width:9px;height:9px;border-radius:999px;flex:0 0 auto;margin-top:6px}
+    .dot-science{background:#155d94}.dot-society{background:#8a5a12}.dot-history{background:#7a5230}.dot-humanities{background:#6b4390}.dot-environment{background:#20714a}
+    .progress-top{position:fixed;top:0;left:0;right:0;height:4px;background:var(--line);z-index:7}
+    .progress-top i{display:block;height:100%;width:0;background:var(--blue)}
+    .rd-fs .para{font-size:calc(16.5px * var(--fs,1))}
+    .lv-L2.rd-fs .para{font-size:calc(17.5px * var(--fs,1))}
+    .qhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .qbar{height:6px;border-radius:999px;background:#e4edf1;overflow:hidden;margin-top:9px}
+    .qbar i{display:block;height:100%;background:var(--blue);border-radius:999px}
+    .choice{display:flex;gap:11px;align-items:center}
+    .cnum{flex:0 0 26px;width:26px;height:26px;border-radius:999px;background:var(--sky);color:var(--blue);font-weight:900;font-size:12.5px;display:grid;place-items:center}
+    .choice.correct .cnum{background:var(--ok);color:#fff}
+    .choice.wrong .cnum{background:var(--bad);color:#fff}
+    .evchip{display:inline-block;margin-top:9px;padding:7px 12px;border-radius:999px;background:#fff;color:var(--blue);font-size:12px;font-weight:800}
+    .ringwrap{display:flex;gap:18px;align-items:center;margin-top:6px}
+    .ring{position:relative;flex:0 0 96px;width:96px;height:96px}
+    .ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+    .ring .rc b{display:block;color:var(--navy);font-size:19px;line-height:1.1}
+    .ring .rc span{display:block;color:var(--muted);font-size:10px;font-weight:700}
+    .grade-lbl{margin:12px 0 0;color:var(--muted);font-size:12.5px;font-weight:900}
+    .obdots{display:flex;gap:7px;margin-bottom:9px}
+    .obdots i{width:9px;height:9px;border-radius:999px;background:var(--line)}
+    .obdots i.on{width:26px;background:var(--blue)}
     .loading{padding:48px 16px;text-align:center;color:var(--muted)}
     .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:350px){.pick-grid,.stat-grid,.evalrow{grid-template-columns:repeat(2,minmax(0,1fr))}.row2{grid-template-columns:1fr}}
@@ -226,13 +267,15 @@ function go(name,extra){view=Object.assign({name},extra||{});sess={};render();}
 function vOnboard(){
   const st=sess.ob||(sess.ob={step:'grade',grade:null,interests:[],diag:null});
   if(st.step==='grade'){
-    return `<div class="card hero"><p class="eyebrow">시작하기 1/3</p><h1>몇 학년인가요?</h1>
-      <p class="sub">학년에 맞는 수준의 글을 골라 줄게요.</p>
-      <div class="pick-grid">${GRADES.map(([v,l])=>`<button class="pick" data-act="ob-grade" data-v="${v}" aria-pressed="${st.grade===v}">${l}</button>`).join('')}</div>
+    const groups=[['초등',['e3','e4','e5','e6']],['중등',['m1','m2','m3']],['고등',['h1','h2','h3']]];
+    return `<div class="card hero"><div class="obdots"><i class="on"></i><i></i><i></i></div><p class="eyebrow">시작하기 1/3</p><h1>몇 학년인가요?</h1>
+      <p class="sub">학년에 맞는 수준의 글을 골라 줄게요. 뒤에서 짧은 글로 딱 맞는 레벨을 다시 확인해요.</p>
+      ${groups.map(([gl,ids])=>`<p class="grade-lbl">${gl}</p>
+      <div class="pick-grid" style="grid-template-columns:repeat(${ids.length},minmax(0,1fr));margin-top:7px">${ids.map(v=>{const l=GRADES.find(g=>g[0]===v)[1];return `<button class="pick" data-act="ob-grade" data-v="${v}" aria-pressed="${st.grade===v}">${l}</button>`;}).join('')}</div>`).join('')}
       <button class="btn" data-act="ob-next-grade" ${st.grade?'':'disabled'}>다음</button></div>`;
   }
   if(st.step==='interests'){
-    return `<div class="card hero"><p class="eyebrow">시작하기 2/3</p><h1>관심 있는 분야를 골라 주세요</h1>
+    return `<div class="card hero"><div class="obdots"><i class="on"></i><i class="on"></i><i></i></div><p class="eyebrow">시작하기 2/3</p><h1>관심 있는 분야를 골라 주세요</h1>
       <p class="sub">1~3개. 나중에 설정에서 바꿀 수 있어요.</p>
       <div class="pick-grid">${INTERESTS.map(([v,l,d])=>`<button class="pick" data-act="ob-int" data-v="${v}" aria-pressed="${st.interests.includes(v)}">${l}<small>${d}</small></button>`).join('')}</div>
       <button class="btn" data-act="ob-next-int" ${st.interests.length?'':'disabled'}>다음</button></div>`;
@@ -252,7 +295,7 @@ function vOnboard(){
   }
   if(st.step==='diag-quiz'){
     const lv=LEVEL_OF[st.grade];const d=DB.diagnostics[lv];
-    return quizCard(d.questions,st.diagQ||(st.diagQ={i:0,correct:0,picked:null}),'ob-diag');
+    return quizCard(d.questions,st.diagQ||(st.diagQ={i:0,correct:0,picked:null}),'ob-diag','레벨 확인');
   }
   if(st.step==='diag-result'){
     const lv=LEVEL_OF[st.grade];const sc=st.diagQ.correct;
@@ -278,12 +321,28 @@ function finishOnboard(levelOverride){
 }
 
 /* ───────────────────────── 홈 ───────────────────────── */
+function weekDots(){
+  const dows=['일','월','화','수','목','금','토'];
+  let cells='';
+  for(let i=6;i>=0;i--){
+    const k=addDays(dkey(),-i);
+    const d=new Date(k+'T12:00:00');
+    const done=!!S.days[k];
+    cells+=`<span class="wd ${i===0?'today':''}"><i class="${done?'done':''}"></i>${dows[d.getDay()]}</span>`;
+  }
+  return cells;
+}
 function vHome(){
   const missionId=pickDaily();
   const a=missionId?DB.articles.find(x=>x.id===missionId):null;
   const doneToday=!!S.days[dkey()];
   const stk=streak();
   const iv=S.profile.interests;
+  const now=new Date();
+  const dateStr=`${now.getMonth()+1}월 ${now.getDate()}일 ${['일','월','화','수','목','금','토'][now.getDay()]}요일`;
+  const greet=`<div class="greet"><div class="g-l"><p class="g-date">${dateStr}</p>
+    <h1>${doneToday?'오늘 미션 완료!':'오늘의 글이 도착했어요'}</h1></div>
+    <span class="streak-chip">◆ ${stk}일째</span></div>`;
   let missionCard;
   if(!a){missionCard=`<div class="card"><div class="empty">아직 읽을 수 있는 글이 없어요.<br>선생님께 문의해 주세요.</div></div>`;}
   else{
@@ -292,23 +351,28 @@ function vHome(){
     const why=a.careers.some(c=>iv.includes(c))
       ?`관심 분야 <b>${esc(a.careers.filter(c=>iv.includes(c)).map(c=>INTEREST_LABEL[c]).join('·'))}</b>에 맞는 글이에요`
       :`오늘은 시야를 넓히는 <b>${CATS[a.category]}</b> 글이에요`;
-    missionCard=`<div class="card hero"><div class="between"><div><p class="eyebrow">오늘의 1지문 ${isRe?'· 다시 읽기':''}</p>
-      <h1>${esc(b.title)}</h1></div><span class="tag ${doneToday?'ok':'warn'}">${doneToday?'오늘 완료':'미완료'}</span></div>
-      <p class="sub" style="margin-top:9px">${why} · 약 ${b.minutes}분 · <span class="tag c-${a.category}">${CATS[a.category]}</span> <span class="tag muted">${LEVEL_LABEL[myLevel()]}</span></p>
-      <button class="btn" data-act="read" data-id="${a.id}">${doneToday&&S.readings[a.id]?'다시 읽기':'읽기 시작'}</button></div>`;
+    missionCard=`<div class="card hero2"><div class="band c-${a.category}"><span>${CATS[a.category]}</span>
+      <small>${LEVEL_LABEL[myLevel()]} · 약 ${b.minutes}분</small></div>
+      <div class="hbody"><p class="eyebrow">오늘의 1지문 ${isRe?'· 다시 읽기':''}</p>
+      <h1>${esc(b.title)}</h1>
+      <p class="sub" style="margin-top:8px">${why}</p>
+      <button class="btn" data-act="read" data-id="${a.id}">${doneToday&&S.readings[a.id]?'다시 읽기':'읽기 시작'}</button></div></div>`;
   }
   const recs=recommend(missionId);
   const scrapN=Object.keys(S.scraps).length;
-  return `${missionCard}
+  return `${greet}${missionCard}
+    <div class="card"><div class="weekhead"><h3>이번 주 읽기</h3><span class="tag muted">${weekCount()}/7일</span></div>
+      <div class="weekdots">${weekDots()}</div></div>
     <div class="card"><div class="stat-grid">
-      <div class="stat"><b><span class="streak-flame">◆</span> ${stk}</b><span>연속 읽기(일)</span></div>
-      <div class="stat"><b>${weekCount()}</b><span>이번 주 완독</span></div>
+      <div class="stat"><b>${Object.keys(S.readings).length}</b><span>완독한 글</span></div>
       <div class="stat"><b>${S.vocab.length}</b><span>모은 어휘</span></div>
+      <div class="stat"><b>${(()=>{const qs=Object.values(S.quiz);const t=qs.reduce((s,q)=>s+q.total,0);return t?Math.round(qs.reduce((s,q)=>s+q.correct,0)/t*100)+'%':'—';})()}</b><span>문제 정답률</span></div>
     </div></div>
     ${scrapN>=5?`<div class="card" style="border-color:#e8c9a8;background:linear-gradient(145deg,#fff8ef 0,#fff 70%)"><p class="eyebrow" style="color:#8a5a12">탐구 랩</p><h2>스크랩이 ${scrapN}편 모였어요</h2><p class="sub">탐구보고서 만들기는 다음 업데이트(v1)에서 열려요. 계속 모아 두세요!</p></div>`:''}
     <div class="card"><div class="between"><h2>더 읽어 볼 글</h2><span class="tag muted">${recs.length}편</span></div>
       <div class="glist">${recs.length?recs.map(r=>{const b=levelBody(r,myLevel());return `<button class="grow" data-act="read" data-id="${r.id}">
-        <span class="t">${esc(b.title)}<small><span class="tag c-${r.category}">${CATS[r.category]}</span> 약 ${b.minutes}분</small></span><span class="go">›</span></button>`;}).join(''):'<div class="empty">추천할 새 글이 없어요. 내일 다시 만나요!</div>'}</div></div>`;
+        <span class="rowdot dot-${r.category}" style="align-self:flex-start"></span>
+        <span class="t">${esc(b.title)}<small>${CATS[r.category]} · 약 ${b.minutes}분</small></span><span class="go">›</span></button>`;}).join(''):'<div class="empty">추천할 새 글이 없어요. 내일 다시 만나요!</div>'}</div></div>`;
 }
 
 /* ───────────────────────── 읽기 화면 ───────────────────────── */
@@ -333,11 +397,15 @@ function vReader(){
     }).join('');
     return `<p class="para" id="para-${pi}">${segs}</p>`;
   }).join('');
-  return `<div class="card lv-${lv} ${chunk?'chunked':''}" id="readerCard">
+  const fs=S.prefs.fs||1;
+  return `<div class="progress-top" aria-hidden="true"><i id="progTop"></i></div>
+    <div class="card lv-${lv} rd-fs ${chunk?'chunked':''}" id="readerCard" style="--fs:${fs}">
       <p class="eyebrow"><span class="tag c-${a.category}">${CATS[a.category]}</span> <span class="tag muted">${LEVEL_LABEL[lv]}</span> <span class="tag muted">약 ${b.minutes}분</span></p>
       <h1 style="margin-top:8px">${esc(b.title)}</h1>
       <div class="rd-tools">
         <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk}">∕ 끊어 읽기</button>
+        <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
+        <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         <span class="toolbtn" style="cursor:default;border-style:dashed">밑줄 단어를 누르면 뜻이 나와요</span>
       </div>
       <div class="rd-body">${paras}</div>
@@ -362,18 +430,24 @@ function completeRead(a,evalv){
 }
 
 /* ───────────────────────── 퀴즈 ───────────────────────── */
-function quizCard(questions,q,prefix){
+const QTYPE_LABEL={main:'핵심 내용',detail:'세부 정보',vocab:'어휘',infer:'추론',critical:'비판적 사고'};
+function quizCard(questions,q,prefix,title){
   const cur=questions[q.i];
   const total=questions.length;
   const answered=q.picked!=null;
-  return `<div class="card"><p class="qnum">문제 ${q.i+1} / ${total}</p>
+  return `<div class="card"><div class="qhead"><p class="qnum">문제 ${q.i+1} / ${total}</p>
+    ${title?`<p class="qnum" style="font-weight:600">${esc(title)}</p>`:''}</div>
+    <div class="qbar"><i style="width:${Math.round(((q.i+(answered?1:0))/total)*100)}%"></i></div>
+    <p class="sub" style="margin-top:12px"><span class="tag">${QTYPE_LABEL[cur.type]||'문항'}</span></p>
     <p class="qtext">${esc(cur.q)}</p>
     <div class="choices">${cur.choices.map((c,i)=>{
-      let cls='choice';
-      if(answered){if(i===cur.answer)cls+=' correct';else if(i===q.picked)cls+=' wrong';}
-      return `<button class="${cls}" data-act="${prefix}-pick" data-i="${i}" ${answered?'disabled':''}>${i+1}. ${esc(c)}</button>`;
+      let cls='choice';let num=String(i+1);
+      if(answered){if(i===cur.answer){cls+=' correct';num='✓';}else if(i===q.picked){cls+=' wrong';num='✕';}}
+      return `<button class="${cls}" data-act="${prefix}-pick" data-i="${i}" ${answered?'disabled':''}>
+        <span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;
     }).join('')}</div>
-    ${answered?`<div class="explain"><b>${q.picked===cur.answer?'정답이에요!':'아쉬워요.'}</b> ${esc(cur.explain)}<br><b>근거:</b> ${cur.evidencePara+1}번째 문단</div>
+    ${answered?`<div class="explain"><b>${q.picked===cur.answer?'정답이에요!':'아쉬워요 — 정답은 '+(cur.answer+1)+'번.'}</b> ${esc(cur.explain)}<br>
+    <span class="evchip">근거: ${cur.evidencePara+1}번째 문단</span></div>
     <button class="btn" data-act="${prefix}-next">${q.i+1<total?'다음 문제':'결과 보기'}</button>`:''}</div>`;
 }
 function vQuiz(){
@@ -391,7 +465,7 @@ function vQuiz(){
       ${S.scraps[a.id]?'':`<button class="btn ghost sm" data-act="scrap-quick" data-id="${a.id}">이 글 스크랩하기</button>`}
       <button class="btn" data-act="nav" data-v="home">홈으로</button></div>`;
   }
-  return quizCard(b.questions,q,'quiz');
+  return quizCard(b.questions,q,'quiz',b.title);
 }
 
 /* ───────────────────────── 서재 ───────────────────────── */
@@ -451,8 +525,16 @@ function vReport(){
   Object.keys(S.readings).forEach(id=>{const a=DB.articles.find(x=>x.id===id);if(a)dist[a.category]++;});
   const max=Math.max(1,...Object.values(dist));
   const days=[];for(let i=6;i>=0;i--){const k=addDays(dkey(),-i);days.push([k.slice(8),!!S.days[k]]);}
+  const ringC=(2*Math.PI*40).toFixed(1);
   return `<div class="card hero"><p class="eyebrow">나의 읽기 리포트</p>
-    <h1><span class="streak-flame">◆</span> ${streak()}일 연속 읽는 중</h1>
+    <div class="ringwrap">
+      <span class="ring"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
+        <circle cx="48" cy="48" r="40" fill="none" stroke="#e4edf1" stroke-width="11"/>
+        <circle cx="48" cy="48" r="40" fill="none" stroke="#087ba6" stroke-width="11" stroke-linecap="round" stroke-dasharray="${(2*Math.PI*40*weekCount()/7).toFixed(1)} ${ringC}" transform="rotate(-90 48 48)"/>
+      </svg><span class="rc"><span><b>${weekCount()}/7</b><span>이번 주</span></span></span></span>
+      <div><h2 style="font-size:17px"><span class="streak-flame">◆</span> ${streak()}일 연속 읽는 중</h2>
+      <p class="sub">매일 한 편이면 충분해요.</p></div>
+    </div>
     <div class="stat-grid">
       <div class="stat"><b>${total}</b><span>총 완독</span></div>
       <div class="stat"><b>${weekCount()}</b><span>이번 주</span></div>
@@ -525,6 +607,8 @@ document.addEventListener('click',e=>{
   else if(act==='ob-finish'){finishOnboard(t.dataset.lv||null);}
   else if(act==='read'){go('reader',{id:t.dataset.id});}
   else if(act==='toggle-chunk'){const lv=myLevel();S.prefs.chunk[lv]=!S.prefs.chunk[lv];save();render();}
+  else if(act==='fs-minus'){S.prefs.fs=Math.round(Math.max(0.9,(S.prefs.fs||1)-0.1)*10)/10;save();render();}
+  else if(act==='fs-plus'){S.prefs.fs=Math.round(Math.min(1.3,(S.prefs.fs||1)+0.1)*10)/10;save();render();}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
   else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
   else if(act==='read-done'){sess.readDone=true;render();}
@@ -557,6 +641,12 @@ document.addEventListener('click',e=>{
   else if(act==='reset-no'){sess.confirmReset=false;render();}
   else if(act==='reset-yes'){localStorage.removeItem(KEY);S=loadState();go('onboard');}
 });
+window.addEventListener('scroll',()=>{
+  if(view.name!=='reader')return;
+  const el=document.getElementById('progTop');if(!el)return;
+  const h=document.documentElement;const max=h.scrollHeight-h.clientHeight;
+  el.style.width=(max>0?Math.min(100,h.scrollTop/max*100):100)+'%';
+},{passive:true});
 document.addEventListener('change',e=>{
   const t=e.target.closest('[data-act-change]');if(!t)return;
   if(t.dataset.actChange==='level'){S.profile.level=t.value;save();render();announce('레벨 변경: '+LEVEL_LABEL[t.value]);}
