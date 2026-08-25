@@ -1,5 +1,5 @@
 {
- "version": "2026-08-25.3",
+ "version": "2026-08-25.4",
  "articles": [
   {
    "id": "nuri-space",
@@ -328,6 +328,33 @@
       "Nuri is a three-stage launch vehicle about 47 meters long. Its first stage bundles four 75-ton-class liquid engines together to produce powerful thrust, and the second and third stages separate one after another to carry the satellite up to its target altitude. There were many mountains to climb, such as the technology to bundle several engines and run them together and the technology to build huge fuel tanks, and many Korean companies took part in making parts and solved these problems together.",
       "In its first launch in October 2021, Nuri failed to place a satellite model into the target orbit. However, the researchers found the cause and fixed it, and in the second launch in June 2022, Nuri safely placed a performance verification satellite into orbit. In the third launch in May 2023, it put several working satellites into orbit. With this, Korea became the seventh country in the world to launch a satellite weighing more than one ton with its own technology.",
       "In May 2024, the Korea AeroSpace Administration (KASA), a government agency in charge of space and aviation policy, opened its doors. KASA takes the role of leading both research and development and the growth of the industry. Space development is a comprehensive industry where technologies from many fields—machinery, electronics, and software—come together, so it is connected to a wide range of career paths. Because independence in launch vehicle technology is the starting point for moving on to satellite use and space exploration, Nuri's success is regarded as an event that opened a new chapter in Korea's space development."
+     ],
+     "envocab": [
+      {
+       "word": "launched",
+       "ko": "발사했다 (동사)",
+       "base": "launch [lɔːntʃ]"
+      },
+      {
+       "word": "cooperation",
+       "ko": "협력 (명사)",
+       "base": "cooperation [koʊˌɑːpəˈreɪʃn]"
+      },
+      {
+       "word": "thrust",
+       "ko": "추력, 추진력 (명사)",
+       "base": "thrust [θrʌst]"
+      },
+      {
+       "word": "altitude",
+       "ko": "고도 (명사)",
+       "base": "altitude [ˈæltɪtuːd]"
+      },
+      {
+       "word": "exploration",
+       "ko": "탐사, 탐험 (명사)",
+       "base": "exploration [ˌekspləˈreɪʃn]"
+      }
      ]
     },
     "L4": {
@@ -533,6 +560,33 @@
       "In the first launch in October 2021, Nuri reached its target altitude, but the third-stage engine shut down earlier than planned, and it failed to put the satellite model into orbit. The researchers identified the cause and improved the design, and in the second launch in June 2022, Nuri safely placed a performance verification satellite into orbit. In the third launch in May 2023, it delivered several working satellites into their planned orbits, proving its ability to provide launch services. With this, Korea became the seventh country in the world capable of launching satellites of more than one ton on its own.",
       "The institutional foundation has also been put in place. In May 2024, the Korea AeroSpace Administration (KASA) opened in Sacheon, South Gyeongsang Province, bringing together the space and aviation policies that had been divided among several ministries into one dedicated agency. As the center of gravity in space development shifts worldwide from governments to private companies, efforts are also under way to transfer Nuri's technology to the private sector and grow an industrial ecosystem.",
       "Independence in launch vehicle technology is less a final goal in itself than a foundation that leads to satellite use, space exploration, and the growth of related industries. The ability to put a satellite into a desired orbit at a desired time supports fields closely tied to daily life, such as communications, weather observation, and land management. How to make use of the foundation created by Nuri's successful launches and the opening of KASA remains the next task for Korea's space development."
+     ],
+     "envocab": [
+      {
+       "word": "strategic",
+       "ko": "전략적인 (형용사)",
+       "base": "strategic [strəˈtiːdʒɪk]"
+      },
+      {
+       "word": "obstacle",
+       "ko": "장애물 (명사)",
+       "base": "obstacle [ˈɑːbstəkl]"
+      },
+      {
+       "word": "combustion",
+       "ko": "연소 (명사)",
+       "base": "combustion [kəmˈbʌstʃən]"
+      },
+      {
+       "word": "institutional",
+       "ko": "제도적인 (형용사)",
+       "base": "institutional [ˌɪnstɪˈtuːʃənl]"
+      },
+      {
+       "word": "ecosystem",
+       "ko": "생태계 (명사)",
+       "base": "ecosystem [ˈiːkoʊsɪstəm]"
+      }
      ]
     }
    },
@@ -871,6 +925,33 @@
       "The principle of CRISPR came from the immune system of bacteria. When a bacterium is infected by a virus, it records a piece of the virus's genes in its own DNA, and when the same virus invades again, it recognizes that part and cuts it. Scientists applied this principle and paired two elements: a guide RNA that leads the way to the target DNA, and the Cas9 protein that actually cuts that spot. Thanks to this, it became possible to select and cut a gene at the desired location.",
       "Emmanuelle Charpentier and Jennifer Doudna, who laid the foundation for this technology, received the Nobel Prize in Chemistry in 2020. CRISPR is widely used in research to uncover the causes of genetic diseases and to find treatments, and in 2023 a CRISPR-based treatment was approved for the first time in the world. This treatment is used to treat blood diseases caused by genetic abnormalities. In agriculture, CRISPR is used to develop crops that resist disease or are rich in nutrients.",
       "Of course, there are also limits and controversies. Errors can occur in which the wrong part is cut instead of the target, and once a gene has been changed, it is hard to undo. In particular, editing the genes of reproductive cells, which are passed directly on to offspring, raises such serious ethical debate that many countries strictly regulate it. For CRISPR to benefit humanity, careful social agreement is needed as much as technological progress."
+     ],
+     "envocab": [
+      {
+       "word": "traits",
+       "ko": "특성, 형질 (명사)",
+       "base": "trait [treɪt]"
+      },
+      {
+       "word": "immune",
+       "ko": "면역의 (형용사)",
+       "base": "immune [ɪˈmjuːn]"
+      },
+      {
+       "word": "invades",
+       "ko": "침입하다 (동사)",
+       "base": "invade [ɪnˈveɪd]"
+      },
+      {
+       "word": "approved",
+       "ko": "승인되었다 (동사, 수동태)",
+       "base": "approve [əˈpruːv]"
+      },
+      {
+       "word": "offspring",
+       "ko": "자손, 후손 (명사)",
+       "base": "offspring [ˈɔːfsprɪŋ]"
+      }
      ]
     },
     "L4": {
@@ -1070,6 +1151,33 @@
       "Applications are expanding rapidly. In medicine, research on treatments for diseases caused by genetic abnormalities is very active, and in 2023 a CRISPR-based treatment was approved for the first time in the world and began to be used to treat inherited blood diseases. In agriculture, the technology is used to develop crops that withstand drought and pests, and in basic research it has become a key tool for revealing what genes do. In Korea as well, basic science research institutes are carrying on genome editing research.",
       "However, the technical limits and ethical issues are also clear. Errors can occur in which a location other than the target is cut, and the results of editing are hard to reverse. Above all, editing cells that are inherited by the next generation—such as sperm, eggs, and embryos—could leave effects on future generations that are hard to predict, so the international community strictly regulates it. This is because what technology can do and what it may be allowed to do are separate questions.",
       "In the end, the future of genome editing technology will not be decided by scientific progress alone. Only when systems that verify safety and a social consensus that weighs risks against benefits are in place together can this technology become real hope for people suffering from disease. Scientific literacy—citizens' understanding of how the technology works and what is at stake—also forms the basis of that consensus."
+     ],
+     "envocab": [
+      {
+       "word": "genome",
+       "ko": "유전체, 게놈 (명사)",
+       "base": "genome [ˈdʒiːnoʊm]"
+      },
+      {
+       "word": "enzyme",
+       "ko": "효소 (명사)",
+       "base": "enzyme [ˈenzaɪm]"
+      },
+      {
+       "word": "withstand",
+       "ko": "견디다 (동사)",
+       "base": "withstand [wɪðˈstænd]"
+      },
+      {
+       "word": "inherited",
+       "ko": "유전되는, 물려받은 (형용사)",
+       "base": "inherit [ɪnˈherɪt]"
+      },
+      {
+       "word": "consensus",
+       "ko": "합의 (명사)",
+       "base": "consensus [kənˈsensəs]"
+      }
      ]
     }
    },
@@ -1406,6 +1514,33 @@
       "A language model learns by reading vast amounts of text, such as books and internet documents. It repeats, countless times, the exercise of covering part of a sentence and guessing the word that comes next. This process of learning in advance is called pre-training. During this process, the countless parameters inside the model are adjusted little by little, and grammar, knowledge, and ways of expression soak into it. Once training is complete, when the model receives a question, it produces an answer by joining high-probability words one by one.",
       "Generative AI helps with many kinds of work, from writing and translation to summarizing long texts and even writing computer programs. Many people also use it to refine their ideas or to study foreign languages. Because of this, the way people work is changing in many fields, including education, journalism, and industry. Still, one thing does not change: it remains a tool that supports human judgment.",
       "However, its limits are also clear. A language model only produces plausible-sounding sentences based on probability; it cannot check for itself whether the content is true. This leads to the hallucination phenomenon, in which it states wrong information with confidence. There is also a risk that it learns and copies the biases contained in the texts it studied. In addition, it may not know about news that appeared after its training ended. This is why the habit of critically reviewing AI answers and checking their sources is so important."
+     ],
+     "envocab": [
+      {
+       "word": "imitate",
+       "ko": "모방하다 (동사)",
+       "base": "imitate [ˈɪmɪteɪt]"
+      },
+      {
+       "word": "probability",
+       "ko": "확률 (명사)",
+       "base": "probability [ˌprɑːbəˈbɪləti]"
+      },
+      {
+       "word": "vast",
+       "ko": "방대한 (형용사)",
+       "base": "vast [væst]"
+      },
+      {
+       "word": "hallucination",
+       "ko": "환각 (명사, AI가 틀린 정보를 지어내는 현상)",
+       "base": "hallucination [həˌluːsɪˈneɪʃn]"
+      },
+      {
+       "word": "critically",
+       "ko": "비판적으로 (부사)",
+       "base": "critically [ˈkrɪtɪkli]"
+      }
      ]
     },
     "L4": {
@@ -1604,6 +1739,33 @@
       "From this principle come both the abilities and the limits of language models. Because a model learns by compressing the knowledge and expressions contained in vast amounts of text, it shows outstanding performance in translation, summarizing, writing, and programming. However, this performance does not mean human-like understanding. The standard for its output is, after all, probabilistic plausibility, not whether something is true. Its representative limits include hallucination, in which it describes unfounded content convincingly; the reproduction of biases contained in its training data; and the absence of information from after its training period.",
       "Social issues follow as well. Debates over the copyright of the texts used for training are under way around the world, and the risk that plausible false information created by AI may spread has also been raised. The enormous electricity and computing resources required to train large models are counted as a challenge too. In response, countries are putting in place systems for the safe use of AI. Research institutes in Korea and many other countries are also continuing research on the use and safety of artificial intelligence.",
       "Language models operate in their own distinctive way—probability calculation—which is different from how humans understand language. If we know the principle, mature use becomes possible: instead of blindly trusting the results or rejecting them outright, we can make use of their strengths and make up for their limits through verification. The literacy to read technology is becoming a basic competence of our time."
+     ],
+     "envocab": [
+      {
+       "word": "architecture",
+       "ko": "구조, 아키텍처 (명사)",
+       "base": "architecture [ˈɑːrkɪtektʃər]"
+      },
+      {
+       "word": "compressing",
+       "ko": "압축하다 (동사의 -ing형)",
+       "base": "compress [kəmˈpres]"
+      },
+      {
+       "word": "plausibility",
+       "ko": "그럴듯함 (명사)",
+       "base": "plausibility [ˌplɔːzəˈbɪləti]"
+      },
+      {
+       "word": "unfounded",
+       "ko": "근거 없는 (형용사)",
+       "base": "unfounded [ʌnˈfaʊndɪd]"
+      },
+      {
+       "word": "copyright",
+       "ko": "저작권 (명사)",
+       "base": "copyright [ˈkɑːpiraɪt]"
+      }
      ]
     }
    },
@@ -1943,6 +2105,33 @@
       "In general, a society is called an aging society when people aged 65 or older make up more than 7% of the population, an aged society when they exceed 14%, and a super-aged society when they exceed 20%. Korea has recently entered the stage of a super-aged society, and the speed of this change is very fast even by world standards. As average life expectancy grows longer and the number of newborns falls, the shape of the population pyramid is also changing into a form that is narrow at the bottom and wide at the top.",
       "Changes in population structure affect many areas of society. When the number of students falls, schools and the education system are adjusted, and when the working-age population that can hold jobs shrinks, companies find it harder to secure workers. On the other hand, demand for medical and care services grows, and the silver industry, which serves elderly people as its main customers, expands. How to run systems that generations pay for together, such as pensions and health insurance, is also being discussed again. In some regions, the population is shrinking and the vitality of local communities is weakening.",
       "In response, the government is acting with a variety of policies. Typical examples are support systems that create a good environment for having and raising children, and programs that help elderly people with jobs and health. Because population change appears gradually over a long period, it is important to prepare in advance on the basis of accurate statistics. Understanding population structure is a starting point for looking ahead to the future of our society."
+     ],
+     "envocab": [
+      {
+       "word": "phenomena",
+       "ko": "현상들 (명사, phenomenon의 복수형)",
+       "base": "phenomenon [fəˈnɑːmɪnən]"
+      },
+      {
+       "word": "elderly",
+       "ko": "나이 든, 고령의 (형용사)",
+       "base": "elderly [ˈeldərli]"
+      },
+      {
+       "word": "expectancy",
+       "ko": "기대치 (명사, life expectancy: 기대수명)",
+       "base": "expectancy [ɪkˈspektənsi]"
+      },
+      {
+       "word": "vitality",
+       "ko": "활력 (명사)",
+       "base": "vitality [vaɪˈtæləti]"
+      },
+      {
+       "word": "statistics",
+       "ko": "통계 (명사)",
+       "base": "statistics [stəˈtɪstɪks]"
+      }
      ]
     },
     "L4": {
@@ -2137,6 +2326,33 @@
       "These changes spread across the economy and institutions as a whole. A smaller labor supply can affect the economy's growth potential, and systems run on contributions from the currently working generation, such as pensions and health insurance, face the task of redesigning the balance between burdens and benefits. This is because the ratio between those who pay taxes and those who receive welfare benefits changes. In education, adjustments to school operations to match the shrinking school-age population are being discussed, and in local communities, measures to maintain the functions of regions with declining populations are on the agenda.",
       "The change does not mean only burdens. As consumption and health care demand among the elderly grow, the so-called silver industry—medical devices, care services, leisure industries, and more—is drawing attention as a new growth area. Discussions are also active about expanding continued employment and retraining so that older workers with accumulated experience can work longer. Some also expect that advances in technology may help fill the gaps in care and labor.",
       "The government is pursuing population policies that cover responses to low birth rates, improvements in the quality of life of the elderly, and support for regions with declining populations. What matters is not to read population change only in the language of crisis, but to gradually redesign social systems on the basis of accurate statistics. The change in population structure is a reality already under way, and understanding its direction is a basic premise for preparing for the society of the future."
+     ],
+     "envocab": [
+      {
+       "word": "migration",
+       "ko": "이주 (명사)",
+       "base": "migration [maɪˈɡreɪʃn]"
+      },
+      {
+       "word": "projections",
+       "ko": "전망, 추계 (명사)",
+       "base": "projection [prəˈdʒekʃn]"
+      },
+      {
+       "word": "contributions",
+       "ko": "기여금, 납부금 (명사)",
+       "base": "contribution [ˌkɑːntrɪˈbjuːʃn]"
+      },
+      {
+       "word": "welfare",
+       "ko": "복지 (명사)",
+       "base": "welfare [ˈwelfer]"
+      },
+      {
+       "word": "premise",
+       "ko": "전제 (명사)",
+       "base": "premise [ˈpremɪs]"
+      }
      ]
     }
    },
@@ -2469,6 +2685,33 @@
       "The basic principle behind price movement is supply and demand. When the demand to buy a product is greater than its supply, the price rises, and when supply is greater than demand, the price falls. Prices can also rise when the costs of making a product, such as raw material prices or wages, go up. When these factors appear across many products, the overall price level moves.",
       "If prices rise or fall too quickly, the whole economy becomes unstable. That is why the Bank of Korea, the country's central bank, takes price stability as its most important goal. The Bank of Korea raises or lowers the base interest rate to influence the amount of money circulating in the market. When interest rates rise, consumption and investment decrease, which can have the effect of calming price increases. Conversely, when the economy slows down too much, the bank may lower interest rates to stimulate economic activity.",
       "Meanwhile, the wages that working people receive have a lower limit set by law. The minimum wage system is designed to guarantee a minimum level of wages and protect low-paid workers. The minimum wage is deliberated and decided every year by the Minimum Wage Commission, in which members representing workers, members representing employers, and members representing the public interest take part. The commission considers a range of factors, such as workers' cost of living, the wages of similar workers, and labor productivity, and once the government confirms and officially announces the decision, it applies the following year."
+     ],
+     "envocab": [
+      {
+       "word": "indicator",
+       "ko": "지표 (명사)",
+       "base": "indicator [ˈɪndɪkeɪtər]"
+      },
+      {
+       "word": "inflation",
+       "ko": "물가 상승, 인플레이션 (명사)",
+       "base": "inflation [ɪnˈfleɪʃn]"
+      },
+      {
+       "word": "circulating",
+       "ko": "유통되는 (동사의 -ing형)",
+       "base": "circulate [ˈsɜːrkjəleɪt]"
+      },
+      {
+       "word": "stimulate",
+       "ko": "자극하다, 활성화하다 (동사)",
+       "base": "stimulate [ˈstɪmjuleɪt]"
+      },
+      {
+       "word": "productivity",
+       "ko": "생산성 (명사)",
+       "base": "productivity [ˌproʊdʌkˈtɪvəti]"
+      }
      ]
     },
     "L4": {
@@ -2658,6 +2901,33 @@
       "When prices change sharply, it becomes difficult for economic actors to predict the future, so central banks in every country take price stability as a core duty. The Bank of Korea operates monetary policy, influencing the money supply and interest rates in general by adjusting the base rate. Raising the base rate tends to slow borrowing and consumption, easing upward pressure on prices, while lowering it is expected to have the opposite effect. However, because there is a time lag before the effects of policy appear, careful judgment is required.",
       "Wages are the price of labor as a factor of production, but they are not left purely to the market; the law guarantees a minimum level. The minimum wage system aims to stabilize the lives of low-paid workers, and it is grounded in the Constitution and the Minimum Wage Act. Every year the Minimum Wage Commission deliberates on it, with equal numbers of worker members, employer members, and public-interest members taking part in the discussion. The law requires that workers' cost of living, the wages of similar workers, labor productivity, and the income distribution ratio be considered, and once the government officially announces the deliberated proposal, it takes effect from January of the following year.",
       "Prices and the minimum wage influence each other. When prices rise, the real value of the same wage falls, so the inflation rate becomes important data in the deliberation process, and changes in wages can in turn affect prices through production costs. In this way, prices and wages are determined on two axes: market principles and social agreement. Understanding these procedures and principles is a basic competence for reading economic news."
+     ],
+     "envocab": [
+      {
+       "word": "allocate",
+       "ko": "배분하다 (동사)",
+       "base": "allocate [ˈæləkeɪt]"
+      },
+      {
+       "word": "purchasing",
+       "ko": "구매 (명사, purchasing power: 구매력)",
+       "base": "purchase [ˈpɜːrtʃəs]"
+      },
+      {
+       "word": "deflation",
+       "ko": "물가 하락, 디플레이션 (명사)",
+       "base": "deflation [diːˈfleɪʃn]"
+      },
+      {
+       "word": "monetary",
+       "ko": "통화의, 금융의 (형용사)",
+       "base": "monetary [ˈmɑːnɪteri]"
+      },
+      {
+       "word": "lag",
+       "ko": "지연, 시차 (명사)",
+       "base": "lag [læɡ]"
+      }
      ]
     }
    },
@@ -2980,6 +3250,33 @@
       "Plastic that enters the sea is gradually broken into small pieces by the action of waves, ultraviolet rays from sunlight, and salt. Pieces that have become smaller than 5 millimeters across are called microplastics. Microplastics may be particles made small from the start, or fragments created when larger plastics break apart. Because they are so small, they spread widely through the water and are very hard to remove. Such tiny pieces are found not only in seawater but also in mudflats and on sandy beaches.",
       "Plastic waste causes many kinds of harm to the marine ecosystem. When seabirds and turtles mistake plastic for food and swallow it, their digestive organs can become blocked, and animals caught in abandoned nets sometimes lose their lives because they cannot move. Microplastics have been confirmed to move along the food chain, from plankton to fish, so scientists are continuing to study their effects. The coastal scenery is also damaged, hurting tourism and fishing.",
       "Responses are being made on several levels. The government and the Korea Marine Environment Management Corporation collect trash from beaches and the sea and run programs to reduce fishing waste. The international community is discussing an agreement to reduce plastic pollution. Individual efforts, such as using fewer disposable products and sorting waste for recycling, are also important. The surest way to reduce the plastic heading to the sea is to produce less waste in the first place."
+     ],
+     "envocab": [
+      {
+       "word": "currents",
+       "ko": "해류 (명사)",
+       "base": "current [ˈkɜːrənt]"
+      },
+      {
+       "word": "ultraviolet",
+       "ko": "자외선의 (형용사)",
+       "base": "ultraviolet [ˌʌltrəˈvaɪələt]"
+      },
+      {
+       "word": "fragments",
+       "ko": "조각, 파편 (명사)",
+       "base": "fragment [ˈfræɡmənt]"
+      },
+      {
+       "word": "abandoned",
+       "ko": "버려진 (형용사)",
+       "base": "abandon [əˈbændən]"
+      },
+      {
+       "word": "disposable",
+       "ko": "일회용의 (형용사)",
+       "base": "disposable [dɪˈspoʊzəbl]"
+      }
      ]
     },
     "L4": {
@@ -3167,6 +3464,33 @@
       "The effects on the ecosystem are multi-layered. Large pieces of waste cause entanglement and swallowing accidents among marine animals, and so-called ghost fishing, in which abandoned fishing gear keeps catching fish, also causes losses to fishery resources. Microplastics are ingested even by small creatures such as plankton and move along the food chain, and they have been detected in the seafood and salt that people eat. However, how they affect the human body is still an area where research is in progress, and the scientific community is carefully building up evidence.",
       "Responses can be organized into four layers: preventing release, collection, recycling, and international cooperation. The government and the Korea Marine Environment Management Corporation collect trash from coastal waters and the seabed and improve the systems for managing fishing gear. Policies that encourage the use of easily recyclable materials at the production stage and reduce the use of single-use plastics are also spreading. The international community is continuing negotiations to establish a binding agreement that covers the entire life cycle of plastic pollution.",
       "The essence of the marine plastic problem is that the cost of convenience is transferred across time and space to the ecosystem as a whole. Since the sea has no borders, the efforts of one country alone have limits, and an approach that redesigns the loop running from production to disposal is required. Only when individual actions that reduce consumption and institutional change work together can the flow of plastic heading toward the sea be reduced."
+     ],
+     "envocab": [
+      {
+       "word": "durability",
+       "ko": "내구성 (명사)",
+       "base": "durability [ˌdʊrəˈbɪləti]"
+      },
+      {
+       "word": "weathering",
+       "ko": "풍화 (명사)",
+       "base": "weathering [ˈweðərɪŋ]"
+      },
+      {
+       "word": "entanglement",
+       "ko": "얽힘, 걸림 (명사)",
+       "base": "entanglement [ɪnˈtæŋɡlmənt]"
+      },
+      {
+       "word": "ingested",
+       "ko": "섭취되다 (동사, 수동태)",
+       "base": "ingest [ɪnˈdʒest]"
+      },
+      {
+       "word": "binding",
+       "ko": "구속력 있는 (형용사)",
+       "base": "binding [ˈbaɪndɪŋ]"
+      }
      ]
     }
    },
@@ -3492,6 +3816,33 @@
       "To respond to climate change, the international community signed the Paris Agreement and promised to keep the rise in the Earth's average temperature below a certain level. The goal set for this purpose is carbon neutrality. Carbon neutrality means reducing greenhouse gas emissions as much as possible and offsetting the remaining emissions through absorption by forests or storage technology, so that net emissions become zero. Many countries, including Korea, have declared carbon neutrality as their goal.",
       "The key means is energy transition. Renewable energy comes from sources that nature supplies continuously and that never run out, such as sunlight, wind, and water. Solar power uses the principle that solar cells made of semiconductors produce an electric current when light falls on them. In wind power, the wind turns large blades, and a generator converts that rotation into electricity. Because no fuel is burned, almost no greenhouse gases are released while the electricity is being generated.",
       "Still, the challenges are clear. Renewable energy is intermittent, meaning its output changes with the weather, so devices that store electricity and improvements to the power grid are needed. The large amount of land and money needed for power facilities, and consultation with local residents, are also important issues. That is why technologies that use energy efficiently and habits of saving energy are emphasized together. Improving the insulation of old buildings also helps save energy. Carbon neutrality is a goal that can be reached only when technology, institutions, and citizens' actions work together."
+     ],
+     "envocab": [
+      {
+       "word": "concentration",
+       "ko": "농도 (명사)",
+       "base": "concentration [ˌkɑːnsnˈtreɪʃn]"
+      },
+      {
+       "word": "offsetting",
+       "ko": "상쇄하다 (동사의 -ing형)",
+       "base": "offset [ˈɔːfset]"
+      },
+      {
+       "word": "Renewable",
+       "ko": "재생 가능한 (형용사)",
+       "base": "renewable [rɪˈnuːəbl]"
+      },
+      {
+       "word": "intermittent",
+       "ko": "간헐적인 (형용사)",
+       "base": "intermittent [ˌɪntərˈmɪtənt]"
+      },
+      {
+       "word": "insulation",
+       "ko": "단열 (명사)",
+       "base": "insulation [ˌɪnsəˈleɪʃn]"
+      }
      ]
     },
     "L4": {
@@ -3683,6 +4034,33 @@
       "At the center of this transition is the power sector. Solar power uses the photoelectric effect: when light strikes a solar cell, a semiconductor device, electrons move and an electric current is produced. Wind power obtains electricity by using the kinetic energy of the wind to turn a turbine. Neither method requires fuel costs, and both emit almost no greenhouse gases during power generation. As technological progress and mass production have steadily lowered the cost of generation, renewable energy facilities are expanding rapidly around the world.",
       "However, a power system centered on renewable energy faces challenges that must be solved. Sunlight and wind cannot be controlled by humans, so power output is intermittent, varying with time and weather. Making up for this requires storage such as energy storage systems (ESS) and pumped-storage hydropower, systems for adjusting demand, and expanded transmission networks that move electricity between regions. Public acceptance of sites for power facilities, and the recycling of used panels and batteries, are also counted among the problems to solve.",
       "Carbon neutrality is not a task for the power sector alone. It also requires switching fuels in industrial processes, improving insulation and efficiency in buildings, electrifying transportation, and preserving carbon sinks such as forests and tidal flats. Improving efficiency, which means getting the same benefit while using less energy, is regarded as the most reliable way to cut emissions. Carbon neutrality is not a goal achieved by any single technology; it is a long-term task in which technology, institutions, and ways of living must change together."
+     ],
+     "envocab": [
+      {
+       "word": "infrared",
+       "ko": "적외선의 (형용사)",
+       "base": "infrared [ˌɪnfrəˈred]"
+      },
+      {
+       "word": "kinetic",
+       "ko": "운동의 (형용사, kinetic energy: 운동 에너지)",
+       "base": "kinetic [kɪˈnetɪk]"
+      },
+      {
+       "word": "acceptance",
+       "ko": "수용, 받아들임 (명사)",
+       "base": "acceptance [əkˈseptəns]"
+      },
+      {
+       "word": "transmission",
+       "ko": "송전, 전송 (명사)",
+       "base": "transmission [trænsˈmɪʃn]"
+      },
+      {
+       "word": "electrifying",
+       "ko": "전기화하다 (동사의 -ing형)",
+       "base": "electrify [ɪˈlektrɪfaɪ]"
+      }
      ]
     }
    },
@@ -4024,6 +4402,33 @@
       "The Veritable Records were not compiled while a king was still alive. Only after a king died was a temporary office called the Sillokcheong set up and compilation begun. Its officials gathered and reviewed the sacho and documents from each government office, arranged them in order of time, and completed the records. When the compilation was finished, the sacho were washed in water to erase the writing, a practice called secho. This was done to prevent the contents of the records from leaking out and causing conflict.",
       "Several copies of the completed records were made and stored separately in archives called sago. Even if the records in one archive were destroyed by fire or war, the copies elsewhere would survive. In fact, during the Japanese invasions of Korea in the 1590s, most of the archives burned down, but the copy at the Jeonju archive alone survived. After the war, Joseon made several new copies based on the surviving records and moved the archives deep into the mountains, where access was difficult, to keep them even safer.",
       "The Veritable Records of the Joseon Dynasty cover the history of one dynasty over several hundred years almost without gaps. They record not only politics and diplomacy but also weather, astronomical events, and the daily lives of the people, making them precious material for historical research. In recognition of this value, the records were inscribed in UNESCO's Memory of the World register in 1997. Today the records have been translated into modern Korean, and anyone can look them up on the internet. The spirit of record-keeping that protected five hundred years of Joseon history still lives on."
+     ],
+     "envocab": [
+      {
+       "word": "reigns",
+       "ko": "재위 기간, 통치 (명사)",
+       "base": "reign [reɪn]"
+      },
+      {
+       "word": "compilation",
+       "ko": "편찬 (명사)",
+       "base": "compilation [ˌkɑːmpɪˈleɪʃn]"
+      },
+      {
+       "word": "archives",
+       "ko": "기록 보관소 (명사)",
+       "base": "archive [ˈɑːrkaɪv]"
+      },
+      {
+       "word": "invasions",
+       "ko": "침략 (명사)",
+       "base": "invasion [ɪnˈveɪʒn]"
+      },
+      {
+       "word": "inscribed",
+       "ko": "등재되었다 (동사, 수동태)",
+       "base": "inscribe [ɪnˈskraɪb]"
+      }
      ]
     },
     "L4": {
@@ -4219,6 +4624,33 @@
       "The second device was a strict compilation procedure. There was a principle that the Veritable Records were compiled only after the king in question had died. When a king passed away, a temporary office called the Sillokcheong was set up, and it gathered, compared, and verified records from many offices, including the sacho and the Diaries of the Royal Secretariat. By cross-checking multiple records instead of relying on a single source, the compilers raised the accuracy of the contents. After compilation, the sacho went through secho, being washed in water to erase them, a measure to prevent sensitive records from leaking out and leading to political revenge.",
       "The third device was distributed storage. In the early Joseon period, the same records were divided among the Chunchugwan in Seoul and three archives in the provinces. When the Japanese invasions of the 1590s burned all the copies except the one in the Jeonju archive, Joseon printed several new sets based on the surviving records and moved the archives to hard-to-reach places such as Ganghwa Island and Mount Taebaek. The risk was spread out so that a disaster in any one place would not mean the loss of the entire record.",
       "Thanks to these institutional devices, the Veritable Records of the Joseon Dynasty are regarded as a rare example of the systematic, long-term recording of a single dynasty's history. Because they contain information on all areas of society, including astronomy, weather, and disasters as well as politics and diplomacy, they serve as research material for many academic fields. In 1997, UNESCO officially recognized their value by inscribing them in the Memory of the World register. What the Veritable Records ultimately show is that the objectivity and reliability of a record come not from an individual's good will but from the institutions that support it."
+     ],
+     "envocab": [
+      {
+       "word": "conscience",
+       "ko": "양심 (명사)",
+       "base": "conscience [ˈkɑːnʃəns]"
+      },
+      {
+       "word": "virtue",
+       "ko": "덕, 미덕 (명사)",
+       "base": "virtue [ˈvɜːrtʃuː]"
+      },
+      {
+       "word": "procedure",
+       "ko": "절차 (명사)",
+       "base": "procedure [prəˈsiːdʒər]"
+      },
+      {
+       "word": "distributed",
+       "ko": "분산된 (형용사)",
+       "base": "distribute [dɪˈstrɪbjuːt]"
+      },
+      {
+       "word": "objectivity",
+       "ko": "객관성 (명사)",
+       "base": "objectivity [ˌɑːbdʒekˈtɪvəti]"
+      }
      ]
     }
    },
@@ -4560,6 +4992,33 @@
       "The consonants of Hunminjeongeum were created on the principle of imitating shapes. The five basic consonants copy the shapes of the speech organs as each sound is made. The letter ㄱ imitates the shape of the root of the tongue blocking the throat, and ㄴ the shape of the tongue touching the upper gums. The letter ㅁ came from the shape of the mouth, ㅅ from the shape of a tooth, and ㅇ from the shape of the throat. The remaining consonants were made by the principle of adding strokes to the basic letters. Since strokes are added as the sound becomes stronger, you can guess the nature of a sound just by looking at the shape of the letter.",
       "The vowels begin from three basic letters that stand for heaven, earth, and human. The round dot ㆍ symbolizes heaven, the horizontal line ㅡ the flat earth, and the vertical line ㅣ a standing person. By combining these basic letters with one another, many vowels such as ㅏ and ㅗ were created in a systematic way. This method of writing countless sounds by combining a small number of basic letters according to fixed rules is highly efficient.",
       "When Hunminjeongeum was created, it had twenty-eight letters in all: seventeen consonants and eleven vowels. Today, 24 of them are in use. The purpose and principles behind the letters are explained in detail in a book called the Hunminjeongeum Haerye, the explanatory edition. It is rare anywhere in the world for records to remain showing who created a writing system, when, and on what principles. In recognition of this value, the Hunminjeongeum Haerye was inscribed in UNESCO's Memory of the World register in 1997."
+     ],
+     "envocab": [
+      {
+       "word": "proclaimed",
+       "ko": "반포했다, 공표했다 (동사)",
+       "base": "proclaim [prəˈkleɪm]"
+      },
+      {
+       "word": "imitating",
+       "ko": "모방하다 (동사의 -ing형)",
+       "base": "imitate [ˈɪmɪteɪt]"
+      },
+      {
+       "word": "organs",
+       "ko": "기관 (명사, speech organs: 발음 기관)",
+       "base": "organ [ˈɔːrɡən]"
+      },
+      {
+       "word": "symbolizes",
+       "ko": "상징하다 (동사)",
+       "base": "symbolize [ˈsɪmbəlaɪz]"
+      },
+      {
+       "word": "efficient",
+       "ko": "효율적인 (형용사)",
+       "base": "efficient [ɪˈfɪʃnt]"
+      }
      ]
     },
     "L4": {
@@ -4748,6 +5207,33 @@
       "The design of the vowels applied the principle of combining three basic letters representing heaven (ㆍ), earth (ㅡ), and human (ㅣ). When these basic letters are combined according to fixed rules, the remaining vowels are formed systematically. This method of writing a wide variety of sounds with a minimum of elements and clear rules of combination can be called an efficient design that creates many things from few parts. The way consonants and vowels are grouped and written in syllable blocks also makes the structure of the sounds visible.",
       "For a long time, these principles of creation were a matter of guesswork. When the Hunminjeongeum Haerye, the book that explains the principles, was discovered in Andong, North Gyeongsang Province, in 1940, the principles behind the letters were finally confirmed. The Haerye describes the reason each of the twenty-eight letters was created and how they were to be used. Its discovery is considered an event that greatly changed the direction of Hangeul studies. The book has been designated a National Treasure of Korea, and in 1997 it was inscribed in UNESCO's Memory of the World register.",
       "Today, linguists regard Hunminjeongeum as an original script designed on the basis of an analysis of the speech organs and the nature of sounds. A writing system made easy to learn lowered the barrier to written communication, and in the information age, its principle of combining consonant and vowel letters has also proved an advantage for entering text on mobile phones and computers. The case of Hunminjeongeum shows that a writing system need not be merely a product of custom; it can be the object of design based on principles."
+     ],
+     "envocab": [
+      {
+       "word": "exceptional",
+       "ko": "예외적인, 특별한 (형용사)",
+       "base": "exceptional [ɪkˈsepʃənl]"
+      },
+      {
+       "word": "commentary",
+       "ko": "해설서, 해설 (명사)",
+       "base": "commentary [ˈkɑːmənteri]"
+      },
+      {
+       "word": "articulated",
+       "ko": "조음되다, 발음되다 (동사, 수동태)",
+       "base": "articulate [ɑːrˈtɪkjuleɪt]"
+      },
+      {
+       "word": "phonetic",
+       "ko": "음성의, 발음의 (형용사)",
+       "base": "phonetic [fəˈnetɪk]"
+      },
+      {
+       "word": "guesswork",
+       "ko": "추측 (명사)",
+       "base": "guesswork [ˈɡeswɜːrk]"
+      }
      ]
     }
    },
@@ -5075,6 +5561,33 @@
       "The most distinctive feature of the webtoon format is vertical scrolling. Unlike paper comics, which are read by turning pages, webtoons are read by scrolling down the screen. This style suits smartphone screens well, so people can read comfortably even while on the move. New storytelling techniques that make use of this vertical flow have also developed, such as adjusting the blank space between panels to express the passage of time or a feeling of tension.",
       "Webtoons gradually formed an industrial ecosystem of their own. A partial-payment model, in which readers pay a fee to read some episodes in advance, took hold and created a stable revenue structure. Beyond authors and platforms, many other participants appeared, such as agencies that support authors and production studios where the writing and the drawing are handled by different people. Before a single webtoon is created and reaches its readers, many different jobs work together.",
       "A webtoon's story does not stay inside the webtoon alone. Popular works are remade into dramas, films, games, and more. This spreading of an original story into many fields is called the expansion of intellectual property, or IP. Korean webtoon platforms have also expanded their services into many languages and gained readers overseas. The vertical-scroll format that took root in Korea has now become one of the standard formats for digital comics in many countries around the world."
+     ],
+     "envocab": [
+      {
+       "word": "serializing",
+       "ko": "연재하다 (동사의 -ing형)",
+       "base": "serialize [ˈsɪriəlaɪz]"
+      },
+      {
+       "word": "readership",
+       "ko": "독자층 (명사)",
+       "base": "readership [ˈriːdərʃɪp]"
+      },
+      {
+       "word": "vertical",
+       "ko": "수직의, 세로 방향의 (형용사)",
+       "base": "vertical [ˈvɜːrtɪkl]"
+      },
+      {
+       "word": "revenue",
+       "ko": "수익 (명사)",
+       "base": "revenue [ˈrevənuː]"
+      },
+      {
+       "word": "intellectual",
+       "ko": "지적인 (형용사, intellectual property: 지식 재산)",
+       "base": "intellectual [ˌɪntəˈlektʃuəl]"
+      }
      ]
     },
     "L4": {
@@ -5266,6 +5779,33 @@
       "On the industrial side, webtoons formed an ecosystem of their own. The partial-payment model, in which readers can wait and read for free but must pay to read ahead, drew readers who were used to free content into the paid market. The way works are created also changed: in addition to individual authors working alone, the division of labor expanded, with collaboration between story writers and artists and the participation of production studios and agencies. Platforms took charge of distributing works and sharing revenue, placing themselves at the center of the ecosystem. Meanwhile, as the industry has grown, discussions about authors' working conditions and fair contracts have been taking place as well.",
       "Another pillar of the webtoon industry is the expansion of intellectual property, or IP. Webtoons with proven stories and established fan bases are used as source material for dramas, films, games, and other media. A reinforcing effect also appears: when a screen adaptation based on a webtoon succeeds, more readers go back to the original. This way of building value as one story moves across many media has made webtoons an important supplier of stories for the video industry.",
       "Korean webtoon platforms have expanded their services into many language regions, spreading the vertical-scroll format throughout the world's digital comics market. Discovering local authors and offering works in local languages goes beyond simple export; it can be called the transplanting of the format itself. The case of webtoons shows that when changes in the media environment are treated as an opportunity rather than a constraint, innovation in the form of content can lead to the expansion of an industry."
+     ],
+     "envocab": [
+      {
+       "word": "emerged",
+       "ko": "등장했다, 나타났다 (동사)",
+       "base": "emerge [ɪˈmɜːrdʒ]"
+      },
+      {
+       "word": "collaboration",
+       "ko": "협업 (명사)",
+       "base": "collaboration [kəˌlæbəˈreɪʃn]"
+      },
+      {
+       "word": "adaptation",
+       "ko": "각색 작품, 영상화 (명사)",
+       "base": "adaptation [ˌædæpˈteɪʃn]"
+      },
+      {
+       "word": "reinforcing",
+       "ko": "강화하는 (형용사)",
+       "base": "reinforce [ˌriːɪnˈfɔːrs]"
+      },
+      {
+       "word": "constraint",
+       "ko": "제약 (명사)",
+       "base": "constraint [kənˈstreɪnt]"
+      }
      ]
     }
    },
@@ -5585,6 +6125,33 @@
       "Space radiation can damage the cells of the human body, so astronauts must prepare for it before staying on the Moon for a long time. That requires accurate data showing how strong the radiation on the lunar surface actually is and what kinds of particles arrive in what amounts. Only with accurate data can we decide how to build spacesuits and lunar bases. Data from the Moon's south pole, which many countries are watching as a candidate site for future crewed exploration, is especially important.",
       "The lunar surface space radiation detector LVRAD, which is being developed under the leadership of the Korea Astronomy and Space Science Institute, is the instrument in charge of this task. It consists of a device that measures the amount and energy distribution of radiation and a device that measures neutrons. In August 2026, the Korea AeroSpace Administration signed an implementing arrangement with the U.S. National Aeronautics and Space Administration (NASA) to send the detector on a lunar lander built by an American private company.",
       "According to the plan, the detector will finish development by 2027 and then be moved to the United States, and it will head for the Moon's south pole aboard a lander launching in 2030. However, the launch date may change depending on NASA's schedule. The observation data gathered there will be used to study how space radiation affects the human body and to prepare for future crewed lunar exploration. It is also a chance for Korea to take on a role in international lunar exploration and show the world the level of its space science."
+     ],
+     "envocab": [
+      {
+       "word": "particles",
+       "ko": "입자 (명사)",
+       "base": "particle [ˈpɑːrtɪkl]"
+      },
+      {
+       "word": "magnetic",
+       "ko": "자기의 (형용사, magnetic field: 자기장)",
+       "base": "magnetic [mæɡˈnetɪk]"
+      },
+      {
+       "word": "astronauts",
+       "ko": "우주비행사 (명사)",
+       "base": "astronaut [ˈæstrənɔːt]"
+      },
+      {
+       "word": "detector",
+       "ko": "검출기, 탐지기 (명사)",
+       "base": "detector [dɪˈtektər]"
+      },
+      {
+       "word": "crewed",
+       "ko": "유인의, 사람이 탑승하는 (형용사)",
+       "base": "crewed [kruːd]"
+      }
      ]
     },
     "L4": {
@@ -5774,6 +6341,33 @@
       "The lunar surface space radiation detector LVRAD, being developed under the leadership of the Korea Astronomy and Space Science Institute, is a science payload that answers this need. Made up of a device that measures radiation dose and energy distribution and a neutron spectrometer, it aims to assess the radiation environment on the surface of the Moon's south pole and its effects on the human body. Because the south pole may hold water ice, many countries are watching it as a candidate site for crewed exploration, which makes radiation data from this region especially valuable.",
       "What deserves attention is how this instrument will travel to the Moon. In August 2026, the Korea AeroSpace Administration signed an implementing arrangement with the U.S. National Aeronautics and Space Administration (NASA) to send LVRAD through NASA's Commercial Lunar Payload Services (CLPS) program. Under CLPS, instead of building landers itself, NASA entrusts the transport of scientific instruments to landers developed by private companies. It is, in effect, a new division of labor in space development, in which government agencies focus on science missions while the private sector handles transportation.",
       "If all goes as planned, LVRAD will complete its flight model by 2027 and be shipped to the United States, then arrive at the Moon's south pole aboard a lander launching in 2030. The launch date, however, may shift depending on NASA's schedule. A Korean observation instrument will produce basic data for lunar exploration within a framework of international cooperation, and this carries the meaning that Korean science and technology is taking part in preparing for the era of crewed lunar exploration."
+     ],
+     "envocab": [
+      {
+       "word": "galactic",
+       "ko": "은하의 (형용사)",
+       "base": "galactic [ɡəˈlæktɪk]"
+      },
+      {
+       "word": "feeble",
+       "ko": "미약한 (형용사)",
+       "base": "feeble [ˈfiːbl]"
+      },
+      {
+       "word": "shielding",
+       "ko": "차폐 (명사)",
+       "base": "shield [ʃiːld]"
+      },
+      {
+       "word": "payload",
+       "ko": "탑재체 (명사)",
+       "base": "payload [ˈpeɪloʊd]"
+      },
+      {
+       "word": "entrusts",
+       "ko": "맡기다, 위탁하다 (동사)",
+       "base": "entrust [ɪnˈtrʌst]"
+      }
      ]
     }
    },
@@ -6095,6 +6689,33 @@
       "The emissions trading scheme rests on two pillars: a cap on total emissions and trading. First, the government sets the total amount of greenhouse gases that can be emitted across the whole country. Within that limit, it distributes emission allowances to companies. One unit of allowance is the right to emit one ton of greenhouse gases. In principle, a company can emit only as much greenhouse gas as the allowances it holds.",
       "The key point is that allowances can be bought and sold in a market. A company that invests in technology to reduce greenhouse gases and has allowances left over can sell them and make a profit. In contrast, a company that runs short of allowances must buy them from the market. The higher the price of allowances rises, the more advantageous it becomes to cut one's own emissions rather than to buy. The system was designed so that reducing pollution literally pays.",
       "Korea has been operating an emissions trading scheme since 2015, and allowances are traded on the Korea Exchange like stocks. The scheme covers more than 70% of the country's total greenhouse gas emissions, and about 770 companies are taking part in the fourth planning period, which began in 2026. Allowance prices move with the economy and with policy, and recently they have also swung sharply. Following the signals the price sends, companies draw up their plans for reducing emissions."
+     ],
+     "envocab": [
+      {
+       "word": "emitters",
+       "ko": "배출자, 배출 기업 (명사)",
+       "base": "emitter [ɪˈmɪtər]"
+      },
+      {
+       "word": "allowances",
+       "ko": "배출권, 할당량 (명사)",
+       "base": "allowance [əˈlaʊəns]"
+      },
+      {
+       "word": "cap",
+       "ko": "상한, 총량 한도 (명사)",
+       "base": "cap [kæp]"
+      },
+      {
+       "word": "advantageous",
+       "ko": "유리한 (형용사)",
+       "base": "advantageous [ˌædvənˈteɪdʒəs]"
+      },
+      {
+       "word": "swung",
+       "ko": "요동쳤다 (동사, swing의 과거형)",
+       "base": "swing [swɪŋ]"
+      }
      ]
     },
     "L4": {
@@ -6286,6 +6907,33 @@
       "The refinement of this scheme lies in letting the market decide where the reductions take place. Companies whose reduction costs are low cut their own emissions and earn money by selling their leftover allowances. Companies whose reduction costs are high choose to buy allowances instead of replacing their facilities at unreasonable expense. As a result, society as a whole achieves the targeted amount of reduction at the lowest cost. When allowance prices rise, the incentive to invest in low-carbon technology grows, and the value of companies that hold reduction technology rises along with it.",
       "Korea introduced a nationwide emissions trading scheme in 2015. The scheme covers about 74% of the country's greenhouse gas emissions, and about 770 companies subject to allocation are taking part in the fourth planning period, which runs from 2026 to 2030. Industries with large emissions, such as power generation, steel, and petrochemicals, are the main participants. Allowances are traded on the Korea Exchange, and their prices move with allocation levels, the economy, and policy changes; recently they have also swung sharply.",
       "Of course, there are challenges. If more allowances are allocated than needed, prices fall and the incentive to reduce emissions weakens; if prices soar, the burden on companies grows. Therefore, how strictly the cap is set and how the share of paid allocation, in which allowances are sold rather than given out for free, is adjusted will decide the success or failure of the scheme. Designing the market so that the price placed on pollution leads to real reductions is still a work in progress. This discussion is also the process by which our society decides who will bear how much of the cost of climate change."
+     ],
+     "envocab": [
+      {
+       "word": "impose",
+       "ko": "부과하다, 지우다 (동사)",
+       "base": "impose [ɪmˈpoʊz]"
+      },
+      {
+       "word": "externality",
+       "ko": "외부효과 (명사, 경제학 용어)",
+       "base": "externality [ˌekstɜːrˈnæləti]"
+      },
+      {
+       "word": "equivalent",
+       "ko": "상당하는, 맞먹는 (형용사)",
+       "base": "equivalent [ɪˈkwɪvələnt]"
+      },
+      {
+       "word": "incentive",
+       "ko": "유인, 동기 (명사)",
+       "base": "incentive [ɪnˈsentɪv]"
+      },
+      {
+       "word": "soar",
+       "ko": "치솟다 (동사)",
+       "base": "soar [sɔːr]"
+      }
      ]
     }
    },
