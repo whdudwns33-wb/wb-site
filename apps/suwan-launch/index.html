@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>수완지구 신규 학원 런치보드 | WB 웩슬러브레인센터</title>
+<title>WB 학원 전략 총괄 보드 | WB 웩슬러브레인센터</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -85,7 +85,7 @@
   .btn.ghost:hover{border-color:var(--coral);color:var(--coral);background:transparent;filter:none}
   .btn.coral{background:var(--coral)}
   .btn.sm{font-size:12.5px;padding:6px 13px}
-  .btn.xs{font-size:11.5px;padding:4px 10px;border-radius:2px}
+  .btn.xs{font-size:11.5px;padding:4px 10px;border-radius:2px;white-space:nowrap}
 
   .progressbar{height:5px;border-radius:0;background:var(--paper-deep);overflow:hidden}
   .progressbar>i{display:block;height:100%;background:var(--blue);border-radius:0;transition:width .3s}
@@ -342,6 +342,53 @@
   .footer-note{font-size:11.5px;color:var(--mid);text-align:center;padding:26px 0 40px}
   .print-only{display:none}
 
+  /* ─── 전략 총괄 (Strategy HQ) ─── */
+  .nav-break{flex-basis:100%;height:0}
+  .nav-group{align-self:center;font-size:9.5px;font-weight:800;letter-spacing:.16em;color:var(--coral);
+    border:1px solid var(--coral);border-radius:2px;padding:2px 7px;margin:0 6px 8px 0;white-space:nowrap;opacity:.85}
+  @media(max-width:700px){.nav-break{display:none}.nav-group{margin-bottom:0;align-self:center}}
+
+  .biz-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media(max-width:760px){.biz-grid{grid-template-columns:1fr}}
+  .biz-card{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--dark);border-radius:2px;padding:18px}
+  .biz-card.prep{border-top-color:var(--coral)}
+  .biz-card .bz-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .biz-card h4{font-family:var(--display);font-size:15.5px;font-weight:700}
+  .biz-card .role{font-size:12px;color:var(--mid);margin-top:2px}
+  .bz-status{flex:none;font-size:10px;font-weight:800;letter-spacing:.08em;padding:3px 8px;border-radius:2px;
+    border:1px solid var(--ok);color:var(--ok)}
+  .bz-status.prep{border-color:var(--coral);color:var(--coral)}
+  .biz-card .bz-kpi{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mid)}
+  .biz-card .bz-kpi b{color:var(--dark);font-variant-numeric:tabular-nums}
+
+  .goal-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--deep-blue);border-radius:2px;padding:18px;margin-bottom:14px}
+  .goal-card h4{font-family:var(--display);font-size:15.5px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .goal-card .why{font-size:12.5px;color:var(--mid);margin:4px 0 10px;line-height:1.7}
+  .goal-item{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .goal-item:last-child{border-bottom:none}
+  .goal-item input{margin-top:3px;flex:none;width:15px;height:15px;accent-color:var(--blue)}
+  .goal-item.done span{text-decoration:line-through;color:var(--mid)}
+
+  .kpi-spark{display:block;width:100%;height:56px;margin-top:6px}
+  .kpi-spark polyline{fill:none;stroke:var(--blue);stroke-width:2}
+  .kpi-spark circle{fill:var(--blue)}
+  .delta-up{color:var(--ok);font-weight:700}
+  .delta-down{color:var(--bad);font-weight:700}
+
+  .dec-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--warn,#A0761B);border-radius:2px;padding:16px 18px;margin-bottom:12px}
+  .dec-card.decided{border-left-color:var(--ok)}
+  .dec-card h4{font-family:var(--display);font-size:14.5px;font-weight:700;display:flex;justify-content:space-between;gap:10px}
+  .dec-card .bg{font-size:12.5px;color:var(--mid);margin-top:5px;line-height:1.7}
+  .dec-card .opts{font-size:12.5px;margin-top:7px;padding:8px 10px;background:var(--light);border-radius:2px}
+  .dec-card .verdict{font-size:13px;margin-top:8px;padding:9px 11px;border-left:3px solid var(--ok);background:var(--ok-bg)}
+
+  .proj-card{background:var(--surface);border:1px solid var(--line);border-radius:2px;padding:18px;margin-bottom:12px}
+  .proj-card h4{font-family:var(--display);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .proj-status{font-size:10px;font-weight:800;letter-spacing:.06em;padding:3px 8px;border-radius:2px;border:1px solid var(--line);color:var(--mid);cursor:pointer}
+  .proj-status.s진행중{border-color:var(--blue);color:var(--deep-blue)}
+  .proj-status.s완료{border-color:var(--ok);color:var(--ok)}
+  .proj-status.s보류{border-color:var(--warn,#A0761B);color:var(--warn,#A0761B)}
+
   /* ─── 샘플 모델 (장신로 144 · 80평) ─── */
   .fp{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;margin:14px 0 6px}
   .fp .rm{border:1px solid var(--line);background:var(--surface);border-radius:2px;padding:10px 9px;min-height:78px}
@@ -384,16 +431,27 @@
     .print-only{display:block}
     body{background:#fff}
     .view{padding:0}
-    .card{break-inside:avoid;border-color:#ccc}
+    .card,.goal-card,.dec-card,.proj-card,.biz-card{break-inside:avoid;border-color:#ccc}
   }
 </style>
 </head>
 <body>
 
 <nav class="demobar no-print">
-  <div class="logo">WB<span>.</span> 수완 런치보드</div>
+  <div class="logo">WB<span>.</span> 전략 총괄 보드</div>
   <div class="tag">내부 전략 도구</div>
-  <button class="navbtn" data-nav="home">홈</button>
+  <span class="nav-group">總括</span>
+  <button class="navbtn" data-nav="hq">총괄 대시보드</button>
+  <button class="navbtn" data-nav="goals">🎯 전략 목표</button>
+  <button class="navbtn" data-nav="kpi">📊 KPI 지표</button>
+  <button class="navbtn" data-nav="projects">🗂 프로젝트</button>
+  <button class="navbtn" data-nav="decisions">⚖ 의사결정 로그</button>
+  <span class="nav-sep"></span>
+  <button class="navbtn" data-nav="data">데이터</button>
+  <button class="navbtn no-print" onclick="logout()" style="color:var(--coral)">로그아웃</button>
+  <span class="nav-break"></span>
+  <span class="nav-group">수완 오픈</span>
+  <button class="navbtn" data-nav="home">프로젝트 홈</button>
   <button class="navbtn" data-nav="interview">① 인터뷰</button>
   <button class="navbtn" data-nav="concepts">② 컨셉 3안</button>
   <button class="navbtn" data-nav="board">③ 연계전략 보드</button>
@@ -416,13 +474,11 @@
   <button class="navbtn" data-nav="funnel">🎯 모집 퍼널 대시보드</button>
   <button class="navbtn" data-nav="sample">🏢 샘플 모델 (장신로 144)</button>
   <span class="nav-sep"></span>
-  <button class="navbtn" data-nav="data">데이터</button>
-  <button class="navbtn no-print" onclick="logout()" style="color:var(--coral)">로그아웃</button>
   <a class="navbtn" href="./partner-brief.html" target="_blank" rel="noopener" style="text-decoration:none">🔗 파트너 공유용 브리핑</a>
 </nav>
 
 <main id="app" class="wrap"></main>
-<div class="footer-note">WB 웩슬러브레인센터 × 리더스 유치원 × 리드앤톡 — 수완지구 신규 학원 오픈 준비 도구 · 데이터는 이 브라우저(localStorage)에 저장됩니다</div>
+<div class="footer-note">WB 학원 운영 전략 총괄 보드 — 센터 · 독해력학원 · 컨설팅 · 수완 신규 거점 · 데이터는 이 브라우저(localStorage)에 저장됩니다</div>
 <div id="toast" class="toast"></div>
 
 <script>
@@ -492,7 +548,12 @@ const defaultState = () => ({
   agreements: null,        // null이면 AGREEMENT_ITEMS에서 초기화 — 3자 합의 항목별 상태
   duediligence: null,      // null이면 DD_ITEMS에서 초기화 — 인수 실사 체크
   funnelEntries: [],       // [{id, month, inquiry, testBooked, testDone, consult, enrolled}]
-  openPrep: {}             // 샘플 모델 오픈 준비 체크 — {항목id: true}
+  openPrep: {},            // 샘플 모델 오픈 준비 체크 — {항목id: true}
+  hq: { focus:'' },        // 총괄 대시보드 — 이번 주 포커스 메모
+  goals: null,             // null이면 GOAL_SEED에서 초기화 — 전략 목표 테마·하위 목표
+  kpiEntries: [],          // [{id, biz, month:'2026-08', students, inquiries, enrolled, withdrawn, tests, memo}]
+  projects: null,          // null이면 PROJECT_SEED에서 초기화 — 프로젝트 포트폴리오
+  decisions: null          // null이면 DECISION_SEED에서 초기화 — 의사결정 로그
 });
 let S = load();
 function migrate(st){
@@ -510,6 +571,11 @@ function migrate(st){
   if(!st.duediligence) merged.duediligence = base.duediligence;
   if(!Array.isArray(st.funnelEntries)) merged.funnelEntries = [];
   if(!st.openPrep || typeof st.openPrep !== 'object') merged.openPrep = {};
+  if(!st.hq || typeof st.hq !== 'object') merged.hq = base.hq;
+  if(!st.goals) merged.goals = base.goals;
+  if(!Array.isArray(st.kpiEntries)) merged.kpiEntries = [];
+  if(!st.projects) merged.projects = base.projects;
+  if(!st.decisions) merged.decisions = base.decisions;
   return merged;
 }
 function load(){
@@ -541,7 +607,7 @@ function ensureTasks(){
 
 /* ══════════════════ 라우팅 ══════════════════ */
 const app = document.getElementById('app');
-let currentView = 'home';
+let currentView = 'hq';
 function nav(v){
   currentView = v;
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.nav===v));
@@ -552,7 +618,12 @@ document.querySelectorAll('.navbtn[data-nav]').forEach(b=>b.addEventListener('cl
 
 function render(){
   ensureTasks();
-  if(currentView==='home') renderHome();
+  if(currentView==='hq') renderHq();
+  else if(currentView==='goals') renderGoals();
+  else if(currentView==='kpi') renderKpi();
+  else if(currentView==='projects') renderProjects();
+  else if(currentView==='decisions') renderDecisions();
+  else if(currentView==='home') renderHome();
   else if(currentView==='interview') renderInterview();
   else if(currentView==='concepts') renderConcepts();
   else if(currentView==='board') renderBoard();
@@ -1656,7 +1727,7 @@ const TIMELINE_OFFSETS = [
 ];
 function renderTimeline(){
   const openDate = S.openDate;
-  if(!openDate){ app.innerHTML = '<section class="view"><div class="card">홈 화면에서 오픈 목표일을 먼저 설정해주세요.</div></section>'; return; }
+  if(!openDate){ app.innerHTML = '<section class="view"><div class="card">프로젝트 홈에서 오픈 목표일을 먼저 설정해주세요.</div></section>'; return; }
   const today = new Date(); today.setHours(0,0,0,0);
   const target = S.answers.s2 || 100;
   const items = TIMELINE_OFFSETS.map(t => {
@@ -1672,7 +1743,7 @@ function renderTimeline(){
   <section class="view">
     <div class="eyebrow">Launch Timeline</div>
     <h2>오픈 타임라인</h2>
-    <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 홈 화면에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
+    <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 프로젝트 홈에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
     <div class="card tight" style="margin-bottom:16px">
       <span class="pill ${seasonState==='off'?'warn':'ok'}">${seasonState==='in' ? '✓ 모집 시즌(11~2월) 한복판 오픈' : seasonState==='pre' ? '✓ 모집 시즌 직전 진입 — 하반기 목표와 정합' : '⚠ 모집 시즌(11~2월)과 어긋남 — 날짜 재검토 권장'}</span>
@@ -1954,7 +2025,7 @@ function addFunnelEntry(){
   }
   S.funnelEntries = S.funnelEntries || [];
   S.funnelEntries.push({ id:'fn'+Math.random().toString(36).slice(2,9), month, ...vals });
-  S.funnelEntries.sort((a,b)=>a.month<b.month?-1:1);
+  S.funnelEntries.sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
   save(); renderFunnel(); toast('입력 완료');
 }
 function delFunnelEntry(id){
@@ -2905,6 +2976,419 @@ function renderSample(){
     </div>
   </section>`;
 }
+/* ══════════════════ 🧭 전략 총괄 (Strategy HQ) ══════════════════
+   이 보드의 상위 레이어. 수완 오픈은 여기 등록된 프로젝트 중 하나이고,
+   사업 전반(센터·학원·컨설팅·신규 거점)의 목표·지표·결정을 총괄한다.
+   숫자 원칙: 자동 집계는 앱 안의 데이터(인터뷰·보드·작업·오픈준비)에서만 —
+   사업 실적(재원생·문의 등)은 지어내지 않고 KPI 화면에 직접 입력받는다. */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+const BIZ_UNITS = [
+  { id:'center',  name:'WB 웩슬러브레인센터', role:'웩슬러 검사 · 상담 · 데이터 허브', status:'운영중' },
+  { id:'academy', name:'WB 독해력학원',       role:'초·중 국어 독해 · 학습관제',      status:'운영중' },
+  { id:'consult', name:'고등 컨설팅',          role:'수행·생기부 · 소수 정예',          status:'운영중' },
+  { id:'suwan',   name:'수완 신규 학원',       role:'국·영·수 종합 · 3자 협업',        status:'준비중' },
+];
+
+const GOAL_SEED = [
+  { id:'g1', theme:'데이터 기반 운영 표준화',
+    why:'검사 → 반편성 → 성장 리포트 파이프라인을 모든 사업에 같은 방식으로 적용한다. 감이 아니라 데이터가 기본값.',
+    items:[
+      { id:'g1a', t:'검사 → 반편성 기준표 문서화 (수완 개원 전 완성)', done:false },
+      { id:'g1b', t:'분기별 성장 리포트 양식 통일 (센터·학원 공용)', done:false },
+      { id:'g1c', t:'KPI 월간 입력 루틴 정착 (이 보드 📊 KPI 화면)', done:false },
+    ]},
+  { id:'g2', theme:'수완지구 신규 거점 오픈',
+    why:'2026 하반기 개원. 이 보드의 수완 프로젝트 화면 전체가 이 목표에 속한다.',
+    items:[
+      { id:'g2a', t:'3자 합의 완료 (합의 트래커 전 항목 합의완료)', done:false },
+      { id:'g2b', t:'임대차 계약 · 인허가 완료 (오픈 준비 체크리스트 ①②)', done:false },
+      { id:'g2c', t:'개원 (목표 2026-11-02)', done:false },
+    ]},
+  { id:'g3', theme:'재원생 유지 · 성장',
+    why:'신규 모집보다 먼저 지금 다니는 학생이 오래, 잘 다니게 한다. 이탈은 사후 대응이 아니라 조기 감지로.',
+    items:[
+      { id:'g3a', t:'월별 퇴원·이탈 사유 기록 시작 (KPI 화면 퇴원 칸)', done:false },
+      { id:'g3b', t:'리텐션 기준선 측정 — 3개월 유지율 파악', done:false },
+      { id:'g3c', t:'재검사 주기(6개월) 안내 체계화', done:false },
+    ]},
+  { id:'g4', theme:'3자 협업 체계화',
+    why:'리더스·리드앤톡과의 관계를 개인 신뢰가 아니라 문서화된 합의와 정기 소통 구조로 만든다.',
+    items:[
+      { id:'g4a', t:'합의 트래커 전 항목 서면화', done:false },
+      { id:'g4b', t:'월 1회 3자 정례 미팅 고정', done:false },
+      { id:'g4c', t:'개인정보 제3자 제공 동의 체계 확립', done:false },
+    ]},
+];
+
+const PROJECT_SEED = [
+  { id:'suwan', builtin:true, name:'수완지구 신규 학원 오픈', status:'진행중',
+    memo:'이 보드의 수완 화면 전체(인터뷰~샘플 모델)가 이 프로젝트에 속합니다. 진행률은 인터뷰·연계전략·실행 작업·오픈 준비에서 자동 집계.' },
+];
+const PROJECT_STATUSES = ['구상중','진행중','보류','완료'];
+
+const DECISION_SEED = [
+  { id:'d1', status:'open', title:'3자 수익 배분 · 지분 구조',
+    bg:'지분+성과 인센티브 혼합 방향만 합의. 리드앤톡 참여 범위(비지분 위탁 vs 공동투자)가 인터뷰에서 상충 — 합의 트래커의 「사업 구조·수익 배분」·「리드앤톡 지분 참여 범위」 항목.',
+    options:'① 대표+리더스 지분, 리드앤톡 운영위탁 ② 3자 공동투자 ③ 혼합(소수 지분+인센티브)', decision:'', decidedAt:'' },
+  { id:'d2', status:'open', title:'수완 오픈일 최종 확정',
+    bg:'"2026 하반기"만 확정. 현재 11-02는 임시값 — 임대차 계약과 인허가 일정이 정해져야 역산이 잠긴다.',
+    options:'11월 초 유지 / 12월 초로 이동 / 계약 후 재역산', decision:'', decidedAt:'' },
+  { id:'d3', status:'open', title:'3개월 100명 목표 재검증',
+    bg:'회의 원자료 기준선(30~60명대) 대비 공격적. 인수 매물의 기존 원생 규모 확정 후 ⑤ 계산기로 다시 본다.',
+    options:'100명 유지 / 70명으로 보수화 / 매물 확정 후 재산정', decision:'', decidedAt:'' },
+  { id:'d4', status:'open', title:'수완 입지 확정 — 장신로 144 후보',
+    bg:'80평 · 강의실 6 기준 샘플 모델 검토 완료(🏢 화면). 실측·임대 조건·건축물대장 용도 확인이 남았다.',
+    options:'장신로 144 진행 / 대안 입지 병행 검토', decision:'', decidedAt:'' },
+];
+
+function goalsState(){ if(!S.goals) S.goals = JSON.parse(JSON.stringify(GOAL_SEED)); return S.goals; }
+function projectsState(){ if(!S.projects) S.projects = JSON.parse(JSON.stringify(PROJECT_SEED)); return S.projects; }
+function decisionsState(){ if(!S.decisions) S.decisions = JSON.parse(JSON.stringify(DECISION_SEED)); return S.decisions; }
+
+function suwanProgress(){
+  // 수완 프로젝트 통합 진행률 — 인터뷰·연계전략·실행 작업·오픈 준비 4개 축의 평균
+  const iv = interviewProgress(), bd = boardProgress(), tk = taskProgress();
+  const prepTotal = OPEN_PREP.reduce((a,c)=>a+c.items.length, 0);
+  const prepDone  = OPEN_PREP.reduce((a,c)=>a+c.items.filter(i=>S.openPrep && S.openPrep[i.id]).length, 0);
+  const prep = prepTotal ? Math.round(prepDone/prepTotal*100) : 0;
+  const parts = [ ['인터뷰', iv.pct], ['연계전략', bd.pct], ['실행 작업', tk.pct], ['오픈 준비', prep] ];
+  const pct = Math.round(parts.reduce((a,p)=>a+p[1],0) / parts.length);
+  return { pct, parts };
+}
+
+/* ── 총괄 대시보드 ── */
+function latestKpi(biz){
+  const rows = S.kpiEntries.filter(e=>e.biz===biz).sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
+  return rows.length ? rows[rows.length-1] : null;
+}
+function setHqFocus(v){ if(!S.hq) S.hq={focus:''}; S.hq.focus = v; save(); }
+function renderHq(){
+  const sp = suwanProgress();
+  const dd = dday();
+  const decs = decisionsState();
+  const openDecs = decs.filter(d=>d.status==='open');
+  const projs = projectsState();
+  const running = projs.filter(p=>p.status==='진행중').length;
+  const goals = goalsState();
+  const agrOpen = agreementsState().filter(a=>a.status!=='합의완료').length;
+
+  app.innerHTML = `
+  <section class="view">
+    <div class="hero-launch">
+      <div class="eyebrow">Strategy HQ · 學院 經營</div>
+      <h1>학원 운영 전략 총괄</h1>
+      <p class="lede">센터 · 독해력학원 · 컨설팅 · 수완 신규 거점을 한 화면에서 총괄합니다.
+      목표를 정하고 → 지표로 확인하고 → 결정을 기록합니다. 수완 오픈은 아래 프로젝트 중 하나입니다.</p>
+      <div class="chip-row">
+        <span class="chip">진행 프로젝트 ${running}건</span>
+        <span class="chip">${dd===null?'수완 오픈일 미설정':(dd>=0?'수완 오픈 D-'+dd:'수완 오픈 D+'+(-dd))}</span>
+        <span class="chip">의사결정 대기 ${openDecs.length}건</span>
+        <span class="chip">3자 합의 미완 ${agrOpen}건</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>사업 포트폴리오</h3>
+      <div class="biz-grid" style="margin-top:12px">
+        ${BIZ_UNITS.map(b=>{
+          const k = latestKpi(b.id);
+          const prep = b.status==='준비중';
+          return `<div class="biz-card ${prep?'prep':''}">
+            <div class="bz-head">
+              <div><h4>${esc(b.name)}</h4><div class="role">${esc(b.role)}</div></div>
+              <span class="bz-status ${prep?'prep':''}">${esc(b.status)}</span>
+            </div>
+            ${b.id==='suwan' ? `
+              <div class="progressbar" style="margin-top:12px"><i style="width:${sp.pct}%"></i></div>
+              <div class="bz-kpi" style="border-top:none;padding-top:6px;margin-top:4px">통합 진행률 <b>${sp.pct}%</b> — ${sp.parts.map(p=>`${p[0]} ${p[1]}%`).join(' · ')}</div>
+              <button class="btn sm" style="margin-top:10px" onclick="nav('home')">프로젝트 열기</button>`
+            : k ? `
+              <div class="bz-kpi">${esc(k.month)} 기준 — 재원생 <b>${k.students==null?'—':num(k.students)+'명'}</b> · 신규 문의 <b>${k.inquiries==null?'—':num(k.inquiries)}</b> · 등록 <b>${k.enrolled==null?'—':num(k.enrolled)}</b> · 검사 <b>${k.tests==null?'—':num(k.tests)+'건'}</b></div>`
+            : `
+              <div class="bz-kpi">지표 미입력 — 📊 KPI 화면에서 월별 실적을 입력하면 여기 요약됩니다.</div>`}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card" style="margin-bottom:0">
+        <h3>이번 주 포커스</h3>
+        <p class="small muted" style="margin:4px 0 10px">이번 주에 대표가 직접 움직일 한두 가지만 적습니다.</p>
+        <textarea class="q-input" style="min-height:96px" placeholder="예: 리드앤톡 원장과 지분 구조 1차 협의 / 장신로 144 실측 방문"
+          onchange="setHqFocus(this.value)">${esc(S.hq && S.hq.focus || '')}</textarea>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <h3>의사결정 대기 <span class="pill warn" style="margin-left:6px">${openDecs.length}건</span></h3>
+        ${openDecs.length ? `<ul style="list-style:none;margin-top:8px">
+          ${openDecs.slice(0,4).map(d=>`<li class="small" style="padding:6px 0;border-bottom:1px solid var(--line)">⚖ ${esc(d.title)}</li>`).join('')}
+        </ul>` : '<p class="small muted" style="margin-top:8px">대기 중인 결정이 없습니다.</p>'}
+        <button class="btn sm ghost" style="margin-top:12px" onclick="nav('decisions')">의사결정 로그 열기</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>전략 목표 진행</h3>
+      <div class="grid2" style="margin-top:12px">
+        ${goals.map(g=>{
+          const total = g.items.length, done = g.items.filter(i=>i.done).length;
+          const pct = total ? Math.round(done/total*100) : 0;
+          return `<div>
+            <div class="small" style="display:flex;justify-content:space-between;font-weight:700"><span>${esc(g.theme)}</span><span class="muted">${done}/${total}</span></div>
+            <div class="progressbar" style="margin-top:6px"><i style="width:${pct}%"></i></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <button class="btn sm ghost" style="margin-top:14px" onclick="nav('goals')">전략 목표 열기</button>
+    </div>
+
+    <div class="card">
+      <h3>수완 오픈 바로가기</h3>
+      <div class="grid4" style="margin-top:12px">
+        ${[['home','프로젝트 홈','인터뷰·컨셉·전략 요약'],['sample','샘플 모델','장신로 144 · 80평'],
+           ['agreements','3자 합의 트래커',agreementsState().length+'건 중 '+agrOpen+'건 미완'],['timeline','오픈 타임라인','역산 마일스톤']]
+          .map(([v,t,d])=>`<button class="card tight" style="text-align:left;cursor:pointer;margin:0" onclick="nav('${v}')">
+            <b class="small" style="font-weight:800">${t}</b><div class="small muted" style="margin-top:2px">${d}</div></button>`).join('')}
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ── 전략 목표 ── */
+function toggleGoalItem(gid, iid){
+  const g = goalsState().find(x=>x.id===gid); if(!g) return;
+  const it = g.items.find(x=>x.id===iid); if(!it) return;
+  it.done = !it.done; save(); renderGoals();
+}
+function addGoalItem(gid){
+  const g = goalsState().find(x=>x.id===gid); if(!g) return;
+  const t = prompt('하위 목표:'); if(!t) return;
+  g.items.push({id:uid(), t, done:false}); save(); renderGoals();
+}
+function delGoalItem(gid, iid){
+  const g = goalsState().find(x=>x.id===gid); if(!g) return;
+  if(!confirm('이 하위 목표를 삭제할까요?')) return;
+  g.items = g.items.filter(x=>x.id!==iid); save(); renderGoals();
+}
+function addGoalTheme(){
+  const theme = prompt('새 전략 테마:'); if(!theme) return;
+  const why = prompt('취지 (선택):')||'';
+  goalsState().push({id:uid(), theme, why, items:[]}); save(); renderGoals();
+}
+function renderGoals(){
+  const goals = goalsState();
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Strategy Goals</div>
+    <h1>전략 목표</h1>
+    <p class="lede">연간 전략 테마와 그 아래 실행 목표입니다. 체크 상태는 이 브라우저에 저장되고, 총괄 대시보드에 진행률로 집계됩니다.</p>
+    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addGoalTheme()">+ 테마 추가</button></div>
+    ${goals.map(g=>{
+      const total=g.items.length, done=g.items.filter(i=>i.done).length;
+      return `<div class="goal-card">
+        <h4><span>${esc(g.theme)}</span><span class="small muted" style="font-weight:400">${done}/${total}</span></h4>
+        ${g.why?`<div class="why">${esc(g.why)}</div>`:''}
+        ${g.items.map(i=>`<div class="goal-item ${i.done?'done':''}">
+          <input type="checkbox" ${i.done?'checked':''} onchange="toggleGoalItem('${g.id}','${i.id}')" aria-label="${esc(i.t)}">
+          <span style="flex:1">${esc(i.t)}</span>
+          <button class="btn xs ghost no-print" onclick="delGoalItem('${g.id}','${i.id}')">삭제</button>
+        </div>`).join('') || '<p class="small muted">하위 목표가 없습니다.</p>'}
+        <button class="btn xs ghost no-print" style="margin-top:10px" onclick="addGoalItem('${g.id}')">+ 하위 목표</button>
+      </div>`;
+    }).join('')}
+  </section>`;
+}
+
+/* ── KPI 지표 ── */
+let kpiBiz = 'academy';
+function setKpiBiz(b){ kpiBiz = b; renderKpi(); }
+function addKpiEntry(){
+  const month = prompt('기준 월 (예: 2026-08):'); if(!month) return;
+  if(!/^\d{4}-\d{2}$/.test(month.trim())){ toast('형식: 2026-08'); return; }
+  const ask = (label)=>{ const v = prompt(label+' (숫자, 모르면 비워두기):','')||''; const n = parseInt(v,10); return isNaN(n)?null:n; };
+  const m = month.trim();
+  const dup = S.kpiEntries.find(x=>x.biz===kpiBiz && x.month===m);
+  if(dup && !confirm(m+'은 이미 입력돼 있습니다. 새 값으로 덮어쓸까요?')) return;
+  const e = { id:uid(), biz:kpiBiz, month:m,
+    students:ask('월말 재원생 수'), inquiries:ask('신규 문의 건수'), enrolled:ask('신규 등록 수'),
+    withdrawn:ask('퇴원 수'), tests:ask('검사 건수'), memo:prompt('메모 (선택):')||'' };
+  if(dup) S.kpiEntries = S.kpiEntries.filter(x=>x.id!==dup.id);
+  S.kpiEntries.push(e); save(); renderKpi();
+}
+function delKpiEntry(id){
+  if(!confirm('이 입력을 삭제할까요?')) return;
+  S.kpiEntries = S.kpiEntries.filter(e=>e.id!==id); save(); renderKpi();
+}
+function kpiSpark(rows){
+  const vals = rows.map(r=>r.students).filter(v=>v!=null);
+  if(vals.length < 2) return '';
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max-min)||1;
+  const W=560, H=50, P=6;
+  const pts = vals.map((v,i)=>[P + i*(W-2*P)/(vals.length-1), H-P-(v-min)*(H-2*P)/span]);
+  return `<svg class="kpi-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${pts.map(p=>p.map(n=>n.toFixed(1)).join(',')).join(' ')}"></polyline>
+    ${pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5"></circle>`).join('')}
+  </svg>`;
+}
+function renderKpi(){
+  const biz = BIZ_UNITS.find(b=>b.id===kpiBiz) || BIZ_UNITS[0];
+  const rows = S.kpiEntries.filter(e=>e.biz===kpiBiz).sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
+  const last = rows[rows.length-1], prev = rows[rows.length-2];
+  const delta = (last && prev && last.students!=null && prev.students!=null) ? last.students - prev.students : null;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">KPI Tracker</div>
+    <h1>KPI 지표</h1>
+    <p class="lede">사업체별 월간 실적을 직접 입력합니다. 이 보드는 실적을 지어내지 않습니다 — 입력한 값만 총괄 대시보드에 요약됩니다.</p>
+    <div class="sm-tabs no-print" style="margin-top:16px">
+      ${BIZ_UNITS.map(b=>`<button class="sm-tab ${b.id===kpiBiz?'active':''}" onclick="setKpiBiz('${b.id}')">${esc(b.name)}</button>`).join('')}
+    </div>
+    <div class="card">
+      <h3>${esc(biz.name)} — 월간 지표</h3>
+      ${rows.length ? `
+        ${delta!==null ? `<p class="small" style="margin-top:6px">재원생 전월 대비
+          <span class="${delta>=0?'delta-up':'delta-down'}">${delta>=0?'+':''}${num(delta)}명</span></p>` : ''}
+        ${kpiSpark(rows)}
+        <div style="overflow-x:auto"><table class="grid-tbl" style="min-width:640px">
+          <thead><tr><th>월</th><th style="width:76px">재원생</th><th style="width:76px">문의</th><th style="width:76px">등록</th>
+            <th style="width:76px">퇴원</th><th style="width:76px">검사</th><th>메모</th><th style="width:56px" class="no-print"></th></tr></thead>
+          <tbody>${rows.map(e=>`<tr>
+            <td><b>${esc(e.month)}</b></td>
+            <td class="num">${e.students==null?'—':num(e.students)}</td>
+            <td class="num">${e.inquiries==null?'—':num(e.inquiries)}</td>
+            <td class="num">${e.enrolled==null?'—':num(e.enrolled)}</td>
+            <td class="num">${e.withdrawn==null?'—':num(e.withdrawn)}</td>
+            <td class="num">${e.tests==null?'—':num(e.tests)}</td>
+            <td class="small muted">${esc(e.memo)}</td>
+            <td class="no-print"><button class="btn xs ghost" onclick="delKpiEntry('${e.id}')">삭제</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`
+      : `<p class="small muted" style="margin-top:8px">아직 입력이 없습니다. 아래 버튼으로 첫 달 실적을 넣어주세요 — 재원생 수 하나만 넣어도 추이가 쌓이기 시작합니다.</p>`}
+      <button class="btn sm no-print" style="margin-top:14px" onclick="addKpiEntry()">+ 월 실적 입력</button>
+    </div>
+    <div class="card">
+      <h3>기록 원칙</h3>
+      <ul style="list-style:none;margin-top:8px">
+        <li class="small" style="padding:4px 0">· 매월 말일 기준으로 한 번씩. 추정치를 넣지 말고, 모르는 칸은 비워둡니다.</li>
+        <li class="small" style="padding:4px 0">· 퇴원 칸에는 숫자와 함께 메모에 사유를 남기면 전략 목표 「재원생 유지·성장」의 원자료가 됩니다.</li>
+        <li class="small" style="padding:4px 0">· 수완 신규 학원은 개원 후부터 이 화면에 입력 — 개원 전 모집 지표는 🎯 모집 퍼널 대시보드를 씁니다.</li>
+      </ul>
+    </div>
+  </section>`;
+}
+
+/* ── 프로젝트 ── */
+function addProject(){
+  const name = prompt('프로젝트 이름:'); if(!name) return;
+  const memo = prompt('메모 (선택):')||'';
+  projectsState().push({id:uid(), builtin:false, name, status:'구상중', memo}); save(); renderProjects();
+}
+function cycleProject(id){
+  const p = projectsState().find(x=>x.id===id); if(!p || p.builtin) return;
+  p.status = PROJECT_STATUSES[(PROJECT_STATUSES.indexOf(p.status)+1) % PROJECT_STATUSES.length];
+  save(); renderProjects();
+}
+function delProject(id){
+  const p = projectsState().find(x=>x.id===id); if(!p) return;
+  if(p.builtin){ toast('수완 프로젝트는 이 보드의 뼈대라 삭제할 수 없습니다'); return; }
+  if(!confirm(`"${p.name}" 프로젝트를 삭제할까요?`)) return;
+  S.projects = projectsState().filter(x=>x.id!==id); save(); renderProjects();
+}
+function renderProjects(){
+  const projs = projectsState();
+  const sp = suwanProgress();
+  const dd = dday();
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Project Portfolio</div>
+    <h1>프로젝트</h1>
+    <p class="lede">진행 중인 전략 프로젝트 목록입니다. 상태 배지를 누르면 구상중 → 진행중 → 보류 → 완료 순으로 바뀝니다.</p>
+    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addProject()">+ 프로젝트 추가</button></div>
+    ${projs.map(p=>`<div class="proj-card">
+      <h4>${esc(p.name)}
+        <span class="proj-status s${esc(p.status)}" ${p.builtin?'':`onclick="cycleProject('${p.id}')"`}>${esc(p.status)}</span>
+        ${p.builtin ? `<span class="pill blue">내장 프로젝트</span>` : ''}
+      </h4>
+      ${p.memo?`<p class="small muted" style="margin-top:6px">${esc(p.memo)}</p>`:''}
+      ${p.builtin ? `
+        <div class="progressbar" style="margin-top:12px"><i style="width:${sp.pct}%"></i></div>
+        <p class="small muted" style="margin-top:6px">통합 진행률 ${sp.pct}% — ${sp.parts.map(x=>`${x[0]} ${x[1]}%`).join(' · ')} · ${dd===null?'오픈일 미설정':(dd>=0?'D-'+dd:'D+'+(-dd))}</p>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm" onclick="nav('home')">프로젝트 홈</button>
+          <button class="btn sm ghost" onclick="nav('timeline')">타임라인</button>
+          <button class="btn sm ghost" onclick="nav('sample')">샘플 모델</button>
+        </div>`
+      : `<div style="margin-top:10px"><button class="btn xs ghost no-print" onclick="delProject('${p.id}')">삭제</button></div>`}
+    </div>`).join('')}
+    <div class="card" style="border-left:3px solid var(--coral)">
+      <h3>프로젝트로 등록할 만한 것</h3>
+      <p class="small muted" style="margin-top:6px">한 번의 결정이 아니라 몇 주 이상 굴러가는 일이면 프로젝트입니다 —
+      예: 여수·순천 확장 타당성 검토, 센터 홈페이지 개편, 학원관리 시스템 교체. 단발 결정은 ⚖ 의사결정 로그에 적는 편이 맞습니다.</p>
+    </div>
+  </section>`;
+}
+
+/* ── 의사결정 로그 ── */
+function addDecision(){
+  const title = prompt('결정할 사안:'); if(!title) return;
+  const bg = prompt('배경 (선택):')||'';
+  const options = prompt('검토 중인 선택지 (선택):')||'';
+  decisionsState().push({id:uid(), status:'open', title, bg, options, decision:'', decidedAt:''});
+  save(); renderDecisions();
+}
+function decideDecision(id){
+  const d = decisionsState().find(x=>x.id===id); if(!d) return;
+  const decision = prompt('결정 내용:', d.decision||''); if(!decision) return;
+  d.decision = decision;
+  d.decidedAt = new Date().toISOString().slice(0,10);
+  d.status = 'decided';
+  save(); renderDecisions();
+}
+function reopenDecision(id){
+  const d = decisionsState().find(x=>x.id===id); if(!d) return;
+  if(!confirm('이 결정을 다시 "대기"로 되돌릴까요? (결정 내용은 지워지지 않습니다)')) return;
+  d.status = 'open'; save(); renderDecisions();
+}
+function delDecision(id){
+  const d = decisionsState().find(x=>x.id===id); if(!d) return;
+  if(!confirm(`"${d.title}" 항목을 삭제할까요?`)) return;
+  S.decisions = decisionsState().filter(x=>x.id!==id); save(); renderDecisions();
+}
+function renderDecisions(){
+  const decs = decisionsState();
+  const open = decs.filter(d=>d.status==='open'), done = decs.filter(d=>d.status==='decided');
+  const card = d => `<div class="dec-card ${d.status==='decided'?'decided':''}">
+    <h4><span>${esc(d.title)}</span>
+      <span class="small muted no-print" style="font-weight:400;white-space:nowrap">
+        ${d.status==='open'
+          ? `<button class="btn xs" onclick="decideDecision('${d.id}')">결정 기록</button>`
+          : `<button class="btn xs ghost" onclick="reopenDecision('${d.id}')">재논의</button>`}
+        <button class="btn xs ghost" onclick="delDecision('${d.id}')">삭제</button>
+      </span></h4>
+    ${d.bg?`<div class="bg">${esc(d.bg)}</div>`:''}
+    ${d.options?`<div class="opts"><b>선택지</b> — ${esc(d.options)}</div>`:''}
+    ${d.status==='decided'?`<div class="verdict"><b>결정 (${esc(d.decidedAt)})</b> — ${esc(d.decision)}</div>`:''}
+  </div>`;
+  app.innerHTML = `
+  <section class="view">
+    <div class="eyebrow">Decision Log</div>
+    <h1>의사결정 로그</h1>
+    <p class="lede">사업의 굵직한 결정을 배경·선택지·결정·날짜와 함께 남깁니다.
+    나중에 "왜 그렇게 했더라"를 찾는 시간이 없어지고, 파트너와의 논의도 이 기록 위에서 시작할 수 있습니다.</p>
+    <div style="margin:16px 0 20px"><button class="btn sm ghost no-print" onclick="addDecision()">+ 사안 추가</button></div>
+    <h2 style="font-size:18px">대기 중 <span class="pill warn">${open.length}건</span></h2>
+    <div style="margin-top:10px">${open.map(card).join('') || '<p class="small muted">대기 중인 결정이 없습니다.</p>'}</div>
+    <h2 style="font-size:18px;margin-top:28px">결정됨 <span class="pill ok">${done.length}건</span></h2>
+    <div style="margin-top:10px">${done.map(card).join('') || '<p class="small muted">아직 기록된 결정이 없습니다.</p>'}</div>
+    <div class="card" style="border-left:3px solid var(--coral);margin-top:20px">
+      <h3>3자 합의와의 관계</h3>
+      <p class="small muted" style="margin-top:6px">리더스·리드앤톡과 함께 정해야 하는 항목은 🤝 3자 합의 트래커에서 관리합니다.
+      이 로그는 대표가 단독으로 내리는 결정용입니다. 같은 사안이 양쪽에 걸치면 — 예: 수익 배분 — 합의 트래커를 원본으로 두고 여기엔 결과만 기록하세요.</p>
+    </div>
+  </section>`;
+}
+
 const GATE_KEY = 'wb-suwan-gate-ok';
 /* 로그인 — 아이디·비밀번호.
    비밀번호는 평문으로 두지 않고 PBKDF2-SHA256(15만 회) 해시만 소스에 남긴다.
@@ -2961,7 +3445,7 @@ async function tryGate(){
   if(ok){
     localStorage.setItem(GATE_KEY, '1');
     document.querySelector('.demobar').style.display = '';
-    nav('home');
+    nav('hq');
   } else {
     toast('아이디 또는 비밀번호가 올바르지 않습니다');
     const p = document.getElementById('gatePw'); if(p){ p.value=''; p.focus(); }
@@ -2974,7 +3458,7 @@ function logout(){
 }
 
 /* ══════════════════ 시작 ══════════════════ */
-if(gatePassed()) nav('home'); else renderGate();
+if(gatePassed()) nav('hq'); else renderGate();
 </script>
 </body>
 </html>
