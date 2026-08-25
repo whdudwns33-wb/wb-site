@@ -229,6 +229,14 @@ if(!db.meta.seedDbV1){
   for(const r of SEED_HSDB)if(!hvH.has(r.name))db.hsdb.push(r);
   db.meta.seedDbV1=true;save();
 }
+/* 학생별 관심대학 시드 — 빌드 시 주입 (공개 소스에는 비어 있음) */
+const SEED_UNIVS={}; /*BUILD:PRIVATE_SEED*/
+(()=>{let ch=false;
+  for(const s of db.students){
+    if(!s.univSeeded&&(!s.univs||!s.univs.length)&&SEED_UNIVS[s.name]){
+      s.univs=SEED_UNIVS[s.name].map(u=>({univ:u[0],major:u[1],track:u[2]||"",tong:"",checked:""}));
+      s.univSeeded=true;ch=true;}}
+  if(ch)save();})();
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
   return {students:[],meta:{created:today()}};}
