@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <title>WB 진로독서 · 강사 검수</title>
+  <style>
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.7}
+    header{padding:14px 18px;background:var(--navy);color:#fff}
+    header b{font-size:17px}header small{opacity:.75;margin-left:8px}
+    main{max-width:900px;margin:auto;padding:16px 14px 60px}
+    .card{margin-bottom:12px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0;color:var(--navy);font-size:17px}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800;margin-right:4px}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}
+    button{font:inherit;cursor:pointer}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+    .row:first-of-type{border-top:0}
+    .open-btn{min-height:40px;padding:6px 14px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--navy);font-weight:800}
+    .lv{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fbfdfe}
+    .lv h3{margin:0 0 4px;color:var(--navy);font-size:15px}
+    .para{margin:10px 0;font-size:15px}
+    .seg-sep{color:var(--blue);opacity:.55;padding:0 2px;font-size:.85em}
+    .meta{color:var(--muted);font-size:12.5px}
+    .q{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--sky);font-size:13.5px}
+    .q b.ans{color:var(--ok)}
+    .vocab-line{font-size:13.5px;margin-top:6px}
+    .check{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+    .check button{min-height:40px;padding:6px 14px;border-radius:10px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
+    .check button[data-on="1"]{border-color:var(--ok);background:#e7f6f0;color:var(--ok)}
+    .check button.rej[data-on="1"]{border-color:#e0a9a1;background:#fff0ef;color:var(--bad)}
+    .summary{position:sticky;top:0;z-index:3;background:#fffbe8;border:1px solid #ecd9a0;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13.5px}
+  </style>
+</head>
+<body>
+<header><b>WB 진로독서 · 강사 검수 뷰어</b><small>지문·문항을 훑어보고 검수 표시를 남기세요 (이 기기에만 저장)</small></header>
+<main id="app"><p>불러오는 중…</p></main>
+<script>
+'use strict';
+const CATS={science:'과학·기술',society:'사회·경제',history:'역사·문화',humanities:'인문·예술',environment:'환경'};
+const LEVEL_LABEL={L2:'초등 심화(L2)',L3:'중등(L3)',L4:'고등(L4)'};
+const RKEY='wbr.review.v1';
+let DB=null,R={};
+try{R=JSON.parse(localStorage.getItem(RKEY)||'{}')}catch(e){R={}}
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function saveR(){try{localStorage.setItem(RKEY,JSON.stringify(R))}catch(e){}}
+function lvHtml(id,lv,b){
+  return `<div class="lv"><h3>${LEVEL_LABEL[lv]} — ${esc(b.title)}</h3>
+  <p class="meta">약 ${b.minutes}분 · ${b.paragraphs.length}문단 · 총 ${b.paragraphs.map(p=>p.join('')).join('').length}자 · 어휘 ${b.vocab.length} · 문항 ${b.questions.length}</p>
+  ${b.paragraphs.map((p,i)=>`<p class="para"><b class="meta">[${i+1}]</b> ${p.map(esc).join('<span class="seg-sep">∕</span>')}</p>`).join('')}
+  ${b.vocab.length?`<div class="vocab-line"><b>어휘:</b> ${b.vocab.map(v=>`${esc(v.word)}${v.hanja?'('+esc(v.hanja)+')':''} — ${esc(v.easy)}`).join(' · ')}</div>`:''}
+  ${b.questions.map((q,i)=>`<div class="q"><b>Q${i+1} [${q.type}]</b> ${esc(q.q)}<br>
+    ${q.choices.map((c,ci)=>`${ci===q.answer?'<b class="ans">✔':'<span>'}${ci+1}. ${esc(c)}${ci===q.answer?'</b>':'</span>'}`).join(' / ')}<br>
+    <span class="meta">해설: ${esc(q.explain)} (근거 ${q.evidencePara+1}문단)</span></div>`).join('')}</div>`;
+}
+function render(){
+  const app=document.getElementById('app');
+  const items=DB.articles;
+  const okN=items.filter(a=>R[a.id]==='ok').length,rejN=items.filter(a=>R[a.id]==='rej').length;
+  app.innerHTML=`<div class="summary"><b>검수 현황:</b> 승인 ${okN} · 반려 ${rejN} · 미검수 ${items.length-okN-rejN} / 총 ${items.length}편
+    — 반려 지문은 articles.json에서 status를 "draft"로 바꿔 주세요.</div>`+
+  items.map(a=>{
+    const open=R['open:'+a.id];
+    return `<div class="card"><div class="row">
+      <div><h2>${a.id}</h2><span class="meta"><span class="tag">${CATS[a.category]}</span>${a.careers.map(c=>`<span class="tag">${c}</span>`).join('')}
+        ${R[a.id]==='ok'?'<span class="tag ok">승인됨</span>':R[a.id]==='rej'?'<span class="tag" style="background:#fff0ef;color:#9b352b">반려됨</span>':''}</span></div>
+      <button class="open-btn" data-open="${a.id}">${open?'접기':'펼쳐서 검수'}</button></div>
+      ${open?['L2','L3','L4'].map(lv=>a.levels[lv]?lvHtml(a.id,lv,a.levels[lv]):'').join('')+
+      `<div class="meta" style="margin-top:8px">출처: ${a.sources.map(s=>esc(s.title)+' ('+esc(s.url)+')').join(' · ')}</div>
+      <div class="check"><button data-mark="ok" data-id="${a.id}" data-on="${R[a.id]==='ok'?1:0}">✔ 승인</button>
+      <button class="rej" data-mark="rej" data-id="${a.id}" data-on="${R[a.id]==='rej'?1:0}">✕ 반려</button></div>`:''}
+    </div>`;}).join('')+
+  `<div class="card"><h2>진단 지문</h2>${['L2','L3','L4'].map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
+}
+document.addEventListener('click',e=>{
+  const o=e.target.closest('[data-open]');if(o){R['open:'+o.dataset.open]=!R['open:'+o.dataset.open];render();return;}
+  const m=e.target.closest('[data-mark]');if(m){const id=m.dataset.id;
+    R[id]=R[id]===m.dataset.mark?null:m.dataset.mark;saveR();render();}
+});
+fetch('./articles.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{DB=d;render();})
+  .catch(()=>{document.getElementById('app').innerHTML='<p>articles.json을 불러오지 못했습니다.</p>';});
+</script>
+</body>
+</html>
