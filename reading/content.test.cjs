@@ -98,6 +98,18 @@ const ids = new Set();
         E(`${tag}/${lv}: en 배열 길이(${Array.isArray(b.en) ? b.en.length : '없음'})가 문단 수(${b.paragraphs.length})와 다름`);
       else b.en.forEach((p, i) => { if (typeof p !== 'string' || p.trim().length < 10) E(`${tag}/${lv}: en[${i}] 비정상`); });
     }
+    if (b.envocab != null) {
+      if (!Array.isArray(b.envocab)) E(`${tag}/${lv}: envocab 배열 아님`);
+      else {
+        const enText = (b.en || []).join('\n');
+        const seen = new Set();
+        b.envocab.forEach((ev, i) => {
+          if (!ev.word || !ev.ko) { E(`${tag}/${lv}: envocab[${i}] word/ko 누락`); return; }
+          if (seen.has(ev.word)) E(`${tag}/${lv}: envocab "${ev.word}" 중복`); seen.add(ev.word);
+          if (!enText.includes(ev.word)) E(`${tag}/${lv}: envocab "${ev.word}" 영어 본문에 없음`);
+        });
+      }
+    }
   });
   (a.papers || []).forEach((p, i) => {
     if (!p.title || !/^https:\/\//.test(p.url || '')) E(`${tag}: papers[${i}] title/https URL 오류`);
