@@ -1175,6 +1175,18 @@ function renderLab(){
       <button class="btn ghost sm" onclick="db.lessons.splice(${i},1);save();render()">✕</button></div>`).join("")||`<p style="color:var(--ink2);font-size:12.5px;margin:4px 0 0">축적된 노하우가 없습니다. 심화 학습 결과의 "실행 노하우 5개"를 여기에 옮기세요.</p>`}
   </div></div>
 
+  <div class="sec"><h2>🗓 입시 데이터 배포 캘린더 <span class="n">대교협·어디가 공식 자료가 갱신되는 시점 — 놓치지 말 것</span></h2>
+  <div class="card"><div class="tablewrap"><table class="t">
+    <tr><th>시기</th><th>무엇이 나오나</th><th>어디서</th><th>액션</th></tr>
+    <tr><td><b>4월 말</b></td><td>차년도 <b>대입전형 시행계획</b> — 전 대학 전형방법·모집인원 확정 발표</td><td>교육부·대교협 보도자료 (첨부 PDF/HWP)</td><td>관심 대학 전형 변경점 스캔 → 학생별 전략 갱신</td></tr>
+    <tr><td><b>5월 말</b></td><td>★ <b>전년도 입시결과 일괄 공개</b> — 어디가에 학과별 등급컷·경쟁률 갱신</td><td>어디가 (전형 평가기준·전년도 결과공개)</td><td>관심 대학 등급컷 재조회 → 어디가 데이터 노트 전면 갱신</td></tr>
+    <tr><td>7월</td><td>수시 특징 분석·수시 지원 가이드</td><td>대교협·교육청 진학센터</td><td>수시 상담 시즌 대비 자료 확보</td></tr>
+    <tr><td>8월</td><td>차차년도 <b>대입 기본사항</b> (제도 변경 예고)</td><td>대교협</td><td>중2·고1 장기 로드맵에 반영</td></tr>
+    <tr><td>9월</td><td>정시 모집요강·정시 특징</td><td>어디가·대학 입학처</td><td>고3 정시 라인 점검</td></tr>
+  </table></div>
+  <p style="font-size:12px;color:var(--ink2);margin:8px 0 0"><b>가장 중요한 건 5월 말</b> — 이때 어디가 등급컷이 새 연도로 바뀝니다. 이 시점에 "관심대학 일괄 조회"를 한 번 돌려 노트를 통째로 갱신하세요. 시도교육청 진학센터(경기·서울 등)는 이 자료를 엑셀·PDF로 재가공해 로그인 없이 배포합니다.</p>
+  </div></div>
+
   <div class="sec"><h2>🧰 도구 배치 가이드</h2>
   <div class="card"><div class="tablewrap"><table class="t">
     <tr><th>용도</th><th>1순위 도구</th><th>이유·방법</th></tr>
@@ -1182,7 +1194,7 @@ function renderLab(){
     <tr><td>월간 심층 학습</td><td>Gemini Deep Research 또는 Claude+perplexity_research</td><td>Gemini는 장문 종합에 강하나 수동 복붙 / Claude 경로는 폴더 저장까지 자동 — 병행 권장</td></tr>
     <tr><td>탐구 자료 조사</td><td>Perplexity (research)</td><td>출처 번호 체계로 조사 → 초안이 그 출처만 인용 (환각 차단이 핵심)</td></tr>
     <tr><td>발표자료(PPT)</td><td><b>Gamma</b></td><td>연결됨. 탐구보고서 탭 Gamma 프롬프트 → 생성+PPTX 내보내기까지 한 번에</td></tr>
-    <tr><td>공식 입시 정보</td><td>대학어디가 (adiga.kr)</td><td>공식 API는 없지만 공개 입결 페이지(로그인 불필요)는 수집 가능 — "어디가 데이터" 섹션의 파이프라인으로 축적. 대학·학과 기본정보는 대학알리미·커리어넷 공공 API(무료)로 보완</td></tr>
+    <tr><td>공식 입결·전형</td><td>대학어디가 (adiga.kr)</td><td>학과별 등급컷은 어디가 화면 조회로만 얻는다(소량·수치인용·출처표시 원칙). 경쟁률·충원율 등 정량 지표는 대교협 공공 API(무료)로 합법 자동화. 둘을 "어디가 데이터" 섹션에서 병행</td></tr>
     <tr><td>유료 예측 데이터</td><td>진학사 통 (tong.jinhak.com)</td><td>API 없음 — Cowork+Chrome 제어 수집 프롬프트로 조회·폴더 저장, 또는 수동 기록</td></tr>
     <tr><td>축적 자료 질의</td><td>NotebookLM</td><td>동향·상담 노트가 쌓이면 업로드해 "우리 자료" 근거로 답변받기</td></tr>
   </table></div>
@@ -1242,19 +1254,24 @@ function renderAdiga(){
   <div class="sub">대학어디가(adiga.kr) 공식 입결·전형 데이터를 수집·축적 — 쌓인 노트는 학생별 입시 전략 프롬프트에 자동 주입</div></div>
   <a class="btn sm" href="https://www.adiga.kr" target="_blank" rel="noopener">🏛 어디가 열기</a></div>
 
-  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">📥 데이터 수집 (3가지 경로)</h2>
+  <div class="card" style="border-color:var(--warn)"><h2 style="font-size:14px;margin-bottom:6px">⚖️ 이용 원칙 <span style="font-weight:400;color:var(--ink2)">(실측 조사 2026-08 기준)</span></h2>
+    <p style="font-size:12.5px;margin:0 0 6px"><b>수치(등급컷·경쟁률 등 사실정보)를 조회해 우리 양식에 옮겨 적고 "출처: 한국대학교육협의회 어디가"를 표시</b>하는 것은 안전합니다. 반면 화면·PDF 통째 복제, 프로그램 대량 크롤링, 유료 상품에의 재가공은 대교협 사전 협의(02-6919-3975) 대상입니다.</p>
+    <p style="font-size:11.5px;color:var(--ink2);margin:0">어디가는 robots.txt로 봇을 전면 차단하고 약관이 정보 재제공을 금지합니다 — 그래서 이 앱은 <b>상담 대상 대학만 소량 조회 + 수치 인용</b> 방식으로 설계돼 있습니다.</p>
+  </div>
+
+  <div class="card" style="margin-top:12px"><h2 style="font-size:14px;margin-bottom:8px">📥 데이터 수집 (3가지 경로)</h2>
     <div class="tablewrap"><table class="t">
-      <tr><th>경로</th><th>내용</th><th>로그인</th></tr>
-      <tr><td><b>① 공개 입결 페이지</b></td><td>어디가 "전형 평가기준·전년도 결과공개" — 대학별 표준화 입결(50·70%컷)·평가기준. 아래 수집 프롬프트로 즉시 가능</td><td>불필요</td></tr>
-      <tr><td><b>② 공공데이터 API</b></td><td>대교협 대학알리미(대학·학과정보)·커리어넷(학과·진로) 무료 API — 인증키 자동승인. 1회 세팅 후 자동 조회</td><td>키 발급</td></tr>
-      <tr><td>③ 환산점수·성적분석</td><td>학생 성적 입력 후 대학별 환산점수 — Chrome 제어 조회 (통과 동일 패턴)</td><td>필요</td></tr>
+      <tr><th>경로</th><th>내용</th><th>등급컷</th></tr>
+      <tr><td><b>① 어디가 화면 조회</b></td><td>학과별 입결(50·70%컷)·경쟁률·평가기준. <b>소량 조회 후 수치만 인용</b>이 원칙 — 대량 크롤링 금지</td><td>✅ 있음</td></tr>
+      <tr><td><b>② 공공데이터 API</b></td><td>대교협 대학정보공시(경쟁률·충원율·등록률)·학과정보 무료 API. 합법·자동화 가능하나 <b>학교/전형유형 단위까지만</b></td><td>❌ 없음</td></tr>
+      <tr><td>③ 공식 대량 배포</td><td>연 2회 대교협 발표(4월말 시행계획·5월말 입시결과) + 교육청 진학센터 재가공 PDF. 로그인 불필요</td><td>✅ 5월</td></tr>
     </table></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <button class="btn sm pri" onclick="copyAdigaCollect()">📥 ① 입결·평가기준 수집 프롬프트</button>
-      <button class="btn sm" onclick="copyAdigaApi()">🔑 ② 공공 API 세팅 프롬프트</button>
-      <button class="btn sm" onclick="copyAdigaBulk()">📦 관심대학 전체 일괄 수집</button>
+      <button class="btn sm pri" onclick="copyAdigaCollect()">📥 ① 입결 조회 프롬프트</button>
+      <button class="btn sm" onclick="copyAdigaApi()">🔑 ② 공공 API 세팅</button>
+      <button class="btn sm" onclick="copyAdigaBulk()">📦 관심대학 일괄 조회</button>
     </div>
-    <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">수집 결과는 Drive <code>코워크/컨설팅/_입시데이터/</code>에 정본 저장 + 아래 노트에 요약 축적. 노트가 쌓일수록 전략 프롬프트가 정확해집니다.</p>
+    <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">조회 결과는 Drive <code>코워크/컨설팅/_입시데이터/</code>에 저장 + 아래 노트에 요약 축적(출처 표시). 노트가 쌓일수록 전략 프롬프트가 정확해집니다.</p>
   </div>
 
   <div class="sec"><h2>🗂 대학 데이터 노트 <span class="n">${notes.length}건 — 학생 관심대학과 이름이 일치하면 전략 프롬프트에 자동 포함</span></h2>
@@ -1288,59 +1305,68 @@ function copyAdigaCollect(){
  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
  <button class="btn pri" onclick="doAdigaCollect()">프롬프트 복사</button></div>`);}
 function doAdigaCollect(){const u=$("#ac_univ").value.trim()||"{대학명}";const m=$("#ac_major").value.trim();closeModal();
- copy(`너는 WB 컨설팅 에이전트다. 대학어디가(adiga.kr)의 공개 자료에서 ${u}${m?" "+m:""}의 입시 데이터를 수집·학습하라.
+ copy(`너는 WB 컨설팅 에이전트다. ${u}${m?" "+m:""}의 입시 데이터를 대학어디가에서 조회해 정리하라.
 
-[수집 경로 — 로그인 불필요 공개 페이지]
-1. WebFetch로 어디가 "전형 평가기준 및 전년도 결과공개" 페이지 조회:
-   https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000
-   → ${u} 항목에서 대학 공식 공개 자료(평가기준·전년도 입결) 확인
-2. 어디가 대학정보에서 ${u}의 2026 경쟁률·입학정원·전형정보 확인:
-   https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000
-3. 부족한 부분은 WebSearch "${u}${m?" "+m:""} 2026 입시결과 어디가 등급컷"으로 보강 — 대학 공식 발표·어디가 출처만 신뢰
+[이용 원칙 — 반드시 준수]
+- 이 대학 1곳만 소량 조회한다. 전 대학 대량 크롤링·반복 자동수집은 하지 마라(어디가 약관·robots.txt 위반).
+- 얻은 것은 등급컷·경쟁률 등 "수치(사실정보)"만 우리 양식에 옮겨 적는다. 화면·표를 통째로 복제하지 마라.
+- 모든 항목에 출처(한국대학교육협의회 어디가, 연도)를 표시한다.
 
-[정리 형식 — 표준 구조]
-| 항목 | 값 | 출처·연도 |
-전형별로: 전형명 / 모집인원(전년 대비 증감) / 경쟁률 / 50%컷·70%컷 / 수능최저 / 전년 대비 변경사항
+[조회 절차]
+1. 어디가 학과별 입결(전년도 전형결과)은 로그인 없이 열린다. 다음을 참고해 ${u}의 학과별 컷을 확인:
+   - 평가기준·전년도 결과: https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000
+   - 대학정보(경쟁률·정원·전형): https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000
+   WebFetch가 세션/CSRF로 막히면 Chrome 브라우저 제어로 사람이 조회하듯 접근하라(통 수집과 동일 패턴).
+2. 보강이 필요하면 WebSearch "${u}${m?" "+m:""} 입시결과 등급컷" — 대학 입학처·어디가 출처만 신뢰.
+
+[정리 형식]
+| 전형 | 모집인원(전년比) | 경쟁률 | 50%컷 | 70%컷 | 수능최저 | 변경사항 | 출처·연도 |
 + 평가기준 요약 3줄 (학종이면 서류·면접 평가요소 비중)
 
-[저장·학습]
+[저장]
 1. 정본: 코워크/컨설팅/_입시데이터/${u.replace(/\s/g,"")}_${today().slice(0,7)}.md 로 저장 (없으면 폴더 생성)
-2. 요약 5줄을 보고하라 — 나는 이것을 워크벤치 "어디가 데이터 노트"에 저장한다
-3. 수치가 확인 안 되는 항목은 "미확인"으로 표시 — 추정 금지`);}
+2. 요약 5줄 보고 — 워크벤치 "어디가 데이터 노트"에 저장할 형태로, 출처 표시 포함
+3. 확인 안 된 수치는 "미확인" 표시 — 추정 금지`);}
 function copyAdigaBulk(){
  const univs=[...new Set(db.students.flatMap(s=>(s.univs||[]).map(u=>`${u.univ} ${u.major}`.trim())))];
- copy(`너는 WB 컨설팅 에이전트다. 아래 관심 대학 전체의 입시 데이터를 대학어디가(adiga.kr) 공개 자료에서 일괄 수집·학습하라.
+ copy(`너는 WB 컨설팅 에이전트다. 아래 "우리 학생들의 관심 대학"만 순차 조회해 입시 데이터를 정리하라.
 
-[대상 — 컨설팅 학생들의 관심 대학 전체]
+[이용 원칙 — 반드시 준수]
+- 대상은 아래 목록에 한정한다. 전국 전 대학 크롤링·목록 밖 확장은 금지(어디가 약관·robots.txt).
+- 대학 사이에 간격을 두고 사람이 조회하듯 순차 진행한다. 고빈도 반복 요청 금지.
+- 수치(사실정보)만 옮겨 적고 출처(어디가, 연도)를 표시한다. 화면 통째 복제 금지.
+
+[대상 — 관심 대학]
 ${univs.length?univs.map(u=>"- "+u).join("\n"):"- (관심 대학 미등록 — 먼저 학생별 진학사 통 탭에서 관심 대학을 등록하라)"}
 
-[수집 절차 — 대학마다 반복]
-1. WebFetch: https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000 에서 해당 대학 공개 입결·평가기준
-2. WebFetch: https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000 에서 경쟁률·정원·전형정보
-3. WebSearch로 보강 (대학 공식 발표·어디가 출처만)
+[대학마다 반복]
+1. 어디가 학과별 입결·경쟁률·평가기준 조회(위 대상만). WebFetch가 막히면 Chrome 제어로 접근.
+   - https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000
+   - https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000
+2. 보강: WebSearch(대학 입학처·어디가 출처만)
 
 [정리·저장]
-- 대학별 표준 구조(전형/모집인원/경쟁률/50·70%컷/수능최저/변경사항)로 정리
+- 대학별 표(전형/모집인원/경쟁률/50·70%컷/수능최저/변경사항/출처)로 정리
 - 정본: 코워크/컨설팅/_입시데이터/ 에 대학별 파일로 저장
-- 마지막에 대학별 핵심 3줄 요약 목록을 보고 — 워크벤치 "어디가 데이터 노트"에 넣을 수 있는 형태로
-- 수치 미확인 항목은 "미확인" 표시, 추정 금지. 시간이 오래 걸리면 대학별로 중간 보고하라`);}
+- 대학별 핵심 3줄 요약을 보고 — "어디가 데이터 노트"에 넣을 형태로, 출처 표시 포함
+- 미확인 수치는 "미확인" 표시, 추정 금지. 대학별로 중간 보고하라`);}
 function copyAdigaApi(){
- copy(`너는 WB 컨설팅 에이전트(CTO 역할)다. 공공데이터 API로 대학·학과 정보를 자동 조회하는 환경을 세팅하라.
+ copy(`너는 WB 컨설팅 에이전트(CTO 역할)다. 공공데이터 API로 대학 정량 지표를 합법·자동 조회하는 환경을 세팅하라.
 
-[배경 — 조사 완료된 사실]
-- 대학어디가 자체는 공식 API가 없다. 대신 아래 무료 공공 API가 있다 (전부 자동승인):
-  1. 한국대학교육협의회_대학알리미 대학 기본 정보 (data.go.kr/data/15037507) — REST/XML
-  2. 한국대학교육협의회_대학별 학과정보 (data.go.kr/data/15116892) — 학과·학위과정·수업연한
-  3. 교육부_커리어넷 오픈API (career.go.kr) — 대학 학과정보·진로정보 (별도 인증키)
-- 대학알리미 파일데이터(CSV)는 로그인 없이도 다운로드 가능
+[실측 확인된 사실 (2026-08 조사)]
+- ★ 등급컷(50·70%컷)은 공공 API에 없다. 등급컷은 어디가 화면 조회(① 경로)로만 얻는다. 이 API는 "정량 베이스라인" 전용이다.
+- 무료·자동승인 데이터 (data.go.kr, 개발계정 일 1,000건):
+  1. 대교협 대학정보공시 학생현황 (data.go.kr/data/15158684) — REST/XML. 대학 단위: 신입생 경쟁률·충원율·최종 등록률·중도탈락률
+  2. 대교협 대학 기본 정보 (15037507) / 대학별 학과정보 (15116892) — 학과·학위과정
+  3. 커리어넷 오픈API (career.go.kr) — 학과·진로 (별도 인증키)
+- 대학알리미(academyinfo.go.kr) 공시 XLSX는 로그인 없이 다운로드: "입학전형 유형별 선발 결과"(전형유형별 모집·지원·입학 인원→전형별 경쟁률 산출), "신입생 충원 현황" 등. 단 학교×전형유형 단위이지 학과별 등급컷은 아니다.
 
 [할 일]
-1. 공공데이터포털(data.go.kr) 회원가입 → 위 1·2번 활용신청 (자동승인, 무료) → 인증키 확보
-   커리어넷은 career.go.kr 오픈API 메뉴에서 인증키 발급
-2. 인증키를 받으면: 관심 대학들의 기본정보·학과정보를 API로 조회하는 스크립트를 작성해
-   코워크/컨설팅/_입시데이터/공공API/ 에 조회 결과를 저장하는 루틴을 만든다
-3. 키 발급까지는 영준님 계정 필요 — 가입·신청 단계는 화면을 안내하며 영준님과 함께 진행하라
-4. 주의: 입결(등급컷)은 이 API에 없다 — 입결은 어디가 공개 페이지 수집 경로를 계속 쓴다`);}
+1. data.go.kr 회원가입 → 위 1~3 활용신청(자동승인, 무료) → serviceKey 확보. 커리어넷은 career.go.kr에서 발급.
+2. serviceKey로 관심 대학들의 경쟁률·충원율·학과정보를 조회하는 스크립트 작성 →
+   코워크/컨설팅/_입시데이터/공공API/ 에 저장하는 루틴 구축.
+3. 키 발급은 영준님 계정 필요 — 가입·신청 화면을 안내하며 함께 진행하라.
+4. 완료 후: 이 API로 얻는 것(정량 지표)과 못 얻는 것(등급컷=어디가 화면)을 표로 정리해 보고하라.`);}
 
 /* ═══════════ 프롬프트 조립기 (노하우 주입) ═══════════ */
 function stuContext(s){
