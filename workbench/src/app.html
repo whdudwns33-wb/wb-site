@@ -1418,7 +1418,7 @@ function addIpdb(){db.ipdb=db.ipdb||[];
   if(!r.univ||(!r.cut50&&!r.cut70)){toast("대학과 컷(50 또는 70)은 필수입니다");return;}
   db.ipdb.push(r);save();render();}
 function importIpdb(){db.ipdb=db.ipdb||[];
-  const lines=$("#db_csv").value.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const lines=$("#db_csv").value.replace(/\uFEFF/g,"").split(/\n/).map(l=>l.trim()).filter(Boolean);
   let n=0;
   for(const l of lines){
     const c=l.split(/[,\t]/).map(x=>x.trim());
@@ -1448,7 +1448,7 @@ function addHsdb(){db.hsdb=db.hsdb||[];
   if(!r.name){toast("학교명을 입력하세요");return;}
   db.hsdb.push(r);save();render();}
 function importHsdb(){db.hsdb=db.hsdb||[];
-  const lines=$("#hs_csv").value.split(/\n/).map(l=>l.trim()).filter(Boolean);let n=0;
+  const lines=$("#hs_csv").value.replace(/\uFEFF/g,"").split(/\n/).map(l=>l.trim()).filter(Boolean);let n=0;
   for(const l of lines){const c=l.split(/[,\t]/).map(x=>x.trim());
     if(c.length<2||!c[0])continue;
     db.hsdb.push({name:c[0],type:c[1]||"일반고",region:c[2]||"",level:c[3]||"중",feature:c[4]||"",source:c[5]||"콘텐츠DB"});n++;}
