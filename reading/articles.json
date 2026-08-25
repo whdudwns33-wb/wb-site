@@ -1,5 +1,5 @@
 {
- "version": "2026-08-25.4",
+ "version": "2026-08-25.5",
  "articles": [
   {
    "id": "nuri-space",
@@ -594,12 +594,14 @@
     {
      "title": "우리는 로켓맨",
      "author": "조광래·고정환",
-     "note": "나로호부터 누리호까지, 한국 로켓을 직접 개발한 연구책임자 두 사람이 들려주는 30년 도전기."
+     "note": "나로호부터 누리호까지, 한국 로켓을 직접 개발한 연구책임자 두 사람이 들려주는 30년 도전기.",
+     "url": "https://search.shopping.naver.com/book/catalog/34774844618"
     },
     {
      "title": "우주미션 이야기",
      "author": "황정아",
-     "note": "인공위성은 어떻게 기획하고 만들어 쏘아 올릴까? 위성 개발 과학자가 우주 미션의 전 과정을 안내한다."
+     "note": "인공위성은 어떻게 기획하고 만들어 쏘아 올릴까? 위성 개발 과학자가 우주 미션의 전 과정을 안내한다.",
+     "url": "https://search.shopping.naver.com/book/catalog/34414010619"
     }
    ],
    "papers": [
@@ -607,6 +609,20 @@
      "title": "정책위키: 한국형 우주발사체(누리호)",
      "url": "https://www.korea.kr/special/policyCurationView.do?newsId=148899436",
      "note": "누리호의 구조와 개발 과정, 발사 일지를 정부가 정리한 해설 페이지로 한눈에 볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "[핫클립] 독자적인 기술로 발사에 성공한 누리호 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=62BI1R9642A",
+     "note": "우리 기술로 만든 누리호가 어떻게 발사에 성공했는지 짧고 쉽게 보여줘요."
+    },
+    {
+     "title": "[자막뉴스] 역대 최초로 100% 성공...정말 완벽했던 누리호 / YTN",
+     "channel": "YTN",
+     "url": "https://www.youtube.com/watch?v=Gqp5FsVBdoE",
+     "note": "누리호가 위성들을 궤도에 올려놓는 데 성공한 순간을 뉴스 영상으로 확인해요."
     }
    ]
   },
@@ -1185,12 +1201,14 @@
     {
      "title": "DNA 혁명 크리스퍼 유전자가위",
      "author": "전방욱",
-     "note": "유전자 가위의 원리부터 생명 윤리 논쟁까지, 우리말로 차근차근 정리한 크리스퍼 입문서."
+     "note": "유전자 가위의 원리부터 생명 윤리 논쟁까지, 우리말로 차근차근 정리한 크리스퍼 입문서.",
+     "url": "https://search.shopping.naver.com/book/catalog/32474291955"
     },
     {
      "title": "크리스퍼가 온다",
      "author": "제니퍼 다우드나·새뮤얼 스턴버그",
-     "note": "크리스퍼를 개발해 노벨상을 받은 과학자가 직접 쓴 발견의 순간과 고민의 기록."
+     "note": "크리스퍼를 개발해 노벨상을 받은 과학자가 직접 쓴 발견의 순간과 고민의 기록.",
+     "url": "https://search.shopping.naver.com/book/catalog/32460052375"
     }
    ],
    "papers": [
@@ -1198,6 +1216,20 @@
      "title": "사이언스올 과학포털(과학백과사전)",
      "url": "https://www.scienceall.com",
      "note": "한국과학창의재단 과학포털에서 '유전자 가위', 'DNA' 같은 개념을 검색해 눈높이 설명을 더 찾아볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "유전자도 편집이 가능할까? 🧬 | 원하는 부위를 자르고 바꿀 수 있는 '크리스퍼 유전자가위' | 생명공학 | 지식채널e",
+     "channel": "EBS 컬렉션 - 사이언스",
+     "url": "https://www.youtube.com/watch?v=V0VYSnIOTGc",
+     "note": "DNA에서 원하는 부분만 잘라 바꾸는 유전자 가위를 5분 안에 이해할 수 있어요."
+    },
+    {
+     "title": "[핫클립] 정확성과 효율성이 높은 크리스퍼-카스9의 원리 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=uoYucpztfwI",
+     "note": "크리스퍼-카스9이 병을 고치는 데 어떻게 쓰이는지 원리를 짚어 줘요."
     }
    ]
   },
@@ -1773,12 +1805,24 @@
     {
      "title": "비전공자도 이해할 수 있는 AI 지식",
      "author": "박상길",
-     "note": "알파고부터 챗GPT까지, 수식 없이 인공지능의 작동 원리를 풀어 주는 베스트셀러 교양서."
+     "note": "알파고부터 챗GPT까지, 수식 없이 인공지능의 작동 원리를 풀어 주는 베스트셀러 교양서.",
+     "url": "https://search.shopping.naver.com/book/catalog/50776676623",
+     "video": {
+      "title": "비전공자도 이해할 수 있는 AI 지식",
+      "channel": "북박이",
+      "url": "https://www.youtube.com/watch?v=0vWH0d1m11I"
+     }
     },
     {
      "title": "챗GPT에게 묻는 인류의 미래",
      "author": "김대식·챗GPT",
-     "note": "뇌과학자가 챗GPT와 직접 나눈 열두 번의 대화로 생성형 AI의 실력과 한계를 보여 준다."
+     "note": "뇌과학자가 챗GPT와 직접 나눈 열두 번의 대화로 생성형 AI의 실력과 한계를 보여 준다.",
+     "url": "https://search.shopping.naver.com/book/catalog/38018933631",
+     "video": {
+      "title": "챗GPT에게 묻는 인류의 미래,  김대식 & 챗GPT 지음, 추서연 옮김, 23/2/28 발행",
+      "channel": "이갑희교수의 신간읽기",
+      "url": "https://www.youtube.com/watch?v=fKX8DCm7w_g"
+     }
     }
    ],
    "papers": [
@@ -1786,6 +1830,20 @@
      "title": "Attention Is All You Need (arXiv 공개 논문)",
      "url": "https://arxiv.org/abs/1706.03762",
      "note": "챗GPT의 뿌리인 '트랜스포머'를 처음 제안한 논문(영어)으로, 생성형 AI가 어디서 출발했는지 원문으로 확인할 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "ChatGPT의 원리, 쉽게 알려드립니다 (보이저엑스 남세동 대표) [ChatGPT 시리즈 1/3]",
+     "channel": "안될과학 Unrealscience",
+     "url": "https://www.youtube.com/watch?v=6-55fAV90TE",
+     "note": "글 쓰는 인공지능이 다음 단어를 확률로 고르는 원리를 재미있게 풀어 줘요."
+    },
+    {
+     "title": "[EBS] 챗GPT, 정보 유출로 벌어지는 일 | 생성형 AI의 정보 수집과 그 위험성 | #지식채널e",
+     "channel": "EBS 지식채널e",
+     "url": "https://www.youtube.com/watch?v=7SrQm6ywmco",
+     "note": "생성형 AI를 쓸 때 조심해야 할 점을 5분 지식채널e로 배워요."
     }
    ]
   },
@@ -2360,12 +2418,24 @@
     {
      "title": "정해진 미래",
      "author": "조영태",
-     "note": "인구 통계로 10년 뒤 한국 사회를 미리 내다보는 인구학자의 대표작."
+     "note": "인구 통계로 10년 뒤 한국 사회를 미리 내다보는 인구학자의 대표작.",
+     "url": "https://search.shopping.naver.com/book/catalog/32472690721",
+     "video": {
+      "title": "세바시 653회 정해진 미래, 인구학이 말하는 10년 후 한국, 그리고 생존전략 | 조영태 서울대 보건대학원 교수",
+      "channel": "세바시 강연 Sebasi Talk",
+      "url": "https://www.youtube.com/watch?v=92twITHF5WQ"
+     }
     },
     {
      "title": "인구 미래 공존",
      "author": "조영태",
-     "note": "저출생·고령화 시대를 위기가 아닌 기획의 기회로 바꾸는 법을 이야기한다."
+     "note": "저출생·고령화 시대를 위기가 아닌 기획의 기회로 바꾸는 법을 이야기한다.",
+     "url": "https://search.shopping.naver.com/book/catalog/32455980979",
+     "video": {
+      "title": "(Book Review) '인구 미래 공존'에서 흥미롭게 읽은 부분들",
+      "channel": "미래채널 MyF",
+      "url": "https://www.youtube.com/watch?v=w77ixMnUYUg"
+     }
     }
    ],
    "papers": [
@@ -2373,6 +2443,20 @@
      "title": "KOSIS 인구로 보는 대한민국",
      "url": "https://kosis.kr/visual/populationKorea/PopulationDashBoardMain.do",
      "note": "통계청 대시보드에서 과거·현재·미래의 인구 변화와 고령화 지표를 그래프로 직접 탐색할 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "외국에서도 경고하기 시작한 대한민국의 현상황┃일본은 한국의 미래 모습? 일본은 어떻게 출산 문제를 해결 중일까?┃대한민국 인구 소멸 심층 분석┃다큐멘터리K┃#골라듄다큐",
+     "channel": "EBSDocumentary (EBS 다큐)",
+     "url": "https://www.youtube.com/watch?v=KPeIWE83Ma4",
+     "note": "저출생·고령화로 인구가 줄어드는 우리 사회의 미래를 다큐로 살펴봐요."
+    },
+    {
+     "title": "EBS가 중장년을 위해 영혼을 갈아 만든 2026 다큐멘터리. 은퇴 없는 5060의 먹고 살기 지옥인 현실｜백세시대에 50대부터 겪는 고충｜베이비부머 세대｜다큐프라임｜#골라듄다큐",
+     "channel": "EBSDocumentary (EBS 다큐)",
+     "url": "https://www.youtube.com/watch?v=zYlJfCzawvw",
+     "note": "고령화 사회에서 어른들의 일과 노후가 어떻게 달라지는지 보여 주는 다큐예요."
     }
    ]
   },
@@ -2935,12 +3019,24 @@
     {
      "title": "최저임금 쫌 아는 10대",
      "author": "하승우",
-     "note": "삼촌과 조카의 대화로 최저임금이 정해지는 과정과 노동의 가치를 쉽게 배우는 청소년 책."
+     "note": "삼촌과 조카의 대화로 최저임금이 정해지는 과정과 노동의 가치를 쉽게 배우는 청소년 책.",
+     "url": "https://search.shopping.naver.com/book/catalog/32436117949",
+     "video": {
+      "title": "[책] 하승우 [최저임금 쫌 아는 10대] #주휴수당 #노동교육 #선거연령하향 #특별근로감독관 #조장풍 #최고임금 #2019최저임금 #8월5일 #명강의",
+      "channel": "옛따책방",
+      "url": "https://www.youtube.com/watch?v=-pDmyAOwJNo"
+     }
     },
     {
      "title": "청소년을 위한 경제의 역사",
      "author": "니콜라우스 피퍼",
-     "note": "화폐와 시장, 물가의 원리를 세계사 속 34가지 사건으로 풀어낸 독일 청소년문학상 수상작."
+     "note": "화폐와 시장, 물가의 원리를 세계사 속 34가지 사건으로 풀어낸 독일 청소년문학상 수상작.",
+     "url": "https://search.shopping.naver.com/book/catalog/45675858621",
+     "video": {
+      "title": "독서아카데미_청소년을 위한 경제의 역사",
+      "channel": "(주) 엄마의 멘토",
+      "url": "https://www.youtube.com/watch?v=WuYs3a-ix4I"
+     }
     }
    ],
    "papers": [
@@ -2948,6 +3044,20 @@
      "title": "최저임금위원회 누리집",
      "url": "https://www.minimumwage.go.kr/main.do",
      "note": "올해 최저임금 금액과 심의·결정 절차, 연도별 변화를 공식 기관 자료로 확인할 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "인플레이션은 무엇인가요?",
+     "channel": "3분차이",
+     "url": "https://www.youtube.com/watch?v=fpE3ac_PNMU",
+     "note": "물건값이 오르는 인플레이션 개념을 3분 만에 그림으로 이해해요."
+    },
+    {
+     "title": "2023년 최저임금 인상? 동결?!💸 최저임금 누가 어떻게 정할까 [법in카드]",
+     "channel": "대한변호사협회Korean Bar Association",
+     "url": "https://www.youtube.com/watch?v=p_U6qygM7g0",
+     "note": "최저임금을 누가, 어떤 절차로 정하는지 변호사들이 쉽게 설명해 줘요."
     }
    ]
   },
@@ -3498,12 +3608,14 @@
     {
      "title": "플라스틱 수프",
      "author": "미힐 로스캄 아빙",
-     "note": "사진과 인포그래픽으로 지구 바다의 플라스틱 오염 실태와 해결 노력을 한눈에 보여 준다."
+     "note": "사진과 인포그래픽으로 지구 바다의 플라스틱 오염 실태와 해결 노력을 한눈에 보여 준다.",
+     "url": "https://search.shopping.naver.com/book/catalog/32494125194"
     },
     {
      "title": "플라스틱 바다",
      "author": "찰스 무어·커샌드라 필립스",
-     "note": "태평양 거대 쓰레기 지대를 발견한 선장이 직접 쓴 해양 플라스틱 추적기."
+     "note": "태평양 거대 쓰레기 지대를 발견한 선장이 직접 쓴 해양 플라스틱 추적기.",
+     "url": "https://search.shopping.naver.com/book/catalog/32466553755"
     }
    ],
    "papers": [
@@ -3511,6 +3623,20 @@
      "title": "해양환경정보포털(MEIS)",
      "url": "https://www.meis.go.kr",
      "note": "해양수산부의 포털에서 우리 바다의 수질과 해양쓰레기·미세플라스틱 조사 자료를 찾아볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "[핫클립] 바다의 재앙이 된 플라스틱 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=M9KVoD3eX3Y",
+     "note": "버려진 플라스틱이 바다 생물에게 어떤 피해를 주는지 짧게 보여줘요."
+    },
+    {
+     "title": "바다 위협하는 플라스틱 해결책, 바다에서 찾는다 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=oYhHJUlwU2o",
+     "note": "해양 플라스틱 문제를 풀기 위한 과학자들의 해결책을 소개해요."
     }
    ]
   },
@@ -4068,12 +4194,24 @@
     {
      "title": "파란하늘 빨간지구",
      "author": "조천호",
-     "note": "국립기상과학원장을 지낸 대기과학자가 기후위기의 과학을 일반인 눈높이로 설명한다."
+     "note": "국립기상과학원장을 지낸 대기과학자가 기후위기의 과학을 일반인 눈높이로 설명한다.",
+     "url": "https://search.shopping.naver.com/book/catalog/32491437056",
+     "video": {
+      "title": "[달작한사이언스]'파란하늘 빨간지구' 조천호 박사의 과학이야기 Part 2 기후위기와 대응",
+      "channel": "APCTP",
+      "url": "https://www.youtube.com/watch?v=thHZdKQuj00"
+     }
     },
     {
      "title": "탄소 사회의 종말",
      "author": "조효제",
-     "note": "기후위기를 인권과 사회의 눈으로 읽으며 탄소 중심 사회 이후를 상상하게 하는 책."
+     "note": "기후위기를 인권과 사회의 눈으로 읽으며 탄소 중심 사회 이후를 상상하게 하는 책.",
+     "url": "https://search.shopping.naver.com/book/catalog/32469416191",
+     "video": {
+      "title": "현장 속으로 [탄소 사회의 종말] KBS제주 220627방송",
+      "channel": "KBS제주",
+      "url": "https://www.youtube.com/watch?v=FLtK8ozquvY"
+     }
     }
    ],
    "papers": [
@@ -4081,6 +4219,20 @@
      "title": "탄소중립 정책포털",
      "url": "https://www.gihoo.or.kr/netzero",
      "note": "2050 탄소중립 목표와 국가 감축 계획, 관련 법과 통계를 정부 포털에서 확인할 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "지구를 뜨겁게 만드는 탄소 이야기 🌎 탄소 중립 | 지식채널e | 기후 변화",
+     "channel": "EBS 컬렉션 - 사이언스",
+     "url": "https://www.youtube.com/watch?v=XVAoQ60yAZc",
+     "note": "탄소가 지구를 뜨겁게 만드는 이유와 탄소중립의 뜻을 5분에 정리해요."
+    },
+    {
+     "title": "[다큐S프라임] 탄소중립, 지구의 마지막 1℃ / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=GrMCf4PrKsQ",
+     "note": "지구 온도 1도의 의미와 재생에너지로의 전환을 다큐로 살펴봐요."
     }
    ]
   },
@@ -4658,12 +4810,24 @@
     {
      "title": "박시백의 조선왕조실록",
      "author": "박시백",
-     "note": "실록 원문을 바탕으로 조선 500년을 20권 만화에 담아낸 역사 만화의 고전."
+     "note": "실록 원문을 바탕으로 조선 500년을 20권 만화에 담아낸 역사 만화의 고전.",
+     "url": "https://search.shopping.naver.com/book/catalog/32505736421",
+     "video": {
+      "title": "[허지웅쇼] '박시백 화백'과 함께하는 조선왕조실록 특집",
+      "channel": "SBS Radio 에라오",
+      "url": "https://www.youtube.com/watch?v=0PbyHUzK0VQ"
+     }
     },
     {
      "title": "조선왕조실톡",
      "author": "무적핑크",
-     "note": "조선의 왕과 백성이 채팅으로 대화한다면? 실록 기록을 톡 형식으로 재미있게 되살린 웹툰 단행본."
+     "note": "조선의 왕과 백성이 채팅으로 대화한다면? 실록 기록을 톡 형식으로 재미있게 되살린 웹툰 단행본.",
+     "url": "https://search.shopping.naver.com/book/catalog/32483318321",
+     "video": {
+      "title": "무적핑크X신병주 교수의 조선왕조실톡(Talk) 리더십",
+      "channel": "MULTICAMPUS",
+      "url": "https://www.youtube.com/watch?v=sFCM7NGLpzo"
+     }
     }
    ],
    "papers": [
@@ -4671,6 +4835,14 @@
      "title": "조선왕조실록 (국사편찬위원회)",
      "url": "https://sillok.history.go.kr",
      "note": "태조부터 순종까지 실록 원문과 한글 번역 전체를 무료로 검색하며 직접 읽어 볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "역사채널e - The history channel e_기록의 나라_#001",
+     "channel": "EBSCulture (EBS 교양)",
+     "url": "https://www.youtube.com/watch?v=hSDrJip5K9c",
+     "note": "조선이 어떻게 500년의 기록을 지켜 냈는지 5분 영상으로 만나요."
     }
    ]
   },
@@ -5241,12 +5413,24 @@
     {
      "title": "한글의 탄생",
      "author": "노마 히데키",
-     "note": "일본인 언어학자의 눈으로 훈민정음 창제가 왜 문자사의 기적인지 밝혀낸 화제작."
+     "note": "일본인 언어학자의 눈으로 훈민정음 창제가 왜 문자사의 기적인지 밝혀낸 화제작.",
+     "url": "https://search.shopping.naver.com/book/catalog/35064585620",
+     "video": {
+      "title": "[Book2022] 일본어로 쓴 한글 설명서, 한글의 탄생, 노마 히데키",
+      "channel": "알라딘 만권당TV",
+      "url": "https://www.youtube.com/watch?v=6LmwFOv5ZMA"
+     }
     },
     {
      "title": "훈민정음: 사진과 기록으로 읽는 한글의 역사",
      "author": "김주원",
-     "note": "훈민정음을 둘러싼 오해를 바로잡고 52장의 사진 자료로 한글의 역사를 보여 주는 책."
+     "note": "훈민정음을 둘러싼 오해를 바로잡고 52장의 사진 자료로 한글의 역사를 보여 주는 책.",
+     "url": "https://search.shopping.naver.com/book/catalog/32502430233",
+     "video": {
+      "title": "훈민정음 이야기_김주원 한글학회 회장",
+      "channel": "박이정TV",
+      "url": "https://www.youtube.com/watch?v=vlHIJPmexMY"
+     }
     }
    ],
    "papers": [
@@ -5254,6 +5438,14 @@
      "title": "국립한글박물관",
      "url": "https://www.hangeul.go.kr/main.do",
      "note": "한글의 역사와 훈민정음 관련 소장 자료, 온라인 전시·교육 콘텐츠를 무료로 볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "역사채널e - The history channel e_세계에서 가장 완벽한 문자, 훈민정음",
+     "channel": "EBSCulture (EBS 교양)",
+     "url": "https://www.youtube.com/watch?v=9a34V5g8qM8",
+     "note": "입과 혀 모양을 본떠 만든 훈민정음의 과학적 원리를 알려 줘요."
     }
    ]
   },
@@ -5813,7 +6005,8 @@
     {
      "title": "웹툰의 시대",
      "author": "위근우",
-     "note": "웹툰 전성기를 이끈 작가 24인의 인터뷰로 웹툰이라는 산업과 직업 세계를 들여다본다."
+     "note": "웹툰 전성기를 이끈 작가 24인의 인터뷰로 웹툰이라는 산업과 직업 세계를 들여다본다.",
+     "url": "https://search.shopping.naver.com/book/catalog/32473422123"
     }
    ],
    "papers": [
@@ -5821,6 +6014,14 @@
      "title": "한국콘텐츠진흥원(KOCCA)",
      "url": "https://www.kocca.kr",
      "note": "연구보고서 메뉴에서 해마다 발표되는 '웹툰산업 실태조사'로 시장 규모와 작가 현황을 확인할 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "\"폭풍 성장 K-웹툰 산업\"…대전을 작가양성 허브로 / KBS 2025.11.14.",
+     "channel": "KBS대전 뉴스",
+     "url": "https://www.youtube.com/watch?v=UtqZ0-A6leU",
+     "note": "빠르게 성장하는 K-웹툰 산업과 웹툰 작가 양성 소식을 뉴스로 확인해요."
     }
    ]
   },
@@ -6375,7 +6576,13 @@
     {
      "title": "우주날씨 이야기",
      "author": "황정아",
-     "note": "우주방사선과 태양풍, 오로라까지 '우주날씨'를 연구해 온 과학자가 들려주는 지구 바깥 이야기."
+     "note": "우주방사선과 태양풍, 오로라까지 '우주날씨'를 연구해 온 과학자가 들려주는 지구 바깥 이야기.",
+     "url": "https://search.shopping.naver.com/book/catalog/32436264039",
+     "video": {
+      "title": "[달작한사이언스] 우주날씨이야기 Q&A (편집영상)",
+      "channel": "서울시립과학관",
+      "url": "https://www.youtube.com/watch?v=dPmC2dLm9K4"
+     }
     }
    ],
    "papers": [
@@ -6383,6 +6590,20 @@
      "title": "한국천문연구원(KASI)",
      "url": "https://www.kasi.re.kr",
      "note": "달 탐사 탑재체 개발 소식과 우주과학 연구 자료, 천문우주 지식 콘텐츠를 찾아볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "[핫클립] 우주방사선 피폭의 원인이 되는 이유 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=MrybuXTVdxs",
+     "note": "우주방사선이 무엇이고 왜 사람 몸에 위험할 수 있는지 알려 줘요."
+    },
+    {
+     "title": "[핫클립] 우리나라의 첫 달 탐사선 다누리 / YTN 사이언스",
+     "channel": "YTN 사이언스",
+     "url": "https://www.youtube.com/watch?v=rYzo4ppxSnE",
+     "note": "달로 향한 한국 최초 탐사선 다누리와 달 탐사 이야기를 소개해요."
     }
    ]
   },
@@ -6941,7 +7162,13 @@
     {
      "title": "기후위기 부의 대전환",
      "author": "홍종호",
-     "note": "기후경제학자가 탄소에 가격을 매기는 정책과 한국 경제의 미래 전략을 알기 쉽게 풀어낸다."
+     "note": "기후경제학자가 탄소에 가격을 매기는 정책과 한국 경제의 미래 전략을 알기 쉽게 풀어낸다.",
+     "url": "https://search.shopping.naver.com/book/catalog/37423299640",
+     "video": {
+      "title": "앞으로의 경제를 바라보는 관점을 완전히 바꾸지 않으면 일어나는 비극 | 홍종호 서울대 교수, '기후위기 부의 대전환' 저자 w/구범준 PD | 나머지 45분 ep.42",
+      "channel": "세바시 강연 Sebasi Talk",
+      "url": "https://www.youtube.com/watch?v=tTFTWxf08dg"
+     }
     }
    ],
    "papers": [
@@ -6949,6 +7176,14 @@
      "title": "KRX 배출권시장 정보플랫폼",
      "url": "https://ets.krx.co.kr",
      "note": "실제 온실가스 배출권이 주식처럼 거래되는 시장의 가격과 제도 정보를 직접 살펴볼 수 있다."
+    }
+   ],
+   "videos": [
+    {
+     "title": "온실가스 배출권거래제 | 환경부",
+     "channel": "기후에너지환경부",
+     "url": "https://www.youtube.com/watch?v=P8KxGxATOfI",
+     "note": "온실가스를 줄이려고 배출권을 사고파는 제도를 정부 공식 영상으로 배워요."
     }
    ]
   }
