@@ -34,6 +34,7 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 ## 배포 옵션
 
 1. **원내 PC/NAS (권장 시작점)**: 학원 컴퓨터에서 위 명령 실행 → 원내 태블릿은 `http://<PC IP>:8890` 접속. 외부(가정) 접속까지 열려면 공유기 포트포워딩+DDNS 또는 Cloudflare Tunnel.
-2. **Cloudflare Workers**: 기존 wb-student/wb-sync 워커와 동일 패턴. server.mjs 라우팅을 워커 fetch 핸들러로 이식하고 store를 KV로 교체(README의 API가 명세). 배포에는 Cloudflare 토큰 필요.
+2. **Cloudflare Workers (운영 중)**: **https://wb-reading.whdudwns33.workers.dev** — 학생 앱(/) + 관리 웹(/admin) + API. `worker.mjs`+KV(DB)로 배포됨.
+   재배포(지문·앱 업데이트 반영): `node build-dist.mjs && CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (reading-server/ 에서)
 
 ⚠ 운영 전 필수: `ADMIN_PIN` 변경, HTTPS(터널/워커) 뒤에서만 외부 노출.

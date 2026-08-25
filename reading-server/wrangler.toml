@@ -9,4 +9,4 @@ binding = "ASSETS"
 # KV 네임스페이스 — 배포 시 `wrangler kv namespace create DB`로 생성된 id로 교체
 [[kv_namespaces]]
 binding = "DB"
-id = "PLACEHOLDER_KV_ID"
+id = "7c7f971952b449fdadf616ef94ef73d1"
