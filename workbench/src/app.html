@@ -307,6 +307,7 @@ function renderSide(){
   <button class="navbtn ${view.page==='home'?'on':''}" onclick="go('home')">🏠 <span class="txt">대시보드</span></button>
   <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
+  <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">진학 가능권 분석</span></button>
   <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
   <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
   ${grades.map(g=>{
@@ -1243,6 +1244,163 @@ function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅
 5. 마무리 지시: 실행 노하우 5개를 워크벤치 앱 "노하우 랩 → 노하우 노트"에 저장하고,
    다음 달 상담 아젠다에 반영할 1개를 고른다`);}
 
+/* ═══════════ 진학 가능권 분석 (웩슬러·중학·고교 → 입결 대조) ═══════════ */
+function normCdf(z){const s=z<0?-1:1;z=Math.abs(z);
+  const k=1/(1+0.2316419*z);
+  const d=0.3989423*Math.exp(-z*z/2);
+  const p=d*k*(0.3193815+k*(-0.3565638+k*(1.7814779+k*(-1.8212560+k*1.3302744))));
+  return s>0?1-p:p;}
+const CUM9=[4,11,23,40,60,77,89,96,100]; // 9등급 누적 상위%
+function topPctToGrade(p){ // 상위 p% → 9등급제 소수 등급 (1.0=상위4% 경계, 하한 1.0)
+  let prev=0;
+  for(let i=0;i<9;i++){
+    if(p<=CUM9[i]){ return Math.max(1, Math.round((i + (p-prev)/(CUM9[i]-prev)) * 100) / 100); }
+    prev=CUM9[i];
+  }
+  return 9;}
+function classify(myG,c70,c50){ // 낮을수록 좋은 등급 기준
+  const ref=(c70!=null)?c70:c50; if(ref==null)return null;
+  const diff=ref-myG;
+  if(diff>=0.4)return["안정","ok"];
+  if(diff>=-0.2)return["적정","acc"];
+  if(diff>=-0.8)return["소신","warn"];
+  return["도전","danger"];}
+function parseCut(v){const n=parseFloat(String(v||"").replace(/[^\d.]/g,""));return isNaN(n)?null:n;}
+function runIpsi(){
+  const mode=$("#ip_mode").value;let band=null,label="";
+  if(mode==="hs"){
+    const g=parseFloat($("#ip_hs").value);
+    if(isNaN(g)||g<1||g>9){toast("내신 평균 등급(1.0~9.0)을 입력하세요");return;}
+    band=[g,g];label=`고교 내신 평균 ${g.toFixed(2)}등급`;
+  }else if(mode==="ms"){
+    let p=parseFloat($("#ip_ms").value);
+    const rank=parseFloat($("#ip_msrank").value),tot=parseFloat($("#ip_mstot").value);
+    if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
+    if(isNaN(p)||p<=0||p>100){toast("상위 % 또는 등수/재적수를 입력하세요");return;}
+    const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
+    band=[g1,g2];label=`중학 상위 ${p.toFixed(1)}% → 일반고 예상 내신 ${g1.toFixed(1)}~${g2.toFixed(1)}등급`;
+  }else{
+    const iq=parseFloat($("#ip_iq").value);
+    if(isNaN(iq)||iq<40||iq>160){toast("전체지능(FSIQ)을 입력하세요 (40~160)");return;}
+    const z=(iq-100)/15;
+    const pTop=(1-normCdf(z))*100;            // 잠재력 상한 (동일 백분위)
+    const pAdj=(1-normCdf(0.6*z))*100;         // 상관 0.6 보정 기대치
+    const g1=topPctToGrade(Math.max(0.1,pTop)),g2=topPctToGrade(Math.min(100,pAdj));
+    band=[Math.min(g1,g2),Math.max(g1,g2)];
+    label=`FSIQ ${iq} → 백분위 상위 ${pTop.toFixed(1)}% · 잠재력 밴드 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급 (통계 보정 포함)`;
+  }
+  view.ipsiResult={band,label,mode};render();}
+function renderIpsi(){
+  const rows=db.ipdb||[];const R=view.ipsiResult;
+  let matchHtml="";
+  if(R&&rows.length){
+    const myG=(R.band[0]+R.band[1])/2;
+    const judged=rows.map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c}:null;}).filter(Boolean);
+    const order={"안정":0,"적정":1,"소신":2,"도전":3};
+    judged.sort((a,b)=>order[a.cls[0]]-order[b.cls[0]]||(parseCut(a.cut70)||9)-(parseCut(b.cut70)||9));
+    const shown=judged.filter(r=>r.cls[0]!=="도전").concat(judged.filter(r=>r.cls[0]==="도전").slice(0,5));
+    matchHtml=`<div class="tablewrap"><table class="t">
+      <tr><th>판정</th><th>대학</th><th>학과</th><th>전형</th><th>70%컷</th><th>50%컷</th><th>연도</th></tr>
+      ${shown.map(r=>`<tr><td><span class="chip ${r.cls[1]}">${r.cls[0]}</span></td>
+        <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
+        <td>${esc(r.cut70||"-")}</td><td>${esc(r.cut50||"-")}</td><td style="color:var(--ink2)">${esc(r.year||"")}</td></tr>`).join("")}
+    </table></div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정 기준: 내 등급이 70%컷보다 0.4 이상 여유=안정 / ±0.2=적정 / -0.8까지=소신. 밴드 중앙값(${myG.toFixed(2)}등급) 기준.</p>`;
+  }else if(R&&!rows.length){
+    matchHtml=`<div class="empty"><b>입결 DB가 비어 있습니다</b>아래 DB에 데이터를 넣거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
+  }
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>진학 가능권 분석</h1>
+  <div class="sub">웩슬러·중학 성적·고교 내신 → 입결 DB 대조. <b>예측이 아니라 상담용 가능권 참고치</b>입니다.</div></div></div>
+
+  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 입력</h2>
+    <div class="frow"><label>입력 유형</label>
+      <select id="ip_mode" onchange="view.ipsiMode=this.value;view.ipsiResult=null;render()">
+        <option value="hs" ${(view.ipsiMode||"hs")==="hs"?"selected":""}>고교 내신 (9등급제 평균)</option>
+        <option value="ms" ${view.ipsiMode==="ms"?"selected":""}>중학교 성적 (상위 % 또는 등수)</option>
+        <option value="iq" ${view.ipsiMode==="iq"?"selected":""}>웩슬러 지능검사 (FSIQ)</option>
+      </select></div>
+    ${(view.ipsiMode||"hs")==="hs"?`
+      <div class="frow"><label>내신 평균</label><input id="ip_hs" placeholder="예: 2.4" style="width:120px"></div>
+      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">현 고1은 5등급제 — 학교 통지 기준을 9등급 환산(상위 % 기준)해 입력하세요. 입결 DB가 9등급제 과거 자료이기 때문입니다.</p>`
+    :view.ipsiMode==="ms"?`
+      <div class="formgrid">
+        <div class="frow"><label>전교 등수</label><input id="ip_msrank" placeholder="예: 12" style="width:100px"></div>
+        <div class="frow"><label>재적수</label><input id="ip_mstot" placeholder="예: 320" style="width:100px"></div>
+      </div>
+      <div class="frow"><label>또는 상위 %</label><input id="ip_ms" placeholder="예: 3.8" style="width:120px"></div>
+      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">일반고 진학 가정의 예상 밴드입니다. 학군·고교 유형(자사·특목)에 따라 크게 달라지므로 반드시 밴드로만 해석하세요.</p>`
+    :`
+      <div class="frow"><label>전체지능 FSIQ</label><input id="ip_iq" placeholder="예: 122" style="width:120px"></div>
+      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">⚠️ 지능은 성취를 결정하지 않습니다(상관 약 0.5~0.6). 이 분석은 <b>잠재력이 온전히 성취로 전환될 때의 상한 참고치</b>이며,
+      현재 성적과의 갭을 보는 것이 목적입니다 — 그 갭을 줄이는 것이 컨설팅입니다.</p>`}
+    <div style="margin-top:10px"><button class="btn pri sm" onclick="runIpsi()">분석 실행</button></div>
+  </div>
+
+  ${R?`<div class="sec"><h2>2️⃣ 결과</h2>
+  <div class="card">
+    <p style="margin:0 0 10px"><b>${esc(R.label)}</b></p>
+    ${matchHtml}
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm" onclick="copyIpsiReport()">📋 상담용 요약 복사</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 본 결과는 과거 공개 입결(출처: 한국대학교육협의회 어디가 등)과의 단순 대조 참고치입니다.
+    실제 합격 가능성은 전형 요소·수능최저·경쟁률 변동에 따라 달라지며, 최종 판단은 상담에서 합니다.</p>
+  </div></div>`:""}
+
+  <div class="sec"><h2>🗄 입결 DB <span class="n">${rows.length}건 — 구조화 데이터 (수치·출처만, 앱 내 저장)</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input id="db_univ" placeholder="대학" style="width:110px"><input id="db_major" placeholder="학과" style="width:120px">
+      <input id="db_track" placeholder="전형" style="width:100px"><input id="db_year" placeholder="연도" style="width:70px">
+      <input id="db_c50" placeholder="50컷" style="width:70px"><input id="db_c70" placeholder="70컷" style="width:70px">
+      <input id="db_src" placeholder="출처" style="width:130px">
+      <button class="btn sm" onclick="addIpdb()">추가</button>
+    </div>
+    <details class="acc2"><summary>📥 CSV 붙여넣기 가져오기 (어디가 조회 프롬프트 결과)</summary>
+      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처 — 한 줄에 하나</p>
+      <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
+      <button class="btn sm" style="margin-top:6px" onclick="importIpdb()">가져오기</button>
+    </details>
+    ${rows.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
+      <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>출처</th><th></th></tr>
+      ${rows.map((r,i)=>`<tr><td>${esc(r.univ)}</td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
+        <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td>
+        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
+        <td><button class="btn ghost sm" onclick="db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">비어 있습니다. 어디가 데이터 섹션의 "관심대학 일괄 조회"를 돌리고 결과 CSV를 여기 붙여넣는 게 가장 빠릅니다. 5월 말 어디가 갱신 때마다 새로 채우세요.</p>`}
+  </div></div>`;}
+function addIpdb(){db.ipdb=db.ipdb||[];
+  const r={univ:$("#db_univ").value.trim(),major:$("#db_major").value.trim(),track:$("#db_track").value.trim(),
+    year:$("#db_year").value.trim(),cut50:$("#db_c50").value.trim(),cut70:$("#db_c70").value.trim(),source:$("#db_src").value.trim()};
+  if(!r.univ||(!r.cut50&&!r.cut70)){toast("대학과 컷(50 또는 70)은 필수입니다");return;}
+  db.ipdb.push(r);save();render();}
+function importIpdb(){db.ipdb=db.ipdb||[];
+  const lines=$("#db_csv").value.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  let n=0;
+  for(const l of lines){
+    const c=l.split(/[,\t]/).map(x=>x.trim());
+    if(c.length<5)continue;
+    const r={univ:c[0],major:c[1]||"",track:c[2]||"",year:c[3]||"",cut50:c[4]||"",cut70:c[5]||"",rate:c[6]||"",source:c[7]||"어디가"};
+    if(!r.univ||(!parseCut(r.cut50)&&!parseCut(r.cut70)))continue;
+    db.ipdb.push(r);n++;}
+  save();render();toast(`${n}건 가져옴`);}
+function copyIpsiReport(){
+  const R=view.ipsiResult;if(!R)return;
+  const rows=db.ipdb||[];const myG=(R.band[0]+R.band[1])/2;
+  const judged=rows.map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c[0]}:null;}).filter(Boolean);
+  const grp=k=>judged.filter(r=>r.cls===k).map(r=>`${r.univ} ${r.major}(${r.track||"-"}, 70%컷 ${r.cut70||r.cut50})`).join(", ")||"—";
+  copy(`[WB 진학 가능권 분석 — 상담 참고용] ${today()}
+입력: ${R.label}
+
+■ 안정권: ${grp("안정")}
+■ 적정권: ${grp("적정")}
+■ 소신권: ${grp("소신")}
+
+※ 과거 공개 입결(출처: 한국대학교육협의회 어디가 등)과의 단순 대조 참고치이며 합격 예측이 아닙니다.
+※ 전형 요소·수능최저·경쟁률 변동에 따라 달라지며, 최종 판단은 상담에서 확정합니다.
+${R.mode==="iq"?"※ 지능검사 기반 분석은 잠재력 상한 참고치입니다 — 현재 성취와의 갭을 줄이는 학습 전략이 핵심입니다.":""}`);}
+
 /* ═══════════ 어디가 데이터 (공식 입결·전형 학습 파이프라인) ═══════════ */
 function renderAdiga(){
   const notes=db.adiga||[];
@@ -1635,6 +1793,7 @@ function render(){
   else if(view.page==="cal")renderCal();
   else if(view.page==="lab")renderLab();
   else if(view.page==="adiga")renderAdiga();
+  else if(view.page==="ipsi")renderIpsi();
   else renderStu();
 }
 render();
