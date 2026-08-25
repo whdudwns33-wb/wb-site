@@ -1,5 +1,5 @@
 {
- "version": "2026-08-25.2",
+ "version": "2026-08-25.3",
  "articles": [
   {
    "id": "nuri-space",
@@ -322,6 +322,12 @@
        "explain": "1톤이 넘는 위성을 자력으로 발사한 나라가 세계에서 일곱 번째라는 사실에서 그런 나라가 많지 않음을 알 수 있다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "A space launch vehicle is a rocket that carries satellites or space probes into space beyond Earth. Korea successfully launched Naro in 2013, but Naro's first-stage rocket was built in cooperation with Russia. So the Korea Aerospace Research Institute set a goal of completing the entire process—from design to production, testing, and launch operation—with domestic technology, and began developing Nuri, Korea's own space launch vehicle.",
+      "Nuri is a three-stage launch vehicle about 47 meters long. Its first stage bundles four 75-ton-class liquid engines together to produce powerful thrust, and the second and third stages separate one after another to carry the satellite up to its target altitude. There were many mountains to climb, such as the technology to bundle several engines and run them together and the technology to build huge fuel tanks, and many Korean companies took part in making parts and solved these problems together.",
+      "In its first launch in October 2021, Nuri failed to place a satellite model into the target orbit. However, the researchers found the cause and fixed it, and in the second launch in June 2022, Nuri safely placed a performance verification satellite into orbit. In the third launch in May 2023, it put several working satellites into orbit. With this, Korea became the seventh country in the world to launch a satellite weighing more than one ton with its own technology.",
+      "In May 2024, the Korea AeroSpace Administration (KASA), a government agency in charge of space and aviation policy, opened its doors. KASA takes the role of leading both research and development and the growth of the industry. Space development is a comprehensive industry where technologies from many fields—machinery, electronics, and software—come together, so it is connected to a wide range of career paths. Because independence in launch vehicle technology is the starting point for moving on to satellite use and space exploration, Nuri's success is regarded as an event that opened a new chapter in Korea's space development."
      ]
     },
     "L4": {
@@ -520,9 +526,35 @@
        "explain": "발사를 다른 나라에 의존하다 차질을 겪은 사례는 기술 자립이 필요하다는 관점을 뒷받침한다.",
        "evidencePara": 0
       }
+     ],
+     "en": [
+      "Space launch vehicle technology shares its basic principles with missile technology, so it is a typical strategic technology whose transfer between countries is strictly controlled. Even if a country wants to buy it, no one will sell it, so the only option is to develop it independently. Korea gained experience through the launch of Naro in 2013, but because its first-stage rocket depended on Russian technology, it was hard to call that complete independence. The Nuri program, led by the Korea Aerospace Research Institute, is distinguished from earlier programs in that it aimed to secure the entire process—design, production, testing, and launch operation—with domestic technology.",
+      "The greatest obstacle in development was the 75-ton-class liquid engine. Liquid engines are counted as a technology that only a small number of countries possess, because their combustion process easily becomes unstable. The researchers completed the engine after hundreds of combustion tests, and they also secured clustering technology, which bundles four engines in the first stage to produce 300-ton-class thrust, as well as the technology to separate the stages during flight. Many Korean companies took part in the development, sharing the work of making and assembling parts, and this became an opportunity to lay the foundations of the space industry.",
+      "In the first launch in October 2021, Nuri reached its target altitude, but the third-stage engine shut down earlier than planned, and it failed to put the satellite model into orbit. The researchers identified the cause and improved the design, and in the second launch in June 2022, Nuri safely placed a performance verification satellite into orbit. In the third launch in May 2023, it delivered several working satellites into their planned orbits, proving its ability to provide launch services. With this, Korea became the seventh country in the world capable of launching satellites of more than one ton on its own.",
+      "The institutional foundation has also been put in place. In May 2024, the Korea AeroSpace Administration (KASA) opened in Sacheon, South Gyeongsang Province, bringing together the space and aviation policies that had been divided among several ministries into one dedicated agency. As the center of gravity in space development shifts worldwide from governments to private companies, efforts are also under way to transfer Nuri's technology to the private sector and grow an industrial ecosystem.",
+      "Independence in launch vehicle technology is less a final goal in itself than a foundation that leads to satellite use, space exploration, and the growth of related industries. The ability to put a satellite into a desired orbit at a desired time supports fields closely tied to daily life, such as communications, weather observation, and land management. How to make use of the foundation created by Nuri's successful launches and the opening of KASA remains the next task for Korea's space development."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "우리는 로켓맨",
+     "author": "조광래·고정환",
+     "note": "나로호부터 누리호까지, 한국 로켓을 직접 개발한 연구책임자 두 사람이 들려주는 30년 도전기."
+    },
+    {
+     "title": "우주미션 이야기",
+     "author": "황정아",
+     "note": "인공위성은 어떻게 기획하고 만들어 쏘아 올릴까? 위성 개발 과학자가 우주 미션의 전 과정을 안내한다."
+    }
+   ],
+   "papers": [
+    {
+     "title": "정책위키: 한국형 우주발사체(누리호)",
+     "url": "https://www.korea.kr/special/policyCurationView.do?newsId=148899436",
+     "note": "누리호의 구조와 개발 과정, 발사 일지를 정부가 정리한 해설 페이지로 한눈에 볼 수 있다."
+    }
+   ]
   },
   {
    "id": "crispr-gene",
@@ -833,6 +865,12 @@
        "explain": "생식세포 교정을 여러 나라가 엄격히 규제한다는 내용에서 신중하게 다루려는 공감대를 확인할 수 있다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "The DNA inside a living thing's cells contains the genetic information needed for life. A gene is a unit of information that determines an organism's appearance and physical traits. \"Genetic scissors\" is a general term for technologies that find and cut a specific part of this DNA. Among them, CRISPR is a third-generation genetic scissors that appeared around 2012; because it is easier to make and costs less than earlier technologies, it changed the course of life science research around the world. The name CRISPR comes from a repeating DNA sequence structure discovered in bacteria.",
+      "The principle of CRISPR came from the immune system of bacteria. When a bacterium is infected by a virus, it records a piece of the virus's genes in its own DNA, and when the same virus invades again, it recognizes that part and cuts it. Scientists applied this principle and paired two elements: a guide RNA that leads the way to the target DNA, and the Cas9 protein that actually cuts that spot. Thanks to this, it became possible to select and cut a gene at the desired location.",
+      "Emmanuelle Charpentier and Jennifer Doudna, who laid the foundation for this technology, received the Nobel Prize in Chemistry in 2020. CRISPR is widely used in research to uncover the causes of genetic diseases and to find treatments, and in 2023 a CRISPR-based treatment was approved for the first time in the world. This treatment is used to treat blood diseases caused by genetic abnormalities. In agriculture, CRISPR is used to develop crops that resist disease or are rich in nutrients.",
+      "Of course, there are also limits and controversies. Errors can occur in which the wrong part is cut instead of the target, and once a gene has been changed, it is hard to undo. In particular, editing the genes of reproductive cells, which are passed directly on to offspring, raises such serious ethical debate that many countries strictly regulate it. For CRISPR to benefit humanity, careful social agreement is needed as much as technological progress."
      ]
     },
     "L4": {
@@ -1025,9 +1063,35 @@
        "explain": "교정 결과를 되돌리기 어렵고 후대에 영향을 남길 수 있다는 근거에서, 신중한 규제가 타당하다는 평가가 글의 관점과 부합한다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "A genome refers to all of the genetic information that an organism carries. Genome editing is a technology that precisely cuts out or changes a specific position in the DNA sequence to control how genes function. Genetic scissors existed before CRISPR, but every time the target changed, a new protein had to be designed, which cost a great deal of time and money. In contrast, CRISPR-Cas9 is simple to design, low in cost, and highly accurate, so within about a decade of its appearance it established itself as the standard tool in laboratories worldwide. The fact that the 2020 Nobel Prize in Chemistry went to Charpentier and Doudna, who developed this technology, shows the scale of its impact.",
+      "CRISPR is originally an adaptive immune system that bacteria use against viruses. A bacterium stores pieces of an invading virus's DNA in its own genome, and when the same virus invades again, it identifies and cuts the intruder using RNA made from the stored information. In 2012, researchers simplified this system and published a method for cutting DNA at a desired position using only a guide RNA that binds to the target sequence and the Cas9 protein, a cutting enzyme. By making use of the process in which the cell repairs the cut DNA on its own, scientists can remove or fix a specific gene.",
+      "Applications are expanding rapidly. In medicine, research on treatments for diseases caused by genetic abnormalities is very active, and in 2023 a CRISPR-based treatment was approved for the first time in the world and began to be used to treat inherited blood diseases. In agriculture, the technology is used to develop crops that withstand drought and pests, and in basic research it has become a key tool for revealing what genes do. In Korea as well, basic science research institutes are carrying on genome editing research.",
+      "However, the technical limits and ethical issues are also clear. Errors can occur in which a location other than the target is cut, and the results of editing are hard to reverse. Above all, editing cells that are inherited by the next generation—such as sperm, eggs, and embryos—could leave effects on future generations that are hard to predict, so the international community strictly regulates it. This is because what technology can do and what it may be allowed to do are separate questions.",
+      "In the end, the future of genome editing technology will not be decided by scientific progress alone. Only when systems that verify safety and a social consensus that weighs risks against benefits are in place together can this technology become real hope for people suffering from disease. Scientific literacy—citizens' understanding of how the technology works and what is at stake—also forms the basis of that consensus."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "DNA 혁명 크리스퍼 유전자가위",
+     "author": "전방욱",
+     "note": "유전자 가위의 원리부터 생명 윤리 논쟁까지, 우리말로 차근차근 정리한 크리스퍼 입문서."
+    },
+    {
+     "title": "크리스퍼가 온다",
+     "author": "제니퍼 다우드나·새뮤얼 스턴버그",
+     "note": "크리스퍼를 개발해 노벨상을 받은 과학자가 직접 쓴 발견의 순간과 고민의 기록."
+    }
+   ],
+   "papers": [
+    {
+     "title": "사이언스올 과학포털(과학백과사전)",
+     "url": "https://www.scienceall.com",
+     "note": "한국과학창의재단 과학포털에서 '유전자 가위', 'DNA' 같은 개념을 검색해 눈높이 설명을 더 찾아볼 수 있다."
+    }
+   ]
   },
   {
    "id": "gen-ai",
@@ -1336,6 +1400,12 @@
        "explain": "학습한 글에 담긴 편향을 그대로 배울 수 있다고 했으므로, 학습 자료의 질이 답변에 영향을 줄 수 있다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "Artificial intelligence that answers questions as if having a conversation and writes texts on request is now widely used. AI that creates new results such as text, images, and sounds is called generative AI. Behind it lies a technology called the large language model. A model means something built to imitate a real-world process so that a computer can handle it. A language model is a program that calculates, using probability, in what order words are likely to follow one another.",
+      "A language model learns by reading vast amounts of text, such as books and internet documents. It repeats, countless times, the exercise of covering part of a sentence and guessing the word that comes next. This process of learning in advance is called pre-training. During this process, the countless parameters inside the model are adjusted little by little, and grammar, knowledge, and ways of expression soak into it. Once training is complete, when the model receives a question, it produces an answer by joining high-probability words one by one.",
+      "Generative AI helps with many kinds of work, from writing and translation to summarizing long texts and even writing computer programs. Many people also use it to refine their ideas or to study foreign languages. Because of this, the way people work is changing in many fields, including education, journalism, and industry. Still, one thing does not change: it remains a tool that supports human judgment.",
+      "However, its limits are also clear. A language model only produces plausible-sounding sentences based on probability; it cannot check for itself whether the content is true. This leads to the hallucination phenomenon, in which it states wrong information with confidence. There is also a risk that it learns and copies the biases contained in the texts it studied. In addition, it may not know about news that appeared after its training ended. This is why the habit of critically reviewing AI answers and checking their sources is so important."
      ]
     },
     "L4": {
@@ -1527,9 +1597,35 @@
        "explain": "출처 확인 교육의 효과를 보여 주는 연구는 검증하며 활용해야 한다는 글의 관점을 뒷받침한다.",
        "evidencePara": 4
       }
+     ],
+     "en": [
+      "Generative AI refers to artificial intelligence that creates new text, images, and sounds based on the data it has learned from. Most of the conversational AI services widely used today run on this technology. At the core of the technology for handling text is the large language model. A language model is a mathematical model that calculates the probability of which word will come after a given context, and its performance improved dramatically after a neural network architecture called the Transformer was proposed in 2017.",
+      "A language model breaks sentences into small units called tokens in order to process them. Training is carried out by repeating, countless times, the task of predicting the next token in vast amounts of text, and in this process parameters numbering from billions to hundreds of billions are adjusted. After pre-training, the model goes through additional training that refines it to follow human instructions. A typical method is to adjust the model by giving higher scores to the answers that people prefer. Through these two stages, the model comes to possess both knowledge and usefulness.",
+      "From this principle come both the abilities and the limits of language models. Because a model learns by compressing the knowledge and expressions contained in vast amounts of text, it shows outstanding performance in translation, summarizing, writing, and programming. However, this performance does not mean human-like understanding. The standard for its output is, after all, probabilistic plausibility, not whether something is true. Its representative limits include hallucination, in which it describes unfounded content convincingly; the reproduction of biases contained in its training data; and the absence of information from after its training period.",
+      "Social issues follow as well. Debates over the copyright of the texts used for training are under way around the world, and the risk that plausible false information created by AI may spread has also been raised. The enormous electricity and computing resources required to train large models are counted as a challenge too. In response, countries are putting in place systems for the safe use of AI. Research institutes in Korea and many other countries are also continuing research on the use and safety of artificial intelligence.",
+      "Language models operate in their own distinctive way—probability calculation—which is different from how humans understand language. If we know the principle, mature use becomes possible: instead of blindly trusting the results or rejecting them outright, we can make use of their strengths and make up for their limits through verification. The literacy to read technology is becoming a basic competence of our time."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "비전공자도 이해할 수 있는 AI 지식",
+     "author": "박상길",
+     "note": "알파고부터 챗GPT까지, 수식 없이 인공지능의 작동 원리를 풀어 주는 베스트셀러 교양서."
+    },
+    {
+     "title": "챗GPT에게 묻는 인류의 미래",
+     "author": "김대식·챗GPT",
+     "note": "뇌과학자가 챗GPT와 직접 나눈 열두 번의 대화로 생성형 AI의 실력과 한계를 보여 준다."
+    }
+   ],
+   "papers": [
+    {
+     "title": "Attention Is All You Need (arXiv 공개 논문)",
+     "url": "https://arxiv.org/abs/1706.03762",
+     "note": "챗GPT의 뿌리인 '트랜스포머'를 처음 제안한 논문(영어)으로, 생성형 AI가 어디서 출발했는지 원문으로 확인할 수 있다."
+    }
+   ]
   },
   {
    "id": "aging-society",
@@ -1841,6 +1937,12 @@
        "explain": "의료·돌봄 수요가 커지고 실버산업이 성장한다고 했으므로 관련 일자리의 증가를 추론할 수 있다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "Population structure is a framework that shows how a population is composed by age, gender, and other factors. It changes according to the number of people who are born, who die, and who move in or out. Korea is experiencing two phenomena at the same time: low birth rates, in which fewer babies are being born, and population aging, in which the share of elderly people in the total population is rising. According to surveys by Statistics Korea, these trends have continued steadily over many years.",
+      "In general, a society is called an aging society when people aged 65 or older make up more than 7% of the population, an aged society when they exceed 14%, and a super-aged society when they exceed 20%. Korea has recently entered the stage of a super-aged society, and the speed of this change is very fast even by world standards. As average life expectancy grows longer and the number of newborns falls, the shape of the population pyramid is also changing into a form that is narrow at the bottom and wide at the top.",
+      "Changes in population structure affect many areas of society. When the number of students falls, schools and the education system are adjusted, and when the working-age population that can hold jobs shrinks, companies find it harder to secure workers. On the other hand, demand for medical and care services grows, and the silver industry, which serves elderly people as its main customers, expands. How to run systems that generations pay for together, such as pensions and health insurance, is also being discussed again. In some regions, the population is shrinking and the vitality of local communities is weakening.",
+      "In response, the government is acting with a variety of policies. Typical examples are support systems that create a good environment for having and raising children, and programs that help elderly people with jobs and health. Because population change appears gradually over a long period, it is important to prepare in advance on the basis of accurate statistics. Understanding population structure is a starting point for looking ahead to the future of our society."
      ]
     },
     "L4": {
@@ -2028,9 +2130,35 @@
        "explain": "실버산업의 성장으로 일자리가 늘었다는 사례는 인구 변화가 기회이기도 하다는 주장을 직접 뒷받침한다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "Population structure is a framework that shows how a society's population is composed by age, gender, and other factors. Three factors—births, deaths, and international migration—determine population structure, and a key characteristic is that its changes are hard to reverse in a short period. Korea is a leading example of a society where low birth rates, with the number of newborns continuously falling, and population aging, with the share of people aged 65 and older growing, are progressing at the same time. A clear illustration is the population pyramid shifting from a bell shape to a shape that is wide at the top, and the future population projections of Statistics Korea also forecast that this trend will continue for a considerable time.",
+      "The primary background of population aging is the extension of life expectancy and the decline in the number of births. With advances in medical technology and living standards, people have come to live longer, while the number of newborns has fallen due to a combination of factors, including changing values about marriage and childbirth and the burdens of housing and child-rearing. As a result, a structure takes shape in which the share of the working-age population—people aged 15 to 64 who can work—shrinks, while the social cost of supporting the elderly population becomes relatively larger.",
+      "These changes spread across the economy and institutions as a whole. A smaller labor supply can affect the economy's growth potential, and systems run on contributions from the currently working generation, such as pensions and health insurance, face the task of redesigning the balance between burdens and benefits. This is because the ratio between those who pay taxes and those who receive welfare benefits changes. In education, adjustments to school operations to match the shrinking school-age population are being discussed, and in local communities, measures to maintain the functions of regions with declining populations are on the agenda.",
+      "The change does not mean only burdens. As consumption and health care demand among the elderly grow, the so-called silver industry—medical devices, care services, leisure industries, and more—is drawing attention as a new growth area. Discussions are also active about expanding continued employment and retraining so that older workers with accumulated experience can work longer. Some also expect that advances in technology may help fill the gaps in care and labor.",
+      "The government is pursuing population policies that cover responses to low birth rates, improvements in the quality of life of the elderly, and support for regions with declining populations. What matters is not to read population change only in the language of crisis, but to gradually redesign social systems on the basis of accurate statistics. The change in population structure is a reality already under way, and understanding its direction is a basic premise for preparing for the society of the future."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "정해진 미래",
+     "author": "조영태",
+     "note": "인구 통계로 10년 뒤 한국 사회를 미리 내다보는 인구학자의 대표작."
+    },
+    {
+     "title": "인구 미래 공존",
+     "author": "조영태",
+     "note": "저출생·고령화 시대를 위기가 아닌 기획의 기회로 바꾸는 법을 이야기한다."
+    }
+   ],
+   "papers": [
+    {
+     "title": "KOSIS 인구로 보는 대한민국",
+     "url": "https://kosis.kr/visual/populationKorea/PopulationDashBoardMain.do",
+     "note": "통계청 대시보드에서 과거·현재·미래의 인구 변화와 고령화 지표를 그래프로 직접 탐색할 수 있다."
+    }
+   ]
   },
   {
    "id": "price-wage",
@@ -2335,6 +2463,12 @@
        "explain": "상품을 만드는 데 드는 비용이 오르면 가격이 오를 수 있다고 했으므로, 재료비 상승은 가격 상승 요인이 된다.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "The overall level of the prices of goods and services traded in the market is called the price level. The price level is not the cost of one individual product; it combines the prices of many products to show an average trend. The Consumer Price Index that appears in the news is an indicator that expresses the movement of prices as a number. The phenomenon of prices rising continuously is called inflation, and when it occurs, the value of money falls relatively. This is because the amount of goods that can be bought with the same money decreases.",
+      "The basic principle behind price movement is supply and demand. When the demand to buy a product is greater than its supply, the price rises, and when supply is greater than demand, the price falls. Prices can also rise when the costs of making a product, such as raw material prices or wages, go up. When these factors appear across many products, the overall price level moves.",
+      "If prices rise or fall too quickly, the whole economy becomes unstable. That is why the Bank of Korea, the country's central bank, takes price stability as its most important goal. The Bank of Korea raises or lowers the base interest rate to influence the amount of money circulating in the market. When interest rates rise, consumption and investment decrease, which can have the effect of calming price increases. Conversely, when the economy slows down too much, the bank may lower interest rates to stimulate economic activity.",
+      "Meanwhile, the wages that working people receive have a lower limit set by law. The minimum wage system is designed to guarantee a minimum level of wages and protect low-paid workers. The minimum wage is deliberated and decided every year by the Minimum Wage Commission, in which members representing workers, members representing employers, and members representing the public interest take part. The commission considers a range of factors, such as workers' cost of living, the wages of similar workers, and labor productivity, and once the government confirms and officially announces the decision, it applies the following year."
      ]
     },
     "L4": {
@@ -2517,9 +2651,35 @@
        "explain": "정책의 효과가 시간이 지난 뒤에 나타났다는 분석은 통화정책에 시차가 있다는 서술을 직접 뒷받침한다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "In a market economy, prices act as signals that allocate resources. Prices are set where supply and demand meet, and changes in prices alter the choices of producers and consumers. The overall price level of the economy as a whole—rather than individual prices—is called the price level, and its movements are measured by indicators such as the Consumer Price Index. When inflation appears, with prices rising continuously, the purchasing power of money falls; conversely, deflation, in which prices fall continuously, can shrink consumption and investment.",
+      "The causes of inflation are explained in two broad ways. One is demand-pull inflation, which appears when the economy improves and buying power grows stronger; the other is cost-push inflation, which appears when production costs, such as raw material prices or wages, rise. In real price movements, the two factors often work together, and factors from outside the country, such as international oil prices and exchange rates, also have an influence.",
+      "When prices change sharply, it becomes difficult for economic actors to predict the future, so central banks in every country take price stability as a core duty. The Bank of Korea operates monetary policy, influencing the money supply and interest rates in general by adjusting the base rate. Raising the base rate tends to slow borrowing and consumption, easing upward pressure on prices, while lowering it is expected to have the opposite effect. However, because there is a time lag before the effects of policy appear, careful judgment is required.",
+      "Wages are the price of labor as a factor of production, but they are not left purely to the market; the law guarantees a minimum level. The minimum wage system aims to stabilize the lives of low-paid workers, and it is grounded in the Constitution and the Minimum Wage Act. Every year the Minimum Wage Commission deliberates on it, with equal numbers of worker members, employer members, and public-interest members taking part in the discussion. The law requires that workers' cost of living, the wages of similar workers, labor productivity, and the income distribution ratio be considered, and once the government officially announces the deliberated proposal, it takes effect from January of the following year.",
+      "Prices and the minimum wage influence each other. When prices rise, the real value of the same wage falls, so the inflation rate becomes important data in the deliberation process, and changes in wages can in turn affect prices through production costs. In this way, prices and wages are determined on two axes: market principles and social agreement. Understanding these procedures and principles is a basic competence for reading economic news."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "최저임금 쫌 아는 10대",
+     "author": "하승우",
+     "note": "삼촌과 조카의 대화로 최저임금이 정해지는 과정과 노동의 가치를 쉽게 배우는 청소년 책."
+    },
+    {
+     "title": "청소년을 위한 경제의 역사",
+     "author": "니콜라우스 피퍼",
+     "note": "화폐와 시장, 물가의 원리를 세계사 속 34가지 사건으로 풀어낸 독일 청소년문학상 수상작."
+    }
+   ],
+   "papers": [
+    {
+     "title": "최저임금위원회 누리집",
+     "url": "https://www.minimumwage.go.kr/main.do",
+     "note": "올해 최저임금 금액과 심의·결정 절차, 연도별 변화를 공식 기관 자료로 확인할 수 있다."
+    }
+   ]
   },
   {
    "id": "ocean-plastic",
@@ -2814,6 +2974,12 @@
        "explain": "미세플라스틱이 먹이사슬을 따라 물고기까지 이동한다고 했으므로 해산물에서도 발견될 수 있다고 추론할 수 있다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "Every year, a large amount of plastic waste flows into the sea. Much of it comes from land. Trash thrown away on the streets travels with rainwater and rivers until it reaches the sea, and nets and buoys thrown away or lost during fishing also remain in the ocean. Trash floating on the sea sometimes travels far offshore along ocean currents. Plastic is convenient because it is light and strong, but it is a material that takes a very long time to break down in nature.",
+      "Plastic that enters the sea is gradually broken into small pieces by the action of waves, ultraviolet rays from sunlight, and salt. Pieces that have become smaller than 5 millimeters across are called microplastics. Microplastics may be particles made small from the start, or fragments created when larger plastics break apart. Because they are so small, they spread widely through the water and are very hard to remove. Such tiny pieces are found not only in seawater but also in mudflats and on sandy beaches.",
+      "Plastic waste causes many kinds of harm to the marine ecosystem. When seabirds and turtles mistake plastic for food and swallow it, their digestive organs can become blocked, and animals caught in abandoned nets sometimes lose their lives because they cannot move. Microplastics have been confirmed to move along the food chain, from plankton to fish, so scientists are continuing to study their effects. The coastal scenery is also damaged, hurting tourism and fishing.",
+      "Responses are being made on several levels. The government and the Korea Marine Environment Management Corporation collect trash from beaches and the sea and run programs to reduce fishing waste. The international community is discussing an agreement to reduce plastic pollution. Individual efforts, such as using fewer disposable products and sorting waste for recycling, are also important. The surest way to reduce the plastic heading to the sea is to produce less waste in the first place."
      ]
     },
     "L4": {
@@ -2994,9 +3160,35 @@
        "explain": "쓰레기가 해류를 타고 국경을 넘어 이동한다는 조사는 국제 협력이 필요하다는 주장을 직접 뒷받침한다.",
        "evidencePara": 4
       }
+     ],
+     "en": [
+      "Thanks to its advantages of being light, easy to shape, and cheap, plastic has become a material used throughout modern civilization. However, that very durability is the source of an environmental problem. Plastic is broken down by microorganisms extremely slowly, so once it leaks into nature, it remains there for a very long time. A considerable share of the plastic produced worldwide has become waste, and part of it has accumulated in the sea after passing through rivers and coastal waters.",
+      "Plastic that flows into the ocean undergoes physical and chemical weathering. Ultraviolet rays weaken the molecular structure of plastic, and waves and sand break it into small pieces. The fragments smaller than 5 millimeters across created this way are microplastics, and some—like the fine particles that come from facial cleansers or textiles—are made small from the beginning and released that way. Because microplastics are so small, recovering them is practically impossible, and they spread along ocean currents and have been detected even in the open ocean, the deep sea, and the polar regions.",
+      "The effects on the ecosystem are multi-layered. Large pieces of waste cause entanglement and swallowing accidents among marine animals, and so-called ghost fishing, in which abandoned fishing gear keeps catching fish, also causes losses to fishery resources. Microplastics are ingested even by small creatures such as plankton and move along the food chain, and they have been detected in the seafood and salt that people eat. However, how they affect the human body is still an area where research is in progress, and the scientific community is carefully building up evidence.",
+      "Responses can be organized into four layers: preventing release, collection, recycling, and international cooperation. The government and the Korea Marine Environment Management Corporation collect trash from coastal waters and the seabed and improve the systems for managing fishing gear. Policies that encourage the use of easily recyclable materials at the production stage and reduce the use of single-use plastics are also spreading. The international community is continuing negotiations to establish a binding agreement that covers the entire life cycle of plastic pollution.",
+      "The essence of the marine plastic problem is that the cost of convenience is transferred across time and space to the ecosystem as a whole. Since the sea has no borders, the efforts of one country alone have limits, and an approach that redesigns the loop running from production to disposal is required. Only when individual actions that reduce consumption and institutional change work together can the flow of plastic heading toward the sea be reduced."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "플라스틱 수프",
+     "author": "미힐 로스캄 아빙",
+     "note": "사진과 인포그래픽으로 지구 바다의 플라스틱 오염 실태와 해결 노력을 한눈에 보여 준다."
+    },
+    {
+     "title": "플라스틱 바다",
+     "author": "찰스 무어·커샌드라 필립스",
+     "note": "태평양 거대 쓰레기 지대를 발견한 선장이 직접 쓴 해양 플라스틱 추적기."
+    }
+   ],
+   "papers": [
+    {
+     "title": "해양환경정보포털(MEIS)",
+     "url": "https://www.meis.go.kr",
+     "note": "해양수산부의 포털에서 우리 바다의 수질과 해양쓰레기·미세플라스틱 조사 자료를 찾아볼 수 있다."
+    }
+   ]
   },
   {
    "id": "carbon-neutral",
@@ -3294,6 +3486,12 @@
        "explain": "재생에너지는 날씨에 따라 발전량이 달라진다고 했으므로, 바람이 꾸준한 지역이 풍력 발전에 유리하다고 추론할 수 있다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "Gases in the atmosphere such as carbon dioxide and methane trap heat rising from the Earth's surface and keep the planet's temperature stable. This is called the greenhouse effect, and such gases are called greenhouse gases. The greenhouse effect itself is a natural phenomenon that is essential for life. However, fossil fuels such as coal, oil, and natural gas release carbon dioxide when they are burned. Since industrialization, the use of fossil fuels has increased greatly, raising the concentration of greenhouse gases in the atmosphere, and the Earth's average temperature has risen along with it.",
+      "To respond to climate change, the international community signed the Paris Agreement and promised to keep the rise in the Earth's average temperature below a certain level. The goal set for this purpose is carbon neutrality. Carbon neutrality means reducing greenhouse gas emissions as much as possible and offsetting the remaining emissions through absorption by forests or storage technology, so that net emissions become zero. Many countries, including Korea, have declared carbon neutrality as their goal.",
+      "The key means is energy transition. Renewable energy comes from sources that nature supplies continuously and that never run out, such as sunlight, wind, and water. Solar power uses the principle that solar cells made of semiconductors produce an electric current when light falls on them. In wind power, the wind turns large blades, and a generator converts that rotation into electricity. Because no fuel is burned, almost no greenhouse gases are released while the electricity is being generated.",
+      "Still, the challenges are clear. Renewable energy is intermittent, meaning its output changes with the weather, so devices that store electricity and improvements to the power grid are needed. The large amount of land and money needed for power facilities, and consultation with local residents, are also important issues. That is why technologies that use energy efficiently and habits of saving energy are emphasized together. Improving the insulation of old buildings also helps save energy. Carbon neutrality is a goal that can be reached only when technology, institutions, and citizens' actions work together."
      ]
     },
     "L4": {
@@ -3478,9 +3676,35 @@
        "explain": "여러 부문의 노력을 병행해 성과를 높인 사례는 탄소중립이 복합적 전환의 과제라는 주장을 뒷받침한다.",
        "evidencePara": 4
       }
+     ],
+     "en": [
+      "The Earth's atmosphere lets energy from the Sun pass through, while absorbing part of the infrared radiation given off by the surface and releasing it again. This process is the greenhouse effect, and greenhouse gases such as carbon dioxide and methane play that role. The problem is that since industrialization, the burning of fossil fuels and the destruction of forests have rapidly raised the concentration of greenhouse gases in the atmosphere, upsetting the Earth's energy balance and pushing up its average temperature. The Intergovernmental Panel on Climate Change (IPCC) has made it clear that human activity is the main cause of global warming.",
+      "In response, the international community agreed through the Paris Agreement to hold the rise in the global average temperature to well below 2 degrees above pre-industrial levels, and if possible within 1.5 degrees. Carbon neutrality, also called net zero, refers to a state in which the amount of greenhouse gases emitted by human activity equals the amount absorbed and removed, so that net emissions become zero. Many countries, including Korea, have declared the goal of carbon neutrality by 2050 and have put laws and plans in place.",
+      "At the center of this transition is the power sector. Solar power uses the photoelectric effect: when light strikes a solar cell, a semiconductor device, electrons move and an electric current is produced. Wind power obtains electricity by using the kinetic energy of the wind to turn a turbine. Neither method requires fuel costs, and both emit almost no greenhouse gases during power generation. As technological progress and mass production have steadily lowered the cost of generation, renewable energy facilities are expanding rapidly around the world.",
+      "However, a power system centered on renewable energy faces challenges that must be solved. Sunlight and wind cannot be controlled by humans, so power output is intermittent, varying with time and weather. Making up for this requires storage such as energy storage systems (ESS) and pumped-storage hydropower, systems for adjusting demand, and expanded transmission networks that move electricity between regions. Public acceptance of sites for power facilities, and the recycling of used panels and batteries, are also counted among the problems to solve.",
+      "Carbon neutrality is not a task for the power sector alone. It also requires switching fuels in industrial processes, improving insulation and efficiency in buildings, electrifying transportation, and preserving carbon sinks such as forests and tidal flats. Improving efficiency, which means getting the same benefit while using less energy, is regarded as the most reliable way to cut emissions. Carbon neutrality is not a goal achieved by any single technology; it is a long-term task in which technology, institutions, and ways of living must change together."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "파란하늘 빨간지구",
+     "author": "조천호",
+     "note": "국립기상과학원장을 지낸 대기과학자가 기후위기의 과학을 일반인 눈높이로 설명한다."
+    },
+    {
+     "title": "탄소 사회의 종말",
+     "author": "조효제",
+     "note": "기후위기를 인권과 사회의 눈으로 읽으며 탄소 중심 사회 이후를 상상하게 하는 책."
+    }
+   ],
+   "papers": [
+    {
+     "title": "탄소중립 정책포털",
+     "url": "https://www.gihoo.or.kr/netzero",
+     "note": "2050 탄소중립 목표와 국가 감축 계획, 관련 법과 통계를 정부 포털에서 확인할 수 있다."
+    }
+   ]
   },
   {
    "id": "sillok-record",
@@ -3794,6 +4018,12 @@
        "explain": "셋째 문단에서 임진왜란 때 전주 사고의 실록만 살아남았고 이를 바탕으로 다시 여러 벌을 만들었다고 하였다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "The Veritable Records of the Joseon Dynasty is a vast collection of history books that organizes the records of the reigns of Joseon kings. At its foundation was the court historian system. Historians attended meetings between the king and his officials and wrote down the king's words and actions, along with affairs of the state large and small, in records called sacho. Because the principle that even the king could not freely read the sacho was upheld, historians could record the facts without worrying about those in power.",
+      "The Veritable Records were not compiled while a king was still alive. Only after a king died was a temporary office called the Sillokcheong set up and compilation begun. Its officials gathered and reviewed the sacho and documents from each government office, arranged them in order of time, and completed the records. When the compilation was finished, the sacho were washed in water to erase the writing, a practice called secho. This was done to prevent the contents of the records from leaking out and causing conflict.",
+      "Several copies of the completed records were made and stored separately in archives called sago. Even if the records in one archive were destroyed by fire or war, the copies elsewhere would survive. In fact, during the Japanese invasions of Korea in the 1590s, most of the archives burned down, but the copy at the Jeonju archive alone survived. After the war, Joseon made several new copies based on the surviving records and moved the archives deep into the mountains, where access was difficult, to keep them even safer.",
+      "The Veritable Records of the Joseon Dynasty cover the history of one dynasty over several hundred years almost without gaps. They record not only politics and diplomacy but also weather, astronomical events, and the daily lives of the people, making them precious material for historical research. In recognition of this value, the records were inscribed in UNESCO's Memory of the World register in 1997. Today the records have been translated into modern Korean, and anyone can look them up on the internet. The spirit of record-keeping that protected five hundred years of Joseon history still lives on."
      ]
     },
     "L4": {
@@ -3982,9 +4212,35 @@
        "explain": "이 글은 제도가 사관의 독립성과 직필을 보장했다고 주장하므로, 사초 내용 때문에 사관이 처벌받은 사례는 이 주장을 약화한다.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "What does a record need in order to earn the trust of later generations? Depending only on the conscience of the record-keeper has its limits. Joseon tried to solve this problem not through personal virtue but through institutions. The result was the Veritable Records of the Joseon Dynasty, which contains about 470 years of history under 25 kings, from Taejo to Cheoljong. The Veritable Records were not personal biographies of kings but official state records covering politics, the economy, and culture as a whole.",
+      "The first device for trust was the court historian system. Historians sat in on the meetings where the king and his officials discussed state affairs and recorded their words and actions in drafts called sacho. The key lay in the principle that guaranteed the independence of the records. Even the king was not allowed to read the sacho, and as a rule, what a historian had written was not to be called into question. By making it impossible for those in power to control the records, Joseon was able to maintain the tradition of jikpil, writing the facts exactly as they were.",
+      "The second device was a strict compilation procedure. There was a principle that the Veritable Records were compiled only after the king in question had died. When a king passed away, a temporary office called the Sillokcheong was set up, and it gathered, compared, and verified records from many offices, including the sacho and the Diaries of the Royal Secretariat. By cross-checking multiple records instead of relying on a single source, the compilers raised the accuracy of the contents. After compilation, the sacho went through secho, being washed in water to erase them, a measure to prevent sensitive records from leaking out and leading to political revenge.",
+      "The third device was distributed storage. In the early Joseon period, the same records were divided among the Chunchugwan in Seoul and three archives in the provinces. When the Japanese invasions of the 1590s burned all the copies except the one in the Jeonju archive, Joseon printed several new sets based on the surviving records and moved the archives to hard-to-reach places such as Ganghwa Island and Mount Taebaek. The risk was spread out so that a disaster in any one place would not mean the loss of the entire record.",
+      "Thanks to these institutional devices, the Veritable Records of the Joseon Dynasty are regarded as a rare example of the systematic, long-term recording of a single dynasty's history. Because they contain information on all areas of society, including astronomy, weather, and disasters as well as politics and diplomacy, they serve as research material for many academic fields. In 1997, UNESCO officially recognized their value by inscribing them in the Memory of the World register. What the Veritable Records ultimately show is that the objectivity and reliability of a record come not from an individual's good will but from the institutions that support it."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "박시백의 조선왕조실록",
+     "author": "박시백",
+     "note": "실록 원문을 바탕으로 조선 500년을 20권 만화에 담아낸 역사 만화의 고전."
+    },
+    {
+     "title": "조선왕조실톡",
+     "author": "무적핑크",
+     "note": "조선의 왕과 백성이 채팅으로 대화한다면? 실록 기록을 톡 형식으로 재미있게 되살린 웹툰 단행본."
+    }
+   ],
+   "papers": [
+    {
+     "title": "조선왕조실록 (국사편찬위원회)",
+     "url": "https://sillok.history.go.kr",
+     "note": "태조부터 순종까지 실록 원문과 한글 번역 전체를 무료로 검색하며 직접 읽어 볼 수 있다."
+    }
+   ]
   },
   {
    "id": "hangeul-science",
@@ -4298,6 +4554,12 @@
        "explain": "둘째 문단에서 소리가 세지면 획이 늘어나 글자의 모양만 보고도 소리의 성질을 짐작할 수 있다고 하였다.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "In 1443, King Sejong the Great created a new writing system called Hunminjeongeum, and in 1446 he proclaimed it to the people. Hunminjeongeum means \"the correct sounds for teaching the people.\" At the time, there were no Korean letters for writing the Korean language, so people borrowed Chinese characters, but these were hard to learn and difficult for ordinary people to use. King Sejong wanted to create letters that anyone could easily learn and use, in order to ease the hardship of people who could not put into writing what they wished to say.",
+      "The consonants of Hunminjeongeum were created on the principle of imitating shapes. The five basic consonants copy the shapes of the speech organs as each sound is made. The letter ㄱ imitates the shape of the root of the tongue blocking the throat, and ㄴ the shape of the tongue touching the upper gums. The letter ㅁ came from the shape of the mouth, ㅅ from the shape of a tooth, and ㅇ from the shape of the throat. The remaining consonants were made by the principle of adding strokes to the basic letters. Since strokes are added as the sound becomes stronger, you can guess the nature of a sound just by looking at the shape of the letter.",
+      "The vowels begin from three basic letters that stand for heaven, earth, and human. The round dot ㆍ symbolizes heaven, the horizontal line ㅡ the flat earth, and the vertical line ㅣ a standing person. By combining these basic letters with one another, many vowels such as ㅏ and ㅗ were created in a systematic way. This method of writing countless sounds by combining a small number of basic letters according to fixed rules is highly efficient.",
+      "When Hunminjeongeum was created, it had twenty-eight letters in all: seventeen consonants and eleven vowels. Today, 24 of them are in use. The purpose and principles behind the letters are explained in detail in a book called the Hunminjeongeum Haerye, the explanatory edition. It is rare anywhere in the world for records to remain showing who created a writing system, when, and on what principles. In recognition of this value, the Hunminjeongeum Haerye was inscribed in UNESCO's Memory of the World register in 1997."
      ]
     },
     "L4": {
@@ -4479,9 +4741,35 @@
        "explain": "글은 훈민정음이 적은 기본자와 일정한 규칙으로 설계되어 배우기 쉽다고 보므로, 짧은 시간에 익힌 사례는 이 관점을 뒷받침한다.",
        "evidencePara": 4
       }
+     ],
+     "en": [
+      "Most of the world's writing systems took shape naturally, changing little by little over long stretches of time. As a result, scripts whose creator, date of creation, and design principles are all known are rare in the world. Hunminjeongeum, created by King Sejong in 1443 and proclaimed in 1446, is exceptional in this respect. Not only are its creator and time of creation clear, but the principles on which the script was designed are systematically recorded in its commentary, the Hunminjeongeum Haerye.",
+      "The consonant system of Hunminjeongeum is based on observation of how speech sounds are produced. The five basic consonants imitate the shapes of the speech organs at the places where the sounds are made: ㄱ, the root of the tongue blocking the throat; ㄴ, the tip of the tongue touching the upper gums; ㅁ, the mouth; ㅅ, a tooth; and ㅇ, the throat. Sounds made at the same place but pronounced more strongly were written by adding strokes to the basic letters. Because the form of each letter reflects where and how the sound is articulated, Hunminjeongeum is regarded as a script that carries phonetic information within its writing system.",
+      "The design of the vowels applied the principle of combining three basic letters representing heaven (ㆍ), earth (ㅡ), and human (ㅣ). When these basic letters are combined according to fixed rules, the remaining vowels are formed systematically. This method of writing a wide variety of sounds with a minimum of elements and clear rules of combination can be called an efficient design that creates many things from few parts. The way consonants and vowels are grouped and written in syllable blocks also makes the structure of the sounds visible.",
+      "For a long time, these principles of creation were a matter of guesswork. When the Hunminjeongeum Haerye, the book that explains the principles, was discovered in Andong, North Gyeongsang Province, in 1940, the principles behind the letters were finally confirmed. The Haerye describes the reason each of the twenty-eight letters was created and how they were to be used. Its discovery is considered an event that greatly changed the direction of Hangeul studies. The book has been designated a National Treasure of Korea, and in 1997 it was inscribed in UNESCO's Memory of the World register.",
+      "Today, linguists regard Hunminjeongeum as an original script designed on the basis of an analysis of the speech organs and the nature of sounds. A writing system made easy to learn lowered the barrier to written communication, and in the information age, its principle of combining consonant and vowel letters has also proved an advantage for entering text on mobile phones and computers. The case of Hunminjeongeum shows that a writing system need not be merely a product of custom; it can be the object of design based on principles."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "한글의 탄생",
+     "author": "노마 히데키",
+     "note": "일본인 언어학자의 눈으로 훈민정음 창제가 왜 문자사의 기적인지 밝혀낸 화제작."
+    },
+    {
+     "title": "훈민정음: 사진과 기록으로 읽는 한글의 역사",
+     "author": "김주원",
+     "note": "훈민정음을 둘러싼 오해를 바로잡고 52장의 사진 자료로 한글의 역사를 보여 주는 책."
+    }
+   ],
+   "papers": [
+    {
+     "title": "국립한글박물관",
+     "url": "https://www.hangeul.go.kr/main.do",
+     "note": "한글의 역사와 훈민정음 관련 소장 자료, 온라인 전시·교육 콘텐츠를 무료로 볼 수 있다."
+    }
+   ]
   },
   {
    "id": "webtoon-industry",
@@ -4781,6 +5069,12 @@
        "explain": "둘째 문단에서 세로 스크롤이 스마트폰 화면에 잘 맞는다고 했으므로, 스마트폰 보급이 웹툰 성장에 유리했음을 짐작할 수 있다.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "Webtoons are digital comics that developed to fit the internet environment. They began to grow in earnest in the early 2000s, when Korean internet portals started serializing comics for free. At a time when the print comics market was struggling, webtoons opened a way to meet readers in a new space, the internet. Because anyone could access them easily, the readership expanded quickly, and the culture of communicating with readers through comments also added to the popularity of webtoons.",
+      "The most distinctive feature of the webtoon format is vertical scrolling. Unlike paper comics, which are read by turning pages, webtoons are read by scrolling down the screen. This style suits smartphone screens well, so people can read comfortably even while on the move. New storytelling techniques that make use of this vertical flow have also developed, such as adjusting the blank space between panels to express the passage of time or a feeling of tension.",
+      "Webtoons gradually formed an industrial ecosystem of their own. A partial-payment model, in which readers pay a fee to read some episodes in advance, took hold and created a stable revenue structure. Beyond authors and platforms, many other participants appeared, such as agencies that support authors and production studios where the writing and the drawing are handled by different people. Before a single webtoon is created and reaches its readers, many different jobs work together.",
+      "A webtoon's story does not stay inside the webtoon alone. Popular works are remade into dramas, films, games, and more. This spreading of an original story into many fields is called the expansion of intellectual property, or IP. Korean webtoon platforms have also expanded their services into many languages and gained readers overseas. The vertical-scroll format that took root in Korea has now become one of the standard formats for digital comics in many countries around the world."
      ]
     },
     "L4": {
@@ -4965,9 +5259,30 @@
        "explain": "글은 형식 혁신이 산업의 성장과 확장으로 이어졌다고 주장하므로, 다수 작가의 여건이 나아지지 않았다는 조사 결과는 이 논지를 약화한다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "The form of content changes according to the character of the medium that carries it. Korean webtoons are a clear example of this change. In the early 2000s, as the print comics market shrank, internet portals opened spaces where comics were serialized for free, and a new form called the webtoon emerged. Freed from the physical limits of paper, webtoons reorganized the grammar of comics to fit the media environment of the digital screen.",
+      "At the heart of this reorganization is the vertical-scroll format. Unlike print comics, which arrange scenes page by page, webtoons place their story on one long flow running from top to bottom. Since the speed at which readers scroll the screen becomes the speed at which they read the story, authors control the passage of time and the level of tension by adjusting the size of the panels and the length of the blank spaces. This format matched the narrow, tall screens of smartphones, and as mobile devices spread, webtoons became a part of everyday content.",
+      "On the industrial side, webtoons formed an ecosystem of their own. The partial-payment model, in which readers can wait and read for free but must pay to read ahead, drew readers who were used to free content into the paid market. The way works are created also changed: in addition to individual authors working alone, the division of labor expanded, with collaboration between story writers and artists and the participation of production studios and agencies. Platforms took charge of distributing works and sharing revenue, placing themselves at the center of the ecosystem. Meanwhile, as the industry has grown, discussions about authors' working conditions and fair contracts have been taking place as well.",
+      "Another pillar of the webtoon industry is the expansion of intellectual property, or IP. Webtoons with proven stories and established fan bases are used as source material for dramas, films, games, and other media. A reinforcing effect also appears: when a screen adaptation based on a webtoon succeeds, more readers go back to the original. This way of building value as one story moves across many media has made webtoons an important supplier of stories for the video industry.",
+      "Korean webtoon platforms have expanded their services into many language regions, spreading the vertical-scroll format throughout the world's digital comics market. Discovering local authors and offering works in local languages goes beyond simple export; it can be called the transplanting of the format itself. The case of webtoons shows that when changes in the media environment are treated as an opportunity rather than a constraint, innovation in the form of content can lead to the expansion of an industry."
      ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "웹툰의 시대",
+     "author": "위근우",
+     "note": "웹툰 전성기를 이끈 작가 24인의 인터뷰로 웹툰이라는 산업과 직업 세계를 들여다본다."
+    }
+   ],
+   "papers": [
+    {
+     "title": "한국콘텐츠진흥원(KOCCA)",
+     "url": "https://www.kocca.kr",
+     "note": "연구보고서 메뉴에서 해마다 발표되는 '웹툰산업 실태조사'로 시장 규모와 작가 현황을 확인할 수 있다."
+    }
+   ]
   },
   {
    "id": "lvrad-moon",
@@ -5264,7 +5579,13 @@
        "evidencePara": 3
       }
      ],
-     "minutes": 5
+     "minutes": 5,
+     "en": [
+      "Space is filled with high-energy particles that fly in from the Sun and from the distant universe. These are called space radiation. On Earth, the thick atmosphere and the magnetic field act as shields, so people live without serious harm. The Moon, however, has almost no atmosphere and only a very weak magnetic field, so space radiation pours straight down onto its surface.",
+      "Space radiation can damage the cells of the human body, so astronauts must prepare for it before staying on the Moon for a long time. That requires accurate data showing how strong the radiation on the lunar surface actually is and what kinds of particles arrive in what amounts. Only with accurate data can we decide how to build spacesuits and lunar bases. Data from the Moon's south pole, which many countries are watching as a candidate site for future crewed exploration, is especially important.",
+      "The lunar surface space radiation detector LVRAD, which is being developed under the leadership of the Korea Astronomy and Space Science Institute, is the instrument in charge of this task. It consists of a device that measures the amount and energy distribution of radiation and a device that measures neutrons. In August 2026, the Korea AeroSpace Administration signed an implementing arrangement with the U.S. National Aeronautics and Space Administration (NASA) to send the detector on a lunar lander built by an American private company.",
+      "According to the plan, the detector will finish development by 2027 and then be moved to the United States, and it will head for the Moon's south pole aboard a lander launching in 2030. However, the launch date may change depending on NASA's schedule. The observation data gathered there will be used to study how space radiation affects the human body and to prepare for future crewed lunar exploration. It is also a chance for Korea to take on a role in international lunar exploration and show the world the level of its space science."
+     ]
     },
     "L4": {
      "title": "유인 달 탐사 시대, 우주방사선 관측과 국제 협력",
@@ -5446,9 +5767,30 @@
        "evidencePara": 4
       }
      ],
-     "minutes": 6
+     "minutes": 6,
+     "en": [
+      "Space is a radiation environment in which high-energy particles fly about without pause. Typical examples are particles released by solar activity and galactic cosmic rays arriving from outside the solar system. Life on the Earth's surface is largely protected from their effects by a double shield: the thick atmosphere and the Earth's magnetic field. The lunar surface, with almost no atmosphere and only a feeble magnetic field, is a different story. Not only does space radiation reach it directly, but secondary radiation, such as the neutrons produced when particles collide with the lunar soil, is added on top.",
+      "Exposure to radiation damages the body's cells and genetic material, threatening the health of astronauts who stay for long periods. For crewed exploration programs that aim to send people to stay on the Moon, therefore, precise measurements of the radiation environment on the lunar surface are essential. Only by knowing which particles arrive, with how much energy, and in what quantities can scientists decide on the shielding design of spacesuits and living facilities, or the limits on how long astronauts can stay, in a scientific way.",
+      "The lunar surface space radiation detector LVRAD, being developed under the leadership of the Korea Astronomy and Space Science Institute, is a science payload that answers this need. Made up of a device that measures radiation dose and energy distribution and a neutron spectrometer, it aims to assess the radiation environment on the surface of the Moon's south pole and its effects on the human body. Because the south pole may hold water ice, many countries are watching it as a candidate site for crewed exploration, which makes radiation data from this region especially valuable.",
+      "What deserves attention is how this instrument will travel to the Moon. In August 2026, the Korea AeroSpace Administration signed an implementing arrangement with the U.S. National Aeronautics and Space Administration (NASA) to send LVRAD through NASA's Commercial Lunar Payload Services (CLPS) program. Under CLPS, instead of building landers itself, NASA entrusts the transport of scientific instruments to landers developed by private companies. It is, in effect, a new division of labor in space development, in which government agencies focus on science missions while the private sector handles transportation.",
+      "If all goes as planned, LVRAD will complete its flight model by 2027 and be shipped to the United States, then arrive at the Moon's south pole aboard a lander launching in 2030. The launch date, however, may shift depending on NASA's schedule. A Korean observation instrument will produce basic data for lunar exploration within a framework of international cooperation, and this carries the meaning that Korean science and technology is taking part in preparing for the era of crewed lunar exploration."
+     ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "우주날씨 이야기",
+     "author": "황정아",
+     "note": "우주방사선과 태양풍, 오로라까지 '우주날씨'를 연구해 온 과학자가 들려주는 지구 바깥 이야기."
+    }
+   ],
+   "papers": [
+    {
+     "title": "한국천문연구원(KASI)",
+     "url": "https://www.kasi.re.kr",
+     "note": "달 탐사 탑재체 개발 소식과 우주과학 연구 자료, 천문우주 지식 콘텐츠를 찾아볼 수 있다."
+    }
+   ]
   },
   {
    "id": "carbon-market",
@@ -5747,7 +6089,13 @@
        "evidencePara": 2
       }
      ],
-     "minutes": 5
+     "minutes": 5,
+     "en": [
+      "The main cause of climate change is the greenhouse gases released when fossil fuels such as coal and oil are burned. The problem is that if companies can release greenhouse gases for free, they have no reason to spend money on reducing their emissions. So many countries have devised a way to put a price on pollution. Policies that make emitters pay for their carbon emissions are broadly called \"carbon pricing.\" A leading example of such a policy is the greenhouse gas emissions trading scheme.",
+      "The emissions trading scheme rests on two pillars: a cap on total emissions and trading. First, the government sets the total amount of greenhouse gases that can be emitted across the whole country. Within that limit, it distributes emission allowances to companies. One unit of allowance is the right to emit one ton of greenhouse gases. In principle, a company can emit only as much greenhouse gas as the allowances it holds.",
+      "The key point is that allowances can be bought and sold in a market. A company that invests in technology to reduce greenhouse gases and has allowances left over can sell them and make a profit. In contrast, a company that runs short of allowances must buy them from the market. The higher the price of allowances rises, the more advantageous it becomes to cut one's own emissions rather than to buy. The system was designed so that reducing pollution literally pays.",
+      "Korea has been operating an emissions trading scheme since 2015, and allowances are traded on the Korea Exchange like stocks. The scheme covers more than 70% of the country's total greenhouse gas emissions, and about 770 companies are taking part in the fourth planning period, which began in 2026. Allowance prices move with the economy and with policy, and recently they have also swung sharply. Following the signals the price sends, companies draw up their plans for reducing emissions."
+     ]
     },
     "L4": {
      "title": "오염에 가격을 매기다: 배출권 거래제의 경제학",
@@ -5931,9 +6279,30 @@
        "evidencePara": 2
       }
      ],
-     "minutes": 6
+     "minutes": 6,
+     "en": [
+      "The greenhouse gases that companies release while producing goods impose a cost on society as a whole in the form of climate change. Yet that cost is not reflected in market prices, so the emitters themselves pay nothing for it. In economics, this phenomenon, in which the costs or benefits of an activity are passed on to third parties, is called an \"externality.\" The emissions trading scheme is a system that puts a price on pollution, bringing this hidden cost into companies' profit-and-loss calculations.",
+      "The backbone of the scheme is the \"cap and trade\" method. The government first sets a cap, the total amount of greenhouse gases that may be emitted during a given period. It then issues allowances up to that limit and allocates them to companies. One allowance is the right to emit greenhouse gases equivalent to one ton of carbon dioxide. Because the total is fixed by the system, the combined emissions of all participating companies cannot exceed the set limit.",
+      "The refinement of this scheme lies in letting the market decide where the reductions take place. Companies whose reduction costs are low cut their own emissions and earn money by selling their leftover allowances. Companies whose reduction costs are high choose to buy allowances instead of replacing their facilities at unreasonable expense. As a result, society as a whole achieves the targeted amount of reduction at the lowest cost. When allowance prices rise, the incentive to invest in low-carbon technology grows, and the value of companies that hold reduction technology rises along with it.",
+      "Korea introduced a nationwide emissions trading scheme in 2015. The scheme covers about 74% of the country's greenhouse gas emissions, and about 770 companies subject to allocation are taking part in the fourth planning period, which runs from 2026 to 2030. Industries with large emissions, such as power generation, steel, and petrochemicals, are the main participants. Allowances are traded on the Korea Exchange, and their prices move with allocation levels, the economy, and policy changes; recently they have also swung sharply.",
+      "Of course, there are challenges. If more allowances are allocated than needed, prices fall and the incentive to reduce emissions weakens; if prices soar, the burden on companies grows. Therefore, how strictly the cap is set and how the share of paid allocation, in which allowances are sold rather than given out for free, is adjusted will decide the success or failure of the scheme. Designing the market so that the price placed on pollution leads to real reductions is still a work in progress. This discussion is also the process by which our society decides who will bear how much of the cost of climate change."
+     ]
     }
-   }
+   },
+   "books": [
+    {
+     "title": "기후위기 부의 대전환",
+     "author": "홍종호",
+     "note": "기후경제학자가 탄소에 가격을 매기는 정책과 한국 경제의 미래 전략을 알기 쉽게 풀어낸다."
+    }
+   ],
+   "papers": [
+    {
+     "title": "KRX 배출권시장 정보플랫폼",
+     "url": "https://ets.krx.co.kr",
+     "note": "실제 온실가스 배출권이 주식처럼 거래되는 시장의 가격과 제도 정보를 직접 살펴볼 수 있다."
+    }
+   ]
   }
  ],
  "diagnostics": {

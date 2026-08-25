@@ -142,6 +142,38 @@
     .obdots{display:flex;gap:7px;margin-bottom:9px}
     .obdots i{width:9px;height:9px;border-radius:999px;background:var(--line)}
     .obdots i.on{width:26px;background:var(--blue)}
+    /* ── v1.2 훈련·탐구·영어 대역 ── */
+    .para-en{margin:-8px 0 16px;padding:10px 13px;border-left:3px solid #b9deed;border-radius:0 10px 10px 0;background:#f5fbfe;color:#33566b;font-size:14px;line-height:1.7}
+    .deep{margin-top:14px;padding:14px 15px;border:1px solid #d6ebf4;border-radius:14px;background:#f8fcfe}
+    .deep h3{margin-bottom:4px}
+    .deep-item{display:block;width:100%;margin-top:9px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;text-align:left;text-decoration:none;color:var(--ink)}
+    .deep-item b{display:block;color:var(--navy);font-size:13.5px;line-height:1.5}
+    .deep-item small{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.5}
+    .train-num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:13px;font-weight:900;margin-right:8px}
+    .tokenwrap{display:flex;flex-wrap:wrap;align-items:center;row-gap:10px;margin-top:14px;font-size:16.5px;line-height:1.6}
+    .tok{color:var(--ink)}
+    .gap{min-width:20px;min-height:34px;margin:0 1px;padding:0 3px;border:0;background:none;color:#c3d4dc;font-size:15px;font-weight:900}
+    .gap[aria-pressed="true"]{color:var(--blue)}
+    .gap.hit{color:var(--ok)}
+    .gap.miss{color:var(--bad)}
+    .gap.extra{color:var(--warn)}
+    .stage-dots{display:flex;gap:6px;margin-top:8px}
+    .stage-dots i{height:7px;flex:1;border-radius:999px;background:#e4edf1}
+    .stage-dots i.on{background:var(--blue)}
+    .hj-char{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#f4ece1;color:#7a5230;font-size:22px;font-weight:900;margin-right:10px;flex:0 0 auto}
+    .chipword{display:inline-block;margin:3px 4px 0 0;padding:5px 9px;border-radius:999px;background:var(--sky);color:var(--navy);font-size:12.5px;font-weight:800}
+    .lab-step{display:flex;gap:6px;margin:10px 0 4px}
+    .lab-step i{height:7px;flex:1;border-radius:999px;background:#e4edf1}
+    .lab-step i.on{background:var(--blue)}
+    .guide{margin-top:10px;padding:11px 13px;border-radius:11px;background:#f3ecf8;color:#553a70;font-size:13px;line-height:1.65}
+    .matchip{display:flex;gap:10px;align-items:flex-start;width:100%;margin-top:8px;padding:11px 13px;border:1.5px solid #bfd7e1;border-radius:12px;background:#fff;text-align:left}
+    .matchip[aria-pressed="true"]{border-color:var(--blue);background:var(--sky)}
+    .matchip .ck{flex:0 0 20px;width:20px;height:20px;border-radius:6px;border:2px solid #9db8c4;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:900}
+    .matchip[aria-pressed="true"] .ck{background:var(--blue);border-color:var(--blue)}
+    .report-doc{margin-top:12px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fffdf8;font-size:14px;line-height:1.75}
+    .report-doc h4{margin:14px 0 4px;color:var(--navy);font-size:14px}
+    .report-doc h4:first-child{margin-top:0}
+    input[type="text"]{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:15px;color:var(--ink);background:#fff}
     .loading{padding:48px 16px;text-align:center;color:var(--muted)}
     .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:350px){.pick-grid,.stat-grid,.evalrow{grid-template-columns:repeat(2,minmax(0,1fr))}.row2{grid-template-columns:1fr}}
@@ -152,9 +184,10 @@
   <main id="app" aria-busy="true"><div class="loading" role="status">오늘의 글을 준비하고 있어요…</div></main>
   <nav class="tabbar" id="tabbar" hidden><div class="tabin">
     <button class="tab" data-act="nav" data-v="home"><b>⌂</b>홈</button>
+    <button class="tab" data-act="nav" data-v="train"><b>◎</b>훈련</button>
+    <button class="tab" data-act="nav" data-v="lab"><b>✎</b>탐구</button>
     <button class="tab" data-act="nav" data-v="library"><b>▤</b>서재</button>
     <button class="tab" data-act="nav" data-v="report"><b>◔</b>리포트</button>
-    <button class="tab" data-act="nav" data-v="settings"><b>⚙</b>설정</button>
   </div></nav>
   <div class="sheet" id="sheet" role="dialog" aria-label="어휘 풀이"><div class="sheet-in" id="sheetIn"></div></div>
   <div id="live" class="sr" role="status" aria-live="polite"></div>
@@ -187,9 +220,20 @@ let sess={}; // 화면 임시 상태 (진단/퀴즈 진행 등)
 let deferredPrompt=null; // PWA 설치 프롬프트
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
+function normalizeState(s){
+  s.prefs=s.prefs||{};
+  s.prefs.chunk=s.prefs.chunk||{L2:true,L3:false,L4:false};
+  s.prefs.en=s.prefs.en||{L3:false,L4:false};
+  s.train=s.train||[];
+  s.redbook=s.redbook||[];
+  s.reports=s.reports||[];
+  if(!('lab' in s))s.lab=null;
+  (s.vocab||[]).forEach(v=>{if(v.box==null)v.box=0;if(!v.last)v.last=v.addedAt||dkey();});
+  return s;
+}
 function loadState(){
-  try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(s&&s.v===1)return s;}}catch(e){}
-  return {v:1,profile:null,prefs:{chunk:{L2:true,L3:false,L4:false}},readings:{},scraps:{},vocab:[],quiz:{},days:{},daily:{},diag:null};
+  try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(s&&s.v===1)return normalizeState(s);}}catch(e){}
+  return normalizeState({v:1,profile:null,prefs:{chunk:{L2:true,L3:false,L4:false}},readings:{},scraps:{},vocab:[],quiz:{},days:{},daily:{},diag:null});
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 
@@ -254,13 +298,19 @@ function weekCount(){
 /* ───────────────────────── 렌더 공통 ───────────────────────── */
 function render(){
   const app=$('#app');
-  const fns={onboard:vOnboard,home:vHome,reader:vReader,quiz:vQuiz,library:vLibrary,report:vReport,settings:vSettings};
+  const fns={onboard:vOnboard,home:vHome,reader:vReader,quiz:vQuiz,library:vLibrary,report:vReport,settings:vSettings,train:vTrain,lab:vLab};
   const f=fns[view.name]||vHome;
   app.innerHTML=f();
   app.removeAttribute('aria-busy');
   $('#tabbar').hidden=!S.profile||['reader','quiz','onboard'].includes(view.name);
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.v===view.name?'true':'false'));
-  $('#headActions').innerHTML=(view.name==='reader'||view.name==='quiz')?'<button class="headbtn" data-act="nav" data-v="home">홈으로</button>':'';
+  if(view.name==='reader'||view.name==='quiz'){
+    $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="home">홈으로</button>';
+  }else if(view.name==='settings'){
+    $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="home">홈으로</button>';
+  }else if(S.profile){
+    $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="settings" aria-label="설정">⚙</button>';
+  }else{$('#headActions').innerHTML='';}
   window.scrollTo(0,0);
 }
 function go(name,extra){view=Object.assign({name},extra||{});sess={};render();}
@@ -370,7 +420,8 @@ function vHome(){
       <div class="stat"><b>${S.vocab.length}</b><span>모은 어휘</span></div>
       <div class="stat"><b>${(()=>{const qs=Object.values(S.quiz);const t=qs.reduce((s,q)=>s+q.total,0);return t?Math.round(qs.reduce((s,q)=>s+q.correct,0)/t*100)+'%':'—';})()}</b><span>문제 정답률</span></div>
     </div></div>
-    ${scrapN>=5?`<div class="card" style="border-color:#e8c9a8;background:linear-gradient(145deg,#fff8ef 0,#fff 70%)"><p class="eyebrow" style="color:#8a5a12">탐구 랩</p><h2>스크랩이 ${scrapN}편 모였어요</h2><p class="sub">탐구보고서 만들기는 다음 업데이트(v1)에서 열려요. 계속 모아 두세요!</p></div>`:''}
+    ${S.lab?`<div class="card" style="border-color:#d8c2ec;background:linear-gradient(145deg,#f8f2fd 0,#fff 70%)"><p class="eyebrow" style="color:#6b4390">탐구 랩</p><h2>쓰던 보고서가 있어요 (${S.lab.step+1}/7단계)</h2><button class="btn sm navy" data-act="nav" data-v="lab">이어서 쓰기</button></div>`
+    :scrapN>=3?`<div class="card" style="border-color:#e8c9a8;background:linear-gradient(145deg,#fff8ef 0,#fff 70%)"><p class="eyebrow" style="color:#8a5a12">탐구 랩</p><h2>스크랩이 ${scrapN}편 모였어요</h2><p class="sub">이제 탐구보고서를 시작할 수 있어요!</p><button class="btn sm" data-act="nav" data-v="lab">탐구 랩 열기</button></div>`:''}
     <div class="card"><div class="between"><h2>더 읽어 볼 글</h2><span class="tag muted">${recs.length}편</span></div>
       <div class="glist">${recs.length?recs.map(r=>{const b=levelBody(r,myLevel());return `<button class="grow" data-act="read" data-id="${r.id}">
         <span class="rowdot dot-${r.category}" style="align-self:flex-start"></span>
@@ -397,15 +448,19 @@ function vReader(){
       }
       return `<span class="seg">${html!=null?html:esc(seg)}</span>`;
     }).join('');
-    return `<p class="para" id="para-${pi}">${segs}</p>`;
+    const enP=(lv!=='L2'&&S.prefs.en[lv]&&Array.isArray(b.en)&&b.en[pi])?`<p class="para-en" lang="en">${esc(b.en[pi])}</p>`:'';
+    return `<p class="para" id="para-${pi}">${segs}</p>${enP}`;
   }).join('');
   const fs=S.prefs.fs||1;
+  const hasEn=lv!=='L2'&&Array.isArray(b.en)&&b.en.length===b.paragraphs.length;
+  const enOn=hasEn&&S.prefs.en[lv];
   return `<div class="progress-top" aria-hidden="true"><i id="progTop"></i></div>
     <div class="card lv-${lv} rd-fs ${chunk?'chunked':''}" id="readerCard" style="--fs:${fs}">
       <p class="eyebrow"><span class="tag c-${a.category}">${CATS[a.category]}</span> <span class="tag muted">${LEVEL_LABEL[lv]}</span> <span class="tag muted">약 ${b.minutes}분</span></p>
       <h1 style="margin-top:8px">${esc(b.title)}</h1>
       <div class="rd-tools">
         <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk}">∕ 끊어 읽기</button>
+        ${hasEn?`<button class="toolbtn" data-act="toggle-en" aria-pressed="${enOn}">EN 대역</button>`:''}
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         <span class="toolbtn" style="cursor:default;border-style:dashed">밑줄 단어를 누르면 뜻이 나와요</span>
@@ -413,6 +468,10 @@ function vReader(){
       <div class="rd-body">${paras}</div>
       <div class="src"><b>이 글은 아래 자료를 참고해 학생 눈높이로 새로 쓴 글이에요.</b><br>
         ${a.sources.map(s=>`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)} ↗</a>`).join(' · ')}</div>
+      ${((a.papers&&a.papers.length)||(a.books&&a.books.length))?`<div class="deep"><h3>더 깊이 보기</h3>
+        ${(a.papers||[]).map(p=>`<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`).join('')}
+        ${(a.books||[]).map(bk=>`<div class="deep-item"><b>📚 ${esc(bk.title)}</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''}</small></div>`).join('')}
+      </div>`:''}
       ${!done?`<button class="btn" data-act="read-done">다 읽었어요</button>`:''}
       ${done&&!sess.evalDone?`<h3 style="margin-top:16px">오늘 글, 어땠어요?</h3>
         <div class="evalrow">${EVALS.map(([v,l])=>`<button class="evalbtn" data-act="eval" data-v="${v}">${l}</button>`).join('')}</div>`:''}
@@ -580,6 +639,291 @@ function vSettings(){
     <p class="sub" style="text-align:center;padding:6px 0">WB 진로독서 MVP · WB 독해력학원 · 웩슬러브레인센터</p>`;
 }
 
+/* ───────────────────────── 훈련 ───────────────────────── */
+function daysSince(k){const a=new Date(k+'T12:00:00'),b=new Date(dkey()+'T12:00:00');return Math.round((b-a)/86400000);}
+function dueVocab(){const iv=[0,1,3,7,14];return S.vocab.filter(v=>daysSince(v.last)>=iv[Math.min(v.box,4)]);}
+function hanjaFamilies(){
+  const map={};
+  for(const a of DB.articles){
+    if(a.status!=='published')continue;
+    for(const lv of LEVELS){
+      const b=a.levels[lv];if(!b)continue;
+      for(const v of b.vocab){
+        if(!v.hanja)continue;
+        for(const part of v.hanja.split('+')){
+          const m=part.trim().match(/^(.)\((.+)\)$/);if(!m)continue;
+          if(!map[m[1]])map[m[1]]={ch:m[1],rd:m[2],words:{}};
+          map[m[1]].words[v.word]={word:v.word,easy:v.easy};
+        }
+      }
+    }
+  }
+  return Object.values(map).map(f=>({ch:f.ch,rd:f.rd,words:Object.values(f.words)}))
+    .filter(f=>f.words.length>=2).sort((x,y)=>y.words.length-x.words.length);
+}
+function copyText(t){
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');announce('복사했어요');}catch(e){announce('복사가 안 됐어요');}ta.remove();};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>announce('복사했어요'),fb);}else fb();
+}
+function pickTrainPara(){
+  const reads=Object.entries(S.readings).sort((x,y)=>y[1].date<x[1].date?-1:1);
+  for(const [id] of reads){
+    const a=DB.articles.find(x=>x.id===id);if(!a)continue;
+    const b=levelBody(a,myLevel());if(!b)continue;
+    let best=-1,bi=0;
+    b.paragraphs.forEach((p,i)=>{const len=p.join('').length;if(p.length>=3&&len>best){best=len;bi=i;}});
+    if(best>0)return {articleId:id,paraIdx:bi};
+  }
+  return null;
+}
+function modelBoundaries(p){
+  const out=new Set();let cum=0;
+  for(let i=0;i<p.length;i++){
+    cum+=p[i].trim().split(/\s+/).filter(Boolean).length;
+    if(i<p.length-1)out.add(cum-1);
+  }
+  return out;
+}
+function vTrain(){
+  if(sess.ct)return vChunkTrain();
+  if(sess.vs)return vVocabSession();
+  if(sess.rb)return vRedbookForm();
+  const tp=pickTrainPara();
+  const due=dueVocab();
+  const hj=hanjaFamilies();
+  const last=S.train.length?S.train[S.train.length-1]:null;
+  return `<div class="card hero"><p class="eyebrow">읽기 근육 훈련</p><h1>오늘도 한 세트!</h1>
+    <p class="sub">회당 5~10분이면 충분해요. 지금까지 훈련 ${S.train.length}회 · 붉은 책 요약 ${S.redbook.length}회</p></div>
+  <div class="card"><div class="between"><h2>∕ 끊어 읽기 훈련</h2>${last?`<span class="tag ok">최근 ${last.score}%</span>`:''}</div>
+    <p class="sub">읽었던 글로 3단계 — 따라 읽기 → 직접 끊기 → 표시 없이 읽고 문제 풀기.</p>
+    <button class="btn sm" data-act="ct-start" ${tp?'':'disabled'}>${tp?'훈련 시작':'먼저 글을 1편 읽어 주세요'}</button></div>
+  <div class="card"><div class="between"><h2>어휘 복습</h2><span class="tag ${due.length?'warn':'muted'}">${due.length?'오늘 '+due.length+'개':'오늘은 없음'}</span></div>
+    <p class="sub">하루·사흘·일주일 간격으로 다시 만나야 오래 남아요.</p>
+    <button class="btn sm" data-act="vs-start" ${due.length?'':'disabled'}>복습 시작</button></div>
+  <div class="card"><div class="between"><h2>한자 카드</h2><span class="tag muted">${hj.length}묶음</span></div>
+    <p class="sub">한자 하나를 알면 낱말 여러 개가 한꺼번에 열려요.</p>
+    <div class="glist">${hj.length?hj.slice(0,8).map(f=>{
+      const open=sess.hjOpen===f.ch;
+      const closed=f.words.map(w=>w.word).join(' · ');
+      const opened=f.words.map(w=>`<b>${esc(w.word)}</b> — ${esc(w.easy)}`).join('<br>');
+      return `<button class="grow" data-act="hj-open" data-ch="${esc(f.ch)}">
+        <span class="hj-char">${esc(f.ch)}</span>
+        <span class="t"><b>${esc(f.rd)}</b><small>${open?opened:esc(closed)}</small></span>
+        <span class="go">${open?'−':'+'}</span></button>`;
+    }).join(''):'<div class="empty">어휘가 쌓이면 한자 묶음이 생겨요.</div>'}</div></div>
+  <div class="card"><div class="between"><h2>붉은 책 요약</h2><span class="tag muted">${S.redbook.length}회</span></div>
+    <p class="sub">스터디포스 교재를 읽고 책을 덮은 뒤, 내 말로 요약해요. 교재 내용은 앱에 싣지 않아요.</p>
+    <button class="btn sm" data-act="rb-new">요약 쓰기</button>
+    <div class="glist">${S.redbook.slice(-3).reverse().map(r=>`<div class="grow" style="cursor:default"><span class="t"><b>${esc(r.unit)}</b><small>${r.date} · ${esc(r.summary.slice(0,42))}${r.summary.length>42?'…':''}</small></span></div>`).join('')}</div>
+    ${S.redbook.length?`<button class="btn ghost sm" data-act="rb-copy">전체 기록 복사 (선생님 확인용)</button>`:''}</div>`;
+}
+function vChunkTrain(){
+  const ct=sess.ct;
+  const a=DB.articles.find(x=>x.id===ct.articleId);
+  const b=levelBody(a,myLevel());
+  const p=b.paragraphs[ct.paraIdx];
+  const text=p.join('');
+  const dots=`<div class="stage-dots">${[1,2,3].map(i=>`<i class="${ct.stage>=i?'on':''}"></i>`).join('')}</div>`;
+  const quit=`<button class="btn ghost sm" data-act="ct-quit">그만하기</button>`;
+  if(ct.stage===1){
+    return `<div class="card chunked"><p class="eyebrow">끊어 읽기 훈련 1/3 — 따라 읽기</p>${dots}
+      <p class="sub" style="margin-top:10px">「${esc(b.title)}」의 한 문단이에요. ∕ 표시에서 살짝 쉬며 의미 덩어리로 읽어 보세요.</p>
+      <p class="para" style="margin-top:14px">${p.map(seg=>`<span class="seg">${esc(seg)}</span>`).join('')}</p>
+      <button class="btn" data-act="ct-to2">다 읽었어요 — 직접 끊어 볼래요</button>${quit}</div>`;
+  }
+  if(ct.stage===2){
+    const words=text.split(/\s+/).filter(Boolean);
+    let flow='';
+    words.forEach((w,i)=>{
+      flow+=`<span class="tok">${esc(w)}</span>`;
+      if(i<words.length-1){
+        const on=ct.marks.has(i);
+        let cls='gap',sym=on?'∕':'·';
+        if(ct.checked){
+          const inM=ct.model.has(i);
+          if(on&&inM){cls+=' hit';sym='∕';}
+          else if(!on&&inM){cls+=' miss';sym='∕';}
+          else if(on&&!inM){cls+=' extra';sym='∕';}
+        }
+        flow+=`<button class="${cls}" data-act="ct-gap" data-i="${i}" aria-pressed="${on}" ${ct.checked?'disabled':''}>${sym}</button>`;
+      }
+    });
+    let result='';
+    if(ct.checked){
+      result=`<div class="explain" style="margin-top:14px"><b>일치 ${ct.hit} / 모범 ${ct.model.size}${ct.extra?` · 불필요 ${ct.extra}`:''} — ${ct.score}점</b><br>
+      <span style="color:var(--ok);font-weight:800">초록 ∕</span> 잘 끊었어요 · <span style="color:var(--bad);font-weight:800">빨강 ∕</span> 여기서도 끊어야 해요${ct.extra?` · <span style="color:var(--warn);font-weight:800">주황 ∕</span> 안 끊어도 돼요`:''}</div>
+      <button class="btn" data-act="ct-to3">다음 — 표시 없이 읽기</button>`;
+    }else{
+      result=`<button class="btn" data-act="ct-check">확인하기</button>`;
+    }
+    return `<div class="card"><p class="eyebrow">끊어 읽기 훈련 2/3 — 직접 끊기</p>${dots}
+      <p class="sub" style="margin-top:10px">의미가 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔 보세요.</p>
+      <div class="tokenwrap">${flow}</div>${result}${quit}</div>`;
+  }
+  const q=ct.q;
+  const answered=ct.picked!=null;
+  if(ct.stage===3){
+    return `<div class="card"><p class="eyebrow">끊어 읽기 훈련 3/3 — 표시 없이 읽기</p>${dots}
+      <p class="para" style="margin-top:14px">${esc(text)}</p>
+      <p class="qtext">${esc(q.q)}</p>
+      <div class="choices">${q.choices.map((c,i)=>{
+        let cls='choice',num=String(i+1);
+        if(answered){if(i===q.answer){cls+=' correct';num='✓';}else if(i===ct.picked){cls+=' wrong';num='✕';}}
+        return `<button class="${cls}" data-act="ct-pick" data-i="${i}" ${answered?'disabled':''}><span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;
+      }).join('')}</div>
+      ${answered?`<div class="explain"><b>${ct.picked===q.answer?'정답!':'아쉬워요.'}</b> ${esc(q.explain)}</div>
+      <button class="btn" data-act="ct-finish">훈련 마치기</button>`:''}${answered?'':quit}</div>`;
+  }
+  return `<div class="card hero"><p class="eyebrow">끊어 읽기 훈련 완료</p><h1>끊기 ${ct.score}점 · 문제 ${ct.qOk?'정답':'오답'}</h1>
+    <p class="sub">${ct.score>=80?'의미 덩어리가 눈에 잘 들어오고 있어요!':'모범 ∕ 위치를 다시 보며 한 번 더 해 보면 늘어요.'}</p>
+    <button class="btn" data-act="ct-quit">훈련으로 돌아가기</button></div>`;
+}
+function vVocabSession(){
+  const vs=sess.vs;
+  if(vs.i>=vs.list.length){
+    return `<div class="card hero"><p class="eyebrow">어휘 복습 완료</p><h1>${vs.list.length}개 끝!</h1>
+      <p class="sub">알았어요 ${vs.ok}개 · 헷갈려요 ${vs.miss}개. 헷갈린 단어는 내일 다시 나와요.</p>
+      <button class="btn" data-act="vs-done">훈련으로 돌아가기</button></div>`;
+  }
+  const v=vs.list[vs.i];
+  return `<div class="card"><p class="qnum">어휘 복습 ${vs.i+1}/${vs.list.length}</p>
+    <p class="qtext" style="font-size:23px;margin-top:12px">${esc(v.word)}</p>
+    ${vs.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}</div>
+      <div class="row2" style="margin-top:10px"><button class="btn sm ghost" data-act="vs-mark" data-ok="0" style="margin-top:0">헷갈려요</button>
+      <button class="btn sm" data-act="vs-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
+    :`<button class="btn sm" data-act="vs-show">뜻 보기</button>`}
+    <button class="btn ghost sm" data-act="vs-done">그만하기</button></div>`;
+}
+function vRedbookForm(){
+  const c=sess.rbChecks||[false,false,false];
+  const labels=['핵심 개념을 내 말로 바꿔 썼어요','예시나 이유를 1개 이상 넣었어요','잘 모르는 부분을 표시해 두었어요'];
+  return `<div class="card"><p class="eyebrow">붉은 책 요약</p><h2>책을 덮고, 내 말로 써 보세요</h2>
+    <p class="sub">교재 문장을 그대로 옮기지 않기! 기억나는 대로 쓰는 것이 진짜 훈련이에요.</p>
+    <input type="text" id="rbUnit" placeholder="단원명 (예: 3단원 문단의 짜임)" value="${esc(sess.rbUnit||'')}">
+    <textarea id="rbSum" style="min-height:120px" placeholder="이 단원에서 배운 것을 내 말로 요약해 보세요 (최소 50자)">${esc(sess.rbSum||'')}</textarea>
+    ${labels.map((l,i)=>`<button class="matchip" data-act="rb-check" data-i="${i}" aria-pressed="${c[i]}"><span class="ck">${c[i]?'✓':''}</span><span>${l}</span></button>`).join('')}
+    <button class="btn" data-act="rb-save">저장하기</button>
+    <button class="btn ghost sm" data-act="rb-quit">취소</button>
+    <p class="note">요약을 체크리스트와 대조해 짚어 주는 AI 코칭은 서버 연동 후 열려요. 지금은 기록이 선생님 확인용으로 저장돼요.</p></div>`;
+}
+
+/* ───────────────────────── 탐구 랩 ───────────────────────── */
+const LAB_STEPS=['재료 고르기','탐구 주제','탐구 동기','알게 된 내용','더 알아보기','결론과 성찰','완성'];
+function labMaterials(){
+  const ids=[...new Set([...Object.keys(S.scraps),...Object.keys(S.readings)])];
+  return ids.map(id=>{const a=DB.articles.find(x=>x.id===id);if(!a)return null;
+    const b=levelBody(a,myLevel())||a.levels.L3||a.levels.L2;
+    return {id,title:b.title,category:a.category,a};}).filter(Boolean);
+}
+function reportText(r){
+  const mats=r.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);const b=a?(levelBody(a,myLevel())||a.levels.L3):null;return {a,title:b?b.title:id};});
+  const refs=[];
+  mats.forEach(m=>{if(m.a)m.a.sources.forEach(s=>{const t=s.title+' — '+s.url;if(!refs.includes(t))refs.push(t);});});
+  const lines=[];
+  lines.push('# '+(r.title||'탐구보고서'));
+  lines.push('');
+  lines.push('## 1. 주제 선정 이유(탐구 동기)');lines.push(r.motive||'');
+  lines.push('## 2. 탐구 질문');lines.push(r.topic||'');
+  lines.push('## 3. 읽은 자료');
+  mats.forEach(m=>lines.push('- '+m.title));
+  lines.push('## 4. 알게 된 내용');
+  mats.forEach(m=>{const l=(r.learned||{})[m.a?m.a.id:''];if(l)lines.push('- ('+m.title+') '+l);});
+  if(r.more){lines.push('## 5. 더 알아본 것');lines.push(r.more);}
+  lines.push('## '+(r.more?'6':'5')+'. 결론');lines.push(r.conclusion||'');
+  lines.push('## '+(r.more?'7':'6')+'. 느낀 점과 진로 성찰');lines.push(r.reflect||'');
+  lines.push('## 참고 자료');
+  refs.forEach(t=>lines.push('- '+t));
+  return lines.join('\n');
+}
+function vReportDoc(r){
+  const mats=r.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);const b=a?(levelBody(a,myLevel())||a.levels.L3):null;return b?b.title:id;});
+  return `<div class="card"><div class="between"><h2>${esc(r.title||'탐구보고서')}</h2><button class="toolbtn" data-act="lab-close-view">닫기</button></div>
+    <div class="report-doc">
+      <h4>1. 주제 선정 이유(탐구 동기)</h4><p>${esc(r.motive||'')}</p>
+      <h4>2. 탐구 질문</h4><p>${esc(r.topic||'')}</p>
+      <h4>3. 읽은 자료</h4><p>${mats.map(esc).join('<br>')}</p>
+      <h4>4. 알게 된 내용</h4><p>${r.mats.map(id=>esc((r.learned||{})[id]||'')).filter(Boolean).join('<br>')}</p>
+      ${r.more?`<h4>5. 더 알아본 것</h4><p>${esc(r.more)}</p>`:''}
+      <h4>${r.more?'6':'5'}. 결론</h4><p>${esc(r.conclusion||'')}</p>
+      <h4>${r.more?'7':'6'}. 느낀 점과 진로 성찰</h4><p>${esc(r.reflect||'')}</p>
+    </div>
+    <button class="btn" data-act="lab-copy-doc">보고서 텍스트 복사 (한글·문서에 붙여넣기)</button>
+    <p class="note">이 보고서는 수행평가·수업 발표·창체 활동에 가져가 쓰는 '준비물'이에요. 생기부에는 학교 활동으로 이어질 때 반영돼요.</p></div>`;
+}
+function vLab(){
+  if(sess.labView!=null)return vReportDoc(S.reports[sess.labView]);
+  if(!S.lab){
+    const mats=labMaterials();
+    return `<div class="card hero"><p class="eyebrow">탐구 랩</p><h1>읽은 글이 보고서가 됩니다</h1>
+      <p class="sub">재료(완독·스크랩) ${mats.length}편. 3편 이상이면 좋아요.</p>
+      <button class="btn" data-act="lab-new" ${mats.length?'':'disabled'}>${mats.length?'탐구보고서 시작하기':'먼저 글을 1편 읽어 주세요'}</button></div>
+    ${S.reports.length?`<div class="card"><h2>완성한 보고서</h2><div class="glist">${S.reports.map((r,i)=>`<button class="grow" data-act="lab-view" data-i="${i}"><span class="t"><b>${esc(r.title||'제목 없음')}</b><small>${r.done} · 재료 ${r.mats.length}편</small></span><span class="go">›</span></button>`).join('')}</div></div>`:''}
+    <div class="card"><h3>어떻게 진행되나요?</h3><p class="sub" style="margin-top:8px">6단계로 한 칸씩: 재료 고르기 → 주제 → 동기 → 알게 된 것 → 더 알아보기 → 결론·성찰 → 완성. 안내 질문이 도와주지만 <b>문장은 전부 내가 씁니다</b> — 그래야 진짜 내 보고서가 되니까요.</p></div>`;
+  }
+  const L=S.lab;const step=L.step;
+  const bar=`<div class="lab-step">${LAB_STEPS.map((_,i)=>`<i class="${step>=i?'on':''}"></i>`).join('')}</div>`;
+  const head=`<p class="eyebrow">탐구보고서 ${step+1}/7 — ${LAB_STEPS[step]}</p>${bar}`;
+  const nav=(nextLabel)=>`${step>0?`<button class="btn ghost sm" data-act="lab-back">이전</button>`:''}
+    <button class="btn" data-act="lab-next">${nextLabel||'다음'}</button>
+    <button class="btn ghost sm" data-act="lab-quit">저장하고 나가기</button>`;
+  if(step===0){
+    const mats=labMaterials();
+    return `<div class="card">${head}
+      <p class="sub" style="margin-top:10px">보고서의 재료가 될 글을 고르세요. (1편 이상, 3편 추천)</p>
+      ${mats.map(m=>`<button class="matchip" data-act="lab-mat" data-id="${m.id}" aria-pressed="${L.mats.includes(m.id)}">
+        <span class="ck">${L.mats.includes(m.id)?'✓':''}</span>
+        <span><b>${esc(m.title)}</b><br><small style="color:var(--muted)">${CATS[m.category]}</small></span></button>`).join('')}
+      ${nav()}</div>`;
+  }
+  if(step===1){
+    const titles=L.mats.map(id=>{const m=labMaterials().find(x=>x.id===id);return m?m.title:id;});
+    return `<div class="card">${head}
+      <div class="guide">고른 글: ${titles.map(esc).join(' / ')}<br>이 글들을 관통하는 <b>궁금증을 질문 한 문장</b>으로 써 보세요. 예: "우주에서 사람 몸을 지키려면 무엇이 필요할까?"</div>
+      <input type="text" id="labTopic" placeholder="탐구 질문 (한 문장)" value="${esc(L.topic||'')}">
+      ${nav()}</div>`;
+  }
+  if(step===2){
+    return `<div class="card">${head}
+      <div class="guide">유도 질문 — 글을 읽다가 <b>가장 놀랐던 부분</b>은? 이 주제가 <b>내 진로와 어떻게 닿아</b> 있나요? 왜 하필 이 질문인가요?</div>
+      <textarea id="labMotive" style="min-height:110px" placeholder="이 주제를 고른 이유를 내 말로 (3~5문장)">${esc(L.motive||'')}</textarea>
+      ${nav()}</div>`;
+  }
+  if(step===3){
+    return `<div class="card">${head}
+      <div class="guide">글마다 <b>알게 된 핵심을 1~2문장</b>으로. 베껴 쓰지 말고 기억나는 대로!</div>
+      ${L.mats.map(id=>{const m=labMaterials().find(x=>x.id===id);
+        return `<p class="sub" style="margin-top:12px;font-weight:800;color:var(--navy)">${esc(m?m.title:id)}</p>
+        <textarea data-learn="${id}" style="min-height:70px" placeholder="이 글에서 알게 된 것">${esc((L.learned||{})[id]||'')}</textarea>`;}).join('')}
+      ${nav()}</div>`;
+  }
+  if(step===4){
+    const deeps=[];
+    L.mats.forEach(id=>{const a=DB.articles.find(x=>x.id===id);if(!a)return;
+      (a.papers||[]).forEach(p=>deeps.push(`<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><b>📄 ${esc(p.title)} ↗</b><small>${esc(p.note||'')}</small></a>`));
+      (a.books||[]).forEach(bk=>deeps.push(`<div class="deep-item"><b>📚 ${esc(bk.title)}</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''}</small></div>`));});
+    return `<div class="card">${head}
+      <div class="guide">더 찾아본 것이 있으면 적어요. (선택 — 없으면 그냥 다음)</div>
+      ${deeps.length?`<p class="sub" style="margin-top:10px;font-weight:800">고른 글과 이어지는 자료</p>${deeps.join('')}`:''}
+      <textarea id="labMore" style="min-height:80px" placeholder="더 찾아본 내용·출처 (선택)">${esc(L.more||'')}</textarea>
+      ${nav()}</div>`;
+  }
+  if(step===5){
+    return `<div class="card">${head}
+      <div class="guide">점검 질문 — 내 결론은 <b>탐구 질문에 대한 답</b>이 되나요? 근거가 결론을 받쳐 주나요?</div>
+      <textarea id="labConc" style="min-height:100px" placeholder="결론: 탐구 질문에 대한 나의 답">${esc(L.conclusion||'')}</textarea>
+      <textarea id="labRef" style="min-height:80px" placeholder="느낀 점과 진로 성찰: 이 탐구가 내 진로 생각을 어떻게 바꿨나요?">${esc(L.reflect||'')}</textarea>
+      ${nav()}</div>`;
+  }
+  return `<div class="card">${head}
+    <div class="guide">제목을 붙이면 완성! 참고 자료 목록은 자동으로 정리돼요.</div>
+    <input type="text" id="labTitle" placeholder="보고서 제목" value="${esc(L.title||'')}">
+    <div class="report-doc" style="max-height:300px;overflow-y:auto"><pre style="white-space:pre-wrap;font:inherit;margin:0">${esc(reportText(L))}</pre></div>
+    ${step>0?`<button class="btn ghost sm" data-act="lab-back">이전</button>`:''}
+    <button class="btn" data-act="lab-finish">완성! 저장하기</button>
+    <button class="btn ghost sm" data-act="lab-quit">저장하고 나가기</button></div>`;
+}
+
 /* ───────────────────────── 어휘 시트 ───────────────────────── */
 function openVocab(articleId,word){
   const a=DB.articles.find(x=>x.id===articleId);
@@ -587,7 +931,7 @@ function openVocab(articleId,word){
   const v=b.vocab.find(x=>x.word===word);if(!v)return;
   let savedNew=false;
   if(!S.vocab.some(x=>x.word===v.word)){
-    S.vocab.push({word:v.word,easy:v.easy,hanja:v.hanja||null,articleId,addedAt:dkey(),ok:0,miss:0});
+    S.vocab.push({word:v.word,easy:v.easy,hanja:v.hanja||null,articleId,addedAt:dkey(),ok:0,miss:0,box:0,last:addDays(dkey(),-1)});
     save();savedNew=true;
   }
   $('#sheetIn').innerHTML=`<div class="between"><span class="sheet-w">${esc(v.word)}</span>
@@ -651,10 +995,88 @@ document.addEventListener('click',e=>{
   else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
     if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
+  else if(act==='toggle-en'){const lv=myLevel();S.prefs.en[lv]=!S.prefs.en[lv];save();render();}
+  /* ── 끊어 읽기 훈련 ── */
+  else if(act==='ct-start'){const tp=pickTrainPara();if(!tp)return;
+    const a=DB.articles.find(x=>x.id===tp.articleId);const b=levelBody(a,myLevel());
+    const p=b.paragraphs[tp.paraIdx];
+    const q=b.questions.find(x=>x.evidencePara===tp.paraIdx)||b.questions[0];
+    sess.ct={articleId:tp.articleId,paraIdx:tp.paraIdx,stage:1,marks:new Set(),model:modelBoundaries(p),checked:false,q,picked:null,score:0,hit:0,extra:0,qOk:false};
+    render();}
+  else if(act==='ct-quit'){sess.ct=null;render();}
+  else if(act==='ct-to2'){sess.ct.stage=2;render();}
+  else if(act==='ct-gap'){const i=+t.dataset.i;const m=sess.ct.marks;if(m.has(i))m.delete(i);else m.add(i);render();}
+  else if(act==='ct-check'){const ct=sess.ct;
+    ct.hit=[...ct.marks].filter(i=>ct.model.has(i)).length;
+    ct.extra=[...ct.marks].filter(i=>!ct.model.has(i)).length;
+    ct.score=Math.max(0,Math.round((ct.hit-0.5*ct.extra)/Math.max(1,ct.model.size)*100));
+    ct.checked=true;render();}
+  else if(act==='ct-to3'){sess.ct.stage=3;render();}
+  else if(act==='ct-pick'){const ct=sess.ct;if(ct.picked!=null)return;
+    ct.picked=+t.dataset.i;ct.qOk=ct.picked===ct.q.answer;render();}
+  else if(act==='ct-finish'){const ct=sess.ct;
+    S.train.push({date:dkey(),articleId:ct.articleId,score:ct.score,qOk:ct.qOk});save();
+    ct.stage=4;render();}
+  /* ── 어휘 SRS 복습 ── */
+  else if(act==='vs-start'){const due=dueVocab();if(!due.length)return;
+    sess.vs={list:due.slice(0,10),i:0,show:false,ok:0,miss:0};render();}
+  else if(act==='vs-show'){sess.vs.show=true;render();}
+  else if(act==='vs-mark'){const vs=sess.vs;const v=vs.list[vs.i];
+    const sv=S.vocab.find(x=>x.word===v.word);
+    if(sv){if(t.dataset.ok==='1'){sv.box=Math.min(4,(sv.box||0)+1);sv.ok=(sv.ok||0)+1;vs.ok++;}
+      else{sv.box=0;sv.miss=(sv.miss||0)+1;vs.miss++;}
+      sv.last=dkey();save();}
+    vs.i++;vs.show=false;render();}
+  else if(act==='vs-done'){sess.vs=null;render();}
+  /* ── 한자 카드 ── */
+  else if(act==='hj-open'){sess.hjOpen=sess.hjOpen===t.dataset.ch?null:t.dataset.ch;render();}
+  /* ── 붉은 책 요약 ── */
+  else if(act==='rb-new'){sess.rb=true;sess.rbChecks=[false,false,false];sess.rbUnit='';sess.rbSum='';render();}
+  else if(act==='rb-check'){sess.rbUnit=($('#rbUnit')||{}).value||'';sess.rbSum=($('#rbSum')||{}).value||'';
+    const i=+t.dataset.i;sess.rbChecks[i]=!sess.rbChecks[i];render();}
+  else if(act==='rb-save'){const unit=($('#rbUnit')||{}).value||'';const sum=($('#rbSum')||{}).value||'';
+    if(!unit.trim()){announce('단원명을 적어 주세요');return;}
+    if(sum.trim().length<50){announce('요약을 50자 이상 써 주세요 (지금 '+sum.trim().length+'자)');return;}
+    S.redbook.push({date:dkey(),unit:unit.trim(),summary:sum.trim(),checks:sess.rbChecks});save();
+    sess.rb=null;render();announce('요약 저장 완료');}
+  else if(act==='rb-quit'){sess.rb=null;render();}
+  else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n${r.summary}\n셀프체크: ${r.checks.filter(Boolean).length}/3`).join('\n\n');
+    copyText('WB 붉은 책 요약 기록\n\n'+txt);}
+  /* ── 탐구 랩 ── */
+  else if(act==='lab-new'){S.lab={step:0,mats:[],topic:'',motive:'',learned:{},more:'',conclusion:'',reflect:'',title:'',started:dkey(),log:[dkey()]};save();render();}
+  else if(act==='lab-mat'){const id=t.dataset.id;const m=S.lab.mats;const i=m.indexOf(id);
+    if(i>=0)m.splice(i,1);else m.push(id);save();render();}
+  else if(act==='lab-back'){labCollect();S.lab.step=Math.max(0,S.lab.step-1);save();render();}
+  else if(act==='lab-next'){const L=S.lab;
+    if(L.step===0&&!L.mats.length){announce('재료를 1편 이상 골라 주세요');return;}
+    labCollect();
+    if(L.step===1&&!L.topic.trim()){announce('탐구 질문을 한 문장 써 주세요');return;}
+    if(L.step===2&&L.motive.trim().length<10){announce('동기를 조금만 더 써 주세요');return;}
+    if(L.step===5&&!L.conclusion.trim()){announce('결론을 써 주세요');return;}
+    L.step=Math.min(6,L.step+1);L.log.push(dkey());save();render();}
+  else if(act==='lab-quit'){labCollect();save();go('lab');announce('임시 저장했어요');}
+  else if(act==='lab-finish'){labCollect();const L=S.lab;
+    if(!L.title.trim()){announce('제목을 붙여 주세요');return;}
+    S.reports.push({...L,done:dkey()});S.lab=null;save();
+    sess.labView=S.reports.length-1;render();announce('보고서 완성!');}
+  else if(act==='lab-view'){sess.labView=+t.dataset.i;render();}
+  else if(act==='lab-close-view'){sess.labView=null;render();}
+  else if(act==='lab-copy-doc'){copyText(reportText(S.reports[sess.labView]));}
   else if(act==='reset-ask'){sess.confirmReset=true;render();}
   else if(act==='reset-no'){sess.confirmReset=false;render();}
   else if(act==='reset-yes'){localStorage.removeItem(KEY);S=loadState();go('onboard');}
 });
+function labCollect(){
+  const L=S.lab;if(!L)return;
+  const g=id=>{const el=document.getElementById(id);return el?el.value:null;};
+  const tv=g('labTopic');if(tv!=null)L.topic=tv;
+  const mv=g('labMotive');if(mv!=null)L.motive=mv;
+  const mo=g('labMore');if(mo!=null)L.more=mo;
+  const co=g('labConc');if(co!=null)L.conclusion=co;
+  const re=g('labRef');if(re!=null)L.reflect=re;
+  const ti=g('labTitle');if(ti!=null)L.title=ti;
+  document.querySelectorAll('[data-learn]').forEach(el=>{L.learned[el.dataset.learn]=el.value;});
+}
 window.addEventListener('scroll',()=>{
   if(view.name!=='reader')return;
   const el=document.getElementById('progTop');if(!el)return;

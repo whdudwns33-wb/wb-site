@@ -91,6 +91,19 @@ const ids = new Set();
   ['L2', 'L3', 'L4'].forEach(lv => {
     if (!a.levels || !a.levels[lv]) { E(`${tag}: ${lv} 없음`); return; }
     checkLevel(`${tag}/${lv}`, lv, a.levels[lv], false);
+    const b = a.levels[lv];
+    if (b.en != null) {
+      if (lv === 'L2') W(`${tag}/${lv}: L2에는 영어 대역을 쓰지 않음`);
+      if (!Array.isArray(b.en) || b.en.length !== b.paragraphs.length)
+        E(`${tag}/${lv}: en 배열 길이(${Array.isArray(b.en) ? b.en.length : '없음'})가 문단 수(${b.paragraphs.length})와 다름`);
+      else b.en.forEach((p, i) => { if (typeof p !== 'string' || p.trim().length < 10) E(`${tag}/${lv}: en[${i}] 비정상`); });
+    }
+  });
+  (a.papers || []).forEach((p, i) => {
+    if (!p.title || !/^https:\/\//.test(p.url || '')) E(`${tag}: papers[${i}] title/https URL 오류`);
+  });
+  (a.books || []).forEach((b, i) => {
+    if (!b.title || !b.author) E(`${tag}: books[${i}] title/author 누락`);
   });
 });
 ['L2', 'L3', 'L4'].forEach(lv => {
