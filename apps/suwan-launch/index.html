@@ -431,7 +431,7 @@
     .print-only{display:block}
     body{background:#fff}
     .view{padding:0}
-    .card{break-inside:avoid;border-color:#ccc}
+    .card,.goal-card,.dec-card,.proj-card,.biz-card{break-inside:avoid;border-color:#ccc}
   }
 </style>
 </head>
@@ -1727,7 +1727,7 @@ const TIMELINE_OFFSETS = [
 ];
 function renderTimeline(){
   const openDate = S.openDate;
-  if(!openDate){ app.innerHTML = '<section class="view"><div class="card">홈 화면에서 오픈 목표일을 먼저 설정해주세요.</div></section>'; return; }
+  if(!openDate){ app.innerHTML = '<section class="view"><div class="card">프로젝트 홈에서 오픈 목표일을 먼저 설정해주세요.</div></section>'; return; }
   const today = new Date(); today.setHours(0,0,0,0);
   const target = S.answers.s2 || 100;
   const items = TIMELINE_OFFSETS.map(t => {
@@ -1743,7 +1743,7 @@ function renderTimeline(){
   <section class="view">
     <div class="eyebrow">Launch Timeline</div>
     <h2>오픈 타임라인</h2>
-    <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 홈 화면에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
+    <p class="lede">오픈 목표일(<b>${esc(fmtDate(openD))}</b>)에서 역산한 준비 일정입니다. 프로젝트 홈에서 목표일을 바꾸면 전체 일정이 자동으로 다시 계산됩니다.</p>
     <div class="no-print" style="margin:14px 0"><button class="btn sm" onclick="window.print()">🖨 인쇄 / PDF 저장</button></div>
     <div class="card tight" style="margin-bottom:16px">
       <span class="pill ${seasonState==='off'?'warn':'ok'}">${seasonState==='in' ? '✓ 모집 시즌(11~2월) 한복판 오픈' : seasonState==='pre' ? '✓ 모집 시즌 직전 진입 — 하반기 목표와 정합' : '⚠ 모집 시즌(11~2월)과 어긋남 — 날짜 재검토 권장'}</span>
@@ -2025,7 +2025,7 @@ function addFunnelEntry(){
   }
   S.funnelEntries = S.funnelEntries || [];
   S.funnelEntries.push({ id:'fn'+Math.random().toString(36).slice(2,9), month, ...vals });
-  S.funnelEntries.sort((a,b)=>a.month<b.month?-1:1);
+  S.funnelEntries.sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
   save(); renderFunnel(); toast('입력 완료');
 }
 function delFunnelEntry(id){
@@ -3001,7 +3001,7 @@ const GOAL_SEED = [
   { id:'g2', theme:'수완지구 신규 거점 오픈',
     why:'2026 하반기 개원. 이 보드의 수완 프로젝트 화면 전체가 이 목표에 속한다.',
     items:[
-      { id:'g2a', t:'3자 합의 완료 (합의 트래커 7건 전부 합의완료)', done:false },
+      { id:'g2a', t:'3자 합의 완료 (합의 트래커 전 항목 합의완료)', done:false },
       { id:'g2b', t:'임대차 계약 · 인허가 완료 (오픈 준비 체크리스트 ①②)', done:false },
       { id:'g2c', t:'개원 (목표 2026-11-02)', done:false },
     ]},
@@ -3015,7 +3015,7 @@ const GOAL_SEED = [
   { id:'g4', theme:'3자 협업 체계화',
     why:'리더스·리드앤톡과의 관계를 개인 신뢰가 아니라 문서화된 합의와 정기 소통 구조로 만든다.',
     items:[
-      { id:'g4a', t:'합의 트래커 7건 서면화', done:false },
+      { id:'g4a', t:'합의 트래커 전 항목 서면화', done:false },
       { id:'g4b', t:'월 1회 3자 정례 미팅 고정', done:false },
       { id:'g4c', t:'개인정보 제3자 제공 동의 체계 확립', done:false },
     ]},
@@ -3029,7 +3029,7 @@ const PROJECT_STATUSES = ['구상중','진행중','보류','완료'];
 
 const DECISION_SEED = [
   { id:'d1', status:'open', title:'3자 수익 배분 · 지분 구조',
-    bg:'지분+성과 인센티브 혼합 방향만 합의. 리드앤톡 참여 범위(비지분 위탁 vs 공동투자)가 인터뷰에서 상충 — 합의 트래커 a4·a5.',
+    bg:'지분+성과 인센티브 혼합 방향만 합의. 리드앤톡 참여 범위(비지분 위탁 vs 공동투자)가 인터뷰에서 상충 — 합의 트래커의 「사업 구조·수익 배분」·「리드앤톡 지분 참여 범위」 항목.',
     options:'① 대표+리더스 지분, 리드앤톡 운영위탁 ② 3자 공동투자 ③ 혼합(소수 지분+인센티브)', decision:'', decidedAt:'' },
   { id:'d2', status:'open', title:'수완 오픈일 최종 확정',
     bg:'"2026 하반기"만 확정. 현재 11-02는 임시값 — 임대차 계약과 인허가 일정이 정해져야 역산이 잠긴다.',
@@ -3059,7 +3059,7 @@ function suwanProgress(){
 
 /* ── 총괄 대시보드 ── */
 function latestKpi(biz){
-  const rows = S.kpiEntries.filter(e=>e.biz===biz).sort((a,b)=>a.month<b.month?-1:1);
+  const rows = S.kpiEntries.filter(e=>e.biz===biz).sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
   return rows.length ? rows[rows.length-1] : null;
 }
 function setHqFocus(v){ if(!S.hq) S.hq={focus:''}; S.hq.focus = v; save(); }
@@ -3104,7 +3104,7 @@ function renderHq(){
               <div class="bz-kpi" style="border-top:none;padding-top:6px;margin-top:4px">통합 진행률 <b>${sp.pct}%</b> — ${sp.parts.map(p=>`${p[0]} ${p[1]}%`).join(' · ')}</div>
               <button class="btn sm" style="margin-top:10px" onclick="nav('home')">프로젝트 열기</button>`
             : k ? `
-              <div class="bz-kpi">${esc(k.month)} 기준 — 재원생 <b>${num(k.students)}</b>명 · 신규 문의 <b>${num(k.inquiries)}</b> · 등록 <b>${num(k.enrolled)}</b> · 검사 <b>${num(k.tests)}</b>건</div>`
+              <div class="bz-kpi">${esc(k.month)} 기준 — 재원생 <b>${k.students==null?'—':num(k.students)+'명'}</b> · 신규 문의 <b>${k.inquiries==null?'—':num(k.inquiries)}</b> · 등록 <b>${k.enrolled==null?'—':num(k.enrolled)}</b> · 검사 <b>${k.tests==null?'—':num(k.tests)+'건'}</b></div>`
             : `
               <div class="bz-kpi">지표 미입력 — 📊 KPI 화면에서 월별 실적을 입력하면 여기 요약됩니다.</div>`}
           </div>`;
@@ -3147,7 +3147,7 @@ function renderHq(){
       <h3>수완 오픈 바로가기</h3>
       <div class="grid4" style="margin-top:12px">
         ${[['home','프로젝트 홈','인터뷰·컨셉·전략 요약'],['sample','샘플 모델','장신로 144 · 80평'],
-           ['agreements','3자 합의 트래커','7건 중 '+agrOpen+'건 미완'],['timeline','오픈 타임라인','역산 마일스톤']]
+           ['agreements','3자 합의 트래커',agreementsState().length+'건 중 '+agrOpen+'건 미완'],['timeline','오픈 타임라인','역산 마일스톤']]
           .map(([v,t,d])=>`<button class="card tight" style="text-align:left;cursor:pointer;margin:0" onclick="nav('${v}')">
             <b class="small" style="font-weight:800">${t}</b><div class="small muted" style="margin-top:2px">${d}</div></button>`).join('')}
       </div>
@@ -3207,9 +3207,13 @@ function addKpiEntry(){
   const month = prompt('기준 월 (예: 2026-08):'); if(!month) return;
   if(!/^\d{4}-\d{2}$/.test(month.trim())){ toast('형식: 2026-08'); return; }
   const ask = (label)=>{ const v = prompt(label+' (숫자, 모르면 비워두기):','')||''; const n = parseInt(v,10); return isNaN(n)?null:n; };
-  const e = { id:uid(), biz:kpiBiz, month:month.trim(),
+  const m = month.trim();
+  const dup = S.kpiEntries.find(x=>x.biz===kpiBiz && x.month===m);
+  if(dup && !confirm(m+'은 이미 입력돼 있습니다. 새 값으로 덮어쓸까요?')) return;
+  const e = { id:uid(), biz:kpiBiz, month:m,
     students:ask('월말 재원생 수'), inquiries:ask('신규 문의 건수'), enrolled:ask('신규 등록 수'),
     withdrawn:ask('퇴원 수'), tests:ask('검사 건수'), memo:prompt('메모 (선택):')||'' };
+  if(dup) S.kpiEntries = S.kpiEntries.filter(x=>x.id!==dup.id);
   S.kpiEntries.push(e); save(); renderKpi();
 }
 function delKpiEntry(id){
@@ -3229,7 +3233,7 @@ function kpiSpark(rows){
 }
 function renderKpi(){
   const biz = BIZ_UNITS.find(b=>b.id===kpiBiz) || BIZ_UNITS[0];
-  const rows = S.kpiEntries.filter(e=>e.biz===kpiBiz).sort((a,b)=>a.month<b.month?-1:1);
+  const rows = S.kpiEntries.filter(e=>e.biz===kpiBiz).sort((a,b)=>a.month<b.month?-1:a.month>b.month?1:0);
   const last = rows[rows.length-1], prev = rows[rows.length-2];
   const delta = (last && prev && last.students!=null && prev.students!=null) ? last.students - prev.students : null;
   app.innerHTML = `
@@ -3267,7 +3271,7 @@ function renderKpi(){
       <h3>기록 원칙</h3>
       <ul style="list-style:none;margin-top:8px">
         <li class="small" style="padding:4px 0">· 매월 말일 기준으로 한 번씩. 추정치를 넣지 말고, 모르는 칸은 비워둡니다.</li>
-        <li class="small" style="padding:4px 0">· 퇴원 칸에는 숫자와 함께 메모에 사유를 남기면 리텐션 전략(🎯 g3)의 원자료가 됩니다.</li>
+        <li class="small" style="padding:4px 0">· 퇴원 칸에는 숫자와 함께 메모에 사유를 남기면 전략 목표 「재원생 유지·성장」의 원자료가 됩니다.</li>
         <li class="small" style="padding:4px 0">· 수완 신규 학원은 개원 후부터 이 화면에 입력 — 개원 전 모집 지표는 🎯 모집 퍼널 대시보드를 씁니다.</li>
       </ul>
     </div>
