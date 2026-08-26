@@ -148,6 +148,62 @@ export async function aiSentence({ word, meaning, type, sentence, apiKey, model 
   return { ok: true, ...v };
 }
 
+/* ── 강사 단어 배정 ──
+   강사가 붙여넣은 단어 목록을 파싱해 학생별 배정함에 넣는다.
+   한 줄 = 단어 | 뜻 | 한자(선택) | 예문(선택)   — 구분자는 | 또는 탭 또는 쉼표 */
+const HANJA_RE = /[一-鿿]/;
+
+export function parseWordList(text) {
+  const out = [], seen = new Set(), errors = [];
+  const lines = String(text || '').split(/\r?\n/);
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) return;
+    const cols = line.split(/\s*[|\t]\s*|\s*,\s*/).map(c => c.trim()).filter((c, k) => c || k === 0);
+    const word = cols[0], meaning = cols[1];
+    if (!word) return;
+    if (!meaning) { errors.push((i + 1) + '행: 뜻이 없어요 — "' + line.slice(0, 24) + '"'); return; }
+    if (word.length > 40 || meaning.length > 200) { errors.push((i + 1) + '행: 너무 길어요'); return; }
+    const key = word.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const rest = cols.slice(2);
+    const hanjaCol = rest.find(c => HANJA_RE.test(c)) || '';
+    const example = rest.find(c => c && c !== hanjaCol) || '';
+    const parts = parseHanjaSpec(hanjaCol);
+    const type = /^[A-Za-z][A-Za-z\s'-]*$/.test(word) ? 'english' : (parts ? 'hanja' : 'native');
+
+    const w = { word, meaning, type };
+    if (parts) {
+      w.parts = parts;
+      w.hanja = parts.map(p => p.ch).join('');
+      w.literal = parts.map(p => p.hun).join(' · ');
+    }
+    if (example) w.example = example.slice(0, 200);
+    out.push(w);
+  });
+  return { words: out, errors };
+}
+
+/* '觀(볼 관)+測(잴 측)' 또는 '觀測' 둘 다 받는다 */
+export function parseHanjaSpec(str) {
+  if (!str) return null;
+  const withGloss = [];
+  const re = /([一-鿿])\s*\(([^)]+)\)/g;
+  let m;
+  while ((m = re.exec(str))) {
+    const inner = m[2].trim(), sp = inner.lastIndexOf(' ');
+    withGloss.push(sp < 0 ? { ch: m[1], hun: inner, eum: inner } : { ch: m[1], hun: inner.slice(0, sp), eum: inner.slice(sp + 1) });
+  }
+  if (withGloss.length) return withGloss;
+  const bare = String(str).match(/[一-鿿]/g);
+  if (!bare || !bare.length) return null;
+  return bare.map(ch => ({ ch, hun: '', eum: '' }));   // 훈음 미상 — 화면에서 한자만 보여 준다
+}
+
+const ASSIGN_KEEP = 20;   // 학생당 보관하는 배정 묶음 수
+
 /* ── 학생별 워드브레인 요약 (강사 현황판·검수 페이지용) ── */
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30, 90];
 export function vocabSummary(stateRec) {
@@ -237,6 +293,7 @@ export async function sendNightPushes({ store, push, fetchFn }) {
        listStateCodes(), getStudent(code),
        getMnemo(key), putMnemo(key, rec), listMnemos(),
        getPush(code), putPush(code, rec), delPush(code), listPushCodes(),
+       getAssign(code), putAssign(code, rec), listAssignCodes(),
      },
      ai: { apiKey, model, generate? },     // generate는 테스트 주입용 (기본 aiMnemonic)
      push: { publicKey, privateJwk, subject },  // VAPID (없으면 알림 기능만 비활성)
@@ -323,6 +380,23 @@ export async function handleVocab(ctx) {
     return j(200, { ok: true, verdict: out.verdict, feedback: out.feedback, better: out.better });
   }
 
+  /* 선생님이 내주신 단어 */
+  if (p === '/api/vocab/assignments' && method === 'GET' && !who.admin) {
+    const rec = await store.getAssign(who.code);
+    const items = ((rec && rec.items) || []).filter(a => !a.done);
+    return j(200, { items });
+  }
+  if (p === '/api/vocab/assignments/ack' && method === 'POST' && !who.admin) {
+    const { id } = await ctx.getBody();
+    const rec = (await store.getAssign(who.code)) || { items: [] };
+    const hit = (rec.items || []).filter(a => a.id === id)[0];
+    if (!hit) return j(404, { error: '배정을 찾을 수 없어요.' });
+    hit.done = true;
+    hit.doneAt = nowIso();
+    await store.putAssign(who.code, rec);
+    return j(200, { ok: true });
+  }
+
   /* 밤 9시 알림 (Web Push 구독) */
   if (p === '/api/vocab/push/key' && method === 'GET' && !who.admin) {
     const key = ctx.push && ctx.push.publicKey;
@@ -365,6 +439,41 @@ export async function handleVocab(ctx) {
     await store.putMnemo(rec.key, rec);
     return j(200, { ok: true, item: rec });
   }
+  if (p === '/api/vocab/admin/assign' && method === 'POST') {
+    const b = await ctx.getBody();
+    const codes = (Array.isArray(b.codes) ? b.codes : []).map(c => String(c || '').trim()).filter(Boolean).slice(0, 200);
+    const title = String(b.title || '').trim().slice(0, 60) || '선생님 배정 단어';
+    const parsed = parseWordList(b.text);
+    if (b.dryRun) return j(200, { ok: true, preview: true, words: parsed.words, errors: parsed.errors });
+    if (!codes.length) return j(400, { error: '배정할 학생을 골라 주세요.' });
+    if (!parsed.words.length) return j(400, { error: '배정할 단어가 없어요.', errors: parsed.errors });
+    if (parsed.words.length > 100) return j(400, { error: '한 번에 100개까지 배정할 수 있어요.' });
+    const id = 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+    const at = nowIso();
+    const assigned = [];
+    for (const code of codes) {
+      const stu = await store.getStudent(code);
+      if (!stu) continue;
+      const rec = (await store.getAssign(code)) || { items: [] };
+      rec.items = [{ id, title, at, words: parsed.words, done: false }].concat(rec.items || []).slice(0, ASSIGN_KEEP);
+      await store.putAssign(code, rec);
+      assigned.push(code);
+    }
+    if (!assigned.length) return j(404, { error: '등록된 학생이 없어요.' });
+    return j(200, { ok: true, id, assigned, count: parsed.words.length, errors: parsed.errors });
+  }
+  if (p === '/api/vocab/admin/assign' && method === 'GET') {
+    const out = [];
+    for (const code of await store.listAssignCodes()) {
+      const rec = await store.getAssign(code);
+      const stu = await store.getStudent(code);
+      ((rec && rec.items) || []).forEach(a => {
+        out.push({ code, name: (stu && stu.name) || '', id: a.id, title: a.title, at: a.at, n: (a.words || []).length, done: !!a.done, doneAt: a.doneAt || null });
+      });
+    }
+    out.sort((x, y) => (x.at < y.at ? 1 : -1));
+    return j(200, { items: out.slice(0, 200) });
+  }
   if (p === '/api/vocab/admin/overview' && method === 'GET') {
     const codes = await store.listStateCodes();
     const students = [];
@@ -383,5 +492,7 @@ export async function dumpVocab(store) {
   for (const code of await store.listStateCodes()) states[code] = await store.getState(code);
   const mnemos = {};
   for (const m of await store.listMnemos()) mnemos[m.key] = m;
-  return { states, mnemos };
+  const assigns = {};
+  for (const code of await store.listAssignCodes()) assigns[code] = await store.getAssign(code);
+  return { states, mnemos, assigns };
 }

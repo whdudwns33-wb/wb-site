@@ -113,6 +113,9 @@ function vocabStore(env) {
     putPush: (c, rec) => env.DB.put('vocab:push:' + c, JSON.stringify(rec)),
     delPush: (c) => env.DB.delete('vocab:push:' + c),
     listPushCodes: async () => (await kvListAll(env, 'vocab:push:')).map(k => k.slice('vocab:push:'.length)),
+    getAssign: (c) => env.DB.get('vocab:assign:' + c, 'json'),
+    putAssign: (c, rec) => env.DB.put('vocab:assign:' + c, JSON.stringify(rec)),
+    listAssignCodes: async () => (await kvListAll(env, 'vocab:assign:')).map(k => k.slice('vocab:assign:'.length)),
   };
 }
 function vocabPushEnv(env) {

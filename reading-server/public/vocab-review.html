@@ -38,6 +38,18 @@
   .num { font-variant-numeric: tabular-nums; }
   .warn { color: #C24936; font-weight: 700; }
   .table-scroll { overflow-x: auto; border: 1px solid #E3DFD2; border-radius: 12px; }
+  .stu-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .stu-pick label { display: inline-flex; align-items: center; gap: 5px; font-size: .84rem; font-weight: 600; background: #F0EDE2; border: 1px solid #E3DFD2; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .stu-pick label.on { background: #E9F5FB; border-color: #9CCBE3; color: #0F7AAB; }
+  .stu-pick input { width: auto; margin: 0; }
+  .prev-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .prev-err { color: #C24936; font-size: .82rem; margin-top: 6px; }
+  .assign-row { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #E3DFD2; font-size: .85rem; }
+  .assign-row:last-child { border-bottom: none; }
+  .assign-row b { min-width: 74px; }
+  .assign-row .st { margin-left: auto; font-size: .78rem; font-weight: 700; }
+  .assign-row .st.done { color: #3A7A43; }
+  .assign-row .st.wait { color: #C98A2D; }
   #msg { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1B3A5C; color: #fff; border-radius: 99px; padding: 9px 18px; font-size: .85rem; opacity: 0; transition: opacity .25s; pointer-events: none; }
   #msg.show { opacity: 1; }
 </style>
@@ -54,6 +66,28 @@
   </div>
 
   <div id="app" hidden>
+    <h2>단어 배정 — 이번 주 외울 단어 내주기</h2>
+    <div class="card">
+      <label>학생 고르기 <span class="muted" id="pickCount"></span></label>
+      <div class="stu-pick" id="stuPick"><span class="muted">불러오는 중…</span></div>
+      <div class="row" style="margin-top:8px;"><button id="pickAll" style="font-size:.8rem;padding:6px 12px;">전체 선택</button><button id="pickNone" style="font-size:.8rem;padding:6px 12px;">선택 해제</button></div>
+
+      <label>제목</label>
+      <input id="asTitle" placeholder="예: 3주차 비문학 어휘" value="이번 주 단어">
+
+      <label>단어 목록 — 한 줄에 하나씩</label>
+      <textarea id="asText" rows="7" placeholder="관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측) | 별을 관측했다.&#10;observe, 관찰하다&#10;드넓다 | 활짝 트여 아주 넓다"></textarea>
+      <p class="muted" style="font-size:.78rem;margin:6px 0 0;">형식: <b>단어 | 뜻 | 한자(선택) | 예문(선택)</b> — 구분자는 <code>|</code>, 탭, 쉼표 모두 됩니다.
+      한자는 <code>觀(볼 관)+測(잴 측)</code>처럼 훈음을 넣으면 학생 화면에 <b>한자 조립 문제</b>가 나가고, <code>觀測</code>만 써도 됩니다.
+      영어 단어는 자동으로 영어 문제(철자·듣기)로 나갑니다.</p>
+
+      <div id="prev"></div>
+      <div class="row" style="margin-top:12px;"><button id="asPrev">미리보기</button><button class="primary" id="asGo">배정하기</button></div>
+    </div>
+
+    <h2>최근 배정 <span class="muted" id="asCount"></span></h2>
+    <div class="card" id="asList"><span class="muted">아직 배정한 단어가 없습니다.</span></div>
+
     <h2>검수 대기 <span id="pendingCount" class="chip st-pending">0</span>
       <button id="btnAll" style="float:right;font-size:.76rem;padding:5px 12px;">전체 보기</button></h2>
     <div id="list"></div>
@@ -177,6 +211,62 @@
     }).join('') : '<tr><td colspan="9" class="muted">아직 연동된 학생이 없습니다.</td></tr>';
   }
 
+  var STUDENTS = [], PICKED = {};
+
+  function renderPick() {
+    var el = $('#stuPick');
+    if (!STUDENTS.length) { el.innerHTML = '<span class="muted">등록된 학생이 없습니다. 관리 웹에서 먼저 등록해 주세요.</span>'; return; }
+    el.innerHTML = STUDENTS.map(function (s) {
+      return '<label class="' + (PICKED[s.code] ? 'on' : '') + '"><input type="checkbox" data-code="' + esc(s.code) + '"' + (PICKED[s.code] ? ' checked' : '') + '>' +
+        esc(s.name || s.code) + (s.cls ? ' <span class="muted">' + esc(s.cls) + '</span>' : '') + '</label>';
+    }).join('');
+    $('#pickCount').textContent = picked().length + '명 선택';
+    el.querySelectorAll('input[data-code]').forEach(function (c) {
+      c.addEventListener('change', function () { PICKED[c.dataset.code] = c.checked; renderPick(); });
+    });
+  }
+  function picked() { return Object.keys(PICKED).filter(function (k) { return PICKED[k]; }); }
+
+  $('#pickAll').addEventListener('click', function () { STUDENTS.forEach(function (s) { PICKED[s.code] = true; }); renderPick(); });
+  $('#pickNone').addEventListener('click', function () { PICKED = {}; renderPick(); });
+
+  async function doAssign(dryRun) {
+    var text = $('#asText').value;
+    if (!text.trim()) { msg('단어를 입력해 주세요'); return; }
+    try {
+      var j = await api('/api/vocab/admin/assign', {
+        method: 'POST',
+        body: JSON.stringify({ codes: picked(), title: $('#asTitle').value, text: text, dryRun: !!dryRun }),
+      });
+      if (dryRun) {
+        $('#prev').innerHTML = '<p class="muted" style="margin:10px 0 0;font-size:.84rem;">' + j.words.length + '개 인식됨</p>' +
+          '<div class="prev-list">' + j.words.map(function (w) {
+            return '<span class="chip t-' + esc(w.type) + '">' + esc(w.word) + (w.hanja ? ' ' + esc(w.hanja) : '') + '</span>';
+          }).join('') + '</div>' +
+          (j.errors && j.errors.length ? '<div class="prev-err">' + j.errors.map(esc).join('<br>') + '</div>' : '');
+        return;
+      }
+      msg(j.count + '개 단어를 ' + j.assigned.length + '명에게 배정했습니다');
+      $('#asText').value = '';
+      $('#prev').innerHTML = '';
+      refresh();
+    } catch (e) { msg(e.message); }
+  }
+  $('#asPrev').addEventListener('click', function () { doAssign(true); });
+  $('#asGo').addEventListener('click', function () {
+    if (!picked().length) { msg('학생을 먼저 골라 주세요'); return; }
+    doAssign(false);
+  });
+
+  function renderAssignList(items2) {
+    $('#asCount').textContent = items2.length ? items2.length + '건' : '';
+    $('#asList').innerHTML = items2.length ? items2.slice(0, 30).map(function (a) {
+      return '<div class="assign-row"><b>' + esc(a.name || a.code) + '</b><span>' + esc(a.title) + ' · ' + a.n + '개</span>' +
+        '<span class="muted">' + esc((a.at || '').slice(0, 10)) + '</span>' +
+        '<span class="st ' + (a.done ? 'done' : 'wait') + '">' + (a.done ? '심음 ✓' : '아직') + '</span></div>';
+    }).join('') : '<span class="muted">아직 배정한 단어가 없습니다.</span>';
+  }
+
   async function refresh() {
     try {
       var rv = await api('/api/vocab/admin/review');
@@ -184,6 +274,11 @@
       renderList();
       var ov = await api('/api/vocab/admin/overview');
       renderOverview(ov.students || []);
+      var all = await api('/api/admin/overview');
+      STUDENTS = (all.students || []).filter(function (s) { return s.name; });
+      renderPick();
+      var asl = await api('/api/vocab/admin/assign');
+      renderAssignList(asl.items || []);
     } catch (e) { msg(e.message); }
   }
 

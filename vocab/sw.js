@@ -1,6 +1,6 @@
 'use strict';
 /* WB 워드브레인 서비스 워커 — 앱 셸 캐시 (오프라인 학습) */
-const VERSION = 'wbv-shell-v4';
+const VERSION = 'wbv-shell-v5';
 const SHELL = ['./', './index.html', './words.js', './bridge.js', './quiz.js', './srs.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -38,6 +38,9 @@ self.addEventListener('notificationclick', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin || e.request.method !== 'GET') return;
+
+  // API 응답은 절대 캐시하지 않는다 — 캐시되면 배정·기록 같은 최신 데이터가 오래된 값으로 굳는다
+  if (url.pathname.startsWith('/api/')) return;
 
   // 페이지 이동: 네트워크 우선, 실패 시 캐시된 앱 셸
   if (e.request.mode === 'navigate') {

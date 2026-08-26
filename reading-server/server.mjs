@@ -23,6 +23,7 @@ const db = getDb();
 
 /* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
 const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
+const vocabAssignMap = () => (db.vocab.assigns = db.vocab.assigns || {});
 const vocabStore = {
   getState: (c) => db.vocab.states[c] || null,
   putState: (c, rec) => { db.vocab.states[c] = rec; persist(); },
@@ -35,6 +36,9 @@ const vocabStore = {
   putPush: (c, rec) => { vocabPushMap()[c] = rec; persist(); },
   delPush: (c) => { delete vocabPushMap()[c]; persist(); },
   listPushCodes: () => Object.keys(vocabPushMap()),
+  getAssign: (c) => vocabAssignMap()[c] || null,
+  putAssign: (c, rec) => { vocabAssignMap()[c] = rec; persist(); },
+  listAssignCodes: () => Object.keys(vocabAssignMap()),
 };
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
