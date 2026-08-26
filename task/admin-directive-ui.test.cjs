@@ -5,8 +5,9 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
-test('관리자는 전체·일부 선생님 공통 요청을 작성·수정·종료하고 확인 현황을 본다', () => {
-  assert.match(source, /공통 관리자 요청/);
+test('관리자는 전체·일부 선생님 실시간 관리자 요청을 작성·수정·종료하고 확인 현황을 본다', () => {
+  assert.match(source, /📣 실시간 관리자 요청/);
+  assert.match(source, /새 실시간 관리자 요청 작성/);
   assert.match(source, /data-act="adminDirectiveAdd"/);
   assert.match(source, /data-admin-directive-staff/);
   assert.match(source, /모든 선생님/);
@@ -17,28 +18,28 @@ test('관리자는 전체·일부 선생님 공통 요청을 작성·수정·종
   }
 });
 
-test('학생정보 업무지시 안에서 수업 요청과 공통 요청의 현재값·최근 3개 기록을 분리한다', () => {
+test('학생정보 업무지시 안에서 수업 요청과 실시간 관리자 요청의 현재값·최근 3개 기록을 분리한다', () => {
   const start = source.indexOf('function lessonAdminRequestsHtml(');
   const end = source.indexOf('function adminDirectiveSoundKey(', start);
   const block = source.slice(start, end);
   assert.match(block, /현재 수업 요청/);
   assert.match(block, /지난 수업 요청 보기 · 최신 3개/);
-  assert.match(block, /현재 공통 요청/);
-  assert.match(block, /지난 공통 요청 보기 · 최신 3개/);
+  assert.match(block, /현재 실시간 관리자 요청/);
+  assert.match(block, /지난 실시간 관리자 요청 보기 · 최신 3개/);
   assert.match(source, /function pastAdminDirectiveRows[\s\S]*?slice\(0, 3\)/);
 });
 
 test('개인 링크는 새 revision을 주기 조회하고 팝업·알림음·확인 이벤트를 사용한다', () => {
   assert.match(source, /setInterval\(\(\) => \{[\s\S]*?loadAdminDirectives\(true, true\)[\s\S]*?\}, 15000\)/);
-  assert.match(source, /관리자 공통 요청/);
+  assert.match(source, /modal\('실시간 관리자 요청'/);
   assert.match(source, /playAdminDirectiveSound\(\)/);
   assert.match(source, /action: 'opened'/);
   assert.match(source, /action: 'acknowledge'/);
   assert.match(source, /item\.isCurrent && item\.displayStatus === 'active' && !item\.acknowledgedAt/);
 });
 
-test('관리자 현황판은 공통 요청과 학생정보·업무지시의 미확인을 함께 집계한다', () => {
-  assert.match(source, /공통 요청 미확인/);
+test('관리자 현황판은 실시간 관리자 요청과 학생정보·업무지시의 미확인을 함께 집계한다', () => {
+  assert.match(source, /실시간 관리자 요청 미확인/);
   assert.match(source, /학생정보 미확인/);
   assert.match(source, /업무지시 미확인/);
   assert.match(source, /studentChangeAcknowledgementStatusHtml/);
