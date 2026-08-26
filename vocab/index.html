@@ -172,6 +172,60 @@
     .fam { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
     .fam .chip { font-size: .76rem; padding: 4px 10px; }
 
+    /* 어종 허브 카드 */
+    .typecards { display: grid; gap: 12px; margin-top: 14px; }
+    .typecard {
+      display: flex; align-items: center; gap: 14px; text-align: left;
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 15px 16px; box-shadow: var(--shadow); width: 100%;
+    }
+    .typecard .tmark { width: 46px; height: 46px; border-radius: 13px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 900; }
+    .typecard .tinfo { flex: 1; min-width: 0; }
+    .typecard .tinfo b { display: block; color: var(--ink-strong); font-size: 1rem; }
+    .typecard .tstat { font-size: .8rem; color: var(--ink-soft); }
+    .typecard .tstat .hot { color: var(--coral); font-weight: 700; }
+    .typecard .tdue { flex: none; background: var(--coral-soft); color: var(--coral); font-size: .74rem; font-weight: 700; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+    .typecard .tmini { display: flex; gap: 1px; flex: none; }
+    .typecard .tmini svg { width: 25px; height: 28px; }
+    .typecard .tgo { color: var(--ink-soft); font-weight: 900; flex: none; }
+    .backbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+    .backbar button { font-size: .84rem; font-weight: 700; color: var(--ink-soft); background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 7px 13px; }
+    .backbar b { font-size: 1.05rem; color: var(--ink-strong); }
+
+    /* 문제 풀이 */
+    .qhead { font-size: .72rem; font-weight: 900; letter-spacing: .08em; color: var(--ink-soft); }
+    .qprompt { font-size: 1.05rem; font-weight: 700; color: var(--ink-strong); margin: 10px 0 2px; white-space: pre-line; line-height: 1.65; }
+    .qchoices { display: grid; gap: 8px; margin-top: 14px; }
+    .qchoice {
+      display: block; width: 100%; text-align: left; font-size: .95rem; font-weight: 500;
+      background: var(--card-2); border: 1px solid var(--line); border-radius: 11px; padding: 13px 15px; color: var(--ink);
+    }
+    .qchoice:active { transform: translateY(1px); }
+    .qchoice.right { background: var(--green-soft); border-color: #8DC49A; color: #2C6B39; font-weight: 700; }
+    .qchoice.wrong { background: var(--coral-soft); border-color: #F0B9AF; color: #C24936; }
+    .qchoice.dim { opacity: .45; }
+    .qinput {
+      width: 100%; font-family: inherit; font-size: 1.2rem; font-weight: 700; text-align: center;
+      padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink-strong); letter-spacing: .04em;
+    }
+    .qhintline { font-family: ui-monospace, "SFMono-Regular", monospace; letter-spacing: .18em; color: var(--ink-soft); font-size: 1rem; margin-top: 8px; }
+    .qmark { font-size: 1.6rem; font-weight: 900; }
+    .qmark.ok { color: var(--green); }
+    .qmark.no { color: var(--coral); }
+
+    /* 뿌리 지도 */
+    .roots { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+    .rootcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px; box-shadow: var(--shadow); text-align: left; }
+    .rootcard .rch { font-size: 1.9rem; line-height: 1.15; color: var(--ink-strong); }
+    .rootcard .rhe { font-size: .76rem; font-weight: 700; color: var(--deep); }
+    .rootcard .rws { font-size: .78rem; color: var(--ink-soft); margin-top: 5px; line-height: 1.55; }
+    .rootcard .rmore { color: var(--ink-soft); opacity: .75; font-size: .74rem; margin-top: 3px; }
+    .rootcard .rgo { font-size: .72rem; font-weight: 700; color: var(--deep); margin-top: 7px; }
+    .rootcard .rn { display: inline-block; font-size: .7rem; font-weight: 700; background: var(--accent-soft, #E3F1F8); color: var(--deep); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
+    .recall-got { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; justify-content: center; }
+    .recall-slot { font-size: .84rem; font-weight: 700; border-radius: 8px; padding: 5px 11px; background: var(--card-2); color: var(--ink-soft); }
+    .recall-slot.got { background: var(--green-soft); color: #2C6B39; }
+
     .cand-list { display: grid; gap: 8px; margin-top: 10px; }
     .cand { display: block; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
     .cand b { color: var(--ink-strong); }
@@ -283,6 +337,7 @@
 
   <script src="./words.js"></script>
   <script src="./bridge.js"></script>
+  <script src="./quiz.js"></script>
   <script src="./srs.js"></script>
   <script>
 /* APP:JS:START */
@@ -305,10 +360,11 @@
   WB_WORDS.forEach(registerFamily);
 
   var TYPE = {
-    hanja: { label: '한자어', cls: 't-h', color: '#1E9DD6' },
-    english: { label: '영어', cls: 't-e', color: '#E85D4A' },
-    native: { label: '고유어', cls: 't-n', color: '#4E9B57' }
+    hanja: { label: '한자어', cls: 't-h', color: '#1E9DD6', mark: '觀', how: '뜻·한자 조립·빈칸' },
+    english: { label: '영어', cls: 't-e', color: '#E85D4A', mark: 'A', how: '뜻·철자·듣기' },
+    native: { label: '고유어', cls: 't-n', color: '#4E9B57', mark: '늠', how: '빈칸·비슷한 말' }
   };
+  var TYPE_ORDER = ['hanja', 'native', 'english'];
 
   /* ── 저장소 ── */
   var KEY = 'wb-wordbrain-v1';
@@ -608,17 +664,60 @@
     });
   }
 
-  /* ── 정원 ── */
-  var filterType = 'all';
-  function activeStates() {
-    return Object.keys(db.states).map(function (k) { return db.states[k]; }).filter(function (s) { return !s.graduated; });
+  /* ── 정원 — 어종별로 나뉜 3개 정원 + 통합 허브 ── */
+  var curType = null;   /* null이면 허브, 값이 있으면 그 어종 정원 */
+
+  function activeStates(type) {
+    return Object.keys(db.states).map(function (k) { return db.states[k]; })
+      .filter(function (s) { return !s.graduated && (!type || (WORDS[s.id] && WORDS[s.id].type === type)); });
   }
+  function statesOfType(type) {
+    var out = {};
+    Object.keys(db.states).forEach(function (k) {
+      if (!type || (WORDS[k] && WORDS[k].type === type)) out[k] = db.states[k];
+    });
+    return out;
+  }
+  function typeSummary(type, t) { return WBSRS.summary(statesOfType(type), t); }
+
+  function potHtml(s, t) {
+    var w = WORDS[s.id], wi = WBSRS.wither(s, t), due = s.due <= t;
+    return '<button class="pot' + (wi >= 3 ? ' alarm' : '') + '" data-id="' + s.id + '">' + plantSVG(WBSRS.stage(s), wi) +
+      '<span class="w">' + esc(w.word) + '</span><span class="due' + (due ? ' hot' : '') + '">' +
+      (wi >= 3 ? '응급!' : fmtDue(s.due)) + '</span></button>';
+  }
+  function sortByUrgency(list, t) {
+    return list.sort(function (a, b) {
+      var wa = WBSRS.wither(a, t), wb = WBSRS.wither(b, t);
+      if (wa !== wb) return wb - wa;
+      return a.due - b.due;
+    });
+  }
+  function bannersHtml(t, inbox) {
+    var today = WBSRS.todayPlanted(db.states, t);
+    var hour = new Date(t).getHours();
+    var html = '';
+    if ((hour >= 21 || hour < 5) && today.length > 0) {
+      html += '<div class="night-banner"><div style="flex:1"><b>자기 전 3분 물주기</b><br><span style="font-size:.82rem;">오늘 심은 ' + today.length + '개, 깜빡이로 한 번 더 보고 자요 — 자는 동안 기억이 굳어요.</span></div><button class="btn" id="btnNight">시작</button></div>';
+    }
+    if (inbox.length) {
+      html += '<div class="night-banner" style="background:var(--deep);"><div style="flex:1"><b>📬 진로독서에서 씨앗 ' + inbox.length + '개 도착</b><br><span style="font-size:.82rem;">읽다가 몰랐던 단어가 진짜 내 단어예요 — 가장 먼저 심어요.</span></div><button class="btn" id="btnInboxGo">심으러</button></div>';
+    }
+    return html;
+  }
+  function bindBanners(el) {
+    var nb = $('#btnNight'); if (nb) nb.addEventListener('click', function () { startBlink('today'); });
+    var ib = $('#btnInboxGo'); if (ib) ib.addEventListener('click', function () { show('plant'); });
+    el.querySelectorAll('.pot').forEach(function (b) {
+      b.addEventListener('click', function () { openWordModal(b.dataset.id); });
+    });
+  }
+
   function renderGarden() {
     var el = $('#view-garden');
     var t = now();
-    var states = activeStates();
     var inbox = getInbox();
-    if (states.length === 0 && !Object.keys(db.states).length) {
+    if (!Object.keys(db.states).length) {
       el.innerHTML =
         '<div class="card empty">' + plantSVG(0, 0) +
         '<h3>아직 심은 단어가 없어요</h3><p class="muted">단어를 심으면 화분이 생기고,<br>잊기 직전에 "물 줄 시간"을 알려 드려요.</p>' +
@@ -629,9 +728,14 @@
       var ei = $('#btnEmptyInbox'); if (ei) ei.addEventListener('click', function () { show('plant'); });
       return;
     }
+    if (curType) renderTypeGarden(el, t, inbox);
+    else renderHub(el, t, inbox);
+  }
+
+  /* 허브 — 오늘 할 일은 세 정원 통합, 아래에 어종별 정원 입구 */
+  function renderHub(el, t, inbox) {
     var sum = WBSRS.summary(db.states, t);
     var today = WBSRS.todayPlanted(db.states, t);
-    var hour = new Date(t).getHours();
     var html =
       '<div class="card today-card"><div class="today-nums">' +
       '<div class="tn' + (sum.due ? ' warn' : '') + '"><b>' + sum.due + '</b><span>물 줄 단어</span></div>' +
@@ -640,42 +744,60 @@
       '<div class="tn"><b>' + sum.graduated + '</b><span>평생 숲</span></div>' +
       '</div></div>';
     html += '<div class="row" style="margin-top:12px;">' +
-      '<button class="btn primary big" id="btnWater"' + (sum.due ? '' : ' disabled style="opacity:.5"') + '>💧 물 주기 (' + sum.due + ')</button>' +
+      '<button class="btn primary big" id="btnWater"' + (sum.due ? '' : ' disabled style="opacity:.5"') + '>💧 오늘 물 주기 (' + sum.due + ')</button>' +
       '<button class="btn big" id="btnGoPlant">🌱 새로 심기</button></div>';
-    if ((hour >= 21 || hour < 5) && today.length > 0) {
-      html += '<div class="night-banner"><div style="flex:1"><b>자기 전 3분 물주기</b><br><span style="font-size:.82rem;">오늘 심은 ' + today.length + '개, 깜빡이로 한 번 더 보고 자요 — 자는 동안 기억이 굳어요.</span></div><button class="btn" id="btnNight">시작</button></div>';
-    }
-    if (inbox.length) {
-      html += '<div class="night-banner" style="background:var(--deep);"><div style="flex:1"><b>📬 진로독서에서 씨앗 ' + inbox.length + '개 도착</b><br><span style="font-size:.82rem;">읽다가 몰랐던 단어가 진짜 내 단어예요 — 가장 먼저 심어요.</span></div><button class="btn" id="btnInboxGo">심으러</button></div>';
-    }
-    html += '<div class="filters">' + [['all', '전체'], ['hanja', '한자어'], ['native', '고유어'], ['english', '영어']].map(function (f) {
-      return '<button data-f="' + f[0] + '" class="' + (filterType === f[0] ? 'on' : '') + '">' + f[1] + '</button>';
+    html += bannersHtml(t, inbox);
+    html += '<h2 class="sec">어종별 정원</h2>';
+    html += '<div class="typecards">' + TYPE_ORDER.map(function (ty) {
+      var sm = typeSummary(ty, t);
+      var mini = sortByUrgency(activeStates(ty), t).slice(0, 3)
+        .map(function (s) { return plantSVG(WBSRS.stage(s), WBSRS.wither(s, t)); }).join('');
+      var stat = sm.total
+        ? '기르는 중 ' + sm.total + ' · 나무 ' + sm.graduated + (sm.due ? '' : ' · 지금은 말끔')
+        : '아직 심은 단어가 없어요';
+      return '<button class="typecard" data-ty="' + ty + '">' +
+        '<span class="tmark ' + TYPE[ty].cls + '">' + TYPE[ty].mark + '</span>' +
+        '<span class="tinfo"><b>' + TYPE[ty].label + '</b><span class="tstat">' + stat + '</span></span>' +
+        (sm.due ? '<span class="tdue">물 ' + sm.due + '</span>' : '') +
+        (mini ? '<span class="tmini">' + mini + '</span>' : '') +
+        '<span class="tgo">›</span></button>';
     }).join('') + '</div>';
-
-    var list = states.filter(function (s) { return filterType === 'all' || WORDS[s.id].type === filterType; });
-    list.sort(function (a, b) {
-      var wa = WBSRS.wither(a, t), wb = WBSRS.wither(b, t);
-      if (wa !== wb) return wb - wa;
-      return a.due - b.due;
-    });
-    html += '<div class="garden">' + list.map(function (s) {
-      var w = WORDS[s.id], wi = WBSRS.wither(s, t), due = s.due <= t;
-      return '<button class="pot' + (wi >= 3 ? ' alarm' : '') + '" data-id="' + s.id + '">' + plantSVG(WBSRS.stage(s), wi) +
-        '<span class="w">' + esc(w.word) + '</span><span class="due' + (due ? ' hot' : '') + '">' + (wi >= 3 ? '응급!' : fmtDue(s.due)) + '</span></button>';
-    }).join('') + '</div>';
-    html += '<p class="demo-note">화분의 모습이 곧 기억 상태예요. 시들기 시작하면 잊히는 중 — 바싹 마르기 전에 물(회상 퀴즈)을 주세요.</p>';
+    html += '<p class="demo-note">어종마다 외우는 방법도 문제 형식도 다르기 때문에 정원을 나눠 두었어요. 위의 "오늘 물 주기"는 세 정원을 합쳐, 잊기 직전인 단어부터 냅니다.</p>';
     el.innerHTML = html;
 
-    if (sum.due) $('#btnWater').addEventListener('click', function () { startReview('review'); });
+    if (sum.due) $('#btnWater').addEventListener('click', function () { startReview('review', null); });
     $('#btnGoPlant').addEventListener('click', function () { show('plant'); });
-    var nb = $('#btnNight'); if (nb) nb.addEventListener('click', function () { startBlink('today'); });
-    var ib = $('#btnInboxGo'); if (ib) ib.addEventListener('click', function () { show('plant'); });
-    el.querySelectorAll('.filters button').forEach(function (b) {
-      b.addEventListener('click', function () { filterType = b.dataset.f; renderGarden(); });
+    el.querySelectorAll('.typecard').forEach(function (b) {
+      b.addEventListener('click', function () { curType = b.dataset.ty; renderGarden(); window.scrollTo(0, 0); });
     });
-    el.querySelectorAll('.pot').forEach(function (b) {
-      b.addEventListener('click', function () { openWordModal(b.dataset.id); });
-    });
+    bindBanners(el);
+  }
+
+  /* 어종 정원 — 그 어종만 */
+  function renderTypeGarden(el, t, inbox) {
+    var ty = curType, sm = typeSummary(ty, t);
+    var list = sortByUrgency(activeStates(ty), t);
+    var html = '<div class="backbar"><button id="btnBack">← 전체 정원</button><b>' + TYPE[ty].label + '</b>' +
+      '<span class="chip ' + TYPE[ty].cls + '" style="margin-left:auto;">문제: ' + TYPE[ty].how + '</span></div>';
+    html += '<div class="card today-card"><div class="today-nums">' +
+      '<div class="tn' + (sm.due ? ' warn' : '') + '"><b>' + sm.due + '</b><span>물 줄 단어</span></div>' +
+      '<div class="tn' + (sm.emergency ? ' warn' : '') + '"><b>' + sm.emergency + '</b><span>응급 화단</span></div>' +
+      '<div class="tn"><b>' + sm.total + '</b><span>기르는 중</span></div>' +
+      '<div class="tn"><b>' + sm.graduated + '</b><span>나무 🌳</span></div>' +
+      '</div></div>';
+    html += '<div class="row" style="margin-top:12px;">' +
+      '<button class="btn primary big" id="btnWaterT"' + (sm.due ? '' : ' disabled style="opacity:.5"') + '>💧 물 주기 (' + sm.due + ')</button>' +
+      '<button class="btn big" id="btnPlantT">🌱 심기</button></div>';
+    html += bannersHtml(t, inbox);
+    html += list.length
+      ? '<div class="garden" style="margin-top:16px;">' + list.map(function (s) { return potHtml(s, t); }).join('') + '</div>'
+      : '<div class="card empty" style="margin-top:16px;">' + plantSVG(0, 0) + '<h3>이 정원은 아직 비어 있어요</h3><p class="muted">' + TYPE[ty].label + ' 단어를 심어 보세요.</p></div>';
+    el.innerHTML = html;
+
+    $('#btnBack').addEventListener('click', function () { curType = null; renderGarden(); window.scrollTo(0, 0); });
+    if (sm.due) $('#btnWaterT').addEventListener('click', function () { startReview('review', ty); });
+    $('#btnPlantT').addEventListener('click', function () { show('plant'); });
+    bindBanners(el);
   }
 
   /* ── 단어 상세 모달 ── */
@@ -775,14 +897,18 @@
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
         '<button class="btn primary big" id="btnInbox">도착한 씨앗 심기 (최대 5개)</button></div>';
     }
+    var picks = {
+      hanja: pickBtn('hanja', '한자어', '한자 뿌리로 분해해서 조립 (남은 ' + counts.hanja + ')', '觀', '#E3F1F8'),
+      native: pickBtn('native', '고유어', '장면을 머릿속에 그려서 (남은 ' + counts.native + ')', '늠', 'var(--green-soft)'),
+      english: pickBtn('english', '영어', '찰떡 발음 연상 + 어원 뿌리 (남은 ' + counts.english + ')', 'A', 'var(--coral-soft)'),
+    };
+    var order = curType ? [curType].concat(TYPE_ORDER.filter(function (k) { return k !== curType; })) : TYPE_ORDER;
     el.innerHTML = '<h2 class="sec">새로 심기 — 한 번에 5개</h2>' +
       '<p class="muted" style="margin-top:-6px;">작업기억이 넘치지 않는 양이에요. 어종마다 외우는 방법이 달라요.</p>' +
       inboxHtml +
       '<div class="pick-grid">' +
-      pickBtn('all', '골고루 5개', '한자어·고유어·영어 섞어서 (남은 ' + counts.all + ')', '🌈', 'var(--card-2)') +
-      pickBtn('hanja', '한자어', '한자 뿌리로 분해해서 조립 (남은 ' + counts.hanja + ')', '觀', '#E3F1F8') +
-      pickBtn('native', '고유어', '장면을 머릿속에 그려서 (남은 ' + counts.native + ')', '늠', 'var(--green-soft)') +
-      pickBtn('english', '영어', '찰떡 발음 연상 + 어원 뿌리 (남은 ' + counts.english + ')', 'A', 'var(--coral-soft)') +
+      order.map(function (k) { return picks[k]; }).join('') +
+      pickBtn('all', '골고루 5개', '세 어종을 섞어서 (남은 ' + counts.all + ')', '🌈', 'var(--card-2)') +
       '</div>' +
       '<p class="demo-note">📬 씨앗 도착함: 진로독서 앱 어휘장에 모은 단어가 자동으로 이곳에 도착해요.' + (inbox.length ? '' : ' 지금은 비어 있어요 — 리포트 탭 데모 도구의 "샘플 씨앗 받기"로 체험할 수 있어요.') + '</p>';
     var bi = $('#btnInbox');
@@ -869,25 +995,132 @@
   }
 
   /* ── 물 주기 / 플래시카드 세션 ── */
-  function startReview(mode) {
+  function poolWords() {
+    return Object.keys(WORDS).map(function (k) { return WORDS[k]; });
+  }
+
+  /* 물 주기 = 문제 풀이(객관적 판정) / 플래시카드 = 뒤집고 자기 채점 */
+  function startReview(mode, type) {
     var t = now();
-    var queue = WBSRS.dueList(db.states, t).map(function (s) { return s.id; });
+    var queue = WBSRS.dueList(statesOfType(type), t).map(function (s) { return s.id; });
     var practice = false;
     if (!queue.length) {
       if (mode === 'flash') {
         practice = true;
-        queue = shuffle(activeStates().map(function (s) { return s.id; })).slice(0, 8);
+        queue = shuffle(activeStates(type).map(function (s) { return s.id; })).slice(0, 8);
         if (!queue.length) { toast('아직 심은 단어가 없어요'); return; }
       } else { toast('지금은 물 줄 단어가 없어요 — 완벽!'); return; }
     }
     var total = queue.length, done = 0, good = 0, failedOnce = {};
-    var title = mode === 'flash' ? (practice ? '플래시카드 · 가벼운 연습' : '플래시카드') : '물 주기';
+    var lab = type ? TYPE[type].label + ' ' : '';
+    var title = mode === 'flash' ? (practice ? '플래시카드 · 가벼운 연습' : lab + '플래시카드') : lab + '물 주기';
     var body = openOverlay(title);
+    var pool = poolWords();
 
-    function next() {
-      if (!queue.length) { end(); return; }
-      var id = queue.shift(), s = db.states[id], w = WORDS[id];
-      setProg(Math.min(done + 1, total), total);
+    function applyGrade(id, s, g) {
+      done += 1;
+      if (!practice) {
+        WBSRS.review(s, g, now(), mode === 'flash' ? 'flash' : 'review');
+        db.log.push({ t: now(), kind: 'review', grade: g, id: id });
+      } else { WBSRS.exposure(s); }
+      if (g === 'good') good += 1;
+      if (g === 'fail' && !practice && !failedOnce[id]) { failedOnce[id] = true; queue.push(id); total += 1; }
+    }
+
+    /* 정답 공개 패널 — 어느 경로로 끝나든 같은 해설을 보여 준다 */
+    function explain(id, s, w, g, headline) {
+      var fb = practice
+        ? (g === 'good' ? '좋아요!' : '한 번 더 보게 될 거예요')
+        : (g === 'good' ? '뿌리가 깊어졌어요 — 다음 물 주기 ' + fmtDue(s.due)
+          : g === 'hard' ? '내일 다시 만나요' : '10분 뒤 응급 화단에서 다시!');
+      body.innerHTML =
+        '<div class="qcard">' +
+        '<div class="qmark ' + (g === 'fail' ? 'no' : 'ok') + '">' + headline + '</div>' +
+        '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+        '<div class="qword' + (w.type === 'english' ? ' en' : '') + '">' + esc(w.word) +
+        (w.hanja ? ' <span style="font-size:1rem;color:var(--ink-soft);">' + w.hanja + '</span>' : '') + '</div>' +
+        (w.pron ? '<div class="qpron">[' + esc(w.pron) + ']</div>' : '') +
+        '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
+        encodeBlock(w, true) +
+        (w.example ? '<div class="qex">' + esc(w.example) + '</div>' : '') +
+        '<button class="say-btn" id="exSay">🔊 소리 듣기</button>' +
+        '<div class="feedback">' + fb + '</div>' +
+        '<button class="btn primary big" id="exNext" style="margin-top:12px;">다음 →</button></div>';
+      $('#exSay').addEventListener('click', function () { sayWord(w); });
+      $('#exNext').addEventListener('click', function () { if ($('#ovBody')) next(); });
+    }
+
+    /* 문제 풀이 */
+    function askQuiz(id, s, w) {
+      var q = WBQUIZ.makeQuestion(w, pool, s.step, Math.random);
+      if (!q) { askCard(id, s, w); return; }
+      var attempts = 0, usedHint = false, dead = {};
+
+      function paint() {
+        var head = '<div style="display:flex;align-items:center;gap:8px;justify-content:center;">' +
+          '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+          '<span class="qhead">' + esc(q.head) + '</span></div>';
+        var wordLine = q.hideWord ? '<div class="qword" style="font-size:2.6rem;">🔊</div>' : '';
+        var main = '<div class="qprompt">' + esc(q.prompt) + '</div>';
+        var body2;
+        if (q.input) {
+          body2 = '<input class="qinput" id="qIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="영어로 입력">' +
+            (usedHint ? '<div class="qhintline">' + esc(q.hint) + '</div>' : '') +
+            '<div class="row" style="margin-top:12px;">' +
+            (q.hint && !usedHint ? '<button class="btn" id="qHint">힌트</button>' : '') +
+            '<button class="btn primary" id="qSubmit">확인</button></div>';
+        } else {
+          body2 = '<div class="qchoices">' + q.choices.map(function (c, i) {
+            return '<button class="qchoice' + (dead[c] ? ' wrong dim' : '') + '" data-c="' + i + '"' + (dead[c] ? ' disabled' : '') + '>' + esc(c) + '</button>';
+          }).join('') + '</div>' +
+            (q.hint && !usedHint ? '<div class="row" style="margin-top:10px;"><button class="btn" id="qHint">힌트</button></div>' : '') +
+            (usedHint && q.hint ? '<div class="hintbox" style="margin-top:10px;"><p>' + esc(q.hint) + '</p></div>' : '');
+        }
+        var retry = attempts > 0 ? '<div class="feedback">아쉬워요 — 한 번 더 골라 볼까요?</div>' : '';
+        body.innerHTML = '<div class="qcard">' + head + wordLine + main + body2 + retry + '</div>' +
+          (practice ? '<p class="demo-note">가벼운 연습 — 기억 간격에는 반영되지 않아요.</p>' : '');
+
+        if (q.speak) sayWord(w);
+        var hb = $('#qHint');
+        if (hb) hb.addEventListener('click', function () { usedHint = true; paint(); });
+        if (q.input) {
+          var inp = $('#qIn');
+          inp.focus();
+          inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(inp.value); });
+          $('#qSubmit').addEventListener('click', function () { submit(inp.value); });
+        } else {
+          body.querySelectorAll('.qchoice').forEach(function (b) {
+            b.addEventListener('click', function () { submit(q.choices[+b.dataset.c], b); });
+          });
+        }
+      }
+
+      function submit(given, btn) {
+        if (q.input && !String(given).trim()) return;
+        attempts += 1;
+        var ok = WBQUIZ.check(q, given);
+        if (ok) {
+          if (btn) btn.classList.add('right');
+          var g = WBQUIZ.grade(true, attempts, usedHint);
+          applyGrade(id, s, g);
+          setTimeout(function () {
+            if ($('#ovBody')) explain(id, s, w, g, g === 'good' ? '정답! ✓' : '맞았어요 ✓');
+          }, btn ? 320 : 0);
+          return;
+        }
+        if (attempts < 2) {                    /* 한 번은 다시 기회 */
+          if (btn) { dead[given] = true; paint(); }
+          else { paint(); }
+          return;
+        }
+        applyGrade(id, s, 'fail');
+        explain(id, s, w, 'fail', '정답은 이거예요');
+      }
+      paint();
+    }
+
+    /* 플래시카드 — 뒤집고 자기 채점 (문항이 안 만들어질 때의 폴백이기도 함) */
+    function askCard(id, s, w) {
       body.innerHTML =
         '<div class="qcard">' + plantSVG(WBSRS.stage(s), WBSRS.wither(s, now())) +
         '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
@@ -895,43 +1128,44 @@
         '<p class="muted">뜻을 떠올린 다음 카드를 뒤집으세요.</p>' +
         '<button class="btn primary big" id="qReveal">뒤집기</button></div>' +
         (practice ? '<p class="demo-note">가벼운 연습 — 기억 간격에는 반영되지 않아요.</p>' : '');
-      $('#qReveal').addEventListener('click', function () { reveal(id, s, w); });
+      $('#qReveal').addEventListener('click', function () {
+        body.querySelector('.qcard').innerHTML =
+          '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+          '<div class="qword' + (w.type === 'english' ? ' en' : '') + '">' + esc(w.word) +
+          (w.hanja ? ' <span style="font-size:1rem;color:var(--ink-soft);">' + w.hanja + '</span>' : '') + '</div>' +
+          '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
+          encodeBlock(w, true) +
+          (w.example ? '<div class="qex">' + esc(w.example) + '</div>' : '') +
+          '<div class="grades"><button class="g-fail" id="gF">몰랐어</button><button class="g-hard" id="gH">알쏭해</button><button class="g-good" id="gG">알았어!</button></div>' +
+          '<div class="feedback" id="qFb"></div>';
+        sayWord(w);
+        var pick = function (g) {
+          applyGrade(id, s, g);
+          $('#qFb').textContent = g === 'good' ? '뿌리가 깊어졌어요 — 다음 물 주기 ' + fmtDue(s.due) :
+            g === 'hard' ? '내일 다시 만나요' : '10분 뒤 응급 화단에서 다시!';
+          setTimeout(function () { if ($('#ovBody')) next(); }, 700);
+        };
+        $('#gF').addEventListener('click', function () { pick('fail'); });
+        $('#gH').addEventListener('click', function () { pick('hard'); });
+        $('#gG').addEventListener('click', function () { pick('good'); });
+      });
     }
 
-    function reveal(id, s, w) {
-      body.querySelector('.qcard').innerHTML =
-        '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
-        '<div class="qword' + (w.type === 'english' ? ' en' : '') + '">' + esc(w.word) + (w.hanja ? ' <span style="font-size:1rem;color:var(--ink-soft);">' + w.hanja + '</span>' : '') + '</div>' +
-        '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
-        encodeBlock(w, true) +
-        (w.example ? '<div class="qex">' + esc(w.example) + '</div>' : '') +
-        '<div class="grades"><button class="g-fail" id="gF">몰랐어</button><button class="g-hard" id="gH">알쏭해</button><button class="g-good" id="gG">알았어!</button></div>' +
-        '<div class="feedback" id="qFb"></div>';
-      sayWord(w);
-      var grade = function (g) {
-        done += 1;
-        if (!practice) {
-          WBSRS.review(s, g, now(), mode === 'flash' ? 'flash' : 'review');
-          db.log.push({ t: now(), kind: 'review', grade: g, id: id });
-        } else { WBSRS.exposure(s); }
-        if (g === 'good') good += 1;
-        var fb = g === 'good' ? '뿌리가 깊어졌어요 — 다음 물 주기 ' + fmtDue(s.due) :
-          g === 'hard' ? '내일 다시 만나요' : '10분 뒤 응급 화단에서 다시!';
-        if (practice) fb = g === 'good' ? '좋아요!' : '한 번 더 보게 될 거예요';
-        $('#qFb').textContent = fb;
-        if (g === 'fail' && !practice && !failedOnce[id]) { failedOnce[id] = true; queue.push(id); total += 1; }
-        setTimeout(function () { if ($('#ovBody')) next(); }, 700);
-      };
-      $('#gF').addEventListener('click', function () { grade('fail'); });
-      $('#gH').addEventListener('click', function () { grade('hard'); });
-      $('#gG').addEventListener('click', function () { grade('good'); });
+    function next() {
+      if (!queue.length) { end(); return; }
+      var id = queue.shift(), s = db.states[id], w = WORDS[id];
+      setProg(Math.min(done + 1, total), total);
+      if (mode === 'flash') askCard(id, s, w);
+      else askQuiz(id, s, w);
     }
 
     function end() {
       bumpStreak(); save();
+      var rate = done ? Math.round(good / done * 100) : 0;
       body.innerHTML = '<div class="qcard">' + plantSVG(3, 0) +
         '<div class="qmeaning">' + (practice ? '연습 완료!' : '물 주기 완료! 💧') + '</div>' +
-        '<p class="muted">' + done + '개 중 ' + good + '개를 바로 떠올렸어요.' + (practice ? '' : ' 화분들이 한 뼘씩 자랐어요.') + '</p>' +
+        '<p class="muted">' + done + '문제 중 <b>' + good + '개</b>를 한 번에 맞혔어요 (' + rate + '%).' +
+        (practice ? '' : ' 화분들이 한 뼘씩 자랐어요.') + '</p>' +
         '<button class="btn primary big" id="qDone">정원으로</button></div>';
       $('#qDone').addEventListener('click', function () { closeOverlay(); show('garden'); });
     }
@@ -942,23 +1176,36 @@
   function renderTrainMenu() {
     var el = $('#view-train');
     var t = now();
-    var due = WBSRS.dueList(db.states, t).length;
-    var todayN = WBSRS.todayPlanted(db.states, t).length;
-    var withered = activeStates().filter(function (s) { return WBSRS.wither(s, t) >= 1; }).length;
-    var speedable = activeStates().filter(function (s) { return s.step >= 1; }).length;
+    var ty = curType;
+    var due = WBSRS.dueList(statesOfType(ty), t).length;
+    var todayN = WBSRS.todayPlanted(statesOfType(ty), t).length;
+    var withered = activeStates(ty).filter(function (s) { return WBSRS.wither(s, t) >= 1; }).length;
+    var speedable = activeStates(ty).filter(function (s) { return s.step >= 1; }).length;
+    var scope = '<div class="filters">' + [[null, '전체']].concat(TYPE_ORDER.map(function (k) { return [k, TYPE[k].label]; }))
+      .map(function (f) {
+        return '<button data-sc="' + (f[0] || '') + '" class="' + (ty === f[0] ? 'on' : '') + '">' + f[1] + '</button>';
+      }).join('') + '</div>';
     el.innerHTML = '<h2 class="sec">훈련 모드</h2>' +
+      '<p class="muted" style="margin-top:-6px;">어떤 정원을 훈련할까요?</p>' + scope +
       '<div class="pick-grid">' +
       pickBtn2('flash', '클래식 플래시카드', due ? '물 줄 단어 ' + due + '개 — 뒤집고 스스로 채점 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '🃏') +
       pickBtn2('blink', '노출 깜빡이', '단어→뜻이 리듬대로 자동 재생 + 발음. 채점 없음 — 워밍업·자기 전용 (오늘 ' + todayN + '개 · 시듦 ' + withered + '개)', '⚡') +
       pickBtn2('speed', '스피드 리콜 깜빡이', '제한시간 안에 뜻 떠올리기 — 아는 단어를 "즉시 아는 단어"로 (가능 ' + speedable + '개)', '⏱️') +
+      pickBtn2('sentence', '문장 짓기', vsyncOn()
+        ? '배운 낱말로 문장을 만들면 선생님 AI가 봐 줘요 — 써먹어야 진짜 내 단어 (가능 ' + speedable + '개)'
+        : '학원 서버에 연동하면 열려요 — 문장을 만들면 AI가 봐 줍니다', '✍️') +
       '</div>' +
       '<p class="demo-note">깜빡이 훈련은 보조예요 — 화분을 자라게 하는 건 물 주기(회상)뿐. 스피드 리콜 결과는 반응 속도 기록과 +6시간 보너스만 줍니다.</p>';
+    el.querySelectorAll('.filters button').forEach(function (b) {
+      b.addEventListener('click', function () { curType = b.dataset.sc || null; renderTrainMenu(); });
+    });
     el.querySelectorAll('.pick').forEach(function (b) {
       b.addEventListener('click', function () {
         var m = b.dataset.t;
-        if (m === 'flash') startReview('flash');
-        else if (m === 'blink') startBlinkSetup();
-        else startSpeed();
+        if (m === 'flash') startReview('flash', ty);
+        else if (m === 'blink') startBlinkSetup(ty);
+        else if (m === 'sentence') startSentence(ty);
+        else startSpeed(ty);
       });
     });
   }
@@ -968,13 +1215,13 @@
 
   /* ── 노출 깜빡이 ── */
   var blinkTimer = null;
-  function startBlinkSetup() {
-    var body = openOverlay('노출 깜빡이');
+  function startBlinkSetup(ty) {
+    var body = openOverlay('노출 깜빡이' + (ty ? ' · ' + TYPE[ty].label : ''));
     var t = now();
     var sets = [
-      { k: 'today', name: '오늘 심은 단어', list: WBSRS.todayPlanted(db.states, t) },
-      { k: 'withered', name: '시들기 시작한 단어', list: activeStates().filter(function (s) { return WBSRS.wither(s, t) >= 1; }) },
-      { k: 'recent', name: '최근 배운 단어 10개', list: activeStates().sort(function (a, b) { return b.plantedAt - a.plantedAt; }).slice(0, 10) }
+      { k: 'today', name: '오늘 심은 단어', list: WBSRS.todayPlanted(statesOfType(ty), t) },
+      { k: 'withered', name: '시들기 시작한 단어', list: activeStates(ty).filter(function (s) { return WBSRS.wither(s, t) >= 1; }) },
+      { k: 'recent', name: '최근 배운 단어 10개', list: activeStates(ty).sort(function (a, b) { return b.plantedAt - a.plantedAt; }).slice(0, 10) }
     ];
     body.innerHTML = '<div class="pick-grid">' + sets.map(function (s) {
       return '<button class="pick" data-k="' + s.k + '"' + (s.list.length ? '' : ' disabled style="opacity:.45"') + '><span style="flex:1"><b>' + s.name + '</b><span class="d">' + s.list.length + '개 × 2회전</span></span><span style="color:var(--ink-soft);font-weight:900;">›</span></button>';
@@ -1043,14 +1290,95 @@
     frame();
   }
 
+  /* ── 문장 짓기 (산출 훈련) — 서버 AI가 판정 ── */
+  function startSentence(ty) {
+    if (!vsyncOn()) { toast('학원 서버에 연동하면 열려요'); return; }
+    var pool = activeStates(ty).filter(function (s) { return s.step >= 1; });
+    if (!pool.length) { toast('먼저 물 주기로 한 번 이상 맞힌 단어가 필요해요'); return; }
+    var ids = shuffle(pool.map(function (s) { return s.id; })).slice(0, 5);
+    var i = 0, scored = 0;
+    var body = openOverlay('문장 짓기' + (ty ? ' · ' + TYPE[ty].label : ''));
+
+    function ask() {
+      if (i >= ids.length) { end(); return; }
+      var id = ids[i], w = WORDS[id];
+      setProg(i + 1, ids.length);
+      body.innerHTML = '<div class="qcard">' +
+        '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+        '<div class="qword' + (w.type === 'english' ? ' en' : '') + '">' + esc(w.word) + '</div>' +
+        '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
+        '<p class="muted" style="margin-top:8px;">이 낱말을 넣어 ' + (w.type === 'english' ? '영어 문장' : '문장') + '을 하나 만들어 보세요.</p>' +
+        '<textarea class="qinput" id="stIn" rows="3" style="text-align:left;font-size:1rem;font-weight:500;resize:vertical;"' +
+        ' placeholder="' + (w.type === 'english' ? 'Write a sentence…' : '문장을 써 보세요…') + '"></textarea>' +
+        '<div class="row" style="margin-top:12px;"><button class="btn" id="stSkip">건너뛰기</button>' +
+        '<button class="btn primary" id="stGo">확인 받기</button></div></div>';
+      $('#stIn').focus();
+      $('#stSkip').addEventListener('click', function () { i += 1; ask(); });
+      $('#stGo').addEventListener('click', function () { judge(id, w, $('#stIn').value.trim()); });
+    }
+
+    async function judge(id, w, sentence) {
+      if (!sentence) { toast('문장을 먼저 써 주세요'); return; }
+      var go = $('#stGo');
+      go.disabled = true; go.textContent = '봐 주는 중…';
+      try {
+        var j = await vsyncApi('/sentence', {
+          method: 'POST',
+          body: JSON.stringify({ word: w.word, meaning: w.meaning, type: w.type, sentence: sentence }),
+        });
+        if (!j.ok) {
+          toast(j.reason === 'no-key' ? 'AI 키가 아직 설정되지 않았어요 — 선생님께 문의!' : '지금은 확인할 수 없어요');
+          go.disabled = false; go.textContent = '확인 받기';
+          return;
+        }
+        show1(id, w, sentence, j);
+      } catch (e) {
+        toast(e.message || '서버에 연결할 수 없어요');
+        go.disabled = false; go.textContent = '확인 받기';
+      }
+    }
+
+    function show1(id, w, sentence, j) {
+      var mark = j.verdict === 'good' ? '아주 좋아요! ✓' : j.verdict === 'ok' ? '괜찮아요 ✓' : '조금 아쉬워요';
+      var st = db.states[id];
+      if (st && j.verdict !== 'wrong') {
+        if (st.contexts.indexOf('produce') < 0) st.contexts.push('produce');
+        if (!st.graduated && st.due <= now() && j.verdict === 'good') WBSRS.review(st, 'good', now(), 'produce');
+        else WBSRS.exposure(st);
+        scored += 1;
+      }
+      db.log.push({ t: now(), kind: 'sentence', id: id, verdict: j.verdict });
+      save();
+      body.innerHTML = '<div class="qcard">' +
+        '<div class="qmark ' + (j.verdict === 'wrong' ? 'no' : 'ok') + '">' + mark + '</div>' +
+        '<span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+        '<div class="qword' + (w.type === 'english' ? ' en' : '') + '" style="font-size:1.5rem;">' + esc(w.word) + '</div>' +
+        '<div class="hintbox" style="text-align:left;"><span class="lbl">내가 쓴 문장</span><p>' + esc(sentence) + '</p></div>' +
+        '<div class="hintbox scene" style="text-align:left;"><span class="lbl">선생님 한마디</span><p>' + esc(j.feedback) + '</p></div>' +
+        (j.better ? '<div class="hintbox mnem" style="text-align:left;"><span class="lbl">이렇게 쓰면 더 좋아요</span><p>' + esc(j.better) + '</p></div>' : '') +
+        '<button class="btn primary big" id="stNext" style="margin-top:14px;">다음 →</button></div>';
+      $('#stNext').addEventListener('click', function () { i += 1; ask(); });
+    }
+
+    function end() {
+      bumpStreak(); save();
+      body.innerHTML = '<div class="qcard">' + plantSVG(5, 0) +
+        '<div class="qmeaning">문장 짓기 완료 ✍️</div>' +
+        '<p class="muted">' + scored + '개 낱말을 문장 속에서 써 봤어요.<br>말이나 글로 써 본 낱말은 훨씬 오래 남아요.</p>' +
+        '<button class="btn primary big" id="stDone">닫기</button></div>';
+      $('#stDone').addEventListener('click', closeOverlay);
+    }
+    ask();
+  }
+
   /* ── 스피드 리콜 깜빡이 ── */
   var speedTimer = null;
-  function startSpeed() {
-    var pool = activeStates().filter(function (s) { return s.step >= 1; });
+  function startSpeed(ty) {
+    var pool = activeStates(ty).filter(function (s) { return s.step >= 1; });
     if (!pool.length) { toast('먼저 물 주기로 한 번 이상 회상한 단어가 필요해요'); return; }
     var ids = shuffle(pool.map(function (s) { return s.id; })).slice(0, 10);
     var i = 0, results = [];
-    var body = openOverlay('스피드 리콜 · 3초 안에!');
+    var body = openOverlay('스피드 리콜 · 3초 안에!' + (ty ? ' · ' + TYPE[ty].label : ''));
     var LIMIT = 3000;
 
     function next() {
@@ -1106,9 +1434,33 @@
   }
 
   /* ── 평생 숲 ── */
+  /* 내가 심은 한자어의 뿌리 모음 */
+  function myRoots() {
+    var roots = {};
+    Object.keys(db.states).forEach(function (id) {
+      var w = WORDS[id];
+      if (!w || w.type !== 'hanja' || !w.parts) return;
+      w.parts.forEach(function (p) {
+        var r = roots[p.ch] = roots[p.ch] || { ch: p.ch, hun: p.hun, eum: p.eum, words: [] };
+        if (!r.words.some(function (x) { return x.id === w.id; })) r.words.push(w);
+      });
+    });
+    Object.keys(roots).forEach(function (ch) {
+      var r = roots[ch];
+      r.more = (FAMILY[ch] || []).filter(function (w) {
+        return !db.states[w.id] && !r.words.some(function (x) { return x.id === w.id; });
+      });
+    });
+    return Object.keys(roots).map(function (k) { return roots[k]; })
+      .sort(function (a, b) { return b.words.length - a.words.length || (a.ch < b.ch ? -1 : 1); });
+  }
+
   function renderForest() {
     var el = $('#view-forest');
     var grads = Object.keys(db.states).map(function (k) { return db.states[k]; }).filter(function (s) { return s.graduated; });
+    var roots = myRoots();
+    var fam = roots.filter(function (r) { return r.words.length >= 2; });
+
     var html = '<h2 class="sec">평생 숲 — 장기 기억이 된 단어들</h2>';
     if (!grads.length) {
       html += '<div class="card empty">' + plantSVG(6, 0) + '<h3>아직 나무가 없어요</h3><p class="muted">한 단어가 30일 간격 시험을 통과하고<br>서로 다른 3가지 방식으로 회상되면<br>나무가 되어 이 숲으로 옮겨져요.</p></div>';
@@ -1117,9 +1469,96 @@
         var w = WORDS[s.id];
         return '<div class="forest-item">' + plantSVG(6, 0) + '<div style="flex:1"><b>' + esc(w.word) + '</b> <span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span><br><span class="muted" style="font-size:.78rem;">' + esc(w.meaning) + ' · 함께한 물 주기 ' + s.reps + '회</span></div></div>';
       }).join('') + '</div>';
-      html += '<p class="demo-note">졸업한 단어도 한 달에 한 번 "복귀전"으로 찾아와요 — 평생 기억은 가끔 만나야 유지되니까요.</p>';
     }
+
+    html += '<h2 class="sec">뿌리 지도 — 한자 하나가 여는 낱말들</h2>';
+    if (!roots.length) {
+      html += '<div class="card"><p class="muted" style="margin:0;">한자어를 심으면 그 한자 뿌리가 여기에 모여요. 뿌리를 알면 처음 보는 단어도 뜻을 짐작할 수 있어요.</p></div>';
+    } else {
+      html += '<p class="muted" style="margin:-6px 0 12px;font-size:.86rem;">뿌리 ' + roots.length + '개 · 낱말이 2개 이상 달린 뿌리 ' + fam.length + '개' +
+        (fam.length ? ' — 눌러서 <b style="color:var(--ink-strong);">자유 회상</b>에 도전해 보세요.' : '') + '</p>';
+      html += '<div class="roots">' + roots.map(function (r) {
+        var many = r.words.length >= 2;
+        return '<button class="rootcard"' + (many ? ' data-root="' + esc(r.ch) + '"' : '') + '>' +
+          '<span class="rch">' + esc(r.ch) + '</span><span class="rn">' + r.words.length + '</span>' +
+          '<div class="rhe">' + esc(r.hun) + ' ' + esc(r.eum) + '</div>' +
+          '<div class="rws">' + r.words.map(function (w) { return esc(w.word); }).join(' · ') +
+          (r.more.length ? '<div class="rmore">아직: ' + r.more.slice(0, 4).map(function (w) { return esc(w.word); }).join(' · ') + '</div>' : '') +
+          '</div>' +
+          (many ? '<div class="rgo">회상 도전 ›</div>' : '') + '</button>';
+      }).join('') + '</div>';
+    }
+    html += '<p class="demo-note">졸업한 단어도 한 달에 한 번 "복귀전"으로 찾아와요. 뿌리 회상은 낱말 하나가 아니라 가족 전체를 한 번에 되살리는 훈련이에요.</p>';
     el.innerHTML = html;
+
+    el.querySelectorAll('.rootcard').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.dataset.root) startRootRecall(b.dataset.root);
+        else toast('이 뿌리는 아직 낱말이 하나예요 — 같은 뿌리 낱말을 더 심어 보세요');
+      });
+    });
+  }
+
+  /* 뿌리 자유 회상 — 뿌리 하나로 아는 낱말을 모두 떠올려 쓴다 */
+  function startRootRecall(ch) {
+    var r = myRoots().filter(function (x) { return x.ch === ch; })[0];
+    if (!r) return;
+    var got = {}, tries = 0;
+    var body = openOverlay('뿌리 회상 · ' + ch);
+    setProg(0, r.words.length);
+
+    function paint(msg) {
+      var slots = r.words.map(function (w) {
+        return '<span class="recall-slot' + (got[w.id] ? ' got' : '') + '">' + (got[w.id] ? esc(w.word) : '○ ○') + '</span>';
+      }).join('');
+      body.innerHTML = '<div class="qcard">' +
+        '<div class="qword" style="font-size:3rem;">' + esc(r.ch) + '</div>' +
+        '<div class="literal">' + esc(r.hun) + ' ' + esc(r.eum) + '</div>' +
+        '<p class="muted" style="margin-top:10px;">이 한자가 들어간 낱말을 아는 대로 써 보세요.</p>' +
+        '<input class="qinput" id="rcIn" autocomplete="off" placeholder="낱말 입력">' +
+        '<div class="row" style="margin-top:12px;"><button class="btn" id="rcDone">다 했어요</button><button class="btn primary" id="rcAdd">확인</button></div>' +
+        '<div class="recall-got">' + slots + '</div>' +
+        '<div class="feedback">' + (msg || '') + '</div></div>';
+      setProg(Object.keys(got).length, r.words.length);
+      var inp = $('#rcIn');
+      inp.focus();
+      var submit = function () {
+        var v = WBQUIZ.normalize(inp.value);
+        if (!v) return;
+        tries += 1;
+        var hit = r.words.filter(function (w) { return WBQUIZ.normalize(w.word) === v; })[0];
+        if (!hit) { paint('그 낱말은 이 뿌리에 없어요 — 다시!'); return; }
+        if (got[hit.id]) { paint('이미 떠올린 낱말이에요.'); return; }
+        got[hit.id] = true;
+        var st = db.states[hit.id];
+        if (st) {
+          if (!st.graduated && st.due <= now()) WBSRS.review(st, 'good', now(), 'root');
+          else { WBSRS.exposure(st); if (st.contexts.indexOf('root') < 0) st.contexts.push('root'); }
+        }
+        if (Object.keys(got).length >= r.words.length) { finish(); return; }
+        paint('좋아요! ' + esc(hit.word) + ' ✓');
+      };
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+      $('#rcAdd').addEventListener('click', submit);
+      $('#rcDone').addEventListener('click', finish);
+    }
+
+    function finish() {
+      var n = Object.keys(got).length;
+      db.log.push({ t: now(), kind: 'root', ch: r.ch, n: n });
+      bumpStreak(); save();
+      var missed = r.words.filter(function (w) { return !got[w.id]; });
+      body.innerHTML = '<div class="qcard">' +
+        '<div class="qword" style="font-size:2.4rem;">' + esc(r.ch) + '</div>' +
+        '<div class="qmeaning">' + n + ' / ' + r.words.length + '개를 떠올렸어요</div>' +
+        (missed.length
+          ? '<div class="hintbox" style="text-align:left;"><span class="lbl">놓친 낱말</span><p>' +
+            missed.map(function (w) { return '<b>' + esc(w.word) + '</b> — ' + esc(w.meaning); }).join('<br>') + '</p></div>'
+          : '<p class="muted">뿌리 가족을 전부 떠올렸어요! 🌳</p>') +
+        '<button class="btn primary big" id="rcClose" style="margin-top:14px;">닫기</button></div>';
+      $('#rcClose').addEventListener('click', closeOverlay);
+    }
+    paint('');
   }
 
   /* ── 리포트 ── */
@@ -1221,7 +1660,7 @@
     var t = now();
     var mk = function (id) { db.states[id] = WBSRS.plant(id, t); return db.states[id]; };
     /* 오늘 심은 새싹 4 */
-    ['h-gwancheuk', 'e-observe', 'n-ganeum', 'h-mosun'].forEach(mk);
+    ['h-gwancheuk', 'h-gwanjeom', 'e-observe', 'n-ganeum'].forEach(mk);
     /* 건강하게 자라는 중 (step2, 만기 전) */
     ['e-predict', 'n-doesaegida', 'h-churon'].forEach(function (id) {
       var s = mk(id);

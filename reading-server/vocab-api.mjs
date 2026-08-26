@@ -81,6 +81,73 @@ export async function aiMnemonic({ word, meaning, type, hanja, interests, apiKey
   return { ok: true, candidates, model: d.model };
 }
 
+/* ── 문장 짓기 판정 (산출 훈련) ── */
+const SENT_SYSTEM = `너는 초등 고학년~중학생의 어휘 사용을 봐 주는 다정한 국어·영어 선생님이다.
+학생이 방금 배운 낱말로 만든 문장이 그 낱말을 "뜻에 맞게, 자연스럽게" 썼는지 판정한다.
+
+판정 기준:
+- good : 뜻에 맞고 문장도 자연스럽다.
+- ok   : 뜻은 맞지만 어색하거나 너무 단순하다(예: "나는 관측을 했다").
+- wrong: 뜻에 맞지 않거나, 낱말이 문장에 없다.
+
+규칙:
+- feedback은 1~2문장, 반말이 아닌 친근한 존댓말. 잘한 점을 먼저 말하고 고칠 점을 짚는다.
+- 절대 비난하지 않는다. 틀려도 다음에 어떻게 쓰면 되는지 알려 준다.
+- better는 그 낱말을 잘 살린 예문 하나(학생 문장을 살려서 다듬으면 더 좋다).
+- 영어 낱말이면 문장도 영어로 판정하고 better도 영어로 쓴다. feedback은 한국어.
+- 출력은 JSON 하나만: {"verdict":"good|ok|wrong","feedback":"...","better":"..."}
+- JSON 밖에 다른 텍스트를 쓰지 않는다.`;
+
+export function parseVerdict(text) {
+  if (!text) return null;
+  let t = String(text).trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try {
+    const d = JSON.parse(t.slice(a, b + 1));
+    if (!['good', 'ok', 'wrong'].includes(d.verdict)) return null;
+    if (typeof d.feedback !== 'string' || !d.feedback.trim()) return null;
+    return {
+      verdict: d.verdict,
+      feedback: d.feedback.trim().slice(0, 300),
+      better: typeof d.better === 'string' ? d.better.trim().slice(0, 200) : '',
+    };
+  } catch (e) { return null; }
+}
+
+export async function aiSentence({ word, meaning, type, sentence, apiKey, model }) {
+  if (!apiKey) return { ok: false, reason: 'no-key' };
+  const user = ['어종: ' + type, '낱말: ' + word, '뜻: ' + meaning, '학생이 만든 문장: ' + sentence].join('\n');
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-opus-5',
+        max_tokens: 1000,
+        fallbacks: 'default',
+        system: SENT_SYSTEM,
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
+  } catch (e) { return { ok: false, reason: 'network' }; }
+  if (!r.ok) return { ok: false, reason: 'api-' + r.status };
+  const d = await r.json();
+  if (d.stop_reason === 'refusal') return { ok: false, reason: 'refused' };
+  const text = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const v = parseVerdict(text);
+  if (!v) return { ok: false, reason: 'parse' };
+  return { ok: true, ...v };
+}
+
 /* ── 학생별 워드브레인 요약 (강사 현황판·검수 페이지용) ── */
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30, 90];
 export function vocabSummary(stateRec) {
@@ -238,6 +305,22 @@ export async function handleVocab(ctx) {
       });
     }
     return j(200, { items });
+  }
+
+  /* 문장 짓기 — 산출 훈련 (AI 판정) */
+  if (p === '/api/vocab/sentence' && method === 'POST' && !who.admin) {
+    const b = await ctx.getBody();
+    const word = String(b.word || '').trim();
+    const meaning = String(b.meaning || '').trim();
+    const type = String(b.type || '').trim();
+    const sentence = String(b.sentence || '').trim();
+    if (!word || !meaning || !sentence) return j(400, { error: '낱말과 문장이 필요해요.' });
+    if (sentence.length > 300) return j(400, { error: '문장이 너무 길어요 (300자 이내).' });
+    if (!['english', 'hanja', 'native'].includes(type)) return j(400, { error: '어종은 english/hanja/native' });
+    const judge = ctx.ai.judge || aiSentence;
+    const out = await judge({ word, meaning, type, sentence, apiKey: ctx.ai.apiKey, model: ctx.ai.model });
+    if (!out.ok) return j(200, { ok: false, reason: out.reason });
+    return j(200, { ok: true, verdict: out.verdict, feedback: out.feedback, better: out.better });
   }
 
   /* 밤 9시 알림 (Web Push 구독) */

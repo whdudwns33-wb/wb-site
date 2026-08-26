@@ -8,7 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
-import { handleVocab, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -119,7 +119,7 @@ function titleMap() {
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
   return TITLE_CACHE.map;
 }
-function parentSummary(stu, st) {
+function parentSummary(stu, st, vst) {
   const titles = titleMap();
   const sum = summarize(stu.code);
   const S = (st && st.state) || {};
@@ -144,6 +144,7 @@ function parentSummary(stu, st) {
     today: sum.today, streak: sum.streak, week: sum.week, weekDays,
     reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
     recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
+    wordbrain: vocabSummary(vst),
   };
 }
 
@@ -175,7 +176,7 @@ const server = http.createServer(async (req, res) => {
         const code = /^[A-Za-z0-9]{16,64}$/.test(t) ? (db.parents || {})[t] : null;
         const stu = code && db.students[code];
         if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
-        return json(res, 200, parentSummary(stu, db.states[code] || null));
+        return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code)));
       }
 
       if (p === '/api/login' && req.method === 'POST') {
