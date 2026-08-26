@@ -1,4 +1,5 @@
 import { validateRosterDocument } from './roster.js';
+import { guardianAnnouncementTargetsAllowed } from './guardian-delivery-policy.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_TITLE = 100;
@@ -200,6 +201,10 @@ async function announcementSave(env, payload, origin, auth, json) {
       expiresDate < publishDate || !targets) {
     return json({ ok: false, error: '공지 제목·본문·게시 기간·대상을 확인해 주세요' }, 400, origin);
   }
+  if (!guardianAnnouncementTargetsAllowed(env, targets.targetType, targets.studentIds)) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '보호자 공지는 허용된 테스트 학생에게만 게시할 수 있습니다' }, 403, origin);
+  }
   const roster = targets.targetType === 'students' ? await activeRosterStudents(env, Date.now()) : null;
   if (targets.targetType === 'students') {
     if (!roster) return json({ ok: false, code: 'ROSTER_UNAVAILABLE',
@@ -276,6 +281,12 @@ async function announcementTransition(env, payload, origin, auth, json, action) 
   }
   if (Number(current.revision) !== expectedRevision) return conflict(json, origin, current);
   const now = Math.max(Date.now(), Number(current.updated_at || 0) + 1);
+  if (destination === 'published' && !guardianAnnouncementTargetsAllowed(
+    env, String(current.target_type || ''), parseTargets(current)
+  )) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '보호자 공지는 허용된 테스트 학생에게만 게시할 수 있습니다' }, 403, origin);
+  }
   if (destination === 'published' && !await targetSnapshotIsCurrent(env, current, now)) {
     return json({ ok: false, code: 'TARGET_RECONFIRM_REQUIRED',
       error: '대상 학생 정보가 변경되었습니다. 공지를 다시 저장한 뒤 게시해 주세요',

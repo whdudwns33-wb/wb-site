@@ -1,3 +1,5 @@
+import { guardianDeliveryAllowed, guardianDeliveryStudentIds } from './guardian-delivery-policy.js';
+
 /**
  * 보호자 연락처·발송 동의 원장 — 학부모 피드백 실제 발송(parent-feedback-send.js)이
  * stable studentId로 전화번호를 찾아오는 유일한 곳이다.
@@ -73,7 +75,8 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
     return json({
       ok: true,
       contacts: (results[0].results || []).map(view),
-      acaflowLinks: (results[1].results || []).map(viewAcaflowLink)
+      acaflowLinks: (results[1].results || []).map(viewAcaflowLink),
+      deliveryEnabledStudentIds: guardianDeliveryStudentIds(env)
     }, 200, origin);
   }
 
@@ -122,6 +125,10 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
     phone = rawPhone;
   }
   const consent = body.consent ? 1 : 0;
+  if (consent && !guardianDeliveryAllowed(env, studentId)) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '이 학생은 학부모 전달 테스트 대상이 아닙니다' }, 403, origin);
+  }
   if (consent && !phone) {
     return json({ ok: false, error: '연락처 없이는 발송 동의를 켤 수 없습니다' }, 400, origin);
   }
