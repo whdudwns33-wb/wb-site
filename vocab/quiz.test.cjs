@@ -60,7 +60,9 @@ t('예문 빈칸 — 활용형도 가려진다', () => {
 t('한자 조립 — 한 글자를 가리고 훈음을 묻는다', () => {
   const q = Q._q.qAssemble(byId['h-gwancheuk'], WB_WORDS.filter(x => x.type === 'hanja'), seeded(2));
   assert.strictEqual(q.kind, 'assemble');
-  assert.ok(q.prompt.includes('?'), '가려진 글자 표시');
+  assert.ok(q.prompt.includes('\u25a1'), '가려진 글자 표시');
+  // 마스크를 '?'로 쓰면 문장 끝 물음표와 겹쳐 무엇을 묻는지 읽히지 않는다
+  assert.strictEqual((q.prompt.match(/\?/g) || []).length, 1, '물음표는 문장 끝 하나뿐: ' + q.prompt);
   assert.ok(['볼 관', '잴 측'].includes(q.answer), '정답이 훈음: ' + q.answer);
   assert.strictEqual(q.choices.length, 4);
 });
