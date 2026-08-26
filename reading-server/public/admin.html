@@ -40,8 +40,23 @@
     .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
     .muted{color:var(--muted);font-size:12.5px}
     #loginCard{max-width:380px;margin:60px auto}
-    dialog{border:1px solid var(--line);border-radius:14px;max-width:520px;width:92%;padding:18px}
+    .namebtn{border:0;background:none;padding:0;font:inherit;color:var(--navy);font-weight:800;border-bottom:2px dotted var(--blue);cursor:pointer}
+    dialog{border:1px solid var(--line);border-radius:14px;max-width:640px;width:94%;padding:0}
     dialog::backdrop{background:#17395766}
+    .dlg-in{padding:18px 20px;max-height:82vh;overflow-y:auto}
+    .dlg-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .dlg-sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+    .dlg-sec h3{margin:0 0 6px;color:var(--navy);font-size:14px}
+    .mini-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+    .mini-stats .stat{padding:9px 4px;min-width:0}
+    .mini-stats .stat b{font-size:17px}
+    .rline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed #e4edf1;font-size:13px}
+    .rline small{color:var(--muted);flex:0 0 auto}
+    details{margin-top:6px}
+    details summary{cursor:pointer;color:var(--blue);font-weight:800;font-size:12.5px}
+    details pre{white-space:pre-wrap;font:inherit;font-size:13px;background:#f8fcfe;border:1px solid #d6ebf4;border-radius:10px;padding:10px 12px;margin:6px 0 0}
+    .linkrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+    .linkrow input{flex:1;min-width:220px;font-size:12.5px}
   </style>
 </head>
 <body>
@@ -51,12 +66,13 @@
   <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
 </header>
 <main id="app"></main>
+<dialog id="dlg"></dialog>
 <script>
 'use strict';
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
-let DATA=null,FILTER='전체';
+let DATA=null,FILTER='전체',ARTS=null;
 const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
 
 async function api(path,opt){
@@ -65,6 +81,28 @@ async function api(path,opt){
   if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
   if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
   return j;
+}
+async function getArts(){
+  if(ARTS)return ARTS;
+  try{const r=await fetch('/articles.json',{cache:'no-store'});ARTS=await r.json();}catch(e){ARTS={articles:[]};}
+  return ARTS;
+}
+function titleOf(id,lv){
+  const a=(ARTS&&ARTS.articles||[]).find(x=>x.id===id);
+  if(!a)return id;
+  const b=(a.levels||{})[lv]||a.levels.L3||a.levels.L2||a.levels.L4;
+  return b?b.title:id;
+}
+function downloadJson(obj,name){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function copyText(t){
+  const fb=()=>{window.prompt('복사해서 사용하세요:',t);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>alert('복사했어요'),fb);else fb();
 }
 function renderLogin(msg){
   $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;
@@ -90,19 +128,20 @@ function render(){
   list.sort((a,b)=>(a.today===b.today?0:a.today?1:-1)||(b.streak-a.streak));
   const linked=all.filter(s=>s.linked);
   const doneToday=linked.filter(s=>s.today).length;
+  const backups=DATA.backups||[];
   $('#app').innerHTML=`
   <div class="card"><h2>오늘 현황</h2><div class="stats">
     <div class="stat"><b>${all.length}</b><span>등록 학생</span></div>
     <div class="stat"><b>${linked.length}</b><span>앱 연동</span></div>
     <div class="stat"><b>${doneToday} / ${linked.length}</b><span>오늘의 1지문 완료</span></div>
     <div class="stat ${linked.length-doneToday>0?'warn':''}"><b>${linked.length-doneToday}</b><span>오늘 미수행</span></div>
-  </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다.</p></div>
+  </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다. 학생 이름을 누르면 상세 기록이 열려요.</p></div>
   <div class="card"><h2>학생 현황판</h2>
     <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
       <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>보고서</th><th>붉은책</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
-        <td><b>${esc(s.name||'(미등록)')}</b> <span class="muted">${esc(s.code)}</span></td>
+        <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span></td>
         <td>${esc(s.cls||'—')}</td>
         <td><select data-lv="${esc(s.code)}" ${s.name?'':'disabled'}>
           ${['','L2','L3','L4'].map(l=>`<option value="${l}" ${s.level===l?'selected':''}>${l?LV[l]:'—'}</option>`).join('')}</select>
@@ -121,8 +160,14 @@ function render(){
       <label>반<br><input id="fCls" placeholder="예: 월수금A" style="width:100%"></label>
       <label>레벨<br><select id="fLv" style="width:100%"><option value="">자동</option><option value="L2">초등 심화</option><option value="L3">중등</option><option value="L4">고등</option></select></label>
       <button class="btn" id="fSave">저장</button>
-    </div><p class="err" id="fErr"></p></div>`;
-  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
+    </div><p class="err" id="fErr"></p></div>
+  <div class="card"><h2>데이터 백업</h2>
+    <p class="muted">모든 학생 기록을 JSON 파일로 컴퓨터에 보관하세요. 서버는 매일 새벽 자동 스냅샷을 최근 10일치 보관합니다.</p>
+    <div class="filters" style="margin:10px 0 0">
+      <button class="btn" id="bkNow">지금 전체 백업 내려받기</button>
+      ${backups.length?backups.map(d=>`<button class="chip" data-bk="${esc(d)}">${esc(d)} 스냅샷</button>`).join(''):'<span class="muted">자동 스냅샷이 아직 없어요 — 매일 새벽에 만들어져요.</span>'}
+    </div></div>`;
+  document.querySelectorAll('.chip[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
   document.querySelectorAll('select[data-lv]').forEach(sel=>sel.onchange=async()=>{
     if(!sel.value)return;
     try{await api('/admin/level',{method:'POST',body:JSON.stringify({code:sel.dataset.lv,level:sel.value})});refresh();}
@@ -134,9 +179,100 @@ function render(){
       refresh();}
     catch(e){$('#fErr').textContent=e.message;}
   };
+  $('#bkNow').onclick=async()=>{
+    try{const j=await api('/admin/export');downloadJson(j,'wb-reading-backup-'+new Date().toISOString().slice(0,10)+'.json');}
+    catch(e){alert(e.message);}
+  };
+  document.querySelectorAll('[data-bk]').forEach(b=>b.onclick=async()=>{
+    try{const j=await api('/admin/export?backup='+b.dataset.bk);downloadJson(j,'wb-reading-snapshot-'+b.dataset.bk+'.json');}
+    catch(e){alert(e.message);}
+  });
+  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>openDetail(b.dataset.view));
+}
+/* ── 학생 상세 ── */
+function stuReportText(r){
+  const lines=['['+(r.title||'탐구보고서')+'] '+(r.done||'')];
+  if(r.topic)lines.push('탐구 질문: '+r.topic);
+  if(r.motive)lines.push('동기: '+r.motive);
+  Object.entries(r.learned||{}).forEach(([id,l])=>{if(l)lines.push('알게 된 것: '+l);});
+  if(r.more)lines.push('더 알아본 것: '+r.more);
+  if(r.conclusion)lines.push('결론: '+r.conclusion);
+  if(r.reflect)lines.push('성찰: '+r.reflect);
+  return lines.join('\n');
+}
+async function openDetail(code){
+  let j;
+  try{[j]=await Promise.all([api('/admin/student/'+code),getArts()]);}
+  catch(e){if(e.message!=='auth')alert(e.message);return;}
+  const s=j.summary;const st=j.state||{};
+  const reads=Object.entries(st.readings||{}).sort((x,y)=>y[1].date<x[1].date?-1:1).slice(0,8);
+  const reports=(st.reports||[]).slice().reverse();
+  const redbook=(st.redbook||[]).slice(-5).reverse();
+  const sp=st.speed||[];
+  const speedLine=sp.length>=2?`최근 <b>${sp[sp.length-1].cpm}자/분</b> (첫 기록 대비 ${sp[sp.length-1].cpm-sp[0].cpm>=0?'+':''}${sp[sp.length-1].cpm-sp[0].cpm})`:sp.length===1?`${sp[0].cpm}자/분 (1회 측정)`:'측정 전';
+  const stu=j.student||{};
+  $('#dlg').innerHTML=`<div class="dlg-in">
+    <div class="dlg-head"><div>
+      <h2 style="margin:0">${esc(s.name||'(미등록)')} <span class="muted" style="font-weight:600">${esc(s.code)}</span></h2>
+      <p class="muted" style="margin:4px 0 0">${esc(s.cls||'—')} · ${esc(s.grade||'—')} · 레벨 ${esc(LV[s.level]||s.level||'자동')} ${s.appLevel&&s.appLevel!==s.level?`(앱: ${esc(s.appLevel)})`:''} · 마지막 활동 ${fmtLast(s.lastActive)}</p>
+    </div><button class="chip" id="dlgClose">닫기 ✕</button></div>
+    <div class="mini-stats">
+      <div class="stat"><b>${s.streak}</b><span>연속(일)</span></div>
+      <div class="stat"><b>${s.week}/7</b><span>이번 주</span></div>
+      <div class="stat"><b>${s.reads}</b><span>완독</span></div>
+      <div class="stat"><b>${s.acc==null?'—':s.acc+'%'}</b><span>정답률</span></div>
+      <div class="stat"><b>${s.vocab}</b><span>어휘</span></div>
+      <div class="stat"><b>${s.train}</b><span>훈련</span></div>
+      <div class="stat"><b>${s.redbook}</b><span>붉은책</span></div>
+      <div class="stat"><b>${s.reports}</b><span>보고서</span></div>
+    </div>
+    <div class="dlg-sec"><h3>읽기 속도</h3><p class="muted" style="font-size:13px">${speedLine}</p></div>
+    <div class="dlg-sec"><h3>최근 완독 (${reads.length})</h3>
+      ${reads.map(([id,r])=>{const q=(st.quiz||{})[id];
+        return `<div class="rline"><span>${esc(titleOf(id,r.level))}${q?` <span class="tag ${q.correct/q.total>=0.75?'ok':'warn'}">${q.correct}/${q.total}</span>`:''}</span><small>${esc(r.date)}</small></div>`;}).join('')||'<p class="muted">아직 없음</p>'}
+    </div>
+    <div class="dlg-sec"><h3>탐구보고서 (${reports.length})</h3>
+      ${reports.map(r=>`<div class="rline" style="display:block"><b>${esc(r.title||'제목 없음')}</b> <small>${esc(r.done||'')}</small>
+        <details><summary>내용 보기</summary><pre>${esc(stuReportText(r))}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
+    </div>
+    <div class="dlg-sec"><h3>붉은 책 요약 (최근 ${redbook.length})</h3>
+      ${redbook.map(r=>`<div class="rline" style="display:block"><b>${esc(r.unit)}</b> <small>${esc(r.date)} · 셀프체크 ${(r.checks||[]).filter(Boolean).length}/3</small>
+        <details><summary>요약 보기</summary><pre>${esc(r.summary)}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
+    </div>
+    <div class="dlg-sec"><h3>학부모 리포트 링크</h3>
+      <p class="muted">로그인 없이 아이의 주간 현황만 보이는 읽기 전용 페이지예요. 학부모께 링크를 보내 주세요.</p>
+      <div class="linkrow">
+        <button class="btn" id="plMake">${stu.ptoken?'링크 복사':'링크 만들기'}</button>
+        ${stu.ptoken?'<button class="chip" id="plReset">재발급 (기존 링크 무효화)</button>':''}
+        <input id="plUrl" readonly value="${stu.ptoken?esc(location.origin+'/parent.html?t='+stu.ptoken):''}" placeholder="링크를 만들면 여기 표시돼요">
+      </div>
+    </div>
+  </div>`;
+  const dlg=$('#dlg');dlg.showModal();
+  $('#dlgClose').onclick=()=>dlg.close();
+  $('#plMake').onclick=async()=>{
+    try{const r=await api('/admin/parentlink',{method:'POST',body:JSON.stringify({code})});
+      const u=location.origin+'/parent.html?t='+r.token;
+      $('#plUrl').value=u;copyText(u);}
+    catch(e){alert(e.message);}
+  };
+  const pr=$('#plReset');
+  if(pr)pr.onclick=async()=>{
+    if(!confirm('기존 학부모 링크가 무효화됩니다. 재발급할까요?'))return;
+    try{const r=await api('/admin/parentlink',{method:'POST',body:JSON.stringify({code,reset:true})});
+      const u=location.origin+'/parent.html?t='+r.token;
+      $('#plUrl').value=u;copyText(u);}
+    catch(e){alert(e.message);}
+  };
 }
 async function refresh(){
-  try{DATA=await api('/admin/overview');render();}
+  try{
+    const [ov,bk]=await Promise.all([
+      api('/admin/overview'),
+      api('/admin/backups').catch(()=>({backups:[]})),
+    ]);
+    DATA=ov;DATA.backups=bk.backups||[];render();
+  }
   catch(e){if(e.message!=='auth')renderLogin(e.message);}
 }
 $('#btnRefresh').onclick=refresh;

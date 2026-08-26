@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -81,6 +81,49 @@ function summarize(code) {
   };
 }
 
+/* ── 학부모 리포트 ── */
+let TITLE_CACHE = { t: 0, map: null };
+function titleMap() {
+  if (TITLE_CACHE.map && Date.now() - TITLE_CACHE.t < 60_000) return TITLE_CACHE.map;
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'articles.json'), 'utf8'));
+    const m = {};
+    for (const a of d.articles || []) {
+      m[a.id] = {};
+      for (const lv of ['L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
+    }
+    TITLE_CACHE = { t: Date.now(), map: m };
+  } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
+  return TITLE_CACHE.map;
+}
+function parentSummary(stu, st) {
+  const titles = titleMap();
+  const sum = summarize(stu.code);
+  const S = (st && st.state) || {};
+  const days = S.days || {};
+  const dows = ['일', '월', '화', '수', '목', '금', '토'];
+  const weekDays = [];
+  for (let i = 6; i >= 0; i--) {
+    const k = dkeyOffset(-i);
+    const d = new Date(k + 'T12:00:00');
+    weekDays.push({ dow: dows[d.getDay()], done: !!days[k], today: i === 0 });
+  }
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  const recent = Object.entries(S.readings || {})
+    .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
+    .slice(0, 5)
+    .map(([id, r]) => ({ date: r.date, title: anyTitle(id, r.level) }));
+  const reports = (S.reports || []).slice(-3).reverse().map(r => ({ title: r.title || '탐구보고서', done: r.done || '' }));
+  const sp = S.speed || [];
+  const speed = sp.length >= 2 ? { last: sp[sp.length - 1].cpm, delta: sp[sp.length - 1].cpm - sp[0].cpm } : null;
+  return {
+    name: stu.name, cls: stu.cls || '', grade: stu.grade || '', level: sum.level || sum.appLevel || '',
+    today: sum.today, streak: sum.streak, week: sum.week, weekDays,
+    reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
+    recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
+  };
+}
+
 /* ── 정적 파일 ── */
 const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pdf': 'application/pdf', '.css': 'text/css; charset=utf-8' };
 function serveFile(res, base, rel) {
@@ -101,6 +144,16 @@ const server = http.createServer(async (req, res) => {
     /* API */
     if (p.startsWith('/api/')) {
       if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso() });
+
+      if (p === '/api/pub' && req.method === 'GET') return json(res, 200, { map: db.pubmap || {} });
+
+      if (p === '/api/parent/summary' && req.method === 'GET') {
+        const t = url.searchParams.get('t') || '';
+        const code = /^[A-Za-z0-9]{16,64}$/.test(t) ? (db.parents || {})[t] : null;
+        const stu = code && db.students[code];
+        if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
+        return json(res, 200, parentSummary(stu, db.states[code] || null));
+      }
 
       if (p === '/api/login' && req.method === 'POST') {
         const { code } = await readBody(req);
@@ -127,6 +180,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/state' && req.method === 'PUT' && !who.admin) {
         const { state } = await readBody(req);
         if (!state || typeof state !== 'object') return json(res, 400, { error: 'state 필요' });
+        if (JSON.stringify(state).length > 900_000) return json(res, 413, { error: '기록이 너무 커서 저장할 수 없어요.' });
         db.states[who.code] = { state, updatedAt: nowIso() };
         persist();
         return json(res, 200, { ok: true, updatedAt: db.states[who.code].updatedAt });
@@ -156,11 +210,48 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true });
       }
+      if (p === '/api/admin/export' && req.method === 'GET') {
+        const day = url.searchParams.get('backup');
+        if (day) {
+          const snap = getBackup(day);
+          if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
+          return json(res, 200, snap);
+        }
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states });
+      }
+      if (p === '/api/admin/backups' && req.method === 'GET') {
+        return json(res, 200, { backups: listBackups() });
+      }
+      if (p === '/api/admin/backup-now' && req.method === 'POST') {
+        return json(res, 200, { ok: true, day: snapshotNow() });
+      }
+      if (p === '/api/admin/pub' && req.method === 'POST') {
+        const { id, status } = await readBody(req);
+        if (!id || typeof id !== 'string' || id.length > 64) return json(res, 400, { error: 'id 필요' });
+        if (!['published', 'draft'].includes(status)) return json(res, 400, { error: 'status는 published/draft' });
+        db.pubmap = db.pubmap || {};
+        db.pubmap[id] = status;
+        persist();
+        return json(res, 200, { ok: true, map: db.pubmap });
+      }
+      if (p === '/api/admin/parentlink' && req.method === 'POST') {
+        const { code, reset } = await readBody(req);
+        const stu = db.students[code];
+        if (!stu) return json(res, 404, { error: '학생 없음' });
+        db.parents = db.parents || {};
+        if (stu.ptoken && !reset) return json(res, 200, { ok: true, token: stu.ptoken });
+        if (stu.ptoken) delete db.parents[stu.ptoken];
+        const t = crypto.randomUUID().replace(/-/g, '');
+        stu.ptoken = t;
+        db.parents[t] = stu.code;
+        persist();
+        return json(res, 200, { ok: true, token: t });
+      }
       const mDetail = p.match(/^\/api\/admin\/student\/([A-Za-z0-9-]+)$/);
       if (mDetail && req.method === 'GET') {
         const code = mDetail[1];
         const st = db.states[code];
-        return json(res, 200, { summary: summarize(code), state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
+        return json(res, 200, { summary: summarize(code), student: db.students[code] || null, state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
       }
       return json(res, 404, { error: 'unknown api' });
     }
@@ -168,6 +259,15 @@ const server = http.createServer(async (req, res) => {
     /* 관리 웹 */
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
+
+    /* 발행 오버라이드 적용된 articles.json */
+    if (p === '/articles.json' && db.pubmap && Object.keys(db.pubmap).length) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'articles.json'), 'utf8'));
+        (data.articles || []).forEach(a => { if (db.pubmap[a.id]) a.status = db.pubmap[a.id]; });
+        return json(res, 200, data);
+      } catch (e) { /* 파일 문제 시 원본 서빙으로 폴백 */ }
+    }
 
     /* 학생 앱 */
     return serveFile(res, APP_DIR, p === '/' ? 'index.html' : p.slice(1));
