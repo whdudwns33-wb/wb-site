@@ -290,7 +290,48 @@ export default {
         return json(200, { ok: true, updatedAt: JSON.parse(raw).updatedAt });
       }
 
+      /* 우리 반 리그 — 같은 반 학생의 스트릭·주간 완료만 (정답률 등 성적은 비공개) */
+      if (p === '/api/league' && req.method === 'GET' && !who.admin) {
+        const me = await env.DB.get('student:' + who.code, 'json');
+        if (!me || !me.cls) return json(200, { cls: '', members: [] });
+        const codes = (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length));
+        const members = [];
+        for (const c of codes) {
+          const stu = await env.DB.get('student:' + c, 'json');
+          if (!stu || stu.cls !== me.cls) continue;
+          const st = await env.DB.get('state:' + c, 'json');
+          const s = summarize(c, stu, st);
+          members.push({ name: stu.name, me: c === who.code, streak: s.streak, week: s.week, today: s.today });
+        }
+        members.sort((a, b) => b.streak - a.streak || b.week - a.week || (b.today ? 1 : 0) - (a.today ? 1 : 0));
+        return json(200, { cls: me.cls, members });
+      }
+
       if (!who.admin) return json(403, { error: '권한이 없습니다.' });
+
+      /* 학부모 주간 메시지 일괄 생성 — 연동 학생마다 링크 포함 발송 문구 */
+      if (p === '/api/admin/parent-messages' && req.method === 'GET') {
+        const codes = (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length));
+        const messages = [];
+        for (const c of codes) {
+          const stu = await env.DB.get('student:' + c, 'json');
+          if (!stu || !stu.name) continue;
+          const st = await env.DB.get('state:' + c, 'json');
+          if (!st) continue; /* 앱 연동 학생만 */
+          if (!stu.ptoken) {
+            const t = crypto.randomUUID().replace(/-/g, '');
+            stu.ptoken = t;
+            await env.DB.put('parent:' + t, stu.code);
+            await env.DB.put('student:' + stu.code, JSON.stringify(stu));
+          }
+          const s = summarize(c, stu, st);
+          messages.push({
+            code: c, name: stu.name, cls: stu.cls || '',
+            text: `[WB 진로독서] ${stu.name} 학생 주간 리포트입니다.\n이번 주 ${s.week}회 완독 · ${s.streak}일 연속 읽는 중${s.acc != null ? ` · 문제 정답률 ${s.acc}%` : ''}입니다.\n자세한 내용: ${url.origin}/parent.html?t=${stu.ptoken}\n— WB 독해력학원 · 웩슬러브레인센터`,
+          });
+        }
+        return json(200, { messages });
+      }
 
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set();

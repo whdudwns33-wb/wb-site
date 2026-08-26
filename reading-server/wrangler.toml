@@ -5,6 +5,9 @@ compatibility_date = "2026-08-01"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+# articles.json은 워커를 먼저 거쳐야 발행 오버라이드(pubmap)가 적용됨.
+# 기본값은 자산 직접 서빙이라 워커의 /articles.json 인터셉트가 실행되지 않는다.
+run_worker_first = ["/articles.json"]
 
 # KV 네임스페이스 — 배포 시 `wrangler kv namespace create DB`로 생성된 id로 교체
 [[kv_namespaces]]

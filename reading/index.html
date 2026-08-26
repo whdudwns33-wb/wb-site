@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173957">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <title>WB 진로독서</title>
@@ -276,6 +276,8 @@ function normalizeState(s){
   s.prefs.auto=s.prefs.auto||{speed:1,scope:0};
   s.mychunks=s.mychunks||{};
   s.speed=s.speed||[];
+  s.wrong=s.wrong||[];
+  if(!('lvhint' in s))s.lvhint=null;
   (s.vocab||[]).forEach(v=>{if(v.box==null)v.box=0;if(!v.last)v.last=v.addedAt||dkey();});
   return s;
 }
@@ -379,6 +381,20 @@ function recommend(excludeId){
   return out.slice(0,3);
 }
 
+/* ───────────────────────── 레벨 자동 제안 ───────────────────────── */
+function levelSuggest(){
+  const lv=myLevel();
+  const recs=Object.entries(S.quiz).filter(([k])=>!k.endsWith('#c')).map(([,v])=>v)
+    .sort((a,b)=>a.date<b.date?-1:1).slice(-5);
+  const qt=recs.reduce((s,q)=>s+q.total,0),qc=recs.reduce((s,q)=>s+q.correct,0);
+  if(recs.length<3||qt<12)return null;                      // 표본 부족
+  if(S.lvhint&&daysSince(S.lvhint)<14)return null;          // 최근에 제안함
+  const acc=qc/qt*100;
+  if(acc>=85&&lv!=='L4')return {dir:'up',acc:Math.round(acc),to:LEVELS[LEVELS.indexOf(lv)+1]};
+  if(acc<60&&lv!=='L2')return {dir:'down',acc:Math.round(acc),to:LEVELS[LEVELS.indexOf(lv)-1]};
+  return null;
+}
+
 /* ───────────────────────── 스트릭 ───────────────────────── */
 function streak(){
   let d=dkey();let n=0;
@@ -401,6 +417,7 @@ function render(){
   $('#tabbar').hidden=!S.profile||['reader','quiz','onboard'].includes(view.name);
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.v===view.name?'true':'false'));
   if(sess.auto&&view.name==='reader'){const rc=document.getElementById('readerCard');if(rc)rc.classList.add('autoread');}
+  if(view.name==='report')loadLeague();
   if(view.name==='reader'||view.name==='quiz'){
     $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="home">홈으로</button>';
   }else if(view.name==='settings'){
@@ -410,7 +427,7 @@ function render(){
   }else{$('#headActions').innerHTML='';}
   window.scrollTo(0,0);
 }
-function go(name,extra){if(sess.auto)autoStop(false);view=Object.assign({name},extra||{});sess={};render();}
+function go(name,extra){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
 
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
@@ -509,7 +526,14 @@ function vHome(){
   }
   const recs=recommend(missionId);
   const scrapN=Object.keys(S.scraps).length;
-  return `${greet}${missionCard}
+  const sug=levelSuggest();
+  const sugCard=sug?`<div class="card" style="border-color:${sug.dir==='up'?'#b3dcc9':'#efd3b0'};background:linear-gradient(145deg,${sug.dir==='up'?'#effaf4':'#fdf6ec'} 0,#fff 70%)">
+    <p class="eyebrow" style="color:${sug.dir==='up'?'var(--ok)':'var(--warn)'}">레벨 제안</p>
+    <h2>${sug.dir==='up'?`최근 정답률 ${sug.acc}% — 한 단계 올려볼까요?`:`최근 정답률 ${sug.acc}% — 한 단계 쉬운 글은 어때요?`}</h2>
+    <p class="sub">${sug.dir==='up'?'지금 수준이 편안해 보여요. '+LEVEL_LABEL[sug.to]+' 글에 도전해 봐요.':LEVEL_LABEL[sug.to]+' 글로 자신감을 쌓고 다시 올라와요.'} 선생님과 연동 중이면 선생님 조정이 우선이에요.</p>
+    <div class="row2"><button class="btn sm ghost" data-act="lv-hint-later" style="margin-top:10px">나중에</button>
+    <button class="btn sm" data-act="lv-hint-go" data-lv="${sug.to}" style="margin-top:10px">${LEVEL_LABEL[sug.to]}로 바꾸기</button></div></div>`:'';
+  return `${greet}${missionCard}${sugCard}
     <div class="card"><div class="weekhead"><h3>이번 주 읽기</h3><span class="tag muted">${weekCount()}/7일</span></div>
       <div class="weekdots">${weekDots()}</div></div>
     <div class="card"><div class="stat-grid">
@@ -591,6 +615,7 @@ function vReader(){
         ${mc?`<button class="toolbtn" data-act="toggle-mychunk" aria-pressed="${chunk&&useMine}">∕ 내 단위</button>`:''}
         <button class="toolbtn" data-act="mychunk-edit">✂ 직접 끊기</button>
         <button class="toolbtn" data-act="auto-start">▶ 자동 읽기</button>
+        <button class="toolbtn" data-act="aloud">🎙 낭독</button>
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         ${hasEn?`<span class="seg-ctl" role="group" aria-label="언어 보기">${[[0,'한글'],[1,'한·영'],[2,'EN만']].map(([m,l])=>`<button data-act="en-mode" data-m="${m}" aria-pressed="${enMode===m}">${l}</button>`).join('')}</span>`:''}
@@ -775,12 +800,28 @@ function vReport(){
     </div>
     <div class="days7">${days.map(([d,on])=>`<span class="day7"><i class="${on?'on':''}"></i>${d}일</span>`).join('')}</div></div>
     ${speedCard}
+    ${SYNC.avail&&SYNC.auth?`<div class="card"><h2>우리 반 리그</h2><p class="sub">꾸준함(연속 일수)으로만 겨뤄요 — 매일 한 편이 최고 전략!</p><div id="leagueBody"><p class="sub" style="margin-top:8px">불러오는 중…</p></div></div>`:''}
     <div class="card"><h2>분야 지도</h2><p class="sub">골고루 읽을수록 시야가 넓어져요.</p>
     <div class="dist">${Object.entries(CATS).map(([c,l])=>`<div class="l"><span>${l}</span><span>${dist[c]}편</span></div>
       <div class="bar"><i style="width:${Math.round(dist[c]/max*100)}%"></i></div>`).join('')}</div></div>
     <div class="card"><h2>진로 관심사</h2>
     <p class="sub" style="margin-top:9px">${S.profile.interests.map(c=>`<span class="tag">${INTEREST_LABEL[c]}</span>`).join(' ')}</p>
     ${acc!=null&&qt>=20?(acc>=85?'<div class="note">최근 정답률이 아주 높아요. 선생님과 레벨 올리기를 상의해 보세요!</div>':acc<60?'<div class="note">조금 어려운 수준일 수 있어요. 선생님과 레벨을 상의해 보세요.</div>':''):''}</div>`;
+}
+
+async function loadLeague(){
+  const el=document.getElementById('leagueBody');if(!el)return;
+  try{
+    if(!sess.league)sess.league=await syncApi('/league');
+    const L=sess.league;
+    const el2=document.getElementById('leagueBody');if(!el2)return;
+    if(!L.cls||!L.members||L.members.length<2){
+      el2.innerHTML='<p class="sub" style="margin-top:8px">같은 반 친구가 2명 이상 연동되면 순위가 보여요.</p>';return;
+    }
+    const medals=['🥇','🥈','🥉'];
+    el2.innerHTML=`<div class="glist">${L.members.map((m,i)=>`<div class="grow" style="cursor:default${m.me?';background:#f5fbfe;border-radius:11px;padding-left:9px;padding-right:9px':''}">
+      <span class="t"><b>${medals[i]||(i+1)+'위'} ${esc(m.name)}${m.me?' · 나':''}</b><small>연속 ${m.streak}일 · 이번 주 ${m.week}/7${m.today?' · 오늘 완료 ✓':''}</small></span></div>`).join('')}</div>`;
+  }catch(e){el.innerHTML='<p class="sub" style="margin-top:8px">지금은 불러올 수 없어요.</p>';}
 }
 
 /* ───────────────────────── 설정 ───────────────────────── */
@@ -873,12 +914,17 @@ function vTrain(){
   if(sess.ct)return vChunkTrain();
   if(sess.vs)return vVocabSession();
   if(sess.rb)return vRedbookForm();
+  if(sess.wq)return vWrongSession();
   const tp=pickTrainPara();
   const due=dueVocab();
   const hj=hanjaFamilies();
-  const last=S.train.length?S.train[S.train.length-1]:null;
+  const last=[...S.train].reverse().find(t=>t.score!=null)||null;
+  const wrongN=S.wrong.length;
   return `<div class="card hero"><p class="eyebrow">읽기 근육 훈련</p><h1>오늘도 한 세트!</h1>
     <p class="sub">회당 5~10분이면 충분해요. 지금까지 훈련 ${S.train.length}회 · 붉은 책 요약 ${S.redbook.length}회</p></div>
+  <div class="card"><div class="thead"><span class="tico c">↺</span><div class="t-main"><h2 style="font-size:16px">오답 노트</h2>
+    <p class="sub" style="margin-top:2px">틀린 문제만 다시 — 맞히면 노트에서 지워져요</p></div><span class="tag ${wrongN?'bad':'muted'}">${wrongN?wrongN+'문제':'비어 있음'}</span></div>
+    <button class="btn sm" data-act="wq-start" ${wrongN?'':'disabled'}>${wrongN?'다시 풀기':'틀린 문제가 없어요'}</button></div>
   <div class="card"><div class="thead"><span class="tico b">∕</span><div class="t-main"><h2 style="font-size:16px">끊어 읽기 훈련</h2>
     <p class="sub" style="margin-top:2px">3단계 — 따라 읽기 → 직접 끊기 → 문제</p></div>${last?`<span class="tag ok">최근 ${last.score}%</span>`:''}</div>
     <button class="btn sm" data-act="ct-start" ${tp?'':'disabled'}>${tp?'훈련 시작':'먼저 글을 1편 읽어 주세요'}</button></div>
@@ -978,6 +1024,46 @@ function vVocabSession(){
       <button class="btn sm" data-act="vs-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
     :`<button class="btn sm" data-act="vs-show">뜻 보기</button>`}
     <button class="btn ghost sm" data-act="vs-done">그만하기</button></div>`;
+}
+function wrongQuestion(w){
+  const a=DB.articles.find(x=>x.id===w.aid);if(!a)return null;
+  const b=a.levels&&a.levels[w.lv];if(!b)return null;
+  const qs=w.ch?(b.challenge||[]):(b.questions||[]);
+  const q=qs[w.qi];if(!q)return null;
+  return {a,b,q};
+}
+function removeWrong(w){
+  const i=S.wrong.findIndex(x=>x.aid===w.aid&&x.lv===w.lv&&x.ch===w.ch&&x.qi===w.qi);
+  if(i>=0){S.wrong.splice(i,1);save();}
+}
+function vWrongSession(){
+  const wq=sess.wq;
+  while(wq.i<wq.list.length&&!wrongQuestion(wq.list[wq.i])){
+    removeWrong(wq.list[wq.i]);wq.list.splice(wq.i,1); // 지문 개편으로 사라진 문항 정리
+  }
+  if(wq.i>=wq.list.length){
+    return `<div class="card hero"><p class="eyebrow">오답 노트 완료</p><h1>${wq.solved}개 해결!${wq.again?` ${wq.again}개는 다음에 다시`:''}</h1>
+      <p class="sub">맞힌 문제는 노트에서 지워졌어요. 남은 문제는 내일 또 도전해요.</p>
+      <button class="btn" data-act="wq-done">훈련으로 돌아가기</button></div>`;
+  }
+  const w=wq.list[wq.i];
+  const {b,q}=wrongQuestion(w);
+  const answered=wq.picked!=null;
+  return `<div class="card"><div class="qhead"><p class="qnum">오답 다시 풀기 ${wq.i+1} / ${wq.list.length}</p>
+    <p class="qnum" style="font-weight:600">${esc(b.title)}${w.ch?' · 심화':''}</p></div>
+    <div class="qbar"><i style="width:${Math.round(((wq.i+(answered?1:0))/wq.list.length)*100)}%"></i></div>
+    <p class="sub" style="margin-top:12px"><span class="tag">${QTYPE_LABEL[q.type]||'문항'}</span> <span class="tag muted">${w.date}에 틀림</span></p>
+    <p class="qtext">${esc(q.q)}</p>
+    <div class="choices">${q.choices.map((c,i)=>{
+      let cls='choice';let num=String(i+1);
+      if(answered){if(i===q.answer){cls+=' correct';num='✓';}else if(i===wq.picked){cls+=' wrong';num='✕';}}
+      return `<button class="${cls}" data-act="wq-pick" data-i="${i}" ${answered?'disabled':''}>
+        <span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;
+    }).join('')}</div>
+    ${answered?`<div class="explain"><b>${wq.picked===q.answer?'해결! 노트에서 지웠어요.':'아직이에요 — 다음에 또 나와요.'}</b> ${esc(q.explain)}<br>
+    <span class="evchip">근거: ${q.evidencePara+1}번째 문단</span></div>
+    <button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
+    ${answered?'':'<button class="btn ghost sm" data-act="wq-done">그만하기</button>'}</div>`;
 }
 function vRedbookForm(){
   const c=sess.rbChecks||[false,false,false];
@@ -1251,6 +1337,52 @@ function autoStart(){
   document.body.appendChild(bar);
   autoTick();
 }
+/* ── 낭독 녹음 (기기 밖으로 전송하지 않음 — 이 화면에서만 재생) ── */
+let ALOUD={rec:null,stream:null,chunks:[],url:null,timer:null,t0:0};
+async function aloudStart(){
+  if(sess.auto)autoStop(false);
+  if(ALOUD.url){URL.revokeObjectURL(ALOUD.url);ALOUD.url=null;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const rec=new MediaRecorder(stream);
+    ALOUD={rec,stream,chunks:[],url:null,timer:null,t0:Date.now()};
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)ALOUD.chunks.push(e.data);};
+    rec.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(ALOUD.chunks,{type:rec.mimeType||'audio/webm'});
+      ALOUD.url=URL.createObjectURL(blob);
+      aloudBar('done');
+    };
+    rec.start();
+    aloudBar('rec');
+  }catch(e){announce('마이크를 사용할 수 없어요. 브라우저의 마이크 권한을 확인해 주세요.');}
+}
+function aloudBar(state){
+  let bar=document.getElementById('aloudBar');
+  if(!bar){bar=document.createElement('div');bar.className='auto-bar';bar.id='aloudBar';document.body.appendChild(bar);}
+  if(ALOUD.timer){clearInterval(ALOUD.timer);ALOUD.timer=null;}
+  if(state==='rec'){
+    bar.innerHTML=`<div class="auto-in"><span class="tag bad">● 녹음 중</span><span class="qnum" id="aloudTime">0:00</span>
+      <span class="auto-lbl">소리 내어 끝까지 읽어 보세요</span><span style="flex:1"></span>
+      <button class="toolbtn" data-act="aloud-stop">■ 녹음 끝</button><button class="toolbtn" data-act="aloud-close">✕</button></div>`;
+    ALOUD.timer=setInterval(()=>{const s=Math.floor((Date.now()-ALOUD.t0)/1000);
+      const el=document.getElementById('aloudTime');if(el)el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');},500);
+  }else{
+    bar.innerHTML=`<div class="auto-in"><span class="tag ok">녹음 완료 — 들어 보세요</span>
+      <audio controls src="${ALOUD.url}" style="flex:1;min-width:170px;height:40px"></audio>
+      <button class="toolbtn" data-act="aloud">다시 녹음</button><button class="toolbtn" data-act="aloud-close">✕</button></div>`;
+  }
+}
+function aloudClose(){
+  try{
+    if(ALOUD.rec&&ALOUD.rec.state==='recording'){ALOUD.rec.onstop=()=>{ALOUD.stream.getTracks().forEach(t=>t.stop());};ALOUD.rec.stop();}
+    else if(ALOUD.stream)ALOUD.stream.getTracks().forEach(t=>t.stop());
+  }catch(e){}
+  if(ALOUD.timer)clearInterval(ALOUD.timer);
+  if(ALOUD.url)URL.revokeObjectURL(ALOUD.url);
+  const bar=document.getElementById('aloudBar');if(bar)bar.remove();
+  ALOUD={rec:null,stream:null,chunks:[],url:null,timer:null,t0:0};
+}
 function openVocabEn(articleId,word){
   const a=DB.articles.find(x=>x.id===articleId);
   const b=levelBody(a,myLevel());
@@ -1346,7 +1478,10 @@ document.addEventListener('click',e=>{
   else if(act==='quiz-pick'){const q=sess.q;if(q.picked!=null)return;
     q.picked=+t.dataset.i;const b=levelBody(DB.articles.find(x=>x.id===view.id),myLevel());
     const qs=q.ch?(b.challenge||[]):b.questions;
-    if(q.picked===qs[q.i].answer)q.correct++;render();}
+    if(q.picked===qs[q.i].answer)q.correct++;
+    else{const w={aid:view.id,lv:myLevel(),ch:!!q.ch,qi:q.i};
+      if(!S.wrong.some(x=>x.aid===w.aid&&x.lv===w.lv&&x.ch===w.ch&&x.qi===w.qi)){S.wrong.push({...w,date:dkey()});save();}}
+    render();}
   else if(act==='quiz-next'){const q=sess.q;const b=levelBody(DB.articles.find(x=>x.id===view.id),myLevel());
     const qs=q.ch?(b.challenge||[]):b.questions;
     if(q.i+1<qs.length){q.i++;q.picked=null;}
@@ -1399,6 +1534,11 @@ document.addEventListener('click',e=>{
     if(a.timer)clearTimeout(a.timer);
     if(a.playing)autoTick();else autoHighlight(ng);}
   else if(act==='auto-exit'){autoStop(false);}
+  /* ── 낭독 녹음 ── */
+  else if(act==='aloud'){aloudStart();}
+  else if(act==='aloud-stop'){if(ALOUD.rec&&ALOUD.rec.state==='recording'){ALOUD.rec.stop();
+    S.train.push({date:dkey(),articleId:view.id,type:'aloud'});save();announce('낭독 녹음 완료! 들어 보세요.');}}
+  else if(act==='aloud-close'){aloudClose();}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
     const a=DB.articles.find(x=>x.id===id);const b=levelBody(a,myLevel());
@@ -1440,6 +1580,17 @@ document.addEventListener('click',e=>{
       sv.last=dkey();save();}
     vs.i++;vs.show=false;render();}
   else if(act==='vs-done'){sess.vs=null;render();}
+  /* ── 오답 노트 ── */
+  else if(act==='wq-start'){if(!S.wrong.length)return;
+    sess.wq={list:S.wrong.slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0};render();}
+  else if(act==='wq-pick'){const wq=sess.wq;if(!wq||wq.picked!=null)return;
+    wq.picked=+t.dataset.i;
+    const w=wq.list[wq.i];const res=wrongQuestion(w);
+    if(res&&wq.picked===res.q.answer){removeWrong(w);wq.solved++;}
+    else wq.again++;
+    render();}
+  else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;render();}
+  else if(act==='wq-done'){sess.wq=null;render();}
   /* ── 한자 카드 ── */
   else if(act==='hj-open'){sess.hjOpen=sess.hjOpen===t.dataset.ch?null:t.dataset.ch;render();}
   /* ── 붉은 책 요약 ── */
@@ -1490,6 +1641,9 @@ document.addEventListener('click',e=>{
   else if(act==='lab-del-no'){sess.confirmDelReport=false;render();}
   else if(act==='lab-del-yes'){S.reports.splice(sess.labView,1);save();
     sess.labView=null;sess.confirmDelReport=false;render();announce('보고서를 삭제했어요');}
+  else if(act==='lv-hint-later'){S.lvhint=dkey();save();render();}
+  else if(act==='lv-hint-go'){const to=t.dataset.lv;if(!LEVELS.includes(to))return;
+    S.profile.level=to;S.lvhint=dkey();save();render();announce('레벨 변경: '+LEVEL_LABEL[to]);}
   else if(act==='reset-ask'){sess.confirmReset=true;render();}
   else if(act==='reset-no'){sess.confirmReset=false;render();}
   else if(act==='reset-yes'){localStorage.removeItem(KEY);S=loadState();go('onboard');}
