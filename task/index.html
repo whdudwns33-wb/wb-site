@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-25.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-25.1"></script>
-<script src="./asset-core.js?v=2026-08-25.1"></script>
-<script src="./qr-core.js?v=2026-08-25.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-25.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-26.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-26.1"></script>
+<script src="./asset-core.js?v=2026-08-26.1"></script>
+<script src="./qr-core.js?v=2026-08-26.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-26.1"></script>
 <script>
 "use strict";
 
@@ -7383,7 +7383,7 @@ function managerRequestInboxRows() {
   const directiveInboxRows = typeof adminDirectiveManageRows === 'undefined' ? [] : adminDirectiveManageRows;
   directiveInboxRows.filter(row => row.isCurrent && row.directiveStatus === 'active').forEach(row => {
     const pending = typeof adminDirectiveAudienceSummary === 'function' ? adminDirectiveAudienceSummary(row).pending : [];
-    if (pending.length) push('공통 요청 미확인', row.title,
+    if (pending.length) push('실시간 관리자 요청 미확인', row.title,
       '미확인: ' + pending.map(item => item.staffName || managerRequestTeacher(item.staffId)).join(', '), '', 'lesson', row.updatedAt, -2);
   });
   const studentChangeInboxEvents = typeof studentChangeEvents === 'undefined' ? [] : studentChangeEvents;
@@ -10658,7 +10658,7 @@ async function acknowledgeStudentChanges(studentId, button) {
   }
 }
 
-/* ── 관리자 공통 요청 · 선생님별 확인 이력 ── */
+/* ── 실시간 관리자 요청 · 선생님별 확인 이력 ── */
 let adminDirectiveManageRows = [], adminDirectiveOwnRows = [];
 let adminDirectiveManageLoaded = false, adminDirectiveOwnLoaded = false;
 let adminDirectiveLoading = false, adminDirectiveError = '', adminDirectiveSaving = false;
@@ -10756,12 +10756,12 @@ function adminDirectiveDateText(row) {
 function adminDirectiveLessonCard(row, acknowledge) {
   const pending = acknowledge && !row.acknowledgedAt;
   return '<div class="admin-directive-card' + (row.priority === 'important' ? ' is-important' : '') + '">' +
-    '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 공통 요청') : '') + '</b>' +
-      (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">공통</span>') + '</div>' +
+    '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 실시간 관리자 요청') : '') + '</b>' +
+      (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">실시간</span>') + '</div>' +
     '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
     '<div class="small muted mt8">' + esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div>' +
     (pending ? '<button class="btn btn-sm btn-primary mt8" data-act="adminDirectiveAck" data-directive="' +
-      esc(row.directiveId) + '" data-rev="' + row.revision + '">이 공통 요청 확인</button>' : '') + '</div>';
+      esc(row.directiveId) + '" data-rev="' + row.revision + '">이 실시간 관리자 요청 확인</button>' : '') + '</div>';
 }
 
 function lessonAdminRequestsHtml(task) {
@@ -10772,7 +10772,7 @@ function lessonAdminRequestsHtml(task) {
   const canAcknowledge = session.isStaffLink && String(session.staffId || '') === String(task.staffId || '');
   return '<section class="mt14"><div class="card-title">관리자 요청사항' +
     ((lessonPending || commonCurrent.some(row => canAcknowledge && !row.acknowledgedAt)) ? newMarker('확인하지 않은 관리자 요청') : '') + '</div>' +
-    '<div class="card-sub mb8">수업별 요청과 여러 선생님에게 전달한 공통 요청을 나누어 표시합니다.</div>' +
+    '<div class="card-sub mb8">수업별 요청과 여러 선생님에게 전달한 실시간 관리자 요청을 나누어 표시합니다.</div>' +
     '<div class="admin-directive-card"><div class="between"><b>현재 수업 요청' +
       (lessonPending ? newMarker('수정된 수업 요청') : '') + '</b><span class="tag">수업</span></div>' +
       '<div class="admin-directive-body">' + esc(String(task.adminRequest || '').trim() || '등록된 요청이 없습니다.') + '</div></div>' +
@@ -10780,12 +10780,12 @@ function lessonAdminRequestsHtml(task) {
       (lessonHistory.length ? lessonHistory.map(row => '<div class="guide mb8"><b>' +
         esc(new Date(row.changedAt).toLocaleDateString('ko-KR')) + '</b><br>' + esc(row.body) + '</div>').join('') :
         '<div class="small muted">지난 수업 요청이 없습니다.</div>') + '</details>' +
-    '<div class="sect">현재 공통 요청</div>' +
+    '<div class="sect">현재 실시간 관리자 요청</div>' +
       (commonCurrent.length ? commonCurrent.map(row => adminDirectiveLessonCard(row, canAcknowledge)).join('') :
-        '<div class="small muted">현재 전달된 공통 요청이 없습니다.</div>') +
-    '<details class="admin-directive-history"><summary>지난 공통 요청 보기 · 최신 3개</summary>' +
+        '<div class="small muted">현재 전달된 실시간 관리자 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 실시간 관리자 요청 보기 · 최신 3개</summary>' +
       (commonPast.length ? commonPast.map(row => adminDirectiveLessonCard(row, false)).join('') :
-        '<div class="small muted">지난 공통 요청이 없습니다.</div>') + '</details></section>';
+        '<div class="small muted">지난 실시간 관리자 요청이 없습니다.</div>') + '</details></section>';
 }
 
 function adminDirectiveSoundKey() {
@@ -10800,7 +10800,7 @@ function adminDirectiveSoundEnabled() {
 function adminDirectiveSoundPromptHtml() {
   if (!session.isStaffLink || !session.staffId || adminDirectiveSoundEnabled()) return '';
   return '<div class="card admin-directive-sound"><div class="between"><div><div class="card-title">🔔 관리자 요청 알림</div>' +
-    '<div class="card-sub">버튼을 한 번 누르면 새 공통 요청 팝업과 함께 알림음이 울립니다.</div></div>' +
+    '<div class="card-sub">버튼을 한 번 누르면 새 실시간 관리자 요청 팝업과 함께 알림음이 울립니다.</div></div>' +
     '<button class="btn btn-sm btn-primary" data-act="adminDirectiveSound">알림음 켜기</button></div></div>';
 }
 
@@ -10841,7 +10841,7 @@ function showPendingAdminDirectivePopup() {
   sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'opened',
     directiveId: row.directiveId, revision: row.revision }).catch(() => {});
   playAdminDirectiveSound();
-  modal('관리자 공통 요청', adminDirectiveLessonCard(row, false),
+  modal('실시간 관리자 요청', adminDirectiveLessonCard(row, false),
     '<button class="btn btn-primary btn-block mt14" data-act="adminDirectiveAck" data-directive="' +
     esc(row.directiveId) + '" data-rev="' + row.revision + '" data-popup="true">확인했습니다</button>');
 }
@@ -10855,7 +10855,7 @@ async function acknowledgeAdminDirective(directiveId, revision, button, fromPopu
       directiveId: String(directiveId), revision: Number(revision) });
     if (!$('#modalHost').hidden) closeModal();
     await loadAdminDirectives(true, false);
-    toast('공통 요청을 확인했습니다');
+    toast('실시간 관리자 요청을 확인했습니다');
     if (fromPopup) setTimeout(showPendingAdminDirectivePopup, 120);
   } catch (error) {
     if (button) button.disabled = false;
@@ -10908,15 +10908,15 @@ function adminDirectiveManagerHtml() {
   const current = adminDirectiveManageRows.filter(row => row.isCurrent && row.directiveStatus === 'active');
   const history = adminDirectiveManageRows.filter(row => !row.isCurrent || row.directiveStatus === 'ended');
   const pending = current.reduce((sum, row) => sum + adminDirectiveAudienceSummary(row).pending.length, 0);
-  return '<details class="card admin-collapsible admin-directive-manager"><summary><span><b>📣 공통 관리자 요청</b>' +
+  return '<details class="card admin-collapsible admin-directive-manager"><summary><span><b>📣 실시간 관리자 요청</b>' +
     '<span class="card-sub">전체 또는 여러 선생님에게 전달하고 확인 여부를 관리합니다.</span></span><span class="pill ' +
     (pending ? 'warn' : '') + '">미확인 ' + pending + '명</span></summary><div class="admin-collapsible-body">' +
-    '<button class="btn btn-primary btn-block mb14" data-act="adminDirectiveAdd">새 공통 요청 작성</button>' +
+    '<button class="btn btn-primary btn-block mb14" data-act="adminDirectiveAdd">새 실시간 관리자 요청 작성</button>' +
     (adminDirectiveError ? '<div class="hint mb14" role="alert">' + esc(adminDirectiveError) +
       '<button class="btn btn-sm btn-ghost mt8" data-act="adminDirectiveRefresh">다시 불러오기</button></div>' : '') +
     (current.length ? current.map(row => adminDirectiveManageCard(row, false)).join('') :
-      '<div class="empty"><b>📣</b>현재 전달 중인 공통 요청이 없습니다.</div>') +
-    '<details class="admin-directive-history"><summary>지난 공통 요청 전체 기록 · ' + history.length + '건</summary>' +
+      '<div class="empty"><b>📣</b>현재 전달 중인 실시간 관리자 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 실시간 관리자 요청 전체 기록 · ' + history.length + '건</summary>' +
       (history.length ? history.map(row => adminDirectiveManageCard(row, true)).join('') :
         '<div class="small muted">지난 기록이 없습니다.</div>') + '</details>' +
     studentChangeAcknowledgementStatusHtml() + '</div></details>';
@@ -10941,7 +10941,7 @@ function adminDirectiveEditorModal() {
   const draft = adminDirectiveEditor;
   if (!draft) return;
   const selected = new Set(draft.staffIds || []);
-  modal(draft.expectedRevision ? '공통 관리자 요청 수정' : '새 공통 관리자 요청',
+  modal(draft.expectedRevision ? '실시간 관리자 요청 수정' : '새 실시간 관리자 요청',
     '<label class="field"><span class="fl">제목</span><input class="in" id="adTitle" maxlength="100" value="' + esc(draft.title) + '" placeholder="예: 오늘 수업 전 확인"></label>' +
     '<label class="field"><span class="fl">요청 내용</span><textarea class="in" id="adBody" rows="6" maxlength="2000" placeholder="선생님이 바로 실행할 수 있도록 적어 주세요.">' + esc(draft.body) + '</textarea></label>' +
     '<div class="grid2"><label class="field"><span class="fl">중요도</span><select class="in" id="adPriority"><option value="normal"' +
@@ -10977,20 +10977,20 @@ async function saveAdminDirective(button) {
   try {
     await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), ...payload });
     adminDirectiveEditor = null; closeModal();
-    await loadAdminDirectives(true, false); render(); toast(payload.expectedRevision ? '공통 요청 수정본을 전달했습니다' : '공통 요청을 전달했습니다');
+    await loadAdminDirectives(true, false); render(); toast(payload.expectedRevision ? '실시간 관리자 요청 수정본을 전달했습니다' : '실시간 관리자 요청을 전달했습니다');
   } catch (error) {
-    toast('공통 요청 저장 실패 — ' + (error.message || error));
+    toast('실시간 관리자 요청 저장 실패 — ' + (error.message || error));
     if (error && error.code === 'STALE_REVISION') { closeModal(); await loadAdminDirectives(true, false); }
   } finally { adminDirectiveSaving = false; if (button) button.disabled = false; }
 }
 
 async function endAdminDirective(directiveId, revision, button) {
-  if (!confirm('이 공통 요청을 종료할까요? 지난 기록과 확인 내역은 유지됩니다.')) return;
+  if (!confirm('이 실시간 관리자 요청을 종료할까요? 지난 기록과 확인 내역은 유지됩니다.')) return;
   if (button) button.disabled = true;
   try {
     await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'end',
       directiveId: String(directiveId), expectedRevision: Number(revision) });
-    await loadAdminDirectives(true, false); render(); toast('공통 요청을 종료했습니다');
+    await loadAdminDirectives(true, false); render(); toast('실시간 관리자 요청을 종료했습니다');
   } catch (error) { if (button) button.disabled = false; toast('종료 실패 — ' + (error.message || error)); }
 }
 
@@ -16002,7 +16002,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-25.1';
+const APP_VER = '2026-08-26.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
