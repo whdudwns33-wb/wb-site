@@ -54,6 +54,9 @@ function seed(db) {
   };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-a','teacher-a',?,?,?)")
     .bind(JSON.stringify(task), now, now).run();
+  const history = { taskId: 'lesson-a', date: '2026-08-20', att: 'L', note: '담당 변경 전 메모', updatedAt: now - 1000 };
+  db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task','lesson-a|2026-08-20','teacher-a',?,?,?)")
+    .bind(JSON.stringify(history), history.updatedAt, history.updatedAt).run();
   const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4] };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-b','teacher-a',?,?,?)")
     .bind(JSON.stringify(second), now, now).run();
@@ -68,6 +71,7 @@ test('migration is additive, append-only, and keeps deletion audit rows private 
 
 test('teacher change is admin-selected, recorded by stable student id, and acknowledged independently', async () => {
   const db = new TestD1(); seed(db);
+  const historyBefore = db.prepare("SELECT data,updated_at FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").first();
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }, note: '담당 변경 요청'
@@ -86,11 +90,21 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   const taskRow = db.prepare("SELECT owner,data FROM tasks WHERE app='task' AND id='lesson-a'").first();
   assert.equal(taskRow.owner, 'teacher-b');
   assert.equal(JSON.parse(taskRow.data).staffId, 'teacher-b');
+  const historyRow = db.prepare("SELECT owner,data,updated_at,srv_at FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").first();
+  assert.equal(historyRow.owner, 'teacher-b');
+  assert.deepEqual(JSON.parse(historyRow.data), {
+    taskId: 'lesson-a', date: '2026-08-20', att: 'L', note: '담당 변경 전 메모', updatedAt: historyRow.updated_at
+  });
+  assert.equal(historyRow.updated_at, historyBefore.updated_at);
+  assert.equal(historyRow.data, historyBefore.data);
+  assert.ok(historyRow.srv_at > historyRow.updated_at);
   const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
   assert.ok(roster.roster.students[0].teacherIds.includes('teacher-b'));
   const newTeacherSync = await call(db, '/sync', { auth: person('teacher-b'), since: 0, changes: [] });
   assert.equal(newTeacherSync.status, 200);
   assert.ok(newTeacherSync.body.changes.some(change => change.table === 'tasks' && change.key === 'lesson-a'));
+  assert.ok(newTeacherSync.body.changes.some(change => change.table === 'checks' &&
+    change.key === 'lesson-a|2026-08-20' && change.data.att === 'L' && change.data.note === '담당 변경 전 메모'));
 
   const oldTeacher = await call(db, '/student-change', { auth: person('teacher-a'), action: 'list' });
   const newTeacher = await call(db, '/student-change', { auth: person('teacher-b'), action: 'list' });
