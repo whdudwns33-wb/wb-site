@@ -1,0 +1,14 @@
+{
+  "name": "WB 워드브레인 — 단어 정원",
+  "short_name": "워드브레인",
+  "description": "한글 어휘·한자어·영어 단어를 망각곡선에 맞춰 장기 기억으로 — WB 어휘 기억 훈련 앱",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F3EA",
+  "theme_color": "#0F7AAB",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
