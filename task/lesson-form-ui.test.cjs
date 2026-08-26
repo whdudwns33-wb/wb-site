@@ -58,6 +58,15 @@ test('lesson edits send sourceTaskId as top-level optimistic-update metadata', (
     /sync\.post\('\/lesson-create', \{[\s\S]{0,220}sourceTaskId: draft\._sourceTaskId \|\| undefined,[\s\S]{0,180}expectedUpdatedAt:[\s\S]{0,120}lesson: lessonPreviewPayload/);
 });
 
+test('teacher-only lesson edits leave roster ownership transfer to the authoritative lesson endpoint', () => {
+  const start = html.indexOf('function lessonRosterStudentPayload(');
+  const end = html.indexOf('function lessonRosterStudentChanged(', start);
+  const block = html.slice(start, end);
+  assert.match(block, /const sourceTask = draft\._sourceTaskId/);
+  assert.match(block, /const teacherTransfer = sourceTask/);
+  assert.match(block, /\.concat\(teacherTransfer \? \[\] : lessonList\.map/);
+});
+
 test('admin lesson registration requires an explicit teacher selection', () => {
   assert.match(html, /<option value="">선생님을 선택하세요<\/option>/);
   assert.match(html, /const teacherReady = !!draft\.studentId && ROSTER_SUBJECT_OPTIONS\.includes/);
