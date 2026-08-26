@@ -86,8 +86,9 @@ var WBQUIZ = (function () {
       });
     });
     if (opts.length < 3) return null;
-    var shown = w.parts.map(function (p, i) { return i === idx ? '?' : p.ch; }).join('');
-    return choiceQ('assemble', w, w.word + ' — ' + shown + ' 에서 ? 의 뜻과 음은?', answer, opts, rnd, {
+    // 가린 글자는 □로 — '?'로 가리면 문장 끝 물음표와 겹쳐 뭘 묻는지 헷갈린다
+    var shown = w.parts.map(function (p, i) { return i === idx ? '□' : p.ch; }).join('');
+    return choiceQ('assemble', w, w.word + ' — ' + shown + ' 에서 □의 뜻과 음은?', answer, opts, rnd, {
       head: '한자 조립', hint: w.literal ? '조립하면: ' + w.literal : null,
     });
   }
