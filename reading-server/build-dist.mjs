@@ -19,6 +19,6 @@ fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 
 /* 워드브레인 (vocab/) — 같은 오리진 /vocab/ 에서 서빙해야 진로독서와 localStorage·토큰이 공유된다 */
 const VOCAB = path.join(ROOT, '..', 'vocab');
 fs.mkdirSync(path.join(DIST, 'vocab'), { recursive: true });
-const VOCAB_FILES = ['index.html', 'words.js', 'bridge.js', 'srs.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const VOCAB_FILES = ['index.html', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of VOCAB_FILES) fs.copyFileSync(path.join(VOCAB, f), path.join(DIST, 'vocab', f));
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));

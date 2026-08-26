@@ -9,11 +9,11 @@ let passed = 0;
 function t(name, fn) { fn(); passed += 1; console.log('  ✓ ' + name); }
 
 /* ── 단어 데이터 ── */
-t('단어 45개 — 어종별 15개', () => {
-  assert.strictEqual(WB_WORDS.length, 45);
+t('단어 135개 — 어종별 45개씩 균형', () => {
+  assert.strictEqual(WB_WORDS.length, 135);
   const by = { hanja: 0, native: 0, english: 0 };
   WB_WORDS.forEach((w) => { by[w.type] += 1; });
-  assert.deepStrictEqual(by, { hanja: 15, native: 15, english: 15 });
+  assert.deepStrictEqual(by, { hanja: 45, native: 45, english: 45 });
 });
 
 t('id 중복 없음, 공통 필드 존재', () => {
@@ -38,13 +38,15 @@ t('어종별 부호화 필드 — 한자 분해·연상·장면', () => {
   });
 });
 
-t('한자 뿌리 가족 — 觀 4단어·論 3단어', () => {
+t('한자 뿌리 가족 — 觀 6단어, 2개 이상 달린 뿌리 7개', () => {
   const fam = {};
   WB_WORDS.filter((w) => w.type === 'hanja').forEach((w) => {
     w.parts.forEach((p) => { (fam[p.ch] = fam[p.ch] || []).push(w.word); });
   });
-  assert.strictEqual(fam['觀'].length, 4);
-  assert.strictEqual(fam['論'].length, 3);
+  assert.ok(fam['觀'].length >= 6, '觀 뿌리 가족: ' + (fam['觀'] || []).join(','));
+  assert.ok(fam['論'].length >= 3, '論 뿌리 가족');
+  const multi = Object.keys(fam).filter((k) => fam[k].length >= 2);
+  assert.ok(multi.length >= 7, '낱말이 2개 이상 달린 뿌리(=뿌리 회상이 가능한 뿌리)가 줄면 안 된다: ' + multi.length);
 });
 
 /* ── 엔진 ── */

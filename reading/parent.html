@@ -72,6 +72,16 @@ const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
     </div>
     <div class="weekdots">${(d.weekDays||[]).map(w=>`<span class="wd ${w.today?'today':''}"><i class="${w.done?'done':''}"></i>${esc(w.dow)}</span>`).join('')}</div>
     <p class="sub" style="margin-top:12px">${enc}</p></div>
+  ${(d.wordbrain&&d.wordbrain.total)?`<div class="card"><h2>어휘 — 워드브레인</h2>
+    <p class="sub" style="margin-top:2px">읽다가 몰랐던 낱말을 잊을 때쯤 다시 만나 문제로 확인해요. 한자어·고유어·영어를 각각 다른 방법으로 익힙니다.</p>
+    <div class="stats">
+      <div class="stat"><b>${d.wordbrain.total}</b><span>기르는 낱말</span></div>
+      <div class="stat"><b>${d.wordbrain.graduated}</b><span>장기 기억 🌳</span></div>
+      <div class="stat"><b>${d.wordbrain.streak}</b><span>연속(일)</span></div>
+      <div class="stat"><b>${d.wordbrain.msAvg?(d.wordbrain.msAvg/1000).toFixed(1)+'초':'—'}</b><span>떠올리는 속도</span></div>
+    </div>
+    ${d.wordbrain.due?`<p class="sub" style="margin-top:10px">지금 복습할 낱말이 <b>${d.wordbrain.due}개</b> 기다리고 있어요${d.wordbrain.emergency?` (그중 ${d.wordbrain.emergency}개는 많이 시들었어요)`:''}.</p>`:`<p class="sub" style="margin-top:10px">복습할 낱말이 밀리지 않았어요 — 잘 관리하고 있어요 👍</p>`}
+    </div>`:''}
   ${d.speed?`<div class="card"><h2>읽기 속도</h2>
     <div class="speedbox">최근 <b>분당 ${d.speed.last}자</b>${d.speed.delta>0?` — 시작할 때보다 <b style="color:var(--ok)">+${d.speed.delta}자/분</b> 빨라졌어요!`:d.speed.delta<0?' — 요즘은 천천히 꼼꼼하게 읽고 있어요.':' — 꾸준히 유지 중이에요.'}</div></div>`:''}
   <div class="card"><h2>최근 읽은 글</h2>

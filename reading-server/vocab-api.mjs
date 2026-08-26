@@ -81,6 +81,129 @@ export async function aiMnemonic({ word, meaning, type, hanja, interests, apiKey
   return { ok: true, candidates, model: d.model };
 }
 
+/* ── 문장 짓기 판정 (산출 훈련) ── */
+const SENT_SYSTEM = `너는 초등 고학년~중학생의 어휘 사용을 봐 주는 다정한 국어·영어 선생님이다.
+학생이 방금 배운 낱말로 만든 문장이 그 낱말을 "뜻에 맞게, 자연스럽게" 썼는지 판정한다.
+
+판정 기준:
+- good : 뜻에 맞고 문장도 자연스럽다.
+- ok   : 뜻은 맞지만 어색하거나 너무 단순하다(예: "나는 관측을 했다").
+- wrong: 뜻에 맞지 않거나, 낱말이 문장에 없다.
+
+규칙:
+- feedback은 1~2문장, 반말이 아닌 친근한 존댓말. 잘한 점을 먼저 말하고 고칠 점을 짚는다.
+- 절대 비난하지 않는다. 틀려도 다음에 어떻게 쓰면 되는지 알려 준다.
+- better는 그 낱말을 잘 살린 예문 하나(학생 문장을 살려서 다듬으면 더 좋다).
+- 영어 낱말이면 문장도 영어로 판정하고 better도 영어로 쓴다. feedback은 한국어.
+- 출력은 JSON 하나만: {"verdict":"good|ok|wrong","feedback":"...","better":"..."}
+- JSON 밖에 다른 텍스트를 쓰지 않는다.`;
+
+export function parseVerdict(text) {
+  if (!text) return null;
+  let t = String(text).trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try {
+    const d = JSON.parse(t.slice(a, b + 1));
+    if (!['good', 'ok', 'wrong'].includes(d.verdict)) return null;
+    if (typeof d.feedback !== 'string' || !d.feedback.trim()) return null;
+    return {
+      verdict: d.verdict,
+      feedback: d.feedback.trim().slice(0, 300),
+      better: typeof d.better === 'string' ? d.better.trim().slice(0, 200) : '',
+    };
+  } catch (e) { return null; }
+}
+
+export async function aiSentence({ word, meaning, type, sentence, apiKey, model }) {
+  if (!apiKey) return { ok: false, reason: 'no-key' };
+  const user = ['어종: ' + type, '낱말: ' + word, '뜻: ' + meaning, '학생이 만든 문장: ' + sentence].join('\n');
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-opus-5',
+        max_tokens: 1000,
+        fallbacks: 'default',
+        system: SENT_SYSTEM,
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
+  } catch (e) { return { ok: false, reason: 'network' }; }
+  if (!r.ok) return { ok: false, reason: 'api-' + r.status };
+  const d = await r.json();
+  if (d.stop_reason === 'refusal') return { ok: false, reason: 'refused' };
+  const text = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const v = parseVerdict(text);
+  if (!v) return { ok: false, reason: 'parse' };
+  return { ok: true, ...v };
+}
+
+/* ── 강사 단어 배정 ──
+   강사가 붙여넣은 단어 목록을 파싱해 학생별 배정함에 넣는다.
+   한 줄 = 단어 | 뜻 | 한자(선택) | 예문(선택)   — 구분자는 | 또는 탭 또는 쉼표 */
+const HANJA_RE = /[一-鿿]/;
+
+export function parseWordList(text) {
+  const out = [], seen = new Set(), errors = [];
+  const lines = String(text || '').split(/\r?\n/);
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) return;
+    const cols = line.split(/\s*[|\t]\s*|\s*,\s*/).map(c => c.trim()).filter((c, k) => c || k === 0);
+    const word = cols[0], meaning = cols[1];
+    if (!word) return;
+    if (!meaning) { errors.push((i + 1) + '행: 뜻이 없어요 — "' + line.slice(0, 24) + '"'); return; }
+    if (word.length > 40 || meaning.length > 200) { errors.push((i + 1) + '행: 너무 길어요'); return; }
+    const key = word.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const rest = cols.slice(2);
+    const hanjaCol = rest.find(c => HANJA_RE.test(c)) || '';
+    const example = rest.find(c => c && c !== hanjaCol) || '';
+    const parts = parseHanjaSpec(hanjaCol);
+    const type = /^[A-Za-z][A-Za-z\s'-]*$/.test(word) ? 'english' : (parts ? 'hanja' : 'native');
+
+    const w = { word, meaning, type };
+    if (parts) {
+      w.parts = parts;
+      w.hanja = parts.map(p => p.ch).join('');
+      w.literal = parts.map(p => p.hun).join(' · ');
+    }
+    if (example) w.example = example.slice(0, 200);
+    out.push(w);
+  });
+  return { words: out, errors };
+}
+
+/* '觀(볼 관)+測(잴 측)' 또는 '觀測' 둘 다 받는다 */
+export function parseHanjaSpec(str) {
+  if (!str) return null;
+  const withGloss = [];
+  const re = /([一-鿿])\s*\(([^)]+)\)/g;
+  let m;
+  while ((m = re.exec(str))) {
+    const inner = m[2].trim(), sp = inner.lastIndexOf(' ');
+    withGloss.push(sp < 0 ? { ch: m[1], hun: inner, eum: inner } : { ch: m[1], hun: inner.slice(0, sp), eum: inner.slice(sp + 1) });
+  }
+  if (withGloss.length) return withGloss;
+  const bare = String(str).match(/[一-鿿]/g);
+  if (!bare || !bare.length) return null;
+  return bare.map(ch => ({ ch, hun: '', eum: '' }));   // 훈음 미상 — 화면에서 한자만 보여 준다
+}
+
+const ASSIGN_KEEP = 20;   // 학생당 보관하는 배정 묶음 수
+
 /* ── 학생별 워드브레인 요약 (강사 현황판·검수 페이지용) ── */
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30, 90];
 export function vocabSummary(stateRec) {
@@ -170,6 +293,7 @@ export async function sendNightPushes({ store, push, fetchFn }) {
        listStateCodes(), getStudent(code),
        getMnemo(key), putMnemo(key, rec), listMnemos(),
        getPush(code), putPush(code, rec), delPush(code), listPushCodes(),
+       getAssign(code), putAssign(code, rec), listAssignCodes(),
      },
      ai: { apiKey, model, generate? },     // generate는 테스트 주입용 (기본 aiMnemonic)
      push: { publicKey, privateJwk, subject },  // VAPID (없으면 알림 기능만 비활성)
@@ -240,6 +364,39 @@ export async function handleVocab(ctx) {
     return j(200, { items });
   }
 
+  /* 문장 짓기 — 산출 훈련 (AI 판정) */
+  if (p === '/api/vocab/sentence' && method === 'POST' && !who.admin) {
+    const b = await ctx.getBody();
+    const word = String(b.word || '').trim();
+    const meaning = String(b.meaning || '').trim();
+    const type = String(b.type || '').trim();
+    const sentence = String(b.sentence || '').trim();
+    if (!word || !meaning || !sentence) return j(400, { error: '낱말과 문장이 필요해요.' });
+    if (sentence.length > 300) return j(400, { error: '문장이 너무 길어요 (300자 이내).' });
+    if (!['english', 'hanja', 'native'].includes(type)) return j(400, { error: '어종은 english/hanja/native' });
+    const judge = ctx.ai.judge || aiSentence;
+    const out = await judge({ word, meaning, type, sentence, apiKey: ctx.ai.apiKey, model: ctx.ai.model });
+    if (!out.ok) return j(200, { ok: false, reason: out.reason });
+    return j(200, { ok: true, verdict: out.verdict, feedback: out.feedback, better: out.better });
+  }
+
+  /* 선생님이 내주신 단어 */
+  if (p === '/api/vocab/assignments' && method === 'GET' && !who.admin) {
+    const rec = await store.getAssign(who.code);
+    const items = ((rec && rec.items) || []).filter(a => !a.done);
+    return j(200, { items });
+  }
+  if (p === '/api/vocab/assignments/ack' && method === 'POST' && !who.admin) {
+    const { id } = await ctx.getBody();
+    const rec = (await store.getAssign(who.code)) || { items: [] };
+    const hit = (rec.items || []).filter(a => a.id === id)[0];
+    if (!hit) return j(404, { error: '배정을 찾을 수 없어요.' });
+    hit.done = true;
+    hit.doneAt = nowIso();
+    await store.putAssign(who.code, rec);
+    return j(200, { ok: true });
+  }
+
   /* 밤 9시 알림 (Web Push 구독) */
   if (p === '/api/vocab/push/key' && method === 'GET' && !who.admin) {
     const key = ctx.push && ctx.push.publicKey;
@@ -282,6 +439,41 @@ export async function handleVocab(ctx) {
     await store.putMnemo(rec.key, rec);
     return j(200, { ok: true, item: rec });
   }
+  if (p === '/api/vocab/admin/assign' && method === 'POST') {
+    const b = await ctx.getBody();
+    const codes = (Array.isArray(b.codes) ? b.codes : []).map(c => String(c || '').trim()).filter(Boolean).slice(0, 200);
+    const title = String(b.title || '').trim().slice(0, 60) || '선생님 배정 단어';
+    const parsed = parseWordList(b.text);
+    if (b.dryRun) return j(200, { ok: true, preview: true, words: parsed.words, errors: parsed.errors });
+    if (!codes.length) return j(400, { error: '배정할 학생을 골라 주세요.' });
+    if (!parsed.words.length) return j(400, { error: '배정할 단어가 없어요.', errors: parsed.errors });
+    if (parsed.words.length > 100) return j(400, { error: '한 번에 100개까지 배정할 수 있어요.' });
+    const id = 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+    const at = nowIso();
+    const assigned = [];
+    for (const code of codes) {
+      const stu = await store.getStudent(code);
+      if (!stu) continue;
+      const rec = (await store.getAssign(code)) || { items: [] };
+      rec.items = [{ id, title, at, words: parsed.words, done: false }].concat(rec.items || []).slice(0, ASSIGN_KEEP);
+      await store.putAssign(code, rec);
+      assigned.push(code);
+    }
+    if (!assigned.length) return j(404, { error: '등록된 학생이 없어요.' });
+    return j(200, { ok: true, id, assigned, count: parsed.words.length, errors: parsed.errors });
+  }
+  if (p === '/api/vocab/admin/assign' && method === 'GET') {
+    const out = [];
+    for (const code of await store.listAssignCodes()) {
+      const rec = await store.getAssign(code);
+      const stu = await store.getStudent(code);
+      ((rec && rec.items) || []).forEach(a => {
+        out.push({ code, name: (stu && stu.name) || '', id: a.id, title: a.title, at: a.at, n: (a.words || []).length, done: !!a.done, doneAt: a.doneAt || null });
+      });
+    }
+    out.sort((x, y) => (x.at < y.at ? 1 : -1));
+    return j(200, { items: out.slice(0, 200) });
+  }
   if (p === '/api/vocab/admin/overview' && method === 'GET') {
     const codes = await store.listStateCodes();
     const students = [];
@@ -300,5 +492,7 @@ export async function dumpVocab(store) {
   for (const code of await store.listStateCodes()) states[code] = await store.getState(code);
   const mnemos = {};
   for (const m of await store.listMnemos()) mnemos[m.key] = m;
-  return { states, mnemos };
+  const assigns = {};
+  for (const code of await store.listAssignCodes()) assigns[code] = await store.getAssign(code);
+  return { states, mnemos, assigns };
 }
