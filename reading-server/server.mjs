@@ -8,7 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
-import { handleVocab } from './vocab-api.mjs';
+import { handleVocab, sendNightPushes } from './vocab-api.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -22,6 +22,7 @@ load();
 const db = getDb();
 
 /* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
+const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
 const vocabStore = {
   getState: (c) => db.vocab.states[c] || null,
   putState: (c, rec) => { db.vocab.states[c] = rec; persist(); },
@@ -30,6 +31,15 @@ const vocabStore = {
   getMnemo: (k) => db.vocab.mnemos[k] || null,
   putMnemo: (k, rec) => { db.vocab.mnemos[k] = rec; persist(); },
   listMnemos: () => Object.values(db.vocab.mnemos),
+  getPush: (c) => vocabPushMap()[c] || null,
+  putPush: (c, rec) => { vocabPushMap()[c] = rec; persist(); },
+  delPush: (c) => { delete vocabPushMap()[c]; persist(); },
+  listPushCodes: () => Object.keys(vocabPushMap()),
+};
+const VOCAB_PUSH_ENV = {
+  publicKey: process.env.VAPID_PUBLIC_KEY || '',
+  privateJwk: process.env.VAPID_PRIVATE_JWK || '',
+  subject: process.env.VAPID_SUBJECT || 'mailto:admin@wb.local',
 };
 
 /* ── 유틸 ── */
@@ -190,6 +200,7 @@ const server = http.createServer(async (req, res) => {
           path: p, method: req.method, who,
           getBody: () => readBody(req), store: vocabStore,
           ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '' },
+          push: VOCAB_PUSH_ENV,
         });
         return json(res, out.status, out.body);
       }
@@ -302,6 +313,20 @@ const server = http.createServer(async (req, res) => {
     json(res, 500, { error: '서버 오류', detail: String(e.message || e) });
   }
 });
+
+/* 밤 9시 물주기 푸시 — 로컬 서버용 1분 폴링 (운영 워커는 크론이 담당) */
+let lastPushDay = null;
+setInterval(async () => {
+  const d = new Date();
+  if (d.getHours() !== 21 || d.getMinutes() !== 0) return;
+  const day = d.toDateString();
+  if (lastPushDay === day) return;
+  lastPushDay = day;
+  try {
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV });
+    if (r.sent || r.removed) console.log('[push] 밤 9시 물주기 알림:', JSON.stringify(r));
+  } catch (e) { console.error('[push] 발송 실패:', e.message); }
+}, 60000).unref();
 
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);

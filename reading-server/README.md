@@ -25,6 +25,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 - 학생 API: `GET /api/vocab/pull` / `PUT /api/vocab/state` (400KB 제한) / `POST /api/vocab/mnemonic {word,meaning,type}` — AI 연상 3안 생성(같은 단어는 캐시, 승인되면 승인본만 반환).
 - 관리 API(PIN): `GET·POST /api/vocab/admin/review` (승인 시 cue·scene 확정 — 이후 학생들에게 재사용) / `GET /api/vocab/admin/overview`.
 - AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
+- **밤 9시 물주기 푸시**: 페이로드 없는 Web Push(암호화 불필요·무의존성). `node reading-server/gen-vapid.mjs`로 키 생성 → `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_JWK` 시크릿 등록. 학생이 리포트 탭에서 "밤 9시 알림 켜기" → 21:00 KST 크론이 **물 줄 단어가 있는 구독자에게만** 발송(404/410이면 구독 자동 정리). 키가 없으면 알림 카드만 비활성.
+- 승인 반영 루프: 학생이 고른 연상이 검수 전(pending)이면 앱이 접속 때마다 `mnemonic/check`로 확인 — 승인되면 승인본으로 교체, 반려되면 제거(재생성 가능).
 
 ## 동작 방식
 
