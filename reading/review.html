@@ -5,48 +5,90 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-  <title>WB 진로독서 · 강사 검수</title>
+  <title>WB 진로독서 · 검수·발행</title>
   <style>
-    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--bad:#9b352b}
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.7}
-    header{padding:14px 18px;background:var(--navy);color:#fff}
-    header b{font-size:17px}header small{opacity:.75;margin-left:8px}
-    main{max-width:900px;margin:auto;padding:16px 14px 60px}
-    .card{margin-bottom:12px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:13px 18px;background:var(--navy);color:#fff;box-shadow:0 4px 18px #17395730}
+    header b{font-size:17px}header small{display:block;font-size:11px;opacity:.72;margin-top:2px}
+    header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer;font-size:13px;text-decoration:none;display:inline-flex;align-items:center}
+    main{max-width:920px;margin:auto;padding:16px 14px 70px}
+    .card{margin-bottom:12px;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 4px 14px #17395708}
     h2{margin:0;color:var(--navy);font-size:17px}
-    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800;margin-right:4px}
-    .tag.ok{background:#e7f6f0;color:var(--ok)}
     button{font:inherit;cursor:pointer}
-    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
-    .row:first-of-type{border-top:0}
-    .open-btn{min-height:40px;padding:6px 14px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--navy);font-weight:800}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    .stat{padding:13px 6px;border:1px solid #d6ebf4;border-radius:14px;background:#fff;text-align:center}
+    .stat b{display:block;font-size:22px;color:var(--navy);line-height:1.2}
+    .stat span{font-size:11.5px;color:var(--muted);font-weight:800}
+    .stat.g{background:#f2faf6;border-color:#c4e5d5}.stat.g b{color:var(--ok)}
+    .stat.o{background:#fdf7ee;border-color:#ecd9b4}.stat.o b{color:var(--warn)}
+    .filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+    .chip{min-height:38px;padding:5px 15px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy);font-size:13px}
+    .chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800;margin:2px 4px 0 0}
+    .tag.c-science{background:#e7f2fb;color:#155d94}.tag.c-society{background:#fdf0e4;color:#8a5a12}.tag.c-history{background:#f4ece1;color:#7a5230}.tag.c-humanities{background:#f3ecf8;color:#6b4390}.tag.c-environment{background:#e7f6ec;color:#20714a}
+    .tag.issue{background:#fbeae6;color:var(--coral)}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:999px;font-size:13px;font-weight:900}
+    .pill.pub{background:#e7f6f0;color:var(--ok)}
+    .pill.draft{background:#fff4e6;color:var(--warn)}
+    .pill i{width:8px;height:8px;border-radius:999px;background:currentColor}
+    .arow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .arow .l{flex:1;min-width:220px}
+    .atitle{margin:2px 0 4px;color:var(--navy);font-size:17px;font-weight:900;line-height:1.4}
+    .aid{color:var(--muted);font-size:12px;font-weight:600}
+    .btns{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:11px;font-weight:900;font-size:13.5px}
+    .btn.pub{background:var(--ok);color:#fff}
+    .btn.unpub{background:#fff;border:1.5px solid #e0a9a1;color:var(--bad)}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
     .lv{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fbfdfe}
     .lv h3{margin:0 0 4px;color:var(--navy);font-size:15px}
     .para{margin:10px 0;font-size:15px}
     .seg-sep{color:var(--blue);opacity:.55;padding:0 2px;font-size:.85em}
     .meta{color:var(--muted);font-size:12.5px}
     .q{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--sky);font-size:13.5px}
+    .q.ch{background:#fdf3f0;border:1px dashed #eac3ba}
     .q b.ans{color:var(--ok)}
     .vocab-line{font-size:13.5px;margin-top:6px}
-    .check{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+    .check{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .check button{min-height:40px;padding:6px 14px;border-radius:10px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
     .check button[data-on="1"]{border-color:var(--ok);background:#e7f6f0;color:var(--ok)}
     .check button.rej[data-on="1"]{border-color:#e0a9a1;background:#fff0ef;color:var(--bad)}
-    .summary{position:sticky;top:0;z-index:3;background:#fffbe8;border:1px solid #ecd9a0;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13.5px}
+    .login{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .login input{min-height:44px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:11px;flex:1;max-width:240px;font:inherit}
+    .empty{padding:30px 10px;text-align:center;color:var(--muted)}
+    #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);z-index:9;padding:13px 22px;border-radius:999px;background:var(--navy);color:#fff;font-weight:800;font-size:14px;box-shadow:0 10px 30px #17395744;transition:transform .25s ease;max-width:92%;text-align:center}
+    #toast.show{transform:translateX(-50%) translateY(0)}
+    @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
   </style>
 </head>
 <body>
-<header><b>WB 진로독서 · 강사 검수 뷰어</b><small>지문·문항을 훑어보고 검수 표시를 남기세요 (이 기기에만 저장)</small></header>
-<main id="app"><p>불러오는 중…</p></main>
+<header>
+  <div><b>검수 · 발행</b><small>WB 진로독서 콘텐츠 관리</small></div>
+  <span class="sp"></span>
+  <a class="hbtn" href="/admin">관리 웹</a>
+  <a class="hbtn" href="/">학생 앱</a>
+</header>
+<main id="app"><p class="empty">불러오는 중…</p></main>
+<div id="toast" role="status"></div>
 <script>
 'use strict';
 const CATS={science:'과학·기술',society:'사회·경제',history:'역사·문화',humanities:'인문·예술',environment:'환경'};
 const LEVEL_LABEL={L2:'초등 심화(L2)',L3:'중등(L3)',L4:'고등(L4)'};
+const CAREER_LABEL={eng:'공학·기계',it:'IT·소프트웨어',med:'의학·보건',bio:'생명과학',nat:'자연·수학',biz:'경영·경제',media:'미디어·콘텐츠',law:'법·행정',edu:'교육',art:'예술·디자인',env:'환경·에너지',hum:'인문·글쓰기'};
 const RKEY='wbr.review.v1';
-let DB=null,R={},API=false,TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let DB=null,R={},API=false,TOKEN=localStorage.getItem('wbr.admin.token')||null,FILTER='전체';
 try{R=JSON.parse(localStorage.getItem(RKEY)||'{}')}catch(e){R={}}
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function saveR(){try{localStorage.setItem(RKEY,JSON.stringify(R))}catch(e){}}
+let toastTimer=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
 async function api(path,opt){
   const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
   const j=await r.json().catch(()=>({}));
@@ -57,68 +99,113 @@ async function api(path,opt){
 async function reloadDb(){
   const r=await fetch('./articles.json',{cache:'no-store'});DB=await r.json();
 }
+function titleOf(a){
+  const b=a.levels.L3||a.levels.L2||a.levels.L4;
+  return b?b.title:a.id;
+}
+function qHtml(q,i,ch){
+  return `<div class="q ${ch?'ch':''}"><b>${ch?'심화':'Q'}${i+1} [${q.type}]</b> ${esc(q.q)}<br>
+    ${q.choices.map((c,ci)=>`${ci===q.answer?'<b class="ans">✔':'<span>'}${ci+1}. ${esc(c)}${ci===q.answer?'</b>':'</span>'}`).join(' / ')}<br>
+    <span class="meta">해설: ${esc(q.explain)} (근거 ${q.evidencePara+1}문단)</span></div>`;
+}
 function lvHtml(id,lv,b){
   return `<div class="lv"><h3>${LEVEL_LABEL[lv]} — ${esc(b.title)}</h3>
-  <p class="meta">약 ${b.minutes}분 · ${b.paragraphs.length}문단 · 총 ${b.paragraphs.map(p=>p.join('')).join('').length}자 · 어휘 ${b.vocab.length} · 문항 ${b.questions.length}</p>
+  <p class="meta">약 ${b.minutes}분 · ${b.paragraphs.length}문단 · 총 ${b.paragraphs.map(p=>p.join('')).join('').length}자 · 어휘 ${b.vocab.length} · 문항 ${b.questions.length}${(b.challenge||[]).length?' + 심화 '+b.challenge.length:''}</p>
   ${b.paragraphs.map((p,i)=>`<p class="para"><b class="meta">[${i+1}]</b> ${p.map(esc).join('<span class="seg-sep">∕</span>')}</p>`).join('')}
   ${b.vocab.length?`<div class="vocab-line"><b>어휘:</b> ${b.vocab.map(v=>`${esc(v.word)}${v.hanja?'('+esc(v.hanja)+')':''} — ${esc(v.easy)}`).join(' · ')}</div>`:''}
-  ${b.questions.map((q,i)=>`<div class="q"><b>Q${i+1} [${q.type}]</b> ${esc(q.q)}<br>
-    ${q.choices.map((c,ci)=>`${ci===q.answer?'<b class="ans">✔':'<span>'}${ci+1}. ${esc(c)}${ci===q.answer?'</b>':'</span>'}`).join(' / ')}<br>
-    <span class="meta">해설: ${esc(q.explain)} (근거 ${q.evidencePara+1}문단)</span></div>`).join('')}</div>`;
+  ${b.questions.map((q,i)=>qHtml(q,i,false)).join('')}
+  ${(b.challenge||[]).map((q,i)=>qHtml(q,i,true)).join('')}</div>`;
 }
 function render(){
   const app=document.getElementById('app');
   const items=DB.articles;
-  const okN=items.filter(a=>R[a.id]==='ok').length,rejN=items.filter(a=>R[a.id]==='rej').length;
   const pubN=items.filter(a=>a.status==='published').length;
-  const loginBox=API&&!TOKEN?`<div class="card"><h2>발행 기능 로그인</h2>
-    <p class="meta">관리 PIN으로 로그인하면 여기서 바로 <b>발행/초안 전환</b>이 됩니다 (새로고침 없이 즉시 반영).</p>
-    <div style="display:flex;gap:8px;margin-top:8px"><input id="pubPin" type="password" placeholder="관리 PIN" style="min-height:40px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;flex:1;max-width:220px">
-    <button class="open-btn" id="pubLogin">로그인</button></div><p class="meta" id="pubErr" style="color:var(--bad)"></p></div>`:'';
-  app.innerHTML=`<div class="summary"><b>검수 현황:</b> 승인 ${okN} · 반려 ${rejN} · 미검수 ${items.length-okN-rejN} / 총 ${items.length}편 · <b>발행 중 ${pubN}</b>
-    ${API?(TOKEN?' — 발행/초안 버튼으로 즉시 전환됩니다.':' — 발행하려면 아래에서 PIN 로그인하세요.'):' — 발행 전환은 서비스 주소(워커)에서만 가능해요.'}</div>`+loginBox+
-  items.map(a=>{
+  const draftN=items.length-pubN;
+  const doneN=items.filter(a=>R[a.id]==='ok'||R[a.id]==='rej').length;
+  const canPub=API&&TOKEN;
+  const loginBox=API&&!TOKEN?`<div class="card"><h2>발행하려면 PIN 로그인</h2>
+    <p class="meta">로그인하면 각 지문의 <b>발행 / 초안 전환 버튼</b>이 나타나고, 누르는 즉시 학생 앱에 반영돼요.</p>
+    <div class="login"><input id="pubPin" type="password" placeholder="관리 PIN">
+    <button class="btn pub" id="pubLogin">로그인</button></div><p class="meta" id="pubErr" style="color:var(--bad)"></p></div>`:'';
+  const filters=['전체','초안','발행 중','미검수'];
+  let list=items;
+  if(FILTER==='초안')list=items.filter(a=>a.status!=='published');
+  else if(FILTER==='발행 중')list=items.filter(a=>a.status==='published');
+  else if(FILTER==='미검수')list=items.filter(a=>!R[a.id]);
+  app.innerHTML=`
+  <div class="stats">
+    <div class="stat"><b>${items.length}</b><span>전체 지문</span></div>
+    <div class="stat g"><b>${pubN}</b><span>발행 중 (학생 공개)</span></div>
+    <div class="stat o"><b>${draftN}</b><span>초안 (비공개)</span></div>
+    <div class="stat"><b>${doneN}/${items.length}</b><span>검수 표시 완료</span></div>
+  </div>
+  ${loginBox}
+  <div class="filters">${filters.map(f=>`<button class="chip" data-f="${f}" aria-pressed="${FILTER===f}">${f}</button>`).join('')}</div>
+  ${list.map(a=>{
     const open=R['open:'+a.id];
     const pub=a.status==='published';
-    return `<div class="card"><div class="row">
-      <div><h2>${a.id}</h2><span class="meta"><span class="tag">${CATS[a.category]}</span>${a.careers.map(c=>`<span class="tag">${c}</span>`).join('')}
-        <span class="tag ${pub?'ok':''}" style="${pub?'':'background:#fff4e6;color:#8a4b08'}">${pub?'발행 중':'초안'}</span>
-        ${R[a.id]==='ok'?'<span class="tag ok">승인됨</span>':R[a.id]==='rej'?'<span class="tag" style="background:#fff0ef;color:#9b352b">반려됨</span>':''}</span></div>
-      <div style="display:flex;gap:6px">
-        ${API&&TOKEN?`<button class="open-btn" data-pub="${a.id}" data-to="${pub?'draft':'published'}" style="${pub?'':'border-color:#14755e;color:#14755e'}">${pub?'초안으로 내리기':'지금 발행'}</button>`:''}
-        <button class="open-btn" data-open="${a.id}">${open?'접기':'펼쳐서 검수'}</button></div></div>
+    return `<div class="card"><div class="arow">
+      <div class="l">
+        <span class="pill ${pub?'pub':'draft'}"><i></i>${pub?'발행 중 — 학생에게 보임':'초안 — 학생에게 안 보임'}</span>
+        <p class="atitle">${esc(titleOf(a))}</p>
+        <span class="aid">${a.id}</span>
+        <div><span class="tag c-${a.category}">${CATS[a.category]}</span>${a.issue?'<span class="tag issue">요즘 이슈 🔥</span>':''}${a.careers.map(c=>`<span class="tag">${CAREER_LABEL[c]||c}</span>`).join('')}
+        ${R[a.id]==='ok'?'<span class="tag" style="background:#e7f6f0;color:var(--ok)">✔ 검수함</span>':R[a.id]==='rej'?'<span class="tag" style="background:#fff0ef;color:var(--bad)">✕ 반려 표시</span>':''}</div>
+      </div>
+      <div class="btns">
+        ${canPub?(pub
+          ?`<button class="btn unpub" data-pub="${a.id}" data-to="draft">초안으로 내리기</button>`
+          :`<button class="btn pub" data-pub="${a.id}" data-to="published">지금 발행</button>`):''}
+        <button class="btn ghost" data-open="${a.id}">${open?'접기 ▲':'내용 보기 ▼'}</button>
+      </div></div>
       ${open?['L2','L3','L4'].map(lv=>a.levels[lv]?lvHtml(a.id,lv,a.levels[lv]):'').join('')+
       `<div class="meta" style="margin-top:8px">출처: ${a.sources.map(s=>esc(s.title)+' ('+esc(s.url)+')').join(' · ')}</div>
-      <div class="check"><button data-mark="ok" data-id="${a.id}" data-on="${R[a.id]==='ok'?1:0}">✔ 승인</button>
-      <button class="rej" data-mark="rej" data-id="${a.id}" data-on="${R[a.id]==='rej'?1:0}">✕ 반려</button></div>`:''}
-    </div>`;}).join('')+
-  `<div class="card"><h2>진단 지문</h2>${['L2','L3','L4'].map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
+      <div class="check"><span class="meta">검수 표시(내 기기 메모, 학생 노출과 무관):</span>
+      <button data-mark="ok" data-id="${a.id}" data-on="${R[a.id]==='ok'?1:0}">✔ 검수함</button>
+      <button class="rej" data-mark="rej" data-id="${a.id}" data-on="${R[a.id]==='rej'?1:0}">✕ 반려 표시</button></div>`:''}
+    </div>`;}).join('')||'<div class="card"><p class="empty">이 조건에 맞는 지문이 없어요.</p></div>'}
+  <div class="card"><h2>진단 지문 (레벨 확인용 — 발행 개념 없음)</h2>${['L2','L3','L4'].map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
 }
 document.addEventListener('click',async e=>{
+  const f=e.target.closest('[data-f]');if(f){FILTER=f.dataset.f;render();return;}
   const o=e.target.closest('[data-open]');if(o){R['open:'+o.dataset.open]=!R['open:'+o.dataset.open];render();return;}
   const m=e.target.closest('[data-mark]');if(m){const id=m.dataset.id;
     R[id]=R[id]===m.dataset.mark?null:m.dataset.mark;saveR();render();return;}
   const pl=e.target.closest('#pubLogin');
   if(pl){
     try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:document.getElementById('pubPin').value})});
-      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);render();}
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);render();toast('로그인 완료 — 발행 버튼이 열렸어요');}
     catch(err){const el=document.getElementById('pubErr');if(el)el.textContent=err.message;}
     return;
   }
   const pb=e.target.closest('[data-pub]');
   if(pb){
     const id=pb.dataset.pub,to=pb.dataset.to;
-    const msg=to==='published'?'이 지문을 학생들에게 지금 발행할까요?':'이 지문을 초안으로 내려 학생 화면에서 숨길까요?';
+    const a=DB.articles.find(x=>x.id===id);
+    const nm=a?titleOf(a):id;
+    const msg=to==='published'?`「${nm}」을(를) 지금 발행할까요?\n학생 앱에 바로 보이게 됩니다.`:`「${nm}」을(를) 초안으로 내릴까요?\n학생 화면에서 즉시 숨겨집니다.`;
     if(!confirm(msg))return;
-    try{await api('/admin/pub',{method:'POST',body:JSON.stringify({id,status:to})});
-      await reloadDb();render();}
-    catch(err){alert(err.message);}
+    pb.disabled=true;pb.textContent='처리 중…';
+    try{
+      await api('/admin/pub',{method:'POST',body:JSON.stringify({id,status:to})});
+      await reloadDb();
+      const now=DB.articles.find(x=>x.id===id);
+      if(now&&now.status===to){
+        render();
+        toast(to==='published'?'✅ 발행 완료 — 학생 앱에 바로 보여요':'초안으로 내렸어요 — 학생 화면에서 숨겨졌어요');
+      }else{
+        render();
+        toast('⚠ 저장은 됐지만 반영 확인이 안 돼요 — 새로고침 후 다시 확인해 주세요');
+      }
+    }
+    catch(err){render();alert(err.message);}
   }
 });
 (async()=>{
   try{const r=await fetch('/api/health',{cache:'no-store'});const j=await r.json();API=!!(j&&j.ok);}catch(e){API=false;}
-  try{await reloadDb();render();}
-  catch(e){document.getElementById('app').innerHTML='<p>articles.json을 불러오지 못했습니다.</p>';}
+  try{await reloadDb();render();
+    if(!API)toast('보기 전용 주소예요 — 발행은 서비스 주소(workers.dev)에서 하세요');}
+  catch(e){document.getElementById('app').innerHTML='<p class="empty">articles.json을 불러오지 못했습니다.</p>';}
 })();
 </script>
 </body>
