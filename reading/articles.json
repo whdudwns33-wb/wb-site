@@ -1,5 +1,5 @@
 {
- "version": "2026-08-26.1",
+ "version": "2026-08-26.2",
  "articles": [
   {
    "id": "nuri-space",
@@ -8994,7 +8994,7 @@
     "med"
    ],
    "publishedAt": "2026-08",
-   "status": "draft",
+   "status": "published",
    "sources": [
     {
      "title": "한국천문연구원",
@@ -9867,7 +9867,7 @@
     "law"
    ],
    "publishedAt": "2026-08",
-   "status": "draft",
+   "status": "published",
    "sources": [
     {
      "title": "환경부",

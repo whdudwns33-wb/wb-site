@@ -38,8 +38,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 ## API 요약
 
 - 공개: `GET /api/health` · `GET /api/pub`(발행 오버라이드 맵) · `GET /api/parent/summary?t=토큰`(학부모 리포트)
-- 학생: `POST /api/login {code}` → `{token, student}` / `GET /api/pull` / `PUT /api/state {state}` (Bearer, 900KB 제한)
-- 관리(Bearer, PIN 로그인): `POST /api/admin/login {pin}` / `GET /api/admin/overview` / `POST /api/admin/students` / `POST /api/admin/level` / `GET /api/admin/student/:code` / `GET /api/admin/export[?backup=날짜]` / `GET /api/admin/backups` / `POST /api/admin/backup-now` / `POST /api/admin/pub {id,status}` / `POST /api/admin/parentlink {code,reset?}`
+- 학생: `POST /api/login {code}` → `{token, student}` / `GET /api/pull` / `PUT /api/state {state}` (Bearer, 900KB 제한) / `GET /api/league`(같은 반 스트릭 리그 — 성적 비공개)
+- 관리(Bearer, PIN 로그인): `POST /api/admin/login {pin}` / `GET /api/admin/overview` / `POST /api/admin/students` / `POST /api/admin/level` / `GET /api/admin/student/:code` / `GET /api/admin/export[?backup=날짜]` / `GET /api/admin/backups` / `POST /api/admin/backup-now` / `POST /api/admin/pub {id,status}` / `POST /api/admin/parentlink {code,reset?}` / `GET /api/admin/parent-messages`(학부모 주간 발송 문구 일괄 생성)
 - 로그인 실패는 IP당 15분 20회로 제한(무차별 대입 완화, 워커).
 
 ## 저장소·백업

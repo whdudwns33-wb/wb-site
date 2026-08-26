@@ -170,7 +170,15 @@ function render(){
     <div class="filters" style="margin:10px 0 0">
       <button class="btn" id="bkNow">지금 전체 백업 내려받기</button>
       ${backups.length?backups.map(d=>`<button class="chip" data-bk="${esc(d)}">${esc(d)} 스냅샷</button>`).join(''):'<span class="muted">자동 스냅샷이 아직 없어요 — 매일 새벽에 만들어져요.</span>'}
-    </div></div>`;
+    </div></div>
+  <div class="card"><h2>학부모 주간 메시지</h2>
+    <p class="muted">연동된 모든 학생의 주간 리포트 발송 문구(링크 포함)를 한 번에 만들어요. 카톡·문자에 붙여넣어 학생별로 잘라 보내세요.</p>
+    <div class="filters" style="margin:10px 0 0">
+      <button class="btn" id="pmMake">메시지 만들기</button>
+      <button class="chip" id="pmCopy" hidden>전체 복사</button>
+      <span class="muted" id="pmInfo"></span>
+    </div>
+    <textarea id="pmOut" hidden style="width:100%;min-height:220px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:10px;font:inherit;font-size:13px;line-height:1.6"></textarea></div>`;
   document.querySelectorAll('.chip[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
   document.querySelectorAll('select[data-lv]').forEach(sel=>sel.onchange=async()=>{
     if(!sel.value)return;
@@ -191,6 +199,17 @@ function render(){
     try{const j=await api('/admin/export?backup='+b.dataset.bk);downloadJson(j,'wb-reading-snapshot-'+b.dataset.bk+'.json');}
     catch(e){alert(e.message);}
   });
+  $('#pmMake').onclick=async()=>{
+    try{
+      const j=await api('/admin/parent-messages');
+      const out=$('#pmOut'),info=$('#pmInfo'),cp=$('#pmCopy');
+      if(!j.messages.length){info.textContent='연동된 학생이 아직 없어요.';return;}
+      out.value=j.messages.map(m=>`■ ${m.name}${m.cls?' ('+m.cls+')':''}\n${m.text}`).join('\n\n──────────\n\n');
+      out.hidden=false;cp.hidden=false;
+      info.textContent=j.messages.length+'명 분량 생성됨';
+      cp.onclick=()=>{out.select();copyText(out.value);};
+    }catch(e){alert(e.message);}
+  };
   document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>openDetail(b.dataset.view));
 }
 /* ── 학생 상세 ── */
