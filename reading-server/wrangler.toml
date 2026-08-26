@@ -11,6 +11,11 @@ binding = "ASSETS"
 binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
 
-# 매일 03:00 KST(18:00 UTC) 자동 백업 스냅샷 (backup:<날짜> 키, 10개 보관)
+# 매일 03:00 KST(18:00 UTC) 자동 백업 스냅샷 (backup:<날짜> 키, 10개 보관 — 워드브레인 vocab: 키 포함)
 [triggers]
 crons = ["0 18 * * *"]
+
+# 워드브레인 AI 연상 생성 — 배포 후 1회 등록 (없으면 앱이 "AI 키 미설정"으로 안내하고 나머지는 정상 동작):
+#   npx wrangler secret put ANTHROPIC_API_KEY
+# 선택: 모델 오버라이드 (기본 claude-opus-5)
+#   npx wrangler secret put VOCAB_AI_MODEL

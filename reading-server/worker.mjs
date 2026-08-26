@@ -4,6 +4,8 @@
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
+import { handleVocab, dumpVocab } from './vocab-api.mjs';
+
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
 const RL_MAX_FAILS = 20;           // 15분당 로그인 실패 허용 횟수
@@ -90,6 +92,26 @@ async function kvListAll(env, prefix) {
   return keys;
 }
 
+/* 워드브레인 저장소 어댑터 — vocab: 접두 키만 사용 (분리 가능한 격리) */
+function vocabStore(env) {
+  return {
+    getState: (c) => env.DB.get('vocab:state:' + c, 'json'),
+    putState: (c, rec) => env.DB.put('vocab:state:' + c, JSON.stringify(rec)),
+    listStateCodes: async () => (await kvListAll(env, 'vocab:state:')).map(k => k.slice('vocab:state:'.length)),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+    getMnemo: (k) => env.DB.get('vocab:mnemo:' + k, 'json'),
+    putMnemo: (k, rec) => env.DB.put('vocab:mnemo:' + k, JSON.stringify(rec)),
+    listMnemos: async () => {
+      const out = [];
+      for (const k of await kvListAll(env, 'vocab:mnemo:')) {
+        const v = await env.DB.get(k, 'json');
+        if (v) out.push(v);
+      }
+      return out;
+    },
+  };
+}
+
 async function fullDump(env) {
   const students = {}; const states = {};
   const codes = new Set();
@@ -104,7 +126,8 @@ async function fullDump(env) {
     if (stu) students[code] = stu;
     if (st) states[code] = st;
   }
-  return { service: 'wb-reading', savedAt: nowIso(), students, states };
+  const vocab = await dumpVocab(vocabStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab };
 }
 
 async function snapshotBackup(env) {
@@ -228,6 +251,16 @@ export default {
 
       const who = await auth(env, req);
       if (!who) return json(401, { error: '로그인이 필요합니다.' });
+
+      /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
+      if (p.startsWith('/api/vocab/')) {
+        const out = await handleVocab({
+          path: p, method: req.method, who,
+          getBody: () => req.json(), store: vocabStore(env),
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '' },
+        });
+        return json(out.status, out.body);
+      }
 
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = await env.DB.get('state:' + who.code, 'json');

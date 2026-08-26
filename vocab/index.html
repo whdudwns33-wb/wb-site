@@ -172,6 +172,11 @@
     .fam { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
     .fam .chip { font-size: .76rem; padding: 4px 10px; }
 
+    .cand-list { display: grid; gap: 8px; margin-top: 10px; }
+    .cand { display: block; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .cand b { color: var(--ink-strong); }
+    .cand span { display: block; color: var(--ink-soft); font-size: .82rem; }
+
     .grades { display: flex; gap: 8px; margin-top: 16px; }
     .grades button { flex: 1; border-radius: 12px; padding: 14px 6px; font-weight: 900; font-size: .92rem; border: 1px solid var(--line); }
     .g-fail { background: var(--coral-soft); color: #C24936; }
@@ -310,7 +315,11 @@
   var db;
   function fresh() { return { states: {}, log: [], streak: { count: 0, last: null }, custom: {}, inboxDemo: [], created: Date.now() }; }
   function load() { try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 저장 불가 환경 */ } }
+  function save() {
+    if (db.log && db.log.length > 600) db.log = db.log.slice(-500);
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 저장 불가 환경 */ }
+    vsyncSchedule();
+  }
   db = load() || fresh();
   db.custom = db.custom || {};
   Object.keys(db.custom).forEach(function (k) { WORDS[k] = db.custom[k]; registerFamily(db.custom[k]); });
@@ -335,6 +344,62 @@
     if (d < 3600000) return Math.max(1, Math.round(d / 60000)) + '분 후';
     if (d < DAY) return Math.round(d / 3600000) + '시간 후';
     return Math.round(d / DAY) + '일 후';
+  }
+
+  /* ── 학원 서버 연동 (진로독서 학생 토큰 재사용 — wbr.auth는 진로독서 앱 소유, 읽기만) ── */
+  var VSYNC = { avail: false, timer: null, busy: false, last: null, authBad: false };
+  function vsyncAuth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+  function vsyncOn() { return VSYNC.avail && !VSYNC.authBad && !!vsyncAuth(); }
+  async function vsyncApi(path, opt) {
+    var a = vsyncAuth();
+    if (!a || !a.token) throw new Error('연동이 필요해요');
+    var r = await fetch('/api/vocab' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }, opt || {}));
+    if (r.status === 401) { VSYNC.authBad = true; throw new Error('연동이 만료됐어요 — 진로독서 설정에서 다시 연동해 주세요'); }
+    var j = await r.json();
+    if (!r.ok) throw new Error((j && j.error) || ('오류 ' + r.status));
+    return j;
+  }
+  function richness(d) { return Object.keys((d && d.states) || {}).length * 10 + ((d && d.log) || []).length; }
+  function adoptDb(next) {
+    db = Object.assign(fresh(), next);
+    db.custom = db.custom || {};
+    Object.keys(db.custom).forEach(function (k) { WORDS[k] = db.custom[k]; registerFamily(db.custom[k]); });
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
+  }
+  function vsyncSchedule() {
+    if (!vsyncOn()) return;
+    clearTimeout(VSYNC.timer);
+    VSYNC.timer = setTimeout(vsyncPush, 2500);
+  }
+  async function vsyncPush() {
+    if (!vsyncOn() || VSYNC.busy) return;
+    VSYNC.busy = true;
+    try {
+      await vsyncApi('/state', { method: 'PUT', body: JSON.stringify({ state: db }) });
+      VSYNC.last = Date.now();
+    } catch (e) { /* 다음 저장 때 재시도 */ }
+    VSYNC.busy = false;
+  }
+  async function vsyncInit() {
+    try {
+      var r = await fetch('/api/health', { cache: 'no-store' });
+      var j = await r.json();
+      VSYNC.avail = !!(j && j.ok);
+    } catch (e) { VSYNC.avail = false; }
+    if (!vsyncOn()) return;
+    try {
+      var res = await vsyncApi('/pull');
+      if (res && res.state && richness(res.state) > richness(db)) {
+        adoptDb(res.state);
+        toast('서버에 저장된 기록을 불러왔어요');
+        renderStreak(); render(curView);
+      } else if (richness(db) > 0) {
+        vsyncSchedule();
+      }
+      VSYNC.last = Date.now();
+    } catch (e) { /* 조용히 — 리포트 탭에 상태 표시 */ }
+    if (curView === 'report') renderReport();
+    else if (curView === 'plant') renderPlantMenu();
   }
 
   /* ── 화분 SVG (성장 0새싹~5꽃, 6나무 / 시듦 0~3) ── */
@@ -417,17 +482,67 @@
       }
     } else if (w.type === 'english') {
       if (w.cue) html += '<div class="hintbox mnem"><span class="lbl">찰떡 연상</span><p><b>' + esc(w.cue) + '</b></p><p class="muted" style="font-size:.84rem;">' + esc(w.scene) + '</p></div>';
-      else if (!compact) html += '<div class="hintbox mnem"><span class="lbl">찰떡 연상</span><p class="muted" style="font-size:.86rem;">연상 준비 중 — 실서비스에서는 AI가 내 취향으로 만든 연상이 강사 검수 후 여기에 붙어요.</p></div>';
+      else if (!compact) html += aiSlotHtml(w);
       if (w.root && !compact) html += '<div class="hintbox"><span class="lbl">어원 뿌리</span><p><b>' + esc(w.root.stem) + '</b> = ' + esc(w.root.sense) + ' · 가족: ' + w.root.family.map(esc).join(', ') + '</p></div>';
       if (w.base && !compact) html += '<div class="hintbox"><span class="lbl">기본형</span><p>' + esc(w.base) + '</p></div>';
     } else {
       if (w.scene) html += '<div class="hintbox scene"><span class="lbl">머릿속에 그려 보기</span><p>' + esc(w.scene) + '</p></div>';
-      else if (!compact) html += '<div class="hintbox scene"><span class="lbl">머릿속에 그려 보기</span><p class="muted" style="font-size:.86rem;">뜻이 살아나는 장면을 스스로 하나 그려 보세요 — 실서비스에선 AI 연상이 붙어요.</p></div>';
+      else if (!compact) html += aiSlotHtml(w);
       if (!compact && w.syn) html += '<div class="fam">' + w.syn.map(function (s) { return '<span class="chip t-n">' + esc(s) + '</span>'; }).join('') + '</div>';
     }
     return html;
   }
   function sayWord(w) { say(w.word, w.type === 'english' ? 'en-US' : 'ko-KR'); }
+
+  /* ── AI 찰떡 연상 (연상 없는 단어에만 — 서버 연동 시) ── */
+  function aiSlotHtml(w) {
+    var cls = w.type === 'native' ? 'scene' : 'mnem';
+    var lbl = w.type === 'native' ? '머릿속에 그려 보기' : '찰떡 연상';
+    var inner = vsyncOn()
+      ? '<p class="muted" style="font-size:.86rem;margin:4px 0 8px;">아직 연상이 없는 단어예요.</p><button class="btn" id="aiGen-' + w.id + '" style="width:100%;">✨ AI 찰떡 연상 만들기</button>'
+      : '<p class="muted" style="font-size:.86rem;">연상 준비 중 — 학원 서버에 연동하면 AI가 만들어 줘요.</p>';
+    return '<div class="hintbox ' + cls + '" id="aiSlot-' + w.id + '"><span class="lbl">' + lbl + '</span>' + inner + '</div>';
+  }
+  function bindAiSlot(w) {
+    var btn = document.getElementById('aiGen-' + w.id);
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      btn.disabled = true; btn.textContent = '만드는 중…';
+      try {
+        var body = { word: w.word, meaning: w.meaning, type: w.type };
+        if (w.parts) body.hanja = w.parts.map(function (p) { return p.ch + '(' + p.hun + ' ' + p.eum + ')'; }).join('+');
+        var j = await vsyncApi('/mnemonic', { method: 'POST', body: JSON.stringify(body) });
+        if (!j.ok) {
+          toast(j.reason === 'no-key' ? 'AI 키가 아직 설정되지 않았어요 — 선생님께 문의!' : '지금은 연상을 만들 수 없어요');
+          btn.disabled = false; btn.textContent = '✨ AI 찰떡 연상 만들기';
+          return;
+        }
+        renderAiCandidates(w, j.candidates, j.status);
+      } catch (e) {
+        toast(e.message || '서버에 연결할 수 없어요');
+        btn.disabled = false; btn.textContent = '✨ AI 찰떡 연상 만들기';
+      }
+    });
+  }
+  function renderAiCandidates(w, cands, status) {
+    var slot = document.getElementById('aiSlot-' + w.id);
+    if (!slot) return;
+    slot.innerHTML = '<span class="lbl">마음에 드는 연상 고르기</span><div class="cand-list">' +
+      cands.map(function (c, i) { return '<button class="cand" data-i="' + i + '"><b>' + esc(c.cue) + '</b><span>' + esc(c.scene) + '</span></button>'; }).join('') +
+      '</div><p class="muted" style="font-size:.74rem;margin:8px 0 0;">' +
+      (status === 'approved' ? '선생님이 검수한 연상이에요 ✓' : '선생님 검수 전이라 아직 나에게만 보여요.') + '</p>';
+    slot.querySelectorAll('.cand').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var c = cands[+b.dataset.i];
+        w.cue = c.cue; w.scene = c.scene;
+        if (db.custom[w.id]) db.custom[w.id] = w;
+        save();
+        slot.innerHTML = '<span class="lbl">' + (w.type === 'native' ? '머릿속에 그려 보기' : '찰떡 연상') + '</span>' +
+          '<p><b>' + esc(c.cue) + '</b></p><p class="muted" style="font-size:.84rem;">' + esc(c.scene) + '</p>' +
+          '<p class="muted" style="font-size:.72rem;">저장했어요 ✓</p>';
+      });
+    });
+  }
 
   /* ── 정원 ── */
   var filterType = 'all';
@@ -524,6 +639,7 @@
     $('#modalBack').classList.add('show');
     $('#mdSay').addEventListener('click', function () { sayWord(w); });
     $('#mdClose').addEventListener('click', closeModal);
+    bindAiSlot(w);
   }
   function closeModal() { $('#modalBack').classList.remove('show'); }
   $('#modalBack').addEventListener('click', function (e) { if (e.target === $('#modalBack')) closeModal(); });
@@ -645,6 +761,7 @@
         '<div class="row" style="margin-top:14px;"><button class="btn primary big" id="pNext">외웠어요, 다음 →</button></div>';
       $('#pSay').addEventListener('click', function () { sayWord(w); });
       $('#pNext').addEventListener('click', function () { idx += 1; encodeStep(); });
+      bindAiSlot(w);
       sayWord(w);
     }
 
@@ -985,6 +1102,8 @@
       (typebar ? '<div class="card" style="margin-top:12px;"><b style="font-size:.86rem;color:var(--ink-strong);">어종 분포</b>' + typebar +
         '<div class="legend"><span><i class="dot" style="background:#1E9DD6"></i>한자어 ' + byType.hanja + '</span><span><i class="dot" style="background:#4E9B57"></i>고유어 ' + byType.native + '</span><span><i class="dot" style="background:#E85D4A"></i>영어 ' + byType.english + '</span></div></div>' : '') +
       '<div class="card" style="margin-top:12px;"><b style="font-size:.86rem;color:var(--ink-strong);">학부모 한 줄 요약</b><p style="margin:6px 0 0;font-size:.92rem;">' + parentLine + '</p></div>' +
+      '<h2 class="sec">학원 서버 연동</h2>' +
+      '<div class="card">' + syncCardHtml() + '</div>' +
       '<h2 class="sec">데모 도구</h2>' +
       '<div class="row"><button class="btn" id="dmDay">⏩ 하루 지나가기</button><button class="btn" id="dmInbox">📬 샘플 씨앗 받기</button></div>' +
       '<div class="row" style="margin-top:8px;"><button class="btn" id="dmSample">샘플 정원</button><button class="btn" id="dmReset">초기화</button></div>' +
@@ -1006,6 +1125,15 @@
       if (!confirm('정원을 완전히 초기화할까요?')) return;
       db = fresh(); save(); toast('처음부터 시작!'); show('garden');
     });
+  }
+
+  function syncCardHtml() {
+    var a = vsyncAuth();
+    if (!VSYNC.avail) return '<p class="muted" style="margin:0;font-size:.88rem;">학원 서버 주소로 접속하면 기록이 선생님께 자동 백업되고, 기기를 바꿔도 이어져요. (지금 주소에서는 이 기기에만 저장돼요)</p>';
+    if (!a) return '<p class="muted" style="margin:0;font-size:.88rem;">진로독서 앱 설정에서 <b style="color:var(--ink-strong);">선생님 연동</b>을 하면 워드브레인 기록도 함께 연동돼요 — 연동은 한 번이면 충분해요.</p>';
+    if (VSYNC.authBad) return '<p class="muted" style="margin:0;font-size:.88rem;">연동이 만료됐어요 — 진로독서 앱 설정에서 다시 연동해 주세요.</p>';
+    return '<p style="margin:0;font-size:.9rem;"><b style="color:var(--ink-strong);">' + esc(a.name || '') + '</b> (' + esc(a.code || '') + ') 연동 중 ✓<br>' +
+      '<span class="muted" style="font-size:.8rem;">마지막 동기화: ' + (VSYNC.last ? new Date(VSYNC.last).toLocaleString('ko-KR') : '—') + ' · AI 연상 만들기 사용 가능</span></p>';
   }
 
   /* ── 샘플 정원 (엔진을 그대로 통과시켜 만든 시연 데이터) ── */
@@ -1067,6 +1195,7 @@
   /* ── 시작 ── */
   renderStreak();
   show('garden');
+  vsyncInit();
 })();
 /* APP:JS:END */
   </script>

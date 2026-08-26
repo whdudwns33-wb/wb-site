@@ -11,10 +11,20 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 | 경로 | 내용 |
 |------|------|
 | `/` | 학생 앱 (reading/ 폴더를 그대로 서빙 — 같은 주소라 연동이 자동 활성화) |
+| `/vocab/` | **워드브레인** (어휘 기억 앱, vocab/ 폴더) — 같은 오리진이라 진로독서 어휘장·학생 토큰이 자동 공유 |
 | `/admin` | 강사 관리 웹 (PIN 로그인) — 현황판·학생 상세·백업·학부모 링크 |
+| `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
 | `/parent.html?t=…` | 학부모 주간 리포트 (학생별 열람 토큰, 로그인 불필요, 읽기 전용) |
 | `/api/health` | 상태 확인 |
+
+### 워드브레인 (분리 가능한 A 구조)
+
+- 라우트는 `/api/vocab/*` 아래, 데이터는 vocab 전용 저장소(워커: `vocab:` 접두 KV 키, 로컬: `db.vocab`)만 사용 — 로직은 `vocab-api.mjs` 한 모듈. 나중에 단독 서비스로 분리할 때 이 모듈+키만 들어내면 된다.
+- 인증은 진로독서 학생 토큰을 그대로 공유 — 학생은 "선생님 연동" 한 번으로 두 앱 모두 연동된다.
+- 학생 API: `GET /api/vocab/pull` / `PUT /api/vocab/state` (400KB 제한) / `POST /api/vocab/mnemonic {word,meaning,type}` — AI 연상 3안 생성(같은 단어는 캐시, 승인되면 승인본만 반환).
+- 관리 API(PIN): `GET·POST /api/vocab/admin/review` (승인 시 cue·scene 확정 — 이후 학생들에게 재사용) / `GET /api/vocab/admin/overview`.
+- AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
 
 ## 동작 방식
 
