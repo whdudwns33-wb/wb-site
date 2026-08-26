@@ -56,6 +56,13 @@ test('lesson edits send sourceTaskId as top-level optimistic-update metadata', (
   assert.match(html, /_sourceTaskId: t\.id, _sourceUpdatedAt: Number\(t\.updatedAt \|\| 0\)/);
   assert.match(html,
     /sync\.post\('\/lesson-create', \{[\s\S]{0,220}sourceTaskId: draft\._sourceTaskId \|\| undefined,[\s\S]{0,180}expectedUpdatedAt:[\s\S]{0,120}lesson: lessonPreviewPayload/);
+  const previewStart = html.indexOf('function previewLessonRegistration()');
+  const previewEnd = html.indexOf('function applyCreatedLesson(', previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  assert.match(preview, /const sourceExisting = draft\._sourceTaskId && state\.tasks\.find/);
+  assert.match(preview, /!item\.deleted && item\.id === draft\._sourceTaskId/);
+  assert.match(preview, /const existing = sourceExisting \|\| state\.tasks\.find/);
+  assert.match(preview, /lessonPreviewExpectedUpdatedAt = existing \? Number\(existing\.updatedAt/);
 });
 
 test('teacher-only lesson edits leave roster ownership transfer to the authoritative lesson endpoint', () => {
