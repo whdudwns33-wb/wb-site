@@ -1,4 +1,5 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { lessonCheckOwnerTransferStatement } from './lesson-history-transfer.js';
 
 const LESSON_TEXT_LIMITS = {
   studentName: 80,
@@ -706,6 +707,9 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
         app, current.id, sourceOwner, databaseUpdatedAt
       )];
       if (transferRoster.changed) statements.push(transferRoster.statement);
+      statements.push(lessonCheckOwnerTransferStatement(
+        env, app, current.id, sourceOwner, staffId, corrected.updatedAt
+      ));
       const effectiveDate = batchRosterKstDate(corrected.updatedAt);
       const eventId = await studentChangeEventId('lesson-create-teacher\n' + corrected.id + '\n' + corrected.lessonRevision);
       statements.push(studentChangeEventStatement(env, app, {
