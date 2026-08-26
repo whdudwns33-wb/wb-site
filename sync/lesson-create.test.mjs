@@ -46,6 +46,7 @@ class FakeDB {
       ['inactive', { id: 'inactive', deleted: true }]
     ]);
     this.tasks = new Map();
+    this.checks = new Map();
     this.failBatchAt = -1;
     this.privateRoster = {
       roster: { students: [
@@ -145,6 +146,17 @@ class FakeDB {
           db.tasks.set(id, { owner: nextOwner, data, updatedAt, srvAt });
           return { meta: { changes: 1 } };
         }
+        if (sql.startsWith('UPDATE checks SET owner=')) {
+          const [nextOwner, srvAt, , owner, taskId] = this.args;
+          let changes = 0;
+          for (const [key, row] of db.checks) {
+            const data = JSON.parse(row.data);
+            if (row.owner !== owner || data.taskId !== taskId) continue;
+            db.checks.set(key, { ...row, owner: nextOwner, srvAt });
+            changes += 1;
+          }
+          return { meta: { changes } };
+        }
         if (sql.startsWith('INSERT OR IGNORE INTO student_change_events')) {
           db.studentChangeEvents.push({ eventType: this.args[4], details: JSON.parse(this.args[6]), audienceStaffIds: JSON.parse(this.args[7]) });
           return { meta: { changes: 1 } };
@@ -156,6 +168,7 @@ class FakeDB {
 
   async batch(statements) {
     const snapshot = new Map(this.tasks);
+    const checksSnapshot = new Map(this.checks);
     const rosterSnapshot = JSON.parse(JSON.stringify(this.privateRoster));
     const rosterUpdatedAtSnapshot = this.privateRosterUpdatedAt;
     const results = [];
@@ -167,6 +180,7 @@ class FakeDB {
       return results;
     } catch (error) {
       this.tasks = snapshot;
+      this.checks = checksSnapshot;
       this.privateRoster = rosterSnapshot;
       this.privateRosterUpdatedAt = rosterUpdatedAtSnapshot;
       throw error;
@@ -468,6 +482,10 @@ test('admin can transfer only the teacher while keeping the lesson id and moving
   const created = await call(db, {
     staffId: 'teacher-1', lesson: assignedLesson()
   }, { scope: 'all', role: 'admin' });
+  const history = { taskId: created.data.task.id, date: '2026-08-20', att: 'A', note: '기존 수업 메모', updatedAt: 123 };
+  db.checks.set(created.data.task.id + '|2026-08-20', {
+    owner: 'teacher-1', data: JSON.stringify(history), updatedAt: 123, srvAt: 123
+  });
   const transferred = await call(db, {
     staffId: 'teacher-2', sourceTaskId: created.data.task.id,
     expectedUpdatedAt: created.data.task.updatedAt,
@@ -481,6 +499,11 @@ test('admin can transfer only the teacher while keeping the lesson id and moving
   assert.equal(db.tasks.get(created.data.task.id).owner, 'teacher-2');
   assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-2']);
   assert.deepEqual(db.privateRoster.bookStudents[0].teacherIds, ['teacher-2']);
+  const movedHistory = db.checks.get(created.data.task.id + '|2026-08-20');
+  assert.equal(movedHistory.owner, 'teacher-2');
+  assert.deepEqual(JSON.parse(movedHistory.data), history);
+  assert.equal(movedHistory.updatedAt, 123);
+  assert.ok(movedHistory.srvAt > 123);
   assert.equal(db.studentChangeEvents.at(-1).eventType, 'teacher_assignment');
   assert.deepEqual(db.studentChangeEvents.at(-1).audienceStaffIds.sort(), ['teacher-1', 'teacher-2']);
 });
