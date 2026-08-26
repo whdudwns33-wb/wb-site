@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-26.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-26.3"></script>
-<script src="./asset-core.js?v=2026-08-26.3"></script>
-<script src="./qr-core.js?v=2026-08-26.3"></script>
-<script src="./acaflow-import-core.js?v=2026-08-26.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-26.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-26.4"></script>
+<script src="./asset-core.js?v=2026-08-26.4"></script>
+<script src="./qr-core.js?v=2026-08-26.4"></script>
+<script src="./acaflow-import-core.js?v=2026-08-26.4"></script>
 <script>
 "use strict";
 
@@ -4917,9 +4917,11 @@ function previewLessonRegistration() {
   const previewValue = value => esc(value || '없음').replace(/\n/g, '<br>');
   const slotSummary = lessonAssignmentScheduleText(taskBody.scheduleSlots, taskBody.lessonHours);
   const assignmentIdentity = core.canonicalLessonIdentity(taskBody, { staffId: draft.staffId });
-  const existing = state.tasks.find(item =>
+  const sourceExisting = draft._sourceTaskId && state.tasks.find(item =>
+    !item.deleted && item.id === draft._sourceTaskId);
+  const existing = sourceExisting || state.tasks.find(item =>
     !item.deleted && item.staffId === draft.staffId &&
-    (item.id === draft._sourceTaskId || core.canonicalLessonIdentity(item, { staffId: item.staffId }) === assignmentIdentity));
+    core.canonicalLessonIdentity(item, { staffId: item.staffId }) === assignmentIdentity);
   lessonPreviewExpectedUpdatedAt = existing ? Number(existing.updatedAt || draft._sourceUpdatedAt || 0) : 0;
   modal(existing ? '수업 정보 수정 미리보기' : '수업 등록 미리보기',
     '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
@@ -16045,7 +16047,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-26.3';
+const APP_VER = '2026-08-26.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
