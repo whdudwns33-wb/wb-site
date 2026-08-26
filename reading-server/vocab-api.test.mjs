@@ -1,14 +1,15 @@
 'use strict';
 /* 워드브레인 서버 라우트 검증 (node reading-server/vocab-api.test.mjs) */
 import assert from 'node:assert';
-import { handleVocab, parseCandidates, parseVerdict, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, parseCandidates, parseVerdict, parseWordList, parseHanjaSpec, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const states = {}, mnemos = {}, push = {}, students = { s1: { code: 's1', name: '김지우', cls: '월수반' } };
+  const states = {}, mnemos = {}, push = {}, assigns = {};
+  const students = { s1: { code: 's1', name: '김지우', cls: '월수반' }, s2: { code: 's2', name: '박서준', cls: '월수반' } };
   return {
     getState: (c) => states[c] || null,
     putState: (c, rec) => { states[c] = rec; },
@@ -21,7 +22,10 @@ function memStore() {
     putPush: (c, rec) => { push[c] = rec; },
     delPush: (c) => { delete push[c]; },
     listPushCodes: () => Object.keys(push),
-    _raw: { states, mnemos, push },
+    getAssign: (c) => assigns[c] || null,
+    putAssign: (c, rec) => { assigns[c] = rec; },
+    listAssignCodes: () => Object.keys(assigns),
+    _raw: { states, mnemos, push, assigns },
   };
 }
 const call = (store, over) => handleVocab({
@@ -273,6 +277,115 @@ await t('parseVerdict — 펜스·잡음 견디고 불량은 null', () => {
   assert.strictEqual(parseVerdict('{"verdict":"nope","feedback":"x"}'), null, '허용 안 된 verdict');
   assert.strictEqual(parseVerdict('{"verdict":"good"}'), null, 'feedback 없음');
   assert.strictEqual(parseVerdict('그냥 텍스트'), null);
+});
+
+await t('단어 목록 파싱 — 구분자·어종 자동 판별·한자 분해·중복·오류행', () => {
+  const { words, errors } = parseWordList([
+    '# 주석은 무시',
+    '관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측) | 별을 관측했다.',
+    'observe, 관찰하다',
+    '드넓다\t활짝 트여 아주 넓다',
+    '분석 | 잘게 나눠 살핌 | 分析',
+    '관측 | 중복이라 무시됨',
+    '뜻없는말',
+    '',
+  ].join('\n'));
+  assert.strictEqual(words.length, 4);
+  const [a, b, c, d] = words;
+  assert.strictEqual(a.type, 'hanja');
+  assert.strictEqual(a.hanja, '觀測');
+  assert.deepStrictEqual(a.parts[0], { ch: '觀', hun: '볼', eum: '관' });
+  assert.strictEqual(a.literal, '볼 · 잴');
+  assert.strictEqual(a.example, '별을 관측했다.');
+  assert.strictEqual(b.type, 'english');
+  assert.strictEqual(b.meaning, '관찰하다');
+  assert.strictEqual(c.type, 'native');
+  assert.strictEqual(d.hanja, '分析', '훈음 없는 한자만 있어도 한자어로');
+  assert.strictEqual(errors.length, 1, '뜻 없는 행만 오류: ' + JSON.stringify(errors));
+  assert.ok(errors[0].includes('뜻이 없어요'));
+});
+
+await t('한자 표기 파싱 — 훈음 있는 형식과 한자만 있는 형식', () => {
+  assert.deepStrictEqual(parseHanjaSpec('觀(볼 관)+測(잴 측)').map(p => p.ch), ['觀', '測']);
+  assert.deepStrictEqual(parseHanjaSpec('軌(바퀴 자국 궤)')[0], { ch: '軌', hun: '바퀴 자국', eum: '궤' });
+  assert.deepStrictEqual(parseHanjaSpec('分析').map(p => p.ch), ['分', '析']);
+  assert.strictEqual(parseHanjaSpec('한글만'), null);
+  assert.strictEqual(parseHanjaSpec(''), null);
+});
+
+await t('배정 — 미리보기는 저장 안 함, 배정은 학생별 배정함에 들어감', async () => {
+  const store = memStore();
+  const admin = { code: '__admin__', admin: true };
+  const text = '관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측)\nobserve, 관찰하다';
+  const dry = await call(store, {
+    path: '/api/vocab/admin/assign', method: 'POST', who: admin,
+    getBody: async () => ({ codes: ['s1'], text, dryRun: true }),
+  });
+  assert.strictEqual(dry.body.preview, true);
+  assert.strictEqual(dry.body.words.length, 2);
+  assert.strictEqual(store.getAssign('s1'), null, '미리보기는 저장하지 않는다');
+
+  const r = await call(store, {
+    path: '/api/vocab/admin/assign', method: 'POST', who: admin,
+    getBody: async () => ({ codes: ['s1', 's2', '없는학생'], title: '3주차 단어', text }),
+  });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.body.assigned, ['s1', 's2'], '등록된 학생에게만');
+  assert.strictEqual(r.body.count, 2);
+  assert.strictEqual(store.getAssign('s1').items[0].title, '3주차 단어');
+  assert.strictEqual(store.getAssign('s1').items[0].words.length, 2);
+});
+
+await t('배정 — 학생이 받아보고 심으면 완료 처리', async () => {
+  const store = memStore();
+  const admin = { code: '__admin__', admin: true };
+  await call(store, {
+    path: '/api/vocab/admin/assign', method: 'POST', who: admin,
+    getBody: async () => ({ codes: ['s1'], title: '1주차', text: '관측 | 보고 재는 것' }),
+  });
+  const got = await call(store, { path: '/api/vocab/assignments' });
+  assert.strictEqual(got.body.items.length, 1);
+  const id = got.body.items[0].id;
+  assert.strictEqual(got.body.items[0].words[0].word, '관측');
+
+  const ack = await call(store, {
+    path: '/api/vocab/assignments/ack', method: 'POST', getBody: async () => ({ id }),
+  });
+  assert.strictEqual(ack.body.ok, true);
+  const after = await call(store, { path: '/api/vocab/assignments' });
+  assert.strictEqual(after.body.items.length, 0, '심은 배정은 목록에서 사라진다');
+
+  const bad = await call(store, {
+    path: '/api/vocab/assignments/ack', method: 'POST', getBody: async () => ({ id: 'zzz' }),
+  });
+  assert.strictEqual(bad.status, 404);
+});
+
+await t('배정 — 학생 간 격리, 관리 목록에 수행 여부 표시', async () => {
+  const store = memStore();
+  const admin = { code: '__admin__', admin: true };
+  await call(store, {
+    path: '/api/vocab/admin/assign', method: 'POST', who: admin,
+    getBody: async () => ({ codes: ['s1'], title: 'A반', text: '관측 | 보고 재는 것' }),
+  });
+  const other = await call(store, { path: '/api/vocab/assignments', who: { code: 's2', admin: false } });
+  assert.strictEqual(other.body.items.length, 0, '다른 학생 배정이 보이면 안 된다');
+  const list = await call(store, { path: '/api/vocab/admin/assign', who: admin });
+  assert.strictEqual(list.body.items.length, 1);
+  assert.strictEqual(list.body.items[0].name, '김지우');
+  assert.strictEqual(list.body.items[0].done, false);
+});
+
+await t('배정 — 학생 미선택·빈 단어·과다 배정 거절', async () => {
+  const store = memStore();
+  const admin = { code: '__admin__', admin: true };
+  const mk = (body) => call(store, { path: '/api/vocab/admin/assign', method: 'POST', who: admin, getBody: async () => body });
+  assert.strictEqual((await mk({ codes: [], text: '관측 | 뜻' })).status, 400);
+  assert.strictEqual((await mk({ codes: ['s1'], text: '' })).status, 400);
+  const many = Array.from({ length: 101 }, (_, i) => 'word' + i + ' | 뜻' + i).join('\n');
+  assert.strictEqual((await mk({ codes: ['s1'], text: many })).status, 400, '100개 초과 거절');
+  const student = await call(store, { path: '/api/vocab/admin/assign', method: 'POST', getBody: async () => ({ codes: ['s1'], text: 'x | y' }) });
+  assert.strictEqual(student.status, 403, '학생은 배정 못 함');
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');

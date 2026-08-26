@@ -454,9 +454,31 @@
       }
       VSYNC.last = Date.now();
       refreshPendingMnemos();
+      await refreshAssignments();
     } catch (e) { /* 조용히 — 리포트 탭에 상태 표시 */ }
     if (curView === 'report') renderReport();
     else if (curView === 'plant') renderPlantMenu();
+  }
+
+  /* ── 선생님이 내주신 단어 ── */
+  var ASSIGNMENTS = [];
+  async function refreshAssignments() {
+    if (!vsyncOn()) { ASSIGNMENTS = []; return; }
+    try {
+      var j = await vsyncApi('/assignments');
+      ASSIGNMENTS = (j.items || []).filter(function (a) { return a.words && a.words.length; });
+    } catch (e) { /* 다음 접속 때 재시도 */ }
+  }
+  /* 배정 단어 → 앱 단어 객체 (id 충돌 없이 등록) */
+  function assignedWords(a) {
+    return a.words.map(function (w, i) {
+      var id = 'tw-' + a.id + '-' + i;
+      var o = { id: id, type: w.type, word: w.word, meaning: w.meaning, source: 'teacher', assignId: a.id };
+      if (w.parts && w.parts.length && w.parts[0].hun) { o.parts = w.parts; o.hanja = w.hanja; o.literal = w.literal; }
+      else if (w.hanja) { o.hanja = w.hanja; }
+      if (w.example) o.example = w.example;
+      return o;
+    });
   }
 
   /* 검수 결과 반영 — 내가 고른 연상이 승인되면 승인본으로, 반려되면 제거(재생성 가능) */
@@ -887,6 +909,16 @@
     var counts = { all: 0, hanja: 0, native: 0, english: 0 };
     WB_WORDS.forEach(function (w) { if (!db.states[w.id]) { counts.all++; counts[w.type]++; } });
     var inbox = getInbox();
+    var assignHtml = ASSIGNMENTS.map(function (a) {
+      var ws = assignedWords(a);
+      var chips = ws.slice(0, 8).map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join(' ');
+      if (ws.length > 8) chips += ' <span class="chip" style="background:var(--card-2);color:var(--ink-soft);">+' + (ws.length - 8) + '</span>';
+      return '<div class="card" style="border-color:#E6C68A;background:#FFFBF2;margin-bottom:14px;">' +
+        '<b style="color:#8A6318;">📋 선생님이 내주신 단어 — ' + esc(a.title) + '</b>' +
+        '<p class="muted" style="margin:4px 0 10px;font-size:.84rem;">' + ws.length + '개 · ' + esc((a.at || '').slice(0, 10)) + '</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
+        '<button class="btn primary big" data-assign="' + esc(a.id) + '">이 단어들 심기</button></div>';
+    }).join('');
     var inboxHtml = '';
     if (inbox.length) {
       var chips = inbox.slice(0, 6).map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join(' ');
@@ -905,12 +937,23 @@
     var order = curType ? [curType].concat(TYPE_ORDER.filter(function (k) { return k !== curType; })) : TYPE_ORDER;
     el.innerHTML = '<h2 class="sec">새로 심기 — 한 번에 5개</h2>' +
       '<p class="muted" style="margin-top:-6px;">작업기억이 넘치지 않는 양이에요. 어종마다 외우는 방법이 달라요.</p>' +
-      inboxHtml +
+      assignHtml + inboxHtml +
       '<div class="pick-grid">' +
       order.map(function (k) { return picks[k]; }).join('') +
       pickBtn('all', '골고루 5개', '세 어종을 섞어서 (남은 ' + counts.all + ')', '🌈', 'var(--card-2)') +
       '</div>' +
       '<p class="demo-note">📬 씨앗 도착함: 진로독서 앱 어휘장에 모은 단어가 자동으로 이곳에 도착해요.' + (inbox.length ? '' : ' 지금은 비어 있어요 — 리포트 탭 데모 도구의 "샘플 씨앗 받기"로 체험할 수 있어요.') + '</p>';
+    el.querySelectorAll('[data-assign]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var a = ASSIGNMENTS.filter(function (x) { return x.id === b.dataset.assign; })[0];
+        if (!a) return;
+        var batch = assignedWords(a).filter(function (w) { return !db.states[w.id]; });
+        if (!batch.length) { toast('이미 다 심은 단어예요'); return; }
+        batch.forEach(registerCustom);
+        save();
+        runPlantSession(batch.slice(0, 8), a.id);
+      });
+    });
     var bi = $('#btnInbox');
     if (bi) bi.addEventListener('click', function () {
       var batch = getInbox().slice(0, 5);
@@ -932,7 +975,7 @@
     if (!pool.length) { toast('이 어종은 모두 심었어요!'); return; }
     runPlantSession(shuffle(pool).slice(0, 5));
   }
-  function runPlantSession(batch) {
+  function runPlantSession(batch, assignId) {
     var idx = 0, recallQ = [], retried = {};
     var body = openOverlay('새로 심기 · 부호화');
 
@@ -984,6 +1027,14 @@
       batch.forEach(function (w) { db.states[w.id] = WBSRS.plant(w.id, t); });
       db.log.push({ t: t, kind: 'plant', n: batch.length });
       bumpStreak(); save();
+      if (assignId) {
+        var a = ASSIGNMENTS.filter(function (x) { return x.id === assignId; })[0];
+        var remain = a ? assignedWords(a).filter(function (w) { return !db.states[w.id]; }).length : 0;
+        if (!remain) {
+          ASSIGNMENTS = ASSIGNMENTS.filter(function (x) { return x.id !== assignId; });
+          vsyncApi('/assignments/ack', { method: 'POST', body: JSON.stringify({ id: assignId }) }).catch(function () {});
+        }
+      }
       var firstDue = db.states[batch[0].id].due;
       body.innerHTML = '<div class="qcard">' + plantSVG(0, 0) +
         '<div class="qmeaning">' + batch.length + '개를 심었어요! 🌱</div>' +

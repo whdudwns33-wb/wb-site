@@ -1,6 +1,6 @@
 'use strict';
 /* WB 진로독서 서비스 워커 — 앱 셸 캐시 + 오프라인 읽기 */
-const VERSION = 'wbr-shell-v1';
+const VERSION = 'wbr-shell-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -20,6 +20,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin || e.request.method !== 'GET') return;
+
+  // API 응답은 절대 캐시하지 않는다 — 캐시되면 배정·기록 같은 최신 데이터가 오래된 값으로 굳는다
+  if (url.pathname.startsWith('/api/')) return;
 
   // 페이지 이동: 네트워크 우선, 실패 시 캐시된 앱 셸
   if (e.request.mode === 'navigate') {
