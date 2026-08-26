@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-25.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-25.1"></script>
-<script src="./asset-core.js?v=2026-08-25.1"></script>
-<script src="./qr-core.js?v=2026-08-25.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-25.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-26.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-26.2"></script>
+<script src="./asset-core.js?v=2026-08-26.2"></script>
+<script src="./qr-core.js?v=2026-08-26.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-26.2"></script>
 <script>
 "use strict";
 
@@ -1283,6 +1283,17 @@ function alertsToday() {
 const SYNC_URL = 'https://wb-sync.whdudwns33.workers.dev';
 const SYNC_APP = 'task';
 const GUARDIAN_CONTACT_ENABLED = false;
+let guardianDeliveryStudentIds = new Set();
+function applyGuardianDeliveryStudentIds(values) {
+  guardianDeliveryStudentIds = new Set((Array.isArray(values) ? values : [])
+    .map(value => String(value || '')).filter(value => /^[A-Za-z0-9_-]{1,128}$/.test(value)));
+}
+function guardianContactEnabledFor(studentId) {
+  return GUARDIAN_CONTACT_ENABLED || guardianDeliveryStudentIds.has(String(studentId || ''));
+}
+function anyGuardianContactEnabled() {
+  return GUARDIAN_CONTACT_ENABLED || guardianDeliveryStudentIds.size > 0;
+}
 const CONTACT_CHECK_PREFIX = '__contact__';
 const isContactCheckKey = key => String(key || '').split('|')[0].startsWith(CONTACT_CHECK_PREFIX);
 
@@ -1724,6 +1735,7 @@ function resetPersonCache(token) {
   acaflowImportSelection.clear(); acaflowImportError = ''; acaflowImportBusy = false;
   acaflowStudentLinks.clear();
   guardianContacts = null; guardianContactsLoaded = false; guardianContactsLoading = false;
+  guardianDeliveryStudentIds = new Set();
   guardianPortalAccess = new Map();
   guardianOpsConsents = new Map(); guardianOpsConsentsError = '';
   guardianOpsSendStates = new Map();
@@ -3183,6 +3195,7 @@ async function loadGuardianPublications(lessonDate, force) {
     const result = await sync.post('/parent-portal', {
       app: SYNC_APP, action: 'publication_list', auth: auth, lessonDate: date
     });
+    applyGuardianDeliveryStudentIds(result.deliveryEnabledStudentIds);
     Array.from(guardianLessonPublications.keys()).forEach(key => {
       if (key.endsWith('|' + date)) guardianLessonPublications.delete(key);
     });
@@ -3201,7 +3214,7 @@ async function loadGuardianPublications(lessonDate, force) {
 }
 
 function guardianPublicationHtml(task, lessonDate) {
-  const guardianContactPaused = typeof GUARDIAN_CONTACT_ENABLED !== 'undefined' && !GUARDIAN_CONTACT_ENABLED;
+  const guardianContactPaused = !guardianContactEnabledFor(task && task.studentId);
   const date = String(lessonDate || '');
   const key = guardianPublicationKey(task.id, date);
   const loading = guardianPublicationLoadingDates.has(date);
@@ -3259,7 +3272,8 @@ async function saveGuardianPublication(container, button) {
   const key = guardianPublicationKey(taskId, lessonDate);
   const current = guardianLessonPublications.get(key) || { status: 'withdrawn', revision: 0 };
   const published = !!(homework || readiness);
-  if (!published && current.status === 'published' && !confirm(GUARDIAN_CONTACT_ENABLED
+  const guardianContactEnabled = guardianContactEnabledFor(task && task.studentId);
+  if (!published && current.status === 'published' && !confirm(guardianContactEnabled
     ? '보호자 앱에서 숙제·준비물 공개 내용을 지울까요?'
     : '저장된 숙제·준비물 내용을 지울까요?')) return;
   const auth = sync.auth();
@@ -3280,7 +3294,7 @@ async function saveGuardianPublication(container, button) {
     guardianLessonPublications.set(key, saved);
     guardianPublicationDrafts.delete(key);
     toast(published
-      ? (!GUARDIAN_CONTACT_ENABLED
+      ? (!guardianContactEnabled
         ? (studentVisible ? '숙제·준비물을 저장하고 학생 앱에 공개했습니다' : '숙제·준비물을 수업 기록에 저장했습니다')
         : (studentVisible ? '보호자·학생 앱에 숙제·준비물을 공개했습니다' : '보호자 앱에 숙제·준비물을 공개했습니다'))
       : '숙제·준비물 내용을 지웠습니다');
@@ -3785,16 +3799,20 @@ function showFeedbackPreview(t, date, fields, letterText) {
   fbCtx = { id: t.id, date: date };
   const teacher = (currentStaff() || {}).name || '';
   const student = studentOf(t);
+  const guardianDeliveryEnabled = guardianContactEnabledFor(t && t.studentId);
   if (letterText == null) letterText = feedbackText(t, date);
   modal('수업 피드백 문구 — ' + esc(student) + ' 학생',
     '<div class="small muted mb8">' + esc(teacher) + ' 선생님 수업 기록을 바탕으로 만든 문구입니다.</div>' +
     '<div class="field"><label class="fl">오늘 배운 내용</label><input class="in" id="fldContent" value="' + esc(fields.contentText || '') + '"></div>' +
     '<div class="field"><label class="fl">잘한 점</label><input class="in" id="fldPlus" value="' + esc(fields.plusText || '') + '"></div>' +
     '<div class="field"><label class="fl">다음에 더 신경 쓸 점</label><input class="in" id="fldMinus" value="' + esc(fields.minusText || '') + '"></div>' +
-    '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 연락처는 보관하지만 메시지나 과제물을 학부모에게 전달하지 않습니다.</div>' +
+    (guardianDeliveryEnabled
+      ? '<div class="hint mt14"><b>테스트 학생 전달 기능 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
+      : '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 연락처는 보관하지만 메시지나 과제물을 학부모에게 전달하지 않습니다.</div>') +
     '<textarea class="in" rows="6" id="mText" style="margin-top:10px">' + esc(letterText) + '</textarea>' +
     '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다 — 실제 발송 내용은 위 세 항목입니다.</div>',
-    '<button class="btn btn-ghost btn-block mt14" data-act="copytext">복사하기</button>');
+    '<button class="btn btn-ghost btn-block mt14" data-act="copytext">복사하기</button>' +
+    (guardianDeliveryEnabled ? '<button class="btn btn-primary btn-block mt8" data-act="feedbacksubmit">보호자 알림톡 보내기</button>' : ''));
 }
 
 function todayStaffList() {
@@ -5486,14 +5504,16 @@ async function reviewLessonChange(action, key, revision) {
  *  보호자 연락처·동의가 없거나 설정이 꺼져 있으면 서버가 조용히 막고 사유를 남긴다
  *  (막힌 사유는 "피드백 검토" 화면에서 원장님이 확인·재시도할 수 있다). */
 async function submitFeedbackForReview(button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 메시지 발송 기능은 현재 사용하지 않습니다');
   if (!fbCtx) return;
+  const task = state.tasks.find(row => row.id === fbCtx.id);
+  if (!guardianContactEnabledFor(task && task.studentId)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const message = (($('#mText') || {}).value || '').trim();
   const contentText = (($('#fldContent') || {}).value || '').trim();
   const plusText = (($('#fldPlus') || {}).value || '').trim();
   const minusText = (($('#fldMinus') || {}).value || '').trim();
   if (!message) return toast('피드백 문구를 입력해 주세요');
   if (!contentText || !plusText || !minusText) return toast('오늘 배운 내용·잘한 점·보완할 점을 모두 입력해 주세요');
+  if (!confirm('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요?')) return;
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   if (button) button.disabled = true;
@@ -7383,7 +7403,7 @@ function managerRequestInboxRows() {
   const directiveInboxRows = typeof adminDirectiveManageRows === 'undefined' ? [] : adminDirectiveManageRows;
   directiveInboxRows.filter(row => row.isCurrent && row.directiveStatus === 'active').forEach(row => {
     const pending = typeof adminDirectiveAudienceSummary === 'function' ? adminDirectiveAudienceSummary(row).pending : [];
-    if (pending.length) push('공통 요청 미확인', row.title,
+    if (pending.length) push('실시간 관리자 요청 미확인', row.title,
       '미확인: ' + pending.map(item => item.staffName || managerRequestTeacher(item.staffId)).join(', '), '', 'lesson', row.updatedAt, -2);
   });
   const studentChangeInboxEvents = typeof studentChangeEvents === 'undefined' ? [] : studentChangeEvents;
@@ -10658,7 +10678,7 @@ async function acknowledgeStudentChanges(studentId, button) {
   }
 }
 
-/* ── 관리자 공통 요청 · 선생님별 확인 이력 ── */
+/* ── 실시간 관리자 요청 · 선생님별 확인 이력 ── */
 let adminDirectiveManageRows = [], adminDirectiveOwnRows = [];
 let adminDirectiveManageLoaded = false, adminDirectiveOwnLoaded = false;
 let adminDirectiveLoading = false, adminDirectiveError = '', adminDirectiveSaving = false;
@@ -10756,12 +10776,12 @@ function adminDirectiveDateText(row) {
 function adminDirectiveLessonCard(row, acknowledge) {
   const pending = acknowledge && !row.acknowledgedAt;
   return '<div class="admin-directive-card' + (row.priority === 'important' ? ' is-important' : '') + '">' +
-    '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 공통 요청') : '') + '</b>' +
-      (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">공통</span>') + '</div>' +
+    '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 실시간 관리자 요청') : '') + '</b>' +
+      (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">실시간</span>') + '</div>' +
     '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
     '<div class="small muted mt8">' + esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div>' +
     (pending ? '<button class="btn btn-sm btn-primary mt8" data-act="adminDirectiveAck" data-directive="' +
-      esc(row.directiveId) + '" data-rev="' + row.revision + '">이 공통 요청 확인</button>' : '') + '</div>';
+      esc(row.directiveId) + '" data-rev="' + row.revision + '">이 실시간 관리자 요청 확인</button>' : '') + '</div>';
 }
 
 function lessonAdminRequestsHtml(task) {
@@ -10772,7 +10792,7 @@ function lessonAdminRequestsHtml(task) {
   const canAcknowledge = session.isStaffLink && String(session.staffId || '') === String(task.staffId || '');
   return '<section class="mt14"><div class="card-title">관리자 요청사항' +
     ((lessonPending || commonCurrent.some(row => canAcknowledge && !row.acknowledgedAt)) ? newMarker('확인하지 않은 관리자 요청') : '') + '</div>' +
-    '<div class="card-sub mb8">수업별 요청과 여러 선생님에게 전달한 공통 요청을 나누어 표시합니다.</div>' +
+    '<div class="card-sub mb8">수업별 요청과 여러 선생님에게 전달한 실시간 관리자 요청을 나누어 표시합니다.</div>' +
     '<div class="admin-directive-card"><div class="between"><b>현재 수업 요청' +
       (lessonPending ? newMarker('수정된 수업 요청') : '') + '</b><span class="tag">수업</span></div>' +
       '<div class="admin-directive-body">' + esc(String(task.adminRequest || '').trim() || '등록된 요청이 없습니다.') + '</div></div>' +
@@ -10780,12 +10800,12 @@ function lessonAdminRequestsHtml(task) {
       (lessonHistory.length ? lessonHistory.map(row => '<div class="guide mb8"><b>' +
         esc(new Date(row.changedAt).toLocaleDateString('ko-KR')) + '</b><br>' + esc(row.body) + '</div>').join('') :
         '<div class="small muted">지난 수업 요청이 없습니다.</div>') + '</details>' +
-    '<div class="sect">현재 공통 요청</div>' +
+    '<div class="sect">현재 실시간 관리자 요청</div>' +
       (commonCurrent.length ? commonCurrent.map(row => adminDirectiveLessonCard(row, canAcknowledge)).join('') :
-        '<div class="small muted">현재 전달된 공통 요청이 없습니다.</div>') +
-    '<details class="admin-directive-history"><summary>지난 공통 요청 보기 · 최신 3개</summary>' +
+        '<div class="small muted">현재 전달된 실시간 관리자 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 실시간 관리자 요청 보기 · 최신 3개</summary>' +
       (commonPast.length ? commonPast.map(row => adminDirectiveLessonCard(row, false)).join('') :
-        '<div class="small muted">지난 공통 요청이 없습니다.</div>') + '</details></section>';
+        '<div class="small muted">지난 실시간 관리자 요청이 없습니다.</div>') + '</details></section>';
 }
 
 function adminDirectiveSoundKey() {
@@ -10800,7 +10820,7 @@ function adminDirectiveSoundEnabled() {
 function adminDirectiveSoundPromptHtml() {
   if (!session.isStaffLink || !session.staffId || adminDirectiveSoundEnabled()) return '';
   return '<div class="card admin-directive-sound"><div class="between"><div><div class="card-title">🔔 관리자 요청 알림</div>' +
-    '<div class="card-sub">버튼을 한 번 누르면 새 공통 요청 팝업과 함께 알림음이 울립니다.</div></div>' +
+    '<div class="card-sub">버튼을 한 번 누르면 새 실시간 관리자 요청 팝업과 함께 알림음이 울립니다.</div></div>' +
     '<button class="btn btn-sm btn-primary" data-act="adminDirectiveSound">알림음 켜기</button></div></div>';
 }
 
@@ -10841,7 +10861,7 @@ function showPendingAdminDirectivePopup() {
   sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'opened',
     directiveId: row.directiveId, revision: row.revision }).catch(() => {});
   playAdminDirectiveSound();
-  modal('관리자 공통 요청', adminDirectiveLessonCard(row, false),
+  modal('실시간 관리자 요청', adminDirectiveLessonCard(row, false),
     '<button class="btn btn-primary btn-block mt14" data-act="adminDirectiveAck" data-directive="' +
     esc(row.directiveId) + '" data-rev="' + row.revision + '" data-popup="true">확인했습니다</button>');
 }
@@ -10855,7 +10875,7 @@ async function acknowledgeAdminDirective(directiveId, revision, button, fromPopu
       directiveId: String(directiveId), revision: Number(revision) });
     if (!$('#modalHost').hidden) closeModal();
     await loadAdminDirectives(true, false);
-    toast('공통 요청을 확인했습니다');
+    toast('실시간 관리자 요청을 확인했습니다');
     if (fromPopup) setTimeout(showPendingAdminDirectivePopup, 120);
   } catch (error) {
     if (button) button.disabled = false;
@@ -10908,15 +10928,15 @@ function adminDirectiveManagerHtml() {
   const current = adminDirectiveManageRows.filter(row => row.isCurrent && row.directiveStatus === 'active');
   const history = adminDirectiveManageRows.filter(row => !row.isCurrent || row.directiveStatus === 'ended');
   const pending = current.reduce((sum, row) => sum + adminDirectiveAudienceSummary(row).pending.length, 0);
-  return '<details class="card admin-collapsible admin-directive-manager"><summary><span><b>📣 공통 관리자 요청</b>' +
+  return '<details class="card admin-collapsible admin-directive-manager"><summary><span><b>📣 실시간 관리자 요청</b>' +
     '<span class="card-sub">전체 또는 여러 선생님에게 전달하고 확인 여부를 관리합니다.</span></span><span class="pill ' +
     (pending ? 'warn' : '') + '">미확인 ' + pending + '명</span></summary><div class="admin-collapsible-body">' +
-    '<button class="btn btn-primary btn-block mb14" data-act="adminDirectiveAdd">새 공통 요청 작성</button>' +
+    '<button class="btn btn-primary btn-block mb14" data-act="adminDirectiveAdd">새 실시간 관리자 요청 작성</button>' +
     (adminDirectiveError ? '<div class="hint mb14" role="alert">' + esc(adminDirectiveError) +
       '<button class="btn btn-sm btn-ghost mt8" data-act="adminDirectiveRefresh">다시 불러오기</button></div>' : '') +
     (current.length ? current.map(row => adminDirectiveManageCard(row, false)).join('') :
-      '<div class="empty"><b>📣</b>현재 전달 중인 공통 요청이 없습니다.</div>') +
-    '<details class="admin-directive-history"><summary>지난 공통 요청 전체 기록 · ' + history.length + '건</summary>' +
+      '<div class="empty"><b>📣</b>현재 전달 중인 실시간 관리자 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>지난 실시간 관리자 요청 전체 기록 · ' + history.length + '건</summary>' +
       (history.length ? history.map(row => adminDirectiveManageCard(row, true)).join('') :
         '<div class="small muted">지난 기록이 없습니다.</div>') + '</details>' +
     studentChangeAcknowledgementStatusHtml() + '</div></details>';
@@ -10941,7 +10961,7 @@ function adminDirectiveEditorModal() {
   const draft = adminDirectiveEditor;
   if (!draft) return;
   const selected = new Set(draft.staffIds || []);
-  modal(draft.expectedRevision ? '공통 관리자 요청 수정' : '새 공통 관리자 요청',
+  modal(draft.expectedRevision ? '실시간 관리자 요청 수정' : '새 실시간 관리자 요청',
     '<label class="field"><span class="fl">제목</span><input class="in" id="adTitle" maxlength="100" value="' + esc(draft.title) + '" placeholder="예: 오늘 수업 전 확인"></label>' +
     '<label class="field"><span class="fl">요청 내용</span><textarea class="in" id="adBody" rows="6" maxlength="2000" placeholder="선생님이 바로 실행할 수 있도록 적어 주세요.">' + esc(draft.body) + '</textarea></label>' +
     '<div class="grid2"><label class="field"><span class="fl">중요도</span><select class="in" id="adPriority"><option value="normal"' +
@@ -10977,20 +10997,20 @@ async function saveAdminDirective(button) {
   try {
     await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), ...payload });
     adminDirectiveEditor = null; closeModal();
-    await loadAdminDirectives(true, false); render(); toast(payload.expectedRevision ? '공통 요청 수정본을 전달했습니다' : '공통 요청을 전달했습니다');
+    await loadAdminDirectives(true, false); render(); toast(payload.expectedRevision ? '실시간 관리자 요청 수정본을 전달했습니다' : '실시간 관리자 요청을 전달했습니다');
   } catch (error) {
-    toast('공통 요청 저장 실패 — ' + (error.message || error));
+    toast('실시간 관리자 요청 저장 실패 — ' + (error.message || error));
     if (error && error.code === 'STALE_REVISION') { closeModal(); await loadAdminDirectives(true, false); }
   } finally { adminDirectiveSaving = false; if (button) button.disabled = false; }
 }
 
 async function endAdminDirective(directiveId, revision, button) {
-  if (!confirm('이 공통 요청을 종료할까요? 지난 기록과 확인 내역은 유지됩니다.')) return;
+  if (!confirm('이 실시간 관리자 요청을 종료할까요? 지난 기록과 확인 내역은 유지됩니다.')) return;
   if (button) button.disabled = true;
   try {
     await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), action: 'end',
       directiveId: String(directiveId), expectedRevision: Number(revision) });
-    await loadAdminDirectives(true, false); render(); toast('공통 요청을 종료했습니다');
+    await loadAdminDirectives(true, false); render(); toast('실시간 관리자 요청을 종료했습니다');
   } catch (error) { if (button) button.disabled = false; toast('종료 실패 — ' + (error.message || error)); }
 }
 
@@ -12429,7 +12449,7 @@ async function loadGuardianAnnouncements(force) {
 
 function guardianAnnouncementsHtml() {
   if (!session.isAdmin) return '';
-  if (!GUARDIAN_CONTACT_ENABLED) {
+  if (!anyGuardianContactEnabled()) {
     return '<section class="card" data-guardian-announcements><div class="card-title">📢 보호자 공지</div>' +
       '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 기존 데이터는 유지하지만 새 공지 작성·게시와 보호자 앱 전달은 사용할 수 없습니다.</div></section>';
   }
@@ -12461,20 +12481,21 @@ function guardianAnnouncementsHtml() {
     }).join('');
   }
   return '<section class="card" data-guardian-announcements><div class="between"><div><div class="card-title">📢 보호자 공지</div>' +
-    '<div class="card-sub">전체 또는 선택한 학생의 보호자 앱에만 게시합니다. 첨부·댓글·읽음 확인은 없습니다.</div></div>' +
+    '<div class="card-sub">' + (GUARDIAN_CONTACT_ENABLED ? '전체 또는 선택한 학생' : '지정된 테스트 학생') +
+    '의 보호자 앱에만 게시합니다. 첨부·댓글·읽음 확인은 없습니다.</div></div>' +
     '<span class="pill">' + guardianAnnouncementRows.filter(row => row.status === 'published').length + '건 게시</span></div>' +
     '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-primary" data-act="gaadd">+ 공지 작성</button>' +
     '<button class="btn btn-ghost" data-act="garefresh"' + (guardianAnnouncementsLoading ? ' disabled' : '') + '>새로고침</button></div>' + body + '</section>';
 }
 
 function guardianAnnouncementModal(announcementId) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 공지 기능은 현재 사용하지 않습니다');
+  if (!anyGuardianContactEnabled()) return toast('학부모 공지 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin) return;
   const current = guardianAnnouncementRows.find(row => row.announcementId === String(announcementId || '')) || null;
   if (current && current.status !== 'draft') return toast('작성 중인 공지만 수정할 수 있습니다');
-  const students = studentLinkCandidates(today().slice(0, 7));
+  const students = studentLinkCandidates(today().slice(0, 7)).filter(student => guardianContactEnabledFor(student.id));
   const selected = new Set(current ? current.studentIds : []);
-  const targetType = current ? current.targetType : 'students';
+  const targetType = GUARDIAN_CONTACT_ENABLED && current ? current.targetType : 'students';
   const id = current ? current.announcementId : 'announcement-' + uid();
   const options = students.map(student => '<label class="row" style="gap:8px;align-items:center;min-height:44px">' +
     '<input type="checkbox" data-ga-student value="' + esc(student.id) + '" ' + (selected.has(student.id) ? 'checked' : '') + '>' +
@@ -12486,7 +12507,7 @@ function guardianAnnouncementModal(announcementId) {
     '<div class="grid2"><label class="field"><span class="fl">게시 시작일</span><input class="in" id="gaPublishDate" type="date" value="' + esc(current && current.publishDate || today()) + '"></label>' +
     '<label class="field"><span class="fl">게시 종료일</span><input class="in" id="gaExpiresDate" type="date" value="' + esc(current && current.expiresDate || addDays(today(), 7)) + '"></label></div>' +
     '<div class="field"><label class="fl">공개 대상</label><select class="in" id="gaTargetType"><option value="students"' + (targetType === 'students' ? ' selected' : '') + '>선택 학생 보호자</option>' +
-    '<option value="all"' + (targetType === 'all' ? ' selected' : '') + '>전체 보호자</option></select></div>' +
+    (GUARDIAN_CONTACT_ENABLED ? '<option value="all"' + (targetType === 'all' ? ' selected' : '') + '>전체 보호자</option>' : '') + '</select></div>' +
     '<div class="hint"><b>선택 학생 보호자</b>를 사용할 때 아래 ' + esc(studentLinkScopeText()) + '에서 한 명 이상 선택하세요. 전체 보호자는 게시할 때 다시 확인합니다.<br>' +
       '<b>모든 공지는 일정·운영·준비 안내용입니다. 연락처·주소·상담/내부 수업 메모를 입력하지 마세요.</b><br>' +
       '<b>전체 공지에는 학생 이름도 입력하지 마세요.</b></div>' +
@@ -12495,7 +12516,7 @@ function guardianAnnouncementModal(announcementId) {
 }
 
 async function saveGuardianAnnouncement(button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 공지 기능은 현재 사용하지 않습니다');
+  if (!anyGuardianContactEnabled()) return toast('학부모 공지 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin) return;
   const announcementId = String(($('#gaId') || {}).value || '');
   const expectedRevision = Number(($('#gaRevision') || {}).value || 0);
@@ -12508,6 +12529,9 @@ async function saveGuardianAnnouncement(button) {
   const studentIds = targetType === 'all' ? [] : selectedIds;
   if (!title || !body || !publishDate || !expiresDate || expiresDate < publishDate) return toast('공지 제목·내용·게시 기간을 확인해 주세요');
   if (targetType === 'students' && !studentIds.length) return toast('공지를 볼 학생을 한 명 이상 선택해 주세요');
+  if (!GUARDIAN_CONTACT_ENABLED && (targetType !== 'students' || studentIds.some(id => !guardianContactEnabledFor(id)))) {
+    return toast('지정된 테스트 학생만 보호자 공지 대상으로 선택할 수 있습니다');
+  }
   const auth = sync.auth(); if (!auth) return toast('관리 인증이 필요합니다');
   if (button) button.disabled = true;
   try {
@@ -12529,10 +12553,14 @@ async function saveGuardianAnnouncement(button) {
 }
 
 async function transitionGuardianAnnouncement(announcementId, action, expectedRevision, button) {
-  if (!GUARDIAN_CONTACT_ENABLED && action !== 'announcement_end') return toast('학부모 공지 기능은 현재 사용하지 않습니다');
+  if (!anyGuardianContactEnabled() && action !== 'announcement_end') return toast('학부모 공지 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin || !['announcement_publish', 'announcement_end'].includes(action)) return;
   const current = guardianAnnouncementRows.find(row => row.announcementId === String(announcementId || ''));
   if (!current || Number(current.revision) !== Number(expectedRevision)) return toast('공지의 최신 상태를 다시 확인해 주세요');
+  if (action === 'announcement_publish' && !GUARDIAN_CONTACT_ENABLED &&
+      (current.targetType !== 'students' || !current.studentIds.length || current.studentIds.some(id => !guardianContactEnabledFor(id)))) {
+    return toast('지정된 테스트 학생에게만 보호자 공지를 게시할 수 있습니다');
+  }
   const prompt = action === 'announcement_publish'
     ? (current.targetType === 'all' ? '이 공지를 전체 보호자에게 공개할까요?' : '선택한 학생 ' + current.studentIds.length + '명의 보호자에게 공지를 공개할까요?')
     : '이 공지 게시를 종료할까요?';
@@ -12615,6 +12643,7 @@ async function refreshGuardianPortalAccess(auth) {
   const result = await sync.post('/parent-portal', {
     app: SYNC_APP, auth: auth, action: 'access_list'
   });
+  applyGuardianDeliveryStudentIds(result.deliveryEnabledStudentIds);
   guardianPortalAccess = new Map((result.access || []).map(row => [row.studentId, row]));
 }
 
@@ -12727,6 +12756,7 @@ async function loadGuardianContacts(force) {
         .then(result => ({ result: result }), error => ({ error: error }))
     ]);
     const result = results[0];
+    applyGuardianDeliveryStudentIds(result.deliveryEnabledStudentIds || results[1].deliveryEnabledStudentIds);
     guardianContacts = new Map((result.contacts || []).map(c => [c.studentId, c]));
     acaflowStudentLinks = new Map((result.acaflowLinks || []).map(row => [row.externalStudentNo, row.studentId]));
     guardianPortalAccess = new Map((results[1].access || []).map(row => [row.studentId, row]));
@@ -12750,7 +12780,7 @@ async function saveGuardianContact(idx, button) {
   const student = settingsGuardianStudents[Number(idx)];
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
   const phone = (($('#gcPhone-' + idx) || {}).value || '').trim();
-  const consent = GUARDIAN_CONTACT_ENABLED && !!(($('#gcConsent-' + idx) || {}).checked);
+  const consent = guardianContactEnabledFor(student.id) && !!(($('#gcConsent-' + idx) || {}).checked);
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   if (button) button.disabled = true;
@@ -12810,12 +12840,12 @@ async function saveGuardianOpsConsent(idx, scope, button) {
 }
 
 async function issueParentPortalInvite(idx, button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 앱 초대 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
   const contact = student && guardianContacts && guardianContacts.get(student.id);
   const access = student && guardianPortalAccess.get(student.id);
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  if (!guardianContactEnabledFor(student.id)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   if (!contact || !contact.phone) return toast('보호자 연락처를 먼저 저장해 주세요');
   if (access && access.needsScopeReconsent) return toast('학원 공지·교재 상태까지 포함한 새 공개 범위를 다시 확인해 주세요');
   if (access && access.needsReconsent) return toast('보호자 연락처가 변경되어 웹앱 이용 동의를 다시 저장해야 합니다');
@@ -13003,10 +13033,10 @@ function parentPreviewHtml(data) {
 }
 
 async function previewParentPortal(idx, button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 앱 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  if (!guardianContactEnabledFor(student.id)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   const requestId = ++parentPreviewRequest;
@@ -13172,10 +13202,10 @@ async function previewStudentPortal(idx, button) {
 }
 
 async function saveGuardianPortalAccess(idx, button) {
-  if (!GUARDIAN_CONTACT_ENABLED) return toast('학부모 앱 공개 기능은 현재 사용하지 않습니다');
   if (!session.isAdmin) return;
   const student = settingsGuardianStudents[Number(idx)];
   if (!student || !student.id) return toast('학생 정보를 찾을 수 없습니다');
+  if (!guardianContactEnabledFor(student.id)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const enabled = !!(($('#gcPortal-' + idx) || {}).checked);
   const current = guardianPortalAccess.get(student.id);
   const expectedUpdatedAt = Number(current && current.updatedAt) || 0;
@@ -13209,7 +13239,7 @@ function viewGuardianContactPanel() {
   const students = studentLinkCandidates(cur);
   settingsGuardianStudents = students.slice();
 
-  if (!GUARDIAN_CONTACT_ENABLED) {
+  if (!anyGuardianContactEnabled()) {
     let contactBody = '';
     if (!rosterDb && !rosterErr) contactBody = '<div class="empty"><b>⏳</b>원생 명단을 불러오는 중입니다.</div>';
     else if (rosterErr) contactBody = '<div class="small" style="color:var(--coral)">원생 명단을 불러오지 못했습니다 — ' + esc(rosterErr) + '</div>';
@@ -13236,7 +13266,7 @@ function viewGuardianContactPanel() {
     notice = '<div class="hint mb14"><b>보호자 연락처를 불러오지 못했습니다</b> — ' + esc(guardianContactsError) +
       ' <button class="btn btn-sm btn-ghost" data-act="gcrefresh">다시 시도</button></div>';
   }
-  if (guardianOpsConsentsError) {
+  if (GUARDIAN_CONTACT_ENABLED && guardianOpsConsentsError) {
     notice += '<div class="hint mb14"><b>보강·회차 알림 동의를 불러오지 못했습니다</b> — ' + esc(guardianOpsConsentsError) +
       ' <button class="btn btn-sm btn-ghost" data-act="gcrefresh">다시 시도</button></div>';
   }
@@ -13247,6 +13277,14 @@ function viewGuardianContactPanel() {
   else if (!students.length) body = '<div class="empty">현재 재원생이 없습니다.</div>';
   else body = students.map((s, i) => {
     const c = (guardianContacts && guardianContacts.get(s.id)) || { phone: '', consent: false };
+    if (!guardianContactEnabledFor(s.id)) {
+      return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' +
+        esc([s.school || '학교 미입력', s.grade || '학년 미입력', s.teacher || '미지정'].join(' · ')) +
+        rosterParentContactSuffix(s) + ')</span> <span class="pill muted">학부모 전달 중지</span></div>' +
+        '<div class="row wraprow" style="gap:8px"><input class="in" style="flex:2 1 140px" id="gcPhone-' + i +
+        '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
+        '<button class="btn btn-sm btn-ghost" data-act="gcsave" data-idx="' + i + '">연락처 저장</button></div></div>';
+    }
     const portal = guardianPortalAccess.get(s.id) || { enabled: false };
     const ops = guardianOpsConsents.get(s.id) || emptyGuardianOpsScopes();
     const makeupOps = ops.makeup || emptyGuardianOpsConsent();
@@ -13257,12 +13295,13 @@ function viewGuardianContactPanel() {
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + i + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcConsent-' + i + '" ' + (c.consent ? 'checked' : '') + '> 수업 피드백 알림톡 동의</label>' +
         '<button class="btn btn-sm btn-ghost" data-act="gcsave" data-idx="' + i + '">연락처·피드백 동의 저장</button>' +
-        '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsMakeup-' + i + '" ' + (makeupOps.consent ? 'checked' : '') + opsDisabled + '> 보강 알림 동의</label>' +
-        (makeupOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 보강 알림 재동의 필요</span>' : '') +
-        '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="makeup" data-idx="' + i + '"' + opsDisabled + '>보강 동의 저장</button>' +
-        '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
-        (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
-        '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' +
+        (GUARDIAN_CONTACT_ENABLED ?
+          '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsMakeup-' + i + '" ' + (makeupOps.consent ? 'checked' : '') + opsDisabled + '> 보강 알림 동의</label>' +
+          (makeupOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 보강 알림 재동의 필요</span>' : '') +
+          '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="makeup" data-idx="' + i + '"' + opsDisabled + '>보강 동의 저장</button>' +
+          '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcOpsSession-' + i + '" ' + (sessionOps.consent ? 'checked' : '') + opsDisabled + '> 회차 안내 동의</label>' +
+          (sessionOps.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 정보 변경 · 회차 안내 재동의 필요</span>' : '') +
+          '<button class="btn btn-sm btn-ghost guardian-ops-save" data-act="gcopsconsent" data-scope="session" data-idx="' + i + '"' + opsDisabled + '>회차 동의 저장</button>' : '') +
         '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcPortal-' + i + '" ' + (portal.enabled ? 'checked' : '') + '> 보호자 앱 공개 동의 v4</label>' +
         (portal.needsScopeReconsent ? '<span class="small" style="color:var(--coral)">학원 공지·교재 상태 공개를 포함한 재동의 필요</span>' :
           portal.needsReconsent ? '<span class="small" style="color:var(--coral)">보호자 연락처 변경 · 웹앱 재동의 필요</span>' : '') +
@@ -13273,7 +13312,8 @@ function viewGuardianContactPanel() {
   }).join('');
 
   return '<div class="card"><div class="card-title">👨‍👩‍👧 보호자 연락처·발송 동의</div>' +
-    '<div class="card-sub mb14">수업 피드백·보강·회차 안내 알림톡과 보호자 앱 공개 동의는 각각 확인합니다. 공개 범위 v4에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백·공개 숙제와 준비물·보호자 요청 상태·학원 공지·교재 준비와 수령 상태가 포함됩니다. 내부 수업 메모·정류장·주소·연락처·주문 업체 정보는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
+    '<div class="card-sub mb14">' + (GUARDIAN_CONTACT_ENABLED ? '모든 학생' : '지정된 테스트 학생') +
+    '의 수업 피드백 알림톡과 보호자 앱 공개 동의를 각각 확인합니다. 공개 범위 v4에는 확정 시간표·오늘 출결·수업 5단계 진행·차량 탑승/하차 확인·보강·회차·피드백·공개 숙제와 준비물·보호자 요청 상태·학원 공지·교재 준비와 수령 상태가 포함됩니다. 내부 수업 메모·정류장·주소·연락처·주문 업체 정보는 공개하지 않습니다. 동의를 끄면 기존 보호자 앱 연결도 즉시 해지됩니다.<br>' +
     '연락처는 이름이 아닌 원생 명단의 학생 ID로 연결되며, 이 목록은 공개 저장소가 아니라 서버 DB에만 저장됩니다.</div>' +
     notice + body + '</div>';
 }
@@ -16002,7 +16042,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-25.1';
+const APP_VER = '2026-08-26.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
