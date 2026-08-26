@@ -416,9 +416,78 @@ async function planBatchRosterLinks(env, app, planned, staffRecords, serverNow) 
   };
 }
 
+async function planLessonTeacherTransferRoster(
+  env, app, task, sourceTaskId, sourceStaffId, targetStaffId, sourceStaff, targetStaff, serverNow
+) {
+  const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1')
+    .bind(app).first();
+  if (!row) return { error: '원생 명단이 아직 준비되지 않았습니다', status: 409 };
+  let document;
+  try { document = JSON.parse(row.data || '{}'); }
+  catch (error) { return { error: '저장된 원생 명단을 확인해 주세요', status: 500 }; }
+  const students = document && document.roster && document.roster.students;
+  if (!Array.isArray(students)) return { error: '저장된 원생 명단을 확인해 주세요', status: 500 };
+  const student = students.find(item => item && String(item.id || '') === String(task.studentId || ''));
+  if (!student || !Array.isArray(student.teacherIds)) {
+    return { error: '원생 명단에서 학생 식별자를 찾을 수 없습니다', status: 409 };
+  }
+
+  sourceStaffId = String(sourceStaffId || '');
+  targetStaffId = String(targetStaffId || '');
+  const otherRows = await env.DB.prepare(
+    "SELECT id,data FROM tasks WHERE app=? AND owner=? AND id<>? AND json_valid(data) " +
+    "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+  ).bind(app, sourceStaffId, sourceTaskId, String(task.studentId || '')).all();
+  const hasOtherSourceLesson = (otherRows.results || []).some(item => {
+    try {
+      const data = JSON.parse(item.data || '{}');
+      return isLessonIntake(data) || isLegacyLessonTask(data);
+    } catch (error) { return false; }
+  });
+
+  const audienceStaffIds = [...new Set(student.teacherIds.map(String).concat(sourceStaffId, targetStaffId).filter(Boolean))];
+  const updateTeacherIds = value => {
+    let ids = Array.isArray(value) ? value.map(String) : [];
+    if (!hasOtherSourceLesson) ids = ids.filter(id => id !== sourceStaffId);
+    if (!ids.includes(targetStaffId)) ids.push(targetStaffId);
+    return [...new Set(ids.filter(Boolean))];
+  };
+  const before = JSON.stringify([student.teacherIds, student.teacher]);
+  student.teacherIds = updateTeacherIds(student.teacherIds);
+  let teacherNames = batchRosterLabels(student.teacher);
+  const sourceName = String(sourceStaff && sourceStaff.name || '').trim();
+  const targetName = String(targetStaff && targetStaff.name || '').trim();
+  if (!hasOtherSourceLesson && sourceName) teacherNames = teacherNames.filter(name => name !== sourceName);
+  if (targetName) teacherNames.push(targetName);
+  student.teacher = [...new Set(teacherNames.filter(Boolean))].join('·');
+
+  let changed = JSON.stringify([student.teacherIds, student.teacher]) !== before;
+  if (Array.isArray(document.bookStudents)) {
+    for (const assignment of document.bookStudents) {
+      if (!assignment || String(assignment.studentId || '') !== String(task.studentId || '')) continue;
+      const beforeIds = JSON.stringify(assignment.teacherIds || []);
+      assignment.teacherIds = updateTeacherIds(assignment.teacherIds);
+      if (JSON.stringify(assignment.teacherIds) !== beforeIds) changed = true;
+    }
+  }
+  if (!changed) return { changed: false, audienceStaffIds };
+
+  document.roster.updated = batchRosterKstDate(serverNow);
+  const expectedUpdatedAt = Number(row.updated_at);
+  const updatedAt = Math.max(serverNow + 1, expectedUpdatedAt + 1);
+  return {
+    changed: true,
+    audienceStaffIds,
+    statement: env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+      .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt)
+  };
+}
+
 function parseTaskRow(row) {
   if (!row) return null;
-  try { return { task: JSON.parse(row.data), updatedAt: Number(row.updated_at) }; } catch (error) { return null; }
+  try {
+    return { task: JSON.parse(row.data), owner: row.owner == null ? '' : String(row.owner), updatedAt: Number(row.updated_at) };
+  } catch (error) { return null; }
 }
 
 function isLessonIntake(task) {
@@ -511,7 +580,8 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     staffId = String(body.staffId || '');
     taskOrigin = auth.role === 'manager' ? 'manager' : 'admin';
   }
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(staffId) || !await activeStaff(env, app, staffId)) {
+  const targetStaff = /^[A-Za-z0-9_-]{1,128}$/.test(staffId) ? await activeStaff(env, app, staffId) : null;
+  if (!targetStaff) {
     return json({ ok: false, error: '활성 담당 선생님을 선택해 주세요' }, 409, origin);
   }
 
@@ -546,11 +616,18 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
   }
 
   let matches;
+  let sourceOwner = staffId;
+  let sourceStaff = targetStaff;
   if (sourceTaskId) {
     const sourceRow = parseTaskRow(await env.DB.prepare(
-      'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
-    ).bind(app, sourceTaskId, staffId).first());
+      'SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1'
+    ).bind(app, sourceTaskId).first());
     if (!sourceRow) return json({ ok: false, error: '수정할 수업을 찾을 수 없습니다' }, 404, origin);
+    sourceOwner = String(sourceRow.owner || sourceRow.task.staffId || '');
+    if (auth.scope !== 'all' && sourceOwner !== staffId) {
+      return json({ ok: false, error: '수정할 수업을 찾을 수 없습니다' }, 404, origin);
+    }
+    sourceStaff = sourceOwner === staffId ? targetStaff : await activeStaff(env, app, sourceOwner);
     if ((!isLessonIntake(sourceRow.task) && !(auth.scope === 'all' && isLegacyLessonTask(sourceRow.task))) ||
         (auth.scope !== 'all' && sourceRow.task.staffId && sourceRow.task.staffId !== staffId)) {
       return json({ ok: false, error: '이 수업은 수업 등록 및 변경 화면에서 정정할 수 없습니다' }, 409, origin);
@@ -574,10 +651,11 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
   if (matches.length === 1) {
     const row = matches[0];
     const current = row.task;
+    const teacherTransferred = sourceTaskId && auth.scope === 'all' && sourceOwner !== staffId;
     if (current.deleted) {
       return json({ ok: false, error: '삭제된 수업과 같은 배정입니다. 원장에게 복구를 요청해 주세요' }, 409, origin);
     }
-    if (await contentHashForTask(current) === task.lessonContentHash) {
+    if (!teacherTransferred && await contentHashForTask(current) === task.lessonContentHash) {
       return json({
         ok: true,
         task: current,
@@ -613,17 +691,52 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
 
     const corrected = correctedTask(task, current, Date.now(), taskOrigin);
     const databaseUpdatedAt = Number.isFinite(row.updatedAt) ? row.updatedAt : Number(current.updatedAt);
-    const result = await env.DB.prepare(
-      'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
-    ).bind(
-      JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
-      app, current.id, staffId, databaseUpdatedAt
-    ).run();
+    let result;
+    let transferRoster = null;
+    if (teacherTransferred) {
+      transferRoster = await planLessonTeacherTransferRoster(
+        env, app, corrected, current.id, sourceOwner, staffId,
+        sourceStaff, targetStaff, corrected.updatedAt
+      );
+      if (transferRoster.error) return json({ ok: false, error: transferRoster.error }, transferRoster.status, origin);
+      const statements = [env.DB.prepare(
+        'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+      ).bind(
+        staffId, JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
+        app, current.id, sourceOwner, databaseUpdatedAt
+      )];
+      if (transferRoster.changed) statements.push(transferRoster.statement);
+      const effectiveDate = batchRosterKstDate(corrected.updatedAt);
+      const eventId = await studentChangeEventId('lesson-create-teacher\n' + corrected.id + '\n' + corrected.lessonRevision);
+      statements.push(studentChangeEventStatement(env, app, {
+        eventId, studentId: String(corrected.studentId), taskId: corrected.id,
+        eventType: 'teacher_assignment', changedFields: ['teacherIds'],
+        details: {
+          beforeStaffId: sourceOwner, beforeStaffName: String(sourceStaff && sourceStaff.name || ''),
+          afterStaffId: staffId, afterStaffName: String(targetStaff.name || '')
+        },
+        audienceStaffIds: transferRoster.audienceStaffIds || [sourceOwner, staffId],
+        effectiveDate, requiresAck: true, changedAt: corrected.updatedAt,
+        changedBy: studentChangeActorKey(auth)
+      }));
+      const applied = await env.DB.batch(statements);
+      result = applied[0];
+      if (transferRoster.changed && Number(applied[1] && applied[1].meta && applied[1].meta.changes || 0) !== 1) {
+        return json({ ok: false, error: '원생 담당 정보가 다른 곳에서 먼저 수정되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+      }
+    } else {
+      result = await env.DB.prepare(
+        'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+      ).bind(
+        JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
+        app, current.id, staffId, databaseUpdatedAt
+      ).run();
+    }
     const changes = Number(result && result.meta && result.meta.changes || 0);
     if (changes !== 1) {
       const latestRow = parseTaskRow(await env.DB.prepare(
-        'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
-      ).bind(app, current.id, staffId).first());
+        'SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1'
+      ).bind(app, current.id).first());
       return revisionConflict(json, origin, latestRow ? latestRow.task : current);
     }
     if (auth.scope === 'all' && SAFE_ID_RE.test(String(corrected.studentId || ''))) {
