@@ -157,4 +157,45 @@ t('요약 — 만기·응급·졸업 집계', () => {
   assert.strictEqual(sum.graduated, 1);
 });
 
-console.log('\n통과 ' + passed + '개 — vocab 엔진·데이터 검증 완료');
+/* ── 브리지: 진로독서 어휘장 → 씨앗 ── */
+const BR = require('./bridge.js');
+
+t('한자 분해 문자열 파싱 — "發(쏠 발)+射(쏠 사)+體(몸 체)"', () => {
+  assert.deepStrictEqual(BR.parseHanja('發(쏠 발)+射(쏠 사)+體(몸 체)'), [
+    { ch: '發', hun: '쏠', eum: '발' }, { ch: '射', hun: '쏠', eum: '사' }, { ch: '體', hun: '몸', eum: '체' }
+  ]);
+  assert.deepStrictEqual(BR.parseHanja('軌(바퀴 자국 궤)+道(길 도)')[0], { ch: '軌', hun: '바퀴 자국', eum: '궤' }, '여러 어절 훈');
+  assert.strictEqual(BR.parseHanja(null), null);
+  assert.strictEqual(BR.parseHanja('한자 없음'), null);
+});
+
+t('진로독서 항목 변환 — 한자어/영어/고유어 판별', () => {
+  const h = BR.fromReadingEntry({ word: '발사체', easy: '로켓', hanja: '發(쏠 발)+射(쏠 사)+體(몸 체)' });
+  assert.strictEqual(h.type, 'hanja');
+  assert.strictEqual(h.hanja, '發射體');
+  assert.strictEqual(h.literal, '쏠 · 쏠 · 몸');
+  assert.strictEqual(h.source, 'reading');
+  const e = BR.fromReadingEntry({ word: 'orbit', easy: '궤도', lang: 'en' });
+  assert.strictEqual(e.type, 'english');
+  assert.strictEqual(e.id, 'rd-orbit');
+  const n = BR.fromReadingEntry({ word: '드넓다', easy: '아주 넓다' });
+  assert.strictEqual(n.type, 'native');
+});
+
+t('씨앗 도착함 — 최신 우선·중복 제거·심은 단어 제외·시드 우선', () => {
+  const seedByWord = { '관측': { id: 'h-gwancheuk', word: '관측', type: 'hanja' } };
+  const arr = [
+    { word: '관측', easy: '살펴 재기', hanja: '觀(볼 관)+測(잴 측)' },
+    { word: '궤도', easy: '도는 길', hanja: '軌(바퀴 자국 궤)+道(길 도)' },
+    { word: '궤도', easy: '도는 길', hanja: '軌(바퀴 자국 궤)+道(길 도)' },
+    { word: '발사체', easy: '로켓', hanja: null }
+  ];
+  const inbox = BR.collectInbox(arr, { plantedIds: {}, seedByWord });
+  assert.deepStrictEqual(inbox.map((w) => w.word), ['발사체', '궤도', '관측'], '최신 우선 + 중복 제거');
+  assert.strictEqual(inbox[2].id, 'h-gwancheuk', '시드에 있는 단어는 시드 데이터 우선');
+  const inbox2 = BR.collectInbox(arr, { plantedIds: { 'rd-궤도': true }, seedByWord });
+  assert.deepStrictEqual(inbox2.map((w) => w.word), ['발사체', '관측'], '이미 심은 단어 제외');
+  assert.deepStrictEqual(BR.collectInbox(null, {}), [], '어휘장 없음 = 빈 도착함');
+});
+
+console.log('\n통과 ' + passed + '개 — vocab 엔진·데이터·브리지 검증 완료');
