@@ -6,6 +6,7 @@ on:
     paths:
       - 'reading/**'
       - 'reading-server/**'
+      - 'vocab/**'
   workflow_dispatch:
 
 jobs:
@@ -18,6 +19,10 @@ jobs:
           node-version: 22
       - name: 콘텐츠 무결성 테스트
         run: node reading/content.test.cjs
+      - name: 워드브레인 엔진·데이터 테스트
+        run: node vocab/srs.test.cjs
+      - name: 워드브레인 서버 라우트 테스트
+        run: node reading-server/vocab-api.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
       - name: Cloudflare Workers 배포
