@@ -4,7 +4,7 @@
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
-import { handleVocab, dumpVocab } from './vocab-api.mjs';
+import { handleVocab, dumpVocab, sendNightPushes } from './vocab-api.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -109,6 +109,17 @@ function vocabStore(env) {
       }
       return out;
     },
+    getPush: (c) => env.DB.get('vocab:push:' + c, 'json'),
+    putPush: (c, rec) => env.DB.put('vocab:push:' + c, JSON.stringify(rec)),
+    delPush: (c) => env.DB.delete('vocab:push:' + c),
+    listPushCodes: async () => (await kvListAll(env, 'vocab:push:')).map(k => k.slice('vocab:push:'.length)),
+  };
+}
+function vocabPushEnv(env) {
+  return {
+    publicKey: env.VAPID_PUBLIC_KEY || '',
+    privateJwk: env.VAPID_PRIVATE_JWK || '',
+    subject: env.VAPID_SUBJECT || 'mailto:admin@wb.local',
   };
 }
 
@@ -187,7 +198,9 @@ function parentSummary(stu, st, titles) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(snapshotBackup(env));
+    /* 12:00 UTC(21:00 KST) = 밤 9시 물주기 푸시 / 그 외(18:00 UTC) = 일일 백업 */
+    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) }));
+    else ctx.waitUntil(snapshotBackup(env));
   },
 
   async fetch(req, env) {
@@ -258,6 +271,7 @@ export default {
           path: p, method: req.method, who,
           getBody: () => req.json(), store: vocabStore(env),
           ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '' },
+          push: vocabPushEnv(env),
         });
         return json(out.status, out.body);
       }

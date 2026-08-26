@@ -106,6 +106,61 @@ export function vocabSummary(stateRec) {
 
 const mnemoKey = (word) => String(word || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60);
 
+/* ── 밤 9시 물주기 푸시 (페이로드 없는 Web Push — VAPID 서명만, 암호화·의존성 불필요) ── */
+function b64u(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  const b64 = (typeof btoa === 'function') ? btoa(s) : Buffer.from(bytes).toString('base64');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function vapidJwt({ audience, subject, privateJwk }) {
+  const enc = new TextEncoder();
+  const header = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const payload = b64u(enc.encode(JSON.stringify({
+    aud: audience, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: subject,
+  })));
+  const key = await crypto.subtle.importKey('jwk', JSON.parse(privateJwk), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(header + '.' + payload));
+  return header + '.' + payload + '.' + b64u(sig);
+}
+
+function dueCountOf(stateRec) {
+  const S = stateRec && stateRec.state;
+  if (!S || !S.states) return 0;
+  const now = Date.now();
+  let n = 0;
+  for (const s of Object.values(S.states)) if (!s.graduated && s.due <= now) n += 1;
+  return n;
+}
+
+/* 구독자 중 "물 줄 단어가 있는" 학생에게만 발송. 404/410 응답이면 구독 정리. */
+export async function sendNightPushes({ store, push, fetchFn }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, reason: 'no-vapid' };
+  const f = fetchFn || fetch;
+  let sent = 0, skipped = 0, removed = 0;
+  for (const code of await store.listPushCodes()) {
+    const sub = await store.getPush(code);
+    if (!sub || !sub.endpoint) continue;
+    if (!dueCountOf(await store.getState(code))) { skipped += 1; continue; }
+    try {
+      const jwt = await vapidJwt({
+        audience: new URL(sub.endpoint).origin,
+        subject: push.subject || 'mailto:admin@wb.local',
+        privateJwk: push.privateJwk,
+      });
+      const r = await f(sub.endpoint, {
+        method: 'POST',
+        headers: { TTL: '86400', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey },
+      });
+      if (r.status === 404 || r.status === 410) { await store.delPush(code); removed += 1; }
+      else sent += 1;
+    } catch (e) { /* 이 학생은 내일 재시도 */ }
+  }
+  return { sent, skipped, removed };
+}
+
 /* ── 라우터 ──
    ctx = {
      path, method, who,                    // who: {code, admin} | null — 호스트가 검증한 토큰
@@ -114,8 +169,10 @@ const mnemoKey = (word) => String(word || '').trim().toLowerCase().replace(/\s+/
        getState(code), putState(code, rec),
        listStateCodes(), getStudent(code),
        getMnemo(key), putMnemo(key, rec), listMnemos(),
+       getPush(code), putPush(code, rec), delPush(code), listPushCodes(),
      },
      ai: { apiKey, model, generate? },     // generate는 테스트 주입용 (기본 aiMnemonic)
+     push: { publicKey, privateJwk, subject },  // VAPID (없으면 알림 기능만 비활성)
    }
    반환: { status, body } — /api/vocab/* 이 아닌 경로는 호출 전에 호스트가 거른다. */
 export async function handleVocab(ctx) {
@@ -164,6 +221,40 @@ export async function handleVocab(ctx) {
       requestedBy: who.code, at: nowIso(), status: 'pending', model: out.model || null,
     });
     return j(200, { ok: true, status: 'pending', candidates: out.candidates });
+  }
+  /* 검수 결과 확인 (AI 재호출 없음) — 학생 앱이 부팅 시 pending 단어의 승인/반려를 반영 */
+  if (p === '/api/vocab/mnemonic/check' && method === 'POST' && !who.admin) {
+    const b = await ctx.getBody();
+    const words = (Array.isArray(b.words) ? b.words : []).slice(0, 50);
+    const items = [];
+    for (const wRaw of words) {
+      const word = String(wRaw || '').trim();
+      if (!word) continue;
+      const rec = await store.getMnemo(mnemoKey(word));
+      items.push({
+        word,
+        status: rec ? rec.status : 'none',
+        approved: rec && rec.status === 'approved' ? rec.approved : undefined,
+      });
+    }
+    return j(200, { items });
+  }
+
+  /* 밤 9시 알림 (Web Push 구독) */
+  if (p === '/api/vocab/push/key' && method === 'GET' && !who.admin) {
+    const key = ctx.push && ctx.push.publicKey;
+    return j(200, key ? { ok: true, key } : { ok: false, reason: 'no-vapid' });
+  }
+  if (p === '/api/vocab/push/subscribe' && method === 'POST' && !who.admin) {
+    const { subscription } = await ctx.getBody();
+    const ep = subscription && String(subscription.endpoint || '');
+    if (!ep || ep.length > 500 || !/^https:\/\//.test(ep)) return j(400, { error: '유효한 구독이 아니에요.' });
+    await store.putPush(who.code, { endpoint: ep, at: nowIso() });
+    return j(200, { ok: true });
+  }
+  if (p === '/api/vocab/push/unsubscribe' && method === 'POST' && !who.admin) {
+    await store.delPush(who.code);
+    return j(200, { ok: true });
   }
 
   /* ── 관리자 (강사) ── */

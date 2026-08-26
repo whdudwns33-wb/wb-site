@@ -1,6 +1,6 @@
 'use strict';
 /* WB 워드브레인 서비스 워커 — 앱 셸 캐시 (오프라인 학습) */
-const VERSION = 'wbv-shell-v2';
+const VERSION = 'wbv-shell-v3';
 const SHELL = ['./', './index.html', './words.js', './bridge.js', './srs.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -15,6 +15,24 @@ self.addEventListener('activate', (e) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+/* 밤 9시 물주기 알림 — 페이로드 없는 푸시(내용은 항상 동일) */
+self.addEventListener('push', (e) => {
+  e.waitUntil(self.registration.showNotification('WB 워드브레인', {
+    body: '자기 전 3분 물주기 시간이에요 🌱 오늘 심은 단어가 기다려요.',
+    icon: './icon.svg',
+    badge: './icon.svg',
+    tag: 'wb-night-water',
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    for (const c of cs) if (c.url.includes('/vocab') && 'focus' in c) return c.focus();
+    return self.clients.openWindow('./');
+  }));
 });
 
 self.addEventListener('fetch', (e) => {

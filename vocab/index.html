@@ -313,7 +313,7 @@
   /* ── 저장소 ── */
   var KEY = 'wb-wordbrain-v1';
   var db;
-  function fresh() { return { states: {}, log: [], streak: { count: 0, last: null }, custom: {}, inboxDemo: [], created: Date.now() }; }
+  function fresh() { return { states: {}, log: [], streak: { count: 0, last: null }, custom: {}, inboxDemo: [], settings: {}, created: Date.now() }; }
   function load() { try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
   function save() {
     if (db.log && db.log.length > 600) db.log = db.log.slice(-500);
@@ -397,9 +397,73 @@
         vsyncSchedule();
       }
       VSYNC.last = Date.now();
+      refreshPendingMnemos();
     } catch (e) { /* 조용히 — 리포트 탭에 상태 표시 */ }
     if (curView === 'report') renderReport();
     else if (curView === 'plant') renderPlantMenu();
+  }
+
+  /* 검수 결과 반영 — 내가 고른 연상이 승인되면 승인본으로, 반려되면 제거(재생성 가능) */
+  async function refreshPendingMnemos() {
+    if (!vsyncOn()) return;
+    var pend = Object.keys(db.custom).map(function (k) { return db.custom[k]; })
+      .filter(function (w) { return w.mnemoStatus === 'pending'; });
+    if (!pend.length) return;
+    try {
+      var j = await vsyncApi('/mnemonic/check', {
+        method: 'POST',
+        body: JSON.stringify({ words: pend.map(function (w) { return w.word; }).slice(0, 50) }),
+      });
+      var by = {};
+      (j.items || []).forEach(function (it) { by[it.word] = it; });
+      var changed = 0;
+      pend.forEach(function (w) {
+        var it = by[w.word];
+        if (!it) return;
+        if (it.status === 'approved' && it.approved) {
+          w.cue = it.approved.cue; w.scene = it.approved.scene; w.mnemoStatus = 'approved'; changed += 1;
+        } else if (it.status === 'rejected' || it.status === 'none') {
+          delete w.cue; delete w.scene; delete w.mnemoStatus; changed += 1;
+        }
+      });
+      if (changed) { save(); toast('선생님 검수 결과가 반영됐어요'); render(curView); }
+    } catch (e) { /* 다음 접속 때 재시도 */ }
+  }
+
+  /* ── 밤 9시 알림 (Web Push) ── */
+  function b64uToU8(s) {
+    var b = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+    var u = new Uint8Array(b.length);
+    for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+    return u;
+  }
+  function pushSupported() {
+    return vsyncOn() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  }
+  async function enableNightPush() {
+    try {
+      var k = await vsyncApi('/push/key');
+      if (!k.ok) { toast('서버에 알림 키가 아직 설정되지 않았어요 — 선생님께 문의!'); return; }
+      var perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('알림 권한이 꺼져 있어요 — 브라우저 설정에서 허용해 주세요'); return; }
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(k.key) });
+      await vsyncApi('/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
+      db.settings = db.settings || {}; db.settings.nightPush = true; save();
+      toast('매일 밤 9시에 물주기 알림을 보낼게요 🌙');
+      renderReport();
+    } catch (e) { toast('알림 설정에 실패했어요 — ' + (e.message || '')); }
+  }
+  async function disableNightPush() {
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      await vsyncApi('/push/unsubscribe', { method: 'POST', body: '{}' });
+    } catch (e) { /* 서버 정리는 다음 발송 때 410으로도 됨 */ }
+    db.settings = db.settings || {}; db.settings.nightPush = false; save();
+    toast('밤 9시 알림을 껐어요');
+    renderReport();
   }
 
   /* ── 화분 SVG (성장 0새싹~5꽃, 6나무 / 시듦 0~3) ── */
@@ -534,7 +598,7 @@
     slot.querySelectorAll('.cand').forEach(function (b) {
       b.addEventListener('click', function () {
         var c = cands[+b.dataset.i];
-        w.cue = c.cue; w.scene = c.scene;
+        w.cue = c.cue; w.scene = c.scene; w.mnemoStatus = status;
         if (db.custom[w.id]) db.custom[w.id] = w;
         save();
         slot.innerHTML = '<span class="lbl">' + (w.type === 'native' ? '머릿속에 그려 보기' : '찰떡 연상') + '</span>' +
@@ -1104,6 +1168,11 @@
       '<div class="card" style="margin-top:12px;"><b style="font-size:.86rem;color:var(--ink-strong);">학부모 한 줄 요약</b><p style="margin:6px 0 0;font-size:.92rem;">' + parentLine + '</p></div>' +
       '<h2 class="sec">학원 서버 연동</h2>' +
       '<div class="card">' + syncCardHtml() + '</div>' +
+      (pushSupported()
+        ? '<div class="card" style="margin-top:12px;"><b style="font-size:.86rem;color:var(--ink-strong);">🌙 자기 전 알림</b>' +
+          '<p class="muted" style="margin:4px 0 10px;font-size:.86rem;">매일 밤 9시, 물 줄 단어가 있으면 알려 드려요 — 자기 전 3분이 기억을 굳히는 골든타임이에요.</p>' +
+          '<button class="btn big" id="pushToggle">' + ((db.settings && db.settings.nightPush) ? '알림 끄기' : '밤 9시 알림 켜기') + '</button></div>'
+        : '') +
       '<h2 class="sec">데모 도구</h2>' +
       '<div class="row"><button class="btn" id="dmDay">⏩ 하루 지나가기</button><button class="btn" id="dmInbox">📬 샘플 씨앗 받기</button></div>' +
       '<div class="row" style="margin-top:8px;"><button class="btn" id="dmSample">샘플 정원</button><button class="btn" id="dmReset">초기화</button></div>' +
@@ -1114,6 +1183,10 @@
       db.log.forEach(function (l) { l.t -= DAY; });
       save(); toast('하루가 지났어요 — 정원을 확인해 보세요');
       renderReport();
+    });
+    var pt = $('#pushToggle');
+    if (pt) pt.addEventListener('click', function () {
+      if (db.settings && db.settings.nightPush) disableNightPush(); else enableNightPush();
     });
     $('#dmInbox').addEventListener('click', function () {
       db.inboxDemo = DEMO_INBOX.slice();
