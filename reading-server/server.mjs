@@ -8,9 +8,11 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
+import { handleVocab, sendNightPushes } from './vocab-api.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
+const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -18,6 +20,27 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 
 load();
 const db = getDb();
+
+/* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
+const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
+const vocabStore = {
+  getState: (c) => db.vocab.states[c] || null,
+  putState: (c, rec) => { db.vocab.states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(db.vocab.states),
+  getStudent: (c) => db.students[c] || null,
+  getMnemo: (k) => db.vocab.mnemos[k] || null,
+  putMnemo: (k, rec) => { db.vocab.mnemos[k] = rec; persist(); },
+  listMnemos: () => Object.values(db.vocab.mnemos),
+  getPush: (c) => vocabPushMap()[c] || null,
+  putPush: (c, rec) => { vocabPushMap()[c] = rec; persist(); },
+  delPush: (c) => { delete vocabPushMap()[c]; persist(); },
+  listPushCodes: () => Object.keys(vocabPushMap()),
+};
+const VOCAB_PUSH_ENV = {
+  publicKey: process.env.VAPID_PUBLIC_KEY || '',
+  privateJwk: process.env.VAPID_PRIVATE_JWK || '',
+  subject: process.env.VAPID_SUBJECT || 'mailto:admin@wb.local',
+};
 
 /* ── 유틸 ── */
 const json = (res, code, obj) => {
@@ -171,6 +194,17 @@ const server = http.createServer(async (req, res) => {
       const who = auth(req);
       if (!who) return json(res, 401, { error: '로그인이 필요합니다.' });
 
+      /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
+      if (p.startsWith('/api/vocab/')) {
+        const out = await handleVocab({
+          path: p, method: req.method, who,
+          getBody: () => readBody(req), store: vocabStore,
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '' },
+          push: VOCAB_PUSH_ENV,
+        });
+        return json(res, out.status, out.body);
+      }
+
       /* 학생 API */
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = db.states[who.code] || null;
@@ -252,7 +286,7 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states });
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -295,6 +329,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
+    /* 워드브레인 앱 */
+    if (p === '/vocab' || p === '/vocab/') return serveFile(res, VOCAB_DIR, 'index.html');
+    if (p.startsWith('/vocab/')) return serveFile(res, VOCAB_DIR, p.slice('/vocab/'.length));
+
     /* 발행 오버라이드 적용된 articles.json */
     if (p === '/articles.json' && db.pubmap && Object.keys(db.pubmap).length) {
       try {
@@ -311,8 +349,22 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/* 밤 9시 물주기 푸시 — 로컬 서버용 1분 폴링 (운영 워커는 크론이 담당) */
+let lastPushDay = null;
+setInterval(async () => {
+  const d = new Date();
+  if (d.getHours() !== 21 || d.getMinutes() !== 0) return;
+  const day = d.toDateString();
+  if (lastPushDay === day) return;
+  lastPushDay = day;
+  try {
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV });
+    if (r.sent || r.removed) console.log('[push] 밤 9시 물주기 알림:', JSON.stringify(r));
+  } catch (e) { console.error('[push] 발송 실패:', e.message); }
+}, 60000).unref();
+
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
-  console.log(`  학생 앱: /   관리 웹: /admin   API: /api/health`);
+  console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   if (ADMIN_PIN === 'wb-admin-2026') console.log('  ⚠ 기본 ADMIN_PIN 사용 중 — 운영 배포 전 반드시 ADMIN_PIN 환경변수로 변경하세요.');
 });

@@ -5,6 +5,10 @@
 # Node
 node_modules/
 
+# reading-server 런타임 데이터·빌드 산출물 — 학생 기록(db.json)은 절대 커밋 금지, dist는 CI가 조립
+reading-server/data/
+reading-server/dist/
+
 # 운영 학생 원본 — 로컬 이관용, 저장소/Pages 배포 금지
 .private/
 
