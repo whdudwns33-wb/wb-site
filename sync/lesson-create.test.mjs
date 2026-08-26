@@ -55,6 +55,7 @@ class FakeDB {
       bookStudents: []
     };
     this.privateRosterUpdatedAt = 100;
+    this.studentChangeEvents = [];
   }
 
   prepare(sql) {
@@ -73,6 +74,10 @@ class FakeDB {
           const row = db.staff.get(this.args[1]);
           return row ? { data: JSON.stringify(row) } : null;
         }
+        if (sql.startsWith('SELECT owner,data,updated_at FROM tasks')) {
+          const row = db.tasks.get(this.args[1]);
+          return row ? { owner: row.owner, data: row.data, updated_at: row.updatedAt } : null;
+        }
         if (sql.startsWith('SELECT data,updated_at FROM tasks')) {
           const row = db.tasks.get(this.args[1]);
           const requestedOwner = sql.includes('owner=?') ? this.args[2] : null;
@@ -82,6 +87,18 @@ class FakeDB {
         throw new Error('unexpected first SQL: ' + sql);
       },
       async all() {
+        if (sql.startsWith('SELECT id,data FROM tasks')) {
+          const [, owner, excludedId, studentId] = this.args;
+          return {
+            results: [...db.tasks.entries()]
+              .filter(([id, row]) => id !== excludedId && row.owner === owner)
+              .map(([id, row]) => ({ id, data: row.data }))
+              .filter(row => {
+                const data = JSON.parse(row.data);
+                return data.studentId === studentId && !data.deleted;
+              })
+          };
+        }
         if (!sql.startsWith('SELECT data,updated_at FROM tasks')) throw new Error('unexpected all SQL: ' + sql);
         const owner = this.args[1];
         return {
@@ -119,7 +136,17 @@ class FakeDB {
           db.tasks.set(id, { owner, data, updatedAt, srvAt });
           return { meta: { changes: 1 } };
         }
+        if (sql.startsWith('UPDATE tasks SET owner=')) {
+          const [nextOwner, data, updatedAt, srvAt, , id, owner, expectedUpdatedAt] = this.args;
+          const current = db.tasks.get(id);
+          if (!current || current.owner !== owner || current.updatedAt !== expectedUpdatedAt) {
+            return { meta: { changes: 0 } };
+          }
+          db.tasks.set(id, { owner: nextOwner, data, updatedAt, srvAt });
+          return { meta: { changes: 1 } };
+        }
         if (sql.startsWith('INSERT OR IGNORE INTO student_change_events')) {
+          db.studentChangeEvents.push({ eventType: this.args[4], details: JSON.parse(this.args[6]), audienceStaffIds: JSON.parse(this.args[7]) });
           return { meta: { changes: 1 } };
         }
         throw new Error('unexpected run SQL: ' + sql);
@@ -433,6 +460,49 @@ test('root admin and allowlisted manager lesson writes keep distinct server attr
     assert.equal(updated.data.task.origin, expectedActor);
     assert.equal(updated.data.task.updatedByScope, expectedActor);
   }
+});
+
+test('admin can transfer only the teacher while keeping the lesson id and moving roster ownership', async () => {
+  const db = new FakeDB();
+  db.privateRoster.bookStudents = [{ studentId: 'student-a', teacherIds: ['teacher-1'] }];
+  const created = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+  const transferred = await call(db, {
+    staffId: 'teacher-2', sourceTaskId: created.data.task.id,
+    expectedUpdatedAt: created.data.task.updatedAt,
+    lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+
+  assert.equal(transferred.response.status, 200);
+  assert.equal(transferred.data.updated, true);
+  assert.equal(transferred.data.task.id, created.data.task.id);
+  assert.equal(transferred.data.task.staffId, 'teacher-2');
+  assert.equal(db.tasks.get(created.data.task.id).owner, 'teacher-2');
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-2']);
+  assert.deepEqual(db.privateRoster.bookStudents[0].teacherIds, ['teacher-2']);
+  assert.equal(db.studentChangeEvents.at(-1).eventType, 'teacher_assignment');
+  assert.deepEqual(db.studentChangeEvents.at(-1).audienceStaffIds.sort(), ['teacher-1', 'teacher-2']);
+});
+
+test('teacher transfer keeps the previous roster assignment when that teacher has another lesson', async () => {
+  const db = new FakeDB();
+  const first = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+  const second = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson({ subject: '영어', lessonRole: '영어' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(second.response.status, 200);
+
+  const transferred = await call(db, {
+    staffId: 'teacher-2', sourceTaskId: first.data.task.id,
+    expectedUpdatedAt: first.data.task.updatedAt,
+    lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+
+  assert.equal(transferred.response.status, 200);
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds.sort(), ['teacher-1', 'teacher-2']);
 });
 
 test('a changed submission without an expected version cannot overwrite', async () => {
