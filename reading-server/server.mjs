@@ -186,8 +186,43 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true, updatedAt: db.states[who.code].updatedAt });
       }
 
+      /* 우리 반 리그 — 같은 반 학생의 스트릭·주간 완료만 (성적 비공개) */
+      if (p === '/api/league' && req.method === 'GET' && !who.admin) {
+        const me = db.students[who.code];
+        if (!me || !me.cls) return json(res, 200, { cls: '', members: [] });
+        const members = Object.values(db.students)
+          .filter(stu => stu.cls === me.cls)
+          .map(stu => {
+            const s = summarize(stu.code);
+            return { name: stu.name, me: stu.code === who.code, streak: s.streak, week: s.week, today: s.today };
+          })
+          .sort((a, b) => b.streak - a.streak || b.week - a.week || (b.today ? 1 : 0) - (a.today ? 1 : 0));
+        return json(res, 200, { cls: me.cls, members });
+      }
+
       /* 관리자 API */
       if (!who.admin) return json(res, 403, { error: '권한이 없습니다.' });
+
+      /* 학부모 주간 메시지 일괄 생성 */
+      if (p === '/api/admin/parent-messages' && req.method === 'GET') {
+        const origin = (req.headers['x-forwarded-proto'] || 'http') + '://' + (req.headers.host || 'localhost:' + PORT);
+        db.parents = db.parents || {};
+        const messages = [];
+        for (const stu of Object.values(db.students)) {
+          if (!stu.name || !db.states[stu.code]) continue; /* 앱 연동 학생만 */
+          if (!stu.ptoken) {
+            stu.ptoken = crypto.randomUUID().replace(/-/g, '');
+            db.parents[stu.ptoken] = stu.code;
+            persist();
+          }
+          const s = summarize(stu.code);
+          messages.push({
+            code: stu.code, name: stu.name, cls: stu.cls || '',
+            text: `[WB 진로독서] ${stu.name} 학생 주간 리포트입니다.\n이번 주 ${s.week}회 완독 · ${s.streak}일 연속 읽는 중${s.acc != null ? ` · 문제 정답률 ${s.acc}%` : ''}입니다.\n자세한 내용: ${origin}/parent.html?t=${stu.ptoken}\n— WB 독해력학원 · 웩슬러브레인센터`,
+          });
+        }
+        return json(res, 200, { messages });
+      }
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set([...Object.keys(db.students), ...Object.keys(db.states)]);
         return json(res, 200, { students: [...codes].map(summarize), time: nowIso() });
