@@ -21,6 +21,8 @@ jobs:
         run: node reading/content.test.cjs
       - name: 워드브레인 엔진·데이터 테스트
         run: node vocab/srs.test.cjs
+      - name: 워드브레인 문제 출제 엔진 테스트
+        run: node vocab/quiz.test.cjs
       - name: 워드브레인 서버 라우트 테스트
         run: node reading-server/vocab-api.test.mjs
       - name: dist 조립

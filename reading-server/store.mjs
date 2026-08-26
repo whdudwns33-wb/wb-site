@@ -10,7 +10,7 @@ const FILE = path.join(DIR, 'db.json');
 const BDIR = path.join(DIR, 'backups');
 const BACKUP_KEEP = 10;
 
-const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {}, vocab: { states: {}, mnemos: {}, push: {} } });
+const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} } });
 
 let db = empty();
 
