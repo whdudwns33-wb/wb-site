@@ -43,10 +43,20 @@
 const CATS={science:'과학·기술',society:'사회·경제',history:'역사·문화',humanities:'인문·예술',environment:'환경'};
 const LEVEL_LABEL={L2:'초등 심화(L2)',L3:'중등(L3)',L4:'고등(L4)'};
 const RKEY='wbr.review.v1';
-let DB=null,R={};
+let DB=null,R={},API=false,TOKEN=localStorage.getItem('wbr.admin.token')||null;
 try{R=JSON.parse(localStorage.getItem(RKEY)||'{}')}catch(e){R={}}
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function saveR(){try{localStorage.setItem(RKEY,JSON.stringify(R))}catch(e){}}
+async function api(path,opt){
+  const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');render();throw new Error(j.error||'로그인이 필요합니다');}
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+async function reloadDb(){
+  const r=await fetch('./articles.json',{cache:'no-store'});DB=await r.json();
+}
 function lvHtml(id,lv,b){
   return `<div class="lv"><h3>${LEVEL_LABEL[lv]} — ${esc(b.title)}</h3>
   <p class="meta">약 ${b.minutes}분 · ${b.paragraphs.length}문단 · 총 ${b.paragraphs.map(p=>p.join('')).join('').length}자 · 어휘 ${b.vocab.length} · 문항 ${b.questions.length}</p>
@@ -60,14 +70,23 @@ function render(){
   const app=document.getElementById('app');
   const items=DB.articles;
   const okN=items.filter(a=>R[a.id]==='ok').length,rejN=items.filter(a=>R[a.id]==='rej').length;
-  app.innerHTML=`<div class="summary"><b>검수 현황:</b> 승인 ${okN} · 반려 ${rejN} · 미검수 ${items.length-okN-rejN} / 총 ${items.length}편
-    — 반려 지문은 articles.json에서 status를 "draft"로 바꿔 주세요.</div>`+
+  const pubN=items.filter(a=>a.status==='published').length;
+  const loginBox=API&&!TOKEN?`<div class="card"><h2>발행 기능 로그인</h2>
+    <p class="meta">관리 PIN으로 로그인하면 여기서 바로 <b>발행/초안 전환</b>이 됩니다 (새로고침 없이 즉시 반영).</p>
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="pubPin" type="password" placeholder="관리 PIN" style="min-height:40px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;flex:1;max-width:220px">
+    <button class="open-btn" id="pubLogin">로그인</button></div><p class="meta" id="pubErr" style="color:var(--bad)"></p></div>`:'';
+  app.innerHTML=`<div class="summary"><b>검수 현황:</b> 승인 ${okN} · 반려 ${rejN} · 미검수 ${items.length-okN-rejN} / 총 ${items.length}편 · <b>발행 중 ${pubN}</b>
+    ${API?(TOKEN?' — 발행/초안 버튼으로 즉시 전환됩니다.':' — 발행하려면 아래에서 PIN 로그인하세요.'):' — 발행 전환은 서비스 주소(워커)에서만 가능해요.'}</div>`+loginBox+
   items.map(a=>{
     const open=R['open:'+a.id];
+    const pub=a.status==='published';
     return `<div class="card"><div class="row">
       <div><h2>${a.id}</h2><span class="meta"><span class="tag">${CATS[a.category]}</span>${a.careers.map(c=>`<span class="tag">${c}</span>`).join('')}
+        <span class="tag ${pub?'ok':''}" style="${pub?'':'background:#fff4e6;color:#8a4b08'}">${pub?'발행 중':'초안'}</span>
         ${R[a.id]==='ok'?'<span class="tag ok">승인됨</span>':R[a.id]==='rej'?'<span class="tag" style="background:#fff0ef;color:#9b352b">반려됨</span>':''}</span></div>
-      <button class="open-btn" data-open="${a.id}">${open?'접기':'펼쳐서 검수'}</button></div>
+      <div style="display:flex;gap:6px">
+        ${API&&TOKEN?`<button class="open-btn" data-pub="${a.id}" data-to="${pub?'draft':'published'}" style="${pub?'':'border-color:#14755e;color:#14755e'}">${pub?'초안으로 내리기':'지금 발행'}</button>`:''}
+        <button class="open-btn" data-open="${a.id}">${open?'접기':'펼쳐서 검수'}</button></div></div>
       ${open?['L2','L3','L4'].map(lv=>a.levels[lv]?lvHtml(a.id,lv,a.levels[lv]):'').join('')+
       `<div class="meta" style="margin-top:8px">출처: ${a.sources.map(s=>esc(s.title)+' ('+esc(s.url)+')').join(' · ')}</div>
       <div class="check"><button data-mark="ok" data-id="${a.id}" data-on="${R[a.id]==='ok'?1:0}">✔ 승인</button>
@@ -75,13 +94,32 @@ function render(){
     </div>`;}).join('')+
   `<div class="card"><h2>진단 지문</h2>${['L2','L3','L4'].map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
 }
-document.addEventListener('click',e=>{
+document.addEventListener('click',async e=>{
   const o=e.target.closest('[data-open]');if(o){R['open:'+o.dataset.open]=!R['open:'+o.dataset.open];render();return;}
   const m=e.target.closest('[data-mark]');if(m){const id=m.dataset.id;
-    R[id]=R[id]===m.dataset.mark?null:m.dataset.mark;saveR();render();}
+    R[id]=R[id]===m.dataset.mark?null:m.dataset.mark;saveR();render();return;}
+  const pl=e.target.closest('#pubLogin');
+  if(pl){
+    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:document.getElementById('pubPin').value})});
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);render();}
+    catch(err){const el=document.getElementById('pubErr');if(el)el.textContent=err.message;}
+    return;
+  }
+  const pb=e.target.closest('[data-pub]');
+  if(pb){
+    const id=pb.dataset.pub,to=pb.dataset.to;
+    const msg=to==='published'?'이 지문을 학생들에게 지금 발행할까요?':'이 지문을 초안으로 내려 학생 화면에서 숨길까요?';
+    if(!confirm(msg))return;
+    try{await api('/admin/pub',{method:'POST',body:JSON.stringify({id,status:to})});
+      await reloadDb();render();}
+    catch(err){alert(err.message);}
+  }
 });
-fetch('./articles.json',{cache:'no-store'}).then(r=>r.json()).then(d=>{DB=d;render();})
-  .catch(()=>{document.getElementById('app').innerHTML='<p>articles.json을 불러오지 못했습니다.</p>';});
+(async()=>{
+  try{const r=await fetch('/api/health',{cache:'no-store'});const j=await r.json();API=!!(j&&j.ok);}catch(e){API=false;}
+  try{await reloadDb();render();}
+  catch(e){document.getElementById('app').innerHTML='<p>articles.json을 불러오지 못했습니다.</p>';}
+})();
 </script>
 </body>
 </html>

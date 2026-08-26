@@ -159,6 +159,21 @@
     .autoread .seg.now::after{opacity:.95}
     .auto-bar{position:fixed;left:0;right:0;bottom:0;z-index:9;background:#fff;border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #17395722}
     .auto-in{display:flex;max-width:560px;margin:auto;gap:7px;align-items:center;flex-wrap:wrap}
+    .auto-lbl{flex:0 0 auto;color:var(--muted);font-size:11px;font-weight:900}
+    button.chipword{border:0;cursor:pointer;text-align:left}
+    /* 인쇄용 탐구보고서 */
+    #printArea{display:none}
+    @media print{
+      body>*{display:none!important}
+      #printArea{display:block!important}
+      .pr-doc{color:#111;line-height:1.85;font-size:12pt}
+      .pr-head{border-bottom:3px solid #173957;padding-bottom:10px;margin-bottom:18px}
+      .pr-doc h1{font-size:21pt;color:#173957;margin:0 0 6px}
+      .pr-meta{color:#444;font-size:10.5pt;margin:0}
+      .pr-doc h2{font-size:13pt;color:#173957;margin:16pt 0 5pt;font-weight:900}
+      .pr-doc p{margin:0 0 6pt;white-space:pre-wrap}
+      .pr-sign{margin-top:26pt;padding:11pt 13pt;border:1.2pt solid #888;font-size:10.5pt;display:flex;justify-content:space-between;gap:12pt}
+    }
     /* v2 시안 반영: 아이콘 타일 */
     .tico{flex:0 0 46px;width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:19px;font-weight:900}
     .tico.b{background:#e7f2fb;color:#155d94}.tico.g{background:#e7f6f0;color:var(--ok)}.tico.t{background:#f4ece1;color:#7a5230}.tico.c{background:#fbeae6;color:var(--coral)}
@@ -219,6 +234,7 @@
   </div></nav>
   <div class="sheet" id="sheet" role="dialog" aria-label="어휘 풀이"><div class="sheet-in" id="sheetIn"></div></div>
   <div id="live" class="sr" role="status" aria-live="polite"></div>
+  <div id="printArea" aria-hidden="true"></div>
 
 <script>
 'use strict';
@@ -257,6 +273,9 @@ function normalizeState(s){
   s.redbook=s.redbook||[];
   s.reports=s.reports||[];
   if(!('lab' in s))s.lab=null;
+  s.prefs.auto=s.prefs.auto||{speed:1,scope:0};
+  s.mychunks=s.mychunks||{};
+  s.speed=s.speed||[];
   (s.vocab||[]).forEach(v=>{if(v.box==null)v.box=0;if(!v.last)v.last=v.addedAt||dkey();});
   return s;
 }
@@ -335,6 +354,7 @@ function score(a,today){
   const iv=S.profile?S.profile.interests:[];
   if(a.careers.some(c=>iv.includes(c)))sc+=2;
   if(!lastCats(2).includes(a.category))sc+=1;
+  if(a.issue)sc+=2; // 시사·사회 이슈 지문 우선 노출
   return sc*1000+hash(today+a.id)%1000;
 }
 function pickDaily(){
@@ -482,7 +502,7 @@ function vHome(){
       :`오늘은 시야를 넓히는 <b>${CATS[a.category]}</b> 글이에요`;
     missionCard=`<div class="card hero2"><div class="band c-${a.category}"><span>${CATS[a.category]}</span>
       <small>${LEVEL_LABEL[myLevel()]} · 약 ${b.minutes}분</small></div>
-      <div class="hbody"><p class="eyebrow">오늘의 1지문 ${isRe?'· 다시 읽기':''}</p>
+      <div class="hbody"><p class="eyebrow">오늘의 1지문 ${isRe?'· 다시 읽기':''}${a.issue?' · <span style="color:var(--coral)">요즘 이슈 🔥</span>':''}</p>
       <h1>${esc(b.title)}</h1>
       <p class="sub" style="margin-top:8px">${why}</p>
       <button class="btn" data-act="read" data-id="${a.id}">${doneToday&&S.readings[a.id]?'다시 읽기':'읽기 시작'}</button></div></div>`;
@@ -502,22 +522,52 @@ function vHome(){
     <div class="card"><div class="between"><h2>더 읽어 볼 글</h2><span class="tag muted">${recs.length}편</span></div>
       <div class="glist">${recs.length?recs.map(r=>{const b=levelBody(r,myLevel());return `<button class="grow" data-act="read" data-id="${r.id}">
         <span class="rowdot dot-${r.category}" style="align-self:flex-start"></span>
-        <span class="t">${esc(b.title)}<small>${CATS[r.category]} · 약 ${b.minutes}분</small></span><span class="go">›</span></button>`;}).join(''):'<div class="empty">추천할 새 글이 없어요. 내일 다시 만나요!</div>'}</div></div>`;
+        <span class="t">${esc(b.title)}<small>${CATS[r.category]} · 약 ${b.minutes}분${r.issue?' · <b style="color:var(--coral)">요즘 이슈</b>':''}</small></span><span class="go">›</span></button>`;}).join(''):'<div class="empty">추천할 새 글이 없어요. 내일 다시 만나요!</div>'}</div></div>`;
 }
 
 /* ───────────────────────── 읽기 화면 ───────────────────────── */
+function segsFromBounds(text,bounds){
+  const words=text.split(/\s+/).filter(Boolean);
+  const bs=new Set(bounds||[]);
+  const out=[];let cur=[];
+  words.forEach((w,i)=>{cur.push(w);
+    if(bs.has(i)&&i<words.length-1){out.push(cur.join(' ')+' ');cur=[];}});
+  if(cur.length)out.push(cur.join(' '));
+  return out.length?out:[text];
+}
+function myChunkKey(a,lv){return a.id+'|'+lv;}
+function vMyChunkEdit(a,b,lv){
+  const me=sess.myEdit;
+  return `<div class="card lv-${lv}"><p class="eyebrow">✂ 직접 끊기 — 내 의미 단위 만들기</p>
+    <h2>${esc(b.title)}</h2>
+    <p class="sub" style="margin-top:8px">의미가 나뉘는 곳의 <b>·</b> 를 눌러 <b style="color:var(--coral)">∕</b> 로 바꾸세요. 저장하면 읽기 화면과 자동 읽기가 <b>내가 끊은 단위</b>대로 움직여요.</p>
+    ${b.paragraphs.map((p,pi)=>{
+      const words=paraText(p).split(/\s+/).filter(Boolean);
+      let flow='';
+      words.forEach((w,i)=>{flow+=`<span class="tok">${esc(w)}</span>`;
+        if(i<words.length-1){const on=me.marks[pi].has(i);
+          flow+=`<button class="gap" data-act="myedit-gap" data-p="${pi}" data-i="${i}" aria-pressed="${on}">${on?'∕':'·'}</button>`;}});
+      return `<p class="sub" style="margin-top:14px;font-weight:800;color:var(--navy)">${pi+1}문단</p><div class="tokenwrap" style="font-size:15.5px">${flow}</div>`;
+    }).join('')}
+    <button class="btn" data-act="myedit-save">저장 — 내 단위로 읽기</button>
+    <button class="btn ghost sm" data-act="myedit-cancel">취소</button></div>`;
+}
 function vReader(){
   const a=DB.articles.find(x=>x.id===view.id);if(!a)return '<div class="card"><div class="empty">글을 찾을 수 없어요.</div></div>';
   const lv=myLevel();const b=levelBody(a,lv);
   if(!sess.startAt)sess.startAt=Date.now();
+  if(sess.myEdit)return vMyChunkEdit(a,b,lv);
   const chunk=S.prefs.chunk[lv];
+  const mc=S.mychunks[myChunkKey(a,lv)];
+  const useMine=!!(mc&&mc.use);
   const done=sess.readDone;
   const linked=new Set();
   const linkedEn=new Set();
   const hasEn=lv!=='L2'&&Array.isArray(b.en)&&b.en.length===b.paragraphs.length;
   const enMode=hasEn?(S.prefs.en[lv]||0):0;
   const paras=b.paragraphs.map((p,pi)=>{
-    const segs=p.map(seg=>{
+    const segSrc=(useMine&&mc.b&&mc.b[pi])?segsFromBounds(paraText(p),mc.b[pi]):p;
+    const segs=segSrc.map(seg=>{
       let html=null;
       for(const vb of b.vocab){
         if(linked.has(vb.word))continue;
@@ -534,10 +584,12 @@ function vReader(){
   const fs=S.prefs.fs||1;
   return `<div class="progress-top" aria-hidden="true"><i id="progTop"></i></div>
     <div class="card lv-${lv} rd-fs ${chunk?'chunked':''} ${enMode===2?'en-only':''}" id="readerCard" style="--fs:${fs}">
-      <p class="eyebrow"><span class="tag c-${a.category}">${CATS[a.category]}</span> <span class="tag muted">${LEVEL_LABEL[lv]}</span> <span class="tag muted">약 ${b.minutes}분</span></p>
+      <p class="eyebrow"><span class="tag c-${a.category}">${CATS[a.category]}</span> <span class="tag muted">${LEVEL_LABEL[lv]}</span> <span class="tag muted">약 ${b.minutes}분</span>${a.issue?' <span class="tag" style="background:#fbeae6;color:var(--coral)">요즘 이슈</span>':''}</p>
       <h1 style="margin-top:8px">${esc(b.title)}</h1>
       <div class="rd-tools">
-        <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk}">∕ 끊어 읽기</button>
+        <button class="toolbtn" data-act="toggle-chunk" aria-pressed="${chunk&&!useMine}">∕ 끊어 읽기</button>
+        ${mc?`<button class="toolbtn" data-act="toggle-mychunk" aria-pressed="${chunk&&useMine}">∕ 내 단위</button>`:''}
+        <button class="toolbtn" data-act="mychunk-edit">✂ 직접 끊기</button>
         <button class="toolbtn" data-act="auto-start">▶ 자동 읽기</button>
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
@@ -556,7 +608,7 @@ function vReader(){
       ${done&&!sess.evalDone?`<h3 style="margin-top:16px">오늘 글, 어땠어요?</h3>
         <div class="evalrow">${EVALS.map(([v,l])=>`<button class="evalbtn" data-act="eval" data-v="${v}">${l}</button>`).join('')}</div>`:''}
       ${sess.evalDone?`<div class="explain" style="margin-top:16px"><b>완독 기록 완료!</b> ${streak()}일 연속 읽는 중이에요.</div>
-        ${(levelBody(a,lv).questions||[]).length?`<button class="btn" data-act="start-quiz" data-id="${a.id}">문제 풀어보기 (${levelBody(a,lv).questions.length}문항)</button>`:''}
+        ${(levelBody(a,lv).questions||[]).length?`<button class="btn" data-act="start-quiz" data-id="${a.id}">문제 풀어보기 (${levelBody(a,lv).questions.length}문항${(levelBody(a,lv).challenge||[]).length?' + 심화 '+levelBody(a,lv).challenge.length:''})</button>`:''}
         ${S.scraps[a.id]?`<button class="btn ghost sm" disabled>스크랩됨 ✓</button>`:`<button class="btn ghost sm" data-act="scrap-open" data-id="${a.id}">스크랩하기 — 탐구 재료로 모으기</button>`}
         <button class="btn ghost sm" data-act="ct-start-article" data-id="${a.id}">∕ 이 글로 끊어 읽기 연습</button>
         ${sess.scrapOpen?`<textarea id="scrapNote" placeholder="한 줄 소감을 남겨 보세요 (선택)"></textarea>
@@ -567,12 +619,22 @@ function vReader(){
 function completeRead(a,evalv){
   const mins=Math.max(1,Math.round((Date.now()-sess.startAt)/60000));
   const prev=S.readings[a.id];
+  /* 읽기 속도 샘플 — 첫 완독만, 비정상 값(너무 빠름/느림)은 제외 */
+  if(!prev){
+    const b=levelBody(a,myLevel());
+    const chars=b?b.paragraphs.reduce((s,p)=>s+paraText(p).length,0):0;
+    const secs=sess.readSecs||0;
+    if(chars>0&&secs>=20&&secs<=3600){
+      const cpm=Math.round(chars/(secs/60));
+      if(cpm>=30&&cpm<=1500)S.speed.push({date:dkey(),id:a.id,level:myLevel(),chars,secs,cpm});
+    }
+  }
   S.readings[a.id]={date:dkey(),level:myLevel(),evalv,minutes:Math.min(mins,60),count:(prev?prev.count:0)+1};
   S.days[dkey()]=true;save();
 }
 
 /* ───────────────────────── 퀴즈 ───────────────────────── */
-const QTYPE_LABEL={main:'핵심 내용',detail:'세부 정보',vocab:'어휘',infer:'추론',critical:'비판적 사고'};
+const QTYPE_LABEL={main:'핵심 내용',detail:'세부 정보',vocab:'어휘',infer:'추론',critical:'비판적 사고',apply:'적용'};
 function quizCard(questions,q,prefix,title){
   const cur=questions[q.i];
   const total=questions.length;
@@ -595,19 +657,27 @@ function quizCard(questions,q,prefix,title){
 function vQuiz(){
   const a=DB.articles.find(x=>x.id===view.id);
   const b=levelBody(a,myLevel());
-  const q=sess.q||(sess.q={i:0,correct:0,picked:null,fin:false});
+  const q=sess.q||(sess.q={i:0,correct:0,picked:null,fin:false,ch:false});
+  const qs=q.ch?(b.challenge||[]):b.questions;
   if(q.fin){
-    const total=b.questions.length;
+    const total=qs.length;
     const acc=Math.round(q.correct/total*100);
     let msg='잘했어요! 근거를 찾으며 읽는 습관이 붙고 있어요.';
-    if(acc===100)msg='완벽해요! 다음에는 한 단계 높은 글에 도전해 볼까요? (레벨 조정은 선생님과 상의해요)';
+    if(q.ch){
+      msg=acc>=80?'심화까지 완벽해요! 글의 속뜻을 꿰뚫어 보고 있어요.'
+        :acc>=50?'심화 문제는 원래 어려워요. 해설의 근거 문단을 다시 보면 확실해져요.'
+        :'심화는 어려운 게 정상이에요! 해설을 읽고 내일 다시 도전하면 실력이 확 늘어요.';
+    }
+    else if(acc===100)msg='완벽해요! 다음에는 한 단계 높은 글에 도전해 볼까요? (레벨 조정은 선생님과 상의해요)';
     else if(acc<50)msg='괜찮아요. 해설의 근거 문단을 다시 읽어 보면 힘이 돼요.';
-    return `<div class="card hero"><p class="eyebrow">문제 풀이 결과</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
+    const hasCh=!q.ch&&Array.isArray(b.challenge)&&b.challenge.length>0;
+    return `<div class="card hero"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
       <p class="sub">${msg}</p>
+      ${hasCh?`<button class="btn navy" data-act="quiz-challenge">🔥 심화 문제 도전 (${b.challenge.length}문항)</button>`:''}
       ${S.scraps[a.id]?'':`<button class="btn ghost sm" data-act="scrap-quick" data-id="${a.id}">이 글 스크랩하기</button>`}
-      <button class="btn" data-act="nav" data-v="home">홈으로</button></div>`;
+      <button class="btn ${hasCh?'ghost sm':''}" data-act="nav" data-v="home">홈으로</button></div>`;
   }
-  return quizCard(b.questions,q,'quiz',b.title);
+  return quizCard(qs,q,'quiz',b.title+(q.ch?' · 심화':''));
 }
 
 /* ───────────────────────── 서재 ───────────────────────── */
@@ -668,6 +738,27 @@ function vReport(){
   const max=Math.max(1,...Object.values(dist));
   const days=[];for(let i=6;i>=0;i--){const k=addDays(dkey(),-i);days.push([k.slice(8),!!S.days[k]]);}
   const ringC=(2*Math.PI*40).toFixed(1);
+  /* 읽기 속도 성장 그래프 */
+  let speedCard='';
+  const sp=S.speed||[];
+  if(sp.length>=2){
+    const pts=sp.slice(-12);
+    const w=300,h=110,pad=8;
+    const lo=Math.min(...pts.map(p=>p.cpm)),hi=Math.max(...pts.map(p=>p.cpm));
+    const rng=Math.max(1,hi-lo);
+    const xy=pts.map((p,i)=>[pad+i*(w-2*pad)/Math.max(1,pts.length-1),h-pad-(p.cpm-lo)*(h-2*pad)/rng]);
+    const poly=xy.map(c=>c[0].toFixed(1)+','+c[1].toFixed(1)).join(' ');
+    const avg=arr=>Math.round(arr.reduce((s,p)=>s+p.cpm,0)/arr.length);
+    const d=avg(pts.slice(-3))-avg(pts.slice(0,Math.min(3,pts.length)));
+    speedCard=`<div class="card"><h2>읽기 속도 성장</h2>
+      <p class="sub">완독한 글의 <b>분당 글자 수</b>예요. ${d>0?`처음보다 <b style="color:var(--ok)">+${d}자/분</b> 빨라졌어요!`:d<0?'요즘은 천천히 꼼꼼하게 읽는 중이에요.':'꾸준히 유지하고 있어요.'}</p>
+      <svg viewBox="0 0 ${w} ${h}" style="display:block;width:100%;height:auto;margin-top:10px" aria-label="읽기 속도 변화 그래프">
+        <polyline points="${poly}" fill="none" stroke="#087ba6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${xy.map((c,i)=>`<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="3.2" fill="${i===xy.length-1?'#c9503c':'#087ba6'}"/>`).join('')}
+      </svg>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--muted);font-weight:700">
+        <span>최근 ${pts.length}편</span><span>지금 약 <b style="color:var(--navy)">${pts[pts.length-1].cpm}자/분</b></span></div></div>`;
+  }
   return `<div class="card hero"><p class="eyebrow">나의 읽기 리포트</p>
     <div class="ringwrap">
       <span class="ring"><svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
@@ -683,6 +774,7 @@ function vReport(){
       <div class="stat"><b>${acc==null?'—':acc+'%'}</b><span>문제 정답률</span></div>
     </div>
     <div class="days7">${days.map(([d,on])=>`<span class="day7"><i class="${on?'on':''}"></i>${d}일</span>`).join('')}</div></div>
+    ${speedCard}
     <div class="card"><h2>분야 지도</h2><p class="sub">골고루 읽을수록 시야가 넓어져요.</p>
     <div class="dist">${Object.entries(CATS).map(([c,l])=>`<div class="l"><span>${l}</span><span>${dist[c]}편</span></div>
       <div class="bar"><i style="width:${Math.round(dist[c]/max*100)}%"></i></div>`).join('')}</div></div>
@@ -902,18 +994,32 @@ function vRedbookForm(){
 
 /* ───────────────────────── 탐구 랩 ───────────────────────── */
 const LAB_STEPS=['재료 고르기','탐구 주제','탐구 동기','알게 된 내용','더 알아보기','결론과 성찰','완성'];
+const LAB_CHECKS=['모든 문장을 내가 직접 썼어요','결론이 탐구 질문에 대한 답이에요','참고 자료 목록을 확인했어요'];
+const CAT_QHINTS={
+  science:['이 기술은 앞으로 우리 생활을 어떻게 바꿀까?','이 원리가 실제로 쓰이는 곳은 어디일까?'],
+  society:['이 제도는 누구에게 이익이고 누구에게 부담일까?','내가 정책을 만든다면 무엇을 바꿀까?'],
+  history:['이 사건이 지금 우리에게 남긴 것은 무엇일까?','그 시대 사람들은 왜 그런 선택을 했을까?'],
+  humanities:['이 생각이 오늘날에도 중요한 이유는 무엇일까?','나라면 어떤 관점으로 바라볼까?'],
+  environment:['이 문제를 늦추기 위해 지금 할 수 있는 일은 무엇일까?','기술과 제도 중 무엇이 더 효과적일까?']
+};
 function labMaterials(){
   const ids=[...new Set([...Object.keys(S.scraps),...Object.keys(S.readings)])];
   return ids.map(id=>{const a=DB.articles.find(x=>x.id===id);if(!a)return null;
     const b=levelBody(a,myLevel())||a.levels.L3||a.levels.L2;
     return {id,title:b.title,category:a.category,a};}).filter(Boolean);
 }
+function reportRefs(r){
+  const refs=[];
+  r.mats.forEach(id=>{const a=DB.articles.find(x=>x.id===id);
+    if(a)a.sources.forEach(s=>{const t=s.title+' — '+s.url;if(!refs.includes(t))refs.push(t);});});
+  return refs;
+}
 function reportText(r){
   const mats=r.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);const b=a?(levelBody(a,myLevel())||a.levels.L3):null;return {a,title:b?b.title:id};});
-  const refs=[];
-  mats.forEach(m=>{if(m.a)m.a.sources.forEach(s=>{const t=s.title+' — '+s.url;if(!refs.includes(t))refs.push(t);});});
+  const refs=reportRefs(r);
   const lines=[];
   lines.push('# '+(r.title||'탐구보고서'));
+  lines.push((r.name?r.name+' · ':'')+(r.done||dkey())+' · WB 진로독서 탐구 랩');
   lines.push('');
   lines.push('## 1. 주제 선정 이유(탐구 동기)');lines.push(r.motive||'');
   lines.push('## 2. 탐구 질문');lines.push(r.topic||'');
@@ -928,9 +1034,14 @@ function reportText(r){
   refs.forEach(t=>lines.push('- '+t));
   return lines.join('\n');
 }
+function reportMats(r){
+  return r.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);const b=a?(levelBody(a,myLevel())||a.levels.L3):null;return b?b.title:id;});
+}
 function vReportDoc(r){
-  const mats=r.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);const b=a?(levelBody(a,myLevel())||a.levels.L3):null;return b?b.title:id;});
+  const mats=reportMats(r);
+  const refs=reportRefs(r);
   return `<div class="card"><div class="between"><h2>${esc(r.title||'탐구보고서')}</h2><button class="toolbtn" data-act="lab-close-view">닫기</button></div>
+    <p class="sub" style="margin-top:4px">${r.name?esc(r.name)+' · ':''}${esc(r.done||'')} · 재료 ${r.mats.length}편</p>
     <div class="report-doc">
       <h4>1. 주제 선정 이유(탐구 동기)</h4><p>${esc(r.motive||'')}</p>
       <h4>2. 탐구 질문</h4><p>${esc(r.topic||'')}</p>
@@ -939,9 +1050,33 @@ function vReportDoc(r){
       ${r.more?`<h4>5. 더 알아본 것</h4><p>${esc(r.more)}</p>`:''}
       <h4>${r.more?'6':'5'}. 결론</h4><p>${esc(r.conclusion||'')}</p>
       <h4>${r.more?'7':'6'}. 느낀 점과 진로 성찰</h4><p>${esc(r.reflect||'')}</p>
+      <h4>참고 자료</h4><p>${refs.map(esc).join('<br>')||'—'}</p>
     </div>
-    <button class="btn" data-act="lab-copy-doc">보고서 텍스트 복사 (한글·문서에 붙여넣기)</button>
-    <p class="note">이 보고서는 수행평가·수업 발표·창체 활동에 가져가 쓰는 '준비물'이에요. 생기부에는 학교 활동으로 이어질 때 반영돼요.</p></div>`;
+    <div class="row2"><button class="btn sm" data-act="lab-print" style="margin-top:12px">🖨 인쇄 · PDF 저장</button>
+    <button class="btn sm navy" data-act="lab-copy-doc" style="margin-top:12px">텍스트 복사</button></div>
+    <div class="row2"><button class="btn ghost sm" data-act="lab-edit">수정하기</button>
+    ${sess.confirmDelReport?'':`<button class="btn ghost sm" data-act="lab-del">삭제</button>`}</div>
+    ${sess.confirmDelReport?`<div class="note">이 보고서를 정말 삭제할까요? 되돌릴 수 없어요.</div>
+      <div class="row2"><button class="btn sm ghost" data-act="lab-del-no" style="margin-top:9px">취소</button>
+      <button class="btn sm" data-act="lab-del-yes" style="margin-top:9px;background:var(--bad)">삭제하기</button></div>`:''}
+    <p class="note">인쇄·PDF로 저장하면 수행평가·발표에 바로 낼 수 있는 서식으로 나와요. 생기부에는 학교 활동으로 이어질 때 반영돼요.</p></div>`;
+}
+function printReport(r){
+  const mats=reportMats(r);
+  const refs=reportRefs(r);
+  $('#printArea').innerHTML=`<div class="pr-doc">
+    <div class="pr-head"><h1>${esc(r.title||'탐구보고서')}</h1>
+      <p class="pr-meta">${r.name?esc(r.name):'이름: ______________'} · ${esc(r.done||dkey())} · WB 진로독서 탐구 랩</p></div>
+    <h2>1. 주제 선정 이유(탐구 동기)</h2><p>${esc(r.motive||'')}</p>
+    <h2>2. 탐구 질문</h2><p>${esc(r.topic||'')}</p>
+    <h2>3. 읽은 자료</h2><p>${mats.map(m=>'· '+esc(m)).join('<br>')}</p>
+    <h2>4. 알게 된 내용</h2><p>${r.mats.map(id=>{const l=(r.learned||{})[id];const i=r.mats.indexOf(id);return l?'· ('+esc(mats[i])+') '+esc(l):'';}).filter(Boolean).join('<br>')}</p>
+    ${r.more?`<h2>5. 더 알아본 것</h2><p>${esc(r.more)}</p>`:''}
+    <h2>${r.more?'6':'5'}. 결론</h2><p>${esc(r.conclusion||'')}</p>
+    <h2>${r.more?'7':'6'}. 느낀 점과 진로 성찰</h2><p>${esc(r.reflect||'')}</p>
+    <h2>참고 자료</h2><p>${refs.map(t=>'· '+esc(t)).join('<br>')||'—'}</p>
+    <div class="pr-sign"><span>지도: WB 독해력학원 · 웩슬러브레인센터</span><span>강사 확인: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</span></div></div>`;
+  window.print();
 }
 function vLab(){
   if(sess.labView!=null)return vReportDoc(S.reports[sess.labView]);
@@ -970,9 +1105,13 @@ function vLab(){
   }
   if(step===1){
     const titles=L.mats.map(id=>{const m=labMaterials().find(x=>x.id===id);return m?m.title:id;});
+    const cats=[...new Set(L.mats.map(id=>{const a=DB.articles.find(x=>x.id===id);return a?a.category:null;}).filter(Boolean))];
+    const hints=cats.flatMap(c=>CAT_QHINTS[c]||[]).slice(0,4);
     return `<div class="card">${head}
-      <div class="guide">고른 글: ${titles.map(esc).join(' / ')}<br>이 글들을 관통하는 <b>궁금증을 질문 한 문장</b>으로 써 보세요. 예: "우주에서 사람 몸을 지키려면 무엇이 필요할까?"</div>
+      <div class="guide">고른 글: ${titles.map(esc).join(' / ')}<br>이 글들을 관통하는 <b>궁금증을 질문 한 문장</b>으로 써 보세요.</div>
       <input type="text" id="labTopic" placeholder="탐구 질문 (한 문장)" value="${esc(L.topic||'')}">
+      ${hints.length?`<p class="sub" style="margin-top:10px;font-weight:800">질문이 막히면 눌러서 시작해 보세요 — 그대로 쓰지 말고 내 주제로 바꿔요</p>
+      <div>${hints.map(h=>`<button class="chipword" data-act="lab-hint" data-h="${esc(h)}">${esc(h)}</button>`).join('')}</div>`:''}
       ${nav()}</div>`;
   }
   if(step===2){
@@ -1008,9 +1147,12 @@ function vLab(){
       <textarea id="labRef" style="min-height:80px" placeholder="느낀 점과 진로 성찰: 이 탐구가 내 진로 생각을 어떻게 바꿨나요?">${esc(L.reflect||'')}</textarea>
       ${nav()}</div>`;
   }
+  const checks=L.checks||[false,false,false];
   return `<div class="card">${head}
-    <div class="guide">제목을 붙이면 완성! 참고 자료 목록은 자동으로 정리돼요.</div>
+    <div class="guide">제목과 이름을 붙이고, 마지막 점검 3가지를 확인하면 완성! 참고 자료 목록은 자동으로 정리돼요.</div>
     <input type="text" id="labTitle" placeholder="보고서 제목" value="${esc(L.title||'')}">
+    <input type="text" id="labName" placeholder="이름 (보고서 표지에 실려요)" value="${esc(L.name||(SYNC.auth&&SYNC.auth.name)||'')}">
+    ${LAB_CHECKS.map((l,i)=>`<button class="matchip" data-act="lab-check" data-i="${i}" aria-pressed="${checks[i]}"><span class="ck">${checks[i]?'✓':''}</span><span>${l}</span></button>`).join('')}
     <div class="report-doc" style="max-height:300px;overflow-y:auto"><pre style="white-space:pre-wrap;font:inherit;margin:0">${esc(reportText(L))}</pre></div>
     ${step>0?`<button class="btn ghost sm" data-act="lab-back">이전</button>`:''}
     <button class="btn" data-act="lab-finish">완성! 저장하기</button>
@@ -1043,22 +1185,45 @@ function videoHtml(v){return `<a class="deep-item" href="${esc(v.url)}" target="
 function paperHtml(p){return `<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><span class="drow"><span class="dico p">📄</span><span class="dmain"><b>${esc(p.title)}</b><small>${esc(p.note||'')}</small></span><span class="dgo">↗</span></span></a>`;}
 function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="${bk.url?esc(bk.url):naverBook(bk)}" target="_blank" rel="noopener noreferrer"><span class="drow"><span class="dico bk">📚</span><span class="dmain"><b>${esc(bk.title)}</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책 소개 보기</small></span><span class="dgo">↗</span></span></a>${bk.video?`<a class="deep-mini" href="${esc(bk.video.url)}" target="_blank" rel="noopener noreferrer">▶ 책 소개 영상 · ${esc(bk.video.channel||'')}</a>`:''}</div>`;}
 /* ── 자동 읽기 (SentenceMask) ── */
+const AUTO_SPEEDS=[170,120,85,60];               // ms/글자
+const AUTO_SPEED_LABELS=['천천히','보통','빠르게','최고'];
+const AUTO_SCOPES=['좁게','넓게','문장'];         // 좁게=의미 단위 1개, 넓게=2개 묶음, 문장=문장 단위
 function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg')).filter(el=>el.offsetParent!==null);}
-function autoDelay(el){
-  const len=(el.textContent||'').trim().length;
-  const per=[240,165,110][sess.auto?sess.auto.speed:1];
-  return Math.max(700,len*per);
+function autoGroups(){
+  const segs=autoSegs();
+  const scope=sess.auto?sess.auto.scope:0;
+  if(scope===0)return segs.map(s=>[s]);
+  const groups=[];let cur=[];
+  const flush=()=>{if(cur.length){groups.push(cur);cur=[];}};
+  for(const el of segs){
+    if(cur.length&&cur[0].parentElement!==el.parentElement)flush();
+    cur.push(el);
+    if(scope===1){if(cur.length>=2)flush();}
+    else if(/[.!?…]['"”’)»]?$/.test((el.textContent||'').trim()))flush();
+  }
+  flush();
+  return groups;
+}
+function autoDelay(g){
+  const len=(g||[]).reduce((s,el)=>s+(el.textContent||'').trim().length,0);
+  const per=AUTO_SPEEDS[sess.auto?sess.auto.speed:1]||AUTO_SPEEDS[1];
+  return Math.max(450,len*per);
+}
+function autoHighlight(groups){
+  const a=sess.auto;if(!a)return;
+  const now=new Set(groups[a.idx]||[]);
+  autoSegs().forEach(s=>s.classList.toggle('now',now.has(s)));
+  const cnt=document.getElementById('autoCount');
+  if(cnt)cnt.textContent=Math.min(a.idx+1,groups.length)+' / '+groups.length;
 }
 function autoTick(){
   const a=sess.auto;if(!a||!a.playing)return;
-  const segs=autoSegs();
-  if(a.idx>=segs.length){autoStop(true);return;}
-  segs.forEach((s,i)=>s.classList.toggle('now',i===a.idx));
-  const cnt=document.getElementById('autoCount');
-  if(cnt)cnt.textContent=(a.idx+1)+' / '+segs.length;
-  const el=segs[a.idx];
-  if(el)el.scrollIntoView({block:'center',behavior:'smooth'});
-  a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(el));
+  const groups=autoGroups();
+  if(a.idx>=groups.length){autoStop(true);return;}
+  autoHighlight(groups);
+  const first=groups[a.idx][0];
+  if(first)first.scrollIntoView({block:'center',behavior:'smooth'});
+  a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(groups[a.idx]));
 }
 function autoStop(done){
   if(sess.auto&&sess.auto.timer)clearTimeout(sess.auto.timer);
@@ -1070,12 +1235,16 @@ function autoStop(done){
 }
 function autoStart(){
   if(sess.auto)return;
-  sess.auto={idx:0,playing:true,speed:1,timer:null};
+  const pf=S.prefs.auto||{speed:1,scope:0};
+  sess.auto={idx:0,playing:true,speed:Math.min(pf.speed==null?1:pf.speed,AUTO_SPEEDS.length-1),scope:Math.min(pf.scope==null?0:pf.scope,AUTO_SCOPES.length-1),timer:null};
   const c=document.getElementById('readerCard');if(c)c.classList.add('autoread');
   const bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
   bar.innerHTML=`<div class="auto-in">
     <button class="toolbtn" data-act="auto-pp" id="autoPP">⏸ 정지</button>
-    <span class="seg-ctl">${['느리게','보통','빠르게'].map((l,i)=>`<button data-act="auto-speed" data-i="${i}" aria-pressed="${i===1}">${l}</button>`).join('')}</span>
+    <span class="auto-lbl">속도</span>
+    <span class="seg-ctl" id="autoSpeedCtl">${AUTO_SPEED_LABELS.map((l,i)=>`<button data-act="auto-speed" data-i="${i}" aria-pressed="${i===sess.auto.speed}">${l}</button>`).join('')}</span>
+    <span class="auto-lbl">범위</span>
+    <span class="seg-ctl" id="autoScopeCtl">${AUTO_SCOPES.map((l,i)=>`<button data-act="auto-scope" data-i="${i}" aria-pressed="${i===sess.auto.scope}">${l}</button>`).join('')}</span>
     <span class="qnum" id="autoCount"></span>
     <span style="flex:1"></span>
     <button class="toolbtn" data-act="auto-exit">끝내기 ✕</button></div>`;
@@ -1137,22 +1306,53 @@ document.addEventListener('click',e=>{
     if(q.i+1<qs.length){q.i++;q.picked=null;}else{ob.step='diag-result';}render();}
   else if(act==='ob-finish'){finishOnboard(t.dataset.lv||null);}
   else if(act==='read'){go('reader',{id:t.dataset.id});}
-  else if(act==='toggle-chunk'){const lv=myLevel();S.prefs.chunk[lv]=!S.prefs.chunk[lv];save();render();}
+  else if(act==='toggle-chunk'){const lv=myLevel();
+    const a=DB.articles.find(x=>x.id===view.id);
+    const mc=a?S.mychunks[myChunkKey(a,lv)]:null;
+    if(S.prefs.chunk[lv]&&!(mc&&mc.use)){S.prefs.chunk[lv]=false;}
+    else{S.prefs.chunk[lv]=true;if(mc)mc.use=false;}
+    save();render();}
+  else if(act==='toggle-mychunk'){const lv=myLevel();
+    const a=DB.articles.find(x=>x.id===view.id);
+    const mc=S.mychunks[myChunkKey(a,lv)];if(!mc)return;
+    if(S.prefs.chunk[lv]&&mc.use){S.prefs.chunk[lv]=false;}
+    else{S.prefs.chunk[lv]=true;mc.use=true;}
+    save();render();}
+  else if(act==='mychunk-edit'){const lv=myLevel();
+    const a=DB.articles.find(x=>x.id===view.id);if(!a)return;
+    const b=levelBody(a,lv);
+    if(sess.auto)autoStop(false);
+    const mc=S.mychunks[myChunkKey(a,lv)];
+    sess.myEdit={marks:b.paragraphs.map((p,i)=>new Set((mc&&mc.b&&mc.b[i])||[]))};
+    render();}
+  else if(act==='myedit-gap'){const me=sess.myEdit;if(!me)return;
+    const s=me.marks[+t.dataset.p];const i=+t.dataset.i;
+    if(s.has(i))s.delete(i);else s.add(i);render();}
+  else if(act==='myedit-save'){const lv=myLevel();
+    const a=DB.articles.find(x=>x.id===view.id);const me=sess.myEdit;if(!a||!me)return;
+    if(!me.marks.some(s=>s.size)){announce('∕ 를 한 곳 이상 눌러 주세요');return;}
+    S.mychunks[myChunkKey(a,lv)]={b:me.marks.map(s=>[...s].sort((x,y)=>x-y)),use:true,at:dkey()};
+    S.prefs.chunk[lv]=true;sess.myEdit=null;save();render();
+    announce('내 단위 저장! 이제 내가 끊은 대로 표시되고, 자동 읽기도 따라가요');}
+  else if(act==='myedit-cancel'){sess.myEdit=null;render();}
   else if(act==='fs-minus'){S.prefs.fs=Math.round(Math.max(0.9,(S.prefs.fs||1)-0.1)*10)/10;save();render();}
   else if(act==='fs-plus'){S.prefs.fs=Math.round(Math.min(1.3,(S.prefs.fs||1)+0.1)*10)/10;save();render();}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
   else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
-  else if(act==='read-done'){sess.readDone=true;render();}
+  else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;render();}
   else if(act==='eval'){const a=DB.articles.find(x=>x.id===view.id);
     completeRead(a,t.dataset.v);sess.evalDone=true;render();announce('완독 기록 완료');}
   else if(act==='start-quiz'){go('quiz',{id:t.dataset.id});}
   else if(act==='quiz-pick'){const q=sess.q;if(q.picked!=null)return;
     q.picked=+t.dataset.i;const b=levelBody(DB.articles.find(x=>x.id===view.id),myLevel());
-    if(q.picked===b.questions[q.i].answer)q.correct++;render();}
+    const qs=q.ch?(b.challenge||[]):b.questions;
+    if(q.picked===qs[q.i].answer)q.correct++;render();}
   else if(act==='quiz-next'){const q=sess.q;const b=levelBody(DB.articles.find(x=>x.id===view.id),myLevel());
-    if(q.i+1<b.questions.length){q.i++;q.picked=null;}
-    else{q.fin=true;S.quiz[view.id]={correct:q.correct,total:b.questions.length,date:dkey()};save();}
+    const qs=q.ch?(b.challenge||[]):b.questions;
+    if(q.i+1<qs.length){q.i++;q.picked=null;}
+    else{q.fin=true;S.quiz[view.id+(q.ch?'#c':'')]={correct:q.correct,total:qs.length,date:dkey()};save();}
     render();}
+  else if(act==='quiz-challenge'){sess.q={i:0,correct:0,picked:null,fin:false,ch:true};render();}
   else if(act==='scrap-open'){sess.scrapOpen=true;render();}
   else if(act==='scrap-save'){const note=($('#scrapNote')?$('#scrapNote').value.trim():'').slice(0,80);
     S.scraps[t.dataset.id]={date:dkey(),note};save();sess.scrapOpen=false;render();announce('스크랩 저장');}
@@ -1185,7 +1385,19 @@ document.addEventListener('click',e=>{
     if(a.playing)autoTick();else if(a.timer)clearTimeout(a.timer);}
   else if(act==='auto-speed'){const a=sess.auto;if(!a)return;
     a.speed=+t.dataset.i;
-    document.querySelectorAll('#autoBar .seg-ctl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));}
+    S.prefs.auto=S.prefs.auto||{};S.prefs.auto.speed=a.speed;save();
+    document.querySelectorAll('#autoSpeedCtl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));}
+  else if(act==='auto-scope'){const a=sess.auto;if(!a)return;
+    const old=autoGroups();const curEl=(old[a.idx]||[])[0];
+    a.scope=+t.dataset.i;
+    S.prefs.auto=S.prefs.auto||{};S.prefs.auto.scope=a.scope;save();
+    const ng=autoGroups();
+    let ni=curEl?ng.findIndex(g=>g.includes(curEl)):-1;
+    if(ni<0)ni=Math.min(a.idx,Math.max(0,ng.length-1));
+    a.idx=ni;
+    document.querySelectorAll('#autoScopeCtl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));
+    if(a.timer)clearTimeout(a.timer);
+    if(a.playing)autoTick();else autoHighlight(ng);}
   else if(act==='auto-exit'){autoStop(false);}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
@@ -1243,7 +1455,11 @@ document.addEventListener('click',e=>{
   else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n${r.summary}\n셀프체크: ${r.checks.filter(Boolean).length}/3`).join('\n\n');
     copyText('WB 붉은 책 요약 기록\n\n'+txt);}
   /* ── 탐구 랩 ── */
-  else if(act==='lab-new'){S.lab={step:0,mats:[],topic:'',motive:'',learned:{},more:'',conclusion:'',reflect:'',title:'',started:dkey(),log:[dkey()]};save();render();}
+  else if(act==='lab-new'){S.lab={step:0,mats:[],topic:'',motive:'',learned:{},more:'',conclusion:'',reflect:'',title:'',name:'',checks:[false,false,false],started:dkey(),log:[dkey()]};save();render();}
+  else if(act==='lab-hint'){const el=$('#labTopic');if(el){el.value=t.dataset.h;el.focus();}}
+  else if(act==='lab-check'){labCollect();const L=S.lab;if(!L)return;
+    L.checks=L.checks||[false,false,false];
+    const i=+t.dataset.i;L.checks[i]=!L.checks[i];save();render();}
   else if(act==='lab-mat'){const id=t.dataset.id;const m=S.lab.mats;const i=m.indexOf(id);
     if(i>=0)m.splice(i,1);else m.push(id);save();render();}
   else if(act==='lab-back'){labCollect();S.lab.step=Math.max(0,S.lab.step-1);save();render();}
@@ -1257,11 +1473,23 @@ document.addEventListener('click',e=>{
   else if(act==='lab-quit'){labCollect();save();go('lab');announce('임시 저장했어요');}
   else if(act==='lab-finish'){labCollect();const L=S.lab;
     if(!L.title.trim()){announce('제목을 붙여 주세요');return;}
+    if(!(L.checks||[]).every(Boolean)){announce('마지막 점검 3가지를 모두 확인해 주세요');return;}
     S.reports.push({...L,done:dkey()});S.lab=null;save();
     sess.labView=S.reports.length-1;render();announce('보고서 완성!');}
-  else if(act==='lab-view'){sess.labView=+t.dataset.i;render();}
-  else if(act==='lab-close-view'){sess.labView=null;render();}
+  else if(act==='lab-view'){sess.labView=+t.dataset.i;sess.confirmDelReport=false;render();}
+  else if(act==='lab-close-view'){sess.labView=null;sess.confirmDelReport=false;render();}
   else if(act==='lab-copy-doc'){copyText(reportText(S.reports[sess.labView]));}
+  else if(act==='lab-print'){printReport(S.reports[sess.labView]);}
+  else if(act==='lab-edit'){
+    if(S.lab){announce('쓰던 보고서가 있어요 — 먼저 완성하거나 저장하고 나가기 해 주세요');return;}
+    const i=sess.labView;const r=S.reports[i];if(!r)return;
+    S.reports.splice(i,1);
+    S.lab={...r,step:6};delete S.lab.done;save();
+    sess.labView=null;sess.confirmDelReport=false;render();announce('수정 모드로 열었어요 — 완성하면 다시 저장돼요');}
+  else if(act==='lab-del'){sess.confirmDelReport=true;render();}
+  else if(act==='lab-del-no'){sess.confirmDelReport=false;render();}
+  else if(act==='lab-del-yes'){S.reports.splice(sess.labView,1);save();
+    sess.labView=null;sess.confirmDelReport=false;render();announce('보고서를 삭제했어요');}
   else if(act==='reset-ask'){sess.confirmReset=true;render();}
   else if(act==='reset-no'){sess.confirmReset=false;render();}
   else if(act==='reset-yes'){localStorage.removeItem(KEY);S=loadState();go('onboard');}
@@ -1275,6 +1503,7 @@ function labCollect(){
   const co=g('labConc');if(co!=null)L.conclusion=co;
   const re=g('labRef');if(re!=null)L.reflect=re;
   const ti=g('labTitle');if(ti!=null)L.title=ti;
+  const nm=g('labName');if(nm!=null)L.name=nm;
   document.querySelectorAll('[data-learn]').forEach(el=>{L.learned[el.dataset.learn]=el.value;});
 }
 window.addEventListener('scroll',()=>{

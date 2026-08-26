@@ -1,9 +1,13 @@
 'use strict';
 /* WB 진로독서 — Cloudflare Workers 버전 (server.mjs의 이식)
-   저장: KV(DB 바인딩) — student:<code> / state:<code> / token:<t>
-   정적: [assets] dist/ (학생 앱 + /admin) */
+   저장: KV(DB 바인딩) — student:<code> / state:<code> / token:<t> / parent:<t> / pubmap / backup:<날짜>
+   정적: [assets] dist/ (학생 앱 + /admin)
+   크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
+const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
+const RL_MAX_FAILS = 20;           // 15분당 로그인 실패 허용 횟수
+const BACKUP_KEEP = 10;
 
 const json = (code, obj) => new Response(JSON.stringify(obj), {
   status: code,
@@ -62,10 +66,122 @@ async function auth(env, req) {
   return await env.DB.get('token:' + t, 'json');
 }
 
+/* 로그인 무차별 대입 완화 — 실패 횟수만 센다(성공 경로는 KV 쓰기 없음) */
+function rlKey(req, bucket) {
+  return 'rl:' + bucket + ':' + (req.headers.get('cf-connecting-ip') || 'unknown');
+}
+async function rlBlocked(env, req, bucket) {
+  const n = parseInt(await env.DB.get(rlKey(req, bucket)), 10) || 0;
+  return n >= RL_MAX_FAILS;
+}
+async function rlFail(env, req, bucket) {
+  const key = rlKey(req, bucket);
+  const n = parseInt(await env.DB.get(key), 10) || 0;
+  await env.DB.put(key, String(n + 1), { expirationTtl: 900 });
+}
+
+async function kvListAll(env, prefix) {
+  const keys = []; let cursor;
+  do {
+    const r = await env.DB.list({ prefix, cursor });
+    keys.push(...r.keys.map(k => k.name));
+    cursor = r.list_complete ? null : r.cursor;
+  } while (cursor);
+  return keys;
+}
+
+async function fullDump(env) {
+  const students = {}; const states = {};
+  const codes = new Set();
+  for (const prefix of ['student:', 'state:']) {
+    (await kvListAll(env, prefix)).forEach(k => codes.add(k.slice(prefix.length)));
+  }
+  for (const code of codes) {
+    const [stu, st] = await Promise.all([
+      env.DB.get('student:' + code, 'json'),
+      env.DB.get('state:' + code, 'json'),
+    ]);
+    if (stu) students[code] = stu;
+    if (st) states[code] = st;
+  }
+  return { service: 'wb-reading', savedAt: nowIso(), students, states };
+}
+
+async function snapshotBackup(env) {
+  const dump = await fullDump(env);
+  const day = dkeyOffset(0);
+  await env.DB.put('backup:' + day, JSON.stringify(dump));
+  const keys = (await kvListAll(env, 'backup:')).sort();
+  for (const k of keys.slice(0, Math.max(0, keys.length - BACKUP_KEEP))) await env.DB.delete(k);
+  return day;
+}
+
+/* 지문 제목 맵 (학부모 리포트용) — 정적 자산에서 읽어 10분 캐시 */
+let TITLE_CACHE = { t: 0, map: null };
+async function titleMap(env, origin) {
+  if (TITLE_CACHE.map && Date.now() - TITLE_CACHE.t < 600_000) return TITLE_CACHE.map;
+  try {
+    const r = await env.ASSETS.fetch(new Request(origin + '/articles.json'));
+    const d = await r.json();
+    const m = {};
+    for (const a of d.articles || []) {
+      m[a.id] = {};
+      for (const lv of ['L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
+    }
+    TITLE_CACHE = { t: Date.now(), map: m };
+  } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
+  return TITLE_CACHE.map;
+}
+
+function parentSummary(stu, st, titles) {
+  const sum = summarize(stu.code, stu, st);
+  const S = (st && st.state) || {};
+  const days = S.days || {};
+  const dows = ['일', '월', '화', '수', '목', '금', '토'];
+  const weekDays = [];
+  for (let i = 6; i >= 0; i--) {
+    const k = dkeyOffset(-i);
+    const d = new Date(k + 'T12:00:00Z');
+    weekDays.push({ dow: dows[d.getUTCDay()], done: !!days[k], today: i === 0 });
+  }
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  const recent = Object.entries(S.readings || {})
+    .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
+    .slice(0, 5)
+    .map(([id, r]) => ({ date: r.date, title: anyTitle(id, r.level) }));
+  const reports = (S.reports || []).slice(-3).reverse().map(r => ({ title: r.title || '탐구보고서', done: r.done || '' }));
+  const sp = S.speed || [];
+  const speed = sp.length >= 2
+    ? { last: sp[sp.length - 1].cpm, delta: sp[sp.length - 1].cpm - sp[0].cpm }
+    : null;
+  return {
+    name: stu.name, cls: stu.cls || '', grade: stu.grade || '', level: sum.level || sum.appLevel || '',
+    today: sum.today, streak: sum.streak, week: sum.week, weekDays,
+    reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
+    recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
+  };
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(snapshotBackup(env));
+  },
+
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
+
+    /* 발행 오버라이드 적용된 articles.json */
+    if (p === '/articles.json') {
+      const res = await env.ASSETS.fetch(req);
+      try {
+        const map = await env.DB.get('pubmap', 'json');
+        if (!map || !Object.keys(map).length) return res;
+        const data = await res.json();
+        (data.articles || []).forEach(a => { if (map[a.id]) a.status = map[a.id]; });
+        return json(200, data);
+      } catch (e) { return env.ASSETS.fetch(req); }
+    }
 
     if (!p.startsWith('/api/')) {
       /* 정적 자산 (학생 앱 + /admin) */
@@ -75,17 +191,39 @@ export default {
     try {
       if (p === '/api/health') return json(200, { ok: true, service: 'wb-reading', runtime: 'workers', time: nowIso() });
 
+      /* 발행 상태 맵 — 공개 읽기 (지문 발행 여부는 민감정보가 아님, 운영 루틴이 git 반영에 사용) */
+      if (p === '/api/pub' && req.method === 'GET') {
+        const map = await env.DB.get('pubmap', 'json');
+        return json(200, { map: map || {} });
+      }
+
       if (p === '/api/login' && req.method === 'POST') {
+        if (await rlBlocked(env, req, 'stu')) return json(429, { error: '시도가 너무 많아요. 15분 뒤 다시 해 주세요.' });
         const { code } = await req.json();
         const stu = code && await env.DB.get('student:' + String(code).trim(), 'json');
-        if (!stu) return json(401, { error: '등록되지 않은 학생 코드예요. 선생님께 확인해 주세요.' });
+        if (!stu) { await rlFail(env, req, 'stu'); return json(401, { error: '등록되지 않은 학생 코드예요. 선생님께 확인해 주세요.' }); }
         return json(200, { token: await newToken(env, stu.code, false), student: stu });
       }
 
       if (p === '/api/admin/login' && req.method === 'POST') {
+        if (await rlBlocked(env, req, 'adm')) return json(429, { error: '시도가 너무 많습니다. 15분 뒤 다시 해 주세요.' });
         const { pin } = await req.json();
-        if (!env.ADMIN_PIN || String(pin || '') !== env.ADMIN_PIN) return json(401, { error: 'PIN이 올바르지 않습니다.' });
+        if (!env.ADMIN_PIN || String(pin || '') !== env.ADMIN_PIN) { await rlFail(env, req, 'adm'); return json(401, { error: 'PIN이 올바르지 않습니다.' }); }
         return json(200, { token: await newToken(env, '__admin__', true) });
+      }
+
+      /* 학부모 리포트 — 학생별 열람 토큰으로 접근(로그인 불필요) */
+      if (p === '/api/parent/summary' && req.method === 'GET') {
+        const t = url.searchParams.get('t') || '';
+        const code = /^[A-Za-z0-9]{16,64}$/.test(t) ? await env.DB.get('parent:' + t) : null;
+        if (!code) return json(404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
+        const [stu, st] = await Promise.all([
+          env.DB.get('student:' + code, 'json'),
+          env.DB.get('state:' + code, 'json'),
+        ]);
+        if (!stu) return json(404, { error: '학생 정보를 찾을 수 없어요.' });
+        const titles = await titleMap(env, url.origin);
+        return json(200, parentSummary(stu, st, titles));
       }
 
       const who = await auth(env, req);
@@ -99,9 +237,10 @@ export default {
       if (p === '/api/state' && req.method === 'PUT' && !who.admin) {
         const { state } = await req.json();
         if (!state || typeof state !== 'object') return json(400, { error: 'state 필요' });
-        const rec = { state, updatedAt: nowIso() };
-        await env.DB.put('state:' + who.code, JSON.stringify(rec));
-        return json(200, { ok: true, updatedAt: rec.updatedAt });
+        const raw = JSON.stringify({ state, updatedAt: nowIso() });
+        if (raw.length > STATE_MAX_BYTES) return json(413, { error: '기록이 너무 커서 저장할 수 없어요.' });
+        await env.DB.put('state:' + who.code, raw);
+        return json(200, { ok: true, updatedAt: JSON.parse(raw).updatedAt });
       }
 
       if (!who.admin) return json(403, { error: '권한이 없습니다.' });
@@ -109,12 +248,7 @@ export default {
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set();
         for (const prefix of ['student:', 'state:']) {
-          let cursor;
-          do {
-            const r = await env.DB.list({ prefix, cursor });
-            r.keys.forEach(k => codes.add(k.name.slice(prefix.length)));
-            cursor = r.list_complete ? null : r.cursor;
-          } while (cursor);
+          (await kvListAll(env, prefix)).forEach(k => codes.add(k.slice(prefix.length)));
         }
         const students = [];
         for (const code of codes) {
@@ -132,7 +266,7 @@ export default {
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(400, { error: '학생 코드는 영문/숫자 3~20자' });
         if (!name) return json(400, { error: '이름 필요' });
         const prev = await env.DB.get('student:' + c, 'json');
-        const stu = { code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev?.createdAt || nowIso() };
+        const stu = { ...(prev || {}), code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev?.createdAt || nowIso() };
         await env.DB.put('student:' + c, JSON.stringify(stu));
         return json(200, { ok: true, student: stu });
       }
@@ -145,13 +279,57 @@ export default {
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true });
       }
+
+      /* 백업: 전체 내려받기 / 자동 스냅샷 목록·내려받기 */
+      if (p === '/api/admin/export' && req.method === 'GET') {
+        const day = url.searchParams.get('backup');
+        if (day) {
+          const snap = await env.DB.get('backup:' + day, 'json');
+          if (!snap) return json(404, { error: '해당 날짜의 스냅샷이 없습니다.' });
+          return json(200, snap);
+        }
+        return json(200, await fullDump(env));
+      }
+      if (p === '/api/admin/backups' && req.method === 'GET') {
+        const keys = (await kvListAll(env, 'backup:')).sort().reverse();
+        return json(200, { backups: keys.map(k => k.slice('backup:'.length)) });
+      }
+      if (p === '/api/admin/backup-now' && req.method === 'POST') {
+        return json(200, { ok: true, day: await snapshotBackup(env) });
+      }
+
+      /* 발행 오버라이드: 검수 뷰어의 발행/초안 원클릭 */
+      if (p === '/api/admin/pub' && req.method === 'POST') {
+        const { id, status } = await req.json();
+        if (!id || typeof id !== 'string' || id.length > 64) return json(400, { error: 'id 필요' });
+        if (!['published', 'draft'].includes(status)) return json(400, { error: 'status는 published/draft' });
+        const map = (await env.DB.get('pubmap', 'json')) || {};
+        map[id] = status;
+        await env.DB.put('pubmap', JSON.stringify(map));
+        return json(200, { ok: true, map });
+      }
+
+      /* 학부모 링크 발급/재발급 */
+      if (p === '/api/admin/parentlink' && req.method === 'POST') {
+        const { code, reset } = await req.json();
+        const stu = await env.DB.get('student:' + code, 'json');
+        if (!stu) return json(404, { error: '학생 없음' });
+        if (stu.ptoken && !reset) return json(200, { ok: true, token: stu.ptoken });
+        if (stu.ptoken) await env.DB.delete('parent:' + stu.ptoken);
+        const t = crypto.randomUUID().replace(/-/g, '');
+        stu.ptoken = t;
+        await env.DB.put('parent:' + t, stu.code);
+        await env.DB.put('student:' + stu.code, JSON.stringify(stu));
+        return json(200, { ok: true, token: t });
+      }
+
       const m = p.match(/^\/api\/admin\/student\/([A-Za-z0-9-]+)$/);
       if (m && req.method === 'GET') {
         const [stu, st] = await Promise.all([
           env.DB.get('student:' + m[1], 'json'),
           env.DB.get('state:' + m[1], 'json'),
         ]);
-        return json(200, { summary: summarize(m[1], stu, st), state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
+        return json(200, { summary: summarize(m[1], stu, st), student: stu, state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
       }
       return json(404, { error: 'unknown api' });
     } catch (e) {

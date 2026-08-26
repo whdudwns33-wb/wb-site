@@ -10,3 +10,7 @@ binding = "ASSETS"
 [[kv_namespaces]]
 binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
+
+# 매일 03:00 KST(18:00 UTC) 자동 백업 스냅샷 (backup:<날짜> 키, 10개 보관)
+[triggers]
+crons = ["0 18 * * *"]
