@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>워드브레인 연상 검수함</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F6F3EA; color: #23313F; font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; line-height: 1.6; word-break: keep-all; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 16px 80px; }
+  h1 { font-size: 1.2rem; font-weight: 900; color: #1B3A5C; margin: 0 0 4px; }
+  .sub { color: #64748B; font-size: .84rem; margin: 0 0 20px; }
+  h2 { font-size: 1rem; font-weight: 900; color: #1B3A5C; margin: 30px 0 10px; }
+  .card { background: #fff; border: 1px solid #E3DFD2; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(27,58,92,.07); margin-bottom: 12px; }
+  button { font-family: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; border: 1px solid #E3DFD2; background: #F0EDE2; color: #1B3A5C; border-radius: 9px; padding: 9px 16px; }
+  button.primary { background: #0F7AAB; border-color: #0F7AAB; color: #fff; }
+  button.danger { background: #FBEAE6; border-color: #F0B9AF; color: #C24936; }
+  input, textarea { font-family: inherit; font-size: .9rem; width: 100%; border: 1px solid #E3DFD2; border-radius: 9px; padding: 9px 12px; background: #fff; color: #23313F; }
+  textarea { resize: vertical; min-height: 56px; }
+  label { font-size: .74rem; font-weight: 700; color: #64748B; display: block; margin: 10px 0 4px; }
+  .chip { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; margin-left: 6px; }
+  .t-hanja { background: #E3F1F8; color: #0F7AAB; }
+  .t-english { background: #FBEAE6; color: #C24936; }
+  .t-native { background: #E7F2E6; color: #3A7A43; }
+  .st-pending { background: #FDF3E4; color: #C98A2D; }
+  .st-approved { background: #E7F2E6; color: #3A7A43; }
+  .st-rejected { background: #F0EDE2; color: #64748B; }
+  .cand { display: block; width: 100%; text-align: left; margin-top: 8px; background: #F8F6F0; font-weight: 400; }
+  .cand.sel { border-color: #0F7AAB; background: #E9F5FB; }
+  .cand b { color: #1B3A5C; }
+  .cand span { color: #64748B; font-size: .84rem; display: block; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .muted { color: #64748B; font-size: .84rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; background: #fff; border-radius: 12px; overflow: hidden; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid #E3DFD2; text-align: left; white-space: nowrap; }
+  thead th { background: #F0EDE2; color: #1B3A5C; font-size: .78rem; }
+  .num { font-variant-numeric: tabular-nums; }
+  .warn { color: #C24936; font-weight: 700; }
+  .table-scroll { overflow-x: auto; border: 1px solid #E3DFD2; border-radius: 12px; }
+  #msg { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1B3A5C; color: #fff; border-radius: 99px; padding: 9px 18px; font-size: .85rem; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #msg.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>워드브레인 — AI 연상 검수함</h1>
+  <p class="sub">학생 요청으로 AI가 만든 연상 후보를 검수합니다. 승인한 연상은 그 단어의 공식 연상이 되어 이후 학생들에게 재사용돼요. <a href="/admin">← 관리 웹</a></p>
+
+  <div id="login" class="card">
+    <label>관리자 PIN</label>
+    <div class="row"><input id="pin" type="password" autocomplete="current-password"><button class="primary" id="btnLogin">로그인</button></div>
+    <p class="muted" id="loginErr"></p>
+  </div>
+
+  <div id="app" hidden>
+    <h2>검수 대기 <span id="pendingCount" class="chip st-pending">0</span>
+      <button id="btnAll" style="float:right;font-size:.76rem;padding:5px 12px;">전체 보기</button></h2>
+    <div id="list"></div>
+
+    <h2>학생별 워드브레인 현황</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>이름</th><th>반</th><th>기르는 단어</th><th>장기기억 🌳</th><th>물 줄 단어</th><th>응급</th><th>스트릭</th><th>인출 속도</th><th>마지막 활동</th></tr></thead>
+      <tbody id="ovBody"></tbody>
+    </table></div>
+  </div>
+</div>
+<div id="msg"></div>
+
+<script>
+'use strict';
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var token = null;
+  try { token = sessionStorage.getItem('wbv.admin'); } catch (e) {}
+  var showAll = false;
+  var items = [];
+
+  function msg(t) {
+    var el = $('#msg'); el.textContent = t; el.classList.add('show');
+    clearTimeout(msg._t); msg._t = setTimeout(function () { el.classList.remove('show'); }, 2200);
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  async function api(path, opt) {
+    var r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token } }, opt || {}));
+    var j = await r.json();
+    if (r.status === 401) { token = null; try { sessionStorage.removeItem('wbv.admin'); } catch (e) {} boot(); throw new Error('다시 로그인해 주세요'); }
+    if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+    return j;
+  }
+
+  $('#btnLogin').addEventListener('click', doLogin);
+  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+  async function doLogin() {
+    try {
+      var r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#pin').value }) });
+      var j = await r.json();
+      if (!r.ok) { $('#loginErr').textContent = j.error || '로그인 실패'; return; }
+      token = j.token;
+      try { sessionStorage.setItem('wbv.admin', token); } catch (e) {}
+      boot();
+    } catch (e) { $('#loginErr').textContent = '서버에 연결할 수 없습니다.'; }
+  }
+
+  $('#btnAll').addEventListener('click', function () {
+    showAll = !showAll;
+    $('#btnAll').textContent = showAll ? '대기만 보기' : '전체 보기';
+    renderList();
+  });
+
+  function typeLabel(t) { return { hanja: '한자어', english: '영어', native: '고유어' }[t] || t; }
+  function stLabel(s) { return { pending: '대기', approved: '승인됨', rejected: '반려됨' }[s] || s; }
+
+  function renderList() {
+    var list = items.filter(function (it) { return showAll || it.status === 'pending'; });
+    $('#pendingCount').textContent = items.filter(function (it) { return it.status === 'pending'; }).length;
+    if (!list.length) { $('#list').innerHTML = '<div class="card muted">검수할 항목이 없습니다.</div>'; return; }
+    $('#list').innerHTML = list.map(function (it, i) {
+      var cands = (it.candidates || []).map(function (c, k) {
+        return '<button class="cand" data-i="' + i + '" data-k="' + k + '"><b>' + esc(c.cue) + '</b><span>' + esc(c.scene) + '</span></button>';
+      }).join('');
+      var appr = it.approved ? '<p class="muted">승인본: <b>' + esc(it.approved.cue) + '</b> — ' + esc(it.approved.scene) + '</p>' : '';
+      return '<div class="card" data-key="' + esc(it.key) + '">' +
+        '<b style="font-size:1.05rem;color:#1B3A5C;">' + esc(it.word) + '</b>' +
+        '<span class="chip t-' + esc(it.type) + '">' + typeLabel(it.type) + '</span>' +
+        '<span class="chip st-' + esc(it.status) + '">' + stLabel(it.status) + '</span>' +
+        '<div class="muted">' + esc(it.meaning) + ' · 요청: ' + esc(it.requestedBy || '') + ' · ' + esc((it.at || '').slice(0, 10)) + '</div>' +
+        appr + cands +
+        '<label>승인할 연상 고리 (수정 가능)</label><input class="fCue" value="">' +
+        '<label>장면</label><textarea class="fScene"></textarea>' +
+        '<div class="row"><button class="primary bAppr">승인</button><button class="danger bRej">반려 (다음 요청 시 재생성)</button></div>' +
+        '</div>';
+    }).join('');
+
+    document.querySelectorAll('.cand').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var card = b.closest('.card');
+        card.querySelectorAll('.cand').forEach(function (x) { x.classList.remove('sel'); });
+        b.classList.add('sel');
+        var it = list[+b.dataset.i], c = it.candidates[+b.dataset.k];
+        card.querySelector('.fCue').value = c.cue;
+        card.querySelector('.fScene').value = c.scene;
+      });
+    });
+    document.querySelectorAll('.bAppr').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var card = b.closest('.card');
+        var cue = card.querySelector('.fCue').value.trim();
+        var scene = card.querySelector('.fScene').value.trim();
+        if (!cue || !scene) { msg('후보를 고르거나 직접 입력해 주세요'); return; }
+        try {
+          await api('/api/vocab/admin/review', { method: 'POST', body: JSON.stringify({ key: card.dataset.key, action: 'approve', cue: cue, scene: scene }) });
+          msg('승인했습니다'); refresh();
+        } catch (e) { msg(e.message); }
+      });
+    });
+    document.querySelectorAll('.bRej').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try {
+          await api('/api/vocab/admin/review', { method: 'POST', body: JSON.stringify({ key: b.closest('.card').dataset.key, action: 'reject' }) });
+          msg('반려했습니다'); refresh();
+        } catch (e) { msg(e.message); }
+      });
+    });
+  }
+
+  function renderOverview(students) {
+    students.sort(function (a, b) { return (b.emergency - a.emergency) || (b.due - a.due); });
+    $('#ovBody').innerHTML = students.length ? students.map(function (s) {
+      return '<tr><td><b>' + esc(s.name || s.code) + '</b></td><td>' + esc(s.cls || '') + '</td>' +
+        '<td class="num">' + s.total + '</td><td class="num">' + s.graduated + '</td>' +
+        '<td class="num' + (s.due ? ' warn' : '') + '">' + s.due + '</td>' +
+        '<td class="num' + (s.emergency ? ' warn' : '') + '">' + s.emergency + '</td>' +
+        '<td class="num">' + s.streak + '일</td>' +
+        '<td class="num">' + (s.msAvg ? (s.msAvg / 1000).toFixed(1) + '초' : '—') + '</td>' +
+        '<td class="muted">' + esc((s.lastActive || '').slice(0, 10)) + '</td></tr>';
+    }).join('') : '<tr><td colspan="9" class="muted">아직 연동된 학생이 없습니다.</td></tr>';
+  }
+
+  async function refresh() {
+    try {
+      var rv = await api('/api/vocab/admin/review');
+      items = rv.items || [];
+      renderList();
+      var ov = await api('/api/vocab/admin/overview');
+      renderOverview(ov.students || []);
+    } catch (e) { msg(e.message); }
+  }
+
+  function boot() {
+    var authed = !!token;
+    $('#login').hidden = authed;
+    $('#app').hidden = !authed;
+    if (authed) refresh();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

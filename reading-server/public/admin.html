@@ -62,6 +62,7 @@
 <body>
 <header><b>WB 진로독서 · 관리</b><small>강사용 현황판</small><span class="sp"></span>
   <button class="hbtn" id="linkReview" onclick="location.href='/review.html'">지문 검수</button>
+  <button class="hbtn" onclick="location.href='/admin/vocab-review.html'">연상 검수함</button>
   <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
   <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
 </header>
@@ -135,11 +136,12 @@ function render(){
     <div class="stat"><b>${linked.length}</b><span>앱 연동</span></div>
     <div class="stat"><b>${doneToday} / ${linked.length}</b><span>오늘의 1지문 완료</span></div>
     <div class="stat ${linked.length-doneToday>0?'warn':''}"><b>${linked.length-doneToday}</b><span>오늘 미수행</span></div>
+    <div class="stat ${DATA.vpending>0?'warn':''}"><b>${DATA.vpending||0}</b><span>연상 검수 대기</span></div>
   </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다. 학생 이름을 누르면 상세 기록이 열려요.</p></div>
   <div class="card"><h2>학생 현황판</h2>
     <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>보고서</th><th>붉은책</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
+      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>붉은책</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
         <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span></td>
         <td>${esc(s.cls||'—')}</td>
@@ -148,8 +150,10 @@ function render(){
           ${s.appLevel&&s.appLevel!==s.level&&s.level?`<span class="tag warn">앱:${s.appLevel}</span>`:''}</td>
         <td>${s.linked?(s.today?'<span class="tag ok">완료</span>':'<span class="tag bad">미수행</span>'):'<span class="tag muted">미연동</span>'}</td>
         <td>${s.streak}일</td><td>${s.week}/7</td><td>${s.reads}</td>
-        <td>${s.acc==null?'—':s.acc+'%'}</td><td>${s.vocab}</td><td>${s.reports}</td><td>${s.redbook}</td><td>${s.train}</td>
-        <td>${fmtLast(s.lastActive)}</td></tr>`).join('')||'<tr><td colspan="13" class="muted">학생이 없습니다. 아래에서 등록하세요.</td></tr>'}
+        <td>${s.acc==null?'—':s.acc+'%'}</td><td>${s.vocab}</td>
+        <td>${(v=>v&&v.total?`${v.due?`<span class="tag ${v.emergency?'bad':'warn'}">물 ${v.due}</span>`:'<span class="tag ok">말끔</span>'} 🌳${v.graduated}`:'<span class="muted">—</span>')(DATA.vmap&&DATA.vmap[s.code])}</td>
+        <td>${s.reports}</td><td>${s.redbook}</td><td>${s.train}</td>
+        <td>${fmtLast(s.lastActive)}</td></tr>`).join('')||'<tr><td colspan="14" class="muted">학생이 없습니다. 아래에서 등록하세요.</td></tr>'}
     </tbody></table></div></div>
   <div class="card"><h2>학생 등록 / 수정</h2>
     <p class="muted">같은 코드로 저장하면 수정됩니다. 학생은 앱 설정 → 선생님 연동에서 이 코드를 입력합니다.</p>
@@ -286,11 +290,16 @@ async function openDetail(code){
 }
 async function refresh(){
   try{
-    const [ov,bk]=await Promise.all([
+    const [ov,bk,vv,vr]=await Promise.all([
       api('/admin/overview'),
       api('/admin/backups').catch(()=>({backups:[]})),
+      api('/vocab/admin/overview').catch(()=>({students:[]})),
+      api('/vocab/admin/review').catch(()=>({items:[]})),
     ]);
-    DATA=ov;DATA.backups=bk.backups||[];render();
+    DATA=ov;DATA.backups=bk.backups||[];
+    DATA.vmap={};(vv.students||[]).forEach(s=>{DATA.vmap[s.code]=s;});
+    DATA.vpending=(vr.items||[]).filter(i=>i.status==='pending').length;
+    render();
   }
   catch(e){if(e.message!=='auth')renderLogin(e.message);}
 }

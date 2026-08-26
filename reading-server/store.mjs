@@ -10,7 +10,7 @@ const FILE = path.join(DIR, 'db.json');
 const BDIR = path.join(DIR, 'backups');
 const BACKUP_KEEP = 10;
 
-const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {} });
+const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {}, vocab: { states: {}, mnemos: {}, push: {} } });
 
 let db = empty();
 
@@ -38,7 +38,7 @@ function snapshotIfNeeded() {
     const f = path.join(BDIR, 'db-' + dayKey() + '.json');
     if (fs.existsSync(f)) return;
     fs.mkdirSync(BDIR, { recursive: true });
-    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states }));
+    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states, vocab: db.vocab }));
     const all = fs.readdirSync(BDIR).filter(x => /^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();
     all.slice(0, Math.max(0, all.length - BACKUP_KEEP)).forEach(x => fs.unlinkSync(path.join(BDIR, x)));
   } catch (e) { console.error('[store] 스냅샷 실패:', e.message); }
@@ -63,7 +63,7 @@ export function snapshotNow() {
   try {
     fs.mkdirSync(BDIR, { recursive: true });
     const f = path.join(BDIR, 'db-' + dayKey() + '.json');
-    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states }));
+    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states, vocab: db.vocab }));
     return dayKey();
   } catch (e) { return null; }
 }

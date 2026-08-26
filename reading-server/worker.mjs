@@ -4,6 +4,8 @@
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
+import { handleVocab, dumpVocab, sendNightPushes } from './vocab-api.mjs';
+
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
 const RL_MAX_FAILS = 20;           // 15분당 로그인 실패 허용 횟수
@@ -90,6 +92,37 @@ async function kvListAll(env, prefix) {
   return keys;
 }
 
+/* 워드브레인 저장소 어댑터 — vocab: 접두 키만 사용 (분리 가능한 격리) */
+function vocabStore(env) {
+  return {
+    getState: (c) => env.DB.get('vocab:state:' + c, 'json'),
+    putState: (c, rec) => env.DB.put('vocab:state:' + c, JSON.stringify(rec)),
+    listStateCodes: async () => (await kvListAll(env, 'vocab:state:')).map(k => k.slice('vocab:state:'.length)),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+    getMnemo: (k) => env.DB.get('vocab:mnemo:' + k, 'json'),
+    putMnemo: (k, rec) => env.DB.put('vocab:mnemo:' + k, JSON.stringify(rec)),
+    listMnemos: async () => {
+      const out = [];
+      for (const k of await kvListAll(env, 'vocab:mnemo:')) {
+        const v = await env.DB.get(k, 'json');
+        if (v) out.push(v);
+      }
+      return out;
+    },
+    getPush: (c) => env.DB.get('vocab:push:' + c, 'json'),
+    putPush: (c, rec) => env.DB.put('vocab:push:' + c, JSON.stringify(rec)),
+    delPush: (c) => env.DB.delete('vocab:push:' + c),
+    listPushCodes: async () => (await kvListAll(env, 'vocab:push:')).map(k => k.slice('vocab:push:'.length)),
+  };
+}
+function vocabPushEnv(env) {
+  return {
+    publicKey: env.VAPID_PUBLIC_KEY || '',
+    privateJwk: env.VAPID_PRIVATE_JWK || '',
+    subject: env.VAPID_SUBJECT || 'mailto:admin@wb.local',
+  };
+}
+
 async function fullDump(env) {
   const students = {}; const states = {};
   const codes = new Set();
@@ -104,7 +137,8 @@ async function fullDump(env) {
     if (stu) students[code] = stu;
     if (st) states[code] = st;
   }
-  return { service: 'wb-reading', savedAt: nowIso(), students, states };
+  const vocab = await dumpVocab(vocabStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab };
 }
 
 async function snapshotBackup(env) {
@@ -164,7 +198,9 @@ function parentSummary(stu, st, titles) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(snapshotBackup(env));
+    /* 12:00 UTC(21:00 KST) = 밤 9시 물주기 푸시 / 그 외(18:00 UTC) = 일일 백업 */
+    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) }));
+    else ctx.waitUntil(snapshotBackup(env));
   },
 
   async fetch(req, env) {
@@ -228,6 +264,17 @@ export default {
 
       const who = await auth(env, req);
       if (!who) return json(401, { error: '로그인이 필요합니다.' });
+
+      /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
+      if (p.startsWith('/api/vocab/')) {
+        const out = await handleVocab({
+          path: p, method: req.method, who,
+          getBody: () => req.json(), store: vocabStore(env),
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '' },
+          push: vocabPushEnv(env),
+        });
+        return json(out.status, out.body);
+      }
 
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = await env.DB.get('state:' + who.code, 'json');
