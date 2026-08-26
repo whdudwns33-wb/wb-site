@@ -17,6 +17,7 @@
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 import { validateRosterDocument } from './roster.js';
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { lessonCheckOwnerTransferStatement } from './lesson-history-transfer.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -400,6 +401,9 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       statements.push(env.DB.prepare(
         'UPDATE tasks SET owner=?, data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND updated_at=?'
       ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+      statements.push(lessonCheckOwnerTransferStatement(
+        env, app, current.task_id, String(taskRow.owner || ''), selectedStaffId, updatedAt
+      ));
 
       const oldStaffId = String(taskRow.owner || '');
       const otherOldLesson = await env.DB.prepare(
