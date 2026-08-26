@@ -277,6 +277,7 @@
 <!-- APP:BODY:END -->
 
   <script src="./words.js"></script>
+  <script src="./bridge.js"></script>
   <script src="./srs.js"></script>
   <script>
 /* APP:JS:START */
@@ -287,11 +288,16 @@
   var WORDS = {};
   WB_WORDS.forEach(function (w) { WORDS[w.id] = w; });
 
-  /* 한자 뿌리 가족 지도 */
+  /* 한자 뿌리 가족 지도 — 진로독서에서 온 단어도 심을 때 합류한다 */
   var FAMILY = {};
-  WB_WORDS.filter(function (w) { return w.type === 'hanja'; }).forEach(function (w) {
-    w.parts.forEach(function (p) { (FAMILY[p.ch] = FAMILY[p.ch] || []).push(w); });
-  });
+  function registerFamily(w) {
+    if (w.type !== 'hanja' || !w.parts) return;
+    w.parts.forEach(function (p) {
+      var fam = FAMILY[p.ch] = FAMILY[p.ch] || [];
+      if (!fam.some(function (o) { return o.id === w.id; })) fam.push(w);
+    });
+  }
+  WB_WORDS.forEach(registerFamily);
 
   var TYPE = {
     hanja: { label: '한자어', cls: 't-h', color: '#1E9DD6' },
@@ -302,10 +308,12 @@
   /* ── 저장소 ── */
   var KEY = 'wb-wordbrain-v1';
   var db;
-  function fresh() { return { states: {}, log: [], streak: { count: 0, last: null }, created: Date.now() }; }
+  function fresh() { return { states: {}, log: [], streak: { count: 0, last: null }, custom: {}, inboxDemo: [], created: Date.now() }; }
   function load() { try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 저장 불가 환경 */ } }
   db = load() || fresh();
+  db.custom = db.custom || {};
+  Object.keys(db.custom).forEach(function (k) { WORDS[k] = db.custom[k]; registerFamily(db.custom[k]); });
 
   function now() { return Date.now(); }
   function toast(msg) {
@@ -408,10 +416,13 @@
         if (keys.length) html += '<div class="fam"><span class="muted" style="font-size:.72rem;font-weight:700;align-self:center;">같은 뿌리</span>' + keys.map(function (k) { return '<span class="chip t-h">' + esc(k) + '</span>'; }).join('') + '</div>';
       }
     } else if (w.type === 'english') {
-      html += '<div class="hintbox mnem"><span class="lbl">찰떡 연상</span><p><b>' + esc(w.cue) + '</b></p><p class="muted" style="font-size:.84rem;">' + esc(w.scene) + '</p></div>';
+      if (w.cue) html += '<div class="hintbox mnem"><span class="lbl">찰떡 연상</span><p><b>' + esc(w.cue) + '</b></p><p class="muted" style="font-size:.84rem;">' + esc(w.scene) + '</p></div>';
+      else if (!compact) html += '<div class="hintbox mnem"><span class="lbl">찰떡 연상</span><p class="muted" style="font-size:.86rem;">연상 준비 중 — 실서비스에서는 AI가 내 취향으로 만든 연상이 강사 검수 후 여기에 붙어요.</p></div>';
       if (w.root && !compact) html += '<div class="hintbox"><span class="lbl">어원 뿌리</span><p><b>' + esc(w.root.stem) + '</b> = ' + esc(w.root.sense) + ' · 가족: ' + w.root.family.map(esc).join(', ') + '</p></div>';
+      if (w.base && !compact) html += '<div class="hintbox"><span class="lbl">기본형</span><p>' + esc(w.base) + '</p></div>';
     } else {
-      html += '<div class="hintbox scene"><span class="lbl">머릿속에 그려 보기</span><p>' + esc(w.scene) + '</p></div>';
+      if (w.scene) html += '<div class="hintbox scene"><span class="lbl">머릿속에 그려 보기</span><p>' + esc(w.scene) + '</p></div>';
+      else if (!compact) html += '<div class="hintbox scene"><span class="lbl">머릿속에 그려 보기</span><p class="muted" style="font-size:.86rem;">뜻이 살아나는 장면을 스스로 하나 그려 보세요 — 실서비스에선 AI 연상이 붙어요.</p></div>';
       if (!compact && w.syn) html += '<div class="fam">' + w.syn.map(function (s) { return '<span class="chip t-n">' + esc(s) + '</span>'; }).join('') + '</div>';
     }
     return html;
@@ -427,13 +438,16 @@
     var el = $('#view-garden');
     var t = now();
     var states = activeStates();
+    var inbox = getInbox();
     if (states.length === 0 && !Object.keys(db.states).length) {
       el.innerHTML =
         '<div class="card empty">' + plantSVG(0, 0) +
         '<h3>아직 심은 단어가 없어요</h3><p class="muted">단어를 심으면 화분이 생기고,<br>잊기 직전에 "물 줄 시간"을 알려 드려요.</p>' +
+        (inbox.length ? '<button class="btn coral big" id="btnEmptyInbox" style="margin-bottom:10px;">📬 도착한 씨앗 ' + inbox.length + '개 심기</button>' : '') +
         '<div class="row"><button class="btn primary" id="btnSample">샘플 정원 체험</button><button class="btn" id="btnFirstPlant">첫 단어 심기</button></div></div>';
       $('#btnSample').addEventListener('click', sampleGarden);
       $('#btnFirstPlant').addEventListener('click', function () { show('plant'); });
+      var ei = $('#btnEmptyInbox'); if (ei) ei.addEventListener('click', function () { show('plant'); });
       return;
     }
     var sum = WBSRS.summary(db.states, t);
@@ -451,6 +465,9 @@
       '<button class="btn big" id="btnGoPlant">🌱 새로 심기</button></div>';
     if ((hour >= 21 || hour < 5) && today.length > 0) {
       html += '<div class="night-banner"><div style="flex:1"><b>자기 전 3분 물주기</b><br><span style="font-size:.82rem;">오늘 심은 ' + today.length + '개, 깜빡이로 한 번 더 보고 자요 — 자는 동안 기억이 굳어요.</span></div><button class="btn" id="btnNight">시작</button></div>';
+    }
+    if (inbox.length) {
+      html += '<div class="night-banner" style="background:var(--deep);"><div style="flex:1"><b>📬 진로독서에서 씨앗 ' + inbox.length + '개 도착</b><br><span style="font-size:.82rem;">읽다가 몰랐던 단어가 진짜 내 단어예요 — 가장 먼저 심어요.</span></div><button class="btn" id="btnInboxGo">심으러</button></div>';
     }
     html += '<div class="filters">' + [['all', '전체'], ['hanja', '한자어'], ['native', '고유어'], ['english', '영어']].map(function (f) {
       return '<button data-f="' + f[0] + '" class="' + (filterType === f[0] ? 'on' : '') + '">' + f[1] + '</button>';
@@ -473,6 +490,7 @@
     if (sum.due) $('#btnWater').addEventListener('click', function () { startReview('review'); });
     $('#btnGoPlant').addEventListener('click', function () { show('plant'); });
     var nb = $('#btnNight'); if (nb) nb.addEventListener('click', function () { startBlink('today'); });
+    var ib = $('#btnInboxGo'); if (ib) ib.addEventListener('click', function () { show('plant'); });
     el.querySelectorAll('.filters button').forEach(function (b) {
       b.addEventListener('click', function () { filterType = b.dataset.f; renderGarden(); });
     });
@@ -490,10 +508,11 @@
     m.innerHTML =
       '<div style="display:flex;align-items:center;gap:14px;">' + plantSVG(WBSRS.stage(s), WBSRS.wither(s, t)) +
       '<div><span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
+      (w.source === 'reading' ? ' <span class="chip" style="background:#F4FAFD;color:var(--deep);">📖 진로독서에서 온 단어</span>' : '') +
       '<div class="qword" style="font-size:1.5rem;margin:2px 0;">' + esc(w.word) + (w.hanja ? ' <span class="muted" style="font-size:1rem;">' + w.hanja + '</span>' : '') + '</div>' +
       (w.pron ? '<div class="qpron">' + esc(w.pron) + '</div>' : '') + '</div></div>' +
       '<p style="margin:12px 0 4px;font-weight:700;color:var(--ink-strong);">' + esc(w.meaning) + '</p>' +
-      '<p class="muted" style="margin:0;">' + esc(w.example) + '</p>' +
+      (w.example ? '<p class="muted" style="margin:0;">' + esc(w.example) + '</p>' : '') +
       encodeBlock(w, false) +
       '<div class="steps">' + steps + '</div>' +
       '<p class="muted" style="font-size:.72rem;margin:4px 0 0;">기억 계단 ' + (s.graduated ? '졸업 🌳' : s.step + ' / 6 (30일 통과 + 3맥락이면 평생 숲으로)') + '</p>' +
@@ -523,24 +542,76 @@
     $('#overlay').innerHTML = '';
     try { speechSynthesis.cancel(); } catch (e) {}
     if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
+    if (speedTimer) { clearTimeout(speedTimer); speedTimer = null; }
     save(); render(curView); renderStreak();
   }
-  function setProg(i, n) { $('#ovProg').textContent = i + ' / ' + n; $('#ovBar').style.width = Math.round(i / n * 100) + '%'; }
+  function setProg(i, n) {
+    var p = $('#ovProg'), b = $('#ovBar');
+    if (!p || !b) return; /* 오버레이가 이미 닫혔으면 무시 */
+    p.textContent = i + ' / ' + n;
+    b.style.width = Math.round(i / n * 100) + '%';
+  }
+
+  /* ── 진로독서 어휘장 → 씨앗 도착함 (wbr.v1은 읽기만 — 쓰기 주체는 진로독서 앱) ── */
+  var SEED_BY_WORD = {};
+  WB_WORDS.forEach(function (w) { SEED_BY_WORD[w.word] = w; });
+  var DEMO_INBOX = [
+    { word: '발사체', easy: '인공위성 등을 우주로 쏘아 올리는 로켓', hanja: '發(쏠 발)+射(쏠 사)+體(몸 체)' },
+    { word: '궤도', easy: '위성이 지구 둘레를 따라 도는 일정한 길', hanja: '軌(바퀴 자국 궤)+道(길 도)' },
+    { word: '분석', easy: '자료를 잘게 나누어 자세히 살펴보는 것', hanja: '分(나눌 분)+析(가를 석)' },
+    { word: 'orbit', easy: '궤도 — 위성이 지구 둘레를 도는 길', lang: 'en' },
+    { word: '드넓다', easy: '활짝 트여 아주 넓다' }
+  ];
+  function readingVocabRaw() {
+    try {
+      var raw = localStorage.getItem('wbr.v1');
+      if (!raw) return [];
+      var s = JSON.parse(raw);
+      return (s && s.vocab) || [];
+    } catch (e) { return []; }
+  }
+  function getInbox() {
+    return WBBRIDGE.collectInbox(readingVocabRaw().concat(db.inboxDemo || []), { plantedIds: db.states, seedByWord: SEED_BY_WORD });
+  }
+  function registerCustom(w) {
+    if (WORDS[w.id]) return;
+    db.custom = db.custom || {};
+    db.custom[w.id] = w; WORDS[w.id] = w; registerFamily(w);
+  }
 
   /* ── 심기 메뉴 ── */
   function renderPlantMenu() {
     var el = $('#view-plant');
     var counts = { all: 0, hanja: 0, native: 0, english: 0 };
     WB_WORDS.forEach(function (w) { if (!db.states[w.id]) { counts.all++; counts[w.type]++; } });
+    var inbox = getInbox();
+    var inboxHtml = '';
+    if (inbox.length) {
+      var chips = inbox.slice(0, 6).map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join(' ');
+      if (inbox.length > 6) chips += ' <span class="chip" style="background:var(--card-2);color:var(--ink-soft);">+' + (inbox.length - 6) + '</span>';
+      inboxHtml = '<div class="card" style="border-color:#9CCBE3;background:#F4FAFD;margin-bottom:14px;">' +
+        '<b style="color:var(--deep);">📬 진로독서에서 도착한 씨앗 ' + inbox.length + '개</b>' +
+        '<p class="muted" style="margin:4px 0 10px;font-size:.84rem;">읽다가 몰랐던 단어들 — 가장 먼저 심어요.</p>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
+        '<button class="btn primary big" id="btnInbox">도착한 씨앗 심기 (최대 5개)</button></div>';
+    }
     el.innerHTML = '<h2 class="sec">새로 심기 — 한 번에 5개</h2>' +
       '<p class="muted" style="margin-top:-6px;">작업기억이 넘치지 않는 양이에요. 어종마다 외우는 방법이 달라요.</p>' +
+      inboxHtml +
       '<div class="pick-grid">' +
       pickBtn('all', '골고루 5개', '한자어·고유어·영어 섞어서 (남은 ' + counts.all + ')', '🌈', 'var(--card-2)') +
       pickBtn('hanja', '한자어', '한자 뿌리로 분해해서 조립 (남은 ' + counts.hanja + ')', '觀', '#E3F1F8') +
       pickBtn('native', '고유어', '장면을 머릿속에 그려서 (남은 ' + counts.native + ')', '늠', 'var(--green-soft)') +
       pickBtn('english', '영어', '찰떡 발음 연상 + 어원 뿌리 (남은 ' + counts.english + ')', 'A', 'var(--coral-soft)') +
       '</div>' +
-      '<p class="demo-note">실서비스에서는 진로독서 앱에서 "읽다가 몰랐던 단어"가 이 목록의 맨 앞에 자동으로 도착합니다.</p>';
+      '<p class="demo-note">📬 씨앗 도착함: 진로독서 앱 어휘장에 모은 단어가 자동으로 이곳에 도착해요.' + (inbox.length ? '' : ' 지금은 비어 있어요 — 리포트 탭 데모 도구의 "샘플 씨앗 받기"로 체험할 수 있어요.') + '</p>';
+    var bi = $('#btnInbox');
+    if (bi) bi.addEventListener('click', function () {
+      var batch = getInbox().slice(0, 5);
+      batch.forEach(registerCustom);
+      save();
+      runPlantSession(batch);
+    });
     el.querySelectorAll('.pick').forEach(function (b) {
       b.addEventListener('click', function () { startPlantSession(b.dataset.t); });
     });
@@ -551,9 +622,11 @@
 
   /* ── 심기 세션 ── */
   function startPlantSession(type) {
-    var pool = WB_WORDS.filter(function (w) { return !db.states[w.id] && (type === 'all' || w.type === type); });
+    var pool = WB_WORDS.filter(function (w) { return !db.states[w.id] && !w.source && (type === 'all' || w.type === type); });
     if (!pool.length) { toast('이 어종은 모두 심었어요!'); return; }
-    var batch = shuffle(pool).slice(0, 5);
+    runPlantSession(shuffle(pool).slice(0, 5));
+  }
+  function runPlantSession(batch) {
     var idx = 0, recallQ = [], retried = {};
     var body = openOverlay('새로 심기 · 부호화');
 
@@ -567,7 +640,7 @@
         (w.pron ? '<div class="qpron">[' + esc(w.pron) + ']</div>' : '') +
         '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
         encodeBlock(w, false) +
-        '<div class="divider"></div><div class="qex">예문 · ' + esc(w.example) + '</div>' +
+        (w.example ? '<div class="divider"></div><div class="qex">예문 · ' + esc(w.example) + '</div>' : '') +
         '<button class="say-btn" id="pSay">🔊 소리 내어 따라 읽기</button></div>' +
         '<div class="row" style="margin-top:14px;"><button class="btn primary big" id="pNext">외웠어요, 다음 →</button></div>';
       $('#pSay').addEventListener('click', function () { sayWord(w); });
@@ -650,7 +723,7 @@
         '<div class="qword' + (w.type === 'english' ? ' en' : '') + '">' + esc(w.word) + (w.hanja ? ' <span style="font-size:1rem;color:var(--ink-soft);">' + w.hanja + '</span>' : '') + '</div>' +
         '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
         encodeBlock(w, true) +
-        '<div class="qex">' + esc(w.example) + '</div>' +
+        (w.example ? '<div class="qex">' + esc(w.example) + '</div>' : '') +
         '<div class="grades"><button class="g-fail" id="gF">몰랐어</button><button class="g-hard" id="gH">알쏭해</button><button class="g-good" id="gG">알았어!</button></div>' +
         '<div class="feedback" id="qFb"></div>';
       sayWord(w);
@@ -666,7 +739,7 @@
         if (practice) fb = g === 'good' ? '좋아요!' : '한 번 더 보게 될 거예요';
         $('#qFb').textContent = fb;
         if (g === 'fail' && !practice && !failedOnce[id]) { failedOnce[id] = true; queue.push(id); total += 1; }
-        setTimeout(next, 700);
+        setTimeout(function () { if ($('#ovBody')) next(); }, 700);
       };
       $('#gF').addEventListener('click', function () { grade('fail'); });
       $('#gH').addEventListener('click', function () { grade('hard'); });
@@ -790,6 +863,7 @@
   }
 
   /* ── 스피드 리콜 깜빡이 ── */
+  var speedTimer = null;
   function startSpeed() {
     var pool = activeStates().filter(function (s) { return s.step >= 1; });
     if (!pool.length) { toast('먼저 물 주기로 한 번 이상 회상한 단어가 필요해요'); return; }
@@ -803,7 +877,6 @@
       var id = ids[i], w = WORDS[id];
       setProg(i + 1, ids.length);
       var shown = performance.now();
-      var timeout;
       body.innerHTML = '<div class="qcard"><span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
         '<div class="qword' + (w.type === 'english' ? ' en' : '') + '" style="font-size:2.4rem;">' + esc(w.word) + '</div>' +
         '<div class="ring"><i id="ringBar"></i></div>' +
@@ -811,14 +884,15 @@
       var bar = $('#ringBar');
       bar.style.transition = 'width ' + LIMIT + 'ms linear';
       requestAnimationFrame(function () { requestAnimationFrame(function () { bar.style.width = '0%'; }); });
-      timeout = setTimeout(function () { reveal(id, w, null); }, LIMIT);
+      speedTimer = setTimeout(function () { reveal(id, w, null); }, LIMIT);
       $('#spGot').addEventListener('click', function () {
-        clearTimeout(timeout);
+        clearTimeout(speedTimer); speedTimer = null;
         reveal(id, w, Math.round(performance.now() - shown));
       });
     }
 
     function reveal(id, w, ms) {
+      if (!$('#ovBody')) return; /* 세션이 이미 닫혔으면 무시 */
       body.querySelector('.qcard').innerHTML =
         '<div class="qword' + (w.type === 'english' ? ' en' : '') + '" style="font-size:1.6rem;">' + esc(w.word) + '</div>' +
         '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
@@ -912,14 +986,20 @@
         '<div class="legend"><span><i class="dot" style="background:#1E9DD6"></i>한자어 ' + byType.hanja + '</span><span><i class="dot" style="background:#4E9B57"></i>고유어 ' + byType.native + '</span><span><i class="dot" style="background:#E85D4A"></i>영어 ' + byType.english + '</span></div></div>' : '') +
       '<div class="card" style="margin-top:12px;"><b style="font-size:.86rem;color:var(--ink-strong);">학부모 한 줄 요약</b><p style="margin:6px 0 0;font-size:.92rem;">' + parentLine + '</p></div>' +
       '<h2 class="sec">데모 도구</h2>' +
-      '<div class="row"><button class="btn" id="dmDay">⏩ 하루 지나가기</button><button class="btn" id="dmSample">샘플 정원</button><button class="btn" id="dmReset">초기화</button></div>' +
-      '<p class="demo-note">"하루 지나가기"는 시연용 — 시간이 흐르면 화분이 어떻게 시드는지, 물 주기 간격이 어떻게 벌어지는지 바로 볼 수 있어요.</p>';
+      '<div class="row"><button class="btn" id="dmDay">⏩ 하루 지나가기</button><button class="btn" id="dmInbox">📬 샘플 씨앗 받기</button></div>' +
+      '<div class="row" style="margin-top:8px;"><button class="btn" id="dmSample">샘플 정원</button><button class="btn" id="dmReset">초기화</button></div>' +
+      '<p class="demo-note">"하루 지나가기"는 시연용 — 화분이 시드는 과정과 간격 확장을 바로 볼 수 있어요. "샘플 씨앗 받기"는 진로독서 어휘장에서 단어가 도착한 상황을 재현해요.</p>';
 
     $('#dmDay').addEventListener('click', function () {
       WBSRS.shiftTime(db.states, 1);
       db.log.forEach(function (l) { l.t -= DAY; });
       save(); toast('하루가 지났어요 — 정원을 확인해 보세요');
       renderReport();
+    });
+    $('#dmInbox').addEventListener('click', function () {
+      db.inboxDemo = DEMO_INBOX.slice();
+      save(); toast('진로독서에서 씨앗 ' + getInbox().length + '개가 도착했어요');
+      show('plant');
     });
     $('#dmSample').addEventListener('click', sampleGarden);
     $('#dmReset').addEventListener('click', function () {
@@ -978,6 +1058,7 @@
       for (var k = 0; k < n; k++) db.log.push({ t: t - d * DAY, kind: 'review', grade: 'good' });
     }
     db.streak = { count: 4, last: dstr(t - DAY) };
+    db.inboxDemo = DEMO_INBOX.slice(0, 3);
     save(); renderStreak();
     toast('샘플 정원을 불러왔어요');
     show('garden');
