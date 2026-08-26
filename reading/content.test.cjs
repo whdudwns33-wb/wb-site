@@ -16,6 +16,7 @@ const LIMITS = {
   L4: { min: 900, max: 1450, vocab: 5, q: 5 },
 };
 const QTYPES = new Set(['main', 'detail', 'vocab', 'infer', 'critical']);
+const CHTYPES = new Set(['main', 'detail', 'vocab', 'infer', 'critical', 'apply']); // 심화 문항
 const CATS = new Set(['science', 'society', 'history', 'humanities', 'environment']);
 const CAREERS = new Set(['eng','it','med','bio','nat','biz','media','law','edu','art','env','hum']);
 
@@ -64,6 +65,20 @@ function checkLevel(tag, lv, b, isDiag) {
       E(`${qt}: evidencePara 범위 오류`);
   });
   if (b.questions.length >= 4 && answerDist.size === 1) W(`${tag}: 정답 위치가 모두 같음`);
+  /* 심화 문항 (선택 — 신규 지문은 레벨당 2개 권장) */
+  if (b.challenge != null) {
+    if (!Array.isArray(b.challenge) || !b.challenge.length) E(`${tag}: challenge 형식 오류`);
+    else b.challenge.forEach((q, qi) => {
+      const qt = `${tag} 심화Q${qi + 1}`;
+      if (!CHTYPES.has(q.type)) E(`${qt}: type "${q.type}" 알 수 없음`);
+      if (!q.q) E(`${qt}: 발문 없음`);
+      if (!Array.isArray(q.choices) || q.choices.length !== 4) E(`${qt}: 선지 4개 아님`);
+      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3) E(`${qt}: answer 인덱스 오류`);
+      if (!q.explain) E(`${qt}: explain 없음`);
+      if (!Number.isInteger(q.evidencePara) || q.evidencePara < 0 || q.evidencePara >= b.paragraphs.length)
+        E(`${qt}: evidencePara 범위 오류`);
+    });
+  } else if (!isDiag) W(`${tag}: 심화 문항 없음 (신규 지문은 2개 권장)`);
 }
 
 let db;
@@ -86,6 +101,7 @@ const ids = new Set();
   if (!Array.isArray(a.careers) || !a.careers.length) E(`${tag}: careers 없음`);
   else a.careers.forEach(c => { if (!CAREERS.has(c)) E(`${tag}: career "${c}" 알 수 없음`); });
   if (!['published', 'draft'].includes(a.status)) E(`${tag}: status 오류`);
+  if (a.issue != null && typeof a.issue !== 'boolean') E(`${tag}: issue는 boolean`);
   if (!Array.isArray(a.sources) || !a.sources.length) E(`${tag}: sources 없음`);
   else a.sources.forEach(s => { if (!/^https:\/\//.test(s.url || '')) E(`${tag}: source URL https 아님`); });
   ['L2', 'L3', 'L4'].forEach(lv => {
