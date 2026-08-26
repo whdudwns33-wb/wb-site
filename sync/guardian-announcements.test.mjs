@@ -41,8 +41,8 @@ const json = (body, status) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' }
 });
 
-async function call(db, payload, auth = manager) {
-  const response = await handleGuardianAnnouncements({ DB: db }, 'task',
+async function call(db, payload, auth = manager, envPatch = {}) {
+  const response = await handleGuardianAnnouncements({ DB: db, ...envPatch }, 'task',
     { app: 'task', ...payload }, 'https://worker.example', auth, json);
   return { status: response.status, body: await response.json() };
 }
@@ -118,6 +118,32 @@ test('관리자 scope all만 목록·작성·게시·종료할 수 있고 migrat
   const result = await call(missing, { action: 'announcement_list' });
   assert.equal(result.status, 503);
   assert.equal(result.body.code, 'ANNOUNCEMENTS_NOT_READY');
+});
+
+test('선별 전달 모드 공지는 허용된 stable studentId 대상만 저장·게시한다', async () => {
+  const db = new TestD1(); seedRoster(db);
+  const selective = {
+    WB_GUARDIAN_CONTACT_ENABLED: 'false',
+    WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-a'
+  };
+  const all = await call(db, draft('notice-all-blocked'), manager, selective);
+  assert.equal(all.status, 403);
+  assert.equal(all.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+  const other = await call(db, draft('notice-other-blocked', {
+    targetType: 'students', studentIds: ['student-b']
+  }), manager, selective);
+  assert.equal(other.status, 403);
+  assert.equal(other.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+  const allowed = await call(db, draft('notice-allowed', {
+    targetType: 'students', studentIds: ['student-a']
+  }), manager, selective);
+  assert.equal(allowed.status, 200);
+  const published = await call(db, {
+    action: 'announcement_publish', announcementId: 'notice-allowed',
+    expectedRevision: allowed.body.announcement.revision
+  }, manager, selective);
+  assert.equal(published.status, 200);
+  assert.equal(published.body.announcement.status, 'published');
 });
 
 test('Worker authenticated action 경유에서도 원장 인증 공지만 허용한다', async () => {

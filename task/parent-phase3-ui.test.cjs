@@ -15,9 +15,11 @@ function block(startText, endText) {
 test('보호자 공지는 관리자 설정 안에서 선택 학생을 기본값으로 작성한다', () => {
   const source = block('function guardianAnnouncementsHtml()', '/* ── 보호자 연락처·발송 동의');
   assert.match(source, /data-guardian-announcements/);
-  assert.match(source, /const targetType = current \? current\.targetType : 'students'/);
+  assert.match(source, /const targetType = GUARDIAN_CONTACT_ENABLED && current \? current\.targetType : 'students'/);
+  assert.match(source, /filter\(student => guardianContactEnabledFor\(student\.id\)\)/);
   assert.match(source, /<option value="students"/);
   assert.match(source, /<option value="all"/);
+  assert.match(source, /지정된 테스트 학생만 보호자 공지 대상으로 선택할 수 있습니다/);
   assert.match(source, /모든 공지는 일정·운영·준비 안내용입니다\. 연락처·주소·상담\/내부 수업 메모를 입력하지 마세요/);
   assert.match(source, /전체 공지에는 학생 이름도 입력하지 마세요/);
   assert.match(html, /backupCard \+ guardianAnnouncementsHtml\(\) \+ viewGuardianContactPanel\(\)/);

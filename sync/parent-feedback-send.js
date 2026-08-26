@@ -21,6 +21,8 @@
  *     (막혔던 건을 원장이 수동으로 다시 시도할 때)
  */
 
+import { guardianDeliveryAllowed } from './guardian-delivery-policy.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
 const SOLAPI_TIMEOUT_MS = 8000;
@@ -95,9 +97,8 @@ function validateRequestShape(body) {
 /** 코드가 배포돼도 실제 발송은 이 다섯 가지가 모두 갖춰져야만 켜진다.
  *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
  *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
-function sendConfiguration(env) {
-  if (safeEqual(env.WB_GUARDIAN_CONTACT_ENABLED, 'false') ||
-      !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
+function sendConfiguration(env, studentId) {
+  if (!guardianDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
       !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
       !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_TEMPLATE_ID || !env.SOLAPI_SENDER_NUMBER) {
     return null;
@@ -300,7 +301,7 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: 'FIELDS_INCOMPLETE', status: 'content_approved_send_blocked' };
   }
 
-  const config = sendConfiguration(env);
+  const config = sendConfiguration(env, studentId);
   if (!config) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '학부모 알림톡 자동 발송이 아직 켜져 있지 않습니다', now0);

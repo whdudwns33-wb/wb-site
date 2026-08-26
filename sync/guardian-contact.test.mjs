@@ -100,6 +100,27 @@ test('director can register a phone and toggle consent', async () => {
   assert.equal(list.body.contacts[0].studentName, '테스트학생');
 });
 
+test('selective mode exposes the allowlist and accepts consent only for an exact stable studentId match', async () => {
+  const db = new TestD1(); seedStaff(db);
+  const selective = {
+    WB_GUARDIAN_CONTACT_ENABLED: 'false',
+    WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-test'
+  };
+  const list = await call(db, { auth: admin, action: 'list' }, selective);
+  assert.deepEqual(list.body.deliveryEnabledStudentIds, ['student-test']);
+  const allowed = await call(db, {
+    auth: admin, action: 'set', studentId: 'student-test', phone: '01012345678', consent: true
+  }, selective);
+  assert.equal(allowed.status, 200);
+
+  const denied = await call(db, {
+    auth: admin, action: 'set', studentId: 'student-test',
+    phone: '01099998888', consent: true
+  }, { ...selective, WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-other-id' });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+});
+
 test('contact import atomically creates and reuses one Acaflow student-number link', async () => {
   const db = new TestD1(); seedStaff(db);
   const set = await call(db, {

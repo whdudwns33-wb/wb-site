@@ -221,7 +221,7 @@ async function connected(db) {
   return { code: invited.body.code, cookie: exchanged.cookie.split(';')[0] };
 }
 
-test('global guardian pause blocks parent delivery and sessions but keeps teacher homework storage available', async () => {
+test('global guardian pause keeps teacher homework storage but blocks non-allowlisted parent access', async () => {
   const db = new TestD1(); seed(db); const today = seedToday(db);
   const disabledEnv = { ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false' };
   const invoke = async (action, body = {}, auth = null) => {
@@ -237,11 +237,51 @@ test('global guardian pause blocks parent delivery and sessions but keeps teache
   }, { scope: 'own', id: 'staff-a', role: 'staff' });
   assert.equal(stored.status, 200);
   assert.equal(stored.body.publication.publicHomework, '연산 2쪽');
-  for (const action of ['invite', 'announcement_publish', 'exchange', 'view', 'respond', 'submit_request']) {
-    const result = await invoke(action, {}, action === 'invite' ? { scope: 'all' } : null);
-    assert.equal(result.status, 503, action);
-    assert.equal(result.body.code, 'GUARDIAN_CONTACT_DISABLED', action);
-  }
+  const access = await invoke('access_set', {
+    studentId: 'student-a', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
+  }, { scope: 'all' });
+  assert.equal(access.status, 403);
+  assert.equal(access.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+  const invite = await invoke('invite', { studentId: 'student-a' }, { scope: 'all' });
+  assert.equal(invite.status, 403);
+  assert.equal(invite.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+  const preview = await invoke('preview', { studentId: 'student-a' }, { scope: 'all' });
+  assert.equal(preview.status, 403);
+  assert.equal(preview.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+});
+
+test('selective guardian mode exposes and permits only exact stable studentId matches', async () => {
+  const db = new TestD1(); seed(db); seedToday(db);
+  const selectiveEnv = {
+    ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false',
+    WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-a'
+  };
+  const invoke = async (action, body = {}, auth = null) => {
+    const response = await handleParentPortal(selectiveEnv, 'task', { app: 'task', action, ...body },
+      'https://whdudwns33-wb.github.io', auth,
+      (payload, status) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } }),
+      new Request('https://worker.example/parent-portal'));
+    return { status: response.status, body: await response.json() };
+  };
+  const list = await invoke('access_list', {}, { scope: 'all' });
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.body.deliveryEnabledStudentIds, ['student-a']);
+
+  const denied = await invoke('access_set', {
+    studentId: 'student-b', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
+  }, { scope: 'all' });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+
+  const allowed = await invoke('access_set', {
+    studentId: 'student-a', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
+  }, { scope: 'all' });
+  assert.equal(allowed.status, 200);
+  const invited = await invoke('invite', { studentId: 'student-a' }, { scope: 'all' });
+  assert.equal(invited.status, 200);
+  assert.match(invited.body.code, /^[a-f0-9]{48}$/);
+  assert.equal((await invoke('preview', { studentId: 'student-a' }, { scope: 'all' })).status, 200);
+  assert.equal((await invoke('invite', { studentId: 'student-b' }, { scope: 'all' })).status, 403);
 });
 
 test('신규 schema와 운영 027→035 적용 결과의 보호자 공개 구조가 같다', () => {
