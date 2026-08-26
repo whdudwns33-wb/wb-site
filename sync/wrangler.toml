@@ -11,6 +11,10 @@ WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"
 # 연락처는 보관하되 보호자 대상 발송·웹앱 접근·응답은 운영에서 일괄 중지한다.
 # 선생님의 숙제·준비물 입력은 내부 수업 기록과 학생 앱 공개용으로 계속 저장한다.
 WB_GUARDIAN_CONTACT_ENABLED = "false"
+# 선별 테스트가 필요할 때 값은 저장소에 쓰지 않고 다음 secret으로 stable studentId만 등록한다.
+# npx wrangler secret put WB_GUARDIAN_CONTACT_STUDENT_IDS --config sync/wrangler.toml
+# 수업 피드백 실제 발송 스위치도 secret으로만 관리한다.
+# npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED --config sync/wrangler.toml
 # 감사 가능한 배포 설정의 관리 담당. 기존 비밀 allowlist와 합쳐 적용한다.
 # 김남기, 김혜지 선생님은 QR 발급을 포함해 동일한 task 관리 권한을 가진다.
 TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479"

@@ -182,6 +182,22 @@ test('global guardian pause overrides an enabled feedback delivery switch', asyn
   assert.equal(fetches, 0);
 });
 
+test('global guardian pause permits only an exact stable studentId allowlist match', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db);
+  registerGuardian(db, '테스트학생');
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const r = await call(db, { auth: admin, requestKey }, {
+      WB_GUARDIAN_CONTACT_ENABLED: 'false',
+      WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-other,student-test'
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.status, 'sent');
+  });
+  assert.equal(fetches, 1);
+});
+
 test('only the director can trigger a manual retry, not the submitting teacher', async () => {
   const db = new TestD1();
   const { requestKey } = seedFeedback(db);

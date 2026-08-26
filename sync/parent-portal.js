@@ -8,6 +8,7 @@ import {
   handleGuardianAnnouncements,
   listActiveGuardianAnnouncements
 } from './guardian-announcements.js';
+import { guardianDeliveryAllowed, guardianDeliveryStudentIds } from './guardian-delivery-policy.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_OPAQUE = /^[a-f0-9]{48}$/i;
@@ -212,6 +213,10 @@ export async function issueGuardianPortalInvite(env, options = {}) {
   if (!SAFE_ID.test(studentId)) {
     return { ok: false, status: 400, errorCode: 'STUDENT_INVALID', error: '학생을 확인해 주세요' };
   }
+  if (!guardianDeliveryAllowed(env, studentId)) {
+    return { ok: false, status: 403, errorCode: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '이 학생은 학부모 전달 테스트 대상이 아닙니다' };
+  }
   const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
   const found = await rosterStudent(env, studentId, now);
   if (found.error) return { ok: false, status: 409, errorCode: found.code, error: found.error };
@@ -274,6 +279,11 @@ async function exchangeInvite(env, body, origin, json, request) {
   ).bind('task', codeHash).first();
   if (!codeRow) return json({ ok: false, code: 'LINK_INVALID', error: '올바르지 않은 보호자 초대 링크입니다' }, 410, origin);
   const studentId = String(codeRow.student_id || '');
+  if (!guardianDeliveryAllowed(env, studentId)) {
+    await env.DB.prepare('UPDATE guardian_portal_codes SET revoked=1 WHERE app=? AND code_hash=?')
+      .bind('task', codeHash).run();
+    return json({ ok: false, code: 'LINK_INVALID', error: '사용할 수 없는 보호자 초대 링크입니다' }, 410, origin);
+  }
   const found = await rosterStudent(env, studentId, now);
   if (found.error) {
     await env.DB.prepare('UPDATE guardian_portal_codes SET revoked=1 WHERE app=? AND code_hash=?').bind('task', codeHash).run();
@@ -374,6 +384,11 @@ async function portalSession(env, rawToken, now) {
     'WHERE app=? AND token_hash=? AND revoked=0 AND expires_at>=? LIMIT 1'
   ).bind('task', tokenHash, now).first();
   if (!row) return null;
+  if (!guardianDeliveryAllowed(env, String(row.student_id || ''))) {
+    await env.DB.prepare('UPDATE guardian_portal_sessions SET revoked=1 WHERE app=? AND token_hash=?')
+      .bind('task', tokenHash).run();
+    return null;
+  }
   const found = await rosterStudent(env, row.student_id, now);
   if (found.error) {
     await env.DB.prepare('UPDATE guardian_portal_sessions SET revoked=1 WHERE app=? AND token_hash=?')
@@ -891,7 +906,8 @@ async function publicationList(env, body, auth, origin, json) {
     if (!current || current.owner !== actorId) continue;
     publications.push(publicationStaffView(row));
   }
-  return json({ ok: true, publications }, 200, origin);
+  return json({ ok: true, publications,
+    deliveryEnabledStudentIds: guardianDeliveryStudentIds(env) }, 200, origin);
 }
 
 async function publicationSet(env, body, auth, origin, json) {
@@ -1352,6 +1368,10 @@ async function previewPortal(env, body, auth, origin, json) {
   }
   const studentId = String(body.studentId || '');
   if (!SAFE_ID.test(studentId)) return json({ ok: false, error: '학생을 확인해 주세요' }, 400, origin);
+  if (!guardianDeliveryAllowed(env, studentId)) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '이 학생은 학부모 전달 테스트 대상이 아닙니다' }, 403, origin);
+  }
   const now = Date.now();
   const found = await rosterStudent(env, studentId, now);
   if (found.error) return json({ ok: false, code: found.code, error: found.error }, 409, origin);
@@ -1464,7 +1484,8 @@ async function portalAccess(env, body, auth, origin, json) {
         updatedAt: Number(row.updated_at)
       });
     }
-    return json({ ok: true, access }, 200, origin);
+    return json({ ok: true, access,
+      deliveryEnabledStudentIds: guardianDeliveryStudentIds(env) }, 200, origin);
   }
   if (!allowedKeys(body, ['auth', 'studentId', 'enabled', 'scopeVersion', 'expectedUpdatedAt'])) {
     return json({ ok: false, error: '허용되지 않은 입력이 있습니다' }, 400, origin);
@@ -1478,6 +1499,10 @@ async function portalAccess(env, body, auth, origin, json) {
   if (body.enabled && Number(body.scopeVersion) !== CURRENT_PORTAL_SCOPE_VERSION) {
     return json({ ok: false, code: 'PORTAL_CONSENT_VERSION_REQUIRED',
       error: '학원 공지와 교재 준비·수령 상태까지 포함한 새 이용 범위 동의를 확인해 주세요' }, 409, origin);
+  }
+  if (body.enabled && !guardianDeliveryAllowed(env, studentId)) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '이 학생은 학부모 전달 테스트 대상이 아닙니다' }, 403, origin);
   }
   const before = await env.DB.prepare(
     'SELECT enabled,guardian_identity_hash,scope_version,accepted_at,updated_at FROM guardian_portal_access ' +
@@ -1558,15 +1583,8 @@ export async function handleParentPortal(env, app, body, origin, auth, json, req
   if (app !== 'task') return json({ ok: false, error: '보호자 웹앱은 task에서만 사용할 수 있습니다' }, 400, origin);
   body = body && typeof body === 'object' ? body : {};
   const action = String(body.action || '');
-  // publication_set은 담당 선생님의 내부 수업 기록 저장이며, 보호자 접근은 아래 view·exchange 차단으로 계속 막는다.
-  const disabledActions = new Set([
-    'access_set', 'invite', 'announcement_save', 'announcement_publish',
-    'exchange', 'view', 'respond', 'submit_request'
-  ]);
-  if (String(env.WB_GUARDIAN_CONTACT_ENABLED || '').trim() === 'false' && disabledActions.has(action)) {
-    return json({ ok: false, code: 'GUARDIAN_CONTACT_DISABLED',
-      error: '학부모 연락 기능은 현재 사용하지 않습니다' }, 503, origin);
-  }
+  // 전역 중지 상태에서도 비공개 studentId 허용목록에 포함된 테스트 학생만 각 기능 내부에서 통과한다.
+  // publication_set은 내부 수업 기록과 학생 앱 공개용이라 기존처럼 모든 수업에서 저장할 수 있다.
   if (action === 'access_list' || action === 'access_set') return portalAccess(env, body, auth, origin, json);
   if (action === 'invite') return issueInvite(env, body, auth, origin, json);
   if (action === 'preview') return previewPortal(env, body, auth, origin, json);

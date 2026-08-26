@@ -389,11 +389,15 @@ test('each lesson selects one subject while preserving the student multi-subject
   assert.match(studentChange, /if \(session\.isAdmin\) \{[\s\S]{0,100}draft\.staffId = ''/);
 });
 
-test('feedback workflow is visibly paused and remains blocked in the stale click handler', () => {
+test('feedback workflow stays paused except for the server-provided stable studentId allowlist', () => {
   assert.match(html, /const GUARDIAN_CONTACT_ENABLED = false/);
-  assert.doesNotMatch(html, /data-act="feedbacksubmit">📱 보호자께 발송/);
+  assert.match(html, /let guardianDeliveryStudentIds = new Set\(\)/);
+  assert.match(html, /function guardianContactEnabledFor\(studentId\)/);
+  assert.match(html, /applyGuardianDeliveryStudentIds\(result\.deliveryEnabledStudentIds\)/);
+  assert.match(html, /data-act="feedbacksubmit">보호자 알림톡 보내기/);
   assert.match(html, /학부모 연락 기능 사용 중지/);
-  assert.match(html, /if \(!GUARDIAN_CONTACT_ENABLED\) return toast\('학부모 메시지 발송 기능은 현재 사용하지 않습니다'\)/);
+  assert.match(html, /if \(!guardianContactEnabledFor\(task && task\.studentId\)\) return toast\('이 학생은 학부모 전달 테스트 대상이 아닙니다'\)/);
+  assert.match(html, /confirm\('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요\?'\)/);
   assert.match(html, /sync\.post\('\/feedback-request'/);
   assert.match(html, /sync\.post\('\/feedback-review'/);
   assert.match(html, /action: 'list', limit: 100/);
