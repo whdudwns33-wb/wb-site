@@ -1,7 +1,7 @@
 'use strict';
 /* 워드브레인 서버 라우트 검증 (node reading-server/vocab-api.test.mjs) */
 import assert from 'node:assert';
-import { handleVocab, parseCandidates, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, parseCandidates, parseVerdict, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -242,6 +242,37 @@ await t('야간 발송 — 물 줄 단어 있는 구독자만, 410은 구독 정
   assert.strictEqual(store.getPush('gone'), null, '410 → 구독 정리');
   const noVapid = await sendNightPushes({ store, push: { publicKey: '', privateJwk: '' } });
   assert.strictEqual(noVapid.reason, 'no-vapid');
+});
+
+await t('문장 짓기 — 판정 왕복, 빈 문장·과길이·키없음 처리', async () => {
+  const store = memStore();
+  const judge = async ({ sentence }) => ({ ok: true, verdict: sentence.includes('별') ? 'good' : 'ok', feedback: '잘 썼어요.', better: '천문대에서 별을 관측했다.' });
+  const call2 = (body, ai) => call(store, {
+    path: '/api/vocab/sentence', method: 'POST', getBody: async () => body,
+    ai: Object.assign({ apiKey: 'k', judge }, ai || {}),
+  });
+  const r = await call2({ word: '관측', meaning: '살펴 재기', type: 'hanja', sentence: '밤하늘의 별을 관측했다.' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.verdict, 'good');
+  assert.ok(r.body.better.length > 0);
+  assert.strictEqual((await call2({ word: '관측', meaning: 'm', type: 'hanja', sentence: '' })).status, 400, '빈 문장 400');
+  assert.strictEqual((await call2({ word: '관측', meaning: 'm', type: 'hanja', sentence: 'x'.repeat(400) })).status, 400, '과길이 400');
+  assert.strictEqual((await call2({ word: '관측', meaning: 'm', type: 'zzz', sentence: '가' })).status, 400, '잘못된 어종 400');
+  const noKey = await call(store, {
+    path: '/api/vocab/sentence', method: 'POST',
+    getBody: async () => ({ word: '관측', meaning: 'm', type: 'hanja', sentence: '별을 관측했다.' }),
+    ai: { apiKey: null },
+  });
+  assert.strictEqual(noKey.body.ok, false);
+  assert.strictEqual(noKey.body.reason, 'no-key');
+});
+
+await t('parseVerdict — 펜스·잡음 견디고 불량은 null', () => {
+  const v = parseVerdict('설명\n```json\n{"verdict":"ok","feedback":"좋아요","better":"예문"}\n```');
+  assert.deepStrictEqual(v, { verdict: 'ok', feedback: '좋아요', better: '예문' });
+  assert.strictEqual(parseVerdict('{"verdict":"nope","feedback":"x"}'), null, '허용 안 된 verdict');
+  assert.strictEqual(parseVerdict('{"verdict":"good"}'), null, 'feedback 없음');
+  assert.strictEqual(parseVerdict('그냥 텍스트'), null);
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');

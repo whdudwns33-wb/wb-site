@@ -4,7 +4,7 @@
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
-import { handleVocab, dumpVocab, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -167,7 +167,7 @@ async function titleMap(env, origin) {
   return TITLE_CACHE.map;
 }
 
-function parentSummary(stu, st, titles) {
+function parentSummary(stu, st, titles, vst) {
   const sum = summarize(stu.code, stu, st);
   const S = (st && st.state) || {};
   const days = S.days || {};
@@ -193,6 +193,7 @@ function parentSummary(stu, st, titles) {
     today: sum.today, streak: sum.streak, week: sum.week, weekDays,
     reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
     recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
+    wordbrain: vocabSummary(vst),
   };
 }
 
@@ -259,7 +260,8 @@ export default {
         ]);
         if (!stu) return json(404, { error: '학생 정보를 찾을 수 없어요.' });
         const titles = await titleMap(env, url.origin);
-        return json(200, parentSummary(stu, st, titles));
+        const vst = await vocabStore(env).getState(code);
+        return json(200, parentSummary(stu, st, titles, vst));
       }
 
       const who = await auth(env, req);
