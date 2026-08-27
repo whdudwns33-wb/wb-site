@@ -3,10 +3,10 @@
   "catalogResetAt": "2026-08-27T15:55:00+09:00",
   "note": "교재 DB를 새 체계로 다시 등록하기 위해 기존 교재 목록을 초기화했습니다.",
   "vendors": [
-    { "name": "청암출판사", "type": "phone", "brands": [], "note": "취급 출판사 목록 확인 필요" },
-    { "name": "천재출판사", "type": "phone", "brands": ["천재교육", "YBM 시사영어", "디딤돌", "골드교육", "길벗스쿨", "NE능률", "월드컴에듀", "씨마스"], "note": "" },
-    { "name": "상형출판사", "type": "phone", "brands": ["마더텅", "이투스", "성지출판(수학의 정석)", "비전", "매그넘", "한국수학평가원"], "note": "" },
-    { "name": "동아출판사", "type": "phone", "brands": ["동아출판", "비상교육", "좋은책신사고", "에듀왕", "이룸E&B", "미래엔"], "note": "" },
+    { "name": "청암출판사", "displayName": "청암총판", "type": "phone", "brands": [], "note": "취급 출판사 목록 확인 필요" },
+    { "name": "천재출판사", "displayName": "천재총판", "type": "phone", "brands": ["천재교육", "YBM 시사영어", "디딤돌", "골드교육", "길벗스쿨", "NE능률", "월드컴에듀", "씨마스"], "note": "" },
+    { "name": "상형출판사", "displayName": "상형총판", "type": "phone", "brands": ["마더텅", "이투스", "성지출판(수학의 정석)", "비전", "매그넘", "한국수학평가원"], "note": "" },
+    { "name": "동아출판사", "displayName": "동아총판", "type": "phone", "brands": ["동아출판", "비상교육", "좋은책신사고", "에듀왕", "이룸E&B", "미래엔"], "note": "" },
     { "name": "쿠팡", "type": "online", "orderUrl": "https://www.coupang.com", "note": "온라인 직접 주문 — 문자 발주 대상 아님" }
   ],
   "books": []
