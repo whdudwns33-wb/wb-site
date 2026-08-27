@@ -92,6 +92,11 @@ function occursOn(task, date) {
   }
 }
 
+/** 교재 주문은 교재 탭의 별도 상태 흐름에서 처리하므로 일반 업무 수행 보고에 넣지 않는다. */
+function isBookOrderWorkTask(task) {
+  return !!task && /^\[주문\]\s*/.test(String(task.title || ''));
+}
+
 function parseObjectJson(value, label) {
   let parsed;
   try {
@@ -124,7 +129,7 @@ export function summarizeReportRows(taskRows, checkRows, staffId, reportDate) {
     const task = parseObjectJson(row.data, 'TASK');
     if (String(row.id || '') !== String(task.id || '')) throw new Error('TASK_ID_MISMATCH');
     if (String(task.staffId || '') !== staffId) throw new Error('TASK_OWNER_MISMATCH');
-    if (occursOn(task, reportDate)) tasks.push(task);
+    if (!isBookOrderWorkTask(task) && occursOn(task, reportDate)) tasks.push(task);
   }
 
   const taskIds = new Set(tasks.map(task => String(task.id)));
