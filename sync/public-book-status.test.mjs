@@ -69,10 +69,10 @@ async function addSnapshotTask(db, taskId, items, createdAt = NOW) {
   }
 }
 
-function addTask(db, id, bookId, title, studentIds, updatedAt = NOW) {
+function addTask(db, id, bookId, title, studentIds, updatedAt = NOW, orderDelivery = 'scheduled_batch_v1') {
   const task = {
     id, staffId: 'teacher-a', title: '[주문] 내부 문구', detail: '업체 메모 010-9999-8888',
-    guide: '교사 메모는 노출하지 않음', deleted: false, orderDelivery: 'scheduled_batch_v1',
+    guide: '교사 메모는 노출하지 않음', deleted: false, orderDelivery,
     orderVendor: '비밀출판사', orderItems: [{ bookId, title, studentIds }]
   };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
@@ -156,6 +156,27 @@ test('legacy order/send/fulfillment rows without an immutable student identity s
   const result = await readPublicBookStatus({ DB: db }, 'student-a', NOW);
   assert.deepEqual(result.rows, []);
   assert.doesNotMatch(JSON.stringify(result), /provider|SECRET|safe_error|status_code/i);
+});
+
+test('bound print receipt is guardian-safe without a send while scheduled receipt still requires an accepted send', async () => {
+  const db = new TestD1(); seed(db);
+  const boundTaskId = 'ord_bound_guardian';
+  const scheduledTaskId = 'ord_scheduled_no_send';
+  const boundBookId = 'BOUND_' + 'a'.repeat(48);
+  await addSnapshotTask(db, boundTaskId, [{ bookId: boundBookId, studentIds: ['student-a'] }], NOW + 2);
+  addTask(db, boundTaskId, boundBookId, '제본 내부 제목', ['student-a'], NOW + 2, 'bound_print_v1');
+  addFulfillment(db, boundTaskId, boundBookId, ['student-a'], 'teacher_received', NOW + 2);
+
+  await addSnapshotTask(db, scheduledTaskId, [{ bookId: 'BK-SCHEDULED', studentIds: ['student-a'] }], NOW + 1);
+  addTask(db, scheduledTaskId, 'BK-SCHEDULED', '일반 주문 내부 제목', ['student-a'], NOW + 1);
+  addFulfillment(db, scheduledTaskId, 'BK-SCHEDULED', ['student-a'], 'teacher_received', NOW + 1);
+
+  const result = await readPublicBookStatus({ DB: db }, 'student-a', NOW + 3);
+  assert.deepEqual(result.rows, [{
+    kind: 'order', title: '주문 교재', stage: 'academy_received', label: '학원 도착', updatedAt: NOW + 2
+  }]);
+  assert.deepEqual(Object.keys(result.rows[0]).sort(), ['kind', 'label', 'stage', 'title', 'updatedAt']);
+  assert.doesNotMatch(JSON.stringify(result), /bound|scheduled|student-a|teacher-a|BOUND_|BK-SCHEDULED|제본 내부|일반 주문/);
 });
 
 test('mismatched issue identities and all unsealed order titles fail closed', async () => {
