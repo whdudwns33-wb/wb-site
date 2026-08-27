@@ -31,6 +31,7 @@
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 고정된 원장 수신처 카카오 알림톡
  *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
  *   POST /book-order { app, auth, action:'create'|'cancel', ... } → 학생 정체성이 봉인된 주문 생성·취소
+ *   POST /book-catalog { app, auth, action:'list'|'review_approve' } → 완료 일반 교재 목록·관리자 후보 확정
  *   POST /book-add-request { app, auth, ... }     → 직원, 새 교재를 교재 목록에 추가해 달라고 신청
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
  *   POST /book-edit-request { app, auth, ... }     → 직원, 기존 교재 정보를 고쳐 달라고 신청
@@ -68,6 +69,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleBookIssue } from './book-issue.js';
+import { handleBookCatalog } from './completed-book-catalog.js';
 import { handleTransport } from './transport.js';
 import { handleOnboardingPatch } from './onboarding.js';
 import { handleParentPortal } from './parent-portal.js';
@@ -325,7 +327,7 @@ function sameLegacyOrderCancellation(stored, incoming) {
 }
 
 async function hasUnsafeGenericScheduledOrder(env, app, entries) {
-  const protectedDeliveries = new Set(['scheduled_batch_v1', 'bound_print_v1']);
+  const protectedDeliveries = new Set(['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1']);
   const scheduled = entries.filter(entry => entry.table === 'tasks' && entry.change &&
     entry.change.data && protectedDeliveries.has(String(entry.change.data.orderDelivery || '')));
   const ids = [...new Set(scheduled.map(entry => String(entry.change.id || '')).filter(Boolean))];
@@ -1639,7 +1641,7 @@ async function handleCurriculum(env, app, body, origin, resolvedAuth) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
     const allowed = (env.ALLOW_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -1758,7 +1760,12 @@ export default {
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
-        return await handleBookIssue(env, app, body, okOrigin, auth, json);
+        return await handleBookIssue(env, app, body, okOrigin, auth, json, ctx);
+      }
+      if (url.pathname === '/book-catalog') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleBookCatalog(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/transport') {
         const auth = await resolveAuth(env, app, body.auth);

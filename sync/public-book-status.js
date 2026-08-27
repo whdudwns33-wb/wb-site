@@ -1,6 +1,7 @@
 import { validateRosterDocument } from './roster.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const ORDER_DELIVERIES = new Set(['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1']);
 const ISSUE_STAGES = {
   prepared: ['preparing', '교재 준비 중'],
   issued: ['ready_for_handoff', '학생 전달 준비'],
@@ -237,7 +238,10 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
       if (!fulfillmentValid) continue;
       const cancelledAt = cancellations.get(taskId) || 0;
       const send = sendByTask.get(taskId) || null;
-      const boundPrint = deliveryByTask.get(taskId) === 'bound_print_v1';
+      // 037 이전 호환 snapshot에는 task 행이 없을 수 있으며 당시 유일한 방식은 문자 일괄 주문이었다.
+      const delivery = deliveryByTask.has(taskId) ? deliveryByTask.get(taskId) : 'scheduled_batch_v1';
+      if (!ORDER_DELIVERIES.has(delivery)) continue;
+      const boundPrint = delivery === 'bound_print_v1';
       if (boundPrint && !fulfillment) continue;
       if (fulfillment && !boundPrint && (!send || String(send.status) !== 'accepted')) continue;
       if (cancelledAt && (fulfillment || (send && ['reserved', 'dispatching', 'accepted', 'unknown'].includes(String(send.status))))) continue;

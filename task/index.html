@@ -613,6 +613,7 @@
   .book-order-kind[open] .book-order-kind-state .when-open { display: inline; }
   .book-order-kind[open] .book-order-kind-state .when-closed { display: none; }
   .book-order-kind-body { padding: 14px; }
+  .book-order-kind-body output.in { display: flex; align-items: center; min-height: 44px; background: var(--light-gray); }
   .bound-book-options { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
   .bound-book-option { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); color: var(--navy); font-size: 13px; font-weight: 900; cursor: pointer; }
   .bound-book-option.is-selected { border-color: #77B9DB; background: #F0F9FF; }
@@ -628,7 +629,7 @@
   .book-order-history[open] .book-order-kind-state .when-open { display: inline; }
   .book-order-history[open] .book-order-kind-state .when-closed { display: none; }
   .book-order-history-body { padding: 14px; }
-  .book-order-history-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+  .book-order-history-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
   .book-order-history-toolbar .field { margin: 0; }
   .book-order-history-toolbar .btn { min-height: 44px; }
   .book-order-history-list { display: grid; gap: 8px; margin-top: 12px; }
@@ -992,11 +993,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.10"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.10"></script>
-<script src="./asset-core.js?v=2026-08-27.10"></script>
-<script src="./qr-core.js?v=2026-08-27.10"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.10"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.11"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.11"></script>
+<script src="./asset-core.js?v=2026-08-27.11"></script>
+<script src="./qr-core.js?v=2026-08-27.11"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.11"></script>
 <script>
 "use strict";
 
@@ -1470,7 +1471,7 @@ const sync = {
       let applied = 0;
       const pending = this.collect(Number(state.settings.pushAt) || 0);
       let refreshBookOrders = pending.some(change => change && change.table === 'tasks' && change.data &&
-        ['scheduled_batch_v1', 'bound_print_v1'].includes(change.data.orderDelivery));
+        ['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1'].includes(change.data.orderDelivery));
       let reconcileQueued = false;
       let reconcileOutstanding = 0;
       const queueOnboardingReconcile = eligible => {
@@ -1515,7 +1516,7 @@ const sync = {
         }
         nextAccessRole = responseAccessRole;
         refreshBookOrders = refreshBookOrders || (d.changes || []).some(change => change && change.table === 'tasks' &&
-          change.data && ['scheduled_batch_v1', 'bound_print_v1'].includes(change.data.orderDelivery));
+          change.data && ['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1'].includes(change.data.orderDelivery));
         applied += this.apply(d.changes);
         state.settings.pullAt = d.now;
         if (batchReconcileCount) {
@@ -1656,6 +1657,29 @@ let onboardingStatusFilter = 'active';
 let onboardingRestoreFocus = null;
 const onboardingPatchSequence = new Map();
 const onboardingServerConfirmedAt = new Map();
+const EXTERNAL_PUBLISHER_UNLISTED = '__unlisted__';
+const EXTERNAL_BOOK_DIRECT = '__direct__';
+const EXTERNAL_BOOK_PUBLISHERS = [
+  ['천재교육', '천재출판사'], ['디딤돌', '천재출판사'], ['YBM', '천재출판사'],
+  ['길벗스쿨', '천재출판사'], ['와칭국어', '천재출판사'],
+  ['미래앤', '동아출판사'], ['동아', '동아출판사'], ['지학사', '동아출판사'],
+  ['입시플라이', '동아출판사'], ['능률', '동아출판사'], ['백발백중', '동아출판사'],
+  ['개념원리', '동아출판사'], ['RPM', '동아출판사'],
+  ['비상', '청암출판사'], ['세듀', '청암출판사'], ['수경', '청암출판사'],
+  ['메가스터디', '청암출판사'], ['교학사', '청암출판사'], ['다락원', '청암출판사'],
+  ['이투스', '상형출판사'], ['마더텅', '상형출판사']
+].map(row => ({ publisherName: row[0], vendorName: row[1] }));
+function emptyExternalBookDraft() {
+  return { publisherValue: '', publisherName: '', vendorName: '', bookValue: '', bookId: '',
+    title: '', studentIds: [], unitPrice: '', taskId: '' };
+}
+let completedBookCatalog = [], completedBookCatalogReviewCandidates = [];
+let completedBookCatalogLoaded = false, completedBookCatalogLoading = false, completedBookCatalogError = '';
+let completedBookCatalogLoadPromise = null, completedBookCatalogPendingRefreshTimer = null;
+let completedBookCatalogReloadQueued = false;
+const completedBookCatalogScheduledPendingIds = new Set();
+let bookCatalogReviewTarget = null, bookCatalogReviewSubmitting = false;
+let externalBookDraft = emptyExternalBookDraft(), externalBookSubmitting = false;
 const BOUND_BOOK_OPTIONS = [
   { productCode: 'pages_1_30', label: '1~30 장 - 4,000원', price: 4000 },
   { productCode: 'pages_31_60', label: '31~60 장 - 7,000원', price: 7000 },
@@ -1668,6 +1692,7 @@ let bookIssueRows = [], bookOrderRows = [], bookIssueLoaded = false, bookIssueLo
 let bookIssueFilter = 'all', bookIssueSearchQuery = '', bookIssueRestoreFocus = null;
 let boundBookOptionCode = '', boundBookSubmitting = false;
 let bookOrderHistoryTeacherId = '', bookOrderHistoryQueriedTeacherId = '';
+let bookOrderHistoryTitleQuery = '', bookOrderHistoryQueriedTitleQuery = '', bookOrderHistorySearched = false;
 let transportDate = today(), transportData = null, transportLoadedDate = '', transportLoadedAt = 0, transportLoading = false, transportError = '';
 let transportRestoreFocus = null, transportConfigDraft = null, transportConfigDirty = false, transportConfigRevisionConflict = false;
 let transportOpenRouteId = '', transportDriverTargetRoute = '', transportPlannerBusyRoute = '';
@@ -1755,9 +1780,17 @@ function resetPersonCache(token) {
   bookDb = null; bookDbErr = ''; bookDbLoading = false;
   approvedBookAdditions = null; approvedBookAdditionsLoaded = false; approvedBookAdditionsLoading = false; approvedBookAdditionsError = '';
   approvedBookEdits = null; approvedBookEditsLoaded = false; approvedBookEditsLoading = false; approvedBookEditsError = '';
+  completedBookCatalog = []; completedBookCatalogReviewCandidates = [];
+  completedBookCatalogLoaded = false; completedBookCatalogLoading = false; completedBookCatalogError = '';
+  completedBookCatalogLoadPromise = null; completedBookCatalogReloadQueued = false;
+  if (completedBookCatalogPendingRefreshTimer) clearTimeout(completedBookCatalogPendingRefreshTimer);
+  completedBookCatalogPendingRefreshTimer = null; completedBookCatalogScheduledPendingIds.clear();
+  bookCatalogReviewTarget = null; bookCatalogReviewSubmitting = false;
+  externalBookDraft = emptyExternalBookDraft(); externalBookSubmitting = false;
   batchSelection.clear(); batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
   boundBookOptionCode = ''; boundBookDraft = null; boundBookSubmitting = false;
   bookOrderHistoryTeacherId = ''; bookOrderHistoryQueriedTeacherId = '';
+  bookOrderHistoryTitleQuery = ''; bookOrderHistoryQueriedTitleQuery = ''; bookOrderHistorySearched = false;
   bookAddQueue = []; bookAddQueueLoaded = false; bookAddQueueLoading = false; bookAddQueueError = '';
   ownBookAddQueue = []; ownBookAddQueueLoaded = false; ownBookAddQueueLoading = false; ownBookAddQueueError = '';
   bookEditQueue = []; bookEditQueueLoaded = false; bookEditQueueLoading = false; bookEditQueueError = '';
@@ -8343,16 +8376,133 @@ function loadBooks() {
     .then(d => {
       d.students = privateBookStudents.slice();
       bookDb = d;
+      mergeCompletedBookCatalog();
       applyBookOverlays();
       if (route === 'books') renderAfterSync();
       loadApprovedBookAdditions(false);
       loadApprovedBookEdits(false);
+      loadCompletedBookCatalog(false);
     })
     .catch(e => { bookDbErr = String(e); if (route === 'books') renderAfterSync(); })
     .finally(() => { bookDbLoading = false; });
 }
 
 function applyBookOverlays() { mergeBookAdditions(); mergeBookEdits(); }
+
+function completedBookCatalogDto(row) {
+  const source = row && typeof row === 'object' ? row : {};
+  const hasSelectedPublisher = Object.prototype.hasOwnProperty.call(source, 'selectedPublisherName');
+  return {
+    bookId: String(source.bookId || source.id || '').trim(),
+    title: String(source.title || '').trim(),
+    publisherName: String(source.publisherName || '').trim(),
+    selectedPublisherName: String(hasSelectedPublisher ? source.selectedPublisherName || '' : source.publisherName || '').trim(),
+    vendorName: String(source.vendorName || '').trim(),
+    completedAt: Number(source.completedAt) || 0,
+    verificationStatus: String(source.verificationStatus || '').trim().toLocaleLowerCase('en-US'),
+    sourceUrls: Array.isArray(source.sourceUrls) ? source.sourceUrls.map(value => String(value || '')).filter(Boolean) : [],
+    verifiedAt: Number(source.verifiedAt) || 0,
+    revision: Number(source.revision),
+    reviewMethod: String(source.reviewMethod || ''),
+    reviewedAt: Number(source.reviewedAt) || 0
+  };
+}
+
+function mergeCompletedBookCatalog() {
+  if (!bookDb || !Array.isArray(completedBookCatalog)) return;
+  if (!Array.isArray(bookDb.books)) bookDb.books = [];
+  const verifiedRows = completedBookCatalog.filter(row => row && row.verificationStatus === 'verified' && row.bookId && row.title);
+  const verifiedIds = new Set(verifiedRows.map(row => String(row.bookId)));
+  bookDb.books = bookDb.books.filter(book => book && (book.source !== 'completed' || verifiedIds.has(String(book.id || ''))));
+  const byId = new Map(bookDb.books.map(book => [String(book.id || ''), book]));
+  verifiedRows.forEach(row => {
+    const id = String(row && (row.bookId || row.id) || '').trim();
+    const title = String(row && row.title || '').trim();
+    if (!id || !title) return;
+    const existing = byId.get(id);
+    if (existing) {
+      if (existing.source === 'completed') {
+        existing.title = title;
+        existing.publisherName = String(row.publisherName || '');
+        existing.selectedPublisherName = String(row.selectedPublisherName || '');
+        existing.vendor = String(row.vendorName || '');
+        existing.verificationStatus = 'verified';
+      } else {
+        if (!existing.publisherName && row.publisherName) existing.publisherName = String(row.publisherName);
+        if (!existing.selectedPublisherName && row.selectedPublisherName) existing.selectedPublisherName = String(row.selectedPublisherName);
+        if (!existing.vendor && row.vendorName) existing.vendor = String(row.vendorName);
+      }
+      return;
+    }
+    const book = {
+      id, title, publisherName: String(row.publisherName || ''),
+      selectedPublisherName: String(row.selectedPublisherName || ''), vendor: String(row.vendorName || ''),
+      verificationStatus: 'verified', subject: '', level: '', units: [], note: '', source: 'completed'
+    };
+    bookDb.books.push(book);
+    byId.set(id, book);
+  });
+}
+
+const COMPLETED_BOOK_CATALOG_PENDING_REFRESH_MS = 12500;
+function scheduleCompletedBookCatalogPendingRefresh() {
+  const pendingIds = completedBookCatalogReviewCandidates.filter(row =>
+    row && row.bookId && row.verificationStatus === 'pending').map(row => String(row.bookId));
+  const newIds = pendingIds.filter(id => !completedBookCatalogScheduledPendingIds.has(id));
+  if (!newIds.length) return;
+  newIds.forEach(id => completedBookCatalogScheduledPendingIds.add(id));
+  if (completedBookCatalogPendingRefreshTimer) clearTimeout(completedBookCatalogPendingRefreshTimer);
+  completedBookCatalogPendingRefreshTimer = setTimeout(() => {
+    completedBookCatalogPendingRefreshTimer = null;
+    loadCompletedBookCatalog(true);
+  }, COMPLETED_BOOK_CATALOG_PENDING_REFRESH_MS);
+}
+
+async function loadCompletedBookCatalog(force) {
+  if (completedBookCatalogLoading) {
+    const activeRequest = completedBookCatalogLoadPromise;
+    if (!force) return activeRequest;
+    completedBookCatalogReloadQueued = true;
+    if (activeRequest) await activeRequest;
+    if (completedBookCatalogReloadQueued) {
+      completedBookCatalogReloadQueued = false;
+      return loadCompletedBookCatalog(true);
+    }
+    return completedBookCatalogLoadPromise;
+  }
+  if (completedBookCatalogLoaded && !force) return;
+  const auth = sync.auth();
+  if (!auth) { completedBookCatalogLoaded = true; return; }
+  completedBookCatalogLoading = true;
+  completedBookCatalogError = '';
+  if (route === 'books') renderAfterSync();
+  const request = (async () => {
+    try {
+      const result = await sync.post('/book-catalog', { app: SYNC_APP, auth: auth, action: 'list' });
+      const verifiedRows = Array.isArray(result.books) ? result.books : Array.isArray(result.catalog) ? result.catalog : [];
+      const reviewRows = Array.isArray(result.reviewCandidates) ? result.reviewCandidates : [];
+      completedBookCatalog = verifiedRows.map(completedBookCatalogDto)
+        .filter(row => row.bookId && row.title && row.verificationStatus === 'verified');
+      completedBookCatalogReviewCandidates = reviewRows.map(completedBookCatalogDto)
+        .filter(row => row.bookId && row.verificationStatus !== 'verified');
+      completedBookCatalogLoaded = true;
+      mergeCompletedBookCatalog();
+      scheduleCompletedBookCatalogPendingRefresh();
+    } catch (error) {
+      completedBookCatalogError = String(error && error.message || error || '완료 교재 DB를 불러오지 못했습니다');
+      completedBookCatalogLoaded = true;
+    } finally {
+      completedBookCatalogLoading = false;
+      if (route === 'books') renderAfterSync();
+    }
+  })();
+  completedBookCatalogLoadPromise = request;
+  try {
+    return await request;
+  } finally {
+    if (completedBookCatalogLoadPromise === request) completedBookCatalogLoadPromise = null;
+  }
+}
 
 function currentBookCatalogOverlays(rows) {
   const resetAt = Date.parse(String(bookDb && bookDb.catalogResetAt || ''));
@@ -8728,36 +8878,6 @@ function batchOrderModal(vendorKey) {
     '<button class="btn btn-primary btn-block mt14" data-act="bkbatchsubmit">선택 학생 수량으로 주문대기 등록</button>');
 }
 
-/** 온라인 직접 주문은 문자 발송·보호자 자동 현황과 분리한 내부 수동 업무로만 남긴다. */
-function saveManualOnlineBookOrder(items) {
-  const at = now();
-  const orderItems = items.map(item => ({
-    bookId: item.bookId, title: item.title, studentIds: item.studentIds,
-    qty: item.studentIds.length + '권', unitPrice: item.unitPrice
-  }));
-  const titleMain = orderItems.length > 1 ? batchVendorName + ' — ' + orderItems.length + '권' : orderItems[0].title;
-  const task = {
-    id: batchOrderTaskId || uid(), groupId: 'order-' + at,
-    staffId: session.isStaffLink ? session.staffId : null,
-    title: '[주문] ' + titleMain,
-    detail: orderItems.map(item => item.title + ': ' + item.qty).join(' · ') + ' · 주문처: ' + batchVendorName,
-    guide: '온라인 사이트에서 직접 주문하는 교재입니다.\n' +
-      '1) 주문 사이트에서 직접 주문\n2) 배송 확인 후 수령·배부 처리\n' +
-      '※ 문자 자동 발송·보호자 자동 상태 공개 대상이 아닙니다.',
-    steps: [{ id: uid(), label: '온라인 직접 주문' }, { id: uid(), label: '배송 확인' }],
-    target: 0, unit: '건', time: '', priority: 'normal',
-    repeat: 'once', days: [], start: today(), end: '', carry: true,
-    orderVendor: batchVendorName, orderItems: orderItems, orderDelivery: 'manual_online_v1',
-    origin: actor(), createdAt: at, updatedAt: at, deleted: false
-  };
-  state.tasks.push(task);
-  items.forEach(item => batchSelection.delete(item.bookId));
-  const totalQty = items.reduce((sum, item) => sum + item.studentIds.length, 0);
-  batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
-  save(); queueSync(); closeModal(); render();
-  toast(totalQty + '권 저장 · 온라인 사이트에서 직접 주문해 주세요');
-}
-
 /** 새 주문은 서버가 현재 재원·담당 범위와 학생 정체성을 봉인한 뒤에만 로컬에 반영한다. */
 async function submitBookOrder(items, button) {
   const duplicateStudent = items.some(item => {
@@ -8768,20 +8888,21 @@ async function submitBookOrder(items, button) {
   if (!batchVendorName) return toast('교재 정보에서 주문처를 먼저 등록해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
-  const vendor = ((bookDb && bookDb.vendors) || []).find(item => (item.name || item) === batchVendorName);
-  if (vendor && vendor.type === 'online') return saveManualOnlineBookOrder(items);
   if (!batchOrderTaskId) batchOrderTaskId = 'ord_' + uid();
   const taskId = batchOrderTaskId;
+  const expectedDelivery = batchVendorName === '쿠팡' ? 'manual_online_v1' : 'scheduled_batch_v1';
   if (button) button.disabled = true;
   try {
     const result = await sync.post('/book-order', {
       app: SYNC_APP, auth: auth, action: 'create', taskId: taskId,
       vendorName: batchVendorName,
       items: items.map(item => ({
-        bookId: item.bookId, title: item.title, studentIds: item.studentIds, unitPrice: item.unitPrice
+        bookId: item.bookId, title: item.title, studentIds: item.studentIds, unitPrice: item.unitPrice,
+        ...(Object.prototype.hasOwnProperty.call(item, 'publisherName')
+          ? { publisherName: String(item.publisherName || '') } : {})
       }))
     });
-    if (!result.task || result.task.id !== taskId || result.task.orderDelivery !== 'scheduled_batch_v1' ||
+    if (!result.task || result.task.id !== taskId || result.task.orderDelivery !== expectedDelivery ||
         Number(result.task.orderIdentityVersion) !== 1) {
       throw new Error('서버의 주문 등록 결과를 확인하지 못했습니다');
     }
@@ -8790,11 +8911,16 @@ async function submitBookOrder(items, button) {
     const totalQty = items.reduce((sum, item) => sum + item.studentIds.length, 0);
     batchDraft = null; batchVendorName = ''; batchOrderTaskId = '';
     bookIssueLoaded = false;
-    closeModal(); render(); loadBookIssues(true);
-    toast(totalQty + '권 저장 · 저녁 8시 일괄 발송 대기');
+    closeModal(); render();
+    await loadBookIssues(true);
+    toast(totalQty + (expectedDelivery === 'manual_online_v1'
+      ? '권 저장 · 1단계에서 쿠팡 주문 결과를 처리해 주세요'
+      : '권 저장 · 저녁 8시 일괄 발송 대기'));
+    return true;
   } catch (error) {
     toast('주문 등록 실패 — ' + String(error && error.message || error));
     if (button && button.isConnected) button.disabled = false;
+    return false;
   }
 }
 
@@ -9495,6 +9621,10 @@ function bookOrderActionButtons(row) {
     return '<button class="btn btn-sm btn-primary" data-act="bookorderlinkopen"' + base + '>학생 연결</button>';
   }
   if (row.integrity || row.needsStudentLink) return '<button class="btn btn-sm btn-ghost" disabled>학생·교재 연결 확인 필요</button>';
+  if (row.orderDelivery === 'manual_online_v1' && row.stage === 'order_waiting' && canTeacherAct) {
+    return '<button class="btn btn-sm btn-primary" data-act="bookordermanualresult" data-result="completed"' + base + '>주문완료</button>' +
+      '<button class="btn btn-sm btn-danger" data-act="bookordermanualresult" data-result="failed"' + base + '>주문실패</button>';
+  }
   if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>';
   if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>';
   if (row.stage === 'student_handed' && session.isAdmin && !row.academyRegisteredAt) {
@@ -9638,10 +9768,41 @@ async function transitionBookOrder(button) {
       taskId: String(button.dataset.task || ''), itemIndex: Number(button.dataset.item),
       next: next, revision: Number(button.dataset.rev) || 0 });
     await loadBookIssues(true);
+    if (next === 'academy_register') await loadCompletedBookCatalog(true);
     toast(next === 'receive' ? '수령완료로 저장했습니다' : next === 'hand' ? '배부완료로 저장했습니다' : '아카등록완료로 저장했습니다');
   } catch (error) {
     button.disabled = false;
     toast('교재 단계 저장 실패 — ' + (error.message || error));
+    loadBookIssues(true);
+  }
+}
+
+async function transitionManualOnlineOrder(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const result = String(button.dataset.result || '');
+  if (!['completed', 'failed'].includes(result)) return toast('쿠팡 주문 결과를 다시 선택해 주세요');
+  const question = result === 'completed'
+    ? '쿠팡에서 이 교재의 주문을 실제로 완료했나요?'
+    : '쿠팡 주문이 실패한 것으로 기록할까요?';
+  if (!confirm(question)) return;
+  const row = button.closest('.book-order-row');
+  const controls = row ? Array.from(row.querySelectorAll('[data-act="bookordermanualresult"]')) : [button];
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    await sync.post('/book-issue', {
+      app: SYNC_APP,
+      auth,
+      action: 'manual_online_result',
+      taskId: String(button.dataset.task || ''),
+      result,
+      revision: Number(button.dataset.rev) || 0
+    });
+    await loadBookIssues(true);
+    toast(result === 'completed' ? '쿠팡 주문완료로 저장했습니다' : '쿠팡 주문실패로 저장했습니다');
+  } catch (error) {
+    controls.forEach(control => { if (control.isConnected) control.disabled = false; });
+    toast('쿠팡 주문 결과 저장 실패 — ' + (error.message || error));
     loadBookIssues(true);
   }
 }
@@ -9803,6 +9964,195 @@ function viewLegacyBookCatalog() {
   return h;
 }
 
+function externalPublisherOptions() {
+  return [{ value: EXTERNAL_PUBLISHER_UNLISTED, label: '목록에 없음', publisherName: '', vendorName: '쿠팡' }]
+    .concat(EXTERNAL_BOOK_PUBLISHERS.slice().sort((a, b) =>
+      a.publisherName.localeCompare(b.publisherName, 'ko') || a.vendorName.localeCompare(b.vendorName, 'ko'))
+      .map(row => ({ value: row.publisherName, label: row.publisherName,
+        publisherName: row.publisherName, vendorName: row.vendorName })));
+}
+
+function externalPublisherChoice(value) {
+  return externalPublisherOptions().find(option => option.value === String(value || '')) || null;
+}
+
+const EXTERNAL_PUBLISHER_SAFE_ALIASES = new Map([
+  ['비상교육', '비상'], ['미래엔', '미래앤'], ['쎄듀', '세듀']
+]);
+function canonicalExternalPublisherName(value) {
+  const normalized = String(value || '').normalize('NFKC').replace(/\s+/g, '').trim();
+  const exact = EXTERNAL_BOOK_PUBLISHERS.find(row =>
+    row.publisherName.normalize('NFKC').replace(/\s+/g, '') === normalized);
+  return exact ? exact.publisherName : EXTERNAL_PUBLISHER_SAFE_ALIASES.get(normalized) || '';
+}
+
+function externalCatalogBooks(publisherName) {
+  const wanted = String(publisherName || '').normalize('NFKC').trim();
+  const rows = [];
+  const verifiedIds = new Set();
+  (Array.isArray(completedBookCatalog) ? completedBookCatalog : []).forEach(row => {
+    if (!row || row.verificationStatus !== 'verified') return;
+    const bookId = String(row.bookId || row.id || '').trim();
+    if (bookId) verifiedIds.add(bookId);
+    rows.push({
+      bookId, title: String(row.title || ''), publisherName: String(row.publisherName || ''),
+      selectedPublisherName: String(row.selectedPublisherName || ''), vendorName: String(row.vendorName || ''), source: 'completed'
+    });
+  });
+  (((bookDb && bookDb.books) || [])).forEach(row => {
+    const bookId = String(row && (row.bookId || row.id) || '').trim();
+    if (!row || row.source === 'completed' || verifiedIds.has(bookId)) return;
+    rows.push({
+      bookId, title: String(row.title || ''),
+      publisherName: String(row.publisherName || row.brand || row.publisher || ''),
+      selectedPublisherName: '', vendorName: String(row.vendorName || row.vendor || ''), source: row.source || 'bookDb'
+    });
+  });
+  const fixedPublishers = new Set(EXTERNAL_BOOK_PUBLISHERS.map(row => row.publisherName));
+  const byId = new Map();
+  rows.forEach(row => {
+    const publisher = row.publisherName.normalize('NFKC').trim();
+    const selectedPublisher = row.selectedPublisherName.normalize('NFKC').trim();
+    const verifiedPublisher = canonicalExternalPublisherName(publisher);
+    const groupPublisher = row.source === 'completed'
+      ? verifiedPublisher : canonicalExternalPublisherName(publisher);
+    const matches = wanted ? groupPublisher === wanted : row.source === 'completed'
+      ? groupPublisher === '' : !fixedPublishers.has(groupPublisher) && row.vendorName === '쿠팡';
+    if (!matches) return;
+    const title = row.title.normalize('NFKC').replace(/\s+/g, ' ').trim();
+    if (!row.bookId || !title) return;
+    if (!byId.has(row.bookId)) byId.set(row.bookId, { bookId: row.bookId, title, publisherName: publisher,
+      selectedPublisherName: selectedPublisher, vendorName: row.vendorName, source: row.source });
+  });
+  return Array.from(byId.values()).sort((a, b) =>
+    a.title.localeCompare(b.title, 'ko') || a.bookId.localeCompare(b.bookId));
+}
+
+async function stableExternalBookId(publisherName, title) {
+  const publisher = String(publisherName || EXTERNAL_PUBLISHER_UNLISTED).normalize('NFKC').trim();
+  const normalizedTitle = String(title || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([publisher, normalizedTitle])));
+  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  return 'EXT_' + hex.slice(0, 48);
+}
+
+function externalBookDraftStudents() {
+  const candidates = new Map(orderStudentCandidates().map(student => [String(student.id), student]));
+  return (Array.isArray(externalBookDraft.studentIds) ? externalBookDraft.studentIds : [])
+    .map(id => candidates.get(String(id))).filter(Boolean);
+}
+
+function externalBookOrderReady() {
+  const publisher = externalPublisherChoice(externalBookDraft.publisherValue);
+  const students = externalBookDraftStudents();
+  const price = Number(externalBookDraft.unitPrice);
+  const bookReady = externalBookDraft.bookValue === EXTERNAL_BOOK_DIRECT
+    ? !!String(externalBookDraft.title || '').trim()
+    : !!externalBookDraft.bookId && !!externalBookDraft.title;
+  return !!(publisher && publisher.vendorName && bookReady && Array.isArray(externalBookDraft.studentIds) &&
+    externalBookDraft.studentIds.length && students.length === externalBookDraft.studentIds.length &&
+    Number.isInteger(price) && price >= 1 && price <= 10000000);
+}
+
+function externalBookOrderOptionsHtml() {
+  if (!completedBookCatalogLoaded && !completedBookCatalogLoading) setTimeout(() => loadCompletedBookCatalog(false), 0);
+  const publisher = externalPublisherChoice(externalBookDraft.publisherValue);
+  const books = publisher ? externalCatalogBooks(publisher.publisherName) : [];
+  const selectedBook = books.find(book => book.bookId === externalBookDraft.bookValue) || null;
+  const direct = externalBookDraft.bookValue === EXTERNAL_BOOK_DIRECT;
+  const students = orderStudentCandidates();
+  const quantity = Array.isArray(externalBookDraft.studentIds) ? externalBookDraft.studentIds.length : 0;
+  const unitPrice = Number(externalBookDraft.unitPrice);
+  const total = Number.isInteger(unitPrice) && unitPrice > 0 && quantity ? unitPrice * quantity : 0;
+  let h = '<div class="field"><label class="fl" for="externalPublisher">출판사</label>' +
+    '<select class="in" id="externalPublisher" data-external-publisher' + (externalBookSubmitting ? ' disabled' : '') + '>' +
+      '<option value="">출판사를 선택하세요</option>' + externalPublisherOptions().map(option =>
+        '<option value="' + esc(option.value) + '"' + (option.value === externalBookDraft.publisherValue ? ' selected' : '') + '>' +
+          esc(option.label) + '</option>').join('') + '</select>' +
+      '<div class="small muted mt8">출판사가 보이지 않으면 ‘목록에 없음’을 선택하세요.</div></div>';
+  if (publisher) {
+    h += '<div class="field"><span class="fl">자동 주문처</span>' +
+      '<output class="in" data-external-vendor>' + esc(bookVendorDisplayName(publisher.vendorName)) + '</output>' +
+      '<div class="small muted mt8">선택한 출판사에 따라 자동 연결됩니다.</div></div>' +
+      '<div class="field"><label class="fl" for="externalBook">교재 선택</label><select class="in" id="externalBook" data-external-book data-direct-value="__direct__"' +
+        (externalBookSubmitting ? ' disabled' : '') + '><option value="">교재를 선택하세요</option>' +
+        '<option value="' + EXTERNAL_BOOK_DIRECT + '"' + (externalBookDraft.bookValue === EXTERNAL_BOOK_DIRECT ? ' selected' : '') +
+          '>교재DB에 없음 · 직접 입력</option>' + books.map(book => '<option value="' + esc(book.bookId) + '"' +
+          (externalBookDraft.bookValue === book.bookId ? ' selected' : '') + '>' + esc(book.title) + '</option>').join('') +
+        '</select></div>';
+    if (direct) {
+      h += '<div class="field"><label class="fl" for="externalBookTitle">교재 이름</label>' +
+        '<input class="in" id="externalBookTitle" data-external-title maxlength="160" autocomplete="off" placeholder="교재 이름 직접 입력" value="' +
+          esc(externalBookDraft.title) + '"' + (externalBookSubmitting ? ' disabled' : '') + '></div>';
+    } else if (selectedBook) {
+      h += '<div class="hint"><b>선택 교재</b><br>' + esc(externalBookDraft.title || '교재 정보를 다시 선택해 주세요') + '</div>';
+    }
+  }
+  if (publisher && (direct || selectedBook)) {
+    h += '<div class="field mt14"><label class="fl" for="externalUnitPrice">교재 금액 (1권 기준)</label>' +
+      '<input class="in" id="externalUnitPrice" type="number" min="1" max="10000000" step="100" inputmode="numeric" ' +
+        'data-external-unit-price value="' + esc(externalBookDraft.unitPrice) + '" placeholder="예: 15000"' +
+        (externalBookSubmitting ? ' disabled' : '') + '></div>' +
+      '<fieldset class="book-order-picker"><legend class="fl" style="padding:11px">사용 학생 선택 · ' +
+        esc(studentLinkScopeText()) + ' · 선택 인원이 주문 수량</legend><div class="book-order-picker-list">' +
+        (students.length ? students.map(student => '<label class="book-order-picker-option"><input type="checkbox" data-external-student value="' +
+          esc(student.id) + '"' + (externalBookDraft.studentIds.includes(String(student.id)) ? ' checked' : '') +
+          (externalBookSubmitting ? ' disabled' : '') + '><span>' + esc(student.name || '이름 미입력') +
+          '<small class="card-sub">' + esc(student.grade || '학년 미지정') + '</small></span></label>').join('') :
+          '<div class="hint">연결할 수 있는 현재 재원 학생이 없습니다.</div>') + '</div></fieldset>' +
+      '<div class="small muted mt8" data-external-order-total>' + (total
+        ? quantity + '권 · 합계 ' + total.toLocaleString('ko-KR') + '원' : '학생과 권당 금액을 확인해 주세요.') + '</div>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="externalbookorder"' +
+        (externalBookOrderReady() && !externalBookSubmitting ? '' : ' disabled') + '>주문하기</button>';
+  }
+  if (completedBookCatalogLoading) h += '<div class="hint mt8">아카등록 완료 교재 DB를 불러오는 중입니다.</div>';
+  if (completedBookCatalogError) h += '<div class="hint mt8" style="color:var(--coral)">교재 DB를 불러오지 못했습니다. ' +
+    '<button class="btn btn-sm btn-ghost" data-act="bookcatalogrefresh">다시 불러오기</button></div>';
+  return h;
+}
+
+function syncExternalBookOrderUi() {
+  document.querySelectorAll('[data-external-publisher], [data-external-book], [data-external-title], [data-external-student], [data-external-unit-price]')
+    .forEach(control => { control.disabled = externalBookSubmitting; });
+  const button = document.querySelector('[data-act="externalbookorder"]');
+  if (button) button.disabled = externalBookSubmitting || !externalBookOrderReady();
+  const quantity = Array.isArray(externalBookDraft.studentIds) ? externalBookDraft.studentIds.length : 0;
+  const unitPrice = Number(externalBookDraft.unitPrice);
+  const total = document.querySelector('[data-external-order-total]');
+  if (total) total.textContent = Number.isInteger(unitPrice) && unitPrice > 0 && quantity
+    ? quantity + '권 · 합계 ' + (unitPrice * quantity).toLocaleString('ko-KR') + '원'
+    : '학생과 권당 금액을 확인해 주세요.';
+}
+
+async function submitExternalBookOrder(button) {
+  if (externalBookSubmitting) return;
+  const publisher = externalPublisherChoice(externalBookDraft.publisherValue);
+  const title = String(externalBookDraft.title || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const unitPrice = Number(externalBookDraft.unitPrice);
+  if (!publisher || !title || !Array.isArray(externalBookDraft.studentIds) || !externalBookDraft.studentIds.length ||
+      !Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > 10000000) {
+    return toast('출판사, 교재, 학생, 권당 금액을 모두 확인해 주세요');
+  }
+  const currentIds = new Set(orderStudentCandidates().map(student => String(student.id)));
+  if (externalBookDraft.studentIds.some(id => !currentIds.has(String(id)))) {
+    return toast('현재 원생 명단에서 연결 학생을 다시 확인해 주세요');
+  }
+  let bookId = String(externalBookDraft.bookId || '');
+  if (externalBookDraft.bookValue === EXTERNAL_BOOK_DIRECT) bookId = await stableExternalBookId(publisher.publisherName, title);
+  if (!bookId) return toast('교재 DB에서 교재를 다시 선택해 주세요');
+  if (!externalBookDraft.taskId) externalBookDraft.taskId = 'ord_' + uid();
+  externalBookSubmitting = true;
+  batchVendorName = publisher.vendorName;
+  batchOrderTaskId = externalBookDraft.taskId;
+  document.querySelectorAll('[data-external-publisher], [data-external-book], [data-external-title], [data-external-unit-price], [data-external-student]')
+    .forEach(control => { control.disabled = true; });
+  const success = await submitBookOrder([{ bookId, title, publisherName: publisher.publisherName,
+    studentIds: externalBookDraft.studentIds.slice(), unitPrice }], button);
+  externalBookSubmitting = false;
+  if (success) externalBookDraft = emptyExternalBookDraft();
+  render();
+}
+
 function boundBookOption(productCode) {
   return BOUND_BOOK_OPTIONS.find(option => option.productCode === String(productCode || '')) || null;
 }
@@ -9950,11 +10300,16 @@ async function submitBoundBookOrder(button) {
   }
 }
 
-function bookOrderHistoryRows(teacherId) {
+function bookOrderHistorySearchKey(value) {
+  return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ko');
+}
+
+function bookOrderHistoryRows(teacherId, titleQuery) {
   const selected = String(teacherId || '');
-  if (!selected) return [];
+  const titleKey = bookOrderHistorySearchKey(titleQuery);
   return bookOrderRows.filter(row => row.academyRegisteredAt &&
-    (row.owner ? String(row.owner) : '__director__') === selected).slice()
+    (!selected || (row.owner ? String(row.owner) : '__director__') === selected) &&
+    (!titleKey || bookOrderHistorySearchKey(row.title).includes(titleKey))).slice()
     .sort((a, b) => Number(b.studentHandedAt || 0) - Number(a.studentHandedAt || 0) ||
       Number(b.academyRegisteredAt || 0) - Number(a.academyRegisteredAt || 0));
 }
@@ -9969,11 +10324,147 @@ function bookOrderHistoryTeachers() {
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko') || a.id.localeCompare(b.id));
 }
 
+function bookOrderCatalogReviewCandidate(row, reviewByBookId) {
+  if (!completedBookCatalogLoaded || completedBookCatalogError || !row ||
+      !['scheduled_batch_v1', 'manual_online_v1'].includes(String(row.orderDelivery || ''))) return null;
+  const bookId = String(row.bookId || '');
+  if (!bookId) return null;
+  const candidates = reviewByBookId instanceof Map ? reviewByBookId : new Map(
+    (Array.isArray(completedBookCatalogReviewCandidates) ? completedBookCatalogReviewCandidates : [])
+      .filter(candidate => candidate && candidate.bookId && candidate.verificationStatus !== 'verified')
+      .map(candidate => [String(candidate.bookId), candidate]));
+  return candidates.get(bookId) || null;
+}
+
+function normalizeBookCatalogReviewText(value, maxLength) {
+  const text = String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  return text && text.length <= maxLength && !/[\u0000-\u001f\u007f]/.test(text) ? text : '';
+}
+
+function syncBookCatalogReviewApproveButton() {
+  const titleInput = document.querySelector('[data-book-catalog-review-title]');
+  const publisherInput = document.querySelector('[data-book-catalog-review-publisher]');
+  const confirmInput = document.querySelector('[data-book-catalog-review-confirm]');
+  const approveButton = document.querySelector('[data-act="bookcatalogreviewapprove"]');
+  const title = titleInput ? normalizeBookCatalogReviewText(titleInput.value, 160) : '';
+  const publisherName = publisherInput ? normalizeBookCatalogReviewText(publisherInput.value, 100) : '';
+  [titleInput, publisherInput, confirmInput].filter(Boolean).forEach(control => {
+    control.disabled = bookCatalogReviewSubmitting;
+  });
+  if (approveButton) approveButton.disabled = bookCatalogReviewSubmitting || !bookCatalogReviewTarget ||
+    !title || !publisherName || !confirmInput || !confirmInput.checked;
+}
+
+function openBookCatalogReviewModal(bookId) {
+  if (!session.isAdmin) return;
+  if (bookCatalogReviewSubmitting) return toast('교재DB 승인을 처리 중입니다');
+  const candidate = (Array.isArray(completedBookCatalogReviewCandidates)
+    ? completedBookCatalogReviewCandidates : []).find(row => row && String(row.bookId || '') === String(bookId || '') &&
+      row.verificationStatus !== 'verified');
+  if (!candidate) {
+    loadCompletedBookCatalog(true);
+    return toast('최신 교재DB 확인 대상을 다시 불러옵니다');
+  }
+  if (candidate.verificationStatus === 'pending') {
+    loadCompletedBookCatalog(true);
+    return toast('자동 교재 확인이 진행 중입니다 · 잠시 후 다시 확인해 주세요');
+  }
+  const revision = Number(candidate.revision);
+  if (!Number.isInteger(revision) || revision < 0) {
+    loadCompletedBookCatalog(true);
+    return toast('최신 교재DB 수정 번호를 다시 불러옵니다');
+  }
+  bookCatalogReviewTarget = {
+    bookId: String(candidate.bookId), revision: revision,
+    verificationStatus: String(candidate.verificationStatus || ''),
+    title: String(candidate.title || ''),
+    publisherName: String(candidate.publisherName || candidate.selectedPublisherName || '')
+  };
+  modal('교재DB 확인',
+    '<div class="hint mb14"><b>정확한 정보 확인이 필요합니다.</b><br>실물 교재 표지나 공식 출판사 정보와 대조한 교재명·출판사만 입력해 주세요. 승인하면 외부교재 재주문 목록에 표시됩니다.</div>' +
+    '<div class="field"><label class="fl" for="bookCatalogReviewTitle">정확한 교재명</label>' +
+      '<input class="in" id="bookCatalogReviewTitle" data-book-catalog-review-title maxlength="160" autocomplete="off" value="' +
+        esc(bookCatalogReviewTarget.title) + '" placeholder="교재명 전체를 정확히 입력"></div>' +
+    '<div class="field"><label class="fl" for="bookCatalogReviewPublisher">정확한 출판사</label>' +
+      '<input class="in" id="bookCatalogReviewPublisher" data-book-catalog-review-publisher maxlength="100" autocomplete="off" value="' +
+        esc(bookCatalogReviewTarget.publisherName) + '" placeholder="출판사명을 정확히 입력"></div>' +
+    '<label class="book-order-picker-option mt14"><input type="checkbox" data-book-catalog-review-confirm>' +
+      '<span>교재명과 출판사를 직접 대조해 정확함을 확인했습니다.</span></label>',
+    '<button class="btn btn-primary btn-block mt14" data-act="bookcatalogreviewapprove" disabled>정확한 정보로 교재DB 승인</button>');
+  requestAnimationFrame(() => document.querySelector('[data-book-catalog-review-title]')?.focus());
+}
+
+async function approveBookCatalogReview(button) {
+  if (!session.isAdmin || bookCatalogReviewSubmitting || !bookCatalogReviewTarget) return;
+  const titleInput = document.querySelector('[data-book-catalog-review-title]');
+  const publisherInput = document.querySelector('[data-book-catalog-review-publisher]');
+  const confirmInput = document.querySelector('[data-book-catalog-review-confirm]');
+  const rawTitle = String(titleInput && titleInput.value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const rawPublisherName = String(publisherInput && publisherInput.value || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const title = normalizeBookCatalogReviewText(rawTitle, 160);
+  const publisherName = normalizeBookCatalogReviewText(rawPublisherName, 100);
+  if (!rawTitle || !rawPublisherName) return toast('정확한 교재명과 출판사를 모두 입력해 주세요');
+  if (!title || title.length > 160 || rawTitle.length > 160) return toast('교재명은 160자 이하의 일반 문자로 입력해 주세요');
+  if (!publisherName || publisherName.length > 100 || rawPublisherName.length > 100) return toast('출판사는 100자 이하의 일반 문자로 입력해 주세요');
+  if (!confirmInput || !confirmInput.checked) return toast('정확한 정보임을 확인해 주세요');
+  const target = Object.assign({}, bookCatalogReviewTarget);
+  if (target.verificationStatus === 'pending') return toast('자동 교재 확인이 끝난 뒤 다시 시도해 주세요');
+  if (!Number.isInteger(target.revision) || target.revision < 0) return toast('최신 교재DB 수정 번호를 다시 불러와 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (!confirm('입력한 교재명과 출판사를 정확한 정본으로 승인할까요? 승인 후 외부교재 주문 목록에 표시됩니다.')) return;
+  bookCatalogReviewSubmitting = true;
+  syncBookCatalogReviewApproveButton();
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/book-catalog', {
+      app: SYNC_APP, auth: auth, action: 'review_approve',
+      bookId: target.bookId, expectedRevision: target.revision,
+      title: title, publisherName: publisherName
+    });
+    if (!result.book || String(result.book.bookId || '') !== target.bookId ||
+        String(result.book.verificationStatus || '') !== 'verified' ||
+        String(result.book.reviewMethod || '') !== 'admin' ||
+        Number(result.book.revision) !== target.revision + 1) {
+      throw new Error('서버의 교재DB 승인 결과를 확인하지 못했습니다');
+    }
+    bookCatalogReviewTarget = null;
+    closeModal();
+    await loadCompletedBookCatalog(true);
+    await loadBookIssues(true);
+    render();
+    toast(completedBookCatalogError || bookIssueError
+      ? '교재DB 승인은 완료됐습니다 · 화면 새로고침 상태를 다시 확인해 주세요'
+      : '교재DB 확인을 승인하고 주문 기록을 갱신했습니다');
+  } catch (error) {
+    if (Number(error && error.status) === 409 || Number(error && error.status) === 404) {
+      const pending = String(error && error.code || '') === 'BOOK_CATALOG_PENDING';
+      bookCatalogReviewTarget = null;
+      closeModal();
+      await loadCompletedBookCatalog(true);
+      await loadBookIssues(true);
+      render();
+      toast(pending ? '자동 교재 확인이 아직 진행 중입니다 · 잠시 후 다시 확인해 주세요'
+        : '다른 화면에서 교재DB 정보가 먼저 변경됐습니다 · 최신 내용을 다시 확인해 주세요');
+    } else {
+      toast('교재DB 승인 실패 — ' + String(error && error.message || error));
+    }
+  } finally {
+    bookCatalogReviewSubmitting = false;
+    syncBookCatalogReviewApproveButton();
+  }
+}
+
 function viewBookOrderHistory() {
   const teachers = bookOrderHistoryTeachers();
-  const rows = bookOrderHistoryQueriedTeacherId ? bookOrderHistoryRows(bookOrderHistoryQueriedTeacherId) : null;
+  const reviewByBookId = new Map((Array.isArray(completedBookCatalogReviewCandidates)
+    ? completedBookCatalogReviewCandidates : []).filter(row => row && row.bookId && row.verificationStatus !== 'verified')
+    .map(row => [String(row.bookId), row]));
+  const rows = bookOrderHistorySearched
+    ? bookOrderHistoryRows(bookOrderHistoryQueriedTeacherId, bookOrderHistoryQueriedTitleQuery)
+    : null;
   const listHtml = rows === null
-    ? '<div class="hint mt8">주문자(선생님)를 고르고 조회를 눌러 주세요.</div>'
+    ? '<div class="hint mt8">주문자 또는 교재명을 선택적으로 입력하고 조회를 눌러 주세요. 조건 없이 조회하면 전체 기록을 봅니다.</div>'
     : rows.length ? '<div class="book-order-history-list">' + rows.map(row => {
       const students = Array.isArray(row.students) ? row.students : [];
       const unitPrice = Number(row.unitPrice);
@@ -9981,30 +10472,43 @@ function viewBookOrderHistory() {
       const money = Number.isInteger(unitPrice) && unitPrice > 0
         ? (unitPrice * quantity).toLocaleString('ko-KR') + '원 (권당 ' + unitPrice.toLocaleString('ko-KR') + '원)'
         : '금액 미입력';
-      return '<article class="book-order-history-row"><div class="card-title">' + esc(row.title || '교재명 미입력') + '</div>' +
+      const reviewCandidate = bookOrderCatalogReviewCandidate(row, reviewByBookId);
+      const catalogSearchPending = reviewCandidate && reviewCandidate.verificationStatus === 'pending';
+      return '<article class="book-order-history-row"><div class="card-title">' + esc(row.title || '교재명 미입력') +
+        (reviewCandidate ? ' <span class="pill warn">' +
+          (catalogSearchPending ? '교재DB 검색 중' : '교재DB 확인 필요') + '</span>' : '') + '</div>' +
         '<div class="book-order-history-meta"><div class="book-order-history-field"><b>배부날짜</b><span>' +
           bookOrderDateText(row.studentHandedAt) + '</span></div>' +
         '<div class="book-order-history-field"><b>주문자(선생님)</b><span>' +
           esc(row.teacherName || (row.owner ? '담당 미지정' : '관리자')) + '</span></div>' +
         '<div class="book-order-history-field"><b>학생</b><span>' + esc(students.length
           ? students.map(student => student.name || '이름 미입력').join(', ') : '학생 연결 없음') + '</span></div>' +
-        '<div class="book-order-history-field"><b>금액</b><span>' + esc(money) + '</span></div></div></article>';
+        '<div class="book-order-history-field"><b>금액</b><span>' + esc(money) + '</span></div></div>' +
+        (reviewCandidate && !catalogSearchPending && session.isAdmin ? '<div class="ops-actions"><button class="btn btn-sm btn-primary" ' +
+          'data-act="bookcatalogreviewopen" data-book-id="' + esc(reviewCandidate.bookId) +
+          '" aria-haspopup="dialog">교재DB 확인</button></div>' : '') + '</article>';
     }).join('') + '</div>'
-      : '<div class="empty"><b>📚</b>선택한 선생님의 아카등록 완료 교재가 없습니다.</div>';
+      : '<div class="empty"><b>📚</b>조회 조건에 맞는 아카등록 완료 교재가 없습니다.</div>';
   return '<details class="card book-order-history" data-persist-key="book-order-history"><summary><span>교재 주문 기록 조회</span>' +
     '<span class="book-order-kind-state" aria-hidden="true"><span class="when-closed">펼치기</span><span class="when-open">접기</span></span></summary>' +
-    '<div class="book-order-history-body"><div class="card-sub mb14">아카등록 완료된 교재를 배부일 최신순으로 조회합니다.</div>' +
+    '<div class="book-order-history-body"><div class="between mb14"><div class="card-sub">아카등록 완료된 교재를 배부일 최신순으로 조회합니다.</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="bookcatalogrefresh"' +
+        (completedBookCatalogLoading ? ' disabled' : '') + '>교재DB 상태 새로고침</button></div>' +
+      (completedBookCatalogLoading ? '<div class="hint mb14" role="status">교재DB 확인 상태를 불러오는 중입니다.</div>' : '') +
+      (completedBookCatalogError ? '<div class="hint mb14" style="color:var(--coral)">교재DB 확인 상태를 불러오지 못했습니다.</div>' : '') +
     '<div class="book-order-history-toolbar"><label class="field"><span class="fl">주문자(선생님)</span>' +
-      '<select class="in" data-book-order-history-teacher><option value="">선생님 선택</option>' + teachers.map(teacher =>
+      '<select class="in" data-book-order-history-teacher><option value="">전체 주문자</option>' + teachers.map(teacher =>
         '<option value="' + esc(teacher.id) + '"' + (teacher.id === bookOrderHistoryTeacherId ? ' selected' : '') + '>' +
           esc(teacher.name) + '</option>').join('') + '</select></label>' +
-      '<button class="btn btn-primary" data-act="bookorderhistorysearch"' + (bookOrderHistoryTeacherId ? '' : ' disabled') + '>조회</button></div>' +
+      '<label class="field"><span class="fl">교재명</span><input class="in" type="search" maxlength="160" ' +
+        'data-book-order-history-title placeholder="교재명 검색" value="' + esc(bookOrderHistoryTitleQuery) + '"></label>' +
+      '<button class="btn btn-primary" data-act="bookorderhistorysearch">조회</button></div>' +
       listHtml + '</div></details>';
 }
 
 function viewBookOrderStart() {
   const kinds = [
-    ['external', '외부교재', '<div class="empty"><b>📚</b>등록된 외부교재가 없습니다.</div>'],
+    ['external', '외부교재', typeof externalBookOrderOptionsHtml === 'function' ? externalBookOrderOptionsHtml() : ''],
     ['internal', '내부교재', '<div class="empty"><b>📚</b>등록된 내부교재가 없습니다.</div>'],
     ['bound', '제본교재', typeof boundBookOrderOptionsHtml === 'function' ? boundBookOrderOptionsHtml() : '']
   ];
@@ -10021,6 +10525,7 @@ function viewBookOrderStart() {
 function viewBooks() {
   if (!rosterDb && !rosterErr && !rosterLoading) loadRoster();
   if (!bookDb && !bookDbErr && !bookDbLoading) loadBooks();
+  if (!completedBookCatalogLoaded && !completedBookCatalogLoading) loadCompletedBookCatalog(false);
   return viewBookIssues() + viewBookOrderStart() + viewBookOrderHistory();
 }
 
@@ -14050,6 +14555,7 @@ function closeModal() {
   const host = $('#modalHost');
   host.hidden = true;
   host.innerHTML = '';
+  bookCatalogReviewTarget = null;
   setModalBackgroundInert(false);
   const target = modalReturnFocus;
   modalReturnFocus = null;
@@ -15044,6 +15550,12 @@ document.addEventListener('click', ev => {
       break;
     case 'rostertransitionsubmit': submitRosterTransition(el); break;
     case 'bookretry': bookDb = null; bookDbErr = ''; loadBooks(); render(); break;
+    case 'bookcatalogrefresh':
+      completedBookCatalogError = '';
+      loadCompletedBookCatalog(true);
+      break;
+    case 'bookcatalogreviewopen': openBookCatalogReviewModal(String(el.dataset.bookId || '')); break;
+    case 'bookcatalogreviewapprove': approveBookCatalogReview(el); break;
     case 'bookissuerefresh': rosterErr = ''; bookIssueError = ''; bookIssueLoaded = false; loadRoster(); loadBookIssues(true); break;
     case 'bookissuefilter': {
       if (!BOOK_ISSUE_FILTERS.some(filter => filter[0] === el.dataset.status)) break;
@@ -15056,15 +15568,21 @@ document.addEventListener('click', ev => {
     case 'bookorderlinksave': saveBookOrderStudentLink(el); break;
     case 'bookorderpricesave': saveLegacyBookOrderPrice(el); break;
     case 'bookordertransition': transitionBookOrder(el); break;
+    case 'bookordermanualresult': transitionManualOnlineOrder(el); break;
+    case 'externalbookorder': submitExternalBookOrder(el); break;
     case 'boundbookstudentopen': openBoundBookStudentModal(); break;
     case 'boundbookstudentlinksave': saveBoundBookStudentLink(); break;
     case 'boundbookordersubmit': submitBoundBookOrder(el); break;
     case 'bookorderhistorysearch': {
       const select = document.querySelector('[data-book-order-history-teacher]');
+      const titleInput = document.querySelector('[data-book-order-history-title]');
       const teacherId = String(select && select.value || bookOrderHistoryTeacherId || '');
-      if (!teacherId) return toast('조회할 주문자(선생님)를 선택해 주세요');
+      const titleQuery = String(titleInput && titleInput.value || bookOrderHistoryTitleQuery || '').slice(0, 160);
       bookOrderHistoryTeacherId = teacherId;
+      bookOrderHistoryTitleQuery = titleQuery;
       bookOrderHistoryQueriedTeacherId = teacherId;
+      bookOrderHistoryQueriedTitleQuery = titleQuery;
+      bookOrderHistorySearched = true;
       render();
       break;
     }
@@ -16304,6 +16822,37 @@ function captureTransportDraftFromEvent(target) {
 let inputTimer = null;
 document.addEventListener('input', ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
+  if (ev.target.closest('[data-book-catalog-review-title], [data-book-catalog-review-publisher]')) {
+    syncBookCatalogReviewApproveButton();
+    return;
+  }
+  const externalTitle = ev.target.closest('[data-external-title]');
+  if (externalTitle) {
+    const nextTitle = String(externalTitle.value || '').slice(0, 160);
+    if (externalBookDraft.title !== nextTitle) {
+      externalBookDraft.title = nextTitle;
+      externalBookDraft.taskId = '';
+      batchOrderTaskId = '';
+    }
+    syncExternalBookOrderUi();
+    return;
+  }
+  const externalPrice = ev.target.closest('[data-external-unit-price]');
+  if (externalPrice) {
+    const nextPrice = String(externalPrice.value || '');
+    if (externalBookDraft.unitPrice !== nextPrice) {
+      externalBookDraft.unitPrice = nextPrice;
+      externalBookDraft.taskId = '';
+      batchOrderTaskId = '';
+    }
+    syncExternalBookOrderUi();
+    return;
+  }
+  const historyTitle = ev.target.closest('[data-book-order-history-title]');
+  if (historyTitle) {
+    bookOrderHistoryTitleQuery = String(historyTitle.value || '').slice(0, 160);
+    return;
+  }
   const boundBookTitle = ev.target.closest('[data-bound-book-title]');
   if (boundBookTitle) {
     syncBoundBookStudentLinkButton();
@@ -16340,6 +16889,10 @@ document.addEventListener('input', ev => {
       renderAfterSync();
     }, 600);
   }
+});
+
+document.addEventListener('change', ev => {
+  if (ev.target.closest('[data-book-catalog-review-confirm]')) syncBookCatalogReviewApproveButton();
 });
 
 /* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */
@@ -16418,6 +16971,48 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', async ev => {
   if (captureTransportDraftFromEvent(ev.target)) return;
+  const externalPublisher = ev.target.closest('[data-external-publisher]');
+  if (externalPublisher) {
+    const value = String(externalPublisher.value || '');
+    const publisher = externalPublisherChoice(value);
+    externalBookDraft = emptyExternalBookDraft();
+    if (publisher) {
+      externalBookDraft.publisherValue = publisher.value;
+      externalBookDraft.publisherName = publisher.publisherName;
+      externalBookDraft.vendorName = publisher.vendorName;
+    }
+    batchVendorName = '';
+    batchOrderTaskId = '';
+    render();
+    requestAnimationFrame(() => document.querySelector('[data-external-publisher]')?.focus());
+    return;
+  }
+  const externalBook = ev.target.closest('[data-external-book]');
+  if (externalBook) {
+    const value = String(externalBook.value || '');
+    const book = value && value !== EXTERNAL_BOOK_DIRECT
+      ? externalCatalogBooks(externalBookDraft.publisherName).find(row => row.bookId === value)
+      : null;
+    externalBookDraft.bookValue = value;
+    externalBookDraft.bookId = book ? book.bookId : '';
+    externalBookDraft.title = book ? book.title : '';
+    externalBookDraft.taskId = '';
+    batchOrderTaskId = '';
+    render();
+    requestAnimationFrame(() => document.querySelector(value === EXTERNAL_BOOK_DIRECT
+      ? '[data-external-title]'
+      : '[data-external-book]')?.focus());
+    return;
+  }
+  const externalStudent = ev.target.closest('[data-external-student]');
+  if (externalStudent) {
+    externalBookDraft.studentIds = Array.from(document.querySelectorAll('[data-external-student]:checked'))
+      .map(input => String(input.value || '')).filter(Boolean);
+    externalBookDraft.taskId = '';
+    batchOrderTaskId = '';
+    syncExternalBookOrderUi();
+    return;
+  }
   const boundBookOptionInput = ev.target.closest('[data-bound-book-option]');
   if (boundBookOptionInput) {
     const nextCode = String(boundBookOptionInput.value || '');
@@ -16436,8 +17031,6 @@ document.addEventListener('change', async ev => {
   const historyTeacher = ev.target.closest('[data-book-order-history-teacher]');
   if (historyTeacher) {
     bookOrderHistoryTeacherId = String(historyTeacher.value || '');
-    const searchButton = document.querySelector('[data-act="bookorderhistorysearch"]');
-    if (searchButton) searchButton.disabled = !bookOrderHistoryTeacherId;
     return;
   }
   if (syncRenderedLessonScheduleField(ev.target)) {
@@ -16710,7 +17303,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.10';
+const APP_VER = '2026-08-27.11';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
