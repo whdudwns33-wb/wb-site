@@ -43,11 +43,12 @@ test('admin lesson screen omits the publication-readiness audit', () => {
   assert.doesNotMatch(view, /숙제·준비물 공개 설정 누락 수업/);
 });
 
-test('guardian publication editor activates for an assigned stable-student lesson today without schedule-slot requirements', () => {
+test('guardian publication editor activates only for an allowed assigned stable-student lesson today', () => {
   const start = html.indexOf('function canEditGuardianPublication(');
   const end = html.indexOf('function normalizeGuardianPublication(', start);
   const block = html.slice(start, end);
   assert.match(block, /!isLesson\(task\)/);
+  assert.match(block, /!guardianContactEnabledFor\(task\.studentId\)/);
   assert.match(html, /assignedLessonStudents\(\)\.some\(student => String\(student\.id\) === String\(task\.studentId\)\)/);
   assert.doesNotMatch(block, /scheduleStatus|scheduleSlots|weekday/);
 });
@@ -428,6 +429,35 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.doesNotMatch(html, /승인 없이 바로 카카오 알림톡이 나갑니다|학부모 피드백 문자/);
   assert.doesNotMatch(html, /보호자께 카카오 알림톡을 보냈습니다|보호자 발송 완료/);
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
+});
+
+test('feedback preview hides the learned-content input and keeps its value from lesson records', () => {
+  const computeStart = html.indexOf('function computeFeedbackFields(');
+  const previewStart = html.indexOf('function showFeedbackPreview(', computeStart);
+  const previewEnd = html.indexOf('function todayStaffList(', previewStart);
+  const submitStart = html.indexOf('async function submitFeedbackForReview(');
+  const submitEnd = html.indexOf('async function reviewFeedbackRequest(', submitStart);
+  const compute = html.slice(computeStart, previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  const submit = html.slice(submitStart, submitEnd);
+  assert.match(compute, /lessonMemoValues\(c\)/);
+  assert.match(compute, /memo\.contentProgress[\s\S]*doneSteps\.length[\s\S]*taskCardDetail\(t\)/);
+  assert.doesNotMatch(preview, /id="fldContent"|<label class="fl">오늘 배운 내용<\/label>/);
+  assert.match(preview, /fbCtx = \{ id: t\.id, date: date, contentText:/);
+  assert.match(preview, /오늘 배운 내용은 저장된 수업내용·진도에서 자동 반영됩니다/);
+  assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
+  assert.doesNotMatch(submit, /#fldContent/);
+});
+
+test('teacher-only other notes never enter parent feedback text or send fields', () => {
+  const feedbackStart = html.indexOf('function feedbackText(');
+  const feedbackEnd = html.indexOf('function todayStaffList(', feedbackStart);
+  const feedback = html.slice(feedbackStart, feedbackEnd);
+  assert.match(feedback, /memo\.contentProgress\.trim\(\)/);
+  assert.match(feedback, /memo\.homework\.trim\(\)/);
+  assert.match(feedback, /memo\.comment\.trim\(\)/);
+  assert.doesNotMatch(feedback, /memo\.otherNotes|otherNotes\.trim/);
+  assert.match(html, /선생님 내부 공유 · 학부모 미발송/);
 });
 
 test('guardian contacts are saved and rendered by stable studentId, not by student name', () => {

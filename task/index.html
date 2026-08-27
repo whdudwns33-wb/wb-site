@@ -171,6 +171,13 @@
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
   textarea.note { display: block; min-height: 44px; resize: vertical; transition: min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
+  .lesson-memo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .lesson-memo-field { display: block; min-width: 0; }
+  .lesson-memo-field .fl { display: block; color: var(--mid-gray); font-size: 12.5px; font-weight: 700; }
+  .lesson-memo-private { display: block; margin-top: 2px; color: #9E3629; font-size: 11px; font-weight: 700; }
+  .lesson-memo-editor .lesson-memo-field textarea.note,
+  .lesson-memo-editor:focus-within .lesson-memo-field textarea.note { min-height: 72px; margin-top: 5px; border-style: dashed; border-color: var(--line); background: var(--ivory); outline: none; }
+  .lesson-memo-editor .lesson-memo-field textarea.note:focus { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
   .memo-save { display: none; margin-top: 8px; }
   .memo-editor:focus-within .memo-save { display: block; }
   .guardian-publication { margin-top: 10px; padding: 12px; border: 1px solid #B9E3C7; border-radius: 10px; background: #F3FCF6; }
@@ -372,6 +379,7 @@
     .schedule-week-grid .schedule-day-head .schedule-person-meta { margin-bottom: 0; }
   }
   @media (max-width: 600px) {
+    .lesson-memo-grid { grid-template-columns: 1fr; }
     .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .schedule-card-grid { grid-template-columns: 1fr; }
     .schedule-list-row { grid-template-columns: 76px minmax(0, 1fr); }
@@ -949,11 +957,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-26.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-26.5"></script>
-<script src="./asset-core.js?v=2026-08-26.5"></script>
-<script src="./qr-core.js?v=2026-08-26.5"></script>
-<script src="./acaflow-import-core.js?v=2026-08-26.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.4"></script>
+<script src="./asset-core.js?v=2026-08-27.4"></script>
+<script src="./qr-core.js?v=2026-08-27.4"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.4"></script>
 <script>
 "use strict";
 
@@ -2774,10 +2782,50 @@ function taskRow(t, date, editable, isCarry) {
   return h + '</div></div>';
 }
 
+const LESSON_MEMO_FIELDS = [
+  { key: 'contentProgress', label: '수업내용 · 진도', placeholder: '오늘 수업한 내용과 실제 진도를 입력하세요' },
+  { key: 'homework', label: '과제', placeholder: '학생에게 안내한 과제를 입력하세요' },
+  { key: 'comment', label: '코멘트', placeholder: '수업에 대한 코멘트를 입력하세요' },
+  { key: 'otherNotes', label: '기타 · 특이사항', placeholder: '그 밖의 특이사항을 입력하세요' }
+];
+
+function lessonMemoValues(check) {
+  const stored = check && check.lessonMemo;
+  const structured = stored && typeof stored === 'object' && !Array.isArray(stored) &&
+    LESSON_MEMO_FIELDS.some(field => Object.prototype.hasOwnProperty.call(stored, field.key));
+  const values = {};
+  LESSON_MEMO_FIELDS.forEach(field => {
+    values[field.key] = structured ? String(stored[field.key] || '') : '';
+  });
+  if (!structured) values.contentProgress = String((check && check.note) || '');
+  return values;
+}
+
+function lessonMemoText(values) {
+  return LESSON_MEMO_FIELDS.map(field => {
+    const value = String((values && values[field.key]) || '').trim();
+    return value ? '[' + field.label + ']\n' + value : '';
+  }).filter(Boolean).join('\n\n');
+}
+
 function taskMemoEditorHtml(t, date, c, editable) {
+  if (isLesson(t)) {
+    const values = lessonMemoValues(c);
+    if (!editable) {
+      const rows = LESSON_MEMO_FIELDS.filter(field => String(values[field.key] || '').trim());
+      return rows.length ? '<div class="lesson-memo-readonly">' + rows.map(field =>
+        '<div class="note"><b>' + esc(field.label) + '</b><br>' + esc(values[field.key]) + '</div>').join('') + '</div>' : '';
+    }
+    return '<div class="memo-editor lesson-memo-editor"><div class="lesson-memo-grid">' + LESSON_MEMO_FIELDS.map(field =>
+      '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
+      (field.key === 'otherNotes' ? '<span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송</span>' : '') +
+      '<textarea class="note" data-lesson-memo-field="' +
+      field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="2" enterkeyhint="enter" placeholder="' + esc(field.placeholder) + '">' +
+      esc(values[field.key]) + '</textarea></label>').join('') + '</div><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
+      t.id + '" data-date="' + date + '">수업 메모 저장</button></div>';
+  }
   return editable
-    ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' +
-      (isLesson(t) ? '메모 — +잘한점 / -보완점 / 숙제○○ 로 쓰면 피드백 문구에 자동 배치' : '메모 · 막힌 이유나 특이사항을 남기세요') + '">' +
+    ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">' +
       esc((c && c.note) || '') + '</textarea><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
       t.id + '" data-date="' + date + '">메모 저장</button></div>'
     : ((c && c.note) ? '<div class="note">' + esc(c.note) + '</div>' : '');
@@ -3049,8 +3097,17 @@ function guardianPublicationKey(taskId, lessonDate) {
 function canEditGuardianPublication(task, lessonDate) {
   if (!task || lessonDate !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
       task.staffId !== session.staffId || !isLesson(task) ||
-      !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) || !rosterDb) return false;
+      !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) ||
+      !guardianContactEnabledFor(task.studentId) || !rosterDb) return false;
   return assignedLessonStudents().some(student => String(student.id) === String(task.studentId));
+}
+
+function prepareGuardianPublicationPolicy(lessonDate) {
+  const date = String(lessonDate || '');
+  if (date !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
+      guardianPublicationLoadedDates.has(date) || guardianPublicationLoadingDates.has(date) ||
+      guardianPublicationErrors.has(date)) return;
+  setTimeout(() => loadGuardianPublications(date, false), 0);
 }
 
 function guardianPublicationAccessHint(task, lessonDate) {
@@ -3367,10 +3424,13 @@ function taskPanel(t, date, c, editable) {
   if (lesson) {
     h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모(실제 진도 및 특이사항)</div>' +
       taskMemoEditorHtml(t, date, c, editable) + '</section>';
-    const canEditPublication = canEditGuardianPublication(t, date);
-    h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
-      '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
-        '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
+    prepareGuardianPublicationPolicy(date);
+    if (guardianContactEnabledFor(t.studentId)) {
+      const canEditPublication = canEditGuardianPublication(t, date);
+      h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
+        '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
+          '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
+    }
     h += previousTaskMemosProgressHtml(t.id, date);
   }
 
@@ -3730,12 +3790,23 @@ function feedbackText(t, date, genComment) {
   const mood = seedPick(FB_MOOD_KEYS, seed, 99);
 
   const plus = [], minus = [], hw = [], etc = [];
-  ((c && c.note) || '').split(/\n|\//).map(x => x.trim()).filter(Boolean).forEach(line => {
-    if (line.startsWith('+')) plus.push(line.slice(1).trim());
-    else if (line.startsWith('-') || line.startsWith('−')) minus.push(line.slice(1).trim());
-    else if (/^숙제/.test(line)) hw.push(line.replace(/^숙제[:\s]*/, '').trim());
-    else etc.push(line);
-  });
+  const storedLessonMemo = c && c.lessonMemo;
+  const hasStructuredLessonMemo = storedLessonMemo && typeof storedLessonMemo === 'object' && !Array.isArray(storedLessonMemo) &&
+    LESSON_MEMO_FIELDS.some(field => Object.prototype.hasOwnProperty.call(storedLessonMemo, field.key));
+  if (hasStructuredLessonMemo) {
+    const memo = lessonMemoValues(c);
+    if (memo.contentProgress.trim()) etc.push(memo.contentProgress.trim());
+    if (memo.homework.trim()) hw.push(memo.homework.trim());
+    if (memo.comment.trim()) etc.push(memo.comment.trim());
+    // 기타·특이사항은 선생님 내부 공유 전용이며 학부모 피드백 문구에는 절대 넣지 않는다.
+  } else {
+    ((c && c.note) || '').split(/\n|\//).map(x => x.trim()).filter(Boolean).forEach(line => {
+      if (line.startsWith('+')) plus.push(line.slice(1).trim());
+      else if (line.startsWith('-') || line.startsWith('−')) minus.push(line.slice(1).trim());
+      else if (/^숙제/.test(line)) hw.push(line.replace(/^숙제[:\s]*/, '').trim());
+      else etc.push(line);
+    });
+  }
 
   const parts = [];
   parts.push(seedPick(FB_GREET[mood], seed, 30));
@@ -3781,36 +3852,38 @@ function feedbackText(t, date, genComment) {
 }
 
 /** 오늘 배운 내용/잘한 점/보완할 점 — 카카오 알림톡 항목별 변수 그대로 나가는 값이다.
- *  doneSteps(실제 체크한 단계)·FB_PLUS/FB_MINUS 칩 선택에서 초안을 뽑아주지만,
- *  최종적으로 나가는 건 이 입력칸에 남아있는 값이라 눌러서 고칠 수 있다. */
+ *  오늘 배운 내용은 수업 메모의 수업내용·진도를 우선하고 실제 체크 단계·등록 수업 정보 순으로 자동 구성한다.
+ *  코멘트 인터뷰 화면에서는 잘한 점과 보완할 점만 확인·수정한다. */
 function computeFeedbackFields(t, date, fbCtx) {
   const c = getCheck(t.id, date);
   const doneSteps = taskSteps(t, c).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
-  const contentText = doneSteps.length ? doneSteps.join(', ') : taskCardDetail(t);
+  const memo = lessonMemoValues(c);
+  const contentText = (String(memo.contentProgress || '').trim() ||
+    (doneSteps.length ? doneSteps.join(', ') : '') || taskCardDetail(t) ||
+    [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const plusText = ((fbCtx && fbCtx.plus) || []).map(i => FB_PLUS[i][0]).join(', ');
   const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
   const minusText = minusPick === '없음' ? '특별히 없음 — 오늘도 잘 따라왔어요' : minusPick;
   return { contentText, plusText, minusText };
 }
 
-/** 실제 발송(카카오 알림톡) 미리보기 + 발송 버튼. fields는 초안일 뿐, 입력칸에서 바로 고칠 수 있다.
+/** 실제 발송(카카오 알림톡) 미리보기 + 발송 버튼. 잘한 점·보완할 점은 입력칸에서 바로 고칠 수 있다.
  *  letterText는 복사용 편지 — 안 주면 인터뷰 없이 그날 체크·메모만으로 생성한다. */
 function showFeedbackPreview(t, date, fields, letterText) {
-  fbCtx = { id: t.id, date: date };
+  fbCtx = { id: t.id, date: date, contentText: String(fields.contentText || '').trim().slice(0, 300) };
   const teacher = (currentStaff() || {}).name || '';
   const student = studentOf(t);
   const guardianDeliveryEnabled = guardianContactEnabledFor(t && t.studentId);
   if (letterText == null) letterText = feedbackText(t, date);
   modal('수업 피드백 문구 — ' + esc(student) + ' 학생',
     '<div class="small muted mb8">' + esc(teacher) + ' 선생님 수업 기록을 바탕으로 만든 문구입니다.</div>' +
-    '<div class="field"><label class="fl">오늘 배운 내용</label><input class="in" id="fldContent" value="' + esc(fields.contentText || '') + '"></div>' +
     '<div class="field"><label class="fl">잘한 점</label><input class="in" id="fldPlus" value="' + esc(fields.plusText || '') + '"></div>' +
     '<div class="field"><label class="fl">다음에 더 신경 쓸 점</label><input class="in" id="fldMinus" value="' + esc(fields.minusText || '') + '"></div>' +
     (guardianDeliveryEnabled
       ? '<div class="hint mt14"><b>테스트 학생 전달 기능 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
       : '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 연락처는 보관하지만 메시지나 과제물을 학부모에게 전달하지 않습니다.</div>') +
     '<textarea class="in" rows="6" id="mText" style="margin-top:10px">' + esc(letterText) + '</textarea>' +
-    '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다 — 실제 발송 내용은 위 세 항목입니다.</div>',
+    '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다. 실제 발송의 오늘 배운 내용은 저장된 수업내용·진도에서 자동 반영됩니다.</div>',
     '<button class="btn btn-ghost btn-block mt14" data-act="copytext">복사하기</button>' +
     (guardianDeliveryEnabled ? '<button class="btn btn-primary btn-block mt8" data-act="feedbacksubmit">보호자 알림톡 보내기</button>' : ''));
 }
@@ -5513,11 +5586,11 @@ async function submitFeedbackForReview(button) {
   const task = state.tasks.find(row => row.id === fbCtx.id);
   if (!guardianContactEnabledFor(task && task.studentId)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const message = (($('#mText') || {}).value || '').trim();
-  const contentText = (($('#fldContent') || {}).value || '').trim();
+  const contentText = String(fbCtx.contentText || '').trim();
   const plusText = (($('#fldPlus') || {}).value || '').trim();
   const minusText = (($('#fldMinus') || {}).value || '').trim();
   if (!message) return toast('피드백 문구를 입력해 주세요');
-  if (!contentText || !plusText || !minusText) return toast('오늘 배운 내용·잘한 점·보완할 점을 모두 입력해 주세요');
+  if (!contentText || !plusText || !minusText) return toast('잘한 점·보완할 점과 수업 기록을 확인해 주세요');
   if (!confirm('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요?')) return;
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
@@ -14593,6 +14666,20 @@ document.addEventListener('click', ev => {
     case 'lessonbriefingsave': saveLessonBriefingEditor(el); break;
     case 'notesave': {
       const editor = el.closest('.memo-editor');
+      const lessonFields = editor && Array.from(editor.querySelectorAll('[data-lesson-memo-field]'));
+      if (lessonFields && lessonFields.length) {
+        const lessonMemo = {};
+        LESSON_MEMO_FIELDS.forEach(field => { lessonMemo[field.key] = ''; });
+        lessonFields.forEach(field => {
+          if (Object.prototype.hasOwnProperty.call(lessonMemo, field.dataset.lessonMemoField)) {
+            lessonMemo[field.dataset.lessonMemoField] = field.value;
+          }
+        });
+        clearTimeout(inputTimer);
+        setCheck(id, date, { lessonMemo: lessonMemo, note: lessonMemoText(lessonMemo) });
+        toast('수업 메모 저장됨');
+        break;
+      }
       const noteEl = editor && editor.querySelector('[data-act="note"]');
       if (!noteEl) return toast('메모 입력칸을 다시 확인해 주세요');
       clearTimeout(inputTimer);
@@ -16047,7 +16134,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-26.5';
+const APP_VER = '2026-08-27.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
