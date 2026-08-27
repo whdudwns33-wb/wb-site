@@ -160,6 +160,10 @@
     .auto-bar{position:fixed;left:0;right:0;bottom:0;z-index:9;background:#fff;border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #17395722}
     .auto-in{display:flex;max-width:560px;margin:auto;gap:7px;align-items:center;flex-wrap:wrap}
     .auto-lbl{flex:0 0 auto;color:var(--muted);font-size:11px;font-weight:900}
+    /* 낭독(TTS): 자동 읽기와 달리 나머지를 흐리지 않는다 — 눈으로 글 전체를 보며 귀로 따라가야 하므로 */
+    .rd-body .seg.spk{background:linear-gradient(transparent 55%,#ffe6a3 55%);border-radius:4px;box-shadow:0 0 0 3px #ffe6a3}
+    .readaloud .rd-body .vw{pointer-events:none}
+    .spk-cue{flex:0 0 auto;background:#fbeae6;color:var(--coral);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:900}
     button.chipword{border:0;cursor:pointer;text-align:left}
     /* 인쇄용 탐구보고서 */
     #printArea{display:none}
@@ -274,6 +278,7 @@ function normalizeState(s){
   s.reports=s.reports||[];
   if(!('lab' in s))s.lab=null;
   s.prefs.auto=s.prefs.auto||{speed:1,scope:0};
+  s.prefs.spk=s.prefs.spk||{rate:1,echo:false};
   s.mychunks=s.mychunks||{};
   s.speed=s.speed||[];
   s.wrong=s.wrong||[];
@@ -427,7 +432,7 @@ function render(){
   }else{$('#headActions').innerHTML='';}
   window.scrollTo(0,0);
 }
-function go(name,extra){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
+function go(name,extra){if(sess.auto)autoStop(false);spkStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
 
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
@@ -615,7 +620,8 @@ function vReader(){
         ${mc?`<button class="toolbtn" data-act="toggle-mychunk" aria-pressed="${chunk&&useMine}">∕ 내 단위</button>`:''}
         <button class="toolbtn" data-act="mychunk-edit">✂ 직접 끊기</button>
         <button class="toolbtn" data-act="auto-start">▶ 자동 읽기</button>
-        <button class="toolbtn" data-act="aloud">🎙 낭독</button>
+        <button class="toolbtn" data-act="spk">🔊 낭독</button>
+        <button class="toolbtn" data-act="aloud">🎙 녹음</button>
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         ${hasEn?`<span class="seg-ctl" role="group" aria-label="언어 보기">${[[0,'한글'],[1,'한·영'],[2,'EN만']].map(([m,l])=>`<button data-act="en-mode" data-m="${m}" aria-pressed="${enMode===m}">${l}</button>`).join('')}</span>`:''}
@@ -1337,7 +1343,157 @@ function autoStart(){
   document.body.appendChild(bar);
   autoTick();
 }
-/* ── 낭독 녹음 (기기 밖으로 전송하지 않음 — 이 화면에서만 재생) ── */
+/* ── 낭독 (기기 음성으로 읽어 주기 · 따라 읽기) ──
+   자동 읽기가 "눈의 속도"를 잡아 준다면, 낭독은 "귀로 듣고 소리로 따라가기"다.
+   저학년은 해독에 작업기억을 다 써서 이해까지 가지 못하므로, 먼저 유창성을 만든다.
+   발음 채점은 하지 않는다 — 아동 음성 인식률이 낮아 "잘 읽었는데 틀렸다"가 이탈로 이어진다. */
+const SPK_RATES=[0.6,0.8,1,1.2];
+const SPK_RATE_LABELS=['아주 천천히','천천히','보통','빠르게'];
+let SPK=null;
+function spkOK(){try{return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance==='function';}catch(e){return false;}}
+function spkVoice(lang){
+  let vs=[];try{vs=speechSynthesis.getVoices()||[];}catch(e){}
+  const pre=lang.slice(0,2).toLowerCase();
+  const same=vs.filter(v=>(v.lang||'').replace('_','-').toLowerCase().startsWith(pre));
+  return same.find(v=>v.localService)||same[0]||null;
+}
+/* 문장 단위로 묶는다 — 문단을 넘지 않고, 영어 문단은 영어 음성으로.
+   긴 문장을 한 번에 넘기면 일부 브라우저가 중간에 끊으므로 문장 단위가 안전하다. */
+function spkUnits(){
+  const segs=Array.from(document.querySelectorAll('#readerCard .rd-body .seg')).filter(el=>el.offsetParent!==null);
+  const out=[];let cur=[];
+  const flush=()=>{
+    if(!cur.length)return;
+    const text=cur.map(el=>(el.textContent||'').trim()).join(' ').replace(/\s+/g,' ').trim();
+    if(text)out.push({els:cur,text,lang:cur[0].closest('.para-en')?'en-US':'ko-KR'});
+    cur=[];
+  };
+  for(const el of segs){
+    if(cur.length&&cur[0].parentElement!==el.parentElement)flush();
+    cur.push(el);
+    if(/[.!?…]['"”’)»]?$/.test((el.textContent||'').trim()))flush();
+  }
+  flush();
+  return out;
+}
+function spkPaint(units){
+  units=units||spkUnits();
+  const u=SPK?units[SPK.idx]:null;
+  const now=new Set(u?u.els:[]);
+  document.querySelectorAll('#readerCard .rd-body .seg').forEach(el=>el.classList.toggle('spk',now.has(el)));
+  const c=document.getElementById('spkCount');
+  if(c&&SPK)c.textContent=Math.min(SPK.idx+1,units.length)+' / '+units.length;
+}
+function spkBar(units){
+  if(!SPK)return;
+  let bar=document.getElementById('spkBar');
+  if(!bar){bar=document.createElement('div');bar.className='auto-bar';bar.id='spkBar';document.body.appendChild(bar);}
+  const head=SPK.waiting
+    ? `<span class="spk-cue">🗣 따라 읽어 보세요</span>
+       <button class="toolbtn" data-act="spk-again">↺ 다시 들려줘</button>
+       <button class="toolbtn" data-act="spk-next">다음 문장 ▶</button>`
+    : `<button class="toolbtn" data-act="spk-pp">${SPK.paused?'▶ 이어서':'⏸ 정지'}</button>
+       <button class="toolbtn" data-act="spk-again">↺ 이 문장 다시</button>`;
+  bar.innerHTML=`<div class="auto-in">${head}
+    <span class="auto-lbl">속도</span>
+    <span class="seg-ctl">${SPK_RATE_LABELS.map((l,i)=>`<button data-act="spk-rate" data-i="${i}" aria-pressed="${i===SPK.rate}">${l}</button>`).join('')}</span>
+    <span class="seg-ctl"><button data-act="spk-echo" aria-pressed="${SPK.echo}">🗣 따라 읽기</button></span>
+    <span class="qnum" id="spkCount"></span>
+    <span style="flex:1"></span>
+    <button class="toolbtn" data-act="spk-exit">끝내기 ✕</button></div>`;
+  spkPaint(units);
+}
+function spkClearTimers(){
+  if(!SPK)return;
+  if(SPK.timer){clearTimeout(SPK.timer);SPK.timer=null;}
+  if(SPK.guard){clearTimeout(SPK.guard);SPK.guard=null;}
+}
+function spkSpeak(){
+  if(!SPK)return;
+  spkClearTimers();
+  const units=spkUnits();
+  if(SPK.idx>=units.length){spkStop(true);return;}
+  const u=units[SPK.idx];
+  SPK.waiting=false;SPK.paused=false;
+  spkBar(units);
+  if(u.els[0])u.els[0].scrollIntoView({block:'center',behavior:'smooth'});
+  let handled=false;
+  /* 한국어 음성이 없는 기기에서는 speak()가 즉시 onerror로 떨어진다.
+     그대로 두면 문장이 소리 없이 좌르륵 넘어가므로, 첫 문장부터 실패하면 멈추고 알린다. */
+  const finish=(failed)=>{
+    if(handled||!SPK)return;
+    handled=true;
+    if(failed){
+      SPK.err++;
+      if(!SPK.ok&&SPK.err>=2){spkStop(false);announce('이 기기에는 읽어 줄 목소리가 없어요. 대신 🎙 녹음으로 직접 읽어 보세요.');return;}
+    }else{SPK.ok++;SPK.err=0;}
+    spkAfter();
+  };
+  try{
+    speechSynthesis.cancel();
+    const utt=new SpeechSynthesisUtterance(u.text);
+    utt.lang=u.lang;utt.rate=SPK_RATES[SPK.rate];utt.pitch=1;
+    const v=spkVoice(u.lang);if(v)utt.voice=v;
+    utt.onend=()=>finish(false);
+    utt.onerror=()=>finish(true);
+    speechSynthesis.speak(utt);
+    /* onend가 오지 않는 기기 대비 안전장치 — 예상 낭독 시간 + 여유 */
+    SPK.guard=setTimeout(()=>finish(false),Math.max(4000,u.text.length*400/SPK_RATES[SPK.rate])+2500);
+  }catch(e){finish(true);}
+}
+function spkAfter(){
+  if(!SPK)return;
+  spkClearTimers();
+  if(SPK.echo){
+    /* 따라 읽기: 아이가 소리 내어 따라 읽을 시간을 준다 (문장 길이에 비례, 손 안 대도 넘어감) */
+    const units=spkUnits();
+    const u=units[SPK.idx];
+    SPK.waiting=true;
+    spkBar(units);
+    SPK.timer=setTimeout(spkNext,Math.max(1800,(u?u.text.length:0)*260));
+    return;
+  }
+  SPK.timer=setTimeout(spkNext,200);
+}
+function spkNext(){
+  if(!SPK)return;
+  spkClearTimers();
+  SPK.idx++;SPK.waiting=false;
+  if(SPK.idx>=spkUnits().length){spkStop(true);return;}
+  spkSpeak();
+}
+function spkStop(done){
+  if(!SPK)return;
+  spkClearTimers();
+  const n=SPK.idx,echo=SPK.echo,aid=SPK.articleId;
+  SPK=null;
+  try{speechSynthesis.cancel();}catch(e){}
+  const c=document.getElementById('readerCard');if(c)c.classList.remove('readaloud');
+  document.querySelectorAll('.seg.spk').forEach(el=>el.classList.remove('spk'));
+  const bar=document.getElementById('spkBar');if(bar)bar.remove();
+  if(!done)return;
+  if(aid){S.train.push({date:dkey(),articleId:aid,type:'readaloud',echo,sentences:n});save();}
+  announce(echo?'따라 읽기 완료! 소리 내어 읽으면 더 잘 이해돼요.':'낭독 완료! 끝까지 들었어요.');
+}
+function spkStart(){
+  if(!spkOK()){announce('이 기기에서는 낭독을 지원하지 않아요. 대신 🎙 녹음으로 직접 읽어 보세요.');return;}
+  if(sess.auto)autoStop(false);
+  aloudClose();
+  if(SPK)spkStop(false);
+  try{speechSynthesis.getVoices();}catch(e){}   // 첫 호출에서 목소리 목록을 깨운다
+  if(!spkUnits().length){announce('읽어 줄 문장을 찾지 못했어요.');return;}
+  const pf=S.prefs.spk||{};
+  SPK={idx:0,rate:Math.min(pf.rate==null?1:pf.rate,SPK_RATES.length-1),echo:!!pf.echo,
+       waiting:false,paused:false,timer:null,guard:null,ok:0,err:0,articleId:view.id||null};
+  const c=document.getElementById('readerCard');if(c)c.classList.add('readaloud');
+  spkSpeak();
+}
+function spkSavePrefs(){if(SPK){S.prefs.spk={rate:SPK.rate,echo:SPK.echo};save();}}
+/* 화면을 벗어나면 목소리가 따라다니지 않게 */
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&SPK)spkStop(false);});
+window.addEventListener('pagehide',()=>{try{speechSynthesis.cancel();}catch(e){}});
+
+/* ── 내 목소리 녹음 (기기 밖으로 전송하지 않음 — 이 화면에서만 재생) ── */
 let ALOUD={rec:null,stream:null,chunks:[],url:null,timer:null,t0:0};
 async function aloudStart(){
   if(sess.auto)autoStop(false);
@@ -1512,7 +1668,7 @@ document.addEventListener('click',e=>{
       .catch(e=>{sess.syncErr=e.message;render();});}
   else if(act==='sync-now'){syncPush().then(()=>syncPull()).then(()=>{render();announce('동기화 완료');});}
   else if(act==='sync-off'){SYNC.auth=null;syncSaveAuth();render();}
-  else if(act==='en-mode'){const lv=myLevel();if(sess.auto)autoStop(false);S.prefs.en[lv]=+t.dataset.m;save();render();}
+  else if(act==='en-mode'){const lv=myLevel();if(sess.auto)autoStop(false);spkStop(false);S.prefs.en[lv]=+t.dataset.m;save();render();}
   else if(act==='auto-start'){autoStart();}
   else if(act==='auto-pp'){const a=sess.auto;if(!a)return;
     a.playing=!a.playing;
@@ -1534,10 +1690,25 @@ document.addEventListener('click',e=>{
     if(a.timer)clearTimeout(a.timer);
     if(a.playing)autoTick();else autoHighlight(ng);}
   else if(act==='auto-exit'){autoStop(false);}
-  /* ── 낭독 녹음 ── */
+  /* ── 낭독 (TTS) ── */
+  else if(act==='spk'){spkStart();}
+  else if(act==='spk-pp'){if(!SPK)return;
+    if(SPK.paused){spkSpeak();}
+    else{SPK.paused=true;spkClearTimers();try{speechSynthesis.cancel();}catch(e){}spkBar();}}
+  else if(act==='spk-again'){if(SPK)spkSpeak();}
+  else if(act==='spk-next'){if(SPK)spkNext();}
+  else if(act==='spk-rate'){if(!SPK)return;
+    SPK.rate=+t.dataset.i;spkSavePrefs();
+    if(SPK.waiting||SPK.paused)spkBar();else spkSpeak();}
+  else if(act==='spk-echo'){if(!SPK)return;
+    SPK.echo=!SPK.echo;spkSavePrefs();
+    if(SPK.waiting&&!SPK.echo)spkNext();else spkBar();
+    announce(SPK.echo?'따라 읽기 켜짐 — 한 문장 듣고 따라 읽어요':'따라 읽기 꺼짐 — 이어서 읽어 줘요');}
+  else if(act==='spk-exit'){spkStop(false);}
+  /* ── 내 목소리 녹음 ── */
   else if(act==='aloud'){aloudStart();}
   else if(act==='aloud-stop'){if(ALOUD.rec&&ALOUD.rec.state==='recording'){ALOUD.rec.stop();
-    S.train.push({date:dkey(),articleId:view.id,type:'aloud'});save();announce('낭독 녹음 완료! 들어 보세요.');}}
+    S.train.push({date:dkey(),articleId:view.id,type:'aloud'});save();announce('녹음 완료! 들어 보세요.');}}
   else if(act==='aloud-close'){aloudClose();}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
