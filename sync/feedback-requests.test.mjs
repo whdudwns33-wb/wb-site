@@ -10,6 +10,7 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/010_feedback_requests.sql', import.meta.url), 'utf8');
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
+const migration051 = fs.readFileSync(new URL('./migrations/051_feedback_template_v2.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -75,6 +76,43 @@ test('schema and migrations are additive and restrict states', () => {
   assert.doesNotMatch(migration017, /DROP TABLE|DELETE FROM/i);
   assert.doesNotMatch(migration021, /DROP TABLE|DELETE FROM/i);
   assert.match(migration021, /ALTER TABLE feedback_requests ADD COLUMN student_id/);
+  assert.doesNotMatch(migration051, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
+  for (const column of ['subject_text', 'homework_text', 'comment_text']) {
+    assert.match(migration051, new RegExp('ALTER TABLE feedback_requests ADD COLUMN ' + column));
+    assert.match(schema, new RegExp(column + '\\s+TEXT'));
+  }
+});
+
+test('v2 submission accepts only the exact fixed template and stores its structured variables', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v2', 'teacher-a', { subject: '국어' });
+  const identityV2 = {
+    taskId: 'task-v2', feedbackDate: '2026-08-27', feedbackType: 'class_feedback', templateVersion: 'v2'
+  };
+  const structured = {
+    contentText: '비문학 지문의 중심 내용 찾기', homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 자신의 생각을 설명하는 태도가 인상적이었습니다.', plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
+    '- 일시 : 2026년 8월 27일\n- 과목 : 국어\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n' +
+    '- 과제 : ' + structured.homeworkText + '\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const auth = person('teacher-a', 'token-a');
+  let result = await call(db, '/feedback-request', { auth, ...identityV2, message, ...structured });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.templateVersion, 'v2');
+  assert.equal(result.body.request.subjectText, '국어');
+  assert.equal(result.body.request.homeworkText, structured.homeworkText);
+  assert.equal(result.body.request.commentText, structured.commentText);
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2, message: message.replace('정리해 보내드립니다.', '보내드립니다.'), ...structured
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
 });
 
 test('feedback submission delegates all real sending to the dedicated send module', () => {

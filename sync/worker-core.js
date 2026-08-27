@@ -1100,6 +1100,7 @@ const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
+const MAX_FEEDBACK_COMMENT = 600;
 const MAX_STUDENT_NAME = 40;
 
 /** 제출한 선생님의 실제 이름을 서버가 직접 찾는다 — 클라이언트가 이름을 자유롭게
@@ -1136,6 +1137,23 @@ function normalizeFeedbackBody(value) {
   return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
 }
 
+function feedbackDateLabel(value) {
+  const matched = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return matched ? matched[1] + '년 ' + Number(matched[2]) + '월 ' + Number(matched[3]) + '일' : '';
+}
+
+/** 클라이언트 미리보기와 카카오 승인 템플릿이 반드시 같은 본문인지 서버에서 다시 확인한다. */
+function feedbackV2Body(studentName, date, subjectText, contentText, homeworkText, commentText) {
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n' +
+    '- 과목 : ' + subjectText + '\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n' +
+    '- 과제 : ' + homeworkText + '\n' +
+    '- 코멘트 : ' + commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+}
+
 function feedbackIdentity(body) {
   const taskId = String(body.taskId || '');
   const feedbackDate = String(body.feedbackDate || '');
@@ -1168,6 +1186,9 @@ function feedbackView(row) {
     studentId: row.student_id || '',
     studentName: row.student_name || '',
     contentText: row.content_text || '',
+    subjectText: row.subject_text || '',
+    homeworkText: row.homework_text || '',
+    commentText: row.comment_text || '',
     plusText: row.plus_text || '',
     minusText: row.minus_text || '',
     revision: Number(row.revision),
@@ -1280,28 +1301,55 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const contentText = normalizeFeedbackField(body.contentText);
   const plusText = normalizeFeedbackField(body.plusText);
   const minusText = normalizeFeedbackField(body.minusText);
-  if (!contentText || !plusText || !minusText) {
-    return json({ ok: false, error: '오늘 배운 내용·잘한 점·보완할 점을 모두 골라 주세요' }, 400, origin);
+  const templateV2 = identity.templateVersion === 'v2';
+  const subjectText = templateV2
+    ? normalizeFeedbackField(checked.taskData.subject || checked.taskData.className || '') : '';
+  const homeworkText = templateV2 ? normalizeFeedbackField(body.homeworkText) : '';
+  const commentText = templateV2 ? normalizeFeedbackBody(body.commentText) : '';
+  if (!contentText || (!templateV2 && (!plusText || !minusText))) {
+    return json({ ok: false, error: templateV2
+      ? '수업내용·진도를 확인해 주세요'
+      : '오늘 배운 내용·잘한 점·보완할 점을 모두 골라 주세요' }, 400, origin);
   }
   if (contentText.length > MAX_FEEDBACK_FIELD || plusText.length > MAX_FEEDBACK_FIELD || minusText.length > MAX_FEEDBACK_FIELD) {
     return json({ ok: false, error: '항목별 문구는 각각 ' + MAX_FEEDBACK_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
+  }
+  if (templateV2 && (!subjectText || !homeworkText || !commentText)) {
+    return json({ ok: false, error: '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
+  }
+  if (templateV2 && (subjectText.length > 80 || homeworkText.length > MAX_FEEDBACK_FIELD ||
+      commentText.length > MAX_FEEDBACK_COMMENT)) {
+    return json({ ok: false, error: '과목은 80자, 과제는 ' + MAX_FEEDBACK_FIELD +
+      '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자까지 입력할 수 있습니다' }, 413, origin);
+  }
+  if (templateV2 && message !== feedbackV2Body(
+    studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText
+  )) {
+    return json({
+      ok: false,
+      code: 'FEEDBACK_TEMPLATE_MISMATCH',
+      error: '미리보기와 승인된 알림톡 형식이 일치하지 않습니다. 피드백 화면을 다시 열어 주세요'
+    }, 409, origin);
   }
 
   const bodyHash = await sha256Hex(message);
   const requestKey = await feedbackRequestKey(identity);
   const sameFields = row => row && row.body_hash === bodyHash && row.body === message &&
     row.teacher_name === teacherName && row.student_id === studentId && row.student_name === studentName &&
-    row.content_text === contentText && row.plus_text === plusText && row.minus_text === minusText;
+    row.content_text === contentText && String(row.subject_text || '') === subjectText &&
+    String(row.homework_text || '') === homeworkText && String(row.comment_text || '') === commentText &&
+    row.plus_text === plusText && row.minus_text === minusText;
 
   if (!current) {
     const insertResult = await env.DB.prepare(
       'INSERT OR IGNORE INTO feedback_requests ' +
       '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,' +
-      'teacher_name,student_id,student_name,content_text,plus_text,minus_text,' +
+      'teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,plus_text,minus_text,' +
       'revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
     ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
-      identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText, plusText, minusText,
+      identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText,
+      subjectText, homeworkText, commentText, plusText, minusText,
       now, now).run();
     current = await findFeedbackRequest(env, identity);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
@@ -1332,10 +1380,12 @@ async function handleFeedbackRequest(env, app, body, origin) {
 
   const result = await env.DB.prepare(
     "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_id=?, student_name=?, " +
-    "content_text=?, plus_text=?, minus_text=?, revision=revision+1, status='approval_waiting', " +
+    "content_text=?, subject_text=?, homework_text=?, comment_text=?, plus_text=?, minus_text=?, " +
+    "revision=revision+1, status='approval_waiting', " +
     'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
     'WHERE app=? AND request_key=? AND revision=?'
-  ).bind(owner, message, bodyHash, teacherName, studentId, studentName, contentText, plusText, minusText,
+  ).bind(owner, message, bodyHash, teacherName, studentId, studentName, contentText,
+    subjectText, homeworkText, commentText, plusText, minusText,
     now, 'task', current.request_key, Number(current.revision)).run();
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
