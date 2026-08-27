@@ -21,4 +21,9 @@ const VOCAB = path.join(ROOT, '..', 'vocab');
 fs.mkdirSync(path.join(DIST, 'vocab'), { recursive: true });
 const VOCAB_FILES = ['index.html', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of VOCAB_FILES) fs.copyFileSync(path.join(VOCAB, f), path.join(DIST, 'vocab', f));
+/* 공통 음성 모듈 — 원본은 shared/ 하나, 두 앱에 같은 파일을 배급한다 */
+const SHARED = path.join(ROOT, '..', 'shared', 'voice.js');
+fs.copyFileSync(SHARED, path.join(DIST, 'voice.js'));
+fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
+
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
