@@ -29,7 +29,8 @@ function scheduleDisplayCore() {
 
 function titleDisplayCore() {
   const source = block('/** 제목 말머리는 데이터 판별용으로 보존하고 화면에서만 감춘다. */', '/* ── 인터뷰형 코멘트 생성 ──');
-  return new Function(`let rosterDb = null;\n${source}\nreturn {
+  const vendorDisplay = block('/** 주문·문자 설정용 기존 식별값은 유지하고 주문처 이름만 화면에서 바꾼다. */', 'function bookSearchText(');
+  return new Function(`let rosterDb = null;\n${vendorDisplay}\n${source}\nreturn {
     schoolGradeDisplayLabel, taskTitlePrefix, taskTitleWithoutPrefix, taskDisplayTitle,
     setRoster(value) { rosterDb = value; }
   };`)();
@@ -104,6 +105,9 @@ test('lesson and order prefixes stay in stored data but are hidden from display 
   const order = { title: '[주문] 수학 교재' };
   assert.equal(core.taskDisplayTitle(lesson), '학생 (2) — 수학');
   assert.equal(core.taskDisplayTitle(order), '수학 교재');
+  assert.equal(core.taskDisplayTitle({
+    title: '[주문] 천재출판사 — 2권', orderVendor: '천재출판사'
+  }), '천재총판 — 2권');
   assert.equal(lesson.title, '[수업] 학생 (2) — 수학');
   assert.equal(order.title, '[주문] 수학 교재');
   assert.equal(core.taskTitlePrefix(lesson), '[수업]');

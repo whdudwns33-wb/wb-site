@@ -3559,6 +3559,11 @@ function taskRosterStudent(t) {
 
 function taskDisplayTitle(t) {
   const raw = String(t && t.title || '');
+  if (/^\[주문\]\s*/.test(raw)) {
+    const visible = taskTitleWithoutPrefix(t);
+    const vendorName = String(t && t.orderVendor || '');
+    return vendorName ? visible.replace(vendorName, bookVendorDisplayName(vendorName)) : visible;
+  }
   if (!/^\[수업\]\s*/.test(raw)) return taskTitleWithoutPrefix(t);
   let visible = taskTitleWithoutPrefix(t);
   const student = taskRosterStudent(t);
@@ -8526,9 +8531,16 @@ function groupBooksBySeries(books) {
 function normalizeBookSearch(value) {
   return String(value || '').normalize('NFKC').toLocaleLowerCase('ko').replace(/\s+/g, ' ').trim();
 }
+/** 주문·문자 설정용 기존 식별값은 유지하고 주문처 이름만 화면에서 바꾼다. */
+function bookVendorDisplayName(vendor) {
+  const configured = vendor && typeof vendor === 'object' ? vendor.displayName : '';
+  const name = String(configured || (vendor && typeof vendor === 'object' ? vendor.name : vendor) || '').trim();
+  return name.replace(/출판사$/, '총판');
+}
 function bookSearchText(book, vendorName, seriesName) {
   return normalizeBookSearch([
-    book && book.title, book && book.subject, book && book.level, vendorName, seriesName
+    book && book.title, book && book.subject, book && book.level,
+    vendorName, bookVendorDisplayName(vendorName), seriesName
   ].filter(Boolean).join(' '));
 }
 function bookSearchMatches(text, query) {
@@ -8701,7 +8713,7 @@ function singleOrderModal(book) {
 function batchOrderModal(vendorKey) {
   if (!bookDb) return;
   const isUnassigned = vendorKey === UNASSIGNED_VENDOR_KEY;
-  const vendorLabel = isUnassigned ? '거래처 미등록' : vendorKey;
+  const vendorLabel = isUnassigned ? '거래처 미등록' : bookVendorDisplayName(vendorKey);
   const books = (bookDb.books || []).filter(b =>
     batchSelection.has(b.id) && (isUnassigned ? !b.vendor : b.vendor === vendorKey));
   if (books.length < 2) return toast('같은 거래처에서 2권 이상 선택해 주세요');
@@ -8952,7 +8964,7 @@ function bookAddSummary(item) {
   const parts = [];
   if (item.subject) parts.push('과목: ' + esc(item.subject));
   if (item.level) parts.push('레벨: ' + esc(item.level));
-  if (item.vendorName) parts.push('거래처: ' + esc(item.vendorName));
+  if (item.vendorName) parts.push('거래처: ' + esc(bookVendorDisplayName(item.vendorName)));
   const sectionCount = (item.units || []).reduce((n, u) => n + ((u.sections || []).length), 0);
   if (sectionCount) parts.push('소단원 ' + sectionCount + '개');
   return parts.join(' · ');
@@ -9017,7 +9029,7 @@ function bookAddModal() {
     '</div>' +
     '<div class="field"><label class="fl">거래처(주문처)</label><select class="in" id="baVendor">' +
       '<option value="">미정 — 나중에 확인</option>' +
-      vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(v.name) + '</option>').join('') +
+      vendors.map(v => '<option value="' + esc(v.name) + '">' + esc(bookVendorDisplayName(v)) + '</option>').join('') +
     '</select></div>' +
     '<div class="field"><label class="fl">목차 (선택)</label><textarea class="in" id="baSections" rows="5" placeholder="대단원 이름은 그대로 한 줄, 소단원은 앞에 &quot;- &quot;를 붙여주세요. 예:\nⅠ. 사실적 독해\n- 중심 문장 찾기\n- 세부 내용 확인"></textarea></div>' +
     '<div class="field"><label class="fl">메모</label><textarea class="in" id="baNote" rows="2" placeholder="예: 새로 들어온 학생용, 재고 확인 필요 등"></textarea></div>',
@@ -9186,7 +9198,7 @@ function editBookModal(bookId) {
     '</div>' +
     '<div class="field"><label class="fl">거래처(주문처)</label><select class="in" id="beVendor">' +
       '<option value="">미정 — 나중에 확인</option>' +
-      vendors.map(v => '<option value="' + esc(v.name) + '"' + (b.vendor === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('') +
+      vendors.map(v => '<option value="' + esc(v.name) + '"' + (b.vendor === v.name ? ' selected' : '') + '>' + esc(bookVendorDisplayName(v)) + '</option>').join('') +
     '</select></div>' +
     '<div class="field"><label class="fl">목차</label><textarea class="in" id="beSections" rows="6">' + esc(unitsToText(b.units)) + '</textarea>' +
       '<div class="hint">대단원 이름은 그대로 한 줄, 소단원은 앞에 "- "를 붙여주세요.</div></div>' +
@@ -9531,7 +9543,7 @@ function bookOrderRowHtml(row) {
   const label = bookOrderStatusLabel(row);
   const students = Array.isArray(row.students) ? row.students : [];
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
-    '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(row.vendorName || '미등록') + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
+    '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(bookVendorDisplayName(row.vendorName || '미등록')) + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
     bookOrderMoneyHtml(row) + bookOrderPriceEntryHtml(row) + bookOrderDatesHtml(row) +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' + esc(student.name) +
       (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div>' :
@@ -9743,13 +9755,13 @@ function viewLegacyBookCatalog() {
     const pending = sec.books.reduce((sum, b) => sum + bookPendingOrderCount(b), 0);
     const selectedHere = sec.books.filter(b => batchSelection.has(b.id));
     const closed = vendorClosed.has(sec.key);
-    const vendorLabel = sec.vend ? sec.vend.name : '거래처 미등록';
+    const vendorLabel = sec.vend ? bookVendorDisplayName(sec.vend) : '거래처 미등록';
     const selectedOutsideSearch = booksOutsideSearch(selectedHere, vendorLabel, bookSearchQuery);
     const brands = sec.vend && Array.isArray(sec.vend.brands) ? sec.vend.brands : [];
     h += '<section class="book-vendor" data-book-vendor data-closed="' + String(closed) + '">' +
       '<button type="button" class="card between book-vendor-toggle" data-act="vendortoggle" data-key="' + esc(sec.key) +
       '" aria-expanded="' + String(!closed) + '"' + (searching ? ' disabled' : '') + '>' +
-      '<span class="book-vendor-copy"><span class="card-title">' + (sec.vend ? esc(sec.vend.name) : '거래처 미등록') +
+      '<span class="book-vendor-copy"><span class="card-title">' + (sec.vend ? esc(bookVendorDisplayName(sec.vend)) : '거래처 미등록') +
         (sec.vend ? ' ' + vendorTypeBadge(sec.vend) : '') +
         (selectedHere.length ? ' <span class="tag">선택 ' + selectedHere.length + '</span>' : '') +
         (pending ? ' <span class="tag high">🛒 주문 진행 ' + pending + '</span>' : '') + '</span>' +
@@ -15608,7 +15620,7 @@ document.addEventListener('click', ev => {
 
         if (vend && vend.type === 'online') {
           modal('온라인 직접 주문',
-            '<div class="card-sub mb8">"' + esc(vend.name) + '"는 온라인에서 직접 주문하는 거래처입니다. 문자 발송 대상이 아닙니다.</div>' +
+            '<div class="card-sub mb8">"' + esc(bookVendorDisplayName(vend)) + '"는 온라인에서 직접 주문하는 거래처입니다. 문자 발송 대상이 아닙니다.</div>' +
             '<textarea class="in" rows="7" id="mText" readonly>' + esc(msg) + '</textarea>',
             (vend.orderUrl
               ? '<a class="btn btn-primary btn-block mt14" href="' + esc(vend.orderUrl) + '" target="_blank" rel="noopener">🌐 주문 사이트 열기</a>'
@@ -15619,7 +15631,7 @@ document.addEventListener('click', ev => {
         }
 
         modal('발주 문자',
-          '<div class="card-sub mb8">주문처: ' + (vend ? esc(vend.name) : '<b style="color:var(--amber)">미등록</b>') + '</div>' +
+          '<div class="card-sub mb8">주문처: ' + (vend ? esc(bookVendorDisplayName(vend)) : '<b style="color:var(--amber)">미등록</b>') + '</div>' +
           '<textarea class="in" rows="9" id="mText">' + esc(msg) + '</textarea>' +
           '<div class="hint mt8">매일 저녁 8시에 같은 출판사 주문과 합쳐 문자 한 통으로 자동 발송됩니다.</div>',
           '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="copytext">복사하기 (카톡용)</button>' +
