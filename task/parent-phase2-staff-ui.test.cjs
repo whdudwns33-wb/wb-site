@@ -18,12 +18,13 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-test('보호자 공개 입력은 확정 시간표 슬롯 없이도 개인 링크의 오늘 본인 담당 원생 수업에 열린다', () => {
+test('보호자 공개 입력은 허용된 stable studentId의 오늘 본인 담당 원생 수업에만 열린다', () => {
   const code = slice('function canEditGuardianPublication(', 'function normalizeGuardianPublication(');
-  const permission = session => new Function('today', 'session', 'hasVerifiedPersonAuth', 'rosterDb', 'assignedLessonStudents', 'isLesson',
+  const permission = session => new Function('today', 'session', 'hasVerifiedPersonAuth', 'rosterDb', 'assignedLessonStudents', 'isLesson', 'guardianContactEnabledFor',
     `${code}\nreturn canEditGuardianPublication;`)(
       () => '2026-08-17', session, () => session.verified === true, {},
-      () => [{ id: 'student-1' }], task => task.taskKind === 'lesson_instruction'
+      () => [{ id: 'student-1' }, { id: 'student-2' }], task => task.taskKind === 'lesson_instruction',
+      studentId => studentId === 'student-1'
     );
   const own = {
     id: 'lesson-1', studentId: 'student-1', staffId: 'teacher-1', lessonFormVersion: 1,
@@ -40,9 +41,12 @@ test('보호자 공개 입력은 확정 시간표 슬롯 없이도 개인 링크
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: false })(own, '2026-08-17'), false);
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, taskKind: '' }, '2026-08-17'), false);
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, studentId: '' }, '2026-08-17'), false);
+  assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, studentId: 'student-2' }, '2026-08-17'), false,
+    '허용 목록 밖 학생은 담당 수업이어도 입력할 수 없어야 한다');
   assert.equal(permission({ isStaffLink: true, isAdmin: false, staffId: 'teacher-1', verified: true })({ ...own, scheduleStatus: 'needs_review', scheduleSlots: [] }, '2026-08-17'), true);
   assert.match(code, /task\.staffId !== session\.staffId/);
   assert.match(code, /!isLesson\(task\)/);
+  assert.match(code, /!guardianContactEnabledFor\(task\.studentId\)/);
   assert.match(code, /assignedLessonStudents\(\)\.some/);
   assert.doesNotMatch(code, /scheduleStatus|scheduleSlots|dowOf/);
 });
@@ -67,6 +71,14 @@ test('숙제·준비물은 내부 메모 파싱 없이 전용 필드와 CAS API�
   assert.match(block, /학부모 메시지와 보호자 앱 전달은 계속 중지됩니다/);
   assert.doesNotMatch(block, /c\.note|\.note\b|task\.homework|guardianPhone|phone:/);
   assert.match(source, /const GUARDIAN_PORTAL_SCOPE_VERSION = 4/);
+});
+
+test('수업 화면은 서버 허용 목록의 stable studentId에만 숙제·준비물 영역을 표시한다', () => {
+  const panel = slice('function taskPanel(', '/** 수업 출결 표시용 */');
+  assert.match(panel, /prepareGuardianPublicationPolicy\(date\)/);
+  assert.match(panel, /if \(guardianContactEnabledFor\(t\.studentId\)\)/);
+  assert.match(panel, /guardianPublicationHtml\(t, date\)/);
+  assert.doesNotMatch(panel, /studentName\s*===|테스트학생/);
 });
 
 test('공개 입력은 로딩·오류·escape 상태와 44px 모바일 조작을 제공한다', () => {

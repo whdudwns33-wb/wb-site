@@ -949,11 +949,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-26.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-26.5"></script>
-<script src="./asset-core.js?v=2026-08-26.5"></script>
-<script src="./qr-core.js?v=2026-08-26.5"></script>
-<script src="./acaflow-import-core.js?v=2026-08-26.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.1"></script>
+<script src="./asset-core.js?v=2026-08-27.1"></script>
+<script src="./qr-core.js?v=2026-08-27.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.1"></script>
 <script>
 "use strict";
 
@@ -3049,8 +3049,17 @@ function guardianPublicationKey(taskId, lessonDate) {
 function canEditGuardianPublication(task, lessonDate) {
   if (!task || lessonDate !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
       task.staffId !== session.staffId || !isLesson(task) ||
-      !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) || !rosterDb) return false;
+      !/^[A-Za-z0-9_-]{1,128}$/.test(String(task.studentId || '')) ||
+      !guardianContactEnabledFor(task.studentId) || !rosterDb) return false;
   return assignedLessonStudents().some(student => String(student.id) === String(task.studentId));
+}
+
+function prepareGuardianPublicationPolicy(lessonDate) {
+  const date = String(lessonDate || '');
+  if (date !== today() || !session.isStaffLink || !hasVerifiedPersonAuth() ||
+      guardianPublicationLoadedDates.has(date) || guardianPublicationLoadingDates.has(date) ||
+      guardianPublicationErrors.has(date)) return;
+  setTimeout(() => loadGuardianPublications(date, false), 0);
 }
 
 function guardianPublicationAccessHint(task, lessonDate) {
@@ -3367,10 +3376,13 @@ function taskPanel(t, date, c, editable) {
   if (lesson) {
     h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모(실제 진도 및 특이사항)</div>' +
       taskMemoEditorHtml(t, date, c, editable) + '</section>';
-    const canEditPublication = canEditGuardianPublication(t, date);
-    h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
-      '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
-        '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
+    prepareGuardianPublicationPolicy(date);
+    if (guardianContactEnabledFor(t.studentId)) {
+      const canEditPublication = canEditGuardianPublication(t, date);
+      h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
+        '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
+          '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
+    }
     h += previousTaskMemosProgressHtml(t.id, date);
   }
 
@@ -16047,7 +16059,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-26.5';
+const APP_VER = '2026-08-27.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

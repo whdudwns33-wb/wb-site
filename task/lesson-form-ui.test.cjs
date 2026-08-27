@@ -43,11 +43,12 @@ test('admin lesson screen omits the publication-readiness audit', () => {
   assert.doesNotMatch(view, /숙제·준비물 공개 설정 누락 수업/);
 });
 
-test('guardian publication editor activates for an assigned stable-student lesson today without schedule-slot requirements', () => {
+test('guardian publication editor activates only for an allowed assigned stable-student lesson today', () => {
   const start = html.indexOf('function canEditGuardianPublication(');
   const end = html.indexOf('function normalizeGuardianPublication(', start);
   const block = html.slice(start, end);
   assert.match(block, /!isLesson\(task\)/);
+  assert.match(block, /!guardianContactEnabledFor\(task\.studentId\)/);
   assert.match(html, /assignedLessonStudents\(\)\.some\(student => String\(student\.id\) === String\(task\.studentId\)\)/);
   assert.doesNotMatch(block, /scheduleStatus|scheduleSlots|weekday/);
 });
