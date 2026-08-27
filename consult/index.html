@@ -7781,44 +7781,48 @@ function consultLinkStudentPanel(student) {
   const contact = consultLinkContactsUi.rows.get(student.id) || null;
   const unavailable = !consultLinkContactsUi.loaded || !!consultLinkContactsUi.error;
   const phone = contact && contact.phoneMasked;
+  const ready = !!(phone && contact.consent);
   const sendBusy = consultLinkContactsUi.busy === 'send:' + student.id;
   const anyBusy = !!consultLinkContactsUi.busy;
   const status = consultLinkContactsUi.error ? '카카오 상태 확인 실패'
     : !consultLinkContactsUi.loaded ? '카카오 상태 확인 중…'
-    : phone ? '카카오 ' + phone + (contact.consent ? ' · 발송 동의' : ' · 동의 필요')
-    : '카카오 미설정';
-  const sendDisabled = unavailable || !phone || !contact.consent || anyBusy;
+    : ready ? '학생 연락처 ' + phone + ' · 카카오 발송 준비됨'
+    : phone ? '학생 연락처 ' + phone + ' · 동의 확인 필요'
+    : '학생 연락처 없음 · 처음 한 번만 등록하세요';
+  const sendDisabled = unavailable || anyBusy;
   return '<div class="small muted mb8">' + esc(status) + '</div>' +
     '<div class="row wraprow" style="gap:8px">' +
-      '<button class="btn btn-sm btn-ghost" data-act="linkcontactopen" data-id="' + esc(student.id) + '"' +
-        (unavailable || anyBusy ? ' disabled' : '') + '>카톡 수신번호 설정</button>' +
+      (ready ? '<button class="btn btn-sm btn-ghost" data-act="linkcontactopen" data-id="' + esc(student.id) + '"' +
+        (unavailable || anyBusy ? ' disabled' : '') + '>학생 연락처 수정</button>' : '') +
       '<button class="btn btn-sm btn-navy" data-act="linksend" data-id="' + esc(student.id) + '"' +
-        (sendDisabled ? ' disabled' : '') + '>' + (sendBusy ? '발송 접수 중…' : '카톡으로 개인 링크 보내기') + '</button>' +
+        (sendDisabled ? ' disabled' : '') + '>' + (sendBusy ? '발송 접수 중…' : ready
+          ? '카톡으로 개인 링크 보내기' : phone ? '동의 확인하고 보내기' : '학생 번호 등록하고 보내기') + '</button>' +
     '</div>';
 }
 
-function consultLinkContactModal(staffId) {
+function consultLinkContactModal(staffId, sendAfterSave) {
   if (!session.isAdmin || session.isStaffLink) return;
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const contact = consultLinkContactsUi.rows.get(staffId) || null;
   const masked = contact && contact.phoneMasked;
-  modal('카톡 수신번호 설정',
-    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생에게 개인 링크를 보낼 휴대폰 번호입니다.</div>' +
-    (masked ? '<div class="hint mb14">현재 번호: <b>' + esc(masked) + '</b><br>번호를 변경하려면 아래에 전체 번호를 다시 입력해 주세요.</div>' : '') +
-    '<div class="field"><label class="fl" for="consultLinkPhone">새 휴대폰 번호</label>' +
+  modal('학생 연락처 ' + (masked ? '수정' : '등록'),
+    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생 본인의 휴대전화 번호입니다. 한 번 등록하면 다음 발송부터 자동으로 사용합니다.</div>' +
+    (masked ? '<div class="hint mb14">현재 학생 번호: <b>' + esc(masked) + '</b><br>번호를 변경하려면 아래에 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    '<div class="field"><label class="fl" for="consultLinkPhone">학생 본인 휴대전화 번호</label>' +
       '<input class="in" id="consultLinkPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
     '<label class="material-type-option"><input type="checkbox" id="consultLinkConsent">' +
       '<span>이 번호로 학생 개인 링크 카카오 알림톡을 보내는 것에 동의를 확인했습니다.</span></label>' +
-    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.</div>',
+    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>보호자 번호는 ‘보호자 공유’에서 별도로 관리합니다.</div>',
     '<button class="btn btn-primary" data-act="linkcontactsave" data-id="' + esc(staffId) + '" data-v="' +
-      (contact ? contact.updatedAt : 0) + '">동의 확인 후 저장</button>' +
+      (contact ? contact.updatedAt : 0) + '"' + (sendAfterSave ? ' data-send="1"' : '') + '>' +
+      (sendAfterSave ? '동의하고 바로 보내기' : '동의 확인 후 저장') + '</button>' +
     (masked ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
       contact.updatedAt + '">발송 중지·번호 삭제</button>' : '') +
     '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
 }
 
-async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear) {
+async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear, sendAfterSave) {
   if (!session.isAdmin || session.isStaffLink || consultLinkContactsUi.busy) return;
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
@@ -7830,6 +7834,7 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear)
   const auth = sync.auth();
   if (!auth) return toast('로그인과 동기화 연결이 필요합니다');
   consultLinkContactsUi.busy = 'set:' + staffId;
+  let savedForSend = false;
   if (button) button.disabled = true;
   try {
     const data = await sync.post('/consult-link-send', {
@@ -7839,8 +7844,11 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear)
     const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}));
     if (row && row.phoneMasked) consultLinkContactsUi.rows.set(staffId, row);
     else consultLinkContactsUi.loaded = false;
+    savedForSend = !!(row && row.phoneMasked && row.consent);
     closeModal();
-    toast(clear ? '카카오 발송을 중지하고 번호를 삭제했습니다' : '카톡 수신번호와 발송 동의를 저장했습니다');
+    toast(clear ? '카카오 발송을 중지하고 번호를 삭제했습니다'
+      : sendAfterSave ? '학생 연락처를 저장했습니다 · 개인 링크를 발송합니다'
+      : '학생 연락처와 발송 동의를 저장했습니다');
     if (!consultLinkContactsUi.loaded) await loadConsultLinkContacts(true);
     else if (route === 'staff') render();
   } catch (error) {
@@ -7850,6 +7858,7 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear)
     consultLinkContactsUi.busy = '';
     if (route === 'staff' && !$('#modalHost').firstElementChild) render();
   }
+  if (savedForSend && sendAfterSave) await sendConsultStudentLink(staffId);
 }
 
 function consultLinkSendMessage(data) {
@@ -7880,7 +7889,7 @@ async function sendConsultStudentLink(staffId) {
   const student = staffById(staffId);
   const contact = consultLinkContactsUi.rows.get(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
-  if (!contact || !contact.phoneMasked || !contact.consent) return toast('카톡 수신번호와 발송 동의를 먼저 설정해 주세요');
+  if (!contact || !contact.phoneMasked || !contact.consent) return consultLinkContactModal(staffId, true);
   if (!sync.auth()) return toast('로그인과 동기화 연결이 필요합니다');
   if (sync.busy) return toast('동기화가 끝난 뒤 다시 눌러 주세요');
   consultLinkContactsUi.busy = 'send:' + staffId;
@@ -7912,7 +7921,7 @@ function viewStaffAdmin() {
     '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 학생은 링크만 열면 됩니다.</div>' +
     '<div class="row"><input class="in" id="sName" placeholder="학생 이름 (예: 김민준)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
-    '<div class="hint mt14">카카오 알림톡 · 문자 대체발송 없음 · 첨부파일 대신 알림톡 버튼에 학생별 링크가 들어갑니다.</div>' +
+    '<div class="hint mt14">학생 번호와 동의는 처음 한 번만 등록합니다. 이후 저장된 학생 번호로 바로 보내며, 보호자 번호는 별도로 관리합니다.</div>' +
     (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
@@ -10311,7 +10320,7 @@ document.addEventListener('click', ev => {
     }
     case 'linkcontactsave': {
       if (!session.isAdmin || session.isStaffLink) break;
-      saveConsultLinkContact(id, Number(el.dataset.v) || 0, el);
+      saveConsultLinkContact(id, Number(el.dataset.v) || 0, el, false, el.dataset.send === '1');
       break;
     }
     case 'linkcontactclear': {
