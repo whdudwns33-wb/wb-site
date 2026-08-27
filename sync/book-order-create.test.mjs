@@ -56,6 +56,21 @@ function seed(db) {
     .bind('task', 'token-a', 'teacher-a', now).run();
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster()), now).run();
+  for (const [id, staffId, studentId] of [
+    ['lesson-a', 'teacher-a', 'student-a'], ['lesson-b', 'teacher-b', 'student-b']
+  ]) {
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
+        lessonFormVersion: 1, intakeVersion: 1,
+        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+  }
+}
+
+function revokeLesson(db, lessonId = 'lesson-a') {
+  const row = db.database.prepare('SELECT data FROM tasks WHERE app=? AND id=?').get('task', lessonId);
+  const task = JSON.parse(row.data);
+  db.database.prepare('UPDATE tasks SET data=? WHERE app=? AND id=?')
+    .run(JSON.stringify({ ...task, deleted: true }), 'task', lessonId);
 }
 
 function env(db, extra = {}) {
@@ -97,7 +112,7 @@ test('037 is additive, append-only, and stores no student display name, contact,
 test('create atomically writes a canonical task and immutable per-student identity snapshots', async () => {
   const db = new TestD1(); seed(db);
   const result = await call(db, createBody());
-  assert.equal(result.status, 201);
+  assert.equal(result.status, 201, JSON.stringify(result.body));
   assert.equal(result.body.task.orderIdentityVersion, 1);
   assert.equal(result.body.task.origin, 'staff');
   assert.equal(result.body.task.staffId, 'teacher-a');
@@ -113,6 +128,56 @@ test('create atomically writes a canonical task and immutable per-student identi
   assert.throws(() => db.database.prepare('UPDATE book_order_student_snapshots SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('UPDATE book_order_active_targets SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('DELETE FROM book_order_active_targets').run(), /APPEND_ONLY/);
+});
+
+test('teacher order scope is the union of active lesson studentIds, not roster teacherIds', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const crossLesson = { id: 'lesson-a-b', staffId: 'teacher-a', studentId: 'student-b',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+    title: '[수업] 교차 담당', start: '2026-01-01', end: '', deleted: false };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', crossLesson.id, 'teacher-a', JSON.stringify(crossLesson), now, now).run();
+
+  const allowed = createBody('ord_lesson_scope_ok');
+  allowed.items[0].studentIds = ['student-b'];
+  assert.equal((await call(db, allowed)).status, 201,
+    'roster teacherIds가 다른 학생도 현재 담당 수업이 있으면 주문할 수 있다');
+
+  const lessonRow = db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+  const deletedLesson = { ...JSON.parse(lessonRow.data), deleted: true };
+  db.database.prepare("UPDATE tasks SET data=? WHERE id='lesson-a'").run(JSON.stringify(deletedLesson));
+  const forged = { id: 'title-only-lesson', staffId: 'teacher-a', studentId: 'student-a',
+    title: '[수업] 제목만 위조', start: '2026-01-01', end: '', deleted: false };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', forged.id, 'teacher-a', JSON.stringify(forged), now, now).run();
+  const denied = await call(db, createBody('ord_lesson_scope_no'));
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, 'ORDER_STUDENT_SCOPE',
+    'roster teacherIds가 남아 있어도 활성 수업이 없으면 fail closed 한다');
+});
+
+test('normal and bound create recheck lesson scope inside the atomic D1 batch', async () => {
+  for (const [label, body] of [
+    ['normal', createBody('ord_scope_race_normal')],
+    ['bound', boundBody('ord_scope_race_bound')]
+  ]) {
+    const db = new TestD1(); seed(db);
+    const originalBatch = db.batch.bind(db);
+    let raced = false;
+    db.batch = statements => {
+      if (!raced) { raced = true; revokeLesson(db); }
+      return originalBatch(statements);
+    };
+    const result = await call(db, body);
+    assert.equal(result.status, 403, label);
+    assert.equal(result.body.code, 'ORDER_STUDENT_SCOPE', label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks WHERE id=?').get(body.taskId).count, 0, label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots WHERE task_id=?')
+      .get(body.taskId).count, 0, label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments WHERE task_id=?')
+      .get(body.taskId).count, 0, label);
+  }
 });
 
 test('each bound product uses the server price map and starts at teacher-received without an SMS send', async () => {
@@ -169,7 +234,7 @@ test('bound create is idempotent, rejects client prices and invalid products, an
   const retry = await call(db, boundBody());
   assert.equal(retry.status, 200);
   assert.equal(retry.body.idempotent, true);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 1);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 1);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 1);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 1);
 
@@ -234,14 +299,14 @@ test('new orders require a positive whole-won unit price within the supported ra
     assert.equal(result.status, 400, taskId);
     assert.equal(result.body.code, 'ORDER_INVALID', taskId);
   }
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0);
 });
 
 test('same taskId and exact payload is idempotent; collision, tampering, and races fail closed', async () => {
   const db = new TestD1(); seed(db);
   const [first, second] = await Promise.all([call(db, createBody()), call(db, createBody())]);
   assert.deepEqual([first.status, second.status].sort(), [200, 201]);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 1);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 1);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 1);
   const conflict = createBody(); conflict.items[0].title = '다른 교재';
   assert.equal((await call(db, conflict)).body.code, 'ORDER_ID_CONFLICT');
@@ -394,7 +459,7 @@ test('snapshot rows use one JSON expansion statement and the entire D1 batch rol
   const failed = await call(db, createBody('ord_rollback12'));
   assert.equal(failed.status, 500);
   assert.equal(statementCount, 2, '학생 수와 무관하게 task+JSON snapshot 두 statement만 쓴다');
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0);
   db.batch = originalBatch;
@@ -419,7 +484,7 @@ test('bound task, identity snapshot, and initial receipt roll back as one three-
   const failed = await call(db, boundBody('ord_bound_rollback'));
   assert.equal(failed.status, 500);
   assert.equal(statementCount, 3);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0);
@@ -467,7 +532,7 @@ test('create CAS rejects a roster revision that changes after identity validatio
   const result = await call(db, createBody('ord_roster_race'));
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'ROSTER_REVISION_CONFLICT');
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets').get().count, 0);
 });
@@ -481,6 +546,15 @@ test('the documented 200-student ceiling is stored with only two D1 batch statem
   db.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=?')
     .bind(JSON.stringify({ roster: { updated: '2026-08-17', baseline: '2026-08', students }, bookStudents: [] }),
       Date.now(), 'task').run();
+  const lessonNow = Date.now();
+  for (const student of students) {
+    const lessonId = 'lesson-' + student.id;
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', lessonId, 'teacher-a', JSON.stringify({ id: lessonId, staffId: 'teacher-a', studentId: student.id,
+        taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+        title: '[수업] 단체', start: '2026-01-01', end: '', deleted: false }),
+      lessonNow, lessonNow).run();
+  }
   const originalBatch = db.batch.bind(db);
   let statementCount = 0;
   db.batch = statements => { statementCount = statements.length; return originalBatch(statements); };

@@ -30,12 +30,12 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
-  const render = new Function('today', 'esc', `${code}\nreturn rosterStudentInfoHtml;`)(
-    () => '2026-08-18', escapeHtml
+  const render = new Function('today', 'esc', 'state', 'isLesson', 'staffById', `${code}\nreturn rosterStudentInfoHtml;`)(
+    () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => null
   );
   const attack = '<img src=x onerror=alert(1)>';
   const html = render({
-    id: 'student-safe', name: attack, school: attack, grade: attack, subject: attack, teacher: attack,
+    id: 'student-safe', name: attack, school: attack, grade: attack, subject: attack,
     phoneSelf: attack, phoneFather: attack, phoneMother: attack,
     registrationDate: '2026-08-18', firstClassDate: '2026-08-19',
     start: '2026-08', end: '', reason: '', memo: attack
@@ -43,7 +43,7 @@ test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모�
   assert.doesNotMatch(html, /<img\b/i);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   for (const label of ['학교', '학년', '연락처\\(본인\\)', '연락처\\(부\\)', '연락처\\(모\\)',
-    '등록과목', '신규 등록일', '첫 수업 시작일', '담당 선생님', '재원 기간', '내부 메모', '수업 참고']) {
+    '등록과목', '신규 등록일', '첫 수업 시작일', '과목별 수업 담당', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
 });
@@ -97,6 +97,9 @@ test('관리자 원생 수정은 승인 없는 휴원·퇴원·복귀와 복귀 
   assert.match(editor, /if \(!session\.isAdmin/);
   assert.match(editor, /data-roster-transition-staff/);
   assert.match(editor, /data-roster-return-subject/);
+  assert.match(editor, /type="radio" name="roster-return-subject"/);
+  assert.match(editor, /draft\.subjects\.length !== 1/);
+  assert.match(editor, /staffId: '', subjects: \[\]/);
   assert.match(editor, /data-roster-return-hours/);
   assert.match(editor, /data-roster-return-day/);
   assert.match(editor, /data-roster-return-time="startTime"/);
@@ -113,7 +116,8 @@ test('이름만 등록한 원생도 운영 연결이 없으면 관리자 완전 
   const canDelete = block('function rosterStudentCanDelete(student)', 'function rosterStudentEditorHtml');
   assert.match(canDelete, /if \(!String\(student && student\.name \|\| ''\)\.trim\(\)\) return false/);
   assert.doesNotMatch(canDelete, /student && student\.school[\s\S]*return false/);
-  assert.match(editor, /\(student\.teacherIds \|\| \[\]\)\.length \|\| rosterStudentSubjects\(student\)\.length/);
+  assert.match(editor, /rosterStudentLessonTasks\(student\.id\)\.length \|\| rosterStudentSubjects\(student\)\.length/);
+  assert.doesNotMatch(canDelete, /teacherIds|student\.teacher/);
   assert.match(editor, /data-act="rosterstudentdelete">원생 완전 삭제/);
   assert.match(editor, /action: 'student_delete'/);
   assert.match(editor, /계속하려면 학생 이름을 입력해 주세요/);
@@ -208,6 +212,24 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   assert.match(popup, /rosterDb\.students\.find\(item => String\(item\.id\) === String\(studentId\)\)/);
   assert.doesNotMatch(popup, /find\([^\n]*name|student\.name\s*===/);
   assert.match(source, /case 'rosterstudentlessons': showRosterStudentLessons\(String\(id \|\| ''\)\)/);
+});
+
+test('학생 공통 담당 대신 활성 수업의 과목별 task.staffId를 묶어 표시한다', () => {
+  const code = block('function rosterStudentLessonTasks(', 'function rosterStudentLessonsHtml(');
+  const tasks = [
+    { id: 'math-a', studentId: 'student-safe', subject: '수학', staffId: 'teacher-a', start: '2026-08-01', lessonFormVersion: 1 },
+    { id: 'math-old', studentId: 'student-safe', subject: '수학', staffId: 'teacher-old', end: '2026-07-31', lessonFormVersion: 1 },
+    { id: 'english-b', studentId: 'student-safe', subject: '영어', staffId: 'teacher-b', start: '2026-08-01', lessonFormVersion: 1 },
+    { id: 'other', studentId: 'other', subject: '국어', staffId: 'teacher-a', lessonFormVersion: 1 }
+  ];
+  const staff = { 'teacher-a': { name: '김덕재' }, 'teacher-b': { name: '서윤지' }, 'teacher-old': { name: '이전담당' } };
+  const helpers = new Function('state', 'isLesson', 'staffById', 'today',
+    `${code}\nreturn { rosterStudentSubjectTeacherAssignments, rosterStudentSubjectTeacherText };`)(
+      { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null, () => '2026-08-27'
+    );
+  assert.equal(helpers.rosterStudentSubjectTeacherText('student-safe'), '수학 → 김덕재 선생님 / 영어 → 서윤지 선생님');
+  assert.deepEqual(helpers.rosterStudentSubjectTeacherAssignments('student-safe').flatMap(row => row.staffIds), ['teacher-a', 'teacher-b']);
+  assert.doesNotMatch(helpers.rosterStudentSubjectTeacherText('student-safe'), /이전담당/);
 });
 
 test('팝업은 이름 추측 없이 현재 권한 범위의 stable studentId만 조회한다', () => {

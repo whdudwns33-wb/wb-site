@@ -50,6 +50,64 @@ function seed(db) {
   }
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster()), now).run();
+  for (const [id, staffId, studentId] of [
+    ['lesson-a', 'teacher-a', 'student-a'], ['lesson-b', 'teacher-b', 'student-b'],
+    ['lesson-kim-a', KIM_NAMGI_STAFF_ID, 'student-a']
+  ]) {
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
+        lessonFormVersion: 1, intakeVersion: 1,
+        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+  }
+}
+
+function revokeLesson(db, lessonId = 'lesson-a') {
+  const row = db.database.prepare('SELECT data FROM tasks WHERE app=? AND id=?').get('task', lessonId);
+  const task = JSON.parse(row.data);
+  db.database.prepare('UPDATE tasks SET data=? WHERE app=? AND id=?')
+    .run(JSON.stringify({ ...task, deleted: true }), 'task', lessonId);
+}
+
+function replaceAssignmentTeachers(db, assignmentId, teacherIds) {
+  const row = db.database.prepare('SELECT data FROM private_rosters WHERE app=?').get('task');
+  const document = JSON.parse(row.data);
+  const assignment = document.bookStudents.find(item => item.id === assignmentId);
+  assignment.teacherIds = teacherIds;
+  db.database.prepare('UPDATE private_rosters SET data=? WHERE app=?').run(JSON.stringify(document), 'task');
+}
+
+function beforeMatchingRun(db, matches, mutate) {
+  const originalPrepare = db.prepare.bind(db);
+  let fired = false;
+  db.prepare = sql => {
+    const statement = originalPrepare(sql);
+    if (!fired && matches(String(sql))) {
+      const originalRun = statement.run.bind(statement);
+      statement.run = () => {
+        fired = true;
+        mutate();
+        return originalRun();
+      };
+    }
+    return statement;
+  };
+  return () => fired;
+}
+
+function insertAcceptedOrder(db, taskId, linked) {
+  const now = Date.now();
+  const item = linked
+    ? { bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'] }
+    : { title: '새 교재', qty: '1권' };
+  const task = { id: taskId, staffId: 'teacher-a', title: '[주문] 새 교재', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트출판사', orderItems: [item],
+    origin: 'staff', createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', taskId, 'teacher-a', JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-' + taskId, 'key-' + taskId, taskId, '테스트출판사', 1,
+      'e'.repeat(64), 'accepted', now, now).run();
+  return { task, now };
 }
 
 async function call(db, body, path = '/book-issue') {
@@ -85,7 +143,7 @@ test('order fulfillment migration is additive and stores stable ids without disp
   assert.doesNotMatch(table, /student_name|phone|address|memo/i);
 });
 
-test('list is authenticated and scoped by current assignment teacherIds', async () => {
+test('legacy issue list keeps assignment-specific teacherIds scope', async () => {
   const db = new TestD1(); seed(db);
   assert.equal((await call(db, { action: 'list' })).status, 401);
   const own = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
@@ -93,6 +151,11 @@ test('list is authenticated and scoped by current assignment teacherIds', async 
   assert.equal(own.body.issues[0].status, 'none');
   assert.equal(JSON.stringify(own.body).includes('teacherIds'), false);
   assert.equal(JSON.stringify(own.body).includes('phone'), false);
+  const sameStudentOtherSubject = await call(db, { auth: person(KIM_NAMGI_STAFF_ID, 'token-kim'), action: 'list' });
+  assert.deepEqual(sameStudentOtherSubject.body.issues, [],
+    '같은 학생의 다른 과목 담당 수업만으로 legacy 교재 배정 권한을 얻지 않는다');
+  assert.equal((await call(db, { auth: person(KIM_NAMGI_STAFF_ID, 'token-kim'), action: 'transition',
+    assignmentId: 'assign-a', next: 'prepared', revision: 0 })).status, 403);
   const all = await call(db, { auth: admin, action: 'list' });
   assert.equal(all.body.issues.length, 2);
 });
@@ -354,6 +417,89 @@ test('order student link enforces owner, accepted result, current assignment sco
   const stale = await call(db, { auth: person('teacher-a', 'token-a'), ...request });
   assert.equal(stale.status, 409);
   assert.equal(stale.body.code, 'REVISION_CONFLICT');
+});
+
+test('student link and receive/hand writes atomically reject a concurrent lesson reassignment', async () => {
+  {
+    const db = new TestD1(); seed(db);
+    const { task, now } = insertAcceptedOrder(db, 'link-scope-race', false);
+    const fired = beforeMatchingRun(db,
+      sql => sql.startsWith('UPDATE tasks SET data=') && sql.includes("json_each(?) selected"),
+      () => revokeLesson(db));
+    const result = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_link',
+      taskId: task.id, itemIndex: 0, bookId: 'BK01', studentIds: ['student-a'], expectedUpdatedAt: now });
+    assert.equal(fired(), true);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'ORDER_STUDENT_SCOPE');
+    const stored = JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(task.id).data);
+    assert.equal(Object.prototype.hasOwnProperty.call(stored.orderItems[0], 'studentIds'), false);
+  }
+
+  {
+    const db = new TestD1(); seed(db);
+    const { task } = insertAcceptedOrder(db, 'receive-scope-race', true);
+    const fired = beforeMatchingRun(db,
+      sql => sql.startsWith('INSERT INTO book_order_fulfillments') && sql.includes("json_each(?) selected"),
+      () => revokeLesson(db));
+    const result = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+      taskId: task.id, itemIndex: 0, next: 'receive', revision: 0 });
+    assert.equal(fired(), true);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'ORDER_STUDENT_SCOPE');
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments WHERE task_id=?')
+      .get(task.id).count, 0);
+  }
+
+  {
+    const db = new TestD1(); seed(db);
+    const { task } = insertAcceptedOrder(db, 'hand-scope-race', true);
+    const auth = person('teacher-a', 'token-a');
+    assert.equal((await call(db, { auth, action: 'order_transition', taskId: task.id,
+      itemIndex: 0, next: 'receive', revision: 0 })).status, 200);
+    const fired = beforeMatchingRun(db,
+      sql => sql.startsWith('UPDATE book_order_fulfillments') && sql.includes("json_each(?) selected"),
+      () => revokeLesson(db));
+    const result = await call(db, { auth, action: 'order_transition', taskId: task.id,
+      itemIndex: 0, next: 'hand', revision: 1 });
+    assert.equal(fired(), true);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'ORDER_STUDENT_SCOPE');
+    assert.equal(db.database.prepare('SELECT status FROM book_order_fulfillments WHERE task_id=?')
+      .get(task.id).status, 'teacher_received');
+  }
+});
+
+test('legacy issue writes atomically retain assignment-specific teacher ownership', async () => {
+  {
+    const db = new TestD1(); seed(db);
+    const fired = beforeMatchingRun(db,
+      sql => sql.startsWith('INSERT INTO book_issues') && sql.includes("$.teacherIds"),
+      () => replaceAssignmentTeachers(db, 'assign-a', ['teacher-b']));
+    const result = await call(db, { auth: person('teacher-a', 'token-a'), action: 'transition',
+      assignmentId: 'assign-a', next: 'prepared', revision: 0 });
+    assert.equal(fired(), true);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'BOOK_ASSIGNMENT_SCOPE');
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_issues WHERE assignment_id=?')
+      .get('assign-a').count, 0);
+  }
+
+  {
+    const db = new TestD1(); seed(db);
+    const auth = person('teacher-a', 'token-a');
+    assert.equal((await call(db, { auth, action: 'transition', assignmentId: 'assign-a',
+      next: 'prepared', revision: 0 })).status, 200);
+    const fired = beforeMatchingRun(db,
+      sql => sql.startsWith('UPDATE book_issues') && sql.includes("$.teacherIds"),
+      () => replaceAssignmentTeachers(db, 'assign-a', ['teacher-b']));
+    const result = await call(db, { auth, action: 'transition', assignmentId: 'assign-a',
+      next: 'issued', revision: 1 });
+    assert.equal(fired(), true);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'BOOK_ASSIGNMENT_SCOPE');
+    assert.equal(db.database.prepare('SELECT status FROM book_issues WHERE assignment_id=?')
+      .get('assign-a').status, 'prepared');
+  }
 });
 
 test('Kim Namgi can record the accepted legacy Wordmaster price once without mutating the sealed task', async () => {

@@ -42,7 +42,7 @@ function hasWeekendSchedule(task) {
 
 function isLesson(task) {
   return !!(task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
-    task.intakeVersion || /^\[(수업|컨설팅)\]/.test(String(task.title || ''))));
+    task.intakeVersion));
 }
 
 function activeOn(task, date) {
@@ -73,8 +73,16 @@ async function findVisit(env, app, visitId) {
     .bind(app, visitId).first();
 }
 
-function canAccess(row, auth) {
-  return auth.scope === 'all' || String(row && row.staff_id || '') === String(auth.id || '');
+async function currentVisitLesson(env, app, row) {
+  if (!row || !SAFE_ID.test(String(row.lesson_task_id || '')) || !SAFE_ID.test(String(row.student_id || ''))) return null;
+  const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, String(row.lesson_task_id)).first();
+  const task = taskRow && parseJson(taskRow.data);
+  const owner = String(taskRow && taskRow.owner || '');
+  if (!task || !isLesson(task) || !SAFE_ID.test(owner) ||
+      String(task.id || '') !== String(row.lesson_task_id) || String(task.staffId || '') !== owner ||
+      String(task.studentId || '') !== String(row.student_id)) return null;
+  return { task, owner, taskData: String(taskRow.data || '') };
 }
 
 async function verifiedLesson(env, app, taskId, studentId, visitDate, auth) {
@@ -98,14 +106,14 @@ async function verifiedLesson(env, app, taskId, studentId, visitDate, auth) {
   if (!students.some(student => student && !student.deleted && String(student.id || '') === studentId)) {
     return { error: '현재 원생 명단에서 학생을 확인할 수 없습니다' };
   }
-  return { task, staffId: String(task.staffId) };
+  return { task, staffId: String(task.staffId), taskData: String(taskRow.data || '') };
 }
 
 async function latestAfterWrite(env, app, visitId) {
   return rowView(await findVisit(env, app, visitId));
 }
 
-async function appendUpdate(env, app, current, values, eventType, reason, auth) {
+async function appendUpdate(env, app, current, values, eventType, reason, auth, lessonGuard) {
   const expectedRevision = Number(values.expectedRevision);
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || expectedRevision !== Number(current.revision)) {
     return { stale: true };
@@ -121,12 +129,17 @@ async function appendUpdate(env, app, current, values, eventType, reason, auth) 
     after: { checkInAt: Number(values.checkInAt), checkOutAt: values.checkOutAt == null ? null : Number(values.checkOutAt), status: values.status },
     reason: String(reason || '')
   });
+  const updateSql =
+    'UPDATE weekend_actual_visits SET check_in_at=?,check_out_at=?,status=?,revision=?,updated_at=?,updated_by=? ' +
+    'WHERE app=? AND visit_id=? AND revision=?' + (lessonGuard
+      ? ' AND EXISTS (SELECT 1 FROM tasks current_task WHERE current_task.app=? AND current_task.id=? ' +
+        'AND current_task.owner=? AND current_task.data=?)'
+      : '');
+  const updateArgs = [values.checkInAt, values.checkOutAt, values.status, revision, updatedAt, actor,
+    app, current.visit_id, expectedRevision];
+  if (lessonGuard) updateArgs.push(app, String(current.lesson_task_id), lessonGuard.owner, lessonGuard.taskData);
   const statements = [
-    env.DB.prepare(
-      'UPDATE weekend_actual_visits SET check_in_at=?,check_out_at=?,status=?,revision=?,updated_at=?,updated_by=? ' +
-      'WHERE app=? AND visit_id=? AND revision=?'
-    ).bind(values.checkInAt, values.checkOutAt, values.status, revision, updatedAt, actor,
-      app, current.visit_id, expectedRevision),
+    env.DB.prepare(updateSql).bind(...updateArgs),
     env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
       'SELECT ?,?,?,?,?,?,? WHERE EXISTS (' +
@@ -144,14 +157,19 @@ async function listVisits(env, app, body, auth, json, origin) {
   if (!isWeekendDate(visitDate)) return json({ ok: false, error: '토요일 또는 일요일 날짜를 선택해 주세요' }, 422, origin);
   let staffId = auth.scope === 'own' ? String(auth.id || '') : String(body.staffId || '');
   if (staffId && !SAFE_ID.test(staffId)) return json({ ok: false, error: '담당자 정보를 확인해 주세요' }, 422, origin);
-  const result = staffId
-    ? await env.DB.prepare(
-      "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND staff_id=? AND status<>'cancelled' ORDER BY check_in_at,student_id"
-    ).bind(app, visitDate, staffId).all()
-    : await env.DB.prepare(
-      "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND status<>'cancelled' ORDER BY check_in_at,staff_id,student_id"
-    ).bind(app, visitDate).all();
-  return json({ ok: true, visits: (result.results || []).map(rowView) }, 200, origin);
+  const result = await env.DB.prepare(
+    "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND status<>'cancelled' ORDER BY check_in_at,staff_id,student_id"
+  ).bind(app, visitDate).all();
+  let rows = result.results || [];
+  if (staffId) {
+    const scoped = [];
+    for (const row of rows) {
+      const lesson = await currentVisitLesson(env, app, row);
+      if (lesson && lesson.owner === staffId) scoped.push(row);
+    }
+    rows = scoped;
+  }
+  return json({ ok: true, visits: rows.map(rowView) }, 200, origin);
 }
 
 async function checkIn(env, app, body, auth, json, origin) {
@@ -182,7 +200,8 @@ async function checkIn(env, app, body, auth, json, origin) {
   if (existing && existing.status === 'cancelled') {
     const reopened = await appendUpdate(env, app, existing, {
       checkInAt: now, checkOutAt: null, status: 'active', expectedRevision: Number(existing.revision)
-    }, 'reopen', '취소 후 다시 등원', auth);
+    }, 'reopen', '취소 후 다시 등원', auth,
+    auth.scope === 'own' ? { owner: verified.staffId, taskData: verified.taskData } : null);
     if (reopened.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
     return json({ ok: true, visit: reopened.visit }, 200, origin);
   }
@@ -196,8 +215,10 @@ async function checkIn(env, app, body, auth, json, origin) {
     env.DB.prepare(
       'INSERT OR IGNORE INTO weekend_actual_visits ' +
       '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
-      'VALUES (?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,?)'
-    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, now, now, now, actor, actor),
+      'SELECT ?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
+      'WHERE current_task.app=? AND current_task.id=? AND current_task.owner=? AND current_task.data=?'
+    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, now, now, now, actor, actor,
+      app, taskId, verified.staffId, verified.taskData),
     env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
       'SELECT ?,?,?,\'check_in\',?,?,? WHERE EXISTS (' +
@@ -216,7 +237,10 @@ async function changeVisit(env, app, body, auth, json, origin) {
   if (!SAFE_ID.test(visitId)) return json({ ok: false, error: '등·하원 기록을 확인해 주세요' }, 422, origin);
   const current = await findVisit(env, app, visitId);
   if (!current || current.status === 'cancelled') return json({ ok: false, error: '현재 등·하원 기록을 찾을 수 없습니다' }, 404, origin);
-  if (!canAccess(current, auth)) return json({ ok: false, error: '본인이 담당하는 수업만 기록할 수 있습니다' }, 422, origin);
+  const currentLesson = auth.scope === 'own' ? await currentVisitLesson(env, app, current) : null;
+  if (auth.scope === 'own' && (!currentLesson || currentLesson.owner !== String(auth.id || ''))) {
+    return json({ ok: false, error: '현재 본인이 담당하는 수업만 기록할 수 있습니다' }, 422, origin);
+  }
   const expectedRevision = Number(body.revision);
 
   if (action === 'check_out') {
@@ -227,7 +251,7 @@ async function changeVisit(env, app, body, auth, json, origin) {
     }
     const saved = await appendUpdate(env, app, current, {
       checkInAt: Number(current.check_in_at), checkOutAt: now, status: 'completed', expectedRevision
-    }, 'check_out', '', auth);
+    }, 'check_out', '', auth, currentLesson);
     if (saved.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
     return json({ ok: true, visit: saved.visit }, 200, origin);
   }
@@ -245,7 +269,7 @@ async function changeVisit(env, app, body, auth, json, origin) {
     const saved = await appendUpdate(env, app, current, {
       checkInAt: Number(current.check_in_at), checkOutAt: current.check_out_at == null ? null : Number(current.check_out_at),
       status: 'cancelled', expectedRevision
-    }, 'cancel', reason, auth);
+    }, 'cancel', reason, auth, currentLesson);
     if (saved.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
     return json({ ok: true, visit: saved.visit }, 200, origin);
   }
@@ -259,7 +283,7 @@ async function changeVisit(env, app, body, auth, json, origin) {
   }
   const saved = await appendUpdate(env, app, current, {
     checkInAt, checkOutAt, status: checkOutAt == null ? 'active' : 'completed', expectedRevision
-  }, 'correct', reason, auth);
+  }, 'correct', reason, auth, currentLesson);
   if (saved.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
   return json({ ok: true, visit: saved.visit }, 200, origin);
 }

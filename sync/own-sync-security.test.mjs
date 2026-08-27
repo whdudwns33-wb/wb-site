@@ -202,6 +202,41 @@ test('staff-origin own task creation and editing remain allowed', async () => {
   assert.equal(db.task('staff-2').origin, 'staff');
 });
 
+test('generic own sync cannot mint or mutate lesson authorization and permits only an exact replay', async () => {
+  const forged = [
+    { taskKind: 'lesson_instruction', studentId: 'student-a' },
+    { lessonFormVersion: 1, studentId: 'student-a' },
+    { intakeVersion: 1, studentId: 'student-a' },
+    { studentId: 'student-a' },
+    { title: '[수업] 위조 수업' }
+  ];
+  for (let index = 0; index < forged.length; index += 1) {
+    const db = new FakeDB();
+    const candidate = { ...task('forged-' + index, 'staff', '일반 업무'), ...forged[index] };
+    const result = await sync(db, [change(candidate, 300)]);
+    assert.equal(result.status, 403);
+    assert.equal(db.tasks.size, 0);
+  }
+
+  const db = new FakeDB();
+  const lesson = { ...task('server-lesson', 'staff', '[수업] 서버 수업'),
+    taskKind: 'lesson_instruction', lessonFormVersion: 2, studentId: 'student-a' };
+  db.seedTask(lesson);
+  const replay = await sync(db, [change({ ...lesson }, 999)]);
+  assert.equal(replay.status, 200);
+  assert.equal(db.tasks.get(lesson.id).updatedAt, 100, 'exact replay는 서버 정본을 다시 쓰지 않는다');
+
+  const changedStudent = await sync(db, [change({ ...lesson, studentId: 'student-b', updatedAt: 999 }, 999)]);
+  assert.equal(changedStudent.status, 403);
+  assert.deepEqual(db.task(lesson.id), lesson);
+
+  const plain = task('plain-task', 'staff', '일반 업무');
+  db.seedTask(plain);
+  const converted = await sync(db, [change({ ...plain, studentId: 'student-a', updatedAt: 400 }, 400)]);
+  assert.equal(converted.status, 403);
+  assert.deepEqual(db.task(plain.id), plain);
+});
+
 test('task envelope id, staffId, and origin are server-validated', async () => {
   const cases = [
     { ...task('task-1', 'staff', 'x'), id: 'inner-other' },

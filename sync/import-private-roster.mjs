@@ -162,7 +162,6 @@ export function buildPrivateRosterDocument({
   const claimedExistingIds = new Set();
   const students = sourceStudents.map(item => {
     const { row, name, grade, key, suppliedId } = item;
-    const teacher = teacherIdentity(row.teacher, staffNames);
     const exactId = existing.byStudent.get(key) || '';
     if (suppliedId && existingDocument !== null && !existing.studentIds.has(suppliedId)) {
       fail('ROSTER_ID_UNKNOWN');
@@ -188,12 +187,10 @@ export function buildPrivateRosterDocument({
       id,
       name,
       grade,
-      teacher: teacher.teacher,
       subject: row.subject,
       start: row.start,
       end: row.end,
-      reason: row.reason,
-      teacherIds: teacher.teacherIds
+      reason: row.reason
     };
     if (Object.prototype.hasOwnProperty.call(row, 'memo')) result.memo = row.memo;
     for (const field of ['school', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate', 'entryType', 'subjects']) {
@@ -213,7 +210,6 @@ export function buildPrivateRosterDocument({
     if (matches.length !== 1) fail('BOOK_STUDENT_NAME_COLLISION');
     const student = matches[0];
     const teacher = teacherIdentity(row.teacher, staffNames);
-    if (teacher.teacherIds.some(id => !student.teacherIds.includes(id))) fail('BOOK_TEACHER_NOT_ASSIGNED');
     const bookId = safeId(row.bookId, 'BOOK_STUDENT_INVALID');
     const key = assignmentKey(student.id, bookId);
     if (sourceAssignmentKeys.has(key)) fail('BOOK_ASSIGNMENT_COLLISION');

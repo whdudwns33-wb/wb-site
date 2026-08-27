@@ -66,13 +66,13 @@ test('lesson edits send sourceTaskId as top-level optimistic-update metadata', (
   assert.match(preview, /lessonPreviewExpectedUpdatedAt = existing \? Number\(existing\.updatedAt/);
 });
 
-test('teacher-only lesson edits leave roster ownership transfer to the authoritative lesson endpoint', () => {
+test('lesson edits keep teacher authority on each lesson and never synthesize a roster-wide teacher list', () => {
   const start = html.indexOf('function lessonRosterStudentPayload(');
   const end = html.indexOf('function lessonRosterStudentChanged(', start);
   const block = html.slice(start, end);
-  assert.match(block, /const sourceTask = draft\._sourceTaskId/);
-  assert.match(block, /const teacherTransfer = sourceTask/);
-  assert.match(block, /\.concat\(teacherTransfer \? \[\] : lessonList\.map/);
+  assert.doesNotMatch(block, /teacherTransfer|teacherIds|lessonList\.map\(item => String\(item\.staffId/);
+  assert.match(block, /Object\.assign\(\{\}, selected/);
+  assert.match(block, /Object\.assign 원본 그대로 보존/);
 });
 
 test('admin lesson registration requires an explicit teacher selection', () => {
@@ -115,7 +115,7 @@ test('admin direct lesson registration reuses the new-student information fields
     assert.match(fields, new RegExp(`data-lesson-roster-field="${key}"`), key);
   }
   assert.doesNotMatch(fields, /data-lesson-roster-teacher/);
-  assert.match(fields, /lessonList\.map\(item => String\(item\.staffId \|\| ''\)\)/);
+  assert.doesNotMatch(fields, /teacherTransfer|teacherIds|lessonList\.map\(item => String\(item\.staffId/);
   for (const subject of ['국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉']) {
     assert.match(html, new RegExp(subject));
   }
