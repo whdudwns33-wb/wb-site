@@ -95,6 +95,14 @@ function seed(db) {
   }
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster()), now).run();
+  for (const [id, staffId, studentId] of [
+    ['lesson-a', 'teacher-a', 'student-a'], ['lesson-b', 'teacher-b', 'student-b']
+  ]) {
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
+        lessonFormVersion: 1, intakeVersion: 1,
+        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+  }
 }
 
 function makeEnv(db, extra = {}) {

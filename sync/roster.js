@@ -1,5 +1,7 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 import { buildLessonTask } from './lesson-create.js';
+import { bookOrderStudentIdsForAuth } from './book-order-student-scope.js';
+import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
@@ -25,8 +27,7 @@ function rosterTransition(student) {
 }
 
 function isLessonTask(value) {
-  return !!value && (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion ||
-    /^\[수업\]/.test(String(value.title || '')));
+  return !!value && (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion);
 }
 
 async function activeStaffRecord(env, app, staffId) {
@@ -173,9 +174,9 @@ function studentParentIdentityKey(value) {
 
 function minimalStudentForDeletion(value) {
   if (!identityText(value && value.name)) return false;
-  if ((value.teacherIds || []).length || (value.subjects || []).length) return false;
+  if ((value.subjects || []).length) return false;
   return ![
-    value.teacher, value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
+    value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
     value.registrationDate, value.firstClassDate, value.end, value.reason, value.memo
   ].some(item => String(item || '').trim());
 }
@@ -220,9 +221,9 @@ async function studentHasReferences(env, app, studentId) {
 function rosterStudent(value, index) {
   const path = 'document.roster.students[' + index + ']';
   shape(value,
-    ['id', 'name', 'grade', 'teacher', 'subject', 'start', 'end', 'reason', 'teacherIds'],
+    ['id', 'name', 'grade', 'subject', 'start', 'end', 'reason'],
     ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
-      'registrationDate', 'firstClassDate', 'subjects'], path);
+      'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -230,13 +231,17 @@ function rosterStudent(value, index) {
     id: id(value.id, path + '.id'),
     name: text(value.name, path + '.name', 40, false),
     grade: text(value.grade, path + '.grade', 20, true),
-    teacher: text(value.teacher, path + '.teacher', 200, true),
     subject: text(value.subject, path + '.subject', 200, true),
     start,
     end,
-    reason: text(value.reason, path + '.reason', 500, true),
-    teacherIds: teacherIds(value.teacherIds, path + '.teacherIds', true)
+    reason: text(value.reason, path + '.reason', 500, true)
   };
+  if (Object.prototype.hasOwnProperty.call(value, 'teacher')) {
+    result.teacher = text(value.teacher, path + '.teacher', 200, true);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'teacherIds')) {
+    result.teacherIds = teacherIds(value.teacherIds, path + '.teacherIds', true);
+  }
   if (Object.prototype.hasOwnProperty.call(value, 'memo')) result.memo = text(value.memo, path + '.memo', 1000, true);
   if (Object.prototype.hasOwnProperty.call(value, 'school')) result.school = text(value.school, path + '.school', 80, true);
   if (Object.prototype.hasOwnProperty.call(value, 'phoneSelf')) result.phoneSelf = phone(value.phoneSelf, path + '.phoneSelf');
@@ -270,9 +275,6 @@ function bookStudent(value, index, rosterById) {
   const name = text(value.name, path + '.name', 40, false);
   if (name !== student.name) fail(path + '.name', 'roster의 학생 이름과 다릅니다');
   const teachers = teacherIds(value.teacherIds, path + '.teacherIds');
-  if (teachers.some(teacherId => !student.teacherIds.includes(teacherId))) {
-    fail(path + '.teacherIds', 'roster 담당자에 없는 직원이 포함되어 있습니다');
-  }
   if (!Number.isInteger(value.perWeek) || value.perWeek < 1 || value.perWeek > 14) {
     fail(path + '.perWeek', '1~14 사이의 정수여야 합니다');
   }
@@ -334,16 +336,79 @@ function withoutTeacherIds(item) {
   return result;
 }
 
-function responseDocument(document, auth) {
-  const allowed = item => auth.scope === 'all' || item.teacherIds.includes(auth.id);
+function withoutRosterTeacher(item) {
+  const result = withoutTeacherIds(item);
+  delete result.teacher;
+  return result;
+}
+
+async function rosterStudentIdsForAuth(env, app, document, auth, activeLessonIds) {
+  if (auth.scope === 'all') return new Set(document.roster.students.map(student => String(student.id)));
+  const allowed = new Set(activeLessonIds);
+  if (auth.scope !== 'own' || !SAFE_ID.test(String(auth.id || ''))) return allowed;
+  const transitioned = new Map(document.roster.students.map(student => [String(student.id), rosterTransition(student)])
+    .filter(([, transition]) => transition));
+  if (!transitioned.size) return allowed;
+  const result = await env.DB.prepare(
+    "SELECT student_id,event_type,effective_date,audience_staff_ids FROM student_change_events AS event " +
+    "WHERE app=? AND event_type IN ('leave','withdrawal') AND json_valid(audience_staff_ids) " +
+    'AND EXISTS (SELECT 1 FROM json_each(event.audience_staff_ids) audience WHERE audience.value=?)'
+  ).bind(app, String(auth.id)).all();
+  for (const row of result.results || []) {
+    const studentId = String(row.student_id || '');
+    const transition = transitioned.get(studentId);
+    if (!transition || transition.operation !== String(row.event_type || '') ||
+        transition.effectiveDate !== String(row.effective_date || '')) continue;
+    let audience;
+    try { audience = JSON.parse(row.audience_staff_ids || '[]'); } catch (error) { continue; }
+    if (!Array.isArray(audience) || !audience.includes(String(auth.id))) continue;
+    allowed.add(studentId);
+  }
+  return allowed;
+}
+
+async function responseDocument(env, app, document, auth) {
+  const lessonStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  const rosterStudentIds = await rosterStudentIdsForAuth(env, app, document, auth, lessonStudentIds);
+  const allowedStudent = item => rosterStudentIds.has(String(item.id));
+  const allowedBookStudent = item => auth.scope === 'all' ||
+    (lessonStudentIds.has(String(item.studentId)) && Array.isArray(item.teacherIds) && item.teacherIds.includes(auth.id));
+  const bookOrderStudents = document.roster.students.filter(student => lessonStudentIds.has(String(student.id)))
+    .map(student => ({ id: String(student.id), name: String(student.name || ''),
+      school: String(student.school || ''), grade: String(student.grade || '') }))
+    .sort((left, right) => left.name.localeCompare(right.name, 'ko') ||
+      left.school.localeCompare(right.school, 'ko') || left.grade.localeCompare(right.grade, 'ko') ||
+      left.id.localeCompare(right.id));
   return {
-    studentSelectionScope: auth.scope === 'all' ? 'all_active' : 'assigned',
+    studentSelectionScope: auth.scope === 'all' ? 'all_active' : 'lesson_students',
     roster: {
       ...document.roster,
-      students: document.roster.students.filter(allowed).map(withoutTeacherIds)
+      students: document.roster.students.filter(allowedStudent).map(withoutRosterTeacher)
     },
-    bookStudents: document.bookStudents.filter(allowed).map(withoutTeacherIds)
+    bookStudents: document.bookStudents.filter(allowedBookStudent).map(withoutTeacherIds),
+    bookOrderStudents
   };
+}
+
+async function lessonStaffIdsForStudent(env, app, studentId, now = Date.now()) {
+  if (!SAFE_ID.test(String(studentId || ''))) return [];
+  const referenceDate = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await env.DB.prepare(
+    "SELECT id,owner,data FROM tasks WHERE app=? AND json_valid(data) " +
+    "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+  ).bind(app, String(studentId)).all();
+  const staffIds = [];
+  for (const row of result.results || []) {
+    let task;
+    try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+    const owner = String(row.owner || '');
+    const end = String(task.end || '');
+    if (!isLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
+        String(task.staffId || '') !== owner || String(task.studentId || '') !== String(studentId) ||
+        (end && (!ISO_DATE.test(end) || end < referenceDate))) continue;
+    staffIds.push(owner);
+  }
+  return [...new Set(staffIds)];
 }
 
 async function studentIdentityHash(studentId, studentName) {
@@ -423,7 +488,6 @@ async function activeBookOrderConflicts(env, app, document) {
 
 async function inactiveTeacherIds(env, app, document) {
   const used = new Set();
-  document.roster.students.forEach(item => item.teacherIds.forEach(id => used.add(id)));
   document.bookStudents.forEach(item => item.teacherIds.forEach(id => used.add(id)));
   if (!used.size) return [];
   const result = await env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all();
@@ -472,7 +536,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
     const student = document.roster.students.find(item => item.id === studentId);
     if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
-    return json({ ok: true, updatedAt: Number(row.updated_at), student }, 200, origin);
+    return json({ ok: true, updatedAt: Number(row.updated_at), student: withoutRosterTeacher(student) }, 200, origin);
   }
 
   if (action === 'student_delete') {
@@ -554,7 +618,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const currentTransition = rosterTransition(student);
     const now = Date.now();
     const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
-    const audienceStaffIds = [...student.teacherIds];
+    const audienceStaffIds = operation === 'leave' || operation === 'withdrawal'
+      ? [] : await lessonStaffIdsForStudent(env, app, studentId, now);
     const statements = [];
     const requiredIndexes = [];
     let responseTask = null;
@@ -579,7 +644,11 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       for (const lessonRow of lessons.results || []) {
         let lesson;
         try { lesson = JSON.parse(lessonRow.data || '{}'); } catch (error) { continue; }
-        if (!isLessonTask(lesson)) continue;
+        const lessonEnd = String(lesson && lesson.end || '');
+        if (!isLessonTask(lesson) || String(lesson.id || '') !== String(lessonRow.id || '') ||
+            String(lesson.staffId || '') !== String(lessonRow.owner || '') ||
+            String(lesson.studentId || '') !== studentId ||
+            (lessonEnd && (!ISO_DATE.test(lessonEnd) || lessonEnd < effectiveDate))) continue;
         const taskUpdatedAt = Math.max(now, Number(lessonRow.updated_at || 0) + 1);
         lesson.end = effectiveDate;
         lesson.deleted = true;
@@ -587,8 +656,12 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         lesson.lastEditBy = actorRole;
         requiredIndexes.push(statements.length);
         statements.push(env.DB.prepare(
-          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
-        ).bind(JSON.stringify(lesson), taskUpdatedAt, taskUpdatedAt, app, lessonRow.id, lessonRow.updated_at));
+          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+        ).bind(JSON.stringify(lesson), taskUpdatedAt, taskUpdatedAt, app, lessonRow.id,
+          lessonRow.owner, lessonRow.updated_at));
+        statements.push(await taskWriteCasGuardStatement(env, app, 'roster_transition_lesson',
+          [studentId, operation, lessonRow.id, lessonRow.owner, lessonRow.updated_at, taskUpdatedAt].join('\n'),
+          taskUpdatedAt));
         audienceStaffIds.push(String(lessonRow.owner || ''));
       }
     } else {
@@ -599,12 +672,18 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       let selectedSubjects;
       try { selectedSubjects = subjects(body.subjects, 'subjects'); }
       catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
-      if (!selectedSubjects.length) return json({ ok: false, error: '복귀 수업 과목을 한 개 이상 선택해 주세요' }, 400, origin);
+      if (selectedSubjects.length !== 1) return json({ ok: false, error: '복귀 수업 과목을 정확히 한 개 선택해 주세요' }, 400, origin);
       if (!String(student.grade || '').trim()) return json({ ok: false, error: '복귀 전에 원생 기본 정보에서 학년을 입력해 주세요' }, 409, origin);
-      const activeLesson = await env.DB.prepare(
-        "SELECT id FROM tasks WHERE app=? AND json_valid(data) AND json_extract(data,'$.studentId')=? " +
-        "AND COALESCE(json_extract(data,'$.deleted'),0)=0 LIMIT 1"
-      ).bind(app, studentId).first();
+      const activeLessonRows = await env.DB.prepare(
+        "SELECT id,owner,data FROM tasks WHERE app=? AND json_valid(data) AND json_extract(data,'$.studentId')=? " +
+        "AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+      ).bind(app, studentId).all();
+      const activeLesson = (activeLessonRows.results || []).some(item => {
+        let data;
+        try { data = JSON.parse(item.data || '{}'); } catch (error) { return false; }
+        return isLessonTask(data) && String(data.id || '') === String(item.id || '') &&
+          String(data.staffId || '') === String(item.owner || '') && String(data.studentId || '') === studentId;
+      });
       if (activeLesson) return json({ ok: false, error: '이미 활성 수업이 있습니다. 수업 정보를 확인한 뒤 다시 처리해 주세요' }, 409, origin);
       let lesson;
       try {
@@ -619,18 +698,25 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       } catch (error) {
         return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin);
       }
-      const oldTask = await env.DB.prepare('SELECT data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+      const oldTask = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
         .bind(app, lesson.id).first();
       if (oldTask) {
         let oldData;
         try { oldData = JSON.parse(oldTask.data || '{}'); } catch (error) { oldData = null; }
-        if (!oldData || !oldData.deleted) return json({ ok: false, error: '같은 복귀 수업이 이미 등록되어 있습니다' }, 409, origin);
+        if (!oldData || !oldData.deleted || !isLessonTask(oldData) ||
+            String(oldData.id || '') !== lesson.id || String(oldData.studentId || '') !== studentId) {
+          return json({ ok: false, error: '같은 복귀 수업 ID의 기존 정보를 확인할 수 없습니다' }, 409, origin);
+        }
         lesson.createdAt = Number(oldData.createdAt) || now;
         lesson.updatedAt = Math.max(now, Number(oldTask.updated_at || 0) + 1);
         requiredIndexes.push(statements.length);
         statements.push(env.DB.prepare(
-          'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
-        ).bind(staff.id, JSON.stringify(lesson), lesson.updatedAt, lesson.updatedAt, app, lesson.id, oldTask.updated_at));
+          'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+        ).bind(staff.id, JSON.stringify(lesson), lesson.updatedAt, lesson.updatedAt, app, lesson.id,
+          oldTask.owner, oldTask.updated_at));
+        statements.push(await taskWriteCasGuardStatement(env, app, 'roster_return_lesson',
+          [studentId, lesson.id, oldTask.owner, staff.id, oldTask.updated_at, lesson.updatedAt].join('\n'),
+          lesson.updatedAt));
       } else {
         requiredIndexes.push(statements.length);
         statements.push(env.DB.prepare(
@@ -639,18 +725,11 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       }
       student.end = '';
       student.reason = '';
-      student.teacherIds = [staff.id];
-      student.teacher = staff.name;
       student.subjects = selectedSubjects;
       student.subject = selectedSubjects.join('·');
-      document.bookStudents.forEach(assignment => {
-        if (assignment.studentId !== studentId) return;
-        assignment.teacherIds = [staff.id];
-        assignment.teacher = staff.name;
-      });
       audienceStaffIds.push(staff.id);
       eventType = 'student_information';
-      changedFields = ['end', 'reason', 'teacherIds', 'subject', 'subjects', 'lessonHours', 'scheduleSlots'];
+      changedFields = ['end', 'reason', 'subject', 'subjects', 'staffId', 'lessonHours', 'scheduleSlots'];
       details = {
         operation: 'return', effectiveDate, label: '복귀', afterStaffName: staff.name,
         subjects: selectedSubjects, lessonHours: lesson.lessonHours, scheduleText: lesson.scheduleText, direct: true,
@@ -675,6 +754,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     statements.push(env.DB.prepare(
       'UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?'
     ).bind(JSON.stringify(document), rosterUpdatedAt, app, row.updated_at));
+    statements.push(await taskWriteCasGuardStatement(env, app, 'roster_transition_document',
+      [studentId, operation, row.updated_at, rosterUpdatedAt].join('\n'), rosterUpdatedAt));
     const eventId = await studentChangeEventId('roster-transition\n' + studentId + '\n' + operation + '\n' + expectedUpdatedAt + '\n' + rosterUpdatedAt);
     statements.push(studentChangeEventStatement(env, app, {
       eventId, studentId, taskId: responseTask && responseTask.id || null, eventType, changedFields, details,
@@ -686,12 +767,14 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     catch (error) {
       if (isBoardingLockError(error)) return json({ ok: false, code: 'BOARDING_LOCK', error: '탑승 후 미하차 상태인 학생은 지금 변경할 수 없습니다' }, 409, origin);
       if (isActiveBookOrderConflictError(error)) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT', error: '미완료 교재 주문이 있어 지금 변경할 수 없습니다' }, 409, origin);
+      if (isTaskWriteCasConflict(error)) return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
+        error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
       throw error;
     }
     if (!requiredIndexes.every(index => Number(applied[index] && applied[index].meta && applied[index].meta.changes || 0) === 1)) {
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT', error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
     }
-    return json({ ok: true, updatedAt: rosterUpdatedAt, student: withoutTeacherIds(student), task: responseTask }, 200, origin);
+    return json({ ok: true, updatedAt: rosterUpdatedAt, student: withoutRosterTeacher(student), task: responseTask }, 200, origin);
   }
 
   if (action === 'student_create' || action === 'student_update') {
@@ -718,6 +801,10 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         return json({ ok: false, code: 'STUDENT_REQUIRED_FIELDS', error: '이름을 입력해 주세요' }, 400, origin);
       }
       nextStudent = rosterStudent(input, 0);
+      // 개별 학생 저장에서는 대표/메인 담당을 만들지 않는다. 기존 전체 문서의 필드는
+      // replace 호환용으로만 읽으며, 실제 담당은 수업 task별 staffId에서 파생한다.
+      delete nextStudent.teacher;
+      delete nextStudent.teacherIds;
     } catch (error) {
       const message = String(error && error.message || error);
       if (message === 'STUDENT_ID_GENERATION_FAILED') {
@@ -726,7 +813,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       return json({ ok: false, error: message }, 400, origin);
     }
     const index = document.roster.students.findIndex(item => item.id === nextStudent.id);
-    const previousStudent = index >= 0 ? { ...document.roster.students[index], teacherIds: document.roster.students[index].teacherIds.slice() } : null;
+    const previousStudent = index >= 0 ? { ...document.roster.students[index] } : null;
     const nextIdentityKey = studentRegistrationIdentityKey(nextStudent);
     const sameBase = document.roster.students.filter(item => item.id !== nextStudent.id &&
       studentRegistrationBaseKey(item) === studentRegistrationBaseKey(nextStudent));
@@ -776,11 +863,11 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     if (action === 'student_update' && previousStudent) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
-        'registrationDate', 'firstClassDate', 'subject', 'subjects', 'teacherIds', 'start', 'end', 'reason', 'memo'];
+        'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo'];
       const changedFields = fields.filter(key => JSON.stringify(previousStudent[key] || '') !== JSON.stringify(nextStudent[key] || ''));
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);
-        const audienceStaffIds = [...new Set([...(previousStudent.teacherIds || []), ...(nextStudent.teacherIds || [])])];
+        const audienceStaffIds = await lessonStaffIdsForStudent(env, app, nextStudent.id, updatedAt);
         await studentChangeEventStatement(env, app, {
           eventId, studentId: nextStudent.id, eventType: 'student_information', changedFields,
           details: {
@@ -792,7 +879,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         }).run();
       }
     }
-    return json({ ok: true, updatedAt, student: withoutTeacherIds(nextStudent) }, 200, origin);
+    return json({ ok: true, updatedAt, student: withoutRosterTeacher(nextStudent) }, 200, origin);
   }
 
   if (action === 'replace') {
@@ -861,5 +948,5 @@ export async function handleRoster(env, app, body, origin, auth, json) {
   let document;
   try { document = validateRosterDocument(JSON.parse(row.data)); }
   catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
-  return json({ ok: true, updatedAt: Number(row.updated_at), ...responseDocument(document, auth) }, 200, origin);
+  return json({ ok: true, updatedAt: Number(row.updated_at), ...await responseDocument(env, app, document, auth) }, 200, origin);
 }

@@ -1,5 +1,11 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 import { lessonCheckOwnerTransferStatement } from './lesson-history-transfer.js';
+import { activeRosterStudent, lessonStudentIdsForStaff } from './book-order-student-scope.js';
+import {
+  isSessionPackTransferConflict,
+  lessonSessionPackTransferStatements
+} from './session-pack-transfer.js';
+import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 
 const LESSON_TEXT_LIMITS = {
   studentName: 80,
@@ -167,6 +173,10 @@ function assignmentIdentityText(staffId, lesson) {
     .map(value => normalizeWords(value).replace(/\s+/g, '')).join('\u001f');
 }
 
+export async function lessonAssignmentKeyForStaff(task, staffId) {
+  return 'sha256:' + await sha256Hex(assignmentIdentityText(staffId, task));
+}
+
 function contentIdentityText(input, slots, scheduleStatus, scheduleReviewReason) {
   const content = {
     studentName: input.studentName,
@@ -326,6 +336,13 @@ function normalizedRosterText(value) {
   return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
 }
 
+function sameLessonAssignmentIdentity(current, candidate) {
+  return String(current && current.studentId || '') !== '' &&
+    String(current.studentId) === String(candidate && candidate.studentId || '') &&
+    ['subject', 'className', 'lessonRole'].every(key =>
+      normalizedRosterText(current[key]) === normalizedRosterText(candidate && candidate[key]));
+}
+
 async function validateLessonStudentAccess(env, app, task, auth) {
   const studentId = String(task && task.studentId || '');
   if (!studentId) {
@@ -342,10 +359,17 @@ async function validateLessonStudentAccess(env, app, task, auth) {
     students = document && document.roster && document.roster.students;
   } catch (error) { return { status: 500, error: '저장된 원생 명단을 확인해 주세요' }; }
   if (!Array.isArray(students)) return { status: 500, error: '저장된 원생 명단을 확인해 주세요' };
-  const student = students.find(item => item && item.id === studentId && Array.isArray(item.teacherIds));
+  const student = students.find(item => item && item.id === studentId);
   if (!student) return { status: 409, error: '원생 명단에서 학생 식별자를 찾을 수 없습니다' };
-  if (auth.scope === 'own' && !student.teacherIds.includes(auth.id)) {
-    return { status: 403, error: '담당 학생의 수업만 등록할 수 있습니다' };
+  const referenceMonth = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
+  if (!activeRosterStudent(student, referenceMonth)) {
+    return { status: 409, error: '현재 재원 중인 학생의 수업만 등록할 수 있습니다' };
+  }
+  if (auth.scope === 'own') {
+    const assignedStudentIds = await lessonStudentIdsForStaff(env, app, auth.id);
+    if (!assignedStudentIds.has(studentId)) {
+      return { status: 403, error: '현재 담당 수업 학생만 등록할 수 있습니다' };
+    }
   }
   if (normalizedRosterText(student.name) !== normalizedRosterText(task.studentName) ||
       normalizedRosterText(student.grade) !== normalizedRosterText(task.grade)) {
@@ -368,7 +392,7 @@ function batchRosterKstDate(now) {
   return values.year + '-' + values.month + '-' + values.day;
 }
 
-async function planBatchRosterLinks(env, app, planned, staffRecords, serverNow) {
+async function planBatchRosterLinks(env, app, planned, serverNow) {
   const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1')
     .bind(app).first();
   if (!row) return { error: '원생 명단이 아직 준비되지 않았습니다', status: 409 };
@@ -383,26 +407,21 @@ async function planBatchRosterLinks(env, app, planned, staffRecords, serverNow) 
   for (const item of planned) {
     const task = item.task;
     const student = byId.get(String(task.studentId || ''));
-    if (!student || !Array.isArray(student.teacherIds)) {
+    if (!student) {
       return { error: '원생 명단에서 학생 식별자를 찾을 수 없습니다', status: 409 };
     }
     if (!beforeByStudentId.has(task.studentId)) {
-      beforeByStudentId.set(task.studentId, JSON.stringify([student.teacherIds, student.subjects, student.teacher, student.subject]));
+      beforeByStudentId.set(task.studentId, JSON.stringify([student.subjects, student.subject]));
     }
-    student.teacherIds = [...new Set(student.teacherIds.map(String).concat(task.staffId).filter(Boolean))];
     const subjects = Array.isArray(student.subjects) ? student.subjects.map(String) : batchRosterLabels(student.subject);
     if (ROSTER_SUBJECTS.has(task.subject)) subjects.push(task.subject);
     student.subjects = [...new Set(subjects.filter(subject => ROSTER_SUBJECTS.has(subject)))];
-    const teacherNames = batchRosterLabels(student.teacher);
-    const staff = staffRecords.get(task.staffId);
-    if (staff && staff.name) teacherNames.push(String(staff.name).trim());
-    student.teacher = [...new Set(teacherNames.filter(Boolean))].join('·');
     student.subject = student.subjects.join('·');
   }
 
   const updatedCount = [...beforeByStudentId].filter(([studentId, before]) => {
     const student = byId.get(studentId);
-    return JSON.stringify([student.teacherIds, student.subjects, student.teacher, student.subject]) !== before;
+    return JSON.stringify([student.subjects, student.subject]) !== before;
   }).length;
   if (!updatedCount) return { changed: false, updatedCount: 0 };
   document.roster.updated = batchRosterKstDate(serverNow);
@@ -411,74 +430,8 @@ async function planBatchRosterLinks(env, app, planned, staffRecords, serverNow) 
   return {
     changed: true,
     updatedCount,
+    expectedUpdatedAt,
     updatedAt,
-    statement: env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
-      .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt)
-  };
-}
-
-async function planLessonTeacherTransferRoster(
-  env, app, task, sourceTaskId, sourceStaffId, targetStaffId, sourceStaff, targetStaff, serverNow
-) {
-  const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1')
-    .bind(app).first();
-  if (!row) return { error: '원생 명단이 아직 준비되지 않았습니다', status: 409 };
-  let document;
-  try { document = JSON.parse(row.data || '{}'); }
-  catch (error) { return { error: '저장된 원생 명단을 확인해 주세요', status: 500 }; }
-  const students = document && document.roster && document.roster.students;
-  if (!Array.isArray(students)) return { error: '저장된 원생 명단을 확인해 주세요', status: 500 };
-  const student = students.find(item => item && String(item.id || '') === String(task.studentId || ''));
-  if (!student || !Array.isArray(student.teacherIds)) {
-    return { error: '원생 명단에서 학생 식별자를 찾을 수 없습니다', status: 409 };
-  }
-
-  sourceStaffId = String(sourceStaffId || '');
-  targetStaffId = String(targetStaffId || '');
-  const otherRows = await env.DB.prepare(
-    "SELECT id,data FROM tasks WHERE app=? AND owner=? AND id<>? AND json_valid(data) " +
-    "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
-  ).bind(app, sourceStaffId, sourceTaskId, String(task.studentId || '')).all();
-  const hasOtherSourceLesson = (otherRows.results || []).some(item => {
-    try {
-      const data = JSON.parse(item.data || '{}');
-      return isLessonIntake(data) || isLegacyLessonTask(data);
-    } catch (error) { return false; }
-  });
-
-  const audienceStaffIds = [...new Set(student.teacherIds.map(String).concat(sourceStaffId, targetStaffId).filter(Boolean))];
-  const updateTeacherIds = value => {
-    let ids = Array.isArray(value) ? value.map(String) : [];
-    if (!hasOtherSourceLesson) ids = ids.filter(id => id !== sourceStaffId);
-    if (!ids.includes(targetStaffId)) ids.push(targetStaffId);
-    return [...new Set(ids.filter(Boolean))];
-  };
-  const before = JSON.stringify([student.teacherIds, student.teacher]);
-  student.teacherIds = updateTeacherIds(student.teacherIds);
-  let teacherNames = batchRosterLabels(student.teacher);
-  const sourceName = String(sourceStaff && sourceStaff.name || '').trim();
-  const targetName = String(targetStaff && targetStaff.name || '').trim();
-  if (!hasOtherSourceLesson && sourceName) teacherNames = teacherNames.filter(name => name !== sourceName);
-  if (targetName) teacherNames.push(targetName);
-  student.teacher = [...new Set(teacherNames.filter(Boolean))].join('·');
-
-  let changed = JSON.stringify([student.teacherIds, student.teacher]) !== before;
-  if (Array.isArray(document.bookStudents)) {
-    for (const assignment of document.bookStudents) {
-      if (!assignment || String(assignment.studentId || '') !== String(task.studentId || '')) continue;
-      const beforeIds = JSON.stringify(assignment.teacherIds || []);
-      assignment.teacherIds = updateTeacherIds(assignment.teacherIds);
-      if (JSON.stringify(assignment.teacherIds) !== beforeIds) changed = true;
-    }
-  }
-  if (!changed) return { changed: false, audienceStaffIds };
-
-  document.roster.updated = batchRosterKstDate(serverNow);
-  const expectedUpdatedAt = Number(row.updated_at);
-  const updatedAt = Math.max(serverNow + 1, expectedUpdatedAt + 1);
-  return {
-    changed: true,
-    audienceStaffIds,
     statement: env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
       .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt)
   };
@@ -586,6 +539,18 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     return json({ ok: false, error: '활성 담당 선생님을 선택해 주세요' }, 409, origin);
   }
 
+  const sourceTaskId = body.sourceTaskId == null ? '' : String(body.sourceTaskId);
+  if (sourceTaskId && !/^[A-Za-z0-9_-]{1,160}$/.test(sourceTaskId)) {
+    return json({ ok: false, error: '수정할 수업 ID를 확인해 주세요' }, 400, origin);
+  }
+  if (auth.scope === 'own' && !sourceTaskId) {
+    return json({
+      ok: false,
+      error: '새 과목 수업은 원장님께 학생 수업 등록 요청을 보내 주세요',
+      code: 'lesson_assignment_approval_required'
+    }, 403, origin);
+  }
+
   let expectedRevision = null;
   if (body.expectedRevision != null) {
     expectedRevision = Number(body.expectedRevision);
@@ -611,11 +576,6 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
   const studentAccess = await validateLessonStudentAccess(env, app, task, auth);
   if (studentAccess) return json({ ok: false, error: studentAccess.error }, studentAccess.status, origin);
 
-  const sourceTaskId = body.sourceTaskId == null ? '' : String(body.sourceTaskId);
-  if (sourceTaskId && !/^[A-Za-z0-9_-]{1,160}$/.test(sourceTaskId)) {
-    return json({ ok: false, error: '수정할 수업 ID를 확인해 주세요' }, 400, origin);
-  }
-
   let matches;
   let sourceOwner = staffId;
   let sourceStaff = targetStaff;
@@ -632,6 +592,13 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     if ((!isLessonIntake(sourceRow.task) && !(auth.scope === 'all' && isLegacyLessonTask(sourceRow.task))) ||
         (auth.scope !== 'all' && sourceRow.task.staffId && sourceRow.task.staffId !== staffId)) {
       return json({ ok: false, error: '이 수업은 수업 등록 및 변경 화면에서 정정할 수 없습니다' }, 409, origin);
+    }
+    if (auth.scope === 'own' && !sameLessonAssignmentIdentity(sourceRow.task, task)) {
+      return json({
+        ok: false,
+        error: '학생 또는 과목 배정 변경은 원장님께 수업 변경을 요청해 주세요',
+        code: 'lesson_assignment_identity_locked'
+      }, 403, origin);
     }
     const identityRows = await findAssignmentRows(env, app, staffId, task);
     if (identityRows.some(row => row.task.id !== sourceTaskId)) {
@@ -693,20 +660,27 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     const corrected = correctedTask(task, current, Date.now(), taskOrigin);
     const databaseUpdatedAt = Number.isFinite(row.updatedAt) ? row.updatedAt : Number(current.updatedAt);
     let result;
-    let transferRoster = null;
     if (teacherTransferred) {
-      transferRoster = await planLessonTeacherTransferRoster(
-        env, app, corrected, current.id, sourceOwner, staffId,
-        sourceStaff, targetStaff, corrected.updatedAt
-      );
-      if (transferRoster.error) return json({ ok: false, error: transferRoster.error }, transferRoster.status, origin);
       const statements = [env.DB.prepare(
         'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
       ).bind(
         staffId, JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
         app, current.id, sourceOwner, databaseUpdatedAt
       )];
-      if (transferRoster.changed) statements.push(transferRoster.statement);
+      let packTransfer;
+      try {
+        packTransfer = await lessonSessionPackTransferStatements(env, app, {
+          beforeTask: current, afterTask: corrected, oldOwner: sourceOwner, newOwner: staffId,
+          taskUpdatedAt: corrected.updatedAt, updatedBy: studentChangeActorKey(auth)
+        });
+      } catch (error) {
+        if (isSessionPackTransferConflict(error)) {
+          return json({ ok: false, code: 'session_pack_transfer_conflict',
+            error: String(error.message || error) }, 409, origin);
+        }
+        throw error;
+      }
+      statements.push(...packTransfer.statements);
       statements.push(lessonCheckOwnerTransferStatement(
         env, app, current.id, sourceOwner, staffId, corrected.updatedAt
       ));
@@ -714,20 +688,26 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       const eventId = await studentChangeEventId('lesson-create-teacher\n' + corrected.id + '\n' + corrected.lessonRevision);
       statements.push(studentChangeEventStatement(env, app, {
         eventId, studentId: String(corrected.studentId), taskId: corrected.id,
-        eventType: 'teacher_assignment', changedFields: ['teacherIds'],
+        eventType: 'teacher_assignment', changedFields: ['staffId'],
         details: {
           beforeStaffId: sourceOwner, beforeStaffName: String(sourceStaff && sourceStaff.name || ''),
           afterStaffId: staffId, afterStaffName: String(targetStaff.name || '')
         },
-        audienceStaffIds: transferRoster.audienceStaffIds || [sourceOwner, staffId],
+        audienceStaffIds: [sourceOwner, staffId],
         effectiveDate, requiresAck: true, changedAt: corrected.updatedAt,
         changedBy: studentChangeActorKey(auth)
       }));
-      const applied = await env.DB.batch(statements);
-      result = applied[0];
-      if (transferRoster.changed && Number(applied[1] && applied[1].meta && applied[1].meta.changes || 0) !== 1) {
-        return json({ ok: false, error: '원생 담당 정보가 다른 곳에서 먼저 수정되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+      let applied;
+      try {
+        applied = await env.DB.batch(statements);
+      } catch (error) {
+        if (isSessionPackTransferConflict(error)) {
+          return json({ ok: false, code: 'session_pack_transfer_conflict',
+            error: '회차권 또는 수업 담당자가 먼저 변경되었습니다. 최신 내용을 확인해 주세요' }, 409, origin);
+        }
+        throw error;
       }
+      result = applied[0];
     } else {
       result = await env.DB.prepare(
         'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
@@ -909,14 +889,20 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
   }
 
   const created = planned.filter(item => item.created);
-  const rosterPlan = await planBatchRosterLinks(env, app, planned, activeStaffIds, serverNow);
+  const rosterPlan = await planBatchRosterLinks(env, app, planned, serverNow);
   if (rosterPlan.error) return json({ ok: false, error: rosterPlan.error }, rosterPlan.status, origin);
   if (created.length || rosterPlan.changed) {
     if (!env.DB || typeof env.DB.batch !== 'function') {
       return json({ ok: false, error: '일괄 저장 기능을 사용할 수 없습니다' }, 503, origin);
     }
     const statements = [];
-    if (rosterPlan.changed) statements.push(rosterPlan.statement);
+    if (rosterPlan.changed) {
+      statements.push(rosterPlan.statement);
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_create_batch_roster', [
+        rosterPlan.expectedUpdatedAt, rosterPlan.updatedAt,
+        ...planned.map(item => String(item.task.id || '')).sort()
+      ].join('\n'), rosterPlan.updatedAt));
+    }
     statements.push(...created.map(item => env.DB.prepare(
       'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
     ).bind(app, item.task.id, item.task.staffId, JSON.stringify(item.task), item.task.updatedAt, item.task.updatedAt)));
@@ -927,6 +913,9 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
         throw new Error('batch_insert_incomplete');
       }
     } catch (error) {
+      if (isTaskWriteCasConflict(error)) {
+        return json({ ok: false, error: '원생 명단이 다른 작업에서 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
+      }
       return json({ ok: false, error: '수업 일괄 저장 중 다른 등록과 충돌했습니다. 새로고침 후 다시 확인해 주세요' }, 409, origin);
     }
   }

@@ -6,18 +6,9 @@ function normalizeName(value) {
   return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
 }
 
-function studentNameOf(task) {
-  if (task && task.studentName) return String(task.studentName).trim();
-  return String(task && task.title || '')
-    .replace(/^\[[^\]]+\]\s*/, '')
-    .split('—')[0]
-    .replace(/\([^)]*\)/g, '')
-    .trim();
-}
-
 function isLesson(task) {
   return !!(task && !task.deleted && (task.taskKind === 'lesson_instruction' ||
-    task.lessonFormVersion || task.intakeVersion || /^\[(수업|컨설팅)\]/.test(String(task.title || ''))));
+    task.lessonFormVersion || task.intakeVersion));
 }
 
 function kstToday(now) {
@@ -93,21 +84,9 @@ export async function handleContactLog(env, app, body, origin, auth, json) {
     if (student && task.studentName && normalizeName(task.studentName) !== normalizeName(student.name)) {
       return json({ ok: false, error: '수업과 학생 명단의 정보가 일치하지 않습니다' }, 422, origin);
     }
-    if (student && (!Array.isArray(student.teacherIds) || !student.teacherIds.includes(task.staffId))) {
-      return json({ ok: false, error: '수업 담당자와 학생 명단의 배정이 일치하지 않습니다' }, 422, origin);
-    }
     if (!student) {
-      const name = normalizeName(studentNameOf(task));
-      const matches = students.filter(item => item && normalizeName(item.name) === name &&
-        Array.isArray(item.teacherIds) && item.teacherIds.includes(task.staffId));
-      if (!name || matches.length !== 1) {
-        return json({ ok: false, error: '담당 학생을 한 명으로 확인할 수 없어 저장하지 않았습니다' }, 422, origin);
-      }
-      student = matches[0];
+      return json({ ok: false, error: '수업의 stable studentId 연결을 확인한 뒤 다시 저장해 주세요' }, 422, origin);
     }
-  }
-  if (auth.scope === 'own' && (!Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id))) {
-    return json({ ok: false, error: '담당 학생의 연락 기록만 작성할 수 있습니다' }, 422, origin);
   }
 
   const actorId = auth.id ? String(auth.id) : '__admin__';

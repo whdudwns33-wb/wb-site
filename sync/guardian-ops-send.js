@@ -154,7 +154,7 @@ async function rosterStudent(env, app, studentId) {
   catch (error) { fail('ROSTER_INVALID', '저장된 원생 명단을 확인해 주세요', 500); }
   const students = document && document.roster.students;
   const student = Array.isArray(students) ? students.find(item => item && item.id === studentId) : null;
-  if (!student || !text(student.name) || !Array.isArray(student.teacherIds)) {
+  if (!student || !text(student.name)) {
     fail('STUDENT_NOT_IN_ROSTER', '현재 원생 명단에서 학생을 찾을 수 없습니다', 409);
   }
   return student;
@@ -226,6 +226,11 @@ async function taskContext(env, app, taskId) {
   return { owner: String(row.owner || ''), task };
 }
 
+function isLessonTask(task) {
+  return !!task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
+    task.intakeVersion);
+}
+
 function scheduleText(startAt, endAt) {
   const start = String(startAt || '');
   const end = String(endAt || '');
@@ -249,9 +254,8 @@ async function makeupTarget(env, app, eventType, sourceId, revision) {
   }
   const student = await rosterStudent(env, app, String(row.student_id));
   const source = await taskContext(env, app, String(row.source_task_id));
-  if (String(source.task.studentId || '') !== String(student.id) ||
-      String(source.owner) !== String(row.source_teacher_id) ||
-      (source.task.staffId && String(source.task.staffId) !== String(row.source_teacher_id))) {
+  if (!isLessonTask(source.task) || String(source.task.studentId || '') !== String(student.id) ||
+      String(source.task.staffId || '') !== source.owner) {
     fail('SOURCE_IDENTITY_MISMATCH', '원 수업과 보강 학생·담당자가 일치하지 않습니다', 409);
   }
   let startAt;
@@ -301,9 +305,9 @@ async function sessionTarget(env, app, sourceId, revision) {
   }
   const student = await rosterStudent(env, app, String(pack.student_id));
   const source = await taskContext(env, app, String(pack.lesson_task_id));
-  if (source.owner !== String(pack.task_owner) || String(source.task.studentId || '') !== String(student.id) ||
-      String(source.task.staffId || source.owner) !== source.owner ||
-      !student.teacherIds.includes(source.owner)) {
+  if (!isLessonTask(source.task) || source.owner !== String(pack.task_owner) ||
+      String(source.task.studentId || '') !== String(student.id) ||
+      String(source.task.staffId || '') !== source.owner) {
     fail('SOURCE_IDENTITY_MISMATCH', '현재 학생·수업·담당자 연결이 회차권과 일치하지 않습니다', 409);
   }
   const studentHash = await sha256Hex('student-id\n' + student.id);

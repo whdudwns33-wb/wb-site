@@ -111,6 +111,15 @@ test('order delivery board uses four collapsed quantity stages and stable-studen
   assert.doesNotMatch(picker, /data-order-qty|placeholder="예: 3권"/);
 });
 
+test('book order student picker uses the server lesson-union DTO instead of roster representative teachers', () => {
+  const picker = block('function orderStudentCandidates()', 'function batchOrderModal(');
+  const loadRoster = block('function loadRoster()', 'function ymNext(');
+  assert.match(loadRoster, /result\.bookOrderStudents/);
+  assert.match(picker, /privateBookOrderStudents/);
+  assert.match(picker, /내 담당 수업 학생 전체/);
+  assert.doesNotMatch(picker, /teacherIds|studentLinkCandidates/);
+});
+
 test('first-day package uses exact stable studentId schedule and shows every honest missing state', () => {
   const schedule = block('function onboardingFirstWeekSchedule(', 'function firstDayPackageHtml(');
   const packageView = block('const ONBOARDING_PACKAGE_DOCS = [', 'function onboardingCardHtml(');

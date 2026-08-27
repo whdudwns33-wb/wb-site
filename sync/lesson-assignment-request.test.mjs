@@ -12,6 +12,8 @@ class DB {
     this.tasks = new Map();
     this.staff = new Map([['teacher-1', { id: 'teacher-1', name: '선생님', deleted: false }]]);
     this.rosterAt = 10;
+    this.beforeBatch = null;
+    this.lastChanges = null;
     this.roster = { roster: { updated: '2026-08-20', students: [{
       id: 'student-1', name: '학생', school: 'WB초', grade: '초4', subject: '수학', subjects: ['수학'],
       teacher: '', teacherIds: [], start: '2026-08', end: '', phoneMother: '010-0000-1234'
@@ -28,6 +30,11 @@ class DB {
         throw new Error('first ' + sql);
       },
       async all() {
+        if (sql.startsWith('SELECT id,owner,data FROM tasks')) {
+          const owner = String(this.args[1]);
+          return { results: [...db.tasks.entries()].filter(([, row]) => row.owner === owner)
+            .map(([id, row]) => ({ id, owner: row.owner, data: row.data })) };
+        }
         if (!sql.startsWith('SELECT * FROM lesson_assignment_requests')) throw new Error('all ' + sql);
         const values = [...db.rows.values()].filter(row => sql.includes('staff_id=?') ? row.staff_id === this.args[1] : true);
         return { results: values };
@@ -88,11 +95,40 @@ class DB {
           if (!row || row.revision!==rev || row.status!=='approval_waiting') return {meta:{changes:0}};
           Object.assign(row,{student_id:studentId,status:'approved',updated_at:updatedAt,reviewed_at:reviewedAt,reviewed_by:by,review_note:null}); return {meta:{changes:1}};
         }
+        if (sql.startsWith('INSERT INTO task_write_cas_guards')) {
+          if (db.lastChanges !== 1) throw new Error('TASK_WRITE_CAS_CONFLICT');
+          return { meta: { changes: 1 } };
+        }
         throw new Error('run ' + sql);
       }
     };
   }
-  async batch(statements) { return Promise.all(statements.map(statement => statement.run())); }
+  async batch(statements) {
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      beforeBatch(this);
+    }
+    const rowsSnapshot = new Map([...this.rows].map(([key, value]) => [key, JSON.parse(JSON.stringify(value))]));
+    const tasksSnapshot = new Map([...this.tasks].map(([key, value]) => [key, JSON.parse(JSON.stringify(value))]));
+    const rosterSnapshot = JSON.parse(JSON.stringify(this.roster));
+    const rosterAtSnapshot = this.rosterAt;
+    const results = [];
+    try {
+      for (const statement of statements) {
+        const result = await statement.run();
+        this.lastChanges = Number(result && result.meta && result.meta.changes || 0);
+        results.push(result);
+      }
+      return results;
+    } catch (error) {
+      this.rows = rowsSnapshot;
+      this.tasks = tasksSnapshot;
+      this.roster = rosterSnapshot;
+      this.rosterAt = rosterAtSnapshot;
+      throw error;
+    }
+  }
 }
 
 async function body(response) { return response.json(); }
@@ -123,6 +159,8 @@ test('teacher receives active studentId candidates without full guardian contact
   const listed = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', { action:'list' }, '*', own, json));
   assert.equal(listed.candidates.length, 2);
   assert.equal(listed.candidates[0].id, 'student-1');
+  assert.equal(listed.candidates[0].assigned, false);
+  assert.equal(listed.candidates[0].teacherIds, undefined);
   assert.equal(listed.candidates[0].phoneMother, undefined);
   assert.match(listed.candidates[0].contactHint, /^\d{4}$/);
   assert.doesNotMatch(JSON.stringify(listed), /010-0000-1234/);
@@ -146,7 +184,7 @@ test('modern approval assigns the stable student and creates the requested lesso
   assert.equal(approved.task.lessonHours, '');
   assert.deepEqual(approved.task.scheduleSlots[0].days, [1,3]);
   assert.deepEqual(approved.task.scheduleSlots.map(slot => slot.lessonHours), ['2T', '1T']);
-  assert.deepEqual(db.roster.roster.students[0].teacherIds, ['teacher-1']);
+  assert.deepEqual(db.roster.roster.students[0].teacherIds, [], '승인은 legacy main-teacher 목록을 쓰지 않는다');
   assert.equal(db.tasks.size, 1);
 });
 
@@ -162,12 +200,38 @@ test('teacher assignment request rejects missing or invalid hours on any confirm
   }
 });
 
-test('a teacher cannot request an already assigned student', async () => {
+test('legacy roster assignment does not block a new subject, but an exact lesson duplicate does', async () => {
   const db = new DB();
   db.roster.roster.students[0].teacherIds = ['teacher-1'];
-  const response = await handleLessonAssignmentRequest({ DB: db }, 'task', request, '*', own, json);
-  assert.equal(response.status, 409);
-  assert.equal(db.rows.size, 0);
+  const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', request, '*', own, json));
+  assert.equal(submitted.ok, true);
+  const approved = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
+  }, '*', all, json);
+  assert.equal(approved.status, 200);
+  const duplicate = await handleLessonAssignmentRequest({ DB: db }, 'task', request, '*', own, json);
+  assert.equal(duplicate.status, 409);
+  assert.equal(db.tasks.size, 1);
+});
+
+test('a request CAS race rolls back roster and lesson writes in assignment approval', async () => {
+  const db = new DB();
+  const submitted = await body(await handleLessonAssignmentRequest({DB:db},'task',{...request,action:'submit'},'*',own,json));
+  const requestKey = submitted.request.requestKey;
+  db.beforeBatch = database => {
+    const row = database.rows.get(requestKey);
+    row.revision = 2;
+    row.updated_at += 1;
+  };
+  const reviewed = await handleLessonAssignmentReview({DB:db},'task',{
+    action:'approve',requestKey,revision:1,studentId:'student-1'
+  },'*',all,json);
+  assert.equal(reviewed.status, 409);
+  assert.equal(db.rows.get(requestKey).revision, 2);
+  assert.equal(db.rows.get(requestKey).status, 'approval_waiting');
+  assert.equal(db.tasks.size, 0);
+  assert.deepEqual(db.roster.roster.students[0].subjects, ['수학']);
+  assert.equal(db.rosterAt, 10);
 });
 
 test('missing-roster request stores school but never creates a student automatically', async () => {
@@ -179,6 +243,32 @@ test('missing-roster request stores school but never creates a student automatic
   assert.equal(submitted.request.studentId, '');
   assert.deepEqual(submitted.request.missing, { school:'WB중', reason:'명단에 보이지 않음' });
   assert.equal(db.roster.roster.students.length, 1);
+});
+
+test('missing-roster approval links the selected stable student without creating a lesson or main teacher', async () => {
+  const db = new DB();
+  const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', {
+    action:'submit_missing', studentName:'새학생', school:'WB중', grade:'중1', reason:'명단에 보이지 않음'
+  }, '*', own, json));
+  const mismatch = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
+  }, '*', all, json);
+  assert.equal(mismatch.status, 409);
+  assert.equal((await body(mismatch)).code, 'IDENTITY_CONFIRM_REQUIRED');
+
+  const approved = await body(await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1',
+    confirmIdentityMismatch:true
+  }, '*', all, json));
+  assert.equal(approved.ok, true);
+  assert.equal(approved.linkOnly, true);
+  assert.equal(approved.task, null);
+  assert.equal(approved.request.studentId, 'student-1');
+  assert.equal(approved.request.status, 'approved');
+  assert.equal(db.tasks.size, 0);
+  assert.equal(db.rosterAt, 10, '연결 전용 승인은 원생 문서를 다시 쓰지 않는다');
+  assert.deepEqual(db.roster.roster.students[0].teacherIds, []);
+  assert.deepEqual(db.roster.roster.students[0].subjects, ['수학']);
 });
 
 test('legacy request still requires explicit identity confirmation', async () => {

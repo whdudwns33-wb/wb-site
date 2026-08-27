@@ -222,6 +222,24 @@ test('own list is roster scoped and only all scope can review, propose, confirm,
   assert.equal((await call(db, all, { action: 'list' })).body.cases.length, 2);
 });
 
+test('own list follows the source lesson current owner after teacher transfer and fails closed on identity mismatch', async () => {
+  const db = new TestD1(); seed(db);
+  await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
+  const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+  const task = JSON.parse(row.data);
+  task.staffId = 'teacher-b';
+  db.prepare("UPDATE tasks SET owner='teacher-b',data=? WHERE app='task' AND id='lesson-a'")
+    .bind(JSON.stringify(task)).run();
+
+  assert.deepEqual((await call(db, own('teacher-a'), { action: 'list' })).body.cases, []);
+  assert.deepEqual((await call(db, own('teacher-b'), { action: 'list' })).body.cases.map(item => item.studentId), ['student-a']);
+
+  task.staffId = 'teacher-a';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  assert.deepEqual((await call(db, own('teacher-b'), { action: 'list' })).body.cases, []);
+  assert.deepEqual((await call(db, all, { action: 'list' })).body.cases, []);
+});
+
 test('state machine uses CAS and emits parent-notification markers for proposal and confirmation', async () => {
   const db = new TestD1(); seed(db);
   const reviewed = await createAndReview(db);
@@ -398,7 +416,7 @@ test('complete appends delta zero when the original absence already consumed the
 });
 
 test('complete preserves the makeup but skips automatic usage when the active pack identity is stale', async () => {
-  for (const mismatch of ['assignment_key', 'teacher_assignment']) {
+  for (const mismatch of ['assignment_key', 'task_teacher_transfer']) {
     const db = new TestD1(); seed(db); await insertPack(db);
     const reviewed = await createAndReview(db);
     const confirmed = await proposeAndConfirm(db, reviewed);
@@ -408,10 +426,11 @@ test('complete preserves the makeup but skips automatic usage when the active pa
       task.lessonAssignmentKey = 'sha256:changed-assignment';
       db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
     } else {
-      const row = db.database.prepare("SELECT data FROM private_rosters WHERE app='task'").get();
-      const document = JSON.parse(row.data);
-      document.roster.students[0].teacherIds = ['teacher-b'];
-      db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+      const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+      const task = JSON.parse(row.data);
+      task.staffId = 'teacher-b';
+      db.prepare("UPDATE tasks SET owner='teacher-b',data=? WHERE app='task' AND id='lesson-a'")
+        .bind(JSON.stringify(task)).run();
     }
 
     const completed = await callAt(db, manager('teacher-b'), { action: 'complete', caseId: confirmed.caseId,
@@ -427,8 +446,8 @@ test('complete preserves the makeup but skips automatic usage when the active pa
   }
 });
 
-test('transaction-time task or roster identity races complete without charging the stale pack', async () => {
-  for (const race of ['assignment_key', 'teacher_assignment']) {
+test('transaction-time assignment or task teacher identity races complete without charging the stale pack', async () => {
+  for (const race of ['assignment_key', 'task_teacher_transfer']) {
     const db = new TestD1(); seed(db); await insertPack(db);
     const reviewed = await createAndReview(db);
     const confirmed = await proposeAndConfirm(db, reviewed);
@@ -439,10 +458,11 @@ test('transaction-time task or roster identity races complete without charging t
         task.lessonAssignmentKey = 'sha256:raced-assignment';
         db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
       } else {
-        const row = db.database.prepare("SELECT data FROM private_rosters WHERE app='task'").get();
-        const document = JSON.parse(row.data);
-        document.roster.students[0].teacherIds = ['teacher-b'];
-        db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+        const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+        const task = JSON.parse(row.data);
+        task.staffId = 'teacher-b';
+        db.prepare("UPDATE tasks SET owner='teacher-b',data=? WHERE app='task' AND id='lesson-a'")
+          .bind(JSON.stringify(task)).run();
       }
     };
 

@@ -64,6 +64,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/049_consult_result_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/050_weekend_actual_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/051_feedback_template_v2.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/052_completed_book_catalog.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/054_lesson_staff_scope.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/055_task_write_cas_guards.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -176,6 +178,13 @@ AI 미설정은 주문 입력값 후보로 보존하며, 아카등록 완료 자
 관리자 확정은 선택 출판사와 raw 주문처를 바꾸지 않으며 별도 append-only 검토 event에 같은 batch로 남긴다.
 재주문용 `/book-catalog`의 `books`에는 웹 근거 또는 관리자 검토로 확정된 `verified` 교재만 노출한다.
 
+수업별 담당자 권한 정본 전환에서는 `054_lesson_staff_scope.sql`, `055_task_write_cas_guards.sql`을
+운영 D1에 순서대로 먼저 적용한 뒤 Worker, task Pages 순서로 배포한다(마이그레이션 → Worker → Pages).
+두 마이그레이션은 회차권 담당 이전과 다중 쓰기 CAS의 원자성을 함께 보호한다. 회차 사용 차감 트리거는
+원생 명단의 기존 `teacherIds`를 권한 조건으로 사용하지 않으며, 수업 task의
+`owner`와 `data.staffId`, stable `studentId`가 일치하는 활성 수업만 담당 범위로 인정하게 한다.
+원생 명단의 `teacher`와 `teacherIds`는 기존 문서 호환용 선택 필드일 뿐 새 권한 판정에는 사용하지 않는다.
+
 금액 없이 생성된 기존 주문에 1회성 권당 금액 입력을 추가하는 배포에서는
 `043_book_order_item_prices.sql`을 운영 D1에 먼저 적용한 뒤 Worker, Pages 순서로 배포한다.
 보조 원장은 주문 task ID와 항목 번호, 금액, 기록 시각·처리자 ID만 저장하고 수정·삭제를
@@ -250,8 +259,10 @@ node ./import-private-roster.mjs ../.private/roster.json ../.private/textbooks-s
 unset TASK_ADMIN_SECRET
 ```
 
-도구는 활성 직원 이름을 서버에서 조회해 `teacherIds`로 정확히 매핑하고, 이미 이관된 문서가
-있으면 기존 원생·교재 배정 ID를 보존한다. 같은 이름의 학생이 한 명뿐이면 학년 승급 뒤에도
+도구는 원생 원장의 공통 `teacher`/`teacherIds`를 새로 만들지 않으며, 교재 배정 행에만 해당 배정의
+직원 이름을 서버에서 조회해 assignment-specific `teacherIds`로 매핑한다. 이미 이관된 문서가 있으면
+기존 원생·교재 배정 ID를 보존한다. 담당 학생 권한의 정본은 교재 배정 값이 아니라 활성 수업 task의
+`owner`와 `data.staffId`다. 같은 이름의 학생이 한 명뿐이면 학년 승급 뒤에도
 ID를 유지하고, 이름 정정 때는 원본 행에 기존 `id`를 명시하면 같은 ID를 유지한다. 도구는 교체
 직후 `/roster get`을 다시 호출해 원생 ID와 교재 배정 ID·연결을 대조한다. 성공 출력의
 `readbackVerified`가 `true`이고 원생·교재 배정 건수가 원본과 같을 때만 프런트를 배포한다.
@@ -301,8 +312,12 @@ curl https://wb-sync.<계정>.workers.dev/health
 
 ### `/roster` — 비공개 원생·교재 배정 문서
 
-모든 레코드는 변경되지 않는 ID와 `teacherIds`가 필요하다. 교재 배정은 여러 권을 지원하기 위해
-행 고유 `id`와 원생을 가리키는 `studentId`를 따로 쓴다. `teacherIds`는 응답에 포함되지 않는다.
+모든 레코드는 변경되지 않는 ID가 필요하다. 원생의 담당 범위는 종료되지 않은 현재·예정 structured
+수업 task의 `owner`와 `data.staffId`가 일치하는 수업을 `studentId`로 결합해 파생한다. roster 학생의 `teacherIds`는
+legacy 문서 호환 필드일 뿐 담당 권한의 정본이 아니다. 교재 배정은 여러 권을 지원하기 위해
+행 고유 `id`와 원생을 가리키는 `studentId`를 따로 쓴다. legacy 교재 배정의 `teacherIds`는
+입력 문서에 남을 수 있지만 응답에는 포함되지 않는다. `/book-issue`의 legacy 조회·출고 변경은
+현재 활성 수업으로 파생한 학생 범위와 해당 교재 배정 행의 `teacherIds`를 모두 만족해야 한다.
 
 ```jsonc
 // 원장만 전체 문서 교체
@@ -312,9 +327,9 @@ curl https://wb-sync.<계정>.workers.dev/health
     "roster": {
       "updated": "2026-08-10", "baseline": "2026-08", "note": "",
       "students": [{
-        "id": "student-001", "name": "홍길동", "grade": "중1", "teacher": "김선생",
-        "subject": "수학", "start": "2026-08", "end": "", "reason": "",
-        "teacherIds": ["staff-kim"]
+        "id": "student-001", "name": "홍길동", "grade": "중1",
+        "subject": "수학", "subjects": ["수학"],
+        "start": "2026-08", "end": "", "reason": ""
       }]
     },
     "bookStudents": [{
@@ -325,7 +340,7 @@ curl https://wb-sync.<계정>.workers.dev/health
   }
 }
 
-// 원장: 전체, 개인 링크: teacherIds에 본인 staffId가 있는 행만 반환
+// 원장: 전체, 개인 링크: 활성 수업 task에서 owner/data.staffId가 본인인 학생 행만 반환
 { "app": "task", "auth": { "mode": "person", "id": "staff-kim", "token": "..." }, "action": "get" }
 → { "ok": true, "updatedAt": 178..., "roster": { ... }, "bookStudents": [ ... ] }
 ```
@@ -402,9 +417,10 @@ KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 �
 
 ### `/book-issue` — 학생별 교재 출고·인계
 
-현재 비공개 원생 문서의 교재 배정이 정본이다. 원장·관리 담당은 전체, 개인 링크는 현재
-`teacherIds`에 본인이 있는 배정만 조회·변경한다. 응답의 학생 이름·학년은 현재 원생 문서에서
-그때 파생하며 출고 원장에는 저장하지 않는다. 관리자 `warnings`에는 삭제된 배정(orphan)이나
+현재 비공개 원생 문서의 교재 배정이 정본이다. 원장·관리 담당은 전체, 개인 링크는 종료되지 않은
+현재·예정 수업 task의 `owner`와 `data.staffId`가 본인으로 일치하고 해당 legacy 교재 배정의
+assignment-specific `teacherIds`에도 본인이 포함된 건만 조회·변경한다. 응답의 학생
+이름·학년은 현재 원생 문서에서 그때 파생하며 출고 원장에는 저장하지 않는다. 관리자 `warnings`에는 삭제된 배정(orphan)이나
 stable ID 정체성 불일치가 나오고, 일반 직원에게는 그런 이력을 노출하지 않는다.
 
 ```jsonc

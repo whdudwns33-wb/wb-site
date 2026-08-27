@@ -88,7 +88,10 @@ test('관리자는 학생 공통 정보와 현재 수업 업무지시를 한 화
     assert.match(editor, new RegExp(`data-lesson-briefing-student="${key}"`), key);
   }
   assert.match(editor, /data-lesson-briefing-subject/);
-  assert.match(editor, /data-lesson-briefing-teacher/);
+  assert.match(editor, /rosterStudentSubjectTeacherText\(student\.id\)/);
+  assert.match(editor, /담당 선생님은 학생 공통 정보가 아니라 각 수업에서 변경합니다/);
+  assert.doesNotMatch(editor, /data-lesson-briefing-teacher/);
+  assert.doesNotMatch(editor, /학생 공통 담당에서 유지/);
   assert.match(editor, /data-lesson-briefing-instruction=/);
   for (const key of ['materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest']) {
     assert.match(editor, new RegExp(`'${key}'`), key);
