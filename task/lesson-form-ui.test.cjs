@@ -431,7 +431,7 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });
 
-test('feedback preview hides the learned-content input and keeps its value from lesson records', () => {
+test('feedback v2 preview uses the fixed approved template and keeps send fields from lesson records', () => {
   const computeStart = html.indexOf('function computeFeedbackFields(');
   const previewStart = html.indexOf('function showFeedbackPreview(', computeStart);
   const previewEnd = html.indexOf('function todayStaffList(', previewStart);
@@ -443,10 +443,38 @@ test('feedback preview hides the learned-content input and keeps its value from 
   assert.match(compute, /lessonMemoValues\(c\)/);
   assert.match(compute, /memo\.contentProgress[\s\S]*doneSteps\.length[\s\S]*taskCardDetail\(t\)/);
   assert.doesNotMatch(preview, /id="fldContent"|<label class="fl">오늘 배운 내용<\/label>/);
-  assert.match(preview, /fbCtx = \{ id: t\.id, date: date, contentText:/);
-  assert.match(preview, /오늘 배운 내용은 저장된 수업내용·진도에서 자동 반영됩니다/);
+  assert.match(preview, /templateVersion: templateVersion,[\s\S]*contentText: feedbackFlatField/);
+  assert.match(preview, /templateVersion === 'v2' \? ' readonly'/);
+  assert.match(preview, /승인 템플릿과 실제 발송 변수로 만든 최종 미리보기입니다/);
   assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
+  assert.match(submit, /templateVersion: templateVersion/);
+  assert.match(submit, /homeworkText: fbCtx\.homeworkText, commentText: fbCtx\.commentText/);
   assert.doesNotMatch(submit, /#fldContent/);
+});
+
+test('feedback v2 has 100+ formal base sentences and renders the requested fixed template', () => {
+  const bankStart = html.indexOf('const FB_FORMAL_OPENERS');
+  const bankEnd = html.indexOf('/** 학생이 보는 교재', bankStart);
+  const bank = html.slice(bankStart, bankEnd);
+  const templateStart = html.indexOf('function feedbackV2Message(');
+  const templateEnd = html.indexOf('/** 새 알림톡 v2', templateStart);
+  const template = html.slice(templateStart, templateEnd);
+  assert.match(bank, /formalFeedbackSentenceCount\(\) < 100/);
+  assert.match(bank, /function formalizeDirectFeedback/);
+  assert.match(bank, /\[\/했어요\$\/, '했습니다'\]/);
+  assert.match(bank, /선생님이 직접 기록한 핵심 내용은/);
+  assert.match(template, /안녕하세요, WB 웩슬러브레인센터\(독해력학원\) 입니다\./);
+  assert.match(template, /학생의 오늘 수업 피드백을 정리해 보내드립니다/);
+  for (const label of ['- 일시 : ', '- 과목 : ', '- 수업내용 · 진도 : ', '- 과제 : ', '- 코멘트 : ']) {
+    assert.ok(template.includes(label), label);
+  }
+  assert.match(template, /문의 사항이 있으시면 학원으로 연락부탁드립니다\. 감사합니다\./);
+  assert.match(html, /String\(t\.studentId \|\| ''\) \+ '\|' \+ t\.id \+ '\|' \+ date/);
+  const helpers = Function(bank + '; return { count: formalFeedbackSentenceCount(), formalize: formalizeDirectFeedback };')();
+  assert.ok(helpers.count >= 100, '격식체 기본 문장이 실제로 100개 이상이어야 한다');
+  assert.equal(helpers.formalize('집중을 잘했어요'), '집중을 잘했습니다.');
+  assert.equal(helpers.formalize('스스로 설명해요'), '스스로 설명합니다.');
+  assert.equal(helpers.formalize('어휘 정리'), '선생님이 직접 기록한 핵심 내용은 “어휘 정리”입니다.');
 });
 
 test('teacher-only other notes never enter parent feedback text or send fields', () => {
