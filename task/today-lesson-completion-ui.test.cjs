@@ -191,9 +191,11 @@ test('수업 메모는 코멘트를 제외한 세 항목을 한 저장 버튼으
     '[수업내용 · 진도]\n분수\n\n[과제]\n2쪽\n\n[기타 · 특이사항]\n없음');
   assert.equal(api.lessonMemoValues({ lessonMemo: { contentProgress: '분수', comment: '기존 코멘트' } }).comment, '기존 코멘트');
   assert.match(panel, /수업 메모[\s\S]{0,180}taskMemoEditorHtml\(t, date, c, editable\)/);
-  assert.match(source, /\.lesson-memo-grid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(source, /\.lesson-memo-editor \.lesson-memo-field textarea\.note:focus \{ min-height: 132px;/);
-  assert.match(source, /@media \(max-width: 600px\) \{[\s\S]*\.lesson-memo-grid \{ grid-template-columns: 1fr; \}/);
+  assert.match(source, /\.lesson-memo-grid \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(source, /\.lesson-memo-editor:focus-within \.lesson-memo-field textarea\.note \{ height: 44px; min-height: 44px;/);
+  assert.match(source, /\.lesson-memo-editor \.lesson-memo-field textarea\.note:focus \{ height: 132px; min-height: 132px;/);
+  assert.match(legacy, /rows="1" enterkeyhint="enter"/);
+  assert.doesNotMatch(source, /\.lesson-memo-grid \{[^}]*repeat\(2/);
   assert.match(source, /\.memo-editor:focus-within \.memo-save \{ display: block; \}/);
   assert.match(source, /case 'notesave':[\s\S]{0,900}setCheck\(id, date, \{ lessonMemo: lessonMemo, note: lessonMemoText\(lessonMemo\) \}\)/);
   assert.doesNotMatch(source, /setTimeout\(\(\) => \{\s*setCheck\(noteEl\.dataset\.id/);
