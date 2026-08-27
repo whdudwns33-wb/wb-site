@@ -1,11 +1,17 @@
 import { validateRosterDocument } from './roster.js';
 import { loadOrderSnapshotRows, verifyOrderTaskSnapshotRows } from './book-order-create.js';
+import { MANUAL_ONLINE_DELIVERY, ONLINE_BOOK_VENDOR } from './book-order-vendors.js';
+import {
+  completedCatalogInsertStatement,
+  completedCatalogRecord,
+  verifyCompletedCatalogEntry
+} from './completed-book-catalog.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
 const NEXT = new Set([...STATES, 'reissue']);
 const ORDER_NEXT = new Set(['receive', 'hand', 'academy_register']);
-const ORDER_DELIVERIES = new Set(['scheduled_batch_v1', 'bound_print_v1']);
+const ORDER_DELIVERIES = new Set(['scheduled_batch_v1', MANUAL_ONLINE_DELIVERY, 'bound_print_v1']);
 const MAX_UNIT_PRICE = 10000000;
 const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 const WORDMASTER_BASIC_TITLE = '워드마스터중등베이직';
@@ -21,7 +27,11 @@ function normalizedName(value) {
 }
 
 async function identityHash(studentId, studentName) {
-  const bytes = new TextEncoder().encode(String(studentId) + '\n' + normalizedName(studentName));
+  return sha256Hex(String(studentId) + '\n' + normalizedName(studentName));
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value == null ? '' : value));
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -117,7 +127,8 @@ function fulfillmentMatches(row, bookId, studentIds) {
 }
 
 function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, correctionRow, integrity,
-    taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents, boundPrint) {
+    taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents, orderDelivery) {
+  const boundPrint = orderDelivery === 'bound_print_v1';
   const studentIds = orderStudentIds(item);
   const unitPrice = storedOrderUnitPrice(item, priceRow, correctionRow);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
@@ -128,6 +139,8 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
   }
   return {
     taskId, itemIndex, bookId: String(item.bookId || ''), title: String(item.title || '교재명 미입력'),
+    publisherName: Object.prototype.hasOwnProperty.call(item || {}, 'publisherName') ? String(item.publisherName || '') : '',
+    orderDelivery: String(orderDelivery || ''),
     quantity: orderQuantity(item, studentIds), vendorName: String(vendorName || '주문처 미등록'),
     unitPrice,
     priceBackfilledAt: priceRow && priceRow.created_at ? Number(priceRow.created_at) : null,
@@ -218,7 +231,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
         staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, correctionRow, integrity,
-        task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents, boundPrint));
+        task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents, task.orderDelivery));
     }
   }
   return rows;
@@ -484,7 +497,78 @@ async function listIssues(env, app, auth, json, origin) {
   return json({ ok: true, issues, warnings, orders }, 200, origin);
 }
 
-async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
+async function setManualOnlineResult(env, app, body, auth, json, origin) {
+  const allowed = new Set(['app', 'auth', 'action', 'taskId', 'result', 'revision']);
+  const taskId = String(body && body.taskId || '');
+  const result = String(body && body.result || '');
+  const revision = body && body.revision;
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      Object.keys(body).some(key => !allowed.has(key)) || !SAFE_ID.test(taskId) ||
+      !['completed', 'failed'].includes(result) || !Number.isInteger(revision) || revision !== 0) {
+    return json({ ok: false, error: 'taskId, result, revision을 확인해 주세요' }, 400, origin);
+  }
+  const taskRow = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const task = orderTaskData(taskRow);
+  if (!task || task.orderDelivery !== MANUAL_ONLINE_DELIVERY || String(task.orderVendor || '') !== ONLINE_BOOK_VENDOR) {
+    return json({ ok: false, error: '온라인 직접 주문을 찾을 수 없습니다' }, 404, origin);
+  }
+  if (auth.scope === 'own' && String(taskRow.owner || '') !== String(auth.id || '')) {
+    return json({ ok: false, error: '본인이 만든 온라인 주문만 처리할 수 있습니다' }, 403, origin);
+  }
+  if (await env.DB.prepare(
+    'SELECT 1 AS found FROM book_order_fulfillments WHERE app=? AND task_id=? LIMIT 1'
+  ).bind(app, taskId).first()) {
+    return json({ ok: false, code: 'ORDER_ALREADY_RECEIVED', error: '수령 처리가 시작된 주문 결과는 바꿀 수 없습니다' }, 409, origin);
+  }
+
+  const existing = await latestOrderSend(env, app, taskId);
+  const targetStatus = result === 'completed' ? 'accepted' : 'rejected';
+  if (existing) {
+    if (String(existing.status) === targetStatus && String(existing.provider_status_code || '') ===
+        (result === 'completed' ? 'MANUAL_ONLINE_COMPLETED' : 'MANUAL_ONLINE_FAILED')) {
+      return json({ ok: true, idempotent: true, status: targetStatus, revision: 1 }, 200, origin);
+    }
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '온라인 주문 결과가 이미 저장되었습니다' }, 409, origin);
+  }
+
+  const document = await currentRoster(env, app);
+  if (!document) return json({ ok: false, error: '원생 데이터가 아직 등록되지 않았습니다' }, 404, origin);
+  const snapshots = await loadOrderSnapshotRows(env, app, taskId);
+  const sealed = await verifyOrderTaskSnapshotRows(taskId, taskRow.owner, task, snapshots, document, Date.now());
+  if (!sealed.valid) {
+    return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '봉인된 주문 정체성이 일치하지 않습니다' }, 409, origin);
+  }
+
+  const now = Date.now();
+  const sendId = 'manual_' + taskId;
+  const messageHash = await sha256Hex(JSON.stringify([
+    taskId,
+    task.orderVendor,
+    task.orderItems.map(item => [String(item.bookId || ''), String(item.title || ''), String(item.qty || '')])
+  ]));
+  const inserted = await env.DB.prepare(
+    'INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,' +
+      'provider_group_id,provider_message_id,provider_status_code,safe_error_code,created_at,dispatch_started_at,updated_at) ' +
+    'SELECT ?,?,?,?,?,?,?,?,NULL,NULL,?,?,?,NULL,? WHERE EXISTS (' +
+      "SELECT 1 FROM tasks WHERE app=? AND id=? AND data=? AND COALESCE(json_extract(data,'$.deleted'),0)=0 " +
+      "AND json_extract(data,'$.orderDelivery')='manual_online_v1'" +
+    ') ON CONFLICT DO NOTHING'
+  ).bind(app, sendId, 'manual-online:' + taskId, taskId, ONLINE_BOOK_VENDOR, task.orderItems.length,
+    messageHash, targetStatus, result === 'completed' ? 'MANUAL_ONLINE_COMPLETED' : 'MANUAL_ONLINE_FAILED',
+    result === 'failed' ? 'MANUAL_ONLINE_FAILED' : null, now, now,
+    app, taskId, String(taskRow.data || '')).run();
+  if (!inserted.meta || Number(inserted.meta.changes || 0) !== 1) {
+    const raced = await latestOrderSend(env, app, taskId);
+    if (raced && String(raced.status) === targetStatus) {
+      return json({ ok: true, idempotent: true, status: targetStatus, revision: 1 }, 200, origin);
+    }
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '온라인 주문 결과가 먼저 저장되었습니다' }, 409, origin);
+  }
+  return json({ ok: true, idempotent: false, status: targetStatus, revision: 1 }, 200, origin);
+}
+
+async function transitionOrderFulfillment(env, app, body, auth, json, origin, ctx) {
   const taskId = String(body.taskId || '');
   const itemIndex = Number(body.itemIndex);
   const next = String(body.next || '');
@@ -552,6 +636,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
   const now = Date.now();
   const actor = actorId(auth);
   const idsJson = JSON.stringify(studentIds);
+  let insertedCatalog = null;
   if (!row) {
     const inserted = await env.DB.prepare(
       'INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,' +
@@ -566,15 +651,57 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
     const handedBy = next === 'hand' ? actor : row.student_handed_by;
     const academyAt = next === 'academy_register' ? now : row.academy_registered_at;
     const academyBy = next === 'academy_register' ? actor : row.academy_registered_by;
-    const updated = await env.DB.prepare(
+    const updateStatement = env.DB.prepare(
       'UPDATE book_order_fulfillments SET status=?,revision=revision+1,student_handed_at=?,student_handed_by=?,' +
       'academy_registered_at=?,academy_registered_by=?,updated_at=? ' +
       'WHERE app=? AND task_id=? AND item_index=? AND revision=? AND status=? AND book_id=? AND student_ids=?'
     ).bind(targetStatus, handedAt, handedBy, academyAt, academyBy, now, app, taskId, itemIndex, revision,
-      row.status, bookId, idsJson).run();
-    if (!updated.meta || Number(updated.meta.changes || 0) !== 1) {
+      row.status, bookId, idsJson);
+    let updated;
+    const catalog = next === 'academy_register' ? completedCatalogRecord(env, item, task, now) : null;
+    if (catalog) {
+      if (typeof env.DB.batch !== 'function') {
+        // 일부 로컬 D1 어댑터에는 batch가 없다. 운영 D1에서는 아래 atomic 경로만 사용된다.
+        updated = await updateStatement.run();
+        if (updated.meta && Number(updated.meta.changes || 0) === 1) {
+          try {
+            const catalogResult = await completedCatalogInsertStatement(env, app, catalog, {
+              taskId, itemIndex, bookId, studentIdsJson: idsJson, revision: revision + 1
+            }).run();
+            if (catalogResult.meta && Number(catalogResult.meta.changes || 0) === 1) insertedCatalog = catalog;
+          } catch (error) {
+            if (!/no such table.*completed_book_catalog/i.test(String(error && error.message || error))) throw error;
+          }
+        }
+      } else try {
+        const results = await env.DB.batch([
+          updateStatement,
+          completedCatalogInsertStatement(env, app, catalog, {
+            taskId,
+            itemIndex,
+            bookId,
+            studentIdsJson: idsJson,
+            revision: revision + 1
+          })
+        ]);
+        updated = results && results[0];
+        if (Number(results && results[1] && results[1].meta && results[1].meta.changes || 0) === 1) {
+          insertedCatalog = catalog;
+        }
+      } catch (error) {
+        // Migration이 아직 적용되지 않은 짧은 전환 구간에도 아카등록 완료 자체는 보존한다.
+        if (!/no such table.*completed_book_catalog/i.test(String(error && error.message || error))) throw error;
+        updated = await updateStatement.run();
+      }
+    } else {
+      updated = await updateStatement.run();
+    }
+    if (!updated || !updated.meta || Number(updated.meta.changes || 0) !== 1) {
       return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 상태가 먼저 변경되었습니다' }, 409, origin);
     }
+  }
+  if (insertedCatalog && insertedCatalog.verificationStatus === 'pending' && ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(verifyCompletedCatalogEntry(env, insertedCatalog.catalogId).catch(() => undefined));
   }
   row = await env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=? LIMIT 1')
     .bind(app, taskId, itemIndex).first();
@@ -688,13 +815,14 @@ async function transition(env, app, body, auth, json, origin) {
   return json({ ok: true, idempotent: false, issue: publicIssue(assignment, student, row) }, 200, origin);
 }
 
-export async function handleBookIssue(env, app, body, origin, auth, json) {
+export async function handleBookIssue(env, app, body, origin, auth, json, ctx) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
   if (action === 'list') return listIssues(env, app, auth, json, origin);
   if (action === 'transition') return transition(env, app, body, auth, json, origin);
   if (action === 'order_link') return linkOrderStudents(env, app, body, auth, json, origin);
   if (action === 'order_price_set') return setLegacyOrderPrice(env, app, body, auth, json, origin);
-  if (action === 'order_transition') return transitionOrderFulfillment(env, app, body, auth, json, origin);
+  if (action === 'manual_online_result') return setManualOnlineResult(env, app, body, auth, json, origin);
+  if (action === 'order_transition') return transitionOrderFulfillment(env, app, body, auth, json, origin, ctx);
   return json({ ok: false, error: '지원하는 교재 처리 action을 확인해 주세요' }, 400, origin);
 }
