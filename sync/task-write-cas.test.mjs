@@ -36,7 +36,7 @@ class TestD1 {
   }
 }
 
-test('054 CAS guard migration is additive, append-only, and matches the schema contract', () => {
+test('055 CAS guard migration is additive, append-only, and matches the schema contract', () => {
   for (const sql of [schema, migration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS task_write_cas_guards/);
     assert.match(sql, /TASK_WRITE_CAS_CONFLICT/);

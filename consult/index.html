@@ -1540,6 +1540,8 @@ const sync = {
       const error = new Error((d && d.error) || ('HTTP ' + res.status));
       error.status = res.status;
       error.code = d && d.code;
+      error.remoteStatus = d && d.status;
+      error.idempotent = !!(d && d.idempotent);
       error.dataGeneration = d && d.dataGeneration;
       throw error;
     }
@@ -1603,6 +1605,7 @@ const sync = {
       }
       if (auth.mode === 'admin_device' && e.status === 401) {
         state.settings.adminToken = '';
+        clearConsultLinkContacts();
         save(); session.lock(); render();
         toast('로그인 기간이 끝났습니다 · 다시 로그인해 주세요');
       }
@@ -1629,6 +1632,10 @@ const sync = {
 
   async exchangeAdmin(code) {
     return await this.post('/exchange', { app: SYNC_APP, staffId: '__admin__', code: code });
+  },
+
+  async exchangeBootstrap(staffId, code) {
+    return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
   },
 
   async loginAdmin(loginId, password) {
@@ -1684,11 +1691,16 @@ function go(r) {
   if (r === 'month' && route !== 'month') monthSection = 'calendar';
   route = r; location.hash = '#/' + r; window.scrollTo(0, 0); render();
 }
+function routeFromHash(hash) {
+  const match = String(hash || '').match(/^#\/([a-z]+)$/);
+  return match ? match[1] : '';
+}
 window.addEventListener('hashchange', () => {
   if (/[#&]admin=/.test(location.hash)) { absorbLinkParams(); connectAdminDevice(); return; }
+  if (/[#&]c=/.test(location.hash)) { absorbLinkParams(); connectStudentLink(); return; }
   // 앱이 이미 열린 상태에서 지시서 링크를 누르면 해시만 바뀌고 새로고침이 없다 — 여기서 받는다
   if (/[#&]add=/.test(location.hash)) { absorbLinkParams(); render(); return; }
-  const r = location.hash.replace('#/', '');
+  const r = routeFromHash(location.hash);
   if (r && r !== route) {
     if (r === 'month') monthSection = 'calendar';
     route = r; render();
@@ -1700,6 +1712,26 @@ function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingAdminCode = ''; // 새 원장 기기에서 한 번만 교환할 연결 코드
 let adminConnectBusy = false;
+let pendingStudentCode = ''; // 학생 링크의 1회용 교환 코드는 저장하지 않고 URL에만 둔다
+let studentConnectBusy = false;
+let studentConnectError = '';
+const STUDENT_LINK_BLOCK_KEY = 'wb_consult_student_link_blocked';
+
+function clearStudentCodeHash() {
+  const clean = location.hash.replace(/(^#|&)c=[^&]*/, '').replace(/^&/, '#');
+  history.replaceState(null, '', location.pathname + location.search + (clean === '#' ? '' : clean));
+}
+
+/** 원장·다른 학생 캐시를 새 학생 권한으로 올리지 않도록 운영 데이터만 비운다. */
+function resetStudentLinkCache(token) {
+  const settings = Object.assign({}, state.settings || {}, {
+    myToken: String(token || ''), pullAt: 0, pushAt: 0
+  });
+  state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
+  viewStaff = '';
+  clearConsultLinkContacts();
+  return save();
+}
 
 /** 링크에 담겨 온 것들을 흡수한다.
  *  s=  동기화 설정 (학생 기기 세팅 대신)
@@ -1709,7 +1741,11 @@ function absorbLinkParams() {
   let touched = false;
 
   const tk = q.get('t');
-  if (tk) { state.settings.myToken = tk; save(); }
+  if (tk) {
+    state.settings.myToken = tk;
+    q.delete('t'); touched = true;
+    save();
+  }
 
   const s = q.get('s');
   if (s) {
@@ -1726,6 +1762,16 @@ function absorbLinkParams() {
   if (adminMatch) {
     try { pendingAdminCode = decodeURIComponent(adminMatch[1]); }
     catch (e) { pendingAdminCode = ''; }
+  }
+
+  const studentMatch = location.hash.match(/[#&]c=([^&]+)/);
+  if (studentMatch) {
+    try {
+      pendingStudentCode = decodeURIComponent(studentMatch[1]);
+      studentConnectError = '';
+      sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
+    }
+    catch (e) { pendingStudentCode = ''; clearStudentCodeHash(); }
   }
 
   // 지시서는 주소창에 남지 않도록 해시(#add=)를 우선 쓴다
@@ -1745,6 +1791,46 @@ function absorbLinkParams() {
   if (touched || m || adminMatch) {
     history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') +
       ((m || adminMatch) ? '' : location.hash));
+  }
+}
+
+async function connectStudentLink() {
+  const code = pendingStudentCode;
+  const staffId = session.staffId;
+  if (!staffId || !code || studentConnectBusy) return;
+  const unsent = sync.collect(Number(state.settings.pushAt) || 0);
+  if (unsent.length) {
+    studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 원장 또는 학생 화면으로 돌아가 동기화한 뒤 같은 링크를 다시 열어 주세요.';
+    render();
+    return;
+  }
+  studentConnectBusy = true;
+  studentConnectError = '';
+  render();
+  try {
+    const d = await sync.exchangeBootstrap(staffId, code);
+    pendingStudentCode = '';
+    const stored = resetStudentLinkCache(d.token);
+    clearStudentCodeHash();
+    sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
+    if (!stored) return;
+    sync.loud = true;
+    await sync.run();
+    toast(sync.err ? '학생 연결 완료 · 데이터 동기화를 다시 시도해 주세요' : '학생 화면에 연결되었습니다');
+  } catch (e) {
+    const terminal = [400, 401, 403, 404, 409, 410, 422].includes(Number(e && e.status));
+    if (terminal) {
+      studentConnectError = '이 연결 링크는 사용할 수 없습니다. 원장님께 새 개인 링크를 요청해 주세요.';
+      sessionStorage.setItem(STUDENT_LINK_BLOCK_KEY, studentConnectError);
+    } else {
+      studentConnectError = '인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
+    }
+    toast(terminal
+      ? '학생 연결 링크를 사용할 수 없습니다 — ' + e.message
+      : '인터넷 연결을 확인한 뒤 다시 시도해 주세요');
+  } finally {
+    studentConnectBusy = false;
+    render();
   }
 }
 
@@ -1884,6 +1970,10 @@ function render() {
   renderTabs();
   const v = $('#view');
 
+  if (session.isStaffLink && (pendingStudentCode || studentConnectError || sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY))) {
+    v.innerHTML = viewStudentLinkConnect();
+    return;
+  }
   if (session.isStaffLink && !staffById(session.staffId)) {
     v.innerHTML = '<div class="card"><div class="empty"><b>🔗</b>이 링크에 연결된 학생 정보가 없습니다.<br>원장님께 링크를 다시 요청해 주세요.</div></div>';
     return;
@@ -1903,6 +1993,7 @@ function render() {
 
   const map = { today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
+  if (route === 'staff' && session.isAdmin && !session.isStaffLink) loadConsultLinkContacts();
 }
 
 function renderTabs() {
@@ -1974,6 +2065,16 @@ function viewLock() {
     '<hr class="sep">' +
     '<div class="hint">최대 5대의 컴퓨터·태블릿에서 자동 로그인할 수 있습니다.</div>' +
   '</div>';
+}
+
+function viewStudentLinkConnect() {
+  const problem = studentConnectError || sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY) || '';
+  return '<div class="card mt14"><div class="card-title">학생 화면 연결</div>' +
+    '<div class="card-sub mb14">개인 링크를 이 기기에 안전하게 연결하고 있습니다.</div>' +
+    (problem ? '<div class="hint bad mb14">' + esc(problem) + '</div>' : '') +
+    (pendingStudentCode ? '<button class="btn btn-primary btn-block" data-act="studentretry"' + (studentConnectBusy ? ' disabled' : '') + '>' +
+      (studentConnectBusy ? '연결 중…' : '다시 연결하기') + '</button>' :
+      '<div class="hint">가장 최근에 받은 개인 링크 전체를 다시 열어 주세요.</div>') + '</div>';
 }
 
 /* ── 오늘 ── */
@@ -7619,6 +7720,195 @@ function studentUsageLine(student) {
     ' · 체크 ' + usage.done + '/' + usage.total + ' · 하루 마감 ' + (usage.closed ? '완료' : '미완료') + '</span></div>';
 }
 
+/* 카카오 수신번호는 서버에만 두고, 원장 화면에는 마스킹 상태만 잠시 보관한다. */
+const consultLinkContactsUi = {
+  rows: new Map(), loaded: false, loading: false, error: '', busy: ''
+};
+
+function clearConsultLinkContacts() {
+  consultLinkContactsUi.rows.clear();
+  consultLinkContactsUi.loaded = false;
+  consultLinkContactsUi.loading = false;
+  consultLinkContactsUi.error = '';
+  consultLinkContactsUi.busy = '';
+}
+
+function consultLinkContactRow(row) {
+  const staffId = String((row && row.staffId) || '');
+  if (!staffId) return null;
+  return {
+    staffId: staffId,
+    phoneMasked: String(row.phoneMasked || ''),
+    consent: row.consent === true,
+    updatedAt: Number(row.updatedAt) || 0
+  };
+}
+
+async function loadConsultLinkContacts(force) {
+  if (!session.isAdmin || session.isStaffLink || consultLinkContactsUi.loading || (consultLinkContactsUi.loaded && !force)) return;
+  const auth = sync.auth();
+  if (!auth) {
+    consultLinkContactsUi.loaded = true;
+    consultLinkContactsUi.error = '로그인과 동기화 연결이 필요합니다';
+    if (route === 'staff') render();
+    return;
+  }
+  consultLinkContactsUi.loading = true;
+  consultLinkContactsUi.loaded = false;
+  consultLinkContactsUi.error = '';
+  try {
+    const data = await sync.post('/consult-link-send', { app: SYNC_APP, auth: sync.auth(), action: 'list' });
+    if (!session.isAdmin || session.isStaffLink) return;
+    const rows = new Map();
+    (Array.isArray(data.contacts) ? data.contacts : []).forEach(value => {
+      const row = consultLinkContactRow(value);
+      if (row) rows.set(row.staffId, row);
+    });
+    consultLinkContactsUi.rows = rows;
+    consultLinkContactsUi.loaded = true;
+  } catch (error) {
+    if (!session.isAdmin || session.isStaffLink) return;
+    consultLinkContactsUi.loaded = true;
+    consultLinkContactsUi.error = String(error && error.message || error);
+  } finally {
+    consultLinkContactsUi.loading = false;
+    if (route === 'staff' && session.isAdmin && !session.isStaffLink) render();
+  }
+}
+
+function consultLinkStudentPanel(student) {
+  if (!student || student.owner || student.manager) return '';
+  const contact = consultLinkContactsUi.rows.get(student.id) || null;
+  const unavailable = !consultLinkContactsUi.loaded || !!consultLinkContactsUi.error;
+  const phone = contact && contact.phoneMasked;
+  const ready = !!(phone && contact.consent);
+  const sendBusy = consultLinkContactsUi.busy === 'send:' + student.id;
+  const anyBusy = !!consultLinkContactsUi.busy;
+  const status = consultLinkContactsUi.error ? '카카오 상태 확인 실패'
+    : !consultLinkContactsUi.loaded ? '카카오 상태 확인 중…'
+    : ready ? '학생 연락처 ' + phone + ' · 카카오 발송 준비됨'
+    : phone ? '학생 연락처 ' + phone + ' · 동의 확인 필요'
+    : '학생 연락처 없음 · 처음 한 번만 등록하세요';
+  const sendDisabled = unavailable || anyBusy;
+  return '<div class="small muted mb8">' + esc(status) + '</div>' +
+    '<div class="row wraprow" style="gap:8px">' +
+      (ready ? '<button class="btn btn-sm btn-ghost" data-act="linkcontactopen" data-id="' + esc(student.id) + '"' +
+        (unavailable || anyBusy ? ' disabled' : '') + '>학생 연락처 수정</button>' : '') +
+      '<button class="btn btn-sm btn-navy" data-act="linksend" data-id="' + esc(student.id) + '"' +
+        (sendDisabled ? ' disabled' : '') + '>' + (sendBusy ? '발송 접수 중…' : ready
+          ? '카톡으로 개인 링크 보내기' : phone ? '동의 확인하고 보내기' : '학생 번호 등록하고 보내기') + '</button>' +
+    '</div>';
+}
+
+function consultLinkContactModal(staffId, sendAfterSave) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+  const contact = consultLinkContactsUi.rows.get(staffId) || null;
+  const masked = contact && contact.phoneMasked;
+  modal('학생 연락처 ' + (masked ? '수정' : '등록'),
+    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생 본인의 휴대전화 번호입니다. 한 번 등록하면 다음 발송부터 자동으로 사용합니다.</div>' +
+    (masked ? '<div class="hint mb14">현재 학생 번호: <b>' + esc(masked) + '</b><br>번호를 변경하려면 아래에 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    '<div class="field"><label class="fl" for="consultLinkPhone">학생 본인 휴대전화 번호</label>' +
+      '<input class="in" id="consultLinkPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
+    '<label class="material-type-option"><input type="checkbox" id="consultLinkConsent">' +
+      '<span>이 번호로 학생 개인 링크 카카오 알림톡을 보내는 것에 동의를 확인했습니다.</span></label>' +
+    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>보호자 번호는 ‘보호자 공유’에서 별도로 관리합니다.</div>',
+    '<button class="btn btn-primary" data-act="linkcontactsave" data-id="' + esc(staffId) + '" data-v="' +
+      (contact ? contact.updatedAt : 0) + '"' + (sendAfterSave ? ' data-send="1"' : '') + '>' +
+      (sendAfterSave ? '동의하고 바로 보내기' : '동의 확인 후 저장') + '</button>' +
+    (masked ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
+      contact.updatedAt + '">발송 중지·번호 삭제</button>' : '') +
+    '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
+}
+
+async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear, sendAfterSave) {
+  if (!session.isAdmin || session.isStaffLink || consultLinkContactsUi.busy) return;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+  const phone = clear ? '' : String((($('#consultLinkPhone') || {}).value) || '').replace(/[\s()-]/g, '');
+  const consent = clear ? false : !!(($('#consultLinkConsent') || {}).checked);
+  if (!clear && !/^01[016789]\d{7,8}$/.test(phone)) return toast('올바른 휴대폰 번호를 입력해 주세요');
+  if (!clear && !consent) return toast('발송 동의를 확인해 주세요');
+  if (clear && !confirm('카카오 발송 동의를 철회하고 저장된 번호를 삭제할까요?')) return;
+  const auth = sync.auth();
+  if (!auth) return toast('로그인과 동기화 연결이 필요합니다');
+  consultLinkContactsUi.busy = 'set:' + staffId;
+  let savedForSend = false;
+  if (button) button.disabled = true;
+  try {
+    const data = await sync.post('/consult-link-send', {
+      app: SYNC_APP, auth: sync.auth(), action: 'set', staffId: staffId, phone: phone,
+      consent: consent, expectedUpdatedAt: Number(expectedUpdatedAt) || 0
+    });
+    const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}));
+    if (row && row.phoneMasked) consultLinkContactsUi.rows.set(staffId, row);
+    else consultLinkContactsUi.loaded = false;
+    savedForSend = !!(row && row.phoneMasked && row.consent);
+    closeModal();
+    toast(clear ? '카카오 발송을 중지하고 번호를 삭제했습니다'
+      : sendAfterSave ? '학생 연락처를 저장했습니다 · 개인 링크를 발송합니다'
+      : '학생 연락처와 발송 동의를 저장했습니다');
+    if (!consultLinkContactsUi.loaded) await loadConsultLinkContacts(true);
+    else if (route === 'staff') render();
+  } catch (error) {
+    toast('수신번호를 저장하지 못했습니다 — ' + String(error && error.message || error));
+    if (button) button.disabled = false;
+  } finally {
+    consultLinkContactsUi.busy = '';
+    if (route === 'staff' && !$('#modalHost').firstElementChild) render();
+  }
+  if (savedForSend && sendAfterSave) await sendConsultStudentLink(staffId);
+}
+
+function consultLinkSendMessage(data) {
+  const send = data && data.send && typeof data.send === 'object' ? data.send : data || {};
+  const status = String(send.status || (data && data.status) || '').toLowerCase();
+  if ((data && data.idempotent === true) || send.idempotent === true || status === 'idempotent') return '이미 같은 발송이 접수되어 중복 발송하지 않았습니다';
+  if (status === 'accepted') return '솔라피에 카카오 알림톡이 접수되었습니다';
+  if (status === 'dispatching') return '이미 솔라피 발송 접수 처리 중입니다';
+  if (status === 'unknown') return '발송 결과를 확인할 수 없습니다 · 중복 발송하지 말고 솔라피 발송 내역을 확인해 주세요';
+  if (status === 'rejected') return '솔라피에서 발송 요청을 접수하지 않았습니다';
+  return '발송 요청 결과를 솔라피 발송 내역에서 확인해 주세요';
+}
+
+function consultLinkSendError(error) {
+  const code = String((error && error.code) || '').toLowerCase();
+  const status = String((error && error.remoteStatus) || '').toLowerCase();
+  if (error && error.idempotent && status === 'accepted') return '이미 같은 발송이 접수되어 중복 발송하지 않았습니다';
+  if (status === 'dispatching' || code.includes('dispatch')) return '이미 솔라피 발송 접수 처리 중입니다';
+  if (status === 'unknown' || code.includes('unknown') || code.includes('uncertain') || code.includes('timeout') || code.includes('network')) {
+    return '발송 결과를 확인할 수 없습니다 · 중복 발송하지 말고 솔라피 발송 내역을 확인해 주세요';
+  }
+  if (status === 'rejected' || code.includes('reject')) return '솔라피에서 발송 요청을 접수하지 않았습니다';
+  return '개인 링크 발송을 접수하지 못했습니다 — ' + String(error && error.message || error);
+}
+
+async function sendConsultStudentLink(staffId) {
+  if (!session.isAdmin || session.isStaffLink || consultLinkContactsUi.busy) return;
+  const student = staffById(staffId);
+  const contact = consultLinkContactsUi.rows.get(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+  if (!contact || !contact.phoneMasked || !contact.consent) return consultLinkContactModal(staffId, true);
+  if (!sync.auth()) return toast('로그인과 동기화 연결이 필요합니다');
+  if (sync.busy) return toast('동기화가 끝난 뒤 다시 눌러 주세요');
+  consultLinkContactsUi.busy = 'send:' + staffId;
+  if (route === 'staff') render();
+  try {
+    await sync.run();
+    if (sync.err) throw new Error('학생 정보를 먼저 동기화해 주세요');
+    const data = await sync.post('/consult-link-send', {
+      app: SYNC_APP, auth: sync.auth(), action: 'send', staffId: staffId
+    });
+    toast(consultLinkSendMessage(data));
+  } catch (error) {
+    toast(consultLinkSendError(error));
+  } finally {
+    consultLinkContactsUi.busy = '';
+    if (route === 'staff') render();
+  }
+}
+
 function viewStaffAdmin() {
   if (!session.isAdmin || session.isStaffLink) return '';
   const list = liveStaff().slice().sort(studentNameCompare);
@@ -7631,6 +7921,8 @@ function viewStaffAdmin() {
     '<div class="card-sub mb14">등록하면 학생별 개인 링크가 만들어집니다. 동기화 설정을 마쳤다면 링크 안에 설정이 함께 담겨서, 학생은 링크만 열면 됩니다.</div>' +
     '<div class="row"><input class="in" id="sName" placeholder="학생 이름 (예: 김민준)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
+    '<div class="hint mt14">학생 번호와 동의는 처음 한 번만 등록합니다. 이후 저장된 학생 번호로 바로 보내며, 보호자 번호는 별도로 관리합니다.</div>' +
+    (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
@@ -7645,6 +7937,7 @@ function viewStaffAdmin() {
           (s.owner ? ' · 학생 통계에서 제외' : '') +
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
+        (!s.owner && !s.manager ? '<hr class="sep">' + consultLinkStudentPanel(s) : '') +
         '<hr class="sep">' +
         '<div class="row wraprow" style="gap:8px">' +
           '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + s.id + '">개인 링크 복사</button>' +
@@ -8335,6 +8628,7 @@ document.addEventListener('click', ev => {
 
     /* 잠금 */
     case 'adminretry': connectAdminDevice(); break;
+    case 'studentretry': connectStudentLink(); break;
     case 'login': {
       const loginId = ($('#loginId').value || '').trim();
       const password = $('#pin').value || '';
@@ -8383,7 +8677,7 @@ document.addEventListener('click', ev => {
       }).catch(e => toast(e.message));
       break;
     }
-    case 'logout': session.lock(); render(); break;
+    case 'logout': clearConsultLinkContacts(); session.lock(); render(); break;
     case 'saveadminaccount': {
       const loginId = ($('#newLoginId').value || '').trim();
       const password = $('#newPin').value || '';
@@ -10014,6 +10308,31 @@ document.addEventListener('click', ev => {
     }
 
     /* 학생 */
+    case 'linkcontactsretry': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      loadConsultLinkContacts(true);
+      break;
+    }
+    case 'linkcontactopen': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      consultLinkContactModal(id);
+      break;
+    }
+    case 'linkcontactsave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      saveConsultLinkContact(id, Number(el.dataset.v) || 0, el, false, el.dataset.send === '1');
+      break;
+    }
+    case 'linkcontactclear': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      saveConsultLinkContact(id, Number(el.dataset.v) || 0, el, true);
+      break;
+    }
+    case 'linksend': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      sendConsultStudentLink(id);
+      break;
+    }
     case 'pickstaff':
       viewStaff = id;
       ingOpenCourseId = '';
@@ -10743,13 +11062,14 @@ document.addEventListener('visibilitychange', () => {
 load();
 if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
 absorbLinkParams();
-const h = location.hash.replace('#/', '');
+const h = routeFromHash(location.hash);
 if (h) route = h;
 if (session.isStaffLink && !['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
-
-if (sync.enabled()) {
+if (pendingStudentCode) {
+  connectStudentLink();
+} else if (sync.enabled()) {
   sync.run();
 }
 setInterval(() => sync.run(), 45000);
