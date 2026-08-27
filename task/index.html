@@ -993,11 +993,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.12"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.12"></script>
-<script src="./asset-core.js?v=2026-08-27.12"></script>
-<script src="./qr-core.js?v=2026-08-27.12"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.12"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.13"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.13"></script>
+<script src="./asset-core.js?v=2026-08-27.13"></script>
+<script src="./qr-core.js?v=2026-08-27.13"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.13"></script>
 <script>
 "use strict";
 
@@ -1091,32 +1091,16 @@ function occursOn(task, date) {
   }
 }
 
-/** 학생 배부까지 끝난 주문은 이후 아카등록만 남는다.
- *  이 단계는 관리자 교재 탭에서만 처리하므로 오늘·주간 업무에서는 제외한다.
- *  원장이나 담당 교사에게 허용된 /book-issue 정본을 아직 읽지 못했다면
- *  업무를 섣불리 숨기지 않고 기존 목록을 유지한다. */
-function isAcademyOnlyBookOrderTask(task) {
-  if (!task || !/^\[주문\]\s*/.test(String(task.title || '')) || !bookIssueLoaded ||
-      !Array.isArray(task.orderItems) || !task.orderItems.length) return false;
-  const rowsByItem = new Map((bookOrderRows || [])
-    .filter(row => String(row.taskId || '') === String(task.id || ''))
-    .map(row => [Number(row.itemIndex), row]));
-  return task.orderItems.every((item, itemIndex) => {
-    const row = rowsByItem.get(itemIndex);
-    return !!row && row.stage === 'student_handed';
-  });
-}
-
-function ensureBookOrderWorkScopeData() {
-  if (bookIssueLoaded || bookIssueLoading || !state.tasks.some(task =>
-      !task.deleted && /^\[주문\]\s*/.test(String(task.title || '')) &&
-      Array.isArray(task.orderItems) && task.orderItems.length)) return;
-  setTimeout(() => loadBookIssues(false), 0);
+/** 교재 주문은 생성부터 아카등록까지 교재 탭에서만 처리한다.
+ *  [주문] 말머리는 기존 주문 데이터의 정본 식별자로 유지하되 오늘·주간·현황판·
+ *  직원 지시관리 같은 일반 업무 화면에서는 단계와 관계없이 제외한다. */
+function isBookOrderWorkTask(task) {
+  return !!task && /^\[주문\]\s*/.test(String(task.title || ''));
 }
 
 function tasksFor(staffId, date) {
   return state.tasks
-    .filter(t => t.staffId === staffId && occursOn(t, date) && !isAcademyOnlyBookOrderTask(t))
+    .filter(t => t.staffId === staffId && occursOn(t, date) && !isBookOrderWorkTask(t))
     .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
                  || (b.priority === 'high') - (a.priority === 'high')
                  || (a.createdAt || 0) - (b.createdAt || 0));
@@ -1319,7 +1303,7 @@ function staffAdded(anchor) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
   const out = [];
   state.tasks.forEach(t => {
-    if (t.deleted || t.origin !== 'staff' || isAcademyOnlyBookOrderTask(t)) return;
+    if (t.deleted || t.origin !== 'staff' || isBookOrderWorkTask(t)) return;
     const s = staffById(t.staffId);
     if (!s || s.owner) return;              // 대표가 스스로 넣은 건 '직원 추가'가 아니다
     days.forEach(d => { if (occursOn(t, d)) out.push({ t: t, date: d }); });
@@ -2737,7 +2721,6 @@ function viewToday() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
 
-  ensureBookOrderWorkScopeData();
   const rel = relLabel(cursor);
   const list = tasksFor(me.id, cursor);
   if (list.some(isLesson) && !rosterDb && !rosterErr && !rosterLoading) loadRoster();
@@ -6935,7 +6918,6 @@ async function submitMakeupReason(button, action) {
 function viewWeek() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
-  ensureBookOrderWorkScopeData();
   const mon = mondayOf(cursor);
   const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
   const rows = {};
@@ -8142,7 +8124,6 @@ function viewDevices() {
 
 /* ── 직원 현황 ── */
 function viewBoard() {
-  ensureBookOrderWorkScopeData();
   const list = teamStaff();
   const mine = owners();
   if (!list.length && !mine.length) return emptyStaffCard();
@@ -13581,7 +13562,6 @@ function viewRoster() {
 
 /* ── 직원 관리 ── */
 function viewStaffAdmin() {
-  ensureBookOrderWorkScopeData();
   const list = liveStaff();
   return '<div class="card">' +
     '<div class="card-title">직원 등록</div>' +
@@ -13603,7 +13583,7 @@ function viewStaffAdmin() {
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
           (s.manager ? ' <span class="tag edit">관리 담당</span>' : '') + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && !isAcademyOnlyBookOrderTask(t)).length + '건' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && !isBookOrderWorkTask(t)).length + '건' +
           (s.owner ? ' · 직원 통계에서 제외' : '') +
           (s.manager ? ' · 관리 담당 표시 · 운영 권한은 서버에서 별도 승인 · 급여 집계 포함' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
@@ -15143,7 +15123,7 @@ async function submitDirectorReport(button) {
 
 function manageTasks(staffId) {
   const s = staffById(staffId);
-  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && !isAcademyOnlyBookOrderTask(t))
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && !isBookOrderWorkTask(t))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   modal((s ? s.name : '') + ' 지시 목록',
     list.length
@@ -17411,7 +17391,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.12';
+const APP_VER = '2026-08-27.13';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
