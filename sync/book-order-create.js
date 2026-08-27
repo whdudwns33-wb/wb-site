@@ -1,5 +1,6 @@
 import { validateRosterDocument } from './roster.js';
 import { acquireBookOrderDispatchLock, releaseBookOrderDispatchLockSafely } from './book-order-lock.js';
+import { MANUAL_ONLINE_DELIVERY, ONLINE_BOOK_VENDOR, resolveBookPublisher } from './book-order-vendors.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_ORDER_TASK_ID = /^ord_[A-Za-z0-9_-]{8,120}$/;
@@ -8,7 +9,7 @@ const MAX_STUDENTS = 200;
 const MAX_UNIT_PRICE = 10000000;
 export const MAX_BOOK_ORDER_MESSAGE_BYTES = 2000;
 const ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'vendorName', 'items', 'expectedUpdatedAt']);
-const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds', 'unitPrice']);
+const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds', 'unitPrice', 'publisherName']);
 const BOUND_ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'productCode', 'title', 'studentIds']);
 const BOUND_DELIVERY = 'bound_print_v1';
 const BOUND_VENDOR = '제본교재';
@@ -75,15 +76,22 @@ async function itemIdentity(item) {
   const studentIds = normalizedStudentIds(item);
   const hasUnitPrice = !!item && Object.prototype.hasOwnProperty.call(item, 'unitPrice');
   const unitPrice = hasUnitPrice ? Number(item.unitPrice) : null;
+  const hasPublisherName = !!item && Object.prototype.hasOwnProperty.call(item, 'publisherName');
+  const publisher = hasPublisherName ? resolveBookPublisher(item.publisherName) : null;
   if (!SAFE_ID.test(bookId) || !title || !studentIds ||
-      (hasUnitPrice && (!Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > MAX_UNIT_PRICE))) return null;
+      (hasUnitPrice && (!Number.isInteger(unitPrice) || unitPrice < 1 || unitPrice > MAX_UNIT_PRICE)) ||
+      (hasPublisherName && typeof item.publisherName !== 'string') ||
+      (hasPublisherName && !publisher)) return null;
   const qty = studentIds.length + '권';
   const studentSetHash = await sha256Hex(JSON.stringify(studentIds));
   const identityFields = [bookId, title, qty, studentSetHash];
   if (hasUnitPrice) identityFields.push(unitPrice);
+  if (hasPublisherName) identityFields.push('publisher:' + publisher.publisherName);
   const itemIdentityHash = await sha256Hex(JSON.stringify(identityFields));
   return {
     bookId, title, studentIds, qty, studentSetHash, itemIdentityHash,
+    ...(hasPublisherName ? { publisherName: publisher.publisherName, publisherVendorName: publisher.vendorName,
+      hasPublisherName: true } : {}),
     ...(hasUnitPrice ? { unitPrice } : {})
   };
 }
@@ -135,7 +143,7 @@ export async function verifyOrderTaskSnapshotRows(
   if (document === false) return { sealed: true, valid: false, code: 'ORDER_STUDENT_IDENTITY_CHANGED' };
   const ownerId = String(owner || '');
   const delivery = String(task && task.orderDelivery || '');
-  if (!task || task.deleted || !['scheduled_batch_v1', BOUND_DELIVERY].includes(delivery) ||
+  if (!task || task.deleted || !['scheduled_batch_v1', MANUAL_ONLINE_DELIVERY, BOUND_DELIVERY].includes(delivery) ||
       Number(task.orderIdentityVersion) !== 1 || !Array.isArray(task.orderItems) || !task.orderItems.length) {
     return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
   }
@@ -148,6 +156,13 @@ export async function verifyOrderTaskSnapshotRows(
       return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
     }
     identities.push(identity);
+  }
+  if (identities.some(identity => identity.hasPublisherName && identity.publisherVendorName !== vendorName)) {
+    return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
+  }
+  if (delivery === MANUAL_ONLINE_DELIVERY && (vendorName !== ONLINE_BOOK_VENDOR ||
+      identities.some(identity => !identity.hasPublisherName || identity.publisherVendorName !== ONLINE_BOOK_VENDOR))) {
+    return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
   }
   if (delivery === BOUND_DELIVERY) {
     const product = BOUND_PRODUCTS[String(task.boundProductCode || '')];
@@ -255,20 +270,24 @@ function configuredVendor(env, vendorName) {
   return /^01[016789]\d{7,8}$/.test(phone);
 }
 
-function canonicalTask(taskId, ownerId, vendorName, items, now) {
+function canonicalTask(taskId, ownerId, vendorName, items, delivery, now) {
   const titleMain = items.length > 1 ? (vendorName || '교재') + ' — ' + items.length + '권' : items[0].title;
   const list = items.map(item => item.title + ': ' + item.qty);
+  const manualOnline = delivery === MANUAL_ONLINE_DELIVERY;
+  const guide = (manualOnline ? '온라인에서 직접 주문할 교재입니다.' : '재고 부족으로 요청된 교재 주문입니다.') +
+    '\n■ 목록\n' + list.map(line => '· ' + line).join('\n') + '\n' +
+    (vendorName ? '■ 주문처: ' + vendorName + '\n' : '■ 주문처: 미등록\n') +
+    (manualOnline
+      ? '1) 쿠팡에서 주문 후 교재 탭에서 주문완료 또는 주문실패 표시\n2) 입고 후 수령완료와 배부완료 처리'
+      : '1) 저녁 8시 주문 접수 확인\n2) 교재 탭에서 수령완료와 배부완료 처리');
   return {
     id: taskId,
     groupId: 'order-' + now,
     staffId: ownerId || null,
     title: '[주문] ' + titleMain,
     detail: list.join(' · ') + (vendorName ? ' · 주문처: ' + vendorName : ''),
-    guide: '재고 부족으로 요청된 교재 주문입니다.\n■ 목록\n' +
-      list.map(line => '· ' + line).join('\n') + '\n' +
-      (vendorName ? '■ 주문처: ' + vendorName + '\n' : '■ 주문처: 미등록\n') +
-      '1) 저녁 8시 주문 접수 확인\n2) 교재 탭에서 수령완료와 배부완료 처리',
-    steps: [{ id: crypto.randomUUID(), label: '교재 탭 배송 확인' }],
+    guide,
+    steps: [{ id: crypto.randomUUID(), label: manualOnline ? '온라인 주문 결과 표시' : '교재 탭 배송 확인' }],
     target: 0,
     unit: '건',
     time: '',
@@ -281,9 +300,10 @@ function canonicalTask(taskId, ownerId, vendorName, items, now) {
     orderVendor: vendorName,
     orderItems: items.map(item => ({
       bookId: item.bookId, title: item.title, studentIds: item.studentIds, qty: item.qty,
-      unitPrice: item.unitPrice
+      unitPrice: item.unitPrice,
+      ...(item.hasPublisherName ? { publisherName: item.publisherName } : {})
     })),
-    orderDelivery: 'scheduled_batch_v1',
+    orderDelivery: delivery,
     orderIdentityVersion: 1,
     createdAt: now,
     updatedAt: now,
@@ -327,14 +347,14 @@ function canonicalBoundTask(taskId, ownerId, productCode, product, item, now) {
   };
 }
 
-async function exactExisting(env, app, taskId, ownerId, vendorName, items, document) {
+async function exactExisting(env, app, taskId, ownerId, vendorName, delivery, items, document) {
   const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, taskId).first();
   const snapshots = await loadOrderSnapshotRows(env, app, taskId);
   if (!row || !snapshots.length) return null;
   const task = parseJson(row.data || '{}', null);
   const verified = await verifyOrderTaskSnapshotRows(taskId, row.owner, task, snapshots, document, Date.now(), false);
-  if (!verified.valid || !verified.sealed || task.orderDelivery !== 'scheduled_batch_v1' ||
+  if (!verified.valid || !verified.sealed || task.orderDelivery !== delivery ||
       String(row.owner || '') !== ownerId ||
       text(task.orderVendor, 100, true) !== vendorName || task.orderItems.length !== items.length) return null;
   for (let index = 0; index < items.length; index++) {
@@ -621,9 +641,6 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   if (!vendorName) {
     return json({ ok: false, code: 'ORDER_VENDOR_REQUIRED', error: '교재 정보에서 주문처를 먼저 등록해 주세요' }, 400, origin);
   }
-  if (!configuredVendor(env, vendorName)) {
-    return json({ ok: false, code: 'ORDER_VENDOR_NOT_CONFIGURED', error: '문자 주문처 설정을 먼저 확인해 주세요' }, 409, origin);
-  }
   const identities = [];
   let studentCount = 0;
   for (const item of body.items) {
@@ -636,6 +653,16 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   if (new Set(identities.map(item => item.bookId)).size !== identities.length) {
     return json({ ok: false, code: 'ORDER_INVALID', error: '같은 교재는 주문 항목에 한 번만 넣어 주세요' }, 400, origin);
   }
+  if (identities.some(item => item.hasPublisherName && item.publisherVendorName !== vendorName)) {
+    return json({ ok: false, code: 'ORDER_VENDOR_MISMATCH',
+      error: '선택한 출판사의 주문처와 주문 정보가 일치하지 않습니다' }, 409, origin);
+  }
+  const delivery = vendorName === ONLINE_BOOK_VENDOR &&
+      identities.every(item => item.hasPublisherName && item.publisherVendorName === ONLINE_BOOK_VENDOR)
+    ? MANUAL_ONLINE_DELIVERY : 'scheduled_batch_v1';
+  if (delivery === 'scheduled_batch_v1' && !configuredVendor(env, vendorName)) {
+    return json({ ok: false, code: 'ORDER_VENDOR_NOT_CONFIGURED', error: '문자 주문처 설정을 먼저 확인해 주세요' }, 409, origin);
+  }
 
   const taskId = String(body.taskId);
   const ownerId = auth && SAFE_ID.test(String(auth.id || '')) ? String(auth.id) : '';
@@ -645,7 +672,7 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   const document = rosterRecord.document;
   const rosterById = new Map(document.roster.students.map(student => [String(student.id), student]));
   let existing;
-  try { existing = await exactExisting(env, app, taskId, ownerId, vendorName, identities, document); }
+  try { existing = await exactExisting(env, app, taskId, ownerId, vendorName, delivery, identities, document); }
   catch (error) {
     if (/no such table.*book_order_student_snapshots/i.test(String(error && error.message || error))) {
       return json({ ok: false, code: 'ORDER_LEDGER_NOT_READY', error: '교재 주문 원장을 준비하고 있습니다' }, 503, origin);
@@ -678,8 +705,9 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   }
 
   const now = Date.now();
-  const task = canonicalTask(taskId, ownerId, vendorName, identities, now);
-  if (new TextEncoder().encode(buildBookOrderMessage(vendorName, task.orderItems)).byteLength >
+  const task = canonicalTask(taskId, ownerId, vendorName, identities, delivery, now);
+  if (delivery === 'scheduled_batch_v1' &&
+      new TextEncoder().encode(buildBookOrderMessage(vendorName, task.orderItems)).byteLength >
       MAX_BOOK_ORDER_MESSAGE_BYTES) {
     return json({ ok: false, code: 'ORDER_MESSAGE_TOO_LARGE',
       error: '한 번에 보낼 주문 내용이 너무 많습니다. 주문을 나눠 등록해 주세요' }, 413, origin);
@@ -722,18 +750,18 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
     const results = await env.DB.batch(statements);
     const taskChanges = Number(results && results[0] && results[0].meta && results[0].meta.changes || 0);
     if (taskChanges !== 1) {
-      const raced = await exactExisting(env, app, taskId, ownerId, vendorName, identities, document);
+      const raced = await exactExisting(env, app, taskId, ownerId, vendorName, delivery, identities, document);
       if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
         error: '원생 명단이 주문 등록 중 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
     }
-    const stored = await exactExisting(env, app, taskId, ownerId, vendorName, identities, document);
+    const stored = await exactExisting(env, app, taskId, ownerId, vendorName, delivery, identities, document);
     if (!stored) {
       return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH',
         error: '교재 주문 원장의 정체성 확인이 필요합니다' }, 500, origin);
     }
   } catch (error) {
-    const raced = await exactExisting(env, app, taskId, ownerId, vendorName, identities, document);
+    const raced = await exactExisting(env, app, taskId, ownerId, vendorName, delivery, identities, document);
     if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
     if (await hasActiveDuplicate(env, app, identities)) {
       return json({ ok: false, code: 'ORDER_ALREADY_ACTIVE',

@@ -61,6 +61,9 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/046_app_data_genera
 npx wrangler d1 execute wb-sync --remote --file=./migrations/047_lesson_assignment_details.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/048_admin_directives.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/049_consult_result_sheets.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/050_weekend_actual_visits.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/051_feedback_template_v2.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/052_completed_book_catalog.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -157,6 +160,21 @@ ID를 매 요청 다시 대조한다. `prepared` 또는 `issued` 상태인 배�
 `031_book_order_fulfillments.sql`을 운영 D1에 먼저 적용한 뒤 Worker, Pages 순서로 배포한다.
 원장에는 주문 task ID, 교재 ID, stable studentId 목록과 단계별 시각만 저장하며 학생 표시명과
 연락처는 저장하지 않는다.
+
+아카등록 완료 일반 교재의 공용 DB와 온라인 직접 주문을 추가하는 배포에서는
+`052_completed_book_catalog.sql`을 운영 D1에 먼저 적용한 뒤 Worker, task Pages 순서로 배포한다.
+완료 교재 원장은 교재 ID·검색 검증 교재명/출판사·주문 당시 선택 출판사·기존 raw 주문처·완료 시각과 검색 검증 상태·근거 URL만
+저장하고 주문 ID, 학생 ID·이름, 연락처는 저장하지 않는다. 같은 정규화 출판사+교재명은 최초 한 행만
+남긴다. `WB_BOOK_CATALOG_WEB_SEARCH_ENABLED="true"`이고 `AI` binding을 사용할 수 있을 때에만 최초
+고유 교재를 `xai/grok-4.20-multi-agent-0309`의 `web_search`로 비동기 검증한다. 12초 내 실패·불일치·
+AI 미설정은 주문 입력값 후보로 보존하며, 아카등록 완료 자체는 검색 결과를 기다리거나 되돌리지 않는다.
+자동 확정은 NFKC 후 공백·기호를 제외한 제목이 정확히 같을 때도 모델이 명시한 근거 중 허용된 HTTPS 상품
+상세 URL만 제한된 시간·개수·응답 크기로 직접 확인한다. 수동 redirect의 모든 목적지를 다시 허용 목록과
+상품 상세 경로로 검사하고, 최종 200 HTML 본문에 전체 교재명과 호환 출판사가 함께 확인될 때만 허용한다.
+접근 불가·무관한 본문·허용 밖 redirect·과대 응답은 확정하지 않는다. 그 외 검색 대기·실패·불일치·근거 부족·과거 보강 행은
+`reviewCandidates`로 분리하고, 관리자가 `review_approve` CAS로 정확한 교재명·출판사를 확정할 수 있다.
+관리자 확정은 선택 출판사와 raw 주문처를 바꾸지 않으며 별도 append-only 검토 event에 같은 batch로 남긴다.
+재주문용 `/book-catalog`의 `books`에는 웹 근거 또는 관리자 검토로 확정된 `verified` 교재만 노출한다.
 
 금액 없이 생성된 기존 주문에 1회성 권당 금액 입력을 추가하는 배포에서는
 `043_book_order_item_prices.sql`을 운영 D1에 먼저 적용한 뒤 Worker, Pages 순서로 배포한다.
