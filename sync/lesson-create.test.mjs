@@ -46,8 +46,18 @@ class FakeDB {
       ['inactive', { id: 'inactive', deleted: true }]
     ]);
     this.tasks = new Map();
+    this.scopeTasks = [
+      { id: 'scope-lesson-a', owner: 'teacher-1', data: JSON.stringify({ id: 'scope-lesson-a',
+        staffId: 'teacher-1', studentId: 'student-a', taskKind: 'lesson_instruction', start: '2020-01-01',
+        end: '', deleted: false }) },
+      { id: 'scope-lesson-b', owner: 'teacher-2', data: JSON.stringify({ id: 'scope-lesson-b',
+        staffId: 'teacher-2', studentId: 'student-b', taskKind: 'lesson_instruction', start: '2020-01-01',
+        end: '', deleted: false }) }
+    ];
     this.checks = new Map();
     this.failBatchAt = -1;
+    this.beforeBatch = null;
+    this.lastChanges = 0;
     this.privateRoster = {
       roster: { students: [
         { id: 'student-a', name: '테스트학생', grade: '초4', teacherIds: ['teacher-1'] },
@@ -75,6 +85,7 @@ class FakeDB {
           const row = db.staff.get(this.args[1]);
           return row ? { data: JSON.stringify(row) } : null;
         }
+        if (sql.startsWith('SELECT * FROM session_packs')) return null;
         if (sql.startsWith('SELECT owner,data,updated_at FROM tasks')) {
           const row = db.tasks.get(this.args[1]);
           return row ? { owner: row.owner, data: row.data, updated_at: row.updatedAt } : null;
@@ -88,6 +99,11 @@ class FakeDB {
         throw new Error('unexpected first SQL: ' + sql);
       },
       async all() {
+        if (sql.startsWith('SELECT id,owner,data FROM tasks')) {
+          const owner = String(this.args[1]);
+          const stored = [...db.tasks.entries()].map(([id, row]) => ({ id, owner: row.owner, data: row.data }));
+          return { results: db.scopeTasks.concat(stored).filter(row => row.owner === owner) };
+        }
         if (sql.startsWith('SELECT id,data FROM tasks')) {
           const [, owner, excludedId, studentId] = this.args;
           return {
@@ -111,15 +127,25 @@ class FakeDB {
       async run() {
         if (sql.startsWith('UPDATE private_rosters SET data=')) {
           const [data, updatedAt, , expectedUpdatedAt] = this.args;
-          if (db.privateRosterUpdatedAt !== expectedUpdatedAt) return { meta: { changes: 0 } };
+          if (db.privateRosterUpdatedAt !== expectedUpdatedAt) {
+            db.lastChanges = 0;
+            return { meta: { changes: 0 } };
+          }
           db.privateRoster = JSON.parse(data);
           db.privateRosterUpdatedAt = updatedAt;
+          db.lastChanges = 1;
+          return { meta: { changes: 1 } };
+        }
+        if (sql.startsWith('INSERT INTO task_write_cas_guards')) {
+          if (db.lastChanges !== 1) throw new Error('TASK_WRITE_CAS_CONFLICT');
+          db.lastChanges = 1;
           return { meta: { changes: 1 } };
         }
         if (sql.startsWith('INSERT INTO tasks')) {
           const [, id, owner, data, updatedAt, srvAt] = this.args;
           if (db.tasks.has(id)) throw new Error('task conflict');
           db.tasks.set(id, { owner, data, updatedAt, srvAt });
+          db.lastChanges = 1;
           return { meta: { changes: 1 } };
         }
         if (sql.startsWith('INSERT OR IGNORE INTO tasks')) {
@@ -161,16 +187,25 @@ class FakeDB {
           db.studentChangeEvents.push({ eventType: this.args[4], details: JSON.parse(this.args[6]), audienceStaffIds: JSON.parse(this.args[7]) });
           return { meta: { changes: 1 } };
         }
+        if (sql.startsWith('INSERT INTO session_pack_transfer_guards')) {
+          return { meta: { changes: 1 } };
+        }
         throw new Error('unexpected run SQL: ' + sql);
       }
     };
   }
 
   async batch(statements) {
+    if (typeof this.beforeBatch === 'function') {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      await beforeBatch(this);
+    }
     const snapshot = new Map(this.tasks);
     const checksSnapshot = new Map(this.checks);
     const rosterSnapshot = JSON.parse(JSON.stringify(this.privateRoster));
     const rosterUpdatedAtSnapshot = this.privateRosterUpdatedAt;
+    const lastChangesSnapshot = this.lastChanges;
     const results = [];
     try {
       for (let index = 0; index < statements.length; index += 1) {
@@ -183,6 +218,7 @@ class FakeDB {
       this.checks = checksSnapshot;
       this.privateRoster = rosterSnapshot;
       this.privateRosterUpdatedAt = rosterUpdatedAtSnapshot;
+      this.lastChanges = lastChangesSnapshot;
       throw error;
     }
   }
@@ -210,6 +246,12 @@ function seed(db, task) {
     updatedAt: task.updatedAt,
     srvAt: task.updatedAt
   });
+}
+
+async function seedOwnLesson(db, overrides = {}, updatedAt = 100) {
+  const task = await buildLessonTask(assignedLesson(overrides), 'teacher-1', 'staff', updatedAt);
+  seed(db, task);
+  return task;
 }
 
 test('server builds an owned lesson with stable assignment and audit fields', async () => {
@@ -347,15 +389,59 @@ test('person auth cannot target another teacher', async () => {
   assert.equal(db.tasks.size, 0);
 });
 
+test('person auth cannot create an additional subject without an exact approved source task', async () => {
+  const db = new FakeDB();
+  const existing = await seedOwnLesson(db, { subject: '국어', lessonRole: '국어' });
+  const result = await call(db, {
+    lesson: assignedLesson({ subject: '영어', lessonRole: '영어', className: '영어' })
+  }, { scope: 'own', id: 'teacher-1' });
+
+  assert.equal(result.response.status, 403);
+  assert.equal(result.data.code, 'lesson_assignment_approval_required');
+  assert.equal(db.tasks.size, 1);
+  assert.equal(JSON.parse(db.tasks.get(existing.id).data).subject, '국어');
+});
+
+test('person auth cannot repurpose an exact source task as another student or subject assignment', async () => {
+  const db = new FakeDB();
+  const source = await seedOwnLesson(db, { subject: '국어', lessonRole: '국어' });
+  db.scopeTasks.push({ id: 'scope-lesson-b-for-teacher-1', owner: 'teacher-1', data: JSON.stringify({
+    id: 'scope-lesson-b-for-teacher-1', staffId: 'teacher-1', studentId: 'student-b',
+    taskKind: 'lesson_instruction', start: '2020-01-01', end: '', deleted: false
+  }) });
+  for (const lesson of [
+    assignedLesson({ subject: '영어', lessonRole: '영어', className: '영어' }),
+    assignedLesson({ studentId: 'student-b' })
+  ]) {
+    const result = await call(db, {
+      sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt, lesson
+    }, { scope: 'own', id: 'teacher-1' });
+    assert.equal(result.response.status, 403);
+    assert.equal(result.data.code, 'lesson_assignment_identity_locked');
+  }
+  assert.equal(db.tasks.size, 1);
+  assert.equal(JSON.parse(db.tasks.get(source.id).data).studentId, 'student-a');
+});
+
 test('student id must exist and person auth is limited to assigned students', async () => {
   const db = new FakeDB();
-  const own = await call(db, { lesson: validLesson({ studentId: 'student-a' }) }, { scope: 'own', id: 'teacher-1' });
+  const source = await seedOwnLesson(db);
+  const own = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt,
+    lesson: validLesson({ studentId: 'student-a', materials: '수정 교재' })
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(own.response.status, 200);
 
-  const other = await call(db, { lesson: validLesson({ studentId: 'student-b' }) }, { scope: 'own', id: 'teacher-1' });
+  const other = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: own.data.task.updatedAt,
+    lesson: validLesson({ studentId: 'student-b' })
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(other.response.status, 403);
 
-  const unknown = await call(db, { lesson: validLesson({ studentId: 'student-missing' }) }, { scope: 'own', id: 'teacher-1' });
+  const unknown = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: own.data.task.updatedAt,
+    lesson: validLesson({ studentId: 'student-missing' })
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(unknown.response.status, 409);
 
   const admin = await call(db, {
@@ -366,35 +452,47 @@ test('student id must exist and person auth is limited to assigned students', as
 
 test('person submissions require a roster id and matching roster identity', async () => {
   const db = new FakeDB();
-  const missing = await call(db, { lesson: validLesson() }, { scope: 'own', id: 'teacher-1' });
+  const source = await seedOwnLesson(db);
+  const common = { sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt };
+  const missing = await call(db, { ...common, lesson: validLesson() }, { scope: 'own', id: 'teacher-1' });
   assert.equal(missing.response.status, 400);
 
   const wrongName = await call(db, {
+    ...common,
     lesson: assignedLesson({ studentName: '다른학생' })
   }, { scope: 'own', id: 'teacher-1' });
   assert.equal(wrongName.response.status, 409);
 
   const wrongGrade = await call(db, {
+    ...common,
     lesson: assignedLesson({ grade: '초5' })
   }, { scope: 'own', id: 'teacher-1' });
   assert.equal(wrongGrade.response.status, 409);
-  assert.equal(db.tasks.size, 0);
+  assert.equal(db.tasks.size, 1);
+  assert.equal(JSON.parse(db.tasks.get(source.id).data).studentName, source.studentName);
 });
 
 test('student id submissions fail closed until the private roster is seeded', async () => {
   const db = new FakeDB();
+  const source = await seedOwnLesson(db);
   db.privateRoster = null;
-  const result = await call(db, { lesson: validLesson({ studentId: 'student-a' }) }, { scope: 'own', id: 'teacher-1' });
+  const result = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt,
+    lesson: validLesson({ studentId: 'student-a' })
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(result.response.status, 409);
-  assert.equal(db.tasks.size, 0);
+  assert.equal(db.tasks.size, 1);
 });
 
 test('client cannot inject server-owned task fields', async () => {
   const db = new FakeDB();
+  const source = await seedOwnLesson(db);
   const lesson = assignedLesson({ origin: 'manager' });
-  const { response } = await call(db, { lesson }, { scope: 'own', id: 'teacher-1' });
+  const { response } = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt, lesson
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(response.status, 403);
-  assert.equal(db.tasks.size, 0);
+  assert.equal(db.tasks.size, 1);
 });
 
 test('admin must choose an active teacher and uses admin origin', async () => {
@@ -409,11 +507,11 @@ test('admin must choose an active teacher and uses admin origin', async () => {
   assert.equal(valid.data.task.origin, 'admin');
 });
 
-test('duplicate submissions are idempotent with explicit response flags', async () => {
+test('admin duplicate submissions are idempotent with explicit response flags', async () => {
   const db = new FakeDB();
-  const body = { lesson: assignedLesson() };
-  const first = await call(db, body, { scope: 'own', id: 'teacher-1' });
-  const second = await call(db, body, { scope: 'own', id: 'teacher-1' });
+  const body = { staffId: 'teacher-1', lesson: assignedLesson() };
+  const first = await call(db, body, { scope: 'all', role: 'admin' });
+  const second = await call(db, body, { scope: 'all', role: 'admin' });
   assert.deepEqual(
     [first.data.created, first.data.updated, first.data.idempotent],
     [true, false, false]
@@ -428,7 +526,8 @@ test('duplicate submissions are idempotent with explicit response flags', async 
 
 test('changed grade, schedule, and start update the same task with a revision', async () => {
   const db = new FakeDB();
-  const first = await call(db, { lesson: assignedLesson() }, { scope: 'own', id: 'teacher-1' });
+  const firstTask = await seedOwnLesson(db);
+  const first = { data: { task: firstTask } };
   db.privateRoster.roster.students[0].grade = '초5';
   const correctedLesson = assignedLesson({
     grade: '초5',
@@ -476,7 +575,7 @@ test('root admin and allowlisted manager lesson writes keep distinct server attr
   }
 });
 
-test('admin can transfer only the teacher while keeping the lesson id and moving roster ownership', async () => {
+test('admin transfers the exact lesson while preserving history and leaving legacy roster ownership untouched', async () => {
   const db = new FakeDB();
   db.privateRoster.bookStudents = [{ studentId: 'student-a', teacherIds: ['teacher-1'] }];
   const created = await call(db, {
@@ -497,8 +596,8 @@ test('admin can transfer only the teacher while keeping the lesson id and moving
   assert.equal(transferred.data.task.id, created.data.task.id);
   assert.equal(transferred.data.task.staffId, 'teacher-2');
   assert.equal(db.tasks.get(created.data.task.id).owner, 'teacher-2');
-  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-2']);
-  assert.deepEqual(db.privateRoster.bookStudents[0].teacherIds, ['teacher-2']);
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
+  assert.deepEqual(db.privateRoster.bookStudents[0].teacherIds, ['teacher-1']);
   const movedHistory = db.checks.get(created.data.task.id + '|2026-08-20');
   assert.equal(movedHistory.owner, 'teacher-2');
   assert.deepEqual(JSON.parse(movedHistory.data), history);
@@ -508,7 +607,7 @@ test('admin can transfer only the teacher while keeping the lesson id and moving
   assert.deepEqual(db.studentChangeEvents.at(-1).audienceStaffIds.sort(), ['teacher-1', 'teacher-2']);
 });
 
-test('teacher transfer keeps the previous roster assignment when that teacher has another lesson', async () => {
+test('teacher transfer never rewrites legacy aggregate roster assignment', async () => {
   const db = new FakeDB();
   const first = await call(db, {
     staffId: 'teacher-1', lesson: assignedLesson()
@@ -525,13 +624,15 @@ test('teacher transfer keeps the previous roster assignment when that teacher ha
   }, { scope: 'all', role: 'admin' });
 
   assert.equal(transferred.response.status, 200);
-  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds.sort(), ['teacher-1', 'teacher-2']);
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
 });
 
 test('a changed submission without an expected version cannot overwrite', async () => {
   const db = new FakeDB();
-  const first = await call(db, { lesson: assignedLesson() }, { scope: 'own', id: 'teacher-1' });
+  const firstTask = await seedOwnLesson(db);
+  const first = { data: { task: firstTask } };
   const unsafe = await call(db, {
+    sourceTaskId: first.data.task.id,
     lesson: assignedLesson({ materials: '기준 없이 덮어쓰기' })
   }, { scope: 'own', id: 'teacher-1' });
   assert.equal(unsafe.response.status, 409);
@@ -542,12 +643,15 @@ test('a changed submission without an expected version cannot overwrite', async 
 
 test('stale expectedUpdatedAt returns an optimistic conflict without overwrite', async () => {
   const db = new FakeDB();
-  const first = await call(db, { lesson: assignedLesson() }, { scope: 'own', id: 'teacher-1' });
+  const firstTask = await seedOwnLesson(db);
+  const first = { data: { task: firstTask } };
   const second = await call(db, {
+    sourceTaskId: first.data.task.id,
     lesson: assignedLesson({ materials: '수정 교재 1' }),
     expectedUpdatedAt: first.data.task.updatedAt
   }, { scope: 'own', id: 'teacher-1' });
   const stale = await call(db, {
+    sourceTaskId: first.data.task.id,
     lesson: assignedLesson({ materials: '수정 교재 2' }),
     expectedUpdatedAt: first.data.task.updatedAt
   }, { scope: 'own', id: 'teacher-1' });
@@ -607,6 +711,7 @@ test('staff cannot overwrite a manager-created assignment', async () => {
   const managed = await buildLessonTask(assignedLesson(), 'teacher-1', 'manager', 100);
   seed(db, managed);
   const result = await call(db, {
+    sourceTaskId: managed.id,
     lesson: assignedLesson({ materials: '직원 임의 수정' }),
     expectedUpdatedAt: managed.updatedAt
   }, { scope: 'own', id: 'teacher-1' });
@@ -620,7 +725,9 @@ test('a deleted matching assignment returns 409 instead of a hidden success', as
   const deleted = await buildLessonTask(assignedLesson(), 'teacher-1', 'staff', 100);
   deleted.deleted = true;
   seed(db, deleted);
-  const result = await call(db, { lesson: assignedLesson() }, { scope: 'own', id: 'teacher-1' });
+  const result = await call(db, {
+    sourceTaskId: deleted.id, expectedUpdatedAt: deleted.updatedAt, lesson: assignedLesson()
+  }, { scope: 'own', id: 'teacher-1' });
   assert.equal(result.response.status, 409);
   assert.match(result.data.error, /삭제된 수업/);
 });
@@ -640,7 +747,8 @@ test('wrong-owner deterministic id is neither returned nor modified', async () =
   });
 
   const result = await call(db, { lesson: assignedLesson() }, { scope: 'own', id: 'teacher-1' });
-  assert.equal(result.response.status, 409);
+  assert.equal(result.response.status, 403);
+  assert.equal(result.data.code, 'lesson_assignment_approval_required');
   assert.notEqual(result.data.task && result.data.task.materials, foreign.materials);
   const persisted = JSON.parse(db.tasks.get(candidate.id).data);
   assert.equal(persisted.staffId, 'teacher-2');
@@ -720,7 +828,7 @@ test('admin atomically creates multiple independent lessons for one stable stude
   assert.equal(db.tasks.size, 2);
   assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a']));
   assert.deepEqual(new Set(result.data.tasks.map(task => task.subject)), new Set(['수학', '영어']));
-  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1', 'teacher-2']);
+  assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
   assert.deepEqual(db.privateRoster.roster.students[0].subjects, ['수학', '영어']);
 });
 
@@ -742,7 +850,7 @@ test('admin atomically registers one shared lesson for multiple stable students'
   assert.deepEqual(new Set(result.data.tasks.map(task => task.studentId)), new Set(['student-a', 'student-b']));
   assert.deepEqual(new Set(result.data.tasks.map(task => task.staffId)), new Set(['teacher-1']));
   assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
-  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2', 'teacher-1']);
+  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2']);
   assert.deepEqual(db.privateRoster.roster.students[0].subjects, ['국어']);
   assert.deepEqual(db.privateRoster.roster.students[1].subjects, ['국어']);
 });
@@ -772,11 +880,11 @@ test('server safely recognizes multiple students even when a stale client sends 
   assert.equal(data.createdCount, 3);
   assert.equal(db.tasks.size, 3);
   assert.equal(data.rosterUpdatedCount, 3);
-  assert.equal(db.privateRoster.roster.students.every(student => student.teacherIds.includes('teacher-1')), true);
+  assert.deepEqual(db.privateRoster.roster.students.map(student => student.teacherIds), [['teacher-1'], ['teacher-2'], []]);
   assert.equal(db.privateRoster.roster.students.every(student => student.subjects.includes('국어')), true);
 });
 
-test('an exact retry repairs missing roster links without recreating existing lessons', async () => {
+test('an exact retry repairs registered subjects without recreating existing lessons or main-teacher links', async () => {
   const db = new FakeDB();
   db.privateRoster.roster.students[0].name = '가학생';
   db.privateRoster.roster.students[1].name = '나학생';
@@ -797,7 +905,7 @@ test('an exact retry repairs missing roster links without recreating existing le
   assert.equal(result.data.idempotent, false);
   assert.equal(db.tasks.size, 2);
   assert.deepEqual(db.privateRoster.roster.students[0].teacherIds, ['teacher-1']);
-  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2', 'teacher-1']);
+  assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2']);
 });
 
 test('multi-student batch rejects duplicate students or differing class templates', async () => {
@@ -867,6 +975,24 @@ test('batch database failure rolls every lesson back and an exact retry is idemp
   assert.equal(retried.data.duplicateCount, 2);
   assert.equal(retried.data.idempotent, true);
   assert.equal(db.tasks.size, 2);
+});
+
+test('a roster CAS race aborts the batch before any lesson can be partially committed', async () => {
+  const db = new FakeDB();
+  db.beforeBatch = current => {
+    current.privateRosterUpdatedAt += 1;
+    current.privateRoster.roster.note = 'concurrent roster update';
+  };
+  const result = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' }) }
+  ]);
+  assert.equal(result.response.status, 409);
+  assert.match(result.data.error, /원생 명단/);
+  assert.equal(db.tasks.size, 0);
+  assert.equal(db.privateRosterUpdatedAt, 101);
+  assert.equal(db.privateRoster.roster.note, 'concurrent roster update');
+  assert.equal(db.privateRoster.roster.students[0].subjects, undefined);
 });
 
 test('teachers cannot use the multi-teacher batch registration endpoint', async () => {

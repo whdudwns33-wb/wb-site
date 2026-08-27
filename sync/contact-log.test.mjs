@@ -157,20 +157,21 @@ test('stale device cannot overwrite a newer daily contact', async () => {
   assert.equal(JSON.parse(db.checks.get(second.body.key).data).contact.note, '최신 메모');
 });
 
-test('legacy lesson without studentId resolves one exact assigned roster student', async () => {
+test('legacy lesson without a stable studentId fails closed instead of resolving by name', async () => {
   const db = new FakeDB();
   db.seedTask(lesson('lesson-1', { taskKind: undefined, studentId: undefined,
     studentName: undefined, title: '[수업] 학생A (초4) — 수학' }));
   const result = await save(db);
-  assert.equal(result.status, 200);
-  assert.equal(result.body.record.contact.studentId, 'student-a');
+  assert.equal(result.status, 422);
+  assert.equal(db.checks.size, 0);
 });
 
-test('non-lesson, other teacher, and unassigned student fail without auth-style 403', async () => {
+test('non-lesson, other owner, and missing stable student fail without auth-style 403', async () => {
   const cases = [
     { task: lesson('lesson-1', { title: '일반 업무', taskKind: undefined }) },
+    { task: lesson('lesson-1', { taskKind: undefined, lessonFormVersion: undefined,
+      intakeVersion: undefined, title: '[수업] 제목만 위조' }) },
     { task: lesson(), owner: 'teacher-2' },
-    { task: lesson('lesson-1', { studentId: 'student-b', studentName: '학생B' }) },
     { task: lesson('lesson-1', { studentId: 'removed-student', studentName: '학생A' }) }
   ];
   for (const item of cases) {
@@ -180,6 +181,14 @@ test('non-lesson, other teacher, and unassigned student fail without auth-style 
     assert.equal(result.status, 422);
     assert.equal(db.checks.size, 0);
   }
+});
+
+test('exact task owner and staffId authorize contact even when legacy roster teacherIds are stale', async () => {
+  const db = new FakeDB();
+  db.seedTask(lesson('lesson-1', { studentId: 'student-b', studentName: '학생B' }));
+  const result = await save(db);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.record.contact.studentId, 'student-b');
 });
 
 test('ambiguous legacy student and multiline or oversized notes are rejected', async () => {

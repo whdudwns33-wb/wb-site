@@ -290,6 +290,24 @@ function sameTaskJson(stored, incoming) {
   }
 }
 
+function hasStructuredLessonMarker(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const lessonFormVersion = Number(data.lessonFormVersion);
+  const intakeVersion = Number(data.intakeVersion);
+  return data.taskKind === 'lesson_instruction' ||
+    (Number.isInteger(lessonFormVersion) && lessonFormVersion >= 1) ||
+    (Number.isInteger(intakeVersion) && intakeVersion >= 1);
+}
+
+function isProtectedLessonTaskData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  return hasStructuredLessonMarker(data) ||
+    Object.prototype.hasOwnProperty.call(data, 'lessonFormVersion') ||
+    Object.prototype.hasOwnProperty.call(data, 'intakeVersion') ||
+    String(data.studentId || '').trim() !== '' ||
+    /^\s*\[(?:수업|컨설팅)\]/.test(String(data.title || ''));
+}
+
 async function inspectSealedOrderChanges(env, app, entries) {
   const taskEntries = entries.filter(entry => entry.table === 'tasks');
   if (!taskEntries.length) return { skip: new Set() };
@@ -383,6 +401,9 @@ async function inspectOwnTaskChanges(env, app, owner, entries) {
     }
     const current = ownById.get(id);
     if (!current) {
+      if (isProtectedLessonTaskData(data)) {
+        return { error: '학생 수업은 전용 수업 등록·승인 화면에서만 저장할 수 있습니다' };
+      }
       if (data.origin !== 'staff') {
         return { error: '개인 링크에서는 직원이 직접 만든 업무만 새로 등록할 수 있습니다' };
       }
@@ -391,6 +412,13 @@ async function inspectOwnTaskChanges(env, app, owner, entries) {
     }
     let currentData;
     try { currentData = JSON.parse(current.data); } catch (error) { currentData = null; }
+    if (isProtectedLessonTaskData(currentData) || isProtectedLessonTaskData(data)) {
+      if (sameTaskJson(current.data, data)) {
+        skip.add(entry);
+        continue;
+      }
+      return { error: '학생 수업은 전용 수업 등록·승인 화면에서만 변경할 수 있습니다' };
+    }
     if (!currentData || currentData.origin !== 'staff') {
       if (sameTaskJson(current.data, data)) {
         skip.add(entry);
@@ -1236,6 +1264,10 @@ async function taskForFeedback(env, identity, auth, origin) {
     }
   } catch (error) {
     return { response: json({ ok: false, error: '업무 데이터가 올바르지 않습니다' }, 409, origin) };
+  }
+  if (!hasStructuredLessonMarker(taskData) || String(taskData.id || '') !== identity.taskId ||
+      String(taskData.staffId || '') !== String(task.owner)) {
+    return { response: json({ ok: false, error: '수업의 ID와 현재 담당자 연결을 확인해 주세요' }, 409, origin) };
   }
   return { task, taskData };
 }

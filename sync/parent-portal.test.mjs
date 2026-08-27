@@ -550,7 +550,8 @@ test('관리자 공개 준비 목록은 간소화된 stable 학생·담당자 �
   seed(db);
   const now = Date.now();
   const broken = {
-    id: 'lesson-missing', title: '[수업] 연결 확인 필요', staffId: 'staff-a', studentName: '이름만 있는 학생',
+    id: 'lesson-missing', title: '[수업] 연결 확인 필요', staffId: 'staff-a',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1, studentName: '이름만 있는 학생',
     grade: '초4', scheduleStatus: 'needs_review', scheduleText: '시간 미정', scheduleSlots: [],
     start: new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10), deleted: false, updatedAt: now
   };
@@ -1210,7 +1211,14 @@ test('활성 회차권도 현재 수업 assignment identity와 담당이 일치�
   db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(roster)).run();
   view = await call(db, { action: 'view' }, auth.cookie);
   assert.equal(view.status, 200);
-  assert.deepEqual(view.body.sessionPacks, [], '현재 담당자 연결이 끊긴 pack도 숨긴다');
+  assert.equal(view.body.sessionPacks.length, 1, 'legacy roster teacherIds는 현재 수업 담당 정본이 아니다');
+  assert.equal(view.body.summary.sessionRemaining, 8);
+
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'")
+    .bind(JSON.stringify({ ...task, staffId: 'staff-b' })).run();
+  view = await call(db, { action: 'view' }, auth.cookie);
+  assert.equal(view.status, 200);
+  assert.deepEqual(view.body.sessionPacks, [], 'task owner와 data.staffId가 어긋난 pack은 숨긴다');
   assert.equal(view.body.summary.sessionRemaining, 0);
 });
 

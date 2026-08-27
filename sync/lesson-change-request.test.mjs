@@ -23,9 +23,25 @@ class TestD1 {
   constructor() {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(schema);
+    this.beforeBatch = null;
   }
   prepare(sql) { return new D1Statement(this.database, sql); }
-  batch(statements) { return statements.map(s => s.run()); }
+  batch(statements) {
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      beforeBatch(this.database);
+    }
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const results = statements.map(statement => statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -48,7 +64,8 @@ function seed(db) {
   db.prepare("INSERT INTO tokens (app,token,staff_id,created_at,revoked) VALUES ('task','tok-other','S-other',?,0)").bind(now).run();
 
   const lessonTask = {
-    id: 'task-1', groupId: 'g1', staffId: 'S-kim',
+    id: 'task-1', groupId: 'g1', staffId: 'S-kim', studentId: 'student-1',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1,
     title: '[수업] 예시학생 (중2) — 수학', detail: '쎈 2-2, 82쪽', guide: '학생 특징: ...',
     steps: [], target: 0, unit: '회', time: '18:00', priority: 'normal',
     repeat: 'days', days: [1, 3, 5], start: '2026-08-02', end: '', carry: true,
@@ -127,6 +144,47 @@ test('director sees the pending request and approving it writes into the live ta
   const archived = await call(db, '/lesson-change-review', { auth: admin, action: 'list', status: 'approved' });
   assert.equal(archived.body.requests.length, 1, '화면에서 숨긴 승인 완료 요청도 서버 기록에는 보관한다');
   assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30' });
+});
+
+test('a request CAS race rolls back the earlier lesson and change-event writes', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { time: '19:30' }
+  });
+  const requestKey = submit.body.request.requestKey;
+  db.beforeBatch = database => database.prepare(
+    "UPDATE lesson_change_requests SET revision=2,updated_at=updated_at+1 WHERE app='task' AND request_key=?"
+  ).run(requestKey);
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey, revision: 1
+  });
+  assert.equal(approve.status, 409);
+  const task = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
+  assert.equal(task.time, '18:00');
+  const request = db.prepare("SELECT revision,status FROM lesson_change_requests WHERE app='task' AND request_key=?")
+    .bind(requestKey).first();
+  assert.equal(request.revision, 2);
+  assert.equal(request.status, 'approval_waiting');
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE request_key=?")
+    .bind(requestKey).first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
+});
+
+test('a future teacher-change start date stays pending until that KST date', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2099-01-01' }
+  });
+  const requestKey = submit.body.request.requestKey;
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey, revision: 1, selectedStaffId: 'S-other'
+  });
+  assert.equal(approve.status, 409);
+  assert.match(approve.body.error, /변경 시작일 당일 또는 이후/);
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='task-1'").first().owner, 'S-kim');
+  assert.equal(db.prepare("SELECT status FROM lesson_change_requests WHERE app='task' AND request_key=?")
+    .bind(requestKey).first().status, 'approval_waiting');
 });
 
 test('legacy top-level lesson hours cannot be changed through the old simple change route', async () => {

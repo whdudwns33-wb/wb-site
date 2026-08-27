@@ -1,6 +1,7 @@
 import { validateRosterDocument } from './roster.js';
 import { loadOrderSnapshotRows, verifyOrderTaskSnapshotRows } from './book-order-create.js';
 import { MANUAL_ONLINE_DELIVERY, ONLINE_BOOK_VENDOR } from './book-order-vendors.js';
+import { bookOrderStudentIdsForAuth, ownBookStudentWriteGuard } from './book-order-student-scope.js';
 import {
   completedCatalogInsertStatement,
   completedCatalogRecord,
@@ -197,6 +198,7 @@ async function listOrderFulfillments(env, app, auth, document) {
     return [String(row.id), String(data.name || row.id)];
   }));
   const studentsById = new Map(document.roster.students.map(student => [String(student.id), student]));
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
   const rows = [];
   for (const taskRow of tasksResult.results || []) {
     if (auth.scope === 'own' && String(taskRow.owner || '') !== auth.id) continue;
@@ -213,10 +215,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       const item = task.orderItems[itemIndex] || {};
       const studentIds = orderStudentIds(item);
       const invalidSelection = Array.isArray(item.studentIds) && !validOrderStudentSelection(item, studentIds);
-      const unauthorized = auth.scope === 'own' && studentIds.some(id => {
-        const student = studentsById.get(id);
-        return !student || !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
-      });
+      const unauthorized = auth.scope === 'own' && studentIds.some(id => !allowedStudentIds.has(id));
       const missing = studentIds.some(id => !studentsById.has(id));
       const fulfillment = fulfillmentByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
       const priceRow = priceByItem.get(String(taskRow.id) + '|' + itemIndex) || null;
@@ -343,10 +342,10 @@ async function linkOrderStudents(env, app, body, auth, json, origin) {
   if (studentIds.some(id => !studentsById.has(id))) {
     return json({ ok: false, code: 'ORDER_STUDENT_MISSING', error: '선택한 학생이 현재 원생 명단에 없어 다시 확인해 주세요' }, 409, origin);
   }
-  if (auth.scope === 'own' && studentIds.some(id => {
-    const student = studentsById.get(id);
-    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
-  })) return json({ ok: false, error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  if (auth.scope === 'own' && studentIds.some(id => !allowedStudentIds.has(id))) {
+    return json({ ok: false, error: '현재 본인이 담당하는 수업 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+  }
 
   const snapshots = await loadOrderSnapshotRows(env, app, taskId);
   const sealedIdentity = await verifyOrderTaskSnapshotRows(
@@ -374,10 +373,18 @@ async function linkOrderStudents(env, app, body, auth, json, origin) {
   const nextTask = { ...task, orderItems: task.orderItems.slice(), updatedAt: now,
     lastEditBy: auth.role === 'manager' ? 'manager' : auth.scope === 'all' ? 'admin' : 'staff' };
   nextTask.orderItems[itemIndex] = { ...item, bookId, studentIds, qty: studentIds.length + '권' };
+  const studentGuard = ownBookStudentWriteGuard(auth, app, studentIds, now);
+  const ownerGuard = ownOrderOwnerWriteGuard(auth, app, taskId);
   const updated = await env.DB.prepare(
-    'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
-  ).bind(JSON.stringify(nextTask), now, now, app, taskId, expectedUpdatedAt).run();
+    'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?' +
+    ownerGuard.sql + studentGuard.sql
+  ).bind(JSON.stringify(nextTask), now, now, app, taskId, expectedUpdatedAt,
+    ...ownerGuard.binds, ...studentGuard.binds).run();
   if (!updated.meta || Number(updated.meta.changes || 0) !== 1) {
+    if (!(await ownOrderMutationStillValid(env, app, auth, taskId, studentIds))) {
+      return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+        error: '담당 수업 또는 주문 담당자가 변경되어 학생을 연결할 수 없습니다' }, 403, origin);
+    }
     return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다. 새로고침 후 다시 연결해 주세요' }, 409, origin);
   }
   return json({ ok: true, idempotent: false, taskUpdatedAt: now }, 200, origin);
@@ -454,11 +461,13 @@ async function listIssues(env, app, auth, json, origin) {
   const stored = new Map((result.results || []).map(row => [String(row.assignment_id), row]));
   const students = new Map(document.roster.students.map(student => [student.id, student]));
   const assignments = new Map(document.bookStudents.map(item => [item.id, item]));
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
   const issues = [];
   const warnings = [];
 
   for (const assignment of document.bookStudents) {
-    if (auth.scope === 'own' && !assignment.teacherIds.includes(auth.id)) continue;
+    if (auth.scope === 'own' &&
+        (!assignment.teacherIds.includes(auth.id) || !allowedStudentIds.has(String(assignment.studentId)))) continue;
     const student = students.get(assignment.studentId);
     const row = stored.get(assignment.id);
     if (row) {
@@ -495,6 +504,57 @@ async function listIssues(env, app, auth, json, origin) {
   }
   const orders = await listOrderFulfillments(env, app, auth, document);
   return json({ ok: true, issues, warnings, orders }, 200, origin);
+}
+
+async function ownOrderStudentScopeStillValid(env, app, auth, studentIds) {
+  if (!auth || auth.scope !== 'own') return true;
+  const document = await currentRoster(env, app);
+  if (!document) return false;
+  const allowed = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  return studentIds.every(studentId => allowed.has(String(studentId)));
+}
+
+async function ownOrderMutationStillValid(env, app, auth, taskId, studentIds) {
+  if (!auth || auth.scope !== 'own') return true;
+  const row = await env.DB.prepare('SELECT owner FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  return !!row && String(row.owner || '') === String(auth.id || '') &&
+    await ownOrderStudentScopeStillValid(env, app, auth, studentIds);
+}
+
+function ownOrderOwnerWriteGuard(auth, app, taskId) {
+  if (!auth || auth.scope !== 'own') return { sql: '', binds: [] };
+  return {
+    sql: ' AND EXISTS (SELECT 1 FROM tasks owned_order WHERE owned_order.app=? ' +
+      'AND owned_order.id=? AND owned_order.owner=?)',
+    binds: [app, taskId, String(auth.id || '')]
+  };
+}
+
+function ownLegacyAssignmentWriteGuard(auth, app, assignment) {
+  if (!auth || auth.scope !== 'own') return { sql: '', binds: [] };
+  return {
+    sql: ' AND EXISTS (SELECT 1 FROM private_rosters current_roster, ' +
+      "json_each(current_roster.data,'$.bookStudents') current_assignment, " +
+      "json_each(current_assignment.value,'$.teacherIds') current_teacher " +
+      'WHERE current_roster.app=? AND json_valid(current_roster.data) ' +
+      "AND CAST(json_extract(current_assignment.value,'$.id') AS TEXT)=? " +
+      "AND CAST(json_extract(current_assignment.value,'$.studentId') AS TEXT)=? " +
+      "AND CAST(json_extract(current_assignment.value,'$.bookId') AS TEXT)=? " +
+      'AND CAST(current_teacher.value AS TEXT)=?)',
+    binds: [app, String(assignment.id), String(assignment.studentId), String(assignment.bookId), String(auth.id || '')]
+  };
+}
+
+async function ownLegacyAssignmentStillValid(env, app, auth, assignment) {
+  if (!auth || auth.scope !== 'own') return true;
+  const document = await currentRoster(env, app);
+  if (!document) return false;
+  const current = document.bookStudents.find(item => item.id === assignment.id &&
+    item.studentId === assignment.studentId && item.bookId === assignment.bookId);
+  if (!current || !Array.isArray(current.teacherIds) || !current.teacherIds.includes(auth.id)) return false;
+  const allowed = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  return allowed.has(String(assignment.studentId));
 }
 
 async function setManualOnlineResult(env, app, body, auth, json, origin) {
@@ -598,10 +658,10 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
   if (studentIds.some(id => !studentsById.has(id))) {
     return json({ ok: false, code: 'ORDER_STUDENT_MISSING', error: '주문 학생이 현재 원생 명단에 없어 확인이 필요합니다' }, 409, origin);
   }
-  if (auth.scope === 'own' && studentIds.some(id => {
-    const student = studentsById.get(id);
-    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
-  })) return json({ ok: false, error: '담당 학생의 주문만 처리할 수 있습니다' }, 403, origin);
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  if (auth.scope === 'own' && studentIds.some(id => !allowedStudentIds.has(id))) {
+    return json({ ok: false, error: '현재 본인이 담당하는 수업 학생의 주문만 처리할 수 있습니다' }, 403, origin);
+  }
 
   const send = await latestOrderSend(env, app, taskId);
   const accepted = task.orderDelivery === 'bound_print_v1' || (!!send && String(send.status) === 'accepted');
@@ -636,14 +696,22 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
   const now = Date.now();
   const actor = actorId(auth);
   const idsJson = JSON.stringify(studentIds);
+  const studentGuard = ownBookStudentWriteGuard(auth, app, studentIds, now);
+  const ownerGuard = ownOrderOwnerWriteGuard(auth, app, taskId);
   let insertedCatalog = null;
   if (!row) {
     const inserted = await env.DB.prepare(
       'INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,' +
-      'teacher_received_at,teacher_received_by,created_at,updated_at) VALUES(?,?,?,?,?,?,1,?,?,?,?) ' +
+      'teacher_received_at,teacher_received_by,created_at,updated_at) SELECT ?,?,?,?,?,?,1,?,?,?,? ' +
+      'WHERE 1=1' + ownerGuard.sql + studentGuard.sql + ' ' +
       'ON CONFLICT(app,task_id,item_index) DO NOTHING'
-    ).bind(app, taskId, itemIndex, bookId, idsJson, targetStatus, now, actor, now, now).run();
+    ).bind(app, taskId, itemIndex, bookId, idsJson, targetStatus, now, actor, now, now,
+      ...ownerGuard.binds, ...studentGuard.binds).run();
     if (!inserted.meta || Number(inserted.meta.changes || 0) !== 1) {
+      if (!(await ownOrderMutationStillValid(env, app, auth, taskId, studentIds))) {
+        return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+          error: '담당 수업 또는 주문 담당자가 변경되어 수령 처리할 수 없습니다' }, 403, origin);
+      }
       return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 상태가 먼저 변경되었습니다' }, 409, origin);
     }
   } else {
@@ -654,9 +722,10 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
     const updateStatement = env.DB.prepare(
       'UPDATE book_order_fulfillments SET status=?,revision=revision+1,student_handed_at=?,student_handed_by=?,' +
       'academy_registered_at=?,academy_registered_by=?,updated_at=? ' +
-      'WHERE app=? AND task_id=? AND item_index=? AND revision=? AND status=? AND book_id=? AND student_ids=?'
+      'WHERE app=? AND task_id=? AND item_index=? AND revision=? AND status=? AND book_id=? AND student_ids=?' +
+      ownerGuard.sql + studentGuard.sql
     ).bind(targetStatus, handedAt, handedBy, academyAt, academyBy, now, app, taskId, itemIndex, revision,
-      row.status, bookId, idsJson);
+      row.status, bookId, idsJson, ...ownerGuard.binds, ...studentGuard.binds);
     let updated;
     const catalog = next === 'academy_register' ? completedCatalogRecord(env, item, task, now) : null;
     if (catalog) {
@@ -697,6 +766,10 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
       updated = await updateStatement.run();
     }
     if (!updated || !updated.meta || Number(updated.meta.changes || 0) !== 1) {
+      if (!(await ownOrderMutationStillValid(env, app, auth, taskId, studentIds))) {
+        return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+          error: '담당 수업 또는 주문 담당자가 변경되어 배부 처리할 수 없습니다' }, 403, origin);
+      }
       return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 상태가 먼저 변경되었습니다' }, 409, origin);
     }
   }
@@ -742,7 +815,11 @@ async function transition(env, app, body, auth, json, origin) {
   const assignment = document.bookStudents.find(item => item.id === assignmentId);
   if (!assignment) return json({ ok: false, error: '현재 명단의 교재 배정을 찾을 수 없습니다' }, 404, origin);
   if (auth.scope === 'own' && !assignment.teacherIds.includes(auth.id)) {
-    return json({ ok: false, error: '담당 학생의 교재만 처리할 수 있습니다' }, 403, origin);
+    return json({ ok: false, error: '이 교재 배정을 담당하는 선생님만 처리할 수 있습니다' }, 403, origin);
+  }
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  if (auth.scope === 'own' && !allowedStudentIds.has(String(assignment.studentId))) {
+    return json({ ok: false, error: '현재 본인이 담당하는 수업 학생의 교재만 처리할 수 있습니다' }, 403, origin);
   }
   const student = document.roster.students.find(item => item.id === assignment.studentId);
   const hash = await identityHash(student.id, student.name);
@@ -765,6 +842,8 @@ async function transition(env, app, body, auth, json, origin) {
   const actor = actorId(auth);
   const plan = transitionPlan(row, next, reason, now, actor);
   if (!plan) return json({ ok: false, code: 'INVALID_TRANSITION', error: '현재 상태에서는 요청한 변경을 할 수 없습니다' }, 409, origin);
+  const studentGuard = ownBookStudentWriteGuard(auth, app, [assignment.studentId], now);
+  const assignmentGuard = ownLegacyAssignmentWriteGuard(auth, app, assignment);
 
   if (!row) {
     const preparedAt = next === 'prepared' || next === 'issued' ? now : null;
@@ -772,10 +851,16 @@ async function transition(env, app, body, auth, json, origin) {
     const inserted = await env.DB.prepare(
       'INSERT INTO book_issues(app,assignment_id,student_id,book_id,student_identity_hash,status,cycle,revision,' +
       'prepared_at,prepared_by,issued_at,issued_by,handed_at,handed_by,cancelled_at,cancelled_by,cancel_reason,reissue_reason,history,created_at,updated_at) ' +
-      'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,NULL,?,?,?) ON CONFLICT(app,assignment_id) DO NOTHING'
+      'SELECT ?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,NULL,?,?,? WHERE 1=1' +
+      assignmentGuard.sql + studentGuard.sql + ' ON CONFLICT(app,assignment_id) DO NOTHING'
     ).bind(app, assignmentId, assignment.studentId, assignment.bookId, hash, plan.status, 1, 1,
-      preparedAt, actor, issuedAt, issuedAt ? actor : null, JSON.stringify(plan.history), now, now).run();
+      preparedAt, actor, issuedAt, issuedAt ? actor : null, JSON.stringify(plan.history), now, now,
+      ...assignmentGuard.binds, ...studentGuard.binds).run();
     if (!inserted.meta || Number(inserted.meta.changes || 0) !== 1) {
+      if (!(await ownLegacyAssignmentStillValid(env, app, auth, assignment))) {
+        return json({ ok: false, code: 'BOOK_ASSIGNMENT_SCOPE',
+          error: '교재 배정 또는 담당 수업이 변경되어 처리할 수 없습니다' }, 403, origin);
+      }
       row = await env.DB.prepare('SELECT * FROM book_issues WHERE app=? AND assignment_id=? LIMIT 1').bind(app, assignmentId).first();
       if (sameIdentity(row, assignment, hash) && latestIsDuplicate(row, next, revision, reason)) {
         return json({ ok: true, idempotent: true, issue: publicIssue(assignment, student, row) }, 200, origin);
@@ -798,11 +883,17 @@ async function transition(env, app, body, auth, json, origin) {
     const updated = await env.DB.prepare(
       'UPDATE book_issues SET status=?,cycle=?,revision=revision+1,prepared_at=?,prepared_by=?,issued_at=?,issued_by=?,' +
       'handed_at=?,handed_by=?,cancelled_at=?,cancelled_by=?,cancel_reason=?,reissue_reason=?,history=?,updated_at=? ' +
-      'WHERE app=? AND assignment_id=? AND revision=? AND status=? AND student_id=? AND book_id=? AND student_identity_hash=?'
+      'WHERE app=? AND assignment_id=? AND revision=? AND status=? AND student_id=? AND book_id=? AND student_identity_hash=?' +
+      assignmentGuard.sql + studentGuard.sql
     ).bind(plan.status, plan.cycle, preparedAt, preparedBy, issuedAt, issuedBy, handedAt, handedBy,
       cancelledAt, cancelledBy, cancelReason, reissueReason, JSON.stringify(plan.history), now,
-      app, assignmentId, revision, row.status, assignment.studentId, assignment.bookId, hash).run();
+      app, assignmentId, revision, row.status, assignment.studentId, assignment.bookId, hash,
+      ...assignmentGuard.binds, ...studentGuard.binds).run();
     if (!updated.meta || Number(updated.meta.changes || 0) !== 1) {
+      if (!(await ownLegacyAssignmentStillValid(env, app, auth, assignment))) {
+        return json({ ok: false, code: 'BOOK_ASSIGNMENT_SCOPE',
+          error: '교재 배정 또는 담당 수업이 변경되어 처리할 수 없습니다' }, 403, origin);
+      }
       const fresh = await env.DB.prepare('SELECT * FROM book_issues WHERE app=? AND assignment_id=? LIMIT 1').bind(app, assignmentId).first();
       if (sameIdentity(fresh, assignment, hash) && latestIsDuplicate(fresh, next, revision, reason)) {
         return json({ ok: true, idempotent: true, issue: publicIssue(assignment, student, fresh) }, 200, origin);

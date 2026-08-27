@@ -120,8 +120,7 @@ async function assignmentContext(env, app, document, studentId, lessonTaskId) {
       !(loaded.task.taskKind === 'lesson_instruction' || loaded.task.lessonFormVersion || loaded.task.intakeVersion)) {
     return { error: '현재 수업과 회차권의 학생·수업 연결이 일치하지 않습니다', code: 'TASK_IDENTITY_MISMATCH' };
   }
-  if (!SAFE_ID.test(loaded.owner) || !Array.isArray(student.teacherIds) ||
-      !student.teacherIds.includes(loaded.owner) || !await activeStaff(env, app, loaded.owner)) {
+  if (!SAFE_ID.test(loaded.owner) || !await activeStaff(env, app, loaded.owner)) {
     return { error: '현재 담당 선생님과 수업 연결을 확인해 주세요', code: 'TASK_ASSIGNMENT_MISMATCH' };
   }
   return { student, task: loaded.task, owner: loaded.owner };
@@ -186,8 +185,7 @@ async function packView(env, app, pack, context, integrity) {
 }
 
 function ownAllowed(auth, context) {
-  return auth.scope === 'all' || (auth.scope === 'own' && auth.id === context.owner &&
-    context.student.teacherIds.includes(auth.id));
+  return auth.scope === 'all' || (auth.scope === 'own' && auth.id === context.owner);
 }
 
 async function listPacks(env, app, body, auth, document, json, origin) {

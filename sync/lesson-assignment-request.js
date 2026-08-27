@@ -1,4 +1,6 @@
 import { buildLessonTask } from './lesson-create.js';
+import { lessonStudentIdsForStaff } from './book-order-student-scope.js';
+import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_NAME = 40;
@@ -100,7 +102,7 @@ function lastFour(value) {
   return digits ? digits.slice(-4) : '';
 }
 
-function candidateViews(students, owner) {
+function candidateViews(students, assignedStudentIds) {
   const active = students.filter(isActiveStudent);
   const identityCounts = new Map();
   active.forEach(student => {
@@ -111,11 +113,10 @@ function candidateViews(students, owner) {
     const key = [normalize(student.name), normalize(student.school), normalize(student.grade)].join('|');
     const duplicate = (identityCounts.get(key) || 0) > 1;
     const hints = duplicate ? [lastFour(student.phoneFather), lastFour(student.phoneMother)].filter(Boolean) : [];
-    const teacherIds = Array.isArray(student.teacherIds) ? student.teacherIds.map(String).filter(id => SAFE_ID.test(id)) : [];
     return {
       id: String(student.id), name: text(student.name, MAX_NAME), school: text(student.school, 80),
-      grade: text(student.grade, MAX_GRADE), subjects: studentSubjects(student), teacherIds,
-      assigned: teacherIds.includes(owner), contactHint: hints.length ? [...new Set(hints)].join(' · ') : ''
+      grade: text(student.grade, MAX_GRADE), subjects: studentSubjects(student),
+      assigned: assignedStudentIds.has(String(student.id)), contactHint: hints.length ? [...new Set(hints)].join(' · ') : ''
     };
   }).sort((left, right) => left.name.localeCompare(right.name, 'ko') || left.school.localeCompare(right.school, 'ko') ||
     left.grade.localeCompare(right.grade, 'ko') || left.id.localeCompare(right.id));
@@ -165,12 +166,14 @@ export async function handleLessonAssignmentRequest(env, app, body, origin, auth
   if (!await activeStaffRecord(env, app, owner)) return json({ ok: false, error: '재직 중인 선생님을 선택해 주세요' }, 409, origin);
 
   if (action === 'list') {
-    const [result, roster] = await Promise.all([
+    const [result, roster, assignedStudentIds] = await Promise.all([
       env.DB.prepare("SELECT * FROM lesson_assignment_requests WHERE app=? AND staff_id=? ORDER BY CASE status WHEN 'approval_waiting' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END, updated_at DESC LIMIT 100")
         .bind(app, owner).all(),
-      rosterRow(env, app)
+      rosterRow(env, app),
+      lessonStudentIdsForStaff(env, app, owner)
     ]);
-    return json({ ok: true, requests: (result.results || []).map(view), candidates: roster ? candidateViews(roster.document.roster.students, owner) : [] }, 200, origin);
+    return json({ ok: true, requests: (result.results || []).map(view),
+      candidates: roster ? candidateViews(roster.document.roster.students, assignedStudentIds) : [] }, 200, origin);
   }
 
   if (action === 'cancel') {
@@ -217,12 +220,21 @@ export async function handleLessonAssignmentRequest(env, app, body, origin, auth
   if (!roster) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
   const student = roster.document.roster.students.find(item => item && String(item.id) === studentId && isActiveStudent(item));
   if (!student) return json({ ok: false, error: '현재 재원생 명단에서 학생을 다시 선택해 주세요' }, 409, origin);
-  if (Array.isArray(student.teacherIds) && student.teacherIds.map(String).includes(owner)) {
-    return json({ ok: false, error: '이미 담당 원생으로 연결된 학생입니다' }, 409, origin);
-  }
   let details;
   try { details = await normalizedRequestDetails(student, body, owner); }
   catch (error) { return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin); }
+
+  let requested;
+  try { requested = await requestedLesson(student, details, owner, Date.now()); }
+  catch (error) { return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin); }
+  const existingLesson = parseTaskRow(await env.DB.prepare(
+    'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
+  ).bind(app, requested.id, owner).first());
+  if (existingLesson && !existingLesson.task.deleted &&
+      String(existingLesson.task.staffId || '') === owner &&
+      String(existingLesson.task.studentId || '') === studentId) {
+    return json({ ok: false, error: '같은 담당자·학생·과목의 수업이 이미 등록되어 있습니다' }, 409, origin);
+  }
 
   const key = await keyFor(owner, 'student-id:' + studentId);
   let current = await requestRow(env, app, key);
@@ -270,8 +282,9 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   const details = parseDetails(current.request_data);
   const missing = parseMissingDetails(current.request_data);
   const modernStudentId = String(current.student_id || '');
-  if (modernStudentId && !details) {
-    return json({ ok: false, error: '이 요청에는 수업시수가 없습니다. 선생님이 요청을 취소한 뒤 다시 제출해 주세요' }, 409, origin);
+  const linkOnly = !details && !modernStudentId && !!missing;
+  if (!details && !linkOnly) {
+    return json({ ok: false, error: '이 요청에는 과목·시간표·수업시수가 없습니다. 원생 등록 후 선생님이 수업 배정 요청을 다시 제출해 주세요' }, 409, origin);
   }
   const studentId = modernStudentId || String(body.studentId || '');
   if (!SAFE_ID.test(studentId)) return json({ ok: false, error: '원생 명단에서 학생을 선택해 주세요' }, 400, origin);
@@ -281,23 +294,17 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   if (!roster) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
   const student = roster.document.roster.students.find(item => item && String(item.id) === studentId && isActiveStudent(item));
   if (!student) return json({ ok: false, error: '현재 재원생 명단에서 학생을 다시 선택해 주세요' }, 409, origin);
-  if (!details) {
-    const identityMismatch = normalize(student.name) !== normalize(current.student_name) || normalize(student.grade) !== normalize(current.grade) ||
-      (!!missing && normalize(student.school) !== normalize(missing.school));
+  if (linkOnly) {
+    const identityMismatch = normalize(student.name) !== normalize(current.student_name) ||
+      normalize(student.grade) !== normalize(current.grade) || normalize(student.school) !== normalize(missing.school);
     if (identityMismatch && body.confirmIdentityMismatch !== true) {
-      return json({ ok: false, code: 'IDENTITY_CONFIRM_REQUIRED', error: '요청 이름·학년과 선택한 원생이 달라 확인이 필요합니다' }, 409, origin);
+      return json({ ok: false, code: 'IDENTITY_CONFIRM_REQUIRED',
+        error: '요청 이름·학교·학년과 선택한 원생이 달라 확인이 필요합니다' }, 409, origin);
     }
   }
-
-  const teacherIds = Array.isArray(student.teacherIds) ? student.teacherIds.map(String) : [];
-  if (!teacherIds.includes(String(current.staff_id))) teacherIds.push(String(current.staff_id));
-  student.teacherIds = [...new Set(teacherIds)];
-  const teacherNames = String(student.teacher || '').split(/[·,]/).map(item => item.trim()).filter(Boolean);
-  if (staff.name && !teacherNames.includes(String(staff.name))) teacherNames.push(String(staff.name));
-  student.teacher = teacherNames.join('·');
-
   let task = null;
   let taskStatement = null;
+  let taskStatementNeedsGuard = false;
   if (details) {
     const subjects = [...new Set(studentSubjects(student).concat(details.subjects))];
     student.subjects = subjects;
@@ -313,23 +320,47 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
       task = { ...task, createdAt: existing.task.createdAt || task.createdAt, updatedAt: Math.max(now, Number(existing.task.updatedAt || 0) + 1) };
       taskStatement = env.DB.prepare('UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?')
         .bind(JSON.stringify(task), task.updatedAt, task.updatedAt, app, task.id, String(current.staff_id), existing.updatedAt);
+      taskStatementNeedsGuard = true;
     } else {
+      if (String(existing.task.id || '') !== task.id ||
+          String(existing.task.staffId || '') !== String(current.staff_id) ||
+          String(existing.task.studentId || '') !== studentId) {
+        return json({ ok: false, error: '기존 수업의 담당자·학생 정체성이 달라 승인할 수 없습니다' }, 409, origin);
+      }
       task = existing.task;
     }
   }
 
-  roster.document.roster.updated = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(now));
-  const statements = [
-    env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
-      .bind(JSON.stringify(roster.document), now, app, roster.updatedAt)
-  ];
-  if (taskStatement) statements.push(taskStatement);
+  const statements = [];
+  if (details) {
+    roster.document.roster.updated = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(now));
+    statements.push(env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+      .bind(JSON.stringify(roster.document), now, app, roster.updatedAt));
+    statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_roster',
+      [requestKey, revision, studentId, roster.updatedAt, now].join('\n'), now));
+  }
+  if (taskStatement) {
+    statements.push(taskStatement);
+    if (taskStatementNeedsGuard) {
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_task',
+        [requestKey, revision, task.id, String(current.staff_id), task.updatedAt].join('\n'), task.updatedAt));
+    }
+  }
   statements.push(env.DB.prepare("UPDATE lesson_assignment_requests SET status='approved', student_id=?, updated_at=?, reviewed_at=?, reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'")
     .bind(studentId, now, now, reviewer, app, requestKey, revision));
-  const applied = await env.DB.batch(statements);
+  statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_request',
+    [requestKey, revision, studentId, now, reviewer].join('\n'), now));
+  let applied;
+  try { applied = await env.DB.batch(statements); }
+  catch (error) {
+    if (isTaskWriteCasConflict(error)) {
+      return json({ ok: false, error: '명단·수업 또는 요청 상태가 바뀌었습니다. 새로고침 후 다시 승인해 주세요' }, 409, origin);
+    }
+    throw error;
+  }
   if (applied.some(result => Number(result.meta && result.meta.changes || 0) !== 1)) {
     return json({ ok: false, error: '명단·수업 또는 요청 상태가 바뀌었습니다. 새로고침 후 다시 승인해 주세요' }, 409, origin);
   }
   current = await requestRow(env, app, requestKey);
-  return json({ ok: true, request: view(current), task }, 200, origin);
+  return json({ ok: true, request: view(current), task, linkOnly }, 200, origin);
 }

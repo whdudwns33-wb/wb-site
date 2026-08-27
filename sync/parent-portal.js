@@ -442,8 +442,7 @@ function activePublicationTaskOnDate(task, date) {
 }
 
 function isPublicationLessonTask(task) {
-  return !!task && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion ||
-    /^\[수업\]/.test(String(task.title || '')));
+  return !!task && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion);
 }
 
 function activeSlotOnDate(slot, date, weekday) {
@@ -499,7 +498,6 @@ export async function currentPublicationTask(env, row, now) {
       !isPublicationLessonTask(task) ||
       String(task.staffId || '') !== owner || String(row.task_owner || '') !== owner ||
       String(task.studentId || '') !== String(row.student_id || '') || !found || found.error ||
-      !Array.isArray(found.student.teacherIds) || !found.student.teacherIds.map(String).includes(owner) ||
       !names.has(owner) || !activePublicationTaskOnDate(task, String(row.lesson_date || '')) ||
       !activePublicationTaskOnDate(task, kstDate(now))) return null;
   const identity = await publicLessonIdentity(task, owner);
@@ -522,8 +520,7 @@ async function publicationTaskForWrite(env, auth, taskId, lessonDate, now) {
   }
   const found = await rosterStudent(env, String(task.studentId || ''), now);
   const names = found.error ? new Map() : await staffNames(env);
-  if (found.error || !Array.isArray(found.student.teacherIds) ||
-      !found.student.teacherIds.map(String).includes(owner) || !names.has(owner) ||
+  if (found.error || !names.has(owner) ||
       !activePublicationTaskOnDate(task, lessonDate)) {
     return { error: '현재 담당 학생의 수업만 공개할 수 있습니다', code: 'ASSIGNMENT_CHANGED', status: 409 };
   }
@@ -553,9 +550,8 @@ async function publicTodayLessons(env, student, now) {
   for (const row of result.results || []) {
     const task = parseJson(row.data);
     const owner = String(row.owner || '');
-    if (!task || (task.id && String(task.id) !== String(row.id)) ||
+    if (!task || String(task.id || '') !== String(row.id) ||
         String(task.staffId || '') !== owner || !names.has(owner) ||
-        !Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(owner) ||
         !activeTaskOnDate(task, date) ||
         !Array.isArray(task.scheduleSlots)) continue;
     const slots = task.scheduleSlots.filter(slot => activeSlotOnDate(slot, date, weekday));
@@ -647,9 +643,8 @@ export async function publicSchedule(env, student, now) {
   for (const row of result.results || []) {
     const task = parseJson(row.data);
     const owner = String(row.owner || '');
-    if (!task || (task.id && String(task.id) !== String(row.id)) ||
+    if (!task || String(task.id || '') !== String(row.id) ||
         String(task.staffId || '') !== owner || !names.has(owner) ||
-        !Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(owner) ||
         !activeTaskOnDate(task, today) || !Array.isArray(task.scheduleSlots)) continue;
     for (const slot of task.scheduleSlots) {
       if (!Array.isArray(slot.days) || !slot.startTime || !slot.endTime) continue;
@@ -808,11 +803,6 @@ export function publicationReadinessForTask(task, owner, activeStaff, activeStud
   } else if (taskStaffId !== ownerId) {
     reasons.push({ code: 'staff_owner_mismatch', field: 'staffId', message: '수업 담당자와 저장 담당자가 서로 다릅니다' });
   }
-  if (student && SAFE_ID.test(ownerId) &&
-      (!Array.isArray(student.teacherIds) || !student.teacherIds.map(String).includes(ownerId))) {
-    reasons.push({ code: 'student_teacher_missing', field: 'staffId', message: '선택 원생의 실제 담당자에 이 선생님이 배정되지 않았습니다' });
-  }
-
   if (!isPublicationLessonTask(task)) {
     reasons.push({ code: 'lesson_format_missing', field: 'schedule', message: '표준 수업 등록 형식으로 변환해야 합니다' });
   }
@@ -857,8 +847,7 @@ async function publicationReadinessList(env, body, auth, origin, json) {
   for (const row of taskRows.results || []) {
     const task = parseJson(row.data);
     if (!task || task.deleted || String(task.id || '') !== String(row.id || '') ||
-        !(task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion ||
-          /^\[수업\]/.test(String(task.title || ''))) ||
+        !(task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion) ||
         (task.start && String(task.start) > date) || (task.end && String(task.end) < date)) continue;
     const owner = String(row.owner || '');
     const readiness = publicationReadinessForTask(task, owner, activeStaff, activeStudents, date);
@@ -1216,7 +1205,7 @@ async function currentSessionPackTask(env, student, row, activeStaff) {
   if (!task || String(task.id || '') !== String(row.lesson_task_id) || task.deleted ||
       String(task.studentId || '') !== String(student.id) || String(task.staffId || '') !== owner ||
       !SAFE_ID.test(owner) || String(row.task_owner || '') !== owner ||
-      !Array.isArray(student.teacherIds) || !student.teacherIds.includes(owner) || !activeStaff.has(owner) ||
+      !activeStaff.has(owner) ||
       !(task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion)) {
     return null;
   }

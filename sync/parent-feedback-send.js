@@ -153,12 +153,17 @@ function normalizedRosterText(value) {
 
 /**
  * 이름은 표시용 스냅샷일 뿐, 수신자 결합 키로 쓰지 않는다. 현재 private_rosters에서
- * stable studentId가 같은 학생을 다시 찾고 이름·담당자까지 일치할 때만 연락처 조회로 간다.
+ * stable studentId가 같은 학생을 다시 찾고, 피드백의 정확한 수업 task가
+ * owner===data.staffId이며 같은 studentId를 가리킬 때만 연락처 조회로 간다.
  * 동명이인이나 개명 뒤 낡은 지시서가 다른 보호자에게 연결되는 일을 fail-closed로 막는다.
  */
-async function verifyFeedbackStudent(env, app, studentId, studentName, owner) {
+async function verifyFeedbackStudent(env, app, studentId, studentName, owner, taskId) {
   if (!SAFE_ID.test(studentId)) return { error: 'STUDENT_ID_MISSING' };
-  const row = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+  if (!SAFE_ID.test(String(taskId || '')) || !SAFE_ID.test(String(owner || ''))) return { error: 'STUDENT_OWNER_MISMATCH' };
+  const [row, taskRow] = await Promise.all([
+    env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first(),
+    env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, taskId).first()
+  ]);
   if (!row) return { error: 'STUDENT_NOT_IN_ROSTER' };
   let students;
   try {
@@ -168,12 +173,18 @@ async function verifyFeedbackStudent(env, app, studentId, studentName, owner) {
     return { error: 'STUDENT_NOT_IN_ROSTER' };
   }
   if (!Array.isArray(students)) return { error: 'STUDENT_NOT_IN_ROSTER' };
-  const student = students.find(item => item && item.id === studentId && Array.isArray(item.teacherIds));
+  const student = students.find(item => item && item.id === studentId);
   if (!student) return { error: 'STUDENT_NOT_IN_ROSTER' };
   if (normalizedRosterText(student.name) !== normalizedRosterText(studentName)) {
     return { error: 'STUDENT_IDENTITY_MISMATCH' };
   }
-  if (!student.teacherIds.includes(String(owner || ''))) return { error: 'STUDENT_OWNER_MISMATCH' };
+  let task;
+  try { task = taskRow && JSON.parse(taskRow.data || '{}'); } catch (error) { task = null; }
+  const lesson = task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
+    task.intakeVersion);
+  if (!lesson || String(task.id || '') !== String(taskId) ||
+      String(taskRow.owner || '') !== String(owner) || String(task.staffId || '') !== String(owner) ||
+      String(task.studentId || '') !== studentId) return { error: 'STUDENT_OWNER_MISMATCH' };
   return { studentId };
 }
 
@@ -331,7 +342,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: 'SEND_DISABLED', status: 'content_approved_send_blocked' };
   }
 
-  const verifiedStudent = await verifyFeedbackStudent(env, app, studentId, studentName, current.owner);
+  const verifiedStudent = await verifyFeedbackStudent(
+    env, app, studentId, studentName, current.owner, current.task_id
+  );
   if (verifiedStudent.error) {
     const note = verifiedStudent.error === 'STUDENT_ID_MISSING'
       ? '학생 식별자가 없어 발송하지 못했습니다 — 원생 명단에서 학생을 선택해 수업을 다시 저장해 주세요'

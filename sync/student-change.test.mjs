@@ -32,7 +32,7 @@ async function call(db, path, body) {
 
 function seed(db) {
   const now = Date.now();
-  for (const [id, name] of [['teacher-a', '가선생'], ['teacher-b', '나선생']]) {
+  for (const [id, name] of [['teacher-a', '가선생'], ['teacher-b', '나선생'], ['teacher-c', '옛선생']]) {
     db.prepare("INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES('task',?,?,?, ?, ?)")
       .bind(id, id, JSON.stringify({ id, name, deleted: false }), now, now).run();
     db.prepare("INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES('task',?,?,?,0)")
@@ -48,6 +48,7 @@ function seed(db) {
   db.prepare("INSERT INTO private_rosters(app,data,updated_at) VALUES('task',?,?)").bind(JSON.stringify(roster), now).run();
   const task = {
     id: 'lesson-a', staffId: 'teacher-a', studentId: 'student-a', studentName: '학생A', grade: '중1',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1,
     title: '[수업] 학생A (중1) — 영어', detail: '교재', guide: '업무지시', steps: [], target: 0,
     unit: '회', time: '18:00', repeat: 'days', days: [1, 3], start: '2026-08-01', end: '',
     createdAt: now, updatedAt: now, deleted: false, origin: 'admin'
@@ -60,6 +61,11 @@ function seed(db) {
   const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4] };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-b','teacher-a',?,?,?)")
     .bind(JSON.stringify(second), now, now).run();
+  for (const [id, end] of [['lesson-ended-c', '2026-08-01'], ['lesson-malformed-c', '종료일오류']]) {
+    const oldLesson = { ...task, id, staffId: 'teacher-c', end };
+    db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-c',?,?,?)")
+      .bind(id, JSON.stringify(oldLesson), now, now).run();
+  }
 }
 
 test('migration is additive, append-only, and keeps deletion audit rows private by contract', () => {
@@ -99,7 +105,12 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   assert.equal(historyRow.data, historyBefore.data);
   assert.ok(historyRow.srv_at > historyRow.updated_at);
   const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
-  assert.ok(roster.roster.students[0].teacherIds.includes('teacher-b'));
+  assert.deepEqual(roster.roster.students[0].teacherIds, ['teacher-a'],
+    'legacy roster 담당 집계는 변경하지 않고 수업 task만 이동한다');
+  const eventRow = db.prepare("SELECT changed_fields,audience_staff_ids FROM student_change_events WHERE app='task' AND student_id='student-a'").first();
+  assert.deepEqual(JSON.parse(eventRow.changed_fields), ['staffId']);
+  assert.deepEqual(JSON.parse(eventRow.audience_staff_ids).sort(), ['teacher-a', 'teacher-b'],
+    '종료됐거나 종료일이 잘못된 옛 수업 담당자는 변경 알림 대상이 아니다');
   const newTeacherSync = await call(db, '/sync', { auth: person('teacher-b'), since: 0, changes: [] });
   assert.equal(newTeacherSync.status, 200);
   assert.ok(newTeacherSync.body.changes.some(change => change.table === 'tasks' && change.key === 'lesson-a'));
@@ -127,6 +138,74 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
     row.staffId === 'teacher-b').acknowledgedAt, null);
 });
 
+test('teacher change refuses an exact target assignment even when its stored assignment key is missing', async () => {
+  const db = new TestD1(); seed(db);
+  const sourceRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const source = JSON.parse(sourceRow.data);
+  const duplicate = {
+    ...source, id: 'lesson-target-duplicate', staffId: 'teacher-b'
+  };
+  const now = Date.now();
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
+    .bind(duplicate.id, JSON.stringify(duplicate), now, now).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1,
+    selectedStaffId: 'teacher-b'
+  });
+  assert.equal(approve.status, 409);
+  assert.match(approve.body.error, /같은 학생·과목 수업/);
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-a'").first().owner, 'teacher-a');
+  assert.equal(db.prepare("SELECT status FROM lesson_change_requests WHERE app='task' AND request_key=?")
+    .bind(submit.body.request.requestKey).first().status, 'approval_waiting');
+});
+
+test('teacher change still allows the target teacher to keep another subject for the same student', async () => {
+  const db = new TestD1(); seed(db);
+  const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  const otherSubject = {
+    ...source, id: 'lesson-target-other-subject', staffId: 'teacher-b',
+    subject: '수학', className: '', lessonRole: '수학'
+  };
+  const now = Date.now();
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
+    .bind(otherSubject.id, JSON.stringify(otherSubject), now, now).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1,
+    selectedStaffId: 'teacher-b'
+  });
+  assert.equal(approve.status, 200);
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-a'").first().owner, 'teacher-b');
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-target-other-subject'").first().owner, 'teacher-b');
+});
+
+test('teacher change fails closed when a target teacher lesson row has a forged inner owner', async () => {
+  const db = new TestD1(); seed(db);
+  const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  const corrupt = { ...source, id: 'lesson-target-corrupt', staffId: 'teacher-a' };
+  const now = Date.now();
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
+    .bind(corrupt.id, JSON.stringify(corrupt), now, now).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1,
+    selectedStaffId: 'teacher-b'
+  });
+  assert.equal(approve.status, 409);
+  assert.match(approve.body.error, /손상/);
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-a'").first().owner, 'teacher-a');
+});
+
 test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
   const db = new TestD1(); seed(db);
   const withdrawal = await call(db, '/lesson-change-request', {
@@ -147,7 +226,15 @@ test('withdrawal moves the student to roster history and hides every linked less
     assert.equal(task.deleted, true);
     assert.equal(task.end, '2026-08-25');
   }
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE app='task'").first().count, 2,
+  for (const id of ['lesson-ended-c', 'lesson-malformed-c']) {
+    const task = JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(id).first().data);
+    assert.equal(task.deleted, false, '적용일 전에 이미 끝났거나 종료일이 잘못된 수업은 다시 전환하지 않는다');
+  }
+  const withdrawalEvent = db.prepare(
+    "SELECT audience_staff_ids FROM student_change_events WHERE event_type='withdrawal'"
+  ).first();
+  assert.deepEqual(JSON.parse(withdrawalEvent.audience_staff_ids), ['teacher-a']);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE app='task'").first().count, 4,
     '수업 행은 삭제하지 않고 이력으로 보존한다');
 });
 

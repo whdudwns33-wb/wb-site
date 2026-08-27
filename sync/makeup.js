@@ -86,10 +86,6 @@ function rosterStudent(document, studentId, date) {
   return student;
 }
 
-function canAccessStudent(student, auth) {
-  return auth.scope === 'all' || (Array.isArray(student.teacherIds) && student.teacherIds.includes(auth.id));
-}
-
 async function activeStaff(env, app, staffId) {
   const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1').bind(app, staffId).first();
   const data = row && parseJson(row.data);
@@ -98,7 +94,7 @@ async function activeStaff(env, app, staffId) {
 
 function isLesson(task) {
   return !!task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
-    task.intakeVersion || /^\[수업\]/.test(String(task.title || '')));
+    task.intakeVersion);
 }
 
 function occurs(task, date) {
@@ -264,8 +260,13 @@ async function latestParentResponse(env, app, row) {
 async function sourceTask(env, app, sourceTaskId, sourceDate) {
   const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, sourceTaskId).first();
   const task = row && parseJson(row.data);
-  if (!row || !isLesson(task) || String(task.studentId || '') === '') problem('stable studentId가 있는 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
-  if (task.staffId && String(task.staffId) !== String(row.owner || '')) problem('수업 담당자 정보가 일치하지 않습니다', 409, 'LESSON_IDENTITY_MISMATCH');
+  if (!row || !isLesson(task) || String(task.id || '') !== sourceTaskId ||
+      !SAFE_ID.test(String(task.studentId || ''))) {
+    problem('stable studentId가 있는 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
+  }
+  if (String(task.staffId || '') !== String(row.owner || '')) {
+    problem('수업 담당자 정보가 일치하지 않습니다', 409, 'LESSON_IDENTITY_MISMATCH');
+  }
   if (!occurs(task, sourceDate)) problem('해당 날짜에 예정된 수업이 아닙니다', 409, 'LESSON_NOT_SCHEDULED');
   return { row, task };
 }
@@ -294,9 +295,9 @@ async function assertCaseIdentity(env, app, row) {
   const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, row.source_task_id).first();
   const task = taskRow && parseJson(taskRow.data);
-  if (!taskRow || !task || String(task.studentId || '') !== String(row.student_id) ||
-      String(taskRow.owner || '') !== String(row.source_teacher_id) ||
-      (task.staffId && String(task.staffId) !== String(row.source_teacher_id))) {
+  if (!taskRow || !task || !isLesson(task) || String(task.id || '') !== String(row.source_task_id) ||
+      String(task.studentId || '') !== String(row.student_id) ||
+      String(task.staffId || '') !== String(taskRow.owner || '')) {
     problem('원 수업과 보강 기록의 학생·담당자가 일치하지 않습니다', 409, 'MAKEUP_IDENTITY_MISMATCH');
   }
   return task;
@@ -461,18 +462,28 @@ async function listCases(env, app, body, auth, json, origin) {
     ' updated_at DESC LIMIT ' + limit).bind(...binds).all();
   const document = await loadRoster(env, app);
   const students = new Map(document.roster.students.map(student => [student.id, student]));
-  const visible = (result.results || []).filter(row => {
-    const student = students.get(String(row.student_id));
-    return student && (canAccessStudent(student, auth) || (auth.scope === 'own' &&
-      [row.proposed_staff_id, row.confirmed_staff_id]
-        .some(staffId => String(staffId || '') === String(auth.id || ''))));
-  });
-  const taskIds = [...new Set(visible.map(row => String(row.source_task_id)))];
+  const candidates = result.results || [];
+  const taskIds = [...new Set(candidates.map(row => String(row.source_task_id)))];
   const tasks = new Map();
+  const currentOwners = new Map();
   for (const taskId of taskIds) {
-    const row = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, taskId).first();
-    if (row) tasks.set(taskId, parseJson(row.data));
+    const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, taskId).first();
+    const task = row && parseJson(row.data);
+    const owner = String(row && row.owner || '');
+    if (!task || !isLesson(task) || String(task.id || '') !== taskId ||
+        String(task.staffId || '') !== owner || !SAFE_ID.test(owner)) continue;
+    tasks.set(taskId, task);
+    currentOwners.set(taskId, owner);
   }
+  const visible = candidates.filter(row => {
+    const student = students.get(String(row.student_id));
+    const taskId = String(row.source_task_id);
+    const task = tasks.get(taskId);
+    if (!student || !task || String(task.studentId || '') !== String(row.student_id)) return false;
+    return auth.scope === 'all' || (auth.scope === 'own' &&
+      [currentOwners.get(taskId), row.proposed_staff_id, row.confirmed_staff_id]
+        .some(staffId => String(staffId || '') === String(auth.id || '')));
+  });
   const responses = await latestParentResponses(env, app);
   return json({ ok: true, cases: visible.map(row => publicCase(row, students.get(String(row.student_id)),
     tasks.get(String(row.source_task_id)), responses.get(String(row.case_id)))) }, 200, origin);
@@ -487,7 +498,7 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, sourceDate);
-  if (!canAccessStudent(student, auth) || (auth.scope === 'own' && sourceTeacherId !== auth.id)) {
+  if (auth.scope !== 'all' && sourceTeacherId !== auth.id) {
     return json({ ok: false, error: '담당 학생의 결석 수업만 보강으로 등록할 수 있습니다' }, 403, origin);
   }
   if (!await activeStaff(env, app, sourceTeacherId)) return json({ ok: false, error: '원 수업 담당자가 비활성 상태입니다' }, 409, origin);

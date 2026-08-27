@@ -25,9 +25,15 @@ class TestD1 {
   constructor() {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(schema);
+    this.beforeBatch = null;
   }
   prepare(sql) { return new D1Statement(this.database, sql); }
   batch(statements) {
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      beforeBatch(this.database);
+    }
     this.database.exec('BEGIN IMMEDIATE');
     try {
       const results = statements.map(statement => statement.run());
@@ -104,6 +110,25 @@ function seedAuth(db) {
   }
 }
 
+function seedLesson(db, id, staffId, studentId, overrides = {}) {
+  const now = Date.now();
+  const task = {
+    id, staffId, studentId, taskKind: 'lesson_instruction', title: '[수업] 테스트',
+    lessonFormVersion: 1, intakeVersion: 1,
+    start: '2026-01-01', end: '', deleted: false, ...overrides
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', id, overrides.owner || staffId, JSON.stringify(task), now, now).run();
+}
+
+function seedTransitionEvent(db, eventId, studentId, eventType, effectiveDate, audienceStaffIds) {
+  db.prepare(
+    "INSERT INTO student_change_events(app,event_id,student_id,task_id,event_type,changed_fields,details," +
+    "audience_staff_ids,effective_date,requires_ack,request_key,request_revision,changed_at,changed_by) " +
+    "VALUES('task',?,?,NULL,?,'[]','{}',?,?,1,NULL,NULL,?,'director')"
+  ).bind(eventId, studentId, eventType, JSON.stringify(audienceStaffIds), effectiveDate, Date.now()).run();
+}
+
 async function call(db, body, app = 'task', envOverrides = {}) {
   const response = await worker.fetch(new Request('https://worker.example/roster', {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -155,7 +180,10 @@ test('director replaces and reads the full document without exposing teacherIds'
   assert.deepEqual(result.body.roster.students.map(item => item.id), ['student-a', 'student-b', 'student-shared']);
   assert.deepEqual(result.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-b', 'book-row-shared']);
   assert.equal(result.body.studentSelectionScope, 'all_active');
+  assert.deepEqual(result.body.bookOrderStudents.map(item => item.id), ['student-a', 'student-shared', 'student-b']);
+  assert.deepEqual(Object.keys(result.body.bookOrderStudents[0]).sort(), ['grade', 'id', 'name', 'school']);
   assert.equal(JSON.stringify(result.body).includes('teacherIds'), false);
+  assert.equal(result.body.roster.students.some(item => Object.prototype.hasOwnProperty.call(item, 'teacher')), false);
   assert.equal(result.headers.get('cache-control'), 'no-store');
 });
 
@@ -175,10 +203,13 @@ test('director adds an existing student and edits one record with roster CAS', a
   assert.equal(created.body.student.entryType, 'existing');
   const createdId = created.body.student.id;
   const stored = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
-  assert.equal(stored.roster.students.find(item => item.id === createdId).entryType, 'existing');
+  const storedCreated = stored.roster.students.find(item => item.id === createdId);
+  assert.equal(storedCreated.entryType, 'existing');
+  assert.equal('teacher' in storedCreated || 'teacherIds' in storedCreated, false);
 
   const detail = await call(db, { auth: admin, action: 'student_get', studentId: createdId });
-  assert.deepEqual(detail.body.student.teacherIds, ['teacher-a']);
+  assert.equal(detail.body.student.teacherIds, undefined);
+  assert.equal(detail.body.student.teacher, undefined);
   const updated = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
     student: { ...detail.body.student, grade: '초6', subject: '영어·독해' }
@@ -218,6 +249,10 @@ test('director stores new-student school, contacts, dates, and fixed multi-subje
   assert.equal(created.body.student.school, '새학교');
   assert.equal(created.body.student.firstClassDate, '2026-08-21');
 
+  seedLesson(db, 'lesson-new-student', 'teacher-a', created.body.student.id);
+  const stored = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === created.body.student.id);
+  assert.equal('teacher' in stored || 'teacherIds' in stored, false);
   const teacher = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
   const visible = teacher.body.roster.students.find(item => item.id === created.body.student.id);
   assert.equal(visible.phoneMother, '010-3333-4444');
@@ -363,6 +398,20 @@ test('admin directly moves a student to leave and returns them with a newly assi
   const leaveEvent = db.prepare("SELECT event_type,details FROM student_change_events WHERE app='task' AND student_id='student-a' ORDER BY changed_at DESC LIMIT 1").first();
   assert.equal(leaveEvent.event_type, 'leave');
   assert.equal(JSON.parse(leaveEvent.details).direct, true);
+  const priorTeacherView = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  assert.deepEqual(priorTeacherView.body.roster.students.map(student => student.id), ['student-a'],
+    '전환 이벤트의 당시 담당자는 휴원 이력을 계속 확인할 수 있다');
+
+  const combined = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: leave.body.updatedAt,
+    studentId: 'student-a', operation: 'return', effectiveDate: '2026-08-25', staffId: 'teacher-b',
+    subjects: ['수학', '영어'], scheduleSlots: [
+      { days: [1], startTime: '16:00', endTime: '17:00', lessonHours: '1.5T' }
+    ]
+  });
+  assert.equal(combined.status, 400);
+  assert.match(combined.body.error, /정확히 한 개/);
+  assert.equal((await call(db, { auth: admin, action: 'get' })).body.updatedAt, leave.body.updatedAt);
 
   const returned = await call(db, {
     auth: admin, action: 'student_transition', expectedUpdatedAt: leave.body.updatedAt,
@@ -375,7 +424,7 @@ test('admin directly moves a student to leave and returns them with a newly assi
   assert.equal(returned.status, 200);
   assert.equal(returned.body.student.end, '');
   assert.equal(returned.body.student.reason, '');
-  assert.equal(returned.body.student.teacher, '나선생');
+  assert.equal(returned.body.student.teacher, undefined, '복귀 담당은 생성 수업 staffId에만 저장한다');
   assert.equal(returned.body.task.staffId, 'teacher-b');
   assert.equal(returned.body.task.lessonHours, '');
   assert.deepEqual(returned.body.task.scheduleSlots.map(slot => slot.lessonHours), ['1.5T', '1T']);
@@ -390,7 +439,51 @@ test('admin directly moves a student to leave and returns them with a newly assi
   assert.equal(JSON.parse(returnEvent.details).lessonHours, '');
   assert.equal(JSON.parse(returnEvent.details).scheduleText, '월·수 16:00-17:00 · 1.5T / 금 18:00-18:50 · 1T');
   const teacherView = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
-  assert.deepEqual(teacherView.body.roster.students.map(student => student.id), ['student-a', 'student-b', 'student-shared']);
+  assert.deepEqual(teacherView.body.roster.students.map(student => student.id), ['student-a']);
+});
+
+test('direct leave only retires lessons that still reach the effective date and records that exact audience', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  seedLesson(db, 'lesson-direct-current', 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
+  seedLesson(db, 'lesson-direct-ended', 'teacher-b', 'student-a', { start: '2026-01-01', end: '2026-08-19' });
+  seedLesson(db, 'lesson-direct-bad-end', 'teacher-b', 'student-a', { start: '2026-01-01', end: '종료일오류' });
+  const initial = await call(db, { auth: admin, action: 'get' });
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20'
+  });
+  assert.equal(leave.status, 200);
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-direct-current'").first().data).deleted, true);
+  for (const id of ['lesson-direct-ended', 'lesson-direct-bad-end']) {
+    assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(id).first().data).deleted, false);
+  }
+  const event = db.prepare(
+    "SELECT audience_staff_ids FROM student_change_events WHERE event_type='leave' AND student_id='student-a'"
+  ).first();
+  assert.deepEqual(JSON.parse(event.audience_staff_ids), ['teacher-a']);
+  const oldUnrelatedTeacher = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
+  assert.equal(oldUnrelatedTeacher.body.roster.students.some(student => student.id === 'student-a'), false);
+});
+
+test('a lesson CAS race aborts the whole direct transition without changing roster or history', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  seedLesson(db, 'lesson-direct-race', 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
+  const initial = await call(db, { auth: admin, action: 'get' });
+  db.beforeBatch = database => database.prepare(
+    "UPDATE tasks SET updated_at=updated_at+1,srv_at=srv_at+1 WHERE app='task' AND id='lesson-direct-race'"
+  ).run();
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20'
+  });
+  assert.equal(leave.status, 409);
+  assert.equal(leave.body.code, 'ROSTER_REVISION_CONFLICT');
+  const student = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === 'student-a');
+  assert.equal(student.reason, '');
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-direct-race'").first().data).deleted, false);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE student_id='student-a'").first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
 });
 
 test('unassigned students may omit school, grade, subjects, and teachers before lesson placement', async () => {
@@ -434,18 +527,71 @@ test('same-name students are separated by school and grade, then by parent conta
   assert.equal(ambiguousWithoutPhone.body.code, 'STUDENT_ALREADY_EXISTS');
 });
 
-test('person receives only assigned and co-taught roster and book rows', async () => {
+test('person roster and book candidates follow current lesson stable ids instead of roster teacherIds', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
+  seedLesson(db, 'lesson-a-b', 'teacher-a', 'student-b');
+  seedLesson(db, 'lesson-b-shared', 'teacher-b', 'student-shared');
   const teacherA = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
   assert.equal(teacherA.status, 200);
-  assert.deepEqual(teacherA.body.roster.students.map(item => item.id), ['student-a', 'student-shared']);
-  assert.deepEqual(teacherA.body.bookStudents.map(item => item.id), ['book-row-a', 'book-row-a-2', 'book-row-shared']);
-  assert.equal(teacherA.body.studentSelectionScope, 'assigned');
+  assert.deepEqual(teacherA.body.roster.students.map(item => item.id), ['student-b']);
+  assert.deepEqual(teacherA.body.bookStudents.map(item => item.id), [],
+    '같은 학생의 다른 과목 수업만으로 legacy 교재 배정을 볼 수 없다');
+  assert.deepEqual(teacherA.body.bookOrderStudents.map(item => item.id), ['student-b']);
+  assert.equal(teacherA.body.studentSelectionScope, 'lesson_students');
   assert.equal(JSON.stringify(teacherA.body).includes('teacherIds'), false);
 
   const teacherB = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
-  assert.deepEqual(teacherB.body.roster.students.map(item => item.id), ['student-b', 'student-shared']);
-  assert.deepEqual(teacherB.body.bookStudents.map(item => item.id), ['book-row-b', 'book-row-shared']);
+  assert.deepEqual(teacherB.body.roster.students.map(item => item.id), ['student-shared']);
+  assert.deepEqual(teacherB.body.bookStudents.map(item => item.id), ['book-row-shared']);
+  assert.deepEqual(teacherB.body.bookOrderStudents.map(item => item.id), ['student-shared']);
+});
+
+test('lesson-derived candidates preserve duplicate ids, retain assigned transition history, and fail closed for invalid lessons', async () => {
+  const db = new TestD1(); seedAuth(db);
+  const document = documentFixture();
+  document.roster.students.push(
+    { id: 'same-a', name: '동명이인', school: '같은학교', grade: '중1', phoneMother: '010-1111-2222',
+      teacher: '나선생', subject: '수학', start: '2020-01', end: '', reason: '', teacherIds: ['teacher-b'] },
+    { id: 'same-b', name: '동명이인', school: '같은학교', grade: '중1', phoneMother: '010-3333-4444',
+      teacher: '나선생', subject: '영어', start: '2020-01', end: '', reason: '', teacherIds: ['teacher-b'] },
+    { id: 'leave-a', name: '휴원학생', grade: '중1', teacher: '가선생', subject: '수학',
+      start: '2020-01', end: '2099-01', reason: '휴원 2026-08-27', teacherIds: ['teacher-a'] },
+    { id: 'withdraw-a', name: '퇴원학생', grade: '중1', teacher: '가선생', subject: '수학',
+      start: '2020-01', end: '2099-01', reason: '퇴원 2026-08-27', teacherIds: ['teacher-a'] },
+    { id: 'eventless-leave', name: '옛담당비공개', grade: '중1', teacher: '가선생', subject: '수학',
+      start: '2020-01', end: '2099-01', reason: '휴원 2026-08-27', teacherIds: ['teacher-a'] },
+    { id: 'ended-a', name: '종료학생', grade: '중1', teacher: '가선생', subject: '수학',
+      start: '2020-01', end: '2020-02', reason: '', teacherIds: ['teacher-a'] }
+  );
+  await replace(db, document);
+  seedLesson(db, 'lesson-same-a', 'teacher-a', 'same-a');
+  seedLesson(db, 'lesson-same-b', 'teacher-a', 'same-b');
+  seedLesson(db, 'lesson-leave', 'teacher-a', 'leave-a', { deleted: true, end: '2026-08-27' });
+  seedLesson(db, 'lesson-withdraw', 'teacher-a', 'withdraw-a', { deleted: true, end: '2026-08-27' });
+  seedLesson(db, 'lesson-eventless-leave', 'teacher-a', 'eventless-leave', { deleted: true, end: '2026-08-27' });
+  seedTransitionEvent(db, 'sce_leave_a', 'leave-a', 'leave', '2026-08-27', ['teacher-a']);
+  seedTransitionEvent(db, 'sce_withdraw_a', 'withdraw-a', 'withdrawal', '2026-08-27', ['teacher-a']);
+  seedLesson(db, 'lesson-ended', 'teacher-a', 'ended-a');
+  seedLesson(db, 'lesson-deleted', 'teacher-a', 'student-a', { deleted: true });
+  seedLesson(db, 'lesson-future', 'teacher-a', 'student-a', { start: '2099-01-01' });
+  seedLesson(db, 'lesson-owner-mismatch', 'teacher-a', 'student-shared', { owner: 'teacher-b' });
+  seedLesson(db, 'lesson-title-only-forgery', 'teacher-a', 'student-shared', {
+    taskKind: '', lessonFormVersion: 0, intakeVersion: 0, title: '[수업] 제목만 위조'
+  });
+  seedLesson(db, 'lesson-no-stable-id', 'teacher-a', '', { studentId: '' });
+
+  const result = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.roster.students.map(item => item.id),
+    ['student-a', 'same-a', 'same-b', 'leave-a', 'withdraw-a']);
+  assert.equal(result.body.roster.students.some(item => item.id === 'eventless-leave'), false,
+    '전환 이벤트가 없는 과거 수업만으로는 보호자 연락처가 포함된 원생 이력을 다시 노출하지 않는다');
+  assert.deepEqual(result.body.bookOrderStudents.map(item => item.id), ['student-a', 'same-a', 'same-b']);
+  assert.equal(result.body.bookOrderStudents.some(item => ['leave-a', 'withdraw-a'].includes(item.id)), false);
+  assert.equal(result.body.bookOrderStudents.some(item => item.id === 'student-shared'), false,
+    '제목만 [수업]인 일반 task는 학생 범위 권한을 만들지 못한다');
+  assert.deepEqual(result.body.bookOrderStudents.filter(item => item.name === '동명이인').map(item => item.id), ['same-a', 'same-b']);
+  assert.equal(result.body.bookOrderStudents.some(item => 'phoneMother' in item || 'teacher' in item), false);
 });
 
 test('both configured task managers receive the full roster for stable-id student selection', async () => {
@@ -472,12 +618,13 @@ test('person cannot replace, forge another id, or use a deleted staff session', 
   })).status, 401);
 });
 
-test('replace rejects missing identity, duplicate ids, bad references, and unknown fields', async () => {
+test('replace accepts optional legacy roster teachers and rejects duplicate ids, bad references, and unknown fields', async () => {
   const db = new TestD1(); seedAuth(db);
 
   const missingTeacherIds = documentFixture();
   delete missingTeacherIds.roster.students[0].teacherIds;
-  assert.equal((await replace(db, missingTeacherIds)).status, 400);
+  delete missingTeacherIds.roster.students[0].teacher;
+  assert.equal((await replace(db, missingTeacherIds)).status, 200);
 
   const duplicateRosterId = documentFixture();
   duplicateRosterId.roster.students[1].id = 'student-a';
@@ -501,11 +648,11 @@ test('replace rejects missing identity, duplicate ids, bad references, and unkno
 
   const unknownTeacher = documentFixture();
   unknownTeacher.roster.students[0].teacherIds.push('teacher-unknown');
-  assert.match((await replace(db, unknownTeacher)).body.error, /활성 직원 ID/);
+  assert.equal((await replace(db, unknownTeacher)).status, 200, 'legacy roster teacherIds는 권한 정본이 아니다');
 
   const deletedTeacher = documentFixture();
   deletedTeacher.roster.students[0].teacherIds.push('teacher-deleted');
-  assert.match((await replace(db, deletedTeacher)).body.error, /활성 직원 ID/);
+  assert.equal((await replace(db, deletedTeacher)).status, 200, '비활성 legacy roster 담당도 새 수업 권한을 부여하지 않는다');
 });
 
 test('replace keeps unresolved boarded students active until transport is completed or reset', async () => {
