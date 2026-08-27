@@ -449,6 +449,17 @@ test('feedback preview hides the learned-content input and keeps its value from 
   assert.doesNotMatch(submit, /#fldContent/);
 });
 
+test('teacher-only other notes never enter parent feedback text or send fields', () => {
+  const feedbackStart = html.indexOf('function feedbackText(');
+  const feedbackEnd = html.indexOf('function todayStaffList(', feedbackStart);
+  const feedback = html.slice(feedbackStart, feedbackEnd);
+  assert.match(feedback, /memo\.contentProgress\.trim\(\)/);
+  assert.match(feedback, /memo\.homework\.trim\(\)/);
+  assert.match(feedback, /memo\.comment\.trim\(\)/);
+  assert.doesNotMatch(feedback, /memo\.otherNotes|otherNotes\.trim/);
+  assert.match(html, /선생님 내부 공유 · 학부모 미발송/);
+});
+
 test('guardian contacts are saved and rendered by stable studentId, not by student name', () => {
   assert.match(html, /new Map\(\(result\.contacts \|\| \[\]\)\.map\(c => \[c\.studentId, c\]\)\)/);
   assert.match(html, /action: 'set', studentId: student\.id,[\s\S]{0,100}studentName: student\.name/);

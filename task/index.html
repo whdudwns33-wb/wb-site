@@ -174,6 +174,7 @@
   .lesson-memo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .lesson-memo-field { display: block; min-width: 0; }
   .lesson-memo-field .fl { display: block; color: var(--mid-gray); font-size: 12.5px; font-weight: 700; }
+  .lesson-memo-private { display: block; margin-top: 2px; color: #9E3629; font-size: 11px; font-weight: 700; }
   .lesson-memo-editor .lesson-memo-field textarea.note,
   .lesson-memo-editor:focus-within .lesson-memo-field textarea.note { min-height: 72px; margin-top: 5px; border-style: dashed; border-color: var(--line); background: var(--ivory); outline: none; }
   .lesson-memo-editor .lesson-memo-field textarea.note:focus { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -956,11 +957,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.3"></script>
-<script src="./asset-core.js?v=2026-08-27.3"></script>
-<script src="./qr-core.js?v=2026-08-27.3"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.4"></script>
+<script src="./asset-core.js?v=2026-08-27.4"></script>
+<script src="./qr-core.js?v=2026-08-27.4"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.4"></script>
 <script>
 "use strict";
 
@@ -2816,7 +2817,9 @@ function taskMemoEditorHtml(t, date, c, editable) {
         '<div class="note"><b>' + esc(field.label) + '</b><br>' + esc(values[field.key]) + '</div>').join('') + '</div>' : '';
     }
     return '<div class="memo-editor lesson-memo-editor"><div class="lesson-memo-grid">' + LESSON_MEMO_FIELDS.map(field =>
-      '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span><textarea class="note" data-lesson-memo-field="' +
+      '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
+      (field.key === 'otherNotes' ? '<span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송</span>' : '') +
+      '<textarea class="note" data-lesson-memo-field="' +
       field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="2" enterkeyhint="enter" placeholder="' + esc(field.placeholder) + '">' +
       esc(values[field.key]) + '</textarea></label>').join('') + '</div><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
       t.id + '" data-date="' + date + '">수업 메모 저장</button></div>';
@@ -3795,7 +3798,7 @@ function feedbackText(t, date, genComment) {
     if (memo.contentProgress.trim()) etc.push(memo.contentProgress.trim());
     if (memo.homework.trim()) hw.push(memo.homework.trim());
     if (memo.comment.trim()) etc.push(memo.comment.trim());
-    if (memo.otherNotes.trim()) etc.push(memo.otherNotes.trim());
+    // 기타·특이사항은 선생님 내부 공유 전용이며 학부모 피드백 문구에는 절대 넣지 않는다.
   } else {
     ((c && c.note) || '').split(/\n|\//).map(x => x.trim()).filter(Boolean).forEach(line => {
       if (line.startsWith('+')) plus.push(line.slice(1).trim());
@@ -16131,7 +16134,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.3';
+const APP_VER = '2026-08-27.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
