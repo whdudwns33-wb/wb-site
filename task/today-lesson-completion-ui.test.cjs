@@ -182,6 +182,7 @@ test('수업 메모는 네 항목을 한 저장 버튼으로 저장하고 기존
     { note: '기존 단일 메모' }, true);
   assert.equal((legacy.match(/data-lesson-memo-field=/g) || []).length, 4);
   for (const label of ['수업내용 · 진도', '과제', '코멘트', '기타 · 특이사항']) assert.match(legacy, new RegExp(label));
+  assert.match(legacy, /기타 · 특이사항<\/span><span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송<\/span>/);
   assert.match(legacy, /data-lesson-memo-field="contentProgress"[\s\S]*기존 단일 메모/);
   assert.equal((legacy.match(/data-act="notesave"/g) || []).length, 1);
   assert.match(legacy, />수업 메모 저장<\/button>/);
