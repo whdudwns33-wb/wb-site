@@ -239,6 +239,12 @@
     .feedback { text-align: center; font-size: .85rem; font-weight: 700; color: var(--deep); margin-top: 10px; min-height: 1.4em; }
 
     .say-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .8rem; font-weight: 700; color: var(--deep); background: #E9F5FB; border-radius: 999px; padding: 6px 14px; }
+    .voice-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+    .voice-row .say-btn { margin-top: 0; }
+    .say-btn.on { background: var(--coral-soft); color: var(--coral); }
+    .voice-out { margin-top: 8px; }
+    .voice-out audio { width: 100%; height: 38px; }
+    .voice-hint { font-size: .7rem; color: var(--ink-soft); text-align: center; margin-top: 6px; }
 
     /* 깜빡이 */
     .blink-stage { min-height: 46vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
@@ -335,6 +341,7 @@
   <div class="toast" id="toast"></div>
 <!-- APP:BODY:END -->
 
+  <script src="./voice.js"></script>
   <script src="./words.js"></script>
   <script src="./bridge.js"></script>
   <script src="./quiz.js"></script>
@@ -385,13 +392,7 @@
     var el = $('#toast'); el.textContent = msg; el.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(function () { el.classList.remove('show'); }, 2200);
   }
-  function say(text, lang) {
-    try {
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = lang || 'ko-KR'; u.rate = 0.95;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
-    } catch (e) { /* TTS 미지원 */ }
-  }
+  function say(text, lang) { WBVoice.speak(text, { lang: lang, rate: 0.95 }); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function fmtDue(due) {
@@ -636,6 +637,67 @@
   }
   function sayWord(w) { say(w.word, w.type === 'english' ? 'en-US' : 'ko-KR'); }
 
+  /* ── 소리 도구: 들어보기(읽어주기) + 낭독(녹음) ──────────────────────────
+     듣기만 해서는 남지 않는다. 소리 내어 읽어야 조음이 기억을 만든다.
+     그래서 들어보기 옆에 늘 낭독을 붙인다 — 모범을 듣고, 따라 읽고, 견줘 본다.
+     녹음은 이 화면에서만 재생되고 기기 밖으로 나가지 않는다. */
+  var VOICE = { rec: null, timer: null };
+
+  function voiceRowHtml(pfx) {
+    return '<div class="voice-row">' +
+      '<button class="say-btn" id="' + pfx + 'Say">🔊 들어보기</button>' +
+      '<button class="say-btn" id="' + pfx + 'Rec">🎙 낭독</button></div>' +
+      '<div class="voice-out" id="' + pfx + 'Out"></div>';
+  }
+
+  function voiceRelease() {
+    if (VOICE.timer) { clearInterval(VOICE.timer); VOICE.timer = null; }
+    if (VOICE.rec) { VOICE.rec.release(); VOICE.rec = null; }
+    WBVoice.stop();
+  }
+
+  function bindVoiceRow(pfx, w) {
+    var say = $('#' + pfx + 'Say'), rec = $('#' + pfx + 'Rec'), out = $('#' + pfx + 'Out');
+    if (!say || !rec) return;
+
+    /* 낱말 → 뜻 → 예문 차례로. 토막마다 언어를 알아서 고른다(영단어 + 한글 뜻) */
+    say.addEventListener('click', function () { WBVoice.speakSeq([w.word, w.meaning, w.example]); });
+
+    if (!WBVoice.recSupported()) { rec.style.display = 'none'; return; }
+
+    function idle(label) {
+      rec.textContent = label; rec.classList.remove('on');
+      if (VOICE.timer) { clearInterval(VOICE.timer); VOICE.timer = null; }
+    }
+    rec.addEventListener('click', function () {
+      if (VOICE.rec) {   // 녹음 중 → 끝내기
+        var r = VOICE.rec; VOICE.rec = null;
+        r.stop().then(function (res) {
+          idle('🎙 다시 낭독');
+          if (!res) return;
+          out.innerHTML = '<audio controls src="' + res.url + '"></audio>' +
+            '<p class="voice-hint">들어보기와 견줘 보세요. 이 소리는 기기 밖으로 나가지 않아요.</p>';
+        });
+        return;
+      }
+      WBVoice.stop();
+      var nr = new WBVoice.Recorder();
+      nr.start().then(function () {
+        VOICE.rec = nr;
+        out.innerHTML = '';
+        rec.classList.add('on');
+        rec.textContent = '■ 끝내기 0:00';
+        VOICE.timer = setInterval(function () {
+          if (!VOICE.rec) return;
+          rec.textContent = '■ 끝내기 ' + WBVoice.clock(VOICE.rec.elapsedMs());
+        }, 500);
+      }).catch(function () {
+        toast('마이크를 쓸 수 없어요. 브라우저의 마이크 권한을 확인해 주세요.');
+        idle('🎙 낭독');
+      });
+    });
+  }
+
   /* ── AI 찰떡 연상 (연상 없는 단어에만 — 서버 연동 시) ── */
   function aiSlotHtml(w) {
     var cls = w.type === 'native' ? 'scene' : 'mnem';
@@ -843,13 +905,14 @@
       '<div class="tile"><b>' + (s.graduated ? '—' : fmtDue(s.due)) + '</b><span>다음 물 주기</span></div>' +
       '<div class="tile"><b>' + s.reps + '회</b><span>물 준 횟수</span></div>' +
       '<div class="tile"><b>' + (s.emaMs ? (s.emaMs / 1000).toFixed(1) + '초' : '—') + '</b><span>인출 속도</span></div></div>' +
-      '<div class="row" style="margin-top:16px;"><button class="btn" id="mdSay">🔊 소리 듣기</button><button class="btn primary" id="mdClose">닫기</button></div>';
+      voiceRowHtml('md') +
+      '<div class="row" style="margin-top:16px;"><button class="btn primary" id="mdClose">닫기</button></div>';
     $('#modalBack').classList.add('show');
-    $('#mdSay').addEventListener('click', function () { sayWord(w); });
+    bindVoiceRow('md', w);
     $('#mdClose').addEventListener('click', closeModal);
     bindAiSlot(w);
   }
-  function closeModal() { $('#modalBack').classList.remove('show'); }
+  function closeModal() { voiceRelease(); $('#modalBack').classList.remove('show'); }
   $('#modalBack').addEventListener('click', function (e) { if (e.target === $('#modalBack')) closeModal(); });
 
   /* ── 오버레이 세션 공통 ── */
@@ -864,7 +927,7 @@
   function closeOverlay() {
     $('#overlay').classList.remove('show');
     $('#overlay').innerHTML = '';
-    try { speechSynthesis.cancel(); } catch (e) {}
+    voiceRelease();
     if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
     if (speedTimer) { clearTimeout(speedTimer); speedTimer = null; }
     save(); render(curView); renderStreak();
@@ -990,9 +1053,9 @@
         '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
         encodeBlock(w, false) +
         (w.example ? '<div class="divider"></div><div class="qex">예문 · ' + esc(w.example) + '</div>' : '') +
-        '<button class="say-btn" id="pSay">🔊 소리 내어 따라 읽기</button></div>' +
+        voiceRowHtml('p') + '</div>' +
         '<div class="row" style="margin-top:14px;"><button class="btn primary big" id="pNext">외웠어요, 다음 →</button></div>';
-      $('#pSay').addEventListener('click', function () { sayWord(w); });
+      bindVoiceRow('p', w);
       $('#pNext').addEventListener('click', function () { idx += 1; encodeStep(); });
       bindAiSlot(w);
       sayWord(w);
@@ -1094,10 +1157,10 @@
         '<div class="qmeaning">' + esc(w.meaning) + '</div>' +
         encodeBlock(w, true) +
         (w.example ? '<div class="qex">' + esc(w.example) + '</div>' : '') +
-        '<button class="say-btn" id="exSay">🔊 소리 듣기</button>' +
+        voiceRowHtml('ex') +
         '<div class="feedback">' + fb + '</div>' +
         '<button class="btn primary big" id="exNext" style="margin-top:12px;">다음 →</button></div>';
-      $('#exSay').addEventListener('click', function () { sayWord(w); });
+      bindVoiceRow('ex', w);
       $('#exNext').addEventListener('click', function () { if ($('#ovBody')) next(); });
     }
 
