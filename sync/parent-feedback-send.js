@@ -41,6 +41,11 @@ const TEMPLATE_FIXED_TEXT =
   ' 선생님이 오늘  학생 수업을 마치고,\n직접 관찰한 내용을 정리해 보내드립니다.\n\n' +
   '▪ 오늘 배운 내용: \n▪ 잘한 점: \n▪ 다음에 더 신경 쓸 점: \n\n' +
   '숫자로 비교하지 않고, 그날 그 아이만 보고 남긴 기록입니다.\n문의사항은 학원으로 연락 주세요. 감사합니다.';
+const TEMPLATE_V2_FIXED_TEXT =
+  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
+  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
+  '- 일시 : \n- 과목 : \n- 수업내용 · 진도 : \n- 과제 : \n- 코멘트 : \n\n' +
+  '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 const MAX_ALIMTALK_CHARS = 900;
 
 function safeEqual(a, b) {
@@ -97,16 +102,18 @@ function validateRequestShape(body) {
 /** 코드가 배포돼도 실제 발송은 이 다섯 가지가 모두 갖춰져야만 켜진다.
  *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
  *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
-function sendConfiguration(env, studentId) {
+function sendConfiguration(env, studentId, templateVersion) {
+  const templateIdValue = templateVersion === 'v2'
+    ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 : env.SOLAPI_KAKAO_TEMPLATE_ID;
   if (!guardianDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
       !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
-      !env.SOLAPI_KAKAO_PF_ID || !env.SOLAPI_KAKAO_TEMPLATE_ID || !env.SOLAPI_SENDER_NUMBER) {
+      !env.SOLAPI_KAKAO_PF_ID || !templateIdValue || !env.SOLAPI_SENDER_NUMBER) {
     return null;
   }
   const apiKey = String(env.SOLAPI_KAKAO_API_KEY).trim();
   const apiSecret = String(env.SOLAPI_KAKAO_API_SECRET).trim();
   const pfId = String(env.SOLAPI_KAKAO_PF_ID).trim();
-  const templateId = String(env.SOLAPI_KAKAO_TEMPLATE_ID).trim();
+  const templateId = String(templateIdValue).trim();
   const sender = normalizedDigits(env.SOLAPI_SENDER_NUMBER);
   if (!apiKey || !apiSecret || !SAFE_ID.test(pfId) || !SAFE_ID.test(templateId) ||
       !/^\d{8,12}$/.test(sender)) return null;
@@ -177,9 +184,17 @@ function cleanField(value) {
 }
 
 function totalAlimtalkLength(fields) {
-  return TEMPLATE_FIXED_TEXT.length +
-    fields.teacherName.length + fields.studentName.length +
+  if (fields.templateVersion === 'v2') {
+    return TEMPLATE_V2_FIXED_TEXT.length + fields.studentName.length + fields.dateText.length +
+      fields.subjectText.length + fields.contentText.length + fields.homeworkText.length + fields.commentText.length;
+  }
+  return TEMPLATE_FIXED_TEXT.length + fields.teacherName.length + fields.studentName.length +
     fields.contentText.length + fields.plusText.length + fields.minusText.length;
+}
+
+function feedbackDateText(value) {
+  const matched = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return matched ? matched[1] + '년 ' + Number(matched[2]) + '월 ' + Number(matched[3]) + '일' : '';
 }
 
 function safeProviderId(value) {
@@ -295,13 +310,21 @@ export async function attemptParentFeedbackSend(env, app, current) {
   const contentText = cleanField(current.content_text);
   const plusText = cleanField(current.plus_text);
   const minusText = cleanField(current.minus_text);
-  if (!teacherName || !studentName || !contentText || !plusText || !minusText) {
+  const templateVersion = cleanField(current.template_version) === 'v2' ? 'v2' : 'v1';
+  const subjectText = cleanField(current.subject_text);
+  const homeworkText = cleanField(current.homework_text);
+  const commentText = cleanField(current.comment_text);
+  const dateText = feedbackDateText(current.feedback_date);
+  const requiredFieldsReady = templateVersion === 'v2'
+    ? subjectText && contentText && homeworkText && commentText && dateText
+    : contentText && plusText && minusText;
+  if (!teacherName || !studentName || !requiredFieldsReady) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '항목이 모두 채워지지 않아 발송하지 못했습니다', now0);
     return { ok: false, code: 'FIELDS_INCOMPLETE', status: 'content_approved_send_blocked' };
   }
 
-  const config = sendConfiguration(env, studentId);
+  const config = sendConfiguration(env, studentId, templateVersion);
   if (!config) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '학부모 알림톡 자동 발송이 아직 켜져 있지 않습니다', now0);
@@ -330,7 +353,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: guardian.error, status: 'content_approved_send_blocked' };
   }
 
-  const fields = { teacherName, studentName, contentText, plusText, minusText };
+  const fields = templateVersion === 'v2'
+    ? { templateVersion, studentName, dateText, subjectText, contentText, homeworkText, commentText }
+    : { templateVersion, teacherName, studentName, contentText, plusText, minusText };
   if (totalAlimtalkLength(fields) > MAX_ALIMTALK_CHARS) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '문구가 알림톡 글자수 상한(900자)을 넘어 발송하지 못했습니다', now0);
@@ -404,7 +429,10 @@ export async function attemptParentFeedbackSend(env, app, current) {
           to: guardian.phone, from: config.sender, type: 'ATA',
           kakaoOptions: {
             pfId: config.pfId, templateId: config.templateId, disableSms: true,
-            variables: {
+            variables: templateVersion === 'v2' ? {
+              '#{학생명}': studentName, '#{일시}': dateText, '#{과목}': subjectText,
+              '#{수업내용진도}': contentText, '#{과제}': homeworkText, '#{코멘트}': commentText
+            } : {
               '#{선생님}': teacherName, '#{학생명}': studentName, '#{학습내용}': contentText,
               '#{잘한점}': plusText, '#{보완점}': minusText
             }
