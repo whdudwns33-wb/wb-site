@@ -221,7 +221,7 @@ async function connected(db) {
   return { code: invited.body.code, cookie: exchanged.cookie.split(';')[0] };
 }
 
-test('global guardian pause keeps teacher homework storage but blocks non-allowlisted parent access', async () => {
+test('global guardian pause blocks non-allowlisted teacher homework storage and parent access', async () => {
   const db = new TestD1(); seed(db); const today = seedToday(db);
   const disabledEnv = { ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false' };
   const invoke = async (action, body = {}, auth = null) => {
@@ -235,8 +235,9 @@ test('global guardian pause keeps teacher homework storage but blocks non-allowl
     taskId: 'lesson-a', lessonDate: today.date, publicHomework: '연산 2쪽', publicReadiness: '연필',
     published: true, studentVisible: false, expectedRevision: 0
   }, { scope: 'own', id: 'staff-a', role: 'staff' });
-  assert.equal(stored.status, 200);
-  assert.equal(stored.body.publication.publicHomework, '연산 2쪽');
+  assert.equal(stored.status, 403);
+  assert.equal(stored.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM guardian_lesson_publications WHERE student_id='student-a'").first().count, 0);
   const access = await invoke('access_set', {
     studentId: 'student-a', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
   }, { scope: 'all' });
@@ -251,7 +252,7 @@ test('global guardian pause keeps teacher homework storage but blocks non-allowl
 });
 
 test('selective guardian mode exposes and permits only exact stable studentId matches', async () => {
-  const db = new TestD1(); seed(db); seedToday(db);
+  const db = new TestD1(); seed(db); const today = seedToday(db);
   const selectiveEnv = {
     ...env(db), WB_GUARDIAN_CONTACT_ENABLED: 'false',
     WB_GUARDIAN_CONTACT_STUDENT_IDS: 'student-a'
@@ -266,6 +267,13 @@ test('selective guardian mode exposes and permits only exact stable studentId ma
   const list = await invoke('access_list', {}, { scope: 'all' });
   assert.equal(list.status, 200);
   assert.deepEqual(list.body.deliveryEnabledStudentIds, ['student-a']);
+
+  const stored = await invoke('publication_set', {
+    taskId: 'lesson-a', lessonDate: today.date, publicHomework: '연산 2쪽', publicReadiness: '연필',
+    published: true, studentVisible: false, expectedRevision: 0
+  }, { scope: 'own', id: 'staff-a', role: 'staff' });
+  assert.equal(stored.status, 200);
+  assert.equal(stored.body.publication.studentId, undefined);
 
   const denied = await invoke('access_set', {
     studentId: 'student-b', enabled: true, scopeVersion: 4, expectedUpdatedAt: 0
