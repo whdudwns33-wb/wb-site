@@ -602,6 +602,17 @@
   .book-issue-card.is-risk { border-left: 4px solid var(--coral); background: #FFF9F7; }
   .book-issue-unassigned { border-color: #F3B8B0; background: #FFF9F7; }
   .book-issue-unassigned > summary { min-height: 44px; cursor: pointer; }
+  .book-order-start { border-color: #B9DDF0; }
+  .book-order-kinds { display: grid; gap: 10px; margin-top: 12px; }
+  .book-order-kind { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
+  .book-order-kind > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 14px 16px; color: var(--navy); cursor: pointer; list-style: none; font-size: 16px; font-weight: 900; }
+  .book-order-kind > summary::-webkit-details-marker { display: none; }
+  .book-order-kind[open] > summary { border-bottom: 1px solid var(--light-gray); background: #F8FBFD; }
+  .book-order-kind-state { color: var(--deep-blue); font-size: 12px; font-weight: 900; }
+  .book-order-kind-state .when-open { display: none; }
+  .book-order-kind[open] .book-order-kind-state .when-open { display: inline; }
+  .book-order-kind[open] .book-order-kind-state .when-closed { display: none; }
+  .book-order-kind-body { padding: 14px; }
   .book-order-stages { display: grid; gap: 9px; margin-top: 12px; }
   .book-order-stage { margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
   .book-order-stage > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 13px; cursor: pointer; list-style: none; }
@@ -956,11 +967,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.8"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.8"></script>
-<script src="./asset-core.js?v=2026-08-27.8"></script>
-<script src="./qr-core.js?v=2026-08-27.8"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.8"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.9"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.9"></script>
+<script src="./asset-core.js?v=2026-08-27.9"></script>
+<script src="./qr-core.js?v=2026-08-27.9"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.9"></script>
 <script>
 "use strict";
 
@@ -8301,6 +8312,12 @@ function loadBooks() {
 
 function applyBookOverlays() { mergeBookAdditions(); mergeBookEdits(); }
 
+function currentBookCatalogOverlays(rows) {
+  const resetAt = Date.parse(String(bookDb && bookDb.catalogResetAt || ''));
+  if (!Number.isFinite(resetAt)) return Array.isArray(rows) ? rows : [];
+  return (Array.isArray(rows) ? rows : []).filter(row => Number(row && row.updatedAt) >= resetAt);
+}
+
 let approvedBookAdditions = null;
 let approvedBookAdditionsLoaded = false;
 let approvedBookAdditionsLoading = false;
@@ -8310,7 +8327,7 @@ let approvedBookAdditionsError = '';
 function mergeBookAdditions() {
   if (!bookDb || !approvedBookAdditions) return;
   const existingIds = new Set((bookDb.books || []).map(b => b.id));
-  approvedBookAdditions.forEach(a => {
+  currentBookCatalogOverlays(approvedBookAdditions).forEach(a => {
     if (existingIds.has(a.bookId)) return;
     bookDb.books.push({
       id: a.bookId, title: a.title, subject: a.subject || '', level: a.level || '',
@@ -8351,7 +8368,7 @@ let approvedBookEditsError = '';
 function mergeBookEdits() {
   if (!bookDb || !approvedBookEdits) return;
   const byId = new Map((bookDb.books || []).map(b => [b.id, b]));
-  approvedBookEdits.forEach(e => {
+  currentBookCatalogOverlays(approvedBookEdits).forEach(e => {
     const b = byId.get(e.bookId);
     if (!b) return;
     b.title = e.title;
@@ -9507,8 +9524,6 @@ function viewBookIssues() {
     bookOrderStageHtml('teacher_received', '3단계 · 선생님 수령', '선생님이 수령한 교재가 없습니다.') +
     bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') + '</div>';
   h += '</section>';
-  const legacy = bookIssueRows.length || (session.isAdmin && bookIssueUnassignedStudents() && bookIssueUnassignedStudents().length);
-  if (legacy) h += '<details class="card"><summary><b>기존 학생별 출고 기록 보기</b></summary><div class="mt14">' + viewLegacyBookIssues() + '</div></details>';
   return h;
 }
 
@@ -9633,7 +9648,7 @@ async function transitionBookIssue(button) {
   }
 }
 
-function viewBooks() {
+function viewLegacyBookCatalog() {
   if (!rosterDb) {
     if (!rosterErr && !rosterLoading) loadRoster();
     if (rosterErr) return '<div class="card alert"><div class="card-title">원생별 교재 정보를 불러오지 못했습니다</div>' +
@@ -9737,6 +9752,28 @@ function viewBooks() {
     h += '</div></section>';
   });
   return h;
+}
+
+function viewBookOrderStart() {
+  const kinds = [
+    ['external', '외부교재', '등록된 외부교재가 없습니다.'],
+    ['internal', '내부교재', '등록된 내부교재가 없습니다.'],
+    ['bound', '제본교재', '등록된 제본교재가 없습니다.']
+  ];
+  return '<section class="card book-order-start"><div class="card-title">교재 주문하기</div>' +
+    '<div class="card-sub">교재 종류를 누르면 주문할 교재 목록이 펼쳐집니다.</div>' +
+    '<div class="book-order-kinds">' + kinds.map(kind =>
+      '<details class="book-order-kind" data-persist-key="book-order-' + kind[0] + '">' +
+        '<summary><span>' + kind[1] + '</span><span class="book-order-kind-state" aria-hidden="true">' +
+          '<span class="when-closed">펼치기</span><span class="when-open">접기</span></span></summary>' +
+        '<div class="book-order-kind-body"><div class="empty"><b>📚</b>' + kind[2] + '</div></div></details>').join('') +
+    '</div></section>';
+}
+
+function viewBooks() {
+  if (!rosterDb && !rosterErr && !rosterLoading) loadRoster();
+  if (!bookDb && !bookDbErr && !bookDbLoading) loadBooks();
+  return viewBookIssues() + viewBookOrderStart();
 }
 
 /* ── 차량 운행 ──
@@ -16386,7 +16423,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.8';
+const APP_VER = '2026-08-27.9';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

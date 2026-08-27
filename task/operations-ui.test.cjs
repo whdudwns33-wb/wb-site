@@ -42,59 +42,47 @@ test('book issue risks use a real 24 hours and unmatched active records stay vis
   assert.match(html, /출고 후 1일\+ 미수령/);
 });
 
-test('legacy book issue UI keeps status and admin-only unassigned KPIs, filters, retry, focus restoration, and no contact fields', () => {
-  const view = block('function viewLegacyBookIssues()', 'function bookOrderStageRows(');
-  const whole = block('/* ── 학생별 교재 출고·인계 ──', 'function viewBooks()');
-  assert.match(view, /미출고/);
-  assert.match(view, /출고 후 1일\+ 미수령/);
-  assert.match(view, /오늘 출고/);
-  assert.match(view, /인계 완료/);
-  assert.match(view, /session\.isAdmin \? \(unassigned === null[\s\S]{0,360}교재 미배정 · 확인 필요/);
-  assert.match(whole, /<details class="card book-issue-unassigned">/);
-  assert.match(whole, /교재는 자동 배정하지 않습니다/);
-  assert.match(view, /data-book-issue-search/);
-  assert.match(view, /bookissuerefresh/);
-  assert.match(whole, /restoreBookIssueFocus/);
-  assert.match(whole, /min-height: 44px|ops-actions/);
-  assert.doesNotMatch(whole, /type=\"tel\"|data-(?:phone|address)|guardianPhone/);
+test('books route keeps the order-delivery board but never renders legacy issue or unassigned surfaces', () => {
+  const issues = block('function viewBookIssues()', 'function bookOrderLinkBook(');
+  const view = block('function viewBooks()', '/* ── 차량 운행');
+
+  assert.match(issues, /교재 주문 및 배송 현황/);
+  assert.doesNotMatch(issues, /viewLegacyBookIssues\(|bookIssueUnassignedStudents\(|기존 학생별 출고 기록 보기|교재 미배정/);
+  assert.match(view, /viewBookIssues\(\)/);
+  assert.doesNotMatch(view, /viewLegacyBookIssues\(|bookIssueUnassigned|기존 학생별 출고 기록 보기|교재 미배정/);
 });
 
-test('unassigned book warning uses stable student ids, current enrollment, and fails closed outside admin roster', () => {
-  const source = block('function bookIssueUnassignedStudents()', 'function bookIssueUnassignedHtml(');
-  assert.match(source, /if \(!session\.isAdmin\) return \[\]/);
-  assert.match(source, /rosterLoading \|\| rosterErr \|\| !rosterDb[\s\S]{0,120}return null/);
-  assert.match(source, /assignedStudentIds.*studentId/);
-  assert.match(source, /student\.start <= currentMonth/);
-  assert.match(source, /!student\.end \|\| student\.end > currentMonth/);
-  assert.doesNotMatch(source, /student\.name.*assignedStudentIds|자동.*배정/);
+test('books route shows only the existing delivery board followed immediately by the new ordering surface', () => {
+  const view = block('function viewBooks()', '/* ── 차량 운행');
+  const delivery = view.indexOf('viewBookIssues()');
+  const ordering = view.indexOf('viewBookOrderStart()');
 
-  const run = (session, rosterDb, privateBookStudents, rosterLoading = false, rosterErr = '') => new Function(
-    'session', 'rosterDb', 'privateBookStudents', 'rosterLoading', 'rosterErr', 'today',
-    source + '; return bookIssueUnassignedStudents();'
-  )(session, rosterDb, privateBookStudents, rosterLoading, rosterErr, () => '2026-08-11');
-  const roster = { students: [
-    { id: 'student-active-missing', name: '미배정학생', grade: '중1', teacher: '담당A', start: '2026-08', end: '' },
-    { id: 'student-active-assigned', name: '배정학생', grade: '중2', teacher: '담당B', start: '2026-07', end: '' },
-    { id: 'student-ended', name: '종료학생', grade: '중3', teacher: '담당C', start: '2026-01', end: '2026-08' },
-    { id: 'student-future', name: '예정학생', grade: '초6', teacher: '담당D', start: '2026-09', end: '' }
-  ] };
-  const assignments = [{ id: 'assignment-stable', studentId: 'student-active-assigned' }];
-
-  assert.deepEqual(run({ isAdmin: false }, roster, assignments), []);
-  assert.equal(run({ isAdmin: true }, null, assignments), null);
-  assert.equal(run({ isAdmin: true }, roster, assignments, true, ''), null);
-  assert.equal(run({ isAdmin: true }, roster, assignments, false, 'temporary error'), null);
-  assert.deepEqual(run({ isAdmin: true }, roster, assignments).map(student => student.id), ['student-active-missing']);
+  assert.ok(delivery >= 0 && ordering > delivery, '교재 주문하기는 주문·배송 현황 바로 뒤에 렌더링해야 합니다');
+  assert.doesNotMatch(view, /교재 DB|data-book-search|viewBookAddReview\(|viewBookEditReview\(|viewOwnBookAddRequests\(|viewOwnBookEditRequests\(|data-book-vendor|bookCard\(/);
 });
 
-test('book issue errors keep roster-derived warnings visible and refresh both sources', () => {
-  const view = block('function viewLegacyBookIssues()', 'function bookOrderStageRows(');
-  const actions = block("case 'rosterretry':", "case 'onbadd':");
-  assert.match(view, /const unassignedHtml = bookIssueUnassignedHtml\(unassigned\)/);
-  assert.match(view, /if \(bookIssueError\)[\s\S]{0,420}\+ unassignedHtml/);
-  assert.match(view, /unassigned === null[\s\S]{0,160}미배정 확인 불가/);
-  assert.match(html, /최신 원생 명단을 확인하지 못해 이전 명단의 숫자를 표시하지 않습니다/);
-  assert.match(actions, /case 'bookissuerefresh':[\s\S]{0,180}loadRoster\(\); loadBookIssues\(true\)/);
+test('book ordering surface has three large, independently persistent, initially collapsed controls', () => {
+  const source = block('function viewBookOrderStart()', 'function viewBooks()');
+  const markup = new Function(`${source}\nreturn viewBookOrderStart();`)();
+  assert.match(markup, /<section class="card book-order-start">/);
+  assert.match(markup, /<div class="card-title">교재 주문하기<\/div>/);
+
+  const expected = [
+    ['book-order-external', '외부교재'],
+    ['book-order-internal', '내부교재'],
+    ['book-order-bound', '제본교재']
+  ];
+  const controls = [...markup.matchAll(/<details class="book-order-kind" data-persist-key="([^"]+)"([^>]*)><summary>([\s\S]*?)<\/summary>/g)];
+  assert.equal(controls.length, 3);
+  for (const [key, label] of expected) {
+    const control = controls.find(match => match[1] === key);
+    assert.ok(control, `${label} 접기·펼치기 영역이 필요합니다`);
+    assert.doesNotMatch(control[2], /\bopen\b/, `${label} 영역은 처음에는 접혀 있어야 합니다`);
+    assert.match(control[3], new RegExp('<span>' + label + '<\\/span>'));
+  }
+
+  assert.match(markup, /class="when-closed">펼치기<\/span><span class="when-open">접기<\/span>/);
+  assert.match(html, /\.book-order-kind\s*>\s*summary\s*\{[^}]*min-height:\s*64px/);
 });
 
 test('order delivery board uses four collapsed quantity stages and stable-student actions', () => {
