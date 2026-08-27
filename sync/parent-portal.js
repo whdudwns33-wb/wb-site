@@ -944,6 +944,10 @@ async function publicationSet(env, body, auth, origin, json) {
   }
   const checked = await publicationTaskForWrite(env, auth, taskId, lessonDate, now);
   if (checked.error) return json({ ok: false, code: checked.code, error: checked.error }, checked.status, origin);
+  if (!guardianDeliveryAllowed(env, checked.student.id)) {
+    return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
+      error: '이 학생은 현재 숙제·준비물 공개 대상이 아닙니다' }, 403, origin);
+  }
   const before = await env.DB.prepare(
     'SELECT * FROM guardian_lesson_publications WHERE app=? AND task_identity_hash=? AND lesson_date=? LIMIT 1'
   ).bind('task', checked.taskIdentityHash, lessonDate).first();
