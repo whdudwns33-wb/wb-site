@@ -325,8 +325,9 @@ function sameLegacyOrderCancellation(stored, incoming) {
 }
 
 async function hasUnsafeGenericScheduledOrder(env, app, entries) {
+  const protectedDeliveries = new Set(['scheduled_batch_v1', 'bound_print_v1']);
   const scheduled = entries.filter(entry => entry.table === 'tasks' && entry.change &&
-    entry.change.data && entry.change.data.orderDelivery === 'scheduled_batch_v1');
+    entry.change.data && protectedDeliveries.has(String(entry.change.data.orderDelivery || '')));
   const ids = [...new Set(scheduled.map(entry => String(entry.change.id || '')).filter(Boolean))];
   if (!ids.length) return false;
   const existing = new Map();
@@ -342,7 +343,7 @@ async function hasUnsafeGenericScheduledOrder(env, app, entries) {
     const row = existing.get(String(entry.change.id || ''));
     let current;
     try { current = row && JSON.parse(row.data || '{}'); } catch (error) { current = null; }
-    return !row || !current || current.orderDelivery !== 'scheduled_batch_v1' ||
+    return !row || !current || current.orderDelivery !== entry.change.data.orderDelivery ||
       String(row.owner || '') !== String(entry.change.owner || '') ||
       (!sameTaskJson(row.data, entry.change.data) && !sameLegacyOrderCancellation(row.data, entry.change.data));
   });

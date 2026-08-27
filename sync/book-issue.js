@@ -5,6 +5,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
 const NEXT = new Set([...STATES, 'reissue']);
 const ORDER_NEXT = new Set(['receive', 'hand', 'academy_register']);
+const ORDER_DELIVERIES = new Set(['scheduled_batch_v1', 'bound_print_v1']);
 const MAX_UNIT_PRICE = 10000000;
 const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 const WORDMASTER_BASIC_TITLE = '워드마스터중등베이직';
@@ -95,7 +96,7 @@ function canSetLegacyOrderPrice(owner, item, send, fulfillment, integrity, store
 function orderTaskData(row) {
   const task = parseJson(row && row.data || '{}', null);
   if (!task || task.deleted || !String(task.title || '').startsWith('[주문] ') ||
-      task.orderDelivery !== 'scheduled_batch_v1' || !Array.isArray(task.orderItems)) return null;
+      !ORDER_DELIVERIES.has(String(task.orderDelivery || '')) || !Array.isArray(task.orderItems)) return null;
   return task;
 }
 
@@ -116,7 +117,7 @@ function fulfillmentMatches(row, bookId, studentIds) {
 }
 
 function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, correctionRow, integrity,
-    taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents) {
+    taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents, boundPrint) {
   const studentIds = orderStudentIds(item);
   const unitPrice = storedOrderUnitPrice(item, priceRow, correctionRow);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
@@ -132,12 +133,12 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
     priceBackfilledAt: priceRow && priceRow.created_at ? Number(priceRow.created_at) : null,
     priceCorrectedAt: correctionRow && correctionRow.created_at ? Number(correctionRow.created_at) : null,
     canSetUnitPrice: canSetLegacyOrderPrice(owner, item, send, row, integrity, unitPrice),
-    owner: owner || null, teacherName: teacherName || '담당 미지정',
-    students, sendStatus: send ? String(send.status) : 'waiting', stage,
+    owner: owner || null, teacherName: teacherName || (owner ? '담당 미지정' : '관리자'),
+    students, sendStatus: send ? String(send.status) : boundPrint ? 'accepted' : 'waiting', stage,
     taskUpdatedAt: Number(taskUpdatedAt) || 0,
     orderRequestedAt: Number(taskCreatedAt) || Number(taskUpdatedAt) || null,
-    orderCompletedAt: send && String(send.status) === 'accepted'
-      ? Number(send.updated_at || send.created_at) || null : null,
+    orderCompletedAt: boundPrint ? Number(taskCreatedAt) || Number(taskUpdatedAt) || null
+      : send && String(send.status) === 'accepted' ? Number(send.updated_at || send.created_at) || null : null,
     needsStudentLink: !!needsStudentLink,
     canLinkStudents: !!canLinkStudents,
     revision: row ? Number(row.revision) : 0,
@@ -189,9 +190,11 @@ async function listOrderFulfillments(env, app, auth, document) {
     const task = orderTaskData(taskRow);
     if (!task) continue;
     const send = sendByTask.get(String(taskRow.id)) || null;
+    const boundPrint = task.orderDelivery === 'bound_print_v1';
+    const accepted = boundPrint || (!!send && String(send.status) === 'accepted');
     const sealedIdentity = await verifyOrderTaskSnapshotRows(
       String(taskRow.id), taskRow.owner, task, snapshotResult.results || [], document, Date.now(),
-      !send || String(send.status) !== 'accepted'
+      !accepted
     );
     for (let itemIndex = 0; itemIndex < task.orderItems.length; itemIndex++) {
       const item = task.orderItems[itemIndex] || {};
@@ -215,7 +218,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
         staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, correctionRow, integrity,
-        task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents));
+        task.createdAt, taskRow.updated_at, needsStudentLink, canLinkStudents, boundPrint));
     }
   }
   return rows;
@@ -517,7 +520,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin) {
   })) return json({ ok: false, error: '담당 학생의 주문만 처리할 수 있습니다' }, 403, origin);
 
   const send = await latestOrderSend(env, app, taskId);
-  const accepted = !!send && String(send.status) === 'accepted';
+  const accepted = task.orderDelivery === 'bound_print_v1' || (!!send && String(send.status) === 'accepted');
   const snapshots = await loadOrderSnapshotRows(env, app, taskId);
   const sealedIdentity = await verifyOrderTaskSnapshotRows(
     taskId, taskRow.owner, task, snapshots, document, Date.now(), !accepted
