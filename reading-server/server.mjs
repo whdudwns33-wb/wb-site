@@ -13,6 +13,7 @@ import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
 const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
+const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -335,6 +336,7 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
     /* 워드브레인 앱 */
+    if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/vocab' || p === '/vocab/') return serveFile(res, VOCAB_DIR, 'index.html');
     if (p.startsWith('/vocab/')) return serveFile(res, VOCAB_DIR, p.slice('/vocab/'.length));
 

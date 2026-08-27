@@ -236,6 +236,7 @@
   <div id="live" class="sr" role="status" aria-live="polite"></div>
   <div id="printArea" aria-hidden="true"></div>
 
+<script src="./voice.js"></script>
 <script>
 'use strict';
 /* ───────────────────────── 상수 ───────────────────────── */
@@ -615,6 +616,7 @@ function vReader(){
         ${mc?`<button class="toolbtn" data-act="toggle-mychunk" aria-pressed="${chunk&&useMine}">∕ 내 단위</button>`:''}
         <button class="toolbtn" data-act="mychunk-edit">✂ 직접 끊기</button>
         <button class="toolbtn" data-act="auto-start">▶ 자동 읽기</button>
+        <button class="toolbtn" data-act="listen-start">🔊 들으며 읽기</button>
         <button class="toolbtn" data-act="aloud">🎙 낭독</button>
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
@@ -1273,6 +1275,7 @@ function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="
 /* ── 자동 읽기 (SentenceMask) ── */
 const AUTO_SPEEDS=[170,120,85,60];               // ms/글자
 const AUTO_SPEED_LABELS=['천천히','보통','빠르게','최고'];
+const VOICE_RATES=[0.75,0.95,1.15,1.4];          // 들으며 읽기 — 같은 4단계를 배속으로
 const AUTO_SCOPES=['좁게','넓게','문장'];         // 좁게=의미 단위 1개, 넓게=2개 묶음, 문장=문장 단위
 function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg')).filter(el=>el.offsetParent!==null);}
 function autoGroups(){
@@ -1309,24 +1312,58 @@ function autoTick(){
   autoHighlight(groups);
   const first=groups[a.idx][0];
   if(first)first.scrollIntoView({block:'center',behavior:'smooth'});
-  a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(groups[a.idx]));
+  if(a.voice){
+    /* 타이머로 넘기면 소리와 글자가 어긋난다. 말이 실제로 끝난 순간에 넘긴다. */
+    const text=groups[a.idx].map(el=>(el.textContent||'').trim()).filter(Boolean).join(' ');
+    const tok=(a.tok=(a.tok||0)+1);   // 멈추거나 속도·범위를 바꾸면 옛 발화의 끝은 무시한다
+    WBVoice.speak(text,{rate:VOICE_RATES[a.speed]||1,onend:()=>{
+      const b=sess.auto;if(!b||!b.playing||b.tok!==tok)return;
+      b.idx++;autoTick();
+    },onerror:()=>{
+      const b=sess.auto;if(!b||b.tok!==tok)return;
+      autoStop(false);announce('소리를 낼 수 없어요. 기기의 소리 설정을 확인해 주세요.');
+    }});
+  }else{
+    a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(groups[a.idx]));
+  }
 }
 function autoStop(done){
+  const wasVoice=!!(sess.auto&&sess.auto.voice);
   if(sess.auto&&sess.auto.timer)clearTimeout(sess.auto.timer);
+  if(wasVoice)WBVoice.stop();
   sess.auto=null;
   const c=document.getElementById('readerCard');if(c)c.classList.remove('autoread');
   document.querySelectorAll('.seg.now').forEach(s=>s.classList.remove('now'));
   const bar=document.getElementById('autoBar');if(bar)bar.remove();
-  if(done)announce('자동 읽기 완료! 눈이 의미 단위를 따라갔어요.');
+  if(done)announce(wasVoice?'끝까지 들으며 읽었어요! 이제 🎙 낭독으로 직접 읽어 보세요.'
+                           :'자동 읽기 완료! 눈이 의미 단위를 따라갔어요.');
 }
-function autoStart(){
+/* 들으며 읽기 — 목소리가 준비됐는지 먼저 본다. 없으면 조용히 안 되는 대신 말해 준다. */
+function listenStart(){
+  if(sess.auto)return;
+  if(!WBVoice.ttsSupported()){announce('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 주세요.');return;}
+  const sample=autoSegs().slice(0,12).map(el=>el.textContent||'').join(' ');
+  const lang=WBVoice.langOf(sample);
+  WBVoice.onReady(function(ok){
+    if(!ok||!WBVoice.hasVoice(lang)){
+      announce(lang==='en'?'이 기기에 영어 목소리가 없어요. 기기 설정에서 음성을 추가해 주세요.'
+                          :'이 기기에 한국어 목소리가 없어요. 기기 설정에서 음성을 추가해 주세요.');
+      return;
+    }
+    autoStart(true);
+  });
+}
+function autoStart(voice){
   if(sess.auto)return;
   const pf=S.prefs.auto||{speed:1,scope:0};
-  sess.auto={idx:0,playing:true,speed:Math.min(pf.speed==null?1:pf.speed,AUTO_SPEEDS.length-1),scope:Math.min(pf.scope==null?0:pf.scope,AUTO_SCOPES.length-1),timer:null};
+  /* 음성은 문장 단위가 기본 — 두세 어절만 끊어 읽으면 말이 토막 나서 알아듣기 어렵다 */
+  const scope=voice?2:Math.min(pf.scope==null?0:pf.scope,AUTO_SCOPES.length-1);
+  sess.auto={idx:0,playing:true,speed:Math.min(pf.speed==null?1:pf.speed,AUTO_SPEEDS.length-1),scope:scope,timer:null,voice:!!voice,tok:0};
   const c=document.getElementById('readerCard');if(c)c.classList.add('autoread');
   const bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
   bar.innerHTML=`<div class="auto-in">
     <button class="toolbtn" data-act="auto-pp" id="autoPP">⏸ 정지</button>
+    ${voice?'<span class="tag ok">🔊 들으며 읽기</span>':''}
     <span class="auto-lbl">속도</span>
     <span class="seg-ctl" id="autoSpeedCtl">${AUTO_SPEED_LABELS.map((l,i)=>`<button data-act="auto-speed" data-i="${i}" aria-pressed="${i===sess.auto.speed}">${l}</button>`).join('')}</span>
     <span class="auto-lbl">범위</span>
@@ -1368,7 +1405,7 @@ function aloudBar(state){
     ALOUD.timer=setInterval(()=>{const s=Math.floor((Date.now()-ALOUD.t0)/1000);
       const el=document.getElementById('aloudTime');if(el)el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');},500);
   }else{
-    bar.innerHTML=`<div class="auto-in"><span class="tag ok">녹음 완료 — 들어 보세요</span>
+    bar.innerHTML=`<div class="auto-in"><span class="tag ok">낭독 완료 — 들어 보세요</span>
       <audio controls src="${ALOUD.url}" style="flex:1;min-width:170px;height:40px"></audio>
       <button class="toolbtn" data-act="aloud">다시 녹음</button><button class="toolbtn" data-act="aloud-close">✕</button></div>`;
   }
@@ -1513,15 +1550,19 @@ document.addEventListener('click',e=>{
   else if(act==='sync-now'){syncPush().then(()=>syncPull()).then(()=>{render();announce('동기화 완료');});}
   else if(act==='sync-off'){SYNC.auth=null;syncSaveAuth();render();}
   else if(act==='en-mode'){const lv=myLevel();if(sess.auto)autoStop(false);S.prefs.en[lv]=+t.dataset.m;save();render();}
-  else if(act==='auto-start'){autoStart();}
+  else if(act==='auto-start'){autoStart(false);}
+  else if(act==='listen-start'){listenStart();}
   else if(act==='auto-pp'){const a=sess.auto;if(!a)return;
     a.playing=!a.playing;
     const pp=document.getElementById('autoPP');if(pp)pp.textContent=a.playing?'⏸ 정지':'▶ 계속';
+    if(a.voice){a.tok=(a.tok||0)+1;WBVoice.stop();}
     if(a.playing)autoTick();else if(a.timer)clearTimeout(a.timer);}
   else if(act==='auto-speed'){const a=sess.auto;if(!a)return;
     a.speed=+t.dataset.i;
     S.prefs.auto=S.prefs.auto||{};S.prefs.auto.speed=a.speed;save();
-    document.querySelectorAll('#autoSpeedCtl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));}
+    document.querySelectorAll('#autoSpeedCtl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));
+    /* 배속은 말하는 중에 못 바꾼다 — 지금 덩어리를 새 속도로 다시 읽는다 */
+    if(a.voice){a.tok=(a.tok||0)+1;WBVoice.stop();if(a.playing)autoTick();}}
   else if(act==='auto-scope'){const a=sess.auto;if(!a)return;
     const old=autoGroups();const curEl=(old[a.idx]||[])[0];
     a.scope=+t.dataset.i;
@@ -1532,12 +1573,13 @@ document.addEventListener('click',e=>{
     a.idx=ni;
     document.querySelectorAll('#autoScopeCtl button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.i===t.dataset.i?'true':'false'));
     if(a.timer)clearTimeout(a.timer);
+    if(a.voice){a.tok=(a.tok||0)+1;WBVoice.stop();}
     if(a.playing)autoTick();else autoHighlight(ng);}
   else if(act==='auto-exit'){autoStop(false);}
   /* ── 낭독 녹음 ── */
   else if(act==='aloud'){aloudStart();}
   else if(act==='aloud-stop'){if(ALOUD.rec&&ALOUD.rec.state==='recording'){ALOUD.rec.stop();
-    S.train.push({date:dkey(),articleId:view.id,type:'aloud'});save();announce('낭독 녹음 완료! 들어 보세요.');}}
+    S.train.push({date:dkey(),articleId:view.id,type:'aloud'});save();announce('낭독 완료! 들어 보세요. 🔊 들으며 읽기와 견줘 보면 더 좋아요.');}}
   else if(act==='aloud-close'){aloudClose();}
   else if(act==='vocab-en'){openVocabEn(t.dataset.id,t.dataset.w);}
   else if(act==='ct-start-article'){const id=t.dataset.id;
