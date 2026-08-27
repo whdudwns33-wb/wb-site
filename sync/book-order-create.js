@@ -9,6 +9,16 @@ const MAX_UNIT_PRICE = 10000000;
 export const MAX_BOOK_ORDER_MESSAGE_BYTES = 2000;
 const ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'vendorName', 'items', 'expectedUpdatedAt']);
 const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds', 'unitPrice']);
+const BOUND_ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'productCode', 'title', 'studentIds']);
+const BOUND_DELIVERY = 'bound_print_v1';
+const BOUND_VENDOR = '제본교재';
+const BOUND_PRODUCTS = Object.freeze({
+  pages_1_30: Object.freeze({ label: '1~30 장 - 4,000원', unitPrice: 4000 }),
+  pages_31_60: Object.freeze({ label: '31~60 장 - 7,000원', unitPrice: 7000 }),
+  pages_61_90: Object.freeze({ label: '61~90 장 - 9,000원', unitPrice: 9000 }),
+  exam_upto_30: Object.freeze({ label: '시험대비 (30장 이하) - 9,000원', unitPrice: 9000 }),
+  exam_over_30: Object.freeze({ label: '시험대비 (31장 이상) - 15,000원', unitPrice: 15000 })
+});
 
 function text(value, max, empty) {
   const cleaned = String(value == null ? '' : value).normalize('NFKC').trim();
@@ -24,6 +34,11 @@ function parseJson(value, fallback) {
 async function sha256Hex(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function boundBookId(productCode, title) {
+  const hash = await sha256Hex(JSON.stringify([String(productCode), String(title)]));
+  return 'BOUND_' + hash.slice(0, 48);
 }
 
 function kstDate(now) {
@@ -119,7 +134,8 @@ export async function verifyOrderTaskSnapshotRows(
   }
   if (document === false) return { sealed: true, valid: false, code: 'ORDER_STUDENT_IDENTITY_CHANGED' };
   const ownerId = String(owner || '');
-  if (!task || task.deleted || task.orderDelivery !== 'scheduled_batch_v1' ||
+  const delivery = String(task && task.orderDelivery || '');
+  if (!task || task.deleted || !['scheduled_batch_v1', BOUND_DELIVERY].includes(delivery) ||
       Number(task.orderIdentityVersion) !== 1 || !Array.isArray(task.orderItems) || !task.orderItems.length) {
     return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
   }
@@ -132,6 +148,15 @@ export async function verifyOrderTaskSnapshotRows(
       return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
     }
     identities.push(identity);
+  }
+  if (delivery === BOUND_DELIVERY) {
+    const product = BOUND_PRODUCTS[String(task.boundProductCode || '')];
+    const identity = identities[0];
+    if (!product || identities.length !== 1 || vendorName !== BOUND_VENDOR ||
+        String(task.boundProductLabel || '') !== product.label || identity.unitPrice !== product.unitPrice ||
+        identity.bookId !== await boundBookId(String(task.boundProductCode), identity.title)) {
+      return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
+    }
   }
   const expectedTaskHash = await taskIdentityHash(String(taskId), ownerId, vendorName, identities);
   const expectedRowCount = identities.reduce((sum, item) => sum + item.studentIds.length, 0);
@@ -202,6 +227,14 @@ function requestError(body) {
     !Number.isInteger(item.unitPrice) || item.unitPrice < 1 || item.unitPrice > MAX_UNIT_PRICE);
 }
 
+function boundRequestError(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || body.action !== 'create_bound' ||
+      Object.keys(body).some(key => !BOUND_ALLOWED_KEYS.has(key)) ||
+      !SAFE_ORDER_TASK_ID.test(String(body.taskId || '')) ||
+      !BOUND_PRODUCTS[String(body.productCode || '')] || !text(body.title, 160, false)) return true;
+  return !normalizedStudentIds({ studentIds: body.studentIds });
+}
+
 function cancelRequestError(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body) || body.action !== 'cancel' ||
       Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) return true;
@@ -258,6 +291,42 @@ function canonicalTask(taskId, ownerId, vendorName, items, now) {
   };
 }
 
+function canonicalBoundTask(taskId, ownerId, productCode, product, item, now) {
+  return {
+    id: taskId,
+    groupId: 'bound-order-' + now,
+    staffId: ownerId || null,
+    title: '[주문] ' + item.title,
+    detail: item.title + ': ' + item.qty + ' · ' + product.label,
+    guide: '제본 교재 주문입니다.\n1) 제본 완료 후 학생에게 배부\n2) 배부 후 아카등록 완료 처리',
+    steps: [{ id: crypto.randomUUID(), label: '배부 후 아카등록' }],
+    target: 0,
+    unit: '건',
+    time: '',
+    priority: 'normal',
+    repeat: 'once',
+    days: [],
+    start: kstDate(now),
+    end: '',
+    carry: true,
+    orderVendor: BOUND_VENDOR,
+    orderItems: [{
+      bookId: item.bookId,
+      title: item.title,
+      studentIds: item.studentIds,
+      qty: item.qty,
+      unitPrice: item.unitPrice
+    }],
+    orderDelivery: BOUND_DELIVERY,
+    orderIdentityVersion: 1,
+    boundProductCode: productCode,
+    boundProductLabel: product.label,
+    createdAt: now,
+    updatedAt: now,
+    deleted: false
+  };
+}
+
 async function exactExisting(env, app, taskId, ownerId, vendorName, items, document) {
   const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, taskId).first();
@@ -265,12 +334,39 @@ async function exactExisting(env, app, taskId, ownerId, vendorName, items, docum
   if (!row || !snapshots.length) return null;
   const task = parseJson(row.data || '{}', null);
   const verified = await verifyOrderTaskSnapshotRows(taskId, row.owner, task, snapshots, document, Date.now(), false);
-  if (!verified.valid || !verified.sealed || String(row.owner || '') !== ownerId ||
+  if (!verified.valid || !verified.sealed || task.orderDelivery !== 'scheduled_batch_v1' ||
+      String(row.owner || '') !== ownerId ||
       text(task.orderVendor, 100, true) !== vendorName || task.orderItems.length !== items.length) return null;
   for (let index = 0; index < items.length; index++) {
     const stored = await itemIdentity(task.orderItems[index]);
     if (!stored || stored.itemIdentityHash !== items[index].itemIdentityHash) return null;
   }
+  return task;
+}
+
+async function exactExistingBound(env, app, taskId, ownerId, productCode, identity, document) {
+  const [taskRow, fulfillment] = await Promise.all([
+    env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, taskId).first(),
+    env.DB.prepare('SELECT * FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=0 LIMIT 1')
+      .bind(app, taskId).first()
+  ]);
+  const snapshots = await loadOrderSnapshotRows(env, app, taskId);
+  if (!taskRow || !snapshots.length || !fulfillment) return null;
+  const task = parseJson(taskRow.data || '{}', null);
+  const verified = await verifyOrderTaskSnapshotRows(
+    taskId, taskRow.owner, task, snapshots, document, Date.now(), false
+  );
+  const stored = task && Array.isArray(task.orderItems) && task.orderItems.length === 1
+    ? await itemIdentity(task.orderItems[0]) : null;
+  const parsedFulfillmentIds = parseJson(fulfillment.student_ids || '[]', null);
+  const fulfillmentIds = Array.isArray(parsedFulfillmentIds) ? parsedFulfillmentIds.map(String).sort() : [];
+  if (!verified.valid || !verified.sealed || task.orderDelivery !== BOUND_DELIVERY ||
+      String(task.boundProductCode || '') !== productCode || String(taskRow.owner || '') !== ownerId ||
+      !stored || stored.itemIdentityHash !== identity.itemIdentityHash ||
+      String(fulfillment.book_id || '') !== identity.bookId ||
+      JSON.stringify(fulfillmentIds) !== JSON.stringify(identity.studentIds) ||
+      !['teacher_received', 'student_handed', 'academy_registered'].includes(String(fulfillment.status || '')) ||
+      !Number(fulfillment.teacher_received_at)) return null;
   return task;
 }
 
@@ -283,6 +379,163 @@ async function hasActiveDuplicate(env, app, identities) {
     'JOIN json_each(?) selected ON selected.value=target.student_id WHERE target.app=? AND target.active=1'
   ).bind(JSON.stringify(studentIds), app).all();
   return (result.results || []).some(row => wanted.has(String(row.book_id) + '\u0000' + String(row.student_id)));
+}
+
+async function createBoundOrder(env, app, body, origin, auth, json) {
+  if (app !== 'task' || boundRequestError(body)) {
+    return json({ ok: false, code: 'ORDER_INVALID',
+      error: '제본 종류·교재명·학생 선택을 다시 확인해 주세요' }, 400, origin);
+  }
+  const productCode = String(body.productCode);
+  const product = BOUND_PRODUCTS[productCode];
+  const title = text(body.title, 160, false).replace(/\s+/g, ' ');
+  const studentIds = normalizedStudentIds({ studentIds: body.studentIds });
+  const bookId = await boundBookId(productCode, title);
+  const identity = await itemIdentity({ bookId, title, studentIds, unitPrice: product.unitPrice });
+  if (!identity) {
+    return json({ ok: false, code: 'ORDER_INVALID',
+      error: '제본 종류·교재명·학생 선택을 다시 확인해 주세요' }, 400, origin);
+  }
+
+  const taskId = String(body.taskId);
+  const ownerId = auth && SAFE_ID.test(String(auth.id || '')) ? String(auth.id) : '';
+  const rosterRecord = await currentRosterRecord(env, app);
+  if (rosterRecord === null) {
+    return json({ ok: false, code: 'ROSTER_MISSING', error: '현재 원생 명단을 먼저 등록해 주세요' }, 404, origin);
+  }
+  if (rosterRecord === false) {
+    return json({ ok: false, code: 'ROSTER_INVALID', error: '현재 원생 명단 형식을 확인해 주세요' }, 409, origin);
+  }
+  const document = rosterRecord.document;
+  const rosterById = new Map(document.roster.students.map(student => [String(student.id), student]));
+  let existing;
+  try {
+    existing = await exactExistingBound(env, app, taskId, ownerId, productCode, identity, document);
+  } catch (error) {
+    if (/no such table.*(?:book_order_student_snapshots|book_order_fulfillments)/i.test(
+      String(error && error.message || error)
+    )) {
+      return json({ ok: false, code: 'ORDER_LEDGER_NOT_READY', error: '교재 주문 원장을 준비하고 있습니다' }, 503, origin);
+    }
+    throw error;
+  }
+  if (existing) return json({ ok: true, idempotent: true, task: existing }, 200, origin);
+
+  const collision = await env.DB.prepare(
+    'SELECT 1 AS found FROM tasks WHERE app=? AND id=? UNION ALL ' +
+    'SELECT 1 AS found FROM book_order_student_snapshots WHERE app=? AND task_id=? LIMIT 1'
+  ).bind(app, taskId, app, taskId).first();
+  if (collision) {
+    return json({ ok: false, code: 'ORDER_ID_CONFLICT',
+      error: '같은 주문 ID가 이미 다른 내용으로 사용되었습니다' }, 409, origin);
+  }
+
+  const month = kstDate(Date.now()).slice(0, 7);
+  if (studentIds.some(id => !rosterById.has(id))) {
+    return json({ ok: false, code: 'ORDER_STUDENT_MISSING',
+      error: '선택한 학생이 현재 원생 명단에 없습니다' }, 409, origin);
+  }
+  if (studentIds.some(id => !activeStudent(rosterById.get(id), month))) {
+    return json({ ok: false, code: 'ORDER_STUDENT_INACTIVE',
+      error: '현재 재원 중인 학생만 주문에 연결할 수 있습니다' }, 409, origin);
+  }
+  if (auth.scope === 'own' && studentIds.some(id => {
+    const student = rosterById.get(id);
+    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
+  })) {
+    return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+      error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+  }
+  if (await hasActiveDuplicate(env, app, [identity])) {
+    return json({ ok: false, code: 'ORDER_ALREADY_ACTIVE',
+      error: '같은 학생의 같은 제본 교재 주문이 아직 완료되지 않았습니다' }, 409, origin);
+  }
+
+  const now = Date.now();
+  const task = canonicalBoundTask(taskId, ownerId, productCode, product, identity, now);
+  task.origin = originFor(auth);
+  const taskHash = await taskIdentityHash(taskId, ownerId, BOUND_VENDOR, [identity]);
+  const snapshots = [];
+  for (const studentId of studentIds) {
+    snapshots.push({
+      taskId, itemIndex: 0, ownerId, bookId, studentId,
+      studentIdentityHash: await studentIdentityHash(rosterById.get(studentId)),
+      studentSetHash: identity.studentSetHash,
+      itemIdentityHash: identity.itemIdentityHash,
+      taskHash,
+      itemCount: 1,
+      rowCount: studentIds.length,
+      createdAt: now
+    });
+  }
+  const taskData = JSON.stringify(task);
+  const studentIdsJson = JSON.stringify(studentIds);
+  const receiverId = ownerId || 'director';
+  const statements = [
+    env.DB.prepare(
+      'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) SELECT ?,?,?,?,?,? ' +
+      'WHERE EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)'
+    ).bind(app, taskId, ownerId || null, taskData, now, now,
+      app, rosterRecord.rawData, rosterRecord.updatedAt),
+    env.DB.prepare(
+      'INSERT INTO book_order_student_snapshots(app,task_id,item_index,owner_id,book_id,public_title,student_id,' +
+      'student_identity_hash,student_set_hash,item_identity_hash,task_identity_hash,' +
+      'expected_item_count,expected_row_count,created_at) ' +
+      "SELECT ?,json_extract(value,'$.taskId'),json_extract(value,'$.itemIndex')," +
+      "json_extract(value,'$.ownerId'),json_extract(value,'$.bookId'),'주문 교재'," +
+      "json_extract(value,'$.studentId'),json_extract(value,'$.studentIdentityHash')," +
+      "json_extract(value,'$.studentSetHash'),json_extract(value,'$.itemIdentityHash')," +
+      "json_extract(value,'$.taskHash'),json_extract(value,'$.itemCount')," +
+      "json_extract(value,'$.rowCount'),json_extract(value,'$.createdAt') FROM json_each(?) " +
+      'WHERE EXISTS (SELECT 1 FROM tasks WHERE app=? AND id=? AND data=? AND updated_at=?) ' +
+      'AND EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)'
+    ).bind(app, JSON.stringify(snapshots), app, taskId, taskData, now,
+      app, rosterRecord.rawData, rosterRecord.updatedAt),
+    env.DB.prepare(
+      'INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,' +
+      'teacher_received_at,teacher_received_by,created_at,updated_at) ' +
+      "SELECT ?,?,?,?,?,'teacher_received',1,?,?,?,? " +
+      'WHERE EXISTS (SELECT 1 FROM tasks WHERE app=? AND id=? AND data=? AND updated_at=?) ' +
+      'AND (SELECT COUNT(*) FROM book_order_student_snapshots WHERE app=? AND task_id=? ' +
+        'AND item_index=0 AND book_id=?)=? ' +
+      'AND NOT EXISTS (SELECT 1 FROM json_each(?) selected WHERE NOT EXISTS (' +
+        'SELECT 1 FROM book_order_student_snapshots snapshot WHERE snapshot.app=? AND snapshot.task_id=? ' +
+        'AND snapshot.item_index=0 AND snapshot.book_id=? AND snapshot.student_id=selected.value))'
+    ).bind(app, taskId, 0, bookId, studentIdsJson, now, receiverId, now, now,
+      app, taskId, taskData, now, app, taskId, bookId, studentIds.length,
+      studentIdsJson, app, taskId, bookId)
+  ];
+
+  try {
+    const results = await env.DB.batch(statements);
+    const taskChanges = Number(results && results[0] && results[0].meta && results[0].meta.changes || 0);
+    const snapshotChanges = Number(results && results[1] && results[1].meta && results[1].meta.changes || 0);
+    const fulfillmentChanges = Number(results && results[2] && results[2].meta && results[2].meta.changes || 0);
+    if (taskChanges !== 1) {
+      const raced = await exactExistingBound(env, app, taskId, ownerId, productCode, identity, document);
+      if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
+      return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
+        error: '원생 명단이 주문 등록 중 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
+    }
+    const stored = await exactExistingBound(env, app, taskId, ownerId, productCode, identity, document);
+    if (snapshotChanges !== studentIds.length || fulfillmentChanges !== 1 || !stored) {
+      return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH',
+        error: '제본 교재 주문 원장의 정체성 확인이 필요합니다' }, 500, origin);
+    }
+  } catch (error) {
+    const raced = await exactExistingBound(env, app, taskId, ownerId, productCode, identity, document);
+    if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
+    if (await hasActiveDuplicate(env, app, [identity])) {
+      return json({ ok: false, code: 'ORDER_ALREADY_ACTIVE',
+        error: '같은 학생의 같은 제본 교재 주문이 아직 완료되지 않았습니다' }, 409, origin);
+    }
+    if (/constraint|unique|primary|BOOK_ORDER_/i.test(String(error && error.message || error))) {
+      return json({ ok: false, code: 'ORDER_ID_CONFLICT',
+        error: '같은 주문 ID가 이미 다른 내용으로 사용되었습니다' }, 409, origin);
+    }
+    throw error;
+  }
+  return json({ ok: true, idempotent: false, task }, 201, origin);
 }
 
 async function cancelSealedOrder(env, app, body, origin, auth, json) {
@@ -319,6 +572,13 @@ async function cancelSealedOrder(env, app, body, origin, auth, json) {
     if (Number(row.updated_at) !== Number(body.expectedUpdatedAt)) {
       return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다' }, 409, origin);
     }
+    const fulfillment = await env.DB.prepare(
+      'SELECT 1 AS found FROM book_order_fulfillments WHERE app=? AND task_id=? LIMIT 1'
+    ).bind(app, taskId).first();
+    if (fulfillment) {
+      return json({ ok: false, code: 'ORDER_ALREADY_RECEIVED',
+        error: '이미 수령 처리가 시작된 주문은 취소할 수 없습니다' }, 409, origin);
+    }
     const active = await env.DB.prepare(
       'SELECT send.status FROM book_order_sends send LEFT JOIN book_order_batch_items item ' +
       'ON item.app=send.app AND item.send_id=send.send_id WHERE send.app=? ' +
@@ -352,6 +612,7 @@ async function cancelSealedOrder(env, app, body, origin, auth, json) {
 }
 
 export async function handleBookOrderCreate(env, app, body, origin, auth, json) {
+  if (body && body.action === 'create_bound') return createBoundOrder(env, app, body, origin, auth, json);
   if (body && body.action === 'cancel') return cancelSealedOrder(env, app, body, origin, auth, json);
   if (app !== 'task' || requestError(body)) {
     return json({ ok: false, code: 'ORDER_INVALID', error: '교재 주문 항목과 학생 선택을 다시 확인해 주세요' }, 400, origin);

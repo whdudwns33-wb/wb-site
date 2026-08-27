@@ -77,6 +77,11 @@ function createBody(taskId = 'ord_safe_a123') {
   ] };
 }
 
+function boundBody(taskId = 'ord_bound_a123', productCode = 'pages_1_30') {
+  return { auth: person, action: 'create_bound', taskId, productCode,
+    title: '가학생 수학 제본', studentIds: ['student-a'] };
+}
+
 test('037 is additive, append-only, and stores no student display name, contact, or raw book title', () => {
   for (const sql of [schema, migration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_student_snapshots/);
@@ -108,6 +113,112 @@ test('create atomically writes a canonical task and immutable per-student identi
   assert.throws(() => db.database.prepare('UPDATE book_order_student_snapshots SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('UPDATE book_order_active_targets SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('DELETE FROM book_order_active_targets').run(), /APPEND_ONLY/);
+});
+
+test('each bound product uses the server price map and starts at teacher-received without an SMS send', async () => {
+  const db = new TestD1(); seed(db);
+  const products = [
+    ['pages_1_30', 4000],
+    ['pages_31_60', 7000],
+    ['pages_61_90', 9000],
+    ['exam_upto_30', 9000],
+    ['exam_over_30', 15000]
+  ];
+  const taskIds = [];
+  for (let index = 0; index < products.length; index++) {
+    const [productCode, unitPrice] = products[index];
+    const taskId = 'ord_bound_' + String(index).padStart(4, '0');
+    const body = boundBody(taskId, productCode);
+    body.title = '제본 교재 ' + (index + 1);
+    const result = await call(db, body);
+    assert.equal(result.status, 201, productCode);
+    assert.equal(result.body.task.orderDelivery, 'bound_print_v1');
+    assert.equal(result.body.task.orderIdentityVersion, 1);
+    assert.equal(result.body.task.staffId, 'teacher-a');
+    assert.equal(result.body.task.orderItems.length, 1);
+    assert.equal(result.body.task.orderItems[0].title, body.title);
+    assert.equal(result.body.task.orderItems[0].unitPrice, unitPrice);
+    assert.deepEqual(result.body.task.orderItems[0].studentIds, ['student-a']);
+    assert.match(result.body.task.orderItems[0].bookId, /^[A-Za-z0-9_-]{1,128}$/);
+    taskIds.push(taskId);
+  }
+
+  assert.equal(new Set(db.database.prepare('SELECT book_id FROM book_order_student_snapshots').all()
+    .map(row => row.book_id)).size, 5, '각 제본 상품 코드는 서로 다른 서버 bookId로 봉인한다');
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 5);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 5);
+  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM book_order_fulfillments WHERE status='teacher_received' AND revision=1").get().count, 5);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_sends').get().count, 0);
+
+  const listed = await call(db, { auth: person, action: 'list' }, '/book-issue');
+  for (const [index, taskId] of taskIds.entries()) {
+    const row = listed.body.orders.find(order => order.taskId === taskId);
+    assert.ok(row, taskId);
+    assert.equal(row.stage, 'teacher_received');
+    assert.equal(row.unitPrice, products[index][1]);
+    assert.equal(row.owner, 'teacher-a');
+    assert.deepEqual(row.students.map(student => student.id), ['student-a']);
+    assert.ok(row.teacherReceivedAt);
+  }
+});
+
+test('bound create is idempotent, rejects client prices and invalid products, and enforces roster scope', async () => {
+  const db = new TestD1(); seed(db);
+  const first = await call(db, boundBody());
+  assert.equal(first.status, 201);
+  const retry = await call(db, boundBody());
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 1);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 1);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 1);
+
+  for (const [taskId, change] of [
+    ['ord_bound_bad_option', body => { body.productCode = 'custom_price'; }],
+    ['ord_bound_bad_price', body => { body.unitPrice = 1; }],
+    ['ord_bound_bad_key', body => { body.optionId = 'pages_1_30'; }],
+    ['ord_bound_bad_title', body => { body.title = ' '; }],
+    ['ord_bound_bad_student', body => { body.studentIds = []; }]
+  ]) {
+    const body = boundBody(taskId);
+    change(body);
+    const result = await call(db, body);
+    assert.equal(result.status, 400, taskId);
+    assert.equal(result.body.code, 'ORDER_INVALID', taskId);
+  }
+  const changedRetry = boundBody(); changedRetry.title = '다른 제본명';
+  assert.equal((await call(db, changedRetry)).body.code, 'ORDER_ID_CONFLICT');
+  const outOfScope = boundBody('ord_bound_scope'); outOfScope.studentIds = ['student-b'];
+  assert.equal((await call(db, outOfScope)).body.code, 'ORDER_STUDENT_SCOPE');
+  const inactive = boundBody('ord_bound_inactive'); inactive.studentIds = ['student-old'];
+  assert.equal((await call(db, inactive)).body.code, 'ORDER_STUDENT_INACTIVE');
+  const missing = boundBody('ord_bound_missing'); missing.studentIds = ['student-missing'];
+  assert.equal((await call(db, missing)).body.code, 'ORDER_STUDENT_MISSING');
+});
+
+test('bound orders continue through existing handoff and academy registration and expose history fields', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, boundBody('ord_bound_flow1', 'exam_over_30'));
+  assert.equal(created.status, 201);
+  const handed = await call(db, { auth: person, action: 'order_transition', taskId: created.body.task.id,
+    itemIndex: 0, next: 'hand', revision: 1 }, '/book-issue');
+  assert.equal(handed.status, 200);
+  assert.equal(handed.body.status, 'student_handed');
+  const academy = await call(db, { auth: admin, action: 'order_transition', taskId: created.body.task.id,
+    itemIndex: 0, next: 'academy_register', revision: 2 }, '/book-issue');
+  assert.equal(academy.status, 200);
+  assert.equal(academy.body.status, 'academy_registered');
+
+  const listed = await call(db, { auth: admin, action: 'list' }, '/book-issue');
+  const record = listed.body.orders.find(row => row.taskId === created.body.task.id);
+  assert.equal(record.title, '가학생 수학 제본');
+  assert.equal(record.owner, 'teacher-a');
+  assert.equal(record.teacherName, '가선생');
+  assert.equal(record.unitPrice, 15000);
+  assert.equal(record.quantity, 1);
+  assert.deepEqual(record.students.map(student => student.name), ['가학생']);
+  assert.ok(record.studentHandedAt);
+  assert.ok(record.academyRegisteredAt);
 });
 
 test('new orders require a positive whole-won unit price within the supported range', async () => {
@@ -236,6 +347,15 @@ test('generic sync cannot create or convert an unsealed scheduled order, but exa
   assert.equal(newOrder.status, 409);
   assert.equal(newOrder.body.code, 'BOOK_ORDER_CREATE_REQUIRED');
 
+  const bound = { id: 'ord_bound_bypass', staffId: 'teacher-a', title: '[주문] 제본 우회', origin: 'staff',
+    orderItems: [{ bookId: 'bound_pages_1_30', title: '제본 우회', qty: '1권',
+      studentIds: ['student-a'], unitPrice: 4000 }],
+    orderDelivery: 'bound_print_v1', orderIdentityVersion: 1, createdAt: now, updatedAt: now, deleted: false };
+  const boundCreate = await call(db, { auth: admin, since: 0, changes: [{ table: 'tasks', id: bound.id,
+    owner: 'teacher-a', data: bound, updated_at: now }] }, '/sync');
+  assert.equal(boundCreate.status, 409);
+  assert.equal(boundCreate.body.code, 'BOOK_ORDER_CREATE_REQUIRED');
+
   const ordinary = { ...scheduled, id: 'ordinary-task', title: '일반 업무', orderDelivery: undefined };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', ordinary.id, 'teacher-a', JSON.stringify(ordinary), now, now).run();
@@ -278,6 +398,55 @@ test('snapshot rows use one JSON expansion statement and the entire D1 batch rol
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0);
   db.batch = originalBatch;
+});
+
+test('bound task, identity snapshot, and initial receipt roll back as one three-statement batch', async () => {
+  const db = new TestD1(); seed(db);
+  const originalBatch = db.batch.bind(db);
+  let statementCount = 0;
+  db.batch = statements => {
+    statementCount = statements.length;
+    db.database.exec('BEGIN');
+    try {
+      statements[0].run();
+      statements[1].run();
+      throw new Error('injected bound fulfillment failure');
+    } catch (error) {
+      db.database.exec('ROLLBACK');
+      return Promise.reject(error);
+    }
+  };
+  const failed = await call(db, boundBody('ord_bound_rollback'));
+  assert.equal(failed.status, 500);
+  assert.equal(statementCount, 3);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM tasks').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0);
+  db.batch = originalBatch;
+});
+
+test('bound orders are never picked up by direct or scheduled SMS delivery', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, boundBody('ord_bound_no_sms'));
+  assert.equal(created.status, 201);
+  let fetches = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { fetches += 1; throw new Error('must not fetch'); };
+  try {
+    const direct = await call(db, { auth: admin, taskId: created.body.task.id }, '/book-order-send', {
+      WB_BOOK_ORDER_SEND_ENABLED: 'true', SOLAPI_API_KEY: 'key', SOLAPI_API_SECRET: 'secret',
+      SOLAPI_SENDER_NUMBER: '0212345678'
+    });
+    assert.equal(direct.status, 409);
+    assert.equal(direct.body.code, 'ORDER_DELIVERY_UNSUPPORTED');
+    const scheduled = await handleScheduledBookOrders(env(db, {
+      WB_BOOK_ORDER_SEND_ENABLED: 'true', SOLAPI_API_KEY: 'key', SOLAPI_API_SECRET: 'secret',
+      SOLAPI_SENDER_NUMBER: '0212345678'
+    }), Date.now() + 1000);
+    assert.deepEqual(scheduled.results, []);
+  } finally { globalThis.fetch = originalFetch; }
+  assert.equal(fetches, 0);
 });
 
 test('create CAS rejects a roster revision that changes after identity validation without leaving a partial seal', async () => {
