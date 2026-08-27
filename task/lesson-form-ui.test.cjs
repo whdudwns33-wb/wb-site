@@ -431,6 +431,24 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });
 
+test('feedback preview hides the learned-content input and keeps its value from lesson records', () => {
+  const computeStart = html.indexOf('function computeFeedbackFields(');
+  const previewStart = html.indexOf('function showFeedbackPreview(', computeStart);
+  const previewEnd = html.indexOf('function todayStaffList(', previewStart);
+  const submitStart = html.indexOf('async function submitFeedbackForReview(');
+  const submitEnd = html.indexOf('async function reviewFeedbackRequest(', submitStart);
+  const compute = html.slice(computeStart, previewStart);
+  const preview = html.slice(previewStart, previewEnd);
+  const submit = html.slice(submitStart, submitEnd);
+  assert.match(compute, /lessonMemoValues\(c\)/);
+  assert.match(compute, /memo\.contentProgress[\s\S]*doneSteps\.length[\s\S]*taskCardDetail\(t\)/);
+  assert.doesNotMatch(preview, /id="fldContent"|<label class="fl">오늘 배운 내용<\/label>/);
+  assert.match(preview, /fbCtx = \{ id: t\.id, date: date, contentText:/);
+  assert.match(preview, /오늘 배운 내용은 저장된 수업내용·진도에서 자동 반영됩니다/);
+  assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
+  assert.doesNotMatch(submit, /#fldContent/);
+});
+
 test('guardian contacts are saved and rendered by stable studentId, not by student name', () => {
   assert.match(html, /new Map\(\(result\.contacts \|\| \[\]\)\.map\(c => \[c\.studentId, c\]\)\)/);
   assert.match(html, /action: 'set', studentId: student\.id,[\s\S]{0,100}studentName: student\.name/);
