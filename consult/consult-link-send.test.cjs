@@ -12,7 +12,7 @@ function between(start, end) {
   return html.slice(a, b);
 }
 
-test('학생 카카오 연락처는 원장 메모리에 마스킹 상태만 두고 실제 학생에게만 보인다', () => {
+test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내며 미등록 학생만 최초 입력한다', () => {
   const contacts = between('const consultLinkContactsUi =', '\nfunction viewStaffAdmin()');
   const panel = between('function consultLinkStudentPanel(student) {', '\nfunction consultLinkContactModal');
   const view = between('function viewStaffAdmin() {', '\n/* ── 설정');
@@ -26,24 +26,34 @@ test('학생 카카오 연락처는 원장 메모리에 마스킹 상태만 두�
   assert.doesNotMatch(state + add, /phoneMasked|phone|contact|consent/i);
   assert.match(panel, /student\.owner \|\| student\.manager/);
   assert.match(view, /!s\.owner && !s\.manager \? '<hr class="sep">' \+ consultLinkStudentPanel\(s\) : ''/);
-  assert.match(view, /카카오 알림톡 · 문자 대체발송 없음 · 첨부파일 대신 알림톡 버튼에 학생별 링크가 들어갑니다/);
-  assert.match(panel, /카톡 수신번호 설정/);
+  assert.match(view, /학생 번호와 동의는 처음 한 번만 등록합니다/);
+  assert.match(view, /보호자 번호는 별도로 관리합니다/);
+  assert.match(panel, /학생 연락처 없음 · 처음 한 번만 등록하세요/);
+  assert.match(panel, /학생 연락처 수정/);
+  assert.match(panel, /학생 번호 등록하고 보내기/);
   assert.match(panel, /카톡으로 개인 링크 보내기/);
+  assert.match(panel, /const sendDisabled = unavailable \|\| anyBusy/);
 });
 
-test('연락처 설정은 전체 번호와 명시적 동의를 요구하고 지정된 서버 계약만 보낸다', () => {
-  const modal = between('function consultLinkContactModal(staffId) {', '\nasync function saveConsultLinkContact');
-  const save = between('async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear) {', '\nfunction consultLinkSendMessage');
+test('학생 번호는 최초 한 번만 동의받아 저장하고 보호자 번호와 분리한다', () => {
+  const modal = between('function consultLinkContactModal(staffId', '\nasync function saveConsultLinkContact');
+  const save = between('async function saveConsultLinkContact(staffId', '\nfunction consultLinkSendMessage');
 
-  assert.match(modal, /phoneMasked[\s\S]*현재 번호:/);
+  assert.match(modal, /학생 본인의 휴대전화 번호/);
+  assert.match(modal, /한 번 등록하면 다음 발송부터 자동으로 사용합니다/);
+  assert.match(modal, /phoneMasked[\s\S]*현재 학생 번호:/);
   assert.match(modal, /변경하려면 아래에 전체 번호를 다시 입력/);
   assert.match(modal, /id="consultLinkConsent"/);
+  assert.match(modal, /보호자 번호는 ‘보호자 공유’에서 별도로 관리합니다/);
+  assert.match(modal, /data-send="1"/);
+  assert.match(modal, /동의하고 바로 보내기/);
   assert.match(save, /\^01\[016789\]\\d\{7,8\}\$/);
   assert.match(save, /if \(!clear && !consent\) return toast\('발송 동의를 확인해 주세요'\)/);
   assert.match(modal, /발송 중지·번호 삭제/);
   assert.match(save, /const phone = clear \? ''/);
   assert.match(save, /const consent = clear \? false/);
   assert.match(save, /sync\.post\('\/consult-link-send', \{\s*app: SYNC_APP, auth: sync\.auth\(\), action: 'set', staffId: staffId, phone: phone,\s*consent: consent, expectedUpdatedAt: Number\(expectedUpdatedAt\) \|\| 0\s*\}\)/);
+  assert.match(save, /if \(savedForSend && sendAfterSave\) await sendConsultStudentLink\(staffId\)/);
 });
 
 test('개인 링크 발송은 먼저 consult 동기화를 확인하고 수신번호나 문구를 요청에 싣지 않는다', () => {
@@ -56,6 +66,7 @@ test('개인 링크 발송은 먼저 consult 동기화를 확인하고 수신번
   assert.doesNotMatch(request, /phone|message|recipient|token/i);
   assert.match(send, /consultLinkContactsUi\.busy = 'send:' \+ staffId/);
   assert.match(send, /finally[\s\S]*consultLinkContactsUi\.busy = ''/);
+  assert.match(send, /return consultLinkContactModal\(staffId, true\)/);
 });
 
 test('솔라피 결과는 접수와 완료를 구분하고 모호한 결과의 중복 발송을 경고한다', () => {
