@@ -210,6 +210,7 @@ test('summary matches task UI recurrence and status priority without exposing ta
     { ...dailyTask('target'), target: 5 },
     { ...dailyTask('step-priority'), steps: [{ id: 's1' }], target: 5 },
     dailyTask('todo'),
+    { ...dailyTask('book-order'), title: '[주문] 오늘 교재', orderItems: [{ bookId: 'book-a' }] },
     { ...dailyTask('outside'), repeat: 'once', start: yesterday },
     { ...dailyTask('deleted'), deleted: true }
   ].map(data => ({ id: data.id, data: JSON.stringify(data) }));
