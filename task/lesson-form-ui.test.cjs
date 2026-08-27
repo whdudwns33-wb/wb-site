@@ -460,6 +460,26 @@ test('teacher-only other notes never enter parent feedback text or send fields',
   assert.match(html, /선생님 내부 공유 · 학부모 미발송/);
 });
 
+test('feedback interview owns the direct comment as question one and preserves it across choices', () => {
+  const interviewStart = html.indexOf('let fbCtx = null;');
+  const interviewEnd = html.indexOf('/** 학부모 피드백 문구', interviewStart);
+  const interview = html.slice(interviewStart, interviewEnd);
+  assert.match(interview, /modal\('피드백 문구 선택'/);
+  assert.match(interview, /1\. 코멘트\(직접작성, 간단히\)/);
+  assert.match(interview, /data-feedback-comment/);
+  assert.match(interview, /2\. 오늘 집중·태도는\?/);
+  assert.match(interview, /3\. 잘한 점은\?/);
+  assert.match(interview, /4\. 보완할 점은\?/);
+  assert.match(interview, /captureFeedbackComment\(\)/);
+  const actionsStart = html.indexOf("case 'fbtext':");
+  const actionsEnd = html.indexOf("case 'feedbacksubmit':", actionsStart);
+  const actions = html.slice(actionsStart, actionsEnd);
+  assert.match(actions, /comment: lessonMemoValues\(getCheck\(id, date\)\)\.comment/);
+  assert.match(actions, /case 'fbq':[\s\S]*captureFeedbackComment\(\)/);
+  assert.match(actions, /case 'fbmake':[\s\S]*lessonMemo\.comment = String\(fbCtx\.comment \|\| ''\)/);
+  assert.match(actions, /setCheck\(fbCtx\.id, fbCtx\.date, \{ lessonMemo: lessonMemo, note: lessonMemoText\(lessonMemo\) \}\)/);
+});
+
 test('guardian contacts are saved and rendered by stable studentId, not by student name', () => {
   assert.match(html, /new Map\(\(result\.contacts \|\| \[\]\)\.map\(c => \[c\.studentId, c\]\)\)/);
   assert.match(html, /action: 'set', studentId: student\.id,[\s\S]{0,100}studentName: student\.name/);

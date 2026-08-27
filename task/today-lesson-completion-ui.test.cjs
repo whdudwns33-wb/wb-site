@@ -171,7 +171,7 @@ test('이전 수업 메모는 기본 접힘 상태이며 제목을 누르면 최
   assert.match(source, /\.previous-memos > summary::after \{ content: '펼치기'/);
 });
 
-test('수업 메모는 네 항목을 한 저장 버튼으로 저장하고 기존 단일 메모를 보존한다', () => {
+test('수업 메모는 코멘트를 제외한 세 항목을 한 저장 버튼으로 저장하고 기존 값을 보존한다', () => {
   const editor = source.slice(source.indexOf('const LESSON_MEMO_FIELDS'), source.indexOf('function previousTaskMemos('));
   const panel = source.slice(source.indexOf('function taskPanel('), source.indexOf('/** 수업 출결 표시용 */'));
   const api = new Function('isLesson', 'esc', `${editor}\nreturn { taskMemoEditorHtml, lessonMemoValues, lessonMemoText };`)(
@@ -180,14 +180,16 @@ test('수업 메모는 네 항목을 한 저장 버튼으로 저장하고 기존
   );
   const legacy = api.taskMemoEditorHtml({ id: 'lesson-1', taskKind: 'lesson_instruction' }, '2026-08-27',
     { note: '기존 단일 메모' }, true);
-  assert.equal((legacy.match(/data-lesson-memo-field=/g) || []).length, 4);
-  for (const label of ['수업내용 · 진도', '과제', '코멘트', '기타 · 특이사항']) assert.match(legacy, new RegExp(label));
+  assert.equal((legacy.match(/data-lesson-memo-field=/g) || []).length, 3);
+  for (const label of ['수업내용 · 진도', '과제', '기타 · 특이사항']) assert.match(legacy, new RegExp(label));
+  assert.doesNotMatch(legacy, />코멘트<|data-lesson-memo-field="comment"/);
   assert.match(legacy, /기타 · 특이사항<\/span><span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송<\/span>/);
   assert.match(legacy, /data-lesson-memo-field="contentProgress"[\s\S]*기존 단일 메모/);
   assert.equal((legacy.match(/data-act="notesave"/g) || []).length, 1);
   assert.match(legacy, />수업 메모 저장<\/button>/);
   assert.equal(api.lessonMemoText({ contentProgress: '분수', homework: '2쪽', comment: '집중함', otherNotes: '없음' }),
-    '[수업내용 · 진도]\n분수\n\n[과제]\n2쪽\n\n[코멘트]\n집중함\n\n[기타 · 특이사항]\n없음');
+    '[수업내용 · 진도]\n분수\n\n[과제]\n2쪽\n\n[기타 · 특이사항]\n없음');
+  assert.equal(api.lessonMemoValues({ lessonMemo: { contentProgress: '분수', comment: '기존 코멘트' } }).comment, '기존 코멘트');
   assert.match(panel, /수업 메모[\s\S]{0,180}taskMemoEditorHtml\(t, date, c, editable\)/);
   assert.match(source, /\.lesson-memo-grid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(source, /\.lesson-memo-editor \.lesson-memo-field textarea\.note:focus \{ min-height: 132px;/);
