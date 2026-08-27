@@ -277,6 +277,36 @@ BEGIN
   SELECT RAISE(ABORT, 'STUDENT_CHANGE_ACK_APPEND_ONLY');
 END;
 
+-- 다중 문장 D1 batch의 optimistic UPDATE가 0건일 때 후속 쓰기가 부분 커밋되지 않게 한다.
+-- guard 행에는 개인정보나 원문 payload가 없고 성공한 CAS의 최소 감사 정보만 append-only로 남긴다.
+CREATE TABLE IF NOT EXISTS task_write_cas_guards (
+  app              TEXT    NOT NULL CHECK (app = 'task'),
+  guard_id         TEXT    NOT NULL CHECK (length(guard_id) BETWEEN 8 AND 80 AND guard_id LIKE 'twcg_%'),
+  operation        TEXT    NOT NULL CHECK (length(operation) BETWEEN 1 AND 80),
+  previous_changes INTEGER NOT NULL CHECK (previous_changes = 1),
+  created_at       INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (app, guard_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_task_write_cas_guard
+BEFORE INSERT ON task_write_cas_guards
+WHEN NEW.previous_changes <> 1
+BEGIN
+  SELECT RAISE(ABORT, 'TASK_WRITE_CAS_CONFLICT');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_task_write_cas_guard_no_update
+BEFORE UPDATE ON task_write_cas_guards
+BEGIN
+  SELECT RAISE(ABORT, 'TASK_WRITE_CAS_GUARD_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_task_write_cas_guard_no_delete
+BEFORE DELETE ON task_write_cas_guards
+BEGIN
+  SELECT RAISE(ABORT, 'TASK_WRITE_CAS_GUARD_APPEND_ONLY');
+END;
+
 -- 관리자가 여러 선생님에게 전달하는 공통 요청을 버전별로 보관한다.
 CREATE TABLE IF NOT EXISTS admin_directives (
   app TEXT NOT NULL CHECK (app = 'task'),
@@ -556,7 +586,7 @@ CREATE INDEX IF NOT EXISTS idx_parent_feedback_sends_request
   ON parent_feedback_sends(app, feedback_request_key, updated_at);
 
 -- 원생 명단과 학생별 교재 배정. GitHub Pages에 공개되는 정적 JSON 대신 D1에만 둔다.
--- teacherIds는 Worker가 개인 링크 응답을 서버에서 담당 학생으로 제한하는 기준이다.
+-- 개인 링크의 학생 범위는 활성 수업 task의 owner와 data.staffId를 일치시켜 서버에서 파생한다.
 CREATE TABLE IF NOT EXISTS private_rosters (
   app        TEXT    NOT NULL CHECK (app = 'task'),
   data       TEXT    NOT NULL CHECK (json_valid(data) AND length(CAST(data AS BLOB)) <= 524288),
@@ -1730,11 +1760,6 @@ BEGIN
             COALESCE(json_extract(student.value, '$.end'), '') = ''
             OR strftime('%Y-%m', 'now', '+9 hours') < json_extract(student.value, '$.end')
           )
-          AND json_type(student.value, '$.teacherIds') = 'array'
-          AND EXISTS (
-            SELECT 1 FROM json_each(student.value, '$.teacherIds') AS assigned
-            WHERE CAST(assigned.value AS TEXT) = pack.task_owner
-          )
       )
   ) THEN RAISE(ABORT, 'SESSION_PACK_IDENTITY_MISMATCH') END;
   SELECT CASE WHEN NEW.source_type <> 'adjustment' AND NOT EXISTS (
@@ -1788,6 +1813,75 @@ BEGIN
   SELECT RAISE(ABORT, 'SESSION_PACK_LEDGER_APPEND_ONLY');
 END;
 
+-- 담당자 이전은 task CAS와 활성 회차권 CAS를 한 D1 batch에서 묶는다. 민감정보가
+-- 없는 guard 행은 감사 원장으로 남기며 task/pack 중 하나라도 0건이면 batch 전체를 중단한다.
+CREATE TABLE IF NOT EXISTS session_pack_transfer_guards (
+  app                         TEXT    NOT NULL CHECK (app = 'task'),
+  transfer_id                 TEXT    NOT NULL,
+  lesson_task_id              TEXT    NOT NULL,
+  pack_id                     TEXT,
+  expected_owner              TEXT    NOT NULL,
+  expected_assignment_key     TEXT    NOT NULL,
+  expected_task_identity_hash TEXT    NOT NULL CHECK (length(expected_task_identity_hash) = 64),
+  expected_revision           INTEGER,
+  expected_task_updated_at    INTEGER NOT NULL,
+  previous_changes            INTEGER NOT NULL,
+  created_at                  INTEGER NOT NULL,
+  PRIMARY KEY (app, transfer_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_transfer_guard
+BEFORE INSERT ON session_pack_transfer_guards
+BEGIN
+  SELECT CASE WHEN NEW.previous_changes <> 1 AND NEW.pack_id IS NULL
+    THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_TASK_CONFLICT') END;
+  SELECT CASE WHEN NEW.previous_changes <> 1 AND NEW.pack_id IS NOT NULL
+    THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_PACK_CONFLICT') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM tasks AS task
+    WHERE task.app = NEW.app AND task.id = NEW.lesson_task_id
+      AND task.owner = NEW.expected_owner AND task.updated_at = NEW.expected_task_updated_at
+      AND json_valid(task.data) AND json_type(task.data) = 'object'
+      AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+      AND json_extract(task.data, '$.staffId') = NEW.expected_owner
+      AND COALESCE(json_extract(task.data, '$.deleted'), 0) = 0
+      AND CAST(COALESCE(
+        NULLIF(json_extract(task.data, '$.lessonAssignmentKey'), ''),
+        NULLIF(json_extract(task.data, '$.lessonDedupeKey'), ''),
+        json_extract(task.data, '$.id')
+      ) AS TEXT) = NEW.expected_assignment_key
+  ) THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_IDENTITY_CONFLICT') END;
+  SELECT CASE WHEN NEW.pack_id IS NULL AND EXISTS (
+    SELECT 1 FROM session_packs AS pack
+    WHERE pack.app = NEW.app AND pack.lesson_task_id = NEW.lesson_task_id AND pack.status = 'active'
+  ) THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_PACK_CONFLICT') END;
+  SELECT CASE WHEN NEW.pack_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM session_packs AS pack
+    JOIN tasks AS task ON task.app = pack.app AND task.id = pack.lesson_task_id
+    WHERE pack.app = NEW.app AND pack.pack_id = NEW.pack_id
+      AND pack.lesson_task_id = NEW.lesson_task_id AND pack.status = 'active'
+      AND pack.task_owner = NEW.expected_owner
+      AND pack.lesson_assignment_key = NEW.expected_assignment_key
+      AND pack.task_identity_hash = NEW.expected_task_identity_hash
+      AND pack.revision = NEW.expected_revision
+      AND task.owner = pack.task_owner
+      AND json_extract(task.data, '$.studentId') = pack.student_id
+  ) THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_PACK_CONFLICT') END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_transfer_guard_no_update
+BEFORE UPDATE ON session_pack_transfer_guards
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_TRANSFER_GUARD_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session_pack_transfer_guard_no_delete
+BEFORE DELETE ON session_pack_transfer_guards
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION_PACK_TRANSFER_GUARD_APPEND_ONLY');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_session_pack_immutable
 BEFORE UPDATE ON session_packs
 WHEN NEW.app IS NOT OLD.app
@@ -1805,7 +1899,56 @@ WHEN NEW.app IS NOT OLD.app
   OR NEW.created_at IS NOT OLD.created_at
   OR NEW.created_by IS NOT OLD.created_by
 BEGIN
-  SELECT RAISE(ABORT, 'SESSION_PACK_IMMUTABLE');
+  SELECT CASE WHEN (
+    OLD.status = 'active' AND NEW.status = 'active'
+    AND NEW.app IS OLD.app AND NEW.pack_id IS OLD.pack_id
+    AND NEW.student_id IS OLD.student_id AND NEW.lesson_task_id IS OLD.lesson_task_id
+    AND NEW.student_identity_hash IS OLD.student_identity_hash
+    AND NEW.total_sessions IS OLD.total_sessions AND NEW.valid_from IS OLD.valid_from
+    AND NEW.expires_on IS OLD.expires_on AND NEW.deduction_policy IS OLD.deduction_policy
+    AND NEW.created_at IS OLD.created_at AND NEW.created_by IS OLD.created_by
+    AND NEW.task_owner IS NOT OLD.task_owner
+    AND NEW.lesson_assignment_key IS NOT OLD.lesson_assignment_key
+    AND NEW.task_identity_hash IS NOT OLD.task_identity_hash
+    AND changes() <> 1
+  ) THEN RAISE(ABORT, 'SESSION_PACK_TRANSFER_TASK_CONFLICT') END;
+  SELECT CASE WHEN NOT (
+    OLD.status = 'active' AND NEW.status = 'active'
+    AND NEW.app IS OLD.app
+    AND NEW.pack_id IS OLD.pack_id
+    AND NEW.student_id IS OLD.student_id
+    AND NEW.lesson_task_id IS OLD.lesson_task_id
+    AND NEW.student_identity_hash IS OLD.student_identity_hash
+    AND NEW.total_sessions IS OLD.total_sessions
+    AND NEW.valid_from IS OLD.valid_from
+    AND NEW.expires_on IS OLD.expires_on
+    AND NEW.deduction_policy IS OLD.deduction_policy
+    AND NEW.created_at IS OLD.created_at
+    AND NEW.created_by IS OLD.created_by
+    AND NEW.task_owner IS NOT OLD.task_owner
+    AND NEW.lesson_assignment_key IS NOT OLD.lesson_assignment_key
+    AND NEW.task_identity_hash IS NOT OLD.task_identity_hash
+    AND changes() = 1
+    AND EXISTS (
+      SELECT 1
+      FROM tasks AS task
+      JOIN staff AS teacher ON teacher.app = task.app AND teacher.id = NEW.task_owner
+      WHERE task.app = NEW.app AND task.id = NEW.lesson_task_id
+        AND task.owner = NEW.task_owner
+        AND json_valid(task.data) AND json_type(task.data) = 'object'
+        AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+        AND json_extract(task.data, '$.studentId') = NEW.student_id
+        AND json_extract(task.data, '$.staffId') = NEW.task_owner
+        AND CAST(COALESCE(
+          NULLIF(json_extract(task.data, '$.lessonAssignmentKey'), ''),
+          NULLIF(json_extract(task.data, '$.lessonDedupeKey'), ''),
+          json_extract(task.data, '$.id')
+        ) AS TEXT) = NEW.lesson_assignment_key
+        AND task.updated_at <= NEW.updated_at
+        AND json_valid(teacher.data) AND json_type(teacher.data) = 'object'
+        AND COALESCE(json_extract(teacher.data, '$.deleted'), 0) = 0
+    )
+  ) THEN RAISE(ABORT, 'SESSION_PACK_IMMUTABLE') END;
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_session_pack_transition

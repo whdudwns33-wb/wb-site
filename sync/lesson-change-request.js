@@ -18,6 +18,12 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 import { validateRosterDocument } from './roster.js';
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 import { lessonCheckOwnerTransferStatement } from './lesson-history-transfer.js';
+import { lessonAssignmentKeyForStaff } from './lesson-create.js';
+import {
+  isSessionPackTransferConflict,
+  lessonSessionPackTransferStatements
+} from './session-pack-transfer.js';
+import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -75,6 +81,35 @@ async function rosterContext(env, app, studentId) {
     const index = document.roster.students.findIndex(student => student.id === studentId);
     return index < 0 ? null : { row, document, index, student: document.roster.students[index] };
   } catch (error) { return null; }
+}
+
+function kstDate(now = Date.now()) {
+  return new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function isLessonTask(task) {
+  return !!task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
+    task.intakeVersion);
+}
+
+async function lessonStaffIdsForStudent(env, app, studentId, now = Date.now()) {
+  const referenceDate = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const result = await env.DB.prepare(
+    "SELECT id,owner,data FROM tasks WHERE app=? AND json_valid(data) " +
+    "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+  ).bind(app, studentId).all();
+  const staffIds = [];
+  for (const row of result.results || []) {
+    let task;
+    try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+    const owner = String(row.owner || '');
+    const end = String(task && task.end || '');
+    if (!isLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
+        String(task.staffId || '') !== owner || String(task.studentId || '') !== studentId ||
+        (end && (!ISO_DATE.test(end) || end < referenceDate))) continue;
+    staffIds.push(owner);
+  }
+  return [...new Set(staffIds)];
 }
 
 /** 화이트리스트 밖 필드는 조용히 버리고, 안에 있는 값만 형식을 검사해 정리한다 */
@@ -200,6 +235,10 @@ export async function handleLessonChangeRequest(env, app, body, origin, auth, js
   if (task.data.deleted) return json({ ok: false, error: '삭제된 지시서에는 요청할 수 없습니다' }, 409, origin);
   if (!task.owner || !SAFE_ID.test(String(task.owner))) {
     return json({ ok: false, error: '담당자가 지정된 지시서만 요청할 수 있습니다' }, 409, origin);
+  }
+  if (!isLessonTask(task.data) || String(task.data.id || '') !== taskId ||
+      String(task.data.staffId || '') !== String(task.owner)) {
+    return json({ ok: false, error: '수업 담당자와 저장 담당자가 일치하는 수업만 변경 요청할 수 있습니다' }, 409, origin);
   }
   if (auth.scope === 'own' && task.owner !== auth.id) {
     return json({ ok: false, error: '본인 지시서에만 변경을 요청할 수 있습니다' }, 403, origin);
@@ -339,8 +378,16 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (!taskData || taskData.deleted) {
       return json({ ok: false, error: '삭제된 지시서는 반영할 수 없습니다' }, 409, origin);
     }
+    if (!isLessonTask(taskData) || String(taskData.id || '') !== String(current.task_id) ||
+        String(taskData.staffId || '') !== String(taskRow.owner || '') ||
+        String(current.owner || '') !== String(taskRow.owner || '')) {
+      return json({ ok: false, error: '요청 이후 수업 담당자 또는 수업 정체성이 변경되었습니다. 다시 요청해 주세요' }, 409, origin);
+    }
     const operation = REQUEST_OPERATIONS.has(String(changes.operation || '')) ? String(changes.operation) : 'lesson_fields';
     const studentId = String(taskData.studentId || '');
+    if (operation === 'teacher_assignment' && String(changes.effectiveDate || '') > kstDate(now)) {
+      return json({ ok: false, error: '담당 선생님 변경은 변경 시작일 당일 또는 이후에 승인해 주세요' }, 409, origin);
+    }
     if (operation !== 'lesson_fields' && !SAFE_ID.test(studentId)) {
       return json({ ok: false, error: 'stable studentId 연결을 확인한 뒤 승인해 주세요' }, 409, origin);
     }
@@ -363,13 +410,16 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     let details = {};
     let effectiveDate = changes.effectiveDate || null;
     let requiresAck = operation !== 'information_request' && operation !== 'lesson_delete';
-    let audienceStaffIds = [String(taskRow.owner || '')];
+    let audienceStaffIds = operation === 'withdrawal' || operation === 'leave'
+      ? [] : [String(taskRow.owner || '')];
     let roster = null;
 
     if (operation !== 'lesson_fields') {
       roster = await rosterContext(env, app, studentId);
       if (!roster) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 409, origin);
-      audienceStaffIds.push(...(roster.student.teacherIds || []));
+      if (operation !== 'withdrawal' && operation !== 'leave') {
+        audienceStaffIds.push(...await lessonStaffIdsForStudent(env, app, studentId, now));
+      }
     }
 
     if (operation === 'lesson_fields') {
@@ -384,10 +434,13 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       const merged = Object.assign({}, taskData, patch, { updatedAt, lastEditBy: actorRole });
       requiredChangeIndexes.push(statements.length);
       statements.push(env.DB.prepare(
-        'UPDATE tasks SET data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND updated_at=?'
-      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+        'UPDATE tasks SET data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.owner, taskRow.updated_at));
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_task',
+        [requestKey, expectedRevision, current.task_id, taskRow.owner, taskRow.updated_at, updatedAt].join('\n'),
+        updatedAt));
     } else if (operation === 'teacher_assignment') {
-      eventType = 'teacher_assignment'; changedFields = ['teacherIds'];
+      eventType = 'teacher_assignment'; changedFields = ['staffId'];
       const selectedStaffId = String(body.selectedStaffId);
       audienceStaffIds.push(selectedStaffId);
       const previousStaff = await activeStaff(env, app, String(taskRow.owner || ''));
@@ -396,33 +449,78 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
         afterStaffId: selectedStaffId, afterStaffName: String(targetStaff.name || '')
       };
       const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
-      const merged = Object.assign({}, taskData, { staffId: selectedStaffId, updatedAt, lastEditBy: actorRole });
+      const nextAssignmentKey = await lessonAssignmentKeyForStaff(taskData, selectedStaffId);
+      const duplicateRows = await env.DB.prepare(
+        "SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND owner=? AND id<>? AND json_valid(data) " +
+        "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0"
+      ).bind(app, selectedStaffId, current.task_id, studentId).all();
+      const targetAssignmentSnapshot = [];
+      let duplicateAssignment = false;
+      let corruptAssignment = false;
+      for (const row of duplicateRows.results || []) {
+        let data;
+        try { data = JSON.parse(row.data || '{}'); } catch (error) { corruptAssignment = true; break; }
+        if (!isLessonTask(data)) continue;
+        if (!SAFE_ID.test(String(row.id || '')) || String(row.owner || '') !== selectedStaffId ||
+            String(data.id || '') !== String(row.id || '') || String(data.staffId || '') !== selectedStaffId ||
+            String(data.studentId || '') !== studentId) {
+          corruptAssignment = true;
+          break;
+        }
+        if (await lessonAssignmentKeyForStaff(data, selectedStaffId) === nextAssignmentKey) {
+          duplicateAssignment = true;
+          break;
+        }
+        targetAssignmentSnapshot.push({ id: String(row.id), updatedAt: Number(row.updated_at), data: String(row.data) });
+      }
+      if (corruptAssignment) {
+        return json({ ok: false, error: '변경할 선생님의 기존 수업 정보가 손상되어 먼저 정리가 필요합니다' }, 409, origin);
+      }
+      if (duplicateAssignment) {
+        return json({ ok: false, error: '변경할 선생님에게 같은 학생·과목 수업이 이미 등록되어 있습니다' }, 409, origin);
+      }
+      const merged = Object.assign({}, taskData, {
+        staffId: selectedStaffId,
+        lessonAssignmentKey: nextAssignmentKey,
+        lessonDedupeKey: nextAssignmentKey,
+        updatedAt,
+        lastEditBy: actorRole
+      });
+      let packTransfer;
+      try {
+        packTransfer = await lessonSessionPackTransferStatements(env, app, {
+          beforeTask: taskData, afterTask: merged,
+          oldOwner: String(taskRow.owner || ''), newOwner: selectedStaffId,
+          taskUpdatedAt: updatedAt, updatedBy: studentChangeActorKey(auth)
+        });
+      } catch (error) {
+        if (isSessionPackTransferConflict(error)) {
+          return json({ ok: false, code: 'session_pack_transfer_conflict',
+            error: String(error.message || error) }, 409, origin);
+        }
+        throw error;
+      }
       requiredChangeIndexes.push(statements.length);
       statements.push(env.DB.prepare(
-        'UPDATE tasks SET owner=?, data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND updated_at=?'
-      ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+        'UPDATE tasks SET owner=?, data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=? ' +
+        'AND NOT EXISTS (SELECT 1 FROM tasks AS duplicate WHERE duplicate.app=? AND duplicate.id<>? ' +
+         'AND duplicate.owner=? AND json_valid(duplicate.data) AND json_type(duplicate.data)=\'object\' ' +
+         'AND json_extract(duplicate.data,\'$.studentId\')=? ' +
+         'AND COALESCE(json_extract(duplicate.data,\'$.deleted\'),0)=0 ' +
+         'AND (json_extract(duplicate.data,\'$.taskKind\')=\'lesson_instruction\' ' +
+         'OR json_type(duplicate.data,\'$.lessonFormVersion\') IS NOT NULL ' +
+         'OR json_type(duplicate.data,\'$.intakeVersion\') IS NOT NULL) ' +
+         'AND NOT EXISTS (SELECT 1 FROM json_each(?) approved WHERE ' +
+         'CAST(json_extract(approved.value,\'$.id\') AS TEXT)=CAST(duplicate.id AS TEXT) ' +
+         'AND CAST(json_extract(approved.value,\'$.updatedAt\') AS INTEGER)=duplicate.updated_at ' +
+         'AND CAST(json_extract(approved.value,\'$.data\') AS TEXT)=CAST(duplicate.data AS TEXT)))'
+      ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id,
+        taskRow.owner, taskRow.updated_at, app, current.task_id, selectedStaffId,
+        studentId, JSON.stringify(targetAssignmentSnapshot)));
+      statements.push(...packTransfer.statements);
       statements.push(lessonCheckOwnerTransferStatement(
         env, app, current.task_id, String(taskRow.owner || ''), selectedStaffId, updatedAt
       ));
-
-      const oldStaffId = String(taskRow.owner || '');
-      const otherOldLesson = await env.DB.prepare(
-        "SELECT id FROM tasks WHERE app=? AND id<>? AND owner=? AND json_valid(data) " +
-        "AND json_extract(data,'$.studentId')=? AND COALESCE(json_extract(data,'$.deleted'),0)=0 LIMIT 1"
-      ).bind(app, current.task_id, oldStaffId, studentId).first();
-      if (!otherOldLesson) roster.student.teacherIds = roster.student.teacherIds.filter(id => id !== oldStaffId);
-      if (!roster.student.teacherIds.includes(selectedStaffId)) roster.student.teacherIds.push(selectedStaffId);
-      for (const assignment of roster.document.bookStudents) {
-        if (assignment.studentId !== studentId) continue;
-        if (!otherOldLesson) assignment.teacherIds = assignment.teacherIds.filter(id => id !== oldStaffId);
-        if (!assignment.teacherIds.includes(selectedStaffId)) assignment.teacherIds.push(selectedStaffId);
-      }
-      const teacherNames = [];
-      for (const teacherId of roster.student.teacherIds) {
-        const teacher = await activeStaff(env, app, teacherId);
-        if (teacher && teacher.name) teacherNames.push(String(teacher.name));
-      }
-      roster.student.teacher = teacherNames.join('·') || roster.student.teacher;
     } else if (operation === 'withdrawal' || operation === 'leave') {
       eventType = operation;
       changedFields = ['end', 'reason', 'deleted'];
@@ -438,13 +536,19 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       for (const row of lessonRows.results || []) {
         let data;
         try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
-        if (!(data.taskKind === 'lesson_instruction' || data.lessonFormVersion || data.intakeVersion || /^\[수업\]/.test(String(data.title || '')))) continue;
+        const owner = String(row.owner || '');
+        const lessonEnd = String(data && data.end || '');
+        if (!isLessonTask(data) || !SAFE_ID.test(owner) || String(data.id || '') !== String(row.id || '') ||
+            String(data.staffId || '') !== owner || String(data.studentId || '') !== studentId ||
+            (lessonEnd && (!ISO_DATE.test(lessonEnd) || lessonEnd < effectiveDate))) continue;
         const updatedAt = Math.max(now, Number(row.updated_at || 0) + 1);
         data.end = effectiveDate; data.deleted = true; data.updatedAt = updatedAt; data.lastEditBy = actorRole;
         requiredChangeIndexes.push(statements.length);
         statements.push(env.DB.prepare(
-          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
-        ).bind(JSON.stringify(data), updatedAt, updatedAt, app, row.id, row.updated_at));
+          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+        ).bind(JSON.stringify(data), updatedAt, updatedAt, app, row.id, row.owner, row.updated_at));
+        statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_transition_task',
+          [requestKey, expectedRevision, row.id, row.owner, row.updated_at, updatedAt].join('\n'), updatedAt));
         audienceStaffIds.push(String(row.owner || ''));
       }
     } else if (operation === 'lesson_delete') {
@@ -454,14 +558,17 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       const merged = Object.assign({}, taskData, { deleted: true, end: effectiveDate, updatedAt, lastEditBy: actorRole });
       requiredChangeIndexes.push(statements.length);
       statements.push(env.DB.prepare(
-        'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND updated_at=?'
-      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.updated_at));
+        'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+      ).bind(JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id, taskRow.owner, taskRow.updated_at));
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_delete_task',
+        [requestKey, expectedRevision, current.task_id, taskRow.owner, taskRow.updated_at, updatedAt].join('\n'),
+        updatedAt));
     } else {
       eventType = 'information_request'; changedFields = ['informationRequest']; requiresAck = false;
       details = { request: String(changes.informationRequest || ''), note: String(current.note || '') };
     }
 
-    if (roster && ['teacher_assignment', 'withdrawal', 'leave'].includes(operation)) {
+    if (roster && ['withdrawal', 'leave'].includes(operation)) {
       roster.document.roster.updated = new Date(now + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
       try { roster.document = validateRosterDocument(roster.document); }
       catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 409, origin); }
@@ -470,6 +577,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       statements.push(env.DB.prepare(
         'UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?'
       ).bind(JSON.stringify(roster.document), rosterUpdatedAt, app, roster.row.updated_at));
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_roster',
+        [requestKey, expectedRevision, studentId, roster.row.updated_at, rosterUpdatedAt].join('\n'), rosterUpdatedAt));
     }
 
     if (SAFE_ID.test(studentId)) {
@@ -485,8 +594,22 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       "UPDATE lesson_change_requests SET status='approved', updated_at=?, reviewed_at=?, " +
       "reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'"
     ).bind(now, now, reviewedBy, app, requestKey, expectedRevision));
+    statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_request',
+      [requestKey, expectedRevision, now, reviewedBy].join('\n'), now));
 
-    const applied = await env.DB.batch(statements);
+    let applied;
+    try {
+      applied = await env.DB.batch(statements);
+    } catch (error) {
+      if (isSessionPackTransferConflict(error)) {
+        return json({ ok: false, code: 'session_pack_transfer_conflict',
+          error: '회차권 또는 수업 담당자가 먼저 변경되었습니다. 최신 내용을 확인해 주세요' }, 409, origin);
+      }
+      if (isTaskWriteCasConflict(error)) {
+        return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
+      }
+      throw error;
+    }
     const reqChanged = Number(applied[requestUpdateIndex] && applied[requestUpdateIndex].meta && applied[requestUpdateIndex].meta.changes || 0);
     const requiredChanged = requiredChangeIndexes.every(index => Number(applied[index] && applied[index].meta && applied[index].meta.changes || 0) === 1);
     if (!requiredChanged || reqChanged !== 1) {

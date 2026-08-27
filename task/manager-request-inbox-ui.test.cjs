@@ -38,22 +38,19 @@ function inboxRowsFor(overrides = {}) {
   return factory(...argNames.map(name => values[name]))();
 }
 
-test('관리담당 현황판은 실제 승인 대기만 선생님 이름으로 모은다', () => {
+test('관리담당 현황판은 실제 승인 대기만 선생님 이름으로 모으고 아카등록은 교재 탭에만 둔다', () => {
   const rows = inboxRowsFor();
   assert.deepEqual(new Set(rows.map(row => row.kind)), new Set([
-    '학생 배정', '수업 변경', '피드백 검토', '교재 추가', '교재 수정', '아카등록'
+    '수업 등록', '수업 변경', '피드백 검토', '교재 추가', '교재 수정'
   ]));
-  assert.equal(rows.length, 6);
+  assert.equal(rows.length, 5);
   assert.ok(rows.every(row => row.kind !== '보강'));
+  assert.ok(rows.every(row => row.kind !== '아카등록'));
   assert.ok(rows.every(row => row.detail !== '알림톡 발송 상태 확인'));
   assert.ok(rows.every(row => / 선생님$/.test(row.requester)));
   assert.ok(rows.every(row => !/teacher-[ab]/.test(row.requester)));
   assert.deepEqual(new Set(rows.map(row => row.route)), new Set(['lesson', 'feedback', 'books']));
   assert.equal(rows.find(row => row.kind === '수업 변경').route, 'lesson');
-  const academy = rows.find(row => row.kind === '아카등록');
-  assert.equal(academy.route, 'books');
-  assert.equal(academy.title, '배부 교재 · 2권');
-  assert.equal(academy.detail, '4단계 학생배부 완료 · 아카등록 필요');
 });
 
 test('관리담당이 아니면 통합 요청함 데이터를 만들지 않는다', () => {
@@ -81,17 +78,18 @@ test('퇴원·휴원·수업삭제·담당자 변경 요청은 현황판에서 �
   }
 });
 
-test('통합 요청함은 선생님별 수업 흐름 아래에 있고 필요한 7개 목록만 새로고침한다', () => {
+test('통합 요청함은 선생님별 수업 흐름 아래에 있고 아카등록 교재 목록은 읽지 않는다', () => {
   const schedule = source.slice(source.indexOf('function viewSchedule()'), source.indexOf('/* ── 기기 대장 ──'));
   assert.match(schedule, /scheduleTimelineHtml\(timeline, cursor, nowKst\);\s*return h \+ managerRequestInboxHtml\(\)/);
   assert.doesNotMatch(schedule, /managerRequestInboxHtml\(\) \+ scheduleToolbarHtml\(\)/);
   const loader = source.slice(source.indexOf('async function loadManagerRequestInbox'), source.indexOf('function managerRequestInboxHtml'));
-  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadBookIssues', 'loadGuardianRequests']) {
+  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadGuardianRequests']) {
     assert.match(loader, new RegExp(name + '\\(force\\)'));
   }
-  assert.match(source, /bookAddQueueLoaded && bookEditQueueLoaded && bookIssueLoaded && guardianRequestsLoaded/);
-  assert.match(source, /bookIssueError, guardianRequestsError/);
-  assert.match(source, /route === 'books' \|\| route === 'schedule'/);
+  assert.doesNotMatch(loader, /loadBookIssues\(force\)/);
+  assert.match(source, /bookAddQueueLoaded && bookEditQueueLoaded && guardianRequestsLoaded/);
+  const ready = source.slice(source.indexOf('function managerRequestInboxReady'), source.indexOf('async function loadManagerRequestInbox'));
+  assert.doesNotMatch(ready, /bookIssueLoaded|bookIssueError/);
   assert.doesNotMatch(loader, /loadMakeups\(force\)/);
   assert.match(source, /\['schedule', '현황판', managerRequestInboxCount\(\)\]/);
   assert.match(source, /case 'managerinboxrefresh': loadManagerRequestInbox\(true\)/);

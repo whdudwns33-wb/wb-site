@@ -47,7 +47,8 @@ function seedToken(db, token, staffId) {
 function seedTask(db, id, owner, overrides = {}) {
   const now = Date.now();
   const data = {
-    id, staffId: owner, title: '[정규] 테스트학생(중2) — 국어 독해',
+    id, staffId: owner, taskKind: 'lesson_instruction', lessonFormVersion: 2,
+    title: '[정규] 테스트학생(중2) — 국어 독해',
     studentId: 'student-test', studentName: '테스트학생', deleted: false, ...overrides
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
@@ -137,6 +138,23 @@ test('authentication and cross-owner task access are enforced', async () => {
   assert.equal(result.status, 403);
   result = await call(db, '/feedback-review', { auth: person('teacher-a', 'token-a'), action: 'list' });
   assert.equal(result.status, 403);
+});
+
+test('feedback submission requires an exact structured lesson task identity', async () => {
+  for (const overrides of [
+    { id: 'different-task' },
+    { staffId: 'teacher-b' },
+    { taskKind: undefined, lessonFormVersion: undefined, intakeVersion: undefined, title: '[수업] 제목만 위조' }
+  ]) {
+    const db = new TestD1();
+    seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+    seedTask(db, 'task-a', 'teacher-a', overrides);
+    const result = await call(db, '/feedback-request', {
+      auth: person('teacher-a', 'token-a'), ...identity, message: '오늘 수업 내용입니다.', ...fields()
+    });
+    assert.equal(result.status, 409);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").first().count, 0);
+  }
 });
 
 test('submitting without content/plus/minus text is rejected', async () => {

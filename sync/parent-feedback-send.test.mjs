@@ -83,7 +83,7 @@ function seedFeedback(db, overrides = {}) {
   const templateVersion = overrides.templateVersion || 'v1';
   const task = {
     id: 'task-1', staffId: 'S-kim', title: '[정규] 테스트학생(중2) — 국어 독해',
-    studentId, studentName: '테스트학생', subject: '국어', deleted: false
+    taskKind: 'lesson_instruction', studentId, studentName: '테스트학생', subject: '국어', deleted: false
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', task.id, task.staffId, JSON.stringify(task), now, now).run();
@@ -279,11 +279,17 @@ test('studentId/name or current owner mismatch is blocked before guardian lookup
     const db = new TestD1();
     const { requestKey } = seedFeedback(db);
     registerGuardian(db, '테스트학생');
-    const row = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
-    const document = JSON.parse(row.data);
-    if (mismatch === 'name') document.roster.students[0].name = '다른학생';
-    else document.roster.students[0].teacherIds = ['S-other'];
-    db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+    if (mismatch === 'name') {
+      const row = db.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
+      const document = JSON.parse(row.data);
+      document.roster.students[0].name = '다른학생';
+      db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+    } else {
+      const row = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first();
+      const task = JSON.parse(row.data);
+      task.staffId = 'S-other';
+      db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='task-1'").bind(JSON.stringify(task)).run();
+    }
     let fetches = 0;
     await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
       const r = await call(db, { auth: admin, requestKey });

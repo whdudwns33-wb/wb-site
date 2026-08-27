@@ -1,6 +1,7 @@
 import { validateRosterDocument } from './roster.js';
 import { acquireBookOrderDispatchLock, releaseBookOrderDispatchLockSafely } from './book-order-lock.js';
 import { MANUAL_ONLINE_DELIVERY, ONLINE_BOOK_VENDOR, resolveBookPublisher } from './book-order-vendors.js';
+import { bookOrderStudentIdsForAuth, ownBookStudentWriteGuard } from './book-order-student-scope.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_ORDER_TASK_ID = /^ord_[A-Za-z0-9_-]{8,120}$/;
@@ -111,6 +112,14 @@ async function currentRosterRecord(env, app) {
     };
   }
   catch (error) { return false; }
+}
+
+async function ownOrderStudentScopeStillValid(env, app, auth, studentIds) {
+  if (!auth || auth.scope !== 'own') return true;
+  const current = await currentRosterRecord(env, app);
+  if (!current || current === false) return false;
+  const allowed = await bookOrderStudentIdsForAuth(env, app, current.document, auth);
+  return studentIds.every(studentId => allowed.has(String(studentId)));
 }
 
 async function currentRoster(env, app) {
@@ -459,12 +468,10 @@ async function createBoundOrder(env, app, body, origin, auth, json) {
     return json({ ok: false, code: 'ORDER_STUDENT_INACTIVE',
       error: '현재 재원 중인 학생만 주문에 연결할 수 있습니다' }, 409, origin);
   }
-  if (auth.scope === 'own' && studentIds.some(id => {
-    const student = rosterById.get(id);
-    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
-  })) {
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  if (auth.scope === 'own' && studentIds.some(id => !allowedStudentIds.has(id))) {
     return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
-      error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+      error: '현재 본인이 담당하는 수업 학생만 주문에 연결할 수 있습니다' }, 403, origin);
   }
   if (await hasActiveDuplicate(env, app, [identity])) {
     return json({ ok: false, code: 'ORDER_ALREADY_ACTIVE',
@@ -491,12 +498,14 @@ async function createBoundOrder(env, app, body, origin, auth, json) {
   const taskData = JSON.stringify(task);
   const studentIdsJson = JSON.stringify(studentIds);
   const receiverId = ownerId || 'director';
+  const writeGuard = ownBookStudentWriteGuard(auth, app, studentIds, now);
   const statements = [
     env.DB.prepare(
       'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) SELECT ?,?,?,?,?,? ' +
-      'WHERE EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)'
+      'WHERE EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)' +
+      writeGuard.sql
     ).bind(app, taskId, ownerId || null, taskData, now, now,
-      app, rosterRecord.rawData, rosterRecord.updatedAt),
+      app, rosterRecord.rawData, rosterRecord.updatedAt, ...writeGuard.binds),
     env.DB.prepare(
       'INSERT INTO book_order_student_snapshots(app,task_id,item_index,owner_id,book_id,public_title,student_id,' +
       'student_identity_hash,student_set_hash,item_identity_hash,task_identity_hash,' +
@@ -534,6 +543,10 @@ async function createBoundOrder(env, app, body, origin, auth, json) {
     if (taskChanges !== 1) {
       const raced = await exactExistingBound(env, app, taskId, ownerId, productCode, identity, document);
       if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
+      if (!(await ownOrderStudentScopeStillValid(env, app, auth, studentIds))) {
+        return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+          error: '담당 수업이 변경되어 이 학생의 주문을 등록할 수 없습니다' }, 403, origin);
+      }
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
         error: '원생 명단이 주문 등록 중 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
     }
@@ -694,10 +707,11 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   if (selectedIds.some(id => !activeStudent(rosterById.get(id), month))) {
     return json({ ok: false, code: 'ORDER_STUDENT_INACTIVE', error: '현재 재원 중인 학생만 주문에 연결할 수 있습니다' }, 409, origin);
   }
-  if (auth.scope === 'own' && selectedIds.some(id => {
-    const student = rosterById.get(id);
-    return !Array.isArray(student.teacherIds) || !student.teacherIds.includes(auth.id);
-  })) return json({ ok: false, code: 'ORDER_STUDENT_SCOPE', error: '현재 담당 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+  const allowedStudentIds = await bookOrderStudentIdsForAuth(env, app, document, auth);
+  if (auth.scope === 'own' && selectedIds.some(id => !allowedStudentIds.has(id))) {
+    return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+      error: '현재 본인이 담당하는 수업 학생만 주문에 연결할 수 있습니다' }, 403, origin);
+  }
 
   if (await hasActiveDuplicate(env, app, identities)) {
     return json({ ok: false, code: 'ORDER_ALREADY_ACTIVE',
@@ -725,12 +739,14 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
     }
   }
   const taskData = JSON.stringify(task);
+  const writeGuard = ownBookStudentWriteGuard(auth, app, selectedIds, now);
   const statements = [
     env.DB.prepare(
       'INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) SELECT ?,?,?,?,?,? ' +
-      'WHERE EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)'
+      'WHERE EXISTS (SELECT 1 FROM private_rosters WHERE app=? AND data=? AND updated_at=?)' +
+      writeGuard.sql
     ).bind(app, taskId, ownerId || null, taskData, now, now,
-      app, rosterRecord.rawData, rosterRecord.updatedAt),
+      app, rosterRecord.rawData, rosterRecord.updatedAt, ...writeGuard.binds),
     env.DB.prepare(
       'INSERT INTO book_order_student_snapshots(app,task_id,item_index,owner_id,book_id,public_title,student_id,' +
       'student_identity_hash,student_set_hash,item_identity_hash,task_identity_hash,' +
@@ -752,6 +768,10 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
     if (taskChanges !== 1) {
       const raced = await exactExisting(env, app, taskId, ownerId, vendorName, delivery, identities, document);
       if (raced) return json({ ok: true, idempotent: true, task: raced }, 200, origin);
+      if (!(await ownOrderStudentScopeStillValid(env, app, auth, selectedIds))) {
+        return json({ ok: false, code: 'ORDER_STUDENT_SCOPE',
+          error: '담당 수업이 변경되어 이 학생의 주문을 등록할 수 없습니다' }, 403, origin);
+      }
       return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
         error: '원생 명단이 주문 등록 중 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
     }

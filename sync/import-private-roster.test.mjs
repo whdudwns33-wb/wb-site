@@ -36,7 +36,7 @@ function studentIds() {
   return () => String(++next);
 }
 
-test('build preserves stable ids, maps exact teachers, and does not mutate sources', () => {
+test('build preserves stable ids, maps assignment-specific teachers, and does not mutate sources', () => {
   const input = sources();
   const before = JSON.parse(JSON.stringify(input));
   const existingDocument = {
@@ -48,7 +48,7 @@ test('build preserves stable ids, maps exact teachers, and does not mutate sourc
   const first = buildPrivateRosterDocument({ ...input, staff, existingDocument, makeUuid: uuids(), makeStudentId: studentIds() });
   assert.deepEqual(input, before);
   assert.equal(first.roster.students[0].id, 'student-existing');
-  assert.deepEqual(first.roster.students[1].teacherIds, ['teacher-a', 'teacher-b']);
+  assert.equal(first.roster.students.some(row => 'teacher' in row || 'teacherIds' in row), false);
   assert.equal(first.bookStudents[0].id, 'book-existing');
   assert.equal(first.bookStudents[0].studentId, 'student-existing');
   assert.deepEqual(first.bookStudents[1].teacherIds, ['teacher-b']);
@@ -174,7 +174,7 @@ test('same-name students use school, grade, then parent contacts as their regist
 
 test('build rejects a missing teacher without putting the name in the error', () => {
   const input = sources();
-  input.rosterSource.students[0].teacher = '없는선생';
+  input.textbooksSource.students[0].teacher = '없는선생';
   assert.throws(
     () => buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids() }),
     error => error.message === 'TEACHER_NOT_FOUND' && !error.message.includes('없는선생')
@@ -204,13 +204,13 @@ test('book student name must resolve to exactly one roster student', () => {
   );
 });
 
-test('book teacher must be a subset of the roster assignment', () => {
+test('book assignment keeps its own teacher without creating a roster main teacher', () => {
   const input = sources();
   input.textbooksSource.students[0].teacher = '나선생';
-  assert.throws(
-    () => buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids() }),
-    { message: 'BOOK_TEACHER_NOT_ASSIGNED' }
-  );
+  const document = buildPrivateRosterDocument({ ...input, staff, makeUuid: uuids() });
+  assert.equal(document.roster.students.some(row => 'teacher' in row || 'teacherIds' in row), false);
+  assert.equal(document.bookStudents[0].teacher, '나선생');
+  assert.deepEqual(document.bookStudents[0].teacherIds, ['teacher-b']);
 });
 
 test('post-import readback verifies student and assignment identities', () => {

@@ -174,6 +174,19 @@ test('record requires the assigned person even with all scope; root admin adjust
   assert.equal(adjusted.body.pack.usedSessions, 0);
 });
 
+test('legacy roster teacherIds do not revoke an exact lesson owner session record', async () => {
+  const db = seed();
+  const pack = (await create(db)).body.pack;
+  const row = db.database.prepare("SELECT data FROM private_rosters WHERE app='task'").get();
+  const document = JSON.parse(row.data);
+  document.roster.students.find(item => item.id === 'student-a').teacherIds = ['teacher-b'];
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+  putCheck(db, 'lesson-a', 'teacher-a', '2026-08-03', 'P');
+  const recorded = await record(db, pack, 'lesson-a', '2026-08-03', own('teacher-a'));
+  assert.equal(recorded.status, 200);
+  assert.equal(recorded.body.pack.usedSessions, 1);
+});
+
 test('present, late, early leave, and absence policies use actual checks and CAS; duplicate source is idempotent', async () => {
   const db = seed();
   let pack = (await create(db, { totalSessions: 6 })).body.pack;
