@@ -169,15 +169,15 @@
   .tag.add  { background: #ECFDF5; color: var(--green); }
   .tag.edit { background: #FFF7ED; color: var(--amber); }
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
-  textarea.note { display: block; min-height: 44px; resize: vertical; transition: min-height .18s ease, border-color .18s ease, background .18s ease; }
+  textarea.note { display: block; min-height: 44px; resize: vertical; transition: height .18s ease, min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
-  .lesson-memo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .lesson-memo-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .lesson-memo-field { display: block; min-width: 0; }
   .lesson-memo-field .fl { display: block; color: var(--mid-gray); font-size: 12.5px; font-weight: 700; }
   .lesson-memo-private { display: block; margin-top: 2px; color: #9E3629; font-size: 11px; font-weight: 700; }
   .lesson-memo-editor .lesson-memo-field textarea.note,
-  .lesson-memo-editor:focus-within .lesson-memo-field textarea.note { min-height: 72px; margin-top: 5px; border-style: dashed; border-color: var(--line); background: var(--ivory); outline: none; }
-  .lesson-memo-editor .lesson-memo-field textarea.note:focus { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
+  .lesson-memo-editor:focus-within .lesson-memo-field textarea.note { height: 44px; min-height: 44px; margin-top: 5px; overflow-y: hidden; border-style: dashed; border-color: var(--line); background: var(--ivory); outline: none; }
+  .lesson-memo-editor .lesson-memo-field textarea.note:focus { height: 132px; min-height: 132px; overflow-y: auto; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
   .memo-save { display: none; margin-top: 8px; }
   .memo-editor:focus-within .memo-save { display: block; }
   .guardian-publication { margin-top: 10px; padding: 12px; border: 1px solid #B9E3C7; border-radius: 10px; background: #F3FCF6; }
@@ -379,7 +379,6 @@
     .schedule-week-grid .schedule-day-head .schedule-person-meta { margin-bottom: 0; }
   }
   @media (max-width: 600px) {
-    .lesson-memo-grid { grid-template-columns: 1fr; }
     .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .schedule-card-grid { grid-template-columns: 1fr; }
     .schedule-list-row { grid-template-columns: 76px minmax(0, 1fr); }
@@ -957,11 +956,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.6"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.6"></script>
-<script src="./asset-core.js?v=2026-08-27.6"></script>
-<script src="./qr-core.js?v=2026-08-27.6"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.6"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.7"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.7"></script>
+<script src="./asset-core.js?v=2026-08-27.7"></script>
+<script src="./qr-core.js?v=2026-08-27.7"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.7"></script>
 <script>
 "use strict";
 
@@ -2821,7 +2820,7 @@ function taskMemoEditorHtml(t, date, c, editable) {
       '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
       (field.key === 'otherNotes' ? '<span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송</span>' : '') +
       '<textarea class="note" data-lesson-memo-field="' +
-      field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="2" enterkeyhint="enter" placeholder="' + esc(field.placeholder) + '">' +
+      field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' + esc(field.placeholder) + '">' +
       esc(values[field.key]) + '</textarea></label>').join('') + '</div><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
       t.id + '" data-date="' + date + '">수업 메모 저장</button></div>';
   }
@@ -16353,7 +16352,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.6';
+const APP_VER = '2026-08-27.7';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
