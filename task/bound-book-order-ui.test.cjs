@@ -91,7 +91,7 @@ test('제본 주문은 전용 서버 경로가 확정한 뒤에만 닫고 즉시
 });
 
 test('아카등록 완료 기록은 선택 교사의 행만 완료 최신순으로 파생한다', () => {
-  const source = block('function bookOrderHistoryRows(', 'function viewBookOrderHistory(');
+  const source = block('function bookOrderHistorySearchKey(', 'function viewBookOrderHistory(');
   const rowsFor = new Function('bookOrderRows', `${source}\nreturn bookOrderHistoryRows;`)([
     { taskId: 'old', owner: 'teacher-a', academyRegisteredAt: 500, studentHandedAt: 90 },
     { taskId: 'waiting', owner: 'teacher-a', academyRegisteredAt: null, studentHandedAt: null },
@@ -100,7 +100,7 @@ test('아카등록 완료 기록은 선택 교사의 행만 완료 최신순으�
   ]);
   assert.deepEqual(rowsFor('teacher-a').map(row => row.taskId), ['new', 'old']);
   assert.deepEqual(rowsFor('teacher-b').map(row => row.taskId), ['other']);
-  assert.deepEqual(rowsFor('').map(row => row.taskId), []);
+  assert.deepEqual(rowsFor('').map(row => row.taskId), ['other', 'new', 'old']);
 });
 
 test('교재 주문 기록 조회는 주문하기 아래에서 교사 조회 후 필수 네 정보를 표시한다', () => {

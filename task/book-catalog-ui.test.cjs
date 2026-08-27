@@ -66,6 +66,7 @@ test('book search is token-based across title, series, subject, level, and vendo
   );
   assert.equal(bookSearchMatches(text, '팩토 초3'), true);
   assert.equal(bookSearchMatches(text, '천재 수학'), true);
+  assert.equal(bookSearchMatches(text, '천재총판 수학'), true);
   assert.equal(bookSearchMatches(text, '팩토 영어'), false);
   assert.equal(bookSearchMatches(text, '  '), true);
   assert.equal(booksOutsideSearch([
@@ -73,6 +74,24 @@ test('book search is token-based across title, series, subject, level, and vendo
     { title: '개별 독해 교재', subject: '국어', level: '초4' }
   ], '천재출판사', '팩토'), 1);
   assert.equal(booksOutsideSearch([{ title: '아무 교재' }], '천재출판사', ''), 0);
+});
+
+test('vendor names display as distributors while stored order keys stay unchanged', () => {
+  const textbooks = JSON.parse(fs.readFileSync(path.join(__dirname, 'textbooks.json'), 'utf8'));
+  const source = block('/** 주문·문자 설정용 기존 식별값은 유지하고 주문처 이름만 화면에서 바꾼다. */', 'function bookSearchText(');
+  const { bookVendorDisplayName } = new Function(`${source}\nreturn { bookVendorDisplayName };`)();
+  assert.deepEqual(textbooks.vendors.slice(0, 4).map(vendor => [vendor.name, vendor.displayName]), [
+    ['청암출판사', '청암총판'],
+    ['천재출판사', '천재총판'],
+    ['상형출판사', '상형총판'],
+    ['동아출판사', '동아총판']
+  ]);
+  assert.deepEqual(textbooks.vendors.map(bookVendorDisplayName), [
+    '청암총판', '천재총판', '상형총판', '동아총판', '쿠팡'
+  ]);
+  assert.equal(bookVendorDisplayName('천재출판사'), '천재총판', '기존 주문 이력도 표시만 변환한다');
+  assert.match(html, /value="' \+ esc\(v\.name\)[\s\S]{0,100}bookVendorDisplayName\(v\)/);
+  assert.match(html, /vendorName: batchVendorName/);
 });
 
 test('DOM-only search refreshes the hidden selected-book count immediately', () => {

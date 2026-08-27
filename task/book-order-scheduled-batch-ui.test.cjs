@@ -16,8 +16,12 @@ test('새 주문은 학생 정체성을 검증하는 서버 전용 경로로만 
   const source = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
   assert.match(source, /await sync\.post\('\/book-order', \{/);
   assert.match(source, /action: 'create', taskId: taskId/);
-  assert.match(source, /items: items\.map\(item => \(\{[\s\S]*bookId: item\.bookId, title: item\.title, studentIds: item\.studentIds, unitPrice: item\.unitPrice/);
-  assert.match(source, /result\.task\.id !== taskId \|\| result\.task\.orderDelivery !== 'scheduled_batch_v1'/);
+  assert.match(source, /items: items\.map\(item => \(\{/);
+  for (const field of ['bookId: item.bookId', 'title: item.title', 'studentIds: item.studentIds',
+    'unitPrice: item.unitPrice']) assert.ok(source.includes(field), field);
+  assert.match(source, /Object\.prototype\.hasOwnProperty\.call\(item, 'publisherName'\)/);
+  assert.match(source, /publisherName: (?:String\(item\.publisherName \|\| ''\)|item\.publisherName)/);
+  assert.match(source, /result\.task\.id !== taskId \|\| result\.task\.orderDelivery !== expectedDelivery/);
   assert.match(source, /Number\(result\.task\.orderIdentityVersion\) !== 1/);
   assert.match(source, /applyCreatedLesson\(result\.task\)/);
   assert.doesNotMatch(source, /state\.tasks\.push|queueSync\(\)/);
@@ -42,7 +46,7 @@ test('한 권 주문과 묶음 주문은 학생 선택을 전용 서버 경로�
 test('학생 선택창 위에서 교재 단가를 받고 주문부터 아카등록까지 금액과 네 단계 날짜를 표시한다', () => {
   const priceInput = block('function orderPriceInput(', 'function selectedOrderStudentIds(');
   const singleModal = block('function singleOrderModal(', 'function batchOrderModal(');
-  const batchModal = block('function batchOrderModal(', '/** 온라인 직접 주문은');
+  const batchModal = block('function batchOrderModal(', 'async function submitBookOrder(');
   const dates = block('function bookOrderDateText(', 'function bookOrderRowHtml(');
   const row = block('function bookOrderRowHtml(', 'function bookOrderStageHtml(');
 
@@ -92,13 +96,13 @@ test('서버 확인 전에는 성공 처리하지 않고 실패 시 같은 주�
 
 test('주문처가 없는 단일·묶음 주문은 서버에 보내지 않고 입력을 유지한다', () => {
   const source = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
-  const guard = source.indexOf("if (!batchVendorName) return toast('교재 정보에서 주문처를 먼저 등록해 주세요')");
+  const guard = source.indexOf('if (!batchVendorName)');
   assert.ok(guard >= 0 && guard < source.indexOf("sync.post('/book-order'"));
   const beforeRequest = source.slice(0, source.indexOf("sync.post('/book-order'"));
   assert.doesNotMatch(beforeRequest, /batchDraft\s*=\s*null|batchOrderTaskId\s*=\s*''|closeModal\(\)/);
 
   const singleModal = block('function singleOrderModal(', 'function batchOrderModal(');
-  const batchModal = block('function batchOrderModal(', '/** 새 주문은');
+  const batchModal = block('function batchOrderModal(', 'async function submitBookOrder(');
   const singleSubmit = block("case 'bkordersubmit':", "case 'bkselect':");
   const batchSubmit = block("case 'bkbatchsubmit':", "case 'bkcancelopen':");
   assert.match(singleModal, /batchVendorName = book\.vendor \|\| ''/);
@@ -107,18 +111,32 @@ test('주문처가 없는 단일·묶음 주문은 서버에 보내지 않고 �
   assert.match(batchSubmit, /submitBookOrder/);
 });
 
-test('온라인 직접 주문은 sealed create와 20시 문자 대상에 절대 넣지 않는다', () => {
-  const manual = block('function saveManualOnlineBookOrder(', '/** 새 주문은');
+test('온라인 직접 주문도 서버 주문으로 등록하고 manual_online_v1 응답을 1단계에 유지한다', () => {
   const submit = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
-  assert.match(manual, /orderDelivery: 'manual_online_v1'/);
-  assert.match(manual, /온라인 직접 주문/);
-  assert.match(manual, /문자 자동 발송·보호자 자동 상태 공개 대상이 아닙니다/);
-  assert.match(manual, /save\(\); queueSync\(\); closeModal\(\); render\(\)/);
-  assert.doesNotMatch(manual, /scheduled_batch_v1|sync\.post\('\/book-order'/);
+  assert.match(submit, /await sync\.post\('\/book-order', \{/);
+  assert.match(submit, /action: 'create'/);
+  assert.match(submit, /publisherName: (?:String\(item\.publisherName \|\| ''\)|item\.publisherName)/);
+  assert.match(submit, /scheduled_batch_v1/);
+  assert.match(submit, /manual_online_v1/);
+  assert.match(submit, /await loadBookIssues\(true\)/);
+  assert.doesNotMatch(submit, /saveManualOnlineBookOrder|vendor\.type === 'online'[\s\S]{0,100}return/);
+  assert.doesNotMatch(submit, /state\.tasks\.push|queueSync\(\)/);
 
-  const guard = submit.indexOf("if (vendor && vendor.type === 'online') return saveManualOnlineBookOrder(items)");
-  const post = submit.indexOf("sync.post('/book-order'");
-  assert.ok(guard >= 0 && post > guard, '온라인 분기가 sealed create POST보다 먼저 return해야 합니다');
+  const status = block('function viewBookIssues(', 'function bookOrderLinkBook(');
+  assert.match(status, /bookOrderStageHtml\('order_waiting', '1단계 · 주문대기'/);
+});
+
+test('기존 총판 교재는 publisherName을 생략하고 외부교재만 빈 선택값까지 명시해 전송한다', () => {
+  const submit = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
+  const single = block("case 'bkordersubmit':", "case 'bkselect':");
+  const batch = block("case 'bkbatchsubmit':", "case 'bkcancelopen':");
+  const external = block('async function submitExternalBookOrder(', 'function bookOrderHistoryRows(');
+
+  assert.match(submit, /Object\.prototype\.hasOwnProperty\.call\(item, 'publisherName'\)/);
+  assert.match(submit, /publisherName: (?:String\(item\.publisherName \|\| ''\)|item\.publisherName)/);
+  assert.doesNotMatch(single, /publisherName/);
+  assert.doesNotMatch(batch, /publisherName/);
+  assert.match(external, /publisherName: publisher\.publisherName/);
 });
 
 test('봉인된 주문 취소는 서버 확인 후에만 반영하고 과거 주문은 기존 경로를 유지한다', () => {
@@ -174,7 +192,7 @@ test('중복 차단은 교재 전체가 아니라 아직 배부되지 않은 선
 
   const card = block('function bookCard(', '/* ── 새 교재 추가 신청');
   const single = block('function singleOrderModal(', 'function batchOrderModal(');
-  const batch = block('function batchOrderModal(', '/** 온라인 직접 주문은');
+  const batch = block('function batchOrderModal(', 'async function submitBookOrder(');
   const submit = block('async function submitBookOrder(', 'async function cancelSealedBookOrder(');
   const click = block("case 'bkorder':", "case 'bkbatch':");
 
@@ -185,7 +203,7 @@ test('중복 차단은 교재 전체가 아니라 아직 배부되지 않은 선
   const guard = submit.indexOf('const duplicateStudent =');
   assert.ok(guard >= 0 && guard < submit.indexOf("sync.post('/book-order'"));
   assert.match(submit.slice(guard, submit.indexOf("if (!batchVendorName)")), /activeBookOrderStudentIds\(item\.bookId\)[\s\S]*activeIds\.has\(String\(id\)\)/);
-  assert.match(submit.slice(guard, submit.indexOf("if (!batchVendorName)")), /return toast\('선택한 학생 중 같은 교재 주문이 이미 진행 중인 학생이 있습니다/);
+  assert.match(submit.slice(guard, submit.indexOf("if (!batchVendorName)")), /if \(duplicateStudent\) return toast\('선택한 학생 중 같은 교재 주문이 이미 진행 중인 학생이 있습니다/);
   assert.doesNotMatch(submit.slice(0, submit.indexOf("if (!batchVendorName)")),
     /batchDraft\s*=\s*null|batchSelection\.delete|closeModal\(\)/);
   assert.doesNotMatch(click, /bookPendingOrderCount/);
