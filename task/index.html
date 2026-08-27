@@ -957,11 +957,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.4"></script>
-<script src="./asset-core.js?v=2026-08-27.4"></script>
-<script src="./qr-core.js?v=2026-08-27.4"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.5"></script>
+<script src="./asset-core.js?v=2026-08-27.5"></script>
+<script src="./qr-core.js?v=2026-08-27.5"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.5"></script>
 <script>
 "use strict";
 
@@ -2785,18 +2785,19 @@ function taskRow(t, date, editable, isCarry) {
 const LESSON_MEMO_FIELDS = [
   { key: 'contentProgress', label: '수업내용 · 진도', placeholder: '오늘 수업한 내용과 실제 진도를 입력하세요' },
   { key: 'homework', label: '과제', placeholder: '학생에게 안내한 과제를 입력하세요' },
-  { key: 'comment', label: '코멘트', placeholder: '수업에 대한 코멘트를 입력하세요' },
   { key: 'otherNotes', label: '기타 · 특이사항', placeholder: '그 밖의 특이사항을 입력하세요' }
 ];
 
 function lessonMemoValues(check) {
   const stored = check && check.lessonMemo;
   const structured = stored && typeof stored === 'object' && !Array.isArray(stored) &&
-    LESSON_MEMO_FIELDS.some(field => Object.prototype.hasOwnProperty.call(stored, field.key));
+    (LESSON_MEMO_FIELDS.some(field => Object.prototype.hasOwnProperty.call(stored, field.key)) ||
+      Object.prototype.hasOwnProperty.call(stored, 'comment'));
   const values = {};
   LESSON_MEMO_FIELDS.forEach(field => {
     values[field.key] = structured ? String(stored[field.key] || '') : '';
   });
+  values.comment = structured ? String(stored.comment || '') : '';
   if (!structured) values.contentProgress = String((check && check.note) || '');
   return values;
 }
@@ -3759,19 +3760,26 @@ function ctModal(name, taskId, studentId) {
       : '<div class="small muted">아직 기록이 없습니다. 첫 연락을 남겨보세요.</div>'));
 }
 
-let fbCtx = null;   // {id, date, focus, plus:[], minus}
+let fbCtx = null;   // {id, date, comment, focus, plus:[], minus}
+function captureFeedbackComment() {
+  const field = document.querySelector('[data-feedback-comment]');
+  if (fbCtx && field) fbCtx.comment = field.value;
+}
+
 function fbModal() {
   const chip = (on, act, extra, label) =>
     '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-act="' + act + '" ' + extra + '>' + label + '</button>';
-  modal('코멘트 인터뷰 — 보기만 고르면 문장은 자동으로',
-    '<div class="fl mb8">1. 오늘 집중·태도는?</div><div class="chips mb14">' +
+  modal('피드백 문구 선택',
+    '<label class="field"><span class="fl">1. 코멘트(직접작성, 간단히)</span><textarea class="in" rows="2" maxlength="200" data-feedback-comment placeholder="수업 중 관찰한 내용을 간단히 입력하세요">' +
+      esc(fbCtx.comment || '') + '</textarea></label>' +
+    '<div class="fl mb8">2. 오늘 집중·태도는?</div><div class="chips mb14">' +
       [['best', '아주 좋음'], ['good', '좋음'], ['soso', '보통'], ['shaky', '흔들림']].map(([v, l]) =>
         chip(fbCtx.focus === v, 'fbq', 'data-q="focus" data-v="' + v + '"', l)).join('') + '</div>' +
-    '<div class="fl mb8">2. 잘한 점은? (1개 이상, 최대 2개)</div><div class="chips mb14">' +
+    '<div class="fl mb8">3. 잘한 점은? (1개 이상, 최대 2개)</div><div class="chips mb14">' +
       FB_PLUS.map((p, i) => chip(fbCtx.plus.includes(i), 'fbq', 'data-q="plus" data-v="' + i + '"', p[0])).join('') + '</div>' +
-    '<div class="fl mb8">3. 보완할 점은? (특별히 없으면 "없음")</div><div class="chips mb14">' +
+    '<div class="fl mb8">4. 보완할 점은? (특별히 없으면 "없음")</div><div class="chips mb14">' +
       FB_MINUS.map((p, i) => chip(fbCtx.minus === i, 'fbq', 'data-q="minus" data-v="' + i + '"', p[0])).join('') + '</div>' +
-    '<div class="hint">여기서 고른 잘한 점·보완할 점이 보호자께 카카오 알림톡으로 나가는 항목입니다. 다음 화면에서 문구는 자유롭게 고칠 수 있어요.</div>',
+    '<div class="hint">직접 작성한 코멘트와 여기서 고른 잘한 점·보완할 점이 학부모 피드백 문구에 반영됩니다. 다음 화면에서 최종 문구를 확인하세요.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="fbmake">다음 — 미리보기</button>');
 }
 
@@ -14668,7 +14676,7 @@ document.addEventListener('click', ev => {
       const editor = el.closest('.memo-editor');
       const lessonFields = editor && Array.from(editor.querySelectorAll('[data-lesson-memo-field]'));
       if (lessonFields && lessonFields.length) {
-        const lessonMemo = {};
+        const lessonMemo = lessonMemoValues(getCheck(id, date));
         LESSON_MEMO_FIELDS.forEach(field => { lessonMemo[field.key] = ''; });
         lessonFields.forEach(field => {
           if (Object.prototype.hasOwnProperty.call(lessonMemo, field.dataset.lessonMemoField)) {
@@ -15143,7 +15151,8 @@ document.addEventListener('click', ev => {
     }
     case 'fbtext': {
       const t = task(); if (!t) break;
-      fbCtx = { id: id, date: date, focus: null, plus: [], minus: null };
+      fbCtx = { id: id, date: date, comment: lessonMemoValues(getCheck(id, date)).comment,
+        focus: null, plus: [], minus: null };
       fbModal();
       break;
     }
@@ -15155,6 +15164,7 @@ document.addEventListener('click', ev => {
     }
     case 'fbq': {
       if (!fbCtx) break;
+      captureFeedbackComment();
       const q = el.dataset.q, v = el.dataset.v;
       if (q === 'focus') fbCtx.focus = (fbCtx.focus === v) ? null : v;
       else if (q === 'plus') {
@@ -15169,8 +15179,14 @@ document.addEventListener('click', ev => {
     case 'fbmake': {
       if (!fbCtx) break;
       const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
+      captureFeedbackComment();
+      if (String(fbCtx.comment || '').length > 200) return toast('코멘트는 200자까지 입력할 수 있습니다');
       if (!fbCtx.plus.length) return toast('잘한 점을 하나 이상 골라주세요');
       if (fbCtx.minus == null) return toast('보완할 점을 골라주세요 (특별히 없으면 "없음")');
+      const currentCheck = getCheck(fbCtx.id, fbCtx.date);
+      const lessonMemo = lessonMemoValues(currentCheck);
+      lessonMemo.comment = String(fbCtx.comment || '');
+      setCheck(fbCtx.id, fbCtx.date, { lessonMemo: lessonMemo, note: lessonMemoText(lessonMemo) });
       const gen = buildComment(fbCtx, t.title + '|' + fbCtx.date);
       showFeedbackPreview(t, fbCtx.date, computeFeedbackFields(t, fbCtx.date, fbCtx), feedbackText(t, fbCtx.date, gen));
       break;
@@ -16134,7 +16150,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.4';
+const APP_VER = '2026-08-27.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
