@@ -1,7 +1,7 @@
 'use strict';
 /* WB 진로독서 서비스 워커 — 앱 셸 캐시 + 오프라인 읽기 */
-const VERSION = 'wbr-shell-v2';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
+const VERSION = 'wbr-shell-v3';
+const SHELL = ['./', './index.html', './voice.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

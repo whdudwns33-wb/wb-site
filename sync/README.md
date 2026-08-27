@@ -64,6 +64,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/049_consult_result_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/050_weekend_actual_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/051_feedback_template_v2.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/052_completed_book_catalog.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/053_consult_link_send.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/054_lesson_staff_scope.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/055_task_write_cas_guards.sql
 
@@ -72,6 +73,7 @@ npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
 npx wrangler secret put TASK_MANAGER_STAFF_IDS # task 운영 관리자 staff ID, 쉼표로 구분
 npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID # 승인된 수행보고 알림톡 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID # 승인된 consult 학생 링크 알림톡 템플릿 ID
 npx wrangler secret put SOLAPI_KAKAO_API_KEY        # 카카오 알림톡 전용 API 키
 npx wrangler secret put SOLAPI_KAKAO_API_SECRET     # 카카오 알림톡 전용 API 시크릿
 npx wrangler secret put SOLAPI_KAKAO_PF_ID          # 연동된 카카오 채널 ID
@@ -86,6 +88,7 @@ npx wrangler secret put WB_GUARDIAN_OPS_SEND_ENABLED # 4개 템플릿 승인·�
 npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_BOARDED_APPROVED_TEMPLATE_ID
 npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_DROPPED_APPROVED_TEMPLATE_ID
 npx wrangler secret put WB_TRANSPORT_NOTIFY_ENABLED # 두 템플릿 APPROVED·차량 목적 동의 확인 뒤에만 true
+npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED # 학생 링크 템플릿 승인·연락처 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
