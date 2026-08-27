@@ -7,6 +7,10 @@ const crypto = require('node:crypto');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const textbooks = JSON.parse(fs.readFileSync(path.join(__dirname, 'textbooks.json'), 'utf8'));
 
+test('static textbook catalog starts empty for the rebuilt database', () => {
+  assert.deepEqual(textbooks.books, []);
+});
+
 test('student private data is never shipped as a Pages static file', () => {
   assert.equal(fs.existsSync(path.join(__dirname, 'roster.json')), false);
   assert.equal(Object.prototype.hasOwnProperty.call(textbooks, 'students'), false);
