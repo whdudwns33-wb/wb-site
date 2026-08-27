@@ -956,11 +956,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.2"></script>
-<script src="./asset-core.js?v=2026-08-27.2"></script>
-<script src="./qr-core.js?v=2026-08-27.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.3"></script>
+<script src="./asset-core.js?v=2026-08-27.3"></script>
+<script src="./qr-core.js?v=2026-08-27.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.3"></script>
 <script>
 "use strict";
 
@@ -3849,36 +3849,38 @@ function feedbackText(t, date, genComment) {
 }
 
 /** 오늘 배운 내용/잘한 점/보완할 점 — 카카오 알림톡 항목별 변수 그대로 나가는 값이다.
- *  doneSteps(실제 체크한 단계)·FB_PLUS/FB_MINUS 칩 선택에서 초안을 뽑아주지만,
- *  최종적으로 나가는 건 이 입력칸에 남아있는 값이라 눌러서 고칠 수 있다. */
+ *  오늘 배운 내용은 수업 메모의 수업내용·진도를 우선하고 실제 체크 단계·등록 수업 정보 순으로 자동 구성한다.
+ *  코멘트 인터뷰 화면에서는 잘한 점과 보완할 점만 확인·수정한다. */
 function computeFeedbackFields(t, date, fbCtx) {
   const c = getCheck(t.id, date);
   const doneSteps = taskSteps(t, c).filter(s => c && c.steps && c.steps[s.id]).map(s => s.label);
-  const contentText = doneSteps.length ? doneSteps.join(', ') : taskCardDetail(t);
+  const memo = lessonMemoValues(c);
+  const contentText = (String(memo.contentProgress || '').trim() ||
+    (doneSteps.length ? doneSteps.join(', ') : '') || taskCardDetail(t) ||
+    [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const plusText = ((fbCtx && fbCtx.plus) || []).map(i => FB_PLUS[i][0]).join(', ');
   const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
   const minusText = minusPick === '없음' ? '특별히 없음 — 오늘도 잘 따라왔어요' : minusPick;
   return { contentText, plusText, minusText };
 }
 
-/** 실제 발송(카카오 알림톡) 미리보기 + 발송 버튼. fields는 초안일 뿐, 입력칸에서 바로 고칠 수 있다.
+/** 실제 발송(카카오 알림톡) 미리보기 + 발송 버튼. 잘한 점·보완할 점은 입력칸에서 바로 고칠 수 있다.
  *  letterText는 복사용 편지 — 안 주면 인터뷰 없이 그날 체크·메모만으로 생성한다. */
 function showFeedbackPreview(t, date, fields, letterText) {
-  fbCtx = { id: t.id, date: date };
+  fbCtx = { id: t.id, date: date, contentText: String(fields.contentText || '').trim().slice(0, 300) };
   const teacher = (currentStaff() || {}).name || '';
   const student = studentOf(t);
   const guardianDeliveryEnabled = guardianContactEnabledFor(t && t.studentId);
   if (letterText == null) letterText = feedbackText(t, date);
   modal('수업 피드백 문구 — ' + esc(student) + ' 학생',
     '<div class="small muted mb8">' + esc(teacher) + ' 선생님 수업 기록을 바탕으로 만든 문구입니다.</div>' +
-    '<div class="field"><label class="fl">오늘 배운 내용</label><input class="in" id="fldContent" value="' + esc(fields.contentText || '') + '"></div>' +
     '<div class="field"><label class="fl">잘한 점</label><input class="in" id="fldPlus" value="' + esc(fields.plusText || '') + '"></div>' +
     '<div class="field"><label class="fl">다음에 더 신경 쓸 점</label><input class="in" id="fldMinus" value="' + esc(fields.minusText || '') + '"></div>' +
     (guardianDeliveryEnabled
       ? '<div class="hint mt14"><b>테스트 학생 전달 기능 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
       : '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 연락처는 보관하지만 메시지나 과제물을 학부모에게 전달하지 않습니다.</div>') +
     '<textarea class="in" rows="6" id="mText" style="margin-top:10px">' + esc(letterText) + '</textarea>' +
-    '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다 — 실제 발송 내용은 위 세 항목입니다.</div>',
+    '<div class="small muted mt8">위 텍스트 상자는 다른 곳에 복사할 때만 씁니다. 실제 발송의 오늘 배운 내용은 저장된 수업내용·진도에서 자동 반영됩니다.</div>',
     '<button class="btn btn-ghost btn-block mt14" data-act="copytext">복사하기</button>' +
     (guardianDeliveryEnabled ? '<button class="btn btn-primary btn-block mt8" data-act="feedbacksubmit">보호자 알림톡 보내기</button>' : ''));
 }
@@ -5581,11 +5583,11 @@ async function submitFeedbackForReview(button) {
   const task = state.tasks.find(row => row.id === fbCtx.id);
   if (!guardianContactEnabledFor(task && task.studentId)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const message = (($('#mText') || {}).value || '').trim();
-  const contentText = (($('#fldContent') || {}).value || '').trim();
+  const contentText = String(fbCtx.contentText || '').trim();
   const plusText = (($('#fldPlus') || {}).value || '').trim();
   const minusText = (($('#fldMinus') || {}).value || '').trim();
   if (!message) return toast('피드백 문구를 입력해 주세요');
-  if (!contentText || !plusText || !minusText) return toast('오늘 배운 내용·잘한 점·보완할 점을 모두 입력해 주세요');
+  if (!contentText || !plusText || !minusText) return toast('잘한 점·보완할 점과 수업 기록을 확인해 주세요');
   if (!confirm('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요?')) return;
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
@@ -16129,7 +16131,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.2';
+const APP_VER = '2026-08-27.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
