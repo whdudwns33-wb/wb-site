@@ -71,6 +71,9 @@
     .hanja span{padding:5px 9px;border-radius:9px;background:#f4ece1;color:#7a5230;font-size:13px;font-weight:800}
     .sheet-e{margin-top:9px;font-size:14.5px;line-height:1.65}
     .sheet-s{margin-top:8px;color:var(--ok);font-size:12px;font-weight:800}
+    .vg-ask{margin-top:11px;font-size:13.5px;font-weight:800;color:var(--navy);line-height:1.6}
+    .vg-tip{margin-top:6px;color:var(--muted);font-size:12px;font-weight:700;line-height:1.55}
+    .vg-il{color:var(--coral)}
     .src{margin-top:14px;padding:12px 13px;border:1px dashed #bfd7e1;border-radius:12px;background:#f8fcfe;font-size:12.5px;color:var(--muted);line-height:1.6}
     .src a{color:var(--blue);font-weight:800;text-decoration:none}
     .evalrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
@@ -279,6 +282,8 @@ function normalizeState(s){
   if(!('lab' in s))s.lab=null;
   s.prefs.auto=s.prefs.auto||{speed:1,scope:0};
   s.prefs.spk=s.prefs.spk||{rate:1,echo:false};
+  s.vgate=s.vgate||{};    // 낱말별 인출 결과 — kn(회상 성공)·un(몰랐음)·il(아는 줄 알았음)
+  s.vcheck=s.vcheck||{};  // 글별 완독 후 어휘 체크 기록
   s.mychunks=s.mychunks||{};
   s.speed=s.speed||[];
   s.wrong=s.wrong||[];
@@ -432,7 +437,7 @@ function render(){
   }else{$('#headActions').innerHTML='';}
   window.scrollTo(0,0);
 }
-function go(name,extra){if(sess.auto)autoStop(false);spkStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
+function go(name,extra){if(sess.auto)autoStop(false);spkStop(false);aloudClose();vgClose();view=Object.assign({name},extra||{});sess={};render();}
 
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
@@ -625,7 +630,7 @@ function vReader(){
         <button class="toolbtn" data-act="fs-minus" ${fs<=0.9?'disabled':''}>가−</button>
         <button class="toolbtn" data-act="fs-plus" ${fs>=1.3?'disabled':''}>가＋</button>
         ${hasEn?`<span class="seg-ctl" role="group" aria-label="언어 보기">${[[0,'한글'],[1,'한·영'],[2,'EN만']].map(([m,l])=>`<button data-act="en-mode" data-m="${m}" aria-pressed="${enMode===m}">${l}</button>`).join('')}</span>`:''}
-        <span class="toolbtn" style="cursor:default;border-style:dashed">밑줄 단어를 누르면 뜻이 나와요</span>
+        <span class="toolbtn" style="cursor:default;border-style:dashed">밑줄 단어를 눌러 뜻을 떠올려 보세요</span>
       </div>
       <div class="rd-body">${paras}</div>
       <div class="src"><b>이 글은 아래 자료를 참고해 학생 눈높이로 새로 쓴 글이에요.</b><br>
@@ -639,7 +644,12 @@ function vReader(){
       ${done&&!sess.evalDone?`<h3 style="margin-top:16px">오늘 글, 어땠어요?</h3>
         <div class="evalrow">${EVALS.map(([v,l])=>`<button class="evalbtn" data-act="eval" data-v="${v}">${l}</button>`).join('')}</div>`:''}
       ${sess.evalDone?`<div class="explain" style="margin-top:16px"><b>완독 기록 완료!</b> ${streak()}일 연속 읽는 중이에요.</div>
-        ${(levelBody(a,lv).questions||[]).length?`<button class="btn" data-act="start-quiz" data-id="${a.id}">문제 풀어보기 (${levelBody(a,lv).questions.length}문항${(levelBody(a,lv).challenge||[]).length?' + 심화 '+levelBody(a,lv).challenge.length:''})</button>`:''}
+        ${sess.vc?vcheckCard(sess.vc):''}
+        ${!sess.vc&&!S.vcheck[a.id]&&vcheckAvail(b)?`<div class="card" style="margin:16px 0 0;border-color:#b9deed">
+          <p class="eyebrow">읽고 나서 — 어휘 체크</p>
+          <p class="sub" style="margin-top:6px">이 글에 나온 낱말 ${VCHECK_N}개만 확인할게요. 모르는 낱말은 어휘장에 넣어 둘게요.</p>
+          <button class="btn navy" data-act="vc-start">어휘 체크 시작 (${VCHECK_N}문항)</button></div>`:''}
+        ${!sess.vc&&(S.vcheck[a.id]||!vcheckAvail(b))&&(levelBody(a,lv).questions||[]).length?`<button class="btn" data-act="start-quiz" data-id="${a.id}">문제 풀어보기 (${levelBody(a,lv).questions.length}문항${(levelBody(a,lv).challenge||[]).length?' + 심화 '+levelBody(a,lv).challenge.length:''})</button>`:''}
         ${S.scraps[a.id]?`<button class="btn ghost sm" disabled>스크랩됨 ✓</button>`:`<button class="btn ghost sm" data-act="scrap-open" data-id="${a.id}">스크랩하기 — 탐구 재료로 모으기</button>`}
         <button class="btn ghost sm" data-act="ct-start-article" data-id="${a.id}">∕ 이 글로 끊어 읽기 연습</button>
         ${sess.scrapOpen?`<textarea id="scrapNote" placeholder="한 줄 소감을 남겨 보세요 (선택)"></textarea>
@@ -738,11 +748,20 @@ function vLibrary(){
   }
   if(tab==='vocab'){
     const vs=S.vocab.slice().reverse();
+    /* 인출 게이트의 산출물 — "아는 줄 알았던 낱말"이 가장 크게 느는 자리다 */
+    const g=Object.values(S.vgate||{});
+    const gKn=g.reduce((n,r)=>n+(r.kn||0),0);
+    const gIl=g.filter(r=>r.il).length;
+    const tried=g.length;
     body=vs.length?`<div class="vlist">${vs.map((v,i)=>`<button class="grow ${sess['vopen'+i]?'open':''}" data-act="vocab-toggle" data-i="${i}">
       <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
       <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>
       <button class="btn sm" data-act="vocab-review">복습 퀴즈 (5개)</button>`
-      :'<div class="empty">모은 어휘가 없어요.<br>글에서 밑줄 단어를 누르면 어휘장에 쌓여요.</div>';
+      :'<div class="empty">모은 어휘가 없어요.<br>글에서 밑줄 단어를 눌러 뜻을 떠올려 보고,<br>모르는 낱말만 여기에 쌓여요.</div>';
+    if(tried&&!sess.vq){
+      body=`<div class="explain" style="margin:0 0 12px"><b>떠올려 본 낱말 ${tried}개</b> · 스스로 회상 ${gKn}번${gIl?` · <span class="vg-il">아는 줄 알았던 낱말 ${gIl}개</span>`:''}
+      ${gIl?'<br><span class="sub">아는 줄 알았던 낱말이 독해가 무너지는 지점이에요. 어휘장에서 다시 만나요.</span>':''}</div>`+body;
+    }
     if(sess.vq){
       const v=sess.vq.list[sess.vq.i];
       body=`<div class="card" style="margin:0 0 12px;border-color:#b9deed"><p class="qnum">어휘 복습 ${sess.vq.i+1}/${sess.vq.list.length}</p>
@@ -1539,39 +1558,124 @@ function aloudClose(){
   const bar=document.getElementById('aloudBar');if(bar)bar.remove();
   ALOUD={rec:null,stream:null,chunks:[],url:null,timer:null,t0:0};
 }
-function openVocabEn(articleId,word){
-  const a=DB.articles.find(x=>x.id===articleId);
-  const b=levelBody(a,myLevel());
-  const v=(b.envocab||[]).find(x=>x.word===word);if(!v)return;
-  let savedNew=false;
-  if(!S.vocab.some(x=>x.word===v.word&&x.lang==='en')){
-    S.vocab.push({word:v.word,easy:v.ko,base:v.base||null,hanja:null,lang:'en',articleId,addedAt:dkey(),ok:0,miss:0,box:0,last:addDays(dkey(),-1)});
-    save();savedNew=true;
+/* ───────────────────────── 어휘 인출 게이트 ─────────────────────────
+   누르자마자 뜻이 나오면 "봤으니 안다"(친숙도 착각)로 끝나고, 어휘장에는
+   궁금해서 눌러 본 아는 낱말까지 섞여 복습 슬롯을 잡아먹는다.
+   그래서 뜻을 보기 전에 한 번 떠올리게 하고, 그 결과로만 어휘장에 넣는다.
+   → 어휘장이 "누른 기록"이 아니라 "정말 몰랐던 낱말"이 된다. */
+let VG=null;
+function vgRec(word){
+  const r=S.vgate[word]||(S.vgate[word]={kn:0,un:0,il:0,last:null});
+  r.last=dkey();return r;
+}
+function vocabFind(word,lang){return S.vocab.find(x=>x.word===word&&((x.lang==='en')===(lang==='en')));}
+/* 회상 실패 — 어휘장에 없으면 넣고, 있으면 간격을 처음으로 되돌린다 */
+function vocabAdd(w,why){
+  const sv=vocabFind(w.word,w.lang);
+  if(sv){sv.miss=(sv.miss||0)+1;sv.box=0;sv.last=dkey();return false;}
+  const e={word:w.word,easy:w.easy,hanja:w.hanja||null,articleId:w.articleId,
+    addedAt:dkey(),ok:0,miss:0,box:0,last:addDays(dkey(),-1),why};
+  if(w.lang==='en'){e.lang='en';e.base=w.base||null;e.hanja=null;}
+  S.vocab.push(e);return true;
+}
+/* 회상 성공 — 어휘장에 있던 낱말이면 간격을 한 칸 늘린다 */
+function vocabHit(word,lang){
+  const sv=vocabFind(word,lang);if(!sv)return;
+  sv.ok=(sv.ok||0)+1;sv.box=Math.min(4,(sv.box||0)+1);sv.last=dkey();
+}
+function vgRender(){
+  if(!VG)return;
+  const w=VG;
+  const head=`<div class="between"><span class="sheet-w">${w.lang==='en'?'<span class="lang-en-tag">EN</span>':''}${esc(w.word)}</span>
+    <button class="toolbtn" data-act="sheet-close">닫기</button></div>`;
+  /* 한자 분해·영어 원형은 뜻을 보기 전에도 보여 준다 — 답이 아니라 추론할 재료라서 */
+  const hint=w.hanja?`<div class="hanja">${w.hanja.split('+').map(h=>`<span>${esc(h.trim())}</span>`).join('')}</div>`
+    :(w.base?`<p class="sub" style="margin-top:6px;font-weight:800">${esc(w.base)}</p>`:'');
+  let body;
+  if(w.stage==='ask'){
+    body=`<p class="vg-ask">이 낱말의 뜻, 떠올릴 수 있나요?</p>
+      <p class="vg-tip">머릿속으로 말해 보거나 소리 내어 말해 보세요.</p>
+      <div class="row2" style="margin-top:11px">
+        <button class="btn sm ghost" data-act="vg-no" style="margin-top:0">모르겠어요</button>
+        <button class="btn sm" data-act="vg-yes" style="margin-top:0">떠올랐어요</button></div>`;
+  }else if(w.stage==='self'){
+    body=`<p class="sheet-e">${esc(w.easy)}</p>
+      <p class="vg-ask">생각한 뜻과 같았나요?</p>
+      <p class="vg-tip">솔직하게 눌러야 내 어휘장이 정확해져요.</p>
+      <div class="row2" style="margin-top:11px">
+        <button class="btn sm ghost" data-act="vg-miss" style="margin-top:0">사실 달랐어요</button>
+        <button class="btn sm" data-act="vg-hit" style="margin-top:0">같았어요</button></div>`;
+  }else{
+    body=`<p class="sheet-e">${esc(w.easy)}</p>
+      <p class="sheet-s${w.warm?' vg-il':''}">${esc(w.msg||'')}</p>
+      ${w.stage==='known'?`<button class="btn sm ghost" data-act="vg-keep" style="margin-top:9px">그래도 어휘장에 넣어 둘래요</button>`:''}`;
   }
-  $('#sheetIn').innerHTML=`<div class="between"><span class="sheet-w"><span class="lang-en-tag">EN</span>${esc(v.word)}</span>
-    <button class="toolbtn" data-act="sheet-close">닫기</button></div>
-    ${v.base?`<p class="sub" style="margin-top:6px;font-weight:800">${esc(v.base)}</p>`:''}
-    <p class="sheet-e">${esc(v.ko)}</p>
-    <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
+  $('#sheetIn').innerHTML=head+hint+body;
+}
+function vgOpen(w){
+  VG=Object.assign({stage:'ask',msg:'',warm:false},w);
+  vgRender();
   $('#sheet').classList.add('open');
-  announce(v.word+': '+v.ko);
+  announce(w.word+' — 뜻을 떠올려 보세요');
+}
+function vgClose(){VG=null;$('#sheet').classList.remove('open');}
+function openVocabEn(articleId,word){
+  const b=levelBody(DB.articles.find(x=>x.id===articleId),myLevel());
+  const v=b&&(b.envocab||[]).find(x=>x.word===word);if(!v)return;
+  vgOpen({articleId,word:v.word,easy:v.ko,base:v.base||null,hanja:null,lang:'en'});
 }
 function openVocab(articleId,word){
-  const a=DB.articles.find(x=>x.id===articleId);
-  const b=levelBody(a,myLevel());
-  const v=b.vocab.find(x=>x.word===word);if(!v)return;
-  let savedNew=false;
-  if(!S.vocab.some(x=>x.word===v.word)){
-    S.vocab.push({word:v.word,easy:v.easy,hanja:v.hanja||null,articleId,addedAt:dkey(),ok:0,miss:0,box:0,last:addDays(dkey(),-1)});
-    save();savedNew=true;
-  }
-  $('#sheetIn').innerHTML=`<div class="between"><span class="sheet-w">${esc(v.word)}</span>
-    <button class="toolbtn" data-act="sheet-close">닫기</button></div>
-    ${v.hanja?`<div class="hanja">${v.hanja.split('+').map(h=>`<span>${esc(h.trim())}</span>`).join('')}</div>`:''}
-    <p class="sheet-e">${esc(v.easy)}</p>
-    <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
-  $('#sheet').classList.add('open');
-  announce(v.word+': '+v.easy);
+  const b=levelBody(DB.articles.find(x=>x.id===articleId),myLevel());
+  const v=b&&b.vocab.find(x=>x.word===word);if(!v)return;
+  vgOpen({articleId,word:v.word,easy:v.easy,hanja:v.hanja||null,lang:'ko'});
+}
+
+/* ───────────────────────── 완독 후 어휘 체크 ─────────────────────────
+   인출 게이트는 "누른 낱말"만 잡는다. 일부러 안 누르고 넘어간 낱말은
+   여기서 잡는다 — 건너뛰기가 일을 줄여 주지 못하게. */
+const VCHECK_N=3;
+/* 아직 한 번도 안 다뤄 본 낱말(=건너뛴 낱말)을 맨 앞에, 몰랐던 낱말을 그다음에 */
+function vcheckPick(b){
+  const all=(b&&b.vocab)||[];
+  const rank=v=>{const r=S.vgate[v.word];if(!r)return 0;return (r.un||r.il)?1:2;};
+  return all.map((v,i)=>({v,i,r:rank(v)}))
+    .sort((x,y)=>x.r-y.r||x.i-y.i).slice(0,VCHECK_N).map(x=>x.v);
+}
+/* 오답 보기는 같은 레벨의 다른 어휘에서 — 엉뚱한 보기로 정답이 드러나지 않게 */
+function vcheckOptions(v){
+  const lv=myLevel(),pool=[];
+  DB.articles.forEach(a=>{const bb=levelBody(a,lv);
+    if(bb&&bb.vocab)bb.vocab.forEach(o=>{if(o.word!==v.word&&o.easy!==v.easy)pool.push(o.easy);});});
+  const seed=hash(v.word);
+  const uniq=Array.from(new Set(pool)).sort((x,y)=>(hash(x)+seed)%997-(hash(y)+seed)%997).slice(0,3);
+  if(uniq.length<3)return null;                 // 보기를 못 채우면 문항으로 쓰지 않는다
+  const answer=hash(v.word+'a')%(uniq.length+1);
+  uniq.splice(answer,0,v.easy);
+  return {choices:uniq,answer};
+}
+function vcheckBuild(b){
+  const list=vcheckPick(b).map(v=>{
+    const o=vcheckOptions(v);
+    return o&&{word:v.word,easy:v.easy,hanja:v.hanja||null,choices:o.choices,answer:o.answer};
+  }).filter(Boolean);
+  return list.length?{list,i:0,picked:null,ok:0}:null;
+}
+function vcheckAvail(b){return !!vcheckBuild(b);}
+/* 문항에는 한자를 보여 주지 않는다 — 軌+道를 보여 주면 '길'이 답으로 드러나
+   "정말 아는가"를 못 재게 된다. 한자 분해는 답을 고른 뒤 배우는 자리로 옮겼다. */
+function vcheckCard(vc){
+  const q=vc.list[vc.i],answered=vc.picked!=null;
+  return `<div class="card" style="margin:16px 0 0;border-color:#b9deed">
+    <p class="qnum">어휘 체크 ${vc.i+1} / ${vc.list.length}</p>
+    <p class="qtext">‘${esc(q.word)}’의 뜻은?</p>
+    <div class="choices">${q.choices.map((c,i)=>{
+      let cls='choice',num=String(i+1);
+      if(answered){if(i===q.answer){cls+=' correct';num='✓';}else if(i===vc.picked){cls+=' wrong';num='✕';}}
+      return `<button class="${cls}" data-act="vc-pick" data-i="${i}" ${answered?'disabled':''}>
+        <span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;}).join('')}</div>
+    ${answered?`<div class="explain"><b>${vc.picked===q.answer?'맞았어요!':'아쉬워요 — 어휘장에 넣어 둘게요.'}</b>
+      ${esc(q.word)}: ${esc(q.easy)}${q.hanja?`<br><span class="evchip">${esc(q.hanja)}</span>`:''}</div>
+      <button class="btn" data-act="vc-next">${vc.i+1<vc.list.length?'다음':'끝내기'}</button>`:''}</div>`;
 }
 
 /* ───────────────────────── 이벤트 ───────────────────────── */
@@ -1626,7 +1730,44 @@ document.addEventListener('click',e=>{
   else if(act==='fs-minus'){S.prefs.fs=Math.round(Math.max(0.9,(S.prefs.fs||1)-0.1)*10)/10;save();render();}
   else if(act==='fs-plus'){S.prefs.fs=Math.round(Math.min(1.3,(S.prefs.fs||1)+0.1)*10)/10;save();render();}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
-  else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
+  else if(act==='sheet-close'){vgClose();}
+  /* ── 어휘 인출 게이트 ── */
+  else if(act==='vg-yes'){if(!VG)return;VG.stage='self';vgRender();announce(VG.word+': '+VG.easy);}
+  else if(act==='vg-no'){if(!VG)return;
+    vgRec(VG.word).un++;
+    const isNew=vocabAdd(VG,'unknown');save();
+    VG.stage='done';
+    VG.msg=isNew?'✓ 어휘장에 넣었어요 — 모른다고 말한 게 실력이에요':'어휘장에 있는 낱말이에요. 곧 다시 물어볼게요';
+    vgRender();announce(VG.word+': '+VG.easy);}
+  else if(act==='vg-hit'){if(!VG)return;
+    vgRec(VG.word).kn++;
+    vocabHit(VG.word,VG.lang);save();
+    VG.stage='known';VG.msg='좋아요! 아는 낱말이라 어휘장에는 넣지 않을게요';
+    vgRender();}
+  else if(act==='vg-miss'){if(!VG)return;
+    vgRec(VG.word).il++;
+    const isNew=vocabAdd(VG,'illusion');save();
+    VG.stage='done';VG.warm=true;
+    VG.msg=isNew?'✓ 어휘장에 넣었어요 — 아는 줄 알았던 낱말이 가장 크게 늘어요':'어휘장에 있는 낱말이에요. 곧 다시 물어볼게요';
+    vgRender();}
+  else if(act==='vg-keep'){if(!VG)return;
+    if(!vocabFind(VG.word,VG.lang))vocabAdd(VG,'kept');
+    save();VG.stage='done';VG.msg='✓ 어휘장에 넣었어요';vgRender();}
+  /* ── 완독 후 어휘 체크 ── */
+  else if(act==='vc-start'){
+    sess.vc=vcheckBuild(levelBody(DB.articles.find(x=>x.id===view.id),myLevel()));render();}
+  else if(act==='vc-pick'){const vc=sess.vc;if(!vc||vc.picked!=null)return;
+    vc.picked=+t.dataset.i;
+    const q=vc.list[vc.i],r=vgRec(q.word);
+    if(vc.picked===q.answer){vc.ok++;r.kn++;vocabHit(q.word,'ko');}
+    else{r.un++;vocabAdd({word:q.word,easy:q.easy,hanja:q.hanja,articleId:view.id,lang:'ko'},'check');}
+    save();render();}
+  else if(act==='vc-next'){const vc=sess.vc;if(!vc)return;
+    if(vc.i+1<vc.list.length){vc.i++;vc.picked=null;}
+    else{S.vcheck[view.id]={date:dkey(),n:vc.list.length,ok:vc.ok};save();
+      announce('어휘 체크 완료 — '+vc.list.length+'개 중 '+vc.ok+'개 맞았어요');
+      sess.vc=null;}
+    render();}
   else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;render();}
   else if(act==='eval'){const a=DB.articles.find(x=>x.id===view.id);
     completeRead(a,t.dataset.v);sess.evalDone=true;render();announce('완독 기록 완료');}
