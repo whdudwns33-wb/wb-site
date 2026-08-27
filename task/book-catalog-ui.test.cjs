@@ -100,7 +100,7 @@ test('DOM-only search refreshes the hidden selected-book count immediately', () 
 });
 
 test('publisher-series-book accordion is searchable and mobile-friendly', () => {
-  const view = block('function viewBooks()', '/* ── 원생 현황');
+  const view = block('function viewLegacyBookCatalog()', 'function viewBookOrderStart()');
   const card = block('function bookCard(', '/* ── 새 교재 추가 신청');
   const search = block('function applyBookSearch(', 'function vendorTypeBadge(');
   const render = block('function render() {', 'function renderTabs()');
@@ -153,7 +153,7 @@ test('book accordion restores keyboard focus and uses valid button content', () 
   api.restoreBookToggleFocus();
   assert.deepEqual(focusOptions, { preventScroll: true });
 
-  const view = block('function viewBooks()', '/* ── 원생 현황');
+  const view = block('function viewLegacyBookCatalog()', 'function viewBookOrderStart()');
   const vendorButton = block('class="card between book-vendor-toggle"', '</span></button>');
   const seriesButton = block('class="between book-series-toggle"', '</span></button>');
   const click = block("case 'vendortoggle':", "case 'baopen':");
@@ -180,7 +180,7 @@ test('background book overlays defer render while the search input is active', (
 test('series display never changes publisher batch or outbound order data', () => {
   const batch = block('function batchOrderModal(', 'function cancelOrderModal(');
   const order = block('async function submitBookOrder(', 'function cancelOrderModal(');
-  const view = block('function viewBooks()', '/* ── 원생 현황');
+  const view = block('function viewLegacyBookCatalog()', 'function viewBookOrderStart()');
   const toggle = block("case 'seriestoggle':", "case 'baopen':");
 
   assert.match(batch, /b\.vendor === vendorKey/);
@@ -194,4 +194,27 @@ test('series display never changes publisher batch or outbound order data', () =
   assert.match(view, /data-book-batch-outside/);
   assert.match(view, /검색 밖 ' \+ selectedOutsideSearch \+ '권 포함/);
   assert.doesNotMatch(toggle, /batchSelection/);
+});
+
+test('catalog reset excludes only approved overlays older than the reset boundary', () => {
+  const source = block('function currentBookCatalogOverlays(', 'let approvedBookAdditions = null;');
+  const makeFilter = bookDb => new Function('bookDb', `${source}\nreturn currentBookCatalogOverlays;`)(bookDb);
+  const resetAt = Date.parse('2026-08-27T15:55:00+09:00');
+  const rows = [
+    { id: 'before', updatedAt: resetAt - 1 },
+    { id: 'equal', updatedAt: resetAt },
+    { id: 'after', updatedAt: resetAt + 1 },
+    { id: 'missing' }
+  ];
+
+  assert.deepEqual(
+    makeFilter({ catalogResetAt: '2026-08-27T15:55:00+09:00' })(rows).map(row => row.id),
+    ['equal', 'after']
+  );
+  assert.equal(makeFilter({})(rows), rows, 'reset 값이 없으면 승인 목록을 그대로 유지해야 합니다');
+
+  const additions = block('function mergeBookAdditions()', 'async function loadApprovedBookAdditions(');
+  const edits = block('function mergeBookEdits()', 'async function loadApprovedBookEdits(');
+  assert.match(additions, /currentBookCatalogOverlays\(approvedBookAdditions\)/);
+  assert.match(edits, /currentBookCatalogOverlays\(approvedBookEdits\)/);
 });
