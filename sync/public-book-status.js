@@ -97,7 +97,8 @@ async function validSnapshotTask(taskRows, document, now) {
  * A guardian-safe, read-only view of one current student's book progress.
  * Contract: never returns stable/internal IDs, raw task text, contacts, actors or provider data.
  * Legacy order tasks have no immutable student identity snapshot, so they are intentionally omitted.
- * Order rows come only from the immutable snapshot/send/fulfillment ledgers; task JSON is never read here.
+ * Order rows come from immutable snapshot/send/fulfillment ledgers. Task JSON contributes only the
+ * allowlisted orderDelivery discriminator needed to distinguish a server-created bound-print receipt.
  */
 export async function readPublicBookStatus(env, studentId, now = Date.now()) {
   const exactId = typeof studentId === 'string' ? studentId : '';
@@ -147,7 +148,7 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
   const targetCte = 'WITH target_tasks AS (' +
     'SELECT task_id FROM book_order_student_snapshots WHERE app=? AND student_id=? ' +
     'GROUP BY task_id ORDER BY MAX(created_at) DESC LIMIT 100) ';
-  const [snapshotResult, sendResult, mappingResult, fulfillmentResult, cancellationResult] = await Promise.all([
+  const [snapshotResult, sendResult, mappingResult, fulfillmentResult, cancellationResult, taskResult] = await Promise.all([
     env.DB.prepare(
       targetCte +
       'SELECT task_id,item_index,owner_id,book_id,public_title,student_id,student_identity_hash,' +
@@ -177,6 +178,10 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
     env.DB.prepare(
       targetCte + 'SELECT task_id,cancelled_at FROM book_order_cancellations WHERE app=? ' +
       'AND EXISTS (SELECT 1 FROM target_tasks target WHERE target.task_id=book_order_cancellations.task_id)'
+    ).bind('task', exactId, 'task').all(),
+    env.DB.prepare(
+      targetCte + "SELECT id,json_extract(data,'$.orderDelivery') AS order_delivery FROM tasks WHERE app=? " +
+      'AND EXISTS (SELECT 1 FROM target_tasks target WHERE target.task_id=tasks.id)'
     ).bind('task', exactId, 'task').all()
   ]);
   const snapshotByTask = new Map();
@@ -205,6 +210,9 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
     String(row.task_id || '') + '|' + Number(row.item_index), row
   ]));
   const cancellations = new Map((cancellationResult.results || []).map(row => [String(row.task_id), Number(row.cancelled_at)]));
+  const deliveryByTask = new Map((taskResult.results || []).map(row => [
+    String(row.id || ''), String(row.order_delivery || '')
+  ]));
 
   for (const [taskId, taskRows] of snapshotByTask) {
     if (!taskRows.some(row => String(row.student_id) === exactId) ||
@@ -229,7 +237,9 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
       if (!fulfillmentValid) continue;
       const cancelledAt = cancellations.get(taskId) || 0;
       const send = sendByTask.get(taskId) || null;
-      if (fulfillment && (!send || String(send.status) !== 'accepted')) continue;
+      const boundPrint = deliveryByTask.get(taskId) === 'bound_print_v1';
+      if (boundPrint && !fulfillment) continue;
+      if (fulfillment && !boundPrint && (!send || String(send.status) !== 'accepted')) continue;
       if (cancelledAt && (fulfillment || (send && ['reserved', 'dispatching', 'accepted', 'unknown'].includes(String(send.status))))) continue;
       const state = cancelledAt ? 'cancelled' : fulfillment ? String(fulfillment.status) : !send ? 'waiting' :
         String(send.status) === 'accepted' ? 'accepted' : String(send.status) === 'rejected' ? 'rejected' : 'checking';
