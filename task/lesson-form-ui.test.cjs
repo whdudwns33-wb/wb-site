@@ -477,6 +477,60 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
   assert.equal(helpers.formalize('어휘 정리'), '선생님이 직접 기록한 핵심 내용은 “어휘 정리”입니다.');
 });
 
+test('feedback interview includes the new condition choices and omits every category explicitly set to none', () => {
+  const bankStart = html.indexOf('const FB_PLUS = [');
+  const bankEnd = html.indexOf('/** 학생이 보는 교재', bankStart);
+  const bank = html.slice(bankStart, bankEnd);
+  const interviewStart = html.indexOf('let fbCtx = null;');
+  const interviewEnd = html.indexOf('/** 학부모 피드백 문구', interviewStart);
+  const interview = html.slice(interviewStart, interviewEnd);
+
+  for (const label of ['컨디션 저하', '스스로 풀어낸 문제 늘어남', '오답 줄어듬',
+    '즐겁고 적극적으로 수업', '컨디션 관리']) {
+    assert.ok(html.includes(label), '피드백 선택 화면에 ' + label + ' 버튼이 있어야 한다');
+  }
+  assert.match(interview, /2\. 오늘 집중·태도는\?/);
+  assert.match(interview, /3\. 잘한 점은\?[\s\S]*FB_PLUS\.map/);
+  assert.match(interview, /4\. 보완할 점은\?[\s\S]*FB_MINUS\.map/);
+  const actionsStart = html.indexOf("case 'fbq':");
+  const actionsEnd = html.indexOf("case 'fbmake':", actionsStart);
+  const actions = html.slice(actionsStart, actionsEnd);
+  assert.match(actions, /n === FB_PLUS_NONE_INDEX[\s\S]*fbCtx\.plus = fbCtx\.plus\.includes\(n\) \? \[\] : \[n\]/);
+  assert.match(actions, /fbCtx\.plus\.filter\(x => x !== FB_PLUS_NONE_INDEX\)/,
+    '잘한 점의 일반 항목을 고르면 없음 선택은 해제되어야 한다');
+
+  const helpers = Function(bank +
+    '; return { plus: FB_PLUS, minus: FB_MINUS, focus: FB_FORMAL_FOCUS, praise: FB_FORMAL_PRAISE, ' +
+    'minusSentences: FB_FORMAL_MINUS, build: buildFormalFeedbackComment };')();
+  const plusNone = helpers.plus.findIndex(row => row[0] === '없음');
+  const minusNone = helpers.minus.findIndex(row => row[0] === '없음');
+  assert.ok(plusNone >= 0, '잘한 점에도 없음 선택지가 있어야 한다');
+  assert.ok(minusNone >= 0, '보완할 점의 없음 선택지가 유지되어야 한다');
+  assert.equal(helpers.plus[plusNone][1], '', '잘한 점 없음은 문장 재료를 가지면 안 된다');
+  assert.equal(helpers.minus[minusNone][1], '', '보완할 점 없음은 문장 재료를 가지면 안 된다');
+
+  const noneComment = helpers.build({ comment: '', focus: 'none', plus: [plusNone], minus: minusNone }, 'none-case');
+  assert.doesNotMatch(noneComment, /없음/, '없음을 선택해도 실제 피드백에 없음 문장을 쓰면 안 된다');
+  for (const sentence of Object.values(helpers.focus).flat()) {
+    assert.ok(!noneComment.includes(sentence), '집중·태도 없음은 집중 문장을 완전히 생략해야 한다');
+  }
+  for (const template of helpers.praise) {
+    assert.ok(!noneComment.includes(template.replace('{x}', '')), '잘한 점 없음은 빈 칭찬 문장을 만들면 안 된다');
+  }
+  for (const template of helpers.minusSentences) {
+    assert.ok(!noneComment.includes(template.replace('{y}', '')), '보완할 점 없음은 빈 보완 문장을 만들면 안 된다');
+  }
+
+  assert.ok(Array.isArray(helpers.focus.condition_low) && helpers.focus.condition_low.length,
+    '컨디션 저하 선택에는 실제 생성 문장이 연결되어야 한다');
+  for (const label of ['스스로 풀어낸 문제 늘어남', '오답 줄어듬', '즐겁고 적극적으로 수업']) {
+    const row = helpers.plus.find(item => item[0] === label);
+    assert.ok(row && row[1], label + ' 선택에는 실제 생성 문장이 연결되어야 한다');
+  }
+  const conditionCare = helpers.minus.find(item => item[0] === '컨디션 관리');
+  assert.ok(conditionCare && conditionCare[1], '컨디션 관리 선택에는 실제 생성 문장이 연결되어야 한다');
+});
+
 test('teacher-only other notes never enter parent feedback text or send fields', () => {
   const feedbackStart = html.indexOf('function feedbackText(');
   const feedbackEnd = html.indexOf('function todayStaffList(', feedbackStart);
