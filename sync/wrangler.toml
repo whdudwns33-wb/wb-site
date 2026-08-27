@@ -48,3 +48,4 @@ binding = "AI"
 #   npx wrangler secret put CONSULT_ADMIN_SECRET
 #   npx wrangler secret put TASK_MANAGER_STAFF_IDS
 #   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID
+#   npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2

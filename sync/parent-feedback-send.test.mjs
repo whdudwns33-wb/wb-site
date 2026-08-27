@@ -10,6 +10,7 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration016 = fs.readFileSync(new URL('./migrations/016_parent_feedback_send.sql', import.meta.url), 'utf8');
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
+const migration051 = fs.readFileSync(new URL('./migrations/051_feedback_template_v2.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -38,6 +39,7 @@ const fullEnvBase = {
   SOLAPI_KAKAO_API_SECRET: 'test-kakao-secret',
   SOLAPI_KAKAO_PF_ID: 'PF_TEST_0001',
   SOLAPI_KAKAO_TEMPLATE_ID: 'TPL_TEST_0001',
+  SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2: 'TPL_TEST_V2_0001',
   SOLAPI_SENDER_NUMBER: '0212345678'
 };
 
@@ -78,9 +80,10 @@ function seedFeedback(db, overrides = {}) {
   ensureKimStaff(db);
   const now = Date.now();
   const studentId = overrides.studentId === undefined ? 'student-test' : overrides.studentId;
+  const templateVersion = overrides.templateVersion || 'v1';
   const task = {
     id: 'task-1', staffId: 'S-kim', title: '[정규] 테스트학생(중2) — 국어 독해',
-    studentId, studentName: '테스트학생', deleted: false
+    studentId, studentName: '테스트학생', subject: '국어', deleted: false
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', task.id, task.staffId, JSON.stringify(task), now, now).run();
@@ -88,6 +91,8 @@ function seedFeedback(db, overrides = {}) {
   const requestKey = overrides.requestKey || 'fbr_test0000000000000000000000000000000000000000';
   const fields = {
     teacherName: '김남기', studentName: '테스트학생', contentText: '독해 지문 3개 풀이',
+    subjectText: '국어', homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 설명하는 태도가 인상적이었습니다.',
     plusText: '오답을 스스로 설명함', minusText: '어휘',
     ...overrides.fields
   };
@@ -109,11 +114,13 @@ function seedFeedback(db, overrides = {}) {
   }
   db.prepare(
     'INSERT INTO feedback_requests (app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
-    'body,body_hash,teacher_name,student_id,student_name,content_text,plus_text,minus_text,revision,status,created_at,updated_at) ' +
-    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)'
-  ).bind('task', requestKey, task.id, 'S-kim', '2026-08-09', 'class_feedback', 'v1',
+    'body,body_hash,teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,' +
+    'plus_text,minus_text,revision,status,created_at,updated_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)'
+  ).bind('task', requestKey, task.id, 'S-kim', '2026-08-09', 'class_feedback', templateVersion,
     '오늘 테스트학생 수업 잘 마쳤습니다.', 'x'.repeat(64),
-    fields.teacherName, studentId || null, fields.studentName, fields.contentText, fields.plusText, fields.minusText,
+    fields.teacherName, studentId || null, fields.studentName, fields.contentText,
+    fields.subjectText, fields.homeworkText, fields.commentText, fields.plusText, fields.minusText,
     overrides.status || 'content_approved_send_blocked', now, now).run();
   return { requestKey, taskId: task.id, studentId, studentName: fields.studentName };
 }
@@ -138,6 +145,8 @@ test('schema and migrations use stable student ids, and the send ledger itself s
   assert.match(migration021, /CREATE TABLE IF NOT EXISTS guardian_contacts_by_student/);
   assert.match(migration021, /ALTER TABLE feedback_requests ADD COLUMN student_id/);
   assert.match(migration021, /ALTER TABLE parent_feedback_sends ADD COLUMN student_id/);
+  assert.doesNotMatch(migration051, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
+  assert.match(migration051, /ALTER TABLE feedback_requests ADD COLUMN comment_text/);
 });
 
 test('client cannot specify phone, recipient, message, or studentName — request rejected before any fetch', async () => {
@@ -350,6 +359,27 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
 
   const row = db.prepare("SELECT status FROM feedback_requests WHERE request_key=?").bind(requestKey).first();
   assert.equal(row.status, 'sent', '발송 성공 후 feedback_requests 상태가 sent로 바뀐다');
+});
+
+test('v2 sends the requested six variables through its separate approved template id', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  let sentMessage = null;
+  await withFetch(async (url, init) => {
+    sentMessage = JSON.parse(init.body).messages[0];
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(db, { auth: admin, requestKey });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, 'sent');
+  });
+  assert.equal(sentMessage.kakaoOptions.templateId, 'TPL_TEST_V2_0001');
+  assert.deepEqual(sentMessage.kakaoOptions.variables, {
+    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': '국어',
+    '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
+    '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.'
+  });
 });
 
 test('resending the same content is idempotent — no second fetch', async () => {
