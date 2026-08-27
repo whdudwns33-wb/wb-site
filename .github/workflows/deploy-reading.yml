@@ -19,6 +19,8 @@ jobs:
           node-version: 22
       - name: 콘텐츠 무결성 테스트
         run: node reading/content.test.cjs
+      - name: 한자 급수표 테스트
+        run: node vocab/hanja-grades.test.cjs
       - name: 워드브레인 엔진·데이터 테스트
         run: node vocab/srs.test.cjs
       - name: 워드브레인 문제 출제 엔진 테스트

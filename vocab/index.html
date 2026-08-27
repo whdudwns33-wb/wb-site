@@ -160,6 +160,7 @@
     .hp { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 76px; }
     .hp .ch { font-size: 1.9rem; line-height: 1.2; color: var(--ink-strong); }
     .hp .he { font-size: .74rem; color: var(--ink-soft); font-weight: 700; }
+    .hp .hg { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 999px; background: #1E9DD6; color: #fff; font-size: .62rem; font-weight: 900; }
     .literal { font-size: .9rem; font-weight: 700; color: var(--deep); }
 
     .hintbox { background: var(--card-2); border-radius: 12px; padding: 12px 14px; margin-top: 12px; text-align: left; }
@@ -336,6 +337,7 @@
 <!-- APP:BODY:END -->
 
   <script src="./words.js"></script>
+  <script src="./hanja-grades.js"></script>
   <script src="./bridge.js"></script>
   <script src="./quiz.js"></script>
   <script src="./srs.js"></script>
@@ -365,6 +367,15 @@
     native: { label: '고유어', cls: 't-n', color: '#4E9B57', mark: '늠', how: '빈칸·비슷한 말' }
   };
   var TYPE_ORDER = ['hanja', 'native', 'english'];
+
+  /* 낱말의 급수 = 그 안에서 가장 어려운 글자의 급수. 한 글자라도 8급~3급 배정 밖이면
+     라벨을 붙이지 않는다 — 矛盾·葛藤처럼 흔한 낱말도 글자가 2급이면 급수가 없다.
+     급수는 "몇 급 한자인가"를 알려 주는 라벨일 뿐, 심는 순서를 정하지 않는다. */
+  function wbGradeChip(hanja) {
+    if (!hanja || typeof wbWordGrade !== 'function') return '';
+    var g = wbWordGrade(hanja);
+    return g ? ' <span class="chip t-h">' + esc(g) + '</span>' : '';
+  }
 
   /* ── 저장소 ── */
   var KEY = 'wb-wordbrain-v1';
@@ -611,7 +622,10 @@
     var html = '';
     if (w.type === 'hanja') {
       html += '<div class="hanja-parts">' + w.parts.map(function (p) {
-        return '<div class="hp"><div class="ch">' + p.ch + '</div><div class="he">' + esc(p.hun) + ' ' + esc(p.eum) + '</div></div>';
+        /* 급수는 라벨이다 — 심는 순서·출제 순서는 급수와 무관하게 그대로 둔다 */
+        var g = typeof wbHanjaGrade === 'function' ? wbHanjaGrade(p.ch) : null;
+        return '<div class="hp"><div class="ch">' + p.ch + '</div><div class="he">' + esc(p.hun) + ' ' + esc(p.eum) + '</div>' +
+          (g ? '<div class="hg">' + esc(g) + '</div>' : '') + '</div>';
       }).join('') + '</div>';
       html += '<div class="literal">= ' + esc(w.literal) + '</div>';
       if (!compact) {
@@ -832,7 +846,7 @@
       '<div style="display:flex;align-items:center;gap:14px;">' + plantSVG(WBSRS.stage(s), WBSRS.wither(s, t)) +
       '<div><span class="chip ' + TYPE[w.type].cls + '">' + TYPE[w.type].label + '</span>' +
       (w.source === 'reading' ? ' <span class="chip" style="background:#F4FAFD;color:var(--deep);">📖 진로독서에서 온 단어</span>' : '') +
-      '<div class="qword" style="font-size:1.5rem;margin:2px 0;">' + esc(w.word) + (w.hanja ? ' <span class="muted" style="font-size:1rem;">' + w.hanja + '</span>' : '') + '</div>' +
+      '<div class="qword" style="font-size:1.5rem;margin:2px 0;">' + esc(w.word) + (w.hanja ? ' <span class="muted" style="font-size:1rem;">' + w.hanja + '</span>' : '') + wbGradeChip(w.hanja) + '</div>' +
       (w.pron ? '<div class="qpron">' + esc(w.pron) + '</div>' : '') + '</div></div>' +
       '<p style="margin:12px 0 4px;font-weight:700;color:var(--ink-strong);">' + esc(w.meaning) + '</p>' +
       (w.example ? '<p class="muted" style="margin:0;">' + esc(w.example) + '</p>' : '') +
