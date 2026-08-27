@@ -956,11 +956,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-27.7"></script>
-<script src="./schedule-board-core.js?v=2026-08-27.7"></script>
-<script src="./asset-core.js?v=2026-08-27.7"></script>
-<script src="./qr-core.js?v=2026-08-27.7"></script>
-<script src="./acaflow-import-core.js?v=2026-08-27.7"></script>
+<script src="./lesson-form-core.js?v=2026-08-27.8"></script>
+<script src="./schedule-board-core.js?v=2026-08-27.8"></script>
+<script src="./asset-core.js?v=2026-08-27.8"></script>
+<script src="./qr-core.js?v=2026-08-27.8"></script>
+<script src="./acaflow-import-core.js?v=2026-08-27.8"></script>
 <script>
 "use strict";
 
@@ -3422,8 +3422,9 @@ function taskPanel(t, date, c, editable) {
   }
 
   if (lesson) {
-    h += '<section class="lesson-progress-section"><div class="lesson-progress-section-title">수업 메모(실제 진도 및 특이사항)</div>' +
-      taskMemoEditorHtml(t, date, c, editable) + '</section>';
+    h += '<details class="lesson-progress-section lesson-progress-details lesson-memo-details" data-persist-key="lesson-memo|' +
+      esc(t.id) + '|' + esc(date) + '" open><summary>수업 메모(실제 진도 및 특이사항)</summary>' +
+      '<div class="lesson-progress-details-body">' + taskMemoEditorHtml(t, date, c, editable) + '</div></details>';
     prepareGuardianPublicationPolicy(date);
     if (guardianContactEnabledFor(t.studentId)) {
       const canEditPublication = canEditGuardianPublication(t, date);
@@ -3542,14 +3543,25 @@ const FB_PLUS = [
   ['어려운 지문도 끝까지 읽음', '어려운 지문도 끝까지 읽어낸 것'],
   ['시간 안에 마무리함', '정해진 시간 안에 잘 마무리한 것'],
   ['발표에 자신감 붙음', '발표할 때 자신감이 붙은 것'],
-  ['새 개념을 빠르게 이해함', '새로운 개념을 빠르게 이해한 것']
+  ['새 개념을 빠르게 이해함', '새로운 개념을 빠르게 이해한 것'],
+  ['스스로 풀어낸 문제 늘어남', '스스로 풀어낸 문제의 수가 늘어난 것'],
+  ['오답 줄어듬', '오답이 줄어든 것'],
+  ['즐겁고 적극적으로 수업', '즐겁고 적극적으로 수업에 참여한 것'],
+  ['없음', '']
 ];
+const FB_PLUS_NONE_INDEX = FB_PLUS.length - 1;
 const FB_MINUS = [
   ['어휘', '어휘력'], ['추론 문제', '추론 유형'], ['실수', '아는 문제에서의 실수'],
   ['풀이 속도', '풀이 속도'], ['집중 유지', '후반부 집중 유지'],
   ['문장 이해', '문장 이해력'], ['서술형 답안', '서술형 답안 작성'],
   ['필기 정리', '필기 정리 습관'], ['시간 관리', '문제 풀이 시간 관리'],
+  ['컨디션 관리', '학습 전후의 컨디션 관리'],
   ['없음', '']
+];
+const FB_MINUS_NONE_INDEX = FB_MINUS.length - 1;
+const FB_FOCUS_CHOICES = [
+  ['best', '아주 좋음'], ['good', '좋음'], ['soso', '보통'], ['shaky', '흔들림'],
+  ['condition_low', '컨디션 저하'], ['none', '없음']
 ];
 const FB_BANK = {
   best: ['오늘은 시작부터 끝까지 집중이 아주 좋았어요.', '오늘 컨디션이 좋아서 수업 흐름이 유난히 매끄럽더라고요.',
@@ -3702,12 +3714,16 @@ function seedPick(arr, seedStr, salt) {
 }
 function buildComment(ctx, seedStr) {
   const parts = [];
-  const focus = ctx.focus || 'good';
-  parts.push(seedPick(FB_BANK[focus], seedStr, 1));
-  parts.push(seedPick(FB_MOOD_FOLLOW[focus], seedStr, 20));
+  const focus = ctx.focus === 'none' ? null : (FB_BANK[ctx.focus] ? ctx.focus : 'good');
+  if (focus) {
+    parts.push(seedPick(FB_BANK[focus], seedStr, 1));
+    parts.push(seedPick(FB_MOOD_FOLLOW[focus], seedStr, 20));
+  }
   (ctx.plus || []).slice(0, 2).forEach((idx, i) => {
-    parts.push(seedPick(FB_BANK.plusPat, seedStr, 2 + i).replace('{x}', FB_PLUS[idx][1]));
-    parts.push(seedPick(FB_BANK.plusFollow, seedStr, 22 + i));
+    if (FB_PLUS[idx] && FB_PLUS[idx][1]) {
+      parts.push(seedPick(FB_BANK.plusPat, seedStr, 2 + i).replace('{x}', FB_PLUS[idx][1]));
+      parts.push(seedPick(FB_BANK.plusFollow, seedStr, 22 + i));
+    }
   });
   const m = ctx.minus == null ? null : FB_MINUS[ctx.minus];
   if (m && m[1]) {
@@ -3720,7 +3736,7 @@ function buildComment(ctx, seedStr) {
 }
 
 /* 알림톡 v2 코멘트용 격식체 문장 은행.
- * 12개 도입 + 32개 태도 + 12개 연결 + 20개 칭찬 + 12개 보완 + 12개 마무리 = 100문장이다.
+ * 12개 도입 + 40개 태도 + 12개 연결 + 20개 칭찬 + 12개 보완 + 12개 마무리 = 108문장이다.
  * studentId·수업·날짜 시드로 고르므로 같은 미리보기는 안정적으로 유지되고 학생·날짜별 조합은 달라진다. */
 const FB_FORMAL_OPENERS = [
   '오늘 수업에서 확인한 학습 태도와 진행 과정을 정리해 전달드립니다.',
@@ -3776,6 +3792,16 @@ const FB_FORMAL_FOCUS = {
     '수업 초반에는 참여가 더뎠지만 후반에는 흐름을 회복하는 모습을 보였습니다.',
     '컨디션의 영향을 받는 모습이 있었으나 포기하지 않고 과정을 마쳤습니다.',
     '주의가 분산되는 순간이 있었지만 반복 안내를 통해 다시 집중했습니다.'
+  ],
+  condition_low: [
+    '오늘은 컨디션이 다소 저하된 상태여서 학습 속도를 조절하며 수업을 진행했습니다.',
+    '평소보다 피로한 모습이 보여 무리하지 않도록 활동량을 조절했습니다.',
+    '컨디션의 영향을 고려하여 짧은 단위로 학습 목표를 나누어 진행했습니다.',
+    '오늘은 몸 상태가 평소보다 좋지 않아 충분히 쉬어가며 필요한 내용을 확인했습니다.',
+    '평소보다 활력이 낮은 상태였으나 학생의 속도에 맞추어 수업을 이어갔습니다.',
+    '오늘은 컨디션 회복을 우선하며 꼭 필요한 학습 내용을 중심으로 진행했습니다.',
+    '피로한 모습이 확인되어 집중 시간을 짧게 나누고 중간중간 휴식을 두었습니다.',
+    '컨디션이 다소 떨어진 상태였으므로 부담을 줄이고 기본 내용을 차분히 점검했습니다.'
   ]
 };
 const FB_FORMAL_CONNECTORS = [
@@ -3859,13 +3885,16 @@ function formalizeDirectFeedback(value) {
 
 function buildFormalFeedbackComment(ctx, seedStr) {
   if (formalFeedbackSentenceCount() < 100) throw new Error('피드백 격식체 기본 문장은 100개 이상이어야 합니다');
-  const focus = ctx && FB_FORMAL_FOCUS[ctx.focus] ? ctx.focus : 'good';
-  const parts = [seedPick(FB_FORMAL_OPENERS, seedStr, 101), seedPick(FB_FORMAL_FOCUS[focus], seedStr, 102)];
+  const focus = ctx && ctx.focus === 'none' ? null : (ctx && FB_FORMAL_FOCUS[ctx.focus] ? ctx.focus : 'good');
+  const parts = [seedPick(FB_FORMAL_OPENERS, seedStr, 101)];
+  if (focus) parts.push(seedPick(FB_FORMAL_FOCUS[focus], seedStr, 102));
   const direct = String(ctx && ctx.comment || '').trim();
   if (direct) parts.push(formalizeDirectFeedback(direct));
   parts.push(seedPick(FB_FORMAL_CONNECTORS, seedStr, 103));
   (ctx && ctx.plus || []).slice(0, 2).forEach((index, offset) => {
-    if (FB_PLUS[index]) parts.push(seedPick(FB_FORMAL_PRAISE, seedStr, 104 + offset).replace('{x}', FB_PLUS[index][1]));
+    if (FB_PLUS[index] && FB_PLUS[index][1]) {
+      parts.push(seedPick(FB_FORMAL_PRAISE, seedStr, 104 + offset).replace('{x}', FB_PLUS[index][1]));
+    }
   });
   const minus = ctx && ctx.minus != null ? FB_MINUS[ctx.minus] : null;
   if (minus && minus[1]) parts.push(seedPick(FB_FORMAL_MINUS, seedStr, 107).replace('{y}', minus[1]));
@@ -3926,9 +3955,9 @@ function fbModal() {
     '<label class="field"><span class="fl">1. 코멘트(직접작성, 간단히)</span><textarea class="in" rows="2" maxlength="200" data-feedback-comment placeholder="수업 중 관찰한 내용을 간단히 입력하세요">' +
       esc(fbCtx.comment || '') + '</textarea></label>' +
     '<div class="fl mb8">2. 오늘 집중·태도는?</div><div class="chips mb14">' +
-      [['best', '아주 좋음'], ['good', '좋음'], ['soso', '보통'], ['shaky', '흔들림']].map(([v, l]) =>
+      FB_FOCUS_CHOICES.map(([v, l]) =>
         chip(fbCtx.focus === v, 'fbq', 'data-q="focus" data-v="' + v + '"', l)).join('') + '</div>' +
-    '<div class="fl mb8">3. 잘한 점은? (1개 이상, 최대 2개)</div><div class="chips mb14">' +
+    '<div class="fl mb8">3. 잘한 점은? (최대 2개, 해당 없으면 "없음")</div><div class="chips mb14">' +
       FB_PLUS.map((p, i) => chip(fbCtx.plus.includes(i), 'fbq', 'data-q="plus" data-v="' + i + '"', p[0])).join('') + '</div>' +
     '<div class="fl mb8">4. 보완할 점은? (특별히 없으면 "없음")</div><div class="chips mb14">' +
       FB_MINUS.map((p, i) => chip(fbCtx.minus === i, 'fbq', 'data-q="minus" data-v="' + i + '"', p[0])).join('') + '</div>' +
@@ -4044,9 +4073,9 @@ function computeFeedbackFields(t, date, fbCtx) {
     [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const subjectText = feedbackFlatField(t.subject || t.className || '').slice(0, 80);
   const homeworkText = feedbackFlatField(memo.homework || '없음').slice(0, 300) || '없음';
-  const plusText = ((fbCtx && fbCtx.plus) || []).map(i => FB_PLUS[i][0]).join(', ');
+  const plusText = ((fbCtx && fbCtx.plus) || []).filter(i => FB_PLUS[i] && FB_PLUS[i][1]).map(i => FB_PLUS[i][0]).join(', ');
   const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
-  const minusText = minusPick === '없음' ? '특별히 없음' : minusPick;
+  const minusText = minusPick === '없음' ? '' : minusPick;
   const seed = String(t.studentId || '') + '|' + t.id + '|' + date;
   const commentText = buildFormalFeedbackComment(fbCtx || {}, seed);
   return { subjectText, contentText, homeworkText, commentText, plusText, minusText };
@@ -15369,8 +15398,13 @@ document.addEventListener('click', ev => {
       if (q === 'focus') fbCtx.focus = (fbCtx.focus === v) ? null : v;
       else if (q === 'plus') {
         const n = Number(v);
-        fbCtx.plus = fbCtx.plus.includes(n) ? fbCtx.plus.filter(x => x !== n)
-          : (fbCtx.plus.length >= 2 ? (toast('잘한 점은 2개까지만'), fbCtx.plus) : fbCtx.plus.concat(n));
+        if (n === FB_PLUS_NONE_INDEX) {
+          fbCtx.plus = fbCtx.plus.includes(n) ? [] : [n];
+        } else {
+          const selected = fbCtx.plus.filter(x => x !== FB_PLUS_NONE_INDEX);
+          fbCtx.plus = selected.includes(n) ? selected.filter(x => x !== n)
+            : (selected.length >= 2 ? (toast('잘한 점은 2개까지만'), selected) : selected.concat(n));
+        }
       }
       else if (q === 'minus') fbCtx.minus = (fbCtx.minus === Number(v)) ? null : Number(v);
       fbModal();
@@ -15381,7 +15415,7 @@ document.addEventListener('click', ev => {
       const t = state.tasks.find(x => x.id === fbCtx.id); if (!t) break;
       captureFeedbackComment();
       if (String(fbCtx.comment || '').length > 200) return toast('코멘트는 200자까지 입력할 수 있습니다');
-      if (!fbCtx.plus.length) return toast('잘한 점을 하나 이상 골라주세요');
+      if (!fbCtx.plus.length) return toast('잘한 점을 고르거나 "없음"을 선택해 주세요');
       if (fbCtx.minus == null) return toast('보완할 점을 골라주세요 (특별히 없으면 "없음")');
       const currentCheck = getCheck(fbCtx.id, fbCtx.date);
       const lessonMemo = lessonMemoValues(currentCheck);
@@ -16352,7 +16386,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-27.7';
+const APP_VER = '2026-08-27.8';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
