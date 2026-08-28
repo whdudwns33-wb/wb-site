@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleWeekendVisit, weekendVisitInternals } from './weekend-visit.js';
 
 const migration = fs.readFileSync(new URL('./migrations/050_weekend_actual_visits.sql', import.meta.url), 'utf8');
+const sourceDateMigration = fs.readFileSync(new URL('./migrations/058_weekend_visit_source_date.sql', import.meta.url), 'utf8');
 const studentChangeMigration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
 const taskWriteCasMigration = fs.readFileSync(new URL('./migrations/055_task_write_cas_guards.sql', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
@@ -41,6 +42,7 @@ class D1Database {
     this.sqlite.exec(studentChangeMigration);
     this.sqlite.exec(taskWriteCasMigration);
     this.sqlite.exec(migration);
+    this.sqlite.exec(sourceDateMigration);
   }
   prepareNative(sql) { return this.sqlite.prepare(sql); }
   prepare(sql) { return new Statement(this, sql); }
@@ -111,15 +113,22 @@ function transferLesson(db, taskId, staffId) {
     .run(staffId, JSON.stringify(task), task.updatedAt, task.updatedAt, 'task', taskId);
 }
 
-test('050 migration is additive, mirrored in schema, and wired before deployment', () => {
+test('050 and 058 migrations are additive, mirrored in schema, and wired before deployment', () => {
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
+  assert.doesNotMatch(sourceDateMigration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
   for (const name of ['weekend_actual_visits', 'weekend_actual_visit_events', 'trg_weekend_actual_visits_no_delete']) {
     assert.match(migration, new RegExp(name));
     assert.match(schema, new RegExp(name));
   }
+  assert.match(sourceDateMigration, /ADD COLUMN source_date TEXT/);
+  assert.match(sourceDateMigration, /NEW\.source_date IS NOT OLD\.source_date/);
+  assert.match(sourceDateMigration, /trg_weekend_actual_visits_source_date_guard/);
+  assert.doesNotMatch(sourceDateMigration, /DROP TRIGGER/i);
+  assert.match(schema, /source_date\s+TEXT\s+CHECK/);
+  assert.match(schema, /trg_weekend_actual_visits_source_date_guard/);
   assert.match(worker, /import \{ handleWeekendVisit \} from '\.\/weekend-visit\.js'/);
   assert.match(worker, /url\.pathname === '\/weekend-visit'/);
-  assert.match(readme, /050_weekend_actual_visits\.sql[\s\S]*Worker[\s\S]*task Pages/);
+  assert.match(readme, /050_weekend_actual_visits\.sql[\s\S]*058_weekend_visit_source_date\.sql[\s\S]*Worker[\s\S]*task Pages/);
 });
 
 test('all subjects qualify and a Sunday timetable may check in on Saturday', async () => {
@@ -131,11 +140,66 @@ test('all subjects qualify and a Sunday timetable may check in on Saturday', asy
   assert.equal(checked.status, 200);
   assert.equal(checked.body.visit.status, 'active');
   assert.equal(checked.body.visit.lessonTaskId, 'lesson-a');
+  assert.equal(checked.body.visit.visitDate, '2026-08-22');
+  assert.equal(checked.body.visit.sourceDate, '2026-08-23');
 
   const listed = await call(db, { action: 'list', visitDate: '2026-08-22' });
   assert.equal(listed.status, 200);
   assert.equal(listed.body.visits.length, 1);
+  assert.equal(listed.body.visits[0].sourceDate, '2026-08-23');
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 1);
+});
+
+test('explicit sourceDate is schedule-validated and legacy derivation prioritizes the actual scheduled day', async () => {
+  const explicitDb = new D1Database(); explicitDb.seed();
+  const explicit = await atNow(saturday, () => call(explicitDb, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23',
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(explicit.status, 200);
+  assert.equal(explicit.body.visit.sourceDate, '2026-08-23');
+  assert.equal(explicitDb.sqlite.prepare(
+    "SELECT source_date FROM weekend_actual_visits WHERE app='task' AND lesson_task_id='lesson-a'"
+  ).get().source_date, '2026-08-23');
+
+  for (const sourceDate of ['2026-08-22', '2026-08-24', '', 'not-a-date']) {
+    const invalidDb = new D1Database(); invalidDb.seed();
+    const invalid = await atNow(saturday, () => call(invalidDb, {
+      action: 'check_in', visitDate: '2026-08-22', sourceDate,
+      lessonTaskId: 'lesson-a', studentId: 'student-a'
+    }));
+    assert.equal(invalid.status, 422, sourceDate);
+    assert.equal(invalid.body.code, 'SOURCE_DATE_INVALID', sourceDate);
+  }
+
+  const actualPriorityDb = new D1Database(); actualPriorityDb.seed();
+  const row = actualPriorityDb.sqlite.prepare(
+    "SELECT data FROM tasks WHERE app='task' AND id='lesson-a'"
+  ).get();
+  const task = JSON.parse(row.data);
+  task.scheduleSlots[0].days = [0, 6];
+  actualPriorityDb.sqlite.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'")
+    .run(JSON.stringify(task));
+  const derived = await atNow(saturday, () => call(actualPriorityDb, {
+    action: 'check_in', visitDate: '2026-08-22', lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(derived.status, 200);
+  assert.equal(derived.body.visit.sourceDate, '2026-08-22');
+});
+
+test('sourceDate is nullable for legacy rows but immutable after creation', () => {
+  const db = new D1Database();
+  const at = Date.parse('2026-08-22T10:00:00+09:00');
+  db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits ' +
+    '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,check_in_at,check_out_at,status,revision,' +
+    'created_at,updated_at,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', 'wv_' + '9'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-22', null,
+    at, null, 'active', 1, at, at, 'teacher-1', 'teacher-1');
+  assert.equal(db.sqlite.prepare('SELECT source_date FROM weekend_actual_visits').get().source_date, null);
+  assert.throws(() => db.sqlite.prepare(
+    'UPDATE weekend_actual_visits SET source_date=?,revision=2,updated_at=? WHERE app=? AND visit_id=?'
+  ).run('2026-08-23', at + 1, 'task', 'wv_' + '9'.repeat(32)), /WEEKEND_VISIT_IMMUTABLE/);
 });
 
 test('a future flexible effective date keeps the existing weekend check-in path active', async () => {

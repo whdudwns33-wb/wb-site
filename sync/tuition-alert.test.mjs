@@ -12,6 +12,11 @@ const tables = `
 CREATE TABLE private_rosters(app TEXT PRIMARY KEY,data TEXT NOT NULL,updated_at INTEGER NOT NULL);
 CREATE TABLE tasks(app TEXT NOT NULL,id TEXT NOT NULL,owner TEXT,data TEXT NOT NULL,updated_at INTEGER NOT NULL,srv_at INTEGER NOT NULL,PRIMARY KEY(app,id));
 CREATE TABLE checks(app TEXT NOT NULL,k TEXT NOT NULL,owner TEXT,data TEXT NOT NULL,updated_at INTEGER NOT NULL,srv_at INTEGER NOT NULL,PRIMARY KEY(app,k));
+CREATE TABLE weekend_actual_visits(
+  app TEXT NOT NULL,visit_id TEXT NOT NULL,student_id TEXT NOT NULL,lesson_task_id TEXT NOT NULL,
+  visit_date TEXT NOT NULL,status TEXT NOT NULL,PRIMARY KEY(app,visit_id),
+  UNIQUE(app,student_id,lesson_task_id,visit_date)
+);
 CREATE TABLE tuition_generation_alerts(
   app TEXT NOT NULL CHECK(app='task'),
   alert_id TEXT NOT NULL CHECK(alert_id LIKE 'tga_%'),
@@ -75,7 +80,7 @@ function seedRoster(db, students) {
 function seedTask(db, id, studentId, owner = 'teacher-a', overrides = {}) {
   const task = {
     id, staffId: owner, studentId, taskKind: 'lesson_instruction', lessonFormVersion: 1,
-    title: '[수업] 테스트', start: '2026-01-01', end: '', ...overrides
+    title: '[수업] 테스트', start: '2026-01-01', end: '', repeat: 'daily', days: [], ...overrides
   };
   db.database.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .run('task', id, owner, JSON.stringify(task), CUTOFF, CUTOFF);
@@ -87,6 +92,12 @@ function seedCheck(db, taskId, date, att, overrides = {}) {
   delete check.key;
   db.database.prepare('INSERT OR REPLACE INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .run('task', key, 'teacher-a', JSON.stringify(check), CUTOFF, CUTOFF);
+}
+
+function seedWeekendVisit(db, taskId, studentId, date, status = 'completed', suffix = '') {
+  db.database.prepare(
+    'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,visit_date,status) VALUES(?,?,?,?,?,?)'
+  ).run('task', 'visit-' + taskId + '-' + date + suffix, studentId, taskId, date, status);
 }
 
 function response(body, status = 200) { return { body, status }; }
@@ -143,6 +154,41 @@ test('same-name students stay separate by stable id and one task/date is counted
   assert.equal(result.created, 1);
   const alerts = db.database.prepare('SELECT student_id FROM tuition_generation_alerts').all();
   assert.deepEqual(alerts.map(row => row.student_id), ['student-a']);
+});
+
+test('weekend tuition counts require recurrence or an exact non-cancelled actual visit', async () => {
+  for (const status of ['cancelled', 'completed']) {
+    const db = new TestD1();
+    seedRoster(db, [rosterStudent('student-fixed', '고정주말')]);
+    seedTask(db, 'lesson-fixed', 'student-fixed', 'teacher-a', {
+      repeat: 'days', days: [6], weekendAttendanceMode: 'fixed'
+    });
+    for (const date of ['2026-08-01', '2026-08-08']) seedCheck(db, 'lesson-fixed', date, 'P');
+    seedCheck(db, 'lesson-fixed', '2026-08-09', 'P');
+    seedWeekendVisit(db, 'lesson-fixed', 'student-fixed', '2026-08-09', status);
+    const result = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+    assert.equal(result.qualifyingAttendances, status === 'completed' ? 3 : 2);
+    assert.equal(result.created, status === 'completed' ? 1 : 0);
+  }
+
+  const flexibleDb = new TestD1();
+  seedRoster(flexibleDb, [rosterStudent('student-flex', '비정기주말')]);
+  seedTask(flexibleDb, 'lesson-flex', 'student-flex', 'teacher-a', {
+    repeat: 'days', days: [6], weekendAttendanceMode: 'flexible', weekendAllowedDays: [0],
+    weekendMonthlyTarget: 2, weekendFlexibleFrom: '2026-08-01'
+  });
+  for (const date of ['2026-08-02', '2026-08-09', '2026-08-16']) {
+    seedCheck(flexibleDb, 'lesson-flex', date, 'P');
+  }
+  const withoutVisits = await handleScheduledTuitionAlerts({ DB: flexibleDb }, CUTOFF);
+  assert.equal(withoutVisits.qualifyingAttendances, 0);
+  assert.equal(withoutVisits.created, 0);
+  for (const date of ['2026-08-02', '2026-08-09', '2026-08-16']) {
+    seedWeekendVisit(flexibleDb, 'lesson-flex', 'student-flex', date);
+  }
+  const withVisits = await handleScheduledTuitionAlerts({ DB: flexibleDb }, CUTOFF);
+  assert.equal(withVisits.qualifyingAttendances, 3);
+  assert.equal(withVisits.created, 1);
 });
 
 test('inactive roster rows and owner-mismatched lesson checks fail closed', async () => {

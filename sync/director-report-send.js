@@ -125,8 +125,10 @@ function checkHasProgress(task, check) {
   return false;
 }
 
-function hasFlexibleVisit(task, reportDate, visitRows) {
-  if (!flexibleWeekendEffectiveOn(task, reportDate)) return false;
+function hasActualWeekendVisit(task, reportDate, visitRows) {
+  if (!task || task.deleted || !isIsoDate(reportDate) || ![0, 6].includes(dayOfWeek(reportDate)) ||
+      (task.start && reportDate < String(task.start)) ||
+      (task.end && reportDate > String(task.end))) return false;
   return (Array.isArray(visitRows) ? visitRows : []).some(row =>
     String(row.lesson_task_id || '') === String(task.id || '') &&
     String(row.student_id || '') === String(task.studentId || '') &&
@@ -140,9 +142,10 @@ export function summarizeReportRows(taskRows, checkRows, staffId, reportDate, vi
     if (String(row.id || '') !== String(task.id || '')) throw new Error('TASK_ID_MISMATCH');
     if (String(task.staffId || '') !== staffId) throw new Error('TASK_OWNER_MISMATCH');
     const weekendPolicy = weekendAttendancePolicyOn(task, reportDate);
+    const actualWeekendVisit = hasActualWeekendVisit(task, reportDate, visitRows);
     const occurs = weekendPolicy === 'flexible'
-      ? hasFlexibleVisit(task, reportDate, visitRows)
-      : weekendPolicy === 'fixed' && occursOn(task, reportDate);
+      ? flexibleWeekendEffectiveOn(task, reportDate) && actualWeekendVisit
+      : weekendPolicy === 'fixed' && (occursOn(task, reportDate) || actualWeekendVisit);
     if (!isBookOrderWorkTask(task) && occurs) tasks.push(task);
   }
 

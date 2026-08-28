@@ -1015,11 +1015,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.11"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.11"></script>
-<script src="./asset-core.js?v=2026-08-28.11"></script>
-<script src="./qr-core.js?v=2026-08-28.11"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.11"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.12"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.12"></script>
+<script src="./asset-core.js?v=2026-08-28.12"></script>
+<script src="./qr-core.js?v=2026-08-28.12"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.12"></script>
 <script>
 "use strict";
 
@@ -1100,14 +1100,10 @@ const owners = () => liveStaff().filter(s => s.owner);
 const staffById = id => state.staff.find(s => s.id === id);
 const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
 
-function occursOn(task, date) {
+function plannedOccursOn(task, date) {
   if (task.deleted) return false;
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
-  /* 비정기 주말 수업은 기존 시간표를 참고값으로만 보존한다.
-   * 전환일 이후에는 이 수업 ID로 저장된 실제 등원 기록이 있는 날짜에만
-   * 오늘 수업으로 활성화한다. 이름이나 비슷한 시간표로 추측하지 않는다. */
-  if (isFlexibleWeekendLesson(task, date)) return hasFlexibleWeekendOccurrence(task, date);
   switch (task.repeat) {
     case 'once':    return date === task.start;
     case 'daily':   return true;
@@ -1115,6 +1111,20 @@ function occursOn(task, date) {
     case 'days':    return (task.days || []).includes(dowOf(date));
     default:        return false;
   }
+}
+
+function occursOn(task, date) {
+  if (!plannedOccursOn(task, date)) {
+    /* 비정기 주말 수업은 실제 방문일이 원래 반복 요일과 다를 수 있다.
+     * 활성 기간 검사는 유지하되 실제 방문 여부를 먼저 확인한다. */
+    if (!task || task.deleted || (task.start && date < task.start) || (task.end && date > task.end) ||
+        !isFlexibleWeekendLesson(task, date)) return false;
+  }
+  /* 비정기 주말 수업은 기존 시간표를 참고값으로만 보존한다.
+   * 전환일 이후에는 이 수업 ID로 저장된 실제 등원 기록이 있는 날짜에만
+   * 오늘 수업으로 활성화한다. 이름이나 비슷한 시간표로 추측하지 않는다. */
+  if (isFlexibleWeekendLesson(task, date)) return hasFlexibleWeekendOccurrence(task, date);
+  return plannedOccursOn(task, date);
 }
 
 /** 교재 주문은 생성부터 아카등록까지 교재 탭에서만 처리한다.
@@ -1315,8 +1325,10 @@ function carryOver(staffId, date) {
   const out = [];
   for (let i = 1; i <= 7; i++) {
     const d = addDays(date, -i);
-    tasksFor(staffId, d).forEach(t => {
-      if (!t.carry || isDone(t.id, d)) return;
+    teacherTaskCardsFor(staffId, d).forEach(t => {
+      const context = isLesson(t) ? lessonRecordContext(t, d) : null;
+      if (context && (!context.ready || !context.recordDate)) return;
+      if (!t.carry || teacherTaskCardStatus(t, d) === 'done') return;
       out.push({ t: t, date: d });
     });
   }
@@ -1799,6 +1811,7 @@ let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitLoadedKey
 const weekendVisitScopeCache = new Map();
 const weekendVisitScheduleLoadingKeys = new Set();
 const weekendVisitScheduleRetryAt = new Map();
+const weekendVisitScheduleErrors = new Map();
 let weekendVisitScopeRevision = 0;
 let weekendVisitEditTarget = null, weekendFlexibleEditor = null, weekendFlexibleSaving = false;
 
@@ -1883,7 +1896,7 @@ function resetPersonCache(token) {
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
   weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
-  weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear();
+  weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear(); weekendVisitScheduleErrors.clear();
   weekendVisitScopeRevision = 0;
   weekendVisitEditTarget = null; weekendFlexibleEditor = null; weekendFlexibleSaving = false;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
@@ -2631,6 +2644,146 @@ function flexibleWeekendAllowedOn(task, date) {
   return isFlexibleWeekendLesson(task, date) && isWeekendVisitDate(date) && flexibleWeekendAllowedDays(task).includes(dowOf(date));
 }
 
+function weekendPairDates(date) {
+  if (!isWeekendVisitDate(date)) return [];
+  return dowOf(date) === 6 ? [date, addDays(date, 1)] : [addDays(date, -1), date];
+}
+
+/** 실제 방문을 원 수업 카드에 연결할 때만 쓰는 확정 시간표 판정.
+ * scheduleSlots가 있으면 그 날짜에 유효한 slot을 정본으로 보고, 구형 수업만 task.days로 보완한다. */
+function plannedWeekendOccurrence(task, date) {
+  if (!task || task.deleted || task.scheduleStatus === 'needs_review' || !isWeekendVisitDate(date) ||
+      (task.start && date < task.start) || (task.end && date > task.end)) return false;
+  const slots = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
+  if (slots.length) {
+    return slots.some(slot => {
+      const from = String(slot && (slot.validFrom || slot.startDate) || '');
+      const to = String(slot && (slot.validTo || slot.endDate) || '');
+      const days = Array.isArray(slot && slot.days) ? slot.days.map(Number) : [];
+      return (!from || from <= date) && (!to || to >= date) && days.includes(dowOf(date));
+    });
+  }
+  return plannedOccursOn(task, date);
+}
+
+/** 신규 API의 sourceDate를 우선한다. 구형 행은 실제 날짜가 예정일이면 그 날짜,
+ * 아니면 같은 주말의 반대 요일이 유일한 예정일일 때만 파생한다. */
+function weekendVisitSourceDate(task, row) {
+  const actualDate = String(row && row.visitDate || '');
+  const pair = weekendPairDates(actualDate);
+  if (!task || !row || pair.length !== 2 || String(row.lessonTaskId || '') !== String(task.id || '') ||
+      !String(task.studentId || '') || String(row.studentId || '') !== String(task.studentId || '')) return '';
+  const explicit = String(row.sourceDate || '');
+  if (explicit) return pair.includes(explicit) ? explicit : '';
+  const candidates = pair.filter(date => plannedWeekendOccurrence(task, date));
+  if (candidates.includes(actualDate)) return actualDate;
+  return candidates.length === 1 ? candidates[0] : '';
+}
+
+function weekendVisitPairScope(task, sourceDate) {
+  const pair = weekendPairDates(sourceDate);
+  const staffId = String(task && task.staffId || '');
+  if (pair.length !== 2 || !staffId) return { ready: false, error: '주말 수업 범위를 확인할 수 없습니다', rows: [] };
+  const keys = pair.map(date => weekendVisitScopeKey(date, staffId));
+  const error = keys.map(key => weekendVisitScheduleErrors.get(key)).find(Boolean);
+  if (error) return { ready: false, error: '실제 등·하원 기록을 모두 불러오지 못했습니다', rows: [] };
+  if (keys.some(key => !weekendVisitScopeCache.has(key))) {
+    return { ready: false, error: '토·일 실제 등·하원 기록을 확인하는 중입니다', rows: [] };
+  }
+  const seen = new Set(), rows = [];
+  keys.forEach(key => {
+    const cached = weekendVisitScopeCache.get(key);
+    (cached && Array.isArray(cached.rows) ? cached.rows : []).forEach(row => {
+      const visitId = String(row && row.visitId || '');
+      if (!visitId || seen.has(visitId)) return;
+      seen.add(visitId); rows.push(row);
+    });
+  });
+  return { ready: true, error: '', rows: rows };
+}
+
+function lessonCheckHasMeaningfulData(check) {
+  if (!check || typeof check !== 'object') return false;
+  if (check.att || check.done || check.blocked || check.at || check.absenceType || Number(check.count || 0) > 0 ||
+      String(check.note || '').trim()) return true;
+  if (check.steps && Object.values(check.steps).some(Boolean)) return true;
+  if (check.lessonMemo && typeof check.lessonMemo === 'object' &&
+      Object.values(check.lessonMemo).some(value => String(value || '').trim())) return true;
+  return false;
+}
+
+function lessonRecordContext(task, sourceDate) {
+  const basic = { sourceDate: String(sourceDate || ''), recordDate: String(sourceDate || ''), visit: null,
+    ready: true, inputEnabled: true, visible: true, issue: '' };
+  if (!task || !isLesson(task) || !isWeekendVisitDate(sourceDate) || !taskHasWeekendSchedule(task)) return basic;
+  const scope = weekendVisitPairScope(task, sourceDate);
+  if (!scope.ready) return Object.assign(basic, { recordDate: '', ready: false, inputEnabled: false, issue: scope.error });
+  const matches = scope.rows.filter(row => row && row.status !== 'cancelled' &&
+    String(row.lessonTaskId || '') === String(task.id || '') && String(row.studentId || '') === String(task.studentId || '') &&
+    weekendVisitSourceDate(task, row) === String(sourceDate));
+  if (matches.length > 1) {
+    return Object.assign(basic, { recordDate: '', inputEnabled: false, issue: '원 수업과 연결된 실제 방문 기록이 여러 개입니다' });
+  }
+  const visit = matches[0] || null;
+  if (!visit) {
+    if (isFlexibleWeekendLesson(task, sourceDate)) {
+      return Object.assign(basic, { recordDate: '', inputEnabled: false, visible: false,
+        issue: '이 원 수업과 연결된 실제 등원 기록이 없습니다' });
+    }
+    return basic;
+  }
+  const recordDate = String(visit.visitDate || '');
+  if (!weekendPairDates(sourceDate).includes(recordDate)) {
+    return Object.assign(basic, { recordDate: '', inputEnabled: false, issue: '실제 방문 날짜 연결을 확인해 주세요' });
+  }
+  if (recordDate !== sourceDate && lessonCheckHasMeaningfulData(getCheck(task.id, sourceDate))) {
+    return Object.assign(basic, { recordDate: '', visit: visit, inputEnabled: false,
+      issue: '원 수업일에 기존 기록이 있어 실제 방문일로 자동 전환할 수 없습니다' });
+  }
+  return Object.assign(basic, { recordDate: recordDate, visit: visit });
+}
+
+function teacherTaskCardOccursOn(task, date) {
+  if (!task || task.deleted || isBookOrderWorkTask(task)) return false;
+  if (isLesson(task) && isFlexibleWeekendLesson(task, date)) {
+    const context = lessonRecordContext(task, date);
+    return plannedWeekendOccurrence(task, date) && context.ready && context.visible && !!context.visit;
+  }
+  return occursOn(task, date);
+}
+
+function teacherTaskCardsFor(staffId, date) {
+  return state.tasks.filter(task => task && task.staffId === staffId && teacherTaskCardOccursOn(task, date))
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99') ||
+    (b.priority === 'high') - (a.priority === 'high') || (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function teacherTaskCardStatus(task, sourceDate) {
+  const context = lessonRecordContext(task, sourceDate);
+  if (!context.recordDate) return 'todo';
+  return statusOf(task, context.recordDate);
+}
+
+function teacherTaskCardProgress(staffId, date) {
+  const list = teacherTaskCardsFor(staffId, date);
+  const done = list.filter(task => teacherTaskCardStatus(task, date) === 'done').length;
+  return { done: done, total: list.length, pct: list.length ? Math.round(done / list.length * 100) : 0 };
+}
+
+function teacherWeekCardProgress(staffId, anchor) {
+  const mon = mondayOf(anchor);
+  let done = 0, total = 0;
+  for (let index = 0; index < 7; index++) {
+    const current = teacherTaskCardProgress(staffId, addDays(mon, index));
+    done += current.done; total += current.total;
+  }
+  return { done: done, total: total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function ensureWeekendVisitSourcePair(date, staffId) {
+  weekendPairDates(date).forEach(pairDate => loadWeekendVisitScheduleScope(pairDate, staffId));
+}
+
 function rememberWeekendVisitScope(date, staffId, result) {
   const key = weekendVisitScopeKey(date, staffId);
   weekendVisitScopeCache.set(key, {
@@ -2639,6 +2792,7 @@ function rememberWeekendVisitScope(date, staffId, result) {
     loadedAt: ++weekendVisitScopeRevision
   });
   weekendVisitScheduleRetryAt.delete(key);
+  weekendVisitScheduleErrors.delete(key);
 }
 
 function weekendVisitRowsForTaskDate(task, date) {
@@ -2759,16 +2913,17 @@ async function loadWeekendVisitScheduleScope(date, staffId) {
     });
     rememberWeekendVisitScope(date, staffId, result);
   } catch (error) {
+    weekendVisitScheduleErrors.set(key, String(error && error.message || error || '불러오기 실패'));
     weekendVisitScheduleRetryAt.set(key, Date.now() + 15000);
     setTimeout(() => {
       if (Number(weekendVisitScheduleRetryAt.get(key) || 0) <= Date.now()) {
         weekendVisitScheduleRetryAt.delete(key);
-        if (route === 'week' || route === 'schedule') loadWeekendVisitScheduleScope(date, staffId);
+        if (route === 'week' || route === 'schedule' || route === 'today') loadWeekendVisitScheduleScope(date, staffId);
       }
     }, 15050);
   } finally {
     weekendVisitScheduleLoadingKeys.delete(key);
-    if (route === 'week' || route === 'schedule') renderAfterSync();
+    if (route === 'week' || route === 'schedule' || route === 'today') renderAfterSync();
   }
 }
 
@@ -2796,6 +2951,7 @@ async function loadWeekendVisits(date, staffId, force) {
     rememberWeekendVisitScope(date, staffId, result);
   } catch (error) {
     weekendVisitError = String(error && error.message || error || '불러오기 실패');
+    weekendVisitScheduleErrors.set(key, weekendVisitError);
   } finally {
     weekendVisitLoading = false;
     if ((route === 'today' || route === 'board') && cursor === date) renderAfterSync();
@@ -2851,25 +3007,36 @@ function weekendVisitRowHtml(task, row, editable) {
   const active = row && row.status === 'active';
   const completed = row && row.status === 'completed';
   const canRecordNow = editable && cursor === today() && isWeekendVisitDate(cursor);
+  const checkInSourceDate = task && !row ? weekendVisitSourceDate(task, {
+    lessonTaskId: task.id, studentId: task.studentId, visitDate: cursor
+  }) : '';
+  const sourceDate = task && row ? weekendVisitSourceDate(task, row) : '';
+  const sourceAction = sourceDate && row
+    ? '<button class="btn btn-sm btn-ghost" data-act="weekendopensource" data-task="' + esc(task.id) +
+      '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '';
   let actions = '';
   if (!row && canRecordNow && task) {
     actions = '<button class="btn btn-sm btn-primary" data-act="weekendcheckin" data-task="' + esc(task.id) +
-      '" data-student-id="' + esc(task.studentId) + '">등원</button>';
+      '" data-student-id="' + esc(task.studentId) + '" data-source-date="' + esc(checkInSourceDate) + '"' +
+      (checkInSourceDate ? '' : ' disabled') + '>등원</button>';
   } else if (active) {
     actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
       '" data-rev="' + row.revision + '">하원</button>' : '') +
       (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' : '');
+        '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' : '') + sourceAction;
   } else if (completed && editable) {
     actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
-      '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>';
+      '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' + sourceAction;
+  } else if (row && sourceAction) {
+    actions = sourceAction;
   }
   return '<div class="weekend-visit-row' + (active ? ' weekend-visit-live' : completed ? ' weekend-visit-complete' : '') + '">' +
     '<div><div class="card-title">' + esc(identity.name) + (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
     '<div class="card-sub">' + esc(subject) + (flexible ? ' · 비정기 ' + esc(flexibleWeekendDayText(task)) : '') +
       (schedule ? ' · ' + (flexible ? '참고 시간표 ' : '예정 ') + esc(schedule) : '') + '</div>' +
     (progress ? '<div class="weekend-flex-progress">' + esc(progress) + '</div>' : '') +
-    (row ? '<div class="weekend-visit-time mt8">실제 ' + esc(weekendVisitTimeText(row)) +
+    (row ? '<div class="weekend-visit-time mt8">' + (sourceDate ? '원 수업 ' + esc(label(sourceDate)) + ' · ' : '') +
+      '실제 ' + esc(weekendVisitTimeText(row)) +
       (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' : '') + '</div>' +
     (actions ? '<div class="weekend-visit-actions">' + actions + '</div>' : '') + '</div>';
 }
@@ -2919,10 +3086,14 @@ function weekendVisitBoardHtml(date) {
   const rows = scopedRows.map(row => {
     const task = state.tasks.find(item => String(item.id) === String(row.lessonTaskId));
     const teacher = staffById(row.staffId);
+    const sourceDate = task ? weekendVisitSourceDate(task, row) : '';
     return '<div class="weekend-visit-row ' + (row.status === 'active' ? 'weekend-visit-live' : 'weekend-visit-complete') + '"><div>' +
       '<div class="card-title">' + esc(weekendVisitStudentLabel(task, row).name) + ' <span class="pill">' + esc(teacher && teacher.name || '담당 확인') + '</span></div>' +
-      '<div class="weekend-visit-time">실제 ' + esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' +
-      '</div><div class="weekend-visit-actions"><button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button></div></div>';
+      '<div class="weekend-visit-time">' + (sourceDate ? '원 수업 ' + esc(label(sourceDate)) + ' · ' : '') +
+      '실제 ' + esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' +
+      '</div><div class="weekend-visit-actions"><button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
+      (sourceDate && task ? '<button class="btn btn-sm btn-ghost" data-act="weekendopensource" data-task="' + esc(task.id) +
+        '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '') + '</div></div>';
   });
   return '<details class="card weekend-visit-card" data-persist-key="weekend-board"><summary><span><b>주말 실제 등·하원 현황</b>' +
     '<span class="card-sub">등원 중 ' + active + '명 · 하원 완료 ' + complete + '명</span></span></summary>' +
@@ -2953,16 +3124,20 @@ function openWeekendFlexibleCheckIn(staffId) {
   const rows = candidates.map(task => {
     const identity = weekendVisitStudentLabel(task, null);
     const schedule = lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '참고 시간표 없음';
+    const sourceDate = weekendVisitSourceDate(task, {
+      lessonTaskId: task.id, studentId: task.studentId, visitDate: cursor
+    });
     return '<div class="weekend-visit-row"><div><div class="card-title">' + esc(identity.name) +
       (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
       '<div class="card-sub">' + esc(task.subject || task.className || '과목 미지정') + ' · 허용 ' +
         esc(flexibleWeekendDayText(task)) + ' · 참고 ' + esc(schedule) + '</div>' +
       '<div class="weekend-flex-progress">' + esc(flexibleWeekendProgressText(task, cursor)) + '</div></div>' +
       '<button class="btn btn-sm btn-primary" data-act="weekendflexcheckin" data-task="' + esc(task.id) +
-        '" data-student-id="' + esc(task.studentId) + '">이 학생 등원</button></div>';
+        '" data-student-id="' + esc(task.studentId) + '" data-source-date="' + esc(sourceDate) + '"' +
+        (sourceDate ? '' : ' disabled') + '>이 학생 등원</button></div>';
   }).join('');
   modal('비정기 등원', '<div class="hint mb14"><b>실제로 등원한 학생만 선택해 주세요.</b><br>' +
-    '선택한 날짜에 기존 수업 ID가 활성화되며 출결·메모·수업진행 기록은 같은 수업에 계속 누적됩니다.</div>' +
+    '원래 예정된 수업 화면에서 입력하며 출결·메모·수업진행 기록은 실제 등원 날짜로 저장됩니다.</div>' +
     '<div class="weekend-visit-list">' + rows + '</div>');
 }
 
@@ -3002,7 +3177,7 @@ function openWeekendFlexibleSettings(taskId) {
       esc(task.weekendMonthlyTarget || '') + '"></label>' +
     '<label class="field"><span class="fl">비정기 적용 시작일</span><input class="in" id="weekendFlexFrom" type="date" value="' +
       esc(task.weekendFlexibleFrom || today()) + '"></label></div>' +
-    '<div class="hint">비정기로 바꿔도 기존 시간표·출결·수업 메모와 수업 ID는 삭제되지 않습니다. 적용일 이후에는 실제 등원을 누른 날짜에만 기존 수업이 오늘 수업으로 표시됩니다.</div>',
+    '<div class="hint">비정기로 바꿔도 기존 시간표·출결·수업 메모와 수업 ID는 삭제되지 않습니다. 실제 등원 후에는 원래 예정일의 수업 화면을 사용하며 기록 날짜만 실제 등원일로 저장됩니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="weekendflexsave">설정 저장</button>');
 }
 
@@ -3078,11 +3253,15 @@ function viewToday() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
 
+  if (isWeekendVisitDate(cursor)) ensureWeekendVisitSourcePair(cursor, me.id);
+  if (cursor === today()) {
+    ensureWeekendVisitScheduleDates(Array.from({ length: 8 }, (_, index) => addDays(cursor, -index)), me.id);
+  }
   const rel = relLabel(cursor);
-  const list = tasksFor(me.id, cursor);
+  const list = teacherTaskCardsFor(me.id, cursor);
   if (list.some(isLesson) && !rosterDb && !rosterErr && !rosterLoading) loadRoster();
   ensureSessionModeData(list);
-  const p = progress(me.id, cursor);
+  const p = teacherTaskCardProgress(me.id, cursor);
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
 
@@ -3095,7 +3274,7 @@ function viewToday() {
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
-  list.forEach(t => counts[statusOf(t, cursor)]++);
+  list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
 
   h += '<div class="card"><div class="prog">' +
     '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
@@ -3179,19 +3358,22 @@ function viewToday() {
 }
 
 function taskRow(t, date, editable, isCarry) {
-  const c = getCheck(t.id, date);
-  const st = statusOf(t, date);
+  const lesson = isLesson(t);
+  const recordContext = lesson ? lessonRecordContext(t, date) : null;
+  const recordDate = recordContext ? recordContext.recordDate : date;
+  const c = recordDate ? getCheck(t.id, recordDate) : null;
+  const st = recordDate ? statusOf(t, recordDate) : 'todo';
   const prog = taskProgress(t, c);
   const steps = taskSteps(t, c);
   const detail = taskCardDetail(t);
   const hasDetail = steps.length || t.guide || t.target;
-  const lesson = isLesson(t);
   const timeDisplay = String(t.time || '').trim();
   const open = openPanels.has(t.id + '|' + date);
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
+  const canEditRecord = editable && (!lesson || !!(recordContext && recordContext.inputEnabled && recordDate));
 
   let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
-    (showFinalBox ? '<button class="box" ' + (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' : '') +
+    (showFinalBox ? '<button class="box" ' + (canEditRecord ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + (lesson ? recordDate : date) + '"' : 'disabled') + '>✓</button>' : '') +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
@@ -3205,6 +3387,11 @@ function taskRow(t, date, editable, isCarry) {
         (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
         (c && c.att && ATT_LABEL[c.att] ? '<span class="tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '') +
+        (recordContext && recordContext.visit && recordContext.recordDate
+          ? '<span class="tag time">원 수업 ' + esc(shortDate(date)) + ' · 실제 기록 ' + esc(shortDate(recordContext.recordDate)) + '</span>'
+          : '') +
+        (recordContext && recordContext.issue && recordContext.visible
+          ? '<span class="tag blk">' + esc(recordContext.issue) + '</span>' : '') +
         sessionModeBadgeHtml(t) +
         originTags(t) +
       '</div>';
@@ -3220,7 +3407,7 @@ function taskRow(t, date, editable, isCarry) {
         (lessonHasNewStudentInfo ? ' aria-label="학생정보 · 업무지시 · 새 변경사항"' : '') + '>학생정보 · 업무지시</button>' +
       '<button type="button" class="lesson-card-tab" data-act="panel" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
         (open ? '수업진행 접기' : '수업진행' + (steps.length ? ' (' + prog.done + '/' + prog.total + ')' : '')) + '</button></div>';
-    if (open) h += taskPanel(t, date, c, editable);
+    if (open) h += taskPanel(t, recordDate || date, c, editable && !!(recordContext && recordContext.inputEnabled), recordContext);
   } else {
     if (hasDetail) {
       h += '<button class="opener" data-act="panel" data-id="' + t.id + '" data-date="' + date + '">' +
@@ -3839,9 +4026,19 @@ function acaflowLessonSummary(t, date) {
 }
 
 function taskPanel(t, date, c, editable) {
+  const recordContext = arguments.length > 4 ? arguments[4] : null;
   const lesson = isLesson(t);
   let h = '<div class="panel' + (lesson ? ' lesson-progress-panel' : '') + '">';
   const steps = taskSteps(t, c);
+
+  if (lesson && recordContext && recordContext.visit && recordContext.recordDate) {
+    h += '<div class="guide"><b>원 수업 ' + esc(label(recordContext.sourceDate)) + '</b><br>' +
+      '이 화면에서 입력한 수업진행 전체는 실제 등원일 <b>' + esc(label(recordContext.recordDate)) + '</b> 기록으로 저장됩니다.</div>';
+  }
+  if (lesson && recordContext && !recordContext.inputEnabled && recordContext.issue) {
+    h += '<div class="guide" style="border-color:var(--coral)"><b>입력할 수 없습니다</b><br>' + esc(recordContext.issue) +
+      '<br>실제 등·하원 기록을 새로고침하거나 관리자에게 기록 정리를 요청해 주세요.</div>';
+  }
 
   if (lesson && editable) {
     const att = (c && c.att) || '';
@@ -7583,9 +7780,9 @@ function viewWeek() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
   ensureWeekendVisitScheduleDates(days, me.id);
   const rows = {};
-  days.forEach(d => tasksFor(me.id, d).forEach(t => { rows[t.id] = t; }));
+  days.forEach(d => teacherTaskCardsFor(me.id, d).forEach(t => { rows[t.id] = t; }));
   const list = Object.values(rows);
-  const wp = weekProgress(me.id, cursor);
+  const wp = teacherWeekCardProgress(me.id, cursor);
   const editable = session.isStaffLink || session.isAdmin;
 
   let h = '';
@@ -7608,11 +7805,15 @@ function viewWeek() {
     '</tr></thead><tbody>' +
     list.map(t => '<tr><td class="n">' + esc(taskDisplayTitle(t)) + '</td>' +
       days.map(d => {
-        if (!occursOn(t, d)) return '<td><span class="dot none">·</span></td>';
-        const st = statusOf(t, d);
+        if (!teacherTaskCardOccursOn(t, d)) return '<td><span class="dot none">·</span></td>';
+        const context = isLesson(t) ? lessonRecordContext(t, d) : null;
+        const recordDate = context ? context.recordDate : d;
+        const st = recordDate ? statusOf(t, recordDate) : 'todo';
         const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
         return '<td><button class="dot ' + cls + '" ' +
-          (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button></td>';
+          (editable && recordDate && (!context || context.inputEnabled)
+            ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + recordDate + '" data-source-date="' + d + '"'
+            : 'disabled title="' + esc(context && context.issue || '실제 방문 기록을 확인하는 중입니다') + '"') + '>✓</button></td>';
       }).join('') + '</tr>').join('') +
     '</tbody></table></div>' +
     '<div class="hint">🔵 완료 · 🟠 진행중 · 🔴 막힘 · 🩷 지난 날짜 미완료. 칸을 눌러 바로 체크할 수 있습니다.</div>';
@@ -17518,25 +17719,57 @@ document.addEventListener('click', ev => {
     case 'weekendflexcheckin': {
       const taskId = String(el.dataset.task || '');
       const studentId = String(el.dataset.studentId || '');
+      const sourceDate = String(el.dataset.sourceDate || '');
       const taskRow = state.tasks.find(item => String(item.id) === taskId && String(item.studentId || '') === studentId);
       if (!taskRow || !flexibleWeekendAllowedOn(taskRow, cursor)) return toast('비정기 수업의 학생·허용 요일을 다시 확인해 주세요');
-      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생이 오늘 실제 등원했나요?')) break;
-      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, lessonTaskId: taskId, studentId: studentId },
-        '비정기 등원을 저장하고 오늘 수업을 열었습니다');
+      if (!sourceDate || weekendVisitSourceDate(taskRow, { lessonTaskId: taskId, studentId: studentId, visitDate: cursor }) !== sourceDate) {
+        return toast('연결할 원 수업 날짜를 확인할 수 없습니다');
+      }
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생이 오늘 실제 등원했나요?\n원 수업 ' + label(sourceDate) +
+          ' · 출결과 메모는 ' + label(cursor) + ' 기록으로 저장됩니다.')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: sourceDate, lessonTaskId: taskId, studentId: studentId },
+        '비정기 등원을 원래 수업 화면과 연결했습니다');
       break;
     }
     case 'weekendrefresh': {
+      const staffId = weekendVisitScopeStaffId();
+      weekendPairDates(cursor).forEach(date => {
+        const key = weekendVisitScopeKey(date, staffId);
+        weekendVisitScopeCache.delete(key);
+        weekendVisitScheduleErrors.delete(key);
+        weekendVisitScheduleRetryAt.delete(key);
+      });
       weekendVisitLoadedKey = '';
-      loadWeekendVisits(cursor, weekendVisitScopeStaffId(), true);
+      loadWeekendVisits(cursor, staffId, true);
+      weekendPairDates(cursor).filter(date => date !== cursor).forEach(date => loadWeekendVisitScheduleScope(date, staffId));
       break;
     }
     case 'weekendcheckin': {
       const taskId = String(el.dataset.task || '');
       const studentId = String(el.dataset.studentId || '');
+      const sourceDate = String(el.dataset.sourceDate || '');
       const taskRow = state.tasks.find(item => String(item.id) === taskId);
       if (!taskRow || !studentId) return toast('학생과 수업 정보를 다시 확인해 주세요');
-      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?')) break;
-      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, lessonTaskId: taskId, studentId: studentId }, '실제 등원 시간을 저장했습니다');
+      if (!sourceDate || weekendVisitSourceDate(taskRow, { lessonTaskId: taskId, studentId: studentId, visitDate: cursor }) !== sourceDate) {
+        return toast('연결할 원 수업 날짜를 확인할 수 없습니다');
+      }
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?\n원 수업 ' + label(sourceDate) +
+          ' · 출결과 메모는 ' + label(cursor) + ' 기록으로 저장됩니다.')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: sourceDate,
+        lessonTaskId: taskId, studentId: studentId }, '실제 등원 시간을 저장했습니다');
+      break;
+    }
+    case 'weekendopensource': {
+      const taskId = String(el.dataset.task || '');
+      const sourceDate = String(el.dataset.sourceDate || '');
+      const taskRow = state.tasks.find(item => !item.deleted && String(item.id || '') === taskId);
+      if (!taskRow || !weekendPairDates(sourceDate).length) {
+        return toast('원래 수업 화면을 확인할 수 없습니다');
+      }
+      cursor = sourceDate;
+      openPanels.add(taskId + '|' + sourceDate);
+      if (session.isAdmin) viewStaff = String(taskRow.staffId || viewStaff || '');
+      route === 'today' ? render() : go('today');
       break;
     }
     case 'weekendcheckout': {
@@ -19075,7 +19308,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.11';
+const APP_VER = '2026-08-28.12';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

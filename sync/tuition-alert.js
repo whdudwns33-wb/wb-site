@@ -1,3 +1,5 @@
+import { weekendAttendancePolicyOn } from './weekend-flex.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
 const ALERT_ID = /^tga_[a-f0-9]{52}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -107,6 +109,16 @@ function lessonTask(value, taskId, taskOwner) {
     (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion);
 }
 
+function occursOn(task, date) {
+  if (!task || task.deleted || (task.start && date < String(task.start)) ||
+      (task.end && date > String(task.end))) return false;
+  const day = new Date(date + 'T00:00:00Z').getUTCDay();
+  if (task.repeat === 'once') return date === String(task.start || '');
+  if (task.repeat === 'daily') return true;
+  if (task.repeat === 'weekday') return day >= 1 && day <= 5;
+  return task.repeat === 'days' && Array.isArray(task.days) && task.days.map(Number).includes(day);
+}
+
 function qualifyingEvidence(row, students, sourceDate) {
   let task, check;
   try {
@@ -119,10 +131,17 @@ function qualifyingEvidence(row, students, sourceDate) {
   const date = String(check && check.date || '');
   const studentId = String(task && task.studentId || '');
   const student = students.get(studentId);
+  const weekendPolicy = weekendAttendancePolicyOn(task, date);
+  const exactActualVisit = validDate(date) && [0, 6].includes(new Date(date + 'T00:00:00Z').getUTCDay()) &&
+    !!String(row.actual_visit_id || '');
+  const attendanceOccurrence = weekendPolicy === 'flexible'
+    ? exactActualVisit
+    : weekendPolicy === 'fixed' && (occursOn(task, date) || exactActualVisit);
   if (!SAFE_ID.test(taskId) || String(row.check_owner || '') !== String(row.task_owner || '') ||
       !student || !lessonTask(task, taskId, row.task_owner) || !validDate(date) ||
       date < student.cycleStartDate || date > sourceDate || String(check.taskId || '') !== taskId ||
-      String(row.check_key || '') !== taskId + '|' + date || !QUALIFYING_ATTENDANCE.has(String(check.att || ''))) {
+      String(row.check_key || '') !== taskId + '|' + date ||
+      !QUALIFYING_ATTENDANCE.has(String(check.att || '')) || !attendanceOccurrence) {
     return null;
   }
   return { studentId, cycleStartDate: student.cycleStartDate, taskId, date, checkKey: taskId + '|' + date };
@@ -131,9 +150,15 @@ function qualifyingEvidence(row, students, sourceDate) {
 async function qualifyingRows(env, earliestDate, sourceDate) {
   const result = await env.DB.prepare(
     "SELECT check_row.k AS check_key,check_row.owner AS check_owner,check_row.data AS check_data," +
-      "task.id AS task_id,task.owner AS task_owner,task.data AS task_data " +
+      "task.id AS task_id,task.owner AS task_owner,task.data AS task_data," +
+      "actual_visit.visit_id AS actual_visit_id " +
     "FROM checks AS check_row JOIN tasks AS task " +
       "ON task.app=check_row.app AND task.id=CAST(json_extract(check_row.data,'$.taskId') AS TEXT) " +
+    "LEFT JOIN weekend_actual_visits AS actual_visit " +
+      "ON actual_visit.app=check_row.app AND actual_visit.lesson_task_id=task.id " +
+      "AND actual_visit.student_id=CAST(json_extract(task.data,'$.studentId') AS TEXT) " +
+      "AND actual_visit.visit_date=CAST(json_extract(check_row.data,'$.date') AS TEXT) " +
+      "AND actual_visit.status<>'cancelled' " +
     "WHERE check_row.app='task' AND json_valid(check_row.data) AND json_valid(task.data) " +
       "AND json_extract(check_row.data,'$.att') IN ('P','L','E') " +
       "AND json_extract(check_row.data,'$.date') BETWEEN ? AND ? " +
