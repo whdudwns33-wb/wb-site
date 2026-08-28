@@ -37,6 +37,7 @@ class FakeDB {
     this.staff = new Map();
     this.tasks = new Map();
     this.checks = new Map();
+    this.weekendVisits = [];
     this.tokens = new Map();
     this.sends = new Map();
   }
@@ -50,6 +51,7 @@ class FakeDB {
   addCheck(k, data, owner = 'teacher-1') {
     this.checks.set(k, { owner, data: JSON.stringify(data) });
   }
+  addWeekendVisit(data) { this.weekendVisits.push({ status: 'completed', ...data }); }
   addToken(raw, staffId) { this.tokens.set(raw, { staff_id: staffId }); }
   async first(sql, args) {
     if (sql.startsWith('SELECT staff_id FROM tokens')) return this.tokens.get(args[2]) || null;
@@ -70,6 +72,10 @@ class FakeDB {
       return { results: [...this.checks.entries()]
         .filter(([k, row]) => row.owner === args[1] && k.endsWith(suffix))
         .map(([k, row]) => ({ k, data: row.data })) };
+    }
+    if (sql.startsWith('SELECT lesson_task_id,student_id,visit_date,status FROM weekend_actual_visits')) {
+      return { results: this.weekendVisits.filter(row =>
+        String(row.app || 'task') === String(args[0]) && row.visit_date === args[1] && row.status !== 'cancelled') };
     }
     throw new Error('Unhandled all SQL: ' + sql);
   }
@@ -232,6 +238,37 @@ test('summary matches task UI recurrence and status priority without exposing ta
   assert.match(text, /상세 내용은 업무지시서 원장 화면에서 확인해 주세요/);
   assert.match(text, /https:\/\/whdudwns33-wb\.github\.io\/wb-site\/task\//);
   assert.doesNotMatch(text, /done|blocked|step-priority/);
+});
+
+test('flexible weekend lessons enter the report only with an exact non-cancelled actual visit', () => {
+  const reportDate = '2026-08-29';
+  const task = dailyTask('flex-report', {
+    studentId: '12345678', weekendAttendanceMode: 'flexible', weekendAllowedDays: [6],
+    weekendMonthlyTarget: 2, weekendFlexibleFrom: '2026-08-01'
+  });
+  const tasks = [{ id: task.id, data: JSON.stringify(task) }];
+  const exact = [{
+    lesson_task_id: task.id, student_id: task.studentId, visit_date: reportDate, status: 'completed'
+  }];
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', reportDate, exact).total, 1);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', reportDate, []).total, 0);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', reportDate,
+    [{ ...exact[0], status: 'cancelled' }]).total, 0);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', reportDate,
+    [{ ...exact[0], student_id: '87654321' }]).total, 0);
+  assert.equal(summarizeReportRows([{
+    id: task.id, data: JSON.stringify({ ...task, end: '2026-08-28' })
+  }], [], 'teacher-1', reportDate, exact).total, 0);
+  const sunday = '2026-08-30';
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', sunday, [{
+    ...exact[0], visit_date: sunday
+  }]).total, 1, 'a stored Sunday visit survives a later allowed-days change to Saturday');
+
+  const futureTask = { ...task, weekendFlexibleFrom: '2026-09-01' };
+  assert.equal(summarizeReportRows([{
+    id: futureTask.id, data: JSON.stringify(futureTask)
+  }], [], 'teacher-1', reportDate, []).total, 1,
+  'before the flexible effective date the existing recurrence remains authoritative');
 });
 
 test('approved report template body and its exact eight variable keys stay pinned', () => {

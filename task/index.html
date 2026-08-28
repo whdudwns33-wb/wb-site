@@ -511,6 +511,8 @@
   .weekend-visit-live { border-color: #86C5DF; background: #F0F9FF; }
   .weekend-visit-complete { border-color: #A7D7C5; background: #F3FBF7; }
   .weekend-visit-time { color: var(--deep-blue); font-weight: 900; }
+  .weekend-flex-trigger { border: 1px dashed #6AAFD0; background: #F5FBFF; border-radius: 11px; padding: 10px; margin-top: 10px; }
+  .weekend-flex-progress { color: #315D7A; font-size: 12px; font-weight: 800; margin-top: 5px; }
   @media (max-width: 600px) {
     .weekend-visit-row { grid-template-columns: 1fr; }
     .weekend-visit-actions { justify-content: flex-start; }
@@ -1013,11 +1015,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.9"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.9"></script>
-<script src="./asset-core.js?v=2026-08-28.9"></script>
-<script src="./qr-core.js?v=2026-08-28.9"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.9"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.10"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.10"></script>
+<script src="./asset-core.js?v=2026-08-28.10"></script>
+<script src="./qr-core.js?v=2026-08-28.10"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.10"></script>
 <script>
 "use strict";
 
@@ -1102,6 +1104,10 @@ function occursOn(task, date) {
   if (task.deleted) return false;
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
+  /* 비정기 주말 수업은 기존 시간표를 참고값으로만 보존한다.
+   * 전환일 이후에는 이 수업 ID로 저장된 실제 등원 기록이 있는 날짜에만
+   * 오늘 수업으로 활성화한다. 이름이나 비슷한 시간표로 추측하지 않는다. */
+  if (isFlexibleWeekendLesson(task, date)) return hasFlexibleWeekendOccurrence(task, date);
   switch (task.repeat) {
     case 'once':    return date === task.start;
     case 'daily':   return true;
@@ -1789,8 +1795,12 @@ const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sy
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가 직접 정한 details 열림/닫힘 상태 유지
-let weekendVisitRows = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
-let weekendVisitEditTarget = null;
+let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
+const weekendVisitScopeCache = new Map();
+const weekendVisitScheduleLoadingKeys = new Set();
+const weekendVisitScheduleRetryAt = new Map();
+let weekendVisitScopeRevision = 0;
+let weekendVisitEditTarget = null, weekendFlexibleEditor = null, weekendFlexibleSaving = false;
 
 function go(r) {
   if (!$('#modalHost').hidden) closeModal();
@@ -1872,7 +1882,10 @@ function resetPersonCache(token) {
   transportNotificationStates.clear(); transportGuardianStates.clear(); transportGuardianTarget = null;
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
-  weekendVisitRows = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = ''; weekendVisitEditTarget = null;
+  weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
+  weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear();
+  weekendVisitScopeRevision = 0;
+  weekendVisitEditTarget = null; weekendFlexibleEditor = null; weekendFlexibleSaving = false;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
   makeupRestoreFocus = null; makeupLiveMessage = '';
   makeupCreateStates.clear();
@@ -2603,6 +2616,124 @@ function taskHasWeekendSchedule(task) {
   return Array.isArray(task && task.days) && task.days.map(Number).some(day => day === 0 || day === 6);
 }
 
+function flexibleWeekendAllowedDays(task) {
+  if (!task || task.weekendAttendanceMode !== 'flexible' || !Array.isArray(task.weekendAllowedDays)) return [];
+  return [...new Set(task.weekendAllowedDays.map(Number).filter(day => day === 0 || day === 6))];
+}
+
+function isFlexibleWeekendLesson(task, date) {
+  if (!task || task.weekendAttendanceMode !== 'flexible') return false;
+  const effectiveFrom = String(task.weekendFlexibleFrom || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) && (!date || String(date) >= effectiveFrom);
+}
+
+function flexibleWeekendAllowedOn(task, date) {
+  return isFlexibleWeekendLesson(task, date) && isWeekendVisitDate(date) && flexibleWeekendAllowedDays(task).includes(dowOf(date));
+}
+
+function rememberWeekendVisitScope(date, staffId, result) {
+  const key = weekendVisitScopeKey(date, staffId);
+  weekendVisitScopeCache.set(key, {
+    rows: Array.isArray(result && result.visits) ? result.visits : [],
+    monthlyCounts: Array.isArray(result && result.monthlyCounts) ? result.monthlyCounts : [],
+    loadedAt: ++weekendVisitScopeRevision
+  });
+  weekendVisitScheduleRetryAt.delete(key);
+}
+
+function weekendVisitRowsForTaskDate(task, date) {
+  const keys = [weekendVisitScopeKey(date, ''), weekendVisitScopeKey(date, task && task.staffId || '')];
+  const cached = [...new Set(keys)].map(key => weekendVisitScopeCache.get(key)).filter(Boolean)
+    .sort((a, b) => Number(b.loadedAt || 0) - Number(a.loadedAt || 0));
+  if (cached.length) return cached[0].rows;
+  return keys.includes(weekendVisitLoadedKey) ? weekendVisitRows : [];
+}
+
+function hasFlexibleWeekendOccurrence(task, date) {
+  if (!isFlexibleWeekendLesson(task, date) || !isWeekendVisitDate(date)) return false;
+  return weekendVisitRowsForTaskDate(task, date).some(row => row && row.status !== 'cancelled' && String(row.visitDate || '') === String(date) &&
+    String(row.lessonTaskId || '') === String(task.id || '') && String(row.studentId || '') === String(task.studentId || ''));
+}
+
+function flexibleWeekendVisit(task, date) {
+  if (!hasFlexibleWeekendOccurrence(task, date)) return null;
+  return weekendVisitRowsForTaskDate(task, date).find(row => row && row.status !== 'cancelled' &&
+    String(row.visitDate || '') === String(date) && String(row.lessonTaskId || '') === String(task.id || '') &&
+    String(row.studentId || '') === String(task.studentId || '')) || null;
+}
+
+function weekendVisitScheduleClock(value) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) return '';
+  const parts = {};
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(new Date(Number(value))).forEach(part => {
+    if (part.type !== 'literal') parts[part.type] = part.value;
+  });
+  return String(parts.hour || '').padStart(2, '0') + ':' + String(parts.minute || '').padStart(2, '0');
+}
+
+function flexibleWeekendVisitScheduleSlot(task, date) {
+  const visit = flexibleWeekendVisit(task, date);
+  if (!visit) return null;
+  const core = window.WBScheduleCore;
+  const projectedEnd = !(Number.isFinite(Number(visit.checkOutAt)) && Number(visit.checkOutAt) > 0);
+  const startTime = weekendVisitScheduleClock(visit.checkInAt);
+  const startMinute = core && core.parseClockMinute(startTime);
+  let endTime = weekendVisitScheduleClock(visit.checkOutAt);
+  let endMinute = core && core.parseClockMinute(endTime);
+  if (startMinute === null || startMinute === undefined) return null;
+  if (endMinute === null || endMinute === undefined || endMinute <= startMinute) {
+    let duration = 50;
+    (Array.isArray(task.scheduleSlots) ? task.scheduleSlots : []).some(slot => {
+      const from = core && core.parseClockMinute(slot && slot.startTime);
+      const to = core && core.parseClockMinute(slot && slot.endTime);
+      if (from === null || from === undefined || to === null || to === undefined || to <= from) return false;
+      duration = to - from;
+      return true;
+    });
+    endMinute = Math.min(23 * 60 + 59, startMinute + duration);
+    if (endMinute <= startMinute) return null;
+    endTime = String(Math.floor(endMinute / 60)).padStart(2, '0') + ':' + String(endMinute % 60).padStart(2, '0');
+  }
+  if (projectedEnd) {
+    const nowKst = seoulNowParts();
+    if (date === nowKst.date && nowKst.minute >= startMinute) {
+      endMinute = Math.max(endMinute, Math.min(23 * 60 + 59, nowKst.minute + 1));
+      endTime = String(Math.floor(endMinute / 60)).padStart(2, '0') + ':' + String(endMinute % 60).padStart(2, '0');
+    }
+  }
+  return {
+    visitId: String(visit.visitId || ''),
+    lessonTaskId: String(visit.lessonTaskId || ''),
+    studentId: String(visit.studentId || ''),
+    visitDate: String(visit.visitDate || ''),
+    status: String(visit.status || ''),
+    projectedEnd: projectedEnd,
+    startTime: startTime,
+    endTime: endTime
+  };
+}
+
+function flexibleWeekendDayText(task) {
+  const days = flexibleWeekendAllowedDays(task);
+  return [6, 0].filter(day => days.includes(day)).map(day => DOW[day]).join('·') || '요일 미지정';
+}
+
+function flexibleWeekendMonthlyCount(task, date) {
+  const month = String(date || today()).slice(0, 7);
+  const row = weekendVisitMonthlyCounts.find(item => item && String(item.lessonTaskId || '') === String(task && task.id || '') &&
+    String(item.studentId || '') === String(task && task.studentId || '') && String(item.month || '') === month);
+  return row ? Math.max(0, Number(row.count) || 0) : 0;
+}
+
+function flexibleWeekendProgressText(task, date) {
+  if (!isFlexibleWeekendLesson(task, date)) return '';
+  const count = flexibleWeekendMonthlyCount(task, date);
+  const target = Number(task.weekendMonthlyTarget || 0);
+  return String(date || today()).slice(5, 7) + '월 실제 등원 ' + count + '회' + (target > 0 ? ' / 목표 ' + target + '회' : '');
+}
+
 function weekendVisitScopeKey(date, staffId) {
   return String(date) + '|' + (staffId ? String(staffId) : '*');
 }
@@ -2611,6 +2742,40 @@ function weekendVisitScopeStaffId() {
   if (session.isStaffLink && !session.isAdmin) return session.staffId;
   if (route === 'today') return String((currentStaff() || {}).id || '');
   return '';
+}
+
+async function loadWeekendVisitScheduleScope(date, staffId) {
+  if (!isWeekendVisitDate(date)) return;
+  const key = weekendVisitScopeKey(date, staffId);
+  if (weekendVisitScopeCache.has(key) || weekendVisitScheduleLoadingKeys.has(key)) return;
+  const retryAt = Number(weekendVisitScheduleRetryAt.get(key) || 0);
+  if (retryAt > Date.now()) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  weekendVisitScheduleLoadingKeys.add(key);
+  try {
+    const result = await sync.post('/weekend-visit', {
+      app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
+    });
+    rememberWeekendVisitScope(date, staffId, result);
+  } catch (error) {
+    weekendVisitScheduleRetryAt.set(key, Date.now() + 15000);
+    setTimeout(() => {
+      if (Number(weekendVisitScheduleRetryAt.get(key) || 0) <= Date.now()) {
+        weekendVisitScheduleRetryAt.delete(key);
+        if (route === 'week' || route === 'schedule') loadWeekendVisitScheduleScope(date, staffId);
+      }
+    }, 15050);
+  } finally {
+    weekendVisitScheduleLoadingKeys.delete(key);
+    if (route === 'week' || route === 'schedule') renderAfterSync();
+  }
+}
+
+function ensureWeekendVisitScheduleDates(dates, staffId) {
+  [...new Set((dates || []).filter(isWeekendVisitDate))].forEach(date => {
+    loadWeekendVisitScheduleScope(date, staffId);
+  });
 }
 
 async function loadWeekendVisits(date, staffId, force) {
@@ -2626,7 +2791,9 @@ async function loadWeekendVisits(date, staffId, force) {
       app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
     });
     weekendVisitRows = result.visits || [];
+    weekendVisitMonthlyCounts = result.monthlyCounts || [];
     weekendVisitLoadedKey = key;
+    rememberWeekendVisitScope(date, staffId, result);
   } catch (error) {
     weekendVisitError = String(error && error.message || error || '불러오기 실패');
   } finally {
@@ -2637,7 +2804,15 @@ async function loadWeekendVisits(date, staffId, force) {
 
 function weekendLessonCandidates(staffId, date) {
   return (state.tasks || []).filter(task => !task.deleted && isLesson(task) && String(task.staffId || '') === String(staffId || '') &&
-    String(task.studentId || '') && taskHasWeekendSchedule(task) &&
+    String(task.studentId || '') && !isFlexibleWeekendLesson(task, date) && taskHasWeekendSchedule(task) &&
+    (!task.start || task.start <= date) && (!task.end || task.end >= date))
+    .sort((a, b) => String(a.studentName || studentOf(a)).localeCompare(String(b.studentName || studentOf(b)), 'ko') ||
+      String(a.subject || '').localeCompare(String(b.subject || ''), 'ko'));
+}
+
+function weekendFlexibleLessonCandidates(staffId, date) {
+  return (state.tasks || []).filter(task => !task.deleted && isLesson(task) && String(task.staffId || '') === String(staffId || '') &&
+    String(task.studentId || '') && flexibleWeekendAllowedOn(task, date) &&
     (!task.start || task.start <= date) && (!task.end || task.end >= date))
     .sort((a, b) => String(a.studentName || studentOf(a)).localeCompare(String(b.studentName || studentOf(b)), 'ko') ||
       String(a.subject || '').localeCompare(String(b.subject || ''), 'ko'));
@@ -2671,6 +2846,8 @@ function weekendVisitRowHtml(task, row, editable) {
   const identity = weekendVisitStudentLabel(task, row);
   const schedule = task ? (lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '주말 시간 확인 필요') : '';
   const subject = String(task && (task.subject || task.className) || '수업 정보 확인');
+  const flexible = !!(task && isFlexibleWeekendLesson(task, row && row.visitDate || cursor));
+  const progress = flexible ? flexibleWeekendProgressText(task, row && row.visitDate || cursor) : '';
   const active = row && row.status === 'active';
   const completed = row && row.status === 'completed';
   const canRecordNow = editable && cursor === today() && isWeekendVisitDate(cursor);
@@ -2689,7 +2866,9 @@ function weekendVisitRowHtml(task, row, editable) {
   }
   return '<div class="weekend-visit-row' + (active ? ' weekend-visit-live' : completed ? ' weekend-visit-complete' : '') + '">' +
     '<div><div class="card-title">' + esc(identity.name) + (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
-    '<div class="card-sub">' + esc(subject) + (schedule ? ' · 예정 ' + esc(schedule) : '') + '</div>' +
+    '<div class="card-sub">' + esc(subject) + (flexible ? ' · 비정기 ' + esc(flexibleWeekendDayText(task)) : '') +
+      (schedule ? ' · ' + (flexible ? '참고 시간표 ' : '예정 ') + esc(schedule) : '') + '</div>' +
+    (progress ? '<div class="weekend-flex-progress">' + esc(progress) + '</div>' : '') +
     (row ? '<div class="weekend-visit-time mt8">실제 ' + esc(weekendVisitTimeText(row)) +
       (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' : '') + '</div>' +
     (actions ? '<div class="weekend-visit-actions">' + actions + '</div>' : '') + '</div>';
@@ -2701,9 +2880,10 @@ function weekendVisitTeacherHtml(staff, date) {
   const key = weekendVisitScopeKey(date, staff.id);
   if (weekendVisitLoadedKey !== key && !weekendVisitLoading) setTimeout(() => loadWeekendVisits(date, staff.id, false), 0);
   const candidates = weekendLessonCandidates(staff.id, date);
+  const flexibleCandidates = weekendFlexibleLessonCandidates(staff.id, date);
   const scopedRows = weekendVisitLoadedKey === key ? weekendVisitRows : [];
   const byTask = new Map(scopedRows.map(row => [String(row.lessonTaskId), row]));
-  const candidateIds = new Set(candidates.map(task => String(task.id)));
+  const candidateIds = new Set(candidates.concat(flexibleCandidates).map(task => String(task.id)));
   const orphanRows = scopedRows.filter(row => !candidateIds.has(String(row.lessonTaskId)));
   let body;
   if (weekendVisitError) {
@@ -2713,9 +2893,15 @@ function weekendVisitTeacherHtml(staff, date) {
     body = '<div class="empty"><b>🕘</b>실제 등·하원 기록을 불러오는 중…</div>';
   } else {
     const rows = candidates.map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)) || null, true))
+      .concat(flexibleCandidates.filter(task => byTask.has(String(task.id))).map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)), true)))
       .concat(orphanRows.map(row => weekendVisitRowHtml(state.tasks.find(task => task.id === row.lessonTaskId) || null, row, true)));
-    body = rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' :
-      '<div class="empty"><b>🗓️</b>담당 토·일 수업이 없습니다.</div>';
+    const waitingFlexible = flexibleCandidates.filter(task => !byTask.has(String(task.id)));
+    const flexibleControl = waitingFlexible.length && cursor === today()
+      ? '<div class="weekend-flex-trigger"><div class="between"><div><b>비정기 등원 학생 선택</b>' +
+        '<div class="small muted">오늘 실제로 온 학생만 선택합니다.</div></div><button class="btn btn-sm btn-primary" data-act="weekendflexopen" data-staff="' +
+        esc(staff.id) + '">비정기 등원 · ' + waitingFlexible.length + '명</button></div></div>' : '';
+    body = (rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '') + flexibleControl;
+    if (!body) body = '<div class="empty"><b>🗓️</b>담당 토·일 수업이 없습니다.</div>';
   }
   return '<details class="card weekend-visit-card" data-persist-key="weekend-actual-visits"><summary><span><b>주말 실제 등·하원</b>' +
     '<span class="card-sub">예정 시간표는 그대로 두고 실제 방문 시간만 별도로 기록합니다.</span></span></summary>' + body + '</details>';
@@ -2754,6 +2940,112 @@ function weekendVisitEditModal(visitId) {
     '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time" value="' + esc(row.checkOutAt ? fmtTime(row.checkOutAt) : '') + '"></div></div>' +
     '<div class="field"><label class="fl">수정 사유</label><input class="in" id="weekendVisitReason" maxlength="200" placeholder="예: 버튼을 늦게 눌러 실제 시간으로 정정"></div>',
     '<button class="btn btn-primary btn-block mt14" data-act="weekendsave">수정 저장</button>');
+}
+
+function openWeekendFlexibleCheckIn(staffId) {
+  const scopedStaffId = String(staffId || weekendVisitScopeStaffId() || '');
+  if (!isWeekendVisitDate(cursor) || cursor !== today()) return toast('비정기 등원은 오늘 토·일 화면에서만 기록할 수 있습니다');
+  const key = weekendVisitScopeKey(cursor, scopedStaffId);
+  if (weekendVisitLoadedKey !== key) return toast('주말 등원 기록을 먼저 새로고침해 주세요');
+  const recorded = new Set(weekendVisitRows.map(row => String(row.lessonTaskId || '')));
+  const candidates = weekendFlexibleLessonCandidates(scopedStaffId, cursor).filter(task => !recorded.has(String(task.id)));
+  if (!candidates.length) return toast('오늘 등원 처리할 비정기 수업이 없습니다');
+  const rows = candidates.map(task => {
+    const identity = weekendVisitStudentLabel(task, null);
+    const schedule = lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '참고 시간표 없음';
+    return '<div class="weekend-visit-row"><div><div class="card-title">' + esc(identity.name) +
+      (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
+      '<div class="card-sub">' + esc(task.subject || task.className || '과목 미지정') + ' · 허용 ' +
+        esc(flexibleWeekendDayText(task)) + ' · 참고 ' + esc(schedule) + '</div>' +
+      '<div class="weekend-flex-progress">' + esc(flexibleWeekendProgressText(task, cursor)) + '</div></div>' +
+      '<button class="btn btn-sm btn-primary" data-act="weekendflexcheckin" data-task="' + esc(task.id) +
+        '" data-student-id="' + esc(task.studentId) + '">이 학생 등원</button></div>';
+  }).join('');
+  modal('비정기 등원', '<div class="hint mb14"><b>실제로 등원한 학생만 선택해 주세요.</b><br>' +
+    '선택한 날짜에 기존 수업 ID가 활성화되며 출결·메모·수업진행 기록은 같은 수업에 계속 누적됩니다.</div>' +
+    '<div class="weekend-visit-list">' + rows + '</div>');
+}
+
+function weekendFlexibleSettingsSummary(task) {
+  if (!isFlexibleWeekendLesson(task)) return '정기 시간표';
+  const target = Number(task.weekendMonthlyTarget || 0);
+  return '비정기 등원 · ' + flexibleWeekendDayText(task) + (target > 0 ? ' · 월 ' + target + '회 목표' : ' · 월 목표 없음') +
+    ' · ' + String(task.weekendFlexibleFrom || '') + '부터';
+}
+
+function openWeekendFlexibleSettings(taskId) {
+  if (!session.isAdmin) return toast('관리자만 비정기 수업을 설정할 수 있습니다');
+  const task = (state.tasks || []).find(item => !item.deleted && isLesson(item) && String(item.id || '') === String(taskId || ''));
+  if (!task || !String(task.studentId || '')) return toast('수업과 학생 연결을 다시 확인해 주세요');
+  const scheduledWeekendDays = [];
+  (task.scheduleSlots || []).forEach(slot => (slot.days || []).map(Number).forEach(day => {
+    if ((day === 0 || day === 6) && !scheduledWeekendDays.includes(day)) scheduledWeekendDays.push(day);
+  }));
+  const currentDays = flexibleWeekendAllowedDays(task);
+  const allowedDays = currentDays.length ? currentDays : (scheduledWeekendDays.length ? scheduledWeekendDays : [6, 0]);
+  const flexible = task.weekendAttendanceMode === 'flexible';
+  weekendFlexibleEditor = {
+    taskId: String(task.id), studentId: String(task.studentId), expectedUpdatedAt: Number(task.updatedAt || 0)
+  };
+  const identity = weekendVisitStudentLabel(task, null);
+  const schedule = lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '참고 시간표 없음';
+  modal('주말 비정기 수업 설정',
+    '<div class="guide"><b>' + esc(identity.name) + ' · ' + esc(task.subject || task.className || '과목 미지정') + '</b>' +
+      '<div class="small mt8">담당 ' + esc(((staffById(task.staffId) || {}).name || '미지정')) + ' 선생님 · 기존 참고 시간표 ' + esc(schedule) + '</div></div>' +
+    '<label class="field mt14"><span class="fl">등원 방식</span><select class="in" id="weekendFlexMode">' +
+      '<option value="fixed"' + (flexible ? '' : ' selected') + '>정기 시간표</option>' +
+      '<option value="flexible"' + (flexible ? ' selected' : '') + '>비정기 등원</option></select></label>' +
+    '<div class="field"><span class="fl">비정기 등원 허용 요일 · 중복 선택</span><div class="chips">' +
+      '<label class="chip"><input type="checkbox" data-weekend-flex-day value="6"' + (allowedDays.includes(6) ? ' checked' : '') + '> 토요일</label>' +
+      '<label class="chip"><input type="checkbox" data-weekend-flex-day value="0"' + (allowedDays.includes(0) ? ' checked' : '') + '> 일요일</label></div></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">월 목표 횟수 · 선택</span><input class="in" id="weekendFlexTarget" type="number" min="1" max="12" inputmode="numeric" placeholder="예: 격주 2회" value="' +
+      esc(task.weekendMonthlyTarget || '') + '"></label>' +
+    '<label class="field"><span class="fl">비정기 적용 시작일</span><input class="in" id="weekendFlexFrom" type="date" value="' +
+      esc(task.weekendFlexibleFrom || today()) + '"></label></div>' +
+    '<div class="hint">비정기로 바꿔도 기존 시간표·출결·수업 메모와 수업 ID는 삭제되지 않습니다. 적용일 이후에는 실제 등원을 누른 날짜에만 기존 수업이 오늘 수업으로 표시됩니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="weekendflexsave">설정 저장</button>');
+}
+
+async function saveWeekendFlexibleSettings(button) {
+  if (!session.isAdmin || !weekendFlexibleEditor || weekendFlexibleSaving) return;
+  const mode = String((document.querySelector('#weekendFlexMode') || {}).value || 'fixed');
+  const allowedDays = Array.from(document.querySelectorAll('[data-weekend-flex-day]:checked')).map(input => Number(input.value));
+  const targetText = String((document.querySelector('#weekendFlexTarget') || {}).value || '').trim();
+  const target = targetText ? Number(targetText) : null;
+  const effectiveFrom = String((document.querySelector('#weekendFlexFrom') || {}).value || '');
+  if (mode === 'flexible' && !allowedDays.length) return toast('토요일 또는 일요일을 한 개 이상 선택해 주세요');
+  if (mode === 'flexible' && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) return toast('비정기 적용 시작일을 선택해 주세요');
+  if (target != null && (!Number.isInteger(target) || target < 1 || target > 12)) return toast('월 목표 횟수는 1회부터 12회까지 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 확인해 주세요');
+  const editor = Object.assign({}, weekendFlexibleEditor);
+  weekendFlexibleSaving = true;
+  if (button) { button.disabled = true; button.textContent = '저장 중…'; }
+  try {
+    const result = await sync.post('/weekend-visit', {
+      app: SYNC_APP, auth: auth, action: 'configure', taskId: editor.taskId, studentId: editor.studentId,
+      expectedUpdatedAt: editor.expectedUpdatedAt,
+      weekendAttendanceMode: mode,
+      weekendAllowedDays: mode === 'flexible' ? allowedDays : [],
+      weekendMonthlyTarget: mode === 'flexible' ? target : null,
+      weekendFlexibleFrom: mode === 'flexible' ? effectiveFrom : ''
+    });
+    if (!result.task) throw new Error('저장된 수업 정보를 받지 못했습니다');
+    applyCreatedLesson(result.task);
+    studentChangeLoaded = false;
+    loadStudentChanges(true);
+    weekendVisitLoadedKey = '';
+    weekendVisitMonthlyCounts = [];
+    weekendFlexibleEditor = null;
+    closeModal();
+    showRosterStudentLessons(editor.studentId);
+    toast(mode === 'flexible' ? '비정기 등원 수업으로 설정했습니다' : '정기 시간표 수업으로 되돌렸습니다');
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '설정 저장'; }
+    toast('비정기 수업 설정 실패 — ' + String(error && error.message || error));
+  } finally {
+    weekendFlexibleSaving = false;
+  }
 }
 
 function weekendVisitTimestamp(date, hm) {
@@ -7289,6 +7581,7 @@ function viewWeek() {
   if (!me) return emptyStaffCard();
   const mon = mondayOf(cursor);
   const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  ensureWeekendVisitScheduleDates(days, me.id);
   const rows = {};
   days.forEach(d => tasksFor(me.id, d).forEach(t => { rows[t.id] = t; }));
   const list = Object.values(rows);
@@ -7470,7 +7763,8 @@ function dailyLessonSchedule(date) {
       date: date,
       dow: dow,
       occurs: occursOn(t, date),
-      withinRange: (!t.start || date >= t.start) && (!t.end || date <= t.end)
+      withinRange: (!t.start || date >= t.start) && (!t.end || date <= t.end),
+      flexibleVisit: flexibleWeekendVisitScheduleSlot(t, date)
     });
     result.slots.forEach((slot, index) => entries.push(Object.assign({}, base, {
       key: String(t.id) + '|' + String(slot.slotId || index),
@@ -8282,6 +8576,10 @@ function viewSchedule() {
   if (!managerRequestInboxReady() && !managerInboxLoading) setTimeout(() => loadManagerRequestInbox(false), 0);
 
   const nowKst = seoulNowParts();
+  const scheduleVisitDates = scheduleView === 'day'
+    ? [cursor]
+    : Array.from({ length: 7 }, (_, index) => addDays(mondayOf(cursor), index));
+  ensureWeekendVisitScheduleDates(scheduleVisitDates, '');
   const weekly = scheduleView === 'day' ? null : weeklyLessonSchedule(cursor);
   const navStep = scheduleView === 'day' ? 1 : 7;
   const navUnit = weekly ? '주' : '날';
@@ -8297,7 +8595,7 @@ function viewSchedule() {
 
   if (weekly) {
     const isStudentView = scheduleView === 'student';
-    const summary = core.weeklyTeacherSummary(weekly.entries);
+    const summary = core.weeklyTeacherSummary(weekly.entries, { todayDate: nowKst.date, nowMinute: nowKst.minute });
     const rosterCount = isStudentView ? (rosterDb ? activeDuringWeek(weekly.days).length : '—') : null;
     const teacherCount = new Set(summary.teachers.map(teacher => teacher.teacherKey).concat(
       weekly.issues.map(issue => issue.staffId || issue.teacherName).filter(Boolean))).size;
@@ -8321,7 +8619,8 @@ function viewSchedule() {
   const current = daily.entries.filter(entry => entry.clockState === 'current');
   const currentStudentCount = new Set(current.map(entry => core.studentGroupKey(entry.studentName, entry.grade, entry.studentId))).size;
   const attendanceRecorded = daily.entries.filter(entry => scheduleAttendance(entry, cursor).value).length;
-  const timeline = { rows: core.timelineRows(daily.entries), range: core.timelineRange(daily.entries) };
+  const timelineOptions = { date: cursor, todayDate: nowKst.date, nowMinute: nowKst.minute };
+  const timeline = { rows: core.timelineRows(daily.entries, timelineOptions), range: core.timelineRange(daily.entries, timelineOptions) };
   const conflictCount = timeline.rows.reduce((count, row) => count + row.sessions.filter(session =>
     session.studentConflict).length, 0);
   const isToday = cursor === nowKst.date;
@@ -13551,9 +13850,13 @@ function rosterStudentLessonsHtml(student) {
       '<span class="pill">수업 ' + (index + 1) + '</span></div><div class="student-info-grid mt14">' +
       '<div class="student-info-field wide"><b>요일·시간·시수</b><span>' + esc(schedule) + '</span></div>' +
       '<div class="student-info-field"><b>적용 시작일</b><span>' + esc(task.start || '미지정') + '</span></div>' +
-      '<div class="student-info-field"><b>담당 선생님</b><span>' + esc((teacher && teacher.name) || '미지정') + '</span></div></div>' +
+      '<div class="student-info-field"><b>담당 선생님</b><span>' + esc((teacher && teacher.name) || '미지정') + '</span></div>' +
+      '<div class="student-info-field wide"><b>주말 등원 방식</b><span>' + esc(weekendFlexibleSettingsSummary(task)) + '</span></div></div>' +
       (canEditLessonTask(task) ? '<button class="btn btn-primary btn-block mt14" data-act="lessonedit" data-id="' + esc(task.id) + '">이 수업 정보 수정</button>' :
-        '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>') + '</section>';
+        '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>') +
+      (session.isAdmin && (taskHasWeekendSchedule(task) || isFlexibleWeekendLesson(task))
+        ? '<button class="btn btn-ghost btn-block mt8" data-act="weekendflexsettings" data-id="' + esc(task.id) + '">비정기 수업 설정</button>'
+        : session.isAdmin ? '<div class="hint mt8">비정기 주말 수업은 먼저 토·일 참고 시간표를 저장한 뒤 설정할 수 있습니다.</div>' : '') + '</section>';
   }).join('');
 }
 
@@ -17172,6 +17475,19 @@ document.addEventListener('click', ev => {
         : s.name + ' — 관리 담당 표시 해제');
       break;
     }
+    case 'weekendflexsettings': openWeekendFlexibleSettings(String(id || '')); break;
+    case 'weekendflexsave': saveWeekendFlexibleSettings(el); break;
+    case 'weekendflexopen': openWeekendFlexibleCheckIn(String(el.dataset.staff || '')); break;
+    case 'weekendflexcheckin': {
+      const taskId = String(el.dataset.task || '');
+      const studentId = String(el.dataset.studentId || '');
+      const taskRow = state.tasks.find(item => String(item.id) === taskId && String(item.studentId || '') === studentId);
+      if (!taskRow || !flexibleWeekendAllowedOn(taskRow, cursor)) return toast('비정기 수업의 학생·허용 요일을 다시 확인해 주세요');
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생이 오늘 실제 등원했나요?')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, lessonTaskId: taskId, studentId: studentId },
+        '비정기 등원을 저장하고 오늘 수업을 열었습니다');
+      break;
+    }
     case 'weekendrefresh': {
       weekendVisitLoadedKey = '';
       loadWeekendVisits(cursor, weekendVisitScopeStaffId(), true);
@@ -18721,7 +19037,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.9';
+const APP_VER = '2026-08-28.10';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

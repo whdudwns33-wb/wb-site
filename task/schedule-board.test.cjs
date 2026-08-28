@@ -109,6 +109,83 @@ test('structured slots never escape the parent task date range', () => {
   assert.equal(result.slots.length, 0);
 });
 
+test('effective flexible weekend lessons never create ghost slots from reference weekdays', () => {
+  const task = {
+    id: 'lesson-flex-1',
+    studentId: 'student-00000001',
+    weekendAttendanceMode: 'flexible',
+    weekendFlexibleFrom: '2026-08-29',
+    scheduleSlots: [{ slotId: 'reference-sun', days: [0], startTime: '10:00', endTime: '11:20' }]
+  };
+
+  const referenceSunday = core.classifyTaskSchedule(task, {
+    date: '2026-08-30', dow: 0, occurs: false, withinRange: true, flexibleVisit: null
+  });
+  assert.deepEqual(referenceSunday, { slots: [], issues: [], sourceType: 'flexible' });
+});
+
+test('effective flexible weekend lessons use the exact actual visit even on a different reference weekday', () => {
+  const task = {
+    id: 'lesson-flex-1',
+    studentId: 'student-00000001',
+    lessonRole: '클리닉',
+    weekendAttendanceMode: 'flexible',
+    weekendFlexibleFrom: '2026-08-29',
+    scheduleSlots: [{ slotId: 'reference-sun', days: [0], startTime: '10:00', endTime: '11:20' }]
+  };
+  const visit = {
+    visitId: 'visit-stable-1',
+    lessonTaskId: task.id,
+    studentId: task.studentId,
+    visitDate: '2026-08-29',
+    status: 'completed',
+    startTime: '12:05',
+    endTime: '13:17'
+  };
+
+  const actualSaturday = core.classifyTaskSchedule(task, {
+    date: '2026-08-29', dow: 6, occurs: true, withinRange: true, flexibleVisit: visit
+  });
+  assert.equal(actualSaturday.sourceType, 'flexible');
+  assert.deepEqual(actualSaturday.slots.map(slot => slot.label), ['12:05–13:17']);
+  assert.equal(actualSaturday.slots[0].slotId, 'weekend-visit:visit-stable-1');
+
+  const activeSaturday = core.classifyTaskSchedule(task, {
+    date: '2026-08-29', dow: 6, occurs: true, withinRange: true,
+    flexibleVisit: Object.assign({}, visit, {
+      status: 'active', projectedEnd: true, startTime: '12:05', endTime: '13:25'
+    })
+  });
+  assert.equal(activeSaturday.slots[0].label, '12:05–등원 중');
+  assert.equal(activeSaturday.slots[0].endMinute, 13 * 60 + 25,
+    'projected end remains available only for timeline placement');
+  assert.equal(activeSaturday.slots[0].scheduleStatus, 'actual_visit_active');
+
+  for (const invalidVisit of [
+    Object.assign({}, visit, { studentId: 'student-00000002' }),
+    Object.assign({}, visit, { lessonTaskId: 'lesson-flex-2' }),
+    Object.assign({}, visit, { visitDate: '2026-08-30' }),
+    Object.assign({}, visit, { status: 'cancelled' })
+  ]) {
+    const rejected = core.classifyTaskSchedule(task, {
+      date: '2026-08-29', dow: 6, occurs: true, withinRange: true, flexibleVisit: invalidVisit
+    });
+    assert.equal(rejected.slots.length, 0);
+  }
+});
+
+test('a future flexible effective date keeps the existing fixed schedule behavior', () => {
+  const result = core.classifyTaskSchedule({
+    id: 'lesson-before-flex',
+    studentId: 'student-00000003',
+    weekendAttendanceMode: 'flexible',
+    weekendFlexibleFrom: '2026-08-30',
+    scheduleSlots: [{ slotId: 'reference-sat', days: [6], startTime: '10:00', endTime: '11:20' }]
+  }, { date: '2026-08-29', dow: 6, occurs: true, withinRange: true });
+  assert.deepEqual(result.slots.map(slot => slot.label), ['10:00–11:20']);
+  assert.equal(result.sourceType, 'structured');
+});
+
 test('legacy review issues never escape the parent task date range', () => {
   const result = core.classifyTaskSchedule(legacyTask('bounded-review', '학생', '', {
     scheduleStatus: 'needs_review', detail: '실제 시간표 확인 필요'
@@ -128,6 +205,38 @@ test('current time boundaries are start inclusive and end exclusive', () => {
   assert.equal(core.clockState(slot, '2026-08-03', '2026-08-03', 930), 'current');
   assert.equal(core.clockState(slot, '2026-08-03', '2026-08-03', 979), 'current');
   assert.equal(core.clockState(slot, '2026-08-03', '2026-08-03', 980), 'ended');
+});
+
+test('an active actual visit stays current and occupies the timeline through now', () => {
+  const active = timelineEntry('김선생', '학생A', 12 * 60 + 5, 13 * 60 + 25, '중1', {
+    date: '2026-08-29', studentId: 'student-active-1'
+  });
+  active.slot.scheduleStatus = 'actual_visit_active';
+  active.slot.label = '12:05–등원 중';
+  const overlapping = timelineEntry('박선생', '학생A', 13 * 60 + 30, 14 * 60 + 10, '중1', {
+    date: '2026-08-29', studentId: 'student-active-1'
+  });
+  const now = 14 * 60;
+
+  assert.equal(core.clockState(active.slot, '2026-08-29', '2026-08-29', now), 'current');
+  assert.equal(core.clockState(active.slot, '2026-08-28', '2026-08-29', now), 'ended');
+  assert.equal(core.clockState({ startMinute: 12 * 60 + 5, endMinute: 13 * 60 + 25 },
+    '2026-08-29', '2026-08-29', now), 'ended', 'regular slots retain their end boundary');
+
+  const rows = core.timelineRows([active, overlapping], {
+    date: '2026-08-29', todayDate: '2026-08-29', nowMinute: now
+  });
+  const activeSession = rows.find(row => row.teacherName === '김선생').sessions[0];
+  const otherSession = rows.find(row => row.teacherName === '박선생').sessions[0];
+  assert.equal(activeSession.endMinute, now + 1);
+  assert.equal(activeSession.label, '12:05–등원 중');
+  assert.ok(activeSession.studentConflict);
+  assert.ok(otherSession.studentConflict);
+
+  const range = core.timelineRange([active], {
+    date: '2026-08-29', todayDate: '2026-08-29', nowMinute: now
+  });
+  assert.ok(range.endMinute > now);
 });
 
 test('student grouping separates same-name students by grade', () => {

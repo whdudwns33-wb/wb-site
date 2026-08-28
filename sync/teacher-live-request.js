@@ -1,3 +1,5 @@
+import { hasFlexibleWeekendVisit, weekendAttendancePolicyOn } from './weekend-flex.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const REQUEST_ID = /^tlr_[A-Za-z0-9_-]{4,76}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -223,7 +225,11 @@ async function verifiedLesson(env, app, body, auth) {
   if (owner !== senderId) {
     return { error: '본인이 담당하는 수업에서만 요청을 보낼 수 있습니다', status: 403 };
   }
-  if (!occursOn(task, lessonDate)) {
+  const weekendPolicy = weekendAttendancePolicyOn(task, lessonDate);
+  const occurs = weekendPolicy === 'flexible'
+    ? await hasFlexibleWeekendVisit(env, app, task, lessonDate)
+    : weekendPolicy === 'fixed' && occursOn(task, lessonDate);
+  if (!occurs) {
     return { error: '오늘 진행되는 활성 수업에서만 요청을 보낼 수 있습니다', status: 422 };
   }
   const studentId = String(task.studentId || '');
