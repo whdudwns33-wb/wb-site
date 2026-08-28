@@ -23,23 +23,26 @@ function functionBlock(name) {
   return source.slice(start, next ? start + match[0].length + next.index : source.length);
 }
 
-test('오늘 수업의 각 수업 진행에는 담당 선생님용 실시간 요청 버튼이 있다', () => {
+test('교사 오늘 화면은 관리자 요청과 선생님 요청을 주말 등하원 바로 위에 중앙 배치한다', () => {
+  const today = block('function viewToday()', 'function taskRow');
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
 
-  assert.match(panel, /실시간 선생님 요청/);
-  assert.match(panel, /data-act="teacherLiveRequestOpen"/);
-  assert.match(panel, /data-id=/);
-  assert.match(panel, /esc\(t\.id\)/);
-  assert.match(panel, /data-date=/);
-  assert.match(panel, /esc\(date\)/);
-  assert.match(panel, /lesson/);
-  assert.match(panel, /editable/);
+  assert.match(today, /session\.isStaffLink && me\.id === session\.staffId && cursor === today\(\)/);
+  const receivedAt = today.indexOf('teacherReceivedAdminDirectiveHtml(me.id)');
+  const composerAt = today.indexOf('teacherLiveRequestComposerHtml(me, cursor)');
+  const weekendAt = today.indexOf('weekendVisitTeacherHtml(me, cursor)');
+  assert.ok(receivedAt >= 0 && receivedAt < composerAt && composerAt < weekendAt,
+    '관리자 요청 → 선생님 요청 → 주말 실제 등하원 순서여야 한다');
+  assert.doesNotMatch(today, /teacherLiveRequestManagerHtml|adminDirectiveManagerHtml/);
+  assert.doesNotMatch(panel, /teacherLiveRequestOpen|실시간 선생님 요청/);
 });
 
-test('요청 버튼은 본문 입력과 관리자 한 명 선택 및 전송을 한 모달에서 제공한다', () => {
-  const editor = functionBlock('openTeacherLiveRequestModal');
+test('중앙 선생님 요청은 접힌 화면 안에서 오늘 수업·본문·관리자 한 명·전송을 제공한다', () => {
+  const editor = functionBlock('teacherLiveRequestComposerHtml');
 
-  assert.match(editor, /modal\('실시간 선생님 요청'/);
+  assert.match(editor, /<details/);
+  assert.match(editor, /data-persist-key="today-teacher-live-request/);
+  assert.match(editor, /data-teacher-live-request-lesson/);
   assert.match(editor, /data-teacher-live-request-body/);
   assert.match(editor, /<textarea[^>]*maxlength=/);
   assert.match(editor, /data-teacher-live-request-recipient/);
@@ -50,6 +53,21 @@ test('요청 버튼은 본문 입력과 관리자 한 명 선택 및 전송을 �
     editor.indexOf('data-teacher-live-request-recipient') < editor.indexOf('data-act="teacherLiveRequestSend"'),
     '수신자 선택 뒤 전송 버튼이 배치되어야 한다'
   );
+  assert.doesNotMatch(editor, /modal\(/);
+});
+
+test('중앙 요청 후보는 인증된 선생님의 오늘 구조화 수업 stable taskId만 사용한다', () => {
+  const lessons = functionBlock('teacherLiveRequestTodayLessons');
+  const label = functionBlock('teacherLiveRequestLessonLabel');
+
+  assert.match(lessons, /tasksFor\(staffId, today\(\)\)/);
+  assert.match(lessons, /isSessionLessonTask\(task\)/);
+  assert.match(lessons, /task\.staffId/);
+  assert.doesNotMatch(lessons, /currentStaff\(|viewStaff|isLesson\(/);
+  assert.doesNotMatch(lessons, /session\.isAdmin/);
+  assert.match(label, /student/);
+  assert.match(label, /subject/);
+  assert.match(label, /schedule/);
 });
 
 test('관리자 수신자 후보는 서버 정본에서 불러오며 일반 직원 목록으로 추측하지 않는다', () => {
@@ -61,7 +79,7 @@ test('관리자 수신자 후보는 서버 정본에서 불러오며 일반 직�
   assert.doesNotMatch(loader, /liveStaff\(\)|teamStaff\(\)|staffById\([^)]*manager/i);
 });
 
-test('전송은 stable taskId와 날짜·서버 발급 대상 ID만 보내고 이름이나 발신자를 위조하지 않는다', () => {
+test('전송은 재시도 requestId와 stable taskId·오늘 날짜·서버 발급 대상 ID만 보낸다', () => {
   const submit = functionBlock('submitTeacherLiveRequest');
 
   assert.match(submit, /sync\.post\('\/teacher-live-request'/);
@@ -71,6 +89,9 @@ test('전송은 stable taskId와 날짜·서버 발급 대상 ID만 보내고 �
   assert.match(submit, /lessonDate:/);
   assert.match(submit, /recipientAdminId:/);
   assert.match(submit, /body:/);
+  assert.match(submit, /teacherLiveRequestDraft\.requestId/);
+  assert.match(submit, /teacherLiveRequestTodayLessons\(\)/);
+  assert.match(submit, /lessonDate:\s*today\(\)/);
   assert.match(submit, /if\s*\(![^)]*recipient/);
   assert.match(submit, /if\s*\(![^)]*(?:message|body|content)/);
   assert.doesNotMatch(submit, /senderId\s*:|teacherId\s*:|studentId\s*:|studentName\s*:|teacherName\s*:|audience(?:Ids|ManagerIds|StaffIds)?\s*:/);
@@ -82,7 +103,8 @@ test('모든 관리자는 지정 수신자와 무관하게 같은 미확인 요�
 
   assert.match(loader, /session\.isAdmin/);
   assert.match(loader, /action:\s*'list'/);
-  assert.match(popup, /!item\.acknowledgedAt/);
+  assert.match(popup, /!row\.acknowledgedAt/);
+  assert.match(popup, /!sessionStorage\.getItem\(key\)/);
   assert.doesNotMatch(popup, /item\.recipientAdminId\s*===|recipientAdminId\s*===\s*(?:session|auth)|includes\([^)]*recipientAdminId/);
   assert.match(popup, /modal\('실시간 선생님 요청'/);
   assert.match(popup, /sessionStorage/);
@@ -113,13 +135,37 @@ test('열어봄과 확인은 stable requestId로만 저장하고 관리자별 �
   assert.match(acknowledge, /loadTeacherLiveRequests\(true,\s*false\)/);
 });
 
-test('요청 조회는 15초마다 갱신되고 클릭 라우팅이 열기·전송·확인을 모두 연결한다', () => {
+test('작성 draft는 재렌더링에도 유지하고 성공한 뒤에만 새 requestId로 초기화한다', () => {
+  const submit = functionBlock('submitTeacherLiveRequest');
+  const composer = functionBlock('teacherLiveRequestComposerHtml');
+  const inputs = block("document.addEventListener('input'", "/* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */");
+
+  assert.match(composer, /teacherLiveRequestDraft\.body/);
+  assert.match(composer, /teacherLiveRequestDraft\.lessonTaskId/);
+  assert.match(composer, /teacherLiveRequestDraft\.recipientAdminId/);
+  assert.match(inputs, /teacherLiveRequestDraft\.body\s*=/);
+  assert.match(inputs, /teacherLiveRequestDraft\.lessonTaskId\s*=/);
+  assert.match(inputs, /teacherLiveRequestDraft\.recipientAdminId\s*=/);
+  assert.match(submit, /lastAttemptPayloadKey/);
+  assert.match(submit, /lastAttemptPayloadKey !== payloadKey[\s\S]*requestId = 'tlr_' \+ uid\(\)/);
+  assert.ok(submit.indexOf("sync.post('/teacher-live-request'") < submit.indexOf('teacherLiveRequestDraft = emptyTeacherLiveRequestDraft'),
+    '서버 전송 성공 경로 뒤에서만 draft를 초기화해야 한다');
+});
+
+test('요청 조회는 15초마다 갱신되고 클릭 라우팅은 중앙 전송과 확인을 연결한다', () => {
   const polling = block('setInterval(() => {', '/* ── 새 버전 감지 ──');
   const clicks = block("document.addEventListener('click'", "document.addEventListener('input'");
 
   assert.match(polling, /loadTeacherLiveRequests\(true,\s*true\)/);
   assert.match(polling, /},\s*15000\);/);
-  for (const action of ['teacherLiveRequestOpen', 'teacherLiveRequestSend', 'teacherLiveRequestAck']) {
+  for (const action of ['teacherLiveRequestSend', 'teacherLiveRequestAck']) {
     assert.match(clicks, new RegExp(`case '${action}'`));
   }
+  assert.doesNotMatch(clicks, /case 'teacherLiveRequestOpen'/);
+});
+
+test('관리자 수업 등록 및 변경 화면의 요청 관리와 확인 이력은 기존 위치를 유지한다', () => {
+  const lessonEntry = block('function viewLessonEntry()', 'function refreshLessonDirectEntry');
+  assert.match(lessonEntry, /teacherLiveRequestManagerHtml\(\) \+ adminDirectiveManagerHtml\(\)/);
+  assert.match(functionBlock('teacherLiveRequestManagerHtml'), /최근 확인한 요청/);
 });
