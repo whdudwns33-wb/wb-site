@@ -68,6 +68,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/053_consult_link_se
 npx wrangler d1 execute wb-sync --remote --file=./migrations/054_lesson_staff_scope.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/055_task_write_cas_guards.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/056_book_order_item_cancellations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/057_teacher_requests_tuition_alerts.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -235,6 +236,11 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 보호자 앱에는 전화번호·학생 특징·상담 메모·다른 학생 정보가 반환되지 않는다.
 특정 학생 공지는 지정 당시 stable 학생 ID와 이름의 비가역 identity snapshot을 함께 저장하며,
 보호자가 읽을 때 현재 활성 원생 명단과 다시 일치하는 경우에만 공개한다.
+
+선생님→관리자 실시간 요청과 학생 단위 4회제 3회 수강료 알림은
+`057_teacher_requests_tuition_alerts.sql` → Worker → Pages 순서로 배포한다. 결제 구분과
+회차 시작일은 비공개 roster의 stable studentId에 저장하고, 23:50 KST 확정 출결 중
+출석·지각·조퇴를 모든 과목에서 합산한다. 알림 원장에는 이름이나 연락처를 저장하지 않는다.
 
 보호자 교재 주문 현황을 추가하는 배포는 반드시
 `037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새

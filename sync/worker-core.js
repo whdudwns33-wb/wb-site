@@ -42,6 +42,8 @@
  *   POST /onboarding-patch { app, auth, ... }       → 신규 학생 30일 기록 CAS 수정
  *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
+ *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
+ *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
@@ -76,6 +78,8 @@ import { handleFeedbackPolish } from './feedback-polish.js';
 import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
+import { handleTeacherLiveRequest } from './teacher-live-request.js';
+import { handleTuitionAlert } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
 import { handleTransport } from './transport.js';
@@ -1817,6 +1821,16 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleAdminDirective(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/teacher-live-request') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleTeacherLiveRequest(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/tuition-alert') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleTuitionAlert(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);
