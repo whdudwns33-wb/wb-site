@@ -99,6 +99,26 @@ function putCheck(db, taskId, ownerId, date, att, absenceType) {
     .bind('task', taskId + '|' + date, ownerId, JSON.stringify(data), Date.now(), Date.now()).run();
 }
 
+function makeFlexible(db, taskId = 'lesson-a') {
+  const row = db.database.prepare('SELECT data FROM tasks WHERE app=? AND id=?').get('task', taskId);
+  const task = JSON.parse(row.data);
+  Object.assign(task, {
+    repeat: 'days', days: [6], weekendAttendanceMode: 'flexible', weekendAllowedDays: [0],
+    weekendMonthlyTarget: 2, weekendFlexibleFrom: '2026-08-01'
+  });
+  db.prepare('UPDATE tasks SET data=? WHERE app=? AND id=?').bind(JSON.stringify(task), 'task', taskId).run();
+}
+
+function putWeekendVisit(db, date, status = 'completed', studentId = 'student-a', taskId = 'lesson-a') {
+  const now = Date.parse(date + 'T01:00:00Z');
+  db.prepare(
+    'INSERT INTO weekend_actual_visits ' +
+    '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,check_in_at,check_out_at,status,revision,' +
+    'created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?)'
+  ).bind('task', 'wv_' + 'a'.repeat(32), studentId, taskId, 'teacher-a', date, now,
+    status === 'active' ? null : now + 3600000, status, now, now, 'teacher-a', 'teacher-a').run();
+}
+
 async function hash(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -248,6 +268,57 @@ test('23:50 KST cron records the latest attendance once after teachers can revis
   assert.equal(duplicate.processed, 0);
   assert.equal(duplicate.idempotent, 1);
   assert.equal(db.database.prepare("SELECT COUNT(*) count FROM session_pack_usage WHERE app='task'").get().count, 1);
+});
+
+test('flexible weekend attendance requires an exact non-cancelled actual visit before session use', async () => {
+  const date = '2026-08-30';
+  for (const status of [null, 'cancelled', 'completed']) {
+    const db = seed();
+    makeFlexible(db);
+    const pack = (await create(db)).body.pack;
+    putCheck(db, 'lesson-a', 'teacher-a', date, 'P');
+    if (status) putWeekendVisit(db, date, status);
+    if (status === 'completed') {
+      const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+      const task = JSON.parse(row.data);
+      task.weekendAllowedDays = [6];
+      db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+    }
+    const result = await record(db, pack, 'lesson-a', date);
+    if (status === 'completed') {
+      assert.equal(result.status, 200);
+      assert.equal(result.body.pack.usedSessions, 1);
+    } else {
+      assert.equal(result.status, 409);
+      assert.equal(result.body.code, 'CHECK_IDENTITY_MISMATCH');
+    }
+  }
+});
+
+test('a future flexible effective date keeps the existing weekend recurrence until transition', async () => {
+  const date = '2026-08-29';
+  const db = seed();
+  makeFlexible(db);
+  const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+  const task = JSON.parse(row.data);
+  task.weekendFlexibleFrom = '2026-08-30';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  const pack = (await create(db)).body.pack;
+  putCheck(db, 'lesson-a', 'teacher-a', date, 'P');
+  const result = await record(db, pack, 'lesson-a', date);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.pack.usedSessions, 1);
+});
+
+test('23:50 KST cron accepts a flexible Sunday visit even when the reference recurrence is Saturday', async () => {
+  const date = '2026-08-30';
+  const db = seed();
+  makeFlexible(db);
+  await create(db);
+  putWeekendVisit(db, date, 'completed');
+  putCheck(db, 'lesson-a', 'teacher-a', date, 'P');
+  const result = await handleScheduledSessionPackAttendance({ DB: db }, Date.parse(date + 'T14:50:00Z'));
+  assert.deepEqual(result, { ok: true, sourceDate: date, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
 });
 
 test('Worker schedules book orders at 20:00 and session attendance finalization at 23:50 KST', () => {

@@ -9,6 +9,7 @@ import {
   listActiveGuardianAnnouncements
 } from './guardian-announcements.js';
 import { guardianDeliveryAllowed, guardianDeliveryStudentIds } from './guardian-delivery-policy.js';
+import { flexibleWeekendEffectiveOn, weekendAttendancePolicyOn } from './weekend-flex.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_OPAQUE = /^[a-f0-9]{48}$/i;
@@ -454,6 +455,26 @@ function activeSlotOnDate(slot, date, weekday) {
   return (!validFrom || validFrom <= date) && (!validTo || validTo >= date);
 }
 
+function flexibleWeekendTaskOnDate(task, date) {
+  return flexibleWeekendEffectiveOn(task, date);
+}
+
+function kstMinute(timestamp, date) {
+  const value = Number(timestamp);
+  if (!Number.isSafeInteger(value) || value <= 0 || kstDate(value) !== date) return '';
+  return new Date(value + 9 * 60 * 60 * 1000).toISOString().slice(11, 16);
+}
+
+function flexibleVisitTimeLabel(visit, date) {
+  const start = kstMinute(visit && visit.check_in_at, date);
+  if (!start) return '';
+  if (String(visit && visit.status || '') === 'active' && visit.check_out_at == null) {
+    return start + '–등원 중';
+  }
+  const end = kstMinute(visit && visit.check_out_at, date);
+  return String(visit && visit.status || '') === 'completed' && end ? start + '–' + end : '';
+}
+
 function validDate(value) {
   const date = String(value || '');
   return /^\d{4}-\d{2}-\d{2}$/.test(date) &&
@@ -545,17 +566,46 @@ async function publicTodayLessons(env, student, now) {
     "SELECT id,owner,data FROM tasks WHERE app=? AND json_extract(data,'$.studentId')=? " +
     "AND COALESCE(json_extract(data,'$.deleted'),0)=0 AND json_extract(data,'$.taskKind')='lesson_instruction'"
   ).bind('task', studentId).all();
+  const taskRows = (result.results || []).map(row => ({ row, task: parseJson(row.data) }));
+  const flexibleVisits = new Map();
+  if (taskRows.some(item => flexibleWeekendTaskOnDate(item.task, date)) &&
+      await tableExists(env, 'weekend_actual_visits')) {
+    const visits = await env.DB.prepare(
+      "SELECT lesson_task_id,student_id,visit_date,check_in_at,check_out_at,status FROM weekend_actual_visits " +
+      "WHERE app=? AND student_id=? AND visit_date=? AND status<>'cancelled'"
+    ).bind('task', studentId, date).all();
+    for (const visit of visits.results || []) {
+      if (String(visit.student_id || '') !== studentId || String(visit.visit_date || '') !== date ||
+          !SAFE_ID.test(String(visit.lesson_task_id || ''))) continue;
+      flexibleVisits.set(String(visit.lesson_task_id), visit);
+    }
+  }
   const names = await staffNames(env);
   const rows = [];
-  for (const row of result.results || []) {
-    const task = parseJson(row.data);
+  for (const item of taskRows) {
+    const row = item.row;
+    const task = item.task;
     const owner = String(row.owner || '');
     if (!task || String(task.id || '') !== String(row.id) ||
         String(task.staffId || '') !== owner || !names.has(owner) ||
-        !activeTaskOnDate(task, date) ||
-        !Array.isArray(task.scheduleSlots)) continue;
-    const slots = task.scheduleSlots.filter(slot => activeSlotOnDate(slot, date, weekday));
-    if (!slots.length) continue;
+        !activeTaskOnDate(task, date)) continue;
+    const weekendPolicy = weekendAttendancePolicyOn(task, date);
+    if (weekendPolicy === 'invalid') continue;
+    const flexible = weekendPolicy === 'flexible';
+    let timeLabels;
+    if (flexible) {
+      if (!flexibleWeekendTaskOnDate(task, date)) continue;
+      const visit = flexibleVisits.get(String(row.id));
+      const timeLabel = flexibleVisitTimeLabel(visit, date);
+      if (!visit || String(visit.student_id || '') !== studentId ||
+          String(visit.lesson_task_id || '') !== String(row.id) || !timeLabel) continue;
+      timeLabels = [timeLabel];
+    } else {
+      if (!Array.isArray(task.scheduleSlots)) continue;
+      const slots = task.scheduleSlots.filter(slot => activeSlotOnDate(slot, date, weekday));
+      if (!slots.length) continue;
+      timeLabels = slots.map(slot => String(slot.startTime) + '–' + String(slot.endTime));
+    }
     const checkRow = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1')
       .bind('task', String(row.id) + '|' + date).first();
     const parsedCheck = checkRow && parseJson(checkRow.data);
@@ -566,12 +616,12 @@ async function publicTodayLessons(env, student, now) {
     const completedSteps = stepIds.filter(id => !!(check && check.steps && check.steps[id])).length;
     const attendance = check && ['P', 'L', 'A', 'E'].includes(String(check.att || '')) ? String(check.att) : '';
     const lessonRef = (await publicLessonIdentity({ ...task, id: String(row.id) }, owner)).lessonRef;
-    for (const slot of slots) rows.push({
+    for (const timeLabel of timeLabels) rows.push({
       lessonRef,
       subject: text(task.subject),
       className: text(task.className),
       teacherName: names.get(owner),
-      timeLabel: String(slot.startTime) + '–' + String(slot.endTime),
+      timeLabel,
       attendance,
       completedSteps,
       totalSteps: stepIds.length,
@@ -643,9 +693,11 @@ export async function publicSchedule(env, student, now) {
   for (const row of result.results || []) {
     const task = parseJson(row.data);
     const owner = String(row.owner || '');
+    const weekendPolicy = weekendAttendancePolicyOn(task, today);
     if (!task || String(task.id || '') !== String(row.id) ||
         String(task.staffId || '') !== owner || !names.has(owner) ||
-        !activeTaskOnDate(task, today) || !Array.isArray(task.scheduleSlots)) continue;
+        !activeTaskOnDate(task, today) || weekendPolicy !== 'fixed' ||
+        !Array.isArray(task.scheduleSlots)) continue;
     for (const slot of task.scheduleSlots) {
       if (!Array.isArray(slot.days) || !slot.startTime || !slot.endTime) continue;
       const validFrom = String(slot.validFrom || slot.startDate || '');

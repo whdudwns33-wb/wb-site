@@ -22,6 +22,15 @@ CREATE TABLE tasks (
   srv_at INTEGER NOT NULL,
   PRIMARY KEY (app,id)
 );
+CREATE TABLE weekend_actual_visits (
+  app TEXT NOT NULL,
+  visit_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  lesson_task_id TEXT NOT NULL,
+  visit_date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  PRIMARY KEY (app,visit_id)
+);
 CREATE TABLE teacher_live_requests (
   app TEXT NOT NULL CHECK (app='task'),
   request_id TEXT NOT NULL CHECK (request_id LIKE 'tlr_%'),
@@ -83,6 +92,12 @@ const json = (body, status) => new Response(JSON.stringify(body), {
 });
 const today = () => new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+async function atNow(value, action) {
+  const original = Date.now;
+  Date.now = () => value;
+  try { return await action(); } finally { Date.now = original; }
+}
+
 function dateOffset(value) {
   return new Date(Date.parse(today() + 'T00:00:00.000Z') + value * 86400000).toISOString().slice(0, 10);
 }
@@ -111,6 +126,12 @@ function putTask(db, id, owner, overrides = {}) {
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', id, owner, JSON.stringify(task), now, now).run();
   return task;
+}
+
+function putWeekendVisit(db, taskId, studentId, visitDate, status = 'completed') {
+  db.prepare(
+    'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,visit_date,status) VALUES(?,?,?,?,?,?)'
+  ).bind('task', 'wv_' + 'a'.repeat(32), studentId, taskId, visitDate, status).run();
 }
 
 function seed(db) {
@@ -185,6 +206,39 @@ test('담당 교사는 오늘 진행되는 자신의 활성 수업 요청만 sta
   const collision = await call(db, request({ body: '서로 다른 요청입니다.' }));
   assert.equal(collision.status, 409);
   assert.equal(collision.body.code, 'REQUEST_ID_CONFLICT');
+});
+
+test('비정기 수업은 오늘의 exact 실제 등원 기록이 있을 때만 실시간 요청을 보낸다', async () => {
+  const sunday = Date.parse('2026-08-30T10:00:00+09:00');
+  await atNow(sunday, async () => {
+    for (const status of [null, 'cancelled', 'completed']) {
+      const db = new TestD1(); seed(db);
+      putTask(db, 'lesson-flex', 'teacher-a', {
+        repeat: 'days', days: [6], weekendAttendanceMode: 'flexible', weekendAllowedDays: [0],
+        weekendMonthlyTarget: null, weekendFlexibleFrom: '2026-08-01'
+      });
+      if (status) putWeekendVisit(db, 'lesson-flex', '12345678', today(), status);
+      const result = await call(db, request({
+        requestId: 'tlr_flexible_' + (status || 'missing'), lessonTaskId: 'lesson-flex'
+      }));
+      assert.equal(result.status, status === 'completed' ? 200 : 422);
+    }
+  });
+});
+
+test('비정기 적용 시작일 전에는 기존 정기 요일에서 실제 방문 없이 요청할 수 있다', async () => {
+  const saturday = Date.parse('2026-08-29T10:00:00+09:00');
+  await atNow(saturday, async () => {
+    const db = new TestD1(); seed(db);
+    putTask(db, 'lesson-future-flex', 'teacher-a', {
+      repeat: 'days', days: [6], weekendAttendanceMode: 'flexible', weekendAllowedDays: [0],
+      weekendMonthlyTarget: 2, weekendFlexibleFrom: '2026-08-30'
+    });
+    const result = await call(db, request({
+      requestId: 'tlr_future_flexible', lessonTaskId: 'lesson-future-flex'
+    }));
+    assert.equal(result.status, 200);
+  });
 });
 
 test('다른 담당자·과거 날짜·오늘 일정이 아닌 수업·위조 수신자를 거부한다', async () => {
