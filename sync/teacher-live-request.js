@@ -3,6 +3,7 @@ import { hasFlexibleWeekendVisit, weekendAttendancePolicyOn } from './weekend-fl
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const REQUEST_ID = /^tlr_[A-Za-z0-9_-]{4,76}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UNRELATED_ID = '__teacher_live_request_no_lesson__';
 const MAX_BODY = 2000;
 const MAX_REQUESTS = 500;
 const MAX_RECEIPTS = 5000;
@@ -236,7 +237,29 @@ async function verifiedLesson(env, app, body, auth) {
   if (!SAFE_ID.test(studentId)) {
     return { error: '수업의 stable studentId 연결을 확인해 주세요', status: 409 };
   }
-  return { taskId, lessonDate, studentId, senderId, owner, taskData: String(row.data || '') };
+  return { taskId, lessonDate, studentId, senderId, owner, taskData: String(row.data || ''), guardKind: 'task' };
+}
+
+async function verifiedRequestContext(env, app, body, auth) {
+  if (String(body.lessonTaskId || '') !== UNRELATED_ID) return verifiedLesson(env, app, body, auth);
+  const lessonDate = String(body.lessonDate || '');
+  const senderId = String(auth && auth.id || '');
+  if (!auth || auth.scope !== 'own' || !SAFE_ID.test(senderId) || !validDate(lessonDate)) {
+    return { error: '날짜와 담당 선생님 정보를 다시 확인해 주세요', status: 400 };
+  }
+  if (lessonDate !== kstDate()) {
+    return { error: '실시간 선생님 요청은 오늘만 보낼 수 있습니다', status: 422 };
+  }
+  const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
+    .bind(app, senderId).first();
+  const staff = row && parseJson(row.data);
+  if (!row || !staff || staff.deleted || String(staff.id || '') !== senderId) {
+    return { error: '현재 재직 중인 선생님 정보를 확인할 수 없습니다', status: 409 };
+  }
+  return {
+    taskId: UNRELATED_ID, lessonDate, studentId: UNRELATED_ID, senderId,
+    staffData: String(row.data || ''), guardKind: 'staff'
+  };
 }
 
 function sameRequest(row, input) {
@@ -253,13 +276,13 @@ async function send(env, app, body, origin, auth, json) {
   if (!REQUEST_ID.test(requestId) || !SAFE_ID.test(recipientAdminId) || !requestBody) {
     return json({ ok: false, error: '요청 ID·내용·수신 관리자를 확인해 주세요' }, 400, origin);
   }
-  const lesson = await verifiedLesson(env, app, body, auth);
-  if (lesson.error) return json({ ok: false, error: lesson.error }, lesson.status, origin);
+  const context = await verifiedRequestContext(env, app, body, auth);
+  if (context.error) return json({ ok: false, error: context.error }, context.status, origin);
   const recipients = await recipientIds(env, app);
   if (!recipients.includes(recipientAdminId)) {
     return json({ ok: false, error: '현재 요청을 받을 수 있는 관리자를 선택해 주세요' }, 422, origin);
   }
-  const input = { ...lesson, recipientAdminId, body: requestBody };
+  const input = { ...context, recipientAdminId, body: requestBody };
   const existing = await env.DB.prepare(
     'SELECT * FROM teacher_live_requests WHERE app=? AND request_id=? LIMIT 1'
   ).bind(app, requestId).first();
@@ -271,19 +294,29 @@ async function send(env, app, body, origin, auth, json) {
     return json({ ok: true, idempotent: true, request: rows.find(row => row.requestId === requestId) }, 200, origin);
   }
   const now = Date.now();
-  const result = await env.DB.prepare(
-    'INSERT OR IGNORE INTO teacher_live_requests ' +
-    '(app,request_id,lesson_task_id,lesson_date,student_id,sender_staff_id,recipient_admin_id,body,created_at) ' +
-    'SELECT ?,?,?,?,?,?,?,?,? FROM tasks current_task WHERE current_task.app=? AND current_task.id=? ' +
-    'AND current_task.owner=? AND current_task.data=?'
-  ).bind(app, requestId, lesson.taskId, lesson.lessonDate, lesson.studentId, lesson.senderId,
-    recipientAdminId, requestBody, now, app, lesson.taskId, lesson.owner, lesson.taskData).run();
+  const insertPrefix = 'INSERT OR IGNORE INTO teacher_live_requests ' +
+    '(app,request_id,lesson_task_id,lesson_date,student_id,sender_staff_id,recipient_admin_id,body,created_at) ';
+  const result = context.guardKind === 'staff'
+    ? await env.DB.prepare(insertPrefix +
+      'SELECT ?,?,?,?,?,?,?,?,? FROM staff current_staff WHERE current_staff.app=? AND current_staff.id=? ' +
+      'AND current_staff.data=?')
+      .bind(app, requestId, context.taskId, context.lessonDate, context.studentId, context.senderId,
+        recipientAdminId, requestBody, now, app, context.senderId, context.staffData).run()
+    : await env.DB.prepare(insertPrefix +
+      'SELECT ?,?,?,?,?,?,?,?,? FROM tasks current_task WHERE current_task.app=? AND current_task.id=? ' +
+      'AND current_task.owner=? AND current_task.data=?')
+      .bind(app, requestId, context.taskId, context.lessonDate, context.studentId, context.senderId,
+        recipientAdminId, requestBody, now, app, context.taskId, context.owner, context.taskData).run();
   const saved = await env.DB.prepare(
     'SELECT * FROM teacher_live_requests WHERE app=? AND request_id=? LIMIT 1'
   ).bind(app, requestId).first();
   if (!saved || !sameRequest(saved, input)) {
-    return json({ ok: false, code: changes(result) ? 'REQUEST_SAVE_INVALID' : 'LESSON_CHANGED',
-      error: '수업 정보가 변경되었습니다. 새로고침 후 다시 보내 주세요' }, 409, origin);
+    const changedCode = context.guardKind === 'task' ? 'LESSON_CHANGED' : 'REQUEST_CONTEXT_CHANGED';
+    const changedMessage = context.guardKind === 'task'
+      ? '수업 정보가 변경되었습니다. 새로고침 후 다시 보내 주세요'
+      : '요청 연결 정보가 변경되었습니다. 새로고침 후 다시 보내 주세요';
+    return json({ ok: false, code: changes(result) ? 'REQUEST_SAVE_INVALID' : changedCode,
+      error: changedMessage }, 409, origin);
   }
   const rows = await listRows(env, app);
   return json({ ok: true, idempotent: changes(result) === 0,
