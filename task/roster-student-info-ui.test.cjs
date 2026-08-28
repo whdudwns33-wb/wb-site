@@ -191,10 +191,13 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   ];
   const staff = { 'teacher-a': { name: '김남기' }, 'teacher-b': { name: '김혜지' } };
   const helpers = new Function('state', 'isLesson', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
+    'weekendFlexibleSettingsSummary', 'taskHasWeekendSchedule', 'isFlexibleWeekendLesson', 'session',
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
       { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null,
       (slots, fallback) => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + (slot.lessonHours || fallback || '')).join(' / '),
-      value => value || '', task => !!task.lessonFormVersion, escapeHtml
+      value => value || '', task => !!task.lessonFormVersion, escapeHtml,
+      () => '정기 시간표', task => (task.scheduleSlots || []).some(slot => (slot.days || []).some(day => day === 0 || day === 6)),
+      () => false, { isAdmin: true }
     );
   assert.deepEqual(helpers.rosterStudentLessonTasks('student-safe').map(task => task.id), ['lesson-math', 'lesson-eng']);
   assert.deepEqual(helpers.rosterStudentLessonTasks(''), []);

@@ -1,3 +1,5 @@
+import { flexibleWeekendEffectiveOn, weekendAttendancePolicyOn } from './weekend-flex.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TEST_RECIPIENT_SLOT = 'TEST-SMS-001';
@@ -123,13 +125,25 @@ function checkHasProgress(task, check) {
   return false;
 }
 
-export function summarizeReportRows(taskRows, checkRows, staffId, reportDate) {
+function hasFlexibleVisit(task, reportDate, visitRows) {
+  if (!flexibleWeekendEffectiveOn(task, reportDate)) return false;
+  return (Array.isArray(visitRows) ? visitRows : []).some(row =>
+    String(row.lesson_task_id || '') === String(task.id || '') &&
+    String(row.student_id || '') === String(task.studentId || '') &&
+    String(row.visit_date || '') === reportDate && String(row.status || '') !== 'cancelled');
+}
+
+export function summarizeReportRows(taskRows, checkRows, staffId, reportDate, visitRows = []) {
   const tasks = [];
   for (const row of (Array.isArray(taskRows) ? taskRows : [])) {
     const task = parseObjectJson(row.data, 'TASK');
     if (String(row.id || '') !== String(task.id || '')) throw new Error('TASK_ID_MISMATCH');
     if (String(task.staffId || '') !== staffId) throw new Error('TASK_OWNER_MISMATCH');
-    if (!isBookOrderWorkTask(task) && occursOn(task, reportDate)) tasks.push(task);
+    const weekendPolicy = weekendAttendancePolicyOn(task, reportDate);
+    const occurs = weekendPolicy === 'flexible'
+      ? hasFlexibleVisit(task, reportDate, visitRows)
+      : weekendPolicy === 'fixed' && occursOn(task, reportDate);
+    if (!isBookOrderWorkTask(task) && occurs) tasks.push(task);
   }
 
   const taskIds = new Set(tasks.map(task => String(task.id)));
@@ -300,7 +314,12 @@ async function loadSummary(env, app, staffId, reportDate) {
     .bind(app, staffId).all();
   const checks = await env.DB.prepare('SELECT k,data FROM checks WHERE app=? AND owner=? AND k LIKE ?')
     .bind(app, staffId, '%|' + reportDate).all();
-  return summarizeReportRows(tasks.results || [], checks.results || [], staffId, reportDate);
+  const visits = await env.DB.prepare(
+    "SELECT lesson_task_id,student_id,visit_date,status FROM weekend_actual_visits " +
+    "WHERE app=? AND visit_date=? AND status<>'cancelled'"
+  ).bind(app, reportDate).all();
+  return summarizeReportRows(tasks.results || [], checks.results || [], staffId, reportDate,
+    visits.results || []);
 }
 
 function safeProviderId(value) {

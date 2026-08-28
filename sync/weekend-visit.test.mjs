@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleWeekendVisit, weekendVisitInternals } from './weekend-visit.js';
 
 const migration = fs.readFileSync(new URL('./migrations/050_weekend_actual_visits.sql', import.meta.url), 'utf8');
+const studentChangeMigration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
+const taskWriteCasMigration = fs.readFileSync(new URL('./migrations/055_task_write_cas_guards.sql', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const worker = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
 const readme = fs.readFileSync(new URL('./README.md', import.meta.url), 'utf8');
@@ -34,12 +36,20 @@ class D1Database {
   constructor() {
     this.sqlite = new DatabaseSync(':memory:');
     this.beforeVisitInsert = null;
+    this.beforeBatch = null;
     this.sqlite.exec('PRAGMA foreign_keys=ON; CREATE TABLE tasks (app TEXT NOT NULL,id TEXT NOT NULL,owner TEXT,data TEXT NOT NULL,updated_at INTEGER NOT NULL,srv_at INTEGER NOT NULL,PRIMARY KEY(app,id)); CREATE TABLE private_rosters (app TEXT NOT NULL PRIMARY KEY,data TEXT NOT NULL,updated_at INTEGER NOT NULL);');
+    this.sqlite.exec(studentChangeMigration);
+    this.sqlite.exec(taskWriteCasMigration);
     this.sqlite.exec(migration);
   }
   prepareNative(sql) { return this.sqlite.prepare(sql); }
   prepare(sql) { return new Statement(this, sql); }
   async batch(statements) {
+    if (this.beforeBatch) {
+      const hook = this.beforeBatch;
+      this.beforeBatch = null;
+      await hook();
+    }
     this.sqlite.exec('BEGIN');
     try {
       const results = [];
@@ -70,6 +80,7 @@ class D1Database {
     });
   }
   seedTask(task) {
+    task = { lessonRevision: 1, updatedAt: 1, ...task };
     this.sqlite.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
       .run('task', task.id, task.staffId, JSON.stringify(task), 1, 1);
   }
@@ -125,6 +136,151 @@ test('all subjects qualify and a Sunday timetable may check in on Saturday', asy
   assert.equal(listed.status, 200);
   assert.equal(listed.body.visits.length, 1);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 1);
+});
+
+test('a future flexible effective date keeps the existing weekend check-in path active', async () => {
+  const db = new D1Database(); db.seed();
+  const configured = await atNow(saturday, () => call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-23'
+  }, admin));
+  assert.equal(configured.status, 200);
+  const checked = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(checked.status, 200);
+  assert.equal(checked.body.visit.status, 'active');
+});
+
+test('admin configures a flexible assignment with stable ids, CAS, and an append-only audit event', async () => {
+  const db = new D1Database(); db.seed();
+  const configured = await atNow(saturday, () => call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-22'
+  }, admin));
+  assert.equal(configured.status, 200);
+  assert.equal(configured.body.task.id, 'lesson-a');
+  assert.equal(configured.body.task.studentId, 'student-a');
+  assert.equal(configured.body.updatedAt, configured.body.task.updatedAt);
+  assert.deepEqual(configured.body.config, {
+    mode: 'flexible', allowedDays: [0], monthlyTarget: 2, flexibleFrom: '2026-08-22'
+  });
+  const stored = JSON.parse(db.sqlite.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get().data);
+  assert.equal(stored.weekendAttendanceMode, 'flexible');
+  assert.deepEqual(stored.weekendAllowedDays, [0]);
+  assert.equal(stored.weekendMonthlyTarget, 2);
+  assert.equal(stored.weekendFlexibleFrom, '2026-08-22');
+  assert.equal(stored.lastEditBy, 'manager');
+  const audit = db.sqlite.prepare(
+    "SELECT event_type,changed_fields,effective_date,changed_by FROM student_change_events WHERE app='task' AND task_id='lesson-a'"
+  ).get();
+  assert.equal(audit.event_type, 'work_instruction');
+  assert.deepEqual(JSON.parse(audit.changed_fields), [
+    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
+  ]);
+  assert.equal(audit.effective_date, '2026-08-22');
+  assert.equal(audit.changed_by, 'manager:manager-1');
+
+  const exactRetry = await call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: configured.body.updatedAt,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-22'
+  }, admin);
+  assert.equal(exactRetry.status, 200);
+  assert.equal(exactRetry.body.idempotent, true);
+  assert.equal(db.sqlite.prepare("SELECT COUNT(*) count FROM student_change_events WHERE task_id='lesson-a'").get().count, 1);
+
+  const stale = await call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'fixed', weekendAllowedDays: [], weekendMonthlyTarget: null, weekendFlexibleFrom: ''
+  }, admin);
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, 'WEEKEND_CONFIG_STALE');
+});
+
+test('flexible configuration is admin-only and fails closed on forged ids or invalid policy values', async () => {
+  const db = new D1Database(); db.seed();
+  const base = {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0, 6], weekendMonthlyTarget: null,
+    weekendFlexibleFrom: '2026-08-22'
+  };
+  assert.equal((await call(db, base, own)).status, 403);
+  assert.equal((await call(db, { ...base, studentId: 'student-b' }, admin)).status, 409);
+  assert.equal((await call(db, { ...base, weekendAllowedDays: [1] }, admin)).status, 422);
+  assert.equal((await call(db, { ...base, weekendAllowedDays: ['0'] }, admin)).status, 422);
+  assert.equal((await call(db, { ...base, weekendMonthlyTarget: 0 }, admin)).status, 422);
+  assert.equal((await call(db, { ...base, weekendMonthlyTarget: '2' }, admin)).status, 422);
+  assert.equal((await call(db, { ...base, weekendFlexibleFrom: '2026-07-01' }, admin)).status, 422);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM student_change_events').get().count, 0);
+});
+
+test('configure CAS rolls back its audit event when the lesson changes after verification', async () => {
+  const db = new D1Database(); db.seed();
+  db.beforeBatch = async () => {
+    const row = db.sqlite.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+    const task = JSON.parse(row.data);
+    task.updatedAt = 2;
+    task.materials = '다른 관리자 수정';
+    db.sqlite.prepare("UPDATE tasks SET data=?,updated_at=2,srv_at=2 WHERE app='task' AND id='lesson-a'")
+      .run(JSON.stringify(task));
+  };
+  const result = await atNow(saturday, () => call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-22'
+  }, admin));
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'WEEKEND_CONFIG_STALE');
+  const stored = JSON.parse(db.sqlite.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get().data);
+  assert.equal(stored.materials, '다른 관리자 수정');
+  assert.equal(stored.weekendAttendanceMode, undefined);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM student_change_events').get().count, 0);
+});
+
+test('flexible check-in honors its allowed weekday and effective date while fixed cross-weekend behavior remains', async () => {
+  const db = new D1Database(); db.seed();
+  const configured = await atNow(saturday, () => call(db, {
+    action: 'configure', taskId: 'lesson-a', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-22'
+  }, admin));
+  assert.equal(configured.status, 200);
+  const saturdayDenied = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(saturdayDenied.status, 422);
+  const sunday = Date.parse('2026-08-23T10:00:00+09:00');
+  const sundayAllowed = await atNow(sunday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-23', lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(sundayAllowed.status, 200);
+  assert.equal(sundayAllowed.body.visit.lessonTaskId, 'lesson-a');
+});
+
+test('list returns non-cancelled monthly visit counts in the current teacher scope', async () => {
+  const db = new D1Database(); db.seed();
+  const insert = db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits (app,visit_id,student_id,lesson_task_id,staff_id,visit_date,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  );
+  const rows = [
+    ['wv_' + '1'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-02', 'completed'],
+    ['wv_' + '2'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-09', 'active'],
+    ['wv_' + '3'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-16', 'cancelled'],
+    ['wv_' + '4'.repeat(32), 'student-b', 'lesson-b', 'teacher-2', '2026-08-08', 'completed']
+  ];
+  rows.forEach((row, index) => {
+    const at = Date.parse(row[4] + 'T10:00:00+09:00') + index;
+    insert.run('task', row[0], row[1], row[2], row[3], row[4], at,
+      row[5] === 'completed' ? at + 3600000 : null, row[5], 1, at, at, row[3], row[3]);
+  });
+  const listed = await call(db, { action: 'list', visitDate: '2026-08-22' }, own);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.monthlyCounts, [
+    { lessonTaskId: 'lesson-a', studentId: 'student-a', month: '2026-08', count: 2 }
+  ]);
 });
 
 test('checkout and correction use CAS and keep append-only events', async () => {

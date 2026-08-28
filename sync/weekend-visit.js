@@ -1,6 +1,16 @@
+import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import {
+  flexibleWeekendAllowedOn as flexibleAllowedOn,
+  flexibleWeekendConfig as flexibleConfig,
+  weekendAttendancePolicyOn,
+  weekendFlexInternals
+} from './weekend-flex.js';
+
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_REASON = 200;
+const { WEEKEND_DAYS, MAX_MONTHLY_TARGET } = weekendFlexInternals;
 
 function parseJson(value) {
   try { return JSON.parse(value); } catch (error) { return null; }
@@ -32,6 +42,24 @@ function isWeekendDate(value) {
   const [year, month, day] = value.split('-').map(Number);
   const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   return dow === 0 || dow === 6;
+}
+
+function monthRange(value) {
+  const matched = String(value || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!matched) return null;
+  const year = Number(matched[1]), month = Number(matched[2]);
+  const next = new Date(Date.UTC(year, month, 1));
+  return {
+    month: matched[1] + '-' + matched[2],
+    start: matched[1] + '-' + matched[2] + '-01',
+    end: String(next.getUTCFullYear()).padStart(4, '0') + '-' +
+      String(next.getUTCMonth() + 1).padStart(2, '0') + '-01'
+  };
+}
+
+function configView(task) {
+  const flexible = flexibleConfig(task);
+  return flexible || { mode: 'fixed', allowedDays: [], monthlyTarget: null, flexibleFrom: '' };
 }
 
 function hasWeekendSchedule(task) {
@@ -90,7 +118,9 @@ async function verifiedLesson(env, app, taskId, studentId, visitDate, auth) {
   const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, taskId).first();
   const task = taskRow && parseJson(taskRow.data);
-  if (!task || !isLesson(task) || !activeOn(task, visitDate) || !hasWeekendSchedule(task)) {
+  const weekendPolicy = weekendAttendancePolicyOn(task, visitDate);
+  if (!task || !isLesson(task) || !activeOn(task, visitDate) || weekendPolicy === 'invalid' ||
+      (weekendPolicy === 'flexible' ? !flexibleAllowedOn(task, visitDate) : !hasWeekendSchedule(task))) {
     return { error: '현재 등록된 토·일 수업을 확인할 수 없습니다' };
   }
   if (String(task.studentId || '') !== studentId || String(task.staffId || '') !== String(taskRow.owner || '')) {
@@ -169,7 +199,148 @@ async function listVisits(env, app, body, auth, json, origin) {
     }
     rows = scoped;
   }
-  return json({ ok: true, visits: rows.map(rowView) }, 200, origin);
+  const range = monthRange(visitDate);
+  const monthlyResult = await env.DB.prepare(
+    "SELECT student_id,lesson_task_id,COUNT(*) AS visit_count FROM weekend_actual_visits " +
+    "WHERE app=? AND visit_date>=? AND visit_date<? AND status<>'cancelled' " +
+    'GROUP BY student_id,lesson_task_id ORDER BY lesson_task_id,student_id'
+  ).bind(app, range.start, range.end).all();
+  const monthlyCounts = [];
+  for (const monthly of monthlyResult.results || []) {
+    if (staffId) {
+      const lesson = await currentVisitLesson(env, app, monthly);
+      if (!lesson || lesson.owner !== staffId) continue;
+    }
+    monthlyCounts.push({
+      lessonTaskId: String(monthly.lesson_task_id), studentId: String(monthly.student_id),
+      month: range.month, count: Number(monthly.visit_count) || 0
+    });
+  }
+  return json({ ok: true, visits: rows.map(rowView), monthlyCounts }, 200, origin);
+}
+
+function requestedConfig(body) {
+  const mode = String(body.weekendAttendanceMode || '');
+  if (mode === 'fixed') {
+    if ((Array.isArray(body.weekendAllowedDays) && body.weekendAllowedDays.length) ||
+        (body.weekendAllowedDays != null && !Array.isArray(body.weekendAllowedDays)) ||
+        (body.weekendMonthlyTarget != null && body.weekendMonthlyTarget !== '') ||
+        (body.weekendFlexibleFrom != null && body.weekendFlexibleFrom !== '')) return null;
+    return { mode: 'fixed', allowedDays: [], monthlyTarget: null, flexibleFrom: '' };
+  }
+  if (mode !== 'flexible') return null;
+  const days = Array.isArray(body.weekendAllowedDays)
+    ? [...new Set(body.weekendAllowedDays)].sort((left, right) => left - right) : [];
+  const target = body.weekendMonthlyTarget == null || body.weekendMonthlyTarget === ''
+    ? null : body.weekendMonthlyTarget;
+  const flexibleFrom = String(body.weekendFlexibleFrom || '');
+  if (!days.length || days.some(day => !Number.isInteger(day) || !WEEKEND_DAYS.has(day)) ||
+      (target != null && (!Number.isInteger(target) || target < 1 || target > MAX_MONTHLY_TARGET)) ||
+      !validDate(flexibleFrom)) return null;
+  return { mode, allowedDays: days, monthlyTarget: target, flexibleFrom };
+}
+
+function sameConfig(left, right) {
+  return left.mode === right.mode && left.flexibleFrom === right.flexibleFrom &&
+    left.monthlyTarget === right.monthlyTarget &&
+    JSON.stringify(left.allowedDays) === JSON.stringify(right.allowedDays);
+}
+
+function taskWithConfig(task, config, updatedAt, editorRole) {
+  const next = {
+    ...task,
+    weekendAttendanceMode: config.mode,
+    weekendAllowedDays: config.allowedDays.slice(),
+    weekendMonthlyTarget: config.monthlyTarget,
+    weekendFlexibleFrom: config.flexibleFrom,
+    updatedAt,
+    previousUpdatedAt: Number(task.updatedAt) || null,
+    lessonRevision: Math.max(1, Number(task.lessonRevision) || 1) + 1,
+    updatedByScope: 'weekend_config',
+    lastEditBy: editorRole
+  };
+  return next;
+}
+
+async function configureLesson(env, app, body, auth, json, origin) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, error: '비정기 주말 수업 설정은 관리자만 변경할 수 있습니다' }, 403, origin);
+  }
+  const taskId = String(body.taskId || '');
+  const studentId = String(body.studentId || '');
+  const expectedUpdatedAt = body.expectedUpdatedAt;
+  const requested = requestedConfig(body);
+  const allowedKeys = new Set([
+    'app', 'auth', 'action', 'taskId', 'studentId', 'expectedUpdatedAt',
+    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
+  ]);
+  if (!SAFE_ID.test(taskId) || !SAFE_ID.test(studentId) ||
+      Object.keys(body).some(key => !allowedKeys.has(key)) ||
+      !Number.isSafeInteger(expectedUpdatedAt) || expectedUpdatedAt <= 0 || !requested) {
+    return json({ ok: false, error: '수업·학생·비정기 등원 설정과 수정 기준 시각을 확인해 주세요' }, 422, origin);
+  }
+  const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const task = row && parseJson(row.data);
+  const owner = String(row && row.owner || '');
+  if (!row || !task || !isLesson(task) || String(task.id || '') !== taskId ||
+      String(task.studentId || '') !== studentId || String(task.staffId || '') !== owner || !SAFE_ID.test(owner)) {
+    return json({ ok: false, error: '현재 학생과 수업의 stable ID 연결을 확인할 수 없습니다' }, 409, origin);
+  }
+  if (requested.mode === 'flexible' && !hasWeekendSchedule(task)) {
+    return json({ ok: false, error: '토요일 또는 일요일 확정 시간표가 있는 수업만 비정기 등원으로 설정할 수 있습니다' }, 422, origin);
+  }
+  if (requested.mode === 'flexible' &&
+      ((task.start && requested.flexibleFrom < String(task.start)) ||
+       (task.end && requested.flexibleFrom > String(task.end)))) {
+    return json({ ok: false, error: '비정기 적용일은 현재 수업의 적용 기간 안에서 선택해 주세요' }, 422, origin);
+  }
+  const rowUpdatedAt = Number(row.updated_at);
+  if (rowUpdatedAt !== expectedUpdatedAt || Number(task.updatedAt) !== expectedUpdatedAt) {
+    return json({ ok: false, code: 'WEEKEND_CONFIG_STALE', error: '수업 설정이 다른 곳에서 먼저 변경되었습니다',
+      task, updatedAt: rowUpdatedAt, config: configView(task) }, 409, origin);
+  }
+  const before = configView(task);
+  if (sameConfig(before, requested)) {
+    return json({ ok: true, idempotent: true, task, updatedAt: rowUpdatedAt, config: before }, 200, origin);
+  }
+
+  const rosterRow = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+  const document = rosterRow && parseJson(rosterRow.data);
+  const students = document && document.roster && Array.isArray(document.roster.students)
+    ? document.roster.students : [];
+  if (!students.some(student => student && !student.deleted && String(student.id || '') === studentId)) {
+    return json({ ok: false, error: '현재 원생 명단에서 학생을 확인할 수 없습니다' }, 409, origin);
+  }
+
+  const changedBy = studentChangeActorKey(auth);
+  const updatedAt = Math.max(Date.now(), rowUpdatedAt + 1);
+  const next = taskWithConfig(task, requested, updatedAt, auth.role === 'manager' ? 'manager' : 'admin');
+  const changedFields = ['weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'];
+  const eventId = await studentChangeEventId('weekend-config\n' + taskId + '\n' + next.lessonRevision);
+  try {
+    const update = env.DB.prepare(
+      'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=? AND data=?'
+    ).bind(JSON.stringify(next), updatedAt, updatedAt, app, taskId, owner, rowUpdatedAt, String(row.data));
+    const guard = await taskWriteCasGuardStatement(env, app, 'weekend_flexible_config',
+      [taskId, studentId, rowUpdatedAt, updatedAt].join('\n'), updatedAt);
+    const event = studentChangeEventStatement(env, app, {
+      eventId, studentId, taskId, eventType: 'work_instruction', changedFields,
+      details: { before, after: requested }, audienceStaffIds: [owner],
+      effectiveDate: requested.mode === 'flexible' ? requested.flexibleFrom : null,
+      requiresAck: true, changedAt: updatedAt, changedBy
+    });
+    const results = await env.DB.batch([update, guard, event]);
+    if (!Array.isArray(results) || Number(results[0] && results[0].meta && results[0].meta.changes || 0) !== 1) {
+      return json({ ok: false, code: 'WEEKEND_CONFIG_STALE', error: '수업 설정이 다른 곳에서 먼저 변경되었습니다' }, 409, origin);
+    }
+  } catch (error) {
+    if (isTaskWriteCasConflict(error)) {
+      return json({ ok: false, code: 'WEEKEND_CONFIG_STALE', error: '수업 설정이 다른 곳에서 먼저 변경되었습니다' }, 409, origin);
+    }
+    throw error;
+  }
+  return json({ ok: true, idempotent: false, task: next, updatedAt, config: requested }, 200, origin);
 }
 
 async function checkIn(env, app, body, auth, json, origin) {
@@ -292,8 +463,11 @@ export async function handleWeekendVisit(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '업무 화면에서만 등·하원 기록을 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || 'list');
   if (action === 'list') return await listVisits(env, app, body, auth, json, origin);
+  if (action === 'configure') return await configureLesson(env, app, body, auth, json, origin);
   if (action === 'check_in') return await checkIn(env, app, body, auth, json, origin);
   return await changeVisit(env, app, body, auth, json, origin);
 }
 
-export const weekendVisitInternals = { isWeekendDate, hasWeekendSchedule, kstParts };
+export const weekendVisitInternals = {
+  isWeekendDate, hasWeekendSchedule, kstParts, flexibleConfig, flexibleAllowedOn, monthRange
+};
