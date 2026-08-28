@@ -71,6 +71,24 @@ test('중앙 요청 후보는 인증된 선생님의 오늘 구조화 수업 sta
   assert.match(label, /schedule/);
 });
 
+test('수업무관은 드롭다운의 첫 실제 항목이며 오늘 수업이 없어도 전송 화면을 유지한다', () => {
+  const editor = functionBlock('teacherLiveRequestComposerHtml');
+  const submit = functionBlock('submitTeacherLiveRequest');
+  const normalize = functionBlock('normalizeTeacherLiveRequest');
+
+  assert.match(source, /const TEACHER_LIVE_REQUEST_UNRELATED_ID = '__teacher_live_request_no_lesson__'/);
+  assert.match(editor, /<option value="" disabled hidden/);
+  const unrelatedAt = editor.indexOf('>수업무관</option>');
+  const scheduledLessonAt = editor.indexOf("lessons.map(task => '<option");
+  assert.ok(unrelatedAt >= 0 && unrelatedAt < scheduledLessonAt,
+    '수업무관은 실제 수업 후보보다 앞에 있어야 한다');
+  assert.doesNotMatch(editor, /if \(!lessons\.length\)|!lessons\.length/);
+  assert.match(submit, /lessonTaskId === TEACHER_LIVE_REQUEST_UNRELATED_ID/);
+  assert.match(submit, /!unrelated && !lesson/);
+  assert.match(normalize, /studentLabel: unrelated \? '수업무관'/);
+  assert.match(normalize, /lessonLabel: unrelated \? '수업 연결 없음'/);
+});
+
 test('관리자 수신자 후보는 서버 정본에서 불러오며 일반 직원 목록으로 추측하지 않는다', () => {
   const loader = functionBlock('loadTeacherLiveRequestRecipients');
 

@@ -208,6 +208,41 @@ test('담당 교사는 오늘 진행되는 자신의 활성 수업 요청만 sta
   assert.equal(collision.body.code, 'REQUEST_ID_CONFLICT');
 });
 
+test('재직 교사는 수업이 없는 날에도 예약 ID로 수업무관 요청을 안전하게 멱등 저장한다', async () => {
+  const db = new TestD1(); seed(db);
+  db.database.prepare('DELETE FROM tasks').run();
+  const unrelated = request({
+    requestId: 'tlr_unrelated_001', lessonTaskId: '__teacher_live_request_no_lesson__',
+    body: '수업과 무관한 확인 요청입니다.'
+  });
+  const first = await call(db, unrelated);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.idempotent, false);
+  assert.deepEqual({
+    lessonTaskId: first.body.request.lessonTaskId,
+    studentId: first.body.request.studentId,
+    senderStaffId: first.body.request.senderStaffId
+  }, {
+    lessonTaskId: '__teacher_live_request_no_lesson__',
+    studentId: '__teacher_live_request_no_lesson__', senderStaffId: 'teacher-a'
+  });
+  assert.equal((await call(db, unrelated)).body.idempotent, true);
+  const collision = await call(db, { ...unrelated, body: '같은 ID의 다른 요청입니다.' });
+  assert.equal(collision.status, 409);
+  assert.equal(collision.body.code, 'REQUEST_ID_CONFLICT');
+
+  const wrongDate = await call(db, { ...unrelated, requestId: 'tlr_unrelated_002', lessonDate: dateOffset(-1) });
+  assert.equal(wrongDate.status, 422);
+  const missingTeacher = await call(db, { ...unrelated, requestId: 'tlr_unrelated_003' }, teacher('teacher-missing'));
+  assert.equal(missingTeacher.status, 409);
+  const managerSender = await call(db, { ...unrelated, requestId: 'tlr_unrelated_004' }, manager('manager-a'));
+  assert.equal(managerSender.status, 400);
+  const forgedSentinel = await call(db, {
+    ...unrelated, requestId: 'tlr_unrelated_005', lessonTaskId: '__teacher_live_request_unrelated_forged__'
+  });
+  assert.equal(forgedSentinel.status, 409);
+});
+
 test('비정기 수업은 오늘의 exact 실제 등원 기록이 있을 때만 실시간 요청을 보낸다', async () => {
   const sunday = Date.parse('2026-08-30T10:00:00+09:00');
   await atNow(sunday, async () => {
