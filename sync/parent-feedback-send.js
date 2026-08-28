@@ -46,7 +46,8 @@ const TEMPLATE_V2_FIXED_TEXT =
   ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
   '- 일시 : \n- 과목 : \n- 수업내용 · 진도 : \n- 과제 : \n- 코멘트 : \n\n' +
   '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
-const MAX_ALIMTALK_CHARS = 900;
+export const MAX_PARENT_FEEDBACK_ALIMTALK_CHARS = 900;
+export const MAX_PARENT_FEEDBACK_COMMENT_CHARS = 600;
 
 function safeEqual(a, b) {
   a = String(a || ''); b = String(b || '');
@@ -201,6 +202,23 @@ function totalAlimtalkLength(fields) {
   }
   return TEMPLATE_FIXED_TEXT.length + fields.teacherName.length + fields.studentName.length +
     fields.contentText.length + fields.plusText.length + fields.minusText.length;
+}
+
+/** 승인된 v2 알림톡 고정문구와 나머지 변수 길이를 뺀 뒤 코멘트가 사용할 수 있는
+ *  실제 글자 수를 계산한다. AI 다듬기와 실발송이 같은 900자 상한을 공유한다. */
+export function parentFeedbackV2CommentBudget(fields) {
+  const safe = fields || {};
+  const used = totalAlimtalkLength({
+    templateVersion: 'v2',
+    studentName: String(safe.studentName || ''),
+    dateText: String(safe.dateText || ''),
+    subjectText: String(safe.subjectText || ''),
+    contentText: String(safe.contentText || ''),
+    homeworkText: String(safe.homeworkText || ''),
+    commentText: ''
+  });
+  return Math.max(0, Math.min(MAX_PARENT_FEEDBACK_COMMENT_CHARS,
+    MAX_PARENT_FEEDBACK_ALIMTALK_CHARS - used));
 }
 
 function feedbackDateText(value) {
@@ -369,7 +387,7 @@ export async function attemptParentFeedbackSend(env, app, current) {
   const fields = templateVersion === 'v2'
     ? { templateVersion, studentName, dateText, subjectText, contentText, homeworkText, commentText }
     : { templateVersion, teacherName, studentName, contentText, plusText, minusText };
-  if (totalAlimtalkLength(fields) > MAX_ALIMTALK_CHARS) {
+  if (totalAlimtalkLength(fields) > MAX_PARENT_FEEDBACK_ALIMTALK_CHARS) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '문구가 알림톡 글자수 상한(900자)을 넘어 발송하지 못했습니다', now0);
     return { ok: false, code: 'MESSAGE_TOO_LONG', status: 'content_approved_send_blocked' };
