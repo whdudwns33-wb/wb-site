@@ -1,5 +1,5 @@
 import { validateRosterDocument } from './roster.js';
-import { hasFlexibleWeekendVisit, weekendAttendancePolicyOn } from './weekend-flex.js';
+import { hasFlexibleWeekendVisit, hasWeekendActualVisit, weekendAttendancePolicyOn } from './weekend-flex.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const GROUP_ID = /^mc_[a-f0-9]{48}$/;
@@ -256,7 +256,8 @@ async function checkEvidence(env, app, task, owner, key, expectedAttendance) {
   const weekendPolicy = weekendAttendancePolicyOn(task, sourceDate);
   const occurs = weekendPolicy === 'flexible'
     ? await hasFlexibleWeekendVisit(env, app, task, sourceDate)
-    : weekendPolicy === 'fixed' && occursOn(task, sourceDate);
+    : weekendPolicy === 'fixed' &&
+      (occursOn(task, sourceDate) || await hasWeekendActualVisit(env, app, task, sourceDate));
   if (!occurs) return { error: '원 수업 날짜와 출결 키를 확인해 주세요', code: 'CHECK_IDENTITY_MISMATCH' };
   const row = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
   if (!row || String(row.owner || '') !== owner) return { error: '담당 수업의 출결 근거를 찾을 수 없습니다', code: 'CHECK_NOT_FOUND' };
