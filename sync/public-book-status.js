@@ -50,10 +50,10 @@ async function identityHash(student) {
 async function ready(env) {
   const result = await env.DB.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name IN " +
-    "('book_issues','book_order_student_snapshots','book_order_cancellations'," +
+    "('book_issues','book_order_student_snapshots','book_order_cancellations','book_order_item_cancellations'," +
     "'book_order_sends','book_order_batch_items','book_order_fulfillments')"
   ).all();
-  return new Set((result.results || []).map(row => String(row.name))).size === 6;
+  return new Set((result.results || []).map(row => String(row.name))).size === 7;
 }
 
 function jsonIds(value) {
@@ -61,7 +61,7 @@ function jsonIds(value) {
   return Array.isArray(ids) && ids.every(id => SAFE_ID.test(String(id))) ? ids.map(String).sort() : null;
 }
 
-async function validSnapshotTask(taskRows, document, now) {
+async function validSnapshotTask(taskRows, document, now, cancelledItemIndexes = new Set()) {
   if (!taskRows.length) return false;
   const taskHash = String(taskRows[0].task_identity_hash || '');
   const owner = String(taskRows[0].owner_id || '');
@@ -81,7 +81,7 @@ async function validSnapshotTask(taskRows, document, now) {
   const indices = [...byItem.keys()].sort((a, b) => a - b);
   if (indices.length !== expectedItemCount || indices.some((index, position) => index !== position)) return false;
   const students = new Map(document.roster.students.map(student => [String(student.id), student]));
-  for (const itemRows of byItem.values()) {
+  for (const [itemIndex, itemRows] of byItem) {
     const first = itemRows[0];
     const ids = itemRows.map(row => String(row.student_id)).sort();
     if (new Set(ids).size !== ids.length ||
@@ -91,8 +91,10 @@ async function validSnapshotTask(taskRows, document, now) {
           String(row.public_title || '') !== '주문 교재' || String(first.public_title || '') !== '주문 교재' ||
           String(row.student_set_hash || '') !== String(first.student_set_hash || '') ||
           String(row.item_identity_hash || '') !== String(first.item_identity_hash || '')) return false;
-      const student = students.get(String(row.student_id));
-      if (!student || await identityHash(student) !== String(row.student_identity_hash || '')) return false;
+      if (!cancelledItemIndexes.has(itemIndex)) {
+        const student = students.get(String(row.student_id));
+        if (!student || await identityHash(student) !== String(row.student_identity_hash || '')) return false;
+      }
     }
   }
   return true;
@@ -153,7 +155,8 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
   const targetCte = 'WITH target_tasks AS (' +
     'SELECT task_id FROM book_order_student_snapshots WHERE app=? AND student_id=? ' +
     'GROUP BY task_id ORDER BY MAX(created_at) DESC LIMIT 100) ';
-  const [snapshotResult, sendResult, mappingResult, fulfillmentResult, cancellationResult, taskResult] = await Promise.all([
+  const [snapshotResult, sendResult, mappingResult, fulfillmentResult, cancellationResult, itemCancellationResult,
+    taskResult] = await Promise.all([
     env.DB.prepare(
       targetCte +
       'SELECT task_id,item_index,owner_id,book_id,public_title,student_id,student_identity_hash,' +
@@ -183,6 +186,10 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
     env.DB.prepare(
       targetCte + 'SELECT task_id,cancelled_at FROM book_order_cancellations WHERE app=? ' +
       'AND EXISTS (SELECT 1 FROM target_tasks target WHERE target.task_id=book_order_cancellations.task_id)'
+    ).bind('task', exactId, 'task').all(),
+    env.DB.prepare(
+      targetCte + 'SELECT task_id,item_index,cancelled_at FROM book_order_item_cancellations WHERE app=? ' +
+      'AND EXISTS (SELECT 1 FROM target_tasks target WHERE target.task_id=book_order_item_cancellations.task_id)'
     ).bind('task', exactId, 'task').all(),
     env.DB.prepare(
       targetCte + "SELECT id,json_extract(data,'$.orderDelivery') AS order_delivery FROM tasks WHERE app=? " +
@@ -215,13 +222,18 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
     String(row.task_id || '') + '|' + Number(row.item_index), row
   ]));
   const cancellations = new Map((cancellationResult.results || []).map(row => [String(row.task_id), Number(row.cancelled_at)]));
+  const itemCancellations = new Map((itemCancellationResult.results || []).map(row => [
+    String(row.task_id) + '|' + Number(row.item_index), Number(row.cancelled_at)
+  ]));
   const deliveryByTask = new Map((taskResult.results || []).map(row => [
     String(row.id || ''), String(row.order_delivery || '')
   ]));
 
   for (const [taskId, taskRows] of snapshotByTask) {
+    const cancelledItemIndexes = new Set((itemCancellationResult.results || [])
+      .filter(row => String(row.task_id) === taskId).map(row => Number(row.item_index)));
     if (!taskRows.some(row => String(row.student_id) === exactId) ||
-        !await validSnapshotTask(taskRows, document, now)) continue;
+        !await validSnapshotTask(taskRows, document, now, cancelledItemIndexes)) continue;
     const byItem = new Map();
     for (const row of taskRows) {
       const index = Number(row.item_index);
@@ -240,7 +252,7 @@ export async function readPublicBookStatus(env, studentId, now = Date.now()) {
         ['teacher_received', 'student_handed', 'academy_registered'].includes(String(fulfillment.status || ''))
       );
       if (!fulfillmentValid) continue;
-      const cancelledAt = cancellations.get(taskId) || 0;
+      const cancelledAt = itemCancellations.get(taskId + '|' + itemIndex) || cancellations.get(taskId) || 0;
       const send = sendByTask.get(taskId) || null;
       // 037 이전 호환 snapshot에는 task 행이 없을 수 있으며 당시 유일한 방식은 문자 일괄 주문이었다.
       const delivery = deliveryByTask.has(taskId) ? deliveryByTask.get(taskId) : 'scheduled_batch_v1';

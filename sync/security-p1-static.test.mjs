@@ -117,7 +117,7 @@ test('기존 운영 DB의 포털 배포는 중복 migration과 역순 배포를 
   assert.match(studentWrangler, /WB_STUDENT_PORTAL_BASE_URL\s*=\s*"https:\/\/wb-student\.whdudwns33\.workers\.dev\/"/);
 });
 
-test('포털 배포 probe는 fresh schema의 선행 구조와 036~040 객체를 정확히 센다', () => {
+test('포털 배포 probe는 fresh schema의 선행 구조와 배포 객체를 정확히 센다', () => {
   const database = new DatabaseSync(':memory:');
   database.exec(schema);
   const rows = portalProbe.split(';').map(statement => statement.trim()).filter(Boolean)
@@ -126,6 +126,7 @@ test('포털 배포 probe는 fresh schema의 선행 구조와 036~040 객체를 
     ['prerequisite_tables', 9, 9],
     ['migration_036_objects', 10, 10],
     ['migration_037_objects', 21, 21],
+    ['migration_056_objects', 6, 6],
     ['migration_038_objects', 10, 10],
     ['migration_038_columns', 2, 2],
     ['migration_039_objects', 4, 4],

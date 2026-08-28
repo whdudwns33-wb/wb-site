@@ -180,6 +180,8 @@ test('쿠팡 주문도 서버 1단계에 남고 수동 주문완료·실패 결�
   assert.match(rowAction, /data-act="bookordermanualresult"/);
   assert.match(rowAction, /data-result="completed"/);
   assert.match(rowAction, /data-result="failed"/);
+  assert.match(rowAction, />쿠팡 주문완료<\/button>/);
+  assert.match(rowAction, />쿠팡 주문실패<\/button>/);
 
   const transition = block('async function transitionManualOnlineOrder(', 'async function saveLegacyBookOrderPrice(');
   assert.match(transition, /sync\.post\('\/book-issue', \{/);

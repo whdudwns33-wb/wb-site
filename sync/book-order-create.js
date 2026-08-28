@@ -13,7 +13,7 @@ const MAX_ITEMS = 50;
 const MAX_STUDENTS = 200;
 const MAX_UNIT_PRICE = 10000000;
 export const MAX_BOOK_ORDER_MESSAGE_BYTES = 2000;
-const ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'vendorName', 'items', 'expectedUpdatedAt']);
+const ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'vendorName', 'items', 'expectedUpdatedAt', 'itemIndex']);
 const ALLOWED_ITEM_KEYS = new Set(['bookId', 'title', 'studentIds', 'unitPrice', 'publisherName']);
 const BOUND_ALLOWED_KEYS = new Set(['app', 'auth', 'action', 'taskId', 'productCode', 'title', 'studentIds']);
 const BOUND_DELIVERY = 'bound_print_v1';
@@ -185,9 +185,23 @@ export async function loadOrderSnapshotRows(env, app, taskId) {
   return result.results || [];
 }
 
+export async function loadOrderItemCancellationRows(env, app, taskId) {
+  const sql = 'SELECT task_id,item_index,book_id,cancelled_at,cancelled_by FROM book_order_item_cancellations WHERE app=?' +
+    (taskId ? ' AND task_id=?' : '') + ' ORDER BY task_id,item_index';
+  const statement = env.DB.prepare(sql).bind(app, ...(taskId ? [taskId] : []));
+  const result = await statement.all();
+  return result.results || [];
+}
+
+export function cancelledOrderItemIndexes(rows, taskId) {
+  return new Set((rows || []).filter(row => String(row.task_id) === String(taskId))
+    .map(row => Number(row.item_index)).filter(index => Number.isInteger(index) && index >= 0));
+}
+
 /** Only a task outside the sealed namespace and without a seal marker may be a zero-row legacy order. */
 export async function verifyOrderTaskSnapshotRows(
-  taskId, owner, task, rows, document, now = Date.now(), requireCurrentEnrollment = true
+  taskId, owner, task, rows, document, now = Date.now(), requireCurrentEnrollment = true,
+  cancelledItemIndexes = new Set()
 ) {
   const selected = (rows || []).filter(row => String(row.task_id) === String(taskId));
   if (!selected.length) {
@@ -280,7 +294,7 @@ export async function verifyOrderTaskSnapshotRows(
           Number(row.expected_row_count) !== expectedRowCount) {
         return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
       }
-      if (rosterById) {
+      if (rosterById && !cancelledItemIndexes.has(index)) {
         const student = rosterById.get(String(row.student_id));
         if (!student || (requireCurrentEnrollment && !activeStudent(student, month)) ||
             await studentIdentityHash(student) !== String(row.student_identity_hash || '')) {
@@ -293,17 +307,22 @@ export async function verifyOrderTaskSnapshotRows(
 }
 
 export async function verifyOrderTaskSnapshot(env, app, taskId, owner, task, document, now) {
-  const rows = await loadOrderSnapshotRows(env, app, taskId);
+  const [rows, cancellations] = await Promise.all([
+    loadOrderSnapshotRows(env, app, taskId),
+    loadOrderItemCancellationRows(env, app, taskId)
+  ]);
   if (!rows.length) return verifyOrderTaskSnapshotRows(taskId, owner, task, rows, null, now);
   const roster = document === undefined ? await currentRoster(env, app) : document;
   if (!roster) return { sealed: true, valid: false, code: 'ORDER_STUDENT_IDENTITY_CHANGED' };
-  return verifyOrderTaskSnapshotRows(taskId, owner, task, rows, roster, now);
+  return verifyOrderTaskSnapshotRows(taskId, owner, task, rows, roster, now, true,
+    cancelledOrderItemIndexes(cancellations, taskId));
 }
 
 function requestError(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return true;
   if (Object.keys(body).some(key => !ALLOWED_KEYS.has(key)) || body.action !== 'create') return true;
   if (Object.prototype.hasOwnProperty.call(body, 'expectedUpdatedAt') ||
+      Object.prototype.hasOwnProperty.call(body, 'itemIndex') ||
       !SAFE_ORDER_TASK_ID.test(String(body.taskId || '')) || !Array.isArray(body.items) ||
       !body.items.length || body.items.length > MAX_ITEMS) return true;
   return body.items.some(item => !item || typeof item !== 'object' || Array.isArray(item) ||
@@ -334,6 +353,17 @@ function cancelRequestError(body) {
       Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) return true;
   const expected = Number(body.expectedUpdatedAt);
   return !SAFE_ORDER_TASK_ID.test(String(body.taskId || '')) || !Number.isInteger(expected) || expected <= 0 ||
+    Object.prototype.hasOwnProperty.call(body, 'vendorName') || Object.prototype.hasOwnProperty.call(body, 'items') ||
+    Object.prototype.hasOwnProperty.call(body, 'itemIndex');
+}
+
+function cancelItemRequestError(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || body.action !== 'cancel_item' ||
+      Object.keys(body).some(key => !ALLOWED_KEYS.has(key))) return true;
+  const expected = Number(body.expectedUpdatedAt);
+  const itemIndex = Number(body.itemIndex);
+  return !SAFE_ORDER_TASK_ID.test(String(body.taskId || '')) || !Number.isInteger(expected) || expected <= 0 ||
+    !Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= MAX_ITEMS ||
     Object.prototype.hasOwnProperty.call(body, 'vendorName') || Object.prototype.hasOwnProperty.call(body, 'items');
 }
 
@@ -730,6 +760,120 @@ async function createImmediateOrder(env, app, body, origin, auth, json) {
   return json({ ok: true, idempotent: false, task }, 201, origin);
 }
 
+async function cancelSealedOrderItem(env, app, body, origin, auth, json) {
+  if (app !== 'task' || cancelItemRequestError(body)) {
+    return json({ ok: false, code: 'ORDER_INVALID', error: '취소할 교재와 최신 상태를 다시 확인해 주세요' }, 400, origin);
+  }
+  const lock = await acquireBookOrderDispatchLock(env, app, 'cancel_item', Date.now());
+  if (!lock) {
+    return json({ ok: false, code: 'ORDER_CANCEL_SEND_ACTIVE', error: '주문 발송 확인 중에는 취소할 수 없습니다' }, 409, origin);
+  }
+  const taskId = String(body.taskId);
+  const itemIndex = Number(body.itemIndex);
+  try {
+    const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+      .bind(app, taskId).first();
+    if (!row) return json({ ok: false, error: '주문 지시서를 찾을 수 없습니다' }, 404, origin);
+    if (auth.scope === 'own' && String(row.owner || '') !== String(auth.id || '')) {
+      return json({ ok: false, error: '본인이 만든 주문만 취소할 수 있습니다' }, 403, origin);
+    }
+    const task = parseJson(row.data || '{}', null);
+    const item = task && Array.isArray(task.orderItems) ? task.orderItems[itemIndex] : null;
+    if (!task || !item || Number(task.orderIdentityVersion) !== 1) {
+      return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING',
+        error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+    }
+    const bookId = String(item.bookId || '');
+    if (!SAFE_ID.test(bookId)) {
+      return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '주문 교재의 정체성 확인이 필요합니다' }, 409, origin);
+    }
+    let cancelled = await env.DB.prepare(
+      'SELECT task_id,item_index,book_id,cancelled_at FROM book_order_item_cancellations ' +
+      'WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+    ).bind(app, taskId, itemIndex).first();
+    if (cancelled) {
+      if (String(cancelled.book_id || '') !== bookId) {
+        return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '취소 원장의 교재 정체성이 일치하지 않습니다' }, 409, origin);
+      }
+      return json({ ok: true, idempotent: true, cancellation: {
+        taskId, itemIndex, cancelledAt: Number(cancelled.cancelled_at)
+      } }, 200, origin);
+    }
+    if (task.deleted || !['scheduled_batch_v1', MANUAL_ONLINE_DELIVERY].includes(String(task.orderDelivery || ''))) {
+      return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING',
+        error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+    }
+    const [snapshots, existingCancellations] = await Promise.all([
+      loadOrderSnapshotRows(env, app, taskId),
+      loadOrderItemCancellationRows(env, app, taskId)
+    ]);
+    const verified = await verifyOrderTaskSnapshotRows(
+      taskId, row.owner, task, snapshots, null, Date.now(), true,
+      cancelledOrderItemIndexes(existingCancellations, taskId)
+    );
+    if (!verified.valid) {
+      return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '주문 내용의 정체성 확인이 필요합니다' }, 409, origin);
+    }
+    if (Number(row.updated_at) !== Number(body.expectedUpdatedAt)) {
+      return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다' }, 409, origin);
+    }
+    const fulfillment = await env.DB.prepare(
+      'SELECT 1 AS found FROM book_order_fulfillments WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+    ).bind(app, taskId, itemIndex).first();
+    if (fulfillment) {
+      return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING', error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+    }
+    const send = await env.DB.prepare(
+      'SELECT 1 AS found FROM book_order_sends send LEFT JOIN book_order_batch_items mapped ' +
+      'ON mapped.app=send.app AND mapped.send_id=send.send_id WHERE send.app=? ' +
+      'AND (send.task_id=? OR mapped.task_id=?) LIMIT 1'
+    ).bind(app, taskId, taskId).first();
+    if (send) {
+      return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING', error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+    }
+    const now = Date.now();
+    const actor = originFor(auth);
+    let inserted;
+    try {
+      inserted = await env.DB.prepare(
+        'INSERT OR IGNORE INTO book_order_item_cancellations(app,task_id,item_index,book_id,cancelled_at,cancelled_by) ' +
+        'SELECT ?,?,?,?,?,? WHERE EXISTS (' +
+          "SELECT 1 FROM tasks WHERE app=? AND id=? AND updated_at=? AND COALESCE(json_extract(data,'$.deleted'),0)=0" +
+        ') AND NOT EXISTS (' +
+          'SELECT 1 FROM book_order_sends active LEFT JOIN book_order_batch_items mapped ' +
+          'ON mapped.app=active.app AND mapped.send_id=active.send_id WHERE active.app=? ' +
+          'AND (active.task_id=? OR mapped.task_id=?)' +
+        ') AND NOT EXISTS (' +
+          'SELECT 1 FROM book_order_fulfillments fulfillment WHERE fulfillment.app=? ' +
+          'AND fulfillment.task_id=? AND fulfillment.item_index=?' +
+        ')'
+      ).bind(app, taskId, itemIndex, bookId, now, actor,
+        app, taskId, Number(body.expectedUpdatedAt), app, taskId, taskId, app, taskId, itemIndex).run();
+    } catch (error) {
+      if (/BOOK_ORDER_ITEM_CANCEL_NOT_WAITING/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING', error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+      }
+      throw error;
+    }
+    cancelled = await env.DB.prepare(
+      'SELECT task_id,item_index,book_id,cancelled_at FROM book_order_item_cancellations ' +
+      'WHERE app=? AND task_id=? AND item_index=? LIMIT 1'
+    ).bind(app, taskId, itemIndex).first();
+    if (cancelled && String(cancelled.book_id || '') === bookId) {
+      return json({ ok: true, idempotent: !inserted || !inserted.meta || Number(inserted.meta.changes || 0) !== 1,
+        cancellation: { taskId, itemIndex, cancelledAt: Number(cancelled.cancelled_at) } }, 200, origin);
+    }
+    const fresh = await env.DB.prepare('SELECT updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+      .bind(app, taskId).first();
+    if (!fresh || Number(fresh.updated_at) !== Number(body.expectedUpdatedAt)) {
+      return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 주문이 먼저 변경되었습니다' }, 409, origin);
+    }
+    return json({ ok: false, code: 'ORDER_CANCEL_NOT_WAITING', error: '1단계 주문대기 교재만 취소할 수 있습니다' }, 409, origin);
+  } finally {
+    await releaseBookOrderDispatchLockSafely(env, app, lock);
+  }
+}
+
 async function cancelSealedOrder(env, app, body, origin, auth, json) {
   if (app !== 'task' || cancelRequestError(body)) {
     return json({ ok: false, code: 'ORDER_INVALID', error: '취소할 주문과 최신 상태를 다시 확인해 주세요' }, 400, origin);
@@ -774,11 +918,13 @@ async function cancelSealedOrder(env, app, body, origin, auth, json) {
     const active = await env.DB.prepare(
       'SELECT send.status FROM book_order_sends send LEFT JOIN book_order_batch_items item ' +
       'ON item.app=send.app AND item.send_id=send.send_id WHERE send.app=? ' +
-      "AND (item.task_id=? OR (send.task_id=? AND send.task_id LIKE 'ord_%')) " +
-      "AND send.status IN ('reserved','dispatching','accepted','unknown') LIMIT 1"
+      'AND (item.task_id=? OR send.task_id=?) LIMIT 1'
     ).bind(app, taskId, taskId).first();
     if (active) {
-      return json({ ok: false, code: 'ORDER_CANCEL_SEND_ACTIVE', error: '이미 발송 중이거나 접수된 주문은 취소할 수 없습니다' }, 409, origin);
+      const stillActive = ['reserved', 'dispatching', 'accepted', 'unknown'].includes(String(active.status || ''));
+      return json({ ok: false, code: stillActive ? 'ORDER_CANCEL_SEND_ACTIVE' : 'ORDER_CANCEL_NOT_WAITING',
+        error: stillActive ? '이미 발송 중이거나 접수된 주문은 취소할 수 없습니다' :
+          '1단계 주문대기 상태에서만 취소할 수 있습니다' }, 409, origin);
     }
     const now = Date.now();
     const next = { ...task, deleted: true, orderCancelledAt: now, updatedAt: now,
@@ -807,6 +953,7 @@ export async function handleBookOrderCreate(env, app, body, origin, auth, json) 
   if (body && ['create_bound', 'create_internal'].includes(body.action)) {
     return createImmediateOrder(env, app, body, origin, auth, json);
   }
+  if (body && body.action === 'cancel_item') return cancelSealedOrderItem(env, app, body, origin, auth, json);
   if (body && body.action === 'cancel') return cancelSealedOrder(env, app, body, origin, auth, json);
   if (app !== 'task' || requestError(body)) {
     return json({ ok: false, code: 'ORDER_INVALID', error: '교재 주문 항목과 학생 선택을 다시 확인해 주세요' }, 400, origin);

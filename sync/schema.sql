@@ -927,6 +927,18 @@ CREATE TABLE IF NOT EXISTS book_order_cancellations (
   PRIMARY KEY (app, task_id)
 );
 
+CREATE TABLE IF NOT EXISTS book_order_item_cancellations (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  task_id      TEXT    NOT NULL,
+  item_index   INTEGER NOT NULL CHECK (item_index >= 0),
+  book_id      TEXT    NOT NULL,
+  cancelled_at INTEGER NOT NULL CHECK (cancelled_at > 0),
+  cancelled_by TEXT    NOT NULL CHECK (cancelled_by IN ('admin','manager','staff')),
+  PRIMARY KEY (app, task_id, item_index)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_item_cancellations_book
+  ON book_order_item_cancellations(app, book_id, cancelled_at);
+
 CREATE TRIGGER IF NOT EXISTS trg_book_order_snapshots_no_update
 BEFORE UPDATE ON book_order_student_snapshots
 BEGIN
@@ -987,6 +999,62 @@ CREATE TRIGGER IF NOT EXISTS trg_book_order_cancellations_no_delete
 BEFORE DELETE ON book_order_cancellations
 BEGIN
   SELECT RAISE(ABORT, 'BOOK_ORDER_CANCELLATION_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_cancellations_guard
+BEFORE INSERT ON book_order_item_cancellations
+WHEN NOT (
+  EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id
+      AND snapshot.item_index=NEW.item_index AND snapshot.book_id=NEW.book_id
+  )
+  AND EXISTS (
+    SELECT 1 FROM tasks task
+    WHERE task.app=NEW.app AND task.id=NEW.task_id
+      AND COALESCE(json_extract(task.data, '$.deleted'), 0)=0
+      AND json_extract(task.data, '$.orderDelivery') IN ('scheduled_batch_v1','manual_online_v1')
+      AND json_type(task.data, '$.orderItems[' || NEW.item_index || ']')='object'
+      AND CAST(json_extract(task.data, '$.orderItems[' || NEW.item_index || '].bookId') AS TEXT)=NEW.book_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_cancellations cancellation
+    WHERE cancellation.app=NEW.app AND cancellation.task_id=NEW.task_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_fulfillments fulfillment
+    WHERE fulfillment.app=NEW.app AND fulfillment.task_id=NEW.task_id
+      AND fulfillment.item_index=NEW.item_index
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_sends send
+    LEFT JOIN book_order_batch_items item
+      ON item.app=send.app AND item.send_id=send.send_id
+    WHERE send.app=NEW.app AND (send.task_id=NEW.task_id OR item.task_id=NEW.task_id)
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_dispatch_lock dispatch
+    WHERE dispatch.app=NEW.app AND dispatch.owner NOT GLOB 'cancel_item_*'
+      AND dispatch.lease_until > NEW.cancelled_at
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_CANCEL_NOT_WAITING');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_cancellations_release
+AFTER INSERT ON book_order_item_cancellations
+BEGIN
+  UPDATE book_order_active_targets SET active=0
+  WHERE app=NEW.app AND task_id=NEW.task_id AND item_index=NEW.item_index AND active=1;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_cancellations_no_update
+BEFORE UPDATE ON book_order_item_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_item_cancellations_no_delete
+BEFORE DELETE ON book_order_item_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_book_order_sealed_task_update
@@ -1061,6 +1129,11 @@ WHEN OLD.app='task' AND EXISTS (
       WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id
     )
     AND NOT EXISTS (
+      SELECT 1 FROM book_order_item_cancellations item_cancellation
+      WHERE item_cancellation.app=snapshot.app AND item_cancellation.task_id=snapshot.task_id
+        AND item_cancellation.item_index=snapshot.item_index
+    )
+    AND NOT EXISTS (
       SELECT 1 FROM book_order_fulfillments fulfillment
       WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id
         AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id
@@ -1116,6 +1189,11 @@ WHEN OLD.app='task' AND EXISTS (
     AND NOT EXISTS (
       SELECT 1 FROM book_order_cancellations cancellation
       WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_item_cancellations item_cancellation
+      WHERE item_cancellation.app=snapshot.app AND item_cancellation.task_id=snapshot.task_id
+        AND item_cancellation.item_index=snapshot.item_index
     )
     AND NOT EXISTS (
       SELECT 1 FROM book_order_fulfillments fulfillment
