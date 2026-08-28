@@ -418,7 +418,8 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.match(html, /let guardianDeliveryStudentIds = new Set\(\)/);
   assert.match(html, /function guardianContactEnabledFor\(studentId\)/);
   assert.match(html, /applyGuardianDeliveryStudentIds\(result\.deliveryEnabledStudentIds\)/);
-  assert.match(html, /data-act="feedbacksubmit">보호자 알림톡 보내기/);
+  assert.match(html, /data-act="feedbackpolish">AI 다듬기/);
+  assert.match(html, /data-act="feedbackfinalsend">최종 전송/);
   assert.match(html, /학부모 연락 기능 사용 중지/);
   assert.match(html, /if \(!guardianContactEnabledFor\(task && task\.studentId\)\) return toast\('이 학생은 학부모 전달 테스트 대상이 아닙니다'\)/);
   assert.match(html, /confirm\('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요\?'\)/);
@@ -451,8 +452,11 @@ test('feedback v2 preview uses the fixed approved template and keeps send fields
   assert.match(compute, /memo\.contentProgress[\s\S]*doneSteps\.length[\s\S]*taskCardDetail\(t\)/);
   assert.doesNotMatch(preview, /id="fldContent"|<label class="fl">오늘 배운 내용<\/label>/);
   assert.match(preview, /templateVersion: templateVersion,[\s\S]*contentText: feedbackFlatField/);
+  assert.match(preview, /baseCommentText: String\(fields\.baseCommentText \|\| initialCommentText\)/);
   assert.match(preview, /templateVersion === 'v2' \? ' readonly'/);
   assert.match(preview, /승인 템플릿과 실제 발송 변수로 만든 최종 미리보기입니다/);
+  assert.match(preview, /data-act="feedbackpolish">AI 다듬기/);
+  assert.match(preview, /data-act="feedbackfinalsend">최종 전송/);
   assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
   assert.match(submit, /templateVersion: templateVersion/);
   assert.match(submit, /homeworkText: fbCtx\.homeworkText, commentText: fbCtx\.commentText/);
@@ -469,7 +473,8 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
   assert.match(bank, /formalFeedbackSentenceCount\(\) < 100/);
   assert.match(bank, /function formalizeDirectFeedback/);
   assert.match(bank, /\[\/했어요\$\/, '했습니다'\]/);
-  assert.match(bank, /선생님이 직접 기록한 핵심 내용은/);
+  assert.match(bank, /const FB_DIRECT_SOFT_PATTERNS/);
+  assert.doesNotMatch(bank, /선생님이 직접 기록한 핵심 내용은|[“”]/);
   assert.match(template, /안녕하세요, WB 웩슬러브레인센터\(독해력학원\) 입니다\./);
   assert.match(template, /학생의 오늘 수업 피드백을 정리해 보내드립니다/);
   for (const label of ['- 일시 : ', '- 과목 : ', '- 수업내용 · 진도 : ', '- 과제 : ', '- 코멘트 : ']) {
@@ -479,9 +484,32 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
   assert.match(html, /String\(t\.studentId \|\| ''\) \+ '\|' \+ t\.id \+ '\|' \+ date/);
   const helpers = Function(bank + '; return { count: formalFeedbackSentenceCount(), formalize: formalizeDirectFeedback };')();
   assert.ok(helpers.count >= 100, '격식체 기본 문장이 실제로 100개 이상이어야 한다');
-  assert.equal(helpers.formalize('집중을 잘했어요'), '집중을 잘했습니다.');
+  assert.equal(helpers.formalize('집중을 잘했어요'), '수업 중 집중력을 안정적으로 유지하며 학습에 성실하게 참여했습니다.');
   assert.equal(helpers.formalize('스스로 설명해요'), '스스로 설명합니다.');
-  assert.equal(helpers.formalize('어휘 정리'), '선생님이 직접 기록한 핵심 내용은 “어휘 정리”입니다.');
+  assert.equal(helpers.formalize('어휘 정리'), '어휘 정리와 관련한 학습 과정을 학생의 현재 흐름에 맞추어 차분히 확인하고 있습니다.');
+  assert.equal(helpers.formalize('자꾸 산만함'), '수업 중 집중력을 유지하는 데 다소 어려움이 있었습니다.');
+});
+
+test('feedback AI polish updates only the send comment and exact fixed-template preview before a separate final send', () => {
+  const polishStart = html.indexOf('async function polishFeedbackComment(');
+  const polishEnd = html.indexOf('let feedbackSubmitting', polishStart);
+  const polish = html.slice(polishStart, polishEnd);
+  const submitStart = html.indexOf('async function submitFeedbackForReview(');
+  const submitEnd = html.indexOf('async function reviewFeedbackRequest(', submitStart);
+  const submit = html.slice(submitStart, submitEnd);
+  assert.match(polish, /sync\.post\('\/feedback-polish'/);
+  assert.match(polish, /commentText: sourceComment/);
+  assert.doesNotMatch(polish, /otherNotes|guardian|phone|studentName/);
+  assert.match(polish, /if \(fbCtx !== context \|\| Number\(context\.polishSeq\) !== seq\) return/);
+  assert.match(polish, /context\.commentText = commentText/);
+  assert.match(polish, /preview\.value = nextMessage/);
+  assert.match(polish, /feedbackV2Message\(task, context\.date/);
+  assert.match(polish, /FEEDBACK_ALIMTALK_MAX_CHARS/);
+  assert.match(submit, /if \(fbCtx\.polishPending\) return toast/);
+  assert.match(submit, /feedbackSubmitting = true/);
+  assert.match(submit, /finally \{[\s\S]*feedbackSubmitting = false/);
+  assert.match(html, /case 'feedbackpolish': polishFeedbackComment\(el\)/);
+  assert.match(html, /case 'feedbackfinalsend': submitFeedbackForReview\(el\)/);
 });
 
 test('feedback interview includes the new condition choices and omits every category explicitly set to none', () => {
