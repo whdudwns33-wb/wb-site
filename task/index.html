@@ -1016,11 +1016,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-29.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-29.1"></script>
-<script src="./asset-core.js?v=2026-08-29.1"></script>
-<script src="./qr-core.js?v=2026-08-29.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-29.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-29.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-29.2"></script>
+<script src="./asset-core.js?v=2026-08-29.2"></script>
+<script src="./qr-core.js?v=2026-08-29.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-29.2"></script>
 <script>
 "use strict";
 
@@ -9883,6 +9883,21 @@ function bookOrderStudentScopeText() {
   return session.isAdmin ? '재원생 전체' : '내 담당 수업 학생 전체';
 }
 
+/** 교재 선택에서는 학교급만 적힌 school과 같은 급의 학년을 한 번만 표시한다. */
+function bookOrderStudentSchoolGradeLabel(student) {
+  const school = String(student && student.school || '').trim();
+  const normalizedSchool = school.normalize('NFKC').replace(/\s+/g, '');
+  const genericLevel = ({
+    '초': '초', '초등': '초', '초교': '초', '초등학교': '초',
+    '중': '중', '중등': '중', '중교': '중', '중학교': '중',
+    '고': '고', '고등': '고', '고교': '고', '고등학교': '고'
+  })[normalizedSchool] || '';
+  const grade = studentDisplayGradeLabel(student);
+  const gradeLevel = (grade.match(/^(초|중|고)[1-6]$/) || [])[1] || '';
+  return genericLevel && genericLevel === gradeLevel
+    ? grade : studentSchoolGradeDetailLabel(student);
+}
+
 function orderStudentPicker(row) {
   const students = orderStudentCandidates();
   const selectedIds = new Set((Array.isArray(row.studentIds) ? row.studentIds : []).map(String));
@@ -9892,7 +9907,7 @@ function orderStudentPicker(row) {
       '<label class="book-order-picker-option"><input type="checkbox" data-order-student data-book="' + esc(row.id) + '" value="' + esc(student.id) + '"' +
       (selectedIds.has(String(student.id)) ? ' checked' : '') + '>' +
       '<span>' + esc(student.name || '이름 미입력') + ' <small class="card-sub">' +
-      esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') +
+      esc(bookOrderStudentSchoolGradeLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') +
     '</div></details>';
 }
 
@@ -10958,7 +10973,7 @@ function openBookOrderStudentLink(button) {
     '<div class="book-order-picker-list">' + students.map(student =>
       '<label class="book-order-picker-option"><input type="checkbox" data-order-link-student value="' + esc(student.id) + '">' +
       '<span>' + esc(student.name || '이름 미입력') + ' <small class="card-sub">' +
-      esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') + '</div>',
+      esc(bookOrderStudentSchoolGradeLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') + '</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="bookorderlinksave" data-task="' + esc(taskId) +
       '" data-item="' + itemIndex + '" data-book="' + esc(book.id) + '" data-task-updated="' + Number(row.taskUpdatedAt || 0) + '">학생 연결 저장</button>');
 }
@@ -11329,7 +11344,7 @@ function externalBookOrderOptionsHtml() {
         (students.length ? students.map(student => '<label class="book-order-picker-option"><input type="checkbox" data-external-student value="' +
           esc(student.id) + '"' + (externalBookDraft.studentIds.includes(String(student.id)) ? ' checked' : '') +
           (externalBookSubmitting ? ' disabled' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          ' <small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
+          ' <small class="card-sub">' + esc(bookOrderStudentSchoolGradeLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') :
           '<div class="hint">연결할 수 있는 현재 재원 학생이 없습니다.</div>') + '</div></fieldset>' +
       '<div class="small muted mt8" data-external-order-total>' + (total
@@ -11499,7 +11514,7 @@ function openInternalBookStudentModal() {
       '<div class="book-order-picker-list">' + students.map(student =>
         '<label class="book-order-picker-option"><input type="checkbox" data-internal-book-student value="' + esc(student.id) + '"' +
           (selectedIds.has(String(student.id)) ? ' checked' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          ' <small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
+          ' <small class="card-sub">' + esc(bookOrderStudentSchoolGradeLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') + '</div></fieldset>',
     '<button class="btn btn-primary btn-block mt14" data-act="internalbookstudentlinksave"' +
       (selectedIds.size ? '' : ' disabled') + '>학생 연결 완료</button>');
@@ -11629,7 +11644,7 @@ function openBoundBookStudentModal() {
       '<div class="book-order-picker-list">' + students.map(student =>
         '<label class="book-order-picker-option"><input type="checkbox" data-bound-book-student value="' + esc(student.id) + '"' +
           (selectedIds.has(String(student.id)) ? ' checked' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          ' <small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
+          ' <small class="card-sub">' + esc(bookOrderStudentSchoolGradeLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') + '</div></fieldset>',
     '<button class="btn btn-primary btn-block mt14" data-act="boundbookstudentlinksave"' +
       (previous && previous.title && selectedIds.size ? '' : ' disabled') + '>학생 연결 완료</button>');
@@ -19448,7 +19463,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-29.1';
+const APP_VER = '2026-08-29.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
