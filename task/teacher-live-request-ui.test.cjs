@@ -27,7 +27,7 @@ test('교사 오늘 화면은 관리자 요청과 선생님 요청을 주말 등
   const today = block('function viewToday()', 'function taskRow');
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
 
-  assert.match(today, /session\.isStaffLink && me\.id === session\.staffId && cursor === today\(\)/);
+  assert.match(today, /session\.isStaffLink && !session\.isAdmin && me\.id === session\.staffId && cursor === today\(\)/);
   const receivedAt = today.indexOf('teacherReceivedAdminDirectiveHtml(me.id)');
   const composerAt = today.indexOf('teacherLiveRequestComposerHtml(me, cursor)');
   const weekendAt = today.indexOf('weekendVisitTeacherHtml(me, cursor)');
@@ -40,6 +40,7 @@ test('교사 오늘 화면은 관리자 요청과 선생님 요청을 주말 등
 test('중앙 선생님 요청은 접힌 화면 안에서 오늘 수업·본문·관리자 한 명·전송을 제공한다', () => {
   const editor = functionBlock('teacherLiveRequestComposerHtml');
 
+  assert.match(editor, /session\.isAdmin/);
   assert.match(editor, /<details/);
   assert.match(editor, /data-persist-key="today-teacher-live-request/);
   assert.match(editor, /data-teacher-live-request-lesson/);
@@ -64,7 +65,7 @@ test('중앙 요청 후보는 인증된 선생님의 오늘 구조화 수업 sta
   assert.match(lessons, /isSessionLessonTask\(task\)/);
   assert.match(lessons, /task\.staffId/);
   assert.doesNotMatch(lessons, /currentStaff\(|viewStaff|isLesson\(/);
-  assert.doesNotMatch(lessons, /session\.isAdmin/);
+  assert.match(lessons, /session\.isAdmin/);
   assert.match(label, /student/);
   assert.match(label, /subject/);
   assert.match(label, /schedule/);
@@ -122,6 +123,9 @@ test('요청 카드는 사용자 입력과 학생·수업 문맥을 escape하고
   assert.match(card, /(?:모든|전체) 관리자/);
   assert.match(card, /esc\(row\.body\)/);
   assert.match(card, /esc\([^)]*(?:student|lesson|teacher|recipient)[^)]*\)/i);
+  assert.match(card, /전송 일시/);
+  assert.match(card, /liveRequestSentAtText\(row\.createdAt\)/);
+  assert.doesNotMatch(card, /row\.lessonDate/);
   assert.doesNotMatch(card, /innerHTML\s*=\s*row\.(?:body|studentName|teacherName)/);
 });
 

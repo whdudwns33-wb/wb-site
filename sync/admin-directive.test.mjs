@@ -26,7 +26,7 @@ const teacher = id => ({ scope: 'own', id });
 const json = (body, status) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' }
 });
-const today = () => new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const kstDate = (value = Date.now()) => new Date(Number(value) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 function seed(db) {
   const now = Date.now();
@@ -52,7 +52,7 @@ function draft(overrides = {}) {
   return {
     action: 'save', directiveId: 'adr_request_001', expectedRevision: 0,
     title: '전체 선생님 안내', body: '오늘 수업 전 확인해 주세요.', priority: 'important',
-    startsDate: today(), expiresDate: '', targetType: 'all', staffIds: [], ...overrides
+    targetType: 'all', staffIds: [], ...overrides
   };
 }
 
@@ -89,6 +89,31 @@ test('전체 대상은 현재 활성 선생님 staffId만 스냅샷하고 선생
   const statuses = managed.body.revisions[0].audienceStatus;
   assert.ok(statuses.find(row => row.staffId === 'teacher-a').acknowledgedAt);
   assert.equal(statuses.find(row => row.staffId === 'teacher-b').acknowledgedAt, null);
+});
+
+test('새 요청은 클라이언트 예약 날짜를 무시하고 서버 전송 시각에 즉시 활성화한다', async () => {
+  const db = new TestD1(); seed(db);
+  const before = Date.now();
+  const saved = await call(db, draft({ startsDate: '2099-12-30', expiresDate: '2099-12-31' }));
+  const after = Date.now();
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.idempotent, false);
+  assert.equal(saved.body.revision.startsDate, kstDate(saved.body.revision.createdAt));
+  assert.equal(saved.body.revision.expiresDate, '');
+  assert.equal(saved.body.revision.displayStatus, 'active');
+  assert.ok(saved.body.revision.createdAt >= before && saved.body.revision.createdAt <= after);
+
+  const row = db.database.prepare(
+    "SELECT starts_date,expires_date,created_at FROM admin_directive_revisions WHERE directive_id='adr_request_001'"
+  ).get();
+  assert.equal(row.starts_date, kstDate(row.created_at));
+  assert.equal(row.expires_date, null);
+  assert.equal(row.created_at, saved.body.revision.createdAt);
+
+  const retry = await call(db, draft({ startsDate: '2000-01-01', expiresDate: '2000-01-02' }));
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(retry.body.revision.createdAt, saved.body.revision.createdAt);
 });
 
 test('수정은 새 revision을 만들고 이전 확인을 승계하지 않으며 지난 기록을 유지한다', async () => {

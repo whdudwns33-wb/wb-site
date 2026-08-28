@@ -1013,11 +1013,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.8"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.8"></script>
-<script src="./asset-core.js?v=2026-08-28.8"></script>
-<script src="./qr-core.js?v=2026-08-28.8"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.8"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.9"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.9"></script>
+<script src="./asset-core.js?v=2026-08-28.9"></script>
+<script src="./qr-core.js?v=2026-08-28.9"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.9"></script>
 <script>
 "use strict";
 
@@ -2842,7 +2842,7 @@ function viewToday() {
     h += '<div class="card"><div class="small muted">담당 수업의 연락 기록은 각 수업 카드에서 입력할 수 있습니다. 평가·온라인 프로그램 기록은 관리 화면에서 관리합니다.</div></div>';
   }
 
-  if (session.isStaffLink && me.id === session.staffId && cursor === today()) {
+  if (session.isStaffLink && !session.isAdmin && me.id === session.staffId && cursor === today()) {
     h += teacherReceivedAdminDirectiveHtml(me.id);
     h += teacherLiveRequestComposerHtml(me, cursor);
   }
@@ -12666,7 +12666,7 @@ async function loadTeacherLiveRequestRecipients(force) {
 
 function teacherLiveRequestTodayLessons() {
   const staffId = String(session.staffId || '');
-  if (!session.isStaffLink || !staffId) return [];
+  if (!session.isStaffLink || session.isAdmin || !staffId) return [];
   return tasksFor(staffId, today()).filter(task => isSessionLessonTask(task) &&
     String(task.staffId || '') === staffId);
 }
@@ -12681,7 +12681,7 @@ function teacherLiveRequestLessonLabel(task) {
 }
 
 function teacherLiveRequestComposerHtml(staff, date) {
-  if (!staff || !session.isStaffLink || String(staff.id || '') !== String(session.staffId || '') ||
+  if (!staff || !session.isStaffLink || session.isAdmin || String(staff.id || '') !== String(session.staffId || '') ||
       String(date || '') !== today()) return '';
   const scopeKey = String(staff.id || '') + '|' + String(date || '');
   if (teacherLiveRequestDraft.scopeKey !== scopeKey) teacherLiveRequestDraft = emptyTeacherLiveRequestDraft(scopeKey);
@@ -12813,7 +12813,8 @@ async function loadTeacherLiveRequests(force, allowPopup) {
 function teacherLiveRequestCardHtml(row, popup) {
   return '<div class="admin-directive-card is-important"><div class="between"><b>' + esc(row.studentLabel) +
     '</b><span class="tag high">실시간 선생님 요청</span></div>' +
-    '<div class="small muted mt8">' + esc(row.teacherLabel) + ' · ' + esc(row.lessonLabel) + ' · ' + esc(row.lessonDate) + '</div>' +
+    '<div class="small muted mt8">' + esc(row.teacherLabel) + ' · ' + esc(row.lessonLabel) +
+      ' · 전송 일시 ' + esc(liveRequestSentAtText(row.createdAt)) + '</div>' +
     '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
     '<div class="admin-directive-status"><span class="tag">지정 수신자 · ' + esc(row.recipientLabel) + '</span>' +
       '<span class="tag">모든 관리자에게 동일 표시</span></div>' +
@@ -13055,7 +13056,7 @@ function teacherReceivedAdminDirectiveRows(staffId) {
 
 function teacherReceivedAdminDirectiveHtml(staffId) {
   const stableId = String(staffId || '');
-  if (!session.isStaffLink || !stableId || stableId !== String(session.staffId || '')) return '';
+  if (!session.isStaffLink || session.isAdmin || !stableId || stableId !== String(session.staffId || '')) return '';
   if (!adminDirectiveOwnLoaded && !adminDirectiveLoading) setTimeout(() => loadAdminDirectives(false, false), 0);
   const rows = teacherReceivedAdminDirectiveRows(stableId);
   const pending = rows.filter(row => row.isCurrent && row.displayStatus === 'active' && !row.acknowledgedAt).length;
@@ -13098,13 +13099,15 @@ function lessonAdminRequestHistory(task) {
     })).filter(row => row.body && !seen.has(row.body) && seen.add(row.body)).slice(0, 3);
 }
 
-function adminDirectiveDateText(row) {
-  const status = row.displayStatus === 'scheduled' ? ' · 예정' :
-    row.displayStatus === 'ended' ? ' · 종료' :
-    row.displayStatus === 'expired' ? ' · 기간 만료' :
-    row.displayStatus === 'superseded' ? ' · 이전 수정본' : '';
-  return row.startsDate + (row.expiresDate ? ' ~ ' + row.expiresDate : '부터') +
-    status;
+function liveRequestSentAtText(value) {
+  const at = Number(value);
+  if (!Number.isFinite(at) || at <= 0) return '확인 필요';
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return '확인 필요';
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).format(date);
 }
 
 function adminDirectiveLessonCard(row, acknowledge) {
@@ -13113,7 +13116,8 @@ function adminDirectiveLessonCard(row, acknowledge) {
     '<div class="between"><b>' + esc(row.title) + (pending ? newMarker('확인하지 않은 실시간 관리자 요청') : '') + '</b>' +
       (row.priority === 'important' ? '<span class="tag high">중요</span>' : '<span class="tag">실시간</span>') + '</div>' +
     '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
-    '<div class="small muted mt8">' + esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div>' +
+    '<div class="small muted mt8">전송 일시 ' + esc(liveRequestSentAtText(row.createdAt)) +
+      esc(adminDirectiveLegacyStatusText(row)) + ' · 수정본 ' + row.revision + '</div>' +
     (pending ? '<button class="btn btn-sm btn-primary mt8" data-act="adminDirectiveAck" data-directive="' +
       esc(row.directiveId) + '" data-rev="' + row.revision + '">이 실시간 관리자 요청 확인</button>' : '') + '</div>';
 }
@@ -13225,11 +13229,18 @@ function adminDirectiveAudienceSummary(row) {
   return { total, confirmed, pending: row.audienceStatus.filter(status => !status.acknowledgedAt) };
 }
 
+function adminDirectiveLegacyStatusText(row) {
+  const labels = { scheduled: '전달 예정', ended: '종료', expired: '기간 만료', superseded: '이전 수정본' };
+  const label = labels[String(row && row.displayStatus || '')];
+  return label ? ' · ' + label : '';
+}
+
 function adminDirectiveManageCard(row, historical) {
   const status = adminDirectiveAudienceSummary(row);
   return '<div class="admin-directive-card' + (row.priority === 'important' ? ' is-important' : '') + '">' +
-    '<div class="between"><div><b>' + esc(row.title) + '</b><div class="small muted">' +
-      esc(adminDirectiveDateText(row)) + ' · 수정본 ' + row.revision + '</div></div>' +
+    '<div class="between"><div><b>' + esc(row.title) + '</b><div class="small muted">전송 일시 ' +
+      esc(liveRequestSentAtText(row.createdAt)) + esc(adminDirectiveLegacyStatusText(row)) +
+      ' · 수정본 ' + row.revision + '</div></div>' +
       '<span class="pill ' + (status.confirmed < status.total && !historical ? 'warn' : 'ok') + '">확인 ' + status.confirmed + '/' + status.total + '</span></div>' +
     '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
     '<details class="admin-directive-history"><summary>선생님별 확인 현황</summary>' +
@@ -13285,8 +13296,7 @@ function openAdminDirectiveEditor(directiveId) {
   adminDirectiveEditor = {
     directiveId: current ? current.directiveId : 'adr_' + uid(), expectedRevision: current ? current.revision : 0,
     title: current ? current.title : '', body: current ? current.body : '',
-    priority: current ? current.priority : 'normal', startsDate: current ? current.startsDate : today(),
-    expiresDate: current ? current.expiresDate : '',
+    priority: current ? current.priority : 'normal',
     targetType: current && (audience.length !== activeIds.length || audience.some((id, index) => id !== activeIds[index])) ? 'staff' : 'all',
     staffIds: audience
   };
@@ -13300,10 +13310,8 @@ function adminDirectiveEditorModal() {
   modal(draft.expectedRevision ? '실시간 관리자 요청 수정' : '새 실시간 관리자 요청',
     '<label class="field"><span class="fl">제목</span><input class="in" id="adTitle" maxlength="100" value="' + esc(draft.title) + '" placeholder="예: 오늘 수업 전 확인"></label>' +
     '<label class="field"><span class="fl">요청 내용</span><textarea class="in" id="adBody" rows="6" maxlength="2000" placeholder="선생님이 바로 실행할 수 있도록 적어 주세요.">' + esc(draft.body) + '</textarea></label>' +
-    '<div class="grid2"><label class="field"><span class="fl">중요도</span><select class="in" id="adPriority"><option value="normal"' +
+    '<label class="field"><span class="fl">중요도</span><select class="in" id="adPriority"><option value="normal"' +
       (draft.priority === 'normal' ? ' selected' : '') + '>일반</option><option value="important"' + (draft.priority === 'important' ? ' selected' : '') + '>중요</option></select></label>' +
-    '<label class="field"><span class="fl">전달 시작일</span><input class="in" id="adStarts" type="date" value="' + esc(draft.startsDate) + '"></label></div>' +
-    '<label class="field"><span class="fl">종료일 · 선택</span><input class="in" id="adExpires" type="date" value="' + esc(draft.expiresDate) + '"></label>' +
     '<label class="field"><span class="fl">전달 대상</span><select class="in" id="adTargetType" data-admin-directive-target><option value="all"' +
       (draft.targetType === 'all' ? ' selected' : '') + '>모든 선생님</option><option value="staff"' + (draft.targetType === 'staff' ? ' selected' : '') + '>일부 선생님 중복 선택</option></select></label>' +
     '<div class="field"><span class="fl">선생님 선택</span><div class="chips">' + teamStaff().map(staff =>
@@ -13322,13 +13330,11 @@ async function saveAdminDirective(button) {
     action: 'save', directiveId: adminDirectiveEditor.directiveId,
     expectedRevision: adminDirectiveEditor.expectedRevision,
     title: $('#adTitle').value, body: $('#adBody').value, priority: $('#adPriority').value,
-    startsDate: $('#adStarts').value, expiresDate: $('#adExpires').value,
     targetType, staffIds
   };
-  if (!payload.title.trim() || !payload.body.trim() || !payload.startsDate || (targetType === 'staff' && !staffIds.length)) {
-    return toast('제목·내용·시작일·대상 선생님을 확인해 주세요');
+  if (!payload.title.trim() || !payload.body.trim() || (targetType === 'staff' && !staffIds.length)) {
+    return toast('제목·내용·대상 선생님을 확인해 주세요');
   }
-  if (payload.expiresDate && payload.expiresDate < payload.startsDate) return toast('종료일은 시작일보다 빠를 수 없습니다');
   adminDirectiveSaving = true; if (button) button.disabled = true;
   try {
     await sync.post('/admin-directive', { app: SYNC_APP, auth: sync.auth(), ...payload });
@@ -18715,7 +18721,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.8';
+const APP_VER = '2026-08-28.9';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

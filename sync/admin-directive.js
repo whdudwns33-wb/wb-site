@@ -27,13 +27,6 @@ function cleanBody(value) {
   return cleaned && cleaned.length <= MAX_BODY ? cleaned : null;
 }
 
-function validDate(value) {
-  const date = String(value || '');
-  const stamp = Date.parse(date + 'T00:00:00.000Z');
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(stamp) &&
-    new Date(stamp).toISOString().slice(0, 10) === date;
-}
-
 function kstDate(now = Date.now()) {
   return new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -149,8 +142,7 @@ async function listRows(env, app, staffId = '') {
 
 function sameRevision(row, input) {
   return row && String(row.title) === input.title && String(row.body) === input.body &&
-    String(row.priority) === input.priority && String(row.starts_date) === input.startsDate &&
-    String(row.expires_date || '') === input.expiresDate &&
+    String(row.priority) === input.priority &&
     String(row.audience_staff_ids) === JSON.stringify(input.audienceStaffIds);
 }
 
@@ -192,23 +184,24 @@ async function save(env, app, body, origin, auth, json) {
   const title = cleanTitle(body.title);
   const directiveBody = cleanBody(body.body);
   const priority = String(body.priority || '');
-  const startsDate = String(body.startsDate || '');
-  const expiresDate = String(body.expiresDate || '');
   const audienceStaffIds = await targetSnapshot(env, app, body);
   if (!SAFE_ID.test(directiveId) || !directiveId.startsWith('adr_') ||
       !Number.isInteger(expectedRevision) || expectedRevision < 0 || !title || !directiveBody ||
-      !PRIORITIES.has(priority) || !validDate(startsDate) ||
-      (expiresDate && (!validDate(expiresDate) || expiresDate < startsDate)) || !audienceStaffIds) {
-    return json({ ok: false, error: '요청 제목·내용·기간·대상 선생님을 확인해 주세요' }, 400, origin);
+      !PRIORITIES.has(priority) || !audienceStaffIds) {
+    return json({ ok: false, error: '요청 제목·내용·대상 선생님을 확인해 주세요' }, 400, origin);
   }
   const current = await env.DB.prepare(
     'SELECT * FROM admin_directives WHERE app=? AND directive_id=? LIMIT 1'
   ).bind(app, directiveId).first();
   const nextRevision = expectedRevision + 1;
+  const now = Math.max(Date.now(), Number(current && current.updated_at || 0) + 1);
   const existingNext = current && Number(current.current_revision) === nextRevision
     ? await env.DB.prepare(
       'SELECT * FROM admin_directive_revisions WHERE app=? AND directive_id=? AND revision=? LIMIT 1'
     ).bind(app, directiveId, nextRevision).first() : null;
+  // 실시간 요청은 예약 기간을 받지 않는다. 과거 schema는 호환을 위해 유지하되 새 revision은 서버 시각에 즉시 전달한다.
+  const startsDate = existingNext ? String(existingNext.starts_date) : kstDate(now);
+  const expiresDate = existingNext && existingNext.expires_date ? String(existingNext.expires_date) : '';
   const input = { title, body: directiveBody, priority, startsDate, expiresDate, audienceStaffIds };
   if (existingNext && sameRevision(existingNext, input)) {
     const rows = await listRows(env, app, '');
@@ -221,7 +214,6 @@ async function save(env, app, body, origin, auth, json) {
       error: '공통 요청이 다른 화면에서 변경되었습니다. 새로고침 후 다시 확인해 주세요' }, 409, origin);
   }
   const by = actor(auth);
-  const now = Math.max(Date.now(), Number(current && current.updated_at || 0) + 1);
   const audienceJson = JSON.stringify(audienceStaffIds);
   let results;
   if (!current) {
