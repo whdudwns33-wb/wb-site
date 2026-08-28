@@ -158,25 +158,39 @@ test('legacy order/send/fulfillment rows without an immutable student identity s
   assert.doesNotMatch(JSON.stringify(result), /provider|SECRET|safe_error|status_code/i);
 });
 
-test('bound print receipt is guardian-safe without a send while scheduled receipt still requires an accepted send', async () => {
+test('bound and internal receipt are guardian-safe without a send while scheduled receipt still requires one', async () => {
   const db = new TestD1(); seed(db);
   const boundTaskId = 'ord_bound_guardian';
+  const internalTaskId = 'ord_internal_guardian';
+  const internalNoReceiptTaskId = 'ord_internal_no_receipt';
   const scheduledTaskId = 'ord_scheduled_no_send';
   const boundBookId = 'BOUND_' + 'a'.repeat(48);
+  const internalBookId = 'INTERNAL_' + 'b'.repeat(45);
   await addSnapshotTask(db, boundTaskId, [{ bookId: boundBookId, studentIds: ['student-a'] }], NOW + 2);
   addTask(db, boundTaskId, boundBookId, '제본 내부 제목', ['student-a'], NOW + 2, 'bound_print_v1');
   addFulfillment(db, boundTaskId, boundBookId, ['student-a'], 'teacher_received', NOW + 2);
+
+  await addSnapshotTask(db, internalTaskId, [{ bookId: internalBookId, studentIds: ['student-a'] }], NOW + 3);
+  addTask(db, internalTaskId, internalBookId, '내부교재 비밀 제목', ['student-a'], NOW + 3, 'internal_book_v1');
+  addFulfillment(db, internalTaskId, internalBookId, ['student-a'], 'student_handed', NOW + 3);
+
+  await addSnapshotTask(db, internalNoReceiptTaskId,
+    [{ bookId: 'INTERNAL_' + 'c'.repeat(45), studentIds: ['student-a'] }], NOW + 4);
+  addTask(db, internalNoReceiptTaskId, 'INTERNAL_' + 'c'.repeat(45), '미수령 내부교재 제목',
+    ['student-a'], NOW + 4, 'internal_book_v1');
 
   await addSnapshotTask(db, scheduledTaskId, [{ bookId: 'BK-SCHEDULED', studentIds: ['student-a'] }], NOW + 1);
   addTask(db, scheduledTaskId, 'BK-SCHEDULED', '일반 주문 내부 제목', ['student-a'], NOW + 1);
   addFulfillment(db, scheduledTaskId, 'BK-SCHEDULED', ['student-a'], 'teacher_received', NOW + 1);
 
-  const result = await readPublicBookStatus({ DB: db }, 'student-a', NOW + 3);
-  assert.deepEqual(result.rows, [{
-    kind: 'order', title: '주문 교재', stage: 'academy_received', label: '학원 도착', updatedAt: NOW + 2
-  }]);
+  const result = await readPublicBookStatus({ DB: db }, 'student-a', NOW + 5);
+  assert.deepEqual(result.rows, [
+    { kind: 'order', title: '주문 교재', stage: 'handed', label: '학생 전달 완료', updatedAt: NOW + 3 },
+    { kind: 'order', title: '주문 교재', stage: 'academy_received', label: '학원 도착', updatedAt: NOW + 2 }
+  ]);
   assert.deepEqual(Object.keys(result.rows[0]).sort(), ['kind', 'label', 'stage', 'title', 'updatedAt']);
-  assert.doesNotMatch(JSON.stringify(result), /bound|scheduled|student-a|teacher-a|BOUND_|BK-SCHEDULED|제본 내부|일반 주문/);
+  assert.doesNotMatch(JSON.stringify(result),
+    /bound|internal|scheduled|student-a|teacher-a|BOUND_|INTERNAL_|BK-SCHEDULED|제본 내부|내부교재 비밀|미수령 내부교재|일반 주문/);
 });
 
 test('mismatched issue identities and all unsealed order titles fail closed', async () => {

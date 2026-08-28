@@ -347,7 +347,9 @@ function sameLegacyOrderCancellation(stored, incoming) {
 }
 
 async function hasUnsafeGenericScheduledOrder(env, app, entries) {
-  const protectedDeliveries = new Set(['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1']);
+  const protectedDeliveries = new Set([
+    'scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1', 'internal_book_v1'
+  ]);
   const scheduled = entries.filter(entry => entry.table === 'tasks' && entry.change &&
     entry.change.data && protectedDeliveries.has(String(entry.change.data.orderDelivery || '')));
   const ids = [...new Set(scheduled.map(entry => String(entry.change.id || '')).filter(Boolean))];
