@@ -1,0 +1,245 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
+
+import { handleScheduledTuitionAlerts, handleTuitionAlert } from './tuition-alert.js';
+
+const source = fs.readFileSync(new URL('./tuition-alert.js', import.meta.url), 'utf8');
+const CUTOFF = Date.parse('2026-08-28T14:50:00Z'); // 2026-08-28 23:50 KST
+
+const tables = `
+CREATE TABLE private_rosters(app TEXT PRIMARY KEY,data TEXT NOT NULL,updated_at INTEGER NOT NULL);
+CREATE TABLE tasks(app TEXT NOT NULL,id TEXT NOT NULL,owner TEXT,data TEXT NOT NULL,updated_at INTEGER NOT NULL,srv_at INTEGER NOT NULL,PRIMARY KEY(app,id));
+CREATE TABLE checks(app TEXT NOT NULL,k TEXT NOT NULL,owner TEXT,data TEXT NOT NULL,updated_at INTEGER NOT NULL,srv_at INTEGER NOT NULL,PRIMARY KEY(app,k));
+CREATE TABLE tuition_generation_alerts(
+  app TEXT NOT NULL CHECK(app='task'),
+  alert_id TEXT NOT NULL CHECK(alert_id LIKE 'tga_%'),
+  student_id TEXT NOT NULL,
+  cycle_start_date TEXT NOT NULL CHECK(length(cycle_start_date)=10),
+  threshold_count INTEGER NOT NULL CHECK(threshold_count=3),
+  trigger_task_id TEXT NOT NULL,
+  trigger_date TEXT NOT NULL CHECK(length(trigger_date)=10),
+  created_at INTEGER NOT NULL CHECK(created_at>0),
+  PRIMARY KEY(app,alert_id),
+  UNIQUE(app,student_id,cycle_start_date)
+);
+CREATE TABLE tuition_generation_alert_confirmations(
+  app TEXT NOT NULL CHECK(app='task'),
+  confirmation_id TEXT NOT NULL CHECK(confirmation_id LIKE 'tgc_%'),
+  alert_id TEXT NOT NULL,
+  confirmed_at INTEGER NOT NULL CHECK(confirmed_at>0),
+  confirmed_by TEXT NOT NULL,
+  PRIMARY KEY(app,confirmation_id),
+  UNIQUE(app,alert_id),
+  FOREIGN KEY(app,alert_id) REFERENCES tuition_generation_alerts(app,alert_id)
+);
+CREATE TRIGGER tuition_generation_alerts_no_update BEFORE UPDATE ON tuition_generation_alerts BEGIN SELECT RAISE(ABORT,'TUITION_ALERT_APPEND_ONLY'); END;
+CREATE TRIGGER tuition_generation_alerts_no_delete BEFORE DELETE ON tuition_generation_alerts BEGIN SELECT RAISE(ABORT,'TUITION_ALERT_APPEND_ONLY'); END;
+CREATE TRIGGER tuition_generation_confirmations_no_update BEFORE UPDATE ON tuition_generation_alert_confirmations BEGIN SELECT RAISE(ABORT,'TUITION_CONFIRMATION_APPEND_ONLY'); END;
+CREATE TRIGGER tuition_generation_confirmations_no_delete BEFORE DELETE ON tuition_generation_alert_confirmations BEGIN SELECT RAISE(ABORT,'TUITION_CONFIRMATION_APPEND_ONLY'); END;
+`;
+
+class Statement {
+  constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
+  bind(...args) { this.args = args; return this; }
+  first() { return this.database.prepare(this.sql).get(...this.args) || null; }
+  all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
+  run() {
+    const result = this.database.prepare(this.sql).run(...this.args);
+    return { meta: { changes: Number(result.changes || 0) } };
+  }
+}
+
+class TestD1 {
+  constructor(withAlertTables = true) {
+    this.database = new DatabaseSync(':memory:');
+    this.database.exec(withAlertTables ? tables : tables.slice(0, tables.indexOf('CREATE TABLE tuition_generation_alerts')));
+  }
+  prepare(sql) { return new Statement(this.database, sql); }
+}
+
+function rosterStudent(id, name, overrides = {}) {
+  return {
+    id, name, school: '테스트학교', grade: '중1', billingMode: 'session4',
+    sessionCycleStartDate: '2026-08-01', ...overrides
+  };
+}
+
+function seedRoster(db, students) {
+  const document = { roster: { students } };
+  db.database.prepare('INSERT OR REPLACE INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
+    .run('task', JSON.stringify(document), CUTOFF);
+}
+
+function seedTask(db, id, studentId, owner = 'teacher-a', overrides = {}) {
+  const task = {
+    id, staffId: owner, studentId, taskKind: 'lesson_instruction', lessonFormVersion: 1,
+    title: '[수업] 테스트', start: '2026-01-01', end: '', ...overrides
+  };
+  db.database.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .run('task', id, owner, JSON.stringify(task), CUTOFF, CUTOFF);
+}
+
+function seedCheck(db, taskId, date, att, overrides = {}) {
+  const check = { taskId, date, att, updatedAt: CUTOFF, ...overrides };
+  const key = Object.prototype.hasOwnProperty.call(overrides, 'key') ? overrides.key : taskId + '|' + date;
+  delete check.key;
+  db.database.prepare('INSERT OR REPLACE INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .run('task', key, 'teacher-a', JSON.stringify(check), CUTOFF, CUTOFF);
+}
+
+function response(body, status = 200) { return { body, status }; }
+
+async function api(db, body, auth = { scope: 'all' }) {
+  return await handleTuitionAlert({ DB: db }, 'task', { app: 'task', auth: {}, ...body }, '', auth, response);
+}
+
+test('23:50 aggregation counts only final P/L/E across subjects and creates the third-attendance alert once', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '김학생')]);
+  seedTask(db, 'lesson-math', 'student-a');
+  seedTask(db, 'lesson-english', 'student-a');
+  seedCheck(db, 'lesson-math', '2026-07-31', 'P'); // cycle start 이전
+  seedCheck(db, 'lesson-math', '2026-08-03', 'P');
+  seedCheck(db, 'lesson-math', '2026-08-10', 'A'); // 결석 제외
+  seedCheck(db, 'lesson-english', '2026-08-17', 'L');
+  seedCheck(db, 'lesson-math', '2026-08-24', 'E');
+  seedCheck(db, 'lesson-math', '2026-08-29', 'P'); // cutoff 이후 제외
+  seedCheck(db, 'lesson-math', '2026-08-25', 'P', { key: 'wrong-key' }); // exact task/date 불일치
+
+  const first = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(first.ok, true);
+  assert.equal(first.eligibleStudents, 1);
+  assert.equal(first.qualifyingAttendances, 3);
+  assert.equal(first.created, 1);
+  const row = db.database.prepare('SELECT * FROM tuition_generation_alerts').get();
+  assert.equal(row.student_id, 'student-a');
+  assert.equal(row.cycle_start_date, '2026-08-01');
+  assert.equal(row.threshold_count, 3);
+  assert.equal(row.trigger_task_id, 'lesson-math');
+  assert.equal(row.trigger_date, '2026-08-24');
+
+  const again = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(again.created, 0);
+  assert.equal(again.idempotent, 1);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM tuition_generation_alerts').get().count, 1);
+});
+
+test('same-name students stay separate by stable id and one task/date is counted at most once', async () => {
+  const db = new TestD1();
+  seedRoster(db, [
+    rosterStudent('student-a', '김예린', { school: '가초', grade: '초3' }),
+    rosterStudent('student-b', '김예린', { school: '나초', grade: '초5' }),
+    rosterStudent('student-monthly', '월결제', { billingMode: 'monthly', sessionCycleStartDate: '' })
+  ]);
+  for (const studentId of ['student-a', 'student-b', 'student-monthly']) seedTask(db, 'lesson-' + studentId, studentId);
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15']) seedCheck(db, 'lesson-student-a', date, 'P');
+  for (const date of ['2026-08-02', '2026-08-09']) seedCheck(db, 'lesson-student-b', date, 'P');
+  for (const date of ['2026-08-03', '2026-08-10', '2026-08-17']) seedCheck(db, 'lesson-student-monthly', date, 'P');
+
+  const result = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(result.eligibleStudents, 2);
+  assert.equal(result.created, 1);
+  const alerts = db.database.prepare('SELECT student_id FROM tuition_generation_alerts').all();
+  assert.deepEqual(alerts.map(row => row.student_id), ['student-a']);
+});
+
+test('inactive roster rows and owner-mismatched lesson checks fail closed', async () => {
+  const db = new TestD1();
+  seedRoster(db, [
+    rosterStudent('student-forged', '위조연결'),
+    rosterStudent('student-ended', '종료학생', { end: '2026-08' }),
+    rosterStudent('student-future', '예정학생', { start: '2026-09' })
+  ]);
+  seedTask(db, 'lesson-forged', 'student-forged', 'teacher-b', { staffId: 'teacher-a' });
+  seedTask(db, 'lesson-ended', 'student-ended');
+  seedTask(db, 'lesson-future', 'student-future');
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15']) {
+    seedCheck(db, 'lesson-forged', date, 'P');
+    seedCheck(db, 'lesson-ended', date, 'P');
+    seedCheck(db, 'lesson-future', date, 'P');
+  }
+  const result = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(result.eligibleStudents, 1);
+  assert.equal(result.qualifyingAttendances, 0);
+  assert.equal(result.created, 0);
+});
+
+test('changing the session cycle start creates a new alert while preserving the prior cycle', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '회차학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15', '2026-08-22']) seedCheck(db, 'lesson-a', date, 'P');
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, CUTOFF)).created, 1);
+
+  seedRoster(db, [rosterStudent('student-a', '회차학생', { sessionCycleStartDate: '2026-08-08' })]);
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, CUTOFF)).created, 1);
+  const starts = db.database.prepare('SELECT cycle_start_date FROM tuition_generation_alerts ORDER BY cycle_start_date').all();
+  assert.deepEqual(starts.map(row => row.cycle_start_date), ['2026-08-01', '2026-08-08']);
+});
+
+test('admin list derives identity at read time and global confirmation is a single append-only row', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '표시이름', { school: '표시학교', grade: '중2', phoneMother: '010-0000-0000' })]);
+  seedTask(db, 'lesson-a', 'student-a');
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15']) seedCheck(db, 'lesson-a', date, 'P');
+  await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  // 결제 방식을 나중에 월결제로 바꿔도 기존 알림의 표시는 현재 roster에서 stable id로 파생한다.
+  seedRoster(db, [rosterStudent('student-a', '표시이름', {
+    school: '표시학교', grade: '중2', phoneMother: '010-0000-0000',
+    billingMode: 'monthly', sessionCycleStartDate: ''
+  })]);
+
+  const denied = await api(db, { action: 'list' }, { scope: 'own', id: 'teacher-a' });
+  assert.equal(denied.status, 403);
+  const listed = await api(db, { action: 'list' });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.alerts.length, 1);
+  assert.deepEqual({
+    id: listed.body.alerts[0].studentId, name: listed.body.alerts[0].studentName,
+    school: listed.body.alerts[0].school, grade: listed.body.alerts[0].grade,
+    message: listed.body.alerts[0].message
+  }, { id: 'student-a', name: '표시이름', school: '표시학교', grade: '중2', message: '수강료 생성필요' });
+  assert.equal(JSON.stringify(listed.body).includes('010-0000-0000'), false);
+  const storedAlert = db.database.prepare('SELECT * FROM tuition_generation_alerts').get();
+  assert.equal(Object.keys(storedAlert).some(key => /name|phone|contact/i.test(key)), false);
+
+  const confirmed = await api(db, { action: 'confirm', alertId: listed.body.alerts[0].alertId },
+    { scope: 'all', role: 'manager', id: 'manager-a' });
+  assert.equal(confirmed.status, 200);
+  assert.equal(confirmed.body.idempotent, false);
+  const repeated = await api(db, { action: 'confirm', alertId: listed.body.alerts[0].alertId }, { scope: 'all' });
+  assert.equal(repeated.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM tuition_generation_alert_confirmations').get().count, 1);
+  assert.equal((await api(db, { action: 'list' })).body.alerts.length, 0);
+  const history = await api(db, { action: 'list', includeConfirmed: true });
+  assert.equal(history.body.alerts[0].status, 'confirmed');
+  assert.ok(history.body.alerts[0].confirmedAt > 0);
+  assert.throws(() => db.database.prepare('UPDATE tuition_generation_alert_confirmations SET confirmed_at=1').run(), /APPEND_ONLY/);
+  assert.throws(() => db.database.prepare('DELETE FROM tuition_generation_alerts').run(), /APPEND_ONLY/);
+});
+
+test('handler rejects extra fields and missing ledger fails closed without exposing roster values', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '비공개학생')]);
+  const extra = await api(db, { action: 'list', phone: '01000000000' });
+  assert.equal(extra.status, 400);
+
+  const missing = new TestD1(false);
+  seedRoster(missing, [rosterStudent('student-a', '비공개학생')]);
+  const listed = await api(missing, { action: 'list' });
+  assert.equal(listed.status, 503);
+  assert.equal(listed.body.code, 'TUITION_ALERT_LEDGER_NOT_READY');
+  assert.equal(JSON.stringify(listed.body).includes('비공개학생'), false);
+});
+
+test('source contract never writes names or contacts and exports separate Cron and HTTP entry points', () => {
+  const insert = source.slice(source.indexOf('INSERT OR IGNORE INTO tuition_generation_alerts'),
+    source.indexOf('function alertView'));
+  assert.doesNotMatch(insert, /student_name|school|grade|phone|contact/i);
+  assert.match(source, /export async function handleScheduledTuitionAlerts/);
+  assert.match(source, /export async function handleTuitionAlert/);
+  assert.match(source, /QUALIFYING_ATTENDANCE = new Set\(\['P', 'L', 'E'\]\)/);
+  assert.doesNotMatch(source.match(/const QUALIFYING_ATTENDANCE[^;]+;/)[0], /'A'/);
+});

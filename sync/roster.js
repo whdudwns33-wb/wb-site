@@ -175,9 +175,11 @@ function studentParentIdentityKey(value) {
 function minimalStudentForDeletion(value) {
   if (!identityText(value && value.name)) return false;
   if ((value.subjects || []).length) return false;
+  if (String(value && value.billingMode || 'monthly') !== 'monthly') return false;
   return ![
     value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
-    value.registrationDate, value.firstClassDate, value.end, value.reason, value.memo
+    value.registrationDate, value.firstClassDate, value.end, value.reason, value.memo,
+    value.sessionCycleStartDate
   ].some(item => String(item || '').trim());
 }
 
@@ -188,7 +190,8 @@ const STUDENT_REFERENCE_TABLES = [
   'guardian_portal_sessions', 'guardian_portal_responses', 'guardian_ops_notification_consents',
   'guardian_ops_notification_sends', 'transport_notification_sends', 'lesson_assignment_requests',
   'guardian_lesson_publications', 'guardian_requests', 'student_portal_access', 'student_portal_codes',
-  'student_portal_sessions', 'student_lesson_self_checks', 'student_lesson_self_check_events'
+  'student_portal_sessions', 'student_lesson_self_checks', 'student_lesson_self_check_events',
+  'teacher_live_requests', 'tuition_generation_alerts'
 ];
 
 function studentReferenceGuard(app, studentId) {
@@ -223,7 +226,8 @@ function rosterStudent(value, index) {
   shape(value,
     ['id', 'name', 'grade', 'subject', 'start', 'end', 'reason'],
     ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
-      'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds'], path);
+      'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds',
+      'billingMode', 'sessionCycleStartDate'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -260,6 +264,19 @@ function rosterStudent(value, index) {
   if (Object.prototype.hasOwnProperty.call(value, 'entryType')) {
     if (!['existing', 'new'].includes(value.entryType)) fail(path + '.entryType', 'existing 또는 new여야 합니다');
     result.entryType = value.entryType;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'billingMode') ||
+      Object.prototype.hasOwnProperty.call(value, 'sessionCycleStartDate')) {
+    const billingMode = String(value.billingMode || 'monthly');
+    if (!['monthly', 'session4'].includes(billingMode)) {
+      fail(path + '.billingMode', 'monthly 또는 session4여야 합니다');
+    }
+    const cycleStart = optionalIsoDate(value.sessionCycleStartDate || '', path + '.sessionCycleStartDate');
+    if (billingMode === 'session4' && !cycleStart) {
+      fail(path + '.sessionCycleStartDate', '회차제 시작일을 입력해 주세요');
+    }
+    result.billingMode = billingMode;
+    result.sessionCycleStartDate = billingMode === 'session4' ? cycleStart : '';
   }
   return result;
 }
@@ -796,12 +813,27 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
     let nextStudent;
     try {
-      const input = action === 'student_create'
+      let input = action === 'student_create'
         ? { ...record(body.student, 'document.roster.students[0]'),
           id: allocateNewStudentId(new Set(document.roster.students.map(item => item.id))) }
-        : body.student;
+        : record(body.student, 'document.roster.students[0]');
       if (action === 'student_create' && (typeof input.name !== 'string' || !identityText(input.name))) {
         return json({ ok: false, code: 'STUDENT_REQUIRED_FIELDS', error: '이름을 입력해 주세요' }, 400, origin);
+      }
+      if (action === 'student_create' && !Object.prototype.hasOwnProperty.call(input, 'billingMode')) {
+        input = { ...input, billingMode: 'monthly', sessionCycleStartDate: '' };
+      }
+      if (action === 'student_update') {
+        const inputId = id(input.id, 'document.roster.students[0].id');
+        const storedStudent = document.roster.students.find(item => item.id === inputId);
+        if (storedStudent) {
+          input = { ...input };
+          for (const key of ['billingMode', 'sessionCycleStartDate']) {
+            if (!Object.prototype.hasOwnProperty.call(input, key) && Object.prototype.hasOwnProperty.call(storedStudent, key)) {
+              input[key] = storedStudent[key];
+            }
+          }
+        }
       }
       nextStudent = rosterStudent(input, 0);
       // 개별 학생 저장에서는 대표/메인 담당을 만들지 않는다. 기존 전체 문서의 필드는
@@ -866,7 +898,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     }
     if (action === 'student_update' && previousStudent) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
-        'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo'];
+        'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo',
+        'billingMode', 'sessionCycleStartDate'];
       const changedFields = fields.filter(key => JSON.stringify(previousStudent[key] || '') !== JSON.stringify(nextStudent[key] || ''));
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);
