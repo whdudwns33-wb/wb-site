@@ -146,6 +146,34 @@ test('director sees the pending request and approving it writes into the live ta
   assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30' });
 });
 
+test('approved lesson-field changes notify only that task owner for a multi-subject student', async () => {
+  const db = new TestD1(); seed(db);
+  const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
+  const otherSubject = {
+    ...source, id: 'task-other-subject', staffId: 'S-other',
+    title: '[수업] 예시학생 (중2) — 영어', subject: '영어'
+  };
+  db.prepare("INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES ('task',?,'S-other',?,?,?)")
+    .bind(otherSubject.id, JSON.stringify(otherSubject), source.updatedAt, source.updatedAt).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { time: '19:30' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1
+  });
+  assert.equal(approve.status, 200);
+  const event = db.prepare(
+    "SELECT task_id,event_type,audience_staff_ids FROM student_change_events WHERE app='task'"
+  ).first();
+  assert.equal(event.task_id, 'task-1');
+  assert.equal(event.event_type, 'work_instruction');
+  assert.deepEqual(JSON.parse(event.audience_staff_ids), ['S-kim']);
+  const ownerEvents = await call(db, '/student-change', { auth: person('S-kim', 'tok-kim'), action: 'list' });
+  const otherEvents = await call(db, '/student-change', { auth: person('S-other', 'tok-other'), action: 'list' });
+  assert.equal(ownerEvents.body.events.length, 1);
+  assert.equal(otherEvents.body.events.length, 0);
+});
+
 test('a request CAS race rolls back the earlier lesson and change-event writes', async () => {
   const db = new TestD1(); seed(db);
   const submit = await call(db, '/lesson-change-request', {

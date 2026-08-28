@@ -73,6 +73,30 @@ test('lesson edits send sourceTaskId as top-level optimistic-update metadata', (
   assert.match(preview, /lessonPreviewExpectedUpdatedAt = existing \? Number\(existing\.updatedAt/);
 });
 
+test('lesson edits do not turn legacy roster defaults into a common student-change notification', () => {
+  const helperStart = html.indexOf('function comparableRosterStudentField(');
+  const helperEnd = html.indexOf('async function saveLessonBriefingEditor(', helperStart);
+  const rosterStart = html.indexOf('function lessonRosterStudentChanged(');
+  const rosterEnd = html.indexOf('async function loadPublicationReadiness(', rosterStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart && rosterStart >= 0 && rosterEnd > rosterStart);
+  const helpers = new Function(html.slice(helperStart, helperEnd) + '\n' + html.slice(rosterStart, rosterEnd) +
+    '\nreturn { lessonBriefingStudentChanged, lessonRosterStudentChanged };')();
+  const legacy = {
+    name: '학생', school: '학교', grade: '중2', subject: '수학·영어',
+    start: '2026-08', billingMode: undefined, sessionCycleStartDate: undefined
+  };
+  const materializedDefaults = {
+    ...legacy, subject: '영어·수학', subjects: ['영어', '수학'],
+    billingMode: 'monthly', sessionCycleStartDate: ''
+  };
+  assert.equal(helpers.lessonBriefingStudentChanged(legacy, materializedDefaults), false);
+  assert.equal(helpers.lessonRosterStudentChanged(legacy, materializedDefaults), false);
+  assert.equal(helpers.lessonBriefingStudentChanged(legacy, { ...materializedDefaults, school: '새학교' }), true);
+  assert.equal(helpers.lessonRosterStudentChanged(legacy, {
+    ...materializedDefaults, billingMode: 'session4', sessionCycleStartDate: '2026-08-29'
+  }), true);
+});
+
 test('lesson edits keep teacher authority on each lesson and never synthesize a roster-wide teacher list', () => {
   const start = html.indexOf('function lessonRosterStudentPayload(');
   const end = html.indexOf('function lessonRosterStudentChanged(', start);

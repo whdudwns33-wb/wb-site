@@ -1016,11 +1016,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-29.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-29.2"></script>
-<script src="./asset-core.js?v=2026-08-29.2"></script>
-<script src="./qr-core.js?v=2026-08-29.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-29.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-29.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-29.3"></script>
+<script src="./asset-core.js?v=2026-08-29.3"></script>
+<script src="./qr-core.js?v=2026-08-29.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-29.3"></script>
 <script>
 "use strict";
 
@@ -3799,10 +3799,30 @@ function lessonBriefingLessonPayload(student) {
   return lessonPreviewPayloadFromTask(taskBody, validation);
 }
 
+function comparableRosterStudentField(student, key) {
+  const row = student || {};
+  if (key === 'billingMode') return String(row.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly';
+  if (key === 'sessionCycleStartDate') {
+    return comparableRosterStudentField(row, 'billingMode') === 'session4' ? String(row.sessionCycleStartDate || '') : '';
+  }
+  if (key === 'subject' || key === 'subjects') {
+    const source = Array.isArray(row.subjects) && row.subjects.length
+      ? row.subjects : String(row.subject || '').split(/[·,\/]/);
+    return [...new Set(source.map(value => String(value || '').normalize('NFKC').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ko'));
+  }
+  return row[key] == null ? '' : row[key];
+}
+
+function rosterStudentFieldsChanged(current, next, fields) {
+  return fields.some(key => JSON.stringify(comparableRosterStudentField(current, key)) !==
+    JSON.stringify(comparableRosterStudentField(next, key)));
+}
+
 function lessonBriefingStudentChanged(current, next) {
-  return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
-    'subject', 'subjects', 'start', 'end', 'reason', 'memo', 'entryType', 'billingMode', 'sessionCycleStartDate']
-    .some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
+  return rosterStudentFieldsChanged(current, next,
+    ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
+      'subject', 'subjects', 'start', 'end', 'reason', 'memo', 'entryType', 'billingMode', 'sessionCycleStartDate']);
 }
 
 async function saveLessonBriefingEditor(button) {
@@ -5352,9 +5372,9 @@ function lessonRosterStudentPayload(selected, draft, lessons) {
 
 function lessonRosterStudentChanged(current, next) {
   if (!current || !next) return false;
-  return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
-    'subject', 'subjects', 'memo', 'billingMode', 'sessionCycleStartDate']
-    .some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
+  return rosterStudentFieldsChanged(current, next,
+    ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
+      'subject', 'subjects', 'memo', 'billingMode', 'sessionCycleStartDate']);
 }
 
 async function loadPublicationReadiness(force) {
@@ -19463,7 +19483,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-29.2';
+const APP_VER = '2026-08-29.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
