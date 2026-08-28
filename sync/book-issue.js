@@ -1,5 +1,9 @@
 import { validateRosterDocument } from './roster.js';
-import { loadOrderSnapshotRows, verifyOrderTaskSnapshotRows } from './book-order-create.js';
+import {
+  INTERNAL_BOOK_DELIVERY,
+  loadOrderSnapshotRows,
+  verifyOrderTaskSnapshotRows
+} from './book-order-create.js';
 import { MANUAL_ONLINE_DELIVERY, ONLINE_BOOK_VENDOR } from './book-order-vendors.js';
 import { bookOrderStudentIdsForAuth, ownBookStudentWriteGuard } from './book-order-student-scope.js';
 import {
@@ -12,7 +16,10 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const STATES = new Set(['prepared', 'issued', 'handed', 'cancelled']);
 const NEXT = new Set([...STATES, 'reissue']);
 const ORDER_NEXT = new Set(['receive', 'hand', 'academy_register']);
-const ORDER_DELIVERIES = new Set(['scheduled_batch_v1', MANUAL_ONLINE_DELIVERY, 'bound_print_v1']);
+const IMMEDIATE_RECEIPT_DELIVERIES = new Set(['bound_print_v1', INTERNAL_BOOK_DELIVERY]);
+const ORDER_DELIVERIES = new Set([
+  'scheduled_batch_v1', MANUAL_ONLINE_DELIVERY, ...IMMEDIATE_RECEIPT_DELIVERIES
+]);
 const MAX_UNIT_PRICE = 10000000;
 const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 const WORDMASTER_BASIC_TITLE = '워드마스터중등베이직';
@@ -129,7 +136,7 @@ function fulfillmentMatches(row, bookId, studentIds) {
 
 function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teacherName, students, send, row, priceRow, correctionRow, integrity,
     taskCreatedAt, taskUpdatedAt, needsStudentLink, canLinkStudents, orderDelivery) {
-  const boundPrint = orderDelivery === 'bound_print_v1';
+  const immediateReceipt = IMMEDIATE_RECEIPT_DELIVERIES.has(String(orderDelivery || ''));
   const studentIds = orderStudentIds(item);
   const unitPrice = storedOrderUnitPrice(item, priceRow, correctionRow);
   let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
@@ -148,10 +155,10 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
     priceCorrectedAt: correctionRow && correctionRow.created_at ? Number(correctionRow.created_at) : null,
     canSetUnitPrice: canSetLegacyOrderPrice(owner, item, send, row, integrity, unitPrice),
     owner: owner || null, teacherName: teacherName || (owner ? '담당 미지정' : '관리자'),
-    students, sendStatus: send ? String(send.status) : boundPrint ? 'accepted' : 'waiting', stage,
+    students, sendStatus: send ? String(send.status) : immediateReceipt ? 'accepted' : 'waiting', stage,
     taskUpdatedAt: Number(taskUpdatedAt) || 0,
     orderRequestedAt: Number(taskCreatedAt) || Number(taskUpdatedAt) || null,
-    orderCompletedAt: boundPrint ? Number(taskCreatedAt) || Number(taskUpdatedAt) || null
+    orderCompletedAt: immediateReceipt ? Number(taskCreatedAt) || Number(taskUpdatedAt) || null
       : send && String(send.status) === 'accepted' ? Number(send.updated_at || send.created_at) || null : null,
     needsStudentLink: !!needsStudentLink,
     canLinkStudents: !!canLinkStudents,
@@ -205,8 +212,8 @@ async function listOrderFulfillments(env, app, auth, document) {
     const task = orderTaskData(taskRow);
     if (!task) continue;
     const send = sendByTask.get(String(taskRow.id)) || null;
-    const boundPrint = task.orderDelivery === 'bound_print_v1';
-    const accepted = boundPrint || (!!send && String(send.status) === 'accepted');
+    const immediateReceipt = IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || ''));
+    const accepted = immediateReceipt || (!!send && String(send.status) === 'accepted');
     const sealedIdentity = await verifyOrderTaskSnapshotRows(
       String(taskRow.id), taskRow.owner, task, snapshotResult.results || [], document, Date.now(),
       !accepted
@@ -664,7 +671,8 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
   }
 
   const send = await latestOrderSend(env, app, taskId);
-  const accepted = task.orderDelivery === 'bound_print_v1' || (!!send && String(send.status) === 'accepted');
+  const accepted = IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || '')) ||
+    (!!send && String(send.status) === 'accepted');
   const snapshots = await loadOrderSnapshotRows(env, app, taskId);
   const sealedIdentity = await verifyOrderTaskSnapshotRows(
     taskId, taskRow.owner, task, snapshots, document, Date.now(), !accepted
@@ -727,7 +735,8 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
     ).bind(targetStatus, handedAt, handedBy, academyAt, academyBy, now, app, taskId, itemIndex, revision,
       row.status, bookId, idsJson, ...ownerGuard.binds, ...studentGuard.binds);
     let updated;
-    const catalog = next === 'academy_register' ? completedCatalogRecord(env, item, task, now) : null;
+    const catalog = next === 'academy_register' && task.orderDelivery !== INTERNAL_BOOK_DELIVERY
+      ? completedCatalogRecord(env, item, task, now) : null;
     if (catalog) {
       if (typeof env.DB.batch !== 'function') {
         // 일부 로컬 D1 어댑터에는 batch가 없다. 운영 D1에서는 아래 atomic 경로만 사용된다.
