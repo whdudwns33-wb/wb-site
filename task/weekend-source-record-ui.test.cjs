@@ -13,6 +13,14 @@ function block(start, end) {
   return html.slice(from, to);
 }
 
+function lastBlock(start, end) {
+  const from = html.lastIndexOf(start);
+  const to = html.indexOf(end, from + start.length);
+  assert.ok(from >= 0, start + ' starts');
+  assert.ok(to > from, end + ' ends');
+  return html.slice(from, to);
+}
+
 function dateHelpers() {
   const parse = value => {
     const [year, month, day] = String(value).split('-').map(Number);
@@ -29,13 +37,13 @@ function dateHelpers() {
 function sourceRecordHarness() {
   const source = block('function weekendPairDates(', 'function rememberWeekendVisitScope(');
   const dates = dateHelpers();
-  const cache = new Map(), errors = new Map(), checks = {};
+  const cache = new Map(), loading = new Map(), errors = new Map(), checks = {};
   const state = { tasks: [] };
   const api = new Function(
     'addDays', 'dowOf', 'isWeekendVisitDate', 'plannedOccursOn', 'isLesson', 'taskHasWeekendSchedule',
-    'weekendVisitScopeKey', 'weekendVisitScopeCache', 'weekendVisitScheduleErrors', 'getCheck',
+    'weekendVisitScopeKey', 'weekendVisitScopeCache', 'weekendVisitScheduleLoadingKeys', 'weekendVisitScheduleErrors', 'getCheck',
     'isFlexibleWeekendLesson', 'state', 'isBookOrderWorkTask', 'occursOn', 'statusOf', 'taskProgress',
-    'mondayOf', 'loadWeekendVisitScheduleScope',
+    'mondayOf', 'loadWeekendVisitScheduleScope', 'WEEKEND_VISIT_SCOPE_TTL_MS',
     source + '; return { weekendPairDates, plannedWeekendOccurrence, weekendVisitSourceDate, ' +
       'weekendVisitPairScope, lessonCheckHasMeaningfulData, lessonRecordContext, teacherTaskCardOccursOn };'
   )(
@@ -45,10 +53,10 @@ function sourceRecordHarness() {
     task => !!task && task.taskKind === 'lesson_instruction',
     task => (task.scheduleSlots || []).some(slot => (slot.days || []).map(Number).some(day => day === 0 || day === 6)),
     (date, staffId) => date + '|' + staffId,
-    cache, errors,
+    cache, loading, errors,
     (taskId, date) => checks[taskId + '|' + date] || null,
     (task, date) => task.weekendAttendanceMode === 'flexible' && date >= task.weekendFlexibleFrom,
-    state, () => false, () => false, () => 'todo', () => ({ done: 0, total: 5 }), value => value, () => {}
+    state, () => false, () => false, () => 'todo', () => ({ done: 0, total: 5 }), value => value, () => {}, 15000
   );
   return { api, cache, errors, checks };
 }
@@ -70,8 +78,8 @@ function visit(overrides = {}) {
 }
 
 function loadWeekendPair(harness, saturdayRows, sundayRows) {
-  harness.cache.set('2026-08-29|teacher-a', { rows: saturdayRows || [] });
-  harness.cache.set('2026-08-30|teacher-a', { rows: sundayRows || [] });
+  harness.cache.set('2026-08-29|teacher-a', { rows: saturdayRows || [], fetchedAt: Date.now() });
+  harness.cache.set('2026-08-30|teacher-a', { rows: sundayRows || [], fetchedAt: Date.now() });
 }
 
 test('API sourceDate wins and legacy visits derive only from the exact confirmed weekend schedule', () => {
@@ -124,8 +132,14 @@ test('source card reads and writes one actual visit-date check and fails closed 
 test('fixed weekend lessons keep their source key unless an exact cross-day visit exists', () => {
   const harness = sourceRecordHarness();
   const task = lessonTask({ weekendAttendanceMode: 'fixed', weekendFlexibleFrom: '' });
-  loadWeekendPair(harness, [], []);
   let context = harness.api.lessonRecordContext(task, '2026-08-29');
+  assert.equal(context.ready, false, 'fixed lessons also fail closed until both weekend scopes are known');
+  assert.equal(context.recordDate, '');
+  assert.equal(context.inputEnabled, false,
+    'writing to sourceDate before a remote cross-day visit is ruled out could split one lesson record');
+
+  loadWeekendPair(harness, [], []);
+  context = harness.api.lessonRecordContext(task, '2026-08-29');
   assert.equal(context.recordDate, '2026-08-29');
   assert.equal(context.inputEnabled, true);
 
@@ -135,6 +149,28 @@ test('fixed weekend lessons keep their source key unless an exact cross-day visi
   assert.equal(context.inputEnabled, true);
 });
 
+test('cancelled visits do not move a flexible card, while a checked-in visit already owns the actual-date record', () => {
+  const harness = sourceRecordHarness();
+  const task = lessonTask();
+  loadWeekendPair(harness, [], [visit({ status: 'cancelled' })]);
+  let context = harness.api.lessonRecordContext(task, '2026-08-29');
+  assert.equal(context.visible, false);
+  assert.equal(context.recordDate, '');
+  assert.equal(context.inputEnabled, false);
+
+  loadWeekendPair(harness, [], [visit({ status: 'checked_in', endTime: '', checkOutAt: null })]);
+  context = harness.api.lessonRecordContext(task, '2026-08-29');
+  assert.equal(context.visible, true);
+  assert.equal(context.recordDate, '2026-08-30');
+  assert.equal(context.inputEnabled, true,
+    'memo and attendance may be entered after check-in without waiting for check-out');
+
+  loadWeekendPair(harness, [], [visit({ status: 'cancelled' })]);
+  context = harness.api.lessonRecordContext(task, '2026-08-29');
+  assert.equal(context.visible, false, 'a cancellation refreshed from another tablet removes the flexible card');
+  assert.equal(context.recordDate, '');
+});
+
 test('today cards, lesson panel, week toggles, and visit rows preserve source UI but use recordDate', () => {
   const carry = block('function carryOver(', '/** 그 주에 직원이 스스로 추가한 업무 */');
   assert.match(carry, /lessonRecordContext\(t, d\)/);
@@ -142,8 +178,16 @@ test('today cards, lesson panel, week toggles, and visit rows preserve source UI
     'an unloaded past weekend must not become a false carry-over');
 
   const today = block('function viewToday()', 'function taskRow(');
-  assert.match(today, /ensureWeekendVisitScheduleDates\(Array\.from\(\{ length: 8 \}/,
-    'today view preloads the weekend scopes needed by seven-day carry-over');
+  assert.match(today, /ensureWeekendVisitScheduleDates\(weekendVisitCarryScopeDates\(cursor\), me\.id\)/);
+  const carryScopeSource = block('function weekendVisitCarryScopeDates(', 'function visibleWeekendVisitScopes(');
+  const dates = dateHelpers();
+  const { api } = sourceRecordHarness();
+  const carryScopeDates = new Function('weekendPairDates', 'addDays',
+    carryScopeSource + '; return weekendVisitCarryScopeDates;')(api.weekendPairDates, dates.addDays);
+  const sundayScopes = carryScopeDates('2026-08-30');
+  assert.ok(sundayScopes.includes('2026-08-22'),
+    'Sunday carry-over must preload the Saturday pair of the Sunday seven days ago');
+  assert.ok(sundayScopes.includes('2026-08-23'));
 
   const taskRow = block('function taskRow(', 'const LESSON_MEMO_FIELDS');
   assert.match(taskRow, /openPanels\.has\(t\.id \+ '\|' \+ date\)/);
@@ -172,4 +216,78 @@ test('today cards, lesson panel, week toggles, and visit rows preserve source UI
   assert.match(actions, /sourceDate:\s*sourceDate/);
   assert.match(actions, /case 'weekendopensource'/);
   assert.match(actions, /openPanels\.add\(taskId \+ '\|' \+ sourceDate\)/);
+});
+
+test('remote weekend visit changes force-refresh source scopes every 15 seconds and on browser return', () => {
+  const loader = block('async function loadWeekendVisitScheduleScope(', 'function ensureWeekendVisitScheduleDates(');
+  assert.match(loader, /loadWeekendVisitScheduleScope\(date, staffId, force\)/,
+    'the lightweight source-scope loader needs an explicit force mode');
+  assert.match(loader, /!force[^\n;]*(?:weekendVisitScopeIsFresh\(key\)|weekendVisitScopeCache\.has\(key\))/,
+    'force mode must bypass a browser-cached visit scope');
+
+  const visibility = block("document.addEventListener('visibilitychange'", '/* ══════════════════════════════════════════════════════');
+  const periodic = lastBlock('startSyncSession();', '/* ── 새 버전 감지 ──');
+  const refreshCall = source =>
+    /loadWeekendVisitScheduleScope\([^)]*,\s*true\)/s.test(source) ||
+    /(?:refresh|reload)\w*WeekendVisit\w*\(/i.test(source);
+  assert.equal(refreshCall(visibility), true,
+    'returning to a visible tablet must refresh remote weekend check-in/cancellation state');
+  assert.match(periodic, /15000/);
+  assert.equal(refreshCall(periodic), true,
+    'the visible-tablet 15-second loop must refresh remote weekend check-in/cancellation state');
+});
+
+test('an older weekend visit response cannot overwrite the newest response for the same scope', () => {
+  const source = block('function weekendVisitScopeIsFresh(', 'function weekendVisitRowsForTaskDate(');
+  const cache = new Map(), loading = new Map(), retryAt = new Map(), errors = new Map(), generations = new Map();
+  const api = new Function(
+    'weekendVisitScopeCache', 'weekendVisitScheduleLoadingKeys', 'weekendVisitScheduleRetryAt',
+    'weekendVisitScheduleErrors', 'weekendVisitScopeRequestGeneration', 'WEEKEND_VISIT_SCOPE_TTL_MS',
+    'weekendVisitScopeKey', 'weekendVisitScopeRequestSerial', 'weekendVisitScopeRevision',
+    source + '; return { beginWeekendVisitScopeRequest, finishWeekendVisitScopeRequest, rememberWeekendVisitScope };'
+  )(cache, loading, retryAt, errors, generations, 15000,
+    (date, staffId) => date + '|' + staffId, 0, 0);
+  const key = '2026-08-30|teacher-a';
+  const older = api.beginWeekendVisitScopeRequest(key);
+  const newer = api.beginWeekendVisitScopeRequest(key);
+  assert.equal(api.rememberWeekendVisitScope('2026-08-30', 'teacher-a',
+    { visits: [{ visitId: 'newer' }] }, newer), true);
+  assert.equal(api.rememberWeekendVisitScope('2026-08-30', 'teacher-a',
+    { visits: [{ visitId: 'older' }] }, older), false);
+  assert.equal(cache.get(key).rows[0].visitId, 'newer');
+  api.finishWeekendVisitScopeRequest(key, older);
+  assert.equal(loading.get(key), newer, 'an old finally block must not clear the current request marker');
+  api.finishWeekendVisitScopeRequest(key, newer);
+  assert.equal(loading.has(key), false);
+});
+
+test('a cached scope stays usable during its same-key refresh, but an error fails closed', () => {
+  const source = block('function weekendVisitScopeIsFresh(', 'function weekendVisitRowsForTaskDate(');
+  const cache = new Map(), loading = new Map(), retryAt = new Map(), errors = new Map(), generations = new Map();
+  const api = new Function(
+    'weekendVisitScopeCache', 'weekendVisitScheduleLoadingKeys', 'weekendVisitScheduleRetryAt',
+    'weekendVisitScheduleErrors', 'weekendVisitScopeRequestGeneration', 'WEEKEND_VISIT_SCOPE_TTL_MS',
+    'weekendVisitScopeKey', 'weekendVisitScopeRequestSerial', 'weekendVisitScopeRevision',
+    source + '; return { weekendVisitScopeIsFresh, beginWeekendVisitScopeRequest, finishWeekendVisitScopeRequest };'
+  )(cache, loading, retryAt, errors, generations, 15000,
+    (date, staffId) => date + '|' + staffId, 0, 0);
+  const key = '2026-08-30|teacher-a';
+  const fetchedAt = 100000;
+  cache.set(key, { rows: [{ visitId: 'known' }], fetchedAt });
+  assert.equal(api.weekendVisitScopeIsFresh(key, fetchedAt + 14999), true);
+  assert.equal(api.weekendVisitScopeIsFresh(key, fetchedAt + 15000), false);
+
+  const generation = api.beginWeekendVisitScopeRequest(key);
+  assert.equal(api.weekendVisitScopeIsFresh(key, fetchedAt + 60000), true,
+    'the prior confirmed rows remain available while a forced refresh is in flight');
+  errors.set(key, 'network failed');
+  assert.equal(api.weekendVisitScopeIsFresh(key, fetchedAt + 60000), false,
+    'a known refresh error must lock the actual-date mapping rather than trust stale rows');
+  api.finishWeekendVisitScopeRequest(key, generation);
+});
+
+test('a disabled actual-date lesson panel never exposes guardian-publication editing', () => {
+  const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
+  assert.match(panel, /const canEditPublication\s*=\s*editable\s*&&\s*canEditGuardianPublication\(t, date\)/,
+    'recordContext.inputEnabled=false must also lock guardian-publication fields');
 });
