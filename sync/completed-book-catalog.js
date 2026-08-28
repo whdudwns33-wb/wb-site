@@ -501,7 +501,7 @@ function reviewableStatus(value) {
 
 async function approveCatalogReview(env, app, body, origin, auth, json) {
   if (!auth || auth.scope !== 'all') {
-    return json({ ok: false, error: '교재DB 후보 확정은 관리자만 처리할 수 있습니다' }, 403, origin);
+    return json({ ok: false, error: '외부교재DB 후보 확정은 관리자만 처리할 수 있습니다' }, 403, origin);
   }
   const allowed = new Set(['app', 'auth', 'action', 'bookId', 'expectedRevision', 'title', 'publisherName']);
   const bookId = String(body && body.bookId || '');
@@ -515,7 +515,7 @@ async function approveCatalogReview(env, app, body, origin, auth, json) {
   }
   if (!env.DB || typeof env.DB.batch !== 'function') {
     return json({ ok: false, code: 'BOOK_CATALOG_REVIEW_LEDGER_NOT_READY',
-      error: '교재DB 검토 원장을 준비하고 있습니다' }, 503, origin);
+      error: '외부교재DB 검토 원장을 준비하고 있습니다' }, 503, origin);
   }
 
   let row;
@@ -525,11 +525,11 @@ async function approveCatalogReview(env, app, body, origin, auth, json) {
     ).bind(bookId).first();
   } catch (error) {
     if (/no such table.*completed_book_catalog/i.test(String(error && error.message || error))) {
-      return json({ ok: false, code: 'BOOK_CATALOG_NOT_READY', error: '완료 교재 DB를 준비하고 있습니다' }, 503, origin);
+      return json({ ok: false, code: 'BOOK_CATALOG_NOT_READY', error: '완료 외부교재DB를 준비하고 있습니다' }, 503, origin);
     }
     throw error;
   }
-  if (!row) return json({ ok: false, error: '교재DB 확인 후보를 찾을 수 없습니다' }, 404, origin);
+  if (!row) return json({ ok: false, error: '외부교재DB 확인 후보를 찾을 수 없습니다' }, 404, origin);
   const actor = reviewActor(auth);
   if (exactAdminReviewRetry(row, expectedRevision, title, publisherName, actor)) {
     return json({ ok: true, idempotent: true, book: publicRow(row) }, 200, origin);
@@ -538,7 +538,7 @@ async function approveCatalogReview(env, app, body, origin, auth, json) {
     return json({ ok: false, code: 'BOOK_CATALOG_PENDING', error: '웹 검색 확인이 끝난 뒤 처리해 주세요' }, 409, origin);
   }
   if (!reviewableStatus(row.verification_status) || Number(row.revision) !== expectedRevision) {
-    return json({ ok: false, code: 'REVISION_CONFLICT', error: '교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '외부교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
   }
 
   const now = Date.now();
@@ -578,13 +578,13 @@ async function approveCatalogReview(env, app, body, origin, auth, json) {
       if (exactAdminReviewRetry(raced, expectedRevision, title, publisherName, actor)) {
         return json({ ok: true, idempotent: true, book: publicRow(raced) }, 200, origin);
       }
-      return json({ ok: false, code: 'REVISION_CONFLICT', error: '교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
+      return json({ ok: false, code: 'REVISION_CONFLICT', error: '외부교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
     }
   } catch (error) {
     const message = String(error && error.message || error);
     if (/no such table.*completed_book_catalog(?:_review_events)?/i.test(message)) {
       return json({ ok: false, code: 'BOOK_CATALOG_REVIEW_LEDGER_NOT_READY',
-        error: '교재DB 검토 원장을 준비하고 있습니다' }, 503, origin);
+        error: '외부교재DB 검토 원장을 준비하고 있습니다' }, 503, origin);
     }
     const raced = await env.DB.prepare(
       "SELECT * FROM completed_book_catalog WHERE app='task' AND catalog_id=? LIMIT 1"
@@ -593,10 +593,10 @@ async function approveCatalogReview(env, app, body, origin, auth, json) {
       return json({ ok: true, idempotent: true, book: publicRow(raced) }, 200, origin);
     }
     if (/unique constraint.*completed_book_catalog\.(?:normalized_publisher|normalized_title)/i.test(message)) {
-      return json({ ok: false, code: 'BOOK_CATALOG_DUPLICATE', error: '같은 교재명과 출판사가 이미 교재DB에 있습니다' }, 409, origin);
+      return json({ ok: false, code: 'BOOK_CATALOG_DUPLICATE', error: '같은 교재명과 출판사가 이미 외부교재DB에 있습니다' }, 409, origin);
     }
     if (/COMPLETED_BOOK_CATALOG_(?:REVIEW_STALE|IMMUTABLE)/i.test(message)) {
-      return json({ ok: false, code: 'REVISION_CONFLICT', error: '교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
+      return json({ ok: false, code: 'REVISION_CONFLICT', error: '외부교재DB 후보가 다른 기기에서 먼저 변경되었습니다' }, 409, origin);
     }
     throw error;
   }
@@ -610,7 +610,7 @@ export async function handleBookCatalog(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body && body.action || '');
   if (action === 'review_approve') return approveCatalogReview(env, app, body, origin, auth, json);
-  if (action !== 'list') return json({ ok: false, error: '지원하는 교재DB action을 확인해 주세요' }, 400, origin);
+  if (action !== 'list') return json({ ok: false, error: '지원하는 외부교재DB action을 확인해 주세요' }, 400, origin);
   const limit = Math.floor(Math.max(1, Math.min(500, Number(body.limit) || 500)));
   try {
     const result = await env.DB.prepare(
@@ -629,7 +629,7 @@ export async function handleBookCatalog(env, app, body, origin, auth, json) {
     }, 200, origin);
   } catch (error) {
     if (/no such table.*completed_book_catalog/i.test(String(error && error.message || error))) {
-      return json({ ok: false, code: 'BOOK_CATALOG_NOT_READY', error: '완료 교재 DB를 준비하고 있습니다' }, 503, origin);
+      return json({ ok: false, code: 'BOOK_CATALOG_NOT_READY', error: '완료 외부교재DB를 준비하고 있습니다' }, 503, origin);
     }
     throw error;
   }
