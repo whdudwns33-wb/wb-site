@@ -30,8 +30,9 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
-  const render = new Function('today', 'esc', 'state', 'isLesson', 'staffById', `${code}\nreturn rosterStudentInfoHtml;`)(
-    () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => null
+  const render = new Function('today', 'esc', 'state', 'isLesson', 'staffById', 'staffStudentCompactLabel', `${code}\nreturn rosterStudentInfoHtml;`)(
+    () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => null,
+    student => [student && student.name, student && student.grade].filter(Boolean).join(' ')
   );
   const attack = '<img src=x onerror=alert(1)>';
   const html = render({
@@ -63,7 +64,7 @@ test('원생 탭은 휴원생과 퇴원생을 한 줄 요약의 접힌 목록으
   assert.match(source, /const curActive = activeIn\(cur\)\.filter\(student => !rosterStudentTransition\(student\)\)/);
 });
 
-test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제공하고 교사 목록은 이름·학년만 표시한다', () => {
+test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제공하고 교사 목록은 학교·정규화 학년을 표시한다', () => {
   const view = block('function viewRoster()', '/* ── 직원 관리');
   const editor = block('const ROSTER_SUBJECT_OPTIONS', '/* ── 신규 학생 30일 적응 관리');
   assert.match(view, /data-act="rosterstudentadd">기존 원생 추가<\/[\s\S]*data-act="rosterstudentnew">신규 원생 추가/);
@@ -85,7 +86,7 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
     assert.match(editor, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));
-  assert.match(mineList, /mineActive\.map[\s\S]*s\.name[\s\S]*s\.grade/);
+  assert.match(mineList, /mineActive\.map[\s\S]*s\.name[\s\S]*studentSchoolGradeDetailLabel\(s\)/);
   assert.doesNotMatch(mineList, /s\.subject|s\.memo|sessionModeBadgesForStudent/);
 });
 

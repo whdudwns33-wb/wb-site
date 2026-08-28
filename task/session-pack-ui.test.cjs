@@ -134,7 +134,7 @@ test('monthly and session counts include only lessons active on the reference da
   assert.match(source, /pack\.status === 'active' && lessonIds\.has/);
 });
 
-test('today and schedule reuse session-pack badges while the own-roster list stays name-and-grade only', () => {
+test('today and schedule reuse session-pack badges while the own-roster list shows school and normalized grade', () => {
   const loader = block('const SESSION_MODE_BADGE_ROUTES', 'function rememberSessionPackFocus');
   const today = block('function viewToday()', 'function taskRow');
   const task = block('function taskRow', 'function taskPanel');
@@ -150,7 +150,7 @@ test('today and schedule reuse session-pack badges while the own-roster list sta
   assert.match(schedule, /sessionModeBadgesHtml\(tasks\)/);
   assert.match(studentCards, /sessionModeBadgesHtml\(taskSources\.map/);
   assert.doesNotMatch(roster, /sessionModeBadgesForStudent\(s\.id, today\(\)\)/);
-  assert.match(roster, /mineActive\.map[\s\S]*esc\(s\.name\)[\s\S]*esc\(s\.grade\)/);
+  assert.match(roster, /mineActive\.map[\s\S]*studentSchoolGradeDetailLabel\(s\)/);
 });
 
 test('session attendance stays editable until the 23:50 cutoff and is then locked for automatic recording', () => {

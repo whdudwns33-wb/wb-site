@@ -30,7 +30,9 @@ const clone = value => JSON.parse(JSON.stringify(value));
 function roster() {
   return {
     roster: { updated: '2026-08-11', baseline: '2026-08', students: [
-      { id: 'student-a', name: '가학생', grade: '중1', teacher: '가선생', subject: '수학', start: '2026-08', end: '', reason: '', teacherIds: ['teacher-a', KIM_NAMGI_STAFF_ID] },
+      { id: 'student-a', name: '가학생', school: '가나다중', grade: '중1', teacher: '가선생', subject: '수학',
+        start: '2026-08', end: '', reason: '', memo: '직원 전용 메모', phoneSelf: '010-1111-1111',
+        phoneFather: '010-2222-2222', phoneMother: '010-3333-3333', teacherIds: ['teacher-a', KIM_NAMGI_STAFF_ID] },
       { id: 'student-b', name: '나학생', grade: '중2', teacher: '나선생', subject: '국어', start: '2026-08', end: '', reason: '', teacherIds: ['teacher-b'] }
     ] },
     bookStudents: [
@@ -254,8 +256,12 @@ test('new order moves through accepted, teacher received, student handed, and ad
   assert.equal(waiting.body.orders[0].orderCompletedAt, null);
   assert.equal(waiting.body.orders[0].teacherReceivedAt, null);
   assert.equal(waiting.body.orders[0].studentHandedAt, null);
-  assert.deepEqual(waiting.body.orders[0].students.map(student => student.id), ['student-a']);
-  assert.equal(JSON.stringify(waiting.body.orders).includes('teacherIds'), false);
+  assert.deepEqual(waiting.body.orders[0].students, [{
+    id: 'student-a', name: '가학생', school: '가나다중', grade: '중1'
+  }]);
+  for (const privateKey of ['phoneSelf', 'phoneFather', 'phoneMother', 'phone', 'contact', 'memo', 'teacherIds']) {
+    assert.equal(Object.prototype.hasOwnProperty.call(waiting.body.orders[0].students[0], privateKey), false, privateKey);
+  }
 
   db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
     .bind('task', 'send-a', 'key-a', 'batch-a', '테스트출판사', 1, 'a'.repeat(64), 'accepted', now, now).run();

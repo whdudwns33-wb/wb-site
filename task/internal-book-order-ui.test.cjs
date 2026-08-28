@@ -12,6 +12,10 @@ function block(from, to) {
   return html.slice(start, end);
 }
 
+function studentLabelHelperSource() {
+  return block('function schoolLevelLabel(school)', 'function taskRosterStudent(t)');
+}
+
 const EXPECTED_INTERNAL_BOOKS = [
   ['reading', 'reading_bisang', '비상', 23000, 8],
   ['reading', 'reading_advanced', '심화', 19000, 12],
@@ -62,13 +66,14 @@ test('외부교재 선택 화면은 기존 구조를 유지하면서 교재DB �
 
 test('최종 확인 내용은 교재·가격·학생 이름·수량·소계와 전체 합계를 계산해 보여준다', () => {
   const source = block('function bookOrderConfirmationStudentRows(', 'function openBookOrderFinalConfirmation(');
-  const render = new Function('orderStudentCandidates', 'esc',
-    `${source}\nreturn bookOrderFinalConfirmationHtml;`)(
+  const render = new Function('orderStudentCandidates', 'esc', 'rosterDb',
+    `${studentLabelHelperSource()}\n${source}\nreturn bookOrderFinalConfirmationHtml;`)(
       () => [
-        { id: 'student-a', name: '가학생', school: '가학교', grade: '초4' },
-        { id: 'student-b', name: '나학생', school: '나학교', grade: '중1' }
+        { id: 'student-a', name: '가학생', school: '가초등학교', grade: '4' },
+        { id: 'student-b', name: '나학생', school: '나중학교', grade: '1' }
       ],
-      value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
+      { students: [] }
     );
   const markup = render([
     { title: '어휘가 독해다 1단계', unitPrice: 12500, studentIds: ['student-a', 'student-b'] },
@@ -77,6 +82,7 @@ test('최종 확인 내용은 교재·가격·학생 이름·수량·소계와 �
 
   for (const text of ['어휘가 독해다 1단계', '스터디포스 제본', '가학생', '나학생',
     '12,500원', '25,000원', '6,000원', '총 3권', '합계 31,000원']) assert.ok(markup.includes(text), text);
+  for (const label of ['가학생 초4', '나학생 중1']) assert.ok(markup.includes(label), label);
   assert.match(markup, /2권/);
   assert.doesNotMatch(markup, /student-a|student-b/, 'stable studentId는 확인 화면에 노출하지 않습니다');
 });

@@ -31,6 +31,9 @@ function inboxRowsFor(overrides = {}) {
     ],
     guardianRequestRows: [],
     state: { tasks: [{ id: 'lesson-a', studentName: '학생A', title: '수업A' }] },
+    staffStudentCompactLabelById: (_studentId, fallbackName, fallbackGrade) =>
+      [fallbackName, fallbackGrade].filter(Boolean).join(' '),
+    taskDisplayTitle: task => String(task && task.title || '').replace(/^\[(?:수업|주문)\]\s*/, ''),
     ...overrides
   };
   const argNames = Object.keys(values);
@@ -106,9 +109,9 @@ test('보호자 요청은 서버 문구 대신 안전한 enum 라벨과 CAS 식�
   });
   const guardian = rows.filter(row => row.kind === '보호자 요청');
   assert.equal(guardian.length, 2);
-  assert.equal(guardian[0].title, '학생C · 상담 요청');
+  assert.equal(guardian[0].title, '학생C 중2 · 상담 요청');
   assert.equal(guardian[0].requester, '보호자 앱');
   assert.equal(guardian[0].guardianRequestRevision, 3);
-  assert.equal(guardian[1].title, '학생D · 요청 유형 확인 필요');
+  assert.equal(guardian[1].title, '학생D 초5 · 요청 유형 확인 필요');
   assert.doesNotMatch(guardian.map(row => row.title).join(' '), /<img|server_html/);
 });

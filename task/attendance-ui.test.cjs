@@ -13,6 +13,10 @@ function block(startText, endText) {
   return html.slice(start, end);
 }
 
+function studentLabelHelperSource() {
+  return block('function schoolLevelLabel(school)', 'function taskRosterStudent(t)');
+}
+
 test('lesson attendance offers present, late, absent, and early leave', () => {
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
   assert.match(panel, /\['P', '출석'\]/);
@@ -45,9 +49,9 @@ test('schedule attendance uses early leave and the exact incomplete label', () =
 test('teacher flow keeps student-by-student attendance while the redundant overview stays hidden', () => {
   const source = block('function scheduleAttendance(entry, date)', 'const SCHEDULE_VIEWS');
   const checks = { present: { att: 'P' }, late: { att: 'L' }, absent: { att: 'A' }, early: { att: 'E' } };
-  const helpers = new Function('getCheck', 'esc', source +
+  const helpers = new Function('getCheck', 'esc', 'rosterDb', studentLabelHelperSource() + source +
     '; return { scheduleAttendanceOverviewHtml, scheduleAttendanceSummaryText };')(
-    taskId => checks[taskId] || null, String
+    taskId => checks[taskId] || null, String, { students: [] }
   );
   const session = {
     label: '16:00–17:00', entries: [
@@ -67,7 +71,7 @@ test('teacher flow keeps student-by-student attendance while the redundant overv
   const timeline = block('function scheduleTimelineHtml(timeline, date, nowKst)', 'function scheduleTimelineModal');
   assert.match(overview, /schedule-attendance-overview/);
   assert.match(overview, /schedule-attendance-pill/);
-  assert.match(overview, /esc\(entry\.studentName\)/);
+  assert.match(overview, /staffStudentCompactLabelById\(entry\.studentId, entry\.studentName, entry\.grade\)/);
   assert.match(overview, /esc\(att\.label\)/);
   assert.match(timeline, /scheduleAttendanceSummaryText\(session, date\)/);
   assert.doesNotMatch(timeline, /scheduleAttendanceOverviewHtml\(timeline, date\)/);
