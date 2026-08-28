@@ -3,6 +3,7 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import worker from './worker-core.js';
+import { verifyOrderTaskSnapshotRows } from './book-order-create.js';
 import { handleScheduledBookOrders } from './book-order-send.js';
 import { readPublicBookStatus } from './public-book-status.js';
 
@@ -97,6 +98,11 @@ function boundBody(taskId = 'ord_bound_a123', productCode = 'pages_1_30') {
     title: '가학생 수학 제본', studentIds: ['student-a'] };
 }
 
+function internalBody(taskId = 'ord_internal_a123', productCode = 'vocab_stage_1', volume) {
+  return { auth: person, action: 'create_internal', taskId, productCode,
+    ...(volume === undefined ? {} : { volume }), studentIds: ['student-a'] };
+}
+
 test('037 is additive, append-only, and stores no student display name, contact, or raw book title', () => {
   for (const sql of [schema, migration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_student_snapshots/);
@@ -157,10 +163,11 @@ test('teacher order scope is the union of active lesson studentIds, not roster t
     'roster teacherIds가 남아 있어도 활성 수업이 없으면 fail closed 한다');
 });
 
-test('normal and bound create recheck lesson scope inside the atomic D1 batch', async () => {
+test('normal, bound, and internal create recheck lesson scope inside the atomic D1 batch', async () => {
   for (const [label, body] of [
     ['normal', createBody('ord_scope_race_normal')],
-    ['bound', boundBody('ord_scope_race_bound')]
+    ['bound', boundBody('ord_scope_race_bound')],
+    ['internal', internalBody('ord_scope_race_internal')]
   ]) {
     const db = new TestD1(); seed(db);
     const originalBatch = db.batch.bind(db);
@@ -284,6 +291,169 @@ test('bound orders continue through existing handoff and academy registration an
   assert.deepEqual(record.students.map(student => student.name), ['가학생']);
   assert.ok(record.studentHandedAt);
   assert.ok(record.academyRegisteredAt);
+});
+
+test('internal catalog is server authoritative and every product starts at teacher-received', async () => {
+  const db = new TestD1(); seed(db);
+  const products = [
+    ['vocab_stage_1', undefined, '어휘가 독해다 1단계', 12500],
+    ['vocab_stage_2', undefined, '어휘가 독해다 2단계', 12500],
+    ['vocab_stage_3', undefined, '어휘가 독해다 3단계', 12500],
+    ['vocab_stage_4', undefined, '어휘가 독해다 4단계', 12500],
+    ['vocab_stage_5', undefined, '어휘가 독해다 5단계', 12500],
+    ['vocab_stage_6', undefined, '어휘가 독해다 6단계', 12500],
+    ['vocab_basic', undefined, '어휘가 독해다 기본', 12000],
+    ['vocab_skill', undefined, '어휘가 독해다 실력', 13000],
+    ['vocab_middle', undefined, '어휘가 독해다 중등', 14500],
+    ['vocab_high', undefined, '어휘가 독해다 고등', 16000],
+    ['vocab_hanja_1', undefined, '어휘가 독해다 한자1단계', 12000],
+    ['vocab_hanja_2', undefined, '어휘가 독해다 한자2단계', 12000],
+    ['vocab_hanja_3', undefined, '어휘가 독해다 한자3단계', 12000],
+    ['vocab_hanja_4', undefined, '어휘가 독해다 한자4단계', 12000],
+    ['reading_bisang', 8, '독해창 비상 8권', 23000],
+    ['reading_advanced', 12, '독해창 심화 12권', 19000],
+    ['reading_application', 12, '독해창 응용 12권', 19000],
+    ['reading_intro', 8, '독해창 입문 8권', 19000],
+    ['reading_top', 8, '독해창 최상 8권', 23000],
+    ['reading_essential', 12, '독해창 필수 12권', 19000],
+    ['studyforce_bound', undefined, '스터디포스 제본', 6000],
+    ['studyforce_passage_notes', undefined, '스터디포스 지문정리노트', 10000]
+  ];
+  const taskIds = [];
+  for (let index = 0; index < products.length; index++) {
+    const [productCode, volume, title, unitPrice] = products[index];
+    const taskId = 'ord_internal_' + String(index).padStart(4, '0');
+    const body = internalBody(taskId, productCode, volume);
+    assert.equal(Object.prototype.hasOwnProperty.call(body, 'title'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(body, 'unitPrice'), false);
+    const result = await call(db, body);
+    assert.equal(result.status, 201, productCode + ': ' + JSON.stringify(result.body));
+    assert.equal(result.body.task.orderDelivery, 'internal_book_v1');
+    assert.equal(result.body.task.orderVendor, '내부교재');
+    assert.equal(result.body.task.internalProductCode, productCode);
+    assert.equal(result.body.task.orderItems[0].title, title);
+    assert.equal(result.body.task.orderItems[0].unitPrice, unitPrice);
+    assert.deepEqual(result.body.task.orderItems[0].studentIds, ['student-a']);
+    assert.match(result.body.task.orderItems[0].bookId, /^INTERNAL_[A-Fa-f0-9]{45}$/);
+    if (volume === undefined) assert.equal('internalProductVolume' in result.body.task, false);
+    else assert.equal(result.body.task.internalProductVolume, volume);
+    taskIds.push(taskId);
+  }
+  assert.equal(new Set(db.database.prepare(
+    "SELECT book_id FROM book_order_student_snapshots WHERE book_id LIKE 'INTERNAL_%'"
+  ).all().map(row => row.book_id)).size, products.length);
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) AS count FROM book_order_fulfillments WHERE status='teacher_received' AND revision=1"
+  ).get().count, products.length);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_sends').get().count, 0);
+
+  const listed = await call(db, { auth: person, action: 'list' }, '/book-issue');
+  for (const [index, taskId] of taskIds.entries()) {
+    const order = listed.body.orders.find(row => row.taskId === taskId);
+    assert.ok(order, taskId);
+    assert.equal(order.stage, 'teacher_received');
+    assert.equal(order.sendStatus, 'accepted');
+    assert.equal(order.title, products[index][2]);
+    assert.equal(order.unitPrice, products[index][3]);
+    assert.ok(order.teacherReceivedAt);
+    assert.ok(order.orderCompletedAt);
+  }
+});
+
+test('internal order validates volume boundaries, forbids client-controlled fields, and is idempotent', async () => {
+  const db = new TestD1(); seed(db);
+  const first = await call(db, internalBody());
+  assert.equal(first.status, 201);
+  const retry = await call(db, internalBody());
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+
+  for (const [taskId, body] of [
+    ['ord_int_unknown1', internalBody('ord_int_unknown1', 'logic_imagination')],
+    ['ord_int_missing1', internalBody('ord_int_missing1', 'reading_bisang')],
+    ['ord_int_volume00', internalBody('ord_int_volume00', 'reading_bisang', 0)],
+    ['ord_int_volume09', internalBody('ord_int_volume09', 'reading_bisang', 9)],
+    ['ord_int_volume13', internalBody('ord_int_volume13', 'reading_advanced', 13)],
+    ['ord_int_fraction', internalBody('ord_int_fraction', 'reading_advanced', 1.5)],
+    ['ord_int_vol_text', internalBody('ord_int_vol_text', 'reading_advanced', '1')],
+    ['ord_int_extra_vol', internalBody('ord_int_extra_vol', 'vocab_basic', 1)],
+    ['ord_int_titlekey', { ...internalBody('ord_int_titlekey'), title: '조작 제목' }],
+    ['ord_int_pricekey', { ...internalBody('ord_int_pricekey'), unitPrice: 1 }]
+  ]) {
+    const result = await call(db, body);
+    assert.equal(result.status, 400, taskId);
+    assert.equal(result.body.code, 'ORDER_INVALID', taskId);
+  }
+  for (const [taskId, productCode, volume] of [
+    ['ord_int_bisang01', 'reading_bisang', 1],
+    ['ord_int_advanced01', 'reading_advanced', 1],
+    ['ord_int_intro001', 'reading_intro', 1],
+    ['ord_int_top00001', 'reading_top', 1],
+    ['ord_int_essential1', 'reading_essential', 1]
+  ]) assert.equal((await call(db, internalBody(taskId, productCode, volume))).status, 201, taskId);
+
+  const collision = internalBody(); collision.productCode = 'vocab_stage_2';
+  assert.equal((await call(db, collision)).body.code, 'ORDER_ID_CONFLICT');
+  const outOfScope = internalBody('ord_int_scope01'); outOfScope.studentIds = ['student-b'];
+  assert.equal((await call(db, outOfScope)).body.code, 'ORDER_STUDENT_SCOPE');
+  const inactive = internalBody('ord_int_inactive'); inactive.studentIds = ['student-old'];
+  assert.equal((await call(db, inactive)).body.code, 'ORDER_STUDENT_INACTIVE');
+  const missing = internalBody('ord_int_missing2'); missing.studentIds = ['student-missing'];
+  assert.equal((await call(db, missing)).body.code, 'ORDER_STUDENT_MISSING');
+});
+
+test('admin cannot order normal, bound, or internal books for leave and withdrawn roster students', async () => {
+  for (const transition of ['휴원 2026-08-28', '퇴원 2026-08-28']) {
+    const db = new TestD1(); seed(db);
+    const document = roster();
+    document.roster.students.find(student => student.id === 'student-a').reason = transition;
+    db.database.prepare('UPDATE private_rosters SET data=?,updated_at=updated_at+1 WHERE app=?')
+      .run(JSON.stringify(document), 'task');
+    const normal = createBody('ord_transition_normal'); normal.auth = admin;
+    const bound = boundBody('ord_transition_bound'); bound.auth = admin;
+    const internal = internalBody('ord_transition_internal'); internal.auth = admin;
+    for (const body of [normal, bound, internal]) {
+      const result = await call(db, body);
+      assert.equal(result.status, 409, transition + ' ' + body.action);
+      assert.equal(result.body.code, 'ORDER_STUDENT_INACTIVE', transition + ' ' + body.action);
+    }
+    assert.equal(db.database.prepare(
+      "SELECT COUNT(*) AS count FROM tasks WHERE json_extract(data,'$.orderIdentityVersion')=1"
+    ).get().count, 0, transition);
+  }
+});
+
+test('internal orders continue through handoff and admin academy registration', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, internalBody('ord_int_flow0001', 'reading_bisang', 3));
+  assert.equal(created.status, 201);
+  const handed = await call(db, { auth: person, action: 'order_transition', taskId: created.body.task.id,
+    itemIndex: 0, next: 'hand', revision: 1 }, '/book-issue');
+  assert.equal(handed.status, 200);
+  assert.equal(handed.body.status, 'student_handed');
+  const academy = await call(db, { auth: admin, action: 'order_transition', taskId: created.body.task.id,
+    itemIndex: 0, next: 'academy_register', revision: 2 }, '/book-issue');
+  assert.equal(academy.status, 200);
+  assert.equal(academy.body.status, 'academy_registered');
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM completed_book_catalog').get().count, 0,
+    '내부 교재는 외부 교재 자동 DB 후보에 섞지 않는다');
+});
+
+test('internal product metadata tampering fails the sealed snapshot verifier', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, internalBody('ord_int_tamper01', 'reading_bisang', 1));
+  assert.equal(created.status, 201);
+  const changed = JSON.parse(JSON.stringify(created.body.task));
+  changed.internalProductVolume = 2;
+  const snapshots = db.database.prepare(
+    'SELECT * FROM book_order_student_snapshots WHERE app=? AND task_id=?'
+  ).all('task', changed.id);
+  const verified = await verifyOrderTaskSnapshotRows(
+    changed.id, 'teacher-a', changed, snapshots, roster(), Date.now(), false
+  );
+  assert.equal(verified.sealed, true);
+  assert.equal(verified.valid, false);
+  assert.equal(verified.code, 'ORDER_IDENTITY_MISMATCH');
 });
 
 test('new orders require a positive whole-won unit price within the supported range', async () => {
@@ -421,6 +591,15 @@ test('generic sync cannot create or convert an unsealed scheduled order, but exa
   assert.equal(boundCreate.status, 409);
   assert.equal(boundCreate.body.code, 'BOOK_ORDER_CREATE_REQUIRED');
 
+  const internal = { id: 'ord_internal_bypass', staffId: 'teacher-a', title: '[주문] 내부교재 우회', origin: 'staff',
+    orderItems: [{ bookId: 'INTERNAL_forged', title: '어휘가 독해다 기본', qty: '1권',
+      studentIds: ['student-a'], unitPrice: 12000 }],
+    orderDelivery: 'internal_book_v1', orderIdentityVersion: 1, createdAt: now, updatedAt: now, deleted: false };
+  const internalCreate = await call(db, { auth: admin, since: 0, changes: [{ table: 'tasks', id: internal.id,
+    owner: 'teacher-a', data: internal, updated_at: now }] }, '/sync');
+  assert.equal(internalCreate.status, 409);
+  assert.equal(internalCreate.body.code, 'BOOK_ORDER_CREATE_REQUIRED');
+
   const ordinary = { ...scheduled, id: 'ordinary-task', title: '일반 업무', orderDelivery: undefined };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', ordinary.id, 'teacher-a', JSON.stringify(ordinary), now, now).run();
@@ -465,30 +644,33 @@ test('snapshot rows use one JSON expansion statement and the entire D1 batch rol
   db.batch = originalBatch;
 });
 
-test('bound task, identity snapshot, and initial receipt roll back as one three-statement batch', async () => {
-  const db = new TestD1(); seed(db);
-  const originalBatch = db.batch.bind(db);
-  let statementCount = 0;
-  db.batch = statements => {
-    statementCount = statements.length;
-    db.database.exec('BEGIN');
-    try {
-      statements[0].run();
-      statements[1].run();
-      throw new Error('injected bound fulfillment failure');
-    } catch (error) {
-      db.database.exec('ROLLBACK');
-      return Promise.reject(error);
-    }
-  };
-  const failed = await call(db, boundBody('ord_bound_rollback'));
-  assert.equal(failed.status, 500);
-  assert.equal(statementCount, 3);
-  assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 0);
-  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0);
-  db.batch = originalBatch;
+test('bound and internal immediate orders roll back task, snapshot, and receipt as one batch', async () => {
+  for (const [label, body] of [
+    ['bound', boundBody('ord_bound_rollback')],
+    ['internal', internalBody('ord_internal_rollback')]
+  ]) {
+    const db = new TestD1(); seed(db);
+    let statementCount = 0;
+    db.batch = statements => {
+      statementCount = statements.length;
+      db.database.exec('BEGIN');
+      try {
+        statements[0].run();
+        statements[1].run();
+        throw new Error('injected ' + label + ' fulfillment failure');
+      } catch (error) {
+        db.database.exec('ROLLBACK');
+        return Promise.reject(error);
+      }
+    };
+    const failed = await call(db, body);
+    assert.equal(failed.status, 500, label);
+    assert.equal(statementCount, 3, label);
+    assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM tasks WHERE COALESCE(json_extract(data,'$.taskKind'),'')!='lesson_instruction'").get().count, 0, label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots').get().count, 0, label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_fulfillments').get().count, 0, label);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_active_targets WHERE active=1').get().count, 0, label);
+  }
 });
 
 test('bound orders are never picked up by direct or scheduled SMS delivery', async () => {
