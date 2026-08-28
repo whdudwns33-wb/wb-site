@@ -26,6 +26,7 @@ test('weekend actual visits are separate from lesson checks and cover every week
 test('teacher today and manager board expose check-in, checkout, correction, and live state', () => {
   assert.match(html, /if \(isWeekendVisitDate\(cursor\)\) h \+= weekendVisitTeacherHtml\(me, cursor\)/);
   const today = block('function viewToday()', 'function taskRow');
+  assert.match(today, /session\.isStaffLink && !session\.isAdmin && me\.id === session\.staffId && cursor === today\(\)/);
   const receivedAt = today.indexOf('teacherReceivedAdminDirectiveHtml(me.id)');
   const composerAt = today.indexOf('teacherLiveRequestComposerHtml(me, cursor)');
   const weekendAt = today.indexOf('weekendVisitTeacherHtml(me, cursor)');

@@ -154,7 +154,9 @@ test('수신자는 director와 배포 allowlist의 활성 stable staffId만 반�
 
 test('담당 교사는 오늘 진행되는 자신의 활성 수업 요청만 stable ID로 멱등 저장한다', async () => {
   const db = new TestD1(); seed(db);
+  const before = Date.now();
   const first = await call(db, request());
+  const after = Date.now();
   assert.equal(first.status, 200);
   assert.equal(first.body.idempotent, false);
   assert.deepEqual({
@@ -168,11 +170,16 @@ test('담당 교사는 오늘 진행되는 자신의 활성 수업 요청만 sta
     senderStaffId: 'teacher-a', recipientAdminId: 'manager-a'
   });
   assert.doesNotMatch(JSON.stringify(first.body), /테스트 학생|01000000000/);
+  assert.ok(first.body.request.createdAt >= before && first.body.request.createdAt <= after);
+  assert.equal(db.database.prepare(
+    "SELECT created_at FROM teacher_live_requests WHERE request_id='tlr_request_001'"
+  ).get().created_at, first.body.request.createdAt);
   assert.equal(db.database.prepare('SELECT COUNT(*) count FROM teacher_live_requests').get().count, 1);
 
   const retry = await call(db, request());
   assert.equal(retry.status, 200);
   assert.equal(retry.body.idempotent, true);
+  assert.equal(retry.body.request.createdAt, first.body.request.createdAt);
   assert.equal(db.database.prepare('SELECT COUNT(*) count FROM teacher_live_requests').get().count, 1);
 
   const collision = await call(db, request({ body: '서로 다른 요청입니다.' }));
