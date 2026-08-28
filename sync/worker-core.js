@@ -24,6 +24,7 @@
  *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
  *   POST /feedback-review  { app, auth(admin) }   → 원장, 발송 이력·상태 확인(승인 클릭은 더 이상 발송 조건이 아님)
+ *   POST /feedback-polish  { app, auth, ... }     → 최종 피드백 코멘트만 글자수 안에서 AI로 완곡하게 정리
  *   POST /parent-feedback-send { app, auth(admin), requestKey } → 막혔던 발송을 원장이 수동으로 재시도
  *   POST /guardian-contact { app, auth(admin), ... } → 원장, 보호자 연락처·발송 동의 등록/조회
  *   POST /lesson-change-request { app, auth, ... } → 직원, 원장이 등록한 지시서에 변경 제안
@@ -65,7 +66,13 @@ import { handleBookOrderCreate } from './book-order-create.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
 import { handleBookEditRequest, handleBookEditReview } from './book-edit-request.js';
 import { handleGuardianContact } from './guardian-contact.js';
-import { handleParentFeedbackSend, attemptParentFeedbackSend, resolveStudentName } from './parent-feedback-send.js';
+import {
+  handleParentFeedbackSend,
+  attemptParentFeedbackSend,
+  resolveStudentName,
+  MAX_PARENT_FEEDBACK_COMMENT_CHARS
+} from './parent-feedback-send.js';
+import { handleFeedbackPolish } from './feedback-polish.js';
 import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
@@ -1148,7 +1155,7 @@ const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
-const MAX_FEEDBACK_COMMENT = 600;
+const MAX_FEEDBACK_COMMENT = MAX_PARENT_FEEDBACK_COMMENT_CHARS;
 const MAX_STUDENT_NAME = 40;
 
 /** 제출한 선생님의 실제 이름을 서버가 직접 찾는다 — 클라이언트가 이름을 자유롭게
@@ -1781,6 +1788,11 @@ export default {
       }
       if (url.pathname === '/feedback-request') return await handleFeedbackRequest(env, app, body, okOrigin);
       if (url.pathname === '/feedback-review') return await handleFeedbackReview(env, app, body, okOrigin);
+      if (url.pathname === '/feedback-polish') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleFeedbackPolish(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/parent-feedback-send') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
