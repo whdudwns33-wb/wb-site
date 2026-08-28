@@ -172,6 +172,25 @@ function studentParentIdentityKey(value) {
   return [...new Set([identityPhone(value && value.phoneFather), identityPhone(value && value.phoneMother)].filter(Boolean))].sort().join(',');
 }
 
+function comparableStudentChangeField(student, key) {
+  const row = student || {};
+  if (key === 'billingMode') return String(row.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly';
+  if (key === 'sessionCycleStartDate') {
+    return comparableStudentChangeField(row, 'billingMode') === 'session4' ? String(row.sessionCycleStartDate || '') : '';
+  }
+  if (key === 'subject' || key === 'subjects') {
+    const source = Array.isArray(row.subjects) && row.subjects.length
+      ? row.subjects : String(row.subject || '').split(/[·,\/]/);
+    return [...new Set(source.map(item => identityText(item)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  }
+  return row[key] == null ? '' : row[key];
+}
+
+function changedStudentFields(before, after, fields) {
+  return fields.filter(key => JSON.stringify(comparableStudentChangeField(before, key)) !==
+    JSON.stringify(comparableStudentChangeField(after, key)));
+}
+
 function minimalStudentForDeletion(value) {
   if (!identityText(value && value.name)) return false;
   if ((value.subjects || []).length) return false;
@@ -900,7 +919,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
         'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo',
         'billingMode', 'sessionCycleStartDate'];
-      const changedFields = fields.filter(key => JSON.stringify(previousStudent[key] || '') !== JSON.stringify(nextStudent[key] || ''));
+      const changedFields = changedStudentFields(previousStudent, nextStudent, fields);
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);
         const audienceStaffIds = await lessonStaffIdsForStudent(env, app, nextStudent.id, updatedAt);
