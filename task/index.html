@@ -1013,11 +1013,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.2"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.2"></script>
-<script src="./asset-core.js?v=2026-08-28.2"></script>
-<script src="./qr-core.js?v=2026-08-28.2"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.2"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.3"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.3"></script>
+<script src="./asset-core.js?v=2026-08-28.3"></script>
+<script src="./qr-core.js?v=2026-08-28.3"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.3"></script>
 <script>
 "use strict";
 
@@ -8879,7 +8879,7 @@ function bookPendingOrders(b) {
         String(row.item.bookId || '') === String(b.id) || (!row.item.bookId && row.item.title === b.title));
       return !bookIssueLoaded || !itemIndexes.length || !itemIndexes.every(row =>
         bookOrderRows.some(status => String(status.taskId) === String(t.id) &&
-          Number(status.itemIndex) === row.index && status.stage === 'student_handed'));
+          Number(status.itemIndex) === row.index && ['student_handed', 'cancelled'].includes(status.stage)));
     }
     return !Object.keys(state.checks).some(k => state.checks[k].taskId === t.id && state.checks[k].done);
   });
@@ -8892,9 +8892,9 @@ function activeBookOrderStudentIds(bookId) {
     Array.isArray(task.orderItems)).forEach(task => {
     task.orderItems.forEach((item, itemIndex) => {
       if (String(item.bookId || '') !== String(bookId)) return;
-      const handed = bookIssueLoaded && bookOrderRows.some(status => String(status.taskId) === String(task.id) &&
-        Number(status.itemIndex) === itemIndex && status.stage === 'student_handed');
-      if (!handed) (Array.isArray(item.studentIds) ? item.studentIds : []).forEach(id => ids.add(String(id)));
+      const inactive = bookIssueLoaded && bookOrderRows.some(status => String(status.taskId) === String(task.id) &&
+        Number(status.itemIndex) === itemIndex && ['student_handed', 'cancelled'].includes(status.stage));
+      if (!inactive) (Array.isArray(item.studentIds) ? item.studentIds : []).forEach(id => ids.add(String(id)));
     });
   });
   return ids;
@@ -9157,6 +9157,58 @@ async function cancelSealedBookOrder(task, button) {
       toast('주문 취소 실패 — ' + String(error && error.message || error));
     }
     if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+const pendingBookOrderItemCancellations = new Set();
+
+function bookOrderTaskControls(taskId) {
+  return Array.from(document.querySelectorAll('[data-task]'))
+    .filter(control => String(control.dataset.task || '') === String(taskId));
+}
+
+async function cancelWaitingBookOrderItem(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const taskId = String(button.dataset.task || '');
+  const itemIndex = Number(button.dataset.item);
+  const row = bookOrderRows.find(item => String(item.taskId) === taskId && Number(item.itemIndex) === itemIndex);
+  if (!row || row.stage !== 'order_waiting') return toast('1단계 주문대기 교재만 취소할 수 있습니다');
+  const key = taskId + '|' + itemIndex;
+  if (pendingBookOrderItemCancellations.has(key)) return;
+  if (!confirm(row.title + ' · ' + Number(row.quantity || 0) + '권 주문을 취소할까요?\n취소한 교재는 저녁 주문에서 제외됩니다.')) return;
+
+  pendingBookOrderItemCancellations.add(key);
+  const controls = bookOrderTaskControls(taskId);
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    const result = await sync.post('/book-order', {
+      app: SYNC_APP,
+      auth,
+      action: 'cancel_item',
+      taskId,
+      itemIndex,
+      expectedUpdatedAt: Number(row.taskUpdatedAt) || 0
+    });
+    const cancellation = result && result.cancellation;
+    if (!cancellation || String(cancellation.taskId || '') !== taskId ||
+        Number(cancellation.itemIndex) !== itemIndex || Number(cancellation.cancelledAt) <= 0) {
+      throw new Error('서버의 교재 주문 취소 결과를 확인하지 못했습니다');
+    }
+    await loadBookIssues(true);
+    toast('선택한 교재 주문을 취소했습니다');
+  } catch (error) {
+    if (error && ['ORDER_CANCEL_NOT_WAITING', 'ORDER_CANCEL_SEND_ACTIVE'].includes(error.code)) {
+      toast('1단계 주문대기 상태에서만 취소할 수 있습니다 — 주문 현황을 다시 확인해 주세요');
+    } else if (error && error.code === 'REVISION_CONFLICT') {
+      toast('주문 상태가 다른 기기에서 바뀌었습니다 — 새로고침 후 다시 확인해 주세요');
+    } else {
+      toast('교재 주문 취소 실패 — ' + String(error && error.message || error));
+    }
+    await loadBookIssues(true);
+  } finally {
+    pendingBookOrderItemCancellations.delete(key);
+    controls.forEach(control => { if (control.isConnected) control.disabled = false; });
   }
 }
 
@@ -9834,10 +9886,14 @@ function bookOrderActionButtons(row) {
     return '<button class="btn btn-sm btn-primary" data-act="bookorderlinkopen"' + base + '>학생 연결</button>';
   }
   if (row.integrity || row.needsStudentLink) return '<button class="btn btn-sm btn-ghost" disabled>학생·교재 연결 확인 필요</button>';
+  const cancelButton = row.stage === 'order_waiting' && canTeacherAct
+    ? '<button class="btn btn-sm btn-danger" data-act="bookordercancel"' + base + '>주문취소</button>' : '';
   if (row.orderDelivery === 'manual_online_v1' && row.stage === 'order_waiting' && canTeacherAct) {
-    return '<button class="btn btn-sm btn-primary" data-act="bookordermanualresult" data-result="completed"' + base + '>주문완료</button>' +
-      '<button class="btn btn-sm btn-danger" data-act="bookordermanualresult" data-result="failed"' + base + '>주문실패</button>';
+    return '<button class="btn btn-sm btn-primary" data-act="bookordermanualresult" data-result="completed"' + base + '>쿠팡 주문완료</button>' +
+      '<button class="btn btn-sm btn-danger" data-act="bookordermanualresult" data-result="failed"' + base + '>쿠팡 주문실패</button>' +
+      cancelButton;
   }
+  if (cancelButton) return cancelButton;
   if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>';
   if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>';
   if (row.stage === 'student_handed' && session.isAdmin && !row.academyRegisteredAt) {
@@ -16074,6 +16130,7 @@ document.addEventListener('click', ev => {
     case 'bookorderpricesave': saveLegacyBookOrderPrice(el); break;
     case 'bookordertransition': transitionBookOrder(el); break;
     case 'bookordermanualresult': transitionManualOnlineOrder(el); break;
+    case 'bookordercancel': cancelWaitingBookOrderItem(el); break;
     case 'externalbookorder': submitExternalBookOrder(el); break;
     case 'internalbookstudentopen': openInternalBookStudentModal(); break;
     case 'internalbookstudentlinksave': saveInternalBookStudentLink(); break;
@@ -17858,7 +17915,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.2';
+const APP_VER = '2026-08-28.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

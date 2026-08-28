@@ -9,6 +9,7 @@ import { readPublicBookStatus } from './public-book-status.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/037_book_order_identity_snapshots.sql', import.meta.url), 'utf8');
+const itemCancellationMigration = fs.readFileSync(new URL('./migrations/056_book_order_item_cancellations.sql', import.meta.url), 'utf8');
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = { mode: 'person', id: 'teacher-a', token: 'token-a' };
 const vendorPhones = JSON.stringify({ '문자출판사': '010-1234-5678' });
@@ -134,6 +135,18 @@ test('create atomically writes a canonical task and immutable per-student identi
   assert.throws(() => db.database.prepare('UPDATE book_order_student_snapshots SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('UPDATE book_order_active_targets SET book_id=?').run('BK99'), /APPEND_ONLY/);
   assert.throws(() => db.database.prepare('DELETE FROM book_order_active_targets').run(), /APPEND_ONLY/);
+});
+
+test('056 stores only immutable item cancellation metadata and releases the exact active target', () => {
+  for (const sql of [schema, itemCancellationMigration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_item_cancellations/);
+    assert.match(sql, /BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY/);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_item_cancellations');
+    const table = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(table, /student_name|student_id|phone|contact|address|memo|title/i);
+  }
+  assert.match(itemCancellationMigration,
+    /UPDATE book_order_active_targets SET active=0[\s\S]*task_id=NEW\.task_id AND item_index=NEW\.item_index/);
 });
 
 test('teacher order scope is the union of active lesson studentIds, not roster teacherIds', async () => {
@@ -823,6 +836,168 @@ test('sealed cancel is CAS/idempotent, append-only, and cannot race or follow an
   const blocked = await call(db, { auth: person, action: 'cancel', taskId: 'ord_active123', expectedUpdatedAt: active.body.task.updatedAt });
   assert.equal(blocked.body.code, 'ORDER_CANCEL_SEND_ACTIVE');
   assert.equal(JSON.parse(db.database.prepare("SELECT data FROM tasks WHERE id='ord_active123'").get().data).deleted, false);
+});
+
+test('one waiting item cancels independently while sibling items and immutable snapshots remain active', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  db.prepare('INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)')
+    .bind('task', 'token-b', 'teacher-b', now).run();
+  const body = createBody('ord_item_cancel_1');
+  body.items = [
+    { bookId: 'BK01', title: '첫 교재', studentIds: ['student-a'], unitPrice: 15000 },
+    { bookId: 'BK02', title: '둘째 교재', studentIds: ['student-a'], unitPrice: 16000 }
+  ];
+  const created = await call(db, body);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const expectedUpdatedAt = created.body.task.updatedAt;
+  const beforeTaskData = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id=?")
+    .get(body.taskId).data;
+
+  const foreign = await call(db, { auth: { mode: 'person', id: 'teacher-b', token: 'token-b' },
+    action: 'cancel_item', taskId: body.taskId, itemIndex: 0, expectedUpdatedAt });
+  assert.equal(foreign.status, 403);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_item_cancellations').get().count, 0);
+
+  const cancelled = await call(db, { auth: person, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 0, expectedUpdatedAt });
+  assert.equal(cancelled.status, 200, JSON.stringify(cancelled.body));
+  assert.equal(cancelled.body.idempotent, false);
+  assert.equal(cancelled.body.cancellation.taskId, body.taskId);
+  assert.equal(cancelled.body.cancellation.itemIndex, 0);
+  assert.ok(cancelled.body.cancellation.cancelledAt > 0);
+  assert.equal(db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id=?").get(body.taskId).data, beforeTaskData);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_student_snapshots WHERE task_id=?')
+    .get(body.taskId).count, 2);
+  assert.equal(db.database.prepare('SELECT active FROM book_order_active_targets WHERE task_id=? AND item_index=0')
+    .get(body.taskId).active, 0);
+  assert.equal(db.database.prepare('SELECT active FROM book_order_active_targets WHERE task_id=? AND item_index=1')
+    .get(body.taskId).active, 1);
+
+  const listed = await call(db, { auth: person, action: 'list' }, '/book-issue');
+  assert.equal(listed.status, 200);
+  const rows = listed.body.orders.filter(row => row.taskId === body.taskId)
+    .sort((a, b) => a.itemIndex - b.itemIndex);
+  assert.deepEqual(rows.map(row => row.stage), ['cancelled', 'order_waiting']);
+  assert.ok(rows[0].orderCancelledAt > 0);
+
+  const again = await call(db, { auth: person, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 0, expectedUpdatedAt: expectedUpdatedAt - 1 });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.idempotent, true);
+  assert.equal(again.body.cancellation.cancelledAt, cancelled.body.cancellation.cancelledAt);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_item_cancellations').get().count, 1);
+  assert.throws(() => db.database.prepare(
+    "UPDATE book_order_item_cancellations SET cancelled_at=cancelled_at+1 WHERE task_id=? AND item_index=0"
+  ).run(body.taskId), /BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY/);
+  assert.throws(() => db.database.prepare(
+    'DELETE FROM book_order_item_cancellations WHERE task_id=? AND item_index=0'
+  ).run(body.taskId), /BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY/);
+});
+
+test('item cancellation is restricted to stage 1 and rejects any send or fulfillment history', async () => {
+  for (const status of ['reserved', 'dispatching', 'accepted', 'unknown', 'rejected']) {
+    const db = new TestD1(); seed(db);
+    const taskId = 'ord_item_' + status;
+    const created = await call(db, createBody(taskId));
+    const now = Date.now();
+    db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .bind('task', 'send-' + status, 'key-' + status, taskId, '문자출판사', 1,
+        status.padEnd(64, 'a').slice(0, 64), status, now, now).run();
+    const blocked = await call(db, { auth: person, action: 'cancel_item', taskId, itemIndex: 0,
+      expectedUpdatedAt: created.body.task.updatedAt });
+    assert.equal(blocked.status, 409, status);
+    assert.equal(blocked.body.code, 'ORDER_CANCEL_NOT_WAITING', status);
+    assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM book_order_item_cancellations').get().count, 0);
+  }
+});
+
+test('scheduled dispatch excludes a cancelled item and skips a task when every item is cancelled', async () => {
+  const db = new TestD1(); seed(db);
+  const body = createBody('ord_cancel_send_1');
+  body.items = [
+    { bookId: 'BK01', title: '발송 제외 교재', studentIds: ['student-a'], unitPrice: 15000 },
+    { bookId: 'BK02', title: '발송 유지 교재', studentIds: ['student-a'], unitPrice: 16000 }
+  ];
+  const created = await call(db, body);
+  assert.equal(created.status, 201);
+  assert.equal((await call(db, { auth: person, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 0, expectedUpdatedAt: created.body.task.updatedAt })).status, 200);
+
+  const requests = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    requests.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ groupInfo: { groupId: 'GROUP_1' },
+      messageList: [{ messageId: 'MSG_1', statusCode: '2000' }] }), {
+      status: 200, headers: { 'content-type': 'application/json' }
+    });
+  };
+  const sendEnv = env(db, {
+    WB_BOOK_ORDER_SEND_ENABLED: 'true', SOLAPI_API_KEY: 'key', SOLAPI_API_SECRET: 'secret',
+    SOLAPI_SENDER_NUMBER: '0212345678'
+  });
+  try {
+    const sent = await handleScheduledBookOrders(sendEnv, Date.now() + 1000);
+    assert.equal(sent.ok, true, JSON.stringify(sent));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(requests.length, 1);
+  const message = requests[0].messages[0].text;
+  assert.doesNotMatch(message, /발송 제외 교재/);
+  assert.match(message, /발송 유지 교재/);
+  assert.equal(db.database.prepare('SELECT item_count FROM book_order_sends').get().item_count, 1);
+
+  const dbAll = new TestD1(); seed(dbAll);
+  const all = await call(dbAll, createBody('ord_all_cancel_1'));
+  assert.equal((await call(dbAll, { auth: person, action: 'cancel_item', taskId: all.body.task.id,
+    itemIndex: 0, expectedUpdatedAt: all.body.task.updatedAt })).status, 200);
+  let fetches = 0;
+  globalThis.fetch = async () => { fetches += 1; throw new Error('all-cancel must not send'); };
+  try {
+    const skipped = await handleScheduledBookOrders(env(dbAll, {
+      WB_BOOK_ORDER_SEND_ENABLED: 'true', SOLAPI_API_KEY: 'key', SOLAPI_API_SECRET: 'secret',
+      SOLAPI_SENDER_NUMBER: '0212345678'
+    }), Date.now() + 1000);
+    assert.equal(skipped.ok, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(fetches, 0);
+  assert.equal(dbAll.database.prepare('SELECT COUNT(*) AS count FROM book_order_sends').get().count, 0);
+});
+
+test('cancelling one item releases only its student identity while sibling verification and public status stay valid', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'lesson-a-b', 'teacher-a', JSON.stringify({ id: 'lesson-a-b', staffId: 'teacher-a',
+      studentId: 'student-b', taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+      title: '[수업] 추가', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+  const body = createBody('ord_roster_partial');
+  body.items = [
+    { bookId: 'BK01', title: '취소 학생 교재', studentIds: ['student-a'], unitPrice: 15000 },
+    { bookId: 'BK02', title: '유지 학생 교재', studentIds: ['student-b'], unitPrice: 16000 }
+  ];
+  const created = await call(db, body);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal((await call(db, { auth: person, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 0, expectedUpdatedAt: created.body.task.updatedAt })).status, 200);
+
+  const detail = await call(db, { auth: admin, action: 'student_get', studentId: 'student-a' }, '/roster');
+  const changed = await call(db, { auth: admin, action: 'student_update', expectedUpdatedAt: detail.body.updatedAt,
+    student: { ...detail.body.student, name: '변경된학생' } }, '/roster');
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+
+  const publicStatus = await readPublicBookStatus(env(db), 'student-b', Date.parse('2026-08-20T03:00:00.000Z'));
+  const orderRows = publicStatus.rows.filter(row => row.kind === 'order');
+  assert.equal(orderRows.length, 1);
+  assert.equal(orderRows[0].stage, 'order_waiting');
+  assert.equal(db.database.prepare('SELECT active FROM book_order_active_targets WHERE task_id=? AND item_index=0')
+    .get(body.taskId).active, 0);
+  assert.equal(db.database.prepare('SELECT active FROM book_order_active_targets WHERE task_id=? AND item_index=1')
+    .get(body.taskId).active, 1);
 });
 
 test('pending sealed orders block roster rename/removal through handoff and release only after academy registration', async () => {

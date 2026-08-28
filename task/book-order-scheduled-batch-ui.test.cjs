@@ -154,6 +154,27 @@ test('봉인된 주문 취소는 서버 확인 후에만 반영하고 과거 주
   assert.ok(click.indexOf('cancelSealedBookOrder(t, el)') < click.indexOf('t.deleted = true'));
 });
 
+test('1단계 각 교재는 권한 보유자에게만 품목별 주문취소를 제공하고 서버 확인 뒤 갱신한다', () => {
+  const actions = block('function bookOrderActionButtons(', 'function bookOrderMoneyHtml(');
+  assert.match(actions, /row\.stage === 'order_waiting' && canTeacherAct/);
+  assert.match(actions, /data-act="bookordercancel"/);
+  assert.match(actions, />주문취소<\/button>/);
+  assert.match(actions, />쿠팡 주문완료<\/button>/);
+  assert.match(actions, />쿠팡 주문실패<\/button>/);
+  assert.ok(actions.indexOf("row.integrity || row.needsStudentLink") < actions.indexOf('const cancelButton'));
+
+  const cancel = block('const pendingBookOrderItemCancellations', 'function cancelOrderModal(');
+  assert.match(cancel, /row\.stage !== 'order_waiting'/);
+  assert.match(cancel, /action: 'cancel_item'/);
+  assert.match(cancel, /taskId,/);
+  assert.match(cancel, /itemIndex,/);
+  assert.match(cancel, /expectedUpdatedAt: Number\(row\.taskUpdatedAt\) \|\| 0/);
+  assert.match(cancel, /Number\(cancellation\.itemIndex\) !== itemIndex/);
+  assert.match(cancel, /await loadBookIssues\(true\)/);
+  assert.doesNotMatch(cancel, /applyCreatedLesson|queueSync\(\)|\.deleted\s*=\s*true/);
+  assert.match(html, /case 'bookordercancel': cancelWaitingBookOrderItem\(el\); break;/);
+});
+
 test('봉인 주문은 해당 교재가 배부되기 전까지 진행 배지와 취소 대상에 남는다', () => {
   const source = block('function bookPendingOrderCount(', '/** 이 주문을 취소할 수 있는가');
   const makePending = (tasks, rows, loaded = true, checks = {}) => new Function(
@@ -167,6 +188,7 @@ test('봉인 주문은 해당 교재가 배부되기 전까지 진행 배지와 
 
   assert.equal(makePending([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'order_waiting' }])(book).length, 1);
   assert.equal(makePending([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'student_handed' }])(book).length, 0);
+  assert.equal(makePending([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'cancelled' }])(book).length, 0);
   assert.equal(makePending([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'student_handed' }], false)(book).length, 1);
   assert.equal(makePending([{ ...order, deleted: true }], [])(book).length, 0);
 
@@ -186,6 +208,7 @@ test('중복 차단은 교재 전체가 아니라 아직 배부되지 않은 선
 
   assert.deepEqual([...activeIds([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'ordered' }])('book-a')], ['student-a']);
   assert.equal(activeIds([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'student_handed' }])('book-a').size, 0);
+  assert.equal(activeIds([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'cancelled' }])('book-a').size, 0);
   assert.deepEqual([...activeIds([order], [{ taskId: 'ord-a', itemIndex: 0, stage: 'student_handed' }], false)('book-a')], ['student-a']);
   assert.equal(activeIds([{ ...order, deleted: true }], [])('book-a').size, 0);
   assert.equal(activeIds([{ ...order, orderIdentityVersion: 0 }], [])('book-a').size, 0);
