@@ -25,6 +25,12 @@ test('weekend actual visits are separate from lesson checks and cover every week
 
 test('teacher today and manager board expose check-in, checkout, correction, and live state', () => {
   assert.match(html, /if \(isWeekendVisitDate\(cursor\)\) h \+= weekendVisitTeacherHtml\(me, cursor\)/);
+  const today = block('function viewToday()', 'function taskRow');
+  const receivedAt = today.indexOf('teacherReceivedAdminDirectiveHtml(me.id)');
+  const composerAt = today.indexOf('teacherLiveRequestComposerHtml(me, cursor)');
+  const weekendAt = today.indexOf('weekendVisitTeacherHtml(me, cursor)');
+  assert.ok(receivedAt >= 0 && receivedAt < composerAt && composerAt < weekendAt,
+    '두 실시간 요청 영역은 주말 실제 등하원 바로 앞에 있어야 한다');
   assert.match(html, /h \+= weekendVisitBoardHtml\(cursor\)/);
   for (const action of ['weekendcheckin', 'weekendcheckout', 'weekendedit', 'weekendsave', 'weekendcancel']) {
     assert.match(html, new RegExp("case '" + action + "'"));
