@@ -246,7 +246,7 @@ test('교재 배송 현황과 완료 기록은 stable studentId 기반 학교급
 
   assert.match(row, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
   assert.match(history, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
-  assert.match(link, /studentSchoolGradeDetailLabel\(student\)/);
+  assert.match(link, /bookOrderStudentSchoolGradeLabel\(student\)/);
   assert.match(bound, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
   assert.doesNotMatch(row, /student\.name \+ ' ' \+ \(student\.grade/);
 });
