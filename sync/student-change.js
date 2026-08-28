@@ -55,24 +55,36 @@ function view(row) {
 }
 
 async function adminAudienceStatuses(env, app, events) {
+  if (!events.length) return events;
+  const eventIds = [...new Set(events.map(event => String(event && event.eventId || '')).filter(Boolean))];
   const result = await env.DB.prepare(
     'SELECT event_id,actor_key,acknowledged_at FROM student_change_acknowledgements ' +
-    'WHERE app=? ORDER BY acknowledged_at DESC LIMIT 5000'
-  ).bind(app).all();
+    'WHERE app=? AND event_id IN (SELECT value FROM json_each(?)) ORDER BY acknowledged_at DESC'
+  ).bind(app, JSON.stringify(eventIds)).all();
   const acknowledgement = new Map();
+  const adminResolution = new Map();
   for (const row of result.results || []) {
     const actorKey = String(row.actor_key || '');
-    const match = /^(?:staff|manager):([A-Za-z0-9_-]{1,160})$/.exec(actorKey);
+    const match = /^(staff|manager|admin_resolved):([A-Za-z0-9_-]{1,160})$/.exec(actorKey);
     if (!match) continue;
-    const key = String(row.event_id) + '\u001f' + match[1];
-    if (!acknowledgement.has(key)) acknowledgement.set(key, Number(row.acknowledged_at));
+    const key = String(row.event_id) + '\u001f' + match[2];
+    const at = Number(row.acknowledged_at) || null;
+    if (match[1] === 'admin_resolved') {
+      if (!adminResolution.has(key)) adminResolution.set(key, at);
+    } else if (!acknowledgement.has(key)) acknowledgement.set(key, at);
   }
   return events.map(event => ({
     ...event,
-    audienceStatus: event.audienceStaffIds.map(staffId => ({
-      staffId: String(staffId),
-      acknowledgedAt: acknowledgement.get(event.eventId + '\u001f' + String(staffId)) || null
-    }))
+    audienceStatus: event.audienceStaffIds.map(staffId => {
+      const key = event.eventId + '\u001f' + String(staffId);
+      const acknowledgedAt = acknowledgement.get(key) || null;
+      const resolvedByAdminAt = adminResolution.get(key) || null;
+      return {
+        staffId: String(staffId),
+        acknowledgedAt: acknowledgedAt || resolvedByAdminAt,
+        resolvedByAdminAt
+      };
+    })
   }));
 }
 
@@ -85,13 +97,13 @@ async function visibleEvents(env, app, auth, actorKey, studentId, pendingOnly) {
     clauses.push('EXISTS (SELECT 1 FROM json_each(event.audience_staff_ids) audience WHERE audience.value=?)');
     binds.push(auth.id);
   }
-  binds.push(actorKey);
+  const adminResolutionActorKey = auth && auth.id ? 'admin_resolved:' + String(auth.id) : '';
   const result = await env.DB.prepare(
     'SELECT event.*, EXISTS (SELECT 1 FROM student_change_acknowledgements ack ' +
-      'WHERE ack.app=event.app AND ack.event_id=event.event_id AND ack.actor_key=?) AS acknowledged ' +
+      'WHERE ack.app=event.app AND ack.event_id=event.event_id AND ack.actor_key IN (?,?)) AS acknowledged ' +
     'FROM student_change_events event WHERE ' + clauses.join(' AND ') +
     ' ORDER BY event.changed_at DESC, event.event_id DESC LIMIT 500'
-  ).bind(binds.pop(), ...binds).all();
+  ).bind(actorKey, adminResolutionActorKey, ...binds).all();
   return result.results || [];
 }
 
