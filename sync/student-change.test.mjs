@@ -68,11 +68,109 @@ function seed(db) {
   }
 }
 
+function seedStudentChangeEvent(db, {
+  eventId, studentId = 'student-a', taskId = 'lesson-a', eventType = 'work_instruction',
+  audienceStaffIds = ['teacher-a'], changedAt = Date.now(), requiresAck = true
+}) {
+  db.prepare(
+    'INSERT INTO student_change_events ' +
+    '(app,event_id,student_id,task_id,event_type,changed_fields,details,audience_staff_ids,effective_date,' +
+      'requires_ack,request_key,request_revision,changed_at,changed_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(
+    'task', eventId, studentId, taskId, eventType, JSON.stringify(['guide']), JSON.stringify({}),
+    JSON.stringify(audienceStaffIds), null, requiresAck ? 1 : 0, null, null, changedAt, 'director'
+  ).run();
+}
+
+function seedStudentChangeAcknowledgement(db, { acknowledgementId, eventId, actorKey, acknowledgedAt }) {
+  db.prepare(
+    'INSERT INTO student_change_acknowledgements ' +
+    '(app,acknowledgement_id,event_id,actor_key,acknowledged_at) VALUES (?,?,?,?,?)'
+  ).bind('task', acknowledgementId, eventId, actorKey, acknowledgedAt).run();
+}
+
 test('migration is additive, append-only, and keeps deletion audit rows private by contract', () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS student_change_events/);
   assert.match(migration, /student_change_acknowledgements/);
   assert.match(migration, /APPEND_ONLY/);
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM/i);
+});
+
+test('admin resolution clears the addressed teacher marker without forging a teacher acknowledgement', async () => {
+  const db = new TestD1(); seed(db);
+  const eventId = 'sce_admin_resolution_001';
+  const resolvedAt = Date.now() + 100;
+  seedStudentChangeEvent(db, { eventId });
+  seedStudentChangeAcknowledgement(db, {
+    acknowledgementId: 'sca_admin_resolution_001', eventId,
+    actorKey: 'admin_resolved:teacher-a', acknowledgedAt: resolvedAt
+  });
+
+  const teacher = await call(db, '/student-change', { auth: person('teacher-a'), action: 'list' });
+  assert.equal(teacher.status, 200);
+  assert.equal(teacher.body.events[0].eventId, eventId);
+  assert.equal(teacher.body.events[0].acknowledged, true,
+    '관리자 읽음 처리는 해당 선생님의 N과 확인 버튼을 함께 해소한다');
+
+  const idempotent = await call(db, '/student-change', {
+    auth: person('teacher-a'), action: 'acknowledge', studentId: 'student-a'
+  });
+  assert.equal(idempotent.status, 200);
+  assert.equal(idempotent.body.idempotent, true);
+  assert.equal(idempotent.body.acknowledged, 0);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM student_change_acknowledgements WHERE actor_key='staff:teacher-a'"
+  ).first().count, 0, '관리자 처리를 실제 선생님 확인으로 위조하지 않는다');
+
+  const director = await call(db, '/student-change', { auth: admin, action: 'list' });
+  const event = director.body.events.find(row => row.eventId === eventId);
+  assert.equal(event.acknowledged, false,
+    '원장 본인의 독립된 확인 상태는 교사 대상 관리자 읽음 처리와 섞지 않는다');
+  const status = event.audienceStatus.find(row => row.staffId === 'teacher-a');
+  assert.equal(status.acknowledgedAt, resolvedAt);
+  assert.equal(status.resolvedByAdminAt, resolvedAt);
+});
+
+test('admin audience status is scoped to returned events and keeps an older acknowledgement beyond 5000 unrelated rows', async () => {
+  const db = new TestD1(); seed(db);
+  const targetEventId = 'sce_target_ack_older_001';
+  const hiddenEventId = 'sce_hidden_ack_noise_001';
+  seedStudentChangeEvent(db, { eventId: targetEventId, changedAt: 10 });
+  seedStudentChangeEvent(db, {
+    eventId: hiddenEventId, taskId: null, eventType: 'lesson_delete', audienceStaffIds: [],
+    changedAt: 20, requiresAck: false
+  });
+  seedStudentChangeAcknowledgement(db, {
+    acknowledgementId: 'sca_target_ack_older_001', eventId: targetEventId,
+    actorKey: 'staff:teacher-a', acknowledgedAt: 1
+  });
+  db.database.exec('BEGIN');
+  try {
+    for (let index = 0; index < 5001; index++) {
+      const suffix = String(index).padStart(4, '0');
+      seedStudentChangeAcknowledgement(db, {
+        acknowledgementId: 'sca_hidden_noise_' + suffix,
+        eventId: hiddenEventId,
+        actorKey: 'staff:noise-' + suffix,
+        acknowledgedAt: 100 + index
+      });
+    }
+    db.database.exec('COMMIT');
+  } catch (error) {
+    db.database.exec('ROLLBACK');
+    throw error;
+  }
+
+  const director = await call(db, '/student-change', { auth: admin, action: 'list' });
+  assert.equal(director.status, 200);
+  assert.equal(director.body.events.some(event => event.eventId === hiddenEventId), false,
+    '화면에서 숨기는 삭제 이벤트는 반환 범위에 포함하지 않는다');
+  const target = director.body.events.find(event => event.eventId === targetEventId);
+  assert.ok(target);
+  const status = target.audienceStatus.find(row => row.staffId === 'teacher-a');
+  assert.equal(status.acknowledgedAt, 1,
+    '반환 이벤트의 ACK는 전역 최근 5000행 밖에 있어도 누락하지 않는다');
+  assert.equal(status.resolvedByAdminAt, null);
 });
 
 test('teacher change is admin-selected, recorded by stable student id, and acknowledged independently', async () => {
