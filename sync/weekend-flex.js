@@ -54,16 +54,27 @@ export function flexibleWeekendAllowedOn(task, date) {
   return !!(config && flexibleWeekendEffectiveOn(task, date) && config.allowedDays.includes(dayOf(date)));
 }
 
-export async function hasFlexibleWeekendVisit(env, app, task, date) {
+/**
+ * Stable lesson task ID + studentId + actual weekend date must all match the
+ * non-cancelled visit ledger. Names and similar timetables are never used.
+ */
+export async function hasWeekendActualVisit(env, app, task, date) {
   const taskId = String(task && task.id || '');
   const studentId = String(task && task.studentId || '');
   if (app !== 'task' || !SAFE_ID.test(taskId) || !SAFE_ID.test(studentId) ||
-      !flexibleWeekendEffectiveOn(task, date)) return false;
+      !task || task.deleted || !validDate(date) || !WEEKEND_DAYS.has(dayOf(date)) ||
+      (task.start && String(task.start) > String(date)) ||
+      (task.end && String(task.end) < String(date))) return false;
   const row = await env.DB.prepare(
     "SELECT visit_id FROM weekend_actual_visits WHERE app=? AND lesson_task_id=? " +
     "AND student_id=? AND visit_date=? AND status<>'cancelled' LIMIT 1"
   ).bind(app, taskId, studentId, String(date)).first();
   return !!row;
+}
+
+export async function hasFlexibleWeekendVisit(env, app, task, date) {
+  if (!flexibleWeekendEffectiveOn(task, date)) return false;
+  return await hasWeekendActualVisit(env, app, task, date);
 }
 
 export const weekendFlexInternals = Object.freeze({ validDate, dayOf, WEEKEND_DAYS, MAX_MONTHLY_TARGET });

@@ -3398,6 +3398,9 @@ CREATE TABLE IF NOT EXISTS weekend_actual_visits (
   lesson_task_id  TEXT    NOT NULL CHECK (length(lesson_task_id) BETWEEN 1 AND 128),
   staff_id        TEXT    NOT NULL CHECK (length(staff_id) BETWEEN 1 AND 128),
   visit_date      TEXT    NOT NULL CHECK (visit_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  source_date     TEXT    CHECK (
+    source_date IS NULL OR source_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+  ),
   check_in_at     INTEGER NOT NULL CHECK (check_in_at > 0),
   check_out_at    INTEGER CHECK (check_out_at IS NULL OR check_out_at >= check_in_at),
   status          TEXT    NOT NULL CHECK (status IN ('active','completed','cancelled')),
@@ -3447,6 +3450,13 @@ WHEN NEW.app <> OLD.app
   OR NEW.created_by <> OLD.created_by
   OR NEW.revision <> OLD.revision + 1
   OR NEW.updated_at <= OLD.updated_at
+BEGIN
+  SELECT RAISE(ABORT, 'WEEKEND_VISIT_IMMUTABLE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_source_date_guard
+BEFORE UPDATE OF source_date ON weekend_actual_visits
+WHEN NEW.source_date IS NOT OLD.source_date
 BEGIN
   SELECT RAISE(ABORT, 'WEEKEND_VISIT_IMMUTABLE');
 END;

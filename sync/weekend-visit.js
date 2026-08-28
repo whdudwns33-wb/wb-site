@@ -44,6 +44,26 @@ function isWeekendDate(value) {
   return dow === 0 || dow === 6;
 }
 
+function dayOfDate(value) {
+  if (!validDate(value)) return -1;
+  const [year, month, day] = String(value).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function addDateDays(value, amount) {
+  if (!validDate(value) || !Number.isInteger(amount)) return '';
+  const [year, month, day] = String(value).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + amount));
+  return date.toISOString().slice(0, 10);
+}
+
+function weekendPairDates(value) {
+  const day = dayOfDate(value);
+  if (day === 6) return [String(value), addDateDays(value, 1)];
+  if (day === 0) return [addDateDays(value, -1), String(value)];
+  return [];
+}
+
 function monthRange(value) {
   const matched = String(value || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
   if (!matched) return null;
@@ -77,11 +97,54 @@ function activeOn(task, date) {
   return (!task.start || String(task.start) <= date) && (!task.end || String(task.end) >= date);
 }
 
+function plannedOccursOn(task, date) {
+  if (!task || task.deleted || !validDate(date) || !activeOn(task, date)) return false;
+  const day = dayOfDate(date);
+  if (task.repeat === 'once') return String(task.start || '') === date;
+  if (task.repeat === 'daily') return true;
+  if (task.repeat === 'weekday') return day >= 1 && day <= 5;
+  return task.repeat === 'days' && Array.isArray(task.days) && task.days.map(Number).includes(day);
+}
+
+/** Structured slots are authoritative. Legacy lessons fall back to recurrence. */
+function plannedWeekendOccurrence(task, date) {
+  if (!task || task.deleted || task.scheduleStatus === 'needs_review' ||
+      !isWeekendDate(date) || !activeOn(task, date)) return false;
+  const slots = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
+  if (slots.length) {
+    return slots.some(slot => {
+      const from = String(slot && (slot.validFrom || slot.startDate) || '');
+      const to = String(slot && (slot.validTo || slot.endDate) || '');
+      const days = Array.isArray(slot && slot.days) ? slot.days.map(Number) : [];
+      return (!from || from <= date) && (!to || to >= date) && days.includes(dayOfDate(date));
+    });
+  }
+  return plannedOccursOn(task, date);
+}
+
+/**
+ * New clients state the original card date. Legacy clients are accepted only
+ * when the task schedule deterministically identifies the actual day first,
+ * or the single opposite day in the same Saturday/Sunday pair.
+ */
+function resolveVisitSourceDate(task, visitDate, body) {
+  const pair = weekendPairDates(visitDate);
+  if (pair.length !== 2) return '';
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'sourceDate')) {
+    const requested = String(body.sourceDate || '');
+    return pair.includes(requested) && plannedWeekendOccurrence(task, requested) ? requested : '';
+  }
+  if (plannedWeekendOccurrence(task, visitDate)) return visitDate;
+  const opposite = pair.find(date => date !== visitDate);
+  return opposite && plannedWeekendOccurrence(task, opposite) ? opposite : '';
+}
+
 function rowView(row) {
   if (!row) return null;
   return {
     visitId: String(row.visit_id), studentId: String(row.student_id), lessonTaskId: String(row.lesson_task_id),
-    staffId: String(row.staff_id), visitDate: String(row.visit_date), checkInAt: Number(row.check_in_at),
+    staffId: String(row.staff_id), visitDate: String(row.visit_date),
+    sourceDate: row.source_date == null ? null : String(row.source_date), checkInAt: Number(row.check_in_at),
     checkOutAt: row.check_out_at == null ? null : Number(row.check_out_at), status: String(row.status),
     revision: Number(row.revision), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
   };
@@ -353,10 +416,19 @@ async function checkIn(env, app, body, auth, json, origin) {
   }
   const verified = await verifiedLesson(env, app, taskId, studentId, visitDate, auth);
   if (verified.error) return json({ ok: false, error: verified.error }, 422, origin);
+  const sourceDate = resolveVisitSourceDate(verified.task, visitDate, body);
+  if (!sourceDate) {
+    return json({ ok: false, code: 'SOURCE_DATE_INVALID',
+      error: '원래 수업 날짜와 확정 주말 시간표 연결을 확인해 주세요' }, 422, origin);
+  }
 
   const existing = await env.DB.prepare(
     'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? LIMIT 1'
   ).bind(app, studentId, taskId, visitDate).first();
+  if (existing && existing.source_date != null && String(existing.source_date) !== sourceDate) {
+    return json({ ok: false, code: 'SOURCE_DATE_MISMATCH',
+      error: '이미 저장된 실제 등원 기록의 원래 수업 날짜와 일치하지 않습니다' }, 409, origin);
+  }
   if (existing && existing.status === 'active') return json({ ok: true, idempotent: true, visit: rowView(existing) }, 200, origin);
   if (existing && existing.status === 'completed') {
     return json({ ok: false, code: 'VISIT_ALREADY_COMPLETED', error: '이미 하원까지 완료된 기록입니다' }, 409, origin);
@@ -381,14 +453,14 @@ async function checkIn(env, app, body, auth, json, origin) {
   const eventId = randomId('wve_');
   const actor = actorId(auth);
   const eventData = JSON.stringify({ version: 1, before: null,
-    after: { checkInAt: now, checkOutAt: null, status: 'active' }, reason: '' });
+    after: { visitDate, sourceDate, checkInAt: now, checkOutAt: null, status: 'active' }, reason: '' });
   const results = await env.DB.batch([
     env.DB.prepare(
       'INSERT OR IGNORE INTO weekend_actual_visits ' +
-      '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
-      'SELECT ?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
+      '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
+      'SELECT ?,?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
       'WHERE current_task.app=? AND current_task.id=? AND current_task.owner=? AND current_task.data=?'
-    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, now, now, now, actor, actor,
+    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, sourceDate, now, now, now, actor, actor,
       app, taskId, verified.staffId, verified.taskData),
     env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
@@ -469,5 +541,6 @@ export async function handleWeekendVisit(env, app, body, origin, auth, json) {
 }
 
 export const weekendVisitInternals = {
-  isWeekendDate, hasWeekendSchedule, kstParts, flexibleConfig, flexibleAllowedOn, monthRange
+  isWeekendDate, hasWeekendSchedule, kstParts, flexibleConfig, flexibleAllowedOn, monthRange,
+  plannedWeekendOccurrence, weekendPairDates, resolveVisitSourceDate
 };

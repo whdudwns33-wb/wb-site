@@ -271,6 +271,26 @@ test('flexible weekend lessons enter the report only with an exact non-cancelled
   'before the flexible effective date the existing recurrence remains authoritative');
 });
 
+test('fixed weekend lessons enter a cross-day report only through an exact non-cancelled actual visit', () => {
+  const saturday = '2026-08-29';
+  const sunday = '2026-08-30';
+  const task = dailyTask('fixed-cross-day', {
+    studentId: '12345678', repeat: 'days', days: [0], weekendAttendanceMode: 'fixed'
+  });
+  const tasks = [{ id: task.id, data: JSON.stringify(task) }];
+  const exact = [{
+    lesson_task_id: task.id, student_id: task.studentId, visit_date: saturday, status: 'completed'
+  }];
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', saturday, exact).total, 1);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', saturday, []).total, 0);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', saturday,
+    [{ ...exact[0], status: 'cancelled' }]).total, 0);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', saturday,
+    [{ ...exact[0], student_id: '87654321' }]).total, 0);
+  assert.equal(summarizeReportRows(tasks, [], 'teacher-1', sunday, []).total, 1,
+    'the fixed recurring Sunday remains valid without an actual visit row');
+});
+
 test('approved report template body and its exact eight variable keys stay pinned', () => {
   assert.equal(directorReportConstants.DIRECTOR_REPORT_TEMPLATE_TEXT, [
     '[WB 오늘 수행 보고]',
