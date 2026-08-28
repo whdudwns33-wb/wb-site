@@ -24,7 +24,9 @@ import {
 } from './book-order-lock.js';
 import {
   buildBookOrderMessage,
+  cancelledOrderItemIndexes,
   loadOrderIdentityRoster,
+  loadOrderItemCancellationRows,
   loadOrderSnapshotRows,
   MAX_BOOK_ORDER_MESSAGE_BYTES,
   verifyOrderTaskSnapshot,
@@ -168,9 +170,14 @@ async function loadOrderTask(env, app, taskId, auth) {
       code: identity.code || 'ORDER_IDENTITY_MISMATCH' };
   }
   const vendorName = String(data.orderVendor || '').trim();
+  const cancellations = await loadOrderItemCancellationRows(env, app, taskId);
+  const cancelledIndexes = cancelledOrderItemIndexes(cancellations, taskId);
   const items = Array.isArray(data.orderItems) ? data.orderItems : [];
   const cleanItems = items
-    .map(it => ({ title: String((it && it.title) || '').trim(), qty: String((it && it.qty) || '').trim() }))
+    .map((it, itemIndex) => cancelledIndexes.has(itemIndex) ? null : ({
+      title: String((it && it.title) || '').trim(), qty: String((it && it.qty) || '').trim()
+    }))
+    .filter(Boolean)
     .filter(it => it.title);
   if (!vendorName || !cleanItems.length) {
     return { error: '이 지시서에는 자동 발송용 주문 정보(거래처·교재 목록)가 없습니다', status: 409 };
@@ -518,7 +525,10 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
     'ORDER BY t.updated_at,t.id LIMIT 2000'
   ).bind(app, retryPrefix + '%').all();
 
-  const snapshotRows = await loadOrderSnapshotRows(env, app);
+  const [snapshotRows, itemCancellationRows] = await Promise.all([
+    loadOrderSnapshotRows(env, app),
+    loadOrderItemCancellationRows(env, app)
+  ]);
   const identityRoster = snapshotRows.length ? (await loadOrderIdentityRoster(env, app) || false) : null;
   const groups = new Map();
   let identityFailures = 0;
@@ -527,11 +537,17 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
-    const identity = await verifyOrderTaskSnapshotRows(row.id, row.owner, task, snapshotRows, identityRoster, now);
+    const cancelledIndexes = cancelledOrderItemIndexes(itemCancellationRows, row.id);
+    const identity = await verifyOrderTaskSnapshotRows(
+      row.id, row.owner, task, snapshotRows, identityRoster, now, true, cancelledIndexes
+    );
     if (identity.sealed && !identity.valid) { identityFailures++; continue; }
     const vendorName = String(task.orderVendor || '').trim();
     const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
-      .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
+      .map((item, itemIndex) => cancelledIndexes.has(itemIndex) ? null : ({
+        title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim()
+      }))
+      .filter(Boolean)
       .filter(item => item.title);
     if (!vendorName || !items.length) continue;
     if (!groups.has(vendorName)) groups.set(vendorName, []);
@@ -692,7 +708,7 @@ async function handleScheduledBookOrdersLocked(env, cutoff, lock) {
     return { ok: false, code: 'BOOK_ORDER_SEND_RESERVED', cutoff,
       results: [{ status: 'BOOK_ORDER_SEND_RESERVED', taskCount: 0, itemCount: 0 }] };
   }
-  const [taskResult, batchResult, directResult, snapshotResult] = await Promise.all([
+  const [taskResult, batchResult, directResult, snapshotResult, itemCancellationResult] = await Promise.all([
     env.DB.prepare(
       "SELECT t.id,t.owner,t.data FROM tasks t WHERE t.app='task' " +
       "AND COALESCE(json_extract(t.data,'$.deleted'),0)=0 " +
@@ -711,7 +727,8 @@ async function handleScheduledBookOrdersLocked(env, cutoff, lock) {
     env.DB.prepare(
       "SELECT task_id FROM book_order_sends WHERE app='task'"
     ).all(),
-    env.DB.prepare("SELECT * FROM book_order_student_snapshots WHERE app='task' ORDER BY task_id,item_index,student_id").all()
+    env.DB.prepare("SELECT * FROM book_order_student_snapshots WHERE app='task' ORDER BY task_id,item_index,student_id").all(),
+    env.DB.prepare("SELECT task_id,item_index FROM book_order_item_cancellations WHERE app='task' ORDER BY task_id,item_index").all()
   ]);
   const snapshotRows = snapshotResult.results || [];
   const identityRoster = snapshotRows.length ? (await loadOrderIdentityRoster(env, 'task') || false) : null;
@@ -724,11 +741,17 @@ async function handleScheduledBookOrdersLocked(env, cutoff, lock) {
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
-    const identity = await verifyOrderTaskSnapshotRows(row.id, row.owner, task, snapshotRows, identityRoster, cutoff);
+    const cancelledIndexes = cancelledOrderItemIndexes(itemCancellationResult.results || [], row.id);
+    const identity = await verifyOrderTaskSnapshotRows(
+      row.id, row.owner, task, snapshotRows, identityRoster, cutoff, true, cancelledIndexes
+    );
     if (identity.sealed && !identity.valid) { identityFailures++; continue; }
     const vendorName = String(task.orderVendor || '').trim();
     const items = (Array.isArray(task.orderItems) ? task.orderItems : [])
-      .map(item => ({ title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim() }))
+      .map((item, itemIndex) => cancelledIndexes.has(itemIndex) ? null : ({
+        title: String((item && item.title) || '').trim(), qty: String((item && item.qty) || '').trim()
+      }))
+      .filter(Boolean)
       .filter(item => item.title);
     if (!vendorName || !items.length) continue;
     if (!groups.has(vendorName)) groups.set(vendorName, []);

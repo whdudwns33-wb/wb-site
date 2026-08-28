@@ -334,6 +334,42 @@ test('manual_online_result 실패는 admin도 기록할 수 있지만 주문완�
   assert.equal(receive.body.code, 'ORDER_NOT_ACCEPTED');
 });
 
+test('쿠팡 묶음은 취소 품목을 제외한 나머지만 결과 원장에 기록하고 전부 취소되면 결과를 막는다', async () => {
+  const db = new TestD1(); seed(db);
+  const body = manualBody('ord_manual_partial');
+  body.items.push({ bookId: 'BK_MANUAL_KEEP', title: '남길 교재', studentIds: ['student-a'],
+    unitPrice: 17000, publisherName: '' });
+  const created = await call(db, body);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const cancelled = await call(db, { auth: teacherA, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 0, expectedUpdatedAt: created.body.task.updatedAt });
+  assert.equal(cancelled.status, 200);
+  const completed = await call(db, { auth: teacherA, action: 'manual_online_result', taskId: body.taskId,
+    result: 'completed', revision: 0 }, '/book-issue');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  const send = db.prepare('SELECT item_count FROM book_order_sends WHERE app=? AND task_id=?')
+    .bind('task', body.taskId).first();
+  assert.equal(send.item_count, 1);
+  const listed = await call(db, { auth: teacherA, action: 'list' }, '/book-issue');
+  const rows = listed.body.orders.filter(row => row.taskId === body.taskId).sort((a, b) => a.itemIndex - b.itemIndex);
+  assert.deepEqual(rows.map(row => row.stage), ['cancelled', 'ordered']);
+  const tooLate = await call(db, { auth: teacherA, action: 'cancel_item', taskId: body.taskId,
+    itemIndex: 1, expectedUpdatedAt: created.body.task.updatedAt });
+  assert.equal(tooLate.status, 409);
+  assert.equal(tooLate.body.code, 'ORDER_CANCEL_NOT_WAITING');
+
+  const allBody = manualBody('ord_manual_alloff', { bookId: 'BK_MANUAL_ALL_OFF' });
+  const allCreated = await call(db, allBody);
+  assert.equal((await call(db, { auth: teacherA, action: 'cancel_item', taskId: allBody.taskId,
+    itemIndex: 0, expectedUpdatedAt: allCreated.body.task.updatedAt })).status, 200);
+  const allBlocked = await call(db, { auth: teacherA, action: 'manual_online_result', taskId: allBody.taskId,
+    result: 'completed', revision: 0 }, '/book-issue');
+  assert.equal(allBlocked.status, 409);
+  assert.equal(allBlocked.body.code, 'ORDER_ITEM_CANCELLED');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM book_order_sends WHERE task_id=?')
+    .bind(allBody.taskId).first().count, 0);
+});
+
 test('052 카탈로그는 additive·append-only이며 과거 완료 일반교재만 개인정보 없는 DTO로 보강한다', async () => {
   for (const sql of [schema, migration]) {
     assert.match(sql, /CREATE TABLE IF NOT EXISTS completed_book_catalog/);
