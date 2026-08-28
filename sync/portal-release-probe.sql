@@ -60,6 +60,18 @@ FROM expected
 LEFT JOIN sqlite_master schema ON schema.type=expected.type AND schema.name=expected.name;
 
 WITH expected(type, name) AS (VALUES
+  ('table','book_order_item_cancellations'),
+  ('index','idx_book_order_item_cancellations_book'),
+  ('trigger','trg_book_order_item_cancellations_guard'),
+  ('trigger','trg_book_order_item_cancellations_release'),
+  ('trigger','trg_book_order_item_cancellations_no_update'),
+  ('trigger','trg_book_order_item_cancellations_no_delete')
+)
+SELECT 'migration_056_objects' AS check_name, COUNT(schema.name) AS found, COUNT(*) AS expected
+FROM expected
+LEFT JOIN sqlite_master schema ON schema.type=expected.type AND schema.name=expected.name;
+
+WITH expected(type, name) AS (VALUES
   ('table','student_portal_access'),
   ('table','student_portal_codes'),
   ('table','student_portal_sessions'),

@@ -448,6 +448,9 @@ async function activeBookOrderConflicts(env, app, document) {
     'FROM book_order_student_snapshots snapshot WHERE snapshot.app=? ' +
     'AND NOT EXISTS (SELECT 1 FROM book_order_cancellations cancellation ' +
       'WHERE cancellation.app=snapshot.app AND cancellation.task_id=snapshot.task_id) ' +
+    'AND NOT EXISTS (SELECT 1 FROM book_order_item_cancellations item_cancellation ' +
+      'WHERE item_cancellation.app=snapshot.app AND item_cancellation.task_id=snapshot.task_id ' +
+        'AND item_cancellation.item_index=snapshot.item_index) ' +
     'AND NOT EXISTS (SELECT 1 FROM book_order_fulfillments fulfillment ' +
       'WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id ' +
         'AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id ' +

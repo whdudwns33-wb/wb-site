@@ -30,7 +30,7 @@
  *   POST /lesson-change-review  { app, auth(admin) } → 원장, 변경 제안 승인·반려
  *   POST /director-report-send { app, auth, reportDate, staffId? } → 고정된 원장 수신처 카카오 알림톡
  *   POST /book-order-send { app, auth, taskId } → 교재 주문 문자를 거래처에 실제 발송
- *   POST /book-order { app, auth, action:'create'|'cancel', ... } → 학생 정체성이 봉인된 주문 생성·취소
+ *   POST /book-order { app, auth, action:'create'|'cancel'|'cancel_item', ... } → 학생 정체성이 봉인된 주문 생성·취소
  *   POST /book-catalog { app, auth, action:'list'|'review_approve' } → 완료 일반 교재 목록·관리자 후보 확정
  *   POST /book-add-request { app, auth, ... }     → 직원, 새 교재를 교재 목록에 추가해 달라고 신청
  *   POST /book-add-review  { app, auth(admin) }   → 원장, 교재 추가 신청 승인·반려
