@@ -38,6 +38,22 @@ test('개인 링크는 새 revision을 주기 조회하고 팝업·알림음·�
   assert.match(source, /item\.isCurrent && item\.displayStatus === 'active' && !item\.acknowledgedAt/);
 });
 
+test('교사 오늘 화면의 받은 관리자 요청은 최신순 최대 5개를 접힌 상태로 표시한다', () => {
+  const start = source.indexOf('function teacherReceivedAdminDirectiveRows(');
+  const end = source.indexOf('function currentAdminDirectiveRows(', start);
+  const block = source.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(block, /adminDirectiveRowsForStaff\(staffId\)\.slice\(0, 5\)/);
+  assert.match(block, /data-persist-key="today-admin-directive-received/);
+  assert.match(block, /<details/);
+  assert.doesNotMatch(block, /<details[^>]*\sopen(?:\s|>)/);
+  assert.match(block, /adminDirectiveLessonCard/);
+  assert.match(block, /row\.isCurrent && row\.displayStatus === 'active'/);
+  assert.match(block, /최신순으로 최대 5개/);
+  assert.match(block, /불러오는 중/);
+  assert.match(block, /불러오지 못했습니다/);
+});
+
 test('관리자 현황판은 실시간 관리자 요청과 학생정보·업무지시의 미확인을 함께 집계한다', () => {
   assert.match(source, /실시간 관리자 요청 미확인/);
   assert.match(source, /학생정보 미확인/);

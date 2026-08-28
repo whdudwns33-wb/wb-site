@@ -22,3 +22,11 @@ test('clearing schedule search no longer auto-closes panels it opened', () => {
   assert.match(source, /delete details\.dataset\.searchOpened/);
   assert.doesNotMatch(source, /details\.open = false/);
 });
+
+test('teacher today live request panels retain independent user-controlled open states', () => {
+  assert.match(html, /data-persist-key="today-admin-directive-received\|/);
+  assert.match(html, /data-persist-key="today-teacher-live-request\|/);
+  const receivedAt = html.indexOf('data-persist-key="today-admin-directive-received|');
+  const composerAt = html.indexOf('data-persist-key="today-teacher-live-request|');
+  assert.notEqual(receivedAt, composerAt);
+});
