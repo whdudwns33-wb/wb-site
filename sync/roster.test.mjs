@@ -270,6 +270,38 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
   assert.equal(monthly.body.student.sessionCycleStartDate, '');
 });
 
+test('legacy roster defaults materialized by a lesson form do not notify every subject teacher', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  seedLesson(db, 'lesson-shared-math', 'teacher-a', 'student-shared', { subject: '수학' });
+  seedLesson(db, 'lesson-shared-korean', 'teacher-b', 'student-shared', { subject: '국어' });
+  const before = await call(db, { auth: admin, action: 'student_get', studentId: 'student-shared' });
+  assert.equal(before.status, 200);
+  const normalized = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: before.body.updatedAt,
+    student: {
+      ...before.body.student,
+      subject: '국어·수학', subjects: ['국어', '수학'],
+      billingMode: 'monthly', sessionCycleStartDate: ''
+    }
+  });
+  assert.equal(normalized.status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE app='task'").first().count, 0,
+    '누락 기본값을 명시한 것만으로 공통 N 이벤트를 만들면 안 된다');
+
+  const actualChange = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: normalized.body.updatedAt,
+    student: { ...normalized.body.student, memo: '실제 공통 정보 수정' }
+  });
+  assert.equal(actualChange.status, 200);
+  const event = db.prepare(
+    "SELECT task_id,event_type,changed_fields,audience_staff_ids FROM student_change_events WHERE app='task'"
+  ).first();
+  assert.equal(event.task_id, null);
+  assert.equal(event.event_type, 'student_information');
+  assert.deepEqual(JSON.parse(event.changed_fields), ['memo']);
+  assert.deepEqual(JSON.parse(event.audience_staff_ids).sort(), ['teacher-a', 'teacher-b']);
+});
+
 test('director stores new-student school, contacts, dates, and fixed multi-subject choices for assigned staff', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const before = await call(db, { auth: admin, action: 'get' });

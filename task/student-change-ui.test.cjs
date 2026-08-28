@@ -49,6 +49,21 @@ test('plain red N is rendered for pending student or work-instruction fields and
   assert.match(source, /requiresAck && !event\.acknowledged/);
 });
 
+test('task-scoped N stays on its exact lesson while common student information stays shared', () => {
+  const start = source.indexOf('function pendingStudentChanges(');
+  const end = source.indexOf('function studentChangedFieldSet(', start);
+  assert.ok(start >= 0 && end > start);
+  const events = [
+    { eventId: 'task-a', studentId: 'student-a', taskId: 'lesson-a', requiresAck: true, acknowledged: false },
+    { eventId: 'task-b', studentId: 'student-a', taskId: 'lesson-b', requiresAck: true, acknowledged: false },
+    { eventId: 'common', studentId: 'student-a', taskId: '', requiresAck: true, acknowledged: false }
+  ];
+  const pending = new Function('studentChangeEvents', source.slice(start, end) + '\nreturn pendingStudentChanges;')(events);
+  assert.deepEqual(pending('student-a', 'lesson-a').map(event => event.eventId), ['task-a', 'common']);
+  assert.deepEqual(pending('student-a', 'lesson-b').map(event => event.eventId), ['task-b', 'common']);
+  assert.deepEqual(pending('student-a', 'lesson-c').map(event => event.eventId), ['common']);
+});
+
 test('approved lesson deletions are absent from the teacher request history UI', () => {
   assert.match(source, /item\.status === 'approved' && item\.changes && item\.changes\.operation === 'lesson_delete'/);
 });

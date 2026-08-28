@@ -184,7 +184,11 @@ class FakeDB {
           return { meta: { changes } };
         }
         if (sql.startsWith('INSERT OR IGNORE INTO student_change_events')) {
-          db.studentChangeEvents.push({ eventType: this.args[4], details: JSON.parse(this.args[6]), audienceStaffIds: JSON.parse(this.args[7]) });
+          db.studentChangeEvents.push({
+            eventId: this.args[1], studentId: this.args[2], taskId: this.args[3], eventType: this.args[4],
+            changedFields: JSON.parse(this.args[5]), details: JSON.parse(this.args[6]),
+            audienceStaffIds: JSON.parse(this.args[7])
+          });
           return { meta: { changes: 1 } };
         }
         if (sql.startsWith('INSERT INTO session_pack_transfer_guards')) {
@@ -529,6 +533,30 @@ test('ordinary lesson correction preserves server-managed weekend flexible metad
   assert.deepEqual(corrected.data.task.weekendAllowedDays, [0]);
   assert.equal(corrected.data.task.weekendMonthlyTarget, 2);
   assert.equal(corrected.data.task.weekendFlexibleFrom, '2026-08-22');
+});
+
+test('admin lesson correction notifies only the exact lesson owner for a multi-subject student', async () => {
+  const db = new FakeDB();
+  const source = await buildLessonTask(assignedLesson({ subject: '국어', lessonRole: '국어' }),
+    'teacher-1', 'admin', 100);
+  seed(db, source);
+  db.scopeTasks.push({
+    id: 'scope-student-a-other-subject', owner: 'teacher-2',
+    data: JSON.stringify({
+      id: 'scope-student-a-other-subject', staffId: 'teacher-2', studentId: 'student-a',
+      subject: '수학', taskKind: 'lesson_instruction', start: '2020-01-01', end: '', deleted: false
+    })
+  });
+  const corrected = await call(db, {
+    staffId: 'teacher-1', sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt,
+    lesson: assignedLesson({ subject: '국어', lessonRole: '국어', materials: '수정된 교재' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(corrected.response.status, 200);
+  assert.equal(db.studentChangeEvents.length, 1);
+  assert.equal(db.studentChangeEvents[0].taskId, source.id);
+  assert.equal(db.studentChangeEvents[0].eventType, 'work_instruction');
+  assert.deepEqual(db.studentChangeEvents[0].changedFields, ['materials', 'guide']);
+  assert.deepEqual(db.studentChangeEvents[0].audienceStaffIds, ['teacher-1']);
 });
 
 test('admin must choose an active teacher and uses admin origin', async () => {
