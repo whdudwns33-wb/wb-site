@@ -88,9 +88,48 @@
     const withinRange = options.withinRange !== false;
     const role = String(task.lessonRole || '').trim();
     const structured = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
+    const flexibleFrom = String(task.weekendFlexibleFrom || '');
+    const flexibleEffective = task.weekendAttendanceMode === 'flexible' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(flexibleFrom) && date >= flexibleFrom;
 
     if (!withinRange) {
       return { slots: [], issues: [], sourceType: structured.length ? 'structured' : 'legacy' };
+    }
+
+    /* 비정기 주말 수업의 기존 scheduleSlots는 참고 시간표일 뿐이다. 전환일 이후
+     * 관리자 시간표에는 exact taskId + studentId + visitDate로 확인한 실제 방문만
+     * 넣는다. 참고 요일로 카드를 만들거나 이름으로 방문을 추측하지 않는다. */
+    if (flexibleEffective) {
+      const visit = options.flexibleVisit || null;
+      const exactVisit = !!(visit && visit.status !== 'cancelled' && fallbackOccurs &&
+        String(visit.lessonTaskId || '') === String(task.id || '') &&
+        String(task.studentId || '') && String(visit.studentId || '') === String(task.studentId || '') &&
+        String(visit.visitDate || '') === date);
+      if (!exactVisit) return { slots: [], issues: [], sourceType: 'flexible' };
+
+      const startMinute = parseClockMinute(visit.startTime);
+      const endMinute = parseClockMinute(visit.endTime);
+      if (startMinute === null || endMinute === null || endMinute <= startMinute) {
+        return {
+          slots: [],
+          issues: [issue('invalid_visit_time', '실제 등·하원 시간을 확인해 주세요', '')],
+          sourceType: 'flexible'
+        };
+      }
+      return {
+        slots: [{
+          slotId: 'weekend-visit:' + String(visit.visitId || task.id + ':' + date),
+          startTime: clockText(startMinute),
+          endTime: clockText(endMinute),
+          startMinute: startMinute,
+          endMinute: endMinute,
+          label: visit.projectedEnd ? clockText(startMinute) + '–등원 중' : clockText(startMinute) + '–' + clockText(endMinute),
+          lessonRole: role,
+          scheduleStatus: visit.projectedEnd ? 'actual_visit_active' : 'actual_visit'
+        }],
+        issues: [],
+        sourceType: 'flexible'
+      };
     }
 
     if (structured.length) {
@@ -170,12 +209,30 @@
     if (date < todayDate) return 'ended';
     if (date > todayDate) return 'upcoming';
     if (nowMinute < slot.startMinute) return 'upcoming';
+    if (slot.scheduleStatus === 'actual_visit_active') return 'current';
     if (nowMinute >= slot.endMinute) return 'ended';
     return 'current';
   }
 
-  function timelineRange(entries) {
-    const slots = (entries || []).map(entry => entry.slot || entry).filter(slot =>
+  function occupiedEndMinute(entry, options) {
+    const slot = entry.slot || entry;
+    let endMinute = Number(slot.endMinute);
+    if (slot.scheduleStatus !== 'actual_visit_active') return endMinute;
+    const date = String(entry.date || options && options.date || '');
+    const todayDate = String(options && options.todayDate || '');
+    const nowMinute = Number(options && options.nowMinute);
+    const startMinute = Number(slot.startMinute);
+    if (date && date === todayDate && Number.isFinite(nowMinute) && nowMinute >= startMinute) {
+      endMinute = Math.max(endMinute, Math.min(24 * 60, nowMinute + 1));
+    }
+    return endMinute;
+  }
+
+  function timelineRange(entries, options) {
+    const slots = (entries || []).map(entry => {
+      const slot = entry.slot || entry;
+      return Object.assign({}, slot, { endMinute: occupiedEndMinute(entry, options) });
+    }).filter(slot =>
       Number.isFinite(slot.startMinute) && Number.isFinite(slot.endMinute) && slot.endMinute > slot.startMinute
     );
     if (!slots.length) return { startMinute: 14 * 60, endMinute: 20 * 60 };
@@ -203,13 +260,13 @@
     return parts.some(Boolean) ? parts.join('|') : 'unspecified';
   }
 
-  function timelineRows(entries) {
+  function timelineRows(entries, options) {
     const prepared = (entries || []).map((entry, index) => ({
       entry: entry,
       index: index,
       teacherKey: String(entry.staffId || entry.teacherName || 'unassigned'),
       startMinute: Number((entry.slot || {}).startMinute),
-      endMinute: Number((entry.slot || {}).endMinute),
+      endMinute: occupiedEndMinute(entry, options),
       lessonIdentity: lessonIdentity(entry)
     })).filter(item => Number.isFinite(item.startMinute) && Number.isFinite(item.endMinute) && item.endMinute > item.startMinute);
 
@@ -298,7 +355,7 @@
     }).sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ko'));
   }
 
-  function weeklyTeacherSummary(entries) {
+  function weeklyTeacherSummary(entries, options) {
     const byDate = new Map();
     (entries || []).forEach(entry => {
       const date = String(entry.date || '');
@@ -309,7 +366,7 @@
 
     const byTeacher = new Map();
     Array.from(byDate.keys()).sort().forEach(date => {
-      timelineRows(byDate.get(date)).forEach(row => {
+      timelineRows(byDate.get(date), Object.assign({}, options || {}, { date: date })).forEach(row => {
         if (!byTeacher.has(row.teacherKey)) byTeacher.set(row.teacherKey, {
           teacherKey: row.teacherKey,
           staffId: row.staffId,

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import worker from './worker-core.js';
-import { handleParentPortal, issueGuardianPortalInvite } from './parent-portal.js';
+import { handleParentPortal, issueGuardianPortalInvite, publicSchedule, publicToday } from './parent-portal.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
@@ -424,6 +424,110 @@ test('공개 범위 v4에서도 v2 오늘 수업 진행과 최소 차량 확인�
   assert.equal(staleAssignment.body.today.lessons.length, 0);
   assert.equal(staleAssignment.body.schedule.length, 0,
     '오늘 수업과 주간 시간표가 같은 현재 assignment 검증을 사용한다');
+});
+
+test('비정기 주말 수업은 적용일 이후 exact 실제 방문이 있는 날만 실제 시간으로 공개한다', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.parse('2026-08-29T12:30:00+09:00');
+  const date = '2026-08-29';
+  const taskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const task = JSON.parse(taskRow.data);
+  Object.assign(task, {
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [6], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-01',
+    scheduleSlots: [{ days: [0], startTime: '16:00', endTime: '17:00' }]
+  });
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+
+  let today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.deepEqual(today.lessons, [], '참고 시간표와 무관하게 실제 방문이 없으면 공개하지 않는다');
+
+  const checkInAt = Date.parse('2026-08-29T10:30:00+09:00');
+  db.prepare(
+    'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,' +
+    'check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
+    "VALUES(?,?,?,?,?,?,?,NULL,'cancelled',1,?,?,?,?)"
+  ).bind('task', 'wv_' + 'a'.repeat(32), 'student-a', 'lesson-a', 'staff-a', date,
+    checkInAt, checkInAt, checkInAt, 'staff-a', 'staff-a').run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.deepEqual(today.lessons, [], '취소된 실제 방문은 수업 근거가 아니다');
+
+  db.prepare(
+    "UPDATE weekend_actual_visits SET status='active',revision=2,updated_at=updated_at+1 " +
+    "WHERE app='task' AND visit_id=?"
+  ).bind('wv_' + 'a'.repeat(32)).run();
+  task.weekendFlexibleFrom = '2026-08-30';
+  task.scheduleSlots = [{ days: [6], startTime: '16:00', endTime: '17:00' }];
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.equal(today.lessons.length, 1, '비정기 적용 시작일 전에는 기존 정기 시간표를 유지한다');
+  assert.equal(today.lessons[0].timeLabel, '16:00–17:00');
+  assert.equal((await publicSchedule(env(db), { id: 'student-a' }, now)).length, 1,
+    '전환 전에는 보호자의 정규 시간표도 유지한다');
+
+  task.weekendFlexibleFrom = '2026-08-01';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.equal(today.lessons.length, 1);
+  assert.equal(today.lessons[0].timeLabel, '10:30–등원 중');
+  assert.deepEqual(await publicSchedule(env(db), { id: 'student-a' }, now), [],
+    '전환 후 참고 시간표를 확정된 정규 시간표처럼 공개하지 않는다');
+  assert.match(today.lessons[0].lessonRef, /^lr_[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(today.lessons), /student-a|lesson-a|staff-a/,
+    'stable ID는 보호자 응답에 노출하지 않는다');
+
+  const checkOutAt = Date.parse('2026-08-29T12:05:00+09:00');
+  db.prepare(
+    "UPDATE weekend_actual_visits SET check_out_at=?,status='completed',revision=3,updated_at=updated_at+1 " +
+    "WHERE app='task' AND visit_id=?"
+  ).bind(checkOutAt, 'wv_' + 'a'.repeat(32)).run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.equal(today.lessons[0].timeLabel, '10:30–12:05');
+});
+
+test('비정기 수업은 위조된 평일 방문 행이 있어도 보호자 오늘 수업으로 공개하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  const date = '2026-08-31';
+  const now = Date.parse(date + 'T12:30:00+09:00');
+  const taskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const task = JSON.parse(taskRow.data);
+  Object.assign(task, {
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0, 6], weekendMonthlyTarget: null,
+    weekendFlexibleFrom: '2026-08-01',
+    scheduleSlots: [{ days: [1], startTime: '16:00', endTime: '17:00' }]
+  });
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  const checkInAt = Date.parse(date + 'T10:30:00+09:00');
+  db.prepare(
+    'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,' +
+    'check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
+    "VALUES(?,?,?,?,?,?,?,?, 'completed',1,?,?,?,?)"
+  ).bind('task', 'wv_' + 'b'.repeat(32), 'student-a', 'lesson-a', 'staff-a', date,
+    checkInAt, checkInAt + 3600000, checkInAt, checkInAt, 'staff-a', 'staff-a').run();
+  const today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.deepEqual(today.lessons, []);
+});
+
+test('주말 실제 방문 테이블이 준비되지 않아도 정기 수업은 유지하고 비정기 수업은 fail-closed 한다', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.parse('2026-08-29T12:30:00+09:00');
+  const taskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first();
+  const task = JSON.parse(taskRow.data);
+  task.scheduleSlots = [{ days: [6], startTime: '16:00', endTime: '17:00' }];
+  task.weekendAttendanceMode = 'flexible';
+  task.weekendFlexibleFrom = '2026-08-01';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  db.database.exec('DROP TABLE weekend_actual_visit_events; DROP TABLE weekend_actual_visits;');
+
+  let today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.deepEqual(today.lessons, [], '근거 테이블이 없으면 비정기 수업을 추정 공개하지 않는다');
+
+  task.weekendAttendanceMode = 'fixed';
+  task.weekendFlexibleFrom = '';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.equal(today.lessons.length, 1);
+  assert.equal(today.lessons[0].timeLabel, '16:00–17:00');
 });
 
 test('v4 실제 화면과 관리자 미리보기는 같은 공지·검증된 교재 상태만 공개한다', async () => {

@@ -495,6 +495,42 @@ test('client cannot inject server-owned task fields', async () => {
   assert.equal(db.tasks.size, 1);
 });
 
+test('general lesson input cannot inject weekend flexible policy fields', async () => {
+  for (const [key, value] of [
+    ['weekendAttendanceMode', 'flexible'],
+    ['weekendAllowedDays', [0, 6]],
+    ['weekendMonthlyTarget', 2],
+    ['weekendFlexibleFrom', '2026-08-22']
+  ]) {
+    await assert.rejects(
+      () => buildLessonTask(assignedLesson({ [key]: value }), 'teacher-1', 'staff', 100),
+      error => error && error.status === 403 && /서버가 정하는 필드/.test(error.message),
+      key
+    );
+  }
+});
+
+test('ordinary lesson correction preserves server-managed weekend flexible metadata', async () => {
+  const db = new FakeDB();
+  const source = await buildLessonTask(assignedLesson(), 'teacher-1', 'staff', 100);
+  Object.assign(source, {
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [0], weekendMonthlyTarget: 2,
+    weekendFlexibleFrom: '2026-08-22'
+  });
+  seed(db, source);
+  const corrected = await call(db, {
+    sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt,
+    lesson: assignedLesson({ materials: '수정된 교재' })
+  }, { scope: 'own', id: 'teacher-1' });
+  assert.equal(corrected.response.status, 200);
+  assert.equal(corrected.data.updated, true);
+  assert.equal(corrected.data.task.id, source.id);
+  assert.equal(corrected.data.task.weekendAttendanceMode, 'flexible');
+  assert.deepEqual(corrected.data.task.weekendAllowedDays, [0]);
+  assert.equal(corrected.data.task.weekendMonthlyTarget, 2);
+  assert.equal(corrected.data.task.weekendFlexibleFrom, '2026-08-22');
+});
+
 test('admin must choose an active teacher and uses admin origin', async () => {
   const db = new FakeDB();
   const missing = await call(db, { lesson: validLesson() }, { scope: 'all' });
