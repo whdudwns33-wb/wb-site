@@ -14,6 +14,9 @@ WB_GUARDIAN_CONTACT_ENABLED = "false"
 # 아카등록 완료된 최초 고유 일반 교재만 Grok web_search로 검증한다.
 # true가 아니거나 AI binding을 사용할 수 없으면 주문 입력값을 그대로 카탈로그에 보존한다.
 WB_BOOK_CATALOG_WEB_SEARCH_ENABLED = "true"
+# 최종 수업 피드백의 코멘트 변수만 교사 확인 전 일시적으로 다듬는다.
+# 저장·발송은 기존 /feedback-request의 명시적 최종 전송 버튼만 수행한다.
+WB_PARENT_FEEDBACK_AI_ENABLED = "true"
 # 선별 테스트가 필요할 때 값은 저장소에 쓰지 않고 다음 secret으로 stable studentId만 등록한다.
 # npx wrangler secret put WB_GUARDIAN_CONTACT_STUDENT_IDS --config sync/wrangler.toml
 # 수업 피드백 실제 발송 스위치도 secret으로만 관리한다.
