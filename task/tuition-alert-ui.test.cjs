@@ -95,6 +95,18 @@ test('관리자 알림은 회차 출결 확정 시각과 3회 기준을 명확�
   assert.match(manager, /session\.isAdmin/);
 });
 
+test('수강료 생성필요 영역은 수업 등록 및 기존 수업 변경 뒤 화면 최하단에 배치한다', () => {
+  const lesson = functionBlock('viewLessonEntry');
+  const registrationStart = lesson.indexOf('const registration =');
+  const existingChangeStart = lesson.indexOf('const existingChange =');
+  const returnStart = lesson.indexOf('return registration + existingChange + tuitionAlertManagerHtml();');
+
+  assert.ok(registrationStart >= 0);
+  assert.ok(existingChangeStart > registrationStart);
+  assert.ok(returnStart > existingChangeStart);
+  assert.doesNotMatch(lesson.slice(registrationStart, existingChangeStart), /tuitionAlertManagerHtml\(\)/);
+});
+
 test('수강료 생성 확인은 stable alertId만 보내고 이름이나 횟수를 믿지 않는다', () => {
   const acknowledge = functionBlock('confirmTuitionAlert');
 

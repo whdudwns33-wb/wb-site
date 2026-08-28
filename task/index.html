@@ -1013,11 +1013,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.6"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.6"></script>
-<script src="./asset-core.js?v=2026-08-28.6"></script>
-<script src="./qr-core.js?v=2026-08-28.6"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.6"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.7"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.7"></script>
+<script src="./asset-core.js?v=2026-08-28.7"></script>
+<script src="./qr-core.js?v=2026-08-28.7"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.7"></script>
 <script>
 "use strict";
 
@@ -5347,7 +5347,7 @@ function viewLessonEntry() {
       '</div></details>' + lessonAssignmentRequestHtml();
   }
   const editing = !!draft._sourceTaskId;
-  const registration = teacherLiveRequestManagerHtml() + tuitionAlertManagerHtml() + adminDirectiveManagerHtml() +
+  const registration = teacherLiveRequestManagerHtml() + adminDirectiveManagerHtml() +
     '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
     '<span class="card-sub">학생 1명의 여러 수업 또는 한 개 수업의 여러 학생을 선택해 일괄 등록할 수 있습니다.</span></span></summary>' +
     '<div class="admin-collapsible-body">' + (editing
@@ -5360,7 +5360,7 @@ function viewLessonEntry() {
       (editing ? '<div class="guide mt14"><b>기존 수업 수정 중</b>' + esc([draft.studentName, draft.subject, (staffById(draft.staffId) || {}).name].filter(Boolean).join(' · ')) +
         '<button class="btn btn-sm btn-ghost mt14" data-act="lessoneditcancel">수정 취소 · 다시 조회</button></div>' + formPanel : '') +
       '<div class="mt14">' + viewLessonChangeReview() + '</div></div></details>';
-  return registration + existingChange;
+  return registration + existingChange + tuitionAlertManagerHtml();
 }
 
 function refreshLessonDirectEntry(forceOpen) {
@@ -18579,7 +18579,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.6';
+const APP_VER = '2026-08-28.7';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
