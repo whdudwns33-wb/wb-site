@@ -1013,11 +1013,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.5"></script>
-<script src="./asset-core.js?v=2026-08-28.5"></script>
-<script src="./qr-core.js?v=2026-08-28.5"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.6"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.6"></script>
+<script src="./asset-core.js?v=2026-08-28.6"></script>
+<script src="./qr-core.js?v=2026-08-28.6"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.6"></script>
 <script>
 "use strict";
 
@@ -1760,6 +1760,11 @@ let sessionPackRestoreFocus = null;
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
 let managerInboxLoading = false;
+let teacherLiveRequestRows = [], teacherLiveRequestRecipients = [];
+let teacherLiveRequestLoaded = false, teacherLiveRequestLoading = false, teacherLiveRequestError = '';
+let teacherLiveRequestRecipientsLoaded = false, teacherLiveRequestRecipientsLoading = false;
+let teacherLiveRequestContext = null, teacherLiveRequestSending = false, teacherLiveRequestViewerAdminId = '';
+let tuitionAlertRows = [], tuitionAlertsLoaded = false, tuitionAlertsLoading = false, tuitionAlertsError = '';
 let guardianRequestRows = [], guardianRequestsLoaded = false, guardianRequestsLoading = false, guardianRequestsError = '';
 const guardianRequestPending = new Set();
 let guardianAnnouncementRows = [], guardianAnnouncementsLoaded = false, guardianAnnouncementsLoading = false, guardianAnnouncementsError = '';
@@ -1866,6 +1871,11 @@ function resetPersonCache(token) {
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
   makeupRestoreFocus = null; makeupLiveMessage = '';
   makeupCreateStates.clear();
+  teacherLiveRequestRows = []; teacherLiveRequestRecipients = [];
+  teacherLiveRequestLoaded = false; teacherLiveRequestLoading = false; teacherLiveRequestError = '';
+  teacherLiveRequestRecipientsLoaded = false; teacherLiveRequestRecipientsLoading = false;
+  teacherLiveRequestContext = null; teacherLiveRequestSending = false; teacherLiveRequestViewerAdminId = '';
+  tuitionAlertRows = []; tuitionAlertsLoaded = false; tuitionAlertsLoading = false; tuitionAlertsError = '';
   guardianRequestRows = []; guardianRequestsLoaded = false; guardianRequestsLoading = false; guardianRequestsError = '';
   guardianRequestPending.clear();
   guardianAnnouncementRows = []; guardianAnnouncementsLoaded = false; guardianAnnouncementsLoading = false; guardianAnnouncementsError = '';
@@ -3052,6 +3062,7 @@ let lessonBriefingSaving = false;
 function lessonBriefingEditorHtml(student, task) {
   const selectedSubjects = new Set(rosterStudentSubjects(student));
   const subjectTeachers = rosterStudentSubjectTeacherText(student.id);
+  const billingMode = String(student.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly';
   const instructionFields = [
     ['materials', '교재·현재 진도', 2400],
     ['onlineProgram', '온라인 프로그램', 600],
@@ -3080,6 +3091,12 @@ function lessonBriefingEditorHtml(student, task) {
       '<div class="small mt8">담당 선생님은 학생 공통 정보가 아니라 각 수업에서 변경합니다.</div></div>' +
     '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-briefing-student="registrationDate" value="' + esc(student.registrationDate || '') + '"></label>' +
     '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-briefing-student="firstClassDate" value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-briefing-student="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
+      '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
+      '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
+    '<label class="field" data-roster-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
+      '<input class="in" type="date" data-lesson-briefing-student="sessionCycleStartDate"' +
+      (billingMode === 'session4' ? ' required aria-required="true"' : '') + ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
     '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-lesson-briefing-student="start" value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" rows="3" maxlength="1000" data-lesson-briefing-student="memo">' + esc(student.memo || '') + '</textarea></label></section>';
   const instructionEditorHtml = '<section class="card"><div class="card-title">이 수업의 업무지시</div>' +
@@ -3137,10 +3154,13 @@ function lessonBriefingStudentPayload() {
     registrationDate: value('registrationDate'), firstClassDate: value('firstClassDate'),
     subject: subjects.join('·'), subjects: subjects,
     start: value('start'), end: String(editor.student.end || ''), reason: String(editor.student.reason || ''),
-    memo: value('memo')
+    memo: value('memo'),
+    billingMode: value('billingMode') === 'session4' ? 'session4' : 'monthly',
+    sessionCycleStartDate: value('billingMode') === 'session4' ? value('sessionCycleStartDate') : ''
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
   if (!student.name || !student.grade || !student.start) throw new Error('이름·학년·명단 기준 시작월을 입력해 주세요');
+  if (student.billingMode === 'session4' && !student.sessionCycleStartDate) throw new Error('회차제 시작일을 입력해 주세요');
   if (ROSTER_SUBJECT_OPTIONS.includes(String(editor.task.subject || '')) && !student.subjects.includes(String(editor.task.subject))) {
     throw new Error('현재 수업 과목을 학생 등록과목에서 유지해 주세요');
   }
@@ -3166,7 +3186,7 @@ function lessonBriefingLessonPayload(student) {
 
 function lessonBriefingStudentChanged(current, next) {
   return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
-    'subject', 'subjects', 'start', 'end', 'reason', 'memo', 'entryType']
+    'subject', 'subjects', 'start', 'end', 'reason', 'memo', 'entryType', 'billingMode', 'sessionCycleStartDate']
     .some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
 }
 
@@ -3576,6 +3596,9 @@ function taskPanel(t, date, c, editable) {
         (blocked ? '✓ 막힘 해제' : '🚧 막혔어요') + '</button>' +
       (lesson
         ? '<button class="btn btn-sm btn-navy" data-act="fbtext" data-id="' + t.id + '" data-date="' + date + '">💬 학부모 피드백 문구</button>' +
+          (session.isStaffLink && String(t.staffId || '') === String(session.staffId || '') && date === today()
+            ? '<button class="btn btn-sm btn-primary" data-act="teacherLiveRequestOpen" data-id="' + esc(t.id) +
+              '" data-date="' + esc(date) + '">실시간 선생님 요청</button>' : '') +
           '<button class="btn btn-sm btn-ghost" data-act="acaflowlessoncopy" data-id="' + t.id + '" data-date="' + date + '">아카플로우 코멘트용 복사</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-id="' + esc(t.id) + '" data-date="' + esc(date) + '" data-name="' + esc(t.studentName || studentOf(t)) + '">📞 연락 기록</button>'
         : '') +
@@ -4603,6 +4626,8 @@ function setLessonRosterDraft(student) {
     grade: String(student.grade || ''), phoneSelf: String(student.phoneSelf || ''),
     phoneFather: String(student.phoneFather || ''), phoneMother: String(student.phoneMother || ''),
     registrationDate: String(student.registrationDate || ''), firstClassDate: String(student.firstClassDate || ''),
+    billingMode: String(student.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly',
+    sessionCycleStartDate: String(student.sessionCycleStartDate || ''),
     subjects: rosterStudentSubjects(student),
     memo: String(student.memo || '')
   } : null;
@@ -4667,6 +4692,12 @@ function lessonRosterInformationHtml() {
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneMother" maxlength="30" value="' + esc(info.phoneMother) + '"></label>' +
     '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-roster-field="registrationDate" value="' + esc(info.registrationDate) + '"></label>' +
     '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-roster-field="firstClassDate" value="' + esc(info.firstClassDate) + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-roster-field="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
+      '<option value="monthly"' + (info.billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
+      '<option value="session4"' + (info.billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
+    '<label class="field" data-roster-cycle-start-wrap' + (info.billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
+      '<input class="in" type="date" data-lesson-roster-field="sessionCycleStartDate"' +
+      (info.billingMode === 'session4' ? ' required aria-required="true"' : '') + ' value="' + esc(info.sessionCycleStartDate) + '"></label></div>' +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" data-lesson-roster-field="memo" maxlength="1000">' + esc(info.memo) + '</textarea></label>';
 }
 
@@ -4680,11 +4711,16 @@ function lessonRosterStudentPayload(selected, draft, lessons) {
   if (!String(info.name || '').trim() || !String(info.grade || '').trim() || !subjects.length) {
     throw new Error('원생 이름·학년·수업 과목을 모두 확인해 주세요');
   }
+  if (info.billingMode === 'session4' && !String(info.sessionCycleStartDate || '').trim()) {
+    throw new Error('회차제 시작일을 입력해 주세요');
+  }
   return Object.assign({}, selected, {
     id: selected.id, name: String(info.name).normalize('NFKC').trim(), school: String(info.school || '').normalize('NFKC').trim(),
     grade: String(info.grade).normalize('NFKC').trim(), phoneSelf: String(info.phoneSelf || '').normalize('NFKC').trim(),
     phoneFather: String(info.phoneFather || '').normalize('NFKC').trim(), phoneMother: String(info.phoneMother || '').normalize('NFKC').trim(),
     registrationDate: String(info.registrationDate || ''), firstClassDate: String(info.firstClassDate || ''),
+    billingMode: info.billingMode === 'session4' ? 'session4' : 'monthly',
+    sessionCycleStartDate: info.billingMode === 'session4' ? String(info.sessionCycleStartDate || '') : '',
     // 구형 명단의 담당 필드는 선택한 수업 담당자로 합성하지 않고 Object.assign 원본 그대로 보존한다.
     subject: subjects.join('·'), subjects: subjects, memo: String(info.memo || '').normalize('NFKC').trim()
   });
@@ -4693,7 +4729,8 @@ function lessonRosterStudentPayload(selected, draft, lessons) {
 function lessonRosterStudentChanged(current, next) {
   if (!current || !next) return false;
   return ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother', 'registrationDate', 'firstClassDate',
-    'subject', 'subjects', 'memo'].some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
+    'subject', 'subjects', 'memo', 'billingMode', 'sessionCycleStartDate']
+    .some(key => JSON.stringify(current[key] || '') !== JSON.stringify(next[key] || ''));
 }
 
 async function loadPublicationReadiness(force) {
@@ -5310,7 +5347,8 @@ function viewLessonEntry() {
       '</div></details>' + lessonAssignmentRequestHtml();
   }
   const editing = !!draft._sourceTaskId;
-  const registration = adminDirectiveManagerHtml() + '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
+  const registration = teacherLiveRequestManagerHtml() + tuitionAlertManagerHtml() + adminDirectiveManagerHtml() +
+    '<details class="card admin-collapsible lesson-direct-entry"' + (lessonDirectEntryOpen ? ' open' : '') + '><summary><span><b>수업 등록</b>' +
     '<span class="card-sub">학생 1명의 여러 수업 또는 한 개 수업의 여러 학생을 선택해 일괄 등록할 수 있습니다.</span></span></summary>' +
     '<div class="admin-collapsible-body">' + (editing
       ? '<div class="hint">현재 기존 수업을 수정 중입니다. 기존 수업 변경에서 수정을 마치거나 취소해 주세요.</div>'
@@ -8129,6 +8167,22 @@ function managerRequestInboxRows() {
       guardianRequestRevision: Number(row.revision) || 0
     });
   });
+  const teacherRequestInboxRows = typeof teacherLiveRequestRows === 'undefined' ? [] : teacherLiveRequestRows;
+  teacherRequestInboxRows.filter(row => !row.acknowledgedAt).forEach(row => {
+    rows.push({
+      kind: '실시간 선생님 요청', title: row.studentLabel, detail: '지정 수신자 · ' + row.recipientLabel,
+      requester: row.teacherLabel, route: '', updatedAt: row.createdAt, priority: -4,
+      teacherLiveRequestId: row.requestId
+    });
+  });
+  const tuitionInboxRows = typeof tuitionAlertRows === 'undefined' ? [] : tuitionAlertRows;
+  tuitionInboxRows.forEach(row => {
+    rows.push({
+      kind: '수강료 생성필요', title: row.studentLabel,
+      detail: '회차제 ' + row.attendanceCount + '/4회 · 23:50 출결 확정', requester: '자동 알림',
+      route: '', updatedAt: row.createdAt, priority: -5, tuitionAlertId: row.alertId
+    });
+  });
   const directiveInboxRows = typeof adminDirectiveManageRows === 'undefined' ? [] : adminDirectiveManageRows;
   directiveInboxRows.filter(row => row.isCurrent && row.directiveStatus === 'active').forEach(row => {
     const pending = typeof adminDirectiveAudienceSummary === 'function' ? adminDirectiveAudienceSummary(row).pending : [];
@@ -8155,12 +8209,12 @@ function managerRequestInboxCount() { return session.isAdmin ? managerRequestInb
 function managerRequestInboxReady() {
   return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded &&
     bookAddQueueLoaded && bookEditQueueLoaded && guardianRequestsLoaded &&
-    studentChangeLoaded && adminDirectiveManageLoaded;
+    studentChangeLoaded && adminDirectiveManageLoaded && teacherLiveRequestLoaded && tuitionAlertsLoaded;
 }
 
 function managerRequestInboxErrors() {
   return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError,
-    guardianRequestsError, studentChangeError, adminDirectiveError]
+    guardianRequestsError, studentChangeError, adminDirectiveError, teacherLiveRequestError, tuitionAlertsError]
     .filter(Boolean);
 }
 
@@ -8172,7 +8226,8 @@ async function loadManagerRequestInbox(force) {
     await Promise.all([
       loadLessonAssignmentRequests(force), loadLessonChangeQueue(force), loadFeedbackQueue(force),
       loadBookAddQueue(force), loadBookEditQueue(force), loadGuardianRequests(force),
-      loadStudentChanges(force), loadAdminDirectives(force, false)
+      loadStudentChanges(force), loadAdminDirectives(force, false),
+      loadTeacherLiveRequests(force, false), loadTuitionAlerts(force, false)
     ]);
   } finally {
     managerInboxLoading = false;
@@ -8200,6 +8255,8 @@ function managerRequestInboxHtml() {
       '<div class="task' + (row.guardianRequestId ? ' manager-guardian-request' : '') + '"><div class="task-body"><div class="between"><div class="task-t">' + esc(row.title) + '</div><span class="tag high">' + esc(row.kind) + '</span></div>' +
       '<div class="meta"><span class="tag">' + esc(row.requester) + '</span><span class="tag">' + esc(row.detail) + '</span></div></div>' +
       (row.guardianRequestId ? guardianRequestControlsHtml(row) :
+        row.teacherLiveRequestId ? '<button class="btn btn-sm btn-primary" data-act="teacherLiveRequestAck" data-request="' + esc(row.teacherLiveRequestId) + '">확인</button>' :
+        row.tuitionAlertId ? '<button class="btn btn-sm btn-primary" data-act="tuitionAlertConfirm" data-alert="' + esc(row.tuitionAlertId) + '">확인</button>' :
         '<button class="btn btn-sm btn-primary" data-go="' + esc(row.route) + '">검토하기</button>') + '</div>'
     ).join('') + '</div>';
   } else if (managerRequestInboxReady() && !errors.length) {
@@ -12532,6 +12589,314 @@ async function acknowledgeStudentChanges(studentId, button) {
   }
 }
 
+/* ── 실시간 선생님 요청 · 모든 관리자에게 동일 표시, 관리자별 확인 ── */
+function teacherLiveRequestRecipientLabel(adminId) {
+  const stableId = String(adminId || '');
+  if (stableId === 'director') return '원장님';
+  const serverRecipient = teacherLiveRequestRecipients.find(item => String(item && item.adminId || '') === stableId);
+  if (serverRecipient && serverRecipient.displayName) return serverRecipient.displayName + ' 관리자';
+  const staff = staffById(stableId);
+  return staff && staff.name ? staff.name + ' 관리자' : '관리자 정보 확인 필요';
+}
+
+function teacherLiveRequestStudentLabel(studentId, lessonTaskId) {
+  const student = rosterDb && Array.isArray(rosterDb.students)
+    ? rosterDb.students.find(item => String(item.id || '') === String(studentId || '')) : null;
+  if (student) return staffStudentCompactLabel(student);
+  const task = (state.tasks || []).find(item => String(item.id || '') === String(lessonTaskId || '') &&
+    String(item.studentId || '') === String(studentId || ''));
+  return task ? (task.studentName || studentOf(task) || '학생 정보 확인 필요') : '학생 정보 확인 필요';
+}
+
+function normalizeTeacherLiveRequest(row, viewerAdminId) {
+  const requestId = String(row && row.requestId || '');
+  if (!/^tlr_[A-Za-z0-9_-]{4,76}$/.test(requestId)) return null;
+  const viewerStatus = (Array.isArray(row.receiptStatus) ? row.receiptStatus : [])
+    .find(item => String(item && item.adminId || '') === String(viewerAdminId || '')) || {};
+  const lessonTask = (state.tasks || []).find(item => String(item.id || '') === String(row.lessonTaskId || '') &&
+    String(item.studentId || '') === String(row.studentId || ''));
+  return {
+    requestId: requestId, lessonTaskId: String(row.lessonTaskId || ''), lessonDate: String(row.lessonDate || ''),
+    studentId: String(row.studentId || ''), senderStaffId: String(row.senderStaffId || ''),
+    recipientAdminId: String(row.recipientAdminId || ''), body: String(row.body || '').slice(0, 2000),
+    createdAt: Number(row.createdAt) || 0, openedAt: Number(viewerStatus.openedAt) || null,
+    acknowledgedAt: Number(viewerStatus.acknowledgedAt) || null,
+    studentLabel: teacherLiveRequestStudentLabel(row.studentId, row.lessonTaskId),
+    lessonLabel: lessonTask ? taskDisplayTitle(lessonTask) : '수업 정보 확인 필요',
+    teacherLabel: managerRequestTeacher(row.senderStaffId),
+    recipientLabel: teacherLiveRequestRecipientLabel(row.recipientAdminId)
+  };
+}
+
+async function loadTeacherLiveRequestRecipients(force) {
+  if (!session.isStaffLink || teacherLiveRequestRecipientsLoading ||
+      (teacherLiveRequestRecipientsLoaded && !force)) return teacherLiveRequestRecipients;
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person') return [];
+  teacherLiveRequestRecipientsLoading = true;
+  try {
+    const result = await sync.post('/teacher-live-request', {
+      app: SYNC_APP, auth: auth, action: 'recipients'
+    });
+    const recipientAdminIds = (result.recipientAdminIds || []).map(String)
+      .filter(id => id === 'director' || /^[A-Za-z0-9_-]{1,128}$/.test(id));
+    const serverNames = new Map((result.recipientAdmins || []).filter(item => item && recipientAdminIds.includes(String(item.adminId || '')))
+      .map(item => [String(item.adminId), String(item.displayName || '').slice(0, 80)]));
+    teacherLiveRequestRecipients = recipientAdminIds.map(adminId => ({
+      adminId: adminId, displayName: serverNames.get(adminId) || (adminId === 'director' ? '원장님' : '관리자')
+    }));
+    teacherLiveRequestRecipientsLoaded = true;
+  } catch (error) {
+    if (!(error && error.personAuthHandled)) teacherLiveRequestError = '수신 관리자를 불러오지 못했습니다.';
+  } finally {
+    teacherLiveRequestRecipientsLoading = false;
+  }
+  return teacherLiveRequestRecipients;
+}
+
+async function openTeacherLiveRequestModal(taskId, lessonDate) {
+  const task = (state.tasks || []).find(item => String(item.id || '') === String(taskId || '') && !item.deleted);
+  const date = String(lessonDate || '');
+  if (!task || !isLesson(task) || date !== today() || !session.isStaffLink ||
+      String(task.staffId || '') !== String(session.staffId || '')) {
+    return toast('오늘 본인 담당 수업에서만 실시간 요청을 보낼 수 있습니다');
+  }
+  teacherLiveRequestContext = { lessonTaskId: String(task.id), lessonDate: date };
+  const recipients = await loadTeacherLiveRequestRecipients(false);
+  if (!teacherLiveRequestContext || teacherLiveRequestContext.lessonTaskId !== String(task.id)) return;
+  const options = recipients.map(recipient => '<option value="' + esc(recipient.adminId) + '">' +
+    esc(recipient.adminId === 'director' ? recipient.displayName : recipient.displayName + ' 관리자') + '</option>').join('');
+  modal('실시간 선생님 요청',
+    '<div class="hint mb14"><b>' + esc(taskDisplayTitle(task)) + '</b><br>지정한 관리자가 우선 확인하며, 요청 내용은 모든 관리자에게 같은 팝업으로 표시됩니다.</div>' +
+    '<label class="field"><span class="fl">요청 내용</span><textarea class="in" rows="6" maxlength="2000" data-teacher-live-request-body placeholder="수업 중 관리자 확인이 필요한 내용을 입력해 주세요."></textarea></label>',
+    '<div class="row mt14" style="gap:8px;align-items:end"><label class="field" style="flex:1;margin:0"><span class="fl">수신 관리자 · 한 명</span>' +
+      '<select class="in" data-teacher-live-request-recipient><option value="">관리자 선택</option>' + options + '</select></label>' +
+      '<button class="btn btn-primary" data-act="teacherLiveRequestSend"' + (teacherLiveRequestSending ? ' disabled' : '') + '>전송</button></div>');
+}
+
+async function submitTeacherLiveRequest(button) {
+  const context = teacherLiveRequestContext;
+  if (!context || teacherLiveRequestSending) return;
+  const recipient = String((document.querySelector('[data-teacher-live-request-recipient]') || {}).value || '');
+  const message = String((document.querySelector('[data-teacher-live-request-body]') || {}).value || '').normalize('NFKC').trim();
+  if (!recipient) return toast('수신 관리자를 한 명 선택해 주세요');
+  if (!message) return toast('요청 내용을 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person') return toast('개인 인증을 확인해 주세요');
+  teacherLiveRequestSending = true;
+  if (button) { button.disabled = true; button.textContent = '전송 중…'; }
+  try {
+    await sync.post('/teacher-live-request', {
+      app: SYNC_APP, auth: auth, action: 'send', requestId: 'tlr_' + uid(),
+      lessonTaskId: context.lessonTaskId, lessonDate: context.lessonDate,
+      recipientAdminId: recipient, body: message
+    });
+    teacherLiveRequestContext = null;
+    closeModal();
+    toast('실시간 선생님 요청을 전송했습니다');
+    if (session.isAdmin) await loadTeacherLiveRequests(true, true);
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '전송'; }
+    toast('요청 전송 실패 — ' + (error.message || error));
+  } finally {
+    teacherLiveRequestSending = false;
+  }
+}
+
+async function loadTeacherLiveRequests(force, allowPopup) {
+  if (!session.isAdmin || teacherLiveRequestLoading || (teacherLiveRequestLoaded && !force)) {
+    if (allowPopup) showPendingTeacherLiveRequestPopup();
+    return;
+  }
+  const auth = sync.auth();
+  if (!auth) return;
+  teacherLiveRequestLoading = true; teacherLiveRequestError = '';
+  try {
+    const result = await sync.post('/teacher-live-request', {
+      app: SYNC_APP, auth: auth, action: 'list'
+    });
+    teacherLiveRequestViewerAdminId = String(result.viewerAdminId || '');
+    teacherLiveRequestRows = (result.requests || []).map(row =>
+      normalizeTeacherLiveRequest(row, teacherLiveRequestViewerAdminId)).filter(Boolean);
+    teacherLiveRequestLoaded = true;
+  } catch (error) {
+    if (!(error && error.personAuthHandled)) teacherLiveRequestError = '실시간 선생님 요청을 불러오지 못했습니다.';
+    teacherLiveRequestLoaded = true;
+  } finally {
+    teacherLiveRequestLoading = false;
+    renderAfterSync();
+    if (allowPopup) showPendingTeacherLiveRequestPopup();
+  }
+}
+
+function teacherLiveRequestCardHtml(row, popup) {
+  return '<div class="admin-directive-card is-important"><div class="between"><b>' + esc(row.studentLabel) +
+    '</b><span class="tag high">실시간 선생님 요청</span></div>' +
+    '<div class="small muted mt8">' + esc(row.teacherLabel) + ' · ' + esc(row.lessonLabel) + ' · ' + esc(row.lessonDate) + '</div>' +
+    '<div class="admin-directive-body">' + esc(row.body) + '</div>' +
+    '<div class="admin-directive-status"><span class="tag">지정 수신자 · ' + esc(row.recipientLabel) + '</span>' +
+      '<span class="tag">모든 관리자에게 동일 표시</span></div>' +
+    (!row.acknowledgedAt && !popup ? '<button class="btn btn-sm btn-primary mt8" data-act="teacherLiveRequestAck" data-request="' +
+      esc(row.requestId) + '">확인했습니다</button>' : '') + '</div>';
+}
+
+function teacherLiveRequestSoundKey() {
+  return 'wb_teacher_live_request_sound_' + String(teacherLiveRequestViewerAdminId || session.staffId || 'director');
+}
+
+function teacherLiveRequestSoundEnabled() {
+  try { return localStorage.getItem(teacherLiveRequestSoundKey()) === '1'; }
+  catch (error) { return false; }
+}
+
+function playTeacherLiveRequestSound() {
+  if (!teacherLiveRequestSoundEnabled()) return;
+  const context = ensureAdminDirectiveAudio();
+  if (!context || context.state !== 'running') return;
+  const start = context.currentTime;
+  [0, .18, .36].forEach((delay, index) => {
+    const oscillator = context.createOscillator(), gain = context.createGain();
+    oscillator.type = 'sine'; oscillator.frequency.value = 620 + index * 130;
+    gain.gain.setValueAtTime(.0001, start + delay);
+    gain.gain.exponentialRampToValueAtTime(.12, start + delay + .015);
+    gain.gain.exponentialRampToValueAtTime(.0001, start + delay + .14);
+    oscillator.connect(gain); gain.connect(context.destination);
+    oscillator.start(start + delay); oscillator.stop(start + delay + .15);
+  });
+}
+
+function showPendingTeacherLiveRequestPopup() {
+  if (!session.isAdmin || !teacherLiveRequestLoaded || !$('#modalHost').hidden) return;
+  const item = teacherLiveRequestRows.find(item => !item.acknowledgedAt);
+  if (!item) { showPendingTuitionAlertPopup(); return; }
+  const shownKey = 'wb_teacher_live_request_popup_' + String(teacherLiveRequestViewerAdminId || 'director') + '_' + item.requestId;
+  if (sessionStorage.getItem(shownKey)) { showPendingTuitionAlertPopup(); return; }
+  sessionStorage.setItem(shownKey, '1');
+  sync.post('/teacher-live-request', { app: SYNC_APP, auth: sync.auth(), action: 'opened',
+    requestId: item.requestId }).catch(() => {});
+  playTeacherLiveRequestSound();
+  modal('실시간 선생님 요청', teacherLiveRequestCardHtml(item, true),
+    '<button class="btn btn-primary btn-block mt14" data-act="teacherLiveRequestAck" data-request="' +
+    esc(item.requestId) + '" data-popup="true">확인했습니다</button>');
+}
+
+async function acknowledgeTeacherLiveRequest(requestId, button, fromPopup) {
+  const auth = sync.auth();
+  if (!auth || !session.isAdmin) return toast('관리자 인증을 확인해 주세요');
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/teacher-live-request', { app: SYNC_APP, auth: auth, action: 'acknowledge',
+      requestId: String(requestId || '') });
+    if (!$('#modalHost').hidden) closeModal();
+    await loadTeacherLiveRequests(true, false);
+    toast('실시간 선생님 요청을 확인했습니다');
+    if (fromPopup) setTimeout(showPendingTeacherLiveRequestPopup, 120);
+  } catch (error) {
+    if (button) button.disabled = false;
+    toast('확인 저장 실패 — ' + (error.message || error));
+  }
+}
+
+function teacherLiveRequestManagerHtml() {
+  if (!session.isAdmin) return '';
+  if (!teacherLiveRequestLoaded && !teacherLiveRequestLoading) setTimeout(() => loadTeacherLiveRequests(false, false), 0);
+  const pending = teacherLiveRequestRows.filter(row => !row.acknowledgedAt);
+  const history = teacherLiveRequestRows.filter(row => row.acknowledgedAt).slice(0, 30);
+  return '<details class="card admin-collapsible"><summary><span><b>📨 실시간 선생님 요청</b>' +
+    '<span class="card-sub">지정 수신자를 표시하며 모든 관리자가 같은 내용을 확인합니다.</span></span>' +
+    '<span class="pill ' + (pending.length ? 'warn' : '') + '">미확인 ' + pending.length + '건</span></summary>' +
+    '<div class="admin-collapsible-body">' + (!teacherLiveRequestSoundEnabled()
+      ? '<button class="btn btn-sm btn-primary mb14" data-act="teacherLiveRequestSound">선생님 요청 알림음 켜기</button>' : '') +
+    (teacherLiveRequestError ? '<div class="hint mb14" role="alert">' + esc(teacherLiveRequestError) + '</div>' : '') +
+    (pending.length ? pending.map(row => teacherLiveRequestCardHtml(row, false)).join('') :
+      '<div class="empty"><b>✅</b>확인할 실시간 선생님 요청이 없습니다.</div>') +
+    '<details class="admin-directive-history"><summary>최근 확인한 요청 · ' + history.length + '건</summary>' +
+      (history.length ? history.map(row => teacherLiveRequestCardHtml(row, false)).join('') :
+        '<div class="small muted">확인한 요청이 없습니다.</div>') + '</details></div></details>';
+}
+
+/* ── 회차제 3회 확정 · 수강료 생성 알림 ── */
+function normalizeTuitionAlert(row) {
+  const alertId = String(row && row.alertId || '');
+  if (!/^tga_[a-f0-9]{52}$/.test(alertId)) return null;
+  const studentLabel = [String(row.studentName || '학생 정보 확인 필요'), String(row.school || ''), String(row.grade || '')]
+    .filter(Boolean).join(' · ');
+  return {
+    alertId: alertId, studentId: String(row.studentId || ''), studentLabel: studentLabel,
+    cycleStartDate: String(row.cycleStartDate || ''), attendanceCount: Number(row.attendanceCount) || 3,
+    triggerDate: String(row.triggerDate || ''), createdAt: Number(row.createdAt) || 0
+  };
+}
+
+async function loadTuitionAlerts(force, allowPopup) {
+  if (!session.isAdmin || tuitionAlertsLoading || (tuitionAlertsLoaded && !force)) {
+    if (allowPopup) showPendingTuitionAlertPopup();
+    return;
+  }
+  const auth = sync.auth();
+  if (!auth) return;
+  tuitionAlertsLoading = true; tuitionAlertsError = '';
+  try {
+    const result = await sync.post('/tuition-alert', { app: SYNC_APP, auth: auth, action: 'list' });
+    tuitionAlertRows = (result.alerts || []).map(normalizeTuitionAlert).filter(Boolean);
+    tuitionAlertsLoaded = true;
+  } catch (error) {
+    if (!(error && error.personAuthHandled)) tuitionAlertsError = '수강료 생성 알림을 불러오지 못했습니다.';
+    tuitionAlertsLoaded = true;
+  } finally {
+    tuitionAlertsLoading = false;
+    renderAfterSync();
+    if (allowPopup) showPendingTuitionAlertPopup();
+  }
+}
+
+function tuitionAlertCardHtml(row, popup) {
+  return '<div class="admin-directive-card is-important"><div class="between"><b>' + esc(row.studentLabel) +
+    '</b><span class="tag high">수강료 생성필요</span></div>' +
+    '<div class="admin-directive-body">회차제 출석이 ' + esc(String(row.attendanceCount)) + '/4회 확정되었습니다.</div>' +
+    '<div class="small muted mt8">회차 시작일 ' + esc(row.cycleStartDate) + ' · 3회째 확정일 ' + esc(row.triggerDate) + '</div>' +
+    (!popup ? '<button class="btn btn-sm btn-primary mt8" data-act="tuitionAlertConfirm" data-alert="' + esc(row.alertId) + '">확인</button>' : '') + '</div>';
+}
+
+function tuitionAlertManagerHtml() {
+  if (!session.isAdmin) return '';
+  if (!tuitionAlertsLoaded && !tuitionAlertsLoading) setTimeout(() => loadTuitionAlerts(false, false), 0);
+  return '<details class="card admin-collapsible"><summary><span><b>💳 수강료 생성필요</b>' +
+    '<span class="card-sub">회차제는 매일 23:50에 출결을 확정하며 3회 완료 시 알립니다.</span></span>' +
+    '<span class="pill ' + (tuitionAlertRows.length ? 'warn' : '') + '">' + tuitionAlertRows.length + '건</span></summary>' +
+    '<div class="admin-collapsible-body">' +
+    (tuitionAlertsError ? '<div class="hint mb14" role="alert">' + esc(tuitionAlertsError) + '</div>' : '') +
+    (tuitionAlertRows.length ? tuitionAlertRows.map(row => tuitionAlertCardHtml(row, false)).join('') :
+      '<div class="empty"><b>✅</b>현재 수강료 생성필요 알림이 없습니다.</div>') + '</div></details>';
+}
+
+function showPendingTuitionAlertPopup() {
+  if (!session.isAdmin || !tuitionAlertsLoaded || !tuitionAlertRows.length || !$('#modalHost').hidden) return;
+  const row = tuitionAlertRows[0];
+  const shownKey = 'wb_tuition_alert_popup_' + String(teacherLiveRequestViewerAdminId || session.staffId || 'director') + '_' + row.alertId;
+  if (sessionStorage.getItem(shownKey)) return;
+  sessionStorage.setItem(shownKey, '1');
+  modal('수강료 생성필요', '<div class="hint mb14">' + esc(row.studentLabel) + ' 학생의 회차제 출석이 3회 확정되었습니다.</div>' +
+    tuitionAlertCardHtml(row, true), '<button class="btn btn-primary btn-block mt14" data-act="tuitionAlertConfirm" data-alert="' +
+    esc(row.alertId) + '">확인</button>');
+}
+
+async function confirmTuitionAlert(alertId, button) {
+  const auth = sync.auth();
+  if (!auth || !session.isAdmin) return toast('관리자 인증을 확인해 주세요');
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/tuition-alert', { app: SYNC_APP, auth: auth, action: 'confirm', alertId: String(alertId || '') });
+    if (!$('#modalHost').hidden) closeModal();
+    await loadTuitionAlerts(true, false);
+    toast('수강료 생성필요 알림을 확인했습니다');
+    setTimeout(showPendingTuitionAlertPopup, 120);
+  } catch (error) {
+    if (button) button.disabled = false;
+    toast('알림 확인 실패 — ' + (error.message || error));
+  }
+}
+
 /* ── 실시간 관리자 요청 · 선생님별 확인 이력 ── */
 let adminDirectiveManageRows = [], adminDirectiveOwnRows = [];
 let adminDirectiveManageLoaded = false, adminDirectiveOwnLoaded = false;
@@ -13076,6 +13441,7 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
   const field = (label, value, wide, keys) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
     esc(label) + ((keys || []).some(key => changed.has(key)) ? marker(label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
+  const billingMode = String(student.billingMode || 'monthly') === 'session4' ? '회차제 · 4회' : '월결제';
   const references = Array.isArray(lessonReferences) ? lessonReferences : [];
   return '<div class="between mb14"><div><div class="card-title">' + esc(staffStudentCompactLabel(student)) +
     (changed.has('name') ? marker('이름') : '') + '</div>' +
@@ -13088,6 +13454,11 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     field('등록과목', student.subject, false, ['subject', 'subjects']) +
     field('신규 등록일', student.registrationDate, false, ['registrationDate']) +
     field('첫 수업 시작일', student.firstClassDate, false, ['firstClassDate']) +
+    '<div class="student-info-field"><b>결제 구분' + (changed.has('billingMode') ? marker('결제 구분') : '') +
+      '</b><span>' + esc(billingMode) + '</span></div>' +
+    (String(student.billingMode || 'monthly') === 'session4'
+      ? '<div class="student-info-field"><b>회차 시작일' + (changed.has('sessionCycleStartDate') ? marker('회차 시작일') : '') +
+        '</b><span>' + esc(student.sessionCycleStartDate || '미지정') + '</span></div>' : '') +
     field('과목별 수업 담당', rosterStudentSubjectTeacherText(student.id), true, ['staffId']) + field('재원 기간', period, true, ['start', 'end']) +
     (student.reason ? field('종료 사유', student.reason, true, ['reason']) : '') +
     (student.memo ? field('내부 메모', student.memo, true, ['memo']) : '') +
@@ -13180,9 +13551,11 @@ function rosterStudentSubjects(student) {
 function rosterStudentCanDelete(student) {
   if (!String(student && student.name || '').trim()) return false;
   if (rosterStudentLessonTasks(student.id).length || rosterStudentSubjects(student).length) return false;
+  if (String(student.billingMode || 'monthly') !== 'monthly') return false;
   return ![
     student.subject, student.phoneSelf, student.phoneFather, student.phoneMother,
-    student.registrationDate, student.firstClassDate, student.end, student.reason, student.memo
+    student.registrationDate, student.firstClassDate, student.end, student.reason, student.memo,
+    student.sessionCycleStartDate
   ].some(value => String(value || '').trim());
 }
 
@@ -13191,6 +13564,7 @@ function rosterStudentEditorHtml(student, assignment) {
   const isCreate = !student._editing;
   const isNew = student.entryType === 'new' && isCreate;
   const transition = rosterStudentTransition(student);
+  const billingMode = String(student.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly';
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
@@ -13208,12 +13582,36 @@ function rosterStudentEditorHtml(student, assignment) {
       '<div class="small mt8">담당 변경은 학생 정보의 수업 정보 확인 및 수정에서 각 수업별로 처리합니다.</div></div>' : '') +
     '<div class="grid2"><label class="field"><span class="fl">신규 등록일 (선택)</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
     '<label class="field"><span class="fl">첫 수업 시작일 (선택)</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-rse-billing-mode onchange="updateRosterBillingFields(this)">' +
+      '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
+      '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
+    '<label class="field" data-rse-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
+      '<input class="in" type="date" data-rse-session-cycle-start' + (billingMode === 'session4' ? ' required aria-required="true"' : '') +
+      ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
+    '<div class="small muted mb14">회차제는 시작일부터 출석·지각·조퇴를 합산하고, 3회 확정 시 관리자에게 수강료 생성 알림을 보냅니다.</div>' +
     (isNew ? '' : '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-rse-start value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<input type="hidden" data-rse-end value="' + esc(student.end || '') + '"><input type="hidden" data-rse-reason value="' + esc(student.reason || '') + '">' +
     (student._editing ? '<div class="hint mb14">현재 상태: <b>' + esc(transition ? transition.label + ' · ' + transition.effectiveDate : '재원') +
       '</b> · 상태 변경은 저장 버튼 아래의 관리자 전용 휴원·퇴원·복귀 버튼을 사용하세요.</div>' : '')) +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" data-rse-memo maxlength="1000">' + esc(student.memo || '') + '</textarea></label>' +
     (assignment ? '<div class="hint">저장되면 ' + esc(assignment.studentName) + ' 학생의 studentId 명단 연결을 완료합니다. ' + esc(assignment.teacherName) + ' 선생님은 이후 과목·시간표를 포함한 수업 등록 요청을 새로 제출합니다.</div>' : '');
+}
+
+function updateRosterBillingFields(selectElement) {
+  const select = selectElement || document.querySelector('[data-rse-billing-mode]');
+  if (!select) return;
+  const primary = select.matches('[data-rse-billing-mode]');
+  const root = select.closest('#modalHost') || document;
+  const input = root.querySelector(primary
+    ? '[data-rse-session-cycle-start]' : '[data-lesson-briefing-student="sessionCycleStartDate"], [data-lesson-roster-field="sessionCycleStartDate"]');
+  const wrap = input && input.closest('[data-rse-cycle-start-wrap], [data-roster-cycle-start-wrap]');
+  const sessionMode = select.value === 'session4';
+  if (wrap) wrap.hidden = !sessionMode;
+  if (input) {
+    input.required = sessionMode;
+    input.setAttribute('aria-required', sessionMode ? 'true' : 'false');
+    if (!sessionMode) input.value = '';
+  }
 }
 
 function showRosterStudentEditor(student, assignment) {
@@ -13338,6 +13736,7 @@ async function openRosterStudentEditor(studentId, assignment, entryType) {
       id: '', name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
       school: assignment ? String(assignment.school || '') : '', phoneSelf: '', phoneFather: '', phoneMother: '', registrationDate: '', firstClassDate: '',
       subject: '', subjects: [], start: today().slice(0, 7), end: '', reason: '', memo: '',
+      billingMode: 'monthly', sessionCycleStartDate: '',
       entryType: entryType === 'new' ? 'new' : 'existing', _editing: false
     }, assignment);
     return;
@@ -13360,6 +13759,9 @@ async function saveRosterStudent(button) {
   const registrationDate = value('[data-rse-registration-date]');
   const firstClassDate = value('[data-rse-first-class-date]');
   const isNew = editor.student.entryType === 'new' && !editor.student._editing;
+  const billingMode = value('[data-rse-billing-mode]') === 'session4' ? 'session4' : 'monthly';
+  let sessionCycleStartDate = billingMode === 'session4' ? value('[data-rse-session-cycle-start]') : '';
+  if (billingMode === 'monthly') sessionCycleStartDate = '';
   const student = {
     id: editor.student.id, name: value('[data-rse-name]'), school: value('[data-rse-school]'), grade: value('[data-rse-grade]'),
     phoneSelf: value('[data-rse-phone-self]'), phoneFather: value('[data-rse-phone-father]'),
@@ -13367,11 +13769,12 @@ async function saveRosterStudent(button) {
     subject: subjects.join('·'), subjects: subjects,
     start: isNew ? (registrationDate.slice(0, 7) || today().slice(0, 7)) : value('[data-rse-start]'),
     end: isNew ? '' : value('[data-rse-end]'), reason: isNew ? '' : value('[data-rse-reason]'),
-    memo: value('[data-rse-memo]')
+    memo: value('[data-rse-memo]'), billingMode: billingMode, sessionCycleStartDate: sessionCycleStartDate
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
   if (!student.name) return toast('이름을 입력해 주세요');
   if (!student.start) return toast('시작월을 입력해 주세요');
+  if (billingMode === 'session4' && !sessionCycleStartDate) return toast('회차 시작일을 입력해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('관리자 인증을 확인해 주세요');
   button.disabled = true; button.textContent = '저장 중…';
@@ -16248,6 +16651,15 @@ document.addEventListener('click', ev => {
       ensureAdminDirectiveAudio(); playAdminDirectiveSound(); render(); toast('관리자 요청 알림음을 켰습니다');
       break;
     }
+    case 'teacherLiveRequestOpen': openTeacherLiveRequestModal(String(id || ''), String(date || '')); break;
+    case 'teacherLiveRequestSend': submitTeacherLiveRequest(el); break;
+    case 'teacherLiveRequestAck': acknowledgeTeacherLiveRequest(String(el.dataset.request || ''), el, el.dataset.popup === 'true'); break;
+    case 'teacherLiveRequestSound': {
+      try { localStorage.setItem(teacherLiveRequestSoundKey(), '1'); } catch (error) { /* 팝업 알림은 계속 사용한다. */ }
+      ensureAdminDirectiveAudio(); playTeacherLiveRequestSound(); render(); toast('선생님 요청 알림음을 켰습니다');
+      break;
+    }
+    case 'tuitionAlertConfirm': confirmTuitionAlert(String(el.dataset.alert || ''), el); break;
 
     /* 회차제 수업 */
     case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
@@ -18048,6 +18460,8 @@ document.addEventListener('toggle', ev => {
 }, true);
 
 document.addEventListener('change', ev => {
+  const billing = ev.target.closest('[data-rse-billing-mode], [data-roster-billing-mode]');
+  if (billing) updateRosterBillingFields(billing);
   const target = ev.target.closest('[data-admin-directive-target]');
   if (!target) return;
   const disabled = target.value === 'all';
@@ -18094,6 +18508,10 @@ document.addEventListener('visibilitychange', () => {
   if (auth && (session.isAdmin || session.isStaffLink)) {
     loadAdminDirectives(true, true);
     loadStudentChanges(true);
+    if (session.isAdmin) {
+      loadTeacherLiveRequests(true, true);
+      loadTuitionAlerts(true, true);
+    }
   }
   sync.run();
 });
@@ -18139,6 +18557,10 @@ async function startSyncSession() {
   if (verified && (session.isAdmin || session.isStaffLink)) {
     loadStudentChanges(false);
     loadAdminDirectives(false, true);
+    if (session.isAdmin) {
+      loadTeacherLiveRequests(false, true);
+      loadTuitionAlerts(false, true);
+    }
   }
   return verified;
 }
@@ -18147,14 +18569,17 @@ setInterval(() => {
   const auth = sync.auth();
   if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
     loadAdminDirectives(true, true);
-    if (session.isStaffLink && !session.isAdmin && auth.mode === 'person') loadStudentChanges(true);
+    if (session.isAdmin) {
+      loadTeacherLiveRequests(true, true);
+      loadTuitionAlerts(true, true);
+    } else if (session.isStaffLink && !session.isAdmin && auth.mode === 'person') loadStudentChanges(true);
   }
 }, 15000);
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.5';
+const APP_VER = '2026-08-28.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

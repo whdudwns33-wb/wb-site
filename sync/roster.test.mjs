@@ -227,6 +227,49 @@ test('director adds an existing student and edits one record with roster CAS', a
   assert.equal(stale.body.code, 'ROSTER_REVISION_CONFLICT');
 });
 
+test('student billing mode is validated, legacy updates preserve it, and monthly clears the cycle date', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  let current = await call(db, { auth: admin, action: 'get' });
+  const missingCycleStart = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
+    student: {
+      id: 'client-id', name: '회차날짜누락', grade: '', subject: '', start: '2026-08', end: '', reason: '',
+      billingMode: 'session4', sessionCycleStartDate: ''
+    }
+  });
+  assert.equal(missingCycleStart.status, 400);
+  assert.match(missingCycleStart.body.error, /회차제 시작일/);
+
+  const created = await call(db, {
+    auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
+    student: {
+      id: 'client-id', name: '회차학생', grade: '', subject: '', start: '2026-08', end: '', reason: '',
+      billingMode: 'session4', sessionCycleStartDate: '2026-08-28'
+    }
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.student.billingMode, 'session4');
+  assert.equal(created.body.student.sessionCycleStartDate, '2026-08-28');
+
+  const legacyPayload = { ...created.body.student, memo: '구버전 수정 경로' };
+  delete legacyPayload.billingMode;
+  delete legacyPayload.sessionCycleStartDate;
+  const preserved = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: created.body.updatedAt, student: legacyPayload
+  });
+  assert.equal(preserved.status, 200);
+  assert.equal(preserved.body.student.billingMode, 'session4');
+  assert.equal(preserved.body.student.sessionCycleStartDate, '2026-08-28');
+
+  const monthly = await call(db, {
+    auth: admin, action: 'student_update', expectedUpdatedAt: preserved.body.updatedAt,
+    student: { ...preserved.body.student, billingMode: 'monthly', sessionCycleStartDate: '2026-09-01' }
+  });
+  assert.equal(monthly.status, 200);
+  assert.equal(monthly.body.student.billingMode, 'monthly');
+  assert.equal(monthly.body.student.sessionCycleStartDate, '');
+});
+
 test('director stores new-student school, contacts, dates, and fixed multi-subject choices for assigned staff', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   const before = await call(db, { auth: admin, action: 'get' });
