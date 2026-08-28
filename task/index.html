@@ -1809,10 +1809,14 @@ const openPanels = new Set();     // 펼쳐진 업무 패널
 const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가 직접 정한 details 열림/닫힘 상태 유지
 let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
 const weekendVisitScopeCache = new Map();
-const weekendVisitScheduleLoadingKeys = new Set();
+const WEEKEND_VISIT_SCOPE_TTL_MS = 15000;
+const weekendVisitScheduleLoadingKeys = new Map();
 const weekendVisitScheduleRetryAt = new Map();
 const weekendVisitScheduleErrors = new Map();
+const weekendVisitScopeRequestGeneration = new Map();
 let weekendVisitScopeRevision = 0;
+let weekendVisitScopeRequestSerial = 0;
+let weekendVisitMainRequestKey = '', weekendVisitMainRequestGeneration = 0;
 let weekendVisitEditTarget = null, weekendFlexibleEditor = null, weekendFlexibleSaving = false;
 
 function go(r) {
@@ -1897,6 +1901,7 @@ function resetPersonCache(token) {
   sessionPackRestoreFocus = null;
   weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
   weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear(); weekendVisitScheduleErrors.clear();
+  weekendVisitScopeRequestGeneration.clear(); weekendVisitMainRequestKey = ''; weekendVisitMainRequestGeneration = 0;
   weekendVisitScopeRevision = 0;
   weekendVisitEditTarget = null; weekendFlexibleEditor = null; weekendFlexibleSaving = false;
   makeupRows = []; makeupLoaded = false; makeupLoading = false; makeupError = '';
@@ -2680,6 +2685,36 @@ function weekendVisitSourceDate(task, row) {
   return candidates.length === 1 ? candidates[0] : '';
 }
 
+function weekendVisitScopeIsFresh(key, at) {
+  const stableKey = String(key || '');
+  const cached = weekendVisitScopeCache.get(stableKey);
+  const checkedAt = Number.isFinite(Number(at)) ? Number(at) : Date.now();
+  return !!(cached && Number.isFinite(Number(cached.fetchedAt)) &&
+    (checkedAt - Number(cached.fetchedAt) < WEEKEND_VISIT_SCOPE_TTL_MS || weekendVisitScheduleLoadingKeys.has(stableKey)) &&
+    !weekendVisitScheduleErrors.has(stableKey));
+}
+
+function freshWeekendVisitScope(key, at) {
+  return weekendVisitScopeIsFresh(key, at) ? weekendVisitScopeCache.get(String(key || '')) : null;
+}
+
+function beginWeekendVisitScopeRequest(key) {
+  const generation = ++weekendVisitScopeRequestSerial;
+  weekendVisitScopeRequestGeneration.set(String(key || ''), generation);
+  weekendVisitScheduleLoadingKeys.set(String(key || ''), generation);
+  return generation;
+}
+
+function isCurrentWeekendVisitScopeRequest(key, generation) {
+  return Number(weekendVisitScopeRequestGeneration.get(String(key || ''))) === Number(generation);
+}
+
+function finishWeekendVisitScopeRequest(key, generation) {
+  if (Number(weekendVisitScheduleLoadingKeys.get(String(key || ''))) === Number(generation)) {
+    weekendVisitScheduleLoadingKeys.delete(String(key || ''));
+  }
+}
+
 function weekendVisitPairScope(task, sourceDate) {
   const pair = weekendPairDates(sourceDate);
   const staffId = String(task && task.staffId || '');
@@ -2687,8 +2722,8 @@ function weekendVisitPairScope(task, sourceDate) {
   const keys = pair.map(date => weekendVisitScopeKey(date, staffId));
   const error = keys.map(key => weekendVisitScheduleErrors.get(key)).find(Boolean);
   if (error) return { ready: false, error: '실제 등·하원 기록을 모두 불러오지 못했습니다', rows: [] };
-  if (keys.some(key => !weekendVisitScopeCache.has(key))) {
-    return { ready: false, error: '토·일 실제 등·하원 기록을 확인하는 중입니다', rows: [] };
+  if (keys.some(key => !weekendVisitScopeIsFresh(key))) {
+    return { ready: false, error: '토·일 실제 등·하원 기록을 새로 확인하는 중입니다', rows: [] };
   }
   const seen = new Set(), rows = [];
   keys.forEach(key => {
@@ -2784,23 +2819,26 @@ function ensureWeekendVisitSourcePair(date, staffId) {
   weekendPairDates(date).forEach(pairDate => loadWeekendVisitScheduleScope(pairDate, staffId));
 }
 
-function rememberWeekendVisitScope(date, staffId, result) {
+function rememberWeekendVisitScope(date, staffId, result, generation) {
   const key = weekendVisitScopeKey(date, staffId);
+  if (generation != null && !isCurrentWeekendVisitScopeRequest(key, generation)) return false;
   weekendVisitScopeCache.set(key, {
     rows: Array.isArray(result && result.visits) ? result.visits : [],
     monthlyCounts: Array.isArray(result && result.monthlyCounts) ? result.monthlyCounts : [],
-    loadedAt: ++weekendVisitScopeRevision
+    loadedAt: ++weekendVisitScopeRevision,
+    fetchedAt: Date.now()
   });
   weekendVisitScheduleRetryAt.delete(key);
   weekendVisitScheduleErrors.delete(key);
+  return true;
 }
 
 function weekendVisitRowsForTaskDate(task, date) {
   const keys = [weekendVisitScopeKey(date, ''), weekendVisitScopeKey(date, task && task.staffId || '')];
-  const cached = [...new Set(keys)].map(key => weekendVisitScopeCache.get(key)).filter(Boolean)
+  const cached = [...new Set(keys)].map(key => freshWeekendVisitScope(key)).filter(Boolean)
     .sort((a, b) => Number(b.loadedAt || 0) - Number(a.loadedAt || 0));
   if (cached.length) return cached[0].rows;
-  return keys.includes(weekendVisitLoadedKey) ? weekendVisitRows : [];
+  return [];
 }
 
 function hasFlexibleWeekendOccurrence(task, date) {
@@ -2898,31 +2936,35 @@ function weekendVisitScopeStaffId() {
   return '';
 }
 
-async function loadWeekendVisitScheduleScope(date, staffId) {
+async function loadWeekendVisitScheduleScope(date, staffId, force) {
   if (!isWeekendVisitDate(date)) return;
   const key = weekendVisitScopeKey(date, staffId);
-  if (weekendVisitScopeCache.has(key) || weekendVisitScheduleLoadingKeys.has(key)) return;
+  if (!force && weekendVisitScopeIsFresh(key)) return;
+  if (!force && weekendVisitScheduleLoadingKeys.has(key)) return;
   const retryAt = Number(weekendVisitScheduleRetryAt.get(key) || 0);
-  if (retryAt > Date.now()) return;
+  if (!force && retryAt > Date.now()) return;
   const auth = sync.auth();
   if (!auth) return;
-  weekendVisitScheduleLoadingKeys.add(key);
+  const generation = beginWeekendVisitScopeRequest(key);
   try {
     const result = await sync.post('/weekend-visit', {
       app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
     });
+    if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
     rememberWeekendVisitScope(date, staffId, result);
   } catch (error) {
+    if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
     weekendVisitScheduleErrors.set(key, String(error && error.message || error || '불러오기 실패'));
     weekendVisitScheduleRetryAt.set(key, Date.now() + 15000);
     setTimeout(() => {
-      if (Number(weekendVisitScheduleRetryAt.get(key) || 0) <= Date.now()) {
+      if (isCurrentWeekendVisitScopeRequest(key, generation) &&
+          Number(weekendVisitScheduleRetryAt.get(key) || 0) <= Date.now()) {
         weekendVisitScheduleRetryAt.delete(key);
         if (route === 'week' || route === 'schedule' || route === 'today') loadWeekendVisitScheduleScope(date, staffId);
       }
     }, 15050);
   } finally {
-    weekendVisitScheduleLoadingKeys.delete(key);
+    finishWeekendVisitScopeRequest(key, generation);
     if (route === 'week' || route === 'schedule' || route === 'today') renderAfterSync();
   }
 }
@@ -2933,29 +2975,105 @@ function ensureWeekendVisitScheduleDates(dates, staffId) {
   });
 }
 
+function weekendVisitCarryScopeDates(date) {
+  const dates = new Set();
+  for (let index = 1; index <= 7; index++) {
+    weekendPairDates(addDays(date, -index)).forEach(pairDate => dates.add(pairDate));
+  }
+  return [...dates];
+}
+
+function visibleWeekendVisitScopes() {
+  const scopes = new Map();
+  const add = (date, staffId, main) => {
+    if (!isWeekendVisitDate(date)) return;
+    const key = weekendVisitScopeKey(date, staffId);
+    const prior = scopes.get(key);
+    scopes.set(key, { key: key, date: date, staffId: String(staffId || ''), main: !!main || !!(prior && prior.main) });
+  };
+  if (route === 'today') {
+    const staff = currentStaff();
+    if (!staff) return [];
+    if (isWeekendVisitDate(cursor)) {
+      weekendPairDates(cursor).forEach(date => add(date, staff.id, date === cursor));
+    }
+    if (cursor === today()) weekendVisitCarryScopeDates(cursor).forEach(date => add(date, staff.id, false));
+  } else if (route === 'week') {
+    const staff = currentStaff();
+    if (!staff) return [];
+    const mon = mondayOf(cursor);
+    Array.from({ length: 7 }, (_, index) => addDays(mon, index)).forEach(date => add(date, staff.id, false));
+  } else if (route === 'schedule' && session.isAdmin) {
+    const dates = scheduleView === 'day'
+      ? [cursor]
+      : Array.from({ length: 7 }, (_, index) => addDays(mondayOf(cursor), index));
+    dates.forEach(date => add(date, '', false));
+  } else if (route === 'board' && session.isAdmin) {
+    add(cursor, '', true);
+  }
+  return [...scopes.values()];
+}
+
+function refreshVisibleWeekendVisitScopes(force) {
+  const scopes = visibleWeekendVisitScopes();
+  scopes.forEach(scope => {
+    if (scope.main) loadWeekendVisits(scope.date, scope.staffId, !!force);
+    else loadWeekendVisitScheduleScope(scope.date, scope.staffId, !!force);
+  });
+  if (force && scopes.length) renderAfterSync();
+}
+
 async function loadWeekendVisits(date, staffId, force) {
-  if (!isWeekendVisitDate(date) || weekendVisitLoading) return;
+  if (!isWeekendVisitDate(date)) return;
   const key = weekendVisitScopeKey(date, staffId);
-  if (!force && weekendVisitLoadedKey === key) return;
+  const cached = freshWeekendVisitScope(key);
+  if (!force && cached) {
+    weekendVisitRows = cached.rows;
+    weekendVisitMonthlyCounts = cached.monthlyCounts;
+    weekendVisitLoadedKey = key;
+    weekendVisitError = '';
+    return;
+  }
+  if (!force && weekendVisitScheduleLoadingKeys.has(key)) return;
   const auth = sync.auth();
   if (!auth) { weekendVisitError = '동기화 인증을 확인해 주세요'; return; }
+  const generation = beginWeekendVisitScopeRequest(key);
+  weekendVisitMainRequestKey = key;
+  weekendVisitMainRequestGeneration = generation;
   weekendVisitLoading = true;
   weekendVisitError = '';
   try {
     const result = await sync.post('/weekend-visit', {
       app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
     });
-    weekendVisitRows = result.visits || [];
-    weekendVisitMonthlyCounts = result.monthlyCounts || [];
-    weekendVisitLoadedKey = key;
+    if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
     rememberWeekendVisitScope(date, staffId, result);
+    if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) {
+      weekendVisitRows = result.visits || [];
+      weekendVisitMonthlyCounts = result.monthlyCounts || [];
+      weekendVisitLoadedKey = key;
+      weekendVisitError = '';
+    }
   } catch (error) {
-    weekendVisitError = String(error && error.message || error || '불러오기 실패');
-    weekendVisitScheduleErrors.set(key, weekendVisitError);
+    if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
+    const message = String(error && error.message || error || '불러오기 실패');
+    weekendVisitScheduleErrors.set(key, message);
+    if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) weekendVisitError = message;
   } finally {
-    weekendVisitLoading = false;
+    finishWeekendVisitScopeRequest(key, generation);
+    if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) weekendVisitLoading = false;
     if ((route === 'today' || route === 'board') && cursor === date) renderAfterSync();
   }
+}
+
+function activateWeekendVisitScope(key) {
+  const cached = freshWeekendVisitScope(key);
+  if (!cached) return null;
+  weekendVisitRows = cached.rows;
+  weekendVisitMonthlyCounts = cached.monthlyCounts;
+  weekendVisitLoadedKey = key;
+  weekendVisitError = '';
+  return cached;
 }
 
 function weekendLessonCandidates(staffId, date) {
@@ -3045,18 +3163,20 @@ function weekendVisitTeacherHtml(staff, date) {
   if (!staff || !isWeekendVisitDate(date)) return '';
   if (!rosterDb && !rosterErr && !rosterLoading) loadRoster();
   const key = weekendVisitScopeKey(date, staff.id);
-  if (weekendVisitLoadedKey !== key && !weekendVisitLoading) setTimeout(() => loadWeekendVisits(date, staff.id, false), 0);
+  const scope = activateWeekendVisitScope(key);
+  if (!scope && !weekendVisitScheduleLoadingKeys.has(key)) setTimeout(() => loadWeekendVisits(date, staff.id, false), 0);
   const candidates = weekendLessonCandidates(staff.id, date);
   const flexibleCandidates = weekendFlexibleLessonCandidates(staff.id, date);
-  const scopedRows = weekendVisitLoadedKey === key ? weekendVisitRows : [];
+  const scopedRows = scope ? scope.rows : [];
   const byTask = new Map(scopedRows.map(row => [String(row.lessonTaskId), row]));
   const candidateIds = new Set(candidates.concat(flexibleCandidates).map(task => String(task.id)));
   const orphanRows = scopedRows.filter(row => !candidateIds.has(String(row.lessonTaskId)));
+  const scopeError = weekendVisitScheduleErrors.get(key) || '';
   let body;
-  if (weekendVisitError) {
-    body = '<div class="hint" style="color:var(--coral)">불러오지 못했습니다 · ' + esc(weekendVisitError) + '</div>' +
+  if (scopeError) {
+    body = '<div class="hint" style="color:var(--coral)">불러오지 못했습니다 · ' + esc(scopeError) + '</div>' +
       '<button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button>';
-  } else if (weekendVisitLoading && weekendVisitLoadedKey !== key) {
+  } else if (!scope) {
     body = '<div class="empty"><b>🕘</b>실제 등·하원 기록을 불러오는 중…</div>';
   } else {
     const rows = candidates.map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)) || null, true))
@@ -3077,10 +3197,12 @@ function weekendVisitTeacherHtml(staff, date) {
 function weekendVisitBoardHtml(date) {
   if (!session.isAdmin || !isWeekendVisitDate(date)) return '';
   const key = weekendVisitScopeKey(date, '');
-  if (weekendVisitLoadedKey !== key && !weekendVisitLoading) setTimeout(() => loadWeekendVisits(date, '', false), 0);
-  if (weekendVisitError) return '<div class="card alert"><div class="card-title">주말 실제 등·하원 불러오기 실패</div>' +
-    '<div class="card-sub">' + esc(weekendVisitError) + '</div><button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button></div>';
-  const scopedRows = weekendVisitLoadedKey === key ? weekendVisitRows : [];
+  const scope = activateWeekendVisitScope(key);
+  if (!scope && !weekendVisitScheduleLoadingKeys.has(key)) setTimeout(() => loadWeekendVisits(date, '', false), 0);
+  const scopeError = weekendVisitScheduleErrors.get(key) || '';
+  if (scopeError) return '<div class="card alert"><div class="card-title">주말 실제 등·하원 불러오기 실패</div>' +
+    '<div class="card-sub">' + esc(scopeError) + '</div><button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button></div>';
+  const scopedRows = scope ? scope.rows : [];
   const active = scopedRows.filter(row => row.status === 'active').length;
   const complete = scopedRows.filter(row => row.status === 'completed').length;
   const rows = scopedRows.map(row => {
@@ -3097,7 +3219,7 @@ function weekendVisitBoardHtml(date) {
   });
   return '<details class="card weekend-visit-card" data-persist-key="weekend-board"><summary><span><b>주말 실제 등·하원 현황</b>' +
     '<span class="card-sub">등원 중 ' + active + '명 · 하원 완료 ' + complete + '명</span></span></summary>' +
-    (weekendVisitLoading && weekendVisitLoadedKey !== key ? '<div class="empty"><b>🕘</b>불러오는 중…</div>' :
+    (!scope ? '<div class="empty"><b>🕘</b>불러오는 중…</div>' :
       rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '<div class="empty">아직 기록이 없습니다.</div>') + '</details>';
 }
 
@@ -3117,8 +3239,9 @@ function openWeekendFlexibleCheckIn(staffId) {
   const scopedStaffId = String(staffId || weekendVisitScopeStaffId() || '');
   if (!isWeekendVisitDate(cursor) || cursor !== today()) return toast('비정기 등원은 오늘 토·일 화면에서만 기록할 수 있습니다');
   const key = weekendVisitScopeKey(cursor, scopedStaffId);
-  if (weekendVisitLoadedKey !== key) return toast('주말 등원 기록을 먼저 새로고침해 주세요');
-  const recorded = new Set(weekendVisitRows.map(row => String(row.lessonTaskId || '')));
+  const scope = activateWeekendVisitScope(key);
+  if (!scope) return toast('주말 등원 기록을 먼저 새로고침해 주세요');
+  const recorded = new Set(scope.rows.map(row => String(row.lessonTaskId || '')));
   const candidates = weekendFlexibleLessonCandidates(scopedStaffId, cursor).filter(task => !recorded.has(String(task.id)));
   if (!candidates.length) return toast('오늘 등원 처리할 비정기 수업이 없습니다');
   const rows = candidates.map(task => {
@@ -3255,7 +3378,7 @@ function viewToday() {
 
   if (isWeekendVisitDate(cursor)) ensureWeekendVisitSourcePair(cursor, me.id);
   if (cursor === today()) {
-    ensureWeekendVisitScheduleDates(Array.from({ length: 8 }, (_, index) => addDays(cursor, -index)), me.id);
+    ensureWeekendVisitScheduleDates(weekendVisitCarryScopeDates(cursor), me.id);
   }
   const rel = relLabel(cursor);
   const list = teacherTaskCardsFor(me.id, cursor);
@@ -4037,7 +4160,9 @@ function taskPanel(t, date, c, editable) {
   }
   if (lesson && recordContext && !recordContext.inputEnabled && recordContext.issue) {
     h += '<div class="guide" style="border-color:var(--coral)"><b>입력할 수 없습니다</b><br>' + esc(recordContext.issue) +
-      '<br>실제 등·하원 기록을 새로고침하거나 관리자에게 기록 정리를 요청해 주세요.</div>';
+      '<br>실제 등·하원 기록을 새로 확인한 뒤 다시 시도해 주세요.' +
+      '<button type="button" class="btn btn-sm btn-ghost mt8" data-act="weekendrecordretry" data-id="' + esc(t.id) +
+      '" data-source-date="' + esc(recordContext.sourceDate) + '">실제 등·하원 다시 확인</button></div>';
   }
 
   if (lesson && editable) {
@@ -4079,7 +4204,7 @@ function taskPanel(t, date, c, editable) {
       '<div class="lesson-progress-details-body">' + taskMemoEditorHtml(t, date, c, editable) + '</div></details>';
     prepareGuardianPublicationPolicy(date);
     if (guardianContactEnabledFor(t.studentId)) {
-      const canEditPublication = canEditGuardianPublication(t, date);
+      const canEditPublication = editable && canEditGuardianPublication(t, date);
       h += '<details class="lesson-progress-section lesson-progress-details guardian-publication-details"><summary>숙제 · 준비물 (보호자 · 학생 공개)</summary>' +
         '<div class="lesson-progress-details-body">' + (canEditPublication ? guardianPublicationHtml(t, date) :
           '<div class="hint">' + esc(guardianPublicationAccessHint(t, date)) + '</div>') + '</div></details>';
@@ -17731,6 +17856,14 @@ document.addEventListener('click', ev => {
         '비정기 등원을 원래 수업 화면과 연결했습니다');
       break;
     }
+    case 'weekendrecordretry': {
+      const taskRow = task();
+      const sourceDate = String(el.dataset.sourceDate || '');
+      if (!taskRow || !weekendPairDates(sourceDate).length) return toast('주말 수업 날짜를 다시 확인해 주세요');
+      weekendPairDates(sourceDate).forEach(date => loadWeekendVisitScheduleScope(date, taskRow.staffId, true));
+      toast('토·일 실제 등·하원 기록을 다시 확인합니다');
+      break;
+    }
     case 'weekendrefresh': {
       const staffId = weekendVisitScopeStaffId();
       weekendPairDates(cursor).forEach(date => {
@@ -19232,6 +19365,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
   const auth = sync.auth();
+  if (auth && (session.isAdmin || session.isStaffLink) && typeof refreshVisibleWeekendVisitScopes === 'function') {
+    refreshVisibleWeekendVisitScopes(true);
+  }
   if (session.isStaffLink && hasVerifiedPersonAuth() && auth && auth.mode === 'person') loadStudentSelfChecks(today(), true);
   if (auth && (session.isAdmin || session.isStaffLink)) {
     loadAdminDirectives(true, true);
@@ -19296,6 +19432,7 @@ startSyncSession();
 setInterval(() => {
   const auth = sync.auth();
   if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
+    if (typeof refreshVisibleWeekendVisitScopes === 'function') refreshVisibleWeekendVisitScopes(true);
     loadAdminDirectives(true, true);
     loadStudentChanges(true);
     if (session.isAdmin) {
