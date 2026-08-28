@@ -364,6 +364,18 @@ test('daily teacher flow shows every student with five distinct attendance color
   assert.match(html, /\.schedule-flow-attendance\.is-pending \{ background: #FEE2E2; color: #B91C1C; \}/);
 });
 
+test('internal schedule views use the stable student compact school-grade label', () => {
+  const names = functionSource('scheduleSessionNames');
+  const timeline = functionSource('scheduleTimelineHtml');
+  const modal = functionSource('scheduleTimelineModal');
+  const cards = functionSource('scheduleStudentCardsHtml');
+
+  assert.match(names, /staffStudentCompactLabelById\(entry\.studentId, entry\.studentName, entry\.grade\)/);
+  assert.match(timeline, /staffStudentCompactLabelById\(entry\.studentId, entry\.studentName, entry\.grade\)/);
+  assert.match(modal, /studentDisplayGradeLabel\(rosterStudentByStableId\(entry\.studentId\), entry\.grade\)/);
+  assert.match(cards, /studentDisplayGradeLabel\(student, grade\)/);
+});
+
 test('schedule search keeps aggregate teacher matches spread across multiple rows', () => {
   const source = functionSource('scheduleSearchPlan');
   const match = (value, terms) => terms.every(term => String(value || '').toLowerCase().includes(term));

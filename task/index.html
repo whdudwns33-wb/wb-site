@@ -1013,11 +1013,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.1"></script>
-<script src="./asset-core.js?v=2026-08-28.1"></script>
-<script src="./qr-core.js?v=2026-08-28.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.2"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.2"></script>
+<script src="./asset-core.js?v=2026-08-28.2"></script>
+<script src="./qr-core.js?v=2026-08-28.2"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.2"></script>
 <script>
 "use strict";
 
@@ -2636,7 +2636,7 @@ function weekendVisitStudentLabel(task, row) {
   const studentId = String(task && task.studentId || row && row.studentId || '');
   const student = weekendVisitRosterStudent(studentId);
   const name = String(student && student.name || task && (task.studentName || studentOf(task)) || '학생 정보 확인 필요');
-  const schoolGrade = [student && student.school, student && student.grade || task && lessonGradeOf(task)].filter(Boolean).join(' · ');
+  const schoolGrade = studentSchoolGradeDetailLabel(student, task && lessonGradeOf(task));
   return { name: name, detail: schoolGrade, student: student };
 }
 
@@ -3635,10 +3635,37 @@ function schoolGradeDisplayLabel(school, grade) {
   return level ? level + numeric[1] : value;
 }
 
-function taskRosterStudent(t) {
-  const stableId = String(t && t.studentId || '');
+/** 내부 업무 화면용 학생 표시. school은 학교급 판정에만 쓰고 이름으로 원생을 추정하지 않는다. */
+function rosterStudentByStableId(studentId) {
+  const stableId = String(studentId || '');
   const students = rosterDb && Array.isArray(rosterDb.students) ? rosterDb.students : [];
   return stableId ? students.find(student => String(student.id || '') === stableId) || null : null;
+}
+
+function studentDisplayGradeLabel(student, fallbackGrade) {
+  return schoolGradeDisplayLabel(student && student.school,
+    (student && student.grade) || fallbackGrade || '');
+}
+
+function staffStudentCompactLabel(student, fallbackName, fallbackGrade) {
+  const name = String((student && student.name) || fallbackName || '학생 정보 확인 필요').trim();
+  const grade = studentDisplayGradeLabel(student, fallbackGrade);
+  return [name, grade].filter(Boolean).join(' ');
+}
+
+function staffStudentCompactLabelById(studentId, fallbackName, fallbackGrade) {
+  return staffStudentCompactLabel(rosterStudentByStableId(studentId), fallbackName, fallbackGrade);
+}
+
+/** 동명이인 선택 화면은 실제 학교명도 유지하되 학년은 초3·중2 형식으로 표시한다. */
+function studentSchoolGradeDetailLabel(student, fallbackGrade) {
+  const school = String(student && student.school || '').trim();
+  const grade = studentDisplayGradeLabel(student, fallbackGrade);
+  return [school, grade].filter(Boolean).join(' · ');
+}
+
+function taskRosterStudent(t) {
+  return rosterStudentByStableId(t && t.studentId);
 }
 
 function taskDisplayTitle(t) {
@@ -3651,7 +3678,7 @@ function taskDisplayTitle(t) {
   if (!/^\[수업\]\s*/.test(raw)) return taskTitleWithoutPrefix(t);
   let visible = taskTitleWithoutPrefix(t);
   const student = taskRosterStudent(t);
-  const grade = schoolGradeDisplayLabel(student && student.school, (student && student.grade) || (t && t.grade));
+  const grade = studentDisplayGradeLabel(student, t && t.grade);
   if (!grade) return visible;
   const separator = visible.indexOf('—');
   let studentPart = separator >= 0 ? visible.slice(0, separator).trim() : visible;
@@ -4568,7 +4595,7 @@ function publicationReadinessHtml() {
       const owner = row.taskOwner && staffById(row.taskOwner);
       const canRepair = !!(task && owner && !owner.deleted);
       return '<article class="publication-audit-item" data-publication-audit-task="' + esc(row.taskId) + '"><div class="between"><div><b>' +
-        esc(row.studentName || row.title || '학생 연결 필요') + (row.grade ? ' · ' + esc(row.grade) : '') + '</b><div class="small muted mt8">' +
+        esc(staffStudentCompactLabel(linkedStudent, row.studentName || row.title || '학생 연결 필요', row.grade)) + '</b><div class="small muted mt8">' +
         esc(row.teacherName || '담당자 확인 필요') + (row.subject || row.className ? ' · ' + esc([row.subject, row.className].filter(Boolean).join(' · ')) : '') +
         '</div></div><span class="tag high">보완 필요</span></div>' +
         publicationReadinessReasonHtml(row, 'studentId', 'studentId', linkedStudent ? linkedStudent.name + ' 연결됨' : '현재 재원 명단 연결됨') +
@@ -4642,7 +4669,7 @@ function currentLessonAssignmentDraft() {
 }
 
 function assignmentCandidateLabel(student) {
-  return [student.name || '이름 미입력', student.school || '학교 미입력', student.grade || '학년 미입력']
+  return [student.name || '이름 미입력', studentSchoolGradeDetailLabel(student) || '학교·학년 미입력']
     .join(' · ') + (student.contactHint ? ' · 보호자 끝 ' + student.contactHint : '') + (student.assigned ? ' · 등록 수업 있음' : '');
 }
 
@@ -4787,8 +4814,8 @@ function lessonAssignmentRequestHtml() {
       (visibleCandidates.length ? visibleCandidates.map(student => '<option value="' + esc(student.id) + '" data-assignment-candidate-search="' +
         esc([student.name, student.school, student.grade].join(' ')) + '"' + (String(draft.studentId) === String(student.id) ? ' selected' : '') + '>' +
         esc(assignmentCandidateLabel(student)) + '</option>').join('') : '<option value="" disabled>검색 결과가 없습니다</option>') + '</select></label>' +
-    (selected ? '<div class="guide mt8"><b>' + esc(selected.name) + '</b>' +
-      esc([selected.school || '학교 미입력', selected.grade || '학년 미입력'].join(' · ')) + '<br>' +
+    (selected ? '<div class="guide mt8"><b>' + esc(staffStudentCompactLabel(selected)) + '</b>' +
+      esc(studentSchoolGradeDetailLabel(selected) || '학교·학년 미입력') + '<br>' +
       '<span class="small">등록과목: ' + esc((selected.subjects || []).join(' · ') || '미지정') + ' · 현재 수업: ' +
       esc(rosterStudentSubjectTeacherText(selected.id)) + '</span></div>' :
       '<div class="hint mt8">학생을 선택하면 원생 정보와 수업 요청 항목이 열립니다.</div>') +
@@ -4810,7 +4837,8 @@ function lessonAssignmentRequestHtml() {
     '<button class="btn btn-primary btn-block" data-act="lessonassignmentrequest">원장님께 학생 수업 등록 요청</button>' : '';
   const pendingHtml = pending.length ? '<div class="sect">승인 대기 ' + pending.length + '건</div>' + pending.map(row => {
     const details = row.details || {};
-    return '<div class="hint mt8"><div class="between"><span><b>' + esc(row.studentName) + '</b> · ' + esc(row.grade || '학년 미입력') + '</span>' +
+    return '<div class="hint mt8"><div class="between"><span><b>' +
+      esc(staffStudentCompactLabelById(row.studentId, row.studentName, row.grade)) + '</b></span>' +
       '<button class="btn btn-sm btn-ghost" data-act="lessonassignmentcancel" data-key="' + esc(row.requestKey) + '" data-rev="' + row.revision + '">요청 취소</button></div>' +
       (row.details ? '<div class="small mt8">' + esc((details.subjects || []).join(' · ')) + ' · ' + esc(lessonAssignmentScheduleText(details.scheduleSlots, details.lessonHours)) +
         ' · ' + esc(details.startDate || '') + ' 시작</div>' : row.missing ? '<div class="small mt8">' + esc(row.missing.school) + ' · 명단 확인 요청</div>' :
@@ -4820,7 +4848,8 @@ function lessonAssignmentRequestHtml() {
     '<span class="card-sub">재원생을 studentId로 선택하고, 승인 시 과목별 담당 수업을 생성합니다.</span></span>' +
     (pending.length ? '<span class="pill warn">' + pending.length + '건</span>' : '') + '</summary><div class="mt14">' +
     selection + requestFields + pendingHtml +
-    (history.length ? '<div class="small muted mt8">최근 요청: ' + history.map(row => esc(row.studentName) + ' · ' +
+    (history.length ? '<div class="small muted mt8">최근 요청: ' + history.map(row =>
+      esc(staffStudentCompactLabelById(row.studentId, row.studentName, row.grade)) + ' · ' +
       esc(row.status === 'approved' ? '승인됨' : row.status === 'rejected' ? '반려됨' : '취소됨')).join(' / ') + '</div>' : '') +
     (lessonAssignmentRequestsError ? '<div class="hint mt8">요청 상태를 불러오지 못했습니다. 다시 열어 확인해 주세요.</div>' : '') + '</div></details>';
 }
@@ -4838,7 +4867,8 @@ function lessonAssignmentReviewHtml() {
       const details = row.details || null;
       const teacher = staffById(row.staffId);
       if (details) {
-        return '<div class="card mt14"><div class="between"><b>' + esc(row.studentName) + ' · ' + esc(row.grade || '학년 미입력') + '</b><span class="tag ok">studentId 연결</span></div>' +
+        return '<div class="card mt14"><div class="between"><b>' +
+          esc(staffStudentCompactLabel(linked, row.studentName, row.grade)) + '</b><span class="tag ok">studentId 연결</span></div>' +
           '<div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
           (linked ? '<div class="guide mt8"><b>' + esc(rosterStudentIdentityLabel(linked)) + '</b>현재 수업: ' +
             esc(rosterStudentSubjectTeacherText(linked.id)) + ' · 등록과목: ' + esc(linked.subject || '미지정') + '</div>' :
@@ -4855,7 +4885,9 @@ function lessonAssignmentReviewHtml() {
         (!row.missing || String(student.school || '').normalize('NFKC').replace(/\s+/g, '') === String(row.missing.school || '').normalize('NFKC').replace(/\s+/g, '')));
       const matchIds = new Set(matches.map(student => String(student.id)));
       const others = students.filter(student => !matchIds.has(String(student.id)));
-      return '<div class="card mt14"><div class="between"><b>' + esc(row.studentName) + ' · ' + esc(row.grade) + '</b><span class="tag warn">' + (row.missing ? '명단 확인 요청' : '구형 요청') + '</span></div><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
+      const requestedStudent = { name: row.studentName, school: row.missing && row.missing.school, grade: row.grade };
+      return '<div class="card mt14"><div class="between"><b>' + esc(staffStudentCompactLabel(requestedStudent)) +
+        '</b><span class="tag warn">' + (row.missing ? '명단 확인 요청' : '구형 요청') + '</span></div><div class="small muted mt8">요청 선생님: ' + esc((teacher && teacher.name) || '현재 직원 명단에서 확인 필요') + '</div>' +
         (row.missing ? '<div class="guide mt8"><b>' + esc(row.missing.school) + '</b>' + esc(row.missing.reason) + '</div>' : '') +
         (!matches.length ? '<div class="hint mt8">같은 이름·학년의 원생이 없습니다. 아래 재원생 전체에서 직접 선택하거나, 명단에 없는 학생이면 기존 원생으로 추가하세요.</div>' : '') +
         '<select class="in mt8" data-lar-student data-key="' + esc(row.requestKey) + '"><option value="">현재 원생 선택</option>' +
@@ -5036,8 +5068,8 @@ function lessonExistingChangeRows(query) {
     const student = students.find(item => String(item.id) === String(task.studentId || ''));
     const studentName = String((student && student.name) || task.studentName || studentOf(task) || '학생 미지정');
     const studentLabel = student
-      ? [student.name, student.school || '학교 미입력', student.grade || '학년 미입력'].join(' · ')
-      : [studentName, task.grade || '학년 미입력'].join(' · ');
+      ? [student.name, studentSchoolGradeDetailLabel(student) || '학교·학년 미입력'].join(' · ')
+      : staffStudentCompactLabelById(task.studentId, studentName, task.grade);
     const teacherName = String((teacher && teacher.name) || '담당 미지정');
     return {
       task: task, studentName: studentName, studentLabel: studentLabel, teacherName: teacherName,
@@ -5087,13 +5119,15 @@ function viewLessonEntry() {
         '<div class="small muted mt8">학생과 수업 과목을 먼저 선택해 주세요.</div>') + '</div>';
 
   const studentFields = personal && draft._sourceTaskId
-    ? '<div class="sect">1. 기존 수업 학생</div><div class="guide mb14"><b>' + esc(draft.studentName || '학생 미지정') +
-      '</b>' + esc(draft.grade || '학년 미입력') + '<div class="small mt8">기존 수업의 학생 연결은 변경할 수 없습니다.</div></div>'
+    ? '<div class="sect">1. 기존 수업 학생</div><div class="guide mb14"><b>' +
+      esc(staffStudentCompactLabelById(draft.studentId, draft.studentName || '학생 미지정', draft.grade)) +
+      '</b><div class="small mt8">기존 수업의 학생 연결은 변경할 수 없습니다.</div></div>'
     : personal
     ? '<div class="sect">1. 내 수업 학생 선택</div><div class="field"><label class="fl">내 수업 학생</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       personalStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">현재 선생님의 기존 수업에 연결된 학생만 표시됩니다.</div></div>' +
-      (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' + esc(draft.grade) + '" readonly></div></div>' : '')
+      (draft.studentId ? '<div class="grid2"><div class="field"><label class="fl">학생 이름</label><input class="in" value="' + esc(draft.studentName) + '" readonly></div><div class="field"><label class="fl">학년</label><input class="in" value="' +
+        esc(studentDisplayGradeLabel(rosterStudentByStableId(draft.studentId), draft.grade)) + '" readonly></div></div>' : '')
     : '<div class="sect">1. 실제 원생 선택</div><div class="field"><label class="fl">' + esc(studentLinkScopeText()) + '</label><select class="in" data-lesson-student><option value="">학생을 선택하세요</option>' +
       selectableStudents.map(student => '<option value="' + esc(student.id) + '"' + (draft.studentId === student.id ? ' selected' : '') + '>' + esc(rosterStudentIdentityLabel(student)) + '</option>').join('') +
       '</select><div class="hint mt8">이름이 아닌 원생 명단의 stable studentId로 연결합니다.</div></div>' + lessonRosterInformationHtml();
@@ -5282,6 +5316,7 @@ function previewLessonBatchRegistration(core, draft, selected) {
   const rosterStudent = {
     id: selected.id,
     name: lessonPreviewRosterStudent ? lessonPreviewRosterStudent.name : selected.name,
+    school: lessonPreviewRosterStudent ? lessonPreviewRosterStudent.school : selected.school,
     grade: lessonPreviewRosterStudent ? lessonPreviewRosterStudent.grade : selected.grade
   };
   const previews = [];
@@ -5307,7 +5342,7 @@ function previewLessonBatchRegistration(core, draft, selected) {
   lessonPreviewBatchKind = 'lessons';
   const previewValue = value => esc(value || '없음').replace(/\n/g, '<br>');
   modal('수업 ' + previews.length + '건 일괄 등록 미리보기',
-    '<div class="guide"><b>1. 학생</b>' + esc(rosterStudent.name + ' / ' + rosterStudent.grade) +
+    '<div class="guide"><b>1. 학생</b>' + esc(staffStudentCompactLabel(rosterStudent)) +
       '<div class="small mt8">아래 수업들은 같은 studentId에 각각 독립된 수업으로 저장됩니다.</div></div>' +
     previews.map((item, index) => {
       const teacher = staffById(item.staffId);
@@ -5367,7 +5402,7 @@ function previewLessonRegistration() {
     '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
       (lessonPreviewRosterStudent ? '<b>원생 기본 정보</b>' + esc([lessonPreviewRosterStudent.school, lessonPreviewRosterStudent.grade,
         lessonPreviewRosterStudent.subject, lessonPreviewRosterStudent.registrationDate, lessonPreviewRosterStudent.firstClassDate].filter(Boolean).join(' · ')) + '<br><br>' : '') +
-      '<b>1. 학생</b><br>' + previewValue(taskBody.studentName + ' / ' + taskBody.grade) + '<br><br>' +
+      '<b>1. 학생</b><br>' + previewValue(staffStudentCompactLabel(selected, taskBody.studentName, taskBody.grade)) + '<br><br>' +
       '<b>2. 수업 과목</b><br>' + previewValue(taskBody.subject) + '<br><br>' +
       '<b>3. 담당 선생님</b><br>' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
       '<b>4. 수업 요일·시간·시수</b><br>' + previewValue(taskBody.scheduleText) + '</div>' +
@@ -6388,7 +6423,8 @@ function sessionPackCreateHtml() {
     '<div class="card-sub">학생 전체가 아니라 학생·수업 조합에만 적용합니다. 지정하지 않은 월제 수업은 아래 목록에 나타나지 않습니다.</div>' +
     '<div class="session-pack-create"><label class="field"><span class="fl">학생·수업</span><select class="in" id="spLesson">' +
       '<option value="">수업 선택</option>' + lessons.map(task => '<option value="' + esc(task.id) + '">' +
-        esc(task.studentName || '학생 미확인') + ' · ' + esc([task.grade, task.subject, task.className].filter(Boolean).join(' · ') || '수업') + '</option>').join('') +
+        esc(staffStudentCompactLabelById(task.studentId, task.studentName || '학생 미확인', task.grade)) + ' · ' +
+        esc([task.subject, task.className].filter(Boolean).join(' · ') || '수업') + '</option>').join('') +
       '</select></label><label class="field"><span class="fl">총 횟수</span><input class="in" id="spTotal" type="number" min="1" max="200" value="8" inputmode="numeric"></label>' +
       '<label class="field"><span class="fl">시작일</span><input class="in" id="spFrom" type="date" value="' + today() + '"></label>' +
       '<label class="field"><span class="fl">종료일</span><input class="in" id="spExpires" type="date" value="' + addDays(today(), 30) + '"></label>' +
@@ -6466,8 +6502,9 @@ function sessionPackCard(pack) {
       '<button class="btn btn-sm btn-ghost" data-act="spadjust" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '" data-delta="-1">1회 복원</button>' +
       '<button class="btn btn-sm btn-danger" data-act="spclose" data-session-pack-action data-pack="' + esc(pack.packId) + '" data-rev="' + Number(pack.revision) + '">회차권 종료</button></div>' : '';
   return '<article class="card session-pack-card' + cls + '" tabindex="-1" data-session-pack="' + esc(pack.packId) + '">' +
-    '<div class="between"><div><div class="card-title">' + esc(pack.studentName || '학생 연결 확인 필요') + '</div>' +
-      '<div class="card-sub">' + esc([pack.grade, pack.lessonLabel].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' +
+    '<div class="between"><div><div class="card-title">' +
+      esc(staffStudentCompactLabelById(pack.studentId, pack.studentName || '학생 연결 확인 필요', pack.grade)) + '</div>' +
+      '<div class="card-sub">' + esc(pack.lessonLabel || '수업 연결 확인 필요') + '</div></div>' +
       '<span class="pill ' + status[1] + '">' + status[0] + '</span></div>' +
     '<div class="session-pack-balance"><span><b>' + Number(pack.totalSessions) + '</b>총 횟수</span><span><b>' + Number(pack.usedSessions) + '</b>사용</span><span><b>' + remaining + '</b>남음</span></div>' +
     (attention ? '<div class="session-pack-warning ' + attention.cls + '" role="status">' + esc(attention.text) + '</div>' : '') +
@@ -6766,8 +6803,9 @@ function makeupCard(row) {
   const actions = makeupAdminActions(row) + (ownComplete
     ? '<button class="btn btn-sm btn-primary" data-act="mucomplete" data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">보강 완료</button>' : '');
   return '<article class="card makeup-card' + (delayed ? ' is-overdue' : scheduledToday ? ' is-today' : '') + '" tabindex="-1" data-makeup-case="' + esc(row.caseId) + '">' +
-    '<div class="between"><div><div class="card-title">' + esc(row.studentName || '학생 연결 확인 필요') + '</div>' +
-      '<div class="card-sub">' + esc([row.grade, row.subject, row.className].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' + makeupStatusPill(row) + '</div>' +
+    '<div class="between"><div><div class="card-title">' +
+      esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생 연결 확인 필요', row.grade)) + '</div>' +
+      '<div class="card-sub">' + esc([row.subject, row.className].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' + makeupStatusPill(row) + '</div>' +
     '<div class="makeup-meta"><span class="tag">원 수업 ' + esc(row.sourceDate) + '</span>' +
       '<span class="tag">' + esc(sourceTeacher ? sourceTeacher.name + ' 선생님' : '원 수업 담당') + '</span>' +
       (delayed ? '<span class="tag blk">지연</span>' : scheduledToday ? '<span class="tag time">오늘</span>' : '') +
@@ -6932,7 +6970,7 @@ function makeupProposalModal(row) {
   const staff = liveStaff().slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   const selected = row.proposedStaffId || row.sourceTeacherId || '';
   const date = row.proposedDate || today();
-  modal('보강 일정 제안 — ' + esc(row.studentName || '학생'),
+  modal('보강 일정 제안 — ' + esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade)),
     '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작</label><input class="in" id="muStart" type="time" value="' + esc(row.proposedStartTime || '18:00') + '"></div>' +
     '<div class="field"><label class="fl" for="muEnd">종료</label><input class="in" id="muEnd" type="time" value="' + esc(row.proposedEndTime || '19:00') + '"></div></div>' +
@@ -7198,7 +7236,8 @@ function scheduleAttendanceOverviewHtml(timeline, date) {
       ' 선생님</b><span>' + esc(session.label) + '</span></div><div class="schedule-attendance-students">' +
       session.entries.map(entry => {
         const att = scheduleAttendance(entry, date);
-        return '<span class="schedule-attendance-pill ' + classes[att.value] + '">' + esc(entry.studentName) + ' · ' +
+        return '<span class="schedule-attendance-pill ' + classes[att.value] + '">' +
+          esc(staffStudentCompactLabelById(entry.studentId, entry.studentName, entry.grade)) + ' · ' +
           esc(att.label) + '</span>';
       }).join('') + '</div></div>'
   ));
@@ -7390,7 +7429,7 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
       const attendanceText = scheduleAttendanceSummaryText(session, date);
       const attendanceDetails = session.entries.map(entry => {
         const att = scheduleAttendance(entry, date);
-        return entry.studentName + ' ' + att.label;
+        return staffStudentCompactLabelById(entry.studentId, entry.studentName, entry.grade) + ' ' + att.label;
       }).join(', ');
       const stateText = (isCurrent ? '현재 수업' : isNext ? '다음 수업' : isEnded ? '종료 수업' : '예정 수업') +
         (conflict ? ' · 학생 수업 겹침 확인 필요' : '');
@@ -7421,8 +7460,9 @@ function scheduleTimelineModal(entries, date) {
         ['숙제', task.homework],
         ['학부모 요청', task.parentRequest]
       ].filter(row => row[1]);
+      const displayGrade = studentDisplayGradeLabel(rosterStudentByStableId(entry.studentId), entry.grade);
       return '<div class="task"><div class="task-body"><div class="between"><div class="task-t">' + esc(entry.studentName) +
-        (entry.grade ? ' <span class="pill">' + esc(entry.grade) + '</span>' : '') + '</div><span class="row" style="gap:5px">' +
+        (displayGrade ? ' <span class="pill">' + esc(displayGrade) + '</span>' : '') + '</div><span class="row" style="gap:5px">' +
         sessionModeBadgeHtml(task) + '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></span></div>' +
         details.map(row => '<div class="schedule-info-row"><b>' + esc(row[0]) + '</b>' + esc(row[1]) + '</div>').join('') + '</div></div>';
     }).join('');
@@ -7454,7 +7494,7 @@ function scheduleSessionNames(session) {
     const key = window.WBScheduleCore.studentGroupKey(entry.studentName, entry.grade, entry.studentId);
     if (seen.has(key)) return;
     seen.add(key);
-    names.push(entry.studentName);
+    names.push(staffStudentCompactLabelById(entry.studentId, entry.studentName, entry.grade));
   });
   return names;
 }
@@ -7467,7 +7507,8 @@ function scheduleSessionAttendanceRows(session, date) {
     const attendance = scheduleAttendance(entry, date);
     const current = rows.get(key);
     if (!current || (!current.value && attendance.value)) rows.set(key, {
-      name: entry.studentName, value: attendance.value, label: attendance.label, cls: classes[attendance.value]
+      name: staffStudentCompactLabelById(entry.studentId, entry.studentName, entry.grade),
+      value: attendance.value, label: attendance.label, cls: classes[attendance.value]
     });
   });
   return Array.from(rows.values());
@@ -7629,6 +7670,7 @@ function scheduleStudentCardsHtml(weekly) {
     const name = group.name, student = group.student || {}, first = group.entries[0] || {};
     const taskSources = group.entries.concat(group.issues);
     const grade = student.grade || first.grade || group.grade || '';
+    const displayGrade = studentDisplayGradeLabel(student, grade);
     const teachers = [...new Set(taskSources.map(entry => entry.teacherName).filter(Boolean))].join('·');
     const subjects = [...new Set([student.subject].concat(taskSources.flatMap(entry => [
       (entry.task || {}).subject, (entry.task || {}).className
@@ -7649,9 +7691,9 @@ function scheduleStudentCardsHtml(weekly) {
       [name, grade, entry.teacherName, entry.role, (entry.task || {}).subject, (entry.task || {}).className].join(' ')
     ));
     return '<div class="card schedule-person-card' + (warnings ? ' is-attention' : '') + '" data-schedule-card data-card-search="' +
-      esc([name, grade].join(' ')) + '" data-search="' + esc(search) + '">' +
+      esc([name, displayGrade].join(' ')) + '" data-search="' + esc(search) + '">' +
       '<div class="between"><div class="card-title">' + esc(name) + '</div>' +
-      (grade ? '<span class="pill">' + esc(grade) + '</span>' : '') + '</div>' +
+      (displayGrade ? '<span class="pill">' + esc(displayGrade) + '</span>' : '') + '</div>' +
       '<div class="schedule-person-meta">' +
       (subjects.length ? '<span class="tag time">' + esc(subjects.join('·')) + '</span>' : '') +
       (teachers ? '<span class="tag">' + esc(teachers) + '</span>' : '') +
@@ -7823,15 +7865,17 @@ function managerRequestInboxRows() {
   });
 
   lessonAssignmentRequests.filter(row => row.status === 'approval_waiting').forEach(row =>
-    push('수업 등록', [row.studentName, row.grade].filter(Boolean).join(' · '), '학생 수업 등록 승인', row.staffId, 'lesson', row.updatedAt, 0));
+    push('수업 등록', staffStudentCompactLabelById(row.studentId, row.studentName, row.grade),
+      '학생 수업 등록 승인', row.staffId, 'lesson', row.updatedAt, 0));
   lessonChangeQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
     const meta = lessonChangeInboxMeta(row.changes);
-    push(meta.kind, (task && (task.studentName || taskDisplayTitle(task))) || '수업 정보', meta.detail, row.owner, 'lesson', row.updatedAt, 0);
+    push(meta.kind, (task && taskDisplayTitle(task)) || '수업 정보', meta.detail, row.owner, 'lesson', row.updatedAt, 0);
   });
   feedbackQueue.filter(row => row.status === 'approval_waiting').forEach(row => {
     const task = state.tasks.find(task => task.id === row.taskId);
-    push('피드백 검토', row.studentName || (task && (task.studentName || taskDisplayTitle(task))) || '수업 피드백',
+    push('피드백 검토', (task && taskDisplayTitle(task)) ||
+      staffStudentCompactLabelById(row.studentId, row.studentName || '수업 피드백', row.grade),
       '피드백 문구 승인', row.owner, 'feedback', row.updatedAt, 0);
   });
   bookAddQueue.filter(row => row.status === 'approval_waiting').forEach(row =>
@@ -7842,8 +7886,8 @@ function managerRequestInboxRows() {
     const typeLabel = GUARDIAN_REQUEST_TYPE_LABELS[row.requestType] || '요청 유형 확인 필요';
     const statusLabel = GUARDIAN_REQUEST_STATUS_LABELS[row.status] || '상태 확인 필요';
     rows.push({
-      kind: '보호자 요청', title: (row.studentName || '학생') + ' · ' + typeLabel,
-      detail: [row.grade, statusLabel].filter(Boolean).join(' · '), requester: '보호자 앱', route: '',
+      kind: '보호자 요청', title: staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade) + ' · ' + typeLabel,
+      detail: statusLabel, requester: '보호자 앱', route: '',
       updatedAt: Number(row.updatedAt) || Number(row.createdAt) || 0, priority: -1,
       guardianRequestId: row.requestId, guardianRequestStatus: row.status,
       guardianRequestRevision: Number(row.revision) || 0
@@ -8887,7 +8931,7 @@ function orderStudentPicker(row) {
       '<label class="book-order-picker-option"><input type="checkbox" data-order-student data-book="' + esc(row.id) + '" value="' + esc(student.id) + '"' +
       (selectedIds.has(String(student.id)) ? ' checked' : '') + '>' +
       '<span>' + esc(student.name || '이름 미입력') + '<small class="card-sub">' +
-      esc([student.school, student.grade].filter(Boolean).join(' · ') || '학교·학년 미지정') + '</small></span></label>').join('') +
+      esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') +
     '</div></details>';
 }
 
@@ -8972,8 +9016,7 @@ function bookOrderFinalConfirmationHtml(items) {
       '</b><span class="pill">' + quantity + '권</span></div><div class="small muted mt8">권당 ' +
       unitPrice.toLocaleString('ko-KR') + '원 · 소계 ' + subtotal.toLocaleString('ko-KR') + '원</div>' +
       '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' +
-        esc(student.name || '이름 미입력') + (student.school ? ' · ' + esc(student.school) : '') +
-        (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div></article>';
+        esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') + '</div></article>';
   }).join('');
   return '<div data-book-order-confirmation><div class="hint mb14">아래 교재·가격·학생을 확인해 주세요. 확인 후 주문하기를 눌러야 주문이 등록됩니다.</div>' +
     '<div class="book-order-confirmation-list">' + body + '</div><div class="book-order-confirmation-total">총 ' +
@@ -9637,8 +9680,8 @@ function bookIssueUnassignedHtml(students) {
   return '<details class="card book-issue-unassigned"><summary class="between"><span><b>교재 미배정 · 확인 필요 ' +
     students.length + '명</b><span class="card-sub">현재 재원 명단에 있지만 학생별 교재 배정이 없습니다.</span></span><span class="pill bad">확인 필요</span></summary>' +
     '<div class="hint mt8">명단 누락을 숨기지 않기 위한 확인 목록입니다. 교재는 자동 배정하지 않습니다.</div>' +
-    students.map(student => '<div class="between mt8"><div><b>' + esc(student.name || '이름 미입력') + '</b><span class="card-sub">' +
-      esc(student.grade || '학년 미지정') + ' · ' + esc(rosterStudentSubjectTeacherText(student.id)) + '</span></div><span class="pill warn">미배정</span></div>').join('') + '</details>';
+    students.map(student => '<div class="between mt8"><div><b>' + esc(staffStudentCompactLabel(student, '이름 미입력')) + '</b><span class="card-sub">' +
+      esc(rosterStudentSubjectTeacherText(student.id)) + '</span></div><span class="pill warn">미배정</span></div>').join('') + '</details>';
 }
 
 async function loadBookIssues(force) {
@@ -9845,8 +9888,8 @@ function bookOrderRowHtml(row) {
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(bookVendorDisplayName(row.vendorName || '미등록')) + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
     bookOrderMoneyHtml(row) + bookOrderPriceEntryHtml(row) + bookOrderDatesHtml(row) +
-    (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' + esc(student.name) +
-      (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') + '</div>' :
+    (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' +
+      esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
     (row.stage === 'student_handed' && !row.academyRegisteredAt && session.isAdmin ? '<div class="hint mt8"><b>해야 할 업무 · 아카등록</b></div>' : '') +
     '<div class="ops-actions">' + bookOrderActionButtons(row) + '</div></article>';
@@ -9897,7 +9940,8 @@ function openBookOrderStudentLink(button) {
     '<div class="hint mb14">' + esc(bookOrderStudentScopeText()) + '에서 이 교재를 사용할 학생을 선택해 주세요. 학생 이름이 아닌 stable studentId로 연결되며, 선택 인원이 교재 수량이 됩니다.</div>' +
     '<div class="book-order-picker-list">' + students.map(student =>
       '<label class="book-order-picker-option"><input type="checkbox" data-order-link-student value="' + esc(student.id) + '">' +
-      '<span>' + esc(student.name || '이름 미입력') + '<small class="card-sub">' + esc(student.grade || '학년 미지정') + '</small></span></label>').join('') + '</div>',
+      '<span>' + esc(student.name || '이름 미입력') + '<small class="card-sub">' +
+      esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</small></span></label>').join('') + '</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="bookorderlinksave" data-task="' + esc(taskId) +
       '" data-item="' + itemIndex + '" data-book="' + esc(book.id) + '" data-task-updated="' + Number(row.taskUpdatedAt || 0) + '">학생 연결 저장</button>');
 }
@@ -10268,7 +10312,7 @@ function externalBookOrderOptionsHtml() {
         (students.length ? students.map(student => '<label class="book-order-picker-option"><input type="checkbox" data-external-student value="' +
           esc(student.id) + '"' + (externalBookDraft.studentIds.includes(String(student.id)) ? ' checked' : '') +
           (externalBookSubmitting ? ' disabled' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          '<small class="card-sub">' + esc([student.school, student.grade].filter(Boolean).join(' · ') || '학교·학년 미지정') +
+          '<small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') :
           '<div class="hint">연결할 수 있는 현재 재원 학생이 없습니다.</div>') + '</div></fieldset>' +
       '<div class="small muted mt8" data-external-order-total>' + (total
@@ -10394,8 +10438,8 @@ function internalBookOrderSummaryHtml() {
     esc(internalBookTitle(option, internalBookDraft.volume)) + '</b><div class="small muted mt8">권당 ' +
     (option ? option.price.toLocaleString('ko-KR') + '원' : '가격 확인 필요') + ' · ' + internalBookDraft.studentIds.length +
     '권</div></div><span class="pill ok">학생 연결 완료</span></div><div class="book-order-student-list">' +
-    (students.length ? students.map(student => '<span class="book-order-student">' + esc(student.name || '이름 미입력') +
-      (student.school ? ' · ' + esc(student.school) : '') + (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') :
+    (students.length ? students.map(student => '<span class="book-order-student">' +
+      esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') :
       '<span class="small muted">현재 원생 명단에서 연결 학생을 다시 확인해 주세요.</span>') + '</div></div>';
 }
 
@@ -10438,7 +10482,7 @@ function openInternalBookStudentModal() {
       '<div class="book-order-picker-list">' + students.map(student =>
         '<label class="book-order-picker-option"><input type="checkbox" data-internal-book-student value="' + esc(student.id) + '"' +
           (selectedIds.has(String(student.id)) ? ' checked' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          '<small class="card-sub">' + esc([student.school, student.grade].filter(Boolean).join(' · ') || '학교·학년 미지정') +
+          '<small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') + '</div></fieldset>',
     '<button class="btn btn-primary btn-block mt14" data-act="internalbookstudentlinksave"' +
       (selectedIds.size ? '' : ' disabled') + '>학생 연결 완료</button>');
@@ -10522,8 +10566,7 @@ function boundBookOrderSummaryHtml() {
     esc(boundBookDraft.title) + '</b><div class="small muted mt8">' + esc(option ? option.label : '가격 항목 확인 필요') +
     ' · ' + boundBookDraft.studentIds.length + '권</div></div><span class="pill ok">학생 연결 완료</span></div>' +
     '<div class="book-order-student-list">' + (students.length ? students.map(student =>
-      '<span class="book-order-student">' + esc(student.name || '이름 미입력') +
-      (student.grade ? ' · ' + esc(student.grade) : '') + '</span>').join('') :
+      '<span class="book-order-student">' + esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') :
       '<span class="small muted">현재 원생 명단에서 연결 학생을 다시 확인해 주세요.</span>') + '</div></div>';
 }
 
@@ -10569,7 +10612,7 @@ function openBoundBookStudentModal() {
       '<div class="book-order-picker-list">' + students.map(student =>
         '<label class="book-order-picker-option"><input type="checkbox" data-bound-book-student value="' + esc(student.id) + '"' +
           (selectedIds.has(String(student.id)) ? ' checked' : '') + '><span>' + esc(student.name || '이름 미입력') +
-          '<small class="card-sub">' + esc([student.school, student.grade].filter(Boolean).join(' · ') || '학교·학년 미지정') +
+          '<small class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
           '</small></span></label>').join('') + '</div></fieldset>',
     '<button class="btn btn-primary btn-block mt14" data-act="boundbookstudentlinksave"' +
       (previous && previous.title && selectedIds.size ? '' : ' disabled') + '>학생 연결 완료</button>');
@@ -10861,7 +10904,7 @@ function viewBookOrderHistory() {
         '<div class="book-order-history-field"><b>주문자(선생님)</b><span>' +
           esc(row.teacherName || (row.owner ? '담당 미지정' : '관리자')) + '</span></div>' +
         '<div class="book-order-history-field"><b>학생</b><span>' + esc(students.length
-          ? students.map(student => student.name || '이름 미입력').join(', ') : '학생 연결 없음') + '</span></div>' +
+          ? students.map(student => staffStudentCompactLabel(student, '이름 미입력')).join(', ') : '학생 연결 없음') + '</span></div>' +
         '<div class="book-order-history-field"><b>금액</b><span>' + esc(money) + '</span></div></div>' +
         (reviewCandidate && !catalogSearchPending && session.isAdmin ? '<div class="ops-actions"><button class="btn btn-sm btn-primary" ' +
           'data-act="bookcatalogreviewopen" data-book-id="' + esc(reviewCandidate.bookId) +
@@ -11348,7 +11391,8 @@ function transportRouteCard(routeRow, rows) {
       stopRows.map(row => {
         const status = TRANSPORT_STATUS[row.status];
         return '<div class="transport-student' + (row.status === 'boarded' ? ' is-riding' : '') + '"><div class="between"><div><b class="small">' +
-          esc(row.student.name || row.student.studentName || '학생 정보 확인 필요') + '</b><div class="small muted">' + esc(sample.stopName || '정류장 미입력') + '</div></div>' +
+          esc(staffStudentCompactLabelById(row.studentId, row.student.name || row.student.studentName || '학생 정보 확인 필요', row.student.grade)) +
+          '</b><div class="small muted">' + esc(sample.stopName || '정류장 미입력') + '</div></div>' +
           '<span class="pill ' + status[1] + '">' + status[0] + '</span></div><div class="ops-actions">' + transportStudentActions(row) + '</div>' +
           transportNotificationHtml(row) + transportGuardianSummaryHtml(row) + '</div>';
       }).join('') + '</section>';
@@ -12035,7 +12079,8 @@ function viewTransport() {
       (unmatchedBoarded ? '탑승 중·미하차 기록을 먼저 확인한 뒤 ' : '') + '원장 화면에서 노선 설정을 확인하세요.</div>' +
     (session.isAdmin ? unmatched.map(row => '<div class="between mt8"><div class="small">· ' + esc(row.date || transportDate) + ' · 노선 ' +
       esc(row.routeName || row.routeId || row.route_id || '미확인') + ' · 학생 ' +
-      esc(row.studentName || row.studentId || row.student_id || '미확인') + ' · 상태 ' +
+      esc(staffStudentCompactLabelById(row.studentId || row.student_id,
+        row.studentName || row.studentId || row.student_id || '미확인', row.grade)) + ' · 상태 ' +
       esc((TRANSPORT_STATUS[normalizeTransportStatus(row.status)] || [row.status])[0]) + '</div>' +
       '<button class="btn btn-sm btn-ghost" data-act="transportstate" data-next="scheduled" data-reason-required="true" data-date="' +
       esc(row.date || transportDate) + '" data-route="' + esc(row.routeId || row.route_id || '') + '" data-student="' +
@@ -12430,7 +12475,7 @@ function studentChangeAcknowledgementStatusHtml() {
       const done = statuses.filter(item => item.acknowledgedAt).length;
       const student = rosterDb && rosterDb.students && rosterDb.students.find(item => String(item.id) === String(event.studentId));
       const title = event.eventType === 'student_information' ? '학생정보 수정' : '업무지시 수정';
-      return '<div class="guide mb8"><b>' + esc((student && student.name || '학생') + ' · ' + title) + '</b><br>' +
+      return '<div class="guide mb8"><b>' + esc(staffStudentCompactLabel(student) + ' · ' + title) + '</b><br>' +
         '확인 ' + done + '/' + statuses.length +
         (statuses.length ? '<div class="small muted mt8">미확인: ' + esc(statuses.filter(item => !item.acknowledgedAt)
           .map(item => managerRequestTeacher(item.staffId)).join(', ') || '없음') + '</div>' : '') + '</div>';
@@ -12740,7 +12785,8 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     esc(label) + ((keys || []).some(key => changed.has(key)) ? marker(label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
   const references = Array.isArray(lessonReferences) ? lessonReferences : [];
-  return '<div class="between mb14"><div><div class="card-title">' + esc(student.name) + (changed.has('name') ? marker('이름') : '') + '</div>' +
+  return '<div class="between mb14"><div><div class="card-title">' + esc(staffStudentCompactLabel(student)) +
+    (changed.has('name') ? marker('이름') : '') + '</div>' +
     '<div class="card-sub">원생 명단 기본 정보' + (references.length ? '와 연결된 수업 참고' : '') + '입니다.</div></div><span class="pill ' + status[1] + '">' +
     status[0] + '</span></div><div class="student-info-grid">' +
     field('학교', student.school, false, ['school']) + field('학년', student.grade, false, ['grade']) +
@@ -12766,7 +12812,7 @@ function rosterTransitionListsHtml(students) {
     return '<section class="card roster-transition-list"><div class="between mb8"><div class="card-title">' + icon + ' ' + title + '</div>' +
       '<span class="pill ' + (type === 'withdrawal' && selected.length ? 'bad' : selected.length ? 'warn' : '') + '">' + selected.length + '명</span></div>' +
       (selected.length ? selected.map(row => '<details class="roster-transition-item"><summary><span class="roster-transition-summary"><b>' +
-        esc(row.student.name) + '</b> · ' + esc([row.student.grade, row.transition.effectiveDate].filter(Boolean).join(' · ')) +
+        esc(staffStudentCompactLabel(row.student)) + '</b> · ' + esc(row.transition.effectiveDate) +
         '</span></summary><div class="roster-transition-detail">' + rosterStudentInfoHtml(row.student, studentLessonReferenceItems(row.student.id)) +
         (session.isAdmin ? '<button class="btn btn-sm btn-ghost mt14" data-act="rosterstudentedit" data-id="' + esc(row.student.id) + '">원생 정보 수정</button>' : '') +
         '</div></details>').join('') : '<div class="small muted">현재 ' + title + ' 명단이 없습니다.</div>') + '</section>';
@@ -12928,7 +12974,7 @@ function showRosterTransitionModal() {
   if (!draft || !rosterStudentEditor) return;
   const student = rosterStudentEditor.student;
   const label = draft.operation === 'leave' ? '휴원' : draft.operation === 'withdrawal' ? '퇴원' : '복귀';
-  let body = '<div class="hint mb14"><b>' + esc(student.name) + ' · ' + label + '</b><br>' +
+  let body = '<div class="hint mb14"><b>' + esc(staffStudentCompactLabel(student)) + ' · ' + label + '</b><br>' +
     (draft.operation === 'return' ? '복귀하면서 만들 첫 수업의 과목·담당 선생님·요일·시간을 지정합니다. 다른 과목 수업은 복귀 후 수업 등록에서 별도로 추가해 주세요.' :
       '확인하면 승인 요청 없이 즉시 처리되며, 현재 수업은 해당 선생님 화면에서 사라집니다.') + '</div>' +
     '<label class="field"><span class="fl">' + (draft.operation === 'return' ? '복귀·수업 시작일' : '적용 날짜') + '</span>' +
@@ -13454,7 +13500,8 @@ function onboardingDashboardHtml(rows) {
       const dueText = row.status.key === 'done' ? shortDate(onboardingCompletionDate(record)) + ' 완료' :
         next.due < today() ? shortDate(next.due) + '부터 지연' : next.due === today() ? '오늘' : shortDate(next.due) + ' 예정';
       return '<div class="onboarding-board-row' + (row.status.overdue || row.status.key === 'firstday' ? ' is-alert' : '') + '" role="row">' +
-        '<div role="cell" data-label="학생"><span class="onboarding-board-name">' + esc(student.name) + '</span><span class="card-sub">' + esc(student.grade || '학년 미지정') + '</span></div>' +
+        '<div role="cell" data-label="학생"><span class="onboarding-board-name">' + esc(student.name) + '</span><span class="card-sub">' +
+          esc(studentDisplayGradeLabel(student) || '학년 미지정') + '</span></div>' +
         '<div role="cell" data-label="첫 등원"><b>' + esc(onboardingDday(record.firstClassDate)) + '</b><span class="card-sub">' + esc(shortDate(record.firstClassDate)) + '</span></div>' +
         '<div role="cell" data-label="상태"><span class="pill ' + (row.status.overdue ? 'bad' : '') + '">' + esc(row.status.label) + '</span></div>' +
         '<div class="onboarding-board-progress" role="cell" data-label="진행률"><div class="bar" role="progressbar" aria-label="' + esc(student.name) + ' 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + row.status.progress.pct + '"><i style="width:' + row.status.progress.pct + '%"></i></div><b>' + row.status.progress.pct + '%</b></div>' +
@@ -13480,7 +13527,8 @@ function onboardingCardHtml(row) {
   return '<article class="card onboarding-card' + cardClass + '" data-onboarding-card data-search="' + esc(onboardingSearchText(student)) + '">' +
     '<div class="between onboarding-card-head"><div><div class="card-title">' + esc(student.name) +
       (status.key === 'firstday' ? ' <span class="pill">첫 등원 TODAY</span>' : '') + '</div>' +
-      '<div class="card-sub">' + esc(student.grade || '학년 미지정') + ' · ' + esc(student.subject || '과목 미지정') + ' · ' + esc(rosterStudentSubjectTeacherText(student.id)) + '</div>' +
+      '<div class="card-sub">' + esc(studentDisplayGradeLabel(student) || '학년 미지정') + ' · ' +
+      esc(student.subject || '과목 미지정') + ' · ' + esc(rosterStudentSubjectTeacherText(student.id)) + '</div>' +
       '<label class="small mt8" for="onb-date-' + esc(student.id) + '">첫 등원일 ' +
         '<input class="in" style="display:inline-block;width:auto;padding:6px 8px" id="onb-date-' + esc(student.id) + '" type="date" ' +
         'data-onboarding-date data-id="' + esc(student.id) + '" value="' + esc(record.firstClassDate) + '"' + (inactive ? ' disabled' : '') + '></label>' + history + '</div>' +
@@ -13746,7 +13794,9 @@ function viewRoster() {
         managed.map(student => {
           const assigned = hasAssignedLesson(student);
           return '<div class="between small" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> ' +
-            (!assigned ? '<span class="tag warn">수업 미지정</span> ' : '') + '<span class="muted">(' + esc([student.school || '학교 미입력', student.grade || '학년 미입력', rosterStudentSubjectTeacherText(student.id)].join(' · ')) + rosterParentContactSuffix(student) + ')</span></span>' +
+            (!assigned ? '<span class="tag warn">수업 미지정</span> ' : '') + '<span class="muted">(' +
+            esc([studentSchoolGradeDetailLabel(student) || '학교·학년 미입력', rosterStudentSubjectTeacherText(student.id)].join(' · ')) +
+            rosterParentContactSuffix(student) + ')</span></span>' +
             '<button class="btn btn-sm btn-ghost" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">수정</button></div>';
         }).join('') +
       '</div></details></section>';
@@ -13769,7 +13819,8 @@ function viewRoster() {
       (risky.length
         ? '<div class="card-sub mb8">결석이 이어질 때 그날 바로 연락하는 것이 가장 효과가 큽니다.</div>' +
           risky.map(x => '<div class="between small" style="padding:4px 0">' +
-            '<span>· ' + esc(x.s.name) + ' <span class="muted">(' + esc(x.s.grade) + ' · ' + esc(rosterStudentSubjectTeacherText(x.s.id)) + ')</span> ' +
+            '<span>· ' + esc(staffStudentCompactLabel(x.s)) + ' <span class="muted">(' +
+            esc(rosterStudentSubjectTeacherText(x.s.id)) + ')</span> ' +
             x.flags.map(f => '<span class="pill ' + f[1] + '">' + esc(f[0]) + '</span>').join(' ') + '</span>' +
             (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-student-id="' + esc(x.s.id) + '" data-name="' + esc(x.s.name) + '">📞 기록</button>' : '') +
             '</div>').join('')
@@ -13785,7 +13836,8 @@ function viewRoster() {
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
         mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
-          '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' + esc([s.school || '학교 미입력', s.grade || '학년 미입력'].join(' · ')) + rosterParentContactSuffix(s) + ')</span></span></div>').join('');
+          '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' +
+          esc(studentSchoolGradeDetailLabel(s) || '학교·학년 미입력') + rosterParentContactSuffix(s) + ')</span></span></div>').join('');
       h += '</div>';
     }
   }
@@ -13823,7 +13875,7 @@ function viewRoster() {
       '<div class="admin-collapsible-body">' +
       '<div class="card-sub mb8">오래 연락하지 못한 학생이 위로 올라옵니다. 퇴원은 연락이 끊긴 뒤에 옵니다 — 위쪽부터 챙겨주세요.</div>' +
       sorted.map(s => '<div class="between small" style="padding:4px 0">' +
-        '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(s.grade) + ' · ' + esc(rosterStudentSubjectTeacherText(s.id)) + ')</span></span>' +
+        '<span>· ' + esc(staffStudentCompactLabel(s)) + ' <span class="muted">(' + esc(rosterStudentSubjectTeacherText(s.id)) + ')</span></span>' +
         '<span class="row" style="gap:6px">' + ctPill(s.name, s.id) +
         '<button class="btn btn-sm btn-ghost" data-act="ctlog" data-student-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">📞 기록</button></span></div>').join('') +
       '</div></details>';
@@ -13845,7 +13897,7 @@ function viewRoster() {
             const nowN = opSum(s.name, mon), lastN = opSum(s.name, last);
             const cls = lastN === 0 ? 'bad' : lastN <= OP_LOW ? 'warn' : '';
             return '<div class="between small" style="padding:4px 0">' +
-              '<span>· ' + esc(s.name) + ' <span class="muted">(' + opProgs(s.name).join('·') + ')</span></span>' +
+               '<span>· ' + esc(staffStudentCompactLabel(s)) + ' <span class="muted">(' + opProgs(s.name).join('·') + ')</span></span>' +
               '<span class="row" style="gap:6px">' +
                 '<span class="pill ' + cls + '">지난주 ' + lastN + '회</span>' +
                 '<span class="pill">이번주 ' + nowN + '</span>' +
@@ -13855,7 +13907,7 @@ function viewRoster() {
         : '<div class="small muted">아직 지정된 학생이 없습니다. 아래에서 이용 중인 프로그램을 지정하세요.</div>') +
       (rest.length
         ? '<hr class="sep"><div class="fl mb8">프로그램 지정</div><div class="chips">' +
-          rest.map(s => '<button class="chip" data-act="oplog" data-name="' + esc(s.name) + '">＋ ' + esc(s.name) + '</button>').join('') +
+          rest.map(s => '<button class="chip" data-act="oplog" data-name="' + esc(s.name) + '">＋ ' + esc(staffStudentCompactLabel(s)) + '</button>').join('') +
           '</div>'
         : '') +
       '</div></details>';
@@ -13872,7 +13924,7 @@ function viewRoster() {
             const last = examAll(s.name)[0];
             const tr = examTrend(s.name, last.kind);
             return '<div class="between small" style="padding:4px 0">' +
-              '<span>· ' + esc(s.name) + ' <span class="muted">(' + esc(last.kind) + ' · ' + esc(last.date) + ')</span></span>' +
+               '<span>· ' + esc(staffStudentCompactLabel(s)) + ' <span class="muted">(' + esc(last.kind) + ' · ' + esc(last.date) + ')</span></span>' +
               '<span class="row" style="gap:6px">' +
                 (tr ? '<span class="pill ' + tr[1] + '">' + tr[0] + '</span>' : '<span class="pill">첫 기록</span>') +
                 '<span class="pill">' + esc(last.label || (last.lv + '단계')) + '</span>' +
@@ -13882,7 +13934,7 @@ function viewRoster() {
         : '<div class="small muted">아직 기록이 없습니다. 넬트는 3개월마다, 메타수학은 주간·월간으로 단계만 남기세요.</div>') +
       '<hr class="sep"><div class="fl mb8">평가 기록 추가</div><div class="chips">' +
         curActive.filter(s => !examAll(s.name).length)
-          .map(s => '<button class="chip" data-act="exlog" data-name="' + esc(s.name) + '">＋ ' + esc(s.name) + '</button>').join('') +
+          .map(s => '<button class="chip" data-act="exlog" data-name="' + esc(s.name) + '">＋ ' + esc(staffStudentCompactLabel(s)) + '</button>').join('') +
       '</div></div></details>';
   }
 
@@ -13906,15 +13958,15 @@ function viewRoster() {
       '<div class="between small" style="padding:2px 0"><span>➕ ' + (m === baseline ? '기준 등록' : '신규') + '</span>' +
         '<span>' + (joins.length ? joins.length + '명' : '0') + '</span></div>' +
       (m !== baseline && joins.length
-        ? '<div class="small muted">' + joins.map(s => esc(s.name) + '(' + esc(s.grade) + ')').join(', ') + '</div>' : '') +
+        ? '<div class="small muted">' + joins.map(s => esc(staffStudentCompactLabel(s))).join(', ') + '</div>' : '') +
       (existingAdds.length ? '<div class="between small" style="padding:2px 0"><span>📋 기존 원생 명단 보완</span><span>' + existingAdds.length + '명</span></div>' +
-        '<div class="small muted">' + existingAdds.map(s => esc(s.name) + '(' + esc(s.grade) + ')').join(', ') + '</div>' : '') +
+        '<div class="small muted">' + existingAdds.map(s => esc(staffStudentCompactLabel(s))).join(', ') + '</div>' : '') +
       '<div class="between small" style="padding:2px 0"><span>➖ 퇴원</span><span>' + (leaves.length ? leaves.length + '명' : '0') + '</span></div>' +
       (leaves.length
-        ? leaves.map(s => '<div class="small muted">· ' + esc(s.name) + '(' + esc(s.grade) + ')' +
+        ? leaves.map(s => '<div class="small muted">· ' + esc(staffStudentCompactLabel(s)) +
             (s.reason ? ' — ' + esc(s.reason) : '') + '</div>').join('') : '') +
       '<div class="between small" style="padding:2px 0"><span>⏸ 휴원</span><span>' + (pauses.length ? pauses.length + '명' : '0') + '</span></div>' +
-      (pauses.length ? pauses.map(s => '<div class="small muted">· ' + esc(s.name) + '(' + esc(s.grade) + ')' +
+      (pauses.length ? pauses.map(s => '<div class="small muted">· ' + esc(staffStudentCompactLabel(s)) +
         (s.reason ? ' — ' + esc(s.reason) : '') + '</div>').join('') : '') +
       '</div>';
   });
@@ -14057,7 +14109,7 @@ function guardianAnnouncementModal(announcementId) {
   const id = current ? current.announcementId : 'announcement-' + uid();
   const options = students.map(student => '<label class="row" style="gap:8px;align-items:center;min-height:44px">' +
     '<input type="checkbox" data-ga-student value="' + esc(student.id) + '" ' + (selected.has(student.id) ? 'checked' : '') + '>' +
-    '<span>' + esc(student.name) + ' <span class="muted">' + esc(student.grade || '') + '</span></span></label>').join('');
+    '<span>' + esc(staffStudentCompactLabel(student)) + '</span></label>').join('');
   modal(current ? '보호자 공지 수정' : '보호자 공지 작성',
     '<input type="hidden" id="gaId" value="' + esc(id) + '"><input type="hidden" id="gaRevision" value="' + Number(current && current.revision || 0) + '">' +
     '<div class="field"><label class="fl">공지 제목</label><input class="in" id="gaTitle" maxlength="100" value="' + esc(current && current.title || '') + '"></div>' +
@@ -14806,7 +14858,7 @@ function viewGuardianContactPanel() {
     else contactBody = students.map((student, index) => {
       const contact = (guardianContacts && guardianContacts.get(student.id)) || { phone: '' };
       return '<div class="mt14"><div class="fl">' + esc(student.name) + ' <span class="muted">(' +
-        esc([student.school || '학교 미입력', student.grade || '학년 미입력', rosterStudentSubjectTeacherText(student.id)].join(' · ')) +
+        esc([studentSchoolGradeDetailLabel(student) || '학교·학년 미입력', rosterStudentSubjectTeacherText(student.id)].join(' · ')) +
         rosterParentContactSuffix(student) + ')</span></div><div class="row wraprow" style="gap:8px">' +
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + index + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(contact.phone || '') + '">' +
         '<button class="btn btn-sm btn-ghost" data-act="gcsave" data-idx="' + index + '">연락처 저장</button></div></div>';
@@ -14837,7 +14889,7 @@ function viewGuardianContactPanel() {
     const c = (guardianContacts && guardianContacts.get(s.id)) || { phone: '', consent: false };
     if (!guardianContactEnabledFor(s.id)) {
       return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' +
-        esc([s.school || '학교 미입력', s.grade || '학년 미입력', rosterStudentSubjectTeacherText(s.id)].join(' · ')) +
+        esc([studentSchoolGradeDetailLabel(s) || '학교·학년 미입력', rosterStudentSubjectTeacherText(s.id)].join(' · ')) +
         rosterParentContactSuffix(s) + ')</span> <span class="pill muted">학부모 전달 중지</span></div>' +
         '<div class="row wraprow" style="gap:8px"><input class="in" style="flex:2 1 140px" id="gcPhone-' + i +
         '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
@@ -14848,7 +14900,7 @@ function viewGuardianContactPanel() {
     const makeupOps = ops.makeup || emptyGuardianOpsConsent();
     const sessionOps = ops.session || emptyGuardianOpsConsent();
     const opsDisabled = guardianOpsConsentsError ? ' disabled' : '';
-    return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc([s.school || '학교 미입력', s.grade || '학년 미입력', rosterStudentSubjectTeacherText(s.id)].join(' · ')) + rosterParentContactSuffix(s) + ')</span></div>' +
+    return '<div class="mt14"><div class="fl">' + esc(s.name) + ' <span class="muted">(' + esc([studentSchoolGradeDetailLabel(s) || '학교·학년 미입력', rosterStudentSubjectTeacherText(s.id)].join(' · ')) + rosterParentContactSuffix(s) + ')</span></div>' +
       '<div class="row wraprow" style="gap:8px">' +
         '<input class="in" style="flex:2 1 140px" id="gcPhone-' + i + '" type="tel" inputmode="numeric" placeholder="01012345678" value="' + esc(c.phone || '') + '">' +
         '<label class="row small guardian-ops-consent" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="gcConsent-' + i + '" ' + (c.consent ? 'checked' : '') + '> 수업 피드백 알림톡 동의</label>' +
@@ -14900,7 +14952,7 @@ function viewStudentPortalPanel() {
     const reconnect = !!(access.needsReconnect || access.needsScopeReconsent);
     const disabled = studentPortalError ? ' disabled' : '';
     const inviteDisabled = (!access.enabled || reconnect || !contact || !contact.phone || studentPortalError) ? ' disabled' : '';
-    return '<div class="mt14"><div class="fl">' + esc(student.name) + ' <span class="muted">(' + esc(student.grade) + ' · ' +
+    return '<div class="mt14"><div class="fl">' + esc(staffStudentCompactLabel(student)) + ' <span class="muted">(' +
       esc(rosterStudentSubjectTeacherText(student.id)) + ')</span></div><div class="row wraprow" style="gap:8px">' +
       '<label class="row small" style="gap:4px;align-items:center;flex:0 0 auto"><input type="checkbox" id="spAccess-' + index + '" ' +
         (access.enabled ? 'checked' : '') + disabled + '> 학생 앱 이용 동의 v3</label>' +
@@ -17806,7 +17858,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.1';
+const APP_VER = '2026-08-28.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

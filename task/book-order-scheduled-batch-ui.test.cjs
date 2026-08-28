@@ -214,3 +214,16 @@ test('화면에서 즉시 문자 발송 경로를 노출하지 않는다', () =>
   assert.doesNotMatch(html, /data-act="bossend"|data-act="smsmanual"|function sendBookOrder/);
   assert.match(html, /개별 주문도 매일 저녁 8시에 출판사별 문자 한 통으로 자동 묶입니다/);
 });
+
+test('교재 배송 현황과 완료 기록은 stable studentId 기반 학교급·학년 표기를 사용한다', () => {
+  const row = block('function bookOrderRowHtml(', 'function bookOrderStageHtml(');
+  const history = block('function viewBookOrderHistory(', 'function viewBookOrderStart(');
+  const link = block('function openBookOrderStudentLink(', 'async function saveBookOrderStudentLink(');
+  const bound = block('function boundBookOrderSummaryHtml(', 'function boundBookOrderOptionsHtml(');
+
+  assert.match(row, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
+  assert.match(history, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
+  assert.match(link, /studentSchoolGradeDetailLabel\(student\)/);
+  assert.match(bound, /staffStudentCompactLabel\(student, '이름 미입력'\)/);
+  assert.doesNotMatch(row, /student\.name \+ ' ' \+ \(student\.grade/);
+});

@@ -5,6 +5,13 @@ const test = require('node:test');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
+function studentLabelHelperSource() {
+  const start = html.indexOf('function schoolLevelLabel(school)');
+  const end = html.indexOf('function taskRosterStudent(t)', start);
+  assert.ok(start >= 0 && end > start, 'student display label helper block exists');
+  return html.slice(start, end);
+}
+
 test('task inline application script parses', () => {
   const start = html.lastIndexOf('<script>') + '<script>'.length;
   const end = html.indexOf('</script>', start);
@@ -198,7 +205,7 @@ test('existing lesson search finds editable tasks by teacher or student name and
   ];
   const staff = { 'teacher-a': { name: 'Teacher One' }, 'teacher-b': { name: 'Teacher Two' } };
   const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'canEditLessonTask', 'staffById', 'studentOf',
-    'lessonAssignmentScheduleText', 'esc', html.slice(start, end) +
+    'lessonAssignmentScheduleText', 'esc', studentLabelHelperSource() + html.slice(start, end) +
     '\nreturn { lessonExistingChangeRows, lessonExistingChangeResultsHtml };')(
       { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion,
       id => staff[id] || null, task => task.studentName || '', () => '', value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
