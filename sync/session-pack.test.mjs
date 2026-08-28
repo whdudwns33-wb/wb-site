@@ -295,6 +295,45 @@ test('flexible weekend attendance requires an exact non-cancelled actual visit b
   }
 });
 
+test('fixed weekend attendance accepts its recurrence or an exact cross-day actual visit only', async () => {
+  const actualDate = '2026-08-30';
+  for (const status of [null, 'cancelled', 'completed']) {
+    const db = seed();
+    const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+    const task = JSON.parse(row.data);
+    Object.assign(task, { repeat: 'days', days: [6], weekendAttendanceMode: 'fixed' });
+    db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
+    const pack = (await create(db)).body.pack;
+    putCheck(db, 'lesson-a', 'teacher-a', actualDate, 'P');
+    if (status) putWeekendVisit(db, actualDate, status);
+    const result = await record(db, pack, 'lesson-a', actualDate);
+    if (status === 'completed') {
+      assert.equal(result.status, 200);
+      assert.equal(result.body.pack.usedSessions, 1);
+    } else {
+      assert.equal(result.status, 409);
+      assert.equal(result.body.code, 'CHECK_IDENTITY_MISMATCH');
+    }
+  }
+
+  const scheduledDb = seed();
+  const scheduledRow = scheduledDb.database.prepare(
+    "SELECT data FROM tasks WHERE app='task' AND id='lesson-a'"
+  ).get();
+  const scheduledTask = JSON.parse(scheduledRow.data);
+  Object.assign(scheduledTask, { repeat: 'days', days: [6], weekendAttendanceMode: 'fixed' });
+  scheduledDb.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'")
+    .bind(JSON.stringify(scheduledTask)).run();
+  await create(scheduledDb);
+  putWeekendVisit(scheduledDb, actualDate, 'completed');
+  putCheck(scheduledDb, 'lesson-a', 'teacher-a', actualDate, 'P');
+  const finalized = await handleScheduledSessionPackAttendance(
+    { DB: scheduledDb }, Date.parse(actualDate + 'T14:50:00Z')
+  );
+  assert.deepEqual(finalized,
+    { ok: true, sourceDate: actualDate, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
+});
+
 test('a future flexible effective date keeps the existing weekend recurrence until transition', async () => {
   const date = '2026-08-29';
   const db = seed();
