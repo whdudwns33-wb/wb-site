@@ -1015,11 +1015,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-28.10"></script>
-<script src="./schedule-board-core.js?v=2026-08-28.10"></script>
-<script src="./asset-core.js?v=2026-08-28.10"></script>
-<script src="./qr-core.js?v=2026-08-28.10"></script>
-<script src="./acaflow-import-core.js?v=2026-08-28.10"></script>
+<script src="./lesson-form-core.js?v=2026-08-28.11"></script>
+<script src="./schedule-board-core.js?v=2026-08-28.11"></script>
+<script src="./asset-core.js?v=2026-08-28.11"></script>
+<script src="./qr-core.js?v=2026-08-28.11"></script>
+<script src="./acaflow-import-core.js?v=2026-08-28.11"></script>
 <script>
 "use strict";
 
@@ -8432,6 +8432,38 @@ function lessonChangeInboxMeta(changes) {
   return { kind: '수업 변경', detail: '요일·시간·진도 변경 승인' };
 }
 
+const STUDENT_CHANGE_INBOX_META = Object.freeze({
+  student_information: { kind: '학생정보 미확인', route: 'roster' },
+  work_instruction: { kind: '업무지시 미확인', route: 'lesson' },
+  teacher_assignment: { kind: '담당 선생님 변경 미확인', route: 'lesson' },
+  withdrawal: { kind: '퇴원 처리 미확인', route: 'roster' },
+  leave: { kind: '휴원 처리 미확인', route: 'roster' }
+});
+
+function studentChangeInboxMeta(event) {
+  return STUDENT_CHANGE_INBOX_META[String(event && event.eventType || '')] ||
+    { kind: '학생 변경 미확인', route: 'roster' };
+}
+
+function studentChangeAudienceIsCurrent(event, status) {
+  const staffId = String(status && status.staffId || '');
+  const studentId = String(event && event.studentId || '');
+  const taskId = String(event && event.taskId || '');
+  if (!staffId || !studentId) return false;
+  if (taskId) {
+    const task = (state.tasks || []).find(row => String(row.id || '') === taskId);
+    return !!(task && !task.deleted && String(task.studentId || '') === studentId &&
+      String(task.staffId || '') === staffId);
+  }
+  return (state.tasks || []).some(task => task && !task.deleted &&
+    String(task.studentId || '') === studentId && String(task.staffId || '') === staffId);
+}
+
+function pendingStudentChangeAudience(event) {
+  return (Array.isArray(event && event.audienceStatus) ? event.audienceStatus : [])
+    .filter(status => !status.acknowledgedAt && studentChangeAudienceIsCurrent(event, status));
+}
+
 function managerRequestInboxRows() {
   if (!session.isAdmin) return [];
   const rows = [];
@@ -8493,14 +8525,15 @@ function managerRequestInboxRows() {
   });
   const studentChangeInboxEvents = typeof studentChangeEvents === 'undefined' ? [] : studentChangeEvents;
   studentChangeInboxEvents.filter(event => event.requiresAck && Array.isArray(event.audienceStatus)).forEach(event => {
-    const pending = event.audienceStatus.filter(item => !item.acknowledgedAt);
+    const pending = pendingStudentChangeAudience(event);
     if (!pending.length) return;
     const task = state.tasks.find(row => String(row.id) === String(event.taskId || ''));
     const student = rosterDb && rosterDb.students && rosterDb.students.find(row => String(row.id) === String(event.studentId || ''));
-    push(event.eventType === 'student_information' ? '학생정보 미확인' : '업무지시 미확인',
+    const meta = studentChangeInboxMeta(event);
+    push(meta.kind,
       (student && student.name) || (task && task.studentName) || '학생 정보',
       '미확인: ' + pending.map(item => managerRequestTeacher(item.staffId)).join(', '), '',
-      event.eventType === 'student_information' ? 'roster' : 'lesson', event.changedAt, -1);
+      meta.route, event.changedAt, -1);
   });
 
   return rows.sort((a, b) => a.priority - b.priority || b.updatedAt - a.updatedAt || a.kind.localeCompare(b.kind, 'ko'));
@@ -13556,12 +13589,16 @@ function studentChangeAcknowledgementStatusHtml() {
   return '<details class="admin-directive-history"><summary>학생정보·업무지시 확인 현황 · 최근 ' + rows.length + '건</summary>' +
     (rows.length ? rows.map(event => {
       const statuses = event.audienceStatus || [];
-      const done = statuses.filter(item => item.acknowledgedAt).length;
+      const current = statuses.filter(item => studentChangeAudienceIsCurrent(event, item));
+      const done = current.filter(item => item.acknowledgedAt).length;
+      const pending = pendingStudentChangeAudience(event);
+      const adminResolved = statuses.filter(item => item.resolvedByAdminAt).length;
       const student = rosterDb && rosterDb.students && rosterDb.students.find(item => String(item.id) === String(event.studentId));
-      const title = event.eventType === 'student_information' ? '학생정보 수정' : '업무지시 수정';
+      const title = studentChangeInboxMeta(event).kind.replace(/ 미확인$/, '');
       return '<div class="guide mb8"><b>' + esc(staffStudentCompactLabel(student) + ' · ' + title) + '</b><br>' +
-        '확인 ' + done + '/' + statuses.length +
-        (statuses.length ? '<div class="small muted mt8">미확인: ' + esc(statuses.filter(item => !item.acknowledgedAt)
+        (current.length ? '현재 담당 처리 ' + done + '/' + current.length : '현재 담당 없음') +
+        (adminResolved ? '<div class="small muted mt8">관리자 읽음 처리: ' + adminResolved + '명</div>' : '') +
+        (current.length ? '<div class="small muted mt8">미확인: ' + esc(pending
           .map(item => managerRequestTeacher(item.staffId)).join(', ') || '없음') + '</div>' : '') + '</div>';
     }).join('') : '<div class="small muted">표시할 변경 이력이 없습니다.</div>') + '</details>';
 }
@@ -19027,17 +19064,18 @@ setInterval(() => {
   const auth = sync.auth();
   if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
     loadAdminDirectives(true, true);
+    loadStudentChanges(true);
     if (session.isAdmin) {
       loadTeacherLiveRequests(true, true);
       loadTuitionAlerts(true, true);
-    } else if (session.isStaffLink && !session.isAdmin && auth.mode === 'person') loadStudentChanges(true);
+    }
   }
 }, 15000);
 
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-28.10';
+const APP_VER = '2026-08-28.11';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

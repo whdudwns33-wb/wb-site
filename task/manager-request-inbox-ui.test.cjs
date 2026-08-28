@@ -115,3 +115,73 @@ test('보호자 요청은 서버 문구 대신 안전한 enum 라벨과 CAS 식�
   assert.equal(guardian[1].title, '학생D 초5 · 요청 유형 확인 필요');
   assert.doesNotMatch(guardian.map(row => row.title).join(' '), /<img|server_html/);
 });
+
+test('학생 변경 미확인은 현재 exact 수업 담당만 표시하고 과거 담당 ghost는 숨긴다', () => {
+  const currentTask = {
+    id: 'lesson-current', studentId: 'student-a', studentName: '학생A', staffId: 'teacher-b', deleted: false
+  };
+  const oldTask = {
+    id: 'lesson-old', studentId: 'student-a', studentName: '학생A', staffId: 'teacher-b', deleted: false
+  };
+  const rows = inboxRowsFor({
+    lessonAssignmentRequests: [], lessonChangeQueue: [], feedbackQueue: [],
+    bookAddQueue: [], bookEditQueue: [], guardianRequestRows: [],
+    rosterDb: { students: [{ id: 'student-a', name: '학생A' }] },
+    state: { tasks: [currentTask, oldTask] },
+    studentChangeEvents: [
+      {
+        eventId: 'event-current', eventType: 'work_instruction', requiresAck: true,
+        taskId: 'lesson-current', studentId: 'student-a', changedAt: 20,
+        audienceStatus: [
+          { staffId: 'teacher-a', acknowledgedAt: null },
+          { staffId: 'teacher-b', acknowledgedAt: null }
+        ]
+      },
+      {
+        eventId: 'event-old-owner', eventType: 'work_instruction', requiresAck: true,
+        taskId: 'lesson-old', studentId: 'student-a', changedAt: 10,
+        audienceStatus: [{ staffId: 'teacher-a', acknowledgedAt: null }]
+      }
+    ]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, '업무지시 미확인');
+  assert.match(rows[0].detail, /김민지 선생님/);
+  assert.doesNotMatch(rows[0].detail, /염다솜 선생님|teacher-a/);
+});
+
+test('학생 변경 eventType은 통합 요청함에서 서로 다른 정확한 라벨과 경로를 쓴다', () => {
+  const cases = [
+    ['student_information', '학생정보 미확인', 'roster'],
+    ['work_instruction', '업무지시 미확인', 'lesson'],
+    ['teacher_assignment', '담당 선생님 변경 미확인', 'lesson'],
+    ['withdrawal', '퇴원 처리 미확인', 'roster'],
+    ['leave', '휴원 처리 미확인', 'roster'],
+    ['future_event_type', '학생 변경 미확인', 'roster']
+  ];
+  const tasks = cases.map(([eventType], index) => ({
+    id: 'lesson-' + index, studentId: 'student-a', studentName: '학생A', staffId: 'teacher-b', deleted: false,
+    eventType
+  }));
+  const rows = inboxRowsFor({
+    lessonAssignmentRequests: [], lessonChangeQueue: [], feedbackQueue: [],
+    bookAddQueue: [], bookEditQueue: [], guardianRequestRows: [],
+    rosterDb: { students: [{ id: 'student-a', name: '학생A' }] },
+    state: { tasks },
+    studentChangeEvents: cases.map(([eventType], index) => ({
+      eventId: 'event-' + index, eventType, requiresAck: true,
+      taskId: 'lesson-' + index, studentId: 'student-a', changedAt: 100 - index,
+      audienceStatus: [{ staffId: 'teacher-b', acknowledgedAt: null }]
+    }))
+  });
+
+  assert.equal(rows.length, cases.length);
+  for (const [, kind, route] of cases) {
+    const row = rows.find(item => item.kind === kind);
+    assert.ok(row, kind + ' 행이 있어야 한다');
+    assert.equal(row.route, route);
+  }
+  assert.equal(rows.filter(row => row.kind === '업무지시 미확인').length, 1,
+    '업무지시 외 변경을 업무지시로 뭉뚱그리지 않는다');
+});

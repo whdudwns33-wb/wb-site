@@ -103,13 +103,35 @@ function scopedReloadHarness(deps) {
   return create(deps);
 }
 
-test('보이는 개인 링크는 15초마다 학생 변경을 확인하고 visibilitychange 갱신도 유지한다', () => {
+test('보이는 관리자와 개인 링크는 모두 15초마다 학생 변경을 확인하고 visibilitychange 갱신도 유지한다', () => {
   const interval = sourceBlock('startSyncSession();', '/* ── 새 버전 감지');
   assert.match(interval, /const auth = sync\.auth\(\)/);
   assert.match(interval, /document\.visibilityState === 'visible'/);
-  assert.match(interval, /session\.isStaffLink && !session\.isAdmin && auth\.mode === 'person'/);
-  assert.match(interval, /loadStudentChanges\(true\)/);
   assert.match(interval, /}, 15000\);/);
+
+  const pollStart = interval.lastIndexOf('setInterval(() => {');
+  assert.ok(pollStart >= 0, '15초 학생 변경 poll을 찾을 수 있어야 한다');
+  const pollSource = interval.slice(pollStart);
+  const runFor = session => {
+    let callback = null;
+    const calls = { directives: 0, changes: 0, teacherRequests: 0, tuition: 0 };
+    const execute = new Function(
+      'setInterval', 'sync', 'document', 'session', 'loadAdminDirectives', 'loadStudentChanges',
+      'loadTeacherLiveRequests', 'loadTuitionAlerts', pollSource
+    );
+    execute((fn, delay) => { assert.equal(delay, 15000); callback = fn; },
+      { auth: () => ({ mode: session.isAdmin ? 'admin' : 'person' }) }, { visibilityState: 'visible' }, session,
+      () => { calls.directives += 1; }, () => { calls.changes += 1; },
+      () => { calls.teacherRequests += 1; }, () => { calls.tuition += 1; });
+    assert.equal(typeof callback, 'function');
+    callback();
+    return calls;
+  };
+
+  assert.deepEqual(runFor({ isAdmin: true, isStaffLink: false }),
+    { directives: 1, changes: 1, teacherRequests: 1, tuition: 1 });
+  assert.deepEqual(runFor({ isAdmin: false, isStaffLink: true }),
+    { directives: 1, changes: 1, teacherRequests: 0, tuition: 0 });
 
   const visibility = sourceBlock("document.addEventListener('visibilitychange'", '/* ══');
   assert.match(visibility, /loadStudentChanges\(true\)/);
