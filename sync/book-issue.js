@@ -233,7 +233,8 @@ async function listOrderFulfillments(env, app, auth, document) {
       const needsStudentLink = !String(item.bookId || '') || !studentIds.length || invalidSelection || unauthorized || missing;
       const canLinkStudents = !integrity && !fulfillment && !!send && String(send.status) === 'accepted' && needsStudentLink;
       const students = integrity ? [] : studentIds.map(id => studentsById.get(id)).filter(Boolean).map(student => ({
-        id: String(student.id), name: String(student.name || '이름 미입력'), grade: String(student.grade || '')
+        id: String(student.id), name: String(student.name || '이름 미입력'),
+        school: String(student.school || ''), grade: String(student.grade || '')
       }));
       rows.push(publicOrderFulfillment(String(taskRow.id), itemIndex, item, task.orderVendor, String(taskRow.owner || ''),
         staffNames.get(String(taskRow.owner || '')), students, send, fulfillment, priceRow, correctionRow, integrity,

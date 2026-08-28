@@ -31,7 +31,9 @@ function titleDisplayCore() {
   const source = block('/** 제목 말머리는 데이터 판별용으로 보존하고 화면에서만 감춘다. */', '/* ── 인터뷰형 코멘트 생성 ──');
   const vendorDisplay = block('/** 주문·문자 설정용 기존 식별값은 유지하고 주문처 이름만 화면에서 바꾼다. */', 'function bookSearchText(');
   return new Function(`let rosterDb = null;\n${vendorDisplay}\n${source}\nreturn {
-    schoolGradeDisplayLabel, taskTitlePrefix, taskTitleWithoutPrefix, taskDisplayTitle,
+    schoolGradeDisplayLabel, studentDisplayGradeLabel, staffStudentCompactLabel,
+    staffStudentCompactLabelById, studentSchoolGradeDetailLabel,
+    taskTitlePrefix, taskTitleWithoutPrefix, taskDisplayTitle,
     setRoster(value) { rosterDb = value; }
   };`)();
 }
@@ -140,6 +142,22 @@ test('grade display does not guess a school level when school information is una
   assert.equal(core.schoolGradeDisplayLabel('', '2'), '2');
   assert.equal(core.schoolGradeDisplayLabel('학교급 확인 필요', '2'), '2');
   assert.equal(core.schoolGradeDisplayLabel('치평중', '중 2학년'), '중2');
+});
+
+test('staff student labels use stable studentId and show school level with grade', () => {
+  const core = titleDisplayCore();
+  core.setRoster({ students: [
+    { id: '80000001', name: '예시학생가', school: '예시중학교', grade: '2', motherPhone: '비공개-연락처' },
+    { id: '80000002', name: '동명학생', school: '예시초등학교', grade: '3' },
+    { id: '80000003', name: '동명학생', school: '예시중학교', grade: '1' }
+  ] });
+
+  assert.equal(core.staffStudentCompactLabelById('80000001', '다른 이름', '9'), '예시학생가 중2');
+  assert.equal(core.staffStudentCompactLabelById('80000002', '동명학생', '3'), '동명학생 초3');
+  assert.equal(core.staffStudentCompactLabelById('80000003', '동명학생', '1'), '동명학생 중1');
+  assert.equal(core.staffStudentCompactLabelById('없는-id', '미연결학생', '2'), '미연결학생 2');
+  assert.equal(core.studentSchoolGradeDetailLabel({ school: '예시중학교', grade: '2' }), '예시중학교 · 중2');
+  assert.doesNotMatch(core.staffStudentCompactLabelById('80000001'), /80000001|비공개-연락처/);
 });
 
 test('lesson references leave the lesson panel and every editable lesson button uses the same wording', () => {
