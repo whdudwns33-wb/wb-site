@@ -483,6 +483,17 @@ test('비정기 주말 수업은 적용일 이후 exact 실제 방문이 있는 
   ).bind(checkOutAt, 'wv_' + 'a'.repeat(32)).run();
   today = await publicToday(env(db), { id: 'student-a' }, now);
   assert.equal(today.lessons[0].timeLabel, '10:30–12:05');
+
+  const secondCheckInAt = Date.parse('2026-08-29T12:20:00+09:00');
+  db.prepare(
+    'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,visit_sequence,' +
+    'check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
+    "VALUES(?,?,?,?,?,?,2,?,NULL,'active',1,?,?,?,?)"
+  ).bind('task', 'wv_' + 'b'.repeat(32), 'student-a', 'lesson-a', 'staff-a', date,
+    secondCheckInAt, secondCheckInAt, secondCheckInAt, 'staff-a', 'staff-a').run();
+  today = await publicToday(env(db), { id: 'student-a' }, now);
+  assert.equal(today.lessons[0].timeLabel, '12:20–등원 중',
+    '같은 날 다시 등원하면 보호자 화면도 활성 방문을 결정적으로 선택한다');
 });
 
 test('비정기 수업은 위조된 평일 방문 행이 있어도 보호자 오늘 수업으로 공개하지 않는다', async () => {

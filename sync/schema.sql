@@ -3401,6 +3401,7 @@ CREATE TABLE IF NOT EXISTS weekend_actual_visits (
   source_date     TEXT    CHECK (
     source_date IS NULL OR source_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
   ),
+  visit_sequence  INTEGER NOT NULL DEFAULT 1 CHECK (visit_sequence BETWEEN 1 AND 99),
   check_in_at     INTEGER NOT NULL CHECK (check_in_at > 0),
   check_out_at    INTEGER CHECK (check_out_at IS NULL OR check_out_at >= check_in_at),
   status          TEXT    NOT NULL CHECK (status IN ('active','completed','cancelled')),
@@ -3410,13 +3411,15 @@ CREATE TABLE IF NOT EXISTS weekend_actual_visits (
   created_by      TEXT    NOT NULL CHECK (length(created_by) BETWEEN 1 AND 128),
   updated_by      TEXT    NOT NULL CHECK (length(updated_by) BETWEEN 1 AND 128),
   PRIMARY KEY (app, visit_id),
-  UNIQUE (app, student_id, lesson_task_id, visit_date)
+  UNIQUE (app, student_id, lesson_task_id, visit_date, visit_sequence)
 );
 
 CREATE INDEX IF NOT EXISTS idx_weekend_actual_visits_date_staff
   ON weekend_actual_visits(app, visit_date, staff_id, status);
 CREATE INDEX IF NOT EXISTS idx_weekend_actual_visits_student
   ON weekend_actual_visits(app, student_id, visit_date DESC);
+CREATE INDEX IF NOT EXISTS idx_weekend_actual_visits_lesson_day
+  ON weekend_actual_visits(app, student_id, lesson_task_id, visit_date, visit_sequence);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_weekend_actual_visits_one_open
   ON weekend_actual_visits(app, student_id)
   WHERE status = 'active';
@@ -3446,6 +3449,7 @@ WHEN NEW.app <> OLD.app
   OR NEW.lesson_task_id <> OLD.lesson_task_id
   OR NEW.staff_id <> OLD.staff_id
   OR NEW.visit_date <> OLD.visit_date
+  OR NEW.visit_sequence <> OLD.visit_sequence
   OR NEW.created_at <> OLD.created_at
   OR NEW.created_by <> OLD.created_by
   OR NEW.revision <> OLD.revision + 1
@@ -3459,6 +3463,102 @@ BEFORE UPDATE OF source_date ON weekend_actual_visits
 WHEN NEW.source_date IS NOT OLD.source_date
 BEGIN
   SELECT RAISE(ABORT, 'WEEKEND_VISIT_IMMUTABLE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_source_date_insert_guard
+BEFORE INSERT ON weekend_actual_visits
+WHEN NEW.status <> 'cancelled'
+  AND NEW.source_date IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM weekend_actual_visits linked
+    WHERE linked.app = NEW.app
+      AND linked.student_id = NEW.student_id
+      AND linked.lesson_task_id = NEW.lesson_task_id
+      AND linked.source_date = NEW.source_date
+      AND linked.visit_date <> NEW.visit_date
+      AND linked.status <> 'cancelled'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'WEEKEND_SOURCE_DATE_ALREADY_LINKED');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_source_date_reopen_guard
+BEFORE UPDATE OF status ON weekend_actual_visits
+WHEN OLD.status = 'cancelled'
+  AND NEW.status <> 'cancelled'
+  AND NEW.source_date IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM weekend_actual_visits linked
+    WHERE linked.app = NEW.app
+      AND linked.student_id = NEW.student_id
+      AND linked.lesson_task_id = NEW.lesson_task_id
+      AND linked.source_date = NEW.source_date
+      AND linked.visit_date <> NEW.visit_date
+      AND linked.status <> 'cancelled'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'WEEKEND_SOURCE_DATE_ALREADY_LINKED');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_time_insert_guard
+BEFORE INSERT ON weekend_actual_visits
+WHEN NEW.status <> 'cancelled'
+  AND EXISTS (
+    SELECT 1 FROM weekend_actual_visits sibling
+    WHERE sibling.app = NEW.app
+      AND sibling.student_id = NEW.student_id
+      AND sibling.lesson_task_id = NEW.lesson_task_id
+      AND sibling.visit_date = NEW.visit_date
+      AND sibling.status <> 'cancelled'
+      AND NOT (
+        COALESCE(NEW.check_out_at, 9223372036854775807) <= sibling.check_in_at
+        OR COALESCE(sibling.check_out_at, 9223372036854775807) <= NEW.check_in_at
+      )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'WEEKEND_VISIT_TIME_OVERLAP');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_time_update_guard
+BEFORE UPDATE OF check_in_at, check_out_at, status ON weekend_actual_visits
+WHEN NEW.status <> 'cancelled'
+  AND (
+    EXISTS (
+      SELECT 1 FROM weekend_actual_visits sibling
+      WHERE sibling.app = NEW.app
+        AND sibling.student_id = NEW.student_id
+        AND sibling.lesson_task_id = NEW.lesson_task_id
+        AND sibling.visit_date = NEW.visit_date
+        AND sibling.visit_id <> NEW.visit_id
+        AND sibling.status <> 'cancelled'
+        AND NOT (
+          COALESCE(NEW.check_out_at, 9223372036854775807) <= sibling.check_in_at
+          OR COALESCE(sibling.check_out_at, 9223372036854775807) <= NEW.check_in_at
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM weekend_actual_visits earlier
+      WHERE earlier.app = NEW.app
+        AND earlier.student_id = NEW.student_id
+        AND earlier.lesson_task_id = NEW.lesson_task_id
+        AND earlier.visit_date = NEW.visit_date
+        AND earlier.visit_sequence < NEW.visit_sequence
+        AND earlier.status <> 'cancelled'
+        AND (earlier.check_out_at IS NULL OR earlier.check_out_at > NEW.check_in_at)
+    )
+    OR EXISTS (
+      SELECT 1 FROM weekend_actual_visits later
+      WHERE later.app = NEW.app
+        AND later.student_id = NEW.student_id
+        AND later.lesson_task_id = NEW.lesson_task_id
+        AND later.visit_date = NEW.visit_date
+        AND later.visit_sequence > NEW.visit_sequence
+        AND later.status <> 'cancelled'
+        AND (NEW.check_out_at IS NULL OR NEW.check_out_at > later.check_in_at)
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'WEEKEND_VISIT_TIME_OVERLAP');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_weekend_actual_visits_no_delete

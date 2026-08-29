@@ -508,13 +508,15 @@
   .weekend-visit-list { display: grid; gap: 8px; margin-top: 12px; }
   .weekend-visit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); }
   .weekend-visit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .weekend-visit-history { display: grid; gap: 7px; margin-top: 9px; }
+  .weekend-visit-period { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-top: 7px; border-top: 1px dashed var(--line); }
   .weekend-visit-live { border-color: #86C5DF; background: #F0F9FF; }
   .weekend-visit-complete { border-color: #A7D7C5; background: #F3FBF7; }
   .weekend-visit-time { color: var(--deep-blue); font-weight: 900; }
   .weekend-flex-trigger { border: 1px dashed #6AAFD0; background: #F5FBFF; border-radius: 11px; padding: 10px; margin-top: 10px; }
   .weekend-flex-progress { color: #315D7A; font-size: 12px; font-weight: 800; margin-top: 5px; }
   @media (max-width: 600px) {
-    .weekend-visit-row { grid-template-columns: 1fr; }
+    .weekend-visit-row, .weekend-visit-period { grid-template-columns: 1fr; }
     .weekend-visit-actions { justify-content: flex-start; }
   }
 
@@ -1016,11 +1018,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-29.4"></script>
-<script src="./schedule-board-core.js?v=2026-08-29.4"></script>
-<script src="./asset-core.js?v=2026-08-29.4"></script>
-<script src="./qr-core.js?v=2026-08-29.4"></script>
-<script src="./acaflow-import-core.js?v=2026-08-29.4"></script>
+<script src="./lesson-form-core.js?v=2026-08-29.5"></script>
+<script src="./schedule-board-core.js?v=2026-08-29.5"></script>
+<script src="./asset-core.js?v=2026-08-29.5"></script>
+<script src="./qr-core.js?v=2026-08-29.5"></script>
+<script src="./acaflow-import-core.js?v=2026-08-29.5"></script>
 <script>
 "use strict";
 
@@ -1809,7 +1811,7 @@ const makeupCreateStates = new Map(); // sourceTaskId|sourceDate -> pending / sy
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가 직접 정한 details 열림/닫힘 상태 유지
-let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
+let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitNextSequences = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
 const weekendVisitScopeCache = new Map();
 const WEEKEND_VISIT_SCOPE_TTL_MS = 15000;
 const weekendVisitScheduleLoadingKeys = new Map();
@@ -1901,7 +1903,7 @@ function resetPersonCache(token) {
   transportNotificationStates.clear(); transportGuardianStates.clear(); transportGuardianTarget = null;
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
-  weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
+  weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitNextSequences = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
   weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear(); weekendVisitScheduleErrors.clear();
   weekendVisitScopeRequestGeneration.clear(); weekendVisitMainRequestKey = ''; weekendVisitMainRequestGeneration = 0;
   weekendVisitScopeRevision = 0;
@@ -2749,19 +2751,39 @@ function lessonCheckHasMeaningfulData(check) {
   return false;
 }
 
+function weekendVisitRowsChronological(rows) {
+  return (Array.isArray(rows) ? rows : []).slice().sort((left, right) => {
+    const leftSequence = Number(left && left.visitSequence);
+    const rightSequence = Number(right && right.visitSequence);
+    const leftOrder = Number.isInteger(leftSequence) && leftSequence > 0 ? leftSequence : Number.MAX_SAFE_INTEGER;
+    const rightOrder = Number.isInteger(rightSequence) && rightSequence > 0 ? rightSequence : Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder || Number(left && left.checkInAt || 0) - Number(right && right.checkInAt || 0) ||
+      Number(left && left.createdAt || 0) - Number(right && right.createdAt || 0) ||
+      String(left && left.visitId || '').localeCompare(String(right && right.visitId || ''));
+  });
+}
+
+function preferredWeekendVisit(rows) {
+  const ordered = weekendVisitRowsChronological(rows);
+  const active = ordered.filter(row => row && row.status === 'active');
+  return active.length ? active[active.length - 1] : (ordered[ordered.length - 1] || null);
+}
+
 function lessonRecordContext(task, sourceDate) {
-  const basic = { sourceDate: String(sourceDate || ''), recordDate: String(sourceDate || ''), visit: null,
+  const basic = { sourceDate: String(sourceDate || ''), recordDate: String(sourceDate || ''), visit: null, visits: [], visitCount: 0,
     ready: true, inputEnabled: true, visible: true, issue: '' };
   if (!task || !isLesson(task) || !isWeekendVisitDate(sourceDate) || !taskHasWeekendSchedule(task)) return basic;
   const scope = weekendVisitPairScope(task, sourceDate);
   if (!scope.ready) return Object.assign(basic, { recordDate: '', ready: false, inputEnabled: false, issue: scope.error });
-  const matches = scope.rows.filter(row => row && row.status !== 'cancelled' &&
+  const matches = weekendVisitRowsChronological(scope.rows.filter(row => row && row.status !== 'cancelled' &&
     String(row.lessonTaskId || '') === String(task.id || '') && String(row.studentId || '') === String(task.studentId || '') &&
-    weekendVisitSourceDate(task, row) === String(sourceDate));
-  if (matches.length > 1) {
-    return Object.assign(basic, { recordDate: '', inputEnabled: false, issue: '원 수업과 연결된 실제 방문 기록이 여러 개입니다' });
+    weekendVisitSourceDate(task, row) === String(sourceDate)));
+  const actualDates = [...new Set(matches.map(row => String(row && row.visitDate || '')).filter(Boolean))];
+  if (actualDates.length > 1) {
+    return Object.assign(basic, { recordDate: '', visits: matches, visitCount: matches.length, inputEnabled: false,
+      issue: '원 수업과 연결된 서로 다른 실제 날짜의 방문 기록이 여러 개입니다' });
   }
-  const visit = matches[0] || null;
+  const visit = preferredWeekendVisit(matches);
   if (!visit) {
     if (isFlexibleWeekendLesson(task, sourceDate)) {
       return Object.assign(basic, { recordDate: '', inputEnabled: false, visible: false,
@@ -2769,15 +2791,16 @@ function lessonRecordContext(task, sourceDate) {
     }
     return basic;
   }
-  const recordDate = String(visit.visitDate || '');
+  const recordDate = actualDates[0] || '';
   if (!weekendPairDates(sourceDate).includes(recordDate)) {
-    return Object.assign(basic, { recordDate: '', inputEnabled: false, issue: '실제 방문 날짜 연결을 확인해 주세요' });
+    return Object.assign(basic, { recordDate: '', visit: visit, visits: matches, visitCount: matches.length,
+      inputEnabled: false, issue: '실제 방문 날짜 연결을 확인해 주세요' });
   }
   if (recordDate !== sourceDate && lessonCheckHasMeaningfulData(getCheck(task.id, sourceDate))) {
-    return Object.assign(basic, { recordDate: '', visit: visit, inputEnabled: false,
+    return Object.assign(basic, { recordDate: '', visit: visit, visits: matches, visitCount: matches.length, inputEnabled: false,
       issue: '원 수업일에 기존 기록이 있어 실제 방문일로 자동 전환할 수 없습니다' });
   }
-  return Object.assign(basic, { recordDate: recordDate, visit: visit });
+  return Object.assign(basic, { recordDate: recordDate, visit: visit, visits: matches, visitCount: matches.length });
 }
 
 function teacherTaskCardOccursOn(task, date) {
@@ -2827,6 +2850,7 @@ function rememberWeekendVisitScope(date, staffId, result, generation) {
   weekendVisitScopeCache.set(key, {
     rows: Array.isArray(result && result.visits) ? result.visits : [],
     monthlyCounts: Array.isArray(result && result.monthlyCounts) ? result.monthlyCounts : [],
+    nextVisitSequences: Array.isArray(result && result.nextVisitSequences) ? result.nextVisitSequences : [],
     loadedAt: ++weekendVisitScopeRevision,
     fetchedAt: Date.now()
   });
@@ -2851,9 +2875,10 @@ function hasFlexibleWeekendOccurrence(task, date) {
 
 function flexibleWeekendVisit(task, date) {
   if (!hasFlexibleWeekendOccurrence(task, date)) return null;
-  return weekendVisitRowsForTaskDate(task, date).find(row => row && row.status !== 'cancelled' &&
+  const matches = weekendVisitRowsForTaskDate(task, date).filter(row => row && row.status !== 'cancelled' &&
     String(row.visitDate || '') === String(date) && String(row.lessonTaskId || '') === String(task.id || '') &&
-    String(row.studentId || '') === String(task.studentId || '')) || null;
+    String(row.studentId || '') === String(task.studentId || ''));
+  return preferredWeekendVisit(matches);
 }
 
 function weekendVisitScheduleClock(value) {
@@ -3032,6 +3057,7 @@ async function loadWeekendVisits(date, staffId, force) {
   if (!force && cached) {
     weekendVisitRows = cached.rows;
     weekendVisitMonthlyCounts = cached.monthlyCounts;
+    weekendVisitNextSequences = cached.nextVisitSequences || [];
     weekendVisitLoadedKey = key;
     weekendVisitError = '';
     return;
@@ -3053,6 +3079,7 @@ async function loadWeekendVisits(date, staffId, force) {
     if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) {
       weekendVisitRows = result.visits || [];
       weekendVisitMonthlyCounts = result.monthlyCounts || [];
+      weekendVisitNextSequences = result.nextVisitSequences || [];
       weekendVisitLoadedKey = key;
       weekendVisitError = '';
     }
@@ -3073,6 +3100,7 @@ function activateWeekendVisitScope(key) {
   if (!cached) return null;
   weekendVisitRows = cached.rows;
   weekendVisitMonthlyCounts = cached.monthlyCounts;
+  weekendVisitNextSequences = cached.nextVisitSequences || [];
   weekendVisitLoadedKey = key;
   weekendVisitError = '';
   return cached;
@@ -3118,47 +3146,84 @@ function weekendVisitDuration(row) {
   return scheduleDurationText(minutes);
 }
 
-function weekendVisitRowHtml(task, row, editable) {
-  const identity = weekendVisitStudentLabel(task, row);
+function weekendVisitSequenceNumber(row, fallback) {
+  const sequence = Number(row && row.visitSequence);
+  return Number.isInteger(sequence) && sequence > 0 ? sequence : Math.max(1, Number(fallback) || 1);
+}
+
+function weekendVisitPeriodText(row, fallback) {
+  const clock = weekendVisitScheduleClock(row && row.checkInAt);
+  const period = clock ? (Number(clock.slice(0, 2)) < 12 ? '오전' : '오후') : '';
+  return '방문 ' + weekendVisitSequenceNumber(row, fallback) + (period ? ' · ' + period : '');
+}
+
+function weekendVisitNextSequence(task, date, rows) {
+  const taskId = String(task && task.id || '');
+  const studentId = String(task && task.studentId || '');
+  const visitDate = String(date || '');
+  const serverValue = (weekendVisitNextSequences || []).find(item => item &&
+    String(item.lessonTaskId || '') === taskId && String(item.studentId || '') === studentId &&
+    String(item.visitDate || '') === visitDate);
+  const next = Number(serverValue && serverValue.next);
+  if (Number.isInteger(next) && next > 0) return next;
+  const visibleMax = weekendVisitRowsChronological(rows).reduce((max, row, index) =>
+    Math.max(max, weekendVisitSequenceNumber(row, index + 1)), 0);
+  return visibleMax + 1;
+}
+
+function weekendVisitRowHtml(task, rows, editable) {
+  const visits = weekendVisitRowsChronological((Array.isArray(rows) ? rows : (rows ? [rows] : []))
+    .filter(row => row && row.status !== 'cancelled'));
+  const referenceRow = preferredWeekendVisit(visits);
+  const identity = weekendVisitStudentLabel(task, referenceRow);
   const schedule = task ? (lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '주말 시간 확인 필요') : '';
   const subject = String(task && (task.subject || task.className) || '수업 정보 확인');
-  const flexible = !!(task && isFlexibleWeekendLesson(task, row && row.visitDate || cursor));
-  const progress = flexible ? flexibleWeekendProgressText(task, row && row.visitDate || cursor) : '';
-  const active = row && row.status === 'active';
-  const completed = row && row.status === 'completed';
+  const flexible = !!(task && isFlexibleWeekendLesson(task, referenceRow && referenceRow.visitDate || cursor));
+  const progress = flexible ? flexibleWeekendProgressText(task, referenceRow && referenceRow.visitDate || cursor) : '';
+  const active = visits.some(row => row.status === 'active');
+  const completed = visits.some(row => row.status === 'completed');
   const canRecordNow = editable && cursor === today() && isWeekendVisitDate(cursor);
-  const checkInSourceDate = task && !row ? weekendVisitSourceDate(task, {
+  const checkInSourceDate = task ? weekendVisitSourceDate(task, {
     lessonTaskId: task.id, studentId: task.studentId, visitDate: cursor
   }) : '';
-  const sourceDate = task && row ? weekendVisitSourceDate(task, row) : '';
-  const sourceAction = sourceDate && row
-    ? '<button class="btn btn-sm btn-ghost" data-act="weekendopensource" data-task="' + esc(task.id) +
-      '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '';
-  let actions = '';
-  if (!row && canRecordNow && task) {
-    actions = '<button class="btn btn-sm btn-primary" data-act="weekendcheckin" data-task="' + esc(task.id) +
+  const nextSequence = task ? weekendVisitNextSequence(task, cursor, visits) : 1;
+  let groupActions = '';
+  if (!active && canRecordNow && task) {
+    groupActions = '<button class="btn btn-sm btn-primary" data-act="weekendcheckin" data-task="' + esc(task.id) +
       '" data-student-id="' + esc(task.studentId) + '" data-source-date="' + esc(checkInSourceDate) + '"' +
-      (checkInSourceDate ? '' : ' disabled') + '>등원</button>';
-  } else if (active) {
-    actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
-      '" data-rev="' + row.revision + '">하원</button>' : '') +
-      (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' : '') + sourceAction;
-  } else if (completed && editable) {
-    actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
-      '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' + sourceAction;
-  } else if (row && sourceAction) {
-    actions = sourceAction;
+      ' data-visit-sequence="' + esc(nextSequence) + '"' + (checkInSourceDate ? '' : ' disabled') + '>' +
+      (visits.length ? '추가 등원' : '등원') + '</button>';
   }
+  const history = visits.map((row, index) => {
+    const sourceDate = task ? weekendVisitSourceDate(task, row) : '';
+    const sourceAction = sourceDate && task
+      ? '<button class="btn btn-sm btn-ghost" data-act="weekendopensource" data-task="' + esc(task.id) +
+        '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '';
+    let actions = '';
+    if (row.status === 'active') {
+      actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
+        '" data-rev="' + row.revision + '">하원</button>' : '') +
+        (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' : '') + sourceAction;
+    } else if (row.status === 'completed' && editable) {
+      actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="weekendcancel" data-visit="' + esc(row.visitId) + '" data-rev="' + row.revision + '">기록 취소</button>' + sourceAction;
+    } else if (sourceAction) {
+      actions = sourceAction;
+    }
+    return '<div class="weekend-visit-period"><div><div class="small"><b>' + esc(weekendVisitPeriodText(row, index + 1)) + '</b></div>' +
+      '<div class="weekend-visit-time">' + (sourceDate ? '원 수업 ' + esc(label(sourceDate)) + ' · ' : '') +
+      '실제 ' + esc(weekendVisitTimeText(row)) +
+      (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div></div>' +
+      (actions ? '<div class="weekend-visit-actions">' + actions + '</div>' : '') + '</div>';
+  }).join('');
   return '<div class="weekend-visit-row' + (active ? ' weekend-visit-live' : completed ? ' weekend-visit-complete' : '') + '">' +
     '<div><div class="card-title">' + esc(identity.name) + (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
     '<div class="card-sub">' + esc(subject) + (flexible ? ' · 비정기 ' + esc(flexibleWeekendDayText(task)) : '') +
       (schedule ? ' · ' + (flexible ? '참고 시간표 ' : '예정 ') + esc(schedule) : '') + '</div>' +
     (progress ? '<div class="weekend-flex-progress">' + esc(progress) + '</div>' : '') +
-    (row ? '<div class="weekend-visit-time mt8">' + (sourceDate ? '원 수업 ' + esc(label(sourceDate)) + ' · ' : '') +
-      '실제 ' + esc(weekendVisitTimeText(row)) +
-      (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' : '') + '</div>' +
-    (actions ? '<div class="weekend-visit-actions">' + actions + '</div>' : '') + '</div>';
+    (history ? '<div class="weekend-visit-history">' + history + '</div>' : '') + '</div>' +
+    (groupActions ? '<div class="weekend-visit-actions">' + groupActions + '</div>' : '') + '</div>';
 }
 
 function weekendVisitTeacherHtml(staff, date) {
@@ -3169,10 +3234,16 @@ function weekendVisitTeacherHtml(staff, date) {
   if (!scope && !weekendVisitScheduleLoadingKeys.has(key)) setTimeout(() => loadWeekendVisits(date, staff.id, false), 0);
   const candidates = weekendLessonCandidates(staff.id, date);
   const flexibleCandidates = weekendFlexibleLessonCandidates(staff.id, date);
-  const scopedRows = scope ? scope.rows : [];
-  const byTask = new Map(scopedRows.map(row => [String(row.lessonTaskId), row]));
+  const scopedRows = (scope ? scope.rows : []).filter(row => row && row.status !== 'cancelled');
+  const byTask = new Map();
+  scopedRows.forEach(row => {
+    const taskId = String(row.lessonTaskId || '');
+    if (!byTask.has(taskId)) byTask.set(taskId, []);
+    byTask.get(taskId).push(row);
+  });
+  byTask.forEach((rows, taskId) => byTask.set(taskId, weekendVisitRowsChronological(rows)));
   const candidateIds = new Set(candidates.concat(flexibleCandidates).map(task => String(task.id)));
-  const orphanRows = scopedRows.filter(row => !candidateIds.has(String(row.lessonTaskId)));
+  const orphanTaskIds = [...byTask.keys()].filter(taskId => !candidateIds.has(taskId));
   const scopeError = weekendVisitScheduleErrors.get(key) || '';
   let body;
   if (scopeError) {
@@ -3181,9 +3252,10 @@ function weekendVisitTeacherHtml(staff, date) {
   } else if (!scope) {
     body = '<div class="empty"><b>🕘</b>실제 등·하원 기록을 불러오는 중…</div>';
   } else {
-    const rows = candidates.map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)) || null, true))
+    const rows = candidates.map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)) || [], true))
       .concat(flexibleCandidates.filter(task => byTask.has(String(task.id))).map(task => weekendVisitRowHtml(task, byTask.get(String(task.id)), true)))
-      .concat(orphanRows.map(row => weekendVisitRowHtml(state.tasks.find(task => task.id === row.lessonTaskId) || null, row, true)));
+      .concat(orphanTaskIds.map(taskId => weekendVisitRowHtml(
+        state.tasks.find(task => String(task.id || '') === taskId) || null, byTask.get(taskId), true)));
     const waitingFlexible = flexibleCandidates.filter(task => !byTask.has(String(task.id)));
     const flexibleControl = waitingFlexible.length && cursor === today()
       ? '<div class="weekend-flex-trigger"><div class="between"><div><b>비정기 등원 학생 선택</b>' +
@@ -3204,15 +3276,20 @@ function weekendVisitBoardHtml(date) {
   const scopeError = weekendVisitScheduleErrors.get(key) || '';
   if (scopeError) return '<div class="card alert"><div class="card-title">주말 실제 등·하원 불러오기 실패</div>' +
     '<div class="card-sub">' + esc(scopeError) + '</div><button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button></div>';
-  const scopedRows = scope ? scope.rows : [];
+  const scopedRows = weekendVisitRowsChronological((scope ? scope.rows : []).filter(row => row && row.status !== 'cancelled'));
   const active = scopedRows.filter(row => row.status === 'active').length;
   const complete = scopedRows.filter(row => row.status === 'completed').length;
   const rows = scopedRows.map(row => {
     const task = state.tasks.find(item => String(item.id) === String(row.lessonTaskId));
     const teacher = staffById(row.staffId);
     const sourceDate = task ? weekendVisitSourceDate(task, row) : '';
+    const relatedRows = weekendVisitRowsChronological(scopedRows.filter(item =>
+      String(item.lessonTaskId || '') === String(row.lessonTaskId || '') &&
+      String(item.studentId || '') === String(row.studentId || '') && String(item.visitDate || '') === String(row.visitDate || '')));
+    const fallbackSequence = Math.max(1, relatedRows.indexOf(row) + 1);
     return '<div class="weekend-visit-row ' + (row.status === 'active' ? 'weekend-visit-live' : 'weekend-visit-complete') + '"><div>' +
       '<div class="card-title">' + esc(weekendVisitStudentLabel(task, row).name) + ' <span class="pill">' + esc(teacher && teacher.name || '담당 확인') + '</span></div>' +
+      '<div class="small"><b>' + esc(weekendVisitPeriodText(row, fallbackSequence)) + '</b></div>' +
       '<div class="weekend-visit-time">' + (sourceDate ? '원 수업 ' + esc(label(sourceDate)) + ' · ' : '') +
       '실제 ' + esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') + '</div>' +
       '</div><div class="weekend-visit-actions"><button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' +
@@ -3220,7 +3297,7 @@ function weekendVisitBoardHtml(date) {
         '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '') + '</div></div>';
   });
   return '<details class="card weekend-visit-card" data-persist-key="weekend-board"><summary><span><b>주말 실제 등·하원 현황</b>' +
-    '<span class="card-sub">등원 중 ' + active + '명 · 하원 완료 ' + complete + '명</span></span></summary>' +
+    '<span class="card-sub">등원 중 ' + active + '건 · 하원 완료 ' + complete + '건</span></span></summary>' +
     (!scope ? '<div class="empty"><b>🕘</b>불러오는 중…</div>' :
       rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '<div class="empty">아직 기록이 없습니다.</div>') + '</details>';
 }
@@ -3243,7 +3320,7 @@ function openWeekendFlexibleCheckIn(staffId) {
   const key = weekendVisitScopeKey(cursor, scopedStaffId);
   const scope = activateWeekendVisitScope(key);
   if (!scope) return toast('주말 등원 기록을 먼저 새로고침해 주세요');
-  const recorded = new Set(scope.rows.map(row => String(row.lessonTaskId || '')));
+  const recorded = new Set(scope.rows.filter(row => row && row.status !== 'cancelled').map(row => String(row.lessonTaskId || '')));
   const candidates = weekendFlexibleLessonCandidates(scopedStaffId, cursor).filter(task => !recorded.has(String(task.id)));
   if (!candidates.length) return toast('오늘 등원 처리할 비정기 수업이 없습니다');
   const rows = candidates.map(task => {
@@ -3252,13 +3329,15 @@ function openWeekendFlexibleCheckIn(staffId) {
     const sourceDate = weekendVisitSourceDate(task, {
       lessonTaskId: task.id, studentId: task.studentId, visitDate: cursor
     });
+    const nextSequence = weekendVisitNextSequence(task, cursor, []);
     return '<div class="weekend-visit-row"><div><div class="card-title">' + esc(identity.name) +
       (identity.detail ? ' <span class="pill">' + esc(identity.detail) + '</span>' : '') + '</div>' +
       '<div class="card-sub">' + esc(task.subject || task.className || '과목 미지정') + ' · 허용 ' +
         esc(flexibleWeekendDayText(task)) + ' · 참고 ' + esc(schedule) + '</div>' +
       '<div class="weekend-flex-progress">' + esc(flexibleWeekendProgressText(task, cursor)) + '</div></div>' +
       '<button class="btn btn-sm btn-primary" data-act="weekendflexcheckin" data-task="' + esc(task.id) +
-        '" data-student-id="' + esc(task.studentId) + '" data-source-date="' + esc(sourceDate) + '"' +
+        '" data-student-id="' + esc(task.studentId) + '" data-source-date="' + esc(sourceDate) +
+        '" data-visit-sequence="' + esc(nextSequence) + '"' +
         (sourceDate ? '' : ' disabled') + '>이 학생 등원</button></div>';
   }).join('');
   modal('비정기 등원', '<div class="hint mb14"><b>실제로 등원한 학생만 선택해 주세요.</b><br>' +
@@ -3336,6 +3415,7 @@ async function saveWeekendFlexibleSettings(button) {
     loadStudentChanges(true);
     weekendVisitLoadedKey = '';
     weekendVisitMonthlyCounts = [];
+    weekendVisitNextSequences = [];
     weekendFlexibleEditor = null;
     closeModal();
     showRosterStudentLessons(editor.studentId);
@@ -3513,7 +3593,8 @@ function taskRow(t, date, editable, isCarry) {
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
         (c && c.att && ATT_LABEL[c.att] ? '<span class="tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '') +
         (recordContext && recordContext.visit && recordContext.recordDate
-          ? '<span class="tag time">원 수업 ' + esc(shortDate(date)) + ' · 실제 기록 ' + esc(shortDate(recordContext.recordDate)) + '</span>'
+          ? '<span class="tag time">원 수업 ' + esc(shortDate(date)) + ' · 실제 기록 ' + esc(shortDate(recordContext.recordDate)) +
+            (recordContext.visitCount > 1 ? ' · 실제 방문 ' + recordContext.visitCount + '회' : '') + '</span>'
           : '') +
         (recordContext && recordContext.issue && recordContext.visible
           ? '<span class="tag blk">' + esc(recordContext.issue) + '</span>' : '') +
@@ -4178,7 +4259,8 @@ function taskPanel(t, date, c, editable) {
 
   if (lesson && recordContext && recordContext.visit && recordContext.recordDate) {
     h += '<div class="guide"><b>원 수업 ' + esc(label(recordContext.sourceDate)) + '</b><br>' +
-      '이 화면에서 입력한 수업진행 전체는 실제 등원일 <b>' + esc(label(recordContext.recordDate)) + '</b> 기록으로 저장됩니다.</div>';
+      '이 화면에서 입력한 수업진행 전체는 실제 등원일 <b>' + esc(label(recordContext.recordDate)) + '</b> 기록으로 저장됩니다.' +
+      (recordContext.visitCount > 1 ? '<br>같은 날 실제 방문 ' + recordContext.visitCount + '회가 출결·메모 1건을 함께 사용합니다.' : '') + '</div>';
   }
   if (lesson && recordContext && !recordContext.inputEnabled && recordContext.issue) {
     h += '<div class="guide" style="border-color:var(--coral)"><b>입력할 수 없습니다</b><br>' + esc(recordContext.issue) +
@@ -17966,14 +18048,17 @@ document.addEventListener('click', ev => {
       const taskId = String(el.dataset.task || '');
       const studentId = String(el.dataset.studentId || '');
       const sourceDate = String(el.dataset.sourceDate || '');
+      const visitSequence = Number(el.dataset.visitSequence);
       const taskRow = state.tasks.find(item => String(item.id) === taskId && String(item.studentId || '') === studentId);
       if (!taskRow || !flexibleWeekendAllowedOn(taskRow, cursor)) return toast('비정기 수업의 학생·허용 요일을 다시 확인해 주세요');
+      if (!Number.isInteger(visitSequence) || visitSequence < 1) return toast('방문 순번을 다시 불러와 주세요');
       if (!sourceDate || weekendVisitSourceDate(taskRow, { lessonTaskId: taskId, studentId: studentId, visitDate: cursor }) !== sourceDate) {
         return toast('연결할 원 수업 날짜를 확인할 수 없습니다');
       }
       if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생이 오늘 실제 등원했나요?\n원 수업 ' + label(sourceDate) +
           ' · 출결과 메모는 ' + label(cursor) + ' 기록으로 저장됩니다.')) break;
-      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: sourceDate, lessonTaskId: taskId, studentId: studentId },
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: sourceDate, lessonTaskId: taskId,
+        studentId: studentId, visitSequence: visitSequence },
         '비정기 등원을 원래 수업 화면과 연결했습니다');
       break;
     }
@@ -18002,15 +18087,17 @@ document.addEventListener('click', ev => {
       const taskId = String(el.dataset.task || '');
       const studentId = String(el.dataset.studentId || '');
       const sourceDate = String(el.dataset.sourceDate || '');
+      const visitSequence = Number(el.dataset.visitSequence);
       const taskRow = state.tasks.find(item => String(item.id) === taskId);
       if (!taskRow || !studentId) return toast('학생과 수업 정보를 다시 확인해 주세요');
+      if (!Number.isInteger(visitSequence) || visitSequence < 1) return toast('방문 순번을 다시 불러와 주세요');
       if (!sourceDate || weekendVisitSourceDate(taskRow, { lessonTaskId: taskId, studentId: studentId, visitDate: cursor }) !== sourceDate) {
         return toast('연결할 원 수업 날짜를 확인할 수 없습니다');
       }
       if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?\n원 수업 ' + label(sourceDate) +
           ' · 출결과 메모는 ' + label(cursor) + ' 기록으로 저장됩니다.')) break;
       submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: sourceDate,
-        lessonTaskId: taskId, studentId: studentId }, '실제 등원 시간을 저장했습니다');
+        lessonTaskId: taskId, studentId: studentId, visitSequence: visitSequence }, '실제 등원 시간을 저장했습니다');
       break;
     }
     case 'weekendopensource': {
@@ -19583,7 +19670,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-29.4';
+const APP_VER = '2026-08-29.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
