@@ -41,8 +41,31 @@ test('teacher today and manager board expose check-in, checkout, correction, and
 });
 
 test('weekend visit controls use stable ids and never expose guardian contact fields', () => {
-  const source = block('function weekendVisitRowHtml(', 'function weekendVisitTimestamp(');
+  const source = block('function weekendVisitSequenceNumber(', 'function weekendVisitTimestamp(');
   assert.match(source, /task\.studentId/);
   assert.match(source, /row\.lessonTaskId/);
+  assert.match(source, /byTask\.get\(taskId\)\.push\(row\)/,
+    'each lesson task must render an array of visits instead of overwriting one row');
+  assert.match(source, /weekend-visit-history/);
+  assert.match(source, /weekend-visit-period/);
+  assert.match(source, /방문 ' \+ weekendVisitSequenceNumber/);
+  assert.match(source, /오전/);
+  assert.match(source, /오후/);
+  assert.match(source, /if \(!active && canRecordNow && task\)/,
+    'an active visit must suppress another check-in');
+  assert.match(source, /추가 등원/);
+  assert.match(source, /data-visit-sequence=/);
+  assert.match(source, /weekendVisitNextSequences/,
+    'the UI must preserve the server-computed sequence that includes cancelled history');
+  assert.match(source, /등원 중 ' \+ active \+ '건 · 하원 완료 ' \+ complete \+ '건/);
   assert.doesNotMatch(source, /phone|contact|guardian|연락처/);
+});
+
+test('every weekend check-in sends the selected visit sequence to the worker', () => {
+  const actions = block("case 'weekendflexcheckin':", "case 'weekendopensource':");
+  assert.match(actions, /const visitSequence = Number\(el\.dataset\.visitSequence\)/);
+  assert.match(actions, /visitSequence:\s*visitSequence/);
+  const normal = block("case 'weekendcheckin':", "case 'weekendopensource':");
+  assert.match(normal, /const visitSequence = Number\(el\.dataset\.visitSequence\)/);
+  assert.match(normal, /visitSequence:\s*visitSequence/);
 });

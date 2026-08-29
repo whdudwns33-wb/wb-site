@@ -10,6 +10,7 @@ import {
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_REASON = 200;
+const MAX_VISIT_SEQUENCE = 99;
 const { WEEKEND_DAYS, MAX_MONTHLY_TARGET } = weekendFlexInternals;
 
 function parseJson(value) {
@@ -144,7 +145,8 @@ function rowView(row) {
   return {
     visitId: String(row.visit_id), studentId: String(row.student_id), lessonTaskId: String(row.lesson_task_id),
     staffId: String(row.staff_id), visitDate: String(row.visit_date),
-    sourceDate: row.source_date == null ? null : String(row.source_date), checkInAt: Number(row.check_in_at),
+    sourceDate: row.source_date == null ? null : String(row.source_date),
+    visitSequence: Math.max(1, Number(row.visit_sequence) || 1), checkInAt: Number(row.check_in_at),
     checkOutAt: row.check_out_at == null ? null : Number(row.check_out_at), status: String(row.status),
     revision: Number(row.revision), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
   };
@@ -152,6 +154,10 @@ function rowView(row) {
 
 function randomId(prefix) {
   return prefix + crypto.randomUUID().replace(/-/g, '');
+}
+
+function hasDatabaseConstraint(error, code) {
+  return String(error && error.message || error || '').includes(String(code || ''));
 }
 
 function actorId(auth) {
@@ -251,7 +257,8 @@ async function listVisits(env, app, body, auth, json, origin) {
   let staffId = auth.scope === 'own' ? String(auth.id || '') : String(body.staffId || '');
   if (staffId && !SAFE_ID.test(staffId)) return json({ ok: false, error: '담당자 정보를 확인해 주세요' }, 422, origin);
   const result = await env.DB.prepare(
-    "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND status<>'cancelled' ORDER BY check_in_at,staff_id,student_id"
+    "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND status<>'cancelled' " +
+    'ORDER BY check_in_at,staff_id,student_id,visit_sequence'
   ).bind(app, visitDate).all();
   let rows = result.results || [];
   if (staffId) {
@@ -262,9 +269,35 @@ async function listVisits(env, app, body, auth, json, origin) {
     }
     rows = scoped;
   }
+  const allDayResult = await env.DB.prepare(
+    'SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? ' +
+    'ORDER BY student_id,lesson_task_id,visit_sequence'
+  ).bind(app, visitDate).all();
+  let allDayRows = allDayResult.results || [];
+  if (staffId) {
+    const scoped = [];
+    for (const row of allDayRows) {
+      const lesson = await currentVisitLesson(env, app, row);
+      if (lesson && lesson.owner === staffId) scoped.push(row);
+    }
+    allDayRows = scoped;
+  }
+  const nextByLesson = new Map();
+  for (const row of allDayRows) {
+    const key = String(row.student_id) + '\n' + String(row.lesson_task_id) + '\n' + String(row.visit_date);
+    const sequence = Math.max(1, Number(row.visit_sequence) || 1);
+    const current = nextByLesson.get(key);
+    if (!current || sequence > current.sequence) nextByLesson.set(key, { row, sequence });
+  }
+  const nextVisitSequences = [...nextByLesson.values()].map(item => ({
+    lessonTaskId: String(item.row.lesson_task_id), studentId: String(item.row.student_id),
+    visitDate: String(item.row.visit_date),
+    next: item.sequence + 1
+  }));
+
   const range = monthRange(visitDate);
   const monthlyResult = await env.DB.prepare(
-    "SELECT student_id,lesson_task_id,COUNT(*) AS visit_count FROM weekend_actual_visits " +
+    "SELECT student_id,lesson_task_id,COUNT(DISTINCT visit_date) AS visit_count FROM weekend_actual_visits " +
     "WHERE app=? AND visit_date>=? AND visit_date<? AND status<>'cancelled' " +
     'GROUP BY student_id,lesson_task_id ORDER BY lesson_task_id,student_id'
   ).bind(app, range.start, range.end).all();
@@ -279,7 +312,7 @@ async function listVisits(env, app, body, auth, json, origin) {
       month: range.month, count: Number(monthly.visit_count) || 0
     });
   }
-  return json({ ok: true, visits: rows.map(rowView), monthlyCounts }, 200, origin);
+  return json({ ok: true, visits: rows.map(rowView), nextVisitSequences, monthlyCounts }, 200, origin);
 }
 
 function requestedConfig(body) {
@@ -411,6 +444,11 @@ async function checkIn(env, app, body, auth, json, origin) {
   const visitDate = String(body.visitDate || '');
   const taskId = String(body.lessonTaskId || '');
   const studentId = String(body.studentId || '');
+  const visitSequence = Object.prototype.hasOwnProperty.call(body || {}, 'visitSequence')
+    ? Number(body.visitSequence) : 1;
+  if (!Number.isSafeInteger(visitSequence) || visitSequence < 1 || visitSequence > MAX_VISIT_SEQUENCE) {
+    return json({ ok: false, error: '실제 등원 방문 순서를 확인해 주세요' }, 422, origin);
+  }
   if (!isWeekendDate(visitDate) || kstParts(now).date !== visitDate) {
     return json({ ok: false, error: '실제 등원은 오늘 토·일 기록에서만 저장할 수 있습니다' }, 422, origin);
   }
@@ -422,16 +460,38 @@ async function checkIn(env, app, body, auth, json, origin) {
       error: '원래 수업 날짜와 확정 주말 시간표 연결을 확인해 주세요' }, 422, origin);
   }
 
-  const existing = await env.DB.prepare(
-    'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? LIMIT 1'
-  ).bind(app, studentId, taskId, visitDate).first();
-  if (existing && existing.source_date != null && String(existing.source_date) !== sourceDate) {
+  const linkedResult = await env.DB.prepare(
+    "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? " +
+    "AND visit_date<>? AND status<>'cancelled' ORDER BY visit_date,visit_sequence"
+  ).bind(app, studentId, taskId, visitDate).all();
+  const linkedElsewhere = (linkedResult.results || []).find(row =>
+    (row.source_date != null && String(row.source_date) === sourceDate) ||
+    (row.source_date == null && resolveVisitSourceDate(verified.task, String(row.visit_date || ''), {}) === sourceDate));
+  if (linkedElsewhere) {
+    return json({ ok: false, code: 'SOURCE_DATE_ALREADY_LINKED',
+      error: '이 원 수업은 이미 다른 실제 등원일에 연결되어 있습니다' }, 409, origin);
+  }
+
+  const seriesResult = await env.DB.prepare(
+    'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? ' +
+    'ORDER BY visit_sequence'
+  ).bind(app, studentId, taskId, visitDate).all();
+  const series = seriesResult.results || [];
+  const existing = series.find(row => Math.max(1, Number(row.visit_sequence) || 1) === visitSequence) || null;
+  if (series.some(row => row.source_date != null && String(row.source_date) !== sourceDate)) {
     return json({ ok: false, code: 'SOURCE_DATE_MISMATCH',
       error: '이미 저장된 실제 등원 기록의 원래 수업 날짜와 일치하지 않습니다' }, 409, origin);
   }
   if (existing && existing.status === 'active') return json({ ok: true, idempotent: true, visit: rowView(existing) }, 200, origin);
   if (existing && existing.status === 'completed') {
     return json({ ok: false, code: 'VISIT_ALREADY_COMPLETED', error: '이미 하원까지 완료된 기록입니다' }, 409, origin);
+  }
+  const maxSequence = series.reduce((max, row) => Math.max(max, Math.max(1, Number(row.visit_sequence) || 1)), 0);
+  const expectedSequence = existing && existing.status === 'cancelled' && visitSequence === maxSequence
+    ? maxSequence : maxSequence + 1;
+  if (visitSequence !== expectedSequence) {
+    return json({ ok: false, code: 'VISIT_SEQUENCE_MISMATCH',
+      error: '최근 등·하원 기록을 새로고침한 뒤 다시 시도해 주세요', nextVisitSequence: expectedSequence }, 409, origin);
   }
   const anotherOpen = await env.DB.prepare(
     "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND status='active' LIMIT 1"
@@ -441,10 +501,23 @@ async function checkIn(env, app, body, auth, json, origin) {
   }
 
   if (existing && existing.status === 'cancelled') {
-    const reopened = await appendUpdate(env, app, existing, {
-      checkInAt: now, checkOutAt: null, status: 'active', expectedRevision: Number(existing.revision)
-    }, 'reopen', '취소 후 다시 등원', auth,
-    auth.scope === 'own' ? { owner: verified.staffId, taskData: verified.taskData } : null);
+    let reopened;
+    try {
+      reopened = await appendUpdate(env, app, existing, {
+        checkInAt: now, checkOutAt: null, status: 'active', expectedRevision: Number(existing.revision)
+      }, 'reopen', '취소 후 다시 등원', auth,
+      auth.scope === 'own' ? { owner: verified.staffId, taskData: verified.taskData } : null);
+    } catch (error) {
+      if (hasDatabaseConstraint(error, 'WEEKEND_SOURCE_DATE_ALREADY_LINKED')) {
+        return json({ ok: false, code: 'SOURCE_DATE_ALREADY_LINKED',
+          error: '이 원 수업은 이미 다른 실제 등원일에 연결되어 있습니다' }, 409, origin);
+      }
+      if (hasDatabaseConstraint(error, 'WEEKEND_VISIT_TIME_OVERLAP')) {
+        return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
+          error: '다른 실제 방문 시간과 겹쳐 등원할 수 없습니다' }, 409, origin);
+      }
+      throw error;
+    }
     if (reopened.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
     return json({ ok: true, visit: reopened.visit }, 200, origin);
   }
@@ -453,22 +526,56 @@ async function checkIn(env, app, body, auth, json, origin) {
   const eventId = randomId('wve_');
   const actor = actorId(auth);
   const eventData = JSON.stringify({ version: 1, before: null,
-    after: { visitDate, sourceDate, checkInAt: now, checkOutAt: null, status: 'active' }, reason: '' });
-  const results = await env.DB.batch([
-    env.DB.prepare(
+    after: { visitDate, sourceDate, visitSequence, checkInAt: now, checkOutAt: null, status: 'active' }, reason: '' });
+  let results;
+  try {
+    results = await env.DB.batch([
+      env.DB.prepare(
       'INSERT OR IGNORE INTO weekend_actual_visits ' +
-      '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
-      'SELECT ?,?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
+      '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,visit_sequence,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
+      'SELECT ?,?,?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
       'WHERE current_task.app=? AND current_task.id=? AND current_task.owner=? AND current_task.data=?'
-    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, sourceDate, now, now, now, actor, actor,
+    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, sourceDate, visitSequence, now, now, now, actor, actor,
       app, taskId, verified.staffId, verified.taskData),
-    env.DB.prepare(
+      env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
       'SELECT ?,?,?,\'check_in\',?,?,? WHERE EXISTS (' +
       'SELECT 1 FROM weekend_actual_visits WHERE app=? AND visit_id=? AND revision=1 AND updated_at=?)'
-    ).bind(app, eventId, visitId, eventData, actor, now, app, visitId, now)
-  ]);
+      ).bind(app, eventId, visitId, eventData, actor, now, app, visitId, now)
+    ]);
+  } catch (error) {
+    if (hasDatabaseConstraint(error, 'WEEKEND_SOURCE_DATE_ALREADY_LINKED')) {
+      return json({ ok: false, code: 'SOURCE_DATE_ALREADY_LINKED',
+        error: '이 원 수업은 이미 다른 실제 등원일에 연결되어 있습니다' }, 409, origin);
+    }
+    if (hasDatabaseConstraint(error, 'WEEKEND_VISIT_TIME_OVERLAP')) {
+      const concurrent = await env.DB.prepare(
+        'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? AND visit_sequence=? LIMIT 1'
+      ).bind(app, studentId, taskId, visitDate, visitSequence).first();
+      if (concurrent && concurrent.status === 'active' &&
+          (concurrent.source_date == null || String(concurrent.source_date) === sourceDate)) {
+        return json({ ok: true, idempotent: true, visit: rowView(concurrent) }, 200, origin);
+      }
+      return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
+        error: '다른 실제 방문 시간과 겹쳐 등원할 수 없습니다' }, 409, origin);
+    }
+    throw error;
+  }
   if (Number(results && results[0] && results[0].meta && results[0].meta.changes || 0) !== 1) {
+    const concurrent = await env.DB.prepare(
+      'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? AND visit_sequence=? LIMIT 1'
+    ).bind(app, studentId, taskId, visitDate, visitSequence).first();
+    if (concurrent && concurrent.status === 'active' &&
+        (concurrent.source_date == null || String(concurrent.source_date) === sourceDate)) {
+      return json({ ok: true, idempotent: true, visit: rowView(concurrent) }, 200, origin);
+    }
+    const concurrentOpen = await env.DB.prepare(
+      "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND status='active' LIMIT 1"
+    ).bind(app, studentId).first();
+    if (concurrentOpen) {
+      return json({ ok: false, code: 'VISIT_ALREADY_OPEN', error: '이 학생의 하원 전 기록이 이미 있습니다',
+        current: rowView(concurrentOpen) }, 409, origin);
+    }
     return json({ ok: false, code: 'VISIT_CONFLICT', error: '다른 기기에서 같은 등원 기록을 먼저 저장했습니다' }, 409, origin);
   }
   return json({ ok: true, visit: await latestAfterWrite(env, app, visitId) }, 200, origin);
@@ -492,9 +599,18 @@ async function changeVisit(env, app, body, auth, json, origin) {
     if (kstParts(now).date !== current.visit_date) {
       return json({ ok: false, error: '지난 날짜의 미하원 기록은 시간 수정 또는 취소로 정리해 주세요' }, 422, origin);
     }
-    const saved = await appendUpdate(env, app, current, {
-      checkInAt: Number(current.check_in_at), checkOutAt: now, status: 'completed', expectedRevision
-    }, 'check_out', '', auth, currentLesson);
+    let saved;
+    try {
+      saved = await appendUpdate(env, app, current, {
+        checkInAt: Number(current.check_in_at), checkOutAt: now, status: 'completed', expectedRevision
+      }, 'check_out', '', auth, currentLesson);
+    } catch (error) {
+      if (hasDatabaseConstraint(error, 'WEEKEND_VISIT_TIME_OVERLAP')) {
+        return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
+          error: '다른 실제 방문 시간과 겹쳐 하원 시간을 저장할 수 없습니다' }, 409, origin);
+      }
+      throw error;
+    }
     if (saved.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
     return json({ ok: true, visit: saved.visit }, 200, origin);
   }
@@ -524,9 +640,39 @@ async function changeVisit(env, app, body, auth, json, origin) {
       (checkOutAt != null && (!Number.isSafeInteger(checkOutAt) || checkOutAt < checkInAt || kstParts(checkOutAt).date !== current.visit_date))) {
     return json({ ok: false, error: '등원·하원 시간을 같은 날짜 안에서 올바르게 입력해 주세요' }, 422, origin);
   }
-  const saved = await appendUpdate(env, app, current, {
-    checkInAt, checkOutAt, status: checkOutAt == null ? 'active' : 'completed', expectedRevision
-  }, 'correct', reason, auth, currentLesson);
+  const siblingResult = await env.DB.prepare(
+    "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? " +
+    "AND visit_id<>? AND status<>'cancelled' ORDER BY check_in_at,visit_sequence"
+  ).bind(app, String(current.student_id), String(current.lesson_task_id), String(current.visit_date), visitId).all();
+  const siblings = siblingResult.results || [];
+  const requestedEnd = checkOutAt == null ? Number.MAX_SAFE_INTEGER : checkOutAt;
+  const overlaps = siblings.some(row => {
+    const siblingEnd = row.check_out_at == null ? Number.MAX_SAFE_INTEGER : Number(row.check_out_at);
+    return !(requestedEnd <= Number(row.check_in_at) || siblingEnd <= checkInAt);
+  });
+  const currentSequence = Math.max(1, Number(current.visit_sequence) || 1);
+  const sequenceConflict = siblings.some(row => {
+    const sequence = Math.max(1, Number(row.visit_sequence) || 1);
+    if (sequence < currentSequence) return row.check_out_at == null || Number(row.check_out_at) > checkInAt;
+    if (sequence > currentSequence) return checkOutAt == null || checkOutAt > Number(row.check_in_at);
+    return false;
+  });
+  if (overlaps || sequenceConflict) {
+    return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
+      error: '방문 순서와 겹치지 않도록 실제 등·하원 시간을 확인해 주세요' }, 409, origin);
+  }
+  let saved;
+  try {
+    saved = await appendUpdate(env, app, current, {
+      checkInAt, checkOutAt, status: checkOutAt == null ? 'active' : 'completed', expectedRevision
+    }, 'correct', reason, auth, currentLesson);
+  } catch (error) {
+    if (hasDatabaseConstraint(error, 'WEEKEND_VISIT_TIME_OVERLAP')) {
+      return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
+        error: '다른 실제 방문 시간이 먼저 변경되어 저장할 수 없습니다' }, 409, origin);
+    }
+    throw error;
+  }
   if (saved.stale) return json({ ok: false, code: 'VISIT_STALE', error: '다른 기기에서 기록이 먼저 변경되었습니다' }, 409, origin);
   return json({ ok: true, visit: saved.visit }, 200, origin);
 }

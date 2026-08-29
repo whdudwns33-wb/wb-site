@@ -7,6 +7,7 @@ import { handleWeekendVisit, weekendVisitInternals } from './weekend-visit.js';
 
 const migration = fs.readFileSync(new URL('./migrations/050_weekend_actual_visits.sql', import.meta.url), 'utf8');
 const sourceDateMigration = fs.readFileSync(new URL('./migrations/058_weekend_visit_source_date.sql', import.meta.url), 'utf8');
+const multiVisitMigration = fs.readFileSync(new URL('./migrations/059_weekend_multi_visits.sql', import.meta.url), 'utf8');
 const studentChangeMigration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
 const taskWriteCasMigration = fs.readFileSync(new URL('./migrations/055_task_write_cas_guards.sql', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
@@ -34,7 +35,7 @@ class Statement {
 }
 
 class D1Database {
-  constructor() {
+  constructor(options = {}) {
     this.sqlite = new DatabaseSync(':memory:');
     this.beforeVisitInsert = null;
     this.beforeBatch = null;
@@ -43,6 +44,7 @@ class D1Database {
     this.sqlite.exec(taskWriteCasMigration);
     this.sqlite.exec(migration);
     this.sqlite.exec(sourceDateMigration);
+    if (options.multiVisit !== false) this.sqlite.exec('BEGIN;\n' + multiVisitMigration + '\nCOMMIT;');
   }
   prepareNative(sql) { return this.sqlite.prepare(sql); }
   prepare(sql) { return new Statement(this, sql); }
@@ -113,9 +115,12 @@ function transferLesson(db, taskId, staffId) {
     .run(staffId, JSON.stringify(task), task.updatedAt, task.updatedAt, 'task', taskId);
 }
 
-test('050 and 058 migrations are additive, mirrored in schema, and wired before deployment', () => {
+test('050, 058, and 059 are mirrored in schema and wired before deployment', () => {
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
   assert.doesNotMatch(sourceDateMigration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
+  assert.match(multiVisitMigration, /visit_sequence\s+INTEGER NOT NULL DEFAULT 1/);
+  assert.match(multiVisitMigration, /UNIQUE \(app, student_id, lesson_task_id, visit_date, visit_sequence\)/);
+  assert.match(multiVisitMigration, /DROP TABLE weekend_actual_visit_events;[\s\S]*DROP TABLE weekend_actual_visits;/);
   for (const name of ['weekend_actual_visits', 'weekend_actual_visit_events', 'trg_weekend_actual_visits_no_delete']) {
     assert.match(migration, new RegExp(name));
     assert.match(schema, new RegExp(name));
@@ -125,10 +130,62 @@ test('050 and 058 migrations are additive, mirrored in schema, and wired before 
   assert.match(sourceDateMigration, /trg_weekend_actual_visits_source_date_guard/);
   assert.doesNotMatch(sourceDateMigration, /DROP TRIGGER/i);
   assert.match(schema, /source_date\s+TEXT\s+CHECK/);
+  assert.match(schema, /visit_sequence\s+INTEGER NOT NULL DEFAULT 1/);
+  assert.match(schema, /UNIQUE \(app, student_id, lesson_task_id, visit_date, visit_sequence\)/);
+  assert.match(schema, /idx_weekend_actual_visits_lesson_day/);
+  assert.match(schema, /trg_weekend_actual_visits_source_date_insert_guard/);
+  assert.match(schema, /trg_weekend_actual_visits_time_update_guard/);
   assert.match(schema, /trg_weekend_actual_visits_source_date_guard/);
   assert.match(worker, /import \{ handleWeekendVisit \} from '\.\/weekend-visit\.js'/);
   assert.match(worker, /url\.pathname === '\/weekend-visit'/);
-  assert.match(readme, /050_weekend_actual_visits\.sql[\s\S]*058_weekend_visit_source_date\.sql[\s\S]*Worker[\s\S]*task Pages/);
+  assert.match(readme, /050_weekend_actual_visits\.sql[\s\S]*058_weekend_visit_source_date\.sql[\s\S]*059_weekend_multi_visits\.sql[\s\S]*Worker[\s\S]*task Pages/);
+});
+
+test('059 preserves legacy visits and events while assigning sequence one', () => {
+  const db = new D1Database({ multiVisit: false });
+  const at = Date.parse('2026-08-22T10:00:00+09:00');
+  const visitId = 'wv_' + 'a'.repeat(32);
+  const eventId = 'wve_' + 'b'.repeat(32);
+  db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits ' +
+    '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,check_in_at,check_out_at,status,revision,' +
+    'created_at,updated_at,created_by,updated_by,source_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', visitId, 'student-a', 'lesson-a', 'teacher-1', '2026-08-22', at, at + 3600000,
+    'completed', 2, at, at + 3600000, 'teacher-1', 'teacher-1', '2026-08-23');
+  db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
+    'VALUES (?,?,?,?,?,?,?)'
+  ).run('task', eventId, visitId, 'check_in', '{"version":1}', 'teacher-1', at);
+
+  db.sqlite.exec('BEGIN;\n' + multiVisitMigration + '\nCOMMIT;');
+
+  const row = db.sqlite.prepare('SELECT * FROM weekend_actual_visits WHERE visit_id=?').get(visitId);
+  assert.equal(row.visit_sequence, 1);
+  assert.equal(row.source_date, '2026-08-23');
+  assert.equal(row.status, 'completed');
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 1);
+  assert.deepEqual(db.sqlite.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.throws(() => db.sqlite.prepare(
+    'UPDATE weekend_actual_visits SET visit_sequence=2,revision=3,updated_at=? WHERE app=? AND visit_id=?'
+  ).run(at + 3600001, 'task', visitId), /WEEKEND_VISIT_IMMUTABLE/);
+  assert.throws(() => db.sqlite.prepare('DELETE FROM weekend_actual_visits WHERE visit_id=?').run(visitId),
+    /WEEKEND_VISIT_NO_DELETE/);
+  assert.throws(() => db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits ' +
+    '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,visit_sequence,check_in_at,check_out_at,status,' +
+    'revision,created_at,updated_at,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', 'wv_' + 'c'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-23', '2026-08-23', 1,
+    at + 86400000, null, 'active', 1, at + 86400000, at + 86400000, 'teacher-1', 'teacher-1'),
+  /WEEKEND_SOURCE_DATE_ALREADY_LINKED/);
+  db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits ' +
+    '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,visit_sequence,check_in_at,check_out_at,status,' +
+    'revision,created_at,updated_at,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', 'wv_' + 'd'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-22', '2026-08-23', 2,
+    at + 7200000, at + 10800000, 'completed', 1, at + 7200000, at + 10800000, 'teacher-1', 'teacher-1');
+  assert.throws(() => db.sqlite.prepare(
+    'UPDATE weekend_actual_visits SET check_out_at=?,revision=3,updated_at=? WHERE app=? AND visit_id=?'
+  ).run(at + 9000000, at + 10800001, 'task', visitId), /WEEKEND_VISIT_TIME_OVERLAP/);
 });
 
 test('all subjects qualify and a Sunday timetable may check in on Saturday', async () => {
@@ -148,6 +205,107 @@ test('all subjects qualify and a Sunday timetable may check in on Saturday', asy
   assert.equal(listed.body.visits.length, 1);
   assert.equal(listed.body.visits[0].sourceDate, '2026-08-23');
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 1);
+});
+
+test('a completed weekend lesson can check in again with an explicit next visit sequence', async () => {
+  const db = new D1Database(); db.seed();
+  const first = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 1,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(first.status, 200);
+  assert.equal(first.body.visit.visitSequence, 1);
+
+  const whileOpen = await atNow(saturday + 1000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 2,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(whileOpen.status, 409);
+  assert.equal(whileOpen.body.code, 'VISIT_ALREADY_OPEN');
+
+  const firstOut = await atNow(saturday + 3600000, () => call(db, {
+    action: 'check_out', visitId: first.body.visit.visitId, revision: first.body.visit.revision
+  }));
+  assert.equal(firstOut.status, 200);
+
+  const legacyRetry = await atNow(saturday + 3601000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23',
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(legacyRetry.status, 409);
+  assert.equal(legacyRetry.body.code, 'VISIT_ALREADY_COMPLETED');
+
+  const gap = await atNow(saturday + 3602000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 3,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(gap.status, 409);
+  assert.equal(gap.body.code, 'VISIT_SEQUENCE_MISMATCH');
+  assert.equal(gap.body.nextVisitSequence, 2);
+
+  const second = await atNow(saturday + 7200000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 2,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(second.status, 200);
+  assert.equal(second.body.visit.visitSequence, 2);
+  assert.notEqual(second.body.visit.visitId, first.body.visit.visitId);
+
+  const activeRetry = await atNow(saturday + 7201000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 2,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(activeRetry.status, 200);
+  assert.equal(activeRetry.body.idempotent, true);
+  assert.equal(activeRetry.body.visit.visitId, second.body.visit.visitId);
+
+  const secondOut = await atNow(saturday + 10800000, () => call(db, {
+    action: 'check_out', visitId: second.body.visit.visitId, revision: second.body.visit.revision
+  }));
+  assert.equal(secondOut.status, 200);
+
+  const completedRetry = await atNow(saturday + 10801000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 2,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(completedRetry.status, 409);
+  assert.equal(completedRetry.body.code, 'VISIT_ALREADY_COMPLETED');
+
+  const overlapCorrection = await atNow(saturday + 10802000, () => call(db, {
+    action: 'correct', visitId: first.body.visit.visitId, revision: firstOut.body.visit.revision,
+    checkInAt: saturday, checkOutAt: saturday + 9000000, reason: '두 번째 방문 시간과 겹치는 잘못된 정정'
+  }, admin));
+  assert.equal(overlapCorrection.status, 409);
+  assert.equal(overlapCorrection.body.code, 'VISIT_TIME_OVERLAP');
+
+  const listed = await call(db, { action: 'list', visitDate: '2026-08-22' });
+  assert.deepEqual(listed.body.visits.map(row => row.visitSequence), [1, 2]);
+  assert.deepEqual(listed.body.nextVisitSequences, [{
+    lessonTaskId: 'lesson-a', studentId: 'student-a', visitDate: '2026-08-22', next: 3
+  }]);
+  assert.equal(listed.body.monthlyCounts[0].count, 1, '같은 날 복수 방문은 월 회차를 중복 차감하지 않는다');
+});
+
+test('one source lesson cannot be linked to both weekend dates', async () => {
+  const db = new D1Database(); db.seed();
+  const first = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 1,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(first.status, 200);
+  const firstOut = await atNow(saturday + 3600000, () => call(db, {
+    action: 'check_out', visitId: first.body.visit.visitId, revision: first.body.visit.revision
+  }));
+  assert.equal(firstOut.status, 200);
+
+  const sunday = Date.parse('2026-08-23T10:00:00+09:00');
+  const split = await atNow(sunday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-23', sourceDate: '2026-08-23', visitSequence: 1,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(split.status, 409);
+  assert.equal(split.body.code, 'SOURCE_DATE_ALREADY_LINKED');
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 1);
 });
 
 test('explicit sourceDate is schedule-validated and legacy derivation prioritizes the actual scheduled day', async () => {
