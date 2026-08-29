@@ -46,7 +46,7 @@ test('external study services use fixed official links without embedded login', 
   assert.match(html, /const LEADERS_EYE_URL = 'https:\/\/www\.eyestudent\.com\/login'/);
   assert.match(html, /centerUrl: LEADERS_EYE_URL, studentUrl: LEADERS_EYE_URL/);
   assert.match(html, /const METAMATH_CENTER_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=center'/);
-  assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/www\.mmatht\.co\.kr\/Pages\/home2\/login\.cshtml\?kind=student'/);
+  assert.match(html, /const METAMATH_STUDENT_URL = 'https:\/\/new\.mmath\.co\.kr\/Pages\/Student\/Login\/login\.cshtml\?f_next='/);
   assert.match(html, /const CLASSCARD_ANDROID_APP_URL = 'https:\/\/play\.google\.com\/store\/apps\/details\?id=classcard\.net'/);
   assert.match(html, /const CLASSCARD_IOS_APP_URL = 'https:\/\/apps\.apple\.com\/kr\/app\/id1176435331'/);
   assert.doesNotMatch(html, /www\.classcard\.net\/Login/);
