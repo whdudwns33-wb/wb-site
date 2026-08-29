@@ -158,6 +158,44 @@ test('admin direct lesson registration reuses the new-student information fields
   assert.match(save, /원생 기본 정보는 저장됐습니다/);
 });
 
+test('new lesson starts follow the student first class date without rewriting existing lesson dates', () => {
+  const start = html.indexOf('function lessonRegistrationIsoDate(');
+  const end = html.indexOf('function normalizeLessonBatchEntry(', start);
+  assert.ok(start >= 0 && end > start, 'lesson start helper block exists');
+  const helpers = new Function('today', html.slice(start, end) +
+    '\nreturn { lessonStudentFirstClassDate, lessonRegistrationStartFloor, lessonFirstClassDateMinimum, ' +
+    'raiseLessonRegistrationStart, lessonStartBeforeFirstClassDate, newLessonBatchEntry };')(() => '2026-08-29');
+  const future = { firstClassDate: '2026-09-05' };
+  const past = { firstClassDate: '2026-08-01' };
+  assert.equal(helpers.lessonRegistrationStartFloor(future), '2026-09-05');
+  assert.equal(helpers.lessonRegistrationStartFloor(past), '2026-08-29');
+  assert.equal(helpers.lessonRegistrationStartFloor([
+    { firstClassDate: '2026-09-01' }, future
+  ]), '2026-09-05');
+  assert.equal(helpers.lessonFirstClassDateMinimum([past, future]), '2026-09-05');
+  assert.equal(helpers.raiseLessonRegistrationStart('2026-08-29', future), '2026-09-05');
+  assert.equal(helpers.raiseLessonRegistrationStart('2026-09-10', future), '2026-09-10');
+  assert.equal(helpers.raiseLessonRegistrationStart('2026-08-10', past), '2026-08-10');
+  assert.equal(helpers.lessonStartBeforeFirstClassDate('2026-09-04', future), true);
+  assert.equal(helpers.lessonStartBeforeFirstClassDate('2026-09-05', future), false);
+  assert.equal(helpers.newLessonBatchEntry('2026-09-05').start, '2026-09-05');
+
+  const studentChangeStart = html.indexOf("const lessonStudent = ev.target.closest('[data-lesson-student]')");
+  const studentChangeEnd = html.indexOf('const onboardingDate', studentChangeStart);
+  const studentChange = html.slice(studentChangeStart, studentChangeEnd);
+  assert.match(studentChange, /draft\.start = lessonRegistrationStartFloor\(student\)/);
+  assert.match(studentChange, /draft\.lessonEntries = \[newLessonBatchEntry\(draft\.start\)\]/);
+  assert.match(html, /entries\.push\(newLessonBatchEntry\(lessonRegistrationStartFloor\(currentLessonRosterDraft\(\) \|\| lessonDraftSelectedStudent\(\)\)\)\)/);
+  assert.match(html, /lessonStartBeforeFirstClassDate\(entries\[index\]\.start, effectiveStudent\)/);
+  assert.match(html, /lessonStartBeforeFirstClassDate\(draft\.start, students\)/);
+  assert.match(html, /draft\.startDate = lessonRegistrationStartFloor\(student\)/);
+
+  const editStart = html.indexOf('function lessonDraftFromTask(');
+  const editEnd = html.indexOf('function lessonTextField(', editStart);
+  assert.match(html.slice(editStart, editEnd), /start: t\.start \|\| today\(\)/);
+  assert.doesNotMatch(html.slice(editStart, editEnd), /firstClassDate/);
+});
+
 test('direct lesson registration puts lesson hours inside every confirmed-time row', () => {
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);

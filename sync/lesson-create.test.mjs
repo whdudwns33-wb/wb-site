@@ -476,6 +476,51 @@ test('person submissions require a roster id and matching roster identity', asyn
   assert.equal(JSON.parse(db.tasks.get(source.id).data).studentName, source.studentName);
 });
 
+test('new lessons cannot start before the roster first class date while existing corrections stay editable', async () => {
+  const db = new FakeDB();
+  db.privateRoster.roster.students[0].firstClassDate = '2026-09-05';
+  const early = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson({ start: '2026-08-29' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(early.response.status, 409);
+  assert.match(early.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.equal(db.tasks.size, 0);
+
+  const exact = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson({ start: '2026-09-05' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(exact.response.status, 200);
+  assert.equal(exact.data.task.start, '2026-09-05');
+  assert.equal(exact.data.task.scheduleSlots.every(slot => slot.validFrom === '2026-09-05'), true);
+  db.privateRoster.roster.students[0].firstClassDate = '2026-09-10';
+  const exactRetry = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson({ start: '2026-09-05' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(exactRetry.response.status, 200);
+  assert.equal(exactRetry.data.idempotent, true);
+
+  const legacyDb = new FakeDB();
+  const legacy = await seedOwnLesson(legacyDb, { start: '2026-08-29' });
+  legacyDb.privateRoster.roster.students[0].firstClassDate = '2026-09-05';
+  const corrected = await call(legacyDb, {
+    sourceTaskId: legacy.id, expectedUpdatedAt: legacy.updatedAt,
+    lesson: assignedLesson({ start: '2026-08-29', materials: '기존 수업의 다른 정보만 정정' })
+  }, { scope: 'own', id: 'teacher-1' });
+  assert.equal(corrected.response.status, 200);
+  assert.equal(corrected.data.task.start, '2026-08-29');
+
+  const reassignmentDb = new FakeDB();
+  const source = await seedOwnLesson(reassignmentDb, { start: '2026-08-29' });
+  reassignmentDb.privateRoster.roster.students[1].firstClassDate = '2026-09-05';
+  const reassignedTooEarly = await call(reassignmentDb, {
+    staffId: 'teacher-1', sourceTaskId: source.id, expectedUpdatedAt: source.updatedAt,
+    lesson: assignedLesson({ studentId: 'student-b', start: '2026-08-29' })
+  }, { scope: 'all', role: 'admin' });
+  assert.equal(reassignedTooEarly.response.status, 409);
+  assert.match(reassignedTooEarly.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.equal(JSON.parse(reassignmentDb.tasks.get(source.id).data).studentId, 'student-a');
+});
+
 test('student id submissions fail closed until the private roster is seeded', async () => {
   const db = new FakeDB();
   const source = await seedOwnLesson(db);
@@ -917,6 +962,39 @@ test('admin atomically registers one shared lesson for multiple stable students'
   assert.deepEqual(db.privateRoster.roster.students[1].teacherIds, ['teacher-2']);
   assert.deepEqual(db.privateRoster.roster.students[0].subjects, ['국어']);
   assert.deepEqual(db.privateRoster.roster.students[1].subjects, ['국어']);
+});
+
+test('multi-student registration uses a common start no earlier than every selected first class date', async () => {
+  const db = new FakeDB();
+  db.privateRoster.roster.students[0].name = '가학생';
+  db.privateRoster.roster.students[0].firstClassDate = '2026-09-01';
+  db.privateRoster.roster.students[1].name = '나학생';
+  db.privateRoster.roster.students[1].grade = '초5';
+  db.privateRoster.roster.students[1].firstClassDate = '2026-09-05';
+  const lessonFor = (studentId, studentName, grade, start) => ({
+    staffId: 'teacher-1', lesson: assignedLesson({ studentId, studentName, grade, start })
+  });
+  const early = await callStudentBatch(db, [
+    lessonFor('student-a', '가학생', '초4', '2026-09-04'),
+    lessonFor('student-b', '나학생', '초5', '2026-09-04')
+  ]);
+  assert.equal(early.response.status, 409);
+  assert.match(early.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.equal(db.tasks.size, 0);
+
+  const valid = await callStudentBatch(db, [
+    lessonFor('student-a', '가학생', '초4', '2026-09-05'),
+    lessonFor('student-b', '나학생', '초5', '2026-09-05')
+  ]);
+  assert.equal(valid.response.status, 200);
+  assert.equal(valid.data.tasks.every(task => task.start === '2026-09-05'), true);
+  db.privateRoster.roster.students.forEach(student => { student.firstClassDate = '2026-09-10'; });
+  const retry = await callStudentBatch(db, [
+    lessonFor('student-a', '가학생', '초4', '2026-09-05'),
+    lessonFor('student-b', '나학생', '초5', '2026-09-05')
+  ]);
+  assert.equal(retry.response.status, 200);
+  assert.equal(retry.data.duplicateCount, 2);
 });
 
 test('server safely recognizes multiple students even when a stale client sends the old batch kind', async () => {

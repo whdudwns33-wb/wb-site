@@ -337,6 +337,15 @@ function normalizedRosterText(value) {
   return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
 }
 
+function validRosterFirstClassDate(value) {
+  const text = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+  const [year, month, day] = text.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? text : '';
+}
+
 function sameLessonAssignmentIdentity(current, candidate) {
   return String(current && current.studentId || '') !== '' &&
     String(current.studentId) === String(candidate && candidate.studentId || '') &&
@@ -344,7 +353,7 @@ function sameLessonAssignmentIdentity(current, candidate) {
       normalizedRosterText(current[key]) === normalizedRosterText(candidate && candidate[key]));
 }
 
-async function validateLessonStudentAccess(env, app, task, auth) {
+async function validateLessonStudentAccess(env, app, task, auth, options = {}) {
   const studentId = String(task && task.studentId || '');
   if (!studentId) {
     return auth.scope === 'own'
@@ -375,6 +384,10 @@ async function validateLessonStudentAccess(env, app, task, auth) {
   if (normalizedRosterText(student.name) !== normalizedRosterText(task.studentName) ||
       normalizedRosterText(student.grade) !== normalizedRosterText(task.grade)) {
     return { status: 409, error: '원생 명단의 이름·학년과 수업 정보가 일치하지 않습니다' };
+  }
+  const firstClassDate = validRosterFirstClassDate(student.firstClassDate);
+  if (options.enforceFirstClassDate && firstClassDate && String(task.start || '') < firstClassDate) {
+    return { status: 409, error: '수업 적용 시작일은 원생 첫 수업 시작일 ' + firstClassDate + ' 이후여야 합니다' };
   }
   return null;
 }
@@ -600,6 +613,12 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
         (auth.scope !== 'all' && sourceRow.task.staffId && sourceRow.task.staffId !== staffId)) {
       return json({ ok: false, error: '이 수업은 수업 등록 및 변경 화면에서 정정할 수 없습니다' }, 409, origin);
     }
+    if (String(sourceRow.task.studentId || '') !== String(task.studentId || '')) {
+      const reassignmentAccess = await validateLessonStudentAccess(env, app, task, auth, {
+        enforceFirstClassDate: true
+      });
+      if (reassignmentAccess) return json({ ok: false, error: reassignmentAccess.error }, reassignmentAccess.status, origin);
+    }
     if (auth.scope === 'own' && !sameLessonAssignmentIdentity(sourceRow.task, task)) {
       return json({
         ok: false,
@@ -621,6 +640,13 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       error: '같은 학생·과목·반 수업이 여러 건입니다. 원장이 먼저 중복을 정리해 주세요',
       code: 'lesson_assignment_ambiguous'
     }, 409, origin);
+  }
+
+  if (!sourceTaskId && matches.length === 0) {
+    const newLessonAccess = await validateLessonStudentAccess(env, app, task, auth, {
+      enforceFirstClassDate: true
+    });
+    if (newLessonAccess) return json({ ok: false, error: newLessonAccess.error }, newLessonAccess.status, origin);
   }
 
   if (matches.length === 1) {
@@ -891,6 +917,12 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
       }
       planned.push({ task: current, created: false });
     } else {
+      const newLessonAccess = await validateLessonStudentAccess(env, app, task, auth, {
+        enforceFirstClassDate: true
+      });
+      if (newLessonAccess) {
+        return json({ ok: false, error: (index + 1) + '번째 수업: ' + newLessonAccess.error }, newLessonAccess.status, origin);
+      }
       planned.push({ task, created: true });
     }
   }
