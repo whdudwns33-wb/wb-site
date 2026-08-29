@@ -117,6 +117,17 @@ test('source card reads and writes one actual visit-date check and fails closed 
   assert.match(context.issue, /기존 기록/);
   delete harness.checks['lesson-a|2026-08-29'];
 
+  loadWeekendPair(harness, [], [
+    visit({ visitId: 'wv_first', visitSequence: 1, checkInAt: 100, status: 'completed' }),
+    visit({ visitId: 'wv_second', visitSequence: 2, checkInAt: 200, status: 'active' })
+  ]);
+  context = harness.api.lessonRecordContext(task, '2026-08-29');
+  assert.equal(context.recordDate, '2026-08-30');
+  assert.equal(context.inputEnabled, true, 'multiple visits on one actual date share one lesson record');
+  assert.equal(context.visitCount, 2);
+  assert.deepEqual(context.visits.map(row => row.visitId), ['wv_first', 'wv_second']);
+  assert.equal(context.visit.visitId, 'wv_second', 'the active visit is the representative visit');
+
   loadWeekendPair(harness, [visit({ visitId: 'wv_b', visitDate: '2026-08-29' })], [visit()]);
   context = harness.api.lessonRecordContext(task, '2026-08-29');
   assert.equal(context.inputEnabled, false);
@@ -251,10 +262,12 @@ test('an older weekend visit response cannot overwrite the newest response for t
   const older = api.beginWeekendVisitScopeRequest(key);
   const newer = api.beginWeekendVisitScopeRequest(key);
   assert.equal(api.rememberWeekendVisitScope('2026-08-30', 'teacher-a',
-    { visits: [{ visitId: 'newer' }] }, newer), true);
+    { visits: [{ visitId: 'newer' }], nextVisitSequences: [{ lessonTaskId: 'lesson-a', studentId: 'student-a', visitDate: '2026-08-30', next: 3 }] }, newer), true);
   assert.equal(api.rememberWeekendVisitScope('2026-08-30', 'teacher-a',
     { visits: [{ visitId: 'older' }] }, older), false);
   assert.equal(cache.get(key).rows[0].visitId, 'newer');
+  assert.equal(cache.get(key).nextVisitSequences[0].next, 3,
+    'the server-computed next sequence must survive the scope cache');
   api.finishWeekendVisitScopeRequest(key, older);
   assert.equal(loading.get(key), newer, 'an old finally block must not clear the current request marker');
   api.finishWeekendVisitScopeRequest(key, newer);

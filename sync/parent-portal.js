@@ -571,13 +571,19 @@ async function publicTodayLessons(env, student, now) {
   if (taskRows.some(item => flexibleWeekendTaskOnDate(item.task, date)) &&
       await tableExists(env, 'weekend_actual_visits')) {
     const visits = await env.DB.prepare(
-      "SELECT lesson_task_id,student_id,visit_date,check_in_at,check_out_at,status FROM weekend_actual_visits " +
-      "WHERE app=? AND student_id=? AND visit_date=? AND status<>'cancelled'"
+      "SELECT lesson_task_id,student_id,visit_date,visit_sequence,check_in_at,check_out_at,status FROM weekend_actual_visits " +
+      "WHERE app=? AND student_id=? AND visit_date=? AND status<>'cancelled' " +
+      'ORDER BY lesson_task_id,visit_sequence,check_in_at'
     ).bind('task', studentId, date).all();
     for (const visit of visits.results || []) {
       if (String(visit.student_id || '') !== studentId || String(visit.visit_date || '') !== date ||
           !SAFE_ID.test(String(visit.lesson_task_id || ''))) continue;
-      flexibleVisits.set(String(visit.lesson_task_id), visit);
+      const key = String(visit.lesson_task_id);
+      const current = flexibleVisits.get(key);
+      if (!current || visit.status === 'active' ||
+          (current.status !== 'active' && Number(visit.visit_sequence || 1) >= Number(current.visit_sequence || 1))) {
+        flexibleVisits.set(key, visit);
+      }
     }
   }
   const names = await staffNames(env);
