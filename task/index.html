@@ -1016,11 +1016,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-29.3"></script>
-<script src="./schedule-board-core.js?v=2026-08-29.3"></script>
-<script src="./asset-core.js?v=2026-08-29.3"></script>
-<script src="./qr-core.js?v=2026-08-29.3"></script>
-<script src="./acaflow-import-core.js?v=2026-08-29.3"></script>
+<script src="./lesson-form-core.js?v=2026-08-29.4"></script>
+<script src="./schedule-board-core.js?v=2026-08-29.4"></script>
+<script src="./asset-core.js?v=2026-08-29.4"></script>
+<script src="./qr-core.js?v=2026-08-29.4"></script>
+<script src="./acaflow-import-core.js?v=2026-08-29.4"></script>
 <script>
 "use strict";
 
@@ -5179,10 +5179,51 @@ function clearLessonDraft() {
   try { sessionStorage.removeItem(lessonDraftStorageKey()); } catch (error) {}
 }
 
-function newLessonBatchEntry() {
+function lessonRegistrationIsoDate(value) {
+  const text = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+  const parts = text.split('-').map(Number);
+  const parsed = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  return parsed.getUTCFullYear() === parts[0] && parsed.getUTCMonth() === parts[1] - 1 && parsed.getUTCDate() === parts[2]
+    ? text : '';
+}
+
+function lessonStudentFirstClassDate(student) {
+  return lessonRegistrationIsoDate(student && student.firstClassDate);
+}
+
+function lessonRegistrationStartFloor(students) {
+  return (Array.isArray(students) ? students : [students]).reduce((latest, student) => {
+    const firstClassDate = lessonStudentFirstClassDate(student);
+    return firstClassDate && firstClassDate > latest ? firstClassDate : latest;
+  }, today());
+}
+
+function lessonFirstClassDateMinimum(students) {
+  return (Array.isArray(students) ? students : [students]).reduce((latest, student) => {
+    const firstClassDate = lessonStudentFirstClassDate(student);
+    return firstClassDate && firstClassDate > latest ? firstClassDate : latest;
+  }, '');
+}
+
+function raiseLessonRegistrationStart(value, students) {
+  const current = lessonRegistrationIsoDate(value);
+  const minimum = lessonFirstClassDateMinimum(students);
+  if (!current) return lessonRegistrationStartFloor(students);
+  return minimum && current < minimum ? minimum : current;
+}
+
+function lessonStartBeforeFirstClassDate(value, students) {
+  const start = lessonRegistrationIsoDate(value);
+  const minimum = lessonFirstClassDateMinimum(students);
+  return !!minimum && (!start || start < minimum);
+}
+
+function newLessonBatchEntry(startDate) {
   return {
     staffId: '', subject: '', className: '', scheduleText: '',
-    scheduleSlots: [{ days: [], startTime: '', endTime: '', lessonHours: '' }], start: today()
+    scheduleSlots: [{ days: [], startTime: '', endTime: '', lessonHours: '' }],
+    start: lessonRegistrationIsoDate(startDate) || today()
   };
 }
 
@@ -5261,6 +5302,27 @@ function assignedLessonStudents() {
 
 function lessonFormStudents() {
   return studentLinkCandidates(today().slice(0, 7));
+}
+
+function lessonDraftSelectedStudent(draft) {
+  draft = draft || currentLessonDraft();
+  return lessonFormStudents().find(student => String(student.id) === String(draft.studentId || '')) || null;
+}
+
+function lessonDraftBulkStudents(draft) {
+  draft = draft || currentLessonDraft();
+  const selectedIds = new Set((draft.bulkStudentIds || []).map(String));
+  return lessonFormStudents().filter(student => selectedIds.has(String(student.id)));
+}
+
+function raiseNewLessonDraftStarts(draft, students) {
+  if (!draft || draft._sourceTaskId) return;
+  draft.start = raiseLessonRegistrationStart(draft.start, students);
+  if (Array.isArray(draft.lessonEntries)) {
+    draft.lessonEntries.forEach(entry => {
+      entry.start = raiseLessonRegistrationStart(entry.start, students);
+    });
+  }
 }
 
 function setLessonRosterDraft(student) {
@@ -5530,6 +5592,9 @@ async function submitLessonAssignmentRequest(button) {
     return toast('각 확정 시간의 요일·시작·종료·수업시수를 모두 입력해 주세요');
   }
   if (!draft.startDate) return toast('수업 시작일을 선택해 주세요');
+  if (lessonStartBeforeFirstClassDate(draft.startDate, selected)) {
+    return toast('수업 시작일은 원생 첫 수업 시작일 ' + lessonStudentFirstClassDate(selected) + ' 이후여야 합니다');
+  }
   if (!String(draft.reason || '').trim()) return toast('수업 등록 요청 사유를 입력해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('개인 인증을 먼저 확인해 주세요');
@@ -5639,6 +5704,7 @@ function lessonAssignmentRequestHtml() {
   const history = lessonAssignmentRequests.filter(row => row.status !== 'approval_waiting').slice(0, 3);
   const candidates = lessonAssignmentCandidates.slice();
   const selected = candidates.find(student => String(student.id) === String(draft.studentId));
+  const selectedFirstClassDate = lessonStudentFirstClassDate(selected);
   const searchKey = String(draft.search || '').normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko');
   const visibleCandidates = candidates.filter(student => !searchKey || [student.name, student.school, student.grade].join(' ')
     .normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase('ko').includes(searchKey) || String(student.id) === String(draft.studentId));
@@ -5674,7 +5740,9 @@ function lessonAssignmentRequestHtml() {
       '<label class="chip"><input type="radio" name="lesson-assignment-subject" data-assignment-subject value="' + esc(subject) + '"' + (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
     '<div class="sect">3. 수업 요일·시간·시수</div>' + scheduleRows +
     '<button class="btn btn-sm btn-ghost mb14" data-act="lessonassignmentslotadd">＋ 다른 시간대 추가</button>' +
-    '<label class="field"><span class="fl">수업 시작일</span><input class="in" type="date" data-assignment-start value="' + esc(draft.startDate || today()) + '"></label>' +
+    '<label class="field"><span class="fl">수업 시작일</span><input class="in" type="date" data-assignment-start' +
+      (selectedFirstClassDate ? ' min="' + esc(selectedFirstClassDate) + '"' : '') + ' value="' + esc(draft.startDate || today()) + '">' +
+      (selectedFirstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(selectedFirstClassDate) + '보다 빠르게 요청할 수 없습니다.</div>' : '') + '</label>' +
     '<label class="field"><span class="fl">수업 등록 요청 사유</span><textarea class="in" rows="3" maxlength="500" data-assignment-reason placeholder="이 학생의 수업 등록이 필요한 이유를 적어 주세요">' + esc(draft.reason || '') + '</textarea></label>' +
     '<div class="hint mb14">승인되면 이 과목의 수업이 요청한 선생님에게 생성됩니다. 연락처 원문은 이 화면에 표시되지 않습니다.</div>' +
     '<button class="btn btn-primary btn-block" data-act="lessonassignmentrequest">원장님께 학생 수업 등록 요청</button>' : '';
@@ -5808,6 +5876,7 @@ function lessonBatchSlotHtml(slot, lessonIndex, slotIndex) {
 
 function lessonBatchEntryHtml(entry, index, count) {
   const teacherReady = ROSTER_SUBJECT_OPTIONS.includes(String(entry.subject || ''));
+  const firstClassDate = lessonStudentFirstClassDate(currentLessonRosterDraft() || lessonDraftSelectedStudent());
   return '<div class="card lesson-batch-card" data-lesson-batch-entry="' + index + '"><div class="between mb14"><div><b>수업 ' + (index + 1) + '</b>' +
     '<div class="small muted">과목·담당·시간표가 다른 수업은 별도 카드로 등록됩니다.</div></div>' +
     (count > 1 ? '<button class="btn btn-sm btn-danger" data-act="lessonbatchremove" data-i="' + index + '">수업 삭제</button>' : '') + '</div>' +
@@ -5820,7 +5889,9 @@ function lessonBatchEntryHtml(entry, index, count) {
     '<div class="sect">4. 수업 요일·시간·시수</div><div class="hint mb8">확정 시간마다 요일·시작·종료·수업시수를 입력해 주세요. 시간대가 다르면 행을 추가할 수 있습니다.</div>' +
       (entry.scheduleSlots || []).map((slot, slotIndex) => lessonBatchSlotHtml(slot, index, slotIndex)).join('') +
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonbatchslotadd" data-i="' + index + '">＋ 다른 시간대 추가</button>' +
-    '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-batch-field="start" data-i="' + index + '" value="' + esc(entry.start || today()) + '"></div></div>';
+    '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-batch-field="start" data-i="' + index + '"' +
+      (firstClassDate ? ' min="' + esc(firstClassDate) + '"' : '') + ' value="' + esc(entry.start || today()) + '">' +
+      (firstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(firstClassDate) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</div></div>';
 }
 
 function lessonBatchRegistrationHtml() {
@@ -5850,6 +5921,9 @@ function lessonStudentBatchRegistrationHtml() {
   const draft = currentLessonDraft();
   const students = lessonFormStudents();
   const selectedIds = new Set((draft.bulkStudentIds || []).map(String));
+  const selectedStudents = students.filter(student => selectedIds.has(String(student.id)));
+  raiseNewLessonDraftStarts(draft, selectedStudents);
+  const firstClassDateMinimum = lessonFirstClassDateMinimum(selectedStudents);
   const query = lessonExistingSearchKey(draft.bulkStudentSearch);
   const teacherReady = selectedIds.size > 0 && ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''));
   const studentRows = students.map(student => {
@@ -5877,7 +5951,9 @@ function lessonStudentBatchRegistrationHtml() {
     '<div class="sect">4. 수업 요일·시간·시수</div><div class="hint mb8">선택한 모든 학생에게 같은 확정 시간표가 적용됩니다. 시간대가 다르면 행을 추가할 수 있습니다.</div>' +
       (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
-    '<label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></label>' +
+    '<label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start"' +
+      (firstClassDateMinimum ? ' min="' + esc(firstClassDateMinimum) + '"' : '') + ' value="' + esc(draft.start || today()) + '">' +
+      (firstClassDateMinimum ? '<div class="hint mt8">선택 학생 중 가장 늦은 첫 수업 시작일 ' + esc(firstClassDateMinimum) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
     '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview"' + (selectedIds.size ? '' : ' disabled') + '>선택 ' + selectedIds.size + '명 · 수업 일괄 등록 미리보기</button>';
 }
 
@@ -6112,6 +6188,9 @@ function previewLessonStudentBatchRegistration(core, draft) {
   const selectedIds = new Set((draft.bulkStudentIds || []).map(String));
   const students = lessonFormStudents().filter(student => selectedIds.has(String(student.id)));
   if (!students.length || students.length > 50) return toast('일괄 등록할 학생은 1명 이상 50명 이하로 선택해 주세요');
+  if (lessonStartBeforeFirstClassDate(draft.start, students)) {
+    return toast('적용 시작일은 선택 학생의 첫 수업 시작일 ' + lessonFirstClassDateMinimum(students) + ' 이후여야 합니다');
+  }
   if (!ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''))) return toast('공통 수업 과목을 한 개 선택해 주세요');
   if (!String(draft.staffId || '')) return toast('이번 수업 담당 선생님을 선택해 주세요');
 
@@ -6149,10 +6228,14 @@ function previewLessonStudentBatchRegistration(core, draft) {
 
 function previewLessonBatchRegistration(core, draft, selected) {
   const entries = lessonBatchEntries(draft);
+  const effectiveStudent = currentLessonRosterDraft() || selected;
   if (!entries.length || entries.length > 10) return toast('등록할 수업은 1건 이상 10건 이하로 입력해 주세요');
   for (let index = 0; index < entries.length; index += 1) {
     if (!ROSTER_SUBJECT_OPTIONS.includes(String(entries[index].subject || ''))) return toast('수업 ' + (index + 1) + '의 과목을 선택해 주세요');
     if (!String(entries[index].staffId || '')) return toast('수업 ' + (index + 1) + '의 담당 선생님을 선택해 주세요');
+    if (lessonStartBeforeFirstClassDate(entries[index].start, effectiveStudent)) {
+      return toast('수업 ' + (index + 1) + '의 적용 시작일은 첫 수업 시작일 ' + lessonStudentFirstClassDate(effectiveStudent) + ' 이후여야 합니다');
+    }
   }
   try { lessonPreviewRosterStudent = lessonRosterStudentPayload(selected, draft, entries); }
   catch (error) { return toast(error.message || '원생 기본 정보를 확인해 주세요'); }
@@ -18484,6 +18567,7 @@ document.addEventListener('click', ev => {
         selectedIds.add(String(input.value));
       }
       currentLessonDraft().bulkStudentIds = Array.from(selectedIds);
+      raiseNewLessonDraftStarts(currentLessonDraft(), lessonDraftBulkStudents());
       lessonPreviewBatchPayload = []; lessonPreviewRosterStudents = [];
       persistLessonDraft(); syncLessonBulkSelectionUi();
       if (visible.length && selectedIds.size >= 50) toast('한 번에 학생은 최대 50명까지 선택할 수 있습니다');
@@ -18492,6 +18576,7 @@ document.addEventListener('click', ev => {
     case 'lessonbulkclear':
       if (!session.isAdmin || currentLessonDraft().registrationMode !== 'students') break;
       currentLessonDraft().bulkStudentIds = [];
+      currentLessonDraft().start = today();
       lessonPreviewBatchPayload = []; lessonPreviewRosterStudents = [];
       persistLessonDraft(); syncLessonBulkSelectionUi();
       break;
@@ -18520,7 +18605,7 @@ document.addEventListener('click', ev => {
     case 'lessonbatchadd': {
       const entries = lessonBatchEntries();
       if (entries.length >= 10) return toast('한 번에 수업은 최대 10건까지 등록할 수 있습니다');
-      entries.push(newLessonBatchEntry());
+      entries.push(newLessonBatchEntry(lessonRegistrationStartFloor(currentLessonRosterDraft() || lessonDraftSelectedStudent())));
       persistLessonDraft(); refreshLessonDirectEntry(true); break;
     }
     case 'lessonbatchremove': {
@@ -19082,7 +19167,15 @@ document.addEventListener('input', ev => {
   const rosterField = ev.target.closest('[data-lesson-roster-field]');
   if (rosterField) {
     const info = currentLessonRosterDraft();
-    if (info) info[rosterField.dataset.lessonRosterField] = rosterField.value;
+    const key = rosterField.dataset.lessonRosterField;
+    if (info) {
+      info[key] = rosterField.value;
+      if (key === 'firstClassDate') {
+        raiseNewLessonDraftStarts(currentLessonDraft(), info);
+        persistLessonDraft();
+        refreshLessonDirectEntry(true);
+      }
+    }
     lessonPreviewRosterStudent = null;
     return;
   }
@@ -19219,7 +19312,10 @@ document.addEventListener('change', async ev => {
     const student = lessonAssignmentCandidates.find(item => String(item.id) === String(assignmentStudent.value));
     draft.studentId = student ? student.id : '';
     draft.subjects = [];
-    if (student) draft.missingOpen = false;
+    if (student) {
+      draft.missingOpen = false;
+      draft.startDate = lessonRegistrationStartFloor(student);
+    } else draft.startDate = today();
     render(); return;
   }
   const assignmentSubject = ev.target.closest('[data-assignment-subject]');
@@ -19240,6 +19336,7 @@ document.addEventListener('change', async ev => {
     } else if (lessonBulkStudent.checked) selectedIds.add(studentId);
     else selectedIds.delete(studentId);
     draft.bulkStudentIds = Array.from(selectedIds);
+    raiseNewLessonDraftStarts(draft, lessonDraftBulkStudents(draft));
     lessonPreviewBatchPayload = []; lessonPreviewRosterStudents = [];
     persistLessonDraft(); syncLessonBulkSelectionUi();
     if (hadSelection !== (selectedIds.size > 0) && ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''))) refreshLessonDirectEntry(true);
@@ -19294,7 +19391,10 @@ document.addEventListener('change', async ev => {
       draft.className = '';
       if (session.isAdmin) {
         draft.staffId = '';
-        if (!draft._sourceTaskId) draft.lessonEntries = [newLessonBatchEntry()];
+        if (!draft._sourceTaskId) {
+          draft.start = lessonRegistrationStartFloor(student);
+          draft.lessonEntries = [newLessonBatchEntry(draft.start)];
+        }
       }
     }
     lessonPreviewBatchPayload = [];
@@ -19483,7 +19583,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-29.3';
+const APP_VER = '2026-08-29.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

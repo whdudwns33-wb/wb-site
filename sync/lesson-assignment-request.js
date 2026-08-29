@@ -14,6 +14,22 @@ const SUBJECT_OPTIONS = new Set([
 const text = (value, max) => String(value == null ? '' : value).normalize('NFKC').trim().slice(0, max);
 const normalize = value => text(value, 200).replace(/\s+/g, '').toLocaleLowerCase('ko');
 
+function validFirstClassDate(value) {
+  const date = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+  const [year, month, day] = date.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+    ? date : '';
+}
+
+function assertStartAfterFirstClassDate(student, startDate) {
+  const firstClassDate = validFirstClassDate(student && student.firstClassDate);
+  if (firstClassDate && String(startDate || '') < firstClassDate) {
+    throw new Error('수업 시작일은 원생 첫 수업 시작일 ' + firstClassDate + ' 이후여야 합니다');
+  }
+}
+
 function parseDetails(value) {
   let parsed;
   try { parsed = JSON.parse(String(value || '')); } catch (error) { parsed = null; }
@@ -116,6 +132,7 @@ function candidateViews(students, assignedStudentIds) {
     return {
       id: String(student.id), name: text(student.name, MAX_NAME), school: text(student.school, 80),
       grade: text(student.grade, MAX_GRADE), subjects: studentSubjects(student),
+      firstClassDate: validFirstClassDate(student.firstClassDate),
       assigned: assignedStudentIds.has(String(student.id)), contactHint: hints.length ? [...new Set(hints)].join(' · ') : ''
     };
   }).sort((left, right) => left.name.localeCompare(right.name, 'ko') || left.school.localeCompare(right.school, 'ko') ||
@@ -129,6 +146,7 @@ async function normalizedRequestDetails(student, body, staffId) {
   if (!text(student.grade, MAX_GRADE)) throw new Error('관리자가 원생 정보에 학년을 먼저 입력해야 합니다');
   const reason = text(body.reason, MAX_NOTE);
   if (!reason) throw new Error('배정 요청 사유를 입력해 주세요');
+  assertStartAfterFirstClassDate(student, body.startDate);
   const task = await buildLessonTask({
     studentId: String(student.id), studentName: text(student.name, MAX_NAME), grade: text(student.grade, MAX_GRADE),
     subject: subjects.join('·'), className: '', lessonRole: subjects.join('·'), lessonHours: text(body.lessonHours, 4), scheduleText: '',
@@ -294,6 +312,10 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   if (!roster) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
   const student = roster.document.roster.students.find(item => item && String(item.id) === studentId && isActiveStudent(item));
   if (!student) return json({ ok: false, error: '현재 재원생 명단에서 학생을 다시 선택해 주세요' }, 409, origin);
+  if (details) {
+    try { assertStartAfterFirstClassDate(student, details.startDate); }
+    catch (error) { return json({ ok: false, error: String(error.message || error) }, 409, origin); }
+  }
   if (linkOnly) {
     const identityMismatch = normalize(student.name) !== normalize(current.student_name) ||
       normalize(student.grade) !== normalize(current.grade) || normalize(student.school) !== normalize(missing.school);

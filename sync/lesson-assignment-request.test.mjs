@@ -155,15 +155,42 @@ test('047 migration adds request details and replaces name-only pending uniquene
 
 test('teacher receives active studentId candidates without full guardian contacts', async () => {
   const db = new DB();
+  db.roster.roster.students[0].firstClassDate = '2026-09-05';
   db.roster.roster.students.push({ ...db.roster.roster.students[0], id:'student-2', teacherIds:[], phoneMother:'010-9999-5678' });
   const listed = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', { action:'list' }, '*', own, json));
   assert.equal(listed.candidates.length, 2);
   assert.equal(listed.candidates[0].id, 'student-1');
   assert.equal(listed.candidates[0].assigned, false);
+  assert.equal(listed.candidates[0].firstClassDate, '2026-09-05');
   assert.equal(listed.candidates[0].teacherIds, undefined);
   assert.equal(listed.candidates[0].phoneMother, undefined);
   assert.match(listed.candidates[0].contactHint, /^\d{4}$/);
   assert.doesNotMatch(JSON.stringify(listed), /010-0000-1234/);
+});
+
+test('teacher requests and later approval cannot predate the latest roster first class date', async () => {
+  const db = new DB();
+  db.roster.roster.students[0].firstClassDate = '2026-09-05';
+  const early = await handleLessonAssignmentRequest({ DB: db }, 'task', {
+    ...request, startDate:'2026-09-04'
+  }, '*', own, json);
+  assert.equal(early.status, 400);
+  assert.match((await body(early)).error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.equal(db.rows.size, 0);
+
+  db.roster.roster.students[0].firstClassDate = '2026-08-20';
+  const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', {
+    ...request, startDate:'2026-09-01'
+  }, '*', own, json));
+  assert.equal(submitted.ok, true);
+  db.roster.roster.students[0].firstClassDate = '2026-09-05';
+  const approval = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
+  }, '*', all, json);
+  assert.equal(approval.status, 409);
+  assert.match((await body(approval)).error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.equal(db.tasks.size, 0);
+  assert.equal(db.rows.get(submitted.request.requestKey).status, 'approval_waiting');
 });
 
 test('modern approval assigns the stable student and creates the requested lesson', async () => {
