@@ -70,6 +70,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/055_task_write_cas_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/056_book_order_item_cancellations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/057_teacher_requests_tuition_alerts.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_source_date.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -202,11 +203,12 @@ DB 트리거로 차단한다. 기존 주문 task와 학생 연결 봉인 데이�
 생성되지 않으므로 배포를 중단하고 대상 상태를 다시 확인한다.
 
 토·일 실제 등·하원 기록 기능은 `050_weekend_actual_visits.sql`과
-`058_weekend_visit_source_date.sql`을 운영 D1에 순서대로 먼저 적용한 뒤 Worker, task Pages
+`058_weekend_visit_source_date.sql`, `059_weekend_multi_visits.sql`을 운영 D1에 순서대로 먼저 적용한 뒤 Worker, task Pages
 순서로 배포한다. 실제 방문일(`visit_date`)과 원래 수업 카드 날짜(`source_date`)를 분리하며,
 기존 행의 `source_date`는 구형 클라이언트 호환을 위해 NULL일 수 있다. 기존 예정 시간표와
 출석·회차 원장은 변경하지 않고, stable studentId와 수업 task ID로 연결된 별도 기록과
-append-only 수정 이력을 저장한다.
+append-only 수정 이력을 저장한다. 같은 학생·수업·실제 방문일의 재등원은 명시적인
+`visit_sequence`로 구분하며, 같은 날짜의 여러 방문은 출결·메모·회차 기록 한 건을 공유한다.
 선생님은 본인 담당 토·일 수업만 당일 23:50 전까지 정정할 수 있고 관리자는 감사 사유를
 남긴 뒤 이전 기록을 정정할 수 있다.
 
