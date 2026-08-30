@@ -1,5 +1,6 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import { lessonHandoffCheckoutGrant } from './lesson-handoff.js';
 import {
   flexibleWeekendAllowedOn as flexibleAllowedOn,
   flexibleWeekendConfig as flexibleConfig,
@@ -228,24 +229,42 @@ async function appendUpdate(env, app, current, values, eventType, reason, auth, 
     after: { checkInAt: Number(values.checkInAt), checkOutAt: values.checkOutAt == null ? null : Number(values.checkOutAt), status: values.status },
     reason: String(reason || '')
   });
+  const handoffGrant = lessonGuard && lessonGuard.handoff;
   const updateSql =
     'UPDATE weekend_actual_visits SET check_in_at=?,check_out_at=?,status=?,revision=?,updated_at=?,updated_by=? ' +
     'WHERE app=? AND visit_id=? AND revision=?' + (lessonGuard
       ? ' AND EXISTS (SELECT 1 FROM tasks current_task WHERE current_task.app=? AND current_task.id=? ' +
         'AND current_task.owner=? AND current_task.data=?)'
+      : '') + (handoffGrant
+      ? ' AND EXISTS (SELECT 1 FROM lesson_handoffs handoff WHERE handoff.app=? AND handoff.handoff_id=? ' +
+        'AND handoff.revision=? AND handoff.status IN (\'accepted\',\'completed\') ' +
+        'AND handoff.recipient_staff_id=? AND handoff.source_staff_id=? ' +
+        'AND handoff.lesson_task_id=? AND handoff.student_id=? AND handoff.record_date=? AND handoff.source_date=? AND handoff.visit_id=? ' +
+        'AND handoff.data_generation=COALESCE((SELECT generation FROM app_data_generations WHERE app=handoff.app),0) ' +
+        'AND EXISTS (SELECT 1 FROM staff recipient WHERE recipient.app=handoff.app AND recipient.id=handoff.recipient_staff_id ' +
+          'AND json_valid(recipient.data) AND COALESCE(json_extract(recipient.data,\'$.deleted\'),0)=0))'
       : '');
   const updateArgs = [values.checkInAt, values.checkOutAt, values.status, revision, updatedAt, actor,
     app, current.visit_id, expectedRevision];
   if (lessonGuard) updateArgs.push(app, String(current.lesson_task_id), lessonGuard.owner, lessonGuard.taskData);
-  const statements = [
-    env.DB.prepare(updateSql).bind(...updateArgs),
+  if (handoffGrant) updateArgs.push(app, handoffGrant.handoffId, handoffGrant.revision, String(auth.id || ''),
+    lessonGuard.owner, String(current.lesson_task_id), String(current.student_id), String(current.visit_date),
+    handoffGrant.sourceDate, String(current.visit_id));
+  const statements = [env.DB.prepare(updateSql).bind(...updateArgs)];
+  if (handoffGrant) {
+    // The handoff may be revoked while a tablet is saving. Fail the entire batch,
+    // including its audit event, unless this exact grant still authorizes checkout.
+    statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_handoff_checkout',
+      [current.visit_id, expectedRevision, handoffGrant.handoffId, handoffGrant.revision, updatedAt].join('\n'), updatedAt));
+  }
+  statements.push(
     env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
       'SELECT ?,?,?,?,?,?,? WHERE EXISTS (' +
       'SELECT 1 FROM weekend_actual_visits WHERE app=? AND visit_id=? AND revision=? AND updated_at=?)'
     ).bind(app, eventId, current.visit_id, eventType, eventData, actor, updatedAt,
       app, current.visit_id, revision, updatedAt)
-  ];
+  );
   const results = await env.DB.batch(statements);
   if (Number(results && results[0] && results[0].meta && results[0].meta.changes || 0) !== 1) return { stale: true };
   return { visit: await latestAfterWrite(env, app, current.visit_id) };
@@ -587,9 +606,14 @@ async function changeVisit(env, app, body, auth, json, origin) {
   if (!SAFE_ID.test(visitId)) return json({ ok: false, error: '등·하원 기록을 확인해 주세요' }, 422, origin);
   const current = await findVisit(env, app, visitId);
   if (!current || current.status === 'cancelled') return json({ ok: false, error: '현재 등·하원 기록을 찾을 수 없습니다' }, 404, origin);
-  const currentLesson = auth.scope === 'own' ? await currentVisitLesson(env, app, current) : null;
+  let currentLesson = auth.scope === 'own' ? await currentVisitLesson(env, app, current) : null;
   if (auth.scope === 'own' && (!currentLesson || currentLesson.owner !== String(auth.id || ''))) {
-    return json({ ok: false, error: '현재 본인이 담당하는 수업만 기록할 수 있습니다' }, 422, origin);
+    const handoff = action === 'check_out' && currentLesson
+      ? await lessonHandoffCheckoutGrant(env, app, auth, current) : null;
+    if (!handoff) {
+      return json({ ok: false, error: '현재 본인이 담당하거나 당일 인계받은 수업만 하원 처리할 수 있습니다' }, 422, origin);
+    }
+    currentLesson = { ...currentLesson, handoff };
   }
   const expectedRevision = Number(body.revision);
 
@@ -605,6 +629,10 @@ async function changeVisit(env, app, body, auth, json, origin) {
         checkInAt: Number(current.check_in_at), checkOutAt: now, status: 'completed', expectedRevision
       }, 'check_out', '', auth, currentLesson);
     } catch (error) {
+      if (isTaskWriteCasConflict(error)) {
+        return json({ ok: false, code: 'VISIT_STALE',
+          error: '수업 인계 또는 등·하원 정보가 변경되었습니다. 새로 확인해 주세요' }, 409, origin);
+      }
       if (hasDatabaseConstraint(error, 'WEEKEND_VISIT_TIME_OVERLAP')) {
         return json({ ok: false, code: 'VISIT_TIME_OVERLAP',
           error: '다른 실제 방문 시간과 겹쳐 하원 시간을 저장할 수 없습니다' }, 409, origin);
