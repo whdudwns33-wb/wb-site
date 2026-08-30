@@ -71,6 +71,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/056_book_order_item
 npx wrangler d1 execute wb-sync --remote --file=./migrations/057_teacher_requests_tuition_alerts.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_source_date.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -732,6 +733,34 @@ euc-kr 페이지도 인코딩을 판별해 읽는다. 자바스크립트로 목�
 ```
 
 ## 설계 메모
+
+### 당일 남은 수업 인계
+
+`060_lesson_handoffs.sql` → 직원·보호자 Worker → task Pages 순서로 배포한다.
+새 원장과 이벤트 테이블만 추가하며 기존 수업, 정규 담당, 출결, 회차권, 실제 방문 행을
+마이그레이션에서 변경하지 않는다. 배포 전 운영 D1 전체 SQL을 저장소 밖의 접근 제한된
+백업 디렉터리에 내보내고, 임시 SQLite 복원 및 신규 마이그레이션 적용 후 기존 핵심 건수와
+외래키 무결성을 확인한다. 학생 전용 Worker나 외부 메시지 설정은 이번 변경의 대상이 아니다.
+
+`POST /lesson-handoff`는 `list`, `create`, `accept`, `save`, `complete`, `cancel`을 지원한다.
+요청마다 `dataGeneration`을 확인하며 등록·수락·메모·완료는 실제 수업일의 23:50 전까지만
+허용한다. 인계는 원 수업 ID, stable studentId, 예정일, 실제 기록일, 확정 시간대에 결합한다.
+서버가 확정 시간대의 시수를 확인하고 진행 시수와 남은 시수의 합이 일치하는지 검사한다.
+시수는 분 단위 수업 시간으로 환산하지 않는다. 같은 원 수업·예정일에는 취소되지 않은
+인계가 하나만 존재한다. 요청자는 원 담당자 또는 관리자이며 수락·메모·완료는 수신자 또는
+관리자만 처리한다. 취소 사유와 각 변경은 삭제되지 않는 이벤트로 남긴다.
+
+원 담당자의 출석·지각 저장을 먼저 요구하고 출결 체크나 회차권을 복제하지 않는다.
+기존 `taskId|실제 기록일` 출결과 23:50 차감 규칙이 그대로 적용된다. 원 담당자의 메모는
+인계 당시 원문을 보존하고 수신자의 메모는 별도 필드에 저장하여 서로 덮어쓰지 않는다.
+수신자에게는 인계된 당일 수업의 최소 정보만 반환하고 정규 수업 수정·학생 전체 조회·
+보호자 발송 권한을 추가하지 않는다. 인계 정보는 generic `/sync` 업로드 대상이 아니다.
+
+실제 방문은 선생님 교체 시 하원·재등원하지 않는다. 인계에 연결된 정확한 방문에 한해
+수락한 수신자도 `/weekend-visit check_out`을 사용할 수 있다. 하원은 당일 자정 전까지
+허용하며, 다른 방문 생성·시간 수정·취소 권한은 주지 않는다. 실제 저장 직전에도 수업
+정체성, 인계 revision·상태·수신자, 데이터 세대를 SQL로 대조하여 취소·담당자 변경과의
+경합에서 방문이나 감사 이벤트가 부분 저장되지 않게 한다.
 
 - **충돌 처리**는 `updated_at`(클라이언트 시각) 기준 last-write-wins. 늦게 도착한 옛 기록이 최신을 덮지 않도록 `ON CONFLICT ... WHERE excluded.updated_at > 기존.updated_at` 으로 막는다.
 - **델타 기준은 `srv_at`(서버 시각)** 을 따로 둔다. 기기 시계가 틀어져도 빠지는 행이 생기지 않는다.

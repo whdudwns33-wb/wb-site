@@ -513,6 +513,15 @@
   .weekend-visit-live { border-color: #86C5DF; background: #F0F9FF; }
   .weekend-visit-complete { border-color: #A7D7C5; background: #F3FBF7; }
   .weekend-visit-time { color: var(--deep-blue); font-weight: 900; }
+  .lesson-handoff-card { border-color: #B9DDF0; }
+  .lesson-handoff-card > summary { cursor: pointer; min-height: 44px; }
+  .lesson-handoff-card > summary .card-sub { margin-top: 5px; }
+  .lesson-handoff-body { margin-top: 14px; display: grid; gap: 12px; }
+  .lesson-handoff-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lesson-handoff-split { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .lesson-handoff-memo .lesson-memo-field textarea { min-height: 70px; }
+  .lesson-handoff-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lesson-handoff-actions .btn { min-height: 44px; }
   .weekend-flex-trigger { border: 1px dashed #6AAFD0; background: #F5FBFF; border-radius: 11px; padding: 10px; margin-top: 10px; }
   .weekend-flex-progress { color: #315D7A; font-size: 12px; font-weight: 800; margin-top: 5px; }
   @media (max-width: 600px) {
@@ -1018,11 +1027,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-29.5"></script>
-<script src="./schedule-board-core.js?v=2026-08-29.5"></script>
-<script src="./asset-core.js?v=2026-08-29.5"></script>
-<script src="./qr-core.js?v=2026-08-29.5"></script>
-<script src="./acaflow-import-core.js?v=2026-08-29.5"></script>
+<script src="./lesson-form-core.js?v=2026-08-30.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-30.1"></script>
+<script src="./asset-core.js?v=2026-08-30.1"></script>
+<script src="./qr-core.js?v=2026-08-30.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-30.1"></script>
 <script>
 "use strict";
 
@@ -1277,6 +1286,7 @@ function taskProgress(t, c) {
 function statusOf(t, date) {
   const c = getCheck(t.id, date);
   if (c && c.blocked) return 'blocked';
+  if (typeof lessonHandoffOutstanding === 'function' && lessonHandoffOutstanding(t, date)) return 'doing';
   if (isDone(t.id, date)) return 'done';
   if (taskProgress(t, c).done > 0) return 'doing';
   return 'todo';
@@ -1301,7 +1311,8 @@ function syncAuto(t, date) {
 
 function progress(staffId, date) {
   const list = tasksFor(staffId, date);
-  const done = list.filter(t => isDone(t.id, date)).length;
+  const done = list.filter(t => isDone(t.id, date) &&
+    !(typeof lessonHandoffOutstanding === 'function' && lessonHandoffOutstanding(t, date))).length;
   return { done: done, total: list.length, pct: list.length ? Math.round(done / list.length * 100) : 0 };
 }
 
@@ -1599,6 +1610,7 @@ const sync = {
     } catch (e) {
       console.warn('sync', e);
       if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
+        resetLessonHandoffs();
         state.staff = [];
         state.tasks = [];
         state.checks = {};
@@ -1688,6 +1700,7 @@ const session = {
   lock() {
     sessionStorage.removeItem('wb_admin');
     sync.accessRole = '';
+    resetLessonHandoffs();
     if (!this.isStaffLink) return false;
     resetPersonCache('');
     return true;
@@ -1822,6 +1835,13 @@ let weekendVisitScopeRevision = 0;
 let weekendVisitScopeRequestSerial = 0;
 let weekendVisitMainRequestKey = '', weekendVisitMainRequestGeneration = 0;
 let weekendVisitEditTarget = null, weekendFlexibleEditor = null, weekendFlexibleSaving = false;
+const LESSON_HANDOFF_TTL_MS = 15000;
+const lessonHandoffScopes = new Map(), lessonHandoffLoads = new Map(), lessonHandoffRequests = new Map();
+const lessonHandoffMemoDrafts = new Map(), lessonHandoffSourceDrafts = new Map();
+const lessonHandoffBusy = new Set(), lessonHandoffErrors = new Map(), lessonHandoffPopupSeen = new Set();
+const lessonHandoffVisibleDates = new Set();
+let lessonHandoffAuth = null, lessonHandoffGeneration = -1, lessonHandoffEpoch = 0, lessonHandoffSerial = 0;
+let lessonHandoffDraft = null, lessonHandoffCancelDraft = null;
 
 function go(r) {
   if (!$('#modalHost').hidden) closeModal();
@@ -1845,6 +1865,7 @@ let linkExchangeBusy = false;
 /** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
 function resetPersonCache(token) {
   const keepToken = String(token || '');
+  resetLessonHandoffs();
   clearTimeout(sync.timer); sync.timer = null; sync.dirty = false;
   sync.accessRole = ''; sync.personVerified = false;
   state.settings.myToken = '';
@@ -2502,6 +2523,7 @@ function replaceView(root, html) {
    ══════════════════════════════════════════════════════ */
 function render() {
   syncRenderPending = false;
+  lessonHandoffVisibleDates.clear();
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -3454,6 +3476,647 @@ async function submitWeekendVisit(button, payload, successMessage) {
 }
 
 /* ── 오늘 ── */
+/* ── 날짜 한정 남은 수업 인계 — 원 수업·출결·회차와 분리된 서버 정본 ── */
+function resetLessonHandoffs() {
+  lessonHandoffEpoch++;
+  lessonHandoffAuth = null; lessonHandoffGeneration = -1;
+  lessonHandoffScopes.clear(); lessonHandoffLoads.clear(); lessonHandoffRequests.clear();
+  lessonHandoffMemoDrafts.clear(); lessonHandoffSourceDrafts.clear(); lessonHandoffBusy.clear();
+  lessonHandoffErrors.clear(); lessonHandoffPopupSeen.clear(); lessonHandoffVisibleDates.clear();
+  lessonHandoffDraft = null; lessonHandoffCancelDraft = null;
+}
+
+function sameLessonHandoffAuth(left, right) {
+  return !!(left && right && left.mode === right.mode && String(left.id || '') === String(right.id || '') &&
+    String(left.token || '') === String(right.token || '') && String(left.secret || '') === String(right.secret || ''));
+}
+
+function lessonHandoffContext() {
+  const auth = sync.auth();
+  if (!auth || (!session.isAdmin && !session.isStaffLink)) {
+    if (lessonHandoffAuth) resetLessonHandoffs();
+    return null;
+  }
+  const generation = Number(state.settings.dataGeneration) || 0;
+  if (!sameLessonHandoffAuth(lessonHandoffAuth, auth) || lessonHandoffGeneration !== generation ||
+      !!lessonHandoffAuth.adminView !== !!session.isAdmin) {
+    resetLessonHandoffs();
+    // 인증 값은 오래된 응답 차단용 메모리 비교에만 쓴다. 캐시 키나 별도 저장소에 기록하지 않는다.
+    lessonHandoffAuth = Object.assign({}, auth, { adminView: !!session.isAdmin });
+    lessonHandoffGeneration = generation;
+  }
+  return { auth: auth, generation: generation, epoch: lessonHandoffEpoch, adminView: !!session.isAdmin };
+}
+
+function isCurrentLessonHandoffContext(context) {
+  return !!(context && context.epoch === lessonHandoffEpoch && context.generation === (Number(state.settings.dataGeneration) || 0) &&
+    context.adminView === !!session.isAdmin && sameLessonHandoffAuth(context.auth, sync.auth()));
+}
+
+function lessonHandoffMemoValues(value) {
+  const memo = value && typeof value === 'object' ? value : {};
+  const values = {};
+  ['contentProgress', 'homework', 'otherNotes', 'comment'].forEach(key => { values[key] = String(memo[key] || ''); });
+  return values;
+}
+
+function normalizeLessonHandoff(row) {
+  if (!row || !/^lh_[a-f0-9]{32}$/.test(String(row.handoffId || '')) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(row.recordDate || '')) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(row.sourceDate || '')) ||
+      !['pending', 'accepted', 'completed', 'cancelled'].includes(row.status)) return null;
+  return Object.assign({}, row, { handoffId: String(row.handoffId), revision: Number(row.revision) || 0,
+    sourceMemo: lessonHandoffMemoValues(row.sourceMemo), memo: lessonHandoffMemoValues(row.memo),
+    student: row.student && typeof row.student === 'object' ? row.student : {},
+    lesson: row.lesson && typeof row.lesson === 'object' ? row.lesson : {} });
+}
+
+async function loadLessonHandoffs(date, force, allowPopup) {
+  const context = lessonHandoffContext();
+  if (!context || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return null;
+  const key = String(date);
+  const cached = lessonHandoffScopes.get(key);
+  if (!force && cached && Date.now() - cached.fetchedAt < LESSON_HANDOFF_TTL_MS) {
+    if (allowPopup) showPendingLessonHandoffPopup();
+    return cached;
+  }
+  const existing = lessonHandoffLoads.get(key);
+  if (existing) {
+    const result = await existing.promise;
+    if (allowPopup && isCurrentLessonHandoffContext(context)) showPendingLessonHandoffPopup();
+    return result;
+  }
+  const serial = ++lessonHandoffSerial;
+  lessonHandoffRequests.set(key, serial);
+  const isCurrent = () => isCurrentLessonHandoffContext(context) && lessonHandoffRequests.get(key) === serial;
+  const request = { serial: serial, promise: null };
+  request.promise = (async () => {
+    try {
+      const result = await sync.post('/lesson-handoff', { app: SYNC_APP, auth: context.auth,
+        dataGeneration: context.generation, action: 'list', date: key });
+      if (!isCurrent()) return null;
+      if (Number(result.dataGeneration) !== context.generation) throw new Error('데이터 기준이 바뀌었습니다. 다시 동기화해 주세요');
+      const rows = (Array.isArray(result.handoffs) ? result.handoffs : []).map(normalizeLessonHandoff).filter(row => row &&
+        row.recordDate === key && (session.isAdmin || row.sourceStaffId === session.staffId || row.recipientStaffId === session.staffId));
+      const scope = { rows: rows, recipients: (Array.isArray(result.recipients) ? result.recipients : [])
+        .filter(row => row && row.staffId).map(row => ({ staffId: String(row.staffId), name: String(row.name || '선생님') })),
+        fetchedAt: Date.now(), error: '' };
+      lessonHandoffScopes.set(key, scope);
+      return scope;
+    } catch (error) {
+      if (!isCurrent()) return null;
+      if (error && error.code === 'DATA_GENERATION_MISMATCH') {
+        resetLessonHandoffs(); sync.run(); return null;
+      }
+      const scope = Object.assign({ rows: [], recipients: [] }, cached || {},
+        { fetchedAt: Date.now(), error: String(error && error.message || '인계 목록을 불러오지 못했습니다') });
+      lessonHandoffScopes.set(key, scope);
+      return scope;
+    } finally {
+      if (lessonHandoffLoads.get(key) === request) lessonHandoffLoads.delete(key);
+      if (isCurrent()) {
+        if (lessonHandoffVisibleDates.has(key)) renderAfterSync();
+        if (allowPopup) showPendingLessonHandoffPopup();
+      }
+    }
+  })();
+  lessonHandoffLoads.set(key, request);
+  return await request.promise;
+}
+
+function ensureLessonHandoffDate(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) || !lessonHandoffContext()) return null;
+  lessonHandoffVisibleDates.add(String(date));
+  loadLessonHandoffs(String(date), false, false);
+  return lessonHandoffScopes.get(String(date)) || null;
+}
+
+function refreshVisibleLessonHandoffs(force, allowPopup) {
+  const handoffToday = seoulNowParts().date;
+  new Set([handoffToday].concat(Array.from(lessonHandoffVisibleDates))).forEach(date =>
+    loadLessonHandoffs(date, !!force, !!allowPopup && date === handoffToday));
+}
+
+function lessonHandoffRows(date) {
+  if (!lessonHandoffContext()) return [];
+  return (lessonHandoffScopes.get(String(date)) || {}).rows || [];
+}
+
+function lessonHandoffForTask(task, sourceDate, recordDate) {
+  return lessonHandoffRows(recordDate).filter(row => String(row.lessonTaskId) === String(task && task.id || '') &&
+    String(row.studentId) === String(task && task.studentId || '') && String(row.sourceDate) === String(sourceDate));
+}
+
+function lessonHandoffOutstanding(task, recordDate) {
+  return lessonHandoffRows(recordDate).some(row => String(row.lessonTaskId) === String(task && task.id || '') &&
+    String(row.studentId) === String(task && task.studentId || '') && ['pending', 'accepted'].includes(row.status));
+}
+
+function lessonHandoffById(id) {
+  if (!lessonHandoffContext()) return null;
+  for (const scope of lessonHandoffScopes.values()) {
+    const row = scope.rows.find(item => item.handoffId === String(id));
+    if (row) return row;
+  }
+  return null;
+}
+
+function lessonHandoffStatusText(row) {
+  return ({ pending: '인계 대기', accepted: '인계 진행중', completed: '인계 수업 완료', cancelled: '인계 취소' })[row.status] || '';
+}
+
+function lessonHandoffTeacherName(staffId, date) {
+  const scope = lessonHandoffScopes.get(String(date));
+  const recipient = scope && scope.recipients.find(row => row.staffId === String(staffId));
+  return String(recipient && recipient.name || (staffById(staffId) || {}).name || '선생님');
+}
+
+function lessonHandoffStudentText(row) {
+  const student = row.student || {};
+  return [String(student.name || '학생 정보 확인 필요'), String(student.school || ''), String(student.grade || '')].filter(Boolean).join(' · ');
+}
+
+function lessonHandoffReadOnlyMemo(memo, title) {
+  const values = lessonHandoffMemoValues(memo);
+  const fields = LESSON_MEMO_FIELDS.concat([{ key: 'comment', label: '기존 코멘트' }]);
+  const body = fields.filter(field => values[field.key].trim()).map(field => '<div class="lesson-handoff-note small"><b>' +
+    esc(field.label) + '</b><br>' + esc(values[field.key]) + '</div>').join('');
+  return '<details class="lesson-progress-section lesson-progress-details"><summary>' + esc(title) + '</summary>' +
+    '<div class="lesson-progress-details-body">' + (body || '<div class="hint">작성된 메모가 없습니다.</div>') + '</div></details>';
+}
+
+function lessonHandoffCanEditDate(date) {
+  const current = seoulNowParts();
+  return String(date) === current.date && current.minute < 23 * 60 + 50;
+}
+
+function lessonHandoffCanAct(row, action) {
+  if (!row || lessonHandoffBusy.has(row.handoffId)) return false;
+  if (row.editable && row.editable[action] === false) return false;
+  if (action === 'cancel') {
+    if (row.status === 'cancelled') return false;
+    if (session.isAdmin) return true;
+    return row.status === 'pending' && lessonHandoffCanEditDate(row.recordDate) &&
+      session.isStaffLink && String(session.staffId) === String(row.sourceStaffId);
+  }
+  if (!lessonHandoffCanEditDate(row.recordDate)) return false;
+  const recipient = session.isStaffLink && String(session.staffId) === String(row.recipientStaffId);
+  if (!session.isAdmin && !recipient) return false;
+  if (action === 'accept') return row.status === 'pending';
+  if (action === 'save') return ['accepted', 'completed'].includes(row.status);
+  if (action === 'complete') return row.status === 'accepted' && seoulNowParts().label >= String(row.startTime || '99:99');
+  return false;
+}
+
+function lessonHandoffCanCheckOut(row) {
+  const visit = row && row.visit;
+  const current = seoulNowParts();
+  return !!(row && ['accepted', 'completed'].includes(row.status) && row.recordDate === current.date &&
+    current.label >= String(row.startTime || '99:99') &&
+    (session.isAdmin || (session.isStaffLink && String(row.recipientStaffId) === String(session.staffId))) &&
+    visit && visit.status === 'active' && visit.visitId && Number(visit.revision) > 0 &&
+    String(visit.lessonTaskId) === String(row.lessonTaskId) && String(visit.studentId) === String(row.studentId) &&
+    // row.visit은 서버가 이 인계의 visitId로 검증한 단일 방문이다. 구형 null만 허용하며 날짜를 추정하지 않는다.
+    (visit.sourceDate === null || String(visit.sourceDate) === String(row.sourceDate)) && String(visit.visitDate) === String(row.recordDate));
+}
+
+function lessonHandoffCardHtml(row, mode) {
+  const sourceName = lessonHandoffTeacherName(row.sourceStaffId, row.recordDate);
+  const recipientName = lessonHandoffTeacherName(row.recipientStaffId, row.recordDate);
+  const attrs = ' data-handoff="' + esc(row.handoffId) + '" data-rev="' + row.revision + '"';
+  const popup = mode === 'popup';
+  const memoEditable = !popup && lessonHandoffCanAct(row, 'save');
+  let draft = lessonHandoffMemoDrafts.get(row.handoffId);
+  if (!draft || !draft.dirty) {
+    draft = { memo: lessonHandoffMemoValues(row.memo), baseRevision: row.revision, dirty: false };
+    lessonHandoffMemoDrafts.set(row.handoffId, draft);
+  }
+  const conflict = draft.dirty && draft.baseRevision !== row.revision;
+  const att = row.attendance && row.attendance.att;
+  let body = '<div class="lesson-handoff-body"><div class="small"><b>' + esc(sourceName) + ' → ' + esc(recipientName) + '</b><br>' +
+    '원 수업 ' + esc(label(row.sourceDate)) + ' · 실제 기록 ' + esc(label(row.recordDate)) + ' · 인계 시작 ' + esc(row.startTime) + '</div>' +
+    '<div class="lesson-handoff-split"><span class="tag">' + esc(sourceName) + ' 진행 ' + esc(row.completedHours) + '</span>' +
+    '<span class="tag ' + (row.status === 'completed' ? 'ok' : 'doing') + '">' + esc(recipientName) + ' 남은 ' + esc(row.remainingHours) +
+    ' · ' + esc(lessonHandoffStatusText(row)) + '</span></div>' +
+    '<div class="hint">원 수업 출결: <b>' + esc(ATT_LABEL[att] ? ATT_LABEL[att][0] : '미기록') +
+    '</b> (읽기 전용) · 출결·회차는 원 수업 1건을 그대로 사용합니다.<br>담당 교체만으로 하원·재등원하지 않습니다. 정규 담당과 시간표는 유지됩니다.</div>' +
+    lessonHandoffReadOnlyMemo(row.sourceMemo, sourceName + '의 인계 당시 원 수업 메모 · ' + row.completedHours) +
+    '<div class="guide lesson-handoff-note"><b>' + esc(sourceName) + '의 전달 메모</b><br>' + esc(row.note || '전달 메모 없음') + '</div>';
+  if (memoEditable) {
+    body += '<div class="lesson-handoff-memo"><div class="fl">' + esc(recipientName) + '의 인계 수업 메모 · ' + esc(row.remainingHours) + '</div>' +
+      '<div class="lesson-memo-grid">' + LESSON_MEMO_FIELDS.map(field => '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
+        '<textarea class="note" rows="3" maxlength="4000" data-lesson-handoff-memo="' + field.key + '" data-handoff="' + esc(row.handoffId) + '">' +
+        esc(draft.memo[field.key]) + '</textarea></label>').join('') + '</div>' +
+      '<div class="hint">선생님 내부 공유 · 학부모 미발송. 원 담당자의 메모는 변경하지 않습니다.</div>' +
+      '<button class="btn btn-primary btn-block mt8" data-act="lessonHandoffSave"' + attrs +
+        (conflict ? ' disabled' : '') + '>인계 수업 메모 저장</button></div>';
+  } else if (!popup && row.status !== 'pending') {
+    body += lessonHandoffReadOnlyMemo(row.memo, recipientName + '의 인계 수업 메모 · ' + row.remainingHours);
+  }
+  if (conflict) body += '<div class="guide" role="alert">다른 기기에서 인계 기록이 변경되었습니다. 작성 중인 메모는 보존했습니다. 최신 기록을 확인한 뒤 다시 입력해 주세요.' +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="lessonHandoffMemoReload"' + attrs + '>서버 메모 다시 불러오기</button></div>';
+  const error = lessonHandoffErrors.get(row.handoffId);
+  if (error) body += '<div class="hint" role="alert">' + esc(error) + '</div>';
+  if (row.status === 'cancelled') body += '<div class="hint">취소 사유: ' + esc(row.cancelReason || row.reason || '기록 확인 필요') + '</div>';
+  if (!lessonHandoffCanEditDate(row.recordDate)) body += '<div class="hint">지난 날짜·23:50 이후 수락·메모·완료는 읽기 전용입니다.' +
+    (lessonHandoffCanAct(row, 'cancel') ? ' 관리자 인계 취소는 사유와 함께 이력에 남습니다.' : '') + '</div>';
+  body += '<div class="lesson-handoff-actions">' +
+    (lessonHandoffCanAct(row, 'accept') ? '<button class="btn btn-primary" data-act="lessonHandoffAccept"' + attrs + (popup ? ' data-popup="true"' : '') + '>인계 수락</button>' : '') +
+    (!popup && row.status === 'accepted' && (session.isAdmin || String(row.recipientStaffId) === String(session.staffId))
+      ? '<button class="btn btn-navy" data-act="lessonHandoffComplete"' + attrs + (!lessonHandoffCanAct(row, 'complete') || conflict ? ' disabled' : '') +
+        '>수업 완료</button>' : '') +
+    (!popup && lessonHandoffCanCheckOut(row) ? '<button class="btn btn-ghost" data-act="lessonHandoffCheckOut"' + attrs + '>최종 하원</button>' : '') +
+    (!popup && lessonHandoffCanAct(row, 'cancel') ? '<button class="btn btn-ghost" data-act="lessonHandoffCancel"' + attrs + '>인계 취소</button>' : '') + '</div></div>';
+  const title = (mode === 'manager' ? '남은 수업 인계 · ' : '인계받은 수업 · ') + String(row.remainingHours);
+  if (popup) return '<section data-lesson-handoff-popup="' + esc(row.handoffId) + '"><div class="card-title">' + esc(title) + '</div>' +
+    '<div class="card-sub">' + esc(lessonHandoffStudentText(row)) + ' · ' + esc(row.lesson.subject || row.lesson.title || '') + '</div>' + body + '</section>';
+  return '<details class="card lesson-handoff-card" data-persist-key="lesson-handoff|' + esc(row.handoffId) + '"' +
+    (['pending', 'accepted'].includes(row.status) ? ' open' : '') + '><summary><b>' + esc(title) + '</b> · ' + esc(lessonHandoffStatusText(row)) +
+    '<div class="card-sub">' + esc(lessonHandoffStudentText(row)) + ' · ' + esc(row.lesson.subject || row.lesson.title || '') + '</div></summary>' + body + '</details>';
+}
+
+function lessonHandoffTeacherHtml(staffId, date) {
+  const scope = ensureLessonHandoffDate(date);
+  if (!scope) return '<div class="hint">날짜별 수업 인계를 확인하는 중입니다.</div>';
+  const rows = scope.rows.filter(row => String(row.recipientStaffId) === String(staffId));
+  return (scope.error ? '<div class="card"><div class="hint" role="alert">인계 수업 조회 실패 — ' + esc(scope.error) + '</div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="lessonHandoffRefresh" data-date="' + esc(date) + '">인계 다시 확인</button></div>' : '') +
+    rows.map(row => lessonHandoffCardHtml(row, 'recipient')).join('');
+}
+
+function lessonHandoffManagerHtml(date) {
+  if (!session.isAdmin) return '';
+  const scope = ensureLessonHandoffDate(date);
+  const rows = scope && scope.rows || [];
+  return '<details class="card lesson-handoff-card" data-persist-key="lesson-handoff-manager"><summary><b>선택일 남은 수업 인계</b> · ' + rows.length +
+    '건<div class="card-sub">' + esc(label(date)) + ' 실제 기록 기준 · 정규 담당 변경 없음</div></summary>' +
+    '<div class="lesson-handoff-body"><button class="btn btn-sm btn-ghost" data-act="lessonHandoffRefresh" data-date="' + esc(date) + '">인계 새로고침</button>' +
+    (!scope ? '<div class="hint">불러오는 중입니다.</div>' : scope.error ? '<div class="hint" role="alert">' + esc(scope.error) + '</div>' : '') +
+    (rows.length ? rows.map(row => lessonHandoffCardHtml(row, 'manager')).join('') : '<div class="hint">이 날짜의 인계 기록이 없습니다.</div>') + '</div></details>';
+}
+
+function lessonHandoffSourcePanelHtml(task, date, check, editable, recordContext) {
+  if (!isSessionLessonTask(task) || !String(task.studentId || '') || !date) return '';
+  const sourceDate = String(recordContext && recordContext.sourceDate || date);
+  const scope = ensureLessonHandoffDate(date);
+  const rows = lessonHandoffForTask(task, sourceDate, date);
+  const mine = session.isAdmin || (session.isStaffLink && String(task.staffId) === String(session.staffId));
+  const canCreate = editable && mine && lessonHandoffCanEditDate(date) && (!recordContext || recordContext.inputEnabled) &&
+    !rows.some(row => row.status !== 'cancelled');
+  let body = rows.map(row => '<div class="guide"><b>진행 ' + esc(row.completedHours) + ' + 남은 ' + esc(row.remainingHours) + ' · ' + esc(lessonHandoffStatusText(row)) + '</b><br>' +
+    esc(lessonHandoffTeacherName(row.sourceStaffId, date)) + ' → ' + esc(lessonHandoffTeacherName(row.recipientStaffId, date)) + ' · 시작 ' + esc(row.startTime) +
+    '<div class="lesson-handoff-note small mt8">전달 메모: ' + esc(row.note || '없음') + '</div>' +
+    (row.status === 'cancelled' ? '<div class="small mt8">취소 사유: ' + esc(row.cancelReason || row.reason || '기록 확인 필요') + '</div>' : '') +
+    lessonHandoffReadOnlyMemo(row.sourceMemo, lessonHandoffTeacherName(row.sourceStaffId, date) + '의 인계 당시 메모 · ' + row.completedHours) +
+    lessonHandoffReadOnlyMemo(row.memo, lessonHandoffTeacherName(row.recipientStaffId, date) + '의 인계 수업 메모 · ' + row.remainingHours) +
+    (lessonHandoffCanAct(row, 'cancel') ? '<button class="btn btn-sm btn-ghost mt8" data-act="lessonHandoffCancel" data-handoff="' + esc(row.handoffId) +
+      '" data-rev="' + row.revision + '">인계 취소</button>' : '') + '</div>').join('');
+  if (canCreate) {
+    const attendanceReady = !!(check && ['P', 'L'].includes(check.att));
+    body += '<button class="btn btn-navy btn-block" data-act="lessonHandoffOpen" data-id="' + esc(task.id) + '" data-source-date="' + esc(sourceDate) + '"' +
+      (!attendanceReady || !scope || scope.error ? ' disabled' : '') + '>남은 수업 인계</button>' +
+      '<div class="hint">' + (!attendanceReady ? '원 수업 출석 또는 지각을 먼저 저장해 주세요. ' : '') +
+      '오늘 남은 시수만 전달하며 정규 담당·시간표·회차는 바꾸지 않습니다.</div>';
+  }
+  if (scope && scope.error) body += '<div class="hint" role="alert">인계 확인 실패 — ' + esc(scope.error) + '</div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="lessonHandoffRefresh" data-date="' + esc(date) + '">인계 다시 확인</button>';
+  return body ? '<section class="lesson-progress-section"><div class="lesson-progress-section-title">남은 수업 인계</div>' + body + '</section>' : '';
+}
+
+function lessonHandoffHoursUnits(value) {
+  const text = String(value == null ? '' : value).trim().replace(/T$/i, '');
+  if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)) return 0;
+  const units = Number(text) * 2;
+  return Number.isSafeInteger(units) && units > 0 && units <= 12 ? units : 0;
+}
+
+function lessonHandoffHoursText(units) { return String(Number(units) / 2) + 'T'; }
+
+function lessonHandoffSlots(task, sourceDate) {
+  if (!task || !isSessionLessonTask(task) || task.scheduleStatus === 'needs_review' ||
+      (task.start && String(task.start) > sourceDate) || (task.end && String(task.end) < sourceDate) ||
+      (task.repeat === 'once' && String(task.start || '') !== sourceDate)) return [];
+  return (Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : []).filter(slot => {
+    const from = String(slot && (slot.validFrom || slot.startDate) || '');
+    const to = String(slot && (slot.validTo || slot.endDate) || '');
+    return slot && slot.status !== 'needs_review' && Array.isArray(slot.days) && slot.days.map(Number).includes(dowOf(sourceDate)) &&
+      (!from || from <= sourceDate) && (!to || to >= sourceDate);
+  });
+}
+
+function newLessonHandoffId() {
+  if (crypto.randomUUID) return 'lh_' + crypto.randomUUID().replace(/-/g, '');
+  const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+  return 'lh_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+}
+
+function lessonHandoffSourceMemoValues(taskId, date, check) {
+  lessonHandoffContext();
+  const draft = lessonHandoffSourceDrafts.get(String(taskId) + '|' + String(date));
+  return draft ? Object.assign({}, draft.memo) : lessonMemoValues(check);
+}
+
+function captureLessonHandoffSourceMemo(task, date) {
+  const check = getCheck(task.id, date);
+  const values = lessonHandoffSourceMemoValues(task.id, date, check);
+  document.querySelectorAll('[data-lesson-memo-field]').forEach(field => {
+    if (String(field.dataset.id) === String(task.id) && String(field.dataset.date) === String(date) &&
+        LESSON_MEMO_FIELDS.some(item => item.key === field.dataset.lessonMemoField)) values[field.dataset.lessonMemoField] = String(field.value || '');
+  });
+  return values;
+}
+
+async function openLessonHandoff(taskId, sourceDate, button) {
+  const task = state.tasks.find(row => !row.deleted && String(row.id) === String(taskId));
+  const recordContext = task && lessonRecordContext(task, sourceDate);
+  const context = lessonHandoffContext();
+  if (!context || !task || !isSessionLessonTask(task) || !recordContext.inputEnabled || !lessonHandoffCanEditDate(recordContext.recordDate) ||
+      (!session.isAdmin && (!session.isStaffLink || String(task.staffId) !== String(session.staffId)))) return toast('본인 수업의 오늘 실제 기록에서 인계해 주세요');
+  const check = getCheck(task.id, recordContext.recordDate);
+  if (!check || !['P', 'L'].includes(check.att)) return toast('원 수업 출석 또는 지각을 먼저 저장해 주세요');
+  const sourceMemo = captureLessonHandoffSourceMemo(task, recordContext.recordDate);
+  const sourceMemoBase = lessonMemoValues(check);
+  if (button) button.disabled = true;
+  try {
+    const scope = await loadLessonHandoffs(recordContext.recordDate, true, false);
+    if (!isCurrentLessonHandoffContext(context)) return;
+    if (!scope || scope.error) throw new Error(scope && scope.error || '인계할 선생님 목록을 확인할 수 없습니다');
+    if (lessonHandoffForTask(task, sourceDate, recordContext.recordDate).some(row => row.status !== 'cancelled')) throw new Error('이미 이 수업의 인계 기록이 있습니다');
+    const slots = lessonHandoffSlots(task, sourceDate);
+    if (!slots.length || slots.every(slot => lessonHandoffHoursUnits(slot.lessonHours) < 2)) throw new Error('원 수업 시간대의 수업시수를 먼저 확인해 주세요. 0.5T 단위로 나눌 수 있어야 합니다');
+    lessonHandoffDraft = { epoch: context.epoch, taskId: task.id, studentId: task.studentId, sourceDate: sourceDate,
+      recordDate: recordContext.recordDate, slotIndex: slots.length === 1 ? '0' : '', recipientStaffId: '',
+      startTime: seoulNowParts().label, completedHours: '', remainingHours: '', note: '', handoffId: newLessonHandoffId(),
+      sourceMemo: sourceMemo, sourceMemoBase: sourceMemoBase, lastAttemptPayloadKey: '', confirmed: false, saving: false };
+    showLessonHandoffForm();
+  } catch (error) { toast(String(error && error.message || error)); }
+  finally { if (button && button.isConnected) button.disabled = false; }
+}
+
+function lessonHandoffDraftParts() {
+  const draft = lessonHandoffDraft;
+  const task = draft && state.tasks.find(row => !row.deleted && String(row.id) === String(draft.taskId));
+  const slots = task ? lessonHandoffSlots(task, draft.sourceDate) : [];
+  const slot = draft && draft.slotIndex !== '' ? slots[Number(draft.slotIndex)] : null;
+  const scope = draft && lessonHandoffScopes.get(draft.recordDate);
+  const recipient = scope && scope.recipients.find(row => row.staffId === String(draft.recipientStaffId));
+  return { draft: draft, task: task, slots: slots, slot: slot, recipient: recipient,
+    total: lessonHandoffHoursUnits(slot && slot.lessonHours), completed: lessonHandoffHoursUnits(draft && draft.completedHours),
+    remaining: lessonHandoffHoursUnits(draft && draft.remainingHours) };
+}
+
+function lessonHandoffDraftSummary() {
+  const parts = lessonHandoffDraftParts();
+  if (!parts.draft) return '';
+  return (parts.recipient ? parts.recipient.name : '수신 선생님 선택 필요') + ' · 인계 시작 ' + (parts.draft.startTime || '미입력') + '\n' +
+    '원 수업 ' + (parts.total ? lessonHandoffHoursText(parts.total) : '시간대 선택 필요') + ' = 진행 ' +
+    (parts.completed ? lessonHandoffHoursText(parts.completed) : '미입력') + ' + 남은 ' + (parts.remaining ? lessonHandoffHoursText(parts.remaining) : '미입력') +
+    (parts.total && parts.completed && parts.remaining && parts.total !== parts.completed + parts.remaining ? '\n진행 시수와 남은 시수의 합이 원 수업 시수와 같아야 합니다.' : '');
+}
+
+function showLessonHandoffForm() {
+  const parts = lessonHandoffDraftParts(), draft = parts.draft;
+  if (!draft || !parts.task) return;
+  const scope = lessonHandoffScopes.get(draft.recordDate);
+  const recipients = (scope && scope.recipients || []).filter(row => row.staffId !== String(parts.task.staffId));
+  modal('남은 수업 인계', '<div class="guide"><b>' + esc(parts.task.studentName || studentOf(parts.task)) + ' · ' + esc(parts.task.subject || '') + '</b><br>' +
+    '원 수업 ' + esc(label(draft.sourceDate)) + ' · 실제 기록 ' + esc(label(draft.recordDate)) + '<br>이 날짜의 남은 수업만 인계합니다. 원 수업 메모·정규 담당·회차는 유지됩니다.</div>' +
+    '<label class="field"><span class="fl">받을 선생님</span><select class="in" data-lesson-handoff-field="recipientStaffId"><option value="">선생님 선택</option>' +
+      recipients.map(row => '<option value="' + esc(row.staffId) + '"' + (row.staffId === draft.recipientStaffId ? ' selected' : '') + '>' + esc(row.name) + '</option>').join('') + '</select></label>' +
+    (parts.slots.length > 1 ? '<label class="field"><span class="fl">원 수업 시간대</span><select class="in" data-lesson-handoff-field="slotIndex"><option value="">시간대 선택</option>' +
+      parts.slots.map((slot, index) => '<option value="' + index + '"' + (String(index) === draft.slotIndex ? ' selected' : '') + '>' +
+        esc([slot.startTime + '–' + slot.endTime, slot.lessonHours || '시수 미입력'].join(' · ')) + '</option>').join('') + '</select></label>' : '') +
+    '<div class="hint">원 시간대 시수: <b id="lessonHandoffTotal">' + esc(parts.slot && parts.slot.lessonHours || '시간대 선택 필요') + '</b> · 시간 길이에서 T를 환산하지 않습니다.</div>' +
+    '<label class="field"><span class="fl">인계 시작 시간</span><input class="in" type="time" data-lesson-handoff-field="startTime" value="' + esc(draft.startTime) + '"></label>' +
+    '<div class="grid2"><label class="field"><span class="fl">진행 시수 (T)</span><input class="in" type="number" min="0.5" step="0.5" inputmode="decimal" data-lesson-handoff-field="completedHours" placeholder="예: 1" value="' + esc(draft.completedHours) + '"></label>' +
+    '<label class="field"><span class="fl">남은 시수 (T)</span><input class="in" type="number" min="0.5" step="0.5" inputmode="decimal" data-lesson-handoff-field="remainingHours" placeholder="예: 1" value="' + esc(draft.remainingHours) + '"></label></div>' +
+    '<label class="field"><span class="fl">전달 메모</span><textarea class="in" rows="4" maxlength="2000" data-lesson-handoff-field="note">' + esc(draft.note) + '</textarea></label>' +
+    '<div class="guide lesson-handoff-note" id="lessonHandoffSummary">' + esc(lessonHandoffDraftSummary()) + '</div>' +
+    '<div class="hint">출석·지각과 작성 중인 원 수업 메모를 먼저 동기화한 뒤 전달합니다. 선생님 앱 알림만 표시되며 외부 메시지는 발송하지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="lessonHandoffPreview">인계 내용 확인</button>');
+}
+
+function validateLessonHandoffDraft() {
+  const parts = lessonHandoffDraftParts(), draft = parts.draft, context = lessonHandoffContext();
+  if (!draft || !context || draft.epoch !== context.epoch || !parts.task) throw new Error('수업과 인증을 다시 확인해 주세요');
+  if (!session.isAdmin && (!session.isStaffLink || String(parts.task.staffId) !== String(session.staffId))) throw new Error('본인 수업만 인계할 수 있습니다');
+  const recordContext = lessonRecordContext(parts.task, draft.sourceDate);
+  if (!recordContext.inputEnabled || recordContext.recordDate !== draft.recordDate || !lessonHandoffCanEditDate(draft.recordDate)) throw new Error('오늘 실제 기록에서 23:50 전까지만 인계할 수 있습니다');
+  if (!parts.recipient || parts.recipient.staffId === String(parts.task.staffId)) throw new Error('인계받을 다른 선생님을 선택해 주세요');
+  if (!parts.slot || parts.total < 2 || (parts.slots.length > 1 && (!parts.slot.slotId ||
+      parts.slots.filter(slot => String(slot.slotId || '') === String(parts.slot.slotId)).length !== 1))) throw new Error('인계할 원 수업 시간대와 입력된 시수를 확인해 주세요');
+  if (!parts.completed || !parts.remaining || parts.completed + parts.remaining !== parts.total) throw new Error('진행 시수와 남은 시수를 0.5T 단위로 입력하고 원 수업 시수와 합을 맞춰 주세요');
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft.startTime) || draft.startTime >= '23:50') throw new Error('인계 시작 시간을 23:50 전으로 입력해 주세요');
+  if (recordContext.visit && draft.startTime < weekendVisitScheduleClock(recordContext.visit.checkInAt)) throw new Error('인계 시작은 실제 등원 이후로 선택해 주세요');
+  if (String(draft.note).length > 2000) throw new Error('전달 메모는 2,000자 이내로 적어 주세요');
+  return parts;
+}
+
+function previewLessonHandoff() {
+  try {
+    const parts = validateLessonHandoffDraft(), draft = parts.draft;
+    draft.confirmed = true;
+    modal('인계 내용 확인', '<div class="guide"><b>' + esc(parts.task.studentName || studentOf(parts.task)) + ' · ' + esc(parts.task.subject || '') + '</b><br>' +
+      esc(lessonHandoffTeacherName(parts.task.staffId, draft.recordDate)) + ' → ' + esc(parts.recipient.name) + '<br>원 수업 ' + esc(label(draft.sourceDate)) +
+      ' · 실제 기록 ' + esc(label(draft.recordDate)) + '</div><div class="guide lesson-handoff-note">' + esc(lessonHandoffDraftSummary()) + '</div>' +
+      '<div class="guide lesson-handoff-note"><b>전달 메모</b><br>' + esc(draft.note || '없음') + '</div>' +
+      lessonHandoffReadOnlyMemo(draft.sourceMemo, '함께 저장할 원 수업 메모') +
+      '<div class="hint">정규 수업은 이동하지 않고, 오늘 남은 ' + esc(lessonHandoffHoursText(parts.remaining)) + '만 인계받은 수업으로 표시됩니다.</div>',
+      '<div class="lesson-handoff-actions mt14"><button class="btn btn-ghost" data-act="lessonHandoffBack">돌아가기</button>' +
+      '<button class="btn btn-primary" data-act="lessonHandoffCreate">인계 전달</button></div>');
+  } catch (error) { toast(String(error && error.message || error)); }
+}
+
+function rememberLessonHandoffMutation(raw, context) {
+  const row = normalizeLessonHandoff(raw);
+  if (!row || !isCurrentLessonHandoffContext(context)) return null;
+  // mutation 뒤 도착한 이전 list가 새 revision을 덮어쓰지 못하게 한다.
+  lessonHandoffRequests.set(row.recordDate, ++lessonHandoffSerial);
+  lessonHandoffLoads.delete(row.recordDate);
+  const scope = lessonHandoffScopes.get(row.recordDate) || { rows: [], recipients: [], fetchedAt: 0, error: '' };
+  scope.rows = scope.rows.filter(item => item.handoffId !== row.handoffId).concat(row);
+  scope.error = ''; scope.fetchedAt = Date.now();
+  lessonHandoffScopes.set(row.recordDate, scope);
+  return row;
+}
+
+async function createLessonHandoff(button) {
+  const draft = lessonHandoffDraft;
+  if (!draft || draft.saving || !draft.confirmed) return;
+  let context;
+  try {
+    validateLessonHandoffDraft(); context = lessonHandoffContext();
+    const check = getCheck(draft.taskId, draft.recordDate);
+    if (!check || !['P', 'L'].includes(check.att)) throw new Error('원 수업 출석 또는 지각을 먼저 저장해 주세요');
+    const currentMemo = lessonMemoValues(check);
+    if (JSON.stringify(currentMemo) !== JSON.stringify(draft.sourceMemoBase) && JSON.stringify(currentMemo) !== JSON.stringify(draft.sourceMemo)) {
+      throw new Error('원 수업 메모가 다른 곳에서 변경되었습니다. 최신 메모를 확인한 뒤 인계를 다시 열어 주세요');
+    }
+    draft.saving = true; if (button) button.disabled = true;
+    if (JSON.stringify(currentMemo) !== JSON.stringify(draft.sourceMemo)) {
+      // 빈 인계 메모가 기존 원 수업 note를 지우는 patch를 만들지 않는다.
+      setCheck(draft.taskId, draft.recordDate, { lessonMemo: Object.assign({}, draft.sourceMemo),
+        note: lessonMemoText(draft.sourceMemo) || String(check.note || '') });
+      draft.sourceMemoBase = Object.assign({}, draft.sourceMemo);
+    }
+    await settleSync();
+    if (!isCurrentLessonHandoffContext(context)) return;
+    const currentParts = validateLessonHandoffDraft();
+    const payload = { lessonTaskId: draft.taskId, studentId: draft.studentId, sourceDate: draft.sourceDate,
+      recordDate: draft.recordDate, slotId: currentParts.slot.slotId || undefined, recipientStaffId: draft.recipientStaffId,
+      startTime: draft.startTime, completedHours: lessonHandoffHoursText(currentParts.completed), remainingHours: lessonHandoffHoursText(currentParts.remaining), note: draft.note };
+    const payloadKey = JSON.stringify(payload);
+    if (draft.lastAttemptPayloadKey && draft.lastAttemptPayloadKey !== payloadKey) draft.handoffId = newLessonHandoffId();
+    draft.lastAttemptPayloadKey = payloadKey;
+    const result = await sync.post('/lesson-handoff', Object.assign({ app: SYNC_APP, auth: context.auth, dataGeneration: context.generation,
+      action: 'create', handoffId: draft.handoffId }, payload));
+    if (!isCurrentLessonHandoffContext(context)) return;
+    if (!result.handoff || result.handoff.handoffId !== draft.handoffId || Number(result.dataGeneration) !== context.generation) throw new Error('저장 결과를 다시 확인해 주세요');
+    rememberLessonHandoffMutation(result.handoff, context);
+    lessonHandoffSourceDrafts.delete(draft.taskId + '|' + draft.recordDate);
+    lessonHandoffDraft = null; closeModal();
+    await loadLessonHandoffs(draft.recordDate, true, false);
+    toast('남은 수업을 인계했습니다. 수신 선생님의 수락을 기다립니다');
+    renderAfterSync();
+  } catch (error) {
+    if (context && !isCurrentLessonHandoffContext(context)) return;
+    toast('인계하지 못했습니다 — ' + String(error && error.message || error));
+  } finally {
+    draft.saving = false;
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+async function submitLessonHandoffAction(action, id, button, fromPopup) {
+  const context = lessonHandoffContext(), row = lessonHandoffById(id);
+  if (!context || !row || !lessonHandoffCanAct(row, action)) return toast('최신 인계 상태·담당자·수정 시간을 확인해 주세요');
+  const draft = lessonHandoffMemoDrafts.get(row.handoffId);
+  const writesMemo = action === 'save' || action === 'complete';
+  if (writesMemo && draft && draft.dirty && draft.baseRevision !== row.revision) return toast('다른 기기의 변경을 확인해 주세요. 작성 중인 메모는 보존했습니다');
+  const memo = writesMemo ? lessonHandoffMemoValues(draft ? draft.memo : row.memo) : undefined;
+  if (memo && Object.values(memo).some(value => value.length > 4000)) return toast('메모는 항목별 4,000자 이내로 적어 주세요');
+  if (action === 'complete' && !confirm('남은 ' + row.remainingHours + ' 인계 수업을 완료할까요?\n입력한 인계 메모도 함께 저장합니다. 원 수업 출결·회차는 다시 기록하지 않습니다.')) return;
+  const reason = action === 'cancel' && lessonHandoffCancelDraft && lessonHandoffCancelDraft.handoffId === row.handoffId
+    ? String(lessonHandoffCancelDraft.reason || '').trim() : '';
+  if (action === 'cancel' && !reason) return toast('인계 취소 사유를 입력해 주세요');
+  const revision = writesMemo && draft && draft.dirty ? draft.baseRevision :
+    action === 'cancel' && lessonHandoffCancelDraft ? lessonHandoffCancelDraft.revision : Number(button && button.dataset.rev || row.revision);
+  lessonHandoffBusy.add(id); lessonHandoffErrors.delete(id);
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/lesson-handoff', { app: SYNC_APP, auth: context.auth, dataGeneration: context.generation,
+      action: action, handoffId: row.handoffId, revision: revision, memo: memo, reason: action === 'cancel' ? reason : undefined });
+    if (!isCurrentLessonHandoffContext(context)) return;
+    if (!result.handoff || result.handoff.handoffId !== row.handoffId || Number(result.dataGeneration) !== context.generation) throw new Error('저장 결과를 확인할 수 없습니다');
+    const saved = rememberLessonHandoffMutation(result.handoff, context);
+    if (writesMemo && draft) {
+      if (JSON.stringify(draft.memo) === JSON.stringify(memo)) lessonHandoffMemoDrafts.delete(id);
+      else draft.baseRevision = saved.revision; // 저장 중 추가 입력은 초안으로 남긴다.
+    }
+    if (action === 'cancel') { lessonHandoffCancelDraft = null; closeModal(); }
+    if (fromPopup) {
+      closeModal(); cursor = row.recordDate; cursorPinned = true;
+      if (route !== 'today') go('today');
+    }
+    await loadLessonHandoffs(row.recordDate, true, false);
+    toast(({ accept: '인계를 수락했습니다', save: '인계 수업 메모를 저장했습니다', complete: '인계 수업을 완료했습니다', cancel: '인계를 취소했습니다' })[action]);
+  } catch (error) {
+    if (!isCurrentLessonHandoffContext(context)) return;
+    lessonHandoffErrors.set(id, '저장 실패 — ' + String(error && error.message || error) + (writesMemo ? ' · 작성 중인 메모는 보존했습니다.' : ''));
+    toast(lessonHandoffErrors.get(id));
+    if (error && error.code === 'DATA_GENERATION_MISMATCH') { resetLessonHandoffs(); sync.run(); }
+    else await loadLessonHandoffs(row.recordDate, true, false);
+  } finally {
+    if (isCurrentLessonHandoffContext(context)) { lessonHandoffBusy.delete(id); renderAfterSync(); }
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+function openLessonHandoffCancel(id) {
+  const row = lessonHandoffById(id);
+  if (!row || !lessonHandoffCanAct(row, 'cancel')) return toast(session.isAdmin
+    ? '이 인계의 최신 상태와 취소 권한을 다시 확인해 주세요'
+    : '본인의 수락 전 인계만 실제 수업 당일 23:50 전에 취소할 수 있습니다');
+  lessonHandoffCancelDraft = { handoffId: row.handoffId, revision: row.revision, reason: '' };
+  modal('인계 취소', '<div class="guide">' + esc(lessonHandoffStudentText(row)) + ' · 남은 ' + esc(row.remainingHours) +
+    '<br>인계만 취소하며 원 수업·메모·출결은 유지됩니다.</div><label class="field"><span class="fl">취소 사유</span>' +
+    '<textarea class="in" rows="3" maxlength="500" data-lesson-handoff-cancel-reason></textarea></label>',
+    '<button class="btn btn-danger btn-block mt14" data-act="lessonHandoffCancelSubmit" data-handoff="' + esc(row.handoffId) + '" data-rev="' + row.revision + '">인계 취소 확인</button>');
+}
+
+async function checkOutLessonHandoff(id, button) {
+  const context = lessonHandoffContext(), row = lessonHandoffById(id);
+  if (!context || !lessonHandoffCanCheckOut(row) || lessonHandoffBusy.has(id)) return toast('수락한 인계의 현재 실제 방문 기록을 다시 확인해 주세요');
+  if (!confirm(lessonHandoffStudentText(row) + ' 학생이 수업을 마치고 최종 하원했나요?\n담당 교체를 위한 하원이 아닙니다. 실제 하원 시간을 지금으로 저장합니다.')) return;
+  lessonHandoffBusy.add(id); if (button) button.disabled = true;
+  try {
+    await sync.post('/weekend-visit', { app: SYNC_APP, auth: context.auth, dataGeneration: context.generation,
+      action: 'check_out', visitId: row.visit.visitId, revision: Number(row.visit.revision) });
+    if (!isCurrentLessonHandoffContext(context)) return;
+    await loadLessonHandoffs(row.recordDate, true, false);
+    refreshVisibleWeekendVisitScopes(true);
+    toast('최종 실제 하원 시간을 저장했습니다');
+  } catch (error) {
+    if (!isCurrentLessonHandoffContext(context)) return;
+    toast('하원 저장 실패 — ' + String(error && error.message || error));
+    await loadLessonHandoffs(row.recordDate, true, false);
+  } finally {
+    if (isCurrentLessonHandoffContext(context)) { lessonHandoffBusy.delete(id); renderAfterSync(); }
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
+
+function showPendingLessonHandoffPopup() {
+  if (!session.isStaffLink || !session.staffId || !$('#modalHost').hidden || isTaskEditorActive()) return;
+  const rows = lessonHandoffRows(seoulNowParts().date);
+  const popupKey = row => 'wb_lesson_handoff_popup_' + lessonHandoffGeneration + '_' + session.staffId + '_' + row.handoffId;
+  const row = rows.find(item => {
+    if (String(item.recipientStaffId) !== String(session.staffId) || item.status !== 'pending' || lessonHandoffPopupSeen.has(popupKey(item))) return false;
+    try { return !sessionStorage.getItem(popupKey(item)); } catch (_) { return true; }
+  });
+  if (!row) return;
+  lessonHandoffPopupSeen.add(popupKey(row));
+  try { sessionStorage.setItem(popupKey(row), '1'); } catch (_) {}
+  playAdminDirectiveSound();
+  modal('남은 수업 인계 알림', lessonHandoffCardHtml(row, 'popup'));
+}
+
+function captureLessonHandoffInput(target) {
+  const field = target.closest('[data-lesson-handoff-field]');
+  if (field && lessonHandoffDraft && !lessonHandoffDraft.saving) {
+    const key = field.dataset.lessonHandoffField;
+    if (['recipientStaffId', 'slotIndex', 'startTime', 'completedHours', 'remainingHours', 'note'].includes(key)) {
+      lessonHandoffDraft[key] = String(field.value || ''); lessonHandoffDraft.confirmed = false;
+      const summary = $('#lessonHandoffSummary'), total = $('#lessonHandoffTotal');
+      if (summary) summary.textContent = lessonHandoffDraftSummary();
+      if (total) total.textContent = lessonHandoffDraftParts().slot && lessonHandoffDraftParts().slot.lessonHours || '시간대 선택 필요';
+    }
+    return true;
+  }
+  const cancelReason = target.closest('[data-lesson-handoff-cancel-reason]');
+  if (cancelReason && lessonHandoffCancelDraft) { lessonHandoffCancelDraft.reason = String(cancelReason.value || ''); return true; }
+  const memoField = target.closest('[data-lesson-handoff-memo]');
+  if (memoField) {
+    const row = lessonHandoffById(memoField.dataset.handoff);
+    if (!row || !LESSON_MEMO_FIELDS.some(field => field.key === memoField.dataset.lessonHandoffMemo)) return true;
+    const draft = lessonHandoffMemoDrafts.get(row.handoffId) || { memo: lessonHandoffMemoValues(row.memo), baseRevision: row.revision, dirty: false };
+    draft.memo[memoField.dataset.lessonHandoffMemo] = String(memoField.value || ''); draft.dirty = true;
+    lessonHandoffMemoDrafts.set(row.handoffId, draft);
+    return true;
+  }
+  const sourceField = target.closest('[data-lesson-memo-field]');
+  if (sourceField && LESSON_MEMO_FIELDS.some(field => field.key === sourceField.dataset.lessonMemoField)) {
+    lessonHandoffContext();
+    const key = String(sourceField.dataset.id) + '|' + String(sourceField.dataset.date);
+    const draft = lessonHandoffSourceDrafts.get(key) || { memo: lessonMemoValues(getCheck(sourceField.dataset.id, sourceField.dataset.date)) };
+    draft.memo[sourceField.dataset.lessonMemoField] = String(sourceField.value || '');
+    lessonHandoffSourceDrafts.set(key, draft);
+    return true;
+  }
+  return false;
+}
+
+/* 오늘 수업 화면 */
 function viewToday() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -3464,9 +4127,21 @@ function viewToday() {
   }
   const rel = relLabel(cursor);
   const list = teacherTaskCardsFor(me.id, cursor);
+  ensureLessonHandoffDate(cursor);
+  list.filter(isLesson).forEach(task => {
+    const context = lessonRecordContext(task, cursor);
+    if (context.recordDate) ensureLessonHandoffDate(context.recordDate);
+  });
   if (list.some(isLesson) && !rosterDb && !rosterErr && !rosterLoading) loadRoster();
   ensureSessionModeData(list);
   const p = teacherTaskCardProgress(me.id, cursor);
+  const receivedHandoffs = lessonHandoffRows(cursor).filter(row => String(row.recipientStaffId) === String(me.id) && row.status !== 'cancelled');
+  const handoffDone = receivedHandoffs.filter(row => row.status === 'completed').length;
+  const displayTotal = p.total + receivedHandoffs.length;
+  const displayDone = p.done + handoffDone;
+  const displayPct = displayTotal ? Math.round(displayDone / displayTotal * 100) : 0;
+  const receivedSummary = receivedHandoffs.length ? '인계받은 수업 ' + receivedHandoffs.length + '건 · 완료 ' + handoffDone +
+    ' · 대기/진행 ' + (receivedHandoffs.length - handoffDone) : '';
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
 
@@ -3482,17 +4157,18 @@ function viewToday() {
   list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
 
   h += '<div class="card"><div class="prog">' +
-    '<div class="ring" style="--p:' + p.pct + '"><b>' + p.pct + '%</b></div>' +
+    '<div class="ring" style="--p:' + displayPct + '"><b>' + displayPct + '%</b></div>' +
     '<div style="flex:1">' +
       '<div class="card-title">' + esc(me.name) + ' 선생님</div>' +
       '<div class="card-sub mb8">' +
         (list.length
           ? '완료 ' + counts.done + ' · 진행중 ' + counts.doing + ' · 미착수 ' + counts.todo +
             (counts.blocked ? ' · <b style="color:var(--coral)">막힘 ' + counts.blocked + '</b>' : '') +
-            (p.total && p.done === p.total ? ' · 오늘 완료 🎉' : '')
-          : '지시된 업무가 없습니다') +
+            (receivedSummary ? '<br>' + receivedSummary : '') +
+            (displayTotal && displayDone === displayTotal ? ' · 오늘 완료 🎉' : '')
+          : receivedSummary || '지시된 업무가 없습니다') +
       '</div>' +
-      '<div class="bar"><i style="width:' + p.pct + '%"></i></div>' +
+      '<div class="bar"><i style="width:' + displayPct + '%"></i></div>' +
     '</div></div></div>';
 
   if (session.isStaffLink && me.id === session.staffId) h += adminDirectiveSoundPromptHtml();
@@ -3524,6 +4200,7 @@ function viewToday() {
   }
 
   if (isWeekendVisitDate(cursor)) h += weekendVisitTeacherHtml(me, cursor);
+  h += lessonHandoffTeacherHtml(me.id, cursor);
 
   if (editable && cursor === today()) {
     h += '<div class="card" style="padding:12px">' +
@@ -3539,7 +4216,7 @@ function viewToday() {
   }
 
   if (!list.length) {
-    if (!carry.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
+    if (!carry.length && !receivedHandoffs.length) h += '<div class="card"><div class="empty"><b>🗓️</b>이 날짜에 지시된 업무가 없습니다.</div></div>';
   } else {
     if (carry.length) h += '<div class="sect">오늘 할 일</div>';
     h += '<div class="card today-task-grid">' + list.map(t => taskRow(t, cursor, editable, false)).join('') + '</div>';
@@ -3568,6 +4245,7 @@ function taskRow(t, date, editable, isCarry) {
   const recordDate = recordContext ? recordContext.recordDate : date;
   const c = recordDate ? getCheck(t.id, recordDate) : null;
   const st = recordDate ? statusOf(t, recordDate) : 'todo';
+  const handoffOutstanding = lesson && recordDate && lessonHandoffOutstanding(t, recordDate);
   const prog = taskProgress(t, c);
   const steps = taskSteps(t, c);
   const detail = taskCardDetail(t);
@@ -3589,7 +4267,7 @@ function taskRow(t, date, editable, isCarry) {
           (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '')) +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
-        (st === 'doing' ? '<span class="tag doing">진행중 ' + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
+        (st === 'doing' ? '<span class="tag doing">' + (handoffOutstanding ? '인계 진행중 · 원 수업 ' : '진행중 ') + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
         (c && c.att && ATT_LABEL[c.att] ? '<span class="tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '') +
         (recordContext && recordContext.visit && recordContext.recordDate
@@ -3602,7 +4280,7 @@ function taskRow(t, date, editable, isCarry) {
         originTags(t) +
       '</div>';
 
-  if (hasDetail && st !== 'done') {
+  if (hasDetail && st !== 'done' && !handoffOutstanding) {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
   if (lesson) {
@@ -3655,7 +4333,8 @@ function lessonMemoText(values) {
 
 function taskMemoEditorHtml(t, date, c, editable) {
   if (isLesson(t)) {
-    const values = lessonMemoValues(c);
+    const values = editable && typeof lessonHandoffSourceMemoValues === 'function'
+      ? lessonHandoffSourceMemoValues(t.id, date, c) : lessonMemoValues(c);
     if (!editable) {
       const rows = LESSON_MEMO_FIELDS.filter(field => String(values[field.key] || '').trim());
       return rows.length ? '<div class="lesson-memo-readonly">' + rows.map(field =>
@@ -4280,6 +4959,8 @@ function taskPanel(t, date, c, editable) {
           (attendanceLocked ? ' disabled' : '') + '>' + l + '</button>'
       ).join('') + '</div>' + sessionPackAttendanceHintHtml(t, date, c, sessionAttendance) + makeupRequestHtml(t, date, c) + '</section>';
   }
+
+  if (lesson) h += lessonHandoffSourcePanelHtml(t, date, c, editable, recordContext);
 
   if (!lesson && !usesStandardLessonDisplay(t) && t.guide) {
     h += '<div class="guide"><b>📘 이렇게 하세요</b>' + esc(t.guide) + '</div>';
@@ -9139,6 +9820,8 @@ function viewSchedule() {
     '<div class="d">' + esc(navTitle) + (navRel ? '<em>' + esc(navRel) + '</em>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="' + navStep + '" aria-label="다음 ' + navUnit + '">›</button></div>' + scheduleToolbarHtml();
 
+  h += lessonHandoffManagerHtml(cursor);
+
   if (weekly) {
     const isStudentView = scheduleView === 'student';
     const summary = core.weeklyTeacherSummary(weekly.entries, { todayDate: nowKst.date, nowMinute: nowKst.minute });
@@ -9373,6 +10056,7 @@ function viewBoard() {
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
 
   h += weekendVisitBoardHtml(cursor);
+  h += lessonHandoffManagerHtml(cursor);
 
   // 막힘 먼저
   const blocked = [];
@@ -17927,6 +18611,24 @@ document.addEventListener('click', ev => {
     case 'lessonbriefing': showTodayLessonBriefing(String(id || ''), String(date || cursor)); break;
     case 'lessonbriefingedit': openLessonBriefingEditor(String(id || ''), String(el.dataset.studentId || '')); break;
     case 'lessonbriefingsave': saveLessonBriefingEditor(el); break;
+    case 'lessonHandoffOpen': openLessonHandoff(String(id || ''), String(el.dataset.sourceDate || date || cursor), el); break;
+    case 'lessonHandoffPreview': previewLessonHandoff(); break;
+    case 'lessonHandoffBack': showLessonHandoffForm(); break;
+    case 'lessonHandoffCreate': createLessonHandoff(el); break;
+    case 'lessonHandoffRefresh': loadLessonHandoffs(String(date || cursor), true, false); break;
+    case 'lessonHandoffAccept': submitLessonHandoffAction('accept', String(el.dataset.handoff || ''), el, el.dataset.popup === 'true'); break;
+    case 'lessonHandoffSave': submitLessonHandoffAction('save', String(el.dataset.handoff || ''), el, false); break;
+    case 'lessonHandoffComplete': submitLessonHandoffAction('complete', String(el.dataset.handoff || ''), el, false); break;
+    case 'lessonHandoffCancel': openLessonHandoffCancel(String(el.dataset.handoff || '')); break;
+    case 'lessonHandoffCancelSubmit': submitLessonHandoffAction('cancel', String(el.dataset.handoff || ''), el, false); break;
+    case 'lessonHandoffCheckOut': checkOutLessonHandoff(String(el.dataset.handoff || ''), el); break;
+    case 'lessonHandoffMemoReload': {
+      const handoffId = String(el.dataset.handoff || ''), row = lessonHandoffById(handoffId);
+      if (!row || !confirm('이 화면에서 작성 중인 인계 메모를 버리고 서버에 저장된 최신 메모를 불러올까요?')) break;
+      lessonHandoffMemoDrafts.delete(handoffId); lessonHandoffErrors.delete(handoffId);
+      loadLessonHandoffs(row.recordDate, true, false).then(() => renderAfterSync());
+      break;
+    }
     case 'notesave': {
       const editor = el.closest('.memo-editor');
       const lessonFields = editor && Array.from(editor.querySelectorAll('[data-lesson-memo-field]'));
@@ -17940,6 +18642,7 @@ document.addEventListener('click', ev => {
         });
         clearTimeout(inputTimer);
         setCheck(id, date, { lessonMemo: lessonMemo, note: lessonMemoText(lessonMemo) });
+        lessonHandoffSourceDrafts.delete(String(id) + '|' + String(date));
         toast('수업 메모 저장됨');
         break;
       }
@@ -19104,6 +19807,7 @@ function captureTransportDraftFromEvent(target) {
 let inputTimer = null;
 document.addEventListener('input', ev => {
   if (syncFeedbackFinalFieldFromInput(ev.target)) return;
+  if (captureLessonHandoffInput(ev.target)) return;
   if (captureTransportDraftFromEvent(ev.target)) return;
   const teacherLiveRequestBody = ev.target.closest('[data-teacher-live-request-body]');
   if (teacherLiveRequestBody) {
@@ -19276,6 +19980,7 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', async ev => {
+  if (captureLessonHandoffInput(ev.target)) return;
   if (captureTransportDraftFromEvent(ev.target)) return;
   const externalPublisher = ev.target.closest('[data-external-publisher]');
   if (externalPublisher) {
@@ -19595,6 +20300,7 @@ document.addEventListener('visibilitychange', () => {
   }
   if (session.isStaffLink && hasVerifiedPersonAuth() && auth && auth.mode === 'person') loadStudentSelfChecks(today(), true);
   if (auth && (session.isAdmin || session.isStaffLink)) {
+    if (typeof refreshVisibleLessonHandoffs === 'function') refreshVisibleLessonHandoffs(true, true);
     loadAdminDirectives(true, true);
     loadStudentChanges(true);
     if (session.isAdmin) {
@@ -19644,6 +20350,7 @@ async function startSyncSession() {
   const verified = await sync.run();
   if (sync.enabled()) ensureSyncLoopStarted();
   if (verified && (session.isAdmin || session.isStaffLink)) {
+    loadLessonHandoffs(seoulNowParts().date, false, true);
     loadStudentChanges(false);
     loadAdminDirectives(false, true);
     if (session.isAdmin) {
@@ -19658,6 +20365,7 @@ setInterval(() => {
   const auth = sync.auth();
   if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
     if (typeof refreshVisibleWeekendVisitScopes === 'function') refreshVisibleWeekendVisitScopes(true);
+    if (typeof refreshVisibleLessonHandoffs === 'function') refreshVisibleLessonHandoffs(true, true);
     loadAdminDirectives(true, true);
     loadStudentChanges(true);
     if (session.isAdmin) {
@@ -19670,7 +20378,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-29.5';
+const APP_VER = '2026-08-30.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
@@ -19701,7 +20409,7 @@ function checkVersion() {
 checkVersion();
 setInterval(checkVersion, 10 * 60 * 1000);
 setInterval(() => {
-  if (route === 'schedule' && scheduleView === 'day' && session.isAdmin && cursor === seoulNowParts().date) render();
+  if (route === 'schedule' && scheduleView === 'day' && session.isAdmin && cursor === seoulNowParts().date) renderAfterSync();
 }, 60 * 1000);
 
 </script>
