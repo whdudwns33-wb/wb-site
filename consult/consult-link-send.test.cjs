@@ -93,19 +93,26 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(exchange, /this\.post\('\/exchange', \{ app: SYNC_APP, staffId: staffId, code: code \}\)/);
   assert.match(absorb, /q\.get\('t'\)/);
   assert.match(absorb, /q\.delete\('t'\); touched = true/);
+  assert.match(absorb, /studentCacheScopedTo\(session\.staffId\)/);
+  assert.match(absorb, /resetStudentLinkCache\(tk\)/);
+  assert.match(absorb, /const unsent = sync\.collect/);
+  assert.match(absorb, /if \(unsent\.length\)[\s\S]*?studentConnectError/);
   assert.match(absorb, /location\.hash\.match\(\/\[#&\]c=/);
   assert.doesNotMatch(absorb, /q\.delete\('c'\)/);
   assert.match(reset, /state = Object\.assign\(blankState\(\), \{ staff: \[\], tasks: \[\], checks: \{\}, settings: settings \}\)/);
   assert.match(reset, /myToken: String\(token \|\| ''\), pullAt: 0, pushAt: 0/);
   assert.match(connect, /const unsent = sync\.collect\(Number\(state\.settings\.pushAt\) \|\| 0\)/);
   assert.match(connect, /if \(unsent\.length\)/);
+  assert.match(connect, /await waitForSyncIdle\(\)/);
   assert.match(connect, /await sync\.exchangeBootstrap\(staffId, code\)/);
   assert.match(connect, /resetStudentLinkCache\(d\.token\)/);
   assert.match(connect, /clearStudentCodeHash\(\)/);
   assert.match(connect, /const terminal = \[400, 401, 403, 404, 409, 410, 422\]/);
   assert.doesNotMatch(connect, /if \(terminal\) \{[\s\S]*resetStudentLinkCache\(''\)/);
   assert.match(connect, /sessionStorage\.setItem\(STUDENT_LINK_BLOCK_KEY/);
-  assert.match(html, /if \(pendingStudentCode\) \{\s*connectStudentLink\(\);\s*\} else if \(sync\.enabled\(\)\)/);
+  assert.match(connect, /await sync\.run\(true\)/);
+  assert.match(html, /async run\(duringStudentConnect\)[\s\S]*?studentConnectBusy && !duringStudentConnect/);
+  assert.match(html, /if \(pendingStudentCode\) \{\s*connectStudentLink\(\);\s*\} else if \(sync\.enabled\(\) && !studentConnectError\)/);
 });
 
 test('라우팅은 #/화면만 읽고 #c 1회코드를 화면 이름으로 오인하지 않는다', () => {
@@ -116,4 +123,28 @@ test('라우팅은 #/화면만 읽고 #c 1회코드를 화면 이름으로 오�
   assert.equal(routeFromHash('#/today&c=code'), '');
   assert.match(html, /const h = routeFromHash\(location\.hash\)/);
   assert.match(html, /connectStudentLink\(\);/);
+});
+
+test('기존 query 학생 링크는 같은 학생 캐시만 유지하고 다른 학생 데이터는 분리한다', () => {
+  const source = between('function studentCacheScopedTo(staffId) {', '\n\n/** 링크에 담겨 온 것들을 흡수한다.');
+  const state = {
+    staff: [{ id: 'student-a' }],
+    tasks: [{ id: 'task-a', staffId: 'student-a' }],
+    checks: { '__stgoal__student-a|all': { mins: 120 } }
+  };
+  const studentCacheScopedTo = new Function('state', 'ownerOfCheck',
+    source + '; return studentCacheScopedTo;')(
+      state,
+      key => key.includes('student-b') ? 'student-b' : 'student-a'
+    );
+
+  assert.equal(studentCacheScopedTo('student-a'), true);
+  state.staff.push({ id: 'student-b' });
+  assert.equal(studentCacheScopedTo('student-a'), false);
+  state.staff.pop();
+  state.tasks.push({ id: 'task-b', staffId: 'student-b' });
+  assert.equal(studentCacheScopedTo('student-a'), false);
+  state.tasks.pop();
+  state.checks['__stgoal__student-b|all'] = { mins: 60 };
+  assert.equal(studentCacheScopedTo('student-a'), false);
 });
