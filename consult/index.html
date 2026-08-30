@@ -773,6 +773,44 @@
   .pill.bad { background: #FEF2F2; color: var(--coral); }
   .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
 
+  /* ─── 학생 사용 안내 ─── */
+  .student-guide { display: grid; gap: 13px; }
+  .student-guide > .card { margin-bottom: 0; }
+  .student-guide-hero { overflow: hidden; position: relative; padding: 23px 21px; color: var(--white); background: linear-gradient(135deg, #1B3A5C 0%, #355F89 64%, #6B5DB6 100%); }
+  .student-guide-hero::after { content: ''; position: absolute; width: 150px; height: 150px; right: -52px; top: -62px; border-radius: 50%; background: rgba(255,255,255,.11); }
+  .student-guide-kicker { display: inline-flex; min-height: 25px; align-items: center; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.16); font-size: 10.5px; font-weight: 900; }
+  .student-guide-title { position: relative; z-index: 1; margin-top: 10px; font-size: clamp(21px, 5vw, 28px); font-weight: 900; line-height: 1.32; letter-spacing: -.035em; }
+  .student-guide-lead { position: relative; z-index: 1; max-width: 560px; margin: 7px 0 16px; color: rgba(255,255,255,.82); font-size: 13px; }
+  .student-guide-hero .btn { position: relative; z-index: 1; background: var(--white); color: var(--navy); }
+  .student-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+  .student-guide-head .pill { flex: 0 0 auto; }
+  .student-guide-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .student-guide-step { min-width: 0; padding: 13px; border: 1px solid #DFE8F2; border-radius: 13px; background: #F8FBFF; }
+  .student-guide-step-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .student-guide-number { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: #E5EFFA; color: var(--deep-blue); font-size: 12px; font-weight: 900; }
+  .student-guide-step b { color: var(--navy); font-size: 13px; }
+  .student-guide-step p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-step code { padding: 2px 5px; border-radius: 5px; background: var(--white); color: var(--deep-blue); font-family: inherit; font-size: 10.5px; font-weight: 900; }
+  .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 11.5px; }
+  .student-guide-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .student-guide-option { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; }
+  .student-guide-option.planner { background: #F1F7FD; border-color: #D5E5F4; }
+  .student-guide-option.lecture { background: #FFF3F8; border-color: #F3DCE7; }
+  .student-guide-option b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 13px; }
+  .student-guide-option p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-closes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .student-guide-close { padding: 13px; border-radius: 12px; background: #F7F4FF; }
+  .student-guide-close b { display: block; color: var(--deep-blue); font-size: 12.5px; }
+  .student-guide-close span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .student-guide-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .student-guide-tab { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border-radius: 11px; background: #F7F8FA; }
+  .student-guide-tab i { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; background: var(--white); font-style: normal; }
+  .student-guide-tab b, .student-guide-tab span { display: block; }
+  .student-guide-tab b { color: var(--navy); font-size: 11.5px; }
+  .student-guide-tab span { color: var(--mid-gray); font-size: 10px; line-height: 1.35; }
+  .student-guide-private { border-color: #F0D9D4; background: #FFF9F8; }
+  .student-guide-private b { color: #A84739; }
+
   /* ─── 오늘 배부 공부 / 스터디 플래너 ─── */
   .study-offer { border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; padding: 12px; margin-top: 9px; background: linear-gradient(90deg, var(--subject-bg), #fff 42%); }
   .study-offer:first-of-type { margin-top: 12px; }
@@ -917,6 +955,8 @@
     .result-list { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
+    .student-guide-steps, .student-guide-options, .student-guide-closes, .student-guide-tabs { grid-template-columns: 1fr; }
+    .student-guide-hero { padding: 20px 17px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
@@ -1713,6 +1753,7 @@ let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingAdminCode = ''; // 새 원장 기기에서 한 번만 교환할 연결 코드
 let adminConnectBusy = false;
 let pendingStudentCode = ''; // 학생 링크의 1회용 교환 코드는 저장하지 않고 URL에만 둔다
+let pendingStudentWelcome = false; // 새 개인 링크로 들어온 학생에게 사용 안내를 먼저 보여준다
 let studentConnectBusy = false;
 let studentConnectError = '';
 const STUDENT_LINK_BLOCK_KEY = 'wb_consult_student_link_blocked';
@@ -1743,6 +1784,7 @@ function absorbLinkParams() {
   const tk = q.get('t');
   if (tk) {
     state.settings.myToken = tk;
+    pendingStudentWelcome = true;
     q.delete('t'); touched = true;
     save();
   }
@@ -1816,6 +1858,7 @@ async function connectStudentLink() {
     if (!stored) return;
     sync.loud = true;
     await sync.run();
+    go('guide');
     toast(sync.err ? '학생 연결 완료 · 데이터 동기화를 다시 시도해 주세요' : '학생 화면에 연결되었습니다');
   } catch (e) {
     const terminal = [400, 401, 403, 404, 409, 410, 422].includes(Number(e && e.status));
@@ -1966,6 +2009,7 @@ function currentStaff() {
 function render() {
   sync.pendingRender = false;
   viewInputDirty = false;
+  if (route === 'guide' && (!session.isStaffLink || isManager())) route = 'today';
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -1987,11 +2031,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['today', 'week', 'month', 'academic', 'ingang', 'study'];
+    const allowed = isManager() ? ['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'staff' && session.isAdmin && !session.isStaffLink) loadConsultLinkContacts();
 }
@@ -2001,7 +2045,7 @@ function renderTabs() {
   const tabs = session.isStaffLink
     ? (isManager()
         ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
+        : [['guide', '사용 안내'], ['today', '오늘 할 일'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
       ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
@@ -2075,6 +2119,66 @@ function viewStudentLinkConnect() {
     (pendingStudentCode ? '<button class="btn btn-primary btn-block" data-act="studentretry"' + (studentConnectBusy ? ' disabled' : '') + '>' +
       (studentConnectBusy ? '연결 중…' : '다시 연결하기') + '</button>' :
       '<div class="hint">가장 최근에 받은 개인 링크 전체를 다시 열어 주세요.</div>') + '</div>';
+}
+
+function viewStudentGuide() {
+  const me = currentStaff();
+  if (!me || !session.isStaffLink || isManager()) return '';
+  return '<div class="student-guide" id="studentGuide">' +
+    '<div class="card student-guide-hero">' +
+      '<span class="student-guide-kicker">처음 사용하는 학생</span>' +
+      '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>매일 네 단계만 기억하세요</div>' +
+      '<div class="student-guide-lead">필수는 오늘 할 일 확인, 완료 표시, 하루 마감입니다. 공부시간 기록과 인강 관리는 해당하는 학생만 사용하면 됩니다.</div>' +
+      '<button class="btn" data-go="today">오늘 할 일 시작하기 →</button>' +
+    '</div>' +
+
+    '<div class="card"><div class="student-guide-head"><div><div class="card-title">매일 반드시 할 것</div>' +
+      '<div class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</div></div><span class="pill">필수</span></div>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>배부 공부 확인</b></div>' +
+          '<p><code>오늘 배부된 공부</code>를 펼쳐 원장님이 보낸 내용을 확인합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>체크리스트에 담기</b></div>' +
+          '<p>할 공부마다 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
+          '<p>공부를 마치면 스터디 플래너 오른쪽의 동그란 체크 칸을 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div>' +
+          '<p><code>오늘 학습 마무리</code>에서 미완료를 정리한 뒤 ‘보고 문자 복사 → 보호자에게 전송 → 발송했어요’까지 완료합니다.</p></div>' +
+      '</div>' +
+      '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 하나를 선택하세요.</div>' +
+    '</div>' +
+
+    '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
+      '<div class="card-sub">해당하지 않는 기능은 사용하지 않아도 됩니다.</div></div><span class="pill warn">선택</span></div>' +
+      '<div class="student-guide-options">' +
+        '<div class="student-guide-option planner"><b>⏱ 공부시간·플래너</b><p>시간을 기록하는 학생은 ‘공부 시작·정지’를 사용합니다. 타이머를 쓰지 않았다면 연필 버튼에서 과목별 실제 시간만 한 번 입력할 수 있습니다. 입력하지 않으면 보고에는 0분으로 표시될 수 있습니다.</p></div>' +
+        '<div class="student-guide-option lecture"><b>🎬 인강 관리</b><p>등록된 인강이 있는 학생만 사용합니다. 오늘 들을 강의를 체크리스트에 담은 뒤 완료 표시하면 됩니다.</p></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card"><div class="student-guide-head"><div><div class="card-title">일요일과 매월 말일</div>' +
+      '<div class="card-sub">평소처럼 하루 마감부터 끝내면 다음 단계가 열립니다.</div></div><span class="pill">자동 안내</span></div>' +
+      '<div class="student-guide-closes">' +
+        '<div class="student-guide-close"><b>일요일 · 주간 마무리</b><span>이번 주 완료율과 미완료 공부를 확인하고 짧게 회고합니다.</span></div>' +
+        '<div class="student-guide-close"><b>매월 말일 · 월간 마무리</b><span>이번 달 기록을 확인하고 다음 달 집중할 내용을 정합니다.</span></div>' +
+      '</div><div class="student-guide-tip"><b>오늘 화면이 잠겼다면?</b> 화면에 표시된 이전 하루·주간·월간 마무리를 먼저 완료하면 자동으로 열립니다.</div>' +
+    '</div>' +
+
+    '<div class="card"><div class="student-guide-head"><div><div class="card-title">탭은 이렇게 사용해요</div>' +
+      '<div class="card-sub">필요할 때 찾아보는 보조 화면입니다.</div></div></div>' +
+      '<div class="student-guide-tabs">' +
+        '<div class="student-guide-tab"><i>✅</i><div><b>오늘 할 일</b><span>매일 공부하고 마감하는 필수 화면</span></div></div>' +
+        '<div class="student-guide-tab"><i>📊</i><div><b>주간 플래너</b><span>요일별 수행과 주간 마무리 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>🗓</i><div><b>일정</b><span>시험·중요 일정과 월간 기록 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>🎓</i><div><b>학사관리</b><span>시험·수행평가와 자료 요청 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>🎬</i><div><b>인강</b><span>인강이 있는 학생의 일정·진도 관리</span></div></div>' +
+        '<div class="student-guide-tab"><i>📚</i><div><b>학습</b><span>온라인 학습·회독·제출 기록 확인</span></div></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="card student-guide-private"><div class="card-title">🔒 개인 링크는 나만 사용해요</div>' +
+      '<div class="card-sub">이 링크를 다른 친구에게 전달하지 마세요. 휴대폰을 바꾸거나 링크가 열리지 않으면 원장님께 새 링크를 요청하세요.</div></div>' +
+    '<button class="btn btn-primary btn-block" data-go="today">안내 확인 완료 · 오늘 할 일로 이동</button>' +
+  '</div>';
 }
 
 /* ── 오늘 ── */
@@ -11064,7 +11168,8 @@ if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
 absorbLinkParams();
 const h = routeFromHash(location.hash);
 if (h) route = h;
-if (session.isStaffLink && !['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
+if (pendingStudentWelcome && session.isStaffLink && !isManager()) route = 'guide';
+if (session.isStaffLink && !['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
 if (pendingStudentCode) {
@@ -11102,7 +11207,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-24.46';
+const APP_VER = '2026-08-30.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
