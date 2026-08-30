@@ -810,6 +810,26 @@
   .student-guide-tab span { color: var(--mid-gray); font-size: 10px; line-height: 1.35; }
   .student-guide-private { border-color: #F0D9D4; background: #FFF9F8; }
   .student-guide-private b { color: #A84739; }
+  .student-setup-progress { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.2); }
+  .student-setup-progress i { display: block; height: 100%; border-radius: inherit; background: #FFF; transition: width .25s ease; }
+  .student-setup-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .student-setup-nav-item { min-width: 0; padding: 10px 8px; border: 1px solid var(--line); border-radius: 11px; background: #F7F8FA; color: var(--mid-gray); text-align: center; font-size: 10.5px; font-weight: 900; }
+  .student-setup-nav-item.done { border-color: #CDE8DC; background: #EDF8F3; color: #247257; }
+  .student-setup-nav-item.current { border-color: #BCD4EA; background: #EDF5FC; color: var(--deep-blue); box-shadow: 0 0 0 2px rgba(61,126,184,.08); }
+  .student-setup-nav-item b { display: block; margin-bottom: 2px; font-size: 14px; }
+  .student-setup-card { border-color: #D9E6F2; background: linear-gradient(180deg, #FBFDFF, #F6FAFD); }
+  .student-setup-card .student-guide-step { background: var(--white); }
+  .student-setup-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+  .student-setup-actions .btn { flex: 1 1 150px; }
+  .student-setup-goals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+  .student-setup-custom { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; margin-top: 8px; }
+  .student-setup-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .student-setup-summary-item { min-width: 0; padding: 12px; border-radius: 12px; background: #F7F8FA; }
+  .student-setup-summary-item b, .student-setup-summary-item span { display: block; }
+  .student-setup-summary-item b { color: var(--navy); font-size: 11.5px; }
+  .student-setup-summary-item span { margin-top: 4px; color: var(--mid-gray); font-size: 10.5px; line-height: 1.4; }
+  .student-setup-reminder { border-color: #D6E5F2; background: #F7FBFF; }
+  .student-setup-reminder .bar { max-width: 280px; }
 
   /* ─── 오늘 배부 공부 / 스터디 플래너 ─── */
   .study-offer { border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; padding: 12px; margin-top: 9px; background: linear-gradient(90deg, var(--subject-bg), #fff 42%); }
@@ -955,7 +975,8 @@
     .result-list { grid-template-columns: 1fr; }
     .quick-add-grid { grid-template-columns: 1fr auto; }
     .quick-add-grid select { grid-column: 1 / -1; }
-    .student-guide-steps, .student-guide-options, .student-guide-closes, .student-guide-tabs { grid-template-columns: 1fr; }
+    .student-guide-steps, .student-guide-options, .student-guide-closes, .student-guide-tabs, .student-setup-summary { grid-template-columns: 1fr; }
+    .student-setup-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .student-guide-hero { padding: 20px 17px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -1588,9 +1609,9 @@ const sync = {
     return d;
   },
 
-  async run() {
+  async run(duringStudentConnect) {
     const auth = this.auth();
-    if (!auth || this.busy) return;
+    if (!auth || this.busy || (studentConnectBusy && !duringStudentConnect)) return;
     this.busy = true; paintStatus();
     try {
       const t0 = now();
@@ -1774,6 +1795,13 @@ function resetStudentLinkCache(token) {
   return save();
 }
 
+function studentCacheScopedTo(staffId) {
+  if (!staffId) return false;
+  if ((state.staff || []).some(row => row.id !== staffId)) return false;
+  if ((state.tasks || []).some(row => row.staffId !== staffId)) return false;
+  return !Object.keys(state.checks || {}).some(key => ownerOfCheck(key) !== staffId);
+}
+
 /** 링크에 담겨 온 것들을 흡수한다.
  *  s=  동기화 설정 (학생 기기 세팅 대신)
  *  add= 지시서 묶음 (원장이 링크 한 번으로 등록) */
@@ -1783,10 +1811,20 @@ function absorbLinkParams() {
 
   const tk = q.get('t');
   if (tk) {
-    state.settings.myToken = tk;
+    const alreadyCurrent = state.settings.myToken === tk && !!staffById(session.staffId) && studentCacheScopedTo(session.staffId);
+    if (alreadyCurrent) {
+      state.settings.myToken = tk;
+      save();
+    } else {
+      const unsent = sync.collect(Number(state.settings.pushAt) || 0);
+      if (unsent.length) {
+        studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 화면에서 동기화한 뒤 학생 링크를 다시 열어 주세요.';
+      } else {
+        resetStudentLinkCache(tk);
+      }
+    }
     pendingStudentWelcome = true;
     q.delete('t'); touched = true;
-    save();
   }
 
   const s = q.get('s');
@@ -1836,20 +1874,29 @@ function absorbLinkParams() {
   }
 }
 
+async function waitForSyncIdle(timeoutMs) {
+  const until = now() + (Number(timeoutMs) || 20000);
+  while (sync.busy && now() < until) await new Promise(resolve => setTimeout(resolve, 100));
+  return !sync.busy;
+}
+
 async function connectStudentLink() {
   const code = pendingStudentCode;
   const staffId = session.staffId;
   if (!staffId || !code || studentConnectBusy) return;
-  const unsent = sync.collect(Number(state.settings.pushAt) || 0);
-  if (unsent.length) {
-    studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 원장 또는 학생 화면으로 돌아가 동기화한 뒤 같은 링크를 다시 열어 주세요.';
-    render();
-    return;
-  }
   studentConnectBusy = true;
   studentConnectError = '';
   render();
   try {
+    if (!(await waitForSyncIdle())) {
+      studentConnectError = '기존 동기화가 아직 끝나지 않았습니다. 잠시 후 같은 링크로 다시 시도해 주세요.';
+      return;
+    }
+    const unsent = sync.collect(Number(state.settings.pushAt) || 0);
+    if (unsent.length) {
+      studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 원장 또는 학생 화면으로 돌아가 동기화한 뒤 같은 링크를 다시 열어 주세요.';
+      return;
+    }
     const d = await sync.exchangeBootstrap(staffId, code);
     pendingStudentCode = '';
     const stored = resetStudentLinkCache(d.token);
@@ -1857,7 +1904,8 @@ async function connectStudentLink() {
     sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
     if (!stored) return;
     sync.loud = true;
-    await sync.run();
+    await sync.run(true);
+    if (!sync.err) startStudentSetup(staffId);
     go('guide');
     toast(sync.err ? '학생 연결 완료 · 데이터 동기화를 다시 시도해 주세요' : '학생 화면에 연결되었습니다');
   } catch (e) {
@@ -2121,16 +2169,159 @@ function viewStudentLinkConnect() {
       '<div class="hint">가장 최근에 받은 개인 링크 전체를 다시 열어 주세요.</div>') + '</div>';
 }
 
+const studentSetupKey = sid => '__studentsetup__' + sid;
+
+function studentSetupOf(sid) {
+  const row = state.checks[studentSetupKey(sid) + '|all'];
+  const setup = (row && row.setup) || {};
+  return {
+    version: Number(setup.version) || 1,
+    startedAt: Number(setup.startedAt) || 0,
+    guideConfirmedAt: Number(setup.guideConfirmedAt) || 0,
+    completedAt: Number(setup.completedAt) || 0
+  };
+}
+
+function studentGoalConfigured(sid) {
+  return Object.prototype.hasOwnProperty.call(state.checks, '__stgoal__' + sid + '|all');
+}
+
+function studentSetupStatus(sid) {
+  const setup = studentSetupOf(sid);
+  const timetable = ingAvail(sid).configured;
+  const goal = studentGoalConfigured(sid);
+  const guide = !!setup.guideConfirmedAt;
+  const done = [timetable, goal, guide].filter(Boolean).length;
+  return {
+    setup: setup, started: !!setup.startedAt, timetable: timetable, goal: goal, guide: guide,
+    done: done, total: 3, pct: Math.round(done / 3 * 100),
+    step: !timetable ? 1 : !goal ? 2 : 3,
+    complete: !!setup.completedAt && timetable && goal && guide
+  };
+}
+
+function saveStudentSetup(sid, patch) {
+  const current = studentSetupOf(sid);
+  const setup = Object.assign({}, current, patch, { version: 1 });
+  return setCheck(studentSetupKey(sid), 'all', { setup: setup, done: !!setup.completedAt });
+}
+
+function startStudentSetup(sid) {
+  if (!sid) return null;
+  const setup = studentSetupOf(sid);
+  if (setup.startedAt) return setup;
+  return saveStudentSetup(sid, { startedAt: now(), guideConfirmedAt: 0, completedAt: 0 });
+}
+
+function studentSetupNav(status) {
+  const labels = ['주간 시간표', '순공 목표', '사용 순서'];
+  return '<div class="student-setup-nav" aria-label="첫 사용 설정 단계">' + labels.map((label, index) => {
+    const number = index + 1;
+    const done = number < status.step || status.complete;
+    const current = !status.complete && number === status.step;
+    return '<div class="student-setup-nav-item ' + (done ? 'done' : current ? 'current' : '') + '"' +
+      (current ? ' aria-current="step"' : '') + '><b>' + (done ? '✓' : number) + '</b>' + label + '</div>';
+  }).join('') + '</div>';
+}
+
+function studentSetupWizard(me, status) {
+  if (!status.started) {
+    return '<div class="student-guide" id="studentGuide"><div class="card student-guide-hero">' +
+      '<span class="student-guide-kicker">처음 사용하는 학생</span>' +
+      '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>처음 3분만 설정해요</div>' +
+      '<div class="student-guide-lead">한 번 설정하면 시험 공부 자동 배분, 반복 일정, 순공시간 기록에 계속 사용됩니다.</div>' +
+      '<div class="student-setup-progress" aria-label="첫 사용 설정 0%"><i style="width:0%"></i></div></div>' +
+      '<div class="card student-setup-card"><div class="student-guide-head"><div><div class="card-title">시작 전에 준비할 것</div>' +
+        '<div class="card-sub">학교·학원 시간과 하루에 공부할 수 있는 시간을 떠올려 주세요.</div></div><span class="pill">약 3분</span></div>' +
+        '<div class="student-guide-steps">' +
+          '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>주간 시간표</b></div><p>학교·학원처럼 매주 반복되는 시간을 입력합니다.</p></div>' +
+          '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>하루 순공 목표</b></div><p>시간을 기록하지 않으면 체크리스트만 사용하도록 선택할 수 있습니다.</p></div>' +
+          '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>매일 사용 순서</b></div><p>공부를 담고 완료한 뒤 보고 문자까지 보내는 순서를 확인합니다.</p></div>' +
+        '</div><div class="student-setup-actions"><button class="btn btn-primary" data-act="studentsetupstart">첫 사용 설정 시작</button>' +
+          '<button class="btn btn-ghost" data-go="today">나중에 하고 오늘 할 일 보기</button></div></div>' +
+      '<div class="card student-guide-private"><div class="card-title">🔒 개인 링크는 나만 사용해요</div>' +
+        '<div class="card-sub">친구나 단체방에 전달하지 말고, 링크에 문제가 생기면 원장님께 새 링크를 요청하세요.</div></div></div>';
+  }
+
+  let body = '';
+  if (status.step === 1) {
+    body = '<div class="card student-setup-card"><div class="student-guide-head"><div><div class="card-title">1 · 주간 생활시간표 입력</div>' +
+      '<div class="card-sub">활동 가능한 시간과 학교·학원 같은 반복 일정을 한 번만 입력하세요.</div></div><span class="pill warn">권장</span></div>' +
+      '<div class="student-guide-tip"><b>어디에 쓰이나요?</b> 시험 공부 자동 배분, 인강 배치, 공부량 과부하 경고가 실제 빈 시간을 기준으로 계산됩니다.</div>' +
+      '<div class="student-setup-actions"><button class="btn btn-primary" data-act="ingavopen">주간 시간표 입력하기</button>' +
+        '<button class="btn btn-ghost" data-go="today">잘 모르겠어요 · 나중에 하기</button></div></div>';
+  } else if (status.step === 2) {
+    body = '<div class="card student-setup-card"><div class="student-guide-head"><div><div class="card-title">2 · 하루 순공 목표 선택</div>' +
+      '<div class="card-sub">타이머를 사용할 학생은 목표시간을 고르고, 사용하지 않으면 체크리스트만 선택하세요.</div></div><span class="pill">선택</span></div>' +
+      '<div class="student-setup-goals">' +
+        '<button class="btn btn-ghost" data-act="studentsetupgoal" data-min="120">2시간</button>' +
+        '<button class="btn btn-ghost" data-act="studentsetupgoal" data-min="180">3시간</button>' +
+        '<button class="btn btn-ghost" data-act="studentsetupgoal" data-min="240">4시간</button>' +
+        '<button class="btn btn-ghost" data-act="studentsetupgoal" data-min="300">5시간</button></div>' +
+      '<div class="student-setup-custom"><input class="in" id="studentSetupGoal" type="number" min="10" max="1440" step="10" inputmode="numeric" aria-label="하루 순공 목표 분 단위" placeholder="직접 입력 · 분 단위">' +
+        '<button class="btn btn-primary" data-act="studentsetupgoalsave">직접 저장</button></div>' +
+      '<div class="student-setup-actions"><button class="btn btn-ghost" data-act="studentsetupgoal" data-min="0">시간 기록 없이 체크리스트만 사용</button>' +
+        '<button class="btn btn-ghost" data-go="today">나중에 정하기</button></div></div>';
+  } else {
+    const courseCount = ingCourses(me.id).length;
+    body = '<div class="card student-setup-card"><div class="student-guide-head"><div><div class="card-title">3 · 매일 이 순서로 사용해요</div>' +
+      '<div class="card-sub">평소에는 오늘 할 일 탭만 위에서 아래로 진행하면 됩니다.</div></div><span class="pill">마지막</span></div>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>공부 담기</b></div><p>오늘 배부된 공부에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 체크</b></div><p>끝낸 공부는 스터디 플래너에서 완료 표시합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>보고 보내기</b></div><p>오늘 학습 마무리 후 보고 문자를 복사해 보호자에게 전송합니다.</p></div></div>' +
+      '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
+        ? '현재 등록된 인강이 ' + courseCount + '개 있습니다. 오늘 들을 강의도 체크리스트로 가져와 완료하세요.'
+        : '현재 등록된 인강은 없습니다. 나중에 원장님이 강좌를 등록하면 자동으로 나타납니다.') + '</div>' +
+      '<div class="student-setup-actions"><button class="btn btn-primary" data-act="studentsetupfinish">확인했어요 · 설정 완료</button>' +
+        '<button class="btn btn-ghost" data-go="today">나중에 마무리하기</button></div></div>';
+  }
+
+  return '<div class="student-guide" id="studentGuide"><div class="card student-guide-hero">' +
+    '<span class="student-guide-kicker">첫 사용 설정 · ' + status.done + '/' + status.total + ' 완료</span>' +
+    '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>' + status.step + '단계를 진행해요</div>' +
+    '<div class="student-guide-lead">중간에 나가도 저장된 단계부터 다시 이어집니다. 오늘 할 일은 언제든 먼저 사용할 수 있어요.</div>' +
+    '<div class="student-setup-progress" aria-label="첫 사용 설정 ' + status.pct + '%"><i style="width:' + status.pct + '%"></i></div></div>' +
+    studentSetupNav(status) + body + '</div>';
+}
+
+function studentSetupSummary(me) {
+  const avail = ingAvail(me.id);
+  const goal = stGoalMin(me.id);
+  const courseCount = ingCourses(me.id).length;
+  return '<div class="card"><div class="student-guide-head"><div><div class="card-title">✓ 첫 사용 설정 완료</div>' +
+    '<div class="card-sub">바뀐 내용은 여기서 언제든 다시 수정할 수 있습니다.</div></div><span class="pill">3/3</span></div>' +
+    '<div class="student-setup-summary">' +
+      '<div class="student-setup-summary-item"><b>🗓 주간 시간표</b><span>' + esc(avail.start) + '~' + esc(avail.end) + ' · 반복 일정 ' + avail.blocks.length + '개</span></div>' +
+      '<div class="student-setup-summary-item"><b>⏱ 순공 목표</b><span>' + (goal ? fmtDur(goal * 60) : '시간 기록 없이 체크리스트 사용') + '</span></div>' +
+      '<div class="student-setup-summary-item"><b>🎬 인강</b><span>' + (courseCount ? '등록 강좌 ' + courseCount + '개' : '등록 강좌 없음') + '</span></div>' +
+    '</div><div class="student-setup-actions"><button class="btn btn-ghost" data-act="ingavopen">주간 시간표 수정</button>' +
+      '<button class="btn btn-ghost" data-act="stgoal">순공 목표 수정</button></div></div>';
+}
+
+function studentSetupReminder(me) {
+  if (!session.isStaffLink || isManager()) return '';
+  const status = studentSetupStatus(me.id);
+  if (!status.started || status.complete) return '';
+  return '<div class="card student-setup-reminder"><div class="between"><div><div class="card-title">⚙ 첫 사용 설정을 이어서 해요</div>' +
+    '<div class="card-sub">' + status.step + '단계가 남았습니다. 설정은 오늘 학습을 막지 않습니다.</div></div><span class="pill warn">' + status.done + '/3</span></div>' +
+    '<div class="bar mt14"><i style="width:' + status.pct + '%"></i></div>' +
+    '<button class="btn btn-primary btn-block mt14" data-go="guide">' + status.step + '단계 이어하기</button></div>';
+}
+
 function viewStudentGuide() {
   const me = currentStaff();
   if (!me || !session.isStaffLink || isManager()) return '';
+  const setupStatus = studentSetupStatus(me.id);
+  if (!setupStatus.complete) return studentSetupWizard(me, setupStatus);
   return '<div class="student-guide" id="studentGuide">' +
     '<div class="card student-guide-hero">' +
-      '<span class="student-guide-kicker">처음 사용하는 학생</span>' +
+      '<span class="student-guide-kicker">설정 완료 · 사용 안내</span>' +
       '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>매일 네 단계만 기억하세요</div>' +
       '<div class="student-guide-lead">필수는 오늘 할 일 확인, 완료 표시, 하루 마감입니다. 공부시간 기록과 인강 관리는 해당하는 학생만 사용하면 됩니다.</div>' +
       '<button class="btn" data-go="today">오늘 할 일 시작하기 →</button>' +
-    '</div>' +
+    '</div>' + studentSetupSummary(me) +
 
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">매일 반드시 할 것</div>' +
       '<div class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</div></div><span class="pill">필수</span></div>' +
@@ -2150,7 +2341,7 @@ function viewStudentGuide() {
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
       '<div class="card-sub">해당하지 않는 기능은 사용하지 않아도 됩니다.</div></div><span class="pill warn">선택</span></div>' +
       '<div class="student-guide-options">' +
-        '<div class="student-guide-option planner"><b>⏱ 공부시간·플래너</b><p>시간을 기록하는 학생은 ‘공부 시작·정지’를 사용합니다. 타이머를 쓰지 않았다면 연필 버튼에서 과목별 실제 시간만 한 번 입력할 수 있습니다. 입력하지 않으면 보고에는 0분으로 표시될 수 있습니다.</p></div>' +
+        '<div class="student-guide-option planner"><b>⏱ 순공시간 기록</b><p>시간을 기록하는 학생은 ‘공부 시작·정지’를 사용합니다. 타이머를 쓰지 않았다면 연필 버튼에서 과목별 실제 시간만 한 번 입력할 수 있습니다. 입력하지 않으면 보고에는 0분으로 표시될 수 있습니다.</p></div>' +
         '<div class="student-guide-option lecture"><b>🎬 인강 관리</b><p>등록된 인강이 있는 학생만 사용합니다. 오늘 들을 강의를 체크리스트에 담은 뒤 완료 표시하면 됩니다.</p></div>' +
       '</div>' +
     '</div>' +
@@ -2243,6 +2434,8 @@ function viewToday() {
         '지난달 학습 결과를 확인하고 월간 보고 발송을 마쳐 주세요.</div></div>';
     return h;
   }
+
+  if (cursor === today()) h += studentSetupReminder(me);
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   list.forEach(t => counts[statusOf(t, cursor)]++);
@@ -8733,6 +8926,44 @@ document.addEventListener('click', ev => {
     /* 잠금 */
     case 'adminretry': connectAdminDevice(); break;
     case 'studentretry': connectStudentLink(); break;
+    case 'studentsetupstart': {
+      const me = currentStaff();
+      if (!me || !session.isStaffLink || isManager()) break;
+      if (sync.busy) return toast('학생 데이터를 불러온 뒤 설정을 시작합니다');
+      if (startStudentSetup(me.id)) { render(); toast('첫 사용 설정을 시작합니다'); }
+      break;
+    }
+    case 'studentsetupgoal': {
+      const me = currentStaff();
+      if (!me || !session.isStaffLink || isManager()) break;
+      const mins = Math.max(0, Math.min(1440, Number(el.dataset.min) || 0));
+      const stored = setCheck('__stgoal__' + me.id, 'all', { mins: mins, done: true });
+      if (stored) { render(); toast(mins ? '하루 순공 목표를 ' + Math.round(mins / 60 * 10) / 10 + '시간으로 저장했습니다' : '체크리스트만 사용하도록 저장했습니다'); }
+      break;
+    }
+    case 'studentsetupgoalsave': {
+      const me = currentStaff();
+      if (!me || !session.isStaffLink || isManager()) break;
+      const input = $('#studentSetupGoal');
+      const mins = Math.round(Number(input && input.value));
+      if (!Number.isFinite(mins) || mins < 10 || mins > 1440) return toast('10분에서 1,440분 사이로 입력해 주세요');
+      const stored = setCheck('__stgoal__' + me.id, 'all', { mins: mins, done: true });
+      if (stored) { render(); toast('하루 순공 목표를 저장했습니다'); }
+      break;
+    }
+    case 'studentsetupfinish': {
+      const me = currentStaff();
+      if (!me || !session.isStaffLink || isManager()) break;
+      const status = studentSetupStatus(me.id);
+      if (!status.started) return toast('첫 사용 설정을 먼저 시작해 주세요');
+      if (!status.timetable) return toast('주간 시간표를 먼저 입력해 주세요');
+      if (!status.goal) return toast('하루 순공 목표 또는 체크리스트만 사용을 선택해 주세요');
+      const at = now();
+      if (saveStudentSetup(me.id, { guideConfirmedAt: at, completedAt: at })) {
+        go('today'); toast('첫 사용 설정을 완료했습니다');
+      }
+      break;
+    }
     case 'login': {
       const loginId = ($('#loginId').value || '').trim();
       const password = $('#pin').value || '';
@@ -11168,14 +11399,21 @@ if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
 absorbLinkParams();
 const h = routeFromHash(location.hash);
 if (h) route = h;
-if (pendingStudentWelcome && session.isStaffLink && !isManager()) route = 'guide';
+if (pendingStudentWelcome && session.isStaffLink && !isManager()) {
+  route = 'guide';
+}
 if (session.isStaffLink && !['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
 if (pendingStudentCode) {
   connectStudentLink();
-} else if (sync.enabled()) {
-  sync.run();
+} else if (sync.enabled() && !studentConnectError) {
+  sync.run().then(() => {
+    if (pendingStudentWelcome && session.isStaffLink && !isManager() && !sync.err) {
+      startStudentSetup(session.staffId);
+      if (route === 'guide') render();
+    }
+  });
 }
 setInterval(() => sync.run(), 45000);
 
@@ -11207,7 +11445,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-30.1';
+const APP_VER = '2026-08-30.2';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
