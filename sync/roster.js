@@ -210,7 +210,7 @@ const STUDENT_REFERENCE_TABLES = [
   'guardian_ops_notification_sends', 'transport_notification_sends', 'lesson_assignment_requests',
   'guardian_lesson_publications', 'guardian_requests', 'student_portal_access', 'student_portal_codes',
   'student_portal_sessions', 'student_lesson_self_checks', 'student_lesson_self_check_events',
-  'teacher_live_requests', 'tuition_generation_alerts'
+  'teacher_live_requests', 'tuition_generation_alerts', 'lesson_handoffs'
 ];
 
 function studentReferenceGuard(app, studentId) {
