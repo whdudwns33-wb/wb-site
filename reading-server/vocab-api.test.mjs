@@ -279,6 +279,18 @@ await t('parseVerdict — 펜스·잡음 견디고 불량은 null', () => {
   assert.strictEqual(parseVerdict('그냥 텍스트'), null);
 });
 
+await t('막대로 나눈 줄에서는 쉼표가 뜻의 일부다', () => {
+  /* 교재 낱말 상당수가 뜻 안에 쉼표를 지닌다 — 「종이, 옷, 비닐봉지처럼 얇은 것을…」.
+     쉼표까지 칸 구분으로 보면 뜻이 「종이」로 잘리고 나머지가 예문 칸으로 밀려
+     학생은 「찢다 = 종이」를 외우게 된다. 검수 화면의 「배정칸에 넣기」가 막대를 쓴다. */
+  const { words } = parseWordList('찢다 | 종이, 옷, 비닐봉지처럼 얇은 것 | 종이를 찢다');
+  assert.strictEqual(words.length, 1);
+  assert.strictEqual(words[0].meaning, '종이, 옷, 비닐봉지처럼 얇은 것');
+  assert.strictEqual(words[0].example, '종이를 찢다');
+  /* 막대가 없으면 쉼표가 칸을 나눈다 — 빠르게 붙여 넣는 형식은 그대로 살린다 */
+  assert.strictEqual(parseWordList('사과, 빨갛고 둥근 과일').words[0].meaning, '빨갛고 둥근 과일');
+});
+
 await t('단어 목록 파싱 — 구분자·어종 자동 판별·한자 분해·중복·오류행', () => {
   const { words, errors } = parseWordList([
     '# 주석은 무시',

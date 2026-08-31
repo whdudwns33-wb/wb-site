@@ -159,7 +159,11 @@ export function parseWordList(text) {
   lines.forEach((raw, i) => {
     const line = raw.trim();
     if (!line || line.startsWith('#')) return;
-    const cols = line.split(/\s*[|\t]\s*|\s*,\s*/).map(c => c.trim()).filter((c, k) => c || k === 0);
+    /* 칸을 나누는 글자를 줄마다 하나만 고른다. 둘 다 인정하면 뜻 속의 쉼표에서 잘린다 —
+       「찢다 | 종이, 옷, 비닐봉지처럼 얇은 것을…」의 뜻이 「종이」가 되고 나머지가 예문 칸으로 밀린다.
+       막대나 탭이 있으면 그것이 칸 구분이고, 쉼표는 뜻의 일부다. */
+    const sep = /[|\t]/.test(line) ? /\s*[|\t]\s*/ : /\s*,\s*/;
+    const cols = line.split(sep).map(c => c.trim()).filter((c, k) => c || k === 0);
     const word = cols[0], meaning = cols[1];
     if (!word) return;
     if (!meaning) { errors.push((i + 1) + '행: 뜻이 없어요 — "' + line.slice(0, 24) + '"'); return; }
