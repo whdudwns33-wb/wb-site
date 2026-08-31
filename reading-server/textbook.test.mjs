@@ -11,6 +11,9 @@ let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 const TB = JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'reading', 'textbook.json'), 'utf8'));
+/* 교재별 강 수 — 시트가 정한 값이다. 여기와 어긋나면 넣다가 흘린 강이 있다는 뜻이다. */
+const BOOKS = [['eoduk-cho1', 20], ['eoduk-cho2', 20], ['eoduk-cho3', 21], ['eoduk-cho4', 21], ['eoduk-silryeok', 28]];
+const IDS = BOOKS.map((b) => b[0]);
 
 /* 확정된 강 하나를 흉내 낸 교재 — 실제 파일은 아직 전부 미확정이다 */
 const FIX = {
@@ -148,11 +151,11 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   }
 });
 
-t('교재가 둘 다 20강씩 들어 있다', () => {
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+t('교재 다섯 권이 정해진 강 수만큼 들어 있다', () => {
+  for (const [id, n] of BOOKS) {
     const b = findBook(TB, id);
     assert.ok(b, id + ' 교재가 없다');
-    assert.strictEqual(b.lessons.length, 20, id + ' 강 수가 20이 아니다');
+    assert.strictEqual(b.lessons.length, n, id + ' 강 수가 ' + n + '이 아니다');
     for (const l of b.lessons) {
       assert.ok(l.coaching && l.coaching.length > 300, id + ' ' + l.lesson + '강 코칭글이 너무 짧다');
       assert.ok(l.coaching.includes('\n'), id + ' ' + l.lesson + '강 코칭글에 줄바꿈이 없다');
@@ -164,7 +167,7 @@ t('교재가 둘 다 20강씩 들어 있다', () => {
 t('두 교재 모두 뜻이 다 채워져 있다', () => {
   /* 빈 뜻이 있으면 그 강은 「검수 완료」가 거절되어 학생에게 나가지 않는다.
      빈칸이 하나라도 생기면 그 강이 통째로 막히므로 여기서 잡는다. */
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+  for (const id of IDS) {
     const blank = findBook(TB, id).lessons
       .flatMap((l) => l.words.map((w) => ({ l: l.lesson, w })))
       .filter((x) => !x.w.meaning);
@@ -173,17 +176,22 @@ t('두 교재 모두 뜻이 다 채워져 있다', () => {
   }
 });
 
-t('뜻이 조사로 끝나지 않는다', () => {
-  /* 「…도전하는 것을 뜻해요」에서 맺음말만 떼면 목적어 조사가 꼬리로 남아
-     뜻이 아니라 문장 토막으로 읽힌다 — "매우 급하고 위험한 상황을". */
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+t('뜻이 매달린 조사로 끝나지 않는다', () => {
+  /* 「…도전하는 것을 뜻해요」에서 맺음말만 떼면 목적어 조사가 꼬리로 남는다.
+     다만 「을」로 끝난다고 다 조사는 아니다 — 「시골의 작은 마을」의 을은 낱말의 일부다.
+     그래서 조사일 수밖에 없는 꼴만 잡는다: 「것을」, 홀로 선 「걸」, 「거를」. */
+  const DANGLING = /(?:것을|거를)$|(?:^|\s)걸$/;
+  for (const id of IDS) {
     for (const l of findBook(TB, id).lessons) {
       for (const w of l.words) {
-        assert.ok(!/[을를]$|\s걸$/.test(w.meaning),
-          id + ' ' + l.lesson + '강 ' + w.word + ': 뜻이 조사로 끝난다 — ' + w.meaning);
+        assert.ok(!DANGLING.test(w.meaning),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 뜻이 매달린 조사로 끝난다 — ' + w.meaning);
       }
     }
   }
+  /* 반대 방향도 붙잡는다 — 조사를 떼려다 낱말을 자른 적이 있다 */
+  const chon = findLesson(findBook(TB, 'eoduk-cho3'), 8).words.find((w) => w.word === '촌락');
+  assert.strictEqual(chon.meaning, '시골의 작은 마을', '「마을」의 을을 조사로 보고 잘라 냈다');
 });
 
 t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
@@ -191,7 +199,7 @@ t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
      꾸밈을 받는 쪽(깃발·경험)은 그 강이 가르치는 말이 아니고, 가르치는 쪽(나달나달·새롭다)은
      따로 잡힌다. 조사로 이은 두 토막("숨이 가쁘다")과 달리 이 모양은 언제나 버린다. */
   const ADNOM = /(한|운|던|게|인)$/;
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+  for (const id of IDS) {
     for (const l of findBook(TB, id).lessons) {
       for (const w of l.words) {
         const parts = w.word.split(/\s+/);
@@ -208,7 +216,7 @@ t('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
      코칭글이 머리글로 세워 둔 짝을 그대로 지킨다. */
   const PAIR = /헷갈[^\n]{0,12}낱말[^가-힣\n]{0,6}([가-힣]{2,7})\s*[/／·,]\s*([가-힣]{2,7})/g;
   let seen = 0;
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+  for (const id of IDS) {
     for (const l of findBook(TB, id).lessons) {
       const have = new Set(l.words.map((w) => w.word));
       for (const m of l.coaching.matchAll(PAIR)) {
@@ -374,13 +382,13 @@ t('이미 열린 강은 다시 쓰지 않고, 닫기는 조건 없이 된다', (
   assert.strictEqual(undo.blocked.length, 0);
 });
 
-t('실제 교재 두 권은 통째로 열 수 있다', () => {
+t('실제 교재 다섯 권은 통째로 열 수 있다', () => {
   /* 뜻이 다 채워져 있으니 막히는 강이 없어야 한다 — 하나라도 막히면 그 강이 학생에게 못 간다 */
-  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+  for (const [id, n] of BOOKS) {
     const plan = confirmAllPlan(findBook(TB, id), {}, true);
     assert.strictEqual(plan.blocked.length, 0,
       id + ': 열리지 않는 강 — ' + plan.blocked.map((x) => x.lesson + '강 ' + x.error).join(' / '));
-    assert.strictEqual(plan.done.length, 20, id + ': 열린 강이 20개가 아니다');
+    assert.strictEqual(plan.done.length, n, id + ': 열린 강이 ' + n + '개가 아니다');
   }
 });
 

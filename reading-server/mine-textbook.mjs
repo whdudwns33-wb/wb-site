@@ -13,7 +13,7 @@ const stem = (w) => w.replace(/(하다|되다|이다|다)$/, '');
 /* 낱말이 아닌 것 — 어간 부스러기와 수업 용어 */
 const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기)$/;
 /* 활동·설명 제목도 콜론을 달고 나온다 — "구별 활동: …", "예시 정리: …". 낱말이 아니다. */
-const NOT_WORD2 = /(활동|하기|만들기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|같습니다)$/;
+const NOT_WORD2 = /(활동|하기|해보기|익히기|만들기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|상황극|같습니다)$/;
 
 /* 두 토막인데 앞 토막이 조사로 끝나면 낱말이 아니라 예문 구절이다 —
    "종이를 찢다", "고무줄을 늘인다". 진짜 낱말(찢다·늘이다)은 따로 잡힌다.
@@ -27,7 +27,10 @@ const isPhrase = (w) => {
   const p = String(w).split(/\s+/);
   return p.length === 2 && (PHRASE.test(p[0]) || ADNOM.test(p[0]));
 };
-const okWord = (w) => /^[가-힣]{2,6}(\s[가-힣]{1,4})?$/.test(w) && !NOT_WORD.test(w)
+/* 사이 공백은 진짜 공백만 — \s 는 줄바꿈까지 먹어서 「만들기\n예」처럼
+   윗줄 꼬리와 아랫줄 머리가 한 낱말로 붙는다. 초1·초2는 코칭글이 한 줄로 눌려 있어
+   드러나지 않았고, 줄바꿈이 살아 있는 초3부터 22군데가 그렇게 어긋났다. */
+const okWord = (w) => /^[가-힣]{2,6}( [가-힣]{1,4})?$/.test(w) && !NOT_WORD.test(w)
   && !/(세요|합니다|어요)$/.test(w)    // "질문해보세요" 같은 당부문은 낱말이 아니다
   && !NOT_WORD2.test(w);
 
@@ -45,20 +48,34 @@ function trimLead(w) {
 
 /* 뜻이 아니라 학부모에게 하는 당부인 것 — 뜻 칸에 들어가면 검수자가 훑다가 그대로 통과시킨다 */
 const NOT_MEANING = /(보세요|주세요|좋아요|좋습니다|효과적|연결해|해보면|지도하|추천|해보기|익히기|키우기)/;
+/* 물음·감탄이거나 따옴표가 섞였으면 뜻이 아니라 아이에게 던지는 말이다 —
+   「글썽이다 = 감동받거나 속상할 때 눈이 글썽인 적 있어?」처럼 그럴듯해서 검수를 그냥 통과한다.
+   화살표 규칙이 쓰던 걸름망을 모든 출처에 똑같이 건다. */
+const NOT_DEF = /[?？!！]|[“”‘’"]|\((?:O|X)\)/;
 const TAIL = /\s*(?:이라는 뜻이에요|라는 뜻이에요|는 뜻이에요|뜻이에요|이라는 뜻|라는 뜻|말이에요|표현이에요|행동이에요|느낌이에요|상황이에요|거예요|이에요|예요|에요|말해요|해요|이야)$/;
+/* 목적어를 거느리는 맺음말 — 이것을 떼어 냈을 때만 남은 조사를 함께 뗀다.
+   그냥 떼면 「시골의 작은 마을」이 「시골의 작은 마」가 된다. 「마을」의 을은 조사가 아니다. */
+const OBJ_TAIL = /(?:말해요|뜻해요|나타내요|말합니다|뜻합니다)$/;
 
-function cleanMeaning(v) {
-  let s = strip(v);
+function cleanMeaning(v, hadObjTail) {
+  /* 뜻은 한 줄을 넘지 않는다 — 넘으면 다음 항목의 머리를 물고 온다 */
+  let s = strip(String(v || '').split('\n')[0]);
   /* 뜻 안에 다음 항목("낱말: ")이 남아 있으면 거기서 자른다.
      그대로 두면 그럴듯해 보이는 틀린 뜻이 되어 검수를 그냥 통과한다. */
   s = s.split(/\s[가-힣]{2,6}(?:\s[가-힣]{1,4})?\s*:/)[0];
   s = s.replace(/[.,]+$/, '');
+  const cut = (s.match(TAIL) || [''])[0];
   s = s.replace(TAIL, '').trim();
   /* 「…뜻해요」를 떼어 내면 그 말이 거느리던 목적어 조사가 꼬리로 남는다 —
      "새로운 일에 도전하는 것을", "매우 급하고 위험한 상황을". 뜻이 아니라 문장 토막으로 읽힌다.
-     구어체 「걸」(것을)도 마찬가지라 「것」으로 되돌린다. */
-  s = s.replace(/\s*걸$/, ' 것').replace(/(것)[을를]$/, '$1').replace(/([가-힣])[을를]$/, '$1');
+     구어체 「걸」(것을)도 「것」으로 되돌린다. 목적어를 거느리는 맺음말을 뗐을 때만 손댄다. */
+  if (hadObjTail || OBJ_TAIL.test(cut.trim())) {
+    s = s.replace(/\s*걸$/, ' 것').replace(/([가-힣])[을를]$/, '$1');
+  }
   s = strip(s);
+  if (NOT_DEF.test(s)) return '';
+  /* 한글이 없으면 뜻풀이가 아니다 — 괄호 속 한자(朋友有信)가 그대로 뜻 칸에 들어오곤 했다 */
+  if (!/[가-힣]/.test(s)) return '';
   if (!s || s.length < 3 || s.length > 55 || NOT_MEANING.test(s)) return '';
   return s;
 }
@@ -68,7 +85,9 @@ function cleanMeaning(v) {
    "실감나다: 진짜처럼 느껴질 때 → “공연이 너무 실감났어요!”"
    "띠다: 감정이나 색, 성질을 지니거나 예: “얼굴에 미소를 띠다”"
    뜻은 마침표로 끝나지 않는다 — 따옴표·화살표·「예:」·다음 낱말 콜론에서 끊긴다. */
-const ANCHOR = /(?:^|[\s\n])([가-힣]{2,6}(?:\s[가-힣]{1,4})?)\s*:\s*/g;
+/* 사이 공백은 진짜 공백만 — \s 는 줄바꿈을 먹어서 「…놀이터\n동해:」가 한 닻으로 잡히고,
+   그러면 앞줄 꼬리에 묶인 동해가 통째로 버려진다. 뜻이 또박또박 달린 줄이 그렇게 사라졌다. */
+const ANCHOR = /(?:^|[\s\n])([가-힣]{2,6}(?: [가-힣]{1,4})?)\s*:\s*/g;
 function colonPairs(text) {
   const out = [];
   const anchors = [];
@@ -160,7 +179,7 @@ function dashMeanings(text) {
 const BODY = "[^\\n.!?“”\"'‘’]";
 const DEFINED = [
   /* 낱말이 따옴표 안에 있고 뒤에서 풀이한다 */
-  new RegExp("['‘\"“]([가-힣]{2,7})['’\"”](?:이라는|라는)?\\s*(?:말)?(?:은|는)\\s+(" + BODY + "{6,70})(?:뜻해요|말해요|나타내요|이에요|예요|에요)", 'g'),
+  new RegExp("['‘\"“]([가-힣]{2,7})['’\"”](?:이라는|라는)?\\s*(?:말)?(?:은|는)\\s+(" + BODY + "{6,70})(뜻해요|말해요|나타내요|이에요|예요|에요)", 'g'),
   /* 글머리 기호 뒤에 낱말이 있고 뜻이 따옴표 안에 있다 */
   /[▪▶●•]\s*([가-힣]{2,7})(?:은|는)\s+['‘"“]([^\n'’"”]{4,60})['’"”]/g,
 ];
@@ -176,11 +195,45 @@ function pairWords(text) {
   return [...new Set(out)];
 }
 
+/* ── 2-6) 사자성어·관용 표현 ──
+   실력(초5·6)은 거의 매 강 하나씩 가르치는데, 낱말 나열이 아니라 문장 안에서 소개한다:
+     고사성어 ‘좌불안석’도 함께 학습합니다.
+     사자성어 – 역지사지 (易地思之)
+   나열 규칙에는 걸리지 않아 열넷 중 셋만 잡혀 있었다. 이 자리에서 따로 집는다.
+   뜻은 바로 아래 「뜻:」 줄에 있다 — 그 줄은 표의 행 이름이라 낱말로 잡으면 안 된다. */
+const IDIOM_KEY = /(?:사자성어|고사성어|관용\s*표현)/g;
+/* 따옴표에 싸였거나 한자를 달고 있는 것만 성어로 본다. 표시가 없으면
+   「관용 표현 ⏎ 안녕하세요, 어머님」의 인사말까지 성어로 집어 온다. */
+const IDIOM_ONE = /[‘“'"]([가-힣]{3,7})[’”'"]|([가-힣]{3,7})\s*\(\s*[一-鿿]{2,6}\s*\)/g;
+function idiomWords(text) {
+  const out = {};
+  for (const k of text.matchAll(IDIOM_KEY)) {
+    /* 한 줄에 둘을 나란히 소개하기도 한다 — 「‘첩첩산중’, ‘산전수전’도 배워」 */
+    const line = text.slice(k.index, (text.indexOf('\n', k.index) + 1 || text.length + 1) - 1);
+    for (const m of line.matchAll(IDIOM_ONE)) {
+      const w = strip(m[1] || m[2]);
+      if (!/^[가-힣]{3,7}$/.test(w) || NOT_WORD.test(w) || NOT_WORD2.test(w)) continue;
+      if (out[w] !== undefined) continue;
+      /* 뜻은 성어를 소개한 줄이 아니라, 뒤쪽에 따로 선 성어 머리글 아래 붙어 있다:
+           좌불안석 ⏎ 뜻: 마음이 불안해서 가만히 앉아 있을 수 없는 상태
+         그래서 낱말이 나오는 자리마다 바로 뒤를 살펴 「뜻: …」을 찾는다. */
+      let v = '';
+      for (const at of text.matchAll(new RegExp(w, 'g'))) {
+        const d = text.slice(at.index, at.index + 220).match(/(?:^|\n)\s*뜻\s*:\s*([^\n]{4,60})/);
+        if (d) { v = cleanMeaning(d[1]); if (v) break; }
+      }
+      out[w] = v;
+    }
+  }
+  return out;
+}
+
 function definedWords(text) {
   const out = {};
   for (const re of DEFINED)
     for (const m of text.matchAll(re)) {
-      const w = strip(m[1]), v = cleanMeaning(m[2]);
+      /* 맺음말을 정규식이 먹어 버리므로, 목적어를 거느리는 것이었는지 따로 알려 준다 */
+      const w = strip(m[1]), v = cleanMeaning(m[2], /^(?:뜻해요|말해요|나타내요)$/.test(m[3] || ''));
       if (okWord(w) && !isPhrase(w) && v && v !== w && !out[w]) out[w] = v;
     }
   return out;
@@ -206,11 +259,24 @@ function proseMeanings(text) {
   return out;
 }
 
+/* 예문 고르기 — 문맥 빈칸 문제가 이 문장에 구멍을 뚫는다. 아무 인용이나 쓰면 안 된다.
+   ① 그 낱말 줄에 달린 인용이 가장 정확하다: 「권리 – “모든 사람은 공부할 권리가 있어요.”」
+   ② 그다음은 물음이 아닌 문장. 「공공이라는 말, 들어본 적 있니?」에 구멍을 뚫으면 문제가 되지 않는다.
+   ③ 그래도 없으면 아무 인용이나. */
 function examples(coaching, words) {
   const quotes = [...coaching.matchAll(/[“"]([^“”"\n]{6,60})[”"]/g)].map((m) => strip(m[1]));
+  const onLine = {};
+  for (const m of coaching.matchAll(/(?:^|\n)\s*([가-힣]{2,7})\s*[–—-]\s*[“"]([^“”"\n]{6,60})[”"]/g))
+    if (!onLine[strip(m[1])]) onLine[strip(m[1])] = strip(m[2]);
+  /* 물음을 거르는 것이 줄 우선보다 앞선다. 그 낱말 줄에 달린 것이라도 물음이면
+     구멍을 뚫을 자리가 없다 — 「놀이공원에서 … 기분 어땠어?」로는 문제가 되지 않는다. */
+  const isAsk = (q) => /[?？]/.test(q);
   const out = {};
   for (const w of words) {
-    const hit = quotes.find((q) => q.includes(stem(w)));
+    const mine = quotes.filter((q) => q.includes(stem(w)));
+    const line = onLine[w];
+    const hit = (line && !isAsk(line) ? line : null)
+      || mine.find((q) => !isAsk(q)) || line || mine[0];
     if (hit) out[w] = hit;
   }
   return out;
@@ -237,6 +303,7 @@ for (const b of tb.books) for (const l of b.lessons) {
   const target = targetWords(l.coaching);
   const paren = parenMeanings(l.coaching), prose = proseMeanings(l.coaching), dash = dashMeanings(l.coaching);
   const defined = definedWords(l.coaching), pairw = pairWords(l.coaching);
+  const idiom = idiomWords(l.coaching);
 
   /* 낱말 순서: 콜론 설명 → 목표 문단 → 풀어 쓴 뜻 → 헷갈리는 짝 → 원래 후보 */
   /* 이미 목록에 있고 뜻까지 붙은 낱말은 누군가 손을 댄 것이다 — 새 후보에 쓰는
@@ -249,7 +316,7 @@ for (const b of tb.books) for (const l of b.lessons) {
      걸름망으로는 못 거른다 — 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두었기 때문이다.
      판단을 파일에 적어 두는 편이 정규식을 더 조이는 것보다 정확하고 되돌리기도 쉽다. */
   const dropped = new Set(l.dropped || []);
-  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...Object.keys(defined), ...pairw, ...kept])]
+  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...Object.keys(defined), ...pairw, ...Object.keys(idiom), ...kept])]
     .filter((w) => !dropped.has(w));
   const byPair = {};
   for (const p of pairs) byPair[p.word] = p;
@@ -271,11 +338,11 @@ for (const b of tb.books) for (const l of b.lessons) {
        따위)이 그대로 굳는다. 다만 코칭글에 설명이 없어 사람이 써 넣은 뜻(src:'ai')은
        다시 캘 수 없으니 남긴다. 강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있다. */
     meaning: (keepHuman(prevBy[w]) || {}).meaning
-      || firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
+      || firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
     example: (prevBy[w] && prevBy[w].example)
       || (byPair[w] && byPair[w].example) || (arrow[w] && arrow[w].example) || ex[w] || '',
     src: keepHuman(prevBy[w]) ? prevBy[w].src
-      : (firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
+      : (firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
   }));
   l.words = words;
   nW += words.length; nM += words.filter((w) => w.meaning).length; nE += words.filter((w) => w.example).length;
