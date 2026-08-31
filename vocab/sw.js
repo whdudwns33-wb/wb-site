@@ -1,6 +1,6 @@
 'use strict';
 /* WB 워드브레인 서비스 워커 — 앱 셸 캐시 (오프라인 학습) */
-const VERSION = 'wbv-shell-v6';
+const VERSION = 'wbv-shell-v7';
 const SHELL = ['./', './index.html', './voice.js', './words.js', './bridge.js', './quiz.js', './srs.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
