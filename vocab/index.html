@@ -404,7 +404,7 @@
   }
 
   /* ── 학원 서버 연동 (진로독서 학생 토큰 재사용 — wbr.auth는 진로독서 앱 소유, 읽기만) ── */
-  var VSYNC = { avail: false, timer: null, busy: false, last: null, authBad: false };
+  var VSYNC = { avail: false, ai: false, timer: null, busy: false, last: null, authBad: false };
   function vsyncAuth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
   function vsyncOn() { return VSYNC.avail && !VSYNC.authBad && !!vsyncAuth(); }
   async function vsyncApi(path, opt) {
@@ -442,7 +442,8 @@
       var r = await fetch('/api/health', { cache: 'no-store' });
       var j = await r.json();
       VSYNC.avail = !!(j && j.ok);
-    } catch (e) { VSYNC.avail = false; }
+      VSYNC.ai = !!(j && j.ai);
+    } catch (e) { VSYNC.avail = false; VSYNC.ai = false; }
     if (!vsyncOn()) return;
     try {
       var res = await vsyncApi('/pull');
@@ -713,9 +714,16 @@
   function aiSlotHtml(w) {
     var cls = w.type === 'native' ? 'scene' : 'mnem';
     var lbl = w.type === 'native' ? '머릿속에 그려 보기' : '찰떡 연상';
-    var inner = vsyncOn()
-      ? '<p class="muted" style="font-size:.86rem;margin:4px 0 8px;">아직 연상이 없는 단어예요.</p><button class="btn" id="aiGen-' + w.id + '" style="width:100%;">✨ AI 찰떡 연상 만들기</button>'
-      : '<p class="muted" style="font-size:.86rem;">연상 준비 중 — 학원 서버에 연동하면 AI가 만들어 줘요.</p>';
+    /* AI 키가 없으면 버튼을 내지 않는다 — 눌러도 안 되는 버튼은 앱이 고장 난 것처럼 보인다.
+       대신 스스로 떠올려 보라고 한다. 어차피 연상은 내가 만든 것이 제일 오래 간다. */
+    var self = w.type === 'native'
+      ? '이 말을 들으면 어떤 장면이 떠오르나요? 머릿속에 그려 보세요.'
+      : '이 낱말과 닮은 말이나 장면을 떠올려 보세요.';
+    var inner = !vsyncOn()
+      ? '<p class="muted" style="font-size:.86rem;">연상 준비 중 — 학원 서버에 연동하면 AI가 만들어 줘요.</p>'
+      : VSYNC.ai
+        ? '<p class="muted" style="font-size:.86rem;margin:4px 0 8px;">아직 연상이 없는 단어예요.</p><button class="btn" id="aiGen-' + w.id + '" style="width:100%;">✨ AI 찰떡 연상 만들기</button>'
+        : '<p class="muted" style="font-size:.86rem;">' + self + '</p>';
     return '<div class="hintbox ' + cls + '" id="aiSlot-' + w.id + '"><span class="lbl">' + lbl + '</span>' + inner + '</div>';
   }
   function bindAiSlot(w) {
