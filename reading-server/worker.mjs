@@ -5,7 +5,7 @@
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, cleanWords, coachingCard, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -423,6 +423,20 @@ export default {
         stu.book = { bookId, lesson: v.lesson.lesson, at: nowIso() };
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true, book: stu.book });
+      }
+
+      /* 교재 한 권을 통째로 열고 닫는다 — 강 번호가 아니라 confirm-all이라 아래 규칙과 겹치지 않는다 */
+      const mAll = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/confirm-all$/);
+      if (mAll && req.method === 'POST') {
+        const book = findBook(await textbookRaw(env, url.origin), mAll[1]);
+        if (!book) return json(404, { error: '없는 교재예요.' });
+        const { confirmed } = await req.json();
+        const ov = (await env.DB.get('textbook', 'json')) || {};
+        const plan = confirmAllPlan(book, ov, !!confirmed);
+        const at = nowIso();
+        for (const e of plan.entries) ov[e.key] = { ...e.value, at };
+        if (plan.entries.length) await env.DB.put('textbook', JSON.stringify(ov));
+        return json(200, { ok: true, confirmed: !!confirmed, done: plan.done, skipped: plan.skipped, blocked: plan.blocked });
       }
 
       /* 강사 검수 — 강 하나의 낱말을 통째로 저장한다 */

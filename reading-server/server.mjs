@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, cleanWords, coachingCard, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -323,6 +323,20 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true, book: stu.book });
       }
+      /* 교재 한 권을 통째로 열고 닫는다 — 강 번호가 아니라 confirm-all이라 아래 규칙과 겹치지 않는다 */
+      const mAll = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/confirm-all$/);
+      if (mAll && req.method === 'POST') {
+        const book = findBook(textbookRaw(), mAll[1]);
+        if (!book) return json(res, 404, { error: '없는 교재예요.' });
+        const { confirmed } = await readBody(req);
+        db.textbook = db.textbook || {};
+        const plan = confirmAllPlan(book, db.textbook, !!confirmed);
+        const at = nowIso();
+        for (const e of plan.entries) db.textbook[e.key] = { ...e.value, at };
+        if (plan.entries.length) persist();
+        return json(res, 200, { ok: true, confirmed: !!confirmed, done: plan.done, skipped: plan.skipped, blocked: plan.blocked });
+      }
+
       /* 강사 검수 — 강 하나의 낱말을 통째로 저장한다 */
       const mLesson = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/(\d{1,3})$/);
       if (mLesson && req.method === 'GET') {

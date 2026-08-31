@@ -131,6 +131,33 @@ export function readyToConfirm(words) {
   return { ok: true, words: list };
 }
 
+/* 교재 한 권을 통째로 열고 닫는다.
+   한 강씩 40번 누르는 대신 한 번에 끝내되, 낱말마다 뜻이 있어야 한다는 조건은 그대로 건다 —
+   뜻 빈 강이 섞여 있으면 그 강만 건너뛰고 어느 강이 왜 남았는지 돌려준다.
+   되돌리기(닫기)에는 조건을 걸지 않는다. 잘못 열었을 때 막힘없이 닫을 수 있어야 한다. */
+export function confirmAllPlan(book, overlay, confirmed) {
+  const ov = overlay || {};
+  const out = { entries: [], done: [], blocked: [], skipped: [] };
+  for (const l of (book && book.lessons) || []) {
+    const key = String(book.id) + '#' + Number(l.lesson);
+    const cur = ov[key];
+    /* 강사가 고쳐 둔 값이 있으면 그것을, 없으면 교재 원본을 쓴다 */
+    const words = cleanWords(cur && cur.words ? cur.words : l.words);
+    if (confirmed) {
+      const r = readyToConfirm(words);
+      if (!r.ok) { out.blocked.push({ lesson: l.lesson, title: l.title, error: r.error }); continue; }
+      if (cur && cur.confirmed) { out.skipped.push(l.lesson); continue; }
+      out.entries.push({ key, value: { words: r.words, confirmed: true } });
+      out.done.push(l.lesson);
+    } else {
+      if (!(cur && cur.confirmed)) { out.skipped.push(l.lesson); continue; }
+      out.entries.push({ key, value: { words, confirmed: false } });
+      out.done.push(l.lesson);
+    }
+  }
+  return out;
+}
+
 const ovKey = (bookId, lesson) => String(bookId) + '#' + Number(lesson);
 
 /* 원본 교재 + 검수 덧씌우기 → 강사·학부모가 보는 실제 교재 */
