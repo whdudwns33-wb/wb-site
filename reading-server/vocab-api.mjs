@@ -250,6 +250,11 @@ const dayKey = (t) => {
   const d = new Date(t + 9 * 3600000); // KST 기준으로 하루를 가른다
   return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
 };
+/* KST 오늘 0시 */
+const dayStart = (t) => {
+  const d = new Date(t + 9 * 3600000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 9 * 3600000;
+};
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : null);
 
 /* 학생 한 명. stateRec은 store.getState(code)가 준 { state, updatedAt } */
@@ -282,6 +287,8 @@ export function studentMetrics(stateRec, now) {
     }
   }
   out.wateredToday = watered.size;
+  const started = watered.size > 0;   // 오늘 물 주기를 시작했는가
+  const today0 = dayStart(now);
 
   for (const s of Object.values(S.states)) {
     out.total += 1;
@@ -289,8 +296,17 @@ export function studentMetrics(stateRec, now) {
     if (s.graduated) { out.graduated += 1; continue; }
     out.growing += 1;
     /* 오늘 물 준 낱말은 밀린 게 아니다 — 틀려서 10분 뒤로 잡힌 것을 밀림으로 세면
-       열심히 푼 학생일수록 완수율이 떨어진다. */
-    if (s.due <= now && !watered.has(String(s.id))) {
+       열심히 푼 학생일수록 완수율이 떨어진다.
+
+       오늘 차례가 온 낱말은 학생이 오늘 물 주기를 시작한 뒤에만 센다.
+       낱말은 대개 밤에 차례가 오고 학생은 그 뒤에 앉는다. 차례가 오자마자 세면
+       꼬박꼬박 하는 반도 학생이 앉기 전까지는 「0% 기준 미달」로 빨갛게 보인다 —
+       원장이 저녁에 화면을 열 때가 바로 그 시간대다.
+       시작했으면 남은 것은 진짜 안 한 것이므로 센다(8개 중 5개만 풀면 62.5%).
+       아예 안 앉았으면 그날이 아직 안 끝났으므로 「해당 없음」이 맞다.
+       하루가 지나면 어제 것이 되어 그때부터 밀림으로 잡힌다. */
+    const late = s.due < today0;
+    if (s.due <= now && !watered.has(String(s.id)) && (started || late)) {
       out.overdue += 1;
       const iv = Math.max(INTERVAL_DAYS[Math.min(s.step || 0, 6)] || 0, 0.5) * 86400000;
       if ((now - s.due) / iv >= 1.25) out.emergency += 1;
