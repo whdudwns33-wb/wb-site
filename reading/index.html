@@ -36,6 +36,8 @@
     .stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:15px}
     .stat{min-width:0;padding:11px 4px;border:1px solid #d6ebf4;border-radius:13px;background:#f5fbfe;text-align:center}
     .stat b{display:block;color:var(--navy);font-size:20px;line-height:1.15;font-variant-numeric:tabular-nums}
+    button.stat{width:100%;cursor:pointer;font:inherit;transition:background .12s}
+    button.stat:active{background:#e7f4fb}
     .stat span{display:block;margin-top:4px;color:var(--muted);font-size:11.5px;font-weight:800;line-height:1.25}
     .pick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
     .pick{min-height:64px;padding:9px 6px;border:1.5px solid #bfd7e1;border-radius:13px;background:#fff;color:var(--navy);font-weight:850;font-size:13.5px;line-height:1.3}
@@ -203,7 +205,12 @@
     .stage-dots{display:flex;gap:6px;margin-top:8px}
     .stage-dots i{height:7px;flex:1;border-radius:999px;background:#e4edf1}
     .stage-dots i.on{background:var(--blue)}
-    .hj-char{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#f4ece1;color:#7a5230;font-size:22px;font-weight:900;margin-right:10px;flex:0 0 auto}
+    .hj-char{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:13px;background:#f4ece1;color:#7a5230;font-size:27px;font-weight:900;margin-right:10px;flex:0 0 auto}
+    .hj-big{display:grid;place-items:center;width:150px;height:150px;margin:14px auto 0;border-radius:28px;background:#f4ece1;color:#7a5230;font-size:96px;font-weight:900;line-height:1}
+    .hj-rd{margin-top:12px;text-align:center;color:var(--navy);font-size:24px;font-weight:900}
+    .hj-word{margin-top:10px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#fff}
+    .hj-word b{color:var(--navy);font-size:19px}
+    .hj-word small{display:block;margin-top:4px;color:var(--ink);font-size:15px;line-height:1.6}
     .chipword{display:inline-block;margin:3px 4px 0 0;padding:5px 9px;border-radius:999px;background:var(--sky);color:var(--navy);font-size:12.5px;font-weight:800}
     .lab-step{display:flex;gap:6px;margin:10px 0 4px}
     .lab-step i{height:7px;flex:1;border-radius:999px;background:#e4edf1}
@@ -218,6 +225,8 @@
     .report-doc h4:first-child{margin-top:0}
     input[type="text"]{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:15px;color:var(--ink);background:#fff}
     .loading{padding:48px 16px;text-align:center;color:var(--muted)}
+    #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%);z-index:12;max-width:92%;padding:12px 20px;border-radius:999px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;line-height:1.5;text-align:center;box-shadow:0 10px 30px #17395755;transition:transform .24s ease}
+    #toast.show{transform:translateX(-50%) translateY(0)}
     .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:350px){.pick-grid,.stat-grid,.evalrow{grid-template-columns:repeat(2,minmax(0,1fr))}.row2{grid-template-columns:1fr}}
   </style>
@@ -234,6 +243,7 @@
   </div></nav>
   <div class="sheet" id="sheet" role="dialog" aria-label="어휘 풀이"><div class="sheet-in" id="sheetIn"></div></div>
   <div id="live" class="sr" role="status" aria-live="polite"></div>
+  <div id="toast" aria-hidden="true"></div>
   <div id="printArea" aria-hidden="true"></div>
 
 <script src="./voice.js"></script>
@@ -274,7 +284,9 @@ function normalizeState(s){
   s.redbook=s.redbook||[];
   s.reports=s.reports||[];
   if(!('lab' in s))s.lab=null;
-  s.prefs.auto=s.prefs.auto||{speed:1,scope:0};
+  s.prefs.auto=s.prefs.auto||{speed:2,scope:0};
+  /* 속도 단계가 4→5로 늘어, 예전에 저장된 값을 같은 체감 속도로 옮긴다 */
+  if(!s.prefs.auto.v5){s.prefs.auto.speed=[1,2,3,4][s.prefs.auto.speed]!=null?[1,2,3,4][s.prefs.auto.speed]:2;s.prefs.auto.v5=true;}
   s.mychunks=s.mychunks||{};
   s.speed=s.speed||[];
   s.wrong=s.wrong||[];
@@ -341,7 +353,15 @@ const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 function dkey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function addDays(k,n){const d=new Date(k+'T12:00:00');d.setDate(d.getDate()+n);return dkey(d);}
 function hash(s){let h=0;for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0;}return Math.abs(h);}
-function announce(t){$('#live').textContent=t;}
+let TOAST_T=null;
+/* 안내는 눈에도 보여야 한다 — 예전에는 화면 낭독기 전용이라 학생이 실패를 알 수 없었다 */
+function announce(t){
+  $('#live').textContent=t;
+  const el=$('#toast');if(!el)return;
+  el.textContent=t;el.classList.add('show');
+  if(TOAST_T)clearTimeout(TOAST_T);
+  TOAST_T=setTimeout(()=>el.classList.remove('show'),3400);
+}
 function paraText(p){return p.join('');}
 function levelBody(a,lv){return a.levels&&a.levels[lv];}
 function myLevel(){return S.profile?S.profile.level:'L3';}
@@ -409,7 +429,11 @@ function weekCount(){
 }
 
 /* ───────────────────────── 렌더 공통 ───────────────────────── */
-function render(){
+/* 카드를 펼치는 것처럼 '제자리 갱신'일 때는 보던 위치를 지킨다.
+   예전에는 무엇을 누르든 맨 위로 튀어서, 방금 누른 항목을 다시 찾아 내려가야 했다. */
+function render(opt){
+  const keep=!!(opt&&opt.keep);
+  const y=window.scrollY;
   const app=$('#app');
   const fns={onboard:vOnboard,home:vHome,reader:vReader,quiz:vQuiz,library:vLibrary,report:vReport,settings:vSettings,train:vTrain,lab:vLab};
   const f=fns[view.name]||vHome;
@@ -426,7 +450,7 @@ function render(){
   }else if(S.profile){
     $('#headActions').innerHTML='<button class="headbtn" data-act="nav" data-v="settings" aria-label="설정">⚙</button>';
   }else{$('#headActions').innerHTML='';}
-  window.scrollTo(0,0);
+  if(keep)window.scrollTo(0,y);else window.scrollTo(0,0);
 }
 function go(name,extra){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
 
@@ -538,9 +562,9 @@ function vHome(){
     <div class="card"><div class="weekhead"><h3>이번 주 읽기</h3><span class="tag muted">${weekCount()}/7일</span></div>
       <div class="weekdots">${weekDots()}</div></div>
     <div class="card"><div class="stat-grid">
-      <div class="stat"><b>${Object.keys(S.readings).length}</b><span>완독한 글</span></div>
-      <div class="stat"><b>${S.vocab.length}</b><span>모은 어휘</span></div>
-      <div class="stat"><b>${(()=>{const qs=Object.values(S.quiz);const t=qs.reduce((s,q)=>s+q.total,0);return t?Math.round(qs.reduce((s,q)=>s+q.correct,0)/t*100)+'%':'—';})()}</b><span>문제 정답률</span></div>
+      <button class="stat" data-act="go-lib" data-tab="reads"><b>${Object.keys(S.readings).length}</b><span>완독한 글 ›</span></button>
+      <button class="stat" data-act="go-lib" data-tab="vocab"><b>${S.vocab.length}</b><span>모은 어휘 ›</span></button>
+      <button class="stat" data-act="nav" data-v="report"><b>${(()=>{const qs=Object.values(S.quiz);const t=qs.reduce((s,q)=>s+q.total,0);return t?Math.round(qs.reduce((s,q)=>s+q.correct,0)/t*100)+'%':'—';})()}</b><span>문제 정답률 ›</span></button>
     </div></div>
     ${S.lab?`<div class="card" style="border-color:#d8c2ec;background:linear-gradient(145deg,#f8f2fd 0,#fff 70%)"><p class="eyebrow" style="color:#6b4390">탐구 랩</p><h2>쓰던 보고서가 있어요 (${S.lab.step+1}/7단계)</h2><button class="btn sm navy" data-act="nav" data-v="lab">이어서 쓰기</button></div>`
     :scrapN>=3?`<div class="card" style="border-color:#e8c9a8;background:linear-gradient(145deg,#fff8ef 0,#fff 70%)"><p class="eyebrow" style="color:#8a5a12">탐구 랩</p><h2>스크랩이 ${scrapN}편 모였어요</h2><p class="sub">이제 탐구보고서를 시작할 수 있어요!</p><button class="btn sm" data-act="nav" data-v="lab">탐구 랩 열기</button></div>`:''}
@@ -701,6 +725,7 @@ function vQuiz(){
     return `<div class="card hero"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
       <p class="sub">${msg}</p>
       ${hasCh?`<button class="btn navy" data-act="quiz-challenge">🔥 심화 문제 도전 (${b.challenge.length}문항)</button>`:''}
+      <button class="btn ${hasCh?'ghost sm':'navy'}" data-act="rb-new" data-id="${a.id}">✎ 이 글 요약 쓰기 — 비문학 독서 요약</button>
       ${S.scraps[a.id]?'':`<button class="btn ghost sm" data-act="scrap-quick" data-id="${a.id}">이 글 스크랩하기</button>`}
       <button class="btn ${hasCh?'ghost sm':''}" data-act="nav" data-v="home">홈으로</button></div>`;
   }
@@ -736,17 +761,31 @@ function vLibrary(){
     const vs=S.vocab.slice().reverse();
     body=vs.length?`<div class="vlist">${vs.map((v,i)=>`<button class="grow ${sess['vopen'+i]?'open':''}" data-act="vocab-toggle" data-i="${i}">
       <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
-      <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>
-      <button class="btn sm" data-act="vocab-review">복습 퀴즈 (5개)</button>`
+      <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>`
       :'<div class="empty">모은 어휘가 없어요.<br>글에서 밑줄 단어를 누르면 어휘장에 쌓여요.</div>';
+    /* 복습 버튼은 어휘가 없어도 자리를 지킨다 — 사라지면 학생은 기능이 없어진 줄 안다 */
+    body+=`<button class="btn sm" data-act="vocab-review" ${vs.length?'':'disabled'}>복습 퀴즈 (${Math.min(5,vs.length)}개)</button>
+      ${vs.length?'':'<p class="sub" style="margin-top:6px">글에서 밑줄 단어를 누르면 어휘가 쌓이고, 그때부터 복습할 수 있어요.</p>'}`;
     if(sess.vq){
-      const v=sess.vq.list[sess.vq.i];
-      body=`<div class="card" style="margin:0 0 12px;border-color:#b9deed"><p class="qnum">어휘 복습 ${sess.vq.i+1}/${sess.vq.list.length}</p>
-        <p class="qtext">${esc(v.word)}</p>
-        ${sess.vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}</div>
-        <div class="row2" style="margin-top:10px"><button class="btn sm ghost" data-act="vq-mark" data-ok="0" style="margin-top:0">헷갈려요</button>
-        <button class="btn sm" data-act="vq-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
-        :`<button class="btn sm" data-act="vq-show">뜻 보기</button>`}</div>`+body;
+      const vq=sess.vq;
+      if(vq.i>=vq.list.length){
+        body=`<div class="card" id="vqCard" style="margin:0 0 12px;border-color:#b3dcc9;background:linear-gradient(145deg,#effaf4 0,#fff 70%)">
+          <p class="eyebrow" style="color:var(--ok)">어휘 복습 완료</p>
+          <h2 style="font-size:18px">${vq.list.length}개 중 ${vq.ok}개 알았어요</h2>
+          <p class="sub">헷갈린 낱말은 훈련 탭 '어휘 복습'에서 알맞은 때에 다시 나와요.</p>
+          <div class="row2"><button class="btn sm ghost" data-act="vq-done" style="margin-top:10px">닫기</button>
+          <button class="btn sm" data-act="vocab-review" style="margin-top:10px">한 번 더</button></div></div>`+body;
+      }else{
+        const v=vq.list[vq.i];
+        body=`<div class="card" id="vqCard" style="margin:0 0 12px;border-color:#b9deed;background:linear-gradient(145deg,#eaf7fd 0,#fff 70%)">
+          <p class="qnum">어휘 복습 ${vq.i+1}/${vq.list.length}</p>
+          <p class="qtext" style="font-size:23px;margin-top:10px">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}${esc(v.word)}</p>
+          ${vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}</div>
+          <div class="row2" style="margin-top:10px"><button class="btn sm ghost" data-act="vq-mark" data-ok="0" style="margin-top:0">헷갈려요</button>
+          <button class="btn sm" data-act="vq-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
+          :`<p class="sub">뜻을 떠올린 다음 눌러 확인해요.</p><button class="btn sm" data-act="vq-show">뜻 보기</button>`}
+          <button class="btn ghost sm" data-act="vq-done">그만하기</button></div>`+body;
+      }
     }
   }
   return `<div class="card"><div class="between"><h2>내 서재</h2></div>
@@ -912,7 +951,25 @@ function modelBoundaries(p){
   }
   return out;
 }
+/* 한자 카드 — 어휘 복습·끊어 읽기처럼 한 장씩 넘기는 세션. 글자를 크게 보여 준다. */
+function vHanjaSession(){
+  const h=sess.hj;const f=h.list[h.i];
+  return `<div class="card"><div class="between"><p class="eyebrow">한자 카드 ${h.i+1} / ${h.list.length}</p>
+      <button class="toolbtn" data-act="hj-done">그만하기</button></div>
+    <div class="stage-dots">${h.list.slice(0,12).map((_,i)=>`<i class="${i===h.i?'on':''}"></i>`).join('')}</div>
+    <div class="hj-big">${esc(f.ch)}</div>
+    <p class="hj-rd">${esc(f.rd)}</p>
+    ${h.show?`<p class="sub" style="text-align:center;margin-top:10px">이 한자가 들어간 낱말 ${f.words.length}개</p>
+      ${f.words.map(w=>`<div class="hj-word"><b>${esc(w.word)}</b><small>${esc(w.easy)}</small></div>`).join('')}`
+      :`<p class="sub" style="text-align:center;margin-top:12px">이 한자가 들어간 낱말이 무엇이 있었는지 떠올려 보세요.</p>
+        <button class="btn" data-act="hj-show">낱말 보기 (${f.words.length}개)</button>`}
+    <div class="row2" style="margin-top:12px">
+      <button class="btn sm ghost" data-act="hj-move" data-d="-1" style="margin-top:0" ${h.i?'':'disabled'}>‹ 이전</button>
+      ${h.i+1<h.list.length?`<button class="btn sm" data-act="hj-move" data-d="1" style="margin-top:0">다음 ›</button>`
+        :`<button class="btn sm" data-act="hj-done" style="margin-top:0">끝내기 ✓</button>`}</div></div>`;
+}
 function vTrain(){
+  if(sess.hj)return vHanjaSession();
   if(sess.ct)return vChunkTrain();
   if(sess.vs)return vVocabSession();
   if(sess.rb)return vRedbookForm();
@@ -923,7 +980,7 @@ function vTrain(){
   const last=[...S.train].reverse().find(t=>t.score!=null)||null;
   const wrongN=S.wrong.length;
   return `<div class="card hero"><p class="eyebrow">읽기 근육 훈련</p><h1>오늘도 한 세트!</h1>
-    <p class="sub">회당 5~10분이면 충분해요. 지금까지 훈련 ${S.train.length}회 · 붉은 책 요약 ${S.redbook.length}회</p></div>
+    <p class="sub">회당 5~10분이면 충분해요. 지금까지 훈련 ${S.train.length}회 · 독서 요약 ${S.redbook.length}회</p></div>
   <div class="card"><div class="thead"><span class="tico c">↺</span><div class="t-main"><h2 style="font-size:16px">오답 노트</h2>
     <p class="sub" style="margin-top:2px">틀린 문제만 다시 — 맞히면 노트에서 지워져요</p></div><span class="tag ${wrongN?'bad':'muted'}">${wrongN?wrongN+'문제':'비어 있음'}</span></div>
     <button class="btn sm" data-act="wq-start" ${wrongN?'':'disabled'}>${wrongN?'다시 풀기':'틀린 문제가 없어요'}</button></div>
@@ -934,20 +991,16 @@ function vTrain(){
     <p class="sub" style="margin-top:2px">1·3·7·14일 간격 반복 — 한국어·영어 함께</p></div><span class="tag ${due.length?'warn':'muted'}">${due.length?'오늘 '+due.length+'개':'오늘 없음'}</span></div>
     <button class="btn sm" data-act="vs-start" ${due.length?'':'disabled'}>복습 시작</button></div>
   <div class="card"><div class="thead"><span class="tico t">字</span><div class="t-main"><h2 style="font-size:16px">한자 카드</h2>
-    <p class="sub" style="margin-top:2px">한자 하나로 낱말 여러 개가 열려요</p></div><span class="tag muted">${hj.length}묶음</span></div>
-    <div class="glist">${hj.length?hj.slice(0,8).map(f=>{
-      const open=sess.hjOpen===f.ch;
-      const closed=f.words.map(w=>w.word).join(' · ');
-      const opened=f.words.map(w=>`<b>${esc(w.word)}</b> — ${esc(w.easy)}`).join('<br>');
-      return `<button class="grow" data-act="hj-open" data-ch="${esc(f.ch)}">
+    <p class="sub" style="margin-top:2px">한자 1개 → 낱말 여러 개. 카드로 넘기며 익혀요</p></div><span class="tag muted">${hj.length}묶음</span></div>
+    <button class="btn sm" data-act="hj-start" data-i="0" ${hj.length?'':'disabled'}>${hj.length?'카드 학습 시작 ('+hj.length+'장)':'어휘가 쌓이면 열려요'}</button>
+    <div class="glist">${hj.length?hj.slice(0,8).map((f,i)=>`<button class="grow" data-act="hj-start" data-i="${i}">
         <span class="hj-char">${esc(f.ch)}</span>
-        <span class="t"><b>${esc(f.rd)}</b><small>${open?opened:esc(closed)}</small></span>
-        <span class="go">${open?'−':'+'}</span></button>`;
-    }).join(''):'<div class="empty">어휘가 쌓이면 한자 묶음이 생겨요.</div>'}</div></div>
-  <div class="card"><div class="thead"><span class="tico c">✎</span><div class="t-main"><h2 style="font-size:16px">붉은 책 요약</h2>
-    <p class="sub" style="margin-top:2px">책을 덮고 내 말로 — 선생님 확인용 기록</p></div><span class="tag muted">${S.redbook.length}회</span></div>
+        <span class="t"><b>${esc(f.rd)}</b><small>낱말 ${f.words.length}개 · ${esc(f.words.map(w=>w.word).join(' · '))}</small></span>
+        <span class="go">›</span></button>`).join(''):'<div class="empty">어휘가 쌓이면 한자 묶음이 생겨요.</div>'}</div></div>
+  <div class="card"><div class="thead"><span class="tico c">✎</span><div class="t-main"><h2 style="font-size:16px">비문학 독서 요약</h2>
+    <p class="sub" style="margin-top:2px">글을 덮고 내 말로 → 점검 → 다시 쓰기 (2단계)</p></div><span class="tag muted">${S.redbook.length}회</span></div>
     <button class="btn sm" data-act="rb-new">요약 쓰기</button>
-    <div class="glist">${S.redbook.slice(-3).reverse().map(r=>`<div class="grow" style="cursor:default"><span class="t"><b>${esc(r.unit)}</b><small>${r.date} · ${esc(r.summary.slice(0,42))}${r.summary.length>42?'…':''}</small></span></div>`).join('')}</div>
+    <div class="glist">${S.redbook.slice(-3).reverse().map(r=>{const fin=r.summary2||r.summary||'';return `<div class="grow" style="cursor:default"><span class="t"><b>${esc(r.unit)}</b><small>${r.date}${r.summary2?' · 2차까지 완성 ✓':''} · ${esc(fin.slice(0,40))}${fin.length>40?'…':''}</small></span></div>`;}).join('')}</div>
     ${S.redbook.length?`<button class="btn ghost sm" data-act="rb-copy">전체 기록 복사 (선생님 확인용)</button>`:''}</div>`;
 }
 function vChunkTrain(){
@@ -1067,17 +1120,42 @@ function vWrongSession(){
     <button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
     ${answered?'':'<button class="btn ghost sm" data-act="wq-done">그만하기</button>'}</div>`;
 }
+const RB_CHECKS=['핵심 개념을 내 말로 바꿔 썼어요','예시나 이유를 1개 이상 넣었어요','글에 없는 내용은 넣지 않았어요','잘 모르는 부분을 표시해 두었어요'];
+function rbCollect(){
+  const g=id=>{const el=document.getElementById(id);return el?el.value:null;};
+  const u=g('rbUnit');if(u!=null)sess.rbUnit=u;
+  const s1=g('rbSum');if(s1!=null)sess.rbSum=s1;
+  const s2=g('rbSum2');if(s2!=null)sess.rbSum2=s2;
+}
+/* 기획서 원안 그대로 — 1차 요약 → 스스로 점검 → 2차 재요약. 요약은 한 번에 끝내지 않는다. */
 function vRedbookForm(){
-  const c=sess.rbChecks||[false,false,false];
-  const labels=['핵심 개념을 내 말로 바꿔 썼어요','예시나 이유를 1개 이상 넣었어요','잘 모르는 부분을 표시해 두었어요'];
-  return `<div class="card"><p class="eyebrow">붉은 책 요약</p><h2>책을 덮고, 내 말로 써 보세요</h2>
-    <p class="sub">교재 문장을 그대로 옮기지 않기! 기억나는 대로 쓰는 것이 진짜 훈련이에요.</p>
-    <input type="text" id="rbUnit" placeholder="단원명 (예: 3단원 문단의 짜임)" value="${esc(sess.rbUnit||'')}">
-    <textarea id="rbSum" style="min-height:120px" placeholder="이 단원에서 배운 것을 내 말로 요약해 보세요 (최소 50자)">${esc(sess.rbSum||'')}</textarea>
-    ${labels.map((l,i)=>`<button class="matchip" data-act="rb-check" data-i="${i}" aria-pressed="${c[i]}"><span class="ck">${c[i]?'✓':''}</span><span>${l}</span></button>`).join('')}
-    <button class="btn" data-act="rb-save">저장하기</button>
-    <button class="btn ghost sm" data-act="rb-quit">취소</button>
-    <p class="note">요약을 체크리스트와 대조해 짚어 주는 AI 코칭은 서버 연동 후 열려요. 지금은 기록이 선생님 확인용으로 저장돼요.</p></div>`;
+  const st=sess.rb||{};
+  const c=sess.rbChecks||[false,false,false,false];
+  const step=`<div class="lab-step">${[0,1].map(i=>`<i class="${(st.stage||1)-1>=i?'on':''}"></i>`).join('')}</div>`;
+  if(st.stage===2){
+    const n=(sess.rbSum2||'').trim().length;
+    return `<div class="card"><p class="eyebrow">비문학 독서 요약 2/2 — 점검하고 다시 쓰기</p>${step}
+      <h2 style="margin-top:8px">내가 쓴 요약을 점검해 보세요</h2>
+      <p class="sub">네 가지를 스스로 확인한 뒤, 빠진 것을 채워 <b>2차 요약</b>을 완성해요. 다시 쓰는 이 과정이 진짜 실력을 만듭니다.</p>
+      <div class="report-doc" style="max-height:190px;overflow-y:auto"><h4>1차 요약</h4><p style="white-space:pre-wrap">${esc(sess.rbSum||'')}</p></div>
+      ${RB_CHECKS.map((l,i)=>`<button class="matchip" data-act="rb-check" data-i="${i}" aria-pressed="${c[i]}"><span class="ck">${c[i]?'✓':''}</span><span>${l}</span></button>`).join('')}
+      <textarea id="rbSum2" style="min-height:140px" placeholder="2차 요약 — 점검한 내용을 반영해 다시 써 보세요 (최소 50자)">${esc(sess.rbSum2||'')}</textarea>
+      <p class="sub" style="text-align:right">${n}자</p>
+      <button class="btn" data-act="rb-save">저장하기</button>
+      <div class="row2"><button class="btn ghost sm" data-act="rb-back1">이전</button>
+      <button class="btn ghost sm" data-act="rb-quit">취소</button></div>
+      <p class="note">1차와 2차가 함께 저장돼, 선생님이 무엇이 좋아졌는지 볼 수 있어요.</p></div>`;
+  }
+  const n1=(sess.rbSum||'').trim().length;
+  return `<div class="card"><p class="eyebrow">비문학 독서 요약 1/2 — 내 말로 쓰기</p>${step}
+    <h2 style="margin-top:8px">글을 덮고, 기억나는 대로 써 보세요</h2>
+    <p class="sub">문장을 그대로 옮기지 않기! 기억나는 대로 쓰는 것이 진짜 훈련이에요.</p>
+    ${st.title?`<p class="sub" style="margin-top:6px">읽은 글: <b>${esc(st.title)}</b></p>`:''}
+    <input type="text" id="rbUnit" placeholder="글·단원 제목 (예: 해양열파 / 3단원 문단의 짜임)" value="${esc(sess.rbUnit||'')}">
+    <textarea id="rbSum" style="min-height:140px" placeholder="이 글에서 무엇을 알게 됐는지 내 말로 요약해 보세요 (최소 50자)">${esc(sess.rbSum||'')}</textarea>
+    <p class="sub" style="text-align:right">${n1}자</p>
+    <button class="btn" data-act="rb-to2">다음 — 점검하고 다시 쓰기</button>
+    <button class="btn ghost sm" data-act="rb-quit">취소</button></div>`;
 }
 
 /* ───────────────────────── 탐구 랩 ───────────────────────── */
@@ -1273,9 +1351,10 @@ function videoHtml(v){return `<a class="deep-item" href="${esc(v.url)}" target="
 function paperHtml(p){return `<a class="deep-item" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><span class="drow"><span class="dico p">📄</span><span class="dmain"><b>${esc(p.title)}</b><small>${esc(p.note||'')}</small></span><span class="dgo">↗</span></span></a>`;}
 function bookHtml(bk){return `<div class="deep-item"><a class="deep-link" href="${bk.url?esc(bk.url):naverBook(bk)}" target="_blank" rel="noopener noreferrer"><span class="drow"><span class="dico bk">📚</span><span class="dmain"><b>${esc(bk.title)}</b><small>${esc(bk.author||'')}${bk.note?' — '+esc(bk.note):''} · 네이버 책 소개 보기</small></span><span class="dgo">↗</span></span></a>${bk.video?`<a class="deep-mini" href="${esc(bk.video.url)}" target="_blank" rel="noopener noreferrer">▶ 책 소개 영상 · ${esc(bk.video.channel||'')}</a>`:''}</div>`;}
 /* ── 자동 읽기 (SentenceMask) ── */
-const AUTO_SPEEDS=[170,120,85,60];               // ms/글자
-const AUTO_SPEED_LABELS=['천천히','보통','빠르게','최고'];
-const VOICE_RATES=[0.75,0.95,1.15,1.4];          // 들으며 읽기 — 같은 4단계를 배속으로
+const AUTO_SPEEDS=[240,170,120,85,55];           // ms/글자 — 5단계
+const AUTO_SPEED_LABELS=['매우 느리게','느리게','보통','빠르게','매우 빠르게'];
+const VOICE_RATES=[0.6,0.8,1.0,1.25,1.6];        // 들으며 읽기 — 같은 5단계를 배속으로
+const AUTO_SPEED_DEFAULT=2;                       // '보통'
 const AUTO_SCOPES=['좁게','넓게','문장'];         // 좁게=의미 단위 1개, 넓게=2개 묶음, 문장=문장 단위
 function autoSegs(){return Array.from(document.querySelectorAll('#readerCard .rd-body .seg')).filter(el=>el.offsetParent!==null);}
 function autoGroups(){
@@ -1295,7 +1374,7 @@ function autoGroups(){
 }
 function autoDelay(g){
   const len=(g||[]).reduce((s,el)=>s+(el.textContent||'').trim().length,0);
-  const per=AUTO_SPEEDS[sess.auto?sess.auto.speed:1]||AUTO_SPEEDS[1];
+  const per=AUTO_SPEEDS[sess.auto?sess.auto.speed:AUTO_SPEED_DEFAULT]||AUTO_SPEEDS[AUTO_SPEED_DEFAULT];
   return Math.max(450,len*per);
 }
 function autoHighlight(groups){
@@ -1316,7 +1395,7 @@ function autoTick(){
     /* 타이머로 넘기면 소리와 글자가 어긋난다. 말이 실제로 끝난 순간에 넘긴다. */
     const text=groups[a.idx].map(el=>(el.textContent||'').trim()).filter(Boolean).join(' ');
     const tok=(a.tok=(a.tok||0)+1);   // 멈추거나 속도·범위를 바꾸면 옛 발화의 끝은 무시한다
-    WBVoice.speak(text,{rate:VOICE_RATES[a.speed]||1,onend:()=>{
+    WBVoice.speak(text,{rate:VOICE_RATES[a.speed]||1,onstart:()=>{const b=sess.auto;if(b)b.started=true;},onend:()=>{
       const b=sess.auto;if(!b||!b.playing||b.tok!==tok)return;
       b.idx++;autoTick();
     },onerror:()=>{
@@ -1342,23 +1421,29 @@ function autoStop(done){
 function listenStart(){
   if(sess.auto)return;
   if(!WBVoice.ttsSupported()){announce('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 주세요.');return;}
+  /* 누른 '그 순간' 안에서 잠금을 풀어야 모바일에서 소리가 난다.
+     예전에는 목소리 목록을 기다렸다가 말해서 그 순간을 놓쳤고, 목록이 늦게 차는 기기에서는
+     아예 '목소리가 없다'며 거절해 버려 조용히 아무 일도 일어나지 않았다. */
+  WBVoice.unlock();
   const sample=autoSegs().slice(0,12).map(el=>el.textContent||'').join(' ');
   const lang=WBVoice.langOf(sample);
-  WBVoice.onReady(function(ok){
-    if(!ok||!WBVoice.hasVoice(lang)){
-      announce(lang==='en'?'이 기기에 영어 목소리가 없어요. 기기 설정에서 음성을 추가해 주세요.'
-                          :'이 기기에 한국어 목소리가 없어요. 기기 설정에서 음성을 추가해 주세요.');
-      return;
-    }
-    autoStart(true);
-  });
+  autoStart(true);
+  /* 미리 막지 않고, 실제로 소리가 시작되는지 지켜본 뒤에만 안내한다 */
+  setTimeout(()=>{
+    const a=sess.auto;
+    if(!a||!a.voice||a.started)return;
+    announce(WBVoice.hasVoice(lang)
+      ?'소리가 안 나면 기기 음량과 무음 모드를 확인해 주세요.'
+      :(lang==='en'?'이 기기에 영어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'
+                   :'이 기기에 한국어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'));
+  },2600);
 }
 function autoStart(voice){
   if(sess.auto)return;
   const pf=S.prefs.auto||{speed:1,scope:0};
   /* 음성은 문장 단위가 기본 — 두세 어절만 끊어 읽으면 말이 토막 나서 알아듣기 어렵다 */
   const scope=voice?2:Math.min(pf.scope==null?0:pf.scope,AUTO_SCOPES.length-1);
-  sess.auto={idx:0,playing:true,speed:Math.min(pf.speed==null?1:pf.speed,AUTO_SPEEDS.length-1),scope:scope,timer:null,voice:!!voice,tok:0};
+  sess.auto={idx:0,playing:true,speed:Math.min(pf.speed==null?AUTO_SPEED_DEFAULT:pf.speed,AUTO_SPEEDS.length-1),scope:scope,timer:null,voice:!!voice,tok:0};
   const c=document.getElementById('readerCard');if(c)c.classList.add('autoread');
   const bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
   bar.innerHTML=`<div class="auto-in">
@@ -1496,7 +1581,7 @@ document.addEventListener('click',e=>{
     render();}
   else if(act==='myedit-gap'){const me=sess.myEdit;if(!me)return;
     const s=me.marks[+t.dataset.p];const i=+t.dataset.i;
-    if(s.has(i))s.delete(i);else s.add(i);render();}
+    if(s.has(i))s.delete(i);else s.add(i);render({keep:true});}
   else if(act==='myedit-save'){const lv=myLevel();
     const a=DB.articles.find(x=>x.id===view.id);const me=sess.myEdit;if(!a||!me)return;
     if(!me.marks.some(s=>s.size)){announce('∕ 를 한 곳 이상 눌러 주세요');return;}
@@ -1530,14 +1615,24 @@ document.addEventListener('click',e=>{
     S.scraps[t.dataset.id]={date:dkey(),note};save();sess.scrapOpen=false;render();announce('스크랩 저장');}
   else if(act==='scrap-quick'){S.scraps[t.dataset.id]={date:dkey(),note:''};save();render();}
   else if(act==='lib-tab'){view.tab=t.dataset.v;sess={};render();}
-  else if(act==='vocab-toggle'){sess['vopen'+t.dataset.i]=!sess['vopen'+t.dataset.i];render();}
-  else if(act==='vocab-review'){const pool=S.vocab.slice().sort(()=>hash(dkey()+Math.random())%2?1:-1);
-    sess.vq={list:pool.slice(0,Math.min(5,pool.length)),i:0,show:false};render();}
-  else if(act==='vq-show'){sess.vq.show=true;render();}
-  else if(act==='vq-mark'){const v=sess.vq.list[sess.vq.i];
-    const sv=S.vocab.find(x=>x.word===v.word);if(sv){if(t.dataset.ok==='1')sv.ok++;else sv.miss++;save();}
-    if(sess.vq.i+1<sess.vq.list.length){sess.vq.i++;sess.vq.show=false;}else{sess.vq=null;announce('어휘 복습 완료');}
-    render();}
+  else if(act==='go-lib'){view={name:'library',tab:t.dataset.tab};sess={};render();}
+  else if(act==='vocab-toggle'){sess['vopen'+t.dataset.i]=!sess['vopen'+t.dataset.i];render({keep:true});}
+  else if(act==='vocab-review'){
+    if(!S.vocab.length){announce('아직 모은 어휘가 없어요. 글에서 밑줄 단어를 누르면 쌓여요.');return;}
+    const pool=S.vocab.slice().sort(()=>Math.random()<0.5?1:-1);
+    sess.vq={list:pool.slice(0,Math.min(5,pool.length)),i:0,show:false,ok:0};
+    view.tab='vocab';render();
+    const c=document.getElementById('vqCard');if(c)c.scrollIntoView({block:'center',behavior:'smooth'});
+    announce('복습 퀴즈 시작! 낱말을 보고 뜻을 떠올려 보세요');}
+  else if(act==='vq-show'){sess.vq.show=true;render({keep:true});}
+  else if(act==='vq-mark'){const vq=sess.vq;const v=vq.list[vq.i];
+    const sv=S.vocab.find(x=>x.word===v.word);
+    if(sv){ /* 훈련 탭 간격 반복과 같은 규칙으로 기록한다 */
+      if(t.dataset.ok==='1'){sv.box=Math.min(4,(sv.box||0)+1);sv.ok=(sv.ok||0)+1;vq.ok++;}
+      else{sv.box=0;sv.miss=(sv.miss||0)+1;}
+      sv.last=dkey();save();}
+    vq.i++;vq.show=false;render({keep:true});}
+  else if(act==='vq-done'){sess.vq=null;render();}
   else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
     if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
@@ -1599,7 +1694,7 @@ document.addEventListener('click',e=>{
     render();}
   else if(act==='ct-quit'){sess.ct=null;render();}
   else if(act==='ct-to2'){sess.ct.stage=2;render();}
-  else if(act==='ct-gap'){const i=+t.dataset.i;const m=sess.ct.marks;if(m.has(i))m.delete(i);else m.add(i);render();}
+  else if(act==='ct-gap'){const i=+t.dataset.i;const m=sess.ct.marks;if(m.has(i))m.delete(i);else m.add(i);render({keep:true});}
   else if(act==='ct-check'){const ct=sess.ct;
     ct.hit=[...ct.marks].filter(i=>ct.model.has(i)).length;
     ct.extra=[...ct.marks].filter(i=>!ct.model.has(i)).length;
@@ -1633,28 +1728,44 @@ document.addEventListener('click',e=>{
     render();}
   else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;render();}
   else if(act==='wq-done'){sess.wq=null;render();}
-  /* ── 한자 카드 ── */
-  else if(act==='hj-open'){sess.hjOpen=sess.hjOpen===t.dataset.ch?null:t.dataset.ch;render();}
-  /* ── 붉은 책 요약 ── */
-  else if(act==='rb-new'){sess.rb=true;sess.rbChecks=[false,false,false];sess.rbUnit='';sess.rbSum='';render();}
-  else if(act==='rb-check'){sess.rbUnit=($('#rbUnit')||{}).value||'';sess.rbSum=($('#rbSum')||{}).value||'';
-    const i=+t.dataset.i;sess.rbChecks[i]=!sess.rbChecks[i];render();}
-  else if(act==='rb-save'){const unit=($('#rbUnit')||{}).value||'';const sum=($('#rbSum')||{}).value||'';
-    if(!unit.trim()){announce('단원명을 적어 주세요');return;}
-    if(sum.trim().length<50){announce('요약을 50자 이상 써 주세요 (지금 '+sum.trim().length+'자)');return;}
-    S.redbook.push({date:dkey(),unit:unit.trim(),summary:sum.trim(),checks:sess.rbChecks});save();
-    sess.rb=null;render();announce('요약 저장 완료');}
+  /* ── 한자 카드 세션 ── */
+  else if(act==='hj-start'){const list=hanjaFamilies();if(!list.length)return;
+    sess.hj={list,i:Math.min(+t.dataset.i||0,list.length-1),show:false};render();}
+  else if(act==='hj-show'){sess.hj.show=true;render({keep:true});}
+  else if(act==='hj-move'){const h=sess.hj;const d=+t.dataset.d;
+    h.i=Math.max(0,Math.min(h.list.length-1,h.i+d));h.show=false;render();}
+  else if(act==='hj-done'){sess.hj=null;render();}
+  /* ── 비문학 독서 요약 ── */
+  else if(act==='rb-new'){const id=t.dataset.id||null;
+    const a=id?DB.articles.find(x=>x.id===id):null;const b=a?levelBody(a,myLevel()):null;
+    view={name:'train'};
+    sess={rb:{stage:1,articleId:id,title:b?b.title:''},rbChecks:[false,false,false,false],rbUnit:b?b.title:'',rbSum:'',rbSum2:''};
+    render();}
+  else if(act==='rb-check'){rbCollect();const i=+t.dataset.i;sess.rbChecks[i]=!sess.rbChecks[i];render({keep:true});}
+  else if(act==='rb-to2'){rbCollect();
+    if(!(sess.rbUnit||'').trim()){announce('글·단원 제목을 적어 주세요');return;}
+    const n=(sess.rbSum||'').trim().length;
+    if(n<50){announce('1차 요약을 50자 이상 써 주세요 (지금 '+n+'자)');return;}
+    sess.rb.stage=2;render();}
+  else if(act==='rb-back1'){rbCollect();sess.rb.stage=1;render();}
+  else if(act==='rb-save'){rbCollect();
+    const sum2=(sess.rbSum2||'').trim();
+    if(!sess.rbChecks.every(Boolean)){announce('점검 4가지를 모두 확인해 주세요');return;}
+    if(sum2.length<50){announce('2차 요약을 50자 이상 써 주세요 (지금 '+sum2.length+'자)');return;}
+    S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
+      summary:(sess.rbSum||'').trim(),summary2:sum2,checks:sess.rbChecks.slice()});save();
+    sess.rb=null;render();announce('요약 저장 완료! 1차와 2차가 함께 기록됐어요');}
   else if(act==='rb-quit'){sess.rb=null;render();}
-  else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n${r.summary}\n셀프체크: ${r.checks.filter(Boolean).length}/3`).join('\n\n');
-    copyText('WB 붉은 책 요약 기록\n\n'+txt);}
+  else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n1차: ${r.summary}${r.summary2?'\n2차: '+r.summary2:''}\n셀프체크: ${(r.checks||[]).filter(Boolean).length}/${(r.checks||[]).length||3}`).join('\n\n');
+    copyText('WB 비문학 독서 요약 기록\n\n'+txt);}
   /* ── 탐구 랩 ── */
   else if(act==='lab-new'){S.lab={step:0,mats:[],topic:'',motive:'',learned:{},more:'',conclusion:'',reflect:'',title:'',name:'',checks:[false,false,false],started:dkey(),log:[dkey()]};save();render();}
   else if(act==='lab-hint'){const el=$('#labTopic');if(el){el.value=t.dataset.h;el.focus();}}
   else if(act==='lab-check'){labCollect();const L=S.lab;if(!L)return;
     L.checks=L.checks||[false,false,false];
-    const i=+t.dataset.i;L.checks[i]=!L.checks[i];save();render();}
+    const i=+t.dataset.i;L.checks[i]=!L.checks[i];save();render({keep:true});}
   else if(act==='lab-mat'){const id=t.dataset.id;const m=S.lab.mats;const i=m.indexOf(id);
-    if(i>=0)m.splice(i,1);else m.push(id);save();render();}
+    if(i>=0)m.splice(i,1);else m.push(id);save();render({keep:true});}
   else if(act==='lab-back'){labCollect();S.lab.step=Math.max(0,S.lab.step-1);save();render();}
   else if(act==='lab-next'){const L=S.lab;
     if(L.step===0&&!L.mats.length){announce('재료를 1편 이상 골라 주세요');return;}
