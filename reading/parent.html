@@ -57,7 +57,8 @@
 <script>
 'use strict';
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
+/* 학부모가 보는 화면이라 '레벨'이 아니라 학년 범위로 부른다 (앱·관리 웹과 같은 표기) */
+const LV={L1:'7세~초2',L2:'초3~6',L3:'중1~3',L4:'고1~3'};
 /* 교재 코칭 — 첫 문단만 펼쳐 두고 나머지는 접는다. 휴대폰에서 1,500자를 한 번에 내밀면 안 읽힌다. */
 function coachCard(b){
   const paras=String(b.coaching||'').split(/\n{2,}/).filter(p=>p.trim());

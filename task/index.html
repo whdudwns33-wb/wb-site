@@ -1027,11 +1027,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-30.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-30.1"></script>
-<script src="./asset-core.js?v=2026-08-30.1"></script>
-<script src="./qr-core.js?v=2026-08-30.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-30.1"></script>
+<script src="./lesson-form-core.js?v=2026-08-31.1"></script>
+<script src="./schedule-board-core.js?v=2026-08-31.1"></script>
+<script src="./asset-core.js?v=2026-08-31.1"></script>
+<script src="./qr-core.js?v=2026-08-31.1"></script>
+<script src="./acaflow-import-core.js?v=2026-08-31.1"></script>
 <script>
 "use strict";
 
@@ -1748,6 +1748,10 @@ const INTERNAL_BOOK_OPTIONS = [
   { family: 'reading', productCode: 'reading_intro', label: '입문', price: 19000, maxVolume: 8 },
   { family: 'reading', productCode: 'reading_top', label: '최상', price: 23000, maxVolume: 8 },
   { family: 'reading', productCode: 'reading_essential', label: '필수', price: 19000, maxVolume: 12 },
+  { family: 'logic', productCode: 'logic_preparatory', label: '예비', price: 18000, maxVolume: 6 },
+  { family: 'logic', productCode: 'logic_basic', label: '기본', price: 24000, maxVolume: 12, volumePrices: { 3: 26000 } },
+  { family: 'logic', productCode: 'logic_leap', label: '도약', price: 24000, maxVolume: 12, volumePrices: { 1: 28000, 2: 28000, 3: 28000, 6: 28000, 8: 28000 } },
+  { family: 'logic', productCode: 'logic_growth', label: '성장', price: 24000, maxVolume: 12, volumePrices: { 4: 26000 } },
   { family: 'vocabulary', productCode: 'vocab_stage_1', label: '1단계', price: 12500 },
   { family: 'vocabulary', productCode: 'vocab_stage_2', label: '2단계', price: 12500 },
   { family: 'vocabulary', productCode: 'vocab_stage_3', label: '3단계', price: 12500 },
@@ -12281,15 +12285,37 @@ function internalBookOption(productCode) {
   return INTERNAL_BOOK_OPTIONS.find(option => option.productCode === String(productCode || '')) || null;
 }
 
+function internalBookHasVolume(option) {
+  return !!(option && Number.isInteger(option.maxVolume) && option.maxVolume > 0);
+}
+
+function internalBookValidVolume(option, value) {
+  const volume = Number(value);
+  return internalBookHasVolume(option) && /^\d+$/.test(String(value == null ? '' : value)) &&
+    Number.isInteger(volume) && volume >= 1 && volume <= option.maxVolume ? volume : null;
+}
+
 function internalBookSelectedVolume(option) {
-  const volume = Number(internalBookVolume);
-  return option && option.family === 'reading' && Number.isInteger(volume) && volume >= 1 && volume <= option.maxVolume
-    ? volume : null;
+  return internalBookValidVolume(option, internalBookVolume);
+}
+
+function internalBookUnitPrice(option, volume) {
+  const selectedVolume = internalBookHasVolume(option) ? internalBookValidVolume(option, volume) : null;
+  if (!option || (internalBookHasVolume(option) && !selectedVolume)) return null;
+  return option.volumePrices && Object.prototype.hasOwnProperty.call(option.volumePrices, selectedVolume)
+    ? option.volumePrices[selectedVolume] : option.price;
+}
+
+function internalBookPriceLabel(option, volume) {
+  const price = internalBookUnitPrice(option, volume);
+  if (price != null) return price.toLocaleString('ko-KR') + '원';
+  return option && !option.volumePrices ? option.price.toLocaleString('ko-KR') + '원' : '권번호 선택';
 }
 
 function internalBookTitle(option, volume) {
   if (!option) return '';
   if (option.family === 'reading') return '독해창 ' + option.label + ' ' + volume + '권';
+  if (option.family === 'logic') return '논리와 상상 ' + option.label + ' ' + volume + '권';
   if (option.family === 'vocabulary') return '어휘가 독해다 ' + option.label;
   return '스터디포스 ' + option.label;
 }
@@ -12315,29 +12341,31 @@ function internalBookSimpleOptionsHtml(family) {
       '<span class="internal-book-option-price">' + option.price.toLocaleString('ko-KR') + '원</span></label>').join('');
 }
 
-function internalBookReadingOptionsHtml() {
-  return INTERNAL_BOOK_OPTIONS.filter(option => option.family === 'reading').map(option => {
+function internalBookVolumeOptionsHtml(family) {
+  return INTERNAL_BOOK_OPTIONS.filter(option => option.family === family && internalBookHasVolume(option)).map(option => {
     const selected = internalBookOptionCode === option.productCode;
+    const selectedVolume = selected ? internalBookSelectedVolume(option) : null;
     const choices = Array.from({ length: option.maxVolume }, (_, index) => index + 1);
     return '<div class="internal-book-option has-volume' + (selected ? ' is-selected' : '') + '">' +
       '<label class="internal-book-option-main"><input type="radio" name="internal-book-option" data-internal-book-option value="' +
         esc(option.productCode) + '"' + (selected ? ' checked' : '') + (internalBookSubmitting ? ' disabled' : '') +
         '><span>' + esc(option.label) + '</span></label>' +
       '<select class="in" data-internal-book-volume data-product-code="' + esc(option.productCode) + '" aria-label="' +
-        esc(option.label) + ' 권번호"' + (internalBookSubmitting ? ' disabled' : '') + '><option value="">권번호</option>' +
+        esc(option.label) + ' 권번호"' + (internalBookSubmitting ? ' disabled' : '') + '><option value="">권번호 선택</option>' +
         choices.map(volume => '<option value="' + volume + '"' + (selected && Number(internalBookVolume) === volume ? ' selected' : '') +
-          '>' + volume + '권</option>').join('') + '</select>' +
-      '<span class="internal-book-option-price">' + option.price.toLocaleString('ko-KR') + '원</span></div>';
+          '>' + volume + '권' + (family === 'logic' ? ' · ' + internalBookPriceLabel(option, volume) : '') + '</option>').join('') + '</select>' +
+      '<span class="internal-book-option-price" data-internal-book-price aria-live="polite">' + internalBookPriceLabel(option, selectedVolume) + '</span></div>';
   }).join('');
 }
 
 function internalBookOrderSummaryHtml() {
   if (!internalBookDraft) return '<div class="hint mt8" data-internal-book-summary>교재를 고른 뒤 학생을 연결해 주세요.</div>';
   const option = internalBookOption(internalBookDraft.productCode);
+  const price = internalBookUnitPrice(option, internalBookDraft.volume);
   const students = internalBookDraftStudents();
   return '<div class="bound-book-link-summary" data-internal-book-summary role="status"><div class="between"><div><b>' +
     esc(internalBookTitle(option, internalBookDraft.volume)) + '</b><div class="small muted mt8">권당 ' +
-    (option ? option.price.toLocaleString('ko-KR') + '원' : '가격 확인 필요') + ' · ' + internalBookDraft.studentIds.length +
+    (price != null ? price.toLocaleString('ko-KR') + '원' : '가격 확인 필요') + ' · ' + internalBookDraft.studentIds.length +
     '권</div></div><span class="pill ok">학생 연결 완료</span></div><div class="book-order-student-list">' +
     (students.length ? students.map(student => '<span class="book-order-student">' +
       esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') :
@@ -12348,19 +12376,48 @@ function internalBookOrderOptionsHtml() {
   const option = internalBookOption(internalBookOptionCode);
   const volume = internalBookSelectedVolume(option);
   const students = internalBookDraftStudents();
-  const selectionReady = !!(option && (option.family !== 'reading' || volume));
+  const selectionReady = !!(option && (!internalBookHasVolume(option) || volume));
   const ready = !!(internalBookDraft && option && internalBookDraft.productCode === option.productCode &&
-    (option.family !== 'reading' || Number(internalBookDraft.volume) === volume) && internalBookDraft.studentIds.length &&
+    selectionReady && (!internalBookHasVolume(option) || Number(internalBookDraft.volume) === volume) && internalBookDraft.studentIds.length &&
     students.length === internalBookDraft.studentIds.length);
   return '<div class="internal-book-families">' +
-    internalBookFamilyDetails('reading', '독해창', internalBookReadingOptionsHtml()) +
-    internalBookFamilyDetails('logic', '논리와 상상', '<div class="hint">준비 중입니다.</div>') +
+    internalBookFamilyDetails('reading', '독해창', internalBookVolumeOptionsHtml('reading')) +
+    internalBookFamilyDetails('logic', '논리와 상상', internalBookVolumeOptionsHtml('logic')) +
     internalBookFamilyDetails('vocabulary', '어휘가 독해다', internalBookSimpleOptionsHtml('vocabulary')) +
     internalBookFamilyDetails('studyforce', '스터디포스', internalBookSimpleOptionsHtml('studyforce')) + '</div>' +
     '<div class="bound-book-actions"><button class="btn btn-ghost" data-act="internalbookstudentopen"' +
       (selectionReady && !internalBookSubmitting ? '' : ' disabled') + '>학생 연결하기</button>' +
     '<button class="btn btn-primary" data-act="internalbookordersubmit"' +
       (ready && !internalBookSubmitting ? '' : ' disabled') + '>주문하기</button></div>' + internalBookOrderSummaryHtml();
+}
+
+function syncInternalBookOrderUi() {
+  const option = internalBookOption(internalBookOptionCode);
+  const volume = internalBookSelectedVolume(option);
+  const students = internalBookDraftStudents();
+  const selectionReady = !!(option && (!internalBookHasVolume(option) || volume));
+  const ready = !!(internalBookDraft && option && internalBookDraft.productCode === option.productCode &&
+    selectionReady && (!internalBookHasVolume(option) || Number(internalBookDraft.volume) === volume) &&
+    internalBookDraft.studentIds.length && students.length === internalBookDraft.studentIds.length);
+  document.querySelectorAll('[data-internal-book-option]').forEach(input => {
+    input.checked = input.value === internalBookOptionCode;
+    input.disabled = internalBookSubmitting;
+    input.closest('.internal-book-option')?.classList.toggle('is-selected', input.checked);
+  });
+  document.querySelectorAll('[data-internal-book-volume]').forEach(select => {
+    const rowOption = internalBookOption(select.dataset.productCode);
+    const selected = rowOption && rowOption.productCode === internalBookOptionCode;
+    select.value = selected && volume ? String(volume) : '';
+    select.disabled = internalBookSubmitting;
+    const price = select.closest('.internal-book-option')?.querySelector('[data-internal-book-price]');
+    if (price) price.textContent = internalBookPriceLabel(rowOption, selected ? volume : null);
+  });
+  const link = document.querySelector('[data-act="internalbookstudentopen"]');
+  const submit = document.querySelector('[data-act="internalbookordersubmit"]');
+  if (link) link.disabled = !selectionReady || internalBookSubmitting;
+  if (submit) submit.disabled = !ready || internalBookSubmitting;
+  const summary = document.querySelector('[data-internal-book-summary]');
+  if (summary) summary.outerHTML = internalBookOrderSummaryHtml();
 }
 
 function syncInternalBookStudentLinkButton() {
@@ -12371,14 +12428,14 @@ function syncInternalBookStudentLinkButton() {
 function openInternalBookStudentModal() {
   const option = internalBookOption(internalBookOptionCode);
   const volume = internalBookSelectedVolume(option);
-  if (!option || (option.family === 'reading' && !volume)) return toast('내부교재와 권번호를 확인해 주세요');
+  if (!option || (internalBookHasVolume(option) && !volume)) return toast('내부교재와 권번호를 확인해 주세요');
   const students = orderStudentCandidates();
   if (!students.length) return toast('연결할 수 있는 현재 재원 학생이 없습니다');
   const previous = internalBookDraft && internalBookDraft.productCode === option.productCode &&
     Number(internalBookDraft.volume || 0) === Number(volume || 0) ? internalBookDraft : null;
   const selectedIds = new Set(previous && Array.isArray(previous.studentIds) ? previous.studentIds.map(String) : []);
   modal('학생 연결 — ' + internalBookTitle(option, volume),
-    '<div class="hint mb14"><b>권당 ' + option.price.toLocaleString('ko-KR') + '원</b><br>사용할 학생을 한 명 이상 선택해 주세요.</div>' +
+    '<div class="hint mb14"><b>권당 ' + internalBookPriceLabel(option, volume) + '</b><br>사용할 학생을 한 명 이상 선택해 주세요.</div>' +
     '<fieldset class="book-order-picker"><legend class="fl" style="padding:11px">학생 선택 · ' + esc(bookOrderStudentScopeText()) + '</legend>' +
       '<div class="book-order-picker-list">' + students.map(student =>
         '<label class="book-order-picker-option"><input type="checkbox" data-internal-book-student value="' + esc(student.id) + '"' +
@@ -12394,7 +12451,7 @@ function saveInternalBookStudentLink() {
   const volume = internalBookSelectedVolume(option);
   const studentIds = Array.from(document.querySelectorAll('[data-internal-book-student]:checked'))
     .map(input => String(input.value || '')).filter(Boolean);
-  if (!option || (option.family === 'reading' && !volume)) return toast('내부교재와 권번호를 다시 확인해 주세요');
+  if (!option || (internalBookHasVolume(option) && !volume)) return toast('내부교재와 권번호를 다시 확인해 주세요');
   if (!studentIds.length) return toast('이 교재를 사용할 학생을 한 명 이상 선택해 주세요');
   const sameDraft = internalBookDraft && internalBookDraft.productCode === option.productCode &&
     Number(internalBookDraft.volume || 0) === Number(volume || 0) &&
@@ -12402,7 +12459,7 @@ function saveInternalBookStudentLink() {
   internalBookDraft = { productCode: option.productCode, volume: volume || '', studentIds,
     taskId: sameDraft ? String(internalBookDraft.taskId || '') : '' };
   closeModal();
-  render();
+  syncInternalBookOrderUi();
   toast(studentIds.length + '명 연결 완료 · 주문하기를 눌러 주세요');
 }
 
@@ -12410,9 +12467,9 @@ async function submitInternalBookOrder(button, confirmed) {
   if (internalBookSubmitting) return false;
   const draft = internalBookDraft;
   const option = draft && internalBookOption(draft.productCode);
-  const volume = option && option.family === 'reading' ? Number(draft.volume) : null;
+  const volume = option && internalBookHasVolume(option) ? internalBookValidVolume(option, draft.volume) : null;
   if (!draft || !option || option.productCode !== internalBookOptionCode ||
-      (option.family === 'reading' && (!Number.isInteger(volume) || volume < 1 || volume > option.maxVolume)) ||
+      (internalBookHasVolume(option) && (!volume || volume !== internalBookSelectedVolume(option))) ||
       !Array.isArray(draft.studentIds) || !draft.studentIds.length) {
     return toast('내부교재와 권번호, 연결 학생을 다시 확인해 주세요');
   }
@@ -12421,16 +12478,17 @@ async function submitInternalBookOrder(button, confirmed) {
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
   if (!draft.taskId) draft.taskId = 'ord_' + uid();
-  const item = { title: internalBookTitle(option, volume), unitPrice: option.price, studentIds: draft.studentIds.slice() };
+  const item = { title: internalBookTitle(option, volume), unitPrice: internalBookUnitPrice(option, volume), studentIds: draft.studentIds.slice() };
   if (!confirmed) {
     openBookOrderFinalConfirmation('internal', [item]);
     return false;
   }
   internalBookSubmitting = true;
+  syncInternalBookOrderUi();
   if (button) button.disabled = true;
   try {
     const result = await sync.post('/book-order', { app: SYNC_APP, auth, action: 'create_internal', taskId: draft.taskId,
-      productCode: draft.productCode, ...(option.family === 'reading' ? { volume } : {}), studentIds: draft.studentIds });
+      productCode: draft.productCode, ...(internalBookHasVolume(option) ? { volume } : {}), studentIds: draft.studentIds });
     if (!result.task || result.task.id !== draft.taskId || result.task.orderDelivery !== 'internal_book_v1' ||
         Number(result.task.orderIdentityVersion) !== 1) throw new Error('서버의 내부교재 주문 등록 결과를 확인하지 못했습니다');
     applyCreatedLesson(result.task);
@@ -20028,14 +20086,13 @@ document.addEventListener('change', async ev => {
   if (internalBookOptionInput) {
     const nextCode = String(internalBookOptionInput.value || '');
     const option = internalBookOption(nextCode);
-    if (!option) return;
+    if (!option || internalBookSubmitting) return;
     if (internalBookOptionCode !== nextCode) {
       internalBookOptionCode = nextCode;
       internalBookVolume = '';
       internalBookDraft = null;
     }
-    render();
-    requestAnimationFrame(() => document.querySelector('[data-internal-book-option][value="' + CSS.escape(nextCode) + '"]')?.focus());
+    syncInternalBookOrderUi();
     return;
   }
   const internalBookVolumeInput = ev.target.closest('[data-internal-book-volume]');
@@ -20043,12 +20100,11 @@ document.addEventListener('change', async ev => {
     const nextCode = String(internalBookVolumeInput.dataset.productCode || '');
     const option = internalBookOption(nextCode);
     const nextVolume = String(internalBookVolumeInput.value || '');
-    if (!option || option.family !== 'reading') return;
+    if (!internalBookHasVolume(option) || internalBookSubmitting) return;
     if (internalBookOptionCode !== nextCode || internalBookVolume !== nextVolume) internalBookDraft = null;
     internalBookOptionCode = nextCode;
     internalBookVolume = nextVolume;
-    render();
-    requestAnimationFrame(() => document.querySelector('[data-internal-book-volume][data-product-code="' + CSS.escape(nextCode) + '"]')?.focus());
+    syncInternalBookOrderUi();
     return;
   }
   const internalBookStudent = ev.target.closest('[data-internal-book-student]');
@@ -20378,7 +20434,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-30.1';
+const APP_VER = '2026-08-31.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
