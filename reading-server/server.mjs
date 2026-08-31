@@ -486,6 +486,22 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { /* 아래 정적 서빙으로 */ }
     }
 
+    /* 한자 카드도 같은 규칙 (워커와 동일) — 내린 지문의 낱말이 카드에 남지 않도록
+       낱말에 붙은 aid로 걸러 낸다. */
+    if (p === '/hanja.json' && db.pubmap && Object.keys(db.pubmap).length) {
+      try {
+        const down = new Set(Object.keys(db.pubmap).filter(k => db.pubmap[k] !== 'published'));
+        if (!down.size) throw new Error('내린 지문 없음');
+        const data = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'hanja.json'), 'utf8'));
+        data.families = (data.families || [])
+          .map(f => ({ ...f, words: (f.words || []).filter(w => !down.has(w.aid)) }))
+          .filter(f => f.words.length >= 2);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=604800' });
+        res.end(JSON.stringify(data));
+        return;
+      } catch (e) { /* 아래 정적 서빙으로 */ }
+    }
+
     /* 발행 오버라이드 적용된 articles.json */
     if (p === '/articles.json' && db.pubmap && Object.keys(db.pubmap).length) {
       try {
