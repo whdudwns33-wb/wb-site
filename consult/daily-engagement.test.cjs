@@ -36,7 +36,7 @@ function dayHarness(options = {}) {
   const day = '2026-09-08';
   const deadline = parseYmd(addDays(day, 1));
   deadline.setHours(12, 0, 0, 0);
-  const close = Object.assign({ status: 'complete', finalizedAt: deadline.getTime() - 1, itemSnapshot: [] }, options.close || {});
+  const close = Object.assign({ status: 'complete', finalizedAt: deadline.getTime() - 1, itemSnapshot: [], resolutions: {} }, options.close || {});
   const items = options.items || [{ key: 'task:t1', done: true }];
   const closeState = {
     close,
@@ -61,7 +61,16 @@ function dayHarness(options = {}) {
 test('a valid day needs tracked study, real activity, current self-close, and on-time reporting', () => {
   assert.equal(dayHarness().stamped, true);
   assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 599 }).stamped, false);
-  assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 600 }).stamped, true);
+  assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 600 }).stamped, false,
+    'study time alone does not excuse an unhandled checklist item');
+  assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 600,
+    close: { resolutions: { 'task:t1': { type: 'carry' } } } }).stamped, true);
+  assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 600,
+    close: { resolutions: { 'task:t1': { type: 'closed' } } } }).stamped, false,
+    'ending an unfinished item is not a rewarded learning day');
+  assert.equal(dayHarness({ items: [{ key: 'task:t1', done: false }], seconds: 600,
+    close: { resolutions: { 'task:t1': { type: 'unknown' } } } }).stamped, false,
+    'unknown resolutions cannot pass the reward whitelist');
   const timerOnly = dayHarness({ tasks: [], items: [], seconds: 600 });
   assert.equal(timerOnly.eligible, true, 'planner-free students can earn a study day with the timer');
   assert.equal(timerOnly.stamped, true);
@@ -128,7 +137,7 @@ function monthHarness({ stamped = 4, directWeeks = 3, monthStatus = 'complete', 
   return summary('s1', ym);
 }
 
-test('monthly reward uses exact 80 percent, three student week closes, and student month close', () => {
+test('legacy monthly engagement benchmark remains exact at 80 percent and three week closes', () => {
   const passed = monthHarness();
   assert.equal(passed.rate, 80);
   assert.equal(passed.weeklyDone, 3);
@@ -167,7 +176,9 @@ test('Today starts with concrete next actions and keeps optional online links co
   assert.match(optional, /\['leaders_eye', 'metamath'\]/);
   assert.match(optional, /<details class="optional-study-links">/);
   assert.match(card, /오늘 해야 할 일/);
-  assert.match(card, /오늘 학습을 마무리/);
+  assert.match(card, /오늘 체크리스트를 정리했어요/);
+  assert.match(card, /pointGaugeHtml\(me\.id\)/);
+  assert.doesNotMatch(card, /data-target="dailyCloseCard"/);
   assert.match(card, /close\.canReport \|\| close\.complete \? \[\] : todayNextActionItems/);
   assert.match(functionSource('engagementStampDots'), /pending \? '마감 전' : '미획득'/);
 });
@@ -175,10 +186,11 @@ test('Today starts with concrete next actions and keeps optional online links co
 test('director sees per-student automatic reward progress without changing consult identity', () => {
   const admin = functionSource('viewStaffAdmin');
   const line = functionSource('studentEngagementLine');
-  assert.match(admin, /유효 학습일 · 월간 꾸준함상/);
+  assert.match(admin, /포인트 · 문화상품권 교환/);
+  assert.match(admin, /pointPending/);
   assert.match(admin, /studentEngagementLine\(s,/);
-  assert.match(line, /이번 달 스탬프/);
-  assert.match(line, /지난달 최종/);
+  assert.match(line, /pointAccount\(student\.id/);
+  assert.match(line, /교환 신청 확인/);
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
 });

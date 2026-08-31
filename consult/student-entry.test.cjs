@@ -138,7 +138,7 @@ function renderLearningSourceCard(studentName, state) {
     source + '; return learningSourceCard;'
   )(
     learningSources(), ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
-    state, { isAdmin: false, isStaffLink: true }, () => false,
+    state, { isAdmin: false, isStaffLink: true, staffId: 'student-a' }, () => false,
     () => false, task => task.start || '', task => task.dueDate || '', () => '2026-08-31',
     value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -205,6 +205,9 @@ test('the Leaders Eye student card renders shared login guidance with the curren
   for (const card of [first, second]) {
     assert.match(card, /Agency ID[\s\S]*?wbbrain/);
     assert.match(card, /Student PW[\s\S]*?0000/);
+    assert.match(card, /오늘 미기록/);
+    assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
+    assert.match(card, /회차나 별도 과제 배정은 필요하지 않습니다/);
   }
   assert.match(first, /Student ID[\s\S]*?김민준/);
   assert.doesNotMatch(first, /이서연/);
