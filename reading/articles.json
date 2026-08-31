@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.7",
+  "version": "2026-08-31.8",
   "articles": [
     {
       "id": "nuri-space",
@@ -21512,6 +21512,905 @@
               " and interpretation were part of a faithful translation. ",
               "The debate leaves one question. ",
               "How far may a translator intervene?"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "jingyeong-landscape",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "hum",
+        "edu"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국립중앙박물관 큐레이터 추천 소장품 — 인왕제색도",
+          "url": "https://www.museum.go.kr/MUSEUM/contents/M0501000000.do?schM=view&relicRecommendId=962060"
+        },
+        {
+          "title": "e뮤지엄 — 정선필 인왕제색도(국보)",
+          "url": "https://emuseum.go.kr/detail?relicId=PS0100100102400000100000"
+        },
+        {
+          "title": "한국민족문화대백과사전 — 정선 필 금강전도",
+          "url": "https://encykorea.aks.ac.kr/Article/E0007558"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "우리 산을 그린 화가",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "옛날 우리나라 화가들은 ",
+              "산 그림을 많이 그렸어요. ",
+              "그런데 그 산은 ",
+              "우리나라 산이 아니었어요. ",
+              "중국 그림책을 보고 ",
+              "따라 그렸기 때문이에요. ",
+              "가 본 적 없는 산이었지요."
+            ],
+            [
+              "정선은 달랐어요. ",
+              "정선은 우리 산에 직접 갔어요. ",
+              "인왕산에도 오르고 ",
+              "금강산에도 갔어요. ",
+              "그리고 자기 눈으로 본 산을 그렸어요. ",
+              "이런 그림을 진경산수라고 해요."
+            ],
+            [
+              "정선이 일흔여섯 살에 그린 그림이 있어요. ",
+              "비가 그친 뒤의 인왕산이에요. ",
+              "젖은 바위를 까맣게 칠했어요. ",
+              "「인왕제색도」라는 그림이에요. ",
+              "지금은 국립중앙박물관에 있어요. ",
+              "우리도 가서 볼 수 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "화가",
+              "easy": "그림을 그리는 사람이에요.",
+              "hanja": null
+            },
+            {
+              "word": "진경산수",
+              "easy": "실제로 있는 우리 산과 강을 보고 그린 그림이에요.",
+              "hanja": null
+            },
+            {
+              "word": "박물관",
+              "easy": "옛날 물건이나 그림을 모아 두고 보여 주는 곳이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "그림 그리는 붓을 고르는 법",
+                "우리 산을 직접 보고 그린 화가 이야기",
+                "중국으로 가는 길",
+                "박물관 입장료"
+              ],
+              "answer": 1,
+              "explain": "정선이 우리 산에 직접 가서 본 대로 그렸다는 것이 이 글의 중심이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "정선이 그린 「인왕제색도」는 어떤 모습인가요?",
+              "choices": [
+                "눈이 오는 산",
+                "비가 그친 뒤의 산",
+                "불이 난 산",
+                "꽃이 핀 산"
+              ],
+              "answer": 1,
+              "explain": "비가 그친 뒤의 인왕산을 그렸고, 젖은 바위를 까맣게 칠했다고 나와요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「진경산수」는 무엇인가요?",
+              "choices": [
+                "실제 우리 산을 보고 그린 그림",
+                "중국 산을 상상해서 그린 그림",
+                "사람 얼굴을 그린 그림",
+                "글씨를 쓴 그림"
+              ],
+              "answer": 0,
+              "explain": "실제로 있는 우리 산과 강을 보고 그린 그림을 진경산수라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정선 앞의 화가들이 그린 산이 우리나라 산이 아니었던 까닭은?",
+              "choices": [
+                "우리나라에 산이 없어서",
+                "중국 그림책을 보고 따라 그려서",
+                "산을 싫어해서",
+                "붓이 없어서"
+              ],
+              "answer": 1,
+              "explain": "중국 그림책을 보고 따라 그렸기 때문에 가 본 적 없는 산을 그렸다고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "정선처럼 우리 동네를 그리려면 어떻게 하면 좋을까요?",
+              "choices": [
+                "다른 사람 그림을 보고 따라 그려요",
+                "직접 나가서 보고 그려요",
+                "눈을 감고 상상해서 그려요",
+                "사진을 찾아 색만 바꿔요"
+              ],
+              "answer": 1,
+              "explain": "정선은 직접 산에 가서 자기 눈으로 본 것을 그렸어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "본 대로 그린다는 것",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "조선의 화가들은 오랫동안 산수화를 그렸다. ",
+              "그런데 그 산은 우리나라 산이 아니었다. ",
+              "중국에서 온 그림책을 보고 ",
+              "그 방식대로 따라 그렸기 때문이다. ",
+              "화가가 한 번도 가 본 적 없는 ",
+              "중국의 산과 강이 화폭에 담겼다. ",
+              "이런 그림을 관념 산수라고 한다."
+            ],
+            [
+              "겸재 정선은 다른 길을 걸었다. ",
+              "그는 우리 산천을 직접 찾아다녔다. ",
+              "금강산에 올랐고 인왕산을 수없이 오르내렸다. ",
+              "그리고 자기 눈으로 본 풍경을 그렸다. ",
+              "실제 경치를 그린 이런 산수화를 ",
+              "진경산수라고 부른다."
+            ],
+            [
+              "정선이 일흔여섯이던 1751년, ",
+              "비가 그친 뒤의 인왕산을 그렸다. ",
+              "「인왕제색도」다. ",
+              "비에 젖어 검게 변한 바위를 ",
+              "짙은 먹으로 눌러 칠했다. ",
+              "이 그림은 오랫동안 개인이 가지고 있었는데, ",
+              "2021년 고 이건희 회장의 유족이 국립중앙박물관에 기증했다. ",
+              "이제는 누구나 가서 볼 수 있다."
+            ],
+            [
+              "그런데 진경산수는 사진이 아니다. ",
+              "1734년에 그린 「금강전도」를 보면 알 수 있다. ",
+              "금강산의 수많은 봉우리는 ",
+              "한자리에 서서 한꺼번에 볼 수 없다. ",
+              "정선은 여기저기 다니며 본 것을 ",
+              "위에서 내려다본 듯 하나의 둥근 화면에 다시 배치했다. ",
+              "본 대로 베낀 것이 아니라 ",
+              "본 것을 새로 짜 맞춘 것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "산수화",
+              "easy": "산과 물이 있는 자연 풍경을 그린 그림",
+              "hanja": "山(메 산)+水(물 수)+畫(그림 화)"
+            },
+            {
+              "word": "화폭",
+              "easy": "그림을 그리는 천이나 종이의 면",
+              "hanja": "畫(그림 화)+幅(폭 폭)"
+            },
+            {
+              "word": "기증",
+              "easy": "물건이나 재산을 대가 없이 내놓아 주는 일",
+              "hanja": "寄(부칠 기)+贈(줄 증)"
+            },
+            {
+              "word": "배치",
+              "easy": "여럿을 알맞은 자리에 나누어 놓는 일",
+              "hanja": "配(나눌 배)+置(둘 치)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "금강산을 오르는 길 안내",
+                "정선이 우리 산천을 직접 보고 새로 짜 맞춰 그렸다는 것",
+                "박물관을 짓는 과정",
+                "먹과 붓을 만드는 방법"
+              ],
+              "answer": 1,
+              "explain": "직접 보고 그렸다는 점과, 본 것을 다시 배치했다는 점을 함께 말하고 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "「관념 산수」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "우리나라 산을 직접 보고 그린 그림",
+                "중국 그림책을 보고 그 방식대로 따라 그린 그림",
+                "사람의 얼굴을 그린 그림",
+                "비 온 뒤 풍경만 그린 그림"
+              ],
+              "answer": 1,
+              "explain": "중국에서 온 그림책을 따라 그려 가 본 적 없는 중국의 산이 화폭에 담겼다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「기증」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "값을 받고 파는 일",
+                "빌려주었다가 돌려받는 일",
+                "대가 없이 내놓아 주는 일",
+                "맡겨 두었다가 찾아가는 일"
+              ],
+              "answer": 2,
+              "explain": "유족이 박물관에 대가 없이 내놓았기 때문에 기증이라고 한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "「금강전도」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "한자리에서 본 모습을 그대로 옮겼다",
+                "봉우리를 하나만 크게 그렸다",
+                "중국의 산을 상상해서 그렸다",
+                "여기저기서 본 것을 하나의 둥근 화면에 다시 배치했다"
+              ],
+              "answer": 3,
+              "explain": "한자리에서 다 볼 수 없는 봉우리들을 위에서 내려다본 듯 둥글게 다시 배치했다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「진경산수는 사진이 아니다」라고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "옛날에는 사진기가 없었다는 뜻",
+                "실제를 바탕으로 하되 화가가 새로 짜 맞춘다는 뜻",
+                "그림이 사진보다 정확하다는 뜻",
+                "사진으로 찍은 뒤에 그렸다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "바로 뒤에서 「금강전도」를 예로 들어, 한자리에서 볼 수 없는 것을 다시 배치했다고 설명한다. 실제를 옮기되 그대로 베끼지는 않는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "우리 학교를 한 장에 그려 소개하려 한다. 정선의 방식과 가장 가까운 것은?",
+              "choices": [
+                "인터넷에서 다른 학교 사진을 찾아 옮겨 그린다",
+                "교문 앞에서 보이는 만큼만 그린다",
+                "학교를 두루 다니며 본 곳들을 한 장에 알맞게 모아 그린다",
+                "학교를 안 보고 기억만으로 그린다"
+              ],
+              "answer": 2,
+              "explain": "정선은 직접 다니며 본 것을 바탕으로 하되 한 화면에 새로 배치했다. 남의 그림을 옮기거나 안 보고 그리는 것은 반대 방향이다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "Painters in Joseon made landscape pictures for a long time. But the mountains were not Korean mountains. They copied the manner of picture books that came from China. Mountains and rivers the painter had never seen filled the paper. Such work is called idea landscape.",
+            "Jeong Seon took another path. He travelled to the mountains of his own country. He climbed Geumgangsan and went up Inwangsan again and again. Then he painted what his own eyes had seen. A landscape drawn from a real place is called jingyeong, a true view.",
+            "In 1751, at the age of seventy-six, he painted Inwangsan after the rain stopped. The work is Inwangjesaekdo. He pressed dark ink onto the rocks that the rain had turned black. The painting was held privately for a long time. In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea. Now anyone can go and see it.",
+            "Yet a true view is not a photograph. His Geumgangjeondo of 1734 shows why. You cannot stand in one spot and see all the peaks of Geumgangsan at once. Jeong Seon walked from place to place and set what he saw into one round picture, as if looking down from above. He did not copy what he saw. He arranged it again."
+          ],
+          "envocab": [
+            {
+              "word": "landscape",
+              "ko": "풍경, 산수 (명사)",
+              "base": "landscape [ˈlændskeɪp]"
+            },
+            {
+              "word": "copied",
+              "ko": "베끼다, 따라 그리다 (동사 copy)",
+              "base": "copy [ˈkɑːpi]"
+            },
+            {
+              "word": "climbed",
+              "ko": "오르다 (동사 climb)",
+              "base": "climb [klaɪm]"
+            },
+            {
+              "word": "privately",
+              "ko": "개인적으로 (부사)",
+              "base": "private [ˈpraɪvət]"
+            },
+            {
+              "word": "photograph",
+              "ko": "사진 (명사)",
+              "base": "photograph [ˈfoʊtəɡræf]"
+            },
+            {
+              "word": "arranged",
+              "ko": "배치하다, 짜 맞추다 (동사 arrange)",
+              "base": "arrange [əˈreɪndʒ]"
+            }
+          ],
+          "enseg": [
+            [
+              "Painters in Joseon made landscape pictures for a long time. ",
+              "But the mountains were not Korean mountains. ",
+              "They copied the manner of picture books that came from China. ",
+              "Mountains",
+              " and rivers the painter had never seen filled the paper. ",
+              "Such work is called idea landscape."
+            ],
+            [
+              "Jeong Seon took another path. ",
+              "He travelled to the mountains of his own country. ",
+              "He climbed Geumgangsan",
+              " and went up Inwangsan again and again. ",
+              "Then he painted what his own eyes had seen. ",
+              "A landscape drawn from a real place is called jingyeong, ",
+              "a true view."
+            ],
+            [
+              "In 1751, at the age of seventy-six, ",
+              "he painted Inwangsan after the rain stopped. ",
+              "The work is Inwangjesaekdo. ",
+              "He pressed dark ink onto the rocks that the rain had turned black. ",
+              "The painting was held privately for a long time. ",
+              "In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea. ",
+              "Now anyone can go and see it."
+            ],
+            [
+              "Yet a true view is not a photograph. ",
+              "His Geumgangjeondo of 1734 shows why. ",
+              "You cannot stand in one spot",
+              " and see all the peaks of Geumgangsan at once. ",
+              "Jeong Seon walked from place to place",
+              " and set what he saw into one round picture, ",
+              "as if looking down from above. ",
+              "He did not copy what he saw. ",
+              "He arranged it again."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "진경산수는 사진이 아니다",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "조선의 산수화는 오랫동안 중국의 화보를 본떠 그려졌다. ",
+              "화가는 중국에 가 본 적이 없었지만 ",
+              "화폭에는 중국의 산과 강이 담겼다. ",
+              "이상적인 산수의 모습이 그림책 속에 정해져 있었고, ",
+              "화가들은 그 틀을 따랐다. ",
+              "이런 그림을 관념 산수라고 부른다. ",
+              "잘 그린 그림은 많았으나 ",
+              "그 안에 우리 땅은 없었다."
+            ],
+            [
+              "겸재 정선은 이 관행을 바꾸었다. ",
+              "그는 금강산에 오르고 ",
+              "인왕산 구석구석을 수없이 걸었다. ",
+              "그리고 자기 눈으로 확인한 풍경을 그렸다. ",
+              "실제 경치를 대상으로 삼은 이 산수화를 진경산수라 한다. ",
+              "우리 땅이 그림의 주인공이 된 것은 ",
+              "이때부터다."
+            ],
+            [
+              "1751년, 일흔여섯이 된 정선은 ",
+              "소나기가 지나간 뒤의 인왕산을 그렸다. ",
+              "「인왕제색도」다. ",
+              "비에 젖어 검게 변한 바위를 짙은 먹으로 눌러 표현했고, ",
+              "산허리에는 흰 구름이 걷히고 있다. ",
+              "이 그림은 오랫동안 개인의 손에 있었으나 ",
+              "2021년 고 이건희 회장의 유족이 국립중앙박물관에 기증하면서 ",
+              "누구나 볼 수 있는 그림이 되었다."
+            ],
+            [
+              "그런데 진경산수를 사진처럼 여기면 오해가 생긴다. ",
+              "1734년 작 「금강전도」가 그 점을 보여 준다. ",
+              "내금강의 봉우리들은 어느 한자리에 서서 ",
+              "한꺼번에 볼 수 있는 것이 아니다. ",
+              "정선은 장안사에서 비로봉까지 두루 다니며 본 것을 ",
+              "위에서 내려다보는 시점으로 재구성해 ",
+              "하나의 원형 안에 배치했다. ",
+              "실제로 존재하지 않는 시점에서 본 그림인 셈이다."
+            ],
+            [
+              "이것은 실패가 아니라 방법이다. ",
+              "화가는 눈에 들어온 것을 그대로 옮기지 않고 ",
+              "무엇을 남기고 무엇을 모을지 판단한다. ",
+              "「진경」이라는 말은 눈앞의 경치를 뜻하는 동시에 ",
+              "그 경치의 참모습을 뜻하기도 한다. ",
+              "정선이 찾은 것은 인왕산의 겉모양이 아니라 ",
+              "비에 젖은 인왕산의 무게였다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "화보",
+              "easy": "그림을 모아 실은 책",
+              "hanja": "畫(그림 화)+譜(족보 보)"
+            },
+            {
+              "word": "관행",
+              "easy": "오래전부터 해 오던 대로 굳어진 방식",
+              "hanja": "慣(익숙할 관)+行(다닐 행)"
+            },
+            {
+              "word": "시점",
+              "easy": "대상을 바라보는 위치와 방향",
+              "hanja": "視(볼 시)+點(점 점)"
+            },
+            {
+              "word": "재구성",
+              "easy": "이미 있는 것을 새로 짜서 다시 이루는 일",
+              "hanja": "再(다시 재)+構(얽을 구)+成(이룰 성)"
+            },
+            {
+              "word": "참모습",
+              "easy": "겉으로 보이는 것 너머의 진짜 모습",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "금강산 등산로의 변화",
+                "진경산수는 실제를 바탕으로 하되 화가가 재구성한 그림이라는 것",
+                "국립중앙박물관의 기증 절차",
+                "먹의 농도를 조절하는 기법"
+              ],
+              "answer": 1,
+              "explain": "관념 산수와의 대비에서 출발해 「금강전도」의 재구성을 근거로, 진경산수가 사진과 다르다는 결론으로 나아간다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "「금강전도」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "한자리에서 본 모습을 그대로 옮겼다",
+                "중국의 산을 상상해 그렸다",
+                "여러 곳에서 본 것을 위에서 내려다보는 시점으로 재구성했다",
+                "봉우리 하나만 확대해 그렸다"
+              ],
+              "answer": 2,
+              "explain": "장안사에서 비로봉까지 두루 다니며 본 것을 부감 시점으로 재구성해 원형 안에 배치했다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「관행」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "오래전부터 해 오던 대로 굳어진 방식",
+                "한 번만 하는 특별한 행사",
+                "그림을 파는 시장",
+                "산에 오르는 길"
+              ],
+              "answer": 0,
+              "explain": "중국 화보를 본떠 그리던 오래된 방식을 정선이 바꾸었다는 흐름이므로, 굳어진 방식을 뜻한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "「인왕제색도」에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "1751년에 그렸다",
+                "비가 그친 뒤의 인왕산을 그렸다",
+                "2021년 국립중앙박물관에 기증되었다",
+                "정선이 스무 살에 그린 첫 작품이다"
+              ],
+              "answer": 3,
+              "explain": "일흔여섯이 된 1751년의 작품이라고 글에 나온다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「실제로 존재하지 않는 시점에서 본 그림」이라고 하면서도 이를 실패로 보지 않은 까닭은?",
+              "choices": [
+                "옛 그림이라 기준이 느슨하기 때문에",
+                "화가가 무엇을 남기고 모을지 판단한 결과이기 때문에",
+                "당시에는 원근법이 알려지지 않았기 때문에",
+                "금강산이 너무 넓어 어쩔 수 없었기 때문에"
+              ],
+              "answer": 1,
+              "explain": "바로 다음 문단에서 이것을 「방법」이라 부르며, 화가가 눈에 들어온 것을 그대로 옮기지 않고 판단한다고 설명한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점으로 볼 때, 우리 마을 안내 그림지도를 그리는 방법으로 가장 알맞은 것은?",
+              "choices": [
+                "항공사진을 그대로 옮겨 그린다",
+                "다른 마을 지도를 참고해 비슷하게 그린다",
+                "직접 걸어 다녀 보고, 사람들이 찾는 곳이 잘 보이도록 배치를 조정한다",
+                "가장 높은 건물 하나만 크게 그린다"
+              ],
+              "answer": 2,
+              "explain": "직접 확인한 실제를 바탕으로 하되 무엇을 살릴지 판단해 배치하는 것이 정선의 방법이다. 옮겨 그리기나 남의 지도 참고는 관념 산수 쪽에 가깝다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "For a long time Joseon landscape painting followed picture books from China. The painter had never been to China, yet Chinese mountains and rivers filled the paper. An ideal landscape was already set down in those books, and painters followed the pattern. Such work is called idea landscape. There were many fine paintings, but the land of Korea was not in them.",
+            "Jeong Seon changed this practice. He climbed Geumgangsan and walked every corner of Inwangsan many times over. Then he painted the scenery his own eyes had confirmed. A landscape that takes a real place as its subject is called jingyeong, a true view. From this time the land of Korea became the subject of the picture.",
+            "In 1751, at seventy-six, Jeong Seon painted Inwangsan after a shower had passed. The work is Inwangjesaekdo. He pressed dark ink onto rocks the rain had turned black, and white cloud is lifting from the slope. The painting stayed in private hands for a long time. In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea, and it became a painting anyone can see.",
+            "Yet treating a true view as a photograph leads to a mistake. Geumgangjeondo, painted in 1734, shows the point. You cannot stand in one place and take in all the peaks of the inner Geumgang at once. Jeong Seon walked from Jangansa up to Birobong, then rebuilt what he had seen from a viewpoint looking down from above and set it inside a single circle. It is a picture seen from a position that does not exist.",
+            "This is not a failure but a method. The painter does not move what enters the eye straight onto the paper. He judges what to keep and what to gather. The word jingyeong means the scene before one's eyes and also the true form of that scene. What Jeong Seon looked for was not the surface of Inwangsan but the weight of a mountain soaked with rain."
+          ],
+          "envocab": [
+            {
+              "word": "practice",
+              "ko": "관행, 늘 해 오던 방식 (명사)",
+              "base": "practice [ˈpræktɪs]"
+            },
+            {
+              "word": "scenery",
+              "ko": "경치, 풍경 (명사)",
+              "base": "scenery [ˈsiːnəri]"
+            },
+            {
+              "word": "viewpoint",
+              "ko": "시점, 보는 위치 (명사)",
+              "base": "viewpoint [ˈvjuːpɔɪnt]"
+            },
+            {
+              "word": "rebuilt",
+              "ko": "다시 짜다, 재구성하다 (동사 rebuild)",
+              "base": "rebuild [ˌriːˈbɪld]"
+            },
+            {
+              "word": "method",
+              "ko": "방법 (명사)",
+              "base": "method [ˈmeθəd]"
+            },
+            {
+              "word": "surface",
+              "ko": "표면, 겉모습 (명사)",
+              "base": "surface [ˈsɜːrfɪs]"
+            }
+          ],
+          "enseg": [
+            [
+              "For a long time Joseon landscape painting followed picture books from China. ",
+              "The painter had never been to China, ",
+              "yet Chinese mountains",
+              " and rivers filled the paper. ",
+              "An ideal landscape was already set down in those books,",
+              " and painters followed the pattern. ",
+              "Such work is called idea landscape. ",
+              "There were many fine paintings, ",
+              "but the land of Korea was not in them."
+            ],
+            [
+              "Jeong Seon changed this practice. ",
+              "He climbed Geumgangsan",
+              " and walked every corner of Inwangsan many times over. ",
+              "Then he painted the scenery his own eyes had confirmed. ",
+              "A landscape that takes a real place as its subject is called jingyeong, ",
+              "a true view. ",
+              "From this time the land of Korea became the subject of the picture."
+            ],
+            [
+              "In 1751, at seventy-six, ",
+              "Jeong Seon painted Inwangsan after a shower had passed. ",
+              "The work is Inwangjesaekdo. ",
+              "He pressed dark ink onto rocks the rain had turned black,",
+              " and white cloud is lifting from the slope. ",
+              "The painting stayed in private hands for a long time. ",
+              "In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea,",
+              " and it became a painting anyone can see."
+            ],
+            [
+              "Yet treating a true view as a photograph leads to a mistake. ",
+              "Geumgangjeondo, painted in 1734, ",
+              "shows the point. ",
+              "You cannot stand in one place",
+              " and take in all the peaks of the inner Geumgang at once. ",
+              "Jeong Seon walked from Jangansa up to Birobong, ",
+              "then rebuilt what he had seen from a viewpoint looking down from above",
+              " and set it inside a single circle. ",
+              "It is a picture seen from a position that does not exist."
+            ],
+            [
+              "This is not a failure but a method. ",
+              "The painter does not move what enters the eye straight onto the paper. ",
+              "He judges what to keep and what to gather. ",
+              "The word jingyeong means the scene before one's eyes",
+              " and also the true form of that scene. ",
+              "What Jeong Seon looked for was not the surface of Inwangsan",
+              " but the weight of a mountain soaked with rain."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "존재하지 않는 자리에서 본 산 — 겸재 정선의 진경",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "조선의 산수화는 오랫동안 중국에서 건너온 화보를 본떠 그려졌다. ",
+              "화가는 중국 땅을 밟아 본 적이 없었지만 화폭에는 중국의 산수가 담겼다. ",
+              "이상적인 산수의 형상이 화보 속에 이미 규정되어 있었고, ",
+              "화가의 실력은 그 틀을 얼마나 능숙하게 구사하는가로 평가되었다. ",
+              "이런 그림을 관념 산수라 한다. ",
+              "빼어난 작품은 적지 않았으나 ",
+              "그 안에 조선의 땅은 들어 있지 않았다."
+            ],
+            [
+              "겸재 정선(1676~1759)은 이 관행을 뒤집었다. ",
+              "그는 금강산에 오르고 인왕산 구석구석을 수없이 걸었다. ",
+              "그리고 자기 눈으로 확인한 풍경을 그림의 대상으로 삼았다. ",
+              "실경을 다룬 이 산수화를 진경산수라 부른다. ",
+              "조선의 땅이 그림의 주인공이 된 것은 이때부터이며, ",
+              "이는 소재의 교체를 넘어 ",
+              "무엇을 그릴 가치가 있다고 보는가의 전환이었다."
+            ],
+            [
+              "1751년, 일흔여섯의 정선은 소나기가 지나간 인왕산을 그렸다. ",
+              "「인왕제색도」다. ",
+              "비에 젖어 검게 변한 바위를 짙은 먹으로 눌러 표현했고, ",
+              "산허리에는 물러가는 구름이 흰 띠로 남아 있다. ",
+              "이 그림은 오랫동안 개인의 소장품이었다. ",
+              "2021년 고 이건희 회장의 유족이 국립중앙박물관에 기증하면서 ",
+              "「건희 1」이라는 소장품 번호를 받았고, ",
+              "누구나 찾아가 볼 수 있는 그림이 되었다."
+            ],
+            [
+              "여기서 한 가지 오해를 짚어야 한다. ",
+              "진경산수를 사진의 조상쯤으로 여기는 오해다. ",
+              "1734년 작 「금강전도」가 그 오해를 깬다. ",
+              "내금강의 봉우리들은 어느 한자리에서 한꺼번에 조망할 수 있는 대상이 아니다. ",
+              "정선은 장안사에서 비로봉에 이르기까지 두루 답사한 뒤, ",
+              "그것을 위에서 내려다보는 부감 시점으로 재구성해 ",
+              "하나의 원형 구도 안에 배치했다. ",
+              "곧 이 그림은 실제로는 존재하지 않는 자리에서 본 풍경이다."
+            ],
+            [
+              "이 재구성은 사실의 훼손이 아니라 방법이다. ",
+              "화가는 망막에 맺힌 상을 그대로 옮기지 않는다. ",
+              "무엇을 남기고 무엇을 한자리에 모을지 판단한다. ",
+              "「진경(眞景)」이라는 말 자체가 이 이중성을 품고 있다. ",
+              "눈앞의 실제 경치를 뜻하는 동시에 그 경치의 참모습을 뜻하기 때문이다. ",
+              "정선이 붙잡으려 한 것은 인왕산의 윤곽이 아니라 ",
+              "비에 젖어 무거워진 산의 상태였다. ",
+              "사실에 다가가는 일에도 해석이 개입한다는 것, ",
+              "진경산수가 남긴 질문은 그것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "규정",
+              "easy": "내용이나 방식을 정해 놓는 것",
+              "hanja": "規(법 규)+定(정할 정)"
+            },
+            {
+              "word": "구사",
+              "easy": "말이나 기술을 마음대로 부려 쓰는 것",
+              "hanja": "驅(몰 구)+使(부릴 사)"
+            },
+            {
+              "word": "조망",
+              "easy": "먼 곳을 한눈에 바라보는 것",
+              "hanja": "眺(바라볼 조)+望(바랄 망)"
+            },
+            {
+              "word": "부감",
+              "easy": "높은 곳에서 아래를 내려다보는 것",
+              "hanja": "俯(구부릴 부)+瞰(굽어볼 감)"
+            },
+            {
+              "word": "이중성",
+              "easy": "한 가지 안에 성질이 다른 두 면이 함께 있는 것",
+              "hanja": "二(두 이)+重(무거울 중)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "금강산 답사 경로의 복원",
+                "사실에 다가가는 일에도 해석이 개입한다는 것을 진경산수가 보여 준다는 것",
+                "국립중앙박물관 기증 제도의 변화",
+                "먹과 종이의 재료학적 특성"
+              ],
+              "answer": 1,
+              "explain": "관념 산수와의 대비에서 출발해 「금강전도」의 재구성을 근거로, 마지막 문단에서 해석의 개입을 진경산수가 남긴 질문으로 정리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "「금강전도」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "한자리에서 조망한 모습을 그대로 옮겼다",
+                "답사한 여러 곳을 부감 시점으로 재구성해 원형 구도에 배치했다",
+                "중국 화보의 구도를 그대로 따랐다",
+                "비로봉 하나만을 확대해 그렸다"
+              ],
+              "answer": 1,
+              "explain": "장안사에서 비로봉까지 답사한 뒤 부감 시점으로 재구성해 원형 구도 안에 배치했다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「구사」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "새로 만들어 내는 것",
+                "값을 매기는 것",
+                "마음대로 부려 쓰는 것",
+                "여럿을 모아 두는 것"
+              ],
+              "answer": 2,
+              "explain": "화가의 실력이 정해진 틀을 얼마나 능숙하게 구사하는가로 평가되었다는 것은, 그 틀을 얼마나 잘 부려 쓰는가를 뜻한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "infer",
+              "q": "글쓴이가 진경산수의 등장을 「소재의 교체를 넘어선 전환」이라고 본 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "그림 재료가 값싼 것으로 바뀌었기 때문에",
+                "무엇을 그릴 가치가 있는가에 대한 판단이 달라졌기 때문에",
+                "화가의 수가 갑자기 늘었기 때문에",
+                "중국과의 교류가 끊겼기 때문에"
+              ],
+              "answer": 1,
+              "explain": "글은 조선의 땅이 주인공이 된 것을 두고 그릴 가치가 있다고 보는 대상 자체가 바뀐 일이라고 설명한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "「금강전도는 실제와 다르게 그렸으므로 진경산수라 부를 수 없다」는 주장을 이 글에 근거해 반박하려 할 때 가장 알맞은 것은?",
+              "choices": [
+                "국보로 지정되었으므로 문제 삼을 수 없다",
+                "정선이 실제로 금강산에 다녀왔으므로 충분하다",
+                "「진경」은 눈앞의 경치와 그 참모습을 함께 뜻하므로, 재구성은 참모습에 다가가는 방법일 수 있다",
+                "당시에는 정확히 그릴 기술이 없었으므로 어쩔 수 없었다"
+              ],
+              "answer": 2,
+              "explain": "글은 「진경」의 이중성을 들어 재구성을 방법으로 규정한다. 지정 사실이나 답사 여부는 재구성의 정당성을 직접 뒷받침하지 못하고, 기술 부족론은 글의 관점과 어긋난다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지가 성립하려면 반드시 참이어야 하는 전제는?",
+              "choices": [
+                "화가는 본 것을 있는 그대로 옮길 의무가 없다",
+                "관념 산수는 예술적 가치가 없다",
+                "부감 시점이 정면 시점보다 우월하다",
+                "그림은 사진보다 정확해야 한다"
+              ],
+              "answer": 0,
+              "explain": "글은 재구성을 훼손이 아니라 방법이라고 본다. 이 판단은 화가에게 있는 그대로 옮길 의무가 없다는 전제 위에서만 성립한다. 나머지는 글이 주장하지 않은 내용이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점을 다큐멘터리 제작에 적용할 때 가장 알맞은 태도는?",
+              "choices": [
+                "촬영한 모든 장면을 편집 없이 순서대로 내보낸다",
+                "사실을 확인한 위에서, 무엇을 보여 줄지 판단해 구성한다",
+                "사실 확인보다 감동적인 구성을 앞세운다",
+                "재구성이 개입하므로 다큐멘터리는 만들지 않는다"
+              ],
+              "answer": 1,
+              "explain": "정선은 직접 답사한 사실을 바탕으로 하되 무엇을 남기고 모을지 판단했다. 사실 확인과 구성의 판단이 함께 가는 태도가 이 관점의 적용이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "For a long time Joseon landscape painting followed picture books brought from China. The painter had never set foot on Chinese soil, yet Chinese scenery filled the paper. The form of an ideal landscape was already prescribed in those books, and a painter's skill was judged by how fluently he handled that pattern. Such work is called idea landscape. There were no few outstanding works, but the land of Joseon was not inside them.",
+            "Jeong Seon (1676-1759) overturned this practice. He climbed Geumgangsan and walked every corner of Inwangsan many times over. He then took as his subject the scenery his own eyes had confirmed. A landscape that deals with a real place is called jingyeong, a true view. From this point the land of Joseon became the subject of the picture, and that was more than a change of material. It was a shift in what counted as worth painting.",
+            "In 1751, at the age of seventy-six, Jeong Seon painted Inwangsan after a shower had passed. The work is Inwangjesaekdo. He pressed dark ink onto rocks the rain had turned black, and a white band of retreating cloud remains across the slope. The painting was privately owned for a long time. In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea, where it received the accession number Kunhee 1 and became a work anyone can go and see.",
+            "One misunderstanding should be addressed here. It is the idea that a true view is a kind of ancestor of the photograph. Geumgangjeondo, painted in 1734, breaks that idea. The peaks of the inner Geumgang cannot be surveyed from any single spot at one time. Jeong Seon travelled through the whole area, from Jangansa up to Birobong, then rebuilt it from a viewpoint looking down from above and placed it inside one circular composition. The picture therefore shows a scene viewed from a position that does not exist.",
+            "This rebuilding is not damage to fact but a method. A painter does not transfer the image on the retina straight to the paper. He judges what to keep and what to gather into one place. The word jingyeong itself holds this double sense, since it means the actual scene before the eyes and also the true form of that scene. What Jeong Seon tried to seize was not the outline of Inwangsan but the state of a mountain made heavy with rain. That approaching a fact still involves interpretation is the question a true view leaves behind."
+          ],
+          "envocab": [
+            {
+              "word": "prescribed",
+              "ko": "규정되다, 정해 놓다 (동사 prescribe)",
+              "base": "prescribe [prɪˈskraɪb]"
+            },
+            {
+              "word": "overturned",
+              "ko": "뒤집다 (동사 overturn)",
+              "base": "overturn [ˌoʊvərˈtɜːrn]"
+            },
+            {
+              "word": "surveyed",
+              "ko": "조망하다, 두루 살피다 (동사 survey)",
+              "base": "survey [sərˈveɪ]"
+            },
+            {
+              "word": "composition",
+              "ko": "구도, 짜임 (명사)",
+              "base": "composition [ˌkɑːmpəˈzɪʃn]"
+            },
+            {
+              "word": "retina",
+              "ko": "망막 (명사)",
+              "base": "retina [ˈretɪnə]"
+            },
+            {
+              "word": "interpretation",
+              "ko": "해석 (명사)",
+              "base": "interpretation [ɪnˌtɜːrprəˈteɪʃn]"
+            }
+          ],
+          "enseg": [
+            [
+              "For a long time Joseon landscape painting followed picture books brought from China. ",
+              "The painter had never set foot on Chinese soil, ",
+              "yet Chinese scenery filled the paper. ",
+              "The form of an ideal landscape was already prescribed in those books,",
+              " ",
+              "and a painter's skill was judged by how fluently he handled that pattern. ",
+              "Such work is called idea landscape. ",
+              "There were no few outstanding works, ",
+              "but the land of Joseon was not inside them."
+            ],
+            [
+              "Jeong Seon (1676-1759) overturned this practice. ",
+              "He climbed Geumgangsan",
+              " and walked every corner of Inwangsan many times over. ",
+              "He then took as his subject the scenery his own eyes had confirmed. ",
+              "A landscape that deals with a real place is called jingyeong, ",
+              "a true view. ",
+              "From this point the land of Joseon became the subject of the picture,",
+              " and that was more than a change of material. ",
+              "It was a shift in what counted as worth painting."
+            ],
+            [
+              "In 1751, at the age of seventy-six, ",
+              "Jeong Seon painted Inwangsan after a shower had passed. ",
+              "The work is Inwangjesaekdo. ",
+              "He pressed dark ink onto rocks the rain had turned black,",
+              " ",
+              "and a white band of retreating cloud remains across the slope. ",
+              "The painting was privately owned for a long time. ",
+              "In 2021 the family of the late chairman Lee Kun-hee gave it to the National Museum of Korea, ",
+              "where it received the accession number Kunhee 1",
+              " and became a work anyone can go and see."
+            ],
+            [
+              "One misunderstanding should be addressed here. ",
+              "It is the idea that a true view is a kind of ancestor of the photograph. ",
+              "Geumgangjeondo, painted in 1734, ",
+              "breaks that idea. ",
+              "The peaks of the inner Geumgang cannot be surveyed from any single spot at one time. ",
+              "Jeong Seon travelled through the whole area, ",
+              "from Jangansa up to Birobong, ",
+              "then rebuilt it from a viewpoint looking down from above",
+              " and placed it inside one circular composition. ",
+              "The picture therefore shows a scene viewed from a position that does not exist."
+            ],
+            [
+              "This rebuilding is not damage to fact",
+              " but a method. ",
+              "A painter does not transfer the image on the retina straight to the paper. ",
+              "He judges what to keep",
+              " and what to gather into one place. ",
+              "The word jingyeong itself holds this double sense, ",
+              "since it means the actual scene before the eyes",
+              " and also the true form of that scene. ",
+              "What Jeong Seon tried to seize was not the outline of Inwangsan",
+              " but the state of a mountain made heavy with rain. ",
+              "That approaching a fact still involves interpretation is the question a true view leaves behind."
             ]
           ]
         }
