@@ -230,4 +230,42 @@ t('오답은 같은 강 낱말을 먼저 쓴다', () => {
   }
 });
 
+t('활용한 꼴도 빈칸으로 잡는다', () => {
+  /* 어간을 글자 그대로 찾는 것만으로는 절반을 놓친다 —
+     예문은 「엇갈렸어요」인데 어간은 「엇갈리」다. 한국어 활용은 어간의 끝 음절만
+     바꾸므로 앞부분으로 자리를 잡고 첫소리로 확인한다. 불규칙이 모두 이 안에 든다. */
+  const cases = [
+    ['엇갈리다', '친구와 길에서 엇갈렸어요.', '친구와 길에서 ○○○.'],
+    ['가쁘다', '숨이 가빴어요.', '숨이 ○○○.'],            // ㅡ 불규칙
+    ['낫다', '감기가 다 나았어요.', '감기가 다 ○○○.'],      // ㅅ 불규칙
+    ['지혜롭다', '지혜로운 친구는 싸움을 피했어요.', '○○○ 친구는 싸움을 피했어요.'], // ㅂ 불규칙
+    ['다르다', '생각이 달라요.', '생각이 ○○○.'],            // 르 불규칙
+    ['부르다', '친구 이름을 불렀어요.', '친구 이름을 ○○○.'],
+    ['가다', '엄마가 시장에 갔다.', '엄마가 시장에 ○○○.'],   // 한 글자 어간
+    ['묶다', '신발 끈을 단단히 묶었어요.', '신발 끈을 단단히 ○○○.'],
+  ];
+  for (const [word, example, want] of cases) {
+    assert.strictEqual(Q.blankExample({ word, example }), want, word + ' 의 활용형을 못 찾았다');
+  }
+});
+
+t('낱말이 없는 문장은 빈칸으로 만들지 않는다', () => {
+  /* 없는 자리에 구멍을 뚫으면 답이 없는 문제가 된다.
+     「오늘」 속의 「늘」을 「늘이다」로 보는 따위도 막아야 한다 — 어절 첫머리여야 한다. */
+  assert.strictEqual(Q.blankExample({ word: '늘이다', example: '오늘 어떤 동작을 가장 많이 했니?' }), null);
+  assert.strictEqual(Q.blankExample({ word: '어절', example: '나는 학교에 갔다.' }), null);
+  assert.strictEqual(Q.blankExample({ word: '애틋하다', example: '오랜만에 가족을 보면 어떤 기분이 드니?' }), null);
+  /* 첫소리·가운뎃소리만 맞추면 「늘이다」가 「늦게」를 잡는다 — 받침까지 봐야 한다 */
+  assert.strictEqual(Q.blankExample({ word: '늘이다', example: '엄마가 늦게 오면 나는 애간장을 태워~' }), null);
+  assert.strictEqual(Q.blankExample({ word: '늘이다', example: '고무줄을 길게 늘였어요.' }), '고무줄을 길게 ○○○.');
+  /* 받침이 그냥 사라지는 일은 없다 — 불규칙일 때만이다.
+     이 표가 없으면 「없다」가 「어떤」을, 「걷다」가 「거름을」을, 「달이다」가 「다른」을 잡는다. */
+  assert.strictEqual(Q.blankExample({ word: '없다', example: '별 하면 어떤 말이 떠올라?' }), null);
+  assert.strictEqual(Q.blankExample({ word: '걷다', example: '농부가 밭에 거름을 뿌렸어요.' }), null);
+  assert.strictEqual(Q.blankExample({ word: '달이다', example: '떡볶이는 맵기만 할까? 다른 느낌도 있지?' }), null);
+  /* 진짜 불규칙은 잡아야 한다 */
+  assert.strictEqual(Q.blankExample({ word: '걷다', example: '아이가 천천히 걸어요.' }), '아이가 천천히 ○○○.');
+  assert.strictEqual(Q.blankExample({ word: '돕다', example: '친구를 도와주었어요.' }), '친구를 ○○○.');
+});
+
 console.log('\n통과 ' + passed + '개 — 문제 출제 엔진 검증 완료');

@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, findLesson, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -209,6 +210,49 @@ t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
       }
     }
   }
+});
+
+t('실린 예문은 모두 문맥 빈칸 문제가 된다', () => {
+  /* 예문을 두는 까닭이 그것이다. 낱말이 없는 문장을 예문 칸에 두면
+     학생 카드에도 검수 화면에도 엉뚱한 문장이 실린다 —
+     「어절 — 나는 학교에 갔다」처럼. 채굴기가 문제 생성기로 직접 걸러야 한다. */
+  const require_ = createRequire(import.meta.url);
+  const QUIZ = require_(path.join(ROOT, '..', 'vocab', 'quiz.js'));
+  const bad = [];
+  for (const id of IDS) {
+    for (const l of findBook(TB, id).lessons) {
+      for (const w of l.words) {
+        if (!w.example) continue;
+        if (!QUIZ.blankExample({ word: w.word, example: w.example })) {
+          bad.push(id + ' ' + l.lesson + '강 ' + w.word + ' — ' + w.example);
+        }
+      }
+    }
+  }
+  assert.strictEqual(bad.length, 0, '문제로 못 쓰는 예문: ' + bad.slice(0, 5).join(' / '));
+});
+
+t('예문의 빈칸 자리가 같은 강의 다른 낱말이 아니다', () => {
+  /* 「걷다」에 「아기가 첫 걸음을 뗐어요」가 붙어 있었다. 활용으로는 걸음이 걷다에서
+     나오지만 그 강은 걸음을 따로 가르치므로 답이 둘이 된다. */
+  const require_ = createRequire(import.meta.url);
+  const QUIZ = require_(path.join(ROOT, '..', 'vocab', 'quiz.js'));
+  const bad = [];
+  for (const id of IDS) {
+    for (const l of findBook(TB, id).lessons) {
+      const all = l.words.map((w) => w.word);
+      for (const w of l.words) {
+        if (!w.example) continue;
+        const blanked = QUIZ.blankExample({ word: w.word, example: w.example });
+        if (!blanked) continue;
+        const i = blanked.indexOf('○○○');
+        const span = w.example.slice(i, w.example.length - (blanked.length - i - 3));
+        const other = all.find((o) => o !== w.word && o.length >= 2 && span.indexOf(o) === 0);
+        if (other) bad.push(id + ' ' + l.lesson + '강 ' + w.word + ' 자리에 ' + other + ' — ' + w.example);
+      }
+    }
+  }
+  assert.strictEqual(bad.length, 0, '답이 둘인 빈칸: ' + bad.slice(0, 4).join(' / '));
 });
 
 t('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
