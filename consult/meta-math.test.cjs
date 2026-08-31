@@ -10,13 +10,15 @@ const section = (start, end) => {
   return from >= 0 && to > from ? html.slice(from, to) : '';
 };
 
-test('study screen renders eight separate source cards and keeps legacy MetaMath tasks', () => {
+test('study screen renders ten separate source cards and keeps legacy MetaMath tasks', () => {
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const expected = [
     ['leaders_eye', '리더스아이'],
     ['metamath', '메타수학'],
     ['classcard', '클래스카드'],
     ['studyforce', '스터디포스'],
+    ['nelt_exam', '넬트 시험'],
+    ['daily_nonfiction', '하루 비문학 독서'],
     ['wb_reading', '자체 독해력 교재'],
     ['reading', '독서'],
     ['inquiry_report', '탐구보고서'],
@@ -63,7 +65,31 @@ test('Leaders Eye is the first online learning card directly above MetaMath', ()
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.ok(sources.indexOf('  leaders_eye: {') < sources.indexOf('  metamath: {'));
-  assert.match(study, /keys: \['leaders_eye', 'metamath', 'classcard', 'studyforce'\]/);
+  assert.match(study, /keys: \['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'\]/);
+});
+
+test('NELT and daily nonfiction open the requested URLs for director, manager, and student', () => {
+  const sources = section('const LEADERS_EYE_URL', 'const DOW');
+  const card = section('function learningSourceCard(', '/* ── 학습 탭');
+  const renderCard = Function('session', 'isManager', 'learningTasksFor', 'esc',
+    sources + card + '\nreturn learningSourceCard;');
+  const expected = [
+    ['nelt_exam', '넬트 시험', 'https://www.netutor.co.kr/st/'],
+    ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev']
+  ];
+  for (const role of ['director', 'manager', 'student']) {
+    const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], String);
+    for (const [key, label, url] of expected) {
+      const output = render({ id: 'student-a', name: '테스트' }, role !== 'manager', key);
+      assert.ok(output.includes('data-learning-source="' + key + '"'));
+      assert.ok(output.includes('<b>' + label + '</b>'));
+      assert.ok(output.includes('href="' + url + '" target="_blank" rel="noopener noreferrer"'));
+      assert.equal(output.includes('data-act="learnadd"'), role === 'director');
+    }
+  }
+  const study = section('function viewStudy(', 'function rdAddModal(');
+  assert.match(study, /title: '온라인 학습'[^\n]*'nelt_exam', 'daily_nonfiction'/);
+  assert.match(study, /title: '자기주도 학습'[^\n]*keys: \['wb_reading', 'reading', 'inquiry_report'\]/);
 });
 
 test('ClassCard opens the native app store route only on supported mobile devices', () => {
