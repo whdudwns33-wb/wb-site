@@ -1386,6 +1386,9 @@
       pickBtn2('sentence', '문장 짓기', vsyncOn()
         ? '배운 낱말로 문장을 만들면 선생님 AI가 봐 줘요 — 써먹어야 진짜 내 단어 (가능 ' + speedable + '개)'
         : '학원 서버에 연동하면 열려요 — 문장을 만들면 AI가 봐 줍니다', '✍️') +
+      pickBtn2('talk', 'AI 대화 미션', vsyncOn()
+        ? '과학자·기자·셰프와 이야기하며 낱말 3개를 자연스럽게 써 보기 (가능 ' + speedable + '개)'
+        : '학원 서버에 연동하면 열려요 — 캐릭터와 대화하며 낱말을 써 봅니다', '💬') +
       '</div>' +
       '<p class="demo-note">깜빡이 훈련은 보조예요 — 화분을 자라게 하는 건 물 주기(회상)뿐. 스피드 리콜 결과는 반응 속도 기록과 +6시간 보너스만 줍니다.</p>';
     el.querySelectorAll('.filters button').forEach(function (b) {
@@ -1397,6 +1400,7 @@
         if (m === 'flash') startReview('flash', ty);
         else if (m === 'blink') startBlinkSetup(ty);
         else if (m === 'sentence') startSentence(ty);
+        else if (m === 'talk') startTalk(ty);
         else startSpeed(ty);
       });
     });
@@ -1483,6 +1487,149 @@
   }
 
   /* ── 문장 짓기 (산출 훈련) — 서버 AI가 판정 ── */
+  /* ── AI 대화 미션 (기획서 §2.5 ⑤) ──
+     캐릭터와 대화하며 낱말 3개를 자연스럽게 쓰면 불이 켜진다.
+     대화 기록은 이 화면이 들고 있다가 매번 통째로 보낸다 — 서버에 대화를 남기지 않는다.
+     한 마디마다 AI를 부르므로 말수는 서버가 막고, 여기서는 남은 횟수를 보여 준다. */
+  var TALK_CHARS = [
+    { id: 'scientist', name: '해린 박사', job: '과학자', ic: '🔬', open: '실험실에 온 걸 환영해요! 오늘 뭘 알아보고 싶나요?' },
+    { id: 'reporter', name: '준서 기자', job: '기자', ic: '📰', open: '취재 중이에요. 요즘 학교에서 제일 큰 뉴스가 뭔가요?' },
+    { id: 'chef', name: '미도 셰프', job: '셰프', ic: '🍳', open: '주방에 어서 와요. 오늘 뭘 만들어 볼까요?' },
+  ];
+
+  function startTalk(ty) {
+    if (!vsyncOn()) { toast('학원 서버에 연동하면 열려요'); return; }
+    var pool = activeStates(ty).filter(function (s) { return s.step >= 1; });
+    if (pool.length < 3) { toast('물 주기로 한 번 이상 맞힌 낱말이 3개는 필요해요'); return; }
+    var mission = shuffle(pool.map(function (s) { return WORDS[s.id]; }))
+      .filter(function (w) { return w && w.word && w.meaning; }).slice(0, 3);
+    if (mission.length < 3) { toast('미션에 쓸 낱말이 모자라요'); return; }
+    var body = openOverlay('AI 대화 미션');
+    pickChar();
+
+    function pickChar() {
+      body.innerHTML = '<div class="qcard"><div class="qmeaning">누구와 이야기해 볼까요?</div>' +
+        '<p class="muted" style="margin:6px 0 12px;">대화하면서 아래 낱말 3개를 자연스럽게 써 보세요.</p>' +
+        '<div class="row" style="flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:14px;">' +
+        mission.map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join('') +
+        '</div>' +
+        TALK_CHARS.map(function (c) {
+          return '<button class="btn big" data-c="' + c.id + '" style="margin-bottom:8px;">' +
+            c.ic + ' ' + esc(c.name) + ' <span class="muted" style="font-weight:600;">· ' + esc(c.job) + '</span></button>';
+        }).join('') + '</div>';
+      body.querySelectorAll('[data-c]').forEach(function (b) {
+        b.addEventListener('click', function () { run(b.dataset.c); });
+      });
+    }
+
+    function run(charId) {
+      var ch = TALK_CHARS.filter(function (c) { return c.id === charId; })[0];
+      var history = [];              // [{role, content}] — 서버로 통째로 간다
+      var lit = {};                  // 불 켜진 낱말
+      var left = 8;
+      var lastSay = ch.open;
+      var lastWhy = '';
+      draw();
+
+      function litRow() {
+        return '<div class="row" style="flex-wrap:wrap;justify-content:center;gap:6px;margin:0 0 10px;">' +
+          mission.map(function (w) {
+            return '<span class="chip ' + (lit[w.word] ? TYPE[w.type].cls : '') + '"' +
+              (lit[w.word] ? '' : ' style="background:var(--card-2);color:var(--ink-soft);opacity:.7;"') + '>' +
+              (lit[w.word] ? '✓ ' : '') + esc(w.word) + '</span>';
+          }).join('') + '</div>';
+      }
+
+      function done() { return mission.every(function (w) { return lit[w.word]; }); }
+
+      /* 주고받은 말 — 대화인데 내가 뭐라고 했는지 안 보이면 이어 말하기가 어렵다.
+         화면이 좁으니 최근 넉 줄만 남기고, 마지막 캐릭터 말은 아래에 크게 따로 보여 준다. */
+      function tape() {
+        var rows = history.slice(-5, -1);
+        if (!rows.length) return '';
+        return '<div style="text-align:left;margin:0 0 10px;max-height:34vh;overflow-y:auto;">' +
+          rows.map(function (m) {
+            var mine = m.role === 'user';
+            return '<div style="margin-bottom:6px;font-size:.88rem;line-height:1.5;' +
+              (mine ? 'text-align:right;' : '') + '">' +
+              '<span style="display:inline-block;max-width:88%;padding:7px 11px;border-radius:12px;' +
+              (mine ? 'background:var(--brand-soft,#E9F5FB);' : 'background:var(--card-2);') + '">' +
+              (mine ? '' : ch.ic + ' ') + esc(m.content) + '</span></div>';
+          }).join('') + '</div>';
+      }
+
+      function draw(busy) {
+        if (done()) { win(); return; }
+        body.innerHTML = '<div class="qcard">' + litRow() + tape() +
+          '<div class="qmeaning" style="text-align:left;">' + ch.ic + ' ' + esc(lastSay) + '</div>' +
+          (lastWhy ? '<p class="muted" style="text-align:left;margin:6px 0 0;font-size:.84rem;">' + esc(lastWhy) + '</p>' : '') +
+          '<textarea class="qinput" id="tkIn" rows="3" style="text-align:left;font-size:1rem;font-weight:500;resize:vertical;margin-top:12px;"' +
+          ' placeholder="하고 싶은 말을 써 보세요…"' + (busy ? ' disabled' : '') + '></textarea>' +
+          '<p class="muted" style="margin:6px 0 0;">남은 기회 ' + left + '번</p>' +
+          '<div class="row" style="margin-top:10px;"><button class="btn" id="tkQuit">그만하기</button>' +
+          '<button class="btn primary" id="tkGo"' + (busy ? ' disabled' : '') + '>' + (busy ? '생각하는 중…' : '보내기') + '</button></div></div>';
+        if (!busy) $('#tkIn').focus();
+        $('#tkQuit').addEventListener('click', function () { closeOverlay(); });
+        $('#tkGo').addEventListener('click', send);
+        $('#tkIn').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send();
+        });
+      }
+
+      async function send() {
+        var text = ($('#tkIn').value || '').trim();
+        if (!text) { toast('하고 싶은 말을 써 주세요'); return; }
+        if (text.length > 500) { toast('한 번에 500자까지 쓸 수 있어요'); return; }
+        history.push({ role: 'user', content: text });
+        draw(true);
+        try {
+          var j = await vsyncApi('/talk', { method: 'POST', body: JSON.stringify({
+            char: charId, words: mission.map(function (w) { return { word: w.word, meaning: w.meaning }; }),
+            history: history,
+          }) });
+          if (!j.ok) {
+            history.pop();
+            toast(j.reason === 'no-key' ? '지금은 대화 미션을 쓸 수 없어요' : '잠시 뒤 다시 해 볼까요?');
+            draw(); return;
+          }
+          history.push({ role: 'assistant', content: j.say });
+          lastSay = j.say; lastWhy = '';
+          if (typeof j.left === 'number') left = j.left;
+          (j.used || []).forEach(function (w) {
+            if (lit[w]) return;
+            lit[w] = true;
+            /* 대화에서 실제로 써 봤으면 그것도 회상이다 — 맥락이 다르니 맥락 종류로 남긴다 */
+            var st = db.states[(mission.filter(function (m) { return m.word === w; })[0] || {}).id];
+            if (st && !st.graduated && st.due <= now()) WBSRS.review(st, 'good', now(), 'talk');
+          });
+          if ((j.used || []).length) { lastWhy = j.why || ''; save(); }
+          if (!left && !done()) { over(); return; }
+          draw();
+        } catch (e) { history.pop(); toast('연결이 잠깐 끊겼어요'); draw(); }
+      }
+
+      function win() {
+        db.log.push({ t: now(), kind: 'talk', char: charId, n: mission.length });
+        save();
+        body.innerHTML = '<div class="qcard"><div class="qmeaning">미션 성공! 🎉</div>' +
+          '<p class="muted" style="margin:8px 0 0;">' + ch.ic + ' ' + esc(ch.name) + '와 이야기하며 낱말 ' + mission.length + '개를 다 써 봤어요.</p>' +
+          '<div style="margin-top:12px;">' + litRow() + '</div>' +
+          '<p class="demo-note">읽고 아는 것과 말로 쓰는 것은 다른 회상이에요. 대화에서 써 본 낱말은 더 오래 남습니다.</p>' +
+          '<button class="btn primary big" id="tkDone" style="margin-top:12px;">정원으로</button></div>';
+        $('#tkDone').addEventListener('click', function () { closeOverlay(); show('garden'); });
+      }
+
+      function over() {
+        var n = mission.filter(function (w) { return lit[w.word]; }).length;
+        body.innerHTML = '<div class="qcard"><div class="qmeaning">여기까지!</div>' +
+          '<p class="muted" style="margin:8px 0 0;">낱말 ' + n + ' / ' + mission.length + '개를 써 봤어요. 다음에 또 도전해요.</p>' +
+          '<div style="margin-top:12px;">' + litRow() + '</div>' +
+          '<button class="btn primary big" id="tkDone" style="margin-top:12px;">정원으로</button></div>';
+        $('#tkDone').addEventListener('click', function () { closeOverlay(); show('garden'); });
+      }
+    }
+  }
+
   function startSentence(ty) {
     if (!vsyncOn()) { toast('학원 서버에 연동하면 열려요'); return; }
     var pool = activeStates(ty).filter(function (s) { return s.step >= 1; });
