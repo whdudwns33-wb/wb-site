@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.10",
+  "version": "2026-08-31.11",
   "articles": [
     {
       "id": "nuri-space",
@@ -24185,6 +24185,1029 @@
               "What is clear is only this: keeping what you have learned takes time to copy it over,",
               " ",
               "and closing the book is not the end of studying."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "jury-trial",
+      "category": "society",
+      "careers": [
+        "law",
+        "media",
+        "edu"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "대법원 전자민원센터 — 국민참여재판 Q&A",
+          "url": "https://www.scourt.go.kr/nm/min_9/min_9_3/index.html"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 평의·평결 절차에서의 참여",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=899&ccfNo=3&cciNo=2&cnpClsNo=1"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 배심원·예비배심원 선정",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=899&ccfNo=2&cciNo=2&cnpClsNo=1"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "번호로 불리는 사람들",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "재판에는 판사만 있는 것이 ",
+              "아니에요. ",
+              "어떤 재판에는 ",
+              "보통 사람들도 함께 앉아요. ",
+              "이런 사람을 ",
+              "배심원이라고 불러요."
+            ],
+            [
+              "배심원은 이름 대신 ",
+              "번호로 불려요. ",
+              "누구인지 알려지면 ",
+              "위험할 수도 있기 때문이에요. ",
+              "배심원은 재판을 ",
+              "처음부터 끝까지 지켜봐요. ",
+              "그리고 따로 모여서 ",
+              "이야기를 나눠요. ",
+              "죄가 있는지 없는지 ",
+              "뜻을 모아요. ",
+              "이렇게 모은 뜻을 ",
+              "평결이라고 해요."
+            ],
+            [
+              "판사는 이 뜻을 ",
+              "꼭 따르지 않아도 돼요. ",
+              "그런데 다르게 정할 때는 ",
+              "왜 그렇게 했는지 ",
+              "말해 주어야 해요. ",
+              "그래서 배심원의 뜻은 ",
+              "그냥 지나칠 수 없는 ",
+              "무게를 가져요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "재판",
+              "easy": "누가 잘못했는지 가려서 정하는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "배심원",
+              "easy": "재판에 함께 참여해서 뜻을 내는 보통 사람이에요.",
+              "hanja": null
+            },
+            {
+              "word": "평결",
+              "easy": "배심원들이 이야기 끝에 함께 모은 마지막 뜻이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "법원 건물이 생긴 모습",
+                "재판에 참여하는 배심원이 하는 일",
+                "판사가 되는 방법",
+                "재판을 구경하는 방법"
+              ],
+              "answer": 1,
+              "explain": "배심원이 재판을 지켜보고 뜻을 모으는 일을 설명한 글이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "배심원을 이름 대신 번호로 부르는 까닭은 무엇인가요?",
+              "choices": [
+                "이름이 너무 길어서",
+                "번호가 부르기 편해서",
+                "누구인지 알려지면 위험할 수도 있어서",
+                "이름을 잊어버려서"
+              ],
+              "answer": 2,
+              "explain": "누구인지 알려지면 위험할 수도 있기 때문이라고 나와 있어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「평결」은 무엇인가요?",
+              "choices": [
+                "배심원들이 함께 모은 마지막 뜻",
+                "재판이 열리는 날짜",
+                "판사가 앉는 자리",
+                "법원까지 가는 길"
+              ],
+              "answer": 0,
+              "explain": "배심원들이 이야기를 나눈 끝에 모은 마지막 뜻을 평결이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "판사가 배심원과 다르게 정할 때 까닭을 말해 주어야 하는 것은 왜 중요할까요?",
+              "choices": [
+                "말을 많이 하면 재판이 길어져서",
+                "까닭을 들으면 왜 그렇게 되었는지 알 수 있어서",
+                "판사가 목소리를 키울 수 있어서",
+                "배심원이 다시 뽑히기 때문에"
+              ],
+              "answer": 1,
+              "explain": "따르지 않아도 되지만 까닭은 말해야 하므로, 사람들이 그 이유를 알 수 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 반에서 이 글처럼 결정을 한다면 어떤 모습일까요?",
+              "choices": [
+                "반장이 혼자 정하고 아무 말도 하지 않는다",
+                "친구들의 뜻을 듣고, 다르게 정할 때는 그 까닭을 말해 준다",
+                "친구들의 뜻을 아예 묻지 않는다",
+                "가장 목소리가 큰 사람이 정한다"
+              ],
+              "answer": 1,
+              "explain": "뜻을 듣되 반드시 따르지는 않고, 다를 때는 까닭을 말하는 것이 이 글의 방식이에요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "따르지 않아도 되는 결정",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "재판은 판사가 혼자 하는 일이라고 ",
+              "생각하기 쉽다. ",
+              "그러나 우리나라에는 ",
+              "국민이 직접 참여하는 형사재판이 있다. ",
+              "이것을 국민참여재판이라고 한다. ",
+              "여기에 참여하는 사람을 ",
+              "배심원이라고 부른다."
+            ],
+            [
+              "배심원은 스스로 지원해서 되는 것이 아니다. ",
+              "법원이 미리 만들어 둔 명부에서 ",
+              "무작위로 뽑는다. ",
+              "만 스무 살이 넘은 국민이면 ",
+              "특별한 자격은 필요하지 않다. ",
+              "다만 변호사나 경찰관처럼 ",
+              "일정한 직업을 가진 사람은 ",
+              "배심원이 될 수 없다. ",
+              "뽑는 날에는 이름을 부르지 않고 ",
+              "법원이 준 번호로만 부른다. ",
+              "사생활과 신변을 지키기 위해서다."
+            ],
+            [
+              "재판이 끝나면 ",
+              "배심원들만 따로 모인다. ",
+              "이 자리를 평의라고 한다. ",
+              "판사는 들어오지 않는다. ",
+              "뜻이 하나로 모이면 ",
+              "그대로 결론을 내린다. ",
+              "모이지 않으면 ",
+              "판사의 의견을 반드시 들은 뒤 ",
+              "다수결로 정한다. ",
+              "이때에도 판사는 ",
+              "유죄인지 무죄인지를 ",
+              "말해서는 안 된다. ",
+              "이렇게 모은 결론이 평결이다."
+            ],
+            [
+              "그런데 이 평결은 ",
+              "법원을 묶지 않는다. ",
+              "판사는 평결과 다른 판결을 ",
+              "선고할 수 있다. ",
+              "대신 조건이 하나 붙는다. ",
+              "선고할 때 배심원의 평결이 무엇이었는지 ",
+              "피고인에게 알려 주어야 하고, ",
+              "그와 다르게 정했다면 ",
+              "그 까닭을 설명해야 한다. ",
+              "따르라고 강제하지는 않으면서 ",
+              "그냥 지나칠 수는 없게 ",
+              "만들어 둔 것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "배심원",
+              "easy": "재판에 참여해 유무죄에 관한 뜻을 내는 일반 국민",
+              "hanja": "陪(모실 배)+審(살필 심)+員(인원 원)"
+            },
+            {
+              "word": "무작위",
+              "easy": "정해진 순서 없이 우연에 맡겨 뽑는 방식",
+              "hanja": "無(없을 무)+作(지을 작)+爲(할 위)"
+            },
+            {
+              "word": "평의",
+              "easy": "배심원들이 모여 유무죄를 의논하는 자리",
+              "hanja": "評(평할 평)+議(의논할 의)"
+            },
+            {
+              "word": "평결",
+              "easy": "의논 끝에 배심원이 내린 최종 판단",
+              "hanja": "評(평할 평)+決(결단할 결)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "국민참여재판은 판사를 대신하는 제도이다",
+                "배심원의 평결은 강제력이 없지만 판사가 그냥 지나칠 수는 없다",
+                "배심원은 원하는 사람이 지원해서 된다",
+                "평의에는 판사도 함께 들어간다"
+              ],
+              "answer": 1,
+              "explain": "평결이 법원을 묶지 않지만, 다른 판결을 하려면 까닭을 설명해야 한다는 것이 글의 핵심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "배심원이 뽑히는 방식으로 알맞은 것은?",
+              "choices": [
+                "법원에 직접 지원한다",
+                "판사가 잘 아는 사람을 고른다",
+                "변호사 가운데에서 정한다",
+                "법원이 만들어 둔 명부에서 무작위로 뽑는다"
+              ],
+              "answer": 3,
+              "explain": "스스로 지원하는 것이 아니라 미리 만들어 둔 명부에서 무작위로 뽑는다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "평의에서 배심원의 뜻이 하나로 모이지 않으면 어떻게 하는가?",
+              "choices": [
+                "판사의 의견을 반드시 들은 뒤 다수결로 정한다",
+                "재판을 처음부터 다시 한다",
+                "판사가 혼자 정한다",
+                "평결을 내리지 않는다"
+              ],
+              "answer": 0,
+              "explain": "뜻이 모이지 않을 때는 판사의 의견을 들은 뒤 다수결로 평결한다고 나와 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「무작위」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "아무 일도 하지 않는 것",
+                "여럿이 나누어 맡는 것",
+                "정해진 순서 없이 우연에 맡겨 뽑는 것",
+                "가장 뛰어난 사람을 고르는 것"
+              ],
+              "answer": 2,
+              "explain": "무작위는 어떤 기준이나 순서 없이 우연에 맡겨 뽑는 방식을 뜻한다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "평의에 판사가 들어오지 않고, 의견을 말할 때에도 유무죄를 밝히지 못하게 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "판사가 재판 내용을 잘 몰라서",
+                "배심원이 판사의 판단에 끌려가지 않고 스스로 결론을 내리게 하려고",
+                "판사가 시간이 없어서",
+                "평의실이 좁아서"
+              ],
+              "answer": 1,
+              "explain": "판사의 유무죄 의견이 먼저 나오면 배심원의 판단이 그쪽으로 쏠릴 수 있으므로, 스스로 결론을 내리도록 막아 둔 장치다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 방식과 가장 비슷한 것은?",
+              "choices": [
+                "설문 결과를 받되, 다르게 결정하면 그 이유를 공개하는 회사",
+                "설문 결과를 그대로 따르는 회사",
+                "설문을 아예 하지 않는 회사",
+                "설문 결과를 받고 아무 말 없이 덮어 두는 회사"
+              ],
+              "answer": 0,
+              "explain": "반드시 따르지는 않지만 다르게 정하면 이유를 밝혀야 하는 구조가 국민참여재판의 평결과 같다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "It is easy to think of a trial as something a judge does alone. In Korea, however, there is a criminal trial in which citizens take part directly. It is called a citizen participation trial, and the people who take part in it are called jurors.",
+            "You do not become a juror by applying. The court draws jurors at random from a list prepared in advance. Any citizen over the age of twenty may serve, and no special qualification is needed. People in certain jobs, such as lawyers and police officers, cannot serve. On the day of selection the court does not call names but only the numbers it has given out, in order to protect privacy and personal safety.",
+            "When the trial ends, the jurors gather on their own. This meeting is called deliberation, and the judge does not enter. If the jurors reach one view, that becomes their conclusion. If they do not, they must hear the judge's opinion and then decide by majority. Even then the judge may not say whether the defendant is guilty or not guilty. The conclusion reached in this way is the verdict.",
+            "This verdict, however, does not bind the court. The judge may hand down a judgment different from it. One condition is attached instead. At sentencing the judge must tell the defendant what the jurors decided, and if the judgment differs, must explain why. The rule does not force the judge to follow the verdict, yet it makes the verdict impossible to pass over in silence."
+          ],
+          "envocab": [
+            {
+              "word": "jurors",
+              "ko": "배심원들 (명사 juror의 복수)",
+              "base": "juror [ˈdʒʊrər]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "평의, 심사숙고 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            },
+            {
+              "word": "verdict",
+              "ko": "평결 (명사)",
+              "base": "verdict [ˈvɜːrdɪkt]"
+            },
+            {
+              "word": "bind",
+              "ko": "묶다, 구속하다 (동사)",
+              "base": "bind [baɪnd]"
+            },
+            {
+              "word": "defendant",
+              "ko": "피고인 (명사)",
+              "base": "defendant [dɪˈfendənt]"
+            }
+          ],
+          "enseg": [
+            [
+              "It is easy to think of a trial as something a judge does alone. ",
+              "In Korea, however, ",
+              "there is a criminal trial in which citizens take part directly. ",
+              "It is called a citizen participation trial, ",
+              "and the people who take part in it are called jurors."
+            ],
+            [
+              "You do not become a juror by applying. ",
+              "The court draws jurors at random from a list prepared in advance. ",
+              "Any citizen over the age of twenty may serve, ",
+              "and no special qualification is needed. ",
+              "People in certain jobs, such as lawyers",
+              " and police officers, cannot serve. ",
+              "On the day of selection the court does not call names",
+              " but only the numbers it has given out, ",
+              "in order to protect privacy and personal safety."
+            ],
+            [
+              "When the trial ends, ",
+              "the jurors gather on their own. ",
+              "This meeting is called deliberation, ",
+              "and the judge does not enter. ",
+              "If the jurors reach one view, ",
+              "that becomes their conclusion. ",
+              "If they do not, ",
+              "they must hear the judge's opinion",
+              " and then decide by majority. ",
+              "Even then the judge may not say whether the defendant is guilty",
+              " or not guilty. ",
+              "The conclusion reached in this way is the verdict."
+            ],
+            [
+              "This verdict, however, does not bind the court. ",
+              "The judge may hand down a judgment different from it. ",
+              "One condition is attached instead. ",
+              "At sentencing the judge must tell the defendant what the jurors decided,",
+              " and if the judgment differs, must explain why. ",
+              "The rule does not force the judge to follow the verdict,",
+              " ",
+              "yet it makes the verdict impossible to pass over in silence."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "기속하지 않는다, 그러나",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "형사재판은 오랫동안 ",
+              "법률을 배운 판사의 몫이었다. ",
+              "그러나 우리나라에는 ",
+              "일반 국민이 배심원으로 참여하는 ",
+              "국민참여재판이 있다. ",
+              "배심원은 법정에서 오가는 공방을 ",
+              "처음부터 끝까지 지켜본 뒤, ",
+              "피고인이 유죄인지 무죄인지에 대한 ",
+              "판단을 내놓는다. ",
+              "유죄로 본 경우에는 ",
+              "어떤 형벌이 알맞은지에 대해서도 ",
+              "의견을 낸다."
+            ],
+            [
+              "배심원은 지원자가 아니다. ",
+              "법원은 미리 만들어 둔 명부에서 ",
+              "필요한 만큼을 무작위로 뽑아 부른다. ",
+              "만 스무 살이 넘은 국민이면 ",
+              "특별한 자격이 필요 없지만, ",
+              "변호사나 경찰관처럼 ",
+              "일정한 직업을 가진 사람은 제외된다. ",
+              "선정기일은 공개하지 않고, ",
+              "후보자를 이름 대신 ",
+              "법원이 부여한 번호로 부른다. ",
+              "인원은 사건에 따라 다르다. ",
+              "법정형이 사형이나 무기형에 해당하는 사건에는 ",
+              "아홉 명이, ",
+              "그 밖의 사건에는 ",
+              "일곱 명이 참여한다."
+            ],
+            [
+              "변론이 끝나면 ",
+              "배심원들은 평의실로 들어간다. ",
+              "이 자리를 평의라고 하며, ",
+              "오직 배심원만 참여한다. ",
+              "전원의 의견이 일치하면 ",
+              "그대로 평결한다. ",
+              "일치하지 않으면 ",
+              "심리에 관여한 판사의 의견을 반드시 들은 뒤 ",
+              "다수결로 정한다. ",
+              "다만 이때 판사는 ",
+              "유죄인지 무죄인지에 대한 의견을 ",
+              "말해서는 안 되고, ",
+              "평결 자체에 참여할 수도 없다. ",
+              "배심원 대표는 ",
+              "유죄 의견과 무죄 의견의 수를 나누어 적은 평결서를 만들고, ",
+              "배심원 전원의 서명을 받아 봉인해 ",
+              "재판부에 전달한다."
+            ],
+            [
+              "이렇게 만들어진 평결은 ",
+              "법원을 기속하지 않는다. ",
+              "법에는 배심원의 평결과 양형 의견이 ",
+              "법원을 기속하지 않는다고 ",
+              "분명히 적혀 있다. ",
+              "판사는 평결과 다른 판결을 ",
+              "선고할 수 있다는 뜻이다. ",
+              "그러나 법은 여기서 멈추지 않는다. ",
+              "재판장은 판결을 선고할 때 ",
+              "배심원의 평결이 무엇이었는지를 ",
+              "피고인에게 반드시 알려야 하고, ",
+              "평결과 다른 판결을 선고하는 때에는 ",
+              "그 이유를 피고인에게 설명해야 한다."
+            ],
+            [
+              "두 조항을 나란히 놓으면 ",
+              "제도의 설계가 보인다. ",
+              "평결을 따르도록 강제했다면 ",
+              "판사의 판단이 사라졌을 것이고, ",
+              "참고 자료로만 두었다면 ",
+              "배심원이 들인 시간이 흔적 없이 사라졌을 것이다. ",
+              "우리 제도는 그 사이를 택했다. ",
+              "따를 의무는 지우지 않되, ",
+              "따르지 않을 때 설명할 의무를 지운 것이다. ",
+              "강제 대신 설명으로 ",
+              "결론에 무게를 싣는 방식이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기속",
+              "easy": "반드시 따르도록 묶어 두는 것",
+              "hanja": "羈(굴레 기)+束(묶을 속)"
+            },
+            {
+              "word": "평의",
+              "easy": "배심원들이 모여 유무죄를 의논하는 절차",
+              "hanja": "評(평할 평)+議(의논할 의)"
+            },
+            {
+              "word": "평결",
+              "easy": "평의 끝에 배심원이 내린 최종 판단",
+              "hanja": "評(평할 평)+決(결단할 결)"
+            },
+            {
+              "word": "양형",
+              "easy": "유죄로 인정된 사람에게 어떤 형벌을 얼마나 줄지 정하는 일",
+              "hanja": "量(헤아릴 량)+刑(형벌 형)"
+            },
+            {
+              "word": "선고",
+              "easy": "법정에서 재판의 결과를 밝혀 알리는 일",
+              "hanja": "宣(베풀 선)+告(알릴 고)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 국민참여재판에서 가장 주목하는 것은?",
+              "choices": [
+                "배심원을 뽑는 절차가 얼마나 까다로운가",
+                "재판이 며칠 만에 끝나는가",
+                "따를 의무는 없지만 설명할 의무는 있게 만든 설계",
+                "배심원에게 지급되는 일당의 액수"
+              ],
+              "answer": 2,
+              "explain": "글은 기속력이 없다는 조항과 이유를 설명해야 한다는 조항을 나란히 놓고, 그 사이를 택한 설계를 설명한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "평의에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "오직 배심원만 참여한다",
+                "전원의 의견이 일치하면 그대로 평결한다",
+                "일치하지 않으면 판사의 의견을 들은 뒤 다수결로 정한다",
+                "판사도 배심원과 함께 평결에 참여한다"
+              ],
+              "answer": 3,
+              "explain": "판사는 의견을 진술할 수 있을 뿐 평결 자체에는 참여할 수 없다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "배심원의 인원에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "법정형이 사형이나 무기형인 사건에는 아홉 명이 참여한다",
+                "모든 사건에 똑같이 일곱 명이 참여한다",
+                "피고인이 인원을 직접 정한다",
+                "인원은 평의가 끝난 뒤에 정해진다"
+              ],
+              "answer": 0,
+              "explain": "법정형이 사형·무기형에 해당하면 아홉 명, 그 밖의 사건에는 일곱 명이 참여한다고 나와 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「기속」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "빠르게 진행하는 것",
+                "반드시 따르도록 묶어 두는 것",
+                "여럿이 나누어 맡는 것",
+                "잠시 미루어 두는 것"
+              ],
+              "answer": 1,
+              "explain": "기속은 어떤 판단에 반드시 따르도록 구속한다는 뜻이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "평결서에 유죄 의견의 수와 무죄 의견의 수를 나누어 적게 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "배심원의 이름을 남기기 위해",
+                "결론뿐 아니라 의견이 얼마나 갈렸는지까지 재판부에 전하기 위해",
+                "평의 시간을 줄이기 위해",
+                "판사가 평결을 바꾸기 쉽게 하기 위해"
+              ],
+              "answer": 1,
+              "explain": "숫자를 나누어 적으면 결론이 만장일치였는지 아슬아슬한 다수결이었는지가 드러나, 재판부가 그 무게를 가늠할 수 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 관점에서 「설명 의무」가 하는 역할을 가장 잘 설명한 것은?",
+              "choices": [
+                "판사가 평결을 반드시 따르게 만든다",
+                "배심원의 평결을 참고 자료로 격하시킨다",
+                "판사의 판단을 없애고 다수의 뜻만 남긴다",
+                "강제하지 않으면서도 평결을 그냥 넘길 수 없게 만든다"
+              ],
+              "answer": 3,
+              "explain": "글은 따를 의무를 지우지 않는 대신 설명할 의무를 지운 것이 이 제도의 설계라고 정리한다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "For a long time a criminal trial was the work of judges who had studied law for years. In Korea, however, there is also the citizen participation trial, in which ordinary citizens take part as jurors. After watching the arguments in the courtroom from beginning to end, the jurors give their judgment on whether the defendant is guilty. When they find guilt, they also give their opinion on what punishment would be fitting.",
+            "Jurors are not volunteers. From a list of candidates prepared in advance the court draws as many as it needs at random and calls them to a selection hearing. Any citizen over the age of twenty may serve without special qualification, but people in certain jobs, such as lawyers and police officers, are excluded. The selection hearing is closed, and candidates are called by numbers given by the court rather than by name. The size of the jury depends on the case. Nine jurors take part when the offence carries a possible death sentence or life imprisonment, and seven in other cases.",
+            "When the arguments close, the jurors enter the deliberation room. Only jurors take part in this meeting. If all of them agree, that agreement becomes the verdict. If they do not, they must hear the opinion of the judge who heard the case and then decide by majority. Even then the judge may not state an opinion on guilt or innocence, and may not take part in the verdict itself. The foreperson writes a verdict sheet setting out the number of guilty opinions and the number of not-guilty opinions, collects the signatures of every juror, seals it, and hands it to the bench.",
+            "The verdict made in this way does not bind the court. The law states plainly that the verdict and the sentencing opinion of the jurors do not bind the court, which means the judge may hand down a judgment different from the verdict. Yet the law does not stop there. When delivering judgment the presiding judge must tell the defendant what the jurors decided, and when the judgment differs from the verdict, must explain the reason to the defendant.",
+            "Placed side by side, these two provisions reveal the design of the system. Had the verdict been made binding, the judgment of the judge would have disappeared. Had it been left as mere reference material, the time the jurors spent would have vanished without a trace. Our system chose the space between. It imposes no duty to follow, but it imposes a duty to explain when not following. Weight is given to the conclusion by explanation rather than by force."
+          ],
+          "envocab": [
+            {
+              "word": "jurors",
+              "ko": "배심원들 (명사 juror의 복수)",
+              "base": "juror [ˈdʒʊrər]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "평의 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            },
+            {
+              "word": "verdict",
+              "ko": "평결 (명사)",
+              "base": "verdict [ˈvɜːrdɪkt]"
+            },
+            {
+              "word": "foreperson",
+              "ko": "배심원 대표 (명사)",
+              "base": "foreperson [ˈfɔːrpɜːrsn]"
+            },
+            {
+              "word": "provisions",
+              "ko": "조항들 (명사 provision의 복수)",
+              "base": "provision [prəˈvɪʒn]"
+            },
+            {
+              "word": "binding",
+              "ko": "구속력 있는 (형용사)",
+              "base": "bind [baɪnd]"
+            }
+          ],
+          "enseg": [
+            [
+              "For a long time a criminal trial was the work of judges who had studied law for years. ",
+              "In Korea, however, ",
+              "there is also the citizen participation trial, ",
+              "in which ordinary citizens take part as jurors. ",
+              "After watching the arguments in the courtroom from beginning to end, ",
+              "the jurors give their judgment on whether the defendant is guilty. ",
+              "When they find guilt, ",
+              "they also give their opinion on what punishment would be fitting."
+            ],
+            [
+              "Jurors are not volunteers. ",
+              "From a list of candidates prepared in advance the court draws as many as it needs at random",
+              " and calls them to a selection hearing. ",
+              "Any citizen over the age of twenty may serve without special qualification,",
+              " but people in certain jobs, such as lawyers",
+              " and police officers, are excluded. ",
+              "The selection hearing is closed, ",
+              "and candidates are called by numbers given by the court rather than by name. ",
+              "The size of the jury depends on the case. ",
+              "Nine jurors take part when the offence carries a possible death sentence",
+              " or life imprisonment, and seven in other cases."
+            ],
+            [
+              "When the arguments close, ",
+              "the jurors enter the deliberation room. ",
+              "Only jurors take part in this meeting. ",
+              "If all of them agree, ",
+              "that agreement becomes the verdict. ",
+              "If they do not, ",
+              "they must hear the opinion of the judge who heard the case",
+              " and then decide by majority. ",
+              "Even then the judge may not state an opinion on guilt",
+              " or innocence, ",
+              "and may not take part in the verdict itself. ",
+              "The foreperson writes a verdict sheet setting out the number of guilty opinions",
+              " and the number of not-guilty opinions, ",
+              "collects the signatures of every juror, ",
+              "seals it, and hands it to the bench."
+            ],
+            [
+              "The verdict made in this way does not bind the court. ",
+              "The law states plainly that the verdict",
+              " and the sentencing opinion of the jurors do not bind the court, ",
+              "which means the judge may hand down a judgment different from the verdict. ",
+              "Yet the law does not stop there. ",
+              "When delivering judgment the presiding judge must tell the defendant what the jurors decided,",
+              " ",
+              "and when the judgment differs from the verdict, ",
+              "must explain the reason to the defendant."
+            ],
+            [
+              "Placed side by side, ",
+              "these two provisions reveal the design of the system. ",
+              "Had the verdict been made binding, ",
+              "the judgment of the judge would have disappeared. ",
+              "Had it been left as mere reference material, ",
+              "the time the jurors spent would have vanished without a trace. ",
+              "Our system chose the space between. ",
+              "It imposes no duty to follow, ",
+              "but it imposes a duty to explain when not following. ",
+              "Weight is given to the conclusion by explanation rather than by force."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "강제하지 않고 무게를 만드는 법",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "국민이 재판에 참여하는 방식은 나라마다 다르다. ",
+              "배심제는 일반 국민으로 구성된 배심원이 ",
+              "직업법관으로부터 독립해 유무죄를 판단하고, ",
+              "법관이 그 평결에 기속되는 제도다. ",
+              "참심제는 참심원이 ",
+              "재판부의 일원으로 들어가 ",
+              "직업법관과 동등한 권한으로 ",
+              "사실과 법률 문제를 판단하는 제도다. ",
+              "국민참여재판은 ",
+              "둘 중 어느 하나를 그대로 들여오지 않았다. ",
+              "두 제도를 섞고 ",
+              "우리 현실에 맞춘 수정을 더했다. ",
+              "그 수정이 무엇이며 왜 그렇게 했는지를 보면 ",
+              "이 제도의 성격이 드러난다."
+            ],
+            [
+              "배심원은 지원해서 되는 자리가 아니다. ",
+              "법원은 미리 작성해 둔 명부에서 ",
+              "필요한 수만큼을 무작위로 뽑아 ",
+              "선정기일을 통지한다. ",
+              "만 스무 살이 넘으면 ",
+              "특별한 자격은 필요 없으나, ",
+              "일정한 전과가 있는 사람과 ",
+              "변호사·경찰관 등은 제외된다. ",
+              "선정기일은 공개하지 않고 ",
+              "후보자를 성명 대신 번호로 부른다. ",
+              "사생활과 신변을 보호하기 위한 장치다. ",
+              "인원은 사건의 무게에 따라 다르다. ",
+              "법정형이 사형이나 무기형인 사건에는 아홉 명, ",
+              "그 밖의 사건에는 일곱 명이 참여하고, ",
+              "피고인이나 변호인이 공소사실의 주요 내용을 인정한 때에는 ",
+              "다섯 명으로 할 수 있다."
+            ],
+            [
+              "변론이 끝나면 배심원들은 평의실로 들어간다. ",
+              "평의에는 오직 배심원만 참여하며, ",
+              "법관은 관여하지 않는다. ",
+              "전원의 의견이 일치하면 그대로 평결한다. ",
+              "일치하지 않으면 ",
+              "심리에 관여한 판사의 의견을 반드시 들은 뒤 ",
+              "다수결로 평결한다. ",
+              "다만 판사는 유무죄에 관한 의견을 진술해서는 안 되며, ",
+              "의견을 말했더라도 평결에 참여할 수 없다. ",
+              "유죄 평결이 나오면 배심원은 판사와 함께 양형을 토의하지만, ",
+              "표결이 아니라 의견을 낼 수 있을 뿐이다. ",
+              "배심원 대표는 유죄 의견과 무죄 의견의 수를 구분한 평결서를 작성하고, ",
+              "전원의 서명을 받아 봉인해 재판부에 전달한다."
+            ],
+            [
+              "그러나 이 평결의 효력은 제한적이다. ",
+              "법은 배심원의 평결과 양형에 관한 의견이 ",
+              "법원을 기속하지 않는다고 규정한다. ",
+              "권고적 효력만 갖는다는 뜻이고, ",
+              "판사는 평결과 다른 판결을 선고할 수 있다. ",
+              "그런데 법은 한 걸음을 더 둔다. ",
+              "재판장은 판결을 선고할 때 ",
+              "배심원의 평결 결과를 피고인에게 고지해야 하고, ",
+              "평결과 다른 판결을 선고할 때에는 ",
+              "그 이유를 설명해야 한다. ",
+              "따를 의무는 지우지 않으면서 ",
+              "따르지 않을 때의 설명 의무를 지운 것이다."
+            ],
+            [
+              "두 규정을 나란히 놓으면 설계자의 고민이 읽힌다. ",
+              "기속력을 주었다면 ",
+              "법률 판단을 훈련받은 법관의 역할이 지워졌을 것이고, ",
+              "참고 자료로만 두었다면 ",
+              "국민이 며칠을 들여 내린 결론이 흔적 없이 사라졌을 것이다. ",
+              "우리 제도는 강제 대신 설명을 택했다. ",
+              "설명은 공개된 법정에서 이루어지고 기록에 남는다. ",
+              "판사는 평결을 뒤집으려면 근거를 갖추어야 한다. ",
+              "물론 이 선택에는 대가가 있다. ",
+              "설명 의무는 결론을 강제하지 못하고, ",
+              "설명이 얼마나 충실한지 판단할 기준도 법에 없다. ",
+              "그럼에도 이 방식의 뜻은 분명하다. ",
+              "제도를 움직이는 힘이 늘 강제에서만 나오지는 않는다는 것, ",
+              "때로는 이유를 밝히게 하는 것만으로도 ",
+              "결론에 무게가 실린다는 것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기속",
+              "easy": "판단을 반드시 따르도록 구속하는 것",
+              "hanja": "羈(굴레 기)+束(묶을 속)"
+            },
+            {
+              "word": "평결",
+              "easy": "평의를 거쳐 배심원이 내린 최종 판단",
+              "hanja": "評(평할 평)+決(결단할 결)"
+            },
+            {
+              "word": "양형",
+              "easy": "유죄로 인정된 사람에게 줄 형벌의 종류와 정도를 정하는 일",
+              "hanja": "量(헤아릴 량)+刑(형벌 형)"
+            },
+            {
+              "word": "권고",
+              "easy": "따르도록 권하되 강제하지는 않는 것",
+              "hanja": "勸(권할 권)+告(알릴 고)"
+            },
+            {
+              "word": "고지",
+              "easy": "결정된 내용을 알려서 알게 하는 일",
+              "hanja": "告(알릴 고)+知(알 지)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 주장으로 가장 알맞은 것은?",
+              "choices": [
+                "국민참여재판은 배심제를 그대로 들여온 제도이다",
+                "평결에 기속력을 주어야 제도가 완성된다",
+                "국민참여재판은 강제 대신 설명 의무로 평결에 무게를 싣는다",
+                "배심원 제도는 판사의 역할을 대신하기 위한 것이다"
+              ],
+              "answer": 2,
+              "explain": "글은 기속력을 주지 않는 대신 설명 의무를 지운 설계를 이 제도의 핵심으로 설명한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "배심제와 참심제에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "배심제에서는 법관이 배심원의 평결에 기속된다",
+                "참심제에서는 참심원이 법정 밖에서만 의견을 낸다",
+                "배심제와 참심제는 사실상 같은 제도이다",
+                "우리나라는 참심제를 그대로 들여왔다"
+              ],
+              "answer": 0,
+              "explain": "배심제는 배심원이 직업법관으로부터 독립해 평결하고 법관이 그 평결에 기속되는 제도라고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "평의와 평결에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "전원의 의견이 일치하지 않으면 판사의 의견을 들은 뒤 다수결로 평결한다",
+                "판사는 의견을 진술한 뒤 평결에도 함께 참여한다",
+                "판사는 유무죄에 관한 의견을 진술해서는 안 된다",
+                "평결서에는 유죄 의견과 무죄 의견의 수를 구분해 적는다"
+              ],
+              "answer": 1,
+              "explain": "판사는 의견을 진술했더라도 평결에는 참여할 수 없다고 명시되어 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「권고적 효력」이라는 표현이 이 글에서 가리키는 것은?",
+              "choices": [
+                "반드시 따라야 하는 힘",
+                "재판을 다시 열게 하는 힘",
+                "형벌을 무겁게 하는 힘",
+                "따르도록 권하되 강제하지는 않는 힘"
+              ],
+              "answer": 3,
+              "explain": "평결이 법원을 기속하지 않고 권고적 효력만 갖는다는 것은, 따르도록 권할 뿐 강제하지 않는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 「이 선택에는 대가가 있다」고 덧붙인 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "배심원을 뽑는 데 비용이 많이 들기 때문에",
+                "설명 의무만으로는 결론을 강제하지 못하고 설명의 충실함을 잴 기준도 없기 때문에",
+                "재판이 길어져 피고인이 손해를 보기 때문에",
+                "판사가 설명하는 것을 꺼리기 때문에"
+              ],
+              "answer": 1,
+              "explain": "바로 뒤에서 설명 의무가 결론을 강제하지 못하며 설명의 충실도를 판단할 기준도 법에 없다고 밝힌다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "다음 중 이 글의 논지를 가장 약하게 만드는 사실은?",
+              "choices": [
+                "판사가 평결과 다른 판결을 하는 경우가 매우 드물다",
+                "판사가 평결과 다르게 선고하면서 「종합적으로 고려했다」는 한 문장만 남겨도 절차상 문제가 없다",
+                "배심원이 선정기일에 번호로 불린다",
+                "배심원의 수가 사건에 따라 달라진다"
+              ],
+              "answer": 1,
+              "explain": "글의 논지는 설명 의무가 판사에게 근거를 갖추게 만든다는 것이다. 형식적인 한 문장으로 의무가 충족된다면 그 힘은 크게 줄어든다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 설계 원리를 학교 운영에 적용한 예로 가장 알맞은 것은?",
+              "choices": [
+                "학생 투표 결과를 학교가 무조건 따르도록 규정을 만든다",
+                "학생 투표를 하되 결과를 공개하지 않는다",
+                "학생 투표 결과를 공개하고, 다르게 결정할 때는 그 이유를 함께 공개하도록 한다",
+                "학생 투표를 없애고 교사 회의로 대신한다"
+              ],
+              "answer": 2,
+              "explain": "따를 의무 대신 다르게 결정할 때의 설명 의무를 두는 것이 이 글이 정리한 국민참여재판의 방식이다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "The way citizens take part in trials differs from country to country. Under the jury system, jurors drawn from ordinary citizens judge guilt independently of professional judges, and the judge is bound by their verdict. Under the lay judge system, lay judges sit as members of the bench itself and decide questions of fact and of law with the same authority as professional judges. Korea's citizen participation trial did not import either one as it stood. It mixed the two systems and added changes fitted to Korean conditions. What those changes are, and why they were made, reveals the character of the system.",
+            "A juror is not a volunteer. From a list of candidates drawn up in advance, the court selects as many as it needs at random and notifies them of a selection hearing. Any citizen over the age of twenty may serve without special qualification, but people with certain criminal records, and people in certain jobs such as lawyers and police officers, are excluded. The selection hearing is closed, and candidates are called by number rather than by name, a device meant to protect privacy and personal safety. The size of the jury varies with the gravity of the case. Nine jurors take part where the offence carries a possible death sentence or life imprisonment and seven in other cases, and five may be used where the defendant or counsel has admitted the main substance of the charge.",
+            "When the arguments close, the jurors enter the deliberation room. Only jurors take part, and in principle they proceed without the involvement of a judge. If all agree, that agreement stands as the verdict. If they do not agree, they must hear the opinion of the judge who heard the case before reaching a verdict, and then decide by majority. Even then the judge may not state an opinion on guilt or innocence, and having spoken may still not take part in the verdict. Where the verdict is guilty, the jurors discuss sentencing together with the judge, but they do not vote on the sentence; they may only offer an opinion. The foreperson draws up a verdict sheet separating the number of guilty opinions from the number of not-guilty opinions, collects every juror's signature, seals it, and hands it to the bench.",
+            "The force of a verdict that has come this far is nonetheless limited. The law provides that the verdict and the sentencing opinion of the jurors do not bind the court. They carry only advisory force, and the judge may hand down a judgment different from the verdict. Yet the law places one more step here. When delivering judgment the presiding judge must inform the defendant of the jurors' verdict, and where the judgment differs from the verdict, must explain the reason to the defendant. No duty to follow is imposed, but a duty to explain not following is.",
+            "Set side by side, these two provisions let us read the difficulty the drafters faced. Had the verdict been made binding, the role of judges trained in legal judgment would have been erased. Had it been left as mere reference material, a conclusion citizens spent days reaching would have vanished without a trace. Our system chose explanation over compulsion. Because the explanation is given in open court and stays on the record, a judge who overturns a verdict must have grounds ready. This choice has its price, of course. A duty to explain cannot compel a conclusion, and no standard for judging how thorough an explanation must be is written into the law. Even so, what the approach means is clear: the force that moves an institution does not always come from compulsion, and sometimes requiring reasons to be stated is enough to give a conclusion weight."
+          ],
+          "envocab": [
+            {
+              "word": "verdict",
+              "ko": "평결 (명사)",
+              "base": "verdict [ˈvɜːrdɪkt]"
+            },
+            {
+              "word": "advisory",
+              "ko": "권고적인, 자문의 (형용사)",
+              "base": "advisory [ədˈvaɪzəri]"
+            },
+            {
+              "word": "compulsion",
+              "ko": "강제 (명사)",
+              "base": "compulsion [kəmˈpʌlʃn]"
+            },
+            {
+              "word": "provisions",
+              "ko": "조항들 (명사 provision의 복수)",
+              "base": "provision [prəˈvɪʒn]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "평의 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            },
+            {
+              "word": "gravity",
+              "ko": "중대함 (명사)",
+              "base": "gravity [ˈɡrævəti]"
+            }
+          ],
+          "enseg": [
+            [
+              "The way citizens take part in trials differs from country to country. ",
+              "Under the jury system, ",
+              "jurors drawn from ordinary citizens judge guilt independently of professional judges,",
+              " and the judge is bound by their verdict. ",
+              "Under the lay judge system, ",
+              "lay judges sit as members of the bench itself",
+              " and decide questions of fact",
+              " and of law with the same authority as professional judges. ",
+              "Korea's citizen participation trial did not import either one as it stood. ",
+              "It mixed the two systems",
+              " and added changes fitted to Korean conditions. ",
+              "What those changes are, and why they were made, ",
+              "reveals the character of the system."
+            ],
+            [
+              "A juror is not a volunteer. ",
+              "From a list of candidates drawn up in advance, ",
+              "the court selects as many as it needs at random",
+              " and notifies them of a selection hearing. ",
+              "Any citizen over the age of twenty may serve without special qualification,",
+              " but people with certain criminal records, ",
+              "and people in certain jobs such as lawyers",
+              " and police officers, are excluded. ",
+              "The selection hearing is closed, ",
+              "and candidates are called by number rather than by name, ",
+              "a device meant to protect privacy",
+              " and personal safety. ",
+              "The size of the jury varies with the gravity of the case. ",
+              "Nine jurors take part where the offence carries a possible death sentence",
+              " or life imprisonment and seven in other cases, ",
+              "and five may be used where the defendant",
+              " or counsel has admitted the main substance of the charge."
+            ],
+            [
+              "When the arguments close, ",
+              "the jurors enter the deliberation room. ",
+              "Only jurors take part, ",
+              "and in principle they proceed without the involvement of a judge. ",
+              "If all agree, ",
+              "that agreement stands as the verdict. ",
+              "If they do not agree, ",
+              "they must hear the opinion of the judge who heard the case before reaching a verdict,",
+              " and then decide by majority. ",
+              "Even then the judge may not state an opinion on guilt",
+              " or innocence, ",
+              "and having spoken may still not take part in the verdict. ",
+              "Where the verdict is guilty, ",
+              "the jurors discuss sentencing together with the judge,",
+              " ",
+              "but they do not vote on the sentence; they may only offer an opinion. ",
+              "The foreperson draws up a verdict sheet separating the number of guilty opinions from the number of not-guilty opinions, ",
+              "collects every juror's signature, seals it, ",
+              "and hands it to the bench."
+            ],
+            [
+              "The force of a verdict that has come this far is nonetheless limited. ",
+              "The law provides that the verdict",
+              " and the sentencing opinion of the jurors do not bind the court. ",
+              "They carry only advisory force, ",
+              "and the judge may hand down a judgment different from the verdict. ",
+              "Yet the law places one more step here. ",
+              "When delivering judgment the presiding judge must inform the defendant of the jurors' verdict,",
+              " ",
+              "and where the judgment differs from the verdict, ",
+              "must explain the reason to the defendant. ",
+              "No duty to follow is imposed, ",
+              "but a duty to explain not following is."
+            ],
+            [
+              "Set side by side, ",
+              "these two provisions let us read the difficulty the drafters faced. ",
+              "Had the verdict been made binding, ",
+              "the role of judges trained in legal judgment would have been erased. ",
+              "Had it been left as mere reference material, ",
+              "a conclusion citizens spent days reaching would have vanished without a trace. ",
+              "Our system chose explanation over compulsion. ",
+              "Because the explanation is given in open court",
+              " and stays on the record, ",
+              "a judge who overturns a verdict must have grounds ready. ",
+              "This choice has its price, of course. ",
+              "A duty to explain cannot compel a conclusion, ",
+              "and no standard for judging how thorough an explanation must be is written into the law. ",
+              "Even so, ",
+              "what the approach means is clear: the force that moves an institution does not always come from compulsion,",
+              " ",
+              "and sometimes requiring reasons to be stated is enough to give a conclusion weight."
             ]
           ]
         }
