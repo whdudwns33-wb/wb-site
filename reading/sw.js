@@ -34,8 +34,14 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // 버전 파일: 항상 네트워크에서 (작다). 이걸로 아래 데이터 캐시를 무효화한다.
+  if (url.pathname.endsWith('version.json')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+
   // 지문 데이터: 네트워크 우선(항상 최신), 오프라인이면 캐시
-  if (url.pathname.endsWith('articles.json')) {
+  if (/articles(-L[1-4])?\.json$|hanja\.json$/.test(url.pathname)) {
     e.respondWith(
       fetch(e.request)
         .then((r) => { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, cp)); return r; })

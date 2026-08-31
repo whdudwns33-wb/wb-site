@@ -1,8 +1,39 @@
+# 보안 헤더는 전 경로에 공통으로. Cache-Control 은 여기 두지 않는다 —
+# /* 에 no-store 를 두면 아래 개별 규칙과 합쳐져 "no-store, public, max-age=..." 가 되고
+# 브라우저는 더 엄격한 쪽(no-store)을 따라 캐시가 통째로 무력화된다.
 /*
   Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   X-Robots-Tag: noindex, nofollow, noarchive
-  Cache-Control: no-store
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# 화면과 관리용 데이터는 항상 최신이어야 한다
+/
+  Cache-Control: no-store
+/index.html
+  Cache-Control: no-store
+/review.html
+  Cache-Control: no-store
+/parent.html
+  Cache-Control: no-store
+/sw.js
+  Cache-Control: no-store
+/articles.json
+  Cache-Control: no-store
+/version.json
+  Cache-Control: no-store
+
+# 학년대별 지문은 URL에 ?v=<버전>을 달고 받는다. 내용이 바뀌면 버전이 바뀌므로
+# 오래 캐시해도 안전하고, 그래야 앱을 켤 때마다 다시 받지 않는다.
+/articles-L1.json
+  Cache-Control: public, max-age=604800
+/articles-L2.json
+  Cache-Control: public, max-age=604800
+/articles-L3.json
+  Cache-Control: public, max-age=604800
+/articles-L4.json
+  Cache-Control: public, max-age=604800
+/hanja.json
+  Cache-Control: public, max-age=604800

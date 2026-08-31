@@ -461,6 +461,40 @@ function levelBody(a,lv){return a.levels&&a.levels[lv];}
 function myLevel(){return S.profile?S.profile.level:'L3';}
 function published(){return DB.articles.filter(a=>a.status==='published'&&levelBody(a,myLevel()));}
 
+/* 지문 데이터는 학년대별로 쪼개 받는다.
+   예전에는 켤 때마다 전체(1MB)를 캐시 없이 받았다. 주 4~5편 × 4학년대로 쌓이면
+   1년 뒤 7MB가 되는데, 학생에게 필요한 것은 자기 학년대 하나뿐이다.
+   version.json(수십 바이트)만 캐시 없이 받고, 본체는 ?v= 를 붙여 캐시한다. */
+let DATA_VER=null, DB_LEVEL=null, HANJA=null;
+async function fetchVersion(){
+  try{
+    const r=await fetch('./version.json',{cache:'no-store'});
+    if(r.ok){const j=await r.json();if(j&&j.v)return String(j.v);}
+  }catch(e){}
+  return String(Date.now());          /* 버전을 못 받으면 캐시를 쓰지 않는다 */
+}
+async function loadLevel(lv){
+  const want=LEVELS.includes(lv)?lv:'L3';
+  if(DB&&DB_LEVEL===want)return DB;
+  if(!DATA_VER)DATA_VER=await fetchVersion();
+  const r=await fetch('./articles-'+want+'.json?v='+encodeURIComponent(DATA_VER));
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();
+  if(!j||!Array.isArray(j.articles)||!j.diagnostics)throw new Error('bad data');
+  DB=j;DB_LEVEL=want;
+  return DB;
+}
+/* 한자 카드만 전 학년대 어휘를 훑어야 해서 따로 미리 만들어 둔 파일을 쓴다 */
+async function loadHanja(){
+  if(HANJA)return HANJA;
+  if(!DATA_VER)DATA_VER=await fetchVersion();
+  const r=await fetch('./hanja.json?v='+encodeURIComponent(DATA_VER));
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();
+  HANJA=Array.isArray(j.families)?j.families:[];
+  return HANJA;
+}
+
 /* ───────────────────────── 추천 로직 ───────────────────────── */
 function lastCats(n){
   const rs=Object.entries(S.readings).sort((a,b)=>b[1].date<a[1].date?-1:1).slice(0,n);
@@ -646,9 +680,10 @@ function vOnboard(){
   }
   return '';
 }
-function finishOnboard(levelOverride){
+async function finishOnboard(levelOverride){
   const st=sess.ob;
   const lv=levelOverride||LEVEL_OF[st.grade];
+  try{ await loadLevel(lv); }catch(e){ announce('글을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요'); return; }
   S.profile={grade:st.grade,level:lv,interests:st.interests.slice(0,lv==='L1'?4:3),createdAt:dkey()};
   if(st.diagQ)S.diag={score:st.diagQ.correct,total:4,at:dkey(),level:lv};
   save();
@@ -1126,27 +1161,7 @@ function vSettings(){
 /* ───────────────────────── 훈련 ───────────────────────── */
 function daysSince(k){const a=new Date(k+'T12:00:00'),b=new Date(dkey()+'T12:00:00');return Math.round((b-a)/86400000);}
 function dueVocab(){const iv=[0,1,3,7,14];return S.vocab.filter(v=>daysSince(v.last)>=iv[Math.min(v.box,4)]);}
-function hanjaFamilies(){
-  const map={};
-  for(const a of DB.articles){
-    if(a.status!=='published')continue;
-    for(const lv of LEVELS){
-      const b=a.levels[lv];if(!b)continue;
-      for(const v of b.vocab){
-        if(!v.hanja)continue;
-        for(const part of v.hanja.split('+')){
-          const m=part.trim().match(/^(.)\((.+)\)$/);if(!m)continue;
-          if(!map[m[1]])map[m[1]]={ch:m[1],rd:m[2],words:{}};
-          const parts=v.hanja.split('+');
-          const at=parts.findIndex(x=>x.trim().indexOf(m[1])===0);
-          map[m[1]].words[v.word]={word:v.word,easy:v.easy,hanja:v.hanja,at:at<0?-1:at};
-        }
-      }
-    }
-  }
-  return Object.values(map).map(f=>({ch:f.ch,rd:f.rd,words:Object.values(f.words)}))
-    .filter(f=>f.words.length>=2).sort((x,y)=>y.words.length-x.words.length);
-}
+function hanjaFamilies(){ return HANJA||[]; }
 function copyText(t){
   const fb=()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
     try{document.execCommand('copy');announce('복사했어요');}catch(e){announce('복사가 안 됐어요');}ta.remove();};
@@ -1206,8 +1221,9 @@ function vTrain(){
   const tp=pickTrainPara();
   const due=dueVocab();
   const hj=hanjaFamilies();
+  if(!HANJA)loadHanja().then(()=>{if(view.name==='train')render({keep:true});}).catch(()=>{HANJA=[];});
   const last=[...S.train].reverse().find(t=>t.score!=null)||null;
-  const wrongN=S.wrong.length;
+  const wrongN=S.wrong.filter(w=>wrongQuestion(w)).length;   /* 학년대를 바꾸면 옛 오답은 열 수 없다 */
   return `<div class="card hero"><p class="eyebrow">읽기 근육 훈련</p><h1>오늘도 한 세트!</h1>
     <p class="sub">회당 5~10분이면 충분해요. 지금까지 훈련 ${S.train.length}회 · 독서 요약 ${S.redbook.length}회</p></div>
   <div class="card"><div class="thead"><span class="tico c">↺</span><div class="t-main"><h2 style="font-size:16px">오답 노트</h2>
@@ -1803,10 +1819,14 @@ document.addEventListener('click',e=>{
   const ob=sess.ob;
   if(act==='nav'){go(t.dataset.v);}
   else if(act==='ob-grade'){ob.grade=t.dataset.v;render();}
-  else if(act==='ob-next-grade'){ob.step='interests';render();}
+  else if(act==='ob-next-grade'){ob.step='interests';render();
+    /* 관심 분야를 고르는 동안 뒤에서 그 학년대 지문을 받아 둔다 — 진단에서 기다리지 않게 */
+    loadLevel(LEVEL_OF[ob.grade]).catch(()=>{});}
   else if(act==='ob-int'){toggleInterest(ob.interests,t.dataset.v,LEVEL_OF[ob.grade],false);render();}
   else if(act==='ob-next-int'){ob.step='diag-intro';render();}
-  else if(act==='ob-diag-start'){ob.step='diag-read';render();}
+  else if(act==='ob-diag-start'){
+    loadLevel(LEVEL_OF[ob.grade]).then(()=>{ob.step='diag-read';render();})
+      .catch(()=>{sess.syncErr=null;announce('글을 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요');});}
   else if(act==='ob-diag-quiz'){ob.step='diag-quiz';render();}
   else if(act==='ob-diag-pick'){const q=ob.diagQ;if(q.picked!=null)return;
     q.picked=+t.dataset.i;const cur=DB.diagnostics[LEVEL_OF[ob.grade]].questions[q.i];
@@ -1986,7 +2006,7 @@ document.addEventListener('click',e=>{
   else if(act==='vs-done'){sess.vs=null;render();}
   /* ── 오답 노트 ── */
   else if(act==='wq-start'){if(!S.wrong.length)return;
-    sess.wq={list:S.wrong.slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0};render();}
+    sess.wq={list:S.wrong.filter(w=>wrongQuestion(w)).slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0};render();}
   else if(act==='wq-pick'){const wq=sess.wq;if(!wq||wq.picked!=null)return;
     wq.picked=+t.dataset.i;
     const w=wq.list[wq.i];const res=wrongQuestion(w);
@@ -2105,7 +2125,12 @@ window.addEventListener('scroll',()=>{
 },{passive:true});
 document.addEventListener('change',e=>{
   const t=e.target.closest('[data-act-change]');if(!t)return;
-  if(t.dataset.actChange==='level'){S.profile.level=t.value;save();render();announce('읽는 글을 '+LEVEL_LABEL[t.value]+'로 바꿨어요');}
+  if(t.dataset.actChange==='level'){
+    const lv=t.value;
+    loadLevel(lv).then(()=>{
+      S.profile.level=lv;save();render();announce('읽는 글을 '+LEVEL_LABEL[lv]+'로 바꿨어요');
+    }).catch(()=>{t.value=S.profile.level;announce('바꾸지 못했어요. 잠시 뒤 다시 해 주세요');});
+  }
 });
 
 /* ───────────────────────── PWA ───────────────────────── */
@@ -2122,17 +2147,17 @@ window.addEventListener('appinstalled',()=>{
 });
 
 /* ───────────────────────── 부팅 ───────────────────────── */
+function dataError(){
+  $('#app').innerHTML='<div class="card"><div class="empty">글 데이터를 불러오지 못했어요.<br>인터넷 연결을 확인하고 새로고침해 주세요.</div><button class="btn" id="reloadBtn">새로고침</button></div>';
+  $('#app').removeAttribute('aria-busy');
+  const b=$('#reloadBtn');if(b)b.addEventListener('click',()=>location.reload());
+}
 (async function boot(){
-  try{
-    const res=await fetch('./articles.json',{cache:'no-store'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    DB=await res.json();
-    if(!DB||!Array.isArray(DB.articles)||!DB.diagnostics)throw new Error('bad data');
-  }catch(err){
-    $('#app').innerHTML='<div class="card"><div class="empty">글 데이터를 불러오지 못했어요.<br>인터넷 연결을 확인하고 새로고침해 주세요.</div><button class="btn" id="reloadBtn">새로고침</button></div>';
-    $('#app').removeAttribute('aria-busy');
-    $('#reloadBtn').addEventListener('click',()=>location.reload());
-    return;
+  /* 프로필이 있으면 그 학년대만, 없으면 아무것도 받지 않는다 —
+     학년을 고르기 전에는 어느 파일이 필요한지 알 수 없다. */
+  if(S.profile){
+    try{ await loadLevel(S.profile.level); }
+    catch(err){ dataError(); return; }
   }
   const linkCode=consumeCodeLink();
   await syncHealth();
