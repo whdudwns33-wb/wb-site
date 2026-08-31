@@ -115,6 +115,12 @@ function examples(coaching, words) {
   return out;
 }
 
+/* 코칭글에 설명이 없어 사람이 써 넣은 뜻 — 다시 캘 수 없으니 살려 둔다 */
+/* 뜻이 없으면 출처도 없다 — 빈 값을 넣어 두면 다시 돌릴 때마다 파일이 달라진다 */
+const dropEmptySrc = (o) => { if (!o.src) delete o.src; return o; };
+
+const keepWritten = (prev) => (prev && prev.src === 'ai' && prev.meaning) || '';
+
 const tb = JSON.parse(fs.readFileSync('reading/textbook.json', 'utf8'));
 let nW = 0, nM = 0, nE = 0;
 const rows = [];
@@ -125,20 +131,26 @@ for (const b of tb.books) for (const l of b.lessons) {
   const paren = parenMeanings(l.coaching), prose = proseMeanings(l.coaching);
 
   /* 낱말 순서: 콜론 설명 → 목표 문단 → 원래 후보 */
-  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...prev.map((p) => p.word).filter(okWord)])];
+  /* 이미 목록에 있고 뜻까지 붙은 낱말은 누군가 손을 댄 것이다 — 새 후보에 쓰는
+     걸름망(okWord)을 다시 들이대면 안 된다. 한 글자 낱말 「샘」이 그렇게 사라졌다.
+     뜻이 없는 채로 남은 옛 후보만 걸름망을 통과해야 살아남는다. */
+  const kept = prev.filter((p) => p.meaning || okWord(p.word)).map((p) => p.word);
+  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...kept])];
   const byPair = {};
   for (const p of pairs) byPair[p.word] = p;
   const prevBy = {};
   for (const p of prev) prevBy[p.word] = p;
   const ex = examples(l.coaching, order);
 
-  const words = order.map((w) => ({
+  const words = order.map((w) => dropEmptySrc({
     word: w,
-    /* 교재 파일에는 사람이 고친 값이 없다 — 강사 검수 결과는 DB 덧씌우기에만 쌓인다.
-       그러니 다시 캘 때는 지난번에 캔 값을 보존하지 않는다. 보존하면 옛 추출의
-       흠(뜻이 다음 항목까지 삼킨 것 따위)이 그대로 굳는다. */
-    meaning: (byPair[w] && byPair[w].meaning) || paren[w] || prose[w] || '',
-    example: (byPair[w] && byPair[w].example) || ex[w] || '',
+    /* 지난번에 "캔" 값은 보존하지 않는다 — 옛 추출의 흠(뜻이 다음 항목까지 삼킨 것
+       따위)이 그대로 굳는다. 다만 코칭글에 설명이 없어 사람이 써 넣은 뜻(src:'ai')은
+       다시 캘 수 없으니 남긴다. 강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있다. */
+    meaning: (byPair[w] && byPair[w].meaning) || paren[w] || prose[w] || keepWritten(prevBy[w]) || '',
+    example: (byPair[w] && byPair[w].example) || ex[w] || (prevBy[w] && prevBy[w].example) || '',
+    src: (byPair[w] && byPair[w].meaning) || paren[w] || prose[w] ? 'coaching'
+      : (keepWritten(prevBy[w]) ? 'ai' : ''),
   }));
   l.words = words;
   nW += words.length; nM += words.filter((w) => w.meaning).length; nE += words.filter((w) => w.example).length;

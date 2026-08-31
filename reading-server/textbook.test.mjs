@@ -137,6 +137,27 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   }
   const filled = words.filter((w) => w.meaning).length;
   assert.ok(filled > words.length / 2, '뜻이 절반도 안 채워졌다 (' + filled + '/' + words.length + ')');
+  /* 뜻이 있으면 출처가 있어야 한다 — 코칭글에서 옮긴 것인지 대신 쓴 것인지
+     구분이 안 되면 강사가 어디를 눈여겨봐야 할지 알 수 없다 */
+  for (const w of words) {
+    if (w.meaning) assert.ok(w.src === 'coaching' || w.src === 'ai', '뜻에 출처가 없다: ' + w.word);
+    else assert.strictEqual(w.src, undefined, '뜻이 없는데 출처가 붙었다: ' + w.word);
+  }
+});
+
+t('1~5강은 코칭글에 설명이 없어 대신 쓴 뜻이다', () => {
+  const lessons = findBook(TB, 'eoduk-cho1').lessons.filter((l) => l.lesson <= 5);
+  for (const l of lessons) {
+    assert.strictEqual(l.words.filter((w) => !w.meaning).length, 0, l.lesson + '강에 빈 뜻이 남았다');
+    assert.ok(l.words.every((w) => w.src === 'ai'), l.lesson + '강 뜻은 모두 대신 쓴 것으로 표시돼야 한다');
+  }
+});
+
+t('출처는 아는 값만, 그리고 뜻이 있을 때만 저장한다', () => {
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: 'ai' }])[0].src, 'ai');
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: 'coaching' }])[0].src, 'coaching');
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: '<script>' }])[0].src, undefined, '모르는 출처는 버린다');
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: '', src: 'ai' }])[0].src, undefined, '뜻이 없으면 출처도 없다');
 });
 
 t('낱말을 다듬어 저장한다 — 빈 것·중복·과한 개수를 막는다', () => {
