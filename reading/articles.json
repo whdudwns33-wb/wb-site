@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.13",
+  "version": "2026-08-31.14",
   "articles": [
     {
       "id": "nuri-space",
@@ -26199,6 +26199,936 @@
               " and opening ceremonies with it; counting carries neither. ",
               "Without counting, however, ",
               "we cannot even know what has gone wrong."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "muryeong-jiseok",
+      "category": "history",
+      "careers": [
+        "hum",
+        "art",
+        "media"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가유산 지식이음 금석문 — 무령왕릉 지석(武寧王陵 誌石)",
+          "url": "https://portal.nrich.go.kr/kor/ksmUsrView.do?menuIdx=584&ksm_idx=2554"
+        },
+        {
+          "title": "국가유산 디지털 서비스 — 무령왕릉 지석 (국보, 1974년 지정)",
+          "url": "https://digital.khs.go.kr/heri/heriDetail.do?ctptUid=13898859730728705517&ctptNo=1113401630000"
+        },
+        {
+          "title": "한국민족문화대백과사전 — 무령왕릉 지석",
+          "url": "https://encykorea.aks.ac.kr/Article/E0054249"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "이름표가 있는 무덤",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "아주 오래된 무덤을 열면 ",
+              "그릇이나 장신구가 나와요. ",
+              "그런데 누구의 무덤인지는 ",
+              "알기 어려워요. ",
+              "이름이 적혀 있지 않으니까요."
+            ],
+            [
+              "그런데 공주에 있는 ",
+              "한 무덤은 달랐어요. ",
+              "안에 납작한 돌판이 ",
+              "두 장 놓여 있었어요. ",
+              "거기에 글자가 새겨져 있었어요. ",
+              "무덤 주인의 이름과 ",
+              "돌아가신 날이 적혀 있었어요. ",
+              "이런 돌판을 지석이라고 해요."
+            ],
+            [
+              "덕분에 우리는 알게 되었어요. ",
+              "이곳은 백제 무령왕의 무덤이에요. ",
+              "삼국시대 무덤은 아주 많지만 ",
+              "주인이 누구인지 아는 무덤은 ",
+              "여기 하나뿐이에요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "무덤",
+              "easy": "돌아가신 분을 땅에 모신 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "지석",
+              "easy": "무덤 주인이 누구인지 새겨서 무덤 안에 넣어 둔 돌판이에요.",
+              "hanja": null
+            },
+            {
+              "word": "삼국시대",
+              "easy": "옛날 우리 땅에 고구려·백제·신라 세 나라가 있던 때예요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "무덤을 만드는 방법",
+                "공주에 가는 길",
+                "글자가 새겨진 돌판 덕분에 주인을 알게 된 무덤",
+                "옛날 그릇을 닦는 방법"
+              ],
+              "answer": 2,
+              "explain": "지석에 이름과 날짜가 적혀 있어 무덤 주인을 알게 되었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "보통 오래된 무덤에서 주인을 알기 어려운 까닭은 무엇인가요?",
+              "choices": [
+                "이름이 적혀 있지 않아서",
+                "무덤이 너무 작아서",
+                "그릇이 나오지 않아서",
+                "무덤이 물에 잠겨서"
+              ],
+              "answer": 0,
+              "explain": "그릇이나 장신구는 나와도 이름이 적혀 있지 않다고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「지석」은 무엇인가요?",
+              "choices": [
+                "무덤을 덮는 흙",
+                "무덤 앞에 심는 나무",
+                "무덤에 넣는 그릇",
+                "무덤 주인을 새겨 넣어 둔 돌판"
+              ],
+              "answer": 3,
+              "explain": "무덤 주인이 누구인지 새겨서 무덤 안에 넣어 둔 돌판을 지석이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "무령왕의 무덤이 특별하게 여겨지는 까닭은 무엇일까요?",
+              "choices": [
+                "가장 큰 무덤이라서",
+                "삼국시대 무덤 가운데 주인을 아는 무덤이 여기 하나뿐이라서",
+                "가장 늦게 만들어져서",
+                "금이 가장 많이 나와서"
+              ],
+              "answer": 1,
+              "explain": "무덤은 아주 많지만 주인이 누구인지 아는 무덤은 여기 하나뿐이라고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "먼 훗날 사람들이 우리 물건을 발견했을 때 주인을 알게 하려면 어떻게 하면 좋을까요?",
+              "choices": [
+                "물건을 아주 깊이 묻는다",
+                "물건을 예쁘게 꾸민다",
+                "누구의 것인지와 언제 것인지를 함께 적어 둔다",
+                "물건을 아주 많이 만든다"
+              ],
+              "answer": 2,
+              "explain": "지석처럼 이름과 날짜를 함께 적어 두면 나중에도 알 수 있어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "돌판 두 장이 세운 시계",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "땅에서 옛 물건이 나와도 ",
+              "그것이 몇 년에 만들어졌는지는 ",
+              "대개 알 수 없다. ",
+              "모양이 비슷한 것끼리 묶어 ",
+              "앞뒤 순서를 짐작할 뿐이다. ",
+              "그래서 고고학에는 ",
+              "연대를 못 박아 주는 유물이 ",
+              "무엇보다 귀하다."
+            ],
+            [
+              "1971년 공주에서 ",
+              "배수로 공사를 하던 중 ",
+              "벽돌로 쌓은 무덤 하나가 ",
+              "우연히 드러났다. ",
+              "무덤 안 널길에는 ",
+              "납작한 돌판 두 장이 ",
+              "나란히 놓여 있었다. ",
+              "무덤 주인에 관한 기록을 새긴 돌, ",
+              "곧 지석이었다."
+            ],
+            [
+              "왕의 지석에는 ",
+              "영동대장군 백제 사마왕이 ",
+              "예순두 살이던 523년 5월 7일에 세상을 떠나고, ",
+              "525년 8월 12일에 무덤에 모셨다고 적혀 있었다. ",
+              "왕비의 지석에는 ",
+              "526년 12월에 세상을 떠나 ",
+              "삼년상을 마친 529년 2월 12일에 모셨다고 적혀 있었다. ",
+              "이 사마왕이 백제 무령왕이다."
+            ],
+            [
+              "날짜가 적힌 돌판 하나가 ",
+              "무덤 전체의 시계가 되었다. ",
+              "이 무덤 안에서 나온 물건들은 ",
+              "언제 만들어진 것인지가 정해졌고, ",
+              "그 물건들은 다시 ",
+              "다른 무덤에서 나온 비슷한 물건의 ",
+              "나이를 재는 자가 되었다. ",
+              "그래서 이 지석은 ",
+              "백제의 무덤과 금속 공예품이 ",
+              "어떻게 변해 왔는지를 살피는 ",
+              "기준 자료로 쓰이고 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "유물",
+              "easy": "옛사람이 남긴 물건",
+              "hanja": "遺(남길 유)+物(물건 물)"
+            },
+            {
+              "word": "지석",
+              "easy": "무덤 주인에 관한 기록을 새겨 무덤에 넣은 돌판",
+              "hanja": "誌(기록할 지)+石(돌 석)"
+            },
+            {
+              "word": "연대",
+              "easy": "어떤 일이 있었거나 물건이 만들어진 때를 가리키는 햇수",
+              "hanja": "年(해 년)+代(대신할 대)"
+            },
+            {
+              "word": "기준",
+              "easy": "다른 것을 재거나 견주어 볼 때 잣대가 되는 것",
+              "hanja": "基(터 기)+準(준할 준)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "벽돌무덤은 흙무덤보다 튼튼하다",
+                "날짜가 적힌 지석 덕분에 다른 유물의 연대를 재는 기준이 생겼다",
+                "공주에는 무덤이 아주 많다",
+                "고고학자는 배수로 공사를 자주 한다"
+              ],
+              "answer": 1,
+              "explain": "지석의 날짜가 무덤 안 유물의 연대를 정해 주고, 그것이 다른 유물을 재는 자가 되었다는 것이 핵심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "무령왕릉이 발견된 경위로 알맞은 것은?",
+              "choices": [
+                "학자들이 오랫동안 찾아 헤맨 끝에 찾아냈다",
+                "지도에 표시되어 있었다",
+                "배수로 공사를 하던 중 우연히 드러났다",
+                "왕실 기록에 위치가 남아 있었다"
+              ],
+              "answer": 2,
+              "explain": "1971년 공주에서 배수로 공사를 하던 중 우연히 드러났다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "왕의 지석에 적힌 내용으로 알맞은 것은?",
+              "choices": [
+                "523년에 세상을 떠나 525년에 무덤에 모셨다",
+                "525년에 태어나 529년에 왕이 되었다",
+                "526년에 세상을 떠나 529년에 모셨다",
+                "날짜는 적혀 있지 않고 이름만 있었다"
+              ],
+              "answer": 0,
+              "explain": "예순두 살이던 523년 5월 7일에 세상을 떠나 525년 8월 12일에 모셨다고 적혀 있었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「기준」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "아주 오래된 것",
+                "가장 값비싼 것",
+                "가장 먼저 만들어진 것",
+                "다른 것을 재거나 견줄 때 잣대가 되는 것"
+              ],
+              "answer": 3,
+              "explain": "기준은 다른 것을 재거나 견주어 볼 때 잣대로 삼는 것을 뜻한다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 지석을 「무덤 전체의 시계」라고 부른 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "지석이 시계 모양이기 때문에",
+                "지석의 날짜가 무덤 안 물건들의 연대까지 정해 주기 때문에",
+                "지석이 무덤에서 가장 무겁기 때문에",
+                "지석에 시간이 새겨져 있기 때문에"
+              ],
+              "answer": 1,
+              "explain": "지석에 적힌 날짜 덕분에 함께 묻힌 물건들의 제작 시기까지 알 수 있게 되었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 방식으로 옛 그릇의 나이를 짐작한다면 가장 알맞은 방법은?",
+              "choices": [
+                "그릇의 무게를 잰다",
+                "그릇의 색깔이 얼마나 진한지 본다",
+                "연대가 확실한 무덤에서 나온 그릇과 모양을 견주어 본다",
+                "그릇이 발견된 땅의 넓이를 잰다"
+              ],
+              "answer": 2,
+              "explain": "연대가 확정된 유물을 자로 삼아 비슷한 유물의 시기를 가늠하는 것이 이 글이 설명한 방식이다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "Even when an old object comes out of the ground, the year it was made is usually unknown. Objects of similar shape are grouped together and only their rough order is guessed at. For this reason archaeology prizes above all an object that pins down a date.",
+            "In 1971, while a drainage ditch was being dug in Gongju, a tomb built of bricks came to light by chance. In the passage inside the tomb lay two flat stone tablets side by side. They were stones carved with a record of the tomb's owner, that is, memorial tablets.",
+            "The king's tablet said that King Sama of Baekje, Great General Yeongdong, died on the seventh day of the fifth month of 523 at the age of sixty-two, and was laid in the tomb on the twelfth day of the eighth month of 525. The queen's tablet said that she died in the twelfth month of 526 and was laid to rest on the twelfth day of the second month of 529, after the three-year mourning was complete. This King Sama is King Muryeong of Baekje.",
+            "A single stone bearing dates became a clock for the whole tomb. The objects found inside now had a fixed time of making, and those objects in turn became a ruler for measuring the age of similar objects from other tombs. The tablets are therefore used as reference material for tracing how the tombs and metal craftwork of Baekje changed over time."
+          ],
+          "envocab": [
+            {
+              "word": "archaeology",
+              "ko": "고고학 (명사)",
+              "base": "archaeology [ˌɑːrkiˈɑːlədʒi]"
+            },
+            {
+              "word": "tablets",
+              "ko": "판, 서판 (명사 tablet의 복수)",
+              "base": "tablet [ˈtæblət]"
+            },
+            {
+              "word": "memorial",
+              "ko": "기념의, 추모의 (형용사)",
+              "base": "memorial [məˈmɔːriəl]"
+            },
+            {
+              "word": "mourning",
+              "ko": "상(喪), 애도 (명사)",
+              "base": "mourn [mɔːrn]"
+            },
+            {
+              "word": "reference",
+              "ko": "참고, 기준 (명사)",
+              "base": "reference [ˈrefrəns]"
+            }
+          ],
+          "enseg": [
+            [
+              "Even when an old object comes out of the ground, ",
+              "the year it was made is usually unknown. ",
+              "Objects of similar shape are grouped together",
+              " and only their rough order is guessed at. ",
+              "For this reason archaeology prizes above all an object that pins down a date."
+            ],
+            [
+              "In 1971, ",
+              "while a drainage ditch was being dug in Gongju, ",
+              "a tomb built of bricks came to light by chance. ",
+              "In the passage inside the tomb lay two flat stone tablets side by side. ",
+              "They were stones carved with a record of the tomb's owner, ",
+              "that is, memorial tablets."
+            ],
+            [
+              "The king's tablet said that King Sama of Baekje, ",
+              "Great General Yeongdong, ",
+              "died on the seventh day of the fifth month of 523 at the age of sixty-two,",
+              " ",
+              "and was laid in the tomb on the twelfth day of the eighth month of 525. ",
+              "The queen's tablet said that she died in the twelfth month of 526",
+              " and was laid to rest on the twelfth day of the second month of 529, ",
+              "after the three-year mourning was complete. ",
+              "This King Sama is King Muryeong of Baekje."
+            ],
+            [
+              "A single stone bearing dates became a clock for the whole tomb. ",
+              "The objects found inside now had a fixed time of making,",
+              " ",
+              "and those objects in turn became a ruler for measuring the age of similar objects from other tombs. ",
+              "The tablets are therefore used as reference material for tracing how the tombs",
+              " and metal craftwork of Baekje changed over time."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "날짜 하나가 하는 일",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "고고학은 대개 ",
+              "정확한 연도를 모른 채 시작한다. ",
+              "땅에서 나온 그릇과 장신구를 ",
+              "모양이 비슷한 것끼리 묶고, ",
+              "이것이 저것보다 앞선다는 식으로 ",
+              "앞뒤 순서만 세울 뿐이다. ",
+              "순서는 알아도 연도는 모르는 상태가 ",
+              "오래 이어진다. ",
+              "그래서 연도를 못 박아 주는 유물 하나는 ",
+              "같은 시대의 다른 유물 전체보다 ",
+              "값이 클 때가 있다."
+            ],
+            [
+              "1971년 공주에서 ",
+              "배수로 공사를 하던 중 ",
+              "벽돌을 쌓아 만든 무덤이 우연히 드러났다. ",
+              "중국 남조 양나라의 영향을 받은 양식이었다. ",
+              "널길 가운데에는 돌짐승이 서 있었고, ",
+              "그 앞에 납작한 돌판 두 장이 나란히 놓여 있었다. ",
+              "가로 41.5센티미터, 세로 35센티미터쯤 되는 ",
+              "청회색 돌에 해서체로 글을 새긴 지석이었다."
+            ],
+            [
+              "왕의 지석에는 ",
+              "영동대장군 백제 사마왕이 ",
+              "예순두 살이던 523년 5월 7일에 세상을 떠나 ",
+              "525년 8월 12일에 대묘에 안장되었다고 적혀 있었다. ",
+              "왕비의 지석에는 ",
+              "526년 12월에 세상을 떠나 ",
+              "삼년상을 마친 529년 2월 12일에 안장되었다고 적혀 있었다. ",
+              "왕비 지석의 뒷면은 매지권이었다. ",
+              "525년 8월 12일에 돈 1만 매로 ",
+              "지신에게서 무덤 쓸 땅을 사들였다는 문서다. ",
+              "삼국시대 능에서 나온 매지권은 ",
+              "지금까지 이것 하나뿐이다."
+            ],
+            [
+              "이 돌판 두 장이 두 가지를 한꺼번에 해결했다. ",
+              "무덤 주인이 백제 무령왕임을 밝혀 주었고, ",
+              "무덤을 쌓은 연대까지 알려 주었다. ",
+              "그러자 이 무덤 안에서 나온 물건들도 ",
+              "제작 시기가 함께 정해졌다. ",
+              "연도를 아는 유물 한 무더기가 생긴 것이다. ",
+              "그 뒤로 이 유물들은 ",
+              "다른 무덤에서 나온 비슷한 물건의 나이를 가늠하는 자가 되어, ",
+              "백제의 고분과 금속 공예품이 ",
+              "어떻게 변해 왔는지를 살피는 ",
+              "기준 자료로 쓰이고 있다."
+            ],
+            [
+              "확실한 것 하나가 ",
+              "불확실한 것 여럿을 줄 세운다. ",
+              "무령왕릉이 특별한 이유는 ",
+              "가장 크거나 가장 화려해서가 아니라, ",
+              "묻은 사람이 날짜를 적어 두었기 때문이다. ",
+              "기록을 남긴다는 그 평범한 행위가 ",
+              "천오백 년 뒤의 학문에 ",
+              "가장 단단한 못 하나를 박아 준 셈이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "유물",
+              "easy": "옛사람이 남긴 물건",
+              "hanja": "遺(남길 유)+物(물건 물)"
+            },
+            {
+              "word": "지석",
+              "easy": "무덤 주인에 관한 기록을 새겨 무덤에 넣은 돌판",
+              "hanja": "誌(기록할 지)+石(돌 석)"
+            },
+            {
+              "word": "매지권",
+              "easy": "땅의 신에게서 무덤 쓸 땅을 샀다고 적어 넣은 문서",
+              "hanja": "買(살 매)+地(땅 지)+券(문서 권)"
+            },
+            {
+              "word": "안장",
+              "easy": "돌아가신 분을 무덤에 모시는 일",
+              "hanja": "安(편안할 안)+葬(장사지낼 장)"
+            },
+            {
+              "word": "기준",
+              "easy": "다른 것을 재거나 견줄 때 잣대로 삼는 것",
+              "hanja": "基(터 기)+準(준할 준)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 무령왕릉에서 가장 중요하게 본 것은?",
+              "choices": [
+                "무덤이 벽돌로 지어졌다는 점",
+                "무덤이 우연히 발견되었다는 점",
+                "묻은 사람이 날짜를 적어 두어 연대의 기준이 생겼다는 점",
+                "무덤에서 금으로 만든 물건이 나왔다는 점"
+              ],
+              "answer": 2,
+              "explain": "글은 마지막 문단에서 크기나 화려함이 아니라 날짜를 적어 둔 것이 이 무덤을 특별하게 만들었다고 정리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "매지권에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "왕의 지석 앞면에 새겨져 있었다",
+                "지신에게서 무덤 쓸 땅을 샀다고 적은 문서다",
+                "무덤을 지은 사람의 이름을 적은 문서다",
+                "삼국시대 능에서 여럿 발견되었다"
+              ],
+              "answer": 1,
+              "explain": "왕비 지석 뒷면에 새겨진, 돈 1만 매로 지신에게서 땅을 사들였다는 문서다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "지석이 밝혀 준 것으로 알맞지 않은 것은?",
+              "choices": [
+                "무덤 주인이 백제 무령왕이라는 사실",
+                "무덤을 쌓은 연대",
+                "무덤 안 물건들의 제작 시기",
+                "백제의 인구가 몇 명이었는지"
+              ],
+              "answer": 3,
+              "explain": "지석은 주인과 축조 연대를 밝히고 그 결과 유물의 제작 시기까지 정해 주었지만, 인구는 알려 주지 않는다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「기준 자료」가 이 글에서 뜻하는 것은?",
+              "choices": [
+                "가장 먼저 발굴된 자료",
+                "가장 값비싼 자료",
+                "가장 많이 남아 있는 자료",
+                "다른 유물의 시기를 가늠할 때 잣대로 삼는 자료"
+              ],
+              "answer": 3,
+              "explain": "연대가 확정된 유물이 다른 유물의 나이를 재는 자가 된다는 뜻으로 쓰였다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「연도를 못 박아 주는 유물 하나는 같은 시대의 다른 유물 전체보다 값이 클 때가 있다」고 쓴 까닭은?",
+              "choices": [
+                "그런 유물이 대개 금으로 만들어졌기 때문에",
+                "그 하나가 나머지 전부의 연대를 가늠하게 해 주기 때문에",
+                "그런 유물이 가장 보기 드물기 때문에",
+                "박물관이 비싸게 사들이기 때문에"
+              ],
+              "answer": 1,
+              "explain": "순서만 알던 유물 무리에 확실한 연도 하나가 들어오면 나머지의 시기도 함께 가늠할 수 있게 된다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지를 가장 잘 이어 가는 문장은?",
+              "choices": [
+                "앞으로는 더 크고 화려한 무덤을 찾아야 한다",
+                "고고학은 유물의 아름다움을 먼저 살펴야 한다",
+                "기록이 남지 않은 시대는 연구할 가치가 없다",
+                "그러므로 지금 우리가 남기는 기록도 훗날 누군가의 기준이 될 수 있다"
+              ],
+              "answer": 3,
+              "explain": "글은 기록을 남긴다는 평범한 행위가 뒷날 학문의 못이 되었다는 데서 끝난다. 그 논지를 오늘로 이어 가는 문장이 알맞다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The work of archaeology usually begins without knowing exact years. Bowls and ornaments taken from the ground are grouped by similar shape, and only their order is established, that this comes before that. The state of knowing the order but not the year lasts a long time. For this reason a single object that pins down a year can be worth more than all the other objects of its age put together.",
+            "In 1971, while a drainage ditch was being dug in Gongju, a tomb built of bricks came to light by chance. Its style showed the influence of the Liang dynasty of southern China. A stone beast stood in the middle of the passage, and in front of it lay two flat stone tablets side by side. They were memorial tablets of blue-grey stone, about 41.5 centimetres by 35, carved in regular script.",
+            "The king's tablet recorded that King Sama of Baekje, Great General Yeongdong, died on the seventh day of the fifth month of 523 at the age of sixty-two and was laid in the great tomb on the twelfth day of the eighth month of 525. The queen's tablet recorded that she died in the twelfth month of 526 and was laid to rest on the twelfth day of the second month of 529, once the three-year mourning was over. The back of the queen's tablet was a land-purchase deed: a document stating that on the twelfth day of the eighth month of 525 the ground for the tomb had been bought from the earth god for ten thousand coins. It remains the only such deed found in a tomb of the Three Kingdoms period.",
+            "These two stones settled two questions at once. They showed that the owner of the tomb was King Muryeong of Baekje, and they gave the year the tomb was built. The objects found inside therefore gained a fixed time of making as well. A whole set of objects with known dates had appeared. Since then those objects have served as a ruler for judging the age of similar things from other tombs, and are used as reference material for tracing how the tombs and metal craftwork of Baekje changed.",
+            "One certain thing puts many uncertain things in order. What makes this tomb exceptional is not that it is the largest or the most splendid, but that those who buried the king wrote down the dates. That ordinary act of leaving a record drove the firmest nail available into the scholarship of fifteen centuries later."
+          ],
+          "envocab": [
+            {
+              "word": "archaeology",
+              "ko": "고고학 (명사)",
+              "base": "archaeology [ˌɑːrkiˈɑːlədʒi]"
+            },
+            {
+              "word": "ornaments",
+              "ko": "장신구 (명사 ornament의 복수)",
+              "base": "ornament [ˈɔːrnəmənt]"
+            },
+            {
+              "word": "deed",
+              "ko": "증서, 문서 (명사)",
+              "base": "deed [diːd]"
+            },
+            {
+              "word": "splendid",
+              "ko": "화려한 (형용사)",
+              "base": "splendid [ˈsplendɪd]"
+            },
+            {
+              "word": "scholarship",
+              "ko": "학문, 학술 (명사)",
+              "base": "scholarship [ˈskɑːlərʃɪp]"
+            },
+            {
+              "word": "reference",
+              "ko": "참고, 기준 (명사)",
+              "base": "reference [ˈrefrəns]"
+            }
+          ],
+          "enseg": [
+            [
+              "The work of archaeology usually begins without knowing exact years. ",
+              "Bowls",
+              " and ornaments taken from the ground are grouped by similar shape,",
+              " and only their order is established, ",
+              "that this comes before that. ",
+              "The state of knowing the order",
+              " but not the year lasts a long time. ",
+              "For this reason a single object that pins down a year can be worth more than all the other objects of its age put together."
+            ],
+            [
+              "In 1971, ",
+              "while a drainage ditch was being dug in Gongju, ",
+              "a tomb built of bricks came to light by chance. ",
+              "Its style showed the influence of the Liang dynasty of southern China. ",
+              "A stone beast stood in the middle of the passage,",
+              " ",
+              "and in front of it lay two flat stone tablets side by side. ",
+              "They were memorial tablets of blue-grey stone, ",
+              "about 41.5 centimetres by 35, ",
+              "carved in regular script."
+            ],
+            [
+              "The king's tablet recorded that King Sama of Baekje, ",
+              "Great General Yeongdong, ",
+              "died on the seventh day of the fifth month of 523 at the age of sixty-two",
+              " and was laid in the great tomb on the twelfth day of the eighth month of 525. ",
+              "The queen's tablet recorded that she died in the twelfth month of 526",
+              " and was laid to rest on the twelfth day of the second month of 529, ",
+              "once the three-year mourning was over. ",
+              "The back of the queen's tablet was a land-purchase deed: a document stating that on the twelfth day of the eighth month of 525 the ground for the tomb had been bought from the earth god for ten thousand coins. ",
+              "It remains the only such deed found in a tomb of the Three Kingdoms period."
+            ],
+            [
+              "These two stones settled two questions at once. ",
+              "They showed that the owner of the tomb was King Muryeong of Baekje,",
+              " and they gave the year the tomb was built. ",
+              "The objects found inside therefore gained a fixed time of making as well. ",
+              "A whole set of objects with known dates had appeared. ",
+              "Since then those objects have served as a ruler for judging the age of similar things from other tombs,",
+              " ",
+              "and are used as reference material for tracing how the tombs",
+              " and metal craftwork of Baekje changed."
+            ],
+            [
+              "One certain thing puts many uncertain things in order. ",
+              "What makes this tomb exceptional is not that it is the largest",
+              " or the most splendid, ",
+              "but that those who buried the king wrote down the dates. ",
+              "That ordinary act of leaving a record drove the firmest nail available into the scholarship of fifteen centuries later."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "우연히 남은 기준점",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "고고학이 다루는 연대에는 두 종류가 있다. ",
+              "유물끼리 견주어 무엇이 먼저이고 무엇이 나중인지를 세우는 상대연대와, ",
+              "몇 년의 것인지를 못 박는 절대연대다. ",
+              "발굴 현장에서 얻기 쉬운 쪽은 앞의 것이다. ",
+              "모양이 닮은 것끼리 묶어 순서를 세우는 일은 ",
+              "유물이 충분히 모이면 가능해진다. ",
+              "그러나 그 줄 전체가 몇 세기에 걸쳐 있는지는 ",
+              "여전히 알 수 없다. ",
+              "그 줄에 연도가 적힌 못 하나를 박아 주는 유물이 나타나야 ",
+              "비로소 편년이 성립한다."
+            ],
+            [
+              "1971년 공주에서 배수로 공사를 하던 중 ",
+              "벽돌을 쌓아 만든 무덤 하나가 우연히 드러났다. ",
+              "중국 남조 양나라의 영향이 뚜렷한 양식이었다. ",
+              "널길 가운데에 돌짐승이 남쪽을 향해 서 있었고, ",
+              "그 앞에 납작한 돌판 두 장이 나란히 놓여 있었다. ",
+              "가로 41.5센티미터, 세로 35센티미터 남짓한 청회색 돌에 ",
+              "해서체로 글자를 새긴 지석이었다."
+            ],
+            [
+              "판독된 내용은 이러했다. ",
+              "왕의 지석에는 영동대장군 백제 사마왕이 ",
+              "예순두 살이던 523년 5월 7일에 세상을 떠나 ",
+              "525년 8월 12일에 대묘에 안장되었다고 적혀 있었다. ",
+              "왕비의 지석 앞면에는 526년 12월에 세상을 떠나 ",
+              "삼년상을 마친 529년 2월 12일에 안장되었다고 적혀 있었고, ",
+              "뒷면은 매지권이었다. ",
+              "525년 8월 12일에 돈 1만 매로 ",
+              "지신에게서 무덤 쓸 땅을 사들였다는 문서로, ",
+              "삼국시대 능에서 발견된 매지권은 지금까지 이것뿐이다."
+            ],
+            [
+              "이 두 장이 해낸 일은 두 겹이다. ",
+              "먼저 무덤 주인이 백제 무령왕임을 입증했다. ",
+              "삼국시대 무덤은 수없이 많지만 ",
+              "주인을 확정할 수 있는 무덤은 이곳이 유일하다. ",
+              "다음으로 무덤을 쌓은 연대를 알려 주었고, ",
+              "그 결과 함께 묻힌 유물들의 제작 시기까지 정해졌다. ",
+              "연도를 아는 유물 한 무더기가 한꺼번에 생긴 것이다. ",
+              "이 유물들은 그 뒤 다른 무덤의 비슷한 물건을 재는 자가 되어, ",
+              "백제 고분과 금속 공예품의 양식이 ",
+              "어떻게 변해 왔는지를 살피는 기준 자료로 쓰인다."
+            ],
+            [
+              "다만 이 단단해 보이는 기준점이 ",
+              "얼마나 우연에 기대고 있는지도 함께 보아야 한다. ",
+              "이 무덤은 도굴되지 않은 채 남았고, ",
+              "학자들이 찾아낸 것이 아니라 배수로 공사 중에 드러났으며, ",
+              "무엇보다 당시 백제 사람들에게 ",
+              "죽은 이의 이름과 날짜를 돌에 새겨 넣는 풍습이 있었다. ",
+              "셋 중 하나만 어긋났어도 ",
+              "이 기준점은 없었을 것이다. ",
+              "그리고 기준에 기대는 만큼 위험도 함께 온다. ",
+              "이 무덤의 연대 위에 세운 다른 연대들은 ",
+              "이 기준이 흔들리면 같이 흔들린다. ",
+              "그럼에도 분명한 것은 하나다. ",
+              "누군가 날짜를 적어 두었기에 ",
+              "천오백 년 뒤의 학문이 자를 갖게 되었다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "편년",
+              "easy": "유물이나 사건을 연대순으로 정리해 시기를 매기는 일",
+              "hanja": "編(엮을 편)+年(해 년)"
+            },
+            {
+              "word": "판독",
+              "easy": "알아보기 어려운 글자나 기호를 읽어 내는 일",
+              "hanja": "判(판단할 판)+讀(읽을 독)"
+            },
+            {
+              "word": "매지권",
+              "easy": "땅의 신에게서 무덤 쓸 땅을 샀다고 적어 넣은 문서",
+              "hanja": "買(살 매)+地(땅 지)+券(문서 권)"
+            },
+            {
+              "word": "입증",
+              "easy": "증거를 들어 사실임을 밝히는 일",
+              "hanja": "立(설 립)+證(증거 증)"
+            },
+            {
+              "word": "도굴",
+              "easy": "허락 없이 몰래 무덤을 파헤쳐 유물을 가져가는 일",
+              "hanja": "盜(도둑 도)+掘(팔 굴)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "무령왕릉은 삼국시대에서 가장 큰 무덤이다",
+                "상대연대는 절대연대보다 언제나 정확하다",
+                "날짜를 적은 지석이 편년의 기준점이 되었으며, 그 기준은 우연에 기대어 남았다",
+                "벽돌무덤은 중국에서 그대로 옮겨 온 양식이다"
+              ],
+              "answer": 2,
+              "explain": "글은 지석이 만든 기준점의 가치와, 그것이 우연의 겹침으로 남았다는 점을 함께 다룬다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "상대연대와 절대연대에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "상대연대는 유물의 앞뒤 순서를, 절대연대는 몇 년의 것인지를 가리킨다",
+                "상대연대는 몇 년의 것인지를 가리킨다",
+                "절대연대는 유물이 모이면 저절로 정해진다",
+                "둘은 같은 말을 다르게 부른 것이다"
+              ],
+              "answer": 0,
+              "explain": "유물끼리 견주어 순서를 세우는 것이 상대연대, 몇 년의 것인지 못 박는 것이 절대연대라고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "지석이 해낸 일로 글에 나오지 않은 것은?",
+              "choices": [
+                "무덤 주인이 무령왕임을 입증했다",
+                "무덤을 쌓은 연대를 알려 주었다",
+                "함께 묻힌 유물의 제작 시기를 정해 주었다",
+                "무덤을 지은 기술자의 이름을 알려 주었다"
+              ],
+              "answer": 3,
+              "explain": "주인 확정, 축조 연대, 유물의 제작 시기까지는 나오지만 기술자의 이름은 언급되지 않는다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「편년」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "무덤을 발굴하는 일",
+                "유물이나 사건을 연대순으로 정리해 시기를 매기는 일",
+                "유물을 복원해 원래 모습으로 되돌리는 일",
+                "옛 글자를 오늘날 말로 옮기는 일"
+              ],
+              "answer": 1,
+              "explain": "편년은 연대순으로 엮어 시기를 매기는 일을 뜻한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 세 가지 우연을 나란히 든 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "발굴 기술이 부족했음을 지적하려고",
+                "무령왕릉의 가치를 낮추어 보려고",
+                "학문이 딛고 선 기준점이 얼마나 아슬아슬하게 남았는지를 보이려고",
+                "도굴을 막을 방법을 제안하려고"
+              ],
+              "answer": 2,
+              "explain": "도굴되지 않음, 공사 중 발견, 기록을 남기는 풍습 — 셋 중 하나만 어긋났어도 기준점이 없었다는 점을 들어 그 취약함을 보인다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어, 무령왕릉을 기준으로 삼는 연구가 특히 조심해야 할 점은?",
+              "choices": [
+                "무령왕릉의 유물이 지나치게 화려하다는 점",
+                "무령왕릉이 벽돌무덤이라는 점",
+                "지석의 글자가 해서체라는 점",
+                "한 무덤의 연대에 여러 연구가 함께 걸려 있어, 그 해석이 바뀌면 다른 연대도 함께 흔들린다는 점"
+              ],
+              "answer": 3,
+              "explain": "글은 기준에 기대는 만큼 위험도 함께 온다고 밝힌다. 기준점 하나에 여러 결론이 매달려 있는 구조 자체가 위험 요소다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점에서 오늘날 기록을 남기는 일에 대해 말할 수 있는 것은?",
+              "choices": [
+                "기록은 당대에 쓸모가 있을 때만 가치가 있다",
+                "날짜를 함께 남긴 기록은 뒷날 다른 자료를 판단하는 기준이 될 수 있다",
+                "기록보다 물건을 잘 보존하는 편이 언제나 낫다",
+                "중요한 기록만 골라 남기면 충분하다"
+              ],
+              "answer": 1,
+              "explain": "지석은 특별한 기록이 아니라 이름과 날짜를 적는 당시의 평범한 관행이었고, 그것이 천오백 년 뒤의 자가 되었다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The dates archaeology works with come in two kinds. There is relative dating, which compares objects and establishes which came earlier and which later, and absolute dating, which fixes the year an object belongs to. The former is the easier to obtain in the field. Grouping similar shapes and setting them in order becomes possible once enough objects have been gathered. Yet how many centuries that whole line spans remains unknown. Only when an object appears that drives a dated nail into the line does a chronology take shape.",
+            "In 1971, while a drainage ditch was being dug in Gongju, a tomb built of bricks came to light by chance. Its style bore the clear influence of the Liang dynasty of southern China. A stone beast stood facing south in the middle of the passage, and in front of it lay two flat stone tablets side by side. They were memorial tablets of blue-grey stone, roughly 41.5 by 35 centimetres, with characters carved in regular script.",
+            "The text read as follows. The king's tablet recorded that King Sama of Baekje, Great General Yeongdong, died on the seventh day of the fifth month of 523 at the age of sixty-two and was laid in the great tomb on the twelfth day of the eighth month of 525. The front of the queen's tablet recorded that she died in the twelfth month of 526 and was laid to rest on the twelfth day of the second month of 529, once the three-year mourning was over; the back was a land-purchase deed. It states that on the twelfth day of the eighth month of 525 the ground for the tomb was bought from the earth god for ten thousand coins, and it remains the only such deed found in a tomb of the Three Kingdoms period.",
+            "What these two stones achieved has two layers. First, they proved that the owner of the tomb was King Muryeong of Baekje. Tombs of the Three Kingdoms period are countless, but this is the only one whose occupant can be identified with certainty. Second, they gave the year the tomb was built, and with it the time of making of every object buried alongside. A whole set of dated objects came into being at once. Those objects have since served as a ruler for measuring similar things from other tombs, and are used as reference material for tracing how the styles of Baekje tombs and metal craftwork changed.",
+            "We should also see, however, how much this seemingly solid fixed point rests on chance. The tomb survived without being robbed; it was uncovered not by searching scholars but during work on a drainage ditch; and above all, the people of Baekje at that time had the custom of carving the name and dates of the dead into stone. Had any one of the three gone otherwise, this fixed point would not exist. And leaning on a standard brings its own risk. Other dates built upon the date of this tomb will shift if that standard shifts. One thing is nonetheless clear: because someone wrote down the dates, the scholarship of fifteen centuries later has a ruler."
+          ],
+          "envocab": [
+            {
+              "word": "chronology",
+              "ko": "편년, 연대순 배열 (명사)",
+              "base": "chronology [krəˈnɑːlədʒi]"
+            },
+            {
+              "word": "relative",
+              "ko": "상대적인 (형용사)",
+              "base": "relative [ˈrelətɪv]"
+            },
+            {
+              "word": "absolute",
+              "ko": "절대적인 (형용사)",
+              "base": "absolute [ˈæbsəluːt]"
+            },
+            {
+              "word": "occupant",
+              "ko": "안에 있는 사람, 거주자 (명사)",
+              "base": "occupant [ˈɑːkjəpənt]"
+            },
+            {
+              "word": "robbed",
+              "ko": "도굴당한, 털린 (동사 rob)",
+              "base": "rob [rɑːb]"
+            },
+            {
+              "word": "custom",
+              "ko": "관습, 풍습 (명사)",
+              "base": "custom [ˈkʌstəm]"
+            }
+          ],
+          "enseg": [
+            [
+              "The dates archaeology works with come in two kinds. ",
+              "There is relative dating, which compares objects",
+              " and establishes which came earlier",
+              " and which later, and absolute dating, ",
+              "which fixes the year an object belongs to. ",
+              "The former is the easier to obtain in the field. ",
+              "Grouping similar shapes",
+              " and setting them in order becomes possible once enough objects have been gathered. ",
+              "Yet how many centuries that whole line spans remains unknown. ",
+              "Only when an object appears that drives a dated nail into the line does a chronology take shape."
+            ],
+            [
+              "In 1971, ",
+              "while a drainage ditch was being dug in Gongju, ",
+              "a tomb built of bricks came to light by chance. ",
+              "Its style bore the clear influence of the Liang dynasty of southern China. ",
+              "A stone beast stood facing south in the middle of the passage,",
+              " ",
+              "and in front of it lay two flat stone tablets side by side. ",
+              "They were memorial tablets of blue-grey stone, ",
+              "roughly 41.5 by 35 centimetres, ",
+              "with characters carved in regular script."
+            ],
+            [
+              "The text read as follows. ",
+              "The king's tablet recorded that King Sama of Baekje, ",
+              "Great General Yeongdong, ",
+              "died on the seventh day of the fifth month of 523 at the age of sixty-two",
+              " and was laid in the great tomb on the twelfth day of the eighth month of 525. ",
+              "The front of the queen's tablet recorded that she died in the twelfth month of 526",
+              " and was laid to rest on the twelfth day of the second month of 529, ",
+              "once the three-year mourning was over; the back was a land-purchase deed. ",
+              "It states that on the twelfth day of the eighth month of 525 the ground for the tomb was bought from the earth god for ten thousand coins,",
+              " ",
+              "and it remains the only such deed found in a tomb of the Three Kingdoms period."
+            ],
+            [
+              "What these two stones achieved has two layers. ",
+              "First, ",
+              "they proved that the owner of the tomb was King Muryeong of Baekje. ",
+              "Tombs of the Three Kingdoms period are countless,",
+              " ",
+              "but this is the only one whose occupant can be identified with certainty. ",
+              "Second, they gave the year the tomb was built, ",
+              "and with it the time of making of every object buried alongside. ",
+              "A whole set of dated objects came into being at once. ",
+              "Those objects have since served as a ruler for measuring similar things from other tombs,",
+              " ",
+              "and are used as reference material for tracing how the styles of Baekje tombs",
+              " and metal craftwork changed."
+            ],
+            [
+              "We should also see, however, ",
+              "how much this seemingly solid fixed point rests on chance. ",
+              "The tomb survived without being robbed; it was uncovered not by searching scholars",
+              " but during work on a drainage ditch;",
+              " and above all, ",
+              "the people of Baekje at that time had the custom of carving the name",
+              " and dates of the dead into stone. ",
+              "Had any one of the three gone otherwise, ",
+              "this fixed point would not exist. ",
+              "And leaning on a standard brings its own risk. ",
+              "Other dates built upon the date of this tomb will shift if that standard shifts. ",
+              "One thing is nonetheless clear: because someone wrote down the dates, ",
+              "the scholarship of fifteen centuries later has a ruler."
             ]
           ]
         }

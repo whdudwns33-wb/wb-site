@@ -843,15 +843,25 @@ function vReader(){
   const paras=b.paragraphs.map((p,pi)=>{
     const segSrc=(useMine&&mc.b&&mc.b[pi])?segsFromBounds(paraText(p),mc.b[pi]):p;
     const segs=segSrc.map(seg=>{
-      let html=null;
+      /* 한 조각에 어휘가 둘 이상 들어 있어도 전부 밑줄 친다.
+         예전에는 첫 낱말만 걸고 멈춰서, 「연대를 못 박아 주는 유물이」처럼
+         두 낱말이 한 조각에 겹치면 뒤엣것은 어디에서도 눌리지 않았다. */
+      const hits=[];
       for(const vb of b.vocab){
         if(linked.has(vb.word))continue;
         const idx=seg.indexOf(vb.word);
-        if(idx>=0){linked.add(vb.word);
-          html=esc(seg.slice(0,idx))+`<button class="vw" data-act="vocab" data-id="${a.id}" data-w="${esc(vb.word)}">${esc(vb.word)}</button>`+esc(seg.slice(idx+vb.word.length));
-          break;}
+        if(idx>=0)hits.push({w:vb.word,i:idx});
       }
-      return `<span class="seg">${html!=null?html:esc(seg)}</span>`;
+      hits.sort((x,y)=>x.i-y.i);
+      let html='',pos=0;
+      for(const h of hits){
+        if(h.i<pos)continue;            /* 앞 낱말과 글자가 겹치면 건너뛴다 */
+        linked.add(h.w);
+        html+=esc(seg.slice(pos,h.i))+`<button class="vw" data-act="vocab" data-id="${a.id}" data-w="${esc(h.w)}">${esc(h.w)}</button>`;
+        pos=h.i+h.w.length;
+      }
+      html+=esc(seg.slice(pos));
+      return `<span class="seg">${html}</span>`;
     }).join('');
     const enP=(enMode>0&&b.en&&b.en[pi])?`<p class="para-en" lang="en">${renderEnPara(b.en[pi],(b.enseg||[])[pi],b.envocab||[],linkedEn,a.id,chunk)}</p>`:'';
     return `<p class="para" id="para-${pi}">${segs}</p>${enP}`;
