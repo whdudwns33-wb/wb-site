@@ -10,7 +10,7 @@ const FILE = path.join(DIR, 'db.json');
 const BDIR = path.join(DIR, 'backups');
 const BACKUP_KEEP = 10;
 
-const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} } });
+const empty = () => ({ students: {}, states: {}, tokens: {}, levelLog: [], pubmap: {}, parents: {}, textbook: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} } });
 
 let db = empty();
 
@@ -27,6 +27,14 @@ export function load() {
   return db;
 }
 
+/* 스냅샷에 담을 것 — 학생 기록만이 아니라 강사가 손으로 만든 것(교재 검수·발행 상태)까지.
+   이게 빠지면 복구했을 때 낱말 검수를 처음부터 다시 해야 한다. */
+function snapshotBody() {
+  return { service: 'wb-reading', savedAt: new Date().toISOString(),
+    students: db.students, states: db.states, vocab: db.vocab,
+    textbook: db.textbook || {}, pubmap: db.pubmap || {} };
+}
+
 function dayKey() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -38,7 +46,7 @@ function snapshotIfNeeded() {
     const f = path.join(BDIR, 'db-' + dayKey() + '.json');
     if (fs.existsSync(f)) return;
     fs.mkdirSync(BDIR, { recursive: true });
-    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states, vocab: db.vocab }));
+    fs.writeFileSync(f, JSON.stringify(snapshotBody()));
     const all = fs.readdirSync(BDIR).filter(x => /^db-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();
     all.slice(0, Math.max(0, all.length - BACKUP_KEEP)).forEach(x => fs.unlinkSync(path.join(BDIR, x)));
   } catch (e) { console.error('[store] 스냅샷 실패:', e.message); }
@@ -63,7 +71,7 @@ export function snapshotNow() {
   try {
     fs.mkdirSync(BDIR, { recursive: true });
     const f = path.join(BDIR, 'db-' + dayKey() + '.json');
-    fs.writeFileSync(f, JSON.stringify({ service: 'wb-reading', savedAt: new Date().toISOString(), students: db.students, states: db.states, vocab: db.vocab }));
+    fs.writeFileSync(f, JSON.stringify(snapshotBody()));
     return dayKey();
   } catch (e) { return null; }
 }

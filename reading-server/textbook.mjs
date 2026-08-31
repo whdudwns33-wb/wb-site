@@ -30,6 +30,8 @@ export function bookIndex(tb) {
     lessons: (b.lessons || []).map((l) => ({
       lesson: l.lesson, week: l.week, title: l.title, pages: l.pages || '',
       words: (l.words || []).length, confirmed: !!l.confirmed,
+      /* 뜻이 채워진 개수 — 강 목록에서 "아직 몇 개 남았는지"가 바로 보여야 한다 */
+      filled: (l.words || []).filter((w) => w && typeof w === 'object' && String(w.meaning || '').trim()).length,
     })),
   }));
 }
@@ -74,7 +76,9 @@ export function coachingCard(tb, prog, vocabState, assignRec) {
   };
   if (!l.confirmed || !l.words || !l.words.length) return card;
 
-  card.words = l.words.slice();
+  /* 학부모에게는 낱말 글자만 보낸다 — 뜻·예문은 강사 검수용이라 리포트를 길게 만들 뿐이다.
+     오래된 파일은 낱말이 글자 배열이었다. 둘 다 받는다. */
+  card.words = l.words.map((w) => (typeof w === 'string' ? w : (w && w.word) || '')).filter(Boolean);
   const grown = plantedByWord(vocabState, assignRec);
   for (const w of card.words) {
     const s = grown[w];
@@ -86,4 +90,56 @@ export function coachingCard(tb, prog, vocabState, assignRec) {
   }
   card.notYet = card.notYet.slice(0, 4);
   return card;
+}
+
+/* ── 강사 검수 덧씌우기 ──
+   교재 파일은 정적 자산이라 워커가 고쳐 쓸 수 없다. 그래서 검수 결과는 DB에 따로 두고
+   읽을 때 덧씌운다 — articles.json 위에 pubmap을 얹는 것과 같은 방식이다.
+   덧씌운 값이 원본을 이긴다: 강사가 고친 뜻이 뽑아 놓은 후보보다 언제나 옳다. */
+
+const WORD_KEYS = ['word', 'meaning', 'example'];
+
+/* 저장 전 다듬기 — 화면에서 온 값을 그대로 믿지 않는다 */
+export function cleanWords(list) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of Array.isArray(list) ? list : []) {
+    const w = {};
+    for (const k of WORD_KEYS) w[k] = String((raw && raw[k]) || '').trim().slice(0, 120);
+    if (!w.word || seen.has(w.word)) continue;
+    seen.add(w.word);
+    out.push(w);
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/* 검수를 끝냈다고 하려면 낱말마다 뜻이 있어야 한다 — 뜻 없는 낱말은 학생이 공부할 수 없다 */
+export function readyToConfirm(words) {
+  const list = cleanWords(words);
+  if (!list.length) return { ok: false, error: '낱말이 없어요.' };
+  const blank = list.filter((w) => !w.meaning).map((w) => w.word);
+  if (blank.length) return { ok: false, error: '뜻이 비어 있어요: ' + blank.slice(0, 5).join(', ') + (blank.length > 5 ? ' 외 ' + (blank.length - 5) + '개' : '') };
+  return { ok: true, words: list };
+}
+
+const ovKey = (bookId, lesson) => String(bookId) + '#' + Number(lesson);
+
+/* 원본 교재 + 검수 덧씌우기 → 강사·학부모가 보는 실제 교재 */
+export function withOverlay(tb, overlay) {
+  if (!overlay || !Object.keys(overlay).length) return tb;
+  const books = ((tb && tb.books) || []).map((b) => ({
+    ...b,
+    lessons: (b.lessons || []).map((l) => {
+      const ov = overlay[ovKey(b.id, l.lesson)];
+      if (!ov) return l;
+      return {
+        ...l,
+        words: ov.words ? ov.words : l.words,
+        confirmed: !!ov.confirmed,
+        reviewedAt: ov.at || '',
+      };
+    }),
+  }));
+  return { ...tb, books };
 }

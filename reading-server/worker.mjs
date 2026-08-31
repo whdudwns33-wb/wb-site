@@ -5,7 +5,7 @@
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, coachingCard, validProgress } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -142,7 +142,9 @@ async function fullDump(env) {
     if (st) states[code] = st;
   }
   const vocab = await dumpVocab(vocabStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab };
+  /* 강사가 손으로 만든 것도 담는다 — 빠지면 복구 후 낱말 검수를 처음부터 다시 해야 한다 */
+  const [textbook, pubmap] = await Promise.all([env.DB.get('textbook','json'), env.DB.get('pubmap','json')]);
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {} };
 }
 
 async function snapshotBackup(env) {
@@ -173,13 +175,19 @@ async function titleMap(env, origin) {
 
 /* 교재(어휘가 독해다) — 제목 맵과 같이 정적 자산에서 읽어 10분 캐시 */
 let TB_CACHE = { t: 0, data: null };
-async function textbook(env, origin) {
+async function textbookRaw(env, origin) {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 600_000) return TB_CACHE.data;
   try {
     const r = await env.ASSETS.fetch(new Request(origin + '/textbook.json'));
     TB_CACHE = { t: Date.now(), data: await r.json() };
   } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
   return TB_CACHE.data;
+}
+/* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다.
+   교재 파일은 정적 자산이라 워커가 고쳐 쓸 수 없어서, 검수 결과만 KV에 따로 둔다. */
+async function textbook(env, origin) {
+  const [raw, ov] = await Promise.all([textbookRaw(env, origin), env.DB.get('textbook', 'json')]);
+  return withOverlay(raw, ov || {});
 }
 
 function parentSummary(stu, st, titles, vst, book) {
@@ -412,6 +420,30 @@ export default {
         stu.book = { bookId, lesson: v.lesson.lesson, at: nowIso() };
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true, book: stu.book });
+      }
+
+      /* 강사 검수 — 강 하나의 낱말을 통째로 저장한다 */
+      const mLesson = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/(\d{1,3})$/);
+      if (mLesson && req.method === 'GET') {
+        const v = validProgress(await textbook(env, url.origin), mLesson[1], mLesson[2]);
+        if (!v.ok) return json(404, { error: v.error });
+        return json(200, { book: { id: v.book.id, short: v.book.short || v.book.title }, lesson: v.lesson });
+      }
+      if (mLesson && req.method === 'POST') {
+        const bookId = mLesson[1], lessonNo = +mLesson[2];
+        const v = validProgress(await textbookRaw(env, url.origin), bookId, lessonNo);
+        if (!v.ok) return json(404, { error: v.error });
+        const { words, confirmed } = await req.json();
+        let list = cleanWords(words);
+        if (confirmed) {
+          const r = readyToConfirm(list);
+          if (!r.ok) return json(400, { error: r.error });
+          list = r.words;
+        }
+        const ov = (await env.DB.get('textbook', 'json')) || {};
+        ov[bookId + '#' + lessonNo] = { words: list, confirmed: !!confirmed, at: nowIso() };
+        await env.DB.put('textbook', JSON.stringify(ov));
+        return json(200, { ok: true, words: list, confirmed: !!confirmed });
       }
 
       /* 백업: 전체 내려받기 / 자동 스냅샷 목록·내려받기 */

@@ -4,7 +4,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bookIndex, coachingCard, findBook, findLesson, validProgress } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, findBook, findLesson, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -117,6 +117,74 @@ t('빈 교재에도 터지지 않는다', () => {
   assert.deepStrictEqual(bookIndex(null), []);
   assert.strictEqual(findBook(null, 'x'), null);
   assert.strictEqual(coachingCard({ books: [] }, { bookId: 'x', lesson: 1 }, null, null), null);
+});
+
+t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
+  const words = findBook(TB, 'eoduk-cho1').lessons.flatMap((l) => l.words);
+  assert.ok(words.length > 100, '낱말이 너무 적다');
+  for (const w of words) {
+    assert.strictEqual(typeof w, 'object', '낱말은 객체여야 한다');
+    assert.ok(w.word, '낱말 글자 없음');
+    assert.strictEqual(typeof w.meaning, 'string');
+    assert.strictEqual(typeof w.example, 'string');
+    /* 지어낸 뜻이 섞이면 검수가 무의미해진다 — 못 캔 자리는 반드시 빈칸이어야 한다 */
+    assert.ok(!/보세요|주세요|좋아요/.test(w.meaning), '뜻 칸에 학부모 당부가 들어갔다: ' + w.word);
+  }
+});
+
+t('낱말을 다듬어 저장한다 — 빈 것·중복·과한 개수를 막는다', () => {
+  const got = cleanWords([
+    { word: ' 초원 ', meaning: ' 넓은 들판 ', example: '' },
+    { word: '초원', meaning: '중복' },
+    { word: '', meaning: '글자 없음' },
+    { meaning: '낱말 자체가 없음' },
+  ]);
+  assert.strictEqual(got.length, 1);
+  assert.deepStrictEqual(got[0], { word: '초원', meaning: '넓은 들판', example: '' });
+  assert.strictEqual(cleanWords(null).length, 0);
+  assert.strictEqual(cleanWords(Array.from({ length: 80 }, (_, i) => ({ word: 'w' + i, meaning: 'm' }))).length, 60, '60개까지만');
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y'.repeat(300) }])[0].meaning.length, 120, '길이를 자른다');
+});
+
+t('뜻이 빈 낱말이 있으면 검수 완료를 막는다', () => {
+  assert.strictEqual(readyToConfirm([]).ok, false);
+  const bad = readyToConfirm([{ word: '초원', meaning: '들판' }, { word: '응달', meaning: '' }]);
+  assert.strictEqual(bad.ok, false);
+  assert.ok(bad.error.includes('응달'), '어느 낱말인지 알려 줘야 한다');
+  assert.strictEqual(readyToConfirm([{ word: '초원', meaning: '들판' }]).ok, true);
+});
+
+t('검수 결과가 원본을 덮어쓴다', () => {
+  const ov = { 'b1#1': { words: [{ word: '새낱말', meaning: '강사가 고친 뜻', example: '' }], confirmed: true, at: '2026-08-31' } };
+  const merged = withOverlay(FIX, ov);
+  const l1 = findLesson(findBook(merged, 'b1'), 1);
+  assert.deepStrictEqual(l1.words.map((w) => w.word), ['새낱말']);
+  assert.strictEqual(l1.confirmed, true);
+  assert.strictEqual(l1.coaching, '앞 문단\n\n뒤 문단', '코칭글은 건드리지 않는다');
+  /* 손대지 않은 강은 그대로 */
+  assert.strictEqual(findLesson(findBook(merged, 'b1'), 2).confirmed, false);
+  /* 원본을 망가뜨리지 않는다 — 덧씌우기는 읽을 때마다 새로 만든다 */
+  assert.strictEqual(findLesson(findBook(FIX, 'b1'), 1).words[0], '가');
+  assert.strictEqual(withOverlay(FIX, {}), FIX, '덧씌울 게 없으면 원본 그대로');
+});
+
+t('검수로 확정하면 그 강 낱말이 학부모에게 나간다', () => {
+  const fix = { books: [{ id: 'b1', short: 'B', lessons: [{ lesson: 1, title: 'x', coaching: 'c', words: [], confirmed: false }] }] };
+  const before = coachingCard(fix, { bookId: 'b1', lesson: 1 }, null, null);
+  assert.deepStrictEqual(before.words, [], '검수 전에는 낱말 없음');
+  const after = coachingCard(
+    withOverlay(fix, { 'b1#1': { words: [{ word: '초원', meaning: '들판' }], confirmed: true } }),
+    { bookId: 'b1', lesson: 1 }, null, null);
+  assert.deepStrictEqual(after.words, ['초원'], '학부모에게는 글자만');
+});
+
+t('목차가 남은 일을 보여 준다', () => {
+  const idx = bookIndex(TB)[0].lessons;
+  for (const l of idx) {
+    assert.ok(l.filled <= l.words, l.lesson + '강: 채운 개수가 전체보다 많다');
+    assert.strictEqual(typeof l.filled, 'number');
+  }
+  assert.ok(idx.some((l) => l.filled > 0), '뜻이 채워진 강이 하나는 있어야 한다');
 });
 
 console.log('\n통과 ' + passed + '개 — 교재 코칭 검증 완료');
