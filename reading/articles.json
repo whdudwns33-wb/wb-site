@@ -13,12 +13,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국항공우주연구원",
-          "url": "https://www.kari.re.kr"
+          "title": "한국항공우주연구원 — 한국형발사체 누리호 제원",
+          "url": "https://www.kari.re.kr/kor/contents/51"
         },
         {
-          "title": "대한민국 정책브리핑",
-          "url": "https://www.korea.kr"
+          "title": "대한민국 정책브리핑 — 한국형 우주발사체(누리호)",
+          "url": "https://www.korea.kr/briefing/policyBriefingView.do?newsId=148899436"
         }
       ],
       "levels": {
@@ -1148,12 +1148,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "기초과학연구원",
-          "url": "https://www.ibs.re.kr"
+          "title": "기초과학연구원 — 유전체 교정 연구단",
+          "url": "https://www.ibs.re.kr/kor/sub02_05_13.do"
         },
         {
-          "title": "사이언스올",
-          "url": "https://www.scienceall.com"
+          "title": "노벨재단 — 2020년 노벨 화학상(샤르팡티에·다우드나)",
+          "url": "https://www.nobelprize.org/prizes/chemistry/2020/summary/"
         }
       ],
       "levels": {
@@ -2270,12 +2270,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국전자통신연구원",
-          "url": "https://www.etri.re.kr"
+          "title": "한국전자통신연구원 웹진 — 무엇이든 만드는 생성형 인공지능 기술",
+          "url": "https://www.etri.re.kr/webzine/202404/sub01.html"
         },
         {
-          "title": "대한민국 정책브리핑",
-          "url": "https://www.korea.kr"
+          "title": "전자통신동향분석 — 거대언어모델의 환각현상 완화 및 평가 기술 동향",
+          "url": "https://ettrends.etri.re.kr/ettrends/217/0905217021/066-074.%20%EC%9D%B4%EB%8F%99%EC%88%98_217%ED%98%B8_%EC%B5%9C%EC%A2%85.pdf"
         }
       ],
       "levels": {
@@ -3375,12 +3375,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "국가데이터처",
-          "url": "https://kostat.go.kr"
+          "title": "국가데이터처 보도자료 — 2025 고령자 통계",
+          "url": "https://mods.go.kr/board.es?act=view&bid=10820&list_no=438832&mid=a10301010000"
         },
         {
-          "title": "대한민국 정책브리핑",
-          "url": "https://www.korea.kr"
+          "title": "KOSIS 인구상황판 — 고령인구 비중",
+          "url": "https://kosis.kr/visual/populationKorea/PopulationDashBoardDetail.do?statJipyoId=3777&vStatJipyoId=5637&listId=A_02"
         }
       ],
       "levels": {
@@ -4501,12 +4501,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국은행",
-          "url": "https://www.bok.or.kr"
+          "title": "한국은행 — 물가안정목표제",
+          "url": "https://www.bok.or.kr/portal/main/contents.do?menuNo=200291"
         },
         {
-          "title": "최저임금위원회",
-          "url": "https://www.minimumwage.go.kr"
+          "title": "고용노동부 보도자료 — 2027년 적용 최저임금 시간급 10,700원 (2026.8.5)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156773394"
         }
       ],
       "levels": {
@@ -5611,12 +5611,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "해양환경공단",
-          "url": "https://www.koem.or.kr"
+          "title": "해양환경정보포털(해양환경공단) — 국가해안쓰레기 모니터링 통계",
+          "url": "https://www.meis.go.kr/mli/monitoringInfo/stat.do"
         },
         {
-          "title": "기후에너지환경부",
-          "url": "https://www.me.go.kr"
+          "title": "기후에너지환경부 보도자료 — 하천부터 바다까지 미세플라스틱 분석 (2026.7.15)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156770834"
         }
       ],
       "levels": {
@@ -6684,12 +6684,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국에너지공단",
-          "url": "https://www.energy.or.kr"
+          "title": "e-나라지표 — 신재생에너지 보급 (한국에너지공단 보급통계)",
+          "url": "https://www.index.go.kr/unity/potal/main/EachDtlPageDetail.do?idx_cd=1171"
         },
         {
-          "title": "기후에너지환경부",
-          "url": "https://www.me.go.kr"
+          "title": "기후에너지환경부 보도자료 — 탄소중립기본법 개정안 국회 통과 (2026.8.26)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775574"
         }
       ],
       "levels": {
@@ -7791,12 +7791,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "조선왕조실록 (국사편찬위원회)",
-          "url": "https://sillok.history.go.kr"
+          "title": "국사편찬위원회 — 조선왕조실록 소개(편찬 과정·사고)",
+          "url": "https://sillok.history.go.kr/intro/intro.do"
         },
         {
-          "title": "국립중앙박물관",
-          "url": "https://www.museum.go.kr"
+          "title": "국사편찬위원회 우리역사넷 — 조선왕조실록(사관과 사초)",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300790&code=kc_age_30"
         }
       ],
       "levels": {
@@ -8920,12 +8920,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "국립한글박물관",
-          "url": "https://www.hangeul.go.kr"
+          "title": "한국민족문화대백과사전 — 훈민정음(해례본)",
+          "url": "https://encykorea.aks.ac.kr/Article/E0065805"
         },
         {
-          "title": "국립국어원",
-          "url": "https://korean.go.kr"
+          "title": "한국민족문화대백과사전 — 한글의 제자원리",
+          "url": "https://encykorea.aks.ac.kr/Article/E0061508"
         }
       ],
       "levels": {
@@ -10044,12 +10044,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국콘텐츠진흥원",
-          "url": "https://www.kocca.kr"
+          "title": "한국콘텐츠진흥원 — 2025 웹툰산업 실태조사 발간",
+          "url": "https://www.kocca.kr/kocca/koccanews/reportview.do?nttNo=1079&menuNo=204767"
         },
         {
-          "title": "대한민국 정책브리핑",
-          "url": "https://www.korea.kr"
+          "title": "e-나라지표 — 문화콘텐츠산업 매출액",
+          "url": "https://www.index.go.kr/unity/potal/main/EachDtlPageDetail.do?idx_cd=2752"
         }
       ],
       "levels": {
@@ -11106,12 +11106,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "한국천문연구원",
-          "url": "https://www.kasi.re.kr"
+          "title": "한국천문연구원 — 달 우주방사선 측정기(LVRAD)",
+          "url": "https://pda.kasi.re.kr/lvrad.php"
         },
         {
-          "title": "우주항공청",
-          "url": "https://www.kasa.go.kr"
+          "title": "우주항공청 보도자료 — LVRAD NASA 탑재 이행약정 (2026.8.17)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156774557"
         }
       ],
       "levels": {
@@ -12188,12 +12188,12 @@
       "status": "published",
       "sources": [
         {
-          "title": "기후에너지환경부",
-          "url": "https://www.me.go.kr"
+          "title": "기후에너지환경부 보도자료 — 제4차 계획기간 배출권 할당 완료 (2025.12.28)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156737066"
         },
         {
-          "title": "온실가스종합정보센터",
-          "url": "https://www.gir.go.kr"
+          "title": "공공데이터포털 — 온실가스종합정보센터 할당대상업체 현황",
+          "url": "https://www.data.go.kr/data/15053949/fileData.do"
         }
       ],
       "levels": {
@@ -13266,8 +13266,8 @@
           "url": "https://www.kma.go.kr/kma/news/press.jsp"
         },
         {
-          "title": "해양수산부",
-          "url": "https://www.mof.go.kr"
+          "title": "기상청 보도자료 — 최근 10년 해양열파 평년 대비 3.7배 증가 (2026.8.26)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775532"
         }
       ],
       "levels": {
@@ -15457,8 +15457,8 @@
       "status": "published",
       "sources": [
         {
-          "title": "대한민국 정책브리핑 전문자료",
-          "url": "https://www.korea.kr/archive/expDocMainList.do"
+          "title": "국립문화유산연구원 보도자료 — 창덕궁·종묘 석재 산지정보 공개 (2026.5.28)",
+          "url": "https://www.nrich.go.kr/kor/boardView.do?menuIdx=283&bbscd=33&bbs_idx=48242&boardTypeGubun=1"
         },
         {
           "title": "국립문화유산연구원",
@@ -16547,12 +16547,12 @@
       "issue": true,
       "sources": [
         {
-          "title": "기후에너지환경부 보도자료",
-          "url": "https://www.mcee.go.kr/home/web/index.do?menuId=10598"
+          "title": "기후에너지환경부 보도자료 — 산업용 지역 전기요금제 설계안 공개 (2026.8.26)",
+          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775556"
         },
         {
-          "title": "대한민국 정책브리핑 보도자료",
-          "url": "https://www.korea.kr/briefing/pressReleaseList.do"
+          "title": "전력거래소 EPSIS — 지역별 전력 거래단가",
+          "url": "https://epsis.kpx.or.kr/epsisnew/selectEkmaRegUpsChart.do?menuId=050804"
         }
       ],
       "levels": {
@@ -17672,8 +17672,8 @@
       "status": "published",
       "sources": [
         {
-          "title": "교육부 보도자료",
-          "url": "https://www.moe.go.kr/boardCnts/listRenew.do?boardID=294&m=020402&s=moe"
+          "title": "교육부 보도자료 — 인공지능(AI) 교과 인정교과서 개발 (2026.8.27)",
+          "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=294&boardSeq=107049&lev=0&m=020402"
         },
         {
           "title": "대한민국 정책브리핑",
