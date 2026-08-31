@@ -25,5 +25,7 @@ for (const f of VOCAB_FILES) fs.copyFileSync(path.join(VOCAB, f), path.join(DIST
 const SHARED = path.join(ROOT, '..', 'shared', 'voice.js');
 fs.copyFileSync(SHARED, path.join(DIST, 'voice.js'));
 fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
+/* QR 인코더 — 관리 웹이 학생 연동 QR을 그린다. CSP가 'self'만 허용해 CDN을 못 쓴다. */
+fs.copyFileSync(path.join(ROOT, '..', 'shared', 'qr.js'), path.join(DIST, 'admin', 'qr.js'));
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
