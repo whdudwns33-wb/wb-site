@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.8",
+  "version": "2026-08-31.10",
   "articles": [
     {
       "id": "nuri-space",
@@ -22411,6 +22411,1780 @@
               "What Jeong Seon tried to seize was not the outline of Inwangsan",
               " but the state of a mountain made heavy with rain. ",
               "That approaching a fact still involves interpretation is the question a true view leaves behind."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "hwaseong-uigwe",
+      "category": "history",
+      "careers": [
+        "eng",
+        "hum",
+        "biz"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "우리역사넷 — 화성(1794)",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300890&code=kc_age_30"
+        },
+        {
+          "title": "한국민족문화대백과사전 — 화성성역의궤",
+          "url": "https://encykorea.aks.ac.kr/Article/E0064682"
+        },
+        {
+          "title": "국가유산 디지털 서비스 — 수원 화성",
+          "url": "https://digital.khs.go.kr/heri/heriDetail.do?ctptUid=13898859673492200651&ctptNo=1333100030000"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "적어 두었기 때문에 다시 세웠어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "아주 오래전 수원에 ",
+              "큰 성을 쌓았어요. ",
+              "이름은 화성이에요. ",
+              "돌이 너무 무거워서 ",
+              "정약용이 기계를 만들었어요. ",
+              "그 기계로 돌을 들어 올렸어요."
+            ],
+            [
+              "성을 다 쌓고 나서 ",
+              "책을 한 권 만들었어요. ",
+              "성을 어떻게 쌓았는지 ",
+              "빠짐없이 적은 책이에요. ",
+              "돌을 몇 개 썼는지도 적었어요. ",
+              "일한 사람 이름도 적었어요. ",
+              "그림도 그려 넣었어요."
+            ],
+            [
+              "오랜 세월이 지나 ",
+              "성이 많이 부서졌어요. ",
+              "그런데 그 책이 남아 있었어요. ",
+              "사람들은 책을 보고 ",
+              "성을 다시 세웠어요. ",
+              "적어 두면 ",
+              "먼 뒷날에도 되살릴 수 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "화성",
+              "easy": "수원에 있는 큰 성이에요. 지금도 가서 볼 수 있어요.",
+              "hanja": null
+            },
+            {
+              "word": "기계",
+              "easy": "사람이 하기 힘든 일을 대신 해 주는 장치예요.",
+              "hanja": null
+            },
+            {
+              "word": "세월",
+              "easy": "흘러가는 오랜 시간이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "성을 구경하는 방법",
+                "적어 둔 책 덕분에 성을 다시 세운 이야기",
+                "돌을 파는 곳",
+                "정약용이 태어난 곳"
+              ],
+              "answer": 1,
+              "explain": "책에 적어 두었기 때문에 부서진 성을 다시 세울 수 있었다는 것이 이 글의 중심이에요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "무거운 돌은 어떻게 옮겼나요?",
+              "choices": [
+                "정약용이 만든 기계로 들어 올렸어요",
+                "말이 등에 지고 갔어요",
+                "물에 띄워 보냈어요",
+                "손으로 굴렸어요"
+              ],
+              "answer": 0,
+              "explain": "돌이 너무 무거워서 정약용이 기계를 만들었고, 그 기계로 들어 올렸다고 나와요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「세월」은 무슨 뜻인가요?",
+              "choices": [
+                "성의 이름",
+                "흘러가는 오랜 시간",
+                "돌의 개수",
+                "책의 제목"
+              ],
+              "answer": 1,
+              "explain": "세월은 흘러가는 오랜 시간을 뜻해요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "그 책이 없었다면 어떤 일이 생겼을까요?",
+              "choices": [
+                "성이 더 튼튼해졌을 거예요",
+                "처음 모습대로 다시 세우기 어려웠을 거예요",
+                "돌이 저절로 모였을 거예요",
+                "성이 더 커졌을 거예요"
+              ],
+              "answer": 1,
+              "explain": "사람들은 책을 보고 성을 다시 세웠어요. 책이 없었다면 어떤 모습이었는지 알 수 없었겠지요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 반이 만든 큰 작품을 뒷날에도 다시 만들 수 있게 하려면?",
+              "choices": [
+                "기억해 두었다가 말로 전해요",
+                "만드는 과정을 사진과 글로 적어 남겨요",
+                "아무것도 하지 않아요",
+                "작품을 숨겨 둬요"
+              ],
+              "answer": 1,
+              "explain": "화성을 다시 세울 수 있었던 것은 만드는 과정을 빠짐없이 적어 두었기 때문이에요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "이백 년 전 공사 기록이 성을 되살리다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "1794년, 정조 임금은 수원에 새 성을 쌓기 시작했다. ",
+              "이 성이 화성이다. ",
+              "공사에는 무거운 돌이 수없이 필요했다. ",
+              "정약용은 거중기와 유형거를 고안해 ",
+              "돌을 들어 올리고 실어 날랐다. ",
+              "그 덕분에 힘과 비용을 크게 줄였고, ",
+              "성은 1796년에 완성되었다."
+            ],
+            [
+              "정조는 공사를 마친 뒤 ",
+              "그 과정을 책으로 남기게 했다. ",
+              "「화성성역의궤」다. ",
+              "여기에는 성의 도면이 그려져 있고, ",
+              "어떤 돌을 몇 개 썼는지, ",
+              "누가 일했고 품삯을 얼마 받았는지, ",
+              "날마다 무슨 일을 했는지가 모두 적혀 있다. ",
+              "1801년에 인쇄되어 세상에 나왔다."
+            ],
+            [
+              "세월이 흐르며 화성은 크게 부서졌다. ",
+              "일제강점기를 지나고 한국전쟁을 겪으면서 ",
+              "성벽과 건물이 무너졌다. ",
+              "1970년대에 복원 공사가 시작되었을 때 ",
+              "사람들이 펼쳐 본 것이 바로 그 책이었다. ",
+              "도면과 치수가 남아 있었으므로 ",
+              "원래 모습대로 되살릴 수 있었다."
+            ],
+            [
+              "복원한 건축물은 보통 세계유산이 되기 어렵다. ",
+              "원래 모습을 확인할 길이 없으면 ",
+              "복원이 추측이 되어 버리기 때문이다. ",
+              "화성에는 추측이 필요 없었다. ",
+              "1997년 화성은 유네스코 세계유산이 되었다. ",
+              "이백 년 전에 적어 둔 기록이 ",
+              "오늘의 성을 세운 셈이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "고안",
+              "easy": "새로운 방법이나 물건을 생각해 내는 일",
+              "hanja": "考(생각할 고)+案(책상 안)"
+            },
+            {
+              "word": "도면",
+              "easy": "건물이나 기계의 모양과 크기를 정확히 그린 그림",
+              "hanja": "圖(그림 도)+面(낯 면)"
+            },
+            {
+              "word": "복원",
+              "easy": "부서지거나 사라진 것을 원래 모습대로 되돌리는 일",
+              "hanja": "復(회복할 복)+元(으뜸 원)"
+            },
+            {
+              "word": "추측",
+              "easy": "확실하지 않은 것을 짐작해 보는 일",
+              "hanja": "推(밀 추)+測(헤아릴 측)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "정약용이 만든 기계의 원리",
+                "공사 기록이 남아 있어 화성을 원래대로 되살릴 수 있었다는 것",
+                "조선의 임금들이 한 일",
+                "세계유산을 신청하는 절차"
+              ],
+              "answer": 1,
+              "explain": "기록을 남긴 일과, 그 덕분에 복원이 가능했다는 점이 글 전체를 잇는 중심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "「화성성역의궤」에 적혀 있지 않은 것은?",
+              "choices": [
+                "성의 도면",
+                "쓴 돌의 개수",
+                "일한 사람이 받은 품삯",
+                "앞으로 지을 성의 계획"
+              ],
+              "answer": 3,
+              "explain": "도면, 자재의 수량, 품삯, 날마다 한 일이 적혀 있다고 했다. 앞으로의 계획은 나오지 않는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「추측」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "확실하지 않은 것을 짐작해 보는 일",
+                "정확히 재어 보는 일",
+                "여럿이 의논하는 일",
+                "글로 적어 두는 일"
+              ],
+              "answer": 0,
+              "explain": "원래 모습을 확인할 길이 없으면 복원이 짐작에 기대게 된다는 뜻으로 쓰였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "화성이 크게 부서진 까닭은?",
+              "choices": [
+                "돌이 약해서",
+                "일제강점기와 한국전쟁을 겪으면서",
+                "처음부터 잘못 쌓아서",
+                "임금이 헐라고 해서"
+              ],
+              "answer": 1,
+              "explain": "일제강점기를 지나고 한국전쟁을 겪으면서 성벽과 건물이 무너졌다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「화성에는 추측이 필요 없었다」고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "성이 부서지지 않았다는 뜻",
+                "도면과 치수가 남아 있어 근거를 두고 복원했다는 뜻",
+                "복원을 하지 않았다는 뜻",
+                "세계유산 심사가 쉬웠다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "앞 문단에서 도면과 치수가 남아 있어 원래 모습대로 되살릴 수 있었다고 했다. 짐작에 기대지 않았다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "학교의 낡은 벽화를 뒷날 되살릴 수 있게 하려면 지금 무엇을 해야 할까?",
+              "choices": [
+                "사진 한 장만 찍어 둔다",
+                "색과 크기, 재료, 그린 사람과 순서를 정리해 기록으로 남긴다",
+                "벽화를 지우고 새로 그린다",
+                "기억하는 사람을 정해 둔다"
+              ],
+              "answer": 1,
+              "explain": "의궤에는 도면과 자재, 사람, 날마다 한 일까지 적혀 있었다. 되살리려면 그만큼 구체적인 근거가 필요하다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "In 1794 King Jeongjo began to build a new fortress at Suwon. This fortress is Hwaseong. The work needed countless heavy stones. Jeong Yak-yong designed a lifting device and a strong cart to raise the stones and carry them. They saved much labour and cost, and the fortress was finished in 1796.",
+            "After the work ended, the king had the whole process written into a book. It is called the Hwaseong Seongyeok Uigwe. It holds drawings of the fortress, the kind and number of stones used, the names of the workers and the wages they were paid, and what was done on each day. It was printed in 1801.",
+            "Over the years Hwaseong fell badly into ruin. Walls and buildings collapsed through the colonial period and the Korean War. When restoration began in the 1970s, the book was what people opened. The drawings and measurements were still there, so the fortress could be brought back to its original form.",
+            "A rebuilt structure usually has trouble becoming a World Heritage site. If there is no way to check the original form, restoration turns into guesswork. Hwaseong needed no guesswork. In 1997 it was placed on the UNESCO World Heritage list. A record written two hundred years earlier built the fortress that stands today."
+          ],
+          "envocab": [
+            {
+              "word": "fortress",
+              "ko": "성, 요새 (명사)",
+              "base": "fortress [ˈfɔːrtrəs]"
+            },
+            {
+              "word": "designed",
+              "ko": "고안하다, 설계하다 (동사 design)",
+              "base": "design [dɪˈzaɪn]"
+            },
+            {
+              "word": "wages",
+              "ko": "품삯, 임금 (명사 wage의 복수)",
+              "base": "wage [weɪdʒ]"
+            },
+            {
+              "word": "restoration",
+              "ko": "복원 (명사)",
+              "base": "restoration [ˌrestəˈreɪʃn]"
+            },
+            {
+              "word": "measurements",
+              "ko": "치수, 측정값 (명사 measurement의 복수)",
+              "base": "measurement [ˈmeʒərmənt]"
+            },
+            {
+              "word": "guesswork",
+              "ko": "추측, 어림짐작 (명사)",
+              "base": "guesswork [ˈɡeswɜːrk]"
+            }
+          ],
+          "enseg": [
+            [
+              "In 1794 King Jeongjo began to build a new fortress at Suwon. ",
+              "This fortress is Hwaseong. ",
+              "The work needed countless heavy stones. ",
+              "Jeong Yak-yong designed a lifting device",
+              " and a strong cart to raise the stones",
+              " and carry them. ",
+              "They saved much labour and cost, ",
+              "and the fortress was finished in 1796."
+            ],
+            [
+              "After the work ended, ",
+              "the king had the whole process written into a book. ",
+              "It is called the Hwaseong Seongyeok Uigwe. ",
+              "It holds drawings of the fortress, the kind",
+              " and number of stones used, ",
+              "the names of the workers",
+              " and the wages they were paid, ",
+              "and what was done on each day. ",
+              "It was printed in 1801."
+            ],
+            [
+              "Over the years Hwaseong fell badly into ruin. ",
+              "Walls",
+              " and buildings collapsed through the colonial period",
+              " and the Korean War. ",
+              "When restoration began in the 1970s, ",
+              "the book was what people opened. ",
+              "The drawings and measurements were still there, ",
+              "so the fortress could be brought back to its original form."
+            ],
+            [
+              "A rebuilt structure usually has trouble becoming a World Heritage site. ",
+              "If there is no way to check the original form, ",
+              "restoration turns into guesswork. ",
+              "Hwaseong needed no guesswork. ",
+              "In 1997 it was placed on the UNESCO World Heritage list. ",
+              "A record written two hundred years earlier built the fortress that stands today."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "복원을 가능하게 한 기록",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "1794년, 정조는 수원에 새 성을 쌓는 공사를 시작했다. ",
+              "이 성이 화성이다. ",
+              "당시로서는 큰 토목 공사였고 ",
+              "막대한 경비와 기술이 들어갔다. ",
+              "정약용은 무거운 자재를 들어 올리는 거중기와 ",
+              "튼튼한 수레인 유형거를 고안해 ",
+              "일손과 비용을 줄였다. ",
+              "성은 1796년에 완성되었다."
+            ],
+            [
+              "정조는 공사가 끝나자 ",
+              "그 전 과정을 기록으로 남기게 했다. ",
+              "이렇게 만들어진 책이 「화성성역의궤」다. ",
+              "여기에는 성곽과 부속 건물의 도면이 실려 있고, ",
+              "자재의 종류와 수량, 참여한 장인과 인부의 이름, ",
+              "지급한 품삯, 날마다의 공사 일지까지 담겼다. ",
+              "1801년에 인쇄되어 열 권의 책으로 세상에 나왔다."
+            ],
+            [
+              "그 뒤 이백 년 가까운 세월이 흘렀다. ",
+              "일제강점기를 지나고 한국전쟁을 겪으며 ",
+              "화성의 성벽과 건물은 크게 무너졌다. ",
+              "1970년대에 복원 공사가 시작되었을 때 ",
+              "가장 중요한 자료가 된 것이 「화성성역의궤」였다. ",
+              "도면과 치수, 재료의 목록이 남아 있었기에 ",
+              "무너진 자리를 원래 모습에 가깝게 되세울 수 있었다."
+            ],
+            [
+              "이 대목이 중요한 까닭이 있다. ",
+              "문화유산을 복원할 때는 확실한 근거가 있어야 하고, ",
+              "근거가 끊겨 추측이 시작되는 지점에서 멈추어야 한다는 원칙이 있다. ",
+              "그래서 크게 복원한 건축물은 ",
+              "대개 세계유산으로 인정받기 어렵다. ",
+              "무엇이 원래 모습인지 확인할 방법이 없기 때문이다. ",
+              "화성은 그 지점에서 달랐다."
+            ],
+            [
+              "1997년 화성은 유네스코 세계유산에 등재되었다. ",
+              "2007년에는 「화성성역의궤」를 포함한 조선왕조 의궤가 ",
+              "유네스코 세계기록유산에 올랐다. ",
+              "성과 그 성을 적은 책이 나란히 인정받은 것이다. ",
+              "기록은 지나간 일을 적어 두는 데서 그치지 않는다. ",
+              "먼 뒷날 무엇을 되살릴 수 있는지를 함께 정한다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "토목",
+              "easy": "길·다리·성처럼 땅 위에 큰 구조물을 만드는 일",
+              "hanja": "土(흙 토)+木(나무 목)"
+            },
+            {
+              "word": "고안",
+              "easy": "새로운 방법이나 물건을 생각해 내는 일",
+              "hanja": "考(생각할 고)+案(책상 안)"
+            },
+            {
+              "word": "일지",
+              "easy": "날마다 있었던 일을 적어 두는 기록",
+              "hanja": "日(날 일)+誌(기록할 지)"
+            },
+            {
+              "word": "원칙",
+              "easy": "어떤 일에서 마땅히 지켜야 할 기본이 되는 규칙",
+              "hanja": "原(근원 원)+則(법칙 칙)"
+            },
+            {
+              "word": "등재",
+              "easy": "목록이나 명부에 정식으로 올리는 일",
+              "hanja": "登(오를 등)+載(실을 재)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "정약용이 고안한 기계의 구조",
+                "기록이 남아 있었기에 화성을 근거 있게 복원할 수 있었다는 것",
+                "조선의 토목 공사 비용 변화",
+                "유네스코 등재 심사 절차"
+              ],
+              "answer": 1,
+              "explain": "의궤를 남긴 일에서 출발해 1970년대 복원과 세계유산 등재로 이어지며, 마지막 문단이 기록의 뜻을 정리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "「화성성역의궤」에 담긴 내용으로 알맞지 않은 것은?",
+              "choices": [
+                "성곽과 부속 건물의 도면",
+                "참여한 장인과 인부의 이름",
+                "지급한 품삯",
+                "복원 공사에 쓸 새 재료의 목록"
+              ],
+              "answer": 3,
+              "explain": "도면, 자재, 사람 이름, 품삯, 공사 일지가 담겼다. 훗날의 복원 재료 목록은 나오지 않는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「원칙」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "마땅히 지켜야 할 기본 규칙",
+                "한 번만 적용되는 예외",
+                "여러 사람의 의견",
+                "공사에 드는 비용"
+              ],
+              "answer": 0,
+              "explain": "복원에는 확실한 근거가 있어야 한다는, 지켜야 할 기본 규칙을 가리킨다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "1997년과 2007년에 각각 일어난 일은?",
+              "choices": [
+                "1997년 의궤 간행, 2007년 화성 완공",
+                "1997년 복원 시작, 2007년 복원 완료",
+                "1997년 화성 세계유산 등재, 2007년 조선왕조 의궤 세계기록유산 등재",
+                "1997년 화성 훼손, 2007년 재훼손"
+              ],
+              "answer": 2,
+              "explain": "1997년에 화성이 세계유산에, 2007년에 의궤가 세계기록유산에 올랐다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「크게 복원한 건축물은 대개 세계유산으로 인정받기 어렵다」고 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "복원에 드는 비용이 크기 때문에",
+                "원래 모습을 확인할 근거가 없으면 복원이 추측이 되기 때문에",
+                "복원한 건물은 오래 못 가기 때문에",
+                "복원 기술이 나라마다 다르기 때문에"
+              ],
+              "answer": 1,
+              "explain": "글은 근거가 끊겨 추측이 시작되는 지점에서 멈추어야 한다는 원칙을 먼저 말한 뒤, 확인할 방법이 없기 때문이라고 이유를 밝힌다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점으로 볼 때, 오래된 마을 한옥을 뒷날 되살릴 수 있게 하려면 지금 해야 할 일로 가장 알맞은 것은?",
+              "choices": [
+                "비슷한 한옥의 사진을 모아 둔다",
+                "치수와 재료, 손본 내력을 도면과 함께 정리해 남긴다",
+                "지금 모습 그대로 두고 손대지 않는다",
+                "기억하는 어르신의 말씀을 녹음해 두는 것으로 충분하다"
+              ],
+              "answer": 1,
+              "explain": "의궤가 복원의 근거가 된 것은 도면과 치수, 재료 목록처럼 확인 가능한 정보가 있었기 때문이다. 비슷한 사례나 기억만으로는 추측을 벗어나기 어렵다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "In 1794 King Jeongjo began building a new fortress at Suwon. This fortress is Hwaseong. It was a large civil engineering project for the time and demanded enormous funds and skill. Jeong Yak-yong designed a lifting device for heavy materials and a sturdy cart, and these reduced both labour and cost. The fortress was completed in 1796.",
+            "When the work was done, the king had the entire process set down as a record. The book made in this way is the Hwaseong Seongyeok Uigwe. It carries drawings of the walls and the attached buildings, the kind and quantity of materials, the names of the craftsmen and labourers, the wages paid to them, and a daily log of the work. It was printed in 1801 and appeared as ten volumes.",
+            "Almost two hundred years then passed. Through the colonial period and the Korean War the walls and buildings of Hwaseong fell into serious ruin. When restoration began in the 1970s, the most important source was the Uigwe. Because the drawings, the measurements, and the list of materials survived, the ruined parts could be rebuilt close to their original form.",
+            "There is a reason this matters. A principle holds that restoring cultural heritage requires firm evidence, and that work must stop at the point where evidence runs out and guesswork begins. For that reason a heavily rebuilt structure is usually hard to recognise as World Heritage. There is no way to confirm what the original form was. Hwaseong was different on exactly this point.",
+            "In 1997 Hwaseong was inscribed on the UNESCO World Heritage list. In 2007 the royal protocols of the Joseon dynasty, including the Hwaseong Seongyeok Uigwe, entered the Memory of the World register. The fortress and the book that described it were recognised side by side. A record does not merely write down what has passed. It also settles what can be brought back long afterwards."
+          ],
+          "envocab": [
+            {
+              "word": "enormous",
+              "ko": "막대한, 엄청난 (형용사)",
+              "base": "enormous [ɪˈnɔːrməs]"
+            },
+            {
+              "word": "quantity",
+              "ko": "수량 (명사)",
+              "base": "quantity [ˈkwɑːntəti]"
+            },
+            {
+              "word": "craftsmen",
+              "ko": "장인들 (명사 craftsman의 복수)",
+              "base": "craftsman [ˈkræftsmən]"
+            },
+            {
+              "word": "evidence",
+              "ko": "근거, 증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            },
+            {
+              "word": "principle",
+              "ko": "원칙 (명사)",
+              "base": "principle [ˈprɪnsəpl]"
+            },
+            {
+              "word": "inscribed",
+              "ko": "등재하다, 이름을 올리다 (동사 inscribe)",
+              "base": "inscribe [ɪnˈskraɪb]"
+            }
+          ],
+          "enseg": [
+            [
+              "In 1794 King Jeongjo began building a new fortress at Suwon. ",
+              "This fortress is Hwaseong. ",
+              "It was a large civil engineering project for the time",
+              " and demanded enormous funds and skill. ",
+              "Jeong Yak-yong designed a lifting device for heavy materials",
+              " and a sturdy cart, ",
+              "and these reduced both labour and cost. ",
+              "The fortress was completed in 1796."
+            ],
+            [
+              "When the work was done, ",
+              "the king had the entire process set down as a record. ",
+              "The book made in this way is the Hwaseong Seongyeok Uigwe. ",
+              "It carries drawings of the walls",
+              " and the attached buildings, the kind",
+              " and quantity of materials, ",
+              "the names of the craftsmen and labourers, ",
+              "the wages paid to them, ",
+              "and a daily log of the work. ",
+              "It was printed in 1801",
+              " and appeared as ten volumes."
+            ],
+            [
+              "Almost two hundred years then passed. ",
+              "Through the colonial period",
+              " and the Korean War the walls",
+              " and buildings of Hwaseong fell into serious ruin. ",
+              "When restoration began in the 1970s, ",
+              "the most important source was the Uigwe. ",
+              "Because the drawings, the measurements, ",
+              "and the list of materials survived, ",
+              "the ruined parts could be rebuilt close to their original form."
+            ],
+            [
+              "There is a reason this matters. ",
+              "A principle holds that restoring cultural heritage requires firm evidence,",
+              " ",
+              "and that work must stop at the point where evidence runs out",
+              " and guesswork begins. ",
+              "For that reason a heavily rebuilt structure is usually hard to recognise as World Heritage. ",
+              "There is no way to confirm what the original form was. ",
+              "Hwaseong was different on exactly this point."
+            ],
+            [
+              "In 1997 Hwaseong was inscribed on the UNESCO World Heritage list. ",
+              "In 2007 the royal protocols of the Joseon dynasty, ",
+              "including the Hwaseong Seongyeok Uigwe, ",
+              "entered the Memory of the World register. ",
+              "The fortress",
+              " and the book that described it were recognised side by side. ",
+              "A record does not merely write down what has passed. ",
+              "It also settles what can be brought back long afterwards."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "기록은 무엇을 되살릴 수 있는지를 정한다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "1794년 정조는 수원에 새 성을 쌓는 공사를 시작했다. ",
+              "이 성이 화성이다. ",
+              "당시로서는 막대한 경비와 기술이 투입된 대규모 토목 공사였다. ",
+              "정약용은 무거운 자재를 들어 올리는 거중기와 튼튼한 수레인 유형거를 고안해 ",
+              "일손과 비용을 줄였다. ",
+              "성은 1796년에 완성되었다. ",
+              "그러나 이 글에서 더 중요한 것은 ",
+              "공사가 끝난 뒤에 벌어진 일이다."
+            ],
+            [
+              "정조는 공사의 전 과정을 기록으로 남기게 했다. ",
+              "그렇게 편찬된 것이 「화성성역의궤」이며, 1801년에 열 권으로 인쇄되었다. ",
+              "여기에는 성곽과 부속 건물의 도면이 실려 있고, ",
+              "자재의 종류와 수량, 참여한 장인과 인부의 이름, 지급한 품삯, ",
+              "날마다의 공사 일지까지 담겼다. ",
+              "공사를 자랑하기 위한 기념물이 아니라 ",
+              "다시 지을 수 있을 만큼 자세한 설명서였다."
+            ],
+            [
+              "이 기록의 값어치는 이백 년 뒤에 드러났다. ",
+              "일제강점기와 한국전쟁을 거치며 화성의 성벽과 건물은 크게 무너졌다. ",
+              "1970년대에 복원이 시작되었을 때 가장 중요한 자료가 의궤였다. ",
+              "도면과 치수, 재료 목록이 남아 있었으므로 ",
+              "무너진 자리를 근거에 따라 되세울 수 있었다."
+            ],
+            [
+              "여기서 문화유산 복원의 원칙을 짚어야 한다. ",
+              "복원은 확실한 근거 위에서만 이루어져야 하고, ",
+              "근거가 끊겨 추측이 시작되는 지점에서 멈추어야 한다. ",
+              "이 원칙 때문에 크게 복원한 건축물은 대개 세계유산으로 인정받기 어렵다. ",
+              "무엇이 원래 모습이었는지 확인할 방법이 없으면 ",
+              "복원된 것은 옛것이 아니라 오늘의 상상이 되기 때문이다. ",
+              "화성은 바로 이 지점에서 다른 조건에 있었다."
+            ],
+            [
+              "1997년 화성은 유네스코 세계유산에 등재되었고, ",
+              "2007년에는 「화성성역의궤」를 포함한 조선왕조 의궤가 세계기록유산에 올랐다. ",
+              "성과 그 성을 적은 책이 나란히 인정받은 셈이다. ",
+              "여기서 기록의 성격이 드러난다. ",
+              "기록은 지나간 일을 보존하는 데서 그치지 않는다. ",
+              "무엇을 되살릴 수 있고 무엇을 영영 잃는지를 미리 정해 놓는다. ",
+              "남기지 않은 것은 훗날 복원의 대상이 아니라 ",
+              "추측의 대상이 될 뿐이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "편찬",
+              "easy": "여러 자료를 모아 정리해 책으로 엮는 일",
+              "hanja": "編(엮을 편)+纂(모을 찬)"
+            },
+            {
+              "word": "값어치",
+              "easy": "그것이 지니는 값이나 쓸모의 정도",
+              "hanja": null
+            },
+            {
+              "word": "원칙",
+              "easy": "어떤 일에서 마땅히 지켜야 할 기본이 되는 규칙",
+              "hanja": "原(근원 원)+則(법칙 칙)"
+            },
+            {
+              "word": "등재",
+              "easy": "목록이나 명부에 정식으로 올리는 일",
+              "hanja": "登(오를 등)+載(실을 재)"
+            },
+            {
+              "word": "보존",
+              "easy": "상하거나 없어지지 않도록 지켜 남기는 일",
+              "hanja": "保(지킬 보)+存(있을 존)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "거중기와 유형거의 작동 원리",
+                "기록은 무엇을 되살릴 수 있는지를 미리 정해 놓는다는 것",
+                "조선 후기 토목 공사의 비용 구조",
+                "세계유산 등재 기준의 변화"
+              ],
+              "answer": 1,
+              "explain": "공사보다 공사 뒤에 남긴 기록에 무게를 두고, 복원 원칙을 거쳐 마지막 문단에서 기록의 성격으로 정리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "글쓴이가 「화성성역의궤」를 설명한 방식으로 알맞은 것은?",
+              "choices": [
+                "다시 지을 수 있을 만큼 자세한 설명서",
+                "공사를 자랑하기 위한 기념물",
+                "왕실의 의례를 정리한 예법서",
+                "복원 공사의 예산안"
+              ],
+              "answer": 0,
+              "explain": "기념물이 아니라 다시 지을 수 있을 만큼 자세한 설명서였다고 직접 밝히고 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「편찬」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "글을 옮겨 적는 일",
+                "책을 인쇄해 파는 일",
+                "자료를 모아 정리해 책으로 엮는 일",
+                "낡은 책을 고치는 일"
+              ],
+              "answer": 2,
+              "explain": "공사의 전 과정을 정리해 한 권의 기록으로 만든 일을 가리킨다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "글쓴이가 「공사가 끝난 뒤에 벌어진 일이 더 중요하다」고 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "공사 기간이 짧았기 때문에",
+                "정약용이 공사 후에 더 유명해졌기 때문에",
+                "완성된 성이 곧 무너졌기 때문에",
+                "기록을 남긴 일이 이백 년 뒤 복원을 가능하게 했기 때문에"
+              ],
+              "answer": 3,
+              "explain": "글은 축성 자체보다 의궤 편찬과 그것이 1970년대 복원의 근거가 된 사실에 무게를 둔다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "「화성은 1970년대에 다시 지은 것이므로 세계유산의 자격이 없다」는 주장을 이 글에 근거해 반박할 때 가장 알맞은 것은?",
+              "choices": [
+                "복원한 건축물도 오래되면 유산이 된다",
+                "복원 기술이 뛰어났으므로 문제가 없다",
+                "복원이 도면과 치수라는 근거 위에서 이루어져 추측이 개입하지 않았다",
+                "유네스코가 이미 등재했으므로 논의할 필요가 없다"
+              ],
+              "answer": 2,
+              "explain": "글이 제시한 기준은 근거의 유무다. 근거가 끊긴 자리에서 멈추어야 한다는 원칙에 비추어, 화성은 의궤라는 근거가 있었다는 점이 반박의 핵심이다. 등재 사실 자체를 드는 것은 순환 논증이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "마지막 문단의 「남기지 않은 것은 복원의 대상이 아니라 추측의 대상이 될 뿐이다」라는 진술이 성립하려면 반드시 참이어야 하는 전제는?",
+              "choices": [
+                "기록은 언제나 정확하다",
+                "원래 모습을 확인할 방법은 남겨진 기록 말고는 없다",
+                "복원은 반드시 해야 하는 일이다",
+                "추측으로 만든 것은 아름답지 않다"
+              ],
+              "answer": 1,
+              "explain": "기록 외에 원형을 확인할 다른 길이 있다면, 기록이 없어도 복원이 가능해져 이 진술은 무너진다. 글은 확인 수단을 기록으로 한정하는 전제 위에 서 있다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점을 오늘날의 디지털 자료 보관에 적용할 때 가장 알맞은 태도는?",
+              "choices": [
+                "완성된 결과물만 잘 보관하면 충분하다",
+                "만드는 과정과 설정, 판단의 근거까지 함께 남겨 두어야 뒷날 되살릴 수 있다",
+                "자료가 많으면 혼란스러우므로 최소한만 남긴다",
+                "기억하는 담당자를 지정해 두면 된다"
+              ],
+              "answer": 1,
+              "explain": "의궤가 복원을 가능하게 한 것은 완성된 성의 모습이 아니라 자재·치수·과정을 함께 적었기 때문이다. 결과만 남기면 되살릴 근거가 부족해진다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "In 1794 King Jeongjo began building a new fortress at Suwon. This fortress is Hwaseong. For its time it was a large civil engineering project into which enormous funds and skill were poured. Jeong Yak-yong designed a lifting device for heavy materials and a sturdy cart, and these reduced both labour and cost. The fortress was completed in 1796. What matters more in this account, however, is what happened after the work ended.",
+            "The king had the entire process of the project set down as a record. What was compiled in this way is the Hwaseong Seongyeok Uigwe, printed in ten volumes in 1801. It carries drawings of the walls and attached buildings, the kind and quantity of materials, the names of craftsmen and labourers, the wages paid, and a daily log of the work. It was not a monument made to boast of the project. It was a manual detailed enough to build the thing again.",
+            "The worth of that record appeared two hundred years later. Through the colonial period and the Korean War the walls and buildings of Hwaseong fell into serious ruin. When restoration began in the 1970s, the Uigwe was the most important source. Because the drawings, the measurements, and the list of materials survived, the ruined parts could be raised again on evidence.",
+            "Here a principle of heritage restoration must be noted. Restoration should proceed only on firm evidence, and it must stop at the point where evidence runs out and guesswork begins. Because of this principle a heavily rebuilt structure is usually hard to recognise as World Heritage. If there is no way to confirm the original form, what is rebuilt is not the old thing but today's imagination. On exactly this point Hwaseong stood in a different position.",
+            "In 1997 Hwaseong was inscribed on the UNESCO World Heritage list, and in 2007 the royal protocols of Joseon, the Uigwe among them, entered the Memory of the World register. The fortress and the book that described it were recognised side by side. The nature of a record shows itself here. A record does not only preserve what has passed. It decides in advance what can be brought back and what is lost for good. Whatever was not written down becomes, in a later age, not an object of restoration but an object of guesswork."
+          ],
+          "envocab": [
+            {
+              "word": "compiled",
+              "ko": "편찬하다, 엮다 (동사 compile)",
+              "base": "compile [kəmˈpaɪl]"
+            },
+            {
+              "word": "monument",
+              "ko": "기념물 (명사)",
+              "base": "monument [ˈmɑːnjumənt]"
+            },
+            {
+              "word": "manual",
+              "ko": "설명서 (명사)",
+              "base": "manual [ˈmænjuəl]"
+            },
+            {
+              "word": "evidence",
+              "ko": "근거, 증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            },
+            {
+              "word": "imagination",
+              "ko": "상상 (명사)",
+              "base": "imagination [ɪˌmædʒɪˈneɪʃn]"
+            },
+            {
+              "word": "preserve",
+              "ko": "보존하다 (동사)",
+              "base": "preserve [prɪˈzɜːrv]"
+            }
+          ],
+          "enseg": [
+            [
+              "In 1794 King Jeongjo began building a new fortress at Suwon. ",
+              "This fortress is Hwaseong. ",
+              "For its time it was a large civil engineering project into which enormous funds",
+              " and skill were poured. ",
+              "Jeong Yak-yong designed a lifting device for heavy materials",
+              " and a sturdy cart, ",
+              "and these reduced both labour and cost. ",
+              "The fortress was completed in 1796. ",
+              "What matters more in this account, however, ",
+              "is what happened after the work ended."
+            ],
+            [
+              "The king had the entire process of the project set down as a record. ",
+              "What was compiled in this way is the Hwaseong Seongyeok Uigwe, ",
+              "printed in ten volumes in 1801. ",
+              "It carries drawings of the walls",
+              " and attached buildings, the kind",
+              " and quantity of materials, ",
+              "the names of craftsmen and labourers, ",
+              "the wages paid, and a daily log of the work. ",
+              "It was not a monument made to boast of the project. ",
+              "It was a manual detailed enough to build the thing again."
+            ],
+            [
+              "The worth of that record appeared two hundred years later. ",
+              "Through the colonial period",
+              " and the Korean War the walls",
+              " and buildings of Hwaseong fell into serious ruin. ",
+              "When restoration began in the 1970s, ",
+              "the Uigwe was the most important source. ",
+              "Because the drawings, the measurements, ",
+              "and the list of materials survived, ",
+              "the ruined parts could be raised again on evidence."
+            ],
+            [
+              "Here a principle of heritage restoration must be noted. ",
+              "Restoration should proceed only on firm evidence,",
+              " ",
+              "and it must stop at the point where evidence runs out",
+              " and guesswork begins. ",
+              "Because of this principle a heavily rebuilt structure is usually hard to recognise as World Heritage. ",
+              "If there is no way to confirm the original form, ",
+              "what is rebuilt is not the old thing",
+              " but today's imagination. ",
+              "On exactly this point Hwaseong stood in a different position."
+            ],
+            [
+              "In 1997 Hwaseong was inscribed on the UNESCO World Heritage list,",
+              " and in 2007 the royal protocols of Joseon, ",
+              "the Uigwe among them, ",
+              "entered the Memory of the World register. ",
+              "The fortress",
+              " and the book that described it were recognised side by side. ",
+              "The nature of a record shows itself here. ",
+              "A record does not only preserve what has passed. ",
+              "It decides in advance what can be brought back",
+              " and what is lost for good. ",
+              "Whatever was not written down becomes, ",
+              "in a later age, not an object of restoration",
+              " but an object of guesswork."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "sleep-memory",
+      "category": "science",
+      "careers": [
+        "bio",
+        "med",
+        "edu"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가정신건강정보포털 — 수면과 수면장애",
+          "url": "https://www.mentalhealth.go.kr/portal/disease/diseaseDetail.do?dissId=32"
+        },
+        {
+          "title": "국립중앙과학관 웹진 — 왜 잠을 자는가? 수면의 과학",
+          "url": "https://www.science.go.kr/webzine/793/column.html"
+        },
+        {
+          "title": "생화학분자생물학회 웹진 — 수면 중 기억의 시스템 공고화",
+          "url": "https://www.ksbmb.or.kr/html/?pmode=webzine&smode=viewDetail&id=202501&menu=1421&seq=37706"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "자는 동안 뇌가 정리해요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "낮에 새로 배운 것은 ",
+              "머릿속에 잠깐 담겨요. ",
+              "아직 단단하지 않아요. ",
+              "조금만 지나도 ",
+              "쉽게 잊어버려요."
+            ],
+            [
+              "그런데 잠을 자면 ",
+              "뇌가 바빠져요. ",
+              "낮에 배운 것을 ",
+              "하나하나 다시 꺼내 봐요. ",
+              "그리고 오래 두는 자리로 ",
+              "조심히 옮겨요. ",
+              "이렇게 옮겨진 것이 ",
+              "오래가는 기억이 돼요. ",
+              "우리가 자는 동안에 ",
+              "이 일이 벌어져요."
+            ],
+            [
+              "그래서 잠을 적게 자면 ",
+              "배운 것이 잘 안 남아요. ",
+              "밤을 새워 외우는 것은 ",
+              "그래서 도움이 되지 않아요. ",
+              "책을 덮고 잠자리에 누워도 ",
+              "공부는 아직 이어지고 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "뇌",
+              "easy": "머릿속에서 생각하고 기억하는 일을 맡은 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "기억",
+              "easy": "겪거나 배운 것을 잊지 않고 담아 두는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "공부",
+              "easy": "새로운 것을 배우고 익히는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "잠자리를 고르는 방법",
+                "자는 동안 뇌가 배운 것을 정리한다는 것",
+                "꿈을 꾸는 까닭",
+                "밤에 먹으면 좋은 음식"
+              ],
+              "answer": 1,
+              "explain": "낮에 배운 것을 자는 동안 뇌가 오래 두는 자리로 옮긴다는 것이 이 글의 중심이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "낮에 새로 배운 것은 처음에 어떤 상태인가요?",
+              "choices": [
+                "아주 단단해요",
+                "아직 단단하지 않아 쉽게 잊어버려요",
+                "영원히 남아요",
+                "저절로 없어져요"
+              ],
+              "answer": 1,
+              "explain": "아직 단단하지 않아서 조금만 지나도 쉽게 잊어버린다고 나와요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「기억」은 무엇인가요?",
+              "choices": [
+                "배운 것을 담아 두는 일",
+                "밤에 자는 일",
+                "책을 사는 일",
+                "친구와 노는 일"
+              ],
+              "answer": 0,
+              "explain": "겪거나 배운 것을 잊지 않고 담아 두는 일을 기억이라고 해요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "밤을 새워 외우면 왜 도움이 되지 않을까요?",
+              "choices": [
+                "책이 무거워서",
+                "잠을 안 자면 뇌가 옮기는 일을 못 해서",
+                "밤에는 불이 어두워서",
+                "아침에 배가 고파서"
+              ],
+              "answer": 1,
+              "explain": "자는 동안 뇌가 배운 것을 오래 두는 자리로 옮겨요. 안 자면 그 일을 할 수 없어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "내일 시험이 있어요. 이 글대로라면 어떻게 하는 것이 좋을까요?",
+              "choices": [
+                "밤을 새워서 계속 봐요",
+                "일찍 공부를 마치고 푹 자요",
+                "공부를 아예 안 해요",
+                "자다가 자꾸 깨서 봐요"
+              ],
+              "answer": 1,
+              "explain": "배운 것이 오래 남으려면 자는 시간이 필요해요. 공부를 마치고 자는 것이 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "잠자는 동안에도 공부는 이어진다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "낮에 새로 배운 것은 ",
+              "곧바로 오래 남는 기억이 되지 않는다. ",
+              "처음에는 뇌의 「해마」라는 곳에 ",
+              "잠깐 맡겨진다. ",
+              "이 상태의 기억은 아직 약해서 ",
+              "쉽게 흐려지거나 사라진다."
+            ],
+            [
+              "기억이 오래 남으려면 ",
+              "해마에 있던 것이 ",
+              "대뇌 겉쪽의 넓은 자리로 옮겨져야 한다. ",
+              "이 옮기는 일을 「기억 공고화」라고 한다. ",
+              "그리고 이 일은 주로 ",
+              "우리가 잠든 사이에 일어난다."
+            ],
+            [
+              "잠자는 동안 뇌는 쉬고만 있지 않는다. ",
+              "낮에 무언가를 배울 때 켜졌던 신경의 움직임을 ",
+              "빠르게 되풀이해 본다. ",
+              "학자들은 이것을 기억이 다시 살아난다는 뜻에서 ",
+              "「재활성」이라고 부른다. ",
+              "특히 깊이 잠든 구간에서 ",
+              "이 되풀이가 활발하게 나타난다."
+            ],
+            [
+              "그래서 배운 뒤에 잠을 줄이면 ",
+              "옮기는 일이 제대로 끝나지 않는다. ",
+              "밤을 새워 외우는 방법이 ",
+              "오래가지 못하는 까닭이 여기에 있다. ",
+              "국가정신건강정보포털은 ",
+              "아동과 청소년에게 하루 아홉 시간에서 열 시간의 잠을 권한다. ",
+              "책을 덮은 뒤에도 ",
+              "공부는 아직 끝나지 않은 셈이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "해마",
+              "easy": "뇌 안쪽에 있는 부분으로, 새로 배운 것을 잠시 맡아 두는 곳",
+              "hanja": null
+            },
+            {
+              "word": "대뇌",
+              "easy": "뇌에서 가장 큰 부분으로, 생각하고 판단하는 일을 맡는다",
+              "hanja": "大(큰 대)+腦(뇌 뇌)"
+            },
+            {
+              "word": "신경",
+              "easy": "몸 곳곳에 신호를 주고받는 가느다란 줄기",
+              "hanja": "神(귀신 신)+經(지날 경)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "잠을 잘 자는 방법",
+                "배운 것이 오래 남으려면 잠자는 동안의 정리가 필요하다는 것",
+                "해마의 생김새",
+                "꿈의 종류"
+              ],
+              "answer": 1,
+              "explain": "기억이 해마에서 대뇌로 옮겨지는 일이 잠든 사이에 일어난다는 것이 글 전체의 중심이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "새로 배운 것이 처음에 맡겨지는 곳은?",
+              "choices": [
+                "대뇌 겉쪽",
+                "눈",
+                "심장",
+                "해마"
+              ],
+              "answer": 3,
+              "explain": "처음에는 뇌의 해마라는 곳에 잠깐 맡겨진다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「공고화」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "빠르게 움직이는 일",
+                "여럿으로 나누는 일",
+                "약한 것을 단단하게 굳히는 일",
+                "크게 소리 내는 일"
+              ],
+              "answer": 2,
+              "explain": "약한 기억을 오래 남도록 단단하게 만드는 일이라 공고화라고 부른다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "「재활성」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "낮에 켜졌던 신경의 움직임을 잠든 동안 되풀이하는 것",
+                "잠들기 전에 책을 다시 읽는 것",
+                "아침에 일찍 일어나는 것",
+                "낮잠을 짧게 자는 것"
+              ],
+              "answer": 0,
+              "explain": "배울 때 켜졌던 신경의 움직임을 잠든 사이 빠르게 되풀이하는 것을 재활성이라 부른다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「책을 덮은 뒤에도 공부는 아직 끝나지 않았다」고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "다음 날 아침에 또 봐야 한다는 뜻",
+                "잠자는 동안 기억을 옮기는 일이 남아 있다는 뜻",
+                "책을 여러 권 읽어야 한다는 뜻",
+                "복습이 예습보다 중요하다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "앞에서 기억을 옮기는 일이 잠든 사이에 일어난다고 했다. 책을 덮어도 그 과정이 남아 있다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글을 읽고 시험 전날 계획을 세운다면 가장 알맞은 것은?",
+              "choices": [
+                "새벽 세 시까지 외우고 두 시간 잔다",
+                "공부를 일찍 마치고 평소만큼 잔다",
+                "잠을 자지 않고 아침까지 본다",
+                "자다가 한 시간마다 깨서 확인한다"
+              ],
+              "answer": 1,
+              "explain": "배운 뒤 잠을 줄이면 옮기는 일이 제대로 끝나지 않는다고 했다. 공부를 마치고 충분히 자는 편이 낫다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "What you learn during the day does not become a lasting memory at once. At first it is left for a short while in a part of the brain called the hippocampus. A memory in this state is still weak, so it fades or disappears easily.",
+            "For a memory to last, what sits in the hippocampus must move out to the wide surface of the cerebrum. This moving is called memory consolidation. And it happens mostly while we are asleep.",
+            "The brain does not simply rest during sleep. It replays, at high speed, the nerve activity that was switched on while you were learning. Scientists call this reactivation, because the memory comes alive again. This replay appears most strongly in the deepest stage of sleep.",
+            "So if you cut your sleep after learning, the moving is not finished properly. That is why staying up all night to memorise does not hold. The national mental health portal advises nine to ten hours of sleep a day for children and teenagers. Even after the book is closed, the studying is not yet over."
+          ],
+          "envocab": [
+            {
+              "word": "lasting",
+              "ko": "오래가는 (형용사)",
+              "base": "last [læst]"
+            },
+            {
+              "word": "hippocampus",
+              "ko": "해마 (명사)",
+              "base": "hippocampus [ˌhɪpəˈkæmpəs]"
+            },
+            {
+              "word": "cerebrum",
+              "ko": "대뇌 (명사)",
+              "base": "cerebrum [səˈriːbrəm]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화, 굳히기 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "replays",
+              "ko": "되풀이해 재생하다 (동사 replay)",
+              "base": "replay [ˌriːˈpleɪ]"
+            },
+            {
+              "word": "reactivation",
+              "ko": "재활성 (명사)",
+              "base": "reactivation [riˌæktɪˈveɪʃn]"
+            }
+          ],
+          "enseg": [
+            [
+              "What you learn during the day does not become a lasting memory at once. ",
+              "At first it is left for a short",
+              " while in a part of the brain called the hippocampus. ",
+              "A memory in this state is still weak, ",
+              "so it fades or disappears easily."
+            ],
+            [
+              "For a memory to last, ",
+              "what sits in the hippocampus must move out to the wide surface of the cerebrum. ",
+              "This moving is called memory consolidation. ",
+              "And it happens mostly while we are asleep."
+            ],
+            [
+              "The brain does not simply rest during sleep. ",
+              "It replays, at high speed, ",
+              "the nerve activity that was switched on",
+              " while you were learning. ",
+              "Scientists call this reactivation, ",
+              "because the memory comes alive again. ",
+              "This replay appears most strongly in the deepest stage of sleep."
+            ],
+            [
+              "So if you cut your sleep after learning, ",
+              "the moving is not finished properly. ",
+              "That is why staying up all night to memorise does not hold. ",
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers. ",
+              "Even after the book is closed, ",
+              "the studying is not yet over."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "기억을 옮겨 적는 시간",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "무언가를 새로 배웠다고 해서 ",
+              "그것이 곧바로 오래 남는 기억이 되지는 않는다. ",
+              "새 정보는 먼저 뇌 안쪽의 「해마」에 임시로 저장된다. ",
+              "이때의 기억은 불안정해서 ",
+              "쉽게 흐려지거나 다른 기억에 밀려난다. ",
+              "시험 직전에 외운 것이 ",
+              "며칠 뒤 남지 않는 경험이 여기에 해당한다."
+            ],
+            [
+              "불안정한 단기 기억이 ",
+              "오래가는 장기 기억으로 바뀌는 과정을 ",
+              "「공고화」라고 한다. ",
+              "공고화의 핵심은 자리를 옮기는 일이다. ",
+              "해마에 임시로 있던 정보가 ",
+              "대뇌 피질의 넓은 저장 공간으로 점차 옮겨 간다. ",
+              "그리고 이 옮김은 대부분 ",
+              "우리가 잠든 사이에 진행된다."
+            ],
+            [
+              "잠자는 뇌는 쉬고 있는 뇌가 아니다. ",
+              "깨어 있을 때 학습하며 나타났던 신경 활동의 패턴이 ",
+              "잠든 동안 시간적으로 압축된 형태로 되풀이된다. ",
+              "연구자들은 이를 「기억 재활성」이라 부르며 ",
+              "공고화의 핵심 작동 방식으로 본다. ",
+              "이 되풀이는 특히 깊은 잠에 해당하는 ",
+              "서파 수면 구간에서 두드러진다."
+            ],
+            [
+              "그렇다면 잠을 줄이면 어떻게 될까. ",
+              "새로운 학습 뒤에 수면을 제한하면 ",
+              "공고화 과정이 크게 나빠진다는 것이 ",
+              "여러 연구에서 확인되었다. ",
+              "밤을 새워 외운 내용이 오래가지 않는 데에는 ",
+              "의지나 집중력이 아니라 ",
+              "이런 생물학적 이유가 있다."
+            ],
+            [
+              "국가정신건강정보포털은 ",
+              "아동과 청소년에게 하루 아홉 시간에서 열 시간의 수면을 권한다. ",
+              "다만 필요한 시간은 사람마다 다르며, ",
+              "다음 날 피곤하지 않게 지낼 수 있는 정도가 ",
+              "그 사람에게 필요한 최소한이다. ",
+              "책을 덮는 순간이 공부의 끝이 아니라는 것, ",
+              "이것이 수면 연구가 알려 주는 사실이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "임시",
+              "easy": "얼마 동안만 잠깐 그렇게 하는 것",
+              "hanja": "臨(임할 임)+時(때 시)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약하고 불안정한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            },
+            {
+              "word": "피질",
+              "easy": "기관의 겉을 이루는 층. 대뇌 피질은 대뇌의 바깥층이다",
+              "hanja": "皮(가죽 피)+質(바탕 질)"
+            },
+            {
+              "word": "압축",
+              "easy": "부피나 길이를 눌러 줄이는 것",
+              "hanja": "壓(누를 압)+縮(줄일 축)"
+            },
+            {
+              "word": "제한",
+              "easy": "일정한 정도를 넘지 못하게 막는 것",
+              "hanja": "制(마를 제)+限(한할 한)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 장애를 치료하는 방법",
+                "기억이 오래 남으려면 잠자는 동안의 공고화가 필요하다는 것",
+                "해마의 해부학적 구조",
+                "꿈이 만들어지는 원리"
+              ],
+              "answer": 1,
+              "explain": "해마의 임시 저장에서 출발해 공고화와 재활성을 설명하고, 수면 제한의 영향으로 마무리한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "「기억 재활성」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "잠들기 직전에 배운 것을 다시 읽는 일",
+                "아침에 일어나 복습하는 일",
+                "해마가 새로 만들어지는 일",
+                "학습할 때 나타났던 신경 활동 패턴이 잠든 동안 압축되어 되풀이되는 일"
+              ],
+              "answer": 3,
+              "explain": "깨어 있을 때의 신경 활동 패턴이 잠든 동안 시간적으로 압축된 형태로 되풀이되는 것을 재활성이라 한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「제한」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "일정한 정도를 넘지 못하게 막는 것",
+                "완전히 없애는 것",
+                "두 배로 늘리는 것",
+                "순서를 바꾸는 것"
+              ],
+              "answer": 0,
+              "explain": "학습 뒤에 수면을 제한한다는 것은 잠자는 시간을 일정 이상 넘지 못하게 줄인다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "권장 수면 시간에 대한 글의 설명으로 알맞은 것은?",
+              "choices": [
+                "모든 사람에게 정확히 아홉 시간이 필요하다",
+                "청소년은 여섯 시간이면 충분하다",
+                "아동·청소년에게 아홉에서 열 시간을 권하되 필요한 시간은 사람마다 다르다",
+                "많이 잘수록 언제나 좋다"
+              ],
+              "answer": 2,
+              "explain": "아홉에서 열 시간을 권하면서도, 필요한 시간은 사람마다 다르고 다음 날 피곤하지 않은 정도가 기준이라고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「의지나 집중력이 아니라 생물학적 이유」라고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "노력해도 공부는 소용없다는 뜻",
+                "밤샘이 실패하는 원인이 마음가짐이 아니라 몸에서 일어나는 과정에 있다는 뜻",
+                "집중력은 기억과 무관하다는 뜻",
+                "잠을 자면 저절로 외워진다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "수면을 제한하면 공고화가 나빠진다는 앞의 설명을 근거로, 원인을 태도가 아니라 몸의 과정에서 찾는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 내용에 비추어, 다음 중 근거가 가장 약한 주장은?",
+              "choices": [
+                "학습 직후 충분히 자면 기억이 더 잘 남을 수 있다",
+                "밤샘 암기는 오래가기 어렵다",
+                "잠을 오래 잘수록 성적이 반드시 오른다",
+                "필요한 수면 시간은 사람마다 다를 수 있다"
+              ],
+              "answer": 2,
+              "explain": "글은 공고화에 수면이 필요하다고 말할 뿐, 수면 시간과 성적이 비례한다고 하지 않는다. 오히려 필요한 시간은 사람마다 다르다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Learning something new does not turn it into a lasting memory right away. New information is first stored for a time in a part of the brain called the hippocampus. A memory at this stage is unstable, so it fades easily or is pushed aside by other memories. Something crammed just before a test, and gone a few days later, is an example.",
+            "The process by which an unstable short-term memory becomes a long-term one is called consolidation. At its core, consolidation is a move. Information held for a time in the hippocampus gradually shifts to the wide storage space of the cerebral cortex. And this move takes place mostly while we are asleep.",
+            "A sleeping brain is not a resting brain. Patterns of nerve activity that appeared during learning are repeated while we sleep, in a form compressed in time. Researchers call this memory reactivation and regard it as the central mechanism of consolidation. The repetition is most marked during slow-wave sleep, the deepest stage.",
+            "So what happens if sleep is cut short? Many studies have confirmed that restricting sleep after new learning seriously impairs consolidation. When material memorised through an all-nighter does not last, the reason is not willpower or concentration. It is biological.",
+            "The national mental health portal advises nine to ten hours of sleep a day for children and teenagers. How much a person needs, however, differs from person to person, and the minimum for each is the amount that lets them get through the next day without fatigue. Closing the book is not the end of studying. That is what sleep research tells us."
+          ],
+          "envocab": [
+            {
+              "word": "unstable",
+              "ko": "불안정한 (형용사)",
+              "base": "unstable [ʌnˈsteɪbl]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "compressed",
+              "ko": "압축된 (형용사 / 동사 compress)",
+              "base": "compress [kəmˈpres]"
+            },
+            {
+              "word": "mechanism",
+              "ko": "작동 방식, 기전 (명사)",
+              "base": "mechanism [ˈmekənɪzəm]"
+            },
+            {
+              "word": "restricting",
+              "ko": "제한하다 (동사 restrict)",
+              "base": "restrict [rɪˈstrɪkt]"
+            },
+            {
+              "word": "fatigue",
+              "ko": "피로 (명사)",
+              "base": "fatigue [fəˈtiːɡ]"
+            }
+          ],
+          "enseg": [
+            [
+              "Learning something new does not turn it into a lasting memory right away. ",
+              "New information is first stored for a time in a part of the brain called the hippocampus. ",
+              "A memory at this stage is unstable, ",
+              "so it fades easily",
+              " or is pushed aside by other memories. ",
+              "Something crammed just before a test, ",
+              "and gone a few days later, is an example."
+            ],
+            [
+              "The process by which an unstable short-term memory becomes a long-term one is called consolidation. ",
+              "At its core, consolidation is a move. ",
+              "Information held for a time in the hippocampus gradually shifts to the wide storage space of the cerebral cortex. ",
+              "And this move takes place mostly",
+              " while we are asleep."
+            ],
+            [
+              "A sleeping brain is not a resting brain. ",
+              "Patterns of nerve activity that appeared during learning are repeated",
+              " while we sleep, in a form compressed in time. ",
+              "Researchers call this memory reactivation",
+              " and regard it as the central mechanism of consolidation. ",
+              "The repetition is most marked during slow-wave sleep, ",
+              "the deepest stage."
+            ],
+            [
+              "So what happens if sleep is cut short? ",
+              "Many studies have confirmed that restricting sleep after new learning seriously impairs consolidation. ",
+              "When material memorised through an all-nighter does not last, ",
+              "the reason is not willpower or concentration. ",
+              "It is biological."
+            ],
+            [
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers. ",
+              "How much a person needs, however, ",
+              "differs from person to person, ",
+              "and the minimum for each is the amount that lets them get through the next day without fatigue. ",
+              "Closing the book is not the end of studying. ",
+              "That is what sleep research tells us."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "기억은 자는 동안 옮겨 적힌다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "새로 배운 내용이 곧바로 오래 남는 기억이 되는 것은 아니다. ",
+              "새 정보는 우선 뇌 안쪽의 해마에 임시로 저장된다. ",
+              "이 단계의 기억은 불안정해서 쉽게 흐려지거나 ",
+              "뒤이어 들어온 정보에 밀려난다. ",
+              "시험 직전에 몰아서 외운 내용이 며칠 만에 남지 않는 경험은 ",
+              "이 불안정함을 그대로 보여 준다."
+            ],
+            [
+              "불안정한 단기 기억이 안정된 장기 기억으로 바뀌는 과정을 공고화라 한다. ",
+              "그 핵심은 저장 장소의 이동이다. ",
+              "해마에 임시로 놓였던 정보가 대뇌 피질의 넓은 저장 공간으로 점차 옮겨 가며, ",
+              "이 과정을 연구자들은 시스템 공고화라고 부른다. ",
+              "중요한 것은 이 이동이 깨어 있는 동안이 아니라 ",
+              "잠든 사이에 주로 진행된다는 점이다."
+            ],
+            [
+              "잠자는 뇌는 활동을 멈춘 뇌가 아니다. ",
+              "깨어 있을 때 학습하며 나타났던 신경 활동의 패턴이 ",
+              "수면 중 시간적으로 압축된 형태로 되풀이된다. ",
+              "이를 기억 재활성이라 하며 공고화의 핵심 기전으로 본다. ",
+              "특히 깊은 잠에 해당하는 서파 수면 구간에서 ",
+              "해마와 대뇌 피질 사이의 신호가 서로 맞물리며 ",
+              "이 되풀이가 활발하게 나타난다."
+            ],
+            [
+              "여기서 학습에 대한 통념 하나가 흔들린다. ",
+              "공부의 성과가 깨어서 보낸 시간에만 달렸다는 생각이다. ",
+              "새로운 학습 뒤에 수면을 제한하면 공고화가 크게 나빠진다는 것은 ",
+              "여러 연구에서 반복해 확인되었다. ",
+              "밤을 새워 외운 내용이 오래가지 않는 까닭은 ",
+              "의지가 약해서가 아니라 옮겨 적을 시간을 없앴기 때문이다. ",
+              "깨어서 외운 양과 실제로 남는 양은 ",
+              "같은 값이 아니다."
+            ],
+            [
+              "다만 이 사실을 단순한 공식으로 바꾸어서는 안 된다. ",
+              "국가정신건강정보포털은 아동과 청소년에게 ",
+              "하루 아홉 시간에서 열 시간의 수면을 권하면서도, ",
+              "필요한 시간은 개인마다 다르다고 밝힌다. ",
+              "다음 날 피곤하지 않게 일상을 보낼 수 있는 정도가 ",
+              "그 사람에게 필요한 최소한이다. ",
+              "오래 잔다고 성적이 저절로 오르는 것도 아니다. ",
+              "다만 배운 것을 남기려면 옮겨 적을 시간이 필요하다는 것, ",
+              "책을 덮는 순간이 공부의 끝이 아니라는 것은 분명하다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "통념",
+              "easy": "널리 그렇다고 받아들여지는 생각",
+              "hanja": "通(통할 통)+念(생각 념)"
+            },
+            {
+              "word": "기전",
+              "easy": "어떤 현상이 일어나는 짜임새와 작동 방식",
+              "hanja": "機(틀 기)+轉(구를 전)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약하고 불안정한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            },
+            {
+              "word": "압축",
+              "easy": "부피나 길이를 눌러 줄이는 것",
+              "hanja": "壓(누를 압)+縮(줄일 축)"
+            },
+            {
+              "word": "제한",
+              "easy": "일정한 정도를 넘지 못하게 막는 것",
+              "hanja": "制(마를 제)+限(한할 한)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 시간을 늘리면 성적이 오른다는 것",
+                "학습의 성과는 깨어 있는 시간만이 아니라 잠든 사이의 공고화에도 달려 있다는 것",
+                "해마와 대뇌 피질의 해부학적 차이",
+                "서파 수면의 뇌파 주파수"
+              ],
+              "answer": 1,
+              "explain": "공고화가 잠든 사이에 일어난다는 사실을 근거로, 깨어 있는 시간만으로 학습 성과를 따지는 통념을 흔드는 것이 글의 중심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "「시스템 공고화」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "해마가 새로 자라나는 과정",
+                "잠들기 전에 복습하는 학습법",
+                "서파 수면의 길이를 재는 방법",
+                "정보가 해마에서 대뇌 피질의 저장 공간으로 점차 옮겨 가는 과정"
+              ],
+              "answer": 3,
+              "explain": "해마에 임시로 놓였던 정보가 대뇌 피질로 옮겨 가는 과정을 연구자들이 시스템 공고화라 부른다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「통념」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "널리 그렇다고 받아들여지는 생각",
+                "새로 밝혀진 사실",
+                "학자들만 아는 이론",
+                "잘못된 기억"
+              ],
+              "answer": 0,
+              "explain": "공부의 성과가 깨어 있는 시간에만 달렸다는, 흔히 받아들여지는 생각을 가리킨다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "「깨어서 외운 양과 실제로 남는 양은 같은 값이 아니다」가 뜻하는 바로 가장 알맞은 것은?",
+              "choices": [
+                "외우는 속도가 사람마다 다르다는 뜻",
+                "많이 외울수록 더 많이 남는다는 뜻",
+                "외운 것 가운데 공고화를 거친 만큼만 장기 기억으로 남는다는 뜻",
+                "외우기보다 이해가 중요하다는 뜻"
+              ],
+              "answer": 2,
+              "explain": "앞에서 수면을 제한하면 공고화가 나빠진다고 했다. 투입한 암기량이 그대로 남는 것이 아니라 옮겨 적히는 과정을 거쳐야 남는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글을 근거로 삼을 때 가장 지지받기 어려운 주장은?",
+              "choices": [
+                "학습 직후의 수면은 기억이 남는 데 도움이 될 수 있다",
+                "밤샘 암기는 오래 유지되기 어렵다",
+                "필요한 수면 시간은 사람마다 다를 수 있다",
+                "수면 시간을 늘리기만 하면 학업 성적이 비례해 오른다"
+              ],
+              "answer": 3,
+              "explain": "글은 마지막 문단에서 오래 잔다고 성적이 저절로 오르는 것은 아니라고 못 박는다. 나머지 셋은 글이 직접 밝힌 내용이다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 「단순한 공식으로 바꾸어서는 안 된다」고 덧붙인 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 연구의 결과가 아직 신뢰할 수 없기 때문에",
+                "권장 시간을 모든 사람에게 똑같이 적용하면 개인차를 놓치기 때문에",
+                "학생마다 공부하는 과목이 다르기 때문에",
+                "수면보다 식사가 더 중요하기 때문에"
+              ],
+              "answer": 1,
+              "explain": "바로 뒤에서 필요한 시간이 개인마다 다르며 다음 날 피곤하지 않은 정도가 기준이라고 밝힌다. 일률적인 숫자로 환원하는 것을 경계하는 것이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점에서 학습 계획을 세울 때 가장 알맞은 원칙은?",
+              "choices": [
+                "시험 전날 잠을 줄여 최대한 많이 본다",
+                "학습을 여러 날에 나누고 그 사이마다 잠을 확보한다",
+                "낮잠으로 밤잠을 모두 대신한다",
+                "잠들기 직전까지 새 내용을 넣는다"
+              ],
+              "answer": 1,
+              "explain": "공고화는 잠든 사이에 진행되므로, 학습과 수면이 번갈아 오도록 나누어 배치하는 편이 이 글의 설명에 맞는다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "Newly learned material does not become a lasting memory at once. New information is first stored for a time in the hippocampus, deep inside the brain. A memory at this stage is unstable, fading easily or being pushed aside by information that arrives after it. Material crammed just before a test, and gone within days, shows this instability plainly.",
+            "The process by which an unstable short-term memory becomes a stable long-term one is called consolidation. At its core lies a change of storage place. Information placed for a time in the hippocampus gradually moves to the wide storage space of the cerebral cortex, and researchers call this systems consolidation. What matters is that the move proceeds mainly during sleep rather than while we are awake.",
+            "A sleeping brain has not stopped working. Patterns of nerve activity that appeared during learning are repeated in sleep in a form compressed in time. This is called memory reactivation and is regarded as the central mechanism of consolidation. During slow-wave sleep, the deepest stage, signals between the hippocampus and the cortex lock together and the repetition becomes especially active.",
+            "Here a common belief about learning is shaken: the belief that results depend only on the hours spent awake. Studies have confirmed again and again that restricting sleep after new learning seriously impairs consolidation. When material memorised through an all-nighter fails to last, the cause is not weak willpower but the loss of the time needed to copy it over. The amount memorised while awake and the amount that actually remains are not the same number.",
+            "This should not, however, be turned into a simple formula. The national mental health portal advises nine to ten hours of sleep a day for children and teenagers, while stating that the amount needed differs between individuals. The minimum for each person is the amount that lets them get through the next day without fatigue. Nor does sleeping longer raise grades by itself. What is clear is only this: keeping what you have learned takes time to copy it over, and closing the book is not the end of studying."
+          ],
+          "envocab": [
+            {
+              "word": "instability",
+              "ko": "불안정함 (명사)",
+              "base": "instability [ˌɪnstəˈbɪləti]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "mechanism",
+              "ko": "기전, 작동 방식 (명사)",
+              "base": "mechanism [ˈmekənɪzəm]"
+            },
+            {
+              "word": "impairs",
+              "ko": "손상시키다, 나빠지게 하다 (동사 impair)",
+              "base": "impair [ɪmˈper]"
+            },
+            {
+              "word": "willpower",
+              "ko": "의지력 (명사)",
+              "base": "willpower [ˈwɪlpaʊər]"
+            },
+            {
+              "word": "individuals",
+              "ko": "개인들 (명사 individual의 복수)",
+              "base": "individual [ˌɪndɪˈvɪdʒuəl]"
+            }
+          ],
+          "enseg": [
+            [
+              "Newly learned material does not become a lasting memory at once. ",
+              "New information is first stored for a time in the hippocampus, ",
+              "deep inside the brain. ",
+              "A memory at this stage is unstable, ",
+              "fading easily",
+              " or being pushed aside by information that arrives after it. ",
+              "Material crammed just before a test, ",
+              "and gone within days, ",
+              "shows this instability plainly."
+            ],
+            [
+              "The process by which an unstable short-term memory becomes a stable long-term one is called consolidation. ",
+              "At its core lies a change of storage place. ",
+              "Information placed for a time in the hippocampus gradually moves to the wide storage space of the cerebral cortex,",
+              " ",
+              "and researchers call this systems consolidation. ",
+              "What matters is that the move proceeds mainly during sleep rather than",
+              " while we are awake."
+            ],
+            [
+              "A sleeping brain has not stopped working. ",
+              "Patterns of nerve activity that appeared during learning are repeated in sleep in a form compressed in time. ",
+              "This is called memory reactivation",
+              " and is regarded as the central mechanism of consolidation. ",
+              "During slow-wave sleep, the deepest stage, ",
+              "signals between the hippocampus",
+              " and the cortex lock together",
+              " and the repetition becomes especially active."
+            ],
+            [
+              "Here a common belief about learning is shaken: the belief that results depend only on the hours spent awake. ",
+              "Studies have confirmed again",
+              " and again that restricting sleep after new learning seriously impairs consolidation. ",
+              "When material memorised through an all-nighter fails to last, ",
+              "the cause is not weak willpower",
+              " but the loss of the time needed to copy it over. ",
+              "The amount memorised while awake",
+              " and the amount that actually remains are not the same number."
+            ],
+            [
+              "This should not, however, ",
+              "be turned into a simple formula. ",
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers, ",
+              "while stating that the amount needed differs between individuals. ",
+              "The minimum for each person is the amount that lets them get through the next day without fatigue. ",
+              "Nor does sleeping longer raise grades by itself. ",
+              "What is clear is only this: keeping what you have learned takes time to copy it over,",
+              " ",
+              "and closing the book is not the end of studying."
             ]
           ]
         }
