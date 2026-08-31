@@ -1023,6 +1023,8 @@ const METAMATH_STUDENT_URL = 'https://new.mmath.co.kr/Pages/Student/Login/login.
 const CLASSCARD_ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=classcard.net';
 const CLASSCARD_IOS_APP_URL = 'https://apps.apple.com/kr/app/id1176435331';
 const STUDYFORCE_URL = 'https://hol.sfcenter.co.kr/';
+const NELT_EXAM_URL = 'https://www.netutor.co.kr/st/';
+const DAILY_NONFICTION_URL = 'https://wb-reading.whdudwns33.workers.dev';
 
 function classcardAppUrl(userAgent, maxTouchPoints) {
   const ua = String(userAgent || '');
@@ -1065,6 +1067,22 @@ const LEARNING_SOURCES = Object.freeze({
     guide: '스터디포스를 열어 배정된 독해력 훈련을 마친 뒤 결과를 확인하고 단계를 체크하세요.',
     steps: ['독해력 훈련 완료하기', '훈련 결과 확인하기'],
     noteHint: '훈련 회차·결과 메모'
+  },
+  nelt_exam: {
+    icon: '📋', label: '넬트 시험', centerUrl: NELT_EXAM_URL, studentUrl: NELT_EXAM_URL,
+    centerAction: '넬트 시험 열기', studentAction: '넬트 시험 응시하기',
+    detail: '넬트 온라인 시험',
+    guide: '안내받은 넬트 시험에 응시한 뒤, 컨설팅 플래너에서 완료 여부와 결과를 기록하세요.',
+    steps: ['시험 응시하기', '완료·결과 기록하기'],
+    noteHint: '시험명·응시일·결과 메모'
+  },
+  daily_nonfiction: {
+    icon: '📰', label: '하루 비문학 독서', centerUrl: DAILY_NONFICTION_URL, studentUrl: DAILY_NONFICTION_URL,
+    centerAction: '하루 비문학 독서 열기', studentAction: '하루 비문학 독서 시작하기',
+    detail: '하루 비문학 독서 온라인 학습',
+    guide: '하루 비문학 독서에서 지정된 글을 읽고 학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
+    steps: ['비문학 글 읽기', '학습 완료·핵심 내용 기록하기'],
+    noteHint: '읽은 글·학습 결과·핵심 내용 메모'
   },
   wb_reading: {
     icon: '📘', label: '자체 독해력 교재',
@@ -4852,7 +4870,7 @@ function viewStudy() {
 
   h += submissionHubCard(me);
   [
-    { title: '온라인 학습', help: '외부 학습 서비스 과제와 진행 상태', keys: ['leaders_eye', 'metamath', 'classcard', 'studyforce'] },
+    { title: '온라인 학습', help: '온라인 학습·시험 과제와 진행 상태', keys: ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'] },
     { title: '자기주도 학습', help: '독해·독서·탐구 결과와 단계 기록', keys: ['wb_reading', 'reading', 'inquiry_report'] },
     { title: '시험 준비', help: '시험 일정과 연결된 제공 자료', keys: ['exam_material'] }
   ].forEach(group => {
@@ -11445,7 +11463,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-30.2';
+const APP_VER = '2026-08-31.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

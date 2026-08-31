@@ -19,8 +19,8 @@ test('result files use authenticated POSTs and never enter consult localStorage 
   assert.match(consult, /action: 'read_media'/);
   assert.match(consult, /resultSheetUi = \{ owner: '', items: \[\]/);
   assert.doesNotMatch(consult, /state\.(?:tasks|checks|settings)\.(?:results|resultSheets)/);
-  assert.equal(version.v, '2026-08-30.2');
-  assert.match(consult, /const APP_VER = '2026-08-30\.2'/);
+  assert.equal(version.v, '2026-08-31.1');
+  assert.match(consult, /const APP_VER = '2026-08-31\.1'/);
 });
 
 test('guardian portal presents read-only report/result tabs with no upload or delete controls', () => {
