@@ -2885,11 +2885,11 @@ function todayNextActionCard(me, list, carry, offers, lectureChecklist) {
           '<div class="today-next-copy"><span>' + esc(item.note) + '</span><b>' + esc(item.title) + '</b></div>' +
           actionButton + '</div>';
       }).join('') + '</div>' + more
-    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '오늘 예정 학습 확인 완료 · 이제 오늘 학습을 마무리하세요.') + '</b>' +
-      (!close.complete ? '<button class="btn btn-primary btn-block mt14" data-act="todayjump" data-target="dailyCloseCard">오늘 학습 마무리</button>' : '') + '</div>';
+    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '오늘 체크리스트를 정리했어요.') + '</b>' +
+      (!close.complete ? '<div class="small muted mt8">필요한 공부를 더 추가하거나 완료 표시를 이어가세요. 하루 마무리는 아래에서 필요할 때 직접 시작할 수 있습니다.</div>' : '') + '</div>';
   const rewardTag = '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span>';
   return '<div class="card today-next-card" id="todayNextAction"><div class="today-next-head"><div>' +
-    '<div class="card-title">오늘 해야 할 일</div><div class="card-sub">구체적인 예정분부터 끝낸 뒤 마지막에 오늘 학습을 마무리하세요.</div></div>' +
+    '<div class="card-title">오늘 해야 할 일</div><div class="card-sub">구체적인 예정분을 차례로 확인하고 필요한 공부를 추가하세요.</div></div>' +
     '<span class="pill' + (rows.length ? ' warn' : '') + '">' + rows.length + '개 남음</span></div>' + flow + body +
     '<div class="engagement-mini"><div class="engagement-mini-head"><b>🏅 이번 달 유효 학습일 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b>' + rewardTag + '</div>' +
       engagementStampDots(summary, today()) +
@@ -12909,7 +12909,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.10';
+const APP_VER = '2026-09-01.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
