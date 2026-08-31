@@ -11,6 +11,7 @@ const E = (m) => errors.push(m);
 const W = (m) => warns.push(m);
 
 const LIMITS = {
+  L1: { min: 180, max: 380, vocab: 3, q: 3 },   // 7세~초2 — 짧은 글
   L2: { min: 450, max: 750, vocab: 4, q: 4 },
   L3: { min: 650, max: 1050, vocab: 5, q: 4 },
   L4: { min: 900, max: 1450, vocab: 5, q: 5 },
@@ -44,7 +45,8 @@ function checkLevel(tag, lv, b, isDiag) {
       if (!v.word || !v.easy) { E(`${tag}: vocab ${vi} word/easy 누락`); return; }
       const inOneSeg = b.paragraphs.some(p => p.some(seg => seg.includes(v.word)));
       if (!inOneSeg) E(`${tag}: vocab "${v.word}" 가 어떤 조각 안에도 없음`);
-      if (v.hanja != null && typeof v.hanja !== 'string') E(`${tag}: vocab "${v.word}" hanja 타입 오류`);
+        if (v.hanja != null && typeof v.hanja !== 'string') E(`${tag}: vocab "${v.word}" hanja 타입 오류`);
+      if (lv === 'L1' && v.hanja) W(`${tag}: L1은 한자 병기 없이 뜻풀이만 (${v.word})`);
     });
     const words = b.vocab.map(v => v.word);
     if (new Set(words).size !== words.length) E(`${tag}: vocab 중복`);
@@ -104,8 +106,11 @@ const ids = new Set();
   if (a.issue != null && typeof a.issue !== 'boolean') E(`${tag}: issue는 boolean`);
   if (!Array.isArray(a.sources) || !a.sources.length) E(`${tag}: sources 없음`);
   else a.sources.forEach(s => { if (!/^https:\/\//.test(s.url || '')) E(`${tag}: source URL https 아님`); });
-  ['L2', 'L3', 'L4'].forEach(lv => {
-    if (!a.levels || !a.levels[lv]) { E(`${tag}: ${lv} 없음`); return; }
+  ['L1', 'L2', 'L3', 'L4'].forEach(lv => {
+    if (!a.levels || !a.levels[lv]) {
+      if (lv === 'L1') { W(`${tag}: L1(7세~초2) 아직 없음`); return; }   // 저학년 확장 진행 중
+      E(`${tag}: ${lv} 없음`); return;
+    }
     checkLevel(`${tag}/${lv}`, lv, a.levels[lv], false);
     const b = a.levels[lv];
     if (b.en != null) {
@@ -137,7 +142,7 @@ const ids = new Set();
   (a.videos || []).forEach((v, i) => {
     if (!v.title || !/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(v.url || '')) E(`${tag}: videos[${i}] title/유튜브 URL 오류`);
   });
-  ['L2', 'L3', 'L4'].forEach(lv => {
+  ['L1', 'L2', 'L3', 'L4'].forEach(lv => {
     const b = a.levels && a.levels[lv];
     if (!b || b.enseg == null) return;
     if (!Array.isArray(b.enseg) || b.enseg.length !== (b.en || []).length) {
@@ -149,8 +154,11 @@ const ids = new Set();
     });
   });
 });
-['L2', 'L3', 'L4'].forEach(lv => {
-  if (!db.diagnostics || !db.diagnostics[lv]) { E(`diagnostics ${lv} 없음`); return; }
+['L1', 'L2', 'L3', 'L4'].forEach(lv => {
+  if (!db.diagnostics || !db.diagnostics[lv]) {
+    if (lv === 'L1') { W('diagnostics L1 아직 없음'); return; }
+    E(`diagnostics ${lv} 없음`); return;
+  }
   checkLevel(`diag/${lv}`, lv, db.diagnostics[lv], true);
 });
 
