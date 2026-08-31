@@ -8233,8 +8233,37 @@ async function guardianRefreshPreview(staffId) {
 }
 
 /* ── 학생 관리 ── */
+let staffSearchQuery = '';
+
 function studentNameCompare(a, b) {
   return String(a && a.name || '').localeCompare(String(b && b.name || ''), 'ko', { numeric: true });
+}
+
+function normalizeStudentSearch(value) {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/g, '');
+}
+
+function studentMatchesSearch(student, query) {
+  const normalized = normalizeStudentSearch(query);
+  return !normalized || normalizeStudentSearch(student && student.name).includes(normalized);
+}
+
+function applyStaffSearchFilter(value) {
+  staffSearchQuery = String(value || '').slice(0, 50);
+  const query = normalizeStudentSearch(staffSearchQuery);
+  const cards = [...document.querySelectorAll('[data-staff-search-name]')];
+  let matched = 0;
+  cards.forEach(card => {
+    const visible = !query || String(card.dataset.staffSearchName || '').includes(query);
+    card.hidden = !visible;
+    if (visible) matched++;
+  });
+  const result = $('#staffSearchResult');
+  if (result) result.textContent = query ? matched + '명 검색됨' : '전체 ' + cards.length + '명';
+  const empty = $('#staffSearchEmpty');
+  if (empty) empty.hidden = !query || matched > 0;
+  const clear = $('#staffSearchClear');
+  if (clear) clear.hidden = !query;
 }
 
 function isStudentActivityCheck(key, row) {
@@ -8502,6 +8531,8 @@ function staffAccessPanels(student) {
 function viewStaffAdmin() {
   if (!session.isAdmin || session.isStaffLink) return '';
   const list = liveStaff().slice().sort(studentNameCompare);
+  const normalizedQuery = normalizeStudentSearch(staffSearchQuery);
+  const matching = list.filter(student => studentMatchesSearch(student, normalizedQuery));
   const students = list.filter(s => !s.owner && !s.manager);
   const usage = list.filter(s => !s.owner && !s.manager).map(s => studentUsage(s.id));
   const todayUsers = usage.filter(item => item.status === 'today').length;
@@ -8513,13 +8544,20 @@ function viewStaffAdmin() {
     '<div class="row"><input class="in" id="sName" placeholder="학생 이름 (예: 김민준)">' +
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     '<div class="hint mt14">학생 번호와 동의는 처음 한 번만 등록합니다. 이후 저장된 학생 번호로 바로 보내며, 보호자 번호는 별도로 관리합니다.</div>' +
+    (list.length ? '<div class="field mt14"><label class="fl" for="staffSearch">학생 검색</label>' +
+      '<div class="row" style="gap:8px"><input class="in" id="staffSearch" type="search" maxlength="50" autocomplete="off" ' +
+        'placeholder="학생 이름 검색" value="' + esc(staffSearchQuery) + '" aria-describedby="staffSearchResult">' +
+        '<button class="btn btn-ghost" id="staffSearchClear" data-act="staffsearchclear"' + (normalizedQuery ? '' : ' hidden') + '>지우기</button></div>' +
+      '<div class="small muted mt8" id="staffSearchResult" aria-live="polite">' +
+        (normalizedQuery ? matching.length + '명 검색됨' : '전체 ' + list.length + '명') + '</div></div>' : '') +
     (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
     (students.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">학생용 링크 한 번에 복사</button>' : '') +
   '</div>' +
   (list.length
-    ? list.map(s => '<div class="card"><div class="between">' +
+    ? list.map(s => '<div class="card" data-staff-search-name="' + esc(normalizeStudentSearch(s.name)) + '"' +
+        (normalizedQuery && !studentMatchesSearch(s, normalizedQuery) ? ' hidden' : '') + '><div class="between">' +
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
@@ -8528,7 +8566,9 @@ function viewStaffAdmin() {
           (s.owner ? ' · 학생 통계에서 제외' : '') +
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
-        staffAccessPanels(s) + '</div>').join('')
+        staffAccessPanels(s) + '</div>').join('') +
+      '<div class="card" id="staffSearchEmpty"' + (normalizedQuery && !matching.length ? '' : ' hidden') +
+        '><div class="empty"><b>🔎</b>검색한 이름과 일치하는 학생이 없습니다.</div></div>'
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 학생이 없습니다.</div></div>');
 }
 
@@ -11043,6 +11083,14 @@ document.addEventListener('click', ev => {
     }
 
     /* 학생 */
+    case 'staffsearchclear': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const input = $('#staffSearch');
+      if (input) input.value = '';
+      applyStaffSearchFilter('');
+      if (input) input.focus();
+      break;
+    }
     case 'linkcontactsretry': {
       if (!session.isAdmin || session.isStaffLink) break;
       loadConsultLinkContacts(true);
@@ -11701,6 +11749,7 @@ document.addEventListener('change', ev => {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (ev.target.id === 'staffSearch') { applyStaffSearchFilter(ev.target.value); return; }
   if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select, [contenteditable="true"]')) {
     viewInputDirty = true;
   }
@@ -11749,6 +11798,7 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'staffSearch') return;
   if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select')) viewInputDirty = true;
 });
 
@@ -11842,7 +11892,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.3';
+const APP_VER = '2026-08-31.4';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
