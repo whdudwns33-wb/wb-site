@@ -313,6 +313,10 @@ test('online learning state distinguishes timer progress, student completion, an
     { score: -1, wrong: 0 }, { score: 101, wrong: 0 },
     { score: 0, wrong: -1 }, { score: 0, wrong: 1000 }, { score: 0, wrong: 1.5 }
   ].forEach(result => assert.equal(api.hasLearningResult(task, { learningResult: result }), false));
+  const leadersEye = { id: 'leaders-1', staffId: 'student-1', source: 'leaders_eye' };
+  assert.equal(api.hasLearningResult(leadersEye, { learningResult: { outcome: '학습 완료' } }), true);
+  assert.equal(api.hasLearningResult(leadersEye, { learningResult: { outcome: '' } }), false);
+  assert.equal(api.learningResultSummary(leadersEye, { learningResult: { round: '기존 회차', outcome: '학습 완료' } }), '학습 완료');
   env.proofStatus = 'approved';
   assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'verified');
   env.check = { done: false };
@@ -399,12 +403,14 @@ test('online learning completion records a service-specific result before finish
   const countInput = section('const cntEl =', "document.addEventListener('change'");
   const assignment = section('function learningTaskModal(', 'function wnAddModal(');
 
-  assert.match(modal, /id="learningResultRound"/);
+  assert.doesNotMatch(modal, /id="learningResultRound"|학습 회차/);
   assert.match(modal, /id="learningResultOutcome"/);
   assert.match(modal, /id="learningResultScore"/);
   assert.match(modal, /id="learningResultWrong"/);
   assert.match(modal, /data-act="learningresultsave"/);
-  assert.match(handlers, /학습 회차와 결과를 모두 입력해 주세요/);
+  assert.match(handlers, /오늘 학습 결과를 입력해 주세요/);
+  assert.match(handlers, /Object\.assign\(\{\}, previous, \{ outcome: outcome \}\)/);
+  assert.doesNotMatch(handlers, /learningResultRound|round: round/);
   assert.match(handlers, /점수를 0~100 사이로 입력해 주세요/);
   assert.match(handlers, /learningResult: result/);
   assert.match(handlers, /done: true/);

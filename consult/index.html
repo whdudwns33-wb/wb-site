@@ -1117,7 +1117,7 @@ const LEARNING_SOURCES = Object.freeze({
     detail: '리더스아이 온라인 학습',
     guide: '리더스아이에서 배정된 온라인 학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
     steps: ['온라인 학습 완료하기', '학습 결과 확인하기'],
-    noteHint: '학습 회차·결과 메모'
+    noteHint: '오늘 학습 결과 메모'
   },
   metamath: {
     icon: '🧮', label: '메타수학', centerUrl: METAMATH_CENTER_URL, studentUrl: METAMATH_STUDENT_URL,
@@ -1533,7 +1533,7 @@ function learningResultSummary(task, check) {
   const result = check && check.learningResult;
   if (result && typeof result === 'object') {
     if (task && task.source === 'leaders_eye') {
-      return [result.round, result.outcome].filter(Boolean).join(' · ');
+      return String(result.outcome || result.summary || result.round || '').trim();
     }
     if (task && task.source === 'metamath') {
       const score = result.score === 0 || result.score ? String(result.score) + '점' : '';
@@ -1548,7 +1548,7 @@ function learningResultSummary(task, check) {
 function hasLearningResult(task, check) {
   const result = check && check.learningResult;
   if (!result || typeof result !== 'object') return false;
-  if (task && task.source === 'leaders_eye') return !!(String(result.round || '').trim() && String(result.outcome || '').trim());
+  if (task && task.source === 'leaders_eye') return !!String(result.outcome || '').trim();
   if (task && task.source === 'metamath') {
     const scorePresent = result.score !== '' && result.score !== null && result.score !== undefined;
     const wrongPresent = result.wrong !== '' && result.wrong !== null && result.wrong !== undefined;
@@ -2520,7 +2520,7 @@ function studentSetupWizard(me, status) {
       '<div class="card-sub">평소에는 오늘 할 일 탭만 위에서 아래로 진행하면 됩니다.</div></div><span class="pill">마지막</span></div>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div><p>첫 카드에서 다음 공부를 확인하고, 배부 대기 항목은 <code>오늘 배부된 공부</code>에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 체크</b></div><p>끝낸 공부는 스터디 플래너에서 완료 표시합니다. 온라인 학습은 회차·점수 같은 결과도 함께 입력합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 체크</b></div><p>끝낸 공부는 스터디 플래너에서 완료 표시합니다. 온라인 학습은 서비스에 맞는 학습 결과나 점수도 함께 입력합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div><p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div></div>' +
       '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
@@ -2595,7 +2595,7 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>체크리스트에 담기</b></div>' +
           '<p>할 공부마다 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
-          '<p>공부를 마치면 스터디 플래너 오른쪽의 동그란 체크 칸을 누릅니다. 온라인 학습은 뜨는 창에 회차·점수·오답 수를 기록합니다.</p></div>' +
+          '<p>공부를 마치면 스터디 플래너 오른쪽의 동그란 체크 칸을 누릅니다. 리더스아이는 오늘 학습 결과를, 메타수학은 점수·오답 수를 기록합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div>' +
           '<p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div>' +
       '</div>' +
@@ -2939,10 +2939,8 @@ function learningResultModal(task, date) {
   const actualSecs = taskStudySeconds(task.staffId, trackingDate, task.id);
   let fields = '';
   if (task.source === 'leaders_eye') {
-    fields = '<div class="grid2"><div class="field"><label class="fl">학습 회차</label>' +
-      '<input class="in" id="learningResultRound" maxlength="40" value="' + esc(result.round || '') + '" placeholder="예: 3회차"></div>' +
-      '<div class="field"><label class="fl">학습 결과</label>' +
-      '<input class="in" id="learningResultOutcome" maxlength="120" value="' + esc(result.outcome || '') + '" placeholder="예: 완료, 정답률 85%"></div></div>';
+    fields = '<div class="field"><label class="fl">오늘 학습 결과</label>' +
+      '<input class="in" id="learningResultOutcome" maxlength="120" value="' + esc(result.outcome || '') + '" placeholder="예: 학습 완료, 정답률 85%"></div>';
   } else if (task.source === 'metamath') {
     fields = '<div class="grid2"><div class="field"><label class="fl">점수</label>' +
       '<input class="in" id="learningResultScore" type="number" inputmode="decimal" min="0" max="100" value="' + esc(result.score === 0 || result.score ? result.score : '') + '" placeholder="예: 82"></div>' +
@@ -11785,12 +11783,13 @@ document.addEventListener('click', ev => {
         return toast('이 온라인 학습 결과를 저장할 수 없습니다');
       }
       if (guardLearningProgressLock(t, date)) break;
+      const current = getCheck(t.id, date) || {};
       let result;
       if (t.source === 'leaders_eye') {
-        const round = (($('#learningResultRound') && $('#learningResultRound').value) || '').trim().slice(0, 40);
         const outcome = (($('#learningResultOutcome') && $('#learningResultOutcome').value) || '').trim().slice(0, 120);
-        if (!round || !outcome) return toast('학습 회차와 결과를 모두 입력해 주세요');
-        result = { round: round, outcome: outcome };
+        if (!outcome) return toast('오늘 학습 결과를 입력해 주세요');
+        const previous = current.learningResult && typeof current.learningResult === 'object' ? current.learningResult : {};
+        result = Object.assign({}, previous, { outcome: outcome });
       } else if (t.source === 'metamath') {
         const scoreRaw = (($('#learningResultScore') && $('#learningResultScore').value) || '').trim();
         const wrongRaw = (($('#learningResultWrong') && $('#learningResultWrong').value) || '').trim();
@@ -11803,7 +11802,6 @@ document.addEventListener('click', ev => {
         if (!summary) return toast('오늘 학습 결과를 입력해 주세요');
         result = { summary: summary };
       }
-      const current = getCheck(t.id, date) || {};
       const steps = {};
       (t.steps || []).forEach(step => { steps[step.id] = true; });
       const savedAt = now();
@@ -12774,7 +12772,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.7';
+const APP_VER = '2026-08-31.8';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
