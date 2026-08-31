@@ -208,9 +208,11 @@
     .hj-char{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:13px;background:#f4ece1;color:#7a5230;font-size:27px;font-weight:900;margin-right:10px;flex:0 0 auto}
     .hj-big{display:grid;place-items:center;width:150px;height:150px;margin:14px auto 0;border-radius:28px;background:#f4ece1;color:#7a5230;font-size:96px;font-weight:900;line-height:1}
     .hj-rd{margin-top:12px;text-align:center;color:var(--navy);font-size:24px;font-weight:900}
-    .hj-word{margin-top:10px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#fff}
-    .hj-word b{color:var(--navy);font-size:19px}
-    .hj-word small{display:block;margin-top:4px;color:var(--ink);font-size:15px;line-height:1.6}
+    .hj-word{margin-top:11px;padding:15px 17px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .hj-word b{display:block;color:var(--navy);font-size:30px;line-height:1.25;letter-spacing:.01em}
+    .hj-word .hl{color:#7a5230;background:#f4ece1;border-radius:8px;padding:0 5px}
+    .hj-word .hj-src{display:block;margin-top:5px;color:var(--muted);font-size:13px;font-weight:700}
+    .hj-word small{display:block;margin-top:7px;color:var(--ink);font-size:17px;line-height:1.65}
     .chipword{display:inline-block;margin:3px 4px 0 0;padding:5px 9px;border-radius:999px;background:var(--sky);color:var(--navy);font-size:12.5px;font-weight:800}
     .lab-step{display:flex;gap:6px;margin:10px 0 4px}
     .lab-step i{height:7px;flex:1;border-radius:999px;background:#e4edf1}
@@ -919,7 +921,9 @@ function hanjaFamilies(){
         for(const part of v.hanja.split('+')){
           const m=part.trim().match(/^(.)\((.+)\)$/);if(!m)continue;
           if(!map[m[1]])map[m[1]]={ch:m[1],rd:m[2],words:{}};
-          map[m[1]].words[v.word]={word:v.word,easy:v.easy};
+          const parts=v.hanja.split('+');
+          const at=parts.findIndex(x=>x.trim().indexOf(m[1])===0);
+          map[m[1]].words[v.word]={word:v.word,easy:v.easy,hanja:v.hanja,at:at<0?-1:at};
         }
       }
     }
@@ -951,6 +955,13 @@ function modelBoundaries(p){
   }
   return out;
 }
+/* 낱말에서 이 한자에 해당하는 음절을 짚어 준다 — '같은 한자 = 같은 소리'가 눈에 들어와야 확장이 된다 */
+function hjWordHtml(w,ch){
+  const t=String(w.word||'');
+  const i=w.at;
+  if(!(i>=0)||i>=t.length)return esc(t);
+  return esc(t.slice(0,i))+'<span class="hl">'+esc(t[i])+'</span>'+esc(t.slice(i+1));
+}
 /* 한자 카드 — 어휘 복습·끊어 읽기처럼 한 장씩 넘기는 세션. 글자를 크게 보여 준다. */
 function vHanjaSession(){
   const h=sess.hj;const f=h.list[h.i];
@@ -960,7 +971,9 @@ function vHanjaSession(){
     <div class="hj-big">${esc(f.ch)}</div>
     <p class="hj-rd">${esc(f.rd)}</p>
     ${h.show?`<p class="sub" style="text-align:center;margin-top:10px">이 한자가 들어간 낱말 ${f.words.length}개</p>
-      ${f.words.map(w=>`<div class="hj-word"><b>${esc(w.word)}</b><small>${esc(w.easy)}</small></div>`).join('')}`
+      ${f.words.map(w=>`<div class="hj-word"><b>${hjWordHtml(w,f.ch)}</b>
+        ${w.hanja?`<span class="hj-src">${esc(w.hanja)}</span>`:''}
+        <small>${esc(w.easy)}</small></div>`).join('')}`
       :`<p class="sub" style="text-align:center;margin-top:12px">이 한자가 들어간 낱말이 무엇이 있었는지 떠올려 보세요.</p>
         <button class="btn" data-act="hj-show">낱말 보기 (${f.words.length}개)</button>`}
     <div class="row2" style="margin-top:12px">
@@ -995,12 +1008,19 @@ function vTrain(){
     <button class="btn sm" data-act="hj-start" data-i="0" ${hj.length?'':'disabled'}>${hj.length?'카드 학습 시작 ('+hj.length+'장)':'어휘가 쌓이면 열려요'}</button>
     <div class="glist">${hj.length?hj.slice(0,8).map((f,i)=>`<button class="grow" data-act="hj-start" data-i="${i}">
         <span class="hj-char">${esc(f.ch)}</span>
-        <span class="t"><b>${esc(f.rd)}</b><small>낱말 ${f.words.length}개 · ${esc(f.words.map(w=>w.word).join(' · '))}</small></span>
+        <span class="t"><b style="font-size:17px">${esc(f.rd)}</b><small style="font-size:14px;color:var(--ink)">낱말 ${f.words.length}개 · ${esc(f.words.map(w=>w.word).join(' · '))}</small></span>
         <span class="go">›</span></button>`).join(''):'<div class="empty">어휘가 쌓이면 한자 묶음이 생겨요.</div>'}</div></div>
   <div class="card"><div class="thead"><span class="tico c">✎</span><div class="t-main"><h2 style="font-size:16px">비문학 독서 요약</h2>
     <p class="sub" style="margin-top:2px">글을 덮고 내 말로 → 점검 → 다시 쓰기 (2단계)</p></div><span class="tag muted">${S.redbook.length}회</span></div>
     <button class="btn sm" data-act="rb-new">요약 쓰기</button>
-    <div class="glist">${S.redbook.slice(-3).reverse().map(r=>{const fin=r.summary2||r.summary||'';return `<div class="grow" style="cursor:default"><span class="t"><b>${esc(r.unit)}</b><small>${r.date}${r.summary2?' · 2차까지 완성 ✓':''} · ${esc(fin.slice(0,40))}${fin.length>40?'…':''}</small></span></div>`;}).join('')}</div>
+    <div class="glist">${S.redbook.map((r,i)=>({r,i})).slice(-3).reverse().map(({r,i})=>{
+      const fin=r.summary2||r.summary||'';
+      const half=!r.summary2;
+      return half
+        ? `<button class="grow" data-act="rb-resume" data-i="${i}"><span class="t"><b>${esc(r.unit)}</b>
+            <small><span class="tag warn">1차만 · 이어 쓰기</span> ${r.date} · ${esc(fin.slice(0,32))}${fin.length>32?'…':''}</small></span><span class="go">›</span></button>`
+        : `<div class="grow" style="cursor:default"><span class="t"><b>${esc(r.unit)}</b><small>${r.date} · 2차까지 완성 ✓ · ${esc(fin.slice(0,36))}${fin.length>36?'…':''}</small></span></div>`;
+    }).join('')}</div>
     ${S.redbook.length?`<button class="btn ghost sm" data-act="rb-copy">전체 기록 복사 (선생님 확인용)</button>`:''}</div>`;
 }
 function vChunkTrain(){
@@ -1134,7 +1154,7 @@ function vRedbookForm(){
   const step=`<div class="lab-step">${[0,1].map(i=>`<i class="${(st.stage||1)-1>=i?'on':''}"></i>`).join('')}</div>`;
   if(st.stage===2){
     const n=(sess.rbSum2||'').trim().length;
-    return `<div class="card"><p class="eyebrow">비문학 독서 요약 2/2 — 점검하고 다시 쓰기</p>${step}
+    return `<div class="card"><p class="eyebrow">비문학 독서 요약 2/2 — 점검하고 다시 쓰기${st.editIdx!=null?' (이어 쓰기)':''}</p>${step}
       <h2 style="margin-top:8px">내가 쓴 요약을 점검해 보세요</h2>
       <p class="sub">네 가지를 스스로 확인한 뒤, 빠진 것을 채워 <b>2차 요약</b>을 완성해요. 다시 쓰는 이 과정이 진짜 실력을 만듭니다.</p>
       <div class="report-doc" style="max-height:190px;overflow-y:auto"><h4>1차 요약</h4><p style="white-space:pre-wrap">${esc(sess.rbSum||'')}</p></div>
@@ -1155,7 +1175,9 @@ function vRedbookForm(){
     <textarea id="rbSum" style="min-height:140px" placeholder="이 글에서 무엇을 알게 됐는지 내 말로 요약해 보세요 (최소 50자)">${esc(sess.rbSum||'')}</textarea>
     <p class="sub" style="text-align:right">${n1}자</p>
     <button class="btn" data-act="rb-to2">다음 — 점검하고 다시 쓰기</button>
-    <button class="btn ghost sm" data-act="rb-quit">취소</button></div>`;
+    <div class="row2"><button class="btn ghost sm" data-act="rb-save1">1차만 저장 · 나중에 이어 쓰기</button>
+    <button class="btn ghost sm" data-act="rb-quit">취소</button></div>
+    <p class="note">시간이 없으면 1차만 저장해 두세요. 훈련 탭에서 '이어 쓰기'로 2차를 마저 쓸 수 있어요.</p></div>`;
 }
 
 /* ───────────────────────── 탐구 랩 ───────────────────────── */
@@ -1748,13 +1770,30 @@ document.addEventListener('click',e=>{
     if(n<50){announce('1차 요약을 50자 이상 써 주세요 (지금 '+n+'자)');return;}
     sess.rb.stage=2;render();}
   else if(act==='rb-back1'){rbCollect();sess.rb.stage=1;render();}
+  else if(act==='rb-save1'){rbCollect();
+    if(!(sess.rbUnit||'').trim()){announce('글·단원 제목을 적어 주세요');return;}
+    const n=(sess.rbSum||'').trim().length;
+    if(n<50){announce('1차 요약을 50자 이상 써 주세요 (지금 '+n+'자)');return;}
+    S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
+      summary:(sess.rbSum||'').trim(),summary2:'',checks:[false,false,false,false],done:false});save();
+    sess.rb=null;render();announce('1차 요약을 저장했어요. 훈련 탭에서 이어 쓸 수 있어요');}
+  else if(act==='rb-resume'){const i=+t.dataset.i;const r=S.redbook[i];if(!r)return;
+    view={name:'train'};
+    sess={rb:{stage:2,articleId:r.articleId||null,title:r.unit||'',editIdx:i},
+      rbChecks:(r.checks||[false,false,false,false]).slice(),rbUnit:r.unit||'',rbSum:r.summary||'',rbSum2:r.summary2||''};
+    render();}
   else if(act==='rb-save'){rbCollect();
     const sum2=(sess.rbSum2||'').trim();
     if(!sess.rbChecks.every(Boolean)){announce('점검 4가지를 모두 확인해 주세요');return;}
     if(sum2.length<50){announce('2차 요약을 50자 이상 써 주세요 (지금 '+sum2.length+'자)');return;}
-    S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
-      summary:(sess.rbSum||'').trim(),summary2:sum2,checks:sess.rbChecks.slice()});save();
-    sess.rb=null;render();announce('요약 저장 완료! 1차와 2차가 함께 기록됐어요');}
+    const idx=sess.rb&&sess.rb.editIdx;
+    if(idx!=null&&S.redbook[idx]){
+      Object.assign(S.redbook[idx],{summary2:sum2,checks:sess.rbChecks.slice(),done:true,date2:dkey()});
+    }else{
+      S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
+        summary:(sess.rbSum||'').trim(),summary2:sum2,checks:sess.rbChecks.slice(),done:true});
+    }
+    save();sess.rb=null;render();announce('요약 저장 완료! 1차와 2차가 함께 기록됐어요');}
   else if(act==='rb-quit'){sess.rb=null;render();}
   else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n1차: ${r.summary}${r.summary2?'\n2차: '+r.summary2:''}\n셀프체크: ${(r.checks||[]).filter(Boolean).length}/${(r.checks||[]).length||3}`).join('\n\n');
     copyText('WB 비문학 독서 요약 기록\n\n'+txt);}
