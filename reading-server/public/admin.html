@@ -59,7 +59,10 @@
     .linkrow input{flex:1;min-width:220px;font-size:12.5px}
   .pendrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line)}
   .pendrow:first-of-type{border-top:0}
-  .qrbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
+  .dlg-sec.danger{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+.btn.danger{background:var(--coral);border-color:var(--coral);color:#fff}
+.btn.danger:hover{filter:brightness(.94)}
+.qrbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
   .qrbox svg{border:1px solid var(--line);border-radius:10px;background:#fff}
   @media print{body *{visibility:hidden}#qrSheet,#qrSheet *{visibility:visible}#qrSheet{position:absolute;left:0;top:0;width:100%}}
   </style>
@@ -319,9 +322,25 @@ async function openDetail(code){
         <input id="plUrl" readonly value="${stu.ptoken?esc(location.origin+'/parent.html?t='+stu.ptoken):''}" placeholder="링크를 만들면 여기 표시돼요">
       </div>
     </div>
+    <div class="dlg-sec danger"><h3>퇴원 처리</h3>
+      <p class="muted">이 학생의 정보와 학습 기록, 워드브레인, 학부모 링크, 로그인해 둔 기기를 모두 지워요.
+        되돌릴 수 없어요. 잠시 쉬는 경우라면 지우지 말고 그대로 두세요.</p>
+      <button class="btn danger" id="stuDel">${esc(stu.name)} 퇴원 처리</button>
+    </div>
   </div>`;
   const dlg=$('#dlg');dlg.showModal();
   $('#dlgClose').onclick=()=>dlg.close();
+  /* 지우기 전에 이름을 직접 치게 한다 — 목록에서 옆 학생을 눌러 놓고 지우는 사고를 막는다 */
+  $('#stuDel').onclick=async()=>{
+    const typed=prompt(`정말 지울까요? 되돌릴 수 없어요.\n지우려면 학생 이름 "${stu.name}" 을 그대로 입력하세요.`);
+    if(typed===null)return;
+    if(typed.trim()!==stu.name){alert('이름이 달라서 취소했어요.');return;}
+    try{
+      const r=await api('/admin/students',{method:'DELETE',body:JSON.stringify({code:stu.code})});
+      alert(`${r.name} 학생을 지웠어요.`);
+      dlg.close(); refresh();
+    }catch(e){alert('지우지 못했어요: '+e.message);}
+  };
   /* 교재를 바꾸면 강 목록도 갈아 끼운다 — 다른 교재의 강 번호를 그대로 두면 엉뚱한 코칭이 나간다 */
   const fillLessons=()=>{
     const b=TB.find(x=>x.id===$('#tbBook').value);

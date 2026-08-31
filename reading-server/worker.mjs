@@ -604,6 +604,40 @@ export default {
         return json(200, { ok: true, token: t });
       }
 
+      /* 퇴원 처리 — 학생이 남긴 것을 한 번에 지운다.
+         지울 것을 하나라도 빠뜨리면, 같은 코드로 새 학생을 등록했을 때 앞 학생의
+         기록이 그대로 따라온다. 학생 정보·학습 기록·워드브레인·학부모 링크·
+         발급된 기기 토큰·승인 대기 줄까지 모두 포함한다. */
+      if (p === '/api/admin/students' && req.method === 'DELETE') {
+        const { code } = await req.json();
+        const c = String(code || '').trim();
+        if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(400, { error: '학생 코드 형식이 아닙니다' });
+        const stu = await env.DB.get('student:' + c, 'json');
+        if (!stu) return json(404, { error: '학생 없음' });
+
+        const removed = [];
+        const drop = async (k) => { await env.DB.delete(k); removed.push(k); };
+
+        if (stu.ptoken) await drop('parent:' + stu.ptoken);
+        await drop('state:' + c);
+        await drop('vocab:state:' + c);
+        await drop('vocab:push:' + c);
+
+        /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
+           남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */
+        for (const k of await kvListAll(env, 'token:')) {
+          const rec = await env.DB.get(k, 'json');
+          if (rec && rec.code === c) await drop(k);
+        }
+        /* 승인 대기 중이던 요청도 함께 (남으면 지운 학생이 승인 줄에 계속 뜬다) */
+        for (const k of await kvListAll(env, 'pend:')) {
+          const rec = await env.DB.get(k, 'json');
+          if (rec && rec.code === c) await drop(k);
+        }
+        await drop('student:' + c);
+        return json(200, { ok: true, code: c, name: stu.name, removed: removed.length });
+      }
+
       const m = p.match(/^\/api\/admin\/student\/([A-Za-z0-9-]+)$/);
       if (m && req.method === 'GET') {
         const [stu, st] = await Promise.all([

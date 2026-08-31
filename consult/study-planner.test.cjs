@@ -243,7 +243,7 @@ test('student claims a scheduled lecture into the study planner with shared prog
   const today = section('function viewToday()', 'function studyOffersCard(');
 
   assert.match(lectureData, /const ingIsClaimed = item => !!\(item && \(item\.claimed \|\| item\.done\)\)/);
-  assert.match(lectureData, /ingPlan\(sid, date\)\.filter\(ingIsClaimed\)/);
+  assert.match(lectureData, /filter\(item => ingIsClaimed\(item\) && !item\.closed\)/);
   assert.match(lectureData, /const ingTimerTaskId = \(cid, seq\) => 'ing:'/);
   assert.match(lectureToggle, /claimed: true, claimedAt: now\(\)/);
   assert.match(todayLecture, /내 체크리스트로 가져오기/);
@@ -252,6 +252,8 @@ test('student claims a scheduled lecture into the study planner with shared prog
   assert.doesNotMatch(todayLecture, /class="box"|data-act="ingcheck"/);
   assert.match(handlers, /session\.isStaffLink/);
   assert.match(handlers, /planDate > today\(\)/);
+  assert.match(handlers, /item\.closed[\s\S]*?다시 체크리스트에 담을 수 없습니다/);
+  assert.match(handlers, /item\.closed[\s\S]*?다시 완료 처리할 수 없습니다/);
   assert.match(handlers, /ingPatchItem[\s\S]*?claimed: true, claimedAt: now\(\)/);
   assert.match(handlers, /planDate < today\(\)[\s\S]*?ingSavePlan\(me\.id, planDate/);
   assert.match(handlers, /밀린 인강을 오늘 스터디 플래너로 옮겼습니다/);
@@ -364,29 +366,44 @@ test('unclaimed distributed study is mandatory in daily closeout and the report'
   assert.match(items, /const tasks = tasksFor\(staffId, date\)\.map/);
   assert.doesNotMatch(items, /filter\(task => isStudyClaimed/);
   assert.match(items, /claimed: claimed/);
-  assert.match(modal, /가져오지 않음/);
+  assert.match(items, /legacyClaimedLecturesOnly[\s\S]*?ingPlan\(staffId, date\)\.filter\(ingIsClaimed\)[\s\S]*?: ingPlan\(staffId, date\)/);
+  assert.match(items, /claimed: ingIsClaimed\(item\)/);
+  assert.match(modal, /체크리스트에 담지 않음/);
   assert.match(save, /claimed: item\.claimed !== false/);
   assert.match(report, /\[미수락 · 내일로 이월\]/);
   assert.match(report, /\[미수락 · 막힘\]/);
   assert.match(report, /\[미수락 · 오늘 종료\]/);
   assert.match(report, /학습 수행 보고/);
 
-  const source = html.match(/function dailyCloseStudyItems\(staffId, date\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const source = html.match(/function dailyCloseStudyItems\(staffId, date, legacyClaimedLecturesOnly\) \{[\s\S]*?\n\}/)?.[0] || '';
   const run = Function(`
     const tasksFor = () => [{ id: 'task-1', title: '수학 5단원', detail: '', dailyCarrySourceDate: '' }];
     const getCheck = () => null;
     const isStudyClaimed = () => false;
     const taskStudySubjectKey = () => 'math';
-    const ingChecklistItems = () => [];
+    const ingPlan = () => [
+      { cid: 'course-1', seq: 2, done: false, claimed: false },
+      { cid: 'course-2', seq: 3, done: false, claimed: true, closed: true }
+    ];
+    const ingIsClaimed = item => !!(item && (item.claimed || item.done));
     const ingLec = () => null;
     const ingCourseSubjectKey = () => 'other';
     ${source}
     return dailyCloseStudyItems;
   `)();
   const result = run('student-1', '2026-08-19');
-  assert.equal(result.length, 1);
+  assert.equal(result.length, 3);
   assert.equal(result[0].claimed, false);
   assert.equal(result[0].done, false);
+  assert.equal(result[1].type, 'lecture');
+  assert.equal(result[1].claimed, false);
+  assert.equal(result[1].done, false);
+  assert.equal(result[2].claimed, true);
+  assert.equal(result[2].dropped, true);
+  const legacyResult = run('student-1', '2026-08-19', true);
+  assert.equal(legacyResult.length, 2, 'legacy signature keeps claimed closed lectures but not unclaimed lectures');
+  assert.equal(legacyResult[1].cid, 'course-2');
+  assert.equal(legacyResult[1].dropped, true);
 });
 
 test('student report contains closeout results and cannot finish until a successful copy', () => {
@@ -433,6 +450,7 @@ test('carried study becomes a unique next-day task and appears in both daily rep
   const report = section('function reportText(', 'function briefText(');
   assert.match(dailyItems, /carriedFromDate: task\.dailyCarrySourceDate/);
   assert.match(save, /dailyCarryTask\(item\.task, cursor\)/);
+  assert.match(section('function dailyCarryLecture(', 'function dailyReportModal('), /closed: false/);
   assert.match(save, /carriedFromDate: item\.carriedFromDate/);
   assert.match(report, /shortDate\(item\.carriedFromDate\).*이월 완료/);
   assert.match(report, /미완료 · 다시 이월/);
