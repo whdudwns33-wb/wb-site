@@ -206,6 +206,14 @@
   .student-subscription-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 9px 10px; border: 1px solid #E6E0F3; border-radius: 10px; background: #FCFAFF; }
   .student-subscription-line.attention { border-color: #F1D29A; background: #FFFBF2; }
   .student-subscription-line .subscription-payment-action { margin-left: auto; }
+  .student-engagement-overview { margin-top: 14px; padding: 12px; border: 1px solid #CFE5DA; border-radius: 12px; background: #F6FCF8; }
+  .student-engagement-overview .between { align-items: flex-start; flex-wrap: wrap; }
+  .student-engagement-line { margin-top: 8px; padding: 10px; border: 1px solid #DCE8E1; border-radius: 10px; background: #FAFDFC; }
+  .student-engagement-line .between { align-items: flex-start; flex-wrap: wrap; }
+  .tag.reward-achieved { background: #E7F7EE; color: #2E6E49; }
+  .tag.reward-progress { background: #E8F2FF; color: #285B91; }
+  .tag.reward-attention { background: #FFF0D8; color: #8A5500; }
+  .tag.reward-empty { background: #F0F2F4; color: #626B75; }
   .subject-tag { border: 1px solid transparent; }
   .subject-korean { --subject-color: var(--subject-korean); --subject-bg: #E8F2FF; --subject-text: #285B91; }
   .subject-english { --subject-color: var(--subject-english); --subject-bg: #FFEAF2; --subject-text: #8E3E5E; }
@@ -427,6 +435,7 @@
   .ing-lecture-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
   .ing-lecture-status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 7px; border-radius: 999px; background: #EEF1F4; color: #66707B; font-size: 9px; font-weight: 900; white-space: nowrap; }
   .ing-lecture-status.done { background: #DFF5E9; color: #167352; }
+  .ing-lecture-status.closed { background: #EEF0F2; color: #68717A; }
   .ing-lecture-status.overdue { background: #FDE5E0; color: #B33A29; }
   .ing-lecture-status.review { background: #FFF0C8; color: #8B6500; }
   .ing-lecture-status.today { background: #DFEFFB; color: #256A99; }
@@ -899,6 +908,35 @@
   .study-total-hero { text-align: center; padding: 20px 17px; }
   .study-total-hero .study-time-total { font-size: clamp(38px, 10vw, 54px); line-height: 1.15; margin: 5px 0 7px; }
   .study-total-hero .study-total-label { color: var(--mid-gray); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+  .today-next-card { border-color: #D8E6F4; background: linear-gradient(145deg, #F7FBFF, #FFFFFF 72%); }
+  .today-next-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .today-flow { display: flex; align-items: center; gap: 6px; margin: 13px 0; color: var(--mid-gray); font-size: 11px; font-weight: 800; }
+  .today-flow span { flex: 1; min-width: 0; padding: 7px 6px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.8); text-align: center; }
+  .today-flow span.on { border-color: #B7D4EE; background: #EAF4FD; color: #285B91; }
+  .today-flow span.done { border-color: #B7E3C8; background: #ECF9F1; color: #2E6E49; }
+  .today-next-list { display: grid; gap: 7px; }
+  .today-next-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid var(--subject-color); border-radius: 11px; background: var(--subject-bg); }
+  .today-next-number { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.76); color: var(--subject-text); font-size: 11px; font-weight: 900; }
+  .today-next-copy { min-width: 0; }
+  .today-next-copy b, .today-next-copy span { display: block; }
+  .today-next-copy b { overflow: hidden; color: var(--dark-gray); font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+  .today-next-copy span { color: var(--subject-text); font-size: 10.5px; font-weight: 800; }
+  .today-next-more { margin-top: 7px; color: var(--mid-gray); font-size: 11px; text-align: center; }
+  .today-next-empty { padding: 14px 12px; border: 1px solid #B7E3C8; border-radius: 11px; background: #F3FCF6; text-align: center; }
+  .today-next-empty b { display: block; color: #2E6E49; }
+  .engagement-mini { margin-top: 13px; padding-top: 12px; border-top: 1px solid #DDE8F1; }
+  .engagement-mini-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .engagement-mini-head b { color: var(--navy); font-size: 12px; }
+  .engagement-stamps { display: flex; gap: 5px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
+  .engagement-stamps::-webkit-scrollbar { display: none; }
+  .engagement-stamp { min-width: 29px; height: 29px; display: grid; place-items: center; border: 1px solid #D9DEE4; border-radius: 50%; background: #F4F6F8; color: #7A838D; font-size: 9px; font-weight: 900; }
+  .engagement-stamp.ok { border-color: #8FD0A9; background: #DFF4E7; color: #23633D; }
+  .engagement-stamp.miss { border-color: #E7CACA; background: #FFF1F1; color: #9A5C5C; }
+  .engagement-stamp.today { box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #8BB9E2; }
+  .optional-study-links { margin-top: 11px; border-top: 1px dashed #D9E2EA; }
+  .optional-study-links summary { min-height: 42px; display: flex; align-items: center; color: var(--mid-gray); font-size: 12px; font-weight: 800; cursor: pointer; }
+  .optional-study-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding-bottom: 2px; }
+  .optional-study-actions .btn { min-width: 0; padding-left: 8px; padding-right: 8px; }
   .study-time-controls { padding: 10px 0 4px; border-bottom: 1px dashed #D7D1C0; }
   .study-timer-subjects { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-bottom: 10px; }
   .study-timer-subjects .chip { min-width: 0; min-height: 30px; padding: 4px 5px; border-radius: 8px; font-size: 10.5px; line-height: 1.25; }
@@ -932,6 +970,9 @@
     .storage-alert .btn, .modal-box .btn-sm { min-height: 44px; }
     .student-subscription-filters .btn { flex: 1 1 auto; min-height: 44px; }
     .student-subscription-line .subscription-payment-action { width: 100%; margin-left: 0; }
+    .today-next-row { grid-template-columns: auto minmax(0, 1fr); }
+    .today-next-row .btn { grid-column: 1 / -1; width: 100%; min-height: 40px; }
+    .optional-study-actions { grid-template-columns: 1fr; }
     .modal { place-items: end center; padding-left: 0; padding-right: 0; padding-bottom: 0; }
     .modal-box { max-width: none; max-height: 92vh; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
     #toast { bottom: calc(18px + env(safe-area-inset-bottom)); }
@@ -2351,7 +2392,7 @@ function studentSetupWizard(me, status) {
     body = '<div class="card student-setup-card"><div class="student-guide-head"><div><div class="card-title">3 · 매일 이 순서로 사용해요</div>' +
       '<div class="card-sub">평소에는 오늘 할 일 탭만 위에서 아래로 진행하면 됩니다.</div></div><span class="pill">마지막</span></div>' +
       '<div class="student-guide-steps">' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>공부 담기</b></div><p>오늘 배부된 공부에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div><p>첫 카드에서 다음 공부를 확인하고, 배부 대기 항목은 <code>오늘 배부된 공부</code>에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 체크</b></div><p>끝낸 공부는 스터디 플래너에서 완료 표시합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div><p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div></div>' +
@@ -2422,8 +2463,8 @@ function viewStudentGuide() {
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">매일 반드시 할 것</div>' +
       '<div class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</div></div><span class="pill">필수</span></div>' +
       '<div class="student-guide-steps">' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>배부 공부 확인</b></div>' +
-          '<p><code>오늘 배부된 공부</code>를 펼쳐 원장님이 보낸 내용을 확인합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div>' +
+          '<p>첫 카드에서 이월·배부 공부·온라인 학습·인강·복습 순서를 확인하고, 필요하면 <code>오늘 배부된 공부</code>를 펼칩니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>체크리스트에 담기</b></div>' +
           '<p>할 공부마다 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
@@ -2432,6 +2473,7 @@ function viewStudentGuide() {
           '<p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div>' +
       '</div>' +
       '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 하나를 선택하세요.</div>' +
+      '<div class="student-guide-tip"><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</div>' +
     '</div>' +
 
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
@@ -2542,6 +2584,8 @@ function viewToday() {
     else counts.todo++;
   });
 
+  if (cursor === today()) h += todayNextActionCard(me, list, carry, offers, lectureChecklist);
+
   h += '<div class="card"><div class="prog">' +
     '<div class="ring" style="--p:' + checklistPct + '"><b>' + checklistPct + '%</b></div>' +
     '<div style="flex:1">' +
@@ -2580,6 +2624,129 @@ function viewToday() {
   }
   if (cursor >= DAILY_CLOSE_START && cursor <= today()) h += dailyClosureCard(me, cursor);
   return h;
+}
+
+function todayLearningUrl(sourceKey) {
+  const source = LEARNING_SOURCES[sourceKey];
+  if (!source || source.appOnly) return '';
+  const academy = session.isAdmin || isManager();
+  return safeHttpsUrl(academy && source.centerUrl ? source.centerUrl : source.studentUrl);
+}
+
+function todayNextActionItems(me, list, carry, offers, lectureChecklist) {
+  const rows = [], seen = new Set();
+  const add = item => {
+    if (!item || !item.key || seen.has(item.key)) return;
+    seen.add(item.key); rows.push(item);
+  };
+  const addTask = (task, date, note, target, action) => {
+    const source = LEARNING_SOURCES[task.source] || null;
+    const subjectKey = taskStudySubjectKey(task);
+    add({
+      key: 'task:' + task.id + '|' + date, subjectKey: subjectKey,
+      title: task.title,
+      note: [source ? source.icon + ' ' + source.label : '', note, task.estimatedMin ? '예상 ' + Number(task.estimatedMin) + '분' : ''].filter(Boolean).join(' · '),
+      target: target || 'studyPlanner', action: action || '플래너 보기'
+    });
+  };
+  const addLecture = (item, note, action) => {
+    const found = ingLec(me.id, item.cid, item.seq);
+    add({
+      key: 'lecture:' + item.cid + ':' + Number(item.seq) + '|' + item.date,
+      subjectKey: found ? ingCourseSubjectKey(found.course) : 'other',
+      title: found ? found.course.name + ' ' + item.seq + '강' + (found.lec.title ? ' · ' + found.lec.title : '') : '인강 ' + item.seq + '강',
+      note: note + (found && found.lec.min ? ' · ' + found.lec.min + '분' : ''),
+      target: 'todayLectures', action: action || '인강 확인'
+    });
+  };
+
+  const running = stRunning(me.id, today());
+  if (running) {
+    const runningTask = state.tasks.find(task => !task.deleted && task.staffId === me.id && task.id === running.taskId);
+    if (runningTask) addTask(runningTask, today(), '공부 중', 'studyPlanner', '이어서 공부');
+    else add({ key: 'running:' + String(running.taskId || running.subj), subjectKey: studySubjectKey(running.subj),
+      title: String(running.subj || '기타') + ' 공부 진행 중', note: '타이머가 실행 중입니다', target: 'studyPlanner', action: '타이머 보기' });
+  }
+
+  carry.filter(item => !isDone(item.t.id, item.date)).forEach(item =>
+    addTask(item.t, item.date, shortDate(item.date) + '에서 이월', 'studyPlanner', '이어서 공부'));
+  list.filter(task => !isDone(task.id, today())).forEach(task => {
+    const blocked = !!((getCheck(task.id, today()) || {}).blocked);
+    addTask(task, today(), blocked ? '막힘 확인 필요' : task.priority === 'high' ? '중요 공부' : '오늘 체크리스트',
+      'studyPlanner', blocked ? '막힘 확인' : '공부 시작');
+  });
+  lectureChecklist.filter(item => !item.done && !item.closed).forEach(item =>
+    addLecture(item, item.blocked ? '막힘 확인 필요' : '오늘 체크리스트', item.blocked ? '막힘 확인' : '공부 시작'));
+  offers.filter(task => !isStudyClaimed(task, today()) && !isDone(task.id, today())).forEach(task =>
+    addTask(task, today(), '원장 배부', 'studyOffers', '체크리스트에 담기'));
+
+  const lecturePlan = ingTodayItems(me.id);
+  lecturePlan.overdue.filter(item => !item.done).forEach(item => addLecture(item, shortDate(item.date) + '에서 밀림', '오늘로 가져오기'));
+  lecturePlan.todays.filter(item => !item.done && !item.closed && !ingIsClaimed(item)).forEach(item => addLecture(item, '오늘 예정', '체크리스트에 담기'));
+
+  wnDue(me.id).forEach(item => add({
+    key: 'wrong:' + item.id, subjectKey: studySubjectKey(item.subj), title: '오답 복습 · ' + (item.note || '복습할 문제'),
+    note: ((item.rv || 0) + 1) + '차 복습', target: 'studyReviews', action: '복습 담기'
+  }));
+  rdDue(me.id).forEach(item => add({
+    key: 'round:' + item.id, subjectKey: studySubjectKey(item.subject), title: '회독 · ' + (item.name || '회독 학습'),
+    note: (Number(item.done || 0) + 1) + '/' + Number(item.target || 1) + '회독', target: 'studyReviews', action: '회독 담기'
+  }));
+  return rows;
+}
+
+function todayOptionalStudyLinks(me, date) {
+  const scheduled = new Set(tasksFor(me.id, date).map(task => task.source).filter(Boolean));
+  const missing = ['leaders_eye', 'metamath'].filter(key => !scheduled.has(key));
+  if (!missing.length) return '';
+  const actions = missing.map(key => {
+    const source = LEARNING_SOURCES[key];
+    const url = todayLearningUrl(key);
+    return url ? '<a class="btn btn-ghost" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' +
+      source.icon + ' ' + esc(source.label) + ' 추가 학습 ↗</a>' : '';
+  }).filter(Boolean).join('');
+  if (!actions) return '';
+  return '<details class="optional-study-links"><summary>오늘 예정분이 없는 온라인 학습 · 필요할 때만 열기</summary>' +
+    '<div class="optional-study-actions">' + actions + '</div></details>';
+}
+
+function engagementStampDots(summary, date) {
+  if (!summary.days.length) return '<div class="small muted mt8">체크리스트를 완료하거나 순공시간을 기록한 날부터 스탬프가 표시됩니다.</div>';
+  return '<div class="engagement-stamps" aria-label="이번 달 유효 학습일 스탬프">' + summary.days.slice(-14).map(day => {
+    const pending = !day.stamped && now() <= Number(day.deadlineAt || 0);
+    const stateLabel = day.stamped ? '유효 학습일' : pending ? '마감 전' : '미획득';
+    return '<span class="engagement-stamp' + (day.stamped ? ' ok' : pending ? '' : ' miss') + (day.date === date ? ' today' : '') +
+      '" title="' + esc(label(day.date) + ' · ' + stateLabel) + '">' + Number(day.date.slice(8)) + '</span>';
+  }).join('') + '</div>';
+}
+
+function todayNextActionCard(me, list, carry, offers, lectureChecklist) {
+  const close = dailyCloseState(me.id, today());
+  const rows = close.canReport || close.complete ? [] : todayNextActionItems(me, list, carry, offers, lectureChecklist);
+  const summary = engagementMonthSummary(me.id, ymOf(today()));
+  const preview = rows.slice(0, 4);
+  const hasActivity = engagementDayState(me.id, today()).hasActivity;
+  const flow = '<div class="today-flow" aria-label="오늘 학습 3단계">' +
+    '<span class="' + (close.complete ? 'done' : rows.length ? 'on' : 'done') + '">1 · 오늘 공부</span>' +
+    '<span class="' + (close.complete || hasActivity ? 'done' : !rows.length ? 'on' : '') + '">2 · 체크·시간</span>' +
+    '<span class="' + (close.complete ? 'done' : !rows.length && (hasActivity || close.canReport) ? 'on' : '') + '">3 · 학습 마무리</span></div>';
+  const body = preview.length
+    ? '<div class="today-next-list">' + preview.map((item, index) => {
+        const subject = studySubject(item.subjectKey);
+        return '<div class="today-next-row ' + subject.className + '"><span class="today-next-number">' + (index + 1) + '</span>' +
+          '<div class="today-next-copy"><span>' + esc(item.note) + '</span><b>' + esc(item.title) + '</b></div>' +
+          '<button class="btn btn-sm btn-ghost" data-act="todayjump" data-target="' + esc(item.target) + '">' + esc(item.action) + '</button></div>';
+      }).join('') + '</div>' + (rows.length > preview.length ? '<div class="today-next-more">아래 세부 학습 영역에 ' + (rows.length - preview.length) + '개가 더 있습니다.</div>' : '')
+    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '체크리스트 확인 완료 · 이제 오늘 학습을 마무리하세요.') + '</b>' +
+      (!close.complete ? '<button class="btn btn-primary btn-block mt14" data-act="todayjump" data-target="dailyCloseCard">오늘 학습 마무리</button>' : '') + '</div>';
+  const rewardTag = '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span>';
+  return '<div class="card today-next-card" id="todayNextAction"><div class="today-next-head"><div>' +
+    '<div class="card-title">오늘 해야 할 일</div><div class="card-sub">구체적인 예정분부터 끝낸 뒤 마지막에 오늘 학습을 마무리하세요.</div></div>' +
+    '<span class="pill' + (rows.length ? ' warn' : '') + '">' + rows.length + '개 남음</span></div>' + flow + body +
+    '<div class="engagement-mini"><div class="engagement-mini-head"><b>🏅 이번 달 유효 학습일 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b>' + rewardTag + '</div>' +
+      engagementStampDots(summary, today()) +
+      '<div class="small muted mt8">체크 완료 또는 순공 10분 이상 + 미완료 정리 + 다음날 정오 전 수행 보고 완료 시 하루 스탬프가 찍힙니다.</div></div>' +
+    todayOptionalStudyLinks(me, today()) + '</div>';
 }
 
 function studyTotalHeroCard(me, date) {
@@ -3282,17 +3449,22 @@ function ingCourseSubject(course) { return STUDY_SUBJECTS[ingCourseSubjectKey(co
 const ingTimerTaskId = (cid, seq) => 'ing:' + String(cid || '') + ':' + Number(seq);
 const ingIsClaimed = item => !!(item && (item.claimed || item.done));
 function ingChecklistItems(sid, date) {
-  return ingPlan(sid, date).filter(ingIsClaimed).map(item => Object.assign({}, item, { date: date }));
+  return ingPlan(sid, date).filter(item => ingIsClaimed(item) && !item.closed)
+    .map(item => Object.assign({}, item, { date: date }));
 }
 function ingStats(sid, c, asg) {
   asg = asg || ingAssigned(sid);
   const lecs = c.lectures || [];
-  let assigned = 0, done = 0;
+  let assigned = 0, done = 0, closed = 0;
   lecs.forEach(l => {
     const a = asg[c.id + '|' + l.seq];
-    if (a) { assigned++; if (a.done) done++; }
+    if (a) {
+      assigned++;
+      if (a.done) done++;
+      else if (a.closed) closed++;
+    }
   });
-  return { total: lecs.length, assigned: assigned, done: done,
+  return { total: lecs.length, assigned: assigned, done: done, closed: closed, resolved: done + closed,
     unassigned: lecs.length - assigned, pct: lecs.length ? Math.round(done / lecs.length * 100) : 0 };
 }
 
@@ -3324,13 +3496,14 @@ function ingCourseState(sid, course, asg) {
   const stats = ingStats(sid, course, asg);
   const items = ingCourseItems(sid, course.id);
   const notes = (course.lectures || []).map(lecture => ingLectureNote(sid, course.id, lecture.seq));
-  const overdue = items.filter(item => !item.done && item.date < today()).length;
+  const overdue = items.filter(item => !item.done && !item.closed && item.date < today()).length;
   const review = items.filter(item => item.review).length;
   const unanswered = notes.filter(note => {
     const question = String(note.question || '').trim(), answer = String(note.answer || '').trim();
     return question && (!answer || String(note.answeredQuestion || '').trim() !== question);
   }).length;
-  const completed = stats.total > 0 && stats.done >= stats.total;
+  const resolved = Number.isFinite(stats.resolved) ? stats.resolved : stats.done;
+  const completed = stats.total > 0 && resolved >= stats.total;
   const paused = !completed && course.status === 'paused';
   const lastDone = items.filter(item => item.done).map(item => item.date).sort().pop() || '';
   const importedDate = Number(course.importedAt) ? ymd(new Date(Number(course.importedAt))) : '';
@@ -3413,8 +3586,9 @@ function ingForecast(sid, course) {
   const stats = ingStats(sid, course);
   const set = ingSet(sid);
   const existing = ingCourseItems(sid, course.id);
-  const overdue = existing.filter(x => !x.done && x.date < today()).length;
-  const existingLast = existing.length ? existing[existing.length - 1].date : null;
+  const activeExisting = existing.filter(x => !x.closed);
+  const overdue = activeExisting.filter(x => !x.done && x.date < today()).length;
+  const existingLast = activeExisting.length ? activeExisting[activeExisting.length - 1].date : null;
   const projectionEnd = addDays(today(), 1099);
   const projected = stats.unassigned
     ? ingBuildSchedule(sid, course, today(), projectionEnd, set.days, set.perDay)
@@ -3426,7 +3600,7 @@ function ingForecast(sid, course) {
   if (course.goalDate) {
     rounds = overdue ? 0 : ingReplayRounds(sid, course, finishDate, course.goalDate, set.days, set.perDay);
   }
-  const review = existing.filter(x => x.review).length;
+  const review = activeExisting.filter(x => x.review).length;
   let next = '현재 회차를 계획대로 진행하세요.';
   if (overdue) next = '밀린 ' + overdue + '강을 다시 배정한 뒤 계획을 이어가세요.';
   else if (review) next = '복습 표시 ' + review + '강을 먼저 다시 들으세요.';
@@ -3490,10 +3664,10 @@ function ingCatchup(sid) {
   ingPlanDates(sid).forEach(d => {
     if (d >= t) return;
     const items = ingPlan(sid, d);
-    const late = items.filter(x => !x.done);
+    const late = items.filter(x => !x.done && !x.closed);
     if (!late.length) return;
     moved.push.apply(moved, late.map(x => Object.assign({}, x, { s: '', e: '', auto: '' })));
-    ingSavePlan(sid, d, items.filter(x => x.done));
+    ingSavePlan(sid, d, items.filter(x => x.done || x.closed));
   });
   if (moved.length) ingSavePlan(sid, t, ingPlan(sid, t).concat(moved));
   return moved.length;
@@ -3505,7 +3679,7 @@ function ingShift(sid, from, n) {
   const buckets = {};
   let cnt = 0;
   ingShiftRows(sid, from).forEach(row => {
-    ingSavePlan(sid, row.date, row.items.filter(x => x.done));
+    ingSavePlan(sid, row.date, row.items.filter(x => x.done || x.closed));
     const nd = addDays(row.date, n);
     (buckets[nd] = buckets[nd] || []).push.apply(buckets[nd],
       row.move.map(x => Object.assign({}, x)));
@@ -3519,7 +3693,7 @@ function ingShiftRows(sid, from) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || from < today()) return [];
   return ingPlanDates(sid).filter(date => date >= from).map(date => {
     const items = ingPlan(sid, date);
-    return { date: date, items: items, move: items.filter(item => !item.done) };
+    return { date: date, items: items, move: items.filter(item => !item.done && !item.closed) };
   }).filter(row => row.move.length);
 }
 
@@ -3607,10 +3781,10 @@ function ingTodayItems(sid) {
   const t = today(), overdue = [];
   ingPlanDates(sid).forEach(d => {
     if (d >= t) return;
-    ingPlan(sid, d).forEach(x => { if (!x.done) overdue.push(Object.assign({}, x, { date: d })); });
+    ingPlan(sid, d).forEach(x => { if (!x.done && !x.closed) overdue.push(Object.assign({}, x, { date: d })); });
   });
   overdue.sort((a, b) => a.date.localeCompare(b.date));
-  return { overdue: overdue, todays: ingPlan(sid, t).map(x => Object.assign({}, x, { date: t })) };
+  return { overdue: overdue, todays: ingPlan(sid, t).filter(x => !x.closed).map(x => Object.assign({}, x, { date: t })) };
 }
 
 function ingRow(sid, it, editable) {
@@ -3937,7 +4111,7 @@ function ingSlotModal(sid, date, start, end) {
 }
 
 function ingCourseStatusLabel(state) {
-  if (state.completed) return '완강';
+  if (state.completed) return state.stats && state.stats.closed ? '학습 종료' : '완강';
   if (state.paused) return '일시 정지';
   if (state.overdue) return '지연 ' + state.overdue + '강';
   if (state.stalled) return '7일 정체';
@@ -3973,6 +4147,7 @@ function ingAttentionCard(me, courseStates, admin) {
 
 function ingLectureStatusInfo(plan) {
   if (!plan) return { key: 'unassigned', label: '미배정' };
+  if (plan.closed) return { key: 'closed', label: '오늘 종료' };
   if (plan.review) return { key: 'review', label: '복습 필요' };
   if (plan.done) return { key: 'done', label: '완료' };
   if (plan.date < today()) return { key: 'overdue', label: '지연' };
@@ -3992,10 +4167,11 @@ function ingCourseDetailHtml(me, course, state, admin, asg) {
   const nextStart = course.nextName && forecast.finishDate && !forecast.review && !forecast.overdue ? addDays(forecast.finishDate, 1) : '';
   const rounds = course.goalDate ? (forecast.rounds ? '총 ' + forecast.rounds + '회독 가능' : '목표일까지 완강 어려움') : '목표일 미설정';
   return '<div class="ing-course-detail"><div class="ing-detail-stats">' +
-      '<div><b>' + state.stats.done + ' / ' + state.stats.total + '강</b><span>완료 회차</span></div>' +
+      '<div><b>' + state.stats.done + ' / ' + state.stats.total + '강</b><span>완료 회차' +
+        (state.stats.closed ? ' · 종료 ' + state.stats.closed + '강' : '') + '</span></div>' +
       '<div><b>' + (state.seconds ? fmtDur(state.seconds) : '기록 전') + '</b><span>인강 타이머</span></div>' +
       '<div><b>' + (avg ? fmtDur(avg) : '기록 전') + '</b><span>완료 1강 평균</span></div>' +
-      '<div><b>' + (forecast.finishDate ? shortDate(forecast.finishDate) : forecast.overdue ? '재배정 필요' : '계획 필요') + '</b><span>예상 완강</span></div>' +
+      '<div><b>' + (state.completed && state.stats.closed ? '학습 종료' : forecast.finishDate ? shortDate(forecast.finishDate) : forecast.overdue ? '재배정 필요' : '계획 필요') + '</b><span>예상 완강</span></div>' +
     '</div>' +
     '<div class="ing-course-roadmap"><div><b>목표·회독</b><span>' + (course.goalDate ? shortDate(course.goalDate) + '까지 · ' : '') + esc(rounds) + '</span></div>' +
       '<div><b>다음 과정</b><span>' + esc(course.nextName || '미설정') + (nextStart ? ' · 예상 전환 ' + shortDate(nextStart) : '') + '</span></div></div>' +
@@ -4031,7 +4207,9 @@ function ingCourseCardHtml(me, course, state, admin, asg) {
   const forecast = ingForecast(me.id, course);
   const statusClass = state.completed ? '' : state.paused ? ' warn' : state.attention ? ' bad' : '';
   const planText = state.overdue ? '밀린 강의를 재배정해야 합니다.' : state.paused ? '새 자동배정이 중지된 강좌입니다.' :
-    state.completed ? '완강했습니다. 필요한 회차는 복습함에서 다시 확인하세요.' :
+    state.completed ? (state.stats.closed
+      ? '완료 ' + state.stats.done + '강 · 오늘 종료 ' + state.stats.closed + '강으로 과정을 정리했습니다.'
+      : '완강했습니다. 필요한 회차는 복습함에서 다시 확인하세요.') :
     forecast.finishDate ? '현재 속도라면 ' + shortDate(forecast.finishDate) + ' 완강 예상' : '목표일과 자동배정 계획을 설정해 주세요.';
   return '<article class="card ing-course-card ' + subject.className + (open ? ' is-open' : '') + '">' +
     '<div class="ing-course-top mb8"><div><div class="ing-course-name">' + esc(course.name) + '</div>' +
@@ -4039,7 +4217,8 @@ function ingCourseCardHtml(me, course, state, admin, asg) {
         ' · 총 ' + state.stats.total + '강' + (course.textbook ? ' · ' + esc(course.textbook) : '') + '</div></div>' +
       '<span class="pill' + statusClass + '">' + ingCourseStatusLabel(state) + '</span></div>' +
     '<div class="bar mb8 ing-course-bar"><i style="width:' + state.stats.pct + '%"></i></div>' +
-    '<div class="ing-course-progress"><span><b>' + state.stats.pct + '%</b> 완료 ' + state.stats.done + '강</span>' +
+    '<div class="ing-course-progress"><span><b>' + state.stats.pct + '%</b> 완료 ' + state.stats.done + '강' +
+      (state.stats.closed ? ' · 종료 ' + state.stats.closed + '강' : '') + '</span>' +
       '<span>배정 ' + state.stats.assigned + ' · 미배정 ' + state.stats.unassigned + '</span></div>' +
     '<div class="ing-course-message">' + esc(planText) + '</div>' +
     '<div class="ing-course-actions">' +
@@ -4111,7 +4290,7 @@ function viewIngang() {
   h += ingAttentionCard(me, courseStates, admin);
   const filters = [
     { key: 'active', label: '수강 중' }, { key: 'attention', label: '관리 필요' },
-    { key: 'paused', label: '일시 정지' }, { key: 'completed', label: '완강' }, { key: 'all', label: '전체' }
+    { key: 'paused', label: '일시 정지' }, { key: 'completed', label: '완료·종료' }, { key: 'all', label: '전체' }
   ];
   const counts = Object.fromEntries(filters.map(filter => [filter.key,
     courseStates.filter(row => ingCourseFilterMatch(row.state, filter.key)).length]));
@@ -4474,7 +4653,7 @@ function studyReviewOffersCard(me) {
   const rounds = rdDue(me.id);
   if (!wrong.length && !rounds.length) return '';
   const canClaim = session.isStaffLink && session.staffId === me.id;
-  return '<div class="card alert"><div class="between"><div><div class="card-title">🔁 오늘 복습할 학습</div>' +
+  return '<div class="card alert" id="studyReviews"><div class="between"><div><div class="card-title">🔁 오늘 복습할 학습</div>' +
     '<div class="card-sub">오답과 회독을 오늘 체크리스트에 담아 시간까지 기록하세요.</div></div>' +
     '<span class="pill bad">' + (wrong.length + rounds.length) + '건</span></div>' +
     wrong.map(item => '<div class="study-review-offer">' + taskStudySubjectTag({ studySubject: studySubjectKey(item.subj) }) +
@@ -5943,6 +6122,8 @@ function monthOverrideModal(ym) {
 /* ── 학생의 하루 마감 ──
  * 오늘 탭에서 미완료 처리와 시험 준비율 확인을 끝내야 보고 문자를 만들 수 있다. */
 const DAILY_CLOSE_START = '2026-08-18';
+const DAILY_CLOSE_SCHEMA_VERSION = 2;
+const DAILY_CLOSE_LECTURE_RULE_START = '2026-09-01';
 const dailyCloseKey = staffId => '__dailyclose__' + staffId;
 function dailyCloseOf(staffId, date) {
   const check = state.checks[dailyCloseKey(staffId) + '|' + date];
@@ -5954,7 +6135,7 @@ function dailyCloseOf(staffId, date) {
   return close;
 }
 
-function dailyCloseStudyItems(staffId, date) {
+function dailyCloseStudyItems(staffId, date, legacyClaimedLecturesOnly) {
   const tasks = tasksFor(staffId, date).map(task => {
     const check = getCheck(task.id, date);
     const claimed = isStudyClaimed(task, date);
@@ -5965,13 +6146,17 @@ function dailyCloseStudyItems(staffId, date) {
       claimed: claimed, done: !!(check && check.done), blocked: !!(check && check.blocked), dropped: !!(check && check.dropped)
     };
   });
-  const lectures = ingChecklistItems(staffId, date).map(item => {
+  const lectureItems = legacyClaimedLecturesOnly
+    ? ingPlan(staffId, date).filter(ingIsClaimed)
+    : ingPlan(staffId, date);
+  const lectures = lectureItems.map(rawItem => {
+    const item = Object.assign({}, rawItem, { date: date });
     const found = ingLec(staffId, item.cid, item.seq);
     return {
       key: 'lecture:' + item.cid + ':' + Number(item.seq), type: 'lecture', cid: item.cid, seq: Number(item.seq), item: item,
       label: found ? found.course.name + ' ' + item.seq + '강' : '인강 ' + item.seq + '강',
       detail: found && found.lec.title ? found.lec.title : '',
-      subjectKey: found ? ingCourseSubjectKey(found.course) : 'other', done: !!item.done,
+      subjectKey: found ? ingCourseSubjectKey(found.course) : 'other', claimed: ingIsClaimed(item), done: !!item.done,
       blocked: !!item.blocked, dropped: !!item.closed
     };
   });
@@ -5991,9 +6176,10 @@ function dailyCloseEventRefs(staffId, date) {
   return refs.sort((a, b) => a.event.date.localeCompare(b.event.date)).slice(0, 3);
 }
 
-function dailyCloseSignature(staffId, date, override) {
+function dailyCloseSignature(staffId, date, override, legacyClaimedLecturesOnly) {
   const close = override || dailyCloseOf(staffId, date);
-  const items = dailyCloseStudyItems(staffId, date).map(item => [item.key, item.done, item.blocked, item.dropped]);
+  const items = dailyCloseStudyItems(staffId, date, legacyClaimedLecturesOnly)
+    .map(item => [item.key, item.done, item.blocked, item.dropped]);
   const events = dailyCloseEventRefs(staffId, date).map(ref => [ref.event.id, Number(ref.event.progress) || 0]);
   const resolutions = Object.keys(close.resolutions || {}).sort().map(key => {
     const row = close.resolutions[key] || {};
@@ -6013,12 +6199,76 @@ function dailyCloseState(staffId, date) {
   const running = date === today() ? stRunning(staffId, date) : null;
   const signature = dailyCloseSignature(staffId, date, close);
   const reviewCurrent = !!close.reviewedAt && close.reviewSignature === signature;
-  const complete = close.status === 'complete' && close.signature === signature;
+  const legacyComplete = close.status === 'complete' && date < DAILY_CLOSE_LECTURE_RULE_START &&
+    Number(close.schemaVersion || 1) < DAILY_CLOSE_SCHEMA_VERSION &&
+    close.signature === dailyCloseSignature(staffId, date, close, true);
+  const complete = close.status === 'complete' && (close.signature === signature || legacyComplete);
   return {
     close: close, items: items, incomplete: incomplete, unresolved: unresolved,
     events: events, unconfirmedEvents: unconfirmedEvents, running: running,
-    signature: signature, reviewCurrent: reviewCurrent, complete: complete,
+    signature: signature, reviewCurrent: reviewCurrent, legacyComplete: legacyComplete, complete: complete,
     canReport: !running && !unresolved.length && !unconfirmedEvents.length && reviewCurrent
+  };
+}
+
+/* 보상용 유효 학습일 — 접속 횟수가 아니라 실제 공부와 학생 본인 마감 기록에서 파생한다. */
+const ENGAGEMENT_REWARD_START = '2026-09';
+const ENGAGEMENT_REWARD_RATE = 80;
+const ENGAGEMENT_WEEKLY_TARGET = 3;
+const ENGAGEMENT_MIN_STUDY_SECONDS = 10 * 60;
+
+function engagementDayState(staffId, date) {
+  const closeState = dailyCloseState(staffId, date);
+  const snapshot = closeState.close.itemSnapshot.length ? closeState.close.itemSnapshot : closeState.items;
+  const plannedCount = Math.max(snapshot.length, tasksFor(staffId, date).length + ingPlan(staffId, date).length);
+  const hasActivity = stTotal(staffId, date) >= ENGAGEMENT_MIN_STUDY_SECONDS || snapshot.some(item => item.done) ||
+    ingPlan(staffId, date).some(item => item.done);
+  const eligible = date >= DAILY_CLOSE_START && date <= today() && (plannedCount > 0 || hasActivity);
+  const handled = !closeState.running && !closeState.unresolved.length && !closeState.unconfirmedEvents.length;
+  const selfClosed = closeState.complete && closeState.close.status === 'complete';
+  const deadline = parseYmd(addDays(date, 1));
+  deadline.setHours(12, 0, 0, 0);
+  const finalizedAt = Number(closeState.close.finalizedAt) || 0;
+  const onTime = !!finalizedAt && finalizedAt <= deadline.getTime();
+  return {
+    date: date, eligible: eligible, plannedCount: plannedCount, hasActivity: hasActivity,
+    handled: handled, selfClosed: selfClosed, onTime: onTime, deadlineAt: deadline.getTime(),
+    stamped: !!(eligible && hasActivity && handled && selfClosed && onTime)
+  };
+}
+
+function engagementMonthSummary(staffId, ym, asOf) {
+  const through = asOf && asOf < today() ? asOf : today();
+  const lastDate = monthLastDate(ym);
+  const capped = through < lastDate ? through : lastDate;
+  const days = monthDates(ym).filter(date => date >= DAILY_CLOSE_START && date <= capped)
+    .map(date => engagementDayState(staffId, date)).filter(day => day.eligible);
+  const stampedDays = days.filter(day => day.stamped).length;
+  const plannedDays = days.length;
+  const rate = plannedDays ? Math.round(stampedDays / plannedDays * 100) : 0;
+  const weekMons = monthDates(ym).filter(date => dowOf(date) === 0 && date <= capped)
+    .map(date => mondayOf(date)).filter(mon => mon >= WEEK_CLOSE_START && addDays(mon, 6) <= capped);
+  const eligibleWeeks = weekMons.filter(mon => weekHadActivity(staffId, mon));
+  const weeklyDone = weekMons.filter(mon => weekCloseOf(staffId, mon).status === 'complete').length;
+  const weeklyTarget = plannedDays ? ENGAGEMENT_WEEKLY_TARGET : 0;
+  const monthEnded = capped >= lastDate;
+  const monthStudentClosed = monthCloseOf(staffId, ym).status === 'complete';
+  const trial = ym < ENGAGEMENT_REWARD_START;
+  const stampTargetMet = plannedDays > 0 && stampedDays * 100 >= plannedDays * ENGAGEMENT_REWARD_RATE;
+  const weeklyTargetMet = weeklyDone >= weeklyTarget;
+  const qualified = !trial && monthEnded && stampTargetMet && weeklyTargetMet && monthStudentClosed;
+  let statusKey = 'progress', statusLabel = '달성 중';
+  if (!plannedDays) { statusKey = 'empty'; statusLabel = '기록 없음'; }
+  else if (trial) { statusKey = 'progress'; statusLabel = '시범 집계'; }
+  else if (qualified) { statusKey = 'achieved'; statusLabel = '기준 달성'; }
+  else if (monthEnded) { statusKey = 'attention'; statusLabel = '확인 필요'; }
+  else if (stampTargetMet && weeklyTargetMet) { statusKey = 'progress'; statusLabel = '기준 유지 중'; }
+  return {
+    ym: ym, days: days, plannedDays: plannedDays, stampedDays: stampedDays, rate: rate,
+    weeklyDone: weeklyDone, weeklyTarget: weeklyTarget, eligibleWeeks: eligibleWeeks,
+    monthEnded: monthEnded, monthStudentClosed: monthStudentClosed, trial: trial,
+    stampTargetMet: stampTargetMet, weeklyTargetMet: weeklyTargetMet, qualified: qualified,
+    statusKey: statusKey, statusLabel: statusLabel
   };
 }
 
@@ -6105,7 +6355,7 @@ function dailyCloseModal(staffId, date) {
     return '<div class="daily-close-item ' + studySubject(item.subjectKey).className + '">' +
       '<div class="row wraprow" style="gap:6px">' + studySubjectTag(item.subjectKey) +
         (item.carriedFromDate ? '<span class="tag carry">' + shortDate(item.carriedFromDate) + ' 이월</span>' : '') +
-        (item.type === 'task' && item.claimed === false ? '<span class="tag high">가져오지 않음</span>' : '') +
+        (item.claimed === false ? '<span class="tag high">체크리스트에 담지 않음</span>' : '') +
         '<b class="small">' + esc(item.label) + '</b></div>' +
       (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') +
       '<div class="daily-close-item-grid"><select class="in" data-daily-resolution data-key="' + esc(item.key) + '">' +
@@ -6205,7 +6455,9 @@ function dailyCarryLecture(staffId, date, cid, seq) {
   const nextDate = date < today() ? today() : addDays(date, 1);
   const next = ingPlan(staffId, nextDate);
   if (!next.some(item => item.cid === cid && Number(item.seq) === Number(seq))) {
-    next.push(Object.assign({}, moving, { s: '', e: '', auto: 'daily-close-v1', done: false }));
+    next.push(Object.assign({}, moving, {
+      s: '', e: '', auto: 'daily-close-v1', done: false, blocked: false, closed: false, closeNote: ''
+    }));
     ingSavePlan(staffId, nextDate, next);
   }
 }
@@ -8518,6 +8770,23 @@ function studentUsageLine(student) {
     ' · 체크 ' + usage.done + '/' + usage.total + ' · 하루 마감 ' + (usage.closed ? '완료' : '미완료') + '</span></div>';
 }
 
+function studentEngagementLine(student, currentSummary, previousSummary) {
+  if (student.owner || student.manager) return '';
+  const currentYm = ymOf(today());
+  const summary = currentSummary || engagementMonthSummary(student.id, currentYm);
+  const previousYm = ymAdd(currentYm, -1);
+  const previous = previousSummary || (previousYm >= ENGAGEMENT_REWARD_START ? engagementMonthSummary(student.id, previousYm, monthLastDate(previousYm)) : null);
+  const monthText = summary.monthEnded
+    ? (summary.monthStudentClosed ? '월간 마감 완료' : '월간 마감 필요')
+    : '말일 월간 마감 예정';
+  const previousText = previous && previous.plannedDays
+    ? '<div class="small muted mt8">지난달 최종 · 스탬프 ' + previous.stampedDays + '/' + previous.plannedDays + '일 (' + previous.rate + '%) · ' +
+      (previous.qualified ? '<b style="color:var(--green)">기준 달성</b>' : '미달·확인') + '</div>' : '';
+  return '<div class="student-engagement-line"><div class="between"><div><b>🏅 이번 달 스탬프 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b>' +
+    '<div class="small muted mt8">주간 마무리 ' + summary.weeklyDone + '/' + summary.weeklyTarget + '회 · ' + monthText + '</div></div>' +
+    '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span></div>' + previousText + '</div>';
+}
+
 /* 카카오 수신번호는 서버에만 두고, 원장 화면에는 마스킹 상태만 잠시 보관한다. */
 const consultLinkContactsUi = {
   rows: new Map(), loaded: false, loading: false, error: '', busy: ''
@@ -8744,6 +9013,16 @@ function viewStaffAdmin() {
   const idleUsers = usage.filter(item => item.status === 'idle').length;
   const subscriptionStudents = students.filter(student => studentSubscription(student).active);
   const paymentAttention = subscriptionStudents.filter(student => studentSubscriptionPayment(student).needsAttention);
+  const engagementYm = ymOf(today());
+  const engagementByStudent = new Map(students.map(student => [student.id, engagementMonthSummary(student.id, engagementYm)]));
+  const engagementRows = [...engagementByStudent.values()];
+  const stampedToday = engagementRows.filter(summary => summary.days.some(day => day.date === today() && day.stamped)).length;
+  const engagementOnTrack = engagementRows.filter(summary => summary.plannedDays && summary.stampedDays * 100 >= summary.plannedDays * ENGAGEMENT_REWARD_RATE).length;
+  const engagementAchieved = engagementRows.filter(summary => summary.qualified).length;
+  const previousEngagementYm = ymAdd(engagementYm, -1);
+  const previousEngagementByStudent = new Map(previousEngagementYm >= ENGAGEMENT_REWARD_START
+    ? students.map(student => [student.id, engagementMonthSummary(student.id, previousEngagementYm, monthLastDate(previousEngagementYm))]) : []);
+  const previousAchieved = [...previousEngagementByStudent.values()].filter(summary => summary.qualified).length;
   const filterButton = (mode, label) => '<button class="btn btn-sm ' + (filterMode === mode ? 'btn-navy' : 'btn-ghost') +
     '" data-act="stafffilter" data-staff-filter="' + mode + '" aria-pressed="' + (filterMode === mode) + '">' + label + '</button>';
   return '<div class="card">' +
@@ -8761,6 +9040,13 @@ function viewStaffAdmin() {
     (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
+    (students.length ? '<div class="student-engagement-overview"><div class="between"><div><b>🏅 유효 학습일 · 월간 꾸준함상</b>' +
+      '<div class="small muted mt8">체크 완료 또는 순공 10분 이상 + 미완료 정리 + 다음날 정오 전 수행 보고까지 학생이 직접 끝낸 날만 집계합니다.</div></div>' +
+      '<div class="small"><b>오늘 스탬프 ' + stampedToday + '명</b> · 80% 이상 ' + engagementOnTrack + '명</div></div>' +
+      '<div class="small muted mt8">월간 기준: 체크리스트 또는 순공 기록이 있는 학습일 스탬프 80% 이상 · 주간 마무리 3회 · 말일 월간 마무리. 원장 대신 마감은 보상에 포함하지 않습니다.' +
+        (engagementYm < ENGAGEMENT_REWARD_START ? '<br><b>2026년 8월은 시범 집계이며, 보상 판정은 9월부터 시작합니다.</b>' :
+          '<br>이번 달 기준 달성 ' + engagementAchieved + '명' + (previousEngagementYm >= ENGAGEMENT_REWARD_START ? ' · 지난달 최종 달성 ' + previousAchieved + '명' : '')) +
+      '</div></div>' : '') +
     (students.length ? '<div class="student-subscription-overview"><div class="between"><div><b>월 구독 관리</b>' +
       '<div class="small muted mt8">학생 이용 기능과 별개로 결제 확인만 관리합니다.</div></div>' +
       '<div class="small"><b>구독 ' + subscriptionStudents.length + '명</b> · 결제 확인 필요 ' + paymentAttention.length + '명</div></div>' +
@@ -8785,7 +9071,8 @@ function viewStaffAdmin() {
             subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot').length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
-          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + studentSubscriptionLine(s) + '</div></div>' +
+          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) +
+          studentEngagementLine(s, engagementByStudent.get(s.id), previousEngagementByStudent.get(s.id)) + studentSubscriptionLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
         staffAccessPanels(s) + '</div>';
     }).join('') +
@@ -10147,6 +10434,7 @@ document.addEventListener('click', ev => {
       const item = ingPlan(me.id, planDate).find(x =>
         x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
       if (!item) return toast('배정된 인강을 찾지 못했습니다');
+      if (item.closed) return toast('오늘 종료한 인강은 다시 체크리스트에 담을 수 없습니다');
       if (planDate < today()) {
         ingSavePlan(me.id, planDate, ingPlan(me.id, planDate).filter(x =>
           !(x.cid === item.cid && Number(x.seq) === Number(item.seq))));
@@ -10173,6 +10461,7 @@ document.addEventListener('click', ev => {
       const item = ingPlan(me.id, planDate).find(x =>
         x.cid === el.dataset.cid && Number(x.seq) === Number(el.dataset.seq));
       if (!item) break;
+      if (item.closed) return toast('오늘 종료한 인강은 다시 완료 처리할 수 없습니다');
       const turnOn = !item.done;
       ingToggle(me.id, planDate, item.cid, Number(item.seq));
       const running = stRunning(me.id, today());
@@ -11226,6 +11515,16 @@ document.addEventListener('click', ev => {
     }
 
     /* 오늘 화면 접기 · 체크 · 단계 · 수량 · 막힘 */
+    case 'todayjump': {
+      const target = el.dataset.target;
+      if (!['studyOffers', 'todayLectures', 'studyPlanner', 'studyReviews', 'dailyCloseCard'].includes(target)) break;
+      let rerender = false;
+      if (target === 'studyOffers' && todayFoldState.studyOffers) { todayFoldState.studyOffers = false; rerender = true; }
+      if (target === 'todayLectures' && todayFoldState.lectures) { todayFoldState.lectures = false; rerender = true; }
+      if (rerender) render();
+      setTimeout(() => document.getElementById(target)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0);
+      break;
+    }
     case 'todayfold': {
       const section = el.dataset.section;
       if (!Object.prototype.hasOwnProperty.call(todayFoldState, section)) break;
@@ -11589,7 +11888,7 @@ document.addEventListener('click', ev => {
       const nextClose = Object.assign({}, data.close, {
         status: 'reviewed', resolutions: nextResolutions, eventProgress: nextEventProgress,
         itemSnapshot: snapshot, reviewedAt: now(), reportCopiedAt: null, copySignature: '',
-        finalizedAt: null, signature: ''
+        finalizedAt: null, signature: '', schemaVersion: DAILY_CLOSE_SCHEMA_VERSION
       });
       nextClose.reviewSignature = dailyCloseSignature(me.id, cursor, nextClose);
       setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
@@ -12163,7 +12462,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.5';
+const APP_VER = '2026-08-31.6';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
