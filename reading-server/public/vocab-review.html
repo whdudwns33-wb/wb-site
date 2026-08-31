@@ -75,10 +75,15 @@
   <div id="app" hidden>
     <h2>교재 낱말 검수 <span class="muted" id="tbStat"></span></h2>
     <div class="card">
-      <p class="muted" style="margin:0 0 8px;font-size:.8rem;">코칭글에서 뽑은 후보예요. <b>뜻이 빈 낱말은 학생에게 못 내보냅니다</b> — 채우고 「검수 완료」를 눌러야 그 강이 열립니다.</p>
+      <p class="muted" style="margin:0 0 8px;font-size:.8rem;">코칭글에서 뽑은 후보예요. <b>뜻이 빈 낱말은 학생에게 못 내보냅니다</b> — 채우고 「검수 완료」를 눌러야 그 강이 열립니다. 한 권을 통째로 열고 뒤에 고쳐 나가셔도 됩니다.</p>
       <div class="row">
         <select id="tbBook" style="flex:0 0 auto"></select>
         <select id="tbLesson" style="flex:1 1 auto"></select>
+      </div>
+      <div class="row" style="margin-top:8px;align-items:center;">
+        <button id="tbAll" style="font-size:.8rem;padding:6px 12px;">이 교재 모두 열기</button>
+        <button id="tbAllUndo" style="font-size:.8rem;padding:6px 12px;">모두 닫기</button>
+        <span class="muted" id="tbAllHint" style="font-size:.76rem;">연 뒤에도 계속 고칠 수 있어요 — 고친 내용은 바로 반영됩니다.</span>
       </div>
       <div id="tbEdit" style="margin-top:10px;"><span class="muted">강을 고르면 낱말이 나옵니다.</span></div>
     </div>
@@ -296,13 +301,30 @@
     return l.lesson + '강 · ' + l.title + (l.confirmed ? ' ✓' : (l.words ? '  (' + l.words + '개' + (blank ? ', 뜻 없음 ' + blank : '') + ')' : '  (낱말 없음)'));
   }
   function tbFillBooks() {
+    /* 목록을 다시 그리면 고른 교재가 첫 칸으로 되돌아간다. 저장 한 번에 초2를 보다가
+       초1 목록으로 튀어 있곤 했다 — 무엇을 고치고 있는지 알 수 없게 된다. */
+    var keepBook = $('#tbBook').value;
     $('#tbBook').innerHTML = TBOOKS.map(function (b) {
       return '<option value="' + esc(b.id) + '">' + esc(b.short) + (b.grade ? ' (' + esc(b.grade) + ')' : '') + '</option>';
     }).join('');
+    if (keepBook && TBOOKS.some(function (b) { return b.id === keepBook; })) $('#tbBook').value = keepBook;
     tbFillLessons();
     var done = 0, all = 0;
     TBOOKS.forEach(function (b) { b.lessons.forEach(function (l) { all++; if (l.confirmed) done++; }); });
     $('#tbStat').textContent = '검수 끝난 강 ' + done + '/' + all;
+    tbFillAllBtn();
+  }
+  /* 「모두 열기」에 이 교재에서 아직 안 연 강이 몇 개인지 적는다 —
+     눌렀을 때 무슨 일이 벌어지는지 누르기 전에 보여야 한다. */
+  function tbFillAllBtn() {
+    var b = TBOOKS.filter(function (x) { return x.id === $('#tbBook').value; })[0];
+    if (!b || !$('#tbAll')) return;
+    var left = b.lessons.filter(function (l) { return !l.confirmed; }).length;
+    var open = b.lessons.length - left;
+    $('#tbAll').textContent = left ? '이 교재 ' + left + '강 모두 열기' : '이 교재는 모두 열려 있어요';
+    $('#tbAll').disabled = !left;
+    $('#tbAllUndo').textContent = '모두 닫기' + (open ? ' (' + open + '강)' : '');
+    $('#tbAllUndo').disabled = !open;
   }
   function tbFillLessons() {
     var b = TBOOKS.filter(function (x) { return x.id === $('#tbBook').value; })[0];
@@ -323,10 +345,15 @@
         + '<button class="tb-del" data-del="' + i + '" title="이 낱말 빼기">✕</button></div>';
     }).join('');
     $('#tbEdit').innerHTML = head + rows
+      /* 이미 열린 강에서는 「저장」이 연 상태를 그대로 둔다. 닫는 것은 따로 눌러야 하는 일이다 —
+         고치려고 저장을 눌렀을 뿐인데 학생에게서 강이 사라지면 알아채기 어렵다. */
       + '<div class="row" style="margin-top:10px;">'
       + '<button id="tbAdd" style="font-size:.8rem;padding:6px 12px;">+ 낱말 추가</button>'
-      + '<button id="tbSave" style="font-size:.8rem;padding:6px 12px;">임시 저장</button>'
-      + '<button class="primary" id="tbConfirm" style="font-size:.8rem;padding:6px 12px;">검수 완료 — 학생에게 열기</button>'
+      + (TBCUR.confirmed
+        ? '<button class="primary" id="tbSave" style="font-size:.8rem;padding:6px 12px;">저장 — 열린 채로</button>'
+          + '<button id="tbClose" style="font-size:.8rem;padding:6px 12px;">학생에게 닫기</button>'
+        : '<button id="tbSave" style="font-size:.8rem;padding:6px 12px;">임시 저장</button>'
+          + '<button class="primary" id="tbConfirm" style="font-size:.8rem;padding:6px 12px;">검수 완료 — 학생에게 열기</button>')
       + '<button id="tbToAssign" style="font-size:.8rem;padding:6px 12px;">배정칸에 넣기 ↓</button></div>'
       + '<p class="muted" style="margin:8px 0 0;font-size:.78rem;">낱말 ' + TBWORDS.length + '개'
       + (blank ? ' · <b style="color:#B14A38">뜻이 빈 낱말 ' + blank + '개</b>' : ' · 뜻은 모두 채워졌어요')
@@ -361,8 +388,12 @@
       tbRenderRows();
     } catch (e) { msg(e.message); }
   }
+  /* confirmed 를 넘기지 않으면 지금 상태를 그대로 지킨다.
+     예전에는 저장이 늘 false 를 보내 열려 있던 강을 조용히 닫았다. */
   async function tbSave(confirmed) {
     var book = $('#tbBook').value, lesson = $('#tbLesson').value;
+    if (confirmed === undefined) confirmed = !!(TBCUR && TBCUR.confirmed);
+    var was = !!(TBCUR && TBCUR.confirmed);
     var words = tbCollect();
     try {
       var j = await api('/api/admin/textbook/' + encodeURIComponent(book) + '/' + encodeURIComponent(lesson),
@@ -379,7 +410,34 @@
       var keep = $('#tbLesson').value;
       tbFillBooks(); $('#tbLesson').value = keep;
       tbRenderRows();
-      msg(confirmed ? '검수 완료 — 이 강 낱말이 학생에게 열렸어요.' : '저장했어요.');
+      msg(confirmed ? (was ? '저장했어요 — 이 강은 학생에게 열린 채예요.' : '검수 완료 — 이 강 낱말이 학생에게 열렸어요.')
+        : (was ? '이 강을 학생에게서 닫았어요.' : '저장했어요.'));
+    } catch (e) { msg(e.message); }
+  }
+  /* 교재 한 권을 통째로 열고 닫는다. 40강을 한 강씩 누르는 대신 한 번에 끝내되,
+     되돌릴 수 있어야 안심하고 누를 수 있으므로 「모두 닫기」를 나란히 둔다. */
+  async function tbConfirmAll(confirmed) {
+    var book = $('#tbBook').value;
+    var b = TBOOKS.filter(function (x) { return x.id === book; })[0];
+    if (!b) return;
+    var n = b.lessons.filter(function (l) { return confirmed ? !l.confirmed : l.confirmed; }).length;
+    if (!n) { msg(confirmed ? '이미 모두 열려 있어요.' : '열려 있는 강이 없어요.'); return; }
+    var name = b.short + (b.grade ? ' (' + b.grade + ')' : '');
+    if (!confirm(confirmed
+      ? name + ' — ' + n + '개 강을 학생에게 엽니다.\n\n연 뒤에도 뜻은 계속 고칠 수 있어요.'
+      : name + ' — ' + n + '개 강을 학생에게서 닫습니다.')) return;
+    try {
+      var j = await api('/api/admin/textbook/' + encodeURIComponent(book) + '/confirm-all',
+        { method: 'POST', body: JSON.stringify({ confirmed: !!confirmed }) });
+      /* 목차의 ✓ 표시와 진행 수를 새로 받아 온다. 고르고 있던 강은 그대로 둔다. */
+      var keep = $('#tbLesson').value;
+      TBOOKS = (await api('/api/admin/textbook')).books || [];
+      tbFillBooks(); $('#tbLesson').value = keep;
+      if (keep) await tbLoadLesson();
+      /* 뜻이 빈 강은 열리지 않는다 — 몇 개가 왜 남았는지 이름으로 알려 준다 */
+      var left = (j.blocked || []).map(function (x) { return x.lesson + '강'; });
+      msg((confirmed ? j.done.length + '개 강을 열었어요.' : j.done.length + '개 강을 닫았어요.')
+        + (left.length ? ' 뜻이 빈 낱말이 있어 ' + left.join(', ') + '은(는) 열지 못했어요.' : ''));
     } catch (e) { msg(e.message); }
   }
   function tbToAssign() {
@@ -395,8 +453,11 @@
     var d = e.target.closest && e.target.closest('[data-del]');
     if (d) { TBWORDS = tbCollect(); TBWORDS.splice(+d.dataset.del, 1); tbRenderRows(); return; }
     if (e.target.id === 'tbAdd') { TBWORDS = tbCollect(); TBWORDS.push({ word: '', meaning: '', example: '' }); tbRenderRows(); return; }
-    if (e.target.id === 'tbSave') return tbSave(false);
+    if (e.target.id === 'tbSave') return tbSave();
     if (e.target.id === 'tbConfirm') return tbSave(true);
+    if (e.target.id === 'tbClose') return tbSave(false);
+    if (e.target.id === 'tbAll') return tbConfirmAll(true);
+    if (e.target.id === 'tbAllUndo') return tbConfirmAll(false);
     if (e.target.id === 'tbToAssign') return tbToAssign();
   });
   document.addEventListener('input', function (e) {
@@ -405,7 +466,7 @@
     /* 채우는 즉시 표시를 걷는다 — 다시 그릴 때까지 노란 채로 두면 고쳐도 안 고쳐진 것처럼 보인다 */
     inp.classList.toggle('blank', !inp.value.trim());
   });
-  $('#tbBook').addEventListener('change', function () { tbFillLessons(); tbLoadLesson(); });
+  $('#tbBook').addEventListener('change', function () { tbFillLessons(); tbFillAllBtn(); tbLoadLesson(); });
   $('#tbLesson').addEventListener('change', tbLoadLesson);
 
   async function refresh() {
