@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리 아이 어휘 나이 — WB 독해력학원</title>
+<!-- 지금은 색인하지 않습니다. 검색에 노출할지는 따로 정할 일입니다 —
+     한번 색인되면 되돌리는 데 시간이 걸리고, 낱말 학년 배치가 교재에서 온 것이라
+     공개 범위를 정하기 전에는 링크로만 씁니다(맘카페·블로그에 붙이는 용도). -->
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="낱말 뜻 문제 몇 개로 우리 아이가 어느 학년대 어휘까지 알고 있는지 가늠해 봅니다. 2분, 개인정보 입력 없음.">
+<style>
+  :root {
+    --ink: #23313F; --ink-strong: #1B3A5C; --soft: #64748B;
+    --bg: #F6F3EA; --card: #fff; --line: #E3DFD2;
+    --blue: #0F7AAB; --green: #3A7A43; --red: #C24936; --amber: #C98A2D;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 16px; line-height: 1.65;
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; word-break: keep-all; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 22px 16px 60px; }
+  header { text-align: center; margin-bottom: 18px; }
+  header .brand { font-size: .74rem; font-weight: 800; letter-spacing: .08em; color: var(--soft); }
+  h1 { font-size: 1.5rem; font-weight: 900; color: var(--ink-strong); margin: 6px 0 0; letter-spacing: -.02em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px 18px; box-shadow: 0 2px 10px rgba(27,58,92,.06); margin-bottom: 12px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--soft); font-size: .88rem; }
+  .btn { display: block; width: 100%; font-family: inherit; font-size: 1rem; font-weight: 800;
+    cursor: pointer; border: 1px solid var(--line); background: #F0EDE2; color: var(--ink-strong);
+    border-radius: 12px; padding: 14px 16px; margin-top: 8px; text-align: left; line-height: 1.45; }
+  .btn:hover { border-color: #9CCBE3; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; text-align: center; }
+  .btn.ghost { background: transparent; text-align: center; font-weight: 700; font-size: .9rem; padding: 10px; }
+  .btn[disabled] { opacity: .55; cursor: default; }
+  .btn.ok { background: #E7F2E6; border-color: #A9CFAE; }
+  .btn.no { background: #FBEAE6; border-color: #E7B3A8; }
+  .grades { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .grades .btn { margin: 0; text-align: center; padding: 13px 6px; }
+  .grades .btn.on { background: #E9F5FB; border-color: var(--blue); color: var(--blue); }
+  .prog { display: flex; gap: 4px; margin-bottom: 14px; }
+  .prog i { flex: 1; height: 5px; border-radius: 99px; background: #E4E0D3; }
+  .prog i.on { background: var(--blue); }
+  .qhead { font-size: .78rem; font-weight: 800; color: var(--soft); }
+  .qword { font-size: 1.9rem; font-weight: 900; color: var(--ink-strong); margin: 4px 0 2px; letter-spacing: -.02em; }
+  .fb { margin-top: 12px; font-weight: 800; font-size: .92rem; }
+  .fb.ok { color: var(--green); } .fb.no { color: var(--red); }
+  .result-band { font-size: 2.6rem; font-weight: 900; color: var(--blue); line-height: 1.1; margin: 4px 0 0; }
+  .result-age { font-size: .9rem; color: var(--soft); font-weight: 700; }
+  .score { background: #F0EDE2; border-radius: 10px; padding: 10px 14px; margin: 14px 0 0; font-size: .9rem; }
+  .wrong { margin-top: 14px; }
+  .wrong b { font-size: .82rem; color: var(--soft); font-weight: 800; }
+  .wrong ul { margin: 6px 0 0; padding-left: 18px; font-size: .9rem; }
+  .wrong li { margin-bottom: 3px; }
+  .caveat { font-size: .8rem; color: var(--soft); border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; }
+  .cta { background: #EDF6FB; border-color: #C6E2F0; text-align: center; }
+  .cta h2 { font-size: 1.05rem; font-weight: 900; color: var(--ink-strong); margin: 0 0 6px; }
+  a { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">WB 웩슬러브레인센터 · 독해력학원</div>
+    <h1>우리 아이 어휘 나이</h1>
+  </header>
+  <div id="app"><div class="card"><p class="muted">준비 중…</p></div></div>
+</div>
+
+<script src="./age.js"></script>
+<script>
+'use strict';
+(function () {
+  /* 상담 연결 — 원장님이 실제 예약 주소·번호로 바꾸시면 됩니다.
+     비워 두면 「전화로 문의」 문구만 나가고 링크는 안 걸립니다. */
+  var CONTACT = { url: '', label: '상담 예약하기', tel: '' };
+
+  var $ = function (s) { return document.querySelector(s); };
+  var app = $('#app');
+  var WORDS = null;
+  var state = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function shuffle(a) { a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a; }
+
+  /* ── 시작 ── */
+  function renderIntro() {
+    app.innerHTML =
+      '<div class="card">' +
+        '<p>낱말 뜻 문제를 풀면서 <b>어느 학년대 어휘까지 알고 있는지</b> 가늠해 봅니다.</p>' +
+        '<p class="muted">2분이면 끝납니다 · 이름·연락처를 받지 않습니다 · 결과는 이 화면에만 나옵니다</p>' +
+        '<p style="margin-top:16px;font-weight:800;color:var(--ink-strong);">아이 학년을 골라 주세요</p>' +
+        '<p class="muted" style="margin:0;">여기서부터 시작해 위아래로 넓혀 갑니다.</p>' +
+        '<div class="grades">' +
+          WBAGE.BANDS.map(function (b, i) {
+            return '<button class="btn" data-g="' + i + '">' + esc(b.label) + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-g]'), function (b) {
+      b.onclick = function () { start(+b.dataset.g); };
+    });
+  }
+
+  /* ── 문제 만들기 ── */
+  function makeQuestions(bandIdx) {
+    var band = WBAGE.BANDS[bandIdx];
+    var pool = WORDS.bands[band.id] || [];
+    var pick = shuffle(pool).slice(0, WBAGE.PER_BAND);
+    return pick.map(function (w) {
+      /* 오답은 같은 칸에서 — 다른 칸에서 가져오면 난이도가 아니라 엉뚱함으로 갈린다 */
+      var others = [];
+      var bag = shuffle(pool);
+      for (var i = 0; i < bag.length && others.length < 3; i++) {
+        if (bag[i].w === w.w || bag[i].m === w.m) continue;
+        if (others.indexOf(bag[i].m) >= 0) continue;
+        others.push(bag[i].m);
+      }
+      return { word: w.w, answer: w.m, options: shuffle([w.m].concat(others)), band: band };
+    }).filter(function (q) { return q.options.length === 4; });
+  }
+
+  function start(bandIdx) {
+    state = { tried: [], asked: [], wrong: [], queue: [], bandIdx: bandIdx, hit: 0, step: 0 };
+    goBand(bandIdx);
+  }
+
+  function goBand(bandIdx) {
+    state.bandIdx = bandIdx;
+    state.hit = 0;
+    state.queue = makeQuestions(bandIdx);
+    if (!state.queue.length) { state.tried[bandIdx] = 0; advance(); return; }
+    renderQ();
+  }
+
+  /* ── 문제 화면 ── */
+  function renderQ() {
+    var q = state.queue[0];
+    var done = WBAGE.PER_BAND - state.queue.length;
+    app.innerHTML =
+      '<div class="card">' +
+        '<div class="prog">' + WBAGE.BANDS.map(function (b, i) {
+          return '<i class="' + (typeof state.tried[i] === 'number' || i === state.bandIdx ? 'on' : '') + '"></i>';
+        }).join('') + '</div>' +
+        '<div class="qhead">' + esc(q.band.label) + ' 낱말 · ' + (done + 1) + ' / ' + WBAGE.PER_BAND + '</div>' +
+        '<p class="qword">' + esc(q.word) + '</p>' +
+        '<p class="muted" style="margin:0 0 12px;">이 낱말의 뜻은?</p>' +
+        q.options.map(function (o, i) {
+          return '<button class="btn" data-o="' + i + '">' + esc(o) + '</button>';
+        }).join('') +
+      '</div>';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-o]'), function (b) {
+      b.onclick = function () { answer(q, q.options[+b.dataset.o], b); };
+    });
+  }
+
+  function answer(q, chosen, btn) {
+    var ok = chosen === q.answer;
+    if (ok) state.hit += 1; else state.wrong.push({ word: q.word, meaning: q.answer });
+    /* 고른 것과 정답을 함께 보여 준다 — 틀린 채로 넘어가면 배우는 게 없다 */
+    Array.prototype.forEach.call(document.querySelectorAll('[data-o]'), function (b) {
+      b.disabled = true;
+      if (b.textContent === q.answer) b.classList.add('ok');
+      else if (b === btn) b.classList.add('no');
+    });
+    var fb = document.createElement('p');
+    fb.className = 'fb ' + (ok ? 'ok' : 'no');
+    fb.textContent = ok ? '맞았어요!' : '아쉬워요 — ' + q.word + ' 은(는) ' + q.answer;
+    btn.parentNode.appendChild(fb);
+    var next = document.createElement('button');
+    next.className = 'btn primary';
+    next.textContent = '다음 ›';
+    next.onclick = function () {
+      state.queue.shift();
+      if (state.queue.length) renderQ();
+      else { state.tried[state.bandIdx] = state.hit; advance(); }
+    };
+    btn.parentNode.appendChild(next);
+    next.focus();
+  }
+
+  function advance() {
+    var n = WBAGE.nextBand(state.tried);
+    if (n.done) renderResult(); else goBand(n.next);
+  }
+
+  /* ── 결과 ── */
+  function renderResult() {
+    var v = WBAGE.verdict(state.tried);
+    var head = v.below
+      ? '<p class="result-band" style="font-size:1.5rem;">초1 낱말부터<br>천천히</p>' +
+        '<p class="result-age">아직 초1 수준 낱말이 익숙하지 않아요</p>'
+      : '<p class="result-band">' + esc(v.band.label) + ' 수준</p>' +
+        '<p class="result-age">또래로 치면 ' + esc(v.band.age) + '</p>';
+
+    var nextLine = v.nextBand
+      ? '<p style="margin-top:12px;">지금 <b>' + esc(v.nextBand.label) + '</b> 낱말이 막 어려워지는 자리예요. 여기가 다음에 채울 곳입니다.</p>'
+      : (v.below ? '' : '<p style="margin-top:12px;">가장 높은 칸까지 통과했어요. 잘하고 있습니다.</p>');
+
+    var cta = CONTACT.url
+      ? '<a class="btn primary" href="' + esc(CONTACT.url) + '">' + esc(CONTACT.label) + '</a>'
+      : (CONTACT.tel
+        ? '<a class="btn primary" href="tel:' + esc(CONTACT.tel) + '">전화로 문의하기</a>'
+        : '<p class="muted" style="margin:0;">자세한 진단과 학습 방향은 센터로 문의해 주세요.</p>');
+
+    app.innerHTML =
+      '<div class="card" style="text-align:center;">' + head +
+        '<div class="score">문제 ' + v.asked + '개 중 <b>' + v.right + '개</b> 정답</div>' +
+      '</div>' +
+      '<div class="card">' + nextLine +
+        (state.wrong.length
+          ? '<div class="wrong"><b>틀린 낱말</b><ul>' +
+            state.wrong.map(function (w) {
+              return '<li><b>' + esc(w.word) + '</b> — ' + esc(w.meaning) + '</li>';
+            }).join('') + '</ul></div>'
+          : '<p class="muted" style="margin:10px 0 0;">틀린 낱말이 없어요.</p>') +
+        '<p class="caveat"><b>이 결과를 어떻게 읽어야 하나요.</b> 낱말 뜻만 물어본 짧은 확인입니다. ' +
+          '한 교재 계열에서 뽑은 낱말이고 문항 수도 적어서, <b>검사가 아니라 눈대중</b>으로 봐 주세요. ' +
+          '읽고 이해하는 힘은 낱말 말고도 배경지식·문장 구조·집중력이 함께 작용합니다.</p>' +
+      '</div>' +
+      '<div class="card cta"><h2>어휘가 막히면 독해가 막힙니다</h2>' +
+        '<p class="muted">WB는 아이가 어느 낱말에서 멈추는지 찾아 그 자리부터 채웁니다.</p>' + cta +
+      '</div>' +
+      '<button class="btn ghost" id="again">다시 해보기</button>';
+    $('#again').onclick = renderIntro;
+    window.scrollTo(0, 0);
+  }
+
+  /* ── 시작 ── */
+  fetch('./words.json').then(function (r) { return r.json(); }).then(function (j) {
+    WORDS = j; renderIntro();
+  }).catch(function () {
+    app.innerHTML = '<div class="card"><p>지금은 문제를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.</p></div>';
+  });
+})();
+</script>
+</body>
+</html>

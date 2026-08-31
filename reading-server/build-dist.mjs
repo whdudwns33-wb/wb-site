@@ -22,6 +22,13 @@ fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin'
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
 
+/* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
+   실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
+const AGE = path.join(ROOT, '..', 'vocab-age');
+fs.mkdirSync(path.join(DIST, 'vocab-age'), { recursive: true });
+for (const f of ['index.html', 'age.js', 'words.json'])
+  fs.copyFileSync(path.join(AGE, f), path.join(DIST, 'vocab-age', f));
+
 /* 워드브레인 (vocab/) — 같은 오리진 /vocab/ 에서 서빙해야 진로독서와 localStorage·토큰이 공유된다 */
 const VOCAB = path.join(ROOT, '..', 'vocab');
 fs.mkdirSync(path.join(DIST, 'vocab'), { recursive: true });
