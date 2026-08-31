@@ -98,9 +98,11 @@ export function coachingCard(tb, prog, vocabState, assignRec) {
    덧씌운 값이 원본을 이긴다: 강사가 고친 뜻이 뽑아 놓은 후보보다 언제나 옳다. */
 
 const WORD_KEYS = ['word', 'meaning', 'example'];
-/* 뜻의 출처 — coaching은 원장님 코칭글에서 옮긴 것, ai는 코칭글에 설명이 없어 대신 쓴 것.
-   검수 화면에서 무게를 달리 보라고 표시할 뿐이라, 아는 값만 통과시킨다. */
-const SRC = ['coaching', 'ai'];
+/* 뜻의 출처 — 검수 화면에서 무게를 달리 보라고 표시할 뿐이라, 아는 값만 통과시킨다.
+     coaching — 코칭글에서 그대로 옮긴 것
+     fixed    — 코칭글에서 옮겼지만 끝이 잘려("…말하는") 손으로 마무리한 것
+     ai       — 코칭글에 설명이 없어 대신 쓴 것 */
+const SRC = ['coaching', 'fixed', 'ai'];
 
 /* 저장 전 다듬기 — 화면에서 온 값을 그대로 믿지 않는다 */
 export function cleanWords(list) {

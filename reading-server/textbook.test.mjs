@@ -143,15 +143,31 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   /* 뜻이 있으면 출처가 있어야 한다 — 코칭글에서 옮긴 것인지 대신 쓴 것인지
      구분이 안 되면 강사가 어디를 눈여겨봐야 할지 알 수 없다 */
   for (const w of words) {
-    if (w.meaning) assert.ok(w.src === 'coaching' || w.src === 'ai', '뜻에 출처가 없다: ' + w.word);
+    if (w.meaning) assert.ok(['coaching', 'fixed', 'ai'].includes(w.src), '뜻에 출처가 없다: ' + w.word);
     else assert.strictEqual(w.src, undefined, '뜻이 없는데 출처가 붙었다: ' + w.word);
   }
 });
 
-t('빈 뜻이 하나도 남아 있지 않다', () => {
-  for (const l of findBook(TB, 'eoduk-cho1').lessons) {
-    const blank = l.words.filter((w) => !w.meaning).map((w) => w.word);
-    assert.deepStrictEqual(blank, [], l.lesson + '강에 빈 뜻이 남았다');
+t('교재가 둘 다 20강씩 들어 있다', () => {
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    const b = findBook(TB, id);
+    assert.ok(b, id + ' 교재가 없다');
+    assert.strictEqual(b.lessons.length, 20, id + ' 강 수가 20이 아니다');
+    for (const l of b.lessons) {
+      assert.ok(l.coaching && l.coaching.length > 300, id + ' ' + l.lesson + '강 코칭글이 너무 짧다');
+      assert.ok(l.coaching.includes('\n'), id + ' ' + l.lesson + '강 코칭글에 줄바꿈이 없다');
+      assert.ok(l.title, id + ' ' + l.lesson + '강 제목 없음');
+    }
+  }
+});
+
+t('낱말은 검수 전이라 빈 뜻이 남아 있을 수 있다 — 다만 절반은 넘어야 한다', () => {
+  /* 빈 뜻이 있으면 그 강은 「검수 완료」가 거절되므로 학생에게 나가지 않는다.
+     그래도 절반도 못 채웠다면 캐내기가 잘못된 것이다. */
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    const words = findBook(TB, id).lessons.flatMap((l) => l.words);
+    const filled = words.filter((w) => w.meaning).length;
+    assert.ok(filled > words.length / 2, id + ': 뜻이 절반도 안 채워졌다 (' + filled + '/' + words.length + ')');
   }
 });
 
@@ -178,6 +194,7 @@ t('낱말이 아니라고 판단해 뺀 것은 다시 캐도 되살아나지 않
 
 t('출처는 아는 값만, 그리고 뜻이 있을 때만 저장한다', () => {
   assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: 'ai' }])[0].src, 'ai');
+  assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: 'fixed' }])[0].src, 'fixed');
   assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: 'coaching' }])[0].src, 'coaching');
   assert.strictEqual(cleanWords([{ word: 'x', meaning: 'y', src: '<script>' }])[0].src, undefined, '모르는 출처는 버린다');
   assert.strictEqual(cleanWords([{ word: 'x', meaning: '', src: 'ai' }])[0].src, undefined, '뜻이 없으면 출처도 없다');
@@ -254,6 +271,16 @@ t('워커가 막는 자산은 워커를 먼저 거치도록 설정돼 있다', (
   assert.ok(guarded.length, '워커에서 가로채는 자산 경로를 찾지 못했다');
   for (const g of guarded) {
     assert.ok(listed.includes(g), g + ' 를 워커가 가로채는데 run_worker_first에 없다 — 그 코드는 실행되지 않는다');
+  }
+});
+
+t('손으로 마무리한 뜻은 fixed로 표시돼 있다', () => {
+  /* 코칭글에서 캤지만 끝이 잘린 것을 손으로 마무리했다. 표시가 없으면 추출기를
+     다시 돌릴 때 잘린 채로 되돌아간다 — 「작은 소리로 조용히 말하는」. */
+  const fixed = findBook(TB, 'eoduk-cho1').lessons.flatMap((l) => l.words).filter((w) => w.src === 'fixed');
+  assert.ok(fixed.length >= 20, '손질 표시가 사라졌다 (' + fixed.length + '개)');
+  for (const w of fixed) {
+    assert.ok(!/(는|한|다는|을|를|의|던)$/.test(w.meaning), '손질했다는데 끝이 매달렸다: ' + w.word);
   }
 });
 
