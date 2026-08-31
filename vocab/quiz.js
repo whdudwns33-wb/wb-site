@@ -128,17 +128,112 @@ var WBQUIZ = (function () {
     return -1;
   }
 
+  var HANGUL = /[가-힣]/;
+  /* 음절의 첫소리. 활용해도 첫소리는 남는다 — 리→렸, 대→댔, 쁘→빴, 롭→로, 낫→나 */
+  function cho(ch) {
+    var c = String(ch || '').charCodeAt(0) - 0xAC00;
+    return (c < 0 || c > 11171) ? '' : CHO[Math.floor(c / 588)];
+  }
+
+  /* 활용형 찾기 — 어간을 글자 그대로 찾는 것만으로는 절반을 놓친다.
+     「엇갈리다」의 예문은 「친구와 길에서 엇갈렸어요」라 '엇갈리'가 없다.
+     한국어 활용은 어간의 끝 음절만 바꾸므로, 앞부분(엇갈)으로 자리를 잡고
+     그다음 음절의 첫소리가 어간 끝 음절의 첫소리와 같은지로 확인한다.
+     ㅅ·ㅂ·ㅡ 불규칙(낫다→나았, 지혜롭다→지혜로운, 가쁘다→가빴)이 모두 이 규칙 안에 든다. */
+  /* 활용했을 때 받침이 어떻게 되는가.
+     그대로 남거나(늘다→늘어), 홀소리로 끝나는 어간에 과거 ㅆ이 붙거나(가다→갔다),
+     불규칙으로만 떨어진다: ㅅ(낫다→나았), ㅂ(돕다→도와), ㅎ(하얗다→하얘), ㄷ→ㄹ(걷다→걸어).
+     이 표가 없으면 「없다」가 「어떤」을, 「걷다」가 「거름을」을 잡는다 —
+     첫소리·가운뎃소리만 같고 받침만 사라진 남남이다. */
+  var CODA_DROP = { 'ㅅ': [''], 'ㅂ': [''], 'ㅎ': [''], 'ㄷ': ['ㄹ'] };
+  function codaOk(from, to) {
+    if (from === to) return true;
+    if (from === '' && to === 'ㅆ') return true;
+    return (CODA_DROP[from] || []).indexOf(to) >= 0;
+  }
+  /* 음절의 받침 */
+  function jong(ch) {
+    var c = String(ch || '').charCodeAt(0) - 0xAC00;
+    return (c < 0 || c > 11171) ? '' : JONG[c % 28];
+  }
+  /* 음절의 가운뎃소리 */
+  function jung(ch) {
+    var c = String(ch || '').charCodeAt(0) - 0xAC00;
+    return (c < 0 || c > 11171) ? '' : JUNG[Math.floor((c % 588) / 28)];
+  }
+  var atStart = function (ex, i) { return i === 0 || !HANGUL.test(ex[i - 1]); };
+  /* 받침 없는 음절에 받침을 붙인다 — 다 + ㄹ → 달 */
+  function addJong(ch, j) {
+    var c = String(ch || '').charCodeAt(0) - 0xAC00, k = JONG.indexOf(j);
+    if (c < 0 || c > 11171 || k < 1 || c % 28 !== 0) return ch;
+    return String.fromCharCode(0xAC00 + c + k);
+  }
+
+  function findConjugated(ex, stem) {
+    /* 어간이 한 글자면 뗄 앞부분이 없다 — 첫소리와 가운뎃소리가 같고 어절이 시작하는
+       자리를 찾는다. 낫다→나았어요, 가다→갔다. 어절 끝쪽을 먼저 보는 편이 안전하다:
+       한국어는 서술어가 뒤에 오고, 「엄마가」의 가는 어절 첫머리가 아니라 걸리지 않는다. */
+    if (stem.length < 2) {
+      var c0 = cho(stem), j0 = jung(stem), g0 = jong(stem), found = -1;
+      if (!c0) return -1;
+      for (var n = 0; n < ex.length; n++) {
+        if (!HANGUL.test(ex[n]) || !atStart(ex, n)) continue;
+        if (cho(ex[n]) !== c0 || jung(ex[n]) !== j0) continue;
+        if (!codaOk(g0, jong(ex[n]))) continue;
+        found = n;
+      }
+      return found;
+    }
+    var head = stem.slice(0, -1), want = cho(stem.slice(-1));
+    if (!want) return -1;
+    /* 르 불규칙은 어간 끝 음절이 앞 음절의 받침으로 녹아든다 — 다르다 → 달라, 부르다 → 불러.
+       앞부분을 「다」가 아니라 「달」로 보고 찾아야 걸린다. */
+    if (stem.slice(-1) === '르' && head) {
+      var alt = head.slice(0, -1) + addJong(head.slice(-1), 'ㄹ');
+      if (alt !== head) {
+        var j = findConjugated(ex, alt + '르');
+        if (j >= 0) return j;
+      }
+    }
+    for (var i = ex.indexOf(head); i >= 0; i = ex.indexOf(head, i + 1)) {
+      var next = ex[i + head.length];
+      if (!next || !HANGUL.test(next)) continue;
+      if (cho(next) !== want) continue;
+      /* 낱말 한가운데를 잘라내면 문장이 망가진다 — 어절이 시작하는 자리여야 한다 */
+      if (!atStart(ex, i)) continue;
+      return i;
+    }
+    return -1;
+  }
+
+  /* 어절 끝까지 지운다. 「엇갈렸어요」를 「엇갈」만 지우면 「○○○렸어요」가 남는다. */
+  function eojeolEnd(ex, from) {
+    var i = from;
+    while (i < ex.length && HANGUL.test(ex[i])) i += 1;
+    return i;
+  }
+
   function blankExample(w) {
     if (!w.example) return null;
     var stems = stemsOf(String(w.word || ''));
-    for (var k = 0; k < stems.length; k++) {
-      var stem = stems[k];
+    var k, stem, i;
+    /* ① 글자 그대로 있는 것을 먼저 — 활용을 짐작할 필요가 없다 */
+    for (k = 0; k < stems.length; k++) {
+      stem = stems[k];
       if (!stem) continue;
-      var i = findStem(w.example, stem);
+      i = findStem(w.example, stem);
       if (i < 0) continue;
       var tail = w.example.slice(i + stem.length).match(/^[가-힣]{0,3}/);
       var len = stem.length + (tail ? tail[0].length : 0);
       return w.example.slice(0, i) + '○○○' + w.example.slice(i + len);
+    }
+    /* ② 활용한 꼴 */
+    for (k = 0; k < stems.length; k++) {
+      stem = stems[k];
+      if (!stem) continue;
+      i = findConjugated(w.example, stem);
+      if (i < 0) continue;
+      return w.example.slice(0, i) + '○○○' + w.example.slice(eojeolEnd(w.example, i));
     }
     return null;
   }
