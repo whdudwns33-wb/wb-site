@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.5",
+  "version": "2026-08-31.6",
   "articles": [
     {
       "id": "nuri-space",
@@ -18726,6 +18726,998 @@
           ]
         }
       }
+    },
+    {
+      "id": "art-conservation",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "hum",
+        "nat"
+      ],
+      "publishedAt": "2026-08",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국립현대미술관 보존과학",
+          "url": "https://www.mmca.go.kr/collections/aboutConservation.do"
+        },
+        {
+          "title": "국립현대미술관 보존환경",
+          "url": "https://www.mmca.go.kr/collections/conservEnvironment.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "그림도 아플 때가 있어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "미술관에는 아주 오래된 그림이 많아요. ",
+              "그림도 시간이 지나면 낡아요. ",
+              "색이 옅어지고 종이가 찢어져요. ",
+              "그래서 그림을 고쳐 주는 사람이 있어요."
+            ],
+            [
+              "이 사람을 보존과학자라고 해요. ",
+              "그림의 아픈 곳을 먼저 찾아요. ",
+              "아주 작은 붓으로 조심조심 고쳐요. ",
+              "의사가 환자를 돌보는 것과 비슷해요."
+            ],
+            [
+              "고치는 것보다 더 중요한 일이 있어요. ",
+              "처음부터 안 아프게 지키는 일이에요. ",
+              "미술관은 방 안 온도를 늘 같게 맞춰요. ",
+              "불빛도 너무 밝지 않게 해요. ",
+              "그러면 그림이 오래오래 살아요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "미술관",
+              "easy": "그림이나 조각을 모아 두고 보여 주는 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "보존과학자",
+              "easy": "낡거나 다친 미술 작품을 고치고 지키는 사람이에요.",
+              "hanja": null
+            },
+            {
+              "word": "온도",
+              "easy": "얼마나 덥고 추운지를 나타내는 것이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "그림을 잘 그리는 방법",
+                "낡은 그림을 고치고 지키는 일",
+                "미술관에 가는 길",
+                "붓을 파는 가게"
+              ],
+              "answer": 1,
+              "explain": "그림이 낡는다는 것, 고쳐 주는 사람이 있다는 것, 미리 지키는 일이 중요하다는 것을 알려 주는 글이에요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "보존과학자는 그림을 어떻게 고치나요?",
+              "choices": [
+                "큰 빗자루로 쓸어요.",
+                "물에 푹 담가요.",
+                "햇볕에 오래 말려요.",
+                "아주 작은 붓으로 조심조심 고쳐요."
+              ],
+              "answer": 3,
+              "explain": "둘째 문단에서 아주 작은 붓으로 조심조심 고친다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "'보존과학자'는 어떤 사람일까요?",
+              "choices": [
+                "그림을 파는 사람",
+                "미술관을 청소하는 사람",
+                "낡거나 다친 작품을 고치고 지키는 사람",
+                "그림을 새로 그리는 사람"
+              ],
+              "answer": 2,
+              "explain": "그림의 아픈 곳을 찾아 고치고, 상하지 않게 지키는 사람이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "미술관이 불빛을 너무 밝지 않게 하는 까닭은 무엇일까요?",
+              "choices": [
+                "전기를 아끼려고",
+                "밝은 빛이 그림을 낡게 만들어서",
+                "사람들이 잠을 자야 해서",
+                "그림이 부끄러워해서"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단은 '안 아프게 지키는 일'을 말하면서 온도와 불빛을 함께 들었어요. 불빛도 그림을 낡게 하니까 어둡게 하는 거예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 집에 오래된 사진이 있어요. 오래 두고 보려면 어떻게 하면 좋을까요?",
+              "choices": [
+                "햇빛이 잘 드는 창가에 붙여 둬요.",
+                "물을 살짝 뿌려 둬요.",
+                "덥고 축축한 곳에 둬요.",
+                "볕이 들지 않는 서늘한 곳에 둬요."
+              ],
+              "answer": 3,
+              "explain": "글에서 미술관은 온도를 늘 같게 하고 불빛을 어둡게 한다고 했어요. 사진도 덥지 않고 볕이 안 드는 곳이 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "그림을 고치는 사람, 보존과학자",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "미술관에 걸린 그림은 ",
+              "시간이 지나면 조금씩 달라진다. ",
+              "물감의 색이 옅어지고, ",
+              "종이가 누렇게 변하고, ",
+              "표면이 갈라지기도 한다. ",
+              "이런 손상을 막고 ",
+              "작품의 수명을 늘리는 일을 ",
+              "보존과학이라고 한다."
+            ],
+            [
+              "보존과학자는 곧바로 손을 대지 않는다. ",
+              "먼저 작품의 상태를 자세히 조사해 ",
+              "어디가 어떻게 상했는지 기록으로 남긴다. ",
+              "필요하면 재질을 과학적으로 분석한다. ",
+              "그다음에야 처리를 시작한다. ",
+              "국립현대미술관은 종이 작품, 유화, ",
+              "조각과 공예, 재질 분석의 네 분야로 나누어 ",
+              "8천여 점의 소장품을 돌본다."
+            ],
+            [
+              "사실 더 중요한 것은 ",
+              "고치기 전에 지키는 일이다. ",
+              "미술관은 전시실과 수장고의 온도를 ",
+              "18도에서 22도로, ",
+              "습도를 50에서 70퍼센트 사이로 유지한다. ",
+              "조명도 작품마다 다르게 맞춘다. ",
+              "유화는 150럭스 이하, ",
+              "동양화와 수채화는 100럭스 이하로 어둡게 한다. ",
+              "빛이 색을 바래게 하기 때문이다."
+            ],
+            [
+              "백남준의 '다다익선'은 ",
+              "브라운관 텔레비전 1003대를 ",
+              "탑처럼 쌓아 올린 작품이다. ",
+              "낡은 텔레비전을 더는 구할 수 없게 되자, ",
+              "미술관은 3년에 걸쳐 737대를 수리하고 ",
+              "266대는 겉모습만 남긴 채 속을 바꾸었다. ",
+              "작품을 되살리는 일에는 ",
+              "예술을 아는 눈과 ",
+              "과학을 다루는 손이 함께 필요하다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "보존과학",
+              "easy": "미술 작품이 상하지 않게 지키고, 상한 곳을 고치는 학문",
+              "hanja": "保(지킬 보)+存(있을 존)+科(과목 과)+學(배울 학)"
+            },
+            {
+              "word": "수장고",
+              "easy": "박물관이나 미술관이 작품을 보관해 두는 특별한 창고",
+              "hanja": "收(거둘 수)+藏(감출 장)+庫(곳집 고)"
+            },
+            {
+              "word": "습도",
+              "easy": "공기 속에 물기가 얼마나 들어 있는지를 나타내는 값",
+              "hanja": "濕(젖을 습)+度(법도 도)"
+            },
+            {
+              "word": "재질",
+              "easy": "물건을 이루는 재료의 성질",
+              "hanja": "材(재목 재)+質(바탕 질)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "미술관 입장료를 아끼는 방법",
+                "보존과학이 작품을 고치고 미리 지키는 일",
+                "유명한 화가들의 생애",
+                "브라운관 텔레비전을 만드는 과정"
+              ],
+              "answer": 1,
+              "explain": "손상을 막고 수명을 늘리는 보존과학이 무엇이며, 고치기보다 미리 지키는 일이 중요하다는 것이 글 전체의 중심이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "국립현대미술관의 보존 분야로 글에 나오지 않는 것은?",
+              "choices": [
+                "종이 작품",
+                "유화",
+                "조각과 공예",
+                "건축 설계"
+              ],
+              "answer": 3,
+              "explain": "둘째 문단에 종이 작품, 유화, 조각과 공예, 재질 분석의 네 분야가 나온다. 건축 설계는 없다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "'수장고'의 뜻으로 알맞은 것은?",
+              "choices": [
+                "작품을 보관해 두는 특별한 창고",
+                "작품을 사고파는 가게",
+                "관람객이 쉬는 방",
+                "그림을 그리는 작업실"
+              ],
+              "answer": 0,
+              "explain": "수장고는 미술관이 작품을 보관하는 창고다. 글에서 전시실과 함께 온습도를 맞추는 공간으로 나온다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "유화보다 동양화와 수채화를 더 어둡게 두는 까닭으로 알맞은 것은?",
+              "choices": [
+                "동양화가 더 비싸기 때문에",
+                "동양화와 수채화가 빛에 더 약하기 때문에",
+                "관람객이 적게 오기 때문에",
+                "전등이 모자라기 때문에"
+              ],
+              "answer": 1,
+              "explain": "빛이 색을 바래게 한다고 했고, 재질마다 허용하는 밝기가 다르다. 더 낮은 밝기를 요구한다는 것은 그만큼 빛에 약하다는 뜻이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 '고치기 전에 지키는 일'을 더 중요하다고 본 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "고치는 비용이 무료이기 때문에",
+                "한 번 상한 작품은 완전히 되돌리기 어렵기 때문에",
+                "보존과학자가 부족하기 때문에",
+                "관람객이 손대는 일이 잦기 때문에"
+              ],
+              "answer": 1,
+              "explain": "글은 색이 옅어지고 종이가 변하고 표면이 갈라지는 '손상'을 먼저 말한 뒤, 온습도와 조명으로 그것을 막는다고 했다. 손상을 미리 막는 쪽이 낫다는 판단이 깔려 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "학교 복도에 학생들의 수채화를 한 학기 동안 걸어 두려고 한다. 글의 내용을 가장 잘 적용한 것은?",
+              "choices": [
+                "햇빛이 가장 잘 드는 창가에 건다.",
+                "밝기를 100럭스 이하로 낮춘 벽면에 건다.",
+                "난방기 바로 위에 걸어 잘 마르게 한다.",
+                "비 오는 날 창문을 열어 습기를 들인다."
+              ],
+              "answer": 1,
+              "explain": "수채화는 100럭스 이하로 어둡게 두라고 했다. 햇빛·난방기·습기는 모두 글이 경계한 조건이다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "Paintings in a museum change slowly over time. Colors fade. Paper turns yellow. Surfaces crack. Conservation science is the work of stopping this damage. It helps art live longer.",
+            "A conservator does not start repairs at once. First she studies the artwork closely. She writes down where it is damaged. Sometimes she checks the materials with science tools. Only then does the treatment begin. Korea's national modern art museum has four teams for this work. They are paper, oil painting, sculpture and craft, and material analysis. Together they care for about 8,000 works.",
+            "Protecting art before it breaks matters even more. The museum keeps rooms between 18 and 22 degrees. It also keeps humidity between 50 and 70 percent. Light is set for each material. Oil paintings get 150 lux or less. Ink and watercolor paintings get 100 lux or less. Strong light makes colors fade.",
+            "Nam June Paik built a tower of 1,003 old TV sets. New parts were no longer sold anywhere. So the museum spent three years on repairs. Workers fixed 737 screens. They kept the shells of 266 more and changed the inside. Saving art needs an artist's eye and a scientist's hands."
+          ],
+          "enseg": [
+            [
+              "Paintings in a museum ",
+              "change slowly over time. ",
+              "Colors fade. ",
+              "Paper turns yellow. ",
+              "Surfaces crack. ",
+              "Conservation science is the work ",
+              "of stopping this damage. ",
+              "It helps art live longer."
+            ],
+            [
+              "A conservator does not start repairs at once. ",
+              "First she studies the artwork closely. ",
+              "She writes down ",
+              "where it is damaged. ",
+              "Sometimes she checks the materials ",
+              "with science tools. ",
+              "Only then does the treatment begin. ",
+              "Korea's national modern art museum ",
+              "has four teams for this work. ",
+              "They are paper, oil painting, ",
+              "sculpture and craft, ",
+              "and material analysis. ",
+              "Together they care for ",
+              "about 8,000 works."
+            ],
+            [
+              "Protecting art before it breaks ",
+              "matters even more. ",
+              "The museum keeps rooms ",
+              "between 18 and 22 degrees. ",
+              "It also keeps humidity ",
+              "between 50 and 70 percent. ",
+              "Light is set for each material. ",
+              "Oil paintings get 150 lux or less. ",
+              "Ink and watercolor paintings ",
+              "get 100 lux or less. ",
+              "Strong light makes colors fade."
+            ],
+            [
+              "Nam June Paik built a tower ",
+              "of 1,003 old TV sets. ",
+              "New parts were no longer sold anywhere. ",
+              "So the museum spent three years on repairs. ",
+              "Workers fixed 737 screens. ",
+              "They kept the shells of 266 more ",
+              "and changed the inside. ",
+              "Saving art needs an artist's eye ",
+              "and a scientist's hands."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "damage",
+              "ko": "손상, 피해 (명사)",
+              "base": "damage [ˈdæmɪdʒ]"
+            },
+            {
+              "word": "conservator",
+              "ko": "보존과학자, 복원 전문가 (명사)",
+              "base": "conservator [kənˈsɜːrvətər]"
+            },
+            {
+              "word": "humidity",
+              "ko": "습도 (명사)",
+              "base": "humidity [hjuːˈmɪdəti]"
+            },
+            {
+              "word": "analysis",
+              "ko": "분석 (명사)",
+              "base": "analysis [əˈnæləsɪs]"
+            },
+            {
+              "word": "repairs",
+              "ko": "수리, 고치는 일 (명사)",
+              "base": "repair [rɪˈper]"
+            },
+            {
+              "word": "fade",
+              "ko": "색이 바래다 (동사)",
+              "base": "fade [feɪd]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "예술과 과학 사이에서 — 미술품 보존과학",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "미술관에 걸린 작품은 ",
+              "완성된 순간부터 조금씩 변한다. ",
+              "물감의 색은 옅어지고, ",
+              "종이는 산화되어 누렇게 변하며, ",
+              "표면에는 균열이 생긴다. ",
+              "이런 손상을 늦추고 ",
+              "작품의 수명을 늘리는 활동을 ",
+              "보존과학이라고 부른다. ",
+              "보존과학은 미술사에 대한 지식과 ",
+              "재질을 분석하는 화학 지식을 ",
+              "함께 요구한다는 점에서, ",
+              "예술과 과학의 경계에 놓인 분야다."
+            ],
+            [
+              "국립현대미술관은 ",
+              "국내 유일의 국립 미술품 보존 전문기관으로, ",
+              "지류·유화·조각공예·재질분석 ",
+              "네 분야로 나누어 ",
+              "8,000여 점의 소장품을 관리한다. ",
+              "보존과학자는 곧바로 손을 대지 않는다. ",
+              "먼저 상태조사를 통해 ",
+              "손상 부위와 정도를 기록으로 남기고, ",
+              "그 기록을 근거로 처리 방향을 정한다. ",
+              "처리 자체보다 ",
+              "판단의 근거를 남기는 일이 ",
+              "앞선다는 뜻이다."
+            ],
+            [
+              "실제로 보존에서 큰 비중을 차지하는 것은 ",
+              "사후 처리가 아니라 사전 관리다. ",
+              "미술관은 전시실과 수장고의 온도를 ",
+              "18~22도, ",
+              "상대습도를 50~70퍼센트로 유지한다. ",
+              "습도가 높으면 곰팡이가 피고, ",
+              "낮으면 표면이 갈라지기 때문이다. ",
+              "조명도 재질별로 다르다. ",
+              "유화는 150럭스 이하, ",
+              "동양화와 수채화는 100럭스 이하, ",
+              "염색품과 판화는 80럭스 이하로 제한한다. ",
+              "반면 금속이나 석재는 빛에 강해 ",
+              "750~1500럭스까지 허용된다."
+            ],
+            [
+              "현대미술은 보존을 한층 어렵게 만든다. ",
+              "백남준의 '다다익선'은 ",
+              "브라운관 모니터 1,003대를 ",
+              "18.5미터 높이로 쌓아 올린 작품이다. ",
+              "2018년 노후화로 가동이 멈추자 ",
+              "미술관은 3년에 걸쳐 복원에 나섰다. ",
+              "손상된 모니터 737대는 ",
+              "중고 부품을 구해 수리했고, ",
+              "더 쓸 수 없는 266대는 ",
+              "겉모습을 남긴 채 ",
+              "내부만 평면 디스플레이로 바꾸었다. ",
+              "원형을 지킬 것인가 ",
+              "작동을 지킬 것인가. ",
+              "보존과학자는 이 물음 앞에서 ",
+              "매번 선택해야 한다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "보존과학",
+              "easy": "미술 작품의 손상을 막고 수명을 늘리는 학문. 미술사 지식과 화학 지식을 함께 쓴다.",
+              "hanja": "保(지킬 보)+存(있을 존)+科(과목 과)+學(배울 학)"
+            },
+            {
+              "word": "산화",
+              "easy": "산소와 결합해 성질이 변하는 것. 쇠가 녹슬거나 종이가 누렇게 되는 일이 여기 속한다.",
+              "hanja": "酸(실 산)+化(될 화)"
+            },
+            {
+              "word": "상대습도",
+              "easy": "공기가 품을 수 있는 최대 수증기량에 견주어, 실제로 얼마나 품고 있는지를 백분율로 나타낸 값",
+              "hanja": "相(서로 상)+對(대할 대)+濕(젖을 습)+度(법도 도)"
+            },
+            {
+              "word": "지류",
+              "easy": "종이로 만든 작품을 통틀어 이르는 말. 한국화·서예·판화·드로잉 등이 여기 든다.",
+              "hanja": "紙(종이 지)+類(무리 류)"
+            },
+            {
+              "word": "원형",
+              "easy": "본디의 모습. 보존에서는 작가가 처음 만들었을 때의 상태를 뜻한다.",
+              "hanja": "原(근원 원)+形(모양 형)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 적절한 것은?",
+              "choices": [
+                "미술관 관람객을 늘리는 방법",
+                "보존과학의 성격과, 처리보다 앞서는 사전 관리·판단의 문제",
+                "백남준의 생애와 작품 세계",
+                "브라운관 모니터의 작동 원리"
+              ],
+              "answer": 1,
+              "explain": "글은 보존과학이 예술과 과학의 경계에 있음을 밝히고, 기록에 근거한 절차와 사전 관리를 강조한 뒤 현대미술 보존의 선택 문제로 마무리한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "글에 제시된 조도 기준으로 옳은 것은?",
+              "choices": [
+                "유화는 80럭스 이하로 제한한다.",
+                "동양화와 수채화는 100럭스 이하로 제한한다.",
+                "염색품과 판화는 150럭스 이하로 제한한다.",
+                "금속과 석재는 100럭스 이하로 제한한다."
+              ],
+              "answer": 1,
+              "explain": "셋째 문단에서 유화 150럭스 이하, 동양화·수채화 100럭스 이하, 염색품·판화 80럭스 이하, 금속·석재는 750~1500럭스까지라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "문맥상 '산화'의 뜻으로 가장 적절한 것은?",
+              "choices": [
+                "산소와 결합해 성질이 변하는 것",
+                "물에 젖어 부풀어 오르는 것",
+                "열을 받아 타 버리는 것",
+                "힘을 받아 갈라지는 것"
+              ],
+              "answer": 0,
+              "explain": "'종이는 산화되어 누렇게 변하며'라는 문맥에서, 공기 중 산소와 반응해 성질이 달라지는 현상을 가리킨다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "infer",
+              "q": "보존과학자가 '곧바로 손을 대지 않는' 까닭으로 가장 적절한 것은?",
+              "choices": [
+                "처리 도구가 비싸서 아껴 써야 하기 때문에",
+                "관람객이 지켜보고 있기 때문에",
+                "처리의 근거가 될 기록이 먼저 있어야 하기 때문에",
+                "작가의 허락을 받아야 하기 때문에"
+              ],
+              "answer": 2,
+              "explain": "둘째 문단은 상태조사로 손상을 기록하고 '그 기록을 근거로' 방향을 정한다고 했다. 근거 없는 처리를 경계하는 태도다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "금속과 석재에 750~1500럭스까지 허용하는 사실에서 이끌어 낼 수 있는 것은?",
+              "choices": [
+                "금속 작품이 다른 작품보다 값이 싸다.",
+                "조도 기준은 작품의 가치가 아니라 재질의 성질에 따라 정해진다.",
+                "금속 작품은 보존 처리가 필요 없다.",
+                "밝은 곳에 두면 모든 작품이 오래간다."
+              ],
+              "answer": 1,
+              "explain": "같은 미술관 안에서도 재질에 따라 허용 조도가 80럭스에서 1500럭스까지 벌어진다. 기준을 가르는 것은 값이나 유명세가 아니라 빛에 견디는 성질이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "한 미술관이 오래된 흑백 사진 100점을 새로 들여왔다. 글의 원칙을 가장 잘 지킨 대응은?",
+              "choices": [
+                "즉시 색이 바랜 부분을 덧칠해 복원한다.",
+                "먼저 상태조사로 손상 부위를 기록한 뒤, 온습도와 조도를 맞춘 수장고에 보관한다.",
+                "밝은 전시실에 걸어 관람객이 많이 보게 한다.",
+                "습기를 없애려고 난방기 옆에 둔다."
+              ],
+              "answer": 1,
+              "explain": "기록을 근거로 삼는 절차와, 처리보다 앞서는 사전 관리라는 두 원칙을 함께 지킨 것은 2번뿐이다. 덧칠은 근거 없는 처리이고, 밝은 빛과 난방기는 글이 경계한 조건이다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "A work of art begins to change the moment it is finished. Pigments lose their brightness, paper oxidizes and turns yellow, and cracks appear on the surface. The activity of slowing this damage and extending the life of a work is called conservation science. Because it demands both a knowledge of art history and the chemistry needed to analyze materials, conservation science sits on the border between art and science.",
+            "Korea's National Museum of Modern and Contemporary Art is the country's only national institution devoted to art conservation. It divides the work into four fields, paper, oil painting, sculpture and craft, and material analysis, and looks after some 8,000 works. A conservator does not touch a piece right away. A condition survey comes first, recording where and how badly the work is damaged, and that record becomes the basis for deciding how to treat it. Leaving a reason behind matters more than the treatment itself.",
+            "In practice, the larger share of conservation is not repair but prevention. The museum keeps galleries and storage rooms at 18 to 22 degrees and holds relative humidity between 50 and 70 percent. Too much moisture invites mold, and too little makes surfaces crack. Lighting also differs by material. Oil paintings are limited to 150 lux or less, ink and watercolor paintings to 100 lux, and dyed works and prints to 80 lux. Metal and stone, which resist light well, may be shown at up to 1,500 lux.",
+            "Contemporary art makes conservation harder still. Nam June Paik's The More, the Better is a tower of 1,003 cathode ray tube monitors rising 18.5 meters. When it was shut down in 2018 because of age, the museum spent three years restoring it. Seven hundred and thirty-seven damaged monitors were repaired with secondhand parts, and 266 that could no longer be used kept their outer shells while flat panels replaced the inside. Preserve the original form, or preserve the ability to run? A conservator has to choose, again and again."
+          ],
+          "envocab": [
+            {
+              "word": "conservation",
+              "ko": "보존 (명사)",
+              "base": "conservation [ˌkɑːnsərˈveɪʃn]"
+            },
+            {
+              "word": "oxidizes",
+              "ko": "산화하다 (동사)",
+              "base": "oxidize [ˈɑːksɪdaɪz]"
+            },
+            {
+              "word": "humidity",
+              "ko": "습도 (명사)",
+              "base": "humidity [hjuːˈmɪdəti]"
+            },
+            {
+              "word": "prevention",
+              "ko": "예방 (명사)",
+              "base": "prevention [prɪˈvenʃn]"
+            },
+            {
+              "word": "restoring",
+              "ko": "복원하는 것 (동사)",
+              "base": "restore [rɪˈstɔːr]"
+            },
+            {
+              "word": "original",
+              "ko": "본디의, 원래의 (형용사)",
+              "base": "original [əˈrɪdʒənl]"
+            }
+          ],
+          "enseg": [
+            [
+              "A work of art begins to change the moment ",
+              "it is finished. ",
+              "Pigments lose their brightness, ",
+              "paper oxidizes and turns yellow, ",
+              "and cracks appear on the surface. ",
+              "The activity of slowing this damage and extending the life ",
+              "of a work is called conservation science. ",
+              "Because it demands both a knowledge of art history ",
+              "and the chemistry needed to analyze materials, ",
+              "conservation science sits on the border between art and science."
+            ],
+            [
+              "Korea's National Museum of Modern and Contemporary Art is the country's ",
+              "only national institution devoted to art conservation. ",
+              "It divides the work into four fields, ",
+              "paper, oil painting, ",
+              "sculpture and craft, ",
+              "and material analysis, ",
+              "and looks after some 8,000 works. ",
+              "A conservator does not touch a piece right away. ",
+              "A condition survey comes first, ",
+              "recording where and how badly the work is damaged, ",
+              "and that record becomes the basis for deciding how to treat it. ",
+              "Leaving a reason behind matters more than the treatment itself."
+            ],
+            [
+              "In practice, the larger share of conservation is not repair but prevention. ",
+              "The museum keeps galleries and storage rooms at 18 ",
+              "to 22 degrees and holds relative humidity between 50 ",
+              "and 70 percent. ",
+              "Too much moisture invites mold, ",
+              "and too little makes surfaces crack. ",
+              "Lighting also differs by material. ",
+              "Oil paintings are limited to 150 lux or less, ",
+              "ink and watercolor paintings to 100 lux, ",
+              "and dyed works and prints to 80 lux. ",
+              "Metal and stone, ",
+              "which resist light well, ",
+              "may be shown at up to 1,500 lux."
+            ],
+            [
+              "Contemporary art makes conservation harder still. ",
+              "Nam June Paik's The More, ",
+              "the Better is a tower of 1,003 cathode ray ",
+              "tube monitors rising 18.5 meters. ",
+              "When it was shut down in 2018 because of age, ",
+              "the museum spent three years restoring it. ",
+              "Seven hundred and thirty-seven damaged monitors were repaired with secondhand ",
+              "parts, and 266 that could no longer be used ",
+              "kept their outer shells while flat panels replaced the inside. ",
+              "Preserve the original form, ",
+              "or preserve the ability to run? ",
+              "A conservator has to choose, ",
+              "again and again."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "원형인가 작동인가 — 보존과학이 마주한 선택",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "작품은 완성된 순간부터 소멸을 향해 간다. ",
+              "안료는 빛을 받아 퇴색하고, ",
+              "종이는 산화되어 누렇게 변하며, ",
+              "금속은 부식되고, ",
+              "유화의 표면에는 균열이 번진다. ",
+              "이 속도를 늦추어 작품의 수명을 연장하는 활동이 ",
+              "보존과학이다. ",
+              "보존과학은 작품이 언제 어떤 의도로 만들어졌는지를 묻는 미술사의 눈과, ",
+              "재질을 분석하고 처리제를 고르는 화학의 손을 ",
+              "동시에 요구한다. ",
+              "예술과 과학 어느 한쪽으로도 환원되지 않는 ",
+              "드문 분야인 셈이다."
+            ],
+            [
+              "보존 처리에는 오래된 원칙이 하나 있다. ",
+              "가역성이다. ",
+              "오늘 시행한 처리는 훗날 더 나은 방법이 나왔을 때 ",
+              "되돌릴 수 있어야 한다는 것이다. ",
+              "이 원칙 때문에 보존과학자는 곧바로 손대지 않는다. ",
+              "먼저 상태조사로 손상의 부위와 정도를 기록하고, ",
+              "그 기록을 근거로 처리 방향을 정한다. ",
+              "처리의 결과보다 판단의 근거를 남기는 일이 앞서는 까닭은, ",
+              "작품의 다음 관리자가 ",
+              "오늘의 선택을 검토하고 뒤집을 수 있어야 하기 때문이다."
+            ],
+            [
+              "실무에서 더 큰 비중을 차지하는 것은 사후 처리가 아니라 사전 관리다. ",
+              "국립현대미술관은 국내 유일의 국립 미술품 보존 전문기관으로, ",
+              "지류·유화·조각공예·재질분석 네 분야에 걸쳐 ",
+              "8,000여 점의 소장품을 관리한다. ",
+              "전시실과 수장고는 온도 18~22도, ",
+              "상대습도 50~70퍼센트로 유지된다. ",
+              "습도가 높으면 곰팡이와 울음현상이 생기고, ",
+              "낮으면 표면이 박락되기 때문이다. ",
+              "조도 기준은 재질을 따른다. ",
+              "유화는 150럭스 이하, ",
+              "동양화와 수채화는 100럭스 이하, ",
+              "염색품과 판화는 80럭스 이하이지만, ",
+              "빛에 강한 금속과 석재는 750~1500럭스까지 허용된다. ",
+              "값이나 명성이 아니라 물성이 기준을 가른다."
+            ],
+            [
+              "현대미술은 이 체계를 흔든다. ",
+              "백남준의 '다다익선'은 브라운관 모니터 1,003대를 ",
+              "높이 18.5미터의 오층탑 형태로 쌓아 올린 작품으로, ",
+              "1988년 국립현대미술관 과천관에 설치되었다. ",
+              "2018년 노후화에 따른 화재 위험으로 가동이 중단되었고, ",
+              "미술관은 2019년 '원형을 최대한 유지하되 불가피할 경우 대체 기술을 도입한다'는 원칙 아래 ",
+              "3년에 걸친 복원에 착수했다. ",
+              "정밀진단 결과 정상 작동 모니터는 26퍼센트에 그쳤다. ",
+              "손상된 737대는 중고 부품으로 수리했고, ",
+              "더는 쓸 수 없는 상단 266대는 ",
+              "외형을 남긴 채 내부만 평면 디스플레이로 교체했다. ",
+              "총사업비 37억 원, ",
+              "재가동은 2022년 9월이었다."
+            ],
+            [
+              "문제는 복원이 끝난 뒤에도 남는다. ",
+              "미술관은 작품의 안정을 위해 가동을 주 4일, ",
+              "하루 2시간으로 제한했다. ",
+              "전원을 넣지 않은 '다다익선'은 여전히 그 작품인가, ",
+              "외형만 남기고 속을 바꾼 모니터 266대는 여전히 백남준의 것인가. ",
+              "작품의 진정성을 원형에서 찾을 것인가 ",
+              "작동에서 찾을 것인가는 ",
+              "기술로 답할 수 없는 물음이다. ",
+              "국립현대미술관이 2026년 청년 보존 인력을 기르는 교육 과정을 ",
+              "처음 연 것도 이 때문이다. ",
+              "현대미술의 보존은 손기술만으로는 감당되지 않는다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "가역성",
+              "easy": "처리한 것을 나중에 되돌릴 수 있는 성질. 보존 처리의 기본 원칙으로, 후대가 더 나은 방법을 쓸 여지를 남겨 둔다.",
+              "hanja": "可(옳을 가)+逆(거스를 역)+性(성품 성)"
+            },
+            {
+              "word": "퇴색",
+              "easy": "빛이나 시간에 의해 색이 바래는 것",
+              "hanja": "退(물러날 퇴)+色(빛 색)"
+            },
+            {
+              "word": "상대습도",
+              "easy": "공기가 품을 수 있는 최대 수증기량에 견주어 실제로 품고 있는 양을 백분율로 나타낸 값",
+              "hanja": "相(서로 상)+對(대할 대)+濕(젖을 습)+度(법도 도)"
+            },
+            {
+              "word": "물성",
+              "easy": "물질이 본디 지닌 성질. 빛·열·습기에 어떻게 반응하는지가 여기 든다.",
+              "hanja": "物(물건 물)+性(성품 성)"
+            },
+            {
+              "word": "진정성",
+              "easy": "작품이 본디 지녔던 참된 성질. 무엇을 그 작품답게 만드는가에 대한 물음이다.",
+              "hanja": "眞(참 진)+正(바를 정)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 논지로 가장 적절한 것은?",
+              "choices": [
+                "보존과학은 화학 기술의 발전으로 대부분의 손상을 해결했다.",
+                "보존과학은 기술적 처리를 넘어 무엇을 작품답게 하는가라는 판단의 문제를 포함한다.",
+                "현대미술은 재료가 약해 보존 대상에서 제외해야 한다.",
+                "미술관은 관람객 수를 늘리기 위해 조도를 높여야 한다."
+              ],
+              "answer": 1,
+              "explain": "글은 가역성 원칙과 환경 기준 같은 기술적 체계를 소개한 뒤, '다다익선'을 통해 원형이냐 작동이냐라는 판단의 문제로 논의를 옮긴다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "'다다익선' 복원에 대한 설명으로 옳지 않은 것은?",
+              "choices": [
+                "정밀진단에서 정상 작동 모니터는 26퍼센트였다.",
+                "손상된 737대는 중고 부품으로 수리했다.",
+                "상단 266대는 외형까지 새로 만들어 교체했다.",
+                "총사업비는 37억 원이었다."
+              ],
+              "answer": 2,
+              "explain": "넷째 문단은 상단 266대가 '외형을 남긴 채 내부만' 평면 디스플레이로 바뀌었다고 했다. 외형은 그대로 두었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "문맥상 '가역성'의 뜻으로 가장 적절한 것은?",
+              "choices": [
+                "처리 속도가 빠른 성질",
+                "오늘의 처리를 훗날 되돌릴 수 있는 성질",
+                "여러 재질에 두루 쓰이는 성질",
+                "물에 녹지 않는 성질"
+              ],
+              "answer": 1,
+              "explain": "둘째 문단은 '훗날 더 나은 방법이 나왔을 때 되돌릴 수 있어야 한다'고 가역성을 풀이한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "'값이나 명성이 아니라 물성이 기준을 가른다'에서 이끌어 낼 수 있는 것은?",
+              "choices": [
+                "비싼 작품일수록 어두운 곳에 두어야 한다.",
+                "보존 기준은 작품의 사회적 평가와 무관하게 재질의 반응으로 결정된다.",
+                "금속 작품은 보존 처리가 필요 없다.",
+                "조도 기준은 미술관마다 임의로 정한다."
+              ],
+              "answer": 1,
+              "explain": "같은 미술관에서 허용 조도가 80럭스에서 1500럭스까지 벌어지는 근거는 재질이 빛에 견디는 정도였다. 작품의 값이나 명성은 개입하지 않는다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지를 약화하는 진술로 가장 적절한 것은?",
+              "choices": [
+                "'다다익선'의 재가동 시간이 주 4일 2시간으로 제한되었다.",
+                "보존과학이 미술사와 화학 지식을 함께 요구한다.",
+                "현대미술 작품 대부분은 작가가 교체 부품과 수명까지 지정해 두어, 무엇이 원형인지에 대한 판단이 필요 없다.",
+                "국립현대미술관이 2026년 보존 인력 교육 과정을 열었다."
+              ],
+              "answer": 2,
+              "explain": "글의 논지는 '기술로 답할 수 없는 판단이 남는다'는 것이다. 작가가 교체 방식과 수명까지 미리 정해 두었다면 판단의 여지가 사라지므로 논지가 약해진다. 나머지는 논지를 뒷받침하거나 중립적이다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "글쓴이가 가역성을 '오래된 원칙'으로 앞세운 데에 전제된 생각으로 가장 적절한 것은?",
+              "choices": [
+                "현재의 보존 기술이 이미 완성 단계에 이르렀다.",
+                "오늘의 판단이 틀릴 수 있으며, 그 판단을 뒤집을 권한은 후대에도 있어야 한다.",
+                "처리 비용을 줄이는 것이 보존의 목적이다.",
+                "작품의 소유권은 미술관에 있다."
+              ],
+              "answer": 1,
+              "explain": "'훗날 더 나은 방법', '다음 관리자가 검토하고 뒤집을 수 있어야' 한다는 서술은, 현재의 판단을 잠정적인 것으로 보는 태도를 전제한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "한 미술관이 형광등을 재료로 쓴 1970년대 설치작품을 인수했다. 해당 형광등은 단종되었다. 글의 원칙을 가장 잘 적용한 대응은?",
+              "choices": [
+                "보기 좋도록 최신 LED로 전부 교체하고 기록은 남기지 않는다.",
+                "작동하지 않으므로 수장고에 넣고 전시하지 않는다.",
+                "단종 사실과 대체 검토 과정을 기록으로 남기고, 되돌릴 수 있는 방식으로 대체 광원을 적용한다.",
+                "원형 보존을 위해 아무 조치도 하지 않고 방치한다."
+              ],
+              "answer": 2,
+              "explain": "기록을 근거로 남기는 절차와 가역성 원칙을 함께 지킨 것은 3번이다. 1번은 기록을 버려 후대의 검토를 막고, 2번과 4번은 '불가피할 경우 대체 기술을 도입한다'는 실제 운영 원칙과 어긋난다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "A work of art starts moving toward its own disappearance the moment it is finished. Pigments fade under light, paper oxidizes and yellows, metal corrodes, and cracks spread across the surface of an oil painting. The activity that slows this process and extends the life of a work is conservation science. It demands the eye of an art historian, who asks when and with what intention a work was made, and the hand of a chemist, who analyzes materials and selects treatments. It is a rare field that cannot be reduced to either art or science alone.",
+            "Conservation treatment rests on one long-standing principle: reversibility. Whatever is done today must be undoable when a better method appears. Because of this principle, a conservator does not begin by touching the work. A condition survey records where and how badly the piece is damaged, and that record becomes the ground for deciding how to treat it. Leaving a documented reason matters more than the result of the treatment, because the next custodian of the work must be able to review today's choice and reverse it.",
+            "In practice, prevention occupies a larger share of the work than repair. Korea's National Museum of Modern and Contemporary Art, the only national institution of its kind in the country, cares for some 8,000 works across four fields: paper, oil painting, sculpture and craft, and material analysis. Galleries and storage rooms are held at 18 to 22 degrees, with relative humidity between 50 and 70 percent. Too much moisture brings mold and buckling; too little causes surfaces to flake. Lighting limits follow the material. Oil paintings are kept at 150 lux or less, ink and watercolor paintings at 100 lux, dyed works and prints at 80 lux, while metal and stone, which tolerate light well, may be shown at up to 1,500 lux. Physical properties, not price or fame, draw the line.",
+            "Contemporary art unsettles this system. Nam June Paik's The More, the Better is a five-tier tower of 1,003 cathode ray tube monitors standing 18.5 meters high, installed at the museum's Gwacheon building in 1988. It was shut down in 2018 over fire risk from aging parts, and in 2019 the museum began a three-year restoration under the rule that the original form would be kept as far as possible, with replacement technology introduced only where unavoidable. A detailed survey found that only 26 percent of the monitors still worked. Seven hundred and thirty-seven damaged units were repaired with secondhand parts, while 266 at the top, beyond saving, kept their outer shells and received flat panels inside. The project cost 3.7 billion won, and the tower was switched back on in September 2022.",
+            "The problem does not end with the restoration. To protect the work, the museum limits operation to two hours a day, four days a week. Is The More, the Better still that work when the power is off? Are the 266 monitors, shells preserved and interiors replaced, still Paik's? Whether the authenticity of a work lies in its original form or in its capacity to run is a question technology cannot answer. That is why the museum opened its first training program for young conservators in 2026. Conserving contemporary art can no longer be handled by craft skill alone."
+          ],
+          "envocab": [
+            {
+              "word": "conservation",
+              "ko": "보존 (명사)",
+              "base": "conservation [ˌkɑːnsərˈveɪʃn]"
+            },
+            {
+              "word": "reversibility",
+              "ko": "가역성 (명사)",
+              "base": "reversibility [rɪˌvɜːrsəˈbɪləti]"
+            },
+            {
+              "word": "corrodes",
+              "ko": "부식하다 (동사)",
+              "base": "corrode [kəˈroʊd]"
+            },
+            {
+              "word": "prevention",
+              "ko": "예방 (명사)",
+              "base": "prevention [prɪˈvenʃn]"
+            },
+            {
+              "word": "restoration",
+              "ko": "복원 (명사)",
+              "base": "restoration [ˌrestəˈreɪʃn]"
+            },
+            {
+              "word": "authenticity",
+              "ko": "진정성 (명사)",
+              "base": "authenticity [ˌɔːθenˈtɪsəti]"
+            }
+          ],
+          "enseg": [
+            [
+              "A work of art starts moving toward its own ",
+              "disappearance the moment it is finished. ",
+              "Pigments fade under light, ",
+              "paper oxidizes and yellows, ",
+              "metal corrodes, and cracks spread across the surface of an oil painting. ",
+              "The activity that slows this process and extends the life ",
+              "of a work is conservation science. ",
+              "It demands the eye of an art historian, ",
+              "who asks when and with what intention a work ",
+              "was made, and the hand of a chemist, ",
+              "who analyzes materials and selects treatments. ",
+              "It is a rare field that cannot be reduced ",
+              "to either art or science alone."
+            ],
+            [
+              "Conservation treatment rests on one long-standing principle: reversibility. ",
+              "Whatever is done today must be undoable when a better method appears. ",
+              "Because of this principle, ",
+              "a conservator does not begin by touching the work. ",
+              "A condition survey records where and how badly the piece ",
+              "is damaged, and that record becomes the ground for deciding ",
+              "how to treat it. ",
+              "Leaving a documented reason matters more than the result ",
+              "of the treatment, ",
+              "because the next custodian of the work must be able ",
+              "to review today's choice and reverse it."
+            ],
+            [
+              "In practice, prevention occupies a larger share of the work than repair. ",
+              "Korea's National Museum of Modern and Contemporary Art, ",
+              "the only national institution of its kind in the country, ",
+              "cares for some 8,000 works across four fields: ",
+              "paper, oil painting, ",
+              "sculpture and craft, ",
+              "and material analysis. ",
+              "Galleries and storage rooms are held at 18 to 22 ",
+              "degrees, with relative humidity between 50 and 70 percent. ",
+              "Too much moisture brings mold and buckling; ",
+              "too little causes surfaces to flake. ",
+              "Lighting limits follow the material. ",
+              "Oil paintings are kept at 150 lux or less, ",
+              "ink and watercolor paintings at 100 lux, ",
+              "dyed works and prints at 80 lux, ",
+              "while metal and stone, ",
+              "which tolerate light well, ",
+              "may be shown at up to 1,500 lux. ",
+              "Physical properties, not price or fame, ",
+              "draw the line."
+            ],
+            [
+              "Contemporary art unsettles this system. ",
+              "Nam June Paik's The More, ",
+              "the Better is a five-tier tower of 1,003 cathode ",
+              "ray tube monitors standing 18.5 meters high, ",
+              "installed at the museum's Gwacheon building in 1988. ",
+              "It was shut down in 2018 over fire risk ",
+              "from aging parts, ",
+              "and in 2019 the museum began a three-year restoration ",
+              "under the rule that the original form would be kept ",
+              "as far as possible, ",
+              "with replacement technology introduced only where unavoidable. ",
+              "A detailed survey found that only 26 percent of the monitors still worked. ",
+              "Seven hundred and thirty-seven damaged units were repaired with secondhand ",
+              "parts, while 266 at the top, ",
+              "beyond saving, kept their outer shells and received flat panels inside. ",
+              "The project cost 3.7 billion won, ",
+              "and the tower was switched back on in September 2022."
+            ],
+            [
+              "The problem does not end with the restoration. ",
+              "To protect the work, ",
+              "the museum limits operation to two hours a day, ",
+              "four days a week. ",
+              "Is The More, ",
+              "the Better still that work when the power is off? ",
+              "Are the 266 monitors, ",
+              "shells preserved and interiors replaced, still Paik's? ",
+              "Whether the authenticity of a work lies in its original ",
+              "form or in its capacity to run is a question ",
+              "technology cannot answer. ",
+              "That is why the museum opened its first training ",
+              "program for young conservators in 2026. ",
+              "Conserving contemporary art can no longer be handled by craft skill alone."
+            ]
+          ]
+        }
+      },
+      "books": [
+        {
+          "title": "예술가의 손끝에서 과학자의 손길로",
+          "author": "김은진",
+          "note": "국립현대미술관 보존과학자가 쓴 책. 실제 작품이 어떻게 진단되고 처리되는지를 사례로 보여 준다. 이 글의 배경을 그대로 넓혀 준다.",
+          "url": "https://m.yes24.com/Goods/Detail/95287536"
+        },
+        {
+          "title": "어떻게 예술 작품을 되살릴까?",
+          "author": "파비에네 마이어·지빌레 불프",
+          "note": "복원 전문가 두 사람이 그림 한 점이 되살아나는 과정을 그림과 함께 풀어낸 청소년 책. 초·중등이 먼저 읽기 좋다.",
+          "url": "https://m.yes24.com/Goods/Detail/128188052"
+        }
+      ],
+      "papers": [
+        {
+          "title": "국립현대미술관 보존과학 연구",
+          "url": "https://www.mmca.go.kr/collections/consScienceResearchList.do",
+          "note": "미술관이 공개한 보존처리·재질분석 연구 자료로, 실제 작품이 어떤 절차를 거쳤는지 확인할 수 있다."
+        }
+      ]
     }
   ],
   "diagnostics": {
