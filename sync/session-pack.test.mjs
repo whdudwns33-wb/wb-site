@@ -17,6 +17,12 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' }
 });
 
+async function withNow(value, action) {
+  const original = Date.now;
+  Date.now = () => value;
+  try { return await action(); } finally { Date.now = original; }
+}
+
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
@@ -316,20 +322,21 @@ test('fixed weekend attendance accepts its recurrence or an exact cross-day actu
     }
   }
 
-  const scheduledDb = seed();
-  const scheduledRow = scheduledDb.database.prepare(
-    "SELECT data FROM tasks WHERE app='task' AND id='lesson-a'"
-  ).get();
-  const scheduledTask = JSON.parse(scheduledRow.data);
-  Object.assign(scheduledTask, { repeat: 'days', days: [6], weekendAttendanceMode: 'fixed' });
-  scheduledDb.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'")
-    .bind(JSON.stringify(scheduledTask)).run();
-  await create(scheduledDb);
-  putWeekendVisit(scheduledDb, actualDate, 'completed');
-  putCheck(scheduledDb, 'lesson-a', 'teacher-a', actualDate, 'P');
-  const finalized = await handleScheduledSessionPackAttendance(
-    { DB: scheduledDb }, Date.parse(actualDate + 'T14:50:00Z')
-  );
+  const scheduledAt = Date.parse(actualDate + 'T14:50:00Z');
+  const finalized = await withNow(scheduledAt - 60 * 60 * 1000, async () => {
+    const scheduledDb = seed();
+    const scheduledRow = scheduledDb.database.prepare(
+      "SELECT data FROM tasks WHERE app='task' AND id='lesson-a'"
+    ).get();
+    const scheduledTask = JSON.parse(scheduledRow.data);
+    Object.assign(scheduledTask, { repeat: 'days', days: [6], weekendAttendanceMode: 'fixed' });
+    scheduledDb.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'")
+      .bind(JSON.stringify(scheduledTask)).run();
+    await create(scheduledDb);
+    putWeekendVisit(scheduledDb, actualDate, 'completed');
+    putCheck(scheduledDb, 'lesson-a', 'teacher-a', actualDate, 'P');
+    return await handleScheduledSessionPackAttendance({ DB: scheduledDb }, scheduledAt);
+  });
   assert.deepEqual(finalized,
     { ok: true, sourceDate: actualDate, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
 });
@@ -351,12 +358,15 @@ test('a future flexible effective date keeps the existing weekend recurrence unt
 
 test('23:50 KST cron accepts a flexible Sunday visit even when the reference recurrence is Saturday', async () => {
   const date = '2026-08-30';
-  const db = seed();
-  makeFlexible(db);
-  await create(db);
-  putWeekendVisit(db, date, 'completed');
-  putCheck(db, 'lesson-a', 'teacher-a', date, 'P');
-  const result = await handleScheduledSessionPackAttendance({ DB: db }, Date.parse(date + 'T14:50:00Z'));
+  const scheduledAt = Date.parse(date + 'T14:50:00Z');
+  const result = await withNow(scheduledAt - 60 * 60 * 1000, async () => {
+    const db = seed();
+    makeFlexible(db);
+    await create(db);
+    putWeekendVisit(db, date, 'completed');
+    putCheck(db, 'lesson-a', 'teacher-a', date, 'P');
+    return await handleScheduledSessionPackAttendance({ DB: db }, scheduledAt);
+  });
   assert.deepEqual(result, { ok: true, sourceDate: date, processed: 1, idempotent: 0, skipped: 0, failed: 0 });
 });
 
