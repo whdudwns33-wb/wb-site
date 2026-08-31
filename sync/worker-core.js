@@ -52,6 +52,7 @@
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /consult-link-send { app:'consult', auth(admin), action, ... } → 학생 개인 링크 연락처·알림톡 접수
+ *   POST /consult-reward { app:'consult', auth(admin), action, ... } → 문화상품권 교환 선점·상태 원장
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -103,6 +104,9 @@ const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
 const MAX_PULL = 2000;       // 응답당 상한. 초과하면 more:true로 알리고 다음 요청에서 이어받는다
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const SAFE_REWARD_REQUEST_ID = /^[A-Za-z0-9_-]{8,128}$/;
+const CONSULT_REWARD_PREFIX = '__rewardtx__';
+const CONSULT_REWARD_TAKEOVER_MS = 30 * 60 * 1000;
 const TOKEN_HASH_PREFIX = 'sha256:';
 const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
@@ -141,6 +145,18 @@ function boardingLockResponse(origin) {
     code: 'BOARDING_LOCK',
     error: '승차 후 미하차 기록이 남아 있어 변경할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
   }, 409, origin);
+}
+
+function isRewardProcessingLockError(error) {
+  return /REWARD_PROCESSING_LOCK/.test(String(error && error.message || error || ''));
+}
+
+function rewardProcessingLockResponse(origin, details) {
+  return json(Object.assign({
+    ok: false,
+    code: 'REWARD_PROCESSING_LOCK',
+    error: '문화상품권 교환 처리를 완료하거나 취소한 뒤 학생 삭제·대표·관리자 전환을 진행해 주세요'
+  }, details || {}), 409, origin);
 }
 
 function corsHeaders(origin) {
@@ -199,12 +215,20 @@ function taskManagerIds(env) {
     .filter(id => SAFE_ID.test(id)));
 }
 
+async function consultRewardActorHash(kind, credentialHash) {
+  return tokenStorageValue(await sha256Hex(
+    'consult-reward-actor:v1:' + String(kind || '') + ':' + String(credentialHash || '')
+  ));
+}
+
 async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
   if (auth.mode === 'admin') {
     const want = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
     if (!want || !safeEqual(auth.secret, want)) return null;
-    return { scope: 'all' };
+    return app === 'consult'
+      ? { scope: 'all', rewardActorHash: await consultRewardActorHash('admin', await sha256Hex(want)) }
+      : { scope: 'all' };
   }
   if (auth.mode === 'admin_device' && app === 'consult') {
     const token = String(auth.token || '');
@@ -215,7 +239,10 @@ async function resolveAuth(env, app, auth) {
       'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
       'AND (token=? OR created_at>=?) LIMIT 1'
     ).bind(app, tokenHash, token, token, createdAfter).first();
-    return row && row.staff_id === ADMIN_DEVICE_ID ? { scope: 'all', device: true } : null;
+    return row && row.staff_id === ADMIN_DEVICE_ID
+      ? { scope: 'all', device: true,
+        rewardActorHash: await consultRewardActorHash('admin_device', tokenHash) }
+      : null;
   }
   if (auth.mode === 'person') {
     const id = String(auth.id || '');
@@ -462,6 +489,9 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
     const keyTaskId = key.slice(0, firstPipe);
     const keyDate = key.slice(firstPipe + 1);
     const data = entry.change.data;
+    if (app === 'consult' && keyTaskId.startsWith(CONSULT_REWARD_PREFIX)) {
+      return '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다';
+    }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       return '체크 데이터 형식을 확인해 주세요';
     }
@@ -604,6 +634,326 @@ async function boardedDriverConflicts(env, app, staffIds) {
   return staffIds.filter(id => boardedDrivers.has(id));
 }
 
+async function consultRewardStaffConflicts(env, app, entries) {
+  if (app !== 'consult') return [];
+  const ids = [...new Set(entries.filter(entry => entry.table === 'staff')
+    .filter(entry => {
+      const data = entry.change && entry.change.data;
+      return data && typeof data === 'object' && !Array.isArray(data) &&
+        (data.deleted === true || data.owner === true || data.manager === true);
+    })
+    .map(entry => String(entry.change.id || ''))
+    .filter(id => SAFE_ID.test(id)))];
+  if (!ids.length) return [];
+  const conflicts = new Set();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT DISTINCT owner FROM checks WHERE app=? AND owner IN (' + placeholders + ') ' +
+      "AND k GLOB '__rewardtx__*' AND json_valid(data)=1 " +
+      "AND json_extract(data,'$.kind')='consult_reward_redemption' " +
+      "AND json_extract(data,'$.staffId')=owner AND json_extract(data,'$.status')='processing'"
+    ).bind('consult', ...chunk).all();
+    for (const row of result.results || []) conflicts.add(String(row.owner || ''));
+  }
+  return ids.filter(id => conflicts.has(id));
+}
+
+async function consultRewardLockDetails(env, app, staffIds) {
+  const ids = [...new Set((staffIds || []).map(id => String(id || '')).filter(id => SAFE_ID.test(id)))];
+  if (app !== 'consult' || !ids.length) return {};
+  const authoritativeStaff = [];
+  const authoritativeRewardChecks = [];
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM staff WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind('consult', ...chunk).all();
+    for (const row of result.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); }
+      catch (error) { continue; }
+      authoritativeStaff.push({
+        table: 'staff', key: String(row.id || ''), owner: row.owner == null ? null : String(row.owner),
+        data, updated_at: Number(row.updated_at) || 0, srv_at: Number(row.srv_at) || 0,
+        authoritative: true
+      });
+    }
+    const rewardResult = await env.DB.prepare(
+      'SELECT k,owner,data,updated_at,srv_at FROM checks WHERE app=? AND owner IN (' + placeholders + ') ' +
+      "AND json_valid(data)=1 AND json_extract(data,'$.kind')='consult_reward_redemption' " +
+      "AND json_extract(data,'$.staffId')=owner AND json_extract(data,'$.status')='processing'"
+    ).bind('consult', ...chunk).all();
+    for (const row of rewardResult.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); }
+      catch (error) { continue; }
+      if (String(row.k || '') !== consultRewardKey(String(row.owner || ''), String(data.requestId || ''))) continue;
+      delete data.claimActorHash;
+      authoritativeRewardChecks.push({
+        table: 'checks', key: String(row.k || ''), owner: row.owner == null ? null : String(row.owner),
+        data, updated_at: Number(row.updated_at) || 0, srv_at: Number(row.srv_at) || 0,
+        authoritative: true
+      });
+    }
+  }
+  return { conflictStaffIds: ids, authoritativeStaff, authoritativeRewardChecks };
+}
+
+function consultRewardKey(staffId, requestId) {
+  return CONSULT_REWARD_PREFIX + staffId + '|' + requestId;
+}
+
+function parseConsultRewardRow(row, key, staffId, requestId) {
+  if (!row || String(row.owner || '') !== staffId) return null;
+  let data;
+  try { data = JSON.parse(row.data || '{}'); }
+  catch (error) { return null; }
+  const status = String(data && data.status || '');
+  if (!data || data.kind !== 'consult_reward_redemption' || Number(data.version) !== 1 ||
+      data.staffId !== staffId || data.requestId !== requestId ||
+      !['processing', 'fulfilled', 'cancelled'].includes(status)) return null;
+  const claimActorHash = String(data.claimActorHash || '');
+  if (!/^sha256:[0-9a-f]{64}$/.test(claimActorHash)) return null;
+  const claimedAt = Number(data.claimedAt) || 0;
+  const updatedAt = Number(data.updatedAt) || Number(row.updated_at) || 0;
+  if (!claimedAt || !updatedAt) return null;
+  return { key, status, claimedAt, updatedAt, data, dbUpdatedAt: Number(row.updated_at) || 0 };
+}
+
+async function readConsultReward(env, key, staffId, requestId) {
+  const row = await env.DB.prepare(
+    'SELECT owner,data,updated_at FROM checks WHERE app=? AND k=? LIMIT 1'
+  ).bind('consult', key).first();
+  return parseConsultRewardRow(row, key, staffId, requestId);
+}
+
+function consultRewardPayload(record, extra) {
+  return Object.assign({
+    ok: true,
+    key: record.key,
+    status: record.status,
+    claimedAt: record.claimedAt,
+    takenOverAt: Number(record.data.takenOverAt) || 0,
+    updatedAt: record.updatedAt
+  }, extra || {});
+}
+
+async function handleConsultReward(env, app, body, origin, auth) {
+  if (app !== 'consult') {
+    return json({ ok: false, error: '컨설팅 앱에서만 사용할 수 있습니다' }, 400, origin);
+  }
+  if (!auth || auth.scope !== 'all' || auth.device !== true ||
+      !/^sha256:[0-9a-f]{64}$/.test(String(auth.rewardActorHash || ''))) {
+    return json({ ok: false, code: 'ADMIN_DEVICE_REQUIRED',
+      error: '원장 기기 로그인을 다시 연결한 뒤 문화상품권 교환을 처리해 주세요' }, 403, origin);
+  }
+  const action = String(body.action || '');
+  if (!['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action)) {
+    return json({ ok: false, error: 'action은 claim, reject, takeover, fulfill 또는 cancel이어야 합니다' }, 400, origin);
+  }
+  const allowedKeys = new Set(['app', 'auth', 'action', 'staffId', 'requestId']);
+  if (Object.keys(body || {}).some(key => !allowedKeys.has(key))) {
+    return json({ ok: false, error: '상품권 코드, URL 또는 지원하지 않는 값은 받을 수 없습니다' }, 400, origin);
+  }
+  const staffId = String(body.staffId || '');
+  const requestId = String(body.requestId || '');
+  if (!SAFE_ID.test(staffId)) {
+    return json({ ok: false, error: '올바른 학생 ID가 필요합니다' }, 400, origin);
+  }
+  if (!SAFE_REWARD_REQUEST_ID.test(requestId)) {
+    return json({ ok: false, error: '교환 요청 ID는 8~128자 영문, 숫자, _, -만 사용할 수 있습니다' }, 400, origin);
+  }
+  const key = consultRewardKey(staffId, requestId);
+  if (action === 'reject') {
+    const existing = await readConsultReward(env, key, staffId, requestId);
+    if (existing) {
+      if (existing.status === 'cancelled') {
+        return json(consultRewardPayload(existing, { changed: false, owned: false }), 200, origin);
+      }
+      return json({ ok: false, error: '이미 처리 중이거나 지급 완료한 교환 신청은 접수 취소로 바꿀 수 없습니다' }, 409, origin);
+    }
+    const student = await activeStaffData(env, 'consult', staffId);
+    if (!student || String(student.id || '') !== staffId || student.owner || student.manager) {
+      return json({ ok: false, error: '활성 컨설팅 학생을 찾을 수 없습니다' }, 404, origin);
+    }
+    const stamp = Date.now();
+    const data = {
+      kind: 'consult_reward_redemption', version: 1, ledgerVersion: 'v1',
+      staffId, requestId, status: 'cancelled', claimActorHash: auth.rewardActorHash,
+      claimedAt: stamp, rejectedAt: stamp, cancelledAt: stamp, updatedAt: stamp
+    };
+    const requestKey = '__pointrequest__' + staffId + '|all';
+    const inserted = await env.DB.prepare(
+      'INSERT OR IGNORE INTO checks(app,k,owner,data,updated_at,srv_at) ' +
+      'SELECT ?,?,?,?,?,? WHERE EXISTS (' +
+      ' SELECT 1 FROM checks request_row, json_each(request_row.data, \'$.requests\') request_item' +
+      ' WHERE request_row.app=? AND request_row.k=? AND request_row.owner=?' +
+      " AND json_extract(request_item.value,'$.id')=?" +
+      " AND json_extract(request_item.value,'$.status')='requested'" +
+      " AND COALESCE(json_extract(request_item.value,'$.cancelledAt'),0)=0" +
+      " AND COALESCE(json_extract(request_item.value,'$.requestedAt'),0)>0" +
+      ') AND EXISTS (' +
+      ' SELECT 1 FROM staff student_row WHERE student_row.app=? AND student_row.id=?' +
+      " AND json_valid(student_row.data)=1 AND json_extract(student_row.data,'$.id')=?" +
+      " AND COALESCE(json_extract(student_row.data,'$.deleted'),0)=0" +
+      " AND COALESCE(json_extract(student_row.data,'$.owner'),0)=0" +
+      " AND COALESCE(json_extract(student_row.data,'$.manager'),0)=0" +
+      ')'
+    ).bind(
+      'consult', key, staffId, JSON.stringify(data), stamp, stamp,
+      'consult', requestKey, staffId, requestId,
+      'consult', staffId, staffId
+    ).run();
+    const record = await readConsultReward(env, key, staffId, requestId);
+    if (record && record.status === 'cancelled') {
+      return json(consultRewardPayload(record, {
+        changed: Number(inserted && inserted.meta && inserted.meta.changes || 0) === 1,
+        owned: false
+      }), 200, origin);
+    }
+    if (record) return json({ ok: false, error: '다른 원장 기기에서 교환 처리를 먼저 시작했습니다' }, 409, origin);
+    return json({ ok: false, error: '유효한 교환 신청을 찾을 수 없습니다' }, 409, origin);
+  }
+
+  if (action === 'claim') {
+    // 한 번 생성된 원장 행은 이후 학생 상태나 신청 취소와 무관하게 권위가 있다.
+    const existing = await readConsultReward(env, key, staffId, requestId);
+    if (existing) {
+      const owned = existing.status === 'processing' && safeEqual(existing.data.claimActorHash, auth.rewardActorHash);
+      return json(consultRewardPayload(existing, { claimed: owned, owned, resumed: owned }), 200, origin);
+    }
+    const student = await activeStaffData(env, 'consult', staffId);
+    if (!student || String(student.id || '') !== staffId || student.owner || student.manager) {
+      return json({ ok: false, error: '활성 컨설팅 학생을 찾을 수 없습니다' }, 404, origin);
+    }
+    const stamp = Date.now();
+    const data = {
+      kind: 'consult_reward_redemption', version: 1,
+      ledgerVersion: 'v1',
+      staffId, requestId, status: 'processing',
+      claimActorHash: auth.rewardActorHash,
+      claimedAt: stamp, updatedAt: stamp
+    };
+    const requestKey = '__pointrequest__' + staffId + '|all';
+    const rewardPrefix = CONSULT_REWARD_PREFIX + staffId + '|';
+    const inserted = await env.DB.prepare(
+      'INSERT OR IGNORE INTO checks(app,k,owner,data,updated_at,srv_at) ' +
+      'SELECT ?,?,?,?,?,? WHERE EXISTS (' +
+      ' SELECT 1 FROM checks request_row, json_each(request_row.data, \'$.requests\') request_item' +
+      ' WHERE request_row.app=? AND request_row.k=? AND request_row.owner=?' +
+      " AND json_extract(request_item.value,'$.id')=?" +
+      " AND json_extract(request_item.value,'$.status')='requested'" +
+      " AND COALESCE(json_extract(request_item.value,'$.cancelledAt'),0)=0" +
+      " AND COALESCE(json_extract(request_item.value,'$.requestedAt'),0)>0" +
+      ') AND EXISTS (' +
+      ' SELECT 1 FROM staff student_row WHERE student_row.app=? AND student_row.id=?' +
+      " AND json_valid(student_row.data)=1 AND json_extract(student_row.data,'$.id')=?" +
+      " AND COALESCE(json_extract(student_row.data,'$.deleted'),0)=0" +
+      " AND COALESCE(json_extract(student_row.data,'$.owner'),0)=0" +
+      " AND COALESCE(json_extract(student_row.data,'$.manager'),0)=0" +
+      ') AND NOT EXISTS (' +
+      ' SELECT 1 FROM checks reward_row WHERE reward_row.app=? AND reward_row.owner=?' +
+      ' AND substr(reward_row.k,1,?)=? AND json_valid(reward_row.data)=1' +
+      " AND json_extract(reward_row.data,'$.kind')='consult_reward_redemption'" +
+      " AND json_extract(reward_row.data,'$.staffId')=?" +
+      " AND json_extract(reward_row.data,'$.status')='processing'" +
+      ')'
+    ).bind(
+      'consult', key, staffId, JSON.stringify(data), stamp, stamp,
+      'consult', requestKey, staffId, requestId,
+      'consult', staffId, staffId,
+      'consult', staffId, rewardPrefix.length, rewardPrefix, staffId
+    ).run();
+    const record = await readConsultReward(env, key, staffId, requestId);
+    if (!record) {
+      const processing = await env.DB.prepare(
+        "SELECT 1 AS found FROM checks WHERE app=? AND owner=? AND substr(k,1,?)=? " +
+        "AND json_valid(data)=1 AND json_extract(data,'$.kind')='consult_reward_redemption' " +
+        "AND json_extract(data,'$.staffId')=? AND json_extract(data,'$.status')='processing' LIMIT 1"
+      ).bind('consult', staffId, rewardPrefix.length, rewardPrefix, staffId).first();
+      return processing
+        ? json({ ok: false, code: 'REWARD_ALREADY_PROCESSING', error: '이 학생의 다른 교환 요청을 이미 처리 중입니다' }, 409, origin)
+        : json({ ok: false, error: '유효한 교환 신청을 찾을 수 없습니다' }, 409, origin);
+    }
+    const owned = record.status === 'processing' && safeEqual(record.data.claimActorHash, auth.rewardActorHash);
+    const created = Number(inserted && inserted.meta && inserted.meta.changes || 0) === 1;
+    return json(consultRewardPayload(record, { claimed: owned, owned, resumed: owned && !created }), 200, origin);
+  }
+
+  const current = await readConsultReward(env, key, staffId, requestId);
+  if (!current) return json({ ok: false, error: '교환 요청을 찾을 수 없습니다' }, 404, origin);
+  const owned = safeEqual(current.data.claimActorHash, auth.rewardActorHash);
+
+  if (action === 'takeover') {
+    if (current.status !== 'processing') {
+      return json({ ok: false, error: '처리 중인 교환만 다른 기기로 인계할 수 있습니다' }, 409, origin);
+    }
+    if (owned) return json(consultRewardPayload(current, { changed: false, owned: true }), 200, origin);
+    const availableAt = current.updatedAt + CONSULT_REWARD_TAKEOVER_MS;
+    if (Date.now() < availableAt) {
+      return json({ ok: false, code: 'REWARD_TAKEOVER_NOT_READY', availableAt,
+        error: '처리 시작 또는 최근 인계 후 30분이 지나야 다른 원장 기기로 인계할 수 있습니다' }, 409, origin);
+    }
+    const stamp = Math.max(Date.now(), current.updatedAt + 1);
+    const data = Object.assign({}, current.data, {
+      claimActorHash: auth.rewardActorHash,
+      takenOverAt: stamp,
+      updatedAt: stamp
+    });
+    const changed = await env.DB.prepare(
+      "UPDATE checks SET data=?,updated_at=?,srv_at=? WHERE app=? AND k=? AND owner=? AND updated_at=? " +
+      "AND json_extract(data,'$.status')='processing' AND json_extract(data,'$.claimActorHash')=?"
+    ).bind(JSON.stringify(data), stamp, stamp, 'consult', key, staffId, current.dbUpdatedAt,
+      current.data.claimActorHash).run();
+    const latest = await readConsultReward(env, key, staffId, requestId);
+    if (latest && latest.status === 'processing' && safeEqual(latest.data.claimActorHash, auth.rewardActorHash)) {
+      return json(consultRewardPayload(latest, {
+        changed: Number(changed && changed.meta && changed.meta.changes || 0) === 1,
+        owned: true
+      }), 200, origin);
+    }
+    return json({ ok: false, error: '다른 원장 기기에서 교환 처리를 먼저 인계했습니다' }, 409, origin);
+  }
+
+  if (!owned) {
+    return json({ ok: false, code: 'REWARD_NOT_OWNER', error: '처리를 선점한 원장 기기에서만 완료하거나 취소할 수 있습니다' }, 403, origin);
+  }
+  const targetStatus = action === 'fulfill' ? 'fulfilled' : 'cancelled';
+  if (current.status === targetStatus) {
+    return json(consultRewardPayload(current, { changed: false, owned: true }), 200, origin);
+  }
+  if (current.status !== 'processing') {
+    return json({ ok: false, error: current.status === 'fulfilled'
+      ? '지급 완료한 교환은 취소할 수 없습니다'
+      : '취소한 교환은 지급 완료로 바꿀 수 없습니다' }, 409, origin);
+  }
+
+  const stamp = Math.max(Date.now(), current.updatedAt + 1);
+  const data = Object.assign({}, current.data, {
+    status: targetStatus,
+    updatedAt: stamp,
+    [targetStatus === 'fulfilled' ? 'fulfilledAt' : 'cancelledAt']: stamp
+  });
+  const changed = await env.DB.prepare(
+    "UPDATE checks SET data=?,updated_at=?,srv_at=? " +
+    "WHERE app=? AND k=? AND owner=? AND updated_at=? AND json_extract(data,'$.status')='processing' " +
+    "AND json_extract(data,'$.claimActorHash')=?"
+  ).bind(JSON.stringify(data), stamp, stamp, 'consult', key, staffId, current.dbUpdatedAt,
+    auth.rewardActorHash).run();
+  const latest = await readConsultReward(env, key, staffId, requestId);
+  if (!latest) return json({ ok: false, error: '교환 요청 상태를 확인할 수 없습니다' }, 409, origin);
+  if (latest.status === targetStatus) {
+    return json(consultRewardPayload(latest, {
+      changed: Number(changed && changed.meta && changed.meta.changes || 0) === 1,
+      owned: safeEqual(latest.data.claimActorHash, auth.rewardActorHash)
+    }), 200, origin);
+  }
+  return json({ ok: false, error: '다른 원장 기기에서 교환 상태가 먼저 변경되었습니다' }, 409, origin);
+}
+
 async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
@@ -645,6 +995,15 @@ async function handleSync(env, app, body, origin) {
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
+    // 상품권 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
+    // 관리 화면이 내려받은 행을 generic LWW로 재전송해도 덮어쓰지 않는다.
+    if (t === 'checks' && app === 'consult' && String(c.k || '').startsWith(CONSULT_REWARD_PREFIX)) {
+      if (auth.scope === 'own') {
+        return json({ ok: false, code: 'REWARD_TX_ENDPOINT_REQUIRED',
+          error: '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다' }, 403, origin);
+      }
+      continue;
+    }
     // 연락 기록은 서버 검증이 있는 /contact-log에서만 저장한다.
     // 클라이언트 캐시에 내려온 행이 generic LWW로 되올라와 정본을 덮지 않게 무시한다.
     if (t === 'checks' && /^__contact__/.test(String(c.k || ''))) continue;
@@ -705,6 +1064,11 @@ async function handleSync(env, app, body, origin) {
       error: '자동 발송 교재 주문은 전용 주문 화면에서 등록해 주세요' }, 409, origin);
   }
   const writeEntries = foldStaffEntries(accepted.filter(entry => !skipped.has(entry)));
+  const rewardStaffConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
+  if (rewardStaffConflicts.length) {
+    return rewardProcessingLockResponse(origin,
+      await consultRewardLockDetails(env, app, rewardStaffConflicts));
+  }
   const deactivations = await effectiveStaffDeactivations(env, app, writeEntries);
   const boardedDrivers = await boardedDriverConflicts(env, app, deactivations);
   if (boardedDrivers.length) {
@@ -720,6 +1084,11 @@ async function handleSync(env, app, body, origin) {
   if (stmts.length) {
     try { await env.DB.batch(stmts); }
     catch (error) {
+      if (isRewardProcessingLockError(error)) {
+        const racedConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
+        return rewardProcessingLockResponse(origin,
+          await consultRewardLockDetails(env, app, racedConflicts));
+      }
       if (isBoardingLockError(error)) return boardingLockResponse(origin);
       if (/BOOK_ORDER_SEALED|BOOK_ORDER_SEND_ACTIVE/.test(String(error && error.message || error))) {
         return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: '봉인된 교재 주문은 전용 주문 화면에서만 변경할 수 있습니다' }, 409, origin);
@@ -751,7 +1120,12 @@ async function handleSync(env, app, body, origin) {
     if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
     for (const r of rows) {
       if (t === 'checks' && forcedKeys.has(String(r.key))) continue;
-      out.push({ table: t, key: r.key, owner: r.owner, data: JSON.parse(r.data), updated_at: r.updated_at, srv_at: r.srv_at });
+      const data = JSON.parse(r.data);
+      // 선점 actor 해시는 서버 CAS 검증용이다. 읽기 동기화 응답에도 내보내지 않는다.
+      if (t === 'checks' && app === 'consult' && String(r.key || '').startsWith(CONSULT_REWARD_PREFIX) && data) {
+        delete data.claimActorHash;
+      }
+      out.push({ table: t, key: r.key, owner: r.owner, data: data, updated_at: r.updated_at, srv_at: r.srv_at });
     }
   }
 
@@ -1743,6 +2117,11 @@ export default {
 
     try {
       if (url.pathname === '/sync')   return await handleSync(env, app, body, okOrigin);
+      if (url.pathname === '/consult-reward') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleConsultReward(env, app, body, okOrigin, auth);
+      }
       if (url.pathname === '/token')  return await handleToken(env, app, body, okOrigin);
       if (url.pathname === '/bootstrap') return await handleBootstrap(env, app, body, okOrigin);
       if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
@@ -1975,6 +2354,7 @@ export default {
       if (url.pathname === '/curriculum') return await handleCurriculum(env, app, body, okOrigin);
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);
     } catch (e) {
+      if (isRewardProcessingLockError(e)) return rewardProcessingLockResponse(okOrigin);
       return json({ ok: false, error: String(e && e.message || e) }, 500, okOrigin);
     }
   }
