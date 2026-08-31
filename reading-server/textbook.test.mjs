@@ -512,6 +512,19 @@ t('예문은 모두 문맥 빈칸 문제가 된다', () => {
   assert.ok(n >= 600, '예문이 갑자기 줄었다 (' + n + '개)');
 });
 
+t('뜻풀이 줄이 예문 칸에 들어가지 않는다', () => {
+  /* 「인내심: 끝까지 해내는 마음」에 구멍을 뚫으면 「○○○: 끝까지 해내는 마음」이 되어
+     문제가 답을 알려 준다. 예문이 아니라 낱말 뜻 줄이 예문 칸에 들어간 것이다. */
+  const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
+  for (const [id] of BOOKS)
+    for (const l of findBook(TB, id).lessons)
+      for (const w of l.words) {
+        if (!w.example) continue;
+        assert.ok(!/^○○○\s*[:：—–-]/.test(QUIZ.blankExample(w)),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 예문이 뜻풀이 줄이다 — ' + w.example);
+      }
+});
+
 t('구멍 밖에 단서가 있는 예문만 남는다', () => {
   /* 「부들부들해요.」는 「○○○.」가, 「OO참변」은 「OO○○○」이 된다.
      보기 넷 중에서 고를 근거가 학생에게 없다 — 예문 없이 뜻 고르기로만 내는 편이 낫다. */
