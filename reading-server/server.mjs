@@ -118,7 +118,7 @@ function titleMap() {
     const m = {};
     for (const a of d.articles || []) {
       m[a.id] = {};
-      for (const lv of ['L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
+      for (const lv of ['L1', 'L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
     }
     TITLE_CACHE = { t: Date.now(), map: m };
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
@@ -136,7 +136,7 @@ function parentSummary(stu, st, vst) {
     const d = new Date(k + 'T12:00:00');
     weekDays.push({ dow: dows[d.getDay()], done: !!days[k], today: i === 0 });
   }
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L1 || titles[id].L4)) || id;
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -279,7 +279,7 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/level' && req.method === 'POST') {
         const { code, level } = await readBody(req);
         if (!db.students[code]) return json(res, 404, { error: '학생 없음' });
-        if (!['L2', 'L3', 'L4'].includes(level)) return json(res, 400, { error: '레벨은 L2/L3/L4' });
+        if (!['L1', 'L2', 'L3', 'L4'].includes(level)) return json(res, 400, { error: '과정은 L1/L2/L3/L4' });
         db.students[code].level = level;
         db.levelLog.push({ code, level, at: nowIso() });
         persist();
