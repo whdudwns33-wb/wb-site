@@ -41,10 +41,10 @@ const EXPECTED_INTERNAL_BOOKS = [
   ['studyforce', 'studyforce_passage_notes', '지문정리노트', 10000, null]
 ];
 
-test('내부교재 가격표는 독해창·어휘가 독해다·스터디포스 전 항목과 권 범위를 정확히 고정한다', () => {
+test('논리와 상상 추가 후에도 독해창·어휘가 독해다·스터디포스 전 항목과 권 범위는 그대로 유지한다', () => {
   const source = block('const INTERNAL_BOOK_OPTIONS =', 'let internalBookOptionCode');
   const options = new Function(`${source}\nreturn INTERNAL_BOOK_OPTIONS;`)();
-  assert.deepEqual(options.map(option => [
+  assert.deepEqual(options.filter(option => option.family !== 'logic').map(option => [
     option.family,
     option.productCode,
     option.label,
@@ -120,18 +120,20 @@ test('내부교재는 독해창·논리와 상상·어휘가 독해다·스터�
     assert.doesNotMatch(markup.match(/<details[^>]*>/)[0], /\bopen\b/, `${label}은 처음에는 접혀 있어야 합니다`);
     assert.match(view, new RegExp("internalBookFamilyDetails\\('" + key + "', '" + label + "'"));
   }
-  assert.match(view, /internalBookFamilyDetails\('logic', '논리와 상상', '<div class="hint">준비 중입니다.<\/div>'\)/);
+  assert.match(view, /internalBookFamilyDetails\('logic', '논리와 상상', internalBookVolumeOptionsHtml\('logic'\)\)/);
+  assert.doesNotMatch(view, /준비 중입니다/);
 });
 
 test('독해창은 제목과 가격 사이에서 제품별 정확한 권번호만 선택하게 한다', () => {
   const optionsSource = block('const INTERNAL_BOOK_OPTIONS =', 'let internalBookOptionCode');
   const options = new Function(`${optionsSource}\nreturn INTERNAL_BOOK_OPTIONS;`)();
-  const source = block('function internalBookReadingOptionsHtml(', 'function internalBookOrderSummaryHtml(');
+  const helpers = block('function internalBookHasVolume(', 'function internalBookDraftStudents(');
+  const source = block('function internalBookVolumeOptionsHtml(', 'function internalBookOrderSummaryHtml(');
   const render = new Function('INTERNAL_BOOK_OPTIONS', 'internalBookOptionCode', 'internalBookVolume',
-    'internalBookSubmitting', 'esc', `${source}\nreturn internalBookReadingOptionsHtml;`)(
+    'internalBookSubmitting', 'esc', `${helpers}\n${source}\nreturn internalBookVolumeOptionsHtml;`)(
       options, '', '', false, String
     );
-  const markup = render();
+  const markup = render('reading');
 
   for (const option of options.filter(row => row.family === 'reading')) {
     const start = markup.indexOf(`value="${option.productCode}"`);
