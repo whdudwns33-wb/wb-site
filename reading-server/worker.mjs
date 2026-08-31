@@ -257,6 +257,29 @@ export default {
       } catch (e) { return env.ASSETS.fetch(req); }
     }
 
+    /* 한자 카드도 같은 규칙을 받아야 한다. 이 파일은 빌드 때 미리 계산해 두는데,
+       강사가 '초안으로 내리기'를 누른 뒤에도 그 지문의 낱말이 카드에 남아 있으면
+       내린 내용이 학생에게 계속 보인다. 낱말마다 붙은 aid로 걸러 낸다. */
+    if (p === '/hanja.json') {
+      const res = await env.ASSETS.fetch(req);
+      try {
+        const map = await env.DB.get('pubmap', 'json');
+        const down = map ? new Set(Object.keys(map).filter(k => map[k] !== 'published')) : null;
+        if (!down || !down.size) return res;
+        const data = await res.json();
+        data.families = (data.families || [])
+          .map(f => ({ ...f, words: (f.words || []).filter(w => !down.has(w.aid)) }))
+          .filter(f => f.words.length >= 2); /* 낱말 1개짜리는 '같은 한자를 쓰는 낱말' 카드가 안 된다 */
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'public, max-age=604800',
+          },
+        });
+      } catch (e) { return env.ASSETS.fetch(req); }
+    }
+
     /* 버전 — 앱이 이것만 캐시 없이 받는다. 발행 상태가 바뀌면 값도 바뀌어야
        학생 기기의 캐시가 갱신된다. */
     if (p === '/version.json') {

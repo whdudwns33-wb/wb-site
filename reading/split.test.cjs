@@ -81,7 +81,7 @@ if (fs.existsSync(path.join(DIR, 'hanja.json'))) {
           if (!m) continue;
           if (!map[m[1]]) map[m[1]] = { ch: m[1], rd: m[2], words: {} };
           const at = v.hanja.split('+').findIndex(x => x.trim().indexOf(m[1]) === 0);
-          map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at };
+          map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at, aid: a.id };
         }
       }
     }
