@@ -388,4 +388,18 @@ await t('배정 — 학생 미선택·빈 단어·과다 배정 거절', async (
   assert.strictEqual(student.status, 403, '학생은 배정 못 함');
 });
 
+await t('AI 키가 없으면 연상 요청이 no-key로 돌아온다', async () => {
+  /* 앱은 이걸 보고 버튼을 감춘다. 여기서 200 + ok:false 를 지켜야
+     학생 화면이 오류처럼 보이지 않는다. */
+  const store = memStore();
+  const out = await call(store, {
+    path: '/api/vocab/mnemonic', method: 'POST', who: { code: 's1' },
+    getBody: async () => ({ word: '관측', meaning: '보고 재는 것', type: 'hanja' }),
+    ai: { apiKey: '', model: '' },
+  });
+  assert.strictEqual(out.status, 200, '키가 없다고 오류를 내면 안 된다');
+  assert.strictEqual(out.body.ok, false);
+  assert.strictEqual(out.body.reason, 'no-key');
+});
+
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');

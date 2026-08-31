@@ -255,7 +255,10 @@ export default {
     }
 
     try {
-      if (p === '/api/health') return json(200, { ok: true, service: 'wb-reading', runtime: 'workers', time: nowIso() });
+      /* ai: AI 연상을 쓸 수 있는지. 키가 없으면 앱이 「AI 연상 만들기」 버튼을 감춘다 —
+         눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
+         키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
+      if (p === '/api/health') return json(200, { ok: true, service: 'wb-reading', runtime: 'workers', time: nowIso(), ai: !!env.ANTHROPIC_API_KEY });
 
       /* 발행 상태 맵 — 공개 읽기 (지문 발행 여부는 민감정보가 아님, 운영 루틴이 git 반영에 사용) */
       if (p === '/api/pub' && req.method === 'GET') {
