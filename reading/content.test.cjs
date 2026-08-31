@@ -168,10 +168,7 @@ const ids = new Set();
  * 보도자료·통계표처럼 그 내용이 실제로 있는 페이지를 링크한다.
  * 아래 목록은 이 규칙을 만들기 전에 쓴 지문들 — 고칠 때마다 빼면 된다. */
 const SRC_GRANDFATHER = new Set([
-  'aging-society', 'ai-textbook', 'carbon-market', 'carbon-neutral', 'crispr-gene',
-  'gen-ai', 'hangeul-science', 'lvrad-moon', 'marine-heatwave', 'nuri-space',
-  'ocean-plastic', 'palace-stone', 'price-wage', 'region-power-price',
-  'sillok-record', 'webtoon-industry',
+  /* 2026-08-31 전부 실제 근거 문서로 교체 완료 — 목록이 비었으니 이제 모든 지문에 규칙이 적용된다 */
 ]);
 const isIndexPage = (u) => {
   let x; try { x = new URL(u); } catch { return false; }
