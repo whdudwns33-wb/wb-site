@@ -548,6 +548,51 @@ function render(opt){
 }
 function go(name,extra){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
 
+/* 선생님 연동 — 코드는 '요청'만 만들고, 강사가 승인해야 열린다.
+   코드가 유일한 자격 증명이라 그것만으로 열어 주면 친구 코드로도 들어갈 수 있었다. */
+let PEND_T=null;
+function pendStop(){if(PEND_T){clearInterval(PEND_T);PEND_T=null;}}
+function pendStart(){pendStop();PEND_T=setInterval(()=>syncPoll(false),4000);}
+function deviceLabel(){
+  const u=navigator.userAgent||'';
+  return /iPad/.test(u)?'아이패드':/iPhone/.test(u)?'아이폰':/Android/.test(u)?'안드로이드':/Mac/.test(u)?'맥':/Windows/.test(u)?'윈도우':'기기';
+}
+function syncRequest(code){
+  const c=String(code||'').trim();
+  if(!c){sess.syncErr='학생 코드를 입력해 주세요.';render();return;}
+  sess.syncCode=c;sess.syncErr=null;
+  syncApi('/login',{method:'POST',body:JSON.stringify({code:c,device:deviceLabel()})})
+    .then(j=>{
+      if(j.token){return finishSync(j);}                   // 옛 서버 호환
+      sess.pend={nonce:j.nonce,name:j.name};render();
+      announce('선생님 승인을 기다리는 중이에요');
+      pendStart();
+    })
+    .catch(e=>{sess.syncErr=e.message;sess.pend=null;pendStop();render();});
+}
+function finishSync(j){
+  SYNC.auth={code:j.student.code,name:j.student.name,token:j.token,lastSync:null};
+  syncSaveAuth();sess.pend=null;sess.syncErr=null;sess.syncCode=null;pendStop();
+  return syncPull(true).then(()=>syncPush()).then(()=>{render();announce('선생님 연동 완료');});
+}
+function syncPoll(loud){
+  if(!sess.pend)return;
+  syncApi('/login/status?n='+encodeURIComponent(sess.pend.nonce))
+    .then(j=>{
+      if(j.token)return finishSync(j);
+      if(j.denied){sess.pend=null;pendStop();sess.syncErr='연동이 거절됐어요. 선생님께 확인해 주세요.';render();return;}
+      if(loud)announce('아직 승인 전이에요');
+    })
+    .catch(e=>{sess.pend=null;pendStop();sess.syncErr=e.message;render();});
+}
+/* QR로 들어오면 ?c=코드 — 학생이 코드를 손으로 칠 필요가 없다 */
+function consumeCodeLink(){
+  let c=null;
+  try{c=new URLSearchParams(location.search).get('c');}catch(e){}
+  if(c)try{history.replaceState(null,'',location.pathname);}catch(e){}   // 주소창에 코드를 남기지 않는다
+  return c;
+}
+
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
   const st=sess.ob||(sess.ob={step:'grade',grade:null,interests:[],diag:null});
@@ -606,7 +651,10 @@ function finishOnboard(levelOverride){
   const lv=levelOverride||LEVEL_OF[st.grade];
   S.profile={grade:st.grade,level:lv,interests:st.interests.slice(0,lv==='L1'?4:3),createdAt:dkey()};
   if(st.diagQ)S.diag={score:st.diagQ.correct,total:4,at:dkey(),level:lv};
-  save();go('home');
+  save();
+  const lc=sess.linkCode;                       /* QR로 들어왔다면 온보딩 뒤에 이어서 연동 */
+  go('home');
+  if(lc&&SYNC.avail&&!SYNC.auth){go('settings');syncRequest(lc);}
 }
 
 /* ───────────────────────── 홈 ───────────────────────── */
@@ -1046,9 +1094,14 @@ function vSettings(){
         마지막 동기화: ${SYNC.auth.lastSync?new Date(SYNC.auth.lastSync).toLocaleString('ko-KR'):'—'}</p>
         <div class="row2"><button class="btn sm ghost" data-act="sync-off">연동 해제</button>
         <button class="btn sm" data-act="sync-now">지금 동기화</button></div>`
-      :`<p class="sub" style="margin-top:9px">선생님께 받은 학생 코드를 입력하면 읽기 기록이 자동으로 전달되고, 레벨 조정도 반영돼요.</p>
-        <input type="text" id="syncCode" placeholder="학생 코드 (예: wb-101)">
-        <button class="btn sm" data-act="sync-login">연동하기</button>
+      :sess.pend?`<p class="sub" style="margin-top:9px"><b>${esc(sess.pend.name||'')}</b> — 선생님 승인을 기다리는 중이에요.</p>
+        <div class="note">선생님이 관리 화면에서 <b>승인</b>을 눌러 주시면 바로 연결됩니다. 옆에 계시면 지금 말씀드리세요.</div>
+        <div class="row2"><button class="btn sm ghost" data-act="sync-cancel">취소</button>
+        <button class="btn sm" data-act="sync-check">지금 확인</button></div>
+        ${sess.syncErr?`<p class="note">${esc(sess.syncErr)}</p>`:''}`
+      :`<p class="sub" style="margin-top:9px">선생님께 받은 학생 코드를 입력하면 읽기 기록이 자동으로 전달되고, 레벨 조정도 반영돼요. 코드를 넣은 뒤 <b>선생님 승인</b>을 한 번 받으면 그 뒤로는 자동입니다.</p>
+        <input type="text" id="syncCode" placeholder="학생 코드 (예: wb-a2b3c4)" value="${esc(sess.syncCode||'')}">
+        <button class="btn sm" data-act="sync-login">연동 요청하기</button>
         ${sess.syncErr?`<p class="note">${esc(sess.syncErr)}</p>`:''}`}
     </div>
     <div class="card"><h2>앱으로 쓰기</h2>
@@ -1853,12 +1906,9 @@ document.addEventListener('click',e=>{
   else if(act==='vq-done'){sess.vq=null;render();}
   else if(act==='set-int'){toggleInterest(S.profile.interests,t.dataset.v,S.profile.level,true);save();render({keep:true});}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
-  else if(act==='sync-login'){const code=($('#syncCode')||{}).value||'';
-    syncApi('/login',{method:'POST',body:JSON.stringify({code:code.trim()})})
-      .then(j=>{SYNC.auth={code:j.student.code,name:j.student.name,token:j.token,lastSync:null};syncSaveAuth();sess.syncErr=null;
-        return syncPull(true).then(()=>syncPush());})
-      .then(()=>{render();announce('선생님 연동 완료');})
-      .catch(e=>{sess.syncErr=e.message;render();});}
+  else if(act==='sync-login'){syncRequest(($('#syncCode')||{}).value||'');}
+  else if(act==='sync-check'){syncPoll(true);}
+  else if(act==='sync-cancel'){sess.pend=null;pendStop();sess.syncErr=null;render();}
   else if(act==='sync-now'){syncPush().then(()=>syncPull()).then(()=>{render();announce('동기화 완료');});}
   else if(act==='sync-off'){SYNC.auth=null;syncSaveAuth();render();}
   else if(act==='en-mode'){const lv=myLevel();if(sess.auto)autoStop(false);S.prefs.en[lv]=+t.dataset.m;save();render();}
@@ -2084,10 +2134,16 @@ window.addEventListener('appinstalled',()=>{
     $('#reloadBtn').addEventListener('click',()=>location.reload());
     return;
   }
+  const linkCode=consumeCodeLink();
   await syncHealth();
   if(SYNC.avail&&SYNC.auth)await syncPull();
   view={name:S.profile?'home':'onboard'};
   render();
+  /* QR로 들어왔고 아직 연동 전이면 곧바로 요청을 건다 */
+  if(linkCode&&SYNC.avail&&!SYNC.auth){
+    if(!S.profile){announce('먼저 학년을 정한 뒤 연동할게요');sess.linkCode=linkCode;}
+    else{go('settings');syncRequest(linkCode);}
+  }
 })();
 </script>
 </body>
