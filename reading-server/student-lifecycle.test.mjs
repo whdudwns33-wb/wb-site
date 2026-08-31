@@ -91,6 +91,8 @@ try {
     '⑨ 퇴원했는데 학부모 링크가 아직 열린다');
   ok(!((await req('/api/admin/pending', { token: admin })).body.pending || []).some(x => x.code === CODE),
     '⑨ 승인 대기 줄에 지운 학생이 남아 있다');
+  ok((await req('/api/admin/student/' + CODE, { token: admin })).status === 404,
+    '⑨ 지운 학생의 상세가 아직 200 이다 — 관리 화면이 빈 상세 창을 열다 터진다');
 
   /* ⑩ 같은 코드로 새 학생을 받으면 앞 학생 기록이 따라오면 안 된다 */
   await req('/api/admin/students', { method: 'POST', token: admin, body: { code: CODE, name: '새학생', level: 'L3' } });
