@@ -42,6 +42,8 @@ jobs:
         run: node reading-server/override.test.mjs
       - name: 반 명단 붙여넣기 테스트
         run: node reading-server/roster.test.mjs
+      - name: 어휘 나이 진단 테스트
+        run: node vocab-age/age.test.cjs
       - name: 학생 수명주기 테스트 (등록~퇴원)
         run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립
