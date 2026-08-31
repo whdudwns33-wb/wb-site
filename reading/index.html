@@ -520,12 +520,15 @@ function vOnboard(){
     let msg,offer=null;
     if(sc>=4&&li<LEVELS.length-1){msg='모두 맞혔어요! 한 단계 높은 글도 잘 읽을 것 같아요.';offer=LEVELS[li+1];}
     else if(sc<=1&&li>0){msg='조금 어려웠나 봐요. 한 단계 쉬운 글부터 차근차근 시작해도 좋아요.';offer=LEVELS[li-1];}
+    else if(sc<=1){msg='괜찮아요. 천천히 읽으면 금방 익숙해져요. 여기서 차근차근 시작할게요.';}
     else{msg='지금 학년 수준이 딱 맞아요. 여기서 시작할게요.';}
-    return `<div class="card hero"><p class="eyebrow">레벨 확인 결과</p><h1>4문제 중 ${sc}개 정답</h1>
+    /* 어떤 글로 시작하는지 이름을 분명히 보여 준다 — 학부모가 함께 볼 때 특히 중요 */
+    return `<div class="card hero"><p class="eyebrow">읽기 수준 확인 결과</p><h1>4문제 중 ${sc}개 정답</h1>
       <p class="sub">${msg}</p>
+      <p class="sub" style="margin-top:10px">시작할 글: <b>${LEVEL_LABEL[offer||lv]}</b> <span class="tag muted">${LEVEL_NOTE[offer||lv]||''}</span></p>
       ${offer?`<button class="btn" data-act="ob-finish" data-lv="${offer}">${LEVEL_LABEL[offer]} 글로 시작</button>
       <button class="btn ghost sm" data-act="ob-finish">${LEVEL_LABEL[lv]} 글 그대로 시작</button>`
-      :`<button class="btn" data-act="ob-finish">시작하기</button>`}</div>`;
+      :`<button class="btn" data-act="ob-finish">${LEVEL_LABEL[lv]} 글로 시작하기</button>`}</div>`;
   }
   return '';
 }
