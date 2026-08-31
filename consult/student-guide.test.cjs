@@ -70,6 +70,9 @@ test('student guide explains the required routine and optional modules', () => {
     /학생용 링크/
   ].forEach(pattern => assert.match(guide, pattern));
   assert.match(guide, /공부시간 기록과 인강 관리는 해당하는 학생만/);
+  assert.match(guide, /온라인 학습은 <code>학습<\/code> 탭에서 바로 실행/);
+  assert.match(guide, /온라인 학습은 <code>학습 완료 기록<\/code>을 눌러/);
+  assert.match(guide, /온라인 학습 실행·완료 기록/);
   assert.match(guide, /순공시간 기록[\s\S]*?시간을 기록하는 학생/);
   assert.match(guide, /인강 관리[\s\S]*?등록된 인강이 있는 학생만/);
   assert.match(guide, /data-go="today"/);

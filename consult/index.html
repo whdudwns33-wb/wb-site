@@ -883,12 +883,6 @@
   .planner-task-desc { margin-top: 2px; color: #817B6C; font-size: 11px; line-height: 1.4; white-space: pre-wrap; }
   .planner-task-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
   .planner-task-actions .btn { min-height: 29px; padding: 4px 7px; font-size: 10.5px; border-radius: 7px; }
-  .online-learning-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; margin: 8px 0; border: 1px solid #D9E5EE; border-radius: 11px; background: linear-gradient(135deg, #F7FBFF, #FFF); }
-  .online-learning-summary-copy { min-width: 0; }
-  .online-learning-summary-copy b, .online-learning-summary-copy span { display: block; }
-  .online-learning-summary-copy b { color: var(--navy); font-size: 12px; }
-  .online-learning-summary-copy span { margin-top: 2px; color: var(--mid-gray); font-size: 10px; line-height: 1.4; }
-  .online-learning-summary-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
   .learning-status { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 7px; border: 1px solid transparent; border-radius: 999px; font-size: 10.5px; font-weight: 900; line-height: 1.2; }
   .learning-status.is-todo { border-color: #D9DEE4; background: #F3F5F7; color: #66707A; }
   .learning-status.is-doing { border-color: #F1D39F; background: #FFF7E9; color: #91601B; }
@@ -899,6 +893,11 @@
   .learning-proof-tag { background: #FFF5E5; color: #8A5B12; }
   .learning-proof-tag.rejected { background: #FFF0F0; color: #A34C4C; }
   .learning-result-box { padding: 9px 10px; margin-top: 9px; border: 1px solid #DED6EF; border-radius: 9px; background: #FAF8FE; color: #5F5275; font-size: 11.5px; line-height: 1.45; }
+  .task.learning-direct-task { margin: 10px 0; padding: 13px; border: 1px solid var(--subject-color); border-radius: 13px; background: var(--subject-bg); }
+  .task.learning-direct-task:last-child { border-bottom: 1px solid var(--subject-color); }
+  .learning-direct-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+  .learning-direct-actions .btn { min-height: 42px; }
+  .learning-direct-actions .btn-primary { flex: 1 1 180px; }
   .planner-check-wrap { display: grid; place-items: center; border-left: 1px solid var(--subject-color); background: rgba(255,255,255,.48); }
   .planner-check { width: 23px; height: 23px; border: 2px solid var(--subject-color, #D897A6); border-radius: 50%; background: rgba(255,255,255,.55); color: transparent; font-size: 14px; font-weight: 900; line-height: 1; }
   .planner-task-row.done .planner-check, .planner-check.is-done { background: var(--subject-bg); border-color: var(--subject-color); color: var(--subject-text); }
@@ -938,6 +937,7 @@
   .today-next-copy b { overflow: hidden; color: var(--dark-gray); font-size: 13px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
   .today-next-copy span { color: var(--subject-text); font-size: 10.5px; font-weight: 800; }
   .today-next-more { margin-top: 7px; color: var(--mid-gray); font-size: 11px; text-align: center; }
+  .today-next-more .btn { margin-top: 7px; }
   .today-next-empty { padding: 14px 12px; border: 1px solid #B7E3C8; border-radius: 11px; background: #F3FCF6; text-align: center; }
   .today-next-empty b { display: block; color: #2E6E49; }
   .engagement-mini { margin-top: 13px; padding-top: 12px; border-top: 1px solid #DDE8F1; }
@@ -1001,8 +1001,7 @@
     .study-planner-pane + .study-planner-pane { border-left: none; border-top: 2px solid #CFC9B7; }
     .planner-list-head, .planner-task-row { grid-template-columns: 54px minmax(0, 1fr) 34px; }
     .planner-task-detail { padding-left: 7px; padding-right: 7px; }
-    .online-learning-summary { align-items: flex-start; flex-direction: column; }
-    .online-learning-summary-stats { justify-content: flex-start; }
+    .learning-direct-actions { display: grid; grid-template-columns: 1fr; }
     .daily-close-steps, .daily-close-item-grid, .week-close-summary, .week-followup-grid { grid-template-columns: 1fr; }
     .week-review-grid { grid-template-columns: 1fr; }
     .week-action-summary { align-items: flex-start; }
@@ -2520,7 +2519,7 @@ function studentSetupWizard(me, status) {
       '<div class="card-sub">평소에는 오늘 할 일 탭만 위에서 아래로 진행하면 됩니다.</div></div><span class="pill">마지막</span></div>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div><p>첫 카드에서 다음 공부를 확인하고, 배부 대기 항목은 <code>오늘 배부된 공부</code>에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 체크</b></div><p>끝낸 공부는 스터디 플래너에서 완료 표시합니다. 온라인 학습은 서비스에 맞는 학습 결과나 점수도 함께 입력합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 완료 기록</b></div><p>일반 공부는 스터디 플래너에서 완료 표시합니다. 리더스아이·메타수학 같은 온라인 학습은 <code>학습</code> 탭에서 바로 실행하고 결과를 기록합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div><p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div></div>' +
       '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
@@ -2592,10 +2591,10 @@ function viewStudentGuide() {
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div>' +
           '<p>첫 카드에서 이월·배부 공부·온라인 학습·인강·복습 순서를 확인하고, 필요하면 <code>오늘 배부된 공부</code>를 펼칩니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>체크리스트에 담기</b></div>' +
-          '<p>할 공부마다 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부 시작하기</b></div>' +
+          '<p>배부 공부는 <code>내 체크리스트로 가져오기</code>를 누릅니다. 온라인 학습은 <code>학습</code> 탭에서 바로 실행하고 완료 결과를 기록하며, 첫 카드의 버튼을 누르면 이동합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
-          '<p>공부를 마치면 스터디 플래너 오른쪽의 동그란 체크 칸을 누릅니다. 리더스아이는 오늘 학습 결과를, 메타수학은 점수·오답 수를 기록합니다.</p></div>' +
+          '<p>일반 공부는 스터디 플래너의 체크 칸을 누릅니다. 온라인 학습은 <code>학습 완료 기록</code>을 눌러 리더스아이는 오늘 학습 결과를, 메타수학은 점수·오답 수를 입력합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div>' +
           '<p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div>' +
       '</div>' +
@@ -2628,7 +2627,7 @@ function viewStudentGuide() {
         '<div class="student-guide-tab"><i>🗓</i><div><b>일정</b><span>시험·중요 일정과 월간 기록 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎓</i><div><b>학사관리</b><span>시험·수행평가와 자료 요청 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎬</i><div><b>인강</b><span>인강이 있는 학생의 일정·진도 관리</span></div></div>' +
-        '<div class="student-guide-tab"><i>📚</i><div><b>학습</b><span>온라인 학습·회독·제출 기록 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>📚</i><div><b>학습</b><span>온라인 학습 실행·완료 기록, 회독·제출 확인</span></div></div>' +
       '</div>' +
     '</div>' +
 
@@ -2656,6 +2655,8 @@ function viewToday() {
   const checklistPct = checklistTotal ? Math.round(checklistDone / checklistTotal * 100) : 0;
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
+  const plannerList = list.filter(task => !isOnlineLearningTask(task));
+  const plannerCarry = carry.filter(item => !isOnlineLearningTask(item.t));
   const priorCloseDates = session.isStaffLink && cursor === today() ? dailyUnclosedDates(me.id, cursor) : [];
   const priorWeekMon = session.isStaffLink && cursor === today() ? previousUnclosedWeek(me.id, cursor) : '';
   const priorMonthYm = session.isStaffLink && cursor === today() ? previousUnclosedMonth(me.id, cursor) : '';
@@ -2723,7 +2724,7 @@ function viewToday() {
           ? '완료 ' + counts.done + ' · 진행중 ' + counts.doing + ' · 미착수 ' + counts.todo +
             (counts.blocked ? ' · <b style="color:var(--coral)">막힘 ' + counts.blocked + '</b>' : '') +
             (checklistDone === checklistTotal ? ' · 오늘 완료 🎉' : '')
-          : (offers.length ? '배부된 공부를 체크리스트에 담아 시작해 보세요' : '체크리스트가 비어 있습니다')) +
+          : (offers.length ? '배부된 공부를 체크리스트에 담아 시작해 보세요' : '오늘 예정 학습이 없습니다')) +
       '</div>' +
       '<div class="bar"><i style="width:' + checklistPct + '%"></i></div>' +
     '</div></div></div>';
@@ -2742,9 +2743,9 @@ function viewToday() {
           '<button class="btn btn-primary" data-act="qadd">추가</button>' +
         '</div></div>';
     }
-    h += studyPlannerCard(me, cursor, list, carry, editable);
+    h += studyPlannerCard(me, cursor, plannerList, plannerCarry, editable);
   } else {
-    h += studyPlannerCard(me, cursor, list, [], false);
+    h += studyPlannerCard(me, cursor, plannerList, [], false);
   }
 
   if (editable && cursor === today()) {
@@ -2770,11 +2771,16 @@ function todayNextActionItems(me, list, carry, offers, lectureChecklist) {
   const addTask = (task, date, note, target, action) => {
     const source = LEARNING_SOURCES[task.source] || null;
     const subjectKey = taskStudySubjectKey(task);
+    const online = isOnlineLearningTask(task);
+    const previousOnline = online && date < today();
     add({
       key: 'task:' + task.id + '|' + date, subjectKey: subjectKey,
       title: task.title,
       note: [source ? source.icon + ' ' + source.label : '', note, task.estimatedMin ? '예상 ' + Number(task.estimatedMin) + '분' : ''].filter(Boolean).join(' · '),
-      target: target || 'studyPlanner', action: action || '플래너 보기'
+      target: target || 'studyPlanner',
+      go: online && !previousOnline ? 'study' : '',
+      dayDate: previousOnline ? date : '',
+      action: previousOnline ? '이전 날짜 마무리' : online ? '학습에서 완료 기록' : (action || '플래너 보기')
     });
   };
   const addLecture = (item, note, action) => {
@@ -2800,7 +2806,7 @@ function todayNextActionItems(me, list, carry, offers, lectureChecklist) {
     addTask(item.t, item.date, shortDate(item.date) + '에서 이월', 'studyPlanner', '이어서 공부'));
   list.filter(task => !isDone(task.id, today())).forEach(task => {
     const blocked = !!((getCheck(task.id, today()) || {}).blocked);
-    addTask(task, today(), blocked ? '막힘 확인 필요' : task.priority === 'high' ? '중요 공부' : '오늘 체크리스트',
+    addTask(task, today(), blocked ? '막힘 확인 필요' : task.priority === 'high' ? '중요 공부' : isOnlineLearningTask(task) ? '온라인 학습' : '오늘 체크리스트',
       'studyPlanner', blocked ? '막힘 확인' : '공부 시작');
   });
   lectureChecklist.filter(item => !item.done && !item.closed).forEach(item =>
@@ -2852,20 +2858,34 @@ function todayNextActionCard(me, list, carry, offers, lectureChecklist) {
   const close = dailyCloseState(me.id, today());
   const rows = close.canReport || close.complete ? [] : todayNextActionItems(me, list, carry, offers, lectureChecklist);
   const summary = engagementMonthSummary(me.id, ymOf(today()));
-  const preview = rows.slice(0, 4);
+  const preview = rows.slice().sort((a, b) => Number(b.go === 'study') - Number(a.go === 'study')).slice(0, 4);
+  const hidden = rows.filter(item => !preview.includes(item));
+  const hiddenOnline = hidden.filter(item => item.go === 'study').length;
+  const hiddenDetail = hidden.length - hiddenOnline;
+  const more = hidden.length
+    ? '<div class="today-next-more">' +
+        (hiddenDetail ? '아래 세부 학습 영역에 ' + hiddenDetail + '개가 더 있습니다.' : '') +
+        (hiddenOnline ? '<button class="btn btn-sm btn-ghost" data-go="study">온라인 학습 ' + hiddenOnline + '개 더 보기</button>' : '') +
+      '</div>'
+    : '';
   const hasActivity = engagementDayState(me.id, today()).hasActivity;
   const flow = '<div class="today-flow" aria-label="오늘 학습 3단계">' +
     '<span class="' + (close.complete ? 'done' : rows.length ? 'on' : 'done') + '">1 · 오늘 공부</span>' +
     '<span class="' + (close.complete || hasActivity ? 'done' : !rows.length ? 'on' : '') + '">2 · 체크·시간</span>' +
     '<span class="' + (close.complete ? 'done' : !rows.length && (hasActivity || close.canReport) ? 'on' : '') + '">3 · 학습 마무리</span></div>';
   const body = preview.length
-    ? '<div class="today-next-list">' + preview.map((item, index) => {
+      ? '<div class="today-next-list">' + preview.map((item, index) => {
         const subject = studySubject(item.subjectKey);
+        const actionButton = item.go
+          ? '<button class="btn btn-sm btn-ghost" data-go="' + esc(item.go) + '">' + esc(item.action) + '</button>'
+          : item.dayDate
+            ? '<button class="btn btn-sm btn-ghost" data-act="daypick" data-date="' + esc(item.dayDate) + '">' + esc(item.action) + '</button>'
+            : '<button class="btn btn-sm btn-ghost" data-act="todayjump" data-target="' + esc(item.target) + '">' + esc(item.action) + '</button>';
         return '<div class="today-next-row ' + subject.className + '"><span class="today-next-number">' + (index + 1) + '</span>' +
           '<div class="today-next-copy"><span>' + esc(item.note) + '</span><b>' + esc(item.title) + '</b></div>' +
-          '<button class="btn btn-sm btn-ghost" data-act="todayjump" data-target="' + esc(item.target) + '">' + esc(item.action) + '</button></div>';
-      }).join('') + '</div>' + (rows.length > preview.length ? '<div class="today-next-more">아래 세부 학습 영역에 ' + (rows.length - preview.length) + '개가 더 있습니다.</div>' : '')
-    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '체크리스트 확인 완료 · 이제 오늘 학습을 마무리하세요.') + '</b>' +
+          actionButton + '</div>';
+      }).join('') + '</div>' + more
+    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '오늘 예정 학습 확인 완료 · 이제 오늘 학습을 마무리하세요.') + '</b>' +
       (!close.complete ? '<button class="btn btn-primary btn-block mt14" data-act="todayjump" data-target="dailyCloseCard">오늘 학습 마무리</button>' : '') + '</div>';
   const rewardTag = '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span>';
   return '<div class="card today-next-card" id="todayNextAction"><div class="today-next-head"><div>' +
@@ -2952,7 +2972,7 @@ function learningResultModal(task, date) {
   }
   modal(source.icon + ' ' + source.label + ' 완료 기록',
     '<div class="guide mb14"><b>' + esc(task.title) + '</b><br>' +
-      '단계와 결과를 저장하면 플래너에 학생 완료로 표시됩니다.' +
+      '결과를 저장하면 오늘 학습 현황과 수행 보고에 학생 완료로 반영됩니다.' +
       (actualSecs ? '<br>이 과제에서 기록한 순공시간: <b>' + fmtDur(actualSecs) + '</b>' : '<br>과제별 순공시간은 공부 시작 버튼을 사용하면 함께 표시됩니다.') + '</div>' +
     fields +
     (task.evidenceMode === 'photo' ? '<div class="hint">완료 후 상세 화면에서 결과 인증사진도 제출해 주세요. 사진이 승인되면 원장 확인으로 바뀝니다.</div>' : ''),
@@ -2966,30 +2986,6 @@ function studyPlannerCard(me, date, list, carry, editable) {
   const studyTotal = stTotal(me.id, date);
   const lectures = ingChecklistItems(me.id, date);
   const todayCount = list.length + lectures.length;
-  const onlineEntries = carry.map(item => ({ task: item.t, date: item.date, trackingDate: date }))
-    .concat(list.map(task => ({ task: task, date: date, trackingDate: date })))
-    .filter(item => isOnlineLearningTask(item.task));
-  const onlineStates = onlineEntries.map(item => plannerLearningState(item.task, item.date, item.trackingDate));
-  const onlineDone = onlineStates.filter(item => item.check && item.check.done).length;
-  const onlineVerifiable = onlineStates.filter(item => item.proofRequired).length;
-  const onlineVerified = onlineStates.filter(item => item.key === 'verified').length;
-  const onlineDoing = onlineStates.filter(item => item.key === 'doing').length;
-  const onlineTodo = onlineStates.filter(item => item.key === 'todo').length;
-  const onlineBlocked = onlineStates.filter(item => item.key === 'blocked').length;
-  const proofError = onlineStates.some(item => item.proofError);
-  const proofLoading = !proofError && onlineStates.some(item => item.proofRequired && !item.proofReady);
-  const onlineSummary = onlineEntries.length ? '<div class="online-learning-summary" aria-label="온라인 학습 진행 현황">' +
-    '<div class="online-learning-summary-copy"><b>💻 온라인 학습 ' + onlineEntries.length + '개</b>' +
-      '<span>○ 미시작 · ◐ 진행 중 · ✓ 학생 완료 · 🛡 원장 확인(인증 과제)</span></div>' +
-    '<div class="online-learning-summary-stats">' +
-      (onlineTodo ? '<span class="learning-status is-todo">○ ' + onlineTodo + '</span>' : '') +
-      (onlineDoing ? '<span class="learning-status is-doing">◐ ' + onlineDoing + '</span>' : '') +
-      (onlineBlocked ? '<span class="learning-status is-blocked">× ' + onlineBlocked + '</span>' : '') +
-      '<span class="learning-status is-complete">✓ 학생 완료 ' + onlineDone + '/' + onlineEntries.length + '</span>' +
-      (onlineVerifiable ? '<span class="learning-status is-verified">🛡 원장 확인 ' + onlineVerified + '/' + onlineVerifiable + '</span>' : '') +
-      (proofError ? '<span class="tag learning-proof-tag rejected">📷 확인 오류</span>' : '') +
-      (proofLoading ? '<span class="tag learning-proof-tag">📷 확인 중</span>' : '') +
-    '</div></div>' : '';
   const checklist = '<div class="planner-list-head"><span>과목</span><span>세부 공부내용</span><span>완료</span></div>' +
     (carry.length
     ? '<div class="planner-divider">지난 미완료 · 오늘 이어서 공부해요</div>' +
@@ -3009,7 +3005,7 @@ function studyPlannerCard(me, date, list, carry, editable) {
     '</div>' +
     '<div class="study-planner">' +
       '<section class="study-planner-pane" aria-label="오늘 공부 체크리스트">' +
-        '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (todayCount + carry.length) + ' TASKS</span></div>' + onlineSummary + checklist + '</section>' +
+        '<div class="study-paper-col-title">TODAY CHECK LIST <span>' + (todayCount + carry.length) + ' TASKS</span></div>' + checklist + '</section>' +
       '<section class="study-planner-pane" aria-label="과목별 순공시간">' +
         '<div class="study-paper-col-title">TIME TABLE <span>실제 · 10분 단위</span></div>' + studyTimePanel(me, editable, true, date) + '</section>' +
     '</div></div>';
@@ -3123,6 +3119,7 @@ function taskRow(t, date, editable, isCarry) {
   const c = getCheck(t.id, date);
   const st = statusOf(t, date);
   const prog = taskProgress(t, c);
+  const subject = taskStudySubject(t);
   const learning = LEARNING_SOURCES[t.source] || null;
   const resourceUrl = safeHttpsUrl(t.resourceUrl);
   const learningDue = learning ? learningDueDate(t) : '';
@@ -3133,10 +3130,36 @@ function taskRow(t, date, editable, isCarry) {
   const noteHint = learning ? learning.noteHint : '메모 · 막힌 이유나 특이사항을 남기세요';
   const learningState = isOnlineLearningTask(t) ? plannerLearningState(t, date, date) : null;
   const learningLock = learningState ? learningProgressLock(t, date) : '';
-  const canToggle = editable && !learningLock;
+  const canToggle = editable && !learningLock && !learningState;
+  const running = learningState && date === today() ? stRunning(t.staffId, today()) : null;
+  const timingThis = !!(running && running.taskId === t.id);
+  let learningActions = '';
 
-  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + '" data-task="' + t.id + '">' +
-    '<button class="box" ' + (canToggle ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>' +
+  if (learningState && editable) {
+    const actions = [];
+    if (date === today() && st !== 'done' && !learningLock) {
+      actions.push('<button class="btn ' + (timingThis ? 'btn-warn' : 'btn-ghost') + '" data-act="sttask" data-id="' + esc(t.id) + '">' +
+        (timingThis ? '⏸ 공부 정지' : '▶ 공부 시작') + '</button>');
+    }
+    if (learningLock === 'verified') {
+      actions.push('<button class="btn btn-ghost" disabled>🛡 원장 확인 완료</button>');
+    } else if (learningLock === 'loading') {
+      actions.push('<button class="btn btn-ghost" disabled>📷 인증 확인 중</button>');
+    } else if (st === 'done') {
+      actions.push('<button class="btn btn-primary" data-act="learningresultopen" data-id="' + esc(t.id) + '" data-date="' + date + '">✏ 결과 보기·수정</button>');
+    } else if (date < today()) {
+      actions.push('<button class="btn btn-primary" data-act="daypick" data-date="' + date + '">이전 날짜 마무리 후 기록</button>');
+    } else if (date > today()) {
+      actions.push('<button class="btn btn-ghost" disabled>' + shortDate(date) + '부터 완료 기록</button>');
+    } else {
+      actions.push('<button class="btn btn-primary" data-act="learningresultopen" data-id="' + esc(t.id) + '" data-date="' + date + '">✓ 학습 완료 기록</button>');
+    }
+    learningActions = '<div class="learning-direct-actions">' + actions.join('') + '</div>';
+  }
+
+  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') +
+    (learningState ? ' learning-direct-task ' + subject.className : '') + '" data-task="' + t.id + '">' +
+    (learningState ? '' : '<button class="box" ' + (canToggle ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + date + '"' : 'disabled') + '>✓</button>') +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(t.title) + '</div>' +
       (t.detail ? '<div class="task-d">' + esc(t.detail) + '</div>' : '') +
@@ -3164,7 +3187,7 @@ function taskRow(t, date, editable, isCarry) {
         (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '') +
         (st === 'done' && c && c.at ? '<span class="tag ok">✓ ' + new Date(c.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' 완료</span>' : '') +
         originTags(t) +
-      '</div>';
+      '</div>' + learningActions;
 
   if (hasDetail && st !== 'done') {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
@@ -5444,12 +5467,17 @@ function learningSourceCard(me, editable, sourceKey) {
   const director = session.isAdmin;
   const academy = director || isManager();
   const appOnly = source.appOnly === true;
-  const list = learningTasksFor(me.id, sourceKey);
+  const onlineSource = ONLINE_LEARNING_SOURCE_KEYS.includes(sourceKey);
+  const list = learningTasksFor(me.id, sourceKey).filter(task =>
+    !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
+      String(row.dailyCarryFrom || '').startsWith(task.id + '|')));
   const help = director
     ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
     : academy
       ? esc(source.detail) + (appOnly ? ' 앱 연결은 휴대폰에서 이용합니다.' : source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
-      : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
+      : onlineSource
+        ? esc(source.detail) + '을 실행한 뒤 아래 과제의 ‘학습 완료 기록’에서 결과를 남깁니다.'
+        : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
   const url = appOnly
     ? classcardAppUrl(navigator.userAgent, navigator.maxTouchPoints)
     : academy && source.centerUrl ? source.centerUrl : source.studentUrl;
@@ -5467,15 +5495,17 @@ function learningSourceCard(me, editable, sourceKey) {
   const active = list.filter(task => !isDone(task.id, learningTaskDate(task)));
   const completed = list.filter(task => isDone(task.id, learningTaskDate(task)));
   const late = active.filter(task => learningDueDate(task) && learningDueDate(task) < today()).length;
+  const studentDue = onlineSource && session.isStaffLink && !isManager() &&
+    active.some(task => learningTaskDate(task) <= today());
   const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
   const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
 
-  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late ? ' open' : '') + '>' +
+  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late || studentDue ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        '<span class="pill' + (active.length ? ' warn' : '') + '">' + active.length + '건</span></span></summary>' +
+        '<span class="pill' + (active.length ? ' warn' : '') + '">' + (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span></span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
@@ -5505,14 +5535,16 @@ function viewStudy() {
     ? '현재 선택: ' + esc(me.name) + ' · 선택한 대상의 학습 현황을 관리하는 화면입니다.'
     : esc(me.name) + ' 본인의 학습 현황입니다.';
   const sourceKeys = Object.keys(LEARNING_SOURCES);
-  const learningTasks = sourceKeys.flatMap(key => learningTasksFor(me.id, key));
+  const learningTasks = sourceKeys.flatMap(key => learningTasksFor(me.id, key).filter(task =>
+    !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
+      String(row.dailyCarryFrom || '').startsWith(task.id + '|'))));
   const activeTasks = learningTasks.filter(task => !isDone(task.id, learningTaskDate(task)));
   const lateTasks = activeTasks.filter(task => learningDueDate(task) && learningDueDate(task) < today());
   const todayTasks = activeTasks.filter(task => learningTaskDate(task) <= today());
   const dueWrong = wnDue(me.id);
   const dueRounds = rdDue(me.id);
   h += '<div class="card study-hub-hero"><div class="card-title">' + roleLabel + ' · 학습 허브</div>' +
-    '<div class="card-sub">' + roleHelp + ' 오늘 실행은 오늘 탭에서, 상세 과제와 기록 관리는 이곳에서 합니다.</div>' +
+    '<div class="card-sub">' + roleHelp + ' 온라인 학습은 이 탭에서 바로 실행·완료 기록하고, 일반 공부는 오늘 탭에서 진행합니다.</div>' +
     '<div class="study-kpis"><div class="study-kpi"><span>진행 과제</span><b>' + activeTasks.length + '건</b></div>' +
       '<div class="study-kpi"><span>오늘·밀림</span><b>' + todayTasks.length + '건</b></div>' +
       '<div class="study-kpi"><span>마감 지연</span><b>' + lateTasks.length + '건</b></div>' +
@@ -5528,7 +5560,7 @@ function viewStudy() {
   if (session.isAdmin) h += metamathRequestInbox();
   h += submissionHubCard(me);
   [
-    { title: '온라인 학습', help: '온라인 학습·시험 과제와 진행 상태', keys: ONLINE_LEARNING_SOURCE_KEYS },
+    { title: '온라인 학습', help: '서비스 실행·완료 결과를 한곳에서 기록', keys: ONLINE_LEARNING_SOURCE_KEYS },
     { title: '자기주도 학습', help: '독해·독서·탐구 결과와 단계 기록', keys: ['wb_reading', 'reading', 'inquiry_report'] },
     { title: '시험 준비', help: '시험 일정과 연결된 제공 자료', keys: ['exam_material'] }
   ].forEach(group => {
@@ -12772,7 +12804,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.8';
+const APP_VER = '2026-08-31.9';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
