@@ -150,4 +150,84 @@ t('같은 꼴이 모자라면 나머지로 채운다 — 문항을 못 내는 �
   assert.strictEqual(q.choices.length, 4);
 });
 
+t('소리가 헷갈리는 짝을 알아본다', () => {
+  /* 교재가 강마다 가르치는 것이 바로 이 짝이다. 글자로 비교하면 못 잡는다 —
+     "거름"과 "걸음"은 두 글자가 다 다르지만 낱자로 풀면 ㄱㅓㄹㅡㅁ 으로 같다. */
+  const pairs = [['거름', '걸음'], ['반듯이', '반드시'], ['갔다', '같다'], ['마치다', '맞히다'],
+    ['부치다', '붙이다'], ['작다', '적다'], ['낫다', '낳다'], ['쫓다', '좇다'],
+    ['띠다', '띄다'], ['싸다', '쌓다'], ['사흘', '나흘'], ['잇다', '잊다']];
+  for (const [a, b] of pairs) assert.ok(Q.confusable(a, b), a + '/' + b + ' 를 짝으로 못 봤다');
+
+  const far = [['초원', '응달'], ['마치다', '속삭이다'], ['작다', '뙤약볕'], ['으뜸', '버금']];
+  for (const [a, b] of far) assert.strictEqual(Q.confusable(a, b), false, a + '/' + b + ' 를 짝으로 잘못 봤다');
+
+  assert.strictEqual(Q.confusable('작다', '작다'), false, '같은 낱말은 짝이 아니다');
+  assert.strictEqual(Q.confusable('', '작다'), false);
+});
+
+t('문맥 빈칸에서 헷갈리는 짝이 오답 1순위로 들어간다', () => {
+  const target = { id: 'w1', type: 'native', word: '마치다', meaning: '끝내다', example: '숙제를 마치고 놀았어요.' };
+  const pool = [target,
+    { id: 'w2', type: 'native', word: '맞히다', meaning: '정답을 알아내다' },
+    { id: 'w3', type: 'native', word: '거들다', meaning: '돕다' },
+    { id: 'w4', type: 'native', word: '번갈다', meaning: '번갈아 하다' },
+    { id: 'w5', type: 'native', word: '속삭이다', meaning: '작게 말하다' },
+    { id: 'w6', type: 'native', word: '연결하다', meaning: '잇다' },
+  ];
+  for (let seed = 1; seed <= 20; seed += 1) {
+    const q = Q._q.qCloze(target, pool, seeded(seed));
+    assert.ok(q, '문항이 만들어져야 한다');
+    assert.ok(q.choices.includes('맞히다'), '짝이 보기에 없다: ' + q.choices.join(', '));
+  }
+});
+
+t('예문 빈칸 — 2음절 용언의 활용형도 가려진다', () => {
+  /* 예전에는 한 글자 어간을 버려서(작다→작) 2음절 용언은 문항이 아예 안 나왔다.
+     하필 교재의 헷갈리는 말이 대부분 그 꼴이다. */
+  const cases = [
+    ['작다', '이 신발은 너무 작아요.', '이 신발은 너무 ○○○.'],
+    ['적다', '내 책이 친구보다 적어요.', '내 책이 친구보다 ○○○.'],
+    ['잇다', '실을 잇다', '실을 ○○○'],
+    ['마치다', '숙제를 마치고 놀았어요.', '숙제를 ○○○ 놀았어요.'],   // 어간은 '마'가 아니라 '마치'
+    ['속삭이다', '비밀 이야기를 친구에게 속삭였어요.', '비밀 이야기를 친구에게 ○○○.'],
+    ['관측', '별을 관측했다.', '별을 ○○○.'],
+  ];
+  for (const [word, example, want] of cases) {
+    assert.strictEqual(Q.blankExample({ word, example }), want, word + ' 의 빈칸이 어긋났다');
+  }
+});
+
+t('한 글자 어간은 남의 낱말 속에 걸리지 않는다', () => {
+  /* "작다"의 어간 '작'이 "작품"의 '작'에 걸리면 엉뚱한 자리가 가려진다 —
+     낱말이 시작하는 자리에서만 인정한다. */
+  assert.strictEqual(Q.blankExample({ word: '작다', example: '이 작품은 훌륭해요.' }), '이 ○○○ 훌륭해요.');
+  assert.strictEqual(Q.blankExample({ word: '작다', example: '내 마음이 작품 같아요.' }), '내 마음이 ○○○ 같아요.');
+  assert.strictEqual(Q.blankExample({ word: '잊다', example: '숙제를 다 했어요.' }), null, '없으면 문항을 만들지 않는다');
+});
+
+t('오답은 같은 강 낱말을 먼저 쓴다', () => {
+  /* 아이가 모르는 말(다른 학년 시드 단어)을 보기로 놓으면 뜻을 몰라도
+     "아는 말 하나"를 골라 맞힌다. 그건 확인이 아니다. */
+  const lesson = [
+    { id: 'tw-a-0', assignId: 'a', type: 'native', word: '마치다', meaning: '끝내다', example: '숙제를 마치고 놀았어요.' },
+    { id: 'tw-a-1', assignId: 'a', type: 'native', word: '맞히다', meaning: '정답을 알아내다' },
+    { id: 'tw-a-2', assignId: 'a', type: 'native', word: '거들다', meaning: '돕다' },
+    { id: 'tw-a-3', assignId: 'a', type: 'native', word: '맞대다', meaning: '닿게 하다' },
+  ];
+  const seeds = [
+    { id: 's0', type: 'native', word: '아우르다', meaning: '여럿을 모으다' },
+    { id: 's1', type: 'native', word: '가늠하다', meaning: '헤아리다' },
+    { id: 's2', type: 'native', word: '드넓다', meaning: '아주 넓다' },
+  ];
+  const words = lesson.map((w) => w.word);
+  for (let seed = 1; seed <= 20; seed += 1) {
+    const q = Q._q.qCloze(lesson[0], lesson.concat(seeds), seeded(seed));
+    assert.ok(q, '문항이 만들어져야 한다');
+    assert.ok(q.choices.includes('맞히다'), '짝이 빠졌다: ' + q.choices.join(', '));
+    for (const c of q.choices) {
+      assert.ok(words.includes(c), '같은 강 낱말로 채울 수 있는데 딴 데서 가져왔다: ' + c);
+    }
+  }
+});
+
 console.log('\n통과 ' + passed + '개 — 문제 출제 엔진 검증 완료');
