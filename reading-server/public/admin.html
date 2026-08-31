@@ -57,6 +57,11 @@
     details pre{white-space:pre-wrap;font:inherit;font-size:13px;background:#f8fcfe;border:1px solid #d6ebf4;border-radius:10px;padding:10px 12px;margin:6px 0 0}
     .linkrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
     .linkrow input{flex:1;min-width:220px;font-size:12.5px}
+  .pendrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line)}
+  .pendrow:first-of-type{border-top:0}
+  .qrbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
+  .qrbox svg{border:1px solid var(--line);border-radius:10px;background:#fff}
+  @media print{body *{visibility:hidden}#qrSheet,#qrSheet *{visibility:visible}#qrSheet{position:absolute;left:0;top:0;width:100%}}
   </style>
 </head>
 <body>
@@ -68,6 +73,7 @@
 </header>
 <main id="app"></main>
 <dialog id="dlg"></dialog>
+<script src="/admin/qr.js"></script>
 <script>
 'use strict';
 const $=s=>document.querySelector(s);
@@ -136,7 +142,16 @@ function render(){
   const linked=all.filter(s=>s.linked);
   const doneToday=linked.filter(s=>s.today).length;
   const backups=DATA.backups||[];
+  const pend=DATA.pending||[];
   $('#app').innerHTML=`
+  ${pend.length?`<div class="card" style="border-color:#c9503c">
+    <h2>연동 승인 대기 <span class="chip" style="background:#fbeae6;color:#c9503c">${pend.length}</span></h2>
+    <p class="muted">학생이 코드를 넣으면 여기 뜹니다. <b>본인이 맞는지 확인한 뒤</b> 승인해 주세요 — 승인해야 앱이 연결됩니다.</p>
+    ${pend.map(x=>`<div class="pendrow">
+      <span><b>${esc(x.name)}</b> <span class="muted">${esc(x.code)}${x.cls?' · '+esc(x.cls):''}${x.device?' · '+esc(x.device):''} · ${fmtLast(x.at)}</span></span>
+      <span><button class="btn sm ghost" data-deny="${esc(x.nonce)}">거절</button>
+      <button class="btn sm" data-appr="${esc(x.nonce)}">승인</button></span></div>`).join('')}
+  </div>`:''}
   <div class="card"><h2>오늘 현황</h2><div class="stats">
     <div class="stat"><b>${all.length}</b><span>등록 학생</span></div>
     <div class="stat"><b>${linked.length}</b><span>앱 연동</span></div>
@@ -186,6 +201,17 @@ function render(){
     </div>
     <textarea id="pmOut" hidden style="width:100%;min-height:220px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:10px;font:inherit;font-size:13px;line-height:1.6"></textarea></div>`;
   document.querySelectorAll('.chip[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
+  document.querySelectorAll('[data-appr]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    try{await api('/admin/pending',{method:'POST',body:JSON.stringify({nonce:b.dataset.appr,action:'approve'})});refresh();}
+    catch(e){alert(e.message);b.disabled=false;}
+  });
+  document.querySelectorAll('[data-deny]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('이 연동 요청을 거절할까요?\n본인이 아닌 학생이 코드를 넣었을 때 거절하세요.'))return;
+    b.disabled=true;
+    try{await api('/admin/pending',{method:'POST',body:JSON.stringify({nonce:b.dataset.deny,action:'deny'})});refresh();}
+    catch(e){alert(e.message);b.disabled=false;}
+  });
   document.querySelectorAll('select[data-lv]').forEach(sel=>sel.onchange=async()=>{
     if(!sel.value)return;
     try{await api('/admin/level',{method:'POST',body:JSON.stringify({code:sel.dataset.lv,level:sel.value})});refresh();}
@@ -281,6 +307,9 @@ async function openDetail(code){
       </div>
       <p class="muted" id="tbMsg" style="margin-top:6px">${cur.bookId?'현재 '+esc(bookNow?bookNow.short:cur.bookId)+' '+cur.lesson+'강':'아직 지정하지 않았어요.'}</p>
     </div>
+    <div class="dlg-sec"><h3>앱 연동 QR</h3>
+      <div class="qrbox" id="qrBox"></div>
+    </div>
     <div class="dlg-sec"><h3>학부모 리포트 링크</h3>
       <p class="muted">로그인 없이 아이의 주간 현황만 보이는 읽기 전용 페이지예요. 학부모께 링크를 보내 주세요.</p>
       <div class="linkrow">
@@ -314,6 +343,23 @@ async function openDetail(code){
       $('#plUrl').value=u;copyText(u);}
     catch(e){alert(e.message);}
   };
+  /* 연동 QR — 학생이 코드를 손으로 칠 필요가 없다. 찍으면 요청이 걸리고 강사가 승인하면 끝. */
+  const qb=$('#qrBox');
+  if(qb&&window.WBQR){
+    const link=location.origin+'/?c='+encodeURIComponent(code);
+    try{
+      qb.innerHTML=`<div id="qrSheet" style="text-align:center">${WBQR.svg(link,{size:200})}
+        <div style="margin-top:8px;font-weight:900;color:#173957">${esc(stu.name||'')} <span style="font-weight:600;color:#647784">${esc(code)}</span></div>
+        <div style="font-size:12px;color:#647784">WB 진로독서 — 카메라로 찍으면 연결돼요</div></div>
+        <div style="flex:1;min-width:200px">
+          <p class="muted" style="margin:0 0 8px">학생 기기 카메라로 이 QR을 찍으면 앱이 열리고 연동 요청이 걸립니다. 그다음 위쪽 <b>연동 승인 대기</b>에서 승인하면 끝이에요.</p>
+          <div class="linkrow"><input readonly value="${esc(link)}"><button class="btn sm ghost" id="qrCopy">링크 복사</button>
+          <button class="btn sm ghost" id="qrPrint">인쇄</button></div>
+        </div>`;
+      const qc=$('#qrCopy');if(qc)qc.onclick=()=>copyText(link);
+      const qp=$('#qrPrint');if(qp)qp.onclick=()=>window.print();
+    }catch(e){qb.innerHTML='<p class="muted">QR을 만들지 못했어요: '+esc(e.message)+'</p>';}
+  }
   const pr=$('#plReset');
   if(pr)pr.onclick=async()=>{
     if(!confirm('기존 학부모 링크가 무효화됩니다. 재발급할까요?'))return;
@@ -325,13 +371,14 @@ async function openDetail(code){
 }
 async function refresh(){
   try{
-    const [ov,bk,vv,vr]=await Promise.all([
+    const [ov,bk,vv,vr,pd]=await Promise.all([
       api('/admin/overview'),
       api('/admin/backups').catch(()=>({backups:[]})),
       api('/vocab/admin/overview').catch(()=>({students:[]})),
       api('/vocab/admin/review').catch(()=>({items:[]})),
+      api('/admin/pending').catch(()=>({pending:[]})),
     ]);
-    DATA=ov;DATA.backups=bk.backups||[];
+    DATA=ov;DATA.backups=bk.backups||[];DATA.pending=pd.pending||[];
     DATA.vmap={};(vv.students||[]).forEach(s=>{DATA.vmap[s.code]=s;});
     DATA.vpending=(vr.items||[]).filter(i=>i.status==='pending').length;
     render();
