@@ -13,13 +13,20 @@ const stem = (w) => w.replace(/(하다|되다|이다|다)$/, '');
 /* 낱말이 아닌 것 — 어간 부스러기와 수업 용어 */
 const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기)$/;
 /* 활동·설명 제목도 콜론을 달고 나온다 — "구별 활동: …", "예시 정리: …". 낱말이 아니다. */
-const NOT_WORD2 = /(활동|하기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|같습니다)$/;
+const NOT_WORD2 = /(활동|하기|만들기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|같습니다)$/;
 
 /* 두 토막인데 앞 토막이 조사로 끝나면 낱말이 아니라 예문 구절이다 —
    "종이를 찢다", "고무줄을 늘인다". 진짜 낱말(찢다·늘이다)은 따로 잡힌다.
    "흉내 내다", "체험 학습"처럼 조사가 없는 두 토막은 그대로 둔다. */
 const PHRASE = /(를|을|이|가|은|는|에|로|와|과|의)$/;
-const isPhrase = (w) => { const p = String(w).split(/\s+/); return p.length === 2 && PHRASE.test(p[0]); };
+/* 앞 토막이 꾸미는 말이어도 낱말이 아니라 구절이다 —
+   "나달나달한 깃발", "새로운 경험", "느리게 걷는다". 꾸밈을 받는 쪽이 낱말인 것도 아니다:
+   그 강이 가르치는 것은 꾸미는 말(나달나달·새롭다) 쪽이고, 그건 따로 잡힌다. */
+const ADNOM = /(한|운|는|던|게|인)$/;
+const isPhrase = (w) => {
+  const p = String(w).split(/\s+/);
+  return p.length === 2 && (PHRASE.test(p[0]) || ADNOM.test(p[0]));
+};
 const okWord = (w) => /^[가-힣]{2,6}(\s[가-힣]{1,4})?$/.test(w) && !NOT_WORD.test(w)
   && !/(세요|합니다|어요)$/.test(w)    // "질문해보세요" 같은 당부문은 낱말이 아니다
   && !NOT_WORD2.test(w);
@@ -27,10 +34,12 @@ const okWord = (w) => /^[가-힣]{2,6}(\s[가-힣]{1,4})?$/.test(w) && !NOT_WORD
 /* 두 토막짜리 후보의 앞 토막이 앞 문장의 꼬리일 때가 있다 —
    "…설명해 주세요 환기: 실내 공기를…" 에서 「주세요 환기」를 낱말로 집어 온다.
    앞 토막이 용언 어미로 끝나면 그것만 떼어낸다. */
+/* 앞 토막이 수업 용어일 때도 마찬가지다 — "…활용 방법 분류하다: 비슷한 것끼리…" */
 const VERB_TAIL = /(요|기|다|서|며|고|자|죠|음)$/;
 function trimLead(w) {
   const parts = String(w).split(/\s+/);
-  if (parts.length === 2 && VERB_TAIL.test(parts[0]) && okWord(parts[1])) return parts[1];
+  if (parts.length !== 2 || !okWord(parts[1])) return w;
+  if (VERB_TAIL.test(parts[0]) || NOT_WORD.test(parts[0])) return parts[1];
   return w;
 }
 
@@ -45,6 +54,10 @@ function cleanMeaning(v) {
   s = s.split(/\s[가-힣]{2,6}(?:\s[가-힣]{1,4})?\s*:/)[0];
   s = s.replace(/[.,]+$/, '');
   s = s.replace(TAIL, '').trim();
+  /* 「…뜻해요」를 떼어 내면 그 말이 거느리던 목적어 조사가 꼬리로 남는다 —
+     "새로운 일에 도전하는 것을", "매우 급하고 위험한 상황을". 뜻이 아니라 문장 토막으로 읽힌다.
+     구어체 「걸」(것을)도 마찬가지라 「것」으로 되돌린다. */
+  s = s.replace(/\s*걸$/, ' 것').replace(/(것)[을를]$/, '$1').replace(/([가-힣])[을를]$/, '$1');
   s = strip(s);
   if (!s || s.length < 3 || s.length > 55 || NOT_MEANING.test(s)) return '';
   return s;
@@ -135,6 +148,44 @@ function dashMeanings(text) {
   return out;
 }
 
+/* ── 2-4) 풀어 쓴 뜻 ──
+   강마다 뜻을 다는 자리가 다르다. 19·20강은 콜론도 화살표도 쓰지 않고 문장으로 풀어 쓴다:
+     ‘모험’이라는 말은 새로운 일에 도전하는 것을 뜻해요.
+     ▪ 분실하다는 ‘물건을 잃어버리는 것’을 말해요.
+   이 자리에서만 나오는 낱말이 있다 — 20강의 화창하다·변덕스럽다·찢다·찧다가 그랬다.
+   그래서 이 규칙은 뜻만이 아니라 낱말도 내놓는다.
+
+   뜻은 한 문장을 넘지 않는다. 마침표나 따옴표를 넘어가면 옆 항목을 삼킨다 —
+   「‘세다’는 힘이나 숫자와 관련된 말 ‘새다’는 물이 빠지거나…」가 그렇게 한 덩어리가 됐다. */
+const BODY = "[^\\n.!?“”\"'‘’]";
+const DEFINED = [
+  /* 낱말이 따옴표 안에 있고 뒤에서 풀이한다 */
+  new RegExp("['‘\"“]([가-힣]{2,7})['’\"”](?:이라는|라는)?\\s*(?:말)?(?:은|는)\\s+(" + BODY + "{6,70})(?:뜻해요|말해요|나타내요|이에요|예요|에요)", 'g'),
+  /* 글머리 기호 뒤에 낱말이 있고 뜻이 따옴표 안에 있다 */
+  /[▪▶●•]\s*([가-힣]{2,7})(?:은|는)\s+['‘"“]([^\n'’"”]{4,60})['’"”]/g,
+];
+/* ── 2-5) 헷갈리는 말 짝 ──
+   강마다 「🔍 헷갈리기 쉬운 낱말 – 찢다 / 찧다」 같은 머리글로 짝을 세워 둔다.
+   짝의 한쪽만 잡히는 일이 잦았다 — 다른 쪽 풀이가 따옴표 안에 있어 걸러졌기 때문이다.
+   머리글에서 둘을 한꺼번에 집으면 짝이 끊기지 않는다. 문맥 빈칸 문제가 이 짝을 오답으로 쓴다. */
+const PAIR = /헷갈[^\n]{0,12}낱말[^가-힣\n]{0,6}([가-힣]{2,7})\s*[/／·,]\s*([가-힣]{2,7})/g;
+function pairWords(text) {
+  const out = [];
+  for (const m of text.matchAll(PAIR))
+    for (const w of [m[1], m[2]]) if (okWord(w)) out.push(w);
+  return [...new Set(out)];
+}
+
+function definedWords(text) {
+  const out = {};
+  for (const re of DEFINED)
+    for (const m of text.matchAll(re)) {
+      const w = strip(m[1]), v = cleanMeaning(m[2]);
+      if (okWord(w) && !isPhrase(w) && v && v !== w && !out[w]) out[w] = v;
+    }
+  return out;
+}
+
 /* ── 3) 괄호 뜻: '사흘(3일)' ── */
 function parenMeanings(text) {
   const out = {};
@@ -185,8 +236,9 @@ for (const b of tb.books) for (const l of b.lessons) {
   const pairs = colonPairs(l.coaching);
   const target = targetWords(l.coaching);
   const paren = parenMeanings(l.coaching), prose = proseMeanings(l.coaching), dash = dashMeanings(l.coaching);
+  const defined = definedWords(l.coaching), pairw = pairWords(l.coaching);
 
-  /* 낱말 순서: 콜론 설명 → 목표 문단 → 원래 후보 */
+  /* 낱말 순서: 콜론 설명 → 목표 문단 → 풀어 쓴 뜻 → 헷갈리는 짝 → 원래 후보 */
   /* 이미 목록에 있고 뜻까지 붙은 낱말은 누군가 손을 댄 것이다 — 새 후보에 쓰는
      걸름망(okWord)을 다시 들이대면 안 된다. 한 글자 낱말 「샘」이 그렇게 사라졌다.
      뜻이 없는 채로 남은 옛 후보만 걸름망을 통과해야 살아남는다. */
@@ -197,7 +249,8 @@ for (const b of tb.books) for (const l of b.lessons) {
      걸름망으로는 못 거른다 — 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두었기 때문이다.
      판단을 파일에 적어 두는 편이 정규식을 더 조이는 것보다 정확하고 되돌리기도 쉽다. */
   const dropped = new Set(l.dropped || []);
-  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...kept])].filter((w) => !dropped.has(w));
+  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...Object.keys(defined), ...pairw, ...kept])]
+    .filter((w) => !dropped.has(w));
   const byPair = {};
   for (const p of pairs) byPair[p.word] = p;
   const prevBy = {};
@@ -218,11 +271,11 @@ for (const b of tb.books) for (const l of b.lessons) {
        따위)이 그대로 굳는다. 다만 코칭글에 설명이 없어 사람이 써 넣은 뜻(src:'ai')은
        다시 캘 수 없으니 남긴다. 강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있다. */
     meaning: (keepHuman(prevBy[w]) || {}).meaning
-      || firstGood(w, [byPair[w] && byPair[w].meaning, arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
+      || firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
     example: (prevBy[w] && prevBy[w].example)
       || (byPair[w] && byPair[w].example) || (arrow[w] && arrow[w].example) || ex[w] || '',
     src: keepHuman(prevBy[w]) ? prevBy[w].src
-      : (firstGood(w, [byPair[w] && byPair[w].meaning, arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
+      : (firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
   }));
   l.words = words;
   nW += words.length; nM += words.filter((w) => w.meaning).length; nE += words.filter((w) => w.example).length;
