@@ -1366,6 +1366,7 @@
 
   /* ── 훈련 메뉴 ── */
   function renderTrainMenu() {
+    arenaProbe();
     var el = $('#view-train');
     var t = now();
     var ty = curType;
@@ -1386,6 +1387,7 @@
       pickBtn2('sentence', '문장 짓기', vsyncOn()
         ? '배운 낱말로 문장을 만들면 선생님 AI가 봐 줘요 — 써먹어야 진짜 내 단어 (가능 ' + speedable + '개)'
         : '학원 서버에 연동하면 열려요 — 문장을 만들면 AI가 봐 줍니다', '✍️') +
+      (ARENA.on ? pickBtn2('arena', '오늘의 반 대전', '반 친구들과 같은 문제로 겨뤄요 — 하루 한 번, 정확하고 빠르게', '🏅') : '') +
       pickBtn2('talk', 'AI 대화 미션', vsyncOn()
         ? '과학자·기자·셰프와 이야기하며 낱말 3개를 자연스럽게 써 보기 (가능 ' + speedable + '개)'
         : '학원 서버에 연동하면 열려요 — 캐릭터와 대화하며 낱말을 써 봅니다', '💬') +
@@ -1401,6 +1403,7 @@
         else if (m === 'blink') startBlinkSetup(ty);
         else if (m === 'sentence') startSentence(ty);
         else if (m === 'talk') startTalk(ty);
+        else if (m === 'arena') startArena();
         else startSpeed(ty);
       });
     });
@@ -1487,6 +1490,113 @@
   }
 
   /* ── 문장 짓기 (산출 훈련) — 서버 AI가 판정 ── */
+  /* ── 아레나(반 대전) — 기획서 §2.5 ③ ──
+     반 전체가 같은 문제를 받고 각자 편할 때 푼다. 하루 한 번.
+     채점과 순위는 서버가 한다 — 여기서 점수를 만들면 순위표를 믿을 수 없다.
+     기본은 꺼져 있다(워커 ARENA_ON=1). 꺼져 있으면 훈련 메뉴에 아예 안 뜬다. */
+  var ARENA = { on: false, checked: false };
+
+  async function arenaProbe() {
+    if (ARENA.checked || !vsyncOn()) return;
+    ARENA.checked = true;
+    try { var j = await vsyncApi('/arena/today'); ARENA.on = !!j.on; ARENA.data = j; }
+    catch (e) { ARENA.on = false; }
+    if (ARENA.on && curView === 'train') renderTrainMenu();
+  }
+
+  function startArena() {
+    if (!vsyncOn()) { toast('학원 서버에 연동하면 열려요'); return; }
+    var body = openOverlay('오늘의 반 대전');
+    body.innerHTML = '<div class="qcard"><p class="muted">불러오는 중…</p></div>';
+    load();
+
+    async function load() {
+      try { render(await vsyncApi('/arena/today')); }
+      catch (e) { body.innerHTML = '<div class="qcard"><p class="muted">지금은 열 수 없어요.</p></div>'; }
+    }
+
+    function boardHtml(rows) {
+      if (!rows || !rows.length) return '<p class="muted">아직 아무도 안 풀었어요. 1등이 될 기회!</p>';
+      return '<div style="margin-top:4px;">' + rows.map(function (r) {
+        var medal = r.place === 1 ? '🥇' : r.place === 2 ? '🥈' : r.place === 3 ? '🥉' : r.place + '위';
+        return '<div style="display:flex;gap:8px;align-items:baseline;padding:7px 10px;border-radius:9px;margin-bottom:4px;' +
+          (r.me ? 'background:var(--brand-soft,#E9F5FB);font-weight:800;' : 'background:var(--card-2);') + '">' +
+          '<span style="min-width:2.2em;">' + medal + '</span>' +
+          '<span style="flex:1;">' + esc(r.name || r.code) + (r.me ? ' (나)' : '') + '</span>' +
+          '<span class="muted">' + r.right + '/' + r.total + '</span>' +
+          '<b style="min-width:3em;text-align:right;">' + r.score + '점</b></div>';
+      }).join('') + '</div>';
+    }
+
+    function render(j) {
+      if (!j.on) { body.innerHTML = '<div class="qcard"><p class="muted">반 대전은 아직 열리지 않았어요.</p></div>'; return; }
+      if (!j.cls) { body.innerHTML = '<div class="qcard"><p class="muted">' + esc(j.error || '반이 정해지면 열려요.') + '</p></div>'; return; }
+      if (!j.ready) { body.innerHTML = '<div class="qcard"><div class="qmeaning">' + esc(j.cls) + '</div>' +
+        '<p class="muted" style="margin-top:8px;">' + esc(j.why || '오늘 문제가 아직 없어요.') + '</p></div>'; return; }
+      if (j.mine || !j.questions) { done(j, null); return; }
+      play(j);
+    }
+
+    function play(j) {
+      var qs = j.questions, i = 0, answers = [], times = [], t0 = 0;
+      ask();
+      function ask() {
+        if (i >= qs.length) { submit(); return; }
+        var q = qs[i];
+        setProg(i + 1, qs.length);
+        t0 = now();
+        body.innerHTML = '<div class="qcard">' +
+          '<div class="qhead" style="font-size:.78rem;color:var(--ink-soft);font-weight:800;">' +
+          esc(j.cls) + ' · ' + (i + 1) + ' / ' + qs.length + '</div>' +
+          '<div class="qword">' + esc(q.word) + '</div>' +
+          '<div class="qmeaning" style="font-size:.92rem;">이 낱말의 뜻은?</div>' +
+          q.options.map(function (o, k) {
+            return '<button class="btn big" data-a="' + k + '" style="margin-top:8px;text-align:left;">' + esc(o) + '</button>';
+          }).join('') + '</div>';
+        body.querySelectorAll('[data-a]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            answers.push(q.options[+b.dataset.a]);
+            times.push(now() - t0);
+            i += 1; ask();
+          });
+        });
+      }
+      async function submit() {
+        body.innerHTML = '<div class="qcard"><p class="muted">채점 중…</p></div>';
+        try {
+          var r = await vsyncApi('/arena/submit', { method: 'POST', body: JSON.stringify({ answers: answers, times: times }) });
+          db.log.push({ t: now(), kind: 'arena', score: (r.mine || {}).score || 0 });
+          save();
+          done(r, qs);
+        } catch (e) { body.innerHTML = '<div class="qcard"><p class="muted">채점하지 못했어요. 잠시 뒤 다시 열어 주세요.</p></div>'; }
+      }
+    }
+
+    function done(j, qs) {
+      var m = j.mine || {};
+      var wrong = '';
+      if (qs && j.marks && j.answers) {
+        var miss = [];
+        for (var k = 0; k < qs.length; k++) if (!j.marks[k]) miss.push({ w: qs[k].word, a: j.answers[k] });
+        if (miss.length) wrong = '<div style="margin-top:14px;text-align:left;">' +
+          '<b style="font-size:.82rem;color:var(--ink-soft);">놓친 낱말</b><ul style="margin:6px 0 0;padding-left:18px;font-size:.9rem;">' +
+          miss.map(function (x) { return '<li><b>' + esc(x.w) + '</b> — ' + esc(x.a) + '</li>'; }).join('') + '</ul></div>';
+      }
+      body.innerHTML = '<div class="qcard">' +
+        '<div class="qmeaning">' + esc(j.cls) + ' · 오늘의 대전</div>' +
+        (m.score != null
+          ? '<div class="qword" style="font-size:2.2rem;">' + m.score + '점</div>' +
+            '<p class="muted" style="margin:0;">' + m.right + ' / ' + m.total + '개 정답</p>'
+          : '<p class="muted" style="margin-top:8px;">아직 안 풀었어요.</p>') +
+        wrong +
+        '<div style="margin-top:16px;text-align:left;"><b style="font-size:.82rem;color:var(--ink-soft);">우리 반 순위</b>' +
+        boardHtml(j.board) + '</div>' +
+        '<p class="demo-note">하루에 한 번, 반 전체가 같은 문제를 풉니다. 내일 새 문제가 나와요.</p>' +
+        '<button class="btn primary big" id="arDone" style="margin-top:10px;">정원으로</button></div>';
+      $('#arDone').addEventListener('click', function () { closeOverlay(); show('garden'); });
+    }
+  }
+
   /* AI를 못 쓸 때 학생에게 할 말. 한도에 걸린 것과 고장난 것은 다르다 —
      "오늘은 여기까지"는 안심시키는 말이고, "잠시 뒤"는 다시 눌러 보라는 말이다. */
   function aiWhy(j, fallback) {

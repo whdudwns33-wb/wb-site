@@ -5,6 +5,7 @@
    나중에 단독 서비스로 분리할 때는 이 모듈 + vocab 저장소만 들어내면 된다. */
 
 import { reserve, usageSummary, readLimits } from './ai-quota.mjs';
+import { buildRound, forClient, grade, rank, ARENA_Q } from './arena.mjs';
 
 const STATE_MAX_BYTES = 400_000; // 워드브레인 기록 1건 최대 크기
 const nowIso = () => new Date().toISOString();
@@ -625,6 +626,75 @@ export async function handleVocab(ctx) {
     const out = await judge({ word, meaning, type, sentence, apiKey: ctx.ai.apiKey, model: ctx.ai.model });
     if (!out.ok) return j(200, { ok: false, reason: out.reason });
     return j(200, { ok: true, verdict: out.verdict, feedback: out.feedback, better: out.better });
+  }
+
+  /* ── 아레나(반 대전) — 기획서 §2.5 ③ ──
+     하루 단위. 반 전체가 같은 문제를 받고 각자 편할 때 푼다.
+
+     기본은 꺼짐이다. 이 기능은 물 주기 완수율을 끌어올리려고 만든 장치라,
+     파일럿 4주가 끝나기 전에 켜면 효과를 잴 기준선이 사라진다.
+     켤 때는 워커 환경변수 ARENA_ON=1. */
+  const arenaOn = String((ctx.ai && ctx.ai.env && ctx.ai.env.ARENA_ON) || '') === '1';
+
+  /* 그 반이 배운 낱말 — 강사가 내준 배정에서 모은다 */
+  async function classPool(cls) {
+    const pool = [], seen = new Set();
+    for (const code of await store.listAssignCodes()) {
+      const stu = await store.getStudent(code);
+      if (!stu || stu.cls !== cls) continue;
+      const rec = await store.getAssign(code);
+      for (const a of (rec && rec.items) || []) {
+        for (const w of a.words || []) {
+          if (!w || !w.word || !w.meaning || seen.has(w.word)) continue;
+          seen.add(w.word);
+          pool.push({ word: w.word, meaning: w.meaning });
+        }
+      }
+    }
+    return pool;
+  }
+
+  if (p.startsWith('/api/vocab/arena') && !who.admin) {
+    if (!arenaOn) return j(200, { on: false });
+    const me = await store.getStudent(who.code);
+    const cls = (me && me.cls) || '';
+    if (!cls) return j(200, { on: true, cls: '', error: '반이 정해지면 열려요.' });
+    const day = dayKey(Date.now());
+    const key = cls + '|' + day;
+    const board = (await store.getArena(key)) || { day, cls, plays: {} };
+
+    if (p === '/api/vocab/arena/today' && method === 'GET') {
+      const round = buildRound(await classPool(cls), cls, day);
+      if (!round) return j(200, { on: true, cls, ready: false, why: '이번 주 낱말이 아직 모자라요.' });
+      const mine = board.plays[who.code] || null;
+      return j(200, {
+        on: true, cls, ready: true, day,
+        /* 이미 푼 날이면 문제를 다시 주지 않는다 — 다시 풀면 점수가 아니라 시도 횟수를 재게 된다 */
+        questions: mine ? null : forClient(round),
+        mine: mine,
+        board: rank(Object.entries(board.plays).map(([code, v]) => ({ code, ...v })), who.code),
+      });
+    }
+
+    if (p === '/api/vocab/arena/submit' && method === 'POST') {
+      if (board.plays[who.code]) return j(200, { on: true, cls, done: true, mine: board.plays[who.code] });
+      const b = await ctx.getBody();
+      const round = buildRound(await classPool(cls), cls, day);
+      if (!round) return j(400, { error: '오늘 문제가 없어요.' });
+      const answers = Array.isArray(b.answers) ? b.answers.slice(0, round.length) : [];
+      const times = Array.isArray(b.times) ? b.times.slice(0, round.length) : [];
+      /* 채점은 서버가 한다 — 순위표가 걸리면 화면이 보내온 점수를 믿을 수 없다 */
+      const g = grade(round, answers, times);
+      board.plays[who.code] = { name: (me && me.name) || who.code, score: g.score, right: g.right, total: g.total, ms: g.ms, at: nowIso() };
+      board.day = day; board.cls = cls;
+      await store.putArena(key, board);
+      return j(200, {
+        on: true, cls, done: true, mine: board.plays[who.code], marks: g.marks,
+        answers: round.map((q) => q.answer),
+        board: rank(Object.entries(board.plays).map(([code, v]) => ({ code, ...v })), who.code),
+      });
+    }
+    return j(404, { error: 'unknown api' });
   }
 
   /* AI 대화 미션 — 학생이 한 마디 할 때마다 부른다.
