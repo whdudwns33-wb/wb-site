@@ -36,6 +36,12 @@
   th, td { padding: 9px 12px; border-bottom: 1px solid #E3DFD2; text-align: left; white-space: nowrap; }
   thead th { background: #F0EDE2; color: #1B3A5C; font-size: .78rem; }
   .num { font-variant-numeric: tabular-nums; }
+  .tb-row { display: grid; grid-template-columns: 7rem 1fr 1fr 2rem; gap: 6px; margin-bottom: 5px; align-items: center; }
+  .tb-row input { margin: 0; font-size: .84rem; padding: 7px 9px; }
+  .tb-row input.blank { background: #FFF6E5; border-color: #E6C68A; }
+  .tb-head { font-size: .74rem; font-weight: 800; color: #7A6A4A; }
+  .tb-del { border: 0; background: none; color: #B14A38; cursor: pointer; font-size: .95rem; padding: 0; }
+  .tb-from { font-size: .68rem; color: #8A7C5E; }
   .warn { color: #C24936; font-weight: 700; }
   .table-scroll { overflow-x: auto; border: 1px solid #E3DFD2; border-radius: 12px; }
   .stu-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -66,6 +72,16 @@
   </div>
 
   <div id="app" hidden>
+    <h2>교재 낱말 검수 <span class="muted" id="tbStat"></span></h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 8px;font-size:.8rem;">코칭글에서 뽑은 후보예요. <b>뜻이 빈 낱말은 학생에게 못 내보냅니다</b> — 채우고 「검수 완료」를 눌러야 그 강이 열립니다.</p>
+      <div class="row">
+        <select id="tbBook" style="flex:0 0 auto"></select>
+        <select id="tbLesson" style="flex:1 1 auto"></select>
+      </div>
+      <div id="tbEdit" style="margin-top:10px;"><span class="muted">강을 고르면 낱말이 나옵니다.</span></div>
+    </div>
+
     <h2>단어 배정 — 이번 주 외울 단어 내주기</h2>
     <div class="card">
       <label>학생 고르기 <span class="muted" id="pickCount"></span></label>
@@ -267,7 +283,130 @@
     }).join('') : '<span class="muted">아직 배정한 단어가 없습니다.</span>';
   }
 
+  /* ── 교재 낱말 검수 ──
+     교재 파일은 정적 자산이라 고쳐 쓸 수 없어서, 검수 결과는 서버에 따로 쌓이고 읽을 때 덧씌워진다. */
+  var TBOOKS = [], TBWORDS = [], TBCUR = null;
+
+  function tbBlankCount(list) {
+    return list.filter(function (w) { return String(w.word || '').trim() && !String(w.meaning || '').trim(); }).length;
+  }
+  function tbLessonLabel(l) {
+    var blank = l.words - l.filled;
+    return l.lesson + '강 · ' + l.title + (l.confirmed ? ' ✓' : (l.words ? '  (' + l.words + '개' + (blank ? ', 뜻 없음 ' + blank : '') + ')' : '  (낱말 없음)'));
+  }
+  function tbFillBooks() {
+    $('#tbBook').innerHTML = TBOOKS.map(function (b) {
+      return '<option value="' + esc(b.id) + '">' + esc(b.short) + (b.grade ? ' (' + esc(b.grade) + ')' : '') + '</option>';
+    }).join('');
+    tbFillLessons();
+    var done = 0, all = 0;
+    TBOOKS.forEach(function (b) { b.lessons.forEach(function (l) { all++; if (l.confirmed) done++; }); });
+    $('#tbStat').textContent = '검수 끝난 강 ' + done + '/' + all;
+  }
+  function tbFillLessons() {
+    var b = TBOOKS.filter(function (x) { return x.id === $('#tbBook').value; })[0];
+    $('#tbLesson').innerHTML = '<option value="">— 강 고르기 —</option>' + (b ? b.lessons.map(function (l) {
+      return '<option value="' + l.lesson + '">' + esc(tbLessonLabel(l)) + '</option>';
+    }).join('') : '');
+  }
+  function tbRenderRows() {
+    if (!TBCUR) { $('#tbEdit').innerHTML = '<span class="muted">강을 고르면 낱말이 나옵니다.</span>'; return; }
+    var blank = tbBlankCount(TBWORDS);
+    var head = '<div class="tb-row tb-head"><span>낱말</span><span>뜻</span><span>예문 (없어도 됩니다)</span><span></span></div>';
+    var rows = TBWORDS.map(function (w, i) {
+      return '<div class="tb-row" data-i="' + i + '">'
+        + '<input data-k="word" value="' + esc(w.word) + '" placeholder="낱말">'
+        + '<input data-k="meaning" class="' + (String(w.meaning || '').trim() ? '' : 'blank') + '" value="' + esc(w.meaning) + '" placeholder="뜻을 채워 주세요">'
+        + '<input data-k="example" value="' + esc(w.example) + '" placeholder="예문">'
+        + '<button class="tb-del" data-del="' + i + '" title="이 낱말 빼기">✕</button></div>';
+    }).join('');
+    $('#tbEdit').innerHTML = head + rows
+      + '<div class="row" style="margin-top:10px;">'
+      + '<button id="tbAdd" style="font-size:.8rem;padding:6px 12px;">+ 낱말 추가</button>'
+      + '<button id="tbSave" style="font-size:.8rem;padding:6px 12px;">임시 저장</button>'
+      + '<button class="primary" id="tbConfirm" style="font-size:.8rem;padding:6px 12px;">검수 완료 — 학생에게 열기</button>'
+      + '<button id="tbToAssign" style="font-size:.8rem;padding:6px 12px;">배정칸에 넣기 ↓</button></div>'
+      + '<p class="muted" style="margin:8px 0 0;font-size:.78rem;">낱말 ' + TBWORDS.length + '개'
+      + (blank ? ' · <b style="color:#B14A38">뜻이 빈 낱말 ' + blank + '개</b>' : ' · 뜻은 모두 채워졌어요')
+      + (TBCUR.confirmed ? ' · <b style="color:#14755E">검수 완료된 강</b>' : '') + '</p>';
+  }
+  /* 화면의 모든 줄을 그대로 걷는다 — 빈 줄을 여기서 버리면
+     「낱말 추가」로 만든 줄이 다음 그리기에서 증발한다. 저장할 때 서버가 걸러낸다. */
+  function tbCollect() {
+    var out = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#tbEdit .tb-row[data-i]'), function (row) {
+      var o = { word: '', meaning: '', example: '' };
+      Array.prototype.forEach.call(row.querySelectorAll('input'), function (inp) { o[inp.dataset.k] = inp.value.trim(); });
+      out.push(o);
+    });
+    return out;
+  }
+  async function tbLoadLesson() {
+    var book = $('#tbBook').value, lesson = $('#tbLesson').value;
+    if (!book || !lesson) { TBCUR = null; TBWORDS = []; tbRenderRows(); return; }
+    try {
+      var j = await api('/api/admin/textbook/' + encodeURIComponent(book) + '/' + encodeURIComponent(lesson));
+      TBCUR = j.lesson;
+      TBWORDS = (j.lesson.words || []).map(function (w) {
+        return typeof w === 'string' ? { word: w, meaning: '', example: '' }
+          : { word: w.word || '', meaning: w.meaning || '', example: w.example || '' };
+      });
+      tbRenderRows();
+    } catch (e) { msg(e.message); }
+  }
+  async function tbSave(confirmed) {
+    var book = $('#tbBook').value, lesson = $('#tbLesson').value;
+    var words = tbCollect();
+    try {
+      var j = await api('/api/admin/textbook/' + encodeURIComponent(book) + '/' + encodeURIComponent(lesson),
+        { method: 'POST', body: JSON.stringify({ words: words, confirmed: !!confirmed }) });
+      TBWORDS = j.words; TBCUR.confirmed = j.confirmed; TBCUR.words = j.words;
+      /* 목차의 개수·✓ 표시도 같이 갱신해야 다음에 골랐을 때 어긋나지 않는다 */
+      TBOOKS.forEach(function (b) {
+        if (b.id !== book) return;
+        b.lessons.forEach(function (l) {
+          if (l.lesson !== +lesson) return;
+          l.words = j.words.length; l.filled = j.words.length - tbBlankCount(j.words); l.confirmed = j.confirmed;
+        });
+      });
+      var keep = $('#tbLesson').value;
+      tbFillBooks(); $('#tbLesson').value = keep;
+      tbRenderRows();
+      msg(confirmed ? '검수 완료 — 이 강 낱말이 학생에게 열렸어요.' : '저장했어요.');
+    } catch (e) { msg(e.message); }
+  }
+  function tbToAssign() {
+    var lines = tbCollect().filter(function (w) { return w.meaning; })
+      .map(function (w) { return w.word + ' | ' + w.meaning + (w.example ? ' |  | ' + w.example : ''); });
+    if (!lines.length) { msg('뜻이 있는 낱말이 없어요.'); return; }
+    $('#asText').value = lines.join('\n');
+    $('#asTitle').value = TBCUR.lesson + '강 ' + TBCUR.title;
+    $('#asText').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    msg(lines.length + '개를 배정칸에 넣었어요. 학생을 고르고 배정하세요.');
+  }
+  document.addEventListener('click', function (e) {
+    var d = e.target.closest && e.target.closest('[data-del]');
+    if (d) { TBWORDS = tbCollect(); TBWORDS.splice(+d.dataset.del, 1); tbRenderRows(); return; }
+    if (e.target.id === 'tbAdd') { TBWORDS = tbCollect(); TBWORDS.push({ word: '', meaning: '', example: '' }); tbRenderRows(); return; }
+    if (e.target.id === 'tbSave') return tbSave(false);
+    if (e.target.id === 'tbConfirm') return tbSave(true);
+    if (e.target.id === 'tbToAssign') return tbToAssign();
+  });
+  document.addEventListener('input', function (e) {
+    var inp = e.target;
+    if (!inp.dataset || inp.dataset.k !== 'meaning' || !inp.closest('#tbEdit')) return;
+    /* 채우는 즉시 표시를 걷는다 — 다시 그릴 때까지 노란 채로 두면 고쳐도 안 고쳐진 것처럼 보인다 */
+    inp.classList.toggle('blank', !inp.value.trim());
+  });
+  $('#tbBook').addEventListener('change', function () { tbFillLessons(); tbLoadLesson(); });
+  $('#tbLesson').addEventListener('change', tbLoadLesson);
+
   async function refresh() {
+    /* 교재 목차는 따로 감싼다 — 여기가 실패해도 연상 검수함은 계속 보여야 한다 */
+    try {
+      TBOOKS = (await api('/api/admin/textbook')).books || [];
+      tbFillBooks();
+    } catch (e) { $('#tbStat').textContent = '교재를 불러오지 못했어요'; }
     try {
       var rv = await api('/api/vocab/admin/review');
       items = rv.items || [];

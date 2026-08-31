@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, coachingCard, validProgress } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -127,13 +127,15 @@ function titleMap() {
 }
 /* 교재(어휘가 독해다) — 정적 파일 하나, 제목 맵과 같은 방식으로 캐시 */
 let TB_CACHE = { t: 0, data: null };
-function textbook() {
+function textbookRaw() {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
   try {
     TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
   } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
   return TB_CACHE.data;
 }
+/* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다 */
+function textbook() { return withOverlay(textbookRaw(), db.textbook || {}); }
 
 function parentSummary(stu, st, vst, assignRec) {
   const titles = titleMap();
@@ -173,6 +175,9 @@ function serveFile(res, base, rel) {
   let fp = path.join(base, safe);
   if (!fp.startsWith(base)) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(fp) && fs.statSync(fp).isDirectory()) fp = path.join(fp, 'index.html');
+  /* 배포본(Cloudflare)은 /admin/vocab-review 처럼 확장자 없이 열린다.
+     로컬만 404가 나면 주소를 헛짚게 되므로 여기서도 .html을 한 번 더 찾아본다. */
+  if (!fs.existsSync(fp) && !path.extname(fp) && fs.existsSync(fp + '.html')) fp += '.html';
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
   fs.createReadStream(fp).pipe(res);
@@ -315,6 +320,29 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true, book: stu.book });
       }
+      /* 강사 검수 — 강 하나의 낱말을 통째로 저장한다 */
+      const mLesson = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/(\d{1,3})$/);
+      if (mLesson && req.method === 'GET') {
+        const v = validProgress(textbook(), mLesson[1], mLesson[2]);
+        if (!v.ok) return json(res, 404, { error: v.error });
+        return json(res, 200, { book: { id: v.book.id, short: v.book.short || v.book.title }, lesson: v.lesson });
+      }
+      if (mLesson && req.method === 'POST') {
+        const bookId = mLesson[1], lessonNo = +mLesson[2];
+        const v = validProgress(textbookRaw(), bookId, lessonNo);
+        if (!v.ok) return json(res, 404, { error: v.error });
+        const { words, confirmed } = await readBody(req);
+        let list = cleanWords(words);
+        if (confirmed) {
+          const r = readyToConfirm(list);
+          if (!r.ok) return json(res, 400, { error: r.error });
+          list = r.words;
+        }
+        db.textbook = db.textbook || {};
+        db.textbook[bookId + '#' + lessonNo] = { words: list, confirmed: !!confirmed, at: nowIso() };
+        persist();
+        return json(res, 200, { ok: true, words: list, confirmed: !!confirmed });
+      }
       if (p === '/api/admin/export' && req.method === 'GET') {
         const day = url.searchParams.get('backup');
         if (day) {
@@ -322,7 +350,7 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab });
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab, textbook: db.textbook || {}, pubmap: db.pubmap || {} });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
