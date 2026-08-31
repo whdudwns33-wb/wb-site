@@ -49,6 +49,13 @@ const INTERNAL_BOOK_PRODUCTS = Object.freeze({
   reading_intro: Object.freeze({ title: '독해창 입문', label: '입문', unitPrice: 19000, volumeMin: 1, volumeMax: 8 }),
   reading_top: Object.freeze({ title: '독해창 최상', label: '최상', unitPrice: 23000, volumeMin: 1, volumeMax: 8 }),
   reading_essential: Object.freeze({ title: '독해창 필수', label: '필수', unitPrice: 19000, volumeMin: 1, volumeMax: 12 }),
+  logic_preparatory: Object.freeze({ title: '논리와 상상 예비', label: '예비', unitPrice: 18000, volumeMin: 1, volumeMax: 6 }),
+  logic_basic: Object.freeze({ title: '논리와 상상 기본', label: '기본', unitPrice: 24000, volumeMin: 1, volumeMax: 12,
+    volumePrices: Object.freeze({ 3: 26000 }) }),
+  logic_leap: Object.freeze({ title: '논리와 상상 도약', label: '도약', unitPrice: 24000, volumeMin: 1, volumeMax: 12,
+    volumePrices: Object.freeze({ 1: 28000, 2: 28000, 3: 28000, 6: 28000, 8: 28000 }) }),
+  logic_growth: Object.freeze({ title: '논리와 상상 성장', label: '성장', unitPrice: 24000, volumeMin: 1, volumeMax: 12,
+    volumePrices: Object.freeze({ 4: 26000 }) }),
   studyforce_bound: Object.freeze({ title: '스터디포스 제본', label: '제본 - 6,000원', unitPrice: 6000 }),
   studyforce_passage_notes: Object.freeze({ title: '스터디포스 지문정리노트', label: '지문정리노트 - 10,000원', unitPrice: 10000 })
 });
@@ -80,7 +87,10 @@ function internalBookProduct(productCode, rawVolume) {
   const volumeProduct = Number.isInteger(base.volumeMin) && Number.isInteger(base.volumeMax);
   if (volumeProduct) {
     if (!Number.isInteger(rawVolume) || rawVolume < base.volumeMin || rawVolume > base.volumeMax) return null;
-    return { ...base, volume: rawVolume, title: base.title + ' ' + rawVolume + '권', label: base.label + ' ' + rawVolume + '권' };
+    const unitPrice = base.volumePrices && Object.prototype.hasOwnProperty.call(base.volumePrices, rawVolume)
+      ? base.volumePrices[rawVolume] : base.unitPrice;
+    return { ...base, unitPrice, volume: rawVolume,
+      title: base.title + ' ' + rawVolume + '권', label: base.label + ' ' + rawVolume + '권' };
   }
   if (rawVolume !== undefined) return null;
   return { ...base, volume: null };
@@ -252,10 +262,12 @@ export async function verifyOrderTaskSnapshotRows(
     const identity = identities[0];
     if (!product || identities.length !== 1 || vendorName !== INTERNAL_BOOK_VENDOR ||
         String(task.internalProductLabel || '') !== product.label || identity.title !== product.title ||
-        identity.unitPrice !== product.unitPrice ||
+        !Number.isInteger(identity.unitPrice) || identity.unitPrice < 1 ||
         identity.bookId !== await internalBookId(productCode, product.volume)) {
       return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
     }
+    // The immutable item/task snapshot hashes below seal the order-time price.
+    // Repricing the catalog must not hide or invalidate an existing sealed order.
   }
   const expectedTaskHash = await taskIdentityHash(String(taskId), ownerId, vendorName, identities);
   const expectedRowCount = identities.reduce((sum, item) => sum + item.studentIds.length, 0);
@@ -550,6 +562,9 @@ async function exactExistingInternal(env, app, taskId, ownerId, productCode, pro
   );
   const stored = task && Array.isArray(task.orderItems) && task.orderItems.length === 1
     ? await itemIdentity(task.orderItems[0]) : null;
+  const requestedAtStoredPrice = verified.valid && stored
+    ? await itemIdentity({ bookId: identity.bookId, title: identity.title,
+      studentIds: identity.studentIds, unitPrice: stored.unitPrice }) : null;
   const parsedFulfillmentIds = parseJson(fulfillment.student_ids || '[]', null);
   const fulfillmentIds = Array.isArray(parsedFulfillmentIds) ? parsedFulfillmentIds.map(String).sort() : [];
   const storedVolume = Object.prototype.hasOwnProperty.call(task || {}, 'internalProductVolume')
@@ -557,7 +572,8 @@ async function exactExistingInternal(env, app, taskId, ownerId, productCode, pro
   if (!verified.valid || !verified.sealed || task.orderDelivery !== INTERNAL_BOOK_DELIVERY ||
       String(task.internalProductCode || '') !== productCode ||
       String(task.internalProductLabel || '') !== product.label || storedVolume !== product.volume ||
-      String(taskRow.owner || '') !== ownerId || !stored || stored.itemIdentityHash !== identity.itemIdentityHash ||
+      String(taskRow.owner || '') !== ownerId || !stored || !requestedAtStoredPrice ||
+      stored.itemIdentityHash !== requestedAtStoredPrice.itemIdentityHash ||
       String(fulfillment.book_id || '') !== identity.bookId ||
       JSON.stringify(fulfillmentIds) !== JSON.stringify(identity.studentIds) ||
       !['teacher_received', 'student_handed', 'academy_registered'].includes(String(fulfillment.status || '')) ||
