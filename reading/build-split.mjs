@@ -17,11 +17,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+/* 산출물을 다른 곳에 쓰고 싶으면 인자로 폴더를 준다.
+ * split.test.cjs 가 이걸 써서 임시 폴더에 빌드한 뒤 커밋본과 비교한다 —
+ * 검사가 작업 트리를 덮어쓰면 실패가 스스로 고쳐져 재실행 때 통과해 버리고,
+ * 그러면 진짜 빠뜨린 재생성이 "그냥 한 번 튄 것"으로 보인다. */
+const OUT = process.argv[2] ? path.resolve(process.argv[2]) : DIR;
 const LEVELS = ['L1', 'L2', 'L3', 'L4'];
 const db = JSON.parse(fs.readFileSync(path.join(DIR, 'articles.json'), 'utf8'));
 const write = (name, obj) => {
   const s = JSON.stringify(obj);
-  fs.writeFileSync(path.join(DIR, name), s + '\n');
+  fs.writeFileSync(path.join(OUT, name), s + '\n');
   return s.length;
 };
 
