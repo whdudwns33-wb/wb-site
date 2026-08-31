@@ -776,7 +776,7 @@
         if (w.parts) body.hanja = w.parts.map(function (p) { return p.ch + '(' + p.hun + ' ' + p.eum + ')'; }).join('+');
         var j = await vsyncApi('/mnemonic', { method: 'POST', body: JSON.stringify(body) });
         if (!j.ok) {
-          toast(j.reason === 'no-key' ? 'AI 키가 아직 설정되지 않았어요 — 선생님께 문의!' : '지금은 연상을 만들 수 없어요');
+          toast(aiWhy(j, '지금은 연상을 만들 수 없어요'));
           btn.disabled = false; btn.textContent = '✨ AI 찰떡 연상 만들기';
           return;
         }
@@ -1487,6 +1487,19 @@
   }
 
   /* ── 문장 짓기 (산출 훈련) — 서버 AI가 판정 ── */
+  /* AI를 못 쓸 때 학생에게 할 말. 한도에 걸린 것과 고장난 것은 다르다 —
+     "오늘은 여기까지"는 안심시키는 말이고, "잠시 뒤"는 다시 눌러 보라는 말이다. */
+  function aiWhy(j, fallback) {
+    if (!j) return fallback;
+    if (j.reason === 'no-key') return 'AI 기능이 아직 켜지지 않았어요 — 선생님께 문의!';
+    if (j.reason === 'quota') {
+      return (j.quota && j.quota.reason === 'student')
+        ? '오늘 AI와 함께한 몫을 다 썼어요. 내일 또 만나요!'
+        : '오늘 학원 전체 AI 사용량을 다 썼어요. 내일 또 해요!';
+    }
+    return fallback;
+  }
+
   /* ── AI 대화 미션 (기획서 §2.5 ⑤) ──
      캐릭터와 대화하며 낱말 3개를 자연스럽게 쓰면 불이 켜진다.
      대화 기록은 이 화면이 들고 있다가 매번 통째로 보낸다 — 서버에 대화를 남기지 않는다.
@@ -1589,7 +1602,7 @@
           }) });
           if (!j.ok) {
             history.pop();
-            toast(j.reason === 'no-key' ? '지금은 대화 미션을 쓸 수 없어요' : '잠시 뒤 다시 해 볼까요?');
+            toast(aiWhy(j, '잠시 뒤 다시 해 볼까요?'));
             draw(); return;
           }
           history.push({ role: 'assistant', content: j.say });
@@ -1666,7 +1679,7 @@
           body: JSON.stringify({ word: w.word, meaning: w.meaning, type: w.type, sentence: sentence }),
         });
         if (!j.ok) {
-          toast(j.reason === 'no-key' ? 'AI 키가 아직 설정되지 않았어요 — 선생님께 문의!' : '지금은 확인할 수 없어요');
+          toast(aiWhy(j, '지금은 확인할 수 없어요'));
           go.disabled = false; go.textContent = '확인 받기';
           return;
         }

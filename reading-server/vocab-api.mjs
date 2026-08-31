@@ -4,6 +4,8 @@
    인증은 호스트(진로독서)의 토큰 검증 결과(who)를 그대로 받는다 — 학생은 연동 한 번으로 두 앱을 쓴다.
    나중에 단독 서비스로 분리할 때는 이 모듈 + vocab 저장소만 들어내면 된다. */
 
+import { reserve, usageSummary, readLimits } from './ai-quota.mjs';
+
 const STATE_MAX_BYTES = 400_000; // 워드브레인 기록 1건 최대 크기
 const nowIso = () => new Date().toISOString();
 
@@ -532,6 +534,19 @@ export async function handleVocab(ctx) {
   const j = (status, body) => ({ status, body });
   if (!who) return j(401, { error: '로그인이 필요합니다.' });
 
+  /* AI를 부르기 전에 자리를 잡는다. 못 잡으면 부르지 않는다 —
+     세 곳(연상·문장·대화)이 같은 장부를 쓴다. 오류가 아니라 ok:false로 돌려주어
+     학생 화면이 고장난 것처럼 보이지 않게 한다. */
+  const limits = readLimits(ctx.ai && ctx.ai.env);
+  async function takeSlot() {
+    if (!store.getUsage) return { ok: true };          // 장부가 없는 호스트면 막지 않는다
+    const now = Date.now();
+    const r = reserve(await store.getUsage(), who.code, now, limits);
+    if (!r.ok) return r;
+    await store.putUsage(r.usage);
+    return r;
+  }
+
   /* ── 학생 ── */
   if (p === '/api/vocab/pull' && method === 'GET' && !who.admin) {
     const st = await store.getState(who.code);
@@ -560,6 +575,8 @@ export async function handleVocab(ctx) {
     if (prev && prev.status === 'pending' && prev.candidates) {
       return j(200, { ok: true, status: 'pending', candidates: prev.candidates });
     }
+    const slot = await takeSlot();
+    if (!slot.ok) return j(200, { ok: false, reason: 'quota', quota: slot });
     const generate = ctx.ai.generate || aiMnemonic;
     const out = await generate({
       word, meaning, type,
@@ -602,6 +619,8 @@ export async function handleVocab(ctx) {
     if (!word || !meaning || !sentence) return j(400, { error: '낱말과 문장이 필요해요.' });
     if (sentence.length > 300) return j(400, { error: '문장이 너무 길어요 (300자 이내).' });
     if (!['english', 'hanja', 'native'].includes(type)) return j(400, { error: '어종은 english/hanja/native' });
+    const slot = await takeSlot();
+    if (!slot.ok) return j(200, { ok: false, reason: 'quota', quota: slot });
     const judge = ctx.ai.judge || aiSentence;
     const out = await judge({ word, meaning, type, sentence, apiKey: ctx.ai.apiKey, model: ctx.ai.model });
     if (!out.ok) return j(200, { ok: false, reason: out.reason });
@@ -639,6 +658,8 @@ export async function handleVocab(ctx) {
     if (!history.length || history[history.length - 1].role !== 'user')
       return j(400, { error: '학생 차례로 끝나야 해요.' });
 
+    const slot = await takeSlot();
+    if (!slot.ok) return j(200, { ok: false, reason: 'quota', quota: slot });
     const talk = ctx.ai.talk || aiTalk;
     const out = await talk({ charId, targets, words, history, apiKey: ctx.ai.apiKey, model: ctx.ai.model });
     if (!out.ok) return j(200, { ok: false, reason: out.reason });
@@ -759,7 +780,8 @@ export async function handleVocab(ctx) {
       const [stu, st] = await Promise.all([store.getStudent(code), store.getState(code)]);
       rows.push({ code, name: (stu && stu.name) || '', cls: (stu && stu.cls) || '', ...studentMetrics(st, now) });
     }
-    return j(200, { ...pilotMetrics(rows, now), time: nowIso() });
+    const usage = store.getUsage ? usageSummary(await store.getUsage(), now, limits) : null;
+    return j(200, { ...pilotMetrics(rows, now), ai: usage, time: nowIso() });
   }
   return j(404, { error: 'unknown api' });
 }
