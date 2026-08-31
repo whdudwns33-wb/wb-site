@@ -1,7 +1,7 @@
 'use strict';
 /* 워드브레인 서버 라우트 검증 (node reading-server/vocab-api.test.mjs) */
 import assert from 'node:assert';
-import { handleVocab, parseCandidates, parseVerdict, parseWordList, parseHanjaSpec, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, parseCandidates, parseVerdict, parseWordList, parseHanjaSpec, vocabSummary, dumpVocab, vapidJwt, sendNightPushes, studentMetrics, pilotMetrics, PILOT } from './vocab-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -412,6 +412,129 @@ await t('AI 키가 없으면 연상 요청이 no-key로 돌아온다', async () 
   assert.strictEqual(out.status, 200, '키가 없다고 오류를 내면 안 된다');
   assert.strictEqual(out.body.ok, false);
   assert.strictEqual(out.body.reason, 'no-key');
+});
+
+/* ── 파일럿 지표 ── */
+const DAY = 86400000;
+/* 하루 경계를 KST로 가르므로 낮 시각을 기준으로 삼는다 — 자정 언저리는 어제로 셀 수 있다 */
+const T0 = Date.UTC(2026, 7, 31, 3, 0, 0);   // 2026-08-31 12:00 KST
+const st = (o) => ({ id: o.id, step: o.step || 0, due: o.due, plantedAt: o.plantedAt || T0 - 30 * DAY,
+  reps: 0, lapses: 0, streak: 0, contexts: [], emaMs: null, exposures: 0,
+  graduated: !!o.graduated, gradAt: null, last: null });
+const rec = (states, log) => ({ state: { states, log: log || [], streak: { count: 3 } }, updatedAt: new Date(T0).toISOString() });
+
+await t('물 주기 완수율 — 오늘 준 것 ÷ (오늘 준 것 + 지금 밀린 것)', () => {
+  const m = studentMetrics(rec({
+    a: st({ id: 'a', due: T0 - DAY }),          // 밀림
+    b: st({ id: 'b', due: T0 - DAY }),          // 밀림
+    c: st({ id: 'c', due: T0 + DAY }),          // 아직 차례 아님 — 분모에 들어가면 안 된다
+    d: st({ id: 'd', due: T0 + 3 * DAY }),      // 오늘 주고 다음으로 넘어간 것
+  }, [{ t: T0 - 3600000, kind: 'review', grade: 'good', id: 'd', from: 2 }]), T0);
+  assert.strictEqual(m.wateredToday, 1);
+  assert.strictEqual(m.overdue, 2);
+  assert.strictEqual(m.waterRate, 33.3, '1 / (1+2)');
+  assert.strictEqual(m.growing, 4);
+});
+
+await t('오늘 틀려서 10분 뒤로 잡힌 낱말은 밀림이 아니다', () => {
+  /* 틀린 낱말은 due가 지금보다 앞이라 그냥 세면 밀림이 된다.
+     열심히 푼 학생일수록 완수율이 떨어지는 셈이 되므로 오늘 준 것은 빼야 한다. */
+  const m = studentMetrics(rec(
+    { a: st({ id: 'a', due: T0 - 600000 }) },
+    [{ t: T0 - 700000, kind: 'review', grade: 'fail', id: 'a', from: 3 }]), T0);
+  assert.strictEqual(m.overdue, 0, '오늘 푼 낱말을 밀림으로 세면 안 된다');
+  assert.strictEqual(m.waterRate, 100);
+});
+
+await t('같은 낱말을 두 번 풀어도 한 개로 센다', () => {
+  const m = studentMetrics(rec({ a: st({ id: 'a', due: T0 + DAY }) }, [
+    { t: T0 - 700000, kind: 'review', grade: 'fail', id: 'a', from: 3 },
+    { t: T0 - 600000, kind: 'review', grade: 'good', id: 'a', from: 1 },
+  ]), T0);
+  assert.strictEqual(m.wateredToday, 1);
+});
+
+await t('30일 회상 통과율 — 계단 5에서 본 시험만 센다', () => {
+  const m = studentMetrics(rec({ a: st({ id: 'a', due: T0 + 90 * DAY, step: 6 }) }, [
+    { t: T0 - 5 * DAY, kind: 'review', grade: 'good', id: 'a', from: PILOT.recallStep },
+    { t: T0 - 4 * DAY, kind: 'review', grade: 'fail', id: 'b', from: PILOT.recallStep },
+    { t: T0 - 3 * DAY, kind: 'review', grade: 'good', id: 'c', from: 4 },   // 14일 시험 — 세면 안 된다
+    { t: T0 - 2 * DAY, kind: 'review', grade: 'good', id: 'd' },            // from 없는 옛 기록
+    { t: T0 - DAY, kind: 'blink', n: 5 },                                   // 물 주기가 아니다
+  ]), T0);
+  assert.strictEqual(m.recallTested, 2);
+  assert.strictEqual(m.recallPassed, 1);
+  assert.strictEqual(m.recallRate, 50);
+});
+
+await t('시험을 아직 한 번도 안 봤으면 통과율은 0%가 아니라 없음이다', () => {
+  /* 0%로 내면 「기준 미달」로 보인다. 30일이 안 지난 것과 떨어진 것은 다르다. */
+  const m = studentMetrics(rec({ a: st({ id: 'a', due: T0 + DAY }) }, []), T0);
+  assert.strictEqual(m.recallRate, null);
+  assert.strictEqual(m.waterRate, null, '물 줄 차례가 온 낱말이 없으면 완수율도 없음');
+});
+
+await t('기록이 아예 없는 학생도 셈이 깨지지 않는다', () => {
+  const m = studentMetrics(null, T0);
+  assert.strictEqual(m.linked, false);
+  assert.strictEqual(m.total, 0);
+  assert.strictEqual(m.waterRate, null);
+  assert.strictEqual(m.recallRate, null);
+  const p = pilotMetrics([{ code: 's1', name: '가', cls: 'A반', ...m }], T0);
+  assert.strictEqual(p.overall.waterRate, null);
+  assert.strictEqual(p.classes.length, 1);
+  assert.strictEqual(p.classes[0].waterPass, null, '수치가 없으면 통과 여부도 없음');
+});
+
+await t('반별로 묶고 기준선과 견준다', () => {
+  const mk = (over) => ({ linked: true, total: 0, growing: 0, graduated: 0, overdue: 0, emergency: 0,
+    wateredToday: 0, recallPassed: 0, recallTested: 0, days7: 0, days28: 0, streak: 0, firstPlant: null, ...over });
+  const p = pilotMetrics([
+    { code: 's1', name: '나', cls: 'A반', ...mk({ wateredToday: 8, overdue: 2, recallPassed: 7, recallTested: 10, firstPlant: T0 - 13 * DAY }) },
+    { code: 's2', name: '가', cls: 'A반', ...mk({ wateredToday: 6, overdue: 4, recallPassed: 5, recallTested: 10, firstPlant: T0 - 20 * DAY }) },
+    { code: 's3', name: '다', cls: 'B반', ...mk({ wateredToday: 1, overdue: 9, recallPassed: 1, recallTested: 10 }) },
+  ], T0);
+  const [A, B] = p.classes;
+  assert.strictEqual(A.cls, 'A반');
+  assert.strictEqual(A.waterRate, 70, '(8+6) / (14+6)');
+  assert.strictEqual(A.waterPass, true, '70%는 기준 70% 이상이므로 통과');
+  assert.strictEqual(A.recallRate, 60);
+  assert.strictEqual(A.recallPass, true);
+  assert.strictEqual(A.dayNo, 21, '가장 먼저 심은 날로부터 며칠째');
+  assert.deepStrictEqual(A.rows.map((r) => r.name), ['가', '나'], '이름순');
+  assert.strictEqual(B.waterPass, false);
+  assert.strictEqual(p.overall.waterRate, 50, '15 / 30');
+  assert.strictEqual(p.criteria.water, 70);
+  assert.strictEqual(p.criteria.recall, 60);
+});
+
+await t('반 차례는 가나다가 아니라 학년 순이다', () => {
+  /* 가나다순이면 「중1 B반」이 「초5 A반」보다 앞에 온다(ㅈ<ㅊ).
+     원장이 명단을 읽는 차례는 초등 → 중등 → 고등이다. */
+  const base = { linked: true, total: 0, growing: 0, graduated: 0, overdue: 0, emergency: 0,
+    wateredToday: 0, recallPassed: 0, recallTested: 0, days7: 0, days28: 0, streak: 0, firstPlant: null };
+  const p = pilotMetrics([
+    { code: 'a', name: '가', cls: '중1 B반', ...base },
+    { code: 'b', name: '나', cls: '고2 C반', ...base },
+    { code: 'c', name: '다', cls: '초5 A반', ...base },
+    { code: 'd', name: '라', cls: '초3 A반', ...base },
+    { code: 'e', name: '마', cls: '', ...base },
+  ], T0);
+  assert.deepStrictEqual(p.classes.map((c) => c.cls),
+    ['초3 A반', '초5 A반', '중1 B반', '고2 C반', '(반 미지정)'],
+    '초 → 중 → 고, 반 이름이 없는 학생은 맨 뒤');
+});
+
+await t('지표 라우트는 관리자만 볼 수 있다', async () => {
+  const store = memStore();
+  await store.putState('s1', rec({ a: st({ id: 'a', due: T0 - DAY }) }, []));
+  const mine = await call(store, { path: '/api/vocab/admin/metrics', who: { code: 's1', admin: false } });
+  assert.strictEqual(mine.status, 403, '학생이 반 전체 지표를 보면 안 된다');
+  const out = await call(store, { path: '/api/vocab/admin/metrics', who: { code: '__admin__', admin: true } });
+  assert.strictEqual(out.status, 200);
+  assert.strictEqual(out.body.classes[0].cls, '월수반');
+  assert.strictEqual(out.body.classes[0].rows[0].name, '김지우');
+  assert.strictEqual(out.body.criteria.weeks, 4);
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');
