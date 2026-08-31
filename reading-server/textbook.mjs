@@ -118,10 +118,12 @@ export function cleanWords(list) {
   return out;
 }
 
-/* 검수를 끝냈다고 하려면 낱말마다 뜻이 있어야 한다 — 뜻 없는 낱말은 학생이 공부할 수 없다 */
+/* 검수를 끝냈다고 하려면 낱말마다 뜻이 있어야 한다 — 뜻 없는 낱말은 학생이 공부할 수 없다.
+   낱말이 아예 없는 강은 통과시킨다: 1강처럼 자음·모음을 배우는 주에는 외울 낱말이 없고,
+   그걸 막아 두면 그 강은 영영 검수를 못 끝내 진행 표시가 20/20이 될 수 없다. */
 export function readyToConfirm(words) {
   const list = cleanWords(words);
-  if (!list.length) return { ok: false, error: '낱말이 없어요.' };
+  if (!list.length) return { ok: true, words: [] };
   const blank = list.filter((w) => !w.meaning).map((w) => w.word);
   if (blank.length) return { ok: false, error: '뜻이 비어 있어요: ' + blank.slice(0, 5).join(', ') + (blank.length > 5 ? ' 외 ' + (blank.length - 5) + '개' : '') };
   return { ok: true, words: list };

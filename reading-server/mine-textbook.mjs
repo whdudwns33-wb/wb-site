@@ -135,7 +135,11 @@ for (const b of tb.books) for (const l of b.lessons) {
      걸름망(okWord)을 다시 들이대면 안 된다. 한 글자 낱말 「샘」이 그렇게 사라졌다.
      뜻이 없는 채로 남은 옛 후보만 걸름망을 통과해야 살아남는다. */
   const kept = prev.filter((p) => p.meaning || okWord(p.word)).map((p) => p.word);
-  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...kept])];
+  /* 사람이 "낱말이 아니다"라고 판단해 뺀 것은 다시 집어 오지 않는다.
+     걸름망으로는 못 거른다 — 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두었기 때문이다.
+     판단을 파일에 적어 두는 편이 정규식을 더 조이는 것보다 정확하고 되돌리기도 쉽다. */
+  const dropped = new Set(l.dropped || []);
+  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...kept])].filter((w) => !dropped.has(w));
   const byPair = {};
   for (const p of pairs) byPair[p.word] = p;
   const prevBy = {};

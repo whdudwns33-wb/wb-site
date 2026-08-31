@@ -145,11 +145,31 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   }
 });
 
-t('1~5강은 코칭글에 설명이 없어 대신 쓴 뜻이다', () => {
-  const lessons = findBook(TB, 'eoduk-cho1').lessons.filter((l) => l.lesson <= 5);
+t('빈 뜻이 하나도 남아 있지 않다', () => {
+  for (const l of findBook(TB, 'eoduk-cho1').lessons) {
+    const blank = l.words.filter((w) => !w.meaning).map((w) => w.word);
+    assert.deepStrictEqual(blank, [], l.lesson + '강에 빈 뜻이 남았다');
+  }
+});
+
+t('1강은 외울 낱말이 없다 — 코칭글만 나간다', () => {
+  const l1 = findLesson(findBook(TB, 'eoduk-cho1'), 1);
+  assert.deepStrictEqual(l1.words, [], '자음·모음 조합 예시어는 외울 낱말이 아니다');
+  assert.ok(l1.coaching.length > 300, '코칭글은 그대로 나가야 한다');
+  const card = coachingCard(TB, { bookId: 'eoduk-cho1', lesson: 1 }, null, null);
+  assert.ok(card && card.coaching, '낱말이 없어도 카드는 나온다');
+});
+
+t('낱말이 아니라고 판단해 뺀 것은 다시 캐도 되살아나지 않는다', () => {
+  /* 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두어 걸름망으로는 못 거른다.
+     판단을 파일(dropped)에 적어 두고, 추출기가 그것을 존중한다. */
+  const lessons = findBook(TB, 'eoduk-cho1').lessons;
+  const withDrop = lessons.filter((l) => (l.dropped || []).length);
+  assert.ok(withDrop.length >= 5, '뺀 기록이 남아 있어야 한다');
   for (const l of lessons) {
-    assert.strictEqual(l.words.filter((w) => !w.meaning).length, 0, l.lesson + '강에 빈 뜻이 남았다');
-    assert.ok(l.words.every((w) => w.src === 'ai'), l.lesson + '강 뜻은 모두 대신 쓴 것으로 표시돼야 한다');
+    for (const d of l.dropped || []) {
+      assert.ok(!l.words.some((w) => w.word === d), l.lesson + '강: 뺐다고 적어 놓고 목록에 남아 있다 — ' + d);
+    }
   }
 });
 
@@ -175,7 +195,9 @@ t('낱말을 다듬어 저장한다 — 빈 것·중복·과한 개수를 막는
 });
 
 t('뜻이 빈 낱말이 있으면 검수 완료를 막는다', () => {
-  assert.strictEqual(readyToConfirm([]).ok, false);
+  /* 낱말이 없는 강은 막지 않는다 — 1강처럼 외울 낱말이 없는 주가 있다 */
+  assert.strictEqual(readyToConfirm([]).ok, true);
+  assert.deepStrictEqual(readyToConfirm([]).words, []);
   const bad = readyToConfirm([{ word: '초원', meaning: '들판' }, { word: '응달', meaning: '' }]);
   assert.strictEqual(bad.ok, false);
   assert.ok(bad.error.includes('응달'), '어느 낱말인지 알려 줘야 한다');
