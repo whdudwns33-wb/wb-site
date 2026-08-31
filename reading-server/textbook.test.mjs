@@ -134,6 +134,9 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
     assert.ok(!/[:：]/.test(w.meaning), '뜻이 다음 항목까지 삼켰다: ' + w.word + ' → ' + w.meaning);
     assert.ok(!/["“”]/.test(w.meaning), '뜻에 예문이 섞였다: ' + w.word + ' → ' + w.meaning);
     assert.ok(w.meaning.length <= 55, '뜻이 너무 길다: ' + w.word);
+    /* 관형형·조사에서 잘린 뜻 — "작은 소리로 조용히 말하는" 처럼 끝이 매달리면
+       학생이 읽었을 때 문장이 끝나지 않는다. 캐낼 때 자주 생기는 흠이다. */
+    assert.ok(!/(는|한|다는|을|를|의|던)$/.test(w.meaning), '뜻의 끝이 매달렸다: ' + w.word + ' → ' + w.meaning);
   }
   const filled = words.filter((w) => w.meaning).length;
   assert.ok(filled > words.length / 2, '뜻이 절반도 안 채워졌다 (' + filled + '/' + words.length + ')');
