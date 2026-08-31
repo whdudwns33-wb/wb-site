@@ -669,6 +669,9 @@
   .material-request { padding: 12px; margin-top: 9px; border: 1px solid var(--line); border-radius: 12px; background: #FBFCFE; }
   .material-request.needs_info { border-color: #F6C86B; background: #FFF9EE; }
   .material-request.provided { border-color: #A9DDBB; background: #F2FBF5; }
+  .material-request.preparing { border-color: #B8C9F2; background: #F4F7FF; }
+  .material-request.assigned { border-color: #A9DDBB; background: #F2FBF5; }
+  .material-request.overdue { border-color: #F3B5B5; background: #FFF6F6; }
   .material-summary { margin-top: 8px; color: var(--dark-gray); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; }
   .material-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .material-type-option { display: flex; align-items: center; gap: 7px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; cursor: pointer; }
@@ -1338,8 +1341,14 @@ function occursOn(task, date) {
   if (task.deleted) return false;
   if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
   if (task.kind === 'report_snapshot') return false;
-  if (task.kind === 'academic_event' || task.kind === 'material_request') return false;
+  if (task.kind === 'academic_event' || task.kind === 'material_request' || task.kind === 'metamath_request') return false;
   if (task.kind === 'material_response' && task.status !== 'provided') return false;
+  if (task.kind === 'metamath_response') {
+    if (task.status !== 'assigned') return false;
+    const request = metamathRequestById(task.metamathRequestId);
+    if (!request || metamathResponseFor(request.id) !== task ||
+        Number(task.requestRevision || 0) < Number(request.requestRevision || 1)) return false;
+  }
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
   switch (task.repeat) {
@@ -4833,7 +4842,8 @@ function learningExamOptions(staffId, selected) {
 function learningTasksFor(staffId, sourceKey) {
   if (!LEARNING_SOURCES[sourceKey]) return [];
   return state.tasks
-    .filter(t => !t.deleted && t.staffId === staffId && t.source === sourceKey)
+    .filter(t => !t.deleted && t.staffId === staffId && t.source === sourceKey &&
+      (t.kind !== 'metamath_response' || metamathRequestStatus(metamathRequestById(t.metamathRequestId)) === 'assigned'))
     .sort((a, b) => {
       const aDate = learningTaskDate(a), bDate = learningTaskDate(b);
       const ad = isDone(a.id, aDate), bd = isDone(b.id, bDate);
@@ -4849,6 +4859,173 @@ function leadersEyeAccountGuide(me) {
     'Agency ID: <strong>wbbrain</strong><br>' +
     'Student ID: <strong>' + esc(me.name) + '</strong><br>' +
     'Student PW: <strong>0000</strong></div>';
+}
+
+const METAMATH_REQUEST_STATUS = Object.freeze({
+  requested: '수요일 제작 대기', changed: '변경 내용 확인', preparing: '제작 중', assigned: '배정 완료', cancelled: '취소됨'
+});
+const METAMATH_GRADES = Object.freeze(['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3']);
+const METAMATH_SEMESTERS = Object.freeze(['1학기', '2학기']);
+
+function nextMetamathRequestWednesday(date) {
+  const offset = (3 - dowOf(date) + 7) % 7;
+  return addDays(date, offset === 0 ? 7 : offset);
+}
+
+function metamathRequestsFor(staffId) {
+  return state.tasks.filter(task => !task.deleted && task.kind === 'metamath_request' && task.staffId === staffId)
+    .sort((a, b) => String(a.processingDate || '').localeCompare(String(b.processingDate || '')) ||
+      Number(a.requestedAt || 0) - Number(b.requestedAt || 0));
+}
+
+function allMetamathRequests() {
+  return teamStaff().flatMap(staff => metamathRequestsFor(staff.id));
+}
+
+function metamathRequestById(requestId) {
+  return state.tasks.find(task => !task.deleted && task.kind === 'metamath_request' && task.id === requestId) || null;
+}
+
+function metamathResponseFor(requestId) {
+  const request = metamathRequestById(requestId);
+  if (!request) return null;
+  return state.tasks.find(task => !task.deleted && task.id === 'metamath-response-' + requestId &&
+    task.kind === 'metamath_response' && task.metamathRequestId === requestId &&
+    task.staffId === request.staffId && task.origin === 'admin') || null;
+}
+
+function ensureMetamathResponse(req) {
+  const responseId = 'metamath-response-' + req.id;
+  let response = metamathResponseFor(req.id);
+  if (response) return response;
+  response = state.tasks.find(task => task.id === responseId && task.staffId === req.staffId) || {
+    id: responseId, createdAt: now(), deleted: false
+  };
+  Object.assign(response, {
+    id: responseId, groupId: responseId, kind: 'metamath_response', metamathRequestId: req.id,
+    staffId: req.staffId, origin: 'admin', deleted: false
+  });
+  if (!state.tasks.includes(response)) state.tasks.push(response);
+  return response;
+}
+
+function metamathRequestStatus(req) {
+  const response = req && metamathResponseFor(req.id);
+  const assigned = response && response.status === 'assigned' && response.source === 'metamath';
+  if (req && req.cancelledAt) return assigned ? 'assigned' : 'cancelled';
+  if (response && Number(response.requestRevision || 0) < Number(req.requestRevision || 1)) return 'changed';
+  if (assigned) return 'assigned';
+  if (response && response.status === 'preparing') return 'preparing';
+  return 'requested';
+}
+
+function metamathRequestFingerprint(req) {
+  const norm = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return [req.staffId, req.processingDate, req.grade, req.semester, req.unit].map(norm).join('|');
+}
+
+function buildMetamathRequestSummary(req) {
+  return [req.grade, req.semester, req.unit, req.note ? '메모: ' + req.note : ''].filter(Boolean).join(' · ');
+}
+
+function setMetamathResponse(req, status, note) {
+  const response = ensureMetamathResponse(req);
+  Object.assign(response, {
+    status: status, source: '', resourceUrl: '', studySubject: 'math',
+    title: '메타수학 문제지 제작 · ' + req.unit,
+    repeat: 'request', days: [], start: req.processingDate || today(), end: '', carry: false,
+    steps: [], responseNote: String(note || '').trim().slice(0, 300),
+    requestRevision: req.requestRevision || 1, requestSnapshot: JSON.parse(JSON.stringify(req)), updatedAt: now()
+  });
+  save(); queueSync();
+  return response;
+}
+
+function assignMetamathRequest(req, fields) {
+  const assigned = metamathResponseFor(req.id);
+  if (assigned && assigned.status === 'assigned' && assigned.source === 'metamath') return assigned;
+  const task = ensureMetamathResponse(req);
+  Object.assign(task, {
+    status: 'assigned', source: 'metamath', resourceUrl: fields.resourceUrl || '',
+    title: fields.title, studySubject: 'math', detail: buildMetamathRequestSummary(req),
+    dueDate: fields.due, estimatedMin: fields.estimatedMin,
+    guide: LEARNING_SOURCES.metamath.guide,
+    steps: (task.steps && task.steps.length) ? task.steps : LEARNING_SOURCES.metamath.steps.map(label => ({ id: uid(), label: label })),
+    target: 0, unit: '건', time: '', priority: 'normal', repeat: 'once', days: [],
+    start: fields.planned, end: '', carry: true, requestRevision: req.requestRevision || 1,
+    requestSnapshot: JSON.parse(JSON.stringify(req)), responseNote: '문제지를 제작하고 학습 일정에 배정했습니다', updatedAt: now()
+  });
+  save(); queueSync();
+  return task;
+}
+
+function metamathRequestCard(req, admin) {
+  const staff = staffById(req.staffId);
+  const status = metamathRequestStatus(req);
+  const response = metamathResponseFor(req.id);
+  const active = status === 'requested' || status === 'changed' || status === 'preparing';
+  const overdue = active && req.processingDate && req.processingDate < today();
+  const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && status === 'requested';
+  return '<div class="material-request ' + status + (overdue ? ' overdue' : '') + '"><div class="request-queue-head"><div>' +
+    '<div class="row wraprow" style="gap:6px"><b>' + esc(admin && staff ? staff.name + ' · ' : '') + esc(req.unit || '단원 미입력') + '</b>' +
+      '<span class="pill ' + (status === 'assigned' ? '' : overdue ? 'bad' : 'warn') + '">' + esc(overdue ? '처리 지연' : METAMATH_REQUEST_STATUS[status]) + '</span></div>' +
+    '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작일 ' + esc(req.processingDate ? label(req.processingDate) : '미정') + '</div></div>' +
+    '<span class="pill">수학</span></div>' +
+    '<div class="material-summary">' + esc(buildMetamathRequestSummary(req)) + '</div>' +
+    (response && response.responseNote ? '<div class="hint mt8"><b>학원 안내:</b> ' + esc(response.responseNote) + '</div>' : '') +
+    '<div class="academic-actions">' +
+      (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="metamathrequestopen" data-id="' + esc(req.id) + '">수정</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="metamathrequestcancel" data-id="' + esc(req.id) + '">취소</button>' : '') +
+      (admin && active ? '<a class="btn btn-sm btn-ghost" href="' + esc(METAMATH_CENTER_URL) + '" target="_blank" rel="noopener noreferrer">교실홈 열기 ↗</a>' : '') +
+      (admin && (status === 'requested' || status === 'changed') ? '<button class="btn btn-sm" data-act="metamathrequeststatus" data-id="' + esc(req.id) + '" data-status="preparing">' +
+        (status === 'changed' ? '변경 확인 후 제작' : '제작 시작') + '</button>' : '') +
+      (admin && status === 'preparing' ? '<button class="btn btn-sm btn-primary" data-act="metamathrequestassign" data-id="' + esc(req.id) + '">문제지 배정하기</button>' : '') +
+      (status === 'assigned' && response && response.start ? '<button class="btn btn-sm btn-primary" data-act="daypick" data-date="' +
+        esc(response.start) + '">학습일 보기 · ' + esc(shortDate(response.start)) + '</button>' : '') +
+    '</div></div>';
+}
+
+function metamathRequestPanel(me) {
+  const requests = metamathRequestsFor(me.id).slice(-8).reverse();
+  const canRequest = session.isStaffLink && !isManager() && me.id === session.staffId;
+  return '<div class="guide mb14"><b>문제지가 필요할 때 요청하세요.</b><br>' +
+    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.</div>' +
+    (requests.length ? '<div class="fl mb8">문제지 요청 현황</div>' + requests.map(req => metamathRequestCard(req, false)).join('') :
+      '<div class="small muted mb14">' + (canRequest ? '아직 요청한 문제지가 없습니다.' : '등록된 문제지 요청이 없습니다.') + '</div>');
+}
+
+function metamathRequestInbox() {
+  const queue = allMetamathRequests().filter(req => ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)))
+    .sort((a, b) => String(a.processingDate || '').localeCompare(String(b.processingDate || '')) ||
+      (metamathRequestStatus(a) === 'preparing' ? -1 : 1) - (metamathRequestStatus(b) === 'preparing' ? -1 : 1) ||
+      Number(a.requestedAt || 0) - Number(b.requestedAt || 0) ||
+      String((staffById(a.staffId) || {}).name || '').localeCompare(String((staffById(b.staffId) || {}).name || ''), 'ko'));
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 수요일 메타수학 문제지 큐</div>' +
+    '<div class="card-sub">요청 정보를 확인해 메타수학 교실홈에서 직접 제작한 뒤, 학습 예정일을 정해 배정하세요.</div></div>' +
+    '<span class="pill ' + (queue.length ? 'warn' : '') + '">' + queue.length + '건</span></div>' +
+    (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') + '</div>';
+}
+
+function metamathRequestModal(existing) {
+  const me = currentStaff();
+  if (!session.isStaffLink || isManager() || !me || me.id !== session.staffId ||
+      (existing && (existing.staffId !== me.id || metamathRequestStatus(existing) !== 'requested'))) {
+    return toast('본인의 대기 중인 문제지 요청만 작성할 수 있어요');
+  }
+  const req = existing || {};
+  const processingDate = req.processingDate || nextMetamathRequestWednesday(today());
+  const gradeOptions = '<option value="">학년 선택</option>' + METAMATH_GRADES.map(value =>
+    '<option value="' + value + '"' + (req.grade === value ? ' selected' : '') + '>' + value + '</option>').join('');
+  const semesterOptions = '<option value="">학기 선택</option>' + METAMATH_SEMESTERS.map(value =>
+    '<option value="' + value + '"' + (req.semester === value ? ' selected' : '') + '>' + value + '</option>').join('');
+  modal('🧮 메타수학 문제지 요청',
+    '<input type="hidden" id="metamathRequestId" value="' + esc(req.id || '') + '">' +
+    '<div class="guide mb14"><b>제작 예정: ' + esc(label(processingDate)) + '</b><br>선생님이 매주 수요일 요청 내용을 보고 문제지를 직접 만들어 배정합니다. 자동 출제 요청이 아닙니다.</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">학년</label><select class="in" id="metamathGrade">' + gradeOptions + '</select></div>' +
+      '<div class="field"><label class="fl">학기</label><select class="in" id="metamathSemester">' + semesterOptions + '</select></div></div>' +
+    '<div class="field"><label class="fl">단원</label><input class="in" id="metamathUnit" maxlength="160" value="' + esc(req.unit || '') + '" placeholder="예: 3단원 일차함수"></div>' +
+    '<div class="field"><label class="fl">기타(메모) <span class="muted">(선택)</span></label><textarea class="in" id="metamathNote" maxlength="500" rows="4" placeholder="난이도, 문항 수, 특히 어려운 유형 등을 적어주세요">' + esc(req.note || '') + '</textarea></div>',
+    '<button class="btn btn-primary btn-block" data-act="metamathrequestsave">' + (existing ? '요청 수정하기' : '문제지 요청하기') + '</button>');
 }
 
 function learningSourceCard(me, editable, sourceKey) {
@@ -4881,6 +5058,8 @@ function learningSourceCard(me, editable, sourceKey) {
   const completed = list.filter(task => isDone(task.id, learningTaskDate(task)));
   const late = active.filter(task => learningDueDate(task) && learningDueDate(task) < today()).length;
   const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
+  const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
+  const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
 
   return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
@@ -4891,8 +5070,10 @@ function learningSourceCard(me, editable, sourceKey) {
     accountGuide +
     '<div class="study-source-actions">' +
       (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
+      (canRequestMetamath ? '<button class="btn btn-ghost" data-act="metamathrequestopen">📝 문제지 요청</button>' : '') +
     '</div>' +
     appHint +
+    metamathPanel +
     (active.length
       ? active.map(t => taskRow(t, learningTaskDate(t), editable, false)).join('')
       : '<div class="small muted">진행할 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
@@ -4934,6 +5115,7 @@ function viewStudy() {
       '<button class="btn btn-primary btn-block mt14" data-act="daypick" data-date="' + today() + '">오늘 탭에서 시작</button></div>';
   }
 
+  if (session.isAdmin) h += metamathRequestInbox();
   h += submissionHubCard(me);
   [
     { title: '온라인 학습', help: '온라인 학습·시험 과제와 진행 상태', keys: ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'] },
@@ -5013,20 +5195,29 @@ function rdLogModal(index) {
     '<button class="btn btn-primary btn-block" data-act="rdlogsave">회독 완료 기록</button>');
 }
 
-function learningTaskModal(sourceKey) {
+function learningTaskModal(sourceKey, requestId) {
   if (!session.isAdmin) return;
   const me = currentStaff();
   if (!me) return toast('학생을 먼저 선택해 주세요');
   const source = LEARNING_SOURCES[sourceKey];
   if (!source) return toast('학습 종류를 다시 선택해 주세요');
-  const planned = addDays(today(), 1);
+  const request = requestId ? metamathRequestById(requestId) : null;
+  if (requestId && (!request || sourceKey !== 'metamath' || request.staffId !== me.id ||
+      metamathRequestStatus(request) !== 'preparing')) {
+    return toast('배정할 메타수학 요청을 다시 확인해 주세요');
+  }
+  const planned = request ? (request.processingDate >= today() ? request.processingDate : today()) : addDays(today(), 1);
+  const defaultTitle = request ? [request.grade, request.semester, request.unit, '문제지'].filter(Boolean).join(' ') : '';
   modal(me.name + ' — ' + source.icon + ' ' + source.label,
     '<input type="hidden" id="learnSource" value="' + esc(sourceKey) + '">' +
-    '<div class="guide mb14"><b>' + source.icon + ' ' + esc(source.label) + ' 보내기</b>과목·학습 예정일·마감일을 정하면 오늘·주간·학습 탭에 같은 일정으로 나타납니다.</div>' +
+    '<input type="hidden" id="learnRequestId" value="' + esc(request ? request.id : '') + '">' +
+    '<div class="guide mb14"><b>' + source.icon + ' ' + esc(request ? '요청 문제지 배정' : source.label + ' 보내기') + '</b><br>' +
+      (request ? esc(buildMetamathRequestSummary(request)) + '<br>메타수학 교실홈에서 실제 제작·배정을 마친 뒤 아래 학습 일정을 저장하세요.' :
+        '과목·학습 예정일·마감일을 정하면 오늘·주간·학습 탭에 같은 일정으로 나타납니다.') + '</div>' +
     '<div class="field"><label class="fl">과제·자료명</label>' +
-      '<input class="in" id="learnTitle" placeholder="예: 중간고사 1회 대비자료, 클래스카드 3세트"></div>' +
-    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="learnSubject">' +
-      studySubjectOptions('', '과목 선택') + '</select></div>' +
+      '<input class="in" id="learnTitle" value="' + esc(defaultTitle) + '" placeholder="예: 중간고사 1회 대비자료, 클래스카드 3세트"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="learnSubject"' + (request ? ' disabled' : '') + '>' +
+      studySubjectOptions(request ? 'math' : '', '과목 선택') + '</select></div>' +
       '<div class="field"><label class="fl">예상 학습시간</label><select class="in" id="learnEstimatedMin">' +
         [20, 30, 40, 50, 60, 80, 90, 120].map(value => '<option value="' + value + '"' + (value === 50 ? ' selected' : '') + '>' + value + '분</option>').join('') +
       '</select></div></div>' +
@@ -5039,7 +5230,7 @@ function learningTaskModal(sourceKey) {
     '<div class="field"><label class="fl">자료 공유 링크 <span class="muted">(선택)</span></label>' +
       '<input class="in" id="learnUrl" type="url" inputmode="url" placeholder="https://... 보기 전용 링크"></div>' +
     '<div class="hint">예정일에는 오늘 체크리스트에 나타나고, 마감일까지 끝내지 못하면 지연으로 표시됩니다. 시험대비자료는 HTTPS 보기 전용 링크가 필수입니다.</div>',
-    '<button class="btn btn-primary btn-block mt14" data-act="learnsave">학생에게 보내기</button>');
+    '<button class="btn btn-primary btn-block mt14" data-act="learnsave">' + (request ? '문제지 배정 완료' : '학생에게 보내기') + '</button>');
 }
 function wnAddModal(me) {
   modal('✏️ 오답 추가',
@@ -9176,6 +9367,98 @@ document.addEventListener('click', ev => {
     }
 
     /* 학습 카드 */
+    case 'metamathrequestopen': {
+      if (!session.isStaffLink) break;
+      if (isManager()) return toast('문제지 요청은 학생 본인 링크에서 할 수 있어요');
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const existing = id ? metamathRequestById(id) : null;
+      if (existing && existing.staffId !== me.id) return toast('본인의 요청만 수정할 수 있어요');
+      if (existing && metamathRequestStatus(existing) !== 'requested') return toast('제작이 시작된 요청은 수정할 수 없어요');
+      metamathRequestModal(existing);
+      break;
+    }
+    case 'metamathrequestsave': {
+      if (!session.isStaffLink) break;
+      if (isManager()) return toast('문제지 요청은 학생 본인 링크에서 할 수 있어요');
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const existingId = (($('#metamathRequestId') && $('#metamathRequestId').value) || '').trim();
+      const existing = existingId ? metamathRequestById(existingId) : null;
+      if (existing && existing.staffId !== me.id) return toast('본인의 요청만 수정할 수 있어요');
+      if (existing && metamathRequestStatus(existing) !== 'requested') return toast('제작이 시작된 요청은 수정할 수 없어요');
+      const grade = (($('#metamathGrade') && $('#metamathGrade').value) || '').trim();
+      const semester = (($('#metamathSemester') && $('#metamathSemester').value) || '').trim();
+      const unit = (($('#metamathUnit') && $('#metamathUnit').value) || '').trim();
+      const note = (($('#metamathNote') && $('#metamathNote').value) || '').trim();
+      if (!grade || !semester || !unit) return toast('학년·학기·단원을 모두 입력해 주세요');
+      if (!METAMATH_GRADES.includes(grade) || grade.length > 20) return toast('학년을 다시 선택해 주세요');
+      if (!METAMATH_SEMESTERS.includes(semester) || semester.length > 20) return toast('학기를 다시 선택해 주세요');
+      if (unit.length > 160) return toast('단원은 160자 이내로 입력해 주세요');
+      if (note.length > 500) return toast('기타 메모는 500자 이내로 입력해 주세요');
+      const processingDate = existing && existing.processingDate ? existing.processingDate : nextMetamathRequestWednesday(today());
+      const probe = { staffId: me.id, processingDate: processingDate, grade: grade, semester: semester, unit: unit };
+      const duplicate = metamathRequestsFor(me.id).find(req => req.id !== existingId &&
+        ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)) &&
+        metamathRequestFingerprint(req) === metamathRequestFingerprint(probe));
+      if (duplicate) return toast('같은 수요일에 같은 범위로 처리 중인 문제지 요청이 있습니다');
+      let req = existing;
+      if (!req) {
+        req = {
+          id: uid(), groupId: 'metamath-request-' + now(), kind: 'metamath_request',
+          staffId: me.id, origin: 'staff', processingDate: nextMetamathRequestWednesday(today()),
+          repeat: 'request', days: [], end: '', carry: false,
+          createdAt: now(), requestedAt: now(), deleted: false
+        };
+        state.tasks.push(req);
+      }
+      Object.assign(req, {
+        grade: grade, semester: semester, unit: unit, note: note,
+        title: '메타수학 문제지 요청 · ' + [grade, semester, unit].join(' '),
+        studySubject: 'math', detail: buildMetamathRequestSummary({ grade: grade, semester: semester, unit: unit, note: note }),
+        guide: '', steps: [], target: 0, time: '', priority: 'normal', start: req.processingDate || processingDate,
+        requestRevision: (req.requestRevision || 0) + 1, cancelledAt: null, updatedAt: now()
+      });
+      req.requestKey = metamathRequestFingerprint(req);
+      save(); queueSync(); closeModal(); render();
+      toast(existing ? '문제지 요청을 수정했습니다' : '문제지 요청을 보냈습니다');
+      break;
+    }
+    case 'metamathrequestcancel': {
+      if (!session.isStaffLink) break;
+      if (isManager()) return toast('문제지 요청은 학생 본인 링크에서 할 수 있어요');
+      const me = currentStaff();
+      const req = metamathRequestById(id);
+      if (!me || me.id !== session.staffId || !req || req.staffId !== me.id || metamathRequestStatus(req) !== 'requested') {
+        return toast('이 요청은 취소할 수 없습니다');
+      }
+      if (!confirm('문제지 요청을 취소할까요?')) break;
+      req.cancelledAt = now(); req.updatedAt = now();
+      save(); queueSync(); render(); toast('문제지 요청을 취소했습니다');
+      break;
+    }
+    case 'metamathrequeststatus': {
+      if (!session.isAdmin) break;
+      const req = metamathRequestById(id);
+      const status = el.dataset.status || '';
+      if (!req || req.cancelledAt || status !== 'preparing' || !['requested', 'changed'].includes(metamathRequestStatus(req))) {
+        return toast('제작을 시작할 요청을 찾지 못했습니다');
+      }
+      setMetamathResponse(req, 'preparing', '선생님이 문제지를 제작하고 있습니다');
+      render(); toast('제작 중으로 표시했습니다');
+      break;
+    }
+    case 'metamathrequestassign': {
+      if (!session.isAdmin) break;
+      const req = metamathRequestById(id);
+      if (!req || req.cancelledAt || metamathRequestStatus(req) !== 'preparing') {
+        return toast('배정할 요청을 찾지 못했습니다');
+      }
+      if (!staffById(req.staffId)) return toast('학생 정보를 찾지 못했습니다');
+      viewStaff = req.staffId;
+      learningTaskModal('metamath', req.id);
+      break;
+    }
     case 'learnadd': {
       if (!session.isAdmin) break;
       const sourceKey = el.dataset.source || '';
@@ -9189,8 +9472,10 @@ document.addEventListener('click', ev => {
       if (!me) return toast('학생을 먼저 선택해 주세요');
       const sourceKey = $('#learnSource').value || '';
       const source = LEARNING_SOURCES[sourceKey];
+      const requestId = (($('#learnRequestId') && $('#learnRequestId').value) || '').trim();
+      const request = requestId ? metamathRequestById(requestId) : null;
       const title = ($('#learnTitle').value || '').trim();
-      const subjectKey = $('#learnSubject').value || '';
+      const subjectKey = requestId ? 'math' : ($('#learnSubject').value || '');
       const planned = $('#learnStudyDate').value || '';
       const due = $('#learnDueDate').value || '';
       const estimatedMin = Math.max(10, Math.min(600, Number($('#learnEstimatedMin').value) || 50));
@@ -9200,6 +9485,8 @@ document.addEventListener('click', ev => {
       const rawUrl = ($('#learnUrl').value || '').trim();
       const resourceUrl = safeHttpsUrl(rawUrl);
       if (!source) return toast('학습 종류를 다시 선택해 주세요');
+      if (requestId && (!request || sourceKey !== 'metamath' || request.staffId !== me.id ||
+          metamathRequestStatus(request) !== 'preparing')) return toast('제작 중인 메타수학 요청만 배정할 수 있어요');
       if (!title) return toast('과제·자료명을 입력해 주세요');
       if (!STUDY_SUBJECTS[subjectKey]) return toast('과목을 선택해 주세요');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(planned) || planned < today()) return toast('학습 예정일을 오늘 이후로 선택해 주세요');
@@ -9207,6 +9494,13 @@ document.addEventListener('click', ev => {
       if (due < planned) return toast('마감일은 학습 예정일보다 빠를 수 없습니다');
       if (rawUrl && !resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
       if (sourceKey === 'exam_material' && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
+      if (request) {
+        assignMetamathRequest(request, {
+          title: title, resourceUrl: resourceUrl, planned: planned, due: due, estimatedMin: estimatedMin
+        });
+        closeModal(); render(); toast(me.name + ' — 메타수학 문제지를 배정했습니다');
+        break;
+      }
       state.tasks.push({
         id: uid(), groupId: 'learning-' + now(), staffId: me.id,
         source: sourceKey, resourceUrl: resourceUrl, studySubject: subjectKey,
@@ -11548,7 +11842,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.2';
+const APP_VER = '2026-08-31.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
