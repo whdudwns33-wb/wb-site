@@ -8,7 +8,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const states = {}, mnemos = {}, push = {}, assigns = {};
+  const states = {}, mnemos = {}, push = {}, assigns = {}, usage = { rec: null };
   const students = { s1: { code: 's1', name: '김지우', cls: '월수반' }, s2: { code: 's2', name: '박서준', cls: '월수반' } };
   return {
     getState: (c) => states[c] || null,
@@ -25,7 +25,9 @@ function memStore() {
     getAssign: (c) => assigns[c] || null,
     putAssign: (c, rec) => { assigns[c] = rec; },
     listAssignCodes: () => Object.keys(assigns),
-    _raw: { states, mnemos, push, assigns },
+    getUsage: () => usage.rec,
+    putUsage: (rec) => { usage.rec = rec; },
+    _raw: { states, mnemos, push, assigns, usage },
   };
 }
 const call = (store, over) => handleVocab({
@@ -640,6 +642,58 @@ await t('캐릭터 목록은 기획서가 정한 셋이다', () => {
   for (const c of Object.values(TALK_CHARS)) {
     assert.ok(c.name && c.job && c.open, '이름·직업·첫마디가 다 있어야 한다');
   }
+});
+
+/* ── AI 하루 한도 ── */
+await t('한도가 차면 AI를 부르지 않고 quota로 돌려준다', async () => {
+  /* 오류가 아니라 ok:false여야 한다 — 학생 화면이 고장난 것처럼 보이면 안 된다.
+     그리고 실제로 AI를 부르지 않아야 한다. 세고 나서 부르면 요금은 이미 나간 뒤다. */
+  const store = memStore();
+  let called = 0;
+  const fake = async () => { called += 1; return { ok: true, say: '네', used: [], why: '' }; };
+  const go = () => call(store, {
+    path: '/api/vocab/talk', method: 'POST', who: { code: 's1', admin: false },
+    getBody: async () => ({ char: 'scientist', words: WORDS, history: [{ role: 'user', content: '안녕' }] }),
+    ai: { apiKey: 'k', model: null, talk: fake, env: { AI_DAILY_PER_STUDENT: '2', AI_DAILY_TOTAL: '5' } },
+  });
+  assert.strictEqual((await go()).body.ok, true);
+  assert.strictEqual((await go()).body.ok, true);
+  const third = await go();
+  assert.strictEqual(third.status, 200, '오류가 아니라 200이어야 한다');
+  assert.strictEqual(third.body.ok, false);
+  assert.strictEqual(third.body.reason, 'quota');
+  assert.strictEqual(third.body.quota.reason, 'student');
+  assert.strictEqual(called, 2, '막힌 요청은 AI를 부르지 않는다 — 부르고 나면 요금은 이미 나갔다');
+});
+
+await t('세 자리(연상·문장·대화)가 같은 장부를 쓴다', async () => {
+  const store = memStore();
+  const ai = { apiKey: 'k', model: null, env: { AI_DAILY_TOTAL: '2', AI_DAILY_PER_STUDENT: '99' },
+    talk: async () => ({ ok: true, say: '네', used: [], why: '' }),
+    judge: async () => ({ ok: true, verdict: 'good', feedback: '좋아요', better: '' }),
+    generate: async () => ({ ok: true, candidates: [{ cue: 'a', scene: 'b' }] }) };
+  const talk = await call(store, { path: '/api/vocab/talk', method: 'POST', who: { code: 's1' },
+    getBody: async () => ({ char: 'chef', words: WORDS, history: [{ role: 'user', content: '안녕' }] }), ai });
+  assert.strictEqual(talk.body.ok, true);
+  const sent = await call(store, { path: '/api/vocab/sentence', method: 'POST', who: { code: 's2' },
+    getBody: async () => ({ word: '관측', meaning: '보고 재기', type: 'hanja', sentence: '별을 관측했다' }), ai });
+  assert.strictEqual(sent.body.ok, true);
+  /* 전체 2회를 두 학생이 나눠 썼으니 세 번째는 누가 불러도 막힌다 */
+  const third = await call(store, { path: '/api/vocab/mnemonic', method: 'POST', who: { code: 's3' },
+    getBody: async () => ({ word: '관측', meaning: '보고 재기', type: 'hanja' }), ai });
+  assert.strictEqual(third.body.ok, false);
+  assert.strictEqual(third.body.quota.reason, 'total');
+  assert.strictEqual(store._raw.usage.rec.total, 2);
+});
+
+await t('관리 화면 지표에 오늘 쓴 AI 양이 함께 온다', async () => {
+  const store = memStore();
+  await store.putUsage({ day: new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), total: 7, by: { s1: 7 } });
+  const out = await call(store, { path: '/api/vocab/admin/metrics', who: { code: '__a', admin: true } });
+  assert.strictEqual(out.status, 200);
+  assert.strictEqual(out.body.ai.total, 7);
+  assert.strictEqual(out.body.ai.cap, 200, '기본 전체 한도');
+  assert.deepStrictEqual(out.body.ai.students, [{ code: 's1', n: 7 }]);
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');
