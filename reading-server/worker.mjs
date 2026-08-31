@@ -5,6 +5,7 @@
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
+import { bookIndex, coachingCard, validProgress } from './textbook.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -170,7 +171,18 @@ async function titleMap(env, origin) {
   return TITLE_CACHE.map;
 }
 
-function parentSummary(stu, st, titles, vst) {
+/* 교재(어휘가 독해다) — 제목 맵과 같이 정적 자산에서 읽어 10분 캐시 */
+let TB_CACHE = { t: 0, data: null };
+async function textbook(env, origin) {
+  if (TB_CACHE.data && Date.now() - TB_CACHE.t < 600_000) return TB_CACHE.data;
+  try {
+    const r = await env.ASSETS.fetch(new Request(origin + '/textbook.json'));
+    TB_CACHE = { t: Date.now(), data: await r.json() };
+  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  return TB_CACHE.data;
+}
+
+function parentSummary(stu, st, titles, vst, book) {
   const sum = summarize(stu.code, stu, st);
   const S = (st && st.state) || {};
   const days = S.days || {};
@@ -181,7 +193,8 @@ function parentSummary(stu, st, titles, vst) {
     const d = new Date(k + 'T12:00:00Z');
     weekDays.push({ dow: dows[d.getUTCDay()], done: !!days[k], today: i === 0 });
   }
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  /* 제목을 못 찾아도 내부 id를 학부모에게 보이지 않는다 — 지문 이름이 바뀌거나 내려가면 생긴다 */
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || '읽은 글';
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -197,6 +210,7 @@ function parentSummary(stu, st, titles, vst) {
     reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
     recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
     wordbrain: vocabSummary(vst),
+    book: book || null,
   };
 }
 
@@ -222,6 +236,10 @@ export default {
         return json(200, data);
       } catch (e) { return env.ASSETS.fetch(req); }
     }
+
+    /* 교재 코칭 원문은 직접 열 수 없다 — WB가 쓴 글이라, 학부모는 자기 아이 링크로만,
+       강사는 로그인해서만 본다. 서버·워커는 이 파일을 내부에서 읽어 쓴다. */
+    if (p === '/textbook.json') return json(404, { error: 'not found' });
 
     if (!p.startsWith('/api/')) {
       /* 정적 자산 (학생 앱 + /admin) */
@@ -263,8 +281,11 @@ export default {
         ]);
         if (!stu) return json(404, { error: '학생 정보를 찾을 수 없어요.' });
         const titles = await titleMap(env, url.origin);
-        const vst = await vocabStore(env).getState(code);
-        return json(200, parentSummary(stu, st, titles, vst));
+        const store = vocabStore(env);
+        const [vst, assignRec, tb] = await Promise.all([
+          store.getState(code), store.getAssign(code), textbook(env, url.origin),
+        ]);
+        return json(200, parentSummary(stu, st, titles, vst, coachingCard(tb, stu.book, vst, assignRec)));
       }
 
       const who = await auth(env, req);
@@ -371,6 +392,26 @@ export default {
         stu.level = level;
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true });
+      }
+
+      /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
+      if (p === '/api/admin/textbook' && req.method === 'GET') {
+        return json(200, { books: bookIndex(await textbook(env, url.origin)) });
+      }
+      if (p === '/api/admin/book' && req.method === 'POST') {
+        const { code, bookId, lesson } = await req.json();
+        const stu = await env.DB.get('student:' + code, 'json');
+        if (!stu) return json(404, { error: '학생 없음' });
+        if (!bookId) {
+          delete stu.book;
+          await env.DB.put('student:' + code, JSON.stringify(stu));
+          return json(200, { ok: true, book: null });
+        }
+        const v = validProgress(await textbook(env, url.origin), bookId, lesson);
+        if (!v.ok) return json(400, { error: v.error });
+        stu.book = { bookId, lesson: v.lesson.lesson, at: nowIso() };
+        await env.DB.put('student:' + code, JSON.stringify(stu));
+        return json(200, { ok: true, book: stu.book });
       }
 
       /* 백업: 전체 내려받기 / 자동 스냅샷 목록·내려받기 */

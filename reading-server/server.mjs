@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
+import { bookIndex, coachingCard, validProgress } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -124,7 +125,17 @@ function titleMap() {
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
   return TITLE_CACHE.map;
 }
-function parentSummary(stu, st, vst) {
+/* 교재(어휘가 독해다) — 정적 파일 하나, 제목 맵과 같은 방식으로 캐시 */
+let TB_CACHE = { t: 0, data: null };
+function textbook() {
+  if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
+  try {
+    TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
+  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  return TB_CACHE.data;
+}
+
+function parentSummary(stu, st, vst, assignRec) {
   const titles = titleMap();
   const sum = summarize(stu.code);
   const S = (st && st.state) || {};
@@ -136,7 +147,8 @@ function parentSummary(stu, st, vst) {
     const d = new Date(k + 'T12:00:00');
     weekDays.push({ dow: dows[d.getDay()], done: !!days[k], today: i === 0 });
   }
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  /* 제목을 못 찾아도 내부 id를 학부모에게 보이지 않는다 — 지문 이름이 바뀌거나 내려가면 생긴다 */
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || '읽은 글';
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -150,6 +162,7 @@ function parentSummary(stu, st, vst) {
     reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
     recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
     wordbrain: vocabSummary(vst),
+    book: coachingCard(textbook(), stu.book, vst, assignRec),
   };
 }
 
@@ -181,7 +194,7 @@ const server = http.createServer(async (req, res) => {
         const code = /^[A-Za-z0-9]{16,64}$/.test(t) ? (db.parents || {})[t] : null;
         const stu = code && db.students[code];
         if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
-        return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code)));
+        return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code), vocabStore.getAssign(code)));
       }
 
       if (p === '/api/login' && req.method === 'POST') {
@@ -272,7 +285,9 @@ const server = http.createServer(async (req, res) => {
         const c = String(code || '').trim();
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(res, 400, { error: '학생 코드는 영문/숫자 3~20자' });
         if (!name) return json(res, 400, { error: '이름 필요' });
-        db.students[c] = { code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: (db.students[c] || {}).createdAt || nowIso() };
+        /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
+        const prev = db.students[c] || {};
+        db.students[c] = { ...prev, code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev.createdAt || nowIso() };
         persist();
         return json(res, 200, { ok: true, student: db.students[c] });
       }
@@ -284,6 +299,21 @@ const server = http.createServer(async (req, res) => {
         db.levelLog.push({ code, level, at: nowIso() });
         persist();
         return json(res, 200, { ok: true });
+      }
+      /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
+      if (p === '/api/admin/textbook' && req.method === 'GET') {
+        return json(res, 200, { books: bookIndex(textbook()) });
+      }
+      if (p === '/api/admin/book' && req.method === 'POST') {
+        const { code, bookId, lesson } = await readBody(req);
+        const stu = db.students[code];
+        if (!stu) return json(res, 404, { error: '학생 없음' });
+        if (!bookId) { delete stu.book; persist(); return json(res, 200, { ok: true, book: null }); }
+        const v = validProgress(textbook(), bookId, lesson);
+        if (!v.ok) return json(res, 400, { error: v.error });
+        stu.book = { bookId, lesson: v.lesson.lesson, at: nowIso() };
+        persist();
+        return json(res, 200, { ok: true, book: stu.book });
       }
       if (p === '/api/admin/export' && req.method === 'GET') {
         const day = url.searchParams.get('backup');
@@ -348,6 +378,10 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, data);
       } catch (e) { /* 파일 문제 시 원본 서빙으로 폴백 */ }
     }
+
+    /* 교재 코칭 원문은 직접 열 수 없다 — WB가 쓴 글이라, 학부모는 자기 아이 링크로만,
+       강사는 로그인해서만 본다. 서버·워커는 이 파일을 내부에서 읽어 쓴다. */
+    if (p === '/textbook.json') return json(res, 404, { error: 'not found' });
 
     /* 학생 앱 */
     return serveFile(res, APP_DIR, p === '/' ? 'index.html' : p.slice(1));

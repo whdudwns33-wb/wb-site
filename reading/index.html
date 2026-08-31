@@ -1523,10 +1523,33 @@ function autoStop(done){
   if(done)announce(wasVoice?'끝까지 들으며 읽었어요! 이제 🎙 낭독으로 직접 읽어 보세요.'
                            :'자동 읽기 완료! 눈이 의미 단위를 따라갔어요.');
 }
+/* 소리 관련 안내는 눈에 보여야 한다.
+   announce()가 쓰는 #live는 .sr — 1px로 잘린 스크린리더 전용 영역이라 화면에 안 나온다.
+   완료 알림은 화면이 이미 바뀌어 있어 괜찮지만, "소리가 안 난다"는 아무것도 안 바뀌어서
+   그대로 "눌렀는데 반응이 없다"가 된다. 이미 떠 있는 바에 넣고, 바가 없으면 띄운다. */
+function voiceNotice(msg){
+  announce(msg);
+  let bar=document.getElementById('autoBar');
+  if(!bar){
+    bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
+    bar.innerHTML=`<div class="auto-in"><span class="tag bad">소리가 나지 않아요</span>
+      <span class="auto-lbl" id="voiceMsg"></span><span style="flex:1"></span>
+      <button class="toolbtn" data-act="auto-exit">닫기 ✕</button></div>`;
+    document.body.appendChild(bar);
+  }else if(!document.getElementById('voiceMsg')){
+    const inner=bar.querySelector('.auto-in');
+    if(inner){
+      const tag=document.createElement('span');tag.className='tag bad';tag.textContent='소리가 나지 않아요';
+      const m=document.createElement('span');m.className='auto-lbl';m.id='voiceMsg';
+      inner.insertBefore(m,inner.firstChild);inner.insertBefore(tag,inner.firstChild);
+    }
+  }
+  const el=document.getElementById('voiceMsg');if(el)el.textContent=msg;
+}
 /* 들으며 읽기 — 목소리가 준비됐는지 먼저 본다. 없으면 조용히 안 되는 대신 말해 준다. */
 function listenStart(){
   if(sess.auto)return;
-  if(!WBVoice.ttsSupported()){announce('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 주세요.');return;}
+  if(!WBVoice.ttsSupported()){voiceNotice('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 보세요.');return;}
   /* 누른 '그 순간' 안에서 잠금을 풀어야 모바일에서 소리가 난다.
      예전에는 목소리 목록을 기다렸다가 말해서 그 순간을 놓쳤고, 목록이 늦게 차는 기기에서는
      아예 '목소리가 없다'며 거절해 버려 조용히 아무 일도 일어나지 않았다. */
@@ -1538,7 +1561,7 @@ function listenStart(){
   setTimeout(()=>{
     const a=sess.auto;
     if(!a||!a.voice||a.started)return;
-    announce(WBVoice.hasVoice(lang)
+    voiceNotice(WBVoice.hasVoice(lang)
       ?'소리가 안 나면 기기 음량과 무음 모드를 확인해 주세요.'
       :(lang==='en'?'이 기기에 영어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'
                    :'이 기기에 한국어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'));

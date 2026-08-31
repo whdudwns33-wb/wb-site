@@ -34,6 +34,18 @@
     .rline:last-child{border-bottom:0}
     .rline small{color:var(--muted);flex:0 0 auto}
     .speedbox{margin-top:10px;padding:11px 13px;border-radius:11px;background:var(--sky);font-size:13.5px}
+    .coach{border-color:#e5d6b4;background:linear-gradient(150deg,#fffaf0 0,#fff 65%)}
+    .coach .eyebrow{color:#a1791f}
+    .coach h2{color:#7a5a12}
+    .coach-txt{margin:11px 0 0;font-size:14px;white-space:pre-wrap;word-break:keep-all}
+    .coach details{margin-top:6px}
+    .coach summary{display:inline-block;margin-top:7px;padding:6px 13px;border-radius:999px;background:#f3e6c7;color:#7a5a12;font-size:12.5px;font-weight:800;cursor:pointer;list-style:none}
+    .coach summary::-webkit-details-marker{display:none}
+    .coach details[open] summary{background:#ece0c4}
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+    .chip{padding:4px 10px;border-radius:999px;background:#f5efe0;color:#6c5a2e;font-size:12.5px;font-weight:700}
+    .chip.on{background:#e7f6f0;color:var(--ok)}
+    .coach-note{margin-top:11px;padding:10px 12px;border-radius:11px;background:#fbf4e4;font-size:13px;color:#6c5a2e}
     footer{max-width:560px;margin:auto;padding:0 14px 40px;color:var(--muted);font-size:12px;text-align:center}
     .err{padding:40px 16px;text-align:center;color:var(--muted)}
   </style>
@@ -46,6 +58,25 @@
 'use strict';
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
+/* 교재 코칭 — 첫 문단만 펼쳐 두고 나머지는 접는다. 휴대폰에서 1,500자를 한 번에 내밀면 안 읽힌다. */
+function coachCard(b){
+  const paras=String(b.coaching||'').split(/\n{2,}/).filter(p=>p.trim());
+  if(!paras.length)return'';
+  const lead=paras[0],rest=paras.slice(1).join('\n\n');
+  const meta=[b.bookTitle,b.pages].filter(Boolean).join(' · ');
+  let words='';
+  if((b.words||[]).length){
+    const notYet=new Set(b.notYet||[]);
+    words='<div class="chips">'+b.words.map(w=>`<span class="chip ${(!notYet.has(w)&&b.planted)?'on':''}">${esc(w)}</span>`).join('')+'</div>'
+      +`<div class="coach-note">${b.planted?`앱에 심은 낱말 <b>${b.planted}/${b.words.length}</b>개 · 그중 <b>${b.rooted}개</b>는 오래 기억에 남을 만큼 자랐어요${(b.notYet||[]).length?` — 아직 <b>${esc(b.notYet.join(', '))}</b>${(b.notYet||[]).length>=4?' 등':''}은 더 만나 봐야 해요.`:'.'}`:'아직 앱에서 만나지 않은 낱말이에요. 교재로 먼저 익히고, 앱에서 다시 만나면 오래 남아요.'}</div>`;
+  }
+  return `<div class="card coach"><p class="eyebrow">이번 주 교재 코칭</p>
+    <h2>${b.lesson}강 ${esc(b.title||'')}</h2>
+    ${meta?`<p class="sub">${esc(meta)}</p>`:''}
+    <p class="coach-txt">${esc(lead)}</p>
+    ${rest?`<details><summary>코칭 전체 보기</summary><p class="coach-txt">${esc(rest)}</p></details>`:''}
+    ${words}</div>`;
+}
 (async()=>{
   const app=document.getElementById('app');
   const t=new URLSearchParams(location.search).get('t')||'';
@@ -63,7 +94,7 @@ const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
   app.innerHTML=`
   <div class="card hero"><p class="eyebrow">주간 읽기 리포트</p>
     <h1>${esc(d.name)} <span class="tag">${esc(LV[d.level]||d.level||'')}</span></h1>
-    <p class="sub">${esc(d.cls||'')}${d.cls?' · ':''}${esc(d.grade||'')} · ${new Date(d.generatedAt).toLocaleDateString('ko-KR')} 기준</p>
+    <p class="sub">${[d.cls,d.grade,new Date(d.generatedAt).toLocaleDateString('ko-KR')+' 기준'].filter(Boolean).map(esc).join(' · ')}</p>
     <div class="stats">
       <div class="stat"><b>${d.streak}</b><span>연속(일)</span></div>
       <div class="stat"><b>${d.week}/7</b><span>이번 주</span></div>
@@ -72,6 +103,7 @@ const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
     </div>
     <div class="weekdots">${(d.weekDays||[]).map(w=>`<span class="wd ${w.today?'today':''}"><i class="${w.done?'done':''}"></i>${esc(w.dow)}</span>`).join('')}</div>
     <p class="sub" style="margin-top:12px">${enc}</p></div>
+  ${d.book?coachCard(d.book):''}
   ${(d.wordbrain&&d.wordbrain.total)?`<div class="card"><h2>어휘 — 워드브레인</h2>
     <p class="sub" style="margin-top:2px">읽다가 몰랐던 낱말을 잊을 때쯤 다시 만나 문제로 확인해요. 한자어·고유어·영어를 각각 다른 방법으로 익힙니다.</p>
     <div class="stats">

@@ -660,8 +660,23 @@
     var say = $('#' + pfx + 'Say'), rec = $('#' + pfx + 'Rec'), out = $('#' + pfx + 'Out');
     if (!say || !rec) return;
 
-    /* 낱말 → 뜻 → 예문 차례로. 토막마다 언어를 알아서 고른다(영단어 + 한글 뜻) */
-    say.addEventListener('click', function () { WBVoice.speakSeq([w.word, w.meaning, w.example]); });
+    /* 낱말 → 뜻 → 예문 차례로. 토막마다 언어를 알아서 고른다(영단어 + 한글 뜻).
+       소리가 안 나는 기기가 있는데 아무 표시도 없으면 "눌러도 안 된다"가 된다.
+       목소리 목록은 못 믿으니 실제로 소리가 시작되는지로 판단해 알려 준다. */
+    say.addEventListener('click', function () {
+      if (!WBVoice.ttsSupported()) { toast('이 브라우저는 읽어주기를 지원하지 않아요.'); return; }
+      WBVoice.unlock();
+      var began = false;
+      var watch = setTimeout(function () {
+        if (began) return;
+        toast(WBVoice.hasVoice(WBVoice.langOf(w.meaning || w.word))
+          ? '소리가 안 나면 기기 음량과 무음 모드를 확인해 주세요.'
+          : '이 기기에 목소리가 없어요. 휴대폰에서 열어 보세요.');
+      }, 2600);
+      WBVoice.speakSeq([w.word, w.meaning, w.example], {
+        onstart: function () { began = true; clearTimeout(watch); },
+      });
+    });
 
     if (!WBVoice.recSupported()) { rec.style.display = 'none'; return; }
 

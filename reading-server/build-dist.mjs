@@ -11,7 +11,7 @@ const DIST = path.join(ROOT, 'dist');
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(path.join(DIST, 'admin'), { recursive: true });
 
-const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html'];
+const APP_FILES = ['index.html', 'articles.json', 'textbook.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html'];
 for (const f of APP_FILES) fs.copyFileSync(path.join(APP, f), path.join(DIST, f));
 fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin', 'index.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
