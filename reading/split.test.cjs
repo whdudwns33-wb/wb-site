@@ -7,6 +7,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
 const DIR = __dirname;
@@ -18,19 +19,23 @@ const E = (m) => errors.push(m);
 const db = read('articles.json');
 
 /* ── 1. 재생성 결과와 커밋된 파일이 같은가 ─────────────── */
-const before = {};
+/* 임시 폴더에 새로 빌드해서 비교한다. 작업 트리를 건드리면 실패가 스스로
+ * 고쳐져 재실행 때 통과해 버리고, 진짜 빠뜨린 재생성이 일시적 오류처럼 보인다. */
 const names = [...LEVELS.map(l => `articles-${l}.json`), 'hanja.json', 'version.json'];
-names.forEach(n => {
-  const p = path.join(DIR, n);
-  before[n] = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
-  if (before[n] == null) E(`${n} 없음 — node reading/build-split.mjs 를 실행하세요`);
-});
-if (!errors.length) {
-  execFileSync(process.execPath, [path.join(DIR, 'build-split.mjs')], { stdio: 'pipe' });
-  names.forEach(n => {
-    const now = fs.readFileSync(path.join(DIR, n), 'utf8');
-    if (now !== before[n]) E(`${n} 이 articles.json 과 어긋납니다 — node reading/build-split.mjs 를 실행하고 커밋하세요`);
-  });
+const missing = names.filter(n => !fs.existsSync(path.join(DIR, n)));
+missing.forEach(n => E(`${n} 없음 — node reading/build-split.mjs 를 실행하세요`));
+if (!missing.length) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-split-'));
+  try {
+    execFileSync(process.execPath, [path.join(DIR, 'build-split.mjs'), tmp], { stdio: 'pipe' });
+    names.forEach(n => {
+      const fresh = fs.readFileSync(path.join(tmp, n), 'utf8');
+      const kept = fs.readFileSync(path.join(DIR, n), 'utf8');
+      if (fresh !== kept) E(`${n} 이 articles.json 과 어긋납니다 — node reading/build-split.mjs 를 실행하고 커밋하세요`);
+    });
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 /* ── 2. 학년대별 파일이 원본과 일치하는가 ───────────────── */
@@ -76,7 +81,7 @@ if (fs.existsSync(path.join(DIR, 'hanja.json'))) {
           if (!m) continue;
           if (!map[m[1]]) map[m[1]] = { ch: m[1], rd: m[2], words: {} };
           const at = v.hanja.split('+').findIndex(x => x.trim().indexOf(m[1]) === 0);
-          map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at };
+          map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at, aid: a.id };
         }
       }
     }

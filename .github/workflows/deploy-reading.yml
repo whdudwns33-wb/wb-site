@@ -36,6 +36,8 @@ jobs:
         run: node reading-server/vocab-api.test.mjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
+      - name: 정적 파일 가로채기 정합 테스트
+        run: node reading-server/override.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
       - name: Cloudflare Workers 배포

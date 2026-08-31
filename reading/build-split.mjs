@@ -17,11 +17,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+/* 산출물을 다른 곳에 쓰고 싶으면 인자로 폴더를 준다.
+ * split.test.cjs 가 이걸 써서 임시 폴더에 빌드한 뒤 커밋본과 비교한다 —
+ * 검사가 작업 트리를 덮어쓰면 실패가 스스로 고쳐져 재실행 때 통과해 버리고,
+ * 그러면 진짜 빠뜨린 재생성이 "그냥 한 번 튄 것"으로 보인다. */
+const OUT = process.argv[2] ? path.resolve(process.argv[2]) : DIR;
 const LEVELS = ['L1', 'L2', 'L3', 'L4'];
 const db = JSON.parse(fs.readFileSync(path.join(DIR, 'articles.json'), 'utf8'));
 const write = (name, obj) => {
   const s = JSON.stringify(obj);
-  fs.writeFileSync(path.join(DIR, name), s + '\n');
+  fs.writeFileSync(path.join(OUT, name), s + '\n');
   return s.length;
 };
 
@@ -37,7 +42,10 @@ for (const lv of LEVELS) {
   });
 }
 
-/* ── 한자 카드 — 앱의 hanjaFamilies()와 같은 규칙 ─────── */
+/* ── 한자 카드 — 앱의 hanjaFamilies()와 같은 규칙 ───────
+ * 낱말마다 어느 지문에서 나왔는지(aid)를 같이 남긴다. 강사가 '초안으로 내리기'를
+ * 누르면 워커가 이 값을 보고 그 지문의 낱말을 빼야 하기 때문이다. 분할 전에는 앱이
+ * articles.json(발행 상태가 이미 반영된)에서 직접 계산해서 저절로 사라졌었다. */
 const map = {};
 for (const a of db.articles) {
   if (a.status !== 'published') continue;
@@ -51,7 +59,7 @@ for (const a of db.articles) {
         if (!m) continue;
         if (!map[m[1]]) map[m[1]] = { ch: m[1], rd: m[2], words: {} };
         const at = v.hanja.split('+').findIndex(x => x.trim().indexOf(m[1]) === 0);
-        map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at };
+        map[m[1]].words[v.word] = { word: v.word, easy: v.easy, hanja: v.hanja, at: at < 0 ? -1 : at, aid: a.id };
       }
     }
   }

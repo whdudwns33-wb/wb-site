@@ -60,8 +60,8 @@ test('director student management renders a bounded accessible search without pe
 
 test('typing filters existing cards immediately and exposes a no-result state', () => {
   const cards = [
-    { dataset: { staffSearchName: '김민준' }, hidden: false },
-    { dataset: { staffSearchName: '박서연' }, hidden: false }
+    { dataset: { staffSearchName: '김민준', staffSubscription: '1', staffPaymentAttention: '0' }, hidden: false },
+    { dataset: { staffSearchName: '박서연', staffSubscription: '0', staffPaymentAttention: '0' }, hidden: false }
   ];
   const nodes = {
     staffSearchResult: { textContent: '' },
@@ -69,13 +69,14 @@ test('typing filters existing cards immediately and exposes a no-result state', 
     staffSearchClear: { hidden: true }
   };
   const apply = Function('$', 'document',
-    "let staffSearchQuery = '';" + functionSource('normalizeStudentSearch') + '\n' +
+    "let staffSearchQuery = ''; let staffListFilter = 'all';" + functionSource('normalizeStudentSearch') + '\n' +
+    functionSource('normalizeStaffListFilter') + '\n' +
     functionSource('applyStaffSearchFilter') + '\nreturn applyStaffSearchFilter;'
   )(id => nodes[id.slice(1)] || null, { querySelectorAll: () => cards });
 
   apply(' 민 준 ');
   assert.deepEqual(cards.map(card => card.hidden), [false, true]);
-  assert.equal(nodes.staffSearchResult.textContent, '1명 검색됨');
+  assert.equal(nodes.staffSearchResult.textContent, '1명 표시됨');
   assert.equal(nodes.staffSearchEmpty.hidden, true);
   assert.equal(nodes.staffSearchClear.hidden, false);
 
