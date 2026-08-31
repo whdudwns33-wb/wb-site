@@ -1114,7 +1114,7 @@ const LEARNING_SOURCES = Object.freeze({
     icon: '👁️', label: '리더스아이', centerUrl: LEADERS_EYE_URL, studentUrl: LEADERS_EYE_URL,
     centerAction: '리더스아이 열기', studentAction: '리더스아이 학습하기',
     detail: '리더스아이 온라인 학습',
-    guide: '리더스아이에서 배정된 온라인 학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
+    guide: '리더스아이 학습을 마친 뒤 학습 탭에서 오늘 완료 여부를 기록하세요. 회차 입력은 필요하지 않습니다.',
     steps: ['온라인 학습 완료하기', '학습 결과 확인하기'],
     noteHint: '오늘 학습 결과 메모'
   },
@@ -2978,6 +2978,18 @@ function learningResultModal(task, date) {
     (task.evidenceMode === 'photo' ? '<div class="hint">완료 후 상세 화면에서 결과 인증사진도 제출해 주세요. 사진이 승인되면 원장 확인으로 바뀝니다.</div>' : ''),
     '<button class="btn btn-primary btn-block mt14" data-act="learningresultsave" data-id="' + esc(task.id) + '" data-date="' + date + '">' +
       (check.done ? '결과 수정 저장' : '결과 저장 · 완료') + '</button>');
+}
+
+function leadersEyeDailyResultModal(me) {
+  if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId) {
+    return toast('학생 본인 화면에서만 오늘 학습을 기록할 수 있어요');
+  }
+  modal('👁️ 리더스아이 오늘 완료',
+    '<div class="guide mb14"><b>회차 입력 없이 오늘의 학습 여부만 기록합니다.</b><br>' +
+      '리더스아이 학습을 마쳤다면 아래 버튼을 누르세요. 오늘 학습 현황과 수행 보고에 반영됩니다.</div>' +
+    '<div class="field"><label class="fl">결과 메모 <span class="muted">(선택)</span></label>' +
+      '<input class="in" id="learningDailyNote" maxlength="120" placeholder="예: 정답률 85%, 오늘 학습 완료"></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="learningdailysave" data-source="leaders_eye">✓ 오늘 학습 완료</button>');
 }
 
 function studyPlannerCard(me, date, list, carry, editable) {
@@ -5285,6 +5297,23 @@ function learningTasksFor(staffId, sourceKey) {
     });
 }
 
+const LEARNING_DAILY_LOG_KIND = 'learning_daily_log';
+
+function dailyLearningRecordId(staffId, sourceKey, date) {
+  return ['learning-daily', staffId, sourceKey, date].join('-');
+}
+
+function dailyLearningRecordTask(staffId, sourceKey, date) {
+  const id = dailyLearningRecordId(staffId, sourceKey, date);
+  return state.tasks.find(task => !task.deleted && task.id === id && task.staffId === staffId &&
+    task.source === sourceKey && task.kind === LEARNING_DAILY_LOG_KIND && task.start === date) || null;
+}
+
+function assignedLearningTaskForDate(staffId, sourceKey, date) {
+  return learningTasksFor(staffId, sourceKey).find(task =>
+    task.kind !== LEARNING_DAILY_LOG_KIND && learningTaskDate(task) === date) || null;
+}
+
 function leadersEyeAccountGuide(me) {
   if (!me) return '';
   return '<div class="guide mt14 mb14"><b>리더스아이 로그인 정보</b><br>' +
@@ -5468,13 +5497,22 @@ function learningSourceCard(me, editable, sourceKey) {
   const academy = director || isManager();
   const appOnly = source.appOnly === true;
   const onlineSource = ONLINE_LEARNING_SOURCE_KEYS.includes(sourceKey);
-  const list = learningTasksFor(me.id, sourceKey).filter(task =>
+  const allList = learningTasksFor(me.id, sourceKey).filter(task =>
     !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
       String(row.dailyCarryFrom || '').startsWith(task.id + '|')));
+  const list = allList.filter(task => task.kind !== LEARNING_DAILY_LOG_KIND || task.start !== today());
+  const leadersEyeTracked = sourceKey === 'leaders_eye' && (director || (session.isStaffLink && !isManager()));
+  const leadersEyeStudent = sourceKey === 'leaders_eye' && session.isStaffLink && !isManager() && me.id === session.staffId;
+  const assignedToday = sourceKey === 'leaders_eye' ? assignedLearningTaskForDate(me.id, sourceKey, today()) : null;
+  const dailyRecord = sourceKey === 'leaders_eye' ? dailyLearningRecordTask(me.id, sourceKey, today()) : null;
+  const todayRecord = assignedToday || dailyRecord;
+  const todayRecorded = !!(todayRecord && isDone(todayRecord.id, today()));
   const help = director
     ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
     : academy
       ? esc(source.detail) + (appOnly ? ' 앱 연결은 휴대폰에서 이용합니다.' : source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
+      : sourceKey === 'leaders_eye'
+        ? '리더스아이 학습 후 ‘오늘 학습 완료 기록’을 누르세요. 회차나 별도 과제 배정은 필요하지 않습니다.'
       : onlineSource
         ? esc(source.detail) + '을 실행한 뒤 아래 과제의 ‘학습 완료 기록’에서 결과를 남깁니다.'
         : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
@@ -5500,16 +5538,30 @@ function learningSourceCard(me, editable, sourceKey) {
   const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
   const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
+  const leadersEyeAction = leadersEyeStudent && !assignedToday
+    ? '<button class="btn btn-navy" data-act="learningdailyopen" data-source="leaders_eye">' +
+      (todayRecorded ? '✏ 오늘 완료 기록 보기·수정' : '✓ 오늘 학습 완료 기록') + '</button>'
+    : '';
+  const leadersEyeStatus = leadersEyeTracked
+    ? '<span class="pill' + (todayRecorded ? '' : ' warn') + '">' + (todayRecorded ? '✓ 오늘 완료' : '오늘 미기록') + '</span>'
+    : '';
+  const assignmentCount = sourceKey === 'leaders_eye'
+    ? (active.length ? '<span class="pill warn">배정 ' + active.length + '건</span>' : '')
+    : '<span class="pill' + (active.length ? ' warn' : '') + '">' +
+      (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span>';
 
-  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late || studentDue ? ' open' : '') + '>' +
+  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' +
+    (late || studentDue || (leadersEyeStudent && !todayRecorded) ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        '<span class="pill' + (active.length ? ' warn' : '') + '">' + (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span></span></summary>' +
+        leadersEyeStatus + assignmentCount + '</span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
-      (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
+      (director && sourceKey !== 'leaders_eye'
+        ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
+      leadersEyeAction +
       (canRequestMetamath ? '<button class="btn btn-ghost" data-act="metamathrequestopen">📝 문제지 요청</button>' : '') +
     '</div>' +
     appHint +
@@ -10267,6 +10319,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const sourceKey = el.dataset.source || '';
       if (!LEARNING_SOURCES[sourceKey]) return toast('학습 종류를 다시 선택해 주세요');
+      if (sourceKey === 'leaders_eye') return toast('리더스아이는 학생이 학습 탭에서 오늘 완료를 직접 기록합니다');
       learningTaskModal(sourceKey);
       break;
     }
@@ -10290,6 +10343,7 @@ document.addEventListener('click', ev => {
       const rawUrl = ($('#learnUrl').value || '').trim();
       const resourceUrl = safeHttpsUrl(rawUrl);
       if (!source) return toast('학습 종류를 다시 선택해 주세요');
+      if (sourceKey === 'leaders_eye') return toast('리더스아이는 회차 과제를 배정하지 않고 학생이 오늘 완료를 직접 기록합니다');
       if (requestId && (!request || sourceKey !== 'metamath' || request.staffId !== me.id ||
           metamathRequestStatus(request) !== 'preparing')) return toast('제작 중인 메타수학 요청만 배정할 수 있어요');
       if (!title) return toast('과제·자료명을 입력해 주세요');
@@ -11798,6 +11852,57 @@ document.addEventListener('click', ev => {
       render(); toast('내 체크리스트에 담았습니다');
       break;
     }
+    case 'learningdailyopen': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || sourceKey !== 'leaders_eye') {
+        return toast('리더스아이 오늘 학습은 학생 본인 화면에서만 기록할 수 있어요');
+      }
+      const assigned = assignedLearningTaskForDate(me.id, sourceKey, today());
+      const existing = dailyLearningRecordTask(me.id, sourceKey, today());
+      if (assigned || existing) learningResultModal(assigned || existing, today());
+      else leadersEyeDailyResultModal(me);
+      break;
+    }
+    case 'learningdailysave': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || sourceKey !== 'leaders_eye') {
+        return toast('리더스아이 오늘 학습은 학생 본인 화면에서만 기록할 수 있어요');
+      }
+      const d = today();
+      const note = (($('#learningDailyNote') && $('#learningDailyNote').value) || '').trim().slice(0, 120);
+      const assigned = assignedLearningTaskForDate(me.id, sourceKey, d);
+      if (assigned) {
+        closeModal(); learningResultModal(assigned, d);
+        toast('오늘 배정된 리더스아이 과제에 결과를 입력해 주세요');
+        break;
+      }
+      let t = dailyLearningRecordTask(me.id, sourceKey, d);
+      if (!t) {
+        const source = LEARNING_SOURCES[sourceKey];
+        const id = dailyLearningRecordId(me.id, sourceKey, d);
+        t = {
+          id: id, groupId: id, kind: LEARNING_DAILY_LOG_KIND, staffId: me.id,
+          source: sourceKey, resourceUrl: '', studySubject: 'english',
+          dueDate: d, estimatedMin: 0, academicEventId: '', evidenceMode: '',
+          title: '리더스아이 오늘 학습', detail: source.detail, guide: source.guide,
+          steps: [], target: 0, unit: '건', time: '', priority: 'normal',
+          repeat: 'once', days: [], start: d, end: '', carry: false, requiresClaim: false,
+          origin: 'staff', createdAt: now(), updatedAt: now(), deleted: false
+        };
+        state.tasks.push(t);
+      }
+      const current = getCheck(t.id, d) || {};
+      const stored = setCheck(t.id, d, {
+        done: true, at: current.at || now(), steps: {}, count: 0, blocked: false,
+        learningResult: { outcome: note || '학습 완료' }, learningResultUpdatedAt: now()
+      });
+      if (!stored) break;
+      syncLinkedStudyTask(t, d);
+      closeModal(); render(); toast('리더스아이 오늘 학습을 완료로 기록했습니다');
+      break;
+    }
     case 'learningresultopen': {
       const t = task();
       const me = currentStaff();
@@ -12804,7 +12909,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.9';
+const APP_VER = '2026-08-31.10';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
