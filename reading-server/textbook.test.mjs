@@ -129,7 +129,14 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
     assert.strictEqual(typeof w.example, 'string');
     /* 지어낸 뜻이 섞이면 검수가 무의미해진다 — 못 캔 자리는 반드시 빈칸이어야 한다 */
     assert.ok(!/보세요|주세요|좋아요/.test(w.meaning), '뜻 칸에 학부모 당부가 들어갔다: ' + w.word);
+    /* 뜻이 다음 항목까지 삼킨 흔적 — "…말하는 것 별처럼 많다:" 처럼 그럴듯해 보여서
+       검수를 그냥 통과한다. 뜻 안의 콜론·따옴표가 그 신호다. */
+    assert.ok(!/[:：]/.test(w.meaning), '뜻이 다음 항목까지 삼켰다: ' + w.word + ' → ' + w.meaning);
+    assert.ok(!/["“”]/.test(w.meaning), '뜻에 예문이 섞였다: ' + w.word + ' → ' + w.meaning);
+    assert.ok(w.meaning.length <= 55, '뜻이 너무 길다: ' + w.word);
   }
+  const filled = words.filter((w) => w.meaning).length;
+  assert.ok(filled > words.length / 2, '뜻이 절반도 안 채워졌다 (' + filled + '/' + words.length + ')');
 });
 
 t('낱말을 다듬어 저장한다 — 빈 것·중복·과한 개수를 막는다', () => {
