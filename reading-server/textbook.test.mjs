@@ -161,14 +161,65 @@ t('교재가 둘 다 20강씩 들어 있다', () => {
   }
 });
 
-t('낱말은 검수 전이라 빈 뜻이 남아 있을 수 있다 — 다만 절반은 넘어야 한다', () => {
-  /* 빈 뜻이 있으면 그 강은 「검수 완료」가 거절되므로 학생에게 나가지 않는다.
-     그래도 절반도 못 채웠다면 캐내기가 잘못된 것이다. */
+t('두 교재 모두 뜻이 다 채워져 있다', () => {
+  /* 빈 뜻이 있으면 그 강은 「검수 완료」가 거절되어 학생에게 나가지 않는다.
+     빈칸이 하나라도 생기면 그 강이 통째로 막히므로 여기서 잡는다. */
   for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
-    const words = findBook(TB, id).lessons.flatMap((l) => l.words);
-    const filled = words.filter((w) => w.meaning).length;
-    assert.ok(filled > words.length / 2, id + ': 뜻이 절반도 안 채워졌다 (' + filled + '/' + words.length + ')');
+    const blank = findBook(TB, id).lessons
+      .flatMap((l) => l.words.map((w) => ({ l: l.lesson, w })))
+      .filter((x) => !x.w.meaning);
+    assert.strictEqual(blank.length, 0,
+      id + ': 뜻이 빈 낱말 — ' + blank.map((x) => x.l + '강 ' + x.w.word).join(', '));
   }
+});
+
+t('뜻이 조사로 끝나지 않는다', () => {
+  /* 「…도전하는 것을 뜻해요」에서 맺음말만 떼면 목적어 조사가 꼬리로 남아
+     뜻이 아니라 문장 토막으로 읽힌다 — "매우 급하고 위험한 상황을". */
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    for (const l of findBook(TB, id).lessons) {
+      for (const w of l.words) {
+        assert.ok(!/[을를]$|\s걸$/.test(w.meaning),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 뜻이 조사로 끝난다 — ' + w.meaning);
+      }
+    }
+  }
+});
+
+t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
+  /* "나달나달한 깃발", "새로운 경험", "느리게 걷는다"는 활동 지시에서 딸려 온 조각이다.
+     꾸밈을 받는 쪽(깃발·경험)은 그 강이 가르치는 말이 아니고, 가르치는 쪽(나달나달·새롭다)은
+     따로 잡힌다. 조사로 이은 두 토막("숨이 가쁘다")과 달리 이 모양은 언제나 버린다. */
+  const ADNOM = /(한|운|던|게|인)$/;
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    for (const l of findBook(TB, id).lessons) {
+      for (const w of l.words) {
+        const parts = w.word.split(/\s+/);
+        if (parts.length < 2) continue;
+        assert.ok(!ADNOM.test(parts[0]),
+          id + ' ' + l.lesson + '강: 낱말이 아니라 구절이다 — ' + w.word);
+      }
+    }
+  }
+});
+
+t('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
+  /* 짝의 한쪽만 있으면 문맥 빈칸 문제가 그 구별을 물을 수 없다.
+     코칭글이 머리글로 세워 둔 짝을 그대로 지킨다. */
+  const PAIR = /헷갈[^\n]{0,12}낱말[^가-힣\n]{0,6}([가-힣]{2,7})\s*[/／·,]\s*([가-힣]{2,7})/g;
+  let seen = 0;
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    for (const l of findBook(TB, id).lessons) {
+      const have = new Set(l.words.map((w) => w.word));
+      for (const m of l.coaching.matchAll(PAIR)) {
+        seen += 1;
+        for (const w of [m[1], m[2]]) {
+          assert.ok(have.has(w), id + ' ' + l.lesson + '강: 짝의 한쪽이 빠졌다 — ' + m[1] + '/' + m[2] + ' 중 ' + w);
+        }
+      }
+    }
+  }
+  assert.ok(seen >= 7, '짝 머리글을 찾지 못했다 (' + seen + '건)');
 });
 
 t('1강은 외울 낱말이 없다 — 코칭글만 나간다', () => {
