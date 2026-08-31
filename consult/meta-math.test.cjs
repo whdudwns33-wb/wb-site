@@ -122,12 +122,16 @@ test('ClassCard opens the native app store route only on supported mobile device
 test('learning tasks stay student-scoped and only the director can send them', () => {
   const list = section('function learningTasksFor(', 'function learningSourceCard(');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
+  const rows = section('function taskRow(', 'function taskPanel(');
   const modal = section('function learningTaskModal(', 'function wnAddModal(');
   const add = section("case 'learnadd':", "case 'learnsave':");
   const save = section("case 'learnsave':", '/* 회독 */');
   assert.match(list, /t\.staffId === staffId/);
   assert.match(list, /t\.source === sourceKey/);
   assert.match(card, /learningTasksFor\(me\.id, sourceKey\)/);
+  assert.match(card, /String\(row\.dailyCarryFrom \|\| ''\)\.startsWith\(task\.id \+ '\|'\)/);
+  assert.match(card, /studentDue[\s\S]*?learningTaskDate\(task\) <= today\(\)/);
+  assert.match(card, /‘학습 완료 기록’/);
   assert.match(card, /taskRow\(t, learningTaskDate\(t\), editable, false\)/);
   assert.match(card, /<details class="card study-source-card"/);
   assert.match(card, /완료 기록/);
@@ -152,6 +156,9 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(save, /start: planned/);
   assert.match(save, /steps: source\.steps\.map/);
   assert.match(save, /save\(\); queueSync\(\)/);
+  assert.match(rows, /learningState \? '' : '<button class="box"/);
+  assert.match(rows, /data-act="learningresultopen"/);
+  assert.match(rows, /✓ 학습 완료 기록/);
 });
 
 test('learning schedule, deadline, subject and weekly move stay distinct across tabs', () => {

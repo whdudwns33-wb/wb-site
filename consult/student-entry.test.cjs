@@ -133,11 +133,12 @@ function learningSources() {
 function renderLearningSourceCard(studentName, state) {
   const source = between('function learningExamOptions(staffId, selected) {', '\n/* ── 학습 탭');
   const renderCard = new Function(
-    'LEARNING_SOURCES', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
+    'LEARNING_SOURCES', 'ONLINE_LEARNING_SOURCE_KEYS', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
     'learningDueDate', 'today', 'esc', 'classcardAppUrl', 'navigator', 'taskRow',
     source + '; return learningSourceCard;'
   )(
-    learningSources(), state, { isAdmin: false, isStaffLink: true }, () => false,
+    learningSources(), ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
+    state, { isAdmin: false, isStaffLink: true }, () => false,
     () => false, task => task.start || '', task => task.dueDate || '', () => '2026-08-31',
     value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'

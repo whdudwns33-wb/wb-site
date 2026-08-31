@@ -32,7 +32,7 @@ test('today places collapsible lectures directly below collapsible distributed s
   const totalAt = today.indexOf('studyTotalHeroCard(me, cursor)');
   const offerAt = today.indexOf('studyOffersCard(me, cursor, offers)');
   const lectureAt = today.indexOf('ingTodayCard(me, editable)');
-  const plannerAt = today.indexOf('studyPlannerCard(me, cursor, list, carry, editable)');
+  const plannerAt = today.indexOf('studyPlannerCard(me, cursor, plannerList, plannerCarry, editable)');
   const quickAt = today.indexOf('id="qSubject"');
 
   assert.ok(totalAt >= 0, 'large total study time must render');
@@ -233,44 +233,41 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
 
-test('online learning is summarized and labeled directly inside the paper planner', () => {
+test('online learning is completed in Study instead of duplicated in the paper checklist', () => {
+  const today = section('function viewToday()', 'function studyOffersCard(');
   const planner = section('function studyPlannerCard(', 'function plannerTaskRow(');
-  const row = section('function plannerTaskRow(', 'function plannerTaskMark(');
+  const studyRow = section('function taskRow(', 'function taskPanel(');
+  const nextItems = section('function todayNextActionItems(', 'function todayOptionalStudyLinks(');
+  const nextCard = section('function todayNextActionCard(', 'function studyTotalHeroCard(');
+  const dailyClose = section('function dailyCloseStudyItems(', 'function dailyCloseEventRefs(');
   const css = section('<style>', '</style>');
 
-  assert.match(planner, /filter\(item => isOnlineLearningTask\(item\.task\)\)/);
-  assert.match(planner, /온라인 학습 진행 현황/);
-  assert.match(planner, /○ 미시작 · ◐ 진행 중 · ✓ 학생 완료 · 🛡 원장 확인\(인증 과제\)/);
-  assert.match(planner, /학생 완료 ' \+ onlineDone \+ '\/' \+ onlineEntries\.length/);
-  assert.match(planner, /onlineVerifiable \? '<span class="learning-status is-verified">🛡 원장 확인 ' \+ onlineVerified \+ '\/' \+ onlineVerifiable/);
-  assert.match(row, /plannerLearningState\(t, date, trackingDate\)/);
-  assert.match(row, /learning\.icon/);
-  assert.match(row, /learningStatusTag\(learningState\)/);
-  assert.match(row, /실제 ' \+ fmtDur\(learningState\.actualSecs\)/);
-  assert.match(row, /learning-result-tag/);
-  assert.match(row, /learningProofTag\(learningState\)/);
+  assert.match(today, /const plannerList = list\.filter\(task => !isOnlineLearningTask\(task\)\)/);
+  assert.match(today, /const plannerCarry = carry\.filter\(item => !isOnlineLearningTask\(item\.t\)\)/);
+  assert.match(today, /todayNextActionCard\(me, list, carry, offers, lectureChecklist\)/);
+  assert.match(today, /studyPlannerCard\(me, cursor, plannerList, plannerCarry, editable\)/);
+  assert.doesNotMatch(planner, /online-learning-summary|isOnlineLearningTask/);
+  assert.match(studyRow, /learning-direct-task/);
+  assert.match(studyRow, /learningState \? '' : '<button class="box"/);
+  assert.match(studyRow, /✓ 학습 완료 기록/);
+  assert.match(studyRow, /✏ 결과 보기·수정/);
+  assert.match(studyRow, /data-act="sttask"/);
+  assert.match(studyRow, /date < today\(\)[\s\S]*?이전 날짜 마무리 후 기록/);
+  assert.match(studyRow, /date > today\(\)[\s\S]*?부터 완료 기록/);
+  assert.match(studyRow, /learningLock === 'verified'[\s\S]*?원장 확인 완료/);
+  assert.match(nextItems, /go: online && !previousOnline \? 'study' : ''/);
+  assert.match(nextItems, /action: previousOnline \? '이전 날짜 마무리' : online \? '학습에서 완료 기록'/);
+  assert.match(nextCard, /sort\(\(a, b\) => Number\(b\.go === 'study'\) - Number\(a\.go === 'study'\)\)/);
+  assert.match(nextCard, /hiddenOnline[\s\S]*?온라인 학습 ' \+ hiddenOnline \+ '개 더 보기/);
+  assert.match(nextCard, /item\.go[\s\S]*?data-go=/);
+  assert.match(dailyClose, /tasksFor\(staffId, date\)/);
   assert.match(css, /\.learning-status\.is-todo/);
   assert.match(css, /\.learning-status\.is-doing/);
   assert.match(css, /\.learning-status\.is-complete/);
   assert.match(css, /\.learning-status\.is-verified/);
-  assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.online-learning-summary \{ align-items: flex-start; flex-direction: column/);
-
-  const render = Function('stTotal', 'ingChecklistItems', 'isOnlineLearningTask', 'plannerLearningState',
-    'plannerTaskRow', 'plannerLectureRow', 'fmtHMS', 'studyTimePanel',
-    planner + '\nreturn studyPlannerCard;')(
-      () => 0, () => [], task => task.source === 'metamath',
-      task => ({
-        key: task.id === 'verified' ? 'verified' : 'complete', check: { done: true },
-        proofRequired: task.id === 'verified', proofReady: true
-      }),
-      task => '<row>' + task.id + '</row>', () => '', () => '0:00:00', () => '<time></time>'
-    );
-  const output = render({ id: 'student-1' }, '2026-08-31',
-    [{ id: 'complete', source: 'metamath' }, { id: 'normal', source: '' }],
-    [{ t: { id: 'verified', source: 'metamath' }, date: '2026-08-30' }], true);
-  assert.match(output, /온라인 학습 2개/);
-  assert.match(output, /학생 완료 2\/2/);
-  assert.match(output, /원장 확인 1\/1/);
+  assert.match(css, /\.task\.learning-direct-task/);
+  assert.match(css, /\.learning-direct-actions \.btn-primary/);
+  assert.doesNotMatch(css, /\.online-learning-summary/);
 });
 
 test('online learning state distinguishes timer progress, student completion, and approved proof', () => {
@@ -511,7 +508,7 @@ test('past dates show the full planner read-only and return to today after close
   assert.match(today, /const pastDate = cursor < today\(\)/);
   assert.match(today, /pastDate \? historicalPlannerTasks\(me\.id, cursor\) : checklistTasksFor\(me\.id, cursor\)/);
   assert.match(today, /const lectureChecklist = ingChecklistItems\(me\.id, cursor\)/);
-  assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, list, \[\], false\)/);
+  assert.match(today, /else \{[\s\S]*?studyPlannerCard\(me, cursor, plannerList, \[\], false\)/);
   assert.doesNotMatch(today, /tbCard\(/);
   assert.match(today, /editable && cursor === today\(\)/);
   assert.doesNotMatch(today, /list\.map\(t => taskRow\(t, cursor, editable, false\)\)/);
