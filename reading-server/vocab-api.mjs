@@ -231,6 +231,121 @@ export function vocabSummary(stateRec) {
   return base;
 }
 
+/* ── 파일럿 지표 ──
+   기획서 §8: 「원내 1개 반에서 4주 — 물 주기 완수율 70%·30일 회상 통과율 60%를
+   통과 기준으로 Phase 2 진행 판단」. 그 두 수를 반 단위로 낸다.
+
+   물 주기 완수율 = 오늘 물 준 낱말 ÷ (오늘 물 준 낱말 + 지금 밀린 낱말)
+     밀린 낱말은 물을 줄 때까지 계속 밀린 채로 남는다. 그래서 어제 걸렀다고
+     어제 수치만 나빠지는 게 아니라 오늘 수치도 같이 나빠진다 — 하루 스냅숏이지만
+     빼먹은 날이 그대로 쌓여 보인다.
+
+   30일 회상 통과율 = 계단 5에서 본 시험 중 「알았어」 비율 (파일럿 기간 누적)
+     간격이 [0,1,3,7,14,30,90]이라 계단 5인 낱말은 30일을 기다린 뒤 시험을 본다.
+     물 주기·플래시카드로 본 시험만 센다 — 문장 짓기와 뿌리 회상은 맞힐 때만
+     기록이 남아(틀려도 시험을 봤다는 흔적이 없다) 통과율을 부풀린다. */
+export const PILOT = { water: 70, recall: 60, weeks: 4, recallStep: 5 };
+
+const dayKey = (t) => {
+  const d = new Date(t + 9 * 3600000); // KST 기준으로 하루를 가른다
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+};
+const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : null);
+
+/* 학생 한 명. stateRec은 store.getState(code)가 준 { state, updatedAt } */
+export function studentMetrics(stateRec, now) {
+  const out = {
+    linked: !!stateRec, total: 0, growing: 0, graduated: 0, overdue: 0, emergency: 0,
+    wateredToday: 0, waterRate: null, recallPassed: 0, recallTested: 0, recallRate: null,
+    days7: 0, days28: 0, streak: 0, firstPlant: null, lastActive: stateRec ? stateRec.updatedAt : null,
+  };
+  const S = stateRec && stateRec.state;
+  if (!S || !S.states) return out;
+  const today = dayKey(now);
+  const log = Array.isArray(S.log) ? S.log : [];
+
+  /* 오늘 물 준 낱말 — 같은 낱말을 두 번 풀어도 하나로 센다(틀리면 큐에 다시 들어간다) */
+  const watered = new Set();
+  const dayset = new Set();
+  for (const l of log) {
+    if (!l || typeof l.t !== 'number') continue;
+    const k = dayKey(l.t);
+    if (l.kind === 'review') {
+      dayset.add(k);
+      if (k === today && l.id != null) watered.add(String(l.id));
+      /* from은 물 주기 화면이 적어 준다. 없는 옛 기록은 세지 않는다 —
+         계단을 모르는 채로 세면 30일 시험이 아닌 것까지 섞인다. */
+      if (l.from === PILOT.recallStep) {
+        out.recallTested += 1;
+        if (l.grade === 'good') out.recallPassed += 1;
+      }
+    }
+  }
+  out.wateredToday = watered.size;
+
+  for (const s of Object.values(S.states)) {
+    out.total += 1;
+    if (s.plantedAt && (out.firstPlant == null || s.plantedAt < out.firstPlant)) out.firstPlant = s.plantedAt;
+    if (s.graduated) { out.graduated += 1; continue; }
+    out.growing += 1;
+    /* 오늘 물 준 낱말은 밀린 게 아니다 — 틀려서 10분 뒤로 잡힌 것을 밀림으로 세면
+       열심히 푼 학생일수록 완수율이 떨어진다. */
+    if (s.due <= now && !watered.has(String(s.id))) {
+      out.overdue += 1;
+      const iv = Math.max(INTERVAL_DAYS[Math.min(s.step || 0, 6)] || 0, 0.5) * 86400000;
+      if ((now - s.due) / iv >= 1.25) out.emergency += 1;
+    }
+  }
+
+  for (let i = 0; i < 28; i++) {
+    const k = dayKey(now - i * 86400000);
+    if (!dayset.has(k)) continue;
+    out.days28 += 1;
+    if (i < 7) out.days7 += 1;
+  }
+  out.waterRate = pct(out.wateredToday, out.wateredToday + out.overdue);
+  out.recallRate = pct(out.recallPassed, out.recallTested);
+  out.streak = (S.streak && S.streak.count) || 0;
+  return out;
+}
+
+/* 반별 묶음. rows = [{ code, name, cls, ...studentMetrics }] */
+export function pilotMetrics(rows, now) {
+  const by = new Map();
+  for (const r of rows) {
+    const cls = r.cls || '(반 미지정)';
+    if (!by.has(cls)) by.set(cls, []);
+    by.get(cls).push(r);
+  }
+  const roll = (list) => {
+    const a = { students: list.length, linked: 0, total: 0, growing: 0, graduated: 0, overdue: 0, emergency: 0,
+      wateredToday: 0, recallPassed: 0, recallTested: 0, firstPlant: null };
+    for (const r of list) {
+      if (r.linked) a.linked += 1;
+      for (const k of ['total', 'growing', 'graduated', 'overdue', 'emergency', 'wateredToday', 'recallPassed', 'recallTested']) a[k] += r[k] || 0;
+      if (r.firstPlant && (a.firstPlant == null || r.firstPlant < a.firstPlant)) a.firstPlant = r.firstPlant;
+    }
+    a.waterRate = pct(a.wateredToday, a.wateredToday + a.overdue);
+    a.recallRate = pct(a.recallPassed, a.recallTested);
+    /* 며칠째인지 — 4주 파일럿에서 지금 어디쯤인지 보여 준다 */
+    a.dayNo = a.firstPlant ? Math.floor((now - a.firstPlant) / 86400000) + 1 : null;
+    a.waterPass = a.waterRate == null ? null : a.waterRate >= PILOT.water;
+    a.recallPass = a.recallRate == null ? null : a.recallRate >= PILOT.recall;
+    return a;
+  };
+  /* 반 차례는 학년 순으로 — 가나다순이면 「중1 B반」이 「초5 A반」보다 앞에 온다(ㅈ<ㅊ).
+     원장이 명단을 읽는 차례는 초등 → 중등 → 고등이다. */
+  const gradeRank = (cls) => '초중고'.indexOf(String(cls)[0]);
+  const classes = [...by.entries()]
+    .map(([cls, list]) => ({ cls, ...roll(list), rows: list.sort((x, y) => (x.name || x.code).localeCompare(y.name || y.code, 'ko')) }))
+    .sort((a, b) => {
+      const ra = gradeRank(a.cls), rb = gradeRank(b.cls);
+      if (ra !== rb) return (ra < 0 ? 9 : ra) - (rb < 0 ? 9 : rb);
+      return a.cls.localeCompare(b.cls, 'ko');
+    });
+  return { criteria: PILOT, overall: roll(rows), classes };
+}
+
 const mnemoKey = (word) => String(word || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60);
 
 /* ── 밤 9시 물주기 푸시 (페이로드 없는 Web Push — VAPID 서명만, 암호화·의존성 불필요) ── */
@@ -486,6 +601,16 @@ export async function handleVocab(ctx) {
       students.push({ code, name: (stu && stu.name) || '', cls: (stu && stu.cls) || '', ...vocabSummary(st) });
     }
     return j(200, { students, time: nowIso() });
+  }
+  if (p === '/api/vocab/admin/metrics' && method === 'GET') {
+    const now = Date.now();
+    const codes = await store.listStateCodes();
+    const rows = [];
+    for (const code of codes) {
+      const [stu, st] = await Promise.all([store.getStudent(code), store.getState(code)]);
+      rows.push({ code, name: (stu && stu.name) || '', cls: (stu && stu.cls) || '', ...studentMetrics(st, now) });
+    }
+    return j(200, { ...pilotMetrics(rows, now), time: nowIso() });
   }
   return j(404, { error: 'unknown api' });
 }
