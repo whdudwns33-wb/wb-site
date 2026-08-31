@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { parseRoster } from './roster.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -326,6 +327,22 @@ const server = http.createServer(async (req, res) => {
         db.students[c] = { ...prev, code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev.createdAt || nowIso() };
         persist();
         return json(res, 200, { ok: true, student: db.students[c] });
+      }
+      /* 반 하나를 등록하려면 폼을 사람 수만큼 채워야 했다 — 명단을 그대로 붙여넣게 한다 */
+      if (p === '/api/admin/students/bulk' && req.method === 'POST') {
+        const { text, cls, grade, level, prefix, dryRun } = await readBody(req);
+        const { rows, errors } = parseRoster(text, { cls, grade, level, prefix, existing: Object.keys(db.students) });
+        if (dryRun) return json(res, 200, { rows, errors, dryRun: true });
+        let created = 0, updated = 0;
+        for (const r of rows) {
+          /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
+          const prev = db.students[r.code];
+          if (prev) updated += 1; else created += 1;
+          db.students[r.code] = { ...(prev || {}), code: r.code, name: r.name, grade: r.grade, cls: r.cls,
+            level: r.level, createdAt: (prev && prev.createdAt) || nowIso() };
+        }
+        if (rows.length) persist();
+        return json(res, 200, { ok: true, created, updated, rows, errors });
       }
       if (p === '/api/admin/pending' && req.method === 'GET') {
         const now = Date.now();

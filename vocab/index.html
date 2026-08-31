@@ -51,6 +51,20 @@
       margin-left: auto; background: var(--card); border: 1px solid var(--line); border-radius: 999px;
       padding: 5px 12px; font-size: .8rem; font-weight: 700; color: var(--amber); box-shadow: var(--shadow);
     }
+    /* 두 앱은 한 벌이다 — 연동 QR은 진로독서로 열리므로 거기서 여기로 오는 길이 있어야 한다 */
+    .swap {
+      margin-left: auto; background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+      padding: 5px 11px; font-size: .78rem; font-weight: 700; color: var(--ink-soft);
+      text-decoration: none; white-space: nowrap; flex: none;
+    }
+    .swap + .streak { margin-left: 6px; flex: none; }
+    .top > div { min-width: 0; }
+    /* 좁은 화면에서는 부제를 접고 링크를 아이콘만 남긴다 — 셋이 다 들어가면 헤더가 두 줄로 무너진다 */
+    @media (max-width: 430px) {
+      .top .sub { display: none; }
+      .swap .lbl { display: none; }
+      .swap { padding: 5px 9px; font-size: .9rem; }
+    }
 
     /* 탭바 */
     .tabbar {
@@ -311,6 +325,7 @@
     <header class="top">
       <svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#0F7AAB"/><path d="M20 30V19" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M20 21c0-5-3.4-7.6-8-7.6.4 5.2 3.6 7.8 8 7.6Z" fill="#8FD08F"/><path d="M20 18c0-4.4 3-6.8 7.2-6.8-.3 4.6-3.2 7-7.2 6.8Z" fill="#BDE6A9"/></svg>
       <div><h1>WB 워드브레인</h1><span class="sub">단어 정원 · 어휘 기억 훈련</span></div>
+      <a class="swap" href="/" aria-label="진로독서 앱으로"><span aria-hidden="true">📖</span><span class="lbl"> 진로독서</span></a>
       <div class="streak" id="streakChip">🔥 0일</div>
     </header>
 

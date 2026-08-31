@@ -6,6 +6,7 @@
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { parseRoster } from './roster.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -466,6 +467,22 @@ export default {
         const stu = { ...(prev || {}), code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev?.createdAt || nowIso() };
         await env.DB.put('student:' + c, JSON.stringify(stu));
         return json(200, { ok: true, student: stu });
+      }
+      /* 반 하나를 등록하려면 폼을 사람 수만큼 채워야 했다 — 명단을 그대로 붙여넣게 한다 */
+      if (p === '/api/admin/students/bulk' && req.method === 'POST') {
+        const { text, cls, grade, level, prefix, dryRun } = await req.json();
+        const existing = (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length));
+        const { rows, errors } = parseRoster(text, { cls, grade, level, prefix, existing });
+        if (dryRun) return json(200, { rows, errors, dryRun: true });
+        let created = 0, updated = 0;
+        for (const r of rows) {
+          /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
+          const prev = await env.DB.get('student:' + r.code, 'json');
+          if (prev) updated += 1; else created += 1;
+          await env.DB.put('student:' + r.code, JSON.stringify({ ...(prev || {}), code: r.code, name: r.name,
+            grade: r.grade, cls: r.cls, level: r.level, createdAt: prev?.createdAt || nowIso() }));
+        }
+        return json(200, { ok: true, created, updated, rows, errors });
       }
       /* 승인 대기 줄 — 강사가 관리 웹에서 보고 누른다 */
       if (p === '/api/admin/pending' && req.method === 'GET') {

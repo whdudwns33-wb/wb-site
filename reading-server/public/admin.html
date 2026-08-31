@@ -64,7 +64,14 @@
 .btn.danger:hover{filter:brightness(.94)}
 .qrbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
   .qrbox svg{border:1px solid var(--line);border-radius:10px;background:#fff}
-  @media print{body *{visibility:hidden}#qrSheet,#qrSheet *{visibility:visible}#qrSheet{position:absolute;left:0;top:0;width:100%}}
+  @media print{body *{visibility:hidden}#qrSheet,#qrSheet *,#qrSheetAll,#qrSheetAll *{visibility:visible}
+    #qrSheet,#qrSheetAll{position:absolute;left:0;top:0;width:100%}
+    /* QR 한 장이 쪽 사이에서 잘리면 학생이 못 찍는다 */
+    #qrSheetAll .qrcard{break-inside:avoid;page-break-inside:avoid}}
+  .qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:12px}
+  .qrcard{border:1px solid #e2ddd0;border-radius:10px;padding:12px 8px;text-align:center;background:#fff}
+  .qrcard b{display:block;margin-top:6px;color:#173957}
+  .qrcard span{font-size:12px;color:#647784}
   </style>
 </head>
 <body>
@@ -164,7 +171,9 @@ function render(){
     <div class="stat ${DATA.vpending>0?'warn':''}"><b>${DATA.vpending||0}</b><span>연상 검수 대기</span></div>
   </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다. 학생 이름을 누르면 상세 기록이 열려요.</p></div>
   <div class="card"><h2>학생 현황판</h2>
-    <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
+    <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}
+      ${list.length?`<button class="btn sm ghost" id="qrAll">${esc(FILTER)} QR 시트 (${list.length}명)</button>`:''}</div>
+    <div id="qrAllBox"></div>
     <div class="tbl"><table><thead><tr>
       <th>학생</th><th>반</th><th>읽는 글</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>독서요약</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
@@ -190,6 +199,21 @@ function render(){
       <label>읽는 글<br><select id="fLv" style="width:100%"><option value="">자동(학년대로)</option><option value="L1">7세~초2</option><option value="L2">초3~6</option><option value="L3">중1~3</option><option value="L4">고1~3</option></select></label>
       <button class="btn" id="fSave">저장</button>
     </div><p class="err" id="fErr"></p></div>
+  <div class="card"><h2>반 명단 한꺼번에 등록</h2>
+    <p class="muted">출석부를 그대로 붙여넣으세요. 한 줄에 한 명, <b>이름</b>만 있으면 됩니다 —
+      코드는 겹치지 않게 새로 만들어 드립니다. 이미 있는 코드로 저장하면 이름·반만 수정되고 기록은 그대로예요.</p>
+    <div class="grid-form" style="margin-top:8px">
+      <label>이 명단의 학년<br><input id="bGrade" placeholder="예: 초5" style="width:100%"></label>
+      <label>이 명단의 반<br><input id="bCls" placeholder="예: 초5 A반" style="width:100%"></label>
+      <label>코드 접두사<br><input id="bPrefix" placeholder="wb-" style="width:100%"></label>
+    </div>
+    <textarea id="bText" rows="7" style="width:100%;margin-top:8px"
+      placeholder="김지우&#10;박서준&#10;이하윤&#10;&#10;줄마다 다르게 적고 싶으면: 이름 | 학년 | 반 | 코드"></textarea>
+    <div class="filters" style="margin:10px 0 0">
+      <button class="btn ghost" id="bPrev">미리보기</button>
+      <button class="btn" id="bSave" disabled>등록하기</button>
+    </div>
+    <div id="bOut"></div></div>
   <div class="card"><h2>데이터 백업</h2>
     <p class="muted">모든 학생 기록을 JSON 파일로 컴퓨터에 보관하세요. 서버는 매일 새벽 자동 스냅샷을 최근 10일치 보관합니다.</p>
     <div class="filters" style="margin:10px 0 0">
@@ -227,6 +251,72 @@ function render(){
       refresh();}
     catch(e){$('#fErr').textContent=e.message;}
   };
+  /* 반 명단 붙여넣기 — 미리보기로 한 번 보여 주고 나서 등록한다.
+     코드를 새로 만들어 주므로, 뭐가 들어갈지 못 보고 누르면 되돌리기가 번거롭다. */
+  let BULK=null;
+  const bulkBody=()=>({text:$('#bText').value,cls:$('#bCls').value,grade:$('#bGrade').value,prefix:$('#bPrefix').value});
+  async function bulkPreview(){
+    try{
+      const j=await api('/admin/students/bulk',{method:'POST',body:JSON.stringify({...bulkBody(),dryRun:true})});
+      BULK=j.rows;
+      const known=new Set(DATA.students.map(s=>s.code));
+      /* 이미 등록된 이름에 새 코드가 붙으면 기록과 끊어진 사람이 하나 더 생긴다.
+         출석부를 통째로 붙여넣으면 늘 일어나는 일이라 미리보기에서 짚어 준다. */
+      const byName={};DATA.students.forEach(s=>{if(s.name)(byName[s.name]=byName[s.name]||[]).push(s.code);});
+      const dup=j.rows.filter(r=>byName[r.name]&&!byName[r.name].includes(r.code));
+      const badge=r=>{
+        if(known.has(r.code))return '<span class="tag warn">기존 학생 수정</span>';
+        if(byName[r.name])return `<span class="tag bad">이름 겹침 → ${esc(byName[r.name].join(', '))}</span>`;
+        return r.made?'<span class="tag ok">새 등록</span>':'<span class="tag ok">새 등록 (코드 지정)</span>';
+      };
+      $('#bOut').innerHTML=(j.rows.length?`<div class="tbl" style="margin-top:10px"><table>
+        <thead><tr><th>이름</th><th>코드</th><th>학년</th><th>반</th><th></th></tr></thead><tbody>
+        ${j.rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.code)}</td><td>${esc(r.grade||'—')}</td>
+          <td>${esc(r.cls||'—')}</td><td>${badge(r)}</td></tr>`).join('')}
+        </tbody></table></div>`:'<p class="muted" style="margin-top:10px">붙여넣은 이름이 없습니다.</p>')
+        +(dup.length?`<p class="err">같은 이름이 이미 등록돼 있습니다 —
+          ${dup.map(r=>esc(r.name)+' ('+esc(byName[r.name].join(', '))+')').join(', ')}.<br>
+          그 학생이 맞으면 줄 끝에 기존 코드를 적어 주세요(<b>${esc(dup[0].name)} | | | ${esc(byName[dup[0].name][0])}</b>) —
+          그래야 지금까지의 기록이 이어집니다. 동명이인이면 이대로 두셔도 됩니다.</p>`:'')
+        +(j.errors.length?`<p class="err">${j.errors.map(esc).join('<br>')}</p>`:'');
+      $('#bSave').disabled=!j.rows.length;
+    }catch(e){$('#bOut').innerHTML=`<p class="err">${esc(e.message)}</p>`;$('#bSave').disabled=true;}
+  }
+  $('#bPrev').onclick=bulkPreview;
+  $('#bSave').onclick=async()=>{
+    if(!BULK||!BULK.length)return;
+    if(!confirm(BULK.length+'명을 등록합니다. 계속할까요?'))return;
+    $('#bSave').disabled=true;
+    try{
+      const j=await api('/admin/students/bulk',{method:'POST',body:JSON.stringify(bulkBody())});
+      $('#bText').value='';BULK=null;
+      alert('새 등록 '+j.created+'명 · 기존 수정 '+j.updated+'명');
+      refresh();
+    }catch(e){$('#bOut').innerHTML=`<p class="err">${esc(e.message)}</p>`;$('#bSave').disabled=false;}
+  };
+
+  /* 반 전체 QR 시트 — 학생마다 상세창을 여는 대신 한 장으로 뽑아 교실에서 돌린다 */
+  const qa=$('#qrAll');
+  if(qa)qa.onclick=()=>{
+    if(!window.WBQR){alert('QR을 만들지 못했어요 — 새로고침해 보세요.');return;}
+    const box=$('#qrAllBox');
+    if(box.dataset.on==='1'){box.innerHTML='';box.dataset.on='';return;}
+    try{
+      box.dataset.on='1';
+      box.innerHTML=`<div id="qrSheetAll">
+        <p style="font-weight:900;color:#173957;margin:14px 0 0">WB 워드브레인 — ${esc(FILTER)} 연동 QR</p>
+        <p class="muted" style="margin:2px 0 0">학생 기기 카메라로 자기 QR을 찍으면 앱이 열리고 연동 요청이 걸립니다.
+          그다음 위쪽 <b>연동 승인 대기</b>에서 승인하면 끝이에요.</p>
+        <div class="qrgrid">${list.map(s=>`<div class="qrcard">
+          ${WBQR.svg(location.origin+'/?c='+encodeURIComponent(s.code),{size:150})}
+          <b>${esc(s.name||'(미등록)')}</b><span>${esc(s.code)}</span></div>`).join('')}</div></div>
+        <div class="filters" style="margin:10px 0 0"><button class="btn sm" id="qrAllPrint">인쇄</button>
+        <button class="btn sm ghost" id="qrAllHide">닫기</button></div>`;
+      $('#qrAllPrint').onclick=()=>window.print();
+      $('#qrAllHide').onclick=()=>{box.innerHTML='';box.dataset.on='';};
+    }catch(e){box.innerHTML=`<p class="err">QR을 만들지 못했어요: ${esc(e.message)}</p>`;box.dataset.on='';}
+  };
+
   $('#bkNow').onclick=async()=>{
     try{const j=await api('/admin/export');downloadJson(j,'wb-reading-backup-'+new Date().toISOString().slice(0,10)+'.json');}
     catch(e){alert(e.message);}
