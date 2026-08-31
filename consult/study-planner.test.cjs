@@ -233,6 +233,203 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
 
+test('online learning is summarized and labeled directly inside the paper planner', () => {
+  const planner = section('function studyPlannerCard(', 'function plannerTaskRow(');
+  const row = section('function plannerTaskRow(', 'function plannerTaskMark(');
+  const css = section('<style>', '</style>');
+
+  assert.match(planner, /filter\(item => isOnlineLearningTask\(item\.task\)\)/);
+  assert.match(planner, /온라인 학습 진행 현황/);
+  assert.match(planner, /○ 미시작 · ◐ 진행 중 · ✓ 학생 완료 · 🛡 원장 확인\(인증 과제\)/);
+  assert.match(planner, /학생 완료 ' \+ onlineDone \+ '\/' \+ onlineEntries\.length/);
+  assert.match(planner, /onlineVerifiable \? '<span class="learning-status is-verified">🛡 원장 확인 ' \+ onlineVerified \+ '\/' \+ onlineVerifiable/);
+  assert.match(row, /plannerLearningState\(t, date, trackingDate\)/);
+  assert.match(row, /learning\.icon/);
+  assert.match(row, /learningStatusTag\(learningState\)/);
+  assert.match(row, /실제 ' \+ fmtDur\(learningState\.actualSecs\)/);
+  assert.match(row, /learning-result-tag/);
+  assert.match(row, /learningProofTag\(learningState\)/);
+  assert.match(css, /\.learning-status\.is-todo/);
+  assert.match(css, /\.learning-status\.is-doing/);
+  assert.match(css, /\.learning-status\.is-complete/);
+  assert.match(css, /\.learning-status\.is-verified/);
+  assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.online-learning-summary \{ align-items: flex-start; flex-direction: column/);
+
+  const render = Function('stTotal', 'ingChecklistItems', 'isOnlineLearningTask', 'plannerLearningState',
+    'plannerTaskRow', 'plannerLectureRow', 'fmtHMS', 'studyTimePanel',
+    planner + '\nreturn studyPlannerCard;')(
+      () => 0, () => [], task => task.source === 'metamath',
+      task => ({
+        key: task.id === 'verified' ? 'verified' : 'complete', check: { done: true },
+        proofRequired: task.id === 'verified', proofReady: true
+      }),
+      task => '<row>' + task.id + '</row>', () => '', () => '0:00:00', () => '<time></time>'
+    );
+  const output = render({ id: 'student-1' }, '2026-08-31',
+    [{ id: 'complete', source: 'metamath' }, { id: 'normal', source: '' }],
+    [{ t: { id: 'verified', source: 'metamath' }, date: '2026-08-30' }], true);
+  assert.match(output, /온라인 학습 2개/);
+  assert.match(output, /학생 완료 2\/2/);
+  assert.match(output, /원장 확인 1\/1/);
+});
+
+test('online learning state distinguishes timer progress, student completion, and approved proof', () => {
+  const helpers = section('function learningResultSummary(', 'function learningStatusTag(');
+  const env = { check: null, segments: [], running: null, proofStatus: '', progressStatus: 'todo' };
+  const api = Function('env', `
+    const getCheck = () => env.check;
+    const stTimelineSegments = () => env.segments;
+    const stRunning = () => env.running;
+    const ensureSubmissionLoad = () => {};
+    const submissionCache = { owner: 'student-1', loaded: true };
+    const latestProof = () => env.proofStatus ? { status: env.proofStatus } : null;
+    const statusOf = () => env.progressStatus;
+    const isOnlineLearningTask = task => !!task && ['leaders_eye', 'metamath', 'classcard'].includes(task.source);
+    const toast = () => {};
+    ${helpers}
+    return { plannerLearningState, learningResultSummary, hasLearningResult };
+  `)(env);
+  const task = { id: 'task-1', staffId: 'student-1', source: 'metamath', evidenceMode: 'photo' };
+
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'todo');
+  env.check = { claimed: true };
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'todo');
+  env.running = { taskId: 'task-1' };
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'doing');
+  assert.equal(api.plannerLearningState(task, '2026-08-31').actualSecs, 0);
+  env.running = null;
+  env.segments = [{ taskId: 'task-1', start: 0, end: 10 * 60 * 1000 }];
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'doing');
+  assert.equal(api.plannerLearningState(task, '2026-08-31').actualSecs, 600);
+  env.segments = [];
+  env.check = { done: true, learningResult: { score: 82, wrong: 6 } };
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'complete');
+  assert.equal(api.learningResultSummary(task, env.check), '82점 · 오답 6개');
+  assert.equal(api.hasLearningResult(task, { learningResult: { score: 0, wrong: 0 } }), true);
+  assert.equal(api.learningResultSummary(task, { learningResult: { score: 0, wrong: 0 } }), '0점 · 오답 0개');
+  [
+    { score: '', wrong: 0 }, { score: 0, wrong: '' },
+    { score: null, wrong: 0 }, { score: 0, wrong: null },
+    { score: -1, wrong: 0 }, { score: 101, wrong: 0 },
+    { score: 0, wrong: -1 }, { score: 0, wrong: 1000 }, { score: 0, wrong: 1.5 }
+  ].forEach(result => assert.equal(api.hasLearningResult(task, { learningResult: result }), false));
+  const leadersEye = { id: 'leaders-1', staffId: 'student-1', source: 'leaders_eye' };
+  assert.equal(api.hasLearningResult(leadersEye, { learningResult: { outcome: '학습 완료' } }), true);
+  assert.equal(api.hasLearningResult(leadersEye, { learningResult: { outcome: '' } }), false);
+  assert.equal(api.learningResultSummary(leadersEye, { learningResult: { round: '기존 회차', outcome: '학습 완료' } }), '학습 완료');
+  env.proofStatus = 'approved';
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'verified');
+  env.check = { done: false };
+  assert.notEqual(api.plannerLearningState(task, '2026-08-31').key, 'verified');
+  env.check = { done: true, blocked: true };
+  assert.equal(api.plannerLearningState(task, '2026-08-31').key, 'blocked');
+});
+
+test('verified or loading proof locks planner controls and every progress mutation path', () => {
+  const lockHelpers = section('function learningProgressLock(', 'function learningStatusTag(');
+  const row = section('function plannerTaskRow(', 'function plannerTaskMark(');
+  const panel = section('function taskPanel(', 'function staffSwitcher(');
+  const resultOpen = section("case 'learningresultopen':", "case 'learningresultsave':");
+  const resultSave = section("case 'learningresultsave':", "case 'toggle':");
+  const toggle = section("case 'toggle':", "case 'step':");
+  const step = section("case 'step':", "case 'cnt':");
+  const count = section("case 'cnt':", "case 'block':");
+  const block = section("case 'block':", "case 'panel':");
+  const countInput = section('const cntEl =', "document.addEventListener('change'");
+
+  assert.match(row, /const canToggle = editable && !learningLock/);
+  assert.match(row, /canToggle \? 'data-act="toggle"[\s\S]*?: 'disabled'/);
+  assert.match(row, /status === 'done' && !learningLock/);
+  assert.match(panel, /const progressEditable = editable && !learningLock/);
+  assert.match(panel, /progressEditable \? 'data-act="step"[\s\S]*?: 'disabled'/);
+  assert.match(panel, /progressEditable \? 'data-act="cnt"[\s\S]*?: 'disabled'/);
+  assert.match(panel, /progressEditable \? 'data-act="cntset"[\s\S]*?: 'readonly'/);
+  assert.match(panel, /progressEditable\s*\? '<div class="mt8"><button class="btn btn-sm btn-ghost" data-act="learningresultopen"/);
+  assert.match(panel, /progressEditable \? '<button class="btn btn-sm '[\s\S]*?data-act="block"/);
+
+  [resultOpen, resultSave, step, count, block, countInput]
+    .forEach(source => assert.match(source, /guardLearningProgressLock\(/));
+  assert.match(toggle, /!turnOn && guardLearningProgressLock\(t, date\)/);
+
+  const env = { check: { done: true }, owner: 'student-1', loaded: false, error: '', proofStatus: 'approved', messages: [] };
+  const api = Function('env', `
+    const getCheck = () => env.check;
+    const isOnlineLearningTask = task => !!task && task.source === 'metamath';
+    const ensureSubmissionLoad = () => {};
+    const submissionCache = {};
+    Object.defineProperties(submissionCache, {
+      owner: { get: () => env.owner }, loaded: { get: () => env.loaded }, error: { get: () => env.error }
+    });
+    const latestProof = () => env.proofStatus ? { status: env.proofStatus } : null;
+    const learningProofState = (task, date) => {
+      if (!task || task.evidenceMode !== 'photo') return { required: false, ready: true, status: '' };
+      ensureSubmissionLoad(task.staffId);
+      const owned = submissionCache.owner === task.staffId;
+      const error = owned ? String(submissionCache.error || '') : '';
+      const ready = owned && submissionCache.loaded && !error;
+      const proof = ready ? latestProof(task.id, date) : null;
+      return { required: true, ready, status: proof ? proof.status : '', error };
+    };
+    const toast = message => env.messages.push(message);
+    ${lockHelpers}
+    return { learningProgressLock, guardLearningProgressLock };
+  `)(env);
+  const task = { id: 'task-1', staffId: 'student-1', source: 'metamath', evidenceMode: 'photo' };
+
+  assert.equal(api.learningProgressLock(task, '2026-08-31'), 'loading');
+  assert.equal(api.guardLearningProgressLock(task, '2026-08-31'), true);
+  assert.match(env.messages.pop(), /불러온 뒤/);
+  env.loaded = true;
+  assert.equal(api.learningProgressLock(task, '2026-08-31'), 'verified');
+  assert.equal(api.guardLearningProgressLock(task, '2026-08-31'), true);
+  assert.match(env.messages.pop(), /원장 확인이 끝난 기록/);
+  env.proofStatus = 'pending';
+  assert.equal(api.learningProgressLock(task, '2026-08-31'), '');
+  env.proofStatus = 'rejected';
+  assert.equal(api.learningProgressLock(task, '2026-08-31'), '');
+  env.check = { done: false };
+  env.proofStatus = 'approved';
+  assert.equal(api.learningProgressLock(task, '2026-08-31'), '');
+  env.check = { done: true };
+  assert.equal(api.learningProgressLock({ ...task, evidenceMode: '' }, '2026-08-31'), '');
+});
+
+test('online learning completion records a service-specific result before finishing', () => {
+  const modal = section('function learningResultModal(', 'function studyPlannerCard(');
+  const sync = section('function taskRequirementsComplete(', 'function progress(');
+  const handlers = section("case 'learningresultopen':", "case 'step':");
+  const step = section("case 'step':", "case 'cnt':");
+  const count = section("case 'cnt':", "case 'block':");
+  const countInput = section('const cntEl =', "document.addEventListener('change'");
+  const assignment = section('function learningTaskModal(', 'function wnAddModal(');
+
+  assert.doesNotMatch(modal, /id="learningResultRound"|학습 회차/);
+  assert.match(modal, /id="learningResultOutcome"/);
+  assert.match(modal, /id="learningResultScore"/);
+  assert.match(modal, /id="learningResultWrong"/);
+  assert.match(modal, /data-act="learningresultsave"/);
+  assert.match(handlers, /오늘 학습 결과를 입력해 주세요/);
+  assert.match(handlers, /Object\.assign\(\{\}, previous, \{ outcome: outcome \}\)/);
+  assert.doesNotMatch(handlers, /learningResultRound|round: round/);
+  assert.match(handlers, /점수를 0~100 사이로 입력해 주세요/);
+  assert.match(handlers, /learningResult: result/);
+  assert.match(handlers, /done: true/);
+  assert.match(handlers, /turnOn && isOnlineLearningTask\(t\)[\s\S]*?learningResultModal\(t, date\)/);
+  assert.match(sync, /isOnlineLearningTask\(t\) && !hasLearningResult\(t, c\)/);
+  assert.match(step, /taskRequirementsComplete\(t, updated\)[\s\S]*?\{\s*render\(\);\s*learningResultModal\(t, date\)/);
+  assert.match(count, /taskRequirementsComplete\(t, updated\)[\s\S]*?\{\s*render\(\);\s*learningResultModal\(t, date\)/);
+  assert.match(countInput, /taskRequirementsComplete\(t, updated\)[\s\S]*?\{\s*render\(\);\s*learningResultModal\(t, d\)/);
+  assert.match(assignment, /id="learnEvidence"/);
+  assert.match(assignment, /중요 과제나 보상 확인이 필요한 날에만 선택/);
+
+  const requirementsSource = section('function taskRequirementsComplete(', '/** 단계·수량이 다 차면');
+  const requirementsComplete = Function(requirementsSource + '\nreturn taskRequirementsComplete;')();
+  const targetTask = { target: 10, steps: [] };
+  assert.equal(requirementsComplete(targetTask, { count: 9 }), false);
+  assert.equal(requirementsComplete(targetTask, { count: 10 }), true);
+  assert.equal(requirementsComplete(targetTask, { count: 11 }), true);
+});
+
 test('student claims a scheduled lecture into the study planner with shared progress and timer data', () => {
   const lectureData = section('function ingCourseSubjectKey(', 'function ingStats(');
   const lectureToggle = section('function ingToggle(', '/** 오늘 이전 미완료를 전부 오늘로');

@@ -65,6 +65,73 @@ test('proof and question UI reuse taskPanel and viewStudy without adding another
   assert.match(hub, /비공개/);
 });
 
+test('planner verification uses only the selected student approved proof after student completion', () => {
+  const proofState = functionSource('learningProofState');
+  const plannerState = functionSource('plannerLearningState');
+
+  assert.match(proofState, /ensureSubmissionLoad\(task\.staffId\)/);
+  assert.match(proofState, /const owned = submissionCache\.owner === task\.staffId/);
+  assert.match(proofState, /const error = owned \? String\(submissionCache\.error \|\| ''\) : ''/);
+  assert.match(proofState, /const ready = owned && submissionCache\.loaded && !error/);
+  assert.match(proofState, /const proof = ready \? latestProof\(task\.id, date\) : null/);
+  assert.match(plannerState, /check && check\.done && proof\.ready && proof\.status === 'approved'/);
+  assert.match(plannerState, /label = '원장 확인'/);
+  assert.match(plannerState, /else if \(check && check\.done\).*label = '학생 완료'/s);
+
+  const evaluate = Function('input', `
+    const calls = [];
+    const submissionCache = input.cache;
+    function ensureSubmissionLoad(staffId) { calls.push(['load', staffId]); }
+    function latestProof(taskId, date) { calls.push(['proof', taskId, date]); return input.proof; }
+    function getCheck() { return input.check; }
+    function taskStudySeconds() { return 0; }
+    function stRunning() { return null; }
+    function statusOf() { return 'todo'; }
+    function learningResultSummary() { return ''; }
+    ${proofState}
+    ${plannerState}
+    const state = plannerLearningState(input.task, input.date, input.date);
+    return { state, calls };
+  `);
+  const task = { id: 'task-1', staffId: 'student-1', evidenceMode: 'photo', source: 'metamath' };
+  const date = '2026-08-31';
+  const base = {
+    task,
+    date,
+    cache: { owner: task.staffId, loaded: true, error: '' },
+    check: { done: true },
+    proof: { status: 'approved' }
+  };
+
+  const verified = evaluate(base);
+  assert.equal(verified.state.key, 'verified');
+  assert.equal(verified.state.label, '원장 확인');
+  assert.deepEqual(verified.calls, [['load', task.staffId], ['proof', task.id, date]]);
+
+  const cases = [
+    ['student has not completed yet', { check: { done: false } }, 'todo'],
+    ['proof is pending', { proof: { status: 'pending' } }, 'complete'],
+    ['proof was rejected', { proof: { status: 'rejected' } }, 'complete'],
+    ['proof list is still loading', { cache: { owner: task.staffId, loaded: false, error: '' } }, 'complete'],
+    ['cache belongs to another student', { cache: { owner: 'student-2', loaded: true, error: '' } }, 'complete'],
+    ['proof loading failed', { cache: { owner: task.staffId, loaded: true, error: 'network' } }, 'complete']
+  ];
+  cases.forEach(([name, overrides, expected]) => {
+    const result = evaluate(Object.assign({}, base, overrides));
+    assert.equal(result.state.key, expected, name);
+    assert.notEqual(result.state.label, '원장 확인', name);
+    if (!result.state.proofReady) {
+      assert.equal(result.calls.some(call => call[0] === 'proof'), false, name + ' must not read a stale proof');
+    }
+  });
+
+  const failed = evaluate(Object.assign({}, base, {
+    cache: { owner: task.staffId, loaded: true, error: 'network' }
+  }));
+  assert.equal(failed.state.proofReady, false);
+  assert.equal(failed.state.proofError, 'network');
+});
+
 test('student submits only their own proof/question while review and answer stay director-only', () => {
   const modal = functionSource('submissionModal');
   const taskPanel = functionSource('submissionTaskPanel');
