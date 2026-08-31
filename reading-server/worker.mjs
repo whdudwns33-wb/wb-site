@@ -120,6 +120,10 @@ function vocabStore(env) {
     getAssign: (c) => env.DB.get('vocab:assign:' + c, 'json'),
     putAssign: (c, rec) => env.DB.put('vocab:assign:' + c, JSON.stringify(rec)),
     listAssignCodes: async () => (await kvListAll(env, 'vocab:assign:')).map(k => k.slice('vocab:assign:'.length)),
+    /* AI 호출 장부 — 하루치 한 칸. KV에 원자적 증가가 없어 동시 요청 몇 개는 같은 수를
+       읽을 수 있다. 하루 수백 회 규모에서 몇 회 오차라 그대로 둔다(ai-quota.mjs 참고). */
+    getUsage: () => env.DB.get('vocab:usage', 'json'),
+    putUsage: (rec) => env.DB.put('vocab:usage', JSON.stringify(rec)),
   };
 }
 function vocabPushEnv(env) {
@@ -380,7 +384,7 @@ export default {
         const out = await handleVocab({
           path: p, method: req.method, who,
           getBody: () => req.json(), store: vocabStore(env),
-          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '' },
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '', env: env },
           push: vocabPushEnv(env),
         });
         return json(out.status, out.body);

@@ -96,6 +96,7 @@
       <p><b>30일 회상 통과율</b> = 30일을 기다린 뒤 본 시험 중 「알았어」 비율(누적).
         간격이 당일밤·1·3·7·14·<b>30</b>·90일이라 여섯 번째 시험이 30일 시험입니다.
         물 주기와 플래시카드로 본 시험만 셉니다 — 문장 짓기·뿌리 회상은 맞힐 때만 기록이 남아 통과율이 부풀려집니다.</p>
+      <p id="aiUse"></p>
       <p id="stamp"></p>
     </div>
   </div>
@@ -225,6 +226,19 @@
       }
       $('#body').innerHTML = d.classes.map(function (c) { return classCard(c, d.criteria); }).join('') + tail;
     }
+    /* AI 사용량 — 요금이 걸린 자리라 원장님이 매일 보는 화면에 함께 둔다 */
+    var ai = d.ai;
+    $('#aiUse').innerHTML = !ai ? '' :
+      '<b>오늘 AI 사용</b> ' + ai.total + ' / ' + ai.cap + '회'
+      + (ai.total >= ai.cap ? ' <span style="color:#C24936;font-weight:800;">— 한도 다 씀</span>'
+        : ai.total >= ai.cap * 0.8 ? ' <span style="color:#C98A2D;font-weight:800;">— 곧 한도</span>' : '')
+      + ' · 학생 한 명 하루 ' + ai.perStudentCap + '회까지'
+      + (ai.students.length
+        ? '<br>많이 쓴 학생: ' + ai.students.slice(0, 5).map(function (r) {
+          return esc(r.code) + ' ' + r.n + '회'; }).join(' · ')
+        : '<br>오늘은 아직 쓴 학생이 없습니다.')
+      + '<br><span style="color:#98A2B0;">연상 만들기·문장 짓기·대화 미션이 이 장부를 함께 씁니다. '
+      + '한도는 워커 환경변수 AI_DAILY_TOTAL·AI_DAILY_PER_STUDENT로 바꿉니다.</span>';
     $('#stamp').textContent = '기준 시각 ' + new Date(d.time).toLocaleString('ko-KR')
       + ' — 새로고침하면 다시 셉니다.';
   }
