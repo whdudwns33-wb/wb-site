@@ -10,7 +10,12 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <title>WB 진로독서</title>
   <style>
-    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c;--white:#fff}
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c;--white:#fff;
+      --rdf:system-ui,-apple-system,'Noto Sans KR',sans-serif;--rdfs:16.5px;--rdlh:1.95}
+    /* 본문 기본 크기 — 읽기 화면은 #readerCard 인라인 변수(학생이 고른 값)가 이기고,
+       진단 지문처럼 인라인이 없는 카드는 여기 값을 쓴다. */
+    .lv-L1{--rdfs:19.5px;--rdlh:2}
+    .lv-L2{--rdfs:17.5px}
     *{box-sizing:border-box}html{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif}body{min-width:280px;margin:0}
     button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
     header{position:sticky;top:0;z-index:5;padding:max(11px,env(safe-area-inset-top)) 14px 11px;background:var(--navy);color:#fff;box-shadow:0 4px 18px #17395730}
@@ -24,6 +29,9 @@
     .eyebrow{margin-bottom:5px;color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
     .sub{margin-top:5px;color:var(--muted);font-size:13px;line-height:1.6}
     .between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    /* 제목이 길면 옆 버튼이 눌려 "닫 / 기"로 쪼개졌다 — 버튼은 줄이지 않는다 */
+    .between>h2{min-width:0}
+    .between>.toolbtn,.between>.btn{flex:0 0 auto;white-space:nowrap}
     .tag{display:inline-block;padding:5px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:900;line-height:1.2}
     .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.muted{background:#eef2f4;color:var(--muted)}
     .tag.c-science{background:#e7f2fb;color:#155d94}.tag.c-society{background:#fdf0e4;color:#8a5a12}.tag.c-history{background:#f4ece1;color:#7a5230}.tag.c-humanities{background:#f3ecf8;color:#6b4390}.tag.c-environment{background:#e7f6ec;color:#20714a}
@@ -43,6 +51,11 @@
     .pick{min-height:64px;padding:9px 6px;border:1.5px solid #bfd7e1;border-radius:13px;background:#fff;color:var(--navy);font-weight:850;font-size:13.5px;line-height:1.3}
     .pick[aria-pressed="true"]{border-color:var(--blue);background:var(--sky);box-shadow:inset 0 0 0 1.5px var(--blue)}
     .pick small{display:block;margin-top:3px;font-weight:600;font-size:11px;color:var(--muted)}
+    /* 7세~초2 — 아이콘 큰 6칸 */
+    .pick-grid.kid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .pick.kid{min-height:108px;padding:14px 8px;font-size:16.5px;line-height:1.35}
+    .pick.kid .ico{display:block;margin-bottom:7px;font-size:36px;line-height:1}
+    .pick.kid small{margin-top:5px;font-size:12.5px}
     .glist{margin-top:13px}
     .grow{display:flex;width:100%;min-height:56px;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border:0;border-top:1px solid var(--line);background:none;text-align:left}
     .grow:first-child{border-top:0}
@@ -62,6 +75,7 @@
     .rd-body{margin-top:14px}
     .para{margin:0 0 16px;font-size:16.5px;line-height:1.95;color:#22303d}
     .lv-L2 .para{font-size:17.5px}
+    .lv-L1 .para{font-size:19.5px;line-height:2}
     .chunked .seg:not(:last-child)::after{content:"∕";color:var(--coral);opacity:.95;font-weight:900;font-size:.85em;padding:0 2px}
     .para.hl{background:#fff9e8;border-radius:8px;box-shadow:0 0 0 6px #fff9e8}
     .vw{display:inline;padding:0;border:0;background:none;color:inherit;font:inherit;border-bottom:2px dotted var(--blue);cursor:pointer}
@@ -87,6 +101,7 @@
     .choice.wrong{border-color:#e0a9a1;background:#fff0ef}
     .choice:disabled{cursor:default;opacity:.92}
     .explain{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--sky);font-size:13.5px;line-height:1.65}
+    .qrev .qtext{font-size:15px}
     .explain b{color:var(--navy)}
     .streak-flame{font-size:15px;color:var(--coral);font-weight:900}
     .bar{height:10px;border-radius:999px;background:#e4edf1;overflow:hidden;margin-top:5px}
@@ -144,6 +159,13 @@
     .choice.wrong .cnum{background:var(--bad);color:#fff}
     .choice.picked{border-color:var(--blue);background:var(--sky);font-weight:800}
     .choice.picked .cnum{background:var(--blue);color:#fff}
+    /* 7세~초2 — 문제·선지 글씨 한 단계 크게 */
+    .lv-L1 .qtext{font-size:19.5px;line-height:1.6}
+    .lv-L1 .choice{min-height:60px;padding:14px 15px;font-size:17px;line-height:1.55}
+    .lv-L1 .cnum{flex:0 0 30px;width:30px;height:30px;font-size:14.5px}
+    .lv-L1 .explain{font-size:15px;line-height:1.7}
+    .lv-L1 .qrev .qtext{font-size:17px}
+    .lv-L1 .odot{font-size:14.5px}
     .omr{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;justify-content:center}
     .odot{min-width:34px;height:34px;padding:0 4px;border:1.5px solid #cfe0e8;border-radius:10px;background:#fff;color:var(--muted);font-size:13px;font-weight:900}
     .odot.done{background:var(--sky);border-color:var(--blue);color:var(--navy)}
@@ -216,6 +238,7 @@
     .deep-mini{display:inline-block;margin-top:8px;padding:6px 11px;border-radius:999px;background:#fff0ef;color:#9b352b;font-size:11.5px;font-weight:850;text-decoration:none}
     .train-num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:13px;font-weight:900;margin-right:8px}
     .tokenwrap{display:flex;flex-wrap:wrap;align-items:center;row-gap:10px;margin-top:14px;font-size:16.5px;line-height:1.6}
+    .lv-L1 .tokenwrap{font-size:19.5px;line-height:1.7}
     .tok{color:var(--ink)}
     .gap{min-width:20px;min-height:34px;margin:0 1px;padding:0 3px;border:0;background:none;color:#c3d4dc;font-size:15px;font-weight:900}
     .gap[aria-pressed="true"]{color:var(--blue)}
@@ -247,8 +270,10 @@
     .report-doc h4:first-child{margin-top:0}
     input[type="text"]{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:15px;color:var(--ink);background:#fff}
     .loading{padding:48px 16px;text-align:center;color:var(--muted)}
-    #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%);z-index:12;max-width:92%;padding:12px 20px;border-radius:999px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;line-height:1.5;text-align:center;box-shadow:0 10px 30px #17395755;transition:transform .24s ease}
-    #toast.show{transform:translateX(-50%) translateY(0)}
+    /* 숨김은 transform만으로 부족했다 — 빈 토스트(높이 24px)의 140%가 bottom 84px보다 작아
+       모든 화면에 검은 알약이 떠 있었다. opacity+visibility로 확실히 감춘다. */
+    #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(14px);z-index:12;max-width:92%;padding:12px 20px;border-radius:999px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;line-height:1.5;text-align:center;box-shadow:0 10px 30px #17395755;opacity:0;visibility:hidden;transition:transform .24s ease,opacity .24s ease,visibility .24s}
+    #toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
     .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:350px){.pick-grid,.stat-grid,.evalrow{grid-template-columns:repeat(2,minmax(0,1fr))}.row2{grid-template-columns:1fr}}
   </style>
@@ -288,6 +313,47 @@ const INTERESTS=[
   ['env','환경·에너지','기후, 자연 보호'],['hum','인문·글쓰기','책, 역사, 글']
 ];
 const INTEREST_LABEL=Object.fromEntries(INTERESTS.map(x=>[x[0],x[1]]));
+/* 7세~초2는 12개 중 3개 고르기가 버겁다 — 같은 12개 키를 6개 묶음으로 접어
+   큰 아이콘으로 보여주고, 최대 2묶음만 고르게 한다 (저장되는 값은 그대로 키). */
+const KID_INTERESTS=[
+  ['🤖','로봇·컴퓨터','로봇, 자동차, 코딩',['eng','it']],
+  ['🚀','우주·자연','별, 지구, 환경',['nat','env']],
+  ['🐶','동물·몸','동물, 식물, 병원',['bio','med']],
+  ['🎨','그림·음악','그림, 노래, 웹툰',['art','media']],
+  ['📚','이야기·학교','책, 옛날이야기, 선생님',['hum','edu']],
+  ['🏪','가게·약속','회사, 돈, 규칙',['biz','law']]
+];
+const KID_INT_MAX=2;
+function kidGroupsOn(iv){return KID_INTERESTS.filter(g=>g[3].every(k=>iv.includes(k))).length;}
+/* 묶음에 속하지 않는 잔여 키 정리 — 화면에 보이는 것과 저장값을 일치시킨다 */
+function kidPrune(iv){
+  const keep=new Set();
+  KID_INTERESTS.forEach(g=>{if(g[3].every(k=>iv.includes(k)))g[3].forEach(k=>keep.add(k));});
+  for(let i=iv.length-1;i>=0;i--)if(!keep.has(iv[i]))iv.splice(i,1);
+}
+function interestGridHtml(act,iv,lv){
+  if(lv!=='L1')return `<div class="pick-grid">${INTERESTS.map(([v,l,d])=>`<button class="pick" data-act="${act}" data-v="${v}" aria-pressed="${iv.includes(v)}">${l}<small>${d}</small></button>`).join('')}</div>`;
+  return `<div class="pick-grid kid">${KID_INTERESTS.map(([ic,l,d,keys])=>`<button class="pick kid" data-act="${act}" data-v="${keys.join(',')}" aria-pressed="${keys.every(k=>iv.includes(k))}"><span class="ico" aria-hidden="true">${ic}</span>${l}<small>${d}</small></button>`).join('')}</div>`;
+}
+/* iv를 제자리에서 토글. keepOne=true면 마지막 1개는 못 지운다(설정 화면). */
+function toggleInterest(iv,v,lv,keepOne){
+  if(lv==='L1'){
+    const g=KID_INTERESTS.find(x=>x[3].join(',')===v);if(!g)return;
+    const keys=g[3];
+    if(keys.every(k=>iv.includes(k))){
+      if(keepOne&&kidGroupsOn(iv)<=1)return;
+      keys.forEach(k=>{const i=iv.indexOf(k);if(i>=0)iv.splice(i,1);});
+    }else{
+      if(kidGroupsOn(iv)>=KID_INT_MAX)return;
+      kidPrune(iv);
+      keys.forEach(k=>{if(!iv.includes(k))iv.push(k);});
+    }
+    return;
+  }
+  const i=iv.indexOf(v);
+  if(i>=0){if(!(keepOne&&iv.length<=1))iv.splice(i,1);}
+  else if(iv.length<3)iv.push(v);
+}
 const CATS={science:'과학·기술',society:'사회·경제',history:'역사·문화',humanities:'인문·예술',environment:'환경'};
 const EVALS=[['good','잘 이해했어요','ok'],['hard','조금 어려웠어요','warn'],['again','다시 읽고 싶어요','muted']];
 
@@ -310,7 +376,9 @@ function normalizeState(s){
   s.reports=s.reports||[];
   if(!('lab' in s))s.lab=null;
   s.prefs.auto=s.prefs.auto||{speed:2,scope:0};
-  s.prefs.type=s.prefs.type||{font:'sans',fs:null,lh:1.9};
+  s.prefs.type=s.prefs.type||{font:'sans',fs:null,lh:null};
+  /* 줄 간격 기본값(1.9)이 저장돼 있던 기존 사용자는 레벨 기본값을 따르도록 되돌린다 */
+  if(s.prefs.type.lh===1.9&&!s.prefs.type.lhSet)s.prefs.type.lh=null;
   /* 속도 단계가 4→5로 늘어, 예전에 저장된 값을 같은 체감 속도로 옮긴다 */
   if(!s.prefs.auto.v5){s.prefs.auto.speed=[1,2,3,4][s.prefs.auto.speed]!=null?[1,2,3,4][s.prefs.auto.speed]:2;s.prefs.auto.v5=true;}
   s.mychunks=s.mychunks||{};
@@ -492,9 +560,10 @@ function vOnboard(){
       <button class="btn" data-act="ob-next-grade" ${st.grade?'':'disabled'}>다음</button></div>`;
   }
   if(st.step==='interests'){
-    return `<div class="card hero"><div class="obdots"><i class="on"></i><i class="on"></i><i></i></div><p class="eyebrow">시작하기 2/3</p><h1>관심 있는 분야를 골라 주세요</h1>
-      <p class="sub">1~3개. 나중에 설정에서 바꿀 수 있어요.</p>
-      <div class="pick-grid">${INTERESTS.map(([v,l,d])=>`<button class="pick" data-act="ob-int" data-v="${v}" aria-pressed="${st.interests.includes(v)}">${l}<small>${d}</small></button>`).join('')}</div>
+    const ilv=LEVEL_OF[st.grade];
+    return `<div class="card hero"><div class="obdots"><i class="on"></i><i class="on"></i><i></i></div><p class="eyebrow">시작하기 2/3</p><h1>${ilv==='L1'?'무엇을 좋아하나요?':'관심 있는 분야를 골라 주세요'}</h1>
+      <p class="sub">${ilv==='L1'?'1~2개만 골라요. 나중에 바꿀 수 있어요.':'1~3개. 나중에 설정에서 바꿀 수 있어요.'}</p>
+      ${interestGridHtml('ob-int',st.interests,ilv)}
       <button class="btn" data-act="ob-next-int" ${st.interests.length?'':'disabled'}>다음</button></div>`;
   }
   if(st.step==='diag-intro'){
@@ -512,7 +581,7 @@ function vOnboard(){
   }
   if(st.step==='diag-quiz'){
     const lv=LEVEL_OF[st.grade];const d=DB.diagnostics[lv];
-    return quizCard(d.questions,st.diagQ||(st.diagQ={i:0,correct:0,picked:null}),'ob-diag','레벨 확인');
+    return quizCard(d.questions,st.diagQ||(st.diagQ={i:0,correct:0,picked:null}),'ob-diag','레벨 확인',LEVEL_OF[st.grade]);
   }
   if(st.step==='diag-result'){
     const lv=LEVEL_OF[st.grade];const sc=st.diagQ.correct;
@@ -535,7 +604,7 @@ function vOnboard(){
 function finishOnboard(levelOverride){
   const st=sess.ob;
   const lv=levelOverride||LEVEL_OF[st.grade];
-  S.profile={grade:st.grade,level:lv,interests:st.interests.slice(0,3),createdAt:dkey()};
+  S.profile={grade:st.grade,level:lv,interests:st.interests.slice(0,lv==='L1'?4:3),createdAt:dkey()};
   if(st.diagQ)S.diag={score:st.diagQ.correct,total:4,at:dkey(),level:lv};
   save();go('home');
 }
@@ -614,8 +683,8 @@ const TYPE_FONTS={
 function typePrefs(lv){
   const t=S.prefs.type||{};
   return {font:t.font==='serif'?'serif':'sans',
-          fs:t.fs!=null?t.fs:(lv==='L2'?18:17),
-          lh:t.lh!=null?t.lh:1.9};
+          fs:t.fs!=null?t.fs:(lv==='L1'?19.5:lv==='L2'?18:17),
+          lh:t.lh!=null?t.lh:(lv==='L1'?2:1.9)};
 }
 function typePanelHtml(tp){
   return `<div class="typebox">
@@ -741,11 +810,11 @@ function completeRead(a,evalv){
 
 /* ───────────────────────── 퀴즈 ───────────────────────── */
 const QTYPE_LABEL={main:'핵심 내용',detail:'세부 정보',vocab:'어휘',infer:'추론',critical:'비판적 사고',apply:'적용'};
-function quizCard(questions,q,prefix,title){
+function quizCard(questions,q,prefix,title,lv){
   const cur=questions[q.i];
   const total=questions.length;
   const answered=q.picked!=null;
-  return `<div class="card"><div class="qhead"><p class="qnum">문제 ${q.i+1} / ${total}</p>
+  return `<div class="card ${lv==='L1'?'lv-L1':''}"><div class="qhead"><p class="qnum">문제 ${q.i+1} / ${total}</p>
     ${title?`<p class="qnum" style="font-weight:600">${esc(title)}</p>`:''}</div>
     <div class="qbar"><i style="width:${Math.round(((q.i+(answered?1:0))/total)*100)}%"></i></div>
     <p class="sub" style="margin-top:12px"><span class="tag">${QTYPE_LABEL[cur.type]||'문항'}</span></p>
@@ -769,6 +838,7 @@ function vQuiz(){
   const b=levelBody(a,myLevel());
   const q=sess.q||(sess.q={i:0,correct:0,picks:[],flags:{},fin:false,ch:false,t0:Date.now(),warn:false});
   const qs=q.ch?(b.challenge||[]):b.questions;
+  const lvc=myLevel()==='L1'?' lv-L1':'';
   if(q.fin){
     const total=qs.length;
     const acc=Math.round(q.correct/total*100);
@@ -785,25 +855,25 @@ function vQuiz(){
       const pick=q.picks[i];const okk=pick===cq.answer;
       return `<div class="qrev ${okk?'ok':'no'}">
         <p class="qnum">${i+1}. <span class="tag">${QTYPE_LABEL[cq.type]||'문항'}</span> ${okk?'<span class="tag ok">정답</span>':'<span class="tag bad">오답</span>'}</p>
-        <p class="qtext" style="font-size:15px;margin-top:6px">${esc(cq.q)}</p>
+        <p class="qtext" style="margin-top:6px">${esc(cq.q)}</p>
         <p class="sub" style="margin-top:6px">내 답: <b>${pick==null?'무응답':(pick+1)+'번 · '+esc(cq.choices[pick])}</b>${okk?'':`<br>정답: <b style="color:var(--ok)">${cq.answer+1}번 · ${esc(cq.choices[cq.answer])}</b>`}</p>
         <div class="explain" style="margin-top:8px">${esc(cq.explain)}<br><span class="evchip">근거: ${cq.evidencePara+1}번째 문단</span></div></div>`;
     }).join('');
-    return `<div class="card hero"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
+    return `<div class="card hero${lvc}"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
       <p class="sub">${msg}${q.t0?` · 걸린 시간 ${fmtSecs((q.tEnd||Date.now())-q.t0)}`:''}</p>
       <div class="omr" style="margin-top:12px">${qs.map((cq,i)=>`<span class="odot ${q.picks[i]===cq.answer?'ok':'no'}">${i+1}</span>`).join('')}</div>
       ${hasCh?`<button class="btn navy" data-act="quiz-challenge">🔥 심화 문제 도전 (${b.challenge.length}문항)</button>`:''}
       <button class="btn ${hasCh?'ghost sm':'navy'}" data-act="rb-new" data-id="${a.id}">✎ 이 글 요약 쓰기 — 비문학 독서 요약</button>
       ${S.scraps[a.id]?'':`<button class="btn ghost sm" data-act="scrap-quick" data-id="${a.id}">이 글 스크랩하기</button>`}
       <button class="btn ${hasCh?'ghost sm':''}" data-act="nav" data-v="home">홈으로</button></div>
-      <div class="card"><h2>문항별 해설</h2><p class="sub">틀린 문제는 오답 노트에 자동으로 담겼어요.</p>${review}</div>`;
+      <div class="card${lvc}"><h2>문항별 해설</h2><p class="sub">틀린 문제는 오답 노트에 자동으로 담겼어요.</p>${review}</div>`;
   }
   /* 문제 풀이 화면 — 정답은 알려주지 않는다 */
   const cur=qs[q.i];const total=qs.length;
   const picked=q.picks[q.i];
   const unanswered=qs.map((_,i)=>i).filter(i=>q.picks[i]==null);
   const last=q.i+1>=total;
-  return `<div class="card"><div class="qhead"><p class="qnum">문제 ${q.i+1} / ${total}</p>
+  return `<div class="card${lvc}"><div class="qhead"><p class="qnum">문제 ${q.i+1} / ${total}</p>
     <p class="qnum" style="font-weight:600">${esc(b.title)}${q.ch?' · 심화':''}</p></div>
     <div class="qbar"><i style="width:${Math.round((qs.filter((_,i)=>q.picks[i]!=null).length/total)*100)}%"></i></div>
     <p class="sub" style="margin-top:12px"><span class="tag">${QTYPE_LABEL[cur.type]||'문항'}</span>
@@ -964,8 +1034,8 @@ function vSettings(){
     <p class="sub" style="margin-top:10px">학년 <b>${gl?gl[1]:'-'}</b> · 읽는 글 <b>${LEVEL_LABEL[p.level]}</b> <span class="tag muted">${LEVEL_NOTE[p.level]||''}</span></p>
     <label class="sub" for="lvSel" style="display:block;margin-top:12px;font-weight:800">읽는 글 바꾸기 (선생님과 상의 후 조정해요)</label>
     <select id="lvSel" data-act-change="level">${LEVELS.map(l=>`<option value="${l}" ${p.level===l?'selected':''}>${LEVEL_LABEL[l]} — ${LEVEL_NOTE[l]}</option>`).join('')}</select></div>
-    <div class="card"><h2>관심 분야</h2><p class="sub">1~3개를 골라 주세요.</p>
-    <div class="pick-grid">${INTERESTS.map(([v,l,d])=>`<button class="pick" data-act="set-int" data-v="${v}" aria-pressed="${p.interests.includes(v)}">${l}<small>${d}</small></button>`).join('')}</div></div>
+    <div class="card"><h2>관심 분야</h2><p class="sub">${p.level==='L1'?'1~2개를 골라 주세요.':'1~3개를 골라 주세요.'}</p>
+    ${interestGridHtml('set-int',p.interests,p.level)}</div>
     <div class="card"><h2>선생님 연동</h2>
     ${!SYNC.avail?'<p class="sub" style="margin-top:9px">학원 서버 주소로 접속하면 기록이 선생님께 자동으로 전달돼요. (지금 주소에서는 사용할 수 없어요)</p>'
       :SYNC.auth?`<p class="sub" style="margin-top:9px"><b>${esc(SYNC.auth.name||'')}</b> (${esc(SYNC.auth.code||'')}) 연동 중 ✓<br>
@@ -1121,7 +1191,7 @@ function vChunkTrain(){
   const dots=`<div class="stage-dots">${[1,2,3].map(i=>`<i class="${ct.stage>=i?'on':''}"></i>`).join('')}</div>`;
   const quit=`<button class="btn ghost sm" data-act="ct-quit">그만하기</button>`;
   if(ct.stage===1){
-    return `<div class="card chunked"><p class="eyebrow">끊어 읽기 훈련 1/3 — 따라 읽기</p>${dots}
+    return `<div class="card chunked ${myLevel()==='L1'?'lv-L1':''}"><p class="eyebrow">끊어 읽기 훈련 1/3 — 따라 읽기</p>${dots}
       <p class="sub" style="margin-top:10px">「${esc(b.title)}」의 한 문단이에요. ∕ 표시에서 살짝 쉬며 의미 덩어리로 읽어 보세요.</p>
       <p class="para" style="margin-top:14px">${p.map(seg=>`<span class="seg">${esc(seg)}</span>`).join('')}</p>
       <button class="btn" data-act="ct-to2">다 읽었어요 — 직접 끊어 볼래요</button>${quit}</div>`;
@@ -1151,14 +1221,14 @@ function vChunkTrain(){
     }else{
       result=`<button class="btn" data-act="ct-check">확인하기</button>`;
     }
-    return `<div class="card"><p class="eyebrow">끊어 읽기 훈련 2/3 — 직접 끊기</p>${dots}
+    return `<div class="card ${myLevel()==='L1'?'lv-L1':''}"><p class="eyebrow">끊어 읽기 훈련 2/3 — 직접 끊기</p>${dots}
       <p class="sub" style="margin-top:10px">의미가 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔 보세요.</p>
       <div class="tokenwrap">${flow}</div>${result}${quit}</div>`;
   }
   const q=ct.q;
   const answered=ct.picked!=null;
   if(ct.stage===3){
-    return `<div class="card"><p class="eyebrow">끊어 읽기 훈련 3/3 — 표시 없이 읽기</p>${dots}
+    return `<div class="card ${myLevel()==='L1'?'lv-L1':''}"><p class="eyebrow">끊어 읽기 훈련 3/3 — 표시 없이 읽기</p>${dots}
       <p class="para" style="margin-top:14px">${esc(text)}</p>
       <p class="qtext">${esc(q.q)}</p>
       <div class="choices">${q.choices.map((c,i)=>{
@@ -1213,7 +1283,7 @@ function vWrongSession(){
   const w=wq.list[wq.i];
   const {b,q}=wrongQuestion(w);
   const answered=wq.picked!=null;
-  return `<div class="card"><div class="qhead"><p class="qnum">오답 다시 풀기 ${wq.i+1} / ${wq.list.length}</p>
+  return `<div class="card ${myLevel()==='L1'?'lv-L1':''}"><div class="qhead"><p class="qnum">오답 다시 풀기 ${wq.i+1} / ${wq.list.length}</p>
     <p class="qnum" style="font-weight:600">${esc(b.title)}${w.ch?' · 심화':''}</p></div>
     <div class="qbar"><i style="width:${Math.round(((wq.i+(answered?1:0))/wq.list.length)*100)}%"></i></div>
     <p class="sub" style="margin-top:12px"><span class="tag">${QTYPE_LABEL[q.type]||'문항'}</span> <span class="tag muted">${w.date}에 틀림</span></p>
@@ -1677,8 +1747,7 @@ document.addEventListener('click',e=>{
   if(act==='nav'){go(t.dataset.v);}
   else if(act==='ob-grade'){ob.grade=t.dataset.v;render();}
   else if(act==='ob-next-grade'){ob.step='interests';render();}
-  else if(act==='ob-int'){const v=t.dataset.v;const i=ob.interests.indexOf(v);
-    if(i>=0)ob.interests.splice(i,1);else if(ob.interests.length<3)ob.interests.push(v);render();}
+  else if(act==='ob-int'){toggleInterest(ob.interests,t.dataset.v,LEVEL_OF[ob.grade],false);render();}
   else if(act==='ob-next-int'){ob.step='diag-intro';render();}
   else if(act==='ob-diag-start'){ob.step='diag-read';render();}
   else if(act==='ob-diag-quiz'){ob.step='diag-quiz';render();}
@@ -1723,8 +1792,8 @@ document.addEventListener('click',e=>{
   else if(act==='type-fs'){const tp=typePrefs(myLevel());
     S.prefs.type.fs=Math.round(Math.min(26,Math.max(14,tp.fs+(+t.dataset.d)*0.5))*10)/10;save();render({keep:true});}
   else if(act==='type-lh'){const tp=typePrefs(myLevel());
-    S.prefs.type.lh=Math.round(Math.min(2.4,Math.max(1.5,tp.lh+(+t.dataset.d)*0.1))*10)/10;save();render({keep:true});}
-  else if(act==='type-reset'){S.prefs.type={font:'sans',fs:null,lh:1.9};save();render({keep:true});announce('글자 설정을 기본값으로 되돌렸어요');}
+    S.prefs.type.lh=Math.round(Math.min(2.4,Math.max(1.5,tp.lh+(+t.dataset.d)*0.1))*10)/10;S.prefs.type.lhSet=true;save();render({keep:true});}
+  else if(act==='type-reset'){S.prefs.type={font:'sans',fs:null,lh:null,lhSet:false};save();render({keep:true});announce('글자 설정을 기본값으로 되돌렸어요');}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
   else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
   else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;render();}
@@ -1778,8 +1847,7 @@ document.addEventListener('click',e=>{
       sv.last=dkey();save();}
     vq.i++;vq.show=false;render({keep:true});}
   else if(act==='vq-done'){sess.vq=null;render();}
-  else if(act==='set-int'){const v=t.dataset.v;const iv=S.profile.interests;const i=iv.indexOf(v);
-    if(i>=0){if(iv.length>1)iv.splice(i,1);}else if(iv.length<3)iv.push(v);save();render();}
+  else if(act==='set-int'){toggleInterest(S.profile.interests,t.dataset.v,S.profile.level,true);save();render({keep:true});}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
   else if(act==='sync-login'){const code=($('#syncCode')||{}).value||'';
     syncApi('/login',{method:'POST',body:JSON.stringify({code:code.trim()})})
