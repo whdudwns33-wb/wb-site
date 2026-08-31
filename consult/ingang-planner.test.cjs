@@ -195,6 +195,7 @@ test('whole-schedule shift previews and moves only future incomplete lectures sa
       '2026-08-17': [{ cid:'past', seq:1, done:false, s:'09:00', e:'10:00' }],
       '2026-08-18': [
         { cid:'done', seq:1, done:true, s:'08:00', e:'09:00' },
+        { cid:'closed', seq:4, done:false, closed:true, s:'09:00', e:'10:00' },
         { cid:'math', seq:2, done:false, s:'10:00', e:'11:00', auto:'free-v1' }
       ],
       '2026-08-20': [{ cid:'eng', seq:3, done:false, s:'13:00', e:'14:00', auto:'slot-v1' }],
@@ -222,7 +223,8 @@ test('whole-schedule shift previews and moves only future incomplete lectures sa
   assert.equal(forward.writes(), 0, 'invalid moves must not write');
   assert.equal(forward.ingShift('student', '2026-08-18', 7), 2);
   assert.deepEqual(forward.plans['2026-08-17'].map(x => x.cid), ['past']);
-  assert.deepEqual(forward.plans['2026-08-18'].map(x => x.cid), ['done']);
+  assert.deepEqual(forward.plans['2026-08-18'].map(x => x.cid), ['done', 'closed'],
+    'a lecture ended during daily closeout must stay on its original date');
   assert.deepEqual(forward.plans['2026-08-25'][0],
     { cid:'math', seq:2, done:false, s:'10:00', e:'11:00', auto:'free-v1' },
     'moving a date must keep its visible calendar time');
@@ -233,6 +235,53 @@ test('whole-schedule shift previews and moves only future incomplete lectures sa
   assert.equal(earlier.ingShift('student', '2026-08-20', -1), 1);
   assert.equal(earlier.plans['2026-08-19'][0].cid, 'eng');
   assert.equal(earlier.plans['2026-08-19'][0].e, '14:00');
+});
+
+test('a lecture ended during daily closeout never returns as overdue', () => {
+  const source = between('function ingTodayItems(sid) {', '\nfunction ingRow(');
+  const ingTodayItems = Function(`
+    function today() { return '2026-08-20'; }
+    function ingPlanDates() { return ['2026-08-18', '2026-08-19', '2026-08-20']; }
+    function ingPlan(_sid, date) {
+      if (date === '2026-08-18') return [{cid:'closed',seq:1,done:false,closed:true}];
+      if (date === '2026-08-19') return [{cid:'open',seq:2,done:false}];
+      return [{cid:'today',seq:3,done:false},{cid:'closed-today',seq:4,done:false,closed:true}];
+    }
+    ${source}
+    return ingTodayItems;
+  `)();
+  const result = ingTodayItems('student');
+  assert.deepEqual(result.overdue.map(item => item.cid), ['open']);
+  assert.deepEqual(result.todays.map(item => item.cid), ['today']);
+
+  const forecastSource = between('function ingForecast(sid, course) {', '\n\n/** 커리큘럼 텍스트 파서');
+  const ingForecast = Function(`
+    function today() { return '2026-08-20'; }
+    function addDays() { return '2029-08-19'; }
+    function ingStats() { return {unassigned:0,pct:50}; }
+    function ingSet() { return {days:[1],perDay:1}; }
+    function ingCourseItems() { return [
+      {date:'2026-08-18',done:false,closed:true},
+      {date:'2026-08-19',done:false}
+    ]; }
+    function ingBuildSchedule() { throw new Error('already assigned'); }
+    function ingReplayRounds() { return 0; }
+    ${forecastSource}
+    return ingForecast;
+  `)();
+  assert.equal(ingForecast('student', {id:'course',lectures:[]}).overdue, 1,
+    'closed lectures must not poison the completion forecast');
+
+  const statusSource = between('function ingLectureStatusInfo(plan) {', '\n\nfunction ingCourseDetailHtml(');
+  const ingLectureStatusInfo = Function('today', 'shortDate', statusSource + '; return ingLectureStatusInfo;')(
+    () => '2026-08-20', value => value.slice(5));
+  assert.deepEqual(ingLectureStatusInfo({date:'2026-08-18',closed:true}), {key:'closed',label:'오늘 종료'});
+
+  const nextActions = between('function todayNextActionItems(', '\nfunction todayOptionalStudyLinks(');
+  assert.match(nextActions, /lectureChecklist\.filter\(item => !item\.done && !item\.closed\)/);
+  assert.match(nextActions, /lecturePlan\.todays\.filter\(item => !item\.done && !item\.closed/);
+  const checklist = between('function ingChecklistItems(', '\nfunction ingStats(');
+  assert.match(checklist, /ingIsClaimed\(item\) && !item\.closed/);
 });
 
 test('whole-schedule shift uses a labeled preview modal instead of a signed-number prompt', () => {
@@ -407,16 +456,18 @@ test('lecture tab keeps the time calendar visible while course management stays 
   const active = { completed:false, paused:false, overdue:0, stalled:false, status:'active', attention:0 };
   const attention = { ...active, overdue:2, attention:2 };
   const completed = { ...active, completed:true, status:'completed' };
+  const ended = { ...completed, stats:{closed:1} };
 
   assert.equal(api.ingCourseStatusLabel(active), '수강 중');
   assert.equal(api.ingCourseStatusLabel(attention), '지연 2강');
   assert.equal(api.ingCourseFilterMatch(attention, 'attention'), true);
   assert.equal(api.ingCourseFilterMatch(completed, 'completed'), true);
+  assert.equal(api.ingCourseStatusLabel(ended), '학습 종료');
   assert.match(view, /강좌 보관함/);
   assert.match(view, /수강 중/);
   assert.match(view, /관리 필요/);
   assert.match(view, /일시 정지/);
-  assert.match(view, /완강/);
+  assert.match(view, /완료·종료/);
   assert.match(view, /h \+= ingWeekCard\(me, editable, admin\);/);
   assert.ok(view.indexOf('ingWeekCard(me, editable, admin)') < view.indexOf('강좌 보관함'));
   assert.doesNotMatch(view, /ing-aux-card/);
@@ -435,7 +486,8 @@ test('course management state separates active, paused, completed, and attention
     function ingCourseItems(_sid,cid){
       if(cid==='active') return [
         {seq:1,date:'2026-08-16',done:true},
-        {seq:2,date:'2026-08-18',done:false,review:true}
+        {seq:2,date:'2026-08-18',done:false,review:true},
+        {seq:3,date:'2026-08-17',done:false,closed:true}
       ];
       return [];
     }
@@ -457,6 +509,8 @@ test('course management state separates active, paused, completed, and attention
   assert.equal(paused.status, 'paused');
   const complete = ingCourseState('S1', {id:'done',status:'paused',lectures:[{seq:1}],stats:{total:1,done:1}}, {});
   assert.equal(complete.status, 'completed', 'completion takes precedence over a stale paused flag');
+  const ended = ingCourseState('S1', {id:'ended',lectures:[{seq:1}],stats:{total:1,done:0,closed:1,resolved:1}}, {});
+  assert.equal(ended.status, 'completed', 'an intentionally ended lecture resolves the course without pretending it was watched');
   const answered = ingCourseState('S1', {id:'answered',lectures:[{seq:1}],stats:{total:1,done:0}}, {});
   assert.equal(answered.unanswered, 0);
 });
@@ -594,7 +648,7 @@ test('director-only lecture mutations are guarded and student checks stay self-s
 });
 
 test('lecture courses persist a study subject for planner colors while legacy names are inferred', () => {
-  const helpers = between('function ingCourseSubjectKey(', '\nfunction ingStats(');
+  const helpers = between('function ingCourseSubjectKey(', '\nfunction ingCourseItems(');
   const addModal = between('function ingAddModal()', '\n\nlet ingPasteSeq');
   const assignModal = between('function ingAssignModal(', '\n\nfunction ingScheduleFromForm(');
   const save = between("case 'ingsave':", "case 'ingdel':");
@@ -622,14 +676,18 @@ test('lecture courses persist a study subject for planner colors while legacy na
     function ingPlan() { return [
       {cid:'a',seq:1,claimed:true,done:false},
       {cid:'a',seq:2,done:true},
-      {cid:'a',seq:3,done:false}
+      {cid:'a',seq:3,done:false},
+      {cid:'a',seq:4,claimed:true,done:false,closed:true}
     ]; }
     ${helpers}
-    return { ingCourseSubjectKey, ingChecklistItems, ingTimerTaskId };
+    return { ingCourseSubjectKey, ingChecklistItems, ingTimerTaskId, ingStats };
   `)();
   assert.equal(api.ingCourseSubjectKey({ studySubject: 'science', name: '통합과정' }), 'science');
   assert.equal(api.ingCourseSubjectKey({ name: '수학 미적분 개념' }), 'math');
   assert.equal(api.ingCourseSubjectKey({ name: '한국사 기출' }), 'social');
   assert.deepEqual(api.ingChecklistItems('s1', '2026-08-18').map(item => item.seq), [1, 2]);
+  assert.deepEqual(api.ingStats('s1', {id:'a',lectures:[{seq:1},{seq:2},{seq:3}]}, {
+    'a|1': {done:true}, 'a|2': {done:false,closed:true}
+  }), {total:3,assigned:2,done:1,closed:1,resolved:2,unassigned:1,pct:33});
   assert.equal(api.ingTimerTaskId('course-a', 2), 'ing:course-a:2');
 });
