@@ -188,6 +188,32 @@ db.articles.forEach(a => {
 });
 if (oldIndexSrc) W(`규칙 이전 지문 ${SRC_GRANDFATHER.size}편에 홈페이지·목록 출처 ${oldIndexSrc}개 남아 있음 (새 지문에는 금지)`);
 
+/* ── 같은 한자는 어디서나 같은 훈음으로 ─────────────────────
+ * 어휘 카드는 지문의 vocab.hanja 문자열을 그대로 보여 주고,
+ * 한자 카드(hanja.json)는 그것을 낱글자로 쪼개 모아 보여 준다.
+ * 그래서 한 글자를 지문마다 다르게 적어 두면 —「制(마를 제)」와
+ *「制(절제할 제)」처럼 — 같은 학생이 두 화면에서 다른 훈을 읽는다.
+ * 글자당 훈음은 하나로 고정한다. */
+const hanjaRd = new Map();
+db.articles.forEach(a => {
+  Object.entries(a.levels).forEach(([lv, b]) => {
+    (b.vocab || []).forEach(v => {
+      if (!v.hanja) return;
+      for (const m of v.hanja.matchAll(/(.)\(([^)]+)\)/g)) {
+        const [, ch, rd] = m;
+        if (!hanjaRd.has(ch)) hanjaRd.set(ch, new Map());
+        const seen = hanjaRd.get(ch);
+        if (!seen.has(rd)) seen.set(rd, `${a.id}/${lv} ${v.word}`);
+      }
+    });
+  });
+});
+hanjaRd.forEach((seen, ch) => {
+  if (seen.size < 2) return;
+  const where = [...seen].map(([rd, at]) => `${ch}(${rd}) — ${at}`).join('\n        ');
+  E(`한자 "${ch}" 의 훈음이 지문마다 다릅니다 — 하나로 통일하세요\n        ${where}`);
+});
+
 warns.forEach(w => console.log('WARN:', w));
 if (errors.length) {
   errors.forEach(e => console.error('ERROR:', e));
