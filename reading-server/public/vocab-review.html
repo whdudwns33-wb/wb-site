@@ -37,6 +37,7 @@
   thead th { background: #F0EDE2; color: #1B3A5C; font-size: .78rem; }
   .num { font-variant-numeric: tabular-nums; }
   .tb-row { display: grid; grid-template-columns: 7rem 1fr 1fr 2rem; gap: 6px; margin-bottom: 5px; align-items: center; }
+  .tb-row input.ai { background: #F4F0FA; border-color: #C9BCE0; }
   .tb-row input { margin: 0; font-size: .84rem; padding: 7px 9px; }
   .tb-row input.blank { background: #FFF6E5; border-color: #E6C68A; }
   .tb-head { font-size: .74rem; font-weight: 800; color: #7A6A4A; }
@@ -312,11 +313,12 @@
   function tbRenderRows() {
     if (!TBCUR) { $('#tbEdit').innerHTML = '<span class="muted">강을 고르면 낱말이 나옵니다.</span>'; return; }
     var blank = tbBlankCount(TBWORDS);
+    var ai = TBWORDS.filter(function (w) { return w.src === 'ai' && String(w.meaning || '').trim(); }).length;
     var head = '<div class="tb-row tb-head"><span>낱말</span><span>뜻</span><span>예문 (없어도 됩니다)</span><span></span></div>';
     var rows = TBWORDS.map(function (w, i) {
       return '<div class="tb-row" data-i="' + i + '">'
         + '<input data-k="word" value="' + esc(w.word) + '" placeholder="낱말">'
-        + '<input data-k="meaning" class="' + (String(w.meaning || '').trim() ? '' : 'blank') + '" value="' + esc(w.meaning) + '" placeholder="뜻을 채워 주세요">'
+        + '<input data-k="meaning" class="' + (String(w.meaning || '').trim() ? (w.src === 'ai' ? 'ai' : '') : 'blank') + '" value="' + esc(w.meaning) + '" placeholder="뜻을 채워 주세요" title="' + (w.src === 'ai' ? '코칭글에 설명이 없어 대신 쓴 뜻이에요 — 확인해 주세요' : '코칭글에서 옮긴 뜻') + '">'
         + '<input data-k="example" value="' + esc(w.example) + '" placeholder="예문">'
         + '<button class="tb-del" data-del="' + i + '" title="이 낱말 빼기">✕</button></div>';
     }).join('');
@@ -328,6 +330,7 @@
       + '<button id="tbToAssign" style="font-size:.8rem;padding:6px 12px;">배정칸에 넣기 ↓</button></div>'
       + '<p class="muted" style="margin:8px 0 0;font-size:.78rem;">낱말 ' + TBWORDS.length + '개'
       + (blank ? ' · <b style="color:#B14A38">뜻이 빈 낱말 ' + blank + '개</b>' : ' · 뜻은 모두 채워졌어요')
+      + (ai ? ' · <span style="background:#F4F0FA;padding:1px 6px;border-radius:6px;">보라 칸 ' + ai + '개</span>는 코칭글에 설명이 없어 대신 쓴 뜻이에요 — 눈으로 확인해 주세요' : '')
       + (TBCUR.confirmed ? ' · <b style="color:#14755E">검수 완료된 강</b>' : '') + '</p>';
   }
   /* 화면의 모든 줄을 그대로 걷는다 — 빈 줄을 여기서 버리면
@@ -337,6 +340,9 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tbEdit .tb-row[data-i]'), function (row) {
       var o = { word: '', meaning: '', example: '' };
       Array.prototype.forEach.call(row.querySelectorAll('input'), function (inp) { o[inp.dataset.k] = inp.value.trim(); });
+      /* 강사가 뜻을 고치면 더는 기계가 쓴 것이 아니다 — 출처 표시를 뗀다 */
+      var was = TBWORDS[+row.dataset.i];
+      if (was && was.src && was.meaning === o.meaning) o.src = was.src;
       out.push(o);
     });
     return out;
@@ -348,8 +354,9 @@
       var j = await api('/api/admin/textbook/' + encodeURIComponent(book) + '/' + encodeURIComponent(lesson));
       TBCUR = j.lesson;
       TBWORDS = (j.lesson.words || []).map(function (w) {
-        return typeof w === 'string' ? { word: w, meaning: '', example: '' }
-          : { word: w.word || '', meaning: w.meaning || '', example: w.example || '' };
+        if (typeof w === 'string') return { word: w, meaning: '', example: '' };
+        /* src(뜻의 출처)까지 들고 와야 화면에서 「대신 쓴 뜻」을 구분해 보여 줄 수 있다 */
+        return { word: w.word || '', meaning: w.meaning || '', example: w.example || '', src: w.src || '' };
       });
       tbRenderRows();
     } catch (e) { msg(e.message); }
