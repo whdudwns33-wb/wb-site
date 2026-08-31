@@ -593,13 +593,35 @@
   /* ── 뷰 전환 ── */
   var VIEWS = ['garden', 'plant', 'train', 'forest', 'report'];
   var curView = 'garden';
-  function show(v) {
+  /* ── 안드로이드 뒤로 가기 ──────────────────────────────────────────
+     방문 기록을 남기지 않으면 뒤로 가기가 곧 앱 종료다. 심기 도중에 눌러
+     세션이 통째로 날아가는 일이 생긴다. 화면마다 기록을 하나씩 남겨
+     ① 오버레이가 열려 있으면 오버레이를 닫고 ② 아니면 앞 탭으로 돌아가고
+     ③ 기록이 바닥나면 그때 앱이 닫히게 한다. */
+  function navSet(v, replace) {
+    try {
+      var st = { wb: 'view', v: v };
+      var cur = history.state;
+      /* 같은 탭을 다시 그릴 때 기록을 쌓으면 뒤로 가기를 여러 번 눌러야 한다 */
+      if (replace || (cur && cur.wb === 'view' && cur.v === v)) history.replaceState(st, '');
+      else history.pushState(st, '');
+    } catch (e) { /* 기록을 못 써도 앱은 그대로 돌아간다 */ }
+  }
+  function show(v, fromPop) {
     curView = v;
     VIEWS.forEach(function (x) { $('#view-' + x).hidden = x !== v; });
     document.querySelectorAll('.tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.view === v); });
+    if (!fromPop) navSet(v);
     render(v);
     window.scrollTo(0, 0);
   }
+  window.addEventListener('popstate', function (e) {
+    var ov = $('#overlay');
+    if (ov && ov.classList.contains('show')) { closeOverlay(true); navSet(curView, true); return; }
+    var st = e.state;
+    if (st && st.wb === 'view' && VIEWS.indexOf(st.v) >= 0) show(st.v, true);
+    /* 여기까지 왔는데 맞는 기록이 없으면 브라우저가 앱을 닫도록 그냥 둔다 */
+  });
   document.querySelectorAll('.tabbar button').forEach(function (b) {
     b.addEventListener('click', function () { show(b.dataset.view); });
   });
@@ -939,6 +961,8 @@
 
   /* ── 오버레이 세션 공통 ── */
   function openOverlay(title) {
+    /* 오버레이도 기록을 하나 차지한다 — 뒤로 가기가 앱을 닫는 대신 이것을 닫는다 */
+    try { history.pushState({ wb: 'ov' }, ''); } catch (e) {}
     var ov = $('#overlay');
     ov.innerHTML = '<div class="ov-head"><b>' + esc(title) + '</b><span class="prog" id="ovProg"></span><button class="x" id="ovClose" aria-label="닫기">✕</button></div>' +
       '<div class="pbar"><i id="ovBar" style="width:0%"></i></div><div class="ov-body"><div class="ov-inner" id="ovBody"></div></div>';
@@ -946,9 +970,13 @@
     $('#ovClose').addEventListener('click', closeOverlay);
     return $('#ovBody');
   }
-  function closeOverlay() {
+  /* fromPop: 뒤로 가기가 부른 것. 그때는 기록이 이미 한 칸 물러나 있어 손대지 않는다.
+     ✕ 로 닫을 때는 오버레이 기록을 지금 탭 기록으로 바꿔 둔다 — 그래야 다음
+     뒤로 가기가 헛돌지 않고 앞 탭으로 간다. */
+  function closeOverlay(fromPop) {
     $('#overlay').classList.remove('show');
     $('#overlay').innerHTML = '';
+    if (!fromPop) navSet(curView, true);
     voiceRelease();
     if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
     if (speedTimer) { clearTimeout(speedTimer); speedTimer = null; }
@@ -1852,7 +1880,10 @@
 
   /* ── 시작 ── */
   renderStreak();
-  show('garden');
+  /* 첫 화면은 기록을 새로 쌓지 않고 지금 자리에 얹는다 — 그래야 정원에서
+     뒤로 가기를 누르면 (앞에 아무것도 없을 때) 앱이 정상으로 닫힌다 */
+  navSet('garden', true);
+  show('garden', true);
   vsyncInit();
 })();
 /* APP:JS:END */
