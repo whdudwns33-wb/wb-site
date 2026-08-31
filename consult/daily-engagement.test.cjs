@@ -167,7 +167,8 @@ test('Today starts with concrete next actions and keeps optional online links co
   assert.match(optional, /\['leaders_eye', 'metamath'\]/);
   assert.match(optional, /<details class="optional-study-links">/);
   assert.match(card, /오늘 해야 할 일/);
-  assert.match(card, /오늘 학습을 마무리/);
+  assert.match(card, /오늘 체크리스트를 정리했어요/);
+  assert.doesNotMatch(card, /data-target="dailyCloseCard"/);
   assert.match(card, /close\.canReport \|\| close\.complete \? \[\] : todayNextActionItems/);
   assert.match(functionSource('engagementStampDots'), /pending \? '마감 전' : '미획득'/);
 });
