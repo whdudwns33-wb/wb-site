@@ -24,6 +24,8 @@ jobs:
         run: node reading/split.test.cjs
       - name: 학생 앱 뒤로 가기 검증
         run: node reading/back-nav.test.cjs
+      - name: 두 학생 앱 사이 이동 검증
+        run: node reading/app-links.test.cjs
       - name: 공통 음성 모듈 테스트
         run: node shared/voice.test.cjs
       - name: QR 인코더 테스트
@@ -38,6 +40,8 @@ jobs:
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
         run: node reading-server/override.test.mjs
+      - name: 반 명단 붙여넣기 테스트
+        run: node reading-server/roster.test.mjs
       - name: 학생 수명주기 테스트 (등록~퇴원)
         run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립
