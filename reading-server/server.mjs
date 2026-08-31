@@ -429,6 +429,31 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true, map: db.pubmap });
       }
+      /* 퇴원 처리 (워커와 동일) — 학생이 남긴 것을 한 번에 지운다.
+         하나라도 빠뜨리면 같은 코드로 새 학생을 등록했을 때 앞 학생 기록이 따라온다. */
+      if (p === '/api/admin/students' && req.method === 'DELETE') {
+        const { code } = await readBody(req);
+        const c = String(code || '').trim();
+        if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(res, 400, { error: '학생 코드 형식이 아닙니다' });
+        const stu = db.students[c];
+        if (!stu) return json(res, 404, { error: '학생 없음' });
+        let removed = 0;
+        const drop = (obj, k) => { if (obj && k in obj) { delete obj[k]; removed++; } };
+
+        db.parents = db.parents || {};
+        if (stu.ptoken) drop(db.parents, stu.ptoken);
+        drop(db.states, c);
+        drop(db.vocab.states, c);
+        drop(db.vocab.push || {}, c);
+        /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
+        for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
+        /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
+        for (const [n, rec] of Object.entries(db.pending || {})) if (rec && rec.code === c) drop(db.pending, n);
+        drop(db.students, c);
+        persist();
+        return json(res, 200, { ok: true, code: c, name: stu.name, removed });
+      }
+
       if (p === '/api/admin/parentlink' && req.method === 'POST') {
         const { code, reset } = await readBody(req);
         const stu = db.students[code];

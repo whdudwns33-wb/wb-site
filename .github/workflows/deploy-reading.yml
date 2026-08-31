@@ -38,6 +38,8 @@ jobs:
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
         run: node reading-server/override.test.mjs
+      - name: 학생 수명주기 테스트 (등록~퇴원)
+        run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
       - name: Cloudflare Workers 배포
