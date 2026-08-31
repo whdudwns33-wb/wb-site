@@ -180,7 +180,13 @@ function serveFile(res, base, rel) {
      로컬만 404가 나면 주소를 헛짚게 되므로 여기서도 .html을 한 번 더 찾아본다. */
   if (!fs.existsSync(fp) && !path.extname(fp) && fs.existsSync(fp + '.html')) fp += '.html';
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+  /* 학년대별 지문 데이터는 ?v=<버전> 을 달고 오므로 오래 캐시해도 안전하다
+     (배포본은 reading/_headers 가 같은 규칙을 준다) */
+  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp);
+  res.writeHead(200, {
+    'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream',
+    'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
+  });
   fs.createReadStream(fp).pipe(res);
 }
 
@@ -454,6 +460,31 @@ const server = http.createServer(async (req, res) => {
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/vocab' || p === '/vocab/') return serveFile(res, VOCAB_DIR, 'index.html');
     if (p.startsWith('/vocab/')) return serveFile(res, VOCAB_DIR, p.slice('/vocab/'.length));
+
+    /* 버전 — 발행 상태가 바뀌면 값도 바뀌어야 학생 기기 캐시가 갱신된다 (워커와 동일) */
+    if (p === '/version.json') {
+      try {
+        const base = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'version.json'), 'utf8')).v || '0';
+        const map = db.pubmap || {};
+        const keys = Object.keys(map).sort();
+        if (!keys.length) return json(res, 200, { v: base });
+        let h = 0;
+        for (const k of keys) { const s2 = k + ':' + map[k]; for (let i = 0; i < s2.length; i++) h = (h * 31 + s2.charCodeAt(i)) | 0; }
+        return json(res, 200, { v: base + '-' + Math.abs(h).toString(36) });
+      } catch (e) { /* 아래 정적 서빙으로 */ }
+    }
+
+    /* 발행 오버라이드 — 전체본과 학년대별 분할본 모두 (워커와 동일).
+       분할본은 ?v= 로 버전이 붙어 오므로 오버라이드를 적용해도 캐시 헤더를 유지한다. */
+    if (/^\/articles-L[1-4]\.json$/.test(p) && db.pubmap && Object.keys(db.pubmap).length) {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(APP_DIR, p.slice(1)), 'utf8'));
+        (data.articles || []).forEach(a => { if (db.pubmap[a.id]) a.status = db.pubmap[a.id]; });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=604800' });
+        res.end(JSON.stringify(data));
+        return;
+      } catch (e) { /* 아래 정적 서빙으로 */ }
+    }
 
     /* 발행 오버라이드 적용된 articles.json */
     if (p === '/articles.json' && db.pubmap && Object.keys(db.pubmap).length) {
