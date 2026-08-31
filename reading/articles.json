@@ -1,5 +1,5 @@
 {
- "version": "2026-08-31.1",
+ "version": "2026-08-31.2",
  "articles": [
   {
    "id": "nuri-space",
@@ -10738,12 +10738,12 @@
     "bio"
    ],
    "publishedAt": "2026-09",
-   "status": "draft",
+   "status": "published",
    "issue": true,
    "sources": [
     {
-     "title": "기상청",
-     "url": "https://www.kma.go.kr"
+     "title": "기상청 보도자료",
+     "url": "https://www.kma.go.kr/kma/news/press.jsp"
     },
     {
      "title": "해양수산부",
@@ -11611,7 +11611,7 @@
     "it"
    ],
    "publishedAt": "2026-09",
-   "status": "draft",
+   "status": "published",
    "sources": [
     {
      "title": "서울아산병원 뉴스룸",
@@ -12499,15 +12499,15 @@
     "nat"
    ],
    "publishedAt": "2026-09",
-   "status": "draft",
+   "status": "published",
    "sources": [
     {
-     "title": "국가유산청",
-     "url": "https://www.khs.go.kr/main.html"
+     "title": "대한민국 정책브리핑 전문자료",
+     "url": "https://www.korea.kr/archive/expDocMainList.do"
     },
     {
      "title": "국립문화유산연구원",
-     "url": "https://www.nrich.go.kr"
+     "url": "https://www.nrich.go.kr/kor/index.do"
     }
    ],
    "levels": {
@@ -13374,16 +13374,16 @@
     "eng"
    ],
    "publishedAt": "2026-09",
-   "status": "draft",
+   "status": "published",
    "issue": true,
    "sources": [
     {
-     "title": "기후에너지환경부",
-     "url": "https://www.mcee.go.kr"
+     "title": "기후에너지환경부 보도자료",
+     "url": "https://www.mcee.go.kr/home/web/index.do?menuId=10598"
     },
     {
-     "title": "대한민국 정책브리핑(korea.kr)",
-     "url": "https://www.korea.kr"
+     "title": "대한민국 정책브리핑 보도자료",
+     "url": "https://www.korea.kr/briefing/pressReleaseList.do"
     }
    ],
    "levels": {
@@ -14284,7 +14284,7 @@
     "media"
    ],
    "publishedAt": "2026-09",
-   "status": "draft",
+   "status": "published",
    "sources": [
     {
      "title": "교육부 보도자료",
