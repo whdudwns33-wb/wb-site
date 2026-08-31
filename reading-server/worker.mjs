@@ -56,6 +56,8 @@ function summarize(code, stu, st) {
   };
 }
 
+const PEND_TTL_S = 1800;   /* 연동 요청은 30분 뒤 사라진다 */
+
 async function newToken(env, code, admin) {
   const t = crypto.randomUUID().replace(/-/g, '');
   await env.DB.put('token:' + t, JSON.stringify({ code, admin: !!admin }), { expirationTtl: TOKEN_TTL_S });
@@ -266,11 +268,33 @@ export default {
         return json(200, { map: map || {} });
       }
 
+      /* 학생 연동은 '요청 → 강사 승인' 두 단계다.
+         코드가 이 앱의 유일한 자격 증명이라, 코드만 알면 남의 기록을 볼 수 있었다.
+         승인 단계를 두면 친구 코드를 찍어 봐도 강사가 눌러 주지 않는 한 열리지 않는다.
+         승인은 기기 1대에 한 번뿐이고, 그 뒤로는 저장된 토큰으로 자동 연결된다. */
       if (p === '/api/login' && req.method === 'POST') {
         if (await rlBlocked(env, req, 'stu')) return json(429, { error: '시도가 너무 많아요. 15분 뒤 다시 해 주세요.' });
-        const { code } = await req.json();
+        const { code, device } = await req.json();
         const stu = code && await env.DB.get('student:' + String(code).trim(), 'json');
         if (!stu) { await rlFail(env, req, 'stu'); return json(401, { error: '등록되지 않은 학생 코드예요. 선생님께 확인해 주세요.' }); }
+        const nonce = crypto.randomUUID().replace(/-/g, '');
+        await env.DB.put('pend:' + nonce, JSON.stringify({
+          code: stu.code, name: stu.name, cls: stu.cls || '', grade: stu.grade || '',
+          device: String(device || '').slice(0, 40), at: nowIso(), state: 'waiting',
+        }), { expirationTtl: PEND_TTL_S });
+        return json(200, { pending: true, nonce, name: stu.name });
+      }
+
+      /* 앱이 승인 여부를 물어본다 (몇 초마다). 승인된 순간에만 토큰을 내준다. */
+      if (p === '/api/login/status' && req.method === 'GET') {
+        const nonce = url.searchParams.get('n') || '';
+        const rec = /^[a-f0-9]{32}$/.test(nonce) ? await env.DB.get('pend:' + nonce, 'json') : null;
+        if (!rec) return json(404, { error: '연동 요청이 만료됐어요. 코드를 다시 입력해 주세요.' });
+        if (rec.state === 'denied') { await env.DB.delete('pend:' + nonce); return json(200, { denied: true }); }
+        if (rec.state !== 'approved') return json(200, { pending: true, name: rec.name });
+        const stu = await env.DB.get('student:' + rec.code, 'json');
+        if (!stu) return json(404, { error: '학생 정보를 찾을 수 없어요.' });
+        await env.DB.delete('pend:' + nonce);
         return json(200, { token: await newToken(env, stu.code, false), student: stu });
       }
 
@@ -395,6 +419,32 @@ export default {
         await env.DB.put('student:' + c, JSON.stringify(stu));
         return json(200, { ok: true, student: stu });
       }
+      /* 승인 대기 줄 — 강사가 관리 웹에서 보고 누른다 */
+      if (p === '/api/admin/pending' && req.method === 'GET') {
+        const list = await env.DB.list({ prefix: 'pend:' });
+        const items = [];
+        for (const k of list.keys) {
+          const rec = await env.DB.get(k.name, 'json');
+          if (rec && rec.state === 'waiting') items.push({ ...rec, nonce: k.name.slice(5) });
+        }
+        items.sort((a, b) => (a.at < b.at ? 1 : -1));
+        return json(200, { pending: items });
+      }
+      if (p === '/api/admin/pending' && req.method === 'POST') {
+        const { nonce, action } = await req.json();
+        if (!/^[a-f0-9]{32}$/.test(String(nonce || ''))) return json(400, { error: 'nonce 형식 오류' });
+        const rec = await env.DB.get('pend:' + nonce, 'json');
+        if (!rec) return json(404, { error: '이미 처리됐거나 만료된 요청입니다.' });
+        if (action === 'deny') {
+          rec.state = 'denied';
+          await env.DB.put('pend:' + nonce, JSON.stringify(rec), { expirationTtl: 300 });
+          return json(200, { ok: true, denied: true });
+        }
+        rec.state = 'approved';
+        await env.DB.put('pend:' + nonce, JSON.stringify(rec), { expirationTtl: PEND_TTL_S });
+        return json(200, { ok: true });
+      }
+
       if (p === '/api/admin/level' && req.method === 'POST') {
         const { code, level } = await req.json();
         const stu = await env.DB.get('student:' + code, 'json');

@@ -4,9 +4,10 @@
  *   CSV (첫 줄은 머리글, UTF-8):  이름,학년,반
  *   예)  김서준,초4,화목B
  *
- * 학생 코드는 이 앱의 유일한 자격 증명이다(비밀번호가 없다).
- * wb-101, wb-102 처럼 순번을 매기면 옆자리 친구가 한 번에 알아맞힐 수 있으므로
- * 헷갈리는 글자(0/O, 1/l/I)를 뺀 31자 알파벳에서 6자를 무작위로 뽑는다.
+ * 학생 코드는 순번(wb-101)이 아니라 무작위로 뽑는다 — 옆자리 친구가 알아맞히지 못하게.
+ * 헷갈리는 글자(0/O, 1/l/I)를 뺀 31자 알파벳에서 10자를 뽑는다.
+ * 배부는 QR로 하므로 학생이 손으로 칠 일이 없어 길이를 늘려도 부담이 없다.
+ * 여기에 더해 첫 연동에는 강사 승인이 필요하다(관리 웹 '연동 승인 대기').
  *
  * 환경변수: BASE(기본 https://wb-reading.whdudwns33.workers.dev), ADMIN_PIN(필수)
  */
@@ -28,7 +29,7 @@ const LEVEL_OF = { '7세':'L1','유치':'L1','초1':'L1','초2':'L1',
 const LEVEL_LABEL = { L1:'7세~초2', L2:'초3~6', L3:'중1~3', L4:'고1~3' };
 
 const ALPHA = '23456789abcdefghjkmnpqrstuvwxyz';   // 0 O 1 l i o 제외
-const newCode = () => 'wb-' + Array.from({length:6}, () => ALPHA[Math.floor(Math.random()*ALPHA.length)]).join('');
+const newCode = () => 'wb-' + Array.from({length:10}, () => ALPHA[Math.floor(Math.random()*ALPHA.length)]).join('');
 
 const rows = fs.readFileSync(file, 'utf8').replace(/^﻿/, '').trim().split(/\r?\n/)
   .map(l => l.split(',').map(s => s.trim()))
@@ -82,7 +83,8 @@ const main = async () => {
   const outFile = file.replace(/\.csv$/i, '') + '-발급결과.csv';
   fs.writeFileSync(outFile, '﻿' + csv);
   console.log(`배부용 파일: ${outFile}`);
-  console.log('학생 코드는 비밀번호나 마찬가지입니다 — 단체 채팅방에 한꺼번에 올리지 말고 개별로 전달하세요.');
+  console.log('배부는 관리 웹 → 학생 이름 클릭 → 「앱 연동 QR」로 하는 것이 가장 안전하고 빠릅니다.');
+  console.log('첫 연동에는 강사 승인이 필요합니다 — 관리 웹 위쪽 「연동 승인 대기」에서 눌러 주세요.');
 };
 
 main().catch(e => { console.error('실패:', e.message); process.exit(1); });
