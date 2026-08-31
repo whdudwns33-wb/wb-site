@@ -512,6 +512,20 @@ t('예문은 모두 문맥 빈칸 문제가 된다', () => {
   assert.ok(n >= 600, '예문이 갑자기 줄었다 (' + n + '개)');
 });
 
+t('구멍 밖에 단서가 있는 예문만 남는다', () => {
+  /* 「부들부들해요.」는 「○○○.」가, 「OO참변」은 「OO○○○」이 된다.
+     보기 넷 중에서 고를 근거가 학생에게 없다 — 예문 없이 뜻 고르기로만 내는 편이 낫다. */
+  const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
+  for (const [id] of BOOKS)
+    for (const l of findBook(TB, id).lessons)
+      for (const w of l.words) {
+        if (!w.example) continue;
+        const rest = QUIZ.blankExample(w).replace('○○○', '').replace(/[^가-힣]/g, '');
+        assert.ok(rest.length >= 2,
+          id + ' ' + l.lesson + '강 ' + w.word + ': 구멍을 뚫으면 단서가 남지 않는다 — ' + w.example);
+      }
+});
+
 t('여섯 권 모든 낱말에 뜻이 있다', () => {
   /* 뜻이 빈 낱말은 그 강 전체를 학생에게 못 열게 만든다 */
   for (const [id] of BOOKS) {

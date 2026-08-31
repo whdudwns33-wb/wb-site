@@ -365,6 +365,9 @@ const usableEx = (word, q, siblings) => {
   /* 지워진 자리가 같은 강의 다른 낱말이면 그 낱말의 예문이지 이것이 아니다 —
      「걷다」에 「아기가 첫 걸음을 뗐어요」가 붙어 있었다. 활용으로는 걸음이 걷다에서
      나오지만, 그 강은 걸음을 따로 가르치므로 답이 둘이 되어 버린다. */
+  /* 구멍 밖에 단서가 없으면 문제가 아니다 — 「부들부들해요.」는 「○○○.」가 되고,
+     「OO참변」은 「OO○○○」이 된다. 보기 넷 중에 고를 근거가 학생에게 없다. */
+  if (blanked.replace('○○○', '').replace(/[^가-힣]/g, '').length < 2) return false;
   const i = blanked.indexOf('○○○');
   const span = q.slice(i, q.length - (blanked.length - i - 3));
   return !(siblings || []).some((o) => o !== word && o.length >= 2 && span.indexOf(o) === 0);
