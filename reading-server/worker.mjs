@@ -235,15 +235,40 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
 
-    /* 발행 오버라이드 적용된 articles.json */
-    if (p === '/articles.json') {
+    /* 발행 오버라이드 — 전체본과 학년대별 분할본 모두에 같은 규칙을 적용한다.
+       분할본만 빼먹으면 강사가 '초안으로 내리기'를 눌러도 학생 화면에서 안 사라진다. */
+    if (/^\/articles(-L[1-4])?\.json$/.test(p)) {
       const res = await env.ASSETS.fetch(req);
       try {
         const map = await env.DB.get('pubmap', 'json');
         if (!map || !Object.keys(map).length) return res;
         const data = await res.json();
         (data.articles || []).forEach(a => { if (map[a.id]) a.status = map[a.id]; });
-        return json(200, data);
+        /* 분할본은 ?v= 로 버전이 붙어 오므로 오버라이드 뒤에도 캐시를 허용한다.
+           전체본(관리·검수용)은 항상 최신이어야 하니 캐시하지 않는다. */
+        const cacheable = p !== '/articles.json';
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
+          },
+        });
+      } catch (e) { return env.ASSETS.fetch(req); }
+    }
+
+    /* 버전 — 앱이 이것만 캐시 없이 받는다. 발행 상태가 바뀌면 값도 바뀌어야
+       학생 기기의 캐시가 갱신된다. */
+    if (p === '/version.json') {
+      const res = await env.ASSETS.fetch(req);
+      try {
+        const base = (await res.json()).v || '0';
+        const map = (await env.DB.get('pubmap', 'json')) || {};
+        const keys = Object.keys(map).sort();
+        if (!keys.length) return json(200, { v: base });
+        let h = 0;
+        for (const k of keys) { const s2 = k + ':' + map[k]; for (let i = 0; i < s2.length; i++) h = (h * 31 + s2.charCodeAt(i)) | 0; }
+        return json(200, { v: base + '-' + Math.abs(h).toString(36) });
       } catch (e) { return env.ASSETS.fetch(req); }
     }
 

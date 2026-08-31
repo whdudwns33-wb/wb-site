@@ -6,3 +6,16 @@
   X-Robots-Tag: noindex, nofollow, noarchive
   Cache-Control: no-store
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# 학년대별 지문 데이터는 URL에 ?v=<버전>을 달고 받는다. 내용이 바뀌면 버전이 바뀌므로
+# 오래 캐시해도 안전하다. 이게 없으면 위 no-store 때문에 켤 때마다 다시 받는다.
+/articles-L1.json
+  Cache-Control: public, max-age=604800
+/articles-L2.json
+  Cache-Control: public, max-age=604800
+/articles-L3.json
+  Cache-Control: public, max-age=604800
+/articles-L4.json
+  Cache-Control: public, max-age=604800
+/hanja.json
+  Cache-Control: public, max-age=604800
