@@ -75,7 +75,7 @@
 <script>
 'use strict';
 const CATS={science:'과학·기술',society:'사회·경제',history:'역사·문화',humanities:'인문·예술',environment:'환경'};
-const LEVEL_LABEL={L2:'초등 심화(L2)',L3:'중등(L3)',L4:'고등(L4)'};
+const LEVEL_LABEL={L1:'7세~초2(L1)',L2:'초3~6(L2)',L3:'중1~3(L3)',L4:'고1~3(L4)'};
 const CAREER_LABEL={eng:'공학·기계',it:'IT·소프트웨어',med:'의학·보건',bio:'생명과학',nat:'자연·수학',biz:'경영·경제',media:'미디어·콘텐츠',law:'법·행정',edu:'교육',art:'예술·디자인',env:'환경·에너지',hum:'인문·글쓰기'};
 const RKEY='wbr.review.v1';
 let DB=null,R={},API=false,TOKEN=localStorage.getItem('wbr.admin.token')||null,FILTER='전체';
@@ -158,13 +158,13 @@ function render(){
           :`<button class="btn pub" data-pub="${a.id}" data-to="published">지금 발행</button>`):''}
         <button class="btn ghost" data-open="${a.id}">${open?'접기 ▲':'내용 보기 ▼'}</button>
       </div></div>
-      ${open?['L2','L3','L4'].map(lv=>a.levels[lv]?lvHtml(a.id,lv,a.levels[lv]):'').join('')+
+      ${open?['L1','L2','L3','L4'].map(lv=>a.levels[lv]?lvHtml(a.id,lv,a.levels[lv]):'').join('')+
       `<div class="meta" style="margin-top:8px">출처: ${a.sources.map(s=>esc(s.title)+' ('+esc(s.url)+')').join(' · ')}</div>
       <div class="check"><span class="meta">검수 표시(내 기기 메모, 학생 노출과 무관):</span>
       <button data-mark="ok" data-id="${a.id}" data-on="${R[a.id]==='ok'?1:0}">✔ 검수함</button>
       <button class="rej" data-mark="rej" data-id="${a.id}" data-on="${R[a.id]==='rej'?1:0}">✕ 반려 표시</button></div>`:''}
     </div>`;}).join('')||'<div class="card"><p class="empty">이 조건에 맞는 지문이 없어요.</p></div>'}
-  <div class="card"><h2>진단 지문 (레벨 확인용 — 발행 개념 없음)</h2>${['L2','L3','L4'].map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
+  <div class="card"><h2>진단 지문 (읽기 수준 확인용 — 발행 개념 없음)</h2>${['L1','L2','L3','L4'].filter(lv=>DB.diagnostics[lv]).map(lv=>lvHtml('diag',lv,DB.diagnostics[lv])).join('')}</div>`;
 }
 document.addEventListener('click',async e=>{
   const f=e.target.closest('[data-f]');if(f){FILTER=f.dataset.f;render();return;}
