@@ -644,6 +644,10 @@ export default {
           env.DB.get('student:' + m[1], 'json'),
           env.DB.get('state:' + m[1], 'json'),
         ]);
+        /* 없는 학생이면 200에 student:null 을 주지 않는다 — 관리 화면이 그걸 받아
+           상세 창을 열다 이름에서 터진다. 다른 창에서 방금 퇴원 처리한 학생을
+           누르면 실제로 일어난다. */
+        if (!stu) return json(404, { error: '학생 없음' });
         return json(200, { summary: summarize(m[1], stu, st), student: stu, state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
       }
       return json(404, { error: 'unknown api' });
