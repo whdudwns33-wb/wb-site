@@ -267,8 +267,10 @@
     .report-doc h4:first-child{margin-top:0}
     input[type="text"]{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:15px;color:var(--ink);background:#fff}
     .loading{padding:48px 16px;text-align:center;color:var(--muted)}
-    #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%);z-index:12;max-width:92%;padding:12px 20px;border-radius:999px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;line-height:1.5;text-align:center;box-shadow:0 10px 30px #17395755;transition:transform .24s ease}
-    #toast.show{transform:translateX(-50%) translateY(0)}
+    /* 숨김은 transform만으로 부족했다 — 빈 토스트(높이 24px)의 140%가 bottom 84px보다 작아
+       모든 화면에 검은 알약이 떠 있었다. opacity+visibility로 확실히 감춘다. */
+    #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(14px);z-index:12;max-width:92%;padding:12px 20px;border-radius:999px;background:var(--navy);color:#fff;font-size:14px;font-weight:800;line-height:1.5;text-align:center;box-shadow:0 10px 30px #17395755;opacity:0;visibility:hidden;transition:transform .24s ease,opacity .24s ease,visibility .24s}
+    #toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
     .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:350px){.pick-grid,.stat-grid,.evalrow{grid-template-columns:repeat(2,minmax(0,1fr))}.row2{grid-template-columns:1fr}}
   </style>
