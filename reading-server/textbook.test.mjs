@@ -13,7 +13,8 @@ const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 const TB = JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'reading', 'textbook.json'), 'utf8'));
 /* 교재별 강 수 — 시트가 정한 값이다. 여기와 어긋나면 넣다가 흘린 강이 있다는 뜻이다. */
-const BOOKS = [['eoduk-cho1', 20], ['eoduk-cho2', 20], ['eoduk-cho3', 21], ['eoduk-cho4', 21], ['eoduk-silryeok', 28]];
+const BOOKS = [['eoduk-cho1', 20], ['eoduk-cho2', 20], ['eoduk-cho3', 21], ['eoduk-cho4', 21],
+  ['eoduk-silryeok', 28], ['eoduk-jungdeung', 28]];
 const IDS = BOOKS.map((b) => b[0]);
 
 /* 확정된 강 하나를 흉내 낸 교재 — 실제 파일은 아직 전부 미확정이다 */
@@ -426,7 +427,7 @@ t('이미 열린 강은 다시 쓰지 않고, 닫기는 조건 없이 된다', (
   assert.strictEqual(undo.blocked.length, 0);
 });
 
-t('실제 교재 다섯 권은 통째로 열 수 있다', () => {
+t('실제 교재 여섯 권은 통째로 열 수 있다', () => {
   /* 뜻이 다 채워져 있으니 막히는 강이 없어야 한다 — 하나라도 막히면 그 강이 학생에게 못 간다 */
   for (const [id, n] of BOOKS) {
     const plan = confirmAllPlan(findBook(TB, id), {}, true);
@@ -469,6 +470,55 @@ t('손으로 마무리한 뜻은 fixed로 표시돼 있다', () => {
   assert.ok(fixed.length >= 20, '손질 표시가 사라졌다 (' + fixed.length + '개)');
   for (const w of fixed) {
     assert.ok(!/(는|한|다는|을|를|의|던)$/.test(w.meaning), '손질했다는데 끝이 매달렸다: ' + w.word);
+  }
+});
+
+t('뜻 칸에 「의미 :」 같은 이름표가 남아 있지 않다', () => {
+  /* 중등 교재는 「통념  의미 : 사회 전체에 널리 퍼진 생각」처럼 적는다.
+     이름표를 떼지 않으면 뜻 고르기의 보기가 「의미 : …」로 나온다. */
+  for (const [id] of BOOKS)
+    for (const l of findBook(TB, id).lessons)
+      for (const w of l.words)
+        assert.ok(!/^(?:의미|뜻|예시|활동|정의)\s*[:：]/.test(w.meaning),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 뜻에 이름표가 붙어 있다 — ' + w.meaning);
+});
+
+t('예문에 여는 따옴표 없이 닫는 따옴표만 남지 않았다', () => {
+  /* 앞뒤 군더더기를 떼는 과정에서 「‘필사적’이라는 말이…」의 여는 따옴표가 떨어져
+     구멍을 뚫으면 「○○○’이라는」으로 보였다. 학생 화면에 그대로 나가는 자리다. */
+  for (const [id] of BOOKS)
+    for (const l of findBook(TB, id).lessons)
+      for (const w of l.words) {
+        if (!w.example) continue;
+        const close = w.example.indexOf('\u2019'), open = w.example.indexOf('\u2018');
+        assert.ok(!(close >= 0 && (open < 0 || close < open)),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 예문의 여는 따옴표가 떨어졌다 — ' + w.example);
+      }
+});
+
+t('예문은 모두 문맥 빈칸 문제가 된다', () => {
+  /* 예문 칸이 채워져 있는데 구멍을 못 뚫으면 그 낱말은 문맥 빈칸 문제를 잃는다.
+     판정은 문제를 만드는 그 함수에 맡긴다 — 기준을 둘로 두지 않는다. */
+  const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
+  let n = 0;
+  for (const [id] of BOOKS)
+    for (const l of findBook(TB, id).lessons)
+      for (const w of l.words) {
+        if (!w.example) continue;
+        n += 1;
+        assert.ok(QUIZ.blankExample(w),
+          id + ' ' + l.lesson + '강 ' + w.word + ': 예문에 구멍을 뚫지 못한다 — ' + w.example);
+      }
+  assert.ok(n >= 600, '예문이 갑자기 줄었다 (' + n + '개)');
+});
+
+t('여섯 권 모든 낱말에 뜻이 있다', () => {
+  /* 뜻이 빈 낱말은 그 강 전체를 학생에게 못 열게 만든다 */
+  for (const [id] of BOOKS) {
+    const blank = findBook(TB, id).lessons
+      .flatMap((l) => l.words.map((w) => [l.lesson, w])).filter(([, w]) => !w.meaning);
+    assert.strictEqual(blank.length, 0,
+      id + ': 뜻이 빈 낱말 — ' + blank.map(([n, w]) => n + '강 ' + w.word).join(', '));
   }
 });
 
