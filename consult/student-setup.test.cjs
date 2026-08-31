@@ -91,6 +91,8 @@ test('wizard reuses the existing timetable and study-goal records', () => {
   const wizard = functionSource('studentSetupWizard');
   const summary = functionSource('studentSetupSummary');
   assert.match(wizard, /data-act="ingavopen"/);
+  assert.match(wizard, /data-act="studentsetuptimetableskip"/);
+  assert.match(wizard, /자동배치 없이 사용/);
   assert.match(wizard, /data-act="studentsetupgoal" data-min="0"/);
   assert.match(wizard, /id="studentSetupGoal" type="number" min="10" max="1440"[\s\S]*?aria-label="하루 순공 목표 분 단위"/);
   assert.match(wizard, /오늘 배부된 공부[\s\S]*?내 체크리스트로 가져오기/);
@@ -110,12 +112,14 @@ test('student setup actions are scoped and completion validates required steps',
   assert.match(actions, /saveStudentSetup\(me\.id, \{ guideConfirmedAt: at, completedAt: at \}\)/);
 });
 
-test('new links start setup after sync, while unfinished setup only reminds and never locks Today', () => {
+test('new links open Today without forcing setup, while manually started setup only reminds', () => {
   const connect = functionSource('connectStudentLink');
-  assert.ok(connect.indexOf('await sync.run(true)') < connect.indexOf('startStudentSetup(staffId)'));
-  assert.ok(connect.indexOf('startStudentSetup(staffId)') < connect.indexOf("go('guide')"));
-  assert.match(connect, /if \(!sync\.err\) startStudentSetup\(staffId\)/);
-  assert.match(html, /sync\.run\(\)\.then\(\(\) => \{[\s\S]*?pendingStudentWelcome[\s\S]*?!sync\.err[\s\S]*?startStudentSetup\(session\.staffId\)/);
+  assert.doesNotMatch(connect, /startStudentSetup/);
+  assert.doesNotMatch(connect, /go\('guide'\)/);
+  assert.match(connect, /await sync\.run\(true\)[\s\S]*?route = 'today'[\s\S]*?location\.hash = '#\/today'/);
+  assert.doesNotMatch(html, /pendingStudentWelcome/);
+  const startAction = between("case 'studentsetupstart':", "case 'studentsetuptimetableskip':");
+  assert.match(startAction, /startStudentSetup\(me\.id\)/);
 
   const reminder = functionSource('studentSetupReminder');
   assert.match(reminder, /!status\.started \|\| status\.complete/);

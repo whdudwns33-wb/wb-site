@@ -62,12 +62,12 @@ test('student guide explains the required routine and optional modules', () => {
     /오늘 배부된 공부/,
     /내 체크리스트로 가져오기/,
     /완료 표시/,
-    /오늘 학습 마무리/,
+    /하루 마감/,
     /보고 문자 복사/,
     /내일로 이월/,
     /주간 마무리/,
     /월간 마무리/,
-    /개인 링크/
+    /학생용 링크/
   ].forEach(pattern => assert.match(guide, pattern));
   assert.match(guide, /공부시간 기록과 인강 관리는 해당하는 학생만/);
   assert.match(guide, /순공시간 기록[\s\S]*?시간을 기록하는 학생/);
@@ -75,22 +75,25 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /data-go="today"/);
 });
 
-test('a newly connected student enters the guide after successful sync', () => {
+test('a newly connected student opens Today after successful sync and the guide stays optional', () => {
   const connect = functionSource('connectStudentLink');
   const exchangeAt = connect.indexOf('await sync.exchangeBootstrap(staffId, code)');
   const storedAt = connect.indexOf('resetStudentLinkCache(d.token)');
-  const syncAt = connect.indexOf('await sync.run(true)');
-  const guideAt = connect.indexOf("go('guide')");
+  const syncAt = connect.lastIndexOf('await sync.run(true)');
+  const todayAt = connect.lastIndexOf("route = 'today'");
+  const hashAt = connect.indexOf("location.hash = '#/today'");
   const catchAt = connect.indexOf('} catch');
 
-  assert.equal((connect.match(/go\('guide'\)/g) || []).length, 1);
+  assert.equal((connect.match(/go\('guide'\)/g) || []).length, 0);
   assert.ok(exchangeAt >= 0 && exchangeAt < storedAt);
-  assert.ok(storedAt < syncAt && syncAt < guideAt);
-  assert.ok(guideAt < catchAt, 'failed link exchanges must not enter the guide');
+  assert.ok(storedAt < syncAt && syncAt < todayAt);
+  assert.ok(todayAt < hashAt && hashAt < catchAt, 'failed link exchanges must not enter Today');
 
-  assert.match(functionSource('absorbLinkParams'), /const tk = q\.get\('t'\);[\s\S]*?pendingStudentWelcome = true/);
-  assert.match(html, /if \(pendingStudentWelcome && session\.isStaffLink && !isManager\(\)\) \{[\s\S]*?route = 'guide'/);
-  assert.match(html, /sync\.run\(\)\.then\(\(\) => \{[\s\S]*?!sync\.err[\s\S]*?startStudentSetup\(session\.staffId\)/);
+  assert.doesNotMatch(functionSource('absorbLinkParams'), /pendingStudentWelcome/);
+  assert.doesNotMatch(html, /pendingStudentWelcome/);
+  assert.doesNotMatch(connect, /startStudentSetup/);
+  assert.match(html, /\[\['today', '오늘'/);
+  assert.match(html, /\['guide', '사용 안내'/);
 });
 
 test('student guide layout remains single-column on small screens', () => {

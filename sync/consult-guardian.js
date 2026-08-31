@@ -449,6 +449,15 @@ async function exchange(env, body, origin, json, request) {
     'WHERE app=? AND code_hash=? LIMIT 1'
   ).bind('consult', codeHash).first();
   if (!codeRow) return json({ ok: false, code: 'LINK_INVALID', error: '올바르지 않은 초대 링크입니다' }, 410, origin);
+  const existing = await portalSession(env, request, now);
+  const codeStaffId = String(codeRow.staff_id || '');
+  if (existing && existing.student.id !== codeStaffId) {
+    return json({ ok: false, code: 'SESSION_CONFLICT', error: '현재 연결을 해제한 뒤 다른 학생의 초대 링크를 사용해 주세요' }, 409, origin);
+  }
+  // 같은 학생의 유효한 보호자 세션에서 이미 쓴 링크를 다시 열면 새 세션을 만들지 않고 현재 화면을 돌려준다.
+  if (existing && codeRow.consumed_at != null) {
+    return json(await portalPayload(env, existing.student), 200, origin);
+  }
   if (codeRow.consumed_at != null) return json({ ok: false, code: 'LINK_USED', error: '이미 사용한 초대 링크입니다' }, 410, origin);
   if (Number(codeRow.revoked) !== 0) return json({ ok: false, code: 'LINK_REPLACED', error: '더 최근 초대 링크를 사용해 주세요' }, 410, origin);
   if (Number(codeRow.expires_at) < now) return json({ ok: false, code: 'LINK_EXPIRED', error: '초대 링크 사용 시간이 지났습니다' }, 410, origin);
@@ -462,10 +471,6 @@ async function exchange(env, body, origin, json, request) {
     return json({ ok: false, code: 'LINK_INVALID', error: '보호자 공유 설정을 다시 확인해 주세요' }, 410, origin);
   }
 
-  const existing = await portalSession(env, request, now);
-  if (existing && existing.student.id !== student.id) {
-    return json({ ok: false, code: 'SESSION_CONFLICT', error: '현재 연결을 로그아웃한 뒤 새 학생 링크를 사용해 주세요' }, 409, origin);
-  }
   if (existing) {
     const consumed = await env.DB.prepare(
       'UPDATE consult_guardian_codes SET consumed_at=? WHERE app=? AND code_hash=? ' +
