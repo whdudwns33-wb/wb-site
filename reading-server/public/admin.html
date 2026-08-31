@@ -74,7 +74,7 @@ const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let DATA=null,FILTER='전체',ARTS=null;
-const LV={L2:'초등 심화',L3:'중등',L4:'고등'};
+const LV={L1:'7세~초2',L2:'초3~6',L3:'중1~3',L4:'고1~3'};
 
 async function api(path,opt){
   const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
@@ -141,12 +141,12 @@ function render(){
   <div class="card"><h2>학생 현황판</h2>
     <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>독서요약</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
+      <th>학생</th><th>반</th><th>읽는 글</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>독서요약</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
         <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span></td>
         <td>${esc(s.cls||'—')}</td>
         <td><select data-lv="${esc(s.code)}" ${s.name?'':'disabled'}>
-          ${['','L2','L3','L4'].map(l=>`<option value="${l}" ${s.level===l?'selected':''}>${l?LV[l]:'—'}</option>`).join('')}</select>
+          ${['','L1','L2','L3','L4'].map(l=>`<option value="${l}" ${s.level===l?'selected':''}>${l?LV[l]:'—'}</option>`).join('')}</select>
           ${s.appLevel&&s.appLevel!==s.level&&s.level?`<span class="tag warn">앱:${s.appLevel}</span>`:''}</td>
         <td>${s.linked?(s.today?'<span class="tag ok">완료</span>':'<span class="tag bad">미수행</span>'):'<span class="tag muted">미연동</span>'}</td>
         <td>${s.streak}일</td><td>${s.week}/7</td><td>${s.reads}</td>
@@ -162,7 +162,7 @@ function render(){
       <label>이름<br><input id="fName" style="width:100%"></label>
       <label>학년<br><input id="fGrade" placeholder="예: 중2" style="width:100%"></label>
       <label>반<br><input id="fCls" placeholder="예: 월수금A" style="width:100%"></label>
-      <label>레벨<br><select id="fLv" style="width:100%"><option value="">자동</option><option value="L2">초등 심화</option><option value="L3">중등</option><option value="L4">고등</option></select></label>
+      <label>읽는 글<br><select id="fLv" style="width:100%"><option value="">자동(학년대로)</option><option value="L1">7세~초2</option><option value="L2">초3~6</option><option value="L3">중1~3</option><option value="L4">고1~3</option></select></label>
       <button class="btn" id="fSave">저장</button>
     </div><p class="err" id="fErr"></p></div>
   <div class="card"><h2>데이터 백업</h2>

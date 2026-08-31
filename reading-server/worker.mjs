@@ -163,7 +163,7 @@ async function titleMap(env, origin) {
     const m = {};
     for (const a of d.articles || []) {
       m[a.id] = {};
-      for (const lv of ['L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
+      for (const lv of ['L1', 'L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
     }
     TITLE_CACHE = { t: Date.now(), map: m };
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
@@ -181,7 +181,7 @@ function parentSummary(stu, st, titles, vst) {
     const d = new Date(k + 'T12:00:00Z');
     weekDays.push({ dow: dows[d.getUTCDay()], done: !!days[k], today: i === 0 });
   }
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || id;
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L1 || titles[id].L4)) || id;
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -367,7 +367,7 @@ export default {
         const { code, level } = await req.json();
         const stu = await env.DB.get('student:' + code, 'json');
         if (!stu) return json(404, { error: '학생 없음' });
-        if (!['L2', 'L3', 'L4'].includes(level)) return json(400, { error: '레벨은 L2/L3/L4' });
+        if (!['L1', 'L2', 'L3', 'L4'].includes(level)) return json(400, { error: '과정은 L1/L2/L3/L4' });
         stu.level = level;
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true });

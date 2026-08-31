@@ -1,5 +1,5 @@
 {
- "version": "2026-08-31.2",
+ "version": "2026-08-31.3",
  "articles": [
   {
    "id": "nuri-space",
@@ -188,6 +188,97 @@
        "answer": 3,
        "explain": "마지막 문단은 공학자, 과학자, 컴퓨터 전문가 등 여러 분야의 사람들이 함께 흘린 땀의 결과가 누리호라고 했다. 그러므로 달 탐사선 같은 새로운 일에도 여러 분야가 힘을 모아야 한다고 말한 ④가 알맞다. ①은 많은 사람의 노력이 필요하다는 글의 내용과 어긋나고, ③은 우주를 향한 도전이 지금도 계속되고 있다고 했으므로 틀렸다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Nuri is a space rocket that Korea made by itself. A launch vehicle is a rocket that carries satellites into space. The name Nuri was chosen by the people of Korea. Researchers at Korea's space center studied it for more than ten years. Korean technology did it all, from design to building.",
+      "In June 2022, the second Nuri launch was a success. It put a test satellite into orbit around Earth. In May 2023, the third launch also worked well. This time it carried several real working satellites. The satellites reached orbit and began their jobs.",
+      "The success of Nuri means a lot to Korea. Only a few countries can launch heavy satellites by themselves. In 2024, Korea opened a new space agency. Now the country has an office to lead its space work. The agency is in Sacheon, a city in the south.",
+      "Space work needs the effort of many people. Engineers design the rocket and scientists study the satellites. Experts who study data on computers help too. Nuri is the fruit of their hard work. The challenge to reach space still goes on today."
+     ],
+     "enseg": [
+      [
+       "Nuri is ",
+       "a space rocket ",
+       "that Korea made by itself. ",
+       "A launch vehicle is a rocket ",
+       "that carries satellites into space. ",
+       "The name Nuri was chosen ",
+       "by the people of Korea. ",
+       "Researchers at Korea's space center ",
+       "studied it ",
+       "for more than ten years. ",
+       "Korean technology did it all, ",
+       "from design to building."
+      ],
+      [
+       "In June 2022, ",
+       "the second Nuri launch ",
+       "was a success. ",
+       "It put a test satellite ",
+       "into orbit around Earth. ",
+       "In May 2023, ",
+       "the third launch also worked well. ",
+       "This time it carried ",
+       "several real working satellites. ",
+       "The satellites reached orbit ",
+       "and began their jobs."
+      ],
+      [
+       "The success of Nuri ",
+       "means a lot to Korea. ",
+       "Only a few countries ",
+       "can launch heavy satellites by themselves. ",
+       "In 2024, Korea opened ",
+       "a new space agency. ",
+       "Now the country has an office ",
+       "to lead its space work. ",
+       "The agency is in Sacheon, ",
+       "a city in the south."
+      ],
+      [
+       "Space work needs ",
+       "the effort of many people. ",
+       "Engineers design the rocket ",
+       "and scientists study the satellites. ",
+       "Experts who study data ",
+       "on computers help too. ",
+       "Nuri is the fruit ",
+       "of their hard work. ",
+       "The challenge to reach space ",
+       "still goes on today."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "rocket",
+       "ko": "로켓 (명사)",
+       "base": "rocket [ˈrɑːkɪt]"
+      },
+      {
+       "word": "satellites",
+       "ko": "인공위성들 (명사)",
+       "base": "satellite [ˈsætəlaɪt]"
+      },
+      {
+       "word": "launch",
+       "ko": "발사 (명사)",
+       "base": "launch [lɔːntʃ]"
+      },
+      {
+       "word": "orbit",
+       "ko": "궤도 (명사)",
+       "base": "orbit [ˈɔːrbɪt]"
+      },
+      {
+       "word": "design",
+       "ko": "설계하다 (동사)",
+       "base": "design [dɪˈzaɪn]"
+      },
+      {
+       "word": "scientists",
+       "ko": "과학자들 (명사)",
+       "base": "scientist [ˈsaɪəntɪst]"
       }
      ]
     },
@@ -1103,6 +1194,96 @@
        "explain": "글의 마지막 문단은 유전자를 잘못 바꾸면 예상하지 못한 문제가 생길 수 있어서, 과학자들도 규칙을 정해 신중하게 연구한다고 했습니다. 노벨상은 기술의 가치를 인정한 것이지, 걱정 없이 마음껏 써도 된다는 뜻이 아닙니다. 세균의 힘에서 나왔다는 말은 둘째 문단의 내용과 맞으므로 잘못 이해한 것이 아닙니다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "Every living thing has genes inside its body. Genes are a plan that decides how a living thing looks. If the plan changes, the living thing changes too. CRISPR is a tool that cuts one chosen part of the plan. It cuts like scissors, so people call it gene scissors.",
+      "CRISPR was found while scientists studied bacteria. Bacteria can fight viruses that attack them. They remember a piece of the virus they fought before. If the same virus comes again, they cut that piece. Scientists turned this idea into a tool for fixing genes.",
+      "Two scientists won the 2020 Nobel Prize in Chemistry. Today this tool is used in many places. Doctors study ways to treat diseases caused by genes. Farmers also use it to grow crops that fight disease. A new road to help sick people is open.",
+      "But we must also be careful. A wrong change in a gene can bring surprise problems. So scientists make rules and work slowly and carefully. A new tool needs wise hands. How we use CRISPR is a question for everyone."
+     ],
+     "enseg": [
+      [
+       "Every living thing ",
+       "has genes inside its body. ",
+       "Genes are a plan ",
+       "that decides ",
+       "how a living thing looks. ",
+       "If the plan changes, ",
+       "the living thing changes too. ",
+       "CRISPR is a tool ",
+       "that cuts one chosen part ",
+       "of the plan. ",
+       "It cuts like scissors, ",
+       "so people call it gene scissors."
+      ],
+      [
+       "CRISPR was found ",
+       "while scientists studied bacteria. ",
+       "Bacteria can fight ",
+       "viruses that attack them. ",
+       "They remember a piece ",
+       "of the virus they fought before. ",
+       "If the same virus comes again, ",
+       "they cut that piece. ",
+       "Scientists turned this idea ",
+       "into a tool for fixing genes."
+      ],
+      [
+       "Two scientists won ",
+       "the 2020 Nobel Prize in Chemistry. ",
+       "Today this tool ",
+       "is used in many places. ",
+       "Doctors study ways ",
+       "to treat diseases caused by genes. ",
+       "Farmers also use it ",
+       "to grow crops that fight disease. ",
+       "A new road ",
+       "to help sick people is open."
+      ],
+      [
+       "But we must ",
+       "also be careful. ",
+       "A wrong change in a gene ",
+       "can bring surprise problems. ",
+       "So scientists make rules ",
+       "and work slowly and carefully. ",
+       "A new tool ",
+       "needs wise hands. ",
+       "How we use CRISPR ",
+       "is a question for everyone."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "genes",
+       "ko": "유전자들 (명사)",
+       "base": "gene [dʒiːn]"
+      },
+      {
+       "word": "cuts",
+       "ko": "자른다 (동사)",
+       "base": "cut [kʌt]"
+      },
+      {
+       "word": "bacteria",
+       "ko": "세균 (명사)",
+       "base": "bacteria [bækˈtɪriə]"
+      },
+      {
+       "word": "virus",
+       "ko": "바이러스 (명사)",
+       "base": "virus [ˈvaɪrəs]"
+      },
+      {
+       "word": "treat",
+       "ko": "치료하다 (동사)",
+       "base": "treat [triːt]"
+      },
+      {
+       "word": "careful",
+       "ko": "조심하는 (형용사)",
+       "base": "careful [ˈkerfl]"
+      }
      ]
     },
     "L3": {
@@ -2012,6 +2193,93 @@
        "explain": "인공지능은 사람처럼 뜻을 이해하지 못해서 없는 책 이름을 지어내는 등 틀린 내용을 그럴듯하게 말할 때가 있다고 했다. 그래서 중요한 정보는 다시 확인해야 하는 것이다. 마지막 선지는 '답이 늘 정답은 아니다'라는 말을 '언제나 틀리다'로 지나치게 부풀린 것이라서 알맞지 않다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "Today AI can answer questions and even write. It can also make song words and stories. We call this kind of AI generative AI. It makes new things like writing and pictures. So how does a computer write like this?",
+      "Generative AI learns by reading a huge amount of writing. It studies how words follow words in books and news. Then it guesses which word comes next. For example, after the word clear, the word sky is likely. It keeps guessing this way until a long text is done.",
+      "But AI does not really understand meaning like people do. So it sometimes says wrong things in a smart way. It may even make up a book that does not exist. An AI answer is not always the right answer.",
+      "Generative AI is a good tool for study and life. It helps with writing practice and finding answers. But you must check important facts again. It is good to compare them with books you can trust. The power to use tools wisely is more and more important."
+     ],
+     "enseg": [
+      [
+       "Today AI can answer questions ",
+       "and even write. ",
+       "It can also make ",
+       "song words and stories. ",
+       "We call this kind of AI ",
+       "generative AI. ",
+       "It makes new things ",
+       "like writing and pictures. ",
+       "So how does a computer ",
+       "write like this?"
+      ],
+      [
+       "Generative AI learns ",
+       "by reading ",
+       "a huge amount of writing. ",
+       "It studies how words follow words ",
+       "in books and news. ",
+       "Then it guesses ",
+       "which word comes next. ",
+       "For example, after the word clear, ",
+       "the word sky is likely. ",
+       "It keeps guessing this way ",
+       "until a long text is done."
+      ],
+      [
+       "But AI does not really ",
+       "understand meaning like people do. ",
+       "So it sometimes says ",
+       "wrong things in a smart way. ",
+       "It may even make up ",
+       "a book that does not exist. ",
+       "An AI answer ",
+       "is not always the right answer."
+      ],
+      [
+       "Generative AI is a good tool ",
+       "for study and life. ",
+       "It helps with writing practice ",
+       "and finding answers. ",
+       "But you must check ",
+       "important facts again. ",
+       "It is good to compare them ",
+       "with books you can trust. ",
+       "The power to use tools wisely ",
+       "is more and more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "answer",
+       "ko": "답하다 (동사)",
+       "base": "answer [ˈænsər]"
+      },
+      {
+       "word": "write",
+       "ko": "글을 쓰다 (동사)",
+       "base": "write [raɪt]"
+      },
+      {
+       "word": "guesses",
+       "ko": "추측한다 (동사)",
+       "base": "guess [ɡes]"
+      },
+      {
+       "word": "meaning",
+       "ko": "뜻 (명사)",
+       "base": "meaning [ˈmiːnɪŋ]"
+      },
+      {
+       "word": "tool",
+       "ko": "도구 (명사)",
+       "base": "tool [tuːl]"
+      },
+      {
+       "word": "check",
+       "ko": "확인하다 (동사)",
+       "base": "check [tʃek]"
+      }
      ]
     },
     "L3": {
@@ -2918,6 +3186,98 @@
        "explain": "글의 마지막 문단은 인구의 변화가 아주 천천히 일어난다고 말한 뒤 미리 준비해야 한다고 했다. 천천히 일어나는 변화는 문제를 알아차린 뒤에 짧은 시간에 바꾸기 어렵기 때문이다. ②는 본문에 나오는 내용이지만, 미리 준비해야 하는 까닭과는 관계가 없다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "In Korea, fewer babies are born each year. At the same time, the number of old people grows fast. Better medicine helps people live much longer. When the share of old people grows, we call it aging. Korea is one of the fastest aging countries in the world.",
+      "Aging changes a country in big ways. Some schools close because there are fewer students. The number of young workers goes down too. But the work of caring for old people grows. So a country spends its money in new ways.",
+      "These changes are not only hard. More hospitals and care homes for old people open. Companies make things that are easy for old people to use. This business of goods and care for old people is called the silver industry. New jobs are born from this change.",
+      "The government is getting ready for this change. It makes plans to help families with young children. It also supports jobs and health for old people. A change in population happens very slowly. So getting ready early is even more important."
+     ],
+     "enseg": [
+      [
+       "In Korea, ",
+       "fewer babies are born each year. ",
+       "At the same time, ",
+       "the number of old people ",
+       "grows fast. ",
+       "Better medicine helps ",
+       "people live much longer. ",
+       "When the share ",
+       "of old people grows, ",
+       "we call it aging. ",
+       "Korea is one of the fastest ",
+       "aging countries in the world."
+      ],
+      [
+       "Aging changes a country ",
+       "in big ways. ",
+       "Some schools close ",
+       "because there are fewer students. ",
+       "The number of young workers ",
+       "goes down too. ",
+       "But the work of caring ",
+       "for old people grows. ",
+       "So a country spends its money ",
+       "in new ways."
+      ],
+      [
+       "These changes ",
+       "are not only hard. ",
+       "More hospitals and care homes ",
+       "for old people open. ",
+       "Companies make things ",
+       "that are easy ",
+       "for old people to use. ",
+       "This business of goods and care ",
+       "for old people ",
+       "is called the silver industry. ",
+       "New jobs are born ",
+       "from this change."
+      ],
+      [
+       "The government is getting ready ",
+       "for this change. ",
+       "It makes plans to help ",
+       "families with young children. ",
+       "It also supports jobs ",
+       "and health for old people. ",
+       "A change in population ",
+       "happens very slowly. ",
+       "So getting ready early ",
+       "is even more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "born",
+       "ko": "태어난 (동사)",
+       "base": "bear [ber]"
+      },
+      {
+       "word": "aging",
+       "ko": "고령화 (명사)",
+       "base": "age [eɪdʒ]"
+      },
+      {
+       "word": "grows",
+       "ko": "늘어난다 (동사)",
+       "base": "grow [ɡroʊ]"
+      },
+      {
+       "word": "hospitals",
+       "ko": "병원들 (명사)",
+       "base": "hospital [ˈhɑːspɪtl]"
+      },
+      {
+       "word": "government",
+       "ko": "정부 (명사)",
+       "base": "government [ˈɡʌvərnmənt]"
+      },
+      {
+       "word": "population",
+       "ko": "인구 (명사)",
+       "base": "population [ˌpɑːpjuˈleɪʃn]"
+      }
      ]
     },
     "L3": {
@@ -3822,6 +4182,95 @@
        "explain": "글에서 최저임금은 물가와 생활비 등을 두루 살펴서 정한다고 했으므로, 물가가 크게 오르면 위원회가 이를 살펴볼 것이라고 짐작할 수 있다. 한국은행이 나온다는 점에서 세 번째 선지가 헷갈리지만, 한국은행은 물가가 안정되도록 관리한다고 했을 뿐 돈을 더 많이 돌게 한다는 내용은 글에 없다. 또 물가가 오르면 같은 돈으로 살 수 있는 물건은 오히려 줄어든다.",
        "evidencePara": 3
       }
+     ],
+     "en": [
+      "Everything we buy has a price. When we put many prices together, we call it the price level. When the price level rises, the same money buys less. If snacks cost more, you can buy fewer snacks. Prices that keep going up are called inflation.",
+      "A price changes with buyers and sellers. If buyers are many and goods are few, the price goes up. If goods are many and buyers are few, the price goes down. We call this the rule of demand and supply.",
+      "Life gets hard when prices rise too fast. So the Bank of Korea works to keep prices steady. It watches how much money moves around the country. It also moves the interest rate up or down. Interest is the price you pay to borrow money.",
+      "The money you earn from work is called a wage. The lowest wage set by law is the minimum wage. A special committee sets the minimum wage every year. Workers, companies, and public members meet and talk about it. They look at prices and living costs before they decide."
+     ],
+     "enseg": [
+      [
+       "Everything we buy ",
+       "has a price. ",
+       "When we put many prices together, ",
+       "we call it the price level. ",
+       "When the price level rises, ",
+       "the same money buys less. ",
+       "If snacks cost more, ",
+       "you can buy fewer snacks. ",
+       "Prices that keep going up ",
+       "are called inflation."
+      ],
+      [
+       "A price changes ",
+       "with buyers and sellers. ",
+       "If buyers are many ",
+       "and goods are few, ",
+       "the price goes up. ",
+       "If goods are many ",
+       "and buyers are few, ",
+       "the price goes down. ",
+       "We call this ",
+       "the rule of demand and supply."
+      ],
+      [
+       "Life gets hard ",
+       "when prices rise too fast. ",
+       "So the Bank of Korea works ",
+       "to keep prices steady. ",
+       "It watches how much money ",
+       "moves around the country. ",
+       "It also moves the interest rate ",
+       "up or down. ",
+       "Interest is the price ",
+       "you pay to borrow money."
+      ],
+      [
+       "The money you earn from work ",
+       "is called a wage. ",
+       "The lowest wage set by law ",
+       "is the minimum wage. ",
+       "A special committee sets ",
+       "the minimum wage every year. ",
+       "Workers, companies, and public members ",
+       "meet and talk about it. ",
+       "They look at prices ",
+       "and living costs ",
+       "before they decide."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "price",
+       "ko": "값 (명사)",
+       "base": "price [praɪs]"
+      },
+      {
+       "word": "inflation",
+       "ko": "물가 상승 (명사)",
+       "base": "inflation [ɪnˈfleɪʃn]"
+      },
+      {
+       "word": "demand",
+       "ko": "수요 (명사)",
+       "base": "demand [dɪˈmænd]"
+      },
+      {
+       "word": "supply",
+       "ko": "공급 (명사)",
+       "base": "supply [səˈplaɪ]"
+      },
+      {
+       "word": "interest",
+       "ko": "이자 (명사)",
+       "base": "interest [ˈɪntrəst]"
+      },
+      {
+       "word": "wage",
+       "ko": "임금 (명사)",
+       "base": "wage [weɪdʒ]"
+      }
      ]
     },
     "L3": {
@@ -4719,6 +5168,95 @@
        "explain": "바다 쓰레기의 많은 부분은 땅에서 시작되어 강을 타고 바다로 간다고 했으므로, 땅에서 쓰레기를 덜 만들면 바다로 가는 쓰레기도 줄어든다. 플라스틱은 잘 썩지 않는 재료라고 했으므로 '빨리 썩게 한다'는 틀렸고, 일회용품을 줄이더라도 이미 버려진 쓰레기를 줍는 정화 활동은 여전히 필요하므로 그 선지도 알맞지 않다.",
        "evidencePara": 0
       }
+     ],
+     "en": [
+      "Plastic trash on the street washes into rivers with rain and wind. Rivers carry the trash all the way to the sea. So much of the sea trash starts on land. Some trash is also thrown away at the beach. Fishing tools and boat trash can stay in the sea.",
+      "Plastic does not rot easily. Plastic in the sea stays there for many, many years. Waves and sunlight only break it into smaller pieces. Pieces smaller than five millimeters are called microplastic.",
+      "Sea animals have a hard time because of plastic. A sea turtle may eat a bag, thinking it is a jellyfish. Birds eat small bits of plastic as if it were food. Microplastic is found inside fish and shellfish too. Some animals get caught in nets and get hurt.",
+      "Many people are working to solve this problem. People clean up trash together on beaches. The country also collects trash from the sea. Using fewer one-time things and sorting trash well helps a lot. Saving the sea starts with small actions."
+     ],
+     "enseg": [
+      [
+       "Plastic trash on the street ",
+       "washes into rivers ",
+       "with rain and wind. ",
+       "Rivers carry the trash ",
+       "all the way to the sea. ",
+       "So much of the sea trash ",
+       "starts on land. ",
+       "Some trash is also ",
+       "thrown away at the beach. ",
+       "Fishing tools and boat trash ",
+       "can stay in the sea."
+      ],
+      [
+       "Plastic does not ",
+       "rot easily. ",
+       "Plastic in the sea ",
+       "stays there for many, many years. ",
+       "Waves and sunlight ",
+       "only break it into smaller pieces. ",
+       "Pieces smaller than five millimeters ",
+       "are called microplastic."
+      ],
+      [
+       "Sea animals have a hard time ",
+       "because of plastic. ",
+       "A sea turtle ",
+       "may eat a bag, ",
+       "thinking it is a jellyfish. ",
+       "Birds eat small bits of plastic ",
+       "as if it were food. ",
+       "Microplastic is found ",
+       "inside fish and shellfish too. ",
+       "Some animals get caught in nets ",
+       "and get hurt."
+      ],
+      [
+       "Many people are working ",
+       "to solve this problem. ",
+       "People clean up trash ",
+       "together on beaches. ",
+       "The country also collects ",
+       "trash from the sea. ",
+       "Using fewer one-time things ",
+       "and sorting trash well ",
+       "helps a lot. ",
+       "Saving the sea ",
+       "starts with small actions."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "trash",
+       "ko": "쓰레기 (명사)",
+       "base": "trash [træʃ]"
+      },
+      {
+       "word": "rivers",
+       "ko": "강들 (명사)",
+       "base": "river [ˈrɪvər]"
+      },
+      {
+       "word": "rot",
+       "ko": "썩다 (동사)",
+       "base": "rot [rɑːt]"
+      },
+      {
+       "word": "pieces",
+       "ko": "조각들 (명사)",
+       "base": "piece [piːs]"
+      },
+      {
+       "word": "microplastic",
+       "ko": "미세플라스틱 (명사)",
+       "base": "microplastic [ˌmaɪkroʊˈplæstɪk]"
+      },
+      {
+       "word": "beaches",
+       "ko": "해변들 (명사)",
+       "base": "beach [biːtʃ]"
+      }
      ]
     },
     "L3": {
@@ -5582,6 +6120,99 @@
        "answer": 0,
        "explain": "4문단에서 흐린 날에는 태양광 발전이 어렵기 때문에 전기를 모아 두는 저장 기술이 함께 연구되고 있다고 했다. 이 마을은 낮에 만든 전기를 모아 두었다가 흐린 날에 썼으므로 저장 기술을 활용한 것이다. 전기를 덜 쓴 것이 아니라 모아 두었다가 쓴 것이므로 '아껴 쓰는 작은 습관'은 답이 될 수 없다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "The Earth is wrapped in air, like a blanket. Gases in the air, like carbon dioxide, hold the Earth's heat. We call these gases greenhouse gases. Thanks to them, the Earth stays warm enough. But too much gas makes the Earth hotter and hotter.",
+      "We burn fuels like coal and oil. This makes a lot of greenhouse gas. Power plants and cars make it too. A hotter Earth changes the weather and melts glaciers. So many countries promised to cut these gases. Carbon neutral means the gas we send out equals the gas we take in.",
+      "For carbon neutral, people look to renewable energy. Renewable energy comes from nature and can be used again. Solar power makes electricity from sunlight. Wind power turns big blades to make electricity. Water power uses running water to make electricity too.",
+      "But there are problems too. Solar power is hard on cloudy days. Wind power stops when the wind does not blow. So people also study ways to store electricity. Small habits, like saving electricity, help protect the Earth."
+     ],
+     "enseg": [
+      [
+       "The Earth is wrapped ",
+       "in air, like a blanket. ",
+       "Gases in the air, ",
+       "like carbon dioxide, ",
+       "hold the Earth's heat. ",
+       "We call these gases ",
+       "greenhouse gases. ",
+       "Thanks to them, ",
+       "the Earth stays warm enough. ",
+       "But too much gas ",
+       "makes the Earth ",
+       "hotter and hotter."
+      ],
+      [
+       "We burn fuels ",
+       "like coal and oil. ",
+       "This makes a lot ",
+       "of greenhouse gas. ",
+       "Power plants and cars ",
+       "make it too. ",
+       "A hotter Earth ",
+       "changes the weather ",
+       "and melts glaciers. ",
+       "So many countries promised ",
+       "to cut these gases. ",
+       "Carbon neutral means ",
+       "the gas we send out ",
+       "equals the gas we take in."
+      ],
+      [
+       "For carbon neutral, ",
+       "people look to renewable energy. ",
+       "Renewable energy comes from nature ",
+       "and can be used again. ",
+       "Solar power makes electricity ",
+       "from sunlight. ",
+       "Wind power turns big blades ",
+       "to make electricity. ",
+       "Water power uses running water ",
+       "to make electricity too."
+      ],
+      [
+       "But there are problems too. ",
+       "Solar power is hard ",
+       "on cloudy days. ",
+       "Wind power stops ",
+       "when the wind does not blow. ",
+       "So people also study ",
+       "ways to store electricity. ",
+       "Small habits, like saving electricity, ",
+       "help protect the Earth."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "wrapped",
+       "ko": "감싸여 있다 (동사)",
+       "base": "wrap [ræp]"
+      },
+      {
+       "word": "greenhouse",
+       "ko": "온실 (명사)",
+       "base": "greenhouse [ˈɡriːnhaʊs]"
+      },
+      {
+       "word": "melts",
+       "ko": "녹인다 (동사)",
+       "base": "melt [melt]"
+      },
+      {
+       "word": "renewable",
+       "ko": "다시 쓸 수 있는 (형용사)",
+       "base": "renewable [rɪˈnuːəbl]"
+      },
+      {
+       "word": "electricity",
+       "ko": "전기 (명사)",
+       "base": "electricity [ɪˌlekˈtrɪsəti]"
+      },
+      {
+       "word": "store",
+       "ko": "저장하다 (동사)",
+       "base": "store [stɔːr]"
       }
      ]
     },
@@ -6481,6 +7112,101 @@
        "answer": 0,
        "explain": "글은 왕도 기록을 볼 수 없었기 '때문에' 사관이 사실을 있는 그대로 남길 수 있었다고 했다. 이를 뒤집으면, 왕이 기록을 볼 수 있었다면 화낸 일이나 실수까지 그대로 적기는 어려웠을 것이다. 사고에 나누어 보관한 것은 불이나 전쟁으로부터 책을 지키기 위한 일이라, 왕이 기록을 보는 것과는 관계가 없다.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "In the Joseon Dynasty, an officer called a sagwan stayed near the king. The sagwan wrote down every word and action of the king. He also wrote when the king got angry or made a mistake. Even the king could not read these records freely. So the sagwan could write down the truth.",
+      "When a king died, an office called Sillokcheong was set up. Officials gathered the sagwan's records and made a big history book. This book is the Annals of the Joseon Dynasty. It holds politics, weather, earthquakes, and the daily life of people. Almost every day of the Joseon Dynasty is in it.",
+      "Joseon kept the finished Annals in storehouses called sago. People made many copies and put them in far places. If one place burned, the books in other places were safe. In a big war, some sago really did burn. But people made new copies from the books that were left.",
+      "In 1997, the Annals became a UNESCO Memory of the World. Few countries kept hundreds of years of history so carefully. The world praised Joseon's great culture of writing records."
+     ],
+     "enseg": [
+      [
+       "In the Joseon Dynasty, ",
+       "an officer called a sagwan ",
+       "stayed near the king. ",
+       "The sagwan wrote down ",
+       "every word and action ",
+       "of the king. ",
+       "He also wrote ",
+       "when the king got angry ",
+       "or made a mistake. ",
+       "Even the king ",
+       "could not read ",
+       "these records freely. ",
+       "So the sagwan ",
+       "could write down the truth."
+      ],
+      [
+       "When a king died, ",
+       "an office called Sillokcheong ",
+       "was set up. ",
+       "Officials gathered ",
+       "the sagwan's records ",
+       "and made a big history book. ",
+       "This book is the Annals ",
+       "of the Joseon Dynasty. ",
+       "It holds politics, weather, ",
+       "earthquakes, and the daily life ",
+       "of people. ",
+       "Almost every day ",
+       "of the Joseon Dynasty ",
+       "is in it."
+      ],
+      [
+       "Joseon kept the finished Annals ",
+       "in storehouses called sago. ",
+       "People made many copies ",
+       "and put them in far places. ",
+       "If one place burned, ",
+       "the books in other places ",
+       "were safe. ",
+       "In a big war, ",
+       "some sago really did burn. ",
+       "But people made new copies ",
+       "from the books that were left."
+      ],
+      [
+       "In 1997, the Annals became ",
+       "a UNESCO Memory of the World. ",
+       "Few countries kept ",
+       "hundreds of years of history ",
+       "so carefully. ",
+       "The world praised ",
+       "Joseon's great culture ",
+       "of writing records."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "officer",
+       "ko": "관리 (명사)",
+       "base": "officer [ˈɔːfɪsər]"
+      },
+      {
+       "word": "records",
+       "ko": "기록들 (명사)",
+       "base": "record [ˈrekərd]"
+      },
+      {
+       "word": "gathered",
+       "ko": "모았다 (동사)",
+       "base": "gather [ˈɡæðər]"
+      },
+      {
+       "word": "copies",
+       "ko": "여러 벌 (명사)",
+       "base": "copy [ˈkɑːpi]"
+      },
+      {
+       "word": "burned",
+       "ko": "불탔다 (동사)",
+       "base": "burn [bɜːrn]"
+      },
+      {
+       "word": "carefully",
+       "ko": "꼼꼼하게 (부사)",
+       "base": "careful [ˈkerfl]"
       }
      ]
     },
@@ -7397,6 +8123,98 @@
        "explain": "자음은 다섯 개의 기본 글자에 획을 더해, 모음은 세 가지 기본 글자를 서로 합쳐 만들었다. 그래서 적은 수의 기본 글자와 만드는 방법만 알면 많은 글자를 읽고 쓸 수 있어 배우기 쉽다. 해례본은 글자를 만든 원리를 설명한 책일 뿐, 백성이 이 책으로 글자를 배웠다는 내용은 글에 없으므로 해례본 때문이라는 설명은 알맞지 않다.",
        "evidencePara": 2
       }
+     ],
+     "en": [
+      "King Sejong made Hunminjeongeum in 1443. The name means the right sounds to teach the people. Back then, people found Chinese characters very hard to learn. So King Sejong made letters that anyone could learn easily.",
+      "The basic consonants copy the shape of our speech parts. The letter ㄱ shows the tongue blocking the throat. The letter ㄴ shows the tongue touching the upper gum. ㅁ copies the mouth, ㅅ the teeth, and ㅇ the throat. Adding a stroke to these five letters makes a stronger sound. For example, ㄱ with one more stroke becomes ㅋ.",
+      "The vowels copy the sky, the earth, and people. A round dot means the sky. The flat line ㅡ means the earth. The standing line ㅣ means a person standing up. Joining these three shapes makes many different vowels. So a few basic letters can write many sounds.",
+      "A book called Hunminjeongeum Haerye explains how the letters were made. Thanks to this book, we know the rules behind Hangeul. Few writing systems tell us the maker, the year, and the rules. In 1997, the Haerye book became a UNESCO Memory of the World."
+     ],
+     "enseg": [
+      [
+       "King Sejong made Hunminjeongeum ",
+       "in 1443. ",
+       "The name means ",
+       "the right sounds to teach the people. ",
+       "Back then, people found ",
+       "Chinese characters very hard to learn. ",
+       "So King Sejong made letters ",
+       "that anyone could learn easily."
+      ],
+      [
+       "The basic consonants ",
+       "copy the shape ",
+       "of our speech parts. ",
+       "The letter ㄱ shows ",
+       "the tongue blocking the throat. ",
+       "The letter ㄴ shows ",
+       "the tongue touching the upper gum. ",
+       "ㅁ copies the mouth, ",
+       "ㅅ the teeth, and ㅇ the throat. ",
+       "Adding a stroke ",
+       "to these five letters ",
+       "makes a stronger sound. ",
+       "For example, ㄱ ",
+       "with one more stroke becomes ㅋ."
+      ],
+      [
+       "The vowels copy the sky, ",
+       "the earth, and people. ",
+       "A round dot means the sky. ",
+       "The flat line ㅡ ",
+       "means the earth. ",
+       "The standing line ㅣ ",
+       "means a person standing up. ",
+       "Joining these three shapes ",
+       "makes many different vowels. ",
+       "So a few basic letters ",
+       "can write many sounds."
+      ],
+      [
+       "A book called ",
+       "Hunminjeongeum Haerye ",
+       "explains how the letters were made. ",
+       "Thanks to this book, ",
+       "we know the rules ",
+       "behind Hangeul. ",
+       "Few writing systems tell us ",
+       "the maker, the year, ",
+       "and the rules. ",
+       "In 1997, the Haerye book ",
+       "became a UNESCO Memory of the World."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "consonants",
+       "ko": "자음들 (명사)",
+       "base": "consonant [ˈkɑːnsənənt]"
+      },
+      {
+       "word": "vowels",
+       "ko": "모음들 (명사)",
+       "base": "vowel [ˈvaʊəl]"
+      },
+      {
+       "word": "shape",
+       "ko": "모양 (명사)",
+       "base": "shape [ʃeɪp]"
+      },
+      {
+       "word": "tongue",
+       "ko": "혀 (명사)",
+       "base": "tongue [tʌŋ]"
+      },
+      {
+       "word": "stroke",
+       "ko": "획 (명사)",
+       "base": "stroke [stroʊk]"
+      },
+      {
+       "word": "explains",
+       "ko": "설명한다 (동사)",
+       "base": "explain [ɪkˈspleɪn]"
+      }
      ]
     },
     "L3": {
@@ -8302,6 +9120,97 @@
        "explain": "첫째 문단에서 웹툰은 무료라서 많은 사람이 즐기게 되었다고 했고, 셋째 문단에서 독자가 늘면서 여러 직업이 생겨났다고 했다. 이 두 내용을 이으면 독자가 늘어난 것이 산업으로 자란 바탕임을 알 수 있다. 드라마·영화는 인기 웹툰이 나중에 다시 만들어진 것이므로 순서를 거꾸로 말한 설명이다.",
        "evidencePara": 0
       }
+     ],
+     "en": [
+      "A webtoon is a comic you read on the internet. It really started in Korea in the early 2000s. At first anyone could read it free, so many people enjoyed it. Unlike a paper comic book, you scroll the screen down. People call this way vertical scroll.",
+      "Vertical scroll fits a smartphone very well. You can read it easily with just one finger. The pictures flow from top to bottom, so the story feels smooth. A long empty space can build tension before a surprise. Paper comics did not have this new way.",
+      "Webtoons have grown into a big industry. Writers make the stories, and platforms bring them to readers. As readers grew, many new jobs appeared around webtoons. Many popular webtoons become dramas or movies. One story can grow into many different shapes.",
+      "Korean webtoons are translated into many languages. Readers in other countries enjoy them on their phones. The vertical scroll way is now used all over the world. A comic style from Korea changed how the world reads comics."
+     ],
+     "enseg": [
+      [
+       "A webtoon is a comic ",
+       "you read on the internet. ",
+       "It really started in Korea ",
+       "in the early 2000s. ",
+       "At first anyone ",
+       "could read it free, ",
+       "so many people enjoyed it. ",
+       "Unlike a paper comic book, ",
+       "you scroll the screen down. ",
+       "People call this way ",
+       "vertical scroll."
+      ],
+      [
+       "Vertical scroll fits ",
+       "a smartphone very well. ",
+       "You can read it easily ",
+       "with just one finger. ",
+       "The pictures flow ",
+       "from top to bottom, ",
+       "so the story feels smooth. ",
+       "A long empty space ",
+       "can build tension ",
+       "before a surprise. ",
+       "Paper comics did not have ",
+       "this new way."
+      ],
+      [
+       "Webtoons have grown ",
+       "into a big industry. ",
+       "Writers make the stories, ",
+       "and platforms bring them to readers. ",
+       "As readers grew, ",
+       "many new jobs appeared ",
+       "around webtoons. ",
+       "Many popular webtoons ",
+       "become dramas or movies. ",
+       "One story can grow ",
+       "into many different shapes."
+      ],
+      [
+       "Korean webtoons are translated ",
+       "into many languages. ",
+       "Readers in other countries ",
+       "enjoy them on their phones. ",
+       "The vertical scroll way ",
+       "is now used ",
+       "all over the world. ",
+       "A comic style from Korea ",
+       "changed how the world reads comics."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "comic",
+       "ko": "만화 (명사)",
+       "base": "comic [ˈkɑːmɪk]"
+      },
+      {
+       "word": "vertical",
+       "ko": "세로의 (형용사)",
+       "base": "vertical [ˈvɜːrtɪkl]"
+      },
+      {
+       "word": "industry",
+       "ko": "산업 (명사)",
+       "base": "industry [ˈɪndəstri]"
+      },
+      {
+       "word": "readers",
+       "ko": "독자들 (명사)",
+       "base": "reader [ˈriːdər]"
+      },
+      {
+       "word": "popular",
+       "ko": "인기 있는 (형용사)",
+       "base": "popular [ˈpɑːpjələr]"
+      },
+      {
+       "word": "translated",
+       "ko": "번역되었다 (동사)",
+       "base": "translate [trænsˈleɪt]"
+      }
      ]
     },
     "L3": {
@@ -9159,6 +10068,100 @@
        "answer": 0,
        "explain": "1문단에서 사람이 달에 오래 머물려면 그곳의 방사선이 얼마나 센지 '미리' 알아야 우주인을 안전하게 지킬 방법을 준비할 수 있다고 했습니다. 그래서 사람보다 측정기를 먼저 보내는 것입니다. 달 남극이 여러 나라가 탐사하고 싶어 하는 곳이라는 말은 본문에 나오지만, 그것은 측정기를 '먼저' 보내는 까닭이 아니라 달 남극이라는 장소에 대한 설명일 뿐입니다.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "Tiny bits of strong energy fly through space. We cannot see them with our eyes. People call them space radiation. On Earth, thick air and a magnetic field block them. But the Moon has almost no air. So space radiation pours right onto the Moon's surface.",
+      "You cannot see or feel space radiation. But too much of it can hurt the human body. Someday people may stay on the Moon for a long time. First we must know how strong the radiation there is. Then we can find ways to keep astronauts safe.",
+      "Korean scientists are building a machine to measure this radiation. Its name is LVRAD. An American company is making a lander for the Moon. LVRAD will ride on that lander. The plan is to land at the Moon's south pole in 2030. Many countries want to explore the Moon's south pole.",
+      "In August 2026, Korea's space agency signed a paper with NASA. The paper promises a seat for LVRAD on the lander. The data from the Moon will help people plan future trips. Korean technology is helping the world explore the Moon."
+     ],
+     "enseg": [
+      [
+       "Tiny bits of strong energy ",
+       "fly through space. ",
+       "We cannot see them ",
+       "with our eyes. ",
+       "People call them space radiation. ",
+       "On Earth, thick air ",
+       "and a magnetic field ",
+       "block them. ",
+       "But the Moon ",
+       "has almost no air. ",
+       "So space radiation pours ",
+       "right onto the Moon's surface."
+      ],
+      [
+       "You cannot see or feel ",
+       "space radiation. ",
+       "But too much of it ",
+       "can hurt the human body. ",
+       "Someday people may stay ",
+       "on the Moon for a long time. ",
+       "First we must know ",
+       "how strong the radiation there is. ",
+       "Then we can find ways ",
+       "to keep astronauts safe."
+      ],
+      [
+       "Korean scientists are building ",
+       "a machine to measure ",
+       "this radiation. ",
+       "Its name is LVRAD. ",
+       "An American company ",
+       "is making a lander ",
+       "for the Moon. ",
+       "LVRAD will ride ",
+       "on that lander. ",
+       "The plan is to land ",
+       "at the Moon's south pole ",
+       "in 2030. ",
+       "Many countries want to explore ",
+       "the Moon's south pole."
+      ],
+      [
+       "In August 2026, ",
+       "Korea's space agency ",
+       "signed a paper with NASA. ",
+       "The paper promises a seat ",
+       "for LVRAD on the lander. ",
+       "The data from the Moon ",
+       "will help people ",
+       "plan future trips. ",
+       "Korean technology is helping ",
+       "the world explore the Moon."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "radiation",
+       "ko": "방사선 (명사)",
+       "base": "radiation [ˌreɪdiˈeɪʃn]"
+      },
+      {
+       "word": "surface",
+       "ko": "표면 (명사)",
+       "base": "surface [ˈsɜːrfɪs]"
+      },
+      {
+       "word": "astronauts",
+       "ko": "우주인들 (명사)",
+       "base": "astronaut [ˈæstrənɔːt]"
+      },
+      {
+       "word": "measure",
+       "ko": "재다 (동사)",
+       "base": "measure [ˈmeʒər]"
+      },
+      {
+       "word": "explore",
+       "ko": "탐사하다 (동사)",
+       "base": "explore [ɪkˈsplɔːr]"
+      },
+      {
+       "word": "signed",
+       "ko": "서명했다 (동사)",
+       "base": "sign [saɪn]"
       }
      ]
     },
@@ -10033,6 +11036,94 @@
        "answer": 3,
        "explain": "글에서 가격이 오르면 배출권을 사는 데 돈이 많이 들어 기업이 온실가스를 더 열심히 줄인다고 했으니, 반대로 가격이 싸지면 줄이는 대신 사서 해결하려는 기업이 많아질 수 있어요. 첫 번째 선지는 이와 반대되는 짐작이라 틀렸어요. 온실가스 전체 양은 나라가 정하는 것이므로 가격 때문에 저절로 늘어나지 않아요.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Big factories and power plants make things and electricity. While they work, they send out greenhouse gases. These gases wrap the Earth like a blanket and hold heat. So the Earth slowly gets hotter. Many countries are looking for ways to cut these gases.",
+      "Korea started a plan called emissions trading in 2015. First, the country sets a total amount of gas. Then it shares that amount among companies. Each company gets the right to send out some gas. People call this right an emission permit.",
+      "A company that sends out less gas has permits left over. It can sell them to other companies in the market. A company that sends out more gas must buy permits. So companies cut their gases to save money.",
+      "Today about 770 Korean companies join this plan. Permit prices go up and down like stock prices. When the price goes up, buying permits costs a lot. So companies try even harder to cut their gases. In this way, the market helps protect the Earth."
+     ],
+     "enseg": [
+      [
+       "Big factories and power plants ",
+       "make things and electricity. ",
+       "While they work, ",
+       "they send out greenhouse gases. ",
+       "These gases wrap the Earth ",
+       "like a blanket and hold heat. ",
+       "So the Earth ",
+       "slowly gets hotter. ",
+       "Many countries are looking ",
+       "for ways to cut these gases."
+      ],
+      [
+       "Korea started a plan ",
+       "called emissions trading ",
+       "in 2015. ",
+       "First, the country sets ",
+       "a total amount of gas. ",
+       "Then it shares that amount ",
+       "among companies. ",
+       "Each company gets the right ",
+       "to send out some gas. ",
+       "People call this right ",
+       "an emission permit."
+      ],
+      [
+       "A company that sends out ",
+       "less gas has permits left over. ",
+       "It can sell them ",
+       "to other companies ",
+       "in the market. ",
+       "A company that sends out ",
+       "more gas must buy permits. ",
+       "So companies cut their gases ",
+       "to save money."
+      ],
+      [
+       "Today about 770 Korean companies ",
+       "join this plan. ",
+       "Permit prices go up and down ",
+       "like stock prices. ",
+       "When the price goes up, ",
+       "buying permits costs a lot. ",
+       "So companies try even harder ",
+       "to cut their gases. ",
+       "In this way, ",
+       "the market helps protect the Earth."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "factories",
+       "ko": "공장들 (명사)",
+       "base": "factory [ˈfæktri]"
+      },
+      {
+       "word": "amount",
+       "ko": "양 (명사)",
+       "base": "amount [əˈmaʊnt]"
+      },
+      {
+       "word": "permits",
+       "ko": "배출권들 (명사)",
+       "base": "permit [ˈpɜːrmɪt]"
+      },
+      {
+       "word": "companies",
+       "ko": "기업들 (명사)",
+       "base": "company [ˈkʌmpəni]"
+      },
+      {
+       "word": "market",
+       "ko": "시장 (명사)",
+       "base": "market [ˈmɑːrkɪt]"
+      },
+      {
+       "word": "protect",
+       "ko": "지키다 (동사)",
+       "base": "protect [prəˈtekt]"
       }
      ]
     },
@@ -10914,6 +12005,110 @@
        "explain": "① 글은 앞으로 해양열파가 더 자주, 더 강하게 나타날 것이라고 했고, 해양열파는 양식장 물고기를 죽게 하는 등 피해를 주므로 대비가 더 중요해질 것이라고 짐작할 수 있어요. ② '바다의 온도를 지켜본다'는 본문의 말을 쓴 둘째 선지가 그럴듯하지만, 해양열파가 늘수록 바다를 지켜보고 미리 알리는 일은 오히려 더 필요해져요.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "In summer, a heat wave comes to the land. The sea can have a heat wave, too. Sometimes the sea water stays much warmer than usual. When this lasts five days or more, we call it a marine heatwave. Sea water does not cool down easily. So a marine heatwave often lasts a long time.",
+      "In August 2026, Korea's weather office shared a new study. It looked at the seas around Korea. In the last ten years, marine heatwaves came about 83 days each year. That is 3.7 times more than before. If the Earth keeps getting warmer, they will come more often. They will also grow stronger.",
+      "A hot sea changes many things. Fish that like cold water swim away. They look for a cooler sea. Fish in sea farms can die in warm water. A hot sea also sends heat and water vapor into the air. Water vapor is water that turned into gas. This can make heat waves and heavy rain worse on land.",
+      "So scientists watch the sea every day. They use satellites and special tools. When the water may get very hot, they warn people early. This helps people keep their fish and farms safe. Cutting greenhouse gases can also slow the warming. Ocean scientists and climate researchers study these changes. Their work is growing more important."
+     ],
+     "enseg": [
+      [
+       "In summer, a heat wave comes ",
+       "to the land. ",
+       "The sea can have ",
+       "a heat wave, too. ",
+       "Sometimes the sea water ",
+       "stays much warmer than usual. ",
+       "When this lasts ",
+       "five days or more, ",
+       "we call it ",
+       "a marine heatwave. ",
+       "Sea water does not ",
+       "cool down easily. ",
+       "So a marine heatwave ",
+       "often lasts a long time."
+      ],
+      [
+       "In August 2026, ",
+       "Korea's weather office ",
+       "shared a new study. ",
+       "It looked at the seas ",
+       "around Korea. ",
+       "In the last ten years, ",
+       "marine heatwaves came ",
+       "about 83 days each year. ",
+       "That is 3.7 times ",
+       "more than before. ",
+       "If the Earth keeps ",
+       "getting warmer, ",
+       "they will come more often. ",
+       "They will also grow stronger."
+      ],
+      [
+       "A hot sea ",
+       "changes many things. ",
+       "Fish that like cold water ",
+       "swim away. ",
+       "They look for a cooler sea. ",
+       "Fish in sea farms ",
+       "can die in warm water. ",
+       "A hot sea also sends ",
+       "heat and water vapor ",
+       "into the air. ",
+       "Water vapor is water ",
+       "that turned into gas. ",
+       "This can make heat waves ",
+       "and heavy rain worse on land."
+      ],
+      [
+       "So scientists watch the sea ",
+       "every day. ",
+       "They use satellites ",
+       "and special tools. ",
+       "When the water ",
+       "may get very hot, ",
+       "they warn people early. ",
+       "This helps people keep ",
+       "their fish and farms safe. ",
+       "Cutting greenhouse gases ",
+       "can also slow the warming. ",
+       "Ocean scientists and climate researchers ",
+       "study these changes. ",
+       "Their work is growing more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "warmer",
+       "ko": "더 따뜻한 (형용사)",
+       "base": "warm [wɔːrm]"
+      },
+      {
+       "word": "lasts",
+       "ko": "계속되다, 이어지다 (동사)",
+       "base": "last [læst]"
+      },
+      {
+       "word": "usual",
+       "ko": "평소의, 보통의 (형용사)",
+       "base": "usual [ˈjuːʒuəl]"
+      },
+      {
+       "word": "satellites",
+       "ko": "인공위성 (명사)",
+       "base": "satellite [ˈsætəlaɪt]"
+      },
+      {
+       "word": "warn",
+       "ko": "미리 알리다, 경고하다 (동사)",
+       "base": "warn [wɔːrn]"
+      },
+      {
+       "word": "important",
+       "ko": "중요한 (형용사)",
+       "base": "important [ɪmˈpɔːrtnt]"
+      }
      ]
     },
     "L3": {
@@ -11784,6 +12979,106 @@
        "answer": 2,
        "explain": "이 검사는 암세포가 혈액에 남긴 DNA 조각의 작은 차이를 인공지능이 찾아내는 방식이에요. 조각이 거의 남지 않으면 단서 자체가 없으니 찾기 어려울 거예요. 두 번째 선지가 헷갈리지만, 인공지능은 혈액 데이터 속 차이를 공부해서 배우는 것이므로 단서가 되는 조각이 없다면 공부할 재료도 없어요. 민감도 90.4%는 대장암 연구에서 나온 결과일 뿐 다른 암에도 그대로 적용된다는 보장은 없어요.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "Cancer is easier to treat when doctors find it early. To check for colon cancer, doctors use an endoscope. An endoscope is a long tube that goes inside the body. Many people feel afraid of this test. Now there is a new way. One small blood test may show the danger of colon cancer.",
+      "Our body is made of tiny cells. When cells get old and die, they break apart. They leave small pieces of DNA in our blood. These pieces are called cell-free DNA. Pieces from cancer cells look a little different. Their length and shape are not the same. AI studies blood data from many people. It learns to find these small differences.",
+      "A research team at Seoul Asan Hospital tried this test. It found nine out of ten colon cancer patients. That is a score of 90.4 percent. But the test only shows a chance of cancer. It cannot say for sure. Doctors still need an endoscope test to be certain.",
+      "An easy test helps people who put off checkups. They can find cancer early and get help. Many people work together to build this tool. Doctors care for the patients. Life scientists study cells and DNA. Computer developers build the medical AI. Do you like science that saves lives? Then watch this field closely."
+     ],
+     "enseg": [
+      [
+       "Cancer is easier to treat ",
+       "when doctors find it early. ",
+       "To check for colon cancer, ",
+       "doctors use an endoscope. ",
+       "An endoscope is a long tube ",
+       "that goes inside the body. ",
+       "Many people feel afraid ",
+       "of this test. ",
+       "Now there is a new way. ",
+       "One small blood test ",
+       "may show the danger ",
+       "of colon cancer."
+      ],
+      [
+       "Our body is made of tiny cells. ",
+       "When cells get old and die, ",
+       "they break apart. ",
+       "They leave small pieces of DNA ",
+       "in our blood. ",
+       "These pieces are called cell-free DNA. ",
+       "Pieces from cancer cells ",
+       "look a little different. ",
+       "Their length and shape ",
+       "are not the same. ",
+       "AI studies blood data ",
+       "from many people. ",
+       "It learns to find ",
+       "these small differences."
+      ],
+      [
+       "A research team ",
+       "at Seoul Asan Hospital ",
+       "tried this test. ",
+       "It found nine out of ten ",
+       "colon cancer patients. ",
+       "That is a score ",
+       "of 90.4 percent. ",
+       "But the test only shows ",
+       "a chance of cancer. ",
+       "It cannot say for sure. ",
+       "Doctors still need ",
+       "an endoscope test ",
+       "to be certain."
+      ],
+      [
+       "An easy test helps people ",
+       "who put off checkups. ",
+       "They can find cancer early ",
+       "and get help. ",
+       "Many people work together ",
+       "to build this tool. ",
+       "Doctors care for the patients. ",
+       "Life scientists study cells and DNA. ",
+       "Computer developers build ",
+       "the medical AI. ",
+       "Do you like science ",
+       "that saves lives? ",
+       "Then watch this field closely."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "early",
+       "ko": "일찍, 이른 시기에 (부사)",
+       "base": "early [ˈɜːrli]"
+      },
+      {
+       "word": "blood",
+       "ko": "피, 혈액 (명사)",
+       "base": "blood [blʌd]"
+      },
+      {
+       "word": "cells",
+       "ko": "세포들 (명사)",
+       "base": "cell [sel]"
+      },
+      {
+       "word": "afraid",
+       "ko": "무서워하는, 두려운 (형용사)",
+       "base": "afraid [əˈfreɪd]"
+      },
+      {
+       "word": "different",
+       "ko": "다른 (형용사)",
+       "base": "different [ˈdɪfrənt]"
+      },
+      {
+       "word": "patients",
+       "ko": "환자들 (명사)",
+       "base": "patient [ˈpeɪʃnt]"
       }
      ]
     },
@@ -12675,6 +13970,103 @@
        "explain": "글은 상한 돌을 바꿀 때 같은 종류의 돌을 써야 한다고 하면서, 조사 정보가 나중에 수리할 때 큰 도움이 된다고 했어요. 어떤 돌이 어디에 쓰였는지 도면에 남겨 두면 수리할 자리의 돌을 바로 알 수 있지요. 창덕궁과 종묘는 이미 세계유산이 되었다고 했으므로 심사를 다시 받으려 한다는 네 번째 선지는 알맞지 않아요.",
        "evidencePara": 1
       }
+     ],
+     "en": [
+      "Changdeokgung in Seoul is an old palace. Kings of the Joseon dynasty lived there. Jongmyo is a shrine near the palace. People held special ceremonies there for old kings and queens. Jongmyo became a UNESCO World Heritage site in 1995. Changdeokgung joined the list in 1997. Many stones hold up their floors, stairs, and walls.",
+      "A research team from the Korea Heritage Service checked the stones. They studied 4,421 stones, one by one. Most of them are granite, a very hard rock. This granite has a soft pink color. The team also drew maps of the buildings. Colors on the maps show where each stone sits.",
+      "Why is the home of a stone important? Wind and rain hurt stones over many years. The stones crack and break apart. Workers must change a broken stone for a new one. A wrong stone looks strange, with a different color. This study found the same granite in Seoul's mountains. Inwangsan and Bugaksan hold this pink rock. So workers can find matching stones for future repairs.",
+      "Saving old treasures needs the power of science. We call these workers conservation scientists. They use science to study and protect our heritage. Do you love history and science together? Then this job may be perfect for you."
+     ],
+     "enseg": [
+      [
+       "Changdeokgung in Seoul ",
+       "is an old palace. ",
+       "Kings of the Joseon dynasty ",
+       "lived there. ",
+       "Jongmyo is a shrine ",
+       "near the palace. ",
+       "People held special ceremonies there ",
+       "for old kings and queens. ",
+       "Jongmyo became a UNESCO ",
+       "World Heritage site in 1995. ",
+       "Changdeokgung joined the list in 1997. ",
+       "Many stones hold up ",
+       "their floors, stairs, and walls."
+      ],
+      [
+       "A research team ",
+       "from the Korea Heritage Service ",
+       "checked the stones. ",
+       "They studied 4,421 stones, ",
+       "one by one. ",
+       "Most of them are granite, ",
+       "a very hard rock. ",
+       "This granite has ",
+       "a soft pink color. ",
+       "The team also drew maps ",
+       "of the buildings. ",
+       "Colors on the maps show ",
+       "where each stone sits."
+      ],
+      [
+       "Why is the home of a stone important? ",
+       "Wind and rain hurt stones ",
+       "over many years. ",
+       "The stones crack and break apart. ",
+       "Workers must change a broken stone ",
+       "for a new one. ",
+       "A wrong stone looks strange, ",
+       "with a different color. ",
+       "This study found the same granite ",
+       "in Seoul's mountains. ",
+       "Inwangsan and Bugaksan hold this pink rock. ",
+       "So workers can find matching stones ",
+       "for future repairs."
+      ],
+      [
+       "Saving old treasures ",
+       "needs the power of science. ",
+       "We call these workers ",
+       "conservation scientists. ",
+       "They use science to study ",
+       "and protect our heritage. ",
+       "Do you love history ",
+       "and science together? ",
+       "Then this job ",
+       "may be perfect for you."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "palace",
+       "ko": "궁궐 (명사)",
+       "base": "palace [ˈpæləs]"
+      },
+      {
+       "word": "stones",
+       "ko": "돌들 (명사)",
+       "base": "stone [stoʊn]"
+      },
+      {
+       "word": "granite",
+       "ko": "화강암 (명사)",
+       "base": "granite [ˈɡrænɪt]"
+      },
+      {
+       "word": "hard",
+       "ko": "단단한 (형용사)",
+       "base": "hard [hɑːrd]"
+      },
+      {
+       "word": "broken",
+       "ko": "깨진, 부서진 (형용사)",
+       "base": "break [breɪk]"
+      },
+      {
+       "word": "protect",
+       "ko": "지키다, 보호하다 (동사)",
+       "base": "protect [prəˈtekt]"
+      }
      ]
     },
     "L3": {
@@ -13555,6 +14947,106 @@
        "answer": 2,
        "explain": "첫째 문단에서 전기를 멀리 보내면 일부가 사라지고 큰돈이 든다고 했고, 둘째 문단에서 발전소가 가까운 남부 지역의 요금을 내려 주자고 했으니, 가까워서 비용이 덜 드는 만큼 요금을 싸게 하려는 것임을 짐작할 수 있어요. 첫 번째 선지는 그럴듯하지만 글은 아껴 쓰는 습관이 아니라 발전소와의 거리와 비용을 근거로 들었기 때문에 틀렸어요.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "Power plants make the electricity we use. But the plants are not spread out evenly. Factories and offices near Seoul use the most power. Yet most big power plants stand in the south. So the electricity must travel a long way north. Some power is lost along the wires. Tall towers and long wires also cost a lot of money.",
+      "On August 26, 2026, the government shared a new plan. Korea's energy office and the power company made it. Factories pay for electricity, and the price could change by area. The plan splits the country into eleven areas. Southern areas near power plants would pay up to 10 percent less. This is only a plan for now. People are still sharing their ideas about it.",
+      "Why did they make this plan? Different prices can move big electricity users. Factories and data centers may go to cheaper areas. Then the country sends less power over long wires. The south may also gain new jobs. Still, some people are not sure. A small price cut may not move a whole company.",
+      "This story is not only for power experts. Engineers plan the roads that electricity travels. Business experts choose the best place for a factory. Policy experts write the rules for prices. They all solve this puzzle together. Can you read the ideas hidden in a price? That skill is the first step to these jobs."
+     ],
+     "enseg": [
+      [
+       "Power plants make ",
+       "the electricity we use. ",
+       "But the plants are not ",
+       "spread out evenly. ",
+       "Factories and offices near Seoul ",
+       "use the most power. ",
+       "Yet most big power plants ",
+       "stand in the south. ",
+       "So the electricity must travel ",
+       "a long way north. ",
+       "Some power is lost ",
+       "along the wires. ",
+       "Tall towers and long wires ",
+       "also cost a lot of money."
+      ],
+      [
+       "On August 26, 2026, ",
+       "the government shared a new plan. ",
+       "Korea's energy office ",
+       "and the power company made it. ",
+       "Factories pay for electricity, ",
+       "and the price could change by area. ",
+       "The plan splits the country ",
+       "into eleven areas. ",
+       "Southern areas near power plants ",
+       "would pay up to 10 percent less. ",
+       "This is only a plan for now. ",
+       "People are still sharing ",
+       "their ideas about it."
+      ],
+      [
+       "Why did they make this plan? ",
+       "Different prices can move ",
+       "big electricity users. ",
+       "Factories and data centers ",
+       "may go to cheaper areas. ",
+       "Then the country sends less power ",
+       "over long wires. ",
+       "The south may also ",
+       "gain new jobs. ",
+       "Still, some people are not sure. ",
+       "A small price cut ",
+       "may not move a whole company."
+      ],
+      [
+       "This story is not only ",
+       "for power experts. ",
+       "Engineers plan the roads ",
+       "that electricity travels. ",
+       "Business experts choose the best place ",
+       "for a factory. ",
+       "Policy experts write ",
+       "the rules for prices. ",
+       "They all solve this puzzle together. ",
+       "Can you read the ideas ",
+       "hidden in a price? ",
+       "That skill is the first step ",
+       "to these jobs."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "electricity",
+       "ko": "전기 (명사)",
+       "base": "electricity [ɪˌlekˈtrɪsəti]"
+      },
+      {
+       "word": "plants",
+       "ko": "발전소들 (명사)",
+       "base": "plant [plænt]"
+      },
+      {
+       "word": "travel",
+       "ko": "이동하다, 가다 (동사)",
+       "base": "travel [ˈtrævl]"
+      },
+      {
+       "word": "wires",
+       "ko": "전선들 (명사)",
+       "base": "wire [ˈwaɪər]"
+      },
+      {
+       "word": "price",
+       "ko": "가격, 요금 (명사)",
+       "base": "price [praɪs]"
+      },
+      {
+       "word": "cheaper",
+       "ko": "더 값싼 (형용사)",
+       "base": "cheap [tʃiːp]"
       }
      ]
     },
@@ -14455,6 +15947,106 @@
        "answer": 2,
        "explain": "시범 적용은 정식 수업보다 먼저 학교에서 미리 써 보는 단계이므로, 학생들이 느끼는 어려움은 이때 가장 먼저 드러날 거예요. 시도교육청의 심의라는 두 번째 선지가 그럴듯하지만, 심의는 어른들이 책을 살펴 의논하는 절차라서 학생들이 책으로 직접 공부하며 느끼는 어려움은 교실에서 시범적으로 써 볼 때 먼저 알 수 있어요.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "In August 2026, the Ministry of Education shared big news. Schools will teach AI as a real school subject. Teachers in the classroom will write the textbooks themselves. There will be six books for elementary school. Middle school gets two, and high school gets eight. That makes sixteen new subjects in all.",
+      "Korea has three kinds of textbooks. The country writes the first kind by itself. Companies write the second kind, and the country checks it. For the third kind, the local school office gives approval. The new AI books belong to this third kind.",
+      "Why do teachers write the books? Teachers meet students in class every day. So they know what is hard for children. They also know what students really need. AI also changes very fast. New tools appear almost every month. So the main book will hold the big ideas. New facts will go into a small extra book. Teachers can update that book again and again.",
+      "Some schools will try the new books in 2027. Real classes will start in March 2028. Today's students will be the first readers. Teachers will guide them through the new books. Edtech developers will build tools that help learning. Content makers will explain hard ideas in simple ways. Do these jobs sound fun? Then keep your eyes on this change."
+     ],
+     "enseg": [
+      [
+       "In August 2026, ",
+       "the Ministry of Education ",
+       "shared big news. ",
+       "Schools will teach AI ",
+       "as a real school subject. ",
+       "Teachers in the classroom ",
+       "will write the textbooks themselves. ",
+       "There will be six books ",
+       "for elementary school. ",
+       "Middle school gets two, ",
+       "and high school gets eight. ",
+       "That makes sixteen ",
+       "new subjects in all."
+      ],
+      [
+       "Korea has three kinds ",
+       "of textbooks. ",
+       "The country writes the first kind ",
+       "by itself. ",
+       "Companies write the second kind, ",
+       "and the country checks it. ",
+       "For the third kind, ",
+       "the local school office ",
+       "gives approval. ",
+       "The new AI books ",
+       "belong to this third kind."
+      ],
+      [
+       "Why do teachers write the books? ",
+       "Teachers meet students ",
+       "in class every day. ",
+       "So they know ",
+       "what is hard for children. ",
+       "They also know what students really need. ",
+       "AI also changes very fast. ",
+       "New tools appear almost every month. ",
+       "So the main book will hold ",
+       "the big ideas. ",
+       "New facts will go ",
+       "into a small extra book. ",
+       "Teachers can update that book ",
+       "again and again."
+      ],
+      [
+       "Some schools will try ",
+       "the new books in 2027. ",
+       "Real classes will start ",
+       "in March 2028. ",
+       "Today's students will be ",
+       "the first readers. ",
+       "Teachers will guide them ",
+       "through the new books. ",
+       "Edtech developers will build tools ",
+       "that help learning. ",
+       "Content makers will explain ",
+       "hard ideas in simple ways. ",
+       "Do these jobs sound fun? ",
+       "Then keep your eyes on this change."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "textbooks",
+       "ko": "교과서들 (명사)",
+       "base": "textbook [ˈtekstbʊk]"
+      },
+      {
+       "word": "subject",
+       "ko": "과목 (명사)",
+       "base": "subject [ˈsʌbdʒɪkt]"
+      },
+      {
+       "word": "teach",
+       "ko": "가르치다 (동사)",
+       "base": "teach [tiːtʃ]"
+      },
+      {
+       "word": "approval",
+       "ko": "승인 (명사)",
+       "base": "approve [əˈpruːv]"
+      },
+      {
+       "word": "update",
+       "ko": "새로 고치다, 갱신하다 (동사)",
+       "base": "update [ʌpˈdeɪt]"
+      },
+      {
+       "word": "guide",
+       "ko": "이끌다, 안내하다 (동사)",
+       "base": "guide [ɡaɪd]"
       }
      ]
     },
