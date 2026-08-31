@@ -12,11 +12,19 @@ import { createRequire } from 'node:module';
    그래야 여기서 고른 예문과 앱이 쓸 수 있는 예문이 어긋나지 않는다. */
 const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
 
-const strip = (s) => String(s || '').replace(/^[\s'‘’"“”\-–—→]+|[\s'‘’"“”\-–—→]+$/g, '').trim();
+const bare = (s) => String(s || '').replace(/^[\s'‘’"“”\-–—→]+|[\s'‘’"“”\-–—→]+$/g, '').trim();
+/* 앞뒤 군더더기를 떼면 「‘필사적’이라는 말이…」의 여는 따옴표까지 떨어져
+   「필사적’이라는 말이…」가 된다. 예문에 구멍을 뚫으면 「○○○’이라는」이 되어 눈에 띈다.
+   닫는 따옴표가 여는 것보다 앞서면 떼어 낸 것이므로 도로 붙인다. */
+const strip = (s) => {
+  const v = bare(s);
+  const close = v.indexOf('’'), open = v.indexOf('‘');
+  return (close >= 0 && (open < 0 || close < open)) ? '‘' + v : v;
+};
 const stem = (w) => w.replace(/(하다|되다|이다|다)$/, '');
 
 /* 낱말이 아닌 것 — 어간 부스러기와 수업 용어 */
-const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기|질문)$/;
+const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기|질문|코칭안|주차)$/;
 /* 활동·설명 제목도 콜론을 달고 나온다 — "구별 활동: …", "예시 정리: …". 낱말이 아니다. */
 const NOT_WORD2 = /(활동|하기|해보기|익히기|만들기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|상황극|같습니다)$/;
 
@@ -65,6 +73,9 @@ const OBJ_TAIL = /(?:말해요|뜻해요|나타내요|말합니다|뜻합니다)
 function cleanMeaning(v, hadObjTail) {
   /* 뜻은 한 줄을 넘지 않는다 — 넘으면 다음 항목의 머리를 물고 온다 */
   let s = strip(String(v || '').split('\n')[0]);
+  /* 머리에 붙은 「의미 :」「뜻 :」은 이름표지 뜻이 아니다. 줄 맨 앞이라 아래 68행의
+     「다음 항목 자르기」(앞에 공백이 있어야 문다)에 걸리지 않고 그대로 남는다. */
+  s = s.replace(/^(?:의미|뜻)\s*[:：]\s*/, '');
   /* 뜻 안에 다음 항목("낱말: ")이 남아 있으면 거기서 자른다.
      그대로 두면 그럴듯해 보이는 틀린 뜻이 되어 검수를 그냥 통과한다. */
   s = s.split(/\s[가-힣]{2,6}(?:\s[가-힣]{1,4})?\s*:/)[0];
@@ -114,6 +125,46 @@ function colonPairs(text) {
     const q = seg.match(/[“"]([^“”"\n]{4,60})[”"]/);
     if (meaning) out.push({ word: a.word, meaning, example: q ? strip(q[1]) : '' });
   });
+  return out;
+}
+
+/* ── 1-2) 분류 표 ──
+   중등 교재는 낱말을 갈래로 묶어 적는다: 「소극적 태도: 미온적, 관망하다」.
+   콜론 규칙은 이것을 「소극적 태도 = 미온적, 관망하다」로 읽는다 — 정반대다.
+   갈래 이름은 낱말이 아니고, 오른쪽에 늘어선 것이 낱말이다.
+
+   뜻풀이와 가르는 자리는 오른쪽 항목의 모양이다. 뜻풀이는 거의 늘 여러 어절이라
+   「해외: 바다 밖, 즉 외국」처럼 띄어쓰기가 섞인다. 갈래 목록은 한 덩어리 낱말만 늘어선다.
+   그래서 항목이 모두 띄어쓰기 없는 한 덩어리일 때만 목록으로 본다. */
+const TABLE = /(?:^|\n)\s*([가-힣]{2,7}(?: [가-힣]{1,5})?)\s*:\s*([^\n]{4,80})(?=\n|$)/g;
+function tableRows(text) {
+  const out = { labels: [], words: [] };
+  for (const m of text.matchAll(TABLE)) {
+    const items = strip(m[2]).split(/\s*,\s*/).map(strip);
+    if (items.length < 2 || !items.every((x) => /^[가-힣]{2,8}$/.test(x))) continue;
+    out.labels.push(strip(m[1]));
+    for (const w of items) if (okWord(w) && !isPhrase(w)) out.words.push(w);
+  }
+  return out;
+}
+
+/* ── 1-3) 3열 표 ──
+   중등·실력은 낱말을 표로 적는다. 시트에서 뽑으면 칸 사이가 여러 칸 공백으로 남는다:
+     선출하다        투표 등의 방법으로 대표나 임원을 뽑는 것        “학생회장을 선출하다”
+   한 줄에 낱말·뜻·예문이 다 있어 셋을 한꺼번에 얻는다.
+   머리글 줄(「어휘  의미 및 설명  예시 문장」)은 첫 칸이 걸름망에 걸려 저절로 빠진다. */
+function tableCells(text) {
+  const out = {};
+  for (const raw of String(text || '').split('\n')) {
+    const c = raw.trim().split(/[\t ]{2,}/);
+    if (c.length < 2 || c.length > 3) continue;
+    const w = strip(c[0]);
+    if (!okWord(w) || isPhrase(w)) continue;
+    const meaning = cleanMeaning(c[1]);
+    const example = c[2] ? strip(c[2]) : '';
+    if (!meaning && !example) continue;
+    if (!out[w]) out[w] = { meaning: meaning, example: example };
+  }
   return out;
 }
 
@@ -326,6 +377,8 @@ const rows = [];
 for (const b of tb.books) for (const l of b.lessons) {
   const prev = (l.words || []).map((w) => (typeof w === 'string' ? { word: w, meaning: '', example: '' } : w));
   const pairs = colonPairs(l.coaching);
+  const table = tableRows(l.coaching);
+  const cells = tableCells(l.coaching);
   const target = targetWords(l.coaching);
   const paren = parenMeanings(l.coaching), prose = proseMeanings(l.coaching), dash = dashMeanings(l.coaching);
   const defined = definedWords(l.coaching), pairw = pairWords(l.coaching);
@@ -342,8 +395,10 @@ for (const b of tb.books) for (const l of b.lessons) {
      걸름망으로는 못 거른다 — 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두었기 때문이다.
      판단을 파일에 적어 두는 편이 정규식을 더 조이는 것보다 정확하고 되돌리기도 쉽다. */
   const dropped = new Set(l.dropped || []);
-  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...Object.keys(defined), ...pairw, ...Object.keys(idiom), ...kept])]
-    .filter((w) => !dropped.has(w));
+  const label = new Set(table.labels);
+  const order = [...new Set([...pairs.map((p) => p.word), ...target, ...Object.keys(defined), ...pairw,
+    ...Object.keys(idiom), ...table.words, ...Object.keys(cells), ...kept])]
+    .filter((w) => !dropped.has(w) && !label.has(w));
   const byPair = {};
   for (const p of pairs) byPair[p.word] = p;
   const prevBy = {};
@@ -364,18 +419,19 @@ for (const b of tb.books) for (const l of b.lessons) {
        따위)이 그대로 굳는다. 다만 코칭글에 설명이 없어 사람이 써 넣은 뜻(src:'ai')은
        다시 캘 수 없으니 남긴다. 강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있다. */
     meaning: (keepHuman(prevBy[w]) || {}).meaning
-      || firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
+      || firstGood(w, [byPair[w] && byPair[w].meaning, cells[w] && cells[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
     /* 예전 예문은 쓸 수 있을 때만 남긴다. 그냥 남기면 「애틋하다 — 오랜만에 가족이나
        친구를 보면 어떤 기분이 드니?」처럼 그 낱말이 없는 예문이 그대로 굳는다.
        (강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있으므로 여기서 다시 캐도 안전하다.) */
     example: firstUsableEx(w, [
       prevBy[w] && prevBy[w].example,
       byPair[w] && byPair[w].example,
+      cells[w] && cells[w].example,
       arrow[w] && arrow[w].example,
       ex[w],
     ], order),
     src: keepHuman(prevBy[w]) ? prevBy[w].src
-      : (firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
+      : (firstGood(w, [byPair[w] && byPair[w].meaning, cells[w] && cells[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
   }));
   l.words = words;
   nW += words.length; nM += words.filter((w) => w.meaning).length; nE += words.filter((w) => w.example).length;
