@@ -60,6 +60,7 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('end', () => { try { resolve(buf ? JSON.parse(buf) : {}); } catch (e) { reject(e); } });
   req.on('error', reject);
 });
+const PEND_TTL = 30 * 60 * 1000;   /* 연동 요청 30분 */
 const newToken = (code, admin) => {
   const t = crypto.randomUUID().replace(/-/g, '');
   db.tokens[t] = { code, admin: !!admin, exp: Date.now() + TOKEN_TTL };
@@ -205,10 +206,31 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code), vocabStore.getAssign(code)));
       }
 
+      /* 학생 연동은 '요청 → 강사 승인' 두 단계 (워커와 동일) */
       if (p === '/api/login' && req.method === 'POST') {
-        const { code } = await readBody(req);
+        const { code, device } = await readBody(req);
         const stu = code && db.students[String(code).trim()];
         if (!stu) return json(res, 401, { error: '등록되지 않은 학생 코드예요. 선생님께 확인해 주세요.' });
+        const nonce = crypto.randomUUID().replace(/-/g, '');
+        db.pending = db.pending || {};
+        db.pending[nonce] = {
+          code: stu.code, name: stu.name, cls: stu.cls || '', grade: stu.grade || '',
+          device: String(device || '').slice(0, 40), at: new Date().toISOString(),
+          state: 'waiting', exp: Date.now() + PEND_TTL,
+        };
+        persist();
+        return json(res, 200, { pending: true, nonce, name: stu.name });
+      }
+
+      if (p === '/api/login/status' && req.method === 'GET') {
+        const nonce = url.searchParams.get('n') || '';
+        const rec = db.pending && db.pending[nonce];
+        if (!rec || rec.exp < Date.now()) { if (rec) { delete db.pending[nonce]; persist(); } return json(res, 404, { error: '연동 요청이 만료됐어요. 코드를 다시 입력해 주세요.' }); }
+        if (rec.state === 'denied') { delete db.pending[nonce]; persist(); return json(res, 200, { denied: true }); }
+        if (rec.state !== 'approved') return json(res, 200, { pending: true, name: rec.name });
+        const stu = db.students[rec.code];
+        if (!stu) return json(res, 404, { error: '학생 정보를 찾을 수 없어요.' });
+        delete db.pending[nonce]; persist();
         return json(res, 200, { token: newToken(stu.code, false), student: stu });
       }
 
@@ -299,6 +321,23 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true, student: db.students[c] });
       }
+      if (p === '/api/admin/pending' && req.method === 'GET') {
+        const now = Date.now();
+        const items = Object.entries(db.pending || {})
+          .filter(([, r]) => r.state === 'waiting' && r.exp > now)
+          .map(([nonce, r]) => ({ ...r, nonce }))
+          .sort((a, b) => (a.at < b.at ? 1 : -1));
+        return json(res, 200, { pending: items });
+      }
+      if (p === '/api/admin/pending' && req.method === 'POST') {
+        const { nonce, action } = await readBody(req);
+        const rec = db.pending && db.pending[nonce];
+        if (!rec) return json(res, 404, { error: '이미 처리됐거나 만료된 요청입니다.' });
+        rec.state = action === 'deny' ? 'denied' : 'approved';
+        persist();
+        return json(res, 200, { ok: true, denied: action === 'deny' });
+      }
+
       if (p === '/api/admin/level' && req.method === 'POST') {
         const { code, level } = await readBody(req);
         if (!db.students[code]) return json(res, 404, { error: '학생 없음' });
@@ -407,6 +446,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* 관리 웹 */
+    if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
