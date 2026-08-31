@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.11",
+  "version": "2026-08-31.13",
   "articles": [
     {
       "id": "nuri-space",
@@ -90,7 +90,7 @@
             {
               "word": "발사체",
               "easy": "인공위성 등을 우주로 쏘아 올리는 로켓",
-              "hanja": "發(쏠 발)+射(쏠 사)+體(몸 체)"
+              "hanja": "發(필 발)+射(쏠 사)+體(몸 체)"
             },
             {
               "word": "궤도",
@@ -2337,7 +2337,7 @@
             {
               "word": "예측",
               "easy": "앞으로 일어날 일을 미리 헤아리는 것",
-              "hanja": "豫(미리 예)+測(잴 측)"
+              "hanja": "豫(미리 예)+測(헤아릴 측)"
             },
             {
               "word": "확률",
@@ -3452,7 +3452,7 @@
             {
               "word": "비율",
               "easy": "전체 가운데 어떤 부분이 차지하는 정도",
-              "hanja": "比(견줄 비)+率(비율 율)"
+              "hanja": "比(견줄 비)+率(비율 률)"
             },
             {
               "word": "고령화",
@@ -3462,7 +3462,7 @@
             {
               "word": "요양",
               "easy": "편안히 쉬면서 몸과 건강을 돌보는 것",
-              "hanja": "療(병 고칠 요)+養(기를 양)"
+              "hanja": "療(병 고칠 료)+養(기를 양)"
             },
             {
               "word": "대비",
@@ -5943,7 +5943,7 @@
             {
               "word": "생태계",
               "easy": "생물과 환경이 서로 영향을 주고받으며 이루는 체계",
-              "hanja": "生(날 생)+態(모습 태)+系(이어 맬 계)"
+              "hanja": "生(날 생)+態(모습 태)+系(맬 계)"
             },
             {
               "word": "먹이사슬",
@@ -10112,7 +10112,7 @@
             {
               "word": "번역",
               "easy": "한 나라의 말을 다른 나라의 말로 옮기는 것",
-              "hanja": "飜(번역할 번)+譯(번역할 역)"
+              "hanja": "飜(뒤칠 번)+譯(번역할 역)"
             },
             {
               "word": "산업",
@@ -10383,7 +10383,7 @@
             {
               "word": "생태계",
               "easy": "여러 참여자가 서로 영향을 주고받으며 함께 움직이는 체계",
-              "hanja": "生(날 생)+態(모습 태)+系(이어맬 계)"
+              "hanja": "生(날 생)+態(모습 태)+系(맬 계)"
             },
             {
               "word": "수익",
@@ -11179,7 +11179,7 @@
             {
               "word": "측정기",
               "easy": "무엇이 얼마나 되는지 재는 기계",
-              "hanja": "測(잴 측)+定(정할 정)+器(그릇 기)"
+              "hanja": "測(헤아릴 측)+定(정할 정)+器(그릇 기)"
             },
             {
               "word": "착륙선",
@@ -12262,7 +12262,7 @@
             {
               "word": "제도",
               "easy": "사회에서 함께 지키기로 정한 규칙이나 방식",
-              "hanja": "制(지을 제)+度(법도 도)"
+              "hanja": "制(절제할 제)+度(법도 도)"
             },
             {
               "word": "발전소",
@@ -12517,7 +12517,7 @@
             {
               "word": "총량",
               "easy": "전체를 합한 양",
-              "hanja": "總(다 총)+量(헤아릴 량)"
+              "hanja": "總(거느릴 총)+量(헤아릴 량)"
             },
             {
               "word": "한도",
@@ -20805,7 +20805,7 @@
             {
               "word": "번역",
               "easy": "한 언어로 된 글을 다른 언어로 옮기는 일",
-              "hanja": "飜(뒤칠 번)+譯(통변할 역)"
+              "hanja": "飜(뒤칠 번)+譯(번역할 역)"
             },
             {
               "word": "출판사",
@@ -23753,7 +23753,7 @@
             {
               "word": "제한",
               "easy": "일정한 정도를 넘지 못하게 막는 것",
-              "hanja": "制(마를 제)+限(한할 한)"
+              "hanja": "制(절제할 제)+限(한할 한)"
             }
           ],
           "questions": [
@@ -23996,7 +23996,7 @@
             {
               "word": "제한",
               "easy": "일정한 정도를 넘지 못하게 막는 것",
-              "hanja": "制(마를 제)+限(한할 한)"
+              "hanja": "制(절제할 제)+限(한할 한)"
             }
           ],
           "questions": [
@@ -25208,6 +25208,997 @@
               "what the approach means is clear: the force that moves an institution does not always come from compulsion,",
               " ",
               "and sometimes requiring reasons to be stated is enough to give a conclusion weight."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "eco-corridor",
+      "category": "environment",
+      "careers": [
+        "env",
+        "bio",
+        "eng"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국립공원공단 보도자료 — 국립공원 생태통로, 야생동물 이용 늘고 동물 찻길 사고 줄었다 (2026.4.8)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1855910"
+        },
+        {
+          "title": "대한민국 정책브리핑 — 환경부 「생태통로의 체계적 관리 제도개선 추진 중」",
+          "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148934403"
+        },
+        {
+          "title": "국립생태원 이슈브리프 [NIE IB 22-01] 과학기반의 로드킬 저감 및 생태통로 개선 노력과 그 효과",
+          "url": "https://www.nie.re.kr/nie/bbs/BMSR00046/view.do?boardId=695962736&menuNo=200067"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "동물만 다니는 길",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "산에 도로가 나면 ",
+              "좋기만 한 것은 아니에요. ",
+              "길 하나가 ",
+              "숲을 둘로 자르기도 해요. ",
+              "동물들은 ",
+              "건너편으로 가고 싶어 해요. ",
+              "그러다 차에 부딪혀요."
+            ],
+            [
+              "그래서 사람들은 ",
+              "동물만 다니는 길을 만들었어요. ",
+              "이것을 생태통로라고 해요. ",
+              "어떤 곳은 ",
+              "도로 아래로 지나가요. ",
+              "어떤 곳은 ",
+              "도로 위를 다리처럼 건너요. ",
+              "동물이 안전하게 다니라고 ",
+              "만든 길이에요."
+            ],
+            [
+              "그런데 만들자마자 ",
+              "동물이 오지는 않아요. ",
+              "처음에는 낯설어서 ",
+              "잘 오지 않아요. ",
+              "몇 해가 지나야 ",
+              "조금씩 늘어나요. ",
+              "그래서 오래 지켜보고 ",
+              "세어 보아야 ",
+              "잘 만들었는지 알 수 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "도로",
+              "easy": "차가 다니도록 만든 넓은 길이에요.",
+              "hanja": null
+            },
+            {
+              "word": "생태통로",
+              "easy": "동물이 도로를 안전하게 건너다니라고 따로 만든 길이에요.",
+              "hanja": null
+            },
+            {
+              "word": "안전",
+              "easy": "다치거나 위험할 걱정이 없는 것이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "도로를 넓게 만드는 방법",
+                "숲에서 길을 잃지 않는 방법",
+                "동물이 건너다니라고 만든 생태통로",
+                "자동차를 고치는 방법"
+              ],
+              "answer": 2,
+              "explain": "도로에 잘린 숲을 이어 주려고 만든 생태통로를 설명한 글이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "생태통로를 만들자마자 어떤 일이 일어나나요?",
+              "choices": [
+                "동물이 바로 많이 와요",
+                "처음에는 낯설어서 잘 오지 않아요",
+                "동물이 영영 오지 않아요",
+                "도로가 사라져요"
+              ],
+              "answer": 1,
+              "explain": "처음에는 낯설어서 잘 오지 않고, 몇 해가 지나야 조금씩 늘어난다고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「생태통로」는 무엇인가요?",
+              "choices": [
+                "동물이 안전하게 건너다니라고 만든 길",
+                "차가 빨리 달리는 길",
+                "사람이 산을 오르는 길",
+                "물이 흐르는 길"
+              ],
+              "answer": 0,
+              "explain": "동물이 도로를 안전하게 건너다니라고 따로 만든 길을 생태통로라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "생태통로를 만든 다음에도 오래 지켜보아야 하는 까닭은 무엇일까요?",
+              "choices": [
+                "도로가 넓어질 수 있어서",
+                "처음에는 동물이 잘 오지 않아 잘 만들었는지 바로 알 수 없어서",
+                "동물이 길을 새로 만들어서",
+                "숲이 빨리 자라서"
+              ],
+              "answer": 1,
+              "explain": "처음에는 잘 오지 않으니, 몇 해를 세어 보아야 잘 만들었는지 알 수 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "새로 만든 생태통로에 동물이 오는지 알아보려면 어떻게 하면 좋을까요?",
+              "choices": [
+                "하루만 보고 정한다",
+                "옆에 더 큰 도로를 낸다",
+                "여러 해 동안 몇 마리가 지나는지 세어 본다",
+                "동물을 잡아서 통로에 놓아둔다"
+              ],
+              "answer": 2,
+              "explain": "여러 해에 걸쳐 세어 보아야 늘어나는지 줄어드는지 알 수 있어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "다리를 놓아 주면 건널까",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "도로가 하나 생기면 ",
+              "숲은 둘로 나뉜다. ",
+              "동물이 살던 자리, ",
+              "곧 서식지가 끊어지는 것이다. ",
+              "이 끊긴 자리를 다시 잇는 시설이 ",
+              "생태통로다. ",
+              "도로 아래로 지나가는 터널형과 ",
+              "도로 위를 건너는 육교형이 있다. ",
+              "우리나라에서는 1998년 ",
+              "지리산을 지나는 도로에 ",
+              "처음 만들어졌고, ",
+              "지금 국립공원 안에는 ",
+              "터널형 아홉 곳과 육교형 아홉 곳, ",
+              "모두 열여덟 곳이 있다."
+            ],
+            [
+              "효과는 숫자로 확인되었다. ",
+              "국립공원공단이 이 열여덟 곳을 분석했더니, ",
+              "만든 지 삼 년까지는 ",
+              "한 해 평균 522개체가 지나갔는데 ",
+              "여덟 해가 지난 뒤에는 675개체로 ",
+              "약 30퍼센트 늘었다. ",
+              "만든 지 다섯 해가 지난 열다섯 곳에서는 ",
+              "동물 찻길 사고가 ",
+              "만들기 전보다 평균 18퍼센트 줄었다. ",
+              "2013년 오대산에 만든 터널형은 ",
+              "87.3퍼센트나 줄어 ",
+              "가장 큰 효과를 보였다."
+            ],
+            [
+              "여기서 눈여겨볼 것이 있다. ",
+              "효과가 곧바로 나타나지 않았다는 점이다. ",
+              "동물은 낯선 구조물을 ",
+              "금방 이용하지 않는다. ",
+              "이용하는 수가 늘고 사고가 줄어드는 것은 ",
+              "여러 해가 지난 뒤였다. ",
+              "만들자마자 성적을 매겼다면 ",
+              "이 통로들은 모두 ",
+              "「효과 없음」으로 적혔을 것이다."
+            ],
+            [
+              "그렇다고 짓기만 하면 되는 것도 아니다. ",
+              "환경부가 전국의 생태통로 564곳을 ",
+              "하나도 빠짐없이 조사한 적이 있다. ",
+              "그 결과 535곳에 ",
+              "고치거나 보완하라고 요청했다. ",
+              "안에 풀과 나무가 제대로 자라지 않거나, ",
+              "다른 용도로 함께 쓰여 ",
+              "제 기능을 못 하는 곳이 많았다. ",
+              "다리를 놓았다는 말과 ",
+              "동물이 건넌다는 말은 ",
+              "같은 말이 아니다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "서식지",
+              "easy": "생물이 자리를 잡고 살아가는 곳",
+              "hanja": "棲(깃들일 서)+息(쉴 식)+地(땅 지)"
+            },
+            {
+              "word": "개체",
+              "easy": "낱낱의 생물 하나하나를 세는 말",
+              "hanja": "個(낱 개)+體(몸 체)"
+            },
+            {
+              "word": "구조물",
+              "easy": "일정한 짜임새를 갖추어 사람이 지어 놓은 것",
+              "hanja": "構(얽을 구)+造(지을 조)+物(물건 물)"
+            },
+            {
+              "word": "보완",
+              "easy": "모자란 곳을 채워 더 낫게 하는 일",
+              "hanja": "補(기울 보)+完(완전할 완)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "생태통로는 만들기만 하면 바로 효과가 난다",
+                "생태통로는 효과가 있지만 시간이 걸리고, 지어 놓는 것만으로는 부족하다",
+                "생태통로는 효과가 없어 그만 만들어야 한다",
+                "도로를 만들지 않는 것이 유일한 방법이다"
+              ],
+              "answer": 1,
+              "explain": "효과는 숫자로 확인되었지만 여러 해가 걸렸고, 전국 조사에서는 많은 곳이 제 기능을 못 했다는 것이 글의 핵심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "생태통로를 지나간 동물 수에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "삼 년까지 522개체, 여덟 해 뒤 675개체로 늘었다",
+                "해마다 줄어들었다",
+                "처음부터 675개체였다",
+                "한 번도 세어 본 적이 없다"
+              ],
+              "answer": 0,
+              "explain": "만든 지 삼 년까지는 한 해 평균 522개체, 여덟 해가 지난 뒤에는 675개체로 약 30퍼센트 늘었다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "환경부가 전국 생태통로 564곳을 조사한 결과는?",
+              "choices": [
+                "모두 잘 관리되고 있었다",
+                "564곳이 모두 헐렸다",
+                "조사를 마치지 못했다",
+                "535곳에 고치거나 보완하라고 요청했다"
+              ],
+              "answer": 3,
+              "explain": "564곳을 빠짐없이 조사해 그중 535곳에 개선·보완을 요청했다고 나와 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「서식지」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "동물을 가두어 기르는 우리",
+                "생물이 자리를 잡고 살아가는 곳",
+                "사람이 지나다니는 길",
+                "나무를 심어 둔 화분"
+              ],
+              "answer": 1,
+              "explain": "서식지는 생물이 자리를 잡고 살아가는 곳을 뜻한다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「만들자마자 성적을 매겼다면 모두 효과 없음으로 적혔을 것이다」라고 쓴 까닭은?",
+              "choices": [
+                "숫자를 세는 사람이 부족했기 때문에",
+                "동물이 낯선 구조물을 금방 이용하지 않아 초기 수치가 낮기 때문에",
+                "통로가 너무 좁게 지어졌기 때문에",
+                "국립공원에는 동물이 살지 않기 때문에"
+              ],
+              "answer": 1,
+              "explain": "초기에는 이용이 적고 여러 해가 지나야 늘어나므로, 짧게만 재면 효과가 없는 것처럼 보인다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 글을 읽고 새 생태통로를 평가한다면 가장 알맞은 방법은?",
+              "choices": [
+                "완공한 달에 한 번 세어 보고 판정한다",
+                "다른 나라 통로의 수치를 그대로 가져다 쓴다",
+                "여러 해에 걸쳐 이용 개체수와 사고 건수를 함께 세어 본다",
+                "통로의 길이만 재어 본다"
+              ],
+              "answer": 2,
+              "explain": "이용이 안정되기까지 시간이 걸리므로, 여러 해 동안 이용 개체수와 사고 건수를 함께 보아야 한다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "When a road is built, a forest is cut in two. The place where animals lived, their habitat, is broken apart. The structure that joins the broken pieces again is called an eco-corridor. Some run under the road as tunnels, and some cross over it as bridges. In Korea the first one was built in 1998 on a road through Jirisan, and today there are eighteen inside the national parks: nine tunnels and nine bridges.",
+            "The effect can be seen in numbers. When the Korea National Park Service analysed those eighteen corridors, an average of 522 animals a year passed through during the first three years, and after eight years the figure had risen to 675, an increase of about thirty percent. At the fifteen corridors older than five years, roadkill fell by an average of eighteen percent compared with before they were built. The tunnel built at Odaesan in 2013 showed the largest effect of all, a fall of 87.3 percent.",
+            "One thing here deserves attention. The effect did not appear at once. Animals do not use an unfamiliar structure straight away. The rise in numbers and the fall in accidents came only after several years had passed. Had these corridors been graded the moment they were finished, every one of them would have been written down as having no effect.",
+            "That does not mean building alone is enough. The Ministry of Environment once surveyed all 564 eco-corridors in the country without exception. It then asked for repairs or improvements at 535 of them. In many, grass and trees inside had not grown properly, or the passage was shared with other uses and could not do its own work. Saying a bridge has been built and saying animals cross it are not the same thing."
+          ],
+          "envocab": [
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "corridor",
+              "ko": "통로 (명사)",
+              "base": "corridor [ˈkɔːrɪdər]"
+            },
+            {
+              "word": "roadkill",
+              "ko": "동물 찻길 사고 (명사)",
+              "base": "roadkill [ˈroʊdkɪl]"
+            },
+            {
+              "word": "unfamiliar",
+              "ko": "낯선 (형용사)",
+              "base": "unfamiliar [ˌʌnfəˈmɪliər]"
+            },
+            {
+              "word": "surveyed",
+              "ko": "조사했다 (동사 survey)",
+              "base": "survey [sərˈveɪ]"
+            }
+          ],
+          "enseg": [
+            [
+              "When a road is built, a forest is cut in two. ",
+              "The place where animals lived, their habitat, ",
+              "is broken apart. ",
+              "The structure that joins the broken pieces again is called an eco-corridor. ",
+              "Some run under the road as tunnels, ",
+              "and some cross over it as bridges. ",
+              "In Korea the first one was built in 1998 on a road through Jirisan,",
+              " ",
+              "and today there are eighteen inside the national parks: nine tunnels",
+              " and nine bridges."
+            ],
+            [
+              "The effect can be seen in numbers. ",
+              "When the Korea National Park Service analysed those eighteen corridors, ",
+              "an average of 522 animals a year passed through during the first three years,",
+              " ",
+              "and after eight years the figure had risen to 675, ",
+              "an increase of about thirty percent. ",
+              "At the fifteen corridors older than five years, ",
+              "roadkill fell by an average of eighteen percent compared with before they were built. ",
+              "The tunnel built at Odaesan in 2013 showed the largest effect of all, ",
+              "a fall of 87.3 percent."
+            ],
+            [
+              "One thing here deserves attention. ",
+              "The effect did not appear at once. ",
+              "Animals do not use an unfamiliar structure straight away. ",
+              "The rise in numbers",
+              " and the fall in accidents came only after several years had passed. ",
+              "Had these corridors been graded the moment they were finished, ",
+              "every one of them would have been written down as having no effect."
+            ],
+            [
+              "That does not mean building alone is enough. ",
+              "The Ministry of Environment once surveyed all 564 eco-corridors in the country without exception. ",
+              "It then asked for repairs",
+              " or improvements at 535 of them. ",
+              "In many, grass",
+              " and trees inside had not grown properly, ",
+              "or the passage was shared with other uses",
+              " and could not do its own work. ",
+              "Saying a bridge has been built",
+              " and saying animals cross it are not the same thing."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "짓는 일과 작동하는 일",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "도로는 사람에게 길을 내주지만 ",
+              "동물에게는 벽이 된다. ",
+              "숲을 가로지르는 도로 하나가 ",
+              "서식지를 둘로 갈라놓기 때문이다. ",
+              "이렇게 끊어진 서식지를 다시 잇는 시설이 생태통로다. ",
+              "도로 밑으로 지나가는 터널형과 ",
+              "도로 위를 넘어가는 육교형이 있다. ",
+              "우리나라 첫 생태통로는 ",
+              "1998년 지리산을 지나는 도로에 만들어졌고, ",
+              "지금 국립공원 안에는 ",
+              "터널형 아홉 곳과 육교형 아홉 곳, ",
+              "모두 열여덟 곳이 있다."
+            ],
+            [
+              "국립공원공단은 이 열여덟 곳을 분석해 ",
+              "효과를 숫자로 내놓았다. ",
+              "설치 초기인 삼 년까지는 ",
+              "한 해 평균 522개체가 통로를 지났는데, ",
+              "여덟 해가 지난 뒤에는 675개체로 ",
+              "약 30퍼센트 늘었다. ",
+              "설치한 지 다섯 해가 넘은 열다섯 곳에서는 ",
+              "동물 찻길 사고가 설치 전보다 ",
+              "평균 약 18퍼센트 줄었다. ",
+              "2013년 오대산 월정사 진입로에 만든 터널형은 ",
+              "87.3퍼센트 감소로 저감 효과 1위를 기록했다. ",
+              "통로만 세운 것이 아니라 ",
+              "유도울타리와 안내표지판을 ",
+              "함께 둔 결과이기도 하다."
+            ],
+            [
+              "이 숫자에서 정작 중요한 것은 ",
+              "효과의 크기가 아니라 시점이다. ",
+              "동물은 낯선 구조물을 곧바로 쓰지 않는다. ",
+              "이용 개체가 늘고 사고가 줄어드는 것은 ",
+              "여러 해가 흐른 뒤였고, ",
+              "공단은 다섯 해쯤부터 이용이 안정화되는 ",
+              "정착 단계로 본다. ",
+              "만약 완공 직후에 성적을 매겼다면 ",
+              "이 통로들은 하나같이 ",
+              "「효과 없음」으로 기록되었을 것이다."
+            ],
+            [
+              "그렇다고 지어 놓기만 하면 되는 것은 아니다. ",
+              "환경부는 전국의 생태통로 564곳을 ",
+              "빠짐없이 조사한 뒤 ",
+              "그중 535곳에 개선과 보완을 요청했다. ",
+              "통로 안쪽에 풀과 나무가 제대로 자라지 않거나, ",
+              "배수로나 농로처럼 다른 용도와 함께 쓰여 ",
+              "본래 기능이 약해진 곳이 적지 않았다. ",
+              "다리를 놓았다는 말과 ",
+              "동물이 그 다리를 건넌다는 말은 ",
+              "같은 말이 아니다."
+            ],
+            [
+              "그래서 제도가 바뀌는 방향도 ",
+              "짓는 쪽이 아니라 확인하는 쪽이다. ",
+              "환경부는 설치 계획을 미리 따져 보는 절차를 강화하고, ",
+              "생태통로 정보를 한데 모으는 시스템을 만들고, ",
+              "지은 뒤에 효과를 평가하는 제도를 새로 두기로 했다. ",
+              "짓는 일에는 예산과 준공식이 따라오지만 ",
+              "세는 일에는 그런 것이 없다. ",
+              "그러나 세어 보지 않으면 ",
+              "무엇이 잘못되었는지조차 알 수 없다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "서식지",
+              "easy": "생물이 자리를 잡고 살아가는 곳",
+              "hanja": "棲(깃들일 서)+息(쉴 식)+地(땅 지)"
+            },
+            {
+              "word": "개체",
+              "easy": "낱낱의 생물 하나하나를 세는 단위",
+              "hanja": "個(낱 개)+體(몸 체)"
+            },
+            {
+              "word": "정착",
+              "easy": "옮겨 다니지 않고 자리를 잡아 안정되는 것",
+              "hanja": "定(정할 정)+着(붙을 착)"
+            },
+            {
+              "word": "저감",
+              "easy": "수나 양을 낮추어 줄이는 일",
+              "hanja": "低(낮을 저)+減(덜 감)"
+            },
+            {
+              "word": "보완",
+              "easy": "모자란 부분을 채워 더 낫게 만드는 일",
+              "hanja": "補(기울 보)+完(완전할 완)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 강조하는 것은?",
+              "choices": [
+                "생태통로는 클수록 효과가 크다",
+                "도로를 더 이상 만들지 말아야 한다",
+                "짓는 일보다 지은 뒤에 확인하는 일이 중요하다",
+                "생태통로는 효과가 없으므로 예산을 줄여야 한다"
+              ],
+              "answer": 2,
+              "explain": "글은 효과가 늦게 나타난다는 점과 전국 조사 결과를 근거로, 확인하는 절차의 중요성으로 마무리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "오대산 월정사 진입로 생태통로에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "2013년에 만든 터널형으로 저감 효과 1위를 기록했다",
+                "1998년에 만든 첫 생태통로다",
+                "육교형이며 효과가 가장 낮았다",
+                "환경부가 철거를 요청했다"
+              ],
+              "answer": 0,
+              "explain": "2013년 오대산 월정사 진입로에 만든 터널형이 87.3퍼센트 감소로 1위였다고 나와 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "전국 생태통로 조사에서 기능이 약해진 원인으로 언급된 것은?",
+              "choices": [
+                "통로가 너무 길어서",
+                "안쪽 식생이 부실하거나 다른 용도와 함께 쓰여서",
+                "동물의 수가 너무 많아서",
+                "안내표지판이 너무 커서"
+              ],
+              "answer": 1,
+              "explain": "안쪽에 풀과 나무가 제대로 자라지 않거나 배수로·농로처럼 다른 용도와 겸용되어 기능이 약해졌다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「정착 단계」가 이 글에서 가리키는 것은?",
+              "choices": [
+                "공사가 끝난 바로 그 시점",
+                "예산이 배정되는 시기",
+                "동물이 통로를 처음 발견한 날",
+                "이용이 안정되어 수치가 꾸준해지는 시기"
+              ],
+              "answer": 3,
+              "explain": "공단은 다섯 해쯤부터 이용이 안정화되는 시기를 정착 단계로 본다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「짓는 일에는 예산과 준공식이 따라오지만 세는 일에는 그런 것이 없다」고 쓴 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "준공식을 더 크게 열어야 한다는 뜻",
+                "예산이 부족해 통로를 지을 수 없다는 뜻",
+                "눈에 띄는 성과는 짓는 쪽에 몰려 있어 확인하는 일이 뒤로 밀리기 쉽다는 뜻",
+                "세는 일은 어차피 필요 없다는 뜻"
+              ],
+              "answer": 2,
+              "explain": "짓는 일에는 보상이 따르지만 확인하는 일에는 없으므로 소홀해지기 쉽다는 점을 지적한 것이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지를 뒷받침하기에 가장 약한 근거는?",
+              "choices": [
+                "설치 삼 년까지 522개체, 여덟 해 뒤 675개체",
+                "전국 564곳 가운데 535곳에 개선·보완 요청",
+                "다섯 해가 넘은 열다섯 곳에서 사고가 평균 18퍼센트 감소",
+                "국립공원 안 생태통로가 터널형 아홉 곳, 육교형 아홉 곳이라는 사실"
+              ],
+              "answer": 3,
+              "explain": "통로의 개수와 형태는 규모를 알려 줄 뿐, 효과가 언제 나타나는지나 관리가 잘되는지는 말해 주지 않는다.",
+              "evidencePara": 0
+            }
+          ],
+          "en": [
+            "A road opens a way for people, but for animals it becomes a wall. A single road across a forest splits a habitat in two. The structure that joins a habitat broken in this way is the eco-corridor. Some pass beneath the road as tunnels, and some go over it as bridges. Korea's first eco-corridor was built in 1998 on a road through Jirisan, and today the national parks hold eighteen of them: nine tunnels and nine bridges.",
+            "The Korea National Park Service analysed those eighteen and put the effect into numbers. During the first three years an average of 522 animals a year crossed, and after eight years the figure reached 675, a rise of about thirty percent. At the fifteen corridors more than five years old, roadkill fell by an average of about eighteen percent from before they were built. The tunnel built in 2013 at the Woljeongsa approach road in Odaesan recorded the largest reduction of all, 87.3 percent. This was possible because the corridors were not built alone; guiding fences and signboards were placed alongside them.",
+            "What matters most in these figures is not the size of the effect but its timing. Animals do not use an unfamiliar structure at once. The rise in crossings and the fall in accidents came only after several years, and the service treats the point around five years, when use levels off, as the settling stage. Had these corridors been graded right after completion, every one of them would have been recorded as having no effect.",
+            "Building them, however, is not enough on its own. The Ministry of Environment surveyed all 564 eco-corridors in the country and then asked for improvements at 535 of them. In more than a few, grass and trees inside had failed to grow, or the passage was shared with drainage channels and farm tracks so that its own function was weakened. Saying a bridge has been built and saying animals cross that bridge are not the same thing.",
+            "The direction in which the rules are changing therefore points at checking rather than building. The ministry has decided to strengthen the review of installation plans in advance, to gather corridor information into a single system, and to add a new procedure for evaluating each corridor after it is built. Building brings budgets and opening ceremonies; counting brings neither. Yet without counting, we cannot even know what has gone wrong."
+          ],
+          "envocab": [
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "corridor",
+              "ko": "통로 (명사)",
+              "base": "corridor [ˈkɔːrɪdər]"
+            },
+            {
+              "word": "roadkill",
+              "ko": "동물 찻길 사고 (명사)",
+              "base": "roadkill [ˈroʊdkɪl]"
+            },
+            {
+              "word": "timing",
+              "ko": "시점, 시기 (명사)",
+              "base": "timing [ˈtaɪmɪŋ]"
+            },
+            {
+              "word": "evaluating",
+              "ko": "평가하는 (동사 evaluate)",
+              "base": "evaluate [ɪˈvæljueɪt]"
+            },
+            {
+              "word": "drainage",
+              "ko": "배수 (명사)",
+              "base": "drainage [ˈdreɪnɪdʒ]"
+            }
+          ],
+          "enseg": [
+            [
+              "A road opens a way for people, ",
+              "but for animals it becomes a wall. ",
+              "A single road across a forest splits a habitat in two. ",
+              "The structure that joins a habitat broken in this way is the eco-corridor. ",
+              "Some pass beneath the road as tunnels, ",
+              "and some go over it as bridges. ",
+              "Korea's first eco-corridor was built in 1998 on a road through Jirisan,",
+              " ",
+              "and today the national parks hold eighteen of them: nine tunnels",
+              " and nine bridges."
+            ],
+            [
+              "The Korea National Park Service analysed those eighteen",
+              " and put the effect into numbers. ",
+              "During the first three years an average of 522 animals a year crossed,",
+              " and after eight years the figure reached 675, ",
+              "a rise of about thirty percent. ",
+              "At the fifteen corridors more than five years old, ",
+              "roadkill fell by an average of about eighteen percent from before they were built. ",
+              "The tunnel built in 2013 at the Woljeongsa approach road in Odaesan recorded the largest reduction of all, ",
+              "87.3 percent. ",
+              "This was possible because the corridors were not built alone; guiding fences",
+              " and signboards were placed alongside them."
+            ],
+            [
+              "What matters most in these figures is not the size of the effect",
+              " but its timing. ",
+              "Animals do not use an unfamiliar structure at once. ",
+              "The rise in crossings",
+              " and the fall in accidents came only after several years,",
+              " ",
+              "and the service treats the point around five years, ",
+              "when use levels off, as the settling stage. ",
+              "Had these corridors been graded right after completion, ",
+              "every one of them would have been recorded as having no effect."
+            ],
+            [
+              "Building them, however, ",
+              "is not enough on its own. ",
+              "The Ministry of Environment surveyed all 564 eco-corridors in the country",
+              " and then asked for improvements at 535 of them. ",
+              "In more than a few, grass",
+              " and trees inside had failed to grow, ",
+              "or the passage was shared with drainage channels",
+              " and farm tracks so that its own function was weakened. ",
+              "Saying a bridge has been built",
+              " and saying animals cross that bridge are not the same thing."
+            ],
+            [
+              "The direction in which the rules are changing therefore points at checking rather than building. ",
+              "The ministry has decided to strengthen the review of installation plans in advance, ",
+              "to gather corridor information into a single system,",
+              " ",
+              "and to add a new procedure for evaluating each corridor after it is built. ",
+              "Building brings budgets",
+              " and opening ceremonies; counting brings neither. ",
+              "Yet without counting, ",
+              "we cannot even know what has gone wrong."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "세지 않으면 알 수 없는 것",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "도로는 사람의 이동을 늘리는 동시에 ",
+              "생태축을 끊는다. ",
+              "숲을 가로지르는 도로 하나가 ",
+              "서식지를 둘로 갈라 두면 ",
+              "동물은 좁아진 구역에 갇히고, ",
+              "먹이와 짝을 찾아 도로로 나섰다가 ",
+              "차에 치인다. ",
+              "이 단절을 되잇기 위한 시설이 생태통로다. ",
+              "도로 아래를 지나는 터널형과 ",
+              "도로 위를 넘는 육교형이 있으며, ",
+              "우리나라 첫 사례는 1998년 ",
+              "지리산을 지나는 지방도 861호에 놓인 터널형이다. ",
+              "지금 국립공원 안에는 터널형 아홉 곳과 육교형 아홉 곳, ",
+              "모두 열여덟 곳이 있다."
+            ],
+            [
+              "국립공원공단 소속 국립공원연구원은 ",
+              "이 열여덟 곳을 분석해 효과를 수치로 정리했다. ",
+              "설치 초기인 삼 년까지 ",
+              "연평균 522개체가 통로를 이용했고, ",
+              "여덟 해가 지난 뒤에는 675개체로 ",
+              "약 30퍼센트 늘었다. ",
+              "설치한 지 다섯 해가 지난 열다섯 곳에서는 ",
+              "연간 동물 찻길 사고가 설치 전보다 ",
+              "평균 약 18퍼센트 줄었다. ",
+              "2013년 오대산 월정사 진입로에 세운 터널형은 ",
+              "87.3퍼센트라는 감소율로 1위를 기록했다. ",
+              "통로 옆에 유도울타리와 안내표지판 같은 ",
+              "연계 시설을 함께 둔 것이 ",
+              "동물을 통로 쪽으로 이끄는 역할을 했다."
+            ],
+            [
+              "이 자료에서 가장 눈여겨볼 대목은 ",
+              "효과의 크기가 아니라 나타난 시점이다. ",
+              "야생동물은 낯선 구조물을 곧바로 이용하지 않는다. ",
+              "이용 개체가 늘고 사고가 줄어드는 변화는 ",
+              "여러 해가 지난 뒤에 나타났고, ",
+              "공단은 다섯 해 무렵부터 ",
+              "이용이 안정화되는 정착 단계로 본다. ",
+              "완공 직후에 성과를 재는 방식이었다면 ",
+              "이 통로들은 예외 없이 ",
+              "「효과 없음」으로 기록되었을 것이다. ",
+              "장기간 지켜본 자료가 쌓인 뒤에야 ",
+              "비로소 판단이 가능해진 셈이다."
+            ],
+            [
+              "그렇다고 짓기만 하면 되는 것은 아니다. ",
+              "환경부는 전국 생태통로 564곳을 전수조사한 뒤 ",
+              "그 가운데 535곳에 개선과 보완을 요청했다. ",
+              "통로 안쪽 식생이 제대로 조성되지 않았거나, ",
+              "배수로·농로처럼 다른 용도와 겸용되어 ",
+              "본래 기능이 약해진 사례가 많았다. ",
+              "구조물은 서 있어도 ",
+              "동물이 지나가지 않는다면 ",
+              "그것은 생태통로가 아니다. ",
+              "다리를 놓았다는 말과 ",
+              "동물이 그 다리를 건넌다는 말은 ",
+              "같은 문장이 아니다."
+            ],
+            [
+              "두 자료를 겹쳐 놓으면 ",
+              "이 문제의 성격이 드러난다. ",
+              "효과는 늦게 나타나므로 ",
+              "짧게 재면 잘 지은 통로도 실패로 보이고, ",
+              "관리를 놓치면 ",
+              "오래 두어도 끝내 작동하지 않는다. ",
+              "어느 쪽이든 답은 계속 세어 보는 것뿐이다. ",
+              "환경부가 설치 계획의 사전 검토를 강화하고, ",
+              "생태통로 정보를 모으는 시스템을 만들고, ",
+              "사후평가 제도를 새로 두기로 한 것도 그래서다. ",
+              "짓는 일에는 예산과 준공식이 따라붙지만 ",
+              "세는 일에는 그런 것이 없다. ",
+              "그럼에도 세지 않으면 ",
+              "무엇이 잘못되었는지조차 알 수 없다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "생태축",
+              "easy": "생물이 이어져 살아가도록 연결된 자연의 큰 줄기",
+              "hanja": "生(날 생)+態(모습 태)+軸(굴대 축)"
+            },
+            {
+              "word": "단절",
+              "easy": "이어져 있던 것이 끊어지는 일",
+              "hanja": "斷(끊을 단)+絶(끊을 절)"
+            },
+            {
+              "word": "정착",
+              "easy": "옮겨 다니지 않고 자리를 잡아 안정되는 것",
+              "hanja": "定(정할 정)+着(붙을 착)"
+            },
+            {
+              "word": "전수조사",
+              "easy": "표본을 뽑지 않고 대상 전체를 빠짐없이 조사하는 일",
+              "hanja": "全(온전 전)+數(셈 수)+調(고를 조)+査(조사할 사)"
+            },
+            {
+              "word": "사후평가",
+              "easy": "사업을 마친 뒤에 실제로 효과가 있었는지 따져 보는 일",
+              "hanja": "事(일 사)+後(뒤 후)+評(평할 평)+價(값 가)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 주장으로 가장 알맞은 것은?",
+              "choices": [
+                "생태통로는 효과가 없으므로 예산을 다른 곳에 써야 한다",
+                "생태통로는 짓는 것으로 끝나지 않으며 계속 세어 확인해야 작동한다",
+                "국립공원의 생태통로 수를 두 배로 늘려야 한다",
+                "육교형보다 터널형이 언제나 낫다"
+              ],
+              "answer": 1,
+              "explain": "효과가 늦게 나타난다는 점과 전국 조사에서 다수가 개선 대상이었다는 점을 근거로, 확인의 필요성을 주장한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "국립공원연구원의 분석 결과로 알맞지 않은 것은?",
+              "choices": [
+                "설치 초기 삼 년까지 연평균 522개체가 이용했다",
+                "여덟 해 뒤에는 675개체로 약 30퍼센트 늘었다",
+                "다섯 해가 지난 열다섯 곳에서 사고가 평균 약 18퍼센트 줄었다",
+                "모든 통로에서 사고가 87.3퍼센트씩 줄었다"
+              ],
+              "answer": 3,
+              "explain": "87.3퍼센트는 오대산 월정사 진입로 터널형 한 곳의 기록으로, 감소율 1위였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "전국 전수조사에서 기능이 약해진 원인으로 제시된 것은?",
+              "choices": [
+                "안쪽 식생이 부실하거나 다른 용도와 겸용된 점",
+                "통로의 폭이 지나치게 넓은 점",
+                "유도울타리를 너무 많이 세운 점",
+                "동물의 개체 수가 갑자기 늘어난 점"
+              ],
+              "answer": 0,
+              "explain": "식생이 제대로 조성되지 않았거나 배수로·농로와 겸용되어 본래 기능이 약해진 사례가 많았다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「전수조사」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "조사 결과를 널리 알리는 일",
+                "여러 해에 걸쳐 반복해 조사하는 일",
+                "대상 전체를 빠짐없이 조사하는 일",
+                "일부를 뽑아 대표로 조사하는 일"
+              ],
+              "answer": 2,
+              "explain": "표본을 뽑지 않고 대상 전체를 하나도 빠뜨리지 않고 조사하는 것이 전수조사다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 두 자료를 겹쳐 놓은 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "국립공원공단과 환경부의 자료가 서로 어긋남을 보이려고",
+                "생태통로 사업을 중단해야 한다고 주장하려고",
+                "통로의 개수가 부족하다는 점을 강조하려고",
+                "짧게 재도 틀리고 관리를 놓쳐도 틀리므로 계속 세는 수밖에 없음을 보이려고"
+              ],
+              "answer": 3,
+              "explain": "효과가 늦다는 자료와 관리가 부실했다는 자료를 겹쳐, 어느 쪽이든 지속적인 확인이 답이라는 결론으로 이끈다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「효과는 늦게 나타난다」는 이 글의 설명이 잘못 쓰일 수 있는 경우로 가장 알맞은 것은?",
+              "choices": [
+                "여러 해에 걸쳐 이용 개체수를 세는 데 쓰이는 경우",
+                "실제로 설계가 잘못된 통로를 두고도 「아직 정착 단계가 아니다」라며 개선을 미루는 경우",
+                "완공 직후의 수치를 최종 성적으로 삼지 않는 경우",
+                "유도울타리를 함께 설치하는 근거로 쓰이는 경우"
+              ],
+              "answer": 1,
+              "explain": "시간이 걸린다는 사실은 기다림의 근거가 되지만, 동시에 실패를 덮는 변명으로도 쓰일 수 있다. 그래서 전수조사 같은 별도의 점검이 필요하다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점을 다른 공공사업에 적용한 예로 가장 알맞은 것은?",
+              "choices": [
+                "시설을 지은 해에 이용자 수를 한 번 세고 사업을 종료한다",
+                "이용자가 적으면 즉시 철거한다",
+                "완공 뒤 여러 해 동안 이용 실태를 정기적으로 조사하고 그 결과로 설계를 고친다",
+                "다른 지역의 성공 사례를 그대로 옮겨 짓는다"
+              ],
+              "answer": 2,
+              "explain": "지은 뒤 오래 세어 보고 그 자료로 고쳐 나가는 것이 이 글이 말하는 사후평가의 방식이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "A road increases human movement and at the same time cuts an ecological axis. When a single road across a forest divides a habitat in two, animals are confined to a narrowed area, step onto the road in search of food and mates, and are struck by cars. The structure meant to rejoin this severed ground is the eco-corridor. Some pass beneath the road as tunnels and some cross above it as bridges; Korea's first was a tunnel laid in 1998 on provincial road 861 through Jirisan. Today the national parks hold nine tunnels and nine bridges, eighteen in all.",
+            "The National Park Research Institute, part of the Korea National Park Service, analysed those eighteen and set out the effect in figures. During the first three years an average of 522 animals a year used the corridors, and after eight years the number reached 675, a rise of about thirty percent. At the fifteen corridors more than five years old, yearly roadkill fell by an average of about eighteen percent from before construction. The tunnel built in 2013 at the Woljeongsa approach road in Odaesan recorded the highest reduction rate, 87.3 percent. Guiding fences and signboards placed beside the corridors played their part by steering animals towards them.",
+            "The passage in this material most worth attention is not the size of the effect but the moment it appeared. Wild animals do not use an unfamiliar structure straight away. The rise in crossings and the fall in accidents emerged only after several years, and the service regards the point around five years, when use stabilises, as the settling stage. Had performance been measured immediately after completion, these corridors would without exception have been recorded as having no effect. Judgment became possible only once years of observation had accumulated.",
+            "Building them, even so, is not the whole task. The Ministry of Environment surveyed every one of the country's 564 eco-corridors and then asked for improvements at 535 of them. In many cases the vegetation inside had not been properly established, or the passage doubled as a drainage channel or farm track so that its intended function weakened. If the structure stands but no animal passes through it, it is not an eco-corridor. Saying a bridge has been built and saying animals cross that bridge are not the same sentence.",
+            "Lay the two sets of findings side by side and the nature of the problem appears. Because the effect comes late, a well-built corridor measured too soon looks like a failure; and where management lapses, a corridor never works however long it stands. Either way the only answer is to keep counting. That is why the ministry has decided to strengthen advance review of installation plans, to build a system gathering corridor information, and to add a procedure for evaluation after construction. Building carries budgets and opening ceremonies with it; counting carries neither. Without counting, however, we cannot even know what has gone wrong."
+          ],
+          "envocab": [
+            {
+              "word": "severed",
+              "ko": "끊어진 (동사 sever)",
+              "base": "sever [ˈsevər]"
+            },
+            {
+              "word": "confined",
+              "ko": "갇힌 (동사 confine)",
+              "base": "confine [kənˈfaɪn]"
+            },
+            {
+              "word": "stabilises",
+              "ko": "안정된다 (동사 stabilise)",
+              "base": "stabilise [ˈsteɪbəlaɪz]"
+            },
+            {
+              "word": "vegetation",
+              "ko": "식생, 초목 (명사)",
+              "base": "vegetation [ˌvedʒəˈteɪʃn]"
+            },
+            {
+              "word": "accumulated",
+              "ko": "쌓였다 (동사 accumulate)",
+              "base": "accumulate [əˈkjuːmjəleɪt]"
+            },
+            {
+              "word": "lapses",
+              "ko": "소홀해지다 (동사 lapse)",
+              "base": "lapse [læps]"
+            }
+          ],
+          "enseg": [
+            [
+              "A road increases human movement",
+              " and at the same time cuts an ecological axis. ",
+              "When a single road across a forest divides a habitat in two, ",
+              "animals are confined to a narrowed area, ",
+              "step onto the road in search of food and mates, ",
+              "and are struck by cars. ",
+              "The structure meant to rejoin this severed ground is the eco-corridor. ",
+              "Some pass beneath the road as tunnels",
+              " and some cross above it as bridges; Korea's first was a tunnel laid in 1998 on provincial road 861 through Jirisan. ",
+              "Today the national parks hold nine tunnels",
+              " and nine bridges, eighteen in all."
+            ],
+            [
+              "The National Park Research Institute, ",
+              "part of the Korea National Park Service, ",
+              "analysed those eighteen",
+              " and set out the effect in figures. ",
+              "During the first three years an average of 522 animals a year used the corridors,",
+              " and after eight years the number reached 675, ",
+              "a rise of about thirty percent. ",
+              "At the fifteen corridors more than five years old, ",
+              "yearly roadkill fell by an average of about eighteen percent from before construction. ",
+              "The tunnel built in 2013 at the Woljeongsa approach road in Odaesan recorded the highest reduction rate, ",
+              "87.3 percent. ",
+              "Guiding fences",
+              " and signboards placed beside the corridors played their part by steering animals towards them."
+            ],
+            [
+              "The passage in this material most worth attention is not the size of the effect",
+              " but the moment it appeared. ",
+              "Wild animals do not use an unfamiliar structure straight away. ",
+              "The rise in crossings",
+              " and the fall in accidents emerged only after several years,",
+              " ",
+              "and the service regards the point around five years, ",
+              "when use stabilises, as the settling stage. ",
+              "Had performance been measured immediately after completion, ",
+              "these corridors would without exception have been recorded as having no effect. ",
+              "Judgment became possible only once years of observation had accumulated."
+            ],
+            [
+              "Building them, even so, is not the whole task. ",
+              "The Ministry of Environment surveyed every one of the country's 564 eco-corridors",
+              " and then asked for improvements at 535 of them. ",
+              "In many cases the vegetation inside had not been properly established,",
+              " or the passage doubled as a drainage channel",
+              " or farm track so that its intended function weakened. ",
+              "If the structure stands",
+              " but no animal passes through it, ",
+              "it is not an eco-corridor. ",
+              "Saying a bridge has been built",
+              " and saying animals cross that bridge are not the same sentence."
+            ],
+            [
+              "Lay the two sets of findings side by side",
+              " and the nature of the problem appears. ",
+              "Because the effect comes late, ",
+              "a well-built corridor measured too soon looks like a failure;",
+              " and where management lapses, ",
+              "a corridor never works however long it stands. ",
+              "Either way the only answer is to keep counting. ",
+              "That is why the ministry has decided to strengthen advance review of installation plans, ",
+              "to build a system gathering corridor information,",
+              " ",
+              "and to add a procedure for evaluation after construction. ",
+              "Building carries budgets",
+              " and opening ceremonies with it; counting carries neither. ",
+              "Without counting, however, ",
+              "we cannot even know what has gone wrong."
             ]
           ]
         }
