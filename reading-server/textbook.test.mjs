@@ -4,7 +4,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bookIndex, cleanWords, coachingCard, findBook, findLesson, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, findLesson, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -297,6 +297,91 @@ t('검수로 확정하면 그 강 낱말이 학부모에게 나간다', () => {
     withOverlay(fix, { 'b1#1': { words: [{ word: '초원', meaning: '들판' }], confirmed: true } }),
     { bookId: 'b1', lesson: 1 }, null, null);
   assert.deepStrictEqual(after.words, ['초원'], '학부모에게는 글자만');
+});
+
+t('검수 화면의 저장은 열린 강을 닫지 않는다', () => {
+  /* 예전에는 「임시 저장」이 늘 confirmed:false 를 보내, 뜻 하나 고치려고 저장했을 뿐인데
+     그 강이 학생에게서 조용히 사라졌다. 닫는 것은 따로 눌러야 하는 일이다. */
+  const ui = fs.readFileSync(path.join(ROOT, 'public', 'vocab-review.html'), 'utf8');
+  assert.ok(/if \(confirmed === undefined\) confirmed = !!\(TBCUR && TBCUR\.confirmed\);/.test(ui),
+    'tbSave 가 지금 상태를 지키지 않는다');
+  assert.ok(/'tbSave'\) return tbSave\(\);/.test(ui), '저장 단추가 confirmed 를 넘기면 안 된다');
+  assert.ok(/'tbClose'\) return tbSave\(false\);/.test(ui), '닫는 단추가 따로 있어야 한다');
+  assert.ok(/'tbAll'\) return tbConfirmAll\(true\);/.test(ui), '모두 열기 단추가 없다');
+  assert.ok(/'tbAllUndo'\) return tbConfirmAll\(false\);/.test(ui), '모두 닫기 단추가 없다');
+});
+
+t('목차를 다시 그려도 고른 교재가 유지된다', () => {
+  /* tbFillBooks 가 select 를 다시 그리면 선택이 첫 교재로 되돌아간다.
+     저장 한 번에 초2를 보다가 초1 목록으로 튀어, 무엇을 고치는지 알 수 없게 됐다. */
+  const ui = fs.readFileSync(path.join(ROOT, 'public', 'vocab-review.html'), 'utf8');
+  assert.ok(/var keepBook = \$\('#tbBook'\)\.value;/.test(ui), '고른 교재를 기억하지 않는다');
+  assert.ok(/if \(keepBook && TBOOKS\.some\(/.test(ui), '고른 교재를 되돌려 놓지 않는다');
+});
+
+t('저장 위치는 DATA_DIR 을 따른다', () => {
+  /* 서버 머리말이 DATA_DIR 을 알리는데 저장소가 읽지 않으면,
+     다른 곳을 가리켜 놓고 시험해도 조용히 기본 자리에 쌓인다. */
+  const store = fs.readFileSync(path.join(ROOT, 'store.mjs'), 'utf8');
+  assert.ok(store.includes('process.env.DATA_DIR'), 'store.mjs 가 DATA_DIR 을 읽지 않는다');
+});
+
+t('두 서버가 같은 통째 열기 경로를 낸다', () => {
+  /* 한쪽에만 있으면 로컬에서는 되고 라이브에서는 조용히 404가 난다 — 전에 겪은 일이다 */
+  for (const f of ['server.mjs', 'worker.mjs']) {
+    const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    assert.ok(src.includes('confirm-all'), f + ': 통째 열기 경로가 없다');
+    assert.ok(src.includes('confirmAllPlan'), f + ': 통째 열기가 공용 규칙을 쓰지 않는다');
+  }
+});
+
+t('교재를 통째로 열 때 뜻이 빈 강만 남는다', () => {
+  const book = { id: 'b1', lessons: [
+    { lesson: 1, title: '온전한 강', words: [{ word: '가', meaning: '뜻가' }] },
+    { lesson: 2, title: '빈 뜻이 있는 강', words: [{ word: '나', meaning: '' }] },
+    { lesson: 3, title: '낱말 없는 강', words: [] },
+  ] };
+  const plan = confirmAllPlan(book, {}, true);
+  assert.deepStrictEqual(plan.done, [1, 3], '뜻이 온전한 강과 낱말 없는 강은 열린다');
+  assert.strictEqual(plan.blocked.length, 1);
+  assert.strictEqual(plan.blocked[0].lesson, 2);
+  assert.ok(plan.blocked[0].error.includes('뜻이 비어'), plan.blocked[0].error);
+  assert.strictEqual(plan.entries.length, 2);
+  assert.ok(plan.entries.every((e) => e.value.confirmed));
+});
+
+t('통째로 열 때 강사가 고쳐 둔 값을 쓴다 — 원본으로 되돌리지 않는다', () => {
+  const book = { id: 'b1', lessons: [{ lesson: 1, title: 'ㄱ', words: [{ word: '가', meaning: '' }] }] };
+  /* 원본은 뜻이 비어 있지만 강사가 화면에서 채워 두었다 */
+  const ov = { 'b1#1': { words: [{ word: '가', meaning: '강사가 채운 뜻' }], confirmed: false } };
+  const plan = confirmAllPlan(book, ov, true);
+  assert.deepStrictEqual(plan.done, [1], '덧씌운 값으로 판단해야 열린다');
+  assert.strictEqual(plan.entries[0].value.words[0].meaning, '강사가 채운 뜻');
+});
+
+t('이미 열린 강은 다시 쓰지 않고, 닫기는 조건 없이 된다', () => {
+  const book = { id: 'b1', lessons: [
+    { lesson: 1, title: 'ㄱ', words: [{ word: '가', meaning: '뜻가' }] },
+    { lesson: 2, title: 'ㄴ', words: [{ word: '나', meaning: '뜻나' }] },
+  ] };
+  const ov = { 'b1#1': { words: [{ word: '가', meaning: '뜻가' }], confirmed: true } };
+  assert.deepStrictEqual(confirmAllPlan(book, ov, true).skipped, [1], '이미 열린 강은 건너뛴다');
+  /* 닫기는 뜻이 비어 있어도 막히지 않아야 한다 — 잘못 열었을 때 되돌릴 길이 없으면 안 된다 */
+  const broken = { 'b1#1': { words: [{ word: '가', meaning: '' }], confirmed: true } };
+  const undo = confirmAllPlan(book, broken, false);
+  assert.deepStrictEqual(undo.done, [1]);
+  assert.strictEqual(undo.entries[0].value.confirmed, false);
+  assert.strictEqual(undo.blocked.length, 0);
+});
+
+t('실제 교재 두 권은 통째로 열 수 있다', () => {
+  /* 뜻이 다 채워져 있으니 막히는 강이 없어야 한다 — 하나라도 막히면 그 강이 학생에게 못 간다 */
+  for (const id of ['eoduk-cho1', 'eoduk-cho2']) {
+    const plan = confirmAllPlan(findBook(TB, id), {}, true);
+    assert.strictEqual(plan.blocked.length, 0,
+      id + ': 열리지 않는 강 — ' + plan.blocked.map((x) => x.lesson + '강 ' + x.error).join(' / '));
+    assert.strictEqual(plan.done.length, 20, id + ': 열린 강이 20개가 아니다');
+  }
 });
 
 t('목차가 남은 일을 보여 준다', () => {

@@ -5,7 +5,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
+/* DATA_DIR 로 저장 위치를 옮길 수 있다 — 서버 머리말이 알리는 값이다.
+   전에는 이 값을 읽지 않아, 다른 곳을 가리켜 놓고 시험해도 조용히 기본 자리에 쌓였다. */
+const DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
 const FILE = path.join(DIR, 'db.json');
 const BDIR = path.join(DIR, 'backups');
 const BACKUP_KEEP = 10;
