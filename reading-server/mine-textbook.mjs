@@ -6,12 +6,17 @@
    원장님이 코칭글에 이미 써 두신 것을 옮길 뿐이다. 못 캔 자리는 비워 둔다 —
    그럴듯하게 지어 넣으면 강사 검수가 무의미해진다. */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+/* 예문은 문맥 빈칸 문제가 구멍을 뚫을 수 있어야 쓸모가 있다.
+   짐작으로 고르지 않고, 문제를 만드는 바로 그 함수에 물어본다 —
+   그래야 여기서 고른 예문과 앱이 쓸 수 있는 예문이 어긋나지 않는다. */
+const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
 
 const strip = (s) => String(s || '').replace(/^[\s'‘’"“”\-–—→]+|[\s'‘’"“”\-–—→]+$/g, '').trim();
 const stem = (w) => w.replace(/(하다|되다|이다|다)$/, '');
 
 /* 낱말이 아닌 것 — 어간 부스러기와 수업 용어 */
-const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기)$/;
+const NOT_WORD = /^(익히|표현하|만들어주|도와주|마주치|던져보|헷갈리|찾아보|사용되|흐르|좋아하|해내|연습|발음|어휘|낱말|활동|이야기|표현|의미|문장|단어|상황|감정|아이|엄마|친구|부모|예시|기억|주의|참고|목표|정리|방법|가지|하나|보기|질문)$/;
 /* 활동·설명 제목도 콜론을 달고 나온다 — "구별 활동: …", "예시 정리: …". 낱말이 아니다. */
 const NOT_WORD2 = /(활동|하기|해보기|익히기|만들기|그리기|놀이|게임|연습|퀴즈|낱말|정리|단계|방법|예시|예문|상황극|같습니다)$/;
 
@@ -271,12 +276,15 @@ function examples(coaching, words) {
   /* 물음을 거르는 것이 줄 우선보다 앞선다. 그 낱말 줄에 달린 것이라도 물음이면
      구멍을 뚫을 자리가 없다 — 「놀이공원에서 … 기분 어땠어?」로는 문제가 되지 않는다. */
   const isAsk = (q) => /[?？]/.test(q);
+  const canBlank = (w, q) => !!(q && QUIZ.blankExample({ word: w, example: q }));
   const out = {};
   for (const w of words) {
-    const mine = quotes.filter((q) => q.includes(stem(w)));
     const line = onLine[w];
-    const hit = (line && !isAsk(line) ? line : null)
-      || mine.find((q) => !isAsk(q)) || line || mine[0];
+    /* 그 낱말이 실제로 들어 있는 인용만 후보다. 줄에 달린 것을 앞에 둔다. */
+    const cand = [line].concat(quotes).filter((q) => q && (canBlank(w, q) || q.includes(stem(w))));
+    const hit = cand.find((q) => !isAsk(q) && canBlank(w, q))   // 문제로 쓸 수 있는 평서문
+      || cand.find((q) => !isAsk(q))                            // 최소한 읽을 수 있는 평서문
+      || cand[0];
     if (hit) out[w] = hit;
   }
   return out;
@@ -293,6 +301,24 @@ const dropEmptySrc = (o) => { if (!o.src) delete o.src; return o; };
    raw로 캔 값(src: coaching)만 새로 캔 것으로 갈아 끼운다. */
 const HUMAN = ['ai', 'fixed'];
 const keepHuman = (prev) => ((prev && HUMAN.indexOf(prev.src) >= 0 && prev.meaning) ? prev : null);
+
+/* 예문은 문제를 만들 수 있을 때만 남긴다 — 판정은 문제를 만드는 그 함수에 맡긴다.
+   「낱말이 들어 있는가」를 글자 포함으로 따로 재면 「오늘 어떤 동작을…」이
+   「늘이다」의 예문으로 통과한다(오늘 안의 늘). 기준을 둘로 두지 않는다.
+   콜론·화살표에서 딸려 온 예문에도 똑같이 건다 — 한 곳만 빼먹으면
+   「어절 — 나는 학교에 갔다」처럼 그 낱말이 없는 예문이 새어 들어온다. */
+const usableEx = (word, q, siblings) => {
+  if (!q) return false;
+  const blanked = QUIZ.blankExample({ word, example: q });
+  if (!blanked) return false;
+  /* 지워진 자리가 같은 강의 다른 낱말이면 그 낱말의 예문이지 이것이 아니다 —
+     「걷다」에 「아기가 첫 걸음을 뗐어요」가 붙어 있었다. 활용으로는 걸음이 걷다에서
+     나오지만, 그 강은 걸음을 따로 가르치므로 답이 둘이 되어 버린다. */
+  const i = blanked.indexOf('○○○');
+  const span = q.slice(i, q.length - (blanked.length - i - 3));
+  return !(siblings || []).some((o) => o !== word && o.length >= 2 && span.indexOf(o) === 0);
+};
+const firstUsableEx = (word, list, siblings) => list.find((q) => usableEx(word, q, siblings)) || '';
 
 const tb = JSON.parse(fs.readFileSync('reading/textbook.json', 'utf8'));
 let nW = 0, nM = 0, nE = 0;
@@ -339,8 +365,15 @@ for (const b of tb.books) for (const l of b.lessons) {
        다시 캘 수 없으니 남긴다. 강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있다. */
     meaning: (keepHuman(prevBy[w]) || {}).meaning
       || firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]),
-    example: (prevBy[w] && prevBy[w].example)
-      || (byPair[w] && byPair[w].example) || (arrow[w] && arrow[w].example) || ex[w] || '',
+    /* 예전 예문은 쓸 수 있을 때만 남긴다. 그냥 남기면 「애틋하다 — 오랜만에 가족이나
+       친구를 보면 어떤 기분이 드니?」처럼 그 낱말이 없는 예문이 그대로 굳는다.
+       (강사가 고친 값은 파일이 아니라 DB 덧씌우기에 있으므로 여기서 다시 캐도 안전하다.) */
+    example: firstUsableEx(w, [
+      prevBy[w] && prevBy[w].example,
+      byPair[w] && byPair[w].example,
+      arrow[w] && arrow[w].example,
+      ex[w],
+    ], order),
     src: keepHuman(prevBy[w]) ? prevBy[w].src
       : (firstGood(w, [byPair[w] && byPair[w].meaning, defined[w], idiom[w], arrow[w] && arrow[w].meaning, dash[w], paren[w], prose[w]]) ? 'coaching' : ''),
   }));
