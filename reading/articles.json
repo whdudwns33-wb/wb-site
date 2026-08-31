@@ -1,5 +1,5 @@
 {
- "version": "2026-08-31.2",
+ "version": "2026-08-31.4",
  "articles": [
   {
    "id": "nuri-space",
@@ -188,6 +188,97 @@
        "answer": 3,
        "explain": "마지막 문단은 공학자, 과학자, 컴퓨터 전문가 등 여러 분야의 사람들이 함께 흘린 땀의 결과가 누리호라고 했다. 그러므로 달 탐사선 같은 새로운 일에도 여러 분야가 힘을 모아야 한다고 말한 ④가 알맞다. ①은 많은 사람의 노력이 필요하다는 글의 내용과 어긋나고, ③은 우주를 향한 도전이 지금도 계속되고 있다고 했으므로 틀렸다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Nuri is a space rocket that Korea made by itself. A launch vehicle is a rocket that carries satellites into space. The name Nuri was chosen by the people of Korea. Researchers at Korea's space center studied it for more than ten years. Korean technology did it all, from design to building.",
+      "In June 2022, the second Nuri launch was a success. It put a test satellite into orbit around Earth. In May 2023, the third launch also worked well. This time it carried several real working satellites. The satellites reached orbit and began their jobs.",
+      "The success of Nuri means a lot to Korea. Only a few countries can launch heavy satellites by themselves. In 2024, Korea opened a new space agency. Now the country has an office to lead its space work. The agency is in Sacheon, a city in the south.",
+      "Space work needs the effort of many people. Engineers design the rocket and scientists study the satellites. Experts who study data on computers help too. Nuri is the fruit of their hard work. The challenge to reach space still goes on today."
+     ],
+     "enseg": [
+      [
+       "Nuri is ",
+       "a space rocket ",
+       "that Korea made by itself. ",
+       "A launch vehicle is a rocket ",
+       "that carries satellites into space. ",
+       "The name Nuri was chosen ",
+       "by the people of Korea. ",
+       "Researchers at Korea's space center ",
+       "studied it ",
+       "for more than ten years. ",
+       "Korean technology did it all, ",
+       "from design to building."
+      ],
+      [
+       "In June 2022, ",
+       "the second Nuri launch ",
+       "was a success. ",
+       "It put a test satellite ",
+       "into orbit around Earth. ",
+       "In May 2023, ",
+       "the third launch also worked well. ",
+       "This time it carried ",
+       "several real working satellites. ",
+       "The satellites reached orbit ",
+       "and began their jobs."
+      ],
+      [
+       "The success of Nuri ",
+       "means a lot to Korea. ",
+       "Only a few countries ",
+       "can launch heavy satellites by themselves. ",
+       "In 2024, Korea opened ",
+       "a new space agency. ",
+       "Now the country has an office ",
+       "to lead its space work. ",
+       "The agency is in Sacheon, ",
+       "a city in the south."
+      ],
+      [
+       "Space work needs ",
+       "the effort of many people. ",
+       "Engineers design the rocket ",
+       "and scientists study the satellites. ",
+       "Experts who study data ",
+       "on computers help too. ",
+       "Nuri is the fruit ",
+       "of their hard work. ",
+       "The challenge to reach space ",
+       "still goes on today."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "rocket",
+       "ko": "로켓 (명사)",
+       "base": "rocket [ˈrɑːkɪt]"
+      },
+      {
+       "word": "satellites",
+       "ko": "인공위성들 (명사)",
+       "base": "satellite [ˈsætəlaɪt]"
+      },
+      {
+       "word": "launch",
+       "ko": "발사 (명사)",
+       "base": "launch [lɔːntʃ]"
+      },
+      {
+       "word": "orbit",
+       "ko": "궤도 (명사)",
+       "base": "orbit [ˈɔːrbɪt]"
+      },
+      {
+       "word": "design",
+       "ko": "설계하다 (동사)",
+       "base": "design [dɪˈzaɪn]"
+      },
+      {
+       "word": "scientists",
+       "ko": "과학자들 (명사)",
+       "base": "scientist [ˈsaɪəntɪst]"
       }
      ]
     },
@@ -885,6 +976,128 @@
        "evidencePara": 4
       }
      ]
+    },
+    "L1": {
+     "title": "누리호가 하늘로 날아갔어요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "누리호는 ",
+       "우리나라가 만든 ",
+       "로켓이에요. ",
+       "로켓은 위성을 ",
+       "우주로 실어 나르는 ",
+       "큰 기계예요. ",
+       "위성은 하늘에 떠서 ",
+       "지구를 도는 기계예요."
+      ],
+      [
+       "2022년에 ",
+       "누리호는 두 번째로 ",
+       "하늘을 날았어요. ",
+       "위성을 우주 궤도에 올려놓았어요. ",
+       "2023년에는 ",
+       "세 번째 발사도 성공했어요. ",
+       "이번에는 ",
+       "일하는 위성 여러 대를 실었어요."
+      ],
+      [
+       "무거운 위성을 ",
+       "스스로 쏘아 올린 나라는 ",
+       "많지 않아요. ",
+       "우리나라도 그런 나라가 되었어요. ",
+       "2024년에는 ",
+       "우주항공청도 문을 열었어요. ",
+       "우주를 연구하는 사람들이 ",
+       "오늘도 힘을 모아요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "위성",
+       "easy": "하늘에 떠서 지구 둘레를 도는 기계예요.",
+       "hanja": null
+      },
+      {
+       "word": "궤도",
+       "easy": "위성이 지구 둘레를 도는 길이에요.",
+       "hanja": null
+      },
+      {
+       "word": "발사",
+       "easy": "로켓을 하늘로 쏘아 올리는 일이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "우리나라 로켓 누리호",
+        "바다에 사는 물고기",
+        "김치를 담그는 법",
+        "봄에 피는 꽃"
+       ],
+       "answer": 0,
+       "explain": "누리호는 우리나라가 만든 로켓이라고 했어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "세 번째 발사가 성공한 때는 언제인가요?",
+       "choices": [
+        "2020년",
+        "2021년",
+        "2022년",
+        "2023년"
+       ],
+       "answer": 3,
+       "explain": "2023년에 세 번째 발사도 성공했어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'위성'은 무엇인가요?",
+       "choices": [
+        "땅을 파는 기계",
+        "지구를 도는 기계",
+        "바다를 달리는 배",
+        "하늘을 나는 새"
+       ],
+       "answer": 1,
+       "explain": "위성은 하늘에 떠서 지구를 도는 기계예요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "누리호를 만들 때 가장 필요한 것은 무엇일까요?",
+       "choices": [
+        "하루 만에 뚝딱 만들기",
+        "여러 사람의 오랜 노력",
+        "다른 나라에서 사 오기",
+        "혼자서 몰래 만들기"
+       ],
+       "answer": 1,
+       "explain": "우주를 연구하는 사람들이 힘을 모은다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "우주 연구를 하고 싶다면 무엇을 하면 좋을까요?",
+       "choices": [
+        "우주 책을 찾아 읽어요",
+        "하늘을 안 봐요",
+        "숫자를 세지 않아요",
+        "질문을 참아요"
+       ],
+       "answer": 0,
+       "explain": "우주를 연구하려면 먼저 알아보고 배우면 좋아요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -1102,6 +1315,96 @@
        "answer": 0,
        "explain": "글의 마지막 문단은 유전자를 잘못 바꾸면 예상하지 못한 문제가 생길 수 있어서, 과학자들도 규칙을 정해 신중하게 연구한다고 했습니다. 노벨상은 기술의 가치를 인정한 것이지, 걱정 없이 마음껏 써도 된다는 뜻이 아닙니다. 세균의 힘에서 나왔다는 말은 둘째 문단의 내용과 맞으므로 잘못 이해한 것이 아닙니다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Every living thing has genes inside its body. Genes are a plan that decides how a living thing looks. If the plan changes, the living thing changes too. CRISPR is a tool that cuts one chosen part of the plan. It cuts like scissors, so people call it gene scissors.",
+      "CRISPR was found while scientists studied bacteria. Bacteria can fight viruses that attack them. They remember a piece of the virus they fought before. If the same virus comes again, they cut that piece. Scientists turned this idea into a tool for fixing genes.",
+      "Two scientists won the 2020 Nobel Prize in Chemistry. Today this tool is used in many places. Doctors study ways to treat diseases caused by genes. Farmers also use it to grow crops that fight disease. A new road to help sick people is open.",
+      "But we must also be careful. A wrong change in a gene can bring surprise problems. So scientists make rules and work slowly and carefully. A new tool needs wise hands. How we use CRISPR is a question for everyone."
+     ],
+     "enseg": [
+      [
+       "Every living thing ",
+       "has genes inside its body. ",
+       "Genes are a plan ",
+       "that decides ",
+       "how a living thing looks. ",
+       "If the plan changes, ",
+       "the living thing changes too. ",
+       "CRISPR is a tool ",
+       "that cuts one chosen part ",
+       "of the plan. ",
+       "It cuts like scissors, ",
+       "so people call it gene scissors."
+      ],
+      [
+       "CRISPR was found ",
+       "while scientists studied bacteria. ",
+       "Bacteria can fight ",
+       "viruses that attack them. ",
+       "They remember a piece ",
+       "of the virus they fought before. ",
+       "If the same virus comes again, ",
+       "they cut that piece. ",
+       "Scientists turned this idea ",
+       "into a tool for fixing genes."
+      ],
+      [
+       "Two scientists won ",
+       "the 2020 Nobel Prize in Chemistry. ",
+       "Today this tool ",
+       "is used in many places. ",
+       "Doctors study ways ",
+       "to treat diseases caused by genes. ",
+       "Farmers also use it ",
+       "to grow crops that fight disease. ",
+       "A new road ",
+       "to help sick people is open."
+      ],
+      [
+       "But we must ",
+       "also be careful. ",
+       "A wrong change in a gene ",
+       "can bring surprise problems. ",
+       "So scientists make rules ",
+       "and work slowly and carefully. ",
+       "A new tool ",
+       "needs wise hands. ",
+       "How we use CRISPR ",
+       "is a question for everyone."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "genes",
+       "ko": "유전자들 (명사)",
+       "base": "gene [dʒiːn]"
+      },
+      {
+       "word": "cuts",
+       "ko": "자른다 (동사)",
+       "base": "cut [kʌt]"
+      },
+      {
+       "word": "bacteria",
+       "ko": "세균 (명사)",
+       "base": "bacteria [bækˈtɪriə]"
+      },
+      {
+       "word": "virus",
+       "ko": "바이러스 (명사)",
+       "base": "virus [ˈvaɪrəs]"
+      },
+      {
+       "word": "treat",
+       "ko": "치료하다 (동사)",
+       "base": "treat [triːt]"
+      },
+      {
+       "word": "careful",
+       "ko": "조심하는 (형용사)",
+       "base": "careful [ˈkerfl]"
       }
      ]
     },
@@ -1796,6 +2099,127 @@
        "evidencePara": 1
       }
      ]
+    },
+    "L1": {
+     "title": "몸속 설계도를 자르는 가위",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "우리 몸속에는 ",
+       "유전자가 있어요. ",
+       "유전자는 몸을 만드는 ",
+       "설계도예요. ",
+       "크리스퍼는 이 설계도에서 ",
+       "원하는 곳만 잘라요. ",
+       "그래서 유전자 가위라고 불러요."
+      ],
+      [
+       "크리스퍼는 ",
+       "세균에게서 배운 방법이에요. ",
+       "세균은 자기를 괴롭힌 ",
+       "바이러스를 기억해요. ",
+       "같은 바이러스가 또 오면 ",
+       "그 부분을 잘라요. ",
+       "과학자들은 이 방법을 ",
+       "좋은 도구로 만들었어요."
+      ],
+      [
+       "이 기술을 연구한 과학자는 ",
+       "노벨상을 받았어요. ",
+       "지금은 아픈 사람을 돕는 ",
+       "연구에 쓰여요. ",
+       "튼튼한 농작물을 만드는 ",
+       "데에도 써요. ",
+       "새 기술은 규칙을 지키며 ",
+       "조심해서 써야 해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "유전자",
+       "easy": "몸의 생김새를 정하는 설계도예요.",
+       "hanja": null
+      },
+      {
+       "word": "설계도",
+       "easy": "무엇을 어떻게 만들지 그린 그림이에요.",
+       "hanja": null
+      },
+      {
+       "word": "세균",
+       "easy": "눈에 보이지 않는 아주 작은 생물이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "크리스퍼는 무엇을 하는 기술인가요?",
+       "choices": [
+        "집을 짓는 기술",
+        "물을 끓이는 기술",
+        "유전자를 자르는 기술",
+        "비를 내리는 기술"
+       ],
+       "answer": 2,
+       "explain": "크리스퍼는 설계도에서 원하는 곳만 자르는 기술이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "크리스퍼는 무엇에게서 배운 방법인가요?",
+       "choices": [
+        "세균",
+        "돌멩이",
+        "구름",
+        "자동차"
+       ],
+       "answer": 0,
+       "explain": "세균이 바이러스를 자르는 방법에서 배웠어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'설계도'는 무엇인가요?",
+       "choices": [
+        "노래하는 소리",
+        "맛있는 음식",
+        "달리는 자동차",
+        "만들 것을 그린 그림"
+       ],
+       "answer": 3,
+       "explain": "설계도는 무엇을 어떻게 만들지 그린 그림이에요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "과학자들이 규칙을 정한 까닭은 무엇일까요?",
+       "choices": [
+        "더 빨리 자르려고",
+        "조심해서 쓰려고",
+        "가위를 팔려고",
+        "노벨상을 받으려고"
+       ],
+       "answer": 1,
+       "explain": "새 기술은 조심해서 써야 한다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "크리스퍼로 도울 수 있는 일은 무엇일까요?",
+       "choices": [
+        "별을 새로 만드는 일",
+        "시간을 되돌리는 일",
+        "눈을 오게 하는 일",
+        "아픈 사람을 돕는 일"
+       ],
+       "answer": 3,
+       "explain": "지금은 아픈 사람을 돕는 연구에 쓰인다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -2011,6 +2435,93 @@
        "answer": 0,
        "explain": "인공지능은 사람처럼 뜻을 이해하지 못해서 없는 책 이름을 지어내는 등 틀린 내용을 그럴듯하게 말할 때가 있다고 했다. 그래서 중요한 정보는 다시 확인해야 하는 것이다. 마지막 선지는 '답이 늘 정답은 아니다'라는 말을 '언제나 틀리다'로 지나치게 부풀린 것이라서 알맞지 않다.",
        "evidencePara": 2
+      }
+     ],
+     "en": [
+      "Today AI can answer questions and even write. It can also make song words and stories. We call this kind of AI generative AI. It makes new things like writing and pictures. So how does a computer write like this?",
+      "Generative AI learns by reading a huge amount of writing. It studies how words follow words in books and news. Then it guesses which word comes next. For example, after the word clear, the word sky is likely. It keeps guessing this way until a long text is done.",
+      "But AI does not really understand meaning like people do. So it sometimes says wrong things in a smart way. It may even make up a book that does not exist. An AI answer is not always the right answer.",
+      "Generative AI is a good tool for study and life. It helps with writing practice and finding answers. But you must check important facts again. It is good to compare them with books you can trust. The power to use tools wisely is more and more important."
+     ],
+     "enseg": [
+      [
+       "Today AI can answer questions ",
+       "and even write. ",
+       "It can also make ",
+       "song words and stories. ",
+       "We call this kind of AI ",
+       "generative AI. ",
+       "It makes new things ",
+       "like writing and pictures. ",
+       "So how does a computer ",
+       "write like this?"
+      ],
+      [
+       "Generative AI learns ",
+       "by reading ",
+       "a huge amount of writing. ",
+       "It studies how words follow words ",
+       "in books and news. ",
+       "Then it guesses ",
+       "which word comes next. ",
+       "For example, after the word clear, ",
+       "the word sky is likely. ",
+       "It keeps guessing this way ",
+       "until a long text is done."
+      ],
+      [
+       "But AI does not really ",
+       "understand meaning like people do. ",
+       "So it sometimes says ",
+       "wrong things in a smart way. ",
+       "It may even make up ",
+       "a book that does not exist. ",
+       "An AI answer ",
+       "is not always the right answer."
+      ],
+      [
+       "Generative AI is a good tool ",
+       "for study and life. ",
+       "It helps with writing practice ",
+       "and finding answers. ",
+       "But you must check ",
+       "important facts again. ",
+       "It is good to compare them ",
+       "with books you can trust. ",
+       "The power to use tools wisely ",
+       "is more and more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "answer",
+       "ko": "답하다 (동사)",
+       "base": "answer [ˈænsər]"
+      },
+      {
+       "word": "write",
+       "ko": "글을 쓰다 (동사)",
+       "base": "write [raɪt]"
+      },
+      {
+       "word": "guesses",
+       "ko": "추측한다 (동사)",
+       "base": "guess [ɡes]"
+      },
+      {
+       "word": "meaning",
+       "ko": "뜻 (명사)",
+       "base": "meaning [ˈmiːnɪŋ]"
+      },
+      {
+       "word": "tool",
+       "ko": "도구 (명사)",
+       "base": "tool [tuːl]"
+      },
+      {
+       "word": "check",
+       "ko": "확인하다 (동사)",
+       "base": "check [tʃek]"
       }
      ]
     },
@@ -2682,6 +3193,128 @@
        "evidencePara": 2
       }
      ]
+    },
+    "L1": {
+     "title": "글도 지어 주는 똑똑한 컴퓨터",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "인공지능은 우리가 물으면 ",
+       "답을 해 주어요. ",
+       "이야기나 노래 가사도 ",
+       "지어 주어요. ",
+       "이런 인공지능을 ",
+       "생성형 인공지능이라고 해요. ",
+       "새로운 글과 그림을 ",
+       "만들어 내기 때문이에요."
+      ],
+      [
+       "인공지능은 아주 많은 글을 ",
+       "읽으며 공부해요. ",
+       "그리고 다음에 올 낱말을 ",
+       "알아맞혀요. ",
+       "'맑은' 다음에는 ",
+       "'하늘'이 잘 온다고 보아요. ",
+       "이렇게 낱말을 이어서 ",
+       "긴 글을 완성해요."
+      ],
+      [
+       "하지만 인공지능이 ",
+       "뜻을 아는 것은 아니에요. ",
+       "그래서 가끔 틀린 말도 ",
+       "그럴듯하게 해요. ",
+       "없는 책 이름을 ",
+       "지어낼 때도 있어요. ",
+       "중요한 것은 책에서 ",
+       "꼭 다시 확인해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "인공지능",
+       "easy": "사람처럼 답해 주는 똑똑한 컴퓨터예요.",
+       "hanja": null
+      },
+      {
+       "word": "낱말",
+       "easy": "뜻을 가진 말 하나하나예요.",
+       "hanja": null
+      },
+      {
+       "word": "생성형",
+       "easy": "무엇을 새로 만들어 낸다는 뜻이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 알려 주나요?",
+       "choices": [
+        "인공지능이 글 쓰는 방법",
+        "맛있는 요리 방법",
+        "축구 하는 방법",
+        "종이 접는 방법"
+       ],
+       "answer": 0,
+       "explain": "인공지능이 낱말을 이어 글을 짓는 방법을 알려 줘요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "detail",
+       "q": "인공지능은 무엇을 하며 공부하나요?",
+       "choices": [
+        "잠을 자며",
+        "많은 글을 읽으며",
+        "노래를 부르며",
+        "달리기를 하며"
+       ],
+       "answer": 1,
+       "explain": "아주 많은 글을 읽으며 공부한다고 했어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'낱말'은 무엇인가요?",
+       "choices": [
+        "그림 한 장",
+        "노래 한 곡",
+        "숫자 하나",
+        "뜻을 가진 말"
+       ],
+       "answer": 3,
+       "explain": "낱말은 뜻을 가진 말 하나하나예요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "인공지능의 답을 다시 확인하는 까닭은?",
+       "choices": [
+        "글씨가 작아서",
+        "틀릴 때가 있어서",
+        "소리가 커서",
+        "글이 짧아서"
+       ],
+       "answer": 1,
+       "explain": "뜻을 아는 것이 아니라 틀린 말도 하기 때문이에요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "인공지능이 알려 준 책 이름을 보면 어떻게 할까요?",
+       "choices": [
+        "그대로 베껴 써요",
+        "읽지 않고 버려요",
+        "책에서 다시 찾아봐요",
+        "친구에게 자랑해요"
+       ],
+       "answer": 2,
+       "explain": "없는 책 이름을 지어낼 때도 있으니 다시 확인해요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -2917,6 +3550,98 @@
        "answer": 3,
        "explain": "글의 마지막 문단은 인구의 변화가 아주 천천히 일어난다고 말한 뒤 미리 준비해야 한다고 했다. 천천히 일어나는 변화는 문제를 알아차린 뒤에 짧은 시간에 바꾸기 어렵기 때문이다. ②는 본문에 나오는 내용이지만, 미리 준비해야 하는 까닭과는 관계가 없다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "In Korea, fewer babies are born each year. At the same time, the number of old people grows fast. Better medicine helps people live much longer. When the share of old people grows, we call it aging. Korea is one of the fastest aging countries in the world.",
+      "Aging changes a country in big ways. Some schools close because there are fewer students. The number of young workers goes down too. But the work of caring for old people grows. So a country spends its money in new ways.",
+      "These changes are not only hard. More hospitals and care homes for old people open. Companies make things that are easy for old people to use. This business of goods and care for old people is called the silver industry. New jobs are born from this change.",
+      "The government is getting ready for this change. It makes plans to help families with young children. It also supports jobs and health for old people. A change in population happens very slowly. So getting ready early is even more important."
+     ],
+     "enseg": [
+      [
+       "In Korea, ",
+       "fewer babies are born each year. ",
+       "At the same time, ",
+       "the number of old people ",
+       "grows fast. ",
+       "Better medicine helps ",
+       "people live much longer. ",
+       "When the share ",
+       "of old people grows, ",
+       "we call it aging. ",
+       "Korea is one of the fastest ",
+       "aging countries in the world."
+      ],
+      [
+       "Aging changes a country ",
+       "in big ways. ",
+       "Some schools close ",
+       "because there are fewer students. ",
+       "The number of young workers ",
+       "goes down too. ",
+       "But the work of caring ",
+       "for old people grows. ",
+       "So a country spends its money ",
+       "in new ways."
+      ],
+      [
+       "These changes ",
+       "are not only hard. ",
+       "More hospitals and care homes ",
+       "for old people open. ",
+       "Companies make things ",
+       "that are easy ",
+       "for old people to use. ",
+       "This business of goods and care ",
+       "for old people ",
+       "is called the silver industry. ",
+       "New jobs are born ",
+       "from this change."
+      ],
+      [
+       "The government is getting ready ",
+       "for this change. ",
+       "It makes plans to help ",
+       "families with young children. ",
+       "It also supports jobs ",
+       "and health for old people. ",
+       "A change in population ",
+       "happens very slowly. ",
+       "So getting ready early ",
+       "is even more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "born",
+       "ko": "태어난 (동사)",
+       "base": "bear [ber]"
+      },
+      {
+       "word": "aging",
+       "ko": "고령화 (명사)",
+       "base": "age [eɪdʒ]"
+      },
+      {
+       "word": "grows",
+       "ko": "늘어난다 (동사)",
+       "base": "grow [ɡroʊ]"
+      },
+      {
+       "word": "hospitals",
+       "ko": "병원들 (명사)",
+       "base": "hospital [ˈhɑːspɪtl]"
+      },
+      {
+       "word": "government",
+       "ko": "정부 (명사)",
+       "base": "government [ˈɡʌvərnmənt]"
+      },
+      {
+       "word": "population",
+       "ko": "인구 (명사)",
+       "base": "population [ˌpɑːpjuˈleɪʃn]"
       }
      ]
     },
@@ -3595,6 +4320,127 @@
        "evidencePara": 2
       }
      ]
+    },
+    "L1": {
+     "title": "어르신이 많아지는 우리나라",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "요즘 태어나는 아기 수가 ",
+       "조금씩 줄고 있어요. ",
+       "그런데 나이 많은 어른은 ",
+       "더 많아져요. ",
+       "의학이 좋아져서 ",
+       "오래 살기 때문이에요. ",
+       "사람들 가운데 노인이 많아지는 것을 ",
+       "고령화라고 해요."
+      ],
+      [
+       "고령화가 되면 ",
+       "마을 모습도 달라져요. ",
+       "학생이 줄어서 ",
+       "문을 닫는 학교가 생겨요. ",
+       "일하는 젊은 사람도 함께 줄어요. ",
+       "노인을 돌보는 일은 ",
+       "점점 많아져요."
+      ],
+      [
+       "좋아지는 것도 있어요. ",
+       "노인을 위한 병원이 ",
+       "더 많아져요. ",
+       "노인이 쓰기 편한 물건도 ",
+       "새로 나와요. ",
+       "이런 물건과 서비스를 ",
+       "실버산업이라고 해요. ",
+       "나라도 미리 준비하고 있어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "고령화",
+       "easy": "나이 많은 사람이 늘어나는 것이에요.",
+       "hanja": null
+      },
+      {
+       "word": "노인",
+       "easy": "나이가 많은 어른을 말해요.",
+       "hanja": null
+      },
+      {
+       "word": "실버산업",
+       "easy": "노인에게 필요한 물건과 일을 만드는 것이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "노인이 많아지는 변화",
+        "새로 나온 장난감",
+        "여름에 가는 바다",
+        "맛있는 과일 이름"
+       ],
+       "answer": 0,
+       "explain": "노인이 많아지는 고령화를 설명하는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "고령화가 되면 학교는 어떻게 되나요?",
+       "choices": [
+        "학생이 늘어나요",
+        "운동장이 커져요",
+        "문을 닫기도 해요",
+        "방학이 길어져요"
+       ],
+       "answer": 2,
+       "explain": "학생이 줄어서 문을 닫는 학교가 생겨요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'고령화'는 무엇인가요?",
+       "choices": [
+        "아기가 늘어나는 것",
+        "날씨가 추워지는 것",
+        "학교가 커지는 것",
+        "나이 많은 사람이 느는 것"
+       ],
+       "answer": 3,
+       "explain": "사람들 가운데 노인이 많아지는 것을 고령화라고 해요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "실버산업이 생겨나는 까닭은 무엇일까요?",
+       "choices": [
+        "노인이 많아져서",
+        "아기가 많아져서",
+        "눈이 많이 와서",
+        "학교가 늘어서"
+       ],
+       "answer": 0,
+       "explain": "노인이 많아지니 노인을 위한 물건이 필요해요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "노인이 많은 동네에 있으면 좋은 것은?",
+       "choices": [
+        "더 빠른 자동차",
+        "쉬어 갈 수 있는 의자",
+        "더 큰 미끄럼틀",
+        "더 높은 계단"
+       ],
+       "answer": 1,
+       "explain": "노인이 쓰기 편한 물건이 도움이 돼요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -3821,6 +4667,95 @@
        "answer": 3,
        "explain": "글에서 최저임금은 물가와 생활비 등을 두루 살펴서 정한다고 했으므로, 물가가 크게 오르면 위원회가 이를 살펴볼 것이라고 짐작할 수 있다. 한국은행이 나온다는 점에서 세 번째 선지가 헷갈리지만, 한국은행은 물가가 안정되도록 관리한다고 했을 뿐 돈을 더 많이 돌게 한다는 내용은 글에 없다. 또 물가가 오르면 같은 돈으로 살 수 있는 물건은 오히려 줄어든다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Everything we buy has a price. When we put many prices together, we call it the price level. When the price level rises, the same money buys less. If snacks cost more, you can buy fewer snacks. Prices that keep going up are called inflation.",
+      "A price changes with buyers and sellers. If buyers are many and goods are few, the price goes up. If goods are many and buyers are few, the price goes down. We call this the rule of demand and supply.",
+      "Life gets hard when prices rise too fast. So the Bank of Korea works to keep prices steady. It watches how much money moves around the country. It also moves the interest rate up or down. Interest is the price you pay to borrow money.",
+      "The money you earn from work is called a wage. The lowest wage set by law is the minimum wage. A special committee sets the minimum wage every year. Workers, companies, and public members meet and talk about it. They look at prices and living costs before they decide."
+     ],
+     "enseg": [
+      [
+       "Everything we buy ",
+       "has a price. ",
+       "When we put many prices together, ",
+       "we call it the price level. ",
+       "When the price level rises, ",
+       "the same money buys less. ",
+       "If snacks cost more, ",
+       "you can buy fewer snacks. ",
+       "Prices that keep going up ",
+       "are called inflation."
+      ],
+      [
+       "A price changes ",
+       "with buyers and sellers. ",
+       "If buyers are many ",
+       "and goods are few, ",
+       "the price goes up. ",
+       "If goods are many ",
+       "and buyers are few, ",
+       "the price goes down. ",
+       "We call this ",
+       "the rule of demand and supply."
+      ],
+      [
+       "Life gets hard ",
+       "when prices rise too fast. ",
+       "So the Bank of Korea works ",
+       "to keep prices steady. ",
+       "It watches how much money ",
+       "moves around the country. ",
+       "It also moves the interest rate ",
+       "up or down. ",
+       "Interest is the price ",
+       "you pay to borrow money."
+      ],
+      [
+       "The money you earn from work ",
+       "is called a wage. ",
+       "The lowest wage set by law ",
+       "is the minimum wage. ",
+       "A special committee sets ",
+       "the minimum wage every year. ",
+       "Workers, companies, and public members ",
+       "meet and talk about it. ",
+       "They look at prices ",
+       "and living costs ",
+       "before they decide."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "price",
+       "ko": "값 (명사)",
+       "base": "price [praɪs]"
+      },
+      {
+       "word": "inflation",
+       "ko": "물가 상승 (명사)",
+       "base": "inflation [ɪnˈfleɪʃn]"
+      },
+      {
+       "word": "demand",
+       "ko": "수요 (명사)",
+       "base": "demand [dɪˈmænd]"
+      },
+      {
+       "word": "supply",
+       "ko": "공급 (명사)",
+       "base": "supply [səˈplaɪ]"
+      },
+      {
+       "word": "interest",
+       "ko": "이자 (명사)",
+       "base": "interest [ˈɪntrəst]"
+      },
+      {
+       "word": "wage",
+       "ko": "임금 (명사)",
+       "base": "wage [weɪdʒ]"
       }
      ]
     },
@@ -4495,6 +5430,126 @@
        "evidencePara": 4
       }
      ]
+    },
+    "L1": {
+     "title": "과자값이 오르면 어떻게 될까요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "우리가 사는 물건에는 ",
+       "값이 있어요. ",
+       "여러 물건 값을 모아 ",
+       "평균을 낸 것이 물가예요. ",
+       "물가가 오르면 ",
+       "살 수 있는 물건이 줄어요. ",
+       "과자값이 오르면 ",
+       "과자를 적게 사게 돼요."
+      ],
+      [
+       "물건값은 사는 사람과 ",
+       "파는 사람에 따라 달라져요. ",
+       "사려는 사람이 많고 ",
+       "물건이 적으면 값이 올라요. ",
+       "물건이 많고 사려는 사람이 적으면 ",
+       "값이 내려요. ",
+       "이것을 수요와 공급이라고 해요."
+      ],
+      [
+       "물가가 너무 빨리 오르면 ",
+       "사람들이 힘들어요. ",
+       "그래서 한국은행이 ",
+       "물가를 잘 살펴요. ",
+       "일해서 받는 돈은 ",
+       "임금이라고 해요. ",
+       "가장 낮은 임금은 해마다 새로 정해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "물가",
+       "easy": "여러 물건 값을 모아 낸 평균이에요.",
+       "hanja": null
+      },
+      {
+       "word": "수요",
+       "easy": "물건을 사려는 사람이 얼마나 많은지예요.",
+       "hanja": null
+      },
+      {
+       "word": "임금",
+       "easy": "일을 하고 받는 돈이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 알려 주나요?",
+       "choices": [
+        "물건값이 오르내리는 까닭",
+        "별자리 이름",
+        "공룡의 종류",
+        "무지개 색깔"
+       ],
+       "answer": 0,
+       "explain": "물건값이 왜 오르고 내리는지 알려 주는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "사려는 사람이 많고 물건이 적으면 어떻게 되나요?",
+       "choices": [
+        "값이 내려요",
+        "값이 올라요",
+        "값이 그대로예요",
+        "값이 없어져요"
+       ],
+       "answer": 1,
+       "explain": "사려는 사람이 많고 물건이 적으면 값이 올라요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'임금'은 무엇인가요?",
+       "choices": [
+        "물건을 담는 상자",
+        "학교에 가는 길",
+        "놀이터의 이름",
+        "일하고 받는 돈"
+       ],
+       "answer": 3,
+       "explain": "일해서 받는 돈을 임금이라고 해요.",
+       "evidencePara": 2
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "과자를 사려는 친구가 갑자기 많아지면?",
+       "choices": [
+        "과자값이 오를 거예요",
+        "과자값이 내릴 거예요",
+        "과자가 사라져요",
+        "값은 늘 똑같아요"
+       ],
+       "answer": 0,
+       "explain": "사려는 사람이 많으면 값이 오른다고 했어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "apply",
+       "q": "물가가 오를 때 용돈을 쓰는 좋은 방법은?",
+       "choices": [
+        "한 번에 다 써요",
+        "꼭 필요한 것만 사요",
+        "값을 보지 않아요",
+        "돈을 그냥 버려요"
+       ],
+       "answer": 1,
+       "explain": "같은 돈으로 살 수 있는 물건이 줄기 때문이에요.",
+       "evidencePara": 0
+      }
+     ]
     }
    },
    "books": [
@@ -4718,6 +5773,95 @@
        "answer": 3,
        "explain": "바다 쓰레기의 많은 부분은 땅에서 시작되어 강을 타고 바다로 간다고 했으므로, 땅에서 쓰레기를 덜 만들면 바다로 가는 쓰레기도 줄어든다. 플라스틱은 잘 썩지 않는 재료라고 했으므로 '빨리 썩게 한다'는 틀렸고, 일회용품을 줄이더라도 이미 버려진 쓰레기를 줍는 정화 활동은 여전히 필요하므로 그 선지도 알맞지 않다.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "Plastic trash on the street washes into rivers with rain and wind. Rivers carry the trash all the way to the sea. So much of the sea trash starts on land. Some trash is also thrown away at the beach. Fishing tools and boat trash can stay in the sea.",
+      "Plastic does not rot easily. Plastic in the sea stays there for many, many years. Waves and sunlight only break it into smaller pieces. Pieces smaller than five millimeters are called microplastic.",
+      "Sea animals have a hard time because of plastic. A sea turtle may eat a bag, thinking it is a jellyfish. Birds eat small bits of plastic as if it were food. Microplastic is found inside fish and shellfish too. Some animals get caught in nets and get hurt.",
+      "Many people are working to solve this problem. People clean up trash together on beaches. The country also collects trash from the sea. Using fewer one-time things and sorting trash well helps a lot. Saving the sea starts with small actions."
+     ],
+     "enseg": [
+      [
+       "Plastic trash on the street ",
+       "washes into rivers ",
+       "with rain and wind. ",
+       "Rivers carry the trash ",
+       "all the way to the sea. ",
+       "So much of the sea trash ",
+       "starts on land. ",
+       "Some trash is also ",
+       "thrown away at the beach. ",
+       "Fishing tools and boat trash ",
+       "can stay in the sea."
+      ],
+      [
+       "Plastic does not ",
+       "rot easily. ",
+       "Plastic in the sea ",
+       "stays there for many, many years. ",
+       "Waves and sunlight ",
+       "only break it into smaller pieces. ",
+       "Pieces smaller than five millimeters ",
+       "are called microplastic."
+      ],
+      [
+       "Sea animals have a hard time ",
+       "because of plastic. ",
+       "A sea turtle ",
+       "may eat a bag, ",
+       "thinking it is a jellyfish. ",
+       "Birds eat small bits of plastic ",
+       "as if it were food. ",
+       "Microplastic is found ",
+       "inside fish and shellfish too. ",
+       "Some animals get caught in nets ",
+       "and get hurt."
+      ],
+      [
+       "Many people are working ",
+       "to solve this problem. ",
+       "People clean up trash ",
+       "together on beaches. ",
+       "The country also collects ",
+       "trash from the sea. ",
+       "Using fewer one-time things ",
+       "and sorting trash well ",
+       "helps a lot. ",
+       "Saving the sea ",
+       "starts with small actions."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "trash",
+       "ko": "쓰레기 (명사)",
+       "base": "trash [træʃ]"
+      },
+      {
+       "word": "rivers",
+       "ko": "강들 (명사)",
+       "base": "river [ˈrɪvər]"
+      },
+      {
+       "word": "rot",
+       "ko": "썩다 (동사)",
+       "base": "rot [rɑːt]"
+      },
+      {
+       "word": "pieces",
+       "ko": "조각들 (명사)",
+       "base": "piece [piːs]"
+      },
+      {
+       "word": "microplastic",
+       "ko": "미세플라스틱 (명사)",
+       "base": "microplastic [ˌmaɪkroʊˈplæstɪk]"
+      },
+      {
+       "word": "beaches",
+       "ko": "해변들 (명사)",
+       "base": "beach [biːtʃ]"
       }
      ]
     },
@@ -5371,6 +6515,125 @@
        "evidencePara": 3
       }
      ]
+    },
+    "L1": {
+     "title": "플라스틱은 어디로 갈까요?",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "길에 버린 플라스틱은 ",
+       "비를 타고 강으로 가요. ",
+       "강물은 쓰레기를 싣고 ",
+       "바다까지 흘러가요. ",
+       "그래서 바다 쓰레기는 ",
+       "땅에서 온 것이 많아요."
+      ],
+      [
+       "플라스틱은 잘 썩지 않아요. ",
+       "바다에 들어가면 ",
+       "오래오래 남아요. ",
+       "파도와 햇빛에 부딪혀 ",
+       "잘게 부서져요. ",
+       "아주 작아진 조각을 ",
+       "미세플라스틱이라고 해요."
+      ],
+      [
+       "바다 동물은 플라스틱 때문에 ",
+       "힘들어요. ",
+       "거북은 비닐봉지를 ",
+       "해파리로 알고 삼켜요. ",
+       "그래서 사람들은 ",
+       "바닷가에서 쓰레기를 주워요. ",
+       "일회용품을 줄이면 ",
+       "바다가 깨끗해져요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "미세플라스틱",
+       "easy": "아주 잘게 부서진 작은 플라스틱 조각이에요.",
+       "hanja": null
+      },
+      {
+       "word": "비닐봉지",
+       "easy": "물건을 담는 얇고 잘 찢어지는 봉지예요.",
+       "hanja": null
+      },
+      {
+       "word": "일회용품",
+       "easy": "한 번만 쓰고 버리는 물건이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "바다로 간 플라스틱",
+        "맛있는 바다 음식",
+        "배를 타는 방법",
+        "거북이 알 낳는 곳"
+       ],
+       "answer": 0,
+       "explain": "길에 버린 플라스틱이 바다까지 가서 생기는 일을 알려 주는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "플라스틱은 무엇을 타고 바다로 가나요?",
+       "choices": [
+        "비행기",
+        "강물",
+        "새의 발",
+        "자동차"
+       ],
+       "answer": 1,
+       "explain": "비를 타고 강으로 간 쓰레기를 강물이 바다까지 싣고 가요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "vocab",
+       "q": "미세플라스틱은 무엇인가요?",
+       "choices": [
+        "바닷물 이름",
+        "커다란 그릇",
+        "아주 작아진 조각",
+        "새로 만든 옷"
+       ],
+       "answer": 2,
+       "explain": "파도와 햇빛에 부딪혀 아주 작아진 플라스틱 조각이에요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "강에 쓰레기를 버리면 어떻게 될까요?",
+       "choices": [
+        "강에서 바로 사라져요",
+        "바다까지 흘러가요",
+        "돌로 변해요",
+        "하늘로 올라가요"
+       ],
+       "answer": 1,
+       "explain": "강물은 쓰레기를 싣고 바다까지 흘러간다고 했어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "apply",
+       "q": "바다를 지키려면 무엇을 하면 좋을까요?",
+       "choices": [
+        "일회용품을 줄여요",
+        "비닐을 더 써요",
+        "쓰레기를 바다에 던져요",
+        "그물을 버려요"
+       ],
+       "answer": 0,
+       "explain": "일회용품을 줄이면 바다가 깨끗해진다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -5582,6 +6845,99 @@
        "answer": 0,
        "explain": "4문단에서 흐린 날에는 태양광 발전이 어렵기 때문에 전기를 모아 두는 저장 기술이 함께 연구되고 있다고 했다. 이 마을은 낮에 만든 전기를 모아 두었다가 흐린 날에 썼으므로 저장 기술을 활용한 것이다. 전기를 덜 쓴 것이 아니라 모아 두었다가 쓴 것이므로 '아껴 쓰는 작은 습관'은 답이 될 수 없다.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "The Earth is wrapped in air, like a blanket. Gases in the air, like carbon dioxide, hold the Earth's heat. We call these gases greenhouse gases. Thanks to them, the Earth stays warm enough. But too much gas makes the Earth hotter and hotter.",
+      "We burn fuels like coal and oil. This makes a lot of greenhouse gas. Power plants and cars make it too. A hotter Earth changes the weather and melts glaciers. So many countries promised to cut these gases. Carbon neutral means the gas we send out equals the gas we take in.",
+      "For carbon neutral, people look to renewable energy. Renewable energy comes from nature and can be used again. Solar power makes electricity from sunlight. Wind power turns big blades to make electricity. Water power uses running water to make electricity too.",
+      "But there are problems too. Solar power is hard on cloudy days. Wind power stops when the wind does not blow. So people also study ways to store electricity. Small habits, like saving electricity, help protect the Earth."
+     ],
+     "enseg": [
+      [
+       "The Earth is wrapped ",
+       "in air, like a blanket. ",
+       "Gases in the air, ",
+       "like carbon dioxide, ",
+       "hold the Earth's heat. ",
+       "We call these gases ",
+       "greenhouse gases. ",
+       "Thanks to them, ",
+       "the Earth stays warm enough. ",
+       "But too much gas ",
+       "makes the Earth ",
+       "hotter and hotter."
+      ],
+      [
+       "We burn fuels ",
+       "like coal and oil. ",
+       "This makes a lot ",
+       "of greenhouse gas. ",
+       "Power plants and cars ",
+       "make it too. ",
+       "A hotter Earth ",
+       "changes the weather ",
+       "and melts glaciers. ",
+       "So many countries promised ",
+       "to cut these gases. ",
+       "Carbon neutral means ",
+       "the gas we send out ",
+       "equals the gas we take in."
+      ],
+      [
+       "For carbon neutral, ",
+       "people look to renewable energy. ",
+       "Renewable energy comes from nature ",
+       "and can be used again. ",
+       "Solar power makes electricity ",
+       "from sunlight. ",
+       "Wind power turns big blades ",
+       "to make electricity. ",
+       "Water power uses running water ",
+       "to make electricity too."
+      ],
+      [
+       "But there are problems too. ",
+       "Solar power is hard ",
+       "on cloudy days. ",
+       "Wind power stops ",
+       "when the wind does not blow. ",
+       "So people also study ",
+       "ways to store electricity. ",
+       "Small habits, like saving electricity, ",
+       "help protect the Earth."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "wrapped",
+       "ko": "감싸여 있다 (동사)",
+       "base": "wrap [ræp]"
+      },
+      {
+       "word": "greenhouse",
+       "ko": "온실 (명사)",
+       "base": "greenhouse [ˈɡriːnhaʊs]"
+      },
+      {
+       "word": "melts",
+       "ko": "녹인다 (동사)",
+       "base": "melt [melt]"
+      },
+      {
+       "word": "renewable",
+       "ko": "다시 쓸 수 있는 (형용사)",
+       "base": "renewable [rɪˈnuːəbl]"
+      },
+      {
+       "word": "electricity",
+       "ko": "전기 (명사)",
+       "base": "electricity [ɪˌlekˈtrɪsəti]"
+      },
+      {
+       "word": "store",
+       "ko": "저장하다 (동사)",
+       "base": "store [stɔːr]"
       }
      ]
     },
@@ -6253,6 +7609,128 @@
        "evidencePara": 4
       }
      ]
+    },
+    "L1": {
+     "title": "지구가 왜 더워질까요?",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "지구는 공기 이불을 ",
+       "덮고 있어요. ",
+       "공기 속 온실가스는 ",
+       "열을 붙잡아요. ",
+       "덕분에 지구는 ",
+       "알맞게 따뜻해요. ",
+       "그런데 온실가스가 너무 많아지면 ",
+       "지구가 더워져요."
+      ],
+      [
+       "온실가스는 석탄과 석유를 ",
+       "태울 때 나와요. ",
+       "지구가 더워지면 ",
+       "빙하가 녹아요. ",
+       "그래서 여러 나라가 ",
+       "약속을 했어요. ",
+       "내보낸 만큼 도로 없애는 것이 ",
+       "탄소중립이에요."
+      ],
+      [
+       "그래서 재생에너지가 필요해요. ",
+       "재생에너지는 다시 쓸 수 있는 ",
+       "에너지예요. ",
+       "태양광은 햇빛으로 ",
+       "전기를 만들어요. ",
+       "풍력은 바람으로 날개를 돌려요. ",
+       "전기를 아껴 쓰는 것도 ",
+       "큰 도움이 돼요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "온실가스",
+       "easy": "지구의 열을 붙잡아 두는 공기예요.",
+       "hanja": null
+      },
+      {
+       "word": "탄소중립",
+       "easy": "내보낸 만큼 도로 없애서 셈을 맞추는 것이에요.",
+       "hanja": null
+      },
+      {
+       "word": "재생에너지",
+       "easy": "햇빛이나 바람처럼 다시 쓸 수 있는 힘이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 말하고 있나요?",
+       "choices": [
+        "바다 동물 이야기",
+        "지구를 지키는 방법",
+        "맛있는 요리법",
+        "글자를 만든 이야기"
+       ],
+       "answer": 1,
+       "explain": "지구가 더워지는 까닭과 이를 막는 방법을 알려 주는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "태양광은 무엇으로 전기를 만드나요?",
+       "choices": [
+        "바람",
+        "물",
+        "햇빛",
+        "석탄"
+       ],
+       "answer": 2,
+       "explain": "태양광은 햇빛으로 전기를 만든다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "vocab",
+       "q": "온실가스는 무엇인가요?",
+       "choices": [
+        "열을 붙잡는 공기",
+        "차가운 얼음",
+        "맑은 물",
+        "단단한 돌"
+       ],
+       "answer": 0,
+       "explain": "공기 속 온실가스가 지구의 열을 붙잡아 준다고 했어요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "온실가스가 계속 늘어나면 어떻게 될까요?",
+       "choices": [
+        "지구가 시원해져요",
+        "지구가 더 더워져요",
+        "빙하가 커져요",
+        "밤이 길어져요"
+       ],
+       "answer": 1,
+       "explain": "온실가스가 너무 많아지면 지구가 더워진다고 했어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "apply",
+       "q": "탄소중립을 돕는 일은 무엇일까요?",
+       "choices": [
+        "불을 계속 켜 두기",
+        "석탄을 더 태우기",
+        "찬 바람 쐬기",
+        "전기를 아껴 쓰기"
+       ],
+       "answer": 3,
+       "explain": "전기를 아껴 쓰는 것도 큰 도움이 된다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -6481,6 +7959,101 @@
        "answer": 0,
        "explain": "글은 왕도 기록을 볼 수 없었기 '때문에' 사관이 사실을 있는 그대로 남길 수 있었다고 했다. 이를 뒤집으면, 왕이 기록을 볼 수 있었다면 화낸 일이나 실수까지 그대로 적기는 어려웠을 것이다. 사고에 나누어 보관한 것은 불이나 전쟁으로부터 책을 지키기 위한 일이라, 왕이 기록을 보는 것과는 관계가 없다.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "In the Joseon Dynasty, an officer called a sagwan stayed near the king. The sagwan wrote down every word and action of the king. He also wrote when the king got angry or made a mistake. Even the king could not read these records freely. So the sagwan could write down the truth.",
+      "When a king died, an office called Sillokcheong was set up. Officials gathered the sagwan's records and made a big history book. This book is the Annals of the Joseon Dynasty. It holds politics, weather, earthquakes, and the daily life of people. Almost every day of the Joseon Dynasty is in it.",
+      "Joseon kept the finished Annals in storehouses called sago. People made many copies and put them in far places. If one place burned, the books in other places were safe. In a big war, some sago really did burn. But people made new copies from the books that were left.",
+      "In 1997, the Annals became a UNESCO Memory of the World. Few countries kept hundreds of years of history so carefully. The world praised Joseon's great culture of writing records."
+     ],
+     "enseg": [
+      [
+       "In the Joseon Dynasty, ",
+       "an officer called a sagwan ",
+       "stayed near the king. ",
+       "The sagwan wrote down ",
+       "every word and action ",
+       "of the king. ",
+       "He also wrote ",
+       "when the king got angry ",
+       "or made a mistake. ",
+       "Even the king ",
+       "could not read ",
+       "these records freely. ",
+       "So the sagwan ",
+       "could write down the truth."
+      ],
+      [
+       "When a king died, ",
+       "an office called Sillokcheong ",
+       "was set up. ",
+       "Officials gathered ",
+       "the sagwan's records ",
+       "and made a big history book. ",
+       "This book is the Annals ",
+       "of the Joseon Dynasty. ",
+       "It holds politics, weather, ",
+       "earthquakes, and the daily life ",
+       "of people. ",
+       "Almost every day ",
+       "of the Joseon Dynasty ",
+       "is in it."
+      ],
+      [
+       "Joseon kept the finished Annals ",
+       "in storehouses called sago. ",
+       "People made many copies ",
+       "and put them in far places. ",
+       "If one place burned, ",
+       "the books in other places ",
+       "were safe. ",
+       "In a big war, ",
+       "some sago really did burn. ",
+       "But people made new copies ",
+       "from the books that were left."
+      ],
+      [
+       "In 1997, the Annals became ",
+       "a UNESCO Memory of the World. ",
+       "Few countries kept ",
+       "hundreds of years of history ",
+       "so carefully. ",
+       "The world praised ",
+       "Joseon's great culture ",
+       "of writing records."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "officer",
+       "ko": "관리 (명사)",
+       "base": "officer [ˈɔːfɪsər]"
+      },
+      {
+       "word": "records",
+       "ko": "기록들 (명사)",
+       "base": "record [ˈrekərd]"
+      },
+      {
+       "word": "gathered",
+       "ko": "모았다 (동사)",
+       "base": "gather [ˈɡæðər]"
+      },
+      {
+       "word": "copies",
+       "ko": "여러 벌 (명사)",
+       "base": "copy [ˈkɑːpi]"
+      },
+      {
+       "word": "burned",
+       "ko": "불탔다 (동사)",
+       "base": "burn [bɜːrn]"
+      },
+      {
+       "word": "carefully",
+       "ko": "꼼꼼하게 (부사)",
+       "base": "careful [ˈkerfl]"
       }
      ]
     },
@@ -7173,6 +8746,126 @@
        "evidencePara": 1
       }
      ]
+    },
+    "L1": {
+     "title": "임금님 이야기를 다 적은 책",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "옛날 우리나라에는 ",
+       "임금님이 있었어요. ",
+       "임금님 곁에는 ",
+       "사관이 늘 있었어요. ",
+       "사관은 임금님의 말과 행동을 ",
+       "모두 적었어요. ",
+       "실수한 일도 ",
+       "그대로 적었어요."
+      ],
+      [
+       "임금님도 이 기록을 ",
+       "마음대로 볼 수 없었어요. ",
+       "그래서 사관은 사실만 남겼어요. ",
+       "임금님이 돌아가시면 ",
+       "기록을 모아 책을 만들었어요. ",
+       "이 책이 조선왕조실록이에요. ",
+       "날씨와 백성의 삶도 담겼어요."
+      ],
+      [
+       "실록은 여러 벌을 만들어 ",
+       "먼 곳에 나누어 두었어요. ",
+       "한 곳이 불타도 ",
+       "다른 곳에 남기 때문이에요. ",
+       "실제로 전쟁 때 몇 곳이 불탔어요. ",
+       "그래도 남은 책으로 ",
+       "다시 만들 수 있었어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "사관",
+       "easy": "임금님 곁에서 있었던 일을 적는 사람이에요.",
+       "hanja": null
+      },
+      {
+       "word": "기록",
+       "easy": "잊지 않으려고 글로 적어 두는 것이에요.",
+       "hanja": null
+      },
+      {
+       "word": "조선왕조실록",
+       "easy": "옛날 우리나라 임금님들의 일을 적은 책이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "임금님의 밥상",
+        "바다 쓰레기",
+        "임금님 일을 적은 책",
+        "글자를 만든 임금님"
+       ],
+       "answer": 2,
+       "explain": "사관이 적은 기록을 모아 만든 조선왕조실록 이야기예요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "detail",
+       "q": "사관은 무엇을 적었나요?",
+       "choices": [
+        "임금님의 말과 행동",
+        "자기 일기",
+        "동네 소문",
+        "물고기 수"
+       ],
+       "answer": 0,
+       "explain": "사관은 임금님의 말과 행동을 모두 적었어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "vocab",
+       "q": "사관은 어떤 사람인가요?",
+       "choices": [
+        "밥을 짓는 사람",
+        "임금님 곁에서 적는 사람",
+        "배를 만드는 사람",
+        "글자를 만든 사람"
+       ],
+       "answer": 1,
+       "explain": "사관은 임금님 곁에서 있었던 일을 적는 사람이에요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "임금님이 기록을 못 보게 한 까닭은 무엇일까요?",
+       "choices": [
+        "사실대로 적게 하려고",
+        "책이 무거워서",
+        "글씨가 작아서",
+        "책이 모자라서"
+       ],
+       "answer": 0,
+       "explain": "임금님이 볼 수 없으니 사관이 사실만 남길 수 있었어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "apply",
+       "q": "소중한 그림을 오래 지키려면 어떻게 할까요?",
+       "choices": [
+        "한 장만 벽에 붙여요",
+        "밖에 그냥 두어요",
+        "여러 벌 만들어 나눠 둬요",
+        "물에 담가 둬요"
+       ],
+       "answer": 2,
+       "explain": "실록처럼 여러 벌을 만들어 나누어 두면 하나가 없어져도 남아요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -7396,6 +9089,98 @@
        "answer": 0,
        "explain": "자음은 다섯 개의 기본 글자에 획을 더해, 모음은 세 가지 기본 글자를 서로 합쳐 만들었다. 그래서 적은 수의 기본 글자와 만드는 방법만 알면 많은 글자를 읽고 쓸 수 있어 배우기 쉽다. 해례본은 글자를 만든 원리를 설명한 책일 뿐, 백성이 이 책으로 글자를 배웠다는 내용은 글에 없으므로 해례본 때문이라는 설명은 알맞지 않다.",
        "evidencePara": 2
+      }
+     ],
+     "en": [
+      "King Sejong made Hunminjeongeum in 1443. The name means the right sounds to teach the people. Back then, people found Chinese characters very hard to learn. So King Sejong made letters that anyone could learn easily.",
+      "The basic consonants copy the shape of our speech parts. The letter ㄱ shows the tongue blocking the throat. The letter ㄴ shows the tongue touching the upper gum. ㅁ copies the mouth, ㅅ the teeth, and ㅇ the throat. Adding a stroke to these five letters makes a stronger sound. For example, ㄱ with one more stroke becomes ㅋ.",
+      "The vowels copy the sky, the earth, and people. A round dot means the sky. The flat line ㅡ means the earth. The standing line ㅣ means a person standing up. Joining these three shapes makes many different vowels. So a few basic letters can write many sounds.",
+      "A book called Hunminjeongeum Haerye explains how the letters were made. Thanks to this book, we know the rules behind Hangeul. Few writing systems tell us the maker, the year, and the rules. In 1997, the Haerye book became a UNESCO Memory of the World."
+     ],
+     "enseg": [
+      [
+       "King Sejong made Hunminjeongeum ",
+       "in 1443. ",
+       "The name means ",
+       "the right sounds to teach the people. ",
+       "Back then, people found ",
+       "Chinese characters very hard to learn. ",
+       "So King Sejong made letters ",
+       "that anyone could learn easily."
+      ],
+      [
+       "The basic consonants ",
+       "copy the shape ",
+       "of our speech parts. ",
+       "The letter ㄱ shows ",
+       "the tongue blocking the throat. ",
+       "The letter ㄴ shows ",
+       "the tongue touching the upper gum. ",
+       "ㅁ copies the mouth, ",
+       "ㅅ the teeth, and ㅇ the throat. ",
+       "Adding a stroke ",
+       "to these five letters ",
+       "makes a stronger sound. ",
+       "For example, ㄱ ",
+       "with one more stroke becomes ㅋ."
+      ],
+      [
+       "The vowels copy the sky, ",
+       "the earth, and people. ",
+       "A round dot means the sky. ",
+       "The flat line ㅡ ",
+       "means the earth. ",
+       "The standing line ㅣ ",
+       "means a person standing up. ",
+       "Joining these three shapes ",
+       "makes many different vowels. ",
+       "So a few basic letters ",
+       "can write many sounds."
+      ],
+      [
+       "A book called ",
+       "Hunminjeongeum Haerye ",
+       "explains how the letters were made. ",
+       "Thanks to this book, ",
+       "we know the rules ",
+       "behind Hangeul. ",
+       "Few writing systems tell us ",
+       "the maker, the year, ",
+       "and the rules. ",
+       "In 1997, the Haerye book ",
+       "became a UNESCO Memory of the World."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "consonants",
+       "ko": "자음들 (명사)",
+       "base": "consonant [ˈkɑːnsənənt]"
+      },
+      {
+       "word": "vowels",
+       "ko": "모음들 (명사)",
+       "base": "vowel [ˈvaʊəl]"
+      },
+      {
+       "word": "shape",
+       "ko": "모양 (명사)",
+       "base": "shape [ʃeɪp]"
+      },
+      {
+       "word": "tongue",
+       "ko": "혀 (명사)",
+       "base": "tongue [tʌŋ]"
+      },
+      {
+       "word": "stroke",
+       "ko": "획 (명사)",
+       "base": "stroke [stroʊk]"
+      },
+      {
+       "word": "explains",
+       "ko": "설명한다 (동사)",
+       "base": "explain [ɪkˈspleɪn]"
       }
      ]
     },
@@ -8086,6 +9871,125 @@
        "evidencePara": 2
       }
      ]
+    },
+    "L1": {
+     "title": "입 모양을 닮은 글자, 한글",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "옛날 우리나라 임금님인 ",
+       "세종대왕이 한글을 만들었어요. ",
+       "그때 백성들은 ",
+       "어려운 한자를 배우기 힘들었어요. ",
+       "그래서 누구나 ",
+       "쉽게 배울 글자를 만들었어요. ",
+       "그 이름이 훈민정음이에요."
+      ],
+      [
+       "자음은 입안의 모양을 ",
+       "본떠 만들었어요. ",
+       "ㄱ은 혀뿌리가 목구멍을 막는 모양이에요. ",
+       "ㄴ은 혀끝이 잇몸에 닿는 모양이에요. ",
+       "ㅁ은 입, ㅅ은 이, ㅇ은 목구멍 모양이에요. ",
+       "여기에 획을 더하면 ",
+       "센 소리가 돼요."
+      ],
+      [
+       "모음은 하늘과 땅과 사람을 본떴어요. ",
+       "둥근 점은 하늘이에요. ",
+       "가로선 ㅡ는 땅이에요. ",
+       "세로선 ㅣ는 ",
+       "서 있는 사람이에요. ",
+       "이 셋을 합쳐 ",
+       "여러 모음을 만들어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "훈민정음",
+       "easy": "세종대왕이 만든 우리 글자의 첫 이름이에요.",
+       "hanja": null
+      },
+      {
+       "word": "자음",
+       "easy": "ㄱ, ㄴ, ㅁ처럼 입안 모양을 본뜬 글자예요.",
+       "hanja": null
+      },
+      {
+       "word": "모음",
+       "easy": "ㅡ, ㅣ처럼 하늘과 땅과 사람을 본뜬 글자예요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "임금님의 옷",
+        "바다 쓰레기",
+        "전기 만들기",
+        "한글을 만든 이야기"
+       ],
+       "answer": 3,
+       "explain": "세종대왕이 한글을 어떻게 만들었는지 알려 주는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "ㅁ은 무엇의 모양인가요?",
+       "choices": [
+        "코",
+        "입",
+        "눈",
+        "귀"
+       ],
+       "answer": 1,
+       "explain": "ㅁ은 입 모양을 본떠 만든 글자예요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "모음은 무엇을 본떠 만들었나요?",
+       "choices": [
+        "새와 나무",
+        "산과 강",
+        "하늘과 땅과 사람",
+        "해와 달"
+       ],
+       "answer": 2,
+       "explain": "모음은 하늘과 땅과 사람을 본떠 만들었어요.",
+       "evidencePara": 2
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "세종대왕이 새 글자를 만든 까닭은 무엇일까요?",
+       "choices": [
+        "백성이 쉽게 쓰게 하려고",
+        "글씨를 예쁘게 쓰려고",
+        "책을 팔려고",
+        "노래를 지으려고"
+       ],
+       "answer": 0,
+       "explain": "한자가 어려워서 누구나 쉽게 배울 글자를 만들었어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "apply",
+       "q": "ㄱ에 획을 하나 더하면 어떤 글자가 될까요?",
+       "choices": [
+        "ㄴ",
+        "ㅁ",
+        "ㅋ",
+        "ㅇ"
+       ],
+       "answer": 2,
+       "explain": "획을 더하면 더 센 소리가 되니 ㄱ은 ㅋ이 돼요.",
+       "evidencePara": 1
+      }
+     ]
     }
    },
    "books": [
@@ -8301,6 +10205,97 @@
        "answer": 3,
        "explain": "첫째 문단에서 웹툰은 무료라서 많은 사람이 즐기게 되었다고 했고, 셋째 문단에서 독자가 늘면서 여러 직업이 생겨났다고 했다. 이 두 내용을 이으면 독자가 늘어난 것이 산업으로 자란 바탕임을 알 수 있다. 드라마·영화는 인기 웹툰이 나중에 다시 만들어진 것이므로 순서를 거꾸로 말한 설명이다.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "A webtoon is a comic you read on the internet. It really started in Korea in the early 2000s. At first anyone could read it free, so many people enjoyed it. Unlike a paper comic book, you scroll the screen down. People call this way vertical scroll.",
+      "Vertical scroll fits a smartphone very well. You can read it easily with just one finger. The pictures flow from top to bottom, so the story feels smooth. A long empty space can build tension before a surprise. Paper comics did not have this new way.",
+      "Webtoons have grown into a big industry. Writers make the stories, and platforms bring them to readers. As readers grew, many new jobs appeared around webtoons. Many popular webtoons become dramas or movies. One story can grow into many different shapes.",
+      "Korean webtoons are translated into many languages. Readers in other countries enjoy them on their phones. The vertical scroll way is now used all over the world. A comic style from Korea changed how the world reads comics."
+     ],
+     "enseg": [
+      [
+       "A webtoon is a comic ",
+       "you read on the internet. ",
+       "It really started in Korea ",
+       "in the early 2000s. ",
+       "At first anyone ",
+       "could read it free, ",
+       "so many people enjoyed it. ",
+       "Unlike a paper comic book, ",
+       "you scroll the screen down. ",
+       "People call this way ",
+       "vertical scroll."
+      ],
+      [
+       "Vertical scroll fits ",
+       "a smartphone very well. ",
+       "You can read it easily ",
+       "with just one finger. ",
+       "The pictures flow ",
+       "from top to bottom, ",
+       "so the story feels smooth. ",
+       "A long empty space ",
+       "can build tension ",
+       "before a surprise. ",
+       "Paper comics did not have ",
+       "this new way."
+      ],
+      [
+       "Webtoons have grown ",
+       "into a big industry. ",
+       "Writers make the stories, ",
+       "and platforms bring them to readers. ",
+       "As readers grew, ",
+       "many new jobs appeared ",
+       "around webtoons. ",
+       "Many popular webtoons ",
+       "become dramas or movies. ",
+       "One story can grow ",
+       "into many different shapes."
+      ],
+      [
+       "Korean webtoons are translated ",
+       "into many languages. ",
+       "Readers in other countries ",
+       "enjoy them on their phones. ",
+       "The vertical scroll way ",
+       "is now used ",
+       "all over the world. ",
+       "A comic style from Korea ",
+       "changed how the world reads comics."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "comic",
+       "ko": "만화 (명사)",
+       "base": "comic [ˈkɑːmɪk]"
+      },
+      {
+       "word": "vertical",
+       "ko": "세로의 (형용사)",
+       "base": "vertical [ˈvɜːrtɪkl]"
+      },
+      {
+       "word": "industry",
+       "ko": "산업 (명사)",
+       "base": "industry [ˈɪndəstri]"
+      },
+      {
+       "word": "readers",
+       "ko": "독자들 (명사)",
+       "base": "reader [ˈriːdər]"
+      },
+      {
+       "word": "popular",
+       "ko": "인기 있는 (형용사)",
+       "base": "popular [ˈpɑːpjələr]"
+      },
+      {
+       "word": "translated",
+       "ko": "번역되었다 (동사)",
+       "base": "translate [trænsˈleɪt]"
       }
      ]
     },
@@ -8959,6 +10954,120 @@
        "evidencePara": 2
       }
      ]
+    },
+    "L1": {
+     "title": "손가락으로 쓱, 웹툰이 뭐예요?",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "웹툰은 인터넷으로 보는 만화예요. ",
+       "우리나라에서 맨 처음 시작했어요. ",
+       "종이 만화책은 옆으로 넘겨요. ",
+       "웹툰은 화면을 아래로 ",
+       "쭉 내리면서 읽어요."
+      ],
+      [
+       "그래서 스마트폰으로 보기 좋아요. ",
+       "손가락 하나면 읽을 수 있어요. ",
+       "그림이 위에서 아래로 이어져요. ",
+       "이야기가 물처럼 술술 흘러가요. ",
+       "종이 만화에는 없던 방법이에요."
+      ],
+      [
+       "웹툰은 인기가 아주 많아요. ",
+       "재미있는 웹툰은 드라마나 ",
+       "영화로도 만들어요. ",
+       "다른 나라 말로 바꾸어 ",
+       "외국 친구들도 읽어요. ",
+       "우리 만화가 세계로 나간 거예요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "웹툰",
+       "easy": "인터넷으로 보는 만화예요.",
+       "hanja": null
+      },
+      {
+       "word": "화면",
+       "easy": "그림과 글자가 보이는 네모난 판이에요.",
+       "hanja": null
+      },
+      {
+       "word": "인기",
+       "easy": "많은 사람이 좋아하고 찾는 것이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 알려 주나요?",
+       "choices": [
+        "종이 만화책 만드는 법",
+        "웹툰이 무엇이고 어떻게 읽는지",
+        "스마트폰을 고치는 법",
+        "영화관에 가는 길"
+       ],
+       "answer": 1,
+       "explain": "웹툰이 무엇인지, 어떻게 읽는지, 얼마나 인기가 많은지 알려 주는 글이에요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "웹툰은 어떻게 읽나요?",
+       "choices": [
+        "책장을 옆으로 넘겨요.",
+        "뒤에서 앞으로 읽어요.",
+        "소리만 들어요.",
+        "화면을 아래로 내려요."
+       ],
+       "answer": 3,
+       "explain": "첫 문단에서 웹툰은 화면을 아래로 쭉 내리면서 읽는다고 했어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "vocab",
+       "q": "'웹툰'은 무엇일까요?",
+       "choices": [
+        "인터넷으로 보는 만화",
+        "만화를 그리는 붓",
+        "만화책을 파는 가게",
+        "만화를 보는 안경"
+       ],
+       "answer": 0,
+       "explain": "첫 문장에서 웹툰은 인터넷으로 보는 만화라고 했어요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "웹툰을 스마트폰으로 보기 좋은 까닭은?",
+       "choices": [
+        "그림이 아주 커서",
+        "글자가 하나도 없어서",
+        "손가락으로 내리며 읽어서",
+        "소리가 크게 나와서"
+       ],
+       "answer": 2,
+       "explain": "손가락 하나면 읽을 수 있고, 그림이 위에서 아래로 이어져요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "apply",
+       "q": "영어를 쓰는 친구에게 우리 웹툰을 보여 주려면?",
+       "choices": [
+        "종이에 다시 그려요.",
+        "영어로 바꾼 웹툰을 알려 줘요.",
+        "만화 가게에 데려가요.",
+        "그림을 지우고 보여 줘요."
+       ],
+       "answer": 1,
+       "explain": "웹툰은 다른 나라 말로 바꾸어 외국 친구들도 읽는다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -9159,6 +11268,100 @@
        "answer": 0,
        "explain": "1문단에서 사람이 달에 오래 머물려면 그곳의 방사선이 얼마나 센지 '미리' 알아야 우주인을 안전하게 지킬 방법을 준비할 수 있다고 했습니다. 그래서 사람보다 측정기를 먼저 보내는 것입니다. 달 남극이 여러 나라가 탐사하고 싶어 하는 곳이라는 말은 본문에 나오지만, 그것은 측정기를 '먼저' 보내는 까닭이 아니라 달 남극이라는 장소에 대한 설명일 뿐입니다.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "Tiny bits of strong energy fly through space. We cannot see them with our eyes. People call them space radiation. On Earth, thick air and a magnetic field block them. But the Moon has almost no air. So space radiation pours right onto the Moon's surface.",
+      "You cannot see or feel space radiation. But too much of it can hurt the human body. Someday people may stay on the Moon for a long time. First we must know how strong the radiation there is. Then we can find ways to keep astronauts safe.",
+      "Korean scientists are building a machine to measure this radiation. Its name is LVRAD. An American company is making a lander for the Moon. LVRAD will ride on that lander. The plan is to land at the Moon's south pole in 2030. Many countries want to explore the Moon's south pole.",
+      "In August 2026, Korea's space agency signed a paper with NASA. The paper promises a seat for LVRAD on the lander. The data from the Moon will help people plan future trips. Korean technology is helping the world explore the Moon."
+     ],
+     "enseg": [
+      [
+       "Tiny bits of strong energy ",
+       "fly through space. ",
+       "We cannot see them ",
+       "with our eyes. ",
+       "People call them space radiation. ",
+       "On Earth, thick air ",
+       "and a magnetic field ",
+       "block them. ",
+       "But the Moon ",
+       "has almost no air. ",
+       "So space radiation pours ",
+       "right onto the Moon's surface."
+      ],
+      [
+       "You cannot see or feel ",
+       "space radiation. ",
+       "But too much of it ",
+       "can hurt the human body. ",
+       "Someday people may stay ",
+       "on the Moon for a long time. ",
+       "First we must know ",
+       "how strong the radiation there is. ",
+       "Then we can find ways ",
+       "to keep astronauts safe."
+      ],
+      [
+       "Korean scientists are building ",
+       "a machine to measure ",
+       "this radiation. ",
+       "Its name is LVRAD. ",
+       "An American company ",
+       "is making a lander ",
+       "for the Moon. ",
+       "LVRAD will ride ",
+       "on that lander. ",
+       "The plan is to land ",
+       "at the Moon's south pole ",
+       "in 2030. ",
+       "Many countries want to explore ",
+       "the Moon's south pole."
+      ],
+      [
+       "In August 2026, ",
+       "Korea's space agency ",
+       "signed a paper with NASA. ",
+       "The paper promises a seat ",
+       "for LVRAD on the lander. ",
+       "The data from the Moon ",
+       "will help people ",
+       "plan future trips. ",
+       "Korean technology is helping ",
+       "the world explore the Moon."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "radiation",
+       "ko": "방사선 (명사)",
+       "base": "radiation [ˌreɪdiˈeɪʃn]"
+      },
+      {
+       "word": "surface",
+       "ko": "표면 (명사)",
+       "base": "surface [ˈsɜːrfɪs]"
+      },
+      {
+       "word": "astronauts",
+       "ko": "우주인들 (명사)",
+       "base": "astronaut [ˈæstrənɔːt]"
+      },
+      {
+       "word": "measure",
+       "ko": "재다 (동사)",
+       "base": "measure [ˈmeʒər]"
+      },
+      {
+       "word": "explore",
+       "ko": "탐사하다 (동사)",
+       "base": "explore [ɪkˈsplɔːr]"
+      },
+      {
+       "word": "signed",
+       "ko": "서명했다 (동사)",
+       "base": "sign [saɪn]"
       }
      ]
     },
@@ -9820,6 +12023,121 @@
        "evidencePara": 4
       }
      ]
+    },
+    "L1": {
+     "title": "달에 가는 우리 작은 기계",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "우주에는 아주 작은 알갱이가 ",
+       "빠르게 날아다녀요. ",
+       "눈에는 보이지 않아요. ",
+       "이것을 우주방사선이라고 해요. ",
+       "지구는 두꺼운 공기가 ",
+       "이불처럼 막아 줘요."
+      ],
+      [
+       "그런데 달에는 공기가 거의 없어요. ",
+       "그래서 알갱이가 그대로 쏟아져요. ",
+       "많이 맞으면 몸이 아플 수 있어요. ",
+       "달에 사람이 가려면 ",
+       "얼마나 센지 먼저 알아야 해요."
+      ],
+      [
+       "우리나라 연구원들이 ",
+       "이것을 재는 기계를 만들어요. ",
+       "기계는 착륙선을 타고 달로 가요. ",
+       "달의 남극에 사뿐히 내려요. ",
+       "여기서 모은 자료로 ",
+       "달에 갈 준비를 해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "우주방사선",
+       "easy": "우주에서 날아다니는 아주 작고 빠른 알갱이예요.",
+       "hanja": null
+      },
+      {
+       "word": "착륙선",
+       "easy": "달이나 별에 사뿐히 내려앉는 우주선이에요.",
+       "hanja": null
+      },
+      {
+       "word": "자료",
+       "easy": "알아보려고 모은 사실이나 숫자예요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 글인가요?",
+       "choices": [
+        "달에 사는 동물",
+        "지구의 여름 날씨",
+        "달을 재러 가는 우리 기계",
+        "우주선을 타는 방법"
+       ],
+       "answer": 2,
+       "explain": "우리나라가 만든 기계가 달에 가서 우주방사선을 잰다는 이야기예요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "detail",
+       "q": "달에 알갱이가 그대로 쏟아지는 까닭은?",
+       "choices": [
+        "공기가 거의 없어서",
+        "물이 아주 많아서",
+        "밤이 짧아서",
+        "돌이 많아서"
+       ],
+       "answer": 0,
+       "explain": "둘째 문단에서 달에는 공기가 거의 없다고 했어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'착륙선'은 무엇일까요?",
+       "choices": [
+        "하늘을 나는 새",
+        "달에서 입는 옷",
+        "땅을 파는 기계",
+        "달에 내려앉는 우주선"
+       ],
+       "answer": 3,
+       "explain": "기계는 착륙선을 타고 달로 가서 남극에 내려요.",
+       "evidencePara": 2
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "지구에서는 왜 알갱이를 덜 맞을까요?",
+       "choices": [
+        "달보다 작아서",
+        "두꺼운 공기가 막아 주어서",
+        "낮이 길어서",
+        "바다가 넓어서"
+       ],
+       "answer": 1,
+       "explain": "지구는 두꺼운 공기가 이불처럼 막아 준다고 했어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "apply",
+       "q": "기계가 모은 자료는 어디에 쓰면 좋을까요?",
+       "choices": [
+        "달에서 밥 짓는 데",
+        "달 그림 그리는 데",
+        "우주인을 안전하게 지키는 데",
+        "달까지 걸어가는 데"
+       ],
+       "answer": 2,
+       "explain": "얼마나 센지 알아야 사람이 달에 갈 준비를 할 수 있어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -10033,6 +12351,94 @@
        "answer": 3,
        "explain": "글에서 가격이 오르면 배출권을 사는 데 돈이 많이 들어 기업이 온실가스를 더 열심히 줄인다고 했으니, 반대로 가격이 싸지면 줄이는 대신 사서 해결하려는 기업이 많아질 수 있어요. 첫 번째 선지는 이와 반대되는 짐작이라 틀렸어요. 온실가스 전체 양은 나라가 정하는 것이므로 가격 때문에 저절로 늘어나지 않아요.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "Big factories and power plants make things and electricity. While they work, they send out greenhouse gases. These gases wrap the Earth like a blanket and hold heat. So the Earth slowly gets hotter. Many countries are looking for ways to cut these gases.",
+      "Korea started a plan called emissions trading in 2015. First, the country sets a total amount of gas. Then it shares that amount among companies. Each company gets the right to send out some gas. People call this right an emission permit.",
+      "A company that sends out less gas has permits left over. It can sell them to other companies in the market. A company that sends out more gas must buy permits. So companies cut their gases to save money.",
+      "Today about 770 Korean companies join this plan. Permit prices go up and down like stock prices. When the price goes up, buying permits costs a lot. So companies try even harder to cut their gases. In this way, the market helps protect the Earth."
+     ],
+     "enseg": [
+      [
+       "Big factories and power plants ",
+       "make things and electricity. ",
+       "While they work, ",
+       "they send out greenhouse gases. ",
+       "These gases wrap the Earth ",
+       "like a blanket and hold heat. ",
+       "So the Earth ",
+       "slowly gets hotter. ",
+       "Many countries are looking ",
+       "for ways to cut these gases."
+      ],
+      [
+       "Korea started a plan ",
+       "called emissions trading ",
+       "in 2015. ",
+       "First, the country sets ",
+       "a total amount of gas. ",
+       "Then it shares that amount ",
+       "among companies. ",
+       "Each company gets the right ",
+       "to send out some gas. ",
+       "People call this right ",
+       "an emission permit."
+      ],
+      [
+       "A company that sends out ",
+       "less gas has permits left over. ",
+       "It can sell them ",
+       "to other companies ",
+       "in the market. ",
+       "A company that sends out ",
+       "more gas must buy permits. ",
+       "So companies cut their gases ",
+       "to save money."
+      ],
+      [
+       "Today about 770 Korean companies ",
+       "join this plan. ",
+       "Permit prices go up and down ",
+       "like stock prices. ",
+       "When the price goes up, ",
+       "buying permits costs a lot. ",
+       "So companies try even harder ",
+       "to cut their gases. ",
+       "In this way, ",
+       "the market helps protect the Earth."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "factories",
+       "ko": "공장들 (명사)",
+       "base": "factory [ˈfæktri]"
+      },
+      {
+       "word": "amount",
+       "ko": "양 (명사)",
+       "base": "amount [əˈmaʊnt]"
+      },
+      {
+       "word": "permits",
+       "ko": "배출권들 (명사)",
+       "base": "permit [ˈpɜːrmɪt]"
+      },
+      {
+       "word": "companies",
+       "ko": "기업들 (명사)",
+       "base": "company [ˈkʌmpəni]"
+      },
+      {
+       "word": "market",
+       "ko": "시장 (명사)",
+       "base": "market [ˈmɑːrkɪt]"
+      },
+      {
+       "word": "protect",
+       "ko": "지키다 (동사)",
+       "base": "protect [prəˈtekt]"
       }
      ]
     },
@@ -10697,6 +13103,120 @@
        "evidencePara": 4
       }
      ]
+    },
+    "L1": {
+     "title": "공장이 지구와 한 약속",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "공장은 물건을 만들면서 ",
+       "연기를 내보내요. ",
+       "연기 속에는 온실가스가 있어요. ",
+       "온실가스는 지구를 이불처럼 덮어요. ",
+       "그래서 지구가 조금씩 더워져요."
+      ],
+      [
+       "우리나라는 좋은 약속을 만들었어요. ",
+       "공장마다 연기를 내보낼 수 있는 ",
+       "딱지를 나누어 줘요. ",
+       "이 딱지를 배출권이라고 해요. ",
+       "딱지가 없으면 더 내보낼 수 없어요."
+      ],
+      [
+       "연기를 적게 낸 공장은 딱지가 남아요. ",
+       "남은 딱지는 다른 공장에 팔아요. ",
+       "그래서 공장들은 ",
+       "연기를 줄이려고 애써요. ",
+       "우리도 불을 끄고 걸어 다니면 ",
+       "지구를 시원하게 도울 수 있어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "온실가스",
+       "easy": "지구를 이불처럼 덮어 더 따뜻하게 만드는 공기예요.",
+       "hanja": null
+      },
+      {
+       "word": "배출권",
+       "easy": "연기를 내보낼 수 있게 나누어 주는 딱지예요.",
+       "hanja": null
+      },
+      {
+       "word": "공장",
+       "easy": "물건을 많이 만드는 큰 일터예요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글에서 가장 하고 싶은 말은?",
+       "choices": [
+        "공장은 모두 문을 닫아야 해요.",
+        "연기는 색깔이 예뻐요.",
+        "지구는 원래 더워요.",
+        "약속을 만들어 온실가스를 줄여요."
+       ],
+       "answer": 3,
+       "explain": "딱지를 나누어 주는 약속으로 공장이 연기를 줄이게 된다는 글이에요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "detail",
+       "q": "연기를 적게 낸 공장은 어떻게 하나요?",
+       "choices": [
+        "딱지를 버려요.",
+        "남은 딱지를 팔아요.",
+        "딱지를 더 사요.",
+        "공장 문을 닫아요."
+       ],
+       "answer": 1,
+       "explain": "셋째 문단에서 남은 딱지는 다른 공장에 판다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "vocab",
+       "q": "'배출권'은 무엇일까요?",
+       "choices": [
+        "연기를 내보낼 수 있는 딱지",
+        "공장에서 만드는 물건",
+        "지구를 덮는 이불",
+        "전기를 켜는 단추"
+       ],
+       "answer": 0,
+       "explain": "둘째 문단에서 이 딱지를 배출권이라고 한다고 했어요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "공장이 연기를 줄이려고 애쓰는 까닭은?",
+       "choices": [
+        "연기가 무거워서",
+        "딱지가 예뻐서",
+        "남은 딱지를 팔 수 있어서",
+        "물건이 안 팔려서"
+       ],
+       "answer": 2,
+       "explain": "적게 내보내면 딱지가 남고, 남은 딱지는 다른 공장에 팔 수 있어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "지구를 돕고 싶어요. 오늘 할 수 있는 일은?",
+       "choices": [
+        "방마다 불을 다 켜요.",
+        "가까운 길도 차를 타요.",
+        "물을 계속 틀어 놔요.",
+        "가까운 곳은 걸어가요."
+       ],
+       "answer": 3,
+       "explain": "불을 끄고 걸어 다니면 우리도 지구를 도울 수 있다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "books": [
@@ -10913,6 +13433,110 @@
        "answer": 0,
        "explain": "① 글은 앞으로 해양열파가 더 자주, 더 강하게 나타날 것이라고 했고, 해양열파는 양식장 물고기를 죽게 하는 등 피해를 주므로 대비가 더 중요해질 것이라고 짐작할 수 있어요. ② '바다의 온도를 지켜본다'는 본문의 말을 쓴 둘째 선지가 그럴듯하지만, 해양열파가 늘수록 바다를 지켜보고 미리 알리는 일은 오히려 더 필요해져요.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "In summer, a heat wave comes to the land. The sea can have a heat wave, too. Sometimes the sea water stays much warmer than usual. When this lasts five days or more, we call it a marine heatwave. Sea water does not cool down easily. So a marine heatwave often lasts a long time.",
+      "In August 2026, Korea's weather office shared a new study. It looked at the seas around Korea. In the last ten years, marine heatwaves came about 83 days each year. That is 3.7 times more than before. If the Earth keeps getting warmer, they will come more often. They will also grow stronger.",
+      "A hot sea changes many things. Fish that like cold water swim away. They look for a cooler sea. Fish in sea farms can die in warm water. A hot sea also sends heat and water vapor into the air. Water vapor is water that turned into gas. This can make heat waves and heavy rain worse on land.",
+      "So scientists watch the sea every day. They use satellites and special tools. When the water may get very hot, they warn people early. This helps people keep their fish and farms safe. Cutting greenhouse gases can also slow the warming. Ocean scientists and climate researchers study these changes. Their work is growing more important."
+     ],
+     "enseg": [
+      [
+       "In summer, a heat wave comes ",
+       "to the land. ",
+       "The sea can have ",
+       "a heat wave, too. ",
+       "Sometimes the sea water ",
+       "stays much warmer than usual. ",
+       "When this lasts ",
+       "five days or more, ",
+       "we call it ",
+       "a marine heatwave. ",
+       "Sea water does not ",
+       "cool down easily. ",
+       "So a marine heatwave ",
+       "often lasts a long time."
+      ],
+      [
+       "In August 2026, ",
+       "Korea's weather office ",
+       "shared a new study. ",
+       "It looked at the seas ",
+       "around Korea. ",
+       "In the last ten years, ",
+       "marine heatwaves came ",
+       "about 83 days each year. ",
+       "That is 3.7 times ",
+       "more than before. ",
+       "If the Earth keeps ",
+       "getting warmer, ",
+       "they will come more often. ",
+       "They will also grow stronger."
+      ],
+      [
+       "A hot sea ",
+       "changes many things. ",
+       "Fish that like cold water ",
+       "swim away. ",
+       "They look for a cooler sea. ",
+       "Fish in sea farms ",
+       "can die in warm water. ",
+       "A hot sea also sends ",
+       "heat and water vapor ",
+       "into the air. ",
+       "Water vapor is water ",
+       "that turned into gas. ",
+       "This can make heat waves ",
+       "and heavy rain worse on land."
+      ],
+      [
+       "So scientists watch the sea ",
+       "every day. ",
+       "They use satellites ",
+       "and special tools. ",
+       "When the water ",
+       "may get very hot, ",
+       "they warn people early. ",
+       "This helps people keep ",
+       "their fish and farms safe. ",
+       "Cutting greenhouse gases ",
+       "can also slow the warming. ",
+       "Ocean scientists and climate researchers ",
+       "study these changes. ",
+       "Their work is growing more important."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "warmer",
+       "ko": "더 따뜻한 (형용사)",
+       "base": "warm [wɔːrm]"
+      },
+      {
+       "word": "lasts",
+       "ko": "계속되다, 이어지다 (동사)",
+       "base": "last [læst]"
+      },
+      {
+       "word": "usual",
+       "ko": "평소의, 보통의 (형용사)",
+       "base": "usual [ˈjuːʒuəl]"
+      },
+      {
+       "word": "satellites",
+       "ko": "인공위성 (명사)",
+       "base": "satellite [ˈsætəlaɪt]"
+      },
+      {
+       "word": "warn",
+       "ko": "미리 알리다, 경고하다 (동사)",
+       "base": "warn [wɔːrn]"
+      },
+      {
+       "word": "important",
+       "ko": "중요한 (형용사)",
+       "base": "important [ɪmˈpɔːrtnt]"
       }
      ]
     },
@@ -11591,6 +14215,121 @@
        "evidencePara": 3
       }
      ]
+    },
+    "L1": {
+     "title": "바다도 더위를 먹어요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "여름에는 날씨가 아주 더워요. ",
+       "그런데 바다도 더워질 때가 있어요. ",
+       "바닷물이 평소보다 훨씬 뜨거워져요. ",
+       "이런 날이 며칠씩 이어지면 ",
+       "해양열파라고 해요."
+      ],
+      [
+       "바다가 뜨거워지면 ",
+       "물고기가 힘들어해요. ",
+       "시원한 물을 좋아하는 물고기는 ",
+       "멀리 떠나 버려요. ",
+       "뜨거운 바다는 땅 위 날씨도 바꿔요. ",
+       "더 덥고 비도 많이 와요."
+      ],
+      [
+       "그래도 너무 걱정하지 않아도 돼요. ",
+       "과학자들은 인공위성으로 ",
+       "바다를 늘 지켜봐요. ",
+       "뜨거워지기 전에 미리 알려 줘요. ",
+       "우리도 전기를 아끼면 ",
+       "바다를 시원하게 지킬 수 있어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "해양열파",
+       "easy": "바닷물이 여러 날 아주 뜨거워지는 일이에요.",
+       "hanja": null
+      },
+      {
+       "word": "인공위성",
+       "easy": "하늘 높이 돌면서 땅과 바다를 살피는 기계예요.",
+       "hanja": null
+      },
+      {
+       "word": "과학자",
+       "easy": "궁금한 것을 알아내려고 살피고 연구하는 사람이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 알려 주나요?",
+       "choices": [
+        "뜨거워진 바다와 지키는 방법",
+        "물고기를 잡는 방법",
+        "여름에 입는 옷",
+        "배를 만드는 방법"
+       ],
+       "answer": 0,
+       "explain": "바다가 더워지는 일과, 그것을 지켜보고 지키는 방법을 알려 줘요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "detail",
+       "q": "바다가 뜨거워지면 물고기는 어떻게 하나요?",
+       "choices": [
+        "더 많이 모여요.",
+        "물 밖으로 나와요.",
+        "시원한 바다로 떠나요.",
+        "하루 종일 잠을 자요."
+       ],
+       "answer": 2,
+       "explain": "시원한 물을 좋아하는 물고기는 멀리 떠나 버린다고 했어요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'인공위성'은 무엇일까요?",
+       "choices": [
+        "바다에 사는 큰 물고기",
+        "하늘에서 바다를 살피는 기계",
+        "물을 끓이는 그릇",
+        "바닷가에 있는 등대"
+       ],
+       "answer": 1,
+       "explain": "과학자들은 인공위성으로 바다를 늘 지켜본다고 했어요.",
+       "evidencePara": 2
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "바다가 뜨거워지는 것을 미리 알면 좋은 점은?",
+       "choices": [
+        "바다가 넓어져요.",
+        "물고기가 커져요.",
+        "여름이 짧아져요.",
+        "미리 준비할 수 있어요."
+       ],
+       "answer": 3,
+       "explain": "과학자들이 미리 알려 주면 사람들이 준비해서 피해를 줄일 수 있어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "바다를 시원하게 지키려면 오늘 무엇을 할까요?",
+       "choices": [
+        "안 쓰는 전기를 꺼요.",
+        "바닷물을 퍼내요.",
+        "물고기를 많이 잡아요.",
+        "선풍기를 밤새 켜요."
+       ],
+       "answer": 0,
+       "explain": "우리도 전기를 아끼면 바다를 지킬 수 있다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "videos": [
@@ -11784,6 +14523,106 @@
        "answer": 2,
        "explain": "이 검사는 암세포가 혈액에 남긴 DNA 조각의 작은 차이를 인공지능이 찾아내는 방식이에요. 조각이 거의 남지 않으면 단서 자체가 없으니 찾기 어려울 거예요. 두 번째 선지가 헷갈리지만, 인공지능은 혈액 데이터 속 차이를 공부해서 배우는 것이므로 단서가 되는 조각이 없다면 공부할 재료도 없어요. 민감도 90.4%는 대장암 연구에서 나온 결과일 뿐 다른 암에도 그대로 적용된다는 보장은 없어요.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "Cancer is easier to treat when doctors find it early. To check for colon cancer, doctors use an endoscope. An endoscope is a long tube that goes inside the body. Many people feel afraid of this test. Now there is a new way. One small blood test may show the danger of colon cancer.",
+      "Our body is made of tiny cells. When cells get old and die, they break apart. They leave small pieces of DNA in our blood. These pieces are called cell-free DNA. Pieces from cancer cells look a little different. Their length and shape are not the same. AI studies blood data from many people. It learns to find these small differences.",
+      "A research team at Seoul Asan Hospital tried this test. It found nine out of ten colon cancer patients. That is a score of 90.4 percent. But the test only shows a chance of cancer. It cannot say for sure. Doctors still need an endoscope test to be certain.",
+      "An easy test helps people who put off checkups. They can find cancer early and get help. Many people work together to build this tool. Doctors care for the patients. Life scientists study cells and DNA. Computer developers build the medical AI. Do you like science that saves lives? Then watch this field closely."
+     ],
+     "enseg": [
+      [
+       "Cancer is easier to treat ",
+       "when doctors find it early. ",
+       "To check for colon cancer, ",
+       "doctors use an endoscope. ",
+       "An endoscope is a long tube ",
+       "that goes inside the body. ",
+       "Many people feel afraid ",
+       "of this test. ",
+       "Now there is a new way. ",
+       "One small blood test ",
+       "may show the danger ",
+       "of colon cancer."
+      ],
+      [
+       "Our body is made of tiny cells. ",
+       "When cells get old and die, ",
+       "they break apart. ",
+       "They leave small pieces of DNA ",
+       "in our blood. ",
+       "These pieces are called cell-free DNA. ",
+       "Pieces from cancer cells ",
+       "look a little different. ",
+       "Their length and shape ",
+       "are not the same. ",
+       "AI studies blood data ",
+       "from many people. ",
+       "It learns to find ",
+       "these small differences."
+      ],
+      [
+       "A research team ",
+       "at Seoul Asan Hospital ",
+       "tried this test. ",
+       "It found nine out of ten ",
+       "colon cancer patients. ",
+       "That is a score ",
+       "of 90.4 percent. ",
+       "But the test only shows ",
+       "a chance of cancer. ",
+       "It cannot say for sure. ",
+       "Doctors still need ",
+       "an endoscope test ",
+       "to be certain."
+      ],
+      [
+       "An easy test helps people ",
+       "who put off checkups. ",
+       "They can find cancer early ",
+       "and get help. ",
+       "Many people work together ",
+       "to build this tool. ",
+       "Doctors care for the patients. ",
+       "Life scientists study cells and DNA. ",
+       "Computer developers build ",
+       "the medical AI. ",
+       "Do you like science ",
+       "that saves lives? ",
+       "Then watch this field closely."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "early",
+       "ko": "일찍, 이른 시기에 (부사)",
+       "base": "early [ˈɜːrli]"
+      },
+      {
+       "word": "blood",
+       "ko": "피, 혈액 (명사)",
+       "base": "blood [blʌd]"
+      },
+      {
+       "word": "cells",
+       "ko": "세포들 (명사)",
+       "base": "cell [sel]"
+      },
+      {
+       "word": "afraid",
+       "ko": "무서워하는, 두려운 (형용사)",
+       "base": "afraid [əˈfreɪd]"
+      },
+      {
+       "word": "different",
+       "ko": "다른 (형용사)",
+       "base": "different [ˈdɪfrənt]"
+      },
+      {
+       "word": "patients",
+       "ko": "환자들 (명사)",
+       "base": "patient [ˈpeɪʃnt]"
       }
      ]
     },
@@ -12473,6 +15312,122 @@
        "evidencePara": 3
       }
      ]
+    },
+    "L1": {
+     "title": "피 한 방울로 몸속을 살펴봐요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "몸속에 병이 생겼는지 ",
+       "알고 싶을 때가 있어요. ",
+       "예전에는 긴 관을 몸에 넣어서 ",
+       "살펴봤어요. ",
+       "요즘은 피 한 방울로 ",
+       "몸속을 살펴보는 방법이 나왔어요."
+      ],
+      [
+       "우리 몸의 작은 세포는 ",
+       "피 속에 작은 조각을 남겨요. ",
+       "아픈 곳에서 나온 조각은 ",
+       "모양이 조금 달라요. ",
+       "인공지능은 많은 자료를 공부해서 ",
+       "이 차이를 찾아내요."
+      ],
+      [
+       "한 병원에서 이 방법을 써 봤어요. ",
+       "열 명 중 아홉 명을 찾아냈어요. ",
+       "검사가 쉬우면 ",
+       "일찍 찾을 수 있어요. ",
+       "병은 일찍 찾으면 잘 나아요. ",
+       "의사와 과학자가 함께 만든 방법이에요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "세포",
+       "easy": "우리 몸을 이루는 아주 작은 알갱이예요.",
+       "hanja": null
+      },
+      {
+       "word": "인공지능",
+       "easy": "사람처럼 배우고 생각하는 똑똑한 컴퓨터예요.",
+       "hanja": null
+      },
+      {
+       "word": "검사",
+       "easy": "괜찮은지 자세히 살펴보는 일이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글이 가장 크게 말하는 내용은 무엇인가요?",
+       "choices": [
+        "긴 관을 넣는 검사가 제일 좋아요.",
+        "피를 조금 뽑아 몸속을 살펴봐요.",
+        "인공지능은 그림을 잘 그려요.",
+        "병원에는 사람이 아주 많아요."
+       ],
+       "answer": 1,
+       "explain": "글 전체가 피 한 방울로 몸속을 살펴보는 새 방법을 알려 주고 있어요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "한 병원에서 열 명 중 몇 명을 찾아냈나요?",
+       "choices": [
+        "세 명",
+        "다섯 명",
+        "일곱 명",
+        "아홉 명"
+       ],
+       "answer": 3,
+       "explain": "셋째 문단에 열 명 중 아홉 명을 찾아냈다고 나와요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "vocab",
+       "q": "'세포'는 무엇인가요?",
+       "choices": [
+        "우리 몸을 이루는 아주 작은 알갱이",
+        "몸속에 넣는 긴 관",
+        "병원에서 주는 약",
+        "피를 담는 그릇"
+       ],
+       "answer": 0,
+       "explain": "세포는 우리 몸을 이루는 아주 작은 알갱이예요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "검사가 더 쉬워지면 어떤 일이 생길까요?",
+       "choices": [
+        "병을 더 늦게 찾아요.",
+        "검사받는 사람이 줄어요.",
+        "병을 더 일찍 찾을 수 있어요.",
+        "피가 아주 많이 필요해요."
+       ],
+       "answer": 2,
+       "explain": "검사가 쉬우면 일찍 찾을 수 있다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "검사를 무서워하는 친구에게 해 줄 말로 알맞은 것은 무엇인가요?",
+       "choices": [
+        "병은 찾지 않는 게 좋아.",
+        "피를 조금만 뽑는 방법도 있대.",
+        "검사는 아무 소용이 없어.",
+        "인공지능은 병을 못 찾아."
+       ],
+       "answer": 1,
+       "explain": "피 한 방울로 몸속을 살펴보는 방법이 나왔다고 했어요.",
+       "evidencePara": 0
+      }
+     ]
     }
    },
    "videos": [
@@ -12674,6 +15629,103 @@
        "answer": 0,
        "explain": "글은 상한 돌을 바꿀 때 같은 종류의 돌을 써야 한다고 하면서, 조사 정보가 나중에 수리할 때 큰 도움이 된다고 했어요. 어떤 돌이 어디에 쓰였는지 도면에 남겨 두면 수리할 자리의 돌을 바로 알 수 있지요. 창덕궁과 종묘는 이미 세계유산이 되었다고 했으므로 심사를 다시 받으려 한다는 네 번째 선지는 알맞지 않아요.",
        "evidencePara": 1
+      }
+     ],
+     "en": [
+      "Changdeokgung in Seoul is an old palace. Kings of the Joseon dynasty lived there. Jongmyo is a shrine near the palace. People held special ceremonies there for old kings and queens. Jongmyo became a UNESCO World Heritage site in 1995. Changdeokgung joined the list in 1997. Many stones hold up their floors, stairs, and walls.",
+      "A research team from the Korea Heritage Service checked the stones. They studied 4,421 stones, one by one. Most of them are granite, a very hard rock. This granite has a soft pink color. The team also drew maps of the buildings. Colors on the maps show where each stone sits.",
+      "Why is the home of a stone important? Wind and rain hurt stones over many years. The stones crack and break apart. Workers must change a broken stone for a new one. A wrong stone looks strange, with a different color. This study found the same granite in Seoul's mountains. Inwangsan and Bugaksan hold this pink rock. So workers can find matching stones for future repairs.",
+      "Saving old treasures needs the power of science. We call these workers conservation scientists. They use science to study and protect our heritage. Do you love history and science together? Then this job may be perfect for you."
+     ],
+     "enseg": [
+      [
+       "Changdeokgung in Seoul ",
+       "is an old palace. ",
+       "Kings of the Joseon dynasty ",
+       "lived there. ",
+       "Jongmyo is a shrine ",
+       "near the palace. ",
+       "People held special ceremonies there ",
+       "for old kings and queens. ",
+       "Jongmyo became a UNESCO ",
+       "World Heritage site in 1995. ",
+       "Changdeokgung joined the list in 1997. ",
+       "Many stones hold up ",
+       "their floors, stairs, and walls."
+      ],
+      [
+       "A research team ",
+       "from the Korea Heritage Service ",
+       "checked the stones. ",
+       "They studied 4,421 stones, ",
+       "one by one. ",
+       "Most of them are granite, ",
+       "a very hard rock. ",
+       "This granite has ",
+       "a soft pink color. ",
+       "The team also drew maps ",
+       "of the buildings. ",
+       "Colors on the maps show ",
+       "where each stone sits."
+      ],
+      [
+       "Why is the home of a stone important? ",
+       "Wind and rain hurt stones ",
+       "over many years. ",
+       "The stones crack and break apart. ",
+       "Workers must change a broken stone ",
+       "for a new one. ",
+       "A wrong stone looks strange, ",
+       "with a different color. ",
+       "This study found the same granite ",
+       "in Seoul's mountains. ",
+       "Inwangsan and Bugaksan hold this pink rock. ",
+       "So workers can find matching stones ",
+       "for future repairs."
+      ],
+      [
+       "Saving old treasures ",
+       "needs the power of science. ",
+       "We call these workers ",
+       "conservation scientists. ",
+       "They use science to study ",
+       "and protect our heritage. ",
+       "Do you love history ",
+       "and science together? ",
+       "Then this job ",
+       "may be perfect for you."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "palace",
+       "ko": "궁궐 (명사)",
+       "base": "palace [ˈpæləs]"
+      },
+      {
+       "word": "stones",
+       "ko": "돌들 (명사)",
+       "base": "stone [stoʊn]"
+      },
+      {
+       "word": "granite",
+       "ko": "화강암 (명사)",
+       "base": "granite [ˈɡrænɪt]"
+      },
+      {
+       "word": "hard",
+       "ko": "단단한 (형용사)",
+       "base": "hard [hɑːrd]"
+      },
+      {
+       "word": "broken",
+       "ko": "깨진, 부서진 (형용사)",
+       "base": "break [breɪk]"
+      },
+      {
+       "word": "protect",
+       "ko": "지키다, 보호하다 (동사)",
+       "base": "protect [prəˈtekt]"
       }
      ]
     },
@@ -13354,6 +16406,123 @@
        "evidencePara": 3
       }
      ]
+    },
+    "L1": {
+     "title": "궁궐 돌은 무슨 색일까요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "서울에는 창덕궁이라는 ",
+       "옛 궁궐이 있어요. ",
+       "아주 오래전 ",
+       "임금님이 살던 곳이에요. ",
+       "계단과 담장에는 ",
+       "돌이 아주 많이 쓰였어요."
+      ],
+      [
+       "연구하는 사람들이 ",
+       "이 돌을 하나하나 살펴봤어요. ",
+       "사천 개가 넘는 돌을 ",
+       "모두 세었어요. ",
+       "돌은 대부분 ",
+       "연한 분홍빛 화강암이었어요."
+      ],
+      [
+       "돌도 오래되면 갈라지고 부서져요. ",
+       "그때 색이 다른 돌을 끼우면 ",
+       "어색해요. ",
+       "그래서 서울의 산에서 ",
+       "같은 돌을 찾아 두었어요. ",
+       "옛 건물을 지키는 데에도 ",
+       "공부가 필요해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "궁궐",
+       "easy": "옛날에 임금님이 살던 큰 집이에요.",
+       "hanja": null
+      },
+      {
+       "word": "담장",
+       "easy": "집이나 마당을 둘러싼 벽이에요.",
+       "hanja": null
+      },
+      {
+       "word": "화강암",
+       "easy": "단단하고 알록달록한 무늬가 있는 돌이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇을 알려 주나요?",
+       "choices": [
+        "궁궐에서 노는 방법",
+        "임금님이 먹던 음식",
+        "궁궐에 쓰인 돌을 살펴본 일",
+        "서울에 있는 산 이름"
+       ],
+       "answer": 2,
+       "explain": "글 전체가 궁궐의 돌을 하나하나 살펴본 이야기예요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "detail",
+       "q": "궁궐의 돌은 대부분 무슨 색이었나요?",
+       "choices": [
+        "연한 분홍빛",
+        "새까만 색",
+        "맑은 파란색",
+        "밝은 노란색"
+       ],
+       "answer": 0,
+       "explain": "둘째 문단에 연한 분홍빛 화강암이었다고 나와요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'담장'은 무엇인가요?",
+       "choices": [
+        "돌을 나르는 수레",
+        "임금님이 앉는 의자",
+        "궁궐 안에 있는 연못",
+        "집이나 마당을 둘러싼 벽"
+       ],
+       "answer": 3,
+       "explain": "담장은 집이나 마당을 둘러싼 벽이에요.",
+       "evidencePara": 0
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "갈라진 자리에 색이 다른 돌을 끼우면 어떻게 될까요?",
+       "choices": [
+        "훨씬 더 튼튼해져요.",
+        "보기에 어색해져요.",
+        "돌이 저절로 커져요.",
+        "색이 저절로 같아져요."
+       ],
+       "answer": 1,
+       "explain": "색이 다른 돌을 끼우면 어색하다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "우리 학교 담장 돌이 깨졌어요. 이 글대로 하면 어떻게 할까요?",
+       "choices": [
+        "아무 돌이나 빨리 끼워요.",
+        "깨진 채로 그냥 둬요.",
+        "색이 비슷한 돌을 찾아요.",
+        "담장을 모두 없애요."
+       ],
+       "answer": 2,
+       "explain": "같은 돌을 미리 찾아 두면 수리할 때 도움이 된다고 했어요.",
+       "evidencePara": 2
+      }
+     ]
     }
    },
    "videos": [
@@ -13555,6 +16724,106 @@
        "answer": 2,
        "explain": "첫째 문단에서 전기를 멀리 보내면 일부가 사라지고 큰돈이 든다고 했고, 둘째 문단에서 발전소가 가까운 남부 지역의 요금을 내려 주자고 했으니, 가까워서 비용이 덜 드는 만큼 요금을 싸게 하려는 것임을 짐작할 수 있어요. 첫 번째 선지는 그럴듯하지만 글은 아껴 쓰는 습관이 아니라 발전소와의 거리와 비용을 근거로 들었기 때문에 틀렸어요.",
        "evidencePara": 0
+      }
+     ],
+     "en": [
+      "Power plants make the electricity we use. But the plants are not spread out evenly. Factories and offices near Seoul use the most power. Yet most big power plants stand in the south. So the electricity must travel a long way north. Some power is lost along the wires. Tall towers and long wires also cost a lot of money.",
+      "On August 26, 2026, the government shared a new plan. Korea's energy office and the power company made it. Factories pay for electricity, and the price could change by area. The plan splits the country into eleven areas. Southern areas near power plants would pay up to 10 percent less. This is only a plan for now. People are still sharing their ideas about it.",
+      "Why did they make this plan? Different prices can move big electricity users. Factories and data centers may go to cheaper areas. Then the country sends less power over long wires. The south may also gain new jobs. Still, some people are not sure. A small price cut may not move a whole company.",
+      "This story is not only for power experts. Engineers plan the roads that electricity travels. Business experts choose the best place for a factory. Policy experts write the rules for prices. They all solve this puzzle together. Can you read the ideas hidden in a price? That skill is the first step to these jobs."
+     ],
+     "enseg": [
+      [
+       "Power plants make ",
+       "the electricity we use. ",
+       "But the plants are not ",
+       "spread out evenly. ",
+       "Factories and offices near Seoul ",
+       "use the most power. ",
+       "Yet most big power plants ",
+       "stand in the south. ",
+       "So the electricity must travel ",
+       "a long way north. ",
+       "Some power is lost ",
+       "along the wires. ",
+       "Tall towers and long wires ",
+       "also cost a lot of money."
+      ],
+      [
+       "On August 26, 2026, ",
+       "the government shared a new plan. ",
+       "Korea's energy office ",
+       "and the power company made it. ",
+       "Factories pay for electricity, ",
+       "and the price could change by area. ",
+       "The plan splits the country ",
+       "into eleven areas. ",
+       "Southern areas near power plants ",
+       "would pay up to 10 percent less. ",
+       "This is only a plan for now. ",
+       "People are still sharing ",
+       "their ideas about it."
+      ],
+      [
+       "Why did they make this plan? ",
+       "Different prices can move ",
+       "big electricity users. ",
+       "Factories and data centers ",
+       "may go to cheaper areas. ",
+       "Then the country sends less power ",
+       "over long wires. ",
+       "The south may also ",
+       "gain new jobs. ",
+       "Still, some people are not sure. ",
+       "A small price cut ",
+       "may not move a whole company."
+      ],
+      [
+       "This story is not only ",
+       "for power experts. ",
+       "Engineers plan the roads ",
+       "that electricity travels. ",
+       "Business experts choose the best place ",
+       "for a factory. ",
+       "Policy experts write ",
+       "the rules for prices. ",
+       "They all solve this puzzle together. ",
+       "Can you read the ideas ",
+       "hidden in a price? ",
+       "That skill is the first step ",
+       "to these jobs."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "electricity",
+       "ko": "전기 (명사)",
+       "base": "electricity [ɪˌlekˈtrɪsəti]"
+      },
+      {
+       "word": "plants",
+       "ko": "발전소들 (명사)",
+       "base": "plant [plænt]"
+      },
+      {
+       "word": "travel",
+       "ko": "이동하다, 가다 (동사)",
+       "base": "travel [ˈtrævl]"
+      },
+      {
+       "word": "wires",
+       "ko": "전선들 (명사)",
+       "base": "wire [ˈwaɪər]"
+      },
+      {
+       "word": "price",
+       "ko": "가격, 요금 (명사)",
+       "base": "price [praɪs]"
+      },
+      {
+       "word": "cheaper",
+       "ko": "더 값싼 (형용사)",
+       "base": "cheap [tʃiːp]"
       }
      ]
     },
@@ -14258,6 +17527,122 @@
        "evidencePara": 1
       }
      ]
+    },
+    "L1": {
+     "title": "전기는 먼 길을 와요",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "우리가 쓰는 전기는 ",
+       "발전소에서 만들어요. ",
+       "큰 발전소는 ",
+       "남쪽에 많이 있어요. ",
+       "전기를 많이 쓰는 공장은 ",
+       "서울 가까이에 많아요."
+      ],
+      [
+       "그래서 전기는 전선을 타고 ",
+       "먼 길을 와요. ",
+       "오는 동안 ",
+       "전기가 조금씩 사라져요. ",
+       "높은 탑과 전선을 세우는 데 ",
+       "돈도 많이 들어요."
+      ],
+      [
+       "그래서 새로운 생각이 나왔어요. ",
+       "발전소가 가까운 곳은 ",
+       "전기 값을 깎아 주자는 거예요. ",
+       "그러면 공장이 ",
+       "그곳으로 옮겨 갈 수 있어요. ",
+       "아직 정해지지는 않았어요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "발전소",
+       "easy": "전기를 만드는 큰 곳이에요.",
+       "hanja": null
+      },
+      {
+       "word": "전선",
+       "easy": "전기가 지나다니는 줄이에요.",
+       "hanja": null
+      },
+      {
+       "word": "공장",
+       "easy": "물건을 많이 만드는 큰 건물이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글에서 말하려는 것은 무엇인가요?",
+       "choices": [
+        "전기는 저절로 생겨요.",
+        "공장은 전기를 안 써요.",
+        "전선은 아주 짧아요.",
+        "전기 값을 지역마다 다르게 하자고 해요."
+       ],
+       "answer": 3,
+       "explain": "발전소가 가까운 곳은 전기 값을 깎아 주자는 새 생각을 알려 주고 있어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "detail",
+       "q": "큰 발전소는 어디에 많이 있나요?",
+       "choices": [
+        "서울 한가운데",
+        "남쪽 지방",
+        "넓은 바다 위",
+        "높은 산꼭대기"
+       ],
+       "answer": 1,
+       "explain": "첫째 문단에 큰 발전소는 남쪽에 많다고 나와요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "vocab",
+       "q": "'전선'은 무엇인가요?",
+       "choices": [
+        "전기를 만드는 기계",
+        "물이 흐르는 길",
+        "전기가 지나다니는 줄",
+        "공장에서 입는 옷"
+       ],
+       "answer": 2,
+       "explain": "전선은 전기가 지나다니는 줄이에요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "전기 값이 싼 곳이 생기면 공장은 어떻게 할까요?",
+       "choices": [
+        "그곳으로 옮겨 갈 수 있어요.",
+        "전기를 아예 안 써요.",
+        "문을 모두 닫아요.",
+        "값을 더 올려 달라고 해요."
+       ],
+       "answer": 0,
+       "explain": "값이 싸면 공장이 그곳으로 옮겨 갈 수 있다고 했어요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "우리 동네 가까이에 발전소가 생기면 좋은 점은 무엇일까요?",
+       "choices": [
+        "전기가 더 많이 사라져요.",
+        "전선을 훨씬 길게 놓아요.",
+        "전기 값이 더 비싸져요.",
+        "전기가 오는 길이 짧아져요."
+       ],
+       "answer": 3,
+       "explain": "전기가 먼 길을 오면 사라지고 돈도 든다고 했으니, 가까우면 길이 짧아져요.",
+       "evidencePara": 1
+      }
+     ]
     }
    },
    "videos": [
@@ -14455,6 +17840,106 @@
        "answer": 2,
        "explain": "시범 적용은 정식 수업보다 먼저 학교에서 미리 써 보는 단계이므로, 학생들이 느끼는 어려움은 이때 가장 먼저 드러날 거예요. 시도교육청의 심의라는 두 번째 선지가 그럴듯하지만, 심의는 어른들이 책을 살펴 의논하는 절차라서 학생들이 책으로 직접 공부하며 느끼는 어려움은 교실에서 시범적으로 써 볼 때 먼저 알 수 있어요.",
        "evidencePara": 3
+      }
+     ],
+     "en": [
+      "In August 2026, the Ministry of Education shared big news. Schools will teach AI as a real school subject. Teachers in the classroom will write the textbooks themselves. There will be six books for elementary school. Middle school gets two, and high school gets eight. That makes sixteen new subjects in all.",
+      "Korea has three kinds of textbooks. The country writes the first kind by itself. Companies write the second kind, and the country checks it. For the third kind, the local school office gives approval. The new AI books belong to this third kind.",
+      "Why do teachers write the books? Teachers meet students in class every day. So they know what is hard for children. They also know what students really need. AI also changes very fast. New tools appear almost every month. So the main book will hold the big ideas. New facts will go into a small extra book. Teachers can update that book again and again.",
+      "Some schools will try the new books in 2027. Real classes will start in March 2028. Today's students will be the first readers. Teachers will guide them through the new books. Edtech developers will build tools that help learning. Content makers will explain hard ideas in simple ways. Do these jobs sound fun? Then keep your eyes on this change."
+     ],
+     "enseg": [
+      [
+       "In August 2026, ",
+       "the Ministry of Education ",
+       "shared big news. ",
+       "Schools will teach AI ",
+       "as a real school subject. ",
+       "Teachers in the classroom ",
+       "will write the textbooks themselves. ",
+       "There will be six books ",
+       "for elementary school. ",
+       "Middle school gets two, ",
+       "and high school gets eight. ",
+       "That makes sixteen ",
+       "new subjects in all."
+      ],
+      [
+       "Korea has three kinds ",
+       "of textbooks. ",
+       "The country writes the first kind ",
+       "by itself. ",
+       "Companies write the second kind, ",
+       "and the country checks it. ",
+       "For the third kind, ",
+       "the local school office ",
+       "gives approval. ",
+       "The new AI books ",
+       "belong to this third kind."
+      ],
+      [
+       "Why do teachers write the books? ",
+       "Teachers meet students ",
+       "in class every day. ",
+       "So they know ",
+       "what is hard for children. ",
+       "They also know what students really need. ",
+       "AI also changes very fast. ",
+       "New tools appear almost every month. ",
+       "So the main book will hold ",
+       "the big ideas. ",
+       "New facts will go ",
+       "into a small extra book. ",
+       "Teachers can update that book ",
+       "again and again."
+      ],
+      [
+       "Some schools will try ",
+       "the new books in 2027. ",
+       "Real classes will start ",
+       "in March 2028. ",
+       "Today's students will be ",
+       "the first readers. ",
+       "Teachers will guide them ",
+       "through the new books. ",
+       "Edtech developers will build tools ",
+       "that help learning. ",
+       "Content makers will explain ",
+       "hard ideas in simple ways. ",
+       "Do these jobs sound fun? ",
+       "Then keep your eyes on this change."
+      ]
+     ],
+     "envocab": [
+      {
+       "word": "textbooks",
+       "ko": "교과서들 (명사)",
+       "base": "textbook [ˈtekstbʊk]"
+      },
+      {
+       "word": "subject",
+       "ko": "과목 (명사)",
+       "base": "subject [ˈsʌbdʒɪkt]"
+      },
+      {
+       "word": "teach",
+       "ko": "가르치다 (동사)",
+       "base": "teach [tiːtʃ]"
+      },
+      {
+       "word": "approval",
+       "ko": "승인 (명사)",
+       "base": "approve [əˈpruːv]"
+      },
+      {
+       "word": "update",
+       "ko": "새로 고치다, 갱신하다 (동사)",
+       "base": "update [ʌpˈdeɪt]"
+      },
+      {
+       "word": "guide",
+       "ko": "이끌다, 안내하다 (동사)",
+       "base": "guide [ɡaɪd]"
       }
      ]
     },
@@ -15122,6 +18607,123 @@
        "evidencePara": 3
       }
      ]
+    },
+    "L1": {
+     "title": "선생님이 만드는 새 교과서",
+     "minutes": 3,
+     "paragraphs": [
+      [
+       "곧 학교에서 ",
+       "인공지능을 배워요. ",
+       "인공지능을 배우는 ",
+       "교과서도 새로 나와요. ",
+       "초등학교, 중학교, 고등학교 책을 ",
+       "함께 만들어요."
+      ],
+      [
+       "이 교과서는 ",
+       "선생님들이 직접 만들어요. ",
+       "선생님은 날마다 ",
+       "교실에서 아이들을 만나요. ",
+       "그래서 무엇이 어려운지 ",
+       "잘 알아요."
+      ],
+      [
+       "인공지능은 아주 빨리 바뀌어요. ",
+       "그래서 책에는 ",
+       "중요한 것만 담아요. ",
+       "새로 바뀐 이야기는 ",
+       "얇은 책으로 따로 만들어요. ",
+       "우리도 곧 ",
+       "이 책으로 공부해요."
+      ]
+     ],
+     "vocab": [
+      {
+       "word": "교과서",
+       "easy": "학교에서 공부할 때 보는 책이에요.",
+       "hanja": null
+      },
+      {
+       "word": "인공지능",
+       "easy": "사람처럼 배우고 생각하는 똑똑한 컴퓨터예요.",
+       "hanja": null
+      },
+      {
+       "word": "교실",
+       "easy": "학교에서 공부하는 방이에요.",
+       "hanja": null
+      }
+     ],
+     "questions": [
+      {
+       "type": "main",
+       "q": "이 글은 무엇에 대한 이야기인가요?",
+       "choices": [
+        "학교 운동회 이야기",
+        "선생님이 쉬는 날 이야기",
+        "인공지능 교과서를 만드는 이야기",
+        "컴퓨터를 고치는 이야기"
+       ],
+       "answer": 2,
+       "explain": "글 전체가 인공지능 교과서를 새로 만드는 이야기예요.",
+       "evidencePara": 0
+      },
+      {
+       "type": "detail",
+       "q": "이 교과서는 누가 만드나요?",
+       "choices": [
+        "선생님들",
+        "학생들",
+        "인공지능",
+        "이웃 어른들"
+       ],
+       "answer": 0,
+       "explain": "둘째 문단에 선생님들이 직접 만든다고 나와요.",
+       "evidencePara": 1
+      },
+      {
+       "type": "vocab",
+       "q": "'교실'은 어떤 곳인가요?",
+       "choices": [
+        "밥을 먹는 식당",
+        "학교에서 공부하는 방",
+        "책을 파는 가게",
+        "운동을 하는 마당"
+       ],
+       "answer": 1,
+       "explain": "교실은 학교에서 공부하는 방이에요.",
+       "evidencePara": 1
+      }
+     ],
+     "challenge": [
+      {
+       "type": "infer",
+       "q": "새로 바뀐 이야기를 얇은 책으로 따로 만드는 까닭은 무엇일까요?",
+       "choices": [
+        "책이 너무 무거워서요.",
+        "선생님이 아주 바빠서요.",
+        "종이가 모자라서요.",
+        "인공지능이 빨리 바뀌어서요."
+       ],
+       "answer": 3,
+       "explain": "인공지능은 아주 빨리 바뀌기 때문이에요.",
+       "evidencePara": 2
+      },
+      {
+       "type": "apply",
+       "q": "선생님이 교과서를 만들면 좋은 점은 무엇일까요?",
+       "choices": [
+        "책을 아주 두껍게 만들어요.",
+        "무엇이 어려운지 잘 알아요.",
+        "책값이 저절로 싸져요.",
+        "시험을 안 봐도 돼요."
+       ],
+       "answer": 1,
+       "explain": "선생님은 날마다 아이들을 만나서 무엇이 어려운지 잘 알아요.",
+       "evidencePara": 1
+      }
+     ]
     }
    }
   }
@@ -15443,6 +19045,109 @@
      ],
      "answer": 2,
      "explain": "셋째 문단에서 글쓴이는 알고리즘 자체가 나쁜 것이 아니라며 다양한 정보 접하기와 디지털 리터러시 등 이용자의 태도를 해법으로 제시하고 있다.",
+     "evidencePara": 2
+    }
+   ]
+  },
+  "L1": {
+   "title": "그림자는 왜 생길까요",
+   "minutes": 3,
+   "paragraphs": [
+    [
+     "햇빛이 밝은 날에는 ",
+     "그림자가 생겨요. ",
+     "빛이 내 몸에 막혀서 ",
+     "지나가지 못해요. ",
+     "그래서 바닥에 ",
+     "어두운 자리가 남아요. ",
+     "그 자리가 바로 그림자예요."
+    ],
+    [
+     "그림자는 하루 동안 ",
+     "길이가 바뀌어요. ",
+     "아침과 저녁에는 ",
+     "그림자가 길어요. ",
+     "해가 낮게 떠 있기 때문이에요. ",
+     "낮에는 해가 높이 올라와서 ",
+     "그림자가 짧아요."
+    ],
+    [
+     "그림자는 빛의 반대쪽에 생겨요. ",
+     "해를 마주 보고 서면 ",
+     "그림자는 내 뒤에 있어요. ",
+     "그림자를 보면 ",
+     "빛이 어디에 있는지 ",
+     "알 수 있어요."
+    ]
+   ],
+   "vocab": [
+    {
+     "word": "그림자",
+     "easy": "빛이 막혀서 생기는 어두운 자리예요.",
+     "hanja": null
+    },
+    {
+     "word": "반대쪽",
+     "easy": "서로 맞은편에 있는 쪽이에요.",
+     "hanja": null
+    },
+    {
+     "word": "마주",
+     "easy": "서로 얼굴을 향해 보는 거예요.",
+     "hanja": null
+    }
+   ],
+   "questions": [
+    {
+     "type": "main",
+     "q": "이 글은 무엇을 알려 주나요?",
+     "choices": [
+      "구름이 생기는 까닭",
+      "해가 뜨는 시간",
+      "그림자가 생기는 까닭",
+      "비가 오는 날씨"
+     ],
+     "answer": 2,
+     "explain": "글 전체가 그림자가 어떻게 생기고 어떻게 바뀌는지 알려 주고 있어요.",
+     "evidencePara": 0
+    },
+    {
+     "type": "detail",
+     "q": "그림자가 가장 짧아지는 때는 언제인가요?",
+     "choices": [
+      "해가 높이 뜬 낮",
+      "해가 낮게 뜬 아침",
+      "해가 지는 저녁",
+      "깜깜한 밤"
+     ],
+     "answer": 0,
+     "explain": "둘째 문단에 낮에는 해가 높이 올라와서 그림자가 짧다고 나와요.",
+     "evidencePara": 1
+    },
+    {
+     "type": "vocab",
+     "q": "'반대쪽'은 어떤 뜻인가요?",
+     "choices": [
+      "아주 가까운 쪽",
+      "위로 올라가는 쪽",
+      "빛이 나오는 쪽",
+      "서로 맞은편에 있는 쪽"
+     ],
+     "answer": 3,
+     "explain": "반대쪽은 서로 맞은편에 있는 쪽이에요.",
+     "evidencePara": 2
+    },
+    {
+     "type": "detail",
+     "q": "해를 마주 보고 서면 그림자는 어디에 생기나요?",
+     "choices": [
+      "내 앞",
+      "내 뒤",
+      "내 머리 위",
+      "해 옆"
+     ],
+     "answer": 1,
+     "explain": "셋째 문단에 해를 마주 보고 서면 그림자는 내 뒤에 있다고 나와요.",
      "evidencePara": 2
     }
    ]

@@ -164,7 +164,7 @@ async function titleMap(env, origin) {
     const m = {};
     for (const a of d.articles || []) {
       m[a.id] = {};
-      for (const lv of ['L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
+      for (const lv of ['L1', 'L2', 'L3', 'L4']) if (a.levels && a.levels[lv]) m[a.id][lv] = a.levels[lv].title;
     }
     TITLE_CACHE = { t: Date.now(), map: m };
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
@@ -194,7 +194,7 @@ function parentSummary(stu, st, titles, vst, book) {
     weekDays.push({ dow: dows[d.getUTCDay()], done: !!days[k], today: i === 0 });
   }
   /* 제목을 못 찾아도 내부 id를 학부모에게 보이지 않는다 — 지문 이름이 바뀌거나 내려가면 생긴다 */
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L4)) || '읽은 글';
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L1 || titles[id].L4)) || '읽은 글';
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -388,7 +388,7 @@ export default {
         const { code, level } = await req.json();
         const stu = await env.DB.get('student:' + code, 'json');
         if (!stu) return json(404, { error: '학생 없음' });
-        if (!['L2', 'L3', 'L4'].includes(level)) return json(400, { error: '레벨은 L2/L3/L4' });
+        if (!['L1', 'L2', 'L3', 'L4'].includes(level)) return json(400, { error: '과정은 L1/L2/L3/L4' });
         stu.level = level;
         await env.DB.put('student:' + code, JSON.stringify(stu));
         return json(200, { ok: true });
