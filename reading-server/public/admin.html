@@ -83,6 +83,12 @@ async function api(path,opt){
   if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
   return j;
 }
+let TB=null;
+async function getTb(){
+  if(TB)return TB;
+  try{TB=(await api('/admin/textbook')).books||[];}catch(e){TB=[];}
+  return TB;
+}
 async function getArts(){
   if(ARTS)return ARTS;
   try{const r=await fetch('/articles.json',{cache:'no-store'});ARTS=await r.json();}catch(e){ARTS={articles:[]};}
@@ -225,7 +231,7 @@ function stuReportText(r){
 }
 async function openDetail(code){
   let j;
-  try{[j]=await Promise.all([api('/admin/student/'+code),getArts()]);}
+  try{[j]=await Promise.all([api('/admin/student/'+code),getArts(),getTb()]);}
   catch(e){if(e.message!=='auth')alert(e.message);return;}
   const s=j.summary;const st=j.state||{};
   const reads=Object.entries(st.readings||{}).sort((x,y)=>y[1].date<x[1].date?-1:1).slice(0,8);
@@ -234,6 +240,8 @@ async function openDetail(code){
   const sp=st.speed||[];
   const speedLine=sp.length>=2?`최근 <b>${sp[sp.length-1].cpm}자/분</b> (첫 기록 대비 ${sp[sp.length-1].cpm-sp[0].cpm>=0?'+':''}${sp[sp.length-1].cpm-sp[0].cpm})`:sp.length===1?`${sp[0].cpm}자/분 (1회 측정)`:'측정 전';
   const stu=j.student||{};
+  const cur=stu.book||{};
+  const bookNow=TB.find(b=>b.id===cur.bookId)||null;
   $('#dlg').innerHTML=`<div class="dlg-in">
     <div class="dlg-head"><div>
       <h2 style="margin:0">${esc(s.name||'(미등록)')} <span class="muted" style="font-weight:600">${esc(s.code)}</span></h2>
@@ -262,6 +270,17 @@ async function openDetail(code){
       ${redbook.map(r=>`<div class="rline" style="display:block"><b>${esc(r.unit)}</b> <small>${esc(r.date)} · 셀프체크 ${(r.checks||[]).filter(Boolean).length}/${(r.checks||[]).length||3}${r.summary2?' · 2차까지 완성':' · 1차만'}</small>
         <details><summary>요약 보기</summary><pre>${esc('[1차] '+(r.summary||'')+(r.summary2?'\n\n[2차 — 점검 후 다시 쓴 것]\n'+r.summary2:''))}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
     </div>
+    <div class="dlg-sec"><h3>교재 진도 (어휘가 독해다)</h3>
+      <p class="muted">지정하면 학부모 리포트에 그 주 코칭이 실려요. ✓ 표시는 낱말 검수까지 끝난 강이에요.</p>
+      <div class="linkrow">
+        <select id="tbBook" style="flex:0 0 auto"><option value="">— 지정 안 함 —</option>
+          ${TB.map(b=>`<option value="${esc(b.id)}" ${cur.bookId===b.id?'selected':''}>${esc(b.short)}${b.grade?' ('+esc(b.grade)+')':''}</option>`).join('')}
+        </select>
+        <select id="tbLesson" style="flex:1 1 auto"></select>
+        <button class="btn" id="tbSave">저장</button>
+      </div>
+      <p class="muted" id="tbMsg" style="margin-top:6px">${cur.bookId?'현재 '+esc(bookNow?bookNow.short:cur.bookId)+' '+cur.lesson+'강':'아직 지정하지 않았어요.'}</p>
+    </div>
     <div class="dlg-sec"><h3>학부모 리포트 링크</h3>
       <p class="muted">로그인 없이 아이의 주간 현황만 보이는 읽기 전용 페이지예요. 학부모께 링크를 보내 주세요.</p>
       <div class="linkrow">
@@ -273,6 +292,22 @@ async function openDetail(code){
   </div>`;
   const dlg=$('#dlg');dlg.showModal();
   $('#dlgClose').onclick=()=>dlg.close();
+  /* 교재를 바꾸면 강 목록도 갈아 끼운다 — 다른 교재의 강 번호를 그대로 두면 엉뚱한 코칭이 나간다 */
+  const fillLessons=()=>{
+    const b=TB.find(x=>x.id===$('#tbBook').value);
+    $('#tbLesson').innerHTML=b?b.lessons.map(l=>`<option value="${l.lesson}" ${cur.bookId===b.id&&cur.lesson===l.lesson?'selected':''}>${l.lesson}강 · ${esc(l.title)}${l.confirmed?' ✓':''}</option>`).join('')
+      :'<option value="">—</option>';
+    $('#tbLesson').disabled=!b;
+  };
+  fillLessons();
+  $('#tbBook').onchange=fillLessons;
+  $('#tbSave').onclick=async()=>{
+    const bookId=$('#tbBook').value,lesson=+$('#tbLesson').value||0;
+    try{
+      const r=await api('/admin/book',{method:'POST',body:JSON.stringify({code,bookId,lesson})});
+      $('#tbMsg').textContent=r.book?'저장했어요 — 학부모 리포트에 '+r.book.lesson+'강 코칭이 실려요.':'지정을 해제했어요.';
+    }catch(e){$('#tbMsg').textContent='저장 실패: '+e.message;}
+  };
   $('#plMake').onclick=async()=>{
     try{const r=await api('/admin/parentlink',{method:'POST',body:JSON.stringify({code})});
       const u=location.origin+'/parent.html?t='+r.token;

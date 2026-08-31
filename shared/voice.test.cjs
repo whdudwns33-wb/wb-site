@@ -68,6 +68,13 @@ t('speakSeq — cancel하면 onend가 오지 않는다', () => {
   assert.strictEqual(ended, 1, '엔진 없는 환경에선 이미 끝나 있고, cancel은 터지지 않는다');
 });
 
+t('speak — onstart를 넘겨도 엔진이 없으면 조용히 넘어간다', () => {
+  let started = 0, ended = 0;
+  V.speak('가나다', { onstart: () => { started += 1; }, onend: () => { ended += 1; } });
+  assert.strictEqual(ended, 1);
+  assert.strictEqual(started, 0, '소리가 안 났으면 onstart도 오면 안 된다 — 이걸로 실패를 잡는다');
+});
+
 t('clock — 분:초 표시', () => {
   assert.strictEqual(V.clock(0), '0:00');
   assert.strictEqual(V.clock(7000), '0:07');

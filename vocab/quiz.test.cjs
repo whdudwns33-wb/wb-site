@@ -98,4 +98,56 @@ t('풀이 후보가 적어도 문항이 만들어진다 (진로독서 단어 1�
   assert.strictEqual(q.id, 'rd-x');
 });
 
+t('문맥 빈칸 오답은 정답과 같은 꼴이다', () => {
+  /* 정답만 명사이고 오답이 모두 '~다'이면 낱말을 몰라도 문법으로 답이 보인다.
+     "회오리바람에 ○○○ 날아갔어요"에 눈부시다·미덥다·가득하다를 놓으면 문제가 성립하지 않는다. */
+  const nouns = [
+    { id: 'n1', type: 'native', word: '나뭇잎', meaning: '나무에 달린 잎', example: '회오리바람에 나뭇잎이 날아갔어요.' },
+    { id: 'n2', type: 'native', word: '초원', meaning: '넓은 들판' },
+    { id: 'n3', type: 'native', word: '응달', meaning: '그늘진 곳' },
+    { id: 'n4', type: 'native', word: '뙤약볕', meaning: '강한 햇볕' },
+  ];
+  const verbs = [
+    { id: 'v1', type: 'native', word: '눈부시다', meaning: '빛이 세다' },
+    { id: 'v2', type: 'native', word: '미덥다', meaning: '믿음직하다' },
+    { id: 'v3', type: 'native', word: '가득하다', meaning: '꽉 차다' },
+  ];
+  for (let seed = 1; seed <= 20; seed += 1) {
+    const q = Q._q.qCloze(nouns[0], nouns.concat(verbs), seeded(seed));
+    assert.ok(q, '문항이 만들어져야 한다');
+    const bad = q.choices.filter((c) => /다$/.test(c));
+    assert.deepStrictEqual(bad, [], '명사 정답에 용언 오답이 섞였다: ' + q.choices.join(', '));
+  }
+});
+
+t('용언이 정답이면 오답도 용언이다', () => {
+  const target = { id: 'v0', type: 'native', word: '속삭이다', meaning: '작게 말하다', example: '비밀 이야기를 속삭였어요.' };
+  const pool = [target,
+    { id: 'v1', type: 'native', word: '눈부시다', meaning: '빛이 세다' },
+    { id: 'v2', type: 'native', word: '미덥다', meaning: '믿음직하다' },
+    { id: 'v3', type: 'native', word: '가득하다', meaning: '꽉 차다' },
+    { id: 'n1', type: 'native', word: '초원', meaning: '넓은 들판' },
+    { id: 'n2', type: 'native', word: '응달', meaning: '그늘진 곳' },
+    { id: 'n3', type: 'native', word: '뙤약볕', meaning: '강한 햇볕' },
+  ];
+  for (let seed = 1; seed <= 20; seed += 1) {
+    const q = Q._q.qCloze(target, pool, seeded(seed));
+    assert.ok(q, '문항이 만들어져야 한다');
+    const bad = q.choices.filter((c) => !/다$/.test(c));
+    assert.deepStrictEqual(bad, [], '용언 정답에 명사 오답이 섞였다: ' + q.choices.join(', '));
+  }
+});
+
+t('같은 꼴이 모자라면 나머지로 채운다 — 문항을 못 내는 것보다 낫다', () => {
+  const target = { id: 'n1', type: 'native', word: '나뭇잎', meaning: '잎', example: '나뭇잎이 날아갔어요.' };
+  const pool = [target,
+    { id: 'v1', type: 'native', word: '눈부시다', meaning: 'a' },
+    { id: 'v2', type: 'native', word: '미덥다', meaning: 'b' },
+    { id: 'v3', type: 'native', word: '가득하다', meaning: 'c' },
+  ];
+  const q = Q._q.qCloze(target, pool, seeded(5));
+  assert.ok(q, '같은 꼴이 없어도 문항은 나와야 한다');
+  assert.strictEqual(q.choices.length, 4);
+});
+
 console.log('\n통과 ' + passed + '개 — 문제 출제 엔진 검증 완료');

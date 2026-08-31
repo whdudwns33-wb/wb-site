@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
+import { bookIndex, cleanWords, coachingCard, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
@@ -124,7 +125,19 @@ function titleMap() {
   } catch (e) { TITLE_CACHE = { t: Date.now(), map: TITLE_CACHE.map || {} }; }
   return TITLE_CACHE.map;
 }
-function parentSummary(stu, st, vst) {
+/* 교재(어휘가 독해다) — 정적 파일 하나, 제목 맵과 같은 방식으로 캐시 */
+let TB_CACHE = { t: 0, data: null };
+function textbookRaw() {
+  if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
+  try {
+    TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
+  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  return TB_CACHE.data;
+}
+/* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다 */
+function textbook() { return withOverlay(textbookRaw(), db.textbook || {}); }
+
+function parentSummary(stu, st, vst, assignRec) {
   const titles = titleMap();
   const sum = summarize(stu.code);
   const S = (st && st.state) || {};
@@ -136,7 +149,8 @@ function parentSummary(stu, st, vst) {
     const d = new Date(k + 'T12:00:00');
     weekDays.push({ dow: dows[d.getDay()], done: !!days[k], today: i === 0 });
   }
-  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L1 || titles[id].L4)) || id;
+  /* 제목을 못 찾아도 내부 id를 학부모에게 보이지 않는다 — 지문 이름이 바뀌거나 내려가면 생긴다 */
+  const anyTitle = (id, lv) => (titles[id] && (titles[id][lv] || titles[id].L3 || titles[id].L2 || titles[id].L1 || titles[id].L4)) || '읽은 글';
   const recent = Object.entries(S.readings || {})
     .sort((x, y) => (y[1].date < x[1].date ? -1 : 1))
     .slice(0, 5)
@@ -150,6 +164,7 @@ function parentSummary(stu, st, vst) {
     reads: sum.reads, acc: sum.acc, vocab: sum.vocab, redbook: sum.redbook, train: sum.train,
     recent, reports, speed, lastActive: sum.lastActive, generatedAt: nowIso(),
     wordbrain: vocabSummary(vst),
+    book: coachingCard(textbook(), stu.book, vst, assignRec),
   };
 }
 
@@ -160,6 +175,9 @@ function serveFile(res, base, rel) {
   let fp = path.join(base, safe);
   if (!fp.startsWith(base)) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(fp) && fs.statSync(fp).isDirectory()) fp = path.join(fp, 'index.html');
+  /* 배포본(Cloudflare)은 /admin/vocab-review 처럼 확장자 없이 열린다.
+     로컬만 404가 나면 주소를 헛짚게 되므로 여기서도 .html을 한 번 더 찾아본다. */
+  if (!fs.existsSync(fp) && !path.extname(fp) && fs.existsSync(fp + '.html')) fp += '.html';
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
   fs.createReadStream(fp).pipe(res);
@@ -181,7 +199,7 @@ const server = http.createServer(async (req, res) => {
         const code = /^[A-Za-z0-9]{16,64}$/.test(t) ? (db.parents || {})[t] : null;
         const stu = code && db.students[code];
         if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
-        return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code)));
+        return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code), vocabStore.getAssign(code)));
       }
 
       if (p === '/api/login' && req.method === 'POST') {
@@ -272,7 +290,9 @@ const server = http.createServer(async (req, res) => {
         const c = String(code || '').trim();
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(res, 400, { error: '학생 코드는 영문/숫자 3~20자' });
         if (!name) return json(res, 400, { error: '이름 필요' });
-        db.students[c] = { code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: (db.students[c] || {}).createdAt || nowIso() };
+        /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
+        const prev = db.students[c] || {};
+        db.students[c] = { ...prev, code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev.createdAt || nowIso() };
         persist();
         return json(res, 200, { ok: true, student: db.students[c] });
       }
@@ -285,6 +305,44 @@ const server = http.createServer(async (req, res) => {
         persist();
         return json(res, 200, { ok: true });
       }
+      /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
+      if (p === '/api/admin/textbook' && req.method === 'GET') {
+        return json(res, 200, { books: bookIndex(textbook()) });
+      }
+      if (p === '/api/admin/book' && req.method === 'POST') {
+        const { code, bookId, lesson } = await readBody(req);
+        const stu = db.students[code];
+        if (!stu) return json(res, 404, { error: '학생 없음' });
+        if (!bookId) { delete stu.book; persist(); return json(res, 200, { ok: true, book: null }); }
+        const v = validProgress(textbook(), bookId, lesson);
+        if (!v.ok) return json(res, 400, { error: v.error });
+        stu.book = { bookId, lesson: v.lesson.lesson, at: nowIso() };
+        persist();
+        return json(res, 200, { ok: true, book: stu.book });
+      }
+      /* 강사 검수 — 강 하나의 낱말을 통째로 저장한다 */
+      const mLesson = p.match(/^\/api\/admin\/textbook\/([A-Za-z0-9-]{1,40})\/(\d{1,3})$/);
+      if (mLesson && req.method === 'GET') {
+        const v = validProgress(textbook(), mLesson[1], mLesson[2]);
+        if (!v.ok) return json(res, 404, { error: v.error });
+        return json(res, 200, { book: { id: v.book.id, short: v.book.short || v.book.title }, lesson: v.lesson });
+      }
+      if (mLesson && req.method === 'POST') {
+        const bookId = mLesson[1], lessonNo = +mLesson[2];
+        const v = validProgress(textbookRaw(), bookId, lessonNo);
+        if (!v.ok) return json(res, 404, { error: v.error });
+        const { words, confirmed } = await readBody(req);
+        let list = cleanWords(words);
+        if (confirmed) {
+          const r = readyToConfirm(list);
+          if (!r.ok) return json(res, 400, { error: r.error });
+          list = r.words;
+        }
+        db.textbook = db.textbook || {};
+        db.textbook[bookId + '#' + lessonNo] = { words: list, confirmed: !!confirmed, at: nowIso() };
+        persist();
+        return json(res, 200, { ok: true, words: list, confirmed: !!confirmed });
+      }
       if (p === '/api/admin/export' && req.method === 'GET') {
         const day = url.searchParams.get('backup');
         if (day) {
@@ -292,7 +350,7 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab });
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab, textbook: db.textbook || {}, pubmap: db.pubmap || {} });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -348,6 +406,10 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, data);
       } catch (e) { /* 파일 문제 시 원본 서빙으로 폴백 */ }
     }
+
+    /* 교재 코칭 원문은 직접 열 수 없다 — WB가 쓴 글이라, 학부모는 자기 아이 링크로만,
+       강사는 로그인해서만 본다. 서버·워커는 이 파일을 내부에서 읽어 쓴다. */
+    if (p === '/textbook.json') return json(res, 404, { error: 'not found' });
 
     /* 학생 앱 */
     return serveFile(res, APP_DIR, p === '/' ? 'index.html' : p.slice(1));

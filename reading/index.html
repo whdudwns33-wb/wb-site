@@ -1576,12 +1576,24 @@ function autoTick(){
     /* 타이머로 넘기면 소리와 글자가 어긋난다. 말이 실제로 끝난 순간에 넘긴다. */
     const text=groups[a.idx].map(el=>(el.textContent||'').trim()).filter(Boolean).join(' ');
     const tok=(a.tok=(a.tok||0)+1);   // 멈추거나 속도·범위를 바꾸면 옛 발화의 끝은 무시한다
-    WBVoice.speak(text,{rate:VOICE_RATES[a.speed]||1,onstart:()=>{const b=sess.auto;if(b)b.started=true;},onend:()=>{
+    /* 소리가 시작되는지 딱 한 번만 지켜본다.
+       목소리 목록(getVoices)은 못 믿는다 — 비어 있어도 읽어 주는 기기가 있고 그 반대도 있다.
+       덩어리마다 감시를 다시 걸면 안 된다: onstart 없이 onend만 오는 기기에서는
+       감시가 계속 미뤄져, 지문을 끝까지 조용히 넘긴 채 아무 말도 안 해 주게 된다. */
+    if(!a.spoke&&!a.watch){
+      a.watch=setTimeout(()=>{
+        if(sess.auto===a&&!a.spoke)
+          voiceFail('이 기기가 한국어를 읽어 주지 못해요. 휴대폰에서 열어 보시거나 기기 설정에서 한국어 음성을 추가해 주세요.');
+      },2500);
+    }
+    WBVoice.speak(text,{rate:VOICE_RATES[a.speed]||1,onstart:()=>{
+      a.spoke=true;clearTimeout(a.watch);
+    },onend:()=>{
       const b=sess.auto;if(!b||!b.playing||b.tok!==tok)return;
       b.idx++;autoTick();
     },onerror:()=>{
       const b=sess.auto;if(!b||b.tok!==tok)return;
-      autoStop(false);announce('소리를 낼 수 없어요. 기기의 소리 설정을 확인해 주세요.');
+      voiceFail('이 기기가 한국어를 읽어 주지 못해요. 휴대폰에서 열어 보시거나 기기 설정에서 한국어 음성을 추가해 주세요.');
     }});
   }else{
     a.timer=setTimeout(()=>{a.idx++;autoTick();},autoDelay(groups[a.idx]));
@@ -1589,6 +1601,7 @@ function autoTick(){
 }
 function autoStop(done){
   const wasVoice=!!(sess.auto&&sess.auto.voice);
+  if(sess.auto&&sess.auto.watch)clearTimeout(sess.auto.watch);
   if(sess.auto&&sess.auto.timer)clearTimeout(sess.auto.timer);
   if(wasVoice)WBVoice.stop();
   sess.auto=null;
@@ -1598,26 +1611,31 @@ function autoStop(done){
   if(done)announce(wasVoice?'끝까지 들으며 읽었어요! 이제 🎙 낭독으로 직접 읽어 보세요.'
                            :'자동 읽기 완료! 눈이 의미 단위를 따라갔어요.');
 }
-/* 들으며 읽기 — 목소리가 준비됐는지 먼저 본다. 없으면 조용히 안 되는 대신 말해 준다. */
+/* 소리가 안 났을 때 눈에 보이게 알린다.
+   announce()는 스크린리더 전용 영역(.sr)이라 화면에서 1px로 잘려 보이지 않는다.
+   완료 알림은 화면이 이미 바뀌니 그걸로 됐지만, 실패는 아무것도 안 바뀌어서
+   "눌렀는데 아무 일도 없다"가 된다. */
+function voiceFail(msg){
+  autoStop(false);
+  const bar=document.createElement('div');bar.className='auto-bar';bar.id='autoBar';
+  bar.innerHTML=`<div class="auto-in"><span class="tag bad">소리가 나지 않아요</span>
+    <span class="auto-lbl">${esc(msg)}</span><span style="flex:1"></span>
+    <button class="toolbtn" data-act="auto-exit">닫기 ✕</button></div>`;
+  document.body.appendChild(bar);
+  announce(msg);
+}
+/* 들으며 읽기 — 목소리 목록을 미리 믿지 않는다.
+   getVoices()가 비어 있어도 읽어 주는 기기가 있고, 차 있어도 못 내는 기기가 있다.
+   일단 시작하고, 실제로 소리가 시작되는지(autoTick의 onstart)로 판단한다. */
 function listenStart(){
   if(sess.auto)return;
-  if(!WBVoice.ttsSupported()){announce('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 주세요.');return;}
+  if(!WBVoice.ttsSupported()){
+    voiceFail('이 브라우저는 읽어주기를 지원하지 않아요. 크롬이나 사파리에서 열어 보세요.');return;
+  }
   /* 누른 '그 순간' 안에서 잠금을 풀어야 모바일에서 소리가 난다.
-     예전에는 목소리 목록을 기다렸다가 말해서 그 순간을 놓쳤고, 목록이 늦게 차는 기기에서는
-     아예 '목소리가 없다'며 거절해 버려 조용히 아무 일도 일어나지 않았다. */
+     목소리 목록을 기다렸다 시작하면 그 순간을 놓쳐 조용히 아무 일도 일어나지 않는다. */
   WBVoice.unlock();
-  const sample=autoSegs().slice(0,12).map(el=>el.textContent||'').join(' ');
-  const lang=WBVoice.langOf(sample);
   autoStart(true);
-  /* 미리 막지 않고, 실제로 소리가 시작되는지 지켜본 뒤에만 안내한다 */
-  setTimeout(()=>{
-    const a=sess.auto;
-    if(!a||!a.voice||a.started)return;
-    announce(WBVoice.hasVoice(lang)
-      ?'소리가 안 나면 기기 음량과 무음 모드를 확인해 주세요.'
-      :(lang==='en'?'이 기기에 영어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'
-                   :'이 기기에 한국어 목소리가 없어요. 기기 설정 → 음성에서 추가해 주세요.'));
-  },2600);
 }
 function autoStart(voice){
   if(sess.auto)return;

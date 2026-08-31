@@ -28,6 +28,8 @@ jobs:
         run: node vocab/quiz.test.cjs
       - name: 워드브레인 서버 라우트 테스트
         run: node reading-server/vocab-api.test.mjs
+      - name: 교재 코칭 테스트
+        run: node reading-server/textbook.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
       - name: Cloudflare Workers 배포
