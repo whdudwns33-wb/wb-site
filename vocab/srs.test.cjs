@@ -200,4 +200,20 @@ t('씨앗 도착함 — 최신 우선·중복 제거·심은 단어 제외·시�
   assert.deepStrictEqual(BR.collectInbox(null, {}), [], '어휘장 없음 = 빈 도착함');
 });
 
+t('배정 카드가 한 자리에 심을 개수를 말해 준다', () => {
+  /* 한 자리에 PLANT_MAX 개까지만 심는다. 카드가 「9개」라고만 적어 두면
+     8개를 심고 나서 다 한 것으로 여겨 남은 낱말이 조용히 밀린다. */
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.ok(/var PLANT_MAX = \d+;/.test(app), '한 자리 상한이 상수로 없다');
+  assert.ok(/runPlantSession\(batch\.slice\(0, PLANT_MAX\)/.test(app),
+    '심는 개수가 상수를 쓰지 않는다 — 안내 문구와 어긋날 수 있다');
+  assert.ok(app.includes('이번엔 \' + take + \'개를 심고, 나머지 \' + (left.length - take) + \'개는 다음에 심어요.'),
+    '한 자리에 다 못 심을 때 그렇게 적지 않는다');
+  assert.ok(/var left = ws\.filter\(function \(w\) \{ return !db\.states\[w\.id\]; \}\);/.test(app),
+    '카드가 남은 낱말이 아니라 배정 전체를 보여 준다');
+  assert.ok(app.includes("'개 중 ' + left.length + '개 남음'"), '남은 개수를 적지 않는다');
+});
+
 console.log('\n통과 ' + passed + '개 — vocab 엔진·데이터·브리지 검증 완료');
