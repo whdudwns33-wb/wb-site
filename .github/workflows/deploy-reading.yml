@@ -46,6 +46,8 @@ jobs:
         run: node vocab-age/age.test.cjs
       - name: AI 하루 한도 테스트
         run: node reading-server/ai-quota.test.mjs
+      - name: 아레나(반 대전) 테스트
+        run: node reading-server/arena.test.mjs
       - name: 학생 수명주기 테스트 (등록~퇴원)
         run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립

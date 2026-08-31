@@ -46,6 +46,9 @@ const vocabStore = {
   /* AI 호출 장부 — 하루치 한 칸. 날짜가 바뀌면 덮어써진다. */
   getUsage: () => db.vocab.usage || null,
   putUsage: (rec) => { db.vocab.usage = rec; persist(); },
+  /* 아레나 오늘 판 — 키는 「반|날짜」. 지난 날 것은 쌓이지만 한 줄짜리라 가볍다. */
+  getArena: (k) => (db.vocab.arena || {})[k] || null,
+  putArena: (k, rec) => { db.vocab.arena = db.vocab.arena || {}; db.vocab.arena[k] = rec; persist(); },
 };
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
