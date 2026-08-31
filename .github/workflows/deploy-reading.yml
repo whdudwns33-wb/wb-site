@@ -22,6 +22,8 @@ jobs:
         run: node reading/content.test.cjs
       - name: 분할 파일 무결성 테스트
         run: node reading/split.test.cjs
+      - name: 학생 앱 뒤로 가기 검증
+        run: node reading/back-nav.test.cjs
       - name: 공통 음성 모듈 테스트
         run: node shared/voice.test.cjs
       - name: QR 인코더 테스트

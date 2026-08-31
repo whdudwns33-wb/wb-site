@@ -581,7 +581,21 @@ function render(opt){
   }else{$('#headActions').innerHTML='';}
   if(keep)window.scrollTo(0,y);else window.scrollTo(0,0);
 }
-function go(name,extra){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};render();}
+/* 안드로이드 뒤로 가기 — 기록을 남기지 않으면 뒤로 가기가 곧 앱 종료다.
+   글을 읽는 중이나 퀴즈 중에 눌러도 그대로 닫혀 버린다. 화면마다 기록을
+   하나씩 남겨 앞 화면으로 돌아가게 하고, 기록이 바닥나면 그때 닫히게 한다.
+   extra 에는 글 id 같은 값만 들어가므로 기록에 그대로 담아도 된다. */
+function navSet(v,replace){try{
+  var cur=history.state;
+  if(replace||(cur&&cur.wb&&cur.wb.name===v.name&&cur.wb.id===v.id))history.replaceState({wb:v},'');
+  else history.pushState({wb:v},'');
+}catch(e){/* 기록을 못 써도 앱은 그대로 돌아간다 */}}
+function go(name,extra,fromPop){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};if(!fromPop)navSet(view);render();}
+window.addEventListener('popstate',function(e){
+  var st=e.state&&e.state.wb;
+  if(st&&st.name)go(st.name,st,true);
+  /* 맞는 기록이 없으면 브라우저가 앱을 닫도록 그냥 둔다 */
+});
 
 /* 선생님 연동 — 코드는 '요청'만 만들고, 강사가 승인해야 열린다.
    코드가 유일한 자격 증명이라 그것만으로 열어 주면 친구 코드로도 들어갈 수 있었다. */
@@ -2164,6 +2178,9 @@ function dataError(){
   await syncHealth();
   if(SYNC.avail&&SYNC.auth)await syncPull();
   view={name:S.profile?'home':'onboard'};
+  /* 첫 화면은 기록을 새로 쌓지 않고 지금 자리에 얹는다 — 그래야 첫 화면에서
+     뒤로 가기를 누르면 (앞에 아무것도 없을 때) 앱이 정상으로 닫힌다 */
+  navSet(view,true);
   render();
   /* QR로 들어왔고 아직 연동 전이면 곧바로 요청을 건다 */
   if(linkCode&&SYNC.avail&&!SYNC.auth){
