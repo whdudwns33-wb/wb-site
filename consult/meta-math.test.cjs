@@ -65,7 +65,8 @@ test('Leaders Eye is the first online learning card directly above MetaMath', ()
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.ok(sources.indexOf('  leaders_eye: {') < sources.indexOf('  metamath: {'));
-  assert.match(study, /keys: \['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'\]/);
+  assert.match(sources, /const ONLINE_LEARNING_SOURCE_KEYS = Object\.freeze\(\[\s*'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'/);
+  assert.match(study, /keys: ONLINE_LEARNING_SOURCE_KEYS/);
 });
 
 test('NELT and daily nonfiction open the requested URLs for director, manager, and student', () => {
@@ -88,7 +89,7 @@ test('NELT and daily nonfiction open the requested URLs for director, manager, a
     }
   }
   const study = section('function viewStudy(', 'function rdAddModal(');
-  assert.match(study, /title: '온라인 학습'[^\n]*'nelt_exam', 'daily_nonfiction'/);
+  assert.match(study, /title: '온라인 학습'[^\n]*keys: ONLINE_LEARNING_SOURCE_KEYS/);
   assert.match(study, /title: '자기주도 학습'[^\n]*keys: \['wb_reading', 'reading', 'inquiry_report'\]/);
 });
 
