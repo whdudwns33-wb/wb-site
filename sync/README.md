@@ -72,6 +72,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/057_teacher_request
 npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_source_date.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/061_consult_reward_processing_guard.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -733,6 +734,13 @@ euc-kr 페이지도 인코딩을 판별해 읽는다. 자바스크립트로 목�
 ```
 
 ## 설계 메모
+
+### consult 문화상품권 교환 잠금
+
+`061_consult_reward_processing_guard.sql` → Worker → consult Pages 순서로 배포한다.
+교환이 `processing`인 학생은 완료 또는 취소 전까지 삭제하거나 대표·관리자로 전환할 수 없다.
+Worker의 사전 검사와 D1 트리거를 함께 사용해 교환 선점과 학생 변경이 동시에 일어나는 경우도
+`REWARD_PROCESSING_LOCK`으로 원자적으로 차단한다.
 
 ### 당일 남은 수업 인계
 

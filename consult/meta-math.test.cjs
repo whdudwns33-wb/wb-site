@@ -69,6 +69,38 @@ test('Leaders Eye is the first online learning card directly above MetaMath', ()
   assert.match(study, /keys: ONLINE_LEARNING_SOURCE_KEYS/);
 });
 
+test('Leaders Eye can record today directly without an assigned round or checklist item', () => {
+  const helpers = section('const LEARNING_DAILY_LOG_KIND', 'function leadersEyeAccountGuide(');
+  const modal = section('function leadersEyeDailyResultModal(', 'function studyPlannerCard(');
+  const card = section('function learningSourceCard(', '/* ── 학습 탭');
+  const add = section("case 'learnadd':", "case 'learnsave':");
+  const assign = section("case 'learnsave':", '/* 학사관리 · 시험대비 자료 요청 */');
+  const open = section("case 'learningdailyopen':", "case 'learningdailysave':");
+  const save = section("case 'learningdailysave':", "case 'learningresultopen':");
+
+  assert.match(helpers, /const LEARNING_DAILY_LOG_KIND = 'learning_daily_log'/);
+  assert.match(helpers, /\['learning-daily', staffId, sourceKey, date\]\.join\('-'\)/);
+  assert.match(helpers, /task\.id === id/);
+  assert.match(card, /sourceKey === 'leaders_eye'/);
+  assert.match(card, /task\.kind !== LEARNING_DAILY_LOG_KIND \|\| task\.start !== today\(\)/);
+  assert.match(card, /director && sourceKey !== 'leaders_eye'/);
+  assert.match(card, /data-act="learningdailyopen"/);
+  assert.match(card, /오늘 미기록/);
+  assert.match(card, /✓ 오늘 완료/);
+  assert.match(modal, /회차 입력 없이 오늘의 학습 여부만 기록/);
+  assert.match(modal, /data-act="learningdailysave"/);
+  assert.match(add, /sourceKey === 'leaders_eye'[\s\S]*?오늘 완료를 직접 기록/);
+  assert.match(assign, /sourceKey === 'leaders_eye'[\s\S]*?회차 과제를 배정하지 않고/);
+  assert.doesNotMatch(open, /state\.tasks\.push/);
+  assert.match(save, /kind: LEARNING_DAILY_LOG_KIND/);
+  assert.match(save, /repeat: 'once'/);
+  assert.match(save, /start: d/);
+  assert.match(save, /carry: false/);
+  assert.match(save, /origin: 'staff'/);
+  assert.match(save, /learningResult: \{ outcome: note \|\| '학습 완료' \}/);
+  assert.match(save, /setCheck\(t\.id, d/);
+});
+
 test('NELT and daily nonfiction open the requested URLs for director, manager, and student', () => {
   const sources = section('const LEADERS_EYE_URL', 'const DOW');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
@@ -135,7 +167,7 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(card, /taskRow\(t, learningTaskDate\(t\), editable, false\)/);
   assert.match(card, /<details class="card study-source-card"/);
   assert.match(card, /완료 기록/);
-  assert.match(card, /director \? '<button[^']*data-act="learnadd"/);
+  assert.match(card, /director && sourceKey !== 'leaders_eye'[\s\S]*?data-act="learnadd"/);
   assert.match(card, /data-source="' \+ esc\(sourceKey\)/);
   assert.match(add, /const sourceKey = el\.dataset\.source/);
   assert.match(add, /!LEARNING_SOURCES\[sourceKey\]/);

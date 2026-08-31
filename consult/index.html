@@ -210,6 +210,32 @@
   .student-engagement-overview .between { align-items: flex-start; flex-wrap: wrap; }
   .student-engagement-line { margin-top: 8px; padding: 10px; border: 1px solid #DCE8E1; border-radius: 10px; background: #FAFDFC; }
   .student-engagement-line .between { align-items: flex-start; flex-wrap: wrap; }
+  .point-gauge-card {
+    margin-top: 14px; padding: 14px; border: 1px solid #EAD9A4; border-radius: 14px;
+    background: linear-gradient(135deg, #FFF9E7, #FFFDF7 62%, #F7F0FF);
+  }
+  .point-gauge-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .point-gauge-title { color: #765611; font-size: 11px; font-weight: 900; letter-spacing: .04em; }
+  .point-gauge-value { margin-top: 2px; color: var(--navy); font-size: 25px; font-weight: 900; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .point-gauge-value small { color: var(--mid-gray); font-size: 13px; font-weight: 800; }
+  .point-gauge-track { height: 12px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(217,188,107,.22); }
+  .point-gauge-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F2C94C, #D9A928); }
+  .point-gauge-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; color: var(--mid-gray); font-size: 11px; font-weight: 700; }
+  .point-rule-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .point-rule-chips span { padding: 4px 8px; border: 1px solid rgba(217,169,40,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #765611; font-size: 10.5px; font-weight: 800; }
+  .point-gauge-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+  .point-gauge-actions .btn { flex: 1 1 150px; }
+  .point-history-list { display: grid; gap: 7px; margin-top: 12px; }
+  .point-history-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: #FCFDFE; }
+  .point-history-row b { color: var(--navy); font-size: 12px; }
+  .point-history-row span { display: block; color: var(--mid-gray); font-size: 10.5px; }
+  .point-history-row strong { white-space: nowrap; color: var(--green); font-size: 12px; }
+  .point-history-row strong.minus { color: var(--coral); }
+  .point-policy { display: grid; gap: 8px; margin-top: 12px; }
+  .point-policy > div { padding: 10px; border-radius: 10px; background: #F8FAFC; }
+  .point-policy b, .point-policy span { display: block; }
+  .point-policy b { color: var(--navy); font-size: 12px; }
+  .point-policy span { margin-top: 2px; color: var(--mid-gray); font-size: 11px; }
   .tag.reward-achieved { background: #E7F7EE; color: #2E6E49; }
   .tag.reward-progress { background: #E8F2FF; color: #285B91; }
   .tag.reward-attention { background: #FFF0D8; color: #8A5500; }
@@ -1114,7 +1140,7 @@ const LEARNING_SOURCES = Object.freeze({
     icon: '👁️', label: '리더스아이', centerUrl: LEADERS_EYE_URL, studentUrl: LEADERS_EYE_URL,
     centerAction: '리더스아이 열기', studentAction: '리더스아이 학습하기',
     detail: '리더스아이 온라인 학습',
-    guide: '리더스아이에서 배정된 온라인 학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
+    guide: '리더스아이 학습을 마친 뒤 학습 탭에서 오늘 완료 여부를 기록하세요. 회차 입력은 필요하지 않습니다.',
     steps: ['온라인 학습 완료하기', '학습 결과 확인하기'],
     noteHint: '오늘 학습 결과 메모'
   },
@@ -1415,6 +1441,7 @@ function occursOn(task, date) {
   if (task.deleted) return false;
   if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
   if (task.kind === 'report_snapshot') return false;
+  if (isPointTransactionTask(task)) return false;
   if (task.kind === 'academic_event' || task.kind === 'material_request' || task.kind === 'metamath_request') return false;
   if (task.kind === 'material_response' && task.status !== 'provided') return false;
   if (task.kind === 'metamath_response') {
@@ -1744,6 +1771,33 @@ function ownerOfCheck(key) {
   return t ? (t.staffId || null) : null;
 }
 
+/** 처리 중인 교환 때문에 서버가 직원 변경을 거절하면 직원과 정산 진입점을 서버 정본으로 되돌린다. */
+function restoreRewardProcessingLock(staffRows, rewardRows) {
+  let restored = 0;
+  (staffRows || []).forEach(row => {
+    if (!row || row.table !== 'staff' || row.authoritative !== true || !row.data) return;
+    const id = String(row.key || '');
+    if (!id || String(row.data.id || '') !== id) return;
+    const index = (state.staff || []).findIndex(staff => staff.id === id);
+    const canonical = Object.assign({}, row.data);
+    if (index < 0) state.staff.push(canonical);
+    else state.staff[index] = canonical;
+    restored++;
+  });
+  (rewardRows || []).forEach(row => {
+    if (!row || row.table !== 'checks' || row.authoritative !== true || !row.data) return;
+    const key = String(row.key || '');
+    if (!key.startsWith('__rewardtx__') || row.data.kind !== 'consult_reward_redemption' ||
+        row.data.status !== 'processing' ||
+        key !== '__rewardtx__' + String(row.data.staffId || '') + '|' + String(row.data.requestId || '')) return;
+    const canonical = Object.assign({}, row.data);
+    delete canonical.claimActorHash;
+    state.checks[key] = canonical;
+    restored++;
+  });
+  return restored;
+}
+
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', pendingRender: false,
 
@@ -1773,6 +1827,7 @@ const sync = {
       if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
     });
     Object.keys(state.checks || {}).forEach(k => {
+      if (String(k).startsWith('__rewardtx__')) return; // 서버 확정 포인트 원장은 전용 경로만 수정한다
       const c = state.checks[k];
       if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
     });
@@ -1787,7 +1842,19 @@ const sync = {
       const at = ch.data.updatedAt || 0;
       if (ch.table === 'checks') {
         const cur = state.checks[ch.key];
-        if (!cur || at > (cur.updatedAt || 0)) { state.checks[ch.key] = ch.data; n++; }
+        if (!cur || at > (cur.updatedAt || 0)) {
+          const rewardRow = String(ch.key || '').startsWith('__rewardtx__');
+          const incoming = rewardRow ? Object.assign({}, ch.data) : ch.data;
+          if (rewardRow) {
+            delete incoming.claimActorHash;
+            if (incoming.staffId && incoming.requestId) {
+              const ownedKey = pointOwnedRequestKey(incoming.staffId, incoming.requestId);
+              pointExchangeUi.ownedRequests.delete(ownedKey);
+              pointExchangeUi.recoveryRequests.delete(ownedKey);
+            }
+          }
+          state.checks[ch.key] = incoming; n++;
+        }
       } else if (ch.table === 'staff' || ch.table === 'tasks') {
         const arr = state[ch.table];
         const i = arr.findIndex(x => x.id === ch.key);
@@ -1811,6 +1878,9 @@ const sync = {
       error.remoteStatus = d && d.status;
       error.idempotent = !!(d && d.idempotent);
       error.dataGeneration = d && d.dataGeneration;
+      error.conflictStaffIds = d && Array.isArray(d.conflictStaffIds) ? d.conflictStaffIds : [];
+      error.authoritativeStaff = d && Array.isArray(d.authoritativeStaff) ? d.authoritativeStaff : [];
+      error.authoritativeRewardChecks = d && Array.isArray(d.authoritativeRewardChecks) ? d.authoritativeRewardChecks : [];
       throw error;
     }
     return d;
@@ -1870,6 +1940,18 @@ const sync = {
         this.err = '';
         if (typeof location !== 'undefined' && typeof location.reload === 'function') location.reload();
         return;
+      }
+      if (e && e.code === 'REWARD_PROCESSING_LOCK') {
+        const restored = restoreRewardProcessingLock(e.authoritativeStaff, e.authoritativeRewardChecks);
+        if (restored) {
+          save();
+          this.err = '';
+          this.dirty = true;
+          renderAfterSync();
+          toast('처리 중인 상품권 교환이 있어 학생 변경을 취소하고 서버 정보로 복구했습니다');
+          queueSync(); // 이어서 processing 원장을 받아 정산 화면을 다시 연다.
+          return;
+        }
       }
       if (auth.mode === 'admin_device' && e.status === 401) {
         state.settings.adminToken = '';
@@ -2247,6 +2329,7 @@ function originTags(t) {
  *  원장은 전부. 학생은 자기가 추가한 업무만 — 원장이 내린 지시는 못 건드린다.
  *  (학생도 체크·단계·수량·메모·막힘은 언제나 가능하다) */
 function canEditTask(t) {
+  if (isPointTransactionTask(t)) return false;
   if (!session.isStaffLink) return session.isAdmin;
   if (isManager()) return t.origin === 'manager';
   return t.origin === 'staff' && t.staffId === session.staffId;
@@ -2601,6 +2684,7 @@ function viewStudentGuide() {
       '<div class="student-guide-tip"><b>온라인 학습 표시</b> ○ 미시작 → ◐ 진행 중 → ✓ 학생 완료 순서로 바뀌며, 인증사진이 승인되면 🛡 원장 확인으로 표시됩니다.</div>' +
       '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 하나를 선택하세요.</div>' +
       '<div class="student-guide-tip"><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</div>' +
+      '<div class="student-guide-tip"><b>포인트와 문화상품권</b> 유효 학습일은 50P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 250P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 500P가 자동 계산됩니다. 5,000P부터 오늘 화면에서 문화상품권 교환을 신청하며, 원장이 기록과 발송을 확인한 뒤 차감됩니다.</div>' +
     '</div>' +
 
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
@@ -2670,6 +2754,7 @@ function viewToday() {
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
 
   if (priorCloseDates.length) {
+    h += pointGaugeHtml(me.id);
     h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 마무리하지 않은 하루가 있습니다</div>' +
       '<div class="card-sub">전날 기록을 먼저 마감해야 오늘 학습을 시작할 수 있습니다.</div></div>' +
       '<span class="pill bad">' + priorCloseDates.length + '일</span></div>' +
@@ -2681,6 +2766,7 @@ function viewToday() {
   }
 
   if (priorWeekMon) {
+    h += pointGaugeHtml(me.id);
     h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 지난주 마무리가 필요합니다</div>' +
       '<div class="card-sub">주간 회고와 보고 발송까지 완료해야 오늘 학습을 시작할 수 있습니다.</div></div>' +
       '<span class="pill bad">지난주 미마감</span></div>' +
@@ -2692,6 +2778,7 @@ function viewToday() {
   }
 
   if (priorMonthYm) {
+    h += pointGaugeHtml(me.id);
     h += '<div class="card alert"><div class="between"><div><div class="card-title">⚠ 지난달 마무리가 필요합니다</div>' +
       '<div class="card-sub">월간 회고와 보고 발송까지 완료해야 오늘 학습을 시작할 수 있습니다.</div></div>' +
       '<span class="pill bad">지난달 미마감</span></div>' +
@@ -2885,13 +2972,13 @@ function todayNextActionCard(me, list, carry, offers, lectureChecklist) {
           '<div class="today-next-copy"><span>' + esc(item.note) + '</span><b>' + esc(item.title) + '</b></div>' +
           actionButton + '</div>';
       }).join('') + '</div>' + more
-    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '오늘 예정 학습 확인 완료 · 이제 오늘 학습을 마무리하세요.') + '</b>' +
-      (!close.complete ? '<button class="btn btn-primary btn-block mt14" data-act="todayjump" data-target="dailyCloseCard">오늘 학습 마무리</button>' : '') + '</div>';
-  const rewardTag = '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span>';
+    : '<div class="today-next-empty"><b>' + (close.complete ? '🎉 오늘 학습과 보고를 모두 마쳤어요.' : '오늘 체크리스트를 정리했어요.') + '</b>' +
+      (!close.complete ? '<div class="small muted mt8">필요한 공부를 더 추가하거나 완료 표시를 이어가세요. 하루 마무리는 아래에서 필요할 때 직접 시작할 수 있습니다.</div>' : '') + '</div>';
   return '<div class="card today-next-card" id="todayNextAction"><div class="today-next-head"><div>' +
-    '<div class="card-title">오늘 해야 할 일</div><div class="card-sub">구체적인 예정분부터 끝낸 뒤 마지막에 오늘 학습을 마무리하세요.</div></div>' +
+    '<div class="card-title">오늘 해야 할 일</div><div class="card-sub">구체적인 예정분을 차례로 확인하고 필요한 공부를 추가하세요.</div></div>' +
     '<span class="pill' + (rows.length ? ' warn' : '') + '">' + rows.length + '개 남음</span></div>' + flow + body +
-    '<div class="engagement-mini"><div class="engagement-mini-head"><b>🏅 이번 달 유효 학습일 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b>' + rewardTag + '</div>' +
+    pointGaugeHtml(me.id) +
+    '<div class="engagement-mini"><div class="engagement-mini-head"><b>🏅 이번 달 유효 학습일 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b><span class="tag">스탬프 현황</span></div>' +
       engagementStampDots(summary, today()) +
       '<div class="small muted mt8">체크 완료 또는 순공 10분 이상 + 미완료 정리 + 다음날 정오 전 수행 보고 완료 시 하루 스탬프가 찍힙니다.</div></div>' +
     todayOptionalStudyLinks(me, today()) + '</div>';
@@ -2978,6 +3065,18 @@ function learningResultModal(task, date) {
     (task.evidenceMode === 'photo' ? '<div class="hint">완료 후 상세 화면에서 결과 인증사진도 제출해 주세요. 사진이 승인되면 원장 확인으로 바뀝니다.</div>' : ''),
     '<button class="btn btn-primary btn-block mt14" data-act="learningresultsave" data-id="' + esc(task.id) + '" data-date="' + date + '">' +
       (check.done ? '결과 수정 저장' : '결과 저장 · 완료') + '</button>');
+}
+
+function leadersEyeDailyResultModal(me) {
+  if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId) {
+    return toast('학생 본인 화면에서만 오늘 학습을 기록할 수 있어요');
+  }
+  modal('👁️ 리더스아이 오늘 완료',
+    '<div class="guide mb14"><b>회차 입력 없이 오늘의 학습 여부만 기록합니다.</b><br>' +
+      '리더스아이 학습을 마쳤다면 아래 버튼을 누르세요. 오늘 학습 현황과 수행 보고에 반영됩니다.</div>' +
+    '<div class="field"><label class="fl">결과 메모 <span class="muted">(선택)</span></label>' +
+      '<input class="in" id="learningDailyNote" maxlength="120" placeholder="예: 정답률 85%, 오늘 학습 완료"></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="learningdailysave" data-source="leaders_eye">✓ 오늘 학습 완료</button>');
 }
 
 function studyPlannerCard(me, date, list, carry, editable) {
@@ -5285,6 +5384,23 @@ function learningTasksFor(staffId, sourceKey) {
     });
 }
 
+const LEARNING_DAILY_LOG_KIND = 'learning_daily_log';
+
+function dailyLearningRecordId(staffId, sourceKey, date) {
+  return ['learning-daily', staffId, sourceKey, date].join('-');
+}
+
+function dailyLearningRecordTask(staffId, sourceKey, date) {
+  const id = dailyLearningRecordId(staffId, sourceKey, date);
+  return state.tasks.find(task => !task.deleted && task.id === id && task.staffId === staffId &&
+    task.source === sourceKey && task.kind === LEARNING_DAILY_LOG_KIND && task.start === date) || null;
+}
+
+function assignedLearningTaskForDate(staffId, sourceKey, date) {
+  return learningTasksFor(staffId, sourceKey).find(task =>
+    task.kind !== LEARNING_DAILY_LOG_KIND && learningTaskDate(task) === date) || null;
+}
+
 function leadersEyeAccountGuide(me) {
   if (!me) return '';
   return '<div class="guide mt14 mb14"><b>리더스아이 로그인 정보</b><br>' +
@@ -5468,13 +5584,22 @@ function learningSourceCard(me, editable, sourceKey) {
   const academy = director || isManager();
   const appOnly = source.appOnly === true;
   const onlineSource = ONLINE_LEARNING_SOURCE_KEYS.includes(sourceKey);
-  const list = learningTasksFor(me.id, sourceKey).filter(task =>
+  const allList = learningTasksFor(me.id, sourceKey).filter(task =>
     !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
       String(row.dailyCarryFrom || '').startsWith(task.id + '|')));
+  const list = allList.filter(task => task.kind !== LEARNING_DAILY_LOG_KIND || task.start !== today());
+  const leadersEyeTracked = sourceKey === 'leaders_eye' && (director || (session.isStaffLink && !isManager()));
+  const leadersEyeStudent = sourceKey === 'leaders_eye' && session.isStaffLink && !isManager() && me.id === session.staffId;
+  const assignedToday = sourceKey === 'leaders_eye' ? assignedLearningTaskForDate(me.id, sourceKey, today()) : null;
+  const dailyRecord = sourceKey === 'leaders_eye' ? dailyLearningRecordTask(me.id, sourceKey, today()) : null;
+  const todayRecord = assignedToday || dailyRecord;
+  const todayRecorded = !!(todayRecord && isDone(todayRecord.id, today()));
   const help = director
     ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
     : academy
       ? esc(source.detail) + (appOnly ? ' 앱 연결은 휴대폰에서 이용합니다.' : source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
+      : sourceKey === 'leaders_eye'
+        ? '리더스아이 학습 후 ‘오늘 학습 완료 기록’을 누르세요. 회차나 별도 과제 배정은 필요하지 않습니다.'
       : onlineSource
         ? esc(source.detail) + '을 실행한 뒤 아래 과제의 ‘학습 완료 기록’에서 결과를 남깁니다.'
         : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
@@ -5500,16 +5625,30 @@ function learningSourceCard(me, editable, sourceKey) {
   const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
   const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
+  const leadersEyeAction = leadersEyeStudent && !assignedToday
+    ? '<button class="btn btn-navy" data-act="learningdailyopen" data-source="leaders_eye">' +
+      (todayRecorded ? '✏ 오늘 완료 기록 보기·수정' : '✓ 오늘 학습 완료 기록') + '</button>'
+    : '';
+  const leadersEyeStatus = leadersEyeTracked
+    ? '<span class="pill' + (todayRecorded ? '' : ' warn') + '">' + (todayRecorded ? '✓ 오늘 완료' : '오늘 미기록') + '</span>'
+    : '';
+  const assignmentCount = sourceKey === 'leaders_eye'
+    ? (active.length ? '<span class="pill warn">배정 ' + active.length + '건</span>' : '')
+    : '<span class="pill' + (active.length ? ' warn' : '') + '">' +
+      (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span>';
 
-  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' + (late || studentDue ? ' open' : '') + '>' +
+  return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' +
+    (late || studentDue || (leadersEyeStudent && !todayRecorded) ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        '<span class="pill' + (active.length ? ' warn' : '') + '">' + (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span></span></summary>' +
+        leadersEyeStatus + assignmentCount + '</span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
-      (director ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
+      (director && sourceKey !== 'leaders_eye'
+        ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
+      leadersEyeAction +
       (canRequestMetamath ? '<button class="btn btn-ghost" data-act="metamathrequestopen">📝 문제지 요청</button>' : '') +
     '</div>' +
     appHint +
@@ -6477,7 +6616,10 @@ function engagementDayState(staffId, date) {
   const hasActivity = stTotal(staffId, date) >= ENGAGEMENT_MIN_STUDY_SECONDS || snapshot.some(item => item.done) ||
     ingPlan(staffId, date).some(item => item.done);
   const eligible = date >= DAILY_CLOSE_START && date <= today() && (plannedCount > 0 || hasActivity);
-  const handled = !closeState.running && !closeState.unresolved.length && !closeState.unconfirmedEvents.length;
+  const closeResolutions = closeState.close.resolutions || {};
+  const hasClosedItem = snapshot.some(item => !item.done && (closeResolutions[item.key] || {}).type === 'closed');
+  const learningHandled = snapshot.every(item => item.done || ['carry', 'blocked'].includes((closeResolutions[item.key] || {}).type));
+  const handled = !closeState.running && !closeState.unresolved.length && !closeState.unconfirmedEvents.length && learningHandled;
   const selfClosed = closeState.complete && closeState.close.status === 'complete';
   const deadline = parseYmd(addDays(date, 1));
   deadline.setHours(12, 0, 0, 0);
@@ -6485,7 +6627,8 @@ function engagementDayState(staffId, date) {
   const onTime = !!finalizedAt && finalizedAt <= deadline.getTime();
   return {
     date: date, eligible: eligible, plannedCount: plannedCount, hasActivity: hasActivity,
-    handled: handled, selfClosed: selfClosed, onTime: onTime, deadlineAt: deadline.getTime(),
+    handled: handled, hasClosedItem: hasClosedItem, learningHandled: learningHandled,
+    selfClosed: selfClosed, onTime: onTime, finalizedAt: finalizedAt, deadlineAt: deadline.getTime(),
     stamped: !!(eligible && hasActivity && handled && selfClosed && onTime)
   };
 }
@@ -6523,6 +6666,393 @@ function engagementMonthSummary(staffId, ym, asOf) {
     stampTargetMet: stampTargetMet, weeklyTargetMet: weeklyTargetMet, qualified: qualified,
     statusKey: statusKey, statusLabel: statusLabel
   };
+}
+
+/* 포인트 v1 — 학습 기록에서 적립 후보를 자동 계산하고, 실제 상품권 교환은 원장이 확정한다. */
+const POINT_RULE_VERSION = 'v1';
+const POINT_EXCHANGE_LEDGER_VERSION = 'v1';
+const POINT_SUPPORTED_EXCHANGE_VERSIONS = ['v1'];
+const POINT_REWARD_START_DATE = '2026-09-01';
+const POINT_DAILY = 50;
+const POINT_WEEKLY = 250;
+const POINT_MONTHLY = 500;
+const POINT_WEEKLY_MIN_DAYS = 3;
+const POINT_MONTHLY_MIN_DAYS = 12;
+const POINT_EXCHANGE_COST = 5000;
+const POINT_PROCESSING_STALE_MS = 30 * 60 * 1000;
+const pointRequestKey = staffId => '__pointrequest__' + staffId;
+const pointExchangeKey = (staffId, requestId) => '__rewardtx__' + staffId + '|' + requestId;
+
+function pointNumber(value) {
+  return Math.max(0, Math.round(Number(value) || 0)).toLocaleString('ko-KR') + 'P';
+}
+
+function isPointTransactionTask(task) {
+  return !!(task && task.kind === 'point_exchange_v1');
+}
+
+function pointRequestsOf(staffId) {
+  const row = state.checks[pointRequestKey(staffId) + '|all'];
+  const seen = new Set();
+  return ((row && Array.isArray(row.requests)) ? row.requests : []).map(item => {
+    const id = String(item && item.id || '');
+    const status = item && item.status === 'cancelled' ? 'cancelled' : 'requested';
+    const requestedAt = Number(item && item.requestedAt) || 0;
+    const cancelledAt = Number(item && item.cancelledAt) || 0;
+    return { id: id, status: status, requestedAt: requestedAt, cancelledAt: cancelledAt };
+  }).filter(item => /^[A-Za-z0-9_-]{8,100}$/.test(item.id) && item.requestedAt > 0 && !seen.has(item.id) && seen.add(item.id));
+}
+
+function pointExchangeDecisions(staffId) {
+  const legacy = (state.tasks || []).filter(task => !task.deleted && task.staffId === staffId &&
+      isPointTransactionTask(task) && task.origin === 'admin' && POINT_SUPPORTED_EXCHANGE_VERSIONS.includes(task.pointRuleVersion) &&
+      Number(task.points) === POINT_EXCHANGE_COST && ['fulfilled', 'cancelled'].includes(task.exchangeStatus) &&
+      /^[A-Za-z0-9_-]{8,100}$/.test(String(task.pointRequestId || '')));
+  const prefix = '__rewardtx__' + staffId + '|';
+  const server = Object.entries(state.checks || {}).filter(([key]) => key.startsWith(prefix)).map(([key, row]) => ({
+    pointRequestId: String(row && row.requestId || key.slice(prefix.length)),
+    exchangeStatus: String(row && row.status || ''), points: POINT_EXCHANGE_COST,
+    staffId: String(row && row.staffId || ''), pointRuleVersion: String(row && row.ledgerVersion || POINT_EXCHANGE_LEDGER_VERSION),
+    createdAt: Number(row && row.claimedAt) || Number(row && row.updatedAt) || 0,
+    takenOverAt: Number(row && row.takenOverAt) || 0,
+    updatedAt: Number(row && row.updatedAt) || 0, server: true
+  })).filter(row => row.staffId === staffId && POINT_SUPPORTED_EXCHANGE_VERSIONS.includes(row.pointRuleVersion) &&
+    ['processing', 'fulfilled', 'cancelled'].includes(row.exchangeStatus) &&
+    /^[A-Za-z0-9_-]{8,100}$/.test(row.pointRequestId));
+  return legacy.concat(server).sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+}
+
+function pointAsOfContext(asOf) {
+  const raw = String(asOf || today());
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(raw) && ymd(parseYmd(raw)) === raw ? raw : today();
+  const throughDate = valid < today() ? valid : today();
+  const cutoffDate = parseYmd(throughDate);
+  cutoffDate.setHours(23, 59, 59, 999);
+  return { throughDate: throughDate, cutoffAt: throughDate === today() ? now() : cutoffDate.getTime() };
+}
+
+function pointWeekSummary(staffId, mon, throughDate) {
+  const sun = addDays(mon, 6);
+  const days = weekCloseDays(mon).filter(date => date >= POINT_REWARD_START_DATE && date <= throughDate)
+    .map(date => engagementDayState(staffId, date)).filter(day => day.eligible);
+  const stampedDays = days.filter(day => day.stamped).length;
+  const rateMet = days.length >= POINT_WEEKLY_MIN_DAYS && stampedDays * 100 >= days.length * ENGAGEMENT_REWARD_RATE;
+  const close = weekCloseOf(staffId, mon);
+  return {
+    mon: mon, sun: sun, days: days, stampedDays: stampedDays, rate: days.length ? Math.round(stampedDays / days.length * 100) : 0,
+    rateMet: rateMet, studentClosed: close.status === 'complete',
+    qualified: sun <= throughDate && rateMet && close.status === 'complete'
+  };
+}
+
+function pointMonthSummary(staffId, ym, throughDate) {
+  const lastDate = monthLastDate(ym);
+  const summary = engagementMonthSummary(staffId, ym, lastDate);
+  const close = monthCloseOf(staffId, ym);
+  return {
+    ym: ym, lastDate: lastDate, summary: summary, studentClosed: close.status === 'complete',
+    qualified: lastDate <= throughDate && summary.plannedDays >= POINT_MONTHLY_MIN_DAYS && summary.stampTargetMet && close.status === 'complete'
+  };
+}
+
+function rewardPointEvents(staffId, asOf) {
+  const context = pointAsOfContext(asOf);
+  const throughDate = context.throughDate;
+  if (throughDate < POINT_REWARD_START_DATE) return [];
+  const cutoffAt = context.cutoffAt;
+  const events = [];
+  for (let date = POINT_REWARD_START_DATE; date <= throughDate; date = addDays(date, 1)) {
+    const day = engagementDayState(staffId, date);
+    const finalizedAt = Number(day.finalizedAt) || 0;
+    if (day.stamped && finalizedAt > 0 && finalizedAt <= cutoffAt) events.push({
+      id: POINT_RULE_VERSION + ':day:' + date, type: 'day', date: date, at: Number(dailyCloseOf(staffId, date).finalizedAt) || parseYmd(date).getTime(),
+      label: '유효 학습일', points: POINT_DAILY
+    });
+  }
+  for (let mon = mondayOf(POINT_REWARD_START_DATE); addDays(mon, 6) <= throughDate; mon = addDays(mon, 7)) {
+    const week = pointWeekSummary(staffId, mon, throughDate);
+    const completedAt = Number(weekCloseOf(staffId, mon).completedAt) || 0;
+    if (week.qualified && completedAt > 0 && completedAt <= cutoffAt) events.push({
+      id: POINT_RULE_VERSION + ':week:' + mon, type: 'week', date: week.sun, at: Number(weekCloseOf(staffId, mon).completedAt) || parseYmd(week.sun).getTime(),
+      label: '주간 80% + 주간 마무리', points: POINT_WEEKLY
+    });
+  }
+  for (let ym = ymOf(POINT_REWARD_START_DATE); monthLastDate(ym) <= throughDate; ym = ymAdd(ym, 1)) {
+    const month = pointMonthSummary(staffId, ym, throughDate);
+    const completedAt = Number(monthCloseOf(staffId, ym).completedAt) || 0;
+    if (month.qualified && completedAt > 0 && completedAt <= cutoffAt) events.push({
+      id: POINT_RULE_VERSION + ':month:' + ym, type: 'month', date: month.lastDate, at: Number(monthCloseOf(staffId, ym).completedAt) || parseYmd(month.lastDate).getTime(),
+      label: '월간 80% + 월간 마무리', points: POINT_MONTHLY
+    });
+  }
+  return events.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+}
+
+function pointAccount(staffId, asOf) {
+  const earnedEvents = rewardPointEvents(staffId, asOf);
+  const context = pointAsOfContext(asOf);
+  const seenDecisions = new Set();
+  const decisions = pointExchangeDecisions(staffId)
+    .filter(task => Number(task.updatedAt || task.createdAt || 0) <= context.cutoffAt)
+    .filter(task => !seenDecisions.has(task.pointRequestId) && seenDecisions.add(task.pointRequestId));
+  const terminalIds = new Set(decisions.filter(task => task.exchangeStatus === 'fulfilled' || task.exchangeStatus === 'cancelled')
+    .map(task => task.pointRequestId));
+  const allRequests = pointRequestsOf(staffId);
+  const pendingRequests = allRequests.filter(request => request.requestedAt <= context.cutoffAt &&
+    (!request.cancelledAt || request.cancelledAt > context.cutoffAt) && !terminalIds.has(request.id));
+  decisions.filter(task => task.exchangeStatus === 'processing' && !terminalIds.has(task.pointRequestId)).forEach(task => {
+    if (pendingRequests.some(request => request.id === task.pointRequestId)) return;
+    const request = allRequests.find(item => item.id === task.pointRequestId);
+    pendingRequests.push(request || {
+      id: task.pointRequestId, status: 'requested', requestedAt: Number(task.createdAt || task.updatedAt || 0), cancelledAt: 0
+    });
+  });
+  pendingRequests.sort((a, b) => Number(a.requestedAt || 0) - Number(b.requestedAt || 0));
+  const earned = earnedEvents.reduce((sum, event) => sum + Number(event.points || 0), 0);
+  const fulfilled = decisions.filter(task => task.exchangeStatus === 'fulfilled');
+  const spent = fulfilled.length * POINT_EXCHANGE_COST;
+  const rawBalance = earned - spent;
+  const deficit = Math.max(0, -rawBalance);
+  const balance = Math.max(0, rawBalance);
+  const processing = decisions.find(task => task.exchangeStatus === 'processing' &&
+    pendingRequests.some(request => request.id === task.pointRequestId)) || null;
+  const pending = processing
+    ? pendingRequests.find(request => request.id === processing.pointRequestId) || null
+    : pendingRequests.length ? pendingRequests[0] : null;
+  const reserved = pending ? Math.min(POINT_EXCHANGE_COST, balance) : 0;
+  const available = Math.max(0, balance - reserved);
+  const progressBase = pending ? balance : available;
+  const pct = Math.min(100, Math.round(progressBase / POINT_EXCHANGE_COST * 100));
+  const currentYm = ymOf(context.throughDate);
+  const currentMonthEarned = earnedEvents.filter(event => ymOf(event.date) === currentYm)
+    .reduce((sum, event) => sum + Number(event.points || 0), 0);
+  return {
+    earnedEvents: earnedEvents, decisions: decisions, pendingRequests: pendingRequests, pending: pending, processing: processing,
+    earned: earned, spent: spent, rawBalance: rawBalance, deficit: deficit, balance: balance, reserved: reserved, available: available,
+    pct: pct, remaining: Math.max(0, POINT_EXCHANGE_COST - Math.min(progressBase, POINT_EXCHANGE_COST)),
+    currentMonthEarned: currentMonthEarned, canRequest: !pending && !deficit && available >= POINT_EXCHANGE_COST
+  };
+}
+
+function hasProcessingPointExchange(staffId) {
+  return pointExchangeDecisions(staffId).some(task => task.exchangeStatus === 'processing');
+}
+
+function pointHistory(staffId) {
+  const account = pointAccount(staffId, today());
+  const rows = account.earnedEvents.map(event => Object.assign({}, event));
+  account.decisions.filter(task => task.exchangeStatus !== 'processing').forEach(task => rows.push({
+    id: 'exchange:' + task.pointRequestId, type: 'exchange', date: ymd(new Date(Number(task.updatedAt || task.createdAt || now()))),
+    at: Number(task.updatedAt || task.createdAt || 0),
+    label: task.exchangeStatus === 'fulfilled' ? '문화상품권 교환 완료' : '교환 신청 취소',
+    points: task.exchangeStatus === 'fulfilled' ? -POINT_EXCHANGE_COST : 0
+  }));
+  if (account.pending) rows.push({
+    id: 'request:' + account.pending.id, type: 'request', date: ymd(new Date(account.pending.requestedAt)),
+    at: account.processing ? Number(account.processing.updatedAt || account.pending.requestedAt) : account.pending.requestedAt,
+    label: account.processing ? '문화상품권 교환 처리 중' : '문화상품권 교환 확인 중', points: 0
+  });
+  return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+}
+
+function pointExchangeRequest(staffId) {
+  if (!session.isStaffLink || isManager() || session.staffId !== staffId) return false;
+  const account = pointAccount(staffId, today());
+  if (!account.canRequest) return false;
+  const requests = pointRequestsOf(staffId).concat({ id: uid(), status: 'requested', requestedAt: now(), cancelledAt: 0 });
+  return !!setCheck(pointRequestKey(staffId), 'all', { requests: requests, done: true });
+}
+
+function cancelPointExchangeRequest(staffId, requestId) {
+  const ownStudent = session.isStaffLink && !isManager() && session.staffId === staffId;
+  if (!ownStudent) return false;
+  const account = pointAccount(staffId, today());
+  if (!account.pending || account.pending.id !== requestId || account.processing) return false;
+  const requests = pointRequestsOf(staffId).map(request => request.id === requestId
+    ? Object.assign({}, request, { status: 'cancelled', cancelledAt: now() }) : request);
+  return !!setCheck(pointRequestKey(staffId), 'all', { requests: requests, done: true });
+}
+
+const pointExchangeUi = { busy: '', ownedRequests: new Set(), recoveryRequests: new Set() };
+const pointOwnedRequestKey = (staffId, requestId) => staffId + '|' + requestId;
+
+function cachePointExchangeResponse(staffId, requestId, response) {
+  const key = pointExchangeKey(staffId, requestId);
+  if (!response || response.key !== key || !['processing', 'fulfilled', 'cancelled'].includes(response.status)) return false;
+  const updatedAt = Number(response.updatedAt) || 0;
+  if (!updatedAt) return false;
+  const previous = state.checks[key];
+  state.checks[key] = {
+    kind: 'consult_reward_redemption', version: 1, ledgerVersion: POINT_EXCHANGE_LEDGER_VERSION,
+    staffId: staffId, requestId: requestId, status: response.status,
+    claimedAt: Number(response.claimedAt) || Number(previous && previous.claimedAt) || updatedAt,
+    takenOverAt: Number(response.takenOverAt) || Number(previous && previous.takenOverAt) || 0,
+    updatedAt: updatedAt
+  };
+  if (save()) return true;
+  if (previous === undefined) delete state.checks[key];
+  else state.checks[key] = previous;
+  return false;
+}
+
+async function runPointExchangeAdminAction(staffId, requestId, action) {
+  if (!session.isAdmin || session.isStaffLink || !['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action) || pointExchangeUi.busy) return null;
+  const student = staffById(staffId);
+  if (!state.settings.adminToken) {
+    toast('문화상품권 처리는 원장 기기 로그인을 다시 연결한 뒤 이용해 주세요');
+    return null;
+  }
+  if ((action === 'claim' || action === 'reject') && (!student || student.deleted || student.owner || student.manager)) {
+    toast('원장 로그인과 학생 정보를 다시 확인해 주세요');
+    return null;
+  }
+  if (sync.busy) { toast('동기화가 끝난 뒤 다시 눌러 주세요'); return null; }
+  pointExchangeUi.busy = action + ':' + staffId + ':' + requestId;
+  try {
+    await sync.run();
+    if (sync.err) throw new Error('최신 포인트 기록을 먼저 동기화해 주세요');
+    const account = pointAccount(staffId, today());
+    if (!account.pending || account.pending.id !== requestId) throw new Error('교환 신청 상태를 다시 확인해 주세요');
+    if (action === 'claim' && !account.processing && (account.deficit || account.balance < POINT_EXCHANGE_COST)) {
+      throw new Error('교환 가능한 포인트 잔액을 다시 확인해 주세요');
+    }
+    const ownedKey = pointOwnedRequestKey(staffId, requestId);
+    const ownedHere = pointExchangeUi.ownedRequests.has(ownedKey);
+    if ((action === 'fulfill' || action === 'cancel') && (!account.processing || !ownedHere)) {
+      throw new Error('먼저 처리 기기를 확인하거나 30분 지난 처리를 이 기기로 인계해 주세요');
+    }
+    if ((action === 'cancel' || action === 'takeover') && !account.processing) throw new Error('처리 중인 교환 신청이 아닙니다');
+    if (action === 'reject' && account.processing) throw new Error('처리 중인 교환은 접수 취소가 아니라 선점 기기의 처리 취소를 사용해 주세요');
+    const response = await sync.post('/consult-reward', {
+      app: SYNC_APP, auth: sync.auth(), action: action, staffId: staffId, requestId: requestId
+    });
+    if (!cachePointExchangeResponse(staffId, requestId, response)) throw new Error('서버 교환 상태를 저장하지 못했습니다');
+    if (action === 'claim' || action === 'takeover') {
+      if (response.owned === true) {
+        pointExchangeUi.ownedRequests.add(ownedKey);
+        if (action === 'takeover' || response.resumed === true || account.processing) {
+          pointExchangeUi.recoveryRequests.add(ownedKey);
+        } else {
+          pointExchangeUi.recoveryRequests.delete(ownedKey);
+        }
+      } else {
+        pointExchangeUi.ownedRequests.delete(ownedKey);
+        pointExchangeUi.recoveryRequests.delete(ownedKey);
+      }
+    }
+    if (response.status === 'fulfilled' || response.status === 'cancelled') {
+      pointExchangeUi.ownedRequests.delete(ownedKey);
+      pointExchangeUi.recoveryRequests.delete(ownedKey);
+    }
+    render();
+    pointHistoryModal(staffId);
+    return response;
+  } catch (error) {
+    if (String(error && error.code || '') === 'REWARD_NOT_OWNER') {
+      pointExchangeUi.ownedRequests.delete(pointOwnedRequestKey(staffId, requestId));
+      pointExchangeUi.recoveryRequests.delete(pointOwnedRequestKey(staffId, requestId));
+    }
+    toast(String(error && error.message || error));
+    pointHistoryModal(staffId);
+    return null;
+  } finally {
+    pointExchangeUi.busy = '';
+  }
+}
+
+function pointGaugeHtml(staffId) {
+  const student = staffById(staffId);
+  if (!student || student.owner || student.manager) return '';
+  const account = pointAccount(staffId, today());
+  const ownStudent = session.isStaffLink && !isManager() && session.staffId === staffId;
+  const status = account.processing ? '<span class="tag reward-attention">교환 처리 중</span>'
+    : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>'
+    : account.pending ? '<span class="tag reward-progress">교환 확인 중</span>'
+    : account.balance >= POINT_EXCHANGE_COST ? '<span class="tag reward-achieved">교환 가능</span>'
+    : '<span class="tag reward-progress">적립 중</span>';
+  const meta = account.processing ? '원장이 상품권 교환을 처리하고 있어요'
+    : account.deficit ? '과거 학습 기록이 바뀌어 원장 확인이 필요해요'
+    : account.pending ? '5,000P 교환 신청을 원장이 확인하고 있어요'
+    : account.remaining ? pointNumber(account.remaining) + ' 더 모으면 문화상품권 교환' : '문화상품권 교환 가능';
+  return '<div class="point-gauge-card" aria-label="문화상품권 포인트 현황"><div class="point-gauge-head"><div>' +
+    '<div class="point-gauge-title">🎁 문화상품권 포인트</div><div class="point-gauge-value">' + pointNumber(account.balance) + ' <small>/ ' + pointNumber(POINT_EXCHANGE_COST) + '</small></div></div>' +
+    status + '</div><div class="point-gauge-track" role="progressbar" aria-valuemin="0" aria-valuemax="' + POINT_EXCHANGE_COST + '" aria-valuenow="' +
+      Math.min(POINT_EXCHANGE_COST, account.pending ? account.balance : account.available) + '"><i style="width:' + account.pct + '%"></i></div>' +
+    '<div class="point-gauge-meta"><span>' + esc(meta) + '</span><b>이번 달 +' + pointNumber(account.currentMonthEarned) + '</b></div>' +
+    '<div class="point-rule-chips"><span>유효 학습일 +' + POINT_DAILY + 'P</span><span>주간 달성 +' + POINT_WEEKLY + 'P</span><span>월간 달성 +' + POINT_MONTHLY + 'P</span></div>' +
+    '<div class="point-gauge-actions"><button class="btn btn-sm btn-ghost" data-act="pointopen" data-id="' + esc(staffId) + '">적립 방법 · 내역</button>' +
+      (ownStudent && account.canRequest ? '<button class="btn btn-sm btn-primary" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 교환 신청</button>' : '') +
+    '</div></div>';
+}
+
+function pointHistoryModal(staffId) {
+  const student = staffById(staffId);
+  if (!student || student.owner || student.manager) return;
+  const ownStudent = session.isStaffLink && !isManager() && session.staffId === staffId;
+  const director = session.isAdmin && !session.isStaffLink;
+  if (!ownStudent && !director) return;
+  const account = pointAccount(staffId, today());
+  const rows = pointHistory(staffId).slice(0, 30);
+  const ownedKey = account.pending ? pointOwnedRequestKey(staffId, account.pending.id) : '';
+  const ownedHere = !!(account.processing && ownedKey && pointExchangeUi.ownedRequests.has(ownedKey));
+  const processingStale = !!(account.processing && now() - Number(account.processing.updatedAt || account.processing.createdAt || now()) >= POINT_PROCESSING_STALE_MS);
+  const processingShortfall = !!(account.processing && account.balance < POINT_EXCHANGE_COST);
+  const processingRecovery = !!(account.processing &&
+    (Number(account.processing.takenOverAt) || (ownedKey && pointExchangeUi.recoveryRequests.has(ownedKey))));
+  const historyHtml = rows.length ? '<div class="point-history-list">' + rows.map(row =>
+    '<div class="point-history-row"><div><b>' + esc(row.label) + '</b><span>' + esc(shortDate(row.date)) + '</span></div>' +
+      '<strong class="' + (row.points < 0 ? 'minus' : '') + '">' + (row.points > 0 ? '+' : row.points < 0 ? '-' : '') + pointNumber(Math.abs(row.points)) + '</strong></div>').join('') + '</div>'
+    : '<div class="empty" style="padding:24px 10px"><b>🌱</b>아직 적립 내역이 없습니다.</div>';
+  let pendingActions = '';
+  if (account.pending && director && !state.settings.adminToken) {
+    pendingActions = '<div class="guide bad mt14"><b>원장 기기 로그인 재연결 필요</b>기존 비밀키 연결만으로는 상품권 교환을 처리할 수 없습니다. 설정에서 원장 아이디·비밀번호로 다시 로그인해 주세요.</div>';
+  } else if (account.pending && account.processing) {
+    if (director) {
+      if (ownedHere) {
+        pendingActions += (processingRecovery || processingShortfall)
+          ? '<div class="guide bad mt14"><b>' + (processingShortfall ? '포인트 부족 · 실제 발송 여부 확인 필수' : '복구된 처리 · 이전 발송 여부 확인 필수') +
+            '</b>새 상품권을 발송하지 마세요. 실제 발송 내역을 먼저 확인한 뒤 아래 두 가지 중 하나만 선택하세요.</div>' +
+            '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointfulfill" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">이미 발송됨 · 완료·차감' + (processingShortfall ? '·정산 부족 표시' : '') + '</button>' +
+            '<button class="btn btn-danger" data-act="pointadmincancel" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">미발송 확인 · 처리 취소</button></div>'
+          : '<div class="guide mt14"><b>이 기기가 교환 처리를 선점했습니다</b>문화상품권을 실제로 발송하고, 성공한 뒤에만 완료를 누르세요. 상품권 번호·링크는 앱에 저장하지 않습니다.</div>' +
+            '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointfulfill" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">실제 발송 완료 · 5,000P 차감</button>' +
+            '<button class="btn btn-danger" data-act="pointadmincancel" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">발송 전 처리 취소</button></div>';
+      } else {
+        pendingActions += '<div class="guide bad mt14"><b>처리 기기를 확인해 주세요</b>선점한 기기가 맞는지 서버에서 확인하기 전에는 상품권을 발송하거나 취소할 수 없습니다.</div>' +
+          '<button class="btn btn-ghost btn-block mt14" data-act="pointownercheck" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">처리 기기 확인</button>' +
+          (processingStale ? '<button class="btn btn-danger btn-block mt14" data-act="pointtakeover" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">30분 지난 처리 인계</button>' : '');
+      }
+    } else if (ownStudent) {
+      pendingActions = '<div class="guide mt14"><b>원장이 교환 처리 중입니다</b>중복 처리를 막기 위해 지금은 신청을 취소할 수 없습니다.</div>';
+    }
+  } else if (account.pending) {
+    if (director) {
+      if (account.deficit || account.balance < POINT_EXCHANGE_COST) {
+        pendingActions = '<div class="guide bad mt14"><b>신청 잔액이 부족합니다</b>교환 처리를 시작하거나 상품권을 발송하지 마세요. 학생 또는 원장이 처리 전 신청을 취소할 수 있습니다.</div>' +
+          '<button class="btn btn-danger btn-block mt14" data-act="pointreject" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">신청 취소 처리 · 포인트 미차감</button>';
+      } else {
+        pendingActions = '<div class="guide mt14"><b>교환 신청 확인</b>잔액과 학습 기록을 확인한 뒤 먼저 서버에서 교환 처리를 선점하세요. 선점 성공 안내가 나온 기기에서만 상품권을 발송합니다.</div>' +
+          '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointclaim" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">교환 처리 시작</button>' +
+          '<button class="btn btn-danger" data-act="pointreject" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">신청 취소 처리</button></div>';
+      }
+    } else if (ownStudent) {
+      pendingActions = '<button class="btn btn-danger btn-block mt14" data-act="pointcancel" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">교환 신청 취소</button>';
+    }
+  } else if (account.deficit) {
+    pendingActions = '<div class="guide bad mt14"><b>정산 확인 필요</b>과거 학습 기록 변경으로 확정 교환액이 현재 자동 적립액보다 큽니다. 추가 교환을 진행하지 말고 기록을 확인해 주세요.</div>';
+  } else if (ownStudent && account.canRequest) {
+    pendingActions = '<button class="btn btn-primary btn-block mt14" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 문화상품권 교환 신청</button>';
+  }
+  modal((director ? student.name + ' · ' : '') + '포인트 적립 방법',
+    '<div class="point-gauge-card" style="margin-top:0"><div class="point-gauge-head"><div><div class="point-gauge-title">현재 교환 잔액</div>' +
+      '<div class="point-gauge-value">' + pointNumber(account.balance) + '</div></div>' +
+      (account.processing ? '<span class="tag reward-attention">교환 처리 중</span>' : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>' : account.pending ? '<span class="tag reward-progress">교환 확인 중</span>' : account.canRequest ? '<span class="tag reward-achieved">교환 가능</span>' : '<span class="tag reward-progress">적립 중</span>') + '</div>' +
+      '<div class="point-gauge-track"><i style="width:' + account.pct + '%"></i></div></div>' +
+    '<div class="point-policy"><div><b>매일 +' + POINT_DAILY + 'P</b><span>공부 완료 또는 순공 10분 이상, 미완료 정리, 다음날 정오 전 학생 수행 보고까지 완료한 유효 학습일</span></div>' +
+      '<div><b>매주 +' + POINT_WEEKLY + 'P</b><span>예정 학습일 3일 이상인 주에 유효 학습일 80% 이상을 달성하고 학생이 일요일 주간 마무리까지 완료</span></div>' +
+      '<div><b>매월 +' + POINT_MONTHLY + 'P</b><span>예정 학습일 12일 이상인 달에 유효 학습일 80% 이상을 달성하고 학생이 말일 월간 마무리까지 완료</span></div>' +
+      '<div><b>' + pointNumber(POINT_EXCHANGE_COST) + ' = 문화상품권</b><span>순위 경쟁 없이 계속 누적되며, 원장이 기록과 신청을 확인한 뒤 실제 발송 완료 시 5,000P가 차감됩니다.</span></div></div>' +
+    '<div class="between mt14"><b class="small">최근 적립·교환 내역</b><span class="small muted">총 적립 ' + pointNumber(account.earned) + '</span></div>' + historyHtml + pendingActions);
 }
 
 function dailyCloseStatusLabel(staffId, date) {
@@ -8983,6 +9513,7 @@ function isStudentActivityCheck(key, row) {
     return !!(close.reviewedAt || close.completedAt || close.difficulty || close.studentNextFocus ||
       Object.keys(close.resolutions || {}).length);
   }
+  if (id.startsWith('__pointrequest__') || id.startsWith('__rewardtx__')) return false;
   if (id.startsWith('__ingp__')) {
     return (row.items || []).some(item => item && (item.claimed || item.done || item.review));
   }
@@ -9023,21 +9554,19 @@ function studentUsageLine(student) {
     ' · 체크 ' + usage.done + '/' + usage.total + ' · 하루 마감 ' + (usage.closed ? '완료' : '미완료') + '</span></div>';
 }
 
-function studentEngagementLine(student, currentSummary, previousSummary) {
+function studentEngagementLine(student, currentSummary, pointSummary) {
   if (student.owner || student.manager) return '';
-  const currentYm = ymOf(today());
-  const summary = currentSummary || engagementMonthSummary(student.id, currentYm);
-  const previousYm = ymAdd(currentYm, -1);
-  const previous = previousSummary || (previousYm >= ENGAGEMENT_REWARD_START ? engagementMonthSummary(student.id, previousYm, monthLastDate(previousYm)) : null);
-  const monthText = summary.monthEnded
-    ? (summary.monthStudentClosed ? '월간 마감 완료' : '월간 마감 필요')
-    : '말일 월간 마감 예정';
-  const previousText = previous && previous.plannedDays
-    ? '<div class="small muted mt8">지난달 최종 · 스탬프 ' + previous.stampedDays + '/' + previous.plannedDays + '일 (' + previous.rate + '%) · ' +
-      (previous.qualified ? '<b style="color:var(--green)">기준 달성</b>' : '미달·확인') + '</div>' : '';
-  return '<div class="student-engagement-line"><div class="between"><div><b>🏅 이번 달 스탬프 ' + summary.stampedDays + '/' + summary.plannedDays + '일 · ' + summary.rate + '%</b>' +
-    '<div class="small muted mt8">주간 마무리 ' + summary.weeklyDone + '/' + summary.weeklyTarget + '회 · ' + monthText + '</div></div>' +
-    '<span class="tag reward-' + summary.statusKey + '">' + esc(summary.statusLabel) + '</span></div>' + previousText + '</div>';
+  const summary = currentSummary || engagementMonthSummary(student.id, ymOf(today()));
+  const account = pointSummary || pointAccount(student.id, today());
+  const status = account.processing ? '<span class="tag reward-attention">교환 처리 중</span>'
+    : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>'
+    : account.pending ? '<span class="tag reward-attention">교환 확인 필요</span>'
+    : account.canRequest ? '<span class="tag reward-achieved">교환 가능</span>'
+    : '<span class="tag reward-progress">적립 중</span>';
+  return '<div class="student-engagement-line"><div class="between"><div><b>🎁 ' + pointNumber(account.balance) + ' / ' + pointNumber(POINT_EXCHANGE_COST) + '</b>' +
+    '<div class="small muted mt8">이번 달 +' + pointNumber(account.currentMonthEarned) + ' · 유효 학습일 ' + summary.stampedDays + '/' + summary.plannedDays + '일 (' + summary.rate + '%)</div></div>' + status + '</div>' +
+    '<div class="point-gauge-track" style="height:7px;margin-top:9px"><i style="width:' + account.pct + '%"></i></div>' +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="pointopen" data-id="' + esc(student.id) + '">' + (account.pending ? '교환 신청 확인' : '포인트 내역') + '</button></div>';
 }
 
 /* 카카오 수신번호는 서버에만 두고, 원장 화면에는 마스킹 상태만 잠시 보관한다. */
@@ -9231,14 +9760,18 @@ async function sendConsultStudentLink(staffId) {
 
 function staffAccessPanels(student) {
   const subscription = studentSubscription(student);
+  const rewardLocked = hasProcessingPointExchange(student.id);
+  const identityLock = rewardLocked
+    ? ' disabled aria-disabled="true" title="문화상품권 교환 처리 완료 또는 취소 후 변경할 수 있습니다"'
+    : '';
   const subscriptionControl = student.owner || student.manager ? '' :
     '<button class="btn btn-sm btn-ghost" data-act="subscriptionopen" data-id="' + student.id + '">' +
       (subscription.active ? '구독 설정' : subscription.endedAt ? '구독 다시 시작' : '월 구독 설정') + '</button>';
   const common = '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + student.id + '">지시 목록 관리</button>' +
     subscriptionControl +
-    '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + student.id + '">' +
+    '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + student.id + '"' + identityLock + '>' +
       (student.owner ? '대표 해제' : '대표로 지정') + '</button>' +
-    '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + student.id + '">' +
+    '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + student.id + '"' + identityLock + '>' +
       (student.manager ? '관리자 해제' : '관리자로 지정') + '</button>';
   if (student.owner || student.manager) {
     return '<hr class="sep"><div class="row wraprow" style="gap:8px">' +
@@ -9249,7 +9782,8 @@ function staffAccessPanels(student) {
     '<button class="btn btn-sm btn-primary mt14" data-act="copylink" data-id="' + student.id + '">학생용 링크 복사</button>' +
     '<hr class="sep"><div class="card-sub mb8"><b>보호자 열람</b> · 발행 리포트와 영·수 결과지만 읽기 전용</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="guardianopen" data-id="' + student.id + '">보호자 초대 링크 관리</button>' +
-    '<hr class="sep"><div class="row wraprow" style="gap:8px">' + common + '</div>';
+    '<hr class="sep">' + (rewardLocked ? '<div class="guide bad mb14"><b>문화상품권 교환 처리 중</b>완료 또는 취소 전에는 학생 삭제·대표·관리자 전환을 할 수 없습니다.</div>' : '') +
+    '<div class="row wraprow" style="gap:8px">' + common + '</div>';
 }
 
 function viewStaffAdmin() {
@@ -9271,11 +9805,11 @@ function viewStaffAdmin() {
   const engagementRows = [...engagementByStudent.values()];
   const stampedToday = engagementRows.filter(summary => summary.days.some(day => day.date === today() && day.stamped)).length;
   const engagementOnTrack = engagementRows.filter(summary => summary.plannedDays && summary.stampedDays * 100 >= summary.plannedDays * ENGAGEMENT_REWARD_RATE).length;
-  const engagementAchieved = engagementRows.filter(summary => summary.qualified).length;
-  const previousEngagementYm = ymAdd(engagementYm, -1);
-  const previousEngagementByStudent = new Map(previousEngagementYm >= ENGAGEMENT_REWARD_START
-    ? students.map(student => [student.id, engagementMonthSummary(student.id, previousEngagementYm, monthLastDate(previousEngagementYm))]) : []);
-  const previousAchieved = [...previousEngagementByStudent.values()].filter(summary => summary.qualified).length;
+  const pointByStudent = new Map(students.map(student => [student.id, pointAccount(student.id, today())]));
+  const pointPending = [...pointByStudent.values()].filter(account => account.pending).length;
+  const pointReady = [...pointByStudent.values()].filter(account => account.canRequest).length;
+  const pointDeficit = [...pointByStudent.values()].filter(account => account.deficit).length;
+  const pointBalances = [...pointByStudent.values()].reduce((sum, account) => sum + account.balance, 0);
   const filterButton = (mode, label) => '<button class="btn btn-sm ' + (filterMode === mode ? 'btn-navy' : 'btn-ghost') +
     '" data-act="stafffilter" data-staff-filter="' + mode + '" aria-pressed="' + (filterMode === mode) + '">' + label + '</button>';
   return '<div class="card">' +
@@ -9293,13 +9827,11 @@ function viewStaffAdmin() {
     (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
-    (students.length ? '<div class="student-engagement-overview"><div class="between"><div><b>🏅 유효 학습일 · 월간 꾸준함상</b>' +
-      '<div class="small muted mt8">체크 완료 또는 순공 10분 이상 + 미완료 정리 + 다음날 정오 전 수행 보고까지 학생이 직접 끝낸 날만 집계합니다.</div></div>' +
-      '<div class="small"><b>오늘 스탬프 ' + stampedToday + '명</b> · 80% 이상 ' + engagementOnTrack + '명</div></div>' +
-      '<div class="small muted mt8">월간 기준: 체크리스트 또는 순공 기록이 있는 학습일 스탬프 80% 이상 · 주간 마무리 3회 · 말일 월간 마무리. 원장 대신 마감은 보상에 포함하지 않습니다.' +
-        (engagementYm < ENGAGEMENT_REWARD_START ? '<br><b>2026년 8월은 시범 집계이며, 보상 판정은 9월부터 시작합니다.</b>' :
-          '<br>이번 달 기준 달성 ' + engagementAchieved + '명' + (previousEngagementYm >= ENGAGEMENT_REWARD_START ? ' · 지난달 최종 달성 ' + previousAchieved + '명' : '')) +
-      '</div></div>' : '') +
+    (students.length ? '<div class="student-engagement-overview"><div class="between"><div><b>🎁 포인트 · 문화상품권 교환</b>' +
+      '<div class="small muted mt8">학습·마감 기록에서 포인트를 자동 계산하고, 학생의 5,000P 신청은 실제 상품권 발송 후 원장이 확정합니다.</div></div>' +
+      '<div class="small"><b>교환 확인 ' + pointPending + '명</b> · 신청 가능 ' + pointReady + '명' + (pointDeficit ? ' · 정산 확인 ' + pointDeficit + '명' : '') + '</div></div>' +
+      '<div class="small muted mt8">오늘 유효 학습일 ' + stampedToday + '명 · 이번 달 80% 이상 ' + engagementOnTrack + '명 · 전체 학생 현재 잔액 ' + pointNumber(pointBalances) +
+        '<br>유효 학습일 +50P · 주 3일 이상에서 80%와 주간 마무리 +250P · 월 12일 이상에서 80%와 월간 마무리 +500P. 상품권 번호나 링크는 앱에 저장하지 않습니다.</div></div>' : '') +
     (students.length ? '<div class="student-subscription-overview"><div class="between"><div><b>월 구독 관리</b>' +
       '<div class="small muted mt8">학생 이용 기능과 별개로 결제 확인만 관리합니다.</div></div>' +
       '<div class="small"><b>구독 ' + subscriptionStudents.length + '명</b> · 결제 확인 필요 ' + paymentAttention.length + '명</div></div>' +
@@ -9312,6 +9844,7 @@ function viewStaffAdmin() {
     ? list.map(s => {
       const subscription = studentSubscription(s);
       const payment = studentSubscriptionPayment(s);
+      const rewardLocked = hasProcessingPointExchange(s.id);
       const visible = studentMatchesSearch(s, normalizedQuery) && studentMatchesStaffFilter(s, filterMode);
       return '<div class="card" data-staff-search-name="' + esc(normalizeStudentSearch(s.name)) + '"' +
         ' data-staff-subscription="' + (subscription.active ? '1' : '0') + '" data-staff-payment-attention="' +
@@ -9322,11 +9855,12 @@ function viewStaffAdmin() {
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') +
           (subscription.active ? ' <span class="tag subscription">월 구독</span>' :
             subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot').length + '건' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t)).length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) +
-          studentEngagementLine(s, engagementByStudent.get(s.id), previousEngagementByStudent.get(s.id)) + studentSubscriptionLine(s) + '</div></div>' +
-        '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
+          studentEngagementLine(s, engagementByStudent.get(s.id), pointByStudent.get(s.id)) + studentSubscriptionLine(s) + '</div></div>' +
+        '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '"' +
+          (rewardLocked ? ' disabled aria-disabled="true" title="문화상품권 교환 처리 완료 또는 취소 후 삭제할 수 있습니다"' : '') + '>삭제</button></div>' +
         staffAccessPanels(s) + '</div>';
     }).join('') +
       '<div class="card" id="staffSearchEmpty"' + ((normalizedQuery || filterMode !== 'all') && !matching.length ? '' : ' hidden') +
@@ -9589,7 +10123,7 @@ function showText(title, text) {
 
 function manageTasks(staffId) {
   const s = staffById(staffId);
-  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && t.kind !== 'report_snapshot')
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   modal((s ? s.name : '') + ' 지시 목록',
     list.length
@@ -10267,6 +10801,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const sourceKey = el.dataset.source || '';
       if (!LEARNING_SOURCES[sourceKey]) return toast('학습 종류를 다시 선택해 주세요');
+      if (sourceKey === 'leaders_eye') return toast('리더스아이는 학생이 학습 탭에서 오늘 완료를 직접 기록합니다');
       learningTaskModal(sourceKey);
       break;
     }
@@ -10290,6 +10825,7 @@ document.addEventListener('click', ev => {
       const rawUrl = ($('#learnUrl').value || '').trim();
       const resourceUrl = safeHttpsUrl(rawUrl);
       if (!source) return toast('학습 종류를 다시 선택해 주세요');
+      if (sourceKey === 'leaders_eye') return toast('리더스아이는 회차 과제를 배정하지 않고 학생이 오늘 완료를 직접 기록합니다');
       if (requestId && (!request || sourceKey !== 'metamath' || request.staffId !== me.id ||
           metamathRequestStatus(request) !== 'preparing')) return toast('제작 중인 메타수학 요청만 배정할 수 있어요');
       if (!title) return toast('과제·자료명을 입력해 주세요');
@@ -11798,6 +12334,57 @@ document.addEventListener('click', ev => {
       render(); toast('내 체크리스트에 담았습니다');
       break;
     }
+    case 'learningdailyopen': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || sourceKey !== 'leaders_eye') {
+        return toast('리더스아이 오늘 학습은 학생 본인 화면에서만 기록할 수 있어요');
+      }
+      const assigned = assignedLearningTaskForDate(me.id, sourceKey, today());
+      const existing = dailyLearningRecordTask(me.id, sourceKey, today());
+      if (assigned || existing) learningResultModal(assigned || existing, today());
+      else leadersEyeDailyResultModal(me);
+      break;
+    }
+    case 'learningdailysave': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || sourceKey !== 'leaders_eye') {
+        return toast('리더스아이 오늘 학습은 학생 본인 화면에서만 기록할 수 있어요');
+      }
+      const d = today();
+      const note = (($('#learningDailyNote') && $('#learningDailyNote').value) || '').trim().slice(0, 120);
+      const assigned = assignedLearningTaskForDate(me.id, sourceKey, d);
+      if (assigned) {
+        closeModal(); learningResultModal(assigned, d);
+        toast('오늘 배정된 리더스아이 과제에 결과를 입력해 주세요');
+        break;
+      }
+      let t = dailyLearningRecordTask(me.id, sourceKey, d);
+      if (!t) {
+        const source = LEARNING_SOURCES[sourceKey];
+        const id = dailyLearningRecordId(me.id, sourceKey, d);
+        t = {
+          id: id, groupId: id, kind: LEARNING_DAILY_LOG_KIND, staffId: me.id,
+          source: sourceKey, resourceUrl: '', studySubject: 'english',
+          dueDate: d, estimatedMin: 0, academicEventId: '', evidenceMode: '',
+          title: '리더스아이 오늘 학습', detail: source.detail, guide: source.guide,
+          steps: [], target: 0, unit: '건', time: '', priority: 'normal',
+          repeat: 'once', days: [], start: d, end: '', carry: false, requiresClaim: false,
+          origin: 'staff', createdAt: now(), updatedAt: now(), deleted: false
+        };
+        state.tasks.push(t);
+      }
+      const current = getCheck(t.id, d) || {};
+      const stored = setCheck(t.id, d, {
+        done: true, at: current.at || now(), steps: {}, count: 0, blocked: false,
+        learningResult: { outcome: note || '학습 완료' }, learningResultUpdatedAt: now()
+      });
+      if (!stored) break;
+      syncLinkedStudyTask(t, d);
+      closeModal(); render(); toast('리더스아이 오늘 학습을 완료로 기록했습니다');
+      break;
+    }
     case 'learningresultopen': {
       const t = task();
       const me = currentStaff();
@@ -11946,6 +12533,83 @@ document.addEventListener('click', ev => {
       applyStaffListFilter(el.dataset.staffFilter);
       break;
     }
+    case 'pointopen': {
+      pointHistoryModal(id);
+      break;
+    }
+    case 'pointrequest': {
+      if (!session.isStaffLink || isManager() || session.staffId !== id) break;
+      if (!confirm('5,000P 문화상품권 교환을 신청할까요? 원장님이 학습 기록을 확인한 뒤 발송합니다.')) break;
+      if (!pointExchangeRequest(id)) return toast('교환 가능한 포인트와 신청 상태를 다시 확인해 주세요');
+      closeModal(); render(); toast('문화상품권 교환을 신청했습니다');
+      break;
+    }
+    case 'pointcancel': {
+      if (!session.isStaffLink || isManager() || session.staffId !== id) break;
+      if (!confirm('문화상품권 교환 신청을 취소할까요? 예약된 포인트는 다시 사용할 수 있습니다.')) break;
+      if (!cancelPointExchangeRequest(id, el.dataset.requestId || '')) return toast('취소할 신청을 다시 확인해 주세요');
+      closeModal(); render(); toast('교환 신청을 취소했습니다');
+      break;
+    }
+    case 'pointclaim': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      const requestId = el.dataset.requestId || '';
+      if (!student || !confirm(student.name + ' 학생의 교환 처리를 이 기기에서 시작할까요?\n서버 선점 성공 안내가 나온 뒤에만 상품권을 발송하세요.')) break;
+      runPointExchangeAdminAction(id, requestId, 'claim').then(response => {
+        if (!response) return;
+        if (response.owned === true) toast('교환 처리 선점 완료 · 이제 이 기기에서만 상품권을 발송하세요');
+        else toast('다른 원장 기기에서 이미 처리 중입니다 · 이 기기에서는 발송하지 마세요');
+      });
+      break;
+    }
+    case 'pointownercheck': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      runPointExchangeAdminAction(id, el.dataset.requestId || '', 'claim').then(response => {
+        if (!response) return;
+        toast(response.owned === true
+          ? '이 기기가 처리 기기로 확인되었습니다'
+          : '다른 원장 기기가 선점했습니다 · 이 기기에서는 발송하지 마세요');
+      });
+      break;
+    }
+    case 'pointtakeover': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || !confirm(student.name + ' 학생의 30분 지난 교환 처리를 이 기기로 인계할까요?\n새 상품권을 발송하지 말고, 이전 기기에서 이미 발송했는지 먼저 확인해야 합니다.\n인계 후에는 “이미 발송됨 → 완료” 또는 “미발송 → 취소”만 선택하세요.')) break;
+      runPointExchangeAdminAction(id, el.dataset.requestId || '', 'takeover').then(response => {
+        if (response && response.owned === true) toast('인계 완료 · 새 상품권을 발송하지 말고 이전 발송 여부를 확인하세요');
+      });
+      break;
+    }
+    case 'pointreject': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      const requestId = el.dataset.requestId || '';
+      if (!student || !confirm(student.name + ' 학생의 교환 신청을 취소 처리할까요? 포인트는 차감하지 않습니다.')) break;
+      runPointExchangeAdminAction(id, requestId, 'reject').then(response => {
+        if (response && response.status === 'cancelled') toast('교환 신청을 취소 처리했습니다');
+      });
+      break;
+    }
+    case 'pointfulfill': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || !confirm(student.name + ' 학생에게 문화상품권을 실제로 발송했나요?\n확정하면 5,000P가 차감되며 학생이 수정할 수 없는 기록으로 남습니다.')) break;
+      runPointExchangeAdminAction(id, el.dataset.requestId || '', 'fulfill').then(response => {
+        if (response && response.status === 'fulfilled') toast('상품권 발송 완료 · 5,000P를 차감했습니다');
+      });
+      break;
+    }
+    case 'pointadmincancel': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || !confirm(student.name + ' 학생에게 상품권을 아직 발송하지 않았나요?\n발송하지 않은 것이 확실할 때만 처리를 취소하세요. 포인트는 차감하지 않습니다.')) break;
+      runPointExchangeAdminAction(id, el.dataset.requestId || '', 'cancel').then(response => {
+        if (response && response.status === 'cancelled') toast('교환 처리를 취소했습니다');
+      });
+      break;
+    }
     case 'subscriptionopen': {
       if (!session.isAdmin || session.isStaffLink) break;
       studentSubscriptionModal(id);
@@ -12058,6 +12722,7 @@ document.addEventListener('click', ev => {
     case 'delstaff': {
       if (!session.isAdmin) break;
       const s = staffById(id);
+      if (s && hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 학생을 삭제해 주세요');
       if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
       s.deleted = true; s.updatedAt = now();
       save(); queueSync(); render();
@@ -12067,6 +12732,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s) break;
+      if (hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 대표 여부를 변경해 주세요');
       s.owner = !s.owner; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.owner ? s.name + ' — 대표로 지정 (학생 통계에서 제외)' : s.name + ' — 대표 해제');
@@ -12076,6 +12742,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s) break;
+      if (hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 관리자 여부를 변경해 주세요');
       s.manager = !s.manager; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.manager
@@ -12804,7 +13471,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.9';
+const APP_VER = '2026-09-01.2';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
