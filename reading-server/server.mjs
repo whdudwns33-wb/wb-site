@@ -43,6 +43,9 @@ const vocabStore = {
   getAssign: (c) => vocabAssignMap()[c] || null,
   putAssign: (c, rec) => { vocabAssignMap()[c] = rec; persist(); },
   listAssignCodes: () => Object.keys(vocabAssignMap()),
+  /* AI 호출 장부 — 하루치 한 칸. 날짜가 바뀌면 덮어써진다. */
+  getUsage: () => db.vocab.usage || null,
+  putUsage: (rec) => { db.vocab.usage = rec; persist(); },
 };
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
@@ -256,7 +259,7 @@ const server = http.createServer(async (req, res) => {
         const out = await handleVocab({
           path: p, method: req.method, who,
           getBody: () => readBody(req), store: vocabStore,
-          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '' },
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '', env: process.env },
           push: VOCAB_PUSH_ENV,
         });
         return json(res, out.status, out.body);
