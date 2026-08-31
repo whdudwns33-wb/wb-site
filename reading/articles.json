@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.9",
+  "version": "2026-08-31.10",
   "articles": [
     {
       "id": "nuri-space",
@@ -23313,6 +23313,878 @@
               "Whatever was not written down becomes, ",
               "in a later age, not an object of restoration",
               " but an object of guesswork."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "sleep-memory",
+      "category": "science",
+      "careers": [
+        "bio",
+        "med",
+        "edu"
+      ],
+      "publishedAt": "2026-08-31",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가정신건강정보포털 — 수면과 수면장애",
+          "url": "https://www.mentalhealth.go.kr/portal/disease/diseaseDetail.do?dissId=32"
+        },
+        {
+          "title": "국립중앙과학관 웹진 — 왜 잠을 자는가? 수면의 과학",
+          "url": "https://www.science.go.kr/webzine/793/column.html"
+        },
+        {
+          "title": "생화학분자생물학회 웹진 — 수면 중 기억의 시스템 공고화",
+          "url": "https://www.ksbmb.or.kr/html/?pmode=webzine&smode=viewDetail&id=202501&menu=1421&seq=37706"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "자는 동안 뇌가 정리해요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "낮에 새로 배운 것은 ",
+              "머릿속에 잠깐 담겨요. ",
+              "아직 단단하지 않아요. ",
+              "조금만 지나도 ",
+              "쉽게 잊어버려요."
+            ],
+            [
+              "그런데 잠을 자면 ",
+              "뇌가 바빠져요. ",
+              "낮에 배운 것을 ",
+              "하나하나 다시 꺼내 봐요. ",
+              "그리고 오래 두는 자리로 ",
+              "조심히 옮겨요. ",
+              "이렇게 옮겨진 것이 ",
+              "오래가는 기억이 돼요. ",
+              "우리가 자는 동안에 ",
+              "이 일이 벌어져요."
+            ],
+            [
+              "그래서 잠을 적게 자면 ",
+              "배운 것이 잘 안 남아요. ",
+              "밤을 새워 외우는 것은 ",
+              "그래서 도움이 되지 않아요. ",
+              "책을 덮고 잠자리에 누워도 ",
+              "공부는 아직 이어지고 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "뇌",
+              "easy": "머릿속에서 생각하고 기억하는 일을 맡은 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "기억",
+              "easy": "겪거나 배운 것을 잊지 않고 담아 두는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "공부",
+              "easy": "새로운 것을 배우고 익히는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "잠자리를 고르는 방법",
+                "자는 동안 뇌가 배운 것을 정리한다는 것",
+                "꿈을 꾸는 까닭",
+                "밤에 먹으면 좋은 음식"
+              ],
+              "answer": 1,
+              "explain": "낮에 배운 것을 자는 동안 뇌가 오래 두는 자리로 옮긴다는 것이 이 글의 중심이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "낮에 새로 배운 것은 처음에 어떤 상태인가요?",
+              "choices": [
+                "아주 단단해요",
+                "아직 단단하지 않아 쉽게 잊어버려요",
+                "영원히 남아요",
+                "저절로 없어져요"
+              ],
+              "answer": 1,
+              "explain": "아직 단단하지 않아서 조금만 지나도 쉽게 잊어버린다고 나와요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「기억」은 무엇인가요?",
+              "choices": [
+                "배운 것을 담아 두는 일",
+                "밤에 자는 일",
+                "책을 사는 일",
+                "친구와 노는 일"
+              ],
+              "answer": 0,
+              "explain": "겪거나 배운 것을 잊지 않고 담아 두는 일을 기억이라고 해요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "밤을 새워 외우면 왜 도움이 되지 않을까요?",
+              "choices": [
+                "책이 무거워서",
+                "잠을 안 자면 뇌가 옮기는 일을 못 해서",
+                "밤에는 불이 어두워서",
+                "아침에 배가 고파서"
+              ],
+              "answer": 1,
+              "explain": "자는 동안 뇌가 배운 것을 오래 두는 자리로 옮겨요. 안 자면 그 일을 할 수 없어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "내일 시험이 있어요. 이 글대로라면 어떻게 하는 것이 좋을까요?",
+              "choices": [
+                "밤을 새워서 계속 봐요",
+                "일찍 공부를 마치고 푹 자요",
+                "공부를 아예 안 해요",
+                "자다가 자꾸 깨서 봐요"
+              ],
+              "answer": 1,
+              "explain": "배운 것이 오래 남으려면 자는 시간이 필요해요. 공부를 마치고 자는 것이 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "잠자는 동안에도 공부는 이어진다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "낮에 새로 배운 것은 ",
+              "곧바로 오래 남는 기억이 되지 않는다. ",
+              "처음에는 뇌의 「해마」라는 곳에 ",
+              "잠깐 맡겨진다. ",
+              "이 상태의 기억은 아직 약해서 ",
+              "쉽게 흐려지거나 사라진다."
+            ],
+            [
+              "기억이 오래 남으려면 ",
+              "해마에 있던 것이 ",
+              "대뇌 겉쪽의 넓은 자리로 옮겨져야 한다. ",
+              "이 옮기는 일을 「기억 공고화」라고 한다. ",
+              "그리고 이 일은 주로 ",
+              "우리가 잠든 사이에 일어난다."
+            ],
+            [
+              "잠자는 동안 뇌는 쉬고만 있지 않는다. ",
+              "낮에 무언가를 배울 때 켜졌던 신경의 움직임을 ",
+              "빠르게 되풀이해 본다. ",
+              "학자들은 이것을 기억이 다시 살아난다는 뜻에서 ",
+              "「재활성」이라고 부른다. ",
+              "특히 깊이 잠든 구간에서 ",
+              "이 되풀이가 활발하게 나타난다."
+            ],
+            [
+              "그래서 배운 뒤에 잠을 줄이면 ",
+              "옮기는 일이 제대로 끝나지 않는다. ",
+              "밤을 새워 외우는 방법이 ",
+              "오래가지 못하는 까닭이 여기에 있다. ",
+              "국가정신건강정보포털은 ",
+              "아동과 청소년에게 하루 아홉 시간에서 열 시간의 잠을 권한다. ",
+              "책을 덮은 뒤에도 ",
+              "공부는 아직 끝나지 않은 셈이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "해마",
+              "easy": "뇌 안쪽에 있는 부분으로, 새로 배운 것을 잠시 맡아 두는 곳",
+              "hanja": null
+            },
+            {
+              "word": "대뇌",
+              "easy": "뇌에서 가장 큰 부분으로, 생각하고 판단하는 일을 맡는다",
+              "hanja": "大(큰 대)+腦(뇌 뇌)"
+            },
+            {
+              "word": "신경",
+              "easy": "몸 곳곳에 신호를 주고받는 가느다란 줄기",
+              "hanja": "神(귀신 신)+經(지날 경)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "잠을 잘 자는 방법",
+                "배운 것이 오래 남으려면 잠자는 동안의 정리가 필요하다는 것",
+                "해마의 생김새",
+                "꿈의 종류"
+              ],
+              "answer": 1,
+              "explain": "기억이 해마에서 대뇌로 옮겨지는 일이 잠든 사이에 일어난다는 것이 글 전체의 중심이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "새로 배운 것이 처음에 맡겨지는 곳은?",
+              "choices": [
+                "대뇌 겉쪽",
+                "눈",
+                "심장",
+                "해마"
+              ],
+              "answer": 3,
+              "explain": "처음에는 뇌의 해마라는 곳에 잠깐 맡겨진다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「공고화」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "빠르게 움직이는 일",
+                "여럿으로 나누는 일",
+                "약한 것을 단단하게 굳히는 일",
+                "크게 소리 내는 일"
+              ],
+              "answer": 2,
+              "explain": "약한 기억을 오래 남도록 단단하게 만드는 일이라 공고화라고 부른다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "「재활성」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "낮에 켜졌던 신경의 움직임을 잠든 동안 되풀이하는 것",
+                "잠들기 전에 책을 다시 읽는 것",
+                "아침에 일찍 일어나는 것",
+                "낮잠을 짧게 자는 것"
+              ],
+              "answer": 0,
+              "explain": "배울 때 켜졌던 신경의 움직임을 잠든 사이 빠르게 되풀이하는 것을 재활성이라 부른다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「책을 덮은 뒤에도 공부는 아직 끝나지 않았다」고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "다음 날 아침에 또 봐야 한다는 뜻",
+                "잠자는 동안 기억을 옮기는 일이 남아 있다는 뜻",
+                "책을 여러 권 읽어야 한다는 뜻",
+                "복습이 예습보다 중요하다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "앞에서 기억을 옮기는 일이 잠든 사이에 일어난다고 했다. 책을 덮어도 그 과정이 남아 있다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글을 읽고 시험 전날 계획을 세운다면 가장 알맞은 것은?",
+              "choices": [
+                "새벽 세 시까지 외우고 두 시간 잔다",
+                "공부를 일찍 마치고 평소만큼 잔다",
+                "잠을 자지 않고 아침까지 본다",
+                "자다가 한 시간마다 깨서 확인한다"
+              ],
+              "answer": 1,
+              "explain": "배운 뒤 잠을 줄이면 옮기는 일이 제대로 끝나지 않는다고 했다. 공부를 마치고 충분히 자는 편이 낫다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "What you learn during the day does not become a lasting memory at once. At first it is left for a short while in a part of the brain called the hippocampus. A memory in this state is still weak, so it fades or disappears easily.",
+            "For a memory to last, what sits in the hippocampus must move out to the wide surface of the cerebrum. This moving is called memory consolidation. And it happens mostly while we are asleep.",
+            "The brain does not simply rest during sleep. It replays, at high speed, the nerve activity that was switched on while you were learning. Scientists call this reactivation, because the memory comes alive again. This replay appears most strongly in the deepest stage of sleep.",
+            "So if you cut your sleep after learning, the moving is not finished properly. That is why staying up all night to memorise does not hold. The national mental health portal advises nine to ten hours of sleep a day for children and teenagers. Even after the book is closed, the studying is not yet over."
+          ],
+          "envocab": [
+            {
+              "word": "lasting",
+              "ko": "오래가는 (형용사)",
+              "base": "last [læst]"
+            },
+            {
+              "word": "hippocampus",
+              "ko": "해마 (명사)",
+              "base": "hippocampus [ˌhɪpəˈkæmpəs]"
+            },
+            {
+              "word": "cerebrum",
+              "ko": "대뇌 (명사)",
+              "base": "cerebrum [səˈriːbrəm]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화, 굳히기 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "replays",
+              "ko": "되풀이해 재생하다 (동사 replay)",
+              "base": "replay [ˌriːˈpleɪ]"
+            },
+            {
+              "word": "reactivation",
+              "ko": "재활성 (명사)",
+              "base": "reactivation [riˌæktɪˈveɪʃn]"
+            }
+          ],
+          "enseg": [
+            [
+              "What you learn during the day does not become a lasting memory at once. ",
+              "At first it is left for a short",
+              " while in a part of the brain called the hippocampus. ",
+              "A memory in this state is still weak, ",
+              "so it fades or disappears easily."
+            ],
+            [
+              "For a memory to last, ",
+              "what sits in the hippocampus must move out to the wide surface of the cerebrum. ",
+              "This moving is called memory consolidation. ",
+              "And it happens mostly while we are asleep."
+            ],
+            [
+              "The brain does not simply rest during sleep. ",
+              "It replays, at high speed, ",
+              "the nerve activity that was switched on",
+              " while you were learning. ",
+              "Scientists call this reactivation, ",
+              "because the memory comes alive again. ",
+              "This replay appears most strongly in the deepest stage of sleep."
+            ],
+            [
+              "So if you cut your sleep after learning, ",
+              "the moving is not finished properly. ",
+              "That is why staying up all night to memorise does not hold. ",
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers. ",
+              "Even after the book is closed, ",
+              "the studying is not yet over."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "기억을 옮겨 적는 시간",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "무언가를 새로 배웠다고 해서 ",
+              "그것이 곧바로 오래 남는 기억이 되지는 않는다. ",
+              "새 정보는 먼저 뇌 안쪽의 「해마」에 임시로 저장된다. ",
+              "이때의 기억은 불안정해서 ",
+              "쉽게 흐려지거나 다른 기억에 밀려난다. ",
+              "시험 직전에 외운 것이 ",
+              "며칠 뒤 남지 않는 경험이 여기에 해당한다."
+            ],
+            [
+              "불안정한 단기 기억이 ",
+              "오래가는 장기 기억으로 바뀌는 과정을 ",
+              "「공고화」라고 한다. ",
+              "공고화의 핵심은 자리를 옮기는 일이다. ",
+              "해마에 임시로 있던 정보가 ",
+              "대뇌 피질의 넓은 저장 공간으로 점차 옮겨 간다. ",
+              "그리고 이 옮김은 대부분 ",
+              "우리가 잠든 사이에 진행된다."
+            ],
+            [
+              "잠자는 뇌는 쉬고 있는 뇌가 아니다. ",
+              "깨어 있을 때 학습하며 나타났던 신경 활동의 패턴이 ",
+              "잠든 동안 시간적으로 압축된 형태로 되풀이된다. ",
+              "연구자들은 이를 「기억 재활성」이라 부르며 ",
+              "공고화의 핵심 작동 방식으로 본다. ",
+              "이 되풀이는 특히 깊은 잠에 해당하는 ",
+              "서파 수면 구간에서 두드러진다."
+            ],
+            [
+              "그렇다면 잠을 줄이면 어떻게 될까. ",
+              "새로운 학습 뒤에 수면을 제한하면 ",
+              "공고화 과정이 크게 나빠진다는 것이 ",
+              "여러 연구에서 확인되었다. ",
+              "밤을 새워 외운 내용이 오래가지 않는 데에는 ",
+              "의지나 집중력이 아니라 ",
+              "이런 생물학적 이유가 있다."
+            ],
+            [
+              "국가정신건강정보포털은 ",
+              "아동과 청소년에게 하루 아홉 시간에서 열 시간의 수면을 권한다. ",
+              "다만 필요한 시간은 사람마다 다르며, ",
+              "다음 날 피곤하지 않게 지낼 수 있는 정도가 ",
+              "그 사람에게 필요한 최소한이다. ",
+              "책을 덮는 순간이 공부의 끝이 아니라는 것, ",
+              "이것이 수면 연구가 알려 주는 사실이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "임시",
+              "easy": "얼마 동안만 잠깐 그렇게 하는 것",
+              "hanja": "臨(임할 임)+時(때 시)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약하고 불안정한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            },
+            {
+              "word": "피질",
+              "easy": "기관의 겉을 이루는 층. 대뇌 피질은 대뇌의 바깥층이다",
+              "hanja": "皮(가죽 피)+質(바탕 질)"
+            },
+            {
+              "word": "압축",
+              "easy": "부피나 길이를 눌러 줄이는 것",
+              "hanja": "壓(누를 압)+縮(줄일 축)"
+            },
+            {
+              "word": "제한",
+              "easy": "일정한 정도를 넘지 못하게 막는 것",
+              "hanja": "制(마를 제)+限(한할 한)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 장애를 치료하는 방법",
+                "기억이 오래 남으려면 잠자는 동안의 공고화가 필요하다는 것",
+                "해마의 해부학적 구조",
+                "꿈이 만들어지는 원리"
+              ],
+              "answer": 1,
+              "explain": "해마의 임시 저장에서 출발해 공고화와 재활성을 설명하고, 수면 제한의 영향으로 마무리한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "「기억 재활성」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "잠들기 직전에 배운 것을 다시 읽는 일",
+                "아침에 일어나 복습하는 일",
+                "해마가 새로 만들어지는 일",
+                "학습할 때 나타났던 신경 활동 패턴이 잠든 동안 압축되어 되풀이되는 일"
+              ],
+              "answer": 3,
+              "explain": "깨어 있을 때의 신경 활동 패턴이 잠든 동안 시간적으로 압축된 형태로 되풀이되는 것을 재활성이라 한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「제한」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "일정한 정도를 넘지 못하게 막는 것",
+                "완전히 없애는 것",
+                "두 배로 늘리는 것",
+                "순서를 바꾸는 것"
+              ],
+              "answer": 0,
+              "explain": "학습 뒤에 수면을 제한한다는 것은 잠자는 시간을 일정 이상 넘지 못하게 줄인다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "권장 수면 시간에 대한 글의 설명으로 알맞은 것은?",
+              "choices": [
+                "모든 사람에게 정확히 아홉 시간이 필요하다",
+                "청소년은 여섯 시간이면 충분하다",
+                "아동·청소년에게 아홉에서 열 시간을 권하되 필요한 시간은 사람마다 다르다",
+                "많이 잘수록 언제나 좋다"
+              ],
+              "answer": 2,
+              "explain": "아홉에서 열 시간을 권하면서도, 필요한 시간은 사람마다 다르고 다음 날 피곤하지 않은 정도가 기준이라고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「의지나 집중력이 아니라 생물학적 이유」라고 한 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "노력해도 공부는 소용없다는 뜻",
+                "밤샘이 실패하는 원인이 마음가짐이 아니라 몸에서 일어나는 과정에 있다는 뜻",
+                "집중력은 기억과 무관하다는 뜻",
+                "잠을 자면 저절로 외워진다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "수면을 제한하면 공고화가 나빠진다는 앞의 설명을 근거로, 원인을 태도가 아니라 몸의 과정에서 찾는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 내용에 비추어, 다음 중 근거가 가장 약한 주장은?",
+              "choices": [
+                "학습 직후 충분히 자면 기억이 더 잘 남을 수 있다",
+                "밤샘 암기는 오래가기 어렵다",
+                "잠을 오래 잘수록 성적이 반드시 오른다",
+                "필요한 수면 시간은 사람마다 다를 수 있다"
+              ],
+              "answer": 2,
+              "explain": "글은 공고화에 수면이 필요하다고 말할 뿐, 수면 시간과 성적이 비례한다고 하지 않는다. 오히려 필요한 시간은 사람마다 다르다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Learning something new does not turn it into a lasting memory right away. New information is first stored for a time in a part of the brain called the hippocampus. A memory at this stage is unstable, so it fades easily or is pushed aside by other memories. Something crammed just before a test, and gone a few days later, is an example.",
+            "The process by which an unstable short-term memory becomes a long-term one is called consolidation. At its core, consolidation is a move. Information held for a time in the hippocampus gradually shifts to the wide storage space of the cerebral cortex. And this move takes place mostly while we are asleep.",
+            "A sleeping brain is not a resting brain. Patterns of nerve activity that appeared during learning are repeated while we sleep, in a form compressed in time. Researchers call this memory reactivation and regard it as the central mechanism of consolidation. The repetition is most marked during slow-wave sleep, the deepest stage.",
+            "So what happens if sleep is cut short? Many studies have confirmed that restricting sleep after new learning seriously impairs consolidation. When material memorised through an all-nighter does not last, the reason is not willpower or concentration. It is biological.",
+            "The national mental health portal advises nine to ten hours of sleep a day for children and teenagers. How much a person needs, however, differs from person to person, and the minimum for each is the amount that lets them get through the next day without fatigue. Closing the book is not the end of studying. That is what sleep research tells us."
+          ],
+          "envocab": [
+            {
+              "word": "unstable",
+              "ko": "불안정한 (형용사)",
+              "base": "unstable [ʌnˈsteɪbl]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "compressed",
+              "ko": "압축된 (형용사 / 동사 compress)",
+              "base": "compress [kəmˈpres]"
+            },
+            {
+              "word": "mechanism",
+              "ko": "작동 방식, 기전 (명사)",
+              "base": "mechanism [ˈmekənɪzəm]"
+            },
+            {
+              "word": "restricting",
+              "ko": "제한하다 (동사 restrict)",
+              "base": "restrict [rɪˈstrɪkt]"
+            },
+            {
+              "word": "fatigue",
+              "ko": "피로 (명사)",
+              "base": "fatigue [fəˈtiːɡ]"
+            }
+          ],
+          "enseg": [
+            [
+              "Learning something new does not turn it into a lasting memory right away. ",
+              "New information is first stored for a time in a part of the brain called the hippocampus. ",
+              "A memory at this stage is unstable, ",
+              "so it fades easily",
+              " or is pushed aside by other memories. ",
+              "Something crammed just before a test, ",
+              "and gone a few days later, is an example."
+            ],
+            [
+              "The process by which an unstable short-term memory becomes a long-term one is called consolidation. ",
+              "At its core, consolidation is a move. ",
+              "Information held for a time in the hippocampus gradually shifts to the wide storage space of the cerebral cortex. ",
+              "And this move takes place mostly",
+              " while we are asleep."
+            ],
+            [
+              "A sleeping brain is not a resting brain. ",
+              "Patterns of nerve activity that appeared during learning are repeated",
+              " while we sleep, in a form compressed in time. ",
+              "Researchers call this memory reactivation",
+              " and regard it as the central mechanism of consolidation. ",
+              "The repetition is most marked during slow-wave sleep, ",
+              "the deepest stage."
+            ],
+            [
+              "So what happens if sleep is cut short? ",
+              "Many studies have confirmed that restricting sleep after new learning seriously impairs consolidation. ",
+              "When material memorised through an all-nighter does not last, ",
+              "the reason is not willpower or concentration. ",
+              "It is biological."
+            ],
+            [
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers. ",
+              "How much a person needs, however, ",
+              "differs from person to person, ",
+              "and the minimum for each is the amount that lets them get through the next day without fatigue. ",
+              "Closing the book is not the end of studying. ",
+              "That is what sleep research tells us."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "기억은 자는 동안 옮겨 적힌다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "새로 배운 내용이 곧바로 오래 남는 기억이 되는 것은 아니다. ",
+              "새 정보는 우선 뇌 안쪽의 해마에 임시로 저장된다. ",
+              "이 단계의 기억은 불안정해서 쉽게 흐려지거나 ",
+              "뒤이어 들어온 정보에 밀려난다. ",
+              "시험 직전에 몰아서 외운 내용이 며칠 만에 남지 않는 경험은 ",
+              "이 불안정함을 그대로 보여 준다."
+            ],
+            [
+              "불안정한 단기 기억이 안정된 장기 기억으로 바뀌는 과정을 공고화라 한다. ",
+              "그 핵심은 저장 장소의 이동이다. ",
+              "해마에 임시로 놓였던 정보가 대뇌 피질의 넓은 저장 공간으로 점차 옮겨 가며, ",
+              "이 과정을 연구자들은 시스템 공고화라고 부른다. ",
+              "중요한 것은 이 이동이 깨어 있는 동안이 아니라 ",
+              "잠든 사이에 주로 진행된다는 점이다."
+            ],
+            [
+              "잠자는 뇌는 활동을 멈춘 뇌가 아니다. ",
+              "깨어 있을 때 학습하며 나타났던 신경 활동의 패턴이 ",
+              "수면 중 시간적으로 압축된 형태로 되풀이된다. ",
+              "이를 기억 재활성이라 하며 공고화의 핵심 기전으로 본다. ",
+              "특히 깊은 잠에 해당하는 서파 수면 구간에서 ",
+              "해마와 대뇌 피질 사이의 신호가 서로 맞물리며 ",
+              "이 되풀이가 활발하게 나타난다."
+            ],
+            [
+              "여기서 학습에 대한 통념 하나가 흔들린다. ",
+              "공부의 성과가 깨어서 보낸 시간에만 달렸다는 생각이다. ",
+              "새로운 학습 뒤에 수면을 제한하면 공고화가 크게 나빠진다는 것은 ",
+              "여러 연구에서 반복해 확인되었다. ",
+              "밤을 새워 외운 내용이 오래가지 않는 까닭은 ",
+              "의지가 약해서가 아니라 옮겨 적을 시간을 없앴기 때문이다. ",
+              "깨어서 외운 양과 실제로 남는 양은 ",
+              "같은 값이 아니다."
+            ],
+            [
+              "다만 이 사실을 단순한 공식으로 바꾸어서는 안 된다. ",
+              "국가정신건강정보포털은 아동과 청소년에게 ",
+              "하루 아홉 시간에서 열 시간의 수면을 권하면서도, ",
+              "필요한 시간은 개인마다 다르다고 밝힌다. ",
+              "다음 날 피곤하지 않게 일상을 보낼 수 있는 정도가 ",
+              "그 사람에게 필요한 최소한이다. ",
+              "오래 잔다고 성적이 저절로 오르는 것도 아니다. ",
+              "다만 배운 것을 남기려면 옮겨 적을 시간이 필요하다는 것, ",
+              "책을 덮는 순간이 공부의 끝이 아니라는 것은 분명하다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "통념",
+              "easy": "널리 그렇다고 받아들여지는 생각",
+              "hanja": "通(통할 통)+念(생각 념)"
+            },
+            {
+              "word": "기전",
+              "easy": "어떤 현상이 일어나는 짜임새와 작동 방식",
+              "hanja": "機(틀 기)+轉(구를 전)"
+            },
+            {
+              "word": "공고화",
+              "easy": "약하고 불안정한 것을 단단하게 굳히는 일",
+              "hanja": "鞏(굳을 공)+固(굳을 고)+化(될 화)"
+            },
+            {
+              "word": "압축",
+              "easy": "부피나 길이를 눌러 줄이는 것",
+              "hanja": "壓(누를 압)+縮(줄일 축)"
+            },
+            {
+              "word": "제한",
+              "easy": "일정한 정도를 넘지 못하게 막는 것",
+              "hanja": "制(마를 제)+限(한할 한)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 시간을 늘리면 성적이 오른다는 것",
+                "학습의 성과는 깨어 있는 시간만이 아니라 잠든 사이의 공고화에도 달려 있다는 것",
+                "해마와 대뇌 피질의 해부학적 차이",
+                "서파 수면의 뇌파 주파수"
+              ],
+              "answer": 1,
+              "explain": "공고화가 잠든 사이에 일어난다는 사실을 근거로, 깨어 있는 시간만으로 학습 성과를 따지는 통념을 흔드는 것이 글의 중심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "「시스템 공고화」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "해마가 새로 자라나는 과정",
+                "잠들기 전에 복습하는 학습법",
+                "서파 수면의 길이를 재는 방법",
+                "정보가 해마에서 대뇌 피질의 저장 공간으로 점차 옮겨 가는 과정"
+              ],
+              "answer": 3,
+              "explain": "해마에 임시로 놓였던 정보가 대뇌 피질로 옮겨 가는 과정을 연구자들이 시스템 공고화라 부른다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "문맥에 비추어 「통념」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "널리 그렇다고 받아들여지는 생각",
+                "새로 밝혀진 사실",
+                "학자들만 아는 이론",
+                "잘못된 기억"
+              ],
+              "answer": 0,
+              "explain": "공부의 성과가 깨어 있는 시간에만 달렸다는, 흔히 받아들여지는 생각을 가리킨다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "「깨어서 외운 양과 실제로 남는 양은 같은 값이 아니다」가 뜻하는 바로 가장 알맞은 것은?",
+              "choices": [
+                "외우는 속도가 사람마다 다르다는 뜻",
+                "많이 외울수록 더 많이 남는다는 뜻",
+                "외운 것 가운데 공고화를 거친 만큼만 장기 기억으로 남는다는 뜻",
+                "외우기보다 이해가 중요하다는 뜻"
+              ],
+              "answer": 2,
+              "explain": "앞에서 수면을 제한하면 공고화가 나빠진다고 했다. 투입한 암기량이 그대로 남는 것이 아니라 옮겨 적히는 과정을 거쳐야 남는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글을 근거로 삼을 때 가장 지지받기 어려운 주장은?",
+              "choices": [
+                "학습 직후의 수면은 기억이 남는 데 도움이 될 수 있다",
+                "밤샘 암기는 오래 유지되기 어렵다",
+                "필요한 수면 시간은 사람마다 다를 수 있다",
+                "수면 시간을 늘리기만 하면 학업 성적이 비례해 오른다"
+              ],
+              "answer": 3,
+              "explain": "글은 마지막 문단에서 오래 잔다고 성적이 저절로 오르는 것은 아니라고 못 박는다. 나머지 셋은 글이 직접 밝힌 내용이다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 「단순한 공식으로 바꾸어서는 안 된다」고 덧붙인 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "수면 연구의 결과가 아직 신뢰할 수 없기 때문에",
+                "권장 시간을 모든 사람에게 똑같이 적용하면 개인차를 놓치기 때문에",
+                "학생마다 공부하는 과목이 다르기 때문에",
+                "수면보다 식사가 더 중요하기 때문에"
+              ],
+              "answer": 1,
+              "explain": "바로 뒤에서 필요한 시간이 개인마다 다르며 다음 날 피곤하지 않은 정도가 기준이라고 밝힌다. 일률적인 숫자로 환원하는 것을 경계하는 것이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점에서 학습 계획을 세울 때 가장 알맞은 원칙은?",
+              "choices": [
+                "시험 전날 잠을 줄여 최대한 많이 본다",
+                "학습을 여러 날에 나누고 그 사이마다 잠을 확보한다",
+                "낮잠으로 밤잠을 모두 대신한다",
+                "잠들기 직전까지 새 내용을 넣는다"
+              ],
+              "answer": 1,
+              "explain": "공고화는 잠든 사이에 진행되므로, 학습과 수면이 번갈아 오도록 나누어 배치하는 편이 이 글의 설명에 맞는다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "Newly learned material does not become a lasting memory at once. New information is first stored for a time in the hippocampus, deep inside the brain. A memory at this stage is unstable, fading easily or being pushed aside by information that arrives after it. Material crammed just before a test, and gone within days, shows this instability plainly.",
+            "The process by which an unstable short-term memory becomes a stable long-term one is called consolidation. At its core lies a change of storage place. Information placed for a time in the hippocampus gradually moves to the wide storage space of the cerebral cortex, and researchers call this systems consolidation. What matters is that the move proceeds mainly during sleep rather than while we are awake.",
+            "A sleeping brain has not stopped working. Patterns of nerve activity that appeared during learning are repeated in sleep in a form compressed in time. This is called memory reactivation and is regarded as the central mechanism of consolidation. During slow-wave sleep, the deepest stage, signals between the hippocampus and the cortex lock together and the repetition becomes especially active.",
+            "Here a common belief about learning is shaken: the belief that results depend only on the hours spent awake. Studies have confirmed again and again that restricting sleep after new learning seriously impairs consolidation. When material memorised through an all-nighter fails to last, the cause is not weak willpower but the loss of the time needed to copy it over. The amount memorised while awake and the amount that actually remains are not the same number.",
+            "This should not, however, be turned into a simple formula. The national mental health portal advises nine to ten hours of sleep a day for children and teenagers, while stating that the amount needed differs between individuals. The minimum for each person is the amount that lets them get through the next day without fatigue. Nor does sleeping longer raise grades by itself. What is clear is only this: keeping what you have learned takes time to copy it over, and closing the book is not the end of studying."
+          ],
+          "envocab": [
+            {
+              "word": "instability",
+              "ko": "불안정함 (명사)",
+              "base": "instability [ˌɪnstəˈbɪləti]"
+            },
+            {
+              "word": "consolidation",
+              "ko": "공고화 (명사)",
+              "base": "consolidation [kənˌsɑːlɪˈdeɪʃn]"
+            },
+            {
+              "word": "mechanism",
+              "ko": "기전, 작동 방식 (명사)",
+              "base": "mechanism [ˈmekənɪzəm]"
+            },
+            {
+              "word": "impairs",
+              "ko": "손상시키다, 나빠지게 하다 (동사 impair)",
+              "base": "impair [ɪmˈper]"
+            },
+            {
+              "word": "willpower",
+              "ko": "의지력 (명사)",
+              "base": "willpower [ˈwɪlpaʊər]"
+            },
+            {
+              "word": "individuals",
+              "ko": "개인들 (명사 individual의 복수)",
+              "base": "individual [ˌɪndɪˈvɪdʒuəl]"
+            }
+          ],
+          "enseg": [
+            [
+              "Newly learned material does not become a lasting memory at once. ",
+              "New information is first stored for a time in the hippocampus, ",
+              "deep inside the brain. ",
+              "A memory at this stage is unstable, ",
+              "fading easily",
+              " or being pushed aside by information that arrives after it. ",
+              "Material crammed just before a test, ",
+              "and gone within days, ",
+              "shows this instability plainly."
+            ],
+            [
+              "The process by which an unstable short-term memory becomes a stable long-term one is called consolidation. ",
+              "At its core lies a change of storage place. ",
+              "Information placed for a time in the hippocampus gradually moves to the wide storage space of the cerebral cortex,",
+              " ",
+              "and researchers call this systems consolidation. ",
+              "What matters is that the move proceeds mainly during sleep rather than",
+              " while we are awake."
+            ],
+            [
+              "A sleeping brain has not stopped working. ",
+              "Patterns of nerve activity that appeared during learning are repeated in sleep in a form compressed in time. ",
+              "This is called memory reactivation",
+              " and is regarded as the central mechanism of consolidation. ",
+              "During slow-wave sleep, the deepest stage, ",
+              "signals between the hippocampus",
+              " and the cortex lock together",
+              " and the repetition becomes especially active."
+            ],
+            [
+              "Here a common belief about learning is shaken: the belief that results depend only on the hours spent awake. ",
+              "Studies have confirmed again",
+              " and again that restricting sleep after new learning seriously impairs consolidation. ",
+              "When material memorised through an all-nighter fails to last, ",
+              "the cause is not weak willpower",
+              " but the loss of the time needed to copy it over. ",
+              "The amount memorised while awake",
+              " and the amount that actually remains are not the same number."
+            ],
+            [
+              "This should not, however, ",
+              "be turned into a simple formula. ",
+              "The national mental health portal advises nine to ten hours of sleep a day for children",
+              " and teenagers, ",
+              "while stating that the amount needed differs between individuals. ",
+              "The minimum for each person is the amount that lets them get through the next day without fatigue. ",
+              "Nor does sleeping longer raise grades by itself. ",
+              "What is clear is only this: keeping what you have learned takes time to copy it over,",
+              " ",
+              "and closing the book is not the end of studying."
             ]
           ]
         }
