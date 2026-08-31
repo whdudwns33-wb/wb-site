@@ -471,7 +471,9 @@ const server = http.createServer(async (req, res) => {
       if (mDetail && req.method === 'GET') {
         const code = mDetail[1];
         const st = db.states[code];
-        return json(res, 200, { summary: summarize(code), student: db.students[code] || null, state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
+        /* 없는 학생이면 404 (워커와 동일) — 200에 student:null 을 주면 관리 화면이 터진다 */
+        if (!db.students[code]) return json(res, 404, { error: '학생 없음' });
+        return json(res, 200, { summary: summarize(code), student: db.students[code], state: st ? st.state : null, updatedAt: st ? st.updatedAt : null });
       }
       return json(res, 404, { error: 'unknown api' });
     }
