@@ -8,7 +8,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const states = {}, mnemos = {}, push = {}, assigns = {}, usage = { rec: null };
+  const states = {}, mnemos = {}, push = {}, assigns = {}, usage = { rec: null }, arena = {};
   const students = { s1: { code: 's1', name: '김지우', cls: '월수반' }, s2: { code: 's2', name: '박서준', cls: '월수반' } };
   return {
     getState: (c) => states[c] || null,
@@ -27,6 +27,8 @@ function memStore() {
     listAssignCodes: () => Object.keys(assigns),
     getUsage: () => usage.rec,
     putUsage: (rec) => { usage.rec = rec; },
+    getArena: (k) => arena[k] || null,
+    putArena: (k, rec) => { arena[k] = rec; },
     _raw: { states, mnemos, push, assigns, usage },
   };
 }
@@ -694,6 +696,96 @@ await t('관리 화면 지표에 오늘 쓴 AI 양이 함께 온다', async () =
   assert.strictEqual(out.body.ai.total, 7);
   assert.strictEqual(out.body.ai.cap, 200, '기본 전체 한도');
   assert.deepStrictEqual(out.body.ai.students, [{ code: 's1', n: 7 }]);
+});
+
+/* ── 아레나 ── */
+const arenaWords = Array.from({ length: 12 }, (_, i) => ({ word: '아낱말' + i, meaning: '아뜻' + i }));
+const arenaStore = async () => {
+  const st = memStore();
+  await st.putAssign('s1', { items: [{ id: 'a1', title: '1주차', words: arenaWords }] });
+  await st.putAssign('s2', { items: [{ id: 'a1', title: '1주차', words: arenaWords }] });
+  return st;
+};
+const arenaCall = (store, over, on) => call(store, {
+  path: '/api/vocab/arena/today', who: { code: 's1', admin: false },
+  ai: { apiKey: 'k', model: null, env: on === false ? {} : { ARENA_ON: '1' } }, ...over,
+});
+
+await t('아레나는 기본이 꺼짐이다 — 파일럿 기준선을 지킨다', async () => {
+  /* 완수율을 올리려고 만든 장치라, 파일럿 중에 켜면 효과를 잴 기준선이 사라진다 */
+  const out = await arenaCall(await arenaStore(), {}, false);
+  assert.strictEqual(out.body.on, false);
+  assert.strictEqual(out.body.questions, undefined, '꺼져 있으면 문제도 안 준다');
+});
+
+await t('아레나 — 문제에 정답이 실려 나가지 않는다', async () => {
+  const out = await arenaCall(await arenaStore());
+  assert.strictEqual(out.body.on, true);
+  assert.strictEqual(out.body.ready, true);
+  assert.strictEqual(out.body.questions.length, 10);
+  for (const q of out.body.questions) {
+    assert.deepStrictEqual(Object.keys(q).sort(), ['options', 'word'], '정답이 같이 가면 순위표가 무의미하다');
+  }
+});
+
+await t('아레나 — 같은 반 두 학생이 같은 문제를 받는다', async () => {
+  const store = await arenaStore();
+  const a = await arenaCall(store);
+  const b = await arenaCall(store, { who: { code: 's2', admin: false } });
+  assert.deepStrictEqual(a.body.questions, b.body.questions);
+});
+
+await t('아레나 — 채점은 서버가 하고, 하루 한 번만 낸다', async () => {
+  const store = await arenaStore();
+  const first = await arenaCall(store, {
+    path: '/api/vocab/arena/submit', method: 'POST',
+    getBody: async () => ({ answers: ['틀림', '틀림'], times: [1000, 1000] }),
+  });
+  assert.strictEqual(first.body.done, true);
+  assert.strictEqual(typeof first.body.mine.score, 'number');
+  assert.strictEqual(first.body.mine.total, 10);
+  assert.ok(Array.isArray(first.body.answers), '끝나면 정답을 알려 준다');
+
+  /* 두 번째는 다시 안 받는다 — 여러 번 풀면 점수가 아니라 시도 횟수를 재게 된다 */
+  const again = await arenaCall(store, {
+    path: '/api/vocab/arena/submit', method: 'POST',
+    getBody: async () => ({ answers: [], times: [] }),
+  });
+  assert.strictEqual(again.body.done, true);
+  assert.strictEqual(again.body.mine.score, first.body.mine.score, '두 번째 시도로 점수가 바뀌면 안 된다');
+
+  /* 이미 푼 학생에게는 문제를 다시 주지 않는다 */
+  const today = await arenaCall(store);
+  assert.strictEqual(today.body.questions, null);
+  assert.ok(today.body.mine, '내 기록은 보여 준다');
+});
+
+await t('아레나 — 순위표에 같은 반 학생만 나온다', async () => {
+  const store = await arenaStore();
+  await store.putAssign('s3', { items: [{ id: 'a1', title: 'x', words: arenaWords }] });
+  for (const code of ['s1', 's2']) {
+    await arenaCall(store, { who: { code, admin: false }, path: '/api/vocab/arena/submit', method: 'POST',
+      getBody: async () => ({ answers: [], times: [] }) });
+  }
+  const out = await arenaCall(store);
+  assert.deepStrictEqual(out.body.board.map((r) => r.code).sort(), ['s1', 's2']);
+  assert.strictEqual(out.body.board.filter((r) => r.me).length, 1);
+});
+
+await t('아레나 — 반이 없으면 열리지 않는다', async () => {
+  const store = await arenaStore();
+  const out = await arenaCall(store, { who: { code: 'nobody', admin: false } });
+  assert.strictEqual(out.body.on, true);
+  assert.strictEqual(out.body.cls, '');
+  assert.ok(out.body.error, '왜 안 열리는지 알려 준다');
+});
+
+await t('아레나 — 낱말이 모자라면 문제를 안 낸다', async () => {
+  const store = memStore();
+  await store.putAssign('s1', { items: [{ id: 'a1', title: 'x', words: arenaWords.slice(0, 3) }] });
+  const out = await arenaCall(store);
+  assert.strictEqual(out.body.ready, false);
+  assert.ok(out.body.why);
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');

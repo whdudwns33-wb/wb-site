@@ -124,6 +124,9 @@ function vocabStore(env) {
        읽을 수 있다. 하루 수백 회 규모에서 몇 회 오차라 그대로 둔다(ai-quota.mjs 참고). */
     getUsage: () => env.DB.get('vocab:usage', 'json'),
     putUsage: (rec) => env.DB.put('vocab:usage', JSON.stringify(rec)),
+    /* 아레나 오늘 판 — 키는 「반|날짜」. 45일 뒤 저절로 지워지게 둔다. */
+    getArena: (k) => env.DB.get('vocab:arena:' + k, 'json'),
+    putArena: (k, rec) => env.DB.put('vocab:arena:' + k, JSON.stringify(rec), { expirationTtl: 45 * 86400 }),
   };
 }
 function vocabPushEnv(env) {
