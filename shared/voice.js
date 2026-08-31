@@ -56,7 +56,25 @@ var WBVoice = (function () {
 
   function hasVoice(lang) { return !!voiceFor(lang); }
 
-  var speaking = false;
+  var speaking = false, unlocked = false;
+
+  /* 모바일 브라우저는 '사용자가 누른 그 순간' 안에서 speak()가 호출돼야 소리를 낸다.
+     목소리 목록을 기다렸다가 말하면 그 순간을 놓쳐 조용히 실패한다.
+     그래서 버튼을 누르자마자 무음 한 마디를 먼저 넣어 잠금을 푼다. */
+  function unlock() {
+    var s = synth();
+    if (!s) return false;
+    try {
+      if (s.resume) s.resume();
+      if (!unlocked) {
+        var u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0; u.rate = 1;
+        s.speak(u);
+        unlocked = true;
+      }
+      return true;
+    } catch (e) { return false; }
+  }
 
   /* 한 덩어리를 읽는다. onend는 끝났을 때 한 번만 부른다(중단 시엔 부르지 않는다). */
   function speak(text, opt) {
@@ -73,6 +91,7 @@ var WBVoice = (function () {
     u.pitch = opt.pitch == null ? 1 : opt.pitch;
 
     var settled = false;
+    if (opt.onstart) u.onstart = function () { try { opt.onstart(); } catch (e) {} };
     u.onend = function () { if (settled) return; settled = true; speaking = false; if (opt.onend) opt.onend(); };
     u.onerror = function (e) {
       if (settled) return; settled = true; speaking = false;
@@ -178,7 +197,7 @@ var WBVoice = (function () {
   }
 
   return {
-    ttsSupported: ttsSupported, onReady: onReady, hasVoice: hasVoice, voiceFor: voiceFor,
+    ttsSupported: ttsSupported, onReady: onReady, hasVoice: hasVoice, voiceFor: voiceFor, unlock: unlock,
     langOf: langOf, speak: speak, speakSeq: speakSeq, stop: stop, isSpeaking: isSpeaking,
     recSupported: recSupported, pickMime: pickMime, Recorder: Recorder, clock: clock,
   };

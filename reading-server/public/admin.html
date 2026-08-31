@@ -141,7 +141,7 @@ function render(){
   <div class="card"><h2>학생 현황판</h2>
     <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>붉은책</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
+      <th>학생</th><th>반</th><th>레벨</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>독서요약</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
         <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span></td>
         <td>${esc(s.cls||'—')}</td>
@@ -246,7 +246,7 @@ async function openDetail(code){
       <div class="stat"><b>${s.acc==null?'—':s.acc+'%'}</b><span>정답률</span></div>
       <div class="stat"><b>${s.vocab}</b><span>어휘</span></div>
       <div class="stat"><b>${s.train}</b><span>훈련</span></div>
-      <div class="stat"><b>${s.redbook}</b><span>붉은책</span></div>
+      <div class="stat"><b>${s.redbook}</b><span>독서요약</span></div>
       <div class="stat"><b>${s.reports}</b><span>보고서</span></div>
     </div>
     <div class="dlg-sec"><h3>읽기 속도</h3><p class="muted" style="font-size:13px">${speedLine}</p></div>
@@ -258,9 +258,9 @@ async function openDetail(code){
       ${reports.map(r=>`<div class="rline" style="display:block"><b>${esc(r.title||'제목 없음')}</b> <small>${esc(r.done||'')}</small>
         <details><summary>내용 보기</summary><pre>${esc(stuReportText(r))}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
     </div>
-    <div class="dlg-sec"><h3>붉은 책 요약 (최근 ${redbook.length})</h3>
-      ${redbook.map(r=>`<div class="rline" style="display:block"><b>${esc(r.unit)}</b> <small>${esc(r.date)} · 셀프체크 ${(r.checks||[]).filter(Boolean).length}/3</small>
-        <details><summary>요약 보기</summary><pre>${esc(r.summary)}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
+    <div class="dlg-sec"><h3>비문학 독서 요약 (최근 ${redbook.length})</h3>
+      ${redbook.map(r=>`<div class="rline" style="display:block"><b>${esc(r.unit)}</b> <small>${esc(r.date)} · 셀프체크 ${(r.checks||[]).filter(Boolean).length}/${(r.checks||[]).length||3}${r.summary2?' · 2차까지 완성':' · 1차만'}</small>
+        <details><summary>요약 보기</summary><pre>${esc('[1차] '+(r.summary||'')+(r.summary2?'\n\n[2차 — 점검 후 다시 쓴 것]\n'+r.summary2:''))}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
     </div>
     <div class="dlg-sec"><h3>학부모 리포트 링크</h3>
       <p class="muted">로그인 없이 아이의 주간 현황만 보이는 읽기 전용 페이지예요. 학부모께 링크를 보내 주세요.</p>
