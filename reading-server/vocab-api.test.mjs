@@ -454,6 +454,33 @@ await t('같은 낱말을 두 번 풀어도 한 개로 센다', () => {
   assert.strictEqual(m.wateredToday, 1);
 });
 
+await t('오늘 차례가 온 낱말은 물 주기를 시작한 뒤에만 밀림으로 센다', () => {
+  /* 낱말은 대개 밤에 차례가 오고 학생은 그 뒤에 앉는다. 차례가 오자마자 세면
+     꼬박꼬박 하는 반도 학생이 앉기 전까지 「0% 기준 미달」로 빨갛게 보인다 —
+     원장이 저녁에 화면을 열 때가 바로 그 시간대다. */
+  const tonight = T0 + 9 * 3600000;              // 그날 21:00 KST
+  const due8 = {}; for (let i = 0; i < 8; i++) due8['w' + i] = st({ id: 'w' + i, due: tonight });
+
+  const before = studentMetrics(rec(due8, []), tonight + 5 * 60000);
+  assert.strictEqual(before.overdue, 0, '아직 안 앉았으면 그날이 안 끝난 것이다');
+  assert.strictEqual(before.waterRate, null, '0%가 아니라 「해당 없음」이어야 한다');
+
+  /* 시작했으면 남은 것은 진짜 안 한 것이다 — 8개 중 5개면 62.5% */
+  const half = {}; for (let i = 0; i < 8; i++)
+    half['w' + i] = st({ id: 'w' + i, due: i < 3 ? tonight : tonight + DAY });
+  const mid = studentMetrics(rec(half, [0, 1, 2, 3, 4].map((i) => (
+    { t: tonight + 4 * 60000, kind: 'review', grade: 'good', id: 'w' + (i + 3), from: 1 }))),
+  tonight + 5 * 60000);
+  assert.strictEqual(mid.wateredToday, 5);
+  assert.strictEqual(mid.overdue, 3, '시작한 뒤 남은 것은 센다');
+  assert.strictEqual(mid.waterRate, 62.5);
+
+  /* 하루가 지나면 어제 것이 되어 안 앉았어도 밀림이다 */
+  const next = studentMetrics(rec(due8, []), tonight + 18 * 3600000);
+  assert.strictEqual(next.overdue, 8, '어제 걸렀으면 오늘 앉기 전에도 밀림이다');
+  assert.strictEqual(next.waterRate, 0);
+});
+
 await t('30일 회상 통과율 — 계단 5에서 본 시험만 센다', () => {
   const m = studentMetrics(rec({ a: st({ id: 'a', due: T0 + 90 * DAY, step: 6 }) }, [
     { t: T0 - 5 * DAY, kind: 'review', grade: 'good', id: 'a', from: PILOT.recallStep },
