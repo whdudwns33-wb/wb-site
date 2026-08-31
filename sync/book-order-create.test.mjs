@@ -373,6 +373,102 @@ test('internal catalog is server authoritative and every product starts at teach
   }
 });
 
+const LOGIC_BOOK_PRICE_MATRIX = [
+  ['logic_preparatory', '예비', [18000, 18000, 18000, 18000, 18000, 18000]],
+  ['logic_basic', '기본', [24000, 24000, 26000, 24000, 24000, 24000, 24000, 24000, 24000, 24000, 24000, 24000]],
+  ['logic_leap', '도약', [28000, 28000, 28000, 24000, 24000, 28000, 24000, 28000, 24000, 24000, 24000, 24000]],
+  ['logic_growth', '성장', [24000, 24000, 24000, 26000, 24000, 24000, 24000, 24000, 24000, 24000, 24000, 24000]]
+];
+
+test('논리와 상상 42권의 서버 가격·제목·3단계 등록과 배부·아카등록 기록이 정확하다', async t => {
+  const db = new TestD1(); seed(db);
+  const orders = [];
+  for (const [productCode, series, prices] of LOGIC_BOOK_PRICE_MATRIX) {
+    for (const [index, unitPrice] of prices.entries()) {
+      const volume = index + 1;
+      await t.test(series + ' ' + volume + '권 · ' + unitPrice + '원', async () => {
+        const taskId = 'ord_logic_' + productCode + '_' + volume;
+        const request = internalBody(taskId, productCode, volume);
+        assert.equal('unitPrice' in request, false);
+        assert.equal('title' in request, false);
+        const created = await call(db, request);
+        assert.equal(created.status, 201, JSON.stringify(created.body));
+        const task = created.body.task;
+        assert.equal(task.orderDelivery, 'internal_book_v1');
+        assert.equal(task.orderVendor, '내부교재');
+        assert.equal(task.internalProductCode, productCode);
+        assert.equal(task.internalProductVolume, volume);
+        assert.equal(task.internalProductLabel, series + ' ' + volume + '권');
+        assert.equal(task.orderItems[0].title, '논리와 상상 ' + series + ' ' + volume + '권');
+        assert.equal(task.orderItems[0].unitPrice, unitPrice);
+        assert.deepEqual(task.orderItems[0].studentIds, ['student-a']);
+        const fulfillment = db.database.prepare('SELECT status,revision FROM book_order_fulfillments WHERE task_id=?').get(taskId);
+        assert.equal(fulfillment.status, 'teacher_received');
+        assert.equal(fulfillment.revision, 1);
+        const retry = await call(db, request);
+        assert.equal(retry.status, 200);
+        assert.equal(retry.body.idempotent, true);
+        assert.deepEqual(retry.body.task, task);
+        orders.push({ task, unitPrice });
+      });
+    }
+  }
+  assert.equal(orders.length, 42);
+  assert.equal(new Set(orders.map(row => row.task.orderItems[0].bookId)).size, 42);
+  const received = await call(db, { auth: person, action: 'list' }, '/book-issue');
+  assert.equal(received.status, 200);
+  for (const { task, unitPrice } of orders) {
+    const row = received.body.orders.find(item => item.taskId === task.id);
+    assert.ok(row, task.id);
+    assert.equal(row.stage, 'teacher_received');
+    assert.equal(row.unitPrice, unitPrice);
+    const handed = await call(db, { auth: person, action: 'order_transition', taskId: task.id,
+      itemIndex: 0, next: 'hand', revision: 1 }, '/book-issue');
+    assert.equal(handed.status, 200, task.id);
+    const registered = await call(db, { auth: admin, action: 'order_transition', taskId: task.id,
+      itemIndex: 0, next: 'academy_register', revision: 2 }, '/book-issue');
+    assert.equal(registered.status, 200, task.id);
+    assert.equal(registered.body.status, 'academy_registered');
+    const savedTask = JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE app=? AND id=?').get('task', task.id).data);
+    assert.deepEqual(savedTask.orderItems, task.orderItems, '단계 처리로 저장 가격이나 교재명이 바뀌지 않는다');
+  }
+  const history = await call(db, { auth: admin, action: 'list' }, '/book-issue');
+  assert.equal(history.status, 200);
+  for (const { task, unitPrice } of orders) {
+    const row = history.body.orders.find(item => item.taskId === task.id);
+    assert.ok(row, task.id);
+    assert.equal(row.stage, 'student_handed');
+    assert.equal(row.title, task.orderItems[0].title);
+    assert.equal(row.unitPrice, unitPrice);
+    assert.ok(row.studentHandedAt);
+    assert.ok(row.academyRegisteredAt);
+  }
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM book_order_student_snapshots').get().n, 42);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM book_order_sends').get().n, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM completed_book_catalog').get().n, 0);
+});
+
+test('논리와 상상은 잘못된 권번호·외부 지정 가격·중복 학생을 주문으로 만들지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  let serial = 0;
+  for (const [productCode, , prices] of LOGIC_BOOK_PRICE_MATRIX) {
+    for (const volume of [undefined, null, '', '1', '3권', 0, -1, 1.5, prices.length + 1]) {
+      const result = await call(db, internalBody('ord_logic_invalid_' + ++serial, productCode, volume));
+      assert.equal(result.status, 400, productCode + ': ' + String(volume));
+      assert.equal(result.body.code, 'ORDER_INVALID');
+    }
+    for (const extra of [{ unitPrice: 1 }, { title: '변조 교재' }, { price: 24000 }, { volumePrices: { 1: 1 } },
+      { studentIds: ['student-a', 'student-a'] }]) {
+      const request = { ...internalBody('ord_logic_forged_' + ++serial, productCode, 1), ...extra };
+      const result = await call(db, request);
+      assert.equal(result.status, 400, productCode + ': ' + JSON.stringify(extra));
+      assert.equal(result.body.code, 'ORDER_INVALID');
+    }
+  }
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM book_order_student_snapshots').get().n, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS n FROM book_order_fulfillments').get().n, 0);
+});
+
 test('internal order validates volume boundaries, forbids client-controlled fields, and is idempotent', async () => {
   const db = new TestD1(); seed(db);
   const first = await call(db, internalBody());

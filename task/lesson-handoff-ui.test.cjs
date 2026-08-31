@@ -495,5 +495,6 @@ test('UI hooks poll every 15 seconds, preserve details and drafts, and show mana
   assert.match(fn('taskPanel'), /lessonHandoffSourcePanelHtml\(t, date, c, editable, recordContext\)/);
   assert.match(fn('resetPersonCache'), /resetLessonHandoffs\(\)/);
   assert.match(html, /case 'notesave':[\s\S]{0,1100}lessonHandoffSourceDrafts\.delete/);
-  assert.match(html, /const APP_VER = '2026-08-30\.1'/);
+  const releaseVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')).v;
+  assert.equal(html.match(/const APP_VER = '([^']+)'/)[1], releaseVersion);
 });
