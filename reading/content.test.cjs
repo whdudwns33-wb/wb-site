@@ -109,7 +109,6 @@ const ids = new Set();
     checkLevel(`${tag}/${lv}`, lv, a.levels[lv], false);
     const b = a.levels[lv];
     if (b.en != null) {
-      if (lv === 'L2') W(`${tag}/${lv}: L2에는 영어 대역을 쓰지 않음`);
       if (!Array.isArray(b.en) || b.en.length !== b.paragraphs.length)
         E(`${tag}/${lv}: en 배열 길이(${Array.isArray(b.en) ? b.en.length : '없음'})가 문단 수(${b.paragraphs.length})와 다름`);
       else b.en.forEach((p, i) => { if (typeof p !== 'string' || p.trim().length < 10) E(`${tag}/${lv}: en[${i}] 비정상`); });
@@ -138,7 +137,7 @@ const ids = new Set();
   (a.videos || []).forEach((v, i) => {
     if (!v.title || !/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(v.url || '')) E(`${tag}: videos[${i}] title/유튜브 URL 오류`);
   });
-  ['L3', 'L4'].forEach(lv => {
+  ['L2', 'L3', 'L4'].forEach(lv => {
     const b = a.levels && a.levels[lv];
     if (!b || b.enseg == null) return;
     if (!Array.isArray(b.enseg) || b.enseg.length !== (b.en || []).length) {
