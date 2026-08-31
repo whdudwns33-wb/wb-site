@@ -52,11 +52,42 @@ test('guardian sharing stays inside consult and only appears for real student ac
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
   const view = functionSource('viewStaffAdmin');
+  const access = functionSource('staffAccessPanels');
   assert.match(view, /if \(!session\.isAdmin \|\| session\.isStaffLink\) return ''/);
-  assert.match(view, /!s\.owner && !s\.manager[\s\S]*data-act="guardianopen"/);
-  assert.match(view, />보호자 공유</);
+  assert.match(view, /staffAccessPanels\(s\)/);
+  assert.match(access, /if \(student\.owner \|\| student\.manager\)/);
+  assert.match(access, /data-act="guardianopen"/);
+  assert.match(access, />보호자 초대 링크 관리</);
+  assert.match(access, /보호자 열람[\s\S]*읽기 전용/);
   assert.doesNotMatch(functionSource('renderTabs'), /guardian|보호자/);
   assert.match(functionSource('guardianOpen'), /staff\.owner \|\| staff\.manager/);
+});
+
+test('guardian one-time invite is not consumed inside Kakao until the user explicitly continues', () => {
+  const portal = fs.readFileSync(path.join(__dirname, '..', 'parent', 'consult-guardian', 'index.html'), 'utf8');
+  assert.match(portal, /KAKAOTALK/);
+  assert.match(portal, /function showConnectionChoice\(\)/);
+  assert.match(portal, /아직 초대 코드는 사용하지 않았습니다/);
+  assert.match(portal, /data-connect/);
+  assert.match(portal, /if\(code&&isEmbeddedBrowser\(\)&&!allowEmbeddedExchange\)/);
+  assert.match(portal, /showConnectionChoice\(\);return/);
+  const preflightStart = portal.indexOf('if(code&&isEmbeddedBrowser()&&!allowEmbeddedExchange){');
+  const preflightEnd = portal.indexOf('}else data=', preflightStart);
+  assert.ok(preflightStart >= 0 && preflightEnd > preflightStart);
+  assert.doesNotMatch(portal.slice(preflightStart, preflightEnd), /action:'view'/);
+  assert.match(portal, /if\(event\.target\.closest\('\[data-connect\]'\)\)return connectPortal\(true\)/);
+});
+
+test('guardian can safely keep the current student or switch after an explicit session conflict', () => {
+  const portal = fs.readFileSync(path.join(__dirname, '..', 'parent', 'consult-guardian', 'index.html'), 'utf8');
+  assert.match(portal, /function showSessionConflict\(message\)/);
+  assert.match(portal, /새 초대 코드는 아직 사용하지 않았습니다/);
+  assert.match(portal, /data-switch/);
+  assert.match(portal, /data-current/);
+  assert.match(portal, /if\(error\.code==='SESSION_CONFLICT'\)\{showSessionConflict\(error\.message\);return\}/);
+  assert.match(portal, /function switchPortalConnection\(\)/);
+  assert.match(portal, /await post\(\{action:'logout'\}\)[\s\S]*await connectPortal\(true\)/);
+  assert.match(portal, /function keepCurrentConnection\(\)\{pendingInviteCode='';clearInviteFragment\(\);refresh\(true\)\}/);
 });
 
 test('director requests use consult auth in JSON bodies and never put credentials in a URL', () => {

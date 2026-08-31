@@ -23,39 +23,43 @@ test('보호자 학습 리포트는 독립된 모바일 웹앱이며 새 의존�
     '테스트 소스는 Worker 정적 자산으로 배포하지 않는다');
 });
 
-test('fragment 초대 코드를 화면 시작 즉시 지운 뒤 same-origin exchange에만 전달한다', () => {
+test('fragment 초대 코드는 카카오 안내 전에는 보존하고 same-origin 교환 뒤에만 지운다', () => {
   const bootStart = script.indexOf('async function boot()');
   const bootEnd = script.indexOf("app.addEventListener('click'", bootStart);
   const boot = script.slice(bootStart, bootEnd);
-  const connectStart = script.indexOf('async function connectPortal()');
+  const connectStart = script.indexOf('async function connectPortal(allowEmbeddedExchange)');
   const connectEnd = script.indexOf('async function boot()', connectStart);
   const connect = script.slice(connectStart, connectEnd);
   assert.match(script, /const API='\/consult-guardian'/);
   assert.match(boot, /const fragment=location\.hash,code=new URLSearchParams\(fragment\.replace\(\/\^#\/,''\)\)\.get\('code'\)\|\|'';/);
   assert.match(boot, /if\(code\)pendingInviteCode=code/);
-  assert.match(boot, /history\.replaceState\(null,'',location\.pathname\+location\.search\)/);
-  assert.match(connect, /code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
+  assert.doesNotMatch(boot, /history\.replaceState/);
+  assert.match(connect, /if\(code&&isEmbeddedBrowser\(\)&&!allowEmbeddedExchange\)\{\s*showConnectionChoice\(\);return/);
+  assert.match(connect, /data=code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
+  assert.match(connect, /pendingInviteCode='';clearInviteFragment\(\)/);
   assert.match(script, /credentials:'include',cache:'no-store'/);
   assert.match(script, /Object\.assign\(\{app:'consult'\},body\)/);
   assert.doesNotMatch(html, /localStorage|sessionStorage|document\.cookie|Authorization|Bearer|location\.search.*code/);
 });
 
 test('exchange는 view 포함 응답과 ok 전용 응답을 모두 처리한다', () => {
-  assert.match(script, /let data=code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
+  assert.match(script, /let data;[\s\S]*data=code\?await post\(\{action:'exchange',code\}\):await post\(\{action:'view'\}\)/);
   assert.match(script, /if\(!Array\.isArray\(data\.reports\)\)data=await post\(\{action:'view'\}\)/);
   assert.match(script, /data\.ok!==true/);
 });
 
 test('일시적 교환 실패는 초대 코드를 메모리에만 남겨 같은 링크로 재시도한다', () => {
-  const start = script.indexOf('async function connectPortal()');
+  const start = script.indexOf('async function connectPortal(allowEmbeddedExchange)');
   const end = script.indexOf('async function boot()', start);
   const connect = script.slice(start, end);
   assert.match(script, /pendingInviteCode=''/);
   assert.match(connect, /const code=pendingInviteCode/);
-  assert.match(connect, /const terminal=\[400,401,403,404,409,410,422\]\.includes\(Number\(error\.status\)\)/);
-  assert.match(connect, /if\(terminal\)pendingInviteCode=''/);
-  assert.doesNotMatch(connect, /catch\(error\)[\s\S]*pendingInviteCode=''[\s\S]*fail\(error\.message,false\)/);
-  assert.match(script, /data-retry[\s\S]*pendingInviteCode\?connectPortal\(\):refresh\(true\)/);
+  assert.match(connect, /if\(error\.code==='SESSION_CONFLICT'\)\{showSessionConflict\(error\.message\);return\}/);
+  assert.match(connect, /const terminal=\[400,401,403,404,410,422\]\.includes\(Number\(error\.status\)\)/);
+  assert.match(connect, /if\(terminal\)\{pendingInviteCode='';clearInviteFragment\(\)\}/);
+  assert.doesNotMatch(connect, /catch\(error\)\{pendingInviteCode=''/);
+  assert.match(connect, /if\(terminal\)\{pendingInviteCode='';clearInviteFragment\(\)\}fail\(error\.message,terminal\)/);
+  assert.match(script, /data-retry[\s\S]*pendingInviteCode\?connectPortal\(true\):refresh\(true\)/);
   assert.doesNotMatch(html, /localStorage|sessionStorage/);
 });
 
@@ -121,7 +125,7 @@ test('확인 응답은 현재 공개 참조와 판 번호만 보내고 갱신한
   assert.match(source, /post\(\{action:'ack',reportId:report\.id,reportRevision:integer\(report\.reportRevision,999999\)\}\)/);
   assert.match(source, /if\(!Array\.isArray\(data\.reports\)\)data=await post\(\{action:'view'\}\)/);
   assert.doesNotMatch(source, /studentId|staffId|freeText|FormData/);
-  assert.match(html, /확인했어요/);
+  assert.match(html, /내용을 확인했습니다/);
 });
 
 test('상세 화면은 브라우저 인쇄와 PDF 저장을 지원한다', () => {
@@ -149,9 +153,9 @@ test('로딩·빈 결과·오류·로그아웃과 모바일 접근성 상태를 
   const logout = script.slice(start, end);
   assert.ok(start >= 0 && end > start);
   assert.match(logout, /await post\(\{action:'logout'\}\)/);
-  assert.match(logout, /로그아웃하지 못했습니다/);
+  assert.match(logout, /이 기기 연결을 해제하지 못했습니다/);
   assert.match(logout, /data-logout-retry/);
   assert.doesNotMatch(logout, /catch\(error\)\{\}/);
-  assert.ok(logout.indexOf('await post') < logout.indexOf('로그아웃했습니다'),
-    '서버가 쿠키를 지운 뒤에만 로그아웃 성공을 표시한다');
+  assert.ok(logout.indexOf('await post') < logout.indexOf('이 기기 연결을 해제했습니다'),
+    '서버가 쿠키를 지운 뒤에만 연결 해제 성공을 표시한다');
 });

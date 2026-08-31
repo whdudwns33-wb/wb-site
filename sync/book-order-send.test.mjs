@@ -332,18 +332,20 @@ test('rejected-only retry groups each vendor once and excludes accepted or unkno
 test('retry processes up to the daily chunk limit and leaves overflow rejected for the next day', async () => {
   const db = new TestD1();
   const vendors = {};
-  for (let index = 0; index < 31; index++) {
-    const vendor = '출판사-' + index;
-    const taskId = 'failed-limit-' + index;
-    vendors[vendor] = '01099998888';
-    seedOrderTask(db, { id: taskId, title: '[주문] 교재-' + index,
-      orderVendor: vendor, orderDelivery: 'scheduled_batch_v1',
-      orderItems: [{ title: '교재-' + index, qty: '1권' }] });
-    seedMappedSend(db, taskId, 'old-limit-' + index, 'rejected');
-  }
+  const dayOne = Date.parse('2026-09-01T00:00:00Z');
+  await withNow(dayOne - 25 * 60 * 60 * 1000, () => {
+    for (let index = 0; index < 31; index++) {
+      const vendor = '출판사-' + index;
+      const taskId = 'failed-limit-' + index;
+      vendors[vendor] = '01099998888';
+      seedOrderTask(db, { id: taskId, title: '[주문] 교재-' + index,
+        orderVendor: vendor, orderDelivery: 'scheduled_batch_v1',
+        orderItems: [{ title: '교재-' + index, qty: '1권' }] });
+      seedMappedSend(db, taskId, 'old-limit-' + index, 'rejected');
+    }
+  });
   const env = { BOOK_VENDOR_PHONES: JSON.stringify(vendors) };
   let fetches = 0;
-  const dayOne = Date.parse('2026-09-01T00:00:00Z');
   await withFetch(async () => { fetches += 1; return acceptedResponse(fetches); }, async () => {
     const first = await withNow(dayOne, () => call(db, { auth: admin, action: 'retry-rejected' }, env));
     assert.equal(first.status, 429);

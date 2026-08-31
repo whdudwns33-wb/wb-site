@@ -9,6 +9,7 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/042_consult_guardian_portal.sql', import.meta.url), 'utf8');
 const source = fs.readFileSync(new URL('./consult-guardian.js', import.meta.url), 'utf8');
 const coreSource = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
+const portalSource = fs.readFileSync(new URL('../parent/consult-guardian/index.html', import.meta.url), 'utf8');
 const ADMIN_ORIGIN = 'https://whdudwns33-wb.github.io';
 const WORKER_ORIGIN = 'https://worker.example';
 const admin = { mode: 'admin', secret: 'consult-secret' };
@@ -203,6 +204,17 @@ test('public actions require exact same origin and exchange a 24h one-time code 
   assert.doesNotMatch(setCookie, /Domain=/i);
   assert.equal(result.body.student.name, '가학생');
 
+  const sessionCount = db.database.prepare(
+    "SELECT COUNT(*) AS count FROM consult_guardian_sessions WHERE app='consult'"
+  ).get().count;
+  const reusedWithCookie = await exchange(db, issued.body.code, cookieOf(result));
+  assert.equal(reusedWithCookie.status, 200, JSON.stringify(reusedWithCookie.body));
+  assert.equal(reusedWithCookie.body.student.name, '가학생');
+  assert.equal(reusedWithCookie.headers.get('set-cookie'), null, 'the existing cookie must be reused');
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) AS count FROM consult_guardian_sessions WHERE app='consult'"
+  ).get().count, sessionCount, 'opening the same link again must not create another session');
+
   const reused = await exchange(db, issued.body.code);
   assert.equal(reused.status, 410);
   assert.equal(reused.body.code, 'LINK_USED');
@@ -210,6 +222,45 @@ test('public actions require exact same origin and exchange a 24h one-time code 
     origin: WORKER_ORIGIN, cookie: cookieOf(result)
   });
   assert.equal(view.status, 200);
+});
+
+test('an invite for another student keeps an explicit session conflict and does not consume the invite', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'student-a');
+  seedStaff(db, 'student-b');
+  await enable(db, 'student-a');
+  await enable(db, 'student-b');
+  const firstInvite = await invite(db, 'student-a');
+  const connected = await exchange(db, firstInvite.body.code);
+  const otherInvite = await invite(db, 'student-b');
+
+  const conflict = await exchange(db, otherInvite.body.code, cookieOf(connected));
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.code, 'SESSION_CONFLICT');
+  assert.match(conflict.body.error, /현재 연결을 해제/);
+  assert.equal(db.database.prepare(
+    "SELECT consumed_at FROM consult_guardian_codes WHERE app='consult' AND staff_id='student-b'"
+  ).get().consumed_at, null);
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) AS count FROM consult_guardian_sessions WHERE app='consult'"
+  ).get().count, 1);
+});
+
+test('guardian portal teaches the review flow and acknowledges only from report detail', () => {
+  const cardSource = portalSource.slice(portalSource.indexOf('function reportCard'), portalSource.indexOf('function resultCard'));
+  const detailSource = portalSource.slice(portalSource.indexOf('function reportDetail'), portalSource.indexOf('function render'));
+  assert.doesNotMatch(cardSource, /data-ack=/);
+  assert.match(detailSource, /data-ack=/);
+  assert.match(detailSource, /내용을 확인했습니다/);
+  for (const text of ['상세 보기', '내용 확인', '수행률', '완료한 비율', '일일 보고는 학생이 보내는 문자', '주간·월간 리포트']) {
+    assert.match(portalSource, new RegExp(text));
+  }
+  assert.match(portalSource, /id="logoutButton"[^>]*>이 기기 연결 해제</);
+  assert.match(portalSource, /confirm\([^)]*새 초대 링크/);
+  assert.match(portalSource, /if\(code&&isEmbeddedBrowser\(\)&&!allowEmbeddedExchange\)\{\s*showConnectionChoice\(\);return/);
+  assert.match(portalSource, /if\(error\.code==='SESSION_CONFLICT'\)\{showSessionConflict\(error\.message\);return\}/);
+  assert.match(portalSource, /data-switch/);
+  assert.match(portalSource, /data-current/);
 });
 
 test('preview/view expose only the latest published report whitelist and hide a latest withdrawn series', async () => {
