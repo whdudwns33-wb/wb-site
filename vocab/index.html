@@ -372,6 +372,9 @@
     native: { label: '고유어', cls: 't-n', color: '#4E9B57', mark: '늠', how: '빈칸·비슷한 말' }
   };
   var TYPE_ORDER = ['hanja', 'native', 'english'];
+  /* 한 자리에서 심는 최대 개수. 작업기억을 넘기지 않으려는 상한이라 배정이 이보다 많아도
+     나눠서 심는다. 카드에 적는 말과 실제로 심는 수가 어긋나면 안 되니 한 곳에 둔다. */
+  var PLANT_MAX = 8;
 
   /* ── 저장소 ── */
   var KEY = 'wb-wordbrain-v1';
@@ -993,13 +996,23 @@
     var inbox = getInbox();
     var assignHtml = ASSIGNMENTS.map(function (a) {
       var ws = assignedWords(a);
-      var chips = ws.slice(0, 8).map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join(' ');
-      if (ws.length > 8) chips += ' <span class="chip" style="background:var(--card-2);color:var(--ink-soft);">+' + (ws.length - 8) + '</span>';
+      /* 아직 안 심은 것만 보여 준다 — 다 심은 낱말까지 늘어놓으면 두 번째 자리에서
+         아무것도 안 한 것처럼 보인다. 심기 단추가 집어 가는 것도 이 목록이다. */
+      var left = ws.filter(function (w) { return !db.states[w.id]; });
+      var take = Math.min(left.length, PLANT_MAX);
+      var chips = left.slice(0, PLANT_MAX).map(function (w) { return '<span class="chip ' + TYPE[w.type].cls + '">' + esc(w.word) + '</span>'; }).join(' ');
+      if (left.length > PLANT_MAX) chips += ' <span class="chip" style="background:var(--card-2);color:var(--ink-soft);">+' + (left.length - PLANT_MAX) + '</span>';
+      /* 한 자리에 다 못 심으면 그렇게 적는다. 「9개」만 보고 다 했다고 여기면
+         남은 낱말이 조용히 밀린다. */
+      var note = left.length === ws.length ? ws.length + '개' : ws.length + '개 중 ' + left.length + '개 남음';
+      note += ' · ' + esc((a.at || '').slice(0, 10));
+      if (left.length > PLANT_MAX) note += '<br>이번엔 ' + take + '개를 심고, 나머지 ' + (left.length - take) + '개는 다음에 심어요.';
       return '<div class="card" style="border-color:#E6C68A;background:#FFFBF2;margin-bottom:14px;">' +
         '<b style="color:#8A6318;">📋 선생님이 내주신 단어 — ' + esc(a.title) + '</b>' +
-        '<p class="muted" style="margin:4px 0 10px;font-size:.84rem;">' + ws.length + '개 · ' + esc((a.at || '').slice(0, 10)) + '</p>' +
+        '<p class="muted" style="margin:4px 0 10px;font-size:.84rem;">' + note + '</p>' +
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
-        '<button class="btn primary big" data-assign="' + esc(a.id) + '">이 단어들 심기</button></div>';
+        '<button class="btn primary big" data-assign="' + esc(a.id) + '">이 단어들 심기'
+        + (left.length > PLANT_MAX ? ' (' + take + '개)' : '') + '</button></div>';
     }).join('');
     var inboxHtml = '';
     if (inbox.length) {
@@ -1033,7 +1046,7 @@
         if (!batch.length) { toast('이미 다 심은 단어예요'); return; }
         batch.forEach(registerCustom);
         save();
-        runPlantSession(batch.slice(0, 8), a.id);
+        runPlantSession(batch.slice(0, PLANT_MAX), a.id);
       });
     });
     var bi = $('#btnInbox');
