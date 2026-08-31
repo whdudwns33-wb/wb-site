@@ -240,4 +240,21 @@ t('목차가 남은 일을 보여 준다', () => {
   assert.ok(idx.some((l) => l.filled > 0), '뜻이 채워진 강이 하나는 있어야 한다');
 });
 
+t('워커가 막는 자산은 워커를 먼저 거치도록 설정돼 있다', () => {
+  /* Cloudflare는 정적 자산을 워커보다 먼저 내보낸다. 그래서 워커 안에 404를 적어 놔도
+     wrangler.toml의 run_worker_first에 그 경로가 없으면 막음이 실행조차 되지 않는다.
+     실제로 코칭 원문 20강이 주소만 알면 그대로 내려받히고 있었다. */
+  const worker = fs.readFileSync(path.join(ROOT, 'worker.mjs'), 'utf8');
+  const toml = fs.readFileSync(path.join(ROOT, 'wrangler.toml'), 'utf8');
+  const first = (toml.match(/run_worker_first\s*=\s*\[([^\]]*)\]/) || [, ''])[1];
+  const listed = [...first.matchAll(/["']([^"']+)["']/g)].map((m) => m[1]);
+
+  /* 워커가 자산 경로를 가로채는 자리 — if (p === '/xxx.json') */
+  const guarded = [...worker.matchAll(/p === '(\/[a-z0-9-]+\.json)'/g)].map((m) => m[1]);
+  assert.ok(guarded.length, '워커에서 가로채는 자산 경로를 찾지 못했다');
+  for (const g of guarded) {
+    assert.ok(listed.includes(g), g + ' 를 워커가 가로채는데 run_worker_first에 없다 — 그 코드는 실행되지 않는다');
+  }
+});
+
 console.log('\n통과 ' + passed + '개 — 교재 코칭 검증 완료');
