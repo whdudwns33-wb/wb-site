@@ -368,6 +368,9 @@ const usableEx = (word, q, siblings) => {
   /* 구멍 밖에 단서가 없으면 문제가 아니다 — 「부들부들해요.」는 「○○○.」가 되고,
      「OO참변」은 「OO○○○」이 된다. 보기 넷 중에 고를 근거가 학생에게 없다. */
   if (blanked.replace('○○○', '').replace(/[^가-힣]/g, '').length < 2) return false;
+  /* 구멍 바로 뒤에 뜻풀이 표시가 오면 예문이 아니라 낱말 뜻 줄이다 —
+     「인내심: 끝까지 해내는 마음」은 「○○○: 끝까지 해내는 마음」이 되어 답을 알려 준다. */
+  if (/^○○○\s*[:：—–-]/.test(blanked)) return false;
   const i = blanked.indexOf('○○○');
   const span = q.slice(i, q.length - (blanked.length - i - 3));
   return !(siblings || []).some((o) => o !== word && o.length >= 2 && span.indexOf(o) === 0);
