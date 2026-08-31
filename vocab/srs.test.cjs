@@ -216,4 +216,29 @@ t('배정 카드가 한 자리에 심을 개수를 말해 준다', () => {
   assert.ok(app.includes("'개 중 ' + left.length + '개 남음'"), '남은 개수를 적지 않는다');
 });
 
+t('물 주기 기록이 계단을 올라가기 전 값으로 남는다', () => {
+  /* 30일 회상 통과율(파일럿 통과 기준 60%)은 이 from 하나로 센다.
+     WBSRS.review가 계단을 올린 뒤에 적으면 30일 시험이 90일 시험으로 기록되어
+     통과율이 영영 「시험 전」으로 굳는다 — 화면에 오류가 안 뜨는 종류의 고장이다. */
+  const fs = require('fs');
+  const path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  const i = app.indexOf('function applyGrade');
+  assert.ok(i > 0, 'applyGrade 를 찾지 못했다');
+  const seg = app.slice(i, i + 700);
+  const from = seg.indexOf('var from = s.step;');
+  const review = seg.indexOf('WBSRS.review(s, g,');
+  const push = seg.indexOf("kind: 'review'");
+  assert.ok(from > 0, '물 주기 기록에 계단(from)을 남기지 않는다');
+  assert.ok(from < review, 'WBSRS.review 가 계단을 올린 뒤에 읽으면 한 칸 밀린 값이 남는다');
+  assert.ok(/kind: 'review', grade: g, id: id, from: from/.test(seg), '기록에 from 을 싣지 않는다');
+  assert.ok(push > review, '기록은 판정 뒤에 남긴다');
+
+  /* 계단 5에서 본 시험이 30일 시험이다 — 간격표가 바뀌면 이 전제가 깨진다 */
+  assert.strictEqual(SRS.INTERVAL_DAYS[5], 30, '간격표가 바뀌었다 — 30일 시험의 계단 번호를 다시 맞춰야 한다');
+  const s = SRS.plant('x', Date.now());
+  for (let k = 0; k < 5; k++) SRS.review(s, 'good', Date.now(), 'review');
+  assert.strictEqual(s.step, 5, '다섯 번 맞히면 계단 5 — 다음 시험이 30일 뒤다');
+});
+
 console.log('\n통과 ' + passed + '개 — vocab 엔진·데이터·브리지 검증 완료');

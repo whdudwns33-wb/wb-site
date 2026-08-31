@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>워드브레인 파일럿 지표</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F6F3EA; color: #23313F; font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; line-height: 1.6; word-break: keep-all; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 16px 80px; }
+  h1 { font-size: 1.2rem; font-weight: 900; color: #1B3A5C; margin: 0 0 4px; }
+  .sub { color: #64748B; font-size: .84rem; margin: 0 0 6px; }
+  h2 { font-size: 1rem; font-weight: 900; color: #1B3A5C; margin: 30px 0 10px; }
+  .card { background: #fff; border: 1px solid #E3DFD2; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(27,58,92,.07); margin-bottom: 12px; }
+  button { font-family: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; border: 1px solid #E3DFD2; background: #F0EDE2; color: #1B3A5C; border-radius: 9px; padding: 9px 16px; }
+  button.primary { background: #0F7AAB; border-color: #0F7AAB; color: #fff; }
+  input { font-family: inherit; font-size: .9rem; width: 100%; border: 1px solid #E3DFD2; border-radius: 9px; padding: 9px 12px; background: #fff; color: #23313F; }
+  label { font-size: .74rem; font-weight: 700; color: #64748B; display: block; margin: 10px 0 4px; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .muted { color: #64748B; font-size: .84rem; }
+  a { color: #0F7AAB; }
+
+  /* 통과 기준 — 화면 맨 위에 늘 보이게 */
+  .crit { background: #EDF6FB; border: 1px solid #C6E2F0; border-radius: 12px; padding: 12px 16px; margin: 0 0 18px; font-size: .86rem; color: #1B3A5C; }
+  .crit b { font-weight: 900; }
+  .crit .src { color: #64748B; font-size: .78rem; display: block; margin-top: 3px; }
+
+  .clshead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .clshead b { font-size: 1.05rem; font-weight: 900; color: #1B3A5C; }
+
+  /* 두 지표를 나란히 — 이 화면이 답해야 하는 질문은 이것뿐이다 */
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } }
+  .kpi { border: 1px solid #E3DFD2; border-radius: 11px; padding: 13px 15px; background: #FCFBF7; }
+  .kpi .lab { font-size: .78rem; font-weight: 800; color: #64748B; }
+  .kpi .val { font-size: 2rem; font-weight: 900; line-height: 1.15; margin: 2px 0 0; font-variant-numeric: tabular-nums; color: #1B3A5C; }
+  .kpi .val.pass { color: #3A7A43; }
+  .kpi .val.fail { color: #C24936; }
+  .kpi .val.none { color: #98A2B0; font-size: 1.4rem; }
+  .kpi .verdict { font-size: .78rem; font-weight: 800; margin-left: 6px; }
+  .kpi .note { font-size: .78rem; color: #64748B; margin-top: 5px; }
+
+  /* 기준선이 눈금으로 보이는 막대 — 숫자만으로는 얼마나 모자란지 안 잡힌다 */
+  .bar { position: relative; height: 9px; border-radius: 99px; background: #EAE6DA; margin-top: 9px; overflow: visible; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: #3A7A43; }
+  .bar .fill.fail { background: #D9705C; }
+  .bar .mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #1B3A5C; }
+  .bar .marklab { position: absolute; top: 11px; font-size: .66rem; font-weight: 800; color: #1B3A5C; transform: translateX(-50%); white-space: nowrap; }
+
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .tile { background: #F0EDE2; border-radius: 9px; padding: 7px 12px; font-size: .8rem; }
+  .tile b { color: #1B3A5C; font-variant-numeric: tabular-nums; }
+  .tile.warn { background: #FBEAE6; } .tile.warn b { color: #C24936; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid #E3DFD2; border-radius: 12px; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: .84rem; background: #fff; }
+  th, td { padding: 8px 11px; border-bottom: 1px solid #E3DFD2; text-align: left; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  thead th { background: #F0EDE2; color: #1B3A5C; font-size: .76rem; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.bad { color: #C24936; font-weight: 700; }
+  td.dim { color: #98A2B0; }
+  .empty { color: #64748B; font-size: .86rem; }
+  .foot { margin-top: 26px; font-size: .78rem; color: #64748B; }
+  .foot b { color: #1B3A5C; }
+  .foot p { margin: 5px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>워드브레인 — 파일럿 지표</h1>
+  <p class="sub">반별로 통과 기준을 넘고 있는지 봅니다. <a href="/admin/vocab-review">← 검수함</a> · <a href="/admin">관리 웹</a></p>
+
+  <div class="crit">
+    통과 기준 — <b>물 주기 완수율 70%</b> · <b>30일 회상 통과율 60%</b>
+    <span class="src">기획서 §8: 원내 1개 반에서 4주. 두 수를 넘으면 Phase 2로 넘어갑니다.</span>
+  </div>
+
+  <div id="login" class="card">
+    <label>관리자 PIN</label>
+    <div class="row"><input id="pin" type="password" autocomplete="current-password"><button class="primary" id="btnLogin">로그인</button></div>
+    <p class="muted" id="loginErr"></p>
+  </div>
+
+  <div id="app" hidden>
+    <div id="body"></div>
+    <div class="foot">
+      <p><b>물 주기 완수율</b> = 오늘 물 준 낱말 ÷ (오늘 물 준 낱말 + 지금 밀린 낱말).
+        밀린 낱말은 물을 줄 때까지 계속 밀린 채 남습니다 — 그래서 빼먹은 날이 있으면 오늘 수치가 같이 내려갑니다.</p>
+      <p><b>30일 회상 통과율</b> = 30일을 기다린 뒤 본 시험 중 「알았어」 비율(누적).
+        간격이 당일밤·1·3·7·14·<b>30</b>·90일이라 여섯 번째 시험이 30일 시험입니다.
+        물 주기와 플래시카드로 본 시험만 셉니다 — 문장 짓기·뿌리 회상은 맞힐 때만 기록이 남아 통과율이 부풀려집니다.</p>
+      <p id="stamp"></p>
+    </div>
+  </div>
+</div>
+<div id="msg"></div>
+
+<script>
+'use strict';
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var token = null;
+  try { token = sessionStorage.getItem('wbv.admin'); } catch (e) {}
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  async function api(path, opt) {
+    opt = opt || {};
+    var h = { 'content-type': 'application/json' };
+    if (token) h.authorization = 'Bearer ' + token;
+    var r = await fetch(path, { method: opt.method || 'GET', headers: h, body: opt.body ? JSON.stringify(opt.body) : undefined });
+    var j = await r.json().catch(function () { return {}; });
+    if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+    return j;
+  }
+
+  /* 수치가 없는 것과 0인 것은 다르다 — 30일이 안 지난 것을 0%로 적으면 미달로 읽힌다 */
+  function fmtRate(v) { return v == null ? '—' : v.toFixed(1) + '%'; }
+
+  function kpi(lab, rate, pass, line, floor, noneNote) {
+    var cls = rate == null ? 'none' : (pass ? 'pass' : 'fail');
+    var verdict = rate == null ? '' : (pass
+      ? '<span class="verdict" style="color:#3A7A43">기준 넘음</span>'
+      : '<span class="verdict" style="color:#C24936">기준 미달</span>');
+    var bar = '';
+    if (rate != null) {
+      bar = '<div class="bar">'
+        + '<div class="fill' + (pass ? '' : ' fail') + '" style="width:' + Math.min(100, rate) + '%"></div>'
+        + '<div class="mark" style="left:' + floor + '%"></div>'
+        + '<div class="marklab" style="left:' + floor + '%">기준 ' + floor + '%</div>'
+        + '</div><div style="height:14px"></div>';
+    }
+    return '<div class="kpi"><div class="lab">' + lab + '</div>'
+      + '<p class="val ' + cls + '">' + (rate == null ? esc(noneNote) : fmtRate(rate)) + verdict + '</p>'
+      + bar
+      + '<div class="note">' + line + '</div></div>';
+  }
+
+  function ago(iso) {
+    if (!iso) return '—';
+    var d = Date.now() - new Date(iso).getTime();
+    if (d < 3600000) return Math.max(1, Math.round(d / 60000)) + '분 전';
+    if (d < 86400000) return Math.round(d / 3600000) + '시간 전';
+    return Math.round(d / 86400000) + '일 전';
+  }
+
+  function rowsTable(rows) {
+    var body = rows.map(function (r) {
+      var water = r.waterRate == null ? '<td class="num dim">—</td>'
+        : '<td class="num' + (r.waterRate >= 70 ? '' : ' bad') + '">' + r.waterRate.toFixed(0) + '%</td>';
+      var recall = r.recallTested
+        ? '<td class="num' + (r.recallRate >= 60 ? '' : ' bad') + '">' + r.recallPassed + '/' + r.recallTested + '</td>'
+        : '<td class="num dim">—</td>';
+      return '<tr>'
+        + '<td>' + esc(r.name || '(미등록)') + ' <span class="muted">' + esc(r.code) + '</span></td>'
+        + water
+        + '<td class="num">' + r.wateredToday + '</td>'
+        + '<td class="num' + (r.overdue ? ' bad' : '') + '">' + r.overdue + '</td>'
+        + '<td class="num' + (r.emergency ? ' bad' : '') + '">' + r.emergency + '</td>'
+        + recall
+        + '<td class="num">' + r.growing + '</td>'
+        + '<td class="num">' + r.graduated + '</td>'
+        + '<td class="num">' + r.days7 + '/7</td>'
+        + '<td class="num">' + r.streak + '</td>'
+        + '<td class="muted">' + ago(r.lastActive) + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="table-scroll"><table>'
+      + '<thead><tr><th>이름</th><th class="num">완수율</th><th class="num">오늘 물 준</th><th class="num">밀림</th>'
+      + '<th class="num">응급</th><th class="num">30일 시험</th><th class="num">기르는</th><th class="num">🌳</th>'
+      + '<th class="num">7일 중</th><th class="num">스트릭</th><th>마지막</th></tr></thead>'
+      + '<tbody>' + body + '</tbody></table></div>';
+  }
+
+  function classCard(c, crit) {
+    var day = c.dayNo == null ? '아직 심은 낱말 없음'
+      : '파일럿 ' + c.dayNo + '일째 / ' + (crit.weeks * 7) + '일';
+    var waterNote = (c.wateredToday + c.overdue)
+      ? '오늘 물 줄 차례 ' + (c.wateredToday + c.overdue) + '개 중 <b>' + c.wateredToday + '개</b> 완료 · 밀림 ' + c.overdue + '개'
+      : '오늘 물 줄 차례가 온 낱말이 없습니다';
+    var recallNote = c.recallTested
+      ? '30일 시험 ' + c.recallTested + '개 중 <b>' + c.recallPassed + '개</b> 통과'
+      : '아직 30일이 지난 낱말이 없습니다';
+    return '<div class="card">'
+      + '<div class="clshead"><b>' + esc(c.cls) + '</b>'
+      + '<span class="muted">학생 ' + c.students + '명 · 연동 ' + c.linked + '명 · ' + day + '</span></div>'
+      + '<div class="kpis">'
+      + kpi('물 주기 완수율', c.waterRate, c.waterPass, waterNote, crit.water, '해당 없음')
+      + kpi('30일 회상 통과율', c.recallRate, c.recallPass, recallNote, crit.recall, '시험 전')
+      + '</div>'
+      + '<div class="tiles">'
+      + '<div class="tile">기르는 낱말 <b>' + c.growing + '</b></div>'
+      + '<div class="tile">장기기억 🌳 <b>' + c.graduated + '</b></div>'
+      + '<div class="tile' + (c.overdue ? ' warn' : '') + '">밀린 낱말 <b>' + c.overdue + '</b></div>'
+      + '<div class="tile' + (c.emergency ? ' warn' : '') + '">응급 <b>' + c.emergency + '</b></div>'
+      + '</div>'
+      + rowsTable(c.rows)
+      + '</div>';
+  }
+
+  function render(d) {
+    if (!d.classes.length) {
+      $('#body').innerHTML = '<div class="card"><p class="empty">아직 워드브레인을 쓰는 학생이 없습니다.'
+        + ' 학생이 앱을 연동하고 첫 낱말을 심으면 여기에 반별로 나옵니다.</p></div>';
+    } else {
+      /* 통과 기준은 반 단위다(기획서 §8 「원내 1개 반」). 그래서 반이 먼저 오고,
+         여러 반을 합친 수는 참고로 아래에 둔다 — 위에 두면 그게 판정으로 읽힌다. */
+      var tail = '';
+      if (d.classes.length > 1) {
+        var o = d.overall;
+        tail = '<h2>전체 합계 <span class="muted" style="font-weight:400">— 참고용, 판정은 반 단위입니다</span></h2>'
+          + '<div class="card"><div class="kpis">'
+          + kpi('물 주기 완수율', o.waterRate, o.waterPass,
+            '반 ' + d.classes.length + '개 합계 · 밀림 ' + o.overdue + '개', d.criteria.water, '해당 없음')
+          + kpi('30일 회상 통과율', o.recallRate, o.recallPass,
+            '30일 시험 ' + o.recallTested + '개', d.criteria.recall, '시험 전')
+          + '</div></div>';
+      }
+      $('#body').innerHTML = d.classes.map(function (c) { return classCard(c, d.criteria); }).join('') + tail;
+    }
+    $('#stamp').textContent = '기준 시각 ' + new Date(d.time).toLocaleString('ko-KR')
+      + ' — 새로고침하면 다시 셉니다.';
+  }
+
+  async function loadAll() {
+    try {
+      render(await api('/api/vocab/admin/metrics'));
+      $('#login').hidden = true; $('#app').hidden = false;
+    } catch (e) {
+      token = null;
+      try { sessionStorage.removeItem('wbv.admin'); } catch (e2) {}
+      $('#login').hidden = false; $('#app').hidden = true;
+      $('#loginErr').textContent = e.message;
+    }
+  }
+
+  $('#btnLogin').onclick = async function () {
+    try {
+      var j = await api('/api/admin/login', { method: 'POST', body: { pin: $('#pin').value } });
+      token = j.token;
+      try { sessionStorage.setItem('wbv.admin', token); } catch (e) {}
+      $('#loginErr').textContent = '';
+      loadAll();
+    } catch (e) { $('#loginErr').textContent = e.message; }
+  };
+  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#btnLogin').click(); });
+
+  if (token) loadAll();
+})();
+</script>
+</body>
+</html>
