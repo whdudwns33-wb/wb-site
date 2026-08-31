@@ -20,6 +20,7 @@ const APP_FILES = ['index.html', 'articles.json', 'textbook.json', 'sw.js', 'man
 for (const f of APP_FILES) fs.copyFileSync(path.join(APP, f), path.join(DIST, f));
 fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin', 'index.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
 
 /* 워드브레인 (vocab/) — 같은 오리진 /vocab/ 에서 서빙해야 진로독서와 localStorage·토큰이 공유된다 */
 const VOCAB = path.join(ROOT, '..', 'vocab');

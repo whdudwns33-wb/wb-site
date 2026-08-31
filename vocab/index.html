@@ -1194,8 +1194,11 @@
     function applyGrade(id, s, g) {
       done += 1;
       if (!practice) {
+        /* 계단은 물을 주는 순간 올라간다. 30일 회상 통과율은 「올라가기 전 계단」으로 세므로
+           먼저 적어 둔다 — step 5에서 본 시험이 곧 30일 간격 시험이다(간격 [0,1,3,7,14,30,90]). */
+        var from = s.step;
         WBSRS.review(s, g, now(), mode === 'flash' ? 'flash' : 'review');
-        db.log.push({ t: now(), kind: 'review', grade: g, id: id });
+        db.log.push({ t: now(), kind: 'review', grade: g, id: id, from: from });
       } else { WBSRS.exposure(s); }
       if (g === 'good') good += 1;
       if (g === 'fail' && !practice && !failedOnce[id]) { failedOnce[id] = true; queue.push(id); total += 1; }
