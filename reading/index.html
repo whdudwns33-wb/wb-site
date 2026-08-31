@@ -964,6 +964,10 @@ function vReport(){
   Object.keys(S.readings).forEach(id=>{const a=DB.articles.find(x=>x.id===id);if(a)dist[a.category]++;});
   const max=Math.max(1,...Object.values(dist));
   const days=[];for(let i=6;i>=0;i--){const k=addDays(dkey(),-i);days.push([k.slice(8),!!S.days[k]]);}
+  /* 링은 '읽은 날 수'(x/7), 타일은 '읽은 글 수' — 같은 숫자를 두 번 보여 주면
+     하루에 3편을 읽고도 '이번 주 1'로 읽혀 오해가 생겼다. */
+  const wkKeys=new Set(days.map((_,i)=>addDays(dkey(),-(6-i))));
+  const weekReads=Object.values(S.readings).filter(r=>wkKeys.has(r.date)).length;
   const ringC=(2*Math.PI*40).toFixed(1);
   /* 읽기 속도 성장 그래프 */
   let speedCard='';
@@ -997,7 +1001,7 @@ function vReport(){
     </div>
     <div class="stat-grid">
       <div class="stat"><b>${total}</b><span>총 완독</span></div>
-      <div class="stat"><b>${weekCount()}</b><span>이번 주</span></div>
+      <div class="stat"><b>${weekReads}</b><span>이번 주 읽은 글</span></div>
       <div class="stat"><b>${acc==null?'—':acc+'%'}</b><span>문제 정답률</span></div>
     </div>
     <div class="days7">${days.map(([d,on])=>`<span class="day7"><i class="${on?'on':''}"></i>${d}일</span>`).join('')}</div></div>
