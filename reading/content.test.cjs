@@ -162,6 +162,35 @@ const ids = new Set();
   checkLevel(`diag/${lv}`, lv, db.diagnostics[lv], true);
 });
 
+/* ── 출처는 그 숫자가 실린 문서를 가리켜야 한다 ─────────────
+ * 기관 홈페이지 주소만 달아 두면, 학생이 "출처"를 눌러 확인하려 해도
+ * kostat.go.kr 첫 화면이 뜰 뿐 근거를 찾을 수 없다. 새로 쓰는 지문은
+ * 보도자료·통계표처럼 그 내용이 실제로 있는 페이지를 링크한다.
+ * 아래 목록은 이 규칙을 만들기 전에 쓴 지문들 — 고칠 때마다 빼면 된다. */
+const SRC_GRANDFATHER = new Set([
+  'aging-society', 'ai-textbook', 'carbon-market', 'carbon-neutral', 'crispr-gene',
+  'gen-ai', 'hangeul-science', 'lvrad-moon', 'marine-heatwave', 'nuri-space',
+  'ocean-plastic', 'palace-stone', 'price-wage', 'region-power-price',
+  'sillok-record', 'webtoon-industry',
+]);
+const isIndexPage = (u) => {
+  let x; try { x = new URL(u); } catch { return false; }
+  const path = x.pathname.replace(/\/$/, '');
+  if (path === '' || /^\/(index|main)\.(do|jsp|html?)$/.test(path)) return true;
+  if (/(List|list)\.do|listRenew|boardCnts\/list/.test(path + x.search)) return true;
+  if (/[?&]menuId=\d+$/.test(x.search) && /index\.do/.test(path)) return true;
+  return false;
+};
+let oldIndexSrc = 0;
+db.articles.forEach(a => {
+  (a.sources || []).forEach(s => {
+    if (!isIndexPage(s.url)) return;
+    if (SRC_GRANDFATHER.has(a.id)) { oldIndexSrc++; return; }
+    E(`${a.id}: 출처 "${s.title.trim()}" 가 기관 홈페이지·목록 페이지입니다 — 그 내용이 실린 보도자료·통계 페이지를 링크하세요\n        ${s.url}`);
+  });
+});
+if (oldIndexSrc) W(`규칙 이전 지문 ${SRC_GRANDFATHER.size}편에 홈페이지·목록 출처 ${oldIndexSrc}개 남아 있음 (새 지문에는 금지)`);
+
 warns.forEach(w => console.log('WARN:', w));
 if (errors.length) {
   errors.forEach(e => console.error('ERROR:', e));

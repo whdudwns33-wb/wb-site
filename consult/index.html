@@ -189,12 +189,23 @@
   .tag.usage-today { background: #E7F7EE; color: #2E6E49; }
   .tag.usage-recent { background: #FFF7D7; color: #755E0A; }
   .tag.usage-idle { background: #F0F2F4; color: #626B75; }
+  .tag.subscription { background: #F1ECFF; color: #5B3E8D; }
+  .tag.subscription-paid { background: #E7F7EE; color: #2E6E49; }
+  .tag.subscription-upcoming { background: #E8F2FF; color: #285B91; }
+  .tag.subscription-attention { background: #FFF0D8; color: #8A5500; }
   .student-usage-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
   .student-usage-summary > div { padding: 10px 8px; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFF; text-align: center; }
   .student-usage-summary span, .student-usage-summary b { display: block; }
   .student-usage-summary span { color: var(--mid-gray); font-size: 10px; font-weight: 800; }
   .student-usage-summary b { margin-top: 3px; color: var(--navy); font-size: 16px; }
   .student-usage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 7px; }
+  .student-subscription-overview { margin-top: 14px; padding: 12px; border: 1px solid #DED5F8; border-radius: 12px; background: #FBF9FF; }
+  .student-subscription-overview .between { gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .student-subscription-filters { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .student-subscription-filters .btn { min-height: 40px; }
+  .student-subscription-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 9px 10px; border: 1px solid #E6E0F3; border-radius: 10px; background: #FCFAFF; }
+  .student-subscription-line.attention { border-color: #F1D29A; background: #FFFBF2; }
+  .student-subscription-line .subscription-payment-action { margin-left: auto; }
   .subject-tag { border: 1px solid transparent; }
   .subject-korean { --subject-color: var(--subject-korean); --subject-bg: #E8F2FF; --subject-text: #285B91; }
   .subject-english { --subject-color: var(--subject-english); --subject-bg: #FFEAF2; --subject-text: #8E3E5E; }
@@ -919,6 +930,8 @@
     .storage-alert .wrap { align-items: stretch; flex-direction: column; }
     .storage-alert .row { display: grid; grid-template-columns: 1fr 1fr; }
     .storage-alert .btn, .modal-box .btn-sm { min-height: 44px; }
+    .student-subscription-filters .btn { flex: 1 1 auto; min-height: 44px; }
+    .student-subscription-line .subscription-payment-action { width: 100%; margin-left: 0; }
     .modal { place-items: end center; padding-left: 0; padding-right: 0; padding-bottom: 0; }
     .modal-box { max-width: none; max-height: 92vh; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
     #toast { bottom: calc(18px + env(safe-area-inset-bottom)); }
@@ -8234,6 +8247,77 @@ async function guardianRefreshPreview(staffId) {
 
 /* ── 학생 관리 ── */
 let staffSearchQuery = '';
+let staffListFilter = 'all';
+
+const SUBSCRIPTION_ADMIN_OWNER = '!director';
+const studentSubscriptionKey = staffId => '__subscription__' + SUBSCRIPTION_ADMIN_OWNER + '|' + staffId;
+const studentSubscriptionPaymentKey = (staffId, month) =>
+  '__subscriptionpayment__' + SUBSCRIPTION_ADMIN_OWNER + '|' + staffId + '@' + month;
+
+function normalizeStudentSubscription(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const startedAt = Number(source.startedAt);
+  const endedAt = Number(source.endedAt);
+  return {
+    active: source.active === true,
+    billingDay: Math.min(31, Math.max(1, Math.round(Number(source.billingDay) || 1))),
+    startedAt: Number.isFinite(startedAt) && startedAt > 0 && Number.isFinite(new Date(startedAt).getTime()) ? startedAt : 0,
+    endedAt: Number.isFinite(endedAt) && endedAt > 0 && Number.isFinite(new Date(endedAt).getTime()) ? endedAt : 0
+  };
+}
+
+function studentSubscription(student) {
+  if (!student || !student.id || student.owner || student.manager) return normalizeStudentSubscription(null);
+  const raw = state.checks[studentSubscriptionKey(student.id)];
+  return normalizeStudentSubscription(raw && raw.staffId === student.id ? raw : null);
+}
+
+function studentSubscriptionDueDate(student, month) {
+  const ym = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || '')) ? String(month) : today().slice(0, 7);
+  const sub = studentSubscription(student);
+  const lastDay = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
+  return ym + '-' + String(Math.min(sub.billingDay, lastDay)).padStart(2, '0');
+}
+
+function studentSubscriptionPaidAt(student, month) {
+  if (!student || !student.id || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return 0;
+  const raw = state.checks[studentSubscriptionPaymentKey(student.id, month)];
+  if (!raw || raw.paid !== true || raw.staffId !== student.id || raw.month !== month) return 0;
+  const paidAt = Number(raw.paidAt);
+  return Number.isFinite(paidAt) && paidAt > 0 && Number.isFinite(new Date(paidAt).getTime()) ? paidAt : 0;
+}
+
+function studentSubscriptionPayment(student, date) {
+  const currentDate = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? String(date) : today();
+  const month = currentDate.slice(0, 7);
+  const sub = studentSubscription(student);
+  const dueDate = studentSubscriptionDueDate(student, month);
+  const paidAt = studentSubscriptionPaidAt(student, month);
+  const needsAttention = sub.active && !paidAt && currentDate >= dueDate;
+  const status = paidAt ? 'paid' : needsAttention ? 'attention' : 'upcoming';
+  return {
+    active: sub.active,
+    month: month,
+    billingDay: sub.billingDay,
+    paidAt: paidAt,
+    dueDate: dueDate,
+    nextDueDate: paidAt ? studentSubscriptionDueDate(student, ymAdd(month, 1)) : dueDate,
+    needsAttention: needsAttention,
+    status: status
+  };
+}
+
+function normalizeStaffListFilter(value) {
+  return value === 'subscription' || value === 'payment' ? value : 'all';
+}
+
+function studentMatchesStaffFilter(student, value) {
+  const mode = normalizeStaffListFilter(value);
+  if (mode === 'all') return true;
+  if (!student || student.owner || student.manager) return false;
+  const sub = studentSubscription(student);
+  return mode === 'subscription' ? sub.active : studentSubscriptionPayment(student).needsAttention;
+}
 
 function studentNameCompare(a, b) {
   return String(a && a.name || '').localeCompare(String(b && b.name || ''), 'ko', { numeric: true });
@@ -8251,19 +8335,132 @@ function studentMatchesSearch(student, query) {
 function applyStaffSearchFilter(value) {
   staffSearchQuery = String(value || '').slice(0, 50);
   const query = normalizeStudentSearch(staffSearchQuery);
+  const mode = normalizeStaffListFilter(staffListFilter);
   const cards = [...document.querySelectorAll('[data-staff-search-name]')];
   let matched = 0;
   cards.forEach(card => {
-    const visible = !query || String(card.dataset.staffSearchName || '').includes(query);
+    const nameMatches = !query || String(card.dataset.staffSearchName || '').includes(query);
+    const filterMatches = mode === 'all' || (mode === 'subscription'
+      ? card.dataset.staffSubscription === '1' : card.dataset.staffPaymentAttention === '1');
+    const visible = nameMatches && filterMatches;
     card.hidden = !visible;
     if (visible) matched++;
   });
   const result = $('#staffSearchResult');
-  if (result) result.textContent = query ? matched + '명 검색됨' : '전체 ' + cards.length + '명';
+  if (result) result.textContent = query || mode !== 'all' ? matched + '명 표시됨' : '전체 ' + cards.length + '명';
   const empty = $('#staffSearchEmpty');
-  if (empty) empty.hidden = !query || matched > 0;
+  if (empty) empty.hidden = !(query || mode !== 'all') || matched > 0;
+  const emptyText = $('#staffSearchEmptyText');
+  if (emptyText) emptyText.textContent = mode === 'all'
+    ? '검색한 이름과 일치하는 학생이 없습니다.' : '선택한 구독 조건과 일치하는 학생이 없습니다.';
   const clear = $('#staffSearchClear');
   if (clear) clear.hidden = !query;
+}
+
+function applyStaffListFilter(value) {
+  staffListFilter = normalizeStaffListFilter(value);
+  document.querySelectorAll('[data-staff-filter]').forEach(button => {
+    const on = button.dataset.staffFilter === staffListFilter;
+    button.classList.toggle('btn-navy', on);
+    button.classList.toggle('btn-ghost', !on);
+    button.setAttribute('aria-pressed', String(on));
+  });
+  const input = $('#staffSearch');
+  applyStaffSearchFilter(input ? input.value : staffSearchQuery);
+}
+
+function studentSubscriptionStatusText(student) {
+  const payment = studentSubscriptionPayment(student);
+  const monthLabel = Number(payment.month.slice(5)) + '월';
+  if (payment.status === 'paid') {
+    return monthLabel + ' 결제 완료 · ' + shortDate(ymd(new Date(payment.paidAt))) + ' 확인 · 다음 확인일 ' + shortDate(payment.nextDueDate);
+  }
+  if (payment.status === 'attention') {
+    return monthLabel + ' 결제 확인 필요 · 결제일 ' + shortDate(payment.dueDate);
+  }
+  return monthLabel + ' 결제 예정 · 확인일 ' + shortDate(payment.dueDate);
+}
+
+function studentSubscriptionLine(student) {
+  const sub = studentSubscription(student);
+  if (!sub.active) {
+    return sub.endedAt ? '<div class="student-subscription-line"><span class="tag usage-idle">구독 종료</span>' +
+      '<span class="small muted">' + esc(new Date(sub.endedAt).toLocaleDateString('ko-KR')) + ' 종료 · 이전 결제 기록 유지</span></div>' : '';
+  }
+  const payment = studentSubscriptionPayment(student);
+  return '<div class="student-subscription-line' + (payment.needsAttention ? ' attention' : '') + '">' +
+    '<span class="tag subscription-' + payment.status + '">' +
+      (payment.status === 'paid' ? '결제 완료' : payment.status === 'attention' ? '결제 확인 필요' : '결제 예정') + '</span>' +
+    '<span class="small muted">매월 ' + sub.billingDay + '일 · ' + esc(studentSubscriptionStatusText(student)) + '</span>' +
+    '<button class="btn btn-sm btn-ghost subscription-payment-action" data-act="subscriptionpaytoggle" data-id="' + esc(student.id) + '">' +
+      (payment.paidAt ? '이번 달 확인 취소' : '이번 달 결제 완료') + '</button></div>';
+}
+
+function saveStudentSubscription(staffId, value) {
+  if (!session.isAdmin || session.isStaffLink) return false;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return false;
+  const key = studentSubscriptionKey(staffId);
+  const previous = state.checks[key];
+  const normalized = normalizeStudentSubscription(value);
+  const updatedAt = Math.max(now(), Number(previous && previous.updatedAt || 0) + 1);
+  state.checks[key] = {
+    staffId: staffId,
+    active: normalized.active,
+    billingDay: normalized.billingDay,
+    startedAt: normalized.startedAt,
+    endedAt: normalized.endedAt,
+    updatedAt: updatedAt
+  };
+  if (!save()) {
+    if (previous === undefined) delete state.checks[key];
+    else state.checks[key] = previous;
+    return false;
+  }
+  queueSync();
+  return true;
+}
+
+function saveStudentSubscriptionPayment(staffId, month, paid) {
+  if (!session.isAdmin || session.isStaffLink || !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) return false;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager || !studentSubscription(student).active) return false;
+  const key = studentSubscriptionPaymentKey(staffId, month);
+  const previous = state.checks[key];
+  const timestamp = now();
+  state.checks[key] = {
+    staffId: staffId,
+    month: month,
+    paid: paid === true,
+    paidAt: paid === true ? timestamp : 0,
+    updatedAt: Math.max(timestamp, Number(previous && previous.updatedAt || 0) + 1)
+  };
+  if (!save()) {
+    if (previous === undefined) delete state.checks[key];
+    else state.checks[key] = previous;
+    return false;
+  }
+  queueSync();
+  return true;
+}
+
+function studentSubscriptionModal(staffId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return;
+  const sub = studentSubscription(student);
+  const defaultDay = sub.active || sub.endedAt ? sub.billingDay : parseYmd(today()).getDate();
+  modal(student.name + ' 월 구독 관리',
+    '<div class="guide mb14"><b>원장 관리용 표시입니다</b>학생 화면과 이용 기능은 바뀌지 않으며, 결제일이 지나도 학생 웹을 차단하지 않습니다.</div>' +
+    '<div class="field"><label class="fl" for="subscriptionBillingDay">매월 결제 확인일</label>' +
+      '<input class="in" id="subscriptionBillingDay" type="number" min="1" max="31" inputmode="numeric" value="' + defaultDay + '">' +
+      '<div class="hint mt8">29~31일은 날짜가 짧은 달에 자동으로 말일 처리됩니다.</div></div>' +
+    (sub.active ? '<div class="panel mt14"><b class="small">현재 상태</b><div class="small muted mt8">' +
+      esc(studentSubscriptionStatusText(student)) + '</div></div>' : ''),
+    '<div class="grid2 mt14"><button class="btn btn-primary" data-act="subscriptionsave" data-id="' + esc(staffId) + '">' +
+      (sub.active ? '구독 설정 저장' : sub.endedAt ? '월 구독 다시 시작' : '월 구독으로 관리') + '</button>' +
+      '<button class="btn btn-ghost" data-act="closemodal">취소</button></div>' +
+    (sub.active ? '<button class="btn btn-danger btn-block mt8" data-act="subscriptionend" data-id="' + esc(staffId) + '">구독 종료</button>' : ''));
 }
 
 function isStudentActivityCheck(key, row) {
@@ -8511,7 +8708,12 @@ async function sendConsultStudentLink(staffId) {
 }
 
 function staffAccessPanels(student) {
+  const subscription = studentSubscription(student);
+  const subscriptionControl = student.owner || student.manager ? '' :
+    '<button class="btn btn-sm btn-ghost" data-act="subscriptionopen" data-id="' + student.id + '">' +
+      (subscription.active ? '구독 설정' : subscription.endedAt ? '구독 다시 시작' : '월 구독 설정') + '</button>';
   const common = '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + student.id + '">지시 목록 관리</button>' +
+    subscriptionControl +
     '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + student.id + '">' +
       (student.owner ? '대표 해제' : '대표로 지정') + '</button>' +
     '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + student.id + '">' +
@@ -8532,12 +8734,18 @@ function viewStaffAdmin() {
   if (!session.isAdmin || session.isStaffLink) return '';
   const list = liveStaff().slice().sort(studentNameCompare);
   const normalizedQuery = normalizeStudentSearch(staffSearchQuery);
-  const matching = list.filter(student => studentMatchesSearch(student, normalizedQuery));
   const students = list.filter(s => !s.owner && !s.manager);
+  if (!students.length) staffListFilter = 'all';
+  const filterMode = normalizeStaffListFilter(staffListFilter);
+  const matching = list.filter(student => studentMatchesSearch(student, normalizedQuery) && studentMatchesStaffFilter(student, filterMode));
   const usage = list.filter(s => !s.owner && !s.manager).map(s => studentUsage(s.id));
   const todayUsers = usage.filter(item => item.status === 'today').length;
   const recentUsers = usage.filter(item => item.status === 'recent').length;
   const idleUsers = usage.filter(item => item.status === 'idle').length;
+  const subscriptionStudents = students.filter(student => studentSubscription(student).active);
+  const paymentAttention = subscriptionStudents.filter(student => studentSubscriptionPayment(student).needsAttention);
+  const filterButton = (mode, label) => '<button class="btn btn-sm ' + (filterMode === mode ? 'btn-navy' : 'btn-ghost') +
+    '" data-act="stafffilter" data-staff-filter="' + mode + '" aria-pressed="' + (filterMode === mode) + '">' + label + '</button>';
   return '<div class="card">' +
     '<div class="card-title">학생 등록</div>' +
     '<div class="card-sub mb14">등록하면 학생이 직접 기록하는 학생용 링크와 보호자가 읽기 전용으로 보는 초대 링크를 따로 관리할 수 있습니다.</div>' +
@@ -8549,26 +8757,42 @@ function viewStaffAdmin() {
         'placeholder="학생 이름 검색" value="' + esc(staffSearchQuery) + '" aria-describedby="staffSearchResult">' +
         '<button class="btn btn-ghost" id="staffSearchClear" data-act="staffsearchclear"' + (normalizedQuery ? '' : ' hidden') + '>지우기</button></div>' +
       '<div class="small muted mt8" id="staffSearchResult" aria-live="polite">' +
-        (normalizedQuery ? matching.length + '명 검색됨' : '전체 ' + list.length + '명') + '</div></div>' : '') +
+        (normalizedQuery || filterMode !== 'all' ? matching.length + '명 표시됨' : '전체 ' + list.length + '명') + '</div></div>' : '') +
     (consultLinkContactsUi.error ? '<button class="btn btn-ghost btn-block mt14" data-act="linkcontactsretry">카카오 상태 다시 불러오기</button>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
+    (students.length ? '<div class="student-subscription-overview"><div class="between"><div><b>월 구독 관리</b>' +
+      '<div class="small muted mt8">학생 이용 기능과 별개로 결제 확인만 관리합니다.</div></div>' +
+      '<div class="small"><b>구독 ' + subscriptionStudents.length + '명</b> · 결제 확인 필요 ' + paymentAttention.length + '명</div></div>' +
+      '<div class="student-subscription-filters" role="group" aria-label="학생 명단 구독 필터">' +
+        filterButton('all', '전체 ' + list.length) + filterButton('subscription', '월 구독 ' + subscriptionStudents.length) +
+        filterButton('payment', '결제 확인 필요 ' + paymentAttention.length) + '</div></div>' : '') +
     (students.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">학생용 링크 한 번에 복사</button>' : '') +
   '</div>' +
   (list.length
-    ? list.map(s => '<div class="card" data-staff-search-name="' + esc(normalizeStudentSearch(s.name)) + '"' +
-        (normalizedQuery && !studentMatchesSearch(s, normalizedQuery) ? ' hidden' : '') + '><div class="between">' +
+    ? list.map(s => {
+      const subscription = studentSubscription(s);
+      const payment = studentSubscriptionPayment(s);
+      const visible = studentMatchesSearch(s, normalizedQuery) && studentMatchesStaffFilter(s, filterMode);
+      return '<div class="card" data-staff-search-name="' + esc(normalizeStudentSearch(s.name)) + '"' +
+        ' data-staff-subscription="' + (subscription.active ? '1' : '0') + '" data-staff-payment-attention="' +
+        (payment.needsAttention ? '1' : '0') + '"' + (!visible ? ' hidden' : '') + '><div class="between">' +
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
-          (s.manager ? ' <span class="tag edit">관리자</span>' : '') + '</div>' +
+          (s.manager ? ' <span class="tag edit">관리자</span>' : '') +
+          (subscription.active ? ' <span class="tag subscription">월 구독</span>' :
+            subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot').length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
-          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + '</div></div>' +
+          (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) + studentSubscriptionLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
-        staffAccessPanels(s) + '</div>').join('') +
-      '<div class="card" id="staffSearchEmpty"' + (normalizedQuery && !matching.length ? '' : ' hidden') +
-        '><div class="empty"><b>🔎</b>검색한 이름과 일치하는 학생이 없습니다.</div></div>'
+        staffAccessPanels(s) + '</div>';
+    }).join('') +
+      '<div class="card" id="staffSearchEmpty"' + ((normalizedQuery || filterMode !== 'all') && !matching.length ? '' : ' hidden') +
+        '><div class="empty"><b>🔎</b><span id="staffSearchEmptyText">' +
+          (filterMode === 'all' ? '검색한 이름과 일치하는 학생이 없습니다.' : '선택한 구독 조건과 일치하는 학생이 없습니다.') +
+        '</span></div></div>'
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 학생이 없습니다.</div></div>');
 }
 
@@ -11083,6 +11307,52 @@ document.addEventListener('click', ev => {
     }
 
     /* 학생 */
+    case 'stafffilter': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      applyStaffListFilter(el.dataset.staffFilter);
+      break;
+    }
+    case 'subscriptionopen': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      studentSubscriptionModal(id);
+      break;
+    }
+    case 'subscriptionsave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      const day = Number($('#subscriptionBillingDay') && $('#subscriptionBillingDay').value);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      if (!Number.isInteger(day) || day < 1 || day > 31) return toast('결제 확인일을 1~31일로 입력해 주세요');
+      const current = studentSubscription(student);
+      if (!saveStudentSubscription(id, Object.assign({}, current, {
+        active: true, billingDay: day, startedAt: current.startedAt || now(), endedAt: 0
+      }))) break;
+      closeModal(); render(); toast(student.name + ' 학생을 월 구독으로 관리합니다');
+      break;
+    }
+    case 'subscriptionend': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const current = studentSubscription(student);
+      if (!current.active || !confirm(student.name + ' 학생의 월 구독 관리를 종료할까요? 결제 기록과 학생 데이터는 유지됩니다.')) break;
+      if (!saveStudentSubscription(id, Object.assign({}, current, { active: false, endedAt: now() }))) break;
+      closeModal(); render(); toast(student.name + ' 학생의 구독 관리를 종료했습니다');
+      break;
+    }
+    case 'subscriptionpaytoggle': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const current = studentSubscription(student);
+      if (!current.active) return toast('월 구독 설정을 먼저 확인해 주세요');
+      const month = today().slice(0, 7);
+      const wasPaid = !!studentSubscriptionPaidAt(student, month);
+      if (wasPaid && !confirm(student.name + ' 학생의 ' + Number(month.slice(5)) + '월 결제 완료 표시를 취소할까요?')) break;
+      if (!saveStudentSubscriptionPayment(id, month, !wasPaid)) break;
+      render(); toast(wasPaid ? '이번 달 결제 확인을 취소했습니다' : '이번 달 결제 완료로 기록했습니다');
+      break;
+    }
     case 'staffsearchclear': {
       if (!session.isAdmin || session.isStaffLink) break;
       const input = $('#staffSearch');
@@ -11147,6 +11417,7 @@ document.addEventListener('click', ev => {
       const name = ($('#sName').value || '').trim();
       if (!name) return toast('이름을 입력해 주세요');
       state.staff.push({ id: uid(), name: name, createdAt: now(), updatedAt: now(), deleted: false });
+      staffSearchQuery = ''; staffListFilter = 'all';
       save(); queueSync(); render(); toast(name + ' 등록 완료');
       break;
     }
@@ -11892,7 +12163,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-08-31.4';
+const APP_VER = '2026-08-31.5';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
