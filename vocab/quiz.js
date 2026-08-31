@@ -17,17 +17,25 @@ var WBQUIZ = (function () {
     return a;
   }
 
-  /* pool에서 target과 겹치지 않는 오답 n개 뽑기 — pick(w)가 보기 문자열 */
-  function distractors(target, pool, pick, n, rnd) {
-    var want = pick(target), seen = {}, out = [];
+  /* 낱말의 '꼴' — 끝이 '다'면 용언(움직임·성질), 아니면 체언(이름).
+     문맥 빈칸에서 정답만 명사이고 오답이 모두 '~다'면 낱말을 몰라도 문법만으로 답이 보인다.
+     "회오리바람에 ○○○ 날아갔어요"에 눈부시다·미덥다·가득하다를 놓으면 문제가 성립하지 않는다. */
+  function shapeOf(s) { return /다$/.test(String(s || '')) ? 'v' : 'n'; }
+
+  /* pool에서 target과 겹치지 않는 오답 n개 뽑기 — pick(w)가 보기 문자열.
+     sameShape가 참이면 정답과 같은 꼴을 먼저 채우고, 모자랄 때만 나머지에서 가져온다. */
+  function distractors(target, pool, pick, n, rnd, sameShape) {
+    var want = pick(target), seen = {}, out = [], rest = [];
     seen[want] = true;
     shuffle(pool, rnd).forEach(function (w) {
-      if (out.length >= n || w.id === target.id) return;
+      if (w.id === target.id) return;
       var v = pick(w);
       if (!v || seen[v]) return;
       seen[v] = true;
-      out.push(v);
+      if (sameShape && shapeOf(v) !== shapeOf(want)) { rest.push(v); return; }
+      if (out.length < n) out.push(v);
     });
+    for (var i = 0; out.length < n && i < rest.length; i++) out.push(rest[i]);
     return out;
   }
 
@@ -64,7 +72,7 @@ var WBQUIZ = (function () {
   function qCloze(w, pool, rnd) {
     var blanked = blankExample(w);
     if (!blanked) return null;
-    var d = distractors(w, pool, function (x) { return x.word; }, 3, rnd);
+    var d = distractors(w, pool, function (x) { return x.word; }, 3, rnd, true);
     if (d.length < 3) return null;
     return choiceQ('cloze', w, '빈칸에 알맞은 말은?\n' + blanked, w.word, d, rnd, { head: '문맥 빈칸' });
   }

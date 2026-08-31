@@ -91,6 +91,9 @@ var WBVoice = (function () {
     u.pitch = opt.pitch == null ? 1 : opt.pitch;
 
     var settled = false;
+    /* 소리가 실제로 시작됐는지는 이것으로만 알 수 있다.
+       getVoices()가 비어 있어도 엔진이 읽어 주는 기기가 있고, 목록이 차 있어도
+       한 마디도 못 내는 기기가 있다. 목록을 믿지 말고 시작 신호를 믿는다. */
     if (opt.onstart) u.onstart = function () { try { opt.onstart(); } catch (e) {} };
     u.onend = function () { if (settled) return; settled = true; speaking = false; if (opt.onend) opt.onend(); };
     u.onerror = function (e) {
@@ -124,7 +127,7 @@ var WBVoice = (function () {
       if (cancelled) return;
       if (i >= items.length) { if (opt.onend) opt.onend(); return; }
       speak(items[i++], {
-        rate: opt.rate, lang: opt.lang, onend: step,
+        rate: opt.rate, lang: opt.lang, onstart: opt.onstart, onend: step,
         onerror: function (why) { cancelled = true; if (opt.onerror) opt.onerror(why); },
       });
     }
