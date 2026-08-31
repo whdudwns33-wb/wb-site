@@ -29,6 +29,9 @@
     .eyebrow{margin-bottom:5px;color:var(--blue);font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
     .sub{margin-top:5px;color:var(--muted);font-size:13px;line-height:1.6}
     .between{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    /* 제목이 길면 옆 버튼이 눌려 "닫 / 기"로 쪼개졌다 — 버튼은 줄이지 않는다 */
+    .between>h2{min-width:0}
+    .between>.toolbtn,.between>.btn{flex:0 0 auto;white-space:nowrap}
     .tag{display:inline-block;padding:5px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:900;line-height:1.2}
     .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.muted{background:#eef2f4;color:var(--muted)}
     .tag.c-science{background:#e7f2fb;color:#155d94}.tag.c-society{background:#fdf0e4;color:#8a5a12}.tag.c-history{background:#f4ece1;color:#7a5230}.tag.c-humanities{background:#f3ecf8;color:#6b4390}.tag.c-environment{background:#e7f6ec;color:#20714a}
