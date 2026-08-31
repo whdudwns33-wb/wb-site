@@ -15,6 +15,7 @@ function between(start, end) {
 test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내며 미등록 학생만 최초 입력한다', () => {
   const contacts = between('const consultLinkContactsUi =', '\nfunction viewStaffAdmin()');
   const panel = between('function consultLinkStudentPanel(student) {', '\nfunction consultLinkContactModal');
+  const access = between('function staffAccessPanels(student) {', '\nfunction viewStaffAdmin()');
   const view = between('function viewStaffAdmin() {', '\n/* ── 설정');
   const state = between('function blankState() {', '\nconst LOCAL_AUTH_SETTINGS');
   const add = between("    case 'addstaff':", "    case 'delstaff':");
@@ -25,13 +26,17 @@ test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내�
     '카카오 연락처 캐시는 wb_consult_v1 또는 동기화 state에 저장하지 않는다');
   assert.doesNotMatch(state + add, /phoneMasked|phone|contact|consent/i);
   assert.match(panel, /student\.owner \|\| student\.manager/);
-  assert.match(view, /!s\.owner && !s\.manager \? '<hr class="sep">' \+ consultLinkStudentPanel\(s\) : ''/);
+  assert.match(view, /staffAccessPanels\(s\)/);
+  assert.match(access, /if \(student\.owner \|\| student\.manager\)/);
+  assert.match(access, /consultLinkStudentPanel\(student\)/);
+  assert.match(access, /학생용 앱[\s\S]*시간표·체크·학습시간·마감/);
+  assert.match(access, /보호자 열람[\s\S]*읽기 전용/);
   assert.match(view, /학생 번호와 동의는 처음 한 번만 등록합니다/);
   assert.match(view, /보호자 번호는 별도로 관리합니다/);
   assert.match(panel, /학생 연락처 없음 · 처음 한 번만 등록하세요/);
   assert.match(panel, /학생 연락처 수정/);
   assert.match(panel, /학생 번호 등록하고 보내기/);
-  assert.match(panel, /카톡으로 개인 링크 보내기/);
+  assert.match(panel, /카톡으로 학생용 링크 보내기/);
   assert.match(panel, /const sendDisabled = unavailable \|\| anyBusy/);
 });
 
@@ -88,7 +93,7 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   const exchange = between('  async exchangeBootstrap(staffId, code) {', '\n\n  async loginAdmin');
   const absorb = between('function absorbLinkParams() {', '\nasync function connectStudentLink');
   const reset = between('function resetStudentLinkCache(token) {', '\n\n/** 링크에 담겨 온 것들을 흡수한다.');
-  const connect = between('async function connectStudentLink() {', '\n/* ══════════════════════════════════════════════════════\n   6. 렌더 헬퍼');
+  const connect = between('async function connectStudentLink(allowEmbeddedExchange) {', '\n/* ══════════════════════════════════════════════════════\n   6. 렌더 헬퍼');
 
   assert.match(exchange, /this\.post\('\/exchange', \{ app: SYNC_APP, staffId: staffId, code: code \}\)/);
   assert.match(absorb, /q\.get\('t'\)/);
@@ -104,6 +109,9 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(connect, /const unsent = sync\.collect\(Number\(state\.settings\.pushAt\) \|\| 0\)/);
   assert.match(connect, /if \(unsent\.length\)/);
   assert.match(connect, /await waitForSyncIdle\(\)/);
+  assert.match(connect, /sameStudentConnected/);
+  assert.match(connect, /isEmbeddedStudentBrowser\(navigator\.userAgent\) && !allowEmbeddedExchange/);
+  assert.match(connect, /studentConnectNeedsApproval = true/);
   assert.match(connect, /await sync\.exchangeBootstrap\(staffId, code\)/);
   assert.match(connect, /resetStudentLinkCache\(d\.token\)/);
   assert.match(connect, /clearStudentCodeHash\(\)/);
@@ -111,6 +119,8 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.doesNotMatch(connect, /if \(terminal\) \{[\s\S]*resetStudentLinkCache\(''\)/);
   assert.match(connect, /sessionStorage\.setItem\(STUDENT_LINK_BLOCK_KEY/);
   assert.match(connect, /await sync\.run\(true\)/);
+  assert.match(connect, /route = 'today'/);
+  assert.doesNotMatch(connect, /go\('guide'\)|pendingStudentWelcome/);
   assert.match(html, /async run\(duringStudentConnect\)[\s\S]*?studentConnectBusy && !duringStudentConnect/);
   assert.match(html, /if \(pendingStudentCode\) \{\s*connectStudentLink\(\);\s*\} else if \(sync\.enabled\(\) && !studentConnectError\)/);
 });
@@ -147,4 +157,44 @@ test('기존 query 학생 링크는 같은 학생 캐시만 유지하고 다른 
   state.tasks.pop();
   state.checks['__stgoal__student-b|all'] = { mins: 60 };
   assert.equal(studentCacheScopedTo('student-a'), false);
+});
+
+test('기존 query 학생 링크는 미동기화 기록이 있으면 토큰과 경고를 보존한다', () => {
+  const source = between('function absorbLinkParams() {', '\nasync function connectStudentLink');
+  function run(unsent) {
+    const location = { search: '?u=student-b&t=legacy-token', hash: '', pathname: '/consult/' };
+    const historyUrls = [];
+    let resetToken = '';
+    const result = new Function(
+      'location', 'history', 'sync', 'resetStudentLinkCache', 'sessionStorage', 'state', 'session',
+      'staffById', 'studentCacheScopedTo', 'save', 'unb64',
+      "let studentConnectError='';let pendingAdminCode='';let pendingStudentCode='';" +
+      "let studentConnectNeedsApproval=false;let pendingAdd=null;const STUDENT_LINK_BLOCK_KEY='blocked';" +
+      source + ';absorbLinkParams();return {error:studentConnectError};'
+    )(
+      location,
+      { replaceState: (_a, _b, url) => historyUrls.push(url) },
+      { collect: () => unsent ? [{ id: 'local-change' }] : [] },
+      token => { resetToken = token; return true; },
+      { removeItem: () => {} },
+      { settings: { myToken: 'old-token', pushAt: 10 } },
+      { staffId: 'student-b' },
+      () => null,
+      () => false,
+      () => true,
+      () => '',
+    );
+    return { result, historyUrls, resetToken };
+  }
+
+  const blocked = run(true);
+  assert.match(blocked.result.error, /아직 동기화되지 않은 기록/);
+  assert.equal(blocked.resetToken, '');
+  assert.deepEqual(blocked.historyUrls, [], '재시도할 legacy token을 URL에서 지우면 안 된다');
+
+  const safe = run(false);
+  assert.equal(safe.result.error, '');
+  assert.equal(safe.resetToken, 'legacy-token');
+  assert.equal(safe.historyUrls.length, 1);
+  assert.doesNotMatch(safe.historyUrls[0], /(?:[?&])t=/);
 });
