@@ -118,8 +118,15 @@
     .day7 i.on{background:var(--ok)}
     .note{margin-top:10px;padding:10px 12px;border-radius:11px;background:#fff4e6;color:#7a4308;font-size:12.5px;line-height:1.6}
     .vlist .grow .t b{font-size:15.5px;color:var(--navy)}
-    .meaning{display:none;margin-top:5px}
-    .grow.open .meaning{display:block}
+    /* 어휘장 한 줄 — 뜻은 늘 보이고, 누르면 아래로 편집칸이 열린다 */
+    .vrow{border-top:1px solid var(--line)}
+    .vrow:first-child{border-top:0}
+    .vrow .grow{border-top:0}
+    .vedit{padding:2px 4px 14px}
+    .vedit textarea{width:100%;min-height:64px;margin:6px 0 10px;padding:10px 12px;border:1px solid var(--line);
+      border-radius:10px;font:inherit;font-size:14.5px;line-height:1.6;color:var(--ink);resize:vertical}
+    .vedit textarea:focus{outline:2px solid var(--blue);outline-offset:1px}
+    .lv-L1 .vedit textarea{font-size:16.5px}
     textarea{width:100%;min-height:64px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:14px;resize:vertical}
     select{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;background:#fff;font:inherit;font-size:15px;font-weight:700;color:var(--navy)}
     /* ── v1.1 피그마 시안 반영 ── */
@@ -181,6 +188,16 @@
     .qrev.ok{border-left-color:var(--ok)}
     .qrev.no{border-left-color:var(--bad)}
     .evchip{display:inline-block;margin-top:9px;padding:7px 12px;border-radius:999px;background:#fff;color:var(--blue);font-size:12px;font-weight:800}
+    /* 근거 문단 다시 보기 — 오답 노트·문항별 해설에서 지문을 펼칠 때 */
+    .evbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:#fbfdfe;border:1px solid #dceef5;max-height:52vh;overflow-y:auto}
+    .evpara{position:relative;margin:0 0 12px;padding-left:26px;font-size:15.5px;line-height:1.9;color:#22303d}
+    .evpara:last-child{margin-bottom:0}
+    .evpara.hit{background:#fff8e1;border-radius:8px;padding:8px 10px 8px 26px;margin-left:-4px}
+    .evno{position:absolute;left:0;top:2px;width:19px;height:19px;border-radius:6px;background:var(--sky);color:var(--blue);
+      font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .evpara.hit .evno{background:var(--coral);color:#fff}
+    .lv-L1 .evpara{font-size:17.5px;line-height:2}
+    .lv-L2 .evpara{font-size:16.5px}
     .ringwrap{display:flex;gap:18px;align-items:center;margin-top:6px}
     .ring{position:relative;flex:0 0 96px;width:96px;height:96px}
     .ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
@@ -568,11 +585,13 @@ function render(opt){
   const keep=!!(opt&&opt.keep);
   const y=window.scrollY;
   const app=$('#app');
-  const fns={onboard:vOnboard,home:vHome,reader:vReader,quiz:vQuiz,library:vLibrary,report:vReport,settings:vSettings,train:vTrain,lab:vLab};
+  const fns={onboard:vOnboard,home:vHome,reader:vReader,quiz:vQuiz,library:vLibrary,report:vReport,settings:vSettings,train:vTrain,lab:vLab,rb:vRedbookForm};
   const f=fns[view.name]||vHome;
   app.innerHTML=f();
   app.removeAttribute('aria-busy');
-  $('#tabbar').hidden=!S.profile||['reader','quiz','onboard'].includes(view.name);
+  /* 요약(rb)도 문제 풀이처럼 탭바를 감춘다 — 탭을 누르면 go() 가 sess 를 비워
+     쓰던 초안이 아무 말 없이 사라진다. 나가려면 「1차만 저장」이나 「취소」로. */
+  $('#tabbar').hidden=!S.profile||['reader','quiz','onboard','rb'].includes(view.name);
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.v===view.name?'true':'false'));
   if(sess.auto&&view.name==='reader'){const rc=document.getElementById('readerCard');if(rc)rc.classList.add('autoread');}
   if(view.name==='report')loadLeague();
@@ -594,8 +613,32 @@ function navSet(v,replace){try{
   if(replace||(cur&&cur.wb&&cur.wb.name===v.name&&cur.wb.id===v.id))history.replaceState({wb:v},'');
   else history.pushState({wb:v},'');
 }catch(e){/* 기록을 못 써도 앱은 그대로 돌아간다 */}}
-function go(name,extra,fromPop){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};if(!fromPop)navSet(view);render();}
+function go(name,extra,fromPop){if(sess.auto)autoStop(false);aloudClose();if(sheetOpen())$('#sheet').classList.remove('open');view=Object.assign({name},extra||{});sess={};if(!fromPop)navSet(view);render();}
+/* ── 어휘 카드(바닥 시트) 여닫기 ──────────────────────────
+   예전에는 「닫기」 단추로만 닫혔다. 안드로이드에서 뒤로 가기를 누르면 카드는
+   그대로 있고 화면만 되돌아갔고, 읽던 글에서 튕겨 나갔다. 워드브레인은 오버레이를
+   뒤로 가기로 먼저 닫도록 처리해 두었는데(back-nav.test.cjs 가 검증한다) 이쪽에는
+   같은 처리가 없었다.
+   덮개(backdrop)는 일부러 두지 않는다 — 카드를 열어 둔 채 지문의 다른 낱말을
+   바로 눌러 볼 수 있어야 하기 때문이다. 뒤로 가기와 Esc 로 닫는다. */
+function sheetOpen(){return $('#sheet').classList.contains('open');}
+function openSheet(){
+  $('#sheet').classList.add('open');
+  /* 뒤로 가기가 소비할 기록을 하나 쌓아 둔다 */
+  try{history.pushState({wb:Object.assign({},view,{sheet:1})},'');}catch(e){}
+}
+function closeSheet(fromPop){
+  $('#sheet').classList.remove('open');
+  /* 단추로 닫았으면 쌓아 둔 기록을 지금 화면 기록으로 바꾼다 —
+     안 그러면 다음 뒤로 가기가 아무 일도 안 한 것처럼 보인다 */
+  if(!fromPop){try{history.replaceState({wb:view},'');}catch(e){}}
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&sheetOpen()){closeSheet(false);}
+});
 window.addEventListener('popstate',function(e){
+  /* 카드가 열려 있으면 뒤로 가기는 카드부터 닫는다 — 화면을 되돌리기 전에 */
+  if(sheetOpen()){closeSheet(true);return;}
   var st=e.state&&e.state.wb;
   if(st&&st.name)go(st.name,st,true);
   /* 맞는 기록이 없으면 브라우저가 앱을 닫도록 그냥 둔다 */
@@ -758,7 +801,17 @@ function vHome(){
     <p class="sub">${sug.dir==='up'?'지금 수준이 편안해 보여요. '+LEVEL_LABEL[sug.to]+' 글에 도전해 봐요.':LEVEL_LABEL[sug.to]+' 글로 자신감을 쌓고 다시 올라와요.'} 선생님과 연동 중이면 선생님 조정이 우선이에요.</p>
     <div class="row2"><button class="btn sm ghost" data-act="lv-hint-later" style="margin-top:10px">나중에</button>
     <button class="btn sm" data-act="lv-hint-go" data-lv="${sug.to}" style="margin-top:10px">${LEVEL_LABEL[sug.to]}로 바꾸기</button></div></div>`:'';
-  return `${greet}${missionCard}${sugCard}
+  /* 어제 이전에 읽고 아직 요약하지 않은 글 — 기억이 흐려진 지금이 회상 훈련의 때다.
+     오늘의 1지문 바로 아래에 둔다. 하루에 한 편만 권해야 부담이 안 된다. */
+  const due=rbDue();
+  const rbCard=due.length?(()=>{const d=due[0];const bb=levelBody(d.a,myLevel());
+    return `<div class="card" style="border-color:#c9d9ea;background:linear-gradient(145deg,#f2f7fc 0,#fff 70%)">
+      <p class="eyebrow" style="color:var(--navy)">기억 꺼내기</p>
+      <h2>${d.date===addDays(dkey(),-1)?'어제':d.date} 읽은 「${esc(bb?bb.title:'')}」, 기억나요?</h2>
+      <p class="sub">글을 덮은 채로 요약해 보세요. 시간이 지난 뒤 끄집어내는 것이 가장 오래 남아요. (5분)</p>
+      <button class="btn sm" data-act="rb-new" data-id="${d.id}">요약 쓰기</button>
+      ${due.length>1?`<p class="sub" style="margin-top:8px">요약을 기다리는 글이 ${due.length}편 있어요.</p>`:''}</div>`;})():'';
+  return `${greet}${missionCard}${rbCard}${sugCard}
     <div class="card"><div class="weekhead"><h3>이번 주 읽기</h3><span class="tag muted">${weekCount()}/7일</span></div>
       <div class="weekdots">${weekDots()}</div></div>
     <div class="card"><div class="stat-grid">
@@ -826,6 +879,50 @@ function vMyChunkEdit(a,b,lv){
     <button class="btn" data-act="myedit-save">저장 — 내 단위로 읽기</button>
     <button class="btn ghost sm" data-act="myedit-cancel">취소</button></div>`;
 }
+/* 지문 한 문단을 어휘 밑줄과 함께 그린다 — 독해 화면과 근거 문단 보기가 함께 쓴다.
+   한 조각에 어휘가 둘 이상 들어 있어도 전부 밑줄 친다. 예전에는 첫 낱말만 걸고
+   멈춰서, 「연대를 못 박아 주는 유물이」처럼 두 낱말이 한 조각에 겹치면
+   뒤엣것은 어디에서도 눌리지 않았다. */
+function koParaHtml(segSrc,vocab,linked,aid){
+  return segSrc.map(seg=>{
+    const hits=[];
+    for(const vb of (vocab||[])){
+      if(linked.has(vb.word))continue;
+      const idx=seg.indexOf(vb.word);
+      if(idx>=0)hits.push({w:vb.word,i:idx});
+    }
+    hits.sort((x,y)=>x.i-y.i);
+    let html='',pos=0;
+    for(const h of hits){
+      if(h.i<pos)continue;            /* 앞 낱말과 글자가 겹치면 건너뛴다 */
+      linked.add(h.w);
+      html+=esc(seg.slice(pos,h.i))+`<button class="vw" data-act="vocab" data-id="${aid}" data-w="${esc(h.w)}">${esc(h.w)}</button>`;
+      pos=h.i+h.w.length;
+    }
+    html+=esc(seg.slice(pos));
+    return `<span class="seg">${html}</span>`;
+  }).join('');
+}
+
+/* ── 근거 문단 다시 보기 ─────────────────────────────────────
+   오답 노트와 문항별 해설에는 「근거: 3번째 문단」 칩만 있었다. 가리키는
+   문단이 화면 어디에도 없으니, 학생은 왜 틀렸는지 확인하지 못한 채 넘어갔다.
+   그렇다고 지문을 늘 펼쳐 두면 오답 노트가 읽고 판단하는 연습이 아니라
+   낱말 찾기가 된다 — 문제 화면이 정답을 감추는 이유와 같다.
+   그래서 답을 고르기 전에는 접어 두고, 고른 뒤에는 근거 문단을 펼쳐 준다.
+   펼친 지문에서도 어휘를 눌러 뜻을 볼 수 있다 — 어휘 때문에 틀리는 일이
+   적지 않은데 지금까지는 그걸 확인할 길이 없었다. */
+function evidenceHtml(a,b,evIdx,all){
+  const linked=new Set();
+  const idxs=all?b.paragraphs.map((_,i)=>i):[evIdx];
+  const body=idxs.map(i=>{
+    const p=b.paragraphs[i];
+    if(!p)return '';
+    return `<p class="evpara${i===evIdx?' hit':''}"><span class="evno">${i+1}</span>${koParaHtml(p,b.vocab,linked,a.id)}</p>`;
+  }).join('');
+  return `<div class="evbox">${body}${all?'':`<p class="sub" style="margin:8px 0 0">${evIdx+1}번째 문단만 보여 주고 있어요.</p>`}</div>`;
+}
+
 function vReader(){
   const a=DB.articles.find(x=>x.id===view.id);if(!a)return '<div class="card"><div class="empty">글을 찾을 수 없어요.</div></div>';
   const lv=myLevel();const b=levelBody(a,lv);
@@ -842,27 +939,7 @@ function vReader(){
   const enMode=hasEn?(S.prefs.en[lv]||0):0;
   const paras=b.paragraphs.map((p,pi)=>{
     const segSrc=(useMine&&mc.b&&mc.b[pi])?segsFromBounds(paraText(p),mc.b[pi]):p;
-    const segs=segSrc.map(seg=>{
-      /* 한 조각에 어휘가 둘 이상 들어 있어도 전부 밑줄 친다.
-         예전에는 첫 낱말만 걸고 멈춰서, 「연대를 못 박아 주는 유물이」처럼
-         두 낱말이 한 조각에 겹치면 뒤엣것은 어디에서도 눌리지 않았다. */
-      const hits=[];
-      for(const vb of b.vocab){
-        if(linked.has(vb.word))continue;
-        const idx=seg.indexOf(vb.word);
-        if(idx>=0)hits.push({w:vb.word,i:idx});
-      }
-      hits.sort((x,y)=>x.i-y.i);
-      let html='',pos=0;
-      for(const h of hits){
-        if(h.i<pos)continue;            /* 앞 낱말과 글자가 겹치면 건너뛴다 */
-        linked.add(h.w);
-        html+=esc(seg.slice(pos,h.i))+`<button class="vw" data-act="vocab" data-id="${a.id}" data-w="${esc(h.w)}">${esc(h.w)}</button>`;
-        pos=h.i+h.w.length;
-      }
-      html+=esc(seg.slice(pos));
-      return `<span class="seg">${html}</span>`;
-    }).join('');
+    const segs=koParaHtml(segSrc,b.vocab,linked,a.id);
     const enP=(enMode>0&&b.en&&b.en[pi])?`<p class="para-en" lang="en">${renderEnPara(b.en[pi],(b.enseg||[])[pi],b.envocab||[],linkedEn,a.id,chunk)}</p>`:'';
     return `<p class="para" id="para-${pi}">${segs}</p>${enP}`;
   }).join('');
@@ -892,9 +969,7 @@ function vReader(){
         ${(a.books||[]).map(bookHtml).join('')}
       </div>`:''}
       ${!done?`<button class="btn" data-act="read-done">다 읽었어요</button>`:''}
-      ${done&&!sess.evalDone?`<h3 style="margin-top:16px">오늘 글, 어땠어요?</h3>
-        <div class="evalrow">${EVALS.map(([v,l])=>`<button class="evalbtn" data-act="eval" data-v="${v}">${l}</button>`).join('')}</div>`:''}
-      ${sess.evalDone?`<div class="explain" style="margin-top:16px"><b>완독 기록 완료!</b> ${streak()}일 연속 읽는 중이에요.</div>
+      ${done?`<div class="explain" style="margin-top:16px"><b>완독 기록 완료!</b> ${streak()}일 연속 읽는 중이에요.</div>
         ${(levelBody(a,lv).questions||[]).length?`<button class="btn" data-act="start-quiz" data-id="${a.id}">문제 풀어보기 (${levelBody(a,lv).questions.length}문항${(levelBody(a,lv).challenge||[]).length?' + 심화 '+levelBody(a,lv).challenge.length:''})</button>`:''}
         ${S.scraps[a.id]?`<button class="btn ghost sm" disabled>스크랩됨 ✓</button>`:`<button class="btn ghost sm" data-act="scrap-open" data-id="${a.id}">스크랩하기 — 탐구 재료로 모으기</button>`}
         <button class="btn ghost sm" data-act="ct-start-article" data-id="${a.id}">∕ 이 글로 끊어 읽기 연습</button>
@@ -969,13 +1044,38 @@ function vQuiz(){
         <p class="qnum">${i+1}. <span class="tag">${QTYPE_LABEL[cq.type]||'문항'}</span> ${okk?'<span class="tag ok">정답</span>':'<span class="tag bad">오답</span>'}</p>
         <p class="qtext" style="margin-top:6px">${esc(cq.q)}</p>
         <p class="sub" style="margin-top:6px">내 답: <b>${pick==null?'무응답':(pick+1)+'번 · '+esc(cq.choices[pick])}</b>${okk?'':`<br>정답: <b style="color:var(--ok)">${cq.answer+1}번 · ${esc(cq.choices[cq.answer])}</b>`}</p>
-        <div class="explain" style="margin-top:8px">${esc(cq.explain)}<br><span class="evchip">근거: ${cq.evidencePara+1}번째 문단</span></div></div>`;
+        <div class="explain" style="margin-top:8px">${esc(cq.explain)}<br><span class="evchip">근거: ${cq.evidencePara+1}번째 문단</span></div>
+        <button class="toolbtn" data-act="qrev-ev" data-i="${i}" aria-pressed="${!!(q.rev&&q.rev[i])}" style="margin-top:9px">📄 근거 문단 ${q.rev&&q.rev[i]?'접기':'펼치기'}</button>
+        ${q.rev&&q.rev[i]?evidenceHtml(a,b,cq.evidencePara,false):''}</div>`;
     }).join('');
+    /* 「이 글, 어땠어요?」는 여기 있어야 배울 것이 생긴다. 읽자마자 물으면 그냥
+       느낌일 뿐이지만, 정답률 옆에 나란히 놓으면 「익숙한 느낌」과 「실제로 아는 것」이
+       얼마나 어긋나는지 스스로 보게 된다. 그 어긋남을 좁히는 것이 공부의 핵심이다. */
+    const rd=S.readings[a.id];
+    const evc=rd?EVALS.find(e=>e[0]===rd.evalv):null;
+    let calib='';
+    if(!q.ch&&rd){
+      if(!evc){
+        calib=`<div class="explain" style="margin-top:14px"><b>풀기 전에 느낀 대로 골라 보세요 — 이 글, 어땠어요?</b>
+          <div class="evalrow" style="margin-top:10px">${EVALS.map(([v,l])=>`<button class="evalbtn" data-act="eval" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+      }else{
+        const felt=evc[0]==='good';const felthard=evc[0]!=='good';
+        const note=felt&&acc>=80?'느낌과 결과가 딱 맞았어요. 자기 이해도를 정확히 읽고 있어요 — 이건 큰 무기예요.'
+          :felt&&acc<50?'잘 이해했다고 느꼈는데 정답률은 낮았어요. 눈에 익은 것과 아는 것은 다릅니다 — 해설의 근거 문단을 꼭 펼쳐 보세요.'
+          :felthard&&acc>=80?'어렵게 느꼈는데 잘 풀었어요! 생각보다 훨씬 잘 읽고 있어요. 자신감을 가져도 됩니다.'
+          :felthard&&acc<50?'어렵게 느낀 그대로였어요. 솔직하게 본 것이 실력을 늘리는 첫걸음이에요.'
+          :'느낌과 결과가 비슷해요.';
+        calib=`<div class="explain" style="margin-top:14px">
+          <b>내 느낌 <span class="tag ${evc[2]}">${evc[1]}</span> · 실제 정답률 <span class="tag ${acc>=80?'ok':acc>=50?'warn':'bad'}">${acc}%</span></b><br>${note}</div>`;
+      }
+    }
     return `<div class="card hero${lvc}"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
       <p class="sub">${msg}${q.t0?` · 걸린 시간 ${fmtSecs((q.tEnd||Date.now())-q.t0)}`:''}</p>
+      ${calib}
       <div class="omr" style="margin-top:12px">${qs.map((cq,i)=>`<span class="odot ${q.picks[i]===cq.answer?'ok':'no'}">${i+1}</span>`).join('')}</div>
       ${hasCh?`<button class="btn navy" data-act="quiz-challenge">🔥 심화 문제 도전 (${b.challenge.length}문항)</button>`:''}
-      <button class="btn ${hasCh?'ghost sm':'navy'}" data-act="rb-new" data-id="${a.id}">✎ 이 글 요약 쓰기 — 비문학 독서 요약</button>
+      <p class="sub" style="margin-top:14px">이 글의 요약 쓰기는 <b>내일</b> 홈에서 알려 드려요 — 해설을 막 본 지금 쓰면 기억이 아니라 해설을 옮겨 적게 되거든요.</p>
+      <button class="btn ghost sm" data-act="rb-new" data-id="${a.id}">✎ 그래도 지금 쓰기</button>
       ${S.scraps[a.id]?'':`<button class="btn ghost sm" data-act="scrap-quick" data-id="${a.id}">이 글 스크랩하기</button>`}
       <button class="btn ${hasCh?'ghost sm':''}" data-act="nav" data-v="home">홈으로</button></div>
       <div class="card${lvc}"><h2>문항별 해설</h2><p class="sub">틀린 문제는 오답 노트에 자동으로 담겼어요.</p>${review}</div>`;
@@ -1032,9 +1132,32 @@ function vLibrary(){
   }
   if(tab==='vocab'){
     const vs=S.vocab.slice().reverse();
-    body=vs.length?`<div class="vlist">${vs.map((v,i)=>`<button class="grow ${sess['vopen'+i]?'open':''}" data-act="vocab-toggle" data-i="${i}">
-      <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
-      <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>`
+    /* 예전에는 「뜻」 단추로 뜻을 폈다 접었다 하게 해 두었는데, `.grow .t small`(0,2,1)이
+       `.meaning`(0,1,0)을 눌러 이겨서 뜻이 늘 펼쳐져 있었다. 단추를 눌러도 글자만
+       「뜻」↔「−」로 바뀌고 화면은 그대로였으니, 학생 눈에는 고장 난 단추였다.
+       뜻이 어차피 한 줄에 들어가니 접었다 펴는 일 자체가 필요 없다 —
+       그 자리를 학생이 실제로 하고 싶어 하는 일, 곧 편집에 내준다. */
+    body=vs.length?`<div class="vlist">${vs.map((v,i)=>{
+      const open=!!sess['vopen'+i];
+      const mine=v.mine&&v.mine.trim();
+      return `<div class="vrow ${open?'open':''}">
+        <button class="grow" data-act="vocab-toggle" data-i="${i}">
+          <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
+          <small>${mine?`<span class="tag ok">내 말</span> ${esc(mine)}`:esc(v.easy)}</small></span>
+          <span class="go">${open?'−':'✎'}</span></button>
+        ${open?`<div class="vedit">
+          ${mine?`<p class="sub" style="margin:0 0 8px">원래 뜻: ${esc(v.easy)}</p>`:''}
+          <label class="sub" for="vm${i}">뜻을 내 말로 바꿔 써 보세요 — 내 말로 옮겨야 진짜 아는 낱말이 돼요.</label>
+          <textarea id="vm${i}" maxlength="120" placeholder="${esc(v.easy)}">${esc(mine||'')}</textarea>
+          <div class="row2">
+            <button class="btn sm" data-act="vocab-save" data-i="${i}" style="margin-top:0">저장</button>
+            <button class="btn sm ghost" data-act="vocab-del" data-i="${i}" style="margin-top:0">어휘장에서 빼기</button>
+          </div>
+          ${sess.vdel===i?`<div class="note">「${esc(v.word)}」을 어휘장에서 뺄까요? 복습 기록도 함께 지워져요.
+            <div class="row2"><button class="btn sm ghost" data-act="vocab-del-no" style="margin-top:9px">그대로 두기</button>
+            <button class="btn sm" data-act="vocab-del-yes" data-i="${i}" style="margin-top:9px">빼기</button></div></div>`:''}
+        </div>`:''}
+      </div>`;}).join('')}</div>`
       :'<div class="empty">모은 어휘가 없어요.<br>글에서 밑줄 단어를 누르면 어휘장에 쌓여요.</div>';
     /* 복습 버튼은 어휘가 없어도 자리를 지킨다 — 사라지면 학생은 기능이 없어진 줄 안다 */
     body+=`<button class="btn sm" data-act="vocab-review" ${vs.length?'':'disabled'}>복습 퀴즈 (${Math.min(5,vs.length)}개)</button>
@@ -1053,7 +1176,7 @@ function vLibrary(){
         body=`<div class="card" id="vqCard" style="margin:0 0 12px;border-color:#b9deed;background:linear-gradient(145deg,#eaf7fd 0,#fff 70%)">
           <p class="qnum">어휘 복습 ${vq.i+1}/${vq.list.length}</p>
           <p class="qtext" style="font-size:23px;margin-top:10px">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}${esc(v.word)}</p>
-          ${vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}</div>
+          ${vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}${v.mine&&v.mine.trim()?`<br><span class="tag ok">내 말</span> ${esc(v.mine)}`:''}</div>
           <div class="row2" style="margin-top:10px"><button class="btn sm ghost" data-act="vq-mark" data-ok="0" style="margin-top:0">헷갈려요</button>
           <button class="btn sm" data-act="vq-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
           :`<p class="sub">뜻을 떠올린 다음 눌러 확인해요.</p><button class="btn sm" data-act="vq-show">뜻 보기</button>`}
@@ -1245,7 +1368,6 @@ function vTrain(){
   if(sess.hj)return vHanjaSession();
   if(sess.ct)return vChunkTrain();
   if(sess.vs)return vVocabSession();
-  if(sess.rb)return vRedbookForm();
   if(sess.wq)return vWrongSession();
   const tp=pickTrainPara();
   const due=dueVocab();
@@ -1378,13 +1500,19 @@ function vWrongSession(){
     removeWrong(wq.list[wq.i]);wq.list.splice(wq.i,1); // 지문 개편으로 사라진 문항 정리
   }
   if(wq.i>=wq.list.length){
+    /* 지문을 열고 맞힌 것도 노트에서 지운다 — 야박하면 오답 노트를 안 열게 된다.
+       대신 스스로 푼 것과 나눠 보여 주어, 학생도 선생님도 상태를 알 수 있게 한다. */
+    const self=wq.solved-(wq.peeked||0);
     return `<div class="card hero"><p class="eyebrow">오답 노트 완료</p><h1>${wq.solved}개 해결!${wq.again?` ${wq.again}개는 다음에 다시`:''}</h1>
-      <p class="sub">맞힌 문제는 노트에서 지워졌어요. 남은 문제는 내일 또 도전해요.</p>
+      <p class="sub">${wq.peeked?`스스로 해결 ${self}개 · 지문 보고 해결 ${wq.peeked}개. `:''}맞힌 문제는 노트에서 지워졌어요. 남은 문제는 내일 또 도전해요.</p>
       <button class="btn" data-act="wq-done">훈련으로 돌아가기</button></div>`;
   }
   const w=wq.list[wq.i];
-  const {b,q}=wrongQuestion(w);
+  const {a,b,q}=wrongQuestion(w);
   const answered=wq.picked!=null;
+  const evIdx=q.evidencePara;
+  /* ev: 0 접힘 · 1 근거 문단만 · 2 전체 지문 */
+  const ev=wq.ev||0;
   return `<div class="card ${myLevel()==='L1'?'lv-L1':''}"><div class="qhead"><p class="qnum">오답 다시 풀기 ${wq.i+1} / ${wq.list.length}</p>
     <p class="qnum" style="font-weight:600">${esc(b.title)}${w.ch?' · 심화':''}</p></div>
     <div class="qbar"><i style="width:${Math.round(((wq.i+(answered?1:0))/wq.list.length)*100)}%"></i></div>
@@ -1397,8 +1525,13 @@ function vWrongSession(){
         <span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;
     }).join('')}</div>
     ${answered?`<div class="explain"><b>${wq.picked===q.answer?'해결! 노트에서 지웠어요.':'아직이에요 — 다음에 또 나와요.'}</b> ${esc(q.explain)}<br>
-    <span class="evchip">근거: ${q.evidencePara+1}번째 문단</span></div>
-    <button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
+    <span class="evchip">근거: ${evIdx+1}번째 문단</span></div>`:''}
+    <div class="rd-tools" style="margin-top:12px">
+      <button class="toolbtn" data-act="wq-ev" data-m="${ev===1?0:1}" aria-pressed="${ev===1}">📄 ${answered?'근거 문단':'지문 다시 보기'}</button>
+      <button class="toolbtn" data-act="wq-ev" data-m="${ev===2?0:2}" aria-pressed="${ev===2}">전체 지문</button>
+    </div>
+    ${ev?evidenceHtml(a,b,evIdx,ev===2):''}
+    ${answered?`<button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
     ${answered?'':'<button class="btn ghost sm" data-act="wq-done">그만하기</button>'}</div>`;
 }
 const RB_CHECKS=['핵심 개념을 내 말로 바꿔 썼어요','예시나 이유를 1개 이상 넣었어요','글에 없는 내용은 넣지 않았어요','잘 모르는 부분을 표시해 두었어요'];
@@ -1408,17 +1541,49 @@ function rbCollect(){
   const s1=g('rbSum');if(s1!=null)sess.rbSum=s1;
   const s2=g('rbSum2');if(s2!=null)sess.rbSum2=s2;
 }
+/* ── 요약 세션 열고 닫기 ────────────────────────────────────
+   요약은 자기 화면(view.name==='rb')을 갖고, 끝나면 온 곳으로 돌아간다.
+   go() 는 sess 를 비우므로 쓸 수 없다 — 요약 초안이 sess 에 들어 있다. */
+function rbOpen(id,a,b,from){
+  view={name:'rb',from:from||'train',id:id||null};navSet(view);
+  sess={rb:{stage:1,articleId:id||null,title:b?b.title:''},rbChecks:[false,false,false,false],
+    rbUnit:b?b.title:'',rbSum:'',rbSum2:''};
+  render();
+}
+function rbClose(){const to=(view&&view.from)||'train';sess.rb=null;go(to);}
+
+/* ── 하루 뒤 요약 ───────────────────────────────────────────
+   완독 직후에 요약을 시키면, 바로 앞 화면에서 문항별 해설로 핵심 문장을
+   다 읽려 준 뒤라 회상이 아니라 해설 재생이 된다. 하루 지나 기억이 흐려진
+   뒤에 끄집어내야 훈련이 된다 — 워드브레인이 「물 줄 시간」을 알려 주는 것과
+   같은 장치다. 완독한 글 가운데 어제 이전에 읽었고 아직 요약을 안 쓴 것을 낸다. */
+function rbDue(){
+  const today=dkey();
+  const written=new Set(S.redbook.filter(r=>r.articleId).map(r=>r.articleId));
+  return Object.entries(S.readings)
+    .filter(([id,r])=>r.date<today&&!written.has(id)&&DB.articles.some(x=>x.id===id))
+    .sort((x,y)=>y[1].date<x[1].date?-1:1)
+    .map(([id,r])=>({id,date:r.date,a:DB.articles.find(x=>x.id===id)}));
+}
+
 /* 기획서 원안 그대로 — 1차 요약 → 스스로 점검 → 2차 재요약. 요약은 한 번에 끝내지 않는다. */
 function vRedbookForm(){
   const st=sess.rb||{};
   const c=sess.rbChecks||[false,false,false,false];
   const step=`<div class="lab-step">${[0,1].map(i=>`<i class="${(st.stage||1)-1>=i?'on':''}"></i>`).join('')}</div>`;
+  /* 2차에서 대조할 원본. 「글에 없는 내용은 넣지 않았어요」를 확인하라면서
+     정작 글을 안 보여 주고 있었다 — 학생은 확인할 방법 없이 체크만 했다. */
+  const srcA=st.articleId?DB.articles.find(x=>x.id===st.articleId):null;
+  const srcB=srcA?levelBody(srcA,myLevel()):null;
   if(st.stage===2){
     const n=(sess.rbSum2||'').trim().length;
     return `<div class="card"><p class="eyebrow">비문학 독서 요약 2/2 — 점검하고 다시 쓰기${st.editIdx!=null?' (이어 쓰기)':''}</p>${step}
       <h2 style="margin-top:8px">내가 쓴 요약을 점검해 보세요</h2>
-      <p class="sub">네 가지를 스스로 확인한 뒤, 빠진 것을 채워 <b>2차 요약</b>을 완성해요. 다시 쓰는 이 과정이 진짜 실력을 만듭니다.</p>
+      <p class="sub">이제 지문을 펼쳐 <b>내가 쓴 것과 맞춰 보세요</b>. 빠뜨린 것, 잘못 기억한 것을 찾아 <b>2차 요약</b>을 완성해요. 덮고 쓴 뒤 펼쳐서 고치는 이 과정이 진짜 실력을 만듭니다.</p>
       <div class="report-doc" style="max-height:190px;overflow-y:auto"><h4>1차 요약</h4><p style="white-space:pre-wrap">${esc(sess.rbSum||'')}</p></div>
+      ${srcA?`<div class="rd-tools" style="margin-top:10px">
+        <button class="toolbtn" data-act="rb-src" aria-pressed="${!!sess.rbSrc}">📄 지문 ${sess.rbSrc?'덮기':'펼쳐 대조하기'}</button>
+      </div>${sess.rbSrc?evidenceHtml(srcA,srcB,-1,true):''}`:''}
       ${RB_CHECKS.map((l,i)=>`<button class="matchip" data-act="rb-check" data-i="${i}" aria-pressed="${c[i]}"><span class="ck">${c[i]?'✓':''}</span><span>${l}</span></button>`).join('')}
       <textarea id="rbSum2" style="min-height:140px" placeholder="2차 요약 — 점검한 내용을 반영해 다시 써 보세요 (최소 50자)">${esc(sess.rbSum2||'')}</textarea>
       <p class="sub" style="text-align:right">${n}자</p>
@@ -1430,7 +1595,7 @@ function vRedbookForm(){
   const n1=(sess.rbSum||'').trim().length;
   return `<div class="card"><p class="eyebrow">비문학 독서 요약 1/2 — 내 말로 쓰기</p>${step}
     <h2 style="margin-top:8px">글을 덮고, 기억나는 대로 써 보세요</h2>
-    <p class="sub">문장을 그대로 옮기지 않기! 기억나는 대로 쓰는 것이 진짜 훈련이에요.</p>
+    <p class="sub">지금은 지문을 보지 않고 씁니다. 문장을 그대로 옮기지 않기! 기억나는 대로 쓰는 것이 진짜 훈련이에요. 지문은 <b>다음 단계에서</b> 펼쳐 맞춰 봅니다.</p>
     ${st.title?`<p class="sub" style="margin-top:6px">읽은 글: <b>${esc(st.title)}</b></p>`:''}
     <input type="text" id="rbUnit" placeholder="글·단원 제목 (예: 해양열파 / 3단원 문단의 짜임)" value="${esc(sess.rbUnit||'')}">
     <textarea id="rbSum" style="min-height:140px" placeholder="이 글에서 무엇을 알게 됐는지 내 말로 요약해 보세요 (최소 50자)">${esc(sess.rbSum||'')}</textarea>
@@ -1820,7 +1985,7 @@ function openVocabEn(articleId,word){
     ${v.base?`<p class="sub" style="margin-top:6px;font-weight:800">${esc(v.base)}</p>`:''}
     <p class="sheet-e">${esc(v.ko)}</p>
     <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
-  $('#sheet').classList.add('open');
+  openSheet();
   announce(v.word+': '+v.ko);
 }
 function openVocab(articleId,word){
@@ -1837,7 +2002,7 @@ function openVocab(articleId,word){
     ${v.hanja?`<div class="hanja">${v.hanja.split('+').map(h=>`<span>${esc(h.trim())}</span>`).join('')}</div>`:''}
     <p class="sheet-e">${esc(v.easy)}</p>
     <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
-  $('#sheet').classList.add('open');
+  openSheet();
   announce(v.word+': '+v.easy);
 }
 
@@ -1901,10 +2066,16 @@ document.addEventListener('click',e=>{
     S.prefs.type.lh=Math.round(Math.min(2.4,Math.max(1.5,tp.lh+(+t.dataset.d)*0.1))*10)/10;S.prefs.type.lhSet=true;save();render({keep:true});}
   else if(act==='type-reset'){S.prefs.type={font:'sans',fs:null,lh:null,lhSet:false};save();render({keep:true});announce('글자 설정을 기본값으로 되돌렸어요');}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
-  else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
-  else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;render();}
-  else if(act==='eval'){const a=DB.articles.find(x=>x.id===view.id);
-    completeRead(a,t.dataset.v);sess.evalDone=true;render();announce('완독 기록 완료');}
+  else if(act==='sheet-close'){closeSheet(false);}
+  else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;
+    /* 예전에는 「오늘 글, 어땠어요?」를 먼저 눌러야 완독이 기록되고 문제도 열렸다.
+       스스로 매긴 이해도가 관문이었던 셈이다. 완독은 다 읽은 그 순간 기록하고,
+       자기 평가는 문제를 푼 뒤로 옮긴다 — 거기서는 실제 정답률과 나란히 놓여
+       「내가 느낀 것」과 「실제로 아는 것」이 얼마나 맞는지 배울 재료가 된다. */
+    completeRead(DB.articles.find(x=>x.id===view.id),null);render();announce('완독 기록 완료');}
+  else if(act==='eval'){const r=S.readings[view.id];
+    if(r){r.evalv=t.dataset.v;save();}
+    render();announce('기록했어요');}
   else if(act==='start-quiz'){go('quiz',{id:t.dataset.id});}
   else if(act==='quiz-pick'){const q=sess.q;q.picks[q.i]=+t.dataset.i;q.warn=false;
     /* 마지막 문제가 아니면 답을 고르는 즉시 다음으로 — 시험지 넘기듯 */
@@ -1930,13 +2101,36 @@ document.addEventListener('click',e=>{
     S.quiz[view.id+(q.ch?'#c':'')]={correct:q.correct,total:qs.length,date:dkey()};save();
     render();announce(qs.length+'문제 중 '+q.correct+'개 정답');}
   else if(act==='quiz-challenge'){sess.q={i:0,correct:0,picks:[],flags:{},fin:false,ch:true,t0:Date.now(),warn:false};render();}
+  else if(act==='qrev-ev'){const q=sess.q;if(!q)return;
+    q.rev=q.rev||{};const i=+t.dataset.i;q.rev[i]=!q.rev[i];render({keep:true});}
   else if(act==='scrap-open'){sess.scrapOpen=true;render();}
   else if(act==='scrap-save'){const note=($('#scrapNote')?$('#scrapNote').value.trim():'').slice(0,80);
     S.scraps[t.dataset.id]={date:dkey(),note};save();sess.scrapOpen=false;render();announce('스크랩 저장');}
   else if(act==='scrap-quick'){S.scraps[t.dataset.id]={date:dkey(),note:''};save();render();}
   else if(act==='lib-tab'){view.tab=t.dataset.v;sess={};render();}
   else if(act==='go-lib'){view={name:'library',tab:t.dataset.tab};sess={};render();}
-  else if(act==='vocab-toggle'){sess['vopen'+t.dataset.i]=!sess['vopen'+t.dataset.i];render({keep:true});}
+  else if(act==='vocab-toggle'){
+    /* 편집칸은 한 번에 하나만 연다 — 여러 칸이 열려 있으면 어느 것을 고치는지 흐려진다 */
+    const i=t.dataset.i,was=sess['vopen'+i];
+    Object.keys(sess).forEach(k=>{if(k.indexOf('vopen')===0)delete sess[k];});
+    sess.vdel=null;
+    if(!was)sess['vopen'+i]=true;
+    render({keep:true});}
+  else if(act==='vocab-save'){
+    const i=+t.dataset.i;const el=document.getElementById('vm'+i);if(!el)return;
+    const v=S.vocab.slice().reverse()[i];if(!v)return;
+    const txt=el.value.trim().slice(0,120);
+    if(txt)v.mine=txt;else delete v.mine;      /* 비우면 원래 뜻으로 되돌아간다 */
+    save();delete sess['vopen'+i];render({keep:true});
+    announce(txt?'내 말로 저장했어요':'원래 뜻으로 되돌렸어요');}
+  else if(act==='vocab-del'){sess.vdel=+t.dataset.i;render({keep:true});}
+  else if(act==='vocab-del-no'){sess.vdel=null;render({keep:true});}
+  else if(act==='vocab-del-yes'){
+    const i=+t.dataset.i;const v=S.vocab.slice().reverse()[i];if(!v)return;
+    const at=S.vocab.indexOf(v);if(at>=0)S.vocab.splice(at,1);
+    save();sess.vdel=null;
+    Object.keys(sess).forEach(k=>{if(k.indexOf('vopen')===0)delete sess[k];});
+    render({keep:true});announce('「'+v.word+'」을 어휘장에서 뺐어요');}
   else if(act==='vocab-review'){
     if(!S.vocab.length){announce('아직 모은 어휘가 없어요. 글에서 밑줄 단어를 누르면 쌓여요.');return;}
     const pool=S.vocab.slice().sort(()=>Math.random()<0.5?1:-1);
@@ -2035,14 +2229,22 @@ document.addEventListener('click',e=>{
   else if(act==='vs-done'){sess.vs=null;render();}
   /* ── 오답 노트 ── */
   else if(act==='wq-start'){if(!S.wrong.length)return;
-    sess.wq={list:S.wrong.filter(w=>wrongQuestion(w)).slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0};render();}
+    sess.wq={list:S.wrong.filter(w=>wrongQuestion(w)).slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0,ev:0,sawEv:false,peeked:0};render();}
+  else if(act==='wq-ev'){const wq=sess.wq;if(!wq)return;
+    wq.ev=+t.dataset.m||0;
+    /* 답을 고르기 전에 열었으면 기억해 둔다 — 막지는 않되 결과에서 나눠 보여 준다 */
+    if(wq.ev&&wq.picked==null)wq.sawEv=true;
+    render({keep:true});}
   else if(act==='wq-pick'){const wq=sess.wq;if(!wq||wq.picked!=null)return;
     wq.picked=+t.dataset.i;
     const w=wq.list[wq.i];const res=wrongQuestion(w);
-    if(res&&wq.picked===res.q.answer){removeWrong(w);wq.solved++;}
+    if(res&&wq.picked===res.q.answer){removeWrong(w);wq.solved++;if(wq.sawEv)wq.peeked++;}
     else wq.again++;
+    /* 답을 고른 순간 근거 문단을 펼친다 — 오답 노트는 왜 틀렸는지 확인하는 자리다.
+       전체 지문을 펼쳐 두고 있었다면 그대로 둔다. */
+    if(wq.ev!==2)wq.ev=1;
     render();}
-  else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;render();}
+  else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;wq.ev=0;wq.sawEv=false;render();}
   else if(act==='wq-done'){sess.wq=null;render();}
   /* ── 한자 카드 세션 ── */
   else if(act==='hj-start'){const list=hanjaFamilies();if(!list.length)return;
@@ -2054,9 +2256,11 @@ document.addEventListener('click',e=>{
   /* ── 비문학 독서 요약 ── */
   else if(act==='rb-new'){const id=t.dataset.id||null;
     const a=id?DB.articles.find(x=>x.id===id):null;const b=a?levelBody(a,myLevel()):null;
-    view={name:'train'};
-    sess={rb:{stage:1,articleId:id,title:b?b.title:''},rbChecks:[false,false,false,false],rbUnit:b?b.title:'',rbSum:'',rbSum2:''};
-    render();}
+    /* 예전에는 view={name:'train'} 으로 훈련 탭에 강제로 떨궜다. 문제 결과 화면에서
+       「요약 쓰기」를 누르면 보던 해설·심화 도전이 통째로 사라졌고, 저장해도 그 자리로
+       돌아오지 않았다. 게다가 go() 를 거치지 않아 방문 기록도 안 남아서, 뒤로 가기를
+       누르면 앱이 그냥 닫혔다. 요약에 자기 화면을 주고, 온 곳을 기억해 둔다. */
+    rbOpen(id,a,b,view.name==='rb'?(view.from||'train'):view.name);}
   else if(act==='rb-check'){rbCollect();const i=+t.dataset.i;sess.rbChecks[i]=!sess.rbChecks[i];render({keep:true});}
   else if(act==='rb-to2'){rbCollect();
     if(!(sess.rbUnit||'').trim()){announce('글·단원 제목을 적어 주세요');return;}
@@ -2070,9 +2274,10 @@ document.addEventListener('click',e=>{
     if(n<50){announce('1차 요약을 50자 이상 써 주세요 (지금 '+n+'자)');return;}
     S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
       summary:(sess.rbSum||'').trim(),summary2:'',checks:[false,false,false,false],done:false});save();
-    sess.rb=null;render();announce('1차 요약을 저장했어요. 훈련 탭에서 이어 쓸 수 있어요');}
+    rbClose();announce('1차 요약을 저장했어요. 훈련 탭에서 이어 쓸 수 있어요');}
   else if(act==='rb-resume'){const i=+t.dataset.i;const r=S.redbook[i];if(!r)return;
-    view={name:'train'};
+    const from=view.name==='rb'?(view.from||'train'):view.name;
+    view={name:'rb',from,id:r.articleId||null};navSet(view);
     sess={rb:{stage:2,articleId:r.articleId||null,title:r.unit||'',editIdx:i},
       rbChecks:(r.checks||[false,false,false,false]).slice(),rbUnit:r.unit||'',rbSum:r.summary||'',rbSum2:r.summary2||''};
     render();}
@@ -2087,8 +2292,9 @@ document.addEventListener('click',e=>{
       S.redbook.push({date:dkey(),unit:(sess.rbUnit||'').trim(),articleId:(sess.rb&&sess.rb.articleId)||null,
         summary:(sess.rbSum||'').trim(),summary2:sum2,checks:sess.rbChecks.slice(),done:true});
     }
-    save();sess.rb=null;render();announce('요약 저장 완료! 1차와 2차가 함께 기록됐어요');}
-  else if(act==='rb-quit'){sess.rb=null;render();}
+    save();rbClose();announce('요약 저장 완료! 1차와 2차가 함께 기록됐어요');}
+  else if(act==='rb-quit'){rbClose();}
+  else if(act==='rb-src'){sess.rbSrc=!sess.rbSrc;render({keep:true});}
   else if(act==='rb-copy'){const txt=S.redbook.map(r=>`[${r.date}] ${r.unit}\n1차: ${r.summary}${r.summary2?'\n2차: '+r.summary2:''}\n셀프체크: ${(r.checks||[]).filter(Boolean).length}/${(r.checks||[]).length||3}`).join('\n\n');
     copyText('WB 비문학 독서 요약 기록\n\n'+txt);}
   /* ── 탐구 랩 ── */

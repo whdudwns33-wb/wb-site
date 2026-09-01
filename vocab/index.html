@@ -1191,18 +1191,26 @@
   /* 물 주기 = 문제 풀이(객관적 판정) / 플래시카드 = 뒤집고 자기 채점 */
   function startReview(mode, type) {
     var t = now();
-    var queue = WBSRS.dueList(statesOfType(type), t).map(function (s) { return s.id; });
+    /* 낱말표에 없는 id 는 걸러 낸다. statesOfType/activeStates 는 어종을 고르지 않으면
+       (전체) id 를 확인하지 않아서, words.js 에서 빠진 낱말이나 진로독서에서 넘어온
+       낱말의 상태가 그대로 큐에 들어왔다. 그러면 WORDS[id] 가 undefined 라
+       TYPE[w.type] 에서 세션이 통째로 죽는다 — 학생은 이유도 모른 채 튕긴다. */
+    var known = function (id) { return !!WORDS[id]; };
+    var queue = WBSRS.dueList(statesOfType(type), t).map(function (s) { return s.id; }).filter(known);
     var practice = false;
+    /* 만기 단어가 없어도 돌려 볼 수 있게 한다 — 예전에는 물 주기가 그냥 막혀서,
+       "더 풀고 싶다"는 학생이 갈 곳이 자기 채점 플래시카드뿐이었다.
+       연습은 exposure 로만 기록되어 기억 간격을 건드리지 않는다. */
     if (!queue.length) {
-      if (mode === 'flash') {
-        practice = true;
-        queue = shuffle(activeStates(type).map(function (s) { return s.id; })).slice(0, 8);
-        if (!queue.length) { toast('아직 심은 단어가 없어요'); return; }
-      } else { toast('지금은 물 줄 단어가 없어요 — 완벽!'); return; }
+      practice = true;
+      queue = shuffle(activeStates(type).map(function (s) { return s.id; }).filter(known)).slice(0, 8);
+      if (!queue.length) { toast('아직 심은 단어가 없어요'); return; }
     }
     var total = queue.length, done = 0, good = 0, failedOnce = {};
     var lab = type ? TYPE[type].label + ' ' : '';
-    var title = mode === 'flash' ? (practice ? '플래시카드 · 가벼운 연습' : lab + '플래시카드') : lab + '물 주기';
+    var title = practice
+      ? (mode === 'flash' ? '플래시카드 · 가벼운 연습' : '실전 문제 · 가벼운 연습')
+      : (mode === 'flash' ? lab + '플래시카드' : lab + '물 주기');
     var body = openOverlay(title);
     var pool = poolWords();
 
@@ -1381,7 +1389,11 @@
     el.innerHTML = '<h2 class="sec">훈련 모드</h2>' +
       '<p class="muted" style="margin-top:-6px;">어떤 정원을 훈련할까요?</p>' + scope +
       '<div class="pick-grid">' +
-      pickBtn2('flash', '클래식 플래시카드', due ? '물 줄 단어 ' + due + '개 — 뒤집고 스스로 채점 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '🃏') +
+      /* 실전 문제를 맨 앞에 둔다. 출제 엔진(quiz.js)은 진작 있었는데 메뉴에서
+         갈 길이 없어, 학생이 채점받을 수 있는 곳이 자기 채점 플래시카드뿐이었다.
+         "알았어!"를 누르는 것과 4지선다를 맞히는 것은 전혀 다른 일이다. */
+      pickBtn2('quiz', '실전 문제', due ? '물 줄 단어 ' + due + '개 — 뜻 고르기·예문 빈칸·한자 조립·철자·듣고 고르기로 진짜 채점 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '📝') +
+      pickBtn2('flash', '클래식 플래시카드', due ? '물 줄 단어 ' + due + '개 — 뒤집고 스스로 채점. 아는지 헷갈리면 실전 문제로 확인해요 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '🃏') +
       pickBtn2('blink', '노출 깜빡이', '단어→뜻이 리듬대로 자동 재생 + 발음. 채점 없음 — 워밍업·자기 전용 (오늘 ' + todayN + '개 · 시듦 ' + withered + '개)', '⚡') +
       pickBtn2('speed', '스피드 리콜 깜빡이', '제한시간 안에 뜻 떠올리기 — 아는 단어를 "즉시 아는 단어"로 (가능 ' + speedable + '개)', '⏱️') +
       pickBtn2('sentence', '문장 짓기', vsyncOn()
@@ -1399,7 +1411,8 @@
     el.querySelectorAll('.pick').forEach(function (b) {
       b.addEventListener('click', function () {
         var m = b.dataset.t;
-        if (m === 'flash') startReview('flash', ty);
+        if (m === 'quiz') startReview('review', ty);
+        else if (m === 'flash') startReview('flash', ty);
         else if (m === 'blink') startBlinkSetup(ty);
         else if (m === 'sentence') startSentence(ty);
         else if (m === 'talk') startTalk(ty);
