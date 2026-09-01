@@ -1433,17 +1433,26 @@ function renderIpsi(){
   let matchHtml="";
   if(R&&rows.length){
     const myG=(R.band[0]+R.band[1])/2;
-    const judged=rows.map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c}:null;}).filter(Boolean);
+    // 등급 스케일(1~9) 컷만 매칭 대상 — 정시 환산점수(수백 점대)는 내신 등급과 비교 불가
+    const gradeRows=rows.filter(r=>{const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);return c!=null&&c>=1&&c<=9;});
+    // 같은 대학·학과·전형은 최신 연도 1건만 (과거 연도는 검색에서 추이로 확인)
+    const latest=new Map();
+    for(const r of gradeRows){const k=r.univ+"|"+r.major+"|"+r.track;const p=latest.get(k);
+      if(!p||String(r.year||"")>String(p.year||""))latest.set(k,r);}
+    const judged=[...latest.values()].map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c}:null;}).filter(Boolean);
     const order={"안정":0,"적정":1,"소신":2,"도전":3};
     judged.sort((a,b)=>order[a.cls[0]]-order[b.cls[0]]||(parseCut(a.cut70)||9)-(parseCut(b.cut70)||9));
-    const shown=judged.filter(r=>r.cls[0]!=="도전").concat(judged.filter(r=>r.cls[0]==="도전").slice(0,5));
+    // 내 등급 ±1.2 창 안의 결과만 (여유 1.2등급 넘는 하위권 '안정'은 상담 가치 없음), 최대 300건
+    const inWindow=judged.filter(r=>{const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);return c-myG<=1.2;});
+    const totalJudged=inWindow.length;
+    const shown=inWindow.filter(r=>r.cls[0]!=="도전").slice(0,300).concat(inWindow.filter(r=>r.cls[0]==="도전").slice(0,5));
     matchHtml=`<div class="tablewrap"><table class="t">
       <tr><th>판정</th><th>대학</th><th>학과</th><th>전형</th><th>70%컷</th><th>50%컷</th><th>연도</th></tr>
       ${shown.map(r=>`<tr><td><span class="chip ${r.cls[1]}">${r.cls[0]}</span></td>
         <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
         <td>${esc(r.cut70||"-")}</td><td>${esc(r.cut50||"-")}</td><td style="color:var(--ink2)">${esc(r.year||"")}</td></tr>`).join("")}
     </table></div>
-    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정 기준: 내 등급이 70%컷보다 0.4 이상 여유=안정 / ±0.2=적정 / -0.8까지=소신. 밴드 중앙값(${myG.toFixed(2)}등급) 기준.</p>`;
+    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정 기준: 내 등급이 70%컷보다 0.4 이상 여유=안정 / ±0.2=적정 / -0.8까지=소신. 밴드 중앙값(${myG.toFixed(2)}등급) ±1.2등급 창 안의 ${totalJudged.toLocaleString()}건 중 상위 ${Math.min(300,totalJudged)}건 표시. 같은 학과·전형은 최신 연도만 — 연도별 추이는 입시 검색에서, 정시(환산점수)는 등급 비교 대상에서 제외.</p>`;
   }else if(R&&!rows.length){
     matchHtml=`<div class="empty"><b>입결 데이터가 비어 있습니다</b>입시 검색에서 ＋로 추가하거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
   }
