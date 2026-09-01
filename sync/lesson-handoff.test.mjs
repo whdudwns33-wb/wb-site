@@ -130,7 +130,9 @@ async function grant(db, auth = recipient, time = at('15:10'), physical = db.phy
 }
 
 test('060 is additive, idempotent, mirrored in schema, and never mutates canonical lesson/attendance/pack rows', () => {
-  assert.ok(schema.includes(migration.trim()));
+  const normalizedSchema = schema.replace(/\r\n/g, '\n');
+  const normalizedMigration = migration.replace(/\r\n/g, '\n').trim();
+  assert.ok(normalizedSchema.includes(normalizedMigration));
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE (?:tasks|checks|session_packs|session_pack_usage)\b/i);
   assert.doesNotMatch(moduleSource, /(?:INSERT(?: OR \w+)? INTO|UPDATE|DELETE FROM)\s+(?:tasks|checks|session_packs|session_pack_usage|weekend_actual_visits)\b/i);
   const db = new DatabaseSync(':memory:');

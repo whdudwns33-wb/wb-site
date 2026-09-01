@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { attemptParentFeedbackSend } from './parent-feedback-send.js';
+import { attemptParentFeedbackSend, parentFeedbackV2CommentBudget } from './parent-feedback-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration016 = fs.readFileSync(new URL('./migrations/016_parent_feedback_send.sql', import.meta.url), 'utf8');
@@ -386,6 +386,20 @@ test('v2 sends the requested six variables through its separate approved templat
     '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
     '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.'
   });
+});
+
+test('v2 comment budget counts every approved-template blank line', () => {
+  const fields = {
+    studentName: '가'.repeat(40), dateText: '나'.repeat(20), subjectText: '다'.repeat(80),
+    contentText: '라'.repeat(250), homeworkText: '마'.repeat(250), commentText: ''
+  };
+  const fixedText = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const used = fixedText.length + fields.studentName.length + fields.dateText.length +
+    fields.subjectText.length + fields.contentText.length + fields.homeworkText.length;
+  assert.equal(parentFeedbackV2CommentBudget(fields), Math.max(0, Math.min(600, 900 - used)));
 });
 
 test('resending the same content is idempotent — no second fetch', async () => {

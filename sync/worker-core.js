@@ -1579,12 +1579,12 @@ function feedbackDateLabel(value) {
 
 /** 클라이언트 미리보기와 카카오 승인 템플릿이 반드시 같은 본문인지 서버에서 다시 확인한다. */
 function feedbackV2Body(studentName, date, subjectText, contentText, homeworkText, commentText) {
-  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-    '- 일시 : ' + feedbackDateLabel(date) + '\n' +
-    '- 과목 : ' + subjectText + '\n' +
-    '- 수업내용 · 진도 : ' + contentText + '\n' +
-    '- 과제 : ' + homeworkText + '\n' +
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n\n' +
+    '- 과제 : ' + homeworkText + '\n\n' +
     '- 코멘트 : ' + commentText + '\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
