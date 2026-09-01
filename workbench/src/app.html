@@ -495,10 +495,17 @@ function renderHome(){
   const allTasks=db.students.flatMap(s=>(s.tasks||[]).filter(t=>t.status!=="제출완료").map(t=>({...t,stu:s})));
   allTasks.sort((a,b)=>(a.due||"9999")<(b.due||"9999")?-1:1);
   const drafts=db.students.reduce((n,s)=>n+(s.saenggibu||[]).length,0);
+  const lb=db.meta&&db.meta.lastExport;
+  const lbd=lb?Math.max(0,Math.floor((new Date(today())-new Date(lb))/864e5)):null;
+  const bkChip=lbd===null
+    ?`<span class="chip danger" style="cursor:pointer" onclick="exportJson()" title="상담 기록의 정본은 이 브라우저 — 백업 파일을 폴더에 보관하세요">💾 백업 기록 없음 — 지금 내보내기</span>`
+    :lbd>=14?`<span class="chip danger" style="cursor:pointer" onclick="exportJson()">💾 마지막 백업 ${lbd}일 전 — 지금 내보내기</span>`
+    :lbd>=7?`<span class="chip warn" style="cursor:pointer" onclick="exportJson()">💾 마지막 백업 ${lbd}일 전</span>`
+    :`<span class="chip ok" style="cursor:pointer" onclick="exportJson()" title="눌러서 새로 백업">💾 백업 ${lbd===0?"오늘":lbd+"일 전"}</span>`;
   $("#main").innerHTML=`
   <div class="pagehead"><div>
     <h1>컨설팅 대시보드</h1>
-    <div class="sub">학생 ${db.students.length}명 · 진행 중 수행평가 ${allTasks.length}건 · 생기부 초안 ${drafts}건 — ${today()}</div>
+    <div class="sub">학생 ${db.students.length}명 · 진행 중 수행평가 ${allTasks.length}건 · 생기부 초안 ${drafts}건 — ${today()} ${bkChip}</div>
   </div><button class="btn pri" onclick="addStudent()">＋ 학생 추가</button></div>
 
   ${db.students.length===0?`<div class="card empty"><b>학생 데이터가 비어 있습니다</b>
@@ -1868,18 +1875,19 @@ function renderIpsi(){
       <input id="db_univ" placeholder="대학" style="width:110px"><input id="db_major" placeholder="학과" style="width:120px">
       <input id="db_track" placeholder="전형" style="width:100px"><input id="db_year" placeholder="연도" style="width:70px">
       <input id="db_c50" placeholder="50컷" style="width:70px"><input id="db_c70" placeholder="70컷" style="width:70px">
+      <input id="db_pct" placeholder="수능백분위" title="정시 전형만 — 진학사 통(RealPass)·모평 자료의 백분위. 전형명을 '수능(…)'으로 적어야 정시 매칭에 반영됩니다" style="width:85px">
       <input id="db_src" placeholder="출처" style="width:130px">
       <button class="btn sm" onclick="addIpdb()">추가</button>
     </div>
     <details class="acc2"><summary>📥 CSV 붙여넣기 가져오기 (어디가 조회 프롬프트 결과)</summary>
-      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처 — 한 줄에 하나</p>
+      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처,수능백분위(정시만·선택) — 한 줄에 하나. 정시는 전형을 "수능(…)"으로 적어야 백분위 매칭에 반영</p>
       <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
       <button class="btn sm" style="margin-top:6px" onclick="importIpdb()">가져오기</button>
     </details>
     ${manual.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
-      <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>출처</th><th></th></tr>
+      <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>백분위</th><th>출처</th><th></th></tr>
       ${manual.map((r,i)=>`<tr><td>${esc(r.univ)}</td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
-        <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td>
+        <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.pct||"")}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
         <td><button class="btn ghost sm" onclick="db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
     </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">수동 추가분이 없습니다. 대량 데이터는 입시 검색에서 이미 매칭에 쓰이고, 여기엔 CSV·직접 입력분만 관리됩니다.</p>`}
@@ -1912,8 +1920,9 @@ function renderIpsi(){
   </div></div>`;}
 function addIpdb(){db.ipdb=db.ipdb||[];
   const r={univ:$("#db_univ").value.trim(),major:$("#db_major").value.trim(),track:$("#db_track").value.trim(),
-    year:$("#db_year").value.trim(),cut50:$("#db_c50").value.trim(),cut70:$("#db_c70").value.trim(),source:$("#db_src").value.trim()};
-  if(!r.univ||(!r.cut50&&!r.cut70)){toast("대학과 컷(50 또는 70)은 필수입니다");return;}
+    year:$("#db_year").value.trim(),cut50:$("#db_c50").value.trim(),cut70:$("#db_c70").value.trim(),
+    pct:$("#db_pct").value.trim(),source:$("#db_src").value.trim()};
+  if(!r.univ||(!r.cut50&&!r.cut70&&!r.pct)){toast("대학과 수치(컷 또는 백분위) 하나는 필수입니다");return;}
   db.ipdb.push(r);save();render();}
 function importIpdb(){db.ipdb=db.ipdb||[];
   const lines=$("#db_csv").value.replace(/\uFEFF/g,"").split(/\n/).map(l=>l.trim()).filter(Boolean);
@@ -1921,8 +1930,8 @@ function importIpdb(){db.ipdb=db.ipdb||[];
   for(const l of lines){
     const c=l.split(/[,\t]/).map(x=>x.trim());
     if(c.length<5)continue;
-    const r={univ:c[0],major:c[1]||"",track:c[2]||"",year:c[3]||"",cut50:c[4]||"",cut70:c[5]||"",rate:c[6]||"",source:c[7]||"어디가"};
-    if(!r.univ||(!parseCut(r.cut50)&&!parseCut(r.cut70)))continue;
+    const r={univ:c[0],major:c[1]||"",track:c[2]||"",year:c[3]||"",cut50:c[4]||"",cut70:c[5]||"",rate:c[6]||"",source:c[7]||"어디가",pct:c[8]||""};
+    if(!r.univ||(!parseCut(r.cut50)&&!parseCut(r.cut70)&&!parseFloat(r.pct)))continue;
     db.ipdb.push(r);n++;}
   save();render();toast(`${n}건 가져옴`);}
 function hsStrategy(p){
