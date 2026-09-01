@@ -181,6 +181,16 @@
     .qrev.ok{border-left-color:var(--ok)}
     .qrev.no{border-left-color:var(--bad)}
     .evchip{display:inline-block;margin-top:9px;padding:7px 12px;border-radius:999px;background:#fff;color:var(--blue);font-size:12px;font-weight:800}
+    /* 근거 문단 다시 보기 — 오답 노트·문항별 해설에서 지문을 펼칠 때 */
+    .evbox{margin-top:10px;padding:12px 14px;border-radius:12px;background:#fbfdfe;border:1px solid #dceef5;max-height:52vh;overflow-y:auto}
+    .evpara{position:relative;margin:0 0 12px;padding-left:26px;font-size:15.5px;line-height:1.9;color:#22303d}
+    .evpara:last-child{margin-bottom:0}
+    .evpara.hit{background:#fff8e1;border-radius:8px;padding:8px 10px 8px 26px;margin-left:-4px}
+    .evno{position:absolute;left:0;top:2px;width:19px;height:19px;border-radius:6px;background:var(--sky);color:var(--blue);
+      font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .evpara.hit .evno{background:var(--coral);color:#fff}
+    .lv-L1 .evpara{font-size:17.5px;line-height:2}
+    .lv-L2 .evpara{font-size:16.5px}
     .ringwrap{display:flex;gap:18px;align-items:center;margin-top:6px}
     .ring{position:relative;flex:0 0 96px;width:96px;height:96px}
     .ring .rc{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
@@ -826,6 +836,50 @@ function vMyChunkEdit(a,b,lv){
     <button class="btn" data-act="myedit-save">저장 — 내 단위로 읽기</button>
     <button class="btn ghost sm" data-act="myedit-cancel">취소</button></div>`;
 }
+/* 지문 한 문단을 어휘 밑줄과 함께 그린다 — 독해 화면과 근거 문단 보기가 함께 쓴다.
+   한 조각에 어휘가 둘 이상 들어 있어도 전부 밑줄 친다. 예전에는 첫 낱말만 걸고
+   멈춰서, 「연대를 못 박아 주는 유물이」처럼 두 낱말이 한 조각에 겹치면
+   뒤엣것은 어디에서도 눌리지 않았다. */
+function koParaHtml(segSrc,vocab,linked,aid){
+  return segSrc.map(seg=>{
+    const hits=[];
+    for(const vb of (vocab||[])){
+      if(linked.has(vb.word))continue;
+      const idx=seg.indexOf(vb.word);
+      if(idx>=0)hits.push({w:vb.word,i:idx});
+    }
+    hits.sort((x,y)=>x.i-y.i);
+    let html='',pos=0;
+    for(const h of hits){
+      if(h.i<pos)continue;            /* 앞 낱말과 글자가 겹치면 건너뛴다 */
+      linked.add(h.w);
+      html+=esc(seg.slice(pos,h.i))+`<button class="vw" data-act="vocab" data-id="${aid}" data-w="${esc(h.w)}">${esc(h.w)}</button>`;
+      pos=h.i+h.w.length;
+    }
+    html+=esc(seg.slice(pos));
+    return `<span class="seg">${html}</span>`;
+  }).join('');
+}
+
+/* ── 근거 문단 다시 보기 ─────────────────────────────────────
+   오답 노트와 문항별 해설에는 「근거: 3번째 문단」 칩만 있었다. 가리키는
+   문단이 화면 어디에도 없으니, 학생은 왜 틀렸는지 확인하지 못한 채 넘어갔다.
+   그렇다고 지문을 늘 펼쳐 두면 오답 노트가 읽고 판단하는 연습이 아니라
+   낱말 찾기가 된다 — 문제 화면이 정답을 감추는 이유와 같다.
+   그래서 답을 고르기 전에는 접어 두고, 고른 뒤에는 근거 문단을 펼쳐 준다.
+   펼친 지문에서도 어휘를 눌러 뜻을 볼 수 있다 — 어휘 때문에 틀리는 일이
+   적지 않은데 지금까지는 그걸 확인할 길이 없었다. */
+function evidenceHtml(a,b,evIdx,all){
+  const linked=new Set();
+  const idxs=all?b.paragraphs.map((_,i)=>i):[evIdx];
+  const body=idxs.map(i=>{
+    const p=b.paragraphs[i];
+    if(!p)return '';
+    return `<p class="evpara${i===evIdx?' hit':''}"><span class="evno">${i+1}</span>${koParaHtml(p,b.vocab,linked,a.id)}</p>`;
+  }).join('');
+  return `<div class="evbox">${body}${all?'':`<p class="sub" style="margin:8px 0 0">${evIdx+1}번째 문단만 보여 주고 있어요.</p>`}</div>`;
+}
+
 function vReader(){
   const a=DB.articles.find(x=>x.id===view.id);if(!a)return '<div class="card"><div class="empty">글을 찾을 수 없어요.</div></div>';
   const lv=myLevel();const b=levelBody(a,lv);
@@ -842,27 +896,7 @@ function vReader(){
   const enMode=hasEn?(S.prefs.en[lv]||0):0;
   const paras=b.paragraphs.map((p,pi)=>{
     const segSrc=(useMine&&mc.b&&mc.b[pi])?segsFromBounds(paraText(p),mc.b[pi]):p;
-    const segs=segSrc.map(seg=>{
-      /* 한 조각에 어휘가 둘 이상 들어 있어도 전부 밑줄 친다.
-         예전에는 첫 낱말만 걸고 멈춰서, 「연대를 못 박아 주는 유물이」처럼
-         두 낱말이 한 조각에 겹치면 뒤엣것은 어디에서도 눌리지 않았다. */
-      const hits=[];
-      for(const vb of b.vocab){
-        if(linked.has(vb.word))continue;
-        const idx=seg.indexOf(vb.word);
-        if(idx>=0)hits.push({w:vb.word,i:idx});
-      }
-      hits.sort((x,y)=>x.i-y.i);
-      let html='',pos=0;
-      for(const h of hits){
-        if(h.i<pos)continue;            /* 앞 낱말과 글자가 겹치면 건너뛴다 */
-        linked.add(h.w);
-        html+=esc(seg.slice(pos,h.i))+`<button class="vw" data-act="vocab" data-id="${a.id}" data-w="${esc(h.w)}">${esc(h.w)}</button>`;
-        pos=h.i+h.w.length;
-      }
-      html+=esc(seg.slice(pos));
-      return `<span class="seg">${html}</span>`;
-    }).join('');
+    const segs=koParaHtml(segSrc,b.vocab,linked,a.id);
     const enP=(enMode>0&&b.en&&b.en[pi])?`<p class="para-en" lang="en">${renderEnPara(b.en[pi],(b.enseg||[])[pi],b.envocab||[],linkedEn,a.id,chunk)}</p>`:'';
     return `<p class="para" id="para-${pi}">${segs}</p>${enP}`;
   }).join('');
@@ -969,7 +1003,9 @@ function vQuiz(){
         <p class="qnum">${i+1}. <span class="tag">${QTYPE_LABEL[cq.type]||'문항'}</span> ${okk?'<span class="tag ok">정답</span>':'<span class="tag bad">오답</span>'}</p>
         <p class="qtext" style="margin-top:6px">${esc(cq.q)}</p>
         <p class="sub" style="margin-top:6px">내 답: <b>${pick==null?'무응답':(pick+1)+'번 · '+esc(cq.choices[pick])}</b>${okk?'':`<br>정답: <b style="color:var(--ok)">${cq.answer+1}번 · ${esc(cq.choices[cq.answer])}</b>`}</p>
-        <div class="explain" style="margin-top:8px">${esc(cq.explain)}<br><span class="evchip">근거: ${cq.evidencePara+1}번째 문단</span></div></div>`;
+        <div class="explain" style="margin-top:8px">${esc(cq.explain)}<br><span class="evchip">근거: ${cq.evidencePara+1}번째 문단</span></div>
+        <button class="toolbtn" data-act="qrev-ev" data-i="${i}" aria-pressed="${!!(q.rev&&q.rev[i])}" style="margin-top:9px">📄 근거 문단 ${q.rev&&q.rev[i]?'접기':'펼치기'}</button>
+        ${q.rev&&q.rev[i]?evidenceHtml(a,b,cq.evidencePara,false):''}</div>`;
     }).join('');
     return `<div class="card hero${lvc}"><p class="eyebrow">${q.ch?'심화 문제 결과':'문제 풀이 결과'}</p><h1>${total}문제 중 ${q.correct}개 정답</h1>
       <p class="sub">${msg}${q.t0?` · 걸린 시간 ${fmtSecs((q.tEnd||Date.now())-q.t0)}`:''}</p>
@@ -1378,13 +1414,19 @@ function vWrongSession(){
     removeWrong(wq.list[wq.i]);wq.list.splice(wq.i,1); // 지문 개편으로 사라진 문항 정리
   }
   if(wq.i>=wq.list.length){
+    /* 지문을 열고 맞힌 것도 노트에서 지운다 — 야박하면 오답 노트를 안 열게 된다.
+       대신 스스로 푼 것과 나눠 보여 주어, 학생도 선생님도 상태를 알 수 있게 한다. */
+    const self=wq.solved-(wq.peeked||0);
     return `<div class="card hero"><p class="eyebrow">오답 노트 완료</p><h1>${wq.solved}개 해결!${wq.again?` ${wq.again}개는 다음에 다시`:''}</h1>
-      <p class="sub">맞힌 문제는 노트에서 지워졌어요. 남은 문제는 내일 또 도전해요.</p>
+      <p class="sub">${wq.peeked?`스스로 해결 ${self}개 · 지문 보고 해결 ${wq.peeked}개. `:''}맞힌 문제는 노트에서 지워졌어요. 남은 문제는 내일 또 도전해요.</p>
       <button class="btn" data-act="wq-done">훈련으로 돌아가기</button></div>`;
   }
   const w=wq.list[wq.i];
-  const {b,q}=wrongQuestion(w);
+  const {a,b,q}=wrongQuestion(w);
   const answered=wq.picked!=null;
+  const evIdx=q.evidencePara;
+  /* ev: 0 접힘 · 1 근거 문단만 · 2 전체 지문 */
+  const ev=wq.ev||0;
   return `<div class="card ${myLevel()==='L1'?'lv-L1':''}"><div class="qhead"><p class="qnum">오답 다시 풀기 ${wq.i+1} / ${wq.list.length}</p>
     <p class="qnum" style="font-weight:600">${esc(b.title)}${w.ch?' · 심화':''}</p></div>
     <div class="qbar"><i style="width:${Math.round(((wq.i+(answered?1:0))/wq.list.length)*100)}%"></i></div>
@@ -1397,8 +1439,13 @@ function vWrongSession(){
         <span class="cnum">${num}</span><span style="flex:1;text-align:left">${esc(c)}</span></button>`;
     }).join('')}</div>
     ${answered?`<div class="explain"><b>${wq.picked===q.answer?'해결! 노트에서 지웠어요.':'아직이에요 — 다음에 또 나와요.'}</b> ${esc(q.explain)}<br>
-    <span class="evchip">근거: ${q.evidencePara+1}번째 문단</span></div>
-    <button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
+    <span class="evchip">근거: ${evIdx+1}번째 문단</span></div>`:''}
+    <div class="rd-tools" style="margin-top:12px">
+      <button class="toolbtn" data-act="wq-ev" data-m="${ev===1?0:1}" aria-pressed="${ev===1}">📄 ${answered?'근거 문단':'지문 다시 보기'}</button>
+      <button class="toolbtn" data-act="wq-ev" data-m="${ev===2?0:2}" aria-pressed="${ev===2}">전체 지문</button>
+    </div>
+    ${ev?evidenceHtml(a,b,evIdx,ev===2):''}
+    ${answered?`<button class="btn" data-act="wq-next">${wq.i+1<wq.list.length?'다음 문제':'끝내기'}</button>`:''}
     ${answered?'':'<button class="btn ghost sm" data-act="wq-done">그만하기</button>'}</div>`;
 }
 const RB_CHECKS=['핵심 개념을 내 말로 바꿔 썼어요','예시나 이유를 1개 이상 넣었어요','글에 없는 내용은 넣지 않았어요','잘 모르는 부분을 표시해 두었어요'];
@@ -1930,6 +1977,8 @@ document.addEventListener('click',e=>{
     S.quiz[view.id+(q.ch?'#c':'')]={correct:q.correct,total:qs.length,date:dkey()};save();
     render();announce(qs.length+'문제 중 '+q.correct+'개 정답');}
   else if(act==='quiz-challenge'){sess.q={i:0,correct:0,picks:[],flags:{},fin:false,ch:true,t0:Date.now(),warn:false};render();}
+  else if(act==='qrev-ev'){const q=sess.q;if(!q)return;
+    q.rev=q.rev||{};const i=+t.dataset.i;q.rev[i]=!q.rev[i];render({keep:true});}
   else if(act==='scrap-open'){sess.scrapOpen=true;render();}
   else if(act==='scrap-save'){const note=($('#scrapNote')?$('#scrapNote').value.trim():'').slice(0,80);
     S.scraps[t.dataset.id]={date:dkey(),note};save();sess.scrapOpen=false;render();announce('스크랩 저장');}
@@ -2035,14 +2084,22 @@ document.addEventListener('click',e=>{
   else if(act==='vs-done'){sess.vs=null;render();}
   /* ── 오답 노트 ── */
   else if(act==='wq-start'){if(!S.wrong.length)return;
-    sess.wq={list:S.wrong.filter(w=>wrongQuestion(w)).slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0};render();}
+    sess.wq={list:S.wrong.filter(w=>wrongQuestion(w)).slice(0,10).map(w=>({...w})),i:0,picked:null,solved:0,again:0,ev:0,sawEv:false,peeked:0};render();}
+  else if(act==='wq-ev'){const wq=sess.wq;if(!wq)return;
+    wq.ev=+t.dataset.m||0;
+    /* 답을 고르기 전에 열었으면 기억해 둔다 — 막지는 않되 결과에서 나눠 보여 준다 */
+    if(wq.ev&&wq.picked==null)wq.sawEv=true;
+    render({keep:true});}
   else if(act==='wq-pick'){const wq=sess.wq;if(!wq||wq.picked!=null)return;
     wq.picked=+t.dataset.i;
     const w=wq.list[wq.i];const res=wrongQuestion(w);
-    if(res&&wq.picked===res.q.answer){removeWrong(w);wq.solved++;}
+    if(res&&wq.picked===res.q.answer){removeWrong(w);wq.solved++;if(wq.sawEv)wq.peeked++;}
     else wq.again++;
+    /* 답을 고른 순간 근거 문단을 펼친다 — 오답 노트는 왜 틀렸는지 확인하는 자리다.
+       전체 지문을 펼쳐 두고 있었다면 그대로 둔다. */
+    if(wq.ev!==2)wq.ev=1;
     render();}
-  else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;render();}
+  else if(act==='wq-next'){const wq=sess.wq;wq.i++;wq.picked=null;wq.ev=0;wq.sawEv=false;render();}
   else if(act==='wq-done'){sess.wq=null;render();}
   /* ── 한자 카드 세션 ── */
   else if(act==='hj-start'){const list=hanjaFamilies();if(!list.length)return;
