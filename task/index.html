@@ -997,6 +997,13 @@
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
+  .feedback-polish-status { min-height: 22px; font-size: 12.5px; font-weight: 700; line-height: 1.55; }
+  .feedback-polish-status[data-state="working"] { color: var(--deep-blue); }
+  .feedback-polish-status[data-state="success"] { color: var(--green); }
+  .feedback-polish-status[data-state="error"] { color: var(--coral); }
+  [data-feedback-final-field="commentText"].feedback-polish-updated {
+    border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,157,116,.14);
+  }
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -1027,11 +1034,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-01.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-01.2"></script>
-<script src="./asset-core.js?v=2026-09-01.2"></script>
-<script src="./qr-core.js?v=2026-09-01.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-01.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-01.3"></script>
+<script src="./schedule-board-core.js?v=2026-09-01.3"></script>
+<script src="./asset-core.js?v=2026-09-01.3"></script>
+<script src="./qr-core.js?v=2026-09-01.3"></script>
+<script src="./acaflow-import-core.js?v=2026-09-01.3"></script>
 <script>
 "use strict";
 
@@ -5722,6 +5729,28 @@ function feedbackFlatField(value) {
   return String(value == null ? '' : value).replace(/[\r\n\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function setFeedbackPolishStatus(state, message, root) {
+  const scope = root && typeof root.querySelector === 'function' ? root : document;
+  const box = scope.querySelector('#feedbackPolishStatus');
+  if (!box) return;
+  box.dataset.state = state || 'idle';
+  box.textContent = String(message || '');
+}
+
+function feedbackPolishErrorText(error) {
+  const code = String(error && error.code || '');
+  const byCode = {
+    FEEDBACK_AI_BUSY: 'AI 요청이 많습니다. 잠시 뒤 다시 시도해 주세요.',
+    FEEDBACK_AI_INVALID: '안전 기준에 맞는 문장을 만들지 못했습니다. 다시 시도해 주세요.',
+    FEEDBACK_AI_DISABLED: 'AI 다듬기 설정을 확인해야 합니다.',
+    FEEDBACK_AI_PRIVATE_TEXT: '코멘트에서 연락처나 이메일을 제거한 뒤 다시 시도해 주세요.',
+    FEEDBACK_AI_NAME_MASK: '학생 이름을 안전하게 구분하기 어려운 문장입니다. 이름 표현을 수정한 뒤 다시 시도해 주세요.',
+    FEEDBACK_LENGTH_LIMIT: '수업내용이나 과제가 길어 코멘트를 다듬을 공간이 부족합니다.',
+    FEEDBACK_AI_FAILED: 'AI 응답을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요.'
+  };
+  return byCode[code] || String(error && error.message || 'AI 다듬기를 완료하지 못했습니다');
+}
+
 /** 서버 검증을 통과했더라도 코드·JSON·HTML·마크다운 흔적이 보이면 화면에 적용하지 않는다. */
 function feedbackPolishHasArtifacts(value) {
   const raw = String(value == null ? '' : value).normalize('NFKC');
@@ -5762,8 +5791,9 @@ function feedbackCommentBudget(t, date, fields) {
     FEEDBACK_ALIMTALK_MAX_CHARS - emptyComment.length));
 }
 
-function updateFeedbackPreviewLength(t) {
-  const target = $('#feedbackPreviewLength');
+function updateFeedbackPreviewLength(t, root) {
+  const scope = root && typeof root.querySelector === 'function' ? root : document;
+  const target = scope.querySelector('#feedbackPreviewLength');
   if (!target || !fbCtx || fbCtx.templateVersion !== 'v2') return;
   const message = feedbackV2Message(t, fbCtx.date, fbCtx);
   const limit = feedbackCommentBudget(t, fbCtx.date, fbCtx);
@@ -5775,9 +5805,9 @@ function updateFeedbackPreviewLength(t) {
   target.textContent = '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
     message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자';
   target.className = 'small mt8 ' + (valid ? 'muted' : 'bad');
-  const finalButton = document.querySelector('[data-act="feedbackfinalsend"]');
+  const finalButton = scope.querySelector('[data-act="feedbackfinalsend"]');
   if (finalButton) finalButton.disabled = !!fbCtx.polishPending || !valid;
-  const polishButton = document.querySelector('[data-act="feedbackpolish"]');
+  const polishButton = scope.querySelector('[data-act="feedbackpolish"]');
   if (polishButton) polishButton.disabled = !!fbCtx.polishPending || !valid;
 }
 
@@ -5792,14 +5822,26 @@ function syncFeedbackFinalFieldFromInput(target) {
     field.value = String(fbCtx[key] || '');
     return true;
   }
+  const modalBox = field.closest('.modal-box');
   const maxChars = key === 'commentText' ? FEEDBACK_COMMENT_MAX_CHARS : 300;
   const nextValue = feedbackFlatField(field.value).slice(0, maxChars);
   fbCtx[key] = nextValue;
-  if (key === 'commentText') fbCtx.baseCommentText = nextValue;
+  if (key === 'commentText') {
+    fbCtx.baseCommentText = nextValue;
+    field.classList.remove('feedback-polish-updated');
+  }
+  const status = modalBox && modalBox.querySelector('#feedbackPolishStatus');
+  const shouldResetStatus = status && (status.dataset.state === 'error' ||
+    (key === 'commentText' && status.dataset.state === 'success'));
+  if (shouldResetStatus) {
+    setFeedbackPolishStatus('idle', key === 'commentText'
+      ? '코멘트를 직접 수정했습니다. 최종 내용을 다시 확인해 주세요.'
+      : '발송 내용을 직접 수정했습니다. 다시 확인한 뒤 AI 다듬기를 눌러 주세요.', modalBox);
+  }
   fbCtx.polishSeq = Number(fbCtx.polishSeq || 0) + 1;
-  const preview = $('#mText');
+  const preview = modalBox && modalBox.querySelector('#mText');
   if (preview) preview.value = feedbackV2Message(task, fbCtx.date, fbCtx);
-  updateFeedbackPreviewLength(task);
+  updateFeedbackPreviewLength(task, modalBox);
   return true;
 }
 
@@ -5869,7 +5911,8 @@ function showFeedbackPreview(t, date, fields, letterText) {
       ? '승인 템플릿과 위의 수정 가능한 발송 변수로 만든 최종 미리보기입니다.'
       : '과거 템플릿 수정 요청입니다. 저장된 수업내용·진도와 선택 항목을 확인해 주세요.') + '</div>',
     (templateVersion === 'v2'
-      ? '<button class="btn btn-navy btn-block mt14" data-act="feedbackpolish">AI 다듬기</button>' : '') +
+      ? '<button class="btn btn-navy btn-block mt14" data-act="feedbackpolish">AI 다듬기</button>' +
+        '<div class="feedback-polish-status mt8" id="feedbackPolishStatus" data-state="idle" role="status" aria-live="polite"></div>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="copytext">복사하기</button>' +
     (guardianDeliveryEnabled
       ? '<button class="btn btn-primary btn-block mt8" data-act="feedbackfinalsend">최종 전송</button>'
@@ -7680,6 +7723,8 @@ async function reviewLessonChange(action, key, revision) {
 async function polishFeedbackComment(button) {
   const context = fbCtx;
   if (!context || context.templateVersion !== 'v2' || context.polishPending) return;
+  const modalBox = button && button.closest('.modal-box');
+  if (!modalBox) return toast('피드백 화면을 다시 열어 주세요');
   const task = state.tasks.find(row => row.id === context.id);
   if (!task) return toast('수업 정보를 찾지 못했습니다');
   const auth = sync.auth();
@@ -7689,11 +7734,14 @@ async function polishFeedbackComment(button) {
   const seq = Number(context.polishSeq || 0) + 1;
   context.polishSeq = seq;
   context.polishPending = true;
-  const finalButton = document.querySelector('[data-act="feedbackfinalsend"]');
-  const editableFields = Array.from(document.querySelectorAll('[data-feedback-final-field]'));
+  const finalButton = modalBox.querySelector('[data-act="feedbackfinalsend"]');
+  const editableFields = Array.from(modalBox.querySelectorAll('[data-feedback-final-field]'));
+  const existingCommentField = modalBox.querySelector('[data-feedback-final-field="commentText"]');
+  if (existingCommentField) existingCommentField.classList.remove('feedback-polish-updated');
   if (button) { button.disabled = true; button.textContent = 'AI가 다듬는 중…'; }
   if (finalButton) finalButton.disabled = true;
   editableFields.forEach(field => { field.disabled = true; });
+  setFeedbackPolishStatus('working', 'AI가 코멘트를 다듬고 있습니다. 잠시만 기다려 주세요.', modalBox);
   try {
     const result = await sync.post('/feedback-polish', {
       app: SYNC_APP, auth,
@@ -7701,7 +7749,8 @@ async function polishFeedbackComment(button) {
       contentText: context.contentText, homeworkText: context.homeworkText,
       commentText: sourceComment
     });
-    if (fbCtx !== context || Number(context.polishSeq) !== seq) return;
+    if (fbCtx !== context || Number(context.polishSeq) !== seq ||
+        !modalBox.isConnected || !button.isConnected || !modalBox.contains(button)) return;
     const rawCommentText = String(result && result.commentText || '');
     if (feedbackPolishHasArtifacts(rawCommentText)) {
       throw new Error('AI 결과에 코드 또는 불필요한 기호가 포함되어 적용하지 않았습니다');
@@ -7718,20 +7767,32 @@ async function polishFeedbackComment(button) {
       throw new Error('다듬은 문구가 알림톡 글자 수를 넘었습니다');
     }
     context.commentText = commentText;
-    const commentField = document.querySelector('[data-feedback-final-field="commentText"]');
-    if (commentField) commentField.value = commentText;
-    const preview = $('#mText');
+    const commentField = modalBox.querySelector('[data-feedback-final-field="commentText"]');
+    if (commentField) {
+      commentField.value = commentText;
+      commentField.classList.add('feedback-polish-updated');
+      requestAnimationFrame(() => commentField.isConnected &&
+        commentField.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    }
+    const preview = modalBox.querySelector('#mText');
     if (preview) preview.value = nextMessage;
-    updateFeedbackPreviewLength(task);
+    updateFeedbackPreviewLength(task, modalBox);
+    setFeedbackPolishStatus('success', 'AI 다듬기 완료 — 코멘트 칸에 반영했습니다. 최종 내용을 확인해 주세요.', modalBox);
     toast('코멘트를 더 부드럽고 자연스럽게 다듬었습니다');
   } catch (error) {
-    if (fbCtx === context) toast('AI 다듬기 실패 — ' + String(error && error.message || error) + ' · 기존 문구는 유지됩니다');
+    if (fbCtx === context && Number(context.polishSeq) === seq && modalBox.isConnected &&
+        button.isConnected && modalBox.contains(button)) {
+      setFeedbackPolishStatus('error', 'AI 다듬기 실패 — ' + feedbackPolishErrorText(error) + ' 기존 코멘트는 변경하지 않았습니다.', modalBox);
+      toast('AI 다듬기에 실패했습니다 — 버튼 아래 안내를 확인해 주세요');
+    }
   } finally {
     if (fbCtx === context && Number(context.polishSeq) === seq) {
       context.polishPending = false;
       editableFields.forEach(field => { if (field.isConnected) field.disabled = false; });
       if (button && button.isConnected) { button.disabled = false; button.textContent = 'AI 다듬기'; }
-      updateFeedbackPreviewLength(task);
+      if (modalBox.isConnected && button && button.isConnected && modalBox.contains(button)) {
+        updateFeedbackPreviewLength(task, modalBox);
+      }
     }
   }
 }
@@ -20435,7 +20496,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-01.2';
+const APP_VER = '2026-09-01.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -607,6 +607,9 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   assert.match(helper, /#mText|feedbackPreview/);
   assert.match(helper, /baseCommentText/,
     '코멘트를 직접 고친 뒤 AI 다듬기를 누르면 수동 수정본을 기준으로 해야 한다');
+  assert.match(helper, /status\.dataset\.state === 'error'/);
+  assert.match(helper, /발송 내용을 직접 수정했습니다/,
+    '길이 오류 뒤 수업내용·과제를 고치면 이전 빨간 오류를 지워야 한다');
   assert.match(html, /addEventListener\('input',[\s\S]*syncFeedbackFinalFieldFromInput\(ev\.target\)/);
 });
 
@@ -620,14 +623,27 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /sync\.post\('\/feedback-polish'/);
   assert.match(polish, /commentText: sourceComment/);
   assert.doesNotMatch(polish, /otherNotes|guardian|phone|studentName/);
-  assert.match(polish, /if \(fbCtx !== context \|\| Number\(context\.polishSeq\) !== seq\) return/);
+  assert.match(polish, /if \(fbCtx !== context \|\| Number\(context\.polishSeq\) !== seq \|\|/);
   assert.match(polish, /context\.commentText = commentText/);
+  assert.match(polish, /setFeedbackPolishStatus\('working'/);
+  assert.match(polish, /setFeedbackPolishStatus\('success'/);
+  assert.match(polish, /setFeedbackPolishStatus\('error'/);
+  assert.match(polish, /feedbackPolishErrorText\(error\)/,
+    'AI 실패 사유는 사라지는 토스트만 쓰지 않고 지속 상태에 안전하게 표시해야 한다');
   assert.match(polish, /feedbackPolishHasArtifacts\(/,
     'AI 결과를 평탄화하거나 화면에 넣기 전에 코드 흔적을 클라이언트에서도 차단해야 한다');
   assert.ok(polish.indexOf('feedbackPolishHasArtifacts') < polish.indexOf('feedbackFlatField(rawCommentText)'),
     '코드 흔적 검사는 줄바꿈·기호를 지우기 전에 실행해야 한다');
   assert.match(polish, /data-feedback-final-field="commentText"|querySelector\('\[data-feedback-final-field="commentText"\]'\)/,
     'AI 성공 결과는 수동 코멘트 입력칸에도 반영해야 한다');
+  assert.match(polish, /feedback-polish-updated/,
+    'AI가 바꾼 코멘트 칸은 선생님이 바로 찾을 수 있게 강조해야 한다');
+  assert.match(polish, /button\.closest\('\.modal-box'\)/,
+    'AI 응답은 요청을 시작한 피드백 팝업 인스턴스에만 적용해야 한다');
+  assert.match(polish, /!modalBox\.isConnected \|\| !button\.isConnected/,
+    '기다리는 동안 팝업이 닫혔다면 늦은 AI 응답을 폐기해야 한다');
+  assert.match(polish, /modalBox\.querySelector\('#mText'\)/,
+    'AI 결과가 다른 팝업의 공용 텍스트 상자를 덮어쓰면 안 된다');
   assert.match(polish, /preview\.value = nextMessage/);
   assert.match(polish, /feedbackV2Message\(task, context\.date/);
   assert.match(polish, /FEEDBACK_ALIMTALK_MAX_CHARS/);
@@ -636,6 +652,8 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(submit, /finally \{[\s\S]*feedbackSubmitting = false/);
   assert.match(html, /case 'feedbackpolish': polishFeedbackComment\(el\)/);
   assert.match(html, /case 'feedbackfinalsend': submitFeedbackForReview\(el\)/);
+  assert.match(html, /id="feedbackPolishStatus"[^>]*role="status"[^>]*aria-live="polite"/,
+    'AI 처리 결과는 버튼 아래의 지속적인 접근성 상태 영역에 표시해야 한다');
 
   const artifactStart = html.indexOf('function feedbackPolishHasArtifacts(');
   const artifactEnd = html.indexOf('function feedbackDateLabel(', artifactStart);
