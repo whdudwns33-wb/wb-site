@@ -258,6 +258,17 @@ const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
       s.profileSeeded=true;}
   }
   if(ch)save();})();
+/* 대량 검색 데이터 — 빌드 시 주입 (공개 소스에는 비어 있음) */
+const BULK={ip:[],hs:[]}; /*BUILD:BULK_DATA*/
+function allIpRows(){
+  const a=(db.ipdb||[]).map(r=>({...r,region:r.region||"",bulk:false}));
+  const b=(BULK.ip||[]).map(r=>({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],region:r[7]||"",source:"어디가 발표",bulk:true}));
+  return a.concat(b);}
+function allHsRows(){
+  const a=(db.hsdb||[]).map(r=>({name:r.name,type:r.type,region:r.region||"",level:r.level||"",feature:r.feature||"",source:r.source||"",bulk:false}));
+  const seen=new Set(a.map(x=>x.name));
+  const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",feature:r[4]||"",source:"나이스",bulk:true}));
+  return a.concat(b);}
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
   return {students:[],meta:{created:today()}};}
@@ -349,6 +360,7 @@ function renderSide(){
   <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
   <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">진학 가능권 분석</span></button>
+  <button class="navbtn ${view.page==='search'?'on':''}" onclick="go('search')">🔍 <span class="txt">입시 검색</span></button>
   <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
   <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
   ${grades.map(g=>{
@@ -1286,7 +1298,90 @@ function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅
 5. 마무리 지시: 실행 노하우 5개를 워크벤치 앱 "노하우 랩 → 노하우 노트"에 저장하고,
    다음 달 상담 아젠다에 반영할 1개를 고른다`);}
 
+/* ═══════════ 입시 검색 (어디가식 대학·고교 검색) ═══════════ */
+function renderSearch(){
+  const tab=view.searchTab||"univ";
+  const q=(view.sq||"").trim();
+  let body="";
+  if(tab==="univ"){
+    const rows=allIpRows();
+    const regions=[...new Set(rows.map(r=>r.region).filter(Boolean))].sort();
+    const years=[...new Set(rows.map(r=>String(r.year||"")).filter(Boolean))].sort().reverse();
+    let f=rows;
+    if(q)f=f.filter(r=>(r.univ+" "+r.major).includes(q));
+    if(view.sTrack)f=f.filter(r=>(r.track||"").includes(view.sTrack));
+    if(view.sRegion)f=f.filter(r=>r.region===view.sRegion);
+    if(view.sYear)f=f.filter(r=>String(r.year)===view.sYear);
+    f.sort((a,b)=>a.univ.localeCompare(b.univ,"ko")||(parseCut(a.cut70)||9)-(parseCut(b.cut70)||9));
+    const shown=f.slice(0,300);
+    body=`
+    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;render()">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="sq" value="${esc(view.sq||"")}" placeholder="대학·학과 검색 (예: 전남대, 의예, 화학공)" style="flex:1;min-width:200px">
+      <select onchange="view.sTrack=this.value;render()" style="width:96px">
+        <option value="">전형 전체</option>${["교과","종합","논술","수능"].map(x=>`<option ${view.sTrack===x?"selected":""}>${x}</option>`).join("")}</select>
+      <select onchange="view.sRegion=this.value;render()" style="width:96px">
+        <option value="">지역 전체</option>${regions.map(x=>`<option ${view.sRegion===x?"selected":""}>${x}</option>`).join("")}</select>
+      <select onchange="view.sYear=this.value;render()" style="width:96px">
+        <option value="">연도 전체</option>${years.map(x=>`<option ${view.sYear===x?"selected":""}>${x}</option>`).join("")}</select>
+      <button class="btn sm pri">검색</button>
+    </div></form>
+    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시, 검색어로 좁혀주세요":""} · 총 데이터 ${rows.length.toLocaleString()}건</p>
+    ${shown.length?`<div class="tablewrap"><table class="t">
+      <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50%컷</th><th>70%컷</th><th>경쟁률</th><th>지역</th><th></th></tr>
+      ${shown.map(r=>`<tr><td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
+        <td>${esc(String(r.year||""))}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.rate||"")}</td>
+        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.region||"")}</td>
+        <td>${r.bulk?`<button class="btn ghost sm" title="분석 DB에 추가 (전략 프롬프트에 반영)" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([r.univ,r.major,r.track,r.year,r.cut50,r.cut70,r.rate]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
+    </table></div>`
+    :`<div class="empty"><b>결과 없음</b>${rows.length<100?"대량 데이터가 아직 주입되지 않았습니다 — 다음 배포에서 채워집니다.":"검색어를 바꿔보세요."}</div>`}`;
+  }else{
+    const rows=allHsRows();
+    const sidos=[...new Set(rows.map(r=>(r.region||"").split(" ")[0]).filter(Boolean))].sort();
+    let f=rows;
+    if(q)f=f.filter(r=>r.name.includes(q));
+    if(view.sSido)f=f.filter(r=>(r.region||"").startsWith(view.sSido));
+    if(view.sHsType)f=f.filter(r=>(r.type||"").includes(view.sHsType));
+    f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
+    const shown=f.slice(0,300);
+    body=`
+    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;render()">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="sq" value="${esc(view.sq||"")}" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
+      <select onchange="view.sSido=this.value;render()" style="width:110px">
+        <option value="">시도 전체</option>${sidos.map(x=>`<option ${view.sSido===x?"selected":""}>${x}</option>`).join("")}</select>
+      <select onchange="view.sHsType=this.value;render()" style="width:110px">
+        <option value="">유형 전체</option>${["일반고","자율고","특목고","특성화","자사고","외고","과학고"].map(x=>`<option ${view.sHsType===x?"selected":""}>${x}</option>`).join("")}</select>
+      <button class="btn sm pri">검색</button>
+    </div></form>
+    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시":""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
+    ${shown.length?`<div class="tablewrap"><table class="t">
+      <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>비고</th><th></th></tr>
+      ${shown.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
+        <td>${r.level?`<span class="chip ${r.level==="상"?"warn":""}">${esc(r.level)}</span>`:""}</td>
+        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.feature||"")}</td>
+        <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
+    </table></div>`
+    :`<div class="empty"><b>결과 없음</b>${rows.length<100?"전국 고교 데이터가 아직 주입되지 않았습니다 — 다음 배포에서 채워집니다.":"검색어를 바꿔보세요."}</div>`}`;
+  }
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>입시 검색</h1>
+  <div class="sub">대학 입결(어디가 발표 기준)과 전국 고교를 검색 — ＋를 누르면 분석·추천 DB에 편입됩니다</div></div></div>
+  <div class="tabs" style="margin-bottom:14px">
+    <button class="tab ${tab==="univ"?"on":""}" onclick="view.searchTab='univ';view.sq='';render()">🎓 대학·학과 입결</button>
+    <button class="tab ${tab==="hs"?"on":""}" onclick="view.searchTab='hs';view.sq='';render()">🏫 고등학교</button>
+  </div>
+  <div class="card">${body}</div>
+  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보 — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
+function addBulkToIpdb(j){const r=JSON.parse(j);db.ipdb=db.ipdb||[];
+  db.ipdb.push({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],source:"어디가 발표"});
+  save();render();toast("분석 DB에 추가");}
+function addBulkToHsdb(j){const r=JSON.parse(j);db.hsdb=db.hsdb||[];
+  db.hsdb.push({name:r[0],type:r[1]||"일반고",region:r[2]||"",level:"중",feature:"검색에서 추가 — 경쟁도 미평가",source:"나이스"});
+  save();render();toast("고교 DB에 추가");}
+
 /* ═══════════ 진학 가능권 분석 (웩슬러·중학·고교 → 입결 대조) ═══════════ */
+
 function normCdf(z){const s=z<0?-1:1;z=Math.abs(z);
   const k=1/(1+0.2316419*z);
   const d=0.3989423*Math.exp(-z*z/2);
@@ -1334,7 +1429,7 @@ function runIpsi(){
   }
   view.ipsiResult={band,label,mode};render();}
 function renderIpsi(){
-  const rows=db.ipdb||[];const R=view.ipsiResult;
+  const rows=allIpRows();const manual=db.ipdb||[];const R=view.ipsiResult;
   let matchHtml="";
   if(R&&rows.length){
     const myG=(R.band[0]+R.band[1])/2;
@@ -1350,7 +1445,7 @@ function renderIpsi(){
     </table></div>
     <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정 기준: 내 등급이 70%컷보다 0.4 이상 여유=안정 / ±0.2=적정 / -0.8까지=소신. 밴드 중앙값(${myG.toFixed(2)}등급) 기준.</p>`;
   }else if(R&&!rows.length){
-    matchHtml=`<div class="empty"><b>입결 DB가 비어 있습니다</b>아래 DB에 데이터를 넣거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
+    matchHtml=`<div class="empty"><b>입결 데이터가 비어 있습니다</b>입시 검색에서 ＋로 추가하거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>진학 가능권 분석</h1>
@@ -1405,7 +1500,7 @@ function renderIpsi(){
       :`<div class="empty" style="padding:14px"><b>고교 DB가 비어 있습니다</b>아래 고교 DB에 광주·전남 학교를 넣으면 추천이 나옵니다 — "콘텐츠DB 추출 프롬프트"가 가장 빠릅니다.</div>`}
     </div></div>`;})():""}`:""}
 
-  <div class="sec"><h2>🗄 입결 DB <span class="n">${rows.length}건 — 구조화 데이터 (수치·출처만, 앱 내 저장)</span></h2>
+  <div class="sec"><h2>🗄 입결 DB <span class="n">매칭 데이터 ${rows.length.toLocaleString()}건 (대량 ${(BULK.ip||[]).length.toLocaleString()} + 수동 ${manual.length}) — 아래 표는 수동분만</span></h2>
   <div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input id="db_univ" placeholder="대학" style="width:110px"><input id="db_major" placeholder="학과" style="width:120px">
@@ -1419,13 +1514,13 @@ function renderIpsi(){
       <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
       <button class="btn sm" style="margin-top:6px" onclick="importIpdb()">가져오기</button>
     </details>
-    ${rows.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
+    ${manual.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
       <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>출처</th><th></th></tr>
-      ${rows.map((r,i)=>`<tr><td>${esc(r.univ)}</td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
+      ${manual.map((r,i)=>`<tr><td>${esc(r.univ)}</td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
         <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
         <td><button class="btn ghost sm" onclick="db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
-    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">비어 있습니다. 어디가 데이터 섹션의 "관심대학 일괄 조회"를 돌리고 결과 CSV를 여기 붙여넣는 게 가장 빠릅니다. 5월 말 어디가 갱신 때마다 새로 채우세요.</p>`}
+    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">수동 추가분이 없습니다. 대량 데이터는 입시 검색에서 이미 매칭에 쓰이고, 여기엔 CSV·직접 입력분만 관리됩니다.</p>`}
   </div></div>
 
   <div class="sec"><h2>🏫 고교 DB <span class="n">${(db.hsdb||[]).length}건 — 중학생 고교 추천에 사용 (광주·전남)</span></h2>
@@ -1505,7 +1600,7 @@ function copyHsdbExtract(){
 4. CSV 전체를 출력하라 — 워크벤치 진학 가능권 분석 → 고교 DB에 붙여넣는다.`);}
 function copyIpsiReport(){
   const R=view.ipsiResult;if(!R)return;
-  const rows=db.ipdb||[];const myG=(R.band[0]+R.band[1])/2;
+  const rows=allIpRows();const myG=(R.band[0]+R.band[1])/2;
   const judged=rows.map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c[0]}:null;}).filter(Boolean);
   const grp=k=>judged.filter(r=>r.cls===k).map(r=>`${r.univ} ${r.major}(${r.track||"-"}, 70%컷 ${r.cut70||r.cut50})`).join(", ")||"—";
   copy(`[WB 진학 가능권 분석 — 상담 참고용] ${today()}
@@ -1912,6 +2007,7 @@ function render(){
   else if(view.page==="lab")renderLab();
   else if(view.page==="adiga")renderAdiga();
   else if(view.page==="ipsi")renderIpsi();
+  else if(view.page==="search")renderSearch();
   else renderStu();
 }
 render();
