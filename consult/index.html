@@ -5406,7 +5406,8 @@ function leadersEyeAccountGuide(me) {
   return '<div class="guide mt14 mb14"><b>리더스아이 로그인 정보</b><br>' +
     'Agency ID: <strong>wbbrain</strong><br>' +
     'Student ID: <strong>' + esc(me.name) + '</strong><br>' +
-    'Student PW: <strong>0000</strong></div>';
+    'Student PW: <strong>0000</strong><br>' +
+    '<span class="small muted">레벨 안내: 학습 결과에 따라 1주일마다 자동으로 레벨이 조정됩니다.</span></div>';
 }
 
 const METAMATH_REQUEST_STATUS = Object.freeze({
@@ -13471,7 +13472,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-01.2';
+const APP_VER = '2026-09-01.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
