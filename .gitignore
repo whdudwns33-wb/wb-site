@@ -11,3 +11,4 @@ node_modules/
 # 구형 배포 스크립트가 만들던 관리자 비밀키 결과 파일 — 커밋 금지
 sync/배포결과.txt
 workbench/src/private-seed.json
+workbench/src/bulk-data.json

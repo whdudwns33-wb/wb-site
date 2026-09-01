@@ -26,6 +26,15 @@ try {
     console.log("비공개 시드 주입됨");
   }
 } catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
+// 대량 검색 데이터(입결·전국 고교) 주입 — bulk-data.json 도 저장소에 커밋하지 않는다
+try {
+  const bulk = readFileSync(join(HERE, "bulk-data.json"), "utf8");
+  const m2 = "const BULK={ip:[],hs:[]}; /*BUILD:BULK_DATA*/";
+  if (htmlStr.includes(m2)) {
+    htmlStr = htmlStr.replace(m2, `const BULK=${bulk.trim()}; /*BUILD:BULK_DATA*/`);
+    console.log("대량 데이터 주입됨");
+  }
+} catch { console.log("대량 데이터 없음 — 빈 상태로 빌드"); }
 const html = Buffer.from(htmlStr, "utf8");
 const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
 const key = crypto.pbkdf2Sync(PASSWORD, salt, ITER, 32, "sha256");
