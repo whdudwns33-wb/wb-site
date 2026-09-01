@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.16",
+  "version": "2026-08-31.17",
   "articles": [
     {
       "id": "nuri-space",
@@ -24202,8 +24202,8 @@
       "status": "published",
       "sources": [
         {
-          "title": "대법원 전자민원센터 — 국민참여재판 Q&A",
-          "url": "https://www.scourt.go.kr/nm/min_9/min_9_3/index.html"
+          "title": "찾기쉬운 생활법령정보 — 배심원 후보자 선정 (배심원후보예정자명부·무작위 추출)",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=899&ccfNo=2&cciNo=1&cnpClsNo=1"
         },
         {
           "title": "찾기쉬운 생활법령정보 — 평의·평결 절차에서의 참여",
@@ -24212,11 +24212,15 @@
         {
           "title": "찾기쉬운 생활법령정보 — 배심원·예비배심원 선정",
           "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=899&ccfNo=2&cciNo=2&cnpClsNo=1"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 국민참여재판의 의의 및 특징 (배심제·참심제 비교)",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=899&ccfNo=1&cciNo=1&cnpClsNo=1"
         }
       ],
       "levels": {
         "L1": {
-          "title": "번호로 불리는 사람들",
+          "title": "뽑혀서 앉는 사람들",
           "minutes": 3,
           "paragraphs": [
             [
@@ -24228,10 +24232,10 @@
               "배심원이라고 불러요."
             ],
             [
-              "배심원은 이름 대신 ",
-              "번호로 불려요. ",
-              "누구인지 알려지면 ",
-              "위험할 수도 있기 때문이에요. ",
+              "배심원은 하고 싶다고 ",
+              "되는 것이 아니에요. ",
+              "나라가 미리 만들어 둔 명단에서 ",
+              "아무나 골라서 불러요. ",
               "배심원은 재판을 ",
               "처음부터 끝까지 지켜봐요. ",
               "그리고 따로 모여서 ",
@@ -24285,15 +24289,15 @@
             },
             {
               "type": "detail",
-              "q": "배심원을 이름 대신 번호로 부르는 까닭은 무엇인가요?",
+              "q": "배심원은 어떻게 정해지나요?",
               "choices": [
-                "이름이 너무 길어서",
-                "번호가 부르기 편해서",
-                "누구인지 알려지면 위험할 수도 있어서",
-                "이름을 잊어버려서"
+                "하고 싶은 사람이 손을 들어요",
+                "미리 만들어 둔 명단에서 골라 불러요",
+                "판사가 아는 사람을 데려와요",
+                "가장 나이가 많은 사람이 해요"
               ],
-              "answer": 2,
-              "explain": "누구인지 알려지면 위험할 수도 있기 때문이라고 나와 있어요.",
+              "answer": 1,
+              "explain": "하고 싶다고 되는 것이 아니라, 미리 만들어 둔 명단에서 골라 부른다고 했어요.",
               "evidencePara": 1
             },
             {
@@ -24361,9 +24365,9 @@
               "다만 변호사나 경찰관처럼 ",
               "일정한 직업을 가진 사람은 ",
               "배심원이 될 수 없다. ",
-              "뽑는 날에는 이름을 부르지 않고 ",
-              "법원이 준 번호로만 부른다. ",
-              "사생활과 신변을 지키기 위해서다."
+              "이 명부는 해마다 새로 만든다. ",
+              "주민등록 자료에서 ",
+              "무작위로 뽑아 적어 둔다."
             ],
             [
               "재판이 끝나면 ",
@@ -24501,7 +24505,7 @@
           ],
           "en": [
             "It is easy to think of a trial as something a judge does alone. In Korea, however, there is a criminal trial in which citizens take part directly. It is called a citizen participation trial, and the people who take part in it are called jurors.",
-            "You do not become a juror by applying. The court draws jurors at random from a list prepared in advance. Any citizen over the age of twenty may serve, and no special qualification is needed. People in certain jobs, such as lawyers and police officers, cannot serve. On the day of selection the court does not call names but only the numbers it has given out, in order to protect privacy and personal safety.",
+            "You do not become a juror by applying. The court draws jurors at random from a list prepared in advance. Any citizen over the age of twenty may serve, and no special qualification is needed. People in certain jobs, such as lawyers and police officers, cannot serve. The list itself is redrawn every year, compiled at random from resident registration records.",
             "When the trial ends, the jurors gather on their own. This meeting is called deliberation, and the judge does not enter. If the jurors reach one view, that becomes their conclusion. If they do not, they must hear the judge's opinion and then decide by majority. Even then the judge may not say whether the defendant is guilty or not guilty. The conclusion reached in this way is the verdict.",
             "This verdict, however, does not bind the court. The judge may hand down a judgment different from it. One condition is attached instead. At sentencing the judge must tell the defendant what the jurors decided, and if the judgment differs, must explain why. The rule does not force the judge to follow the verdict, yet it makes the verdict impossible to pass over in silence."
           ],
@@ -24547,9 +24551,8 @@
               "and no special qualification is needed. ",
               "People in certain jobs, such as lawyers",
               " and police officers, cannot serve. ",
-              "On the day of selection the court does not call names",
-              " but only the numbers it has given out, ",
-              "in order to protect privacy and personal safety."
+              "The list itself is redrawn every year, ",
+              "compiled at random from resident registration records."
             ],
             [
               "When the trial ends, ",
@@ -24603,9 +24606,8 @@
               "특별한 자격이 필요 없지만, ",
               "변호사나 경찰관처럼 ",
               "일정한 직업을 가진 사람은 제외된다. ",
-              "선정기일은 공개하지 않고, ",
-              "후보자를 이름 대신 ",
-              "법원이 부여한 번호로 부른다. ",
+              "이 명부는 지방법원장이 해마다 ",
+              "주민등록 자료에서 무작위로 추출해 새로 만든다. ",
               "인원은 사건에 따라 다르다. ",
               "법정형이 사형이나 무기형에 해당하는 사건에는 ",
               "아홉 명이, ",
@@ -24771,7 +24773,7 @@
           ],
           "en": [
             "For a long time a criminal trial was the work of judges who had studied law for years. In Korea, however, there is also the citizen participation trial, in which ordinary citizens take part as jurors. After watching the arguments in the courtroom from beginning to end, the jurors give their judgment on whether the defendant is guilty. When they find guilt, they also give their opinion on what punishment would be fitting.",
-            "Jurors are not volunteers. From a list of candidates prepared in advance the court draws as many as it needs at random and calls them to a selection hearing. Any citizen over the age of twenty may serve without special qualification, but people in certain jobs, such as lawyers and police officers, are excluded. The selection hearing is closed, and candidates are called by numbers given by the court rather than by name. The size of the jury depends on the case. Nine jurors take part when the offence carries a possible death sentence or life imprisonment, and seven in other cases.",
+            "Jurors are not volunteers. From a list of candidates prepared in advance the court draws as many as it needs at random and calls them to a selection hearing. Any citizen over the age of twenty may serve without special qualification, but people in certain jobs, such as lawyers and police officers, are excluded. The list is remade each year by the chief district judge, drawn at random from resident registration records. The size of the jury depends on the case. Nine jurors take part when the offence carries a possible death sentence or life imprisonment, and seven in other cases.",
             "When the arguments close, the jurors enter the deliberation room. Only jurors take part in this meeting. If all of them agree, that agreement becomes the verdict. If they do not, they must hear the opinion of the judge who heard the case and then decide by majority. Even then the judge may not state an opinion on guilt or innocence, and may not take part in the verdict itself. The foreperson writes a verdict sheet setting out the number of guilty opinions and the number of not-guilty opinions, collects the signatures of every juror, seals it, and hands it to the bench.",
             "The verdict made in this way does not bind the court. The law states plainly that the verdict and the sentencing opinion of the jurors do not bind the court, which means the judge may hand down a judgment different from the verdict. Yet the law does not stop there. When delivering judgment the presiding judge must tell the defendant what the jurors decided, and when the judgment differs from the verdict, must explain the reason to the defendant.",
             "Placed side by side, these two provisions reveal the design of the system. Had the verdict been made binding, the judgment of the judge would have disappeared. Had it been left as mere reference material, the time the jurors spent would have vanished without a trace. Our system chose the space between. It imposes no duty to follow, but it imposes a duty to explain when not following. Weight is given to the conclusion by explanation rather than by force."
@@ -24826,8 +24828,8 @@
               "Any citizen over the age of twenty may serve without special qualification,",
               " but people in certain jobs, such as lawyers",
               " and police officers, are excluded. ",
-              "The selection hearing is closed, ",
-              "and candidates are called by numbers given by the court rather than by name. ",
+              "The list is remade each year by the chief district judge, ",
+              "drawn at random from resident registration records. ",
               "The size of the jury depends on the case. ",
               "Nine jurors take part when the offence carries a possible death sentence",
               " or life imprisonment, and seven in other cases."
@@ -24891,22 +24893,21 @@
               "둘 중 어느 하나를 그대로 들여오지 않았다. ",
               "두 제도를 섞고 ",
               "우리 현실에 맞춘 수정을 더했다. ",
-              "그 수정이 무엇이며 왜 그렇게 했는지를 보면 ",
+              "그 수정을 보면 ",
               "이 제도의 성격이 드러난다."
             ],
             [
               "배심원은 지원해서 되는 자리가 아니다. ",
-              "법원은 미리 작성해 둔 명부에서 ",
-              "필요한 수만큼을 무작위로 뽑아 ",
-              "선정기일을 통지한다. ",
-              "만 스무 살이 넘으면 ",
-              "특별한 자격은 필요 없으나, ",
-              "일정한 전과가 있는 사람과 ",
-              "변호사·경찰관 등은 제외된다. ",
-              "선정기일은 공개하지 않고 ",
-              "후보자를 성명 대신 번호로 부른다. ",
-              "사생활과 신변을 보호하기 위한 장치다. ",
-              "인원은 사건의 무게에 따라 다르다. ",
+              "지방법원장은 해마다 관할 구역에 사는 ",
+              "만 스무 살 이상 국민의 주민등록 자료에서 ",
+              "배심원후보예정자명부를 만든다. ",
+              "법원은 명부에서 필요한 수만큼을 ",
+              "무작위로 뽑아 선정기일을 통지한다. ",
+              "특별한 자격은 필요 없고 ",
+              "일정한 전과가 있는 사람과 변호사·경찰관 등은 제외된다. ",
+              "선정기일의 질문도 후보자의 명예와 사생활을 ",
+              "해치지 않아야 한다. ",
+              "인원은 사건에 따라 다르다. ",
               "법정형이 사형이나 무기형인 사건에는 아홉 명, ",
               "그 밖의 사건에는 일곱 명이 참여하고, ",
               "피고인이나 변호인이 공소사실의 주요 내용을 인정한 때에는 ",
@@ -24922,7 +24923,7 @@
               "다수결로 평결한다. ",
               "다만 판사는 유무죄에 관한 의견을 진술해서는 안 되며, ",
               "의견을 말했더라도 평결에 참여할 수 없다. ",
-              "유죄 평결이 나오면 배심원은 판사와 함께 양형을 토의하지만, ",
+              "유죄 평결이 나오면 배심원은 판사와 양형을 토의하지만, ",
               "표결이 아니라 의견을 낼 수 있을 뿐이다. ",
               "배심원 대표는 유죄 의견과 무죄 의견의 수를 구분한 평결서를 작성하고, ",
               "전원의 서명을 받아 봉인해 재판부에 전달한다."
@@ -25060,7 +25061,7 @@
               "choices": [
                 "판사가 평결과 다른 판결을 하는 경우가 매우 드물다",
                 "판사가 평결과 다르게 선고하면서 「종합적으로 고려했다」는 한 문장만 남겨도 절차상 문제가 없다",
-                "배심원이 선정기일에 번호로 불린다",
+                "배심원 후보가 주민등록 자료에서 무작위로 뽑힌다",
                 "배심원의 수가 사건에 따라 달라진다"
               ],
               "answer": 1,
@@ -25083,7 +25084,7 @@
           ],
           "en": [
             "The way citizens take part in trials differs from country to country. Under the jury system, jurors drawn from ordinary citizens judge guilt independently of professional judges, and the judge is bound by their verdict. Under the lay judge system, lay judges sit as members of the bench itself and decide questions of fact and of law with the same authority as professional judges. Korea's citizen participation trial did not import either one as it stood. It mixed the two systems and added changes fitted to Korean conditions. What those changes are, and why they were made, reveals the character of the system.",
-            "A juror is not a volunteer. From a list of candidates drawn up in advance, the court selects as many as it needs at random and notifies them of a selection hearing. Any citizen over the age of twenty may serve without special qualification, but people with certain criminal records, and people in certain jobs such as lawyers and police officers, are excluded. The selection hearing is closed, and candidates are called by number rather than by name, a device meant to protect privacy and personal safety. The size of the jury varies with the gravity of the case. Nine jurors take part where the offence carries a possible death sentence or life imprisonment and seven in other cases, and five may be used where the defendant or counsel has admitted the main substance of the charge.",
+            "A juror is not a volunteer. Each year the chief district judge compiles a list of prospective juror candidates, drawn at random from the resident registration records of citizens over twenty living in the district. From that list the court again selects at random as many as it needs and notifies them of a selection hearing. No special qualification is required, but people with certain criminal records, and people in certain jobs such as lawyers and police officers, are excluded. Questions at the selection hearing are likewise limited so as not to harm a candidate's reputation or privacy. The size of the jury varies with the gravity of the case. Nine jurors take part where the offence carries a possible death sentence or life imprisonment and seven in other cases, and five may be used where the defendant or counsel has admitted the main substance of the charge.",
             "When the arguments close, the jurors enter the deliberation room. Only jurors take part, and in principle they proceed without the involvement of a judge. If all agree, that agreement stands as the verdict. If they do not agree, they must hear the opinion of the judge who heard the case before reaching a verdict, and then decide by majority. Even then the judge may not state an opinion on guilt or innocence, and having spoken may still not take part in the verdict. Where the verdict is guilty, the jurors discuss sentencing together with the judge, but they do not vote on the sentence; they may only offer an opinion. The foreperson draws up a verdict sheet separating the number of guilty opinions from the number of not-guilty opinions, collects every juror's signature, seals it, and hands it to the bench.",
             "The force of a verdict that has come this far is nonetheless limited. The law provides that the verdict and the sentencing opinion of the jurors do not bind the court. They carry only advisory force, and the judge may hand down a judgment different from the verdict. Yet the law places one more step here. When delivering judgment the presiding judge must inform the defendant of the jurors' verdict, and where the judgment differs from the verdict, must explain the reason to the defendant. No duty to follow is imposed, but a duty to explain not following is.",
             "Set side by side, these two provisions let us read the difficulty the drafters faced. Had the verdict been made binding, the role of judges trained in legal judgment would have been erased. Had it been left as mere reference material, a conclusion citizens spent days reaching would have vanished without a trace. Our system chose explanation over compulsion. Because the explanation is given in open court and stays on the record, a judge who overturns a verdict must have grounds ready. This choice has its price, of course. A duty to explain cannot compel a conclusion, and no standard for judging how thorough an explanation must be is written into the law. Even so, what the approach means is clear: the force that moves an institution does not always come from compulsion, and sometimes requiring reasons to be stated is enough to give a conclusion weight."
@@ -25138,17 +25139,16 @@
             ],
             [
               "A juror is not a volunteer. ",
-              "From a list of candidates drawn up in advance, ",
-              "the court selects as many as it needs at random",
+              "Each year the chief district judge compiles a list of prospective juror candidates, ",
+              "drawn at random from the resident registration records of citizens over twenty living in the district. ",
+              "From that list the court again selects at random as many as it needs",
               " and notifies them of a selection hearing. ",
-              "Any citizen over the age of twenty may serve without special qualification,",
-              " but people with certain criminal records, ",
+              "No special qualification is required, ",
+              "but people with certain criminal records, ",
               "and people in certain jobs such as lawyers",
               " and police officers, are excluded. ",
-              "The selection hearing is closed, ",
-              "and candidates are called by number rather than by name, ",
-              "a device meant to protect privacy",
-              " and personal safety. ",
+              "Questions at the selection hearing are likewise limited so as not to harm a candidate's reputation",
+              " or privacy. ",
               "The size of the jury varies with the gravity of the case. ",
               "Nine jurors take part where the offence carries a possible death sentence",
               " or life imprisonment and seven in other cases, ",
