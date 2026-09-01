@@ -65,6 +65,25 @@ function shapeVerdict(u) {
   return null;
 }
 
+/* 한국어가 거의 없는 문서(노벨재단·유네스코 같은 영어 페이지)는 우리 제목의
+   한국어 낱말로 찾으면 늘 0/N 이 나온다. 그럴 때는 주소의 슬러그를 검사 낱말로
+   쓴다 — pansori-epic-chant-00070 → pansori·epic·chant, chemistry/2020/summary
+   → chemistry·2020. 우리가 적어 둔 주소가 그 문서를 가리키는지 확인하는 데는
+   이쪽이 오히려 정확하다. */
+const SLUG_STOP = /^(www|com|org|net|go|kr|en|ko|html?|php|jsp|asp|do|index|main|view|list|prizes|summary|facts|RL|ich|unesco|nobelprize|https?)$/i;
+function slugWords(u) {
+  let x; try { x = new URL(u); } catch { return []; }
+  return (x.pathname + ' ' + x.search)
+    .split(/[^A-Za-z0-9]+/)
+    .filter(w => w.length >= 3 && !SLUG_STOP.test(w) && !/^\d{5,}$/.test(w))
+    .slice(0, 6);
+}
+const hangul = t => (t.match(/[\uac00-\ud7a3]/g) || []).length;
+
+/* 200 을 주면서 내용 대신 봇 검사를 내보내는 곳이 있다 — 유네스코가 그렇다.
+   지금까지는 「다른 문서일 수 있습니다」로 떠서 진짜 결함과 섞였다. */
+const CAPTCHA = /(whether you are a human|automated spam|Just a moment|Checking your browser|자동\s*등록\s*방지|Enable JavaScript and cookies|cf-browser-verification|hcaptcha|recaptcha)/i;
+
 /* --selftest : 망을 타지 않고 판정 규칙만 확인한다.
    실제로 걸렸던 주소들을 넣어 두었으니, 규칙을 손대면 여기부터 돌려 본다. */
 if (selftest) {
@@ -87,10 +106,36 @@ if (selftest) {
     console.log(`${ok ? '  ' : '✗ '}${String(got ?? '통과').padEnd(14)} ${u}`);
     if (!ok) console.log(`     기대: ${want ?? '통과'}`);
   }
+  /* 봇 검사 화면을 알아보나 — 유네스코가 실제로 이걸 내보냈다 */
+  const CAP = [
+    ['This question is for testing whether you are a human visitor and to prevent automated spam submission.', true],
+    ['Just a moment... Checking your browser before accessing', true],
+    ['국립국어원 표준국어대사전 본문입니다. 판소리는 소리꾼이', false],
+  ];
+  for (const [t, want] of CAP) {
+    const got = CAPTCHA.test(t);
+    if (got !== want) { fail++; console.log(`✗ 봇 검사 판정 어긋남 — ${t.slice(0, 40)}…`); }
+    else console.log(`  ${want ? '봇 검사로 봄  ' : '본문으로 봄   '} ${t.slice(0, 46)}…`);
+  }
+
+  /* 외국어 문서용 주소 낱말 뽑기 */
+  const SLUGS = [
+    ['https://ich.unesco.org/en/RL/pansori-epic-chant-00070', ['pansori', 'epic', 'chant']],
+    ['https://www.nobelprize.org/prizes/chemistry/2020/summary/', ['chemistry', '2020']],
+    ['https://www.nobelprize.org/prizes/literature/2024/han/facts/', ['literature', '2024', 'han']],
+  ];
+  for (const [u, want] of SLUGS) {
+    const got = slugWords(u);
+    const ok = want.every(w => got.includes(w));
+    if (!ok) { fail++; console.log(`✗ 주소 낱말 — ${u}\n     뽑힘: ${got.join('·')} / 기대: ${want.join('·')}`); }
+    else console.log(`  주소 낱말 ${got.join('·')}`);
+  }
+
   /* 현재 지문의 출처가 모양 규칙에 걸리지 않는지도 함께 본다 */
   const caught = items.filter(it => shapeVerdict(it.url));
   caught.forEach(it => console.log(`✗ 지금 쓰는 출처가 규칙에 걸립니다 — ${it.id}#${it.n} ${it.url}`));
-  console.log(`\n규칙 ${CASES.length}건 중 ${CASES.length - fail}건 통과 · 현재 출처 ${items.length}개 중 걸린 것 ${caught.length}개`);
+  const total = CASES.length + CAP.length + SLUGS.length;
+  console.log(`\n규칙 ${total}건 중 ${total - fail}건 통과 · 현재 출처 ${items.length}개 중 걸린 것 ${caught.length}개`);
   process.exit(fail || caught.length ? 1 : 0);
 }
 
@@ -153,8 +198,11 @@ for (const it of items) {
   const r = await fetchWithRetry(it.url);
   const n = parseInt(r.code, 10) || 0;
   const txt = r.html ? bodyText(r.html) : '';
-  const kws = keywords(it.title);
-  const hit = kws.filter(k => txt.includes(k));
+  /* 본문에 한국어가 거의 없으면 제목 낱말 대신 주소 슬러그로 맞춰 본다 */
+  const foreign = txt.length > 300 && hangul(txt) < txt.length * 0.02;
+  const kws = foreign ? slugWords(it.url) : keywords(it.title);
+  const low = txt.toLowerCase();
+  const hit = kws.filter(k => foreign ? low.includes(k.toLowerCase()) : txt.includes(k));
   const ratio = kws.length ? hit.length / kws.length : 1;
 
   /* PDF 는 본문을 글자로 읽을 수 없다 — 압축된 이진 파일이라 제목 낱말이 하나도 안 잡힌다.
@@ -172,12 +220,15 @@ for (const it of items) {
     else { verdict = 'ok'; note = `PDF ${kb}KB — 내용은 사람이 확인 (글자 추출 불가)`; }
   }
   else if ([403, 418, 429].includes(n)) { verdict = 'warn'; note = '봇 차단 — 사람이 열면 정상일 수 있습니다'; }
+  else if (CAPTCHA.test(txt.slice(0, 4000))) { verdict = 'warn'; note = '봇 차단(사람 확인 화면) — 브라우저로 열어 보세요'; }
   else if (n >= 500) { verdict = 'warn'; note = '서버 오류'; }
   else if (ERRPAGE.test(txt.slice(0, 3000))) { verdict = 'bad'; note = '오류 안내 페이지'; }
   else if (txt.length < 400) { verdict = 'warn'; note = `본문 ${txt.length}자 — 첨부만 있거나 자바스크립트로 그리는 페이지` };
   if (!verdict) {
-    if (ratio >= 0.4) { verdict = 'ok'; note = `제목 낱말 ${hit.length}/${kws.length} 본문 확인`; }
-    else { verdict = 'warn'; note = `제목 낱말 ${hit.length}/${kws.length}만 본문에 있음 — 다른 문서일 수 있습니다`; }
+    const what = foreign ? '주소 낱말' : '제목 낱말';
+    const tail = foreign ? ' (외국어 문서 — 주소로 맞춰 봄)' : '';
+    if (ratio >= 0.4) { verdict = 'ok'; note = `${what} ${hit.length}/${kws.length} 본문 확인${tail}`; }
+    else { verdict = 'warn'; note = `${what} ${hit.length}/${kws.length}만 본문에 있음 — 다른 문서일 수 있습니다${tail}`; }
   }
 
   if (verdict === 'bad') bad++; else if (verdict === 'warn') warn++;
@@ -185,7 +236,7 @@ for (const it of items) {
   console.log(`${mark}${it.id}#${it.n}  ${r.code}  ${note}`);
   if (verdict !== 'ok') console.log(`     ${it.title}\n     ${it.url}`);
 
-  rows.push({ ...it, code: r.code, verdict, note, bodyLen: txt.length, kws, hit });
+  rows.push({ ...it, code: r.code, verdict, note, bodyLen: txt.length, foreign, kws, hit });
 }
 
 console.log(`\n${'─'.repeat(56)}`);
