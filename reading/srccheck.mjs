@@ -157,10 +157,20 @@ for (const it of items) {
   const hit = kws.filter(k => txt.includes(k));
   const ratio = kws.length ? hit.length / kws.length : 1;
 
+  /* PDF 는 본문을 글자로 읽을 수 없다 — 압축된 이진 파일이라 제목 낱말이 하나도 안 잡힌다.
+     예전 점검에서 학회지 논문 PDF 가 매번 「다른 문서일 수 있습니다」로 떠서, 진짜 결함과
+     섞여 신호가 흐려졌다. 파일이 진짜 PDF 이고 알맹이가 있을 만큼 크면 통과로 본다. */
+  const isPdf = /^%PDF-/.test(r.html.slice(0, 8)) || (/\.pdf($|\?)/i.test(it.url) && r.html.length > 50000);
+
   let verdict, note;
   if (shape) { verdict = 'bad'; note = shape; }
   else if (r.failed || n === 0) { verdict = 'warn'; note = '응답 없음 — 사람이 직접 열어 보세요'; }
   else if ([400, 404, 410].includes(n)) { verdict = 'bad'; note = '없는 페이지'; }
+  else if (isPdf) {
+    const kb = Math.round(r.html.length / 1024);
+    if (kb < 20) { verdict = 'warn'; note = `PDF 인데 ${kb}KB 뿐 — 빈 파일일 수 있습니다`; }
+    else { verdict = 'ok'; note = `PDF ${kb}KB — 내용은 사람이 확인 (글자 추출 불가)`; }
+  }
   else if ([403, 418, 429].includes(n)) { verdict = 'warn'; note = '봇 차단 — 사람이 열면 정상일 수 있습니다'; }
   else if (n >= 500) { verdict = 'warn'; note = '서버 오류'; }
   else if (ERRPAGE.test(txt.slice(0, 3000))) { verdict = 'bad'; note = '오류 안내 페이지'; }

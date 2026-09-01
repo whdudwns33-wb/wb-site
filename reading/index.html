@@ -118,8 +118,15 @@
     .day7 i.on{background:var(--ok)}
     .note{margin-top:10px;padding:10px 12px;border-radius:11px;background:#fff4e6;color:#7a4308;font-size:12.5px;line-height:1.6}
     .vlist .grow .t b{font-size:15.5px;color:var(--navy)}
-    .meaning{display:none;margin-top:5px}
-    .grow.open .meaning{display:block}
+    /* 어휘장 한 줄 — 뜻은 늘 보이고, 누르면 아래로 편집칸이 열린다 */
+    .vrow{border-top:1px solid var(--line)}
+    .vrow:first-child{border-top:0}
+    .vrow .grow{border-top:0}
+    .vedit{padding:2px 4px 14px}
+    .vedit textarea{width:100%;min-height:64px;margin:6px 0 10px;padding:10px 12px;border:1px solid var(--line);
+      border-radius:10px;font:inherit;font-size:14.5px;line-height:1.6;color:var(--ink);resize:vertical}
+    .vedit textarea:focus{outline:2px solid var(--blue);outline-offset:1px}
+    .lv-L1 .vedit textarea{font-size:16.5px}
     textarea{width:100%;min-height:64px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:12px;font:inherit;font-size:14px;resize:vertical}
     select{width:100%;min-height:48px;margin-top:8px;padding:0 12px;border:1.5px solid #bfd7e1;border-radius:12px;background:#fff;font:inherit;font-size:15px;font-weight:700;color:var(--navy)}
     /* ── v1.1 피그마 시안 반영 ── */
@@ -1068,9 +1075,32 @@ function vLibrary(){
   }
   if(tab==='vocab'){
     const vs=S.vocab.slice().reverse();
-    body=vs.length?`<div class="vlist">${vs.map((v,i)=>`<button class="grow ${sess['vopen'+i]?'open':''}" data-act="vocab-toggle" data-i="${i}">
-      <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
-      <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>`
+    /* 예전에는 「뜻」 단추로 뜻을 폈다 접었다 하게 해 두었는데, `.grow .t small`(0,2,1)이
+       `.meaning`(0,1,0)을 눌러 이겨서 뜻이 늘 펼쳐져 있었다. 단추를 눌러도 글자만
+       「뜻」↔「−」로 바뀌고 화면은 그대로였으니, 학생 눈에는 고장 난 단추였다.
+       뜻이 어차피 한 줄에 들어가니 접었다 펴는 일 자체가 필요 없다 —
+       그 자리를 학생이 실제로 하고 싶어 하는 일, 곧 편집에 내준다. */
+    body=vs.length?`<div class="vlist">${vs.map((v,i)=>{
+      const open=!!sess['vopen'+i];
+      const mine=v.mine&&v.mine.trim();
+      return `<div class="vrow ${open?'open':''}">
+        <button class="grow" data-act="vocab-toggle" data-i="${i}">
+          <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}
+          <small>${mine?`<span class="tag ok">내 말</span> ${esc(mine)}`:esc(v.easy)}</small></span>
+          <span class="go">${open?'−':'✎'}</span></button>
+        ${open?`<div class="vedit">
+          ${mine?`<p class="sub" style="margin:0 0 8px">원래 뜻: ${esc(v.easy)}</p>`:''}
+          <label class="sub" for="vm${i}">뜻을 내 말로 바꿔 써 보세요 — 내 말로 옮겨야 진짜 아는 낱말이 돼요.</label>
+          <textarea id="vm${i}" maxlength="120" placeholder="${esc(v.easy)}">${esc(mine||'')}</textarea>
+          <div class="row2">
+            <button class="btn sm" data-act="vocab-save" data-i="${i}" style="margin-top:0">저장</button>
+            <button class="btn sm ghost" data-act="vocab-del" data-i="${i}" style="margin-top:0">어휘장에서 빼기</button>
+          </div>
+          ${sess.vdel===i?`<div class="note">「${esc(v.word)}」을 어휘장에서 뺄까요? 복습 기록도 함께 지워져요.
+            <div class="row2"><button class="btn sm ghost" data-act="vocab-del-no" style="margin-top:9px">그대로 두기</button>
+            <button class="btn sm" data-act="vocab-del-yes" data-i="${i}" style="margin-top:9px">빼기</button></div></div>`:''}
+        </div>`:''}
+      </div>`;}).join('')}</div>`
       :'<div class="empty">모은 어휘가 없어요.<br>글에서 밑줄 단어를 누르면 어휘장에 쌓여요.</div>';
     /* 복습 버튼은 어휘가 없어도 자리를 지킨다 — 사라지면 학생은 기능이 없어진 줄 안다 */
     body+=`<button class="btn sm" data-act="vocab-review" ${vs.length?'':'disabled'}>복습 퀴즈 (${Math.min(5,vs.length)}개)</button>
@@ -1089,7 +1119,7 @@ function vLibrary(){
         body=`<div class="card" id="vqCard" style="margin:0 0 12px;border-color:#b9deed;background:linear-gradient(145deg,#eaf7fd 0,#fff 70%)">
           <p class="qnum">어휘 복습 ${vq.i+1}/${vq.list.length}</p>
           <p class="qtext" style="font-size:23px;margin-top:10px">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}${esc(v.word)}</p>
-          ${vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}</div>
+          ${vq.show?`<div class="explain">${v.hanja?`<b>${esc(v.hanja)}</b><br>`:''}${esc(v.easy)}${v.mine&&v.mine.trim()?`<br><span class="tag ok">내 말</span> ${esc(v.mine)}`:''}</div>
           <div class="row2" style="margin-top:10px"><button class="btn sm ghost" data-act="vq-mark" data-ok="0" style="margin-top:0">헷갈려요</button>
           <button class="btn sm" data-act="vq-mark" data-ok="1" style="margin-top:0">알았어요</button></div>`
           :`<p class="sub">뜻을 떠올린 다음 눌러 확인해요.</p><button class="btn sm" data-act="vq-show">뜻 보기</button>`}
@@ -1985,7 +2015,28 @@ document.addEventListener('click',e=>{
   else if(act==='scrap-quick'){S.scraps[t.dataset.id]={date:dkey(),note:''};save();render();}
   else if(act==='lib-tab'){view.tab=t.dataset.v;sess={};render();}
   else if(act==='go-lib'){view={name:'library',tab:t.dataset.tab};sess={};render();}
-  else if(act==='vocab-toggle'){sess['vopen'+t.dataset.i]=!sess['vopen'+t.dataset.i];render({keep:true});}
+  else if(act==='vocab-toggle'){
+    /* 편집칸은 한 번에 하나만 연다 — 여러 칸이 열려 있으면 어느 것을 고치는지 흐려진다 */
+    const i=t.dataset.i,was=sess['vopen'+i];
+    Object.keys(sess).forEach(k=>{if(k.indexOf('vopen')===0)delete sess[k];});
+    sess.vdel=null;
+    if(!was)sess['vopen'+i]=true;
+    render({keep:true});}
+  else if(act==='vocab-save'){
+    const i=+t.dataset.i;const el=document.getElementById('vm'+i);if(!el)return;
+    const v=S.vocab.slice().reverse()[i];if(!v)return;
+    const txt=el.value.trim().slice(0,120);
+    if(txt)v.mine=txt;else delete v.mine;      /* 비우면 원래 뜻으로 되돌아간다 */
+    save();delete sess['vopen'+i];render({keep:true});
+    announce(txt?'내 말로 저장했어요':'원래 뜻으로 되돌렸어요');}
+  else if(act==='vocab-del'){sess.vdel=+t.dataset.i;render({keep:true});}
+  else if(act==='vocab-del-no'){sess.vdel=null;render({keep:true});}
+  else if(act==='vocab-del-yes'){
+    const i=+t.dataset.i;const v=S.vocab.slice().reverse()[i];if(!v)return;
+    const at=S.vocab.indexOf(v);if(at>=0)S.vocab.splice(at,1);
+    save();sess.vdel=null;
+    Object.keys(sess).forEach(k=>{if(k.indexOf('vopen')===0)delete sess[k];});
+    render({keep:true});announce('「'+v.word+'」을 어휘장에서 뺐어요');}
   else if(act==='vocab-review'){
     if(!S.vocab.length){announce('아직 모은 어휘가 없어요. 글에서 밑줄 단어를 누르면 쌓여요.');return;}
     const pool=S.vocab.slice().sort(()=>Math.random()<0.5?1:-1);
