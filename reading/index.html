@@ -613,8 +613,32 @@ function navSet(v,replace){try{
   if(replace||(cur&&cur.wb&&cur.wb.name===v.name&&cur.wb.id===v.id))history.replaceState({wb:v},'');
   else history.pushState({wb:v},'');
 }catch(e){/* 기록을 못 써도 앱은 그대로 돌아간다 */}}
-function go(name,extra,fromPop){if(sess.auto)autoStop(false);aloudClose();view=Object.assign({name},extra||{});sess={};if(!fromPop)navSet(view);render();}
+function go(name,extra,fromPop){if(sess.auto)autoStop(false);aloudClose();if(sheetOpen())$('#sheet').classList.remove('open');view=Object.assign({name},extra||{});sess={};if(!fromPop)navSet(view);render();}
+/* ── 어휘 카드(바닥 시트) 여닫기 ──────────────────────────
+   예전에는 「닫기」 단추로만 닫혔다. 안드로이드에서 뒤로 가기를 누르면 카드는
+   그대로 있고 화면만 되돌아갔고, 읽던 글에서 튕겨 나갔다. 워드브레인은 오버레이를
+   뒤로 가기로 먼저 닫도록 처리해 두었는데(back-nav.test.cjs 가 검증한다) 이쪽에는
+   같은 처리가 없었다.
+   덮개(backdrop)는 일부러 두지 않는다 — 카드를 열어 둔 채 지문의 다른 낱말을
+   바로 눌러 볼 수 있어야 하기 때문이다. 뒤로 가기와 Esc 로 닫는다. */
+function sheetOpen(){return $('#sheet').classList.contains('open');}
+function openSheet(){
+  $('#sheet').classList.add('open');
+  /* 뒤로 가기가 소비할 기록을 하나 쌓아 둔다 */
+  try{history.pushState({wb:Object.assign({},view,{sheet:1})},'');}catch(e){}
+}
+function closeSheet(fromPop){
+  $('#sheet').classList.remove('open');
+  /* 단추로 닫았으면 쌓아 둔 기록을 지금 화면 기록으로 바꾼다 —
+     안 그러면 다음 뒤로 가기가 아무 일도 안 한 것처럼 보인다 */
+  if(!fromPop){try{history.replaceState({wb:view},'');}catch(e){}}
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&sheetOpen()){closeSheet(false);}
+});
 window.addEventListener('popstate',function(e){
+  /* 카드가 열려 있으면 뒤로 가기는 카드부터 닫는다 — 화면을 되돌리기 전에 */
+  if(sheetOpen()){closeSheet(true);return;}
   var st=e.state&&e.state.wb;
   if(st&&st.name)go(st.name,st,true);
   /* 맞는 기록이 없으면 브라우저가 앱을 닫도록 그냥 둔다 */
@@ -1961,7 +1985,7 @@ function openVocabEn(articleId,word){
     ${v.base?`<p class="sub" style="margin-top:6px;font-weight:800">${esc(v.base)}</p>`:''}
     <p class="sheet-e">${esc(v.ko)}</p>
     <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
-  $('#sheet').classList.add('open');
+  openSheet();
   announce(v.word+': '+v.ko);
 }
 function openVocab(articleId,word){
@@ -1978,7 +2002,7 @@ function openVocab(articleId,word){
     ${v.hanja?`<div class="hanja">${v.hanja.split('+').map(h=>`<span>${esc(h.trim())}</span>`).join('')}</div>`:''}
     <p class="sheet-e">${esc(v.easy)}</p>
     <p class="sheet-s">${savedNew?'✓ 어휘장에 저장했어요':'어휘장에 있는 단어예요'}</p>`;
-  $('#sheet').classList.add('open');
+  openSheet();
   announce(v.word+': '+v.easy);
 }
 
@@ -2042,7 +2066,7 @@ document.addEventListener('click',e=>{
     S.prefs.type.lh=Math.round(Math.min(2.4,Math.max(1.5,tp.lh+(+t.dataset.d)*0.1))*10)/10;S.prefs.type.lhSet=true;save();render({keep:true});}
   else if(act==='type-reset'){S.prefs.type={font:'sans',fs:null,lh:null,lhSet:false};save();render({keep:true});announce('글자 설정을 기본값으로 되돌렸어요');}
   else if(act==='vocab'){openVocab(t.dataset.id,t.dataset.w);}
-  else if(act==='sheet-close'){$('#sheet').classList.remove('open');}
+  else if(act==='sheet-close'){closeSheet(false);}
   else if(act==='read-done'){sess.readSecs=Math.round((Date.now()-sess.startAt)/1000);sess.readDone=true;
     /* 예전에는 「오늘 글, 어땠어요?」를 먼저 눌러야 완독이 기록되고 문제도 열렸다.
        스스로 매긴 이해도가 관문이었던 셈이다. 완독은 다 읽은 그 순간 기록하고,
