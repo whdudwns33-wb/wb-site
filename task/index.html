@@ -1027,11 +1027,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-08-31.1"></script>
-<script src="./schedule-board-core.js?v=2026-08-31.1"></script>
-<script src="./asset-core.js?v=2026-08-31.1"></script>
-<script src="./qr-core.js?v=2026-08-31.1"></script>
-<script src="./acaflow-import-core.js?v=2026-08-31.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-01.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-01.2"></script>
+<script src="./asset-core.js?v=2026-09-01.2"></script>
+<script src="./qr-core.js?v=2026-09-01.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-01.2"></script>
 <script>
 "use strict";
 
@@ -5743,12 +5743,12 @@ function feedbackDateLabel(value) {
 }
 
 function feedbackV2Message(t, date, fields) {
-  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-    studentOf(t) + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-    '- 일시 : ' + feedbackDateLabel(date) + '\n' +
-    '- 과목 : ' + fields.subjectText + '\n' +
-    '- 수업내용 · 진도 : ' + fields.contentText + '\n' +
-    '- 과제 : ' + fields.homeworkText + '\n' +
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentOf(t) + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + fields.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + fields.contentText + '\n\n' +
+    '- 과제 : ' + fields.homeworkText + '\n\n' +
     '- 코멘트 : ' + fields.commentText + '\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
@@ -7328,8 +7328,9 @@ function viewOwnFeedbackRequests() {
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbownrefresh">새로고침</button></div>';
   if (ownFeedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 상태를 불러오는 중입니다.</div></div>';
   if (ownFeedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownFeedbackQueueError) + '</div></div>';
-  if (!ownFeedbackQueue.length) return h + '<div class="card"><div class="empty"><b>💬</b>아직 요청한 피드백 문구가 없습니다.</div></div>';
-  return h + ownFeedbackQueue.map(ownFeedbackCard).join('');
+  const visibleOwnQueue = ownFeedbackQueue.filter(item => item.status !== 'cancelled');
+  if (!visibleOwnQueue.length) return h + '<div class="card"><div class="empty"><b>💬</b>아직 요청한 피드백 문구가 없습니다.</div></div>';
+  return h + visibleOwnQueue.map(ownFeedbackCard).join('');
 }
 
 function feedbackQueueCard(item) {
@@ -20434,7 +20435,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-08-31.1';
+const APP_VER = '2026-09-01.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
