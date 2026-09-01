@@ -232,6 +232,21 @@ if(!db.meta.seedDbV1){
 /* 학생별 관심대학 시드 — 빌드 시 주입 (공개 소스에는 비어 있음) */
 const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
 (()=>{let ch=false;const SU=SEED_PRIV.univs||{},SP=SEED_PRIV.profiles||{};
+  /* 학생 명단이 비어 있으면 내장 명단으로 생성 (이름이 이미 있으면 건너뜀) */
+  const SS=SEED_PRIV.students||[];
+  if(SS.length){
+    const have=new Set(db.students.map(x=>x.name));
+    for(const r of SS){
+      if(have.has(r.name))continue;
+      db.students.push({id:r.id||uid(),name:r.name,grade:r.grade||"고1",school:r.school||"",
+        career:r.career||"",targetUniv:r.targetUniv||"",lcsi:r.lcsi||"미파악",
+        narrative:r.narrative||"",notes:r.notes||"",profileMd:r.profileMd||"",
+        saenggibu:[],tasks:[],records:[],planners:[],grades:[],inquiries:[],
+        exams:[],subjectsMgmt:[],univs:[],tongLogs:[],commLogs:[],consult:{}});
+      ch=true;}
+    const ORD={"고3":0,"고2":1,"고1":2};
+    db.students.sort((a,b)=>(ORD[a.grade]??9)-(ORD[b.grade]??9));
+  }
   for(const s of db.students){
     if(!s.univSeeded&&(!s.univs||!s.univs.length)&&SU[s.name]){
       s.univs=SU[s.name].map(u=>({univ:u[0],major:u[1],track:u[2]||"",tong:"",checked:""}));

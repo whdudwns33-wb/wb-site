@@ -205,6 +205,7 @@ test('the Leaders Eye student card renders shared login guidance with the curren
   for (const card of [first, second]) {
     assert.match(card, /Agency ID[\s\S]*?wbbrain/);
     assert.match(card, /Student PW[\s\S]*?0000/);
+    assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
     assert.match(card, /오늘 미기록/);
     assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
     assert.match(card, /회차나 별도 과제 배정은 필요하지 않습니다/);
