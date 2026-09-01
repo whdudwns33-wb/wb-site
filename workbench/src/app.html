@@ -465,7 +465,9 @@ function renderSide(){
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
   <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">진학 가능권 분석</span></button>
   <button class="navbtn ${view.page==='mock'?'on':''}" onclick="go('mock')">🧾 <span class="txt">모의지원</span></button>
+  <button class="navbtn ${view.page==='hssim'?'on':''}" onclick="go('hssim')">🏫 <span class="txt">고교 선택</span></button>
   <button class="navbtn ${view.page==='search'?'on':''}" onclick="go('search')">🔍 <span class="txt">입시 검색</span></button>
+  <button class="navbtn ${view.page==='partner'?'on':''}" onclick="go('partner')">🤝 <span class="txt">학교 파트너십</span></button>
   <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
   <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
   ${grades.map(g=>{
@@ -621,10 +623,94 @@ function tabOverview(){
       <button class="btn sm" onclick="addGrade()">추가</button>
     </div>
   </div></div>
+  <div class="sec"><h2>📉 성장 궤적 <span class="n">중3 기준선 → 고교 보정 → 실측 — 예측선 위에 실제선을 얹는 6년짜리 그림</span></h2>
+  <div class="card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
+      <div class="frow" style="margin:0"><label>중3 상위 %</label>
+        <input value="${esc(s.baseMsPct||"")}" placeholder="예: 6" style="width:90px" onchange="upStu('baseMsPct',this.value)"></div>
+      <div class="frow" style="margin:0"><label>웩슬러 FSIQ</label>
+        <input value="${esc(s.baseFsiq||"")}" placeholder="예: 122" style="width:90px" onchange="upStu('baseFsiq',this.value)"></div>
+      <div class="frow" style="margin:0"><label>내신 평균 추가</label>
+        <div style="display:flex;gap:6px">
+          <input id="gpa_term" placeholder="학기 (예: 고1-1)" style="width:110px">
+          <input id="gpa_avg" placeholder="평균 (예: 2.8)" style="width:90px">
+          <button class="btn sm" onclick="addGpa()">기록</button></div></div>
+    </div>
+    ${(s.gpaLog||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${s.gpaLog.map((g,i)=>`<span class="chip">${esc(g.term)} <b>${esc(String(g.avg))}</b>
+        <button style="color:var(--ink2)" title="삭제" onclick="stu().gpaLog.splice(${i},1);save();render()">✕</button></span>`).join("")}</div>`:""}
+    ${trajHtml(s)}
+  </div></div>
   <div class="sec"><h2>프로파일 원문 <span class="n">00_학생프로파일.md</span>
     <button class="btn sm" style="margin-left:auto" onclick="editProfileMd()">편집</button>
     <button class="btn sm" onclick="saveFile('00_학생프로파일.md',stu().profileMd||'')">📁 폴더용 저장</button></h2>
     <div class="card mdv">${s.profileMd?md(s.profileMd):`<div class="empty"><b>프로파일 원문이 없습니다</b>Drive의 00_학생프로파일.md 내용을 붙여넣어 두면 모든 프롬프트에 자동 포함됩니다.</div>`}</div></div>`;}
+function addGpa(){const s=stu();s.gpaLog=s.gpaLog||[];
+  const t=$("#gpa_term").value.trim(),a=parseFloat($("#gpa_avg").value);
+  if(!t||isNaN(a)||a<1||a>9){toast("학기와 평균 등급(1~9)을 입력하세요");return;}
+  const ex=s.gpaLog.findIndex(x=>x.term===t);
+  if(ex>=0)s.gpaLog[ex].avg=a;else s.gpaLog.push({term:t,avg:a});
+  s.gpaLog.sort((x,y)=>x.term<y.term?-1:1);save();render();}
+/* 고교 보정: 학교명으로 고교 DB 대조 → 내신 난이도 보정치 */
+function hsAdjOf(name){
+  if(!name)return {adj:0,why:"학교 미입력 — 보정 없음"};
+  const n1=name.trim(),n2=n1.replace(/여고$/,"여자고등학교").replace(/([^자])고$/,"$1고등학교");
+  const row=allHsRows().find(h=>h.name===n1||h.name===n2||h.name.includes(n1)||n1.includes(h.name.replace(/고등학교$/,"고")));
+  if(!row)return {adj:0,why:"고교 DB에 없음 — 보정 없음"};
+  let adj=0,parts=[];
+  const ty=row.type||"";
+  if(ty.includes("자사")||ty.includes("자율")){adj+=0.5;parts.push("자율·자사 +0.5");}
+  else if(ty.includes("특목")||ty.includes("외고")||ty.includes("과학")||ty.includes("국제")){adj+=1.0;parts.push("특목 +1.0");}
+  else if(ty.includes("특성화")){adj-=0.5;parts.push("특성화 −0.5");}
+  if(row.level==="상"){adj+=0.4;parts.push("내신경쟁 상 +0.4");}
+  else if(row.level==="하"){adj-=0.3;parts.push("내신경쟁 하 −0.3");}
+  return {adj,why:`${row.name}(${ty||"유형 미상"}${row.level?"·경쟁 "+row.level:""}) — ${parts.join(", ")||"보정 0"}`};}
+function trajHtml(s){
+  const p=parseFloat(s.baseMsPct),iq=parseFloat(s.baseFsiq);
+  const log=(s.gpaLog||[]);
+  if(isNaN(p)&&isNaN(iq)&&!log.length)
+    return `<div class="empty" style="padding:14px"><b>기준선이 없습니다</b>중3 상위% 또는 FSIQ를 넣으면 예측 밴드가, 내신 평균을 기록하면 실제선이 그려집니다.</div>`;
+  const ha=hsAdjOf(s.school);
+  let msBand=null,iqBand=null;
+  if(!isNaN(p)&&p>0&&p<=100){
+    const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
+    msBand=[Math.max(1,Math.min(9,g1+ha.adj)),Math.max(1,Math.min(9,g2+ha.adj))];}
+  if(!isNaN(iq)&&iq>=40&&iq<=160){
+    const z=(iq-100)/15,pT=(1-normCdf(z))*100,pA=(1-normCdf(0.6*z))*100;
+    const b1=topPctToGrade(Math.max(0.1,pT)),b2=topPctToGrade(Math.min(100,pA));
+    iqBand=[Math.min(b1,b2),Math.max(b1,b2)];}
+  // 차트
+  const terms=["중3",...log.map(g=>g.term)];
+  const W=680,H=210,PL=34,PR=14,PT=14,PB=26;
+  const gmax=Math.min(9,Math.max(5,...log.map(g=>g.avg+1),msBand?msBand[1]+0.5:0,iqBand?iqBand[1]+0.5:0));
+  const y=g=>PT+(Math.min(gmax,Math.max(1,g))-1)/(gmax-1)*(H-PT-PB);
+  const x=i=>PL+(terms.length<2?(W-PL-PR)/2:i/(terms.length-1)*(W-PL-PR));
+  let grid="";
+  for(let g=1;g<=gmax;g++)grid+=`<line x1="${PL}" y1="${y(g)}" x2="${W-PR}" y2="${y(g)}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${PL-6}" y="${y(g)+3.5}" text-anchor="end" style="fill:var(--ink2)" font-size="10">${g}</text>`;
+  const band=(b,color,label,left)=>b?`<rect x="${PL}" y="${y(b[0])}" width="${W-PL-PR}" height="${Math.max(3,y(b[1])-y(b[0]))}" fill="${color}" opacity="0.14"/>
+    <text x="${left?PL+5:W-PR-4}" y="${y(b[left?0:1])+(left?11:-4)}" text-anchor="${left?"start":"end"}" style="fill:${color}" font-size="10" font-weight="700">${label} ${b[0].toFixed(1)}~${b[1].toFixed(1)}</text>`:"";
+  const pts=log.map((g,i)=>({cx:x(i+1),cy:y(g.avg),g}));
+  const line=pts.length?`<polyline points="${pts.map(pt=>pt.cx+","+pt.cy).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="2"/>`:"";
+  const dots=pts.map(pt=>`<circle cx="${pt.cx}" cy="${pt.cy}" r="4" fill="var(--ink)"><title>${esc(pt.g.term)} ${pt.g.avg}</title></circle>
+    <text x="${pt.cx}" y="${pt.cy-8}" text-anchor="middle" style="fill:var(--ink)" font-size="10" font-weight="600">${pt.g.avg}</text>`).join("");
+  const xlabels=terms.map((t,i)=>`<text x="${x(i)}" y="${H-8}" text-anchor="middle" style="fill:var(--ink2)" font-size="10">${esc(t)}</text>`).join("");
+  // 갭 배지
+  let gapLine="";
+  if(log.length&&iqBand){
+    const cur=log[log.length-1].avg,d=+(cur-iqBand[1]).toFixed(2);
+    gapLine=d>0.2?`<span class="chip danger">잠재 대비 ${d.toFixed(1)}등급 미달 — 학습 전략이 상담 의제</span>`
+      :d<-0.2?`<span class="chip ok">잠재 밴드 상단 상회 — 성취 습관이 강점</span>`
+      :`<span class="chip acc">잠재 밴드 안 — 유지 + 상향 목표 정당</span>`;}
+  let predLine="";
+  if(log.length&&msBand){
+    const cur=log[log.length-1].avg;
+    predLine=cur>msBand[1]+0.2?`<span class="chip warn">중3 예측 대비 하회 — 고교 적응 점검</span>`
+      :cur<msBand[0]-0.2?`<span class="chip ok">중3 예측 상회</span>`:`<span class="chip">중3 예측 범위 안</span>`;}
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="min-width:520px">
+    ${grid}${band(msBand,"var(--w1,#2F6DB5)","중3 예측",true)}${band(iqBand,"var(--accent)","웩슬러 잠재",false)}${line}${dots}${xlabels}</svg></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${gapLine}${predLine}</div>
+  <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">고교 보정: ${esc(ha.why)}. 밴드는 참고치 — 예측이 아니라 상담의 출발선입니다. 등급 축은 1(위)~${gmax}(아래).</p>`;}
 function upStu(k,v){stu()[k]=v;save();renderSide();}
 function addGrade(){const s=stu();s.grades=s.grades||[];
   const g={date:$("#g_date").value||today(),exam:$("#g_exam").value.trim(),subject:$("#g_subject").value.trim(),score:$("#g_score").value.trim()};
@@ -1901,6 +1987,221 @@ function copyIpsiReport(){
 ※ 전형 요소·수능최저·경쟁률 변동에 따라 달라지며, 최종 판단은 상담에서 확정합니다.
 ${R.mode==="iq"?"※ 지능검사 기반 분석은 잠재력 상한 참고치입니다 — 현재 성취와의 갭을 줄이는 학습 전략이 핵심입니다.":""}`);}
 
+/* ═══════════ 고교 선택 시뮬레이터 (중3 → 후보 고교 병렬 비교) ═══════════ */
+function hsSimBand(p,row){ // 중학 상위% + 고교 행 → 예상 내신 밴드
+  const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
+  let adj=0;const ty=row.type||"";
+  if(ty.includes("자사")||ty.includes("자율"))adj=0.5;
+  else if(ty.includes("특목")||ty.includes("외고")||ty.includes("과학")||ty.includes("국제"))adj=1.0;
+  else if(ty.includes("특성화"))adj=-0.5;
+  if(row.level==="상")adj+=0.4;else if(row.level==="하")adj-=0.3;
+  return {band:[Math.max(1,Math.min(9,g1+adj)),Math.max(1,Math.min(9,g2+adj))],adj};}
+function renderHsSim(){
+  let p=parseFloat(view.hsP);
+  const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
+  if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
+  const field=view.hsField||"전체";
+  const picks=view.hsPicks||[];
+  const hsRows=allHsRows();
+  const q=(view.hsSchQ||"").trim();
+  const cand=q?hsRows.filter(h=>h.name.includes(q)&&!picks.includes(h.name)).slice(0,8):[];
+  let cmp="";
+  if(!isNaN(p)&&p>0&&p<=100&&picks.length){
+    const colsH=picks.map(name=>{
+      const row=hsRows.find(h=>h.name===name);if(!row)return"";
+      const {band,adj}=hsSimBand(p,row);
+      const mid=(band[0]+band[1])/2;
+      const myPct=Math.round((100-gradeToTopPct(mid))*10)/10;
+      const isHonam=/^(광주|전남|전북|전라)/.test(row.region||"");
+      // 미니 보드: 적정·소신 상단 3건씩 (특별전형 제외, 지역인재는 호남 고교만 유효)
+      const j=[];
+      for(const g of ipGroups()){
+        if(g.isJ)continue;
+        if(isSpecialTrack(g.track))continue;
+        if(!isHonam&&g.track.includes("지역인재"))continue;
+        if(field!=="전체"&&!fieldPass(g.major,field))continue;
+        const v=judgeGroup(g,mid,myPct);
+        if(v&&(v.cls[0]==="적정"||v.cls[0]==="소신"))j.push({g,v});
+      }
+      j.sort((a,b)=>(a.g.cutG??9)-(b.g.cutG??9));
+      const pick3=k=>j.filter(x=>x.v.cls[0]===k).slice(0,3);
+      const ji=j.filter(x=>x.g.track.includes("지역인재")).length;
+      const mini=(k,arr)=>arr.length?`<div style="margin-top:7px"><b style="font-size:11px;color:var(--ink2)">${k} 상단</b>
+        ${arr.map(x=>`<div style="font-size:12px;margin-top:3px"><b>${esc(x.g.univ)}</b> ${esc(x.g.major)}
+        <span style="color:var(--ink2)">(${esc(x.g.track)}, ${fmtCut(x.g.latest)})</span></div>`).join("")}</div>`:"";
+      const ty=row.type||"유형 미상";
+      const isElite=["특목","자사","자율","과학","외고","외국어","국제","영재"].some(k=>ty.includes(k));
+      const trade=isElite?"내신은 불리하나 학종 프로그램·면학 분위기가 강점 — 종합 전형 설계가 전제"
+        :ty.includes("특성화")?"내신·취업 병행 트랙 — 특성화고 특별전형 경로는 상담에서 검토"
+        :row.level==="상"?"선호 일반고 — 내신 경쟁 감수, 학종·교과 병행"
+        :row.level==="하"?"내신 확보 유리 — 교과 전형 최상위 라인 전략"
+        :"내신·프로그램 균형 — 교과 중심에 종합 보조";
+      return `<div class="bcol" style="background:var(--chip)">
+        <h4 style="color:var(--ink)">${esc(row.name)}<span class="bcnt">${esc(row.region||"")}</span></h4>
+        <div class="kcard" style="border-left-color:var(--accent)">
+          <div class="ku">${esc(ty)}${row.level?` · 내신경쟁 ${esc(row.level)}`:""}${adj?` · 보정 ${adj>0?"+":""}${adj.toFixed(1)}`:""}</div>
+          <div class="km">예상 내신 <span class="mono">${band[0].toFixed(1)}~${band[1].toFixed(1)}</span>등급</div>
+          ${mini("적정",pick3("적정"))}${mini("소신",pick3("소신"))}
+          ${isHonam?`<div style="font-size:11.5px;color:var(--accent-ink);margin-top:6px">📍 지역인재 자격 — 가능권에 ${ji}건</div>`
+            :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">지역인재 비대상 지역</div>`}
+          <div style="font-size:11.5px;color:var(--ink2);margin-top:6px;border-top:1px dashed var(--line);padding-top:5px">${trade}</div>
+          <button class="kstar" title="비교에서 제거" style="color:var(--ink2)" onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(name)}');render()">✕</button>
+        </div></div>`;}).join("");
+    cmp=`<div class="sec"><h2>3️⃣ 나란히 비교 <span class="n">같은 학생(상위 ${p.toFixed(1)}%)이 각 학교에 갔을 때</span>
+      <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button></h2>
+      <div class="bcols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${colsH}</div>
+      <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
+  }
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>고교 선택 시뮬레이터</h1>
+  <div class="sub">"어느 고등학교 보내야 하나" — 후보 고교별 예상 내신과 3년 뒤 대학 가능권을 나란히 비교합니다 (중3 상담용)</div></div></div>
+  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 학생 성적 (중학교)</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="frow" style="margin:0"><label>상위 %</label><input value="${esc(view.hsP||"")}" placeholder="예: 6" style="width:90px" onchange="view.hsP=this.value;render()"></div>
+      <span style="color:var(--ink2);font-size:12px;padding-bottom:9px">또는</span>
+      <div class="frow" style="margin:0"><label>전교 등수</label><input value="${esc(view.hsRank||"")}" placeholder="12" style="width:80px" onchange="view.hsRank=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>재적수</label><input value="${esc(view.hsTot||"")}" placeholder="320" style="width:80px" onchange="view.hsTot=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>희망 계열</label>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">${["전체",...Object.keys(FIELD_KW)].map(f=>`<button class="fchip ${field===f?"on":""}" onclick="view.hsField='${f}';render()">${f}</button>`).join("")}</div></div>
+    </div></div>
+  <div class="sec"><h2>2️⃣ 후보 고교 (최대 3곳)</h2><div class="card">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+      ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:12.5px">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
+    ${picks.length<3?`<input value="${esc(view.hsSchQ||"")}" placeholder="학교명 검색 (예: 순천, 상무고)" oninput="view.hsSchQ=this.value;render()" style="max-width:340px">
+    ${cand.map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
+      <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("")}`:""}
+  </div></div>
+  ${cmp||(picks.length&&!(p>0)?`<p style="font-size:12.5px;color:var(--danger);margin-top:10px">상위 % 또는 등수/재적수를 입력하면 비교가 나옵니다.</p>`:"")}`;}
+function copyHsSim(){
+  let p=parseFloat(view.hsP);
+  const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
+  if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
+  const hsRows=allHsRows();
+  const lines=(view.hsPicks||[]).map(name=>{
+    const row=hsRows.find(h=>h.name===name);if(!row)return"";
+    const {band}=hsSimBand(p,row);
+    return `■ ${row.name} (${row.type||"유형 미상"}${row.level?"·경쟁 "+row.level:""}): 예상 내신 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급`;
+  }).join("\n");
+  copy(`[WB 고교 선택 시뮬레이션 — 상담 참고용] ${today()}
+중학 상위 ${p.toFixed(1)}% 기준
+${lines}
+
+※ 학교 유형·내신 경쟁 강도 기반 시뮬레이션 참고치입니다. 실제 내신은 학교 시험 난이도·학생 적응에 따라 달라지며, 고교 확정은 통학·프로그램·분위기를 포함해 상담에서 결정합니다.`);}
+
+/* ═══════════ 학교 파트너십 (제휴 관리 + 문서 생성) ═══════════ */
+function renderPartner(){
+  db.partners=db.partners||[];
+  const P=db.partners;
+  const ST=["접촉 전","제안서 발송","협의 중","제휴 진행","휴면"];
+  const stCls=s=>s==="제휴 진행"?"ok":s==="협의 중"||s==="제안서 발송"?"acc":s==="휴면"?"danger":"";
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>학교 파트너십</h1>
+  <div class="sub">지역 중·고교 제휴 채널 — 웩슬러 단체검사·진로 특강으로 들어가고, 학교별 진학 리포트로 돌려주고, 상담 리드로 받습니다</div></div></div>
+  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">제휴 학교 관리 <span style="font-weight:400;color:var(--ink2);font-size:12px">${P.length}곳</span></h2>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input id="pt_school" placeholder="학교명" style="width:150px">
+      <input id="pt_contact" placeholder="담당(직책·이름)" style="width:140px">
+      <input type="date" id="pt_next" style="width:140px" title="다음 액션 날짜">
+      <input id="pt_note" placeholder="메모 (경로·조건 등)" style="flex:1;min-width:160px">
+      <button class="btn sm" onclick="addPartner()">추가</button>
+    </div>
+    ${P.length?`<div class="tablewrap"><table class="t">
+      <tr><th>학교</th><th>상태</th><th>담당</th><th>다음 액션</th><th>리드</th><th>메모</th><th>문서</th><th></th></tr>
+      ${P.map((r,i)=>`<tr><td><b>${esc(r.school)}</b><div style="font-size:11px;color:var(--ink2)">${esc(r.region||"")}</div></td>
+        <td><select style="width:110px" onchange="db.partners[${i}].status=this.value;save();render()">${ST.map(s=>`<option ${r.status===s?"selected":""}>${s}</option>`).join("")}</select></td>
+        <td><input value="${esc(r.contact||"")}" style="width:110px" onchange="db.partners[${i}].contact=this.value;save()"></td>
+        <td><input type="date" value="${esc(r.next||"")}" style="width:130px" onchange="db.partners[${i}].next=this.value;save();render()">${r.next?ddayChip(r.next):""}</td>
+        <td><input value="${esc(String(r.leads??""))}" style="width:52px" title="특강·검사에서 온 상담 리드 수" onchange="db.partners[${i}].leads=this.value;save()"></td>
+        <td><input value="${esc(r.note||"")}" style="min-width:130px" onchange="db.partners[${i}].note=this.value;save()"></td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost sm" title="제휴 제안서" onclick='copyPartnerProposal(${JSON.stringify(r.school)})'>제안서</button>
+          <button class="btn ghost sm" title="학교별 진학 리포트" onclick='copySchoolReport(${JSON.stringify(r.school)})'>리포트</button></td>
+        <td><button class="btn ghost sm" onclick="db.partners.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+    </table></div>`:`<div class="empty" style="padding:14px"><b>제휴 학교가 없습니다</b>첫 목표 학교를 추가하고 제안서 버튼으로 시작하세요 — 웩슬러 단체검사가 제휴의 명분입니다.</div>`}
+  </div>
+  <div class="sec"><h2>📄 표준 문서 <span class="n">복사해서 다듬어 쓰는 3종 — 학생 개인정보는 어떤 문서에도 넣지 않습니다</span></h2>
+  <div class="grid cols3">
+    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">① 제휴 제안서</h3>
+      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">교장·진로부장 앞으로 보내는 1장짜리 — 제공(단체검사·특강·리포트)과 요청(시간·안내장)을 명시</p>
+      <button class="btn sm" onclick="copyPartnerProposal('')">복사</button></div>
+    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">② 진로 특강 구성안 (45분)</h3>
+      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">중3 대상 "성적대별 고교·대학 지도" — 우리 데이터 기반, 신청서가 곧 상담 리드</p>
+      <button class="btn sm" onclick="copyLecturePlan()">복사</button></div>
+    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">③ 학교별 진학 리포트</h3>
+      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">그 학교 성적대별 진학 라인을 입결 DB에서 실수치로 채워 생성 — 담임·진로부장 전달용</p>
+      <button class="btn sm" onclick="copySchoolReport('')">학교명 입력 후 생성</button></div>
+  </div></div>
+  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">운영 원칙: 학교에서 받는 데이터는 익명 분포까지만 · 문서에 학생 실명 금지 · 특강·검사 → 개별 해석상담 전환은 학부모 동의 기반.</p>`;}
+function addPartner(){db.partners=db.partners||[];
+  const s=$("#pt_school").value.trim();if(!s){toast("학교명을 입력하세요");return;}
+  const row=allHsRows().find(h=>h.name===s||h.name.includes(s));
+  db.partners.push({school:row?row.name:s,region:row?row.region:"",status:"접촉 전",
+    contact:$("#pt_contact").value.trim(),next:$("#pt_next").value,note:$("#pt_note").value.trim(),leads:""});
+  save();render();}
+function copyPartnerProposal(school){
+  const nm=school||"(학교명)";
+  copy(`[제휴 제안] ${nm} × WB 웩슬러브레인센터 — 진로·학습 데이터 협력
+
+안녕하십니까. 광주 서구 월드컵4강로 52 WB 웩슬러브레인센터입니다.
+저희는 웩슬러 지능검사(WISC-V) 기반 학습 전략 상담 기관으로, 5개 학년도 대입 입결 데이터베이스(4만 6천여 건)와 전국 고교 데이터를 갖추고 있습니다. ${nm}에 아래 협력을 제안드립니다.
+
+■ 센터가 제공하는 것 (무상)
+1. 진로 특강 (연 1~2회, 45분): "성적대별 고교·대학 지도" — 학년 전체 대상, 자료 일체 제공
+2. 웩슬러 단체검사 협력: 희망 가정 대상 검사·해석 (학교는 안내만, 비용·운영은 가정과 센터가 직접)
+3. 학교 맞춤 진학 리포트: 성적대별 진학 가능 라인 정리본 (담임·진로부장용, 연 2회 갱신)
+
+■ 학교에 요청드리는 것
+1. 특강 시간 1회 배정 및 가정통신문 안내
+2. (가능한 범위에서) 익명 통계 수준의 진학·성적 분포 공유 — 리포트 정확도에 반영됩니다
+
+학생 개인정보는 일절 수집하지 않으며, 모든 자료는 익명 통계 기준입니다.
+검토 후 연락 주시면 일정을 맞추겠습니다. 감사합니다.
+
+WB 웩슬러브레인센터 원장 드림 / (성명·연락처 기입)`);}
+function copyLecturePlan(){
+  copy(`[진로 특강 구성안 — 중3 대상 45분] "성적으로 그려보는 고교·대학 지도"
+
+0~5분   오프닝: "지금 등수로 무엇이 정해지고, 무엇은 안 정해졌나"
+5~15분  성적대별 고교 지도: 상위 5/10/25/50%가 각각 유리한 고교 유형 (일반고 내신 vs 특목·자사 학종의 트레이드오프, 실제 사례 익명)
+15~30분 고교 내신 → 대학 라인: 5개년 실제 입결로 보는 "내신 X등급이면 어디까지" (지역인재 전형 — 호남권 학생만의 카드 강조)
+30~38분 잠재력과 성취의 갭: 웩슬러 검사가 알려주는 것 — "머리는 좋은데 성적이 안 나오는" 경우의 원인 유형
+38~45분 Q&A + 희망 가정 개별 상담 안내 (신청서 배부)
+
+준비물: 특강 슬라이드(센터 제작), 신청서 양식, 가정통신문 문안
+금지: 특정 학생 실명 언급, 성적 보장 표현, 타 기관 비교 비하
+효과 측정: 신청서 수 → 해석상담 전환 수를 파트너십 화면 '리드'에 기록`);}
+function copySchoolReport(school){
+  const nm=(school||prompt("리포트를 만들 학교명(고등학교)을 입력하세요")||"").trim();
+  if(!nm)return;
+  const row=allHsRows().find(h=>h.name===nm||h.name.includes(nm));
+  const isHonam=row?/^(광주|전남|전북|전라)/.test(row.region||""):true;
+  const LEVELS=[["상위 5%",5],["상위 10%",10],["상위 20%",20],["상위 35%",35],["상위 50%",50]];
+  const lines=LEVELS.map(([label,pc])=>{
+    const g=topPctToGrade(pc);
+    const myPct=Math.round((100-pc)*10)/10;
+    const arr=[];
+    for(const x of ipGroups()){
+      if(x.isJ||isSpecialTrack(x.track))continue;
+      if(!isHonam&&x.track.includes("지역인재"))continue;
+      const v=judgeGroup(x,g,myPct);
+      if(v&&(v.cls[0]==="적정"))arr.push(x);
+    }
+    arr.sort((a,b)=>(a.cutG??9)-(b.cutG??9));
+    const top=arr.slice(0,3).map(x=>`${x.univ} ${x.major}(${x.track})`).join(" / ")||"데이터 범위 밖";
+    return `- ${label} (내신 약 ${g.toFixed(1)}등급대): ${top}`;
+  }).join("\n");
+  copy(`[${row?row.name:nm} 진학 참고 리포트] WB 웩슬러브레인센터 제공 · ${today()} 기준
+
+${row?`학교: ${row.name} (${row.type||"유형 미상"}, ${row.region||""})`:`학교: ${nm}`}
+자료: 한국대학교육협의회 어디가 발표 5개 학년도(2021~2025) 입결 재정리본 — 최종등록자 교과등급 70%컷 기준
+
+■ 내신 성적대별 진학 가능 라인 (수시 일반전형 기준, 적정권 상단 예시)
+${lines}
+${isHonam?"\n■ 지역인재 전형: 호남권 고교 재학생 전용 — 의약·간호 계열에서 일반전형보다 컷이 완화되는 경우가 많아 상위권 학생에게 우선 검토를 권합니다.":""}
+
+※ 본 자료는 공개 입결 통계의 참고 정리본이며 특정 학생의 합격을 예측하지 않습니다.
+※ 학생 개인정보는 포함되어 있지 않습니다. 문의: WB 웩슬러브레인센터 (광주 서구 월드컵4강로 52)`);}
+
 /* ═══════════ 모의지원 (목표 대학·학과 갭 분석) ═══════════ */
 function mkFieldOf(major){for(const f of Object.keys(FIELD_KW))if(FIELD_KW[f].some(k=>major.includes(k)))return f;return null;}
 function renderMock(){
@@ -2414,6 +2715,8 @@ function render(){
   else if(view.page==="adiga")renderAdiga();
   else if(view.page==="ipsi")renderIpsi();
   else if(view.page==="mock")renderMock();
+  else if(view.page==="hssim")renderHsSim();
+  else if(view.page==="partner")renderPartner();
   else if(view.page==="search")renderSearch();
   else renderStu();
 }
