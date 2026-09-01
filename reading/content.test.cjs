@@ -176,8 +176,25 @@ const isIndexPage = (u) => {
   if (path === '' || /^\/(index|main)\.(do|jsp|html?)$/.test(path)) return true;
   if (/(List|list)\.do|listRenew|boardCnts\/list/.test(path + x.search)) return true;
   if (/[?&]menuId=\d+$/.test(x.search) && /index\.do/.test(path)) return true;
+  /* 쿼리 없이 press/news/notice/board 로 끝나면 게시판 목록이다.
+     kma.go.kr/kma/news/press.jsp 가 이 구멍으로 빠져나가 있었다 —
+     학생이 눌러도 그날의 보도자료 목록만 뜨고 근거는 찾을 수 없다. */
+  if (/\/(press|news|notice|board|list)\.(do|jsp|html?|php|asp)$/i.test(path) && !x.search) return true;
   return false;
 };
+/* korea.kr 의 pressReleaseView.do 는 부처 보도자료를 '전재'한다고만 적어 두고
+   본문은 싣지 않는다 — 화면에는 제목과 20MB짜리 hwp 내려받기 단추뿐이고,
+   본문 문장은 <meta>·JSON-LD 안에만 잘린 채로 들어 있다. 링크 검사는
+   200 을 돌려받고 제목 키워드도 맞아서 통과하지만, 학생이 눌러 보면
+   근거가 없다. 부처 누리집의 원문 상세 페이지를 대신 링크한다. */
+const isAttachmentOnly = (u) => /korea\.kr\/briefing\/pressReleaseView\.do/.test(u);
+db.articles.forEach(a => {
+  (a.sources || []).forEach(s => {
+    if (!isAttachmentOnly(s.url)) return;
+    E(`${a.id}: 출처 "${s.title.trim()}" 는 첨부파일만 있는 전재 페이지입니다 — 발표 부처 누리집의 보도자료 원문을 링크하세요\n        ${s.url}`);
+  });
+});
+
 let oldIndexSrc = 0;
 db.articles.forEach(a => {
   (a.sources || []).forEach(s => {

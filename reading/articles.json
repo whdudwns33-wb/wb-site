@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-31.17",
+  "version": "2026-08-31.18",
   "articles": [
     {
       "id": "nuri-space",
@@ -4505,8 +4505,8 @@
           "url": "https://www.bok.or.kr/portal/main/contents.do?menuNo=200291"
         },
         {
-          "title": "고용노동부 보도자료 — 2027년 적용 최저임금 시간급 10,700원 (2026.8.5)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156773394"
+          "title": "고용노동부 보도자료 — 2027년도 적용 최저임금 시간급 10,700원 (2026.8.5)",
+          "url": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=19744"
         }
       ],
       "levels": {
@@ -5615,8 +5615,8 @@
           "url": "https://www.meis.go.kr/mli/monitoringInfo/stat.do"
         },
         {
-          "title": "기후에너지환경부 보도자료 — 하천부터 바다까지 미세플라스틱 분석 (2026.7.15)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156770834"
+          "title": "기후에너지환경부 보도자료 — 하천부터 바다까지 미세플라스틱 분석 '연결고리' 잇는다 (2026.7.15)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1877470"
         }
       ],
       "levels": {
@@ -6688,8 +6688,8 @@
           "url": "https://www.index.go.kr/unity/potal/main/EachDtlPageDetail.do?idx_cd=1171"
         },
         {
-          "title": "기후에너지환경부 보도자료 — 탄소중립기본법 개정안 국회 통과 (2026.8.26)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775574"
+          "title": "기후에너지환경부 보도자료 — 탄소중립기본법 개정안·기후적응법 제정안 국회 통과 (2026.8.26)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1886480"
         }
       ],
       "levels": {
@@ -11110,8 +11110,8 @@
           "url": "https://pda.kasi.re.kr/lvrad.php"
         },
         {
-          "title": "우주항공청 보도자료 — LVRAD NASA 탑재 이행약정 (2026.8.17)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156774557"
+          "title": "우주항공청 보도자료 — 달 표면 우주방사선 측정기(LVRAD) NASA 달 착륙선 탑재 이행약정 체결 (2026.8.17)",
+          "url": "https://www.kasa.go.kr/prog/plcyBrf/brief/kor/sub01_01_04/view.do?plcyBrfNo=468"
         }
       ],
       "levels": {
@@ -12188,8 +12188,8 @@
       "status": "published",
       "sources": [
         {
-          "title": "기후에너지환경부 보도자료 — 제4차 계획기간 배출권 할당 완료 (2025.12.28)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156737066"
+          "title": "기후에너지환경부 보도자료 — 온실가스 배출권거래제 제4차 계획기간(2026~2030) 배출권 할당 완료 (2025.12.28)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1831130"
         },
         {
           "title": "공공데이터포털 — 온실가스종합정보센터 할당대상업체 현황",
@@ -13262,12 +13262,12 @@
       "issue": true,
       "sources": [
         {
-          "title": "기상청 보도자료",
-          "url": "https://www.kma.go.kr/kma/news/press.jsp"
+          "title": "기상청 보도자료 — 최근 10년 우리 바다 해양열파 평년 대비 3.7배 증가 (2026.8.25)",
+          "url": "https://www.kma.go.kr/kma/news/press_01.jsp?mode=view&num=1194719"
         },
         {
-          "title": "기상청 보도자료 — 최근 10년 해양열파 평년 대비 3.7배 증가 (2026.8.26)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775532"
+          "title": "국회도서관 국가전략포털 — [기후위기 특집④] 해양 기후재해 해양열파(고수온)와 우리의 대응 (2025.6.4)",
+          "url": "https://nsp.nanet.go.kr/plan/subject/detail.do?nationalPlanControlNo=PLAN0000053154"
         }
       ],
       "levels": {
@@ -13552,7 +13552,7 @@
               "5일 이상 지속되는 현상을 ",
               "'해양열파'라고 한다. ",
               "과학자들은 보통 수온이 ",
-              "지난 30년 기록 가운데 ",
+              "평년 분포에서 ",
               "상위 10%에 들 만큼 ",
               "높을 때를 기준으로 삼는다. ",
               "바닷물은 공기보다 ",
@@ -13692,7 +13692,7 @@
           ],
           "minutes": 5,
           "en": [
-            "Just as there are heatwaves on land, there are heatwaves in the sea. A 'marine heatwave' is a period in which the sea water stays much warmer than the normal level for that region and season for five days or more. Scientists usually use a standard: the water temperature must be high enough to rank in the top 10% of the records from the past thirty years. Because sea water holds heat longer than air, a marine heatwave, once it starts, can sometimes continue for weeks.",
+            "Just as there are heatwaves on land, there are heatwaves in the sea. A 'marine heatwave' is a period in which the sea water stays much warmer than the normal level for that region and season for five days or more. Scientists usually use a standard: the water temperature must be high enough to fall in the top 10% of the normal distribution for that place and season. Because sea water holds heat longer than air, a marine heatwave, once it starts, can sometimes continue for weeks.",
             "According to an analysis released by the Korea Meteorological Administration in August 2026, marine heatwaves occurred in the seas around Korea for an average of 83.3 days per year during the last ten years (2016-2025). That is 3.7 times the normal level. During the same period, the sea surface temperature was also 0.7 degrees higher than normal. The KMA expects that if warming continues, marine heatwaves will become more frequent and stronger, and by the end of the century most days of the year could be marine heatwave days.",
             "When the sea gets hotter, the effects spread both inside and outside the ocean. Fish species that live in cold water move north, changing the kinds of fish that are caught, and fish on farms die in large numbers because they cannot stand the high water temperature. A hot sea also supplies the air with a great deal of heat and water vapor, which fuels heatwaves and heavy rain and makes typhoons stronger. The changes in the sea come back to us as the weather on land.",
             "So scientists watch the water temperature in real time with satellites and observation equipment at sea, and when it rises sharply, they issue warnings so that fishing communities can prepare. Cutting greenhouse gas emissions can also slow down the warming of the ocean. For marine scientists and climate researchers who study marine heatwaves, and for people in the fishing industry who look for ways to adapt to a changed sea, the warming ocean is becoming a stage for new careers."
@@ -13709,9 +13709,9 @@
               "for five days or more. ",
               "Scientists usually use a standard: ",
               "the water temperature must be high enough ",
-              "to rank in the top 10% ",
-              "of the records ",
-              "from the past thirty years. ",
+              "to fall in the top 10% ",
+              "of the normal distribution ",
+              "for that place and season. ",
               "Because sea water holds heat ",
               "longer than air, ",
               "a marine heatwave, once it starts, ",
@@ -13849,7 +13849,7 @@
               "이례적으로 높은 상태가 ",
               "5일 이상 지속되는 현상을 말한다. ",
               "과학자들은 보통 ",
-              "지난 30년 관측 기록의 ",
+              "평년(1991~2020년) 분포의 ",
               "상위 10%를 넘는 수온이 ",
               "이어질 때를 해양열파로 판정한다. ",
               "기준이 지역과 계절에 상대적이므로, ",
@@ -14029,7 +14029,7 @@
           ],
           "minutes": 6,
           "en": [
-            "It is not only the air that global warming has heated. Most of the extra heat trapped by greenhouse gases is stored in the ocean. As a result, extreme events corresponding to heatwaves on land also occur in the sea, and these are marine heatwaves. A marine heatwave is a phenomenon in which the water temperature in a particular sea area remains unusually high, compared with the normal values for that time of year, for five days or longer. Scientists generally identify a marine heatwave when the water temperature stays above the top 10% of the observation records of the past thirty years. Since the standard is relative to region and season, marine heatwaves can occur even in winter seas.",
+            "It is not only the air that global warming has heated. Most of the extra heat trapped by greenhouse gases is stored in the ocean. As a result, extreme events corresponding to heatwaves on land also occur in the sea, and these are marine heatwaves. A marine heatwave is a phenomenon in which the water temperature in a particular sea area remains unusually high, compared with the normal values for that time of year, for five days or longer. Scientists generally identify a marine heatwave when the water temperature stays above the top 10% of the normal distribution for 1991 to 2020. Since the standard is relative to region and season, marine heatwaves can occur even in winter seas.",
             "According to the analysis 'Climate Characteristics and Future Outlook of the Seas around Korea,' released by the Korea Meteorological Administration in August 2026, marine heatwaves in Korean waters occurred for an average of 83.3 days per year over the last decade (2016-2025), 3.7 times the normal level. Over the same period, the average sea surface temperature was 18.1 degrees, 0.7 degrees above normal. The outlook for the future is even clearer. Although it depends on greenhouse gas emission scenarios, marine heatwaves could increase to around 300 days a year by the end of the twenty-first century. Most of the year, in other words, would be in a state of 'ocean heatwave.'",
             "A rise of a few degrees in water temperature may seem trivial, but for marine creatures, whose body temperature follows the water around them, it is a matter of survival. When a marine heatwave strikes, cold-water fish species shift their habitats northward, while seaweeds and shellfish that cannot move sometimes die off in masses. As the species that fishermen catch change, the landscape of the fishing industry changes as well. Fish on aquaculture farms, confined to one place, cannot escape the hot water, which often leads to large-scale die-offs in summer. A marine heatwave thus shakes marine ecosystems and the fisheries industry at the same time.",
             "The effects do not end in the sea. A heated ocean supplies the atmosphere with vast amounts of heat and water vapor, fueling heatwaves and torrential rain on land and helping typhoons move north while keeping their strength. A feedback occurs in which changes in the ocean disturb the climate in turn. In response, countries monitor water temperatures in real time with satellites and observation buoys, and issue warnings when high water temperatures are expected so that fish farms can prepare in advance. Above all, reducing greenhouse gas emissions is considered the most fundamental response that can lower the frequency and intensity of future marine heatwaves.",
@@ -14056,8 +14056,8 @@
               "Scientists generally identify a marine heatwave ",
               "when the water temperature stays ",
               "above the top 10% ",
-              "of the observation records ",
-              "of the past thirty years. ",
+              "of the normal distribution ",
+              "for 1991 to 2020. ",
               "Since the standard is relative ",
               "to region and season, ",
               "marine heatwaves can occur ",
@@ -16548,7 +16548,7 @@
       "sources": [
         {
           "title": "기후에너지환경부 보도자료 — 산업용 지역 전기요금제 설계안 공개 (2026.8.26)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156775556"
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1886260"
         },
         {
           "title": "전력거래소 EPSIS — 지역별 전력 거래단가",
@@ -31694,8 +31694,8 @@
       "status": "published",
       "sources": [
         {
-          "title": "대한민국 정책브리핑 — 국립산림과학원, 서울 25개 자치구 도시숲과 지표면 온도 상관관계 (2026.8.3)",
-          "url": "https://www.korea.kr/briefing/pressReleaseView.do?newsId=156773120"
+          "title": "국립산림과학원 보도자료 — 나무 많을수록 여름철 도시 더 시원하다: 도시숲의 열섬 완화 효과 입증 (2026.8.3)",
+          "url": "https://nifos.forest.go.kr/kfsweb/cop/bbs/selectBoardArticle.do?nttId=3222898&bbsId=BBSMSTR_1036&mn=UKFR_03_03_01&ctgryLrcls=CTGRY150"
         },
         {
           "title": "산림청 보도자료 — 도시숲은 폭염을 식혀주는 천연에어컨 (가로수·교통섬 그늘 온도 저감)",
