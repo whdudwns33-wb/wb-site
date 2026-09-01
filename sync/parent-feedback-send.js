@@ -42,9 +42,9 @@ const TEMPLATE_FIXED_TEXT =
   '▪ 오늘 배운 내용: \n▪ 잘한 점: \n▪ 다음에 더 신경 쓸 점: \n\n' +
   '숫자로 비교하지 않고, 그날 그 아이만 보고 남긴 기록입니다.\n문의사항은 학원으로 연락 주세요. 감사합니다.';
 const TEMPLATE_V2_FIXED_TEXT =
-  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-  '- 일시 : \n- 과목 : \n- 수업내용 · 진도 : \n- 과제 : \n- 코멘트 : \n\n' +
+  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+  '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
   '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 export const MAX_PARENT_FEEDBACK_ALIMTALK_CHARS = 900;
 export const MAX_PARENT_FEEDBACK_COMMENT_CHARS = 600;

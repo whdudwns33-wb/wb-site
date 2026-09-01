@@ -547,6 +547,22 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
     assert.ok(template.includes(label), label);
   }
   assert.match(template, /문의 사항이 있으시면 학원으로 연락부탁드립니다\. 감사합니다\./);
+  const templateFunctionEnd = html.indexOf('\n}', templateStart) + 2;
+  const renderTemplate = Function(
+    "const studentOf = task => task.studentName; const feedbackDateLabel = () => '2026년 9월 1일';\n" +
+    html.slice(templateStart, templateFunctionEnd) + '; return feedbackV2Message;'
+  )();
+  assert.equal(renderTemplate({ studentName: '테스트학생' }, '2026-09-01', {
+    subjectText: '국어', contentText: '비문학 중심 내용 찾기',
+    homeworkText: '어휘 10개 복습', commentText: '근거를 찾아 설명했습니다.'
+  }), '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 1일\n\n' +
+    '- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : 비문학 중심 내용 찾기\n\n' +
+    '- 과제 : 어휘 10개 복습\n\n' +
+    '- 코멘트 : 근거를 찾아 설명했습니다.\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.');
   assert.match(html, /String\(t\.studentId \|\| ''\) \+ '\|' \+ t\.id \+ '\|' \+ date/);
   const helpers = Function("const seedPick = (rows, seed, slot) => rows[Math.abs(slot) % rows.length];\n" + bank +
     '; return { count: formalFeedbackSentenceCount(), formalize: formalizeDirectFeedback, ' +

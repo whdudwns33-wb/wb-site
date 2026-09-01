@@ -95,11 +95,11 @@ test('v2 submission accepts only the exact fixed template and stores its structu
     contentText: '비문학 지문의 중심 내용 찾기', homeworkText: '어휘 10개 복습',
     commentText: '근거를 찾아 자신의 생각을 설명하는 태도가 인상적이었습니다.', plusText: '', minusText: ''
   };
-  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-    '- 일시 : 2026년 8월 27일\n- 과목 : 국어\n' +
-    '- 수업내용 · 진도 : ' + structured.contentText + '\n' +
-    '- 과제 : ' + structured.homeworkText + '\n- 코멘트 : ' + structured.commentText + '\n\n' +
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 8월 27일\n\n- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
   const auth = person('teacher-a', 'token-a');
   let result = await call(db, '/feedback-request', { auth, ...identityV2, message, ...structured });
@@ -114,6 +114,14 @@ test('v2 submission accepts only the exact fixed template and stores its structu
   });
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2,
+    message: message.replace('입니다.\n\n테스트학생', '입니다.\n테스트학생'),
+    ...structured
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '승인 템플릿의 빈 줄 하나가 빠져도 거부해야 한다');
 });
 
 test('feedback submission delegates all real sending to the dedicated send module', () => {
