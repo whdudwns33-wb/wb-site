@@ -57,8 +57,11 @@ test('관리자 변경 검토는 수업 등록 및 변경 탭에 있고 승인 �
   assert.match(card, /<b>요청 사유<\/b><br>/);
 });
 
-test('취소된 피드백은 활성 피드백 검토 목록에서 숨긴다', () => {
+test('취소된 피드백은 관리자 검토와 선생님 발송 상태의 활성 목록에서 숨긴다', () => {
+  const ownFeedbackView = source.slice(source.indexOf('function viewOwnFeedbackRequests()'), source.indexOf('function feedbackQueueCard('));
   const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
+  assert.match(ownFeedbackView, /ownFeedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
+  assert.match(ownFeedbackView, /visibleOwnQueue\.map\(ownFeedbackCard\)/);
   assert.match(feedbackView, /feedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
 });
 
