@@ -5,6 +5,7 @@
   --accent:#0F6B5C; --accent-soft:#E3F0EC; --accent-ink:#0A4A40;
   --ok:#2E7D32; --warn:#B26A00; --danger:#B3261E; --warn-soft:#FFF4E0; --danger-soft:#FBEAE9; --ok-soft:#E8F3E8;
   --chip:#EEF1ED; --shadow:0 1px 3px rgba(28,43,42,.08);
+  --tk2bg:#F4E1EE; --tk2ink:#A03A80; --tk3bg:#E9E3F7; --tk3ink:#5B44A8;
 }
 :root:not([data-theme="light"]) { }
 @media (prefers-color-scheme: dark){
@@ -13,6 +14,7 @@
     --accent:#4CC2A9; --accent-soft:#1E332E; --accent-ink:#8FE0CE;
     --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
     --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
+    --tk2bg:#332030; --tk2ink:#D98CC0; --tk3bg:#282442; --tk3ink:#A794E0;
   }
 }
 :root[data-theme="dark"]{
@@ -20,6 +22,7 @@
   --accent:#4CC2A9; --accent-soft:#1E332E; --accent-ink:#8FE0CE;
   --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
   --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
+  --tk2bg:#332030; --tk2ink:#D98CC0; --tk3bg:#282442; --tk3ink:#A794E0;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -78,6 +81,72 @@ a.btn{text-decoration:none;color:var(--ink)}
 .stucard{cursor:pointer;transition:border-color .15s}
 .stucard:hover{border-color:var(--accent)}
 .stucard h3{font-size:15px;display:flex;align-items:center;gap:7px}
+/* ── 입시 검색 A안 (디렉터리) ── */
+.ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
+.ucard{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.ucard:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.ucard .utop{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.uinit{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13.5px;flex:none}
+.ucard .uname{font-size:14.5px;font-weight:700}
+.ucard .ureg{font-size:11px;color:var(--ink2)}
+.ucard .umeta{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)}
+.ucard .urange{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.mrow{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:7px;overflow:hidden}
+.mbtn{display:flex;width:100%;align-items:center;gap:9px;padding:10px 13px;background:none;border:0;font:inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.mbtn .mname{font-weight:600;font-size:13.5px;flex:1;min-width:0}
+.mbtn .mcut{font-weight:600;color:var(--accent);font-size:13.5px;flex:none;font-variant-numeric:tabular-nums}
+.mbtn .marr{color:var(--ink2);flex:none;transition:transform .15s;font-size:11px}
+.mrow.open .marr{transform:rotate(90deg)}
+.mtrend{display:none;border-top:1px dashed var(--line);padding:11px 13px;gap:7px;flex-wrap:wrap;align-items:center}
+.mrow.open .mtrend{display:flex}
+.ycell{flex:1;min-width:70px;max-width:110px;background:var(--chip);border-radius:8px;padding:6px 8px;text-align:center}
+.ycell .yy{font-size:10px;color:var(--ink2);letter-spacing:.05em;font-variant-numeric:tabular-nums}
+.ycell .yc{font-weight:600;font-size:13.5px;font-variant-numeric:tabular-nums}
+.ycell .yd{font-size:10px;font-weight:600}
+.yd.up{color:var(--danger)}.yd.dn{color:var(--ok)}.yd.fl{color:var(--ink2)}
+.tchip{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px;flex:none;white-space:nowrap}
+.tchip.tk0{background:var(--accent-soft);color:var(--accent-ink)}
+.tchip.tk1{background:var(--warn-soft);color:var(--warn)}
+.tchip.tk2{background:var(--tk2bg,#F4E1EE);color:var(--tk2ink,#A03A80)}
+.tchip.tk3{background:var(--tk3bg,#E9E3F7);color:var(--tk3ink,#5B44A8)}
+/* ── 진학 분석 C안 (상담 보드) ── */
+.bfilters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.fchip{border:1.5px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.bsummary{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:10px;color:var(--accent-ink)}
+.bpins{border:1.5px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bpin{background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--accent-ink);display:inline-flex;gap:5px;align-items:center}
+.bpin button{border:0;background:none;cursor:pointer;color:var(--accent-ink);padding:0;font-size:12px;line-height:1}
+.bcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;align-items:start}
+.bcol{background:var(--chip);border-radius:11px;padding:8px}
+.bcol h4{font-size:12px;font-weight:700;padding:2px 5px 7px;display:flex;justify-content:space-between}
+.bcol .bcnt{color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+.bcol.k0 h4{color:var(--ok)}.bcol.k1 h4{color:var(--accent-ink)}.bcol.k2 h4{color:var(--warn)}.bcol.k3 h4{color:var(--danger)}
+.kcard{background:var(--panel);border-radius:9px;border:1px solid var(--line);border-left:3.5px solid transparent;padding:8px 10px;margin-bottom:7px;position:relative}
+.bcol.k0 .kcard{border-left-color:var(--ok)}.bcol.k1 .kcard{border-left-color:var(--accent)}
+.bcol.k2 .kcard{border-left-color:var(--warn)}.bcol.k3 .kcard{border-left-color:var(--danger)}
+.kcard .ku{font-size:10.5px;color:var(--ink2);font-weight:600}
+.kcard .km{font-weight:700;font-size:12.5px;padding-right:20px;line-height:1.35}
+.kcard .kb{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--ink2)}
+.kcard .kb>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.kcard .kcut{font-weight:600;font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.kstar{position:absolute;top:5px;right:6px;border:0;background:none;cursor:pointer;font-size:14px;color:var(--line);padding:2px;line-height:1}
+.kstar.on{color:#DBA60F}
+.bmore{font-size:11px;color:var(--ink2);text-align:center;padding:3px 0 1px}
+/* ── B안 지형(등급 맵) ── */
+.terrain{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:6px 4px;margin-bottom:10px}
+.tlegend{display:flex;gap:12px;font-size:11px;color:var(--ink2);padding:4px 12px 6px;flex-wrap:wrap}
+.tlegend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+/* ── 모의지원 ── */
+.gapbar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;flex:1;min-width:80px;position:relative}
+.gapbar i{position:absolute;top:0;bottom:0;border-radius:99px}
+.mockrow{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px;background:var(--panel)}
+.mockrow .mrtop{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.mockrow .mrgap{display:flex;align-items:center;gap:10px;margin:8px 0 2px;font-size:12.5px}
+.mockrow .fix{font-size:12.5px;color:var(--ink2);margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
+.mocksel{display:flex;width:100%;align-items:center;gap:8px;padding:9px 12px;background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:6px;cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
+.mocksel:hover{border-color:var(--accent)}
+.mocksel .cnt{margin-left:auto;font-size:11.5px;color:var(--ink2);white-space:nowrap}
 .stucard .meta{color:var(--ink2);font-size:12.5px;margin:6px 0 10px;min-height:2.6em}
 .stucard .chips{display:flex;flex-wrap:wrap;gap:5px}
 /* 마감 스트립 */
@@ -261,9 +330,44 @@ const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
 /* 대량 검색 데이터 — 빌드 시 주입 (공개 소스에는 비어 있음) */
 const BULK={ip:[],hs:[]}; /*BUILD:BULK_DATA*/
 function allIpRows(){
-  const a=(db.ipdb||[]).map(r=>({...r,region:r.region||"",bulk:false}));
-  const b=(BULK.ip||[]).map(r=>({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],region:r[7]||"",source:"어디가 발표",bulk:true}));
+  const a=(db.ipdb||[]).map(r=>({...r,region:r.region||"",pct:r.pct||"",bulk:false}));
+  const b=(BULK.ip||[]).map(r=>({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],region:r[7]||"",pct:r[8]||"",source:"어디가 발표",bulk:true}));
   return a.concat(b);}
+/* 대학·학과·전형 그룹 (연도 추이 포함) — 검색·분석·모의지원 공용, save() 시 캐시 무효화 */
+function uniNorm(u){return String(u||"").replace(/대학교/,"대").trim();}
+var _IPG=null;
+function ipGroups(){
+  if(_IPG)return _IPG;
+  const m=new Map();
+  for(const r of allIpRows()){
+    const nu=uniNorm(r.univ);
+    const k=nu+"|"+r.major+"|"+(r.track||"");
+    let g=m.get(k);
+    if(!g){g={key:k,univ:nu,major:r.major,track:r.track||"",region:r.region,years:{},y50:{},pcts:{},rates:{}};m.set(k,g);}
+    if(!g.region&&r.region)g.region=r.region;
+    const y=String(r.year||"");
+    const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);
+    if(c!=null&&c>=1&&c<=9&&g.years[y]==null)g.years[y]=c;
+    if(r.cut50&&!g.y50[y])g.y50[y]=r.cut50;
+    if(r.pct&&g.pcts[y]==null){const p=parseFloat(r.pct);if(p>0&&p<=100)g.pcts[y]=p;}
+    if(r.rate&&!g.rates[y])g.rates[y]=r.rate;
+  }
+  for(const g of m.values()){
+    g.ys=Object.keys(g.years).sort();
+    g.latestYear=g.ys[g.ys.length-1]||"";g.latest=g.ys.length?g.years[g.latestYear]:null;
+    g.delta=g.ys.length>1?+(g.latest-g.years[g.ys[g.ys.length-2]]).toFixed(2):null;
+    const py=Object.keys(g.pcts).sort();
+    g.pctYear=py[py.length-1]||"";g.pct=py.length?g.pcts[g.pctYear]:null;
+    g.isJ=(g.track||"").startsWith("수능");
+    // 통합 정렬용 등급 환산치: 수시=등급 그대로, 정시=백분위→등급
+    g.cutG=(!g.isJ&&g.latest!=null)?g.latest:(g.pct!=null?topPctToGrade(Math.max(0.1,100-g.pct)):null);
+  }
+  _IPG=[...m.values()];
+  return _IPG;}
+function ttypeIdx(t){t=String(t||"");return t.startsWith("교과")?0:t.startsWith("종합")?1:t.startsWith("논술")?2:3;}
+function fmtCut(n){return n==null||isNaN(n)?"—":(Math.round(n*100)/100).toFixed(2).replace(/0$/,"").replace(/\.$/,".0");}
+const _UCPAL=["#2F6DB5","#6C4BB0","#0E7A6A","#B0487E","#B26A2A","#4A7A2F","#8A5A3A","#3E7C8A","#A04545","#5B5FA8"];
+function uColor(u){let h=0;for(let i=0;i<u.length;i++)h=(h*31+u.charCodeAt(i))>>>0;return _UCPAL[h%_UCPAL.length];}
 function allHsRows(){
   const a=(db.hsdb||[]).map(r=>({name:r.name,type:r.type,region:r.region||"",level:r.level||"",feature:r.feature||"",source:r.source||"",bulk:false}));
   const seen=new Set(a.map(x=>x.name));
@@ -272,7 +376,7 @@ function allHsRows(){
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
   return {students:[],meta:{created:today()}};}
-function save(){localStorage.setItem(LS,JSON.stringify(db));}
+function save(){_IPG=null;localStorage.setItem(LS,JSON.stringify(db));}
 function stu(){return db.students.find(s=>s.id===view.stuId);}
 
 /* ── 미니 마크다운 렌더러 (프로파일 원문 표시용) ── */
@@ -360,6 +464,7 @@ function renderSide(){
   <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
   <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">진학 가능권 분석</span></button>
+  <button class="navbtn ${view.page==='mock'?'on':''}" onclick="go('mock')">🧾 <span class="txt">모의지원</span></button>
   <button class="navbtn ${view.page==='search'?'on':''}" onclick="go('search')">🔍 <span class="txt">입시 검색</span></button>
   <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
   <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
@@ -1304,37 +1409,66 @@ function renderSearch(){
   const q=(view.sq||"").trim();
   let body="";
   if(tab==="univ"){
-    const rows=allIpRows();
-    const regions=[...new Set(rows.map(r=>r.region).filter(Boolean))].sort();
-    const years=[...new Set(rows.map(r=>String(r.year||"")).filter(Boolean))].sort().reverse();
-    let f=rows;
-    if(q)f=f.filter(r=>(r.univ+" "+r.major).includes(q));
-    if(view.sTrack)f=f.filter(r=>(r.track||"").includes(view.sTrack));
-    if(view.sRegion)f=f.filter(r=>r.region===view.sRegion);
-    if(view.sYear)f=f.filter(r=>String(r.year)===view.sYear);
-    f.sort((a,b)=>a.univ.localeCompare(b.univ,"ko")||(parseCut(a.cut70)||9)-(parseCut(b.cut70)||9));
-    const shown=f.slice(0,300);
-    body=`
-    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;render()">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    const gs=ipGroups();
+    const regions=[...new Set(gs.map(g=>g.region).filter(Boolean))].sort();
+    let f=gs.filter(g=>g.cutG!=null||g.latest!=null||Object.keys(g.years).length||g.pct!=null);
+    if(q)f=f.filter(g=>(g.univ+" "+g.major).includes(q));
+    if(view.sTrack)f=f.filter(g=>(g.track||"").startsWith(view.sTrack));
+    if(view.sRegion)f=f.filter(g=>g.region===view.sRegion);
+    const filters=`
+    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sUniv=null;render()">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <input id="sq" value="${esc(view.sq||"")}" placeholder="대학·학과 검색 (예: 전남대, 의예, 화학공)" style="flex:1;min-width:200px">
-      <select onchange="view.sTrack=this.value;render()" style="width:96px">
-        <option value="">전형 전체</option>${["교과","종합","논술","수능"].map(x=>`<option ${view.sTrack===x?"selected":""}>${x}</option>`).join("")}</select>
-      <select onchange="view.sRegion=this.value;render()" style="width:96px">
+      ${["","교과","종합","논술","수능"].map(t=>`<button type="button" class="fchip ${((view.sTrack||"")===t)?"on":""}"
+        onclick="view.sTrack='${t}';render()">${t||"전형 전체"}</button>`).join("")}
+      <select onchange="view.sRegion=this.value;view.sUniv=null;render()" style="width:96px">
         <option value="">지역 전체</option>${regions.map(x=>`<option ${view.sRegion===x?"selected":""}>${x}</option>`).join("")}</select>
-      <select onchange="view.sYear=this.value;render()" style="width:96px">
-        <option value="">연도 전체</option>${years.map(x=>`<option ${view.sYear===x?"selected":""}>${x}</option>`).join("")}</select>
       <button class="btn sm pri">검색</button>
-    </div></form>
-    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시, 검색어로 좁혀주세요":""} · 총 데이터 ${rows.length.toLocaleString()}건</p>
-    ${shown.length?`<div class="tablewrap"><table class="t">
-      <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50%컷</th><th>70%컷</th><th>경쟁률</th><th>지역</th><th></th></tr>
-      ${shown.map(r=>`<tr><td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
-        <td>${esc(String(r.year||""))}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.rate||"")}</td>
-        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.region||"")}</td>
-        <td>${r.bulk?`<button class="btn ghost sm" title="분석 DB에 추가 (전략 프롬프트에 반영)" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([r.univ,r.major,r.track,r.year,r.cut50,r.cut70,r.rate]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
-    </table></div>`
-    :`<div class="empty"><b>결과 없음</b>${rows.length<100?"대량 데이터가 아직 주입되지 않았습니다 — 다음 배포에서 채워집니다.":"검색어를 바꿔보세요."}</div>`}`;
+    </div></form>`;
+    if(view.sUniv){
+      const ug=f.filter(g=>g.univ===view.sUniv).sort((a,b)=>a.major.localeCompare(b.major,"ko")||(a.cutG||9)-(b.cutG||9));
+      body=filters+`
+      <button class="btn ghost sm" style="margin-bottom:10px" onclick="view.sUniv=null;render()">← 대학 목록</button>
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px">
+        <div class="uinit" style="background:${uColor(view.sUniv)}">${esc(view.sUniv.slice(0,2))}</div>
+        <div><b style="font-size:17px">${esc(view.sUniv)}</b>
+        <div style="font-size:12px;color:var(--ink2)">${esc(ug[0]?.region||"")} · 학과·전형 ${ug.length}건 — 행을 누르면 연도별 추이가 펼쳐집니다</div></div></div>
+      ${ug.slice(0,120).map(g=>{
+        const open=view.sKey===g.key;
+        const ys=g.isJ?Object.keys(g.pcts).sort():g.ys;
+        const cutTxt=g.isJ?(g.pct!=null?`백분위 ${g.pct}`:"환산점수만"):(g.latest!=null?fmtCut(g.latest):"—");
+        return `<div class="mrow ${open?"open":""}">
+        <button class="mbtn" onclick="view.sKey=view.sKey==='${esc(g.key)}'?null:'${esc(g.key)}';render()">
+          <span class="marr">▶</span><span class="mname">${esc(g.major)}</span>
+          <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span>
+          <span class="mcut">${cutTxt}<span style="color:var(--ink2);font-weight:400;font-size:11px"> ${esc(g.isJ?g.pctYear:g.latestYear)}</span></span></button>
+        <div class="mtrend">${ys.length?ys.map((y,i)=>{
+          const c=g.isJ?g.pcts[y]:g.years[y];const p=i>0?(g.isJ?g.pcts[ys[i-1]]:g.years[ys[i-1]]):null;
+          const d=p!=null?+(c-p).toFixed(2):null;
+          const harder=g.isJ?(d!=null&&d>0.5):(d!=null&&d<-0.05);
+          const easier=g.isJ?(d!=null&&d<-0.5):(d!=null&&d>0.05);
+          return `<div class="ycell" title="경쟁률 ${esc(g.rates[y]||"-")}"><div class="yy">${y}</div><div class="yc">${g.isJ?c:fmtCut(c)}</div>
+            <div class="yd ${harder?"up":easier?"dn":"fl"}">${d==null?"·":harder?"▲ 강화":easier?"▼ 완화":"— 유지"}</div></div>`;}).join("")
+          :`<span style="font-size:12px;color:var(--ink2)">연도별 수치 없음 (환산점수 전용 전형)</span>`}
+          <button class="btn ghost sm" title="수동 분석 DB에 추가" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([g.univ,g.major,g.track,g.isJ?g.pctYear:g.latestYear,g.y50[g.latestYear]||"",g.isJ?"":String(g.latest??""),g.rates[g.latestYear]||""]))})'>＋ DB</button>
+        </div></div>`;}).join("")||`<div class="empty"><b>조건에 맞는 학과가 없습니다</b></div>`}
+      ${ug.length>120?`<p style="font-size:12px;color:var(--ink2)">전형이 많아 120건까지 표시 — 검색어·전형 필터로 좁혀주세요.</p>`:""}`;
+    }else{
+      const byU=new Map();
+      for(const g of f){if(!byU.has(g.univ))byU.set(g.univ,[]);byU.get(g.univ).push(g);}
+      const us=[...byU.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ko"));
+      body=filters+`
+      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">대학 ${us.length}곳 · 학과·전형 ${f.length.toLocaleString()}건 — 카드를 누르면 학과·연도 추이로 들어갑니다</p>
+      <div class="ugrid">${us.slice(0,72).map(([u,list])=>{
+        const cuts=list.map(g=>g.cutG).filter(n=>n!=null).sort((a,b)=>a-b);
+        return `<button class="ucard" onclick="view.sUniv='${esc(u)}';view.sKey=null;render()">
+          <div class="utop"><div class="uinit" style="background:${uColor(u)}">${esc(u.slice(0,2))}</div>
+          <div><div class="uname">${esc(u)}</div><div class="ureg">${esc(list[0].region||"")}</div></div></div>
+          <div class="umeta"><span>학과·전형 ${list.length}건</span>
+          <span class="urange">${cuts.length?fmtCut(cuts[0])+"~"+fmtCut(cuts[cuts.length-1])+"등급":""}</span></div></button>`;}).join("")}</div>
+      ${us.length>72?`<p style="font-size:12px;color:var(--ink2);margin-top:10px">${us.length}곳 중 72곳 표시 — 검색어·지역으로 좁혀주세요.</p>`:""}
+      ${!us.length?`<div class="empty"><b>결과 없음</b>${gs.length<100?"대량 데이터가 아직 주입되지 않았습니다.":"검색어를 바꿔보세요."}</div>`:""}`;
+    }
   }else{
     const rows=allHsRows();
     const sidos=[...new Set(rows.map(r=>(r.region||"").split(" ")[0]).filter(Boolean))].sort();
@@ -1403,12 +1537,41 @@ function classify(myG,c70,c50){ // 낮을수록 좋은 등급 기준
   if(diff>=-0.8)return["소신","warn"];
   return["도전","danger"];}
 function parseCut(v){const n=parseFloat(String(v||"").replace(/[^\d.]/g,""));return isNaN(n)?null:n;}
+function gradeToTopPct(g){g=Math.max(1,Math.min(9,g));const i=Math.min(8,Math.floor(g));const prev=i===0?0:CUM9[i-1];return prev+(g-i)*(CUM9[i]-prev);}
+function classifyPct(myPct,cutPct){ // 정시: 수능 백분위 기준 (높을수록 좋음)
+  if(cutPct==null||isNaN(cutPct))return null;
+  const d=myPct-cutPct;
+  if(d>=5)return["안정","ok"];
+  if(d>=-3)return["적정","acc"];
+  if(d>=-10)return["소신","warn"];
+  return["도전","danger"];}
+const FIELD_KW={"의약·간호":["의예","치의","한의","수의","약학","간호","의학","보건","임상"],
+ "교육":["교육","사범","유아","초등"],
+ "공학·자연":["공학","컴퓨터","전자","전기","기계","화학","물리","수학","생명","소프트","반도체","산업","통계","데이터","건축","토목","신소재","환경","에너지","인공지능","AI","IT","정보"],
+ "인문·사회":["경영","경제","행정","심리","국어","영어","사회","미디어","법","정치","사학","철학","문헌","광고","무역","회계","복지","관광","언론","국제"]};
+function fieldPass(major,f){const kw=FIELD_KW[f];return !kw||kw.some(k=>major.includes(k));}
+const SPECIAL_KW=["특성화고","농어촌","기초","차상위","한부모","배려","보훈","장애","특수교육대상","재외국민","만학도","성인학습자","특성화고졸","서해5도","북한이탈","다문화","목회","신학","군인","군사","계약학과"];
+function isSpecialTrack(t){t=String(t||"");return SPECIAL_KW.some(k=>t.includes(k));}
+/* 보드 판정: 그룹 → {cls, diffTxt} 또는 null(창 밖·비교 불가) */
+function judgeGroup(g,myG,myPct){
+  if(!g.isJ&&g.latest!=null&&g.latest>=1&&g.latest<=9){
+    const d=g.latest-myG;
+    if(d>1.2)return null;
+    const c=classify(myG,g.latest,null);
+    return c?{cls:c,diff:d,kind:"s"}:null;}
+  if(g.isJ&&g.pct!=null){
+    const d=myPct-g.pct;
+    if(d>15)return null;
+    const c=classifyPct(myPct,g.pct);
+    return c?{cls:c,diff:d,kind:"j"}:null;}
+  return null;}
 function runIpsi(){
   const mode=$("#ip_mode").value;let band=null,label="";
   if(mode==="hs"){
     const g=parseFloat($("#ip_hs").value);
     if(isNaN(g)||g<1||g>9){toast("내신 평균 등급(1.0~9.0)을 입력하세요");return;}
     band=[g,g];label=`고교 내신 평균 ${g.toFixed(2)}등급`;
+    view.ipsiMyPct=Math.round((100-gradeToTopPct(g))*10)/10;
   }else if(mode==="ms"){
     let p=parseFloat($("#ip_ms").value);
     const rank=parseFloat($("#ip_msrank").value),tot=parseFloat($("#ip_mstot").value);
@@ -1416,7 +1579,7 @@ function runIpsi(){
     if(isNaN(p)||p<=0||p>100){toast("상위 % 또는 등수/재적수를 입력하세요");return;}
     const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
     band=[g1,g2];label=`중학 상위 ${p.toFixed(1)}% → 일반고 예상 내신 ${g1.toFixed(1)}~${g2.toFixed(1)}등급`;
-    view.ipsiPct=p;
+    view.ipsiPct=p;view.ipsiMyPct=Math.round((100-p)*10)/10;
   }else{
     const iq=parseFloat($("#ip_iq").value);
     if(isNaN(iq)||iq<40||iq>160){toast("전체지능(FSIQ)을 입력하세요 (40~160)");return;}
@@ -1426,33 +1589,129 @@ function runIpsi(){
     const g1=topPctToGrade(Math.max(0.1,pTop)),g2=topPctToGrade(Math.min(100,pAdj));
     band=[Math.min(g1,g2),Math.max(g1,g2)];
     label=`FSIQ ${iq} → 백분위 상위 ${pTop.toFixed(1)}% · 잠재력 밴드 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급 (통계 보정 포함)`;
+    view.ipsiMyPct=Math.round((100-(pTop+pAdj)/2)*10)/10;
   }
   view.ipsiResult={band,label,mode};render();}
+/* 관심대학 핀 — 학생 선택 시 그 학생의 관심대학으로 저장, 미선택 시 세션 핀 */
+function ipsiPin(key){
+  const g=ipGroups().find(x=>x.key===key);if(!g)return;
+  const sid=view.ipsiStu;
+  if(sid){
+    const s=db.students.find(x=>x.id===sid);if(!s)return;
+    s.univs=s.univs||[];
+    const i=s.univs.findIndex(u=>uniNorm(u.univ)===g.univ&&u.major===g.major&&(u.track||"")===g.track);
+    if(i>=0){s.univs.splice(i,1);toast("관심대학에서 제거");}
+    else{s.univs.push({univ:g.univ,major:g.major,track:g.track,tong:"",checked:""});toast(`${g.univ} ${g.major} → ${s.name} 관심대학`);}
+    save();
+  }else{
+    view.ipsiPins=view.ipsiPins||[];
+    const i=view.ipsiPins.indexOf(key);
+    if(i>=0)view.ipsiPins.splice(i,1);else view.ipsiPins.push(key);
+  }
+  render();}
+function ipsiPinned(g){
+  const sid=view.ipsiStu;
+  if(sid){const s=db.students.find(x=>x.id===sid);
+    return !!(s&&(s.univs||[]).some(u=>uniNorm(u.univ)===g.univ&&u.major===g.major&&(u.track||"")===g.track));}
+  return (view.ipsiPins||[]).includes(g.key);}
+function boardCard(g,j){
+  const on=ipsiPinned(g);
+  const cut=j.kind==="j"?`백분위 ${g.pct}`:fmtCut(g.latest);
+  const gap=j.kind==="j"
+    ?(j.diff>=0?`+${j.diff.toFixed(1)} 여유`:`${j.diff.toFixed(1)} 부족`)
+    :(j.diff>=0?`+${j.diff.toFixed(2)}`:j.diff.toFixed(2));
+  const dArrow=g.isJ?"":(g.delta==null?"":g.delta<-0.05?` <span style="color:var(--danger)">▲</span>`:g.delta>0.05?` <span style="color:var(--ok)">▼</span>`:"");
+  return `<div class="kcard"><button class="kstar ${on?"on":""}" title="관심대학 고정/해제" onclick="ipsiPin('${esc(g.key)}')">★</button>
+    <div class="ku">${esc(g.univ)}${g.region?` · ${esc(g.region)}`:""}</div>
+    <div class="km">${esc(g.major)}</div>
+    <div class="kb"><span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track)}</span>
+    <span class="kcut" title="갭 ${esc(gap)}">${cut}${dArrow}</span></div></div>`;}
+/* B안 지형 — 창 안 수시 항목을 등급 축 위에 배치 */
+function terrainSvg(list,myG){
+  const byU=new Map();
+  for(const it of list){if(it.j.kind!=="s")continue;
+    if(!byU.has(it.g.univ))byU.set(it.g.univ,[]);byU.get(it.g.univ).push(it.g);}
+  if(!byU.size)return `<p style="font-size:12px;color:var(--ink2);padding:8px 12px">지형에 올릴 수시(등급) 항목이 없습니다.</p>`;
+  const lanes=[...byU.entries()].sort((a,b)=>Math.min(...a[1].map(x=>x.latest))-Math.min(...b[1].map(x=>x.latest))).slice(0,16);
+  const X0=Math.max(1,myG-1.6),X1=Math.min(9,myG+1.6),W=960,PL=104,PR=16,LH=32,H=lanes.length*LH+56;
+  const x=v=>PL+(Math.min(X1,Math.max(X0,v))-X0)/(X1-X0)*(W-PL-PR);
+  const DCOL=["#2F6DB5","#C88A18","#B0487E","#6C4BB0"];
+  let grid="";
+  for(let v=Math.ceil(X0*2)/2;v<=X1;v+=0.5){
+    grid+=`<line x1="${x(v)}" y1="30" x2="${x(v)}" y2="${H-22}" stroke="var(--line)" stroke-width="1"/>
+    <text x="${x(v)}" y="${H-8}" text-anchor="middle" style="fill:var(--ink2)" font-size="10">${v.toFixed(1)}</text>`;}
+  const bands=`
+    <rect x="${x(Math.min(X1,myG+0.4))}" y="30" width="${Math.max(0,W-PR-x(Math.min(X1,myG+0.4)))}" height="${H-52}" fill="var(--ok)" opacity="0.08"/>
+    <rect x="${x(Math.max(X0,myG-0.2))}" y="30" width="${Math.max(0,x(Math.min(X1,myG+0.4))-x(Math.max(X0,myG-0.2)))}" height="${H-52}" fill="var(--accent)" opacity="0.10"/>
+    <rect x="${x(Math.max(X0,myG-0.8))}" y="30" width="${Math.max(0,x(Math.max(X0,myG-0.2))-x(Math.max(X0,myG-0.8)))}" height="${H-52}" fill="var(--warn)" opacity="0.10"/>
+    <line x1="${x(myG)}" y1="22" x2="${x(myG)}" y2="${H-20}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 3"/>
+    <text x="${x(myG)}" y="14" text-anchor="middle" style="fill:var(--accent)" font-size="11" font-weight="700">내 등급 ${myG.toFixed(2)}</text>`;
+  let dots="";
+  lanes.forEach(([u,items],li)=>{
+    const y=30+li*LH+LH/2;
+    dots+=`<text x="${PL-10}" y="${y+3.5}" text-anchor="end" style="fill:var(--ink2)" font-size="11" font-weight="600">${esc(u)}</text>
+    <line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
+    for(const g of items){
+      dots+=`<circle cx="${x(g.latest)}" cy="${y}" r="4.5" fill="${DCOL[ttypeIdx(g.track)]}" opacity="0.9">
+        <title>${esc(g.major)} · ${esc(g.track)} · ${fmtCut(g.latest)}등급 (${esc(g.latestYear)})</title></circle>`;}
+  });
+  return `<div class="tlegend"><span><i style="background:#2F6DB5"></i>교과</span><span><i style="background:#C88A18"></i>종합</span><span><i style="background:#B0487E"></i>논술</span><span style="margin-left:auto">왼쪽일수록 높은 컷 — 점에 마우스를 올리면 상세</span></div>
+  <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="min-width:760px">${grid}${bands}${dots}</svg>`;}
 function renderIpsi(){
   const rows=allIpRows();const manual=db.ipdb||[];const R=view.ipsiResult;
   let matchHtml="";
   if(R&&rows.length){
     const myG=(R.band[0]+R.band[1])/2;
-    // 등급 스케일(1~9) 컷만 매칭 대상 — 정시 환산점수(수백 점대)는 내신 등급과 비교 불가
-    const gradeRows=rows.filter(r=>{const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);return c!=null&&c>=1&&c<=9;});
-    // 같은 대학·학과·전형은 최신 연도 1건만 (과거 연도는 검색에서 추이로 확인)
-    const latest=new Map();
-    for(const r of gradeRows){const k=r.univ+"|"+r.major+"|"+r.track;const p=latest.get(k);
-      if(!p||String(r.year||"")>String(p.year||""))latest.set(k,r);}
-    const judged=[...latest.values()].map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c}:null;}).filter(Boolean);
+    const myPct=view.ipsiMyPct!=null?view.ipsiMyPct:Math.round((100-gradeToTopPct(myG))*10)/10;
+    const field=view.ipsiField||"전체";
+    const regionF=view.ipsiRegion||"";
+    const showJ=view.ipsiJ!==false;
+    const hideSp=view.ipsiSp!==false; // 특별전형(특성화고·농어촌·기초차상위 등) 기본 숨김
+    // 그룹(학과·전형별 최신) 판정 → 수시 4칸 보드 + 정시 스트립
+    const list=[];
+    for(const g of ipGroups()){
+      if(field!=="전체"&&!fieldPass(g.major,field))continue;
+      if(regionF&&g.region!==regionF)continue;
+      if(!showJ&&g.isJ)continue;
+      if(hideSp&&isSpecialTrack(g.track))continue;
+      const j=judgeGroup(g,myG,myPct);
+      if(j)list.push({g,j});
+    }
     const order={"안정":0,"적정":1,"소신":2,"도전":3};
-    judged.sort((a,b)=>order[a.cls[0]]-order[b.cls[0]]||(parseCut(a.cut70)||9)-(parseCut(b.cut70)||9));
-    // 내 등급 ±1.2 창 안의 결과만 (여유 1.2등급 넘는 하위권 '안정'은 상담 가치 없음), 최대 300건
-    const inWindow=judged.filter(r=>{const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);return c-myG<=1.2;});
-    const totalJudged=inWindow.length;
-    const shown=inWindow.filter(r=>r.cls[0]!=="도전").slice(0,300).concat(inWindow.filter(r=>r.cls[0]==="도전").slice(0,5));
-    matchHtml=`<div class="tablewrap"><table class="t">
-      <tr><th>판정</th><th>대학</th><th>학과</th><th>전형</th><th>70%컷</th><th>50%컷</th><th>연도</th></tr>
-      ${shown.map(r=>`<tr><td><span class="chip ${r.cls[1]}">${r.cls[0]}</span></td>
-        <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
-        <td>${esc(r.cut70||"-")}</td><td>${esc(r.cut50||"-")}</td><td style="color:var(--ink2)">${esc(r.year||"")}</td></tr>`).join("")}
-    </table></div>
-    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정 기준: 내 등급이 70%컷보다 0.4 이상 여유=안정 / ±0.2=적정 / -0.8까지=소신. 밴드 중앙값(${myG.toFixed(2)}등급) ±1.2등급 창 안의 ${totalJudged.toLocaleString()}건 중 상위 ${Math.min(300,totalJudged)}건 표시. 같은 학과·전형은 최신 연도만 — 연도별 추이는 입시 검색에서, 정시(환산점수)는 등급 비교 대상에서 제외.</p>`;
+    list.sort((a,b)=>(a.g.cutG??9)-(b.g.cutG??9));
+    const cols=[[],[],[],[]];
+    const jList=[];
+    for(const it of list){if(it.j.kind==="j")jList.push(it);else cols[order[it.j.cls[0]]].push(it);}
+    jList.sort((a,b)=>Math.abs(a.j.diff)-Math.abs(b.j.diff));
+    const KN=["안정","적정","소신","도전"];
+    const regions=[...new Set(ipGroups().map(g=>g.region).filter(Boolean))].sort();
+    // "어디까지 가능?" — 적정·소신 최상단
+    const top=k=>cols[k].length?cols[k][0]:null;
+    const t1=top(1),t2=top(2);
+    const summary=(t1||t2)?`<div class="bsummary">🎯 <b>가능권 상단</b> — ${t1?`적정 최상단: <b>${esc(t1.g.univ)} ${esc(t1.g.major)}</b> (${esc(t1.g.track)}, ${t1.j.kind==="j"?`백분위 ${t1.g.pct}`:fmtCut(t1.g.latest)+"등급"})`:""}${t1&&t2?" · ":""}${t2?`소신 최상단: <b>${esc(t2.g.univ)} ${esc(t2.g.major)}</b> (${esc(t2.g.track)}, ${t2.j.kind==="j"?`백분위 ${t2.g.pct}`:fmtCut(t2.g.latest)+"등급"})`:""}</div>`:"";
+    // 관심대학 핀 스트립
+    const sid=view.ipsiStu;const sSel=sid?db.students.find(x=>x.id===sid):null;
+    const pinned=sSel?(sSel.univs||[]).map(u=>`${uniNorm(u.univ)} ${u.major}`):
+      (view.ipsiPins||[]).map(k=>{const g=ipGroups().find(x=>x.key===k);return g?`${g.univ} ${g.major}`:"";}).filter(Boolean);
+    matchHtml=`
+    <div class="bfilters">
+      ${["전체",...Object.keys(FIELD_KW)].map(f=>`<button class="fchip ${field===f?"on":""}" onclick="view.ipsiField='${f}';render()">${f}</button>`).join("")}
+      <select onchange="view.ipsiRegion=this.value;render()" style="width:96px">
+        <option value="">지역 전체</option>${regions.map(x=>`<option ${regionF===x?"selected":""}>${x}</option>`).join("")}</select>
+      <button class="fchip ${showJ?"on":""}" onclick="view.ipsiJ=view.ipsiJ===false?true:false;render()">정시 포함</button>
+      <button class="fchip ${hideSp?"on":""}" title="특성화고·농어촌·기초차상위 등 자격 제한 전형" onclick="view.ipsiSp=view.ipsiSp===false?true:false;render()">특별전형 숨김</button>
+      <button class="fchip ${view.ipsiTerrain?"on":""}" onclick="view.ipsiTerrain=!view.ipsiTerrain;render()">🗺 지형 보기</button>
+    </div>
+    ${summary}
+    ${view.ipsiTerrain?`<div class="terrain">${terrainSvg(list,myG)}</div>`:""}
+    <div class="bpins">${sSel?`<b style="font-size:11px;color:var(--accent-ink)">★ ${esc(sSel.name)} 관심대학</b>`:`<b style="font-size:11px;color:var(--ink2)">★ 세션 핀</b>`}
+      ${pinned.length?pinned.map(p=>`<span class="bpin">${esc(p)}</span>`).join(""):`<span style="color:var(--ink2)">카드의 ★을 누르면 ${sSel?"학생 관심대학에 저장됩니다":"여기에 쌓입니다 — 학생을 선택하면 그 학생에게 저장"}</span>`}</div>
+    <div class="bcols">${cols.map((c,i)=>`<div class="bcol k${i}"><h4>${KN[i]}<span class="bcnt">${c.length.toLocaleString()}</span></h4>
+      ${c.slice(0,i===3?8:30).map(it=>boardCard(it.g,it.j)).join("")}
+      ${c.length>(i===3?8:30)?`<div class="bmore">+ ${(c.length-(i===3?8:30)).toLocaleString()}건 — 계열·지역으로 좁혀보세요</div>`:""}</div>`).join("")}</div>
+    ${showJ&&jList.length?`<div class="sec" style="margin-top:14px"><h2 style="font-size:13.5px">🌙 정시(수능) 가능권 <span class="n">수능 백분위 ${myPct} 추정 기준 · 백분위 공개 전형 ${jList.length.toLocaleString()}건 중 근접 12</span></h2>
+    <div class="bcols" style="grid-template-columns:repeat(auto-fill,minmax(195px,1fr))">${jList.slice(0,12).map(it=>`<div class="bcol k${order[it.j.cls[0]]}" style="padding:0;background:none">${boardCard(it.g,it.j)}</div>`).join("")}</div></div>`:""}
+    <p style="font-size:11.5px;color:var(--ink2);margin:8px 0 0">판정: 수시(교과·종합·논술)는 최신 70%컷 등급과 내 등급(밴드 중앙 ${myG.toFixed(2)}) 차이 — +0.4 안정 / ±0.2 적정 / −0.8 소신. 정시(수능)는 최종등록자 수능 백분위와 내 추정 백분위(${myPct}) 차이 — +5 안정 / ±3 적정 / −10 소신. 같은 학과·전형은 최신 연도 1건, ▲▼는 전년 대비 컷 강화·완화. 연도별 추이는 입시 검색에서.</p>`;
   }else if(R&&!rows.length){
     matchHtml=`<div class="empty"><b>입결 데이터가 비어 있습니다</b>입시 검색에서 ＋로 추가하거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
   }
@@ -1461,6 +1720,14 @@ function renderIpsi(){
   <div class="sub">웩슬러·중학 성적·고교 내신 → 입결 DB 대조. <b>예측이 아니라 상담용 가능권 참고치</b>입니다.</div></div></div>
 
   <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 입력</h2>
+    <div class="frow"><label>학생 연동</label>
+      <select onchange="view.ipsiStu=this.value||null;render()" style="max-width:240px">
+        <option value="">직접 입력 (학생 미지정)</option>
+        ${db.students.map(s=>`<option value="${esc(s.id)}" ${view.ipsiStu===s.id?"selected":""}>${esc(s.name)} (${esc(s.grade||"")})</option>`).join("")}
+      </select></div>
+    ${view.ipsiStu?(()=>{const s=db.students.find(x=>x.id===view.ipsiStu);
+      const gr=(s?.grades||[]).slice(-3).map(g=>`${g.exam} ${g.subject} ${g.score}`).join(" · ");
+      return `<p style="font-size:11.5px;color:var(--ink2);margin:2px 0 8px">★ 핀이 <b>${esc(s?.name||"")}</b>의 관심대학으로 저장됩니다${gr?` — 최근 성적: ${esc(gr)}`:" — 성적 기록이 없으니 아래에 직접 입력하세요"}</p>`;})():""}
     <div class="frow"><label>입력 유형</label>
       <select id="ip_mode" onchange="view.ipsiMode=this.value;view.ipsiResult=null;render()">
         <option value="hs" ${(view.ipsiMode||"hs")==="hs"?"selected":""}>고교 내신 (9등급제 평균)</option>
@@ -1609,11 +1876,22 @@ function copyHsdbExtract(){
 4. CSV 전체를 출력하라 — 워크벤치 진학 가능권 분석 → 고교 DB에 붙여넣는다.`);}
 function copyIpsiReport(){
   const R=view.ipsiResult;if(!R)return;
-  const rows=allIpRows();const myG=(R.band[0]+R.band[1])/2;
-  const judged=rows.map(r=>{const c=classify(myG,parseCut(r.cut70),parseCut(r.cut50));return c?{...r,cls:c[0]}:null;}).filter(Boolean);
-  const grp=k=>judged.filter(r=>r.cls===k).map(r=>`${r.univ} ${r.major}(${r.track||"-"}, 70%컷 ${r.cut70||r.cut50})`).join(", ")||"—";
+  const myG=(R.band[0]+R.band[1])/2;
+  const myPct=view.ipsiMyPct!=null?view.ipsiMyPct:Math.round((100-gradeToTopPct(myG))*10)/10;
+  const field=view.ipsiField||"전체";
+  const judged=[];
+  for(const g of ipGroups()){
+    if(field!=="전체"&&!fieldPass(g.major,field))continue;
+    if(view.ipsiRegion&&g.region!==view.ipsiRegion)continue;
+    const j=judgeGroup(g,myG,myPct);
+    if(j)judged.push({g,j});
+  }
+  judged.sort((a,b)=>(a.g.cutG??9)-(b.g.cutG??9));
+  const grp=k=>judged.filter(x=>x.j.cls[0]===k).slice(0,15)
+    .map(x=>`${x.g.univ} ${x.g.major}(${x.g.track||"-"}, ${x.j.kind==="j"?"백분위 "+x.g.pct:"70%컷 "+fmtCut(x.g.latest)})`).join(", ")||"—";
   copy(`[WB 진학 가능권 분석 — 상담 참고용] ${today()}
-입력: ${R.label}
+입력: ${R.label}${field!=="전체"?` · 계열: ${field}`:""}
+수능 백분위 추정: ${myPct}
 
 ■ 안정권: ${grp("안정")}
 ■ 적정권: ${grp("적정")}
@@ -1622,6 +1900,125 @@ function copyIpsiReport(){
 ※ 과거 공개 입결(출처: 한국대학교육협의회 어디가 등)과의 단순 대조 참고치이며 합격 예측이 아닙니다.
 ※ 전형 요소·수능최저·경쟁률 변동에 따라 달라지며, 최종 판단은 상담에서 확정합니다.
 ${R.mode==="iq"?"※ 지능검사 기반 분석은 잠재력 상한 참고치입니다 — 현재 성취와의 갭을 줄이는 학습 전략이 핵심입니다.":""}`);}
+
+/* ═══════════ 모의지원 (목표 대학·학과 갭 분석) ═══════════ */
+function mkFieldOf(major){for(const f of Object.keys(FIELD_KW))if(FIELD_KW[f].some(k=>major.includes(k)))return f;return null;}
+function renderMock(){
+  const g=parseFloat(view.mkG);
+  const iq=parseFloat(view.mkIq);
+  const pctIn=parseFloat(view.mkPct);
+  const myPct=!isNaN(pctIn)?pctIn:(!isNaN(g)?Math.round((100-gradeToTopPct(g))*10)/10:null);
+  const gs=ipGroups();
+  // 목표 후보: 대학|학과 단위
+  const majors=new Map();
+  for(const x of gs){const k=x.univ+"|"+x.major;
+    if(!majors.has(k))majors.set(k,{univ:x.univ,major:x.major,region:x.region,tracks:[]});
+    majors.get(k).tracks.push(x);}
+  const q=(view.mkQ||"").trim();
+  const cand=q?[...majors.values()].filter(m=>(m.univ+" "+m.major).includes(q)).slice(0,30):[];
+  const sel=view.mkSel?majors.get(view.mkSel):null;
+  let verdict="";
+  if(sel&&!isNaN(g)){
+    // 옛 전형명 변형(명칭 개편 전) 제거: 수시는 최신 연도-1까지만 표시
+    const maxY=Math.max(0,...sel.tracks.map(t=>parseInt(t.latestYear||t.pctYear||"0")||0));
+    const tracks=sel.tracks.filter(t=>{
+      if(t.isJ)return true;
+      const y=parseInt(t.latestYear||"0")||0;
+      return !maxY||y>=maxY-1;
+    }).sort((a,b)=>(isSpecialTrack(a.track)?1:0)-(isSpecialTrack(b.track)?1:0)||ttypeIdx(a.track)-ttypeIdx(b.track)||(a.cutG??9)-(b.cutG??9));
+    const rowsH=tracks.map(t=>{
+      const isJ=t.isJ;
+      let cut=null,d=null,unit="",cutTxt="—",dTxt="",cls=null,est="";
+      if(!isJ&&t.latest!=null){cut=t.latest;d=+(cut-g).toFixed(2);unit="등급";cutTxt=fmtCut(cut)+"등급 ("+t.latestYear+")";
+        cls=classify(g,cut,null);dTxt=d>=0?`${d.toFixed(2)}등급 여유`:`${(-d).toFixed(2)}등급 부족`;}
+      else if(isJ&&t.pct!=null&&myPct!=null){cut=t.pct;d=+(myPct-cut).toFixed(1);unit="백분위";cutTxt="백분위 "+t.pct+" ("+t.pctYear+")";
+        cls=classifyPct(myPct,cut);dTxt=d>=0?`백분위 ${d.toFixed(1)} 여유`:`백분위 ${(-d).toFixed(1)} 부족`;
+        est=isNaN(pctIn)?" · 내신 환산 추정치 기준":"";}
+      else if(isJ){cutTxt=t.latestYear||t.pctYear?"환산점수만 공개":"—";}
+      const ys=isJ?Object.keys(t.pcts).sort():t.ys;
+      const trend=ys.map(y=>`<div class="ycell"><div class="yy">${y}</div><div class="yc">${isJ?t.pcts[y]:fmtCut(t.years[y])}</div></div>`).join("");
+      // 보완 포인트
+      let fix="";
+      const ti=ttypeIdx(t.track);
+      if(cls){
+        if(ti===0)fix=d>=0.4?"교과 기준 안정권 — 이 라인을 받침돌로 상향(종합·논술) 검토 여지":
+          d>=-0.2?"컷 경계 — 남은 학기 내신을 지키는 것이 최우선, 수능최저 충족 여부 확인":
+          `내신 ${fmtCut(cut)} 이내 필요 — 현재보다 ${(-d).toFixed(2)}등급 보완 또는 지역인재·타 전형 우회`;
+        else if(ti===1)fix=Math.abs(d)<=0.5?"컷 경계권 — 종합은 서류가 당락: 세특·탐구보고서·전공 연계 활동 보강이 실질 보완책":
+          d>0.5?"등급은 여유 — 서류 완성도만 받쳐주면 안정적":"등급 열세 — 서류로 뒤집는 폭에는 한계, 소신 카드로만";
+        else if(ti===2)fix="논술 전형 — 내신 반영 낮음, 논술 대비 병행 여부가 관건";
+        else fix=d!=null?(d>=0?"정시 라인 확보 — 수시 상향 지원의 안전판":"수능 백분위 "+cut+" 필요 — 국·수·탐 백분위 보완 (현재 추정 "+myPct+")"):"";
+      }
+      return `<div class="mockrow">
+        <div class="mrtop"><span class="tchip tk${ti}">${esc(t.track)}</span>
+          <b style="font-size:13.5px">${cutTxt}</b>
+          ${cls?`<span class="chip ${cls[1]}">${cls[0]}</span>`:""}
+          ${t.rates[t.latestYear]?`<span class="chip">경쟁률 ${esc(t.rates[t.latestYear])}</span>`:""}</div>
+        ${cls?`<div class="mrgap"><span style="min-width:110px;font-weight:600;color:${d>=0?"var(--ok)":"var(--danger)"}">${dTxt}${est}</span>
+          <div class="gapbar"><i style="left:${d>=0?50:Math.max(2,50-(Math.min(Math.abs(d)/(unit==="등급"?1.5:15),1)*48)) }%;width:${Math.max(3,Math.min(Math.abs(d)/(unit==="등급"?1.5:15),1)*48)}%;background:${d>=0?"var(--ok)":"var(--danger)"}"></i>
+          <i style="left:49.6%;width:0.8%;background:var(--ink2)"></i></div></div>`:""}
+        ${trend?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${trend}</div>`:""}
+        ${fix?`<div class="fix">💡 ${fix}</div>`:""}
+      </div>`;}).join("");
+    // 지역인재 팁
+    const ji=tracks.find(t=>t.track.includes("지역인재")&&t.latest!=null);
+    const gen=tracks.find(t=>!t.track.includes("지역인재")&&ttypeIdx(t.track)===0&&t.latest!=null);
+    const jiTip=ji&&gen?`<p style="font-size:12.5px;margin:6px 0 0;color:var(--accent-ink)">📍 지역인재 전형 보유 — ${ji.latest>gen.latest?`일반 대비 컷이 ${fmtCut(ji.latest-gen.latest)}등급 완화(${fmtCut(gen.latest)}→${fmtCut(ji.latest)}). 호남권 재학생이면 우선 검토.`:`일반과 컷 차이 미미(${fmtCut(gen.latest)} vs ${fmtCut(ji.latest)}) — 경쟁률 비교로 판단.`}</p>`:"";
+    // 웩슬러 갭 코칭
+    let iqLine="";
+    if(!isNaN(iq)&&iq>=40&&iq<=160){
+      const z=(iq-100)/15,pT=(1-normCdf(z))*100,pA=(1-normCdf(0.6*z))*100;
+      const b1=topPctToGrade(Math.max(0.1,pT)),b2=topPctToGrade(Math.min(100,pA));
+      const lo=Math.min(b1,b2),hi=Math.max(b1,b2);
+      iqLine=`<div class="bsummary" style="margin-top:8px">🧠 FSIQ ${iq} 잠재 밴드 <b>${lo.toFixed(1)}~${hi.toFixed(1)}등급</b> vs 현재 내신 ${g.toFixed(2)} — ${g>hi?`갭 ${(g-hi).toFixed(1)}~${(g-lo).toFixed(1)}등급: 잠재력 대비 미달, 학습 전략·습관 교정으로 끌어올릴 여지가 근거 있음`:g<lo?"잠재 밴드보다 높은 성취 — 현재 학습 태도가 강점, 유지 전략":"잠재 밴드 안 — 현 성취 유지 + 상향 목표 정당"}</div>`;}
+    // 대안 추천
+    const fld=mkFieldOf(sel.major);
+    const alts=gs.filter(x=>x.univ!==sel.univ&&x.cutG!=null&&(fld?fieldPass(x.major,fld):x.major.slice(0,2)===sel.major.slice(0,2)))
+      .map(x=>{const j=judgeGroup(x,g,myPct==null?0:myPct);return j&&(j.cls[0]==="적정"||j.cls[0]==="안정")?{x,j}:null;})
+      .filter(Boolean).sort((a,b)=>Math.abs(a.j.diff)-Math.abs(b.j.diff)).slice(0,5);
+    verdict=`<div class="sec"><h2>3️⃣ 판정 — ${esc(sel.univ)} ${esc(sel.major)}
+      ${view.mkStu?`<button class="btn sm" style="margin-left:auto" onclick="mkSaveUniv()">★ 학생 관심대학에 추가</button>`:""}</h2>
+    <div class="card">${rowsH||'<div class="empty">전형 데이터가 없습니다</div>'}${jiTip}${iqLine}
+    ${alts.length?`<div class="fix" style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">🔄 <b>같은 계열 대안</b> (적정·안정만): ${alts.map(a=>`${esc(a.x.univ)} ${esc(a.x.major)}(${esc(a.x.track)}, ${a.j.kind==="j"?"백분위 "+a.x.pct:fmtCut(a.x.latest)})`).join(" · ")}</div>`:""}
+    <p style="font-size:11.5px;color:var(--warn);margin:10px 0 0">⚠️ 과거 공개 입결 대조 참고치 — 합격 예측이 아닙니다. 수능최저·모집인원 변동·면접은 반영되지 않으며 최종 판단은 상담에서.</p>
+    </div></div>`;
+  }
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>모의지원</h1>
+  <div class="sub">목표 대학·학과를 정하면 전형별로 <b>부족한지 남는지, 무엇을 보완할지</b>를 5개년 입결로 진단합니다</div></div></div>
+  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 내 성적</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="frow" style="margin:0"><label>학생 연동</label>
+        <select onchange="view.mkStu=this.value||null;render()" style="width:170px">
+          <option value="">직접 입력</option>
+          ${db.students.map(s=>`<option value="${esc(s.id)}" ${view.mkStu===s.id?"selected":""}>${esc(s.name)} (${esc(s.grade||"")})</option>`).join("")}</select></div>
+      <div class="frow" style="margin:0"><label>내신 평균 (필수)</label>
+        <input value="${esc(view.mkG||"")}" placeholder="예: 2.4" style="width:100px" onchange="view.mkG=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>수능 백분위 (선택)</label>
+        <input value="${esc(view.mkPct||"")}" placeholder="모평 평균" style="width:100px" onchange="view.mkPct=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>FSIQ (선택)</label>
+        <input value="${esc(view.mkIq||"")}" placeholder="예: 122" style="width:90px" onchange="view.mkIq=this.value;render()"></div>
+    </div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">수능 백분위를 비우면 내신에서 추정합니다(정시 판정은 근사치). FSIQ를 넣으면 잠재력 대비 갭 코칭이 붙습니다.</p></div>
+  <div class="sec"><h2>2️⃣ 목표 대학·학과</h2><div class="card">
+    <input value="${esc(view.mkQ||"")}" placeholder="대학·학과 검색 (예: 전남대 화학, 조선대 의예)" oninput="view.mkQ=this.value;render()" style="margin-bottom:8px">
+    ${sel?`<div class="mocksel" style="border-color:var(--accent);cursor:default"><b>${esc(sel.univ)} ${esc(sel.major)}</b><span class="chip acc">선택됨</span>
+      <button class="btn ghost sm" style="margin-left:auto" onclick="view.mkSel=null;render()">변경</button></div>`:""}
+    ${!sel&&q?cand.map(m=>`<button class="mocksel" onclick="view.mkSel='${esc(m.univ)}|${esc(m.major)}';render()">
+      <b>${esc(m.univ)}</b> ${esc(m.major)}<span class="cnt">${esc(m.region||"")} · 전형 ${m.tracks.length}개</span></button>`).join("")||`<div class="empty">검색 결과 없음</div>`:""}
+    ${!sel&&!q?`<p style="font-size:12.5px;color:var(--ink2);margin:0">검색해서 목표를 선택하세요 — 학생 연동 시 그 학생의 관심대학이 아래에 바로 나옵니다.</p>
+      ${view.mkStu?(()=>{const s=db.students.find(x=>x.id===view.mkStu);
+        return (s?.univs||[]).slice(0,8).map(u=>{const k=uniNorm(u.univ)+"|"+u.major;
+          return majors.has(k)?`<button class="mocksel" onclick="view.mkSel='${esc(k)}';render()"><b>${esc(uniNorm(u.univ))}</b> ${esc(u.major)}<span class="cnt">관심대학</span></button>`:"";}).join("");})():""}`:""}
+    ${sel&&isNaN(g)?`<p style="font-size:12.5px;color:var(--danger);margin:6px 0 0">내신 평균을 입력하면 판정이 나옵니다.</p>`:""}
+  </div></div>
+  ${verdict}`;}
+function mkSaveUniv(){
+  const s=db.students.find(x=>x.id===view.mkStu);if(!s||!view.mkSel)return;
+  const [u,m]=view.mkSel.split("|");
+  s.univs=s.univs||[];
+  if(s.univs.some(x=>uniNorm(x.univ)===u&&x.major===m)){toast("이미 관심대학에 있습니다");return;}
+  s.univs.push({univ:u,major:m,track:"",tong:"",checked:""});save();render();toast(`${u} ${m} → ${s.name} 관심대학`);}
 
 /* ═══════════ 어디가 데이터 (공식 입결·전형 학습 파이프라인) ═══════════ */
 function renderAdiga(){
@@ -2016,6 +2413,7 @@ function render(){
   else if(view.page==="lab")renderLab();
   else if(view.page==="adiga")renderAdiga();
   else if(view.page==="ipsi")renderIpsi();
+  else if(view.page==="mock")renderMock();
   else if(view.page==="search")renderSearch();
   else renderStu();
 }
