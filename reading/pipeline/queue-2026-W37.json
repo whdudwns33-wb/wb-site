@@ -1,0 +1,171 @@
+{
+  "week": "2026-W37",
+  "scannedAt": null,
+  "preparedAt": "2026-09-01",
+  "method": null,
+  "note": "루틴 실행 전 미리 씨앗을 넣어 둔 파일이다. ② 단계에서 스캔 결과를 items 에 덧붙이고 scannedAt·method 를 채운 뒤, ③ 에서 selected 4~5편을 고른다. carryover 는 W36 에서 넘어온 후보 — 새 스캔 결과와 같은 자격으로 견줘 보고, 유효하지 않으면 hold 로 내린다.",
+  "prep": {
+    "분포": {
+      "지문": 35,
+      "전부발행": true,
+      "분야": {
+        "과학·기술": 7,
+        "사회·경제": 7,
+        "역사·문화": 7,
+        "인문·예술": 7,
+        "환경": 7
+      },
+      "진로": {
+        "it": 8,
+        "bio": 8,
+        "med": 8,
+        "biz": 8,
+        "law": 8,
+        "env": 8,
+        "art": 8,
+        "eng": 9,
+        "media": 9,
+        "edu": 9,
+        "nat": 10,
+        "hum": 11
+      },
+      "시사태깅": "6/35 (17%)"
+    },
+    "선정 지침": [
+      "분야가 5개 전부 7편으로 고르다 — 예전 큐에 적힌 「인문·예술이 얇으니 우선 보강」은 이제 맞지 않는다. 그 문장을 그대로 따르지 말 것.",
+      "대신 직전 주(W36) 로테이션을 피한다: W36 은 society 2편 · environment/science/history 각 1편 · humanities 0편이었다. W37 은 humanities 를 1편 이상 넣고 society 를 2편 넘기지 않는다.",
+      "진로는 8편으로 묶여 있는 7개(it·bio·med·biz·law·env·art)를 우선 태깅하고, hum(11)·nat(10)은 되도록 피한다.",
+      "시사 태깅이 35편 중 6편(17%)뿐이다. 이번 주 최소 1편, 권장 2편은 issue:true 로 확실히 잡는다."
+    ],
+    "집필 도구": [
+      "끊어 읽기 초안: node reading/chunk.mjs --band L3 \"문단\" — 초안이므로 반드시 사람이 손질한다(F1 66).",
+      "규칙: docs/의미단위-끊어읽기-규격.md. 조사 뒤에서 끊는 규칙은 쓰지 말 것 — 무작위와 같고 관형어를 가른다."
+    ]
+  },
+  "items": [
+    {
+      "id": "brain-iot",
+      "cluster": "의약·공학",
+      "title": "KAIST 무선 뇌 조절 장치 — 지구 반대편에서 뇌 연구 (8/27)",
+      "summary": "약물 전달+빛 자극+무선 통신 뇌 장치. '뇌 연구도 IoT 시대'.",
+      "category": "science",
+      "careers": [
+        "med",
+        "eng",
+        "it"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.sciencetimes.co.kr"
+      ],
+      "status": "carryover",
+      "note": "ai-blood-cancer와 같은 주 의료 중복 회피 — 다음 주 1순위 · W36 이월"
+    },
+    {
+      "id": "rare-earth-recycle",
+      "cluster": "환경·자원",
+      "title": "폐가전 속 희토류, 국내 산업 원료로 재활용 (기후부, 8/27)",
+      "summary": "도시광산 개념 — 자원 순환 경제.",
+      "category": "environment",
+      "careers": [
+        "env",
+        "eng",
+        "biz"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.mcee.go.kr"
+      ],
+      "status": "carryover",
+      "note": "environment 편중 방지로 이번 주 보류 · W36 이월"
+    },
+    {
+      "id": "artificial-fingerprint",
+      "cluster": "신소재·보안",
+      "title": "KAIST 콜로이드 나노 패턴 '인공 지문' 보안 기술 (8/26)",
+      "summary": "복제 불가능한 무작위 패턴으로 진위 판별.",
+      "category": "science",
+      "careers": [
+        "it",
+        "nat",
+        "eng"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.sciencetimes.co.kr"
+      ],
+      "status": "carryover",
+      "note": "W36 이월"
+    },
+    {
+      "id": "quake-npp-ai",
+      "cluster": "안전·AI",
+      "title": "표준연 — 지진 후 원전 점검 우선순위 알려주는 AI 가상센싱 (8/26)",
+      "summary": "지진계 1대 신호로 139개 지점 진동을 추론.",
+      "category": "science",
+      "careers": [
+        "eng",
+        "it",
+        "nat"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.sciencetimes.co.kr"
+      ],
+      "status": "carryover",
+      "note": "W36 이월"
+    },
+    {
+      "id": "cloud-seeding",
+      "cluster": "기상·공학",
+      "title": "한-미 공동 차세대 인공증우 원천기술 개발 착수 (기상청, 8/11)",
+      "summary": "가뭄 대응 인공비 — 구름 씨뿌리기 원리.",
+      "category": "science",
+      "careers": [
+        "nat",
+        "env",
+        "eng"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.kma.go.kr"
+      ],
+      "status": "carryover",
+      "note": "W36 이월"
+    },
+    {
+      "id": "content-industry-stats",
+      "cluster": "문화·산업",
+      "title": "콘텐츠산업 매출·수출 통계 (KOCCA)",
+      "summary": "장르별 매출 구조와 성장 — humanities 보강재.",
+      "category": "humanities",
+      "careers": [
+        "media",
+        "biz"
+      ],
+      "confidence": "B",
+      "sources": [
+        "https://www.kocca.kr"
+      ],
+      "status": "carryover",
+      "note": "W35 이월 — humanities 부족 해소용 다음 주 우선 승격, 수치 원문 확인 필요 · W36 이월"
+    },
+    {
+      "id": "space-parts-verification",
+      "cluster": "우주·항공",
+      "title": "국산 우주부품 궤도 실증 사업 착수 (우주항공청)",
+      "summary": "W35 이월 후보.",
+      "category": "science",
+      "careers": [
+        "eng",
+        "nat"
+      ],
+      "confidence": "A",
+      "sources": [
+        "https://www.kasa.go.kr"
+      ],
+      "status": "carryover",
+      "note": "science 편중으로 계속 이월 — 우주 소재 3편이라 당분간 보류 · W36 이월"
+    }
+  ]
+}
