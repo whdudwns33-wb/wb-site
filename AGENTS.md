@@ -15,6 +15,13 @@
 2. `workbench/src/app.html` 수정 → `WB_PASSWORD='...' node workbench/src/build.mjs`
    → 출력의 "복호화 검증: 일치 ✓" 확인.
 3. 배포는 main에 index.html + bulk.enc.json (worktree 사용 권장), 배포 후 라이브 URL 해시 대조.
+   **⚠ 두 파일은 반드시 함께 배포** — 암호화 키가 빌드마다 바뀌어 짝이 어긋나면 전 기기에서
+   대량 데이터 로드가 실패한다(2026-09-02 실제 사고). 라이브 해시는 index.html과 bulk.enc.json
+   **둘 다** 대조할 것. 앱은 빌드 태그(BUILD_TAG ↔ bulk의 t 필드)로 불일치를 감지해 경고를 띄운다.
+4. 원장 데이터 반영: Drive `WB_워크벤치_백업` 폴더의 최신 `wb-consulting-backup-*.json`을 받아
+   `node workbench/src/seed-from-backup.mjs <백업파일>` → 재빌드 → 두 파일 배포 →
+   `workbench/backup/private-seed.enc.json` 재암호화 커밋(backup/README) →
+   `workbench/backup/last-drive-import.json`(fileId·modifiedTime) 갱신. 매일 아침 루틴이 이를 자동 수행한다.
 
 ## 절대 규칙 (위반 시 커밋 금지)
 1. **공개 파일에 학생 실명·연락처 0건.** `app.html`·문서·커밋 메시지 포함.

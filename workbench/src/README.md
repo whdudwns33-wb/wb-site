@@ -36,9 +36,25 @@ git worktree add /tmp/wt-main origin/main && cd /tmp/wt-main \
   && git checkout -b deploy-$(date +%s) origin/main \
   && cp <저장소>/workbench/index.html <저장소>/workbench/bulk.enc.json workbench/ \
   && git add workbench/index.html workbench/bulk.enc.json && git commit -m "workbench: ... 배포" && git push origin HEAD:main
-# 6) 라이브 확인: 배포 후 1~2분 뒤
-curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/ | sha256sum   # 로컬 index.html 해시와 일치해야 함
+# 6) 라이브 확인: 배포 후 1~2분 뒤 — 반드시 두 파일 모두 대조 (하나만 배포되면 전 기기 데이터 로드 실패)
+curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/ | sha256sum                # = 로컬 index.html
+curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/bulk.enc.json | sha256sum  # = 로컬 bulk.enc.json
 ```
+
+## 원장 백업 자동 반영 (Drive → 시드 → 재배포)
+
+원장이 앱의 "백업 내보내기"로 만든 `wb-consulting-backup-*.json`을 Google Drive `WB_워크벤치_백업`
+폴더에 올리면, 매일 아침 루틴이 새 파일을 감지해 반영한다. 수동으로 할 때:
+
+```bash
+node workbench/src/seed-from-backup.mjs <백업파일.json>   # private-seed.json 전체 갱신 (학생 전체 상태 + 수동 DB extras)
+WB_PASSWORD='...' node workbench/src/build.mjs             # 재빌드
+# 이후 위 4)~6) 배포 절차 + backup/private-seed.enc.json 재암호화(backup/README) + backup/last-drive-import.json 갱신
+```
+
+시드는 새 기기(또는 로그아웃 상태 기기)에 전체 상태를 채워 주고, 이미 쓰던 기기에는 신규 학생·신규
+DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 시점으로 완전히 맞추려면 앱의
+"가져오기 → 전체 복원"으로 백업 파일을 직접 읽힌다.
 
 `private-seed.json`을 수정했다면 `../backup/private-seed.enc.json`도 재생성해 커밋한다 (backup/README 참조 역방향).
 
