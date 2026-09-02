@@ -5,6 +5,7 @@ import fs from 'node:fs';
 
 import worker from './worker-core.js';
 import {
+  feedbackPolishUsageDayUtc,
   koreanStudentGivenName,
   normalizeFeedbackPolishResult,
   prefixFeedbackStudentSubject,
@@ -12,6 +13,8 @@ import {
 } from './feedback-polish.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
+const budgetCacheMigration = fs.readFileSync(
+  new URL('./migrations/062_feedback_ai_budget_cache.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -61,6 +64,15 @@ function validBody(overrides = {}) {
   };
 }
 
+const RICH_SOURCE = '민우는 오늘 학습할 내용을 차분하게 살펴보며 핵심을 찾았고 스스로 생각해 풀이의 근거를 확인했습니다. ' +
+  '답을 정리한 뒤에는 놓친 부분을 다시 점검했고 안정적인 태도로 맡은 과정을 끝까지 성실하게 마무리했습니다.';
+const RICH_SOURCE_VARIANT = '민우는 학습할 내용을 차분하게 살펴 핵심을 찾고 스스로 생각하며 풀이 근거를 확인했습니다. ' +
+  '답을 정리한 다음 놓친 부분을 다시 점검했으며 안정적인 태도로 맡은 과정을 끝까지 성실하게 마무리했습니다.';
+const RICH_COMMENT = '오늘 수업에서 학습할 내용을 차분하게 살펴보며 핵심을 찾았습니다. ' +
+  '문제를 해결하는 과정에서는 스스로 생각을 이어 가며 풀이의 근거를 확인했습니다. ' +
+  '답을 정리한 뒤에는 놓친 부분이 없는지 다시 점검하며 학습 내용을 정돈했습니다. ' +
+  '수업 내내 안정적인 태도를 유지하며 맡은 과정을 끝까지 성실하게 마무리했습니다.';
+
 function aiInputText(input) {
   return (input && Array.isArray(input.messages) ? input.messages : [])
     .map(message => String(message && message.content || '')).join('\n');
@@ -71,7 +83,9 @@ async function call(db, body, envPatch = {}) {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
   }), {
     DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret',
-    WB_PARENT_FEEDBACK_AI_ENABLED: 'true', ...envPatch
+    WB_PARENT_FEEDBACK_AI_ENABLED: 'true',
+    WB_PARENT_FEEDBACK_AI_CACHE_SECRET: 'feedback-polish-test-hmac-secret-v1',
+    ...envPatch
   });
   return { status: response.status, body: await response.json() };
 }
@@ -83,6 +97,37 @@ function seededDb() {
   seedLesson(db);
   return db;
 }
+
+test('AI 비용 가드·캐시 migration은 UTC 일일 150회와 비식별 캐시만 저장한다', () => {
+  assert.match(budgetCacheMigration, /CREATE TABLE IF NOT EXISTS feedback_polish_daily_usage/);
+  assert.match(budgetCacheMigration, /ai_calls\s+INTEGER[\s\S]*BETWEEN 1 AND 150/);
+  assert.match(budgetCacheMigration, /PRIMARY KEY \(app, usage_day_utc\)/);
+  assert.match(budgetCacheMigration, /CREATE TABLE IF NOT EXISTS feedback_polish_cache/);
+  assert.match(budgetCacheMigration, /length\(cache_key\) = 64/);
+  assert.match(budgetCacheMigration, /cache_key NOT GLOB '\*\[\^0-9a-f\]\*'/);
+  assert.match(budgetCacheMigration, /state\s+TEXT[\s\S]*'pending'[\s\S]*'ready'/);
+  assert.match(budgetCacheMigration, /claim_token\s+TEXT/);
+  assert.match(budgetCacheMigration, /lease_until\s+INTEGER/);
+  const cacheDefinition = budgetCacheMigration.slice(
+    budgetCacheMigration.indexOf('CREATE TABLE IF NOT EXISTS feedback_polish_cache'),
+    budgetCacheMigration.indexOf(');', budgetCacheMigration.indexOf('CREATE TABLE IF NOT EXISTS feedback_polish_cache')) + 2
+  );
+  assert.doesNotMatch(cacheDefinition,
+    /^\s*(?:student(?:_id|_name)?|task_id|owner|auth|token|phone|contact|source_(?:text|comment))\s+TEXT/im,
+  '캐시에 학생·수업 식별자, 인증정보, 연락처 또는 원문을 저장하면 안 된다');
+  assert.doesNotMatch(budgetCacheMigration, /\b(?:DROP|DELETE|UPDATE)\s+(?:TABLE|FROM|tasks|staff|tokens)\b/i);
+  const normalizedSchema = schema.replace(/\r\n/g, '\n').replace(/\n{2,}/g, '\n');
+  const normalizedMigration = budgetCacheMigration.trim().replace(/\r\n/g, '\n').replace(/\n{2,}/g, '\n');
+  assert.ok(normalizedSchema.includes(normalizedMigration),
+    '운영 schema에도 동일한 migration이 반영되어야 한다');
+});
+
+test('AI 일일 cap 날짜는 서버 현지시간이 아니라 UTC 자정에서 전환된다', () => {
+  assert.equal(feedbackPolishUsageDayUtc(Date.parse('2026-09-02T23:59:59.999Z')), '2026-09-02');
+  assert.equal(feedbackPolishUsageDayUtc(Date.parse('2026-09-03T00:00:00.000Z')), '2026-09-03');
+  assert.equal(feedbackPolishUsageDayUtc(Date.parse('2026-09-03T08:59:59.999+09:00')), '2026-09-02');
+  assert.equal(feedbackPolishUsageDayUtc(Date.parse('2026-09-03T09:00:00.000+09:00')), '2026-09-03');
+});
 
 test('AI 다듬기는 학생 이름을 마스킹하고 코멘트 외 수업·인증 정보를 모델에 보내지 않는다', async () => {
   const db = seededDb();
@@ -117,6 +162,14 @@ test('AI 다듬기는 학생 이름을 마스킹하고 코멘트 외 수업·인
     assert.ok(!modelInput.includes(privateValue), privateValue + '가 AI 입력에 들어가면 안 된다');
   }
   assert.equal(input.stream, false);
+  assert.equal(input.max_tokens, 256, '무료 사용량을 아끼기 위해 출력 토큰 상한을 작게 유지해야 한다');
+  assert.match(input.messages[0].content, /2\s*[~～-]\s*4문장/,
+    '학부모 코멘트는 가능하면 2~4문장으로 풍성하게 요청해야 한다');
+  assert.match(input.messages[0].content, /120\s*자[\s\S]*220\s*자/,
+    '충분한 예산에서는 120~220자를 목표로 요청해야 한다');
+  assert.match(input.messages[0].content, /새로운 사실[^\n]*추가하지 마세요/,
+    '문장을 늘리더라도 관찰하지 않은 사실을 만들면 안 된다');
+  assert.equal(result.body.source, 'ai');
   assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").get().count, 0);
   assert.equal(db.database.prepare("SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE app='task'").get().count, 0);
 });
@@ -180,7 +233,6 @@ test('AI 바인딩·스위치·민감정보·과도한 입력은 모델 호출 �
 });
 
 test('AI 결과 실패는 개인정보 없는 세부 reason code로 구분하고 자동 재시도하지 않는다', async () => {
-  const db = seededDb();
   for (const [reason, responseText] of [
     ['numbers', '오늘 4개 문제를 차분하게 풀었습니다.'],
     ['formality', '오늘 3개 문제를 차분하게 풀었어요.'],
@@ -189,16 +241,24 @@ test('AI 결과 실패는 개인정보 없는 세부 reason code로 구분하고
     ['contact', '오늘 3개 문제를 확인했으며 자세한 내용은 전화 주세요.'],
     ['length', '3개를 풀었습니다.']
   ]) {
+    const db = seededDb();
     let calls = 0;
+    const request = validBody();
     const result = await call(db, validBody(), { AI: { run: async () => {
       calls += 1;
       return { response: responseText };
     } } });
-    assert.equal(result.status, 422, responseText);
-    assert.equal(result.body.code, 'FEEDBACK_AI_INVALID');
-    assert.equal(result.body.reason, reason);
-    assert.equal(result.body.reasonCode, 'FEEDBACK_AI_INVALID_' + reason.toUpperCase());
+    assert.equal(result.status, 200, responseText);
+    assert.equal(result.body.ok, true);
+    assert.equal(result.body.source, 'fallback');
+    assert.equal(result.body.fallbackReason, 'ai_invalid');
+    assert.equal(result.body.commentText, request.commentText,
+      '검증을 통과하지 못한 모델 출력으로 기존 코멘트를 덮어쓰면 안 된다');
     assert.equal(calls, 1, '검증 실패 뒤 모델을 자동으로 다시 호출하면 안 된다');
+    assert.equal(db.database.prepare(
+      'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+    ).get('task', new Date().toISOString().slice(0, 10)).ai_calls, 1,
+    '이미 호출한 모델 결과가 무효여도 비용 안전 사용량을 환급하면 안 된다');
   }
 });
 
@@ -273,8 +333,10 @@ test('구조화 JSON 객체·JSON 문자열과 배포 전 일반 문자열 응�
   const rejected = await call(seededDb(), validBody(), { AI: { run: async () => ({
     response: JSON.stringify({ commentText: output, extra: '노출 금지' })
   }) } });
-  assert.equal(rejected.status, 422);
-  assert.equal(rejected.body.reason, 'artifact');
+  assert.equal(rejected.status, 200);
+  assert.equal(rejected.body.source, 'fallback');
+  assert.equal(rejected.body.fallbackReason, 'ai_invalid');
+  assert.equal(rejected.body.commentText, validBody().commentText);
 });
 
 test('요청 과목은 AI 글자수 예산에 반영되고 누락된 구형 요청만 수업 과목을 쓴다', async () => {
@@ -295,7 +357,7 @@ test('요청 과목은 AI 글자수 예산에 반영되고 누락된 구형 요�
   assert.ok(!captured.includes(customSubject), '과목은 길이 계산에만 쓰고 모델 입력에는 보내지 않는다');
   const longestPrefix = '민우는 오늘 수업에서';
   assert.match(captured, new RegExp('전체 길이는 공백 포함 ' +
-    (custom.body.maxChars - longestPrefix.length - 1) + '자 이하여야 합니다'));
+    (Math.min(custom.body.maxChars, 220) - longestPrefix.length - 1) + '자 이하여야 합니다'));
 
   let calls = 0;
   const tooLong = await call(seededDb(), validBody({ subjectText: '과'.repeat(81) }), {
@@ -513,14 +575,52 @@ test('AI 결과 정규화는 학생 마커와 격식체가 있어도 코드·JSO
     '__WB_STUDENT__은 오늘 3개 문제를 차분하게 풀었습니다. 풀이 과정도 끝까지 확인했습니다.');
 });
 
-test('AI 공급자 오류는 안전한 오류로 바꾸고 기존 코멘트를 응답에 노출하지 않는다', async () => {
+test('AI 공급자 오류와 429는 추가 호출 없이 기존 코멘트를 안전하게 유지한다', async () => {
+  for (const [message, fallbackReason] of [
+    ['provider secret failure', 'ai_failed'],
+    ['429 quota exceeded', 'busy']
+  ]) {
+    const db = seededDb();
+    const request = validBody();
+    let calls = 0;
+    const result = await call(db, request, { AI: { run: async () => {
+      calls += 1;
+      throw new Error(message);
+    } } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.ok, true);
+    assert.equal(result.body.source, 'fallback');
+    assert.equal(result.body.fallbackReason, fallbackReason);
+    assert.equal(result.body.commentText, request.commentText);
+    assert.equal(calls, 1, '공급자 실패를 서버가 자동 재시도해 추가 사용량을 만들면 안 된다');
+    assert.ok(!JSON.stringify(result.body).includes(message), '공급자 내부 오류는 응답에 노출하면 안 된다');
+    assert.equal(db.database.prepare(
+      'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+    ).get('task', new Date().toISOString().slice(0, 10)).ai_calls, 1,
+    '호출 시도 뒤 오류가 나도 비용 안전 사용량을 환급하면 안 된다');
+  }
+});
+
+test('같은 실패 입력은 짧은 negative cache 동안 AI를 다시 호출하지 않는다', async () => {
   const db = seededDb();
-  const original = validBody().commentText;
-  const result = await call(db, validBody(), { AI: { run: async () => { throw new Error('provider secret failure'); } } });
-  assert.equal(result.status, 502);
-  assert.equal(result.body.code, 'FEEDBACK_AI_FAILED');
-  assert.ok(!JSON.stringify(result.body).includes(original));
-  assert.ok(!JSON.stringify(result.body).includes('provider secret failure'));
+  const request = validBody();
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    throw new Error('provider unavailable');
+  } } };
+  const first = await call(db, request, env);
+  const second = await call(db, request, env);
+  assert.equal(first.body.fallbackReason, 'ai_failed');
+  assert.equal(second.body.fallbackReason, 'ai_failed');
+  assert.equal(calls, 1, '실패 직후 반복 클릭이 AI 호출 한도를 연속 차감하면 안 된다');
+  const cached = db.database.prepare(
+    "SELECT state,failure_reason,result_text,claim_token,lease_until FROM feedback_polish_cache WHERE app='task'"
+  ).get();
+  assert.deepEqual({ ...cached }, {
+    state: 'failed', failure_reason: 'ai_failed', result_text: null,
+    claim_token: null, lease_until: null
+  });
 });
 
 test('AI 결과 정규화는 전체 결과가 길면 자르지 않고 거부하며 새 숫자나 비격식체도 거부한다', () => {
@@ -546,4 +646,346 @@ test('AI 결과 정규화는 전체 결과가 길면 자르지 않고 거부하�
     '__WB_STUDENT__는 __WB_STUDENT__와 오늘 3개 문제를 확인했습니다.',
     '__WB_STUDENT__는 오늘 3개 문제를 확인했습니다.', 100),
   { commentText: '', reason: 'marker' });
+});
+
+test('풍성하게 생성된 코멘트는 2~4문장과 120~220자 목표 안에서 적용한다', async () => {
+  assert.ok(RICH_COMMENT.length >= 120 && RICH_COMMENT.length <= 220);
+  assert.equal(RICH_COMMENT.match(/니다\./g)?.length, 4);
+  const result = await call(seededDb(), validBody({ commentText: RICH_SOURCE }), {
+    AI: { run: async () => ({ response: RICH_COMMENT }) }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.source, 'ai');
+  assert.match(result.body.commentText, /^민우는 오늘 수업에서 학습할 내용을/);
+  assert.ok(result.body.commentText.length >= 120 && result.body.commentText.length <= 220,
+    result.body.commentText);
+  assert.equal(result.body.commentText.match(/니다\./g)?.length, 4);
+});
+
+test('220자 최종 상한을 넘을 AI 본문은 잘라 쓰지 않고 기존 코멘트를 유지한다', async () => {
+  const request = validBody({ commentText: RICH_SOURCE });
+  const overlong = Array.from({ length: 10 }, () =>
+    '학습 내용을 차분하게 확인하고 관찰한 내용을 자연스럽게 정리했습니다.').join(' ');
+  assert.ok(overlong.length > 220);
+  let input;
+  const result = await call(seededDb(), request, {
+    AI: { run: async (name, body) => {
+      input = body;
+      return { response: overlong };
+    } }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.source, 'fallback');
+  assert.equal(result.body.fallbackReason, 'ai_invalid');
+  assert.equal(result.body.commentText, request.commentText);
+  assert.match(aiInputText(input), /전체 길이는 공백 포함 208자 이하여야 합니다/);
+});
+
+test('동일한 AI 입력은 준비된 캐시를 재사용하고 사용량을 다시 차감하지 않는다', async () => {
+  const db = seededDb();
+  const request = validBody({ commentText: RICH_SOURCE });
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } };
+  const first = await call(db, request, env);
+  const second = await call(db, request, env);
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(first.body.source, 'ai');
+  assert.equal(second.body.source, 'cache');
+  assert.equal(second.body.commentText, first.body.commentText);
+  assert.equal(calls, 1, '같은 입력으로 Workers AI를 두 번 호출하면 안 된다');
+
+  const usageDate = new Date().toISOString().slice(0, 10);
+  const usage = db.database.prepare(
+    'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+  ).get('task', usageDate);
+  assert.equal(usage.ai_calls, 1, '캐시 조회는 하루 무료 안전 한도를 소비하면 안 된다');
+  const cacheRows = db.database.prepare('SELECT * FROM feedback_polish_cache').all().map(row => ({ ...row }));
+  assert.equal(cacheRows.length, 1);
+  assert.match(cacheRows[0].cache_key, /^[a-f0-9]{64}$/);
+  const stored = JSON.stringify(cacheRows);
+  for (const privateValue of [request.taskId, request.auth.token, '김민우', '민우', request.commentText]) {
+    assert.ok(!stored.includes(privateValue), privateValue + '가 AI 캐시에 저장되면 안 된다');
+  }
+});
+
+test('같은 원문도 수업일이 바뀌면 비식별 rotation salt로 새 문장을 만든다', async () => {
+  const db = seededDb();
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } };
+  const first = await call(db, validBody({
+    feedbackDate: '2026-08-28', commentText: RICH_SOURCE
+  }), env);
+  const nextDay = await call(db, validBody({
+    feedbackDate: '2026-08-29', commentText: RICH_SOURCE
+  }), env);
+  assert.equal(first.body.source, 'ai');
+  assert.equal(nextDay.body.source, 'ai');
+  assert.equal(calls, 2);
+  const rows = db.database.prepare(
+    'SELECT cache_key FROM feedback_polish_cache ORDER BY cache_key'
+  ).all();
+  assert.equal(rows.length, 2);
+  assert.notEqual(rows[0].cache_key, rows[1].cache_key);
+  assert.doesNotMatch(JSON.stringify(rows), /2026-08-2[89]|lesson-a/,
+    '수업일과 taskId 원문을 캐시에 저장하면 안 된다');
+});
+
+test('하루 cap이 소진되어도 이미 검증된 동일 입력 캐시는 비용 없이 반환한다', async () => {
+  const db = seededDb();
+  const request = validBody({ commentText: RICH_SOURCE });
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } };
+  const first = await call(db, request, env);
+  assert.equal(first.body.source, 'ai');
+  const usageDate = new Date().toISOString().slice(0, 10);
+  db.database.prepare(
+    'UPDATE feedback_polish_daily_usage SET ai_calls=150 WHERE app=? AND usage_day_utc=?'
+  ).run('task', usageDate);
+  const cached = await call(db, request, env);
+  assert.equal(cached.status, 200);
+  assert.equal(cached.body.source, 'cache');
+  assert.equal(cached.body.commentText, first.body.commentText);
+  assert.equal(calls, 1);
+  assert.equal(db.database.prepare(
+    'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+  ).get('task', usageDate).ai_calls, 150);
+});
+
+test('동일 입력의 동시 요청도 한 요청만 AI 캐시 claim을 획득한다', async () => {
+  const db = seededDb();
+  const request = validBody({ commentText: RICH_SOURCE });
+  let calls = 0;
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const env = { AI: { run: async () => {
+    calls += 1;
+    await pending;
+    return { response: RICH_COMMENT };
+  } } };
+  const firstPromise = call(db, request, env);
+  await new Promise(resolve => setImmediate(resolve));
+  const secondPromise = call(db, request, env);
+  await new Promise(resolve => setImmediate(resolve));
+  release();
+  const results = await Promise.all([firstPromise, secondPromise]);
+  assert.equal(calls, 1, '같은 cache key의 동시 miss가 Workers AI를 중복 호출하면 안 된다');
+  assert.ok(results.every(result => result.status === 200 && result.body.ok === true));
+  assert.equal(results.filter(result => result.body.source === 'ai').length, 1);
+  assert.ok(results.some(result => result.body.source === 'cache' || result.body.source === 'fallback'));
+  assert.equal(db.database.prepare(
+    'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+  ).get('task', new Date().toISOString().slice(0, 10)).ai_calls, 1);
+});
+
+test('AI 처리 중 claim token이 바뀌면 이전 요청은 캐시를 ready로 전환하지 못한다', async () => {
+  const db = seededDb();
+  let release;
+  let enteredResolve;
+  const entered = new Promise(resolve => { enteredResolve = resolve; });
+  const pending = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    enteredResolve();
+    await pending;
+    return { response: RICH_COMMENT };
+  } } };
+  const firstPromise = call(db, validBody({ commentText: RICH_SOURCE }), env);
+  await entered;
+  const stolenToken = 'c'.repeat(64);
+  db.database.prepare(
+    "UPDATE feedback_polish_cache SET claim_token=? WHERE app='task' AND state='pending'"
+  ).run(stolenToken);
+  release();
+  const first = await firstPromise;
+  assert.equal(first.body.source, 'ai', '이미 검증한 현재 응답은 사용자에게 반환할 수 있다');
+  const row = db.database.prepare(
+    "SELECT state,claim_token,result_text FROM feedback_polish_cache WHERE app='task'"
+  ).get();
+  assert.deepEqual({ ...row }, { state: 'pending', claim_token: stolenToken, result_text: null });
+  const second = await call(db, validBody({ commentText: RICH_SOURCE }), env);
+  assert.equal(second.body.source, 'fallback');
+  assert.equal(second.body.fallbackReason, 'in_flight');
+  assert.equal(calls, 1);
+});
+
+test('만료된 pending cache lease는 새 요청이 인수해 다시 AI를 호출할 수 있다', async () => {
+  const db = seededDb();
+  const request = validBody({ commentText: RICH_SOURCE });
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } };
+  const first = await call(db, request, env);
+  assert.equal(first.body.source, 'ai');
+  const now = Date.now();
+  db.database.prepare(
+    `UPDATE feedback_polish_cache
+        SET state='pending',result_text=NULL,claim_token=?,lease_until=?,
+            created_at=?,updated_at=?,expires_at=?
+      WHERE app='task'`
+  ).run('b'.repeat(64), now - 1, now - 60000, now - 60000, now + 60000);
+  const recovered = await call(db, request, env);
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.body.source, 'ai');
+  assert.equal(calls, 2);
+  const cache = db.database.prepare(
+    "SELECT state,claim_token,lease_until FROM feedback_polish_cache WHERE app='task'"
+  ).get();
+  assert.deepEqual({ ...cache }, { state: 'ready', claim_token: null, lease_until: null });
+});
+
+test('유효하지 않은 ready 캐시는 재사용하지 않고 삭제한 뒤 새 결과로 교체한다', async () => {
+  const db = seededDb();
+  const request = validBody({ commentText: RICH_SOURCE });
+  let calls = 0;
+  const env = { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } };
+  const first = await call(db, request, env);
+  assert.equal(first.body.source, 'ai');
+  const invalidCachedText = 'const result = true; 오늘 학습 내용을 차분하게 확인했습니다.';
+  db.database.prepare(
+    "UPDATE feedback_polish_cache SET result_text=? WHERE app='task' AND state='ready'"
+  ).run(invalidCachedText);
+  const refreshed = await call(db, request, env);
+  assert.equal(refreshed.status, 200);
+  assert.equal(refreshed.body.source, 'ai');
+  assert.equal(calls, 2, '안전 검증에 실패한 캐시를 사용자에게 반환하면 안 된다');
+  const cache = db.database.prepare(
+    "SELECT state,result_text FROM feedback_polish_cache WHERE app='task'"
+  ).get();
+  assert.equal(cache.state, 'ready');
+  assert.equal(cache.result_text, RICH_COMMENT);
+});
+
+test('HMAC cache secret이 없으면 비용 가드를 열지 않고 AI 호출 없이 원문을 유지한다', async () => {
+  const db = seededDb();
+  const request = validBody();
+  let calls = 0;
+  const result = await call(db, request, {
+    WB_PARENT_FEEDBACK_AI_CACHE_SECRET: '',
+    AI: { run: async () => {
+      calls += 1;
+      return { response: RICH_COMMENT };
+    } }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.source, 'fallback');
+  assert.equal(result.body.fallbackReason, 'cost_guard');
+  assert.equal(result.body.commentText, request.commentText);
+  assert.equal(calls, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM feedback_polish_daily_usage').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM feedback_polish_cache').get().count, 0);
+});
+
+test('만료 캐시 행은 다음 요청에서 제한된 정리 대상으로 삭제한다', async () => {
+  const db = seededDb();
+  const now = Date.now();
+  const insert = db.database.prepare(
+    `INSERT INTO feedback_polish_cache
+       (app,cache_key,prompt_version,state,result_text,failure_reason,claim_token,lease_until,
+        max_chars,created_at,updated_at,expires_at)
+     VALUES('task',?,?,'ready',?,NULL,NULL,NULL,?,?,?,?)`);
+  for (let index = 1; index <= 30; index += 1) {
+    insert.run(index.toString(16).padStart(64, '0'), 'expired-v1',
+      '오늘 학습 내용을 차분하게 확인하고 정리했습니다.', 200,
+      now - 2000, now - 2000, now - 1);
+  }
+  const result = await call(db, validBody({ commentText: RICH_SOURCE }), {
+    AI: { run: async () => ({ response: RICH_COMMENT }) }
+  });
+  assert.equal(result.body.source, 'ai');
+  assert.equal(db.database.prepare(
+    'SELECT COUNT(*) AS count FROM feedback_polish_cache WHERE expires_at<=?'
+  ).get(now).count, 5, '한 요청은 만료 행을 최대 25개만 정리해야 한다');
+});
+
+test('UTC 하루 150회 cap은 경쟁 요청에서도 한 자리만 원자적으로 허용한다', async () => {
+  const db = seededDb();
+  const usageDate = new Date().toISOString().slice(0, 10);
+  db.database.prepare(
+    'INSERT INTO feedback_polish_daily_usage(app,usage_day_utc,ai_calls,updated_at) VALUES(?,?,?,?)'
+  ).run('task', usageDate, 149, Date.now());
+  const requests = [
+    validBody({ commentText: RICH_SOURCE }),
+    validBody({ commentText: RICH_SOURCE_VARIANT })
+  ];
+  let calls = 0;
+  const results = await Promise.all(requests.map(request => call(db, request, { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } })));
+  assert.equal(calls, 1, '149회에서 동시에 요청해도 AI 호출은 150번째 한 건뿐이어야 한다');
+  assert.deepEqual(results.map(result => result.body.source).sort(), ['ai', 'fallback']);
+  for (let index = 0; index < results.length; index += 1) {
+    assert.equal(results[index].status, 200);
+    if (results[index].body.source === 'fallback') {
+      assert.equal(results[index].body.fallbackReason, 'daily_limit');
+      assert.equal(results[index].body.commentText, requests[index].commentText);
+    }
+  }
+  assert.equal(db.database.prepare(
+    'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+  ).get('task', usageDate).ai_calls, 150);
+});
+
+test('일일 cap 소진 뒤 요청은 AI를 호출하지 않고 원문을 그대로 반환한다', async () => {
+  const db = seededDb();
+  const usageDate = new Date().toISOString().slice(0, 10);
+  db.database.prepare(
+    'INSERT INTO feedback_polish_daily_usage(app,usage_day_utc,ai_calls,updated_at) VALUES(?,?,?,?)'
+  ).run('task', usageDate, 150, Date.now());
+  const request = validBody();
+  let calls = 0;
+  const result = await call(db, request, { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.source, 'fallback');
+  assert.equal(result.body.fallbackReason, 'daily_limit');
+  assert.equal(result.body.commentText, request.commentText);
+  assert.equal(calls, 0);
+  assert.equal(db.database.prepare(
+    'SELECT ai_calls FROM feedback_polish_daily_usage WHERE app=? AND usage_day_utc=?'
+  ).get('task', usageDate).ai_calls, 150);
+});
+
+test('비용 가드 저장소를 확인하지 못하면 AI를 호출하지 않고 원문을 안전하게 유지한다', async () => {
+  const backing = seededDb();
+  const DB = {
+    prepare(sql) {
+      if (/feedback_polish_(?:cache|daily_usage)/.test(String(sql))) {
+        throw new Error('D1_ERROR: private quota detail');
+      }
+      return backing.prepare(sql);
+    },
+    batch(statements) { return backing.batch(statements); }
+  };
+  const request = validBody();
+  let calls = 0;
+  const result = await call(DB, request, { AI: { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } } });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.source, 'fallback');
+  assert.equal(result.body.commentText, request.commentText);
+  assert.equal(calls, 0, '비용 상한을 확인할 수 없을 때 fail-open하면 추가요금이 발생할 수 있다');
+  assert.doesNotMatch(JSON.stringify(result.body), /D1_ERROR|private quota detail/);
 });

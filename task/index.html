@@ -1068,11 +1068,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-02.4"></script>
-<script src="./schedule-board-core.js?v=2026-09-02.4"></script>
-<script src="./asset-core.js?v=2026-09-02.4"></script>
-<script src="./qr-core.js?v=2026-09-02.4"></script>
-<script src="./acaflow-import-core.js?v=2026-09-02.4"></script>
+<script src="./lesson-form-core.js?v=2026-09-02.5"></script>
+<script src="./schedule-board-core.js?v=2026-09-02.5"></script>
+<script src="./asset-core.js?v=2026-09-02.5"></script>
+<script src="./qr-core.js?v=2026-09-02.5"></script>
+<script src="./acaflow-import-core.js?v=2026-09-02.5"></script>
 <script>
 "use strict";
 
@@ -5983,6 +5983,19 @@ function feedbackPolishErrorText(error) {
   return 'AI 다듬기를 완료하지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
 }
 
+function feedbackPolishFallbackText(reason) {
+  const messages = {
+    daily_limit: '오늘의 AI 다듬기 사용 안전 한도에 도달해 기존 코멘트를 유지했습니다.',
+    in_flight: '같은 코멘트를 다듬는 요청이 진행 중이어서 기존 코멘트를 유지했습니다.',
+    busy: 'AI 요청이 많아 기존 코멘트를 유지했습니다. 잠시 뒤 다시 시도해 주세요.',
+    ai_failed: 'AI 응답을 받지 못해 기존 코멘트를 유지했습니다.',
+    ai_invalid: '안전 기준에 맞는 결과가 아니어서 기존 코멘트를 유지했습니다.',
+    storage_busy: '비용 보호 상태를 확인하지 못해 AI를 호출하지 않고 기존 코멘트를 유지했습니다.',
+    cost_guard: '비용 보호 설정을 확인할 수 없어 AI를 호출하지 않고 기존 코멘트를 유지했습니다.'
+  };
+  return messages[String(reason || '')] || 'AI를 호출하지 않고 기존 코멘트를 유지했습니다.';
+}
+
 /** 서버 검증을 통과했더라도 코드·JSON·HTML·마크다운 흔적이 보이면 화면에 적용하지 않는다. */
 function feedbackPolishHasArtifacts(value) {
   const raw = String(value == null ? '' : value).normalize('NFKC');
@@ -6094,13 +6107,11 @@ function updateFeedbackPreviewLength(t, root) {
   const hasRequiredFields = !!subjectText && !!contentText && !!homeworkText && !!commentText;
   const sendValid = hasRequiredFields && commentText.length <= limit &&
     message.length <= FEEDBACK_ALIMTALK_MAX_CHARS;
-  const polishValid = hasRequiredFields && commentText.length <= FEEDBACK_COMMENT_MAX_CHARS &&
-    feedbackPolishBudgetReady(t, limit);
   target.textContent = '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
     message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자';
   target.className = 'small mt8 ' + (sendValid ? 'muted' : 'bad');
   const polishButton = scope.querySelector('[data-act="feedbackpolish"]');
-  if (polishButton) polishButton.disabled = !!fbCtx.polishPending || !polishValid;
+  if (polishButton) polishButton.disabled = !!fbCtx.polishPending;
   refreshFeedbackFinalSendStatus(t, scope);
 }
 
@@ -8235,17 +8246,37 @@ async function reviewLessonChange(action, key, revision) {
  *  성공한 결과도 최종 전송을 누르기 전에는 저장하거나 발송하지 않는다. */
 async function polishFeedbackComment(button) {
   const context = fbCtx;
-  if (!context || context.templateVersion !== 'v2' || context.polishPending) return;
+  if (!context || context.templateVersion !== 'v2') return;
   const modalBox = button && button.closest('.modal-box');
   if (!modalBox) return toast('피드백 화면을 다시 열어 주세요');
+  const stopWithReason = message => {
+    setFeedbackPolishStatus('error', message, modalBox);
+    toast('AI 다듬기를 시작하지 않았습니다 — 버튼 아래 안내를 확인해 주세요');
+  };
+  if (context.polishPending) {
+    stopWithReason('AI 다듬기가 아직 진행 중입니다.');
+    return;
+  }
   const task = state.tasks.find(row => row.id === context.id);
-  if (!task) return toast('수업 정보를 찾지 못했습니다');
+  if (!task) return stopWithReason('해당 수업 정보를 다시 불러온 뒤 시도해 주세요.');
   const auth = sync.auth();
-  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (!auth) return stopWithReason('동기화 인증이 필요합니다.');
   const latestCommentField = modalBox.querySelector('[data-feedback-final-field="commentText"]');
   if (latestCommentField) syncFeedbackFinalFieldFromInput(latestCommentField);
   const sourceComment = feedbackFlatField(latestCommentField ? latestCommentField.value : context.commentText);
-  if (!sourceComment) return toast('다듬을 코멘트가 없습니다');
+  const missing = [];
+  if (!String(context.subjectText || '').trim()) missing.push('과목');
+  if (!String(context.contentText || '').trim()) missing.push('수업내용 · 진도');
+  if (!String(context.homeworkText || '').trim()) missing.push('과제');
+  if (!sourceComment) missing.push('코멘트');
+  if (missing.length) return stopWithReason(missing.join('·') + ' 빈칸이 있어 AI로 다듬을 수 없습니다.');
+  if (sourceComment.length > FEEDBACK_COMMENT_MAX_CHARS) {
+    return stopWithReason('코멘트가 600자를 초과해 AI로 다듬을 수 없습니다.');
+  }
+  const localBudget = feedbackCommentBudget(task, context.date, context);
+  if (!feedbackPolishBudgetReady(task, localBudget)) {
+    return stopWithReason('수업내용이나 과제가 길어 코멘트를 다듬을 글자 수가 부족합니다.');
+  }
   const seq = Number(context.polishSeq || 0) + 1;
   context.polishSeq = seq;
   context.polishPending = true;
@@ -8266,6 +8297,11 @@ async function polishFeedbackComment(button) {
     });
     if (fbCtx !== context || Number(context.polishSeq) !== seq ||
         !modalBox.isConnected || !button.isConnected || !modalBox.contains(button)) return;
+    if (String(result && result.source || '') === 'fallback') {
+      setFeedbackPolishStatus('error', feedbackPolishFallbackText(result.fallbackReason), modalBox);
+      toast('기존 코멘트를 그대로 유지했습니다 — 버튼 아래 안내를 확인해 주세요');
+      return;
+    }
     const rawCommentText = String(result && result.commentText || '');
     if (feedbackPolishHasArtifacts(rawCommentText)) {
       throw new Error('AI 결과에 코드 또는 불필요한 기호가 포함되어 적용하지 않았습니다');
@@ -8292,8 +8328,13 @@ async function polishFeedbackComment(button) {
     const preview = modalBox.querySelector('#mText');
     if (preview) preview.value = nextMessage;
     updateFeedbackPreviewLength(task, modalBox);
-    setFeedbackPolishStatus('success', 'AI 다듬기 완료 — 코멘트 칸에 반영했습니다. 최종 내용을 확인해 주세요.', modalBox);
-    toast('코멘트를 더 부드럽고 자연스럽게 다듬었습니다');
+    const fromCache = String(result && result.source || '') === 'cache';
+    setFeedbackPolishStatus('success', fromCache
+      ? '저장된 안전 결과를 재사용했습니다 — 추가 AI 호출 없이 코멘트 칸에 반영했습니다.'
+      : 'AI 다듬기 완료 — 코멘트 칸에 반영했습니다. 최종 내용을 확인해 주세요.', modalBox);
+    toast(fromCache
+      ? '추가 AI 호출 없이 다듬은 코멘트를 불러왔습니다'
+      : '코멘트를 더 부드럽고 자연스럽게 다듬었습니다');
   } catch (error) {
     if (fbCtx === context && Number(context.polishSeq) === seq && modalBox.isConnected &&
         button.isConnected && modalBox.contains(button)) {
@@ -21058,7 +21099,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-02.4';
+const APP_VER = '2026-09-02.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
