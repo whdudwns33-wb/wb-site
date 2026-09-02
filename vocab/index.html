@@ -91,6 +91,8 @@
     .btn.ghost { background: transparent; }
     .btn.big { width: 100%; padding: 15px 18px; font-size: 1rem; }
     .btn:active { transform: translateY(1px); }
+    /* [hidden]의 display:none을 위 .btn 규칙이 덮는다 — 숨긴 단추가 그대로 보인다 */
+    .btn[hidden] { display: none; }
     .row { display: flex; gap: 10px; }
     .row > * { flex: 1; }
 
@@ -175,6 +177,20 @@
     .hp .ch { font-size: 1.9rem; line-height: 1.2; color: var(--ink-strong); }
     .hp .he { font-size: .74rem; color: var(--ink-soft); font-weight: 700; }
     .literal { font-size: .9rem; font-weight: 700; color: var(--deep); }
+
+    /* 따라쓰기 — 손으로 쓰는 칸. 태블릿에서 손가락·스타일러스로 그린다.
+       touch-action:none 이 없으면 획을 그으려는 손짓이 페이지 스크롤로 먹힌다. */
+    .trace { margin-top: 12px; }
+    .trace-head { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-bottom: 8px; }
+    .trace-head b { font-size: 1.5rem; line-height: 1.2; color: var(--ink-strong); }
+    .trace-head span { font-size: .8rem; font-weight: 700; color: var(--ink-soft); }
+    .trace-head i { font-style: normal; font-size: .78rem; font-weight: 900; color: var(--deep); }
+    .trace canvas { display: block; width: 100%; max-width: 250px; aspect-ratio: 1 / 1; margin: 0 auto;
+      border-radius: 12px; background: #fff; touch-action: none; cursor: crosshair; }
+    .trace-tip { margin: 8px 0 0; font-size: .8rem; color: var(--ink-soft); text-align: center; }
+    .trace-tip.warn { color: var(--coral); font-weight: 700; }
+    .trace-btns { margin-top: 10px; }
+    .trace-btns .btn { flex: 1; padding: 10px 6px; font-size: .86rem; }
 
     .hintbox { background: var(--card-2); border-radius: 12px; padding: 12px 14px; margin-top: 12px; text-align: left; }
     .hintbox .lbl { font-size: .7rem; font-weight: 900; letter-spacing: .08em; color: var(--ink-soft); }
@@ -361,6 +377,7 @@
   <script src="./bridge.js"></script>
   <script src="./quiz.js"></script>
   <script src="./srs.js"></script>
+  <script src="./trace.js"></script>
   <script>
 /* APP:JS:START */
 (function () {
@@ -656,6 +673,7 @@
         return '<div class="hp"><div class="ch">' + p.ch + '</div><div class="he">' + esc(p.hun) + ' ' + esc(p.eum) + '</div></div>';
       }).join('') + '</div>';
       html += '<div class="literal">= ' + esc(w.literal) + '</div>';
+      if (!compact) html += traceHtml(w);
       if (!compact) {
         var fam = {};
         w.parts.forEach(function (p) {
@@ -677,6 +695,213 @@
     return html;
   }
   function sayWord(w) { say(w.word, w.type === 'english' ? 'en-US' : 'ko-KR'); }
+
+  /* ── 한자 따라쓰기 ──────────────────────────────────────────────
+     눈·귀·입은 이미 있었고 손이 없었다(기획서 §2.2 멀티모달 입력).
+     한자는 획을 손이 한 번 겪어야 눈에 들어온다.
+
+     세 번 쓰되 안내 글자가 회차마다 옅어진다 — 마지막은 빈 칸이다.
+     베끼기 세 번은 손만 움직이고 기억은 안 남는다(§2.3 인출 난이도 사다리).
+
+     획 좌표는 0~1로 저장한다. 화면을 돌리거나 창이 바뀌어도 다시 그리기만 하면
+     되고, 칸 크기와 획 길이가 어긋날 일이 없다. */
+  var TRACE_FONT = '"Apple SD Gothic Neo", "Noto Serif KR", "Nanum Myeongjo", "Batang", serif';
+  var TRACE = { cv: null, ctx: null, size: 0, strokes: [], plan: [], step: 0, peek: false, w: null, cur: null };
+
+  function traceHtml(w) {
+    if (w.type !== 'hanja' || !WBTrace.chars(w.hanja).length) return '';
+    return '<button class="say-btn" id="trOpen">✍️ 따라쓰기</button>' +
+      '<div class="trace" id="trPanel" hidden></div>';
+  }
+
+  /* 열 때마다 새로 만든다 — 다 쓰고 접었다 펴면 처음부터 다시 쓸 수 있고,
+     같은 단추에 리스너가 겹쳐 붙어 한 번 눌렀는데 두 칸씩 넘어가는 일도 없다 */
+  function tracePanelHtml() {
+    return '<div class="trace-head"><b id="trCh"></b><span id="trHun"></span><i id="trRep"></i></div>' +
+      '<canvas id="trCv"></canvas>' +
+      '<p class="trace-tip" id="trTip"></p>' +
+      '<div class="row trace-btns">' +
+        '<button class="btn ghost" id="trClear">지우기</button>' +
+        '<button class="btn ghost" id="trPeek" hidden>겹쳐 보기</button>' +
+        '<button class="btn primary" id="trNext">다음 →</button>' +
+      '</div>';
+  }
+
+  function traceFit() {
+    var cv = TRACE.cv;
+    if (!cv) return;
+    var css = Math.round(cv.getBoundingClientRect().width) || 250;
+    var dpr = Math.min(3, window.devicePixelRatio || 1);
+    cv.width = Math.round(css * dpr);
+    cv.height = Math.round(css * dpr);
+    TRACE.size = css;
+    TRACE.ctx = cv.getContext('2d');
+    TRACE.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function tracePaint() {
+    var c = TRACE.ctx, s = TRACE.size, cur = TRACE.cur;
+    if (!c || !cur) return;
+    c.clearRect(0, 0, s, s);
+    /* 米자 격자 — 손글씨 연습장의 그 칸. 획이 어디쯤 오는지 가늠자가 된다 */
+    c.save();
+    c.strokeStyle = '#DCE8F0'; c.lineWidth = 1;
+    c.strokeRect(0.5, 0.5, s - 1, s - 1);
+    c.setLineDash([4, 5]);
+    c.beginPath();
+    c.moveTo(s / 2, 0); c.lineTo(s / 2, s);
+    c.moveTo(0, s / 2); c.lineTo(s, s / 2);
+    c.moveTo(0, 0); c.lineTo(s, s);
+    c.moveTo(s, 0); c.lineTo(0, s);
+    c.stroke();
+    c.restore();
+    /* 안내 글자 */
+    var a = TRACE.peek ? 0.3 : WBTrace.guideAlpha(cur.rep);
+    if (a > 0) {
+      c.save();
+      c.globalAlpha = a;
+      c.fillStyle = '#1B3A5C';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = Math.round(s * 0.8) + 'px ' + TRACE_FONT;
+      c.fillText(cur.ch, s / 2, s * 0.54);
+      c.restore();
+    }
+    traceInk();
+  }
+
+  function traceInk() {
+    var c = TRACE.ctx, s = TRACE.size;
+    if (!c) return;
+    c.save();
+    c.strokeStyle = '#23313F';
+    c.lineWidth = Math.max(4, s * 0.032);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    TRACE.strokes.forEach(function (st) {
+      if (!st.length) return;
+      c.beginPath();
+      c.moveTo(st[0].x * s, st[0].y * s);
+      if (st.length === 1) c.lineTo(st[0].x * s + 0.1, st[0].y * s);
+      else for (var i = 1; i < st.length; i++) c.lineTo(st[i].x * s, st[i].y * s);
+      c.stroke();
+    });
+    c.restore();
+  }
+
+  function traceShow() {
+    var cur = TRACE.plan[TRACE.step];
+    TRACE.cur = cur;
+    TRACE.strokes = [];
+    TRACE.peek = false;
+    var part = (TRACE.w.parts || []).filter(function (p) { return p.ch === cur.ch; })[0];
+    $('#trCh').textContent = cur.ch;
+    $('#trHun').textContent = part ? part.hun + ' ' + part.eum : '';
+    $('#trRep').textContent = (cur.rep + 1) + ' / ' + WBTrace.REPS;
+    var tip = $('#trTip');
+    tip.classList.remove('warn');
+    tip.textContent = cur.rep === 0 ? '옅은 글자를 그대로 따라 그어 보세요.'
+      : (cur.rep === 1 ? '더 옅어졌어요 — 획이 어디로 가는지 떠올리며.'
+        : '이번엔 안내가 없어요. 기억해서 써 보세요.');
+    var peek = $('#trPeek');
+    peek.hidden = !cur.last;
+    peek.textContent = '겹쳐 보기';
+    $('#trNext').textContent = TRACE.step === TRACE.plan.length - 1 ? '다 썼어요' : '다음 →';
+    traceFit();
+    tracePaint();
+  }
+
+  function traceDone() {
+    var body = $('#trPanel');
+    if (!body) return;
+    body.innerHTML = '<div class="hintbox" style="text-align:center;"><p>' +
+      esc(TRACE.w.hanja) + ' — ' + WBTrace.REPS + '번씩 다 썼어요 ✍️</p>' +
+      '<p class="muted" style="font-size:.82rem;margin-top:6px;">손으로 한 번 겪은 획은 눈으로만 본 획보다 오래 남아요.</p></div>';
+    var btn = $('#trOpen');
+    if (btn) { btn.textContent = '✍️ 따라쓰기 완료'; btn.classList.add('on'); }
+  }
+
+  function traceBindCanvas() {
+    var cv = TRACE.cv, cur = null;
+    function pt(e) {
+      var r = cv.getBoundingClientRect();
+      /* 0~1로 담는다 — 화면 크기가 바뀌어도 획이 어긋나지 않는다 */
+      return { x: (e.clientX - r.left) / (r.width || 1), y: (e.clientY - r.top) / (r.height || 1) };
+    }
+    function seg(a, b) {
+      var c = TRACE.ctx, s = TRACE.size;
+      c.save();
+      c.strokeStyle = '#23313F'; c.lineWidth = Math.max(4, s * 0.032);
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      c.beginPath(); c.moveTo(a.x * s, a.y * s); c.lineTo(b.x * s, b.y * s); c.stroke();
+      c.restore();
+    }
+    cv.addEventListener('pointerdown', function (e) {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+      var p = pt(e);
+      cur = [p];
+      TRACE.strokes.push(cur);
+      seg(p, p);
+      var tip = $('#trTip');
+      if (tip) tip.classList.remove('warn');
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!cur || !e.isPrimary) return;
+      e.preventDefault();
+      var p = pt(e);
+      seg(cur[cur.length - 1], p);
+      cur.push(p);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+      cv.addEventListener(ev, function () { cur = null; });
+    });
+  }
+
+  function bindTrace(w) {
+    var open = $('#trOpen');
+    if (!open) return;
+    open.addEventListener('click', function () {
+      var panel = $('#trPanel');
+      if (!panel) return;
+      if (!panel.hidden) { panel.hidden = true; open.classList.remove('on'); return; }
+      panel.innerHTML = tracePanelHtml();
+      panel.hidden = false;
+      open.classList.add('on');
+      open.textContent = '✍️ 따라쓰기';
+      TRACE.w = w;
+      TRACE.plan = WBTrace.plan(w.hanja);
+      TRACE.step = 0;
+      TRACE.cv = $('#trCv');
+      traceBindCanvas();
+      traceShow();
+      $('#trClear').addEventListener('click', function () { TRACE.strokes = []; tracePaint(); });
+      $('#trPeek').addEventListener('click', function () {
+        TRACE.peek = !TRACE.peek;
+        this.textContent = TRACE.peek ? '안내 숨기기' : '겹쳐 보기';
+        tracePaint();
+      });
+      $('#trNext').addEventListener('click', function () {
+        /* 손 안 대고 세 번 넘기면 따라쓰기를 한 것이 아니다 */
+        if (!WBTrace.enough(TRACE.strokes, 1)) {
+          var tip = $('#trTip');
+          tip.textContent = '아직 안 썼어요 — 칸 안에 손으로 한 번 써 보세요.';
+          tip.classList.add('warn');
+          return;
+        }
+        TRACE.step += 1;
+        if (TRACE.step >= TRACE.plan.length) { traceDone(); return; }
+        traceShow();
+      });
+    });
+  }
+
+  /* 화면을 돌리면 캔버스 해상도가 어긋난다 — 다시 맞추고 그린다 */
+  window.addEventListener('resize', function () {
+    var panel = $('#trPanel');
+    if (!panel || panel.hidden || !TRACE.cv || !document.body.contains(TRACE.cv)) return;
+    traceFit(); tracePaint();
+  });
+
 
   /* ── 소리 도구: 들어보기(읽어주기) + 낭독(녹음) ──────────────────────────
      듣기만 해서는 남지 않는다. 소리 내어 읽어야 조음이 기억을 만든다.
@@ -970,6 +1195,7 @@
     bindVoiceRow('md', w);
     $('#mdClose').addEventListener('click', closeModal);
     bindAiSlot(w);
+    bindTrace(w);
   }
   function closeModal() { voiceRelease(); $('#modalBack').classList.remove('show'); }
   $('#modalBack').addEventListener('click', function (e) { if (e.target === $('#modalBack')) closeModal(); });
@@ -1133,6 +1359,7 @@
       bindVoiceRow('p', w);
       $('#pNext').addEventListener('click', function () { idx += 1; encodeStep(); });
       bindAiSlot(w);
+      bindTrace(w);
       sayWord(w);
     }
 
