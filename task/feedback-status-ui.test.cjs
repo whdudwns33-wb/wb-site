@@ -20,6 +20,13 @@ function feedbackSortHelpers(state = { tasks: [] }) {
     'feedbackLessonStartMinutes, feedbackSortRows, feedbackTeacherGroups };')(state, parseYmd, ymd);
 }
 
+function feedbackStatusHelpers() {
+  const start = source.indexOf('const FEEDBACK_STATUS_LABEL =');
+  const end = source.indexOf('function feedbackWeekdayKey(', start);
+  assert.ok(start >= 0 && end > start, 'feedback status helper block exists');
+  return Function(source.slice(start, end) + '\nreturn { feedbackSendState, feedbackIsUnsent };')();
+}
+
 test('선생님 피드백 상태는 최신 저장 순으로 정렬한다', () => {
   const { feedbackSortRows } = feedbackSortHelpers();
   const rows = [
@@ -129,15 +136,22 @@ test('관리자 피드백은 선생님별로 묶고 내부에서 미발송 우�
 });
 
 test('저장된 최종 메시지를 재구성하지 않고 줄바꿈과 함께 안전하게 표시한다', () => {
-  const start = source.indexOf('function feedbackStoredMessageHtml(');
+  const start = source.indexOf('const FEEDBACK_STATUS_LABEL =');
   const end = source.indexOf('function feedbackReasonHtml(', start);
   assert.ok(start >= 0 && end > start, 'stored message renderer exists');
   const esc = value => String(value).replace(/[&<>"']/g, character =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
   const renderStoredMessage = new Function('esc', source.slice(start, end) +
     '\nreturn feedbackStoredMessageHtml;')(esc);
-  const rendered = renderStoredMessage({ message: '첫 줄 <확인>\n둘째 줄' });
+  const rendered = renderStoredMessage({
+    status: 'sent', messageDeliveryState: 'delivered', message: '첫 줄 <확인>\n둘째 줄'
+  });
   assert.match(rendered, /첫 줄 &lt;확인&gt;\n둘째 줄/);
+  assert.match(rendered, /수신 완료/);
+  const pending = renderStoredMessage({
+    status: 'sent', messageDeliveryState: 'provider_queued', message: '아직 처리 중'
+  });
+  assert.doesNotMatch(pending, /수신 완료/, '공급자 접수만 된 메시지를 학부모 수신 완료로 표시하면 안 된다');
   assert.match(source, /\.feedback-message-text[\s\S]{0,400}white-space: pre-wrap/);
 });
 
@@ -205,10 +219,42 @@ test('발송 대기 카드의 재접수 버튼은 항상 보이고 실패 사유
   assert.match(source, /id="fbSendResult-/);
 });
 
-test('접수 성공 상태는 전달 완료가 아닌 솔라피 발송 접수로 표시한다', () => {
+test('피드백 상태는 원시 코드 대신 서로 다른 안전한 한글 상태로 표시한다', () => {
   const start = source.indexOf('const FEEDBACK_STATUS_LABEL =');
-  const end = source.indexOf('function feedbackSendState(', start);
+  const end = source.indexOf('function feedbackUpdatedAt(', start);
   const labels = source.slice(start, end);
-  assert.match(labels, /sent: \['솔라피 발송 접수'/);
-  assert.doesNotMatch(labels, /전달완료|전달 완료|발송 완료/);
+  const { feedbackSendState } = feedbackStatusHelpers();
+  const labelFor = state => feedbackSendState({ status: 'sent', messageDeliveryState: state }).label[0];
+  const safeLabels = {
+    provider_queued: labelFor('provider_queued'),
+    carrier_processing: labelFor('carrier_processing'),
+    delivered: labelFor('delivered'),
+    failed: labelFor('failed'),
+    unknown: labelFor('unknown')
+  };
+  assert.match(safeLabels.provider_queued, /접수|대기/);
+  assert.match(safeLabels.carrier_processing, /통신사|전달 중/);
+  assert.match(safeLabels.delivered, /수신 완료/);
+  assert.match(safeLabels.failed, /실패|거절/);
+  assert.match(safeLabels.unknown, /확인 필요|알 수 없음/);
+  assert.equal(new Set(Object.values(safeLabels)).size, 5, '진행·완료·실패 상태를 같은 문구로 합치면 안 된다');
+  assert.doesNotMatch(labels, /\b(?:2000|3000|4000)\b/);
+  assert.doesNotMatch(labels, /provider(?:Message|Group|Status)Id|providerStatusCode/i);
+});
+
+test('기존 접수 성공도 전달 상태가 없으면 수신 완료라고 추측하지 않는다', () => {
+  const { feedbackSendState } = feedbackStatusHelpers();
+  const legacy = feedbackSendState({ status: 'sent' }).label[0];
+  assert.match(legacy, /접수/);
+  assert.doesNotMatch(legacy, /수신 완료/);
+});
+
+test('수신 완료 전달 상태는 뒤늦은 요청 실패 상태보다 우선하여 완료로 집계한다', () => {
+  const { feedbackSendState, feedbackIsUnsent } = feedbackStatusHelpers();
+  for (const requestStatus of ['content_approved_send_blocked', 'revision_requested']) {
+    const item = { status: requestStatus, messageDeliveryState: 'delivered' };
+    assert.match(feedbackSendState(item).label[0], /수신 완료/);
+    assert.equal(feedbackIsUnsent(item), false,
+      'API가 확정한 delivered를 요청 행의 더 최신 실패 상태 때문에 미발송으로 되돌리면 안 된다');
+  }
 });

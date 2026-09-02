@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { attemptParentFeedbackSend, parentFeedbackV2CommentBudget } from './parent-feedback-send.js';
+import {
+  attemptParentFeedbackSend,
+  feedbackMessageDeliveryState,
+  handleScheduledParentFeedbackStatusRefresh,
+  parentFeedbackV2CommentBudget
+} from './parent-feedback-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration016 = fs.readFileSync(new URL('./migrations/016_parent_feedback_send.sql', import.meta.url), 'utf8');
@@ -132,6 +138,57 @@ function registerGuardian(db, studentName, { studentId = 'student-test', phone =
     'INSERT INTO guardian_contacts_by_student ' +
     '(app,student_id,student_name,phone,consent,updated_at,updated_by) VALUES (?,?,?,?,?,?,?)'
   ).bind('task', studentId, studentName, phone, consent, now, 'director').run();
+}
+
+function seedFeedbackSend(db, requestKey, {
+  sendId = 'pfs_status_test', status = 'dispatching', statusCode = null,
+  groupId = null, messageId = null, safeErrorCode = null,
+  messageHash = 'm'.repeat(64), createdAt = Date.now() - 60_000, updatedAt = createdAt
+} = {}) {
+  db.prepare(
+    'INSERT INTO parent_feedback_sends ' +
+    '(app,send_id,idempotency_key,feedback_request_key,student_id,student_name,message_hash,status,' +
+    'provider_group_id,provider_message_id,provider_status_code,safe_error_code,' +
+    'created_at,dispatch_started_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(
+    'task', sendId, ('idem_' + sendId).padEnd(64, 'x'), requestKey,
+    'student-test', '테스트학생', messageHash, status,
+    groupId, messageId, statusCode, safeErrorCode,
+    createdAt, createdAt, updatedAt
+  ).run();
+  return sendId;
+}
+
+function v2FeedbackMessageHash(fields = {}) {
+  const variables = {
+    templateVersion: 'v2',
+    studentName: '테스트학생',
+    dateText: '2026년 8월 9일',
+    subjectText: '국어',
+    contentText: '독해 지문 3개 풀이',
+    homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 설명하는 태도가 인상적이었습니다.',
+    ...fields
+  };
+  return createHash('sha256').update(JSON.stringify(variables)).digest('hex');
+}
+
+async function listFeedbackForDirector(db) {
+  const response = await worker.fetch(new Request('https://worker.example/feedback-review', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ app: 'task', auth: admin, action: 'list', limit: 100 })
+  }), { DB: db, ...fullEnvBase });
+  return { status: response.status, body: await response.json() };
+}
+
+async function listFeedbackForTeacher(db) {
+  const response = await worker.fetch(new Request('https://worker.example/feedback-request', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      app: 'task', auth: person('S-kim', 'tok-kim'), action: 'list', limit: 100
+    })
+  }), { DB: db, ...fullEnvBase });
+  return { status: response.status, body: await response.json() };
 }
 
 test('schema and migrations use stable student ids, and the send ledger itself stores no phone or message body', () => {
@@ -790,6 +847,353 @@ test('provider HTTP errors retain only a safe code; 4xx is rejected and 5xx is u
     ).bind(requestKey).first();
     assert.equal(ledger.status, expectedLedger);
   }
+});
+
+test('feedback delivery status is reduced to safe enums without exposing provider codes', () => {
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '2000' }), 'provider_queued');
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '3000' }), 'carrier_processing');
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '4000' }), 'delivered');
+  assert.equal(feedbackMessageDeliveryState({ status: 'rejected', provider_status_code: '4010' }), 'failed');
+  assert.equal(feedbackMessageDeliveryState({ status: 'dispatching' }), 'unknown');
+  assert.equal(feedbackMessageDeliveryState({ status: 'unknown' }), 'unknown');
+  for (const state of ['provider_queued', 'carrier_processing', 'delivered', 'failed', 'unknown']) {
+    assert.doesNotMatch(state, /\d{4}|provider_message|provider_group/i);
+  }
+});
+
+test('scheduled status refresh recovers a delivered orphan by exact customFields wbSendId and blocks every repeat send', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  await withFetch(async () => acceptedResponse(77), async () => {
+    const initiallyAccepted = await call(db, { auth: admin, requestKey });
+    assert.equal(initiallyAccepted.status, 200);
+  });
+  const acceptedLedger = db.prepare(
+    'SELECT send_id FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first();
+  const sendId = acceptedLedger.send_id;
+  db.prepare(
+    "UPDATE parent_feedback_sends SET status='dispatching',provider_group_id=NULL," +
+    'provider_message_id=NULL,provider_status_code=NULL,safe_error_code=NULL,' +
+    'created_at=?,dispatch_started_at=?,updated_at=? WHERE send_id=?'
+  ).bind(now - 60_000, now - 60_000, now - 60_000, sendId).run();
+  db.prepare(
+    "UPDATE feedback_requests SET status='content_approved_send_blocked'," +
+    "review_note='접수 여부 확인 필요 — 확인 전 재발송 금지' WHERE request_key=?"
+  ).bind(requestKey).run();
+
+  let listFetches = 0;
+  let sendFetches = 0;
+  await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === '/messages/v4/list') {
+      listFetches += 1;
+      assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+      assert.ok(parsed.searchParams.get('startDate'), 'orphan lookup must use a bounded start date');
+      assert.ok(parsed.searchParams.get('endDate'), 'orphan lookup must use a bounded end date');
+      assert.equal(parsed.searchParams.get('dateType'), 'CREATED');
+      assert.equal(parsed.searchParams.get('type'), 'ATA');
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_RECOVERED: {
+            messageId: 'MSG_RECOVERED', groupId: 'GROUP_RECOVERED', type: 'ATA', statusCode: '4000',
+            dateCreated: new Date(now - 59_000).toISOString(),
+            customFields: { wbSendId: sendId },
+            kakaoOptions: { templateId: 'TPL_TEST_V2_0001' }
+          }
+        },
+        limit: 20, startKey: null
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    sendFetches += 1;
+    throw new Error('recovered feedback must never be sent again');
+  }, async () => {
+    const refreshed = await handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(refreshed.ok, true, JSON.stringify(refreshed));
+
+    const ledger = db.prepare(
+      'SELECT status,provider_group_id,provider_message_id,provider_status_code,safe_error_code ' +
+      'FROM parent_feedback_sends WHERE send_id=?'
+    ).bind(sendId).first();
+    assert.deepEqual({ ...ledger }, {
+      status: 'accepted', provider_group_id: 'GROUP_RECOVERED', provider_message_id: 'MSG_RECOVERED',
+      provider_status_code: '4000', safe_error_code: null
+    });
+    const request = db.prepare(
+      'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+    ).bind(requestKey).first();
+    assert.deepEqual({ ...request }, { status: 'sent', review_note: null });
+
+    const repeated = await call(db, { auth: admin, requestKey });
+    assert.equal(repeated.status, 200);
+    assert.equal(repeated.body.code, 'ALREADY_SENT');
+    assert.equal(repeated.body.idempotent, true);
+  });
+
+  assert.equal(listFetches, 1);
+  assert.equal(sendFetches, 0, '상태 복구 뒤 반복 클릭은 공급자 발송 API를 다시 호출하면 안 된다');
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1, '복구는 기존 원장 한 건을 갱신하고 재발송 원장을 만들지 않는다');
+});
+
+test('orphan recovery fails closed when customFields wbSendId differs and a repeat click still cannot resend', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_orphan_mismatch', createdAt: now - 60_000, updatedAt: now - 60_000
+  });
+  let sendFetches = 0;
+
+  await withFetch(async (url) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === '/messages/v4/list') {
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_OTHER: {
+            messageId: 'MSG_OTHER', groupId: 'GROUP_OTHER', type: 'ATA', statusCode: '4000',
+            dateCreated: new Date(now - 59_000).toISOString(),
+            customFields: { wbSendId: 'pfs_someone_else' },
+            kakaoOptions: { templateId: 'TPL_TEST_V2_0001' }
+          }
+        }, limit: 20, startKey: null
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    sendFetches += 1;
+    return acceptedResponse();
+  }, async () => {
+    await handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    const ledger = db.prepare(
+      'SELECT status,provider_message_id,provider_status_code FROM parent_feedback_sends WHERE send_id=?'
+    ).bind(sendId).first();
+    assert.deepEqual({ ...ledger }, { status: 'dispatching', provider_message_id: null, provider_status_code: null });
+
+    const repeated = await call(db, { auth: admin, requestKey });
+    assert.equal(repeated.status, 202);
+    assert.equal(repeated.body.code, 'PRIOR_SEND_UNCERTAIN');
+  });
+
+  assert.equal(sendFetches, 0);
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1);
+});
+
+test('director and teacher feedback lists expose only a safe delivery state and never raw Solapi values', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_private_provider_values', status: 'accepted', statusCode: '4000',
+    groupId: 'GROUP_MUST_NOT_LEAK', messageId: 'MSG_MUST_NOT_LEAK',
+    messageHash: v2FeedbackMessageHash()
+  });
+
+  for (const listed of [await listFeedbackForDirector(db), await listFeedbackForTeacher(db)]) {
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.requests.length, 1);
+    assert.equal(listed.body.requests[0].messageDeliveryState, 'delivered');
+    const serialized = JSON.stringify(listed.body);
+    assert.doesNotMatch(serialized, /GROUP_MUST_NOT_LEAK|MSG_MUST_NOT_LEAK|\b4000\b/);
+    assert.doesNotMatch(serialized, /provider(?:Group|Message|Status|_group|_message|_status)/i);
+  }
+});
+
+test('a delivered attempt outranks later rejected or unknown attempts in both feedback list APIs', async () => {
+  for (const later of [
+    { status: 'rejected', statusCode: '4010', safeErrorCode: 'SOLAPI_STATUS_4010' },
+    { status: 'unknown', statusCode: null, safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND' }
+  ]) {
+    const db = new TestD1();
+    const now = Date.now();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+    const messageHash = v2FeedbackMessageHash();
+    seedFeedbackSend(db, requestKey, {
+      sendId: 'pfs_delivered_first', status: 'accepted', statusCode: '4000',
+      groupId: 'GROUP_DELIVERED', messageId: 'MSG_DELIVERED', messageHash,
+      createdAt: now - 2_000, updatedAt: now - 2_000
+    });
+    seedFeedbackSend(db, requestKey, {
+      sendId: 'pfs_later_' + later.status, ...later,
+      groupId: 'GROUP_LATER', messageId: 'MSG_LATER', messageHash,
+      createdAt: now - 1_000, updatedAt: now - 1_000
+    });
+
+    for (const listed of [await listFeedbackForDirector(db), await listFeedbackForTeacher(db)]) {
+      assert.equal(listed.status, 200);
+      assert.equal(listed.body.requests[0].messageDeliveryState, 'delivered',
+        `더 최신 ${later.status} 행이 과거의 실제 수신완료를 덮으면 안 된다`);
+    }
+  }
+});
+
+test('a terminal ledger update self-heals its feedback request on the next cron after one CAS miss', async () => {
+  for (const scenario of [
+    { providerCode: '4000', ledgerStatus: 'accepted', beforeStatus: 'content_approved_send_blocked', afterStatus: 'sent', afterNote: null },
+    {
+      providerCode: '4010', ledgerStatus: 'rejected', beforeStatus: 'sent',
+      afterStatus: 'content_approved_send_blocked', afterNote: '카카오 발송 결과가 실패로 확인되었습니다'
+    }
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+    registerGuardian(db, '테스트학생');
+    await withFetch(async () => acceptedResponse(91), async () => {
+      const sent = await call(db, { auth: admin, requestKey });
+      assert.equal(sent.status, 200);
+    });
+    const ledger = db.prepare(
+      'SELECT send_id,provider_group_id,provider_message_id,created_at FROM parent_feedback_sends WHERE feedback_request_key=?'
+    ).bind(requestKey).first();
+    const now = Math.max(Date.now(), Number(ledger.created_at)) + 60_000;
+    db.prepare(
+      'UPDATE feedback_requests SET status=?,review_note=?,updated_at=? WHERE request_key=?'
+    ).bind(scenario.beforeStatus, scenario.beforeStatus === 'sent' ? null : '이전 상태', now - 10_000, requestKey).run();
+
+    const originalPrepare = db.prepare.bind(db);
+    let failOneRequestUpdate = true;
+    db.prepare = sql => {
+      const statement = originalPrepare(sql);
+      if (failOneRequestUpdate && /^UPDATE feedback_requests SET status=\?,review_note=\?,updated_at=\?/.test(String(sql))) {
+        statement.run = () => {
+          failOneRequestUpdate = false;
+          return { meta: { changes: 0 } };
+        };
+      }
+      return statement;
+    };
+
+    try {
+      const first = await withFetch(async (url) => {
+        assert.equal(new URL(String(url)).pathname, '/messages/v4/list');
+        return new Response(JSON.stringify({
+          messageList: {
+            [ledger.provider_message_id]: {
+              messageId: ledger.provider_message_id,
+              groupId: ledger.provider_group_id,
+              statusCode: scenario.providerCode
+            }
+          }
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+      assert.equal(first.updated, 1);
+      assert.equal(first.requestUpdated, 0, '첫 cron의 feedback_requests CAS 실패를 재발송으로 보완하면 안 된다');
+      assert.equal(originalPrepare(
+        'SELECT status FROM parent_feedback_sends WHERE send_id=?'
+      ).bind(ledger.send_id).first().status, scenario.ledgerStatus);
+      assert.equal(originalPrepare(
+        'SELECT status FROM feedback_requests WHERE request_key=?'
+      ).bind(requestKey).first().status, scenario.beforeStatus);
+
+      const second = await withFetch(async () => {
+        throw new Error('terminal ledger self-heal must not query or resend through Solapi');
+      }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000));
+      assert.equal(second.ok, true, JSON.stringify(second));
+      assert.equal(second.requestUpdated, 1);
+      const healed = originalPrepare(
+        'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+      ).bind(requestKey).first();
+      assert.deepEqual({ ...healed }, { status: scenario.afterStatus, review_note: scenario.afterNote });
+    } finally {
+      db.prepare = originalPrepare;
+    }
+  }
+});
+
+test('orphan recovery follows nextKey pages with a bounded template query until the exact wbSendId is found', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  await withFetch(async () => acceptedResponse(92), async () => {
+    const sent = await call(db, { auth: admin, requestKey });
+    assert.equal(sent.status, 200);
+  });
+  const accepted = db.prepare(
+    'SELECT send_id,created_at FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first();
+  const now = Math.max(Date.now(), Number(accepted.created_at)) + 120_000;
+  db.prepare(
+    "UPDATE parent_feedback_sends SET status='dispatching',provider_group_id=NULL,provider_message_id=NULL," +
+    'provider_status_code=NULL,safe_error_code=NULL,created_at=?,dispatch_started_at=?,updated_at=? WHERE send_id=?'
+  ).bind(now - 60_000, now - 60_000, now - 60_000, accepted.send_id).run();
+  db.prepare(
+    "UPDATE feedback_requests SET status='content_approved_send_blocked',review_note='이전 상태',updated_at=? " +
+    'WHERE request_key=?'
+  ).bind(now - 30_000, requestKey).run();
+
+  const pageQueries = [];
+  const result = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    const query = Object.fromEntries(parsed.searchParams.entries());
+    pageQueries.push(query);
+    for (const [key, value] of Object.entries({
+      limit: '20', dateType: 'CREATED', type: 'ATA',
+      criteria: 'kakaoTemplateId', cond: 'eq', value: 'TPL_TEST_V2_0001'
+    })) assert.equal(query[key], value, `모든 복구 페이지가 ${key} 조건을 유지해야 한다`);
+    assert.ok(query.startDate);
+    assert.ok(query.endDate);
+
+    if (pageQueries.length === 1) {
+      assert.equal(query.startKey, undefined);
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_OTHER: {
+            messageId: 'MSG_OTHER', groupId: 'GROUP_OTHER', statusCode: '4000',
+            customFields: { wbSendId: 'pfs_not_the_target' }
+          }
+        },
+        nextKey: 'PAGE_TWO'
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    assert.equal(pageQueries.length, 2, '일치 항목을 찾은 뒤 불필요한 추가 페이지를 요청하면 안 된다');
+    assert.equal(query.startKey, 'PAGE_TWO');
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_EXACT: {
+          messageId: 'MSG_EXACT', groupId: 'GROUP_EXACT', statusCode: '4000',
+          customFields: { wbSendId: accepted.send_id }
+        }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(pageQueries.length, 2);
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_message_id,provider_status_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(accepted.send_id).first() }, {
+    status: 'accepted', provider_message_id: 'MSG_EXACT', provider_status_code: '4000'
+  });
+  assert.equal(db.prepare(
+    'SELECT status FROM feedback_requests WHERE request_key=?'
+  ).bind(requestKey).first().status, 'sent');
+});
+
+test('an accepted ledger row with no provider code blocks a new provider POST', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_accepted_without_code', status: 'accepted', statusCode: null,
+    groupId: 'GROUP_WITHOUT_CODE', messageId: 'MSG_WITHOUT_CODE',
+    messageHash: v2FeedbackMessageHash()
+  });
+  let fetches = 0;
+  const repeated = await withFetch(async () => {
+    fetches += 1;
+    return acceptedResponse(93);
+  }, () => call(db, { auth: admin, requestKey }));
+  assert.equal(repeated.status, 202);
+  assert.equal(repeated.body.code, 'PRIOR_SEND_UNCERTAIN');
+  assert.equal(fetches, 0, '공급자 코드가 비어 있어도 accepted 원장이 있으면 새 POST를 보내면 안 된다');
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1);
 });
 
 test('consult app cannot use this feature', async () => {

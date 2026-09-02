@@ -37,7 +37,7 @@ directory = "../parent"
 binding = "ASSETS"
 run_worker_first = true
 
-# Cloudflare Cron은 UTC 기준이다. 교재 문자 상태는 10분마다 숫자 코드를 재확인한다.
+# Cloudflare Cron은 UTC 기준이다. 교재 문자와 학부모 피드백 상태는 10분마다 재확인한다.
 # 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
 [triggers]
 crons = ["0 11 * * *", "50 14 * * *", "*/10 * * * *"]

@@ -1,5 +1,6 @@
 import curriculumWorker from './curriculum-fix.js';
 import { handleScheduledBookOrders, handleScheduledBookOrderStatusRefresh } from './book-order-send.js';
+import { handleScheduledParentFeedbackStatusRefresh } from './parent-feedback-send.js';
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
 import { handleScheduledTuitionAlerts } from './tuition-alert.js';
 
@@ -38,7 +39,10 @@ export default {
 
   async scheduled(controller, env, ctx) {
     if (controller.cron === BOOK_ORDER_STATUS_CRON) {
-      ctx.waitUntil(handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime));
+      ctx.waitUntil(Promise.all([
+        handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime),
+        handleScheduledParentFeedbackStatusRefresh(env, controller.scheduledTime)
+      ]));
       return;
     }
     if (controller.cron === SESSION_PACK_ATTENDANCE_CRON) {
