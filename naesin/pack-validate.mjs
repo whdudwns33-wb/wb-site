@@ -76,6 +76,12 @@ if (sen) {
         warn(f, `${at} 핵심어 "${k.en}"가 en에 안 보임 — 표기 확인`);
     });
     if (!Array.isArray(s.tokens) || s.tokens.length < 2) warn(f, `${at} tokens 부족(배열 훈련 불가)`);
+    if (s.chunks) {
+      /* 청크는 해석 판정의 기준 — 조각을 이어 붙이면 정본 en과 정확히 일치해야 한다 */
+      const flat = (t) => String(t).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, '');
+      if (flat(s.chunks.map((c) => c.en).join(' ')) !== flat(s.en)) err(f, `${at} chunks 연결이 en과 불일치`);
+      s.chunks.forEach((c, j) => { if (!(nonEmpty(c.en) && nonEmpty(c.ko))) err(f, `${at} chunks[${j}] en/ko 불완전`); });
+    }
   });
   const kw = list.reduce((n, s) => n + (s.keywords?.length || 0), 0);
   summary.push(`sentences: ${list.length}문장 (핵심어 ${kw} · 어색한곳 ${sen.oddOneItems?.length ?? 0} · Check ${sen.checkItems?.length ?? 0})`);
