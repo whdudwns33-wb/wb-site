@@ -239,11 +239,13 @@
   }
   function pushState() {
     if (!authed) return;
-    var body = { v: 1, packs: DB.packs, summary: summaryOf(), savedAt: DB.savedAt };
+    /* 서버 계약: PUT body는 { state: {...} } 래핑 (naesin-api.mjs) */
+    var body = { state: { v: 1, packs: DB.packs, summary: summaryOf(), savedAt: DB.savedAt } };
     api('/state', { method: 'PUT', body: JSON.stringify(body) }).catch(function () {});
   }
   function pullState() {
-    return api('/state').then(function (remote) {
+    return api('/state').then(function (r) {
+      var remote = r && r.state;
       if (remote && remote.packs && (remote.savedAt || 0) > (DB.savedAt || 0)) DB.packs = remote.packs;
     }).catch(function () {});
   }
@@ -971,13 +973,14 @@
     var a = auth();
     var flow;
     if (a && a.token) {
-      flow = api('/exam').then(function (ex) {
+      flow = api('/exam').then(function (r) {
         authed = true;
+        var ex = (r && r.exam) || {};        /* 서버 계약: { exam, scope } 래핑 */
         return pullState().then(function () {
           var pid = ex && ex.packIds && ex.packIds[0];
           if (!pid) throw new Error('no-pack');
-          return api('/pack?id=' + encodeURIComponent(pid)).then(function (p) {
-            pack = p;
+          return api('/pack?id=' + encodeURIComponent(pid)).then(function (r2) {
+            pack = r2.pack;                   /* 서버 계약: { pack, updatedAt } 래핑 */
             if (ex.examDate) { /* 서버 시험 배정이 로컬보다 우선 */
               var pd0 = DB.packs[pack.packId];
               if (!pd0 || !pd0.exam || pd0.exam.examDate !== ex.examDate) {

@@ -22,6 +22,7 @@ for (const f of APP_FILES) fs.copyFileSync(path.join(APP, f), path.join(DIST, f)
 fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin', 'index.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-admin.html'), path.join(DIST, 'admin', 'naesin-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
