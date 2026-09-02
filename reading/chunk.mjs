@@ -25,17 +25,27 @@
 
 /* ── 학년대별 목표 어절 수 ───────────────────────────────
    사람이 끊은 것의 평균이다. max 는 90분위에서 왔다. */
+/* 학년대별 눈금 — target·max 는 규격서 2장, 나머지 넷은 거기에 맞춰 보정한 값이다.
+ *
+ *   target  목표 어절 수 (규격서 표)
+ *   max     한 조각 최대 어절 수. 규격서가 「8어절 넘으면 거의 항상 쪼갤 자리가 있다」
+ *           고 못박았으므로 8을 넘기지 않는다.
+ *   W       경계 품질을 길이보다 얼마나 무겁게 볼 것인가
+ *   CUT     끊을 때마다 무는 삯. 이게 0 이면 조금이라도 그럴듯한 자리마다 끊어
+ *           조각이 잘게 부서진다 — 예전에 정밀도가 57%밖에 안 됐던 이유다.
+ *   exp     확률을 몇 제곱해서 쓸 것인가. 2 는 애매한 자리를 너무 눌렀다.
+ *   longW   긴 조각 쪽 벌점 배율. 사람은 짧은 조각보다 긴 조각을 더 봐준다.
+ *
+ * 고르는 방법 — F1 을 직접 좇지 않았다. 우리 코퍼스는 끊기 스타일이 두 갈래로
+ * 갈려 있어(아래 주석) F1 이 어느 쪽을 재는지에 따라 달라진다. 대신 «출력 길이
+ * 분포를 규격에 맞추고, 8어절 초과를 0으로» 를 조건으로 걸고 그 안에서 F1 이
+ * 높은 값을 골랐다. 결과적으로 두 갈래 모두에서 F1 이 올랐다. */
 export const BANDS = {
-  L1: { target: 3.3, max: 6 },
-  L2: { target: 3.7, max: 6 },
-  L3: { target: 4.1, max: 7 },
-  L4: { target: 4.5, max: 8 },
+  L1: { target: 3.3, max: 6, W: 20, CUT: 2, exp: 1.5, longW: 0.55 },
+  L2: { target: 3.7, max: 7, W: 28, CUT: 4, exp: 1.5, longW: 0.7 },
+  L3: { target: 4.1, max: 8, W: 28, CUT: 4, exp: 1.5, longW: 0.85 },
+  L4: { target: 4.5, max: 8, W: 34, CUT: 6, exp: 1.5, longW: 1 },
 };
-
-/* 경계 품질을 길이보다 얼마나 무겁게 볼 것인가.
-   --eval 로 F1 을 보며 맞췄다. 낮추면 길이만 맞추고 문법을 무시하고,
-   높이면 조사만 보이면 끊어 조각이 잘게 부서진다. */
-const BOUNDARY_WEIGHT = 28.0;
 
 /* ── 끊을 자리 점수 — 우리가 끊은 것에서 배웠다 ────────────
    손으로 규칙을 쓰다가 「높은」을 주격 조사로 오인해 관형어를 갈랐다.
@@ -187,7 +197,7 @@ function breakScore(ws, i) {
 function splitWords(ws, band) {
   const n = ws.length;
   if (n <= 1) return [ws];
-  const { target, max } = band;
+  const { target, max, W, CUT, exp, longW } = band;
 
   const best = new Array(n + 1).fill(Infinity);
   const from = new Array(n + 1).fill(-1);
@@ -197,13 +207,14 @@ function splitWords(ws, band) {
     for (let i = Math.max(0, j - max); i < j; i++) {
       if (best[i] === Infinity) continue;
       /* i..j-1 을 한 조각으로 삼는다 */
-      const len = j - i;
-      let cost = (len - target) ** 2;
+      const d = j - i - target;
+      /* 목표보다 긴 쪽은 덜 벌한다 — 사람도 긴 조각을 더 봐준다 */
+      let cost = d >= 0 ? longW * d * d : d * d;
       /* 이 조각이 끝나는 자리(j-1 뒤)의 품질. 문단 끝은 공짜. */
       if (j < n) {
         const q = breakScore(ws, j - 1);
         if (q === 0) continue;                  /* 끊으면 안 되는 자리 */
-        cost -= BOUNDARY_WEIGHT * q * q;   /* 제곱 — 확실한 자리를 더 밀어 준다 */
+        cost += CUT - W * Math.pow(q, exp);     /* 끊는 삯을 내고, 자리값만큼 돌려받는다 */
       }
       if (best[i] + cost < best[j]) { best[j] = best[i] + cost; from[j] = i; }
     }
@@ -314,6 +325,43 @@ if (isMain) {
     fs.writeFileSync(ME, src.slice(0, a) + 'const SUFFIX = {\n' + lines.join('\n') + '\n' + src.slice(b));
     console.log(`확률표를 다시 배웠습니다 — 어미 ${items.length}개 (지문 ${DB.articles.length}편)`);
     console.log('바뀐 실력을 보려면: node reading/chunk.mjs --eval --holdout');
+    process.exit(0);
+  }
+
+  if (argv.includes('--style')) {
+    /* 코퍼스가 한 가지 스타일로 끊겨 있는가.
+       2026-09-02 에 이걸 세어 보고서야 알았다 — 8-31 에 한꺼번에 쓴 17편이
+       나머지보다 1.5~2어절 길게 끊겨 있었다. 두 갈래가 섞인 데이터로 F1 을
+       좇으면 어느 쪽도 아닌 값이 나온다. 새 지문을 쓸 때마다 확인할 것. */
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const HERE = path.dirname(fileURLToPath(import.meta.url));
+    const DB = JSON.parse(fs.readFileSync(path.join(HERE, 'articles.json'), 'utf8'));
+    const wc = (x) => (x.match(/\S+\s*/g) || []).length;
+    console.log('지문마다 사람이 끊은 조각 길이 — 규격서 2장의 눈금과 견준다\n');
+    console.log('   지문                     L1    L2    L3    L4   8어절초과');
+    const all = {};
+    for (const a of DB.articles) {
+      const row = [], over = [];
+      for (const lv of ['L1', 'L2', 'L3', 'L4']) {
+        const b = (a.levels || {})[lv];
+        const L = [];
+        if (b) (b.paragraphs || []).forEach(p => { if (Array.isArray(p)) p.forEach(x => L.push(wc(x))); });
+        if (!L.length) { row.push('   —'); continue; }
+        (all[lv] = all[lv] || []).push(...L);
+        over.push(...L.filter(x => x > 8));
+        row.push((L.reduce((x, y) => x + y, 0) / L.length).toFixed(2).padStart(5));
+      }
+      console.log(`   ${a.id.padEnd(24)}${row.join(' ')}   ${over.length || ''}`);
+    }
+    console.log('\n   규격 눈금                 3.30  3.70  4.10  4.50');
+    const avg = ['L1','L2','L3','L4'].map(lv => all[lv]
+      ? (all[lv].reduce((x,y)=>x+y,0)/all[lv].length).toFixed(2).padStart(5) : '   —').join(' ');
+    console.log(`   전체 평균                ${avg}`);
+    const tooLong = ['L1','L2','L3','L4'].reduce((n, lv) => n + (all[lv] || []).filter(x => x > 8).length, 0);
+    console.log(`\n   8어절 넘는 조각 ${tooLong}개 — 규격서는 「거의 항상 쪼갤 자리가 있다」고 한다.`);
+    console.log('   지문마다 평균이 1어절 넘게 벌어지면 스타일이 갈린 것이다. 먼저 맞춘 뒤 --eval 을 믿을 것.');
     process.exit(0);
   }
 
