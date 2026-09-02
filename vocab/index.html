@@ -462,6 +462,9 @@
       VSYNC.avail = !!(j && j.ok);
       VSYNC.ai = !!(j && j.ai);
     } catch (e) { VSYNC.avail = false; VSYNC.ai = false; }
+    /* 서버가 있는지는 첫 그리기 뒤에야 알게 된다. 미연동 경고는 그 답에 달려 있으니
+       여기서 한 번 다시 그린다 — 안 그리면 배너가 영영 안 뜬다. */
+    if (VSYNC.avail && !vsyncAuth() && curView === 'garden') renderGarden();
     if (!vsyncOn()) return;
     try {
       var res = await vsyncApi('/pull');
@@ -840,6 +843,11 @@
     var today = WBSRS.todayPlanted(db.states, t);
     var hour = new Date(t).getHours();
     var html = '';
+    /* 미연동 경고 — 심은 단어가 이 브라우저 하나에만 있다. 기기를 바꾸거나
+       브라우저가 저장소를 비우면 되살릴 길이 없다. 연동은 진로독서에서 한다. */
+    if (VSYNC.avail && !vsyncAuth()) {
+      html += '<div class="night-banner" style="background:var(--coral);"><div style="flex:1"><b>이 기기에만 저장되고 있어요</b><br><span style="font-size:.82rem;">학생 코드를 넣으면 심은 단어가 학원 서버에도 저장돼요. 휴대폰을 바꿔도 정원이 그대로 남아요.</span></div><a class="btn" href="/">코드 넣기</a></div>';
+    }
     if ((hour >= 21 || hour < 5) && today.length > 0) {
       html += '<div class="night-banner"><div style="flex:1"><b>자기 전 3분 물주기</b><br><span style="font-size:.82rem;">오늘 심은 ' + today.length + '개, 깜빡이로 한 번 더 보고 자요 — 자는 동안 기억이 굳어요.</span></div><button class="btn" id="btnNight">시작</button></div>';
     }
