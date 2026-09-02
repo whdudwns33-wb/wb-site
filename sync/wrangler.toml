@@ -60,5 +60,6 @@ binding = "AI"
 #   npx wrangler secret put TASK_MANAGER_STAFF_IDS
 #   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID
 #   npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2
+#   npx wrangler secret put WB_PARENT_FEEDBACK_AI_CACHE_SECRET
 #   npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID
 #   npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED

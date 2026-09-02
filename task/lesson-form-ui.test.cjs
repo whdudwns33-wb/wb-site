@@ -695,12 +695,13 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   const lengthEnd = html.indexOf('function syncFeedbackFinalFieldFromInput(', lengthStart);
   const lengthLogic = html.slice(lengthStart, lengthEnd);
   assert.match(lengthLogic, /const sendValid = hasRequiredFields[\s\S]*commentText\.length <= limit/);
-  assert.match(lengthLogic, /const polishValid = hasRequiredFields && commentText\.length <= FEEDBACK_COMMENT_MAX_CHARS &&[\s\S]*feedbackPolishBudgetReady\(t, limit\)/);
   assert.doesNotMatch(lengthLogic, /finalButton\.disabled/,
     '최종 전송 버튼은 검증 실패 중에도 눌러서 정확한 이유를 확인할 수 있어야 한다');
   assert.match(lengthLogic, /refreshFeedbackFinalSendStatus\(t, scope\)/);
-  assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending \|\| !polishValid/,
-    '코멘트가 현재 알림톡 예산을 넘어도 600자 이하면 AI로 줄이기를 시도할 수 있어야 한다');
+  assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending/,
+    'AI 다듬기 버튼은 진행 중일 때만 중복 클릭을 막아야 한다');
+  assert.doesNotMatch(lengthLogic, /polishButton\.disabled[\s\S]*!polishValid/,
+    '입력 문제는 비활성 버튼이 아니라 클릭 뒤 지속 안내로 설명해야 한다');
   const budgetStart = html.indexOf('const FEEDBACK_AI_MIN_BODY_CHARS');
   const budgetEnd = html.indexOf('function updateFeedbackPreviewLength(', budgetStart);
   const budgetApi = Function("const feedbackStudentSubject = () => '민우는'; const studentOf = () => '김민우';\n" +
@@ -721,6 +722,11 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /sync\.post\('\/feedback-polish'/);
   assert.match(polish, /commentText: sourceComment/);
   assert.match(polish, /subjectText: context\.subjectText/);
+  assert.match(polish, /const stopWithReason = message =>/);
+  assert.match(polish, /missing\.join\('\u00b7'\).*AI로 다듬을 수 없습니다/,
+    '빈칸이 있으면 버튼 아래에 누락 항목을 정확히 표시해야 한다');
+  assert.match(polish, /sourceComment\.length > FEEDBACK_COMMENT_MAX_CHARS/);
+  assert.match(polish, /feedbackPolishBudgetReady\(task, localBudget\)/);
   assert.match(polish, /latestCommentField[\s\S]*syncFeedbackFinalFieldFromInput\(latestCommentField\)[\s\S]*sourceComment/,
     'AI 다듬기는 클릭 직전 DOM의 최신 코멘트를 사용해야 한다');
   assert.doesNotMatch(polish, /otherNotes|guardian|phone|studentName/);
@@ -729,6 +735,12 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /setFeedbackPolishStatus\('working'/);
   assert.match(polish, /setFeedbackPolishStatus\('success'/);
   assert.match(polish, /setFeedbackPolishStatus\('error'/);
+  assert.match(polish, /result\.source \|\| ''\) === 'fallback'/,
+    '비용 한도나 안전 검증 fallback은 기존 코멘트를 덮어쓰지 않아야 한다');
+  assert.match(polish, /feedbackPolishFallbackText\(result\.fallbackReason\)/,
+    'fallback 이유는 버튼 아래 지속 안내로 표시해야 한다');
+  assert.match(polish, /result\.source \|\| ''\) === 'cache'/,
+    '캐시 재사용은 새 AI 호출과 구분해 안내해야 한다');
   assert.match(polish, /feedbackPolishErrorText\(error\)/,
     'AI 실패 사유는 사라지는 토스트만 쓰지 않고 지속 상태에 안전하게 표시해야 한다');
   assert.match(polish, /feedbackPolishHasArtifacts\(/,
