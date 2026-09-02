@@ -74,6 +74,7 @@ import {
   handleParentFeedbackSend,
   attemptParentFeedbackSend,
   resolveStudentName,
+  feedbackMessageDeliveryState,
   MAX_PARENT_FEEDBACK_COMMENT_CHARS
 } from './parent-feedback-send.js';
 import { handleFeedbackPolish } from './feedback-polish.js';
@@ -1607,8 +1608,43 @@ async function feedbackRequestKey(identity) {
   return 'fbr_' + (await sha256Hex(raw)).slice(0, 48);
 }
 
-function feedbackView(row) {
+const FEEDBACK_WITH_LATEST_SEND_SELECT =
+  'SELECT f.*,s.status AS send_status,s.provider_status_code AS send_provider_status_code,' +
+  's.message_hash AS send_message_hash ' +
+  'FROM feedback_requests f LEFT JOIN parent_feedback_sends s ON s.app=f.app AND s.send_id=(' +
+    'SELECT latest.send_id FROM parent_feedback_sends latest ' +
+    'WHERE latest.app=f.app AND latest.feedback_request_key=f.request_key AND latest.message_hash=(' +
+      'SELECT newest.message_hash FROM parent_feedback_sends newest ' +
+      'WHERE newest.app=f.app AND newest.feedback_request_key=f.request_key ' +
+      'ORDER BY newest.created_at DESC,newest.send_id DESC LIMIT 1) ' +
+    "ORDER BY CASE WHEN latest.status='accepted' AND latest.provider_status_code='4000' THEN 0 " +
+    "WHEN latest.status='accepted' AND latest.provider_status_code='3000' THEN 1 " +
+    "WHEN latest.status='accepted' AND latest.provider_status_code='2000' THEN 2 " +
+    "WHEN latest.status IN ('reserved','dispatching','unknown') THEN 3 ELSE 4 END," +
+    'latest.created_at DESC,latest.send_id DESC LIMIT 1) ';
+
+async function feedbackView(row) {
   if (!row) return null;
+  const templateVersion = String(row.template_version || '') === 'v2' ? 'v2' : 'v1';
+  const fields = templateVersion === 'v2' ? {
+    templateVersion,
+    studentName: String(row.student_name || '').trim(),
+    dateText: feedbackDateLabel(row.feedback_date),
+    subjectText: String(row.subject_text || '').trim(),
+    contentText: String(row.content_text || '').trim(),
+    homeworkText: String(row.homework_text || '').trim(),
+    commentText: String(row.comment_text || '').trim()
+  } : {
+    templateVersion,
+    teacherName: String(row.teacher_name || '').trim(),
+    studentName: String(row.student_name || '').trim(),
+    contentText: String(row.content_text || '').trim(),
+    plusText: String(row.plus_text || '').trim(),
+    minusText: String(row.minus_text || '').trim()
+  };
+  const currentMessageHash = await sha256Hex(JSON.stringify(fields));
+  const messageDeliveryState = currentMessageHash === String(row.send_message_hash || '')
+    ? feedbackMessageDeliveryState(row) : '';
   return {
     requestKey: row.request_key,
     taskId: row.task_id,
@@ -1629,6 +1665,7 @@ function feedbackView(row) {
     minusText: row.minus_text || '',
     revision: Number(row.revision),
     status: row.status,
+    messageDeliveryState,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     reviewedAt: row.reviewed_at == null ? null : Number(row.reviewed_at),
@@ -1664,9 +1701,16 @@ async function taskForFeedback(env, identity, auth, origin) {
 
 async function findFeedbackRequest(env, identity) {
   return await env.DB.prepare(
-    'SELECT * FROM feedback_requests WHERE app=? AND task_id=? AND feedback_date=? ' +
-    'AND feedback_type=? AND template_version=? LIMIT 1'
+    FEEDBACK_WITH_LATEST_SEND_SELECT +
+    'WHERE f.app=? AND f.task_id=? AND f.feedback_date=? ' +
+    'AND f.feedback_type=? AND f.template_version=? LIMIT 1'
   ).bind('task', identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion).first();
+}
+
+async function findFeedbackRequestByKey(env, app, requestKey) {
+  return await env.DB.prepare(
+    FEEDBACK_WITH_LATEST_SEND_SELECT + 'WHERE f.app=? AND f.request_key=? LIMIT 1'
+  ).bind(app, requestKey).first();
 }
 
 async function handleFeedbackRequest(env, app, body, origin) {
@@ -1684,11 +1728,11 @@ async function handleFeedbackRequest(env, app, body, origin) {
     }
     const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
     const result = await env.DB.prepare(
-      "SELECT * FROM feedback_requests WHERE app=? AND owner=? ORDER BY CASE status " +
+      FEEDBACK_WITH_LATEST_SEND_SELECT + "WHERE f.app=? AND f.owner=? ORDER BY CASE f.status " +
       "WHEN 'revision_requested' THEN 0 WHEN 'approval_waiting' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, f.updated_at DESC LIMIT " + limit
     ).bind('task', auth.id).all();
-    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+    return json({ ok: true, requests: await Promise.all((result.results || []).map(feedbackView)) }, 200, origin);
   }
   const identity = feedbackIdentity(body);
   if (identity.error) return json({ ok: false, error: identity.error }, 400, origin);
@@ -1702,7 +1746,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (action === 'cancel') {
     if (!current) return json({ ok: false, error: '취소할 피드백 요청을 찾을 수 없습니다' }, 404, origin);
     if (current.status === 'cancelled') {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET owner=?, status='cancelled', revision=revision+1, updated_at=?, " +
@@ -1711,9 +1755,8 @@ async function handleFeedbackRequest(env, app, body, origin) {
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
     }
-    current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-      .bind('task', current.request_key).first();
-    return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+    current = await findFeedbackRequestByKey(env, 'task', current.request_key);
+    return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
   }
 
   const message = normalizeFeedbackBody(body.message);
@@ -1798,11 +1841,20 @@ async function handleFeedbackRequest(env, app, body, origin) {
     const freshInsert = Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) === 1;
     if (freshInsert) {
       current = await attemptSendAndReload(env, app, current);
-      return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
     }
     if (sameFields(current)) {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
+  }
+
+  if (current.status === 'sent' && !sameFields(current)) {
+    return json({
+      ok: false,
+      code: 'FEEDBACK_ALREADY_SENT',
+      error: '이미 발송된 피드백은 내용을 바꾸어 다시 보낼 수 없습니다',
+      request: await feedbackView(current)
+    }, 409, origin);
   }
 
   if (sameFields(current) && current.status === 'revision_requested') {
@@ -1810,14 +1862,14 @@ async function handleFeedbackRequest(env, app, body, origin) {
       ok: false,
       code: 'REVISION_UNCHANGED',
       error: '수정 요청을 반영해 문구를 변경한 뒤 다시 제출해 주세요',
-      request: feedbackView(current)
+      request: await feedbackView(current)
     }, 409, origin);
   }
 
   if (sameFields(current) && current.status !== 'cancelled') {
     // 내용은 그대로다 — 다만 이전에 막혀서 못 나갔을 수 있으니(보호자 등록 등) 재시도는 해본다.
     current = await attemptSendAndReload(env, app, current);
-    return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+    return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
   }
 
   const result = await env.DB.prepare(
@@ -1832,10 +1884,9 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
   }
-  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', current.request_key).first();
+  current = await findFeedbackRequestByKey(env, 'task', current.request_key);
   current = await attemptSendAndReload(env, app, current);
-  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+  return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
 }
 
 /** 제출 즉시 카카오 알림톡 발송을 시도하고, 상태가 바뀐 최신 행을 다시 읽어 돌려준다.
@@ -1843,8 +1894,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
  *  상태·사유를 review_note에 남기므로, 여기서는 그 결과를 그대로 반영한 최신 행만 반환한다. */
 async function attemptSendAndReload(env, app, current) {
   await attemptParentFeedbackSend(env, app, current);
-  return await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind(app, current.request_key).first();
+  return await findFeedbackRequestByKey(env, app, current.request_key);
 }
 
 async function handleFeedbackReview(env, app, body, origin) {
@@ -1856,31 +1906,31 @@ async function handleFeedbackReview(env, app, body, origin) {
 
   const action = String(body.action || 'list');
   if (action === 'list') {
-    const clauses = ['app=?'];
+    const clauses = ['f.app=?'];
     const binds = ['task'];
     if (body.status != null && body.status !== '') {
       const status = String(body.status);
       if (!FEEDBACK_STATUSES.has(status)) return json({ ok: false, error: '올바른 status가 필요합니다' }, 400, origin);
-      clauses.push('status=?'); binds.push(status);
+      clauses.push('f.status=?'); binds.push(status);
     }
     if (body.owner != null && body.owner !== '') {
       const owner = String(body.owner);
       if (!SAFE_ID.test(owner)) return json({ ok: false, error: '올바른 owner가 필요합니다' }, 400, origin);
-      clauses.push('owner=?'); binds.push(owner);
+      clauses.push('f.owner=?'); binds.push(owner);
     }
     if (body.feedbackDate != null && body.feedbackDate !== '') {
       const feedbackDate = String(body.feedbackDate);
       if (!validIsoDate(feedbackDate)) return json({ ok: false, error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' }, 400, origin);
-      clauses.push('feedback_date=?'); binds.push(feedbackDate);
+      clauses.push('f.feedback_date=?'); binds.push(feedbackDate);
     }
     const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
     const statement = env.DB.prepare(
-      'SELECT * FROM feedback_requests WHERE ' + clauses.join(' AND ') +
-      " ORDER BY CASE status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
+      FEEDBACK_WITH_LATEST_SEND_SELECT + 'WHERE ' + clauses.join(' AND ') +
+      " ORDER BY CASE f.status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, f.updated_at DESC LIMIT " + limit
     ).bind(...binds);
     const result = await statement.all();
-    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+    return json({ ok: true, requests: await Promise.all((result.results || []).map(feedbackView)) }, 200, origin);
   }
 
   if (action !== 'approve_content' && action !== 'request_revision') {
@@ -1894,8 +1944,7 @@ async function handleFeedbackReview(env, app, body, origin) {
   if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
     return json({ ok: false, error: '현재 revision이 필요합니다' }, 400, origin);
   }
-  let current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', requestKey).first();
+  let current = await findFeedbackRequestByKey(env, 'task', requestKey);
   if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
   if (Number(current.revision) !== expectedRevision) {
     return json({ ok: false, error: '문구가 변경되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
@@ -1905,7 +1954,7 @@ async function handleFeedbackReview(env, app, body, origin) {
   const now = Date.now();
   if (action === 'approve_content') {
     if (current.status === 'content_approved_send_blocked') {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     if (current.status !== 'approval_waiting') {
       return json({ ok: false, error: '수정된 문구가 다시 제출된 뒤 승인할 수 있습니다' }, 409, origin);
@@ -1922,7 +1971,7 @@ async function handleFeedbackReview(env, app, body, origin) {
     if (!note) return json({ ok: false, error: '수정 요청 내용을 입력해 주세요' }, 400, origin);
     if (note.length > MAX_REVIEW_NOTE) return json({ ok: false, error: '수정 요청은 ' + MAX_REVIEW_NOTE + '자까지 입력할 수 있습니다' }, 413, origin);
     if (current.status === 'revision_requested' && String(current.review_note || '') === note) {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET status='revision_requested', updated_at=?, reviewed_at=?, " +
@@ -1932,9 +1981,8 @@ async function handleFeedbackReview(env, app, body, origin) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }
   }
-  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', requestKey).first();
-  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+  current = await findFeedbackRequestByKey(env, 'task', requestKey);
+  return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
 }
 
 

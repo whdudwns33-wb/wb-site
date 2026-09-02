@@ -161,11 +161,16 @@ test('schema and migration are additive, and the send ledger itself stores no ph
 
 test('20:00 KST book cron remains configured with the 23:50 session cutoff cron', () => {
   assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*", "\*\/10 \* \* \* \*"\]/);
+  assert.equal((wrangler.match(/"\*\/10 \* \* \* \*"/g) || []).length, 1,
+    '교재와 피드백 상태조회는 별도 중복 cron이 아니라 동일한 10분 cron을 공유한다');
   assert.match(entry, /async scheduled\(controller, env, ctx\)/);
   assert.match(entry, /controller\.cron === BOOK_ORDER_CRON/);
   assert.match(entry, /handleScheduledBookOrders\(env, controller\.scheduledTime\)/);
   assert.match(entry, /controller\.cron === BOOK_ORDER_STATUS_CRON/);
   assert.match(entry, /handleScheduledBookOrderStatusRefresh\(env, controller\.scheduledTime\)/);
+  assert.match(entry,
+    /controller\.cron === BOOK_ORDER_STATUS_CRON[\s\S]*?ctx\.waitUntil\(Promise\.all\(\[\s*handleScheduledBookOrderStatusRefresh\(env, controller\.scheduledTime\),\s*handleScheduledParentFeedbackStatusRefresh\(env, controller\.scheduledTime\)\s*\]\)\)/,
+    '같은 10분 cron 분기에서 교재와 피드백 상태조회를 Promise.all로 함께 실행해야 한다');
   assert.match(batchMigration, /CREATE TABLE IF NOT EXISTS book_order_batch_items/);
   assert.doesNotMatch(batchMigration, /phone|message_body|DROP TABLE|DELETE FROM/i);
   for (const sql of [schema, lockMigration]) {
