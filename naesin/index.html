@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WB 내신브레인 — 영어 시험대비</title>
+  <meta name="description" content="단어 암기·본문 해석·백지 영작까지 — WB 영어 내신 시험대비 훈련 앱 (원내 전용)">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1B3A5C">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #F6F3EA; --card: #FFFFFF; --card-2: #F0EDE2;
+      --ink: #23313F; --ink-strong: #1B3A5C; --ink-soft: #64748B; --line: #E3DFD2;
+      --blue: #1E9DD6; --deep: #0F7AAB; --navy: #1B3A5C;
+      --coral: #E85D4A; --coral-soft: #FBEAE6;
+      --green: #4E9B57; --green-soft: #E7F2E6;
+      --amber: #C98A2D; --amber-soft: #F7EEDA;
+      --shadow: 0 1px 4px rgba(27,58,92,.08); --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--ink);
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      font-size: 16px; line-height: 1.6; word-break: keep-all; -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; font-size: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    input, textarea { font-family: inherit; font-size: 1rem; color: var(--ink); }
+    :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+    .shell { max-width: 640px; margin: 0 auto; padding: 0 16px 96px; }
+
+    .top { display: flex; align-items: center; gap: 10px; padding: 18px 2px 10px; }
+    .top img { width: 34px; height: 34px; border-radius: 9px; flex: none; }
+    .top h1 { font-size: 1.1rem; font-weight: 900; color: var(--ink-strong); margin: 0; }
+    .top .sub { font-size: .72rem; color: var(--ink-soft); display: block; font-weight: 500; }
+    .dday { margin-left: auto; background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+      padding: 5px 12px; font-size: .8rem; font-weight: 700; color: var(--coral); box-shadow: var(--shadow); white-space: nowrap; }
+    .dday.practice { color: var(--deep); }
+
+    .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--card);
+      border-top: 1px solid var(--line); display: flex; justify-content: center; gap: 2px;
+      padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); }
+    .tabbar button { flex: 1; max-width: 110px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+      font-size: .68rem; font-weight: 700; color: var(--ink-soft); padding: 6px 0; border-radius: 10px; }
+    .tabbar button .ico { font-size: 1.05rem; line-height: 1.2; }
+    .tabbar button.on { color: var(--deep); background: #E9F5FB; }
+
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 16px 18px; margin: 0 0 12px; }
+    .card h2 { font-size: .98rem; font-weight: 900; color: var(--ink-strong); margin: 0 0 8px; }
+    .muted { color: var(--ink-soft); font-size: .85rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px;
+      padding: 12px 16px; font-weight: 700; font-size: .95rem; background: var(--card-2);
+      color: var(--ink-strong); border: 1px solid var(--line); }
+    .btn.primary { background: var(--deep); color: #fff; border-color: var(--deep); }
+    .btn.coral { background: var(--coral); color: #fff; border-color: var(--coral); }
+    .btn.big { width: 100%; padding: 14px 18px; font-size: 1rem; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .row { display: flex; gap: 10px; } .row > * { flex: 1; }
+    .chip { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+    .c-blue { background: #E3F1F8; color: var(--deep); }
+    .c-green { background: var(--green-soft); color: var(--green); }
+    .c-amber { background: var(--amber-soft); color: var(--amber); }
+    .c-coral { background: var(--coral-soft); color: var(--coral); }
+    .banner { background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 10px;
+      padding: 10px 14px; font-size: .85rem; margin: 0 0 12px; }
+
+    .stat3 { display: flex; gap: 8px; margin: 10px 0 4px; }
+    .stat3 > div { flex: 1; background: var(--card-2); border-radius: 10px; padding: 8px 6px; text-align: center; }
+    .stat3 b { display: block; font-size: 1.25rem; font-weight: 900; color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+    .stat3 span { font-size: .7rem; color: var(--ink-soft); font-weight: 700; }
+
+    .bar { height: 8px; background: var(--card-2); border-radius: 999px; overflow: hidden; margin: 6px 0; }
+    .bar i { display: block; height: 100%; background: var(--deep); border-radius: 999px; }
+    .bar i.g { background: var(--green); }
+
+    .wordgrid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .wchip { border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+      padding: 4px 10px; font-size: .8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+    .wchip .dots { display: inline-flex; gap: 2px; }
+    .wchip .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+    .wchip .dots i.on { background: var(--green); }
+    .wchip.reached { border-color: var(--deep); }
+    .wchip.stable { border-color: var(--green); background: var(--green-soft); }
+
+    .senrow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .senrow:last-child { border-bottom: none; }
+    .senrow .no { flex: none; width: 1.8em; font-weight: 900; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .senrow .txt { flex: 1; min-width: 0; font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stagebar { flex: none; display: inline-flex; gap: 2px; }
+    .stagebar i { width: 9px; height: 12px; border-radius: 3px; background: var(--card-2); border: 1px solid var(--line); }
+    .stagebar i.on { background: var(--deep); border-color: var(--deep); }
+    .stagebar i.done { background: var(--green); border-color: var(--green); }
+    .okmark { flex: none; font-weight: 900; }
+    .okmark.y { color: var(--green); } .okmark.n { color: var(--line); }
+
+    /* 훈련 러너 오버레이 */
+    .runner { position: fixed; inset: 0; z-index: 60; background: var(--bg); overflow-y: auto; display: none; }
+    .runner.open { display: block; }
+    .runner .rshell { max-width: 640px; margin: 0 auto; padding: 14px 16px 40px; }
+    .rtop { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .rtop .prog { flex: 1; } .rtop .quit { flex: none; font-size: 1.3rem; color: var(--ink-soft); padding: 4px 8px; }
+    .q { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 20px 18px; }
+    .q .qmeta { font-size: .74rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; }
+    .q .prompt { font-size: 1.2rem; font-weight: 900; color: var(--ink-strong); margin: 4px 0 14px; line-height: 1.5; }
+    .q .prompt.sm { font-size: 1rem; font-weight: 500; }
+    .choices { display: flex; flex-direction: column; gap: 8px; }
+    .choices button { text-align: left; background: var(--card-2); border: 1px solid var(--line);
+      border-radius: 10px; padding: 11px 14px; font-weight: 500; }
+    .choices button.sel { border-color: var(--deep); background: #E9F5FB; }
+    .choices button.right { border-color: var(--green); background: var(--green-soft); }
+    .choices button.wrongpick { border-color: var(--coral); background: var(--coral-soft); }
+    .blankline { display: inline-block; min-width: 70px; border: none; border-bottom: 2px solid var(--deep);
+      background: transparent; padding: 2px 6px; margin: 0 2px; text-align: center; font-weight: 700; }
+    .blankline.ok { border-color: var(--green); color: var(--green); }
+    .blankline.bad { border-color: var(--coral); color: var(--coral); }
+    .hintko { font-size: .72rem; color: var(--amber); display: inline-block; margin: 0 2px; }
+    .tokens { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .tokens button { background: var(--card-2); border: 1px solid var(--line); border-radius: 8px;
+      padding: 7px 12px; font-weight: 700; }
+    .tokens button:disabled { opacity: .3; }
+    .built { min-height: 46px; background: var(--card-2); border: 1px dashed var(--line); border-radius: 10px;
+      padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .built button { background: var(--card); border: 1px solid var(--deep); border-radius: 8px; padding: 5px 10px; font-weight: 700; }
+    textarea.ans { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; background: var(--card); resize: vertical; }
+    input.ans { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); }
+    .result { margin-top: 12px; border-radius: 10px; padding: 12px 14px; font-size: .92rem; }
+    .result.good { background: var(--green-soft); } .result.bad { background: var(--coral-soft); }
+    .result .exp { margin-top: 6px; color: var(--ink-soft); font-size: .85rem; }
+    .confrow { display: flex; gap: 8px; margin-top: 12px; }
+    .confrow button { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px;
+      font-size: .82rem; font-weight: 700; background: var(--card); }
+    .rnext { margin-top: 12px; }
+
+    .chunkline { margin: 4px 0; padding: 6px 10px; border-radius: 8px; background: var(--card-2); font-size: .92rem; }
+    .chunkline .ko { color: var(--ink-soft); font-size: .82rem; display: block; }
+    .chunkline.miss { background: var(--coral-soft); }
+    .diffline { margin: 6px 0; padding: 8px 10px; border-radius: 8px; font-size: .9rem; background: var(--card-2); }
+    .diffline.ok { background: var(--green-soft); } .diffline.partial { background: var(--amber-soft); }
+    .diffline.missing { background: var(--coral-soft); }
+    .diffline .d-missing { color: var(--coral); text-decoration: underline; }
+    .diffline .d-extra { color: var(--amber); text-decoration: line-through; }
+    .diffline .lbl { font-size: .72rem; font-weight: 900; margin-right: 6px; }
+    .paperbtn { border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px; font-weight: 900; }
+    .paperbtn.y { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+    .paperbtn.n { background: var(--coral-soft); border-color: var(--coral); color: var(--coral); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <img src="./icon.svg" alt="">
+    <div><h1>내신브레인</h1><span class="sub" id="packTitle">팩을 불러오는 중…</span></div>
+    <span class="dday" id="ddayBadge">—</span>
+  </div>
+  <div id="modeBanner"></div>
+  <main id="views"></main>
+</div>
+
+<nav class="tabbar" id="tabbar">
+  <button data-tab="today"><span class="ico">📅</span>오늘</button>
+  <button data-tab="words"><span class="ico">🔤</span>단어</button>
+  <button data-tab="passage"><span class="ico">📖</span>본문</button>
+  <button data-tab="quiz"><span class="ico">✏️</span>문제</button>
+  <button data-tab="progress"><span class="ico">📊</span>성취도</button>
+</nav>
+
+<div class="runner" id="runner"><div class="rshell">
+  <div class="rtop">
+    <div class="prog"><div class="bar"><i id="rBar" style="width:0%"></i></div>
+      <span class="muted" id="rCount"></span></div>
+    <button class="quit" id="rQuit" aria-label="닫기">✕</button>
+  </div>
+  <div id="rBody"></div>
+</div></div>
+
+<script src="./voice.js"></script>
+<script src="./engine.js"></script>
+<script src="./grade.js"></script>
+<script src="./gen.js"></script>
+<script>
+'use strict';
+/* WB 내신브레인 — 학생 앱 (Phase 1 MVP)
+   엔진(WBNAESIN)·채점(WBGRADE)·생성(WBGEN)은 순수 모듈, 이 파일은 화면과 상태 관리만 한다.
+   상태는 localStorage(wbn.v1)가 정본이고, 연동된 학생은 서버(/api/naesin/state)로 백업된다. */
+(function () {
+  var KEY = 'wbn.v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var pack = null, DB = null, view = 'today';
+  var authed = false;
+
+  /* ── 저장소 ── */
+  function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function persist() {
+    DB.savedAt = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {}
+    scheduleSync();
+  }
+  function packDB() {
+    if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
+    return DB.packs[pack.packId];
+  }
+
+  /* ── 서버 연동 (진로독서 연동 토큰 재사용 — vocab 패턴) ── */
+  function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+  function api(path, opt) {
+    var a = auth();
+    if (!a || !a.token) return Promise.reject(new Error('no-auth'));
+    return fetch('/api/naesin' + path, Object.assign({
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token }
+    }, opt || {})).then(function (r) {
+      if (!r.ok) throw new Error('api-' + r.status);
+      return r.json();
+    });
+  }
+  var syncTimer = null;
+  function scheduleSync() {
+    if (!authed) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushState, 3000);
+  }
+  function summaryOf() {
+    var pd = packDB();
+    var w = {}, s = {};
+    Object.keys(pd.states).forEach(function (k) {
+      var st = pd.states[k];
+      if (st.kind === 'sentence') s[k] = st; else w[k] = st;
+    });
+    return {
+      packId: pack.packId,
+      word: WBNAESIN.wordSummary(w),
+      sentence: WBNAESIN.sentenceSummary(s),
+      updatedAt: new Date().toISOString()
+    };
+  }
+  function pushState() {
+    if (!authed) return;
+    /* 서버 계약: PUT body는 { state: {...} } 래핑 (naesin-api.mjs) */
+    var body = { state: { v: 1, packs: DB.packs, summary: summaryOf(), savedAt: DB.savedAt } };
+    api('/state', { method: 'PUT', body: JSON.stringify(body) }).catch(function () {});
+  }
+  function pullState() {
+    return api('/state').then(function (r) {
+      var remote = r && r.state;
+      if (remote && remote.packs && (remote.savedAt || 0) > (DB.savedAt || 0)) DB.packs = remote.packs;
+    }).catch(function () {});
+  }
+
+  /* ── 상태 준비 ── */
+  function ensureStates() {
+    var pd = packDB(), now = Date.now();
+    (pack.words || []).forEach(function (w) {
+      if (!pd.states[w.id]) pd.states[w.id] = WBNAESIN.createState(w.id, 'word', now);
+    });
+    (pack.sentences || []).forEach(function (s) {
+      var id = WBNAESIN.sentenceId(s.seq);
+      if (!pd.states[id]) pd.states[id] = WBNAESIN.createState(id, 'sentence', now);
+    });
+  }
+  function wordStates() {
+    var pd = packDB(), out = {};
+    Object.keys(pd.states).forEach(function (k) { if (pd.states[k].kind !== 'sentence') out[k] = pd.states[k]; });
+    return out;
+  }
+  function senStates() {
+    var pd = packDB(), out = {};
+    Object.keys(pd.states).forEach(function (k) { if (pd.states[k].kind === 'sentence') out[k] = pd.states[k]; });
+    return out;
+  }
+  function senState(seq) { return packDB().states[WBNAESIN.sentenceId(seq)]; }
+  function exam() { return packDB().exam || null; }
+  function wordById(id) { for (var i = 0; i < pack.words.length; i++) if (pack.words[i].id === id) return pack.words[i]; return null; }
+  function senBySeq(seq) { for (var i = 0; i < pack.sentences.length; i++) if (pack.sentences[i].seq === seq) return pack.sentences[i]; return null; }
+  function dayGroups() {
+    var groups = [], cur = null;
+    (pack.sentences || []).forEach(function (s) {
+      if (!cur || cur.day !== s.dayGroup) { cur = { day: s.dayGroup, header: s.dayHeaderKo || s.dayGroup, sentences: [] }; groups.push(cur); }
+      if (s.dayHeaderKo) cur.header = s.dayHeaderKo;
+      cur.sentences.push(s);
+    });
+    return groups;
+  }
+
+  /* ── 탭 ── */
+  function setTab(t) {
+    view = t;
+    var btns = $('tabbar').querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === t);
+    render();
+  }
+  $('tabbar').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tab]');
+    if (b) setTab(b.getAttribute('data-tab'));
+  });
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ── 헤더 ── */
+  function renderHeader() {
+    $('packTitle').textContent = pack ? (pack.textbook + ' · ' + (pack.lessonTitle || ('Lesson ' + pack.lesson))) : '';
+    var ex = exam(), b = $('ddayBadge');
+    if (ex && ex.examDate) {
+      var d = WBNAESIN.daysUntil(ex.examDate, Date.now());
+      b.textContent = d >= 0 ? 'D-' + d : '시험 끝';
+      b.className = 'dday';
+    } else { b.textContent = '연습 모드'; b.className = 'dday practice'; }
+    $('modeBanner').innerHTML = authed ? '' :
+      '<div class="banner">체험 모드 — 자체 제작 데모 팩입니다. 학원에서 받은 QR로 진로독서 앱에 연동하면 우리 학교 시험 팩과 기록 저장이 열립니다.</div>';
+  }
+
+  /* ════════════ 오늘 탭 ════════════ */
+  function renderToday(root) {
+    var pd = packDB();
+    if (!pd.diagDone) {
+      root.innerHTML =
+        '<div class="card"><h2>시작 전, 2분 출발선 진단</h2>' +
+        '<p class="muted">이미 아는 단어를 골라내서 오늘부터 <b>새로 외울 것만</b> 계획에 넣어요. 모르는 건 부담 없이 「모름」!</p>' +
+        '<button class="btn primary big" id="startDiag">진단 시작 (' + pack.words.length + '단어)</button></div>';
+      $('startDiag').onclick = startDiagnostic;
+      return;
+    }
+    var plan = WBNAESIN.planDay(pack, pd.states, exam(), Date.now(), {});
+    var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
+    var wsum = WBNAESIN.wordSummary(wordStates());
+    var total = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
+    root.innerHTML =
+      '<div class="card"><h2>오늘의 플랜</h2>' +
+      '<div class="stat3">' +
+      '<div><b>' + plan.words.fresh.length + '</b><span>새 단어</span></div>' +
+      '<div><b>' + (plan.words.review.length + plan.words.relearn.length) + '</b><span>복습·안정화</span></div>' +
+      '<div><b>' + plan.sentences.length + '</b><span>본문 문장</span></div></div>' +
+      (plan.note ? '<p class="muted">' + esc(plan.note) + '</p>' : '') +
+      (!g.open ? '<p class="muted">🔒 단어 게이트: ' + g.done + '/' + g.total + ' 도달 — 단어를 먼저 끝내면 백지 훈련이 열려요.</p>' : '') +
+      '<button class="btn primary big" id="startToday"' + (total + plan.sentences.length ? '' : ' disabled') + '>오늘 훈련 시작</button></div>' +
+      '<div class="card"><h2>브레인덤프 (2분)</h2>' +
+      '<p class="muted">배운 문장을 기억나는 대로 써 보기 — 채점 없이 빠뜨린 곳만 보여 줘요.</p>' +
+      '<button class="btn big" id="startDump">브레인덤프 시작</button></div>' +
+      '<div class="card"><h2>단어 안정화</h2>' +
+      '<div class="bar"><i class="g" style="width:' + (wsum.total ? Math.round(wsum.stable / wsum.total * 100) : 0) + '%"></i></div>' +
+      '<p class="muted">안정화(다른 날 3회 재도달) ' + wsum.stable + ' · 도달 ' + wsum.reached + ' / ' + wsum.total + '</p></div>';
+    $('startToday').onclick = function () {
+      var items = WBGEN.dailySet(pack, plan, Math.random);
+      if (items.length) runItems(items, '오늘 훈련');
+    };
+    $('startDump').onclick = startDump;
+  }
+
+  /* ── 출발선 진단 ── */
+  function startDiagnostic() {
+    var items = WBGEN.diagnosticSet(pack, Math.random);
+    var results = [];
+    runQueue(items, '출발선 진단', function (item, ok, answerKey) {
+      results.push({ id: item.wordId, known: ok && answerKey !== item.unknownKey });
+    }, function () {
+      var pd = packDB();
+      WBNAESIN.applyDiagnostic(pd.states, results, Date.now());
+      pd.diagDone = true;
+      persist();
+      var known = results.filter(function (r) { return r.known; }).length;
+      alert('진단 완료! ' + pack.words.length + '개 중 ' + known + '개는 이미 알아요.\n새로 외울 단어는 ' + (pack.words.length - known) + '개!');
+      render();
+    }, { noConfidence: true, noEngine: true });
+  }
+
+  /* ════════════ 러너 (문항 큐 실행) ════════════ */
+  var RQ = null;
+  function runItems(items, title) {
+    runQueue(items, title, function (item, ok, ans, meta) {
+      var pd = packDB(), now = Date.now();
+      if (item.kind === 'sentence' || item.seq != null && item.stage != null) {
+        var st = senState(item.seq);
+        if (st) WBNAESIN.advanceStage(st, ok, now);
+      } else if (item.wordId) {
+        var ws = pd.states[item.wordId];
+        if (!ws) return;
+        if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, confidence: meta.confidence }, now);
+        else WBNAESIN.recordQuiz(ws, { correct: ok, confidence: meta.confidence, hinted: false }, now);
+      }
+    }, function () { persist(); render(); });
+  }
+  function runQueue(items, title, onGrade, onDone, opts) {
+    RQ = { items: items, i: 0, title: title, onGrade: onGrade, onDone: onDone, opts: opts || {} };
+    $('runner').classList.add('open');
+    stepRunner();
+  }
+  $('rQuit').onclick = function () {
+    $('runner').classList.remove('open');
+    if (RQ && RQ.onDone) RQ.onDone();
+    RQ = null;
+  };
+  function stepRunner() {
+    if (!RQ) return;
+    if (RQ.i >= RQ.items.length) { $('rQuit').onclick(); return; }
+    $('rBar').style.width = Math.round(RQ.i / RQ.items.length * 100) + '%';
+    $('rCount').textContent = RQ.title + ' · ' + (RQ.i + 1) + ' / ' + RQ.items.length;
+    renderItem(RQ.items[RQ.i], $('rBody'));
+  }
+  function finishItem(item, ok, answerKey, resultHtml) {
+    /* 결과 → (확신도) → 다음 */
+    var box = document.createElement('div');
+    box.className = 'result ' + (ok ? 'good' : 'bad');
+    box.innerHTML = (ok ? '⭕ 정답!' : '❌ 아쉽!') + (resultHtml || '');
+    $('rBody').querySelector('.q').appendChild(box);
+    var q = $('rBody').querySelector('.q');
+    var needConf = !RQ.opts.noConfidence && item.wordId && item.type !== undefined;
+    function next(conf) {
+      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: conf || 'sure' });
+      RQ.i += 1; stepRunner();
+    }
+    if (needConf) {
+      var cr = document.createElement('div');
+      cr.className = 'confrow';
+      cr.innerHTML = '<button data-c="sure">😎 확실했어요</button><button data-c="unsure">🤔 애매했어요</button><button data-c="guess">🎲 찍었어요</button>';
+      cr.onclick = function (e) { var b = e.target.closest('button'); if (b) next(b.getAttribute('data-c')); };
+      q.appendChild(cr);
+    } else {
+      var nb = document.createElement('div');
+      nb.className = 'rnext';
+      nb.innerHTML = '<button class="btn primary big">다음</button>';
+      nb.querySelector('button').onclick = function () { next('sure'); };
+      q.appendChild(nb);
+      nb.querySelector('button').focus();
+    }
+  }
+
+  /* ── 문항 렌더 (유형별) ── */
+  function renderItem(item, root) {
+    var stageLabel = item.stage ? '본문 ' + Math.floor(item.stage) + '단계' : (item.kind === 'word' || item.wordId ? '단어' : '');
+    var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
+
+    if (item.choices) { /* mcq · defpick · vocabMcqReverse */
+      root.innerHTML = head + '<div class="prompt">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div></div>';
+      var chs = $('chs');
+      var list = item.choices.slice();
+      if (item.unknownKey) list.push({ key: item.unknownKey, text: '❓ 모름 — 새로 배울래요' });
+      list.forEach(function (c) {
+        var b = document.createElement('button');
+        b.textContent = c.text; b.setAttribute('data-k', c.key);
+        chs.appendChild(b);
+      });
+      chs.onclick = function (e) {
+        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        chs.setAttribute('data-done', '1');
+        var k = b.getAttribute('data-k');
+        var ok = k === item.answerKey;
+        var all = chs.querySelectorAll('button');
+        for (var i = 0; i < all.length; i++) {
+          if (all[i].getAttribute('data-k') === item.answerKey) all[i].classList.add('right');
+          else if (all[i] === b) all[i].classList.add('wrongpick');
+        }
+        finishItem(item, ok, k, '');
+      };
+      return;
+    }
+
+    if (item.type === 'spell') {
+      root.innerHTML = head + '<div class="prompt sm">뜻: <b>' + esc(item.promptKo) + '</b></div>' +
+        '<div class="prompt" style="letter-spacing:2px">' + esc(item.hint) + '</div>' +
+        '<input class="ans" id="spellIn" autocomplete="off" autocapitalize="off" placeholder="영어로 입력">' +
+        '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
+      bindSubmit(function () {
+        var v = $('spellIn').value;
+        var g = WBGRADE.gradeAnswer(v, item.answers);
+        finishItem(item, g.correct, v, g.correct ? '' : ' 정답: <b>' + esc(item.answers[0]) + '</b>');
+      });
+      $('spellIn').focus();
+      return;
+    }
+
+    if (item.type === 'cloze') {
+      root.innerHTML = head + '<div class="prompt sm">' + esc(item.textParts[0]) +
+        '<input class="blankline" id="czIn" autocomplete="off" autocapitalize="off">' + esc(item.textParts[1]) + '</div>' +
+        '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
+      bindSubmit(function () {
+        var v = $('czIn').value;
+        var g = WBGRADE.gradeAnswer(v, item.answers);
+        finishItem(item, g.correct, v, g.correct ? '' : ' 정답: <b>' + esc(item.answers[0]) + '</b>');
+      });
+      $('czIn').focus();
+      return;
+    }
+
+    if (item.type === 'kwblank' || item.type === 'verb') {
+      var html = head + (item.koFull ? '<div class="prompt sm muted">' + esc(item.koFull) + '</div>' : '') + '<div class="prompt sm">';
+      var bi = 0;
+      item.parts.forEach(function (p) {
+        if (p.text != null) html += esc(p.text);
+        else {
+          var hint = p.blank.hintKo ? '<span class="hintko">' + esc(p.blank.hintKo) + '</span>' : (p.blank.base ? '<span class="hintko">(' + esc(p.blank.base) + ')</span>' : '');
+          html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '" autocomplete="off" autocapitalize="off">' + hint + '</span>';
+          bi += 1;
+        }
+      });
+      html += '</div><div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
+      root.innerHTML = html;
+      var blanks = item.parts.filter(function (p) { return p.blank; });
+      bindSubmit(function () {
+        var ins = root.querySelectorAll('input[data-b]');
+        var inputs = [], answers = [];
+        blanks.forEach(function (p, i) { inputs.push(ins[i].value); answers.push(p.blank.answers); });
+        var g = WBGRADE.gradeBlanks(inputs, answers);
+        for (var i = 0; i < ins.length; i++) ins[i].classList.add(g.perBlank[i].correct ? 'ok' : 'bad');
+        var wrongAns = g.perBlank.filter(function (pb) { return !pb.correct; })
+          .map(function (pb) { return pb.expected && pb.expected[0]; }).filter(Boolean);
+        finishItem(item, g.allCorrect, null, g.allCorrect ? '' : ' 정답: <b>' + esc(wrongAns.join(', ')) + '</b>');
+      });
+      var f = root.querySelector('input[data-b]'); if (f) f.focus();
+      return;
+    }
+
+    if (item.type === 'order') {
+      root.innerHTML = head + '<div class="prompt sm muted" id="ordKo"></div>' +
+        '<div class="built" id="built"></div><div class="tokens" id="toks"></div>' +
+        '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
+      var sen = senBySeq(item.seq);
+      $('ordKo').textContent = sen ? sen.ko : '순서대로 배열하세요';
+      var picked = [];
+      function draw() {
+        var b = $('built'); b.innerHTML = '';
+        picked.forEach(function (t, i) {
+          var x = document.createElement('button'); x.textContent = t;
+          x.onclick = function () { picked.splice(i, 1); draw(); };
+          b.appendChild(x);
+        });
+        var tk = $('toks'); tk.innerHTML = '';
+        var used = picked.slice();
+        item.shuffled.forEach(function (t) {
+          var x = document.createElement('button'); x.textContent = t;
+          var ui = used.indexOf(t);
+          if (ui >= 0) { x.disabled = true; used.splice(ui, 1); }
+          else x.onclick = function () { picked.push(t); draw(); };
+          tk.appendChild(x);
+        });
+      }
+      draw();
+      bindSubmit(function () {
+        var ok = picked.length === item.answer.length && picked.every(function (t, i) { return t === item.answer[i]; });
+        finishItem(item, ok, null, ok ? '' : ' 정답: <b>' + esc(item.answer.join(' ')) + '</b>');
+      });
+      return;
+    }
+
+    if (item.type === 'write' || item.type === 'skeleton') {
+      var hintHtml = item.type === 'write'
+        ? '<p class="muted">키워드: ' + esc((item.keywords || []).join(' · ')) + '</p>'
+        : '<p class="muted">힌트 단어: <b>' + esc(item.hint) + '</b></p>';
+      root.innerHTML = head + '<div class="prompt sm">' + esc(item.ko || '이 문장을 영어로 쓰세요') + '</div>' + hintHtml +
+        '<textarea class="ans" id="wrIn" autocapitalize="off" placeholder="영어 문장 전체를 쓰세요"></textarea>' +
+        '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
+      bindSubmit(function () {
+        var v = $('wrIn').value;
+        var g = WBGRADE.gradeAnswer(v, item.answers);
+        var sim = WBGRADE.similarity(v, item.answers[0]);
+        var ok = g.correct || sim >= 0.92;
+        finishItem(item, ok, v, '<div class="exp">모범: ' + esc(item.answers[0]) + (ok ? '' : ' (유사도 ' + Math.round(sim * 100) + '%)') + '</div>');
+      });
+      $('wrIn').focus();
+      return;
+    }
+
+    /* 알 수 없는 유형 — 건너뛰기 */
+    root.innerHTML = head + '<div class="prompt sm">이 문항 유형은 아직 지원 전이에요.</div>' +
+      '<div class="rnext"><button class="btn big" id="subBtn">건너뛰기</button></div></div>';
+    bindSubmit(function () { RQ.i += 1; stepRunner(); });
+  }
+  function bindSubmit(fn) {
+    var b = $('subBtn');
+    b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
+  }
+
+  /* ════════════ 단어 탭 ════════════ */
+  function renderWords(root) {
+    var ws = wordStates();
+    var sum = WBNAESIN.wordSummary(ws);
+    var html = '<div class="card"><h2>단어 ' + sum.total + '개</h2>' +
+      '<div class="stat3"><div><b>' + sum.reached + '</b><span>도달</span></div>' +
+      '<div><b>' + sum.stable + '</b><span>안정화</span></div>' +
+      '<div><b>' + sum.risky + '</b><span>위험</span></div></div>' +
+      '<button class="btn primary big" id="trainWords">단어 훈련 시작</button>' +
+      '<div class="wordgrid" id="wgrid"></div></div>';
+    root.innerHTML = html;
+    var grid = $('wgrid');
+    pack.words.forEach(function (w) {
+      var st = ws[w.id];
+      var stb = st ? WBNAESIN.stability(st) : 0;
+      var cls = 'wchip' + (st && st.reached ? (WBNAESIN.isStable(st) ? ' stable' : ' reached') : '');
+      var dots = '';
+      for (var i = 0; i < 3; i++) dots += '<i class="' + (i < stb ? 'on' : '') + '"></i>';
+      var el = document.createElement('button');
+      el.className = cls;
+      el.innerHTML = esc(w.headword) + '<span class="dots">' + dots + '</span>';
+      el.onclick = function () {
+        var ex = w.example ? '\n예문: ' + w.example.en + '\n' + w.example.ko : '';
+        alert(w.headword + ' — ' + (w.meaningKo || []).join(', ') + ex);
+      };
+      grid.appendChild(el);
+    });
+    $('trainWords').onclick = function () {
+      var plan = WBNAESIN.planDay(pack, packDB().states, exam(), Date.now(), {});
+      var wordsOnly = { words: plan.words, sentences: [] };
+      var items = WBGEN.dailySet(pack, wordsOnly, Math.random);
+      if (!items.length) { alert('지금은 예정된 단어가 없어요. 내일 다시!'); return; }
+      runItems(items, '단어 훈련');
+    };
+  }
+
+  /* ════════════ 본문 탭 ════════════ */
+  var STAGE_NAMES = { 1: '대역 읽기', 2: '해석 쓰기', 3: '핵심어 가리기', 4: '클로즈·배열', 5: '문장 영작', 6: '백지 쓰기' };
+  function stageBar(stage, done) {
+    var h = '<span class="stagebar">';
+    for (var i = 1; i <= 6; i++) h += '<i class="' + (done ? 'done' : (i < stage ? 'on' : (i === stage ? 'on' : ''))) + '"></i>';
+    return h + '</span>';
+  }
+  function renderPassage(root) {
+    var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
+    var html = '<div class="card"><h2>' + esc(pack.passage ? pack.passage.titleEn : '본문') + '</h2>' +
+      '<p class="muted">문장을 누르면 지금 단계 훈련이 시작돼요. ' + (g.open ? '' : '🔒 5·6단계는 단어 게이트(' + g.done + '/' + g.total + ') 이후 열려요.') + '</p></div>';
+    dayGroups().forEach(function (gr, gi) {
+      html += '<div class="card"><h2>' + esc(gr.header) + '</h2><div data-group="' + gi + '">';
+      gr.sentences.forEach(function (s) {
+        var st = senState(s.seq);
+        var done = st && st.reached;
+        html += '<div class="senrow" data-seq="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
+          '<span class="txt">' + esc(s.en) + '</span>' + stageBar(st ? st.stage : 1, done) + '</div>';
+      });
+      html += '</div><button class="btn big" data-blank="' + gi + '"' + (g.open ? '' : ' disabled') + '>이 단락 백지 도전</button></div>';
+    });
+    root.innerHTML = html;
+    root.onclick = function (e) {
+      var r = e.target.closest('.senrow');
+      if (r) { trainSentence(Number(r.getAttribute('data-seq'))); return; }
+      var b = e.target.closest('button[data-blank]');
+      if (b) startBlank(dayGroups()[Number(b.getAttribute('data-blank'))]);
+    };
+  }
+
+  function trainSentence(seq) {
+    var s = senBySeq(seq), st = senState(seq);
+    if (!s || !st) return;
+    var stage = st.stage;
+    var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
+    if (stage >= 5 && !g.open) { alert('단어 게이트(' + g.done + '/' + g.total + ')를 먼저 통과해야 5·6단계가 열려요.\n선생님이 열어 줄 수도 있어요.'); return; }
+    if (stage === 1) return stageRead(s, st);
+    if (stage === 2) return stageTranslate(s, st);
+    if (stage === 3) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) { q.stage = 3; q.seq = seq; return runItems([q], '3단계 · 핵심어'); } return advanceAndRefresh(st, true); }
+    if (stage === 4) {
+      var items = [];
+      var c = WBGEN.clozeWide(s, Math.random); if (c) { c.stage = 4; c.seq = seq; items.push(c); }
+      var o = WBGEN.tokenOrder(s, Math.random); if (o) { o.stage = 4; o.seq = seq; items.push(o); }
+      if (items.length) return runItems(items, '4단계 · 클로즈·배열');
+      return advanceAndRefresh(st, true);
+    }
+    if (stage === 5) { var w = WBGEN.writingPrompt(s); if (w) { w.stage = 5; w.seq = seq; return runItems([w], '5단계 · 문장 영작'); } return advanceAndRefresh(st, true); }
+    if (stage >= 6) { var grp = dayGroups().filter(function (gr) { return gr.day === s.dayGroup; })[0]; return startBlank(grp); }
+  }
+  function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now()); persist(); render(); }
+
+  /* 1단계 — 대역 읽기 (청크·TTS 포함) */
+  function stageRead(s, st) {
+    var chunksHtml = (s.chunks || []).map(function (c) {
+      return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+    }).join('');
+    var notes = (s.grammarNotes || []).map(function (n) {
+      return '<p class="muted">💡 <b>' + esc(n.target) + '</b> — ' + esc(n.note) + '</p>';
+    }).join('');
+    runCustom('1단계 · 대역 읽기',
+      '<div class="q"><div class="qmeta">문장 ' + s.seq + '</div>' +
+      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn" title="듣기">🔊</button></div>' +
+      '<div class="prompt sm muted">' + esc(s.ko) + '</div>' + chunksHtml + notes +
+      '<div class="rnext"><button class="btn primary big" id="okBtn">다 읽었어요 → 해석 단계로</button></div></div>',
+      function () {
+        $('ttsBtn').onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
+        $('okBtn').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
+      });
+  }
+
+  /* 2단계 — 해석 쓰기 (청크 커버리지 + 셀프 체크) */
+  function stageTranslate(s, st) {
+    runCustom('2단계 · 해석 쓰기',
+      '<div class="q"><div class="qmeta">문장 ' + s.seq + ' — 영어를 보고 한글로 해석해 보세요</div>' +
+      '<div class="prompt">' + esc(s.en) + '</div>' +
+      '<textarea class="ans" id="trIn" placeholder="한글 해석을 쓰세요"></textarea>' +
+      '<div class="rnext"><button class="btn primary big" id="okBtn">확인</button></div>' +
+      '<div id="trOut"></div></div>',
+      function () {
+        $('okBtn').onclick = function () {
+          var v = $('trIn').value;
+          var cov = WBGRADE.gradeTranslationChunks(v, s.chunks || []);
+          var html = '<div class="result ' + (cov.coverage >= 0.99 ? 'good' : 'bad') + '"><b>모범 해석:</b> ' + esc(s.ko) + '</div>';
+          (s.chunks || []).forEach(function (c, i) {
+            var miss = cov.perChunk[i] && !cov.perChunk[i].present;
+            html += '<div class="chunkline' + (miss ? ' miss' : '') + '">' + (miss ? '⚠ ' : '✓ ') + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+          });
+          html += '<p class="muted">스스로 판정하세요 — 핵심 의미를 맞게 옮겼나요?</p>' +
+            '<div class="confrow"><button id="selfOk">⭕ 맞게 해석했다</button><button id="selfNo">🔁 다시 연습할래</button></div>';
+          $('trOut').innerHTML = html;
+          $('selfOk').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
+          $('selfNo').onclick = function () { closeCustom(); advanceAndRefresh(st, false); };
+        };
+      });
+  }
+
+  /* 6단계 — 단락 백지 도전 */
+  function startBlank(group) {
+    if (!group) return;
+    var targets = group.sentences;
+    runCustom('백지 도전 · ' + group.header,
+      '<div class="q"><div class="qmeta">' + esc(group.header) + ' — ' + targets.length + '문장을 순서대로, 아무것도 안 보고!</div>' +
+      '<textarea class="ans" id="bkIn" style="min-height:160px" placeholder="기억나는 대로 영어로 쭉 쓰세요. 줄바꿈으로 문장을 나눠도 돼요."></textarea>' +
+      '<div class="rnext"><button class="btn primary big" id="okBtn">채점</button></div>' +
+      '<div id="bkOut"></div></div>',
+      function () {
+        $('okBtn').onclick = function () {
+          var v = $('bkIn').value;
+          var canonical = targets.map(function (s) { return { seq: s.seq, en: s.en }; });
+          var d = WBGRADE.diffPassage(v, canonical);
+          var html = '<div class="result ' + (d.missingCount === 0 && d.partialCount === 0 ? 'good' : 'bad') + '">' +
+            '⭕ ' + d.okCount + ' · 🔶 ' + d.partialCount + ' · ❌ ' + d.missingCount +
+            (d.orderOk ? '' : ' · 순서가 달라요') + '</div>';
+          d.perSentence.forEach(function (ps) {
+            var s = senBySeq(ps.seq);
+            var body;
+            if (ps.status === 'missing') body = '<span class="d-missing">' + esc(s.en) + '</span>';
+            else body = (ps.diff || []).map(function (t) {
+              if (t.type === 'missing') return '<span class="d-missing">' + esc(t.text) + '</span>';
+              if (t.type === 'extra') return '<span class="d-extra">' + esc(t.text) + '</span>';
+              return esc(t.text);
+            }).join(' ');
+            html += '<div class="diffline ' + ps.status + '"><span class="lbl">' + ps.seq + '</span>' + body + '</div>';
+          });
+          html += '<div class="rnext"><button class="btn primary big" id="bkDone">기록하고 닫기</button></div>';
+          $('bkOut').innerHTML = html;
+          $('bkDone').onclick = function () {
+            var now = Date.now(), pd = packDB();
+            d.perSentence.forEach(function (ps) {
+              var st = senState(ps.seq);
+              if (st && st.stage >= 6) WBNAESIN.advanceStage(st, ps.status === 'ok', now);
+            });
+            pd.dump.push({ at: new Date().toISOString(), scope: group.day, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
+            closeCustom(); persist(); render();
+          };
+        };
+      });
+  }
+
+  /* 브레인덤프 — 판정 없는 2분 자유 인출 (§14-3) */
+  function startDump() {
+    var studied = pack.sentences.filter(function (s) { var st = senState(s.seq); return st && st.stage >= 2; });
+    if (!studied.length) { alert('아직 배운 문장이 없어요 — 본문 1단계부터 시작해 보세요!'); return; }
+    runCustom('브레인덤프 (2분)',
+      '<div class="q"><div class="qmeta">오늘까지 배운 문장 ' + studied.length + '개 — 기억나는 대로! 채점 없어요.</div>' +
+      '<textarea class="ans" id="dpIn" style="min-height:160px" placeholder="생각나는 문장을 자유롭게 쓰세요"></textarea>' +
+      '<div class="rnext"><button class="btn primary big" id="okBtn">비교해 보기</button></div>' +
+      '<div id="dpOut"></div></div>',
+      function () {
+        $('okBtn').onclick = function () {
+          var v = $('dpIn').value;
+          var d = WBGRADE.diffPassage(v, studied.map(function (s) { return { seq: s.seq, en: s.en }; }));
+          var html = '<div class="result good">떠올린 문장 ⭕ ' + d.okCount + ' · 🔶 ' + d.partialCount + ' · 아직 ❌ ' + d.missingCount + '</div>';
+          d.perSentence.forEach(function (ps) {
+            if (ps.status === 'missing') { var s = senBySeq(ps.seq); html += '<div class="diffline missing"><span class="lbl">' + ps.seq + '</span>' + esc(s.en) + '</div>'; }
+          });
+          html += '<p class="muted">빠진 문장은 내일의 나에게 힌트! 판정·기록 부담 없이 여기서 끝.</p>' +
+            '<div class="rnext"><button class="btn primary big" id="dpDone">닫기</button></div>';
+          $('dpOut').innerHTML = html;
+          packDB().dump.push({ at: new Date().toISOString(), scope: 'dump', ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
+          persist();
+          $('dpDone').onclick = closeCustom;
+        };
+      });
+  }
+
+  /* 커스텀 러너 화면 (문항 큐가 아닌 자유 화면) */
+  function runCustom(title, html, wire) {
+    RQ = { custom: true };
+    $('runner').classList.add('open');
+    $('rBar').style.width = '100%';
+    $('rCount').textContent = title;
+    $('rBody').innerHTML = html;
+    wire();
+  }
+  function closeCustom() { $('runner').classList.remove('open'); RQ = null; }
+
+  /* ════════════ 문제 탭 ════════════ */
+  function itemKey(it) { return 'i-' + (it.no != null ? it.no : Math.random()); }
+  function renderQuiz(root) {
+    var items = pack.items || [];
+    var pd = packDB();
+    var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
+    root.innerHTML =
+      '<div class="card"><h2>문제 풀이</h2>' +
+      '<p class="muted">이 팩의 저장 문항 ' + items.length + '개 — 즉시 채점, 해설 제공.</p>' +
+      '<button class="btn primary big" id="startQuiz"' + (items.length ? '' : ' disabled') + '>문제 풀기</button></div>' +
+      '<div class="card"><h2>오답노트 <span class="chip c-coral">' + wrongs.length + '</span></h2>' +
+      '<p class="muted">서로 다른 날 2번 맞히면 클리어! 이겨낸 오답: ' +
+      Object.keys(pd.wrong).filter(function (k) { return pd.wrong[k].cleared; }).length + '개</p>' +
+      '<button class="btn big" id="retryWrong"' + (wrongs.length ? '' : ' disabled') + '>오답 재도전</button></div>';
+    $('startQuiz').onclick = function () { runStoredItems(items); };
+    $('retryWrong').onclick = function () {
+      var retry = items.filter(function (it) { return wrongs.indexOf('i-' + it.no) >= 0; });
+      runStoredItems(retry, true);
+    };
+  }
+  function runStoredItems(items, isRetry) {
+    var qs = items.map(function (it) {
+      var stim = (it.stimulus && it.stimulus.parts || []).map(function (p) { return p.text; }).join(' ').trim();
+      return {
+        stored: it, no: it.no, type: 'storedmcq',
+        prompt: (it.instructionKo || '') + (stim ? '\n' + stim : ''),
+        choices: it.choices.map(function (c) { return { key: String(c.label), text: c.text || (c.tuple || []).join(' - ') }; }),
+        answerKeys: it.answer.map(String), answerCount: it.answerCount || 1,
+        explanation: it.explanationKo || ''
+      };
+    });
+    runQueue(qs, isRetry ? '오답 재도전' : '문제 풀이', function (q, ok) {
+      var pd = packDB(), k = 'i-' + q.no, now = Date.now();
+      if (!ok) {
+        if (!pd.wrong[k]) pd.wrong[k] = { firstAt: new Date().toISOString(), tries: 0, cleared: false, state: WBNAESIN.createState(k, 'word', now) };
+        pd.wrong[k].tries += 1;
+      } else if (pd.wrong[k] && !pd.wrong[k].cleared) {
+        var r = WBNAESIN.clearWrong(pd.wrong[k].state, now);
+        if (r && r.cleared) pd.wrong[k].cleared = true;
+      }
+    }, function () { persist(); render(); }, { noConfidence: true });
+  }
+
+  /* storedmcq 렌더 — 복수 정답 지원 */
+  var origRenderItem = renderItem;
+  renderItem = function (item, root) {
+    if (item.type !== 'storedmcq') return origRenderItem(item, root);
+    var multi = item.answerCount > 1;
+    root.innerHTML = '<div class="q"><div class="qmeta">문항 ' + item.no + (multi ? ' · 정답 ' + item.answerCount + '개' : '') + '</div>' +
+      '<div class="prompt sm" style="white-space:pre-line">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div>' +
+      (multi ? '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div>' : '') + '</div>';
+    var chs = $('chs');
+    item.choices.forEach(function (c) {
+      var b = document.createElement('button');
+      b.textContent = c.key + '. ' + c.text; b.setAttribute('data-k', c.key);
+      chs.appendChild(b);
+    });
+    function grade(picked) {
+      var ok = picked.length === item.answerKeys.length &&
+        item.answerKeys.every(function (k) { return picked.indexOf(k) >= 0; });
+      var all = chs.querySelectorAll('button');
+      for (var i = 0; i < all.length; i++) {
+        var k = all[i].getAttribute('data-k');
+        if (item.answerKeys.indexOf(k) >= 0) all[i].classList.add('right');
+        else if (picked.indexOf(k) >= 0) all[i].classList.add('wrongpick');
+      }
+      finishItem(item, ok, picked.join(','), item.explanation ? '<div class="exp">' + esc(item.explanation) + '</div>' : '');
+    }
+    if (multi) {
+      var picked = [];
+      chs.onclick = function (e) {
+        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        var k = b.getAttribute('data-k'), i = picked.indexOf(k);
+        if (i >= 0) { picked.splice(i, 1); b.classList.remove('sel'); }
+        else { picked.push(k); b.classList.add('sel'); }
+      };
+      bindSubmit(function () { chs.setAttribute('data-done', '1'); grade(picked); });
+    } else {
+      chs.onclick = function (e) {
+        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        chs.setAttribute('data-done', '1');
+        grade([b.getAttribute('data-k')]);
+      };
+    }
+  };
+
+  /* ════════════ 성취도 탭 ════════════ */
+  var paperMode = false;
+  function renderProgress(root) {
+    var pd = packDB();
+    var wsum = WBNAESIN.wordSummary(wordStates());
+    var ssum = WBNAESIN.sentenceSummary(senStates());
+    var ex = exam();
+    var html =
+      '<div class="card"><h2>' + esc(pack.textbook + ' · Lesson ' + pack.lesson) + ' 성취도</h2>' +
+      '<div class="stat3">' +
+      '<div><b>' + wsum.reached + '<span style="font-size:.7em;color:var(--ink-soft)">/' + wsum.total + '</span></b><span>단어 도달</span></div>' +
+      '<div><b>' + ssum.interpreted + '<span style="font-size:.7em;color:var(--ink-soft)">/' + ssum.total + '</span></b><span>해석 통과</span></div>' +
+      '<div><b>' + ssum.memorized + '<span style="font-size:.7em;color:var(--ink-soft)">/' + ssum.total + '</span></b><span>백지 암송</span></div></div></div>' +
+
+      '<div class="card"><h2>🔤 단어 암기</h2>' +
+      '<div class="bar"><i style="width:' + pct(wsum.reached, wsum.total) + '%"></i></div>' +
+      '<p class="muted">도달 ' + wsum.reached + ' · 안정화 ' + wsum.stable + ' · 철자 재검증 대기 ' + wsum.needsSpellCheck + '</p>' +
+      '<div class="wordgrid">' + pack.words.map(function (w) {
+        var st = pd.states[w.id], stb = st ? WBNAESIN.stability(st) : 0;
+        var dots = ''; for (var i = 0; i < 3; i++) dots += '<i class="' + (i < stb ? 'on' : '') + '"></i>';
+        return '<span class="wchip' + (st && st.reached ? (WBNAESIN.isStable(st) ? ' stable' : ' reached') : '') + '">' +
+          esc(w.headword) + '<span class="dots">' + dots + '</span></span>';
+      }).join('') + '</div></div>' +
+
+      '<div class="card"><h2>📖 본문 해석 (영→한)</h2>' +
+      '<div class="bar"><i style="width:' + pct(ssum.interpreted, ssum.total) + '%"></i></div><div>' +
+      pack.sentences.map(function (s) {
+        var st = senState(s.seq), ok = st && st.stage >= 3;
+        return '<div class="senrow" data-go="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
+          '<span class="txt">' + esc(s.en) + '</span><span class="okmark ' + (ok ? 'y' : 'n') + '">' + (ok ? '✓' : '·') + '</span></div>';
+      }).join('') + '</div></div>' +
+
+      '<div class="card"><h2>✍️ 본문 암기 (백지 영작)</h2>' +
+      '<div class="bar"><i class="g" style="width:' + pct(ssum.memorized, ssum.total) + '%"></i></div>' +
+      '<p class="muted">단계 분포 — ' + [1, 2, 3, 4, 5, 6].map(function (i) { return i + '단계 ' + (ssum.byStage[i] || 0); }).join(' · ') + '</p>' +
+      '<div class="row" style="margin-bottom:8px"><button class="btn" id="paperToggle">' + (paperMode ? '입력 끝내기' : '📄 종이 백지시험 결과 입력') + '</button></div><div>' +
+      pack.sentences.map(function (s) {
+        var st = senState(s.seq), stage = st ? st.stage : 1, done = st && st.reached;
+        var paper = pd.paper[s.seq];
+        var mark = paperMode
+          ? '<button class="paperbtn ' + (paper === true ? 'y' : paper === false ? 'n' : '') + '" data-paper="' + s.seq + '">' + (paper === true ? '○' : paper === false ? '×' : '—') + '</button>'
+          : '<span class="okmark ' + (done ? 'y' : 'n') + '">' + (done ? '✓' : STAGE_NAMES[stage].slice(0, 2)) + '</span>';
+        return '<div class="senrow"><span class="no">' + s.seq + '</span>' +
+          '<span class="txt">' + esc(s.en) + '</span>' + stageBar(stage, done) + mark + '</div>';
+      }).join('') + '</div>' +
+      (paperMode ? '<p class="muted">선생님과 함께 종이 백지시험 결과를 문장별로 ○/×로 입력하세요 — ○는 암송 기록에 반영돼요.</p>' : '') + '</div>' +
+
+      '<div class="card"><h2>⚙️ 시험 설정</h2>' +
+      '<p class="muted">' + (ex && ex.examDate ? '시험일: <b>' + esc(ex.examDate) + '</b> (시험 모드)' : '시험일이 없어요 — 연습 모드로 자유 진도예요.') + '</p>' +
+      '<div class="row"><input class="ans" type="date" id="examIn" value="' + esc(ex && ex.examDate || '') + '">' +
+      '<button class="btn" id="examSet">적용</button><button class="btn" id="examClear">연습 모드로</button></div>' +
+      '<p class="muted" style="margin-top:8px">' + (authed ? '☁️ 서버 저장 켜짐 — 기록이 선생님 화면과 이어져요.' : '📱 이 기기에만 저장 중 (체험 모드)') + '</p></div>';
+    root.innerHTML = html;
+    root.onclick = function (e) {
+      var pb = e.target.closest('button[data-paper]');
+      if (pb) {
+        var seq = Number(pb.getAttribute('data-paper'));
+        var cur = pd.paper[seq];
+        var next = cur === true ? false : cur === false ? null : true;
+        if (next === null) delete pd.paper[seq]; else pd.paper[seq] = next;
+        if (next === true) { /* 종이 ○ = 완전 인출 성공 환류 (§14-3) */
+          var st = senState(seq);
+          if (st) { if (st.stage < 6) st.stage = 6; WBNAESIN.advanceStage(st, true, Date.now()); }
+        }
+        persist(); render();
+        return;
+      }
+      var go = e.target.closest('[data-go]');
+      if (go) { setTab('passage'); trainSentence(Number(go.getAttribute('data-go'))); }
+    };
+    $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
+    $('examSet').onclick = function () {
+      var v = $('examIn').value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하세요'); return; }
+      packDB().exam = { examDate: v, wordDeadlineDays: 7 };
+      persist(); render();
+    };
+    $('examClear').onclick = function () { packDB().exam = null; persist(); render(); };
+  }
+  function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
+
+  /* ── 렌더 루트 ── */
+  function render() {
+    renderHeader();
+    var root = $('views');
+    if (!pack) { root.innerHTML = '<div class="card"><p class="muted">팩을 불러오는 중…</p></div>'; return; }
+    if (view === 'today') renderToday(root);
+    else if (view === 'words') renderWords(root);
+    else if (view === 'passage') renderPassage(root);
+    else if (view === 'quiz') renderQuiz(root);
+    else renderProgress(root);
+  }
+
+  /* ── 부팅: 연동 확인 → 시험·팩 로드 (실패 시 체험 팩) ── */
+  function loadDemo() {
+    return fetch('./pack-sample.json').then(function (r) { return r.json(); });
+  }
+  function boot() {
+    DB = loadDB() || { v: 1, packs: {}, savedAt: 0 };
+    var a = auth();
+    var flow;
+    if (a && a.token) {
+      flow = api('/exam').then(function (r) {
+        authed = true;
+        var ex = (r && r.exam) || {};        /* 서버 계약: { exam, scope } 래핑 */
+        return pullState().then(function () {
+          var pid = ex && ex.packIds && ex.packIds[0];
+          if (!pid) throw new Error('no-pack');
+          return api('/pack?id=' + encodeURIComponent(pid)).then(function (r2) {
+            pack = r2.pack;                   /* 서버 계약: { pack, updatedAt } 래핑 */
+            if (ex.examDate) { /* 서버 시험 배정이 로컬보다 우선 */
+              var pd0 = DB.packs[pack.packId];
+              if (!pd0 || !pd0.exam || pd0.exam.examDate !== ex.examDate) {
+                if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
+                DB.packs[pack.packId].exam = { examDate: ex.examDate, wordDeadlineDays: ex.wordDeadlineDays || 7 };
+              }
+            }
+          });
+        });
+      }).catch(function () { return loadDemo().then(function (p) { pack = p; }); });
+    } else {
+      flow = loadDemo().then(function (p) { pack = p; });
+    }
+    flow.then(function () {
+      ensureStates(); persist();
+      setTab('today');
+    }).catch(function () {
+      $('views').innerHTML = '<div class="card"><p>팩을 불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p></div>';
+    });
+  }
+  boot();
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
+})();
+</script>
+</body>
+</html>

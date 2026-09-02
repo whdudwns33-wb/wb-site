@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 내신브레인 · 관리</title>
+  <style>
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}
+    header b{font-size:17px}header small{opacity:.75}
+    header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1080px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}
+    h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}
+    input,select{font:inherit;min-height:42px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2f4;color:var(--muted)}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+    .stat{flex:1;min-width:120px;padding:12px;border:1px solid #d6ebf4;border-radius:12px;background:#f5fbfe;text-align:center}
+    .stat b{display:block;font-size:22px;color:var(--navy)}
+    .stat span{font-size:12px;color:var(--muted);font-weight:800}
+    .stat.warn{background:#fff0ef;border-color:#efc2bb}
+    .stat.warn b{color:var(--bad)}
+    .tbl{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+    th{position:sticky;top:0;background:#f0f5f7;color:var(--navy);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+    tr:hover td{background:#f8fcfe}
+    tbody tr:nth-child(even) td{background:#f8fcfe}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
+    .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    .mini{display:inline-block;min-width:110px}
+    .minibar{display:inline-block;width:74px;height:7px;background:#eef2f4;border-radius:99px;overflow:hidden;vertical-align:middle;margin-right:6px}
+    .minibar i{display:block;height:100%;background:var(--blue)}
+    .minibar i.g{background:var(--ok)}
+    .issues{margin:8px 0 0;padding:10px 12px;border-radius:10px;font-size:13px}
+    .issues.bad{background:#fff0ef}.issues.warn{background:#fff4e6}.issues.ok{background:#e7f6f0}
+    .issues div{margin:2px 0}
+    .packrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+    .packrow:first-of-type{border-top:0}
+    label.ck{display:inline-flex;align-items:center;gap:6px;font-weight:700;margin:2px 10px 2px 0}
+  </style>
+</head>
+<body>
+<header><b>WB 내신브레인 · 관리</b><small>팩 업로드 · 시험 등록 · 성취도</small><span class="sp"></span>
+  <button class="hbtn" onclick="location.href='/admin/'">진로독서 관리</button>
+  <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
+  <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
+</header>
+<main id="app"></main>
+<script>
+'use strict';
+/* WB 내신브레인 관리 웹 — 원장·강사용.
+   기획서 §6·§7: 팩 업로드(추출 JSON 묶음 → 병합·검증 → KV), 시험 등록, 반 성취도.
+   인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다. */
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let OV=null,PACKS=[],FILTER='전체';
+let ASSEMBLED=null;   // 병합·검증을 통과한 업로드 대기 팩
+
+async function api(path,opt){
+  const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+
+function renderLogin(msg){
+  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;
+  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">관리 PIN을 입력하세요. (진로독서 관리와 같은 PIN)</p>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
+    <button class="btn" id="doLogin">로그인</button></div>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
+  $('#doLogin').onclick=async()=>{
+    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);refresh();}
+    catch(e){renderLogin(e.message);}
+  };
+  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+}
+
+function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;
+  if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+
+/* ── 팩 병합: 분리 추출 파일(words/sentences/dialogues/patterns/items-*) 또는 통짜 팩 ── */
+const TOP_FIELDS=['packId','curriculum','textbook','grade','lesson','lessonTitle','source','passage'];
+const ARR_FIELDS=['words','sentences','dialogues','keyExpressions','functions','vocabSidebar','readingQA','patterns'];
+function assemble(files){
+  const out={items:[]},ids=new Set(),errors=[];
+  for(const f of files){
+    let d;
+    try{d=JSON.parse(f.text);}catch(e){errors.push(f.name+': JSON 파싱 실패 — '+e.message);continue;}
+    if(d.packId)ids.add(d.packId);
+    for(const k of TOP_FIELDS)if(d[k]!=null&&out[k]==null)out[k]=d[k];
+    for(const k of ARR_FIELDS)if(Array.isArray(d[k])&&d[k].length&&!(out[k]&&out[k].length))out[k]=d[k];
+    if(Array.isArray(d.items)&&d.items.length)out.items=out.items.concat(d.items);
+  }
+  if(ids.size>1)errors.push('packId가 서로 달라요: '+[...ids].join(' / ')+' — 같은 팩의 파일만 함께 올리세요.');
+  return {pack:out,errors};
+}
+
+/* ── 클라이언트 검증 — naesin/pack-validate.mjs의 핵심 검사를 화면용으로 축약 ── */
+const flat=t=>String(t||'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,'');
+function validatePack(p){
+  const errors=[],warns=[];
+  if(!/^[A-Za-z0-9-]{3,60}$/.test(p.packId||''))errors.push('packId 형식 오류 (영문/숫자/하이픈 3~60자): '+p.packId);
+  const W=p.words||[];
+  if(!W.length)warns.push('단어가 없어요');
+  const wid=new Set();
+  W.forEach((w,i)=>{
+    if(!w.id)errors.push(`words[${i}] id 없음`);else if(wid.has(w.id))errors.push(`words[${i}] id 중복: ${w.id}`);else wid.add(w.id);
+    if(!w.headword)errors.push(`words[${i}] headword 없음`);
+    if(!(Array.isArray(w.meaningKo)&&w.meaningKo.length))errors.push(`words[${i}](${w.headword}) meaningKo 비었음`);
+  });
+  const S=p.sentences||[];
+  if(!S.length)warns.push('본문 문장이 없어요');
+  S.forEach((s,i)=>{
+    if(s.seq!==i+1)errors.push(`sentences[${i}] seq가 순번(${i+1})과 다름`);
+    if(!s.en||!s.ko)errors.push(`문장 ${s.seq} en/ko 누락`);
+    if(!(Array.isArray(s.keywords)&&s.keywords.length))warns.push(`문장 ${s.seq} keywords 없음 (빈칸 훈련 불가)`);
+    if(s.chunks&&flat(s.chunks.map(c=>c.en).join(' '))!==flat(s.en))errors.push(`문장 ${s.seq} chunks 연결이 en과 불일치`);
+  });
+  (p.items||[]).forEach((it,i)=>{
+    if(!Array.isArray(it.answer)||!it.answer.length){errors.push(`items[${i}](no ${it.no}) answer 비었음`);return;}
+    if(Array.isArray(it.choices)&&it.choices.length){
+      const labels=new Set(it.choices.map(c=>String(c.label)));
+      it.answer.forEach(a=>{if(!labels.has(String(a)))errors.push(`items[${i}](no ${it.no}) 정답 "${a}"가 보기에 없음`);});
+    }
+  });
+  return {errors,warns};
+}
+function packCounts(p){
+  return {단어:(p.words||[]).length,문장:(p.sentences||[]).length,대화:(p.dialogues||[]).length,
+    문법:(p.patterns||[]).length,문항:(p.items||[]).length,
+    청크:(p.sentences||[]).reduce((n,s)=>n+((s.chunks||[]).length),0)};
+}
+
+/* ── 화면 ── */
+function render(){
+  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  const students=(OV&&OV.students||[]).slice();
+  const classes=['전체',...new Set(students.map(s=>s.cls).filter(Boolean))];
+  const list=FILTER==='전체'?students:students.filter(s=>s.cls===FILTER);
+  const stale=s=>s.lastActive&&(Date.now()-new Date(s.lastActive))>48*3600e3;
+  const riskyN=students.filter(s=>stale(s)||(s.summary&&s.summary.word&&s.summary.word.risky>0)).length;
+  const todayN=students.filter(s=>s.lastActive&&(Date.now()-new Date(s.lastActive))<24*3600e3).length;
+
+  $('#app').innerHTML=`
+  <div class="card"><h2>반 성취도 현황판</h2>
+    <div class="stats">
+      <div class="stat"><b>${students.length}</b><span>기록 있는 학생</span></div>
+      <div class="stat"><b>${todayN}</b><span>최근 24시간 학습</span></div>
+      <div class="stat ${riskyN?'warn':''}"><b>${riskyN}</b><span>확인 필요 (미접속·위험)</span></div>
+      <div class="stat"><b>${PACKS.length}</b><span>업로드된 팩</span></div>
+    </div>
+    <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
+    <div class="tbl"><table><thead><tr>
+      <th>이름</th><th>반</th><th>팩</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>마지막 학습</th></tr></thead>
+      <tbody>${list.length?list.map(s=>{
+        const m=s.summary||{},w=m.word||{},sn=m.sentence||{};
+        const warn=stale(s)||w.risky>0;
+        return `<tr>
+          <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
+          <td>${esc(s.cls||'—')}</td>
+          <td class="muted">${esc(m.packId||'—')}</td>
+          <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${w.reached??'—'}/${w.total??'—'} · 안정 ${w.stable??'—'}</td>
+          <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${sn.interpreted??'—'}/${sn.total??'—'}</td>
+          <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${sn.memorized??'—'}/${sn.total??'—'}</td>
+          <td class="muted">${fmtLast(s.lastActive)}</td></tr>`;
+      }).join(''):`<tr><td colspan="7" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+  </div>
+
+  <div class="card"><h2>레슨 팩</h2>
+    <p class="muted">추출 JSON 파일들(pack·words·sentences·dialogues·patterns·items)을 <b>한꺼번에 선택</b>하면 병합·검증 후 업로드합니다. 팩 콘텐츠는 서버 저장소에만 저장돼요(저장소·정적 파일에 안 남음).</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="packFiles" accept=".json,application/json" multiple>
+      <button class="btn" id="btnUpload" disabled>업로드</button>
+    </div>
+    <div id="packPreview"></div>
+    <h3>업로드된 팩 ${PACKS.length}개</h3>
+    ${PACKS.length?PACKS.map(id=>`<div class="packrow"><b>${esc(id)}</b><span class="tag">배포됨</span></div>`).join(''):'<p class="muted">아직 없어요.</p>'}
+  </div>
+
+  <div class="card"><h2>시험 등록</h2>
+    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다.</p>
+    <div class="grid-form">
+      <label>대상<br><select id="exScope"><option value="default">반 공통 (전체 기본)</option>
+        ${students.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}</select></label>
+      <label>시험일<br><input type="date" id="exDate"></label>
+      <div><span class="muted">시험 범위 팩</span><br><span id="exPacks">
+        ${PACKS.length?PACKS.map(id=>`<label class="ck"><input type="checkbox" value="${esc(id)}">${esc(id)}</label>`).join(''):'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
+      <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>시험 등록</button>
+    </div>
+    <div id="examOut"></div>
+  </div>`;
+
+  document.querySelectorAll('.chip[data-cls]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.cls;render();});
+  $('#packFiles').onchange=onPackFiles;
+  $('#btnUpload').onclick=uploadPack;
+  $('#btnExam').onclick=saveExam;
+}
+
+async function onPackFiles(){
+  ASSEMBLED=null;$('#btnUpload').disabled=true;
+  const files=[...$('#packFiles').files];
+  if(!files.length){$('#packPreview').innerHTML='';return;}
+  const read=await Promise.all(files.map(f=>f.text().then(text=>({name:f.name,text}))));
+  const {pack,errors:mergeErr}=assemble(read);
+  const {errors,warns}=validatePack(pack);
+  const all=[...mergeErr,...errors];
+  const c=packCounts(pack);
+  let html=`<div class="issues ${all.length?'bad':'ok'}">
+    <b>${esc(pack.packId||'(packId 없음)')}</b> — ${esc(pack.textbook||'')} ${esc(pack.grade||'')} Lesson ${esc(pack.lesson??'?')}<br>
+    ${Object.entries(c).map(([k,v])=>k+' '+v).join(' · ')}<br>
+    ${all.length?'<b>오류 '+all.length+'건 — 업로드 차단</b>':'검증 통과'+(warns.length?' (경고 '+warns.length+'건)':'')}</div>`;
+  if(all.length)html+=`<div class="issues bad">${all.slice(0,15).map(e=>'<div>✗ '+esc(e)+'</div>').join('')}${all.length>15?'<div>… 외 '+(all.length-15)+'건</div>':''}</div>`;
+  if(warns.length)html+=`<div class="issues warn">${warns.slice(0,10).map(w=>'<div>⚠ '+esc(w)+'</div>').join('')}</div>`;
+  $('#packPreview').innerHTML=html;
+  if(!all.length){ASSEMBLED=pack;$('#btnUpload').disabled=false;}
+}
+
+async function uploadPack(){
+  if(!ASSEMBLED)return;
+  $('#btnUpload').disabled=true;
+  try{
+    const j=await api('/naesin/admin/pack',{method:'POST',body:JSON.stringify({id:ASSEMBLED.packId,pack:ASSEMBLED})});
+    alert('팩 업로드 완료: '+j.id);
+    ASSEMBLED=null;refresh();
+  }catch(e){alert('업로드 실패: '+e.message);$('#btnUpload').disabled=false;}
+}
+
+async function saveExam(){
+  const scope=$('#exScope').value;
+  const examDate=$('#exDate').value;
+  const packIds=[...document.querySelectorAll('#exPacks input:checked')].map(i=>i.value);
+  if(!examDate){$('#examOut').innerHTML='<p class="err">시험일을 선택하세요.</p>';return;}
+  if(!packIds.length){$('#examOut').innerHTML='<p class="err">시험 범위 팩을 하나 이상 선택하세요.</p>';return;}
+  try{
+    const j=await api('/naesin/admin/exam',{method:'POST',body:JSON.stringify({scope,examDate,packIds})});
+    $('#examOut').innerHTML=`<div class="issues ok">등록 완료 — ${esc(j.scope==='default'?'반 공통':j.scope)} · ${esc(j.exam.examDate)} · [${j.exam.packIds.map(esc).join(', ')}]</div>`;
+  }catch(e){$('#examOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+}
+
+async function refresh(){
+  try{
+    const [ov,pk]=await Promise.all([api('/naesin/admin/overview'),api('/naesin/admin/packs')]);
+    OV=ov;PACKS=pk.packs||[];
+    render();
+  }catch(e){if(e.message!=='auth')renderLogin(e.message);}
+}
+$('#btnRefresh').onclick=refresh;
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+if(TOKEN)refresh();else renderLogin();
+</script>
+</body>
+</html>
