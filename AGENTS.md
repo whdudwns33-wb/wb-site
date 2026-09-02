@@ -5,7 +5,7 @@
 
 ## 브랜치 규칙
 - 워크벤치 **소스 작업은 전부 `claude/agent-performance-optimization-rj8ql6` 브랜치**에서 한다.
-- `main`에는 워크벤치 관련으로 **`workbench/index.html`(암호화 배포본) 한 파일만** 올린다
+- `main`에는 워크벤치 관련으로 **암호화 배포본 두 파일(`workbench/index.html`, `workbench/bulk.enc.json`)만** 올린다
   — 다른 워크벤치 파일을 main에 커밋하지 말 것. main의 나머지 파일들(apps/, consult/ 등)은 별개 프로젝트다.
 
 ## 시작하기 / 빌드 / 배포
@@ -14,7 +14,7 @@
    (`private-seed.json`, `bulk-data.json`) 복원. 복호화 키 = 워크벤치 접속 비밀번호 (원장에게 확인).
 2. `workbench/src/app.html` 수정 → `WB_PASSWORD='...' node workbench/src/build.mjs`
    → 출력의 "복호화 검증: 일치 ✓" 확인.
-3. 배포는 main에 index.html만 (worktree 사용 권장), 배포 후 라이브 URL 해시 대조.
+3. 배포는 main에 index.html + bulk.enc.json (worktree 사용 권장), 배포 후 라이브 URL 해시 대조.
 
 ## 절대 규칙 (위반 시 커밋 금지)
 1. **공개 파일에 학생 실명·연락처 0건.** `app.html`·문서·커밋 메시지 포함.

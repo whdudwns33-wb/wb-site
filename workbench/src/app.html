@@ -1579,7 +1579,7 @@ function renderSearch(){
           <div class="umeta"><span>학과·전형 ${list.length}건</span>
           <span class="urange">${cuts.length?fmtCut(cuts[0])+"~"+fmtCut(cuts[cuts.length-1])+"등급":""}</span></div></button>`;}).join("")}</div>
       ${us.length>72?`<p style="font-size:12px;color:var(--ink2);margin-top:10px">${us.length}곳 중 72곳 표시 — 검색어·지역으로 좁혀주세요.</p>`:""}
-      ${!us.length?`<div class="empty"><b>결과 없음</b>${gs.length<100?"대량 데이터가 아직 주입되지 않았습니다.":"검색어를 바꿔보세요."}</div>`:""}`;
+      ${!us.length?`<div class="empty"><b>결과 없음</b>${gs.length<100?(window.__bulkStatus==="loading"?"입시 대량 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"대량 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`:""}`;
     }
   }else{
     const rows=allHsRows();
@@ -1624,7 +1624,7 @@ function renderSearch(){
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.feature||"")}</td>
         <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
     </table></div>`
-    :`<div class="empty"><b>결과 없음</b>${rows.length<100?"전국 고교 데이터가 아직 주입되지 않았습니다 — 다음 배포에서 채워집니다.":"검색어를 바꿔보세요."}</div>`}`;
+    :`<div class="empty"><b>결과 없음</b>${rows.length<100?(window.__bulkStatus==="loading"?"학교 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"학교 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`}`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>입시 검색</h1>
@@ -2945,4 +2945,34 @@ function render(){
   else renderStu();
 }
 render();
+
+/* ═══════════ 대량 데이터 지연 로딩 ═══════════
+   앱 본체는 가볍게 즉시 뜨고, 입결·학교 대량 데이터(bulk.enc.json)는 로그인 직후
+   래퍼가 넘겨준 키(window.__wbKey, 기억하기 시 localStorage)로 받아 복호화한다.
+   아티팩트 내장판(BULK 주입됨)은 이 단계를 건너뛴다. */
+window.__bulkStatus=window.__bulkStatus||"idle";
+async function loadBulk(){
+  if((BULK.ip||[]).length||(BULK.hs||[]).length){window.__bulkStatus="done";return;}
+  const b64=k=>Uint8Array.from(atob(k),c=>c.charCodeAt(0));
+  try{
+    window.__bulkStatus="loading";
+    const raw=window.__wbKey||localStorage.getItem("wb-wb-key");
+    if(!raw)throw new Error("키 없음");
+    const key=await crypto.subtle.importKey("raw",b64(raw),{name:"AES-GCM"},false,["decrypt"]);
+    const res=await fetch("bulk.enc.json");
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const env=await res.json();
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64(env.i)},key,b64(env.c));
+    const out=await new Response(new Response(pt).body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    const data=JSON.parse(new TextDecoder().decode(out));
+    BULK.ip=data.ip||[];BULK.hs=data.hs||[];
+    _IPG=null;_MKM=null;window.__bulkStatus="done";
+    toast(`입시 데이터 로드 완료 — 입결 ${BULK.ip.length.toLocaleString()}건 · 학교 ${BULK.hs.length.toLocaleString()}곳`);
+    render();
+  }catch(e){
+    window.__bulkStatus="error";
+    toast("입시 대량 데이터를 불러오지 못했습니다 — 새로고침 해보세요");
+  }
+}
+loadBulk();
 </script>
