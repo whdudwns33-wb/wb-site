@@ -371,7 +371,7 @@ test('23:50 KST cron accepts a flexible Sunday visit even when the reference rec
 });
 
 test('Worker schedules book orders at 20:00 and session attendance finalization at 23:50 KST', () => {
-  assert.match(wrangler, /crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*"\]/);
+  assert.match(wrangler, /crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*", "\*\/10 \* \* \* \*"\]/);
   assert.match(workerEntry, /controller\.cron === SESSION_PACK_ATTENDANCE_CRON[\s\S]{0,160}handleScheduledSessionPackAttendance/);
   assert.match(workerEntry, /controller\.cron === BOOK_ORDER_CRON[\s\S]{0,160}handleScheduledBookOrders/);
 });

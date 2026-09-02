@@ -63,6 +63,22 @@ test('학생 선택창 위에서 교재 단가를 받고 주문부터 아카등�
   assert.match(row, /row\.stage === 'student_handed'[\s\S]*해야 할 업무 · 아카등록/);
 });
 
+test('교재 주문 문자 상태는 숫자 코드 대신 한국어 진행 상태로 표시한다', () => {
+  const status = block('function bookOrderMessageStatusLabel(', 'function bookOrderActionButtons(');
+  const stageStatus = block('function bookOrderStatusLabel(', 'function bookOrderSecondaryMessageStatusHtml(');
+  for (const state of ['phone_ordered', 'provider_queued', 'carrier_processing', 'delivered', 'failed', 'unknown']) {
+    assert.match(status, new RegExp("messageDeliveryState === '" + state + "'"), state);
+  }
+  for (const label of ['전화 주문 완료', '문자 접수 · 발송 대기', '통신사 전달 중', '문자 수신 완료', '문자 발송 실패']) {
+    assert.match(status, new RegExp(label));
+  }
+  assert.doesNotMatch(status, /2000|3000|4000/);
+  assert.match(status, /bookOrderSecondaryMessageStatusHtml/);
+  assert.match(status, /문자 상태 ·/);
+  assert.doesNotMatch(stageStatus, /messageDeliveryState/);
+  for (const label of ['선생님 수령', '학생배부 완료', '아카등록 완료']) assert.match(stageStatus, new RegExp(label));
+});
+
 test('대상 과거 주문은 1회성 권당 금액 입력칸을 보이고 저장 뒤 서버 목록으로 갱신한다', () => {
   const input = block('function bookOrderPriceEntryHtml(', 'function bookOrderDatesHtml(');
   const save = block('async function saveLegacyBookOrderPrice(', 'async function transitionBookIssue(');

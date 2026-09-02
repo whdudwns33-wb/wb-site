@@ -35,8 +35,14 @@ import {
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
+const SOLAPI_LIST_URL = 'https://api.solapi.com/messages/v4/list';
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const MAX_STATUS_RESPONSE_BYTES = 128 * 1024;
+const STATUS_REFRESH_LIMIT = 90;
+const STATUS_REFRESH_CHUNK_SIZE = 20;
+const QUEUED_STATUS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CARRIER_STATUS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 const GLOBAL_DAILY_LIMIT = 30;
 const SAMPLE_RECIPIENT_SLOT = 'TEST-SMS-001';
 const SAMPLE_IDEMPOTENCY_VERSION = 'BOOK_ORDER_SAMPLE_V1';
@@ -44,6 +50,7 @@ const SAMPLE_TASK_PREFIX = 'sample:book-order:';
 const SAMPLE_VENDOR_NAME = '__BOOK_ORDER_SAMPLE__';
 const SAMPLE_ITEMS = [{ title: '교재 주문 발송 경로 점검 (실제 주문 아님)', qty: '1권' }];
 const REJECTED_RETRY_VERSION = 'BOOK_ORDER_REJECTED_RETRY_V1';
+const MANUAL_PHONE_ORDERED_CODE = 'MANUAL_PHONE_ORDERED';
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'taskId', 'action']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|vendor)/i;
@@ -518,12 +525,13 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
     "JOIN book_order_sends failed ON failed.app=i.app AND failed.send_id=i.send_id " +
     "JOIN tasks t ON t.app=i.app AND t.id=i.task_id " +
     "WHERE i.app=? AND failed.status='rejected' " +
+    "AND COALESCE(failed.safe_error_code,'')<>? " +
     "AND failed.task_id NOT LIKE ? " +
     "AND NOT EXISTS (SELECT 1 FROM book_order_sends active " +
       "WHERE active.app=i.app AND active.task_id=i.task_id " +
       "AND active.status IN ('reserved','dispatching','accepted','unknown')) " +
     'ORDER BY t.updated_at,t.id LIMIT 2000'
-  ).bind(app, retryPrefix + '%').all();
+  ).bind(app, MANUAL_PHONE_ORDERED_CODE, retryPrefix + '%').all();
 
   const [snapshotRows, itemCancellationRows] = await Promise.all([
     loadOrderSnapshotRows(env, app),
@@ -678,6 +686,132 @@ export async function handleBookOrderSend(env, app, body, origin, auth, json) {
   } finally {
     await releaseBookOrderDispatchLockSafely(env, app, lock);
   }
+}
+
+function providerStatusRefreshOutcome(value) {
+  const statusCode = safeProviderStatus(value);
+  if (!statusCode) return null;
+  if (statusCode === '2000' || statusCode === '3000' || statusCode === '4000') {
+    return { status: 'accepted', statusCode, errorCode: null };
+  }
+  return { status: 'rejected', statusCode, errorCode: 'SOLAPI_STATUS_' + statusCode };
+}
+
+function providerMessages(payload) {
+  const list = payload && payload.messageList;
+  if (!list || typeof list !== 'object' || Array.isArray(list)) return new Map();
+  const messages = new Map();
+  for (const value of Object.values(list)) {
+    const messageId = safeProviderId(value && value.messageId);
+    if (messageId) messages.set(messageId, value);
+  }
+  return messages;
+}
+
+async function fetchProviderStatuses(config, messageIds) {
+  const url = new URL(SOLAPI_LIST_URL);
+  url.searchParams.set('messageIds', JSON.stringify(messageIds));
+  url.searchParams.set('limit', String(messageIds.length));
+  const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);
+  let response;
+  let raw;
+  try {
+    response = await fetch(url.toString(), {
+      method: 'GET', headers: { Authorization: authorization }, signal: controller.signal
+    });
+    raw = await response.text();
+  } catch (error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok || new TextEncoder().encode(raw || '').byteLength > MAX_STATUS_RESPONSE_BYTES) return null;
+  try { return providerMessages(raw ? JSON.parse(raw) : {}); }
+  catch (error) { return null; }
+}
+
+async function updateProviderStatusCas(env, row, status, statusCode, safeErrorCode) {
+  const refreshedAt = Math.max(Date.now(), Number(row.updated_at || 0) + 1);
+  const changed = await env.DB.prepare(
+    'UPDATE book_order_sends SET status=?,provider_status_code=?,safe_error_code=?,updated_at=? ' +
+    "WHERE app='task' AND send_id=? AND provider_message_id=? AND status=? " +
+    'AND provider_status_code=? AND updated_at=? AND safe_error_code IS NULL'
+  ).bind(status, statusCode, safeErrorCode || null, refreshedAt, row.send_id, row.provider_message_id,
+    row.status, row.provider_status_code, row.updated_at).run();
+  return Number(changed && changed.meta && changed.meta.changes || 0);
+}
+
+/**
+ * 진행 중인 주문의 같은 provider messageId만 다시 조회한다.
+ * 실패가 확인돼도 새 문자를 보내지 않으며, 전화 주문 완료 표식은 조회·재시도에서 제외한다.
+ */
+export async function handleScheduledBookOrderStatusRefresh(env, scheduledTime) {
+  const now = Number(scheduledTime) || Date.now();
+  const config = solapiConfiguration(env);
+  if (!config) return { ok: false, code: 'SOLAPI_STATUS_DISABLED', checked: 0, updated: 0 };
+  let result;
+  try {
+    result = await env.DB.prepare(
+      "SELECT send_id,provider_group_id,provider_message_id,provider_status_code,status,created_at,updated_at " +
+      "FROM book_order_sends WHERE app='task' AND status IN ('accepted','unknown') " +
+      "AND provider_status_code IN ('2000','3000') AND provider_message_id IS NOT NULL " +
+      "AND safe_error_code IS NULL ORDER BY created_at,send_id LIMIT ?"
+    ).bind(STATUS_REFRESH_LIMIT).all();
+  } catch (error) {
+    return { ok: false, code: 'BOOK_ORDER_STATUS_DB', checked: 0, updated: 0 };
+  }
+  const rows = (result.results || []).filter(row => safeProviderId(row.provider_message_id));
+  let checked = 0;
+  let updated = 0;
+  let providerErrors = 0;
+  for (let start = 0; start < rows.length; start += STATUS_REFRESH_CHUNK_SIZE) {
+    const chunk = rows.slice(start, start + STATUS_REFRESH_CHUNK_SIZE);
+    const messages = await fetchProviderStatuses(config, chunk.map(row => String(row.provider_message_id)));
+    if (!messages) { providerErrors += 1; continue; }
+    for (const row of chunk) {
+      const messageId = String(row.provider_message_id);
+      const message = messages.get(messageId);
+      const age = Math.max(0, now - Number(row.created_at || 0));
+      const stale = String(row.provider_status_code) === '2000'
+        ? age >= QUEUED_STATUS_MAX_AGE_MS
+        : age >= CARRIER_STATUS_MAX_AGE_MS;
+      if (!message) {
+        if (stale) {
+          checked += 1;
+          updated += await updateProviderStatusCas(
+            env, row, 'unknown', row.provider_status_code, 'SOLAPI_STATUS_STALE_' + row.provider_status_code
+          );
+        }
+        continue;
+      }
+      const groupId = safeProviderId(message.groupId);
+      if (row.provider_group_id && groupId !== String(row.provider_group_id)) continue;
+      const outcome = providerStatusRefreshOutcome(message.statusCode);
+      if (!outcome) continue;
+      checked += 1;
+      if (String(row.provider_status_code) === '3000' && outcome.statusCode === '2000') {
+        if (age >= CARRIER_STATUS_MAX_AGE_MS) {
+          updated += await updateProviderStatusCas(env, row, 'unknown', '3000', 'SOLAPI_STATUS_STALE_3000');
+        }
+        continue;
+      }
+      const outcomeStale = outcome.statusCode === '2000'
+        ? age >= QUEUED_STATUS_MAX_AGE_MS
+        : outcome.statusCode === '3000' && age >= CARRIER_STATUS_MAX_AGE_MS;
+      if (outcomeStale) {
+        updated += await updateProviderStatusCas(
+          env, row, 'unknown', outcome.statusCode, 'SOLAPI_STATUS_STALE_' + outcome.statusCode
+        );
+        continue;
+      }
+      if (outcome.statusCode === String(row.provider_status_code) && outcome.status === String(row.status)) continue;
+      updated += await updateProviderStatusCas(env, row, outcome.status, outcome.statusCode, outcome.errorCode);
+    }
+  }
+  return { ok: providerErrors === 0, ...(providerErrors ? { code: 'SOLAPI_STATUS_PARTIAL' } : {}),
+    checked, updated, providerErrors };
 }
 
 const scheduledJson = (obj, status) => new Response(JSON.stringify(obj), {

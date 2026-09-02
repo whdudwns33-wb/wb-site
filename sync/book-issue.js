@@ -26,6 +26,7 @@ const ORDER_DELIVERIES = new Set([
 const MAX_UNIT_PRICE = 10000000;
 const KIM_NAMGI_STAFF_ID = '84349fea-f2f0-4fc3-b32a-aaef1e466d54';
 const WORDMASTER_BASIC_TITLE = '워드마스터중등베이직';
+const MANUAL_PHONE_ORDERED_CODE = 'MANUAL_PHONE_ORDERED';
 
 function cleanReason(value) {
   const reason = String(value || '').trim();
@@ -107,9 +108,37 @@ function normalizedBookTitle(value) {
   return normalizedName(value).replace(/\s+/g, '');
 }
 
+/**
+ * Solapi의 숫자 코드는 서버 내부에만 두고, 화면에는 안전한 상태 enum만 내보낸다.
+ * 2000·3000은 주문 전달의 최종 성공이 아니며 4000만 수신 완료다.
+ */
+function bookOrderMessageDeliveryState(send) {
+  if (!send) return '';
+  if (String(send.safe_error_code || '') === MANUAL_PHONE_ORDERED_CODE) return 'phone_ordered';
+  const code = String(send.provider_status_code || '');
+  if (String(send.status || '') === 'rejected') return /^\d{1,16}$/.test(code) ? 'failed' : '';
+  if (String(send.status || '') === 'unknown' || String(send.status || '') === 'dispatching' ||
+      String(send.status || '') === 'reserved') return 'unknown';
+  if (code === '2000') return 'provider_queued';
+  if (code === '3000') return 'carrier_processing';
+  if (code === '4000') return 'delivered';
+  return '';
+}
+
+function isBookOrderCompletedSend(send) {
+  if (!send) return false;
+  const deliveryState = bookOrderMessageDeliveryState(send);
+  if (deliveryState === 'phone_ordered') return true;
+  if (String(send.status || '') !== 'accepted') return false;
+  if (deliveryState === 'delivered') return true;
+  if (deliveryState === 'provider_queued' || deliveryState === 'carrier_processing' || deliveryState === 'unknown') return false;
+  // provider code가 없는 기존 이력과 온라인 직접 주문은 예전 완료 판정을 유지한다.
+  return true;
+}
+
 function canSetLegacyOrderPrice(owner, item, send, fulfillment, integrity, storedPrice) {
   if (String(owner || '') !== KIM_NAMGI_STAFF_ID || orderUnitPrice(item) !== null || storedPrice !== null || integrity) return false;
-  if (!send || String(send.status) !== 'accepted') return false;
+  if (!isBookOrderCompletedSend(send)) return false;
   if (fulfillment && ['student_handed', 'academy_registered'].includes(String(fulfillment.status))) return true;
   return !fulfillment && normalizedBookTitle(item && item.title) === WORDMASTER_BASIC_TITLE;
 }
@@ -148,7 +177,9 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
   const immediateReceipt = IMMEDIATE_RECEIPT_DELIVERIES.has(String(orderDelivery || ''));
   const studentIds = orderStudentIds(item);
   const unitPrice = storedOrderUnitPrice(item, priceRow, correctionRow);
-  let stage = !send ? 'order_waiting' : send.status === 'accepted' ? 'ordered'
+  const messageDeliveryState = bookOrderMessageDeliveryState(send);
+  const orderCompleted = isBookOrderCompletedSend(send);
+  let stage = !send ? 'order_waiting' : orderCompleted ? 'ordered'
     : send.status === 'rejected' ? 'order_failed' : 'order_check';
   if (row && !integrity) {
     if (row.status === 'teacher_received') stage = 'teacher_received';
@@ -165,11 +196,13 @@ function publicOrderFulfillment(taskId, itemIndex, item, vendorName, owner, teac
     priceCorrectedAt: correctionRow && correctionRow.created_at ? Number(correctionRow.created_at) : null,
     canSetUnitPrice: canSetLegacyOrderPrice(owner, item, send, row, integrity, unitPrice),
     owner: owner || null, teacherName: teacherName || (owner ? '담당 미지정' : '관리자'),
-    students, sendStatus: send ? String(send.status) : immediateReceipt ? 'accepted' : 'waiting', stage,
+    students, sendStatus: send ? String(send.status) : immediateReceipt ? 'accepted' : 'waiting',
+    messageDeliveryState, stage,
     taskUpdatedAt: Number(taskUpdatedAt) || 0,
     orderRequestedAt: Number(taskCreatedAt) || Number(taskUpdatedAt) || null,
     orderCompletedAt: immediateReceipt ? Number(taskCreatedAt) || Number(taskUpdatedAt) || null
-      : send && String(send.status) === 'accepted' ? Number(send.updated_at || send.created_at) || null : null,
+      : orderCompleted ? Number(send.updated_at || send.created_at) || null
+        : row ? Number(row.teacher_received_at || row.created_at || row.updated_at) || null : null,
     needsStudentLink: !!needsStudentLink,
     canLinkStudents: !!canLinkStudents,
     revision: row ? Number(row.revision) : 0,
@@ -230,7 +263,7 @@ async function listOrderFulfillments(env, app, auth, document) {
     const cancelledIndexes = cancelledOrderItemIndexes(itemCancellationResult.results || [], taskRow.id);
     const send = sendByTask.get(String(taskRow.id)) || null;
     const immediateReceipt = IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || ''));
-    const accepted = immediateReceipt || (!!send && String(send.status) === 'accepted');
+    const accepted = immediateReceipt || isBookOrderCompletedSend(send);
     const sealedIdentity = await verifyOrderTaskSnapshotRows(
       String(taskRow.id), taskRow.owner, task, snapshotResult.results || [], document, Date.now(),
       !accepted, cancelledIndexes
@@ -250,7 +283,7 @@ async function listOrderFulfillments(env, app, auth, document) {
       const integrity = cancelled ? '' : sealedIdentity.sealed && !sealedIdentity.valid ? 'identity_mismatch' :
         invalidSelection ? 'student_invalid' : unauthorized ? 'student_scope' : missing ? 'student_missing' : identityMismatch ? 'identity_mismatch' : '';
       const needsStudentLink = !cancelled && (!String(item.bookId || '') || !studentIds.length || invalidSelection || unauthorized || missing);
-      const canLinkStudents = !cancelled && !integrity && !fulfillment && !!send && String(send.status) === 'accepted' && needsStudentLink;
+      const canLinkStudents = !cancelled && !integrity && !fulfillment && isBookOrderCompletedSend(send) && needsStudentLink;
       const students = integrity || cancelled ? [] : studentIds.map(id => studentsById.get(id)).filter(Boolean).map(student => ({
         id: String(student.id), name: String(student.name || '이름 미입력'),
         school: String(student.school || ''), grade: String(student.grade || '')
@@ -367,7 +400,7 @@ async function linkOrderStudents(env, app, body, auth, json, origin) {
     return json({ ok: false, code: 'ORDER_ALREADY_RECEIVED', error: '이미 수령 처리가 시작된 주문의 학생 연결은 변경할 수 없습니다' }, 409, origin);
   }
   const send = await latestOrderSend(env, app, taskId);
-  if (!send || String(send.status) !== 'accepted') {
+  if (!isBookOrderCompletedSend(send)) {
     return json({ ok: false, code: 'ORDER_NOT_ACCEPTED', error: '주문완료가 확인된 교재만 학생을 연결할 수 있습니다' }, 409, origin);
   }
 
@@ -722,7 +755,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
 
   const send = await latestOrderSend(env, app, taskId);
   const accepted = IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || '')) ||
-    (!!send && String(send.status) === 'accepted');
+    isBookOrderCompletedSend(send);
   const snapshots = await loadOrderSnapshotRows(env, app, taskId);
   const sealedIdentity = await verifyOrderTaskSnapshotRows(
     taskId, taskRow.owner, task, snapshots, document, Date.now(), !accepted
@@ -748,7 +781,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
       (row.status === 'student_handed' && next !== 'academy_register') || row.status === 'academy_registered')) {
     return json({ ok: false, code: 'INVALID_TRANSITION', error: '현재 상태에서는 요청한 변경을 할 수 없습니다' }, 409, origin);
   }
-  if (!accepted) {
+  if (!accepted && !row) {
     return json({ ok: false, code: 'ORDER_NOT_ACCEPTED', error: '주문완료가 확인된 뒤 수령·배부 처리할 수 있습니다' }, 409, origin);
   }
   const now = Date.now();
