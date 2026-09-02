@@ -117,6 +117,9 @@
     .day7 i{width:26px;height:26px;border-radius:999px;background:#e4edf1}
     .day7 i.on{background:var(--ok)}
     .note{margin-top:10px;padding:10px 12px;border-radius:11px;background:#fff4e6;color:#7a4308;font-size:12.5px;line-height:1.6}
+    .linkwarn{border-left:4px solid var(--warn)}
+    .linkwarn.strong{border-left-color:var(--coral);background:#fff8f6}
+    .linkwarn .sub{margin:0 0 10px}
     .vlist .grow .t b{font-size:15.5px;color:var(--navy)}
     /* 어휘장 한 줄 — 뜻은 늘 보이고, 누르면 아래로 편집칸이 열린다 */
     .vrow{border-top:1px solid var(--line)}
@@ -388,14 +391,20 @@ let deferredPrompt=null; // PWA 설치 프롬프트
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
 function normalizeState(s){
+  /* 기본 그릇 — 하나라도 없으면 렌더 도중 터지고, 학생 눈에는 "기록이 다 사라졌다"로 보인다.
+     새 상태 리터럴에만 있으면 안 된다. 서버에서 받아 온 상태(syncPull)와 예전 판이 저장해
+     둔 상태가 이 함수를 그대로 지나가기 때문이다. 실제로 그렇게 한 번 터졌다. */
+  const OBJ=['readings','scraps','quiz','days','daily','mychunks'];
+  OBJ.forEach(k=>{if(!s[k]||typeof s[k]!=='object'||Array.isArray(s[k]))s[k]={};});
+  const ARR=['vocab','reports','train','redbook','speed','wrong'];
+  ARR.forEach(k=>{if(!Array.isArray(s[k]))s[k]=[];});
+  if(!('profile' in s))s.profile=null;
+  if(!('diag' in s))s.diag=null;
   s.prefs=s.prefs||{};
   s.prefs.chunk=s.prefs.chunk||{L2:true,L3:false,L4:false};
   s.prefs.en=s.prefs.en||{L2:0,L3:0,L4:0};
   if(s.prefs.en.L2==null)s.prefs.en.L2=0;
   ['L2','L3','L4'].forEach(l=>{if(typeof s.prefs.en[l]==='boolean')s.prefs.en[l]=s.prefs.en[l]?1:0;});
-  s.train=s.train||[];
-  s.redbook=s.redbook||[];
-  s.reports=s.reports||[];
   if(!('lab' in s))s.lab=null;
   s.prefs.auto=s.prefs.auto||{speed:2,scope:0};
   s.prefs.type=s.prefs.type||{font:'sans',fs:null,lh:null};
@@ -403,9 +412,6 @@ function normalizeState(s){
   if(s.prefs.type.lh===1.9&&!s.prefs.type.lhSet)s.prefs.type.lh=null;
   /* 속도 단계가 4→5로 늘어, 예전에 저장된 값을 같은 체감 속도로 옮긴다 */
   if(!s.prefs.auto.v5){s.prefs.auto.speed=[1,2,3,4][s.prefs.auto.speed]!=null?[1,2,3,4][s.prefs.auto.speed]:2;s.prefs.auto.v5=true;}
-  s.mychunks=s.mychunks||{};
-  s.speed=s.speed||[];
-  s.wrong=s.wrong||[];
   if(!('lvhint' in s))s.lvhint=null;
   (s.vocab||[]).forEach(v=>{if(v.box==null)v.box=0;if(!v.last)v.last=v.addedAt||dkey();});
   return s;
@@ -669,7 +675,24 @@ function syncRequest(code){
 function finishSync(j){
   SYNC.auth={code:j.student.code,name:j.student.name,token:j.token,lastSync:null};
   syncSaveAuth();sess.pend=null;sess.syncErr=null;sess.syncCode=null;pendStop();
-  return syncPull(true).then(()=>syncPush()).then(()=>{render();announce('선생님 연동 완료');});
+  return syncPull(true).then(()=>syncPush()).then(()=>{
+    /* 연동 순간 서버에 있던 기록을 받아 온다. 전에 쓰던 학생이면 프로필까지
+       돌아오므로 학년을 다시 물을 이유가 없다 — 곧장 하던 자리로 보낸다. */
+    if(view.name==='onboard'){
+      if(S.profile){
+        /* 새 기기에서 연동하면 여기서 프로필이 처음 생긴다. 부팅 때는 프로필이 없어
+           학년별 글 파일을 안 받아 왔으므로, 홈으로 보내기 전에 먼저 받아야 한다.
+           안 그러면 DB.articles 가 없어 홈을 그리다 터진다. */
+        sess.ob=null;
+        return loadLevel(S.profile.level)
+          .then(()=>{announce('전에 하던 기록을 불러왔어요');go('home');})
+          .catch(()=>{announce('기록은 불러왔는데 글을 받지 못했어요. 새로 고침해 주세요');});
+      }
+      if(sess.ob)sess.ob.step='grade';
+      render();announce('연동됐어요 — 이제 학년을 골라 주세요');return;
+    }
+    render();announce('선생님 연동 완료');
+  });
 }
 function syncPoll(loud){
   if(!sess.pend)return;
@@ -691,7 +714,26 @@ function consumeCodeLink(){
 
 /* ───────────────────────── 온보딩 ───────────────────────── */
 function vOnboard(){
-  const st=sess.ob||(sess.ob={step:'grade',grade:null,interests:[],diag:null});
+  /* 첫 걸음은 학생 코드다. 여기서 연동해 두면 기록이 서버에 함께 남아
+     기기를 바꾸거나 브라우저가 저장소를 비워도 이어서 할 수 있다.
+     연동 없이 시작하면 이 브라우저 하나에만 남는다 — 실제로 체험 학생이
+     그렇게 활동 기록을 통째로 잃은 것처럼 보인 일이 있었다.
+     서버에 닿지 않는 주소(미러·정적 배포)에서는 물어볼 것이 없으니 건너뛴다. */
+  const st=sess.ob||(sess.ob={step:SYNC.avail?'link':'grade',grade:null,interests:[],diag:null});
+  if(st.step==='link'&&!SYNC.avail)st.step='grade';
+  if(st.step==='link'){
+    return `<div class="card hero"><p class="eyebrow">시작하기</p><h1>학생 코드가 있나요?</h1>
+      ${sess.pend?`<p class="sub" style="margin-top:9px"><b>${esc(sess.pend.name||'')}</b> — 선생님 승인을 기다리는 중이에요.</p>
+        <div class="note">선생님이 관리 화면에서 <b>승인</b>을 눌러 주시면 바로 연결됩니다. 옆에 계시면 지금 말씀드리세요.</div>
+        <div class="row2"><button class="btn sm ghost" data-act="sync-cancel">취소</button>
+        <button class="btn sm" data-act="sync-check">지금 확인</button></div>`
+      :`<p class="sub">선생님께 받은 코드를 넣으면 <b>기록이 학원 서버에도 저장돼요.</b> 휴대폰을 바꾸거나 앱을 지웠다가 다시 깔아도 읽은 글과 심은 낱말이 그대로 이어집니다. 전에 쓰던 코드라면 하던 데서 바로 이어서 해요.</p>
+        <input type="text" id="obCode" placeholder="학생 코드 (예: wb-a2b3c4)" value="${esc(sess.syncCode||'')}" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="btn" data-act="ob-link">연동하고 시작하기</button>
+        <button class="btn ghost sm" data-act="ob-skip-link">코드 없이 둘러보기</button>
+        <p class="note">코드 없이 시작하면 이 기기 브라우저에만 저장돼요. 나중에 설정에서 연동할 수 있지만, 그 전에 브라우저 기록을 지우면 되살릴 수 없어요.</p>`}
+      ${sess.syncErr?`<p class="note">${esc(sess.syncErr)}</p>`:''}</div>`;
+  }
   if(st.step==='grade'){
     const groups=[['유치·초등 저학년',['k7','e1','e2']],['초등',['e3','e4','e5','e6']],['중등',['m1','m2','m3']],['고등',['h1','h2','h3']]];
     return `<div class="card hero"><div class="obdots"><i class="on"></i><i></i><i></i></div><p class="eyebrow">시작하기 1/3</p><h1>몇 학년인가요?</h1>
@@ -749,9 +791,7 @@ async function finishOnboard(levelOverride){
   S.profile={grade:st.grade,level:lv,interests:st.interests.slice(0,lv==='L1'?4:3),createdAt:dkey()};
   if(st.diagQ)S.diag={score:st.diagQ.correct,total:4,at:dkey(),level:lv};
   save();
-  const lc=sess.linkCode;                       /* QR로 들어왔다면 온보딩 뒤에 이어서 연동 */
   go('home');
-  if(lc&&SYNC.avail&&!SYNC.auth){go('settings');syncRequest(lc);}
 }
 
 /* ───────────────────────── 홈 ───────────────────────── */
@@ -811,7 +851,16 @@ function vHome(){
       <p class="sub">글을 덮은 채로 요약해 보세요. 시간이 지난 뒤 끄집어내는 것이 가장 오래 남아요. (5분)</p>
       <button class="btn sm" data-act="rb-new" data-id="${d.id}">요약 쓰기</button>
       ${due.length>1?`<p class="sub" style="margin-top:8px">요약을 기다리는 글이 ${due.length}편 있어요.</p>`:''}</div>`;})():'';
-  return `${greet}${missionCard}${rbCard}${sugCard}
+  /* 연동 안내 — 미연동이면 기록이 이 브라우저 하나에만 있다. 브라우저가 저장소를
+     비우거나 기기를 바꾸면 되살릴 길이 없다. 쌓인 것이 많을수록 강하게 알린다. */
+  const linkCard=(SYNC.avail&&!SYNC.auth)?(()=>{
+    const n=activityScore(S);
+    if(n===0)return `<div class="card linkwarn"><p class="sub"><b>선생님 연동을 아직 안 했어요.</b> 학생 코드를 넣으면 기록이 학원 서버에도 저장돼요.</p>
+      <button class="btn ghost sm" data-act="go-settings">코드 넣기</button></div>`;
+    return `<div class="card linkwarn strong"><p class="sub"><b>지금 기록은 이 기기에만 저장돼요.</b> 휴대폰을 바꾸거나 브라우저 기록을 지우면 지금까지 읽은 글과 모은 어휘가 사라져요. 학생 코드를 넣으면 학원 서버에도 함께 저장돼 어디서 열어도 이어집니다.</p>
+      <button class="btn sm" data-act="go-settings">학생 코드 넣기</button></div>`;
+  })():'';
+  return `${greet}${linkCard}${missionCard}${rbCard}${sugCard}
     <div class="card"><div class="weekhead"><h3>이번 주 읽기</h3><span class="tag muted">${weekCount()}/7일</span></div>
       <div class="weekdots">${weekDots()}</div></div>
     <div class="card"><div class="stat-grid">
@@ -1388,6 +1437,7 @@ function vTrain(){
     <button class="btn sm" data-act="vs-start" ${due.length?'':'disabled'}>복습 시작</button></div>
   <div class="card"><div class="thead"><span class="tico t">字</span><div class="t-main"><h2 style="font-size:16px">한자 카드</h2>
     <p class="sub" style="margin-top:2px">한자 1개 → 낱말 여러 개. 카드로 넘기며 익혀요</p></div><span class="tag muted">${hj.length}묶음</span></div>
+    <p class="note">이 한자들은 <b>급수 시험 교재에서 뽑은 게 아니라, 읽은 글에 실제로 나온 낱말에서 모은 것</b>이에요. 그래서 같은 학년이어도 읽은 글에 따라 묶음이 달라져요. 초등학교에는 한자 교과가 따로 없고(국어과 어휘 학습의 일부예요), 교육부 「교육용 기초한자」 1,800자는 중·고등학교용이라 초등 기준으로 쓰기 어렵습니다.</p>
     <button class="btn sm" data-act="hj-start" data-i="0" ${hj.length?'':'disabled'}>${hj.length?'카드 학습 시작 ('+hj.length+'장)':'어휘가 쌓이면 열려요'}</button>
     <div class="glist">${hj.length?hj.slice(0,8).map((f,i)=>`<button class="grow" data-act="hj-start" data-i="${i}">
         <span class="hj-char">${esc(f.ch)}</span>
@@ -2109,6 +2159,7 @@ document.addEventListener('click',e=>{
   else if(act==='scrap-quick'){S.scraps[t.dataset.id]={date:dkey(),note:''};save();render();}
   else if(act==='lib-tab'){view.tab=t.dataset.v;sess={};render();}
   else if(act==='go-lib'){view={name:'library',tab:t.dataset.tab};sess={};render();}
+  else if(act==='go-settings'){go('settings');}
   else if(act==='vocab-toggle'){
     /* 편집칸은 한 번에 하나만 연다 — 여러 칸이 열려 있으면 어느 것을 고치는지 흐려진다 */
     const i=t.dataset.i,was=sess['vopen'+i];
@@ -2150,6 +2201,8 @@ document.addEventListener('click',e=>{
   else if(act==='set-int'){toggleInterest(S.profile.interests,t.dataset.v,S.profile.level,true);save();render({keep:true});}
   else if(act==='pwa-install'){if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;render();});}}
   else if(act==='sync-login'){syncRequest(($('#syncCode')||{}).value||'');}
+  else if(act==='ob-link'){syncRequest(($('#obCode')||{}).value||'');}
+  else if(act==='ob-skip-link'){sess.syncErr=null;sess.ob.step='grade';render();}
   else if(act==='sync-check'){syncPoll(true);}
   else if(act==='sync-cancel'){sess.pend=null;pendStop();sess.syncErr=null;render();}
   else if(act==='sync-now'){syncPush().then(()=>syncPull()).then(()=>{render();announce('동기화 완료');});}
@@ -2402,9 +2455,11 @@ function dataError(){
      뒤로 가기를 누르면 (앞에 아무것도 없을 때) 앱이 정상으로 닫힌다 */
   navSet(view,true);
   render();
-  /* QR로 들어왔고 아직 연동 전이면 곧바로 요청을 건다 */
+  /* QR로 들어왔고 아직 연동 전이면 곧바로 요청을 건다.
+     처음 온 학생은 온보딩 첫 걸음이 이미 연동 화면이라 거기서 바로 건다 —
+     학년부터 물은 뒤 연동하면, 전에 쓰던 학생에게 학년을 두 번 묻게 된다. */
   if(linkCode&&SYNC.avail&&!SYNC.auth){
-    if(!S.profile){announce('먼저 학년을 정한 뒤 연동할게요');sess.linkCode=linkCode;}
+    if(!S.profile){sess.syncCode=linkCode;render();syncRequest(linkCode);}
     else{go('settings');syncRequest(linkCode);}
   }
 })();

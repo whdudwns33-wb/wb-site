@@ -231,6 +231,37 @@ hanjaRd.forEach((seen, ch) => {
   E(`한자 "${ch}" 의 훈음이 지문마다 다릅니다 — 하나로 통일하세요\n        ${where}`);
 });
 
+/* ── 끊어 읽기 조각이 너무 길지 않은가 ──
+   규격서(docs/의미단위-끊어읽기-규격.md) 2장: 「8어절이 넘으면 거의 항상 두 개로
+   쪼갤 자리가 있다」. 넘는 조각은 학생이 한 호흡에 삼켜야 하는 덩어리라
+   끊어 읽기의 목적이 무너진다. 2026-09-02 전수 점검에서 133개가 나왔다 —
+   8-31에 한꺼번에 쓴 17편이 나머지보다 1.5~2어절 길게 끊겨 있었다.
+   고치는 중이라 아직 오류가 아니라 경고다. 0이 되면 E 로 올린다. */
+{
+  const LONG = 8;
+  const byArt = new Map();
+  let total = 0;
+  db.articles.forEach(a => {
+    Object.entries(a.levels || {}).forEach(([lv, b]) => {
+      (b.paragraphs || []).forEach(p => {
+        if (!Array.isArray(p)) return;
+        p.forEach(seg => {
+          const n = (seg.match(/\S+\s*/g) || []).length;
+          if (n <= LONG) return;
+          total += 1;
+          const k = `${a.id}/${lv}`;
+          byArt.set(k, (byArt.get(k) || 0) + 1);
+        });
+      });
+    });
+  });
+  if (total) {
+    const worst = [...byArt].sort((x, y) => y[1] - x[1]).slice(0, 8)
+      .map(([k, n]) => `${k} ${n}개`).join(' · ');
+    W(`${LONG}어절이 넘는 끊어 읽기 조각 ${total}개 — 규격서 2장은 쪼개라고 합니다\n        많은 순: ${worst}`);
+  }
+}
+
 warns.forEach(w => console.log('WARN:', w));
 if (errors.length) {
   errors.forEach(e => console.error('ERROR:', e));
