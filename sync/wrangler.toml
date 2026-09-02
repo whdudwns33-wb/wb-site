@@ -11,6 +11,10 @@ WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"
 # 연락처는 보관하되 보호자 대상 발송·웹앱 접근·응답은 운영에서 일괄 중지한다.
 # 선생님의 숙제·준비물 입력은 내부 수업 기록과 학생 앱 공개용으로 계속 저장한다.
 WB_GUARDIAN_CONTACT_ENABLED = "false"
+# 기존 보호자 웹앱·공지·운영 알림은 계속 중지한 채, 수업 피드백만 전체 학생에게
+# 허용한다. guardian_contacts_by_student 행이 없는 학생만 비공개 roster의 모→부
+# 연락처를 보완 수신번호로 사용한다.
+WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED = "true"
 # 아카등록 완료된 최초 고유 일반 교재만 Grok web_search로 검증한다.
 # true가 아니거나 AI binding을 사용할 수 없으면 주문 입력값을 그대로 카탈로그에 보존한다.
 WB_BOOK_CATALOG_WEB_SEARCH_ENABLED = "true"

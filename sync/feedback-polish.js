@@ -188,11 +188,6 @@ function restoreStudentMarkersAsGeneric(value) {
   return restored.split(STUDENT_MARKER).join('학생');
 }
 
-const GENERIC_STUDENT_PARTICLES = Object.freeze([
-  '에게서', '한테서', '에게', '한테', '처럼', '보다', '까지', '부터',
-  '으로', '은', '는', '이', '가', '의', '을', '를', '과', '와', '도', '로', '랑', '만'
-]);
-
 function feedbackStudentNameForm(studentName, particle) {
   const givenName = koreanStudentGivenName(studentName);
   const normalized = oneLine(givenName);
@@ -217,21 +212,21 @@ function feedbackStudentNameForm(studentName, particle) {
 }
 
 function feedbackNeutralOpening(studentName) {
-  const possessive = feedbackStudentNameForm(studentName, '의');
-  return possessive ? possessive + ' 오늘 수업에서 확인한 내용을 정리했습니다.' : '';
+  const topic = feedbackStudentNameForm(studentName, '는');
+  return topic ? topic + ' 오늘 수업에서' : '';
 }
 
-/** 선두의 generic 학생 표현은 같은 조사 의미의 이름형으로 바꾸고, 표현이 없으면
- *  행위자를 바꾸지 않는 중립적인 소유격 안내 문장만 앞에 붙인다. */
+/** AI가 어떤 도입 표현을 반환하더라도 최종 코멘트는 이름 주어 + "오늘 수업에서"로
+ *  한 번만 시작한다. 한글 한 글자와 비한글 이름은 "학생은" 형식을 사용한다. */
 export function prefixFeedbackStudentSubject(value, studentName) {
-  const genericBody = oneLine(restoreStudentMarkersAsGeneric(value))
-    .replace(/^학생\s+/, '');
-  const particlePattern = GENERIC_STUDENT_PARTICLES.map(escapeRegExp).join('|');
-  const leading = genericBody.match(new RegExp('^학생(' + particlePattern + ')(?=$|\\s)', 'u'));
-  if (leading) {
-    const nameForm = feedbackStudentNameForm(studentName, leading[1]);
-    return oneLine(nameForm + genericBody.slice(leading[0].length));
-  }
+  let genericBody = oneLine(restoreStudentMarkersAsGeneric(value));
+  genericBody = genericBody
+    .replace(/^오늘(?:의)?\s*수업(?:에서는|에서|중에는|중에|중)?\s*/u, '')
+    .replace(/^오늘\s+/u, '')
+    .replace(/^학생(?:\s*(?:은|는|이|가|의)(?=$|\s)|(?=$|\s))\s*/u, '')
+    .replace(/^오늘(?:의)?\s*수업(?:에서는|에서|중에는|중에|중)?\s*/u, '')
+    .replace(/^오늘\s+/u, '')
+    .trim();
   const opening = feedbackNeutralOpening(studentName);
   return oneLine(opening + (genericBody ? ' ' + genericBody : ''));
 }

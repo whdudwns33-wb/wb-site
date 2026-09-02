@@ -95,7 +95,7 @@ test('AI 다듬기는 학생 이름을 마스킹하고 코멘트 외 수업·인
   const result = await call(db, validBody(), { AI });
   assert.equal(result.status, 200);
   assert.equal(result.body.ok, true);
-  assert.match(result.body.commentText, /민우는 오늘 3개 문제/);
+  assert.match(result.body.commentText, /^민우는 오늘 수업에서 3개 문제/);
   assert.ok(result.body.commentText.length <= result.body.maxChars);
   assert.equal(model, '@cf/meta/llama-3.1-8b-instruct-fast');
   assert.equal(input.prompt, undefined, '단일 prompt 호출은 실제 모델이 지시문을 되풀이하게 만들 수 있다');
@@ -210,59 +210,43 @@ test('학생 마커는 누락되어도 허용하고 원문보다 늘어난 경�
   assert.equal(result.status, 200);
   assert.equal(result.body.ok, true);
   assert.match(result.body.commentText,
-    /^민우의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 3개 문제/);
+    /^민우는 오늘 수업에서 3개 문제/);
   assert.equal(result.body.commentText.match(/민우/g)?.length, 1);
   assert.doesNotMatch(result.body.commentText, /__WB_STUDENT__/);
 });
 
-test('검증 후 이름은 leading 학생 조사를 보존하고 없으면 중립 소유격 안내를 한 번 붙인다', () => {
-  for (const [studentName, topic, possessive] of [
-    ['김민우', '민우는', '민우의'],
-    ['김민준', '민준이는', '민준이의'],
-    ['김수', '수 학생은', '수 학생의'],
-    ['황보민준', '민준이는', '민준이의'],
-    ['Alex', 'Alex 학생은', 'Alex 학생의']
+test('검증 후 이름은 받침·한 글자·비한글에 맞는 주어로 오늘 수업 문장 맨 앞에 한 번 붙인다', () => {
+  for (const [studentName, topic] of [
+    ['김민우', '민우는'],
+    ['김민준', '민준이는'],
+    ['김수', '수 학생은'],
+    ['황보민준', '민준이는'],
+    ['Alex', 'Alex 학생은']
   ]) {
-    const cases = [
-      ['오늘 3개 문제를 차분하게 확인했습니다.',
-        possessive + ' 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 3개 문제'],
-      ['__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다.', topic + ' 오늘 3개 문제'],
-      ['오늘 3개 문제를 확인했고 __WB_STUDENT__는 풀이를 다시 살펴보았습니다.',
-        possessive + ' 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 3개 문제']
-    ];
-    for (const [value, expectedStart] of cases) {
+    for (const value of [
+      '오늘 3개 문제를 차분하게 확인했습니다.',
+      '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다.',
+      '오늘 3개 문제를 확인했고 __WB_STUDENT__는 풀이를 다시 살펴보았습니다.'
+    ]) {
       const result = prefixFeedbackStudentSubject(value, studentName);
       const givenName = koreanStudentGivenName(studentName);
-      assert.ok(result.startsWith(expectedStart), studentName + ': ' + value);
+      assert.ok(result.startsWith(topic + ' 오늘 수업에서 '), studentName + ': ' + value);
       const identityCount = givenName.length === 1
         ? result.split(givenName + ' 학생').length - 1 : result.split(givenName).length - 1;
       assert.equal(identityCount, 1, studentName + ': ' + value);
       assert.doesNotMatch(result, /__WB_STUDENT__/);
+      assert.doesNotMatch(result, /오늘 수업에서 오늘/);
       if (value.includes('확인했고 __WB_STUDENT__')) assert.match(result, /확인했고 학생은 풀이를/);
     }
   }
-  for (const [source, expected] of [
-    ['학생은 오늘 차분하게 학습했습니다.', '민우는 오늘 차분하게 학습했습니다.'],
-    ['학생이 오늘 차분하게 학습했습니다.', '민우가 오늘 차분하게 학습했습니다.'],
-    ['학생의 오늘 태도가 안정적이었습니다.', '민우의 오늘 태도가 안정적이었습니다.'],
-    ['학생에게 숙제를 안내했습니다.', '민우에게 숙제를 안내했습니다.'],
-    ['학생을 격려했습니다.', '민우를 격려했습니다.'],
-    ['학생과 풀이를 확인했습니다.', '민우와 풀이를 확인했습니다.'],
-    ['학생도 끝까지 참여했습니다.', '민우도 끝까지 참여했습니다.'],
-    ['학생으로 역할을 정했습니다.', '민우로 역할을 정했습니다.']
-  ]) assert.equal(prefixFeedbackStudentSubject(source, '김민우'), expected);
-  assert.equal(prefixFeedbackStudentSubject('학생에게 숙제를 안내했습니다.', '김민준'),
-    '민준이에게 숙제를 안내했습니다.');
-  assert.equal(prefixFeedbackStudentSubject('학생에게 숙제를 안내했습니다.', '김수'),
-    '수 학생에게 숙제를 안내했습니다.');
   assert.equal(prefixFeedbackStudentSubject('보호자에게 숙제를 안내했습니다.', '김민우'),
-    '민우의 오늘 수업에서 확인한 내용을 정리했습니다. 보호자에게 숙제를 안내했습니다.');
+    '민우는 오늘 수업에서 보호자에게 숙제를 안내했습니다.');
 });
 
 test('문장 중간 학생 marker의 직접 조사는 자연스러운 generic 학생 조사로 복원한다', () => {
   assert.equal(
     prefixFeedbackStudentSubject('오늘 __WB_STUDENT__랑 풀이를 차분하게 확인했습니다.', '김민우'),
-    '민우의 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 학생과 풀이를 차분하게 확인했습니다.'
+    '민우는 오늘 수업에서 학생과 풀이를 차분하게 확인했습니다.'
   );
   for (const [suffix, expected] of [
     ['에게', '학생에게'], ['한테', '학생에게'], ['처럼', '학생처럼'], ['보다', '학생보다'],
@@ -270,7 +254,7 @@ test('문장 중간 학생 marker의 직접 조사는 자연스러운 generic �
   ]) {
     const result = prefixFeedbackStudentSubject(
       '오늘 __WB_STUDENT__' + suffix + ' 관련된 내용을 확인했습니다.', '김민우');
-    assert.match(result, new RegExp('오늘 ' + expected + ' 관련된 내용을'));
+    assert.match(result, new RegExp(expected + ' 관련된 내용을'));
     assert.doesNotMatch(result, /__WB_STUDENT__|학생랑|학생이으로/);
   }
 });
@@ -284,7 +268,7 @@ test('구조화 JSON 객체·JSON 문자열과 배포 전 일반 문자열 응�
   ]) {
     const result = await call(seededDb(), validBody(), { AI: { run: async () => response } });
     assert.equal(result.status, 200, JSON.stringify(response));
-    assert.match(result.body.commentText, /^민우는 오늘 3개 문제/);
+    assert.match(result.body.commentText, /^민우는 오늘 수업에서 3개 문제/);
   }
   const rejected = await call(seededDb(), validBody(), { AI: { run: async () => ({
     response: JSON.stringify({ commentText: output, extra: '노출 금지' })
@@ -309,7 +293,7 @@ test('요청 과목은 AI 글자수 예산에 반영되고 누락된 구형 요�
   assert.equal(custom.status, 200);
   assert.equal(custom.body.maxChars, legacy.body.maxChars - (customSubject.length - '국어'.length));
   assert.ok(!captured.includes(customSubject), '과목은 길이 계산에만 쓰고 모델 입력에는 보내지 않는다');
-  const longestPrefix = '민우의 오늘 수업에서 확인한 내용을 정리했습니다.';
+  const longestPrefix = '민우는 오늘 수업에서';
   assert.match(captured, new RegExp('전체 길이는 공백 포함 ' +
     (custom.body.maxChars - longestPrefix.length - 1) + '자 이하여야 합니다'));
 
@@ -354,7 +338,7 @@ test('한 글자 bare 이름은 문장 시작·경계에서만 마스킹하고 �
     });
     assert.equal(result.status, 200, commentText);
     assert.match(result.body.commentText,
-      /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 3개 문제/);
+      /^수 학생은 오늘 수업에서 3개 문제/);
   }
   assert.equal(calls, 2);
   assert.match(inputs[0], /__WB_STUDENT__ 오늘 3개 문제/);
@@ -379,7 +363,7 @@ test('한 글자 이름의 쉼표·콜론·세미콜론 호명은 AI 입력에�
     });
     assert.equal(result.status, 200, punctuation);
     assert.match(result.body.commentText,
-      /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 수업에서 3개 문제/);
+      /^수 학생은 오늘 수업에서 3개 문제/);
   }
   assert.equal(inputs.length, 3);
   for (const [index, punctuation] of [',', ':', ';'].entries()) {
@@ -407,8 +391,8 @@ test('한 글자 이름의 명시적 학생 호칭은 마스킹하고 수업 속
   assert.match(input.messages[1].content, /__WB_STUDENT__ 학생의 오늘 수업/);
   assert.ok(!aiInputText(input).includes('김수'));
   assert.ok(!aiInputText(input).includes('수 학생의'));
-  assert.match(result.body.commentText, /^수 학생의 오늘 수업/);
-  assert.equal(result.body.commentText.match(/수 학생의/g)?.length, 1);
+  assert.match(result.body.commentText, /^수 학생은 오늘 수업/);
+  assert.equal(result.body.commentText.match(/수 학생은/g)?.length, 1);
 });
 
 test('학생 전체 이름은 조사·호칭이 바로 붙어도 AI 입력에서 마스킹한다', async () => {
@@ -428,14 +412,14 @@ test('학생 전체 이름은 조사·호칭이 바로 붙어도 AI 입력에서
     assert.ok(!aiInputText(input).includes(studentName), studentName + '이 AI 입력에 남으면 안 된다');
     assert.match(aiInputText(input), new RegExp('__WB_STUDENT__' + sourceSuffix + ' 오늘 3개 문제'));
     const expectedSubject = studentName === '김민우' ? '민우는' : studentName + ' 학생은';
-    assert.match(result.body.commentText, new RegExp('^' + expectedSubject + ' 오늘 3개 문제'));
+    assert.match(result.body.commentText, new RegExp('^' + expectedSubject + ' 오늘 수업에서 3개 문제'));
   }
 });
 
-test('받침 이름의 이는·이의 보조형도 longest-first로 마스킹하고 조사 의미를 보존한다', async () => {
-  for (const [suffix, expectedStart, tail] of [
-    ['이는', '민준이는', ' 오늘 3개 문제를 차분하게 확인했습니다.'],
-    ['이의', '민준이의', ' 오늘 학습 태도와 3개 문제 풀이를 차분하게 확인했습니다.']
+test('받침 이름의 이는·이의 보조형도 longest-first로 마스킹하고 최종 주어를 통일한다', async () => {
+  for (const [suffix, tail] of [
+    ['이는', ' 오늘 3개 문제를 차분하게 확인했습니다.'],
+    ['이의', ' 오늘 학습 태도와 3개 문제 풀이를 차분하게 확인했습니다.']
   ]) {
     const db = new TestD1();
     seedTeacher(db, 'teacher-a', 'token-a', '김남기');
@@ -451,7 +435,7 @@ test('받침 이름의 이는·이의 보조형도 longest-first로 마스킹하
     assert.match(input.messages[1].content, new RegExp('__WB_STUDENT__' + suffix));
     assert.ok(!aiInputText(input).includes('김민준'));
     assert.ok(!aiInputText(input).includes('민준'));
-    assert.ok(result.body.commentText.startsWith(expectedStart + ' 오늘'));
+    assert.ok(result.body.commentText.startsWith('민준이는 오늘 수업에서 '));
     assert.equal(result.body.commentText.match(/민준/g)?.length, 1);
   }
 });
@@ -486,7 +470,7 @@ test('성 없는 이름에 호칭이 붙으면 가리고 한 글자 이름과 �
   } } });
   assert.equal(allowed.status, 200);
   assert.match(allowed.body.commentText,
-    /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 수업/);
+    /^수 학생은 오늘 수업에서 할 수 있는 3개 문제/);
   assert.match(input.messages[1].content, /수업에서는 할 수 있는 3개 문제/);
   assert.doesNotMatch(input.messages[1].content, /__WB_STUDENT__/);
   assert.equal(calls, 1, '일반 단어 속 같은 음절만으로 AI 호출을 막으면 안 된다');
@@ -500,7 +484,7 @@ test('학생 이름이 마커 문자열 일부와 같아도 잔존 이름으로 
     AI: { run: async () => ({ response: '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다.' }) }
   });
   assert.equal(result.status, 200);
-  assert.match(result.body.commentText, /^WB 학생은 오늘 3개 문제/);
+  assert.match(result.body.commentText, /^WB 학생은 오늘 수업에서 3개 문제/);
 });
 
 test('AI 결과 정규화는 학생 마커와 격식체가 있어도 코드·JSON·HTML·마크다운 흔적을 거부한다', () => {

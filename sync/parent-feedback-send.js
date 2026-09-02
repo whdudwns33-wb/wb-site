@@ -8,9 +8,10 @@
  * 나중에 등록한 경우 등)을 원장이 수동으로 재시도할 때만 쓴다.
  *
  * book-order-send.js와 같은 안전장치를 따른다:
- *   · 전화번호는 서버가 guardian_contacts(원장이 직접 입력한 보호자 연락처)에서만 찾는다 —
+ *   · 기본 수신번호는 guardian_contacts(원장이 직접 입력한 보호자 연락처)에서 찾는다.
+ *     다만 전용 전체학생 플래그가 켜지고 행 자체가 없을 때만 roster의 모→부 번호를 보완 사용한다.
  *     앱도, 자동발송 호출부도 전화번호를 직접 넘기지 않는다.
- *   · 발송 동의(consent)가 켜진 학생에게만 나간다.
+ *   · guardian_contacts 행이 있으면 동의·전화번호 규칙을 그대로 적용하며 roster로 우회하지 않는다.
  *   · 코드가 배포돼도 기본은 꺼짐 — WB_PARENT_FEEDBACK_SEND_ENABLED가 'true'여야 나간다.
  *   · 카카오 알림톡 전용 키(SOLAPI_KAKAO_API_KEY/SECRET)를 따로 써서, 교재주문·원장리포트가
  *     쓰는 기존 SOLAPI_API_KEY와 완전히 분리한다 — 문제가 생겨도 서로 영향이 없다.
@@ -21,7 +22,10 @@
  *     (막혔던 건을 원장이 수동으로 다시 시도할 때)
  */
 
-import { guardianDeliveryAllowed } from './guardian-delivery-policy.js';
+import {
+  parentFeedbackAllStudentsEnabled,
+  parentFeedbackDeliveryAllowed
+} from './guardian-delivery-policy.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
@@ -106,7 +110,7 @@ function validateRequestShape(body) {
 function sendConfiguration(env, studentId, templateVersion) {
   const templateIdValue = templateVersion === 'v2'
     ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 : env.SOLAPI_KAKAO_TEMPLATE_ID;
-  if (!guardianDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
+  if (!parentFeedbackDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
       !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
       !env.SOLAPI_KAKAO_PF_ID || !templateIdValue || !env.SOLAPI_SENDER_NUMBER) {
     return null;
@@ -134,18 +138,31 @@ export function resolveStudentName(taskData) {
   return title.replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
 }
 
-async function guardianPhone(env, app, studentId, studentName) {
+async function guardianPhone(env, app, studentId, studentName, rosterStudent) {
   const row = await env.DB.prepare(
     'SELECT student_name, phone, consent FROM guardian_contacts_by_student WHERE app=? AND student_id=? LIMIT 1'
   ).bind(app, studentId).first();
-  if (!row) return { error: 'GUARDIAN_NOT_REGISTERED' };
-  if (normalizedRosterText(row.student_name) !== normalizedRosterText(studentName)) {
-    return { error: 'GUARDIAN_IDENTITY_MISMATCH' };
+  if (row) {
+    if (normalizedRosterText(row.student_name) !== normalizedRosterText(studentName)) {
+      return { error: 'GUARDIAN_IDENTITY_MISMATCH' };
+    }
+    const phone = normalizedDigits(row.phone);
+    if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
+    if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
+    return { phone };
   }
-  const phone = normalizedDigits(row.phone);
-  if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
-  if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
-  return { phone };
+
+  // 전체 학생 피드백 전용 gate가 켜진 경우에만, 별도 보호자 연락처 행이 전혀 없는
+  // 학생을 현재 비공개 roster의 모→부 연락처 순서로 보완한다. 빈 행이나 동의 off 행은
+  // 명시적인 운영 선택이므로 roster 번호로 우회하지 않는다.
+  if (!parentFeedbackAllStudentsEnabled(env) || !rosterStudent ||
+      String(rosterStudent.id || '') !== studentId ||
+      normalizedRosterText(rosterStudent.name) !== normalizedRosterText(studentName)) {
+    return { error: 'GUARDIAN_NOT_REGISTERED' };
+  }
+  const phone = [rosterStudent.phoneMother, rosterStudent.phoneFather]
+    .map(normalizedDigits).find(value => /^01[016789]\d{7,8}$/.test(value));
+  return phone ? { phone } : { error: 'GUARDIAN_PHONE_MISSING' };
 }
 
 function normalizedRosterText(value) {
@@ -186,7 +203,7 @@ async function verifyFeedbackStudent(env, app, studentId, studentName, owner, ta
   if (!lesson || String(task.id || '') !== String(taskId) ||
       String(taskRow.owner || '') !== String(owner) || String(task.staffId || '') !== String(owner) ||
       String(task.studentId || '') !== studentId) return { error: 'STUDENT_OWNER_MISMATCH' };
-  return { studentId };
+  return { studentId, student };
 }
 
 /** 항목별 변수 값을 다듬는다 — 앞뒤 공백 제거, 지나치게 길면 잘라내지 않고 거부하도록
@@ -372,7 +389,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: verifiedStudent.error, status: 'content_approved_send_blocked' };
   }
 
-  const guardian = await guardianPhone(env, app, verifiedStudent.studentId, studentName);
+  const guardian = await guardianPhone(
+    env, app, verifiedStudent.studentId, studentName, verifiedStudent.student
+  );
   if (guardian.error) {
     const note = guardian.error === 'GUARDIAN_CONSENT_MISSING'
       ? '보호자의 발송 동의가 켜져 있지 않아 발송하지 못했습니다'

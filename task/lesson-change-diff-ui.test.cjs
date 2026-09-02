@@ -61,7 +61,7 @@ test('취소된 피드백은 관리자 검토와 선생님 발송 상태의 활�
   const ownFeedbackView = source.slice(source.indexOf('function viewOwnFeedbackRequests()'), source.indexOf('function feedbackQueueCard('));
   const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
   assert.match(ownFeedbackView, /ownFeedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
-  assert.match(ownFeedbackView, /visibleOwnQueue\.map\(ownFeedbackCard\)/);
+  assert.match(ownFeedbackView, /feedbackSortRows\(visibleOwnQueue, false\)\.map\(ownFeedbackCard\)/);
   assert.match(feedbackView, /feedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
 });
 
