@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
+import { handleNaesin } from './naesin-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -50,6 +51,22 @@ const vocabStore = {
   getArena: (k) => (db.vocab.arena || {})[k] || null,
   putArena: (k, rec) => { db.vocab.arena = db.vocab.arena || {}; db.vocab.arena[k] = rec; persist(); },
 };
+/* 내신 저장소 어댑터 — db.naesin만 사용 (vocab과 같은 분리 가능한 격리).
+   옛 db.json에는 naesin 칸이 없으므로 첫 접근 때 만들어 준다 — store.mjs를 고치지 않기 위해. */
+const naesinRoot = () => (db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} });
+const naesinStore = {
+  getPack: (id) => naesinRoot().packs[id] || null,
+  putPack: (id, rec) => { naesinRoot().packs[id] = rec; persist(); },
+  getPackIds: () => naesinRoot().packIds || null,
+  putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
+  getState: (c) => naesinRoot().states[c] || null,
+  putState: (c, rec) => { naesinRoot().states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(naesinRoot().states),
+  getExam: (s) => naesinRoot().exams[s] || null,
+  putExam: (s, rec) => { naesinRoot().exams[s] = rec; persist(); },
+  getStudent: (c) => db.students[c] || null,
+};
+
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
   privateJwk: process.env.VAPID_PRIVATE_JWK || '',
@@ -264,6 +281,16 @@ const server = http.createServer(async (req, res) => {
           getBody: () => readBody(req), store: vocabStore,
           ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '', env: process.env },
           push: VOCAB_PUSH_ENV,
+        });
+        return json(res, out.status, out.body);
+      }
+
+      /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
+         json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
+      if (p.startsWith('/api/naesin/')) {
+        const out = await handleNaesin({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readBody(req), store: naesinStore,
         });
         return json(res, out.status, out.body);
       }
