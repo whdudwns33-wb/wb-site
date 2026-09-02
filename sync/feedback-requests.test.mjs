@@ -124,6 +124,43 @@ test('v2 submission accepts only the exact fixed template and stores its structu
   assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '승인 템플릿의 빈 줄 하나가 빠져도 거부해야 한다');
 });
 
+test('v2 submission uses an optional client subject and only legacy requests fall back to the task subject', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v2-custom', 'teacher-a', { subject: '국어' });
+  const identityV2 = {
+    taskId: 'task-v2-custom', feedbackDate: '2026-08-28',
+    feedbackType: 'class_feedback', templateVersion: 'v2'
+  };
+  const auth = person('teacher-a', 'token-a');
+  const structured = {
+    subjectText: '국어 독해 · 비문학', contentText: '비문학 지문의 중심 내용 찾기',
+    homeworkText: '어휘 10개 복습', commentText: '근거를 찾아 차분하게 설명했습니다.',
+    plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 8월 28일\n\n- 과목 : ' + structured.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  let result = await call(db, '/feedback-request', { auth, ...identityV2, message, ...structured });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.subjectText, structured.subjectText);
+  assert.equal(db.prepare('SELECT subject_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first().subject_text, structured.subjectText);
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2, message, ...structured, subjectText: ''
+  });
+  assert.equal(result.status, 400, '명시적으로 빈 과목은 수업 과목으로 조용히 대체하면 안 된다');
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2, message, ...structured, subjectText: '과'.repeat(81)
+  });
+  assert.equal(result.status, 413);
+});
+
 test('feedback submission delegates all real sending to the dedicated send module', () => {
   const start = source.indexOf('학부모 피드백 — 항목 제출 + 실제 발송');
   const end = source.indexOf('인강 커리큘럼 자동 가져오기');

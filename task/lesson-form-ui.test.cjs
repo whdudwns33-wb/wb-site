@@ -480,7 +480,7 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.match(html, /let guardianDeliveryStudentIds = new Set\(\)/);
   assert.match(html, /function guardianContactEnabledFor\(studentId\)/);
   assert.match(html, /applyGuardianDeliveryStudentIds\(result\.deliveryEnabledStudentIds\)/);
-  assert.match(html, /data-act="feedbackpolish">AI 다듬기/);
+  assert.match(html, /data-act="feedbackpolish">코멘트만 AI 다듬기/);
   assert.match(html, /data-act="feedbackfinalsend">최종 전송/);
   assert.match(html, /학부모 연락 기능 사용 중지/);
   assert.match(html, /if \(!guardianContactEnabledFor\(task && task\.studentId\)\) return toast\('이 학생은 학부모 전달 테스트 대상이 아닙니다'\)/);
@@ -516,12 +516,13 @@ test('feedback v2 preview uses the fixed approved template and keeps send fields
   assert.match(preview, /templateVersion: templateVersion,[\s\S]*contentText: feedbackFlatField/);
   assert.match(preview, /baseCommentText: String\(fields\.baseCommentText \|\| initialCommentText\)/);
   assert.match(preview, /templateVersion === 'v2' \? ' readonly'/);
-  for (const field of ['contentText', 'homeworkText', 'commentText']) {
+  for (const field of ['subjectText', 'contentText', 'homeworkText', 'commentText']) {
     assert.match(preview, new RegExp('data-feedback-final-field="' + field + '"'),
       field + ' 최종 발송 변수를 직접 수정할 수 있어야 한다');
   }
   assert.match(preview, /승인 템플릿과[^']*발송 변수로 만든 최종 미리보기입니다/);
-  assert.match(preview, /data-act="feedbackpolish">AI 다듬기/);
+  assert.match(preview, /아래 네 항목만 실제 알림톡 변수로 전송됩니다/);
+  assert.match(preview, /data-act="feedbackpolish">코멘트만 AI 다듬기/);
   assert.match(preview, /data-act="feedbackfinalsend">최종 전송/);
   assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
   assert.match(submit, /templateVersion: templateVersion/);
@@ -566,34 +567,81 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
   assert.match(html, /String\(t\.studentId \|\| ''\) \+ '\|' \+ t\.id \+ '\|' \+ date/);
   const helpers = Function("const seedPick = (rows, seed, slot) => rows[Math.abs(slot) % rows.length];\n" + bank +
     '; return { count: formalFeedbackSentenceCount(), formalize: formalizeDirectFeedback, ' +
-    'givenName: studentGivenName, subject: feedbackStudentSubject, neutralize: neutralizeStudentNameInFeedback, ' +
-    'build: buildFormalFeedbackComment };')();
+    'givenName: studentGivenName, subject: feedbackStudentSubject, possessive: feedbackStudentPossessive, neutralize: neutralizeStudentNameInFeedback, ' +
+    'focus: FB_FORMAL_FOCUS, namedOpeners: FB_FORMAL_NAMED_OPENERS, build: buildFormalFeedbackComment };')();
   assert.ok(helpers.count >= 100, '격식체 기본 문장이 실제로 100개 이상이어야 한다');
   assert.equal(helpers.formalize('집중을 잘했어요'), '수업 중 집중력을 안정적으로 유지하며 학습에 성실하게 참여했습니다.');
   assert.equal(helpers.formalize('스스로 설명해요'), '스스로 설명합니다.');
-  assert.equal(helpers.formalize('어휘 정리'), '어휘 정리와 관련한 학습 과정을 학생의 현재 흐름에 맞추어 차분히 확인하고 있습니다.');
+  assert.equal(helpers.formalize('어휘 정리'), '어휘 정리.',
+    '안전하게 격식체로 바꾸지 못하는 짧은 메모는 임의 사실을 붙이지 않고 원문을 유지한다');
   assert.equal(helpers.formalize('자꾸 산만함'), '수업 중 집중력을 유지하는 데 다소 어려움이 있었습니다.');
+  assert.equal(helpers.formalize('설명을 잘했지만 계산 실수도 있었어요'),
+    '설명을 잘했지만 계산 실수도 있었습니다.', '복합문의 두 관찰을 모두 보존해야 한다');
+  assert.equal(helpers.formalize('설명을 잘했고 계산 실수도 있었음'),
+    '설명을 잘했고 계산 실수도 있었습니다.', '`...했고` 복합문의 두 관찰을 보존하며 인식 가능한 어미만 격식체로 바꿔야 한다');
+  assert.equal(helpers.formalize('집중 잘함 숙제 안함'),
+    '수업 중 집중력을 안정적으로 유지하며 학습에 성실하게 참여했습니다. 숙제 준비가 충분하지 않은 부분이 있었습니다.',
+    '짧은 복합 메모가 여러 soft pattern에 일치하면 원문 순서대로 모든 관찰을 남겨야 한다');
+  assert.equal(helpers.formalize('집중 잘함 계산 실수 많음'),
+    '수업 중 집중력을 안정적으로 유지하며 학습에 성실하게 참여했습니다. 계산 과정에서 실수가 여러 차례 나타나 정확도를 조금 더 보완할 필요가 있었습니다.',
+    '집중과 계산 실수 관찰을 둘 다 보존해야 한다');
+  assert.equal(helpers.formalize('숙제 잘함 숙제 안함'),
+    '숙제를 성실하게 준비해 와 수업 내용을 안정적으로 이어갈 수 있었습니다. 숙제 준비가 충분하지 않은 부분이 있었습니다.',
+    '동일한 주제의 서로 다른 두 관찰도 greedy 매칭으로 하나가 사라지면 안 된다');
+  assert.equal(helpers.formalize('집중 잘함 발표 소극적'), '집중 잘함 발표 소극적.',
+    'soft pattern이 덮지 못한 관찰이 남으면 매칭된 첫 사실만 반환하지 말고 원문 전체를 보존해야 한다');
   assert.equal(helpers.givenName('김민우'), '민우');
   assert.equal(helpers.subject('김민우'), '민우는');
   assert.equal(helpers.givenName('황보민준'), '민준');
-  assert.equal(helpers.subject('황보민준'), '민준은');
+  assert.equal(helpers.subject('황보민준'), '민준이는');
+  assert.equal(helpers.subject('김수'), '수 학생은');
+  assert.equal(helpers.subject('Alex'), 'Alex 학생은');
   assert.equal(helpers.subject('테스트학생1'), '테스트학생1 학생은');
+  assert.equal(helpers.possessive('김민우'), '민우의');
+  assert.equal(helpers.possessive('김민준'), '민준이의');
+  assert.equal(helpers.possessive('김수'), '수 학생의');
+  assert.ok(helpers.namedOpeners.length >= 8, '이름 소유격으로 시작하는 도입 문장은 8개 이상이어야 한다');
+  helpers.namedOpeners.forEach(sentence => assert.match(sentence, /^\{P\}/,
+    '이름 도입 문장은 학생이 정리·전달한 것으로 오해되지 않게 소유격으로 시작해야 한다'));
   assert.equal(helpers.givenName('황보람'), '보람', '흔한 단성 황 + 보람을 복성 황보로 오인하면 안 된다');
   assert.equal(helpers.neutralize('수업에서 할 수 있도록 지도했습니다.', '김수'),
     '수업에서 할 수 있도록 지도했습니다.', '한 글자 이름이 수업이나 할 수를 훼손하면 안 된다');
   assert.equal(helpers.neutralize('김수는 수업에 참여했고 수가 질문했습니다.', '김수'),
     '학생은 수업에 참여했고 학생이 질문했습니다.');
+  assert.equal(helpers.neutralize('황보민준이는 문제를 풀었고 민준이의 풀이를 설명했습니다.', '황보민준'),
+    '학생은 문제를 풀었고 학생의 풀이를 설명했습니다.', '복성·받침 이름의 친근한 조사형도 일반화해야 한다');
+  const friendlyForms = [
+    ['민준이는', '학생은'], ['민준이의', '학생의'], ['민준이가', '학생이'], ['민준이를', '학생을'],
+    ['민준이와', '학생과'], ['민준이도', '학생도'], ['민준이로', '학생으로']
+  ];
+  friendlyForms.forEach(([source, expected]) => assert.equal(helpers.neutralize(source + ' 확인', '황보민준'), expected + ' 확인'));
   for (const [fullName, givenName] of [['김민우', '민우'], ['황보민준', '민준']]) {
     const generated = helpers.build({ comment: '', focus: 'good', plus: [], minus: null }, 'named-' + fullName, fullName);
+    assert.ok(generated.startsWith(helpers.possessive(fullName) + ' '), '성을 뺀 이름의 소유격이 첫 문장 첫머리에 와야 한다');
     assert.equal((generated.match(new RegExp(givenName, 'g')) || []).length, 1,
       '성 제외 이름은 생성 코멘트의 자연스러운 주어로 한 번만 사용해야 한다');
-    assert.ok(generated.includes(helpers.subject(fullName)), '이름 뒤에는 자연스러운 주제 조사가 붙어야 한다');
     assert.ok(!generated.includes(fullName), '생성 코멘트 주어에는 성을 포함한 전체 이름을 반복하지 않는다');
   }
+  const singleNamed = helpers.build({ comment: '', focus: null, plus: [], minus: null }, 'named-single', '김수');
+  assert.ok(singleNamed.startsWith('수 학생의 '), '한 글자 이름은 `학생의`를 붙여 자연스럽게 시작해야 한다');
+  const latinNamed = helpers.build({ comment: '', focus: null, plus: [], minus: null }, 'named-latin', 'Alex');
+  assert.ok(latinNamed.startsWith('Alex 학생의 '), '비한글 이름은 조사를 추측하지 않고 `학생의`를 사용한다');
   const directNamed = helpers.build({ comment: '김민우는 문제를 풀었고 민우가 설명했어요', focus: 'good', plus: [], minus: null },
     'direct-named', '김민우');
   assert.equal((directNamed.match(/민우/g) || []).length, 1, '직접 코멘트의 반복 이름은 학생으로 일반화해야 한다');
-  assert.match(directNamed, /민우는/);
+  assert.match(directNamed, /^민우의 /);
+  const friendlyNamed = helpers.build({ comment: '민준이는 문제를 풀었고 민준이의 풀이를 설명했습니다', focus: null, plus: [], minus: null },
+    'friendly-named', '황보민준');
+  assert.ok(friendlyNamed.startsWith('민준이의 '));
+  assert.equal((friendlyNamed.match(/민준/g) || []).length, 1,
+    '친근한 조사형을 쓴 직접 코멘트도 첫 문장 첫머리 외에는 이름이 남지 않아야 한다');
+  const noFocus = helpers.build({ comment: '어휘 정리', plus: [], minus: null }, 'no-focus', '김민우');
+  for (const sentence of Object.values(helpers.focus).flat()) {
+    assert.ok(!noFocus.includes(sentence), '집중·태도를 선택하지 않으면 포커스 문장을 임의로 추가하지 않아야 한다');
+  }
+  const buildSource = bank.slice(bank.indexOf('function buildFormalFeedbackComment'));
+  assert.doesNotMatch(buildSource, /parts\.push\(seedPick\(FB_FORMAL_CONNECTORS/,
+    '원문에 없는 수업 행위를 만드는 연결 문장을 무조건 삽입하면 안 된다');
 });
 
 test('feedback final v2 variable fields update context and rebuild the readonly approved-template preview', () => {
@@ -611,6 +659,22 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   assert.match(helper, /발송 내용을 직접 수정했습니다/,
     '길이 오류 뒤 수업내용·과제를 고치면 이전 빨간 오류를 지워야 한다');
   assert.match(html, /addEventListener\('input',[\s\S]*syncFeedbackFinalFieldFromInput\(ev\.target\)/);
+  const lengthStart = html.indexOf('function updateFeedbackPreviewLength(');
+  const lengthEnd = html.indexOf('function syncFeedbackFinalFieldFromInput(', lengthStart);
+  const lengthLogic = html.slice(lengthStart, lengthEnd);
+  assert.match(lengthLogic, /const sendValid = hasRequiredFields[\s\S]*commentText\.length <= limit/);
+  assert.match(lengthLogic, /const polishValid = hasRequiredFields && commentText\.length <= FEEDBACK_COMMENT_MAX_CHARS &&[\s\S]*feedbackPolishBudgetReady\(t, limit\)/);
+  assert.match(lengthLogic, /finalButton\.disabled = !!fbCtx\.polishPending \|\| !sendValid/);
+  assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending \|\| !polishValid/,
+    '코멘트가 현재 알림톡 예산을 넘어도 600자 이하면 AI로 줄이기를 시도할 수 있어야 한다');
+  const budgetStart = html.indexOf('const FEEDBACK_AI_MIN_BODY_CHARS');
+  const budgetEnd = html.indexOf('function updateFeedbackPreviewLength(', budgetStart);
+  const budgetApi = Function("const feedbackStudentPossessive = () => '민우의'; const studentOf = () => '김민우';\n" +
+    html.slice(budgetStart, budgetEnd) + '; return { minimum: feedbackPolishMinimumBudget, ready: feedbackPolishBudgetReady };')();
+  const minimumBudget = budgetApi.minimum({});
+  assert.equal(budgetApi.ready({}, 0), false, '코멘트 예산이 0이면 AI 다듬기를 활성화하면 안 된다');
+  assert.equal(budgetApi.ready({}, minimumBudget - 1), false);
+  assert.equal(budgetApi.ready({}, minimumBudget), true, '이름 도입문+공백+AI 본문 20자가 모두 들어갈 예산이 필요하다');
 });
 
 test('feedback AI polish updates only the send comment and exact fixed-template preview before a separate final send', () => {
@@ -622,6 +686,9 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   const submit = html.slice(submitStart, submitEnd);
   assert.match(polish, /sync\.post\('\/feedback-polish'/);
   assert.match(polish, /commentText: sourceComment/);
+  assert.match(polish, /subjectText: context\.subjectText/);
+  assert.match(polish, /latestCommentField[\s\S]*syncFeedbackFinalFieldFromInput\(latestCommentField\)[\s\S]*sourceComment/,
+    'AI 다듬기는 클릭 직전 DOM의 최신 코멘트를 사용해야 한다');
   assert.doesNotMatch(polish, /otherNotes|guardian|phone|studentName/);
   assert.match(polish, /if \(fbCtx !== context \|\| Number\(context\.polishSeq\) !== seq \|\|/);
   assert.match(polish, /context\.commentText = commentText/);
@@ -654,6 +721,14 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(html, /case 'feedbackfinalsend': submitFeedbackForReview\(el\)/);
   assert.match(html, /id="feedbackPolishStatus"[^>]*role="status"[^>]*aria-live="polite"/,
     'AI 처리 결과는 버튼 아래의 지속적인 접근성 상태 영역에 표시해야 한다');
+  assert.match(html, /placeholder="예\)오늘 ___하는 모습을 보였습니다\."/);
+  const errorStart = html.indexOf('function feedbackPolishErrorText(');
+  const errorEnd = html.indexOf('/** 서버 검증', errorStart);
+  const errorText = html.slice(errorStart, errorEnd);
+  assert.match(errorText, /FEEDBACK_STORAGE_BUSY/);
+  assert.match(errorText, /D1\|STORE\|STORAGE\|DATABASE/);
+  assert.doesNotMatch(errorText, /error\s*&&\s*error\.message/,
+    '서버의 D1 원문 오류를 사용자에게 노출하면 안 된다');
 
   const artifactStart = html.indexOf('function feedbackPolishHasArtifacts(');
   const artifactEnd = html.indexOf('function feedbackDateLabel(', artifactStart);

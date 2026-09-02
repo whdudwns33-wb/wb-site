@@ -4,7 +4,12 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { koreanStudentGivenName, normalizeFeedbackPolishResult } from './feedback-polish.js';
+import {
+  koreanStudentGivenName,
+  normalizeFeedbackPolishResult,
+  prefixFeedbackStudentSubject,
+  validateFeedbackPolishResult
+} from './feedback-polish.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 
@@ -95,6 +100,15 @@ test('AI 다듬기는 학생 이름을 마스킹하고 코멘트 외 수업·인
   assert.equal(model, '@cf/meta/llama-3.1-8b-instruct-fast');
   assert.equal(input.prompt, undefined, '단일 prompt 호출은 실제 모델이 지시문을 되풀이하게 만들 수 있다');
   assert.deepEqual(input.messages.map(message => message.role), ['system', 'user']);
+  assert.deepEqual(input.response_format, {
+    type: 'json_schema',
+    json_schema: {
+      type: 'object',
+      properties: { commentText: { type: 'string' } },
+      required: ['commentText'],
+      additionalProperties: false
+    }
+  });
   assert.match(input.messages[0].content, /신뢰할 수 없는 원문 데이터/);
   assert.match(input.messages[1].content, /^SOURCE_JSON=/);
   const modelInput = aiInputText(input);
@@ -165,38 +179,236 @@ test('AI 바인딩·스위치·민감정보·과도한 입력은 모델 호출 �
   assert.equal(calls, 0);
 });
 
-test('AI 결과는 사실 숫자·학생 마커·격식체·글자수 검증을 모두 통과해야 적용된다', async () => {
+test('AI 결과 실패는 개인정보 없는 세부 reason code로 구분하고 자동 재시도하지 않는다', async () => {
   const db = seededDb();
-  for (const responseText of [
-    '오늘 4개 문제를 잘 풀었습니다.',
-    '오늘 3개 문제를 잘 풀었어요.',
-    '학생은 오늘 3개 문제를 차분하게 풀었습니다.',
-    '```오늘 3개 문제를 차분하게 풀었습니다.```'
+  for (const [reason, responseText] of [
+    ['numbers', '오늘 4개 문제를 차분하게 풀었습니다.'],
+    ['formality', '오늘 3개 문제를 차분하게 풀었어요.'],
+    ['marker', '__WB_STUDENT__는 __WB_STUDENT__와 오늘 3개 문제를 차분하게 풀었습니다.'],
+    ['artifact', '```오늘 3개 문제를 차분하게 풀었습니다.```'],
+    ['contact', '오늘 3개 문제를 확인했으며 자세한 내용은 전화 주세요.'],
+    ['length', '3개를 풀었습니다.']
   ]) {
-    const result = await call(db, validBody(), { AI: { run: async () => ({ response: responseText }) } });
+    let calls = 0;
+    const result = await call(db, validBody(), { AI: { run: async () => {
+      calls += 1;
+      return { response: responseText };
+    } } });
     assert.equal(result.status, 422, responseText);
     assert.equal(result.body.code, 'FEEDBACK_AI_INVALID');
+    assert.equal(result.body.reason, reason);
+    assert.equal(result.body.reasonCode, 'FEEDBACK_AI_INVALID_' + reason.toUpperCase());
+    assert.equal(calls, 1, '검증 실패 뒤 모델을 자동으로 다시 호출하면 안 된다');
   }
 });
 
-test('한 글자 이름을 일반 문자열과 구분할 수 없으면 AI 호출 전에 안전하게 중단한다', async () => {
+test('학생 마커는 누락되어도 허용하고 원문보다 늘어난 경우에만 거부한다', async () => {
+  const db = seededDb();
+  const result = await call(db, validBody(), { AI: { run: async () => ({
+    response: '오늘 3개 문제를 끝까지 살펴보며 성실하게 학습했습니다. 문제를 해결하는 과정에서도 차분한 태도를 유지했습니다.'
+  }) } });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.match(result.body.commentText,
+    /^민우의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 3개 문제/);
+  assert.equal(result.body.commentText.match(/민우/g)?.length, 1);
+  assert.doesNotMatch(result.body.commentText, /__WB_STUDENT__/);
+});
+
+test('검증 후 이름은 leading 학생 조사를 보존하고 없으면 중립 소유격 안내를 한 번 붙인다', () => {
+  for (const [studentName, topic, possessive] of [
+    ['김민우', '민우는', '민우의'],
+    ['김민준', '민준이는', '민준이의'],
+    ['김수', '수 학생은', '수 학생의'],
+    ['황보민준', '민준이는', '민준이의'],
+    ['Alex', 'Alex 학생은', 'Alex 학생의']
+  ]) {
+    const cases = [
+      ['오늘 3개 문제를 차분하게 확인했습니다.',
+        possessive + ' 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 3개 문제'],
+      ['__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다.', topic + ' 오늘 3개 문제'],
+      ['오늘 3개 문제를 확인했고 __WB_STUDENT__는 풀이를 다시 살펴보았습니다.',
+        possessive + ' 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 3개 문제']
+    ];
+    for (const [value, expectedStart] of cases) {
+      const result = prefixFeedbackStudentSubject(value, studentName);
+      const givenName = koreanStudentGivenName(studentName);
+      assert.ok(result.startsWith(expectedStart), studentName + ': ' + value);
+      const identityCount = givenName.length === 1
+        ? result.split(givenName + ' 학생').length - 1 : result.split(givenName).length - 1;
+      assert.equal(identityCount, 1, studentName + ': ' + value);
+      assert.doesNotMatch(result, /__WB_STUDENT__/);
+      if (value.includes('확인했고 __WB_STUDENT__')) assert.match(result, /확인했고 학생은 풀이를/);
+    }
+  }
+  for (const [source, expected] of [
+    ['학생은 오늘 차분하게 학습했습니다.', '민우는 오늘 차분하게 학습했습니다.'],
+    ['학생이 오늘 차분하게 학습했습니다.', '민우가 오늘 차분하게 학습했습니다.'],
+    ['학생의 오늘 태도가 안정적이었습니다.', '민우의 오늘 태도가 안정적이었습니다.'],
+    ['학생에게 숙제를 안내했습니다.', '민우에게 숙제를 안내했습니다.'],
+    ['학생을 격려했습니다.', '민우를 격려했습니다.'],
+    ['학생과 풀이를 확인했습니다.', '민우와 풀이를 확인했습니다.'],
+    ['학생도 끝까지 참여했습니다.', '민우도 끝까지 참여했습니다.'],
+    ['학생으로 역할을 정했습니다.', '민우로 역할을 정했습니다.']
+  ]) assert.equal(prefixFeedbackStudentSubject(source, '김민우'), expected);
+  assert.equal(prefixFeedbackStudentSubject('학생에게 숙제를 안내했습니다.', '김민준'),
+    '민준이에게 숙제를 안내했습니다.');
+  assert.equal(prefixFeedbackStudentSubject('학생에게 숙제를 안내했습니다.', '김수'),
+    '수 학생에게 숙제를 안내했습니다.');
+  assert.equal(prefixFeedbackStudentSubject('보호자에게 숙제를 안내했습니다.', '김민우'),
+    '민우의 오늘 수업에서 확인한 내용을 정리했습니다. 보호자에게 숙제를 안내했습니다.');
+});
+
+test('문장 중간 학생 marker의 직접 조사는 자연스러운 generic 학생 조사로 복원한다', () => {
+  assert.equal(
+    prefixFeedbackStudentSubject('오늘 __WB_STUDENT__랑 풀이를 차분하게 확인했습니다.', '김민우'),
+    '민우의 오늘 수업에서 확인한 내용을 정리했습니다. 오늘 학생과 풀이를 차분하게 확인했습니다.'
+  );
+  for (const [suffix, expected] of [
+    ['에게', '학생에게'], ['한테', '학생에게'], ['처럼', '학생처럼'], ['보다', '학생보다'],
+    ['까지', '학생까지'], ['부터', '학생부터'], ['만', '학생만'], ['으로', '학생으로']
+  ]) {
+    const result = prefixFeedbackStudentSubject(
+      '오늘 __WB_STUDENT__' + suffix + ' 관련된 내용을 확인했습니다.', '김민우');
+    assert.match(result, new RegExp('오늘 ' + expected + ' 관련된 내용을'));
+    assert.doesNotMatch(result, /__WB_STUDENT__|학생랑|학생이으로/);
+  }
+});
+
+test('구조화 JSON 객체·JSON 문자열과 배포 전 일반 문자열 응답을 모두 안전하게 읽는다', async () => {
+  const output = '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다. 풀이 과정에도 성실하게 참여했습니다.';
+  for (const response of [
+    { response: { commentText: output } },
+    { response: JSON.stringify({ commentText: output }) },
+    { response: output }
+  ]) {
+    const result = await call(seededDb(), validBody(), { AI: { run: async () => response } });
+    assert.equal(result.status, 200, JSON.stringify(response));
+    assert.match(result.body.commentText, /^민우는 오늘 3개 문제/);
+  }
+  const rejected = await call(seededDb(), validBody(), { AI: { run: async () => ({
+    response: JSON.stringify({ commentText: output, extra: '노출 금지' })
+  }) } });
+  assert.equal(rejected.status, 422);
+  assert.equal(rejected.body.reason, 'artifact');
+});
+
+test('요청 과목은 AI 글자수 예산에 반영되고 누락된 구형 요청만 수업 과목을 쓴다', async () => {
+  const contentText = '수업내용'.repeat(35);
+  const homeworkText = '과제내용'.repeat(35);
+  const response = '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다. 풀이 과정에도 성실하게 참여했습니다.';
+  let captured = '';
+  const AI = { run: async (name, input) => {
+    captured = aiInputText(input);
+    return { response };
+  } };
+  const legacy = await call(seededDb(), validBody({ contentText, homeworkText }), { AI });
+  const customSubject = '국어 독해와 비문학 심화';
+  const custom = await call(seededDb(), validBody({ subjectText: customSubject, contentText, homeworkText }), { AI });
+  assert.equal(legacy.status, 200);
+  assert.equal(custom.status, 200);
+  assert.equal(custom.body.maxChars, legacy.body.maxChars - (customSubject.length - '국어'.length));
+  assert.ok(!captured.includes(customSubject), '과목은 길이 계산에만 쓰고 모델 입력에는 보내지 않는다');
+  const longestPrefix = '민우의 오늘 수업에서 확인한 내용을 정리했습니다.';
+  assert.match(captured, new RegExp('전체 길이는 공백 포함 ' +
+    (custom.body.maxChars - longestPrefix.length - 1) + '자 이하여야 합니다'));
+
+  let calls = 0;
+  const tooLong = await call(seededDb(), validBody({ subjectText: '과'.repeat(81) }), {
+    AI: { run: async () => { calls += 1; return { response }; } }
+  });
+  assert.equal(tooLong.status, 413);
+  assert.equal(calls, 0);
+});
+
+test('피드백 조회 D1 오류는 원문을 숨기고 기존 문구 보존용 안전 코드로 바꾼다', async () => {
+  const DB = { prepare(sql) {
+    assert.match(sql, /SELECT owner,data FROM tasks/);
+    return { bind() { return this; }, first() { throw new Error('D1_ERROR: private storage detail'); } };
+  } };
+  const result = await call(DB, validBody({ auth: { mode: 'admin', secret: 'director-secret' } }), {
+    AI: { run: async () => { throw new Error('호출되면 안 됩니다'); } }
+  });
+  assert.equal(result.status, 503);
+  assert.equal(result.body.code, 'FEEDBACK_STORAGE_BUSY');
+  assert.match(result.body.error, /기존 문구는 그대로 유지됩니다/);
+  assert.doesNotMatch(JSON.stringify(result.body), /D1_ERROR|private storage detail/);
+});
+
+test('한 글자 bare 이름은 문장 시작·경계에서만 마스킹하고 일반 표현은 건드리지 않는다', async () => {
   const db = new TestD1();
   seedTeacher(db, 'teacher-a', 'token-a', '김남기');
   seedLesson(db, 'lesson-a', 'teacher-a', '김수');
   let calls = 0;
+  const inputs = [];
   for (const commentText of [
-    '수업에서는 할 수 있는 3개 문제를 확인했고 수는 끝까지 참여했습니다.',
-    '수에게 풀이 과정을 설명했습니다.',
-    '수처럼 차분하게 문제를 풀었습니다.',
-    '수만 마지막 문제를 확인했습니다.'
+    '수 오늘 3개 문제를 끝까지 확인했습니다.',
+    '오늘 3개 문제를 끝까지 확인했습니다. 수'
   ]) {
     const result = await call(db, validBody({ commentText }), {
-      AI: { run: async () => { calls += 1; return { response: '호출되면 안 됩니다.' }; } }
+      AI: { run: async (name, input) => {
+        calls += 1;
+        inputs.push(aiInputText(input));
+        return { response: '오늘 3개 문제를 끝까지 확인하며 차분하게 학습했습니다.' };
+      } }
     });
-    assert.equal(result.status, 422, commentText);
-    assert.equal(result.body.code, 'FEEDBACK_AI_NAME_MASK', commentText);
+    assert.equal(result.status, 200, commentText);
+    assert.match(result.body.commentText,
+      /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 3개 문제/);
   }
-  assert.equal(calls, 0);
+  assert.equal(calls, 2);
+  assert.match(inputs[0], /__WB_STUDENT__ 오늘 3개 문제/);
+  assert.ok(!inputs[0].includes('수 오늘 3개 문제'));
+  assert.match(inputs[1], /확인했습니다\. __WB_STUDENT__/);
+  assert.ok(!inputs[1].includes('확인했습니다. 수'));
+});
+
+test('한 글자 이름의 쉼표·콜론·세미콜론 호명은 AI 입력에서만 마스킹한다', async () => {
+  const db = new TestD1();
+  seedTeacher(db, 'teacher-a', 'token-a', '김남기');
+  seedLesson(db, 'lesson-a', 'teacher-a', '김수');
+  const inputs = [];
+  for (const punctuation of [',', ':', ';']) {
+    const source = '오늘 수업에서 수' + punctuation +
+      ' 3개 문제를 차분하게 확인했습니다. 다음에도 풀 수 있도록 돕겠습니다.';
+    const result = await call(db, validBody({ commentText: source }), {
+      AI: { run: async (name, input) => {
+        inputs.push(aiInputText(input));
+        return { response: '오늘 수업에서 3개 문제를 차분하게 확인했습니다. 다음에도 풀 수 있도록 돕겠습니다.' };
+      } }
+    });
+    assert.equal(result.status, 200, punctuation);
+    assert.match(result.body.commentText,
+      /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 수업에서 3개 문제/);
+  }
+  assert.equal(inputs.length, 3);
+  for (const [index, punctuation] of [',', ':', ';'].entries()) {
+    assert.ok(inputs[index].includes('오늘 수업에서 __WB_STUDENT__' + punctuation + ' 3개 문제'),
+      punctuation + ' 뒤 호명 토큰이 marker로 바뀌어야 한다');
+    assert.ok(!inputs[index].includes('오늘 수업에서 수' + punctuation + ' 3개 문제'));
+    assert.ok(inputs[index].includes('오늘 수업에서'), '수업의 수는 훼손하면 안 된다');
+    assert.ok(inputs[index].includes('풀 수 있도록'), '가능 표현의 수는 훼손하면 안 된다');
+  }
+});
+
+test('한 글자 이름의 명시적 학생 호칭은 마스킹하고 수업 속 같은 음절은 잔존 이름으로 보지 않는다', async () => {
+  const db = new TestD1();
+  seedTeacher(db, 'teacher-a', 'token-a', '김남기');
+  seedLesson(db, 'lesson-a', 'teacher-a', '김수');
+  let input;
+  const source = '수 학생의 오늘 수업에서 확인한 3개 문제 풀이가 차분했습니다. 다음에도 차분히 풀 수 있도록 돕겠습니다.';
+  const result = await call(db, validBody({ commentText: source }), {
+    AI: { run: async (name, body) => {
+      input = body;
+      return { response: '__WB_STUDENT__ 학생의 오늘 수업에서 확인한 3개 문제 풀이가 차분했습니다. 다음에도 차분히 풀 수 있도록 돕겠습니다.' };
+    } }
+  });
+  assert.equal(result.status, 200);
+  assert.match(input.messages[1].content, /__WB_STUDENT__ 학생의 오늘 수업/);
+  assert.ok(!aiInputText(input).includes('김수'));
+  assert.ok(!aiInputText(input).includes('수 학생의'));
+  assert.match(result.body.commentText, /^수 학생의 오늘 수업/);
+  assert.equal(result.body.commentText.match(/수 학생의/g)?.length, 1);
 });
 
 test('학생 전체 이름은 조사·호칭이 바로 붙어도 AI 입력에서 마스킹한다', async () => {
@@ -215,12 +427,36 @@ test('학생 전체 이름은 조사·호칭이 바로 붙어도 AI 입력에서
     assert.equal(result.status, 200, studentName);
     assert.ok(!aiInputText(input).includes(studentName), studentName + '이 AI 입력에 남으면 안 된다');
     assert.match(aiInputText(input), new RegExp('__WB_STUDENT__' + sourceSuffix + ' 오늘 3개 문제'));
-    const expectedName = studentName === '김민우' ? '민우' : studentName;
-    assert.match(result.body.commentText, new RegExp('^' + expectedName + sourceSuffix + ' 오늘 3개 문제'));
+    const expectedSubject = studentName === '김민우' ? '민우는' : studentName + ' 학생은';
+    assert.match(result.body.commentText, new RegExp('^' + expectedSubject + ' 오늘 3개 문제'));
   }
 });
 
-test('성 없는 이름에 호칭이 붙어도 가리고 한 글자 전체 이름의 일반 단어는 AI에 보내지 않는다', async () => {
+test('받침 이름의 이는·이의 보조형도 longest-first로 마스킹하고 조사 의미를 보존한다', async () => {
+  for (const [suffix, expectedStart, tail] of [
+    ['이는', '민준이는', ' 오늘 3개 문제를 차분하게 확인했습니다.'],
+    ['이의', '민준이의', ' 오늘 학습 태도와 3개 문제 풀이를 차분하게 확인했습니다.']
+  ]) {
+    const db = new TestD1();
+    seedTeacher(db, 'teacher-a', 'token-a', '김남기');
+    seedLesson(db, 'lesson-a', 'teacher-a', '김민준');
+    let input;
+    const result = await call(db, validBody({ commentText: '민준' + suffix + tail }), {
+      AI: { run: async (name, body) => {
+        input = body;
+        return { response: '__WB_STUDENT__' + suffix + tail };
+      } }
+    });
+    assert.equal(result.status, 200, suffix);
+    assert.match(input.messages[1].content, new RegExp('__WB_STUDENT__' + suffix));
+    assert.ok(!aiInputText(input).includes('김민준'));
+    assert.ok(!aiInputText(input).includes('민준'));
+    assert.ok(result.body.commentText.startsWith(expectedStart + ' 오늘'));
+    assert.equal(result.body.commentText.match(/민준/g)?.length, 1);
+  }
+});
+
+test('성 없는 이름에 호칭이 붙으면 가리고 한 글자 이름과 같은 일반 표현은 실명으로 오인하지 않는다', async () => {
   for (const [sourcePrefix, suffix] of [['민우', '님은'], ['민우', '학생은'], ['수', ' 님은'], ['수', ' 학생은']]) {
     const db = new TestD1();
     seedTeacher(db, 'teacher-a', 'token-a', '김남기');
@@ -240,12 +476,20 @@ test('성 없는 이름에 호칭이 붙어도 가리고 한 글자 전체 이�
   seedTeacher(db, 'teacher-a', 'token-a', '김남기');
   seedLesson(db, 'lesson-a', 'teacher-a', '수');
   let calls = 0;
-  const blocked = await call(db, validBody({
+  let input;
+  const allowed = await call(db, validBody({
     commentText: '수업에서는 할 수 있는 3개 문제를 차분하게 확인했습니다.'
-  }), { AI: { run: async () => { calls += 1; return { response: '호출되면 안 됩니다.' }; } } });
-  assert.equal(blocked.status, 422);
-  assert.equal(blocked.body.code, 'FEEDBACK_AI_NAME_MASK');
-  assert.equal(calls, 0, '한 글자 이름과 일반 단어를 구분할 수 없으면 모델 호출 전에 중단해야 한다');
+  }), { AI: { run: async (name, body) => {
+    calls += 1;
+    input = body;
+    return { response: '오늘 수업에서는 할 수 있는 3개 문제를 차분하게 확인했습니다.' };
+  } } });
+  assert.equal(allowed.status, 200);
+  assert.match(allowed.body.commentText,
+    /^수 학생의 오늘 수업에서 확인한 내용을 정리했습니다\. 오늘 수업/);
+  assert.match(input.messages[1].content, /수업에서는 할 수 있는 3개 문제/);
+  assert.doesNotMatch(input.messages[1].content, /__WB_STUDENT__/);
+  assert.equal(calls, 1, '일반 단어 속 같은 음절만으로 AI 호출을 막으면 안 된다');
 });
 
 test('학생 이름이 마커 문자열 일부와 같아도 잔존 이름으로 오인하지 않는다', async () => {
@@ -256,7 +500,7 @@ test('학생 이름이 마커 문자열 일부와 같아도 잔존 이름으로 
     AI: { run: async () => ({ response: '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다.' }) }
   });
   assert.equal(result.status, 200);
-  assert.match(result.body.commentText, /^WB는 오늘 3개 문제/);
+  assert.match(result.body.commentText, /^WB 학생은 오늘 3개 문제/);
 });
 
 test('AI 결과 정규화는 학생 마커와 격식체가 있어도 코드·JSON·HTML·마크다운 흔적을 거부한다', () => {
@@ -295,7 +539,7 @@ test('AI 공급자 오류는 안전한 오류로 바꾸고 기존 코멘트를 �
   assert.ok(!JSON.stringify(result.body).includes('provider secret failure'));
 });
 
-test('AI 결과 정규화는 문장 경계에서 길이를 맞추고 새 숫자나 비격식체를 거부한다', () => {
+test('AI 결과 정규화는 전체 결과가 길면 자르지 않고 거부하며 새 숫자나 비격식체도 거부한다', () => {
   assert.equal(koreanStudentGivenName('황보민준'), '민준');
   assert.equal(koreanStudentGivenName('황보람'), '보람');
   assert.equal(normalizeFeedbackPolishResult(
@@ -303,10 +547,19 @@ test('AI 결과 정규화는 문장 경계에서 길이를 맞추고 새 숫자�
     '오늘 수업에서 차분한 태도로 끝까지 성실하게 학습했습니다.');
   assert.equal(normalizeFeedbackPolishResult('첫 문장을 차분하게 확인했습니다. 두 번째 문장도 안정적으로 진행했습니다.',
     '첫 문장과 두 번째 문장', 24), '');
+  const firstSentence = '오늘 수업에서 첫 문장을 차분하게 끝까지 확인했습니다.';
+  const overlong = firstSentence + ' 두 번째 문장도 안정적으로 끝까지 진행했습니다.';
+  assert.ok(firstSentence.length >= 20);
+  assert.deepEqual(validateFeedbackPolishResult(overlong, '두 문장을 확인함', firstSentence.length),
+    { commentText: '', reason: 'length' }, '첫 문장만 잘라 적용하면 안 된다');
   assert.equal(normalizeFeedbackPolishResult('오늘 2문제를 풀었습니다.', '오늘 1문제 풀이', 80), '');
   assert.equal(normalizeFeedbackPolishResult('오늘 잘했어요.', '오늘 잘함', 80), '');
   assert.equal(normalizeFeedbackPolishResult(
     '__WB_STUDENT__는 U.S. 교재의 3.5T 범위를 차분하게 확인했습니다.',
     '__WB_STUDENT__는 U.S. 교재의 3.5T 범위를 확인했습니다.', 100),
     '__WB_STUDENT__는 U.S. 교재의 3.5T 범위를 차분하게 확인했습니다.');
+  assert.deepEqual(validateFeedbackPolishResult(
+    '__WB_STUDENT__는 __WB_STUDENT__와 오늘 3개 문제를 확인했습니다.',
+    '__WB_STUDENT__는 오늘 3개 문제를 확인했습니다.', 100),
+  { commentText: '', reason: 'marker' });
 });
