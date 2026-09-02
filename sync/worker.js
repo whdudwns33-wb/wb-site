@@ -1,9 +1,10 @@
 import curriculumWorker from './curriculum-fix.js';
-import { handleScheduledBookOrders } from './book-order-send.js';
+import { handleScheduledBookOrders, handleScheduledBookOrderStatusRefresh } from './book-order-send.js';
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
 import { handleScheduledTuitionAlerts } from './tuition-alert.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
+const BOOK_ORDER_STATUS_CRON = '*/10 * * * *';
 const SESSION_PACK_ATTENDANCE_CRON = '50 14 * * *';
 
 export function cleanupCurriculum(text) {
@@ -36,6 +37,10 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    if (controller.cron === BOOK_ORDER_STATUS_CRON) {
+      ctx.waitUntil(handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime));
+      return;
+    }
     if (controller.cron === SESSION_PACK_ATTENDANCE_CRON) {
       ctx.waitUntil(Promise.all([
         handleScheduledSessionPackAttendance(env, controller.scheduledTime),
