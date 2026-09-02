@@ -376,7 +376,7 @@ function allHsRows(){
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
   return {students:[],meta:{created:today()}};}
-function save(){_IPG=null;localStorage.setItem(LS,JSON.stringify(db));}
+function save(){_IPG=null;_MKM=null;localStorage.setItem(LS,JSON.stringify(db));}
 function stu(){return db.students.find(s=>s.id===view.stuId);}
 
 /* ── 미니 마크다운 렌더러 (프로파일 원문 표시용) ── */
@@ -2175,8 +2175,7 @@ function renderHsSim(){
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:12.5px">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
     ${picks.length<3?`<input id="hsq" value="${esc(view.hsSchQ||"")}" placeholder="학교명 검색 (예: 순천, 상무고)" oninput="hsQIn(this)" style="max-width:340px">
-    ${cand.map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
-      <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("")}`:""}
+    <div id="hscand">${hsCandHtml()}</div>`:""}
   </div></div>
   ${cmp||(picks.length&&!(p>0)?`<p style="font-size:12.5px;color:var(--danger);margin-top:10px">상위 % 또는 등수/재적수를 입력하면 비교가 나옵니다.</p>`:"")}`;}
 function copyHsSim(){
@@ -2311,10 +2310,38 @@ ${isHonam?"\n■ 지역인재 전형: 호남권 고교 재학생 전용 — 의�
 
 /* ═══════════ 모의지원 (목표 대학·학과 갭 분석) ═══════════ */
 function mkFieldOf(major){for(const f of Object.keys(FIELD_KW))if(FIELD_KW[f].some(k=>major.includes(k)))return f;return null;}
-/* 리렌더 후 검색 입력 포커스 복원 — 없으면 한 글자 칠 때마다 포커스가 죽는다 */
-function refocus(id){const el=document.getElementById(id);if(el){el.focus();const n=el.value.length;try{el.setSelectionRange(n,n);}catch(e){}}}
-function mkQIn(el){view.mkQ=el.value;view.mkSel=null;render();refocus("mkq");}
-function hsQIn(el){view.hsSchQ=el.value;render();refocus("hsq");}
+/* 검색 타이핑: 입력창은 절대 리렌더하지 않고 후보 목록(#mkcand/#hscand)만 부분 갱신
+   — 전체 리렌더+포커스 복원 방식은 한글 IME 조합을 끊어 자음·모음이 분리된다 */
+var _MKM=null;
+function mkMajors(){
+  if(_MKM)return _MKM;
+  const m=new Map();
+  for(const x of ipGroups()){const k=x.univ+"|"+x.major;
+    if(!m.has(k))m.set(k,{univ:x.univ,major:x.major,region:x.region,tracks:[]});
+    m.get(k).tracks.push(x);}
+  _MKM=m;return m;}
+function mkCandHtml(){
+  if(view.mkSel)return"";
+  const q=(view.mkQ||"").trim();
+  const majors=mkMajors();
+  if(q){
+    const cand=[...majors.values()].filter(m=>(m.univ+" "+m.major).includes(q)).slice(0,30);
+    return cand.map(m=>`<button class="mocksel" onclick="view.mkSel='${esc(m.univ)}|${esc(m.major)}';render()">
+      <b>${esc(m.univ)}</b> ${esc(m.major)}<span class="cnt">${esc(m.region||"")} · 전형 ${m.tracks.length}개</span></button>`).join("")
+      ||`<div class="empty">검색 결과 없음</div>`;}
+  return `<p style="font-size:12.5px;color:var(--ink2);margin:0">검색해서 목표를 선택하세요 — 학생 연동 시 그 학생의 관심대학이 아래에 바로 나옵니다.</p>
+    ${view.mkStu?(()=>{const s=db.students.find(x=>x.id===view.mkStu);
+      return (s?.univs||[]).slice(0,8).map(u=>{const k=uniNorm(u.univ)+"|"+u.major;
+        return majors.has(k)?`<button class="mocksel" onclick="view.mkSel='${esc(k)}';render()"><b>${esc(uniNorm(u.univ))}</b> ${esc(u.major)}<span class="cnt">관심대학</span></button>`:"";}).join("");})():""}`;}
+function hsCandHtml(){
+  const q=(view.hsSchQ||"").trim();
+  if(!q)return"";
+  const picks=view.hsPicks||[];
+  return allHsRows().filter(h=>h.name.includes(q)&&!picks.includes(h.name)).slice(0,8)
+    .map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
+      <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("");}
+function mkQIn(el){view.mkQ=el.value;const c=document.getElementById("mkcand");if(c)c.innerHTML=mkCandHtml();}
+function hsQIn(el){view.hsSchQ=el.value;const c=document.getElementById("hscand");if(c)c.innerHTML=hsCandHtml();}
 /* 5등급제(현 고1·고2) → 9등급 등가 환산 — 입결 DB가 9등급 기준이므로 */
 const CUM5=[10,34,66,90,100];
 function g5ToTopPct(g){g=Math.max(1,Math.min(5,g));const i=Math.min(4,Math.floor(g));const prev=i===0?0:CUM5[i-1];return prev+(g-i)*(CUM5[i]-prev);}
@@ -2380,13 +2407,8 @@ function renderMock(){
   const pctIn=parseFloat(view.mkPct);
   const myPct=!isNaN(pctIn)?pctIn:(!isNaN(g)?Math.round((100-gradeToTopPct(g))*10)/10:null);
   const gs=ipGroups();
-  // 목표 후보: 대학|학과 단위
-  const majors=new Map();
-  for(const x of gs){const k=x.univ+"|"+x.major;
-    if(!majors.has(k))majors.set(k,{univ:x.univ,major:x.major,region:x.region,tracks:[]});
-    majors.get(k).tracks.push(x);}
+  const majors=mkMajors();
   const q=(view.mkQ||"").trim();
-  const cand=q?[...majors.values()].filter(m=>(m.univ+" "+m.major).includes(q)).slice(0,30):[];
   const sel=view.mkSel?majors.get(view.mkSel):null;
   let verdict="";
   if(sel&&!isNaN(g)){
@@ -2479,12 +2501,7 @@ function renderMock(){
     <input id="mkq" value="${esc(view.mkQ||"")}" placeholder="대학·학과 검색 (예: 전남대 화학, 조선대 의예)" oninput="mkQIn(this)" style="margin-bottom:8px">
     ${sel?`<div class="mocksel" style="border-color:var(--accent);cursor:default"><b>${esc(sel.univ)} ${esc(sel.major)}</b><span class="chip acc">선택됨</span>
       <button class="btn ghost sm" style="margin-left:auto" onclick="view.mkSel=null;render()">변경</button></div>`:""}
-    ${!sel&&q?cand.map(m=>`<button class="mocksel" onclick="view.mkSel='${esc(m.univ)}|${esc(m.major)}';render()">
-      <b>${esc(m.univ)}</b> ${esc(m.major)}<span class="cnt">${esc(m.region||"")} · 전형 ${m.tracks.length}개</span></button>`).join("")||`<div class="empty">검색 결과 없음</div>`:""}
-    ${!sel&&!q?`<p style="font-size:12.5px;color:var(--ink2);margin:0">검색해서 목표를 선택하세요 — 학생 연동 시 그 학생의 관심대학이 아래에 바로 나옵니다.</p>
-      ${view.mkStu?(()=>{const s=db.students.find(x=>x.id===view.mkStu);
-        return (s?.univs||[]).slice(0,8).map(u=>{const k=uniNorm(u.univ)+"|"+u.major;
-          return majors.has(k)?`<button class="mocksel" onclick="view.mkSel='${esc(k)}';render()"><b>${esc(uniNorm(u.univ))}</b> ${esc(u.major)}<span class="cnt">관심대학</span></button>`:"";}).join("");})():""}`:""}
+    <div id="mkcand">${mkCandHtml()}</div>
     ${sel&&isNaN(g)?`<p style="font-size:12.5px;color:var(--danger);margin:6px 0 0">내신 평균을 입력하면 판정이 나옵니다.</p>`:""}
   </div></div>
   ${verdict}`;}
