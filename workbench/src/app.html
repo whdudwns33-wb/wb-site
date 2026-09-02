@@ -371,7 +371,7 @@ function uColor(u){let h=0;for(let i=0;i<u.length;i++)h=(h*31+u.charCodeAt(i))>>
 function allHsRows(){
   const a=(db.hsdb||[]).map(r=>({name:r.name,type:r.type,region:r.region||"",level:r.level||"",feature:r.feature||"",source:r.source||"",bulk:false}));
   const seen=new Set(a.map(x=>x.name));
-  const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",feature:r[4]||"",source:"나이스",bulk:true}));
+  const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",estab:r[4]||"",feature:[r[4]||"",r[5]||""].filter(Boolean).join(" · "),source:"나이스",bulk:true}));
   return a.concat(b);}
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
@@ -673,7 +673,7 @@ function addGpa(){const s=stu();s.gpaLog=s.gpaLog||[];
 function hsAdjOf(name){
   if(!name)return {adj:0,why:"학교 미입력 — 보정 없음"};
   const n1=name.trim(),n2=n1.replace(/여고$/,"여자고등학교").replace(/([^자])고$/,"$1고등학교");
-  const row=allHsRows().find(h=>h.name===n1||h.name===n2||h.name.includes(n1)||n1.includes(h.name.replace(/고등학교$/,"고")));
+  const row=allHsRows().find(h=>h.type!=="초등학교"&&h.type!=="중학교"&&(h.name===n1||h.name===n2||h.name.includes(n1)||n1.includes(h.name.replace(/고등학교$/,"고"))));
   if(!row)return {adj:0,why:"고교 DB에 없음 — 보정 없음"};
   let adj=0,parts=[];
   const ty=row.type||"";
@@ -1584,20 +1584,36 @@ function renderSearch(){
   }else{
     const rows=allHsRows();
     const sidos=[...new Set(rows.map(r=>(r.region||"").split(" ")[0]).filter(Boolean))].sort();
+    const lv=view.sLevel||"";
+    const isEM=t=>t==="초등학교"||t==="중학교";
     let f=rows;
+    if(lv==="초")f=f.filter(r=>r.type==="초등학교");
+    else if(lv==="중")f=f.filter(r=>r.type==="중학교");
+    else if(lv==="고")f=f.filter(r=>!isEM(r.type));
     if(q)f=f.filter(r=>r.name.includes(q));
     if(view.sSido)f=f.filter(r=>(r.region||"").startsWith(view.sSido));
+    const gungus=view.sSido?[...new Set(f.map(r=>(r.region||"").split(" ")[1]).filter(Boolean))].sort():[];
+    if(view.sGungu&&view.sSido)f=f.filter(r=>(r.region||"").split(" ")[1]===view.sGungu);
     if(view.sHsType)f=f.filter(r=>(r.type||"").includes(view.sHsType));
+    if(view.sEstab)f=f.filter(r=>((r.estab||"")+(r.feature||"")).includes(view.sEstab));
+    if(view.sOwned)f=f.filter(r=>!r.bulk);
     f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
     const shown=f.slice(0,300);
     body=`
     <form onsubmit="event.preventDefault();view.sq=$('#sq').value;render()">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <input id="sq" value="${esc(view.sq||"")}" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
-      <select onchange="view.sSido=this.value;render()" style="width:110px">
+      <select onchange="view.sLevel=this.value;view.sHsType='';render()" style="width:92px">
+        <option value="">학교급 전체</option>${[["고","고등학교"],["중","중학교(호남)"],["초","초등학교(호남)"]].map(([v,l])=>`<option value="${v}" ${lv===v?"selected":""}>${l}</option>`).join("")}</select>
+      <select onchange="view.sSido=this.value;view.sGungu='';render()" style="width:110px">
         <option value="">시도 전체</option>${sidos.map(x=>`<option ${view.sSido===x?"selected":""}>${x}</option>`).join("")}</select>
-      <select onchange="view.sHsType=this.value;render()" style="width:110px">
-        <option value="">유형 전체</option>${["일반고","자율고","특목고","특성화","자사고","외고","과학고"].map(x=>`<option ${view.sHsType===x?"selected":""}>${x}</option>`).join("")}</select>
+      ${view.sSido?`<select onchange="view.sGungu=this.value;render()" style="width:104px">
+        <option value="">시군구 전체</option>${gungus.map(x=>`<option ${view.sGungu===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
+      ${lv!=="초"&&lv!=="중"?`<select onchange="view.sHsType=this.value;render()" style="width:100px">
+        <option value="">유형 전체</option>${["일반고","자율고","특목고","특성화","자사고","외고","과학고"].map(x=>`<option ${view.sHsType===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
+      <select onchange="view.sEstab=this.value;render()" style="width:88px">
+        <option value="">설립 전체</option>${["공립","사립","국립"].map(x=>`<option ${view.sEstab===x?"selected":""}>${x}</option>`).join("")}</select>
+      <button type="button" class="fchip ${view.sOwned?"on":""}" title="내신경쟁 평가를 보유한 학교만" onclick="view.sOwned=!view.sOwned;render()">평가 보유만</button>
       <button class="btn sm pri">검색</button>
     </div></form>
     <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시":""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
@@ -1615,7 +1631,7 @@ function renderSearch(){
   <div class="sub">대학 입결(어디가 발표 기준)과 전국 고교를 검색 — ＋를 누르면 분석·추천 DB에 편입됩니다</div></div></div>
   <div class="tabs" style="margin-bottom:14px">
     <button class="tab ${tab==="univ"?"on":""}" onclick="view.searchTab='univ';view.sq='';render()">🎓 대학·학과 입결</button>
-    <button class="tab ${tab==="hs"?"on":""}" onclick="view.searchTab='hs';view.sq='';render()">🏫 고등학교</button>
+    <button class="tab ${tab==="hs"?"on":""}" onclick="view.searchTab='hs';view.sq='';render()">🏫 학교 (전국 고교 + 호남 초·중)</button>
   </div>
   <div class="card">${body}</div>
   <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보 — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
@@ -1951,9 +1967,18 @@ function renderIpsi(){
       <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
       <button class="btn sm" style="margin-top:6px" onclick="importIpdb()">가져오기</button>
     </details>
-    ${manual.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
+    ${manual.length?`<div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <select onchange="view.dbSort=this.value;render()" style="width:130px;font-size:12px">
+        ${[["univ","대학 가나다순"],["cut","컷 낮은순"],["year","연도 최신순"],["recent","최근 입력순"]].map(([v,l])=>`<option value="${v}" ${(view.dbSort||"univ")===v?"selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="tablewrap" style="margin-top:6px"><table class="t">
       <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>백분위</th><th>출처</th><th></th></tr>
-      ${manual.map((r,i)=>`<tr style="cursor:pointer" title="눌러서 연도별 상세 보기" onclick="ipDetail('${esc(uniNorm(r.univ))}|${esc(r.major)}|${esc(r.track||"")}')">
+      ${manual.map((r,i)=>({r,i})).sort((a,b)=>{
+        const so=view.dbSort||"univ";
+        if(so==="cut")return (parseCut(a.r.cut70)??parseCut(a.r.cut50)??99)-(parseCut(b.r.cut70)??parseCut(b.r.cut50)??99);
+        if(so==="year")return String(b.r.year||"").localeCompare(String(a.r.year||""))||a.r.univ.localeCompare(b.r.univ,"ko");
+        if(so==="recent")return b.i-a.i;
+        return a.r.univ.localeCompare(b.r.univ,"ko")||a.r.major.localeCompare(b.r.major,"ko")||String(b.r.year||"").localeCompare(String(a.r.year||""));
+      }).map(({r,i})=>`<tr style="cursor:pointer" title="눌러서 연도별 상세 보기" onclick="ipDetail('${esc(uniNorm(r.univ))}|${esc(r.major)}|${esc(r.track||"")}')">
         <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
         <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.pct||"")}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
@@ -1979,9 +2004,17 @@ function renderIpsi(){
       <textarea id="hs_csv" rows=4 placeholder="OO고등학교,일반고,광주 서구,중,학종 프로그램 우수,콘텐츠DB"></textarea>
       <button class="btn sm" style="margin-top:6px" onclick="importHsdb()">가져오기</button>
     </details>
-    ${(db.hsdb||[]).length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
+    ${(db.hsdb||[]).length?`<div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <select onchange="view.hsDbSort=this.value;render()" style="width:130px;font-size:12px">
+        ${[["region","지역순"],["level","경쟁 상→하"],["name","이름 가나다순"]].map(([v,l])=>`<option value="${v}" ${(view.hsDbSort||"region")===v?"selected":""}>${l}</option>`).join("")}</select></div>
+    <div class="tablewrap" style="margin-top:6px"><table class="t">
       <tr><th>학교</th><th>유형</th><th>지역</th><th>경쟁</th><th>특징</th><th></th></tr>
-      ${(db.hsdb||[]).map((r,i)=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type)}</td><td>${esc(r.region||"")}</td>
+      ${(db.hsdb||[]).map((r,i)=>({r,i})).sort((a,b)=>{
+        const so=view.hsDbSort||"region";const LV={"상":0,"중":1,"하":2};
+        if(so==="level")return (LV[a.r.level]??1)-(LV[b.r.level]??1)||(a.r.region||"").localeCompare(b.r.region||"","ko");
+        if(so==="name")return a.r.name.localeCompare(b.r.name,"ko");
+        return (a.r.region||"").localeCompare(b.r.region||"","ko")||a.r.name.localeCompare(b.r.name,"ko");
+      }).map(({r,i})=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type)}</td><td>${esc(r.region||"")}</td>
         <td>${esc(r.level||"중")}</td><td style="font-size:12px;color:var(--ink2)">${esc(r.feature||"")}</td>
         <td><button class="btn ghost sm" onclick="db.hsdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
     </table></div>`:""}
@@ -2337,7 +2370,7 @@ function hsCandHtml(){
   const q=(view.hsSchQ||"").trim();
   if(!q)return"";
   const picks=view.hsPicks||[];
-  return allHsRows().filter(h=>h.name.includes(q)&&!picks.includes(h.name)).slice(0,8)
+  return allHsRows().filter(h=>h.type!=="초등학교"&&h.type!=="중학교"&&h.name.includes(q)&&!picks.includes(h.name)).slice(0,8)
     .map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
       <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("");}
 function mkQIn(el){view.mkQ=el.value;const c=document.getElementById("mkcand");if(c)c.innerHTML=mkCandHtml();}
