@@ -643,6 +643,17 @@ function tabOverview(){
           <input id="gpa_avg" placeholder="평균 (예: 2.8)" style="width:90px">
           <button class="btn sm" onclick="addGpa()">기록</button></div></div>
     </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
+      <span style="font-size:11.5px;color:var(--ink2);font-weight:600;padding-bottom:9px">다요인지능(백분위)</span>
+      <div class="frow" style="margin:0"><label>어휘적용력</label>
+        <input value="${esc(s.dyVo||"")}" placeholder="예: 90" style="width:80px" onchange="upStu('dyVo',this.value)"></div>
+      <div class="frow" style="margin:0"><label>언어유추력</label>
+        <input value="${esc(s.dyAn||"")}" placeholder="예: 85" style="width:80px" onchange="upStu('dyAn',this.value)"></div>
+      <div class="frow" style="margin:0"><label>추리력</label>
+        <input value="${esc(s.dyRe||"")}" placeholder="예: 95" style="width:80px" onchange="upStu('dyRe',this.value)"></div>
+      <div class="frow" style="margin:0"><label>검사일</label>
+        <input type="date" value="${esc(s.dyDate||"")}" style="width:140px" onchange="upStu('dyDate',this.value)"></div>
+    </div>
     ${(s.gpaLog||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       ${s.gpaLog.map((g,i)=>`<span class="chip">${esc(g.term)} <b>${esc(String(g.avg))}</b>
         <button style="color:var(--ink2)" title="삭제" onclick="stu().gpaLog.splice(${i},1);save();render()">✕</button></span>`).join("")}</div>`:""}
@@ -674,11 +685,12 @@ function hsAdjOf(name){
   return {adj,why:`${row.name}(${ty||"유형 미상"}${row.level?"·경쟁 "+row.level:""}) — ${parts.join(", ")||"보정 0"}`};}
 function trajHtml(s){
   const p=parseFloat(s.baseMsPct),iq=parseFloat(s.baseFsiq);
+  const dl=[parseFloat(s.dyVo),parseFloat(s.dyAn)].filter(v=>!isNaN(v)&&v>=1&&v<=99.9);
   const log=(s.gpaLog||[]);
-  if(isNaN(p)&&isNaN(iq)&&!log.length)
-    return `<div class="empty" style="padding:14px"><b>기준선이 없습니다</b>중3 상위% 또는 FSIQ를 넣으면 예측 밴드가, 내신 평균을 기록하면 실제선이 그려집니다.</div>`;
+  if(isNaN(p)&&isNaN(iq)&&!dl.length&&!log.length)
+    return `<div class="empty" style="padding:14px"><b>기준선이 없습니다</b>중3 상위%·FSIQ·다요인 백분위 중 하나를 넣으면 예측 밴드가, 내신 평균을 기록하면 실제선이 그려집니다.</div>`;
   const ha=hsAdjOf(s.school);
-  let msBand=null,iqBand=null;
+  let msBand=null,iqBand=null,dyBand=null;
   if(!isNaN(p)&&p>0&&p<=100){
     const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
     msBand=[Math.max(1,Math.min(9,g1+ha.adj)),Math.max(1,Math.min(9,g2+ha.adj))];}
@@ -686,10 +698,17 @@ function trajHtml(s){
     const z=(iq-100)/15,pT=(1-normCdf(z))*100,pA=(1-normCdf(0.6*z))*100;
     const b1=topPctToGrade(Math.max(0.1,pT)),b2=topPctToGrade(Math.min(100,pA));
     iqBand=[Math.min(b1,b2),Math.max(b1,b2)];}
+  if(dl.length){
+    const lang=dl.reduce((a,b)=>a+b,0)/dl.length,zL=invNorm(lang/100);
+    const b1=topPctToGrade(Math.max(0.1,100-lang)),b2=topPctToGrade(Math.min(100,(1-normCdf(0.6*zL))*100));
+    dyBand=[Math.min(b1,b2),Math.max(b1,b2)];}
+  // 잠재 밴드: 웩슬러 우선, 없으면 다요인 (초등 검사 학생용)
+  const potBand=iqBand||dyBand;
+  const potLabel=iqBand?"웩슬러 잠재":"다요인 잠재";
   // 차트
   const terms=["중3",...log.map(g=>g.term)];
   const W=680,H=210,PL=34,PR=14,PT=14,PB=26;
-  const gmax=Math.min(9,Math.max(5,...log.map(g=>g.avg+1),msBand?msBand[1]+0.5:0,iqBand?iqBand[1]+0.5:0));
+  const gmax=Math.min(9,Math.max(5,...log.map(g=>g.avg+1),msBand?msBand[1]+0.5:0,potBand?potBand[1]+0.5:0));
   const y=g=>PT+(Math.min(gmax,Math.max(1,g))-1)/(gmax-1)*(H-PT-PB);
   const x=i=>PL+(terms.length<2?(W-PL-PR)/2:i/(terms.length-1)*(W-PL-PR));
   let grid="";
@@ -704,8 +723,8 @@ function trajHtml(s){
   const xlabels=terms.map((t,i)=>`<text x="${x(i)}" y="${H-8}" text-anchor="middle" style="fill:var(--ink2)" font-size="10">${esc(t)}</text>`).join("");
   // 갭 배지
   let gapLine="";
-  if(log.length&&iqBand){
-    const cur=log[log.length-1].avg,d=+(cur-iqBand[1]).toFixed(2);
+  if(log.length&&potBand){
+    const cur=log[log.length-1].avg,d=+(cur-potBand[1]).toFixed(2);
     gapLine=d>0.2?`<span class="chip danger">잠재 대비 ${d.toFixed(1)}등급 미달 — 학습 전략이 상담 의제</span>`
       :d<-0.2?`<span class="chip ok">잠재 밴드 상단 상회 — 성취 습관이 강점</span>`
       :`<span class="chip acc">잠재 밴드 안 — 유지 + 상향 목표 정당</span>`;}
@@ -715,7 +734,7 @@ function trajHtml(s){
     predLine=cur>msBand[1]+0.2?`<span class="chip warn">중3 예측 대비 하회 — 고교 적응 점검</span>`
       :cur<msBand[0]-0.2?`<span class="chip ok">중3 예측 상회</span>`:`<span class="chip">중3 예측 범위 안</span>`;}
   return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="min-width:520px">
-    ${grid}${band(msBand,"var(--w1,#2F6DB5)","중3 예측",true)}${band(iqBand,"var(--accent)","웩슬러 잠재",false)}${line}${dots}${xlabels}</svg></div>
+    ${grid}${band(msBand,"var(--w1,#2F6DB5)","중3 예측",true)}${band(potBand,"var(--accent)",potLabel,false)}${line}${dots}${xlabels}</svg></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${gapLine}${predLine}</div>
   <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">고교 보정: ${esc(ha.why)}. 밴드는 참고치 — 예측이 아니라 상담의 출발선입니다. 등급 축은 1(위)~${gmax}(아래).</p>`;}
 function upStu(k,v){stu()[k]=v;save();renderSide();}
@@ -1784,6 +1803,7 @@ function terrainSvg(list,myG){
   <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="min-width:760px">${grid}${bands}${dots}</svg>`;}
 function renderIpsi(){
   const rows=allIpRows();const manual=db.ipdb||[];const R=view.ipsiResult;
+  const sst=view.ipsiStu?db.students.find(x=>x.id===view.ipsiStu):null;
   let matchHtml="";
   if(R&&rows.length){
     const myG=(R.band[0]+R.band[1])/2;
@@ -1877,14 +1897,14 @@ function renderIpsi(){
       <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">일반고 진학 가정의 예상 밴드입니다. 학군·고교 유형(자사·특목)에 따라 크게 달라지므로 반드시 밴드로만 해석하세요.</p>`
     :view.ipsiMode==="dy"?`
       <div class="formgrid">
-        <div class="frow"><label>어휘적용력 백분위</label><input id="ip_dy_vo" placeholder="예: 90" style="width:100px"></div>
-        <div class="frow"><label>언어유추력 백분위</label><input id="ip_dy_an" placeholder="예: 85" style="width:100px"></div>
-        <div class="frow"><label>추리력 백분위</label><input id="ip_dy_re" placeholder="예: 95 (선택)" style="width:110px"></div>
+        <div class="frow"><label>어휘적용력 백분위</label><input id="ip_dy_vo" value="${esc(sst?.dyVo||"")}" placeholder="예: 90" style="width:100px"></div>
+        <div class="frow"><label>언어유추력 백분위</label><input id="ip_dy_an" value="${esc(sst?.dyAn||"")}" placeholder="예: 85" style="width:100px"></div>
+        <div class="frow"><label>추리력 백분위</label><input id="ip_dy_re" value="${esc(sst?.dyRe||"")}" placeholder="예: 95 (선택)" style="width:110px"></div>
       </div>
       <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">검사지의 백분위를 그대로 입력하세요(높을수록 좋음). <b>어휘적용력·언어유추력 → 교과(내신) 잠재 밴드</b>,
       <b>추리력 → 수능(정시) 백분위 잠재치</b>로 환산해 분석합니다. 초2부터 가능한 검사라 초등 결과는 장기 잠재 참고치로만 해석하세요 — 상관 보정(0.6)이 포함됩니다.</p>`
     :`
-      <div class="frow"><label>전체지능 FSIQ</label><input id="ip_iq" placeholder="예: 122" style="width:120px"></div>
+      <div class="frow"><label>전체지능 FSIQ</label><input id="ip_iq" value="${esc(sst?.baseFsiq||"")}" placeholder="예: 122" style="width:120px"></div>
       <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">⚠️ 지능은 성취를 결정하지 않습니다(상관 약 0.5~0.6). 이 분석은 <b>잠재력이 온전히 성취로 전환될 때의 상한 참고치</b>이며,
       현재 성적과의 갭을 보는 것이 목적입니다 — 그 갭을 줄이는 것이 컨설팅입니다.</p>`}
     <div style="margin-top:10px"><button class="btn pri sm" onclick="runIpsi()">분석 실행</button></div>
