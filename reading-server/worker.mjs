@@ -6,7 +6,7 @@
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin } from './naesin-api.mjs';
-import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
@@ -171,7 +171,7 @@ async function fullDump(env) {
   }
   const vocab = await dumpVocab(vocabStore(env));
   /* 강사가 손으로 만든 것도 담는다 — 빠지면 복구 후 낱말 검수를 처음부터 다시 해야 한다 */
-  const [textbook, pubmap] = await Promise.all([env.DB.get('textbook','json'), env.DB.get('pubmap','json')]);
+  const [textbook, pubmap, textbookSrc] = await Promise.all([env.DB.get('textbook','json'), env.DB.get('pubmap','json'), env.DB.get('textbook-src','json')]);
   /* 내신브레인 — 학생 기록·시험 배정만 담는다. 팩 본문은 원장이 보관한 원본 JSON으로
      재업로드할 수 있고, 담으면 스냅샷이 팩 크기(수 MB)만큼 부풀어서 id 목록만 남긴다. */
   const naesin = { states: {}, exams: {}, packIds: (await env.DB.get('naesin:packs', 'json')) || [] };
@@ -179,7 +179,7 @@ async function fullDump(env) {
     naesin.states[k.slice('naesin:state:'.length)] = await env.DB.get(k, 'json');
   for (const k of await kvListAll(env, 'naesin:exam:'))
     naesin.exams[k.slice('naesin:exam:'.length)] = await env.DB.get(k, 'json');
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin };
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, textbookSrc: textbookSrc || {} };
 }
 
 async function snapshotBackup(env) {
@@ -208,13 +208,14 @@ async function titleMap(env, origin) {
   return TITLE_CACHE.map;
 }
 
-/* 교재(어휘가 독해다) — 제목 맵과 같이 정적 자산에서 읽어 10분 캐시 */
+/* 교재(어휘가 독해다) 원문 — 예전엔 정적 자산이었지만 공개 저장소에 파일이 그대로
+   노출되어 KV(textbook-src)로 옮겼다(2026-09, 관리 웹에서 업로드). 10분 캐시. */
 let TB_CACHE = { t: 0, data: null };
 async function textbookRaw(env, origin) {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 600_000) return TB_CACHE.data;
   try {
-    const r = await env.ASSETS.fetch(new Request(origin + '/textbook.json'));
-    TB_CACHE = { t: Date.now(), data: await r.json() };
+    const rec = await env.DB.get('textbook-src', 'json');
+    TB_CACHE = { t: Date.now(), data: (rec && rec.src) || { books: [] } };
   } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
   return TB_CACHE.data;
 }
@@ -565,6 +566,23 @@ export default {
       /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
       if (p === '/api/admin/textbook' && req.method === 'GET') {
         return json(200, { books: bookIndex(await textbook(env, url.origin)) });
+      }
+      /* 교재 원문(코칭) — KV 이전분 관리. GET은 요약만, PUT은 검증 후 저장 + 캐시 갱신 */
+      if (p === '/api/admin/textbook-src' && req.method === 'GET') {
+        const rec = await env.DB.get('textbook-src', 'json');
+        if (!rec) return json(200, { exists: false });
+        const sum = sourceSummary(rec.src);
+        return json(200, { exists: true, updatedAt: rec.updatedAt || null, version: (rec.src && rec.src.version) || null, books: sum.books });
+      }
+      if (p === '/api/admin/textbook-src' && req.method === 'PUT') {
+        const src = await req.json();
+        const sum = sourceSummary(src);
+        if (sum.errors.length) return json(400, { error: '원문 검증 실패', details: sum.errors.slice(0, 10) });
+        if (JSON.stringify(src).length > 5_000_000) return json(413, { error: '원문이 너무 커요 (5MB 이내).' });
+        const rec = { src, updatedAt: nowIso() };
+        await env.DB.put('textbook-src', JSON.stringify(rec));
+        TB_CACHE = { t: 0, data: null };
+        return json(200, { ok: true, updatedAt: rec.updatedAt, version: src.version || null, books: sum.books });
       }
       if (p === '/api/admin/book' && req.method === 'POST') {
         const { code, bookId, lesson } = await req.json();
