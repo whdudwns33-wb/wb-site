@@ -2177,7 +2177,8 @@ function renderHsSim(){
           <button class="kstar" title="비교에서 제거" style="color:var(--ink2)" onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(name)}');render()">✕</button>
         </div></div>`;}).join("");
     cmp=`<div class="sec"><h2>3️⃣ 나란히 비교 <span class="n">같은 학생(상위 ${p.toFixed(1)}%)이 각 학교에 갔을 때</span>
-      <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button></h2>
+      <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button>
+      <button class="btn sm pri" onclick="hsSimReport()">📄 학부모 리포트 (파일)</button></h2>
       <div class="bcols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${colsH}</div>
       <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
   }
@@ -2226,6 +2227,74 @@ function copyHsSim(){
 ${lines}
 
 ※ 학교 유형·내신 경쟁 강도 기반 시뮬레이션 참고치입니다. 실제 내신은 학교 시험 난이도·학생 적응에 따라 달라지며, 고교 확정은 통학·프로그램·분위기를 포함해 상담에서 결정합니다.`);}
+/* 고교 선택 패키지 — 학부모 전달용 정식 리포트 (md 파일) */
+function hsSimReport(){
+  let p=parseFloat(view.hsP);
+  const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
+  if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
+  const ach=achEstimate();
+  const usingAch=isNaN(p)&&!!ach;
+  if(usingAch)p=ach.mid;
+  if(isNaN(p)||!(view.hsPicks||[]).length){toast("성적과 후보 고교를 먼저 입력하세요");return;}
+  const field=view.hsField||"전체";
+  const hsRows=allHsRows();
+  const cols=(view.hsPicks||[]).map(name=>{
+    const row=hsRows.find(h=>h.name===name);if(!row)return null;
+    const {band,adj}=hsSimBand(p,row);
+    const mid=(band[0]+band[1])/2, myPct=Math.round((100-gradeToTopPct(mid))*10)/10;
+    const isHonam=/^(광주|전남|전북|전라)/.test(row.region||"");
+    const j=[];
+    for(const g of ipGroups()){
+      if(g.isJ||isSpecialTrack(g.track))continue;
+      if(!isHonam&&g.track.includes("지역인재"))continue;
+      if(field!=="전체"&&!fieldPass(g.major,field))continue;
+      const v=judgeGroup(g,mid,myPct);
+      if(v&&(v.cls[0]==="적정"||v.cls[0]==="소신"))j.push({g,v});
+    }
+    j.sort((a,b)=>(a.g.cutG??9)-(b.g.cutG??9));
+    const top=k=>j.filter(x=>x.v.cls[0]===k).slice(0,3).map(x=>`${x.g.univ} ${x.g.major}(${fmtCut(x.g.latest)})`).join(" / ")||"—";
+    const ji=j.filter(x=>x.g.track.includes("지역인재")).length;
+    return {row,band,adj,top1:top("적정"),top2:top("소신"),ji,isHonam};
+  }).filter(Boolean);
+  const t=(l,f)=>`| ${l} | ${cols.map(f).join(" | ")} |`;
+  const md=`# 고교 선택 분석 리포트
+
+**WB 웩슬러브레인센터** · ${today()} · 담당: 원장
+
+## 1. 학생 성적 기준
+${usingAch?`- 중학 절대평가 성취도 평균 **${ach.avg}** (${ach.n}과목 입력) → 상위 **${ach.lo}~${ach.hi}%** 추정 (분석은 중앙값 ${ach.mid}% 적용)`
+:`- 중학교 성적: 상위 **${p.toFixed(1)}%**`}
+- 희망 계열: **${field}**
+
+## 2. 후보 고교 비교
+
+${t("항목",c=>`**${c.row.name}**`)}
+|---|${cols.map(()=>"---").join("|")}|
+${t("유형·설립",c=>`${c.row.type||"—"}${c.row.estab?" · "+c.row.estab:""}`)}
+${t("소재지",c=>c.row.region||"—")}
+${t("내신 경쟁도",c=>c.row.level?`${c.row.level}${c.adj?` (보정 ${c.adj>0?"+":""}${c.adj.toFixed(1)}등급)`:""}`:"평가 없음")}
+${t("예상 내신(3년)",c=>`**${c.band[0].toFixed(1)}~${c.band[1].toFixed(1)}등급**`)}
+${t("적정권 상단(70%컷)",c=>c.top1)}
+${t("소신권 상단",c=>c.top2)}
+${t("지역인재 전형 자격",c=>c.isHonam?`해당 (가능권 ${c.ji}건)`:"비해당 지역")}
+${t("학교 특징",c=>c.row.feature||"—")}
+
+## 3. 해석 (상담 요지)
+- (상담에서 작성 — 내신 유리함 vs 학종 환경, 통학·기숙, 학생 성향과의 적합성)
+
+## 4. 권고
+- 1지망: (상담에서 확정)
+- 2지망:
+- 판단 근거:
+
+---
+※ **예상 내신은 시뮬레이션 참고치**입니다 — 학교 유형·내신 경쟁 강도 통계에 기반하며, 실제 결과는 학교 시험 난이도와 학생의 적응에 따라 달라집니다. 합격 예측이 아닙니다.
+※ 대학 라인은 한국대학교육협의회 어디가 발표 입결(2021~2025학년도, 최종등록자 교과등급 70%컷)과의 대조 참고치입니다.
+※ 최종 고교 선택은 통학 거리·학교 분위기·교육과정 편성을 포함해 학생·학부모와의 상담에서 확정합니다.
+
+문의: WB 웩슬러브레인센터 (광주 서구 월드컵4강로 52)`;
+  saveFile(`고교선택리포트_${today()}.md`,md);
+  toast("학부모 리포트를 저장했습니다 — 학생 폴더에 보관 후 전달하세요");}
 
 /* ═══════════ 학교 파트너십 (제휴 관리 + 문서 생성) ═══════════ */
 function renderPartner(){
