@@ -7,6 +7,7 @@ on:
       - 'reading/**'
       - 'reading-server/**'
       - 'vocab/**'
+      - 'naesin/**'
       - 'shared/**'
   workflow_dispatch:
 
@@ -38,6 +39,14 @@ jobs:
         run: node vocab/quiz.test.cjs
       - name: 워드브레인 서버 라우트 테스트
         run: node reading-server/vocab-api.test.mjs
+      - name: 내신브레인 암기 엔진 테스트
+        run: node naesin/engine.test.cjs
+      - name: 내신브레인 채점 모듈 테스트
+        run: node naesin/grade.test.cjs
+      - name: 내신브레인 문항 생성 테스트
+        run: node naesin/gen.test.cjs
+      - name: 내신브레인 서버 라우트 테스트
+        run: node reading-server/naesin-api.test.mjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
@@ -54,6 +63,8 @@ jobs:
         run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
+      - name: 배포본 캐시 무효화 검증
+        run: node reading-server/dist-cache.test.mjs
       - name: Cloudflare Workers 배포
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

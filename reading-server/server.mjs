@@ -9,7 +9,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { handleNaesin } from './naesin-api.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,7 @@ const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파�
 const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
 const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
+const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -50,6 +52,28 @@ const vocabStore = {
   getArena: (k) => (db.vocab.arena || {})[k] || null,
   putArena: (k, rec) => { db.vocab.arena = db.vocab.arena || {}; db.vocab.arena[k] = rec; persist(); },
 };
+/* 내신 저장소 어댑터 — db.naesin만 사용 (vocab과 같은 분리 가능한 격리).
+   옛 db.json에는 naesin 칸이 없으므로 첫 접근 때 만들어 준다 — store.mjs를 고치지 않기 위해. */
+const naesinRoot = () => {
+  db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
+  db.naesin.tasks = db.naesin.tasks || {};
+  return db.naesin;
+};
+const naesinStore = {
+  getPack: (id) => naesinRoot().packs[id] || null,
+  putPack: (id, rec) => { naesinRoot().packs[id] = rec; persist(); },
+  getPackIds: () => naesinRoot().packIds || null,
+  putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
+  getState: (c) => naesinRoot().states[c] || null,
+  putState: (c, rec) => { naesinRoot().states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(naesinRoot().states),
+  getExam: (s) => naesinRoot().exams[s] || null,
+  putExam: (s, rec) => { naesinRoot().exams[s] = rec; persist(); },
+  getTask: (s) => naesinRoot().tasks[s] || null,
+  putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
+  getStudent: (c) => db.students[c] || null,
+};
+
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
   privateJwk: process.env.VAPID_PRIVATE_JWK || '',
@@ -138,9 +162,13 @@ function titleMap() {
 let TB_CACHE = { t: 0, data: null };
 function textbookRaw() {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
-  try {
-    TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
-  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  /* 원문은 관리 웹 업로드분(db.textbookSrc)이 정본 — 공개 저장소에서 파일을 뺐다(2026-09).
+     로컬 파일(reading/textbook.json)은 개발 편의용 폴백이며 gitignore 대상이다. */
+  let data = (db.textbookSrc && db.textbookSrc.src) || null;
+  if (!data) {
+    try { data = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')); } catch (e) {}
+  }
+  TB_CACHE = { t: Date.now(), data: data || TB_CACHE.data || { books: [] } };
   return TB_CACHE.data;
 }
 /* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다 */
@@ -268,6 +296,16 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
+         json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
+      if (p.startsWith('/api/naesin/')) {
+        const out = await handleNaesin({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readBody(req), store: naesinStore,
+        });
+        return json(res, out.status, out.body);
+      }
+
       /* 학생 API */
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = db.states[who.code] || null;
@@ -380,6 +418,21 @@ const server = http.createServer(async (req, res) => {
       /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
       if (p === '/api/admin/textbook' && req.method === 'GET') {
         return json(res, 200, { books: bookIndex(textbook()) });
+      }
+      /* 교재 원문(코칭) — 서버 저장소 이전분 관리 (워커와 동일 계약) */
+      if (p === '/api/admin/textbook-src' && req.method === 'GET') {
+        if (!db.textbookSrc) return json(res, 200, { exists: false });
+        const sum = sourceSummary(db.textbookSrc.src);
+        return json(res, 200, { exists: true, updatedAt: db.textbookSrc.updatedAt || null, version: (db.textbookSrc.src && db.textbookSrc.src.version) || null, books: sum.books });
+      }
+      if (p === '/api/admin/textbook-src' && req.method === 'PUT') {
+        const src = await readBody(req);
+        const sum = sourceSummary(src);
+        if (sum.errors.length) return json(res, 400, { error: '원문 검증 실패', details: sum.errors.slice(0, 10) });
+        db.textbookSrc = { src, updatedAt: nowIso() };
+        TB_CACHE = { t: 0, data: null };
+        persist();
+        return json(res, 200, { ok: true, updatedAt: db.textbookSrc.updatedAt, version: src.version || null, books: sum.books });
       }
       if (p === '/api/admin/book' && req.method === 'POST') {
         const { code, bookId, lesson } = await readBody(req);
@@ -506,6 +559,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
+
+    /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
+    if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/naesin' || p === '/naesin/') return serveFile(res, NAESIN_DIR, 'index.html');
+    if (p.startsWith('/naesin/')) return serveFile(res, NAESIN_DIR, p.slice('/naesin/'.length));
 
     /* 워드브레인 앱 */
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');

@@ -96,7 +96,7 @@ test('wizard reuses the existing timetable and study-goal records', () => {
   assert.match(wizard, /data-act="studentsetupgoal" data-min="0"/);
   assert.match(wizard, /id="studentSetupGoal" type="number" min="10" max="1440"[\s\S]*?aria-label="하루 순공 목표 분 단위"/);
   assert.match(wizard, /오늘 배부된 공부[\s\S]*?내 체크리스트로 가져오기/);
-  assert.match(wizard, /원장님이 강좌를 등록하면 자동으로 나타납니다/);
+  assert.match(wizard, /인강 탭에서 필요한 강좌의 배정을 요청할 수 있습니다/);
   assert.match(summary, /ingAvail\(me\.id\)/);
   assert.match(summary, /stGoalMin\(me\.id\)/);
   assert.match(summary, /ingCourses\(me\.id\)\.length/);
