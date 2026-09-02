@@ -29,7 +29,7 @@ function renderTabsHtml(sessionValue, manager) {
   const target = { innerHTML: '' };
   const source = functionSource('renderTabs');
   new Function(
-    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route',
+    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff',
     source + '; renderTabs();'
   )(
     sessionValue,
@@ -37,7 +37,8 @@ function renderTabsHtml(sessionValue, manager) {
     () => ({ total: 0 }),
     selector => selector === '#tabs' ? target : null,
     () => {},
-    'today'
+    'today',
+    () => []
   );
   return target.innerHTML;
 }
