@@ -383,10 +383,19 @@ function fmtCut(n){return n==null||isNaN(n)?"—":(Math.round(n*100)/100).toFixe
 const _UCPAL=["#2F6DB5","#6C4BB0","#0E7A6A","#B0487E","#B26A2A","#4A7A2F","#8A5A3A","#3E7C8A","#A04545","#5B5FA8"];
 function uColor(u){let h=0;for(let i=0;i<u.length;i++)h=(h*31+u.charCodeAt(i))>>>0;return _UCPAL[h%_UCPAL.length];}
 function allHsRows(){
-  const a=(db.hsdb||[]).map(r=>({name:r.name,type:r.type,region:r.region||"",level:r.level||"",feature:r.feature||"",source:r.source||"",bulk:false}));
+  /* met = [졸업자, 진학계, 4년제, 재적, 연간전출] — 학교알리미 공시 수집분 (고교만, 없으면 null) */
+  const MI=new Map();for(const r of (BULK.hs||[]))if(r[6])MI.set(r[0],r[6]);
+  const a=(db.hsdb||[]).map(r=>({name:r.name,type:r.type,region:r.region||"",level:r.level||"",feature:r.feature||"",source:r.source||"",bulk:false,met:MI.get(r.name)||null}));
   const seen=new Set(a.map(x=>x.name));
-  const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",estab:r[4]||"",feature:[r[4]||"",r[5]||""].filter(Boolean).join(" · "),source:"나이스",bulk:true}));
+  const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",estab:r[4]||"",feature:[r[4]||"",r[5]||""].filter(Boolean).join(" · "),source:"나이스",bulk:true,met:r[6]||null}));
   return a.concat(b);}
+/* 진학 실적 요약 문자열 (표·카드 공용) — g>0일 때만 진학률 표기 */
+function hsMetHtml(met,long){
+  if(!met)return"";
+  const [g,go,u4,st]=met;
+  if(g>0){const p4=Math.round(u4/g*100),pa=Math.round(go/g*100);
+    return `<b>4년제 ${p4}%</b> · 진학 ${pa}%${long?` <span style="color:var(--ink2)">(2025 졸업 ${g}명${st?` · 재적 ${st}`:""})</span>`:""}`;}
+  return st?`<span style="color:var(--ink2)">재적 ${st}명</span>`:"";}
 let view={page:"home",stuId:null,tab:"overview",editDraft:null,editTask:null};
 function load(){try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.students)return d;}catch(e){}
   return {students:[],meta:{created:today()}};}
@@ -1632,9 +1641,10 @@ function renderSearch(){
     </div></form>
     <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시":""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
     ${shown.length?`<div class="tablewrap"><table class="t">
-      <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>비고</th><th></th></tr>
+      <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>진학 실적</th><th>비고</th><th></th></tr>
       ${shown.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
         <td>${r.level?`<span class="chip ${r.level==="상"?"warn":""}">${esc(r.level)}</span>`:""}</td>
+        <td style="font-size:11.5px;white-space:nowrap" title="${r.met&&r.met[0]>0?`2025년 2월 졸업 ${r.met[0]}명 · 진학 ${r.met[1]} (4년제 ${r.met[2]}) · 재적 ${r.met[3]||"-"} · 연간 전출 ${r.met[4]||0} — 학교알리미`:""}">${hsMetHtml(r.met)}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.feature||"")}</td>
         <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
     </table></div>`
@@ -1648,7 +1658,7 @@ function renderSearch(){
     <button class="tab ${tab==="hs"?"on":""}" onclick="view.searchTab='hs';view.sq='';render()">🏫 학교 (전국 고교 + 호남 초·중)</button>
   </div>
   <div class="card">${body}</div>
-  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보 — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
+  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보·학교알리미 공시(졸업생 진로 2025년 2월 졸업 기준, 재적·전출 2026 공시) — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
 function addBulkToIpdb(j){const r=JSON.parse(j);db.ipdb=db.ipdb||[];
   db.ipdb.push({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],source:"어디가 발표"});
   save();render();toast("분석 DB에 추가");}
@@ -2184,6 +2194,7 @@ function renderHsSim(){
         <div class="kcard" style="border-left-color:var(--accent)">
           <div class="ku">${esc(ty)}${row.level?` · 내신경쟁 ${esc(row.level)}`:""}${adj?` · 보정 ${adj>0?"+":""}${adj.toFixed(1)}`:""}</div>
           <div class="km">예상 내신 <span class="mono">${band[0].toFixed(1)}~${band[1].toFixed(1)}</span>등급</div>
+          ${row.met&&row.met[0]>0?`<div style="font-size:11.5px;margin-top:5px">🎓 ${hsMetHtml(row.met,true)}</div>`:""}
           ${mini("적정",pick3("적정"))}${mini("소신",pick3("소신"))}
           ${isHonam?`<div style="font-size:11.5px;color:var(--accent-ink);margin-top:6px">📍 지역인재 자격 — 가능권에 ${ji}건</div>`
             :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">지역인재 비대상 지역</div>`}
@@ -2194,7 +2205,7 @@ function renderHsSim(){
       <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button>
       <button class="btn sm pri" onclick="hsSimReport()">📄 학부모 리포트 (파일)</button></h2>
       <div class="bcols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${colsH}</div>
-      <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
+      <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 진학률의 "기타"에는 재수 준비가 포함되어 <b>정시 강세 학교일수록 진학률이 낮게 보일 수 있습니다</b>. 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>고교 선택 시뮬레이터</h1>
@@ -2234,7 +2245,7 @@ function copyHsSim(){
   const lines=(view.hsPicks||[]).map(name=>{
     const row=hsRows.find(h=>h.name===name);if(!row)return"";
     const {band}=hsSimBand(p,row);
-    return `■ ${row.name} (${row.type||"유형 미상"}${row.level?"·경쟁 "+row.level:""}): 예상 내신 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급`;
+    return `■ ${row.name} (${row.type||"유형 미상"}${row.level?"·경쟁 "+row.level:""}): 예상 내신 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급${row.met&&row.met[0]>0?` · 4년제 진학 ${Math.round(row.met[2]/row.met[0]*100)}%`:""}`;
   }).join("\n");
   copy(`[WB 고교 선택 시뮬레이션 — 상담 참고용] ${today()}
 중학 상위 ${p.toFixed(1)}% 기준
@@ -2287,11 +2298,14 @@ ${t("항목",c=>`**${c.row.name}**`)}
 ${t("유형·설립",c=>`${c.row.type||"—"}${c.row.estab?" · "+c.row.estab:""}`)}
 ${t("소재지",c=>c.row.region||"—")}
 ${t("내신 경쟁도",c=>c.row.level?`${c.row.level}${c.adj?` (보정 ${c.adj>0?"+":""}${c.adj.toFixed(1)}등급)`:""}`:"평가 없음")}
+${t("진학 실적(학교알리미)",c=>c.row.met&&c.row.met[0]>0?`4년제 ${Math.round(c.row.met[2]/c.row.met[0]*100)}% · 진학 ${Math.round(c.row.met[1]/c.row.met[0]*100)}% (2025 졸업 ${c.row.met[0]}명)`:"—")}
 ${t("예상 내신(3년)",c=>`**${c.band[0].toFixed(1)}~${c.band[1].toFixed(1)}등급**`)}
 ${t("적정권 상단(70%컷)",c=>c.top1)}
 ${t("소신권 상단",c=>c.top2)}
 ${t("지역인재 전형 자격",c=>c.isHonam?`해당 (가능권 ${c.ji}건)`:"비해당 지역")}
 ${t("학교 특징",c=>c.row.feature||"—")}
+
+※ 진학 실적 출처는 학교알리미 공시(2025년 2월 졸업생)이며, 미진학(기타)에는 재수 준비가 포함되어 정시 강세 학교는 진학률이 낮게 보일 수 있습니다.
 
 ## 3. 해석 (상담 요지)
 - (상담에서 작성 — 내신 유리함 vs 학종 환경, 통학·기숙, 학생 성향과의 적합성)
