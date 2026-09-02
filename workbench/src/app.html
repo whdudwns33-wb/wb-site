@@ -389,6 +389,15 @@ function allHsRows(){
   const seen=new Set(a.map(x=>x.name));
   const b=(BULK.hs||[]).filter(r=>!seen.has(r[0])).map(r=>({name:r[0],type:r[1]||"",region:((r[2]||"")+" "+(r[3]||"")).trim(),level:"",estab:r[4]||"",feature:[r[4]||"",r[5]||""].filter(Boolean).join(" · "),source:"나이스",bulk:true,met:r[6]||null}));
   return a.concat(b);}
+/* 목록 페이지 넘김 — view[vkey]가 현재 페이지(0부터), 총량이 줄면 자동 클램프 */
+function pager(total,per,vkey,cur){
+  const pages=Math.ceil(total/per);if(pages<=1)return"";
+  const btn=(p,l,dis)=>`<button class="btn ghost sm" ${dis?"disabled style='opacity:.4'":""} onclick="view.${vkey}=${p};render();document.querySelector('.card').scrollIntoView()">${l}</button>`;
+  return `<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px">
+    ${btn(cur-1,"◀ 이전",cur<=0)}
+    <span style="font-size:12px;color:var(--ink2)">${cur+1} / ${pages} 페이지 · 총 ${total.toLocaleString()}건</span>
+    ${btn(cur+1,"다음 ▶",cur>=pages-1)}</div>`;}
+function pageClamp(total,per,vkey){const pages=Math.max(1,Math.ceil(total/per));const c=Math.min(Math.max(0,view[vkey]||0),pages-1);view[vkey]=c;return c;}
 /* 진학 실적 요약 문자열 (표·카드 공용) — g>0일 때만 진학률 표기 */
 function hsMetHtml(met,long){
   if(!met)return"";
@@ -1551,12 +1560,12 @@ function renderSearch(){
     if(view.sTrack)f=f.filter(g=>(g.track||"").startsWith(view.sTrack));
     if(view.sRegion)f=f.filter(g=>g.region===view.sRegion);
     const filters=`
-    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sUniv=null;render()">
+    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sUniv=null;view.sUPage=0;view.sDPage=0;render()">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <input id="sq" value="${esc(view.sq||"")}" placeholder="대학·학과 검색 (예: 전남대, 의예, 화학공)" style="flex:1;min-width:200px">
       ${["","교과","종합","논술","수능"].map(t=>`<button type="button" class="fchip ${((view.sTrack||"")===t)?"on":""}"
-        onclick="view.sTrack='${t}';render()">${t||"전형 전체"}</button>`).join("")}
-      <select onchange="view.sRegion=this.value;view.sUniv=null;render()" style="width:96px">
+        onclick="view.sTrack='${t}';view.sUPage=0;view.sDPage=0;render()">${t||"전형 전체"}</button>`).join("")}
+      <select onchange="view.sRegion=this.value;view.sUniv=null;view.sUPage=0;render()" style="width:96px">
         <option value="">지역 전체</option>${regions.map(x=>`<option ${view.sRegion===x?"selected":""}>${x}</option>`).join("")}</select>
       <button class="btn sm pri">검색</button>
     </div></form>`;
@@ -1568,7 +1577,7 @@ function renderSearch(){
         <div class="uinit" style="background:${uColor(view.sUniv)}">${esc(view.sUniv.slice(0,2))}</div>
         <div><b style="font-size:17px">${esc(view.sUniv)}</b>
         <div style="font-size:12px;color:var(--ink2)">${esc(ug[0]?.region||"")} · 학과·전형 ${ug.length}건 — 행을 누르면 연도별 추이가 펼쳐집니다</div></div></div>
-      ${ug.slice(0,120).map(g=>{
+      ${(()=>{const per=120,cur=pageClamp(ug.length,per,"sDPage");return ug.slice(cur*per,cur*per+per);})().map(g=>{
         const open=view.sKey===g.key;
         const ys=g.isJ?Object.keys(g.pcts).sort():g.ys;
         const cutTxt=g.isJ?(g.pct!=null?`백분위 ${g.pct}`:"환산점수만"):(g.latest!=null?fmtCut(g.latest):"—");
@@ -1587,21 +1596,22 @@ function renderSearch(){
           :`<span style="font-size:12px;color:var(--ink2)">연도별 수치 없음 (환산점수 전용 전형)</span>`}
           <button class="btn ghost sm" title="수동 분석 DB에 추가" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([g.univ,g.major,g.track,g.isJ?g.pctYear:g.latestYear,g.y50[g.latestYear]||"",g.isJ?"":String(g.latest??""),g.rates[g.latestYear]||""]))})'>＋ DB</button>
         </div></div>`;}).join("")||`<div class="empty"><b>조건에 맞는 학과가 없습니다</b></div>`}
-      ${ug.length>120?`<p style="font-size:12px;color:var(--ink2)">전형이 많아 120건까지 표시 — 검색어·전형 필터로 좁혀주세요.</p>`:""}`;
+      ${pager(ug.length,120,"sDPage",view.sDPage||0)}`;
     }else{
       const byU=new Map();
       for(const g of f){if(!byU.has(g.univ))byU.set(g.univ,[]);byU.get(g.univ).push(g);}
       const us=[...byU.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ko"));
+      const perU=72,curU=pageClamp(us.length,perU,"sUPage");
       body=filters+`
       <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">대학 ${us.length}곳 · 학과·전형 ${f.length.toLocaleString()}건 — 카드를 누르면 학과·연도 추이로 들어갑니다</p>
-      <div class="ugrid">${us.slice(0,72).map(([u,list])=>{
+      <div class="ugrid">${us.slice(curU*perU,curU*perU+perU).map(([u,list])=>{
         const cuts=list.map(g=>g.cutG).filter(n=>n!=null).sort((a,b)=>a-b);
-        return `<button class="ucard" onclick="view.sUniv='${esc(u)}';view.sKey=null;render()">
+        return `<button class="ucard" onclick="view.sUniv='${esc(u)}';view.sKey=null;view.sDPage=0;render()">
           <div class="utop"><div class="uinit" style="background:${uColor(u)}">${esc(u.slice(0,2))}</div>
           <div><div class="uname">${esc(u)}</div><div class="ureg">${esc(list[0].region||"")}</div></div></div>
           <div class="umeta"><span>학과·전형 ${list.length}건</span>
           <span class="urange">${cuts.length?fmtCut(cuts[0])+"~"+fmtCut(cuts[cuts.length-1])+"등급":""}</span></div></button>`;}).join("")}</div>
-      ${us.length>72?`<p style="font-size:12px;color:var(--ink2);margin-top:10px">${us.length}곳 중 72곳 표시 — 검색어·지역으로 좁혀주세요.</p>`:""}
+      ${pager(us.length,perU,"sUPage",curU)}
       ${!us.length?`<div class="empty"><b>결과 없음</b>${gs.length<100?(window.__bulkStatus==="loading"?"입시 대량 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"대량 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`:""}`;
     }
   }else{
@@ -1621,25 +1631,26 @@ function renderSearch(){
     if(view.sEstab)f=f.filter(r=>((r.estab||"")+(r.feature||"")).includes(view.sEstab));
     if(view.sOwned)f=f.filter(r=>!r.bulk);
     f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
-    const shown=f.slice(0,300);
+    const perH=300,curH=pageClamp(f.length,perH,"sHsPage");
+    const shown=f.slice(curH*perH,curH*perH+perH);
     body=`
-    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;render()">
+    <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sHsPage=0;render()">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <input id="sq" value="${esc(view.sq||"")}" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
-      <select onchange="view.sLevel=this.value;view.sHsType='';render()" style="width:92px">
+      <select onchange="view.sLevel=this.value;view.sHsType='';view.sHsPage=0;render()" style="width:92px">
         <option value="">학교급 전체</option>${[["고","고등학교"],["중","중학교(호남)"],["초","초등학교(호남)"]].map(([v,l])=>`<option value="${v}" ${lv===v?"selected":""}>${l}</option>`).join("")}</select>
-      <select onchange="view.sSido=this.value;view.sGungu='';render()" style="width:110px">
+      <select onchange="view.sSido=this.value;view.sGungu='';view.sHsPage=0;render()" style="width:110px">
         <option value="">시도 전체</option>${sidos.map(x=>`<option ${view.sSido===x?"selected":""}>${x}</option>`).join("")}</select>
-      ${view.sSido?`<select onchange="view.sGungu=this.value;render()" style="width:104px">
+      ${view.sSido?`<select onchange="view.sGungu=this.value;view.sHsPage=0;render()" style="width:104px">
         <option value="">시군구 전체</option>${gungus.map(x=>`<option ${view.sGungu===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
-      ${lv!=="초"&&lv!=="중"?`<select onchange="view.sHsType=this.value;render()" style="width:100px">
+      ${lv!=="초"&&lv!=="중"?`<select onchange="view.sHsType=this.value;view.sHsPage=0;render()" style="width:100px">
         <option value="">유형 전체</option>${["일반고","자율고","특목고","특성화","자사고","외고","과학고"].map(x=>`<option ${view.sHsType===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
-      <select onchange="view.sEstab=this.value;render()" style="width:88px">
+      <select onchange="view.sEstab=this.value;view.sHsPage=0;render()" style="width:88px">
         <option value="">설립 전체</option>${["공립","사립","국립"].map(x=>`<option ${view.sEstab===x?"selected":""}>${x}</option>`).join("")}</select>
-      <button type="button" class="fchip ${view.sOwned?"on":""}" title="내신경쟁 평가를 보유한 학교만" onclick="view.sOwned=!view.sOwned;render()">평가 보유만</button>
+      <button type="button" class="fchip ${view.sOwned?"on":""}" title="내신경쟁 평가를 보유한 학교만" onclick="view.sOwned=!view.sOwned;view.sHsPage=0;render()">평가 보유만</button>
       <button class="btn sm pri">검색</button>
     </div></form>
-    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>300?" — 상위 300건 표시":""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
+    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>perH?` — ${curH*perH+1}~${Math.min(f.length,(curH+1)*perH)}건 표시`:""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
     ${shown.length?`<div class="tablewrap"><table class="t">
       <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>진학 실적</th><th>비고</th><th></th></tr>
       ${shown.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
@@ -1647,7 +1658,7 @@ function renderSearch(){
         <td style="font-size:11.5px;white-space:nowrap" title="${r.met&&r.met[0]>0?`2025년 2월 졸업 ${r.met[0]}명 · 진학 ${r.met[1]} (4년제 ${r.met[2]}) · 재적 ${r.met[3]||"-"} · 연간 전출 ${r.met[4]||0} — 학교알리미`:""}">${hsMetHtml(r.met)}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.feature||"")}</td>
         <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
-    </table></div>`
+    </table></div>${pager(f.length,perH,"sHsPage",curH)}`
     :`<div class="empty"><b>결과 없음</b>${rows.length<100?(window.__bulkStatus==="loading"?"학교 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"학교 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`}`;
   }
   $("#main").innerHTML=`
