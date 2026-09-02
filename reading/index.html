@@ -1437,6 +1437,7 @@ function vTrain(){
     <button class="btn sm" data-act="vs-start" ${due.length?'':'disabled'}>복습 시작</button></div>
   <div class="card"><div class="thead"><span class="tico t">字</span><div class="t-main"><h2 style="font-size:16px">한자 카드</h2>
     <p class="sub" style="margin-top:2px">한자 1개 → 낱말 여러 개. 카드로 넘기며 익혀요</p></div><span class="tag muted">${hj.length}묶음</span></div>
+    <p class="note">이 한자들은 <b>급수 시험 교재에서 뽑은 게 아니라, 읽은 글에 실제로 나온 낱말에서 모은 것</b>이에요. 그래서 같은 학년이어도 읽은 글에 따라 묶음이 달라져요. 초등학교에는 한자 교과가 따로 없고(국어과 어휘 학습의 일부예요), 교육부 「교육용 기초한자」 1,800자는 중·고등학교용이라 초등 기준으로 쓰기 어렵습니다.</p>
     <button class="btn sm" data-act="hj-start" data-i="0" ${hj.length?'':'disabled'}>${hj.length?'카드 학습 시작 ('+hj.length+'장)':'어휘가 쌓이면 열려요'}</button>
     <div class="glist">${hj.length?hj.slice(0,8).map((f,i)=>`<button class="grow" data-act="hj-start" data-i="${i}">
         <span class="hj-char">${esc(f.ch)}</span>
