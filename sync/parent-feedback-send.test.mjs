@@ -369,7 +369,10 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
 
 test('v2 sends the requested six variables through its separate approved template id', async () => {
   const db = new TestD1();
-  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const requestedSubject = '국어 독해 · 비문학';
+  const { requestKey } = seedFeedback(db, {
+    templateVersion: 'v2', fields: { subjectText: requestedSubject }
+  });
   registerGuardian(db, '테스트학생');
   let sentMessage = null;
   await withFetch(async (url, init) => {
@@ -382,7 +385,7 @@ test('v2 sends the requested six variables through its separate approved templat
   });
   assert.equal(sentMessage.kakaoOptions.templateId, 'TPL_TEST_V2_0001');
   assert.deepEqual(sentMessage.kakaoOptions.variables, {
-    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': '국어',
+    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': requestedSubject,
     '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
     '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.'
   });
