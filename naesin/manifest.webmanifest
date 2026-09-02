@@ -1,0 +1,14 @@
+{
+  "name": "WB 내신브레인 — 영어 시험대비",
+  "short_name": "내신브레인",
+  "description": "단어 암기·본문 해석·백지 영작까지 — WB 영어 내신 시험대비 훈련 앱 (원내 전용)",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F3EA",
+  "theme_color": "#1B3A5C",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
