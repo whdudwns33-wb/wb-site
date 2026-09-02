@@ -143,6 +143,8 @@ function naesinStore(env) {
     listStateCodes: async () => (await kvListAll(env, 'naesin:state:')).map(k => k.slice('naesin:state:'.length)),
     getExam: (s) => env.DB.get('naesin:exam:' + s, 'json'),
     putExam: (s, rec) => env.DB.put('naesin:exam:' + s, JSON.stringify(rec)),
+    getTask: (s) => env.DB.get('naesin:task:' + s, 'json'),
+    putTask: (s, rec) => env.DB.put('naesin:task:' + s, JSON.stringify(rec)),
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }

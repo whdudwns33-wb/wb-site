@@ -8,7 +8,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const packs = {}, states = {}, exams = {};
+  const packs = {}, states = {}, exams = {}, tasks = {};
   let packIds = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
   return {
@@ -21,6 +21,8 @@ function memStore() {
     listStateCodes: () => Object.keys(states),
     getExam: (s) => exams[s] || null,
     putExam: (s, rec) => { exams[s] = rec; },
+    getTask: (s) => tasks[s] || null,
+    putTask: (s, rec) => { tasks[s] = rec; },
     getStudent: (c) => students[c] || null,
     _raw: { packs, states, exams, ids: () => packIds },
   };
@@ -210,6 +212,35 @@ await t('naesinSummary — 기록 없음·불량 summary도 셈이 깨지지 않
   const arr = naesinSummary('st-1', { name: '김지우', cls: 'A' }, { state: { summary: [1, 2] }, updatedAt: 'x' });
   assert.strictEqual(arr.summary, undefined, '배열 summary는 요약이 아니다');
   assert.strictEqual(arr.linked, true);
+});
+
+await t('수업 과제 — 없으면 빈 값, 등록·조회 왕복, 검증', async () => {
+  const store = memStore();
+  let r = await call(store, { path: '/api/naesin/task' });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.body.task, {}, '과제가 없으면 빈 값 — 평시는 오류가 아니다');
+  assert.strictEqual(r.body.scope, null);
+
+  r = await call(store, { path: '/api/naesin/admin/task', method: 'POST', who: ADMIN,
+    getBody: async () => ({ date: '2026-9-20', title: 'x', typeKeys: ['w-e2k'] }) });
+  assert.strictEqual(r.status, 400, '날짜 형식 오류는 저장 전에 거른다');
+  r = await call(store, { path: '/api/naesin/admin/task', method: 'POST', who: ADMIN,
+    getBody: async () => ({ date: '2026-09-20', title: '4교시 과제', typeKeys: [] }) });
+  assert.strictEqual(r.status, 400, '유형 없는 과제는 거절');
+  r = await call(store, { path: '/api/naesin/admin/task', method: 'POST', who: ADMIN,
+    getBody: async () => ({ date: '2026-09-20', title: '4교시 과제', typeKeys: ['w-e2k', 's-gram'], seqFrom: 11, seqTo: 19 }) });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.task.seqFrom, 11);
+
+  r = await call(store, { path: '/api/naesin/task' });
+  assert.strictEqual(r.body.task.title, '4교시 과제');
+  assert.strictEqual(r.body.scope, 'default');
+  r = await call(store, { path: '/api/naesin/admin/task', who: ADMIN });
+  assert.strictEqual(r.body.task.typeKeys.length, 2, '관리자 조회로 현재 과제를 확인한다');
+
+  r = await call(store, { path: '/api/naesin/admin/task', method: 'POST',
+    getBody: async () => ({ date: '2026-09-20', title: 'x', typeKeys: ['w-e2k'] }) });
+  assert.strictEqual(r.status, 403, '학생은 과제를 등록할 수 없다');
 });
 
 await t('모르는 경로는 404', async () => {

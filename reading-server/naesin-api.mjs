@@ -47,6 +47,7 @@ export function naesinSummary(code, stu, stateRec) {
        getPackIds(), putPackIds(ids),   // naesin:packs — 저장된 팩 id 배열
        getState(code), putState(code, rec), listStateCodes(),
        getExam(scope), putExam(scope, rec),   // scope: 'default' | 학생코드
+       getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
        getStudent(code),                // 호스트 학생 명부 (읽기만)
      },
    }
@@ -100,8 +101,38 @@ export async function handleNaesin(ctx) {
     return j(200, { exam: {}, scope: null });
   }
 
+  /* 오늘 수업 과제 — 강사가 배정한 반 공통 과제(수업 모드). 없으면 빈 값(평시). */
+  if (p === '/api/naesin/task' && method === 'GET' && !who.admin) {
+    const rec = await store.getTask('default');
+    return j(200, { task: rec || {}, scope: rec ? 'default' : null });
+  }
+
   /* ── 관리자 (원장·강사 — 관리 PIN 토큰) ── */
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
+
+  /* 수업 과제 등록·조회 — 수업시간에 전원이 같은 범위를 진행하게 하는 배정 */
+  if (p === '/api/naesin/admin/task' && method === 'GET') {
+    return j(200, { task: (await store.getTask('default')) || {} });
+  }
+  if (p === '/api/naesin/admin/task' && method === 'POST') {
+    const b = await body();
+    if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+    const date = String(b.date || '').trim();
+    if (!EXAM_DATE_RE.test(date)) return j(400, { error: 'date는 YYYY-MM-DD' });
+    const title = String(b.title || '').trim().slice(0, 80);
+    if (!title) return j(400, { error: 'title 필요' });
+    const typeKeys = Array.isArray(b.typeKeys)
+      ? b.typeKeys.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 14) : [];
+    if (!typeKeys.length) return j(400, { error: 'typeKeys 필요 (학습 유형 1개 이상)' });
+    const rec = { date, title, typeKeys, updatedAt: nowIso() };
+    if (b.seqFrom != null || b.seqTo != null) {
+      const f = Number(b.seqFrom), to = Number(b.seqTo);
+      if (!Number.isInteger(f) || !Number.isInteger(to) || f < 1 || to < f) return j(400, { error: '문장 범위가 올바르지 않아요.' });
+      rec.seqFrom = f; rec.seqTo = to;
+    }
+    await store.putTask('default', rec);
+    return j(200, { ok: true, task: rec });
+  }
 
   /* 팩 업로드 — 업로드 파이프라인의 종착지(§7). 검증은 최소로:
      구조 검증은 업로드 도구·검수 화면 몫이고, 서버는 id 일치와 크기만 지킨다. */

@@ -54,7 +54,11 @@ const vocabStore = {
 };
 /* 내신 저장소 어댑터 — db.naesin만 사용 (vocab과 같은 분리 가능한 격리).
    옛 db.json에는 naesin 칸이 없으므로 첫 접근 때 만들어 준다 — store.mjs를 고치지 않기 위해. */
-const naesinRoot = () => (db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} });
+const naesinRoot = () => {
+  db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
+  db.naesin.tasks = db.naesin.tasks || {};
+  return db.naesin;
+};
 const naesinStore = {
   getPack: (id) => naesinRoot().packs[id] || null,
   putPack: (id, rec) => { naesinRoot().packs[id] = rec; persist(); },
@@ -65,6 +69,8 @@ const naesinStore = {
   listStateCodes: () => Object.keys(naesinRoot().states),
   getExam: (s) => naesinRoot().exams[s] || null,
   putExam: (s, rec) => { naesinRoot().exams[s] = rec; persist(); },
+  getTask: (s) => naesinRoot().tasks[s] || null,
+  putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
   getStudent: (c) => db.students[c] || null,
 };
 
