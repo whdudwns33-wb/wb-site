@@ -34,6 +34,8 @@ jobs:
         run: node vocab/srs.test.cjs
       - name: 워드브레인 문제 출제 엔진 테스트
         run: node vocab/quiz.test.cjs
+      - name: 한자 따라쓰기 판정 테스트
+        run: node vocab/trace.test.cjs
       - name: 워드브레인 서버 라우트 테스트
         run: node reading-server/vocab-api.test.mjs
       - name: 교재 코칭 테스트
