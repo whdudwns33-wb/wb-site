@@ -1017,12 +1017,27 @@
   }
   .feedback-record[open] > summary::after, .feedback-teacher-group[open] > summary::after { content: '접기'; }
   .feedback-record-body, .feedback-teacher-group-body { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .feedback-weekday-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
+  .feedback-weekday-button {
+    min-width: 0; min-height: 70px; padding: 9px 7px; border: 1px solid var(--line); border-radius: 11px;
+    background: #FFF; color: var(--navy); font: inherit; text-align: center; cursor: pointer;
+  }
+  .feedback-weekday-button b, .feedback-weekday-button span { display: block; }
+  .feedback-weekday-button b { font-size: 13px; }
+  .feedback-weekday-button span { margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; line-height: 1.45; }
+  .feedback-weekday-button[aria-pressed="true"] { border-color: var(--deep-blue); background: #EAF6FC; box-shadow: inset 0 0 0 1px var(--deep-blue); }
+  .feedback-weekday-button[aria-pressed="true"] span { color: var(--deep-blue); }
+  .feedback-weekday-summary { margin-top: 12px; padding: 11px 12px; border-radius: 10px; background: #F8FBFD; color: var(--navy); font-size: 12.5px; line-height: 1.6; }
+  .feedback-teacher-group-body > .feedback-record { margin-left: 0; margin-right: 0; }
   .feedback-message-label { margin-bottom: 6px; color: var(--navy); font-size: 12px; font-weight: 900; }
   .feedback-message-text {
     padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #F8FBFD;
     color: var(--navy); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere;
   }
   .feedback-send-reason { overflow-wrap: anywhere; }
+  @media(max-width:720px) {
+    .feedback-weekday-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  }
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -1053,11 +1068,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-02.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-02.2"></script>
-<script src="./asset-core.js?v=2026-09-02.2"></script>
-<script src="./qr-core.js?v=2026-09-02.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-02.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-02.3"></script>
+<script src="./schedule-board-core.js?v=2026-09-02.3"></script>
+<script src="./asset-core.js?v=2026-09-02.3"></script>
+<script src="./qr-core.js?v=2026-09-02.3"></script>
+<script src="./acaflow-import-core.js?v=2026-09-02.3"></script>
 <script>
 "use strict";
 
@@ -1924,6 +1939,7 @@ function resetPersonCache(token) {
   lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false; lessonDirectEntryOpen = false;
   lessonExistingChangeOpen = false; lessonExistingSearchQuery = '';
   feedbackQueue = []; feedbackQueueLoaded = false; feedbackQueueLoading = false; feedbackQueueError = '';
+  feedbackWeekdayFilter = '';
   ownFeedbackQueue = []; ownFeedbackQueueLoaded = false; ownFeedbackQueueLoading = false; ownFeedbackQueueError = '';
   lessonChangeQueue = []; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false; lessonChangeQueueError = '';
   ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = ''; ownLessonChangeLastLoadedAt = 0;
@@ -7557,6 +7573,17 @@ let ownFeedbackQueue = [];
 let ownFeedbackQueueLoaded = false;
 let ownFeedbackQueueLoading = false;
 let ownFeedbackQueueError = '';
+let feedbackWeekdayFilter = '';
+
+const FEEDBACK_WEEKDAYS = [
+  { key: '1', day: 1, label: '월요일' },
+  { key: '2', day: 2, label: '화요일' },
+  { key: '3', day: 3, label: '수요일' },
+  { key: '4', day: 4, label: '목요일' },
+  { key: '5', day: 5, label: '금요일' },
+  { key: '6', day: 6, label: '토요일' },
+  { key: '0', day: 0, label: '일요일' }
+];
 
 const FEEDBACK_STATUS_LABEL = {
   approval_waiting: ['원장 검토 대기', 'warn'],
@@ -7602,11 +7629,106 @@ function feedbackIsUnsent(item) {
   return !!item && item.status !== 'sent' && item.status !== 'cancelled';
 }
 
-function feedbackSortRows(rows, unsentFirst) {
+function feedbackWeekdayKey(value) {
+  const source = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(source)) return '';
+  const parsed = parseYmd(source);
+  if (!Number.isFinite(parsed.getTime()) || ymd(parsed) !== source) return '';
+  return String(parsed.getDay());
+}
+
+function feedbackWeekdayLabel(value) {
+  const key = feedbackWeekdayKey(value);
+  const weekday = FEEDBACK_WEEKDAYS.find(day => day.key === key);
+  return weekday ? weekday.label : '요일 미확인';
+}
+
+function feedbackWeekdaySummary(rows) {
+  const summaries = FEEDBACK_WEEKDAYS.map(day => ({
+    key: day.key, day: day.day, label: day.label, sentCount: 0, unsentCount: 0, totalCount: 0
+  }));
+  const byKey = new Map(summaries.map(summary => [summary.key, summary]));
+  (Array.isArray(rows) ? rows : []).forEach(item => {
+    if (!item || item.status === 'cancelled') return;
+    const summary = byKey.get(feedbackWeekdayKey(item.feedbackDate));
+    if (!summary) return;
+    summary.totalCount += 1;
+    if (item.status === 'sent') summary.sentCount += 1;
+    else summary.unsentCount += 1;
+  });
+  return summaries;
+}
+
+function feedbackFilterByWeekday(rows, weekdayKey) {
+  const key = String(weekdayKey || '');
+  if (!FEEDBACK_WEEKDAYS.some(day => day.key === key)) return [];
+  return (Array.isArray(rows) ? rows : []).filter(item => feedbackWeekdayKey(item && item.feedbackDate) === key);
+}
+
+function feedbackTaskForItem(item, taskOverride) {
+  if (taskOverride) return taskOverride;
+  return state.tasks.find(row => String(row && row.id || '') === String(item && item.taskId || '')) || null;
+}
+
+function feedbackLessonSlots(item, taskOverride) {
+  const task = feedbackTaskForItem(item, taskOverride);
+  const date = String(item && item.feedbackDate || '');
+  const weekdayKey = feedbackWeekdayKey(date);
+  if (!task || weekdayKey === '') return [];
+  const weekday = Number(weekdayKey);
+  return (Array.isArray(task.scheduleSlots) ? task.scheduleSlots : []).filter(slot => {
+    const days = Array.isArray(slot && slot.days) ? slot.days.map(Number) : [];
+    const validFrom = String(slot && (slot.validFrom || slot.startDate) || '');
+    const validTo = String(slot && (slot.validTo || slot.endDate) || '');
+    return days.includes(weekday) && (!validFrom || validFrom <= date) && (!validTo || validTo >= date);
+  }).slice().sort((left, right) => String(left && left.startTime || '').localeCompare(String(right && right.startTime || '')) ||
+    String(left && left.endTime || '').localeCompare(String(right && right.endTime || '')));
+}
+
+function feedbackClockMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return Number.POSITIVE_INFINITY;
+  const hour = Number(match[1]), minute = Number(match[2]);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
+    ? hour * 60 + minute : Number.POSITIVE_INFINITY;
+}
+
+function feedbackLessonStartMinutes(item, taskOverride) {
+  const task = feedbackTaskForItem(item, taskOverride);
+  if (!task) return Number.POSITIVE_INFINITY;
+  const slotMinutes = feedbackLessonSlots(item, task).map(slot => feedbackClockMinutes(slot && slot.startTime))
+    .filter(Number.isFinite);
+  if (slotMinutes.length) return Math.min(...slotMinutes);
+  if (Array.isArray(task.scheduleSlots) && task.scheduleSlots.length) return Number.POSITIVE_INFINITY;
+  return feedbackClockMinutes(task.time);
+}
+
+function feedbackLessonTimeLabel(item, taskOverride) {
+  const task = feedbackTaskForItem(item, taskOverride);
+  if (!task) return '시간 미확인';
+  const labels = feedbackLessonSlots(item, task).map(slot => {
+    const start = String(slot && slot.startTime || '').trim();
+    const end = String(slot && slot.endTime || '').trim();
+    return start && end ? start + '–' + end : start;
+  }).filter(Boolean);
+  if (labels.length) return [...new Set(labels)].join(' / ');
+  if (Array.isArray(task.scheduleSlots) && task.scheduleSlots.length) return '시간 미확인';
+  return String(task.time || '').trim() || '시간 미확인';
+}
+
+function feedbackSortRows(rows, unsentFirst, lessonTimeFirst) {
   return (Array.isArray(rows) ? rows : []).slice().sort((a, b) => {
     if (unsentFirst) {
       const unsentOrder = Number(feedbackIsUnsent(b)) - Number(feedbackIsUnsent(a));
       if (unsentOrder) return unsentOrder;
+    }
+    if (lessonTimeFirst) {
+      const leftTime = feedbackLessonStartMinutes(a), rightTime = feedbackLessonStartMinutes(b);
+      if (leftTime !== rightTime) {
+        if (!Number.isFinite(leftTime)) return 1;
+        if (!Number.isFinite(rightTime)) return -1;
+        return leftTime - rightTime;
+      }
     }
     return feedbackUpdatedAt(b) - feedbackUpdatedAt(a) ||
       String(b && b.feedbackDate || '').localeCompare(String(a && a.feedbackDate || ''), 'ko') ||
@@ -7614,16 +7736,17 @@ function feedbackSortRows(rows, unsentFirst) {
   });
 }
 
-function feedbackTeacherGroups(rows) {
+function feedbackTeacherGroups(rows, lessonTimeFirst) {
   const groups = new Map();
-  feedbackSortRows(rows, true).forEach(item => {
+  feedbackSortRows(rows, true, lessonTimeFirst).forEach(item => {
     const owner = String(item && item.owner || '');
     if (!groups.has(owner)) groups.set(owner, { owner: owner, rows: [] });
     groups.get(owner).rows.push(item);
   });
   return Array.from(groups.values()).map(group => {
-    group.rows = feedbackSortRows(group.rows, true);
+    group.rows = feedbackSortRows(group.rows, true, lessonTimeFirst);
     group.unsentCount = group.rows.filter(feedbackIsUnsent).length;
+    group.sentCount = group.rows.filter(item => item && item.status === 'sent').length;
     group.latestUpdatedAt = group.rows.reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
     group.latestUnsentAt = group.rows.filter(feedbackIsUnsent)
       .reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
@@ -7722,7 +7845,8 @@ function feedbackQueueCard(item) {
   const status = feedbackSendState(item).label;
   return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
       '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
-      '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' · ' +
+      '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' (' + esc(feedbackWeekdayLabel(item.feedbackDate)) + ') · ' +
+      esc(feedbackLessonTimeLabel(item, task)) + ' · ' +
       (item.status === 'sent' ? '접수 ' : '상태 변경 ') + esc(feedbackUpdatedAtLabel(item)) +
       ' · 수정본 ' + esc(item.revision) + '</span></span>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></summary>' +
@@ -7737,18 +7861,26 @@ function feedbackQueueCard(item) {
       : '') + feedbackReasonHtml(item, false) + '</div></details>';
 }
 
-function feedbackTeacherGroupHtml(group) {
+function feedbackTeacherGroupHtml(group, weekdayKey) {
   const first = group.rows[0] || {};
   const staff = staffById(group.owner);
   const rawName = String((staff && staff.name) || first.teacherName || group.owner || '담당 선생님').trim();
   const teacherName = /(?:선생님|쌤)$/.test(rawName) ? rawName : rawName + ' 선생님';
   const status = group.unsentCount
-    ? '<span class="pill warn">미전송 ' + group.unsentCount + '건</span>'
+    ? '<span class="pill warn">미발송 ' + group.unsentCount + '건</span>'
     : '<span class="pill">전체 솔라피 접수</span>';
-  return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(group.owner) + '"><summary><span>' +
+  return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(weekdayKey) + '|' + esc(group.owner) + '"><summary><span>' +
       '<span class="card-title">' + esc(teacherName) + '</span>' +
-      '<span class="small muted">전체 ' + group.rows.length + '건 · 미전송 ' + group.unsentCount + '건</span></span>' + status + '</summary>' +
+      '<span class="small muted">발송 접수 ' + group.sentCount + '건 · 미발송 ' + group.unsentCount + '건</span></span>' + status + '</summary>' +
     '<div class="feedback-teacher-group-body">' + group.rows.map(feedbackQueueCard).join('') + '</div></details>';
+}
+
+function feedbackWeekdayButtonsHtml(rows) {
+  return '<div class="feedback-weekday-grid" role="group" aria-label="피드백 검토 요일 선택">' + feedbackWeekdaySummary(rows).map(summary =>
+    '<button type="button" class="feedback-weekday-button" data-act="feedbackweekday" data-day="' + esc(summary.key) + '" aria-pressed="' +
+      (feedbackWeekdayFilter === summary.key ? 'true' : 'false') + '"><b>' + esc(summary.label) + '</b><span>발송 접수 ' +
+      summary.sentCount + '건<br>미발송 ' + summary.unsentCount + '건</span></button>'
+  ).join('') + '</div>';
 }
 
 function viewFeedbackReview() {
@@ -7764,7 +7896,24 @@ function viewFeedbackReview() {
   else {
     const visibleQueue = feedbackQueue.filter(item => item.status !== 'cancelled');
     if (!visibleQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
-    else h += feedbackTeacherGroups(visibleQueue).map(feedbackTeacherGroupHtml).join('');
+    else {
+      h += '<div class="card"><div class="card-title">요일별 피드백 현황</div>' +
+        '<div class="card-sub">요일을 선택하면 선생님별 수업을 확인할 수 있습니다. 발송 건수는 솔라피 접수 기준입니다.</div>' +
+        feedbackWeekdayButtonsHtml(visibleQueue) + '</div>';
+      if (!feedbackWeekdayFilter) {
+        h += '<div class="card"><div class="empty"><b>📅</b>확인할 요일을 선택해 주세요.</div></div>';
+      } else {
+        const daySummary = feedbackWeekdaySummary(visibleQueue).find(summary => summary.key === feedbackWeekdayFilter);
+        const dayRows = feedbackFilterByWeekday(visibleQueue, feedbackWeekdayFilter);
+        h += '<div class="feedback-weekday-summary"><b>' + esc(daySummary ? daySummary.label : '선택 요일') + '</b> · 발송 접수 ' +
+          (daySummary ? daySummary.sentCount : 0) + '건 · 미발송 ' + (daySummary ? daySummary.unsentCount : 0) + '건</div>';
+        if (!dayRows.length) {
+          h += '<div class="card"><div class="empty"><b>💬</b>선택한 요일의 피드백 기록이 없습니다.</div></div>';
+        } else {
+          h += feedbackTeacherGroups(dayRows, true).map(group => feedbackTeacherGroupHtml(group, feedbackWeekdayFilter)).join('');
+        }
+      }
+    }
   }
   return h;
 }
@@ -19712,6 +19861,13 @@ document.addEventListener('click', ev => {
     case 'feedbackpolish': polishFeedbackComment(el); break;
     case 'feedbackfinalsend': submitFeedbackForReview(el); break;
     case 'feedbacksubmit': submitFeedbackForReview(el); break;
+    case 'feedbackweekday': {
+      const key = String(el.dataset.day || '');
+      if (!FEEDBACK_WEEKDAYS.some(day => day.key === key)) break;
+      feedbackWeekdayFilter = key;
+      render();
+      break;
+    }
     case 'fbrefresh': feedbackQueueLoaded = false; loadFeedbackQueue(true); break;
     case 'managerinboxrefresh': loadManagerRequestInbox(true); break;
     case 'guardianrequestresolve': resolveGuardianRequest(el.dataset.request, el.dataset.resolution, Number(el.dataset.rev), el); break;
@@ -20867,7 +21023,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-02.2';
+const APP_VER = '2026-09-02.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
