@@ -475,15 +475,20 @@ test('each lesson selects one subject while preserving the student multi-subject
   assert.match(studentChange, /if \(session\.isAdmin\) \{[\s\S]{0,100}draft\.staffId = ''/);
 });
 
-test('feedback workflow stays paused except for the server-provided stable studentId allowlist', () => {
+test('parent feedback is enabled for all students without enabling the other guardian-contact features', () => {
   assert.match(html, /const GUARDIAN_CONTACT_ENABLED = false/);
+  assert.match(html, /const PARENT_FEEDBACK_ALL_STUDENTS_ENABLED = true/);
   assert.match(html, /let guardianDeliveryStudentIds = new Set\(\)/);
   assert.match(html, /function guardianContactEnabledFor\(studentId\)/);
+  assert.match(html, /function parentFeedbackEnabledFor\(studentId\)/);
+  assert.match(html, /PARENT_FEEDBACK_ALL_STUDENTS_ENABLED \|\| guardianContactEnabledFor\(studentId\)/);
   assert.match(html, /applyGuardianDeliveryStudentIds\(result\.deliveryEnabledStudentIds\)/);
   assert.match(html, /data-act="feedbackpolish">코멘트만 AI 다듬기/);
   assert.match(html, /data-act="feedbackfinalsend">최종 전송/);
-  assert.match(html, /학부모 연락 기능 사용 중지/);
-  assert.match(html, /if \(!guardianContactEnabledFor\(task && task\.studentId\)\) return toast\('이 학생은 학부모 전달 테스트 대상이 아닙니다'\)/);
+  assert.match(html, /전체 원생 학부모 피드백 사용 중/);
+  assert.match(html, /이 학생은 학부모 피드백 전달 허용 대상이 아닙니다/);
+  assert.match(html, /id="feedbackFinalSendStatus"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.doesNotMatch(html, /<button class="btn btn-primary btn-block mt8" disabled>최종 전송<\/button>/);
   assert.match(html, /confirm\('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요\?'\)/);
   assert.match(html, /sync\.post\('\/feedback-request'/);
   assert.match(html, /sync\.post\('\/feedback-review'/);
@@ -495,7 +500,8 @@ test('feedback workflow stays paused except for the server-provided stable stude
   assert.match(html, /접수 여부 확인 필요/);
   assert.match(html, /if \(note\.startsWith\('접수 여부 확인 필요'\)\) return '⚠ 접수 여부 확인 — '/);
   assert.match(html, /if \(note\.startsWith\('카카오 발송이 거절되었습니다'\)\) return '발송 거절 — '/);
-  assert.match(html, /item\.status === 'content_approved_send_blocked' && sendState\.retry/);
+  assert.match(html, /item\.status === 'content_approved_send_blocked'[\s\S]{0,260}data-act="fbsend"/);
+  assert.doesNotMatch(html, /sendState\.retry/);
   assert.doesNotMatch(html, /승인 없이 바로 카카오 알림톡이 나갑니다|학부모 피드백 문자/);
   assert.doesNotMatch(html, /보호자께 카카오 알림톡을 보냈습니다|보호자 발송 완료/);
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
@@ -531,6 +537,7 @@ test('feedback v2 preview uses the fixed approved template and keeps send fields
 });
 
 test('feedback v2 has 100+ formal base sentences and renders the requested fixed template', () => {
+  assert.ok(html.includes('placeholder="예) ___ (하)는 모습을 보였습니다"'));
   const bankStart = html.indexOf('const FB_FORMAL_OPENERS');
   const bankEnd = html.indexOf('/** 학생이 보는 교재', bankStart);
   const bank = html.slice(bankStart, bankEnd);
@@ -564,12 +571,19 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
     '- 과제 : 어휘 10개 복습\n\n' +
     '- 코멘트 : 근거를 찾아 설명했습니다.\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.');
-  assert.match(html, /String\(t\.studentId \|\| ''\) \+ '\|' \+ t\.id \+ '\|' \+ date/);
+  assert.match(html, /const studentKey = String\(t\.studentId \|\| studentOf\(t\) \|\| ''\)/);
+  assert.match(html, /buildFormalFeedbackComment\(fbCtx \|\| \{\}, seed, studentOf\(t\), date, studentKey\)/);
   const helpers = Function("const seedPick = (rows, seed, slot) => rows[Math.abs(slot) % rows.length];\n" + bank +
     '; return { count: formalFeedbackSentenceCount(), formalize: formalizeDirectFeedback, ' +
     'givenName: studentGivenName, subject: feedbackStudentSubject, possessive: feedbackStudentPossessive, neutralize: neutralizeStudentNameInFeedback, ' +
+    'directSentence: feedbackDirectStudentSentence, dailyPick: feedbackDailyRotatingPick, closings: FB_FORMAL_CLOSINGS, ' +
     'focus: FB_FORMAL_FOCUS, namedOpeners: FB_FORMAL_NAMED_OPENERS, build: buildFormalFeedbackComment };')();
   assert.ok(helpers.count >= 100, '격식체 기본 문장이 실제로 100개 이상이어야 한다');
+  assert.equal(helpers.closings.length, 100, '마무리 문장은 정확히 100개여야 한다');
+  assert.equal(new Set(helpers.closings).size, 100, '마무리 문장 100개가 서로 달라야 한다');
+  assert.ok(helpers.closings.every(sentence => /습니다\.$/.test(sentence)), '마무리 문장은 모두 격식체여야 한다');
+  assert.ok(helpers.closings.every(sentence => sentence.length <= 50), '마무리 문장이 코멘트 예산을 지나치게 차지하면 안 된다');
+  assert.ok(!helpers.closings.includes('확인된 강점은 더욱 발전시키고 필요한 부분은 차근차근 보완하겠습니다.'));
   assert.equal(helpers.formalize('집중을 잘했어요'), '수업 중 집중력을 안정적으로 유지하며 학습에 성실하게 참여했습니다.');
   assert.equal(helpers.formalize('스스로 설명해요'), '스스로 설명합니다.');
   assert.equal(helpers.formalize('어휘 정리'), '어휘 정리.',
@@ -627,14 +641,32 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
   const latinNamed = helpers.build({ comment: '', focus: null, plus: [], minus: null }, 'named-latin', 'Alex');
   assert.ok(latinNamed.startsWith('Alex 학생의 '), '비한글 이름은 조사를 추측하지 않고 `학생의`를 사용한다');
   const directNamed = helpers.build({ comment: '김민우는 문제를 풀었고 민우가 설명했어요', focus: 'good', plus: [], minus: null },
-    'direct-named', '김민우');
+    'direct-named', '김민우', '2026-09-01', 'student-minwoo');
   assert.equal((directNamed.match(/민우/g) || []).length, 1, '직접 코멘트의 반복 이름은 학생으로 일반화해야 한다');
-  assert.match(directNamed, /^민우의 /);
+  assert.match(directNamed, /^민우는 오늘 수업에서 문제를 풀었고 학생이 설명했습니다\./);
   const friendlyNamed = helpers.build({ comment: '민준이는 문제를 풀었고 민준이의 풀이를 설명했습니다', focus: null, plus: [], minus: null },
-    'friendly-named', '황보민준');
-  assert.ok(friendlyNamed.startsWith('민준이의 '));
+    'friendly-named', '황보민준', '2026-09-01', 'student-minjun');
+  assert.ok(friendlyNamed.startsWith('민준이는 오늘 수업에서 문제를 풀었고 학생의 풀이를 설명했습니다.'));
   assert.equal((friendlyNamed.match(/민준/g) || []).length, 1,
     '친근한 조사형을 쓴 직접 코멘트도 첫 문장 첫머리 외에는 이름이 남지 않아야 한다');
+  assert.equal(helpers.directSentence('오늘 수업에서 집중하는 모습을 보였습니다.', '김민우'),
+    '민우는 오늘 수업에서 집중하는 모습을 보였습니다.');
+  assert.equal(helpers.directSentence('민준이는 오늘 수업에서 집중하는 모습을 보였습니다.', '황보민준'),
+    '민준이는 오늘 수업에서 집중하는 모습을 보였습니다.');
+  assert.equal(helpers.directSentence('수 학생은 오늘 수업에서 집중하는 모습을 보였습니다.', '김수'),
+    '수 학생은 오늘 수업에서 집중하는 모습을 보였습니다.');
+  assert.equal(helpers.directSentence('Alex 학생은 오늘 수업에서 집중하는 모습을 보였습니다.', 'Alex'),
+    'Alex 학생은 오늘 수업에서 집중하는 모습을 보였습니다.');
+  assert.equal(helpers.directSentence('오늘 수업에서 오늘 수업에서 질문했고 계산 실수도 있었어요.', '김민우'),
+    '민우는 오늘 수업에서 질문했고 계산 실수도 있었습니다.', '중복 선두만 제거하고 복합 사실은 보존해야 한다');
+  const rotationDates = Array.from({ length: 100 }, (_, index) =>
+    new Date(Date.UTC(2026, 0, 28 + index)).toISOString().slice(0, 10));
+  const rotatedClosings = rotationDates.map(date =>
+    helpers.dailyPick(helpers.closings, 'student-minwoo', date, 108, 'fallback'));
+  assert.equal(new Set(rotatedClosings).size, 100,
+    '월 경계를 지나도 같은 학생의 서로 다른 연속 100일에는 마무리가 반복되면 안 된다');
+  assert.equal(helpers.dailyPick(helpers.closings, 'student-minwoo', rotationDates[0], 108, 'fallback'),
+    rotatedClosings[0], '같은 학생과 날짜로 다시 열면 같은 문장을 골라야 한다');
   const noFocus = helpers.build({ comment: '어휘 정리', plus: [], minus: null }, 'no-focus', '김민우');
   for (const sentence of Object.values(helpers.focus).flat()) {
     assert.ok(!noFocus.includes(sentence), '집중·태도를 선택하지 않으면 포커스 문장을 임의로 추가하지 않아야 한다');
@@ -664,12 +696,14 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   const lengthLogic = html.slice(lengthStart, lengthEnd);
   assert.match(lengthLogic, /const sendValid = hasRequiredFields[\s\S]*commentText\.length <= limit/);
   assert.match(lengthLogic, /const polishValid = hasRequiredFields && commentText\.length <= FEEDBACK_COMMENT_MAX_CHARS &&[\s\S]*feedbackPolishBudgetReady\(t, limit\)/);
-  assert.match(lengthLogic, /finalButton\.disabled = !!fbCtx\.polishPending \|\| !sendValid/);
+  assert.doesNotMatch(lengthLogic, /finalButton\.disabled/,
+    '최종 전송 버튼은 검증 실패 중에도 눌러서 정확한 이유를 확인할 수 있어야 한다');
+  assert.match(lengthLogic, /refreshFeedbackFinalSendStatus\(t, scope\)/);
   assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending \|\| !polishValid/,
     '코멘트가 현재 알림톡 예산을 넘어도 600자 이하면 AI로 줄이기를 시도할 수 있어야 한다');
   const budgetStart = html.indexOf('const FEEDBACK_AI_MIN_BODY_CHARS');
   const budgetEnd = html.indexOf('function updateFeedbackPreviewLength(', budgetStart);
-  const budgetApi = Function("const feedbackStudentPossessive = () => '민우의'; const studentOf = () => '김민우';\n" +
+  const budgetApi = Function("const feedbackStudentSubject = () => '민우는'; const studentOf = () => '김민우';\n" +
     html.slice(budgetStart, budgetEnd) + '; return { minimum: feedbackPolishMinimumBudget, ready: feedbackPolishBudgetReady };')();
   const minimumBudget = budgetApi.minimum({});
   assert.equal(budgetApi.ready({}, 0), false, '코멘트 예산이 0이면 AI 다듬기를 활성화하면 안 된다');
@@ -714,14 +748,17 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /preview\.value = nextMessage/);
   assert.match(polish, /feedbackV2Message\(task, context\.date/);
   assert.match(polish, /FEEDBACK_ALIMTALK_MAX_CHARS/);
-  assert.match(submit, /if \(fbCtx\.polishPending\) return toast/);
+  assert.match(submit, /feedbackFinalSendBlockReason\(task, templateVersion, message\)/);
+  assert.match(html, /if \(fbCtx\.polishPending\) return 'AI 다듬기가 아직 진행 중입니다\.'/);
+  assert.doesNotMatch(polish, /finalButton\.disabled/,
+    'AI 처리 중에도 최종 전송 버튼은 활성 상태로 두고 버튼 아래 이유를 보여야 한다');
   assert.match(submit, /feedbackSubmitting = true/);
   assert.match(submit, /finally \{[\s\S]*feedbackSubmitting = false/);
   assert.match(html, /case 'feedbackpolish': polishFeedbackComment\(el\)/);
   assert.match(html, /case 'feedbackfinalsend': submitFeedbackForReview\(el\)/);
   assert.match(html, /id="feedbackPolishStatus"[^>]*role="status"[^>]*aria-live="polite"/,
     'AI 처리 결과는 버튼 아래의 지속적인 접근성 상태 영역에 표시해야 한다');
-  assert.match(html, /placeholder="예\)오늘 ___하는 모습을 보였습니다\."/);
+  assert.ok(html.includes('placeholder="예) ___ (하)는 모습을 보였습니다"'));
   const errorStart = html.indexOf('function feedbackPolishErrorText(');
   const errorEnd = html.indexOf('/** 서버 검증', errorStart);
   const errorText = html.slice(errorStart, errorEnd);

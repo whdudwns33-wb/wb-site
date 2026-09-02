@@ -997,13 +997,32 @@
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
-  .feedback-polish-status { min-height: 22px; font-size: 12.5px; font-weight: 700; line-height: 1.55; }
-  .feedback-polish-status[data-state="working"] { color: var(--deep-blue); }
-  .feedback-polish-status[data-state="success"] { color: var(--green); }
-  .feedback-polish-status[data-state="error"] { color: var(--coral); }
+  .feedback-polish-status, .feedback-final-send-status { min-height: 22px; font-size: 12.5px; font-weight: 700; line-height: 1.55; }
+  .feedback-polish-status[data-state="working"], .feedback-final-send-status[data-state="working"] { color: var(--deep-blue); }
+  .feedback-polish-status[data-state="success"], .feedback-final-send-status[data-state="success"] { color: var(--green); }
+  .feedback-polish-status[data-state="error"], .feedback-final-send-status[data-state="error"] { color: var(--coral); }
   [data-feedback-final-field="commentText"].feedback-polish-updated {
     border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,157,116,.14);
   }
+  .feedback-record > summary, .feedback-teacher-group > summary {
+    min-height: 44px; display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none;
+  }
+  .feedback-record > summary::-webkit-details-marker, .feedback-teacher-group > summary::-webkit-details-marker { display: none; }
+  .feedback-record > summary > span:first-child, .feedback-teacher-group > summary > span:first-child { min-width: 0; flex: 1 1 auto; }
+  .feedback-record > summary .card-title, .feedback-record > summary .small,
+  .feedback-teacher-group > summary .card-title, .feedback-teacher-group > summary .small { display: block; }
+  .feedback-record > summary .pill, .feedback-teacher-group > summary .pill { flex: 0 0 auto; }
+  .feedback-record > summary::after, .feedback-teacher-group > summary::after {
+    content: '펼치기'; flex: 0 0 auto; color: var(--deep-blue); font-size: 11px; font-weight: 800;
+  }
+  .feedback-record[open] > summary::after, .feedback-teacher-group[open] > summary::after { content: '접기'; }
+  .feedback-record-body, .feedback-teacher-group-body { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .feedback-message-label { margin-bottom: 6px; color: var(--navy); font-size: 12px; font-weight: 900; }
+  .feedback-message-text {
+    padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #F8FBFD;
+    color: var(--navy); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .feedback-send-reason { overflow-wrap: anywhere; }
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -1034,11 +1053,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-02.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-02.1"></script>
-<script src="./asset-core.js?v=2026-09-02.1"></script>
-<script src="./qr-core.js?v=2026-09-02.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-02.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-02.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-02.2"></script>
+<script src="./asset-core.js?v=2026-09-02.2"></script>
+<script src="./qr-core.js?v=2026-09-02.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-02.2"></script>
 <script>
 "use strict";
 
@@ -1393,6 +1412,8 @@ function alertsToday() {
 const SYNC_URL = 'https://wb-sync.whdudwns33.workers.dev';
 const SYNC_APP = 'task';
 const GUARDIAN_CONTACT_ENABLED = false;
+/* 학부모 피드백만 전체 원생에게 허용한다. 보호자 앱·공지 등 다른 연락 기능은 계속 중지한다. */
+const PARENT_FEEDBACK_ALL_STUDENTS_ENABLED = true;
 let guardianDeliveryStudentIds = new Set();
 function applyGuardianDeliveryStudentIds(values) {
   guardianDeliveryStudentIds = new Set((Array.isArray(values) ? values : [])
@@ -1400,6 +1421,9 @@ function applyGuardianDeliveryStudentIds(values) {
 }
 function guardianContactEnabledFor(studentId) {
   return GUARDIAN_CONTACT_ENABLED || guardianDeliveryStudentIds.has(String(studentId || ''));
+}
+function parentFeedbackEnabledFor(studentId) {
+  return PARENT_FEEDBACK_ALL_STUDENTS_ENABLED || guardianContactEnabledFor(studentId);
 }
 function anyGuardianContactEnabled() {
   return GUARDIAN_CONTACT_ENABLED || guardianDeliveryStudentIds.size > 0;
@@ -5341,8 +5365,9 @@ function buildComment(ctx, seedStr) {
 }
 
 /* 알림톡 v2 코멘트용 격식체 문장 은행.
- * 12개 도입 + 40개 태도 + 12개 연결 + 20개 칭찬 + 12개 보완 + 12개 마무리 = 108문장이다.
- * studentId·수업·날짜 시드로 고르므로 같은 미리보기는 안정적으로 유지되고 학생·날짜별 조합은 달라진다. */
+ * 12개 도입 + 40개 태도 + 12개 연결 + 20개 칭찬 + 12개 보완 + 100개 마무리 +
+ * 12개 이름 도입 = 208문장이다. 같은 미리보기는 안정적으로 유지하되, 마무리는 학생과
+ * 날짜를 기준으로 순환하여 서로 다른 100일 안에는 같은 문장을 다시 고르지 않는다. */
 const FB_FORMAL_OPENERS = [
   '오늘 수업에서 확인한 학습 태도와 진행 과정을 정리해 전달드립니다.',
   '오늘 수업 중 관찰한 주요 내용을 중심으로 안내드립니다.',
@@ -5451,17 +5476,105 @@ const FB_FORMAL_MINUS = [
 ];
 const FB_FORMAL_CLOSINGS = [
   '다음 수업에서도 오늘의 학습 흐름을 이어가며 안정적으로 지도하겠습니다.',
-  '확인된 강점은 더욱 발전시키고 필요한 부분은 차근차근 보완하겠습니다.',
-  '학생의 현재 속도에 맞추어 다음 학습도 세심하게 준비하겠습니다.',
-  '오늘의 학습 결과를 바탕으로 다음 수업의 목표를 구체적으로 설정하겠습니다.',
-  '앞으로도 학생이 스스로 이해하고 설명하는 과정을 중심으로 지도하겠습니다.',
-  '다음 시간에는 오늘 확인한 내용을 바탕으로 학습 범위를 확장하겠습니다.',
-  '학생이 자신감을 유지하며 학습을 이어갈 수 있도록 돕겠습니다.',
-  '오늘의 긍정적인 흐름이 계속 이어지도록 다음 수업에서도 세심히 살피겠습니다.',
-  '현재의 강점과 보완점을 반영하여 다음 수업을 체계적으로 진행하겠습니다.',
-  '학습 과정에서 확인된 변화를 지속적으로 관찰하며 지도하겠습니다.',
-  '학생이 무리하지 않으면서도 꾸준히 성장할 수 있도록 수업을 이어가겠습니다.',
-  '다음 수업에서도 정확한 이해와 안정적인 학습 습관을 함께 만들어가겠습니다.'
+  '오늘 확인한 긍정적인 모습이 꾸준히 이어지도록 지도하겠습니다.',
+  '잘하고 있는 부분은 자연스럽게 확장하고 필요한 부분은 세심히 살피겠습니다.',
+  '학생의 현재 강점을 바탕으로 다음 학습을 차분히 연결하겠습니다.',
+  '긍정적인 학습 태도가 계속 유지되도록 수업을 준비하겠습니다.',
+  '오늘 드러난 좋은 흐름을 다음 시간에도 이어갈 수 있도록 돕겠습니다.',
+  '학생이 보여준 강점을 바탕으로 학습의 폭을 조금씩 넓혀가겠습니다.',
+  '현재 잘 형성된 부분은 유지하면서 필요한 연습을 더해가겠습니다.',
+  '오늘의 긍정적인 경험이 다음 학습의 자신감으로 이어지도록 하겠습니다.',
+  '강점은 안정적으로 이어가고 보완이 필요한 부분은 부담 없이 다루겠습니다.',
+  '학생의 속도에 맞추어 잘하는 부분과 연습할 부분을 균형 있게 지도하겠습니다.',
+  '오늘 확인한 학습 특성을 반영해 다음 수업을 세심하게 구성하겠습니다.',
+  '안정된 부분은 계속 이어가고 어려운 부분은 작은 단계로 나누어 살피겠습니다.',
+  '학생이 편안하게 강점을 발휘할 수 있도록 다음 활동을 준비하겠습니다.',
+  '잘된 과정은 충분히 이어가며 필요한 부분은 반복해서 확인하겠습니다.',
+  '오늘의 학습 결과를 바탕으로 다음 목표를 구체적으로 조정하겠습니다.',
+  '긍정적인 변화가 학습 습관으로 자리 잡도록 꾸준히 지원하겠습니다.',
+  '학생이 스스로 해낸 부분을 바탕으로 다음 단계에 도전하도록 돕겠습니다.',
+  '현재의 좋은 태도가 다양한 학습 상황에서도 이어지도록 지도하겠습니다.',
+  '오늘 살펴본 내용을 토대로 다음 수업의 초점을 알맞게 정하겠습니다.',
+  '학생의 학습 속도를 존중하며 필요한 도움을 적절히 제공하겠습니다.',
+  '무리하지 않는 범위에서 강점을 넓히고 기초를 단단히 다지겠습니다.',
+  '학생이 안정감을 유지하며 다음 학습에 참여할 수 있도록 준비하겠습니다.',
+  '오늘의 수행 과정을 반영해 다음 시간의 활동 난이도를 조절하겠습니다.',
+  '익숙한 부분은 자신 있게 활용하고 새로운 부분은 차근차근 익히도록 돕겠습니다.',
+  '현재의 학습 흐름이 끊기지 않도록 다음 수업을 자연스럽게 연결하겠습니다.',
+  '학생이 자신의 속도로 꾸준히 성장할 수 있도록 세심히 지도하겠습니다.',
+  '잘 이해한 내용은 확장하고 아직 익숙하지 않은 내용은 다시 확인하겠습니다.',
+  '학생의 반응을 살피며 다음 학습의 양과 속도를 알맞게 조절하겠습니다.',
+  '오늘 형성된 좋은 리듬을 유지하며 다음 활동으로 이어가겠습니다.',
+  '배운 내용을 안정적으로 활용할 수 있도록 반복과 적용을 함께 진행하겠습니다.',
+  '학생이 부담을 느끼지 않으면서도 성취를 경험하도록 수업을 구성하겠습니다.',
+  '이해가 안정된 부분을 바탕으로 새로운 내용을 단계적으로 연결하겠습니다.',
+  '필요한 부분은 충분한 시간을 두고 익힐 수 있도록 돕겠습니다.',
+  '학생의 현재 수준에 맞는 목표를 세워 꾸준히 학습을 이어가겠습니다.',
+  '오늘 확인한 이해 정도를 기준으로 다음 설명과 활동을 조정하겠습니다.',
+  '익숙해진 과정은 스스로 수행하고 어려운 과정은 함께 점검하겠습니다.',
+  '학습의 속도와 정확도가 균형을 이루도록 차분히 지도하겠습니다.',
+  '학생이 안정적으로 참여할 수 있는 흐름을 계속 만들어가겠습니다.',
+  '다음 시간에도 작은 성공을 쌓아갈 수 있도록 활동을 준비하겠습니다.',
+  '학생이 자신의 생각을 편안하게 표현하도록 지속적으로 격려하겠습니다.',
+  '스스로 해결한 경험이 자신감으로 이어지도록 충분히 인정하고 돕겠습니다.',
+  '학생이 학습 과정의 주도권을 조금씩 넓혀가도록 지도하겠습니다.',
+  '오늘 보여준 참여가 다음 시간에도 자연스럽게 이어지도록 지원하겠습니다.',
+  '학생이 자신의 강점을 알고 활용할 수 있도록 구체적으로 안내하겠습니다.',
+  '문제를 해결하는 과정에서 자신감을 잃지 않도록 세심히 살피겠습니다.',
+  '스스로 생각하고 설명하는 기회를 다음 수업에서도 충분히 마련하겠습니다.',
+  '학생이 질문과 시도를 편안하게 이어갈 수 있는 분위기를 만들겠습니다.',
+  '오늘의 성취를 바탕으로 다음 과제에도 자신 있게 접근하도록 돕겠습니다.',
+  '학생이 자신의 학습 과정을 돌아보는 힘을 기르도록 지도하겠습니다.',
+  '잘한 과정은 구체적으로 확인하고 다음 도전으로 자연스럽게 연결하겠습니다.',
+  '학생의 시도 자체가 의미 있는 경험으로 남도록 과정 중심으로 지도하겠습니다.',
+  '스스로 선택하고 해결하는 경험을 조금씩 늘려가겠습니다.',
+  '학생이 실수를 부담으로 느끼지 않고 배움의 기회로 활용하도록 돕겠습니다.',
+  '오늘 확인한 자신감이 꾸준한 참여로 이어지도록 격려하겠습니다.',
+  '학생이 이해한 내용을 자신의 말로 정리하는 습관을 키우겠습니다.',
+  '필요한 도움은 제공하되 스스로 해결할 시간도 충분히 보장하겠습니다.',
+  '학생이 학습 목표를 이해하고 주도적으로 참여하도록 안내하겠습니다.',
+  '오늘의 긍정적인 참여를 다음 수업의 동력으로 이어가겠습니다.',
+  '학생이 한 단계씩 성취를 확인하며 학습하도록 돕겠습니다.',
+  '오늘 확인한 내용을 토대로 다음 수업의 목표를 명확하게 설정하겠습니다.',
+  '다음 시간에는 이해한 내용을 다른 문제에도 적용해 보도록 지도하겠습니다.',
+  '학습한 개념이 안정적으로 자리 잡도록 다양한 방식으로 확인하겠습니다.',
+  '오늘의 수행을 바탕으로 다음 활동을 적절한 수준으로 확장하겠습니다.',
+  '다음 수업에서는 필요한 부분을 중심으로 설명과 연습을 조정하겠습니다.',
+  '이해한 내용과 연습이 필요한 내용을 구분해 체계적으로 지도하겠습니다.',
+  '오늘 배운 내용이 다음 학습과 자연스럽게 연결되도록 준비하겠습니다.',
+  '다음 시간에도 과정과 결과를 함께 살피며 학습을 이어가겠습니다.',
+  '학생의 반응에 맞추어 설명 방법과 활동 순서를 유연하게 조절하겠습니다.',
+  '오늘의 학습 기록을 바탕으로 다음 수업을 구체적으로 준비하겠습니다.',
+  '익힌 내용을 실제 문제에 적용하며 이해를 더욱 안정시키겠습니다.',
+  '필요한 개념은 다시 확인하고 익숙한 내용은 한 단계 확장하겠습니다.',
+  '다음 수업에서도 핵심 내용을 놓치지 않도록 차분히 점검하겠습니다.',
+  '학생이 배운 내용을 연결해 생각하도록 단계별 질문을 활용하겠습니다.',
+  '오늘 확인한 학습 상태에 맞추어 다음 과제의 범위를 조절하겠습니다.',
+  '개념 이해와 문제 적용이 자연스럽게 이어지도록 지도하겠습니다.',
+  '다음 시간에는 오늘의 학습 과정을 짧게 되짚고 새 내용을 시작하겠습니다.',
+  '학생이 풀이 과정을 스스로 점검하도록 적절한 기준을 안내하겠습니다.',
+  '반복이 필요한 내용은 충분히 연습하고 익숙한 내용은 확장하겠습니다.',
+  '다음 수업에서도 정확한 이해를 중심으로 학습을 이어가겠습니다.',
+  '학생의 변화를 꾸준히 관찰하며 필요한 지원을 제때 제공하겠습니다.',
+  '학습 과정에서 나타나는 작은 변화도 세심하게 살펴 지도에 반영하겠습니다.',
+  '학생의 반응과 수행을 지속적으로 확인하며 수업 방향을 조정하겠습니다.',
+  '좋은 학습 습관이 자연스럽게 자리 잡도록 꾸준히 안내하겠습니다.',
+  '학생이 일정한 흐름으로 학습을 이어가도록 안정적으로 지원하겠습니다.',
+  '오늘 확인한 부분을 다음 수업에서도 이어서 세심하게 관찰하겠습니다.',
+  '학습 태도와 이해의 변화를 함께 살피며 균형 있게 지도하겠습니다.',
+  '학생의 현재 모습을 존중하며 필요한 성장을 차분히 지원하겠습니다.',
+  '꾸준한 참여가 안정적인 학습 습관으로 이어지도록 돕겠습니다.',
+  '학생에게 맞는 학습 방식을 계속 살피며 수업에 반영하겠습니다.',
+  '잘하고 있는 부분을 충분히 활용하며 다음 성장을 준비하겠습니다.',
+  '필요한 연습은 부담을 줄이고 성취는 분명히 느끼도록 지도하겠습니다.',
+  '학생이 편안하게 배우고 꾸준히 도전할 수 있도록 지원하겠습니다.',
+  '오늘의 학습 경험이 긍정적으로 축적되도록 다음 수업도 세심히 진행하겠습니다.',
+  '학생의 강점과 현재 필요를 함께 고려해 수업을 이어가겠습니다.',
+  '한 번에 서두르기보다 이해를 확인하며 단계적으로 나아가겠습니다.',
+  '학생이 안정감과 자신감을 함께 키울 수 있도록 지도하겠습니다.',
+  '현재의 좋은 흐름을 지키면서 새로운 성장을 차분히 준비하겠습니다.',
+  '오늘 확인한 학습 과정을 바탕으로 꾸준하고 균형 있게 지도하겠습니다.',
+  '다음 수업에서도 학생의 가능성을 살피며 필요한 지원을 이어가겠습니다.'
 ];
 const FB_FORMAL_NAMED_OPENERS = [
   '{P} 오늘 수업에서 확인한 내용을 정리해 전달드립니다.',
@@ -5504,6 +5617,34 @@ function feedbackStudentPossessive(value) {
   if (last < 0xAC00 || last > 0xD7A3 || name.length === 1) return name + ' 학생의';
   const hasBatchim = (last - 0xAC00) % 28 !== 0;
   return name + (hasBatchim ? '이의' : '의');
+}
+
+function feedbackDateOrdinal(value) {
+  const matched = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!matched) return null;
+  const year = Number(matched[1]), month = Number(matched[2]), day = Number(matched[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const checked = new Date(timestamp);
+  if (checked.getUTCFullYear() !== year || checked.getUTCMonth() !== month - 1 || checked.getUTCDate() !== day) return null;
+  return Math.floor(timestamp / 86400000);
+}
+
+function feedbackStableHash(value, salt) {
+  let hash = Number(salt || 0) * 2654435761 >>> 0;
+  for (const char of String(value || '')) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return hash >>> 0;
+}
+
+/** 학생별 시작 위치에 날짜 순번을 더한다. 같은 학생은 서로 다른 100일 안에서
+ *  100개 마무리 문장을 다시 고르지 않으며, 같은 날짜를 다시 열면 결과가 그대로다. */
+function feedbackDailyRotatingPick(rows, studentKey, feedbackDate, salt, fallbackSeed) {
+  if (!Array.isArray(rows) || !rows.length) return '';
+  const ordinal = feedbackDateOrdinal(feedbackDate);
+  const stableStudentKey = String(studentKey || '').trim();
+  if (ordinal == null || !stableStudentKey) return seedPick(rows, fallbackSeed || stableStudentKey, salt);
+  const offset = feedbackStableHash(stableStudentKey, salt) % rows.length;
+  const dayIndex = ((ordinal % rows.length) + rows.length) % rows.length;
+  return rows[(offset + dayIndex) % rows.length];
 }
 
 function neutralizeStudentNameInFeedback(value, studentName) {
@@ -5604,18 +5745,34 @@ function formalizeDirectFeedback(value) {
   }).join(' ');
 }
 
-function buildFormalFeedbackComment(ctx, seedStr, studentName) {
+function feedbackDirectStudentSentence(value, studentName) {
+  const subject = feedbackStudentSubject(studentName);
+  let source = String(value || '').trim();
+  if (subject) {
+    const escapedSubject = subject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    source = source.replace(new RegExp('^' + escapedSubject + '(?=\\s|[,，:：]|$)(?:\\s+|[,，:：]\\s*)?'), '');
+  }
+  const normalized = neutralizeStudentNameInFeedback(source, studentName);
+  let body = formalizeDirectFeedback(normalized).trim();
+  if (!body) return '';
+  body = body.replace(/^(?:학생(?:은|는|이|가|의|도)?\s+)+/, '')
+    .replace(/^(?:(?:오늘(?:은|도)?\s+)?(?:수업(?:에서는|에서|\s*중에는|\s*중에|\s*중)|학습\s*과정에서)\s*)+/, '')
+    .replace(/^(?:오늘(?:은|도)?\s+)+/, '')
+    .trim();
+  return subject && body ? subject + ' 오늘 수업에서 ' + body : body;
+}
+
+function buildFormalFeedbackComment(ctx, seedStr, studentName, feedbackDate, studentKey) {
   if (formalFeedbackSentenceCount() < 100) throw new Error('피드백 격식체 기본 문장은 100개 이상이어야 합니다');
   const focus = ctx && ctx.focus !== 'none' && FB_FORMAL_FOCUS[ctx.focus] ? ctx.focus : null;
   const possessiveName = feedbackStudentPossessive(studentName);
   const opener = possessiveName
     ? seedPick(FB_FORMAL_NAMED_OPENERS, seedStr, 101).replace('{P}', possessiveName)
     : seedPick(FB_FORMAL_OPENERS, seedStr, 101);
-  const parts = [opener];
-  if (focus) parts.push(seedPick(FB_FORMAL_FOCUS[focus], seedStr, 102));
   const direct = String(ctx && ctx.comment || '').trim();
-  const normalizedDirect = neutralizeStudentNameInFeedback(direct, studentName);
-  if (normalizedDirect) parts.push(formalizeDirectFeedback(normalizedDirect));
+  const directSentence = feedbackDirectStudentSentence(direct, studentName);
+  const parts = [directSentence || opener];
+  if (focus) parts.push(seedPick(FB_FORMAL_FOCUS[focus], seedStr, 102));
   (ctx && ctx.plus || []).slice(0, 2).forEach((index, offset) => {
     if (FB_PLUS[index] && FB_PLUS[index][1]) {
       parts.push(seedPick(FB_FORMAL_PRAISE, seedStr, 104 + offset).replace('{x}', FB_PLUS[index][1]));
@@ -5623,7 +5780,9 @@ function buildFormalFeedbackComment(ctx, seedStr, studentName) {
   });
   const minus = ctx && ctx.minus != null ? FB_MINUS[ctx.minus] : null;
   if (minus && minus[1]) parts.push(seedPick(FB_FORMAL_MINUS, seedStr, 107).replace('{y}', minus[1]));
-  parts.push(seedPick(FB_FORMAL_CLOSINGS, seedStr, 108));
+  parts.push(feedbackDailyRotatingPick(
+    FB_FORMAL_CLOSINGS, studentKey || studentName, feedbackDate, 108, seedStr
+  ));
   return parts.join(' ');
 }
 
@@ -5677,7 +5836,7 @@ function fbModal() {
   const chip = (on, act, extra, label) =>
     '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-act="' + act + '" ' + extra + '>' + label + '</button>';
   modal('피드백 문구 선택',
-    '<label class="field"><span class="fl">1. 코멘트(직접작성, 간단히)</span><textarea class="in" rows="2" maxlength="200" data-feedback-comment placeholder="예)오늘 ___하는 모습을 보였습니다.">' +
+    '<label class="field"><span class="fl">1. 코멘트(직접작성, 간단히)</span><textarea class="in" rows="2" maxlength="200" data-feedback-comment placeholder="예) ___ (하)는 모습을 보였습니다">' +
       esc(fbCtx.comment || '') + '</textarea></label>' +
     '<div class="fl mb8">2. 오늘 집중·태도는?</div><div class="chips mb14">' +
       FB_FOCUS_CHOICES.map(([v, l]) =>
@@ -5778,6 +5937,14 @@ function setFeedbackPolishStatus(state, message, root) {
   box.textContent = String(message || '');
 }
 
+function setFeedbackFinalSendStatus(state, message, root) {
+  const scope = root && typeof root.querySelector === 'function' ? root : document;
+  const box = scope.querySelector('#feedbackFinalSendStatus');
+  if (!box) return;
+  box.dataset.state = state || 'idle';
+  box.textContent = String(message || '');
+}
+
 function feedbackPolishErrorText(error) {
   const code = String(error && error.code || '');
   const byCode = {
@@ -5842,8 +6009,7 @@ function feedbackCommentBudget(t, date, fields) {
 }
 
 function feedbackPolishMinimumBudget(t) {
-  const namedLead = (feedbackStudentPossessive(studentOf(t)) +
-    ' 오늘 수업에서 확인한 내용을 정리했습니다.').trim();
+  const namedLead = (feedbackStudentSubject(studentOf(t)) + ' 오늘 수업에서').trim();
   return namedLead.length + 1 + FEEDBACK_AI_MIN_BODY_CHARS;
 }
 
@@ -5851,10 +6017,58 @@ function feedbackPolishBudgetReady(t, limit) {
   return Number(limit) >= feedbackPolishMinimumBudget(t);
 }
 
+function feedbackFinalSendBlockReason(t, templateVersion, message) {
+  if (!fbCtx) return '피드백 화면을 다시 열어 주세요.';
+  if (fbCtx.polishPending) return 'AI 다듬기가 아직 진행 중입니다.';
+  if (!t) return '해당 수업 정보를 찾을 수 없습니다.';
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(t.studentId || ''))) {
+    return 'studentId가 연결되지 않아 전송할 수 없습니다. 원생 명단에서 학생을 다시 연결해 주세요.';
+  }
+  if (!parentFeedbackEnabledFor(t.studentId)) return '이 학생은 학부모 피드백 전달 허용 대상이 아닙니다.';
+  if (templateVersion === 'v2') {
+    const missing = [];
+    if (!String(fbCtx.subjectText || '').trim()) missing.push('과목');
+    if (!String(fbCtx.contentText || '').trim()) missing.push('수업내용 · 진도');
+    if (!String(fbCtx.homeworkText || '').trim()) missing.push('과제');
+    if (!String(fbCtx.commentText || '').trim()) missing.push('코멘트');
+    if (missing.length) return missing.join('·') + ' 빈칸이 있어 전송할 수 없습니다.';
+    if (String(message || '').length > FEEDBACK_ALIMTALK_MAX_CHARS) {
+      return '전체 문구가 900자를 초과했습니다. 수업내용·과제 또는 코멘트를 줄여 주세요.';
+    }
+    if (String(fbCtx.commentText || '').length > feedbackCommentBudget(t, fbCtx.date, fbCtx)) {
+      return '코멘트가 현재 알림톡 글자 수 한도를 초과했습니다.';
+    }
+  } else {
+    if (!String(message || '').trim()) return '피드백 문구가 비어 있습니다.';
+    if (!String(fbCtx.contentText || '').trim() || !String(fbCtx.plusText || '').trim() ||
+        !String(fbCtx.minusText || '').trim()) {
+      return '수업 기록과 피드백 항목 중 빈칸이 있어 전송할 수 없습니다.';
+    }
+  }
+  if (!sync.auth()) return '동기화 인증이 필요합니다.';
+  return '';
+}
+
+function refreshFeedbackFinalSendStatus(t, root) {
+  if (!fbCtx) return;
+  const templateVersion = fbCtx.templateVersion === 'v1' ? 'v1' : 'v2';
+  const message = templateVersion === 'v2'
+    ? (t ? feedbackV2Message(t, fbCtx.date, fbCtx) : '')
+    : String(((root && root.querySelector && root.querySelector('#mText')) || {}).value || '').trim();
+  const reason = feedbackFinalSendBlockReason(t, templateVersion, message);
+  setFeedbackFinalSendStatus(reason ? 'error' : 'success',
+    reason || '전송 준비가 완료되었습니다. 버튼을 누르면 실제 알림톡 접수를 시도합니다.', root);
+}
+
 function updateFeedbackPreviewLength(t, root) {
   const scope = root && typeof root.querySelector === 'function' ? root : document;
   const target = scope.querySelector('#feedbackPreviewLength');
-  if (!target || !fbCtx || fbCtx.templateVersion !== 'v2') return;
+  if (!fbCtx) return;
+  if (fbCtx.templateVersion !== 'v2') {
+    refreshFeedbackFinalSendStatus(t, scope);
+    return;
+  }
+  if (!target) return;
   const message = feedbackV2Message(t, fbCtx.date, fbCtx);
   const limit = feedbackCommentBudget(t, fbCtx.date, fbCtx);
   const contentText = String(fbCtx.contentText || '').trim();
@@ -5869,10 +6083,9 @@ function updateFeedbackPreviewLength(t, root) {
   target.textContent = '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
     message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자';
   target.className = 'small mt8 ' + (sendValid ? 'muted' : 'bad');
-  const finalButton = scope.querySelector('[data-act="feedbackfinalsend"]');
-  if (finalButton) finalButton.disabled = !!fbCtx.polishPending || !sendValid;
   const polishButton = scope.querySelector('[data-act="feedbackpolish"]');
   if (polishButton) polishButton.disabled = !!fbCtx.polishPending || !polishValid;
+  refreshFeedbackFinalSendStatus(t, scope);
 }
 
 function syncFeedbackFinalFieldFromInput(target) {
@@ -5924,8 +6137,9 @@ function computeFeedbackFields(t, date, fbCtx) {
   const plusText = ((fbCtx && fbCtx.plus) || []).filter(i => FB_PLUS[i] && FB_PLUS[i][1]).map(i => FB_PLUS[i][0]).join(', ');
   const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
   const minusText = minusPick === '없음' ? '' : minusPick;
-  const seed = String(t.studentId || '') + '|' + t.id + '|' + date;
-  const commentText = buildFormalFeedbackComment(fbCtx || {}, seed, studentOf(t));
+  const studentKey = String(t.studentId || studentOf(t) || '');
+  const seed = studentKey + '|' + t.id + '|' + date;
+  const commentText = buildFormalFeedbackComment(fbCtx || {}, seed, studentOf(t), date, studentKey);
   return { subjectText, contentText, homeworkText, commentText, plusText, minusText };
 }
 
@@ -5948,7 +6162,7 @@ function showFeedbackPreview(t, date, fields, letterText) {
   };
   const teacher = (currentStaff() || {}).name || '';
   const student = studentOf(t);
-  const guardianDeliveryEnabled = guardianContactEnabledFor(t && t.studentId);
+  const guardianDeliveryEnabled = parentFeedbackEnabledFor(t && t.studentId);
   if (letterText == null) letterText = templateVersion === 'v2'
     ? feedbackV2Message(t, date, fbCtx) : feedbackText(t, date);
   const legacyFields = templateVersion === 'v1'
@@ -5967,8 +6181,8 @@ function showFeedbackPreview(t, date, fields, letterText) {
     '<div class="small muted mb8">' + esc(teacher) + ' 선생님 수업 기록을 바탕으로 만든 문구입니다.</div>' +
     legacyFields +
     (guardianDeliveryEnabled
-      ? '<div class="hint mt14"><b>테스트 학생 전달 기능 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
-      : '<div class="hint mt14"><b>학부모 연락 기능 사용 중지</b> — 연락처는 보관하지만 메시지나 과제물을 학부모에게 전달하지 않습니다.</div>') +
+      ? '<div class="hint mt14"><b>전체 원생 학부모 피드백 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
+      : '<div class="hint mt14"><b>학부모 피드백 전달 대상 아님</b> — 버튼을 누르면 전송할 수 없는 정확한 이유가 아래에 표시됩니다.</div>') +
     finalFieldEditor +
     '<textarea class="in" rows="12" id="mText" style="margin-top:10px"' + (templateVersion === 'v2' ? ' readonly' : '') + '>' + esc(letterText) + '</textarea>' +
     (templateVersion === 'v2' ? '<div class="small muted mt8" id="feedbackPreviewLength"></div>' : '') +
@@ -5979,9 +6193,8 @@ function showFeedbackPreview(t, date, fields, letterText) {
       ? '<button class="btn btn-navy btn-block mt14" data-act="feedbackpolish">코멘트만 AI 다듬기</button>' +
         '<div class="feedback-polish-status mt8" id="feedbackPolishStatus" data-state="idle" role="status" aria-live="polite"></div>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="copytext">복사하기</button>' +
-    (guardianDeliveryEnabled
-      ? '<button class="btn btn-primary btn-block mt8" data-act="feedbackfinalsend">최종 전송</button>'
-      : '<button class="btn btn-primary btn-block mt8" disabled>최종 전송</button>'));
+    '<button class="btn btn-primary btn-block mt8" data-act="feedbackfinalsend">최종 전송</button>' +
+    '<div class="feedback-final-send-status mt8" id="feedbackFinalSendStatus" data-state="idle" role="status" aria-live="polite"></div>');
   updateFeedbackPreviewLength(t);
 }
 
@@ -7348,7 +7561,7 @@ let ownFeedbackQueueError = '';
 const FEEDBACK_STATUS_LABEL = {
   approval_waiting: ['원장 검토 대기', 'warn'],
   content_approved_send_blocked: ['문구 승인 · 발송 대기', ''],
-  sent: ['보호자 알림톡 접수', ''],
+  sent: ['솔라피 발송 접수', ''],
   revision_requested: ['수정 요청', 'bad'],
   cancelled: ['취소', '']
 };
@@ -7356,10 +7569,10 @@ const FEEDBACK_STATUS_LABEL = {
 function feedbackSendState(item) {
   if (item && item.status === 'content_approved_send_blocked') {
     const note = String(item.reviewNote || '');
-    if (note.startsWith('접수 여부 확인 필요')) return { label: ['접수 여부 확인 필요', 'warn'], retry: false };
-    if (note.startsWith('카카오 발송이 거절되었습니다')) return { label: ['알림톡 거절 · 확인 필요', 'bad'], retry: false };
+    if (note.startsWith('접수 여부 확인 필요')) return { label: ['접수 여부 확인 필요', 'warn'] };
+    if (note.startsWith('카카오 발송이 거절되었습니다')) return { label: ['알림톡 거절 · 확인 필요', 'bad'] };
   }
-  return { label: FEEDBACK_STATUS_LABEL[item && item.status] || [item && item.status || '', ''], retry: true };
+  return { label: FEEDBACK_STATUS_LABEL[item && item.status] || [item && item.status || '', ''] };
 }
 
 function feedbackReviewPrefix(item, ownCard) {
@@ -7370,6 +7583,73 @@ function feedbackReviewPrefix(item, ownCard) {
   if (note.startsWith('접수 여부 확인 필요')) return '⚠ 접수 여부 확인 — ';
   if (note.startsWith('카카오 발송이 거절되었습니다')) return '발송 거절 — ';
   return '⏳ 아직 안 나감 — ';
+}
+
+function feedbackUpdatedAt(item) {
+  return Math.max(0, Number(item && item.updatedAt) || 0);
+}
+
+function feedbackUpdatedAtLabel(item) {
+  const timestamp = feedbackUpdatedAt(item);
+  if (!timestamp) return '기록 시각 없음';
+  return new Date(timestamp).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
+}
+
+function feedbackIsUnsent(item) {
+  return !!item && item.status !== 'sent' && item.status !== 'cancelled';
+}
+
+function feedbackSortRows(rows, unsentFirst) {
+  return (Array.isArray(rows) ? rows : []).slice().sort((a, b) => {
+    if (unsentFirst) {
+      const unsentOrder = Number(feedbackIsUnsent(b)) - Number(feedbackIsUnsent(a));
+      if (unsentOrder) return unsentOrder;
+    }
+    return feedbackUpdatedAt(b) - feedbackUpdatedAt(a) ||
+      String(b && b.feedbackDate || '').localeCompare(String(a && a.feedbackDate || ''), 'ko') ||
+      String(a && a.requestKey || '').localeCompare(String(b && b.requestKey || ''), 'ko');
+  });
+}
+
+function feedbackTeacherGroups(rows) {
+  const groups = new Map();
+  feedbackSortRows(rows, true).forEach(item => {
+    const owner = String(item && item.owner || '');
+    if (!groups.has(owner)) groups.set(owner, { owner: owner, rows: [] });
+    groups.get(owner).rows.push(item);
+  });
+  return Array.from(groups.values()).map(group => {
+    group.rows = feedbackSortRows(group.rows, true);
+    group.unsentCount = group.rows.filter(feedbackIsUnsent).length;
+    group.latestUpdatedAt = group.rows.reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
+    group.latestUnsentAt = group.rows.filter(feedbackIsUnsent)
+      .reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
+    return group;
+  }).sort((a, b) => Number(b.unsentCount > 0) - Number(a.unsentCount > 0) ||
+    b.latestUnsentAt - a.latestUnsentAt || b.latestUpdatedAt - a.latestUpdatedAt ||
+    a.owner.localeCompare(b.owner, 'ko'));
+}
+
+function feedbackStoredMessageHtml(item) {
+  const storedMessage = String(item && item.message || '');
+  const message = storedMessage.trim() ? storedMessage : '저장된 최종 메시지가 없습니다.';
+  const label = item && item.status === 'sent'
+    ? '솔라피에 접수된 최종 메시지' : '저장된 최종 메시지 (미전송)';
+  return '<div class="feedback-message-label">' + label + '</div>' +
+    '<div class="feedback-message-text">' + esc(message) + '</div>';
+}
+
+function feedbackReasonHtml(item, ownCard) {
+  let note = String(item && item.reviewNote || '').trim();
+  const blocked = !!item && item.status === 'content_approved_send_blocked';
+  if (!note && blocked) note = '솔라피 발송 접수가 완료되지 않았습니다.';
+  if (!note) return '';
+  const resultId = !ownCard && blocked ? ' id="fbSendResult-' + esc(item.requestKey) + '"' : '';
+  return '<div class="hint mt8 feedback-send-reason"' + resultId + '>' +
+    feedbackReviewPrefix(item, ownCard) + esc(note) + '</div>';
 }
 
 async function loadFeedbackQueue(force) {
@@ -7413,20 +7693,16 @@ async function loadOwnFeedbackQueue(force) {
 function ownFeedbackCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const status = feedbackSendState(item).label;
-  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">' +
-      esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
-      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
-    (item.studentName
-      ? '<div class="small muted mb8">▪ 오늘 배운 내용: ' + esc(item.contentText) + '<br>▪ 잘한 점: ' + esc(item.plusText) +
-        '<br>▪ 보완할 점: ' + esc(item.minusText) + '</div>'
-      : '<div class="guide">' + esc(item.message || '').replace(/\n/g, '<br>') + '</div>') +
-    (item.reviewNote
-      ? '<div class="hint mt14">' + feedbackReviewPrefix(item, true) + esc(item.reviewNote) + '</div>'
-      : '') +
+  return '<details class="card feedback-record" data-persist-key="feedback-own|' + esc(item.requestKey) + '"><summary><span>' +
+      '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
+      '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' · ' +
+      (item.status === 'sent' ? '접수 ' : '상태 변경 ') + esc(feedbackUpdatedAtLabel(item)) +
+      ' · 수정본 ' + esc(item.revision) + '</span></span>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></summary>' +
+    '<div class="feedback-record-body">' + feedbackStoredMessageHtml(item) +
     (item.status === 'revision_requested'
       ? '<button class="btn btn-sm btn-primary mt14" data-act="fbeditrequest" data-key="' + item.requestKey + '">문구 수정 후 다시 요청</button>'
-      : '') + '</div>';
+      : '') + feedbackReasonHtml(item, true) + '</div></details>';
 }
 
 function viewOwnFeedbackRequests() {
@@ -7438,34 +7714,41 @@ function viewOwnFeedbackRequests() {
   if (ownFeedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownFeedbackQueueError) + '</div></div>';
   const visibleOwnQueue = ownFeedbackQueue.filter(item => item.status !== 'cancelled');
   if (!visibleOwnQueue.length) return h + '<div class="card"><div class="empty"><b>💬</b>아직 요청한 피드백 문구가 없습니다.</div></div>';
-  return h + visibleOwnQueue.map(ownFeedbackCard).join('');
+  return h + feedbackSortRows(visibleOwnQueue, false).map(ownFeedbackCard).join('');
 }
 
 function feedbackQueueCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
-  const staff = staffById(item.owner);
-  const sendState = feedbackSendState(item);
-  const status = sendState.label;
-  return '<div class="card"><div class="between mb8"><div><div class="card-title">' +
-      esc(task ? taskDisplayTitle(task) : item.taskId) + '</div><div class="small muted">' +
-      esc((staff && staff.name) || item.owner) + ' 선생님 · ' + esc(item.feedbackDate) + ' · 수정본 ' + item.revision + '</div></div>' +
-      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></div>' +
-    (item.studentName
-      ? '<div class="small muted mb8">▪ 오늘 배운 내용: ' + esc(item.contentText) + '<br>▪ 잘한 점: ' + esc(item.plusText) +
-        '<br>▪ 보완할 점: ' + esc(item.minusText) + '</div>'
-      : '') +
-    (item.reviewNote
-      ? '<div class="hint mt8">' + feedbackReviewPrefix(item, false) + esc(item.reviewNote) + '</div>'
-      : '') +
+  const status = feedbackSendState(item).label;
+  return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
+      '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
+      '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' · ' +
+      (item.status === 'sent' ? '접수 ' : '상태 변경 ') + esc(feedbackUpdatedAtLabel(item)) +
+      ' · 수정본 ' + esc(item.revision) + '</span></span>' +
+      '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></summary>' +
+    '<div class="feedback-record-body">' + feedbackStoredMessageHtml(item) +
     (item.status === 'approval_waiting'
       ? '<div class="row wraprow mt14">' +
-          '<button class="btn btn-sm btn-primary" data-act="fbreviewapprove" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">문구 승인</button>' +
-          '<button class="btn btn-sm btn-warn" data-act="fbreviewrevise" data-key="' + item.requestKey + '" data-rev="' + item.revision + '">수정 요청</button></div>'
+          '<button class="btn btn-sm btn-primary" data-act="fbreviewapprove" data-key="' + esc(item.requestKey) + '" data-rev="' + esc(item.revision) + '">문구 승인</button>' +
+          '<button class="btn btn-sm btn-warn" data-act="fbreviewrevise" data-key="' + esc(item.requestKey) + '" data-rev="' + esc(item.revision) + '">수정 요청</button></div>'
       : '') +
-    (item.status === 'content_approved_send_blocked' && sendState.retry
-      ? '<div class="row wraprow mt14"><button class="btn btn-sm btn-primary" data-act="fbsend" data-key="' + item.requestKey + '">📱 다시 발송 시도</button></div>' +
-        '<div class="hint mt8" id="fbSendResult-' + item.requestKey + '"></div>'
-      : '') + '</div>';
+    (item.status === 'content_approved_send_blocked'
+      ? '<div class="row wraprow mt14"><button class="btn btn-sm btn-primary" data-act="fbsend" data-key="' + esc(item.requestKey) + '">📱 다시 솔라피 발송 접수</button></div>'
+      : '') + feedbackReasonHtml(item, false) + '</div></details>';
+}
+
+function feedbackTeacherGroupHtml(group) {
+  const first = group.rows[0] || {};
+  const staff = staffById(group.owner);
+  const rawName = String((staff && staff.name) || first.teacherName || group.owner || '담당 선생님').trim();
+  const teacherName = /(?:선생님|쌤)$/.test(rawName) ? rawName : rawName + ' 선생님';
+  const status = group.unsentCount
+    ? '<span class="pill warn">미전송 ' + group.unsentCount + '건</span>'
+    : '<span class="pill">전체 솔라피 접수</span>';
+  return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(group.owner) + '"><summary><span>' +
+      '<span class="card-title">' + esc(teacherName) + '</span>' +
+      '<span class="small muted">전체 ' + group.rows.length + '건 · 미전송 ' + group.unsentCount + '건</span></span>' + status + '</summary>' +
+    '<div class="feedback-teacher-group-body">' + group.rows.map(feedbackQueueCard).join('') + '</div></details>';
 }
 
 function viewFeedbackReview() {
@@ -7481,11 +7764,7 @@ function viewFeedbackReview() {
   else {
     const visibleQueue = feedbackQueue.filter(item => item.status !== 'cancelled');
     if (!visibleQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
-    else {
-      const rank = { approval_waiting: 0, revision_requested: 1, content_approved_send_blocked: 2, sent: 3 };
-      h += visibleQueue.slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || b.updatedAt - a.updatedAt)
-        .map(feedbackQueueCard).join('');
-    }
+    else h += feedbackTeacherGroups(visibleQueue).map(feedbackTeacherGroupHtml).join('');
   }
   return h;
 }
@@ -7801,14 +8080,13 @@ async function polishFeedbackComment(button) {
   const seq = Number(context.polishSeq || 0) + 1;
   context.polishSeq = seq;
   context.polishPending = true;
-  const finalButton = modalBox.querySelector('[data-act="feedbackfinalsend"]');
   const editableFields = Array.from(modalBox.querySelectorAll('[data-feedback-final-field]'));
   const existingCommentField = modalBox.querySelector('[data-feedback-final-field="commentText"]');
   if (existingCommentField) existingCommentField.classList.remove('feedback-polish-updated');
   if (button) { button.disabled = true; button.textContent = '코멘트를 AI가 다듬는 중…'; }
-  if (finalButton) finalButton.disabled = true;
   editableFields.forEach(field => { field.disabled = true; });
   setFeedbackPolishStatus('working', 'AI가 코멘트를 다듬고 있습니다. 잠시만 기다려 주세요.', modalBox);
+  updateFeedbackPreviewLength(task, modalBox);
   try {
     const result = await sync.post('/feedback-polish', {
       app: SYNC_APP, auth,
@@ -7871,34 +8149,46 @@ let feedbackSubmitting = false;
  *  보호자 연락처·동의가 없거나 설정이 꺼져 있으면 서버가 조용히 막고 사유를 남긴다
  *  (막힌 사유는 "피드백 검토" 화면에서 원장님이 확인·재시도할 수 있다). */
 async function submitFeedbackForReview(button) {
-  if (!fbCtx || feedbackSubmitting) return;
-  if (fbCtx.polishPending) return toast('AI 다듬기가 끝난 뒤 최종 전송해 주세요');
+  const modalBox = button && button.closest('.modal-box');
+  if (!fbCtx) return toast('피드백 화면을 다시 열어 주세요');
+  if (feedbackSubmitting) {
+    setFeedbackFinalSendStatus('working', '이미 전송 요청을 처리하고 있습니다.', modalBox);
+    return;
+  }
   const task = state.tasks.find(row => row.id === fbCtx.id);
-  if (!task) return toast('수업 정보를 찾지 못했습니다');
-  if (!guardianContactEnabledFor(task && task.studentId)) return toast('이 학생은 학부모 전달 테스트 대상이 아닙니다');
   const templateVersion = fbCtx.templateVersion === 'v1' ? 'v1' : 'v2';
   const message = templateVersion === 'v2'
-    ? feedbackV2Message(task, fbCtx.date, fbCtx)
-    : (($('#mText') || {}).value || '').trim();
+    ? (task ? feedbackV2Message(task, fbCtx.date, fbCtx) : '')
+    : String(((modalBox && modalBox.querySelector('#mText')) || {}).value || '').trim();
   const contentText = String(fbCtx.contentText || '').trim();
-  const plusText = templateVersion === 'v1' ? (($('#fldPlus') || {}).value || '').trim() : String(fbCtx.plusText || '').trim();
-  const minusText = templateVersion === 'v1' ? (($('#fldMinus') || {}).value || '').trim() : String(fbCtx.minusText || '').trim();
-  if (!message) return toast('피드백 문구를 입력해 주세요');
-  if (!contentText || (templateVersion === 'v1' && (!plusText || !minusText))) {
-    return toast('수업 기록과 피드백 항목을 확인해 주세요');
+  const plusText = templateVersion === 'v1'
+    ? String(((modalBox && modalBox.querySelector('#fldPlus')) || {}).value || '').trim()
+    : String(fbCtx.plusText || '').trim();
+  const minusText = templateVersion === 'v1'
+    ? String(((modalBox && modalBox.querySelector('#fldMinus')) || {}).value || '').trim()
+    : String(fbCtx.minusText || '').trim();
+  if (templateVersion === 'v1') {
+    fbCtx.plusText = plusText;
+    fbCtx.minusText = minusText;
   }
-  if (templateVersion === 'v2' && (!fbCtx.subjectText || !fbCtx.homeworkText || !fbCtx.commentText)) {
-    return toast('과목·수업내용·과제·코멘트를 모두 확인해 주세요');
+  const blockedReason = feedbackFinalSendBlockReason(task, templateVersion, message);
+  if (blockedReason) {
+    setFeedbackFinalSendStatus('error', blockedReason, modalBox);
+    toast('최종 전송 불가 — 버튼 아래 이유를 확인해 주세요');
+    return;
   }
-  if (templateVersion === 'v2' && (message.length > FEEDBACK_ALIMTALK_MAX_CHARS ||
-      fbCtx.commentText.length > feedbackCommentBudget(task, fbCtx.date, fbCtx))) {
-    return toast('알림톡 글자 수를 넘었습니다 — 수업내용·과제 또는 코멘트를 줄여 주세요');
+  if (!confirm('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요?')) {
+    setFeedbackFinalSendStatus('idle', '전송을 취소했습니다. 내용을 확인한 뒤 다시 누를 수 있습니다.', modalBox);
+    return;
   }
-  if (!confirm('저장된 보호자 연락처로 수업 피드백 알림톡을 실제 발송할까요?')) return;
   const auth = sync.auth();
-  if (!auth) return toast('동기화 인증이 필요합니다');
+  if (!auth) {
+    setFeedbackFinalSendStatus('error', '동기화 인증이 필요합니다.', modalBox);
+    return;
+  }
   feedbackSubmitting = true;
-  if (button) button.disabled = true;
+  if (button) { button.disabled = true; button.textContent = '전송 요청 중…'; }
+  setFeedbackFinalSendStatus('working', '솔라피에 알림톡 발송을 요청하고 있습니다.', modalBox);
   try {
     const result = await sync.post('/feedback-request', {
       app: SYNC_APP, auth: auth, taskId: fbCtx.id,
@@ -7909,16 +8199,29 @@ async function submitFeedbackForReview(button) {
     });
     feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false;
     const status = result.request && result.request.status;
-    if (status === 'sent') toast('보호자 알림톡 발송 요청이 접수됐습니다');
-    else if (status === 'revision_requested') toast('원장 수정 요청을 확인해 문구를 바꿔 주세요');
-    else if (result.idempotent) toast('같은 내용이 이미 처리되어 있습니다 — 상태는 "피드백 검토"에서 확인해 주세요');
-    else toast('제출했습니다 — 아직 발송되지 않았다면 "피드백 검토"에서 사유를 확인해 주세요');
-    closeModal();
+    if (status === 'sent') {
+      setFeedbackFinalSendStatus('success', '솔라피 발송 요청이 접수됐습니다. 실제 전달 결과는 발송 결과 연동 후 확인할 수 있습니다.', modalBox);
+      toast('보호자 알림톡 발송 요청이 접수됐습니다');
+      closeModal();
+    } else {
+      const reason = String(result.request && result.request.reviewNote || '').trim() ||
+        (status === 'revision_requested'
+          ? '원장 수정 요청을 확인해 문구를 바꿔 주세요.'
+          : result.idempotent
+            ? '같은 내용이 이미 처리되었습니다. 피드백 상태에서 결과를 확인해 주세요.'
+            : '발송되지 않았습니다. 피드백 상태에서 저장된 사유를 확인해 주세요.');
+      setFeedbackFinalSendStatus('error', reason, modalBox);
+      toast('알림톡이 접수되지 않았습니다 — 버튼 아래 이유를 확인해 주세요');
+    }
   } catch (error) {
-    toast('제출 실패 — ' + (error.message || error));
-    if (button) button.disabled = false;
+    const raw = String(error && error.message || '전송 요청에 실패했습니다');
+    const safeReason = /(?:D1|DATABASE|SQL|TOKEN|SECRET|API[_ -]?KEY)/i.test(raw)
+      ? '서버에서 발송 준비 상태를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' : raw;
+    setFeedbackFinalSendStatus('error', safeReason, modalBox);
+    toast('제출 실패 — 버튼 아래 이유를 확인해 주세요');
   } finally {
     feedbackSubmitting = false;
+    if (button && button.isConnected) { button.disabled = false; button.textContent = '최종 전송'; }
   }
 }
 
@@ -20564,7 +20867,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-02.1';
+const APP_VER = '2026-09-02.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

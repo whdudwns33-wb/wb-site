@@ -6,7 +6,9 @@ import {
   guardianDeliveryAllowed,
   guardianDeliveryAvailable,
   guardianDeliveryGloballyEnabled,
-  guardianDeliveryStudentIds
+  guardianDeliveryStudentIds,
+  parentFeedbackAllStudentsEnabled,
+  parentFeedbackDeliveryAllowed
 } from './guardian-delivery-policy.js';
 
 test('전역 기능은 명시적으로 false일 때만 중지한다', () => {
@@ -37,4 +39,19 @@ test('선별 모드 공지는 허용된 학생을 직접 선택한 경우에만 
   assert.equal(guardianAnnouncementTargetsAllowed(env, 'students', []), false);
   assert.equal(guardianAnnouncementTargetsAllowed(env, 'students', ['student-a', 'student-c']), false);
   assert.equal(guardianAnnouncementTargetsAllowed(env, 'all', []), false);
+});
+
+test('피드백 전용 전체 학생 gate는 기존 보호자 기능을 켜지 않고 명시적 true만 허용한다', () => {
+  const env = {
+    WB_GUARDIAN_CONTACT_ENABLED: 'false',
+    WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+  };
+  assert.equal(parentFeedbackAllStudentsEnabled(env), true);
+  assert.equal(parentFeedbackDeliveryAllowed(env, 'student-any'), true);
+  assert.equal(guardianDeliveryAllowed(env, 'student-any'), false);
+  assert.equal(guardianDeliveryAvailable(env), false);
+  assert.equal(guardianAnnouncementTargetsAllowed(env, 'students', ['student-any']), false);
+  assert.equal(parentFeedbackAllStudentsEnabled({
+    WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'TRUE'
+  }), false);
 });
