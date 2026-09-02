@@ -26,6 +26,13 @@ try {
     console.log("비공개 시드 주입됨");
   }
 } catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
+// 빌드 태그 — index 와 bulk 가 같은 빌드인지 앱이 대조한다 (키가 빌드마다 바뀌므로 짝이 어긋나면 복호화 불가)
+const TAG = crypto.randomBytes(4).toString("hex");
+{
+  const tm = 'const BUILD_TAG="dev"; /*BUILD:TAG*/';
+  if (!htmlStr.includes(tm)) { console.error("BUILD:TAG 마커가 app.html에 없습니다"); process.exit(1); }
+  htmlStr = htmlStr.replace(tm, `const BUILD_TAG="${TAG}"; /*BUILD:TAG*/`);
+}
 // 대량 데이터(입결·학교)는 앱에 넣지 않는다 — 지연 로딩용 bulk.enc.json 으로 별도 암호화 (아래)
 const html = Buffer.from(htmlStr, "utf8");
 const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
@@ -62,7 +69,7 @@ try {
   const iv2 = crypto.randomBytes(12);
   const c2 = crypto.createCipheriv("aes-256-gcm", key, iv2);
   const ct2 = Buffer.concat([c2.update(gz), c2.final(), c2.getAuthTag()]);
-  const env2 = JSON.stringify({ v: 1, inner: "gzip(bulk-data.json)",
+  const env2 = JSON.stringify({ v: 1, inner: "gzip(bulk-data.json)", t: TAG,
     i: iv2.toString("base64"), c: ct2.toString("base64") });
   writeFileSync(join(HERE, "..", "bulk.enc.json"), env2);
   // 검증: WebCrypto 로 복호화 + gunzip 대조
@@ -76,3 +83,10 @@ try {
   if (e && e.code === "ENOENT") console.log("대량 데이터 없음 — bulk.enc.json 생략");
   else { console.error("bulk 빌드 실패:", e.message); process.exit(1); }
 }
+
+// 배포 안내 — 두 파일은 같은 빌드끼리만 호환된다
+const sha = f => { try { return crypto.createHash("sha256").update(readFileSync(join(HERE, "..", f))).digest("hex"); } catch { return "-"; } };
+console.log(`빌드 태그 ${TAG}`);
+console.log(`sha256 index.html    ${sha("index.html")}`);
+console.log(`sha256 bulk.enc.json ${sha("bulk.enc.json")}`);
+console.log("⚠ 배포 시 index.html 과 bulk.enc.json 을 반드시 함께 main 에 올릴 것 — 하나만 올리면 전 기기에서 대량 데이터 로드가 실패한다.");
