@@ -4,20 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>WB 내신브레인 — 영어 시험대비</title>
-  <meta name="description" content="단어 암기·본문 해석·백지 영작까지 — WB 영어 내신 시험대비 훈련 앱 (원내 전용)">
+  <meta name="description" content="단어 암기·본문 해석·백지 영작 — WB 영어 내신 시험대비 학습 시스템 (원내 전용)">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#1B3A5C">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <style>
+    /* 중학생 전용 학습 시스템 — 놀이 요소 없이 정보와 진도가 주인공인 화면.
+       워드브레인(정원 메타포)과 달리 눈금·숫자·단계명으로만 말한다. */
     :root {
-      --bg: #F6F3EA; --card: #FFFFFF; --card-2: #F0EDE2;
-      --ink: #23313F; --ink-strong: #1B3A5C; --ink-soft: #64748B; --line: #E3DFD2;
-      --blue: #1E9DD6; --deep: #0F7AAB; --navy: #1B3A5C;
-      --coral: #E85D4A; --coral-soft: #FBEAE6;
-      --green: #4E9B57; --green-soft: #E7F2E6;
-      --amber: #C98A2D; --amber-soft: #F7EEDA;
-      --shadow: 0 1px 4px rgba(27,58,92,.08); --radius: 14px;
+      --bg: #F4F5F7; --card: #FFFFFF; --card-2: #EDF0F3;
+      --ink: #1F2A37; --ink-strong: #14243A; --ink-soft: #5B6B7C; --line: #DDE3E9;
+      --navy: #1B3A5C; --blue: #0F6FA8; --blue-soft: #E8F1F8;
+      --green: #2E7D46; --green-soft: #E9F3EC;
+      --red: #B3372B; --red-soft: #F9ECEA;
+      --amber: #A16A12; --amber-soft: #F7F0E2;
+      --shadow: 0 1px 3px rgba(20,36,58,.07); --radius: 10px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
@@ -25,148 +27,172 @@
       font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       font-size: 16px; line-height: 1.6; word-break: keep-all; -webkit-font-smoothing: antialiased; }
     button { font-family: inherit; font-size: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-    input, textarea { font-family: inherit; font-size: 1rem; color: var(--ink); }
+    input, textarea, select { font-family: inherit; font-size: 1rem; color: var(--ink); }
     :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
-    .shell { max-width: 640px; margin: 0 auto; padding: 0 16px 96px; }
+    .shell { max-width: 680px; margin: 0 auto; padding: 0 16px 88px; }
 
-    .top { display: flex; align-items: center; gap: 10px; padding: 18px 2px 10px; }
-    .top img { width: 34px; height: 34px; border-radius: 9px; flex: none; }
-    .top h1 { font-size: 1.1rem; font-weight: 900; color: var(--ink-strong); margin: 0; }
-    .top .sub { font-size: .72rem; color: var(--ink-soft); display: block; font-weight: 500; }
-    .dday { margin-left: auto; background: var(--card); border: 1px solid var(--line); border-radius: 999px;
-      padding: 5px 12px; font-size: .8rem; font-weight: 700; color: var(--coral); box-shadow: var(--shadow); white-space: nowrap; }
-    .dday.practice { color: var(--deep); }
+    .top { display: flex; align-items: baseline; gap: 10px; padding: 16px 2px 4px; flex-wrap: wrap; }
+    .top h1 { font-size: 1.05rem; font-weight: 800; color: var(--ink-strong); margin: 0; letter-spacing: -.01em; }
+    .top .who { font-size: .8rem; color: var(--ink-soft); }
+    .dday { margin-left: auto; border: 1px solid var(--line); background: var(--card); border-radius: 6px;
+      padding: 3px 10px; font-size: .8rem; font-weight: 800; color: var(--red); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .dday.practice { color: var(--blue); }
+    .packline { padding: 0 2px 10px; font-size: .82rem; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .packline select { font-size: .82rem; min-height: 30px; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; background: var(--card); }
 
     .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--card);
-      border-top: 1px solid var(--line); display: flex; justify-content: center; gap: 2px;
-      padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); }
-    .tabbar button { flex: 1; max-width: 110px; display: flex; flex-direction: column; align-items: center; gap: 1px;
-      font-size: .68rem; font-weight: 700; color: var(--ink-soft); padding: 6px 0; border-radius: 10px; }
-    .tabbar button .ico { font-size: 1.05rem; line-height: 1.2; }
-    .tabbar button.on { color: var(--deep); background: #E9F5FB; }
+      border-top: 1px solid var(--line); display: flex; justify-content: center;
+      padding: 4px 8px calc(6px + env(safe-area-inset-bottom)); }
+    .tabbar button { flex: 1; max-width: 120px; font-size: .82rem; font-weight: 700; color: var(--ink-soft);
+      padding: 10px 0 8px; border-top: 2px solid transparent; }
+    .tabbar button.on { color: var(--navy); border-top-color: var(--navy); }
 
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
       box-shadow: var(--shadow); padding: 16px 18px; margin: 0 0 12px; }
-    .card h2 { font-size: .98rem; font-weight: 900; color: var(--ink-strong); margin: 0 0 8px; }
-    .muted { color: var(--ink-soft); font-size: .85rem; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px;
-      padding: 12px 16px; font-weight: 700; font-size: .95rem; background: var(--card-2);
+    .card h2 { font-size: .95rem; font-weight: 800; color: var(--ink-strong); margin: 0 0 10px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .card h2 small { font-weight: 500; color: var(--ink-soft); font-size: .78rem; margin-left: 6px; }
+    .muted { color: var(--ink-soft); font-size: .84rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px;
+      padding: 11px 16px; font-weight: 700; font-size: .93rem; background: var(--card-2);
       color: var(--ink-strong); border: 1px solid var(--line); }
-    .btn.primary { background: var(--deep); color: #fff; border-color: var(--deep); }
-    .btn.coral { background: var(--coral); color: #fff; border-color: var(--coral); }
-    .btn.big { width: 100%; padding: 14px 18px; font-size: 1rem; }
-    .btn:disabled { opacity: .45; cursor: default; }
+    .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .btn.line { background: var(--card); }
+    .btn.big { width: 100%; padding: 13px 16px; }
+    .btn:disabled { opacity: .4; cursor: default; }
     .btn:active:not(:disabled) { transform: translateY(1px); }
-    .row { display: flex; gap: 10px; } .row > * { flex: 1; }
-    .chip { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
-    .c-blue { background: #E3F1F8; color: var(--deep); }
-    .c-green { background: var(--green-soft); color: var(--green); }
-    .c-amber { background: var(--amber-soft); color: var(--amber); }
-    .c-coral { background: var(--coral-soft); color: var(--coral); }
-    .banner { background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 10px;
-      padding: 10px 14px; font-size: .85rem; margin: 0 0 12px; }
+    .row { display: flex; gap: 8px; } .row > * { flex: 1; }
+    .tag { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 4px; padding: 1px 7px; }
+    .t-blue { background: var(--blue-soft); color: var(--blue); }
+    .t-green { background: var(--green-soft); color: var(--green); }
+    .t-red { background: var(--red-soft); color: var(--red); }
+    .t-amber { background: var(--amber-soft); color: var(--amber); }
+    .t-gray { background: var(--card-2); color: var(--ink-soft); }
+    .notice { border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 8px;
+      padding: 10px 14px; font-size: .84rem; margin: 0 0 12px; }
 
-    .stat3 { display: flex; gap: 8px; margin: 10px 0 4px; }
-    .stat3 > div { flex: 1; background: var(--card-2); border-radius: 10px; padding: 8px 6px; text-align: center; }
-    .stat3 b { display: block; font-size: 1.25rem; font-weight: 900; color: var(--ink-strong); font-variant-numeric: tabular-nums; }
-    .stat3 span { font-size: .7rem; color: var(--ink-soft); font-weight: 700; }
-
-    .bar { height: 8px; background: var(--card-2); border-radius: 999px; overflow: hidden; margin: 6px 0; }
-    .bar i { display: block; height: 100%; background: var(--deep); border-radius: 999px; }
+    /* 진도 수치 */
+    .nums { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 0 0 10px; }
+    .nums > div { flex: 1; text-align: center; padding: 10px 4px; background: var(--card); }
+    .nums > div + div { border-left: 1px solid var(--line); }
+    .nums b { display: block; font-size: 1.3rem; font-weight: 800; color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+    .nums b small { font-size: .72rem; color: var(--ink-soft); font-weight: 600; }
+    .nums span { font-size: .72rem; color: var(--ink-soft); font-weight: 700; }
+    .bar { height: 6px; background: var(--card-2); border-radius: 3px; overflow: hidden; margin: 6px 0; }
+    .bar i { display: block; height: 100%; background: var(--blue); }
     .bar i.g { background: var(--green); }
 
-    .wordgrid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .wchip { border: 1px solid var(--line); background: var(--card); border-radius: 999px;
-      padding: 4px 10px; font-size: .8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
-    .wchip .dots { display: inline-flex; gap: 2px; }
-    .wchip .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
-    .wchip .dots i.on { background: var(--green); }
-    .wchip.reached { border-color: var(--deep); }
-    .wchip.stable { border-color: var(--green); background: var(--green-soft); }
+    /* 영역 진입 목록 */
+    .arearow { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .arearow:last-child { border-bottom: none; }
+    .arearow .no { flex: none; width: 1.6em; height: 1.6em; border-radius: 4px; background: var(--navy); color: #fff;
+      font-weight: 800; font-size: .8rem; display: flex; align-items: center; justify-content: center; }
+    .arearow .tt { flex: 1; min-width: 0; }
+    .arearow .tt b { display: block; font-size: .92rem; color: var(--ink-strong); }
+    .arearow .tt span { font-size: .78rem; color: var(--ink-soft); }
+    .arearow .go { flex: none; color: var(--ink-soft); font-weight: 700; }
 
-    .senrow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    /* 유형 목록 (문제 영역) */
+    .typerow { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+    .typerow:last-child { border-bottom: none; }
+    .typerow .tt { flex: 1; min-width: 0; font-size: .9rem; font-weight: 600; color: var(--ink-strong); }
+    .typerow .tt small { display: block; font-weight: 400; color: var(--ink-soft); font-size: .76rem; }
+    .typerow button { flex: none; border: 1px solid var(--line); background: var(--card-2); border-radius: 6px;
+      padding: 6px 14px; font-size: .82rem; font-weight: 700; color: var(--ink-strong); }
+    .typerow button:disabled { opacity: .4; }
+
+    /* 단어·문장 목록 */
+    .wordgrid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .wchip { border: 1px solid var(--line); background: var(--card); border-radius: 6px;
+      padding: 3px 9px; font-size: .8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
+    .wchip .lv { font-size: .68rem; font-weight: 800; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+    .wchip.reached { border-color: var(--blue); } .wchip.reached .lv { color: var(--blue); }
+    .wchip.stable { border-color: var(--green); background: var(--green-soft); } .wchip.stable .lv { color: var(--green); }
+    .senrow { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
     .senrow:last-child { border-bottom: none; }
-    .senrow .no { flex: none; width: 1.8em; font-weight: 900; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-    .senrow .txt { flex: 1; min-width: 0; font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .senrow .no { flex: none; width: 1.9em; font-weight: 800; color: var(--ink-soft); font-variant-numeric: tabular-nums; font-size: .85rem; }
+    .senrow .txt { flex: 1; min-width: 0; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .stagebar { flex: none; display: inline-flex; gap: 2px; }
-    .stagebar i { width: 9px; height: 12px; border-radius: 3px; background: var(--card-2); border: 1px solid var(--line); }
-    .stagebar i.on { background: var(--deep); border-color: var(--deep); }
+    .stagebar i { width: 8px; height: 11px; border-radius: 2px; background: var(--card-2); border: 1px solid var(--line); }
+    .stagebar i.on { background: var(--blue); border-color: var(--blue); }
     .stagebar i.done { background: var(--green); border-color: var(--green); }
-    .okmark { flex: none; font-weight: 900; }
-    .okmark.y { color: var(--green); } .okmark.n { color: var(--line); }
+    .okmark { flex: none; font-weight: 800; font-size: .8rem; min-width: 2.6em; text-align: right; }
+    .okmark.y { color: var(--green); } .okmark.n { color: var(--ink-soft); }
 
-    /* 훈련 러너 오버레이 */
+    /* 훈련 러너 */
     .runner { position: fixed; inset: 0; z-index: 60; background: var(--bg); overflow-y: auto; display: none; }
     .runner.open { display: block; }
-    .runner .rshell { max-width: 640px; margin: 0 auto; padding: 14px 16px 40px; }
+    .runner .rshell { max-width: 680px; margin: 0 auto; padding: 12px 16px 40px; }
     .rtop { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .rtop .prog { flex: 1; } .rtop .quit { flex: none; font-size: 1.3rem; color: var(--ink-soft); padding: 4px 8px; }
+    .rtop .prog { flex: 1; } .rtop .quit { flex: none; font-size: 1.2rem; color: var(--ink-soft); padding: 4px 10px; }
     .q { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-      box-shadow: var(--shadow); padding: 20px 18px; }
-    .q .qmeta { font-size: .74rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; }
-    .q .prompt { font-size: 1.2rem; font-weight: 900; color: var(--ink-strong); margin: 4px 0 14px; line-height: 1.5; }
-    .q .prompt.sm { font-size: 1rem; font-weight: 500; }
+      box-shadow: var(--shadow); padding: 18px; }
+    .q .qmeta { font-size: .74rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;
+      text-transform: none; letter-spacing: .02em; }
+    .q .prompt { font-size: 1.15rem; font-weight: 800; color: var(--ink-strong); margin: 4px 0 14px; line-height: 1.55; }
+    .q .prompt.sm { font-size: .98rem; font-weight: 500; }
     .choices { display: flex; flex-direction: column; gap: 8px; }
-    .choices button { text-align: left; background: var(--card-2); border: 1px solid var(--line);
-      border-radius: 10px; padding: 11px 14px; font-weight: 500; }
-    .choices button.sel { border-color: var(--deep); background: #E9F5FB; }
+    .choices button { text-align: left; background: var(--card); border: 1px solid var(--line);
+      border-radius: 8px; padding: 11px 14px; font-weight: 500; }
+    .choices button.sel { border-color: var(--blue); background: var(--blue-soft); }
     .choices button.right { border-color: var(--green); background: var(--green-soft); }
-    .choices button.wrongpick { border-color: var(--coral); background: var(--coral-soft); }
-    .blankline { display: inline-block; min-width: 70px; border: none; border-bottom: 2px solid var(--deep);
+    .choices button.wrongpick { border-color: var(--red); background: var(--red-soft); }
+    .blankline { display: inline-block; min-width: 68px; border: none; border-bottom: 2px solid var(--blue);
       background: transparent; padding: 2px 6px; margin: 0 2px; text-align: center; font-weight: 700; }
     .blankline.ok { border-color: var(--green); color: var(--green); }
-    .blankline.bad { border-color: var(--coral); color: var(--coral); }
+    .blankline.bad { border-color: var(--red); color: var(--red); }
     .hintko { font-size: .72rem; color: var(--amber); display: inline-block; margin: 0 2px; }
     .tokens { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-    .tokens button { background: var(--card-2); border: 1px solid var(--line); border-radius: 8px;
-      padding: 7px 12px; font-weight: 700; }
+    .tokens button { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font-weight: 600; }
     .tokens button:disabled { opacity: .3; }
-    .built { min-height: 46px; background: var(--card-2); border: 1px dashed var(--line); border-radius: 10px;
+    .built { min-height: 46px; background: var(--card-2); border: 1px dashed var(--line); border-radius: 8px;
       padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-    .built button { background: var(--card); border: 1px solid var(--deep); border-radius: 8px; padding: 5px 10px; font-weight: 700; }
-    textarea.ans { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 10px;
+    .built button { background: var(--card); border: 1px solid var(--blue); border-radius: 6px; padding: 5px 10px; font-weight: 600; }
+    textarea.ans { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 8px;
       padding: 10px 12px; background: var(--card); resize: vertical; }
-    input.ans { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); }
-    .result { margin-top: 12px; border-radius: 10px; padding: 12px 14px; font-size: .92rem; }
-    .result.good { background: var(--green-soft); } .result.bad { background: var(--coral-soft); }
-    .result .exp { margin-top: 6px; color: var(--ink-soft); font-size: .85rem; }
+    input.ans { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--card); }
+    .result { margin-top: 12px; border-radius: 8px; padding: 11px 14px; font-size: .9rem; border: 1px solid transparent; }
+    .result.good { background: var(--green-soft); border-color: var(--green); }
+    .result.bad { background: var(--red-soft); border-color: var(--red); }
+    .result b.mark { font-weight: 800; }
+    .result .exp { margin-top: 6px; color: var(--ink-soft); font-size: .84rem; }
     .confrow { display: flex; gap: 8px; margin-top: 12px; }
-    .confrow button { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px;
-      font-size: .82rem; font-weight: 700; background: var(--card); }
+    .confrow button { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 9px 4px;
+      font-size: .84rem; font-weight: 700; background: var(--card); color: var(--ink-strong); }
+    .confrow .cl { font-size: .7rem; color: var(--ink-soft); display: block; font-weight: 500; }
     .rnext { margin-top: 12px; }
 
-    .chunkline { margin: 4px 0; padding: 6px 10px; border-radius: 8px; background: var(--card-2); font-size: .92rem; }
-    .chunkline .ko { color: var(--ink-soft); font-size: .82rem; display: block; }
-    .chunkline.miss { background: var(--coral-soft); }
-    .diffline { margin: 6px 0; padding: 8px 10px; border-radius: 8px; font-size: .9rem; background: var(--card-2); }
+    .chunkline { margin: 4px 0; padding: 6px 10px; border-radius: 6px; background: var(--card-2); font-size: .9rem; }
+    .chunkline .ko { color: var(--ink-soft); font-size: .8rem; display: block; }
+    .chunkline.miss { background: var(--red-soft); }
+    .diffline { margin: 6px 0; padding: 8px 10px; border-radius: 6px; font-size: .88rem; background: var(--card-2); }
     .diffline.ok { background: var(--green-soft); } .diffline.partial { background: var(--amber-soft); }
-    .diffline.missing { background: var(--coral-soft); }
-    .diffline .d-missing { color: var(--coral); text-decoration: underline; }
+    .diffline.missing { background: var(--red-soft); }
+    .diffline .d-missing { color: var(--red); text-decoration: underline; }
     .diffline .d-extra { color: var(--amber); text-decoration: line-through; }
-    .diffline .lbl { font-size: .72rem; font-weight: 900; margin-right: 6px; }
-    .paperbtn { border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px; font-weight: 900; }
+    .diffline .lbl { font-size: .72rem; font-weight: 800; margin-right: 6px; }
+    .paperbtn { border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; font-weight: 800; }
     .paperbtn.y { background: var(--green-soft); border-color: var(--green); color: var(--green); }
-    .paperbtn.n { background: var(--coral-soft); border-color: var(--coral); color: var(--coral); }
-    .hidden { display: none !important; }
+    .paperbtn.n { background: var(--red-soft); border-color: var(--red); color: var(--red); }
   </style>
 </head>
 <body>
 <div class="shell">
   <div class="top">
-    <img src="./icon.svg" alt="">
-    <div><h1>내신브레인</h1><span class="sub" id="packTitle">팩을 불러오는 중…</span></div>
+    <h1>내신브레인</h1><span class="who" id="whoLine"></span>
     <span class="dday" id="ddayBadge">—</span>
   </div>
+  <div class="packline" id="packLine"></div>
   <div id="modeBanner"></div>
   <main id="views"></main>
 </div>
 
 <nav class="tabbar" id="tabbar">
-  <button data-tab="today"><span class="ico">📅</span>오늘</button>
-  <button data-tab="words"><span class="ico">🔤</span>단어</button>
-  <button data-tab="passage"><span class="ico">📖</span>본문</button>
-  <button data-tab="quiz"><span class="ico">✏️</span>문제</button>
-  <button data-tab="progress"><span class="ico">📊</span>성취도</button>
+  <button data-tab="home">홈</button>
+  <button data-tab="words">단어 암기</button>
+  <button data-tab="passage">본문 암기</button>
+  <button data-tab="quiz">문제 풀이</button>
+  <button data-tab="progress">성취도</button>
 </nav>
 
 <div class="runner" id="runner"><div class="rshell">
@@ -184,14 +210,15 @@
 <script src="./gen.js"></script>
 <script>
 'use strict';
-/* WB 내신브레인 — 학생 앱 (Phase 1 MVP)
-   엔진(WBNAESIN)·채점(WBGRADE)·생성(WBGEN)은 순수 모듈, 이 파일은 화면과 상태 관리만 한다.
-   상태는 localStorage(wbn.v1)가 정본이고, 연동된 학생은 서버(/api/naesin/state)로 백업된다. */
+/* WB 내신브레인 — 중학생 전용 학생 앱.
+   설계 원칙(원장 지시): 놀이 요소 없이 학습 도구로만. 영역 3개(단어 암기·본문 암기·문제
+   풀이)를 분리하고, 문제는 유형별로 나눈다. 접속하면 내 학교 교재(배정 팩)의 진도를
+   이어서 학습한다. 엔진(WBNAESIN)·채점(WBGRADE)·생성(WBGEN)은 그대로, 이 파일은 화면만. */
 (function () {
   var KEY = 'wbn.v1';
   var $ = function (id) { return document.getElementById(id); };
-  var pack = null, DB = null, view = 'today';
-  var authed = false;
+  var pack = null, DB = null, view = 'home';
+  var authed = false, examServer = null, packList = [];
 
   /* ── 저장소 ── */
   function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
@@ -204,8 +231,11 @@
     if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
     return DB.packs[pack.packId];
   }
+  function setLast(label, resume) {
+    DB.last = { packId: pack.packId, label: label, resume: resume, at: Date.now() };
+  }
 
-  /* ── 서버 연동 (진로독서 연동 토큰 재사용 — vocab 패턴) ── */
+  /* ── 서버 연동 (진로독서 연동 토큰 재사용) ── */
   function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
   function api(path, opt) {
     var a = auth();
@@ -224,33 +254,29 @@
     syncTimer = setTimeout(pushState, 3000);
   }
   function summaryOf() {
-    var pd = packDB();
-    var w = {}, s = {};
+    var pd = packDB(), w = {}, s = {};
     Object.keys(pd.states).forEach(function (k) {
       var st = pd.states[k];
       if (st.kind === 'sentence') s[k] = st; else w[k] = st;
     });
-    return {
-      packId: pack.packId,
-      word: WBNAESIN.wordSummary(w),
-      sentence: WBNAESIN.sentenceSummary(s),
-      updatedAt: new Date().toISOString()
-    };
+    return { packId: pack.packId, word: WBNAESIN.wordSummary(w), sentence: WBNAESIN.sentenceSummary(s), updatedAt: new Date().toISOString() };
   }
   function pushState() {
     if (!authed) return;
-    /* 서버 계약: PUT body는 { state: {...} } 래핑 (naesin-api.mjs) */
-    var body = { state: { v: 1, packs: DB.packs, summary: summaryOf(), savedAt: DB.savedAt } };
+    var body = { state: { v: 1, packs: DB.packs, last: DB.last || null, summary: summaryOf(), savedAt: DB.savedAt } };
     api('/state', { method: 'PUT', body: JSON.stringify(body) }).catch(function () {});
   }
   function pullState() {
     return api('/state').then(function (r) {
       var remote = r && r.state;
-      if (remote && remote.packs && (remote.savedAt || 0) > (DB.savedAt || 0)) DB.packs = remote.packs;
+      if (remote && remote.packs && (remote.savedAt || 0) > (DB.savedAt || 0)) {
+        DB.packs = remote.packs;
+        if (remote.last) DB.last = remote.last;
+      }
     }).catch(function () {});
   }
 
-  /* ── 상태 준비 ── */
+  /* ── 상태 준비·조회 ── */
   function ensureStates() {
     var pd = packDB(), now = Date.now();
     (pack.words || []).forEach(function (w) {
@@ -273,7 +299,6 @@
   }
   function senState(seq) { return packDB().states[WBNAESIN.sentenceId(seq)]; }
   function exam() { return packDB().exam || null; }
-  function wordById(id) { for (var i = 0; i < pack.words.length; i++) if (pack.words[i].id === id) return pack.words[i]; return null; }
   function senBySeq(seq) { for (var i = 0; i < pack.sentences.length; i++) if (pack.sentences[i].seq === seq) return pack.sentences[i]; return null; }
   function dayGroups() {
     var groups = [], cur = null;
@@ -284,6 +309,8 @@
     });
     return groups;
   }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
 
   /* ── 탭 ── */
   function setTab(t) {
@@ -297,63 +324,105 @@
     if (b) setTab(b.getAttribute('data-tab'));
   });
 
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-
-  /* ── 헤더 ── */
+  /* ── 헤더: 학생·교재·시험 ── */
   function renderHeader() {
-    $('packTitle').textContent = pack ? (pack.textbook + ' · ' + (pack.lessonTitle || ('Lesson ' + pack.lesson))) : '';
+    var a = auth();
+    $('whoLine').textContent = a && a.name ? a.name + ' 학생' : (authed ? '' : '체험 모드');
     var ex = exam(), b = $('ddayBadge');
     if (ex && ex.examDate) {
       var d = WBNAESIN.daysUntil(ex.examDate, Date.now());
-      b.textContent = d >= 0 ? 'D-' + d : '시험 끝';
+      b.textContent = d >= 0 ? '시험 D-' + d : '시험 종료';
       b.className = 'dday';
-    } else { b.textContent = '연습 모드'; b.className = 'dday practice'; }
+    } else { b.textContent = '자율 학습'; b.className = 'dday practice'; }
+    var pl = $('packLine');
+    if (!pack) { pl.textContent = ''; return; }
+    var label = '교재: ' + (pack.textbook || '') + ' · Lesson ' + pack.lesson + (pack.lessonTitle ? ' (' + pack.lessonTitle + ')' : '');
+    if (packList.length > 1) {
+      pl.innerHTML = '교재 범위: <select id="packSel">' + packList.map(function (id) {
+        return '<option value="' + esc(id) + '"' + (id === pack.packId ? ' selected' : '') + '>' + esc(id) + '</option>';
+      }).join('') + '</select>';
+      $('packSel').onchange = function () { switchPack(this.value); };
+    } else {
+      pl.textContent = label;
+    }
     $('modeBanner').innerHTML = authed ? '' :
-      '<div class="banner">체험 모드 — 자체 제작 데모 팩입니다. 학원에서 받은 QR로 진로독서 앱에 연동하면 우리 학교 시험 팩과 기록 저장이 열립니다.</div>';
+      '<div class="notice">체험 모드 — 예시 교재로 둘러보는 중입니다. 학원에서 받은 QR로 연동하면 <b>내 학교 교재</b>와 학습 기록이 열립니다.</div>';
+  }
+  function switchPack(pid) {
+    api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
+      pack = r.pack; ensureStates();
+      if (examServer && examServer.examDate) packDB().exam = { examDate: examServer.examDate, wordDeadlineDays: examServer.wordDeadlineDays || 7 };
+      persist(); render();
+    }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
   }
 
-  /* ════════════ 오늘 탭 ════════════ */
-  function renderToday(root) {
+  /* ════════ 홈 — 이어서 학습 + 오늘의 학습(영역별) ════════ */
+  function todayCounts() {
+    var pd = packDB();
+    var plan = WBNAESIN.planDay(pack, pd.states, exam(), Date.now(), {});
+    return { plan: plan,
+      words: plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length,
+      sentences: plan.sentences.length };
+  }
+  function renderHome(root) {
     var pd = packDB();
     if (!pd.diagDone) {
       root.innerHTML =
-        '<div class="card"><h2>시작 전, 2분 출발선 진단</h2>' +
-        '<p class="muted">이미 아는 단어를 골라내서 오늘부터 <b>새로 외울 것만</b> 계획에 넣어요. 모르는 건 부담 없이 「모름」!</p>' +
-        '<button class="btn primary big" id="startDiag">진단 시작 (' + pack.words.length + '단어)</button></div>';
+        '<div class="card"><h2>진단 평가 <small>학습 시작 전 1회</small></h2>' +
+        '<p class="muted">현재 알고 있는 단어를 확인해 학습 계획을 세웁니다. 전 단어 ' + pack.words.length + '개, 약 2분. 모르는 단어는 「모름」을 선택하면 됩니다 — 진단이므로 점수와 무관합니다.</p>' +
+        '<button class="btn primary big" id="startDiag">진단 평가 시작</button></div>';
       $('startDiag').onclick = startDiagnostic;
       return;
     }
-    var plan = WBNAESIN.planDay(pack, pd.states, exam(), Date.now(), {});
+    var tc = todayCounts();
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     var wsum = WBNAESIN.wordSummary(wordStates());
-    var total = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
-    root.innerHTML =
-      '<div class="card"><h2>오늘의 플랜</h2>' +
-      '<div class="stat3">' +
-      '<div><b>' + plan.words.fresh.length + '</b><span>새 단어</span></div>' +
-      '<div><b>' + (plan.words.review.length + plan.words.relearn.length) + '</b><span>복습·안정화</span></div>' +
-      '<div><b>' + plan.sentences.length + '</b><span>본문 문장</span></div></div>' +
-      (plan.note ? '<p class="muted">' + esc(plan.note) + '</p>' : '') +
-      (!g.open ? '<p class="muted">🔒 단어 게이트: ' + g.done + '/' + g.total + ' 도달 — 단어를 먼저 끝내면 백지 훈련이 열려요.</p>' : '') +
-      '<button class="btn primary big" id="startToday"' + (total + plan.sentences.length ? '' : ' disabled') + '>오늘 훈련 시작</button></div>' +
-      '<div class="card"><h2>브레인덤프 (2분)</h2>' +
-      '<p class="muted">배운 문장을 기억나는 대로 써 보기 — 채점 없이 빠뜨린 곳만 보여 줘요.</p>' +
-      '<button class="btn big" id="startDump">브레인덤프 시작</button></div>' +
-      '<div class="card"><h2>단어 안정화</h2>' +
-      '<div class="bar"><i class="g" style="width:' + (wsum.total ? Math.round(wsum.stable / wsum.total * 100) : 0) + '%"></i></div>' +
-      '<p class="muted">안정화(다른 날 3회 재도달) ' + wsum.stable + ' · 도달 ' + wsum.reached + ' / ' + wsum.total + '</p></div>';
-    $('startToday').onclick = function () {
-      var items = WBGEN.dailySet(pack, plan, Math.random);
-      if (items.length) runItems(items, '오늘 훈련');
+    var ssum = WBNAESIN.sentenceSummary(senStates());
+    var last = DB.last && DB.last.packId === pack.packId ? DB.last : null;
+    var html = '';
+    if (last) {
+      html += '<div class="card"><h2>이어서 학습</h2>' +
+        '<p class="muted">마지막 학습: <b>' + esc(last.label) + '</b></p>' +
+        '<button class="btn primary big" id="resumeBtn">이어서 시작</button></div>';
+    }
+    html +=
+      '<div class="card"><h2>오늘의 학습' + (tc.plan.dday != null ? ' <small>시험까지 ' + tc.plan.dday + '일</small>' : '') + '</h2>' +
+      '<div id="areaList">' +
+      '<div class="arearow" data-area="words"><span class="no">1</span><div class="tt"><b>단어 암기</b>' +
+      '<span>오늘 ' + tc.words + '개 (신규 ' + tc.plan.words.fresh.length + ' · 복습 ' + tc.plan.words.review.length + ' · 안정화 ' + tc.plan.words.relearn.length + ') — 도달 ' + wsum.reached + '/' + wsum.total + '</span></div><span class="go">›</span></div>' +
+      '<div class="arearow" data-area="passage"><span class="no">2</span><div class="tt"><b>본문 암기</b>' +
+      '<span>오늘 ' + tc.sentences + '문장 — 해석 통과 ' + ssum.interpreted + '/' + ssum.total + ' · 백지 완료 ' + ssum.memorized + '/' + ssum.total + '</span></div><span class="go">›</span></div>' +
+      '<div class="arearow" data-area="quiz"><span class="no">3</span><div class="tt"><b>문제 풀이</b>' +
+      '<span>유형별 문제 · 오답 ' + Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; }).length + '개 미해결</span></div><span class="go">›</span></div>' +
+      '</div>' +
+      (tc.plan.note ? '<p class="muted" style="margin-top:8px">' + esc(tc.plan.note) + '</p>' : '') +
+      (!g.open ? '<p class="muted">단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 본문 5·6단계가 잠깁니다 — 단어를 먼저 완성하세요.</p>' : '') +
+      '</div>' +
+      '<div class="card"><h2>백지 점검 <small>자유 인출 2분 · 채점 기록 없음</small></h2>' +
+      '<p class="muted">지금까지 학습한 문장을 아무것도 보지 않고 써 봅니다. 빠뜨린 문장만 확인시켜 주는 점검이며 성적에 반영되지 않습니다.</p>' +
+      '<button class="btn big line" id="startDump">백지 점검 시작</button></div>';
+    root.innerHTML = html;
+    if (last) $('resumeBtn').onclick = function () { doResume(last.resume); };
+    $('areaList').onclick = function (e) {
+      var r = e.target.closest('.arearow');
+      if (r) setTab(r.getAttribute('data-area'));
     };
     $('startDump').onclick = startDump;
   }
+  function doResume(r) {
+    if (!r) return;
+    if (r.t === 'wordDaily') return startWordDaily();
+    if (r.t === 'sentence') { setTab('passage'); return trainSentence(r.seq); }
+    if (r.t === 'quizType') { setTab('quiz'); return runQuizType(r.key); }
+    if (r.t === 'blank') { setTab('passage'); var grp = dayGroups().filter(function (g) { return g.day === r.day; })[0]; return startBlank(grp); }
+    setTab('home');
+  }
 
-  /* ── 출발선 진단 ── */
+  /* ── 진단 평가 ── */
   function startDiagnostic() {
     var items = WBGEN.diagnosticSet(pack, Math.random);
     var results = [];
-    runQueue(items, '출발선 진단', function (item, ok, answerKey) {
+    runQueue(items, '진단 평가', function (item, ok, answerKey) {
       results.push({ id: item.wordId, known: ok && answerKey !== item.unknownKey });
     }, function () {
       var pd = packDB();
@@ -361,17 +430,17 @@
       pd.diagDone = true;
       persist();
       var known = results.filter(function (r) { return r.known; }).length;
-      alert('진단 완료! ' + pack.words.length + '개 중 ' + known + '개는 이미 알아요.\n새로 외울 단어는 ' + (pack.words.length - known) + '개!');
+      alert('진단 완료.\n아는 단어 ' + known + '개 / 전체 ' + pack.words.length + '개.\n학습 계획은 남은 ' + (pack.words.length - known) + '개 기준으로 편성됩니다.');
       render();
-    }, { noConfidence: true, noEngine: true });
+    }, { noConfidence: true });
   }
 
-  /* ════════════ 러너 (문항 큐 실행) ════════════ */
+  /* ════════ 러너 (문항 큐) ════════ */
   var RQ = null;
   function runItems(items, title) {
     runQueue(items, title, function (item, ok, ans, meta) {
       var pd = packDB(), now = Date.now();
-      if (item.kind === 'sentence' || item.seq != null && item.stage != null) {
+      if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
         var st = senState(item.seq);
         if (st) WBNAESIN.advanceStage(st, ok, now);
       } else if (item.wordId) {
@@ -400,10 +469,9 @@
     renderItem(RQ.items[RQ.i], $('rBody'));
   }
   function finishItem(item, ok, answerKey, resultHtml) {
-    /* 결과 → (확신도) → 다음 */
     var box = document.createElement('div');
     box.className = 'result ' + (ok ? 'good' : 'bad');
-    box.innerHTML = (ok ? '⭕ 정답!' : '❌ 아쉽!') + (resultHtml || '');
+    box.innerHTML = '<b class="mark">' + (ok ? '정답' : '오답') + '</b>' + (resultHtml || '');
     $('rBody').querySelector('.q').appendChild(box);
     var q = $('rBody').querySelector('.q');
     var needConf = !RQ.opts.noConfidence && item.wordId && item.type !== undefined;
@@ -414,9 +482,16 @@
     if (needConf) {
       var cr = document.createElement('div');
       cr.className = 'confrow';
-      cr.innerHTML = '<button data-c="sure">😎 확실했어요</button><button data-c="unsure">🤔 애매했어요</button><button data-c="guess">🎲 찍었어요</button>';
+      cr.innerHTML =
+        '<button data-c="sure">확실함<span class="cl">알고 답함</span></button>' +
+        '<button data-c="unsure">애매함<span class="cl">확신 없음</span></button>' +
+        '<button data-c="guess">추측함<span class="cl">찍어서 답함</span></button>';
       cr.onclick = function (e) { var b = e.target.closest('button'); if (b) next(b.getAttribute('data-c')); };
       q.appendChild(cr);
+      var note = document.createElement('p');
+      note.className = 'muted'; note.style.marginTop = '6px';
+      note.textContent = '정직하게 선택할수록 복습 계획이 정확해집니다.';
+      q.appendChild(note);
     } else {
       var nb = document.createElement('div');
       nb.className = 'rnext';
@@ -427,16 +502,16 @@
     }
   }
 
-  /* ── 문항 렌더 (유형별) ── */
+  /* ── 문항 렌더 ── */
   function renderItem(item, root) {
     var stageLabel = item.stage ? '본문 ' + Math.floor(item.stage) + '단계' : (item.kind === 'word' || item.wordId ? '단어' : '');
     var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
 
-    if (item.choices) { /* mcq · defpick · vocabMcqReverse */
+    if (item.choices) {
       root.innerHTML = head + '<div class="prompt">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div></div>';
       var chs = $('chs');
       var list = item.choices.slice();
-      if (item.unknownKey) list.push({ key: item.unknownKey, text: '❓ 모름 — 새로 배울래요' });
+      if (item.unknownKey) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
       list.forEach(function (c) {
         var b = document.createElement('button');
         b.textContent = c.text; b.setAttribute('data-k', c.key);
@@ -460,12 +535,12 @@
     if (item.type === 'spell') {
       root.innerHTML = head + '<div class="prompt sm">뜻: <b>' + esc(item.promptKo) + '</b></div>' +
         '<div class="prompt" style="letter-spacing:2px">' + esc(item.hint) + '</div>' +
-        '<input class="ans" id="spellIn" autocomplete="off" autocapitalize="off" placeholder="영어로 입력">' +
+        '<input class="ans" id="spellIn" autocomplete="off" autocapitalize="off" placeholder="영어 단어 입력">' +
         '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {
         var v = $('spellIn').value;
         var g = WBGRADE.gradeAnswer(v, item.answers);
-        finishItem(item, g.correct, v, g.correct ? '' : ' 정답: <b>' + esc(item.answers[0]) + '</b>');
+        finishItem(item, g.correct, v, g.correct ? '' : ' — 정답: <b>' + esc(item.answers[0]) + '</b>');
       });
       $('spellIn').focus();
       return;
@@ -478,7 +553,7 @@
       bindSubmit(function () {
         var v = $('czIn').value;
         var g = WBGRADE.gradeAnswer(v, item.answers);
-        finishItem(item, g.correct, v, g.correct ? '' : ' 정답: <b>' + esc(item.answers[0]) + '</b>');
+        finishItem(item, g.correct, v, g.correct ? '' : ' — 정답: <b>' + esc(item.answers[0]) + '</b>');
       });
       $('czIn').focus();
       return;
@@ -506,7 +581,7 @@
         for (var i = 0; i < ins.length; i++) ins[i].classList.add(g.perBlank[i].correct ? 'ok' : 'bad');
         var wrongAns = g.perBlank.filter(function (pb) { return !pb.correct; })
           .map(function (pb) { return pb.expected && pb.expected[0]; }).filter(Boolean);
-        finishItem(item, g.allCorrect, null, g.allCorrect ? '' : ' 정답: <b>' + esc(wrongAns.join(', ')) + '</b>');
+        finishItem(item, g.allCorrect, null, g.allCorrect ? '' : ' — 정답: <b>' + esc(wrongAns.join(', ')) + '</b>');
       });
       var f = root.querySelector('input[data-b]'); if (f) f.focus();
       return;
@@ -517,7 +592,7 @@
         '<div class="built" id="built"></div><div class="tokens" id="toks"></div>' +
         '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
       var sen = senBySeq(item.seq);
-      $('ordKo').textContent = sen ? sen.ko : '순서대로 배열하세요';
+      $('ordKo').textContent = sen ? sen.ko : '어순에 맞게 배열하시오';
       var picked = [];
       function draw() {
         var b = $('built'); b.innerHTML = '';
@@ -539,31 +614,30 @@
       draw();
       bindSubmit(function () {
         var ok = picked.length === item.answer.length && picked.every(function (t, i) { return t === item.answer[i]; });
-        finishItem(item, ok, null, ok ? '' : ' 정답: <b>' + esc(item.answer.join(' ')) + '</b>');
+        finishItem(item, ok, null, ok ? '' : ' — 정답: <b>' + esc(item.answer.join(' ')) + '</b>');
       });
       return;
     }
 
     if (item.type === 'write' || item.type === 'skeleton') {
       var hintHtml = item.type === 'write'
-        ? '<p class="muted">키워드: ' + esc((item.keywords || []).join(' · ')) + '</p>'
-        : '<p class="muted">힌트 단어: <b>' + esc(item.hint) + '</b></p>';
-      root.innerHTML = head + '<div class="prompt sm">' + esc(item.ko || '이 문장을 영어로 쓰세요') + '</div>' + hintHtml +
-        '<textarea class="ans" id="wrIn" autocapitalize="off" placeholder="영어 문장 전체를 쓰세요"></textarea>' +
+        ? '<p class="muted">활용 단어: ' + esc((item.keywords || []).join(', ')) + '</p>'
+        : '<p class="muted">제시어: <b>' + esc(item.hint) + '</b></p>';
+      root.innerHTML = head + '<div class="prompt sm">' + esc(item.ko || '다음 문장을 영어로 쓰시오.') + '</div>' + hintHtml +
+        '<textarea class="ans" id="wrIn" autocapitalize="off" placeholder="영어 문장 전체를 쓰시오"></textarea>' +
         '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {
         var v = $('wrIn').value;
         var g = WBGRADE.gradeAnswer(v, item.answers);
         var sim = WBGRADE.similarity(v, item.answers[0]);
         var ok = g.correct || sim >= 0.92;
-        finishItem(item, ok, v, '<div class="exp">모범: ' + esc(item.answers[0]) + (ok ? '' : ' (유사도 ' + Math.round(sim * 100) + '%)') + '</div>');
+        finishItem(item, ok, v, '<div class="exp">모범 답안: ' + esc(item.answers[0]) + (ok ? '' : ' (일치율 ' + Math.round(sim * 100) + '%)') + '</div>');
       });
       $('wrIn').focus();
       return;
     }
 
-    /* 알 수 없는 유형 — 건너뛰기 */
-    root.innerHTML = head + '<div class="prompt sm">이 문항 유형은 아직 지원 전이에요.</div>' +
+    root.innerHTML = head + '<div class="prompt sm">지원하지 않는 문항 유형입니다.</div>' +
       '<div class="rnext"><button class="btn big" id="subBtn">건너뛰기</button></div></div>';
     bindSubmit(function () { RQ.i += 1; stepRunner(); });
   }
@@ -572,62 +646,74 @@
     b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
   }
 
-  /* ════════════ 단어 탭 ════════════ */
+  /* ════════ 영역 1 — 단어 암기 ════════ */
+  function startWordDaily() {
+    var plan = WBNAESIN.planDay(pack, packDB().states, exam(), Date.now(), {});
+    var wordsOnly = { words: plan.words, sentences: [] };
+    var items = WBGEN.dailySet(pack, wordsOnly, Math.random);
+    if (!items.length) { alert('오늘 예정된 단어 학습이 없습니다.'); return; }
+    setLast('단어 암기 — 오늘의 학습', { t: 'wordDaily' });
+    persist();
+    runItems(items, '단어 암기');
+  }
   function renderWords(root) {
     var ws = wordStates();
     var sum = WBNAESIN.wordSummary(ws);
-    var html = '<div class="card"><h2>단어 ' + sum.total + '개</h2>' +
-      '<div class="stat3"><div><b>' + sum.reached + '</b><span>도달</span></div>' +
-      '<div><b>' + sum.stable + '</b><span>안정화</span></div>' +
-      '<div><b>' + sum.risky + '</b><span>위험</span></div></div>' +
-      '<button class="btn primary big" id="trainWords">단어 훈련 시작</button>' +
-      '<div class="wordgrid" id="wgrid"></div></div>';
-    root.innerHTML = html;
+    var tc = todayCounts();
+    root.innerHTML =
+      '<div class="card"><h2>단어 암기 <small>' + esc(pack.textbook || '') + ' L' + pack.lesson + '</small></h2>' +
+      '<div class="nums">' +
+      '<div><b>' + sum.reached + '<small>/' + sum.total + '</small></b><span>도달</span></div>' +
+      '<div><b>' + sum.stable + '</b><span>안정화 완료</span></div>' +
+      '<div><b>' + sum.risky + '</b><span>취약</span></div></div>' +
+      '<p class="muted">도달 = 힌트 없이 1회 인출 성공. 안정화 = 도달 후 서로 다른 날 3회 재확인(0/1/2/3 표시). 시험 전 전 단어 안정화가 목표입니다.</p>' +
+      '<button class="btn primary big" id="trainWords">오늘의 단어 학습 (' + tc.words + '개)</button></div>' +
+      '<div class="card"><h2>단어 목록 <small>숫자 = 안정화 횟수</small></h2><div class="wordgrid" id="wgrid"></div></div>';
     var grid = $('wgrid');
     pack.words.forEach(function (w) {
       var st = ws[w.id];
       var stb = st ? WBNAESIN.stability(st) : 0;
       var cls = 'wchip' + (st && st.reached ? (WBNAESIN.isStable(st) ? ' stable' : ' reached') : '');
-      var dots = '';
-      for (var i = 0; i < 3; i++) dots += '<i class="' + (i < stb ? 'on' : '') + '"></i>';
       var el = document.createElement('button');
       el.className = cls;
-      el.innerHTML = esc(w.headword) + '<span class="dots">' + dots + '</span>';
+      el.innerHTML = esc(w.headword) + '<span class="lv">' + stb + '/3</span>';
       el.onclick = function () {
-        var ex = w.example ? '\n예문: ' + w.example.en + '\n' + w.example.ko : '';
+        var ex = w.example ? '\n예문: ' + w.example.en + '\n      ' + w.example.ko : '';
         alert(w.headword + ' — ' + (w.meaningKo || []).join(', ') + ex);
       };
       grid.appendChild(el);
     });
-    $('trainWords').onclick = function () {
-      var plan = WBNAESIN.planDay(pack, packDB().states, exam(), Date.now(), {});
-      var wordsOnly = { words: plan.words, sentences: [] };
-      var items = WBGEN.dailySet(pack, wordsOnly, Math.random);
-      if (!items.length) { alert('지금은 예정된 단어가 없어요. 내일 다시!'); return; }
-      runItems(items, '단어 훈련');
-    };
+    $('trainWords').onclick = startWordDaily;
   }
 
-  /* ════════════ 본문 탭 ════════════ */
-  var STAGE_NAMES = { 1: '대역 읽기', 2: '해석 쓰기', 3: '핵심어 가리기', 4: '클로즈·배열', 5: '문장 영작', 6: '백지 쓰기' };
+  /* ════════ 영역 2 — 본문 암기 ════════ */
+  var STAGE_NAMES = { 1: '대역 읽기', 2: '해석 쓰기', 3: '핵심어 인출', 4: '클로즈·배열', 5: '문장 영작', 6: '백지 쓰기' };
   function stageBar(stage, done) {
     var h = '<span class="stagebar">';
-    for (var i = 1; i <= 6; i++) h += '<i class="' + (done ? 'done' : (i < stage ? 'on' : (i === stage ? 'on' : ''))) + '"></i>';
+    for (var i = 1; i <= 6; i++) h += '<i class="' + (done ? 'done' : (i <= stage ? 'on' : '')) + '"></i>';
     return h + '</span>';
   }
   function renderPassage(root) {
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
-    var html = '<div class="card"><h2>' + esc(pack.passage ? pack.passage.titleEn : '본문') + '</h2>' +
-      '<p class="muted">문장을 누르면 지금 단계 훈련이 시작돼요. ' + (g.open ? '' : '🔒 5·6단계는 단어 게이트(' + g.done + '/' + g.total + ') 이후 열려요.') + '</p></div>';
+    var ssum = WBNAESIN.sentenceSummary(senStates());
+    var html =
+      '<div class="card"><h2>본문 암기 <small>' + esc(pack.passage ? pack.passage.titleEn : '') + '</small></h2>' +
+      '<div class="nums">' +
+      '<div><b>' + ssum.interpreted + '<small>/' + ssum.total + '</small></b><span>해석 통과</span></div>' +
+      '<div><b>' + (ssum.byStage[5] || 0) + '</b><span>영작 단계</span></div>' +
+      '<div><b>' + ssum.memorized + '<small>/' + ssum.total + '</small></b><span>백지 완료</span></div></div>' +
+      '<p class="muted">문장별 6단계: ①대역 읽기 → ②해석 쓰기 → ③핵심어 인출 → ④클로즈·배열 → ⑤문장 영작 → ⑥백지 쓰기. 문장을 선택하면 현재 단계부터 이어서 학습합니다.' +
+      (g.open ? '' : ' 현재 단어 선행 기준 미충족(' + g.done + '/' + g.total + ')으로 ⑤·⑥단계는 잠겨 있습니다.') + '</p></div>';
     dayGroups().forEach(function (gr, gi) {
       html += '<div class="card"><h2>' + esc(gr.header) + '</h2><div data-group="' + gi + '">';
       gr.sentences.forEach(function (s) {
         var st = senState(s.seq);
         var done = st && st.reached;
         html += '<div class="senrow" data-seq="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
-          '<span class="txt">' + esc(s.en) + '</span>' + stageBar(st ? st.stage : 1, done) + '</div>';
+          '<span class="txt">' + esc(s.en) + '</span>' + stageBar(st ? st.stage : 1, done) +
+          '<span class="okmark ' + (done ? 'y' : 'n') + '">' + (done ? '완료' : STAGE_NAMES[st ? st.stage : 1].slice(0, 2)) + '</span></div>';
       });
-      html += '</div><button class="btn big" data-blank="' + gi + '"' + (g.open ? '' : ' disabled') + '>이 단락 백지 도전</button></div>';
+      html += '</div><button class="btn big line" data-blank="' + gi + '"' + (g.open ? '' : ' disabled') + '>단락 백지 시험</button></div>';
     });
     root.innerHTML = html;
     root.onclick = function (e) {
@@ -643,60 +729,60 @@
     if (!s || !st) return;
     var stage = st.stage;
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
-    if (stage >= 5 && !g.open) { alert('단어 게이트(' + g.done + '/' + g.total + ')를 먼저 통과해야 5·6단계가 열려요.\n선생님이 열어 줄 수도 있어요.'); return; }
+    if (stage >= 5 && !g.open) { alert('단어 선행 기준(' + g.done + '/' + g.total + ' 도달)을 먼저 충족해야 5·6단계가 열립니다.\n필요하면 선생님이 열어 줄 수 있습니다.'); return; }
+    setLast('본문 암기 — 문장 ' + seq + ' (' + STAGE_NAMES[Math.min(stage, 6)] + ')', { t: 'sentence', seq: seq });
+    persist();
     if (stage === 1) return stageRead(s, st);
     if (stage === 2) return stageTranslate(s, st);
-    if (stage === 3) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) { q.stage = 3; q.seq = seq; return runItems([q], '3단계 · 핵심어'); } return advanceAndRefresh(st, true); }
+    if (stage === 3) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) { q.stage = 3; q.seq = seq; return runItems([q], '본문 3단계 · 핵심어 인출'); } return advanceAndRefresh(st, true); }
     if (stage === 4) {
       var items = [];
       var c = WBGEN.clozeWide(s, Math.random); if (c) { c.stage = 4; c.seq = seq; items.push(c); }
       var o = WBGEN.tokenOrder(s, Math.random); if (o) { o.stage = 4; o.seq = seq; items.push(o); }
-      if (items.length) return runItems(items, '4단계 · 클로즈·배열');
+      if (items.length) return runItems(items, '본문 4단계 · 클로즈·배열');
       return advanceAndRefresh(st, true);
     }
-    if (stage === 5) { var w = WBGEN.writingPrompt(s); if (w) { w.stage = 5; w.seq = seq; return runItems([w], '5단계 · 문장 영작'); } return advanceAndRefresh(st, true); }
+    if (stage === 5) { var w = WBGEN.writingPrompt(s); if (w) { w.stage = 5; w.seq = seq; return runItems([w], '본문 5단계 · 문장 영작'); } return advanceAndRefresh(st, true); }
     if (stage >= 6) { var grp = dayGroups().filter(function (gr) { return gr.day === s.dayGroup; })[0]; return startBlank(grp); }
   }
   function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now()); persist(); render(); }
 
-  /* 1단계 — 대역 읽기 (청크·TTS 포함) */
   function stageRead(s, st) {
     var chunksHtml = (s.chunks || []).map(function (c) {
       return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
     }).join('');
     var notes = (s.grammarNotes || []).map(function (n) {
-      return '<p class="muted">💡 <b>' + esc(n.target) + '</b> — ' + esc(n.note) + '</p>';
+      return '<p class="muted">[구문] <b>' + esc(n.target) + '</b> — ' + esc(n.note) + '</p>';
     }).join('');
-    runCustom('1단계 · 대역 읽기',
+    runCustom('본문 1단계 · 대역 읽기',
       '<div class="q"><div class="qmeta">문장 ' + s.seq + '</div>' +
-      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn" title="듣기">🔊</button></div>' +
+      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn" class="tag t-blue" title="듣기">듣기</button></div>' +
       '<div class="prompt sm muted">' + esc(s.ko) + '</div>' + chunksHtml + notes +
-      '<div class="rnext"><button class="btn primary big" id="okBtn">다 읽었어요 → 해석 단계로</button></div></div>',
+      '<div class="rnext"><button class="btn primary big" id="okBtn">읽기 완료 — 해석 단계로</button></div></div>',
       function () {
         $('ttsBtn').onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
         $('okBtn').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
       });
   }
 
-  /* 2단계 — 해석 쓰기 (청크 커버리지 + 셀프 체크) */
   function stageTranslate(s, st) {
-    runCustom('2단계 · 해석 쓰기',
-      '<div class="q"><div class="qmeta">문장 ' + s.seq + ' — 영어를 보고 한글로 해석해 보세요</div>' +
+    runCustom('본문 2단계 · 해석 쓰기',
+      '<div class="q"><div class="qmeta">문장 ' + s.seq + ' — 영어를 보고 우리말로 해석하시오</div>' +
       '<div class="prompt">' + esc(s.en) + '</div>' +
-      '<textarea class="ans" id="trIn" placeholder="한글 해석을 쓰세요"></textarea>' +
+      '<textarea class="ans" id="trIn" placeholder="우리말 해석 입력"></textarea>' +
       '<div class="rnext"><button class="btn primary big" id="okBtn">확인</button></div>' +
       '<div id="trOut"></div></div>',
       function () {
         $('okBtn').onclick = function () {
           var v = $('trIn').value;
           var cov = WBGRADE.gradeTranslationChunks(v, s.chunks || []);
-          var html = '<div class="result ' + (cov.coverage >= 0.99 ? 'good' : 'bad') + '"><b>모범 해석:</b> ' + esc(s.ko) + '</div>';
+          var html = '<div class="result ' + (cov.coverage >= 0.99 ? 'good' : 'bad') + '"><b>모범 해석</b> — ' + esc(s.ko) + '</div>';
           (s.chunks || []).forEach(function (c, i) {
             var miss = cov.perChunk[i] && !cov.perChunk[i].present;
-            html += '<div class="chunkline' + (miss ? ' miss' : '') + '">' + (miss ? '⚠ ' : '✓ ') + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+            html += '<div class="chunkline' + (miss ? ' miss' : '') + '">' + (miss ? '[누락] ' : '') + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
           });
-          html += '<p class="muted">스스로 판정하세요 — 핵심 의미를 맞게 옮겼나요?</p>' +
-            '<div class="confrow"><button id="selfOk">⭕ 맞게 해석했다</button><button id="selfNo">🔁 다시 연습할래</button></div>';
+          html += '<p class="muted">핵심 의미를 맞게 옮겼는지 스스로 판정하시오.</p>' +
+            '<div class="confrow"><button id="selfOk">통과 — 맞게 해석함</button><button id="selfNo">재학습 — 다시 연습</button></div>';
           $('trOut').innerHTML = html;
           $('selfOk').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
           $('selfNo').onclick = function () { closeCustom(); advanceAndRefresh(st, false); };
@@ -704,13 +790,14 @@
       });
   }
 
-  /* 6단계 — 단락 백지 도전 */
   function startBlank(group) {
     if (!group) return;
     var targets = group.sentences;
-    runCustom('백지 도전 · ' + group.header,
-      '<div class="q"><div class="qmeta">' + esc(group.header) + ' — ' + targets.length + '문장을 순서대로, 아무것도 안 보고!</div>' +
-      '<textarea class="ans" id="bkIn" style="min-height:160px" placeholder="기억나는 대로 영어로 쭉 쓰세요. 줄바꿈으로 문장을 나눠도 돼요."></textarea>' +
+    setLast('본문 암기 — ' + group.header + ' 백지 시험', { t: 'blank', day: group.day });
+    persist();
+    runCustom('백지 시험 · ' + group.header,
+      '<div class="q"><div class="qmeta">' + esc(group.header) + ' — ' + targets.length + '문장을 순서대로, 아무것도 보지 않고 쓰시오</div>' +
+      '<textarea class="ans" id="bkIn" style="min-height:160px" placeholder="기억나는 대로 영어로 작성 (줄바꿈으로 문장 구분 가능)"></textarea>' +
       '<div class="rnext"><button class="btn primary big" id="okBtn">채점</button></div>' +
       '<div id="bkOut"></div></div>',
       function () {
@@ -719,8 +806,8 @@
           var canonical = targets.map(function (s) { return { seq: s.seq, en: s.en }; });
           var d = WBGRADE.diffPassage(v, canonical);
           var html = '<div class="result ' + (d.missingCount === 0 && d.partialCount === 0 ? 'good' : 'bad') + '">' +
-            '⭕ ' + d.okCount + ' · 🔶 ' + d.partialCount + ' · ❌ ' + d.missingCount +
-            (d.orderOk ? '' : ' · 순서가 달라요') + '</div>';
+            '정확 ' + d.okCount + ' · 부분 ' + d.partialCount + ' · 누락 ' + d.missingCount +
+            (d.orderOk ? '' : ' · 순서 불일치') + '</div>';
           d.perSentence.forEach(function (ps) {
             var s = senBySeq(ps.seq);
             var body;
@@ -747,24 +834,23 @@
       });
   }
 
-  /* 브레인덤프 — 판정 없는 2분 자유 인출 (§14-3) */
   function startDump() {
     var studied = pack.sentences.filter(function (s) { var st = senState(s.seq); return st && st.stage >= 2; });
-    if (!studied.length) { alert('아직 배운 문장이 없어요 — 본문 1단계부터 시작해 보세요!'); return; }
-    runCustom('브레인덤프 (2분)',
-      '<div class="q"><div class="qmeta">오늘까지 배운 문장 ' + studied.length + '개 — 기억나는 대로! 채점 없어요.</div>' +
-      '<textarea class="ans" id="dpIn" style="min-height:160px" placeholder="생각나는 문장을 자유롭게 쓰세요"></textarea>' +
-      '<div class="rnext"><button class="btn primary big" id="okBtn">비교해 보기</button></div>' +
+    if (!studied.length) { alert('학습한 문장이 아직 없습니다. 본문 1단계부터 시작하십시오.'); return; }
+    runCustom('백지 점검 (기록 없음)',
+      '<div class="q"><div class="qmeta">지금까지 학습한 문장 ' + studied.length + '개 — 기억나는 대로 쓰시오. 채점·기록 없는 자기 점검입니다.</div>' +
+      '<textarea class="ans" id="dpIn" style="min-height:160px" placeholder="기억나는 문장을 자유롭게 작성"></textarea>' +
+      '<div class="rnext"><button class="btn primary big" id="okBtn">대조 확인</button></div>' +
       '<div id="dpOut"></div></div>',
       function () {
         $('okBtn').onclick = function () {
           var v = $('dpIn').value;
           var d = WBGRADE.diffPassage(v, studied.map(function (s) { return { seq: s.seq, en: s.en }; }));
-          var html = '<div class="result good">떠올린 문장 ⭕ ' + d.okCount + ' · 🔶 ' + d.partialCount + ' · 아직 ❌ ' + d.missingCount + '</div>';
+          var html = '<div class="result good">회상 ' + d.okCount + ' · 부분 ' + d.partialCount + ' · 미회상 ' + d.missingCount + '</div>';
           d.perSentence.forEach(function (ps) {
             if (ps.status === 'missing') { var s = senBySeq(ps.seq); html += '<div class="diffline missing"><span class="lbl">' + ps.seq + '</span>' + esc(s.en) + '</div>'; }
           });
-          html += '<p class="muted">빠진 문장은 내일의 나에게 힌트! 판정·기록 부담 없이 여기서 끝.</p>' +
+          html += '<p class="muted">미회상 문장이 다음 학습의 우선 대상입니다.</p>' +
             '<div class="rnext"><button class="btn primary big" id="dpDone">닫기</button></div>';
           $('dpOut').innerHTML = html;
           packDB().dump.push({ at: new Date().toISOString(), scope: 'dump', ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
@@ -774,7 +860,6 @@
       });
   }
 
-  /* 커스텀 러너 화면 (문항 큐가 아닌 자유 화면) */
   function runCustom(title, html, wire) {
     RQ = { custom: true };
     $('runner').classList.add('open');
@@ -785,29 +870,48 @@
   }
   function closeCustom() { $('runner').classList.remove('open'); RQ = null; }
 
-  /* ════════════ 문제 탭 ════════════ */
-  function itemKey(it) { return 'i-' + (it.no != null ? it.no : Math.random()); }
-  function renderQuiz(root) {
-    var items = pack.items || [];
-    var pd = packDB();
-    var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
-    root.innerHTML =
-      '<div class="card"><h2>문제 풀이</h2>' +
-      '<p class="muted">이 팩의 저장 문항 ' + items.length + '개 — 즉시 채점, 해설 제공.</p>' +
-      '<button class="btn primary big" id="startQuiz"' + (items.length ? '' : ' disabled') + '>문제 풀기</button></div>' +
-      '<div class="card"><h2>오답노트 <span class="chip c-coral">' + wrongs.length + '</span></h2>' +
-      '<p class="muted">서로 다른 날 2번 맞히면 클리어! 이겨낸 오답: ' +
-      Object.keys(pd.wrong).filter(function (k) { return pd.wrong[k].cleared; }).length + '개</p>' +
-      '<button class="btn big" id="retryWrong"' + (wrongs.length ? '' : ' disabled') + '>오답 재도전</button></div>';
-    $('startQuiz').onclick = function () { runStoredItems(items); };
-    $('retryWrong').onclick = function () {
-      var retry = items.filter(function (it) { return wrongs.indexOf('i-' + it.no) >= 0; });
-      runStoredItems(retry, true);
-    };
+  /* ════════ 영역 3 — 문제 풀이 (유형별) ════════ */
+  function rndPick(arr, n, rnd) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor((rnd || Math.random)() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a.slice(0, n);
   }
-  function runStoredItems(items, isRetry) {
-    var qs = items.map(function (it) {
-      var stim = (it.stimulus && it.stimulus.parts || []).map(function (p) { return p.text; }).join(' ').trim();
+  /* 유형 정의 — key, 이름, 설명, 문항 생성기. 저장 문항(pack.items)은 형식별로 뒤에서 추가 */
+  function quizTypes() {
+    var types = [];
+    var W = pack.words || [], S = pack.sentences || [];
+    types.push({ key: 'w-e2k', group: '단어 시험', name: '영어 → 뜻 고르기', desc: '4지선다 ' + Math.min(10, W.length) + '문항',
+      make: function () { return rndPick(W, 10).map(function (w) { return WBGEN.vocabMcq(w, W, Math.random); }).filter(Boolean).map(tagWord); } });
+    types.push({ key: 'w-k2e', group: '단어 시험', name: '뜻 → 영어 고르기', desc: '4지선다 ' + Math.min(10, W.length) + '문항',
+      make: function () { return rndPick(W, 10).map(function (w) { return WBGEN.vocabMcqReverse(w, W, Math.random); }).filter(Boolean).map(tagWord); } });
+    types.push({ key: 'w-spell', group: '단어 시험', name: '철자 쓰기', desc: '뜻을 보고 영어 단어 입력',
+      make: function () { return rndPick(W, 10).map(function (w) { return WBGEN.spelling(w); }).filter(Boolean).map(tagWord); } });
+    types.push({ key: 'w-cloze', group: '단어 시험', name: '예문 빈칸', desc: '예문 속 단어 채우기',
+      make: function () { return rndPick(W.filter(function (w) { return w.example; }), 10).map(function (w) { return WBGEN.exampleCloze(w); }).filter(Boolean).map(tagWord); } });
+    types.push({ key: 'w-def', group: '단어 시험', name: '영영풀이', desc: '영어 정의를 보고 단어 고르기',
+      make: function () { return rndPick(W.filter(function (w) { return w.definition; }), 10).map(function (w) { return WBGEN.definitionPick(w, W, Math.random); }).filter(Boolean).map(tagWord); } });
+    types.push({ key: 's-gram', group: '본문 변형', name: '어법 선택', desc: '본문 문장의 어법 2지선다',
+      make: function () { return S.map(function (s) { return WBGEN.grammarChoiceDrill(s); }).filter(Boolean).reduce(function (a, b) { return a.concat(b); }, []).slice(0, 12); } });
+    types.push({ key: 's-verb', group: '본문 변형', name: '동사 형태', desc: '괄호 동사를 알맞은 형태로',
+      make: function () { return rndPick(S.filter(function (s) { return (s.verbForms || []).length; }), 8).map(function (s) { return WBGEN.verbFormDrill(s); }).filter(Boolean); } });
+    types.push({ key: 's-order', group: '본문 변형', name: '어순 배열', desc: '우리말에 맞게 어구 배열',
+      make: function () { return rndPick(S, 8).map(function (s) { return WBGEN.tokenOrder(s, Math.random); }).filter(Boolean); } });
+    types.push({ key: 's-kw', group: '본문 변형', name: '핵심어 빈칸', desc: '우리말 힌트로 핵심어 채우기',
+      make: function () { return rndPick(S, 8).map(function (s) { return WBGEN.keywordBlanks(s, 'en'); }).filter(Boolean); } });
+    /* 저장 문항 — 형식별 그룹 */
+    var items = pack.items || [];
+    var single = items.filter(function (it) { return (it.answerCount || 1) === 1; });
+    var multi = items.filter(function (it) { return (it.answerCount || 1) > 1; });
+    if (single.length) types.push({ key: 'i-mcq', group: '문법·실전', name: '객관식 (단일 정답)', desc: single.length + '문항 · 해설 포함',
+      make: function () { return storedToRunner(single); } });
+    if (multi.length) types.push({ key: 'i-multi', group: '문법·실전', name: '객관식 (복수 정답)', desc: multi.length + '문항 · 해설 포함',
+      make: function () { return storedToRunner(multi); } });
+    return types;
+  }
+  function tagWord(q) { if (q) q.kind = 'word'; return q; }
+  function storedToRunner(items) {
+    return items.map(function (it) {
+      var stim = ((it.stimulus && it.stimulus.parts) || []).map(function (p) { return p.text; }).join(' ').trim();
       return {
         stored: it, no: it.no, type: 'storedmcq',
         prompt: (it.instructionKo || '') + (stim ? '\n' + stim : ''),
@@ -816,7 +920,52 @@
         explanation: it.explanationKo || ''
       };
     });
-    runQueue(qs, isRetry ? '오답 재도전' : '문제 풀이', function (q, ok) {
+  }
+  function runQuizType(key) {
+    var tdef = quizTypes().filter(function (t) { return t.key === key; })[0];
+    if (!tdef) return;
+    var items = tdef.make();
+    if (!items.length) { alert('이 유형은 현재 교재에서 출제할 문항이 없습니다.'); return; }
+    setLast('문제 풀이 — ' + tdef.name, { t: 'quizType', key: key });
+    persist();
+    if (key.charAt(0) === 'i') runStoredItems(items, tdef.name);
+    else runItems(items, tdef.name);
+  }
+  function renderQuiz(root) {
+    var pd = packDB();
+    var types = quizTypes();
+    var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
+    var groups = [];
+    types.forEach(function (t) {
+      var g = groups.filter(function (x) { return x.name === t.group; })[0];
+      if (!g) { g = { name: t.group, types: [] }; groups.push(g); }
+      g.types.push(t);
+    });
+    var html = '';
+    groups.forEach(function (g) {
+      html += '<div class="card"><h2>' + esc(g.name) + '</h2>';
+      g.types.forEach(function (t) {
+        html += '<div class="typerow"><div class="tt">' + esc(t.name) + '<small>' + esc(t.desc) + '</small></div>' +
+          '<button data-qt="' + esc(t.key) + '">시작</button></div>';
+      });
+      html += '</div>';
+    });
+    html += '<div class="card"><h2>오답노트 <small>미해결 ' + wrongs.length + '문항</small></h2>' +
+      '<p class="muted">틀린 문항은 서로 다른 날 2회 정답이어야 해결 처리됩니다. 해결 ' +
+      Object.keys(pd.wrong).filter(function (k) { return pd.wrong[k].cleared; }).length + '문항.</p>' +
+      '<button class="btn big line" id="retryWrong"' + (wrongs.length ? '' : ' disabled') + '>오답 재시험</button></div>';
+    root.innerHTML = html;
+    root.onclick = function (e) {
+      var b = e.target.closest('button[data-qt]');
+      if (b) runQuizType(b.getAttribute('data-qt'));
+    };
+    $('retryWrong').onclick = function () {
+      var items = (pack.items || []).filter(function (it) { return wrongs.indexOf('i-' + it.no) >= 0; });
+      runStoredItems(storedToRunner(items), '오답 재시험', true);
+    };
+  }
+  function runStoredItems(qs, title, isRetry) {
+    runQueue(qs, title, function (q, ok) {
       var pd = packDB(), k = 'i-' + q.no, now = Date.now();
       if (!ok) {
         if (!pd.wrong[k]) pd.wrong[k] = { firstAt: new Date().toISOString(), tries: 0, cleared: false, state: WBNAESIN.createState(k, 'word', now) };
@@ -833,7 +982,7 @@
   renderItem = function (item, root) {
     if (item.type !== 'storedmcq') return origRenderItem(item, root);
     var multi = item.answerCount > 1;
-    root.innerHTML = '<div class="q"><div class="qmeta">문항 ' + item.no + (multi ? ' · 정답 ' + item.answerCount + '개' : '') + '</div>' +
+    root.innerHTML = '<div class="q"><div class="qmeta">문항 ' + item.no + (multi ? ' · 정답 ' + item.answerCount + '개 선택' : '') + '</div>' +
       '<div class="prompt sm" style="white-space:pre-line">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div>' +
       (multi ? '<div class="rnext"><button class="btn primary big" id="subBtn">확인</button></div>' : '') + '</div>';
     var chs = $('chs');
@@ -871,7 +1020,7 @@
     }
   };
 
-  /* ════════════ 성취도 탭 ════════════ */
+  /* ════════ 성취도 ════════ */
   var paperMode = false;
   function renderProgress(root) {
     var pd = packDB();
@@ -879,50 +1028,49 @@
     var ssum = WBNAESIN.sentenceSummary(senStates());
     var ex = exam();
     var html =
-      '<div class="card"><h2>' + esc(pack.textbook + ' · Lesson ' + pack.lesson) + ' 성취도</h2>' +
-      '<div class="stat3">' +
-      '<div><b>' + wsum.reached + '<span style="font-size:.7em;color:var(--ink-soft)">/' + wsum.total + '</span></b><span>단어 도달</span></div>' +
-      '<div><b>' + ssum.interpreted + '<span style="font-size:.7em;color:var(--ink-soft)">/' + ssum.total + '</span></b><span>해석 통과</span></div>' +
-      '<div><b>' + ssum.memorized + '<span style="font-size:.7em;color:var(--ink-soft)">/' + ssum.total + '</span></b><span>백지 암송</span></div></div></div>' +
+      '<div class="card"><h2>성취도 <small>' + esc(pack.textbook + ' · Lesson ' + pack.lesson) + '</small></h2>' +
+      '<div class="nums">' +
+      '<div><b>' + wsum.reached + '<small>/' + wsum.total + '</small></b><span>단어 도달</span></div>' +
+      '<div><b>' + ssum.interpreted + '<small>/' + ssum.total + '</small></b><span>해석 통과</span></div>' +
+      '<div><b>' + ssum.memorized + '<small>/' + ssum.total + '</small></b><span>백지 완료</span></div></div></div>' +
 
-      '<div class="card"><h2>🔤 단어 암기</h2>' +
+      '<div class="card"><h2>단어 암기 현황</h2>' +
       '<div class="bar"><i style="width:' + pct(wsum.reached, wsum.total) + '%"></i></div>' +
-      '<p class="muted">도달 ' + wsum.reached + ' · 안정화 ' + wsum.stable + ' · 철자 재검증 대기 ' + wsum.needsSpellCheck + '</p>' +
+      '<p class="muted">도달 ' + wsum.reached + ' · 안정화 완료 ' + wsum.stable + ' · 철자 재확인 대기 ' + wsum.needsSpellCheck + '</p>' +
       '<div class="wordgrid">' + pack.words.map(function (w) {
         var st = pd.states[w.id], stb = st ? WBNAESIN.stability(st) : 0;
-        var dots = ''; for (var i = 0; i < 3; i++) dots += '<i class="' + (i < stb ? 'on' : '') + '"></i>';
         return '<span class="wchip' + (st && st.reached ? (WBNAESIN.isStable(st) ? ' stable' : ' reached') : '') + '">' +
-          esc(w.headword) + '<span class="dots">' + dots + '</span></span>';
+          esc(w.headword) + '<span class="lv">' + stb + '/3</span></span>';
       }).join('') + '</div></div>' +
 
-      '<div class="card"><h2>📖 본문 해석 (영→한)</h2>' +
+      '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말</small></h2>' +
       '<div class="bar"><i style="width:' + pct(ssum.interpreted, ssum.total) + '%"></i></div><div>' +
       pack.sentences.map(function (s) {
         var st = senState(s.seq), ok = st && st.stage >= 3;
         return '<div class="senrow" data-go="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
-          '<span class="txt">' + esc(s.en) + '</span><span class="okmark ' + (ok ? 'y' : 'n') + '">' + (ok ? '✓' : '·') + '</span></div>';
+          '<span class="txt">' + esc(s.en) + '</span><span class="okmark ' + (ok ? 'y' : 'n') + '">' + (ok ? '통과' : '미완') + '</span></div>';
       }).join('') + '</div></div>' +
 
-      '<div class="card"><h2>✍️ 본문 암기 (백지 영작)</h2>' +
+      '<div class="card"><h2>본문 암기 현황 <small>백지 영작</small></h2>' +
       '<div class="bar"><i class="g" style="width:' + pct(ssum.memorized, ssum.total) + '%"></i></div>' +
-      '<p class="muted">단계 분포 — ' + [1, 2, 3, 4, 5, 6].map(function (i) { return i + '단계 ' + (ssum.byStage[i] || 0); }).join(' · ') + '</p>' +
-      '<div class="row" style="margin-bottom:8px"><button class="btn" id="paperToggle">' + (paperMode ? '입력 끝내기' : '📄 종이 백지시험 결과 입력') + '</button></div><div>' +
+      '<p class="muted">단계 분포: ' + [1, 2, 3, 4, 5, 6].map(function (i) { return i + '단계 ' + (ssum.byStage[i] || 0); }).join(' · ') + '</p>' +
+      '<div class="row" style="margin-bottom:8px"><button class="btn line" id="paperToggle">' + (paperMode ? '입력 종료' : '종이 백지시험 결과 입력') + '</button></div><div>' +
       pack.sentences.map(function (s) {
         var st = senState(s.seq), stage = st ? st.stage : 1, done = st && st.reached;
         var paper = pd.paper[s.seq];
         var mark = paperMode
           ? '<button class="paperbtn ' + (paper === true ? 'y' : paper === false ? 'n' : '') + '" data-paper="' + s.seq + '">' + (paper === true ? '○' : paper === false ? '×' : '—') + '</button>'
-          : '<span class="okmark ' + (done ? 'y' : 'n') + '">' + (done ? '✓' : STAGE_NAMES[stage].slice(0, 2)) + '</span>';
+          : '<span class="okmark ' + (done ? 'y' : 'n') + '">' + (done ? '완료' : stage + '단계') + '</span>';
         return '<div class="senrow"><span class="no">' + s.seq + '</span>' +
           '<span class="txt">' + esc(s.en) + '</span>' + stageBar(stage, done) + mark + '</div>';
       }).join('') + '</div>' +
-      (paperMode ? '<p class="muted">선생님과 함께 종이 백지시험 결과를 문장별로 ○/×로 입력하세요 — ○는 암송 기록에 반영돼요.</p>' : '') + '</div>' +
+      (paperMode ? '<p class="muted">선생님과 함께 종이 백지시험 결과를 문장별 ○/×로 입력합니다. ○는 암기 완료 기록에 반영됩니다.</p>' : '') + '</div>' +
 
-      '<div class="card"><h2>⚙️ 시험 설정</h2>' +
-      '<p class="muted">' + (ex && ex.examDate ? '시험일: <b>' + esc(ex.examDate) + '</b> (시험 모드)' : '시험일이 없어요 — 연습 모드로 자유 진도예요.') + '</p>' +
-      '<div class="row"><input class="ans" type="date" id="examIn" value="' + esc(ex && ex.examDate || '') + '">' +
-      '<button class="btn" id="examSet">적용</button><button class="btn" id="examClear">연습 모드로</button></div>' +
-      '<p class="muted" style="margin-top:8px">' + (authed ? '☁️ 서버 저장 켜짐 — 기록이 선생님 화면과 이어져요.' : '📱 이 기기에만 저장 중 (체험 모드)') + '</p></div>';
+      '<div class="card"><h2>시험 설정</h2>' +
+      '<p class="muted">' + (ex && ex.examDate ? '시험일 <b>' + esc(ex.examDate) + '</b> — 시험 모드로 학습량이 자동 편성됩니다.' : '등록된 시험이 없어 자율 학습 모드입니다.') + '</p>' +
+      '<div class="row"><input class="ans" type="date" id="examIn" value="' + esc((ex && ex.examDate) || '') + '">' +
+      '<button class="btn line" id="examSet">적용</button><button class="btn line" id="examClear">자율 학습으로</button></div>' +
+      '<p class="muted" style="margin-top:8px">' + (authed ? '학습 기록이 서버에 저장되어 선생님 화면과 연동됩니다.' : '이 기기에만 저장 중입니다 (체험 모드).') + '</p></div>';
     root.innerHTML = html;
     root.onclick = function (e) {
       var pb = e.target.closest('button[data-paper]');
@@ -931,7 +1079,7 @@
         var cur = pd.paper[seq];
         var next = cur === true ? false : cur === false ? null : true;
         if (next === null) delete pd.paper[seq]; else pd.paper[seq] = next;
-        if (next === true) { /* 종이 ○ = 완전 인출 성공 환류 (§14-3) */
+        if (next === true) {
           var st = senState(seq);
           if (st) { if (st.stage < 6) st.stage = 6; WBNAESIN.advanceStage(st, true, Date.now()); }
         }
@@ -944,27 +1092,26 @@
     $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
     $('examSet').onclick = function () {
       var v = $('examIn').value;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하세요'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하십시오.'); return; }
       packDB().exam = { examDate: v, wordDeadlineDays: 7 };
       persist(); render();
     };
     $('examClear').onclick = function () { packDB().exam = null; persist(); render(); };
   }
-  function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
 
   /* ── 렌더 루트 ── */
   function render() {
     renderHeader();
     var root = $('views');
-    if (!pack) { root.innerHTML = '<div class="card"><p class="muted">팩을 불러오는 중…</p></div>'; return; }
-    if (view === 'today') renderToday(root);
+    if (!pack) { root.innerHTML = '<div class="card"><p class="muted">교재를 불러오는 중…</p></div>'; return; }
+    if (view === 'home') renderHome(root);
     else if (view === 'words') renderWords(root);
     else if (view === 'passage') renderPassage(root);
     else if (view === 'quiz') renderQuiz(root);
     else renderProgress(root);
   }
 
-  /* ── 부팅: 연동 확인 → 시험·팩 로드 (실패 시 체험 팩) ── */
+  /* ── 부팅: 연동 확인 → 배정된 내 학교 교재 로드 (실패 시 체험 팩) ── */
   function loadDemo() {
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
@@ -975,18 +1122,18 @@
     if (a && a.token) {
       flow = api('/exam').then(function (r) {
         authed = true;
-        var ex = (r && r.exam) || {};        /* 서버 계약: { exam, scope } 래핑 */
+        var ex = (r && r.exam) || {};
+        examServer = ex;
+        packList = (ex.packIds || []).slice();
         return pullState().then(function () {
-          var pid = ex && ex.packIds && ex.packIds[0];
+          /* 마지막에 보던 과가 배정 범위 안이면 그 과를, 아니면 첫 과를 연다 */
+          var pid = (DB.last && packList.indexOf(DB.last.packId) >= 0) ? DB.last.packId : packList[0];
           if (!pid) throw new Error('no-pack');
           return api('/pack?id=' + encodeURIComponent(pid)).then(function (r2) {
-            pack = r2.pack;                   /* 서버 계약: { pack, updatedAt } 래핑 */
-            if (ex.examDate) { /* 서버 시험 배정이 로컬보다 우선 */
-              var pd0 = DB.packs[pack.packId];
-              if (!pd0 || !pd0.exam || pd0.exam.examDate !== ex.examDate) {
-                if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
-                DB.packs[pack.packId].exam = { examDate: ex.examDate, wordDeadlineDays: ex.wordDeadlineDays || 7 };
-              }
+            pack = r2.pack;
+            if (ex.examDate) {
+              if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
+              DB.packs[pack.packId].exam = { examDate: ex.examDate, wordDeadlineDays: ex.wordDeadlineDays || 7 };
             }
           });
         });
@@ -996,9 +1143,9 @@
     }
     flow.then(function () {
       ensureStates(); persist();
-      setTab('today');
+      setTab('home');
     }).catch(function () {
-      $('views').innerHTML = '<div class="card"><p>팩을 불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.</p></div>';
+      $('views').innerHTML = '<div class="card"><p>교재를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하십시오.</p></div>';
     });
   }
   boot();
