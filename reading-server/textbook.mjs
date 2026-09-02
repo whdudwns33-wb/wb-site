@@ -178,3 +178,29 @@ export function withOverlay(tb, overlay) {
   }));
   return { ...tb, books };
 }
+
+/* 원문 업로드 검증(구조) + 책별 요약 — 원문이 공개 저장소에서 서버 저장소로 옮겨지면서
+   (2026-09), "넣다가 흘린 강"을 잡던 저장소 테스트의 역할을 업로드 관문이 이어받는다.
+   개수 기준을 하드코딩하지 않고 책별 강 수·빈 코칭 수를 되돌려 강사가 눈으로 확인한다. */
+export function sourceSummary(tb) {
+  const errors = [];
+  if (!tb || typeof tb !== 'object' || !Array.isArray(tb.books)) {
+    return { errors: ['books 배열이 필요합니다 — reading/textbook.json 형식 그대로 올려 주세요.'], books: [] };
+  }
+  const seen = new Set();
+  const books = tb.books.map((b, i) => {
+    const id = String((b && b.id) || '');
+    if (!/^[A-Za-z0-9-]{1,40}$/.test(id)) errors.push(`books[${i}] id 형식 오류: ${id || '(없음)'}`);
+    else if (seen.has(id)) errors.push(`books[${i}] id 중복: ${id}`);
+    else seen.add(id);
+    const lessons = Array.isArray(b && b.lessons) ? b.lessons : [];
+    if (!lessons.length) errors.push(`${id || 'books[' + i + ']'}: lessons 비었음`);
+    let emptyCoaching = 0;
+    lessons.forEach((l, j) => {
+      if (!l || typeof l.lesson !== 'number') errors.push(`${id} lessons[${j}] lesson 번호 없음`);
+      if (!l || !String(l.coaching || '').trim()) emptyCoaching += 1;
+    });
+    return { id, title: String((b && b.title) || ''), lessons: lessons.length, emptyCoaching };
+  });
+  return { errors, books };
+}

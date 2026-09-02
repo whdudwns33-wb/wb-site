@@ -12,7 +12,9 @@ const DIST = path.join(ROOT, 'dist');
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(path.join(DIST, 'admin'), { recursive: true });
 
-const APP_FILES = ['index.html', 'articles.json', 'textbook.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html',
+/* textbook.json(코칭 원문)은 더 이상 싣지 않는다 — 공개 저장소·정적 자산에서 빼고
+   KV(textbook-src)로 옮겼다. 관리 웹의 「교재 코칭 원문」 카드에서 업로드한다. */
+const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html',
   /* 학년대별 분할본 — 학생 앱은 자기 학년대 하나만 받는다 (node reading/build-split.mjs 산출물) */
   'articles-L1.json', 'articles-L2.json', 'articles-L3.json', 'articles-L4.json', 'hanja.json', 'version.json',
   /* 보안 헤더(CSP·X-Frame-Options·Referrer-Policy 등)와 캐시 규칙.

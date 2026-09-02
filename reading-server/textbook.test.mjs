@@ -11,7 +11,12 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
-const TB = JSON.parse(fs.readFileSync(path.join(ROOT, '..', 'reading', 'textbook.json'), 'utf8'));
+const TB_FILE = path.join(ROOT, '..', 'reading', 'textbook.json');
+/* 원문은 공개 저장소에서 빠져 서버 저장소(textbook-src)로 이전됐다(2026-09).
+   데이터 검증은 업로드 관문(sourceSummary)이 잇고, 로컬에 원문 사본이 있을 때만 여기서도 돈다. */
+const TB = fs.existsSync(TB_FILE) ? JSON.parse(fs.readFileSync(TB_FILE, 'utf8')) : null;
+let skipped = 0;
+const td = (name, fn) => { if (!TB) { skipped += 1; return; } t(name, fn); };
 /* 교재별 강 수 — 시트가 정한 값이다. 여기와 어긋나면 넣다가 흘린 강이 있다는 뜻이다. */
 const BOOKS = [['eoduk-cho1', 20], ['eoduk-cho2', 20], ['eoduk-cho3', 21], ['eoduk-cho4', 21],
   ['eoduk-silryeok', 28], ['eoduk-jungdeung', 28]];
@@ -31,7 +36,7 @@ const FIX = {
 const assign = (id, words) => ({ items: [{ id, title: '배정', at: '', words: words.map(w => ({ word: w })), done: false }] });
 const st = (o) => ({ state: { states: o } });
 
-t('실제 textbook.json — 초1 20강, 코칭글이 모두 있다', () => {
+td('실제 textbook.json — 초1 20강, 코칭글이 모두 있다', () => {
   const b = findBook(TB, 'eoduk-cho1');
   assert.ok(b, '교재를 찾아야 한다');
   assert.strictEqual(b.lessons.length, 20);
@@ -44,7 +49,7 @@ t('실제 textbook.json — 초1 20강, 코칭글이 모두 있다', () => {
   }
 });
 
-t('강사 검수 전에는 낱말이 나가지 않는다', () => {
+td('강사 검수 전에는 낱말이 나가지 않는다', () => {
   for (const l of findBook(TB, 'eoduk-cho1').lessons) {
     if (l.confirmed) continue;
     const card = coachingCard(TB, { bookId: 'eoduk-cho1', lesson: l.lesson }, null, null);
@@ -110,7 +115,7 @@ t('낱말 id 규칙이 앱과 같다', () => {
   assert.ok(app.includes("'tw-' + a.id + '-' + i"), 'vocab/index.html의 낱말 id 규칙이 바뀌었다 — textbook.mjs도 함께 고쳐야 한다');
 });
 
-t('강사 목차에는 코칭 원문이 실리지 않는다', () => {
+td('강사 목차에는 코칭 원문이 실리지 않는다', () => {
   const idx = bookIndex(TB);
   assert.strictEqual(idx.length, TB.books.length);
   assert.strictEqual(JSON.stringify(idx).includes('안녕하세요'), false, '목차에 코칭 원문이 새어 나갔다');
@@ -124,7 +129,7 @@ t('빈 교재에도 터지지 않는다', () => {
   assert.strictEqual(coachingCard({ books: [] }, { bookId: 'x', lesson: 1 }, null, null), null);
 });
 
-t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
+td('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   const words = findBook(TB, 'eoduk-cho1').lessons.flatMap((l) => l.words);
   assert.ok(words.length > 100, '낱말이 너무 적다');
   for (const w of words) {
@@ -153,7 +158,7 @@ t('실제 교재 낱말은 글자·뜻·예문을 갖춘 모양이다', () => {
   }
 });
 
-t('교재 다섯 권이 정해진 강 수만큼 들어 있다', () => {
+td('교재 다섯 권이 정해진 강 수만큼 들어 있다', () => {
   for (const [id, n] of BOOKS) {
     const b = findBook(TB, id);
     assert.ok(b, id + ' 교재가 없다');
@@ -166,7 +171,7 @@ t('교재 다섯 권이 정해진 강 수만큼 들어 있다', () => {
   }
 });
 
-t('두 교재 모두 뜻이 다 채워져 있다', () => {
+td('두 교재 모두 뜻이 다 채워져 있다', () => {
   /* 빈 뜻이 있으면 그 강은 「검수 완료」가 거절되어 학생에게 나가지 않는다.
      빈칸이 하나라도 생기면 그 강이 통째로 막히므로 여기서 잡는다. */
   for (const id of IDS) {
@@ -178,7 +183,7 @@ t('두 교재 모두 뜻이 다 채워져 있다', () => {
   }
 });
 
-t('뜻이 매달린 조사로 끝나지 않는다', () => {
+td('뜻이 매달린 조사로 끝나지 않는다', () => {
   /* 「…도전하는 것을 뜻해요」에서 맺음말만 떼면 목적어 조사가 꼬리로 남는다.
      다만 「을」로 끝난다고 다 조사는 아니다 — 「시골의 작은 마을」의 을은 낱말의 일부다.
      그래서 조사일 수밖에 없는 꼴만 잡는다: 「것을」, 홀로 선 「걸」, 「거를」. */
@@ -196,7 +201,7 @@ t('뜻이 매달린 조사로 끝나지 않는다', () => {
   assert.strictEqual(chon.meaning, '시골의 작은 마을', '「마을」의 을을 조사로 보고 잘라 냈다');
 });
 
-t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
+td('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
   /* "나달나달한 깃발", "새로운 경험", "느리게 걷는다"는 활동 지시에서 딸려 온 조각이다.
      꾸밈을 받는 쪽(깃발·경험)은 그 강이 가르치는 말이 아니고, 가르치는 쪽(나달나달·새롭다)은
      따로 잡힌다. 조사로 이은 두 토막("숨이 가쁘다")과 달리 이 모양은 언제나 버린다. */
@@ -213,7 +218,7 @@ t('꾸미는 말이 앞에 붙은 구절은 낱말이 아니다', () => {
   }
 });
 
-t('실린 예문은 모두 문맥 빈칸 문제가 된다', () => {
+td('실린 예문은 모두 문맥 빈칸 문제가 된다', () => {
   /* 예문을 두는 까닭이 그것이다. 낱말이 없는 문장을 예문 칸에 두면
      학생 카드에도 검수 화면에도 엉뚱한 문장이 실린다 —
      「어절 — 나는 학교에 갔다」처럼. 채굴기가 문제 생성기로 직접 걸러야 한다. */
@@ -233,7 +238,7 @@ t('실린 예문은 모두 문맥 빈칸 문제가 된다', () => {
   assert.strictEqual(bad.length, 0, '문제로 못 쓰는 예문: ' + bad.slice(0, 5).join(' / '));
 });
 
-t('예문의 빈칸 자리가 같은 강의 다른 낱말이 아니다', () => {
+td('예문의 빈칸 자리가 같은 강의 다른 낱말이 아니다', () => {
   /* 「걷다」에 「아기가 첫 걸음을 뗐어요」가 붙어 있었다. 활용으로는 걸음이 걷다에서
      나오지만 그 강은 걸음을 따로 가르치므로 답이 둘이 된다. */
   const require_ = createRequire(import.meta.url);
@@ -256,7 +261,7 @@ t('예문의 빈칸 자리가 같은 강의 다른 낱말이 아니다', () => {
   assert.strictEqual(bad.length, 0, '답이 둘인 빈칸: ' + bad.slice(0, 4).join(' / '));
 });
 
-t('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
+td('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
   /* 짝의 한쪽만 있으면 문맥 빈칸 문제가 그 구별을 물을 수 없다.
      코칭글이 머리글로 세워 둔 짝을 그대로 지킨다. */
   const PAIR = /헷갈[^\n]{0,12}낱말[^가-힣\n]{0,6}([가-힣]{2,7})\s*[/／·,]\s*([가-힣]{2,7})/g;
@@ -275,7 +280,7 @@ t('헷갈리는 말 짝은 양쪽 다 낱말로 들어 있다', () => {
   assert.ok(seen >= 7, '짝 머리글을 찾지 못했다 (' + seen + '건)');
 });
 
-t('1강은 외울 낱말이 없다 — 코칭글만 나간다', () => {
+td('1강은 외울 낱말이 없다 — 코칭글만 나간다', () => {
   const l1 = findLesson(findBook(TB, 'eoduk-cho1'), 1);
   assert.deepStrictEqual(l1.words, [], '자음·모음 조합 예시어는 외울 낱말이 아니다');
   assert.ok(l1.coaching.length > 300, '코칭글은 그대로 나가야 한다');
@@ -283,7 +288,7 @@ t('1강은 외울 낱말이 없다 — 코칭글만 나간다', () => {
   assert.ok(card && card.coaching, '낱말이 없어도 카드는 나온다');
 });
 
-t('낱말이 아니라고 판단해 뺀 것은 다시 캐도 되살아나지 않는다', () => {
+td('낱말이 아니라고 판단해 뺀 것은 다시 캐도 되살아나지 않는다', () => {
   /* 코칭글이 "거름을 뿌린다"를 예문으로 또박또박 적어 두어 걸름망으로는 못 거른다.
      판단을 파일(dropped)에 적어 두고, 추출기가 그것을 존중한다. */
   const lessons = findBook(TB, 'eoduk-cho1').lessons;
@@ -427,7 +432,7 @@ t('이미 열린 강은 다시 쓰지 않고, 닫기는 조건 없이 된다', (
   assert.strictEqual(undo.blocked.length, 0);
 });
 
-t('실제 교재 여섯 권은 통째로 열 수 있다', () => {
+td('실제 교재 여섯 권은 통째로 열 수 있다', () => {
   /* 뜻이 다 채워져 있으니 막히는 강이 없어야 한다 — 하나라도 막히면 그 강이 학생에게 못 간다 */
   for (const [id, n] of BOOKS) {
     const plan = confirmAllPlan(findBook(TB, id), {}, true);
@@ -437,7 +442,7 @@ t('실제 교재 여섯 권은 통째로 열 수 있다', () => {
   }
 });
 
-t('목차가 남은 일을 보여 준다', () => {
+td('목차가 남은 일을 보여 준다', () => {
   const idx = bookIndex(TB)[0].lessons;
   for (const l of idx) {
     assert.ok(l.filled <= l.words, l.lesson + '강: 채운 개수가 전체보다 많다');
@@ -463,7 +468,7 @@ t('워커가 막는 자산은 워커를 먼저 거치도록 설정돼 있다', (
   }
 });
 
-t('손으로 마무리한 뜻은 fixed로 표시돼 있다', () => {
+td('손으로 마무리한 뜻은 fixed로 표시돼 있다', () => {
   /* 코칭글에서 캤지만 끝이 잘린 것을 손으로 마무리했다. 표시가 없으면 추출기를
      다시 돌릴 때 잘린 채로 되돌아간다 — 「작은 소리로 조용히 말하는」. */
   const fixed = findBook(TB, 'eoduk-cho1').lessons.flatMap((l) => l.words).filter((w) => w.src === 'fixed');
@@ -473,7 +478,7 @@ t('손으로 마무리한 뜻은 fixed로 표시돼 있다', () => {
   }
 });
 
-t('뜻 칸에 「의미 :」 같은 이름표가 남아 있지 않다', () => {
+td('뜻 칸에 「의미 :」 같은 이름표가 남아 있지 않다', () => {
   /* 중등 교재는 「통념  의미 : 사회 전체에 널리 퍼진 생각」처럼 적는다.
      이름표를 떼지 않으면 뜻 고르기의 보기가 「의미 : …」로 나온다. */
   for (const [id] of BOOKS)
@@ -483,7 +488,7 @@ t('뜻 칸에 「의미 :」 같은 이름표가 남아 있지 않다', () => {
           id + ' ' + l.lesson + '강 ' + w.word + ': 뜻에 이름표가 붙어 있다 — ' + w.meaning);
 });
 
-t('예문에 여는 따옴표 없이 닫는 따옴표만 남지 않았다', () => {
+td('예문에 여는 따옴표 없이 닫는 따옴표만 남지 않았다', () => {
   /* 앞뒤 군더더기를 떼는 과정에서 「‘필사적’이라는 말이…」의 여는 따옴표가 떨어져
      구멍을 뚫으면 「○○○’이라는」으로 보였다. 학생 화면에 그대로 나가는 자리다. */
   for (const [id] of BOOKS)
@@ -496,7 +501,7 @@ t('예문에 여는 따옴표 없이 닫는 따옴표만 남지 않았다', () =
       }
 });
 
-t('예문은 모두 문맥 빈칸 문제가 된다', () => {
+td('예문은 모두 문맥 빈칸 문제가 된다', () => {
   /* 예문 칸이 채워져 있는데 구멍을 못 뚫으면 그 낱말은 문맥 빈칸 문제를 잃는다.
      판정은 문제를 만드는 그 함수에 맡긴다 — 기준을 둘로 두지 않는다. */
   const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
@@ -512,7 +517,7 @@ t('예문은 모두 문맥 빈칸 문제가 된다', () => {
   assert.ok(n >= 600, '예문이 갑자기 줄었다 (' + n + '개)');
 });
 
-t('뜻풀이 줄이 예문 칸에 들어가지 않는다', () => {
+td('뜻풀이 줄이 예문 칸에 들어가지 않는다', () => {
   /* 「인내심: 끝까지 해내는 마음」에 구멍을 뚫으면 「○○○: 끝까지 해내는 마음」이 되어
      문제가 답을 알려 준다. 예문이 아니라 낱말 뜻 줄이 예문 칸에 들어간 것이다. */
   const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
@@ -525,7 +530,7 @@ t('뜻풀이 줄이 예문 칸에 들어가지 않는다', () => {
       }
 });
 
-t('구멍 밖에 단서가 있는 예문만 남는다', () => {
+td('구멍 밖에 단서가 있는 예문만 남는다', () => {
   /* 「부들부들해요.」는 「○○○.」가, 「OO참변」은 「OO○○○」이 된다.
      보기 넷 중에서 고를 근거가 학생에게 없다 — 예문 없이 뜻 고르기로만 내는 편이 낫다. */
   const QUIZ = createRequire(import.meta.url)('../vocab/quiz.js');
@@ -539,7 +544,7 @@ t('구멍 밖에 단서가 있는 예문만 남는다', () => {
       }
 });
 
-t('여섯 권 모든 낱말에 뜻이 있다', () => {
+td('여섯 권 모든 낱말에 뜻이 있다', () => {
   /* 뜻이 빈 낱말은 그 강 전체를 학생에게 못 열게 만든다 */
   for (const [id] of BOOKS) {
     const blank = findBook(TB, id).lessons
@@ -549,4 +554,4 @@ t('여섯 권 모든 낱말에 뜻이 있다', () => {
   }
 });
 
-console.log('\n통과 ' + passed + '개 — 교재 코칭 검증 완료');
+console.log('\n통과 ' + passed + '개' + (skipped ? ' · 건너뜀 ' + skipped + '개(원문 사본 없음 — 데이터 검증은 업로드 관문이 담당)' : '') + ' — 교재 코칭 검증 완료');

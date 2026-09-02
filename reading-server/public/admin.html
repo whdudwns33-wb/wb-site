@@ -221,6 +221,13 @@ function render(){
       <button class="btn" id="bkNow">지금 전체 백업 내려받기</button>
       ${backups.length?backups.map(d=>`<button class="chip" data-bk="${esc(d)}">${esc(d)} 스냅샷</button>`).join(''):'<span class="muted">자동 스냅샷이 아직 없어요 — 매일 새벽에 만들어져요.</span>'}
     </div></div>
+  <div class="card"><h2>교재 코칭 원문</h2>
+    <p class="muted">원문(코칭글)은 공개 저장소가 아니라 <b>서버에만</b> 저장돼요. 코칭 카드가 비어 보이면 여기서 원문 JSON(reading/textbook.json 형식)을 올려 주세요.</p>
+    <div id="tbSrcStatus" class="muted" style="margin-top:6px">확인 중…</div>
+    <div class="filters" style="margin:10px 0 0">
+      <input type="file" id="tbSrcFile" accept=".json,application/json">
+      <button class="btn" id="tbSrcUp" disabled>원문 업로드</button>
+    </div></div>
   <div class="card"><h2>학부모 주간 메시지</h2>
     <p class="muted">연동된 모든 학생의 주간 리포트 발송 문구(링크 포함)를 한 번에 만들어요. 카톡·문자에 붙여넣어 학생별로 잘라 보내세요.</p>
     <div class="filters" style="margin:10px 0 0">
@@ -229,6 +236,20 @@ function render(){
       <span class="muted" id="pmInfo"></span>
     </div>
     <textarea id="pmOut" hidden style="width:100%;min-height:220px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:10px;font:inherit;font-size:13px;line-height:1.6"></textarea></div>`;
+  (async()=>{try{const s=await api('/admin/textbook-src');
+    $('#tbSrcStatus').innerHTML=s.exists
+      ?`<span class="tag ok">서버에 있음</span> 버전 ${esc(s.version||'-')} · 책 ${s.books.length}권 — ${s.books.map(b=>esc(b.id)+' '+b.lessons+'강').join(', ')}`
+      :`<span class="tag bad">서버에 원문이 없어요</span> 코칭 카드가 비어 있습니다 — 아래에서 업로드해 주세요.`;
+  }catch(e){$('#tbSrcStatus').textContent='원문 상태 확인 실패: '+e.message;}})();
+  $('#tbSrcFile').onchange=()=>{$('#tbSrcUp').disabled=!$('#tbSrcFile').files.length;};
+  $('#tbSrcUp').onclick=async()=>{
+    $('#tbSrcUp').disabled=true;
+    try{const txt=await $('#tbSrcFile').files[0].text();
+      JSON.parse(txt);   /* 올리기 전에 파싱만 확인 — 깨진 파일로 왕복하지 않게 */
+      const j=await api('/admin/textbook-src',{method:'PUT',body:txt});
+      alert('원문 업로드 완료 — 책 '+j.books.length+'권, 버전 '+(j.version||'-'));refresh();}
+    catch(e){alert('업로드 실패: '+e.message);$('#tbSrcUp').disabled=false;}
+  };
   document.querySelectorAll('.chip[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;render();});
   document.querySelectorAll('[data-appr]').forEach(b=>b.onclick=async()=>{
     b.disabled=true;
