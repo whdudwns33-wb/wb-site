@@ -236,7 +236,8 @@ hanjaRd.forEach((seen, ch) => {
    쪼갤 자리가 있다」. 넘는 조각은 학생이 한 호흡에 삼켜야 하는 덩어리라
    끊어 읽기의 목적이 무너진다. 2026-09-02 전수 점검에서 133개가 나왔다 —
    8-31에 한꺼번에 쓴 17편이 나머지보다 1.5~2어절 길게 끊겨 있었다.
-   고치는 중이라 아직 오류가 아니라 경고다. 0이 되면 E 로 올린다. */
+   2026-09-02에 133개를 하나씩 보고 쪼갰다(reading/long-cuts.json). 이제 0이므로
+   경고가 아니라 오류다 — 다시 생기면 커밋 전에 막는다. */
 {
   const LONG = 8;
   const byArt = new Map();
@@ -258,7 +259,10 @@ hanjaRd.forEach((seen, ch) => {
   if (total) {
     const worst = [...byArt].sort((x, y) => y[1] - x[1]).slice(0, 8)
       .map(([k, n]) => `${k} ${n}개`).join(' · ');
-    W(`${LONG}어절이 넘는 끊어 읽기 조각 ${total}개 — 규격서 2장은 쪼개라고 합니다\n        많은 순: ${worst}`);
+    E(`${LONG}어절이 넘는 끊어 읽기 조각 ${total}개 — 규격서 2장은 쪼개라고 합니다.`
+      + `\n        학생이 한 호흡에 삼켜야 하는 덩어리라 끊어 읽기의 목적이 무너집니다.`
+      + `\n        많은 순: ${worst}`
+      + `\n        고치려면: node reading/fix-long.mjs 로 자리를 보고, reading/long-cuts.json 에 적은 뒤 --write`);
   }
 }
 
