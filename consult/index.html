@@ -1442,6 +1442,7 @@ function occursOn(task, date) {
   if (task.kind === 'mgoal') return false;   // 월간 목표는 일별 목록에 섞지 않는다
   if (task.kind === 'report_snapshot') return false;
   if (isPointTransactionTask(task)) return false;
+  if (isLectureRequestTask(task)) return false;
   if (task.kind === 'academic_event' || task.kind === 'material_request' || task.kind === 'metamath_request') return false;
   if (task.kind === 'material_response' && task.status !== 'provided') return false;
   if (task.kind === 'metamath_response') {
@@ -2329,6 +2330,7 @@ function originTags(t) {
  *  원장은 전부. 학생은 자기가 추가한 업무만 — 원장이 내린 지시는 못 건드린다.
  *  (학생도 체크·단계·수량·메모·막힘은 언제나 가능하다) */
 function canEditTask(t) {
+  if (isLectureRequestTask(t)) return false;
   if (isPointTransactionTask(t)) return false;
   if (!session.isStaffLink) return session.isAdmin;
   if (isManager()) return t.origin === 'manager';
@@ -2411,12 +2413,14 @@ function render() {
 
 function renderTabs() {
   const a = alertsToday();
+  const lecturePending = session.isAdmin && !session.isStaffLink
+    ? teamStaff().reduce((sum, staff) => sum + lectureRequestsFor(staff.id).filter(lectureRequestActive).length, 0) : 0;
   const tabs = session.isStaffLink
     ? (isManager()
         ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
         : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
+      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -2607,7 +2611,7 @@ function studentSetupWizard(me, status) {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div><p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div></div>' +
       '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
         ? '현재 등록된 인강이 ' + courseCount + '개 있습니다. 오늘 들을 강의도 체크리스트로 가져와 완료하세요.'
-        : '현재 등록된 인강은 없습니다. 나중에 원장님이 강좌를 등록하면 자동으로 나타납니다.') + '</div>' +
+        : '현재 등록된 인강은 없습니다. 인강 탭에서 필요한 강좌의 배정을 요청할 수 있습니다.') + '</div>' +
       '<div class="student-setup-actions"><button class="btn btn-primary" data-act="studentsetupfinish">확인했어요 · 설정 완료</button>' +
         '<button class="btn btn-ghost" data-go="today">나중에 마무리하기</button></div></div>';
   }
@@ -4606,6 +4610,140 @@ function ingLectureNoteModal(sid, cid, seq) {
       '<button class="btn btn-primary" data-act="inganswersave" data-sid="' + esc(sid) + '" data-cid="' + esc(cid) + '" data-seq="' + seq + '">답변 저장</button></div>');
 }
 
+/* 인강 배정 요청은 학습 체크가 아닌 학생·원장 간 메시지로 동기화한다. */
+const LECTURE_REQUEST_STATUS = Object.freeze({
+  requested: '확인 대기', reviewing: '확인 중', answered: '답변 완료', changed: '변경 확인 대기', cancelled: '취소됨'
+});
+function isLectureRequestTask(task) {
+  return !!task && (task.kind === 'lecture_request' || task.kind === 'lecture_response');
+}
+function lectureRequestsFor(staffId) {
+  return state.tasks.filter(task => !task.deleted && task.kind === 'lecture_request' && task.origin === 'staff' && task.staffId === staffId)
+    .sort((a, b) => Number(b.requestedAt || 0) - Number(a.requestedAt || 0));
+}
+function lectureRequestById(id) {
+  return state.tasks.find(task => !task.deleted && task.kind === 'lecture_request' && task.origin === 'staff' && task.id === id) || null;
+}
+function lectureResponseFor(id) {
+  const req = lectureRequestById(id);
+  return req ? state.tasks.find(task => !task.deleted && task.id === 'lecture-response-' + id &&
+    task.kind === 'lecture_response' && task.lectureRequestId === id && task.staffId === req.staffId && task.origin === 'admin') || null : null;
+}
+function lectureRequestStatus(req) {
+  if (!req || req.cancelledAt) return 'cancelled';
+  const response = lectureResponseFor(req.id);
+  if (response && Number(response.requestRevision || 0) < Number(req.requestRevision || 1)) return 'changed';
+  return response && ['reviewing', 'answered'].includes(response.status) ? response.status : 'requested';
+}
+function lectureRequestActive(req) {
+  return ['requested', 'changed', 'reviewing'].includes(lectureRequestStatus(req));
+}
+function lectureRequestFingerprint(req) {
+  const norm = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return [req.staffId, req.site, req.instructor, req.courseName, req.startDate, req.perDay].map(norm).join('|');
+}
+function buildLectureRequestSummary(req) {
+  return [req.site, '강사: ' + req.instructor, req.courseName, '희망 시작일 ' + req.startDate,
+    '하루 ' + req.perDay + '강', req.note ? '메모: ' + req.note : ''].filter(Boolean).join(' · ');
+}
+function setLectureResponse(req, status, note) {
+  if (!session.isAdmin || session.isStaffLink || !req || req.cancelledAt || !['reviewing', 'answered'].includes(status)) return null;
+  const responseId = 'lecture-response-' + req.id;
+  let response = state.tasks.find(task => task.id === responseId);
+  if (!response) { response = { id: responseId, createdAt: now() }; state.tasks.push(response); }
+  Object.assign(response, {
+    groupId: responseId, kind: 'lecture_response', lectureRequestId: req.id, staffId: req.staffId, origin: 'admin',
+    title: '인강 요청 답변 · ' + req.courseName, status: status, responseNote: note,
+    requestRevision: req.requestRevision || 1, requestSnapshot: buildLectureRequestSummary(req),
+    repeat: 'request', source: '', start: '', end: '', days: [], steps: [], carry: false, deleted: false, updatedAt: now()
+  });
+  save(); queueSync();
+  return response;
+}
+function lectureRequestCard(req, admin) {
+  const status = lectureRequestStatus(req), response = lectureResponseFor(req.id);
+  const student = staffById(req.staffId);
+  const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && ['requested', 'changed'].includes(status);
+  return '<div class="material-request"><div class="request-queue-head"><b>' +
+    esc(admin && student ? student.name + ' · ' : '') + esc(req.courseName) + '</b>' +
+    '<span class="pill ' + (lectureRequestActive(req) ? 'warn' : '') + '">' + esc(LECTURE_REQUEST_STATUS[status]) + '</span></div>' +
+    '<div class="small muted mt8">' + esc(req.site) + ' · 강사: ' + esc(req.instructor) + '</div>' +
+    '<div class="material-summary">희망 시작일 <b>' + esc(req.startDate) + '</b> · 하루 <b>' + esc(String(req.perDay)) + '강</b></div>' +
+    (req.note ? '<div class="hint mb8">' + esc(req.note) + '</div>' : '') +
+    (response && response.responseNote ? '<div class="guide mt8"><b>' + (status === 'changed' ? '이전 요청에 대한 답변' : '원장 답변') +
+      '</b><br><span style="white-space:pre-wrap">' + esc(response.responseNote) + '</span></div>' : '') +
+    '<div class="academic-actions">' +
+      (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="lecturerequestopen" data-id="' + esc(req.id) + '">요청 수정</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="lecturerequestcancel" data-id="' + esc(req.id) + '" data-revision="' + Number(req.requestRevision || 1) + '">취소</button>' : '') +
+      (admin && !req.cancelledAt ? '<button class="btn btn-sm btn-primary" data-act="lectureresponseopen" data-id="' + esc(req.id) + '">확인·답변</button>' +
+        '<button class="btn btn-sm btn-ghost" data-act="lecturerequestregister" data-id="' + esc(req.id) + '">강좌 등록 열기</button>' : '') +
+    '</div></div>';
+}
+function lectureRequestPanel(me) {
+  const requests = lectureRequestsFor(me.id);
+  const active = requests.filter(lectureRequestActive), history = requests.filter(req => !lectureRequestActive(req));
+  const latestAnswer = history.filter(req => lectureRequestStatus(req) === 'answered')
+    .sort((a, b) => Number(lectureResponseFor(b.id).updatedAt || 0) - Number(lectureResponseFor(a.id).updatedAt || 0))[0];
+  const older = history.filter(req => req !== latestAnswer);
+  const canRequest = session.isStaffLink && !isManager() && me.id === session.staffId;
+  return '<div class="card"><div class="between wraprow mb8"><div><div class="card-title">💬 인강 배정 요청</div>' +
+    '<div class="card-sub">듣고 싶은 강좌와 희망 공부량을 선생님께 알려 주세요.</div></div>' +
+    (canRequest ? '<button class="btn btn-primary btn-sm" data-act="lecturerequestopen">＋ 배정 요청하기</button>' : '') + '</div>' +
+    '<div class="hint mb14">요청은 원장모드의 인강 요청함으로 전달됩니다. 선생님 확인 후 강좌와 일정을 배정하며, 요청만으로 자동 배정되지는 않습니다.</div>' +
+    (active.length ? active.map(req => lectureRequestCard(req, false)).join('') : '<div class="small muted">대기 중인 요청이 없습니다.</div>') +
+    (latestAnswer ? '<div class="fl mt14 mb8">최근 답변</div>' + lectureRequestCard(latestAnswer, false) : '') +
+    (older.length ? '<details class="mt14"><summary>지난 요청·답변 ' + older.length + '건</summary>' +
+      older.map(req => lectureRequestCard(req, false)).join('') + '</details>' : '') + '</div>';
+}
+function lectureRequestInbox() {
+  if (!session.isAdmin || session.isStaffLink) return '';
+  const requests = teamStaff().flatMap(staff => lectureRequestsFor(staff.id));
+  const active = requests.filter(lectureRequestActive).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) ||
+    Number(a.requestedAt || 0) - Number(b.requestedAt || 0));
+  const history = requests.filter(req => !lectureRequestActive(req)).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">📥 전체 학생 인강 배정 요청함</div>' +
+    '<div class="card-sub">요청을 확인하고 기존 강좌 등록·일정 배정 기능으로 처리한 뒤 답변을 남겨 주세요.</div></div>' +
+    '<span class="pill ' + (active.length ? 'warn' : '') + '">' + active.length + '건</span></div>' +
+    (active.length ? active.map(req => lectureRequestCard(req, true)).join('') : '<div class="small muted">처리할 인강 요청이 없습니다.</div>') +
+    (history.length ? '<details class="mt14"><summary>지난 요청·답변 ' + history.length + '건</summary>' +
+      history.map(req => lectureRequestCard(req, true)).join('') + '</details>' : '') + '</div>';
+}
+function lectureRequestModal(existing) {
+  const me = currentStaff();
+  if (!session.isStaffLink || isManager() || !me || me.id !== session.staffId ||
+      (existing && (existing.staffId !== me.id || !['requested', 'changed'].includes(lectureRequestStatus(existing))))) {
+    return toast('본인의 대기 중인 인강 요청만 작성할 수 있어요');
+  }
+  const req = existing || {};
+  modal('🎬 인강 배정 요청',
+    '<input type="hidden" id="lectureRequestId" value="' + esc(req.id || '') + '">' +
+    '<input type="hidden" id="lectureRequestRevision" value="' + Number(req.requestRevision || 0) + '">' +
+    '<div class="guide mb14">아래 정보를 보내면 선생님이 확인 후 배정합니다. 사이트 로그인 정보는 적지 마세요.</div>' +
+    '<div class="field"><label class="fl" for="lectureSite">사이트</label><input class="in" id="lectureSite" list="lectureSites" maxlength="80" value="' +
+      esc(req.site || '') + '" placeholder="예: 메가스터디, 이투스, EBSi"><datalist id="lectureSites">' +
+      ING_PLATFORMS.filter(p => p !== '기타').map(p => '<option value="' + esc(p) + '">').join('') + '</datalist></div>' +
+    '<div class="field"><label class="fl" for="lectureInstructor">강사</label><input class="in" id="lectureInstructor" maxlength="80" value="' + esc(req.instructor || '') + '" placeholder="강사 이름"></div>' +
+    '<div class="field"><label class="fl" for="lectureCourseName">강좌명</label><input class="in" id="lectureCourseName" maxlength="160" value="' + esc(req.courseName || '') + '" placeholder="정확한 강좌명을 적어 주세요"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="lectureStartDate">수강 시작일</label><input class="in" id="lectureStartDate" type="date" min="' + today() + '" value="' + esc(req.startDate || today()) + '"></div>' +
+      '<div class="field"><label class="fl" for="lecturePerDay">하루 듣고 싶은 강의 수</label><input class="in" id="lecturePerDay" type="number" min="1" max="20" step="1" value="' + esc(String(req.perDay || 1)) + '"><div class="hint">하루 1~20강 중 입력</div></div></div>' +
+    '<div class="field"><label class="fl" for="lectureNote">추가 메모 (선택)</label><textarea class="in" id="lectureNote" maxlength="500" rows="3" placeholder="수강 요일, 현재 진도 등 참고할 내용">' + esc(req.note || '') + '</textarea></div>',
+    '<button class="btn btn-primary btn-block" data-act="lecturerequestsave">' + (existing ? '요청 수정하기' : '선생님께 요청 보내기') + '</button>');
+}
+function lectureResponseModal(req) {
+  if (!session.isAdmin || session.isStaffLink || !req || req.cancelledAt) return;
+  const response = lectureResponseFor(req.id);
+  modal('💬 인강 요청 확인·답변',
+    '<input type="hidden" id="lectureResponseId" value="' + esc(req.id) + '">' +
+    '<input type="hidden" id="lectureResponseRevision" value="' + Number(req.requestRevision || 1) + '">' +
+    '<div class="guide mb14"><b>' + esc((staffById(req.staffId) || {}).name || '') + '</b><br>' + esc(buildLectureRequestSummary(req)) + '</div>' +
+    '<div class="field"><label class="fl" for="lectureResponseStatus">처리 상태</label><select class="in" id="lectureResponseStatus">' +
+      '<option value="reviewing">확인 중</option><option value="answered"' + (lectureRequestStatus(req) === 'answered' ? ' selected' : '') + '>답변 완료</option></select></div>' +
+    '<div class="field"><label class="fl" for="lectureResponseNote">학생에게 보낼 답변</label><textarea class="in" id="lectureResponseNote" maxlength="500" rows="4" placeholder="배정 일정이나 추가로 필요한 정보를 알려 주세요">' +
+      esc(response && response.responseNote || '') + '</textarea></div>' +
+    '<div class="hint">답변 저장은 실제 강좌·일정을 배정하지 않습니다. 배정이 필요한 경우 기존 강좌 등록·일정 배정을 진행해 주세요.</div>',
+    '<button class="btn btn-primary btn-block" data-act="lectureresponsesave">답변 저장</button>');
+}
+
 function viewIngang() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -4617,8 +4755,10 @@ function viewIngang() {
 
   let h = '';
   if (!session.isStaffLink) h += staffSwitcher(me.id);
+  if (session.isAdmin && !session.isStaffLink) h += lectureRequestInbox();
 
   h += ingOverviewCard(me, editable, admin, courses, courseStates.map(row => row.state));
+  if (session.isStaffLink && !isManager()) h += lectureRequestPanel(me);
   h += ingWeekCard(me, editable, admin);
 
   if (!courses.length) {
@@ -4647,13 +4787,14 @@ function viewIngang() {
   return h;
 }
 
-function ingAddModal() {
+function ingAddModal(request) {
   modal('🎬 강좌 등록',
+    (request ? '<div class="guide mb14"><b>학생 요청</b><br>' + esc(buildLectureRequestSummary(request)) + '</div>' : '') +
     '<div class="field"><label class="fl" for="ingSubject">과목 · 스터디 플래너 색상</label>' +
       '<select class="in" id="ingSubject">' + studySubjectOptions(null, '과목 선택') + '</select></div>' +
-    '<input class="in mb8" id="ingName" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
+    '<input class="in mb8" id="ingName" value="' + esc(request ? request.courseName : '') + '" placeholder="강좌 이름 (예: 고1 수학 상 개념)">' +
     '<div class="fl mb8">플랫폼</div><div class="chips mb14" id="ingPf">' +
-      ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + (i === 0 ? 'on' : '') +
+      ING_PLATFORMS.map((p, i) => '<button type="button" class="chip ' + ((request ? p === (ING_PLATFORMS.includes(request.site) ? request.site : '기타') : i === 0) ? 'on' : '') +
         '" data-act="ingpf" data-v="' + p + '">' + p + '</button>').join('') + '</div>' +
     '<hr class="sep"><div class="panel mb14"><div class="fl mb8">① 목차 사진으로 가져오기 <span class="tag edit">추천</span></div>' +
       '<input class="in mb8" id="ingImages" type="file" accept="image/*" multiple>' +
@@ -9531,7 +9672,7 @@ function studentUsage(staffId) {
     }
   });
   (state.tasks || []).forEach(task => {
-    if (!task.deleted && task.staffId === staffId && task.origin === 'staff') {
+    if (!task.deleted && task.staffId === staffId && task.origin === 'staff' && !isLectureRequestTask(task)) {
       lastAt = Math.max(lastAt, Number(task.updatedAt) || 0);
     }
   });
@@ -9856,7 +9997,7 @@ function viewStaffAdmin() {
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') +
           (subscription.active ? ' <span class="tag subscription">월 구독</span>' :
             subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t)).length + '건' +
+        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t) && !isLectureRequestTask(t)).length + '건' +
           (s.owner ? ' · 학생 통계에서 제외' : '') +
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) +
           studentEngagementLine(s, engagementByStudent.get(s.id), pointByStudent.get(s.id)) + studentSubscriptionLine(s) + '</div></div>' +
@@ -10124,7 +10265,7 @@ function showText(title, text) {
 
 function manageTasks(staffId) {
   const s = staffById(staffId);
-  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t))
+  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t) && !isLectureRequestTask(t))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   modal((s ? s.name : '') + ' 지시 목록',
     list.length
@@ -11214,6 +11355,93 @@ document.addEventListener('click', ev => {
       if (!x) break;
       wnPatch(me.id, el.dataset.date, el.dataset.id, { fixed: !x.fixed });
       render();
+      break;
+    }
+
+    /* 인강 배정 요청 */
+    case 'lecturerequestopen': {
+      if (!session.isStaffLink || isManager()) break;
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const existing = id ? lectureRequestById(id) : null;
+      if (id && !existing) return toast('요청을 찾지 못했습니다');
+      lectureRequestModal(existing);
+      break;
+    }
+    case 'lecturerequestsave': {
+      if (!session.isStaffLink || isManager()) break;
+      const me = currentStaff();
+      if (!me || me.id !== session.staffId) break;
+      const value = selector => String(($(selector) || {}).value || '').trim();
+      const existingId = value('#lectureRequestId');
+      const existing = existingId ? lectureRequestById(existingId) : null;
+      if (existingId && (!existing || existing.staffId !== me.id || !['requested', 'changed'].includes(lectureRequestStatus(existing)))) {
+        return toast('본인의 대기 중인 요청만 수정할 수 있어요');
+      }
+      if (existing && Number(value('#lectureRequestRevision')) !== Number(existing.requestRevision || 1)) {
+        return toast('요청 내용이 변경되었습니다. 창을 닫고 다시 확인해 주세요');
+      }
+      const site = value('#lectureSite'), instructor = value('#lectureInstructor'), courseName = value('#lectureCourseName');
+      const startDate = value('#lectureStartDate'), perDay = Number(value('#lecturePerDay')), note = value('#lectureNote');
+      if (!site || !instructor || !courseName) return toast('사이트·강사·강좌명을 모두 입력해 주세요');
+      if (site.length > 80 || instructor.length > 80 || courseName.length > 160 || note.length > 500) return toast('입력 가능한 글자 수를 확인해 주세요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || ymd(parseYmd(startDate)) !== startDate || startDate < today()) {
+        return toast('수강 시작일은 오늘 이후의 올바른 날짜로 입력해 주세요');
+      }
+      if (!Number.isInteger(perDay) || perDay < 1 || perDay > 20) return toast('하루 강의 수는 1~20 사이의 정수로 입력해 주세요');
+      const fields = { staffId: me.id, site: site, instructor: instructor, courseName: courseName, startDate: startDate, perDay: perDay, note: note };
+      const duplicate = lectureRequestsFor(me.id).find(req => req.id !== existingId && lectureRequestActive(req) &&
+        lectureRequestFingerprint(req) === lectureRequestFingerprint(fields));
+      if (duplicate) return toast('같은 내용으로 대기 중인 인강 요청이 있습니다');
+      const req = existing || { id: uid(), createdAt: now(), requestedAt: now() };
+      Object.assign(req, fields, {
+        groupId: req.id, kind: 'lecture_request', origin: 'staff', title: '인강 배정 요청 · ' + courseName,
+        detail: buildLectureRequestSummary(fields), source: '', repeat: 'request', start: '', end: '', days: [], steps: [], carry: false,
+        requestRevision: Number(req.requestRevision || 0) + 1, cancelledAt: null, deleted: false, updatedAt: now()
+      });
+      if (!existing) state.tasks.push(req);
+      const stored = save(); queueSync(); closeModal(); render();
+      toast(stored ? '요청을 저장했습니다 · 동기화 후 선생님께 전달됩니다' : '기기 저장에 실패했습니다. 상단 안내에서 다시 시도해 주세요');
+      break;
+    }
+    case 'lecturerequestcancel': {
+      if (!session.isStaffLink || isManager()) break;
+      const me = currentStaff(), req = lectureRequestById(id);
+      if (!me || me.id !== session.staffId || !req || req.staffId !== me.id || !['requested', 'changed'].includes(lectureRequestStatus(req))) {
+        return toast('이 요청은 취소할 수 없습니다');
+      }
+      if (Number(el.dataset.revision) !== Number(req.requestRevision || 1)) return toast('요청 내용이 변경되었습니다. 다시 확인해 주세요');
+      if (!confirm('인강 배정 요청을 취소할까요?')) break;
+      req.cancelledAt = now(); req.updatedAt = now();
+      save(); queueSync(); render(); toast('인강 요청을 취소했습니다');
+      break;
+    }
+    case 'lectureresponseopen': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      lectureResponseModal(lectureRequestById(id));
+      break;
+    }
+    case 'lectureresponsesave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const req = lectureRequestById(String(($('#lectureResponseId') || {}).value || ''));
+      if (!req || req.cancelledAt) return toast('답변할 요청을 찾지 못했습니다');
+      if (Number(($('#lectureResponseRevision') || {}).value) !== Number(req.requestRevision || 1)) {
+        return toast('학생의 요청 내용이 변경되었습니다. 다시 확인한 뒤 답변해 주세요');
+      }
+      const status = String(($('#lectureResponseStatus') || {}).value || '');
+      const note = String(($('#lectureResponseNote') || {}).value || '').trim();
+      if (!['reviewing', 'answered'].includes(status)) return toast('처리 상태를 다시 선택해 주세요');
+      if (note.length > 500) return toast('답변은 500자 이내로 입력해 주세요');
+      if (status === 'answered' && !note) return toast('학생에게 전달할 답변을 입력해 주세요');
+      setLectureResponse(req, status, note || '선생님이 요청을 확인하고 있습니다.');
+      closeModal(); render(); toast('답변을 저장했습니다 · 동기화 후 학생에게 표시됩니다');
+      break;
+    }
+    case 'lecturerequestregister': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const req = lectureRequestById(id);
+      if (!req || req.cancelledAt || !teamStaff().some(staff => staff.id === req.staffId)) return toast('학생 요청을 찾지 못했습니다');
+      viewStaff = req.staffId; route = 'ingang'; render(); ingAddModal(req);
       break;
     }
 
@@ -13472,7 +13700,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-01.3';
+const APP_VER = '2026-09-02.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

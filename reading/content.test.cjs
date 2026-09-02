@@ -236,7 +236,8 @@ hanjaRd.forEach((seen, ch) => {
    쪼갤 자리가 있다」. 넘는 조각은 학생이 한 호흡에 삼켜야 하는 덩어리라
    끊어 읽기의 목적이 무너진다. 2026-09-02 전수 점검에서 133개가 나왔다 —
    8-31에 한꺼번에 쓴 17편이 나머지보다 1.5~2어절 길게 끊겨 있었다.
-   고치는 중이라 아직 오류가 아니라 경고다. 0이 되면 E 로 올린다. */
+   2026-09-02에 133개를 하나씩 보고 쪼갰다(reading/long-cuts.json). 이제 0이므로
+   경고가 아니라 오류다 — 다시 생기면 커밋 전에 막는다. */
 {
   const LONG = 8;
   const byArt = new Map();
@@ -258,8 +259,44 @@ hanjaRd.forEach((seen, ch) => {
   if (total) {
     const worst = [...byArt].sort((x, y) => y[1] - x[1]).slice(0, 8)
       .map(([k, n]) => `${k} ${n}개`).join(' · ');
-    W(`${LONG}어절이 넘는 끊어 읽기 조각 ${total}개 — 규격서 2장은 쪼개라고 합니다\n        많은 순: ${worst}`);
+    E(`${LONG}어절이 넘는 끊어 읽기 조각 ${total}개 — 규격서 2장은 쪼개라고 합니다.`
+      + `\n        학생이 한 호흡에 삼켜야 하는 덩어리라 끊어 읽기의 목적이 무너집니다.`
+      + `\n        많은 순: ${worst}`
+      + `\n        고치려면: node reading/fix-long.mjs 로 자리를 보고, reading/long-cuts.json 에 적은 뒤 --write`);
   }
+}
+
+/* ── 새 지문은 조각 길이 규격을 지킨다 ──
+   규격서 2장의 눈금(L1 3.3 · L2 3.7 · L3 4.1 · L4 4.5 어절)이다.
+   기존 35편은 규격이 생기기 전에 쓴 것이라 chunk-baseline.json 으로 빼 준다 —
+   17편을 다시 끊으려면 경계 2,000개를 건드려야 해서, 새로 쓰는 글부터 맞추기로 했다.
+
+   허용 폭이 ±0.8 인 이유: `node reading/chunk.mjs --band L3 "문단"` 이 내놓는 초안은
+   규격에서 ±0.4 안쪽이다. 초안을 받아 손질하면 ±0.4 의 여유가 더 있는 셈이라
+   자연히 통과한다. 손으로만 끊으면 걸릴 수 있는데, 그때는 도구를 먼저 돌리면 된다. */
+{
+  const SPEC = { L1: 3.3, L2: 3.7, L3: 4.1, L4: 4.5 };
+  const TOL = 0.8;
+  const baseline = new Set(
+    JSON.parse(fs.readFileSync(path.join(__dirname, 'chunk-baseline.json'), 'utf8'))['지문']);
+  db.articles.forEach(a => {
+    if (baseline.has(a.id)) return;
+    Object.entries(a.levels || {}).forEach(([lv, b]) => {
+      const target = SPEC[lv];
+      if (target == null) return;
+      const lens = [];
+      (b.paragraphs || []).forEach(p => {
+        if (Array.isArray(p)) p.forEach(seg => lens.push((seg.match(/\S+\s*/g) || []).length));
+      });
+      if (lens.length < 5) return;                  /* 너무 적으면 평균이 흔들린다 */
+      const mean = lens.reduce((x, y) => x + y, 0) / lens.length;
+      const off = mean - target;
+      if (Math.abs(off) <= TOL) return;
+      E(`${a.id}/${lv}: 끊어 읽기 조각이 평균 ${mean.toFixed(2)}어절 — 규격은 ${target} ± ${TOL} 입니다`
+        + ` (${off > 0 ? '너무 큼' : '너무 잘음'}, 조각 ${lens.length}개)`
+        + `\n        node reading/chunk.mjs --band ${lv} "문단" 으로 초안을 받아 손질하면 대개 맞습니다`);
+    });
+  });
 }
 
 warns.forEach(w => console.log('WARN:', w));

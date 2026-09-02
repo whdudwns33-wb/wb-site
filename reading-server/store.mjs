@@ -36,7 +36,8 @@ export function load() {
 function snapshotBody() {
   return { service: 'wb-reading', savedAt: new Date().toISOString(),
     students: db.students, states: db.states, vocab: db.vocab,
-    textbook: db.textbook || {}, pubmap: db.pubmap || {} };
+    textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: db.naesin || {},
+    textbookSrc: db.textbookSrc || {} };
 }
 
 function dayKey() {
