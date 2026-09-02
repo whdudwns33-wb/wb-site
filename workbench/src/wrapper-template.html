@@ -43,6 +43,9 @@ async function derive(pw){
 async function open_(key){
  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b2a(P.i)},key,b2a(P.c));
  const html=new TextDecoder().decode(pt);
+ // 파싱이 끝나기 전 document.open()은 무시되어 앱이 로그인 화면 뒤에 덧붙는다 — 반드시 로드 완료 후 교체
+ if(document.readyState==="loading")
+  await new Promise(r=>document.addEventListener("DOMContentLoaded",r,{once:true}));
  document.open();document.write(html);document.close();}
 async function tryStored(){
  const raw=localStorage.getItem("wb-wb-key");if(!raw)return;
