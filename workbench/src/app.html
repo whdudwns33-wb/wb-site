@@ -1661,9 +1661,13 @@ function judgeGroup(g,myG,myPct){
 function runIpsi(){
   const mode=$("#ip_mode").value;let band=null,label="";
   if(mode==="hs"){
-    const g=parseFloat($("#ip_hs").value);
-    if(isNaN(g)||g<1||g>9){toast("내신 평균 등급(1.0~9.0)을 입력하세요");return;}
-    band=[g,g];label=`고교 내신 평균 ${g.toFixed(2)}등급`;
+    const raw=parseFloat($("#ip_hs").value);
+    const is5=view.ipsiScale==="5";
+    if(is5&&(isNaN(raw)||raw<1||raw>5)){toast("5등급제 내신 평균(1.0~5.0)을 입력하세요");return;}
+    if(!is5&&(isNaN(raw)||raw<1||raw>9)){toast("내신 평균 등급(1.0~9.0)을 입력하세요");return;}
+    const g=is5?g5to9(raw):raw;
+    band=[g,g];
+    label=is5?`5등급제 내신 ${raw.toFixed(2)} → 9등급 환산 ${g.toFixed(2)}등급 (입결 DB가 9등급 기준)`:`고교 내신 평균 ${g.toFixed(2)}등급`;
     view.ipsiMyPct=Math.round((100-gradeToTopPct(g))*10)/10;
   }else if(mode==="ms"){
     let p=parseFloat($("#ip_ms").value);
@@ -1714,7 +1718,8 @@ function boardCard(g,j){
     ?(j.diff>=0?`+${j.diff.toFixed(1)} 여유`:`${j.diff.toFixed(1)} 부족`)
     :(j.diff>=0?`+${j.diff.toFixed(2)}`:j.diff.toFixed(2));
   const dArrow=g.isJ?"":(g.delta==null?"":g.delta<-0.05?` <span style="color:var(--danger)">▲</span>`:g.delta>0.05?` <span style="color:var(--ok)">▼</span>`:"");
-  return `<div class="kcard"><button class="kstar ${on?"on":""}" title="관심대학 고정/해제" onclick="ipsiPin('${esc(g.key)}')">★</button>
+  return `<div class="kcard" style="cursor:pointer" title="눌러서 연도별 상세 보기" onclick="ipDetail('${esc(g.key)}')">
+    <button class="kstar ${on?"on":""}" title="관심대학 고정/해제" onclick="event.stopPropagation();ipsiPin('${esc(g.key)}')">★</button>
     <div class="ku">${esc(g.univ)}${g.region?` · ${esc(g.region)}`:""}</div>
     <div class="km">${esc(g.major)}</div>
     <div class="kb"><span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track)}</span>
@@ -1828,8 +1833,13 @@ function renderIpsi(){
         <option value="iq" ${view.ipsiMode==="iq"?"selected":""}>웩슬러 지능검사 (FSIQ)</option>
       </select></div>
     ${(view.ipsiMode||"hs")==="hs"?`
-      <div class="frow"><label>내신 평균</label><input id="ip_hs" placeholder="예: 2.4" style="width:120px"></div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">현 고1은 5등급제 — 학교 통지 기준을 9등급 환산(상위 % 기준)해 입력하세요. 입결 DB가 9등급제 과거 자료이기 때문입니다.</p>`
+      <div class="frow"><label>내신 체계</label>
+        <select onchange="view.ipsiScale=this.value;view.ipsiResult=null;render()" style="max-width:200px">
+          <option value="9" ${view.ipsiScale!=="5"?"selected":""}>9등급제 (고3)</option>
+          <option value="5" ${view.ipsiScale==="5"?"selected":""}>5등급제 (고1·고2)</option>
+        </select></div>
+      <div class="frow"><label>내신 평균</label><input id="ip_hs" placeholder="${view.ipsiScale==="5"?"예: 1.5 (1~5)":"예: 2.4"}" style="width:120px"></div>
+      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">${view.ipsiScale==="5"?"5등급제 평균을 그대로 넣으면 상위% 기준으로 9등급 등가로 환산해 대조합니다 (입결 DB가 9등급제 과거 자료). 환산치는 결과에 표시됩니다.":"고1·고2는 위에서 5등급제를 선택하면 학교 통지 그대로 입력할 수 있습니다."}</p>`
     :view.ipsiMode==="ms"?`
       <div class="formgrid">
         <div class="frow"><label>전교 등수</label><input id="ip_msrank" placeholder="예: 12" style="width:100px"></div>
@@ -1869,16 +1879,17 @@ function renderIpsi(){
       :`<div class="empty" style="padding:14px"><b>고교 DB가 비어 있습니다</b>아래 고교 DB에 광주·전남 학교를 넣으면 추천이 나옵니다 — "콘텐츠DB 추출 프롬프트"가 가장 빠릅니다.</div>`}
     </div></div>`;})():""}`:""}
 
-  <div class="sec"><h2>🗄 입결 DB <span class="n">매칭 데이터 ${rows.length.toLocaleString()}건 (대량 ${(BULK.ip||[]).length.toLocaleString()} + 수동 ${manual.length}) — 아래 표는 수동분만</span></h2>
+  <div class="sec"><h2>🗄 입결 DB <span class="n">매칭 데이터 ${rows.length.toLocaleString()}건 (대량 ${(BULK.ip||[]).length.toLocaleString()} + 수동 ${manual.length}) — 행을 누르면 상세</span></h2>
   <div class="card">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <details class="acc2"><summary>✏️ 직접 입력 (진학사 통·모평 수치 — 정시는 전형명을 "수능(…)"으로)</summary>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
       <input id="db_univ" placeholder="대학" style="width:110px"><input id="db_major" placeholder="학과" style="width:120px">
       <input id="db_track" placeholder="전형" style="width:100px"><input id="db_year" placeholder="연도" style="width:70px">
       <input id="db_c50" placeholder="50컷" style="width:70px"><input id="db_c70" placeholder="70컷" style="width:70px">
       <input id="db_pct" placeholder="수능백분위" title="정시 전형만 — 진학사 통(RealPass)·모평 자료의 백분위. 전형명을 '수능(…)'으로 적어야 정시 매칭에 반영됩니다" style="width:85px">
       <input id="db_src" placeholder="출처" style="width:130px">
       <button class="btn sm" onclick="addIpdb()">추가</button>
-    </div>
+    </div></details>
     <details class="acc2"><summary>📥 CSV 붙여넣기 가져오기 (어디가 조회 프롬프트 결과)</summary>
       <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처,수능백분위(정시만·선택) — 한 줄에 하나. 정시는 전형을 "수능(…)"으로 적어야 백분위 매칭에 반영</p>
       <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
@@ -1886,10 +1897,11 @@ function renderIpsi(){
     </details>
     ${manual.length?`<div class="tablewrap" style="margin-top:8px"><table class="t">
       <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>백분위</th><th>출처</th><th></th></tr>
-      ${manual.map((r,i)=>`<tr><td>${esc(r.univ)}</td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
+      ${manual.map((r,i)=>`<tr style="cursor:pointer" title="눌러서 연도별 상세 보기" onclick="ipDetail('${esc(uniNorm(r.univ))}|${esc(r.major)}|${esc(r.track||"")}')">
+        <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
         <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.pct||"")}</td>
         <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
-        <td><button class="btn ghost sm" onclick="db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
+        <td><button class="btn ghost sm" onclick="event.stopPropagation();db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
     </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">수동 추가분이 없습니다. 대량 데이터는 입시 검색에서 이미 매칭에 쓰이고, 여기엔 CSV·직접 입력분만 관리됩니다.</p>`}
   </div></div>
 
@@ -2005,10 +2017,29 @@ function hsSimBand(p,row){ // 중학 상위% + 고교 행 → 예상 내신 밴�
   else if(ty.includes("특성화"))adj=-0.5;
   if(row.level==="상")adj+=0.4;else if(row.level==="하")adj-=0.3;
   return {band:[Math.max(1,Math.min(9,g1+adj)),Math.max(1,Math.min(9,g2+adj))],adj};}
+/* 중학 절대평가 성취도(A~E, 학기별) → 상위% 추정 밴드 — 학교별 A비율 편차를 반영한 근사 */
+const ACH_TERMS=["중1-1","중1-2","중2-1","중2-2","중3-1","중3-2"];
+function achEstimate(){
+  const a=view.hsAch||{};const map={A:5,B:4,C:3,D:2,E:1};const vals=[];
+  for(const t of ACH_TERMS){const s=(a[t]||"").toUpperCase().replace(/[^A-E]/g,"");
+    for(const ch of s)vals.push(map[ch]);}
+  if(!vals.length)return null;
+  const avg=vals.reduce((x,y)=>x+y,0)/vals.length;
+  const PTS=[[5,3,18],[4.5,8,28],[4,18,40],[3.5,32,55],[3,48,70],[2.5,63,85],[2,75,92],[1,88,98]];
+  let lo=PTS[0][1],hi=PTS[0][2];
+  if(avg<=PTS[PTS.length-1][0]){lo=PTS[PTS.length-1][1];hi=PTS[PTS.length-1][2];}
+  else for(let i=0;i<PTS.length-1;i++){const A1=PTS[i],A2=PTS[i+1];
+    if(avg<=A1[0]&&avg>=A2[0]){const t=(A1[0]-avg)/(A1[0]-A2[0]);
+      lo=A1[1]+(A2[1]-A1[1])*t;hi=A1[2]+(A2[2]-A1[2])*t;break;}}
+  return {avg:Math.round(avg*100)/100,lo:Math.round(lo),hi:Math.round(hi),
+    mid:Math.round((lo+hi)/2*10)/10,n:vals.length};}
 function renderHsSim(){
   let p=parseFloat(view.hsP);
   const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
   if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
+  const ach=achEstimate();
+  const usingAch=isNaN(p)&&!!ach;
+  if(usingAch)p=ach.mid;
   const field=view.hsField||"전체";
   const picks=view.hsPicks||[];
   const hsRows=allHsRows();
@@ -2072,11 +2103,22 @@ function renderHsSim(){
       <div class="frow" style="margin:0"><label>재적수</label><input value="${esc(view.hsTot||"")}" placeholder="320" style="width:80px" onchange="view.hsTot=this.value;render()"></div>
       <div class="frow" style="margin:0"><label>희망 계열</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap">${["전체",...Object.keys(FIELD_KW)].map(f=>`<button class="fchip ${field===f?"on":""}" onclick="view.hsField='${f}';render()">${f}</button>`).join("")}</div></div>
-    </div></div>
+    </div>
+    <details class="acc2" style="margin-top:10px" ${ach?"open":""}><summary>📗 또는 절대평가 성취도로 입력 (학년·학기별, A~E)</summary>
+      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">학기마다 주요과목 성취도를 이어 적으세요 (예: 국영수사과 = AABBA). 순서 무관, A~E만 인식. 상위%나 등수를 비우면 이 성취도로 추정합니다.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${ACH_TERMS.map(t=>`<div class="frow" style="margin:0"><label style="font-size:11px">${t}</label>
+          <input value="${esc((view.hsAch||{})[t]||"")}" placeholder="AABBA" style="width:92px"
+            onchange="view.hsAch=view.hsAch||{};view.hsAch['${t}']=this.value;render()"></div>`).join("")}
+      </div>
+      ${ach?`<p style="font-size:12px;margin:8px 0 0"><span class="chip acc">성취도 평균 ${ach.avg} (${ach.n}과목)</span>
+        <span class="chip ${usingAch?"warn":""}">상위 ${ach.lo}~${ach.hi}% 추정${usingAch?` — 중앙 ${ach.mid}%로 시뮬 적용 중`:" (상위% 직접 입력이 우선)"}</span></p>
+      <p style="font-size:11px;color:var(--ink2);margin:4px 0 0">⚠️ 절대평가 성취도는 학교별 A 비율 편차가 커서 상위% 환산이 원리적으로 근사치입니다 — 반드시 밴드로만 해석하고, 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</p>`:""}
+    </details></div>
   <div class="sec"><h2>2️⃣ 후보 고교 (최대 3곳)</h2><div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:12.5px">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
-    ${picks.length<3?`<input value="${esc(view.hsSchQ||"")}" placeholder="학교명 검색 (예: 순천, 상무고)" oninput="view.hsSchQ=this.value;render()" style="max-width:340px">
+    ${picks.length<3?`<input id="hsq" value="${esc(view.hsSchQ||"")}" placeholder="학교명 검색 (예: 순천, 상무고)" oninput="hsQIn(this)" style="max-width:340px">
     ${cand.map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
       <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("")}`:""}
   </div></div>
@@ -2213,6 +2255,32 @@ ${isHonam?"\n■ 지역인재 전형: 호남권 고교 재학생 전용 — 의�
 
 /* ═══════════ 모의지원 (목표 대학·학과 갭 분석) ═══════════ */
 function mkFieldOf(major){for(const f of Object.keys(FIELD_KW))if(FIELD_KW[f].some(k=>major.includes(k)))return f;return null;}
+/* 리렌더 후 검색 입력 포커스 복원 — 없으면 한 글자 칠 때마다 포커스가 죽는다 */
+function refocus(id){const el=document.getElementById(id);if(el){el.focus();const n=el.value.length;try{el.setSelectionRange(n,n);}catch(e){}}}
+function mkQIn(el){view.mkQ=el.value;view.mkSel=null;render();refocus("mkq");}
+function hsQIn(el){view.hsSchQ=el.value;render();refocus("hsq");}
+/* 5등급제(현 고1·고2) → 9등급 등가 환산 — 입결 DB가 9등급 기준이므로 */
+const CUM5=[10,34,66,90,100];
+function g5ToTopPct(g){g=Math.max(1,Math.min(5,g));const i=Math.min(4,Math.floor(g));const prev=i===0?0:CUM5[i-1];return prev+(g-i)*(CUM5[i]-prev);}
+function g5to9(g5){return topPctToGrade(Math.max(0.1,g5ToTopPct(g5)));}
+/* 대학·학과·전형 상세 모달 — 어디서든 눌러서 확인 */
+function ipDetail(key){
+  const g=ipGroups().find(x=>x.key===key);if(!g)return;
+  const ys=[...new Set([...g.ys,...Object.keys(g.pcts)])].sort().reverse();
+  modal(`<h2>${esc(g.univ)} ${esc(g.major)}</h2>
+  <p style="font-size:12.5px;color:var(--ink2);margin:4px 0 10px">
+    <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span> ${g.region?" · "+esc(g.region):""} · ${ys.length}개 연도</p>
+  <div class="tablewrap"><table class="t">
+    <tr><th>연도</th><th>70%컷</th><th>50%컷</th><th>수능백분위</th><th>경쟁률</th></tr>
+    ${ys.map(y=>`<tr><td>${y}</td><td>${g.years[y]!=null?fmtCut(g.years[y]):"—"}</td>
+      <td>${esc(g.y50[y]||"—")}</td><td>${g.pcts[y]!=null?g.pcts[y]:"—"}</td><td>${esc(g.rates[y]||"—")}</td></tr>`).join("")}
+  </table></div>
+  <p style="font-size:11px;color:var(--ink2);margin:8px 0 0">출처: 한국대학교육협의회 어디가 발표(재정리본)·수동 입력분 — 수시 컷=최종등록자 교과등급, 정시=백분위·환산점수. ▲연도별 추이로 강화·완화를 읽으세요.</p>
+  <div class="mfoot">
+    <button class="btn sm" onclick="closeModal();view.mkSel='${esc(g.univ)}|${esc(g.major)}';view.mkQ='${esc(g.univ)} ${esc(g.major)}';go('mock')">🧾 모의지원으로</button>
+    <button class="btn sm" onclick="closeModal();view.sUniv='${esc(g.univ)}';view.sq='';view.searchTab='univ';go('search')">🔍 검색에서 보기</button>
+    <button class="btn" onclick="closeModal()">닫기</button>
+  </div>`);}
 /* 진학사식 반원 게이지 — d=여유(+)/부족(−), unit "등급"|"백분위" */
 function gaugeSvg(d,unit,dTxt){
   const R=unit==="등급"?[-1.5,-0.8,-0.2,0.4,1.5]:[-15,-10,-3,5,15];
@@ -2250,7 +2318,8 @@ function mkTrendChart(t,isJ,myV){
     <text x="${W-PR+16}" y="${(y(myV)+3.5).toFixed(1)}" style="fill:var(--danger)" font-size="9.5" font-weight="700">내 위치</text>`:"";
   return `<div style="overflow-x:auto;flex:1;min-width:200px"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${my}${line}${dots}</svg></div>`;}
 function renderMock(){
-  const g=parseFloat(view.mkG);
+  const rawG=parseFloat(view.mkG);
+  const g=view.mkScale==="5"?(isNaN(rawG)?NaN:g5to9(Math.max(1,Math.min(5,rawG)))):rawG;
   const iq=parseFloat(view.mkIq);
   const pctIn=parseFloat(view.mkPct);
   const myPct=!isNaN(pctIn)?pctIn:(!isNaN(g)?Math.round((100-gradeToTopPct(g))*10)/10:null);
@@ -2336,8 +2405,14 @@ function renderMock(){
         <select onchange="view.mkStu=this.value||null;render()" style="width:170px">
           <option value="">직접 입력</option>
           ${db.students.map(s=>`<option value="${esc(s.id)}" ${view.mkStu===s.id?"selected":""}>${esc(s.name)} (${esc(s.grade||"")})</option>`).join("")}</select></div>
+      <div class="frow" style="margin:0"><label>내신 체계</label>
+        <select onchange="view.mkScale=this.value;render()" style="width:130px">
+          <option value="9" ${view.mkScale!=="5"?"selected":""}>9등급제(고3)</option>
+          <option value="5" ${view.mkScale==="5"?"selected":""}>5등급제(고1·2)</option>
+        </select></div>
       <div class="frow" style="margin:0"><label>내신 평균 (필수)</label>
-        <input value="${esc(view.mkG||"")}" placeholder="예: 2.4" style="width:100px" onchange="view.mkG=this.value;render()"></div>
+        <input value="${esc(view.mkG||"")}" placeholder="${view.mkScale==="5"?"예: 1.5":"예: 2.4"}" style="width:100px" onchange="view.mkG=this.value;render()"></div>
+      ${view.mkScale==="5"&&!isNaN(g)?`<span class="chip" style="align-self:center" title="입결 DB가 9등급 기준이라 환산해 대조">→ 9등급 환산 ${g.toFixed(2)}</span>`:""}
       <div class="frow" style="margin:0"><label>수능 백분위 (선택)</label>
         <input value="${esc(view.mkPct||"")}" placeholder="모평 평균" style="width:100px" onchange="view.mkPct=this.value;render()"></div>
       <div class="frow" style="margin:0"><label>FSIQ (선택)</label>
@@ -2345,7 +2420,7 @@ function renderMock(){
     </div>
     <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">수능 백분위를 비우면 내신에서 추정합니다(정시 판정은 근사치). FSIQ를 넣으면 잠재력 대비 갭 코칭이 붙습니다.</p></div>
   <div class="sec"><h2>2️⃣ 목표 대학·학과</h2><div class="card">
-    <input value="${esc(view.mkQ||"")}" placeholder="대학·학과 검색 (예: 전남대 화학, 조선대 의예)" oninput="view.mkQ=this.value;render()" style="margin-bottom:8px">
+    <input id="mkq" value="${esc(view.mkQ||"")}" placeholder="대학·학과 검색 (예: 전남대 화학, 조선대 의예)" oninput="mkQIn(this)" style="margin-bottom:8px">
     ${sel?`<div class="mocksel" style="border-color:var(--accent);cursor:default"><b>${esc(sel.univ)} ${esc(sel.major)}</b><span class="chip acc">선택됨</span>
       <button class="btn ghost sm" style="margin-left:auto" onclick="view.mkSel=null;render()">변경</button></div>`:""}
     ${!sel&&q?cand.map(m=>`<button class="mocksel" onclick="view.mkSel='${esc(m.univ)}|${esc(m.major)}';render()">
