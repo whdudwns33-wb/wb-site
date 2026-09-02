@@ -54,6 +54,8 @@ jobs:
         run: node reading-server/student-lifecycle.test.mjs
       - name: dist 조립
         run: node reading-server/build-dist.mjs
+      - name: 배포본 캐시 무효화 검증
+        run: node reading-server/dist-cache.test.mjs
       - name: Cloudflare Workers 배포
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -2,6 +2,7 @@
 /* dist/ 조립: 학생 앱(reading/) + 관리 웹(public/admin.html → /admin/) */
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -41,4 +42,31 @@ fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
 /* QR 인코더 — 관리 웹이 학생 연동 QR을 그린다. CSP가 'self'만 허용해 CDN을 못 쓴다. */
 fs.copyFileSync(path.join(ROOT, '..', 'shared', 'qr.js'), path.join(DIST, 'admin', 'qr.js'));
 
+/* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
+   두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
+   sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
+   영영 못 받는다. 2026-09-02 에 실제로 그랬다 — 낱말을 135개에서 207개로
+   늘려 배포했는데 기존 학생 화면은 그대로였다.
+
+   손으로 올리는 것을 잊지 않기를 바라는 대신, 껍데기 파일 내용의 해시를 그대로
+   VERSION 으로 박는다. 파일이 한 글자라도 바뀌면 캐시 이름이 달라지고,
+   안 바뀌면 그대로다. 잊을 수가 없다. */
+function stampSW(swPath, shellPaths, prefix) {
+  const src = fs.readFileSync(swPath, 'utf8');
+  const h = crypto.createHash('sha256');
+  for (const f of shellPaths.slice().sort()) h.update(fs.readFileSync(f));
+  h.update(src);                                   /* sw.js 자신도 포함 */
+  const tag = prefix + '-' + h.digest('hex').slice(0, 10);
+  const out = src.replace(/const VERSION = '[^']*';/, `const VERSION = '${tag}';`);
+  if (out === src) throw new Error(`${swPath}: VERSION 을 못 바꿨습니다 — sw.js 의 선언 형태가 바뀌었나 봅니다`);
+  fs.writeFileSync(swPath, out);
+  return tag;
+}
+const rTag = stampSW(path.join(DIST, 'sw.js'),
+  ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, f)), 'wbr-shell');
+const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
+  ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'vocab', f)), 'wbv-shell');
+
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag);
