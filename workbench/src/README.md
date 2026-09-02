@@ -10,7 +10,8 @@
 | `build.mjs` | seed·bulk 주입 → AES-256-GCM 암호화 → `../index.html` 생성 + 복호화 자가검증 |
 | `private-seed.json` | **gitignored.** 학생 시드 — `../backup/private-seed.enc.json` 에서 복원 |
 | `bulk-data.json` | **gitignored.** 입결 5개년+전국고교 — `../backup/bulk-data.enc.json` 에서 복원 |
-| `../index.html` | **배포본(자동 생성).** 직접 수정하지 말 것 |
+| `../index.html` | **배포본(자동 생성).** 앱 본체(시드 포함) 암호문 — 직접 수정 금지 |
+| `../bulk.enc.json` | **배포본(자동 생성).** 대량 입시 데이터 암호문 — 로그인 후 지연 로딩 |
 
 ## 새 기기에서 시작 (한 번만)
 
@@ -29,12 +30,12 @@ WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs   # "복호화 검증:
 # 3) 실명 검사 (공개 파일에 학생 실명 0건이어야 함 — 통과 못 하면 커밋 금지)
 grep -c "한수빈\|박세윤\|조유빈\|강준서\|마윤서\|김아린\|강현서\|김태련\|고현준\|오수아\|남혁준\|윤시현" workbench/src/app.html  # → 0
 # 4) 소스 커밋: 작업 브랜치에 app.html + index.html
-git add workbench/src/app.html workbench/index.html && git commit && git push origin claude/agent-performance-optimization-rj8ql6
+git add workbench/src/app.html workbench/index.html workbench/bulk.enc.json && git commit && git push origin claude/agent-performance-optimization-rj8ql6
 # 5) 배포: main에는 index.html 한 파일만 (Pages가 main을 서비스)
 git worktree add /tmp/wt-main origin/main && cd /tmp/wt-main \
   && git checkout -b deploy-$(date +%s) origin/main \
-  && cp <저장소>/workbench/index.html workbench/index.html \
-  && git add workbench/index.html && git commit -m "workbench: ... 배포" && git push origin HEAD:main
+  && cp <저장소>/workbench/index.html <저장소>/workbench/bulk.enc.json workbench/ \
+  && git add workbench/index.html workbench/bulk.enc.json && git commit -m "workbench: ... 배포" && git push origin HEAD:main
 # 6) 라이브 확인: 배포 후 1~2분 뒤
 curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/ | sha256sum   # 로컬 index.html 해시와 일치해야 함
 ```

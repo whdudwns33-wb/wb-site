@@ -26,15 +26,7 @@ try {
     console.log("비공개 시드 주입됨");
   }
 } catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
-// 대량 검색 데이터(입결·전국 고교) 주입 — bulk-data.json 도 저장소에 커밋하지 않는다
-try {
-  const bulk = readFileSync(join(HERE, "bulk-data.json"), "utf8");
-  const m2 = "const BULK={ip:[],hs:[]}; /*BUILD:BULK_DATA*/";
-  if (htmlStr.includes(m2)) {
-    htmlStr = htmlStr.replace(m2, `const BULK=${bulk.trim()}; /*BUILD:BULK_DATA*/`);
-    console.log("대량 데이터 주입됨");
-  }
-} catch { console.log("대량 데이터 없음 — 빈 상태로 빌드"); }
+// 대량 데이터(입결·학교)는 앱에 넣지 않는다 — 지연 로딩용 bulk.enc.json 으로 별도 암호화 (아래)
 const html = Buffer.from(htmlStr, "utf8");
 const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
 const key = crypto.pbkdf2Sync(PASSWORD, salt, ITER, 32, "sha256");
@@ -60,3 +52,27 @@ const k2 = await crypto.webcrypto.subtle.deriveKey(
 const pt = await crypto.webcrypto.subtle.decrypt({ name: "AES-GCM", iv: b2a(P.i) }, k2, b2a(P.c));
 if (!Buffer.from(pt).equals(html)) { console.error("검증 실패 — 배포하지 마세요"); process.exit(1); }
 console.log("복호화 검증: 일치 ✓");
+
+// ── 대량 데이터 지연 로딩 파일: gzip → 같은 키(같은 salt)·다른 IV 로 암호화 → ../bulk.enc.json
+// 앱은 래퍼가 넘겨준 원시 키로 로그인 직후 이 파일을 받아 복호화한다.
+import { gzipSync, gunzipSync } from "zlib";
+try {
+  const bulkRaw = readFileSync(join(HERE, "bulk-data.json"));
+  const gz = gzipSync(bulkRaw, { level: 9 });
+  const iv2 = crypto.randomBytes(12);
+  const c2 = crypto.createCipheriv("aes-256-gcm", key, iv2);
+  const ct2 = Buffer.concat([c2.update(gz), c2.final(), c2.getAuthTag()]);
+  const env2 = JSON.stringify({ v: 1, inner: "gzip(bulk-data.json)",
+    i: iv2.toString("base64"), c: ct2.toString("base64") });
+  writeFileSync(join(HERE, "..", "bulk.enc.json"), env2);
+  // 검증: WebCrypto 로 복호화 + gunzip 대조
+  const rawKey = await crypto.webcrypto.subtle.exportKey("raw", k2);
+  const k3 = await crypto.webcrypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]);
+  const E = JSON.parse(env2);
+  const dec = await crypto.webcrypto.subtle.decrypt({ name: "AES-GCM", iv: b2a(E.i) }, k3, b2a(E.c));
+  if (!gunzipSync(Buffer.from(dec)).equals(bulkRaw)) { console.error("bulk 검증 실패 — 배포하지 마세요"); process.exit(1); }
+  console.log(`대량 데이터 지연 파일: bulk.enc.json ${env2.length}B (원본 ${bulkRaw.length}B) — 검증 ✓`);
+} catch (e) {
+  if (e && e.code === "ENOENT") console.log("대량 데이터 없음 — bulk.enc.json 생략");
+  else { console.error("bulk 빌드 실패:", e.message); process.exit(1); }
+}
