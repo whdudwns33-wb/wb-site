@@ -42,6 +42,15 @@ fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
 /* QR 인코더 — 관리 웹이 학생 연동 QR을 그린다. CSP가 'self'만 허용해 CDN을 못 쓴다. */
 fs.copyFileSync(path.join(ROOT, '..', 'shared', 'qr.js'), path.join(DIST, 'admin', 'qr.js'));
 
+/* 내신브레인 (naesin/) — 같은 오리진 /naesin/ 에서 서빙해야 학생 코드·API가 공유된다.
+   팩 콘텐츠(구매 자료)는 dist에 싣지 않는다 — KV에만 산다(기획서 §9.3).
+   pack-sample.json 은 실제 교재와 무관한 자체 창작 체험 팩이라 실어도 된다. */
+const NAESIN = path.join(ROOT, '..', 'naesin');
+fs.mkdirSync(path.join(DIST, 'naesin'), { recursive: true });
+const NAESIN_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of NAESIN_FILES) fs.copyFileSync(path.join(NAESIN, f), path.join(DIST, 'naesin', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'naesin', 'voice.js'));
+
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
    sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
@@ -67,6 +76,9 @@ const rTag = stampSW(path.join(DIST, 'sw.js'),
 const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
   ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'vocab', f)), 'wbv-shell');
+const nTag = stampSW(path.join(DIST, 'naesin', 'sw.js'),
+  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'naesin', f)), 'wbn-shell');
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag);
