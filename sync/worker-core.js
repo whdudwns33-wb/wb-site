@@ -1535,6 +1535,7 @@ const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
+const MAX_FEEDBACK_SUBJECT = 80;
 const MAX_FEEDBACK_COMMENT = MAX_PARENT_FEEDBACK_COMMENT_CHARS;
 const MAX_STUDENT_NAME = 40;
 
@@ -1741,8 +1742,10 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const plusText = normalizeFeedbackField(body.plusText);
   const minusText = normalizeFeedbackField(body.minusText);
   const templateV2 = identity.templateVersion === 'v2';
+  const hasSubjectText = Object.hasOwn(body, 'subjectText');
   const subjectText = templateV2
-    ? normalizeFeedbackField(checked.taskData.subject || checked.taskData.className || '') : '';
+    ? normalizeFeedbackField(hasSubjectText
+      ? body.subjectText : checked.taskData.subject || checked.taskData.className || '') : '';
   const homeworkText = templateV2 ? normalizeFeedbackField(body.homeworkText) : '';
   const commentText = templateV2 ? normalizeFeedbackBody(body.commentText) : '';
   if (!contentText || (!templateV2 && (!plusText || !minusText))) {
@@ -1756,9 +1759,9 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (templateV2 && (!subjectText || !homeworkText || !commentText)) {
     return json({ ok: false, error: '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
   }
-  if (templateV2 && (subjectText.length > 80 || homeworkText.length > MAX_FEEDBACK_FIELD ||
+  if (templateV2 && (subjectText.length > MAX_FEEDBACK_SUBJECT || homeworkText.length > MAX_FEEDBACK_FIELD ||
       commentText.length > MAX_FEEDBACK_COMMENT)) {
-    return json({ ok: false, error: '과목은 80자, 과제는 ' + MAX_FEEDBACK_FIELD +
+    return json({ ok: false, error: '과목은 ' + MAX_FEEDBACK_SUBJECT + '자, 과제는 ' + MAX_FEEDBACK_FIELD +
       '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자까지 입력할 수 있습니다' }, 413, origin);
   }
   if (templateV2 && message !== feedbackV2Body(
@@ -2355,6 +2358,11 @@ export default {
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);
     } catch (e) {
       if (isRewardProcessingLockError(e)) return rewardProcessingLockResponse(okOrigin);
+      if (url.pathname === '/feedback-polish') {
+        return json({ ok: false, code: 'FEEDBACK_STORAGE_BUSY',
+          error: '피드백 저장소를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요. 기존 문구는 그대로 유지됩니다' },
+        503, okOrigin);
+      }
       return json({ ok: false, error: String(e && e.message || e) }, 500, okOrigin);
     }
   }

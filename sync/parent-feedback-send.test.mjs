@@ -102,7 +102,8 @@ function seedFeedback(db, overrides = {}) {
         updated: '2026-08-09', baseline: '2026-08',
         students: [{
           id: studentId, name: fields.studentName, grade: '중2', teacher: '김남기', subject: '국어',
-          start: '2026-08', end: '', reason: '', teacherIds: ['S-kim']
+          start: '2026-08', end: '', reason: '', teacherIds: ['S-kim'],
+          ...overrides.rosterFields
         }]
       },
       bookStudents: []
@@ -205,6 +206,86 @@ test('global guardian pause permits only an exact stable studentId allowlist mat
     assert.equal(r.body.status, 'sent');
   });
   assert.equal(fetches, 1);
+});
+
+test('feedback-only all-students gate falls back to the private roster mother phone before father', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { rosterFields: {
+    phoneMother: '010-2222-3333', phoneFather: '010-4444-5555'
+  } });
+  let recipient = '';
+  await withFetch(async (url, init) => {
+    recipient = JSON.parse(init.body).messages[0].to;
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(db, { auth: admin, requestKey }, {
+      WB_GUARDIAN_CONTACT_ENABLED: 'false',
+      WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+      WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, 'sent');
+  });
+  assert.equal(recipient, '01022223333');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM guardian_contacts_by_student').first().count, 0,
+    'roster fallback은 별도 보호자 연락처 행을 만들지 않는다');
+});
+
+test('roster fallback uses father only when no valid mother mobile exists and never uses student phone', async () => {
+  for (const [rosterFields, expectedCode, expectedRecipient] of [
+    [{ phoneMother: '', phoneFather: '010-4444-5555' }, '', '01044445555'],
+    [{ phoneMother: '062-123-4567', phoneFather: '010-6666-7777' }, '', '01066667777'],
+    [{ phoneSelf: '010-8888-9999', phoneMother: '', phoneFather: '' }, 'GUARDIAN_PHONE_MISSING', '']
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { rosterFields });
+    let recipient = '';
+    let fetches = 0;
+    await withFetch(async (url, init) => {
+      fetches += 1;
+      recipient = JSON.parse(init.body).messages[0].to;
+      return acceptedResponse();
+    }, async () => {
+      const result = await call(db, { auth: admin, requestKey }, {
+        WB_GUARDIAN_CONTACT_ENABLED: 'false',
+        WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+        WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+      });
+      assert.equal(result.body.code || '', expectedCode);
+    });
+    assert.equal(recipient, expectedRecipient);
+    assert.equal(fetches, expectedRecipient ? 1 : 0);
+  }
+});
+
+test('an existing guardian row always overrides roster fallback and preserves its phone and consent rules', async () => {
+  for (const [contact, expectedCode, expectedRecipient] of [
+    [{ phone: '01011112222', consent: 0 }, 'GUARDIAN_CONSENT_MISSING', ''],
+    [{ phone: '', consent: 1 }, 'GUARDIAN_PHONE_MISSING', ''],
+    [{ phone: '01077778888', consent: 1 }, '', '01077778888']
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { rosterFields: {
+      phoneMother: '01022223333', phoneFather: '01044445555'
+    } });
+    registerGuardian(db, '테스트학생', contact);
+    let recipient = '';
+    let fetches = 0;
+    await withFetch(async (url, init) => {
+      fetches += 1;
+      recipient = JSON.parse(init.body).messages[0].to;
+      return acceptedResponse();
+    }, async () => {
+      const result = await call(db, { auth: admin, requestKey }, {
+        WB_GUARDIAN_CONTACT_ENABLED: 'false',
+        WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+        WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+      });
+      assert.equal(result.body.code || '', expectedCode);
+    });
+    assert.equal(recipient, expectedRecipient);
+    assert.equal(fetches, expectedRecipient ? 1 : 0);
+  }
 });
 
 test('only the director can trigger a manual retry, not the submitting teacher', async () => {
@@ -369,7 +450,10 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
 
 test('v2 sends the requested six variables through its separate approved template id', async () => {
   const db = new TestD1();
-  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const requestedSubject = '국어 독해 · 비문학';
+  const { requestKey } = seedFeedback(db, {
+    templateVersion: 'v2', fields: { subjectText: requestedSubject }
+  });
   registerGuardian(db, '테스트학생');
   let sentMessage = null;
   await withFetch(async (url, init) => {
@@ -382,7 +466,7 @@ test('v2 sends the requested six variables through its separate approved templat
   });
   assert.equal(sentMessage.kakaoOptions.templateId, 'TPL_TEST_V2_0001');
   assert.deepEqual(sentMessage.kakaoOptions.variables, {
-    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': '국어',
+    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': requestedSubject,
     '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
     '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.'
   });
