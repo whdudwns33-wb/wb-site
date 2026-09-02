@@ -1614,6 +1614,11 @@ function normCdf(z){const s=z<0?-1:1;z=Math.abs(z);
   const d=0.3989423*Math.exp(-z*z/2);
   const p=d*k*(0.3193815+k*(-0.3565638+k*(1.7814779+k*(-1.8212560+k*1.3302744))));
   return s>0?1-p:p;}
+function invNorm(p){ // 백분위/확률 → z (이분법, normCdf 역함수)
+  p=Math.min(0.9999,Math.max(0.0001,p));
+  let lo=-4,hi=4;
+  for(let i=0;i<60;i++){const m=(lo+hi)/2;if(normCdf(m)<p)lo=m;else hi=m;}
+  return (lo+hi)/2;}
 const CUM9=[4,11,23,40,60,77,89,96,100]; // 9등급 누적 상위%
 function topPctToGrade(p){ // 상위 p% → 9등급제 소수 등급 (1.0=상위4% 경계, 하한 1.0)
   let prev=0;
@@ -1677,6 +1682,28 @@ function runIpsi(){
     const g1=topPctToGrade(p),g2=topPctToGrade(Math.min(100,p*2));
     band=[g1,g2];label=`중학 상위 ${p.toFixed(1)}% → 일반고 예상 내신 ${g1.toFixed(1)}~${g2.toFixed(1)}등급`;
     view.ipsiPct=p;view.ipsiMyPct=Math.round((100-p)*10)/10;
+  }else if(mode==="dy"){
+    const vo=parseFloat($("#ip_dy_vo").value),an=parseFloat($("#ip_dy_an").value),re=parseFloat($("#ip_dy_re").value);
+    const langs=[vo,an].filter(v=>!isNaN(v)&&v>=1&&v<=99.9);
+    if(!langs.length){toast("어휘적용력·언어유추력 백분위(1~99.9)를 하나 이상 입력하세요");return;}
+    const lang=langs.reduce((a,b)=>a+b,0)/langs.length;
+    // 언어 요인 → 내신 잠재 밴드 (동일 백분위 상한 + 상관 0.6 보정 기대치)
+    const zL=invNorm(lang/100);
+    const pTop=100-lang;                          // 상위%
+    const pAdj=(1-normCdf(0.6*zL))*100;
+    const g1=topPctToGrade(Math.max(0.1,pTop)),g2=topPctToGrade(Math.min(100,pAdj));
+    band=[Math.min(g1,g2),Math.max(g1,g2)];
+    // 추리력 → 정시(수능) 백분위 잠재치 (동일 백분위와 보정치의 중앙)
+    let reTxt="";
+    if(!isNaN(re)&&re>=1&&re<=99.9){
+      const zR=invNorm(re/100);
+      const reAdj=normCdf(0.6*zR)*100;
+      view.ipsiMyPct=Math.round((re+reAdj)/2*10)/10;
+      reTxt=` · 추리력 ${re} → 수능 백분위 ${view.ipsiMyPct} 추정`;
+    }else{
+      view.ipsiMyPct=Math.round((100-gradeToTopPct((band[0]+band[1])/2))*10)/10;
+    }
+    label=`다요인지능 ${!isNaN(vo)?`어휘 ${vo}`:""}${!isNaN(vo)&&!isNaN(an)?"·":""}${!isNaN(an)?`유추 ${an}`:""} → 교과 잠재 밴드 ${band[0].toFixed(1)}~${band[1].toFixed(1)}등급 (상관 0.6 보정 포함)${reTxt}`;
   }else{
     const iq=parseFloat($("#ip_iq").value);
     if(isNaN(iq)||iq<40||iq>160){toast("전체지능(FSIQ)을 입력하세요 (40~160)");return;}
@@ -1831,6 +1858,7 @@ function renderIpsi(){
         <option value="hs" ${(view.ipsiMode||"hs")==="hs"?"selected":""}>고교 내신 (9등급제 평균)</option>
         <option value="ms" ${view.ipsiMode==="ms"?"selected":""}>중학교 성적 (상위 % 또는 등수)</option>
         <option value="iq" ${view.ipsiMode==="iq"?"selected":""}>웩슬러 지능검사 (FSIQ)</option>
+        <option value="dy" ${view.ipsiMode==="dy"?"selected":""}>다요인지능검사 (백분위, 초2~)</option>
       </select></div>
     ${(view.ipsiMode||"hs")==="hs"?`
       <div class="frow"><label>내신 체계</label>
@@ -1847,6 +1875,14 @@ function renderIpsi(){
       </div>
       <div class="frow"><label>또는 상위 %</label><input id="ip_ms" placeholder="예: 3.8" style="width:120px"></div>
       <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">일반고 진학 가정의 예상 밴드입니다. 학군·고교 유형(자사·특목)에 따라 크게 달라지므로 반드시 밴드로만 해석하세요.</p>`
+    :view.ipsiMode==="dy"?`
+      <div class="formgrid">
+        <div class="frow"><label>어휘적용력 백분위</label><input id="ip_dy_vo" placeholder="예: 90" style="width:100px"></div>
+        <div class="frow"><label>언어유추력 백분위</label><input id="ip_dy_an" placeholder="예: 85" style="width:100px"></div>
+        <div class="frow"><label>추리력 백분위</label><input id="ip_dy_re" placeholder="예: 95 (선택)" style="width:110px"></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">검사지의 백분위를 그대로 입력하세요(높을수록 좋음). <b>어휘적용력·언어유추력 → 교과(내신) 잠재 밴드</b>,
+      <b>추리력 → 수능(정시) 백분위 잠재치</b>로 환산해 분석합니다. 초2부터 가능한 검사라 초등 결과는 장기 잠재 참고치로만 해석하세요 — 상관 보정(0.6)이 포함됩니다.</p>`
     :`
       <div class="frow"><label>전체지능 FSIQ</label><input id="ip_iq" placeholder="예: 122" style="width:120px"></div>
       <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">⚠️ 지능은 성취를 결정하지 않습니다(상관 약 0.5~0.6). 이 분석은 <b>잠재력이 온전히 성취로 전환될 때의 상한 참고치</b>이며,
