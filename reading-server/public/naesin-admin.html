@@ -70,7 +70,11 @@
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
-let OV=null,PACKS=[],FILTER='전체';
+let OV=null,PACKS=[],FILTER='전체',TASK=null;
+/* 학생 앱 문제 유형 키 — 수업 과제 배정용 (naesin/index.html quizTypes와 동일 키) */
+const TYPE_LIST=[['w-e2k','영어→뜻'],['w-k2e','뜻→영어'],['w-spell','철자 쓰기'],['w-cloze','예문 빈칸'],['w-def','영영풀이'],
+ ['w-poly','다의어'],['w-syn','유의·반의'],['s-gram','어법 선택'],['s-verb','동사 형태'],['s-order','어순 배열'],
+ ['s-kw','핵심어 빈칸'],['i-mcq','객관식(단일)'],['i-multi','객관식(복수)'],['mock','실전 모의']];
 let ASSEMBLED=null;   // 병합·검증을 통과한 업로드 대기 팩
 
 async function api(path,opt){
@@ -173,9 +177,9 @@ function render(){
     </div>
     <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>이름</th><th>반</th><th>팩</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>마지막 학습</th></tr></thead>
+      <th>이름</th><th>반</th><th>팩</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>오늘 과제</th><th>마지막 학습</th></tr></thead>
       <tbody>${list.length?list.map(s=>{
-        const m=s.summary||{},w=m.word||{},sn=m.sentence||{};
+        const m=s.summary||{},w=m.word||{},sn=m.sentence||{},tk=m.task;
         const warn=stale(s)||w.risky>0;
         return `<tr>
           <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
@@ -184,8 +188,22 @@ function render(){
           <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${w.reached??'—'}/${w.total??'—'} · 안정 ${w.stable??'—'}</td>
           <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${sn.interpreted??'—'}/${sn.total??'—'}</td>
           <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${sn.memorized??'—'}/${sn.total??'—'}</td>
+          <td>${tk?`<span class="tag ok">${tk.correct}/${tk.total}</span>`:'<span class="tag muted">—</span>'}</td>
           <td class="muted">${fmtLast(s.lastActive)}</td></tr>`;
-      }).join(''):`<tr><td colspan="7" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+      }).join(''):`<tr><td colspan="8" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+  </div>
+
+  <div class="card"><h2>오늘 수업 과제</h2>
+    <p class="muted">배정하면 학생 앱 홈 최상단에 「오늘 수업 과제」로 뜨고, 완료 결과가 위 표의 「오늘 과제」 열에 모입니다.</p>
+    ${TASK?`<p style="margin:4px 0 10px"><span class="tag">${esc(TASK.date)}</span> <b>${esc(TASK.title)}</b> — 유형 ${TASK.typeKeys.length}종${TASK.seqFrom?` · 문장 ${TASK.seqFrom}–${TASK.seqTo}`:''}</p>`:'<p class="muted" style="margin:4px 0 10px">배정된 과제가 없습니다.</p>'}
+    <div class="grid-form">
+      <label>날짜<br><input type="date" id="tkDate"></label>
+      <label>과제 이름<br><input id="tkTitle" placeholder="예: 4교시 — 본문 클로즈 + 어법"></label>
+      <label>본문 문장 범위 (선택)<br><span style="display:flex;gap:6px"><input type="number" id="tkFrom" min="1" placeholder="시작" style="width:80px"><input type="number" id="tkTo" min="1" placeholder="끝" style="width:80px"></span></label>
+      <button class="btn" id="btnTask">과제 배정</button>
+    </div>
+    <div style="margin-top:10px">${TYPE_LIST.map(([k,l])=>`<label class="ck"><input type="checkbox" name="tkType" value="${k}">${esc(l)}</label>`).join('')}</div>
+    <div id="taskOut"></div>
   </div>
 
   <div class="card"><h2>레슨 팩</h2>
@@ -216,6 +234,23 @@ function render(){
   $('#packFiles').onchange=onPackFiles;
   $('#btnUpload').onclick=uploadPack;
   $('#btnExam').onclick=saveExam;
+  $('#tkDate').value=new Date().toISOString().slice(0,10);
+  $('#btnTask').onclick=saveTask;
+}
+
+async function saveTask(){
+  const date=$('#tkDate').value, title=$('#tkTitle').value.trim();
+  const typeKeys=[...document.querySelectorAll('input[name=tkType]:checked')].map(i=>i.value);
+  const body={date,title,typeKeys};
+  const f=$('#tkFrom').value, to=$('#tkTo').value;
+  if(f||to){body.seqFrom=Number(f);body.seqTo=Number(to);}
+  if(!title){$('#taskOut').innerHTML='<p class="err">과제 이름을 입력하세요.</p>';return;}
+  if(!typeKeys.length){$('#taskOut').innerHTML='<p class="err">학습 유형을 하나 이상 선택하세요.</p>';return;}
+  try{
+    const j=await api('/naesin/admin/task',{method:'POST',body:JSON.stringify(body)});
+    TASK=j.task;render();
+    $('#taskOut').innerHTML=`<div class="issues ok">배정 완료 — ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${j.task.typeKeys.length}종</div>`;
+  }catch(e){$('#taskOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
 }
 
 async function onPackFiles(){
@@ -261,8 +296,9 @@ async function saveExam(){
 
 async function refresh(){
   try{
-    const [ov,pk]=await Promise.all([api('/naesin/admin/overview'),api('/naesin/admin/packs')]);
-    OV=ov;PACKS=pk.packs||[];
+    const [ov,pk,tk]=await Promise.all([api('/naesin/admin/overview'),api('/naesin/admin/packs'),
+      api('/naesin/admin/task').catch(()=>({task:{}}))]);
+    OV=ov;PACKS=pk.packs||[];TASK=(tk.task&&tk.task.date)?tk.task:null;
     render();
   }catch(e){if(e.message!=='auth')renderLogin(e.message);}
 }
