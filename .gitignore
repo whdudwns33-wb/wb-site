@@ -15,3 +15,6 @@ reading-server/dist/
 # 구형 배포 스크립트가 만들던 관리자 비밀키 결과 파일 — 커밋 금지
 sync/배포결과.txt
 workbench/src/private-seed.json
+
+# 교재 코칭 원문 — 공개 저장소에 두지 않는다(서버 KV로 이전, 2026-09). 로컬 사본은 개발용.
+reading/textbook.json

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin } from './naesin-api.mjs';
-import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -156,9 +156,13 @@ function titleMap() {
 let TB_CACHE = { t: 0, data: null };
 function textbookRaw() {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
-  try {
-    TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
-  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  /* 원문은 관리 웹 업로드분(db.textbookSrc)이 정본 — 공개 저장소에서 파일을 뺐다(2026-09).
+     로컬 파일(reading/textbook.json)은 개발 편의용 폴백이며 gitignore 대상이다. */
+  let data = (db.textbookSrc && db.textbookSrc.src) || null;
+  if (!data) {
+    try { data = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')); } catch (e) {}
+  }
+  TB_CACHE = { t: Date.now(), data: data || TB_CACHE.data || { books: [] } };
   return TB_CACHE.data;
 }
 /* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다 */
@@ -408,6 +412,21 @@ const server = http.createServer(async (req, res) => {
       /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
       if (p === '/api/admin/textbook' && req.method === 'GET') {
         return json(res, 200, { books: bookIndex(textbook()) });
+      }
+      /* 교재 원문(코칭) — 서버 저장소 이전분 관리 (워커와 동일 계약) */
+      if (p === '/api/admin/textbook-src' && req.method === 'GET') {
+        if (!db.textbookSrc) return json(res, 200, { exists: false });
+        const sum = sourceSummary(db.textbookSrc.src);
+        return json(res, 200, { exists: true, updatedAt: db.textbookSrc.updatedAt || null, version: (db.textbookSrc.src && db.textbookSrc.src.version) || null, books: sum.books });
+      }
+      if (p === '/api/admin/textbook-src' && req.method === 'PUT') {
+        const src = await readBody(req);
+        const sum = sourceSummary(src);
+        if (sum.errors.length) return json(res, 400, { error: '원문 검증 실패', details: sum.errors.slice(0, 10) });
+        db.textbookSrc = { src, updatedAt: nowIso() };
+        TB_CACHE = { t: 0, data: null };
+        persist();
+        return json(res, 200, { ok: true, updatedAt: db.textbookSrc.updatedAt, version: src.version || null, books: sum.books });
       }
       if (p === '/api/admin/book' && req.method === 'POST') {
         const { code, bookId, lesson } = await readBody(req);
