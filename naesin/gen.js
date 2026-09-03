@@ -3,7 +3,7 @@
    레슨 팩 마스터(단어·문장)에서 훈련 문항을 런타임 생성한다 — 변주 문항은 저장하지
    않는다는 팩 스키마 원칙(마스터 우선)의 실행부다.
      단어  : 뜻 4지선다(정/역방향) · 철자 입력 · 예문 빈칸 · 영영풀이 고르기 (기획 §4.1)
-     문장  : 사다리 3~5.5단계 — 핵심어 빈칸 → 구 클로즈 → 순서 배열 → 영작 → 스켈레톤 (§4.2, §14-3)
+     문장  : 사다리 3~5단계 — 핵심어 빈칸 → 클로즈+배열 → 영작 (§4.2; 스켈레톤은 §14-3 발판)
      진단  : 전 단어 고속 4지선다 + '모름' 버튼 (§14-1 사전 인출 진단)
    모든 무작위성은 rnd(0~1 반환 함수) 주입 — 미주입 시 Math.random. 테스트는 시드 고정. */
 var WBGEN = (function () {
@@ -11,7 +11,8 @@ var WBGEN = (function () {
   function shuffle(arr, rnd) {
     var a = arr.slice(), r = rnd || Math.random;
     for (var i = a.length - 1; i > 0; i--) {
-      var j = Math.floor(r() * (i + 1));
+      /* rnd()가 정확히 1.0을 돌려주면 j=i+1로 튀어 undefined가 섞인다 — 상한을 막는다 */
+      var j = Math.min(i, Math.floor(r() * (i + 1)));
       var t = a[i]; a[i] = a[j]; a[j] = t;
     }
     return a;
@@ -26,6 +27,59 @@ var WBGEN = (function () {
     return m || '';
   }
 
+  function norm(v) { return String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+  /* 단어가 가진 뜻 전부를 낱개 풀이로 — "간직하다, 보관하다"는 두 풀이다. 오답 보기가
+     정답 단어의 다른 뜻과 같으면 정답이 둘인 문항이 된다(keep·maintain '유지하다'). */
+  function allMeanings(w) {
+    var out = {}, list = [];
+    var m = w.meaningKo;
+    if (m && typeof m !== 'string' && typeof m.length === 'number') list = list.concat(m);
+    else if (m) list.push(m);
+    (w.senses || []).forEach(function (s) { if (s && s.meaningKo) list.push(s.meaningKo); });
+    list.forEach(function (v) {
+      var whole = norm(v);
+      if (whole) out[whole] = true;
+      String(v).split(/[,;，、/]/).forEach(function (g) {
+        var k = norm(g);
+        if (k) out[k] = true;
+      });
+    });
+    return out;
+  }
+
+  /* 유의어 표기는 "over"·"sweet (달콤한)" 같이 괄호 풀이가 붙기도 한다 — 표제어만 남긴다 */
+  function synonymHeads(w) {
+    return (w.synonyms || []).map(function (s) { return norm(String(s).replace(/\(.*$/, '')); }).filter(Boolean);
+  }
+
+  /* 정답 단어와 '같은 답'이 될 수 있는 것들 — 정답의 모든 뜻, 유의어 표제어, 그리고 팩 안의
+     유의어 단어가 가진 뜻까지(store≈keep 이면 keep 의 '간직하다'도 store 의 답이다).
+     반환: { meanings: {뜻: true}, heads: {표제어: true} } */
+  function answerSet(target, pool) {
+    var meanings = allMeanings(target), heads = {}, th = norm(target.headword);
+    synonymHeads(target).forEach(function (h) { heads[h] = true; });
+    (pool || []).forEach(function (w) {
+      if (w === target) return;
+      var hw = norm(w.headword);
+      if (!hw) return;
+      var syn = heads[hw] || (th && synonymHeads(w).indexOf(th) >= 0);
+      if (!syn) return;
+      heads[hw] = true;
+      var wm = allMeanings(w), k;
+      for (k in wm) if (Object.prototype.hasOwnProperty.call(wm, k)) meanings[k] = true;
+    });
+    return { meanings: meanings, heads: heads };
+  }
+
+  /* 후보 단어가 정답과 겹치는가 — 표제어가 유의어이거나 뜻이 하나라도 겹치면 보기로 못 쓴다 */
+  function related(set, w) {
+    if (set.heads[norm(w.headword)]) return true;
+    var wm = allMeanings(w), k;
+    for (k in wm) if (Object.prototype.hasOwnProperty.call(wm, k) && set.meanings[k]) return true;
+    return false;
+  }
+
   /* 두 단어가 겹치는 section(대화문/본문)을 갖는가 — 같은 지문에서 함께 배우는 말인가 */
   function sharesSection(a, b) {
     var as = a.sections || [], bs = b.sections || [];
@@ -36,18 +90,23 @@ var WBGEN = (function () {
   /* 오답 보기 n개 — 같은 팩의 다른 단어에서(§2.2). 우선순위:
        ① 같은 section + 같은 품사 — 지금 함께 외우는, 문법으로 걸러지지 않는 보기
        ② 같은 section  ③ 같은 품사  ④ 나머지 — 문항을 못 내는 것보다 낫다
-     정답과 겹치는 보기는 금지(뜻 문자열 기준 중복 제거). */
+     정답과 겹치는 보기는 금지 — 뜻 문자열 중복뿐 아니라 정답 단어의 다른 뜻·유의어까지
+     (정방향·역방향 모두: '유지하다'를 보고 keep/maintain 둘 다 맞으면 문항이 아니다). */
   function distractors(target, pool, pick, n, rnd) {
     var want = pick(target), seen = {}, both = [], sec = [], pos = [], rest = [];
-    seen[String(want).toLowerCase()] = true;
+    seen[norm(want)] = true;
+    var set = answerSet(target, pool), k;
+    for (k in set.meanings) if (Object.prototype.hasOwnProperty.call(set.meanings, k)) seen[k] = true;
+    for (k in set.heads) if (Object.prototype.hasOwnProperty.call(set.heads, k)) seen[k] = true;
     shuffle(pool || [], rnd).forEach(function (w) {
       if (w === target) return;
       if (w.id != null && target.id != null && w.id === target.id) return;
       var v = pick(w);
       if (!v) return;
-      var k = String(v).toLowerCase();
-      if (seen[k]) return;
-      seen[k] = true;
+      var key = norm(v);
+      if (seen[key]) return;
+      if (related(set, w)) return;
+      seen[key] = true;
       var s = sharesSection(w, target), p = !!(w.pos && target.pos && w.pos === target.pos);
       if (s && p) both.push(v);
       else if (s) sec.push(v);
@@ -57,7 +116,7 @@ var WBGEN = (function () {
     return both.concat(sec, pos, rest).slice(0, n);
   }
 
-  /* 보기 4개를 셔플하고 '1'~'4' 키를 붙인다. answerKey는 셔플 후의 정답 위치. */
+  /* 보기를 셔플하고 '1'~'n' 키를 붙인다. answerKey는 셔플 후의 정답 위치. */
   function keyedChoices(answer, opts, rnd) {
     var texts = shuffle([answer].concat(opts), rnd);
     var choices = texts.map(function (t, i) { return { key: String(i + 1), text: t }; });
@@ -68,16 +127,18 @@ var WBGEN = (function () {
 
   /* 뜻 4지선다 — 영어 headword를 보고 한국어 뜻을 고른다.
      opts.withUnknown이면 '0' 모름 선택지를 붙인다(§14-1: 진단에서 찍기를 막는 버튼 —
-     찍어서 맞으면 출발선이 오염된다). 오답 3개를 못 채우면 null. */
+     찍어서 맞으면 출발선이 오염된다). 오답을 opts.minDistractors(기본 3)개 못 채우면 null. */
   function vocabMcq(word, pool, rnd, opts) {
     rnd = rnd || Math.random;
+    opts = opts || {};
+    var minD = opts.minDistractors == null ? 3 : opts.minDistractors;
     var answer = meaningOf(word);
     if (!answer) return null;
     var d = distractors(word, pool, meaningOf, 3, rnd);
-    if (d.length < 3) return null;
+    if (d.length < minD) return null;
     var kc = keyedChoices(answer, d, rnd);
     var q = { type: 'mcq', wordId: word.id, prompt: word.headword, choices: kc.choices, answerKey: kc.answerKey };
-    if (opts && opts.withUnknown) {
+    if (opts.withUnknown) {
       q.choices.push({ key: '0', text: '모름' });
       q.unknownKey = '0';
     }
@@ -95,21 +156,28 @@ var WBGEN = (function () {
     return { type: 'mcq', wordId: word.id, prompt: meaningOf(word), choices: kc.choices, answerKey: kc.answerKey };
   }
 
-  /* 철자 입력 — 뜻을 보고 headword를 쓴다. 힌트는 첫 글자 + 글자 수("s _ _ _ _ _ _").
+  /* 철자 입력 — 뜻을 보고 headword를 쓴다. 기본은 첫 글자 + 글자 수 힌트("s _ _ _ _ _ _",
+     구 표제어는 낱말 경계를 ' / '로 남긴다). opts.hint === false면 무힌트 — 힌트 없는 완전
+     인출만이 기준 도달(§14-1)이므로 relearn·재검증 레인은 이걸 쓴다. hinted 플래그를 문항에
+     실어 앱이 recordCriterion에 그대로 넘기게 한다.
      정답은 headword 하나뿐이다 — 불규칙형(kept)을 받으면 "썼다"는 착각만 남는다. */
-  function spelling(word) {
+  function spelling(word, rnd, opts) {
     var h = String(word.headword || '');
     if (!h) return null;
-    var hint = h[0];
-    for (var i = 1; i < h.length; i++) hint += ' _';
-    return { type: 'spell', wordId: word.id, promptKo: meaningOf(word), hint: hint, answers: [h] };
+    var hinted = !(opts && opts.hint === false);
+    var hint = null;
+    if (hinted) {
+      hint = h[0];
+      for (var i = 1; i < h.length; i++) hint += h[i] === ' ' ? ' /' : ' _';
+    }
+    return { type: 'spell', wordId: word.id, promptKo: meaningOf(word), hint: hint, hinted: hinted, answers: [h] };
   }
 
   /* ── 표층형 탐색 ──
      예문 속 단어는 headword 그대로가 아니다 — keep은 kept로, call은 calling으로 나온다.
-     후보: headword · irregularForms · 단순 파생(s/es/ed/ing). 긴 후보부터 찾아야
-     'calling'을 두고 'call'만 오려 내는 일이 없다. 어절 경계 필수 — 'keep'이 'keeper'
-     속에 걸리면 문장이 망가진다. */
+     후보: headword · irregularForms · 규칙 굴절(s/es/ed/ing/er/est + e탈락·y→ie·자음중복).
+     긴 후보부터 찾아야 'calling'을 두고 'call'만 오려 내는 일이 없다. 어절 경계 필수 —
+     'keep'이 'keeper' 속에 걸리면 문장이 망가진다. */
   var WORDCH = /[A-Za-z0-9]/;
 
   function overlaps(taken, start, len) {
@@ -136,9 +204,36 @@ var WBGEN = (function () {
     return null;
   }
 
+  var VOWEL = /[aeiou]/;
+
   function surfaceCandidates(word) {
     var h = String(word.headword || ''), seen = {}, out = [];
-    var list = [h].concat(word.irregularForms || [], [h + 's', h + 'es', h + 'ed', h + 'ing']);
+    var list = [h].concat(word.irregularForms || []);
+    if (h && h.indexOf(' ') < 0) {
+      /* 비교급·최상급은 형용사·부사의 굴절이다 — 동사·명사에 -er 을 붙이면 keep→keeper 처럼
+         다른 낱말(행위자 명사)에 걸린다. 품사를 모르면 허용한다(못 내는 것보다 낫다). */
+      var grad = !word.pos || /^(a|adj|adv)/i.test(String(word.pos));
+      list.push(h + 's', h + 'es', h + 'ed', h + 'ing');
+      if (grad) list.push(h + 'er', h + 'est');
+      var last = h[h.length - 1], prev = h[h.length - 2] || '';
+      if (last === 'e') {                                        // make→making, like→liked, large→larger
+        var st = h.slice(0, -1);
+        list.push(st + 'ing', h + 'd');
+        if (grad) list.push(h + 'r', h + 'st');
+      }
+      if (last === 'y' && prev && !VOWEL.test(prev)) {           // try→tries·tried, city→cities, happy→happier
+        var sy = h.slice(0, -1);
+        list.push(sy + 'ies', sy + 'ied');
+        if (grad) list.push(sy + 'ier', sy + 'iest');
+      }
+      /* 자음-모음-자음 끝(run·big·stop)은 마지막 자음을 겹친다 — running·bigger·stopped */
+      if (h.length >= 3 && !VOWEL.test(last) && /[a-z]/.test(last) && 'wxy'.indexOf(last) < 0 &&
+          VOWEL.test(prev) && !VOWEL.test(h[h.length - 3] || 'a')) {
+        var dbl = h + last;
+        list.push(dbl + 'ing', dbl + 'ed');
+        if (grad) list.push(dbl + 'er', dbl + 'est');
+      }
+    }
     list.forEach(function (c) {
       if (!c || seen[c]) return;
       seen[c] = true; out.push(c);
@@ -222,9 +317,17 @@ var WBGEN = (function () {
     return q;
   }
 
-  /* 사다리 4단계 전반 — 구 단위 클로즈로 가는 확장: 핵심어 빈칸에 더해 내용어(4자 이상)
-     1~2개를 추가로 가린다. 추가 빈칸은 힌트가 없다(hintKo: null) — 힌트 없는 인출이
-     이 단계의 목적이다. 같은 낱말은 한 번만 후보로 삼는다. */
+  /* 4자 이상이어도 내용어가 아닌 낱말 — 이걸 가리면 "when을 외웠는가"를 묻는 문항이 된다 */
+  var FUNCTION_WORDS = {};
+  ('when what where which while whom whose will would shall should could might must than then that this these those there their them they '
+    + 'with without from into onto over under here have been being were does done some such very also just only more most much many '
+    + 'each every both either neither about after before because until since though although whether every your yours ours mine '
+    + 'himself herself itself myself yourself ourselves themselves cannot')
+    .split(' ').forEach(function (w) { FUNCTION_WORDS[w] = true; });
+
+  /* 사다리 4단계 전반 — 구 단위 클로즈로 가는 확장: 핵심어 빈칸에 더해 내용어(4자 이상,
+     기능어 제외) 1~2개를 추가로 가린다. 추가 빈칸은 힌트가 없다(hintKo: null) — 힌트 없는
+     인출이 이 단계의 목적이다. 같은 낱말은 한 번만 후보로 삼는다. */
   function clozeWide(sentence, rnd) {
     rnd = rnd || Math.random;
     var text = sentence.en || '';
@@ -242,7 +345,7 @@ var WBGEN = (function () {
     while ((m = re.exec(text))) {
       if (overlaps(taken, m.index, m[0].length)) continue;
       var k = m[0].toLowerCase();
-      if (seen[k]) continue;
+      if (seen[k] || FUNCTION_WORDS[k]) continue;
       seen[k] = true;
       cand.push({ start: m.index, len: m[0].length, extra: { hintKo: null } });
     }
@@ -254,13 +357,18 @@ var WBGEN = (function () {
   }
 
   /* 사다리 4단계 후반 — 어구 토큰 셔플 → 재조립(워크북 8형).
-     셔플이 원답 그대로 나오면 1회 재셔플한다 — "이미 맞는 순서"는 문제가 아니다. */
+     토큰이 3개 미만이면 문제가 아니다(2개는 뒤집기뿐). 셔플이 원답 그대로면 다시 섞고,
+     여러 번 해도 같으면(토큰이 전부 같은 문장) null — "이미 맞는 순서"는 문제가 아니다. */
   function tokenOrder(sentence, rnd) {
     rnd = rnd || Math.random;
     var answer = (sentence.tokens || []).slice();
-    if (answer.length < 2) return null;
-    var shuffled = shuffle(answer, rnd);
-    if (shuffled.join('') === answer.join('')) shuffled = shuffle(answer, rnd);
+    if (answer.length < 3) return null;
+    var key = answer.join(''), shuffled = null;
+    for (var tries = 0; tries < 12; tries++) {
+      var cand = shuffle(answer, rnd);
+      if (cand.join('') !== key) { shuffled = cand; break; }
+    }
+    if (!shuffled) return null;
     return { type: 'order', seq: sentence.seq, shuffled: shuffled, answer: answer, koFull: sentence.ko };
   }
 
@@ -273,7 +381,7 @@ var WBGEN = (function () {
     };
   }
 
-  /* 5.5단계 — 키워드 스켈레톤(§14-3): 5단계(한글 전문)와 6단계(백지) 사이의 발판.
+  /* 키워드 스켈레톤(§14-3): 5단계(한글 전문)와 6단계(백지) 사이의 발판.
      문장당 핵심어 한 개(keywords[0].en)만 남기고 전문을 복원한다. */
   function skeleton(sentence) {
     var kws = sentence.keywords || [];
@@ -329,27 +437,44 @@ var WBGEN = (function () {
   /* ── 세트 조립 ── */
 
   /* 사전 진단(§14-1) — 팩 진입 첫 세션: 전 단어 영→한 4지선다 + '모름' 버튼.
-     진단이 곧 학습(pretesting)이고, 결과가 개인 출발선이 된다. */
+     진단이 곧 학습(pretesting)이고, 결과가 개인 출발선이 된다. 보기가 모자라는 작은 팩도
+     남은 단어로라도 낸다 — 진단에서 빠진 단어는 출발선 없이 신규 큐에 묻힌다. */
   function diagnosticSet(pack, rnd) {
     rnd = rnd || Math.random;
     var out = [];
     (pack.words || []).forEach(function (w) {
-      var q = vocabMcq(w, pack.words, rnd, { withUnknown: true });
+      var q = vocabMcq(w, pack.words, rnd, { withUnknown: true, minDistractors: 0 });
       if (q) out.push(q);
     });
     return out;
   }
 
+  /* 문자열 해시(작은 양의 정수) — 로테이션을 단어마다 다른 자리에서 시작시키는 데 쓴다 */
+  function strHash(s) {
+    var h = 0, str = String(s == null ? '' : s);
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0x7fffffff;
+    return h;
+  }
+
   /* 하루 세트 — 플래너가 산출한 planDay({words:{fresh,review,relearn}, sentences})를
      실제 문항 시퀀스로 조립한다. 항목은 id(문자열)든 객체든 받는다.
-       fresh   : 첫 만남 — 재인(4지선다)으로 열고 곧장 인출(철자)로 굳힌다
-       review  : 유형 로테이션(4지선다/예문 빈칸/영영풀이) — 같은 단어를 늘 같은 각도로
-                 보면 문항 답을 외우지 뜻을 외우지 않는다. 그 단어로 못 만드는 유형은
-                 다음 유형으로 폴백 — 문항을 못 내는 것보다 낫다
-       relearn : 철자 입력만 — D-7 이후 고속 재인출 안정화(§14-1)는 짧고 완전한 인출이다
-       문장    : stage에 맞는 사다리 생성기(3→핵심어, 4→구 클로즈, 4.5→배열, 5→영작, 5.5→스켈레톤) */
-  function dailySet(pack, plan, rnd) {
+       fresh   : 첫 만남 — 재인(4지선다)으로 열고 힌트 철자로 굳힌다(힌트 철자는 도달이 아니다)
+       review  : 미도달 단어는 무힌트 철자 — 도달 기회는 완전 인출뿐이라 재인 문항만 돌면
+                 영원히 미도달이다. 도달 단어는 유형 로테이션(4지선다/예문 빈칸/영영풀이/
+                 무힌트 철자) — 같은 단어를 늘 같은 각도로 보면 문항 답을 외우지 뜻을 외우지
+                 않는다. 로테이션 자리는 단어 상태(id·오답·연속·날짜)로 정해 배열 위치와
+                 무관하다. 그 단어로 못 만드는 유형은 다음 유형으로 폴백
+       relearn : 무힌트 철자만 — 안정화 회전·철자 재검증은 짧고 완전한 인출이다(§14-1)
+       문장    : 엔진 단계 정수 그대로 — 3 핵심어 빈칸, 4 클로즈+배열(2문항), 5 영작.
+                 1·2·6단계는 앱이 직접 진행(읽기·해석·백지)하므로 여기선 만들지 않는다
+     opts.states(또는 plan.states)로 상태 맵을 주면 도달 여부·로테이션에 쓴다. opts.now(ms)는
+     날짜 해시용 — 없으면 단어 상태만으로 정한다. */
+  function dailySet(pack, plan, rnd, opts) {
     rnd = rnd || Math.random;
+    opts = opts || {};
+    var states = opts.states || (plan && plan.states) || {};
+    var now = opts.now != null ? +opts.now : (plan && plan.now != null ? +plan.now : 0);
+    var dayNo = Math.floor(now / 86400000);
     var byId = {}, bySeq = {}, out = [];
     (pack.words || []).forEach(function (w) { byId[w.id] = w; });
     (pack.sentences || []).forEach(function (s) { bySeq[s.seq] = s; });
@@ -366,19 +491,23 @@ var WBGEN = (function () {
       var w = word(ref);
       if (!w) return;
       push(vocabMcq(w, pack.words, rnd), 'word');
-      push(spelling(w), 'word');
+      push(spelling(w, rnd), 'word');
     });
 
     var rotation = [
       function (w) { return vocabMcq(w, pack.words, rnd); },
       function (w) { return exampleCloze(w); },
       function (w) { return definitionPick(w, pack.words, rnd); },
+      function (w) { return spelling(w, rnd, { hint: false }); },
     ];
-    (words.review || []).forEach(function (ref, i) {
+    (words.review || []).forEach(function (ref) {
       var w = word(ref);
       if (!w) return;
+      var s = states[w.id];
+      if (s && !s.reached) { push(spelling(w, rnd, { hint: false }), 'word'); return; }
+      var base = strHash(w.id) + dayNo + (s ? ((s.wrong || 0) + (s.streak || 0)) : 0);
       for (var k = 0; k < rotation.length; k++) {
-        var q = rotation[(i + k) % rotation.length](w);
+        var q = rotation[(base + k) % rotation.length](w);
         if (q) { push(q, 'word'); return; }
       }
     });
@@ -386,23 +515,22 @@ var WBGEN = (function () {
     (words.relearn || []).forEach(function (ref) {
       var w = word(ref);
       if (!w) return;
-      push(spelling(w), 'word');
+      push(spelling(w, rnd, { hint: false }), 'word');
     });
 
     var stageGens = {
-      '3': function (s) { return keywordBlanks(s, 'en'); },
-      '4': function (s) { return clozeWide(s, rnd); },
-      '4.5': function (s) { return tokenOrder(s, rnd); },
-      '5': function (s) { return writingPrompt(s); },
-      '5.5': function (s) { return skeleton(s); },
+      '3': function (s) { return [keywordBlanks(s, 'en')]; },
+      '4': function (s) { return [clozeWide(s, rnd), tokenOrder(s, rnd)]; },
+      '5': function (s) { return [writingPrompt(s)]; },
     };
     ((plan && plan.sentences) || []).forEach(function (ref) {
       var seq = typeof ref === 'number' ? ref : ref.seq;
       var stage = (ref && typeof ref === 'object' && ref.stage != null) ? ref.stage : 3;
       var s = bySeq[seq];
       if (!s) return;
-      var gen = stageGens[String(stage)] || stageGens['3'];
-      push(gen(s), 'sentence', stage);
+      var gen = stageGens[String(stage)];
+      if (!gen) return;
+      gen(s).forEach(function (q) { push(q, 'sentence', stage); });
     });
 
     return out;
@@ -415,7 +543,7 @@ var WBGEN = (function () {
     writingPrompt: writingPrompt, skeleton: skeleton,
     diagnosticSet: diagnosticSet, verbFormDrill: verbFormDrill,
     grammarChoiceDrill: grammarChoiceDrill, dailySet: dailySet,
-    shuffle: shuffle,
+    shuffle: shuffle, surfaceCandidates: surfaceCandidates,
   };
 })();
 
