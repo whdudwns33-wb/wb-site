@@ -84,6 +84,9 @@ const naesinStore = {
   /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
   getReports: (id) => naesinRoot().reports[id] || null,
   putReports: (id, list) => { naesinRoot().reports[id] = list; persist(); },
+  /* 팩 제작 AI 추출의 하루 사용 장부(기획서 §13-8) — 학생용 AI 한도와 따로 센다 */
+  getAiUse: () => naesinRoot().aiUse || null,
+  putAiUse: (rec) => { naesinRoot().aiUse = rec; persist(); },
   /* 수업 라이브 세션 — 지금 이 단계·투사 문제. 4시간 뒤 만료 판정은 읽는 쪽(naesin-live)이 한다 */
   getLive: (s) => naesinRoot().live[s] || null,
   putLive: (s, rec) => { naesinRoot().live[s] = rec; persist(); },
@@ -369,7 +372,10 @@ const server = http.createServer(async (req, res) => {
           getBody: () => readBody(req, naesinBodyLimit(p)), store: naesinStore,
         };
         /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
-        const st = await handleStudio({ ...ctx, ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.NAESIN_AI_MODEL || '' } });
+        const st = await handleStudio({
+          ...ctx,
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.NAESIN_AI_MODEL || '', env: process.env },
+        });
         if (st) return json(res, st.status, st.body);
         const out = await handleNaesin(ctx);
         return json(res, out.status, out.body);
