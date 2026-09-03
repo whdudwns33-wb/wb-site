@@ -1075,21 +1075,31 @@
   function renderWords() {
     var ws = wordStates();
     var sum = WBNAESIN.wordSummary(ws);
-    var listHtml = '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b>' +
-      (sum.needsSpellCheck ? ' · 철자 확인 대기 <b>' + sum.needsSpellCheck + '</b>' : '') + '</span></div><div class="rows" id="wRows">';
-    pack.words.forEach(function (w) {
+    /* 미완성만 보기 — 지난 시험 회고 칩("그때 미완성이던 단어 N개")이 들어오는 자리.
+       '미완성' = 안정화(다른 날 3회) 전 = 시험 전에 아직 채워야 할 단어. */
+    var unfinished = pack.words.filter(function (w) { var st = ws[w.id]; return !(st && WBNAESIN.isStable(st)); });
+    var shown = wordFilter === 'unfinished' ? unfinished : pack.words;
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b>' +
+      (sum.needsSpellCheck ? ' · 철자 확인 대기 <b>' + sum.needsSpellCheck + '</b>' : '') + '</span></div>' +
+      '<div class="hdr"><span>' + (wordFilter === 'unfinished' ? '미완성 ' + unfinished.length + '개만 표시 중' : '전체 ' + pack.words.length + '개') + '</span>' +
+      '<button id="wFilter" type="button">' + (wordFilter === 'unfinished' ? '전체 보기' : '미완성만 (' + unfinished.length + ')') + '</button></div>' +
+      '<div class="rows" id="wRows">';
+    shown.forEach(function (w) {
       var st = ws[w.id], stb = st ? WBNAESIN.stability(st) : 0;
       var cls = st && st.reached ? (WBNAESIN.isStable(st) ? 's' : 'r') : '';
       listHtml += '<div class="row' + (selWordId === w.id ? ' sel' : '') + '" role="button" tabindex="0" data-w="' + esc(w.id) + '">' +
         '<span class="tx">' + esc(w.headword) + '<span class="sub">' + esc((w.meaningKo || [])[0] || '') + (st && st.needsSpellCheck ? ' · 철자 확인 대기' : '') + '</span></span>' +
         '<span class="lvchip ' + cls + '">' + stb + '/3</span></div>';
     });
+    if (!shown.length) listHtml += '<p class="muted" style="padding:14px">이 과의 단어는 모두 안정화되었습니다.</p>';
     listHtml += '</div>';
     var w = selWordId ? wordById(selWordId) : null;
     var workHtml =
       '<div class="card"><h2>오늘의 단어 학습</h2>' +
       '<p class="muted">도달 = 힌트 없이 1회 인출 성공 · 안정화 = 도달 후 서로 다른 날 3회 재확인. 시험 전 전 단어 안정화(3/3)가 목표입니다.' +
       (sum.needsSpellCheck ? ' <b>철자 확인 대기 ' + sum.needsSpellCheck + '개</b> — 진단에서 「안다」고 답한 단어는 철자 입력으로 다시 확인합니다.' : '') + '</p>' +
+      (isRange() ? '<p class="muted" style="margin:6px 0 0">오늘의 단어는 시험 범위 전체(' + esc(rangeIds().map(lessonLabel).join('·')) + ')에서 함께 편성됩니다. 목록·상세는 위에서 고른 과만 보여 줍니다.</p>' : '') +
       '<button class="btn p big" id="trainWords" style="margin-top:8px">단어 학습 시작</button></div>';
     if (w) {
       var st = ws[w.id];
@@ -1112,6 +1122,7 @@
       var r = e.target.closest('.row[data-w]');
       if (r) { selWordId = r.getAttribute('data-w'); render(); }
     };
+    $('wFilter').onclick = function () { wordFilter = wordFilter === 'unfinished' ? 'all' : 'unfinished'; render(); };
     $('trainWords').onclick = startWordDaily;
   }
 
@@ -1133,7 +1144,8 @@
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     var ssum = WBNAESIN.sentenceSummary(senStates());
     if (selSeq == null) selSeq = (pack.sentences[0] || {}).seq;
-    var listHtml = '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
     dayGroups().forEach(function (gr, gi) {
       var doneAll = gr.sentences.every(function (s) { var st = senState(s.seq); return st && st.reached; });
       listHtml += '<div class="hdr"><span>' + esc(gr.header) + (doneAll ? ' · 백지 완료' : '') + '</span>' +
@@ -1616,7 +1628,8 @@
       if (!g) { g = { name: t.group, types: [] }; groups.push(g); }
       g.types.push(t);
     });
-    var listHtml = '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
     /* 세션 ② 문법 개념 — 문제 앞에 개념 학습이 온다 */
     if ((pack.patterns || []).length) {
       listHtml += '<div class="hdr"><span>문법 개념</span></div>';
@@ -1660,10 +1673,16 @@
         '<button class="btn p big" id="qGo" style="margin-top:10px"' + ((pat.letsUseIt || []).length ? '' : ' disabled') + '>확인 문제 (' + (pat.letsUseIt || []).length + '문항)</button></div>';
     } else {
       var tdef = types.filter(function (t) { return t.key === selType; })[0] || types[0];
+      /* 실전 모의는 시험 범위 전체가 기준이다(§4.4) — 본문 사다리 5·6단계는 그 과의 단어지만,
+         실전은 시험 그 자체를 흉내 내므로 범위 단어가 다 완성되기 전에는 열지 않는다. */
+      var mg = tdef.key === 'mock' ? rangeGate() : null;
       workHtml = '<div class="wh"><h2>' + esc(tdef.name) + '</h2><span class="tag t-ind">' + esc(tdef.group) + '</span></div>' +
         '<div class="card"><p class="muted">' + esc(tdef.desc) +
         (tdef.key === 'mock' ? ' · 시험처럼 정답을 바로 보여 주지 않고, 종료 후 점수와 오답을 한꺼번에 확인합니다.' : ' · 문항 단위 즉시 채점되며, 오답은 정답·해설과 함께 오답노트에 기록됩니다.') + '</p>' +
-        '<button class="btn p big" id="qGo">시작</button></div>';
+        (mg && !mg.open
+          ? '<div class="notice">시험 범위 단어 선행 기준(' + mg.done + '/' + mg.total + ' 도달) 충족 전에는 실전 모의가 잠깁니다. 단어 암기를 먼저 완성하십시오.</div>'
+          : '') +
+        '<button class="btn p big" id="qGo"' + (mg && !mg.open ? ' disabled' : '') + '>시작</button></div>';
     }
     layoutSplit(listHtml, workHtml);
     $('qRows').onclick = function (e) {
@@ -1687,9 +1706,16 @@
         runQueue(items2, '개념 확인 · 패턴 ' + pat.patternNo, function (it, ok) { logEvent('concept', 'kwblank', it.ref, ok); },
           function () { persist(); render(); }, { noConfidence: true });
       } else if (selType === 'mock') {
+        if (!rangeGate().open) return;
         runMock();
       } else runQuizType(selType);
     };
+  }
+
+  /* 범위 전체 단어 게이트 — 엔진에 gateRange 가 없는 판이면 현재 과 게이트로 물러난다 */
+  function rangeGate() {
+    if (WBNAESIN.gateRange) return WBNAESIN.gateRange(rangeEntries(), exam(), Date.now(), {});
+    return WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
   }
 
   /* 세션 ④ 실전 모의 — 즉시 채점 없이 수집, 종료 후 결과 리포트 */
@@ -1799,11 +1825,13 @@
     } else {
       examMsg = '등록된 시험이 없어 자율 학습 모드입니다.';
     }
+    var curNote = isRange() ? ' <b>' + esc(lessonLabel(curPackId())) + '</b>' : '';
     var html =
+      (isRange() ? '<div class="card" style="padding:6px 10px"><div class="todo"><span class="t">과 선택</span>' + packSegHtml() + '</div></div>' : '') +
       '<div class="big3">' +
-      '<div><div class="n">' + wsum.reached + '<small>/' + wsum.total + '</small></div><div class="l">단어 도달 · 안정화 ' + wsum.stable + '</div></div>' +
-      '<div><div class="n">' + ssum.interpreted + '<small>/' + ssum.total + '</small></div><div class="l">본문 해석 통과</div></div>' +
-      '<div><div class="n">' + ssum.memorized + '<small>/' + ssum.total + '</small></div><div class="l">백지 영작 완료</div></div></div>' +
+      '<div><div class="n">' + wsum.reached + '<small>/' + wsum.total + '</small></div><div class="l">단어 도달 · 안정화 ' + wsum.stable + curNote + '</div></div>' +
+      '<div><div class="n">' + ssum.interpreted + '<small>/' + ssum.total + '</small></div><div class="l">본문 해석 통과' + curNote + '</div></div>' +
+      '<div><div class="n">' + ssum.memorized + '<small>/' + ssum.total + '</small></div><div class="l">백지 영작 완료' + curNote + '</div></div></div>' +
 
       '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말 · 3단계 이상 = 통과</small></h2><div id="ipRows">' +
       pack.sentences.map(function (s) {
@@ -1824,6 +1852,8 @@
           '<span class="tx">' + esc(s.en) + '</span>' + stgMini(stage, done) + mark + '</div>';
       }).join('') + '</div>' +
       (paperMode ? '<p class="muted" style="margin-top:8px">선생님과 함께 종이 백지시험 결과를 문장별 ○/×로 입력합니다. ○는 암기 완료 기록에 반영됩니다.</p>' : '') + '</div>' +
+
+      predictionHtml() +
 
       '<div class="card"><h2>시험 설정</h2>' +
       '<p class="muted">' + examMsg + '</p>' +
@@ -1849,21 +1879,41 @@
       if (go) { selSeq = Number(go.getAttribute('data-go')); setTab('passage'); }
     });
     $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
+    /* 시험은 범위 전체에 하나다 — 시험일도 「자율 학습으로」도 범위의 모든 과에 같이 건다.
+       한 과만 바꾸면 같은 화면의 D-day 와 과별 플랜 모드가 서로 다른 말을 하게 된다. */
     $('examSet').onclick = function () {
-      var v = $('examIn').value, pd2 = packDB();
+      var v = $('examIn').value;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하십시오.'); return; }
-      pd2.exam = { examDate: v, wordDeadlineDays: (pd2.exam && pd2.exam.wordDeadlineDays) || 7 };
-      delete pd2.examOverride; delete pd2.examOverrideFor;
+      rangeIds().forEach(function (id) {
+        var q = packDB(id);
+        q.exam = { examDate: v, wordDeadlineDays: (q.exam && q.exam.wordDeadlineDays) || 7 };
+        delete q.examOverride; delete q.examOverrideFor;
+        touchPack(id);
+      });
       persist(); render();
     };
     /* 「자율 학습으로」는 오버라이드로 저장한다 — 시험일을 지우면 부팅 때 서버 배정이 다시 덮어쓴다.
        서버 시험일이 바뀌면(applyServerExam) 오버라이드는 자동으로 풀린다. */
     $('examClear').onclick = function () {
-      var pd2 = packDB();
-      pd2.examOverride = 'practice';
-      pd2.examOverrideFor = (pd2.exam && pd2.exam.examDate) || null;
+      rangeIds().forEach(function (id) {
+        var q = packDB(id);
+        q.examOverride = 'practice';
+        q.examOverrideFor = (q.exam && q.exam.examDate) || null;
+        touchPack(id);
+      });
       persist(); render();
     };
+  }
+  /* 예상 점수대(계약 R2 prediction) — 원내 시험 결과가 충분히 쌓였을 때만 서버가 준다.
+     확정·과장 어조를 쓰지 않는다: 도달률과 점수의 관계에서 나온 참고 구간일 뿐이다. */
+  function predictionHtml() {
+    var pr = resultServer && resultServer.prediction;
+    if (!pr || typeof pr !== 'object') return '';
+    var lo = Number(pr.low), hi = Number(pr.high);
+    if (!isFinite(lo) || !isFinite(hi)) return '';
+    return '<div class="card"><h2>예상 점수대 <small>참고용</small></h2>' +
+      '<p style="font-size:15px;margin:0 0 4px">현재 도달률 기준 예상 점수대 <b class="num">' + Math.round(lo) + '~' + Math.round(hi) + '점</b></p>' +
+      '<p class="muted" style="margin:0">원내 ' + n0(pr.n) + '회 시험 데이터로 계산한 참고값입니다. 실제 점수는 시험 범위·난이도·문항 구성에 따라 달라질 수 있습니다.</p></div>';
   }
 
   /* ════════ 러너 공통 ════════ */
@@ -2264,12 +2314,37 @@
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
   function openLoaded() {
-    var n = ensureStates();
+    var n = ensureStatesAll();       // 범위 전체 — 아직 안 연 과의 단어·문장도 합계에 들어가야 한다
     if (n) persist(); else save();   // 실제로 상태를 만들었을 때만 서버 push — 열기만으로 savedAt을 올리지 않는다
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { pack = p; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { pack = p; PACKS[p.packId] = p; demoMode = true; openLoaded(); });
+  }
+  /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
+     한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
+  function loadRangePacks() {
+    if (!packList.length) return Promise.reject(new Error('no-pack'));
+    var errs = [];
+    return Promise.all(packList.map(function (id) {
+      return api('/pack?id=' + encodeURIComponent(id))
+        .then(function (r) { return { id: id, pack: r.pack, updatedAt: r.updatedAt || null }; })
+        .catch(function (e) { errs.push(e); return null; });
+    })).then(function (list) {
+      var got = list.filter(function (x) { return x && x.pack && x.pack.packId; });
+      if (!got.length) {
+        /* 배정 밖(403)만이면 '아직 배정되지 않음'이다 — 서버 오류가 아니라 A7 안내 화면 */
+        if (errs.length && errs.every(function (e) { return e && e.message === 'api-403'; })) throw new Error('no-pack');
+        throw errs[0] || new Error('no-pack');
+      }
+      got.forEach(function (g) { PACKS[g.id] = g.pack; });
+      cachePacks(got);
+      /* 지금 열 과 — 마지막으로 보던 과가 범위에 남아 있으면 그것, 아니면 범위의 첫 과 */
+      var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : got[0].id;
+      pack = PACKS[pid];
+      applyServerExamAll();
+      return got;
+    });
   }
   function fatal(html) { layoutFull('<div class="card" style="max-width:560px;margin:40px auto">' + html + '</div>'); }
   function bootError(e) {
@@ -2288,10 +2363,19 @@
       return;
     }
     if (isNetErr(e)) {
-      var c = loadPackCache();
+      var c = loadPacksCache();
       if (c) {
-        /* 오프라인 — 마지막 교재로 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다(팩별 savedAt 병합). */
-        pack = c.pack; offlineMode = true;
+        /* 오프라인 — 캐시된 시험 범위 전체를 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다
+           (팩별 savedAt 병합). 범위가 여러 과면 오프라인에서도 과 전환이 그대로 된다. */
+        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = c[id].pack; });
+        var ids = packList.filter(function (id) { return !!PACKS[id]; });
+        if (!ids.length) ids = Object.keys(PACKS);
+        /* /exam 도 못 받은 상태다 — 캐시에 담긴 팩 목록이 곧 마지막으로 아는 시험 범위다.
+           이걸 안 채우면 범위를 캐시해 두고도 과 선택이 사라져 한 과만 열린다. */
+        packList = ids.slice();
+        var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : ids[0];
+        pack = PACKS[pid];
+        offlineMode = true;
         openLoaded();
         return;
       }
@@ -2352,19 +2436,13 @@
         });
         if (localNewer) scheduleSync();
       }).catch(function () {}).then(function () {
-        return api('/task').then(function (tr) { taskServer = tr; }).catch(function () {});
+        /* 과제·지난 시험 결과는 학습을 막지 않는다 — 없거나 라우트가 아직 없으면 조용히 넘어간다 */
+        return Promise.all([
+          api('/task').then(function (tr) { taskServer = tr; }).catch(function () {}),
+          api('/result').then(function (rr) { resultServer = rr; }).catch(function () {})
+        ]);
       }).then(function () {
-        var pid = (DB.last && packList.indexOf(DB.last.packId) >= 0) ? DB.last.packId : packList[0];
-        if (!pid) throw new Error('no-pack');
-        /* 배정 밖 팩의 403은 서버 오류가 아니라 '아직 배정되지 않음'이다 — A7 안내 화면으로 보낸다 */
-        return api('/pack?id=' + encodeURIComponent(pid)).catch(function (e) {
-          if (e && e.message === 'api-403') throw new Error('no-pack');
-          throw e;
-        }).then(function (r2) {
-          pack = r2.pack;
-          cachePack(pid, r2.pack, r2.updatedAt);
-          applyServerExam();
-        });
+        return loadRangePacks();
       });
     }).then(function () { openLoaded(); }).catch(bootError);
   }

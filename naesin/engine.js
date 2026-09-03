@@ -305,36 +305,52 @@ var WBNAESIN = (function () {
   }
 
   /* 후보 → 오늘 몫. 상한·마감은 넘겨받은 ctx 하나로 계산한다 — 범위 플랜이면 그 값이
-     범위 전체 기준이므로 과가 둘이어도 하루 분량이 두 배가 되지 않는다. */
+     범위 전체 기준이라, 과가 둘이어도 마감·상한을 두 번 세지 않는다. */
   function allocateWords(cand, ctx, opts) {
     opts = opts || {};
-    var maxNew = opts.maxNewWords == null ? 10 : opts.maxNewWords;
     /* 안정화 상한 기본값은 (범위) 단어 수에서 나온다 — 77단어×3회전을 7일에 끝내려면 하루
        33개인데 늦게 도달한 단어는 앞쪽 며칠을 못 쓰므로 (마감-2)일로 나눠 여유를 둔다 */
     var maxRe = opts.maxRelearn == null
       ? Math.max(15, Math.ceil(ctx.total * RELEARN_TARGET / Math.max(1, ctx.deadlineDays - 2)))
       : opts.maxRelearn;
-    var maxRev = opts.maxReview == null ? 20 : opts.maxReview;
 
-    /* 신규 할당 — 미도달 잔량 ÷ 마감까지 잔여일(마감 당일 포함). 마감 경과면 오늘 다(상한만) */
+    /* 신규 할당 — 미도달 잔량 ÷ 마감까지 남은 날. 나누는 날수는 마감 하루 전까지다:
+       fresh 레인은 4지선다+힌트 철자라 그날은 '도달'이 아니고, 무힌트 철자(=도달)는 다음 날
+       복습 레인에서 나온다. 마감 당일에 처음 꺼낸 단어는 마감을 못 지킨다 — 하루 앞당겨
+       나눠야 마감이 곧 '초회 도달 완료'가 된다(목표③).
+       상한 기본값도 여기서 나온다: max(10, 오늘 필요량) — 고정 상한(옛 10)은 범위가 커질수록
+       마감을 이겨 버려서, 상한 때문에 마감을 못 지키는 일이 생겼다(2과 154단어에서 130개만
+       도달). 상한은 하루 분량의 안전판이지 마감을 무르는 장치가 아니다. 명시
+       opts.maxNewWords는 그대로 이긴다 — 그때는 못 지키는 마감을 노트가 밝힌다. */
     var freshCand = cand.fresh.slice().sort(byRank);
-    var fresh, lateDeadline = false, overCap = false;
+    var fresh, lateDeadline = false, needNew = 0, maxNew, capped = false, aim = 1;
     if (ctx.mode === 'exam') {
       var remain = ctx.dday - ctx.deadlineDays + 1;
       if (remain < 1) { remain = 1; lateDeadline = freshCand.length > 0; }
-      var need = Math.ceil(freshCand.length / remain);
-      /* 하루 상한으로는 마감까지 다 못 내보내는 상태 — 범위를 여러 과로 묶으면 흔해진다.
-         배분은 그대로 두고(상한이 곧 하루 감당량이다) 사실만 노트로 알린다. */
-      overCap = !lateDeadline && need > maxNew;
-      fresh = freshCand.slice(0, Math.min(maxNew, need));
+      aim = Math.max(1, remain - 1);            // 마감 하루 전까지 남은 날
+      needNew = Math.ceil(freshCand.length / aim);
+      maxNew = opts.maxNewWords == null ? Math.max(10, needNew) : opts.maxNewWords;
+      capped = needNew > maxNew;
+      fresh = freshCand.slice(0, Math.min(maxNew, needNew));
     } else if (ctx.mode === 'after') {
       fresh = [];
     } else {
+      /* 연습 모드는 마감이 없다 — 자동 산정할 분모가 없으니 하루 10개 고정 */
+      maxNew = opts.maxNewWords == null ? 10 : opts.maxNewWords;
       fresh = freshCand.slice(0, maxNew);
     }
 
     /* 복습 — 미도달(도달 기회가 급하다)이 먼저, 그다음 만기 오래된 순. 상한으로 자른다:
-       결석 뒤 만기 60개를 한 화면에 쏟으면 그게 곧 "밀린 것 60개"다 */
+       결석 뒤 만기 60개를 한 화면에 쏟으면 그게 곧 "밀린 것 60개"다.
+       다만 시험 모드에선 도달 대기(미도달)만큼은 자리를 비워 둔다 — 어제 꺼낸 단어가
+       '도달'하는 자리가 바로 이 레인이라(fresh는 힌트 철자, 무힌트 철자는 다음 날 여기서
+       나온다) 상한이 신규보다 작으면 도달이 매일 조금씩 밀려 마감을 못 지킨다. 밀린 도달
+       잔량도 신규와 같은 눈으로 마감까지 고르게 나눈다 — 결석 뒤 60개를 한 날에 쏟지 않는다. */
+    var reachN = 0;
+    cand.review.forEach(function (c) { if (!c.s.reached) reachN += 1; });
+    var maxRev = opts.maxReview == null
+      ? (ctx.mode === 'exam' ? Math.max(20, needNew, Math.ceil(reachN / aim)) : 20)
+      : opts.maxReview;
     var review = cand.review.slice().sort(function (a, b) {
       var ra = a.s.reached ? 1 : 0, rb = b.s.reached ? 1 : 0;
       return ra - rb || a.s.due - b.s.due || a.rank - b.rank;
@@ -360,7 +376,8 @@ var WBNAESIN = (function () {
     }
     return {
       fresh: fresh, review: review, relearn: relearnCand.slice(0, relearnN),
-      freshCand: freshCand.length, lateDeadline: lateDeadline, overCap: overCap
+      freshCand: freshCand.length, lateDeadline: lateDeadline,
+      needNew: needNew, maxNew: maxNew, capped: capped
     };
   }
 
@@ -397,7 +414,10 @@ var WBNAESIN = (function () {
     if (rangeLabel) parts.push(rangeLabel);
     if (ctx.mode === 'exam') {
       if (flags.lateDeadline) parts.push('단어 마감 경과 — 회복 편성');
-      if (flags.overCap) parts.push('신규 상한 초과 — 마감까지 빠듯');
+      /* 하루 분량이 평상시(10개)를 넘으면 그 숫자를 그대로 보여 준다 — 범위를 두세 과로
+         잡으면 마감을 지키는 데 얼마가 드는지가 강사·학생이 먼저 알아야 할 사실이다 */
+      if (flags.heavy) parts.push('하루 신규 ' + flags.needNew + '개 필요 — 범위가 큽니다');
+      if (flags.capped) parts.push('신규 상한 ' + flags.maxNew + '개 — 마감까지 도달 어려움');
       if (flags.locked) parts.push('단어 게이트 잠김(5·6단계 보류)');
       if (flags.parallel) parts.push('병행 모드 — 미완성 단어 선차감');
     }
@@ -429,7 +449,9 @@ var WBNAESIN = (function () {
       words: { fresh: ids(alloc.fresh), review: ids(alloc.review), relearn: ids(alloc.relearn) },
       sentences: sentences,
       note: planNote(ctx, {
-        lateDeadline: alloc.lateDeadline, overCap: alloc.overCap, locked: !g.open, parallel: g.reason === 'parallel'
+        lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
+        needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        locked: !g.open, parallel: g.reason === 'parallel'
       }, {
         fresh: alloc.fresh.length, freshCand: alloc.freshCand,
         review: alloc.review.length, relearn: alloc.relearn.length
@@ -528,7 +550,11 @@ var WBNAESIN = (function () {
       },
       sentences: sentences,
       perPack: perPack,
-      note: planNote(ctx, { lateDeadline: alloc.lateDeadline, overCap: alloc.overCap, locked: locked, parallel: parallel }, {
+      note: planNote(ctx, {
+        lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
+        needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        locked: locked, parallel: parallel
+      }, {
         fresh: alloc.fresh.length, freshCand: alloc.freshCand,
         review: alloc.review.length, relearn: alloc.relearn.length
       }, label)

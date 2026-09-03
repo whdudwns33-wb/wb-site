@@ -60,6 +60,8 @@
     .banner{display:flex;gap:10px;align-items:center;max-width:1080px;margin:12px auto -6px;padding:10px 14px;border-radius:12px;background:#fff0ef;color:var(--bad);font-weight:800;font-size:13.5px}
     .banner[hidden]{display:none}
     .banner .sp{flex:1}
+    /* 팩 id 는 길다(ne-m2-L6 …) — 좁은 칸에 넣으면 글자 단위로 쪼개져 읽을 수 없다. 폭을 주고 표를 가로로 넘긴다. */
+    .pkcell{white-space:normal;min-width:150px}
     /* 범위 합계 안의 팩별 값 — 기본은 접어 둔다(한 줄에 다 펴면 표가 못 읽게 넓어진다) */
     details.rng>summary{cursor:pointer;font-weight:800;color:var(--navy);list-style:none}
     details.rng>summary::-webkit-details-marker{display:none}
@@ -126,11 +128,16 @@ let ASSEMBLED=null;   // 병합·검증을 통과한 업로드 대기 팩 — re
 const num=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null;};
 const numStr=v=>{const n=num(v);return n==null?'—':String(n);};
 const pct=(a,b)=>{a=num(a);b=num(b);return (a!=null&&b>0)?Math.max(0,Math.min(100,Math.round(a/b*100))):0;};
+/* 서버 분석값은 "낼 수 없었다"를 null 로 알린다 — Number(null)은 0이라 그대로 재면
+   표본이 없어 못 낸 상관이 "상관 0.00"(= 관계 없음)으로 둔갑한다. 없는 값과 0을 여기서 가른다. */
+const fin=v=>{const n=(v==null||v==='')?NaN:Number(v);return Number.isFinite(n)?n:null;};
 /* 소수 첫째 자리 평균 — analysis.meanScore 는 78.5 같은 값이라 num()으로 반올림하면 정보가 준다 */
-const dec1=v=>{const n=Number(v);return Number.isFinite(n)?(Math.round(n*10)/10).toFixed(1):'—';};
+const dec1=v=>{const n=fin(v);return n==null?'—':(Math.round(n*10)/10).toFixed(1);};
+/* 상관계수 — 못 낸 값(null)은 문자열로도 null 로 돌려 화면이 "0에 가깝다"로 오해하지 않게 한다 */
+const corrStr=v=>{const n=fin(v);return n==null?null:n.toFixed(2);};
 /* 0~1 비율 → 정수 % 문자열. 서버가 준 값도 유한수가 아니면 '—' (num()과 같은 결) */
-const rateStr=v=>{const n=Number(v);return Number.isFinite(n)?Math.max(0,Math.min(100,Math.round(n*100)))+'%':'—';};
-const rate01=v=>{const n=Number(v);return Number.isFinite(n)?Math.max(0,Math.min(1,n)):null;};
+const rateStr=v=>{const n=fin(v);return n==null?'—':Math.max(0,Math.min(100,Math.round(n*100)))+'%';};
+const rate01=v=>{const n=fin(v);return n==null?null:Math.max(0,Math.min(1,n));};
 /* KST 오늘 — 서버의 만료 판정과 같은 식(계약 0.2). 브라우저 시간대나 UTC 자정에 흔들리지 않게 학원 날짜로 고정 */
 const kstToday=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
 const dayNum=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?Date.UTC(+m[1],+m[2]-1,+m[3])/864e5:NaN;};
@@ -266,9 +273,13 @@ function rangeCell(rg){
   const ids=(Array.isArray(rg.packIds)?rg.packIds:[]).map(String);
   const packs=(rg.packs&&typeof rg.packs==='object'&&!Array.isArray(rg.packs))?rg.packs:{};
   const keys=ids.filter(id=>packs[id]).concat(Object.keys(packs).filter(k=>ids.indexOf(k)<0));
-  const label='범위 '+(ids.length?ids.join('+'):'—');
-  if(!keys.length)return `<span>${esc(label)}</span>`;
-  return `<details class="rng"><summary>${esc(label)}</summary>${keys.map(k=>{
+  /* 「범위 ne-m2-L6 +L7」 — 둘째 팩부터는 끝자리만. 팩 id 를 다 적으면 칸이 글자 단위로 쪼개져 못 읽는다.
+     전체 id 는 title 과 펼친 팩별 줄에 그대로 남는다. */
+  const tail=x=>{const i=String(x).lastIndexOf('-');return i>0?String(x).slice(i+1):String(x);};
+  const label=ids.length?('범위 '+ids[0]+ids.slice(1).map(x=>' +'+tail(x)).join('')):'범위 —';
+  const full=ids.join(', ');
+  if(!keys.length)return `<span title="${esc(full)}">${esc(label)}</span>`;
+  return `<details class="rng"><summary title="${esc(full)}">${esc(label)}</summary>${keys.map(k=>{
     const p=packs[k]||{},pw=p.word||{},ps=p.sentence||{};
     return `<div class="ppk"><b>${esc(k)}</b> · 단어 ${numStr(pw.reached)}/${numStr(pw.total)} (안정 ${numStr(pw.stable)}) · 해석 ${numStr(ps.interpreted)}/${numStr(ps.total)} · 백지 ${numStr(ps.memorized)}/${numStr(ps.total)}</div>`;
   }).join('')}</details>`;
@@ -286,7 +297,7 @@ function studentRow(s){
   return `<tr>
     <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
     <td>${esc(s.cls||'—')}</td>
-    <td class="muted" style="white-space:normal">${rg?rangeCell(rg):esc(m.packId||'—')}</td>
+    <td class="muted${rg?' pkcell':''}">${rg?rangeCell(rg):esc(m.packId||'—')}</td>
     <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${numStr(w.reached)}/${numStr(w.total)} · 안정 ${numStr(w.stable)}${spell?` · <span class="tag warn">철자 확인 ${spell}</span>`:''}</td>
     <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${numStr(sn.interpreted)}/${numStr(sn.total)}</td>
     <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${numStr(sn.memorized)}/${numStr(sn.total)}</td>
@@ -744,7 +755,7 @@ function renderAnalysis(){
   const a=(ANALYSIS&&typeof ANALYSIS==='object'&&!Array.isArray(ANALYSIS))?ANALYSIS:{};
   const pts=resultPoints();
   const n=num(a.n)!=null?num(a.n):(Array.isArray(RESULTS)?RESULTS.length:0);
-  const rNum=Number(a.r),hasR=Number.isFinite(rNum);
+  const rTxt=corrStr(a.r);   // null = 서버가 "아직 못 낸다"고 한 것 (표본 3건 미만·분산 0)
   const gr=(a.groups&&typeof a.groups==='object'&&!Array.isArray(a.groups))?a.groups:{};
   const hi=gr.highBlank||{},lo=gr.lowBlank||{};
   const hiN=num(hi.n)||0,loN=num(lo.n)||0;
@@ -753,10 +764,10 @@ function renderAnalysis(){
 
   let verdict;
   if(!n)verdict='<p class="muted">아직 입력된 시험 결과가 없어요 — 위에서 점수를 넣으면 도달률과 점수의 관계가 여기 쌓입니다.</p>';
-  else if(!hasR)verdict=`<div class="issues warn"><b>아직 판단하기 이릅니다 — 시험 결과 ${n}건 누적.</b>
+  else if(rTxt==null)verdict=`<div class="issues warn"><b>아직 판단하기 이릅니다 — 시험 결과 ${n}건 누적.</b>
     도달률과 점수의 상관은 도달률 기록이 함께 있는 결과가 ${MIN_N_CORR}건은 모여야 계산합니다.
     (도달률 짝이 있는 결과 ${pts.length}건)</div>`;
-  else verdict=`<div class="issues ${n<MIN_N_TRUST?'warn':'ok'}"><b>상관 r = ${esc(rNum.toFixed(2))}</b> — 도달률과 점수가 같이 움직이는 정도예요.
+  else verdict=`<div class="issues ${n<MIN_N_TRUST?'warn':'ok'}"><b>상관 r = ${esc(rTxt)}</b> — 도달률과 점수가 같이 움직이는 정도예요.
     1에 가까울수록 「도달률이 높은 학생이 점수도 높았다」, 0 근처면 관계가 뚜렷하지 않다는 뜻입니다.
     ${n<MIN_N_TRUST?`<br>표본 ${n}건은 아직 적어요 — 방향을 참고만 하고 단정하지 마세요 (${MIN_N_TRUST}건 넘게 쌓이면 다시 보세요).`:''}</div>`;
 
@@ -764,7 +775,7 @@ function renderAnalysis(){
     ? `<div class="tbl"><table><thead><tr><th>백지 암송 그룹</th><th>인원</th><th>평균 점수</th></tr></thead><tbody>
         <tr><td><b>80% 이상</b> <span class="tag ok">목표선</span></td><td>${hiN}명</td><td><b>${esc(dec1(hi.mean))}</b>점</td></tr>
         <tr><td>80% 미만</td><td>${loN}명</td><td><b>${esc(dec1(lo.mean))}</b>점</td></tr></tbody></table></div>
-       ${(Number.isFinite(Number(hi.mean))&&Number.isFinite(Number(lo.mean)))?`<p class="muted">차이 ${esc(dec1(Number(hi.mean)-Number(lo.mean)))}점 — 표본이 ${hiN+loN}건이라 아직 경향으로만 읽으세요.</p>`:''}`
+       ${(fin(hi.mean)!=null&&fin(lo.mean)!=null)?`<p class="muted">차이 ${esc(dec1(fin(hi.mean)-fin(lo.mean)))}점 — 표본이 ${hiN+loN}건이라 아직 경향으로만 읽으세요.</p>`:''}`
     : `<p class="muted">백지 80% 이상 ${hiN}명 · 미만 ${loN}명 — 두 그룹 모두 ${MIN_N_GROUP}명 이상 모여야 평균을 견줄 만합니다.</p>`;
 
   el.innerHTML=`<div class="card"><h2>성과 분석</h2>
@@ -772,15 +783,15 @@ function renderAnalysis(){
     <div class="stats">
       <div class="stat"><b>${n}</b><span>입력된 시험 결과</span></div>
       <div class="stat"><b>${esc(dec1(a.meanScore))}</b><span>평균 점수</span></div>
-      <div class="stat"><b>${hasR?esc(rNum.toFixed(2)):'—'}</b><span>도달률↔점수 상관 r</span></div>
+      <div class="stat"><b>${rTxt==null?'—':esc(rTxt)}</b><span>도달률↔점수 상관 r</span></div>
       <div class="stat"><b>${pts.length}</b><span>도달률 짝이 있는 결과</span></div>
     </div>
     ${verdict}
-    ${dstat?`<p class="muted" style="margin-top:8px">이 시험일(${esc(RES_DATE)}): ${esc(String(num(dstat.n)==null?'—':num(dstat.n)))}건 · 평균 ${esc(dec1(dstat.meanScore))}점 · 상관 ${Number.isFinite(Number(dstat.r))?esc(Number(dstat.r).toFixed(2)):'—(표본 부족)'}</p>`:''}
+    ${dstat?`<p class="muted" style="margin-top:8px">이 시험일(${esc(RES_DATE)}): ${esc(String(num(dstat.n)==null?'—':num(dstat.n)))}건 · 평균 ${esc(dec1(dstat.meanScore))}점 · 상관 ${corrStr(dstat.r)==null?'—(표본 부족)':esc(corrStr(dstat.r))}</p>`:''}
     <h3>백지 암송 80% 기준 그룹 비교</h3>
     ${groupBox}
     <h3>도달률 ↔ 점수 산점도</h3>
-    ${pts.length?scatterSvg(pts,hasR):'<p class="muted">그릴 점이 아직 없어요 — 도달률 기록이 함께 있는 결과가 필요합니다.</p>'}
+    ${pts.length?scatterSvg(pts,rTxt!=null):'<p class="muted">그릴 점이 아직 없어요 — 도달률 기록이 함께 있는 결과가 필요합니다.</p>'}
   </div>`;
 }
 /* 산점도 — 외부 라이브러리 없이 인라인 SVG. x=복합 도달률(%), y=점수(점).
