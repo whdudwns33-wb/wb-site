@@ -7,9 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { handleNaesin } from './naesin-api.mjs';
+import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -62,6 +62,7 @@ const naesinRoot = () => {
 const naesinStore = {
   getPack: (id) => naesinRoot().packs[id] || null,
   putPack: (id, rec) => { naesinRoot().packs[id] = rec; persist(); },
+  deletePack: (id) => { delete naesinRoot().packs[id]; persist(); },
   getPackIds: () => naesinRoot().packIds || null,
   putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
   getState: (c) => naesinRoot().states[c] || null,
@@ -69,6 +70,8 @@ const naesinStore = {
   listStateCodes: () => Object.keys(naesinRoot().states),
   getExam: (s) => naesinRoot().exams[s] || null,
   putExam: (s, rec) => { naesinRoot().exams[s] = rec; persist(); },
+  deleteExam: (s) => { delete naesinRoot().exams[s]; persist(); },
+  listExamScopes: () => Object.keys(naesinRoot().exams),
   getTask: (s) => naesinRoot().tasks[s] || null,
   putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
   getStudent: (c) => db.students[c] || null,
@@ -83,13 +86,32 @@ const VOCAB_PUSH_ENV = {
 /* ── 유틸 ── */
 const json = (res, code, obj) => {
   const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  /* nosniff — 워커와 같은 헤더. API JSON 을 브라우저가 HTML 로 추측 렌더하는 길을 막는다. */
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(body);
 };
-const readBody = (req) => new Promise((resolve, reject) => {
-  let buf = ''; let n = 0;
-  req.on('data', (c) => { n += c.length; if (n > 2_000_000) { reject(new Error('too large')); req.destroy(); return; } buf += c; });
-  req.on('end', () => { try { resolve(buf ? JSON.parse(buf) : {}); } catch (e) { reject(e); } });
+/* 요청 몸통 상한 — 라우트별. 팩 업로드(4.5MB)·교재 원문(워커 계약 5MB)만 크고 나머지는 2MB 그대로.
+   초과하면 413 JSON 으로 답한다: 전에는 소켓을 끊어(destroy) 클라이언트가 빈 응답·연결 오류만 봤다.
+   남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
+const BODY_LIMIT_DEFAULT = 2_000_000;
+const BODY_LIMIT_TEXTBOOK = 5_500_000;
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
+const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
+  /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
+     큰 팩(한글 본문 수 MB)이 그 경계를 수십 번 지난다. 상한도 바이트로 잰다. */
+  const chunks = []; let n = 0; let over = false;
+  req.on('data', (c) => {
+    if (over) return;
+    n += c.length;
+    if (n > limit) { over = true; chunks.length = 0; req.resume(); return; }
+    chunks.push(c);
+  });
+  req.on('end', () => {
+    if (over) { reject(tooLarge()); return; }
+    const buf = Buffer.concat(chunks).toString('utf8');
+    try { resolve(buf ? JSON.parse(buf) : {}); } catch (e) { reject(e); }
+  });
   req.on('error', reject);
 });
 const PEND_TTL = 30 * 60 * 1000;   /* 연동 요청 30분 */
@@ -299,9 +321,11 @@ const server = http.createServer(async (req, res) => {
       /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
+        /* content-length 가 오면 읽기 전에 거른다(워커와 동일) — 없으면(chunked) readBody 의 스트림 상한이 잡는다 */
+        if (Number(req.headers['content-length'] || 0) > naesinBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleNaesin({
           path: p, method: req.method, who, query: url.searchParams,
-          getBody: () => readBody(req), store: naesinStore,
+          getBody: () => readBody(req, naesinBodyLimit(p)), store: naesinStore,
         });
         return json(res, out.status, out.body);
       }
@@ -366,6 +390,8 @@ const server = http.createServer(async (req, res) => {
         const { code, name, grade, cls, level } = await readBody(req);
         const c = String(code || '').trim();
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(res, 400, { error: '학생 코드는 영문/숫자 3~20자' });
+        /* 'default' 는 내신 반 공통 배정의 scope 키 — 학생 코드로 쓰면 개별 배정과 한 키를 두고 싸운다 */
+        if (isReservedCode(c)) return json(res, 400, { error: "'default'는 반 공통 배정에 쓰는 예약어라 학생 코드로 쓸 수 없어요." });
         if (!name) return json(res, 400, { error: '이름 필요' });
         /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
         const prev = db.students[c] || {};
@@ -376,7 +402,7 @@ const server = http.createServer(async (req, res) => {
       /* 반 하나를 등록하려면 폼을 사람 수만큼 채워야 했다 — 명단을 그대로 붙여넣게 한다 */
       if (p === '/api/admin/students/bulk' && req.method === 'POST') {
         const { text, cls, grade, level, prefix, dryRun } = await readBody(req);
-        const { rows, errors } = parseRoster(text, { cls, grade, level, prefix, existing: Object.keys(db.students) });
+        const { rows, errors } = dropReservedRows(parseRoster(text, { cls, grade, level, prefix, existing: Object.keys(db.students) }));
         if (dryRun) return json(res, 200, { rows, errors, dryRun: true });
         let created = 0, updated = 0;
         for (const r of rows) {
@@ -426,7 +452,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { exists: true, updatedAt: db.textbookSrc.updatedAt || null, version: (db.textbookSrc.src && db.textbookSrc.src.version) || null, books: sum.books });
       }
       if (p === '/api/admin/textbook-src' && req.method === 'PUT') {
-        const src = await readBody(req);
+        const src = await readBody(req, bodyLimit(p));
         const sum = sourceSummary(src);
         if (sum.errors.length) return json(res, 400, { error: '원문 검증 실패', details: sum.errors.slice(0, 10) });
         db.textbookSrc = { src, updatedAt: nowIso() };
@@ -489,7 +515,10 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab, textbook: db.textbook || {}, pubmap: db.pubmap || {} });
+        /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
+           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
+          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {} });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -522,6 +551,9 @@ const server = http.createServer(async (req, res) => {
         drop(db.states, c);
         drop(db.vocab.states, c);
         drop(db.vocab.push || {}, c);
+        /* 내신브레인 — 학습 기록과 이 학생만의 시험 배정(워커와 동일). 반 공통·팩은 학생 것이 아니라 둔다 */
+        drop(naesinRoot().states, c);
+        drop(naesinRoot().exams, c);
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
@@ -630,6 +662,8 @@ const server = http.createServer(async (req, res) => {
     /* 학생 앱 */
     return serveFile(res, APP_DIR, p === '/' ? 'index.html' : p.slice(1));
   } catch (e) {
+    /* readBody 의 상한 초과는 서버 오류가 아니다 — 413 으로 답하고 남은 몸통은 흘려보낸다 */
+    if (e && e.status === 413) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
     json(res, 500, { error: '서버 오류', detail: String(e.message || e) });
   }
 });

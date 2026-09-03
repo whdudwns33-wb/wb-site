@@ -21,6 +21,8 @@
     input,select{font:inherit;min-height:42px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
     .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
     .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
+    .btn.sm{min-height:32px;padding:3px 10px;font-size:12.5px}
+    .btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
     .btn:disabled{opacity:.45;cursor:default}
     .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}
     .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2f4;color:var(--muted)}
@@ -36,10 +38,12 @@
     th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
     tr:hover td{background:#f8fcfe}
     tbody tr:nth-child(even) td{background:#f8fcfe}
+    tr.expired td{color:var(--muted)}
     .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
     .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
     .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
     .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .grid-form label[hidden]{display:none}
     .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
     .muted{color:var(--muted);font-size:12.5px}
     #loginCard{max-width:380px;margin:60px auto}
@@ -53,6 +57,9 @@
     .packrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
     .packrow:first-of-type{border-top:0}
     label.ck{display:inline-flex;align-items:center;gap:6px;font-weight:700;margin:2px 10px 2px 0}
+    .banner{display:flex;gap:10px;align-items:center;max-width:1080px;margin:12px auto -6px;padding:10px 14px;border-radius:12px;background:#fff0ef;color:var(--bad);font-weight:800;font-size:13.5px}
+    .banner[hidden]{display:none}
+    .banner .sp{flex:1}
   </style>
 </head>
 <body>
@@ -61,32 +68,60 @@
   <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
   <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
 </header>
+<div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerRetry">다시 시도</button></div>
 <main id="app"></main>
 <script>
 'use strict';
 /* WB 내신브레인 관리 웹 — 원장·강사용.
-   기획서 §6·§7: 팩 업로드(추출 JSON 묶음 → 병합·검증 → KV), 시험 등록, 반 성취도.
-   인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다. */
+   기획서 §6·§7: 팩 업로드(추출 JSON 묶음 → 병합·검증 → KV), 시험 등록·배정 현황, 반 성취도, 수업 과제.
+   인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다.
+   서버 계약(naesin-api.mjs, 계약 0.1~0.4): overview의 summary는 서버가 정규화해 주지만 화면은 그래도
+   모든 값을 esc()/num()으로 감싼다 — 여기는 학생 기기가 올린 값을 강사 화면에 그리는 곳이라
+   저장형 XSS의 마지막 방어선이다. */
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
-let OV=null,PACKS=[],FILTER='전체',TASK=null;
-/* 학생 앱 문제 유형 키 — 수업 과제 배정용 (naesin/index.html quizTypes와 동일 키) */
+let OV=null,PACKS=[],FILTER='전체',TASK=null,EXAMS=null,ROSTER=[];
+/* 학생 앱 문제 유형 키 — 수업 과제 배정용. naesin/index.html quizTypes()의 key, 서버 TASK_TYPE_KEYS와
+   같은 목록이어야 한다(계약 0.4). 문법 개념은 팩의 패턴 번호별 g-<n> 동적 키라 고정 목록 대신
+   번호 입력(#tkPat)으로 받는다. */
 const TYPE_LIST=[['w-e2k','영어→뜻'],['w-k2e','뜻→영어'],['w-spell','철자 쓰기'],['w-cloze','예문 빈칸'],['w-def','영영풀이'],
  ['w-poly','다의어'],['w-syn','유의·반의'],['s-gram','어법 선택'],['s-verb','동사 형태'],['s-order','어순 배열'],
  ['s-kw','핵심어 빈칸'],['i-mcq','객관식(단일)'],['i-multi','객관식(복수)'],['mock','실전 모의']];
-let ASSEMBLED=null;   // 병합·검증을 통과한 업로드 대기 팩
+const CODE_RE=/^[A-Za-z0-9-]{3,20}$/;   // 학생 코드 — 서버 등록 규칙과 동일
+const WDD_DEFAULT=7, WDD_MIN=3, WDD_MAX=30;   // 단어 초회 도달 마감 D-n (서버 허용 범위와 동일)
+let ASSEMBLED=null;   // 병합·검증을 통과한 업로드 대기 팩 — render()가 건드리지 않는 업로더 영역에 산다
+
+/* 숫자 요약값 — 유한수가 아니면 null. 서버가 정규화해도(계약 0.1) 화면은 믿지 않는다 */
+const num=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null;};
+const numStr=v=>{const n=num(v);return n==null?'—':String(n);};
+const pct=(a,b)=>{a=num(a);b=num(b);return (a!=null&&b>0)?Math.max(0,Math.min(100,Math.round(a/b*100))):0;};
+/* KST 오늘 — 서버의 만료 판정과 같은 식(계약 0.2). 브라우저 시간대나 UTC 자정에 흔들리지 않게 학원 날짜로 고정 */
+const kstToday=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+const dayNum=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?Date.UTC(+m[1],+m[2]-1,+m[3])/864e5:NaN;};
+/* 날짜까지 남은 날 수(KST 기준, 음수면 지남) — 모양이 아니면 null */
+const daysUntil=(d,today)=>{const n=dayNum(d)-dayNum(today||kstToday());return Number.isFinite(n)?Math.round(n):null;};
 
 async function api(path,opt){
-  const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){const err=new Error('네트워크 오류 — 연결을 확인하고 다시 시도하세요.');err.network=true;throw err;}
   const j=await r.json().catch(()=>({}));
   if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
-  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  /* 상태 코드·본문을 오류에 실어 보낸다 — 409(배정된 팩 삭제)는 본문의 scopes 까지 보여 줘야 한다 */
+  if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;err.body=j;throw err;}
   return j;
 }
+const isAuth=e=>!!e&&e.message==='auth';
+/* 선택 라우트(없어도 화면을 막지 않는 것)의 실패는 null로 — 인증 만료만 위로 올린다 */
+const optional=e=>{if(isAuth(e))throw e;return null;};
+
+function showBanner(msg){$('#bannerMsg').textContent=msg;$('#banner').hidden=false;}
+function hideBanner(){$('#banner').hidden=true;}
 
 function renderLogin(msg){
   $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;
+  ASSEMBLED=null;hideBanner();
   $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
     <p class="muted">관리 PIN을 입력하세요. (진로독서 관리와 같은 PIN)</p>
     <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
@@ -95,14 +130,13 @@ function renderLogin(msg){
   $('#doLogin').onclick=async()=>{
     try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
       TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);refresh();}
-    catch(e){renderLogin(e.message);}
+    catch(e){if(!isAuth(e))renderLogin(e.message);}
   };
   $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
 }
 
-function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;
+function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if(!Number.isFinite(d))return '—';
   if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
-const pct=(a,b)=>b?Math.round(a/b*100):0;
 
 /* ── 팩 병합: 분리 추출 파일(words/sentences/dialogues/patterns/items-*) 또는 통짜 팩 ── */
 const TOP_FIELDS=['packId','curriculum','textbook','grade','lesson','lessonTitle','source','passage'];
@@ -157,18 +191,60 @@ function packCounts(p){
     청크:(p.sentences||[]).reduce((n,s)=>n+((s.chunks||[]).length),0)};
 }
 
-/* ── 화면 ── */
+/* ── 화면 ──
+   골격은 한 번만 만든다. 팩 업로더(파일 선택·미리보기·ASSEMBLED)는 골격에 살고 render()가 다시 그리지
+   않는다 — 과제 배정이나 새로고침 뒤에 검증까지 끝낸 미리보기가 사라지면 파일을 다시 골라야 한다. */
+function ensureShell(){
+  if($('#ovArea'))return;
+  $('#app').innerHTML=`<section id="ovArea"></section><section id="taskArea"></section>
+  <div class="card"><h2>레슨 팩</h2>
+    <p class="muted">추출 JSON 파일들(pack·words·sentences·dialogues·patterns·items)을 <b>한꺼번에 선택</b>하면 병합·검증 후 업로드합니다. 팩 콘텐츠는 서버 저장소에만 저장돼요(저장소·정적 파일에 안 남음).</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="packFiles" accept=".json,application/json" multiple>
+      <button class="btn" id="btnUpload" disabled>업로드</button>
+    </div>
+    <div id="packPreview"></div>
+    <div id="packList"></div>
+  </div>
+  <section id="examArea"></section>`;
+  $('#packFiles').onchange=onPackFiles;
+  $('#btnUpload').onclick=uploadPack;
+}
 function render(){
   $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
-  const students=(OV&&OV.students||[]).slice();
-  const classes=['전체',...new Set(students.map(s=>s.cls).filter(Boolean))];
-  const list=FILTER==='전체'?students:students.filter(s=>s.cls===FILTER);
-  const stale=s=>s.lastActive&&(Date.now()-new Date(s.lastActive))>48*3600e3;
-  const riskyN=students.filter(s=>stale(s)||(s.summary&&s.summary.word&&s.summary.word.risky>0)).length;
-  const todayN=students.filter(s=>s.lastActive&&(Date.now()-new Date(s.lastActive))<24*3600e3).length;
+  ensureShell();
+  renderOverview();renderTask();renderPackList();renderExamForm();renderExamList();
+}
 
-  $('#app').innerHTML=`
-  <div class="card"><h2>반 성취도 현황판</h2>
+/* ── 반 성취도 ── */
+const ago=t=>{const d=Date.now()-new Date(t||0);return Number.isFinite(d)?d:Infinity;};
+const stale=s=>!!s.lastActive&&ago(s.lastActive)>48*3600e3;
+const risky=s=>{const w=s.summary&&s.summary.word;return !!w&&(num(w.risky)||0)>0;};
+function studentRow(s){
+  const m=(s.summary&&typeof s.summary==='object'&&!Array.isArray(s.summary))?s.summary:{};
+  const w=m.word||{},sn=m.sentence||{},tk=m.task;
+  const warn=stale(s)||risky(s);
+  /* 과제 완료 = 지금 배정된 과제(날짜+updatedAt)에 대한 기록일 때만(계약 0.4) — 어제 과제나 같은 날
+     재배정 전의 기록은 '—'. 학생 앱의 '완료' 표시와 같은 기준이라 두 화면이 어긋나지 않는다. */
+  const done=!!(tk&&TASK&&tk.date===TASK.date&&tk.taskAt===TASK.updatedAt);
+  const spell=num(w.needsSpellCheck)||0;
+  return `<tr>
+    <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
+    <td>${esc(s.cls||'—')}</td>
+    <td class="muted">${esc(m.packId||'—')}</td>
+    <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${numStr(w.reached)}/${numStr(w.total)} · 안정 ${numStr(w.stable)}${spell?` · <span class="tag warn">철자 확인 ${spell}</span>`:''}</td>
+    <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${numStr(sn.interpreted)}/${numStr(sn.total)}</td>
+    <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${numStr(sn.memorized)}/${numStr(sn.total)}</td>
+    <td>${done?`<span class="tag ok">${numStr(tk.correct)}/${numStr(tk.total)}</span>`:'<span class="tag muted">—</span>'}</td>
+    <td class="muted">${fmtLast(s.lastActive)}</td></tr>`;
+}
+function renderOverview(){
+  const students=(OV&&Array.isArray(OV.students)?OV.students:[]).filter(s=>s&&typeof s==='object');
+  const classes=['전체',...new Set(students.map(s=>String(s.cls||'')).filter(Boolean))];
+  const list=FILTER==='전체'?students:students.filter(s=>s.cls===FILTER);
+  const riskyN=students.filter(s=>stale(s)||risky(s)).length;
+  const todayN=students.filter(s=>s.lastActive&&ago(s.lastActive)<24*3600e3).length;
+  $('#ovArea').innerHTML=`<div class="card"><h2>반 성취도 현황판</h2>
     <div class="stats">
       <div class="stat"><b>${students.length}</b><span>기록 있는 학생</span></div>
       <div class="stat"><b>${todayN}</b><span>최근 24시간 학습</span></div>
@@ -177,82 +253,73 @@ function render(){
     </div>
     <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>이름</th><th>반</th><th>팩</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>오늘 과제</th><th>마지막 학습</th></tr></thead>
-      <tbody>${list.length?list.map(s=>{
-        const m=s.summary||{},w=m.word||{},sn=m.sentence||{},tk=m.task;
-        const warn=stale(s)||w.risky>0;
-        return `<tr>
-          <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
-          <td>${esc(s.cls||'—')}</td>
-          <td class="muted">${esc(m.packId||'—')}</td>
-          <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${w.reached??'—'}/${w.total??'—'} · 안정 ${w.stable??'—'}</td>
-          <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${sn.interpreted??'—'}/${sn.total??'—'}</td>
-          <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${sn.memorized??'—'}/${sn.total??'—'}</td>
-          <td>${tk?`<span class="tag ok">${tk.correct}/${tk.total}</span>`:'<span class="tag muted">—</span>'}</td>
-          <td class="muted">${fmtLast(s.lastActive)}</td></tr>`;
-      }).join(''):`<tr><td colspan="8" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
-  </div>
+      <th>이름</th><th>반</th><th>팩</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>${TASK?'과제 '+esc(TASK.date):'오늘 과제'}</th><th>마지막 학습</th></tr></thead>
+      <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="8" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+  </div>`;
+  document.querySelectorAll('.chip[data-cls]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.cls;renderOverview();});
+}
 
-  <div class="card"><h2>오늘 수업 과제</h2>
-    <p class="muted">배정하면 학생 앱 홈 최상단에 「오늘 수업 과제」로 뜨고, 완료 결과가 위 표의 「오늘 과제」 열에 모입니다.</p>
-    ${TASK?`<p style="margin:4px 0 10px"><span class="tag">${esc(TASK.date)}</span> <b>${esc(TASK.title)}</b> — 유형 ${TASK.typeKeys.length}종${TASK.seqFrom?` · 문장 ${TASK.seqFrom}–${TASK.seqTo}`:''}</p>`:'<p class="muted" style="margin:4px 0 10px">배정된 과제가 없습니다.</p>'}
+/* ── 수업 과제 ── */
+function renderTask(){
+  const today=kstToday();
+  let head='<p class="muted" style="margin:4px 0 10px">배정된 과제가 없습니다.</p>';
+  if(TASK){
+    const d=String(TASK.date||'');
+    const past=d<today,future=d>today;
+    const tag=past?`<span class="tag warn">지난 과제 (${esc(d)})</span>`:future?`<span class="tag">예정 (${esc(d)})</span>`:`<span class="tag ok">오늘 (${esc(d)})</span>`;
+    const from=num(TASK.seqFrom),to=num(TASK.seqTo);
+    head=`<p style="margin:4px 0 10px">${tag} <b>${esc(TASK.title)}</b> — 유형 ${(Array.isArray(TASK.typeKeys)?TASK.typeKeys:[]).length}종${from?` · 문장 ${from}–${to==null?'?':to}`:''}
+      ${past?'<br><span class="err">학생 앱 홈에는 오늘 날짜의 과제만 뜹니다 — 아래에서 오늘 과제를 새로 배정하세요.</span>':''}</p>`;
+  }
+  $('#taskArea').innerHTML=`<div class="card"><h2>오늘 수업 과제</h2>
+    <p class="muted">배정하면 학생 앱 홈 최상단에 「오늘 수업 과제」로 뜨고, 완료 결과가 위 표의 「과제」 열에 모입니다. 같은 날 다시 배정하면 완료 표시가 초기화돼요.</p>
+    ${head}
     <div class="grid-form">
       <label>날짜<br><input type="date" id="tkDate"></label>
-      <label>과제 이름<br><input id="tkTitle" placeholder="예: 4교시 — 본문 클로즈 + 어법"></label>
+      <label>과제 이름<br><input id="tkTitle" placeholder="예: 4교시 — 본문 클로즈 + 어법" maxlength="80"></label>
       <label>본문 문장 범위 (선택)<br><span style="display:flex;gap:6px"><input type="number" id="tkFrom" min="1" placeholder="시작" style="width:80px"><input type="number" id="tkTo" min="1" placeholder="끝" style="width:80px"></span></label>
+      <label>문법 패턴 번호 (선택)<br><input id="tkPat" placeholder="예: 1,2" autocomplete="off"></label>
       <button class="btn" id="btnTask">과제 배정</button>
     </div>
     <div style="margin-top:10px">${TYPE_LIST.map(([k,l])=>`<label class="ck"><input type="checkbox" name="tkType" value="${k}">${esc(l)}</label>`).join('')}</div>
     <div id="taskOut"></div>
-  </div>
-
-  <div class="card"><h2>레슨 팩</h2>
-    <p class="muted">추출 JSON 파일들(pack·words·sentences·dialogues·patterns·items)을 <b>한꺼번에 선택</b>하면 병합·검증 후 업로드합니다. 팩 콘텐츠는 서버 저장소에만 저장돼요(저장소·정적 파일에 안 남음).</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <input type="file" id="packFiles" accept=".json,application/json" multiple>
-      <button class="btn" id="btnUpload" disabled>업로드</button>
-    </div>
-    <div id="packPreview"></div>
-    <h3>업로드된 팩 ${PACKS.length}개</h3>
-    ${PACKS.length?PACKS.map(id=>`<div class="packrow"><b>${esc(id)}</b><span class="tag">배포됨</span></div>`).join(''):'<p class="muted">아직 없어요.</p>'}
-  </div>
-
-  <div class="card"><h2>시험 등록</h2>
-    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다.</p>
-    <div class="grid-form">
-      <label>대상<br><select id="exScope"><option value="default">반 공통 (전체 기본)</option>
-        ${students.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}</select></label>
-      <label>시험일<br><input type="date" id="exDate"></label>
-      <div><span class="muted">시험 범위 팩</span><br><span id="exPacks">
-        ${PACKS.length?PACKS.map(id=>`<label class="ck"><input type="checkbox" value="${esc(id)}">${esc(id)}</label>`).join(''):'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
-      <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>시험 등록</button>
-    </div>
-    <div id="examOut"></div>
   </div>`;
-
-  document.querySelectorAll('.chip[data-cls]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.cls;render();});
-  $('#packFiles').onchange=onPackFiles;
-  $('#btnUpload').onclick=uploadPack;
-  $('#btnExam').onclick=saveExam;
-  $('#tkDate').value=new Date().toISOString().slice(0,10);
+  $('#tkDate').value=today;
   $('#btnTask').onclick=saveTask;
 }
-
 async function saveTask(){
+  const out=h=>{$('#taskOut').innerHTML=h;};
   const date=$('#tkDate').value, title=$('#tkTitle').value.trim();
   const typeKeys=[...document.querySelectorAll('input[name=tkType]:checked')].map(i=>i.value);
+  /* 문법 개념은 팩마다 패턴 번호가 달라 g-<n> 동적 키 — 번호만 받아 키로 만든다 */
+  const pats=$('#tkPat').value.split(/[,\s]+/).map(x=>x.trim()).filter(Boolean);
+  for(const p of pats){
+    if(!/^\d{1,3}$/.test(p))return out('<p class="err">문법 패턴 번호는 숫자만 쉼표로 구분해 적으세요 (예: 1,2).</p>');
+    typeKeys.push('g-'+Number(p));
+  }
   const body={date,title,typeKeys};
   const f=$('#tkFrom').value, to=$('#tkTo').value;
   if(f||to){body.seqFrom=Number(f);body.seqTo=Number(to);}
-  if(!title){$('#taskOut').innerHTML='<p class="err">과제 이름을 입력하세요.</p>';return;}
-  if(!typeKeys.length){$('#taskOut').innerHTML='<p class="err">학습 유형을 하나 이상 선택하세요.</p>';return;}
+  if(!date)return out('<p class="err">날짜를 선택하세요.</p>');
+  if(!title)return out('<p class="err">과제 이름을 입력하세요.</p>');
+  if(!typeKeys.length)return out('<p class="err">학습 유형을 하나 이상 선택하세요.</p>');
+  /* 지난 날짜의 과제는 학생 앱 홈에 뜨지 않는다 — 날짜 입력 실수를 여기서 잡는다 */
+  if(date<kstToday()&&!confirm(`과제 날짜 ${date}은(는) 이미 지났어요. 학생 앱에는 오늘 날짜의 과제만 뜹니다. 그래도 배정할까요?`))return;
   try{
     const j=await api('/naesin/admin/task',{method:'POST',body:JSON.stringify(body)});
-    TASK=j.task;render();
-    $('#taskOut').innerHTML=`<div class="issues ok">배정 완료 — ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${j.task.typeKeys.length}종</div>`;
-  }catch(e){$('#taskOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+    TASK=j.task;renderOverview();renderTask();
+    out(`<div class="issues ok">배정 완료 — ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${(j.task.typeKeys||[]).length}종</div>`);
+  }catch(e){if(isAuth(e))return;out('<p class="err">'+esc(e.message)+'</p>');}
 }
 
+/* ── 레슨 팩 ── */
+function renderPackList(){
+  $('#packList').innerHTML=`<h3>업로드된 팩 ${PACKS.length}개</h3>
+    ${PACKS.length?PACKS.map(id=>`<div class="packrow"><b>${esc(id)}</b><span><span class="tag">배포됨</span> <button class="btn sm danger" data-del="${esc(id)}">삭제</button></span></div>`).join(''):'<p class="muted">아직 없어요.</p>'}
+    <div id="packOut"></div>`;
+  document.querySelectorAll('#packList [data-del]').forEach(b=>b.onclick=()=>deletePack(b.dataset.del));
+}
+async function loadPacks(){PACKS=((await api('/naesin/admin/packs')).packs||[]).map(String);}
 async function onPackFiles(){
   ASSEMBLED=null;$('#btnUpload').disabled=true;
   const files=[...$('#packFiles').files];
@@ -262,47 +329,174 @@ async function onPackFiles(){
   const {errors,warns}=validatePack(pack);
   const all=[...mergeErr,...errors];
   const c=packCounts(pack);
+  const exists=PACKS.includes(pack.packId);
   let html=`<div class="issues ${all.length?'bad':'ok'}">
     <b>${esc(pack.packId||'(packId 없음)')}</b> — ${esc(pack.textbook||'')} ${esc(pack.grade||'')} Lesson ${esc(pack.lesson??'?')}<br>
     ${Object.entries(c).map(([k,v])=>k+' '+v).join(' · ')}<br>
-    ${all.length?'<b>오류 '+all.length+'건 — 업로드 차단</b>':'검증 통과'+(warns.length?' (경고 '+warns.length+'건)':'')}</div>`;
+    ${all.length?'<b>오류 '+all.length+'건 — 업로드 차단</b>':'검증 통과'+(warns.length?' (경고 '+warns.length+'건)':'')}
+    ${!all.length&&exists?'<br><b>이미 업로드된 팩이에요 — 업로드하면 덮어씁니다.</b>':''}</div>`;
   if(all.length)html+=`<div class="issues bad">${all.slice(0,15).map(e=>'<div>✗ '+esc(e)+'</div>').join('')}${all.length>15?'<div>… 외 '+(all.length-15)+'건</div>':''}</div>`;
   if(warns.length)html+=`<div class="issues warn">${warns.slice(0,10).map(w=>'<div>⚠ '+esc(w)+'</div>').join('')}</div>`;
   $('#packPreview').innerHTML=html;
   if(!all.length){ASSEMBLED=pack;$('#btnUpload').disabled=false;}
 }
-
 async function uploadPack(){
   if(!ASSEMBLED)return;
+  const id=ASSEMBLED.packId;
+  /* 같은 id는 서버가 그대로 덮어쓴다(계약 0.3) — 학생들이 보는 교재가 바뀌는 일이라 한 번 되묻는다 */
+  if(PACKS.includes(id)&&!confirm(`이미 업로드된 팩 "${id}"을(를) 덮어씁니다. 학생 앱은 다음 로드부터 새 내용을 봅니다. 계속할까요?`))return;
   $('#btnUpload').disabled=true;
   try{
-    const j=await api('/naesin/admin/pack',{method:'POST',body:JSON.stringify({id:ASSEMBLED.packId,pack:ASSEMBLED})});
-    alert('팩 업로드 완료: '+j.id);
-    ASSEMBLED=null;refresh();
-  }catch(e){alert('업로드 실패: '+e.message);$('#btnUpload').disabled=false;}
+    const j=await api('/naesin/admin/pack',{method:'POST',body:JSON.stringify({id,pack:ASSEMBLED})});
+    ASSEMBLED=null;$('#packFiles').value='';
+    $('#packPreview').innerHTML=`<div class="issues ok">팩 업로드 완료 — ${esc(j.id)}</div>`;
+    await loadPacks();renderPackList();renderExamForm();renderExamList();
+  }catch(e){
+    if(isAuth(e))return;
+    $('#packPreview').insertAdjacentHTML('beforeend',`<p class="err">업로드 실패: ${esc(e.message)}</p>`);
+    $('#btnUpload').disabled=false;
+  }
+}
+async function deletePack(id){
+  if(!confirm(`팩 "${id}"을(를) 서버에서 삭제할까요? 학생 앱에서 더 이상 열 수 없습니다.`))return;
+  try{
+    await api('/naesin/admin/pack',{method:'DELETE',body:JSON.stringify({id})});
+    await loadPacks();renderPackList();renderExamForm();
+    $('#packOut').innerHTML=`<div class="issues ok">삭제 완료 — ${esc(id)}</div>`;
+  }catch(e){
+    if(isAuth(e))return;
+    /* 409 = 어떤 배정이 아직 이 팩을 가리킨다 — 어느 배정인지 이름으로 보여 줘야 해제하러 갈 수 있다 */
+    const scopes=(e.body&&Array.isArray(e.body.scopes))?e.body.scopes.map(scopeLabel):[];
+    $('#packOut').innerHTML=`<p class="err">${esc(e.message)}${scopes.length?' — 배정: '+scopes.map(esc).join(', '):''}</p>`;
+  }
 }
 
+/* ── 시험 등록·배정 현황 ── */
+function scopeLabel(scope){
+  if(scope==='default')return '반 공통';
+  const s=ROSTER.find(x=>x.code===scope)||(OV&&Array.isArray(OV.students)?OV.students:[]).find(x=>x&&x.code===scope)
+    ||(Array.isArray(EXAMS)?EXAMS:[]).find(x=>x.scope===scope);
+  return s&&s.name?`${s.name} (${scope})`:String(scope);
+}
+function renderExamForm(){
+  /* 개별 배정 대상은 호스트 명부 전체(내신 기록이 아직 없는 학생도) — 명부를 못 받았으면 내신 기록 학생이라도.
+     명부에 없는 코드는 직접 입력으로 — 서버가 등록 여부를 검사한다(404). */
+  const roster=(ROSTER.length?ROSTER:(OV&&Array.isArray(OV.students)?OV.students:[])).filter(s=>s&&s.code).slice()
+    .sort((a,b)=>String(a.cls||'').localeCompare(String(b.cls||''),'ko')||String(a.name||'').localeCompare(String(b.name||''),'ko'));
+  $('#examArea').innerHTML=`<div class="card"><h2>시험 등록</h2>
+    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다. 학생 개별 배정은 시험일이 지나기 전까지 반 공통보다 우선해요.</p>
+    <div class="grid-form">
+      <label>대상<br><select id="exScope"><option value="default">반 공통 (전체 기본)</option>
+        ${roster.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}
+        <option value="__code">학생 코드 직접 입력…</option></select></label>
+      <label id="exCodeWrap" hidden>학생 코드<br><input id="exCode" placeholder="예: stu-0123" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+      <label>시험일<br><input type="date" id="exDate"></label>
+      <label>단어 마감 (시험 D-n)<br><input type="number" id="exWdd" min="${WDD_MIN}" max="${WDD_MAX}" value="${WDD_DEFAULT}" style="width:90px"></label>
+      <div style="grid-column:span 2"><span class="muted">시험 범위 팩</span><br><span id="exPacks">
+        ${PACKS.length?PACKS.map(id=>`<label class="ck"><input type="checkbox" value="${esc(id)}">${esc(id)}</label>`).join(''):'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
+      <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>시험 등록</button>
+    </div>
+    <div id="examOut"></div>
+    <h3>현재 배정 현황</h3>
+    <div id="examList"></div>
+  </div>`;
+  $('#exScope').onchange=()=>{const w=$('#exCodeWrap');w.hidden=$('#exScope').value!=='__code';if(!w.hidden)$('#exCode').focus();};
+  $('#btnExam').onclick=saveExam;
+}
+async function loadExams(){
+  const r=await api('/naesin/admin/exams').catch(optional);
+  EXAMS=r&&Array.isArray(r.exams)?r.exams:null;
+  if(r&&typeof r.today==='string')EXAMS.today=r.today;   // 서버의 KST 오늘 — 만료 표시를 서버 판정과 맞춘다
+}
+function renderExamList(){
+  const el=$('#examList');if(!el)return;
+  if(EXAMS===null){el.innerHTML='<p class="muted">배정 현황을 불러오지 못했어요 (서버가 목록 조회를 지원하지 않거나 일시 오류) — 새로고침으로 다시 시도하세요.</p>';return;}
+  if(!EXAMS.length){el.innerHTML='<p class="muted">등록된 시험이 없어요.</p>';return;}
+  const today=EXAMS.today||kstToday();
+  const rows=EXAMS.filter(ex=>ex&&typeof ex==='object').slice()
+    .sort((a,b)=>(a.scope==='default'?-1:b.scope==='default'?1:scopeLabel(a.scope).localeCompare(scopeLabel(b.scope),'ko')));
+  el.innerHTML=`<div class="tbl"><table><thead><tr><th>대상</th><th>시험일</th><th>D-day</th><th>범위 팩</th><th>단어 마감</th><th>등록</th><th></th></tr></thead><tbody>
+    ${rows.map(ex=>{
+      const dd=daysUntil(ex.examDate,today);
+      /* 만료 = examDate < KST 오늘(계약 0.2) — 개별 배정은 만료되면 학생 앱이 무시하고 반 공통으로 돌아간다 */
+      const expired=ex.expired===true||(dd!=null&&dd<0);
+      const ddTag=dd==null?'<span class="tag muted">?</span>':expired?`<span class="tag bad">만료 (${-dd}일 지남)</span>`:dd===0?'<span class="tag warn">오늘</span>':`<span class="tag">D-${dd}</span>`;
+      const wdd=num(ex.wordDeadlineDays);
+      const packs=Array.isArray(ex.packIds)?ex.packIds:[];
+      return `<tr class="${expired?'expired':''}" data-scope="${esc(ex.scope)}"><td><b>${esc(scopeLabel(ex.scope))}</b>${ex.scope==='default'?'':'<br><span class="muted">개별 배정 — '+(expired?'만료되어 반 공통을 따름':'반 공통보다 우선')+'</span>'}</td>
+        <td>${esc(ex.examDate)}</td><td>${ddTag}</td>
+        <td style="white-space:normal">${packs.map(id=>`<span class="tag muted">${esc(id)}</span>`).join(' ')||'—'}</td>
+        <td>D-${wdd==null?WDD_DEFAULT+' <span class="muted">(기본)</span>':wdd}</td>
+        <td class="muted">${fmtLast(ex.updatedAt)}</td>
+        <td><button class="btn sm danger" data-unassign="${esc(ex.scope)}">해제</button></td></tr>`;}).join('')}
+  </tbody></table></div>`;
+  el.querySelectorAll('[data-unassign]').forEach(b=>b.onclick=()=>deleteExam(b.dataset.unassign));
+}
 async function saveExam(){
-  const scope=$('#exScope').value;
+  const out=h=>{$('#examOut').innerHTML=h;};
+  const sel=$('#exScope').value;
+  const scope=sel==='__code'?$('#exCode').value.trim():sel;
   const examDate=$('#exDate').value;
   const packIds=[...document.querySelectorAll('#exPacks input:checked')].map(i=>i.value);
-  if(!examDate){$('#examOut').innerHTML='<p class="err">시험일을 선택하세요.</p>';return;}
-  if(!packIds.length){$('#examOut').innerHTML='<p class="err">시험 범위 팩을 하나 이상 선택하세요.</p>';return;}
+  const wddRaw=$('#exWdd').value.trim();
+  if(scope!=='default'&&!CODE_RE.test(scope))return out('<p class="err">학생 코드는 영문/숫자/하이픈 3~20자예요.</p>');
+  if(!examDate)return out('<p class="err">시험일을 선택하세요.</p>');
+  if(!packIds.length)return out('<p class="err">시험 범위 팩을 하나 이상 선택하세요.</p>');
+  const body={scope,examDate,packIds};
+  if(wddRaw){
+    const w=Number(wddRaw);
+    if(!Number.isInteger(w)||w<WDD_MIN||w>WDD_MAX)return out(`<p class="err">단어 마감은 시험 ${WDD_MIN}~${WDD_MAX}일 전 사이로 정하세요.</p>`);
+    body.wordDeadlineDays=w;
+  }
+  /* 지난 시험일도 저장은 된다(계약 0.2 — 시험 뒤 자율 복습 범위로 남기는 용도) — 날짜 실수라면 여기서 잡는다 */
+  const dd=daysUntil(examDate);
+  if(dd!=null&&dd<0&&!confirm(`시험일 ${examDate}은(는) 이미 ${-dd}일 지났어요. 학생 앱은 지난 시험을 '시험 종료 · 자율 학습'으로 보여 주고, 개별 배정이면 무시합니다. 그래도 등록할까요?`))return;
   try{
-    const j=await api('/naesin/admin/exam',{method:'POST',body:JSON.stringify({scope,examDate,packIds})});
-    $('#examOut').innerHTML=`<div class="issues ok">등록 완료 — ${esc(j.scope==='default'?'반 공통':j.scope)} · ${esc(j.exam.examDate)} · [${j.exam.packIds.map(esc).join(', ')}]</div>`;
-  }catch(e){$('#examOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+    const j=await api('/naesin/admin/exam',{method:'POST',body:JSON.stringify(body)});
+    await loadExams();renderExamList();
+    const ex=j.exam||{};
+    out(`<div class="issues ok">등록 완료 — ${esc(scopeLabel(j.scope))} · ${esc(ex.examDate)} · [${(Array.isArray(ex.packIds)?ex.packIds:[]).map(esc).join(', ')}] · 단어 마감 D-${num(ex.wordDeadlineDays)??WDD_DEFAULT}${dd!=null&&dd<0?' · <b>지난 날짜</b>':''}</div>`);
+  }catch(e){if(isAuth(e))return;out('<p class="err">'+esc(e.message)+'</p>');}
+}
+async function deleteExam(scope){
+  const label=scopeLabel(scope);
+  if(!confirm(`${label} 시험 배정을 해제할까요?${scope==='default'?' 개별 배정이 없는 학생은 자율 학습으로 돌아갑니다.':' 이 학생은 반 공통 배정을 따르게 됩니다.'}`))return;
+  try{
+    await api('/naesin/admin/exam',{method:'DELETE',body:JSON.stringify({scope})});
+    await loadExams();renderExamList();
+    $('#examOut').innerHTML=`<div class="issues ok">해제 완료 — ${esc(label)}</div>`;
+  }catch(e){if(isAuth(e))return;$('#examOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
 }
 
+/* ── 부팅·새로고침 ── */
+function renderRetry(msg){
+  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  $('#app').innerHTML=`<div class="card" id="retryCard"><h2>서버에 연결하지 못했어요</h2><p class="err">${esc(msg)}</p>
+    <p class="muted">로그인은 유지돼요. 연결을 확인한 뒤 다시 시도하세요.</p><button class="btn" id="btnRetry">다시 시도</button></div>`;
+  $('#btnRetry').onclick=refresh;
+}
 async function refresh(){
+  hideBanner();
   try{
-    const [ov,pk,tk]=await Promise.all([api('/naesin/admin/overview'),api('/naesin/admin/packs'),
-      api('/naesin/admin/task').catch(()=>({task:{}}))]);
-    OV=ov;PACKS=pk.packs||[];TASK=(tk.task&&tk.task.date)?tk.task:null;
+    const [ov,pk,tk,ex,ro]=await Promise.all([
+      api('/naesin/admin/overview'),api('/naesin/admin/packs'),
+      api('/naesin/admin/task').catch(optional),api('/naesin/admin/exams').catch(optional),
+      api('/admin/overview').catch(optional)]);   // 호스트 명부 전체 — 개별 배정 대상 목록
+    OV=ov;PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
+    TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;
+    EXAMS=ex&&Array.isArray(ex.exams)?ex.exams:null;
+    if(EXAMS&&typeof ex.today==='string')EXAMS.today=ex.today;
+    ROSTER=ro&&Array.isArray(ro.students)?ro.students.filter(s=>s&&s.code):[];
     render();
-  }catch(e){if(e.message!=='auth')renderLogin(e.message);}
+  }catch(e){
+    if(isAuth(e))return;   // api()가 이미 로그인 화면을 그렸다
+    /* 네트워크·서버 오류는 로그인 화면으로 보내지 않는다 — 토큰은 멀쩡하고, 화면에 있던 작업(팩 미리보기)도 살려 둔다 */
+    showBanner('불러오기 실패: '+e.message);
+    if(!OV)renderRetry(e.message);
+  }
 }
 $('#btnRefresh').onclick=refresh;
+$('#bannerRetry').onclick=refresh;
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
 if(TOKEN)refresh();else renderLogin();
 </script>
