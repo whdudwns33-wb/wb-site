@@ -207,6 +207,30 @@ test('all subjects qualify and a Sunday timetable may check in on Saturday', asy
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 1);
 });
 
+test('projected makeup lessons cannot be configured or used as recurring weekend visits', async () => {
+  const db = new D1Database(); db.seed();
+  db.seedTask({
+    id: 'makeup_lesson_mu_weekend', staffId: 'teacher-1', studentId: 'student-a', studentName: '학생A',
+    title: '[수업] 보강', taskKind: 'lesson_instruction', lessonFormVersion: 1,
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_weekend', repeat: 'once',
+    scheduleSlots: [{ days: [6], startTime: '10:00', endTime: '11:00' }],
+    start: '2026-08-22', end: '2026-08-22'
+  });
+  const configured = await atNow(saturday, () => call(db, {
+    action: 'configure', taskId: 'makeup_lesson_mu_weekend', studentId: 'student-a', expectedUpdatedAt: 1,
+    weekendAttendanceMode: 'flexible', weekendAllowedDays: [6], weekendMonthlyTarget: 1,
+    weekendFlexibleFrom: '2026-08-22'
+  }, admin));
+  assert.equal(configured.status, 409);
+
+  const checked = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-22',
+    lessonTaskId: 'makeup_lesson_mu_weekend', studentId: 'student-a'
+  }));
+  assert.equal(checked.status, 422);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 0);
+});
+
 test('a completed weekend lesson can check in again with an explicit next visit sequence', async () => {
   const db = new D1Database(); db.seed();
   const first = await atNow(saturday, () => call(db, {

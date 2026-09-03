@@ -156,6 +156,21 @@ test('same-name students stay separate by stable id and one task/date is counted
   assert.deepEqual(alerts.map(row => row.student_id), ['student-a']);
 });
 
+test('attendance checks on projected makeup tasks do not create tuition alerts', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '보강학생')]);
+  seedTask(db, 'makeup_lesson_mu_tuition', 'student-a', 'teacher-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_tuition',
+    repeat: 'once', start: '2026-08-03', end: '2026-08-03'
+  });
+  for (const date of ['2026-08-03', '2026-08-10', '2026-08-17']) {
+    seedCheck(db, 'makeup_lesson_mu_tuition', date, 'P');
+  }
+  const result = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(result.qualifyingAttendances, 0);
+  assert.equal(result.created, 0);
+});
+
 test('weekend tuition counts require recurrence or an exact non-cancelled actual visit', async () => {
   for (const status of ['cancelled', 'completed']) {
     const db = new TestD1();

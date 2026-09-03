@@ -633,6 +633,26 @@ test('admin duplicate submissions are idempotent with explicit response flags', 
   assert.equal(db.tasks.size, 1);
 });
 
+test('one-time makeup tasks never satisfy or block a regular lesson assignment', async () => {
+  const db = new FakeDB();
+  const copied = await buildLessonTask(assignedLesson(), 'teacher-1', 'admin', 100);
+  seed(db, {
+    ...copied,
+    id: 'makeup_lesson_mu_assignment_copy',
+    groupId: 'makeup_lesson_mu_assignment_copy',
+    lessonInstanceType: 'makeup',
+    makeupCaseId: 'mu_assignment_copy',
+    start: '2026-08-30', end: '2026-08-30', repeat: 'once'
+  });
+
+  const created = await call(db, { staffId: 'teacher-1', lesson: assignedLesson() },
+    { scope: 'all', role: 'admin' });
+  assert.equal(created.response.status, 200);
+  assert.equal(created.data.created, true);
+  assert.equal(created.data.task.id, copied.id);
+  assert.equal(db.tasks.size, 2);
+});
+
 test('changed grade, schedule, and start update the same task with a revision', async () => {
   const db = new FakeDB();
   const firstTask = await seedOwnLesson(db);

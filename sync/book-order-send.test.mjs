@@ -524,12 +524,13 @@ test('전화로 주문 완료한 배치는 후속 상태가 거절로 바뀌어�
   seedMappedSend(db, 'phone-completed', 'phone-completed-send', 'rejected');
   db.prepare("UPDATE book_order_sends SET safe_error_code='MANUAL_PHONE_ORDERED' WHERE send_id='phone-completed-send'").run();
   let fetches = 0;
-  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
-    const result = await call(db, { auth: admin, action: 'retry-rejected' });
-    assert.equal(result.status, 200);
-    assert.equal(result.body.idempotent, true);
-    assert.deepEqual(result.body.results, []);
-  });
+  await withNow(Date.parse('2026-09-03T00:00:00Z'), () =>
+    withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const result = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(result.status, 200);
+      assert.equal(result.body.idempotent, true);
+      assert.deepEqual(result.body.results, []);
+    }));
   assert.equal(fetches, 0);
 });
 

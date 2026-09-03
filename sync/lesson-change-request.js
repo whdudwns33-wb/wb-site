@@ -24,6 +24,7 @@ import {
   lessonSessionPackTransferStatements
 } from './session-pack-transfer.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -92,6 +93,11 @@ function isLessonTask(task) {
     task.intakeVersion);
 }
 
+function isRegularLessonTask(task) {
+  return isLessonTask(task) && String(task.lessonInstanceType || '') !== 'makeup' &&
+    !String(task.makeupCaseId || '').trim();
+}
+
 async function lessonStaffIdsForStudent(env, app, studentId, now = Date.now()) {
   const referenceDate = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const result = await env.DB.prepare(
@@ -104,7 +110,7 @@ async function lessonStaffIdsForStudent(env, app, studentId, now = Date.now()) {
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     const owner = String(row.owner || '');
     const end = String(task && task.end || '');
-    if (!isLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
+    if (!isRegularLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
         String(task.staffId || '') !== owner || String(task.studentId || '') !== studentId ||
         (end && (!ISO_DATE.test(end) || end < referenceDate))) continue;
     staffIds.push(owner);
@@ -236,7 +242,7 @@ export async function handleLessonChangeRequest(env, app, body, origin, auth, js
   if (!task.owner || !SAFE_ID.test(String(task.owner))) {
     return json({ ok: false, error: '담당자가 지정된 지시서만 요청할 수 있습니다' }, 409, origin);
   }
-  if (!isLessonTask(task.data) || String(task.data.id || '') !== taskId ||
+  if (!isRegularLessonTask(task.data) || String(task.data.id || '') !== taskId ||
       String(task.data.staffId || '') !== String(task.owner)) {
     return json({ ok: false, error: '수업 담당자와 저장 담당자가 일치하는 수업만 변경 요청할 수 있습니다' }, 409, origin);
   }
@@ -378,7 +384,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (!taskData || taskData.deleted) {
       return json({ ok: false, error: '삭제된 지시서는 반영할 수 없습니다' }, 409, origin);
     }
-    if (!isLessonTask(taskData) || String(taskData.id || '') !== String(current.task_id) ||
+    if (!isRegularLessonTask(taskData) || String(taskData.id || '') !== String(current.task_id) ||
         String(taskData.staffId || '') !== String(taskRow.owner || '') ||
         String(current.owner || '') !== String(taskRow.owner || '')) {
       return json({ ok: false, error: '요청 이후 수업 담당자 또는 수업 정체성이 변경되었습니다. 다시 요청해 주세요' }, 409, origin);
@@ -460,7 +466,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       for (const row of duplicateRows.results || []) {
         let data;
         try { data = JSON.parse(row.data || '{}'); } catch (error) { corruptAssignment = true; break; }
-        if (!isLessonTask(data)) continue;
+        if (!isRegularLessonTask(data)) continue;
         if (!SAFE_ID.test(String(row.id || '')) || String(row.owner || '') !== selectedStaffId ||
             String(data.id || '') !== String(row.id || '') || String(data.staffId || '') !== selectedStaffId ||
             String(data.studentId || '') !== studentId) {
@@ -507,6 +513,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
          'AND duplicate.owner=? AND json_valid(duplicate.data) AND json_type(duplicate.data)=\'object\' ' +
          'AND json_extract(duplicate.data,\'$.studentId\')=? ' +
          'AND COALESCE(json_extract(duplicate.data,\'$.deleted\'),0)=0 ' +
+         'AND COALESCE(CAST(json_extract(duplicate.data,\'$.lessonInstanceType\') AS TEXT),\'\')<>\'makeup\' ' +
+         'AND COALESCE(CAST(json_extract(duplicate.data,\'$.makeupCaseId\') AS TEXT),\'\')=\'\' ' +
          'AND (json_extract(duplicate.data,\'$.taskKind\')=\'lesson_instruction\' ' +
          'OR json_type(duplicate.data,\'$.lessonFormVersion\') IS NOT NULL ' +
          'OR json_type(duplicate.data,\'$.intakeVersion\') IS NOT NULL) ' +
@@ -538,7 +546,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
         try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
         const owner = String(row.owner || '');
         const lessonEnd = String(data && data.end || '');
-        if (!isLessonTask(data) || !SAFE_ID.test(owner) || String(data.id || '') !== String(row.id || '') ||
+        if (!isRegularLessonTask(data) || !SAFE_ID.test(owner) || String(data.id || '') !== String(row.id || '') ||
             String(data.staffId || '') !== owner || String(data.studentId || '') !== studentId ||
             (lessonEnd && (!ISO_DATE.test(lessonEnd) || lessonEnd < effectiveDate))) continue;
         const updatedAt = Math.max(now, Number(row.updated_at || 0) + 1);
@@ -551,6 +559,21 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
           [requestKey, expectedRevision, row.id, row.owner, row.updated_at, updatedAt].join('\n'), updatedAt));
         audienceStaffIds.push(String(row.owner || ''));
       }
+      let makeupCleanup;
+      try {
+        makeupCleanup = await prepareMakeupLifecycleCleanup(env, app, {
+          studentId, lifecycleAction: operation, actorId: studentChangeActorKey(auth), actorRole, now
+        });
+      } catch (error) {
+        if (isMakeupLifecycleConflict(error)) {
+          return json({ ok: false, code: 'MAKEUP_LIFECYCLE_CONFLICT',
+            error: String(error.message || error) }, 409, origin);
+        }
+        throw error;
+      }
+      const makeupOffset = statements.length;
+      statements.push(...makeupCleanup.statements);
+      requiredChangeIndexes.push(...makeupCleanup.requiredIndexes.map(index => makeupOffset + index));
     } else if (operation === 'lesson_delete') {
       eventType = 'lesson_delete'; changedFields = ['deleted']; requiresAck = false;
       details = { effectiveDate };
@@ -563,6 +586,22 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_delete_task',
         [requestKey, expectedRevision, current.task_id, taskRow.owner, taskRow.updated_at, updatedAt].join('\n'),
         updatedAt));
+      let makeupCleanup;
+      try {
+        makeupCleanup = await prepareMakeupLifecycleCleanup(env, app, {
+          sourceTaskId: String(current.task_id), lifecycleAction: operation,
+          actorId: studentChangeActorKey(auth), actorRole, now
+        });
+      } catch (error) {
+        if (isMakeupLifecycleConflict(error)) {
+          return json({ ok: false, code: 'MAKEUP_LIFECYCLE_CONFLICT',
+            error: String(error.message || error) }, 409, origin);
+        }
+        throw error;
+      }
+      const makeupOffset = statements.length;
+      statements.push(...makeupCleanup.statements);
+      requiredChangeIndexes.push(...makeupCleanup.requiredIndexes.map(index => makeupOffset + index));
     } else {
       eventType = 'information_request'; changedFields = ['informationRequest']; requiresAck = false;
       details = { request: String(changes.informationRequest || ''), note: String(current.note || '') };

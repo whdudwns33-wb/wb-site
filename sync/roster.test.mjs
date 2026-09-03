@@ -540,6 +540,142 @@ test('direct leave only retires lessons that still reach the effective date and 
   assert.equal(oldUnrelatedTeacher.body.roster.students.some(student => student.id === 'student-a'), false);
 });
 
+test('direct leave atomically cancels active makeup and soft-deletes its generated lesson without erasing records', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const sourceTaskId = 'lesson-makeup-source';
+  const caseId = 'mu_roster_lifecycle';
+  const lessonTaskId = 'makeup_lesson_' + caseId;
+  seedLesson(db, sourceTaskId, 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', caseId, 'student-a', sourceTaskId, '2026-08-17', 'teacher-a',
+    'mc_roster_lifecycle', 'confirmed', 1, '2026-08-30T10:00:00+09:00',
+    '2026-08-30T10:50:00+09:00', 'teacher-a',
+    JSON.stringify([{ action: 'schedule', revision: 1, at: 100 }]), 100, 100).run();
+  seedLesson(db, lessonTaskId, 'teacher-a', 'student-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, makeupSourceTaskId: sourceTaskId,
+    makeupSourceDate: '2026-08-17', repeat: 'once', days: [0], start: '2026-08-30', end: '2026-08-30'
+  });
+  db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', lessonTaskId + '|2026-08-30', 'teacher-a',
+      JSON.stringify({ taskId: lessonTaskId, date: '2026-08-30', att: 'P', note: '보존할 수업 기록' }), 200, 200).run();
+
+  const initial = await call(db, { auth: admin, action: 'get' });
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20'
+  });
+  assert.equal(leave.status, 200);
+  const makeupCase = db.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=?')
+    .bind('task', caseId).first();
+  assert.equal(makeupCase.status, 'cancelled');
+  assert.equal(makeupCase.reason, 'student_inactive');
+  assert.equal(makeupCase.revision, 2);
+  assert.equal(JSON.parse(makeupCase.history).at(-1).action, 'cancel_for_source_lifecycle');
+  assert.equal(JSON.parse(makeupCase.history).at(-1).lifecycleAction, 'leave');
+  const generated = JSON.parse(db.prepare('SELECT data FROM tasks WHERE app=? AND id=?')
+    .bind('task', lessonTaskId).first().data);
+  assert.equal(generated.deleted, true);
+  assert.equal(generated.makeupCancelledReason, 'leave');
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM checks WHERE app=? AND k=?')
+    .bind('task', lessonTaskId + '|2026-08-30').first().count, 1,
+  '생성 보강의 출결·메모 행은 지우지 않는다');
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM makeup_cases WHERE app='task' AND status='confirmed'").first().count, 0,
+    '취소된 보강은 시간 충돌을 더 이상 점유하지 않는다');
+});
+
+test('a concurrent makeup change rolls back the entire direct leave including generated-task hiding', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const sourceTaskId = 'lesson-makeup-race';
+  const caseId = 'mu_roster_lifecycle_race';
+  const lessonTaskId = 'makeup_lesson_' + caseId;
+  seedLesson(db, sourceTaskId, 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', caseId, 'student-a', sourceTaskId, '2026-08-17', 'teacher-a',
+    'mc_roster_lifecycle_race', 'confirmed', 1, '2026-08-30T10:00:00+09:00',
+    '2026-08-30T10:50:00+09:00', 'teacher-a', '[]', 100, 100).run();
+  seedLesson(db, lessonTaskId, 'teacher-a', 'student-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, makeupSourceTaskId: sourceTaskId,
+    makeupSourceDate: '2026-08-17', repeat: 'once', days: [0], start: '2026-08-30', end: '2026-08-30'
+  });
+  const initial = await call(db, { auth: admin, action: 'get' });
+  db.beforeBatch = database => database.prepare(
+    "UPDATE makeup_cases SET revision=revision+1,updated_at=updated_at+1 WHERE app='task' AND case_id=?"
+  ).run(caseId);
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'withdrawal', effectiveDate: '2026-08-20'
+  });
+  assert.equal(leave.status, 409);
+  assert.equal(leave.body.code, 'ROSTER_REVISION_CONFLICT');
+  assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(sourceTaskId).first().data).deleted, false);
+  assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(lessonTaskId).first().data).deleted, false);
+  assert.equal(db.prepare('SELECT status FROM makeup_cases WHERE case_id=?').bind(caseId).first().status, 'confirmed');
+  const student = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === 'student-a');
+  assert.equal(student.reason, '');
+});
+
+test('an active makeup created after cleanup selection aborts direct withdrawal without leaving an orphan', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const sourceTaskId = 'lesson-makeup-scope-race';
+  const knownCaseId = 'mu_roster_scope_known';
+  const knownLessonTaskId = 'makeup_lesson_' + knownCaseId;
+  const racedCaseId = 'mu_roster_scope_raced';
+  const racedLessonTaskId = 'makeup_lesson_' + racedCaseId;
+  seedLesson(db, sourceTaskId, 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', knownCaseId, 'student-a', sourceTaskId, '2026-08-17', 'teacher-a',
+    'mc_roster_scope_known', 'confirmed', 1, '2026-08-30T10:00:00+09:00',
+    '2026-08-30T10:50:00+09:00', 'teacher-a', '[]', 100, 100).run();
+  seedLesson(db, knownLessonTaskId, 'teacher-a', 'student-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: knownCaseId, makeupSourceTaskId: sourceTaskId,
+    makeupSourceDate: '2026-08-17', repeat: 'once', days: [0], start: '2026-08-30', end: '2026-08-30'
+  });
+  const initial = await call(db, { auth: admin, action: 'get' });
+  db.beforeBatch = database => {
+    const racedAt = Date.now();
+    database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+      'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', racedCaseId, 'student-a', sourceTaskId, '2026-08-18', 'teacher-a',
+      'mc_roster_scope_raced', 'confirmed', 1, '2026-09-06T11:00:00+09:00',
+      '2026-09-06T11:50:00+09:00', 'teacher-a', '[]', racedAt, racedAt);
+    const racedTask = {
+      id: racedLessonTaskId, staffId: 'teacher-a', studentId: 'student-a',
+      taskKind: 'lesson_instruction', lessonFormVersion: 1, deleted: false,
+      lessonInstanceType: 'makeup', makeupCaseId: racedCaseId, makeupSourceTaskId: sourceTaskId,
+      makeupSourceDate: '2026-08-18', repeat: 'once', days: [0],
+      start: '2026-09-06', end: '2026-09-06', createdAt: racedAt, updatedAt: racedAt
+    };
+    database.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .run('task', racedLessonTaskId, 'teacher-a', JSON.stringify(racedTask), racedAt, racedAt);
+  };
+  const withdrawal = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'withdrawal', effectiveDate: '2026-08-20'
+  });
+  assert.equal(withdrawal.status, 409);
+  assert.equal(withdrawal.body.code, 'ROSTER_REVISION_CONFLICT');
+  assert.equal(db.prepare('SELECT status FROM makeup_cases WHERE case_id=?').bind(knownCaseId).first().status, 'confirmed');
+  assert.equal(db.prepare('SELECT status FROM makeup_cases WHERE case_id=?').bind(racedCaseId).first().status, 'confirmed');
+  assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(knownLessonTaskId).first().data).deleted, false);
+  assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(racedLessonTaskId).first().data).deleted, false);
+  assert.equal(JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(sourceTaskId).first().data).deleted, false);
+  const student = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === 'student-a');
+  assert.equal(student.reason, '');
+});
+
 test('a lesson CAS race aborts the whole direct transition without changing roster or history', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   seedLesson(db, 'lesson-direct-race', 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
@@ -606,6 +742,10 @@ test('person roster and book candidates follow current lesson stable ids instead
   const db = new TestD1(); seedAuth(db); await replace(db);
   seedLesson(db, 'lesson-a-b', 'teacher-a', 'student-b');
   seedLesson(db, 'lesson-b-shared', 'teacher-b', 'student-shared');
+  seedLesson(db, 'makeup_lesson_mu_roster_scope', 'teacher-a', 'student-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_roster_scope',
+    start: '2099-08-20', end: '2099-08-20', repeat: 'once'
+  });
   const teacherA = await call(db, { auth: person('teacher-a', 'token-a'), action: 'get' });
   assert.equal(teacherA.status, 200);
   assert.deepEqual(teacherA.body.roster.students.map(item => item.id), ['student-b']);

@@ -91,8 +91,9 @@ function hasWeekendSchedule(task) {
 }
 
 function isLesson(task) {
-  return !!(task && !task.deleted && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion ||
-    task.intakeVersion));
+  return !!(task && !task.deleted && String(task.lessonInstanceType || '') !== 'makeup' &&
+    !String(task.makeupCaseId || '').trim() &&
+    (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion));
 }
 
 function activeOn(task, date) {
