@@ -23,8 +23,12 @@ const WHO = { code: '__admin__', admin: true };
 function memStore() {
   const jobs = new Map(), src = new Map(), packs = new Map();
   let ids = [];
+  let aiUse = null;
   return {
     jobs, src, packs,
+    getAiUse: async () => aiUse,
+    putAiUse: async (rec) => { aiUse = rec; },
+    peekAiUse: () => aiUse,
     getJob: async (id) => jobs.get(id) || null,
     putJob: async (id, rec) => { jobs.set(id, rec); },
     deleteJob: async (id) => { jobs.delete(id); },
@@ -199,6 +203,40 @@ await t('초안 직접 넣기 — 키 없이도 스튜디오를 쓸 수 있다',
   assert.strictEqual(r.body.job.counts.words, 1);
   assert.ok(!('empty' in r.body.job.counts), '빈 배열은 안 담는다');
   assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: cr.body.jobId, draft: {} })).status, 400);
+});
+
+/* ── 비용 한도 (기획서 §13-8) ──
+   요금이 걸린 자리라 '막힌다'만이 아니라 '얼마나 남았는지'까지 화면에 가야 한다. */
+await t('AI 추출은 하루 한도를 받고, 남은 횟수를 화면에 돌려준다', async () => {
+  const s2 = memStore();
+  const cr = await call(s2, '/api/naesin/admin/job', 'POST', {
+    packId: '2022-q-m2-L1', sources: [{ name: 'w.txt', kind: 'words', text: '원천' }],
+  });
+  const id = cr.body.jobId;
+  const ai = { ...fakeAi({ words: [{ id: 'w-001', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] }), env: { NAESIN_AI_DAILY: '2' } };
+  const r1 = await call(s2, '/api/naesin/admin/job/extract', 'POST', { jobId: id, kind: 'words' }, { ai });
+  assert.strictEqual(r1.body.ok, true, JSON.stringify(r1.body).slice(0, 200));
+  assert.strictEqual(r1.body.aiCap, 2);
+  assert.strictEqual(r1.body.aiLeft, 1, '남은 횟수가 화면에 가야 관리가 된다');
+  assert.strictEqual(s2.peekAiUse().count, 1, '장부에 남는다');
+
+  const r2 = await call(s2, '/api/naesin/admin/job/extract', 'POST', { jobId: id, kind: 'words' }, { ai });
+  assert.strictEqual(r2.body.aiLeft, 0);
+  const r3 = await call(s2, '/api/naesin/admin/job/extract', 'POST', { jobId: id, kind: 'words' }, { ai });
+  assert.strictEqual(r3.body.ok, false);
+  assert.strictEqual(r3.body.reason, 'quota', '한도를 넘으면 부르지 않는다');
+  assert.strictEqual(s2.peekAiUse().count, 2, '막힌 요청은 장부를 올리지 않는다');
+});
+
+await t('환경변수가 없으면 기본 한도(80)를 쓴다 — 오타로 기능이 죽지 않게', async () => {
+  const s2 = memStore();
+  const cr = await call(s2, '/api/naesin/admin/job', 'POST', {
+    packId: '2022-q-m2-L2', sources: [{ name: 'w.txt', kind: 'words', text: '원천' }],
+  });
+  const r = await call(s2, '/api/naesin/admin/job/extract', 'POST', { jobId: cr.body.jobId, kind: 'words' },
+    { ai: { ...fakeAi({ words: [{ id: 'w-001', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] }), env: {} } });
+  assert.strictEqual(r.body.aiCap, 80);
+  assert.strictEqual(r.body.aiLeft, 79);
 });
 
 console.log('\n== 검수');

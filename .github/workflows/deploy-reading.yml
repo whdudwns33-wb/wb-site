@@ -92,6 +92,22 @@ jobs:
         run: node reading-server/build-dist.mjs
       - name: 배포본 캐시 무효화 검증
         run: node reading-server/dist-cache.test.mjs
+      # 배포 #90·#91 이 여기서 죽었다: 저장소 테스트는 전부 초록인데 워커 번들이
+      # 'node:module' 을 찾다 실패했다(Node 에서는 잘 도는 코드였다). 실패가 배포 로그에만
+      # 있어서 운영이 두 판 뒤처진 것을 한참 뒤에 알았다. dry-run 은 자격증명 없이도 돌고
+      # 번들을 실제로 만들어 보므로, 같은 종류는 여기서 먼저 멈춘다.
+      - name: 워커 번들 검증 (dry-run — 자격증명 없이 돈다)
+        working-directory: reading-server
+        run: npx wrangler@4 deploy --dry-run --outdir=/tmp/wb-bundle
+      - name: 번들에 Node 전용 모듈이 없는지
+        run: |
+          if grep -rl 'node:' /tmp/wb-bundle/*.js 2>/dev/null | head -1 | grep -q .; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
+            grep -o 'node:[a-z]*' /tmp/wb-bundle/*.js | sort -u
+            exit 1
+          fi
+          echo "번들 정상 — node: 임포트 없음"
+
       - name: Cloudflare Workers 배포
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

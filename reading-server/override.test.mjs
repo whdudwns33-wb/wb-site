@@ -107,6 +107,13 @@ for (const { rel, code } of graph) {
   if (/\brequire\s*\(/.test(code) && !/typeof module/.test(code))
     E(`${rel} 이 런타임 require 를 씁니다 — 번들러가 풀지 못합니다`);
 }
+/* 비용 장부 어댑터가 양쪽 호스트에 다 있는가 — 한쪽만 있으면 그 호스트에서는 한도가 없는 셈이다 */
+for (const [name, rel] of [['worker.mjs', 'worker.mjs'], ['server.mjs', 'server.mjs']]) {
+  const txt = fs.readFileSync(path.join(DIR, rel), 'utf8');
+  for (const fn of ['getAiUse', 'putAiUse'])
+    if (!txt.includes(fn + ':')) E(`${name} 의 내신 저장소 어댑터에 ${fn} 이 없습니다 — 그 호스트에서는 AI 비용 한도가 걸리지 않습니다`);
+}
+
 /* 공용 검사 모듈이 실제로 그래프에 들어와 있는가 — 배포 관문이 CLI 검증기와 같은 규칙을 쓰는 근거다 */
 if (!graph.some((g) => g.rel.endsWith('pack-check.js')))
   E('worker.mjs 그래프에 naesin/pack-check.js 가 없습니다 — 배포 관문이 검사 규칙을 잃었습니다');

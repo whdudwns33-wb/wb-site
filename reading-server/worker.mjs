@@ -157,6 +157,10 @@ function naesinStore(env) {
     /* 수업 라이브 세션 — 지금 이 단계·투사 문제와 그 응답. 만료(4시간) 판정은 읽는 쪽이 한다.
        KV 는 만료를 걸 수 있지만(expirationTtl) 단계를 연장할 때마다 새로 써야 하고,
        만료된 값을 강사 화면이 「끝난 수업」으로 보여 줄 수도 있어 값은 남기고 판정만 한다. */
+    /* 팩 제작 AI 추출의 하루 사용 장부(기획서 §13-8) — 학생용 AI 한도(vocab)와 따로 센다.
+       둘을 한 장부에 담으면 팩 하나 만들다 학생들의 연상 만들기가 막힌다. */
+    getAiUse: () => env.DB.get('naesin:aiuse', 'json'),
+    putAiUse: (rec) => env.DB.put('naesin:aiuse', JSON.stringify(rec)),
     getLive: (s) => env.DB.get('naesin:live:' + s, 'json'),
     putLive: (s, rec) => env.DB.put('naesin:live:' + s, JSON.stringify(rec)),
     deleteLive: (s) => Promise.all([env.DB.delete('naesin:live:' + s), env.DB.delete('naesin:livevote:' + s)]),
@@ -487,7 +491,10 @@ export default {
           getBody: () => req.json(), store: naesinStore(env),
         };
         /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
-        const st = await handleStudio({ ...ctx, ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.NAESIN_AI_MODEL || '' } });
+        const st = await handleStudio({
+          ...ctx,
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.NAESIN_AI_MODEL || '', env },
+        });
         if (st) return json(st.status, st.body);
         const out = await handleNaesin(ctx);
         return json(out.status, out.body);

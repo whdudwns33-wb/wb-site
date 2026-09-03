@@ -577,19 +577,32 @@ async function runExtract(kind,btn){
     if(!j.ok){
       const parts=(j.parts||[]).filter(p=>!p.ok);
       $('#exOut').innerHTML='<div class="issues bad"><b>'+esc(reasonKo(j.reason))+'</b>'
-        +(parts.length?'<div class="muted">실패한 구간 '+num(parts.length)+'개</div>':'')+'</div>';
+        +(parts.length?'<div class="muted">실패한 구간 '+num(parts.length)+'개</div>':'')
+        +aiLeftHtml(j)+'</div>';
       BUSY=false;btn.disabled=false;btn.textContent=old;return;
     }
     /* 초안이 바뀌었으니 검수 상태·판정을 서버에서 다시 받는다 */
     BUSY=false;
-    const msg=kindKo(kind)+' '+j.count+'행을 뽑았어요.'+((j.parts||[]).some(p=>!p.ok)?' (일부 구간 실패 — 원천을 나눠 다시 시도할 수 있어요)':'');
+    const short=(j.parts||[]).filter(p=>!p.ok);
+    const byQuota=short.some(p=>p.reason==='quota');
+    const msg=kindKo(kind)+' '+j.count+'행을 뽑았어요.'
+      +(byQuota?' 오늘 AI 한도에 걸려 일부 구간을 못 불렀어요 — 내일 이어서 하거나 한도를 올리세요.'
+        :short.length?' (일부 구간 실패 — 원천을 나눠 다시 시도할 수 있어요)':'');
+    const left=aiLeftHtml(j);
     await openJob(JOB.jobId);
-    $('#exOut').innerHTML='<div class="issues ok">'+esc(msg)+'</div>';
+    $('#exOut').innerHTML='<div class="issues '+(byQuota?'warn':'ok')+'">'+esc(msg)+left+'</div>';
   }catch(e){
     BUSY=false;btn.disabled=false;btn.textContent=old;
     if(isAuth(e))return;
     $('#exOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';
   }
+}
+/* 오늘 남은 AI 호출 수 — 요금이 걸린 값이라 화면에서 보이지 않으면 관리가 안 된다.
+   호출 한 번이 대략 200원, 팩 하나가 10~15회다(기획서 §13-8). */
+function aiLeftHtml(j){
+  if(j==null||j.aiLeft==null)return '';
+  const left=num(j.aiLeft),cap=num(j.aiCap);
+  return '<div class="muted">오늘 남은 AI 호출 '+left+'/'+cap+'회 — 팩 하나에 10~15회쯤 듭니다.</div>';
 }
 async function putDraft(){
   const raw=$('#draftJson').value;
