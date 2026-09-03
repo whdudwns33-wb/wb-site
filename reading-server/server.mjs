@@ -62,6 +62,8 @@ const naesinRoot = () => {
   db.naesin.reports = db.naesin.reports || {};
   db.naesin.jobs = db.naesin.jobs || {};
   db.naesin.jobSrc = db.naesin.jobSrc || {};
+  db.naesin.live = db.naesin.live || {};
+  db.naesin.votes = db.naesin.votes || {};
   return db.naesin;
 };
 const naesinStore = {
@@ -82,6 +84,12 @@ const naesinStore = {
   /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
   getReports: (id) => naesinRoot().reports[id] || null,
   putReports: (id, list) => { naesinRoot().reports[id] = list; persist(); },
+  /* 수업 라이브 세션 — 지금 이 단계·투사 문제. 4시간 뒤 만료 판정은 읽는 쪽(naesin-live)이 한다 */
+  getLive: (s) => naesinRoot().live[s] || null,
+  putLive: (s, rec) => { naesinRoot().live[s] = rec; persist(); },
+  deleteLive: (s) => { delete naesinRoot().live[s]; delete naesinRoot().votes[s]; persist(); },
+  getVotes: (s) => naesinRoot().votes[s] || null,
+  putVotes: (s, rec) => { naesinRoot().votes[s] = rec; persist(); },
   /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 두고(jobSrc)
      목록 조회가 매번 수 MB를 읽지 않게 한다. 작업을 지우면 원천도 함께 지운다. */
   getJob: (id) => naesinRoot().jobs[id] || null,

@@ -288,6 +288,36 @@
       .big3 .n { font-size: 28px; }
       .bar .who { font-size: 11.5px; }   /* 세로 태블릿에서도 보인다 — 「다른 학생으로 연동」 입구가 사라지면 안 된다 */
     }
+
+    /* ── 수업 띠(타임박스) ──
+       강사가 세운 단계를 알리기만 한다 — 화면을 대신 넘기지 않는다(계약 L3).
+       44px 이상 터치 타깃과 색 대비는 앱 나머지와 같은 기준. */
+    .live{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0;padding:10px 16px;
+      background:var(--b1);color:var(--ink);border-bottom:1px solid var(--line);font-weight:800}
+    .live[hidden]{display:none}
+    .live .lk{padding:3px 10px;border-radius:999px;background:#fff;color:var(--ind);font-size:12.5px;font-weight:900}
+    .live .lt{flex:1;min-width:0;font-size:15px}
+    .live .lc{font-variant-numeric:tabular-nums;font-size:20px;font-weight:900;color:var(--ind)}
+    .live .lc.low{color:var(--red)}
+    .live button{min-height:44px;padding:6px 16px;border:0;border-radius:12px;background:var(--ind);color:#fff;font:inherit;font-weight:900}
+    .live button.ghost{background:#fff;color:var(--ind);border:1.5px solid var(--ind)}
+    /* ── 투사 응답 모드 ──
+       문제 본문은 TV에 있다. 태블릿에는 번호와 보기 버튼만 크게 — 학생이 화면을 읽느라
+       고개를 내리면 투사의 의미가 없다. */
+    .pjv{position:fixed;inset:0;z-index:60;background:var(--bg);display:none;overflow:auto}
+    .pjv.open{display:block}
+    .pjv .pin{max-width:720px;margin:auto;padding:22px 16px 40px;text-align:center}
+    .pjv .pno{font-size:15px;font-weight:900;color:var(--ind)}
+    .pjv .phd{margin:6px 0 4px;font-size:26px;font-weight:900;color:var(--ink)}
+    .pjv .psub{color:var(--soft);font-size:14px;font-weight:700}
+    .pjv .pch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}
+    .pjv .pch button{min-height:78px;padding:10px;border:2.5px solid var(--line);border-radius:16px;background:#fff;
+      color:var(--ink);font:inherit;font-size:22px;font-weight:900}
+    .pjv .pch button.pick{border-color:var(--ind);background:var(--b1)}
+    .pjv .pch button.right{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+    .pjv .pch button.wrong{border-color:var(--red);background:var(--red-soft);color:var(--red)}
+    .pjv .pmsg{margin-top:16px;font-size:17px;font-weight:900}
+    .pjv .pmsg.ok{color:var(--green)}.pjv .pmsg.bad{color:var(--red)}
   </style>
 </head>
 <body>
@@ -306,7 +336,20 @@
   <span class="dd" id="ddayBadge">—</span>
 </header>
 <div class="banner" id="topBanner" hidden></div>
+<div class="live" id="liveBar" hidden role="status" aria-live="polite">
+  <span class="lk" id="liveKind"></span>
+  <span class="lt" id="liveLabel"></span>
+  <span class="lc" id="liveClock"></span>
+  <button type="button" id="liveGo">이 단계로 이동</button>
+</div>
 <div class="wrap" id="wrap"></div>
+<div class="pjv" id="pjv" role="dialog" aria-modal="true" aria-label="선생님이 띄운 문제" tabindex="-1"><div class="pin">
+  <div class="pno" id="pjNo"></div>
+  <h2 class="phd">화면(TV)의 문제를 보고 답을 고르세요</h2>
+  <p class="psub" id="pjSub">문제는 앞 화면에 있어요.</p>
+  <div class="pch" id="pjCh"></div>
+  <p class="pmsg" id="pjMsg"></p>
+</div></div>
 
 <div class="runner" id="runner" role="dialog" aria-modal="true" aria-label="학습 진행" tabindex="-1"><div class="rshell">
   <div class="rtop">
@@ -425,6 +468,21 @@
   }
   function setLast(label, resume) { DB.last = { packId: pack.packId, label: label, resume: resume || null, at: Date.now() }; }
   function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+  /* ── 학원 달력 (KST) ──
+     서버는 시험 만료·과제 날짜를 늘 KST 로 판정하고(naesin-api todayKst), 관리 웹도 KST 로 적는다.
+     학생 앱만 기기 시간대로 견주면 시간대가 어긋난 태블릿에서 배정된 과제가 조용히 안 뜨고
+     D-day 도 하루 어긋난다 — 실제로 그랬다. 서버가 준 날짜와 견주는 자리는 전부 이 함수를 쓴다.
+     (엔진의 '다른 날' 판정은 학생 자기 날짜라 기기 로컬 그대로 둔다 — 별개 문제다.) */
+  function kstDate(now) { return new Date((now == null ? Date.now() : now) + 9 * 3600e3).toISOString().slice(0, 10); }
+  /* 서버가 준 'YYYY-MM-DD' 까지 남은 날 수 (학원 달력 기준, 오늘=0) */
+  function kstDaysUntil(ymd) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+    if (!m) return null;
+    var target = Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5;
+    var today = Date.UTC.apply(null, kstDate().split('-').map(function (x, i) { return i === 1 ? +x - 1 : +x; })) / 864e5;
+    return Math.round(target - today);
+  }
+
   function api(path, opt) {
     var a = auth();
     if (!a || !a.token) return Promise.reject(new Error('no-auth'));
@@ -481,10 +539,19 @@
     el.className = 'savedot ' + s;
     el.querySelector('span').textContent = SAVE_LABEL[s][0];
     el.title = SAVE_LABEL[s][1];
-    if (s === 'toobig') showBanner('기록이 너무 커서 저장되지 않았습니다. 선생님께 알려 주세요.');
-    else if (s === 'saved') showBanner('');
+    if (s === 'toobig') showBanner('기록이 너무 커서 저장되지 않았습니다. 선생님께 알려 주세요.', 'save');
+    else if (s === 'saved') clearBanner('save');
   }
-  function showBanner(msg) { var b = $('topBanner'); b.textContent = msg; b.hidden = !msg; }
+  /* 띠 하나를 여러 곳이 쓴다 — 저장 상태·문항 신고·수업 안내. 임자를 적어 두지 않으면
+     저장이 성공할 때마다 남의 안내가 지워진다("선생님께 전달했어요"가 1초 뒤 사라졌다).
+     지우는 것은 자기가 띄운 것만 지운다. */
+  var bannerOwner = null;
+  function showBanner(msg, owner) {
+    var b = $('topBanner');
+    b.textContent = msg; b.hidden = !msg;
+    bannerOwner = msg ? (owner || 'app') : null;
+  }
+  function clearBanner(owner) { if (bannerOwner === owner || bannerOwner == null) showBanner(''); }
 
   var syncTimer = null;
   /* 체험 교재(배정 전 연습)는 서버에 올리지 않는다 — 관리 overview에 예시 교재 요약이 학생 기록으로 뜨면 안 된다 */
@@ -513,8 +580,39 @@
       task: task,
       passage: passageSummaryOf(curPackId()) || undefined,
       range: rangeSummaryNow(),
+      live: liveSelf(),
       updatedAt: new Date().toISOString()
     };
+  }
+  /* 계약 L2 의 summary.live — 강사 라이브 보드가 「지금 무엇을 하고 있는지」를 읽는 값.
+     서버가 화이트리스트로 정규화하고 강사 화면이 다시 이스케이프한다(두 겹을 유지). */
+  function liveSelf() {
+    var where = RQ ? 'runner' : (view === 'home' || view === 'words' || view === 'passage' || view === 'quiz' || view === 'progress' ? view : 'home');
+    var label = RQ ? String(RQ.title || '') : selfLabel();
+    return {
+      at: new Date().toISOString(), where: where, label: label.slice(0, 40),
+      /* 정체는 마지막 조작 이후다 — 화면을 켜 두고 딴짓하는 것을 강사가 알아야 한다 */
+      idleSec: Math.max(0, Math.round((Date.now() - lastAct) / 1000)),
+      todayDone: doneToday()
+    };
+  }
+  function selfLabel() {
+    if (view === 'words') return selWordId ? ('단어 ' + selWordId) : '단어 목록';
+    if (view === 'passage') return selPass ? ('본문 ' + selPass.kind) : (selSeq != null ? ('본문 문장 ' + selSeq) : '본문 목록');
+    if (view === 'quiz') return selType ? ('문제 ' + selType) : '문제 목록';
+    if (view === 'progress') return '성취도';
+    return '홈';
+  }
+  /* 오늘 끝낸 세션 수 — 범위 전체의 학습 로그에서 센다(과 하나만 세면 통합 범위에서 절반이 빠진다) */
+  function doneToday() {
+    var day = kstDate(), n = 0;
+    Object.keys(DB.packs || {}).forEach(function (pid) {
+      var lg = (DB.packs[pid] && DB.packs[pid].log) || [];
+      for (var i = 0; i < lg.length; i += 1) if (String(lg[i].at || '').slice(0, 10) === day) n += 1;
+      var tl = (DB.packs[pid] && DB.packs[pid].taskLog && DB.packs[pid].taskLog[day]) || null;
+      if (tl) n += Math.max(0, Number(tl.total) || 0) ? 1 : 0;
+    });
+    return Math.min(9999, n);
   }
   /* 계약 R1 의 summary.range — 시험 범위 전체 합계 + 과별 값. 관리 현황판이 "시험 범위 100%"를
      한 단위로 보게 하는 값이라, 팩 하나만 열려 있어도(단일 범위) 같은 모양으로 낸다.
@@ -808,7 +906,8 @@
      시험은 범위 전체에 하나다 — 시험일·오버라이드도 범위의 모든 과에 같이 걸고 같이 푼다
      (성취도 탭 「적용」·「자율 학습으로」가 rangeIds() 를 돌며 쓴다). */
   function exam(pid) { var pd = packDB(pid); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
-  function examEnded() { var ex = exam(); return !!(ex && ex.examDate && WBNAESIN.daysUntil(ex.examDate, Date.now()) < 0); }
+  /* 만료 판정은 서버(resolveExam)와 같은 달력이어야 한다 — 한쪽만 '시험 끝'이면 화면과 서빙이 어긋난다 */
+  function examEnded() { var ex = exam(), d = ex && ex.examDate ? kstDaysUntil(ex.examDate) : null; return d != null && d < 0; }
   /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
   function applyServerExam(pid) {
     var ex = examServer;
@@ -908,6 +1007,14 @@
   var FADED_STAGES = { 1: true, 3: true, 5: true };   // 단서 농도가 걸리는 단계(§3.3)
   var CK_MAX = 3, PG_MAX = 3;
 
+  /* ── 마지막 조작 시각 ──
+     강사 화면의 「정체」가 이 값에서 나온다. 화면을 켜 두고 딴짓하는 것과 열심히 푸는 것을
+     서버가 가릴 방법이 이것뿐이다(state 는 3초 디바운스로만 올라간다). */
+  var lastAct = Date.now();
+  ['pointerdown', 'keydown', 'input'].forEach(function (ev) {
+    document.addEventListener(ev, function () { lastAct = Date.now(); }, { passive: true, capture: true });
+  });
+
   /* ── 탭 ── */
   function setTab(t) {
     view = t;
@@ -955,7 +1062,7 @@
     setSaveStatus(saveStatus);
     var ex = exam(), b = $('ddayBadge');
     if (ex && ex.examDate) {
-      var d = WBNAESIN.daysUntil(ex.examDate, Date.now());
+      var d = kstDaysUntil(ex.examDate);
       if (d >= 0) { b.textContent = 'D-' + d; b.className = 'dd'; }
       else { b.textContent = '시험 종료 · 자율 학습'; b.className = 'dd practice'; }
     } else { b.textContent = '자율 학습'; b.className = 'dd practice'; }
@@ -1086,7 +1193,7 @@
   /* 오늘 과제(세션 ⑤ 수업 모드) — 서버 과제의 date가 오늘일 때만 */
   function todayTask() {
     var t = taskServer && taskServer.task;
-    return (t && t.date === WBNAESIN.localDate(Date.now())) ? t : null;
+    return (t && t.date === kstDate()) ? t : null;
   }
   /* 완료 = 같은 날짜의 로그가 '그 배정'(updatedAt)에 대한 것일 때만 — 같은 날 재배정하면 다시 미완료 */
   function taskDone(task) {
@@ -3062,6 +3169,8 @@
   var lastFocus = null;
   function openRunner() {
     var r = $('runner');
+    /* 러너가 열리면 라이브 폴링을 늦춘다 — 학습 중 네트워크를 덜 쓴다(계약 L3) */
+    if (livePollId) liveTimers();
     if (!r.classList.contains('open')) lastFocus = document.activeElement;
     r.classList.add('open');
     r.scrollTop = 0;
@@ -3070,6 +3179,7 @@
   }
   function closeRunner() {
     $('runner').classList.remove('open');
+    if (livePollId) setTimeout(liveTimers, 0);   /* RQ 가 비워진 뒤 주기를 되돌린다 */
     /* 신고 창을 열어 둔 채 세션이 끝나면 다음 세션에 남의 문항 신고가 열려 있다 */
     if (typeof closeFlag === 'function') closeFlag();
     document.body.style.overflow = '';
@@ -3140,8 +3250,8 @@
     Array.prototype.forEach.call($('rFlagWhy').querySelectorAll('button'), function (b) { b.classList.remove('sel'); });
   }
   $('rFlag').onclick = function () {
-    if (!authed) { showBanner('체험 모드에서는 알릴 수 없어요.'); return; }
-    if (!flagTarget()) { showBanner('지금 화면에서는 알릴 수 없어요.'); return; }
+    if (!authed) { showBanner('체험 모드에서는 알릴 수 없어요.', 'flag'); return; }
+    if (!flagTarget()) { showBanner('지금 화면에서는 알릴 수 없어요.', 'flag'); return; }
     var open = $('rFlagBox').hidden;
     $('rFlagBox').hidden = !open;
     $('rFlag').classList.toggle('on', open);
@@ -3160,9 +3270,9 @@
     var body = { packId: t.packId, itemRef: t.itemRef, reason: flagReason || 'other', memo: $('rFlagMemo').value.trim() };
     closeFlag();
     api('/report', { method: 'POST', body: JSON.stringify(body) })
-      .then(function () { showBanner('선생님께 전달했어요. 계속 풀어도 됩니다.'); })
+      .then(function () { showBanner('선생님께 전달했어요. 계속 풀어도 됩니다.', 'flag'); })
       /* 전달 실패도 학습을 막지 않는다 — 다만 조용히 넘기지는 않는다 */
-      .catch(function () { showBanner('전달하지 못했어요. 잠시 뒤 다시 눌러 주세요.'); });
+      .catch(function () { showBanner('전달하지 못했어요. 잠시 뒤 다시 눌러 주세요.', 'flag'); });
   };
   function stepRunner() {
     if (!RQ) return;
@@ -3554,6 +3664,174 @@
     b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
   }
 
+  /* ════════ 수업 라이브 (계약 L3 · 기획서 §15-3) ════════
+     강사가 세운 단계와 TV에 띄운 문제를 앱이 읽어 따라간다. 원격 조작이 아니라 신호다 —
+     강사 화면이 학생 기기를 끌고 다니면 오작동 한 번이 그 학생의 학습을 망친다.
+     그래서 띠는 「시작」 버튼을 주고, 학생이 누를 때만 화면이 옮겨진다. 예외는 하나:
+     러너가 닫혀 있고 홈에 멍하니 있는 경우엔 잠깐 뒤 스스로 옮긴다(수업 시간이다).
+
+     투사 응답은 다르다. 강사가 문제를 띄우면 태블릿은 바로 응답 화면으로 바뀐다 —
+     쪽지시험은 반 전체가 같은 순간에 같은 문제를 봐야 성립한다. */
+  var LIVE_POLL_MS = 5000, LIVE_POLL_BUSY_MS = 10000;   /* 러너가 열려 있으면 네트워크를 덜 쓴다 */
+  var LIVE_AUTO_MS = 3000;                              /* 홈에 있으면 이만큼 뒤 스스로 이동 */
+  var liveState = null, livePollId = null, liveClockId = null;
+  var liveSeen = '';          /* 이미 안내한 단계 — 같은 단계로 계속 자동 이동하지 않게 */
+  var liveAutoId = null;
+  var pjSeen = '';            /* 이미 본 투사 문제(ref) — 문제가 넘어가면 응답 화면을 새로 그린다 */
+  var pjPick = null;          /* 이 문제에 내가 고른 보기 */
+  var pjSent = false;
+
+  var PHASE_TAB = { words: 'words', passage: 'passage', quiz: 'quiz', mock: 'quiz', free: 'home', projector: 'home' };
+  var PHASE_KO = { words: '단어', passage: '본문', quiz: '문제', mock: '실전 모의', free: '자유', projector: '화면 문제' };
+
+  function liveStart() {
+    if (!authed || livePollId) return;
+    livePoll();
+    liveTimers();
+  }
+  function liveTimers() {
+    liveStop();
+    livePollId = setInterval(livePoll, RQ ? LIVE_POLL_BUSY_MS : LIVE_POLL_MS);
+    liveClockId = setInterval(liveClock, 1000);
+  }
+  function liveStop() {
+    if (livePollId) clearInterval(livePollId);
+    if (liveClockId) clearInterval(liveClockId);
+    livePollId = null; liveClockId = null;
+  }
+  function livePoll() {
+    if (!authed) return;
+    api('/live').then(function (r) {
+      liveState = (r && r.live) || null;
+      liveApply();
+    }).catch(function () {
+      /* 수업 신호를 못 받는 것은 학습을 막을 일이 아니다 — 띠만 내리고 조용히 다음 폴링을 기다린다 */
+      liveState = null; liveApply();
+    });
+  }
+  function liveApply() {
+    var pj = liveState && liveState.projector;
+    if (pj && pj.item) pjApply(pj); else pjClose();
+    liveBar();
+  }
+
+  /* ── 단계 띠 ── */
+  function liveBar() {
+    var bar = $('liveBar'), ph = liveState && liveState.phase;
+    if (!ph || !authed) { bar.hidden = true; if (liveAutoId) { clearTimeout(liveAutoId); liveAutoId = null; } return; }
+    bar.hidden = false;
+    $('liveKind').textContent = PHASE_KO[ph.key] || ph.key;
+    $('liveLabel').textContent = ph.label || '';
+    var go = $('liveGo'), tab = PHASE_TAB[ph.key] || 'home';
+    go.hidden = (view === tab) || ph.key === 'projector';
+    go.textContent = '이 단계로 이동';
+    liveClock();
+    /* 새 단계가 왔고, 러너도 안 열려 있고, 홈에 있으면 잠깐 뒤 스스로 옮긴다.
+       러너가 열려 있으면 절대 건드리지 않는다 — 풀던 문제가 사라지면 그게 더 나쁘다. */
+    var sig = ph.key + '|' + (ph.startedAt || '');
+    if (sig !== liveSeen) {
+      liveSeen = sig;
+      if (liveAutoId) clearTimeout(liveAutoId);
+      if (!RQ && view === 'home' && tab !== 'home') {
+        liveAutoId = setTimeout(function () {
+          liveAutoId = null;
+          if (!RQ && view === 'home') setTab(tab);
+        }, LIVE_AUTO_MS);
+      }
+    }
+  }
+  /* 남은 시간은 1초마다 화면에서 센다 — 폴링(5초)에 맞추면 시계가 5초씩 뛴다 */
+  function liveClock() {
+    var el = $('liveClock'), ph = liveState && liveState.phase;
+    if (!el) return;
+    if (!ph || !ph.endsAt) { el.textContent = ''; el.className = 'lc'; return; }
+    var sec = Math.max(0, Math.round((Date.parse(ph.endsAt) - Date.now()) / 1000));
+    el.textContent = sec ? mmss(sec * 1000) : '시간 종료';
+    el.className = 'lc' + (sec <= 60 ? ' low' : '');
+  }
+  $('liveGo').addEventListener('click', function () {
+    var ph = liveState && liveState.phase;
+    if (!ph) return;
+    if (liveAutoId) { clearTimeout(liveAutoId); liveAutoId = null; }
+    setTab(PHASE_TAB[ph.key] || 'home');
+    liveBar();
+  });
+
+  /* ── 투사 응답 ──
+     화면(TV)에 문제가 있고 태블릿에는 보기 버튼만 있다. 정답은 서버가 공개할 때까지
+     응답에 실려 오지 않는다(계약 L1) — 여기서 정답을 알 방법이 없어야 맞다. */
+  function pjApply(pj) {
+    var it = pj.item;
+    var box = $('pjv');
+    if (pjSeen !== it.ref) { pjSeen = it.ref; pjPick = null; pjSent = false; }
+    $('pjNo').textContent = (pj.index + 1) + ' / ' + pj.count;
+    $('pjSub').textContent = pj.revealed ? '정답이 공개됐어요.' : '문제는 앞 화면에 있어요. 답만 고르세요.';
+    var ch = $('pjCh');
+    ch.innerHTML = it.choices.map(function (c) {
+      var cls = '';
+      if (pj.revealed) {
+        if (it.answerKey && c.key === it.answerKey) cls = 'right';
+        else if (pjPick === c.key) cls = 'wrong';
+      } else if (pjPick === c.key) cls = 'pick';
+      return '<button type="button" data-pjk="' + esc(c.key) + '"' + (cls ? ' class="' + cls + '"' : '') +
+        (pj.revealed ? ' disabled' : '') + '>' + esc(c.key) + '. ' + esc(c.text) + '</button>';
+    }).join('');
+    var msg = $('pjMsg');
+    if (pj.revealed) {
+      if (pjPick == null) { msg.className = 'pmsg'; msg.textContent = '답을 못 냈어요. 정답을 확인하세요.'; }
+      else if (pjPick === it.answerKey) { msg.className = 'pmsg ok'; msg.textContent = '맞았어요.'; }
+      else { msg.className = 'pmsg bad'; msg.textContent = '틀렸어요 — 정답은 ' + esc(it.answerKey) + '번이에요.'; }
+      /* 결과는 오답노트로 들어간다 — 별도 통계를 만들지 않는다(계약 L3) */
+      pjRecord(it, pjPick === it.answerKey);
+    } else {
+      msg.className = 'pmsg' + (pjSent ? ' ok' : '');
+      msg.textContent = pjSent ? '제출했어요. 다음 문제를 기다리세요.' : '';
+    }
+    if (!box.classList.contains('open')) {
+      box.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      try { box.focus(); } catch (e) {}
+    }
+  }
+  function pjClose() {
+    var box = $('pjv');
+    if (box.classList.contains('open')) {
+      box.classList.remove('open');
+      /* 러너가 열려 있었다면 스크롤 잠금은 러너 것이다 — 러너가 없을 때만 푼다 */
+      if (!RQ) document.body.style.overflow = '';
+    }
+    pjSeen = ''; pjPick = null; pjSent = false;
+  }
+  $('pjCh').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-pjk]');
+    if (!b || b.disabled) return;
+    var pj = liveState && liveState.projector;
+    if (!pj || !pj.item || pj.revealed) return;
+    pjPick = b.getAttribute('data-pjk');
+    pjSent = false;
+    pjApply(pj);                       /* 고른 것을 먼저 보여 준다 — 왕복을 기다리면 눌렸는지 알 수 없다 */
+    api('/live/answer', { method: 'POST', body: JSON.stringify({ ref: pj.item.ref, key: pjPick }) })
+      .then(function () { pjSent = true; if (liveState && liveState.projector) pjApply(liveState.projector); })
+      .catch(function () {
+        /* 제출이 실패하면 고른 표시를 지운다 — 낸 줄 알고 기다리는 것이 가장 나쁘다 */
+        pjPick = null; pjSent = false;
+        if (liveState && liveState.projector) pjApply(liveState.projector);
+        var m = $('pjMsg'); m.className = 'pmsg bad'; m.textContent = '제출하지 못했어요. 다시 눌러 주세요.';
+      });
+  });
+  /* 투사 문제의 오답노트 키 — ref 가 '<유형>:<단어id>' 라 그 유형의 재시험 생성기로 이어진다 */
+  var pjDone = {};
+  function pjRecord(it, ok) {
+    if (!it || pjPick == null || pjDone[it.ref]) return;
+    pjDone[it.ref] = true;
+    var parts = String(it.ref || '').split(':');
+    var type = parts[0], ref = parts[1];
+    if (GEN_KEYS.indexOf(type) < 0 || !ref) return;
+    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, Date.now(), curPackId());
+    logEvent('projector', type, ref, ok);
+    persist();
+  }
+
   /* ── 렌더 루트 ── */
   function render() {
     renderHeader();
@@ -3702,7 +3980,7 @@
       }).then(function () {
         return loadRangePacks();
       });
-    }).then(function () { openLoaded(); }).catch(bootError);
+    }).then(function () { openLoaded(); liveStart(); }).catch(bootError);
   }
   /* 원격 상태를 팩별 savedAt 비교로 받아 적는다(pullState와 같은 규칙, 부팅용 동기 버전) */
   function pullAdopt(remote) {

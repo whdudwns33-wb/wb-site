@@ -20,11 +20,12 @@
  *   getPack(id) putPack(id, rec) getPackIds() putPackIds(ids)   // 배포용(naesin-api 와 같은 어댑터)
  */
 
-import { createRequire } from 'node:module';
 import { extract, KINDS } from './naesin-extract.mjs';
-
-const require = createRequire(import.meta.url);
-const CHECK = require('../naesin/pack-check.js');
+/* 팩 검사 규칙은 브라우저·Node 공용 모듈(IIFE + module.exports 가드)이다. 정적 import 로
+   가져온다 — createRequire 를 쓰면 Cloudflare Workers 번들이 'node:module' 을 찾다가
+   배포 자체가 실패한다(nodejs_compat 이 없고, 있어도 런타임 require 는 번들러가 못 푼다).
+   기본 import 는 Node 의 CJS 상호운용과 esbuild 양쪽에서 module.exports 를 그대로 준다. */
+import CHECK from '../naesin/pack-check.js';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const JOB_ID_RE = /^job-[a-z0-9]{6,20}$/;

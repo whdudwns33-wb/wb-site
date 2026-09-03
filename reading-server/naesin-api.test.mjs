@@ -10,7 +10,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const packs = {}, states = {}, exams = {}, tasks = {}, results = {};
+  const packs = {}, states = {}, exams = {}, tasks = {}, results = {}, reports = {}, live = {}, votes = {};
   let packIds = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
   return {
@@ -34,8 +34,16 @@ function memStore() {
     deleteResult: (c, d) => { if (results[c]) { delete results[c][d]; if (!Object.keys(results[c]).length) delete results[c]; } },
     listResults: () => Object.entries(results).flatMap(([c, byDate]) =>
       Object.entries(byDate).map(([d, rec]) => ({ ...rec, code: c, examDate: d }))),
+    getReports: (id) => reports[id] || null,
+    putReports: (id, list) => { reports[id] = list; },
+    /* 수업 라이브 세션 (계약 L1) — 워커는 naesin:live:/naesin:livevote:, 로컬은 db.naesin.live/votes */
+    getLive: (sc) => live[sc] || null,
+    putLive: (sc, rec) => { live[sc] = rec; },
+    deleteLive: (sc) => { delete live[sc]; delete votes[sc]; },
+    getVotes: (sc) => votes[sc] || null,
+    putVotes: (sc, rec) => { votes[sc] = rec; },
     getStudent: (c) => students[c] || null,
-    _raw: { packs, states, exams, results, ids: () => packIds },
+    _raw: { packs, states, exams, results, reports, live, votes, ids: () => packIds },
   };
 }
 const call = (store, over) => handleNaesin({
@@ -821,6 +829,172 @@ await t('[R2] 퇴원(학생 삭제) 처리에 시험 결과 삭제가 들어 있
   for (const [name, txt] of [['worker.mjs', worker], ['server.mjs', server]]) {
     for (const fn of ['getResult', 'putResult', 'deleteResult', 'listResults'])
       assert.ok(txt.includes(fn + ':'), name + ' 의 내신 저장소 어댑터에 ' + fn + ' 이 없다');
+  }
+});
+
+await t('[L3] 관리 팩 단건 조회 — 강사 화면이 즉석 문제를 만들려면 팩을 읽어야 한다', async () => {
+  const store = memStore();
+  store.putPack('ne-m2-L6', { pack: { packId: 'ne-m2-L6', words: [{ id: 'w1', headword: 'apple' }] }, updatedAt: 'x' });
+  const r = await call(store, { path: '/api/naesin/admin/pack', who: ADMIN, query: new URLSearchParams('id=ne-m2-L6') });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.pack.words[0].headword, 'apple');
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/pack', who: ADMIN, query: new URLSearchParams('id=nope') })).status, 404);
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/pack', who: ADMIN, query: new URLSearchParams('id=x') })).status, 400, '형식 오류는 400');
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/pack', query: new URLSearchParams('id=ne-m2-L6') })).status, 403,
+    '학생은 이 경로로 배정 밖 팩을 읽을 수 없다');
+});
+
+/* ── 수업 라이브 세션 (계약 L1 · 기획서 §15-3) ── */
+const PJ_ITEMS = [
+  { ref: 'q1', prompt: 'apple 의 뜻은?', choices: [{ key: 'a', text: '사과' }, { key: 'b', text: '바나나' }], answerKey: 'a' },
+  { ref: 'q2', prompt: 'run 의 과거형은?', choices: [{ key: 'a', text: 'runned' }, { key: 'b', text: 'ran' }], answerKey: 'b' },
+];
+const setPhase = (store, phase) => call(store, { path: '/api/naesin/admin/live/phase', method: 'POST', who: ADMIN, getBody: async () => ({ phase }) });
+const setProj = (store, b) => call(store, { path: '/api/naesin/admin/live/projector', method: 'POST', who: ADMIN, getBody: async () => b });
+const getLive = (store, over) => call(store, { path: '/api/naesin/live', ...over });
+
+await t('[L1] 단계는 강사만 세우고, 학생은 읽는다 — endsAt 은 서버가 계산한다', async () => {
+  const store = memStore();
+  assert.strictEqual((await setPhase(store, { key: 'words', label: '단어 10분', minutes: 10 })).status, 200);
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/live/phase', method: 'POST', getBody: async () => ({ phase: { key: 'words' } }) })).status, 403,
+    '학생이 단계를 세울 수 있으면 수업 신호가 학생 손에 넘어간다');
+  const r = await getLive(store);
+  assert.strictEqual(r.body.live.phase.key, 'words');
+  assert.strictEqual(r.body.live.phase.label, '단어 10분');
+  assert.ok(r.body.live.phase.remainSec > 9 * 60 && r.body.live.phase.remainSec <= 10 * 60, r.body.live.phase.remainSec);
+});
+
+await t('[L1] 모르는 단계는 400 — 학생 앱이 못 따라가는 단계를 만들지 않는다', async () => {
+  const store = memStore();
+  assert.strictEqual((await setPhase(store, { key: 'hack' })).status, 400);
+});
+
+await t('[L1] 세션이 없으면 학생에게 live:null (빈 껍데기를 주지 않는다)', async () => {
+  const r = await getLive(memStore());
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.live, null);
+});
+
+await t('[L1] 4시간 넘게 방치된 단계는 학생 화면에 남지 않는다', async () => {
+  const store = memStore();
+  await setPhase(store, { key: 'words', minutes: 10 });
+  const later = Date.now() + 5 * 3600e3;
+  assert.strictEqual((await getLive(store, { now: later })).body.live, null, '어제 단계가 오늘 아침 화면에 남는다');
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/live', who: ADMIN, now: later })).body.live, null,
+    '강사 화면도 끝난 수업을 진행 중으로 보여 주면 안 된다');
+});
+
+await t('[L1] 투사 문제에서 정답이 학생 응답에 섞이지 않는다', async () => {
+  const store = memStore();
+  assert.strictEqual((await setProj(store, { items: PJ_ITEMS })).status, 200);
+  const r = await getLive(store);
+  assert.strictEqual(JSON.stringify(r.body).indexOf('answerKey'), -1, JSON.stringify(r.body));
+  assert.strictEqual(JSON.stringify(r.body).indexOf('ran'), -1, '다음 문제의 보기까지 내려가면 미리 풀어 버린다');
+  assert.strictEqual(r.body.live.projector.item.ref, 'q1');
+  assert.strictEqual(r.body.live.projector.count, 2);
+});
+
+await t('[L1] 공개하면 그 문제의 정답만 붙는다', async () => {
+  const store = memStore();
+  await setProj(store, { items: PJ_ITEMS });
+  await setProj(store, { revealed: true });
+  const r = await getLive(store);
+  assert.strictEqual(r.body.live.projector.item.answerKey, 'a');
+  assert.strictEqual((JSON.stringify(r.body).match(/answerKey/g) || []).length, 1);
+});
+
+await t('[L1] 응답은 지금 띄운 문제만 받는다 — 뒤 문제를 미리 찍을 수 없다', async () => {
+  const store = memStore();
+  await setProj(store, { items: PJ_ITEMS });
+  const post = (b, who) => call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => b, ...(who ? { who } : {}) });
+  assert.strictEqual((await post({ ref: 'q1', key: 'a' })).status, 200);
+  assert.strictEqual((await post({ ref: 'q2', key: 'b' })).status, 409, '다음 문제에 미리 답하면 TV 진행이 무의미해진다');
+  assert.strictEqual((await post({ ref: 'q1', key: 'zz' })).status, 400, '보기에 없는 답');
+  assert.strictEqual((await post({ ref: 'nope', key: 'a' })).status, 400);
+  assert.strictEqual((await post({ ref: 'q1', key: 'a' }, ADMIN)).status, 404,
+    '학생 라우트는 학생 토큰 전용 — 강사 토큰이 응답을 넣으면 분포에 강사가 섞인다');
+  assert.deepStrictEqual(store._raw.votes.default, { q1: { 'st-1': 'a' } });
+});
+
+await t('[L1] 응답은 정답 여부를 돌려주지 않는다 (강사가 공개할 때 다 같이 본다)', async () => {
+  const store = memStore();
+  await setProj(store, { items: PJ_ITEMS });
+  const r = await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'b' }) });
+  assert.deepStrictEqual(r.body, { ok: true }, '틀렸다는 것을 알려 주면 바로 고쳐 내 분포가 무의미해진다');
+});
+
+await t('[L1] 투사가 없으면 응답은 409', async () => {
+  const store = memStore();
+  assert.strictEqual((await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'a' }) })).status, 409);
+});
+
+await t('[L1] 새 문제 세트를 띄우면 앞 응답이 남지 않는다', async () => {
+  const store = memStore();
+  await setProj(store, { items: PJ_ITEMS });
+  await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'a' }) });
+  await setProj(store, { items: PJ_ITEMS });
+  assert.deepStrictEqual(store._raw.votes.default, {}, '지난 쪽지시험 응답이 새 시험 분포에 섞인다');
+});
+
+await t('[L1] 단계와 투사는 서로를 지우지 않는다', async () => {
+  const store = memStore();
+  await setPhase(store, { key: 'quiz', minutes: 5 });
+  await setProj(store, { items: PJ_ITEMS });
+  const r1 = await getLive(store);
+  assert.strictEqual(r1.body.live.phase.key, 'quiz');
+  assert.ok(r1.body.live.projector);
+  await setProj(store, { items: null });
+  const r2 = await getLive(store);
+  assert.strictEqual(r2.body.live.phase.key, 'quiz', '투사를 끝내면 단계도 사라지면 수업이 끊긴다');
+  assert.strictEqual(r2.body.live.projector, null);
+  await setPhase(store, null);
+  assert.strictEqual((await getLive(store)).body.live.phase, null);
+});
+
+await t('[L2] 강사 화면은 폴링 한 번으로 세션·응답 분포·반 현황을 받는다', async () => {
+  const store = memStore();
+  const at = new Date().toISOString();
+  store.putState('st-1', { state: { summary: { live: { at, where: 'runner', label: '본문 3단계', idleSec: 400, todayDone: 3 }, sentence: { total: 25, memorized: 4 } } }, updatedAt: at });
+  store.putState('st-2', { state: { summary: { live: { at, where: 'words', label: '단어', idleSec: 5, todayDone: 9 }, sentence: { total: 25, memorized: 20 } } }, updatedAt: at });
+  await setProj(store, { items: PJ_ITEMS });
+  await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'b' }) });
+  const r = await call(store, { path: '/api/naesin/admin/live', who: ADMIN });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.body.board.map((x) => x.code), ['st-1', 'st-2'], '정체 오래된 학생이 위로 와야 화면을 볼 이유가 생긴다');
+  assert.strictEqual(r.body.board[0].label, '본문 3단계');
+  assert.ok(r.body.board[0].idleSec >= 400);
+  assert.deepStrictEqual(r.body.weakest, ['st-1', 'st-2']);
+  assert.strictEqual(r.body.votes[0].answered, 1);
+  assert.deepStrictEqual(r.body.votes[0].wrong, ['st-1']);
+  assert.strictEqual(r.body.votes[0].answerKey, 'a', '강사 화면에는 정답이 있어야 한다');
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/live' })).status, 403, '학생은 강사 폴링을 못 쓴다');
+});
+
+await t('[L2] summary.live 는 화이트리스트로 정규화된다 — 강사 화면에 그려지는 학생 입력', () => {
+  const sum = normalizeSummary({ live: { at: 'nope', where: 'DROP', label: '<img src=x onerror=1>'.repeat(9), idleSec: -3, todayDone: 1e9 } });
+  assert.strictEqual(sum.live.where, 'home');
+  assert.strictEqual(sum.live.at, null);
+  assert.strictEqual(sum.live.label.length, 40);
+  assert.strictEqual(sum.live.idleSec, 0);
+  assert.strictEqual(sum.live.todayDone, 9999);
+  assert.ok(sum.live.label.indexOf('<img') === 0, '값은 지우지 않는다 — 화면이 이스케이프한다');
+  assert.strictEqual(normalizeSummary({}).live, undefined, '옛 저장본에 빈 칸을 만들지 않는다');
+});
+
+await t('[L1] 세션 삭제는 응답까지 함께 지운다', async () => {
+  const store = memStore();
+  await setProj(store, { items: PJ_ITEMS });
+  await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'a' }) });
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/live', method: 'DELETE', who: ADMIN })).status, 200);
+  assert.strictEqual(store._raw.live.default, undefined);
+  assert.strictEqual(store._raw.votes.default, undefined, '지운 수업의 응답이 남으면 다음 수업 분포에 섞인다');
+});
+
+await t('[L1] 저장소 어댑터 계약이 워커·로컬 양쪽에 있다', () => {
+  const src = (f) => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
+  for (const [name, txt] of [['worker.mjs', src('./worker.mjs')], ['server.mjs', src('./server.mjs')]]) {
+    for (const fn of ['getLive', 'putLive', 'deleteLive', 'getVotes', 'putVotes'])
+      assert.ok(txt.includes(fn + ':'), name + ' 의 내신 저장소 어댑터에 ' + fn + ' 이 없다 — 한쪽만 고치면 운영에서만 다르게 돈다');
   }
 });
 

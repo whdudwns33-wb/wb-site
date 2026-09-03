@@ -154,6 +154,14 @@ function naesinStore(env) {
     /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
     getReports: (id) => env.DB.get('naesin:report:' + id, 'json'),
     putReports: (id, list) => env.DB.put('naesin:report:' + id, JSON.stringify(list)),
+    /* 수업 라이브 세션 — 지금 이 단계·투사 문제와 그 응답. 만료(4시간) 판정은 읽는 쪽이 한다.
+       KV 는 만료를 걸 수 있지만(expirationTtl) 단계를 연장할 때마다 새로 써야 하고,
+       만료된 값을 강사 화면이 「끝난 수업」으로 보여 줄 수도 있어 값은 남기고 판정만 한다. */
+    getLive: (s) => env.DB.get('naesin:live:' + s, 'json'),
+    putLive: (s, rec) => env.DB.put('naesin:live:' + s, JSON.stringify(rec)),
+    deleteLive: (s) => Promise.all([env.DB.delete('naesin:live:' + s), env.DB.delete('naesin:livevote:' + s)]),
+    getVotes: (s) => env.DB.get('naesin:livevote:' + s, 'json'),
+    putVotes: (s, rec) => env.DB.put('naesin:livevote:' + s, JSON.stringify(rec)),
     /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 둔다(jobsrc)
        목록 조회가 매번 수 MB를 읽지 않게. 작업을 지우면 원천도 함께 지운다. */
     getJob: (id) => env.DB.get('naesin:job:' + id, 'json'),
