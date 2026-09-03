@@ -1080,11 +1080,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-03.5"></script>
-<script src="./schedule-board-core.js?v=2026-09-03.5"></script>
-<script src="./asset-core.js?v=2026-09-03.5"></script>
-<script src="./qr-core.js?v=2026-09-03.5"></script>
-<script src="./acaflow-import-core.js?v=2026-09-03.5"></script>
+<script src="./lesson-form-core.js?v=2026-09-03.6"></script>
+<script src="./schedule-board-core.js?v=2026-09-03.6"></script>
+<script src="./asset-core.js?v=2026-09-03.6"></script>
+<script src="./qr-core.js?v=2026-09-03.6"></script>
+<script src="./acaflow-import-core.js?v=2026-09-03.6"></script>
 <script>
 "use strict";
 
@@ -9433,14 +9433,14 @@ function viewMakeups() {
     '<div class="card-sub">결석으로 생성된 보강 건과 관리자·선생님이 직접 생성한 보강을 생성·완료·없음 세 가지 동작으로 처리합니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="murefresh">새로고침</button></div>' +
     (session.isAdmin || (session.isStaffLink && session.staffId)
-      ? '<button class="btn btn-primary mt14" data-act="mumanualopen">보강생성</button>' : '') +
+      ? '<button class="btn btn-primary mt14" data-act="mumanualopen">보강생성(수업무관)</button>' : '') +
     '<div class="makeup-reason-guide">보강생성은 선택한 날짜의 담당 선생님 오늘 수업과 관리자 현황판에 보강수업을 만듭니다. 보강완료는 실제 진행 일시를 기록합니다.</div>' +
     '<div class="small muted mt8" role="status" aria-live="polite">' + esc(makeupLiveMessage) + '</div></section>';
   if (makeupLoading && !makeupLoaded) return h + '<div class="card" role="status" aria-live="polite"><div class="empty"><b>⏳</b>보강 현황을 불러오는 중입니다.</div></div>';
   if (makeupError) h += '<div class="card alert" role="alert"><div class="card-title">보강 현황을 불러오지 못했습니다</div><div class="small">' + esc(makeupError) + '</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="murefresh" autofocus>다시 시도</button></div>';
   h += makeupKpis(rows);
-  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">위 보강생성 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요.</span></div></div>';
+  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">위 보강생성(수업무관) 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요.</span></div></div>';
   h += active.length
     ? '<div class="makeup-grid" aria-live="polite">' + active.map(makeupCard).join('') + '</div>'
     : '<div class="card"><div class="empty"><b>✓</b>처리할 보강 건이 없습니다.</div></div>';
@@ -21481,7 +21481,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-03.5';
+const APP_VER = '2026-09-03.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
