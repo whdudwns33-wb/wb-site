@@ -712,8 +712,16 @@
     m.push('<div class="q" id="q">');
     m.push('<div class="stem">' + esc(it.stem) + '</div>');
     if (it.kind === 'blank') {
-      var txt = esc(it.context || '').replace(/□+/, '<input class="blank" id="ans" autocomplete="off" ' +
-        'placeholder="' + (it.hintLen ? it.hintLen + '자' : '') + '">');
+      /* 한 문맥에 □ 무리가 여럿인 빈칸이 흔하다(개관 '특징' 한 줄에 정답 6~7개).
+         **채점할 정답의 자리에** 입력칸을 뚫어야 한다 — 늘 첫 무리에 뚫으면 학생이 보는 칸과
+         채점하는 답이 어긋난다(실측 요약노트 빈칸의 44%가 첫 무리가 아니다). */
+      var slot = it.slot || 0, seen = -1;
+      var txt = esc(it.context || '').replace(/□+/g, function (g) {
+        seen += 1;
+        if (seen !== slot) return g;
+        return '<input class="blank" id="ans" autocomplete="off" placeholder="' +
+          (it.hintLen ? it.hintLen + '자' : '') + '">';
+      });
       if (txt.indexOf('id="ans"') < 0) txt += ' <input class="blank" id="ans" autocomplete="off">';
       m.push('<div class="quote">' + txt + '</div>');
       m.push('<button class="btn" data-sub="1">확인</button>');

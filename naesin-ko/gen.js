@@ -204,7 +204,9 @@ var WBKOGEN = (function () {
     return {
       id: 'g-bl-' + b.id, gen: true, workId: work.workId, kind: 'blank', blankId: b.id,
       stem: b.label || '빈칸에 알맞은 말을 쓰세요.',
-      context: b.text, answers: b.answers, hintLen: (b.answers && b.answers[0] || '').length
+      context: b.text, answers: b.answers, hintLen: (b.answers && b.answers[0] || '').length,
+      /* 한 문맥에 □ 무리가 여럿일 때 이 빈칸이 몇 번째인지. 없으면 첫 무리(옛 팩 호환) */
+      slot: b.slot || 0
     };
   }
 

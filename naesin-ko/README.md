@@ -26,8 +26,13 @@ naesin-ko/
   pack-schema.md    팩 스키마 정의
   pack-validate.mjs 팩 검증기 CLI
   extract/          출판사 PDF → 팩 초안 (오프라인 도구 — README.md가 절차 정본)
-    pdf-spans.py      PDF → span JSON (좌표·크기·색). PyMuPDF 필요
-    build-ihae.mjs    span JSON → 작품 정본 초안 (학생용/선생님용 색 대조로 빈칸 판정)
+    build-pack.mjs    **입구.** 단원 폴더 하나 → 팩 초안 + 검수 부속물 (판별·병합·id 부여)
+    spans-util.mjs    공용 규칙 — 시리즈 판별·공백 복원·기둥 분리·연 나누기·머리말 메타·id 규약
+    pdf-spans.py      PDF → span JSON (좌표·크기·색). PyMuPDF 필요. `--colors` 로 팔레트 점검
+    build-ihae.mjs    이해완성 → Work 정본(개관·연/행·날개풀이·연 요지·빈칸)
+    build-yoyak.mjs   직전 요약노트 → 요약 빈칸·어휘·체크리스트·★ 출제 Point
+    build-danwon.mjs  단원집중 → 지문 세트·객관식 문항·작가·㉠ 기호
+    build-seosul.mjs  서술형 공략 → 서술형 문항(조건·모범답안·채점 요소)·발췌 지문·작가
   *.test.cjs        각 모듈 테스트 (node로 바로 실행)
 reading-server/
   naesin-ko-api.mjs         /api/naesin-ko/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
@@ -79,15 +84,17 @@ reading-server/
 4. **검증**: `node naesin-ko/pack-validate.mjs <팩 디렉터리>` — 오류 0이어야 배포.
 5. **업로드**: `/admin/naesin-ko-admin.html` → 파일 전부 선택(브라우저가 병합·재검증) → 업로드 → 시험 등록.
 
-**출판사별 PDF 업데이트 절차는 `naesin-ko/extract/README.md`가 정본이다.** 요약:
+**자료 폴더 규칙은 `docs/자료-폴더-표준.md`, 추출 절차는 `naesin-ko/extract/README.md`가 정본이다.** 요약:
 
 ```bash
-pip install pymupdf                                                    # 한 번만
-python3 naesin-ko/extract/pdf-spans.py 이해완성.pdf --colors           # 새 출판사면 색 팔레트 점검
-python3 naesin-ko/extract/pdf-spans.py 이해완성.pdf > spans.json       # PDF → 좌표·크기·색
-node naesin-ko/extract/build-ihae.mjs spans.json --workId w-x --title "작품명" > w-x.json
-node naesin-ko/pack-validate.mjs <팩 디렉터리>                          # 검증 → 관리 웹 업로드
+pip install pymupdf                                        # 한 번만
+node naesin-ko/extract/build-pack.mjs "<단원 폴더>"          # 폴더 하나 → 팩 초안 + 검수 부속물
+node naesin-ko/pack-validate.mjs "<단원 폴더>/_build/pack"   # 오류 0 → 관리 웹 업로드
 ```
+
+폴더 이름이 곧 팩 id이고, 시리즈는 **파일명이 아니라 지면 내용**으로 판별한다(드라이브에서 한글
+파일명이 깨진다). 4종 추출기를 `build-pack.mjs` 가 묶어 부르고, 못 뽑은 것은 팩이 아니라
+`review/` 로 내린다 — 지문 없는 문항, 루브릭 없는 서술형, 좌우 대조 미달이 그 자리다.
 
 **빈칸을 어떻게 아는가 — 기획서 §7의 추정을 뒤집은 발견**: 이해완성은 같은 지면을 앞은 학생용,
 뒤는 선생님용으로 두 번 싣는데 **텍스트 레이어가 같고 학생용은 정답 글자의 색만 흰색으로 바꿔 둔다.**
@@ -98,7 +105,7 @@ node naesin-ko/pack-validate.mjs <팩 디렉터리>                          # �
 
 ## 현재 상태 (Phase 1a 완료)
 
-**완료**: 기획서 v1.1 · 순수 로직 5모듈 + 테스트 7종(130개 검증) · 학생 앱(사다리 5단계·세션·오답노트·
+**완료**: 기획서 v1.1 · 순수 로직 5모듈 + 추출 도구 6종 + 테스트 11종(200개 이상 검증) · 학생 앱(사다리 5단계·세션·오답노트·
 실수 유형·성취도·**준비도**) · 서버 API(저장 예산 분리) · 관리 웹(팩 업로드·시험·과제·오버레이·
 서술형 검토·**반 준비도 분포와 위험 학생**) · 공용 개념어 사전 55개 · 자체 창작 체험 팩 ·
 **PDF 추출 파이프라인**(`extract/`) · CI·백업·`_headers`·dist 조립 등록.

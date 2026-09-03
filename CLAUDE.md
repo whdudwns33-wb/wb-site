@@ -13,7 +13,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `naesin-ko/` | 국어브레인 — 국어 내신 시험대비 앱. **상세: `naesin-ko/README.md`** |
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
-| `docs/` | 기획서 모음 — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.0, 기획 단계) |
+| `docs/` | 기획서 + 자료 폴더 표준(`자료-폴더-표준.md`) — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.0, 기획 단계) |
 | `vocab-age/` | 어휘 나이 진단 (유일한 공개 페이지) |
 
 ## 명령
@@ -25,6 +25,8 @@ node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
+node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
+python3 naesin-ko/extract/pdf-spans.py <PDF> --colors  # 새 출판사 자료 색 팔레트 점검
 ```
 
 CI: `.github/workflows/deploy-reading.yml` — **main 푸시가 곧 배포**다(테스트 전부 통과 시
@@ -72,9 +74,19 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 남은 것은 **회신본 서면 보관**이다. 그래도 원문 없이 위치 참조만으로 성립하는 설계는 지우지 않는다 —
 이용권·출판사가 바뀌면 다시 쓴다.
 
-**출판사별 PDF 업데이트는 `naesin-ko/extract/README.md`가 절차 정본이다.** 빈칸 정답은 도형이 아니라
-학생용 지면의 **흰 글씨 텍스트**이고, 선생님용 지면과 색을 대조해 자동으로 뽑는다. 추출은 전부 오프라인
-로컬 도구다 — **구매 자료를 외부 AI API로 보내지 않는다.**
+**자료를 올리는 자리와 이름 규칙은 `docs/자료-폴더-표준.md`, 추출 절차는
+`naesin-ko/extract/README.md` 가 정본이다.** 구글 드라이브 공유 폴더 하나 아래 앱별로 폴더를 나누되
+이름을 저장소 디렉터리와 같게 두고(`naesin-ko/`·`naesin/`…), **단원 폴더 이름을 곧 팩 id로** 쓴다.
+PDF 파일명은 도구가 보지 않는다 — 드라이브에서 한글이 깨지므로 시리즈는 **지면 내용**으로 판별한다.
+
+족보닷컴 4종(이해완성·직전 요약노트·단원집중·서술형 공략) 추출기가 다 있고 `build-pack.mjs` 가 묶어
+부른다. 빈칸 정답은 도형이 아니라 지면의 **흰 글씨 텍스트**다. 공용 규칙(시리즈 판별·공백 복원·
+연 나누기·id 규약)은 `extract/spans-util.mjs` 하나에 모은다 — 추출기가 각자 다시 구현하면 안 된다.
+추출은 전부 오프라인 로컬 도구다 — **구매 자료를 외부 AI API로 보내지 않는다.**
+
+추출기가 지키는 두 가지: ① **검수 부속물은 팩에 넣지 않는다**(병합기가 알 수 없는 최상위 키를 팩 루트로
+복사해 학생 기기까지 간다) ② **못 뽑은 것은 조용히 넘기지 않는다** — 지문 없는 문항·루브릭 없는 서술형·
+대조 미달은 `review/` 로 내리고 이유를 남긴다.
 
 학생 성취·시험대비 수치화는 `naesin-ko/readiness.js`(준비도 0~100 + 반 집계) 하나로 모은다 —
 학생 앱 성취도 탭과 관리 웹 반 성취도가 같은 모듈을 쓴다.

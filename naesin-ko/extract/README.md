@@ -54,17 +54,36 @@ python3 naesin-ko/extract/pdf-spans.py pdf/이해완성-저녁항구.pdf --color
 
 ---
 
-## 2. 추출 — 기계가 하는 두 단계
+## 2. 추출 — 보통은 한 줄이다
+
+폴더를 통째로 넘긴다. 시리즈 판별·추출·메타 교차 보강·작품 병합·id 부여를 다 한다.
 
 ```bash
-# 1단계: PDF → span JSON (좌표·크기·색)
-python3 naesin-ko/extract/pdf-spans.py pdf/이해완성-저녁항구.pdf > spans/ihae-1.json
-
-# 2단계: span JSON → 작품 정본 초안
-node naesin-ko/extract/build-ihae.mjs spans/ihae-1.json \
-     --workId w-jeonyeok-hanggu --title "저녁 항구" --author "" \
-     --unitPath "2학기/1단원" > works/w-jeonyeok-hanggu.json
+node naesin-ko/extract/build-pack.mjs "~/WB 학습자료/naesin-ko/2026-2/2022-cheonjae-nomisuk-m2-1-U1"
 ```
+
+```
+[단원 팩 초안]
+  팩 id 2022-cheonjae-nomisuk-m2-1-U1
+  자료 5개: 단원집중 · 서술형 공략 · 직전 요약노트 · 이해완성 · 이해완성
+  작품 2 · 지문 세트 6 · 저장 문항 11
+  개념 단위(빈칸) 328 · 어휘 14
+  메타: 천재(노미숙) · 중2 · 1학기 · 1. 문학을 펼치면 · 2022 개정
+  검수 대기 40건 — 루브릭 미저작 서술형·대조 미달 등. 팩에 넣지 않았습니다.
+```
+
+`_build/pack/` 과 `_build/review/` 가 나온다. **둘은 절대 안 섞인다** — 검증기와 관리 웹은
+팩 루트와 `works/` 한 겹만 읽으므로 검수 부속물이 학생 기기까지 갈 길이 없다.
+
+시리즈 하나만 따로 돌리고 싶으면(디버깅·부분 재추출) 낱개 도구를 쓴다:
+
+```bash
+python3 naesin-ko/extract/pdf-spans.py pdf/이해완성-저녁항구.pdf > spans/ihae-1.json
+node naesin-ko/extract/build-ihae.mjs spans/ihae-1.json \
+     --workId w-1-1-1 --title "저녁 항구" --review review/w-1-1-1.json > works/w-1-1-1.json
+```
+
+낱개 도구는 서로 모르므로 **id 충돌과 조각 병합을 사람이 책임진다.** 평소에는 `build-pack.mjs` 를 쓴다.
 
 2단계는 stderr로 **초안 품질 보고**를 낸다. 이 숫자를 눈으로 대조하는 것이 검수의 시작이다.
 
@@ -120,7 +139,7 @@ node naesin-ko/extract/build-ihae.mjs spans/ihae-1.json \
 5. `candidates[]`를 보고 `keywords`·`rhetoric`·`speaker` 배정
 6. 원본 오탈자는 **고치지 않고** `notes`에 적는다(`naesin/pack-schema.md` 원칙 3)
 
-실측: 저녁 항구 1편 기준 자동 추출 **약 3초**, 검수 대상은 빈칸 112개 + 후보 47개다.
+실측: 시 1편 기준 자동 추출 **약 3초**, 검수 대상은 빈칸 114개 + 후보 47개다.
 기획서 §7이 잡은 "자료 1종당 1.5~3시간"은 이 도구가 생기기 전 추정이다 —
 Phase 0에서 스톱워치로 재서 그 값으로 총량을 다시 산출한다(§7 대응 ①).
 
@@ -151,27 +170,63 @@ node naesin-ko/pack-validate.mjs ~/wb-packs/2026-2/cheonjae-nomisuk-m2-2-U1/
 
 ## 나머지 시리즈 3종 — 현재 상태
 
-| 시리즈 | 뽑을 것 | 상태 |
+| 시리즈 | 뽑을 것 | 도구 |
 |--------|---------|------|
-| 이해완성 | Work 정본 · blanks | ✅ `build-ihae.mjs` |
-| 요약노트 | checklist · vocab · examPoints(★) · 시어 상징 표 | ⬜ 미구현 — 관리 웹에서 수기 입력 |
-| 단원집중 | PassageSet · 객관식 Item(선지별 해설·부정발문·<보기>) | ⬜ 미구현 |
-| 서술형 공략 | 서술형 Item(조건·채점 요소·배점) | ⬜ 미구현 — **루브릭 저작은 어차피 사람 몫이다** |
+| 이해완성 | Work 정본(개관·연/행·날개풀이·연 요지) · blanks | `build-ihae.mjs` |
+| 직전 요약노트 | 요약 빈칸 · vocab · checklist · examPoints(★) · 개관 대조 | `build-yoyak.mjs` |
+| 단원집중 | PassageSet · 객관식 Item(선지별 해설·부정발문·&lt;보기&gt;) · 작가 · ㉠ | `build-danwon.mjs` |
+| 서술형 공략 | 서술형 Item(조건·모범답안·채점 요소) · 발췌 지문 · 작가 | `build-seosul.mjs` |
 
-미구현 3종은 **막힌 것이 아니라 순서 문제**다. 빈칸 대조 방식이 그대로 통하는지
-(요약노트도 정답이 흰 글씨인지) 자료가 오면 1단계 `--colors`로 5분에 확인된다.
-그때까지는 관리 웹의 수기 입력으로 채운다 — 팩 스키마는 소스 중립이라(기획서 §7)
-"족보닷컴에서 뽑은 것"과 "강사가 쓴 것"을 구분하지 않는다.
+넷 다 `build-pack.mjs` 가 알아서 부른다. 시리즈 판별은 **파일명이 아니라 지면 내용**이다.
+
+실측 1단원(천재 노미숙 중2-1, 자료 5개 59쪽) 결과: 작품 2 · 빈칸 328 · 어휘 14 ·
+지문 세트 6 · 문항 11 + 검수 대기 40. 소요는 1분 미만이다.
+
+### 자동화하지 않은 것과 그 이유
+
+| 안 뽑는 것 | 왜 |
+|---|---|
+| 서술형 루브릭 | 채점 핵심어가 25문항 중 8개 안팎에만 인쇄돼 있다. **빈 rubric 은 배포 차단 오류**라, 저작한 뒤 `review.pending` 에서 `items` 로 옮기는 순서를 도구가 강제한다 |
+| `targetRefs`(문항→개념 단위) | 자료에 대응 정보가 없다. 문자열로 억지 매칭하면 오답이 엉뚱한 빈칸 큐로 돌아가 학생이 상관없는 것을 외운다 |
+| keywords·rhetoric·speaker | 표 구조가 작품마다 달라 오배정 위험이 크다. `review.candidates` 로만 모은다 |
+| 작가·제목 확정 | 후보는 뽑지만 &lt;보기&gt; 안 인용 출처가 같은 자리에 와서 함께 걸린다 |
+| 구조도 | 다이어그램이라 텍스트 레이어에 없다 |
+| 개정 연도 | 자료 어디에도 인쇄돼 있지 않다 — `_meta.txt` 에 적는다 |
 
 ---
 
 ## 도구 테스트
 
 ```bash
+node naesin-ko/extract/spans-util.test.mjs      # 공용 규칙(시리즈 판별·공백 복원·연 나누기·id 규약)
 node naesin-ko/extract/build-ihae.test.mjs
+node naesin-ko/extract/build-yoyak.test.mjs
+node naesin-ko/extract/build-danwon.test.mjs
+node naesin-ko/extract/build-seosul.test.mjs
 ```
 
 실제 지면은 저장소에 못 들어오므로 **지면의 성질만 베낀 자체 창작 fixture**로 건다.
 회귀로 못 박은 두 가지는 실제 지면에서 초안을 망가뜨렸던 것들이다:
 색 박스의 흰 라벨을 빈칸으로 오검출하는 문제, 쪽번호·자료 식별번호가 연 요지 끝에
 붙어 들어오는 문제.
+
+---
+
+## 알려진 한계 — 다음 자료에서 먼저 깨질 자리
+
+표본이 **한 단원(천재 노미숙 중2-1, 시 2편 + 산문 1편)** 뿐이다. 적대적 검증에서 나온
+'조용히 틀릴 수 있는' 자리를 적어 둔다 — 새 출판사·새 갈래 자료를 처음 돌릴 때 여기부터 본다.
+
+- **본문 글꼴 크기를 값으로 거른다.** 0.1pt만 달라도 발문·조건이 빈다. 발문이 빈 문항은
+  검증기가 막지만(`stem 없음`), 추출기의 개수 검산은 마커만 세므로 '일치'라고 초록불을 켠다.
+  → 산출물의 문항 수가 맞는데 내용이 비면 이것을 의심한다.
+- **지문 세트의 시작을 `※ 다음 글을 읽고` 로 잡는다.** '다음 시를 읽고' 같은 표기가 오면
+  세트를 못 찾고, 지문 한 통이 앞 문항의 &lt;보기&gt;로 들어갈 수 있다.
+- **한 문항에 &lt;보기&gt; 상자가 둘이면 앞의 것이 버려진다.** 두 작품 비교형에서 나올 수 있다.
+- **작가 판정이 이름 폭에 기댄다.** 다섯 자를 넘는 이름(번역 소설·공동 저자)에서 제목·작가가
+  본문 첫 줄로 섞일 수 있다.
+- **단(column)을 가로지르는 넓은 상자**는 기둥 경계에서 반으로 잘린다.
+- **한 폴더에 같은 시리즈의 다른 회차를 넣으면** 문항 id 가 겹칠 수 있다 — 회차별로 폴더를 나눈다.
+
+공통 대응: 새 자료를 처음 돌리면 **개수(문항·세트·빈칸)와 표본 5건을 지면과 눈으로 대조**한다.
+어긋나면 그때 도구를 고친다 — 추측으로 미리 넓히지 않는다.
