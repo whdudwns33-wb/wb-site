@@ -70,6 +70,8 @@ jobs:
         run: node reading-server/naesin-studio.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
+      - name: 내신브레인 수업 라이브 세션 테스트
+        run: node reading-server/naesin-live.test.mjs
       - name: 내신브레인 시험 결과 분석·예측 테스트
         run: node reading-server/naesin-results.test.mjs
       - name: 교재 코칭 테스트

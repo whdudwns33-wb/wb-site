@@ -24,9 +24,11 @@ reading-server/
   naesin-api.mjs    /api/naesin/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
   naesin-results.mjs  시험 결과 분석·예측 (복합 도달률·상관·최소제곱) — 순수 함수
   naesin-studio.mjs   팩 제작 스튜디오 — 추출 작업(Job) 저장소·검수·배포 관문
+  naesin-live.mjs     수업 라이브 세션 — 단계(타임박스)·투사 문제·라이브 보드 행 (순수 함수)
   naesin-extract.mjs  AI 추출 — 원천 텍스트 → 종류별 JSON (Claude, fetch 주입 가능)
   public/naesin-admin.html   관리 웹(운영) — 팩 업로드·시험 등록·반 성취도·팩 커버리지·문항 신고
   public/naesin-studio.html  관리 웹(제작) — 원천 붙이기 → AI 추출 → 검수 → 배포
+  public/naesin-live.html    관리 웹(수업) — 반 현황·타임박스·투사 모드 (강사 노트북)
 ```
 
 핵심 데이터 흐름: **PDF(구매 자료) → [추출·검증] → 팩 JSON → 관리 웹 업로드 → KV
@@ -81,6 +83,15 @@ reading-server/
 - 문항 신고(정오표): 학생 `POST /report {packId, itemRef, reason, memo?}` — **자기 시험 범위의
   팩만**(아니면 403), 같은 학생·같은 문항의 미처리 신고는 합친다 · 관리
   `GET /admin/reports?packId=` → 문항별로 묶어 건수 내림차순 · `POST /admin/reports/resolve {packId, id|itemRef}`
+- 수업 라이브(naesin-live.mjs, 계약 L1): 학생 `GET /live` → `{live:{phase, projector}, scope}` —
+  **투사 문제의 `answerKey`는 공개(revealed) 전까지 응답에 없고, 지금 띄운 문제 하나만 내려간다** ·
+  학생 `POST /live/answer {ref, key}` (지금 화면의 문제만, 정답 여부는 돌려주지 않는다) · 관리
+  `GET /admin/live` → `{live, votes, board, weakest}` (폴링 한 번으로 세션·응답 분포·반 현황) ·
+  `POST /admin/live/phase {phase|null}` (endsAt 은 서버가 분 입력에서 계산 — 강사 노트북 시계를 믿지 않는다) ·
+  `POST /admin/live/projector {items|null, index?, revealed?}` · `DELETE /admin/live`.
+  세션은 `updatedAt` 이 4시간을 넘으면 없는 것으로 본다 — 방치된 단계가 다음 날 학생 화면에 남지 않게.
+- 팩 단건: `GET /admin/pack?id=` → `{pack, updatedAt}` — 강사 화면이 즉석 문제를 만들 때 쓴다
+  (문제 생성은 학생 앱과 같은 `gen.js` 로 화면에서 한다)
 - 제작 스튜디오(naesin-studio.mjs): `POST /admin/job` (원천 텍스트 종류별) · `GET /admin/jobs` ·
   `GET /admin/job?id=[&src=1]` → `{job, gate}` (`src=1`이면 원천까지) · `POST /admin/job/extract {jobId, kind}` ·
   `POST /admin/job/draft {jobId, draft}` (AI 키 없이 쓰는 길) · `POST /admin/job/review {jobId, rows|key,…}` ·
@@ -174,11 +185,31 @@ Enter 제출, 러너 접근성.
 서버가 없는 팩 등록과 배정된 팩 삭제를 모두 막으므로 실제로 나는 구멍은 "올렸는데 어느 시험에도
 안 넣은 팩"이다)와 **문항 신고**(학생이 수업 중 발견한 오류를 문항별로 묶어 건수 순으로).
 
+**강사 라이브 보드·타임박스·투사 모드(2026-09-03, 기획서 §15-3)** — 관리 웹은 결과 집계용이라
+수업 중 강사가 보는 화면이 없었다. 학생 상태는 이미 주기적으로 서버에 올라가므로 **5초 폴링**으로
+반 현황을 낸다(WebSocket 을 워커에 띄우는 비용이 5초 지연보다 크다). 정렬은 정체 오래된 순 —
+강사가 먼저 가 봐야 할 학생이 위로 와야 화면을 볼 이유가 생긴다. 정체는 학생이 올린 `idleSec` 에
+그 뒤 흐른 시간을 더해 센다(앱을 덮으면 갱신이 멈춘다).
+**타임박스**는 강사가 세운 단계를 학생 태블릿 상단 띠로 알리지만 **화면을 대신 넘기지 않는다** —
+학생이 「이 단계로 이동」을 눌러야 옮겨진다(잘못 눌린 단계가 학습을 망치지 않게). 예외는 하나,
+러너가 닫혀 있고 홈에 멍하니 있으면 3초 뒤 스스로 옮긴다.
+**투사 모드**는 TV에 문제를 띄우고 답만 태블릿에서 받는다 — 그래서 `GET /live` 응답에 정답이 없다.
+문제 생성은 학생 앱과 같은 `gen.js` 로 강사 화면에서 한다(서버에 규칙을 복제하면 학생이 푸는 문제와
+TV에 띄우는 문제가 조용히 갈라진다). 결과는 기존 오답노트·학습 로그로 들어간다.
+
+**같이 고친 것 두 가지**(둘 다 라이브 검증 중에 드러났다):
+- **학원 달력(KST)**: 서버는 시험 만료·과제 날짜를 늘 KST 로 판정하는데 학생 앱만 기기 시간대로
+  견주고 있었다. 시간대가 어긋난 태블릿에서 **배정된 과제가 조용히 안 뜨고** D-day 도 하루
+  어긋났다. 서버가 준 날짜와 견주는 자리를 모두 `kstDate`·`kstDaysUntil` 로 바꿨다(엔진의
+  '다른 날' 판정은 학생 자기 날짜라 기기 로컬 그대로 둔다 — 별개 문제다).
+- **상단 띠의 임자**: 저장 표시가 성공할 때마다 `showBanner('')` 로 남의 안내까지 지웠다 —
+  「선생님께 전달했어요」가 1초 뒤 사라졌다. 띠에 임자를 적어 자기가 띄운 것만 지운다.
+
 **Phase 2 백로그** (기획서 §12·§14 매핑):
 - 문항 확장: Grammar 객관식 21~45 + 워크북(07)·주관식(09) 전량, 내용정리 점검 문항
 - AI 채점: 해석 청크 enum 판정(+KV 캐시·표본 감사, §14-2) · 백지 실패 원인 라우팅 ·
   종이 답안 촬영 채점(§14-3) — Claude API는 vocab-api.mjs의 호출 패턴·ai-quota 재사용
-- 회복 triage(targetRefs 역인덱스) · 결석 감지→개입 카드 · 학부모 D-day 브리핑(§14-5,
+- 회복 triage(targetRefs 역인덱스) · 결석 감지→개입 카드 · 라이브 세션을 반별(scope=cls)로 · 학부모 D-day 브리핑(§14-5,
   기존 발송 승인 워크플로우 경유) · 21:00 푸시에 내신 복습 포함
 - 관리: 학교↔교과서 매핑(팩 커버리지가 이것 없이 시험의 packIds 기준으로만 계산한다)
 - 시험 후 워드브레인 이관(§4.5)
