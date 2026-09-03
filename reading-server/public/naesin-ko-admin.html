@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 국어브레인 · 관리</title>
+  <style>
+    :root{--green:#2A3B2E;--acc:#3E6B4A;--soft:#e9f1ea;--bg:#f4f6f3;--line:#dde5dc;--muted:#6b7268;--ink:#222a24;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--green);color:#fff;flex-wrap:wrap}
+    header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1080px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--green);font-size:17px}
+    h3{margin:12px 0 6px;color:var(--green);font-size:14px}
+    button{font:inherit;cursor:pointer}
+    input,select,textarea{font:inherit;min-height:42px;padding:8px 10px;border:1.5px solid #c6d5c4;border-radius:10px;background:#fff;color:var(--ink);width:100%}
+    textarea{min-height:70px;resize:vertical}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #c6d5c4;color:var(--green)}
+    .btn.sm{min-height:34px;padding:4px 12px;font-size:13px}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2ee;color:var(--muted)}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+    .stat{flex:1;min-width:120px;padding:12px;border:1px solid #d6e4d5;border-radius:12px;background:#f7fbf7;text-align:center}
+    .stat b{display:block;font-size:22px;color:var(--green)}
+    .stat span{font-size:12px;color:var(--muted);font-weight:800}
+    .tbl{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13.5px}
+    th{position:sticky;top:0;background:#eef3ed;color:var(--green);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    tbody tr:nth-child(even) td{background:#f8fbf8}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    .issues{margin:8px 0 0;padding:10px 12px;border-radius:10px;font-size:13px;max-height:280px;overflow:auto}
+    .issues.bad{background:#fff0ef}.issues.warn{background:#fff4e6}.issues.ok{background:#e7f6f0}
+    .issues div{margin:2px 0}
+    label.ck{display:inline-flex;align-items:center;gap:6px;font-weight:700;margin:2px 10px 2px 0}
+    label.ck input{width:auto;min-height:auto}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .ans{background:#f7fbf7;border-left:3px solid var(--acc);padding:8px 11px;border-radius:0 8px 8px 0;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+<header><b>WB 국어브레인 · 관리</b><small>팩 업로드 · 시험 등록 · 오버레이 · 서술형 검토</small><span class="sp"></span>
+  <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">내신브레인(영어)</button>
+  <button class="hbtn" onclick="location.href='/admin/'">진로독서 관리</button>
+  <button class="hbtn" id="btnLogout">로그아웃</button>
+</header>
+<main id="app"></main>
+
+<script src="/naesin-ko/pack-check.js"></script>
+<script>
+/* WB 국어브레인 관리 웹 — 기획서 §6·§7.
+   인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다.
+   팩 검증은 학생 앱·CLI와 같은 pack-check.js를 부른다 — 규칙을 두 벌로 두지 않는다(§7[3]). */
+let TOKEN = localStorage.getItem('wbr.admin.token') || null;
+let PACKS = [], OVERVIEW = [], REVIEWS = [], ASSEMBLED = null, CONCEPTS = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(path, opt) {
+  const r = await fetch('/api' + path, Object.assign({
+    headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) }
+  }, opt || {}));
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && TOKEN) {
+    TOKEN = null; localStorage.removeItem('wbr.admin.token');
+    renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');
+    throw new Error('auth');
+  }
+  if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+  return j;
+}
+
+function renderLogin(msg) {
+  $('#app').innerHTML = `<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">진로독서 관리와 같은 PIN을 씁니다.</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="관리 PIN" autocomplete="current-password">
+    <button class="btn" id="go" style="margin-top:10px;width:100%">로그인</button>
+    <div class="err" id="e">${msg ? esc(msg) : ''}</div></div>`;
+  $('#go').onclick = async () => {
+    try {
+      const j = await api('/admin/login', { method: 'POST', body: JSON.stringify({ pin: $('#pin').value }) });
+      TOKEN = j.token; localStorage.setItem('wbr.admin.token', TOKEN); refresh();
+    } catch (e) { $('#e').textContent = e.message; }
+  };
+  $('#pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#go').click(); });
+}
+
+async function refresh() {
+  try {
+    const [ov, pk] = await Promise.all([api('/naesin-ko/admin/overview'), api('/naesin-ko/admin/packs')]);
+    OVERVIEW = ov.students || []; PACKS = pk.packs || [];
+    try { REVIEWS = (await api('/naesin-ko/admin/review')).reviews || []; } catch (e) { REVIEWS = []; }
+    render();
+  } catch (e) { if (e.message !== 'auth') $('#app').innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
+}
+
+function render() {
+  const linked = OVERVIEW.filter((s) => s.linked);
+  const hold = REVIEWS.filter((r) => !r.teacher && r.verdict !== 'pass');
+  $('#app').innerHTML = `
+  <div class="card">
+    <h2>반 성취도</h2>
+    <div class="stats">
+      <div class="stat"><b>${linked.length}</b><span>학습 중</span></div>
+      <div class="stat"><b>${PACKS.length}</b><span>등록된 팩</span></div>
+      <div class="stat"><b>${hold.length}</b><span>서술형 검토 대기</span></div>
+    </div>
+    <div class="tbl"><table><thead><tr>
+      <th>학생</th><th>반</th><th>작품 완료</th><th>개념 안정화</th><th>어휘 안정화</th><th>오답</th><th>서술형</th><th>최근</th>
+    </tr></thead><tbody>${linked.length ? linked.map(rowStudent).join('') :
+      '<tr><td colspan="8" class="muted">아직 학습 기록이 없어요.</td></tr>'}</tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>서술형 검토 큐</h2>
+    <p class="muted">규칙 채점(1층)이 <b>보류</b>로 남긴 답안입니다. 읽고 원터치로 확정하세요 —
+      학생 화면에는 “연습 판정”으로 표시됩니다(§10-8).</p>
+    <div id="reviewList">${renderReviews()}</div>
+  </div>
+
+  <div class="card">
+    <h2>단원 팩 업로드</h2>
+    <p class="muted">분리 JSON을 모두 고르면 브라우저에서 합쳐 검증합니다.
+      규칙은 <code>naesin-ko/pack-check.js</code> 하나 — CLI 검증기와 같은 파일입니다.</p>
+    <input type="file" id="files" multiple accept="application/json,.json">
+    <div id="checkOut"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="btnUpload" disabled>업로드</button>
+      <span class="muted" id="upMsg"></span>
+    </div>
+    <h3>등록된 팩</h3>
+    <div id="packList" class="muted">${PACKS.length ? PACKS.map((p) => `<span class="tag" style="margin:2px">${esc(p)}</span>`).join('') : '없음'}</div>
+  </div>
+
+  <div class="card">
+    <h2>시험 등록</h2>
+    <p class="muted">시험 프로파일(문항 수·서술형 배점)은 학교알리미 평가계획에서 옮겨 적습니다.
+      서술형 배점이 30% 이상이면 플래너가 서술형을 D-21부터 배정합니다(§5.4).</p>
+    <div class="grid-form">
+      <div><label class="muted">대상</label><input id="exScope" value="default" placeholder="default 또는 학생 코드"></div>
+      <div><label class="muted">시험일</label><input id="exDate" type="date"></div>
+      <div><label class="muted">객관식 문항 수</label><input id="exMc" type="number" min="0" placeholder="예: 21"></div>
+      <div><label class="muted">서술형 문항 수</label><input id="exEs" type="number" min="0" placeholder="예: 5"></div>
+      <div><label class="muted">서술형 배점 비율</label><input id="exW" type="number" min="0" max="100" placeholder="예: 40 (%)"></div>
+    </div>
+    <h3>범위 팩</h3>
+    <div id="exPacks">${PACKS.length ? PACKS.map((p) => `<label class="ck"><input type="checkbox" value="${esc(p)}"> ${esc(p)}</label>`).join('') : '<span class="muted">먼저 팩을 올려 주세요.</span>'}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnExam">등록</button><span class="muted" id="exMsg"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>오늘 수업 과제</h2>
+    <p class="muted">배정하면 학생 홈 맨 위에 고정됩니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">날짜</label><input id="tkDate" type="date"></div>
+      <div><label class="muted">제목</label><input id="tkTitle" placeholder="예: 빈 의자 구절 적용"></div>
+      <div><label class="muted">팩(선택)</label><select id="tkPack"><option value="">(지정 안 함)</option>${PACKS.map((p) => `<option>${esc(p)}</option>`).join('')}</select></div>
+    </div>
+    <h3>학습 유형</h3>
+    <div id="tkTypes">${['읽기', '개념 빈칸', '구절 적용', '주석 복원', '서술형', '실전 객관식', '확인 문제', '브레인덤프']
+      .map((k) => `<label class="ck"><input type="checkbox" value="${k}"> ${k}</label>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnTask">배정</button><span class="muted" id="tkMsg"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>학교 강조점 오버레이</h2>
+    <p class="muted">국어 내신의 채점 기준은 <b>학교 선생님이 수업에서 강조한 해석</b>입니다(§1.4-4).
+      정본과 다르면 여기서 덮어쓰세요 — 채점기·문항 생성기가 이 값을 따릅니다.
+      학생 필기에 기반한 정보이므로 학생 화면에는 “학교 선생님 강조”로 표시됩니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">대상</label><input id="ovScope" value="default"></div>
+    </div>
+    <h3>정답 덮어쓰기</h3>
+    <p class="muted">한 줄에 하나: <code>b-빈칸id | 정답1 / 정답2 | 메모</code></p>
+    <textarea id="ovOver" placeholder="b-bl-09 | 의인법 / 활유법 | 학교에서는 활유법도 인정"></textarea>
+    <h3>작품별 강조 메모</h3>
+    <p class="muted">한 줄에 하나: <code>작품id | 메모</code></p>
+    <textarea id="ovNotes" placeholder="w-bin-uija | 5연 역설을 서술형으로 낸다고 하심"></textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnOv">저장</button>
+      <button class="btn ghost sm" id="btnOvLoad">불러오기</button><span class="muted" id="ovMsg"></span></div>
+  </div>`;
+
+  bind();
+}
+
+function rowStudent(s) {
+  const m = s.summary || {};
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
+  return `<tr>
+    <td>${esc(s.name || s.code)}<div class="muted">${esc(s.code)}</div></td>
+    <td>${esc(s.cls || '')}</td>
+    <td>${m.complete != null ? `${m.complete} / ${m.works || 0}` : '-'}</td>
+    <td>${m.blankTotal ? `${m.blankStable}/${m.blankTotal} <span class="muted">(${pct(m.blankStable, m.blankTotal)})</span>` : '-'}</td>
+    <td>${m.vocabTotal ? `${m.vocabStable}/${m.vocabTotal}` : '-'}</td>
+    <td>${m.wrongOpen != null ? (m.wrongOpen > 0 ? `<span class="tag warn">${m.wrongOpen}</span>` : '<span class="tag ok">0</span>') : '-'}</td>
+    <td>${m.essayPass != null ? `통과 ${m.essayPass}${m.essayHold ? ` · 보류 ${m.essayHold}` : ''}` : '-'}</td>
+    <td class="muted">${s.lastActive ? esc(String(s.lastActive).slice(5, 16).replace('T', ' ')) : '-'}</td>
+  </tr>`;
+}
+
+function renderReviews() {
+  const rows = REVIEWS.filter((r) => !r.teacher);
+  if (!rows.length) return '<p class="muted">검토할 답안이 없어요.</p>';
+  return rows.slice(0, 40).map((r) => {
+    const v = r.rule || {};
+    const tag = r.verdict === 'pass' ? '<span class="tag ok">규칙 통과</span>'
+      : r.verdict === 'fail' ? '<span class="tag bad">규칙 미달</span>' : '<span class="tag warn">보류</span>';
+    return `<div style="border-top:1px solid var(--line);padding:10px 0">
+      <div class="row"><b>${esc(r.name || r.code)}</b><span class="muted">${esc(r.cls || '')}</span>
+        <span class="tag muted">${esc(r.itemId)}</span>${tag}
+        <span class="muted">${v.score != null ? `${v.score}/${v.total}점` : ''}</span></div>
+      <div class="ans" style="margin:6px 0">${esc(r.answer || '(빈 답안)')}</div>
+      <div class="row">
+        <button class="btn sm" data-rv="pass" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">통과</button>
+        <button class="btn sm ghost" data-rv="hold" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">보류</button>
+        <button class="btn sm ghost" data-rv="fail" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">미달</button>
+        <input style="max-width:80px" type="number" placeholder="점수" data-pt="${esc(r.code)}|${esc(r.itemId)}">
+        <input style="max-width:260px" placeholder="한 줄 피드백" data-cm="${esc(r.code)}|${esc(r.itemId)}">
+      </div></div>`;
+  }).join('');
+}
+
+function bind() {
+  $('#files').onchange = async (e) => {
+    const files = [...e.target.files];
+    const out = $('#checkOut');
+    if (!files.length) { out.innerHTML = ''; return; }
+    const parsed = [];
+    for (const f of files) {
+      try { parsed.push({ name: f.name, json: JSON.parse(await f.text()) }); }
+      catch (err) { parsed.push({ name: f.name, json: null }); }
+    }
+    if (!CONCEPTS) {
+      try { CONCEPTS = await (await fetch('/naesin-ko/concepts.json')).json(); } catch (err) { CONCEPTS = null; }
+    }
+    const { pack, notes } = WBKOCHECK.assemble(parsed);
+    const r = WBKOCHECK.checkPack(pack, CONCEPTS ? { concepts: CONCEPTS } : {});
+    ASSEMBLED = r.ok ? pack : null;
+    const errs = notes.concat(r.errors);
+    out.innerHTML = `<div class="issues ${errs.length ? 'bad' : (r.warns.length ? 'warn' : 'ok')}">
+      <div><b>${esc(pack.packId || '(packId 없음)')}</b> — ${r.summary.map(esc).join(' · ')}</div>
+      ${errs.map((x) => `<div>✗ ${esc(x)}</div>`).join('')}
+      ${r.warns.map((x) => `<div>! ${esc(x)}</div>`).join('')}
+      ${!errs.length ? '<div>✓ 오류 없음 — 업로드할 수 있어요.</div>' : ''}</div>`;
+    $('#btnUpload').disabled = !ASSEMBLED;
+  };
+
+  $('#btnUpload').onclick = async () => {
+    if (!ASSEMBLED) return;
+    try {
+      await api('/naesin-ko/admin/pack', { method: 'POST', body: JSON.stringify({ id: ASSEMBLED.packId, pack: ASSEMBLED }) });
+      $('#upMsg').textContent = '업로드 완료';
+      ASSEMBLED = null; refresh();
+    } catch (e) { $('#upMsg').textContent = e.message; }
+  };
+
+  $('#btnExam').onclick = async () => {
+    const packIds = [...document.querySelectorAll('#exPacks input:checked')].map((i) => i.value);
+    const w = Number($('#exW').value);
+    const profile = {
+      mcCount: $('#exMc').value === '' ? null : Number($('#exMc').value),
+      essayCount: $('#exEs').value === '' ? null : Number($('#exEs').value),
+      essayWeight: $('#exW').value === '' ? null : (w > 1 ? w / 100 : w)
+    };
+    try {
+      await api('/naesin-ko/admin/exam', { method: 'POST', body: JSON.stringify({
+        scope: $('#exScope').value.trim(), examDate: $('#exDate').value, packIds, profile }) });
+      $('#exMsg').textContent = '등록 완료';
+    } catch (e) { $('#exMsg').textContent = e.message; }
+  };
+
+  $('#btnTask').onclick = async () => {
+    const typeKeys = [...document.querySelectorAll('#tkTypes input:checked')].map((i) => i.value);
+    try {
+      await api('/naesin-ko/admin/task', { method: 'POST', body: JSON.stringify({
+        date: $('#tkDate').value, title: $('#tkTitle').value.trim(),
+        typeKeys, packId: $('#tkPack').value || undefined }) });
+      $('#tkMsg').textContent = '배정 완료';
+    } catch (e) { $('#tkMsg').textContent = e.message; }
+  };
+
+  $('#btnOvLoad').onclick = async () => {
+    try {
+      const j = await api('/naesin-ko/admin/overlay?scope=' + encodeURIComponent($('#ovScope').value.trim() || 'default'));
+      const o = j.overlay || {};
+      $('#ovOver').value = (o.overrides || []).map((x) => `${x.targetRef} | ${(x.answers || []).join(' / ')}${x.note ? ' | ' + x.note : ''}`).join('\n');
+      $('#ovNotes').value = (o.notes || []).map((n) => `${n.workId} | ${n.text}`).join('\n');
+      $('#ovMsg').textContent = '불러왔어요';
+    } catch (e) { $('#ovMsg').textContent = e.message; }
+  };
+
+  $('#btnOv').onclick = async () => {
+    const overrides = $('#ovOver').value.split('\n').map((l) => l.split('|').map((s) => s.trim()))
+      .filter((p) => p[0] && p[1])
+      .map((p) => ({ targetRef: p[0], answers: p[1].split('/').map((s) => s.trim()).filter(Boolean), note: p[2] || '' }));
+    const notes = $('#ovNotes').value.split('\n').map((l) => l.split('|').map((s) => s.trim()))
+      .filter((p) => p[0] && p[1]).map((p) => ({ workId: p[0], text: p.slice(1).join(' | ') }));
+    try {
+      await api('/naesin-ko/admin/overlay', { method: 'POST', body: JSON.stringify({
+        scope: $('#ovScope').value.trim() || 'default', overrides, notes }) });
+      $('#ovMsg').textContent = `저장 완료 (덮어쓰기 ${overrides.length} · 메모 ${notes.length})`;
+    } catch (e) { $('#ovMsg').textContent = e.message; }
+  };
+
+  $('#reviewList').onclick = async (e) => {
+    const b = e.target.closest('[data-rv]');
+    if (!b) return;
+    const code = b.getAttribute('data-code'), itemId = b.getAttribute('data-item');
+    const key = `${code}|${itemId}`;
+    const pt = document.querySelector(`[data-pt="${key}"]`);
+    const cm = document.querySelector(`[data-cm="${key}"]`);
+    try {
+      await api('/naesin-ko/admin/review', { method: 'POST', body: JSON.stringify({
+        code, itemId, verdict: b.getAttribute('data-rv'),
+        points: pt && pt.value !== '' ? Number(pt.value) : undefined,
+        comment: cm ? cm.value : '' }) });
+      refresh();
+    } catch (err) { alert(err.message); }
+  };
+}
+
+$('#btnLogout').onclick = () => { TOKEN = null; localStorage.removeItem('wbr.admin.token'); renderLogin(); };
+if (TOKEN) refresh(); else renderLogin();
+</script>
+</body>
+</html>

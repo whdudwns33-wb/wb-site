@@ -73,6 +73,19 @@ try {
     body: { state: { profile: { level: 'L3' }, readings: { 'nuri-space': { date: '2026-08-31' } } } } })).body.ok, '⑥ 기록 저장 실패');
   ok((await req('/api/pull', { token: stuTok })).body.state?.readings?.['nuri-space'], '⑥ 저장한 기록을 다시 못 읽는다');
 
+  /* ⑥-2 내신 두 앱에도 기록을 남긴다 — 퇴원 처리가 이것들까지 지우는지 ⑪에서 확인한다.
+     국어는 요약·서술형 답안·오버레이가 state와 다른 키에 있어 하나만 지워서는 안 된다
+     (국어 기획서 §8 저장 예산 · §10-7 개인정보 삭제). */
+  await req('/api/naesin/state', { method: 'PUT', token: stuTok, body: { state: { v: 1, packs: {} } } });
+  await req('/api/naesin-ko/state', { method: 'PUT', token: stuTok,
+    body: { state: { v: 1, packs: {} }, summary: { works: 1, complete: 0 } } });
+  await req('/api/naesin-ko/review', { method: 'POST', token: stuTok,
+    body: { review: { itemId: 'it-1', packId: 'dummy-ko-u1', answer: '학생이 쓴 서술형 답안', verdict: 'hold' } } });
+  await req('/api/naesin-ko/admin/overlay', { method: 'POST', token: admin,
+    body: { scope: CODE, overrides: [{ targetRef: 'b-1', answers: ['학교 정답'] }], notes: [] } });
+  ok((await req('/api/naesin-ko/review', { token: stuTok })).body.reviews?.length === 1,
+    '⑥-2 국어 서술형 제출이 저장되지 않았다');
+
   /* ⑦ 학부모 링크 */
   const ptok = (await req('/api/admin/parentlink', { method: 'POST', token: admin, body: { code: CODE } })).body.token;
   ok(ptok, '⑦ 학부모 링크 발급 실패');
@@ -106,6 +119,8 @@ try {
   await sleep(500); /* 저장은 300ms 디바운스 — 파일까지 반영되기를 기다린다 */
   const disk = fs.readFileSync(path.join(DATA, 'db.json'), 'utf8');
   ok(!disk.includes(CODE), '⑪ 저장 파일에 지운 학생 코드가 남아 있다');
+  ok(!disk.includes('학생이 쓴 서술형 답안'),
+    '⑪ 퇴원했는데 국어 서술형 답안이 남아 있다 — state만 지우면 review 키가 남는다');
 } catch (e) {
   E('예외: ' + e.message);
 } finally {
@@ -118,4 +133,4 @@ if (errors.length) {
   console.error(`\nFAIL — ${errors.length}건`);
   process.exit(1);
 }
-console.log('OK — 등록·승인 게이트·기록·학부모 링크·퇴원 처리(잔여 0) 11단계 통과');
+console.log('OK — 등록·승인 게이트·기록(진로독서·내신·국어)·학부모 링크·퇴원 처리(잔여 0) 12단계 통과');

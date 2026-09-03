@@ -25,6 +25,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin'
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-admin.html'), path.join(DIST, 'admin', 'naesin-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
@@ -54,6 +55,16 @@ const NAESIN_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-sam
 for (const f of NAESIN_FILES) fs.copyFileSync(path.join(NAESIN, f), path.join(DIST, 'naesin', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin', 'voice.js'));
 
+/* 국어브레인 (naesin-ko/) — 같은 오리진 /naesin-ko/ 에서 서빙해야 학생 토큰·API가 공유된다.
+   팩 콘텐츠는 여기 없다(KV 전용). concepts.json·grammar-examples.json은 자체 창작이라
+   정적 자산으로 나간다 — naesin-ko/concepts.test.cjs가 그 전제를 지킨다(국어 기획서 §9.3). */
+const NAESINKO = path.join(ROOT, '..', 'naesin-ko');
+fs.mkdirSync(path.join(DIST, 'naesin-ko'), { recursive: true });
+const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js',
+  'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
+
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
    sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
@@ -82,6 +93,10 @@ const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
 const nTag = stampSW(path.join(DIST, 'naesin', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin', f)), 'wbn-shell');
+const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
+  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'concepts.json',
+    'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag);

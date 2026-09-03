@@ -275,6 +275,9 @@ var WBGRADE = (function () {
   }
 
   return {
+    /* JOSA·stripJosa는 국어 앱(naesin-ko/grade.js)이 같은 목록을 쓰도록 내보낸다(국어 기획서 §9.4).
+       두 목록이 어긋나면 naesin-ko/grade.test.cjs가 깨진다. */
+    JOSA: JOSA, stripJosa: stripJosa,
     normalizeEn: normalizeEn, gradeAnswer: gradeAnswer, gradeBlanks: gradeBlanks,
     similarity: similarity, splitSentences: splitSentences, diffPassage: diffPassage,
     gradeTranslationChunks: gradeTranslationChunks,

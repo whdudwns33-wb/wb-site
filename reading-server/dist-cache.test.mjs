@@ -21,19 +21,25 @@ const build = () => execFileSync(process.execPath, [path.join(HERE, 'build-dist.
 const swVer = (p) => (fs.readFileSync(p, 'utf8').match(/const VERSION = '([^']*)'/) || [])[1];
 const R_SW = path.join(DIST, 'sw.js');
 const V_SW = path.join(DIST, 'vocab', 'sw.js');
+const N_SW = path.join(DIST, 'naesin', 'sw.js');
+const K_SW = path.join(DIST, 'naesin-ko', 'sw.js');
 
 build();
-const before = { r: swVer(R_SW), v: swVer(V_SW) };
+const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW) };
 
 t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값이 아니다', () => {
   assert.ok(/^wbr-shell-[0-9a-f]{10}$/.test(before.r), '진로독서 sw.js: ' + before.r);
   assert.ok(/^wbv-shell-[0-9a-f]{10}$/.test(before.v), '워드브레인 sw.js: ' + before.v);
+  assert.ok(/^wbn-shell-[0-9a-f]{10}$/.test(before.n), '내신브레인 sw.js: ' + before.n);
+  assert.ok(/^wbk-shell-[0-9a-f]{10}$/.test(before.k), '국어브레인 sw.js: ' + before.k);
 });
 
 t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 날아가지 않는다', () => {
   build();
   assert.strictEqual(swVer(R_SW), before.r);
   assert.strictEqual(swVer(V_SW), before.v);
+  assert.strictEqual(swVer(N_SW), before.n);
+  assert.strictEqual(swVer(K_SW), before.k);
 });
 
 t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 코드를 받는다', () => {
@@ -41,6 +47,9 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   const cases = [
     { file: path.join(HERE, '..', 'vocab', 'words.js'), sw: V_SW, was: before.v, what: '워드브레인 낱말' },
     { file: path.join(HERE, '..', 'reading', 'index.html'), sw: R_SW, was: before.r, what: '진로독서 앱' },
+    { file: path.join(HERE, '..', 'naesin', 'engine.js'), sw: N_SW, was: before.n, what: '내신브레인 엔진' },
+    /* 국어는 개념어 사전도 셸에 실린다 — 사전을 고치면 학생이 새 사전을 받아야 한다 */
+    { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
   ];
   for (const c of cases) {
     const orig = fs.readFileSync(c.file);
@@ -55,6 +64,8 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   build();
   assert.strictEqual(swVer(R_SW), before.r, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(V_SW), before.v, '되돌렸는데 값이 안 돌아왔다');
+  assert.strictEqual(swVer(N_SW), before.n, '되돌렸는데 값이 안 돌아왔다');
+  assert.strictEqual(swVer(K_SW), before.k, '되돌렸는데 값이 안 돌아왔다');
 });
 
 t('지문 데이터 버전이 articles.json 과 version.json 에서 같다', () => {

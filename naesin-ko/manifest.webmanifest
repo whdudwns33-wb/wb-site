@@ -1,0 +1,14 @@
+{
+  "name": "WB 국어브레인 — 국어 시험대비",
+  "short_name": "국어브레인",
+  "description": "작품 정본 암기·구절 적용·서술형까지 — WB 국어 내신 시험대비 훈련 앱 (원내 전용)",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F2EE",
+  "theme_color": "#2A3B2E",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

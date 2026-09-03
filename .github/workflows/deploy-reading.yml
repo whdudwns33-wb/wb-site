@@ -8,6 +8,7 @@ on:
       - 'reading-server/**'
       - 'vocab/**'
       - 'naesin/**'
+      - 'naesin-ko/**'
       - 'shared/**'
   workflow_dispatch:
 
@@ -47,6 +48,18 @@ jobs:
         run: node naesin/gen.test.cjs
       - name: 내신브레인 서버 라우트 테스트
         run: node reading-server/naesin-api.test.mjs
+      - name: 국어브레인 학습 엔진 테스트
+        run: node naesin-ko/engine.test.cjs
+      - name: 국어브레인 채점 모듈 테스트
+        run: node naesin-ko/grade.test.cjs
+      - name: 국어브레인 문항 생성 테스트
+        run: node naesin-ko/gen.test.cjs
+      - name: 국어브레인 팩 검증 규칙 테스트
+        run: node naesin-ko/pack-check.test.cjs
+      - name: 국어브레인 개념어 사전 테스트
+        run: node naesin-ko/concepts.test.cjs
+      - name: 국어브레인 서버 라우트 테스트
+        run: node reading-server/naesin-ko-api.test.mjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
