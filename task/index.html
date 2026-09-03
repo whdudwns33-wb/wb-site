@@ -1080,11 +1080,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-03.4"></script>
-<script src="./schedule-board-core.js?v=2026-09-03.4"></script>
-<script src="./asset-core.js?v=2026-09-03.4"></script>
-<script src="./qr-core.js?v=2026-09-03.4"></script>
-<script src="./acaflow-import-core.js?v=2026-09-03.4"></script>
+<script src="./lesson-form-core.js?v=2026-09-03.5"></script>
+<script src="./schedule-board-core.js?v=2026-09-03.5"></script>
+<script src="./asset-core.js?v=2026-09-03.5"></script>
+<script src="./qr-core.js?v=2026-09-03.5"></script>
+<script src="./acaflow-import-core.js?v=2026-09-03.5"></script>
 <script>
 "use strict";
 
@@ -9146,9 +9146,16 @@ const MAKEUP_REASON_OPTIONS = [
   ['student_inactive', '수강 종료'], ['other', '기타 운영 사유']
 ];
 const MAKEUP_REASON_LABELS = Object.fromEntries(MAKEUP_REASON_OPTIONS);
+const MANUAL_MAKEUP_REASON_OPTIONS = [
+  ['manual_absence', '결석보강'], ['manual_exam', '시험보강'], ['manual_other', '기타보강']
+];
+const MANUAL_MAKEUP_REASON_LABELS = Object.fromEntries(MANUAL_MAKEUP_REASON_OPTIONS);
 
 function makeupCaseForSource(taskId, date) {
-  return makeupRows.find(row => row.sourceTaskId === taskId && row.sourceDate === date) || null;
+  /* 결석 출결 카드에는 결석에서 파생된 보강만 연결한다. 같은 원 수업·날짜를 참조하는
+   * 관리자 수동 보강이 정규수업의 보강완료 표시나 자동 생성 흐름을 가로채면 안 된다. */
+  return makeupRows.find(row => row.creationType === 'absence' &&
+    row.sourceTaskId === taskId && row.sourceDate === date) || null;
 }
 
 function makeupCompletionTagHtml(task, date, check) {
@@ -9332,7 +9339,7 @@ async function loadMakeups(force) {
     makeupError = String(error && error.message || error); makeupLoaded = true;
   } finally {
     makeupLoading = false;
-    if (['makeup', 'today', 'week'].includes(route)) renderAfterSync();
+    if (['makeup', 'today', 'week', 'schedule'].includes(route)) renderAfterSync();
   }
 }
 
@@ -9385,12 +9392,16 @@ function makeupCard(row) {
   const scheduledToday = (row.confirmedDate || row.proposedDate) === today();
   const sourceTeacher = staffById(row.sourceTeacherId);
   const reason = MAKEUP_REASON_LABELS[row.reason] || '';
+  const manualCreation = row.creationType === 'manual';
+  const manualReason = MANUAL_MAKEUP_REASON_LABELS[row.manualReason] || '';
   const actions = makeupActions(row);
   return '<article class="card makeup-card' + (delayed ? ' is-overdue' : scheduledToday ? ' is-today' : '') + '" tabindex="-1" data-makeup-case="' + esc(row.caseId) + '">' +
     '<div class="between"><div><div class="card-title">' +
       esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생 연결 확인 필요', row.grade)) + '</div>' +
       '<div class="card-sub">' + esc([row.subject, row.className].filter(Boolean).join(' · ') || '수업 연결 확인 필요') + '</div></div>' + makeupStatusPill(row) + '</div>' +
-    '<div class="makeup-meta"><span class="tag">원 수업 ' + esc(row.sourceDate) + '</span>' +
+    '<div class="makeup-meta"><span class="tag">' + (manualCreation
+      ? '직접 생성 · ' + esc(manualReason || '유형 확인 필요')
+      : '원 수업 ' + esc(row.sourceDate)) + '</span>' +
       '<span class="tag">' + esc(sourceTeacher ? sourceTeacher.name + ' 선생님' : '원 수업 담당') + '</span>' +
       (delayed ? '<span class="tag blk">지연</span>' : scheduledToday ? '<span class="tag time">오늘</span>' : '') +
       (reason ? '<span class="tag">' + esc(reason) + '</span>' : '') + '</div>' +
@@ -9409,6 +9420,8 @@ function makeupKpis(rows) {
 
 function viewMakeups() {
   if (!makeupLoaded && !makeupLoading) setTimeout(() => loadMakeups(false), 0);
+  if ((session.isAdmin || (session.isStaffLink && session.staffId)) &&
+      !rosterDb && !rosterErr && !rosterLoading) setTimeout(() => loadRoster(), 0);
   const order = { review_pending: 0, reviewed: 0, awaiting_parent: 0, confirmed: 1, completed: 2, cancelled: 3 };
   const rows = makeupRows.slice().sort((a, b) => Number(makeupIsDelayed(b, today())) - Number(makeupIsDelayed(a, today())) ||
     Number(order[a.status] ?? 9) - Number(order[b.status] ?? 9) || String(a.sourceDate || '').localeCompare(String(b.sourceDate || '')))
@@ -9417,15 +9430,17 @@ function viewMakeups() {
   const archived = rows.filter(row => ['completed', 'cancelled'].includes(row.status))
     .sort((a, b) => Number(b.updatedAt || b.completedAt || b.cancelledAt || 0) - Number(a.updatedAt || a.completedAt || a.cancelledAt || 0));
   let h = '<section class="card makeup-hero"><div class="between"><div><div class="card-title">보강 관리</div>' +
-    '<div class="card-sub">결석으로 생성된 보강 건을 생성·완료·없음 세 가지 동작으로 처리합니다.</div></div>' +
+    '<div class="card-sub">결석으로 생성된 보강 건과 관리자·선생님이 직접 생성한 보강을 생성·완료·없음 세 가지 동작으로 처리합니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="murefresh">새로고침</button></div>' +
+    (session.isAdmin || (session.isStaffLink && session.staffId)
+      ? '<button class="btn btn-primary mt14" data-act="mumanualopen">보강생성</button>' : '') +
     '<div class="makeup-reason-guide">보강생성은 선택한 날짜의 담당 선생님 오늘 수업과 관리자 현황판에 보강수업을 만듭니다. 보강완료는 실제 진행 일시를 기록합니다.</div>' +
     '<div class="small muted mt8" role="status" aria-live="polite">' + esc(makeupLiveMessage) + '</div></section>';
   if (makeupLoading && !makeupLoaded) return h + '<div class="card" role="status" aria-live="polite"><div class="empty"><b>⏳</b>보강 현황을 불러오는 중입니다.</div></div>';
   if (makeupError) h += '<div class="card alert" role="alert"><div class="card-title">보강 현황을 불러오지 못했습니다</div><div class="small">' + esc(makeupError) + '</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="murefresh" autofocus>다시 시도</button></div>';
   h += makeupKpis(rows);
-  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">수업 카드에서 결석을 기록한 뒤 보강 검토를 요청하세요.</span></div></div>';
+  if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">위 보강생성 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요.</span></div></div>';
   h += active.length
     ? '<div class="makeup-grid" aria-live="polite">' + active.map(makeupCard).join('') + '</div>'
     : '<div class="card"><div class="empty"><b>✓</b>처리할 보강 건이 없습니다.</div></div>';
@@ -9457,7 +9472,7 @@ async function mutateMakeup(payload, button, successText, focusAct, closeOnSucce
       if (taskIndex < 0) state.tasks.push(result.lessonTask);
       else state.tasks[taskIndex] = result.lessonTask;
       save();
-    } else if (payload.action === 'schedule' || payload.action === 'restore_schedule' || payload.action === 'no_makeup') {
+    } else if (payload.action === 'create_manual' || payload.action === 'schedule' || payload.action === 'restore_schedule' || payload.action === 'no_makeup') {
       /* 혼합 배포 중 이전 응답을 받더라도 새 1회성 수업을 즉시 내려받는다. */
       await sync.run();
     }
@@ -9556,6 +9571,102 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
     renderAfterSync();
     return false;
   }
+}
+
+function manualMakeupStudents() {
+  const allowedIds = new Set(manualMakeupSourceLessons('').map(task => String(task.studentId || '')).filter(Boolean));
+  return studentLinkCandidates(today().slice(0, 7), false).filter(student =>
+    allowedIds.has(String(student.id || '')));
+}
+
+function manualMakeupSourceLessons(studentId) {
+  const stableId = String(studentId || '');
+  const reference = today();
+  return (state.tasks || []).filter(task => isRegularLessonTask(task) &&
+    (!stableId || String(task.studentId || '') === stableId) &&
+    (session.isAdmin || (session.isStaffLink && String(task.staffId || '') === String(session.staffId || ''))) &&
+    (!task.start || String(task.start) <= reference) && (!task.end || String(task.end) >= reference))
+    .slice().sort((a, b) => {
+      const subjectA = String(a.subject || a.className || '');
+      const subjectB = String(b.subject || b.className || '');
+      const teacherA = String((staffById(a.staffId) || {}).name || '');
+      const teacherB = String((staffById(b.staffId) || {}).name || '');
+      return subjectA.localeCompare(subjectB, 'ko') || teacherA.localeCompare(teacherB, 'ko') ||
+        String(a.id || '').localeCompare(String(b.id || ''));
+    });
+}
+
+function manualMakeupSourceLessonLabel(task) {
+  const teacher = staffById(task && task.staffId);
+  const schedule = lessonAssignmentScheduleText(task && task.scheduleSlots, task && task.lessonHours) ||
+    String(task && (task.scheduleText || task.time) || '').trim() || '시간표 미지정';
+  return [String(task && (task.subject || task.className) || '').trim() || '과목 미지정',
+    teacher && teacher.name ? teacher.name + ' 선생님' : '담당 미지정', schedule].join(' · ');
+}
+
+function manualMakeupLessonOptionsHtml(studentId) {
+  const lessons = manualMakeupSourceLessons(studentId);
+  if (!studentId) return '<option value="">원생을 먼저 선택하세요</option>';
+  if (!lessons.length) return '<option value="">현재 배정된 정규수업이 없습니다</option>';
+  return '<option value="">원 수업을 선택하세요</option>' + lessons.map(task =>
+    '<option value="' + esc(task.id) + '">' + esc(manualMakeupSourceLessonLabel(task)) + '</option>').join('');
+}
+
+function updateManualMakeupLessonSelect(studentId) {
+  const select = $('#muManualSourceTask');
+  const hint = $('#muManualLessonHint');
+  if (!select) return;
+  const lessons = manualMakeupSourceLessons(studentId);
+  select.innerHTML = manualMakeupLessonOptionsHtml(studentId);
+  select.disabled = !studentId || !lessons.length;
+  if (hint) hint.textContent = !studentId ? '원생을 선택하면 현재 배정된 정규수업만 표시됩니다.'
+    : lessons.length ? '보강 담당 선생님은 선택한 원 수업 담당자로 자동 지정됩니다.'
+      : '이 원생에게 현재 배정된 정규수업이 없습니다.';
+}
+
+function openManualMakeupModal() {
+  if (!(session.isAdmin || (session.isStaffLink && session.staffId))) return;
+  if (!rosterDb) {
+    if (!rosterLoading) loadRoster();
+    toast(rosterErr ? '원생 명단을 불러오지 못했습니다. 원생 탭에서 다시 시도해 주세요' : '원생 명단을 불러오는 중입니다');
+    return;
+  }
+  const students = manualMakeupStudents();
+  modal('보강생성',
+    '<div class="field"><label class="fl" for="muManualStudent">1. 원생</label><select class="in" id="muManualStudent" data-manual-makeup-student>' +
+      '<option value="">원생을 선택하세요</option>' + students.map(student => '<option value="' + esc(student.id) + '">' +
+        esc(rosterStudentIdentityLabel(student)) + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label class="fl" for="muManualSourceTask">2. 원 수업</label><select class="in" id="muManualSourceTask" disabled>' +
+      manualMakeupLessonOptionsHtml('') + '</select></div>' +
+    '<div class="small muted" id="muManualLessonHint">원생을 선택하면 현재 배정된 정규수업만 표시됩니다.</div>' +
+    '<div class="field"><label class="fl" for="muManualReason">3. 보강 유형</label><select class="in" id="muManualReason">' +
+      '<option value="">유형을 선택하세요</option>' + MANUAL_MAKEUP_REASON_OPTIONS.map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></div>' +
+    '<div class="field"><label class="fl" for="muManualDate">4. 보강 날짜</label><input class="in" id="muManualDate" type="date" min="' + esc(today()) + '"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="muManualStart">시작시간</label><input class="in" id="muManualStart" type="time"></div>' +
+      '<div class="field"><label class="fl" for="muManualEnd">종료시간</label><input class="in" id="muManualEnd" type="time"></div></div>' +
+    '<div class="makeup-reason-guide">원 수업의 출결은 바꾸지 않습니다. 결석보강만 회차를 1회 차감하며, 시험보강·기타보강은 회차를 추가 차감하지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="mumanualsubmit"' + (students.length ? '' : ' disabled') + '>확인</button>');
+}
+
+async function submitManualMakeup(button) {
+  if (!(session.isAdmin || (session.isStaffLink && session.staffId))) return;
+  const studentId = String(($('#muManualStudent') || {}).value || '');
+  const sourceTaskId = String(($('#muManualSourceTask') || {}).value || '');
+  const reason = String(($('#muManualReason') || {}).value || '');
+  const date = String(($('#muManualDate') || {}).value || '');
+  const startTime = String(($('#muManualStart') || {}).value || '');
+  const endTime = String(($('#muManualEnd') || {}).value || '');
+  if (!studentId) return toast('원생을 선택해 주세요');
+  const sourceTask = manualMakeupSourceLessons(studentId).find(task => String(task.id) === sourceTaskId);
+  if (!sourceTask) return toast('현재 배정된 원 수업을 선택해 주세요');
+  if (!MANUAL_MAKEUP_REASON_LABELS[reason]) return toast('보강 유형을 선택해 주세요');
+  if (!date || !startTime || !endTime || startTime >= endTime) {
+    return toast('날짜·시작시간·종료시간을 모두 확인해 주세요');
+  }
+  if (date < today()) return toast('오늘보다 이전 날짜에는 보강수업을 생성할 수 없습니다');
+  await mutateMakeup({ action: 'create_manual', studentId: studentId, sourceTaskId: sourceTaskId,
+    reason: reason, date: date, startTime: startTime, endTime: endTime }, button,
+    '보강수업을 생성했습니다', '', true);
 }
 
 function makeupCanComplete(row) {
@@ -10596,6 +10707,15 @@ function managerRequestInboxRows() {
       route: '', updatedAt: row.createdAt, priority: -5, tuitionAlertId: row.alertId
     });
   });
+  const teacherMakeupRows = typeof makeupRows === 'undefined' ? [] : makeupRows;
+  teacherMakeupRows.filter(row => row.creationType === 'manual' && row.createdScope === 'own' &&
+    !['completed', 'cancelled'].includes(row.status)).forEach(row => {
+    const typeLabel = MANUAL_MAKEUP_REASON_LABELS[row.manualReason] || '보강 유형 확인 필요';
+    const slot = row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime
+      ? row.confirmedDate + ' ' + row.confirmedStartTime + '–' + row.confirmedEndTime : '일정 확인 필요';
+    push('선생님 보강 생성', staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade),
+      typeLabel + ' · ' + slot, row.createdBy || row.sourceTeacherId, 'makeup', row.updatedAt || row.createdAt, -3);
+  });
   const directiveInboxRows = typeof adminDirectiveManageRows === 'undefined' ? [] : adminDirectiveManageRows;
   directiveInboxRows.filter(row => row.isCurrent && row.directiveStatus === 'active').forEach(row => {
     const pending = typeof adminDirectiveAudienceSummary === 'function' ? adminDirectiveAudienceSummary(row).pending : [];
@@ -10623,12 +10743,12 @@ function managerRequestInboxCount() { return session.isAdmin ? managerRequestInb
 function managerRequestInboxReady() {
   return lessonAssignmentRequestsLoaded && lessonChangeQueueLoaded && feedbackQueueLoaded &&
     bookAddQueueLoaded && bookEditQueueLoaded && guardianRequestsLoaded &&
-    studentChangeLoaded && adminDirectiveManageLoaded && teacherLiveRequestLoaded && tuitionAlertsLoaded;
+    studentChangeLoaded && adminDirectiveManageLoaded && teacherLiveRequestLoaded && tuitionAlertsLoaded && makeupLoaded;
 }
 
 function managerRequestInboxErrors() {
   return [lessonAssignmentRequestsError, lessonChangeQueueError, feedbackQueueError, bookAddQueueError, bookEditQueueError,
-    guardianRequestsError, studentChangeError, adminDirectiveError, teacherLiveRequestError, tuitionAlertsError]
+    guardianRequestsError, studentChangeError, adminDirectiveError, teacherLiveRequestError, tuitionAlertsError, makeupError]
     .filter(Boolean);
 }
 
@@ -10641,7 +10761,7 @@ async function loadManagerRequestInbox(force) {
       loadLessonAssignmentRequests(force), loadLessonChangeQueue(force), loadFeedbackQueue(force),
       loadBookAddQueue(force), loadBookEditQueue(force), loadGuardianRequests(force),
       loadStudentChanges(force), loadAdminDirectives(force, false),
-      loadTeacherLiveRequests(force, false), loadTuitionAlerts(force, false)
+      loadTeacherLiveRequests(force, false), loadTuitionAlerts(force, false), loadMakeups(force)
     ]);
   } finally {
     managerInboxLoading = false;
@@ -10685,7 +10805,9 @@ function viewSchedule() {
   if (!core) return '<div class="card"><div class="empty"><b>⚠️</b>수업 현황을 불러오지 못했습니다.<br>새로고침해 주세요.</div></div>';
   ensureSessionModeData(state.tasks);
   if (!rosterDb && !rosterErr) loadRoster();
-  if (!managerRequestInboxReady() && !managerInboxLoading) setTimeout(() => loadManagerRequestInbox(false), 0);
+  if (!managerRequestInboxReady() && !managerInboxLoading && !makeupLoading) {
+    setTimeout(() => loadManagerRequestInbox(false), 0);
+  }
 
   const nowKst = seoulNowParts();
   const scheduleVisitDates = scheduleView === 'day'
@@ -17826,6 +17948,16 @@ function parentPreviewTeacherLabel(value) {
   const name = String(value || '').trim();
   return !name ? '담당 선생님' : /선생님$/.test(name) ? name : name + ' 선생님';
 }
+const PARENT_PREVIEW_MAKEUP_TYPE_LABELS = {
+  manual_absence: '결석보강', manual_exam: '시험보강', manual_other: '기타보강'
+};
+function parentPreviewMakeupOriginLabel(row) {
+  if (row && row.creationType === 'absence') return '원 수업 ' + String(row.sourceDate || '');
+  if (row && row.creationType === 'manual') {
+    return '직접 생성 · ' + (PARENT_PREVIEW_MAKEUP_TYPE_LABELS[row.manualReason] || '보강 유형 확인 중');
+  }
+  return '보강 생성 정보 확인 중';
+}
 function parentPreviewStamp(value) {
   return value != null && value !== '' && Number(value) > 0 && Number.isFinite(Number(value))
     ? new Date(Number(value)).toLocaleString('ko-KR', {
@@ -17896,7 +18028,7 @@ function parentPreviewHtml(data) {
     ? parentPreviewSection('Book', '교재 준비·수령', bookStatusRows, '현재 진행 중인 교재가 없습니다.') : '';
   const makeupRows = (data.makeups || []).map(row =>
     '<div class="parent-preview-row"><div class="parent-preview-between"><div class="parent-preview-item"><b class="parent-preview-item-title">' +
-      esc(row.subject || '보강 수업') + '</b><div class="parent-preview-sub">원 수업 ' + esc(row.sourceDate || '') +
+      esc(row.subject || '보강 수업') + '</b><div class="parent-preview-sub">' + esc(parentPreviewMakeupOriginLabel(row)) +
       '</div></div><span class="parent-preview-tag ' + (row.status === 'confirmed' ? 'ok' : 'warn') + '">' +
       esc(row.statusLabel || row.status || '확인 중') + '</span></div>' + (row.confirmedDate ? '<div class="parent-preview-text">' +
       esc(row.confirmedDate) + ' ' + esc(row.confirmedTime || '') + ' · ' + esc(row.teacherName ? parentPreviewTeacherLabel(row.teacherName) : '담당 확인 중') + '</div>' : '') + '</div>');
@@ -19306,6 +19438,8 @@ document.addEventListener('click', ev => {
 
     /* 보강 */
     case 'murefresh': makeupLoaded = false; loadMakeups(true); break;
+    case 'mumanualopen': openManualMakeupModal(); break;
+    case 'mumanualsubmit': submitManualMakeup(el); break;
     case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el); break;
     case 'muschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'schedule');
@@ -20850,6 +20984,11 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', ev => {
+  const manualMakeupStudent = ev.target.closest('[data-manual-makeup-student]');
+  if (manualMakeupStudent) {
+    updateManualMakeupLessonSelect(String(manualMakeupStudent.value || ''));
+    return;
+  }
   const teacherLiveRequestLesson = ev.target.closest('[data-teacher-live-request-lesson]');
   if (teacherLiveRequestLesson) {
     teacherLiveRequestDraft.lessonTaskId = String(teacherLiveRequestLesson.value || '');
@@ -21342,7 +21481,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-03.4';
+const APP_VER = '2026-09-03.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

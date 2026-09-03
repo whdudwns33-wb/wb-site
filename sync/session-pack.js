@@ -367,9 +367,25 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
   } else {
     if (!/^mu_[a-f0-9]{48}$/.test(sourceRef)) return reply(json, origin, { ok: false, error: '보강 건 ID를 확인해 주세요' }, 400);
     const makeup = await env.DB.prepare(
-      'SELECT case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,status,completed_at ' +
+      'SELECT case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,status,completed_at,history ' +
       'FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1'
     ).bind(app, sourceRef).first();
+    let makeupHistory = [];
+    try { makeupHistory = JSON.parse(makeup && makeup.history || '[]'); } catch (error) { makeupHistory = []; }
+    // 시험·기타 보강은 원 수업 회차를 대체하지 않는다. makeup.js의 자동 완료 경로뿐 아니라
+    // 수동 회차 기록 API에서도 최초 생성 이벤트를 확인해 영구적으로 차단한다.
+    const firstMakeupEvent = Array.isArray(makeupHistory) && makeupHistory[0] &&
+      typeof makeupHistory[0] === 'object' ? makeupHistory[0] : null;
+    const manual = firstMakeupEvent && firstMakeupEvent.action === 'create_manual' ? firstMakeupEvent : null;
+    const absenceOrigin = firstMakeupEvent && firstMakeupEvent.action === 'create_from_absence';
+    if (!manual && !absenceOrigin) {
+      return reply(json, origin, { ok: false, code: 'MAKEUP_ORIGIN_NO_CHARGE',
+        error: '생성 근거를 확인할 수 없는 보강은 회차를 차감하거나 회차 원장에 기록하지 않습니다' }, 409);
+    }
+    if (manual && String(manual.reason || '') !== 'manual_absence') {
+      return reply(json, origin, { ok: false, code: 'MANUAL_MAKEUP_NO_CHARGE',
+        error: '결석 없이 생성한 보강은 회차를 차감하거나 회차 원장에 기록하지 않습니다' }, 409);
+    }
     if (!makeup || makeup.status !== 'completed' || !Number(makeup.completed_at) ||
         makeup.student_id !== pack.student_id || makeup.source_task_id !== pack.lesson_task_id ||
         makeup.source_teacher_id !== pack.task_owner || makeup.consumption_group_id !== suppliedGroup) {
@@ -380,8 +396,12 @@ async function recordUsage(env, app, body, auth, document, json, origin) {
     if (suppliedGroup !== expectedGroup || (body.checkKey && body.checkKey !== context.task.id + '|' + sourceDate)) {
       return reply(json, origin, { ok: false, code: 'CONSUMPTION_GROUP_MISMATCH', error: '원 결석과 보강의 소비 그룹이 일치하지 않습니다' }, 409);
     }
-    evidence = await checkEvidence(env, app, context.task, context.owner, context.task.id + '|' + sourceDate, 'A');
-    if (evidence.error) return reply(json, origin, { ok: false, code: evidence.code, error: evidence.error }, 409);
+    // 선생님이 직접 만든 결석보강은 결석 체크가 아직 없어도 생성·완료할 수 있다는 명시적
+    // 운영 유형이다. 자동 생성 결석보강은 기존처럼 A 출결을 반드시 근거로 확인한다.
+    if (!manual) {
+      evidence = await checkEvidence(env, app, context.task, context.owner, context.task.id + '|' + sourceDate, 'A');
+      if (evidence.error) return reply(json, origin, { ok: false, code: evidence.code, error: evidence.error }, 409);
+    }
     event = 'makeup_completed';
     const duplicate = await existingSource(env, app, sourceType, sourceRef);
     if (duplicate) {

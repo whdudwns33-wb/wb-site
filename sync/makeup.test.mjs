@@ -213,6 +213,267 @@ test('create requires a real A check, stable roster assignment, active source st
   assert.equal(inactive.status, 409);
 });
 
+test('assigned teacher or administrator can create one confirmed manual makeup on a non-recurring day without changing attendance', async () => {
+  const db = new TestD1(); seed(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const denied = await call(db, own('teacher-b'), request);
+  assert.equal(denied.status, 403);
+  const created = await call(db, own('teacher-a'), request);
+  assert.equal(created.status, 200);
+  assert.equal(created.body.idempotent, false);
+  assert.equal(created.body.case.status, 'confirmed');
+  assert.equal(created.body.case.creationType, 'manual');
+  assert.equal(created.body.case.manualReason, 'manual_exam');
+  assert.equal(created.body.case.createdBy, 'teacher-a');
+  assert.equal(created.body.case.createdScope, 'own');
+  assert.equal(created.body.case.confirmedStaffId, 'teacher-a');
+  assert.equal(created.body.lessonTask.lessonInstanceType, 'makeup');
+  assert.equal(created.body.lessonTask.start, '2026-08-12');
+  assert.equal(created.body.lessonTask.makeupCaseId, created.body.case.caseId);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE app='task'").get().n, 2);
+  const adminList = await call(db, manager('director'), { action: 'list' });
+  assert.equal(adminList.body.cases.length, 1);
+  assert.equal(adminList.body.cases[0].createdBy, 'teacher-a');
+  assert.equal(adminList.body.cases[0].createdScope, 'own');
+
+  const retry = await call(db, manager('director'), request);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 1);
+
+  const changed = await call(db, manager('director'), { ...request, startTime: '20:30', endTime: '21:30' });
+  assert.equal(changed.status, 409);
+  assert.equal(changed.body.code, 'MANUAL_MAKEUP_CONFLICT');
+});
+
+test('manual makeup validates type, stable student/source identity, active lesson range, roster, and staff', async () => {
+  const db = new TestD1(); seed(db);
+  const base = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  assert.equal((await call(db, all, { ...base, reason: '임의 사유' })).status, 400);
+  const mismatch = await call(db, all, { ...base, studentId: 'student-b' });
+  assert.equal(mismatch.status, 409);
+  assert.equal(mismatch.body.code, 'LESSON_STUDENT_MISMATCH');
+  const finiteRow = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+  const finiteTask = JSON.parse(finiteRow.data);
+  finiteTask.end = '2026-12-31';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(finiteTask)).run();
+  const inactiveRange = await call(db, all, { ...base, date: '2027-01-06' });
+  assert.equal(inactiveRange.status, 409);
+  assert.equal(inactiveRange.body.code, 'LESSON_INACTIVE');
+
+  const rosterDoc = roster();
+  rosterDoc.roster.students[0].end = '2026-08';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(rosterDoc)).run();
+  const inactiveStudent = await call(db, all, base);
+  assert.equal(inactiveStudent.status, 409);
+  assert.equal(inactiveStudent.body.code, 'STUDENT_INACTIVE');
+
+  const staffDb = new TestD1(); seed(staffDb);
+  staffDb.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'")
+    .bind(JSON.stringify({ id: 'teacher-a', deleted: true })).run();
+  const inactiveStaff = await call(staffDb, all, base);
+  assert.equal(inactiveStaff.status, 409);
+  assert.equal(inactiveStaff.body.code, 'STAFF_INACTIVE');
+});
+
+test('manual makeup allows teacher regular overlap but blocks student regular and confirmed-makeup overlaps', async () => {
+  const teacherOverlap = new TestD1(); seed(teacherOverlap);
+  insertTask(teacherOverlap, lesson('teacher-overlap', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  assert.equal((await call(teacherOverlap, all, request)).status, 200);
+
+  const studentOverlap = new TestD1(); seed(studentOverlap);
+  insertTask(studentOverlap, lesson('student-overlap', 'student-a', 'teacher-b', [3], '20:30', '21:30'));
+  const blockedStudent = await call(studentOverlap, all, request);
+  assert.equal(blockedStudent.status, 409);
+  assert.equal(blockedStudent.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+
+  const makeupOverlap = new TestD1(); seed(makeupOverlap);
+  insertTask(makeupOverlap, lesson('lesson-b-by-a', 'student-b', 'teacher-a', [2], '17:00', '18:00'));
+  assert.equal((await call(makeupOverlap, all, request)).status, 200);
+  const blockedStaff = await call(makeupOverlap, all, {
+    ...request, studentId: 'student-b', sourceTaskId: 'lesson-b-by-a', reason: 'manual_other'
+  });
+  assert.equal(blockedStaff.status, 409);
+  assert.equal(blockedStaff.body.code, 'STAFF_MAKEUP_CONFLICT');
+  assert.equal(makeupOverlap.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+});
+
+test('manual creation atomically rolls back case and task when source, roster, staff, or conflicts change', async () => {
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const transferDb = new TestD1(); seed(transferDb);
+  transferDb.beforeBatch = () => {
+    const row = transferDb.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+    const task = JSON.parse(row.data);
+    task.staffId = 'teacher-b';
+    transferDb.database.prepare(
+      "UPDATE tasks SET owner='teacher-b',data=?,updated_at=updated_at+1 WHERE app='task' AND id='lesson-a'"
+    ).run(JSON.stringify(task));
+  };
+  const transferred = await call(transferDb, own('teacher-a'), request);
+  assert.equal(transferred.status, 409);
+  assert.equal(transferred.body.code, 'REVISION_CONFLICT');
+  assert.equal(transferDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(transferDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+
+  const conflictDb = new TestD1(); seed(conflictDb);
+  conflictDb.beforeBatch = () => {
+    const task = lesson('late-conflict', 'student-a', 'teacher-b', [3], '20:30', '21:30');
+    conflictDb.database.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .run('task', task.id, task.staffId, JSON.stringify(task), 2, 2);
+  };
+  const conflicted = await call(conflictDb, all, request);
+  assert.equal(conflicted.status, 409);
+  assert.equal(conflicted.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(conflictDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(conflictDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+
+  const rosterDb = new TestD1(); seed(rosterDb);
+  rosterDb.beforeBatch = () => {
+    const row = rosterDb.database.prepare("SELECT data FROM private_rosters WHERE app='task'").get();
+    const document = JSON.parse(row.data);
+    document.roster.students.find(student => student.id === 'student-a').end = '2026-08';
+    rosterDb.database.prepare("UPDATE private_rosters SET data=?,updated_at=updated_at+1 WHERE app='task'")
+      .run(JSON.stringify(document));
+  };
+  const rosterChanged = await call(rosterDb, all, request);
+  assert.equal(rosterChanged.status, 409);
+  assert.equal(rosterChanged.body.code, 'STUDENT_INACTIVE');
+  assert.equal(rosterDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const staffDb = new TestD1(); seed(staffDb);
+  staffDb.beforeBatch = () => {
+    staffDb.database.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'")
+      .run(JSON.stringify({ id: 'teacher-a', name: 'teacher-a', deleted: true }));
+  };
+  const staffChanged = await call(staffDb, all, request);
+  assert.equal(staffChanged.status, 409);
+  assert.equal(staffChanged.body.code, 'STAFF_INACTIVE');
+  assert.equal(staffDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const makeupDb = new TestD1(); seed(makeupDb);
+  insertTask(makeupDb, lesson('lesson-b-by-a', 'student-b', 'teacher-a', [2], '17:00', '18:00'));
+  makeupDb.beforeBatch = () => {
+    const now = Date.now();
+    makeupDb.database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+      'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', 'mu_' + 'b'.repeat(48), 'student-b', 'lesson-b-by-a', '2026-08-12', 'teacher-a',
+      'mc_' + 'b'.repeat(48), 'confirmed', 1, '2026-08-12T20:30:00+09:00',
+      '2026-08-12T21:30:00+09:00', 'teacher-a',
+      JSON.stringify([{ action: 'create_from_absence', actorId: 'teacher-a', at: now }]), now, now);
+  };
+  const makeupChanged = await call(makeupDb, all, request);
+  assert.equal(makeupChanged.status, 409);
+  assert.equal(makeupChanged.body.code, 'MAKEUP_TIME_CONFLICT');
+  assert.equal(makeupDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+  assert.equal(makeupDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+});
+
+test('exam/other manual makeup completion never changes a session pack and attendance reconciliation cannot cancel it', async () => {
+  const db = new TestD1(); seed(db);
+  await insertPack(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_other',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const created = await call(db, all, request);
+  assert.equal(created.status, 200);
+  const reconciled = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-12'
+  });
+  assert.equal(reconciled.status, 200);
+  assert.equal(reconciled.body.idempotent, true);
+  assert.equal(reconciled.body.case.status, 'confirmed');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE k='lesson-a|2026-08-12'").get().n, 0);
+
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+  }, '2026-08-12T21:01:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.deepEqual(completed.body.sessionPackImpact,
+    { status: 'not_applicable', reason: 'manual_no_charge', refreshNeeded: false });
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 0);
+  assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 1);
+});
+
+test('manual absence makeup applies the normal session-pack consumption policy without requiring an A check', async () => {
+  const db = new TestD1(); seed(db);
+  await insertPack(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  });
+  assert.equal(created.status, 200);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE k='lesson-a|2026-08-12'").get().n, 0);
+  const completed = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+  }, '2026-08-12T21:01:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.sessionPackImpact.status, 'recorded');
+  assert.equal(completed.body.sessionPackImpact.delta, 1);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 1);
+  assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 2);
+});
+
+test('unknown or invalid first creation events are exposed as unknown/manual and never charge a session pack', async () => {
+  for (const [index, history] of [
+    [],
+    [{ action: 'unexpected_origin', actorId: 'teacher-a' }],
+    [{ action: 'create_manual', reason: 'tampered_type', actorId: 'teacher-a', actorScope: 'own' }]
+  ].entries()) {
+    const db = new TestD1(); seed(db);
+    await insertPack(db);
+    const created = await call(db, own('teacher-a'), {
+      action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+      date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+    });
+    assert.equal(created.status, 200);
+    db.prepare("UPDATE makeup_cases SET history=? WHERE app='task' AND case_id=?")
+      .bind(JSON.stringify(history), created.body.case.caseId).run();
+    const listed = await call(db, all, { action: 'list' });
+    assert.equal(listed.body.cases[0].creationType, index === 2 ? 'manual' : 'unknown');
+    const completed = await callAt(db, own('teacher-a'), {
+      action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+    }, '2026-08-12T21:01:00+09:00');
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.sessionPackImpact.status, 'not_applicable');
+    assert.equal(completed.body.sessionPackImpact.reason,
+      index === 2 ? 'manual_no_charge' : 'unknown_origin_no_charge');
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 0);
+    assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 1);
+  }
+});
+
+test('absence creation fails closed when the same source/date belongs to a manual makeup', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, all, {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-17', startTime: '20:00', endTime: '21:00'
+  });
+  assert.equal(created.status, 200);
+  absence(db, 'lesson-a', 'teacher-a', '2026-08-17');
+  const collision = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-17'
+  });
+  assert.equal(collision.status, 409);
+  assert.equal(collision.body.code, 'MANUAL_MAKEUP_EXISTS');
+});
+
 test('own list is roster scoped and only all scope can review, propose, confirm, or cancel', async () => {
   const db = new TestD1(); seed(db);
   await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
