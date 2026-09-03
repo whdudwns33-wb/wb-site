@@ -105,14 +105,16 @@ async function refresh() {
 
 function render() {
   const linked = OVERVIEW.filter((s) => s.linked);
-  const hold = REVIEWS.filter((r) => !r.teacher && r.verdict !== 'pass');
+  /* 목록과 같은 기준으로 센다 — 규칙이 통과시킨 답안도 표본 감사(§5.3 self)를 위해
+     확정 전까지 큐에 남는다. 카운트만 다른 기준이면 숫자와 목록이 어긋나 보인다. */
+  const hold = REVIEWS.filter((r) => !r.teacher);
   $('#app').innerHTML = `
   <div class="card">
     <h2>반 성취도</h2>
     <div class="stats">
       <div class="stat"><b>${linked.length}</b><span>학습 중</span></div>
       <div class="stat"><b>${PACKS.length}</b><span>등록된 팩</span></div>
-      <div class="stat"><b>${hold.length}</b><span>서술형 검토 대기</span></div>
+      <div class="stat"><b>${hold.length}</b><span>서술형 미확정</span></div>
     </div>
     <div class="tbl"><table><thead><tr>
       <th>학생</th><th>반</th><th>작품 완료</th><th>개념 안정화</th><th>어휘 안정화</th><th>오답</th><th>서술형</th><th>최근</th>

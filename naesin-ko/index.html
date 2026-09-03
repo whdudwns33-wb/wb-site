@@ -120,7 +120,7 @@
     .banner.warn { background: var(--amber-soft); color: var(--amber); }
     .banner.err { background: var(--red-soft); color: var(--red); }
     .src { font-size: 11.5px; color: var(--soft); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 14px; }
-    .wm { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .035; overflow: hidden;
+    .wm { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .022; overflow: hidden;
       font-size: 15px; font-weight: 700; color: #000; line-height: 3.2; white-space: pre; transform: rotate(-24deg) scale(1.6); }
   </style>
 </head>
@@ -223,8 +223,28 @@
       .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
   }
 
+  /* 화면을 떠날 때 미뤄 둔 저장을 밀어 넣는다.
+     3초 디바운스 중에 탭을 닫으면 로컬에는 남아도 서버 백업이 빠지고,
+     강사 화면이 옛 값을 본다. keepalive라야 언로드 중에도 요청이 산다. */
+  function flush() {
+    if (!S.token || S.demo || !saveTimer) return;
+    clearTimeout(saveTimer); saveTimer = null;
+    try {
+      fetch(API + '/state', {
+        method: 'PUT', keepalive: true,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token },
+        body: JSON.stringify({ state: S.data, summary: summary() })
+      });
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', flush);
+
   function push() {
     if (!S.token || S.demo) return;
+    saveTimer = null;
     S.saving = true;
     api('/state', { method: 'PUT', body: { state: S.data, summary: summary() } })
       .then(function (r) {
@@ -361,14 +381,7 @@
   /* ── 오늘 ── */
   function renderHome() {
     var p = plan();
-    var s = [];
-    s.push('<div class="card"><h3>오늘의 계획</h3>');
-    s.push('<div class="small muted">' + esc(p.note) + '</div></div>');
     var sum = E.workSummary(pk().states);
-    s.push('<div class="card"><h3>진행</h3><div class="small">' +
-      '작품 완료 ' + sum.complete + ' · 주석 복원 ' + sum.restored + ' · 적용 통과 ' + sum.applied +
-      '</div></div>');
-
     var m = [];
     m.push(banner());
     m.push('<div class="card"><div class="spread"><h3 style="margin:0">오늘의 계획</h3>' +
@@ -401,8 +414,11 @@
         '<button class="btn sm ghost" data-open="' + esc(w.workId) + '">열기</button></div>');
     });
     m.push('</div>');
+    m.push('<div class="card"><h3>진행</h3><div class="small">' +
+      '작품 완료 ' + sum.complete + ' · 주석 복원 ' + sum.restored + ' · 적용 통과 ' + sum.applied +
+      ' · 개념 안정화 ' + E.kindSummary(pk().states, 'blank').stable + '</div></div>');
     m.push(sourceNote());
-    split(s.join(''), m.join(''));
+    full(m.join(''));
 
     $('pane').addEventListener('click', function (e) {
       var o = e.target.closest('[data-open]');
