@@ -170,6 +170,12 @@ test('teacher order scope is the union of active lesson studentIds, not roster t
     title: '[수업] 제목만 위조', start: '2026-01-01', end: '', deleted: false };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', forged.id, 'teacher-a', JSON.stringify(forged), now, now).run();
+  const makeupOnly = {
+    ...deletedLesson, id: 'makeup_lesson_mu_scope_only', deleted: false,
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_scope_only'
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', makeupOnly.id, 'teacher-a', JSON.stringify(makeupOnly), now, now).run();
   const denied = await call(db, createBody('ord_lesson_scope_no'));
   assert.equal(denied.status, 403);
   assert.equal(denied.body.code, 'ORDER_STUDENT_SCOPE',
@@ -183,6 +189,15 @@ test('normal, bound, and internal create recheck lesson scope inside the atomic 
     ['internal', internalBody('ord_scope_race_internal')]
   ]) {
     const db = new TestD1(); seed(db);
+    const now = Date.now();
+    const makeup = {
+      id: 'makeup_lesson_mu_scope_race', staffId: 'teacher-a', studentId: 'student-a',
+      taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+      lessonInstanceType: 'makeup', makeupCaseId: 'mu_scope_race',
+      title: '[수업] 보강', start: '2026-08-30', end: '2026-08-30', deleted: false
+    };
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', makeup.id, 'teacher-a', JSON.stringify(makeup), now, now).run();
     const originalBatch = db.batch.bind(db);
     let raced = false;
     db.batch = statements => {

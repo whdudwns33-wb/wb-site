@@ -169,7 +169,7 @@ test('session attendance stays editable until the 23:50 cutoff and is then locke
   assert.match(cutoff, /date === current\.date && current\.minute >= SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE/);
   assert.match(cutoff, /당일 23:50 기준 출결이 회차 원장에 반영되어 마감됐습니다/);
   for (const type of ['approved_absence', 'same_day', 'no_show', 'academy_cancel']) assert.match(cutoff, new RegExp(type));
-  assert.match(panel, /attendanceLocked \? ' disabled' : ''/);
+  assert.match(panel, /attendanceLocked \|\| attendanceReconcileBusy \? ' disabled' : ''/);
   assert.match(panel, /sessionPackAttendanceHintHtml\(t, date, c, sessionAttendance\)/);
   assert.match(changes, /data-session-pack-absence/);
   assert.match(changes, /setCheck\(taskId, date, \{ absenceType \}\)/);

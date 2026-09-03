@@ -2,6 +2,7 @@ import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatemen
 import { buildLessonTask } from './lesson-create.js';
 import { bookOrderStudentIdsForAuth } from './book-order-student-scope.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
@@ -28,6 +29,11 @@ function rosterTransition(student) {
 
 function isLessonTask(value) {
   return !!value && (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion);
+}
+
+function isRegularLessonTask(value) {
+  return isLessonTask(value) && String(value.lessonInstanceType || '') !== 'makeup' &&
+    !String(value.makeupCaseId || '').trim();
 }
 
 async function activeStaffRecord(env, app, staffId) {
@@ -439,7 +445,7 @@ async function lessonStaffIdsForStudent(env, app, studentId, now = Date.now()) {
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     const owner = String(row.owner || '');
     const end = String(task.end || '');
-    if (!isLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
+    if (!isRegularLessonTask(task) || !SAFE_ID.test(owner) || String(task.id || '') !== String(row.id || '') ||
         String(task.staffId || '') !== owner || String(task.studentId || '') !== String(studentId) ||
         (end && (!ISO_DATE.test(end) || end < referenceDate))) continue;
     staffIds.push(owner);
@@ -684,7 +690,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         let lesson;
         try { lesson = JSON.parse(lessonRow.data || '{}'); } catch (error) { continue; }
         const lessonEnd = String(lesson && lesson.end || '');
-        if (!isLessonTask(lesson) || String(lesson.id || '') !== String(lessonRow.id || '') ||
+        if (!isRegularLessonTask(lesson) || String(lesson.id || '') !== String(lessonRow.id || '') ||
             String(lesson.staffId || '') !== String(lessonRow.owner || '') ||
             String(lesson.studentId || '') !== studentId ||
             (lessonEnd && (!ISO_DATE.test(lessonEnd) || lessonEnd < effectiveDate))) continue;
@@ -703,6 +709,21 @@ export async function handleRoster(env, app, body, origin, auth, json) {
           taskUpdatedAt));
         audienceStaffIds.push(String(lessonRow.owner || ''));
       }
+      let makeupCleanup;
+      try {
+        makeupCleanup = await prepareMakeupLifecycleCleanup(env, app, {
+          studentId, lifecycleAction: operation, actorId: studentChangeActorKey(auth), actorRole, now
+        });
+      } catch (error) {
+        if (isMakeupLifecycleConflict(error)) {
+          return json({ ok: false, code: 'MAKEUP_LIFECYCLE_CONFLICT',
+            error: String(error.message || error) }, 409, origin);
+        }
+        throw error;
+      }
+      const makeupOffset = statements.length;
+      statements.push(...makeupCleanup.statements);
+      requiredIndexes.push(...makeupCleanup.requiredIndexes.map(index => makeupOffset + index));
     } else {
       if (!currentTransition) return json({ ok: false, error: '휴원생 또는 퇴원생만 복귀 처리할 수 있습니다' }, 409, origin);
       const staffId = String(body.staffId || '');
@@ -720,7 +741,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       const activeLesson = (activeLessonRows.results || []).some(item => {
         let data;
         try { data = JSON.parse(item.data || '{}'); } catch (error) { return false; }
-        return isLessonTask(data) && String(data.id || '') === String(item.id || '') &&
+        return isRegularLessonTask(data) && String(data.id || '') === String(item.id || '') &&
           String(data.staffId || '') === String(item.owner || '') && String(data.studentId || '') === studentId;
       });
       if (activeLesson) return json({ ok: false, error: '이미 활성 수업이 있습니다. 수업 정보를 확인한 뒤 다시 처리해 주세요' }, 409, origin);
@@ -742,7 +763,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       if (oldTask) {
         let oldData;
         try { oldData = JSON.parse(oldTask.data || '{}'); } catch (error) { oldData = null; }
-        if (!oldData || !oldData.deleted || !isLessonTask(oldData) ||
+        if (!oldData || !oldData.deleted || !isRegularLessonTask(oldData) ||
             String(oldData.id || '') !== lesson.id || String(oldData.studentId || '') !== studentId) {
           return json({ ok: false, error: '같은 복귀 수업 ID의 기존 정보를 확인할 수 없습니다' }, 409, origin);
         }

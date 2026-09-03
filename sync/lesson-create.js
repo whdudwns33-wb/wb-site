@@ -458,12 +458,18 @@ function parseTaskRow(row) {
   } catch (error) { return null; }
 }
 
+function isMakeupLessonInstance(task) {
+  return !!task && (String(task.lessonInstanceType || '') === 'makeup' ||
+    String(task.makeupCaseId || '').trim());
+}
+
 function isLessonIntake(task) {
-  return task && (task.lessonFormVersion || task.intakeVersion || task.intakeSource === 'teacher_9_field_form');
+  return task && !isMakeupLessonInstance(task) &&
+    (task.lessonFormVersion || task.intakeVersion || task.intakeSource === 'teacher_9_field_form');
 }
 
 function isLegacyLessonTask(task) {
-  return !!task && !task.deleted && /^\[수업\]/.test(String(task.title || ''));
+  return !!task && !task.deleted && !isMakeupLessonInstance(task) && /^\[수업\]/.test(String(task.title || ''));
 }
 
 async function findAssignmentRows(env, app, staffId, candidate) {

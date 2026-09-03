@@ -257,6 +257,7 @@ test('existing lesson search finds editable tasks by teacher or student name and
   const tasks = [
     { id: 'lesson-a', studentId: 'student-a', studentName: 'Legacy Alpha', staffId: 'teacher-a', subject: '수학', scheduleText: '월 18:00-19:50', lessonFormVersion: 1 },
     { id: 'lesson-b', studentId: 'student-b', studentName: 'Student Beta', staffId: 'teacher-b', subject: '영어', scheduleText: '화 19:00-20:00', lessonFormVersion: 1 },
+    { id: 'makeup-a', studentId: 'student-a', studentName: 'Student Alpha', staffId: 'teacher-a', subject: '수학', lessonFormVersion: 1, lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' },
     { id: 'deleted', studentId: 'student-a', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
     { id: 'general', studentId: 'student-a', staffId: 'teacher-a' }
   ];
@@ -266,10 +267,11 @@ test('existing lesson search finds editable tasks by teacher or student name and
     { id: 'student-same-name', name: 'Student Alpha', school: 'Other School', grade: 'G3' }
   ];
   const staff = { 'teacher-a': { name: 'Teacher One' }, 'teacher-b': { name: 'Teacher Two' } };
-  const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'canEditLessonTask', 'staffById', 'studentOf',
+  const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'isRegularLessonTask', 'canEditLessonTask', 'staffById', 'studentOf',
     'lessonAssignmentScheduleText', 'esc', studentLabelHelperSource() + html.slice(start, end) +
     '\nreturn { lessonExistingChangeRows, lessonExistingChangeResultsHtml };')(
-      { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion,
+      { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion,
+      task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, task => !!task.lessonFormVersion,
       id => staff[id] || null, task => task.studentName || '', () => '', value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
     );
   assert.deepEqual(helpers.lessonExistingChangeRows('Teacher One').map(row => row.task.id), ['lesson-a']);
@@ -281,6 +283,7 @@ test('existing lesson search finds editable tasks by teacher or student name and
   assert.match(rendered, /Teacher One 선생님/);
   assert.match(rendered, /data-act="lessonedit" data-id="lesson-a"/);
   assert.doesNotMatch(rendered, /Other School|deleted|general/);
+  assert.doesNotMatch(rendered, /makeup-a/);
   const helperSource = html.slice(start, end);
   assert.match(helperSource, /students\.find\(item => String\(item\.id\) === String\(task\.studentId \|\| ''\)\)/);
   assert.doesNotMatch(helperSource, /students\.find\([^\n]*name/);

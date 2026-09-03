@@ -43,6 +43,19 @@ class FakeDB {
     if (sql.startsWith('SELECT DISTINCT snapshot.task_id,task.data FROM book_order_student_snapshots')) {
       return { results: [] };
     }
+    if (sql.startsWith('SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.tasks.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([id, row]) => ({ id, owner: row.owner, data: row.data,
+          updated_at: row.updatedAt, srv_at: row.srvAt })) };
+    }
+    if (sql.startsWith('SELECT id,data FROM tasks WHERE app=? AND id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.tasks.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([id, row]) => ({ id, data: row.data })) };
+    }
     if (sql.startsWith('SELECT id,data FROM tasks WHERE app=? AND owner=?')) {
       const owner = args[1];
       const ids = new Set(args.slice(2).map(String));
@@ -103,10 +116,10 @@ const change = (data, updatedAt = 200) => ({
   table: 'tasks', id: data.id, owner: 'teacher-1', data, updated_at: updatedAt
 });
 
-async function sync(db, changes, envOverrides = {}, requestAuth = auth) {
+async function sync(db, changes, envOverrides = {}, requestAuth = auth, since = 0) {
   const response = await worker.fetch(new Request('https://worker.example/sync', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ app: 'task', auth: requestAuth, since: 0, changes })
+    body: JSON.stringify({ app: 'task', auth: requestAuth, since, changes })
   }), { DB: db, TASK_ADMIN_SECRET: 'admin-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...envOverrides });
   return { status: response.status, body: await response.json() };
 }
@@ -235,6 +248,63 @@ test('generic own sync cannot mint or mutate lesson authorization and permits on
   const converted = await sync(db, [change({ ...plain, studentId: 'student-a', updatedAt: 400 }, 400)]);
   assert.equal(converted.status, 403);
   assert.deepEqual(db.task(plain.id), plain);
+});
+
+test('generic sync skips every stale server-authored makeup copy but cannot mint a makeup task', async () => {
+  const adminAuth = { mode: 'admin', secret: 'admin-secret' };
+  const db = new FakeDB();
+  const makeup = {
+    ...task('makeup_mu_a', 'admin', '[수업] 보강 수업'),
+    taskKind: 'lesson_instruction', lessonFormVersion: 2, studentId: 'student-a',
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_a', makeupSourceTaskId: 'lesson-a'
+  };
+  db.seedTask(makeup);
+
+  const replay = await sync(db, [change({ ...makeup }, 999)], {}, adminAuth);
+  assert.equal(replay.status, 200);
+  assert.equal(db.batchCalls, 0, '서버 정본의 동일 재전송은 쓰지 않는다');
+  assert.equal(replay.body.changes.filter(item => item.table === 'tasks' && item.key === makeup.id).length, 1,
+    'forced 정본과 일반 pull은 같은 task를 중복 반환하지 않는다');
+
+  for (const mutated of [
+    { ...makeup, title: '[수업] 임의 수정', updatedAt: 999 },
+    { ...makeup, deleted: true, updatedAt: 1, lessonRevision: 1 },
+    { id: makeup.id, staffId: makeup.staffId, origin: makeup.origin, title: '일반 업무로 위장', deleted: true, updatedAt: 999 }
+  ]) {
+    const result = await sync(db, [change(mutated, 999)], {}, adminAuth);
+    assert.equal(result.status, 200);
+    assert.equal(db.batchCalls, 0, '서버에 존재하는 보강 task의 stale copy는 쓰지 않는다');
+    assert.deepEqual(db.task(makeup.id), makeup);
+  }
+
+  const ownStale = await sync(db, [change({ ...makeup, title: '오래된 개인기기 사본', updatedAt: 1,
+    lessonRevision: 1 }, 1)]);
+  assert.equal(ownStale.status, 200);
+  assert.deepEqual(db.task(makeup.id), makeup);
+  const ownNewerMutation = await sync(db, [change({ ...makeup, title: '서버보다 최신으로 보이는 변조 사본',
+    updatedAt: 9999, lessonRevision: 999 }, 9999)], {}, auth, 500);
+  assert.equal(ownNewerMutation.status, 200);
+  assert.equal(db.batchCalls, 0);
+  assert.deepEqual(db.task(makeup.id), makeup);
+  const canonical = ownNewerMutation.body.changes.filter(item => item.table === 'tasks' && item.key === makeup.id);
+  assert.equal(canonical.length, 1);
+  assert.equal(canonical[0].authoritative, true);
+  assert.deepEqual(canonical[0].data, makeup);
+
+  const forged = { ...makeup, id: 'makeup_mu_forged', makeupCaseId: 'mu_forged' };
+  const created = await sync(db, [{ table: 'tasks', id: forged.id, owner: forged.staffId,
+    data: forged, updated_at: 999 }], {}, adminAuth);
+  assert.equal(created.status, 409);
+  assert.equal(created.body.code, 'MAKEUP_ENDPOINT_REQUIRED');
+  assert.equal(db.tasks.has(forged.id), false);
+
+  const regular = task('regular-existing', 'staff', '일반 업무');
+  db.seedTask(regular);
+  const converted = await sync(db, [change({ ...regular, lessonInstanceType: 'makeup',
+    makeupCaseId: 'mu_convert', updatedAt: 999 }, 999)], {}, adminAuth);
+  assert.equal(converted.status, 409);
+  assert.equal(converted.body.code, 'MAKEUP_ENDPOINT_REQUIRED');
+  assert.deepEqual(db.task(regular.id), regular);
 });
 
 test('task envelope id, staffId, and origin are server-validated', async () => {

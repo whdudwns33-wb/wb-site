@@ -117,6 +117,7 @@ async function assignmentContext(env, app, document, studentId, lessonTaskId) {
   if (!student) return { error: '현재 원생 명단에서 학생을 찾을 수 없습니다', code: 'STUDENT_IDENTITY_MISMATCH' };
   const loaded = await taskRow(env, app, lessonTaskId);
   if (!loaded || !loaded.task || loaded.task.id !== lessonTaskId || loaded.task.deleted ||
+      String(loaded.task.lessonInstanceType || '') === 'makeup' || String(loaded.task.makeupCaseId || '').trim() ||
       loaded.task.studentId !== studentId || loaded.task.staffId !== loaded.owner ||
       !(loaded.task.taskKind === 'lesson_instruction' || loaded.task.lessonFormVersion || loaded.task.intakeVersion)) {
     return { error: '현재 수업과 회차권의 학생·수업 연결이 일치하지 않습니다', code: 'TASK_IDENTITY_MISMATCH' };

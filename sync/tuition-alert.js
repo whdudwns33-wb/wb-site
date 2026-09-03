@@ -104,6 +104,7 @@ async function loadRoster(env, sourceDate) {
 
 function lessonTask(value, taskId, taskOwner) {
   return value && typeof value === 'object' && !Array.isArray(value) &&
+    String(value.lessonInstanceType || '') !== 'makeup' && !String(value.makeupCaseId || '').trim() &&
     String(value.id || '') === taskId && SAFE_ID.test(String(value.studentId || '')) &&
     SAFE_ID.test(String(taskOwner || '')) && String(value.staffId || '') === String(taskOwner) &&
     (value.taskKind === 'lesson_instruction' || value.lessonFormVersion || value.intakeVersion);

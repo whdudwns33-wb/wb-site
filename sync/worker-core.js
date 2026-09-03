@@ -283,13 +283,18 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
   const onboardingGuard = table === 'checks' && /^__onboarding__/.test(String(key || ''))
     ? " AND COALESCE(json_extract(checks.data,'$.casVersion'),0)<>1"
     : '';
+  // 검토와 실제 쓰기 사이에 보강 task가 생성되는 경우에도 generic LWW가 덮지 못한다.
+  const makeupTaskGuard = table === 'tasks'
+    ? " AND COALESCE(CAST(json_extract(tasks.data,'$.lessonInstanceType') AS TEXT),'')<>'makeup'" +
+      " AND COALESCE(CAST(json_extract(tasks.data,'$.makeupCaseId') AS TEXT),'')=''"
+    : '';
   return env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
     'VALUES (?, ?, ?, ' + insertData + ', ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
-    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard
+    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard + makeupTaskGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
 }
 
@@ -347,6 +352,55 @@ function isProtectedLessonTaskData(data) {
     Object.prototype.hasOwnProperty.call(data, 'intakeVersion') ||
     String(data.studentId || '').trim() !== '' ||
     /^\s*\[(?:수업|컨설팅)\]/.test(String(data.title || ''));
+}
+
+function isScheduledMakeupTaskData(data) {
+  return !!(data && typeof data === 'object' && !Array.isArray(data) &&
+    (String(data.lessonInstanceType || '') === 'makeup' || String(data.makeupCaseId || '').trim()));
+}
+
+/**
+ * 보강 수업 task는 makeup_cases의 서버 투영본이다. 서버 행이 이미 있으면 로컬 사본의
+ * 시각·revision·내용과 무관하게 무시하고, 이 sync 응답의 pull 정본으로 교체하게 한다.
+ */
+async function inspectScheduledMakeupTaskChanges(env, app, entries) {
+  if (app !== 'task') return { skip: new Set(), forced: [] };
+  const taskEntries = entries.filter(entry => entry.table === 'tasks' && entry.change);
+  if (!taskEntries.length) return { skip: new Set(), forced: [] };
+
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  const currentById = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) currentById.set(String(row.id), row);
+  }
+
+  const skip = new Set();
+  const forcedById = new Map();
+  for (const entry of taskEntries) {
+    const stored = currentById.get(String(entry.change.id || ''));
+    let current = null;
+    try { current = stored == null ? null : JSON.parse(stored.data); } catch (error) { current = null; }
+    if (isScheduledMakeupTaskData(current)) {
+      skip.add(entry);
+      if (!forcedById.has(String(entry.change.id || ''))) {
+        const row = stored;
+        forcedById.set(String(entry.change.id || ''), {
+          table: 'tasks', key: String(entry.change.id || ''), owner: row.owner, data: current,
+          updated_at: row.updated_at, srv_at: row.srv_at, authoritative: true
+        });
+      }
+      continue;
+    }
+    if (isScheduledMakeupTaskData(entry.change.data)) {
+      return { error: '보강수업은 보강 탭의 생성·완료·없음 기능으로만 변경할 수 있습니다' };
+    }
+  }
+  return { skip, forced: [...forcedById.values()] };
 }
 
 async function inspectSealedOrderChanges(env, app, entries) {
@@ -1038,10 +1092,15 @@ async function handleSync(env, app, body, origin) {
   }
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
   let skipped = new Set();
+  const makeupInspection = await inspectScheduledMakeupTaskChanges(env, app, accepted);
+  if (makeupInspection.error) {
+    return json({ ok: false, code: 'MAKEUP_ENDPOINT_REQUIRED', error: makeupInspection.error }, 409, origin);
+  }
+  for (const entry of makeupInspection.skip) skipped.add(entry);
   if (auth.scope === 'own') {
-    const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted);
+    const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted.filter(entry => !skipped.has(entry)));
     if (inspected.error) return json({ ok: false, error: inspected.error }, 403, origin);
-    skipped = inspected.skip;
+    for (const entry of inspected.skip) skipped.add(entry);
     for (const entry of accepted) {
       if (entry.table === 'staff') skipped.add(entry);
     }
@@ -1049,7 +1108,7 @@ async function handleSync(env, app, body, origin) {
     if (checkError) return json({ ok: false, error: checkError }, 403, origin);
   }
   let sealedInspection;
-  try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted); }
+  try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted.filter(entry => !skipped.has(entry))); }
   catch (error) {
     if (/no such table.*book_order_student_snapshots/i.test(String(error && error.message || error))) {
       return json({ ok: false, code: 'ORDER_LEDGER_NOT_READY', error: '교재 주문 원장을 준비하고 있습니다' }, 503, origin);
@@ -1103,10 +1162,13 @@ async function handleSync(env, app, body, origin) {
   const forced = auth.scope === 'all'
     ? await canonicalOnboardingChanges(env, app, attemptedOnboardingKeys)
     : [];
-  const forcedKeys = new Set(forced.map(change => change.key));
+  const makeupForced = (makeupInspection.forced || []).filter(change =>
+    auth.scope === 'all' || String(change.owner || '') === String(auth.id || ''));
+  const forcedRows = forced.concat(makeupForced);
+  const forcedKeys = new Set(forcedRows.map(change => change.table + '\n' + change.key));
 
   // ── 내려받기 (since 이후)
-  const out = forced.slice();
+  const out = forcedRows.slice();
   let more = false;
   for (const t of ['staff', 'tasks', 'checks']) {
     const idCol = t === 'checks' ? 'k' : 'id';
@@ -1120,7 +1182,7 @@ async function handleSync(env, app, body, origin) {
     const rows = (res.results || []);
     if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
     for (const r of rows) {
-      if (t === 'checks' && forcedKeys.has(String(r.key))) continue;
+      if (forcedKeys.has(t + '\n' + String(r.key))) continue;
       const data = JSON.parse(r.data);
       // 선점 actor 해시는 서버 CAS 검증용이다. 읽기 동기화 응답에도 내보내지 않는다.
       if (t === 'checks' && app === 'consult' && String(r.key || '').startsWith(CONSULT_REWARD_PREFIX) && data) {

@@ -170,6 +170,23 @@ test('monthly is the default with no row; only all scope creates and own list is
   assert.equal((await call(db, { action: 'list', studentId: 'student-monthly' }, admin)).body.packs.length, 0);
 });
 
+test('a projected one-time makeup lesson cannot become a separate session pack assignment', async () => {
+  const db = seed();
+  const task = lesson('makeup_lesson_mu_pack', 'student-a', 'teacher-a', '2026-08-30');
+  Object.assign(task, {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_pack', repeat: 'once', end: '2026-08-30'
+  });
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, task.staffId, JSON.stringify(task), Date.now(), Date.now()).run();
+  const result = await create(db, {
+    lessonTaskId: task.id, validFrom: '2026-08-30', expiresOn: '2026-08-30'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'TASK_IDENTITY_MISMATCH');
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM session_packs WHERE lesson_task_id=?')
+    .get(task.id).count, 0);
+});
+
 test('same-name students remain separate by stable student and lesson IDs', async () => {
   const db = seed();
   const first = await create(db);
