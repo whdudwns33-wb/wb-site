@@ -9,6 +9,8 @@
    무조건 401로 끝난다. Cache-Control: no-store 는 호스트의 json() 헬퍼가 모든
    /api/* 응답에 붙인다(§10-3) — 여기서 따로 붙일 헤더가 없다. */
 
+import { resultStats, predictScore, reachOf } from './naesin-results.mjs';
+
 const STATE_MAX_BYTES = 262_144;    // 학생 학습 기록 1건 최대 크기 (256KB, UTF-8 바이트)
 const PACK_MAX_BYTES = 4_194_304;   // 팩 1건 최대 크기 (4MB) — 단어 77·문장 25·문항·해설이 다 들어간다
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
@@ -17,6 +19,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXAM_PACKS_MAX = 20;          // 한 시험 범위에 담는 팩 수 — 한 학기 시험이 이걸 넘지 않는다
 const WORD_DEADLINE_MIN = 3, WORD_DEADLINE_MAX = 30;   // 단어 초회 도달 마감(D-n) 허용 범위, 기본 7은 클라이언트가 안다
 const TASK_TYPES_MAX = 30;          // 과제 한 건의 학습 유형 수 — 고정 키 15개 + 문법 패턴 키 몇 개면 충분하다
+/* 시험 결과(계약 R2) — 학교 시험 점수는 100점 만점, 틀린 문항 수는 한 유형에 50문항을 넘지 않는다.
+   메모는 강사가 손으로 적는 한 줄(200자) — 관리 화면이 esc() 로 그린다. */
+const SCORE_MAX = 100;
+const WRONG_MAX = 50;
+const RESULT_MEMO_MAX = 200;
+export const WRONG_TYPE_KEYS = ['word', 'grammar', 'passage', 'writing'];
 
 /* 호스트가 몸통을 파싱하기 전에 content-length 로 끊는 상한 — 저장 상한보다 조금 크다(JSON 래핑 여유).
    워커는 req.json()이 몸통을 다 읽고서야 크기를 아는데, 그 전에 끊어야 메모리도 시간도 안 쓴다. */
@@ -74,12 +82,44 @@ const strMax = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const isoStr = (v) => (typeof v === 'string' && ISO_RE.test(v) ? v : '');
 const dateStr = (v) => (typeof v === 'string' && DATE_RE.test(v) ? v : '');
 
+/* 범위 합계(계약 R1) — 실제 시험 범위는 보통 2~3과라, 팩 하나짜리 값으로는
+   「시험 전 100% 완성」이 시험과 단위가 맞지 않는다. 학생 앱이 범위 전체 합과 팩별 값을
+   같이 올리고, 관리 현황판·결과 상관이 이 합계를 쓴다.
+   packIds·packs 키는 팩 id 형식(PACK_ID_RE)만, 개수는 시험 범위 상한(EXAM_PACKS_MAX)까지. */
+function normalizeRange(r) {
+  if (!isObj(r)) return null;
+  const w = isObj(r.word) ? r.word : {};
+  const s = isObj(r.sentence) ? r.sentence : {};
+  const bs = isObj(s.byStage) ? s.byStage : {};
+  const packs = {};
+  if (isObj(r.packs)) {
+    for (const k of Object.keys(r.packs).filter((x) => PACK_ID_RE.test(x)).slice(0, EXAM_PACKS_MAX)) {
+      const p = isObj(r.packs[k]) ? r.packs[k] : {};
+      const pw = isObj(p.word) ? p.word : {}, ps = isObj(p.sentence) ? p.sentence : {};
+      packs[k] = {
+        word: { total: int0(pw.total), reached: int0(pw.reached), stable: int0(pw.stable) },
+        sentence: { total: int0(ps.total), interpreted: int0(ps.interpreted), memorized: int0(ps.memorized) },
+      };
+    }
+  }
+  return {
+    packIds: (Array.isArray(r.packIds) ? r.packIds : []).filter((x) => typeof x === 'string' && PACK_ID_RE.test(x)).slice(0, EXAM_PACKS_MAX),
+    word: { total: int0(w.total), reached: int0(w.reached), stable: int0(w.stable), risky: int0(w.risky), needsSpellCheck: int0(w.needsSpellCheck) },
+    sentence: {
+      total: int0(s.total), interpreted: int0(s.interpreted), memorized: int0(s.memorized),
+      byStage: { 1: int0(bs[1]), 2: int0(bs[2]), 3: int0(bs[3]), 4: int0(bs[4]), 5: int0(bs[5]), 6: int0(bs[6]) },
+    },
+    packs,
+  };
+}
+
 export function normalizeSummary(sum) {
   if (!isObj(sum)) return null;
   const w = isObj(sum.word) ? sum.word : {};
   const s = isObj(sum.sentence) ? sum.sentence : {};
   const bs = isObj(s.byStage) ? s.byStage : {};
   const t = isObj(sum.task) ? sum.task : null;
+  const range = normalizeRange(sum.range);
   return {
     packId: typeof sum.packId === 'string' && PACK_ID_RE.test(sum.packId) ? sum.packId : '',
     word: { total: int0(w.total), reached: int0(w.reached), stable: int0(w.stable), risky: int0(w.risky), needsSpellCheck: int0(w.needsSpellCheck) },
@@ -87,6 +127,8 @@ export function normalizeSummary(sum) {
       total: int0(s.total), interpreted: int0(s.interpreted), memorized: int0(s.memorized),
       byStage: { 1: int0(bs[1]), 2: int0(bs[2]), 3: int0(bs[3]), 4: int0(bs[4]), 5: int0(bs[5]), 6: int0(bs[6]) },
     },
+    /* range 는 있을 때만 넣는다 — 옛 클라이언트(팩 하나만 보는 요약)의 저장본에 빈 칸을 만들지 않는다 */
+    ...(range ? { range } : {}),
     /* taskAt 은 관리 웹이 과제의 updatedAt 과 문자열 그대로 비교한다 — 형식만 확인하고 값은 손대지 않는다 */
     task: t ? { date: dateStr(t.date), taskAt: isoStr(t.taskAt), title: strMax(t.title, SUMMARY_TITLE_MAX), correct: int0(t.correct), total: int0(t.total) } : null,
     updatedAt: isoStr(sum.updatedAt),
@@ -141,6 +183,39 @@ function examRow(scope, rec, stu, today) {
   return row;
 }
 
+/* ── 시험 결과 (계약 R2) ──
+   저장할 때 검증하지만, 읽을 때도 한 번 더 화이트리스트로 거른다(summary 와 같은 결).
+   저장본은 손으로 고쳐질 수도 있고(로컬 db.json), 여기서 나간 값이 관리 화면에 그대로 그려진다.
+   모양이 아닌 줄(코드·날짜가 없는 줄)은 아예 버린다 — 셈에 끼면 통계가 조용히 틀어진다. */
+function normalizeResult(rec) {
+  if (!isObj(rec)) return null;
+  const code = typeof rec.code === 'string' && CODE_RE.test(rec.code) ? rec.code : '';
+  const examDate = dateStr(rec.examDate);
+  if (!code || !examDate) return null;
+  const out = { code, examDate, score: Math.min(SCORE_MAX, int0(rec.score)) };
+  if (isObj(rec.wrongTypes)) {
+    out.wrongTypes = {};
+    for (const k of WRONG_TYPE_KEYS) out.wrongTypes[k] = Math.min(WRONG_MAX, int0(rec.wrongTypes[k]));
+  }
+  const memo = strMax(rec.memo, RESULT_MEMO_MAX);
+  if (memo) out.memo = memo;
+  out.packIds = (Array.isArray(rec.packIds) ? rec.packIds : []).filter((x) => typeof x === 'string' && PACK_ID_RE.test(x)).slice(0, EXAM_PACKS_MAX);
+  out.snapshot = normalizeSummary(rec.snapshot);
+  out.at = isoStr(rec.at);
+  return out;
+}
+
+/* 결과 한 줄에 그 시점의 도달률(reach)을 붙인다 — 관리 산점도의 x축이자 학생 회고 칩의 근거.
+   공식은 서버 한 곳(naesin-results.mjs)에만 둔다 — 화면이 같은 식을 다시 쓰면 두 곳이 어긋난다.
+   snapshot 이 없는 옛 결과는 null(그릴 점이 없다). */
+function withReach(rec) {
+  const re = reachOf(rec.snapshot);
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  return { ...rec, reach: re ? { m: r3(re.m), stable: r3(re.stable), interpret: r3(re.interpret), blank: r3(re.blank) } : null };
+}
+/* 관리 표 한 줄 — 여기에 이름·반(계약 밖 편의 필드, examRow 와 같은 결)까지 */
+const resultRow = (rec, stu) => ({ ...withReach(rec), name: (stu && stu.name) || '', cls: (stu && stu.cls) || '' });
+
 /* 이 팩을 참조하는 배정 scope 들 — 팩 삭제 전 확인용 */
 async function scopesUsingPack(store, id) {
   const out = [];
@@ -164,6 +239,8 @@ async function scopesUsingPack(store, id) {
        getState(code), putState(code, rec), listStateCodes(),
        getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 학생코드
        getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
+       getResult(code, examDate), putResult(code, examDate, rec), deleteResult(code, examDate),
+       listResults(),                   // → [{code, examDate, ...rec}] — 원내 전체(성과 분석·예측의 표본)
        getStudent(code),                // 호스트 학생 명부 (읽기만)
      },
    }
@@ -235,6 +312,19 @@ export async function handleNaesin(ctx) {
   if (p === '/api/naesin/task' && method === 'GET' && !who.admin) {
     const rec = await store.getTask('default');
     return j(200, { task: rec || {}, scope: rec ? 'default' : null });
+  }
+
+  /* 내 시험 결과 + 예상 점수대 (계약 R2).
+     결과는 내 것만 나간다 — 남의 점수는 학생에게 한 줄도 보이지 않는다.
+     prediction 은 원내 전체 결과로 세운 직선에 내 지금 도달률을 넣은 숫자일 뿐이고
+     ("74~86점" 같은 말투·참고용 문구는 화면 몫), 표본이 5건 미만이면 null 이다. */
+  if (p === '/api/naesin/result' && method === 'GET' && !who.admin) {
+    const all = ((await store.listResults()) || []).map(normalizeResult).filter(Boolean);
+    const results = all.filter((r) => r.code === who.code)
+      .sort((a, b) => b.examDate.localeCompare(a.examDate)).map(withReach);
+    const st = await store.getState(who.code);
+    const summary = normalizeSummary(st && st.state && st.state.summary);
+    return j(200, { results, prediction: predictScore(all, summary) });
   }
 
   /* ── 관리자 (원장·강사 — 관리 PIN 토큰) ── */
@@ -352,6 +442,74 @@ export async function handleNaesin(ctx) {
     if (scope !== 'default' && !CODE_RE.test(scope)) return j(400, { error: "scope는 'default' 또는 학생 코드" });
     await store.deleteExam(scope);
     return j(200, { ok: true, scope });
+  }
+
+  /* ── 시험 결과 회고 (계약 R2) ──
+     시험이 끝나면 강사가 점수를 넣는다. 그때의 state.summary 를 snapshot 으로 같이 박아 둔다 —
+     나중에 학생이 더 공부해 도달률이 올라가도, 그 시험을 치를 때의 도달률은 그대로 남아야
+     「도달률↔점수」를 견줄 수 있다. 지금 요약으로 사후에 다시 계산하면 관계가 통째로 거짓이 된다. */
+  if (p === '/api/naesin/admin/result' && method === 'POST') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const code = String(b.code || '').trim();
+    if (!CODE_RE.test(code)) return j(400, { error: 'code는 학생 코드 형식' });
+    if (!(await store.getStudent(code))) return j(404, { error: '등록되지 않은 학생 코드예요.' });
+    const examDate = String(b.examDate || '').trim();
+    if (!isValidDate(examDate)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
+    const score = Number(b.score);
+    if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) return j(400, { error: 'score는 0~' + SCORE_MAX + ' 정수' });
+    const rec = { code, examDate, score };
+    /* 틀린 유형 4칸 — 비운 칸은 0. 화이트리스트 밖 키는 버린다. */
+    if (b.wrongTypes != null && b.wrongTypes !== '') {
+      if (!isObj(b.wrongTypes)) return j(400, { error: 'wrongTypes는 객체' });
+      const wt = {};
+      for (const k of WRONG_TYPE_KEYS) {
+        const v = b.wrongTypes[k];
+        if (v == null || v === '') { wt[k] = 0; continue; }
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 0 || n > WRONG_MAX) return j(400, { error: 'wrongTypes.' + k + '는 0~' + WRONG_MAX + ' 정수' });
+        wt[k] = n;
+      }
+      rec.wrongTypes = wt;
+    }
+    const memo = String(b.memo == null ? '' : b.memo).trim().slice(0, RESULT_MEMO_MAX);
+    if (memo) rec.memo = memo;
+    /* 범위는 저장 시점의 유효 시험(계약 0.2) — 어느 과를 놓고 친 시험인지 결과에 함께 남긴다 */
+    const { exam } = await resolveExam(store, code, ctx.now);
+    rec.packIds = (Array.isArray(exam.packIds) ? exam.packIds : []).filter((x) => typeof x === 'string' && PACK_ID_RE.test(x)).slice(0, EXAM_PACKS_MAX);
+    const st = await store.getState(code);
+    rec.snapshot = normalizeSummary(st && st.state && st.state.summary);
+    rec.at = nowIso();
+    await store.putResult(code, examDate, rec);
+    return j(200, { ok: true, result: rec });
+  }
+  /* 결과 삭제 — 없어도 ok(두 번 눌러도 오류가 아니다). 퇴원한 학생 것도 지울 수 있어야 해서
+     학생 존재는 보지 않는다. */
+  if (p === '/api/naesin/admin/result' && method === 'DELETE') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const code = String(b.code || '').trim();
+    if (!CODE_RE.test(code)) return j(400, { error: 'code는 학생 코드 형식' });
+    const examDate = String(b.examDate || '').trim();
+    if (!isValidDate(examDate)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
+    await store.deleteResult(code, examDate);
+    return j(200, { ok: true, code, examDate });
+  }
+  /* 결과 목록 + 성과 분석. examDate 를 주면 그 시험만(분석도 그 시험만).
+     analysis 는 숫자만이다 — 「상관 0.7」이 무슨 뜻인지 풀어 쓰는 것은 관리 웹 몫. */
+  if (p === '/api/naesin/admin/results' && method === 'GET') {
+    const want = String((ctx.query && ctx.query.get('examDate')) || '').trim();
+    if (want && !isValidDate(want)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
+    const rows = [];
+    for (const raw of (await store.listResults()) || []) {
+      const rec = normalizeResult(raw);
+      if (!rec) continue;
+      if (want && rec.examDate !== want) continue;
+      rows.push(resultRow(rec, await store.getStudent(rec.code)));
+    }
+    /* 최근 시험이 위, 같은 시험이면 코드순 — 화면이 정렬을 다시 할 필요가 없게 */
+    rows.sort((a, b) => (a.examDate === b.examDate ? a.code.localeCompare(b.code) : b.examDate.localeCompare(a.examDate)));
+    return j(200, { results: rows, analysis: resultStats(rows), time: nowIso() });
   }
 
   /* 성취도 대시보드 원천 — 연동(기록 있는) 학생만, 요약만 추려서.

@@ -36,12 +36,13 @@ export function load() {
 
 /* 내신 칸의 스냅샷 — 팩 본문(packs)은 뺀다. 팩은 라이선스 원문이라 백업 파일로 흩어지면 안 되고,
    원장이 보관한 원본 JSON 으로 언제든 재업로드할 수 있다. id 목록만 남겨 무엇이 있었는지는 알게 한다.
-   워커의 fullDump 와 같은 모양({packIds, states, exams, tasks}) — 로컬 /api/admin/export 도 이걸 쓴다. */
+   워커의 fullDump 와 같은 모양({packIds, states, exams, tasks, results}) — 로컬 /api/admin/export 도 이걸 쓴다.
+   시험 결과(results)는 강사가 손으로 넣은 유일한 실제 성과 자료라 반드시 담는다 — 팩과 달리 다시 만들 수 없다. */
 export function naesinSnapshot(n) {
   const src = n || {};
   return {
     packIds: Array.isArray(src.packIds) ? src.packIds : Object.keys(src.packs || {}),
-    states: src.states || {}, exams: src.exams || {}, tasks: src.tasks || {},
+    states: src.states || {}, exams: src.exams || {}, tasks: src.tasks || {}, results: src.results || {},
   };
 }
 

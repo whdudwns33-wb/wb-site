@@ -9,7 +9,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const packs = {}, states = {}, exams = {}, tasks = {};
+  const packs = {}, states = {}, exams = {}, tasks = {}, results = {};
   let packIds = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
   return {
@@ -27,8 +27,14 @@ function memStore() {
     listExamScopes: () => Object.keys(exams),
     getTask: (s) => tasks[s] || null,
     putTask: (s, rec) => { tasks[s] = rec; },
+    /* 시험 결과 — 워커는 naesin:result:<코드>:<시험일>, 로컬은 db.naesin.results[코드][시험일] */
+    getResult: (c, d) => (results[c] || {})[d] || null,
+    putResult: (c, d, rec) => { (results[c] = results[c] || {})[d] = rec; },
+    deleteResult: (c, d) => { if (results[c]) { delete results[c][d]; if (!Object.keys(results[c]).length) delete results[c]; } },
+    listResults: () => Object.entries(results).flatMap(([c, byDate]) =>
+      Object.entries(byDate).map(([d, rec]) => ({ ...rec, code: c, examDate: d }))),
     getStudent: (c) => students[c] || null,
-    _raw: { packs, states, exams, ids: () => packIds },
+    _raw: { packs, states, exams, results, ids: () => packIds },
   };
 }
 const call = (store, over) => handleNaesin({

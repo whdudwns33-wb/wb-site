@@ -256,13 +256,18 @@
 (function () {
   /* 저장 키는 학생 코드별이다 — 공용 태블릿에서 앞 학생의 기록이 다음 학생에게 섞이지 않게.
      미연동 기기는 'wbn.v1:demo'. 옛 단일 키 'wbn.v1'은 부팅 때 1회 이관한다. */
-  var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1', PACK_CACHE_KEY = 'wbn.pack';
+  var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1';
+  /* 팩 캐시는 시험 범위 전체다 — 실제 시험은 보통 2~3개 과라 '마지막 교재' 하나만 캐시하면
+     오프라인에서 범위의 나머지 과가 통째로 사라진다. 옛 단일 키('wbn.pack')는 부팅 때 이관한다. */
+  var PACKS_CACHE_KEY = 'wbn.packs', LEGACY_PACK_CACHE_KEY = 'wbn.pack';
   var DEMO_PACK_ID = 'sample-demo-L0';
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
+  var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
   var authed = false, examServer = null, packList = [];
   var selSeq = null, selWordId = null, selType = null, selDlg = null;
-  var taskServer = null;
+  var wordFilter = 'all';      // 단어 목록 필터 — 'unfinished' 는 회고 칩에서 들어온 미완성만 보기
+  var taskServer = null, resultServer = null;
   var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
   var demoMode = false;        // 체험 교재(pack-sample)로 열린 상태 — 미연동 기기 또는 배정 전 연습
   var DUMP_MAX = 20, LOG_MAX = 50;   // 기록 상한 — state 256KB 계약을 넘기지 않기 위해
@@ -272,20 +277,34 @@
      persist(): 학습 결과 — savedAt 갱신 + 팩별 savedAt + 서버 push 예약 */
   function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
+  /* 이번 persist 에서 savedAt 을 올려야 할 과들. 통합 범위 학습은 한 세션에서 여러 과의 단어를
+     같이 푼다 — 현재 과만 올리면 다른 과의 기록이 '오래된 것'으로 남아 다른 기기의 옛 기록에
+     덮인다(pullAdopt 는 팩별 savedAt 으로 병합한다). */
+  var touchedPacks = {};
+  function touchPack(pid) { if (pid != null) touchedPacks[pid] = 1; }
   function persist() {
     DB.savedAt = Date.now();
-    if (pack) {
-      var pd = packDB();
+    if (pack) touchPack(pack.packId);
+    Object.keys(touchedPacks).forEach(function (pid) {
+      var pd = DB.packs[pid];
+      if (!pd) return;
       pd.savedAt = DB.savedAt;
       if (pd.dump.length > DUMP_MAX) pd.dump = pd.dump.slice(-DUMP_MAX);
       if (pd.log.length > LOG_MAX) pd.log = pd.log.slice(-LOG_MAX);
-    }
+    });
+    touchedPacks = {};
     save();
     scheduleSync();
   }
-  function packDB() {
-    var pd = DB.packs[pack.packId];
-    if (!pd) pd = DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 };
+  function blankPd() { return { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 }; }
+  var orphanPd = null;
+  function curPackId() { return pack ? pack.packId : null; }
+  /* 과별 학습 기록. 인자를 생략하면 '지금 보는 과' — 통합 범위 세션은 문항의 packId 로 부른다. */
+  function packDB(pid) {
+    if (pid == null) pid = curPackId();
+    if (pid == null) return (orphanPd || (orphanPd = blankPd()));   // 팩 로드 전 호출 — DB에 남기지 않는다
+    var pd = DB.packs[pid];
+    if (!pd) pd = DB.packs[pid] = blankPd();
     /* 옛 기록엔 나중에 생긴 필드가 없다 — 접근할 때마다 보정해 호출부가 || {} 를 안 쓰게 */
     if (!pd.states || typeof pd.states !== 'object') pd.states = {};
     if (!pd.wrong || typeof pd.wrong !== 'object') pd.wrong = {};
@@ -322,12 +341,30 @@
   /* 네트워크 단절(fetch 자체 실패)과 서버가 답한 오류(api-NNN)를 가른다 — 오프라인 캐시는 전자에만 쓴다 */
   function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
 
-  /* 마지막 교재 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다. */
-  function cachePack(id, p, updatedAt) {
-    try { localStorage.setItem(PACK_CACHE_KEY, JSON.stringify({ id: id, pack: p, updatedAt: updatedAt || null })); } catch (e) {}
+  /* 시험 범위 팩 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다.
+     담는 것은 '지금 범위'뿐이다: 지난 학기 팩까지 쌓으면 localStorage 를 몇 MB씩 먹는다. */
+  function cachePacks(entries) {
+    var out = {};
+    entries.forEach(function (e) { if (e && e.pack && e.pack.packId) out[e.id] = { pack: e.pack, updatedAt: e.updatedAt || null }; });
+    try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
   }
-  function loadPackCache() {
-    try { var c = JSON.parse(localStorage.getItem(PACK_CACHE_KEY) || 'null'); return c && c.pack && c.pack.packId ? c : null; } catch (e) { return null; }
+  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다 */
+  function loadPacksCache() {
+    var out = null;
+    try { out = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || 'null'); } catch (e) { out = null; }
+    if (!out || typeof out !== 'object') out = {};
+    var legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(LEGACY_PACK_CACHE_KEY) || 'null'); } catch (e) {}
+    if (legacy && legacy.pack && legacy.pack.packId && !out[legacy.id || legacy.pack.packId]) {
+      out[legacy.id || legacy.pack.packId] = { pack: legacy.pack, updatedAt: legacy.updatedAt || null };
+      try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
+    }
+    try { localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
+    var ids = Object.keys(out).filter(function (id) { return out[id] && out[id].pack && out[id].pack.packId; });
+    return ids.length ? out : null;
+  }
+  function clearPackCache() {
+    try { localStorage.removeItem(PACKS_CACHE_KEY); localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
   }
 
   /* 저장 상태 표시 — 실패는 다음 persist 때 자연히 재시도된다(push는 늘 전체 상태) */
@@ -373,8 +410,18 @@
       sentence: { total: n0(s.total), interpreted: n0(s.interpreted), memorized: n0(s.memorized),
         byStage: { 1: n0(bs[1]), 2: n0(bs[2]), 3: n0(bs[3]), 4: n0(bs[4]), 5: n0(bs[5]), 6: n0(bs[6]) } },
       task: task,
+      range: rangeSummaryNow(),
       updatedAt: new Date().toISOString()
     };
+  }
+  /* 계약 R1 의 summary.range — 시험 범위 전체 합계 + 과별 값. 관리 현황판이 "시험 범위 100%"를
+     한 단위로 보게 하는 값이라, 팩 하나만 열려 있어도(단일 범위) 같은 모양으로 낸다.
+     엔진에 범위 API 가 없는 판(옛 engine.js)에서는 아예 붙이지 않는다 — 반쪽 모양을 올리면
+     서버 정규화가 0으로 채운 값이 강사 화면에 진짜 숫자처럼 뜬다. */
+  function rangeSummaryNow() {
+    if (!WBNAESIN.rangeSummary || !pack) return undefined;
+    var r = WBNAESIN.rangeSummary(rangeEntries());
+    return (r && r.packIds && r.packIds.length) ? r : undefined;
   }
   function pushState() {
     if (!authed || !pack || demoMode) return;
@@ -419,18 +466,20 @@
     return s;
   }
   /* 없는 상태만 만든다. 반환: 새로 만들거나 고친 수 — 0이면 부팅 때 persist(서버 push)할 이유가 없다 */
-  function ensureStates() {
-    var pd = packDB(), now = Date.now(), n = 0;
-    (pack.words || []).forEach(function (w) {
+  function ensureStates(pid) {
+    var p = packOf(pid);
+    if (!p) return 0;
+    var pd = packDB(p.packId), now = Date.now(), n = 0;
+    (p.words || []).forEach(function (w) {
       if (!pd.states[w.id]) { pd.states[w.id] = WBNAESIN.createState(w.id, 'word', now); n += 1; }
     });
-    (pack.sentences || []).forEach(function (s) {
+    (p.sentences || []).forEach(function (s) {
       var id = WBNAESIN.sentenceId(s.seq);
       if (!pd.states[id]) { pd.states[id] = WBNAESIN.createState(id, 'sentence', now); n += 1; }
     });
     /* 대화문 — 3단계(읽기→대화 완성→순서 배열), stage 4 도달 = 완료. kind 'dialogue'는 본문 문장
        집계(해석·백지)에 섞이지 않는다 — 옛 기록의 'sentence' 대화문은 여기서 이관한다. */
-    (pack.dialogues || []).forEach(function (d) {
+    (p.dialogues || []).forEach(function (d) {
       var id = 'd-' + d.id, cur = pd.states[id];
       if (!cur) { pd.states[id] = mkDialogueState(id, now); n += 1; }
       else if (cur.kind !== 'dialogue') { cur.kind = 'dialogue'; if (cur.stage == null) cur.stage = 1; n += 1; }
@@ -438,17 +487,24 @@
     n += tidyPack(pd);
     return n;
   }
-  function dlgState(id) { return packDB().states['d-' + id]; }
+  /* 범위 전체의 상태를 만든다 — 홈의 범위 합계·범위 플랜은 아직 한 번도 열지 않은 과의
+     단어·문장까지 세야 "시험 범위 100%"가 실제 시험 단위와 맞는다. */
+  function ensureStatesAll() {
+    var n = 0;
+    rangeIds().forEach(function (id) { n += ensureStates(id); });
+    return n;
+  }
+  function dlgState(id, pid) { return packDB(pid).states['d-' + id]; }
   function dlgById(id) { for (var i = 0; i < (pack.dialogues || []).length; i++) if (pack.dialogues[i].id === id) return pack.dialogues[i]; return null; }
   function dlgDone(st) { return st && st.stage >= 4; }
   var DLG_STAGES = { 1: '대역 읽기', 2: '대화 완성', 3: '순서 배열' };
-  function statesOfKind(kind) {
-    var pd = packDB(), out = {};
+  function statesOfKind(kind, pid) {
+    var pd = packDB(pid), out = {};
     Object.keys(pd.states).forEach(function (k) { if (pd.states[k] && pd.states[k].kind === kind) out[k] = pd.states[k]; });
     return out;
   }
-  function wordStates() { return statesOfKind('word'); }
-  function senStates() { return statesOfKind('sentence'); }
+  function wordStates(pid) { return statesOfKind('word', pid); }
+  function senStates(pid) { return statesOfKind('sentence', pid); }
   function senState(seq) { return packDB().states[WBNAESIN.sentenceId(seq)]; }
   /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드 */
   function exam() { var pd = packDB(); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
@@ -505,7 +561,8 @@
   $('whoLine').onclick = function () {
     if (!authed) return;
     if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
-    try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (e) {}
+    try { localStorage.removeItem('wbr.auth'); } catch (e) {}
+    clearPackCache();
     location.href = '/';
   };
   $('offBadge').onclick = function () { location.reload(); };
@@ -1955,7 +2012,7 @@
     if (msg === 'api-401') {
       fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
         '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
-      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (x) {} location.href = '/'; };
+      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/'; };
       return;
     }
     if (msg === 'no-pack') {
