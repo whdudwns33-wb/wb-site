@@ -64,6 +64,8 @@ jobs:
           node naesin/pack-validate.mjs /tmp/wb-pack-sample
       - name: 내신브레인 서버 라우트 테스트
         run: node reading-server/naesin-api.test.mjs
+      - name: 내신브레인 시험 결과 분석·예측 테스트
+        run: node reading-server/naesin-results.test.mjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
