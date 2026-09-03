@@ -2,7 +2,7 @@
 /* WB 국어브레인 서비스 워커 — 앱 셸 캐시 (태블릿 학습존·오프라인 훈련)
    VERSION 은 build-dist.mjs 가 셸 파일 내용 해시로 스탬프한다 — 손으로 올리지 않는다. */
 const VERSION = 'wbk-shell-dev';
-const SHELL = ['./', './index.html', './engine.js', './grade.js', './gen.js', './pack-check.js', './concepts.json', './pack-sample.json', './voice.js', './manifest.webmanifest', './icon.svg'];
+const SHELL = ['./', './index.html', './engine.js', './grade.js', './gen.js', './pack-check.js', './readiness.js', './concepts.json', './pack-sample.json', './voice.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

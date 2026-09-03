@@ -39,6 +39,23 @@
     .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--ind-soft); color: var(--ind); font-weight: 700; }
     .chip.warn { background: var(--amber-soft); color: var(--amber); }
     .chip.mut { background: #EFEEE9; color: var(--soft); }
+    .chip.bad { background: var(--red-soft); color: var(--red); }
+
+    /* 준비도 — 숫자 하나와 그 분해. 막대는 '얼마나 찼나'가 아니라
+       '어느 축이 비었나'를 보이려고 축마다 따로 그린다. */
+    .score { display: flex; align-items: baseline; gap: 10px; }
+    .score b { font-size: 34px; line-height: 1; letter-spacing: -1px; }
+    .axes { margin-top: 10px; display: grid; gap: 7px; }
+    .axis { display: grid; grid-template-columns: 84px 1fr 42px; gap: 8px; align-items: center; font-size: 12.5px; }
+    .axis .tr { height: 8px; border-radius: 999px; background: #EFEEE9; overflow: hidden; }
+    .axis .fl { display: block; height: 100%; background: var(--b3); border-radius: 999px; }
+    .axis.weak .fl { background: var(--amber); }
+    /* 비어 있는 축은 막대가 0이라 색으로 못 알린다 — 라벨로 알린다 */
+    .axis.weak > span:first-child { color: var(--amber); font-weight: 700; }
+    .axis .n { text-align: right; color: var(--soft); font-variant-numeric: tabular-nums; }
+    .alert { margin-top: 10px; padding: 9px 11px; border-radius: 8px; font-size: 13px;
+      background: var(--amber-soft); color: var(--amber); }
+    .alert.risk { background: var(--red-soft); color: var(--red); }
 
     nav.seg { display: flex; gap: 2px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; }
     nav.seg button { padding: 7px 14px; border-radius: 8px; font-weight: 700; color: var(--soft); white-space: nowrap; }
@@ -143,6 +160,7 @@
 <script src="./grade.js"></script>
 <script src="./gen.js"></script>
 <script src="./pack-check.js"></script>
+<script src="./readiness.js"></script>
 <script src="./voice.js"></script>
 <script>
 'use strict';
@@ -150,7 +168,7 @@
    localStorage(wbk.v1)가 정본이고 서버는 백업이다. 요약(summary)은 state와 함께
    올리되 서버에서는 별도 키에 저장된다 — 관리 화면이 state를 통째로 읽지 않게(§8). */
 (function () {
-  var E = window.WBKOENGINE, G = window.WBKOGRADE, GEN = window.WBKOGEN;
+  var E = window.WBKOENGINE, G = window.WBKOGRADE, GEN = window.WBKOGEN, RD = window.WBKOREADY;
   var LS = 'wbk.v1';
   var AUTH = 'wbr.auth';
   var API = '/api/naesin-ko';
@@ -205,13 +223,22 @@
       if (p.essays[k].verdict === 'pass') essayPass += 1;
       else if (p.essays[k].verdict === 'hold') essayHold += 1;
     }
+    /* 준비도는 축 백분율만 담는다 — 관리 화면이 반 그림을 만드는 데 그것이면 충분하고,
+       요약 예산(8KB)을 학생 수만큼 곱하면 작은 차이가 큰 차이가 된다(§8). */
+    var rd = readyNow(), ready = null;
+    if (rd) {
+      var axes = {};
+      rd.parts.forEach(function (x) { if (x.weight > 0) axes[x.key] = Math.round(x.rate * 100); });
+      ready = { score: rd.score, grade: rd.grade, weak: rd.weak, axes: axes,
+        alert: rd.alert, pace: rd.pace, untouched: rd.totals.untouched };
+    }
     return {
       packId: S.packId, works: sum.total, complete: sum.complete, restored: sum.restored,
       applied: sum.applied, byStage: sum.byStage,
       vocabReached: v.reached, vocabStable: v.stable, vocabTotal: v.total,
       blankReached: b.reached, blankStable: b.stable, blankTotal: b.total,
       wrongOpen: wrongOpen, essayPass: essayPass, essayHold: essayHold,
-      lastAt: new Date().toISOString()
+      ready: ready, lastAt: new Date().toISOString()
     };
   }
 
@@ -317,6 +344,23 @@
   function works() { return (S.pack && S.pack.works) || []; }
   function work(id) { var w = works().filter(function (x) { return x.workId === id; }); return w[0] || null; }
   function canonWorks() { return works().filter(function (w) { return w.hasCanon; }); }
+
+  /* 준비도(§11) — 팩·상태·시험을 넘겨 한 숫자와 그 분해를 받는다.
+     여기서만 만들고 화면 세 군데(홈 칩·성취도 카드·서버 요약)가 같은 값을 쓴다. */
+  function readyNow() {
+    if (!RD || !S.pack) return null;
+    var p = pk(), open = 0, k;
+    for (k in p.wrong) if (p.wrong[k] && !p.wrong[k].cleared) open += 1;
+    return RD.readiness(readyPack(), p.states, {
+      exam: S.exam, now: Date.now(), wrongOpen: open,
+      relearnTarget: E.RELEARN_TARGET, applyGateRate: E.APPLY_GATE_RATE
+    });
+  }
+  function readyPack() {
+    return { works: canonWorks().map(function (w) {
+      return { workId: w.workId, title: w.title, vocab: w.vocab || [], blanks: w.blanks || [] };
+    }) };
+  }
   function $(id) { return document.getElementById(id); }
   function rnd() { return Math.random(); }
 
@@ -378,6 +422,50 @@
       '<br>채점 결과는 <b>연습 판정</b>이에요 — 학교 채점 기준과 다를 수 있어요.</div>';
   }
 
+  /* 준비도 카드 — 홈은 접힌 형태(숫자 + 다음 할 일), 성취도는 축을 다 편다.
+     학생에게 '몇 %'만 보이면 행동이 안 바뀐다. 늘 **가장 비어 있는 축**을 같이 말한다(§11). */
+  function readyCard(rd, compact) {
+    if (!rd) return '';
+    var weak = null;
+    rd.parts.forEach(function (x) { if (x.key === rd.weak) weak = x; });
+    var m = ['<div class="card"><div class="spread"><h3 style="margin:0">시험 준비도</h3>' +
+      (rd.pace ? '<span class="small muted">D-' + rd.pace.dday + '</span>' : '<span class="small muted">연습 모드</span>') +
+      '</div>'];
+    m.push('<div class="score" style="margin-top:8px"><b>' + rd.score + '<span style="font-size:18px">%</span></b>' +
+      '<span class="chip' + (rd.score >= 70 ? '' : rd.score >= 45 ? ' mut' : ' warn') + '">' + esc(rd.grade.label) + '</span></div>');
+    if (weak && weak.rate < 1) {
+      m.push('<div class="small" style="margin-top:6px">다음에 할 것 → <b>' + esc(weak.label) + '</b> ' +
+        '<span class="muted">' + esc(weak.act) + '</span></div>');
+    }
+    if (!compact) {
+      m.push('<div class="axes">');
+      rd.parts.forEach(function (x) {
+        if (!x.weight) return;
+        var w = Math.round(x.rate * 100);
+        m.push('<div class="axis' + (x.key === rd.weak ? ' weak' : '') + '" title="' + esc(x.hint || '') + '">' +
+          '<span>' + esc(x.label) + '</span>' +
+          '<span class="tr"><span class="fl" style="width:' + w + '%"></span></span>' +
+          '<span class="n">' + w + '%</span></div>');
+      });
+      m.push('</div>');
+      var ew = Math.round(rd.parts.filter(function (x) { return x.key === 'essay'; })[0].weight * 100);
+      m.push('<div class="small muted" style="margin-top:8px">' +
+        (rd.weightSource === 'exam'
+          ? '축의 비중은 우리 학교 시험 배점에서 와요 — 서술형 ' + ew + '%.'
+          : '학교 시험 배점이 등록되면 그 비중으로 다시 계산돼요(지금은 기본값 · 서술형 ' + ew + '%).') +
+        ' 빈 축부터 채우면 점수가 가장 많이 올라요.</div>');
+      m.push('<div class="small muted">구절 적용은 게이트 기준선(' + Math.round(E.APPLY_GATE_RATE * 100) +
+        '%) 대비로 재요 — 시도가 ' + RD.APPLY_MIN + '회보다 적으면 그만큼 낮게 잡혀요.</div>');
+      if (rd.pace) {
+        m.push('<div class="small muted" style="margin-top:4px">안정화까지 최소 ' + rd.pace.minDays + '일' +
+          ' · 남은 회전 ' + rd.pace.rotations + '개(하루 ' + rd.pace.perDay + '개)</div>');
+      }
+    }
+    if (rd.alert) m.push('<div class="alert' + (rd.alert.level === 'risk' ? ' risk' : '') + '">' + esc(rd.alert.why) + '</div>');
+    m.push('</div>');
+    return m.join('');
+  }
+
   /* ── 오늘 ── */
   function renderHome() {
     var p = plan();
@@ -392,6 +480,7 @@
         '<div><b>' + esc(S.task.title) + '</b> <span class="small muted">' + esc(S.task.date) + '</span></div>' +
         '<div class="small muted">' + esc((S.task.typeKeys || []).join(' · ')) + '</div></div>');
     }
+    m.push(readyCard(readyNow(), true));
     m.push('<div class="card"><h3>세션</h3><div class="small muted" style="margin-bottom:10px">' +
       '단계마다 걸리는 시간이 달라요. 오늘은 이만큼이면 됩니다.</div><div class="row">');
     var n1 = p.blanks.fresh.length + p.blanks.review.length + p.blanks.relearn.length;
@@ -1136,6 +1225,7 @@
     var p = pk(), sum = E.workSummary(p.states);
     var v = E.kindSummary(p.states, 'vocab'), b = E.kindSummary(p.states, 'blank');
     var m = [banner()];
+    m.push(readyCard(readyNow(), false));
     m.push('<div class="card"><h3>작품 × 단계</h3><table class="mx"><tr><th class="t">작품</th>' +
       '<th>단계</th><th>적용</th><th>복원</th><th>서술형</th></tr>');
     canonWorks().forEach(function (w) {

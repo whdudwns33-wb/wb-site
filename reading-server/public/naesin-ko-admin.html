@@ -30,6 +30,16 @@
     .stat b{display:block;font-size:22px;color:var(--green)}
     .stat span{font-size:12px;color:var(--muted);font-weight:800}
     .tbl{overflow-x:auto}
+    /* 준비도 — 반 그림은 평균 하나가 아니라 분포와 '누가 위험한가'다 */
+    .rdbar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:#eef2ee;margin:8px 0 4px}
+    .rdbar i{display:block}
+    .rd-start{background:#e0736a}.rd-building{background:#e8b45c}.rd-ontrack{background:#7db98c}.rd-ready{background:#2e7d55}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700}
+    .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+    .risklist{margin-top:10px;font-size:13px}
+    .risklist div{padding:6px 0;border-top:1px solid var(--line)}
+    .mini{display:inline-block;width:52px;height:7px;border-radius:999px;background:#eef2ee;vertical-align:middle;overflow:hidden}
+    .mini i{display:block;height:100%;background:var(--green)}
     table{border-collapse:collapse;width:100%;font-size:13.5px}
     th{position:sticky;top:0;background:#eef3ed;color:var(--green);font-size:12px}
     th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
@@ -56,6 +66,7 @@
 <main id="app"></main>
 
 <script src="/naesin-ko/pack-check.js"></script>
+<script src="/naesin-ko/readiness.js"></script>
 <script>
 /* WB 국어브레인 관리 웹 — 기획서 §6·§7.
    인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다.
@@ -103,8 +114,39 @@ async function refresh() {
   } catch (e) { if (e.message !== 'auth') $('#app').innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
 }
 
+/* 학생 요약만 보고 반 그림을 만든다 — 학생 state는 서버가 통째로 읽지 않는다(§8).
+   학생 앱과 **같은 모듈**(readiness.js)이라 두 화면의 숫자가 어긋날 수 없다. */
+let CLS = { avg: null, risk: [], watch: [], dist: {}, weakTop: [], linked: 0, n: 0 };
+const AXIS_LABEL = {};
+(window.WBKOREADY ? WBKOREADY.AXES : []).forEach((a) => { AXIS_LABEL[a.key] = a.label; });
+
+/* 위험한 학생이 표 맨 위에 온다 — 스크롤해서 찾아야 하는 신호는 신호가 아니다 */
+function byReady(a, b) {
+  const s = (x) => (x.summary && x.summary.ready && typeof x.summary.ready.score === 'number') ? x.summary.ready.score : 999;
+  return s(a) - s(b);
+}
+
+function renderClass() {
+  if (!CLS.linked) return '';
+  const d = CLS.dist, n = CLS.linked;
+  const seg = (k, label) => d[k] ? `<i class="rd-${k}" style="width:${(d[k] / n) * 100}%" title="${label} ${d[k]}명"></i>` : '';
+  const weak = CLS.weakTop.slice(0, 3).map((w) => `${esc(w.label)} ${w.n}명`).join(' · ');
+  const rows = CLS.risk.concat(CLS.watch).slice(0, 8).map((r) =>
+    `<div><span class="tag ${CLS.risk.includes(r) ? 'bad' : 'warn'}">${CLS.risk.includes(r) ? '위험' : '주의'}</span>
+      <b>${esc(r.name)}</b> <span class="muted">${esc(r.why)}</span></div>`).join('');
+  return `<div class="rdbar">${seg('start', '시작 단계')}${seg('building', '쌓는 중')}${seg('ontrack', '궤도')}${seg('ready', '준비 완료')}</div>
+    <div class="legend">
+      <span><i class="rd-start"></i>시작 ${d.start}</span><span><i class="rd-building"></i>쌓는 중 ${d.building}</span>
+      <span><i class="rd-ontrack"></i>궤도 ${d.ontrack}</span><span><i class="rd-ready"></i>완료 ${d.ready}</span>
+      <span>중앙값 ${CLS.median}% · 최저 ${CLS.low}% · 최고 ${CLS.high}%</span>
+    </div>
+    ${weak ? `<p class="muted" style="margin:8px 0 0">반에서 가장 비어 있는 축: <b>${weak}</b> — 다음 수업 세트를 여기에 맞추세요.</p>` : ''}
+    ${rows ? `<div class="risklist">${rows}</div>` : ''}`;
+}
+
 function render() {
   const linked = OVERVIEW.filter((s) => s.linked);
+  CLS = window.WBKOREADY ? WBKOREADY.classReadiness(linked) : CLS;
   /* 목록과 같은 기준으로 센다 — 규칙이 통과시킨 답안도 표본 감사(§5.3 self)를 위해
      확정 전까지 큐에 남는다. 카운트만 다른 기준이면 숫자와 목록이 어긋나 보인다. */
   const hold = REVIEWS.filter((r) => !r.teacher);
@@ -112,14 +154,16 @@ function render() {
   <div class="card">
     <h2>반 성취도</h2>
     <div class="stats">
+      <div class="stat"><b>${CLS.avg == null ? '-' : CLS.avg + '%'}</b><span>평균 준비도</span></div>
       <div class="stat"><b>${linked.length}</b><span>학습 중</span></div>
-      <div class="stat"><b>${PACKS.length}</b><span>등록된 팩</span></div>
+      <div class="stat"><b>${CLS.risk.length}</b><span>위험</span></div>
       <div class="stat"><b>${hold.length}</b><span>서술형 미확정</span></div>
     </div>
+    ${renderClass()}
     <div class="tbl"><table><thead><tr>
-      <th>학생</th><th>반</th><th>작품 완료</th><th>개념 안정화</th><th>어휘 안정화</th><th>오답</th><th>서술형</th><th>최근</th>
-    </tr></thead><tbody>${linked.length ? linked.map(rowStudent).join('') :
-      '<tr><td colspan="8" class="muted">아직 학습 기록이 없어요.</td></tr>'}</tbody></table></div>
+      <th>학생</th><th>반</th><th>준비도</th><th>비어 있는 축</th><th>작품 완료</th><th>개념 안정화</th><th>오답</th><th>서술형</th><th>최근</th>
+    </tr></thead><tbody>${linked.length ? linked.slice().sort(byReady).map(rowStudent).join('') :
+      '<tr><td colspan="9" class="muted">아직 학습 기록이 없어요.</td></tr>'}</tbody></table></div>
   </div>
 
   <div class="card">
@@ -196,13 +240,26 @@ function render() {
 
 function rowStudent(s) {
   const m = s.summary || {};
+  const r = m.ready;
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
+  /* 준비도는 숫자 + 막대 + 신호등. 신호가 있으면 why 를 title 로 달아 둔다 —
+     한 줄에 다 쓰면 표가 안 읽히고, 안 쓰면 왜 위험한지 모른다. */
+  const lvl = r && r.alert ? r.alert.level : null;
+  const ready = r ? `<b>${r.score}%</b> <span class="mini"><i style="width:${r.score}%"></i></span>
+      ${lvl ? `<span class="tag ${lvl === 'risk' ? 'bad' : 'warn'}" title="${esc(r.alert.why)}">${lvl === 'risk' ? '위험' : '주의'}</span>` : ''}` : '-';
+  /* 가장 비어 있는 축 두 개 — 이 학생에게 오늘 무엇을 시킬지가 여기서 나온다.
+     찬 축은 빼고 센다: '비어 있는 축'에 100%가 뜨면 표를 잘못 읽게 된다. */
+  const empty = r && r.axes ? Object.keys(r.axes).filter((k) => r.axes[k] < 100).sort((a, b) => r.axes[a] - r.axes[b]) : [];
+  const axes = !r ? '-' : (empty.length
+    ? empty.slice(0, 2).map((k) => `${esc(AXIS_LABEL[k] || k)} ${r.axes[k]}%`).join(' · ')
+    : '<span class="tag ok">없음</span>');
   return `<tr>
     <td>${esc(s.name || s.code)}<div class="muted">${esc(s.code)}</div></td>
     <td>${esc(s.cls || '')}</td>
+    <td>${ready}</td>
+    <td class="muted">${axes}</td>
     <td>${m.complete != null ? `${m.complete} / ${m.works || 0}` : '-'}</td>
     <td>${m.blankTotal ? `${m.blankStable}/${m.blankTotal} <span class="muted">(${pct(m.blankStable, m.blankTotal)})</span>` : '-'}</td>
-    <td>${m.vocabTotal ? `${m.vocabStable}/${m.vocabTotal}` : '-'}</td>
     <td>${m.wrongOpen != null ? (m.wrongOpen > 0 ? `<span class="tag warn">${m.wrongOpen}</span>` : '<span class="tag ok">0</span>') : '-'}</td>
     <td>${m.essayPass != null ? `통과 ${m.essayPass}${m.essayHold ? ` · 보류 ${m.essayHold}` : ''}` : '-'}</td>
     <td class="muted">${s.lastActive ? esc(String(s.lastActive).slice(5, 16).replace('T', ' ')) : '-'}</td>

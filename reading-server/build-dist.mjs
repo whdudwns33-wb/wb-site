@@ -61,7 +61,7 @@ fs.copyFileSync(SHARED, path.join(DIST, 'naesin', 'voice.js'));
 const NAESINKO = path.join(ROOT, '..', 'naesin-ko');
 fs.mkdirSync(path.join(DIST, 'naesin-ko'), { recursive: true });
 const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js',
-  'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+  'readiness.js', 'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
 
@@ -94,8 +94,8 @@ const nTag = stampSW(path.join(DIST, 'naesin', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin', f)), 'wbn-shell');
 const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
-  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'concepts.json',
-    'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
+  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'readiness.js',
+    'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));

@@ -58,6 +58,10 @@ jobs:
         run: node naesin-ko/pack-check.test.cjs
       - name: 국어브레인 개념어 사전 테스트
         run: node naesin-ko/concepts.test.cjs
+      - name: 국어브레인 준비도 테스트
+        run: node naesin-ko/readiness.test.cjs
+      - name: 국어브레인 이해완성 추출기 테스트
+        run: node naesin-ko/extract/build-ihae.test.mjs
       - name: 국어브레인 서버 라우트 테스트
         run: node reading-server/naesin-ko-api.test.mjs
       - name: 교재 코칭 테스트
