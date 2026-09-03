@@ -30,7 +30,9 @@ export const WRONG_TYPE_KEYS = ['word', 'grammar', 'passage', 'writing'];
    워커는 req.json()이 몸통을 다 읽고서야 크기를 아는데, 그 전에 끊어야 메모리도 시간도 안 쓴다. */
 export const BODY_LIMIT_PACK = 4_718_592;   // 4.5MB — /admin/pack
 export const BODY_LIMIT_STATE = 307_200;    // 300KB — /state 를 비롯한 나머지 전부
-export const naesinBodyLimit = (p) => (p === '/api/naesin/admin/pack' ? BODY_LIMIT_PACK : BODY_LIMIT_STATE);
+/* 스튜디오 작업 생성·초안 넣기는 원천 텍스트(과 단위 자료)를 담아 팩과 같은 급이다 */
+const BIG_BODY_PATHS = ['/api/naesin/admin/pack', '/api/naesin/admin/job', '/api/naesin/admin/job/draft'];
+export const naesinBodyLimit = (p) => (BIG_BODY_PATHS.includes(p) ? BODY_LIMIT_PACK : BODY_LIMIT_STATE);
 
 /* 과제 학습 유형 키 — 학생 앱 quizTypes()·관리 웹 TYPE_LIST 와 같은 목록(계약 0.4).
    세 곳이 어긋나면 강사가 고른 유형이 학생 화면에서 조용히 빠진다. 여기서 모르는 키는 400으로 돌려

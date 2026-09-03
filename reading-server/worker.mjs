@@ -6,6 +6,7 @@
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
+import { handleStudio } from './naesin-studio.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -153,6 +154,20 @@ function naesinStore(env) {
     /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
     getReports: (id) => env.DB.get('naesin:report:' + id, 'json'),
     putReports: (id, list) => env.DB.put('naesin:report:' + id, JSON.stringify(list)),
+    /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 둔다(jobsrc)
+       목록 조회가 매번 수 MB를 읽지 않게. 작업을 지우면 원천도 함께 지운다. */
+    getJob: (id) => env.DB.get('naesin:job:' + id, 'json'),
+    putJob: (id, rec) => env.DB.put('naesin:job:' + id, JSON.stringify(rec)),
+    deleteJob: (id) => env.DB.delete('naesin:job:' + id),
+    listJobs: async () => {
+      const keys = await kvListAll(env, 'naesin:job:');
+      const out = [];
+      for (const k of keys) { const v = await env.DB.get(k, 'json'); if (v) out.push(v); }
+      return out;
+    },
+    getJobSrc: (id) => env.DB.get('naesin:jobsrc:' + id, 'json'),
+    putJobSrc: (id, rec) => env.DB.put('naesin:jobsrc:' + id, JSON.stringify(rec)),
+    deleteJobSrc: (id) => env.DB.delete('naesin:jobsrc:' + id),
     /* 시험 결과 — 키는 naesin:result:<코드>:<시험일>. 코드도 날짜도 콜론을 못 쓰므로
        키에서 둘을 그대로 되읽을 수 있다(listResults). 학생 하나가 시험마다 한 줄. */
     getResult: (c, d) => env.DB.get('naesin:result:' + c + ':' + d, 'json'),
@@ -459,10 +474,14 @@ export default {
            req.json() 은 다 읽고서야 크기를 알아서, 기기 하나가 수십 MB 를 보내면 그만큼 워커 메모리·시간을 쓴다. */
         const len = Number(req.headers.get('content-length') || 0);
         if (len > naesinBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleNaesin({
+        const ctx = {
           path: p, method: req.method, who, query: url.searchParams,
           getBody: () => req.json(), store: naesinStore(env),
-        });
+        };
+        /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
+        const st = await handleStudio({ ...ctx, ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.NAESIN_AI_MODEL || '' } });
+        if (st) return json(st.status, st.body);
+        const out = await handleNaesin(ctx);
         return json(out.status, out.body);
       }
 
