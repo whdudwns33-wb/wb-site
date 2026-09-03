@@ -1,6 +1,7 @@
 'use strict';
 /* 내신 서버 라우트 검증 (node reading-server/naesin-api.test.mjs) */
 import assert from 'node:assert';
+import fs from 'node:fs';
 import { handleNaesin, naesinSummary, normalizeSummary, resolveExam, isValidDate, todayKst,
   TASK_TYPE_KEYS, isTaskTypeKey, isReservedCode, dropReservedRows, naesinBodyLimit, BODY_LIMIT_PACK, BODY_LIMIT_STATE } from './naesin-api.mjs';
 
@@ -489,6 +490,266 @@ await t('수업 과제 — 없으면 빈 값, 등록·조회 왕복, 검증(실�
   r = await call(store, { path: '/api/naesin/admin/task', method: 'POST',
     getBody: async () => ({ date: '2026-09-20', title: 'x', typeKeys: ['w-e2k'] }) });
   assert.strictEqual(r.status, 403, '학생은 과제를 등록할 수 없다');
+});
+
+/* ── R1 범위 요약 · R2 시험 결과 회고 ── */
+
+await t('[R1] normalizeSummary range — 범위 합계도 화이트리스트(팩 id 형식·개수 상한·숫자 강제)', () => {
+  const xss = '<img src=x onerror=alert(1)>';
+  const n = normalizeSummary({
+    packId: 'dummy-e2-mid1',
+    word: { total: 5 }, sentence: { total: 5 },
+    range: {
+      packIds: ['dummy-e2-mid1', 'dummy-e2-mid2', xss, 42, 'a!b'],
+      word: { total: '154', reached: 90.9, stable: -3, risky: xss, needsSpellCheck: 1, hack: xss },
+      sentence: { total: 50, interpreted: '20', memorized: null, byStage: { 1: '5', 2: xss, 6: 3, 9: 7 }, evil: xss },
+      packs: {
+        'dummy-e2-mid1': { word: { total: 77, reached: 50, stable: 30, risky: 9 }, sentence: { total: 25, interpreted: 10, memorized: 4 }, junk: xss },
+        'dummy-e2-mid2': { word: 'x', sentence: null },
+        '나쁜팩!': { word: { total: 99 } },
+      },
+      extra: xss,
+    },
+  });
+  assert.deepStrictEqual(Object.keys(n.range).sort(), ['packIds', 'packs', 'sentence', 'word'], '계약 R1 키만 남는다');
+  assert.deepStrictEqual(n.range.packIds, ['dummy-e2-mid1', 'dummy-e2-mid2'], '팩 id 형식 밖은 버리고 순서는 유지');
+  assert.deepStrictEqual(n.range.word, { total: 154, reached: 90, stable: 0, risky: 0, needsSpellCheck: 1 });
+  assert.deepStrictEqual(n.range.sentence, { total: 50, interpreted: 20, memorized: 0, byStage: { 1: 5, 2: 0, 3: 0, 4: 0, 5: 0, 6: 3 } });
+  assert.deepStrictEqual(Object.keys(n.range.packs), ['dummy-e2-mid1', 'dummy-e2-mid2'], 'packs 키도 팩 id 형식만');
+  assert.deepStrictEqual(n.range.packs['dummy-e2-mid1'], {
+    word: { total: 77, reached: 50, stable: 30 }, sentence: { total: 25, interpreted: 10, memorized: 4 },
+  }, '팩별 값은 계약의 여섯 숫자만(risky·junk 는 버린다)');
+  assert.deepStrictEqual(n.range.packs['dummy-e2-mid2'], { word: { total: 0, reached: 0, stable: 0 }, sentence: { total: 0, interpreted: 0, memorized: 0 } });
+  assert.ok(!JSON.stringify(n).includes('hack') && !JSON.stringify(n).includes('evil') && !JSON.stringify(n).includes('extra'));
+
+  /* 범위 상한 — 시험 하나에 담기는 팩 수(EXAM_PACKS_MAX=20)까지만 */
+  const many = normalizeSummary({ range: { packIds: Array.from({ length: 30 }, (_, i) => 'dummy-pack-' + i),
+    packs: Object.fromEntries(Array.from({ length: 30 }, (_, i) => ['dummy-pack-' + i, { word: {}, sentence: {} }])) } });
+  assert.strictEqual(many.range.packIds.length, 20);
+  assert.strictEqual(Object.keys(many.range.packs).length, 20);
+
+  /* 기존 동작 그대로 — range 가 없으면 키 자체가 없다(옛 클라이언트 저장본에 빈 칸을 만들지 않는다) */
+  assert.strictEqual('range' in normalizeSummary({ packId: 'dummy-e2-mid1' }), false);
+  assert.strictEqual('range' in normalizeSummary({ range: 'x' }), false);
+  assert.strictEqual('range' in normalizeSummary({ range: [1, 2] }), false);
+  const clean = { packId: 'dummy-e2-mid1', word: { total: 77, reached: 41, stable: 12, risky: 3, needsSpellCheck: 2 },
+    sentence: { total: 25, interpreted: 10, memorized: 4, byStage: { 1: 5, 2: 6, 3: 4, 4: 3, 5: 3, 6: 4 } },
+    range: { packIds: ['dummy-e2-mid1', 'dummy-e2-mid2'],
+      word: { total: 154, reached: 82, stable: 24, risky: 6, needsSpellCheck: 4 },
+      sentence: { total: 50, interpreted: 20, memorized: 8, byStage: { 1: 10, 2: 12, 3: 8, 4: 6, 5: 6, 6: 8 } },
+      packs: { 'dummy-e2-mid1': { word: { total: 77, reached: 41, stable: 12 }, sentence: { total: 25, interpreted: 10, memorized: 4 } } } },
+    task: null, updatedAt: '2026-09-20T05:00:00.000Z' };
+  assert.deepStrictEqual(normalizeSummary(clean), clean, '계약대로 온 값은 한 글자도 안 바뀐다');
+});
+
+await t('[R1] PUT /state → overview 까지 range 가 살아서 간다 (관리 현황판의 범위 합계 원천)', async () => {
+  const store = memStore();
+  const range = { packIds: ['dummy-e2-mid1', 'dummy-e2-mid2'],
+    word: { total: 154, reached: 82, stable: 24, risky: 6, needsSpellCheck: 4 },
+    sentence: { total: 50, interpreted: 20, memorized: 8, byStage: { 1: 10, 2: 12, 3: 8, 4: 6, 5: 6, 6: 8 } },
+    packs: { 'dummy-e2-mid2': { word: { total: 77, reached: 41, stable: 12 }, sentence: { total: 25, interpreted: 10, memorized: 4 } } } };
+  await call(store, { method: 'PUT', getBody: async () => ({ state: { summary: { packId: 'dummy-e2-mid2', word: { total: 77 }, sentence: { total: 25 }, range } } }) });
+  assert.deepStrictEqual(store.getState('st-1').state.summary.range, range, '저장본에 범위 합계가 그대로 남는다');
+  const r = await call(store, { path: '/api/naesin/admin/overview', who: ADMIN });
+  assert.deepStrictEqual(r.body.students[0].summary.range, range, 'overview 출력에도 실려 나간다');
+});
+
+/* 결과 픽스처 — 단어 10·문장 10짜리 요약. m = 0.04·안정화 + 0.03·해석 + 0.03·백지 */
+const snap = (stable, interpreted, memorized) => ({
+  packId: 'dummy-e2-mid1', word: { total: 10, reached: stable, stable, risky: 0, needsSpellCheck: 0 },
+  sentence: { total: 10, interpreted, memorized, byStage: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: memorized } },
+  task: null, updatedAt: '',
+});
+const postResult = (store, body) => call(store, { path: '/api/naesin/admin/result', method: 'POST', who: ADMIN, getBody: async () => body });
+
+await t('[R2] 결과 저장 — 그 시점의 summary 를 snapshot 으로, 유효 시험 범위를 packIds 로 함께 박는다', async () => {
+  const store = memStore();
+  await seedAssigned(store, ['dummy-e2-mid1', 'dummy-e2-mid2']);
+  store.putState('st-1', { state: { summary: snap(8, 6, 4) }, updatedAt: 'x' });
+  const r = await postResult(store, { code: 'st-1', examDate: '2026-10-05', score: 88,
+    wrongTypes: { word: 2, grammar: '3', passage: 0 }, memo: '  단어에서 두 개  ' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.ok, true);
+  const rec = r.body.result;
+  assert.strictEqual(rec.code, 'st-1');
+  assert.strictEqual(rec.examDate, '2026-10-05');
+  assert.strictEqual(rec.score, 88);
+  assert.deepStrictEqual(rec.wrongTypes, { word: 2, grammar: 3, passage: 0, writing: 0 }, '빈 칸은 0, 문자열 숫자는 정수');
+  assert.strictEqual(rec.memo, '단어에서 두 개', '앞뒤 공백은 잘라 저장');
+  assert.deepStrictEqual(rec.packIds, ['dummy-e2-mid1', 'dummy-e2-mid2'], '저장 시점의 유효 시험 범위');
+  assert.deepStrictEqual(rec.snapshot, normalizeSummary(snap(8, 6, 4)), '그때의 도달률이 통째로 남는다');
+  assert.ok(rec.at, '저장 시각');
+  assert.deepStrictEqual(store._raw.results['st-1']['2026-10-05'], rec, '저장소에도 같은 값');
+
+  /* 나중에 학생이 더 공부해 요약이 올라가도, 이미 저장된 결과의 snapshot 은 그대로여야 한다 */
+  store.putState('st-1', { state: { summary: snap(10, 10, 10) }, updatedAt: 'y' });
+  const list = await call(store, { path: '/api/naesin/admin/results', who: ADMIN });
+  assert.deepStrictEqual(list.body.results[0].snapshot, normalizeSummary(snap(8, 6, 4)), '지난 시험의 도달률은 사후에 다시 계산되지 않는다');
+
+  /* 같은 학생·같은 시험일에 다시 넣으면 덮어쓴다(강사가 점수를 고친다) */
+  const again = await postResult(store, { code: 'st-1', examDate: '2026-10-05', score: 90 });
+  assert.strictEqual(again.body.result.score, 90);
+  assert.strictEqual(again.body.result.memo, undefined, '메모를 비우면 필드가 없다');
+  assert.strictEqual(again.body.result.wrongTypes, undefined, 'wrongTypes 도 선택 필드');
+  assert.strictEqual(Object.keys(store._raw.results['st-1']).length, 1, '덮어쓰기지 새 줄이 아니다');
+
+  /* 요약이 없는 학생(미연동)도 결과는 남길 수 있다 — snapshot 만 null */
+  const r2 = await postResult(store, { code: 'st-2', examDate: '2026-10-05', score: 70 });
+  assert.strictEqual(r2.body.result.snapshot, null);
+});
+
+await t('[R2] 결과 저장 검증 — 학생 존재·실제 달력 날짜·0~100 정수·wrongTypes 0~50 정수·메모 200자', async () => {
+  const store = memStore();
+  const ok = { code: 'st-1', examDate: '2026-10-05', score: 80 };
+  assert.strictEqual((await postResult(store, { ...ok, code: '한글' })).status, 400, 'code 형식');
+  assert.strictEqual((await postResult(store, { ...ok, code: 'ghost-9' })).status, 404, '등록 안 된 학생');
+  assert.strictEqual((await postResult(store, { ...ok, examDate: '2026-10-5' })).status, 400, '날짜 형식');
+  assert.strictEqual((await postResult(store, { ...ok, examDate: '2026-02-30' })).status, 400, '달력에 없는 날');
+  assert.strictEqual((await postResult(store, { ...ok, score: 101 })).status, 400, '100 초과');
+  assert.strictEqual((await postResult(store, { ...ok, score: -1 })).status, 400, '음수');
+  assert.strictEqual((await postResult(store, { ...ok, score: 88.5 })).status, 400, '정수만');
+  assert.strictEqual((await postResult(store, { ...ok, score: 'x' })).status, 400, '숫자가 아니면 거절');
+  assert.strictEqual((await postResult(store, { ...ok, score: undefined })).status, 400, 'score 필수');
+  assert.strictEqual((await postResult(store, { ...ok, score: '' })).status, 400, '빈 칸이 0점으로 저장되면 안 된다');
+  assert.strictEqual((await postResult(store, { ...ok, score: null })).status, 400);
+  assert.strictEqual((await postResult(store, { ...ok, score: true })).status, 400);
+  assert.strictEqual((await postResult(store, { ...ok, wrongTypes: 'x' })).status, 400, 'wrongTypes 객체 아님');
+  assert.strictEqual((await postResult(store, { ...ok, wrongTypes: { word: 51 } })).status, 400, '한 유형 50문항 초과');
+  assert.strictEqual((await postResult(store, { ...ok, wrongTypes: { word: -1 } })).status, 400);
+  assert.strictEqual((await postResult(store, { ...ok, wrongTypes: { word: 1.5 } })).status, 400);
+  assert.strictEqual(Object.keys(store._raw.results).length, 0, '거절된 결과는 저장되지 않는다');
+  assert.strictEqual((await postResult(store, { ...ok, score: '90' })).body.result.score, 90, '입력칸에서 온 문자열 숫자는 정수로 저장');
+  assert.strictEqual((await postResult(store, { ...ok, wrongTypes: { word: '' } })).body.result.wrongTypes.word, 0, '빈 칸은 0');
+  const r = await postResult(store, { ...ok, score: 0, wrongTypes: { word: 0, hack: 99 }, memo: '가'.repeat(300) });
+  assert.strictEqual(r.status, 200, '0점도 정상 값');
+  assert.deepStrictEqual(r.body.result.wrongTypes, { word: 0, grammar: 0, passage: 0, writing: 0 }, '모르는 유형 키는 버린다');
+  assert.strictEqual(r.body.result.memo.length, 200, '메모는 200자');
+  assert.deepStrictEqual(r.body.result.packIds, [], '시험 배정이 없으면 빈 범위');
+  const bad = await call(store, { path: '/api/naesin/admin/result', method: 'POST', who: ADMIN, getBody: async () => { throw new Error('bad json'); } });
+  assert.strictEqual(bad.status, 400, '파싱 실패는 400');
+});
+
+await t('[R2] 결과 삭제 — 두 번 눌러도 ok, 형식 검증, 퇴원한 학생 것도 지울 수 있다', async () => {
+  const store = memStore();
+  await postResult(store, { code: 'st-1', examDate: '2026-10-05', score: 80 });
+  const del = (body) => call(store, { path: '/api/naesin/admin/result', method: 'DELETE', who: ADMIN, getBody: async () => body });
+  assert.strictEqual((await del({ code: '한글', examDate: '2026-10-05' })).status, 400);
+  assert.strictEqual((await del({ code: 'st-1', examDate: '2026-13-01' })).status, 400);
+  const r = await del({ code: 'st-1', examDate: '2026-10-05' });
+  assert.deepStrictEqual(r.body, { ok: true, code: 'st-1', examDate: '2026-10-05' });
+  assert.strictEqual(store.getResult('st-1', '2026-10-05'), null);
+  assert.strictEqual((await del({ code: 'st-1', examDate: '2026-10-05' })).status, 200, '없어도 ok');
+  assert.strictEqual((await del({ code: 'gone-99', examDate: '2026-10-05' })).status, 200, '학생 존재는 보지 않는다(퇴원생 정리)');
+});
+
+await t('[R2] GET /admin/results — 시험일 필터·정렬·이름·도달률(reach)·성과 분석(analysis)', async () => {
+  const store = memStore();
+  /* (m, score) = (.2,60) (.4,70) (.6,80) (.8,90) (1,100) → 완전 직선, r = 1 */
+  const seed = [['st-1', 60, snap(5, 0, 0)], ['st-2', 70, snap(10, 0, 0)], ['st-3', 80, snap(6, 8, 4)],
+    ['st-4', 90, snap(8, 10, 6)], ['st-5', 100, snap(10, 10, 10)]];
+  for (const [code, score, s] of seed) store.putResult(code, '2026-10-05', { code, examDate: '2026-10-05', score, packIds: ['dummy-e2-mid1'], snapshot: s, at: '2026-10-06T00:00:00.000Z' });
+  store.putResult('st-1', '2026-05-01', { code: 'st-1', examDate: '2026-05-01', score: 55, packIds: [], snapshot: null, at: '2026-05-02T00:00:00.000Z' });
+
+  const all = await call(store, { path: '/api/naesin/admin/results', who: ADMIN });
+  assert.strictEqual(all.status, 200);
+  assert.strictEqual(all.body.results.length, 6);
+  assert.deepStrictEqual(all.body.results.map((r) => r.examDate + '/' + r.code).slice(0, 6),
+    ['2026-10-05/st-1', '2026-10-05/st-2', '2026-10-05/st-3', '2026-10-05/st-4', '2026-10-05/st-5', '2026-05-01/st-1'],
+    '최근 시험이 위, 같은 시험이면 코드순');
+  assert.strictEqual(all.body.results[0].name, '김지우', '관리 표가 쓸 이름');
+  assert.strictEqual(all.body.results[0].cls, '중2 A반');
+  assert.strictEqual(all.body.results[2].name, '', '명부에 없는 코드도 줄은 나온다');
+  assert.deepStrictEqual(all.body.results[0].reach, { m: 0.2, stable: 0.5, interpret: 0, blank: 0 }, '산점도 x축 — 서버가 계산해서 준다');
+  assert.strictEqual(all.body.results[5].reach, null, 'snapshot 없는 옛 결과는 그릴 점이 없다');
+  assert.strictEqual(all.body.analysis.n, 6);
+  assert.strictEqual(all.body.analysis.r, 1, '도달률과 점수가 같이 움직인다');
+  assert.deepStrictEqual(all.body.analysis.groups.highBlank, { n: 1, mean: 100 }, '백지 80% 이상 그룹');
+  assert.deepStrictEqual(all.body.analysis.groups.lowBlank, { n: 4, mean: 75 });
+  assert.deepStrictEqual(Object.keys(all.body.analysis.byDate), ['2026-05-01', '2026-10-05']);
+  assert.deepStrictEqual(all.body.analysis.byDate['2026-10-05'], { n: 5, meanScore: 80, r: 1 });
+
+  const one = await call(store, { path: '/api/naesin/admin/results', who: ADMIN, query: new URLSearchParams('examDate=2026-05-01') });
+  assert.strictEqual(one.body.results.length, 1, '시험일 필터');
+  assert.strictEqual(one.body.analysis.n, 1);
+  assert.strictEqual(one.body.analysis.r, null, '한 건으로는 상관을 내지 않는다');
+  assert.strictEqual((await call(store, { path: '/api/naesin/admin/results', who: ADMIN, query: new URLSearchParams('examDate=2026-13-01') })).status, 400, '날짜 형식 오류');
+  assert.deepStrictEqual((await call(store, { path: '/api/naesin/admin/results', who: ADMIN })).body.results.length, 6);
+
+  /* 손으로 고쳐진 저장본(형식 밖 줄)은 목록에서 아예 빠진다 — 셈에 끼면 통계가 조용히 틀어진다 */
+  store.putResult('한글코드', '2026-10-05', { score: 100 });
+  store.putResult('st-9', '엉터리', { code: 'st-9', examDate: '엉터리', score: 100 });
+  const clean = await call(store, { path: '/api/naesin/admin/results', who: ADMIN });
+  assert.strictEqual(clean.body.results.length, 6, '모양이 아닌 줄은 버린다');
+  assert.strictEqual(clean.body.analysis.n, 6);
+});
+
+await t('[R2] 학생 GET /result — 내 것만 최신순, prediction 은 표본 5건부터(참고용 숫자)', async () => {
+  const store = memStore();
+  const seed = [['st-1', 60, snap(5, 0, 0)], ['st-2', 70, snap(10, 0, 0)], ['st-3', 80, snap(6, 8, 4)], ['st-4', 90, snap(8, 10, 6)]];
+  for (const [code, score, s] of seed) store.putResult(code, '2026-10-05', { code, examDate: '2026-10-05', score, packIds: ['dummy-e2-mid1'], snapshot: s, at: 'x' });
+  store.putState('st-1', { state: { summary: snap(5, 6, 4) }, updatedAt: 'x' });   // m = 0.5
+
+  let r = await call(store, { path: '/api/naesin/result' });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.results.length, 1, '남의 결과는 한 줄도 안 나간다');
+  assert.strictEqual(r.body.results[0].code, 'st-1');
+  assert.strictEqual(r.body.results[0].score, 60);
+  assert.deepStrictEqual(r.body.results[0].reach, { m: 0.2, stable: 0.5, interpret: 0, blank: 0 }, '그때의 도달률(회고 칩의 근거)');
+  assert.strictEqual(r.body.prediction, null, '표본 4건으로는 예상 점수대를 말하지 않는다');
+
+  /* 다섯 번째 결과가 들어오면 직선이 선다 — score = 50 + 50m, 내 m = 0.5 → 75, RMSE 0 → ±5 */
+  store.putResult('st-5', '2026-10-05', { code: 'st-5', examDate: '2026-10-05', score: 100, packIds: [], snapshot: snap(10, 10, 10), at: 'x' });
+  r = await call(store, { path: '/api/naesin/result' });
+  assert.deepStrictEqual(r.body.prediction, { score: 75, low: 70, high: 80, n: 5 });
+  assert.strictEqual(r.body.results.length, 1, '예측은 원내 전체로 계산해도 결과는 내 것만');
+
+  /* 내 결과가 여러 건이면 최신 시험이 위 */
+  store.putResult('st-1', '2026-05-01', { code: 'st-1', examDate: '2026-05-01', score: 55, packIds: [], snapshot: null, at: 'x' });
+  store.putResult('st-1', '2026-12-10', { code: 'st-1', examDate: '2026-12-10', score: 95, packIds: [], snapshot: null, at: 'x' });
+  r = await call(store, { path: '/api/naesin/result' });
+  assert.deepStrictEqual(r.body.results.map((x) => x.examDate), ['2026-12-10', '2026-10-05', '2026-05-01']);
+
+  /* 요약이 없는 학생에게는 예측이 없다 — 넣을 도달률이 없다 */
+  const s2 = await call(store, { path: '/api/naesin/result', who: { code: 'st-2', admin: false } });
+  assert.strictEqual(s2.body.prediction, null);
+  assert.strictEqual(s2.body.results.length, 1);
+  assert.strictEqual(s2.body.results[0].code, 'st-2');
+});
+
+await t('[R2] 결과 라우트 권한 — 미인증 401, 학생은 관리 라우트 403, 관리자는 학생 /result 로 남의 것을 못 본다', async () => {
+  const store = memStore();
+  store.putResult('st-1', '2026-10-05', { code: 'st-1', examDate: '2026-10-05', score: 80, packIds: [], snapshot: null, at: 'x' });
+  for (const [path, method] of [['/api/naesin/result', 'GET'], ['/api/naesin/admin/result', 'POST'],
+    ['/api/naesin/admin/result', 'DELETE'], ['/api/naesin/admin/results', 'GET']]) {
+    const un = await call(store, { path, method, who: null });
+    assert.strictEqual(un.status, 401, path + ' ' + method + ' — 인증 없이는 아무것도 나가지 않는다');
+    assert.strictEqual(un.body.results, undefined);
+  }
+  for (const [path, method] of [['/api/naesin/admin/result', 'POST'], ['/api/naesin/admin/result', 'DELETE'], ['/api/naesin/admin/results', 'GET']]) {
+    const r = await call(store, { path, method, getBody: async () => ({ code: 'st-1', examDate: '2026-10-05', score: 100 }) });
+    assert.strictEqual(r.status, 403, path + ' ' + method + ' — 학생에게 열리면 안 된다');
+  }
+  assert.strictEqual(store.getResult('st-1', '2026-10-05').score, 80, '학생 요청은 저장을 못 건드린다');
+  assert.strictEqual((await call(store, { path: '/api/naesin/result', who: ADMIN })).status, 404, '학생 라우트는 학생 토큰 전용');
+});
+
+await t('[R2] 퇴원(학생 삭제) 처리에 시험 결과 삭제가 들어 있다 — 워커·로컬 서버 양쪽', () => {
+  const src = (f) => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
+  const worker = src('./worker.mjs'), server = src('./server.mjs');
+  /* 퇴원 처리 블록만 잘라 본다 — 다른 곳에 있는 삭제로 통과하지 않게 */
+  const wDel = worker.split("p === '/api/admin/students' && req.method === 'DELETE'")[1] || '';
+  const sDel = server.split("p === '/api/admin/students' && req.method === 'DELETE'")[1] || '';
+  assert.ok(wDel.includes("naesin:state:' + c") && wDel.includes("naesin:exam:' + c"), '워커 퇴원 처리가 바뀌었다 — 이 검사를 다시 맞춰야 한다');
+  assert.ok(/naesin:result:' \+ c \+ ':'/.test(wDel.slice(0, 2000)),
+    '워커 퇴원 처리에 내신 시험 결과 삭제가 없다 — 같은 코드의 새 학생에게 앞 학생 점수가 따라온다');
+  assert.ok(sDel.includes('naesinRoot().states') && sDel.includes('naesinRoot().exams'), '로컬 서버 퇴원 처리가 바뀌었다');
+  assert.ok(sDel.slice(0, 2000).includes('drop(naesinRoot().results, c)'),
+    '로컬 서버 퇴원 처리에 내신 시험 결과 삭제가 없다 — 워커와 한쪽만 고치면 운영에서만 다르게 돈다');
+  /* 저장소 어댑터 계약(getResult/putResult/deleteResult/listResults)이 양쪽에 다 있어야 한다 */
+  for (const [name, txt] of [['worker.mjs', worker], ['server.mjs', server]]) {
+    for (const fn of ['getResult', 'putResult', 'deleteResult', 'listResults'])
+      assert.ok(txt.includes(fn + ':'), name + ' 의 내신 저장소 어댑터에 ' + fn + ' 이 없다');
+  }
 });
 
 await t('모르는 경로는 404', async () => {

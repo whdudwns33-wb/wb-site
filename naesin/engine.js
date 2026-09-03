@@ -397,7 +397,7 @@ var WBNAESIN = (function () {
     if (rangeLabel) parts.push(rangeLabel);
     if (ctx.mode === 'exam') {
       if (flags.lateDeadline) parts.push('단어 마감 경과 — 회복 편성');
-      if (flags.overCap) parts.push('신규 상한 초과 — 마감까지 다 못 나감');
+      if (flags.overCap) parts.push('신규 상한 초과 — 마감까지 빠듯');
       if (flags.locked) parts.push('단어 게이트 잠김(5·6단계 보류)');
       if (flags.parallel) parts.push('병행 모드 — 미완성 단어 선차감');
     }

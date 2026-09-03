@@ -456,7 +456,10 @@ export async function handleNaesin(ctx) {
     if (!(await store.getStudent(code))) return j(404, { error: '등록되지 않은 학생 코드예요.' });
     const examDate = String(b.examDate || '').trim();
     if (!isValidDate(examDate)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
-    const score = Number(b.score);
+    /* 관리 웹의 입력칸은 문자열로 온다('88') — 숫자로 받되, 빈 칸·null·불린이 0점으로
+       조용히 저장되는 길은 막는다(NaN → 400). wordDeadlineDays 와 같은 결. */
+    const numField = (v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN);
+    const score = numField(b.score);
     if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) return j(400, { error: 'score는 0~' + SCORE_MAX + ' 정수' });
     const rec = { code, examDate, score };
     /* 틀린 유형 4칸 — 비운 칸은 0. 화이트리스트 밖 키는 버린다. */
@@ -466,7 +469,7 @@ export async function handleNaesin(ctx) {
       for (const k of WRONG_TYPE_KEYS) {
         const v = b.wrongTypes[k];
         if (v == null || v === '') { wt[k] = 0; continue; }
-        const n = Number(v);
+        const n = numField(v);
         if (!Number.isInteger(n) || n < 0 || n > WRONG_MAX) return j(400, { error: 'wrongTypes.' + k + '는 0~' + WRONG_MAX + ' 정수' });
         wt[k] = n;
       }
