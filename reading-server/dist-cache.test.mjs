@@ -120,16 +120,23 @@ t('배포본 _headers — /naesin/*·/vocab/*·/admin/* 은 no-store, 전 경로
 /* 관리 화면은 서비스 워커가 없다 — 빌드가 dist/admin/ 으로 복사하지 않으면 그 화면만
    운영에서 404 다. 로컬 서버는 public/ 을 직접 서빙해 티가 안 나므로 여기서 지킨다. */
 t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면만 운영에서 404', () => {
-  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html'];
+  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html', 'naesin-live.html'];
   for (const f of want) {
     const fp = path.join(DIST, 'admin', f);
     assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');
     assert.ok(fs.statSync(fp).size > 2000, 'dist/admin/' + f + ' 가 비었다');
   }
-  /* 제작 화면은 원천·초안을 다루므로 색인·추적을 막는 메타가 반드시 있어야 한다 */
-  const studio = fs.readFileSync(path.join(DIST, 'admin', 'naesin-studio.html'), 'utf8');
-  assert.ok(/noindex/.test(studio), '제작 화면에 noindex 가 없다');
-  assert.ok(/no-referrer/.test(studio), '제작 화면에 referrer 정책이 없다');
+  /* 제작·수업 화면은 원천과 학생 실시간 상태를 다루므로 색인·추적을 막는 메타가 반드시 있어야 한다 */
+  for (const f of ['naesin-studio.html', 'naesin-live.html']) {
+    const txt = fs.readFileSync(path.join(DIST, 'admin', f), 'utf8');
+    assert.ok(/noindex/.test(txt), f + ' 에 noindex 가 없다');
+    assert.ok(/no-referrer/.test(txt), f + ' 에 referrer 정책이 없다');
+  }
+  /* 수업 화면은 학생 앱과 같은 문항 생성기를 불러 쓴다 — 그 경로가 배포본에 있어야 한다 */
+  const live = fs.readFileSync(path.join(DIST, 'admin', 'naesin-live.html'), 'utf8');
+  const genSrc = (live.match(/src="([^"]*gen\.js)"/) || [])[1];
+  assert.ok(genSrc, '수업 화면이 gen.js 를 불러오지 않는다 — 투사 문제를 만들 수 없다');
+  assert.ok(fs.existsSync(path.join(DIST, genSrc.replace(/^\//, ''))), '배포본에 ' + genSrc + ' 이 없다');
 });
 
 console.log(`\nOK — ${passed}개 통과. 배포하면 학생 화면도 함께 바뀝니다.`);

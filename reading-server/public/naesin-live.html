@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 내신브레인 · 수업</title>
+  <style>
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}
+    header b{font-size:17px}header small{opacity:.75}
+    header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1320px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}
+    h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}
+    input,select{font:inherit;min-height:42px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
+    .btn.sm{min-height:32px;padding:3px 10px;font-size:12.5px}
+    .btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
+    .btn.go{background:var(--ok)}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2f4;color:var(--muted)}
+    .tbl{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+    th{position:sticky;top:0;background:#f0f5f7;color:var(--navy);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+    tbody tr:nth-child(even) td{background:#f8fcfe}
+    tr.hot td{background:#fff6f5}
+    tr.gone td{color:var(--muted);background:#f6f8f9}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    .issues{margin:8px 0 0;padding:10px 12px;border-radius:10px;font-size:13px}
+    .issues.bad{background:#fff0ef}.issues.warn{background:#fff4e6}.issues.ok{background:#e7f6f0}
+    .banner{display:flex;gap:10px;align-items:center;max-width:1320px;margin:12px auto -6px;padding:10px 14px;border-radius:12px;background:#fff0ef;color:var(--bad);font-weight:800;font-size:13.5px}
+    .banner[hidden]{display:none}
+    .banner .sp{flex:1}
+    label.fld{display:block;font-size:12px;font-weight:800;color:var(--muted)}
+
+    /* ── 타임박스 ──
+       남은 시간은 강사가 교실 반대편에서도 읽어야 한다 — 숫자를 크게. */
+    .clock{font-size:44px;font-weight:900;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.1}
+    .clock.low{color:var(--bad)}
+    .clock.none{font-size:20px;color:var(--muted)}
+    .phaserow{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    .phaserow>div{min-width:0}
+    /* 응답 분포 막대 — 누가 무엇을 골랐는지 한눈에. 정답 막대만 초록. */
+    .dist{margin-top:6px}
+    .dbar{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px}
+    .dbar b{min-width:22px}
+    .dbar i{display:block;height:16px;border-radius:5px;background:var(--blue);min-width:2px}
+    .dbar i.ans{background:var(--ok)}
+    .dbar .w{flex:1;background:#eef2f4;border-radius:5px;overflow:hidden}
+    .dbar span{min-width:44px;text-align:right;color:var(--muted);font-weight:800}
+    /* 투사 화면(TV) — 별도 창으로 열린다. 교실 뒤에서 읽히는 크기가 기준이다. */
+    .proj{padding:18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .proj .no{font-size:15px;font-weight:900;color:var(--blue)}
+    .proj .q{margin:8px 0 14px;font-size:30px;font-weight:900;color:var(--navy);word-break:break-word}
+    .proj .ch{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .proj .ch div{padding:12px 14px;border:2px solid var(--line);border-radius:12px;font-size:22px;font-weight:800;background:#fbfdfe}
+    .proj .ch div.ans{border-color:var(--ok);background:#e7f6f0;color:var(--ok)}
+    .grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+    @media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header><b>WB 내신브레인 · 수업</b><small>반 현황 · 타임박스 · 투사 모드</small><span class="sp"></span>
+  <span class="tag" id="pollTag" hidden>5초마다 갱신</span>
+  <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">운영 관리</button>
+  <button class="hbtn" onclick="location.href='/admin/naesin-studio.html'">팩 제작</button>
+  <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
+</header>
+<div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerClose">닫기</button></div>
+<main id="app"></main>
+<!-- 문항 생성은 학생 앱과 같은 모듈을 쓴다 — 규칙을 복제하면 학생이 푸는 문제와 TV에 띄우는 문제가 갈라진다 -->
+<script src="/naesin/gen.js"></script>
+<script>
+'use strict';
+/* WB 내신브레인 수업 화면 — 강사 노트북용 (기획서 §15-3).
+   운영 화면(집계)·제작 화면(콘텐츠)과 역할을 나눈다. 여기는 지금 이 시간의 교실이다.
+
+   설계에서 지키는 것:
+    - 새 실시간 인프라를 만들지 않는다. 학생 상태는 이미 주기적으로 서버에 올라가므로
+      5초 폴링으로 족하다(WebSocket 을 워커에 띄우는 비용이 5초 지연보다 크다).
+    - 강사가 학생 태블릿을 원격 조작하지 않는다. 「지금 이 단계」 신호만 서버에 두고
+      학생 앱이 읽어 스스로 따라간다 — 오작동이 학습을 망치는 구조를 만들지 않는다.
+    - TV에는 문제만, 답은 학생 태블릿에서. 그래서 학생 응답(GET /live)에는 정답이 없다.
+    - 화면에 그리는 값은 학생 기기가 올린 것이다 — 전부 esc() 로 감싼다. */
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null;};
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+
+const POLL_MS=5000;            /* 수업 운영에 5초 지연은 영향이 없다 */
+const IDLE_WARN=180;           /* 3분 이상 멈춤 = 가 봐야 할 학생 (서버 IDLE_WARN_SEC 과 같은 값) */
+const PHASES=[['words','단어'],['passage','본문'],['quiz','문제'],['mock','실전 모의'],['free','자유']];
+const WHERE_KO={home:'홈',words:'단어',passage:'본문',quiz:'문제',progress:'성취도',runner:'문제 풀는 중'};
+const PROJ_KINDS=[['w-e2k','단어 → 뜻'],['w-k2e','뜻 → 단어']];
+const PROJ_N_DEFAULT=10;
+
+let LIVE=null,VOTES=[],BOARD=null,WEAK=[],PACKS=[];
+let TICK=null,POLL=null,PROJWIN=null,BUSY=false;
+let genPack=null;              /* 투사 문제를 만들 팩 — 고른 뒤에만 받아 둔다(팩은 구매 자료다) */
+
+async function api(path,opt){
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){const err=new Error('네트워크 오류 — 연결을 확인하세요.');err.network=true;throw err;}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');stopPoll();renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;err.body=j;throw err;}
+  return j;
+}
+const isAuth=e=>!!e&&e.message==='auth';
+function showBanner(m){$('#bannerMsg').textContent=m;$('#banner').hidden=false;}
+function hideBanner(){$('#banner').hidden=true;}
+function fail(e){if(isAuth(e))return;showBanner(e.message||String(e));}
+const mmss=s=>{const n=Math.max(0,num(s)||0);return Math.floor(n/60)+':'+String(n%60).padStart(2,'0');};
+function fmtIdle(s){const n=num(s);if(n==null)return '—';if(n<60)return n+'초';if(n<3600)return Math.floor(n/60)+'분 '+(n%60)+'초';return Math.floor(n/3600)+'시간';}
+
+function renderLogin(msg){
+  $('#btnLogout').hidden=true;$('#pollTag').hidden=true;hideBanner();
+  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">관리 PIN을 입력하세요. (운영 관리와 같은 PIN)</p>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
+    <button class="btn" id="doLogin">로그인</button></div>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
+  $('#doLogin').onclick=async()=>{
+    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);start();}
+    catch(e){if(!isAuth(e))renderLogin(e.message);}
+  };
+  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+}
+
+/* ── 폴링 ──
+   화면 전체를 다시 그리면 강사가 입력 중인 분(分) 값이 날아간다 — 표와 시계만 갈아 끼운다. */
+async function poll(){
+  try{
+    const j=await api('/naesin/admin/live');
+    LIVE=j.live;VOTES=j.votes||[];BOARD=j.board||[];WEAK=j.weakest||[];
+    hideBanner();
+    paintPhase();paintBoard();paintVotes();paintProjWin();
+  }catch(e){
+    if(isAuth(e))return;
+    BOARD=null;
+    /* 폴링 실패는 배너로만 알린다 — 화면을 비우면 수업이 끊긴다 */
+    showBanner('현황을 갱신하지 못했어요 — '+(e.message||''));
+    paintBoard();
+  }
+}
+function startPoll(){stopPoll();POLL=setInterval(poll,POLL_MS);TICK=setInterval(paintClock,1000);}
+function stopPoll(){if(POLL)clearInterval(POLL);if(TICK)clearInterval(TICK);POLL=null;TICK=null;}
+
+async function start(){
+  $('#btnLogout').hidden=false;$('#pollTag').hidden=false;
+  renderShell();
+  try{PACKS=((await api('/naesin/admin/packs')).packs||[]).map(String);}catch(e){if(isAuth(e))return;PACKS=[];}
+  paintPackPick();
+  await poll();
+  startPoll();
+}
+
+function renderShell(){
+  $('#app').innerHTML=`
+  <div class="card"><h2>수업 타임박스 <small>지금 이 단계</small></h2>
+    <p class="muted">단계를 세우면 학생 태블릿 상단에 띠가 뜹니다. <b>화면을 대신 넘기지는 않습니다</b> —
+      학생이 「시작」을 눌러야 이동합니다(잘못 눌린 단계가 학습을 망치지 않게).</p>
+    <div class="phaserow" style="margin-top:8px">
+      <div><div class="muted">남은 시간</div><div id="clock" class="clock none">—</div></div>
+      <div id="phaseNow" style="flex:1"></div>
+    </div>
+    <div class="filters" style="margin-top:10px">
+      ${PHASES.map(([k,ko])=>`<button class="btn sm ghost" data-ph="${k}">${esc(ko)}</button>`).join('')}
+      <label class="fld" style="margin-left:6px">분<input id="phMin" type="number" min="1" max="180" value="10" style="width:80px"></label>
+      <button class="btn sm" id="btnExt">연장 5분</button>
+      <button class="btn sm danger" id="btnEnd">단계 종료</button>
+    </div>
+    <div id="phOut"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>반 현황 <small id="boardWho"></small></h2>
+      <p class="muted">정체 오래된 학생이 위로 옵니다 — 먼저 가 봐야 할 학생입니다.
+        3분 넘게 멈춘 학생은 붉게, 앱을 닫은 학생은 회색입니다.</p>
+      <div id="boardArea"></div>
+    </div>
+
+    <div class="card"><h2>투사 모드 <small>TV엔 문제, 답은 태블릿</small></h2>
+      <p class="muted">즉석 쪽지시험입니다. 문제는 학생 앱과 같은 생성기로 만들고,
+        <b>정답은 학생 기기로 내려가지 않습니다</b>(공개를 누를 때 함께 봅니다).</p>
+      <div class="filters" style="margin-top:8px">
+        <select id="pjPack"></select>
+        <select id="pjKind">${PROJ_KINDS.map(([k,ko])=>`<option value="${k}">${esc(ko)}</option>`).join('')}</select>
+        <label class="fld">문항<input id="pjN" type="number" min="2" max="20" value="${PROJ_N_DEFAULT}" style="width:74px"></label>
+        <button class="btn" id="btnProj">띄우기</button>
+      </div>
+      <div id="pjOut"></div>
+      <div id="pjPanel"></div>
+    </div>
+  </div>`;
+  document.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>setPhase(b.dataset.ph));
+  $('#btnExt').onclick=extend;
+  $('#btnEnd').onclick=()=>setPhase(null);
+  $('#btnProj').onclick=startProj;
+  paintPhase();paintBoard();paintVotes();
+}
+function paintPackPick(){
+  const el=$('#pjPack');if(!el)return;
+  el.innerHTML=PACKS.length?PACKS.map(id=>`<option value="${esc(id)}">${esc(id)}</option>`).join('')
+    :'<option value="">올린 팩이 없어요</option>';
+}
+
+/* ── 타임박스 ── */
+function paintPhase(){
+  const el=$('#phaseNow');if(!el)return;
+  const ph=LIVE&&LIVE.phase;
+  el.innerHTML=ph
+    ? `<div><span class="tag">${esc((PHASES.find(p=>p[0]===ph.key)||[,ph.key])[1])}</span>
+        <b style="margin-left:6px;font-size:16px">${esc(ph.label||'')}</b></div>
+       <div class="muted">시작 ${esc(String(ph.startedAt||'').slice(11,16))}${ph.endsAt?(' · 종료 예정 '+esc(String(ph.endsAt).slice(11,16))):' · 시간 제한 없음'}</div>`
+    : '<span class="muted">지금 세운 단계가 없어요. 아래에서 고르면 학생 태블릿에 띠가 뜹니다.</span>';
+  paintClock();
+}
+/* 남은 시간은 1초마다 화면에서 센다 — 폴링(5초)에 맞추면 시계가 5초씩 뛴다 */
+function paintClock(){
+  const el=$('#clock');if(!el)return;
+  const ph=LIVE&&LIVE.phase;
+  if(!ph||!ph.endsAt){el.className='clock none';el.textContent=ph?'제한 없음':'—';return;}
+  const s=Math.max(0,Math.round((Date.parse(ph.endsAt)-Date.now())/1000));
+  el.className='clock'+(s<=60?' low':'');
+  el.textContent=s?mmss(s):'끝';
+}
+async function setPhase(key){
+  if(BUSY)return;BUSY=true;
+  const mins=Number($('#phMin').value);
+  const body=key===null?{phase:null}
+    :{phase:{key,label:(PHASES.find(p=>p[0]===key)||[,key])[1]+(mins>0?(' '+mins+'분'):''),minutes:mins>0?mins:null}};
+  try{
+    const j=await api('/naesin/admin/live/phase',{method:'POST',body:JSON.stringify(body)});
+    LIVE=j.live;hideBanner();$('#phOut').innerHTML='';paintPhase();
+  }catch(e){if(!isAuth(e))$('#phOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+  BUSY=false;
+}
+async function extend(){
+  const ph=LIVE&&LIVE.phase;
+  if(!ph){$('#phOut').innerHTML='<p class="err">세운 단계가 없어요.</p>';return;}
+  /* 남은 시간에 5분을 더한다 — 이미 끝난 단계는 지금부터 5분 */
+  const left=ph.endsAt?Math.max(0,(Date.parse(ph.endsAt)-Date.now())/60000):0;
+  try{
+    const j=await api('/naesin/admin/live/phase',{method:'POST',
+      body:JSON.stringify({phase:{key:ph.key,label:ph.label,startedAt:ph.startedAt,minutes:Math.round(left+5)}})});
+    LIVE=j.live;paintPhase();
+  }catch(e){fail(e);}
+}
+
+/* ── 반 현황 ── */
+function paintBoard(){
+  const el=$('#boardArea');if(!el)return;
+  if(BOARD===null){el.innerHTML='<p class="err">현황을 불러오지 못했어요 — 자동으로 다시 시도합니다.</p>';return;}
+  const on=BOARD.filter(r=>!r.stale).length;
+  const who=$('#boardWho');if(who)who.textContent='접속 '+on+'명 / '+BOARD.length+'명';
+  if(!BOARD.length){el.innerHTML='<p class="muted">연동된 학생이 없어요.</p>';return;}
+  const weak=new Set(WEAK);
+  el.innerHTML=`<div class="tbl"><table><thead><tr>
+    <th>학생</th><th>지금</th><th>정체</th><th>오늘</th><th>백지</th><th>마지막</th></tr></thead><tbody>
+    ${BOARD.map(r=>{
+      const hot=!r.stale&&r.idleSec!=null&&r.idleSec>=IDLE_WARN;
+      const acc=r.blankAcc==null?'—':Math.round(r.blankAcc*100)+'%';
+      return `<tr class="${r.stale?'gone':hot?'hot':''}">
+        <td><b>${esc(r.name||r.code)}</b>${r.cls?' <span class="muted">'+esc(r.cls)+'</span>':''}
+          ${weak.has(r.code)?' <span class="tag warn">백지 하위</span>':''}</td>
+        <td style="white-space:normal">${r.stale?'<span class="tag muted">앱 닫음</span>'
+          :`<span class="tag">${esc(WHERE_KO[r.where]||r.where||'—')}</span>${r.label?' <span class="muted">'+esc(r.label)+'</span>':''}`}</td>
+        <td>${hot?'<span class="tag bad">'+esc(fmtIdle(r.idleSec))+'</span>':esc(fmtIdle(r.idleSec))}</td>
+        <td>${r.todayDone==null?'—':num(r.todayDone)+'세션'}</td>
+        <td>${esc(acc)}</td>
+        <td class="muted">${esc(fmtLastIso(r.lastActive))}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+function fmtLastIso(t){if(!t)return '—';const d=(Date.now()-new Date(t))/1000;if(!Number.isFinite(d))return '—';
+  if(d<60)return '방금';if(d<3600)return Math.round(d/60)+'분 전';return Math.round(d/3600)+'시간 전';}
+
+/* ── 투사 모드 ──
+   문제를 만드는 것은 학생 앱과 같은 gen.js 다. 서버에 생성 규칙을 복제하면 학생이 푸는
+   문제와 TV에 띄우는 문제가 조용히 갈라진다 — 팩 검사 규칙에서 이미 치른 비용이다. */
+async function startProj(){
+  const packId=$('#pjPack').value;
+  if(!packId){$('#pjOut').innerHTML='<p class="err">먼저 팩을 올리세요.</p>';return;}
+  const n=Math.max(2,Math.min(20,Number($('#pjN').value)||PROJ_N_DEFAULT));
+  const kind=$('#pjKind').value;
+  $('#pjOut').innerHTML='<p class="muted">문제를 만들고 있어요…</p>';
+  try{
+    if(!genPack||genPack.packId!==packId)genPack=(await api('/naesin/admin/pack?id='+encodeURIComponent(packId))).pack;
+    const items=makeItems(genPack,kind,n);
+    if(!items.length){$('#pjOut').innerHTML='<p class="err">이 팩에서 그 유형의 문제를 만들 수 없어요 (단어가 4개 이상이어야 합니다).</p>';return;}
+    const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({items})});
+    LIVE=j.live;VOTES=[];$('#pjOut').innerHTML='<div class="issues ok">'+esc(items.length)+'문항을 띄웠어요. 학생 태블릿이 응답 화면으로 바뀝니다.</div>';
+    paintVotes();openProjWin();
+  }catch(e){if(!isAuth(e))$('#pjOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+}
+function makeItems(pack,kind,n){
+  const words=(pack&&Array.isArray(pack.words))?pack.words:[];
+  if(words.length<4||typeof WBGEN==='undefined')return [];
+  const pool=words;
+  const pick=WBGEN.shuffle(words.slice(),Math.random).slice(0,n);
+  const out=[];
+  pick.forEach(w=>{
+    const q=kind==='w-k2e'?WBGEN.vocabMcqReverse(w,pool,Math.random):WBGEN.vocabMcq(w,pool,Math.random);
+    if(!q||!q.prompt||!Array.isArray(q.choices))return;
+    /* 서버 계약(계약 L1)의 모양으로 — ref 는 무엇을 물었는지 남긴다(오답노트로 이어진다) */
+    out.push({ref:kind+':'+String(w.id||q.prompt),prompt:q.prompt,
+      choices:q.choices.map(c=>({key:String(c.key),text:String(c.text)})),answerKey:String(q.answerKey)});
+  });
+  return out;
+}
+function paintVotes(){
+  const el=$('#pjPanel');if(!el)return;
+  const pj=LIVE&&LIVE.projector;
+  if(!pj){el.innerHTML='<p class="muted">지금 띄운 문제가 없어요.</p>';return;}
+  const cur=pj.items[pj.index]||null;
+  const v=VOTES[pj.index]||null;
+  const on=BOARD?BOARD.filter(r=>!r.stale).length:0;
+  el.innerHTML=`<div class="filters" style="margin-top:10px">
+      <button class="btn sm ghost" id="pjPrev" ${pj.index<=0?'disabled':''}>← 앞</button>
+      <b>${num(pj.index+1)} / ${num(pj.items.length)}</b>
+      <button class="btn sm ghost" id="pjNext" ${pj.index>=pj.items.length-1?'disabled':''}>다음 →</button>
+      <button class="btn sm ${pj.revealed?'ghost':'go'}" id="pjRev">${pj.revealed?'정답 가리기':'정답 공개'}</button>
+      <button class="btn sm ghost" id="pjWin">TV 창 열기</button>
+      <button class="btn sm danger" id="pjStop">종료</button>
+    </div>
+    ${cur?`<div style="margin-top:8px"><div class="muted">${esc(cur.prompt)}</div>
+      <div class="dist">${cur.choices.map(c=>{
+        const cnt=(v&&v.counts&&num(v.counts[c.key]))||0;
+        const pctv=v&&v.answered?Math.round(cnt/v.answered*100):0;
+        const isAns=pj.revealed&&c.key===cur.answerKey;
+        return `<div class="dbar"><b>${esc(c.key)}</b><span style="min-width:0;flex:0 0 auto;color:var(--ink);font-weight:700">${esc(c.text)}</span>
+          <div class="w"><i class="${isAns?'ans':''}" style="width:${pctv}%"></i></div>
+          <span>${num(cnt)}명</span></div>`;
+      }).join('')}</div>
+      <p class="muted">응답 ${num(v?v.answered:0)}명 / 접속 ${num(on)}명${v&&v.answered?(' · 정답 '+num(v.correct)+'명'):''}</p>
+      ${v&&v.wrong&&v.wrong.length?`<p class="muted">틀린 학생: ${v.wrong.map(c=>esc(nameOf(c))).join(', ')}</p>`:''}
+      ${pj.revealed?`<p class="muted">정답 <b>${esc(cur.answerKey)}</b> — 학생 태블릿에도 지금 보입니다.</p>`:''}
+      </div>`:''}`;
+  $('#pjPrev').onclick=()=>moveProj(pj.index-1);
+  $('#pjNext').onclick=()=>moveProj(pj.index+1);
+  $('#pjRev').onclick=()=>revealProj(!pj.revealed);
+  $('#pjWin').onclick=openProjWin;
+  $('#pjStop').onclick=stopProj;
+}
+const nameOf=code=>{const r=(BOARD||[]).find(x=>x.code===code);return (r&&(r.name||r.code))||code;};
+async function moveProj(i){
+  /* 문제를 넘기면 공개는 내린다 — 앞 문제의 공개 상태가 새 문제에 붙으면 답을 보여 준 채 시작한다 */
+  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({index:i,revealed:false})});
+    LIVE=j.live;paintVotes();paintProjWin();}catch(e){fail(e);}
+}
+async function revealProj(on){
+  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({revealed:!!on})});
+    LIVE=j.live;paintVotes();paintProjWin();}catch(e){fail(e);}
+}
+async function stopProj(){
+  if(!confirm('투사를 종료합니다. 응답 분포는 사라집니다. 계속할까요?'))return;
+  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({items:null})});
+    LIVE=j.live;VOTES=[];paintVotes();closeProjWin();}catch(e){fail(e);}
+}
+
+/* ── TV 창 ──
+   강사 노트북은 조작 화면, TV는 문제 화면이다. 별도 창을 열어 그쪽만 크게 그린다.
+   창 안에서 폴링하지 않고 이 화면이 밀어 넣는다 — 창이 따로 인증을 들고 있지 않아도 된다. */
+function openProjWin(){
+  if(!PROJWIN||PROJWIN.closed){
+    PROJWIN=window.open('','wbProj','width=1280,height=760');
+    if(!PROJWIN){showBanner('팝업이 막혀 TV 창을 열지 못했어요 — 브라우저에서 팝업을 허용하세요.');return;}
+    PROJWIN.document.title='WB 내신브레인 · 투사';
+  }
+  paintProjWin();
+}
+function closeProjWin(){if(PROJWIN&&!PROJWIN.closed)PROJWIN.close();PROJWIN=null;}
+function paintProjWin(){
+  if(!PROJWIN||PROJWIN.closed)return;
+  const pj=LIVE&&LIVE.projector;
+  const cur=pj?(pj.items[pj.index]||null):null;
+  const css=`body{margin:0;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;background:#f3f7f8;color:#20384c}
+    .wrap{padding:36px;max-width:1200px;margin:auto}
+    .no{font-size:22px;font-weight:900;color:#087ba6}
+    .q{margin:14px 0 28px;font-size:56px;font-weight:900;color:#173957;word-break:break-word;line-height:1.25}
+    .ch{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+    .ch div{padding:20px 24px;border:3px solid #d9e5e9;border-radius:16px;background:#fff;font-size:38px;font-weight:800}
+    .ch div.ans{border-color:#14755e;background:#e7f6f0;color:#14755e}
+    .idle{padding:60px;text-align:center;font-size:32px;font-weight:800;color:#647784}`;
+  PROJWIN.document.body.innerHTML=`<style>${css}</style>`+(cur
+    ? `<div class="wrap"><div class="no">${num(pj.index+1)} / ${num(pj.items.length)}</div>
+        <div class="q">${esc(cur.prompt)}</div>
+        <div class="ch">${cur.choices.map(c=>`<div class="${pj.revealed&&c.key===cur.answerKey?'ans':''}">${esc(c.key)}. ${esc(c.text)}</div>`).join('')}</div></div>`
+    : '<div class="idle">문제가 없습니다</div>');
+}
+
+/* 탭을 덮어 두면 폴링을 멈춘다 — 수업이 끝난 뒤 노트북이 계속 서버를 두드릴 이유가 없다 */
+document.addEventListener('visibilitychange',()=>{
+  if(!TOKEN)return;
+  if(document.hidden)stopPoll();
+  else if(!POLL){poll();startPoll();}
+});
+window.addEventListener('beforeunload',()=>{stopPoll();});
+
+$('#bannerClose').onclick=hideBanner;
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');stopPoll();closeProjWin();renderLogin();};
+if(TOKEN)start();else renderLogin();
+</script>
+</body>
+</html>

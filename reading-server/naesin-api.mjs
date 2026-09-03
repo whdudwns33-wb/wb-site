@@ -10,6 +10,10 @@
    /api/* 응답에 붙인다(§10-3) — 여기서 따로 붙일 헤더가 없다. */
 
 import { resultStats, predictScore, reachOf } from './naesin-results.mjs';
+import {
+  normalizeLive, normalizePhase, normalizeProjector, publicLive, isLive,
+  boardRows, weakest, tally, putVote, PHASE_KEYS,
+} from './naesin-live.mjs';
 
 const STATE_MAX_BYTES = 262_144;    // 학생 학습 기록 1건 최대 크기 (256KB, UTF-8 바이트)
 const PACK_MAX_BYTES = 4_194_304;   // 팩 1건 최대 크기 (4MB) — 단어 77·문장 25·문항·해설이 다 들어간다
@@ -25,6 +29,8 @@ const SCORE_MAX = 100;
 const WRONG_MAX = 50;
 const RESULT_MEMO_MAX = 200;
 export const WRONG_TYPE_KEYS = ['word', 'grammar', 'passage', 'writing'];
+/* 수업 라이브 세션의 범위 — 지금은 반 공통 하나다(과제와 같은 결). 반별로 나눌 때 이 값만 넓힌다. */
+const LIVE_SCOPE = 'default';
 
 /* 호스트가 몸통을 파싱하기 전에 content-length 로 끊는 상한 — 저장 상한보다 조금 크다(JSON 래핑 여유).
    워커는 req.json()이 몸통을 다 읽고서야 크기를 아는데, 그 전에 끊어야 메모리도 시간도 안 쓴다. */
@@ -163,6 +169,7 @@ export function normalizeSummary(sum) {
   const t = isObj(sum.task) ? sum.task : null;
   const range = normalizeRange(sum.range);
   const passage = normalizePassage(sum.passage);
+  const live = normalizeLive(sum.live);
   return {
     packId: typeof sum.packId === 'string' && PACK_ID_RE.test(sum.packId) ? sum.packId : '',
     word: { total: int0(w.total), reached: int0(w.reached), stable: int0(w.stable), risky: int0(w.risky), needsSpellCheck: int0(w.needsSpellCheck) },
@@ -174,6 +181,9 @@ export function normalizeSummary(sum) {
        저장본에 빈 칸을 만들지 않는다. 없는 값과 0을 관리 화면이 가를 수 있어야 한다. */
     ...(range ? { range } : {}),
     ...(passage ? { passage } : {}),
+    /* live 는 「지금 무엇을 하고 있는지」(계약 L2) — 강사 라이브 보드의 원천.
+       옛 저장본에는 없으므로 있을 때만 넣는다(range·passage 와 같은 결). */
+    ...(live ? { live } : {}),
     /* taskAt 은 관리 웹이 과제의 updatedAt 과 문자열 그대로 비교한다 — 형식만 확인하고 값은 손대지 않는다 */
     task: t ? { date: dateStr(t.date), taskAt: isoStr(t.taskAt), title: strMax(t.title, SUMMARY_TITLE_MAX), correct: int0(t.correct), total: int0(t.total) } : null,
     updatedAt: isoStr(sum.updatedAt),
@@ -285,6 +295,8 @@ async function scopesUsingPack(store, id) {
        getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 학생코드
        getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
        getReports(packId), putReports(packId, list),   // 문항 신고 — 팩별 배열(최근 200건)
+       getLive(scope), putLive(scope, rec), deleteLive(scope),   // 수업 라이브 세션 (계약 L1)
+       getVotes(scope), putVotes(scope, rec),                    // 투사 문제 응답 {[ref]:{[code]:key}}
        getResult(code, examDate), putResult(code, examDate, rec), deleteResult(code, examDate),
        listResults(),                   // → [{code, examDate, ...rec}] — 원내 전체(성과 분석·예측의 표본)
        getStudent(code),                // 호스트 학생 명부 (읽기만)
@@ -402,6 +414,37 @@ export async function handleNaesin(ctx) {
     return j(200, { ok: true });
   }
 
+  /* ── 수업 라이브 세션 (계약 L1 · 기획서 §15-3) ──
+     강사가 수업 중 보는 화면과 학생 태블릿을 같은 신호로 묶는다. 새 실시간 인프라 없이
+     5초 폴링으로 굴린다 — 수업 운영에 5초 지연은 영향이 없고, 워커에서 WebSocket 을
+     띄우는 비용·복잡도가 그 값보다 크다.
+
+     scope 는 지금 'default' 하나다(과제와 같은 결). 반별로 나눌 때 이 값만 넓히면 된다. */
+  if (p === '/api/naesin/live' && method === 'GET' && !who.admin) {
+    const rec = await store.getLive(LIVE_SCOPE);
+    /* publicLive 가 answerKey 를 지운다 — 이 기능의 유일한 보안 지점이다.
+       TV에 문제를 띄우고 답만 태블릿에서 받는 구조라 정답이 내려가면 의미가 없어진다. */
+    return j(200, { live: publicLive(rec, ctx.now), scope: LIVE_SCOPE });
+  }
+
+  /* 투사 문제 응답 — 정답 여부를 돌려주지 않는다(강사가 공개할 때 다 같이 본다) */
+  if (p === '/api/naesin/live/answer' && method === 'POST' && !who.admin) {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const rec = await store.getLive(LIVE_SCOPE);
+    if (!isLive(rec, ctx.now) || !rec.projector) return j(409, { error: '지금 진행 중인 투사 문제가 없어요.' });
+    const ref = String(b.ref || '').trim().slice(0, 80);
+    const key = String(b.key || '').trim().slice(0, 8);
+    const item = (rec.projector.items || []).find((it) => it.ref === ref);
+    if (!item) return j(400, { error: '그 문제를 찾을 수 없어요.' });
+    if (!item.choices.some((c) => c.key === key)) return j(400, { error: '보기에 없는 답이에요.' });
+    /* 지금 띄운 문제만 받는다 — 뒤 문제를 미리 찍어 두는 것을 막는다(응답에도 안 내려간다) */
+    if (rec.projector.items[rec.projector.index] !== item) return j(409, { error: '지금 화면의 문제가 아니에요.' });
+    const votes = putVote(await store.getVotes(LIVE_SCOPE), ref, who.code, key);
+    await store.putVotes(LIVE_SCOPE, votes);
+    return j(200, { ok: true });
+  }
+
   /* ── 관리자 (원장·강사 — 관리 PIN 토큰) ── */
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
 
@@ -499,6 +542,18 @@ export async function handleNaesin(ctx) {
     if (!ids.includes(id)) { ids.push(id); await store.putPackIds(ids); }
     return j(200, { ok: true, id, updatedAt: rec.updatedAt });
   }
+  /* 팩 단건 — 강사 화면이 즉석 문제를 만들 때 쓴다(투사 모드). 문제 생성은 학생 앱과 같은
+     gen.js 로 화면에서 한다: 규칙을 서버에 복제하면 학생이 푸는 문제와 TV에 띄우는 문제가
+     조용히 갈라진다(pack-check.js 로 배운 것과 같은 이유다). 그러려면 화면이 팩을 읽어야 한다.
+     관리 PIN 뒤이고 자기가 올린 팩이라 학생 서빙 제한(배정 범위)은 걸지 않는다. */
+  if (p === '/api/naesin/admin/pack' && method === 'GET') {
+    const id = String((ctx.query && ctx.query.get('id')) || '').trim();
+    if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id가 필요해요.' });
+    const rec = await store.getPack(id);
+    if (!rec) return j(404, { error: '없는 팩이에요.' });
+    return j(200, { pack: rec.pack, updatedAt: rec.updatedAt || null });
+  }
+
   if (p === '/api/naesin/admin/packs' && method === 'GET') {
     return j(200, { packs: (await store.getPackIds()) || [], time: nowIso() });
   }
@@ -648,6 +703,81 @@ export async function handleNaesin(ctx) {
       students.push(naesinSummary(code, stu, st));
     }
     return j(200, { students, time: nowIso() });
+  }
+
+  /* 강사 화면 한 번의 폴링으로 필요한 것을 다 준다 — 세션·응답 집계·반 현황 */
+  if (p === '/api/naesin/admin/live' && method === 'GET') {
+    const rec = await store.getLive(LIVE_SCOPE);
+    const alive = isLive(rec, ctx.now);
+    const students = [];
+    for (const code of await store.listStateCodes()) {
+      const [stu, st] = await Promise.all([store.getStudent(code), store.getState(code)]);
+      students.push(naesinSummary(code, stu, st));
+    }
+    const board = boardRows(students, ctx.now);
+    const votes = alive ? await store.getVotes(LIVE_SCOPE) : null;
+    return j(200, {
+      live: alive ? { phase: rec.phase || null, projector: rec.projector || null, updatedAt: rec.updatedAt } : null,
+      votes: alive && rec.projector ? tally(votes, rec.projector) : [],
+      board, weakest: weakest(board, 3), scope: LIVE_SCOPE, time: nowIso(),
+    });
+  }
+
+  /* 단계 설정·해제 (타임박스). phase:null 이면 단계만 지우고 투사는 남긴다 */
+  if (p === '/api/naesin/admin/live/phase' && method === 'POST') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const prev = (await store.getLive(LIVE_SCOPE)) || {};
+    const alive = isLive(prev, ctx.now);
+    let phase = null;
+    if (b.phase !== null && b.phase !== undefined) {
+      phase = normalizePhase(b.phase, ctx.now);
+      if (!phase) return j(400, { error: "단계는 " + PHASE_KEYS.join('·') + " 중 하나여야 해요." });
+    }
+    const rec = {
+      scope: LIVE_SCOPE, phase,
+      projector: alive ? (prev.projector || null) : null,
+      updatedAt: nowIso(),
+    };
+    await store.putLive(LIVE_SCOPE, rec);
+    return j(200, { ok: true, live: { phase: rec.phase, projector: rec.projector, updatedAt: rec.updatedAt } });
+  }
+
+  /* 투사 시작·이동·공개·종료. items 가 오면 새 세트(응답도 새로 시작한다) */
+  if (p === '/api/naesin/admin/live/projector' && method === 'POST') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const prev = (await store.getLive(LIVE_SCOPE)) || {};
+    const alive = isLive(prev, ctx.now);
+    let projector = null;
+    if (b.items === null) {
+      projector = null;                       /* 종료 */
+      await store.putVotes(LIVE_SCOPE, {});
+    } else if (Array.isArray(b.items)) {
+      projector = normalizeProjector(b, ctx.now);
+      if (!projector) return j(400, { error: '띄울 수 있는 문제가 없어요 (보기 2개 이상 + 정답이 보기 안).' });
+      await store.putVotes(LIVE_SCOPE, {});   /* 새 세트면 앞 응답을 남기지 않는다 */
+    } else {
+      /* 이동·공개 — 문제는 그대로 두고 index·revealed 만 바꾼다 */
+      const cur = alive ? prev.projector : null;
+      if (!cur) return j(409, { error: '진행 중인 투사가 없어요.' });
+      projector = normalizeProjector({
+        items: cur.items, startedAt: cur.startedAt,
+        index: b.index != null ? b.index : cur.index,
+        revealed: b.revealed != null ? !!b.revealed : cur.revealed,
+      }, ctx.now);
+    }
+    const rec = {
+      scope: LIVE_SCOPE, phase: alive ? (prev.phase || null) : null,
+      projector, updatedAt: nowIso(),
+    };
+    await store.putLive(LIVE_SCOPE, rec);
+    return j(200, { ok: true, live: { phase: rec.phase, projector: rec.projector, updatedAt: rec.updatedAt } });
+  }
+
+  if (p === '/api/naesin/admin/live' && method === 'DELETE') {
+    await store.deleteLive(LIVE_SCOPE);
+    return j(200, { ok: true });
   }
 
   return j(404, { error: 'unknown api' });
