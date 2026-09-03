@@ -225,6 +225,47 @@
     .typerow .tt { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
     .typerow .tt small { display: block; font-weight: 400; color: var(--soft); font-size: 11.5px; }
 
+    /* ── 본문 암기 재설계 — 뜻 세우기 · 영어 얹기 · 굳히기 ──
+       못 읽는 학생이 첫날 오를 수 있는 사다리를 위한 화면들. 한글 청크는 언제나 영어 자리와
+       짝지어 보인다(한글만 있는 화면을 만들지 않는다). */
+    .zonehd { padding: 7px 14px 3px; font-size: 10.5px; font-weight: 800; color: var(--ind);
+      letter-spacing: .02em; background: #FAFBFE; border-bottom: 1px solid #EFF2F5; }
+    .row.lk { opacity: .62; cursor: default; }
+    .row .why { display: block; font-size: 10.5px; color: var(--amber); font-weight: 700; white-space: normal; }
+    /* 단서 농도 표시 — "지금은 힌트 단계, 맞히면 힌트가 줄어요" */
+    .cuebar { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+      color: var(--soft); margin: 0 0 12px; flex-wrap: wrap; }
+    .cuebar b { color: var(--amber); }
+    .cuebar .dots { display: inline-flex; gap: 3px; }
+    .cuebar .dots i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #E1E6EC; }
+    .cuebar .dots i.on { background: var(--amber); }
+    /* 청크 짝 맞추기 — 왼쪽 영어, 오른쪽 한글. 탭 → 탭으로 잇는다(끌기 없음: 태블릿에서 안정적) */
+    .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 0; }
+    .pairs .col { display: flex; flex-direction: column; gap: 8px; }
+    .pairs .cl { font-size: 10.5px; font-weight: 800; color: var(--soft); }
+    .pairs button { text-align: left; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 9px; padding: 10px 12px; min-height: 44px; font-size: 14px; font-weight: 600; }
+    .pairs button.sel { border-color: var(--ind); background: var(--ind-soft); }
+    .pairs button.done { border-color: var(--green); background: var(--green-soft); color: var(--green); }
+    .pairs button.bad { border-color: var(--red); background: var(--red-soft); }
+    .pairs button:disabled { cursor: default; }
+    .enline { font-size: 15.5px; font-weight: 700; line-height: 1.7; margin: 0 0 4px; }
+    .showans { background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 9px;
+      padding: 9px 12px; margin: 0 0 12px; font-size: 14.5px; font-weight: 600; }
+    .showans small { display: block; font-weight: 700; font-size: 11px; color: var(--amber); }
+    .ckstep { display: flex; gap: 6px; margin-left: auto; }
+    .ckstep em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--soft);
+      background: #E9EDF2; border-radius: 6px; padding: 3px 8px; }
+    .ckstep em.on { background: var(--ind); color: #fff; }
+    .ckstep em.dn { background: var(--green); color: #fff; }
+    .misstop { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+    .misstop:last-child { border-bottom: none; }
+    .misstop .mn { font-family: var(--mono); font-weight: 800; color: var(--red); flex: none; min-width: 46px; }
+    .pgbars { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .pgbars > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .pgbars .n { font-family: var(--mono); font-size: 22px; font-weight: 700; letter-spacing: -.03em; }
+    .pgbars .l { font-size: 11.5px; color: var(--soft); font-weight: 700; }
+
     /* ── 반응형: 세로 패드·폰 — 목록이 위로 접힌다 ── */
     @media (max-width: 880px) {
       .wrap { flex-direction: column; }
@@ -284,6 +325,9 @@
   var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
   var authed = false, examServer = null, packList = [];
   var selSeq = null, selWordId = null, selType = null, selDlg = null;
+  /* 본문 탭에서 문장이 아닌 항목을 고른 상태 — {kind:'chunk'|'para'|'cum'|'check', day, i}.
+     null 이면 selSeq(문장)가 지면의 주인이다. */
+  var selPass = null;
   var wordFilter = 'all';      // 단어 목록 필터 — 'unfinished' 는 회고 칩에서 들어온 미완성만 보기
   var taskServer = null, resultServer = null;
   var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
@@ -314,7 +358,9 @@
     save();
     scheduleSync();
   }
-  function blankPd() { return { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 }; }
+  /* cumulative·check·senMiss 는 본문 암기의 팩 저장소 기록(§3.5) — 상태(states)가 아니라
+     "이 교재에서 무엇을 어디까지 밟았는가"의 기록이다. */
+  function blankPd() { return { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, cumulative: {}, check: null, senMiss: {}, savedAt: 0 }; }
   var orphanPd = null;
   function curPackId() { return pack ? pack.packId : null; }
   /* 과별 학습 기록. 인자를 생략하면 '지금 보는 과' — 통합 범위 세션은 문항의 packId 로 부른다. */
@@ -331,6 +377,9 @@
     if (!pd.taskLog || typeof pd.taskLog !== 'object') pd.taskLog = {};
     if (!Array.isArray(pd.log)) pd.log = [];
     if (pd.exam === undefined) pd.exam = null;
+    if (!pd.cumulative || typeof pd.cumulative !== 'object') pd.cumulative = {};
+    if (pd.check !== null && (!pd.check || typeof pd.check !== 'object')) pd.check = null;
+    if (!pd.senMiss || typeof pd.senMiss !== 'object') pd.senMiss = {};
     return pd;
   }
   /* 오답 항목엔 엔진 상태 객체를 넣지 않는다(크기·혼동) — 옛 항목의 state는 날짜 배열만 남기고 걷어낸다 */
@@ -432,6 +481,7 @@
       sentence: { total: n0(s.total), interpreted: n0(s.interpreted), memorized: n0(s.memorized),
         byStage: { 1: n0(bs[1]), 2: n0(bs[2]), 3: n0(bs[3]), 4: n0(bs[4]), 5: n0(bs[5]), 6: n0(bs[6]) } },
       task: task,
+      passage: passageSummaryOf(curPackId()) || undefined,
       range: rangeSummaryNow(),
       updatedAt: new Date().toISOString()
     };
@@ -443,7 +493,11 @@
   function rangeSummaryNow() {
     if (!WBNAESIN.rangeSummary || !pack) return undefined;
     var r = WBNAESIN.rangeSummary(rangeEntries());
-    return (r && r.packIds && r.packIds.length) ? r : undefined;
+    if (!(r && r.packIds && r.packIds.length)) return undefined;
+    /* 본문 진행(§3.6)은 범위 합계로도 낸다 — 시험 범위가 재는 단위가 과 하나가 아니다.
+       엔진판이 이미 넣어 줬으면 그것을 정본으로 둔다. */
+    if (!r.passage) r.passage = passageSummaryRange();
+    return r;
   }
   function pushState() {
     if (!authed || !pack || demoMode) return;
@@ -511,6 +565,14 @@
       if (!cur) { pd.states[id] = mkDialogueState(id, now); n += 1; }
       else if (cur.kind !== 'dialogue') { cur.kind = 'dialogue'; if (cur.stage == null) cur.stage = 1; n += 1; }
     });
+    /* 단락 단위 트랙 — 청크(뜻 세우기)와 단락 관문(굳히기). 문장이 없는 팩이면 만들지 않는다. */
+    dayGroupsOf(p).forEach(function (gr) {
+      var ci = ckId(gr.day), pi = pgId(gr.day);
+      if (!pd.states[ci]) { pd.states[ci] = mkTrackState(ci, 'chunk', now); n += 1; }
+      else if (pd.states[ci].kind !== 'chunk') { pd.states[ci].kind = 'chunk'; if (pd.states[ci].stage == null) pd.states[ci].stage = 1; n += 1; }
+      if (!pd.states[pi]) { pd.states[pi] = mkTrackState(pi, 'para', now); n += 1; }
+      else if (pd.states[pi].kind !== 'para') { pd.states[pi].kind = 'para'; if (pd.states[pi].stage == null) pd.states[pi].stage = 1; n += 1; }
+    });
     n += tidyPack(pd);
     return n;
   }
@@ -533,6 +595,185 @@
   function wordStates(pid) { return statesOfKind('word', pid); }
   function senStates(pid) { return statesOfKind('sentence', pid); }
   function senState(seq, pid) { return packDB(pid).states[WBNAESIN.sentenceId(seq)]; }
+
+  /* ══ 본문 암기 — 청크 트랙(뜻 세우기) · 단락 관문(굳히기) ══
+     kind 'chunk'·'para' 는 statesOfKind 가 kind 로 거르므로 단어·문장 집계에 섞이지 않는다
+     (지금 'dialogue' 가 빠지는 것과 같다). 진행은 passage 요약이 따로 센다(§3.6). */
+  function ckId(day) { return 'ck-' + day; }
+  function pgId(day) { return 'pg-' + day; }
+  function mkTrackState(id, kind, now) {
+    var s = WBNAESIN.createState(id, kind, now);
+    if (s.stage == null) s.stage = 1;   // 엔진이 이 kind 에 사다리를 안 붙이는 판이어도 트랙은 돈다
+    if (s.cue == null) s.cue = 1;
+    return s;
+  }
+  function ckState(day, pid) { return packDB(pid).states[ckId(day)]; }
+  function pgState(day, pid) { return packDB(pid).states[pgId(day)]; }
+  /* 단계는 정수로만 읽는다 — 옛 기록의 4.5 같은 값이 화면 분기를 어긋나게 하지 않게 */
+  function stageNum(st) { var n = Math.floor(+(st && st.stage)); return n >= 1 ? n : 1; }
+  function groupOfDay(day, pid) {
+    var gs = dayGroupsOf(packOf(pid) || pack);
+    for (var i = 0; i < gs.length; i++) if (gs[i].day === day) return gs[i];
+    return null;
+  }
+
+  /* 단서 농도(§3.3) — 엔진판이 있으면 그것이 정본이고, 없으면 앱이 같은 계약으로 읽고 쓴다 */
+  function cueOf(st) {
+    if (WBNAESIN.cueOf) { try { var v = WBNAESIN.cueOf(st); if (isFinite(v)) return Math.max(0, Math.min(3, Math.floor(v))); } catch (e) {} }
+    var c = Math.floor(+(st && st.cue));
+    return isFinite(c) && c >= 0 ? Math.min(3, c) : 1;
+  }
+  /* 통과하면 단서 한 칸 소거, 틀리면 한 칸 증가(최대 3) — 단계는 그대로다.
+     엔진 recordCue 가 있으면 먼저 부르고, 그것이 값을 안 움직였을 때만 계약대로 앱이 맞춘다
+     (엔진이 더 똑똑하게 움직이면 그 판단을 존중한다). */
+  function bumpCue(st, passed, now) {
+    if (!st) return 1;
+    var before = cueOf(st);
+    if (WBNAESIN.recordCue) { try { WBNAESIN.recordCue(st, passed, now); } catch (e) {} }
+    if (cueOf(st) === before) st.cue = passed ? Math.max(0, before - 1) : Math.min(3, before + 1);
+    return cueOf(st);
+  }
+  function isFadedStage(stage) {
+    if (WBNAESIN.isCueStage) { try { return !!WBNAESIN.isCueStage(stage); } catch (e) {} }
+    return !!FADED_STAGES[stage];
+  }
+  /* 문장 사다리 한 세트의 결과 반영.
+     단서 단계(1·3·5)는 recordCue 하나만 부른다 — 그 함수가 단서 소거와 진급을 함께 처리한다.
+     recordCue 와 advanceStage(faded)를 둘 다 부르면 한 번의 통과가 두 번 세어진다.
+     단서 없는 단계(2·4·6)는 예전처럼 advanceStage 한 번이다. */
+  function applyLadder(st, passed, now, session) {
+    if (!st) return;
+    var stage = stageNum(st);
+    if (st.reached || !isFadedStage(stage)) {
+      WBNAESIN.advanceStage(st, passed, now, { session: session, fromStage: stage });
+      return;
+    }
+    if (WBNAESIN.recordCue) { WBNAESIN.recordCue(st, passed, now, { session: session, fromStage: stage }); return; }
+    /* 엔진에 recordCue 가 없는 판 — 같은 계약(§3.3)을 앱이 지킨다 */
+    if (passed && cueOf(st) === 0) {
+      WBNAESIN.advanceStage(st, true, now, { session: session, fromStage: stage });
+      st.cue = 1;
+      return;
+    }
+    st.last = now;
+    bumpCue(st, passed, now);
+  }
+  /* 청크 트랙·단락 관문 진급 — 3단이고 3단 통과가 그 트랙의 reached다.
+     엔진 advanceStage 가 stageMaxOf 로 트랙별 최고 단계를 알면 그것이 정본이다. */
+  function trackAdvance(st, passed, max, now) {
+    if (!st) return;
+    if (WBNAESIN.stageMaxOf) {
+      try {
+        if (WBNAESIN.stageMaxOf(st) === max) {
+          WBNAESIN.advanceStage(st, passed, now, { fromStage: stageNum(st) });
+          return;
+        }
+      } catch (e) {}
+    }
+    st.last = now;
+    if (!passed || st.reached) return;
+    var cur = stageNum(st);
+    if (cur < max) { st.stage = cur + 1; st.stageAdvancedAt = now; return; }
+    st.stage = max; st.reached = true;
+    if (st.reachedAt == null) st.reachedAt = now;
+  }
+
+  /* ── 게이트(§3.4) — 엔진판을 먼저 쓰고, 없으면 같은 판정을 앱이 한다 ── */
+  function ckGate(day, pid) {
+    var p = packOf(pid) || pack;
+    if (WBNAESIN.chunkGate) {
+      try { var r = WBNAESIN.chunkGate(p, packDB(pid).states, day); if (r && typeof r === 'object') return r; if (typeof r === 'boolean') return { open: r }; } catch (e) {}
+    }
+    var gr = groupOfDay(day, pid);
+    var hasCk = !!(gr && gr.sentences.some(function (s) { return (s.chunks || []).length; }));
+    if (!hasCk) return { open: true, reason: 'no-chunk' };   // 열 방법이 없는 자물쇠는 걸지 않는다
+    var st = ckState(day, pid);
+    return { open: !!(st && st.reached), reason: (st && st.reached) ? 'reached' : 'chunk-gate', stage: st ? stageNum(st) : 1 };
+  }
+  function pgStageGate(day, need, pid) {
+    var p = packOf(pid) || pack;
+    if (WBNAESIN.paraGate) {
+      try { var r = WBNAESIN.paraGate(p, packDB(pid).states, day, need); if (r && typeof r === 'object') return r; if (typeof r === 'boolean') return { open: r }; } catch (e) {}
+    }
+    var gr = groupOfDay(day, pid);
+    if (!gr || !gr.sentences.length) return { open: false, done: 0, total: 0, need: need };
+    var done = 0;
+    gr.sentences.forEach(function (s) {
+      var st = senState(s.seq, pid);
+      var n = st ? (st.reached ? 6 : stageNum(st)) : 1;
+      if (n >= need) done += 1;
+    });
+    return { open: done >= gr.sentences.length, done: done, total: gr.sentences.length, need: need };
+  }
+  /* 그 단락 백지가 끝났는가 = 문장이 전부 reached. 누적·종합이 열리는 조건의 단위다. */
+  function paraBlankDone(gr, pid) {
+    return !!(gr && gr.sentences.length && gr.sentences.every(function (s) { var st = senState(s.seq, pid); return st && st.reached; }));
+  }
+  /* 엔진 passageCandidates 와 같은 눈 — 단락 관문(pg)이 3단(단락 백지)까지 reached 인가.
+     관문 3단은 그 단락 문장이 모두 백지를 통과했을 때만 reached 가 된다(startBlank). */
+  function allParasDone(pid) {
+    var gs = dayGroupsOf(packOf(pid) || pack);
+    return gs.length > 0 && gs.every(function (gr) {
+      var st = pgState(gr.day, pid);
+      return !!(st && st.reached);
+    });
+  }
+  /* 누적 백지 단계 — 1일차 → 1+2일차 → … → 전체. 앞 칸을 밟아야 다음 칸이 열린다. */
+  function cumSteps(pid) {
+    var gs = dayGroupsOf(packOf(pid) || pack), pd = packDB(pid), rec = pd.cumulative || {};
+    var out = [];
+    for (var i = 0; i < gs.length; i++) {
+      var lastDay = gs[i].day;
+      out.push({ i: i, lastDay: lastDay, days: gs.slice(0, i + 1).map(function (g) { return g.day; }),
+        rec: rec[lastDay] || null, open: i === 0 ? true : !!rec[gs[i - 1].day] });
+    }
+    return out;
+  }
+  function cumReachedCount(pid) {
+    var steps = cumSteps(pid), n = 0;
+    steps.forEach(function (s, i) { if (s.rec) n = i + 1; });
+    return n;
+  }
+  /* 상태 요약의 passage(§3.6) — 엔진판이 있으면 그것을 쓰고, 없으면 같은 모양을 앱이 만든다 */
+  function passageSummaryOf(pid) {
+    var p = packOf(pid);
+    if (!p) return null;
+    var pd = packDB(pid);
+    if (WBNAESIN.passageSummary) {
+      try {
+        var r = WBNAESIN.passageSummary(p, pd.states, { cumulative: pd.cumulative, check: pd.check });
+        if (r && typeof r === 'object' && r.chunkTotal != null) return normPassage(r);
+      } catch (e) {}
+    }
+    var gs = dayGroupsOf(p), ckDone = 0, blank = 0;
+    gs.forEach(function (gr) {
+      var ck = pd.states[ckId(gr.day)];
+      if (ck && ck.reached) ckDone += 1;
+      if (paraBlankDone(gr, pid)) blank += 1;
+    });
+    return normPassage({ chunkDone: ckDone, chunkTotal: gs.length, paraBlank: blank, paraTotal: gs.length,
+      cumulative: cumReachedCount(pid), check: pd.check && isFinite(+pd.check.total) ? { correct: pd.check.correct, total: pd.check.total } : null });
+  }
+  function normPassage(r) {
+    var chk = r.check && isFinite(+r.check.total) ? { correct: n0(r.check.correct), total: n0(r.check.total) } : null;
+    return { chunkDone: n0(r.chunkDone), chunkTotal: n0(r.chunkTotal), paraBlank: n0(r.paraBlank),
+      paraTotal: n0(r.paraTotal), cumulative: n0(r.cumulative), check: chk };
+  }
+  /* 범위 전체 합계 — 과가 여러 개인 시험 범위도 한 단위로 본다 */
+  function passageSummaryRange() {
+    var out = { chunkDone: 0, chunkTotal: 0, paraBlank: 0, paraTotal: 0, cumulative: 0, check: null };
+    var cor = 0, tot = 0, any = false;
+    rangeIds().forEach(function (id) {
+      var r = passageSummaryOf(id);
+      if (!r) return;
+      out.chunkDone += r.chunkDone; out.chunkTotal += r.chunkTotal;
+      out.paraBlank += r.paraBlank; out.paraTotal += r.paraTotal;
+      out.cumulative += r.cumulative;
+      if (r.check) { any = true; cor += r.check.correct; tot += r.check.total; }
+    });
+    if (any) out.check = { correct: cor, total: tot };
+    return out;
+  }
   /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드.
      시험은 범위 전체에 하나다 — 시험일·오버라이드도 범위의 모든 과에 같이 걸고 같이 푼다
      (성취도 탭 「적용」·「자율 학습으로」가 rangeIds() 를 돌며 쓴다). */
@@ -565,8 +806,12 @@
   }
   /* 엔진 범위 API(planRange·gateRange·rangeSummary)의 입력 — [{packId, pack, states}] 범위 순서 */
   function rangeEntries() {
-    return rangeIds().map(function (id) { return { packId: id, pack: packOf(id), states: packDB(id).states }; })
-      .filter(function (e) { return !!e.pack; });
+    /* rec — 팩 저장소의 누적 백지·종합 Check 기록(§3.5). 엔진 플랜이 "다음 누적은 어디까지인가"를
+       이 값으로 안다. 없으면 누적은 미시작으로 본다. */
+    return rangeIds().map(function (id) {
+      var pd = packDB(id);
+      return { packId: id, pack: packOf(id), states: pd.states, rec: { cumulative: pd.cumulative, check: pd.check } };
+    }).filter(function (e) { return !!e.pack; });
   }
   function isRange() { return rangeIds().length > 1; }
   /* 과 표시명 — 학생이 아는 단위는 packId 가 아니라 'L6' 이다 */
@@ -606,9 +851,12 @@
     for (var i = 0; i < ss.length; i++) if (ss[i].seq === seq) return ss[i];
     return null;
   }
-  function dayGroups() {
+  function dayGroups() { return dayGroupsOf(pack); }
+  /* 단락(dayGroup) 묶음 — 청크 트랙·단락 관문·누적 백지가 모두 이 단위다.
+     packOf(pid) 로 다른 과의 단락도 세야 범위 합계(passage 요약)가 맞는다. */
+  function dayGroupsOf(p) {
     var groups = [], cur = null;
-    (pack.sentences || []).forEach(function (s) {
+    ((p && p.sentences) || []).forEach(function (s) {
       if (!cur || cur.day !== s.dayGroup) { cur = { day: s.dayGroup, header: s.dayHeaderKo || s.dayGroup, sentences: [] }; groups.push(cur); }
       if (s.dayHeaderKo) cur.header = s.dayHeaderKo;
       cur.sentences.push(s);
@@ -617,7 +865,18 @@
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
-  var STAGE_NAMES = { 1: '대역 읽기', 2: '해석 쓰기', 3: '핵심어 인출', 4: '클로즈·배열', 5: '문장 영작', 6: '백지 쓰기' };
+  /* 6단 사다리 — 단계 수는 6 그대로 두고 내용만 바꾼다(서버 normalizeSummary 의 byStage{1..6}
+     화이트리스트와 관리 웹 매트릭스를 건드리지 않기 위해). 뜻(한글)을 먼저 세우고 영어를 얹는다. */
+  var STAGE_NAMES = { 1: '줄 해석', 2: '영어 청크 배열', 3: '핵심어 빈칸', 4: '문법 형태', 5: '줄 영작', 6: '단락 백지' };
+  /* 학생에게 보이는 세 구역 — 지금 무엇을 하는 중인지 한 낱말로 말한다 */
+  var ZONE_MEAN = '뜻 세우기', ZONE_EN = '영어 얹기', ZONE_FIRM = '굳히기';
+  function zoneOfStage(stage) { return stage <= 1 ? ZONE_MEAN : (stage <= 5 ? ZONE_EN : ZONE_FIRM); }
+  var CK_STAGES = { 1: '듣고 짝 맞추기', 2: '뜻 인출', 3: '순서 세우기' };
+  var PG_STEPS = { 1: '단락 줄거리', 2: '어색한 곳 찾기', 3: '단락 백지' };
+  var PG_NEED = { 1: 2, 2: 5, 3: 5 };      // 그 관문이 열리려면 단락 문장이 전부 이 단계 이상
+  var CUE_NAMES = { 3: '보고 옮겨 쓰기', 2: '첫 글자 + 글자 수', 1: '첫 글자만', 0: '힌트 없음' };
+  var FADED_STAGES = { 1: true, 3: true, 5: true };   // 단서 농도가 걸리는 단계(§3.3)
+  var CK_MAX = 3, PG_MAX = 3;
 
   /* ── 탭 ── */
   function setTab(t) {
@@ -691,15 +950,21 @@
   function rangePlan(now) {
     var ents = rangeEntries();
     if (WBNAESIN.planRange && ents.length) return WBNAESIN.planRange(ents, exam(), now, {});
-    var pid = curPackId();
-    var plan = WBNAESIN.planDay(pack, packDB(pid).states, exam(), now, {});
+    var pid = curPackId(), pdp = packDB(pid);
+    var plan = WBNAESIN.planDay(pack, pdp.states, exam(), now, { rec: { cumulative: pdp.cumulative, check: pdp.check } });
     var wrap = function (arr) { return (arr || []).map(function (id) { return { packId: pid, id: id }; }); };
     var pp = {};
     pp[pid] = { words: plan.words, sentences: plan.sentences };
     return {
       mode: plan.mode, dday: plan.dday,
       words: { fresh: wrap(plan.words.fresh), review: wrap(plan.words.review), relearn: wrap(plan.words.relearn) },
-      sentences: (plan.sentences || []).map(function (x) { return { packId: pid, seq: x.seq, stage: x.stage }; }),
+      /* 항목 모양을 넓혔다 — {kind:'chunk'|'sentence'|'para'|'cumulative'|'check', …}.
+         옛 소비자를 위해 seq·stage 는 그대로 두고 나머지 필드를 그대로 옮긴다. */
+      sentences: (plan.sentences || []).map(function (x) {
+        var o = { packId: pid }, k;
+        for (k in x) if (Object.prototype.hasOwnProperty.call(x, k)) o[k] = x[k];
+        return o;
+      }),
       perPack: pp, note: plan.note
     };
   }
@@ -892,8 +1157,9 @@
 
       '<div class="card"><div class="todo"><span class="t">오늘의 학습</span>' +
       '<button class="chip now" data-go="words">단어 ' + wCount + '개<small>신규 ' + plan.words.fresh.length + ' · 복습 ' + plan.words.review.length + ' · 안정화 ' + plan.words.relearn.length + '</small></button>' +
-      '<button class="chip" id="senGo" data-go="passage">본문 ' + plan.sentences.length + '문장<small>' +
-      (firstSen && firstSen.packId !== curPackId() ? esc(lessonLabel(firstSen.packId)) + '부터 · 단계별 훈련' : '단계별 훈련') + '</small></button>' +
+      '<button class="chip" id="senGo" data-go="passage">본문 ' + plan.sentences.length + '개<small>' +
+      esc((firstSen && firstSen.packId !== curPackId() ? lessonLabel(firstSen.packId) + ' · ' : '') +
+        (planKindCounts(plan.sentences) || planItemLabel(firstSen))) + '</small></button>' +
       '<button class="chip" data-go="quiz">문제 풀이<small>오답 ' + wrongN + '문항 미해결</small></button>' +
       (last ? '<button class="btn dark" id="resumeBtn" style="margin-left:auto">이어서 학습<small style="display:block;font-weight:400;font-size:11px;opacity:.8">' + esc(last.label) + '</small></button>' : '') +
       '</div>' + (plan.note ? '<p class="muted" style="margin:10px 0 0">' + esc(plan.note) + '</p>' : '') + '</div>' +
@@ -932,17 +1198,55 @@
     wireHomeLinks();
     /* 본문 칩 — 범위 플랜의 첫 문장이 다른 과면 그 과로 전환하고 그 문장을 연다(계약 R4).
        탭만 바꾸면 학생은 "왜 오늘 할 문장이 여기 없지?" 하고 목록을 헤맨다. */
-    if (firstSen) $('senGo').onclick = function (e) { e.stopPropagation(); goSentence(firstSen.packId, firstSen.seq); };
+    if (firstSen) $('senGo').onclick = function (e) { e.stopPropagation(); goPlanItem(firstSen); };
     if (last) $('resumeBtn').onclick = function () { doResume(last.resume); };
     $('startDump').onclick = startDump;
     wireTaskCard(task);
     wireResultCard();
   }
+  /* 오늘의 본문 플랜 항목 다섯 종류(§4-E-6) — 칩을 누르면 그 종류의 첫 자리로 곧장 간다.
+     탭만 바꾸면 학생은 "왜 오늘 할 것이 여기 없지?" 하고 목록을 헤맨다. */
+  var PARA_STEP_NO = { summary: 1, odd: 2, blank: 3 };
+  function planItemLabel(x) {
+    if (!x) return '단계별 훈련';
+    if (x.kind === 'chunk') return ZONE_MEAN + '(청크)부터';
+    if (x.kind === 'para') return '단락 ' + (PG_STEPS[PARA_STEP_NO[x.step] || 1] || '관문') + '부터';
+    if (x.kind === 'cumulative') return '누적 백지부터';
+    if (x.kind === 'check') return '종합 Check';
+    return '문장 ' + x.seq + ' · ' + (STAGE_NAMES[Math.floor(x.stage) || 1] || '') + '부터';
+  }
+  function planKindCounts(list) {
+    var c = { chunk: 0, sentence: 0, para: 0, cumulative: 0, check: 0 };
+    (list || []).forEach(function (x) { var k = x && x.kind ? x.kind : 'sentence'; if (c[k] != null) c[k] += 1; });
+    var parts = [];
+    if (c.chunk) parts.push('뜻 ' + c.chunk);
+    if (c.sentence) parts.push('문장 ' + c.sentence);
+    if (c.para) parts.push('관문 ' + c.para);
+    if (c.cumulative) parts.push('누적 ' + c.cumulative);
+    if (c.check) parts.push('종합 ' + c.check);
+    return parts.join(' · ');
+  }
+  function cumIndexOf(lastDay) {
+    var steps = cumSteps();
+    for (var i = 0; i < steps.length; i++) if (steps[i].lastDay === lastDay) return i;
+    return 0;
+  }
+  function goPlanItem(x) {
+    if (!x) { setTab('passage'); return; }
+    if (x.packId && x.packId !== curPackId() && packOf(x.packId)) openPack(packOf(x.packId), x.packId, {});
+    selDlg = null;
+    if (x.kind === 'chunk') selPass = { kind: 'chunk', day: x.day };
+    else if (x.kind === 'para') selPass = { kind: 'para', day: x.day, i: PARA_STEP_NO[x.step] || 1 };
+    else if (x.kind === 'cumulative') selPass = { kind: 'cum', i: cumIndexOf(x.lastDay) };
+    else if (x.kind === 'check') selPass = { kind: 'check' };
+    else { selPass = null; if (x.seq != null) selSeq = Number(x.seq); }
+    setTab('passage');
+  }
   /* 그 과의 그 문장으로 — 과 전환이 필요하면 전환까지 한 번에 */
   function goSentence(pid, seq) {
     if (pid && pid !== curPackId() && packOf(pid)) { openPack(packOf(pid), pid, { seq: seq, tab: 'passage' }); return; }
     if (seq != null) selSeq = Number(seq);
-    selDlg = null;
+    selDlg = null; selPass = null;
     setTab('passage');
   }
   /* 문법 개념(g-<n>) 확인 문제 — 과제 typeKeys에 패턴 키가 오면 그 패턴의 Let's Use It */
@@ -990,7 +1294,7 @@
     PACKS[pid] = p;
     /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
     selSeq = opt.seq != null ? Number(opt.seq) : null;
-    selWordId = null; selType = null; selDlg = null; paperMode = false; wordFilter = 'all';
+    selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all';
     applyServerExam(pid);
     ensureStates(pid);
     setLast('교재 ' + pid, null);
@@ -1016,11 +1320,15 @@
   }
   function doResume(r) {
     if (!r) return;
-    selDlg = null;
+    selDlg = null; selPass = null;
     if (r.t === 'wordDaily') { setTab('words'); return startWordDaily(); }
     if (r.t === 'sentence') { selSeq = r.seq; setTab('passage'); return; }
     if (r.t === 'quizType') { selType = r.key; setTab('quiz'); return; }
     if (r.t === 'blank') { setTab('passage'); var grp = dayGroups().filter(function (g) { return g.day === r.day; })[0]; return startBlank(grp); }
+    if (r.t === 'chunk') { selPass = { kind: 'chunk', day: r.day }; setTab('passage'); return; }
+    if (r.t === 'para') { selPass = { kind: 'para', day: r.day, i: Number(r.step) || 1 }; setTab('passage'); return; }
+    if (r.t === 'cumulative') { selPass = { kind: 'cum', i: Number(r.i) || 0 }; setTab('passage'); return; }
+    if (r.t === 'check') { selPass = { kind: 'check' }; setTab('passage'); return; }
     if (r.t === 'dialogue') { selDlg = r.id; setTab('passage'); return; }
     setTab('home');
   }
@@ -1156,23 +1464,361 @@
     for (var i = 1; i <= 6; i++) h += '<i class="' + (done ? 'dn' : (i < stage ? 'dn' : (i === stage ? 'on' : ''))) + '"></i>';
     return h + '</span>';
   }
+  /* ══ 본문 문항 생성 ══
+     문항 생성기(gen.js)의 새 함수가 아직 없는 판에서도 학습이 멈추지 않게, 같은 계약의
+     대체 생성기를 앱 안에 둔다. WBGEN 판이 있으면 그것을 쓰고 모양이 맞지 않을 때만
+     대체본으로 내려간다 — 어느 쪽을 썼는지는 화면 한 줄로 남긴다(조용히 넘어가지 않는다). */
+  var genFallback = {};
+  function genNote(name) { genFallback[name] = 1; }
+  function genNoteHtml() {
+    var ks = Object.keys(genFallback);
+    if (!ks.length) return '';
+    return '<p class="muted" style="margin:6px 0 0">문항 생성기(' + esc(ks.join(', ')) + ')가 이 판에 없어 앱 내장 문항으로 진행합니다.</p>';
+  }
+  function shuffleNot(arr) {
+    var a = (arr || []).slice();
+    if (a.length < 2) return a;
+    var s = WBGEN.shuffle(a, Math.random);
+    if (s.join('|') === a.join('|')) s = WBGEN.shuffle(a, Math.random);
+    return s;
+  }
+  /* 암기용 한글은 chunks[].ko(직독직해)다 — sentences[].ko(매끄러운 해석)는 한국어 어순이라
+     영어 자리와 어긋난다. 표시용으로만 쓴다. */
+  function chunksOfGroup(gr) {
+    var out = [];
+    (gr ? gr.sentences : []).forEach(function (s) {
+      (s.chunks || []).forEach(function (c) {
+        if (c && c.en && c.ko) out.push({ en: String(c.en), ko: String(c.ko), seq: s.seq });
+      });
+    });
+    return out;
+  }
+  function chunkCountOf(gr) { return chunksOfGroup(gr).length; }
+
+  /* ① 듣고 짝 맞추기 — 생성기는 한 판(4~5쌍)씩 준다. next 로 단락 전체를 덮는다. */
+  function ckMatchItems(gr) {
+    var out = [];
+    if (WBGEN.chunkMatch) {
+      try {
+        var start = 0;
+        for (var n = 0; n < 20; n++) {
+          var q = WBGEN.chunkMatch(gr.sentences, Math.random, { start: start });
+          if (!q || !Array.isArray(q.pairs) || q.pairs.length < 2) break;
+          out.push({ type: 'ckmatch', pairs: q.pairs.map(function (x) { return { en: String(x.en), ko: String(x.ko) }; }) });
+          if (q.next == null || q.next <= start) break;
+          start = q.next;
+        }
+      } catch (e) { out = []; }
+    }
+    if (out.length) return out;
+    if (WBGEN.chunkMatch) genNote('chunkMatch');
+    var all = chunksOfGroup(gr);
+    for (var i = 0; i < all.length; i += 5) {
+      var part = all.slice(i, i + 5);
+      if (part.length === 1 && out.length) { out[out.length - 1].pairs.push({ en: part[0].en, ko: part[0].ko }); break; }
+      out.push({ type: 'ckmatch', pairs: part.map(function (c) { return { en: c.en, ko: c.ko }; }) });
+    }
+    return out.filter(function (q) { return q.pairs.length >= 2; });
+  }
+  /* ② 뜻 인출 — 생성기는 청크 하나씩 준다(opts.index). 단락의 청크를 차례로 돈다. */
+  function ckMeanItems(gr) {
+    var all = chunksOfGroup(gr), out = [];
+    if (WBGEN.chunkMeaning) {
+      try {
+        for (var i = 0; i < all.length; i++) {
+          var q = WBGEN.chunkMeaning(gr.sentences, Math.random, { index: i });
+          if (!q || !Array.isArray(q.choices) || q.choices.length < 2 || q.answerKey == null) continue;
+          q.type = 'ckmean';
+          if (!q.ttsText) q.ttsText = q.prompt;
+          out.push(q);
+        }
+      } catch (e) { out = []; }
+    }
+    if (out.length) return out;
+    if (WBGEN.chunkMeaning) genNote('chunkMeaning');
+    if (all.length < 2) return [];
+    return all.map(function (c, i) {
+      var pool = all.filter(function (x, j) { return j !== i && x.ko !== c.ko; });
+      var texts = [c.ko].concat(rndPick(pool, 3, Math.random).map(function (w) { return w.ko; }));
+      texts = WBGEN.shuffle(texts, Math.random);
+      var chs = texts.map(function (t, k) { return { key: 'abcde'.charAt(k), text: t }; });
+      var ans = chs.filter(function (o) { return o.text === c.ko; })[0];
+      return { type: 'ckmean', prompt: c.en, ttsText: c.en, choices: chs, answerKey: ans ? ans.key : chs[0].key };
+    });
+  }
+  /* ③ 순서 세우기 — 한글 청크를 직독직해 순서로. 영어 원문(enFull)을 늘 곁에 둔다. */
+  function ckOrderItems(gr) {
+    var out = [];
+    (gr ? gr.sentences : []).forEach(function (s) {
+      var q = null;
+      if (WBGEN.chunkOrder) { try { q = WBGEN.chunkOrder(s, Math.random); } catch (e) { q = null; } }
+      if (!q || !Array.isArray(q.answer) || q.answer.length < 2) {
+        if (WBGEN.chunkOrder) genNote('chunkOrder');
+        var kos = (s.chunks || []).map(function (c) { return c.ko; }).filter(Boolean);
+        if (kos.length < 2) return;
+        q = { shuffled: shuffleNot(kos), answer: kos, enFull: s.en };
+      }
+      out.push({ type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
+        answer: q.answer, hintText: q.enFull || s.en, ttsText: q.enFull || s.en, hintLabel: '영어 원문' });
+    });
+    return out;
+  }
+  /* 2단계 — 한글 청크를 순서대로 보여 주고 영어 청크를 배열. 철자를 한 자도 쓰지 않는다.
+     영어 전문은 화면에도 소리에도 두지 않는다(그게 곧 정답이다) — 생성기가 enFull 을 빼는 이유. */
+  function enChunkOrderItem(s) {
+    var q = null;
+    if (WBGEN.enChunkOrder) { try { q = WBGEN.enChunkOrder(s, Math.random); } catch (e) { q = null; } }
+    var ens = (s.chunks || []).map(function (c) { return c.en; }).filter(Boolean);
+    var kos = (s.chunks || []).map(function (c) { return c.ko; }).filter(Boolean);
+    if (!q || !Array.isArray(q.answer) || q.answer.length < 2) {
+      if (WBGEN.enChunkOrder) genNote('enChunkOrder');
+      if (ens.length < 2) return null;
+      q = { shuffled: shuffleNot(ens), answer: ens, koChunks: kos };
+    }
+    return { type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
+      answer: q.answer, hintText: (q.koChunks || kos).join(' / ') || s.ko, hintLabel: '한글 청크 순서' };
+  }
+
+  /* ── 단서 농도(§3.3) — 3 전사 · 2 첫 글자+글자 수 · 1 첫 글자 · 0 빈칸만 ──
+     생성기가 빈칸마다 hint(화면 문자열)를, 문항에 showAnswer(불리언)+given(전문)을 실어 준다.
+     생성기가 cue 를 모르는 옛 판일 때만 앱이 같은 모양을 만든다. */
+  function cueHintOf(ans, cue) {
+    var a = String(ans == null ? '' : ans);
+    if (!a || cue >= 3 || cue <= 0) return '';
+    if (cue === 2) return a.charAt(0) + '__ (' + a.replace(/\s/g, '').length + '자)';
+    return a.charAt(0) + '__';
+  }
+  function applyCueParts(q, cue) {
+    (q.parts || []).forEach(function (p) {
+      if (!p || !p.blank) return;
+      if (p.blank.hint == null && p.blank.ph == null) p.blank.ph = cueHintOf((p.blank.answers || [])[0], cue);
+    });
+    return q;
+  }
+  /* 1단계 줄 해석 — 영어 자리를 보며 한글 뜻을 채운다. 영어 입력이 한 글자도 없는 단계다. */
+  function koBlankItem(s, cue) {
+    var q = null;
+    if (WBGEN.koBlanks) { try { q = WBGEN.koBlanks(s, cue); } catch (e) { q = null; } }
+    if (!q || !Array.isArray(q.parts) || !q.parts.some(function (p) { return p && p.blank; })) {
+      if (WBGEN.koBlanks) genNote('koBlanks');
+      q = fallbackKoBlanks(s);
+      if (q && cue >= 3) { q.showAnswer = true; q.given = String(s.ko || ''); }
+    }
+    if (!q) return null;
+    q.type = 'koblank'; q.lang = 'ko'; q.seq = s.seq; q.cue = cue;
+    if (q.enFull == null) q.enFull = s.en;
+    if (!q.chunks) q.chunks = (s.chunks || []).slice();
+    return applyCueParts(q, cue);
+  }
+  function fallbackKoBlanks(s) {
+    var chunks = (s.chunks || []).filter(function (c) { return c && c.ko; });
+    var text = chunks.length ? chunks.map(function (c) { return c.ko; }).join(' / ') : String(s.ko || '');
+    if (!text) return null;
+    var taken = [], spans = [];
+    (s.keywords || []).forEach(function (kw) {
+      var w = kw && kw.ko;
+      if (!w) return;
+      for (var p = text.indexOf(w); p >= 0; p = text.indexOf(w, p + 1)) {
+        var free = taken.every(function (t) { return p >= t[1] || p + w.length <= t[0]; });
+        if (free) { taken.push([p, p + w.length]); spans.push({ start: p, end: p + w.length, ans: w, en: kw.en }); return; }
+      }
+    });
+    if (!spans.length) return null;
+    spans.sort(function (a, b) { return a.start - b.start; });
+    var parts = [], cur = 0;
+    spans.forEach(function (sp) {
+      if (sp.start > cur) parts.push({ text: text.slice(cur, sp.start) });
+      parts.push({ blank: { answers: [sp.ans], hintEn: sp.en } });
+      cur = sp.end;
+    });
+    if (cur < text.length) parts.push({ text: text.slice(cur) });
+    return { type: 'koblank', parts: parts, enFull: s.en,
+      chunks: chunks.map(function (c) { return { en: c.en || '', ko: c.ko }; }) };
+  }
+  /* 3단계 핵심어 빈칸(영어) */
+  function kwBlankItem(s, cue) {
+    var q = null;
+    try { q = WBGEN.keywordBlanks(s, 'en', cue); } catch (e) { q = null; }
+    if (!q) return null;
+    q.seq = s.seq; q.cue = cue;
+    if (cue >= 3 && q.given == null) { q.showAnswer = true; q.given = String(s.en || ''); }
+    return applyCueParts(q, cue);
+  }
+  /* 5단계 줄 영작 — cue 3 은 모범 문장을 보여 주고 그대로 옮겨 쓰는 전사다 */
+  function writeItem(s, cue) {
+    var q = null;
+    try { q = WBGEN.writingPrompt(s, cue); } catch (e) { q = null; }
+    if (!q) return null;
+    q.seq = s.seq; q.cue = cue;
+    if (cue >= 3 && q.given == null) { q.showAnswer = true; q.given = String(s.en || ''); }
+    if (q.hint == null && cue > 0 && cue < 3) {
+      q.hint = String(s.en || '').split(/\s+/).map(function (w) {
+        var core = w.replace(/[^A-Za-z']/g, '');
+        if (!core) return w;
+        return cue === 2 ? core.charAt(0) + new Array(core.length).join('_') : core.charAt(0);
+      }).join(' ');
+    }
+    return q;
+  }
+  /* 4단계 문법 형태 — 동사 형태 + 어법 선택. 단서 없이 한 번에 판정한다. */
+  function formItems(s) {
+    var out = [];
+    var v = null, c = null;
+    try { v = WBGEN.verbFormDrill(s); } catch (e) {}
+    try { c = WBGEN.grammarChoiceDrill(s, Math.random); } catch (e) {}
+    if (v) out.push(v);
+    if (c) { if (Array.isArray(c)) out = out.concat(c); else out.push(c); }
+    if (!out.length) {
+      var w = null;
+      try { w = WBGEN.clozeWide(s, Math.random); } catch (e) {}
+      if (w) out.push(w);
+    }
+    return out;
+  }
+  /* 어색한 곳 찾기 — 생성기는 그 단락의 문항을 index 로 하나씩 준다. 팩에 데이터가 없으면 빈 배열. */
+  function oddItems(day) {
+    var src = pack.oddOneItems || [];
+    var out = [];
+    if (WBGEN.oddOneItem && src.length) {
+      var n = 0;
+      try {
+        var first = WBGEN.oddOneItem(src, day, { index: 0 });
+        n = first && first.total ? first.total : (first ? 1 : 0);
+        for (var i = 0; i < n; i++) {
+          var q = i === 0 ? first : WBGEN.oddOneItem(src, day, { index: i });
+          if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.answerKey != null) out.push(q);
+        }
+      } catch (e) { out = []; }
+    }
+    if (out.length) return out;
+    /* 생성기가 없거나 못 만든 경우 — 팩 항목이 이미 러너 모양이면 그대로 쓴다 */
+    return (Array.isArray(src) ? src : []).filter(function (x) {
+      return x && (x.dayGroup == null || x.dayGroup === day) && Array.isArray(x.choices) && x.choices.length >= 2 && x.answerKey != null;
+    }).map(function (q) {
+      var o = {}, k;
+      for (k in q) if (Object.prototype.hasOwnProperty.call(q, k)) o[k] = q[k];
+      o.type = 'oddone';
+      return o;
+    });
+  }
+  /* 종합 Check — 팩의 checkItems 를 러너 문항으로. 없으면 사다리 문항을 섞어 대체 점검을 만든다. */
+  function checkSetItems() {
+    var src = pack.checkItems || [];
+    var made = null;
+    if (WBGEN.checkSet && src.length) { try { made = WBGEN.checkSet(src, Math.random); } catch (e) { made = null; } }
+    var list = (Array.isArray(made) ? made : (made ? [made] : [])).filter(renderableItem);
+    if (list.length) return { items: list, made: true };
+    return { items: fallbackCheckItems(), made: false };
+  }
+  function renderableItem(q) {
+    if (!q || typeof q !== 'object') return false;
+    if (Array.isArray(q.choices) && q.choices.length >= 2 && q.answerKey != null) return true;
+    if (Array.isArray(q.parts) && q.parts.some(function (p) { return p && p.blank; })) return true;
+    if (q.type === 'order' && Array.isArray(q.answer) && q.answer.length >= 2) return true;
+    if ((q.type === 'write' || q.type === 'skeleton') && Array.isArray(q.answers) && q.answers.length) return true;
+    if (q.type === 'spell' && Array.isArray(q.answers) && q.answers.length) return true;
+    if (q.type === 'cloze' && Array.isArray(q.answers) && q.answers.length) return true;
+    return false;
+  }
+  /* 대체 종합 점검 — choice(뜻 인출) · blank(핵심어) · arrange(청크 배열) · write(영작)를 골고루 */
+  function fallbackCheckItems() {
+    var out = [];
+    dayGroups().forEach(function (gr) {
+      var means = ckMeanItems(gr);
+      if (means.length) out.push(means[Math.floor(Math.random() * means.length)]);
+      gr.sentences.forEach(function (s) {
+        var k = kwBlankItem(s, 0); if (k) out.push(k);
+        var o = enChunkOrderItem(s); if (o) out.push(o);
+        var w = writeItem(s, 0); if (w) out.push(w);
+      });
+    });
+    return out;
+  }
+
+  /* ══ 본문 탭 — 단락별로 「뜻 세우기 → 영어 얹기 → 굳히기」 ══
+     잠긴 항목은 지우지 않고 이유를 한 줄로 보인다 — 왜 못 하는지 모르는 자물쇠가 가장 나쁘다. */
+  function lockRow(attrs, sel, title, sub, right, why) {
+    return '<div class="row' + (sel ? ' sel' : '') + (why ? ' lk' : '') + '" role="button" tabindex="0" ' + attrs + '>' +
+      '<span class="tx">' + title +
+      (sub ? '<span class="sub">' + sub + '</span>' : '') +
+      (why ? '<span class="why">잠김 · ' + why + '</span>' : '') + '</span>' + (right || '') + '</div>';
+  }
+  function chip(done, label) { return '<span class="lvchip ' + (done ? 's' : '') + '">' + label + '</span>'; }
+  function selIs(kind, day, i) {
+    return !!(selPass && selPass.kind === kind && (day == null || selPass.day === day) && (i == null || selPass.i === i));
+  }
+  function groupRowsHtml(gr, gi, g) {
+    var ck = ckState(gr.day), ckg = ckGate(gr.day);
+    var ckStage = Math.min(stageNum(ck), CK_MAX), ckDone = !!(ck && ck.reached);
+    var nCk = chunkCountOf(gr);
+    var h = '<div class="hdr"><span>' + esc(gr.header) + (paraBlankDone(gr) ? ' · 백지 완료' : '') + '</span></div>';
+
+    h += '<div class="zonehd">' + ZONE_MEAN + ' — 한글 청크로 뜻부터</div>';
+    h += lockRow('data-ck="' + esc(gr.day) + '"', selIs('chunk', gr.day),
+      '청크 ' + nCk + '개 · ' + (ckDone ? '완료' : CK_STAGES[ckStage]),
+      ckDone ? '듣고 짝 맞추기 · 뜻 인출 · 순서 세우기 통과' : '영어를 쓰지 않고 뜻부터 세웁니다',
+      chip(ckDone, ckDone ? '완료' : ckStage + '/3'), null);
+
+    h += '<div class="zonehd">' + ZONE_EN + ' — 문장 사다리 6단</div>';
+    gr.sentences.forEach(function (s) {
+      var st = senState(s.seq);
+      var stage = st && st.reached ? 6 : stageNum(st);
+      var why = null;
+      if (!ckg.open) why = '먼저 청크 뜻을 익혀요';
+      else if (stage >= 5 && !(st && st.reached) && !g.open) why = '단어 ' + g.done + '/' + g.total + ' 도달 뒤에 열려요';
+      h += '<div class="row' + (s.seq === selSeq && !selPass && !selDlg ? ' sel' : '') + (why ? ' lk' : '') + '" role="button" tabindex="0" data-seq="' + s.seq + '">' +
+        '<span class="no">' + s.seq + '</span><span class="tx">' + esc(s.en) +
+        (why ? '<span class="why">잠김 · ' + why + '</span>' : '') + '</span>' +
+        stgMini(stage, st && st.reached) + '</div>';
+    });
+
+    h += '<div class="zonehd">' + ZONE_FIRM + ' — 단락으로 굳히기</div>';
+    var pg = pgState(gr.day), pgStage = Math.min(stageNum(pg), PG_MAX), pgDone = !!(pg && pg.reached);
+    [1, 2, 3].forEach(function (step) {
+      var done = pgDone || pgStage > step;
+      var gate = pgStageGate(gr.day, PG_NEED[step]);
+      var why = null;
+      if (!done) {
+        if (!ckg.open) why = '먼저 청크 뜻을 익혀요';
+        else if (pgStage < step) why = '앞 단계(' + PG_STEPS[step - 1] + ')를 먼저 마쳐요';
+        else if (!gate.open) why = '단락 문장이 모두 ' + PG_NEED[step] + '단계 이상이어야 열려요 (' + n0(gate.done) + '/' + n0(gate.total) + ')';
+        else if (step >= 2 && !g.open) why = '단어 ' + g.done + '/' + g.total + ' 도달 뒤에 열려요';
+      }
+      h += lockRow('data-pg="' + esc(gr.day) + '" data-step="' + step + '"', selIs('para', gr.day, step),
+        PG_STEPS[step], step === 1 ? '한글 줄거리 이어 쓰기' : (step === 2 ? '바뀐 곳 고르기' : '단락 전체를 아무것도 보지 않고'),
+        chip(done, done ? '완료' : step + '/3'), why);
+    });
+    return h;
+  }
+  function tailRowsHtml(g) {
+    var gs = dayGroups();
+    if (!gs.length) return '';
+    var allDone = allParasDone(), h = '<div class="hdr"><span>전체 마무리 · ' + ZONE_FIRM + '</span></div>';
+    cumSteps().forEach(function (cs) {
+      var why = !allDone ? '모든 단락 백지를 마친 뒤에 열려요'
+        : (!g.open ? '단어 ' + g.done + '/' + g.total + ' 도달 뒤에 열려요'
+        : (!cs.open ? '앞 누적 백지를 먼저 마쳐요' : null));
+      var label = cs.i === 0 ? '누적 백지 · 1일차' : (cs.i === gs.length - 1 ? '누적 백지 · 전체' : '누적 백지 · 1~' + (cs.i + 1) + '일차');
+      h += lockRow('data-cum="' + cs.i + '"', selIs('cum', null, cs.i), label,
+        cs.days.join(' + ') + ' 단락을 이어서',
+        chip(!!cs.rec, cs.rec ? n0(cs.rec.okCount) + '/' + n0(cs.rec.total) : (cs.i + 1) + '/' + gs.length), why);
+    });
+    var pd = packDB();
+    var chkWhy = !allDone ? '모든 단락 백지를 마친 뒤에 열려요' : (!g.open ? '단어 ' + g.done + '/' + g.total + ' 도달 뒤에 열려요' : null);
+    h += lockRow('data-check="1"', selIs('check'), '종합 Check',
+      '시험 전 최종 점검', chip(!!pd.check, pd.check ? n0(pd.check.correct) + '/' + n0(pd.check.total) : '최종'), chkWhy);
+    return h;
+  }
   function renderPassage() {
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     var ssum = WBNAESIN.sentenceSummary(senStates());
+    var psum = passageSummaryOf(curPackId()) || { chunkDone: 0, chunkTotal: 0, paraBlank: 0, paraTotal: 0, cumulative: 0, check: null };
     if (selSeq == null) selSeq = (pack.sentences[0] || {}).seq;
     var listHtml = packSegHtml() +
-      '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
-    dayGroups().forEach(function (gr, gi) {
-      var doneAll = gr.sentences.every(function (s) { var st = senState(s.seq); return st && st.reached; });
-      listHtml += '<div class="hdr"><span>' + esc(gr.header) + (doneAll ? ' · 백지 완료' : '') + '</span>' +
-        '<button data-blank="' + gi + '"' + (g.open ? '' : ' disabled') + '>단락 백지 시험</button></div>';
-      gr.sentences.forEach(function (s) {
-        var st = senState(s.seq);
-        listHtml += '<div class="row' + (s.seq === selSeq ? ' sel' : '') + '" role="button" tabindex="0" data-seq="' + s.seq + '">' +
-          '<span class="no">' + s.seq + '</span><span class="tx">' + esc(s.en) + '</span>' +
-          stgMini(st ? st.stage : 1, st && st.reached) + '</div>';
-      });
-    });
+      '<div class="lh"><span>본문 ' + ssum.total + '문장 · ' + psum.chunkTotal + '단락</span>' +
+      '<span>뜻 <b>' + psum.chunkDone + '</b>/' + psum.chunkTotal + ' · 해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
+    dayGroups().forEach(function (gr, gi) { listHtml += groupRowsHtml(gr, gi, g); });
+    listHtml += tailRowsHtml(g);
     if ((pack.dialogues || []).length) {
       listHtml += '<div class="hdr"><span>대화문 · 의사소통 기능</span></div>';
       pack.dialogues.forEach(function (d) {
@@ -1187,17 +1833,230 @@
       }
     }
     listHtml += '</div>';
-    layoutSplit(listHtml, selDlg ? dialogueWorkHtml(selDlg) : sentenceWorkHtml(selSeq, g));
+    var work;
+    if (selDlg) work = dialogueWorkHtml(selDlg);
+    else if (selPass && selPass.kind === 'chunk') work = chunkWorkHtml(selPass.day, g);
+    else if (selPass && selPass.kind === 'para') work = paraWorkHtml(selPass.day, selPass.i, g);
+    else if (selPass && selPass.kind === 'cum') work = cumWorkHtml(selPass.i, g);
+    else if (selPass && selPass.kind === 'check') work = checkWorkHtml(g);
+    else work = sentenceWorkHtml(selSeq, g);
+    layoutSplit(listHtml, work);
     $('sRows').onclick = function (e) {
-      var b = e.target.closest('button[data-blank]');
-      if (b) { startBlank(dayGroups()[Number(b.getAttribute('data-blank'))]); return; }
-      var r = e.target.closest('.row[data-seq]');
-      if (r) { selSeq = Number(r.getAttribute('data-seq')); selDlg = null; render(); return; }
-      var dr = e.target.closest('.row[data-dlg]');
-      if (dr) { selDlg = dr.getAttribute('data-dlg'); render(); }
+      var t = e.target;
+      var ckr = t.closest('.row[data-ck]');
+      if (ckr) { selPass = { kind: 'chunk', day: ckr.getAttribute('data-ck') }; selDlg = null; render(); return; }
+      var pgr = t.closest('.row[data-pg]');
+      if (pgr) { selPass = { kind: 'para', day: pgr.getAttribute('data-pg'), i: Number(pgr.getAttribute('data-step')) }; selDlg = null; render(); return; }
+      var cr = t.closest('.row[data-cum]');
+      if (cr) { selPass = { kind: 'cum', i: Number(cr.getAttribute('data-cum')) }; selDlg = null; render(); return; }
+      var chr = t.closest('.row[data-check]');
+      if (chr) { selPass = { kind: 'check' }; selDlg = null; render(); return; }
+      var r = t.closest('.row[data-seq]');
+      if (r) { selSeq = Number(r.getAttribute('data-seq')); selPass = null; selDlg = null; render(); return; }
+      var dr = t.closest('.row[data-dlg]');
+      if (dr) { selDlg = dr.getAttribute('data-dlg'); selPass = null; render(); }
     };
     if (selDlg) wireDialogueWork(selDlg);
+    else if (selPass && selPass.kind === 'chunk') wireChunkWork(selPass.day, g);
+    else if (selPass && selPass.kind === 'para') wireParaWork(selPass.day, selPass.i, g);
+    else if (selPass && selPass.kind === 'cum') wireCumWork(selPass.i, g);
+    else if (selPass && selPass.kind === 'check') wireCheckWork(g);
     else wireSentenceWork(selSeq, g);
+  }
+
+  /* ── 뜻 세우기(청크 트랙) 지면 ── */
+  function ckStepDots(stage, done) {
+    var h = '<span class="ckstep">';
+    for (var i = 1; i <= CK_MAX; i++) h += '<em class="' + (done || i < stage ? 'dn' : (i === stage ? 'on' : '')) + '">' + CK_STAGES[i] + '</em>';
+    return h + '</span>';
+  }
+  function chunkWorkHtml(day, g) {
+    var gr = groupOfDay(day);
+    if (!gr) return '<p class="muted">단락을 선택하십시오.</p>';
+    var st = ckState(day), stage = Math.min(stageNum(st), CK_MAX), done = !!(st && st.reached);
+    var all = chunksOfGroup(gr);
+    var pairs = all.map(function (c) {
+      return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+    }).join('');
+    return '<div class="wh"><h2>' + esc(gr.header) + ' · ' + ZONE_MEAN + '</h2>' +
+      '<span class="tag ' + (done ? 't-green' : 't-ind') + '">' + (done ? '뜻 세우기 완료' : stage + '/3 · ' + CK_STAGES[stage]) + '</span>' +
+      ckStepDots(stage, done) + '</div>' +
+      '<div class="card"><p class="muted" style="margin:0 0 8px">영어를 쓰지 않습니다. 뜻(한글)을 먼저 세운 뒤에 문장 사다리가 열립니다.</p>' +
+      (all.length ? pairs : '<p class="muted">이 단락에는 청크 데이터가 없어 뜻 세우기를 건너뜁니다 — 문장 사다리가 바로 열립니다.</p>') +
+      '<div class="row2" style="margin-top:10px">' +
+      '<button class="btn" id="ckTts">전체 듣기</button>' +
+      (all.length
+        ? '<button class="btn p" id="ckGo">' + (done ? '뜻 세우기 다시 연습' : stage + '단계 시작 — ' + CK_STAGES[stage]) + '</button>'
+        : '<button class="btn" disabled>청크 없음</button>') +
+      '</div>' + genNoteHtml() + '</div>';
+  }
+  function wireChunkWork(day, g) {
+    var gr = groupOfDay(day);
+    if (!gr) return;
+    var tts = $('ckTts');
+    if (tts) tts.onclick = function () {
+      var list = chunksOfGroup(gr).map(function (c) { return c.en; });
+      if (window.WBVoice && WBVoice.ttsSupported() && list.length) WBVoice.speakSeq(list, { lang: 'en' });
+    };
+    var go = $('ckGo');
+    if (go) go.onclick = function () { runChunkSession(day); };
+  }
+  /* 청크 세션 — 통과 기준은 8할이다. 만점을 요구하면 못 읽는 학생이 첫 관문에서 다시 막힌다. */
+  function runChunkSession(day) {
+    var gr = groupOfDay(day), st = ckState(day);
+    if (!gr || !st) return;
+    var stage = Math.min(stageNum(st), CK_MAX);
+    var items = stage === 1 ? ckMatchItems(gr) : (stage === 2 ? ckMeanItems(gr) : ckOrderItems(gr));
+    if (!items.length) {
+      alert('이 단락의 ' + CK_STAGES[stage] + ' 문항을 만들 수 없습니다 (청크 데이터 부족). 문장 사다리로 바로 진행합니다.');
+      trackAdvance(st, true, CK_MAX, Date.now());
+      persist(); render();
+      return;
+    }
+    var pid = curPackId();
+    items.forEach(function (q) { q.packId = pid; q.track = 'chunk'; q.day = day; });
+    var okN = 0;
+    setLast('본문 ' + gr.header + ' · ' + ZONE_MEAN + ' ' + stage + '단계', { t: 'chunk', day: day });
+    persist();
+    runQueue(items, ZONE_MEAN + ' ' + stage + '/3 · ' + CK_STAGES[stage],
+      function (it, ok) { if (ok) okN += 1; logEvent('chunk', it.type, day, ok, pid); },
+      function (finished) {
+        var passed = finished && items.length > 0 && (okN / items.length) >= 0.8;
+        trackAdvance(st, passed, CK_MAX, Date.now());
+        touchPack(pid); persist(); render();
+      }, { noConfidence: true });
+  }
+
+  /* ── 굳히기(단락 관문) 지면 ── */
+  function paraWorkHtml(day, step, g) {
+    var gr = groupOfDay(day);
+    if (!gr) return '<p class="muted">단락을 선택하십시오.</p>';
+    var pg = pgState(day), pgStage = Math.min(stageNum(pg), PG_MAX), pgDone = !!(pg && pg.reached);
+    var done = pgDone || pgStage > step;
+    var gate = pgStageGate(day, PG_NEED[step]), ckg = ckGate(day);
+    var why = null;
+    if (!done) {
+      if (!ckg.open) why = '먼저 이 단락의 청크 뜻을 익히세요.';
+      else if (pgStage < step) why = '앞 단계(' + PG_STEPS[step - 1] + ')를 먼저 마치세요.';
+      else if (!gate.open) why = '이 단락 문장이 모두 ' + PG_NEED[step] + '단계 이상이어야 열립니다 (지금 ' + n0(gate.done) + '/' + n0(gate.total) + ').';
+      else if (step >= 2 && !g.open) why = '단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 잠깁니다.';
+    }
+    var body;
+    if (step === 1) body = '<p class="muted">이 단락의 줄거리를 우리말로 이어 씁니다. 청크의 핵심 뜻이 얼마나 들어갔는지로 채점합니다.</p>';
+    else if (step === 2) body = '<p class="muted">단락 문장 중 한 곳이 바뀌어 있습니다. 어디가 어색한지 고릅니다.</p>' +
+      ((pack.oddOneItems || []).length ? '' : '<p class="muted" style="color:var(--amber)">이 교재에는 「어색한 곳」 문항 데이터(oddOneItems)가 없습니다 — 건너뛰고 단락 백지로 넘어갑니다.</p>');
+    else body = '<p class="muted">' + gr.sentences.length + '문장을 순서대로, 아무것도 보지 않고 씁니다. 틀린 문장은 원인에 맞는 단계로 되돌아갑니다.</p>';
+    return '<div class="wh"><h2>' + esc(gr.header) + ' · ' + PG_STEPS[step] + '</h2>' +
+      '<span class="tag ' + (done ? 't-green' : 't-ind') + '">' + (done ? '통과' : ZONE_FIRM + ' ' + step + '/3') + '</span></div>' +
+      '<div class="card">' + body +
+      (why ? '<div class="notice" style="margin:10px 0 0">' + esc(why) + '</div>'
+           : '<button class="btn p big" id="pgGo" style="margin-top:10px">' + (done ? PG_STEPS[step] + ' 다시 하기' : PG_STEPS[step] + ' 시작') + '</button>') +
+      '</div>';
+  }
+  function wireParaWork(day, step, g) {
+    var go = $('pgGo');
+    if (!go) return;
+    go.onclick = function () {
+      if (step === 1) return runParaSummary(day);
+      if (step === 2) return runParaOdd(day);
+      return startBlank(groupOfDay(day));
+    };
+  }
+  /* 관문 ① 단락 줄거리 — 한글 이어 쓰기, 청크 커버리지로 채점(6할) */
+  function runParaSummary(day) {
+    var gr = groupOfDay(day), pg = pgState(day);
+    if (!gr || !pg) return;
+    var chunks = chunksOfGroup(gr);
+    setLast('본문 ' + gr.header + ' · 단락 줄거리', { t: 'para', day: day, step: 1 });
+    persist();
+    runCustom(ZONE_FIRM + ' · ' + esc(gr.header) + ' 단락 줄거리',
+      '<div class="q"><div class="qmeta">' + esc(gr.header) + ' — 이 단락의 줄거리를 우리말로 이어 쓰시오</div>' +
+      gr.sentences.map(function (s) { return '<div class="chunkline">' + esc(s.en) + '</div>'; }).join('') +
+      '<textarea class="ans" id="pgIn" style="min-height:140px"' + INATTR + ' placeholder="우리말로 줄거리를 이어 쓰기"></textarea>' +
+      '<div class="rnext"><button class="btn p big" id="okBtn">확인</button></div><div id="pgOut"></div></div>',
+      function () {
+        $('okBtn').onclick = function () {
+          var v = $('pgIn').value;
+          var cov = WBGRADE.gradeTranslationChunks(v, chunks);
+          var passed = cov.coverage >= 0.6;
+          var html = '<div class="result ' + (passed ? 'good' : 'bad') + '">청크 뜻 ' + Math.round(cov.coverage * 100) + '% 반영 — ' + (passed ? '통과' : '더 채워야 합니다(60% 이상)') + '</div>';
+          chunks.forEach(function (c, i) {
+            var miss = cov.perChunk[i] && !cov.perChunk[i].present;
+            html += '<div class="chunkline' + (miss ? ' miss' : '') + '">' + (miss ? '[빠짐] ' : '') + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+          });
+          html += '<div class="rnext"><button class="btn p big" id="pgDone">기록하고 닫기</button></div>';
+          $('pgOut').innerHTML = html;
+          $('pgDone').onclick = function () {
+            trackAdvance(pg, passed, PG_MAX, Date.now());
+            logEvent('para', 'summary', day, passed);
+            closeCustom(); persist(); render();
+          };
+        };
+      });
+  }
+  /* 관문 ② 어색한 곳 찾기 — 데이터가 없으면 이유를 보이고 넘긴다(조용히 막지 않는다) */
+  function runParaOdd(day) {
+    var gr = groupOfDay(day), pg = pgState(day);
+    if (!gr || !pg) return;
+    var items = oddItems(day);
+    if (!items.length) {
+      alert('이 교재에는 「어색한 곳 찾기」 문항 데이터(oddOneItems)가 없습니다.\n이 단계를 건너뛰고 단락 백지로 넘어갑니다.');
+      trackAdvance(pg, true, PG_MAX, Date.now());
+      persist(); render();
+      return;
+    }
+    var pid = curPackId();
+    items.forEach(function (q) { q.packId = pid; q.day = day; });
+    var okN = 0;
+    setLast('본문 ' + gr.header + ' · 어색한 곳', { t: 'para', day: day, step: 2 });
+    persist();
+    runQueue(items, ZONE_FIRM + ' · 어색한 곳 찾기',
+      function (it, ok) { if (ok) okN += 1; logEvent('para', 'odd', day, ok, pid); },
+      function (finished) {
+        trackAdvance(pg, finished && okN === items.length, PG_MAX, Date.now());
+        touchPack(pid); persist(); render();
+      }, { noConfidence: true });
+  }
+
+  /* ── 누적 백지 · 종합 Check 지면 ── */
+  function cumWorkHtml(i, g) {
+    var steps = cumSteps(), cs = steps[i];
+    if (!cs) return '<p class="muted">항목을 선택하십시오.</p>';
+    var allDone = allParasDone();
+    var why = !allDone ? '모든 단락의 백지를 먼저 마치세요.'
+      : (!g.open ? '단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 잠깁니다.'
+      : (!cs.open ? '앞 누적 백지를 먼저 마치세요.' : null));
+    var n = 0;
+    cs.days.forEach(function (d) { var gr = groupOfDay(d); if (gr) n += gr.sentences.length; });
+    return '<div class="wh"><h2>누적 백지 · ' + esc(cs.days.join(' + ')) + '</h2>' +
+      '<span class="tag ' + (cs.rec ? 't-green' : 't-ind') + '">' + (cs.rec ? '정확 ' + n0(cs.rec.okCount) + '/' + n0(cs.rec.total) : (i + 1) + '/' + steps.length) + '</span></div>' +
+      '<div class="card"><p class="muted">1일차 → 1+2일차 → … 순서로 범위를 넓혀 갑니다. 이번 범위는 ' + n + '문장입니다.</p>' +
+      (cs.rec ? '<p class="muted">마지막 기록 · 정확 ' + n0(cs.rec.okCount) + ' / ' + n0(cs.rec.total) + ' (' + n0(cs.rec.score) + '%)</p>' : '') +
+      (why ? '<div class="notice" style="margin:10px 0 0">' + esc(why) + '</div>'
+           : '<button class="btn p big" id="cumGo" style="margin-top:10px">' + (cs.rec ? '누적 백지 다시 도전' : '누적 백지 시작') + '</button>') +
+      '</div>';
+  }
+  function wireCumWork(i, g) {
+    var go = $('cumGo');
+    if (go) go.onclick = function () { startCumulative(i); };
+  }
+  function checkWorkHtml(g) {
+    var pd = packDB(), allDone = allParasDone();
+    var why = !allDone ? '모든 단락의 백지를 먼저 마치세요.'
+      : (!g.open ? '단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 잠깁니다.' : null);
+    var src = (pack.checkItems || []).length;
+    return '<div class="wh"><h2>종합 Check</h2>' +
+      '<span class="tag ' + (pd.check ? 't-green' : 't-ind') + '">' + (pd.check ? n0(pd.check.correct) + '/' + n0(pd.check.total) : '최종 점검') + '</span></div>' +
+      '<div class="card"><p class="muted">시험 전 최종 점검입니다. 고르기·빈칸·배열·영작을 섞어 한 번에 봅니다.</p>' +
+      (src ? '' : '<p class="muted" style="color:var(--amber)">이 교재에는 종합 Check 문항(checkItems)이 없어 사다리 문항으로 대체 점검을 만듭니다.</p>') +
+      (pd.check ? '<p class="muted">마지막 기록 · ' + n0(pd.check.correct) + ' / ' + n0(pd.check.total) + '</p>' : '') +
+      (why ? '<div class="notice" style="margin:10px 0 0">' + esc(why) + '</div>'
+           : '<button class="btn p big" id="chkGo" style="margin-top:10px">' + (pd.check ? '종합 Check 다시 보기' : '종합 Check 시작') + '</button>') +
+      '</div>';
+  }
+  function wireCheckWork(g) {
+    var go = $('chkGo');
+    if (go) go.onclick = runCheck;
   }
 
   /* ── 대화문 학습 (세션 ①) ── */
@@ -1296,29 +2155,51 @@
     /* 엔진 상태가 없는 학습 — 결과는 최근 학습 로그(pd.log)에 남긴다 */
     runQueue(items, '핵심표현 확인', function (it, ok) { logEvent('key', 'kwblank', it.ref, ok); }, function () { persist(); render(); }, { noConfidence: true });
   }
+  /* 진급 세션 id — 엔진의 이중 진급 가드는 session이 없으면 '1분 안 재호출'을 중복으로 본다.
+     1단계 읽기 완료 직후 2단계 해석을 1분 안에 통과하는 빠른 학생의 정당한 진급이 먹히지 않게
+     앱은 학습 세트(러너 1회)마다 새 session을 넘긴다 — 같은 세트 안의 재호출만 막힌다. */
+  var stageSessionNo = 0;
+  function newSession() { stageSessionNo += 1; return stageSessionNo + ':' + Date.now(); }
+  function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now(), { session: newSession() }); persist(); render(); }
+
+  /* ── 문장 사다리 지면 ── */
+  function cueBarHtml(cue) {
+    var dots = '';
+    for (var i = 3; i >= 1; i--) dots += '<i class="' + (cue >= i ? 'on' : '') + '"></i>';
+    return '<div class="cuebar"><span class="dots" aria-hidden="true">' + dots + '</span>' +
+      '<span>지금은 힌트 <b>' + CUE_NAMES[cue] + '</b> · 맞히면 힌트가 줄어요' +
+      (cue === 0 ? ' — 여기서 맞히면 다음 단계로' : '') + '</span></div>';
+  }
   function sentenceWorkHtml(seq, g) {
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return '<p class="muted">문장을 선택하십시오.</p>';
-    var stage = st.reached ? 6 : st.stage;
-    var locked = stage >= 5 && !g.open && !st.reached;
+    var stage = st.reached ? 6 : stageNum(st);
+    var ckg = ckGate(s.dayGroup);
+    var wordLocked = stage >= 5 && !g.open && !st.reached;
     var chunks = (s.chunks || []).map(function (c) {
       return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
     }).join('');
     var notes = (s.grammarNotes || []).map(function (n) {
       return '<p class="muted">[구문] <b>' + esc(n.target) + '</b> — ' + esc(n.note) + '</p>';
     }).join('');
+    var cue = cueOf(st);
     return '<div class="wh"><h2>문장 ' + s.seq + '</h2>' +
+      '<span class="tag t-gray">' + zoneOfStage(stage) + '</span>' +
       '<span class="tag ' + (st.reached ? 't-green' : 't-ind') + '">' + (st.reached ? '암기 완료' : stage + '단계 · ' + STAGE_NAMES[stage]) + '</span>' +
-      stageSteps(st.stage, st.reached) + '</div>' +
+      stageSteps(stageNum(st), st.reached) + '</div>' +
+      (!st.reached && FADED_STAGES[stage] && ckg.open ? cueBarHtml(cue) : '') +
       '<div class="card">' +
-      '<p style="font-size:16.5px;font-weight:600;line-height:1.7;margin:0 0 6px">' + esc(s.en) +
+      '<p class="enline">' + esc(s.en) +
       ' <button id="ttsBtn" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></p>' +
       '<p class="muted" style="font-size:13.5px;margin:0 0 10px">' + esc(s.ko) + '</p>' +
-      (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(해석 쓰기)까지 표시됩니다.</p>') +
+      (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(영어 청크 배열)까지 표시됩니다.</p>') +
       '</div>' +
-      (locked
-        ? '<div class="notice">단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 5·6단계가 잠깁니다. 단어 암기를 먼저 완성하십시오.</div>'
-        : '<button class="btn p big" id="stageGo">' + (st.reached ? '단락 백지 시험 다시 보기' : stage + '단계 학습 시작 — ' + STAGE_NAMES[stage]) + '</button>');
+      (!ckg.open
+        ? '<div class="notice">먼저 이 단락의 「' + ZONE_MEAN + '」(청크 뜻)을 마쳐야 문장 사다리가 열립니다. 왼쪽 목록의 청크 항목부터 시작하십시오.</div>'
+        : (wordLocked
+          ? '<div class="notice">단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 5·6단계가 잠깁니다. 단어 암기를 먼저 완성하십시오.</div>'
+          : '<button class="btn p big" id="stageGo">' + (st.reached ? '단락 백지 시험 다시 보기' : stage + '단계 학습 시작 — ' + STAGE_NAMES[stage]) + '</button>')) +
+      genNoteHtml();
   }
   function wireSentenceWork(seq, g) {
     var s = senBySeq(seq), st = senState(seq);
@@ -1328,78 +2209,133 @@
     var go = $('stageGo');
     if (go) go.onclick = function () { trainSentence(seq); };
   }
-  function trainSentence(seq) {
+  /* 사다리 한 세트 — 문장당 1회만 진급시킨다(4단계는 문항이 둘).
+     단서 단계는 한 세션 안에서 두 라운드를 돈다: 통과하면 곧바로 같은 문장을 한 단계 낮은
+     단서로 한 번 더 낸다. 이걸 다음 날로 미루면 문장당 러너 횟수가 6회에서 9회로 불어난다.
+     틀리면 거기서 세션이 끝난다 — 다음에는 더 높은 단서(더 많은 힌트)로 다시 만난다. */
+  var CUE_ROUNDS = 2;
+  function runLadder(items, title, st, stage, seq, round, faded) {
+    var pid = curPackId(), allOk = true, session = newSession();
+    runQueue(items, title, function (item, ok) {
+      if (!ok) allOk = false;
+      recordGenResult(item, ok, Date.now(), pid);
+      logEvent('sentence', item.type, 's' + seq, ok, pid);
+    }, function (finished) {
+      var before = { stage: stageNum(st), cue: cueOf(st) };
+      var passed = finished && allOk;
+      applyLadder(st, passed, Date.now(), session);
+      touchPack(pid); persist();
+      if (faded && passed && round < CUE_ROUNDS && !st.reached &&
+          stageNum(st) === before.stage && cueOf(st) < before.cue) {
+        setTimeout(function () { trainStageRound(seq, round + 1); }, 260);
+        return;
+      }
+      render();
+    }, { noConfidence: true });
+  }
+  function trainSentence(seq) { return trainStageRound(seq, 1); }
+  function trainStageRound(seq, round) {
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return;
-    var stage = st.stage;
+    if (!ckGate(s.dayGroup).open) return;            // 청크 미통과 단락은 1단계도 시작할 수 없다
+    var stage = st.reached ? 6 : stageNum(st);
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     if (stage >= 5 && !g.open && !st.reached) return;
-    setLast('본문 문장 ' + seq + ' · ' + STAGE_NAMES[Math.min(stage, 6)], { t: 'sentence', seq: seq });
-    persist();
-    if (st.reached || stage >= 6) { var grp = dayGroups().filter(function (gr) { return gr.day === s.dayGroup; })[0]; return startBlank(grp); }
-    if (stage === 1) return stageRead(s, st);
-    if (stage === 2) return stageTranslate(s, st);
-    if (stage === 3) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) { q.stage = 3; q.seq = seq; return runItems([q], '본문 3단계 · 핵심어 인출'); } return advanceAndRefresh(st, true); }
-    if (stage === 4) {
-      var items = [];
-      var c = WBGEN.clozeWide(s, Math.random); if (c) { c.stage = 4; c.seq = seq; items.push(c); }
-      var o = WBGEN.tokenOrder(s, Math.random); if (o) { o.stage = 4; o.seq = seq; items.push(o); }
-      if (items.length) return runItems(items, '본문 4단계 · 클로즈·배열');
-      return advanceAndRefresh(st, true);
+    var cue = cueOf(st);
+    if (round <= 1) {
+      setLast('본문 문장 ' + seq + ' · ' + STAGE_NAMES[Math.min(stage, 6)], { t: 'sentence', seq: seq });
+      persist();
     }
-    if (stage === 5) { var w = WBGEN.writingPrompt(s); if (w) { w.stage = 5; w.seq = seq; return runItems([w], '본문 5단계 · 문장 영작'); } return advanceAndRefresh(st, true); }
+    if (st.reached || stage >= 6) return startBlank(groupOfDay(s.dayGroup));
+    var items = [], q;
+    if (stage === 1) { q = koBlankItem(s, cue); if (q) items.push(q); }
+    else if (stage === 2) { q = enChunkOrderItem(s); if (q) items.push(q); }
+    else if (stage === 3) { q = kwBlankItem(s, cue); if (q) items.push(q); }
+    else if (stage === 4) { items = formItems(s); }
+    else if (stage === 5) { q = writeItem(s, cue); if (q) items.push(q); }
+    if (!items.length) {
+      /* 그 단계를 만들 데이터가 없다 — 조용히 넘기지 않고 이유를 말한 뒤 다음 단계로 보낸다 */
+      alert('이 문장은 ' + stage + '단계(' + STAGE_NAMES[stage] + ') 문항을 만들 데이터가 없습니다.\n다음 단계로 넘깁니다.');
+      WBNAESIN.advanceStage(st, true, Date.now(), { session: newSession(), fromStage: stage });
+      st.cue = 1;
+      persist(); render();
+      return;
+    }
+    var pid = curPackId(), faded = isFadedStage(stage);
+    items.forEach(function (it) { it.stage = stage; it.seq = seq; it.packId = pid; it.kind = 'sentence'; });
+    if (faded && round > 1) items[0].roundNote = '힌트를 줄여서 한 번 더 — 지금은 ' + CUE_NAMES[cue];
+    runLadder(items, '본문 ' + stage + '단계 · ' + STAGE_NAMES[stage] + (faded && round > 1 ? ' · 힌트 줄여 한 번 더' : ''),
+      st, stage, seq, round, faded);
   }
-  /* 진급 세션 id — 엔진의 이중 진급 가드는 session이 없으면 '1분 안 재호출'을 중복으로 본다.
-     1단계 읽기 완료 직후 2단계 해석을 1분 안에 통과하는 빠른 학생의 정당한 진급이 먹히지 않게
-     앱은 학습 세트(러너 1회)마다 새 session을 넘긴다 — 같은 세트 안의 재호출만 막힌다. */
-  var stageSessionNo = 0;
-  function newSession() { stageSessionNo += 1; return stageSessionNo + ':' + Date.now(); }
-  function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now(), { session: newSession() }); persist(); render(); }
 
-  function stageRead(s, st) {
-    var chunksHtml = (s.chunks || []).map(function (c) {
-      return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
-    }).join('');
-    var notes = (s.grammarNotes || []).map(function (n) {
-      return '<p class="muted">[구문] <b>' + esc(n.target) + '</b> — ' + esc(n.note) + '</p>';
-    }).join('');
-    runCustom('본문 1단계 · 대역 읽기',
-      '<div class="q"><div class="qmeta">문장 ' + s.seq + '</div>' +
-      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn2" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></div>' +
-      '<div class="prompt sm" style="color:var(--soft)">' + esc(s.ko) + '</div>' + chunksHtml + notes +
-      '<div class="rnext"><button class="btn p big" id="okBtn">읽기 완료 — 해석 단계로</button></div></div>',
-      function () {
-        $('ttsBtn2').onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
-        $('okBtn').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
-      });
+  /* ── 백지 실패 원인 라우팅(§3.7) ── */
+  var CAUSE_STAGE = { missing: 1, order: 2, form: 4, lexical: 3 };
+  var CAUSE_LABEL = { missing: '통째로 빠뜨림', order: '어순', form: '동사 형태', lexical: '낱말' };
+  function tokBag(text) {
+    var bag = {};
+    WBGRADE.normalizeEn(text).split(' ').forEach(function (t) { if (t) bag[t] = (bag[t] || 0) + 1; });
+    return bag;
   }
-  function stageTranslate(s, st) {
-    runCustom('본문 2단계 · 해석 쓰기',
-      '<div class="q"><div class="qmeta">문장 ' + s.seq + ' — 영어를 보고 우리말로 해석하시오</div>' +
-      '<div class="prompt">' + esc(s.en) + '</div>' +
-      '<textarea class="ans" id="trIn"' + INATTR + ' placeholder="우리말 해석 입력"></textarea>' +
-      '<div class="rnext"><button class="btn p big" id="okBtn">확인</button></div>' +
-      '<div id="trOut"></div></div>',
-      function () {
-        $('okBtn').onclick = function () {
-          var v = $('trIn').value;
-          var cov = WBGRADE.gradeTranslationChunks(v, s.chunks || []);
-          var html = '<div class="result ' + (cov.coverage >= 0.99 ? 'good' : 'bad') + '"><b>모범 해석</b> — ' + esc(s.ko) + '</div>';
-          (s.chunks || []).forEach(function (c, i) {
-            var miss = cov.perChunk[i] && !cov.perChunk[i].present;
-            html += '<div class="chunkline' + (miss ? ' miss' : '') + '">' + (miss ? '[누락] ' : '') + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
-          });
-          html += '<p class="muted">핵심 의미를 맞게 옮겼는지 스스로 판정하시오.</p>' +
-            '<div class="confrow"><button id="selfOk">통과 — 맞게 해석함</button><button id="selfNo">재학습 — 다시 연습</button></div>';
-          $('trOut').innerHTML = html;
-          $('selfOk').onclick = function () { closeCustom(); advanceAndRefresh(st, true); };
-          $('selfNo').onclick = function () { closeCustom(); advanceAndRefresh(st, false); };
-        };
-      });
+  function bagDiff(a, b) {
+    var out = [], k;
+    for (k in a) if (Object.prototype.hasOwnProperty.call(a, k)) { var n = (a[k] || 0) - (b[k] || 0); if (n > 0) out.push(k); }
+    return out;
+  }
+  /* 채점기에 blankCause 가 있으면 그것이 정본, 없으면 같은 네 분류를 앱이 근사한다 */
+  function causeOf(ps, s) {
+    if (WBGRADE.blankCause) {
+      try { var c = WBGRADE.blankCause(ps, s); if (c === 'ok' || (typeof c === 'string' && CAUSE_STAGE[c] != null)) return c; } catch (e) {}
+    }
+    if (!ps || ps.status === 'ok') return 'ok';
+    if (ps.status === 'missing' || !ps.input) return 'missing';
+    var A = tokBag(s.en), B = tokBag(ps.input);
+    var lost = bagDiff(A, B), gained = bagDiff(B, A);
+    if (!lost.length && !gained.length) return 'order';                   // 같은 토큰, 순서만 다름
+    var vf = {};
+    (s.verbForms || []).forEach(function (v) {
+      if (v && v.answer) vf[WBGRADE.normalizeEn(v.answer)] = 1;
+      if (v && v.base) vf[WBGRADE.normalizeEn(v.base)] = 1;
+    });
+    var onlyForm = lost.length > 0 && lost.every(function (t) { return vf[t]; }) && gained.every(function (t) { return vf[t] || !!vfLike(t, vf); });
+    if (onlyForm) return 'form';
+    return 'lexical';
+  }
+  /* 동사 형태 변형 근사 — 정본 동사와 앞 3글자를 공유하면 같은 동사의 다른 형태로 본다 */
+  function vfLike(tok, vf) {
+    var k;
+    for (k in vf) if (Object.prototype.hasOwnProperty.call(vf, k)) {
+      if (k.length >= 3 && tok.length >= 3 && k.slice(0, 3) === tok.slice(0, 3)) return true;
+    }
+    return false;
+  }
+  function routeBlank(ps, s, st, now, pd) {
+    var cause = causeOf(ps, s);
+    if (cause === 'ok') return null;
+    pd.senMiss[s.seq] = n0(pd.senMiss[s.seq]) + 1;
+    if (st.reached && cause !== 'missing') return { cause: cause, target: null };
+    /* 이미 백지를 통과한 문장은 통째로 빠뜨렸을 때만 되돌린다 — 낱말 하나 차이로 '암기 완료'가
+       사라지면 사다리가 신뢰를 잃는다. 통째로 못 쓴 것은 실제로 잊은 것이다. */
+    if (st.reached) { st.reached = false; st.reachedAt = null; st.relearnCount = 0; }
+    /* 원인 → 단계 표는 채점기(grade.js)에 있다 — 앱과 채점기가 같은 표를 본다 */
+    var target = (WBGRADE.blankCauseStage ? WBGRADE.blankCauseStage(cause) : null) || CAUSE_STAGE[cause] || 3;
+    st.stage = Math.min(stageNum(st), target);
+    if (cause === 'missing') st.cue = Math.min(3, cueOf(st) + 1);
+    st.last = now;
+    return { cause: cause, target: st.stage };
+  }
+  function diffLineHtml(ps, s) {
+    var body;
+    if (ps.status === 'missing') body = '<span class="d-missing">' + esc(s.en) + '</span>';
+    else body = (ps.diff || []).map(function (t) {
+      if (t.type === 'missing') return '<span class="d-missing">' + esc(t.text) + '</span>';
+      if (t.type === 'extra') return '<span class="d-extra">' + esc(t.text) + '</span>';
+      return esc(t.text);
+    }).join(' ');
+    return '<div class="diffline ' + ps.status + '"><span class="lbl">' + ps.seq + '</span>' + body + '</div>';
   }
   function startBlank(group) {
     if (!group) return;
-    var targets = group.sentences;
+    var targets = group.sentences, pid = curPackId();
     setLast('본문 ' + group.header + ' · 백지 시험', { t: 'blank', day: group.day });
     persist();
     runCustom('백지 시험 · ' + group.header,
@@ -1415,31 +2351,97 @@
           var html = '<div class="result ' + (d.missingCount === 0 && d.partialCount === 0 ? 'good' : 'bad') + '">' +
             '정확 ' + d.okCount + ' · 부분 ' + d.partialCount + ' · 누락 ' + d.missingCount +
             (d.orderOk ? '' : ' · 순서 불일치') + '</div>';
-          d.perSentence.forEach(function (ps) {
-            var s = senBySeq(ps.seq);
-            var body;
-            if (ps.status === 'missing') body = '<span class="d-missing">' + esc(s.en) + '</span>';
-            else body = (ps.diff || []).map(function (t) {
-              if (t.type === 'missing') return '<span class="d-missing">' + esc(t.text) + '</span>';
-              if (t.type === 'extra') return '<span class="d-extra">' + esc(t.text) + '</span>';
-              return esc(t.text);
-            }).join(' ');
-            html += '<div class="diffline ' + ps.status + '"><span class="lbl">' + ps.seq + '</span>' + body + '</div>';
-          });
+          d.perSentence.forEach(function (ps) { html += diffLineHtml(ps, senBySeq(ps.seq)); });
           html += '<div class="rnext"><button class="btn p big" id="bkDone">기록하고 닫기</button></div>';
           $('bkOut').innerHTML = html;
           $('bkDone').onclick = function () {
-            var now = Date.now(), pd = packDB();
+            var now = Date.now(), pd = packDB(), routes = [];
             d.perSentence.forEach(function (ps) {
-              var st = senState(ps.seq);
-              if (st && st.stage >= 6) WBNAESIN.advanceStage(st, ps.status === 'ok', now);
+              var s = senBySeq(ps.seq), st = senState(ps.seq);
+              if (!s || !st) return;
+              if (ps.status === 'ok') {
+                if (stageNum(st) >= 6 || st.reached) WBNAESIN.advanceStage(st, true, now, { fromStage: 6 });
+                return;
+              }
+              var r = routeBlank(ps, s, st, now, pd);
+              if (r) routes.push({ seq: ps.seq, cause: r.cause, target: r.target });
             });
+            /* 단락 관문 3단(단락 백지)은 그 단락 문장이 전부 reached 일 때 통과다 */
+            var pg = pgState(group.day);
+            if (pg) trackAdvance(pg, paraBlankDone(group), PG_MAX, now);
             pd.dump.push({ at: new Date().toISOString(), scope: group.day, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
-            closeCustom(); persist(); render();
+            logEvent('blank', 'blank', group.day, d.missingCount === 0 && d.partialCount === 0, pid);
+            touchPack(pid); persist();
+            if (routes.length) { closeCustom(); showRoutes(routes); return; }
+            closeCustom(); render();
           };
         };
       });
   }
+  /* 되돌림 안내 — "이 문장은 ○단계부터 다시" 를 원인과 함께 한 줄씩 */
+  function showRoutes(routes) {
+    runCustom('백지 결과 · 되돌아갈 자리',
+      '<div class="q"><div class="qmeta">틀린 문장은 원인에 맞는 단계로 되돌립니다 — 처음부터 다시가 아닙니다</div>' +
+      routes.map(function (r) {
+        var s = senBySeq(r.seq);
+        return '<div class="chunkline">' + '<b>문장 ' + r.seq + '</b> · ' + esc(CAUSE_LABEL[r.cause] || r.cause) +
+          '<span class="ko">' + (r.target ? '→ ' + r.target + '단계(' + STAGE_NAMES[r.target] + ')부터 다시' : '→ 암기 완료는 유지 · 다음 백지에서 확인') +
+          ' — ' + esc(s ? s.en : '') + '</span></div>';
+      }).join('') +
+      '<div class="rnext"><button class="btn p big" id="rtDone">확인</button></div></div>',
+      function () { $('rtDone').onclick = function () { closeCustom(); render(); }; });
+  }
+  /* ── 누적 백지 — 1일차 → 1+2일차 → … → 전체 ── */
+  function startCumulative(i) {
+    var steps = cumSteps(), cs = steps[i];
+    if (!cs) return;
+    var targets = [], pid = curPackId();
+    cs.days.forEach(function (d) { var gr = groupOfDay(d); if (gr) targets = targets.concat(gr.sentences); });
+    if (!targets.length) return;
+    setLast('누적 백지 · ' + cs.days.join('+'), { t: 'cumulative', i: i });
+    persist();
+    runCustom('누적 백지 · ' + cs.days.join(' + '),
+      '<div class="q"><div class="qmeta">' + esc(cs.days.join(' + ')) + ' — ' + targets.length + '문장을 순서대로, 아무것도 보지 않고 쓰시오</div>' +
+      '<textarea class="ans" id="cmIn" style="min-height:200px"' + INATTR + ' placeholder="기억나는 대로 영어로 작성"></textarea>' +
+      '<div class="rnext"><button class="btn p big" id="okBtn">채점</button></div><div id="cmOut"></div></div>',
+      function () {
+        $('okBtn').onclick = function () {
+          var v = $('cmIn').value;
+          var d = WBGRADE.diffPassage(v, targets.map(function (s) { return { seq: s.seq, en: s.en }; }));
+          var score = targets.length ? Math.round(d.okCount / targets.length * 100) : 0;
+          var html = '<div class="result ' + (score >= 80 ? 'good' : 'bad') + '">정확 ' + d.okCount + ' / ' + targets.length + ' (' + score + '%)' +
+            ' · 부분 ' + d.partialCount + ' · 누락 ' + d.missingCount + '</div>';
+          d.perSentence.forEach(function (ps) { html += diffLineHtml(ps, senBySeq(ps.seq)); });
+          html += '<div class="rnext"><button class="btn p big" id="cmDone">기록하고 닫기</button></div>';
+          $('cmOut').innerHTML = html;
+          $('cmDone').onclick = function () {
+            var pd = packDB(pid);
+            d.perSentence.forEach(function (ps) { if (ps.status !== 'ok') pd.senMiss[ps.seq] = n0(pd.senMiss[ps.seq]) + 1; });
+            pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score };
+            pd.dump.push({ at: new Date().toISOString(), scope: 'cum:' + cs.lastDay, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
+            logEvent('cumulative', 'blank', cs.lastDay, score >= 80, pid);
+            touchPack(pid); closeCustom(); persist(); render();
+          };
+        };
+      });
+  }
+  /* ── 종합 Check — 모든 단락을 마친 뒤의 최종 점검 ── */
+  function runCheck() {
+    var made = checkSetItems(), items = made.items, pid = curPackId();
+    if (!items.length) { alert('종합 Check 문항을 만들 수 없습니다 (문항 데이터 부족).'); return; }
+    items.forEach(function (q) { q.packId = pid; delete q.stage; delete q.kind; });
+    var correct = 0, total = 0;
+    setLast('종합 Check', { t: 'check' });
+    persist();
+    runQueue(items, '종합 Check' + (made.made ? '' : ' (대체 점검)'),
+      function (it, ok) { total += 1; if (ok) correct += 1; logEvent('check', it.type, 'check', ok, pid); },
+      function (finished) {
+        if (finished) packDB(pid).check = { at: new Date().toISOString(), correct: correct, total: total };
+        touchPack(pid); persist(); render();
+        if (finished) alert('종합 Check 결과 · ' + correct + ' / ' + total);
+      }, { noConfidence: true });
+  }
+
   function startDump() {
     var studied = pack.sentences.filter(function (s) { var st = senState(s.seq); return st && st.stage >= 2; });
     if (!studied.length) { alert('학습한 문장이 아직 없습니다. 본문 1단계부터 시작하십시오.'); return; }
@@ -1864,9 +2866,12 @@
       '<div><div class="n">' + ssum.interpreted + '<small>/' + ssum.total + '</small></div><div class="l">본문 해석 통과' + curNote + '</div></div>' +
       '<div><div class="n">' + ssum.memorized + '<small>/' + ssum.total + '</small></div><div class="l">백지 영작 완료' + curNote + '</div></div></div>' +
 
-      '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말 · 3단계 이상 = 통과</small></h2><div id="ipRows">' +
+      passageBoardHtml() +
+      missTopHtml() +
+
+      '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말 · 1단계(줄 해석) 통과 = 해석 가능</small></h2><div id="ipRows">' +
       pack.sentences.map(function (s) {
-        var st = senState(s.seq), ok = st && st.stage >= 3;
+        var st = senState(s.seq), ok = st && (st.reached || stageNum(st) >= 2);
         return '<div class="row" role="button" tabindex="0" data-go="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
           '<span class="tx">' + esc(s.en) + '</span><span class="lvchip ' + (ok ? 's' : '') + '">' + (ok ? '통과' : '미완') + '</span></div>';
       }).join('') + '</div></div>' +
@@ -1907,7 +2912,7 @@
         return;
       }
       var go = e.target.closest('[data-go]');
-      if (go) { selSeq = Number(go.getAttribute('data-go')); setTab('passage'); }
+      if (go) { selSeq = Number(go.getAttribute('data-go')); selPass = null; selDlg = null; setTab('passage'); }
     });
     $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
     /* 시험은 범위 전체에 하나다 — 시험일도 「자율 학습으로」도 범위의 모든 과에 같이 건다.
@@ -1934,6 +2939,37 @@
       });
       persist(); render();
     };
+  }
+  /* 본문 진행 — 청크(뜻 세우기) · 단락 백지 · 누적 · 종합 Check 한 줄 요약(§4-A-9) */
+  function passageBoardHtml() {
+    var ps = passageSummaryOf(curPackId());
+    if (!ps) return '';
+    var steps = cumSteps(), cum = cumReachedCount();
+    return '<div class="card"><h2>본문 진행 <small>뜻 세우기 → 영어 얹기 → 굳히기</small></h2>' +
+      '<div class="pgbars">' +
+      '<div><div class="n">' + ps.chunkDone + '<small style="font-size:13px;color:var(--soft)">/' + ps.chunkTotal + '</small></div><div class="l">' + ZONE_MEAN + ' 통과 단락</div></div>' +
+      '<div><div class="n">' + ps.paraBlank + '<small style="font-size:13px;color:var(--soft)">/' + ps.paraTotal + '</small></div><div class="l">단락 백지 통과</div></div>' +
+      '<div><div class="n">' + cum + '<small style="font-size:13px;color:var(--soft)">/' + steps.length + '</small></div><div class="l">누적 백지 도달 단락</div></div>' +
+      '<div><div class="n">' + (ps.check ? ps.check.correct + '<small style="font-size:13px;color:var(--soft)">/' + ps.check.total + '</small>' : '—') + '</div><div class="l">종합 Check</div></div>' +
+      '</div></div>';
+  }
+  /* 자주 빠뜨리는 문장 Top 5 — 백지·누적에서 놓친 횟수(pd.senMiss). 다음 학습의 우선 대상이다. */
+  function missTopHtml() {
+    var pd = packDB(), rows = [];
+    Object.keys(pd.senMiss || {}).forEach(function (k) {
+      var n = n0(pd.senMiss[k]);
+      if (n > 0) rows.push({ seq: Number(k), n: n });
+    });
+    if (!rows.length) return '';
+    rows.sort(function (a, b) { return b.n - a.n || a.seq - b.seq; });
+    return '<div class="card"><h2>자주 빠뜨리는 문장 <small>백지에서 놓친 횟수 상위 5</small></h2>' +
+      rows.slice(0, 5).map(function (r) {
+        var sen = senBySeq(r.seq), st = senState(r.seq);
+        var stage = st && st.reached ? '암기 완료' : (st ? stageNum(st) + '단계' : '1단계');
+        return '<div class="misstop"><span class="mn">' + r.n + '회</span>' +
+          '<span class="tx" style="flex:1;min-width:0">' + esc(sen ? sen.en : ('문장 ' + r.seq)) + '</span>' +
+          '<button class="btn" data-go="' + r.seq + '" style="min-height:44px">' + stage + ' →</button></div>';
+      }).join('') + '</div>';
   }
   /* 예상 점수대(계약 R2 prediction) — 원내 시험 결과가 충분히 쌓였을 때만 서버가 준다.
      확정·과장 어조를 쓰지 않는다: 도달률과 점수의 관계에서 나온 참고 구간일 뿐이다. */
@@ -2128,23 +3164,100 @@
   /* ── 문항 렌더 (유형별) ── */
   /* 답 입력창 공통 속성 — 자동 교정·대문자화·맞춤법 밑줄은 영어 철자 시험을 망친다 */
   var INATTR = ' autocorrect="off" spellcheck="false" autocomplete="off" autocapitalize="off" enterkeyhint="done"';
+  /* 듣기 버튼 — 청크 트랙과 배열 문항에서 영어 소리를 늘 곁에 둔다(못 읽는 학생의 입구) */
+  function ttsBtnHtml(item, id) {
+    if (!item.ttsText) return '';
+    return ' <button id="' + id + '" class="tag t-ind tb" aria-label="영어 듣기">듣기</button>';
+  }
+  function wireTtsBtn(item, id) {
+    var b = $(id);
+    if (b) b.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(item.ttsText, { lang: 'en' }); };
+  }
+  /* 전사(cue 3) 화면에 보여 줄 답 — 생성기는 showAnswer(불리언)+given(전문)으로 준다.
+     옛 판·앱 대체본은 showAnswer 에 문자열을 담기도 해서 둘 다 받는다. */
+  function givenText(item) {
+    if (item.showAnswer === true) return String(item.given || '');
+    if (typeof item.showAnswer === 'string') return item.showAnswer;
+    return '';
+  }
+  /* 한글 답 채점 — WBGRADE.normalizeEn 은 한글을 통째로 지우므로 뜻 빈칸에 쓸 수 없다.
+     공백·문장부호만 털고 견준다(조사·어미까지 좇지 않는다 — 여기서 재는 것은 '뜻을 아는가'다). */
+  function normKo(v) {
+    return String(v == null ? '' : v).replace(/\s+/g, '').replace(/[.,!?~·"'“”‘’()\[\]<>/\\-]/g, '').toLowerCase();
+  }
+  function gradeKoBlanks(inputs, answers) {
+    var all = true;
+    var per = (answers || []).map(function (acc, i) {
+      var got = normKo(inputs[i]);
+      var ok = !!got && (acc || []).some(function (a) { return normKo(a) === got; });
+      if (!ok) all = false;
+      return { correct: ok, expected: (acc && acc[0]) || '' };
+    });
+    return { allCorrect: all, perBlank: per };
+  }
   function renderItem(item, root) {
-    var stageLabel = item.stage ? '본문 ' + Math.floor(item.stage) + '단계'
+    var stageLabel = item.track === 'chunk' ? ZONE_MEAN + (item.day ? ' · ' + item.day : '')
+      : item.stage ? '본문 ' + Math.floor(item.stage) + '단계 · ' + (STAGE_NAMES[Math.floor(item.stage)] || '')
       : (item.kind === 'word' || item.wordId ? '단어'
       : (item.type === 'grammar' ? '어법 선택' + (item.seq != null ? ' · 문장 ' + item.seq : '')
       : (item.seq != null ? '본문 문장 ' + item.seq : '')));
     /* 통합 범위 세션은 과가 섞인다 — 지금 보는 과가 아닌 문항엔 어느 과인지 붙인다 */
     if (item.packId != null && item.packId !== curPackId()) stageLabel = lessonLabel(item.packId) + ' · ' + stageLabel;
-    var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
+    var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>' +
+      (item.roundNote ? '<div class="cuebar"><span>' + esc(item.roundNote) + '</span></div>' : '');
 
     if (item.type === 'storedmcq') return renderStored(item, root);
+
+    /* 청크 짝 맞추기 — 왼쪽 영어를 누르면 소리가 나고, 오른쪽 한글을 눌러 잇는다.
+       틀리면 표시만 하고 다시 고를 수 있다(여기서 막히면 첫날이 끝난다). 다 이으면 통과. */
+    if (item.type === 'ckmatch') {
+      var pairs = item.pairs || [];
+      var kos = WBGEN.shuffle(pairs.map(function (p, i) { return { i: i, ko: p.ko }; }), Math.random);
+      root.innerHTML = head + '<div class="prompt sm">영어를 누르면 소리가 납니다. 같은 뜻의 우리말을 이어 주세요.</div>' +
+        '<div class="pairs"><div class="col"><span class="cl">영어 청크</span>' +
+        pairs.map(function (p, i) { return '<button data-en="' + i + '">' + esc(p.en) + '</button>'; }).join('') +
+        '</div><div class="col"><span class="cl">우리말 뜻</span>' +
+        kos.map(function (k) { return '<button data-ko="' + k.i + '">' + esc(k.ko) + '</button>'; }).join('') +
+        '</div></div><p class="muted" id="mkNote" style="margin-top:10px">0 / ' + pairs.length + ' 연결</p></div>';
+      var pickedEn = null, matched = {}, wrongOnce = false;
+      var enBtns = root.querySelectorAll('button[data-en]'), koBtns = root.querySelectorAll('button[data-ko]');
+      function clearSel() { for (var i = 0; i < enBtns.length; i++) enBtns[i].classList.remove('sel', 'bad'); for (i = 0; i < koBtns.length; i++) koBtns[i].classList.remove('sel', 'bad'); }
+      function doneN() { return Object.keys(matched).length; }
+      function finish() {
+        $('mkNote').textContent = doneN() + ' / ' + pairs.length + ' 연결';
+        if (doneN() < pairs.length) return;
+        finishItem(item, !wrongOnce, null, wrongOnce ? ' — 다시 이어 맞췄습니다' : '');
+      }
+      root.querySelector('.pairs').onclick = function (e) {
+        var b = e.target.closest('button');
+        if (!b || b.disabled) return;
+        if (b.hasAttribute('data-en')) {
+          clearSel(); pickedEn = Number(b.getAttribute('data-en')); b.classList.add('sel');
+          if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(pairs[pickedEn].en, { lang: 'en' });
+          return;
+        }
+        var ki = Number(b.getAttribute('data-ko'));
+        if (pickedEn == null) { b.classList.add('sel'); setTimeout(function () { b.classList.remove('sel'); }, 250); return; }
+        var eb = root.querySelector('button[data-en="' + pickedEn + '"]');
+        if (ki === pickedEn) {
+          matched[ki] = 1; eb.classList.remove('sel'); eb.classList.add('done'); eb.disabled = true;
+          b.classList.add('done'); b.disabled = true; pickedEn = null;
+          finish();
+        } else {
+          wrongOnce = true; b.classList.add('bad'); eb.classList.add('bad');
+          setTimeout(function () { clearSel(); pickedEn = null; }, 450);
+        }
+      };
+      return;
+    }
 
     if (item.choices) {
       /* prompt가 없는 문항(어법 선택 — parts로만 옴)은 빈칸(____)을 넣어 조립한 문장 + 우리말을 보인다 */
       var ptxt = item.prompt != null ? String(item.prompt) : promptOf(item);
       root.innerHTML = head +
         (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') +
-        '<div class="prompt' + (item.prompt != null ? '' : ' sm') + '">' + esc(ptxt) + '</div><div class="choices" id="chs"></div></div>';
+        '<div class="prompt' + (item.prompt != null ? '' : ' sm') + '">' + esc(ptxt) + ttsBtnHtml(item, 'chTts') + '</div><div class="choices" id="chs"></div></div>';
+      wireTtsBtn(item, 'chTts');
       var chs = $('chs');
       var list = item.choices.slice();
       if (item.unknownKey) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
@@ -2200,28 +3313,46 @@
     }
 
     /* parts+blank 형식 전부 — 핵심어 빈칸(3단계)·구 클로즈(4단계, clozewide)·동사 형태 */
-    if (item.type === 'kwblank' || item.type === 'verb' || item.type === 'clozewide' || (item.parts && !item.choices)) {
-      var html = head + (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') + '<div class="prompt sm">';
+    if (item.type === 'kwblank' || item.type === 'koblank' || item.type === 'ckblank' || item.type === 'verb' || item.type === 'clozewide' || (item.parts && !item.choices)) {
+      var isKo = item.lang === 'ko';
+      /* 단서 3(전사) — 답을 보여 주고 그대로 옮겨 쓴다. 실패부터 시키면 학습이 아니라 회피가 생긴다. */
+      var shownAns = givenText(item);
+      var html = head +
+        (shownAns ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(shownAns) + '</div>' : '') +
+        (isKo && item.enFull ? '<div class="enline">' + esc(item.enFull) + ttsBtnHtml({ ttsText: item.enFull }, 'kbTts') + '</div>' : '') +
+        (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') +
+        '<div class="prompt sm">';
       var bi = 0;
       item.parts.forEach(function (p) {
         if (p.text != null) html += esc(p.text);
         else {
-          var hint = p.blank.hintKo ? '<span class="hintko">' + esc(p.blank.hintKo) + '</span>' : (p.blank.base ? '<span class="hintko">(' + esc(p.blank.base) + ')</span>' : '');
-          html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '"' + INATTR + ' aria-label="빈칸 ' + (bi + 1) + '">' + hint + '</span>';
+          var hint = p.blank.hintKo ? '<span class="hintko">' + esc(p.blank.hintKo) + '</span>'
+            : (p.blank.hintEn ? '<span class="hintko">' + esc(p.blank.hintEn) + '</span>'
+            : (p.blank.base ? '<span class="hintko">(' + esc(p.blank.base) + ')</span>' : ''));
+          var phv = p.blank.hint != null ? p.blank.hint : p.blank.ph;
+          var ph = phv ? ' placeholder="' + esc(phv) + '"' : '';
+          html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '"' + INATTR + ph + ' aria-label="빈칸 ' + (bi + 1) + '">' + hint + '</span>';
           bi += 1;
         }
       });
-      html += '</div><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
+      html += '</div>' +
+        (isKo && (item.chunks || []).length ? (item.chunks || []).map(function (c) {
+          return '<div class="chunkline">' + esc(c.en) + '<span class="ko">' + esc(c.ko) + '</span></div>';
+        }).join('') : '') +
+        '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
       root.innerHTML = html;
+      if (isKo && item.enFull) wireTtsBtn({ ttsText: item.enFull }, 'kbTts');
       var blanks = item.parts.filter(function (p) { return p.blank; });
       bindSubmit(function () {
         var ins = root.querySelectorAll('input[data-b]');
         var inputs = [], answers = [];
         blanks.forEach(function (p, i) { inputs.push(ins[i].value); answers.push(p.blank.answers); });
-        var g = WBGRADE.gradeBlanks(inputs, answers);
+        var g = isKo ? gradeKoBlanks(inputs, answers) : WBGRADE.gradeBlanks(inputs, answers);
         for (var i = 0; i < ins.length; i++) ins[i].classList.add(g.perBlank[i].correct ? 'ok' : 'bad');
+        /* expected 는 대표 정답 '문자열'이다 — [0]을 집으면 첫 글자만 보여 준다(옛 버그).
+           단서가 줄어드는 단계에서 정답을 못 보면 배울 기회 자체가 없다. */
         var wrongAns = g.perBlank.filter(function (pb) { return !pb.correct; })
-          .map(function (pb) { return pb.expected && pb.expected[0]; }).filter(Boolean);
+          .map(function (pb) { return pb.expected; }).filter(Boolean);
         finishItem(item, g.allCorrect, null, g.allCorrect ? '' : ' — 정답: <b>' + esc(wrongAns.join(', ')) + '</b>');
       });
       var f = root.querySelector('input[data-b]'); if (f) f.focus();
@@ -2229,11 +3360,16 @@
     }
 
     if (item.type === 'order') {
-      root.innerHTML = head + '<div class="prompt sm" style="color:var(--soft)" id="ordKo"></div>' +
+      /* 배열 문항의 길잡이 — 한글 청크를 배열할 때 매끄러운 해석(sentences[].ko)을 그대로 보이면
+         답이 그대로 새어 나간다. 문항이 hintText 를 주면 그것이 정본이다(영어 원문·한글 청크 순서). */
+      root.innerHTML = head +
+        (item.hintLabel ? '<div class="qmeta">' + esc(item.hintLabel) + '</div>' : '') +
+        '<div class="prompt sm" style="color:var(--soft)"><span id="ordKo"></span>' + ttsBtnHtml(item, 'ordTts') + '</div>' +
         '<div class="built" id="built"></div><div class="tokens" id="toks"></div>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
+      wireTtsBtn(item, 'ordTts');
       var sen = senBySeq(item.seq, item.packId);
-      $('ordKo').textContent = sen ? sen.ko : '어순에 맞게 배열하시오';
+      $('ordKo').textContent = item.hintText != null ? String(item.hintText) : (sen ? sen.ko : '어순에 맞게 배열하시오');
       var picked = [];
       function draw() {
         var b = $('built'); b.innerHTML = '';
@@ -2264,7 +3400,12 @@
       var hintHtml = item.type === 'write'
         ? '<p class="muted">활용 단어: ' + esc((item.keywords || []).join(', ')) + '</p>'
         : '<p class="muted">제시어: <b>' + esc(item.hint) + '</b></p>';
-      root.innerHTML = head + '<div class="prompt sm">' + esc(item.ko || '다음 문장을 영어로 쓰시오.') + '</div>' + hintHtml +
+      var shownW = givenText(item);
+      var skel = item.cueHint != null ? item.cueHint : (item.type === 'write' && !shownW ? item.hint : null);
+      if (skel) hintHtml += '<p class="muted" style="font-family:var(--mono);letter-spacing:1px">' + esc(skel) + '</p>';
+      root.innerHTML = head +
+        (shownW ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(shownW) + '</div>' : '') +
+        '<div class="prompt sm">' + esc(item.ko || '다음 문장을 영어로 쓰시오.') + '</div>' + hintHtml +
         '<textarea class="ans" id="wrIn"' + INATTR + ' placeholder="영어 문장 전체를 쓰시오"></textarea>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {

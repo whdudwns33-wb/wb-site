@@ -441,4 +441,344 @@ t('E1/E16 dailySet — now 를 안 넘기면 Date.now() 기준으로 로테이�
   } finally { Date.now = realNow; }
 });
 
+/* ── 본문 암기 재설계: 청크 트랙 · 단서 농도 · 단락/전체 관문 ── */
+
+const day1 = pack.sentences.filter((s) => s.dayGroup === '8/1');   // seq 1~3, 청크 8개
+const day2 = pack.sentences.filter((s) => s.dayGroup === '8/2');   // seq 4~5, 청크 5개
+/* 한글 빈칸 파트 재조립 — 빈칸은 표층형(answers[0]) */
+const koRebuild = (parts) => parts.map((p) => (p.text != null ? p.text : p.blank.answers[0])).join('');
+
+t('chunkMatch — 단락 청크 4~5쌍을 key 로 짝짓고 양쪽 순서를 달리 섞는다 / 판을 넘겨 전체를 덮는다', () => {
+  const q = G.chunkMatch(day1, seeded(3));
+  assert.strictEqual(q.type, 'ckmatch');
+  assert.strictEqual(q.total, 8);
+  assert.strictEqual(q.pairs.length, 5, '한 판은 4~5쌍');
+  assert.strictEqual(q.start, 0);
+  assert.strictEqual(q.next, 5);
+  assert.strictEqual(new Set(q.pairs.map((p) => p.key)).size, 5, 'key 중복');
+  /* 쌍의 en·ko 는 팩의 청크 그대로 */
+  q.pairs.forEach((p) => {
+    const parts = p.key.split(':');
+    const c = bySeq[+parts[0]].chunks[+parts[1]];
+    assert.deepStrictEqual([p.en, p.ko], [c.en, c.ko], p.key);
+  });
+  const keys = (list) => list.map((x) => x.key).join('|');
+  assert.deepStrictEqual(q.left.map((x) => x.key).slice().sort(), q.pairs.map((p) => p.key).slice().sort());
+  assert.deepStrictEqual(q.right.map((x) => x.key).slice().sort(), q.pairs.map((p) => p.key).slice().sort());
+  assert.notStrictEqual(keys(q.left), keys(q.right), '두 줄이 같은 순서면 눈으로 답이 보인다');
+  /* 다음 판 — 남은 3쌍으로 단락 전체를 덮는다 */
+  const q2 = G.chunkMatch(day1, seeded(9), { start: q.next });
+  assert.strictEqual(q2.pairs.length, 3);
+  assert.strictEqual(q2.next, null);
+  const covered = q.pairs.concat(q2.pairs).map((p) => p.key);
+  assert.strictEqual(new Set(covered).size, 8, '두 판이면 단락 청크 8개를 모두 덮는다');
+  assert.strictEqual(G.chunkMatch(day1, seeded(1), { size: 2 }).pairs.length, 2);
+});
+
+t('chunkMatch — 결측·퇴화 경로: 청크 없음·한 쌍뿐이면 null, 똑같은 청크는 한 번만', () => {
+  assert.strictEqual(G.chunkMatch([{ seq: 1, en: 'x', ko: 'ㄱ' }], seeded(1)), null, '청크 없음');
+  assert.strictEqual(G.chunkMatch([], seeded(1)), null);
+  assert.strictEqual(G.chunkMatch([{ seq: 1, chunks: [{ en: 'a', ko: '가' }] }], seeded(1)), null, '한 쌍은 문항이 아니다');
+  /* 같은 en·ko 가 두 번 나오면 어느 쪽에 이어도 맞아 채점이 거짓 오답을 낸다 */
+  const dup = [{ seq: 1, chunks: [{ en: 'to the sea.', ko: '바다로' }, { en: 'to the sea.', ko: '바다로' }, { en: 'we ran', ko: '우리는 뛰었다' }] }];
+  const q = G.chunkMatch(dup, seeded(1));
+  assert.strictEqual(q.pairs.length, 2);
+  assert.strictEqual(q.total, 2);
+  /* 마지막 판에 한 쌍만 남으면 앞에서 당겨 채운다 */
+  const tail = G.chunkMatch(day1, seeded(2), { start: 7 });
+  assert.ok(tail.pairs.length >= 2, '한 쌍짜리 판을 내지 않는다');
+  assert.strictEqual(G.chunkMatch(day1, seeded(2), { start: 99 }), null, '범위 밖 start 는 null');
+});
+
+t('chunkMeaning — 영어 청크 → 한글 4지선다, 오답은 같은 단락의 다른 청크', () => {
+  const all = [];
+  day1.forEach((s) => (s.chunks || []).forEach((c) => all.push(c)));
+  for (let i = 0; i < all.length; i++) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const q = G.chunkMeaning(day1, seeded(seed), { index: i });
+      assert.ok(q, 'index ' + i + ' 문항 생성 실패');
+      assert.strictEqual(q.type, 'ckmean');
+      assert.strictEqual(q.prompt, all[i].en);
+      assert.strictEqual(q.total, all.length);
+      assert.strictEqual(q.choices.length, 4);
+      assert.strictEqual(new Set(q.choices.map((c) => c.text)).size, 4, '보기 중복');
+      assert.strictEqual(q.choices.find((c) => c.key === q.answerKey).text, all[i].ko);
+      q.choices.filter((c) => c.key !== q.answerKey)
+        .forEach((c) => assert.ok(all.some((x) => x.ko === c.text), '오답이 단락 청크가 아님: ' + c.text));
+    }
+  }
+  const a = G.chunkMeaning(day1, seeded(11), { index: 2 });
+  const b = G.chunkMeaning(day1, seeded(11), { index: 2 });
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b), '같은 시드는 같은 문항');
+});
+
+t('G/E15 chunkMeaning — 정답과 같은 뜻·부분 정답·같은 영어의 다른 뜻은 오답 보기가 될 수 없다', () => {
+  const para = [{ seq: 1, chunks: [
+    { en: 'to the sea.', ko: '바다로 가는' },        // 정답
+    { en: 'to the sea.', ko: '바다 쪽으로' },        // 같은 영어 — 이것도 정답이다
+    { en: 'toward the shore', ko: '바다로' },        // 정답에 담기는 부분 정답
+    { en: 'to the sea,', ko: '바다로 가는!' },       // 구두점만 다른 같은 뜻
+    { en: 'we walked', ko: '우리는 걸었다' },
+    { en: 'every morning', ko: '아침마다' },
+    { en: 'with my dog', ko: '내 개와 함께' },
+    { en: 'after school', ko: '학교가 끝나고' },
+  ] }];
+  const banned = ['바다 쪽으로', '바다로', '바다로 가는!'];
+  for (let seed = 1; seed <= 20; seed++) {
+    const q = G.chunkMeaning(para, seeded(seed), { index: 0 });
+    assert.ok(q, 'seed ' + seed);
+    assert.strictEqual(q.choices.find((c) => c.key === q.answerKey).text, '바다로 가는');
+    q.choices.filter((c) => c.key !== q.answerKey)
+      .forEach((c) => assert.ok(banned.indexOf(c.text) < 0, 'seed ' + seed + ' 정답이 섞인 보기: ' + c.text));
+  }
+});
+
+t('chunkMeaning — 결측 경로: 청크 없음·범위 밖 index·오답 부족은 null', () => {
+  assert.strictEqual(G.chunkMeaning([{ seq: 1, en: 'x' }], seeded(1)), null, '청크 없음');
+  assert.strictEqual(G.chunkMeaning(null, seeded(1)), null);
+  assert.strictEqual(G.chunkMeaning(day1, seeded(1), { index: 99 }), null, '범위 밖 index');
+  assert.strictEqual(G.chunkMeaning(day1, seeded(1), { index: -1 }), null);
+  assert.strictEqual(G.chunkMeaning(day2.slice(0, 1), seeded(1)), null, '청크 2개로는 오답 3개를 못 채운다');
+  assert.ok(G.chunkMeaning(day2.slice(0, 1), seeded(1), { minDistractors: 1 }), '문턱을 낮추면 낼 수 있다');
+});
+
+t('chunkOrder — 한글 청크를 직독직해 순서로, 영어 자리를 함께 싣는다 / 청크 2개 미만은 null', () => {
+  const s = bySeq[2];
+  const q = G.chunkOrder(s, seeded(7));
+  assert.strictEqual(q.type, 'ckorder');
+  assert.deepStrictEqual(q.answer, s.chunks.map((c) => c.ko));
+  assert.deepStrictEqual(q.answerEn, s.chunks.map((c) => c.en), '한글만 있는 화면을 만들지 않는다');
+  assert.strictEqual(q.enFull, s.en);
+  assert.deepStrictEqual(q.shuffled.slice().sort(), q.answer.slice().sort(), '같은 청크의 순열');
+  for (let seed = 1; seed <= 60; seed++) {
+    const r = G.chunkOrder(s, seeded(seed));
+    assert.notStrictEqual(r.shuffled.join('|'), r.answer.join('|'), 'seed ' + seed + ' 항등 셔플');
+  }
+  assert.strictEqual(G.chunkOrder({ seq: 9, chunks: [{ en: 'a', ko: '가' }] }, seeded(1)), null, '한 청크는 순서가 없다');
+  assert.strictEqual(G.chunkOrder({ seq: 9 }, seeded(1)), null, '청크 없음');
+  assert.strictEqual(G.chunkOrder({ seq: 9, chunks: [{ en: 'a', ko: '가' }, { en: 'b', ko: '가' }] }, seeded(1)), null,
+    '한글이 전부 같으면 문제가 아니다');
+});
+
+t('enChunkOrder — 한글 청크를 보고 영어 청크 배열(2단계), 영어 전문은 화면에 없다', () => {
+  const s = bySeq[5];
+  const q = G.enChunkOrder(s, seeded(5));
+  assert.strictEqual(q.type, 'enorder');
+  assert.deepStrictEqual(q.answer, s.chunks.map((c) => c.en));
+  assert.deepStrictEqual(q.koChunks, s.chunks.map((c) => c.ko), '한글 청크를 순서대로 보여 준다');
+  assert.strictEqual(q.koFull, s.ko);
+  assert.strictEqual('enFull' in q, false, '영어 전문이 화면에 있으면 베껴 쓰는 문항이 된다');
+  assert.deepStrictEqual(q.shuffled.slice().sort(), q.answer.slice().sort());
+  for (let seed = 1; seed <= 60; seed++) {
+    assert.notStrictEqual(G.enChunkOrder(s, seeded(seed)).shuffled.join('|'), q.answer.join('|'), 'seed ' + seed);
+  }
+  assert.strictEqual(G.enChunkOrder({ seq: 9, chunks: [{ en: 'a', ko: '가' }] }, seeded(1)), null);
+  assert.strictEqual(G.enChunkOrder({ seq: 9, tokens: ['a', 'b', 'c'] }, seeded(1)), null, '청크 없음 — tokens 로 조용히 대체하지 않는다');
+});
+
+t('koBlanks — 청크 직독직해 줄에 keywords[].ko 빈칸, 빈칸 옆엔 늘 영어 핵심어 (전체 5문장)', () => {
+  pack.sentences.forEach((s) => {
+    const q = G.koBlanks(s, 1);
+    assert.ok(q, 'seq ' + s.seq + ' 문항 생성 실패');
+    assert.strictEqual(q.type, 'koblank');
+    assert.strictEqual(q.source, 'chunks');
+    assert.strictEqual(q.koText, s.chunks.map((c) => c.ko).join(' / '), 'seq ' + s.seq + ' 암기용 한글은 청크 직독직해다');
+    assert.notStrictEqual(q.koText, s.ko, '매끄러운 해석(sentence.ko)은 영어 자리와 어긋나 쓰지 않는다');
+    assert.strictEqual(koRebuild(q.parts), q.koText, 'seq ' + s.seq + ' 재조립이 줄과 다르다');
+    assert.strictEqual(q.enFull, s.en, '영어 자리를 함께 보여 준다');
+    const blanks = q.parts.filter((p) => p.blank);
+    assert.strictEqual(blanks.length, s.keywords.length, 'seq ' + s.seq + ' 빈칸 수');
+    /* 빈칸 차례는 한글 줄의 자리 순서다(핵심어 배열 순서가 아니다) — 짝은 hintEn 으로 맞춘다 */
+    assert.deepStrictEqual(blanks.map((p) => p.blank.hintEn).slice().sort(), s.keywords.map((k) => k.en).slice().sort(),
+      'seq ' + s.seq + ' 영어 핵심어 힌트');
+    blanks.forEach((p) => {
+      const kw = s.keywords.filter((k) => k.en === p.blank.hintEn)[0];
+      assert.strictEqual(p.blank.answers[0], kw.ko, 'seq ' + s.seq + ' ' + kw.en + ' 빈칸 정답');
+    });
+  });
+});
+
+t('koBlanks — 청크 없는 팩은 sentence.ko 로 내려가되 source 로 알린다 / 결측은 null', () => {
+  const s = { seq: 9, en: 'We ran to the sea.', ko: '우리는 바다로 뛰었다.', keywords: [{ en: 'sea', ko: '바다' }] };
+  const q = G.koBlanks(s, 1);
+  assert.strictEqual(q.source, 'ko');
+  assert.strictEqual(q.koText, s.ko);
+  assert.strictEqual(koRebuild(q.parts), s.ko);
+  assert.deepStrictEqual(q.chunks, []);
+  assert.strictEqual(G.koBlanks({ seq: 9, en: 'x', keywords: [{ en: 'a', ko: '가' }] }, 1), null, '한글 줄이 없으면 null');
+  assert.strictEqual(G.koBlanks({ seq: 9, en: 'x', ko: '가나다' }, 1), null, 'keywords 없으면 null');
+  assert.strictEqual(G.koBlanks({ seq: 9, en: 'x', ko: '가나다', keywords: [{ en: 'z', ko: '라마' }] }, 1), null,
+    '줄에서 키워드를 하나도 못 찾으면 null — 빈칸 없는 해석 화면은 문항이 아니다');
+});
+
+t('cue 3→0 — 단서가 실제로 줄어든다: 전사 → 첫 글자+글자 수 → 첫 글자 → 빈칸만', () => {
+  const hintsOf = (q) => q.parts.filter((p) => p.blank).map((p) => p.blank.hint);
+  /* 1단계 한글 빈칸 — '항상' */
+  const ko = [3, 2, 1, 0].map((c) => G.koBlanks(bySeq[5], c));
+  assert.deepStrictEqual(hintsOf(ko[0]), ['항상', '간직할', '소금기 어린']);
+  assert.deepStrictEqual(hintsOf(ko[1]), ['항 _', '간 _ _', '소 _ _ / _ _']);
+  assert.deepStrictEqual(hintsOf(ko[2]), ['항', '간', '소']);
+  assert.deepStrictEqual(hintsOf(ko[3]), [null, null, null]);
+  assert.deepStrictEqual(ko.map((q) => q.showAnswer), [true, false, false, false]);
+  assert.strictEqual(ko[0].given, ko[0].koText, '전사는 전문을 보여 주고 그대로 옮겨 쓰게 한다');
+  assert.strictEqual(ko[3].given, null);
+  ko.forEach((q, i) => {
+    assert.strictEqual(q.cue, [3, 2, 1, 0][i]);
+    q.parts.filter((p) => p.blank).forEach((p) => {
+      assert.strictEqual(p.blank.length != null, q.cue >= 2, '글자 수는 cue 2 이상');
+      assert.strictEqual(p.blank.lead != null, q.cue >= 1, '첫 글자는 cue 1 이상');
+    });
+  });
+  /* 3단계 영어 핵심어 빈칸 */
+  const en = [3, 2, 1, 0].map((c) => G.keywordBlanks(bySeq[2], 'en', c));
+  assert.deepStrictEqual(hintsOf(en[0]), ['heard', 'seagulls', 'above']);
+  assert.deepStrictEqual(hintsOf(en[1]), ['h _ _ _ _', 's _ _ _ _ _ _ _', 'a _ _ _ _']);
+  assert.deepStrictEqual(hintsOf(en[2]), ['h', 's', 'a']);
+  assert.deepStrictEqual(hintsOf(en[3]), [null, null, null]);
+  assert.strictEqual(en[0].given, bySeq[2].en);
+  en.forEach((q) => assert.strictEqual(koRebuild(q.parts), bySeq[2].en, 'cue 를 입혀도 재조립은 원문'));
+  /* 5단계 줄 영작 */
+  const wr = [3, 2, 1, 0].map((c) => G.writingPrompt(bySeq[1], c));
+  assert.strictEqual(wr[0].hint, bySeq[1].en);
+  assert.strictEqual(wr[1].hint, 'L___ s_____, m_ f_____ t___ a s___ t____ t_ t__ s__.');
+  assert.strictEqual(wr[2].hint, 'L s, m f t a s t t t s.');
+  assert.strictEqual(wr[3].hint, null);
+  assert.deepStrictEqual(wr.map((q) => q.showAnswer), [true, false, false, false]);
+  assert.deepStrictEqual(wr.map((q) => q.given), [bySeq[1].en, null, null, null]);
+  wr.forEach((q) => assert.deepStrictEqual(q.answers, [bySeq[1].en], '정답은 늘 원문 한 줄'));
+  /* 단서가 실제로 줄어든다 — 보여 주는 글자 수가 줄고(3→2), 그다음 글자 수 정보가 사라진다(2→1) */
+  const letters = (h) => (String(h || '').match(/[A-Za-z]/g) || []).length;
+  const len = (h) => (h == null ? 0 : String(h).length);
+  assert.ok(letters(wr[0].hint) > letters(wr[1].hint), '전사 → 첫 글자');
+  assert.strictEqual(letters(wr[1].hint), letters(wr[2].hint), '첫 글자는 그대로');
+  assert.ok(len(wr[1].hint) > len(wr[2].hint), 'cue 1 에서는 글자 수 정보가 사라진다');
+  assert.ok(letters(wr[2].hint) > letters(wr[3].hint) && wr[3].hint === null, '마지막은 힌트 없음');
+  /* 범위 밖 cue 는 0~3 으로 잘라 쓴다(정수) */
+  assert.strictEqual(G.writingPrompt(bySeq[1], 9).hint, bySeq[1].en);
+  assert.strictEqual(G.writingPrompt(bySeq[1], -5).hint, null);
+  assert.strictEqual(G.writingPrompt(bySeq[1], '2').hint, wr[1].hint, '문자열 cue 도 같은 단계');
+});
+
+t('호환 — cue 를 안 넘기면 keywordBlanks·writingPrompt 는 예전 그대로(학생 앱 호출을 깨지 않는다)', () => {
+  assert.deepStrictEqual(G.keywordBlanks(bySeq[3], 'en'), {
+    type: 'kwblank', seq: 3, direction: 'en', koFull: bySeq[3].ko,
+    parts: [
+      { text: 'We ' }, { blank: { answers: ['built'], hintKo: '만들었다' } },
+      { text: ' a small ' }, { blank: { answers: ['castle'], hintKo: '성' } },
+      { text: ' out of warm sand.' },
+    ],
+  });
+  assert.deepStrictEqual(G.writingPrompt(bySeq[3]), {
+    type: 'write', seq: 3, ko: bySeq[3].ko, keywords: ['build', 'castle', 'sand'], answers: [bySeq[3].en],
+  });
+  const q = G.keywordBlanks(bySeq[3], 'ko');
+  assert.strictEqual(q.enFull, bySeq[3].en);
+  assert.strictEqual('cue' in q, false);
+});
+
+t('oddOneItem — 지면에 ①②③④, 재조립 = 원문, 정답 조각을 correction 으로 되돌리면 본문이 된다', () => {
+  ['8/1', '8/2'].forEach((day, i) => {
+    const q = G.oddOneItem(pack.oddOneItems, day);
+    const src = pack.oddOneItems[i];
+    assert.strictEqual(q.type, 'oddone');
+    assert.strictEqual(q.dayGroup, day);
+    assert.strictEqual(q.kind, ['lexical', 'grammatical'][i]);
+    assert.strictEqual(q.answerKey, String(src.answerIdx + 1));
+    assert.deepStrictEqual(q.choices.map((c) => c.text), src.options);
+    assert.strictEqual(q.lines.length, src.sentences.length);
+    /* 파트를 이어 붙이면 지면 그대로 */
+    q.lines.forEach((ln, j) => {
+      const rebuilt = ln.parts.map((p) => (p.text != null ? p.text : p.pick.text)).join('');
+      assert.strictEqual(rebuilt, src.sentences[j].text, day + ' 줄 ' + j + ' 재조립');
+    });
+    /* 고르는 자리는 옵션 순서대로 ①②③④ */
+    const picks = [];
+    q.lines.forEach((ln) => ln.parts.forEach((p) => { if (p.pick) picks.push(p.pick); }));
+    assert.deepStrictEqual(picks.map((p) => p.key), src.options.map((x, k) => String(k + 1)), day + ' 번호 순서');
+    assert.deepStrictEqual(picks.map((p) => p.text), src.options);
+    assert.ok(q.prompt.indexOf('①') === 0 && q.prompt.indexOf('④') > 0, '지면에 번호가 붙는다');
+    /* 딱 한 곳만 바뀌었다 — 정답 조각을 correction 으로 되돌리면 정본과 같아진다 */
+    const answerText = src.options[src.answerIdx];
+    src.sentences.forEach((ln) => {
+      assert.strictEqual(ln.text.replace(answerText, src.correction), bySeq[ln.seq].en,
+        day + ' seq ' + ln.seq + ' 되돌리기');
+    });
+    const answerLine = src.sentences.filter((ln) => ln.text.indexOf(answerText) >= 0)[0];
+    assert.notStrictEqual(answerLine.text, bySeq[answerLine.seq].en, '정답 줄은 실제로 바뀌어 있어야 한다');
+  });
+});
+
+t('oddOneItem — 결측 경로: 그 단락 문항 없음·조각을 못 찾음·정답 없음은 null', () => {
+  assert.strictEqual(G.oddOneItem(pack.oddOneItems, '8/3'), null, '그 단락 문항 없음');
+  assert.strictEqual(G.oddOneItem([], '8/1'), null);
+  assert.strictEqual(G.oddOneItem(null, '8/1'), null);
+  const bad = [{ id: 'x', dayGroup: '8/1', sentences: [{ seq: 1, text: 'We ran to the sea.' }],
+    options: ['We ran', 'to the moon'], answerIdx: 1 }];
+  assert.strictEqual(G.oddOneItem(bad, '8/1'), null, '지면에 없는 조각이 있으면 번호가 어긋난다 — 문항을 내지 않는다');
+  const noAns = [{ id: 'y', dayGroup: '8/1', sentences: [{ seq: 1, text: 'We ran to the sea.' }], options: ['We ran', 'to the sea'] }];
+  assert.strictEqual(G.oddOneItem(noAns, '8/1'), null, 'answerIdx 없음');
+  const one = [{ id: 'z', dayGroup: '8/1', sentences: [{ seq: 1, text: 'We ran.' }], options: ['We ran'], answerIdx: 0 }];
+  assert.strictEqual(G.oddOneItem(one, '8/1'), null, '보기 하나는 문항이 아니다');
+  /* index 는 같은 단락의 여러 문항을 돌려 쓴다(범위를 넘으면 앞으로 돈다) */
+  assert.strictEqual(G.oddOneItem(pack.oddOneItems, null, { index: 1 }).dayGroup, '8/2', 'dayGroup 없이 부르면 전체에서');
+  assert.strictEqual(G.oddOneItem(pack.oddOneItems, '8/1', { index: 5 }).id, 'odd-8-1');
+});
+
+t('checkSet — 종합 Check 네 슬롯이 러너 문항으로 (choice·blank·write·arrange)', () => {
+  const set = G.checkSet(pack.checkItems, seeded(11));
+  assert.strictEqual(set.length, 8);
+  assert.deepStrictEqual(set.skipped, [], '못 만든 칸이 없어야 한다');
+  assert.deepStrictEqual(set.map((q) => q.slot), ['choice', 'choice', 'choice', 'choice', 'blank', 'blank', 'write', 'arrange']);
+  assert.deepStrictEqual(set.map((q) => q.type), ['mcq', 'mcq', 'mcq', 'mcq', 'ckblank', 'ckblank', 'write', 'order']);
+  set.forEach((q) => assert.strictEqual(q.kind, 'check'));
+  assert.deepStrictEqual(set.map((q) => q.checkId), pack.checkItems.map((it) => it.id));
+  /* choice — 정답 텍스트가 authored 정답과 같고 보기가 겹치지 않는다 */
+  pack.checkItems.forEach((it, i) => {
+    if (it.slot !== 'choice') return;
+    const q = set[i];
+    assert.strictEqual(q.choices.length, it.choices.length);
+    assert.strictEqual(new Set(q.choices.map((c) => c.text)).size, it.choices.length, '보기 중복: ' + it.id);
+    assert.strictEqual(q.choices.find((c) => c.key === q.answerKey).text, it.choices[it.answerIdx], it.id);
+    assert.strictEqual(q.prompt, it.textEn);
+  });
+  /* blank — ___ 자리에 정답, 이어 붙이면 지문 그대로 */
+  const b = set[5];
+  assert.strictEqual(b.parts.filter((p) => p.blank).length, 2);
+  assert.deepStrictEqual(b.parts.filter((p) => p.blank).map((p) => p.blank.answers[0]), ['keep', 'heart']);
+  assert.deepStrictEqual(b.parts.filter((p) => p.blank).map((p) => p.blank.hintKo), ['간직할', '마음']);
+  assert.strictEqual(b.parts.map((p) => (p.text != null ? p.text : '______')).join(''), pack.checkItems[5].textEn);
+  assert.strictEqual(b.koFull, pack.checkItems[5].promptKo);
+  /* write · arrange 는 기존 러너 문항 모양 그대로 */
+  assert.deepStrictEqual(set[6].answers, pack.checkItems[6].answers);
+  assert.deepStrictEqual(set[6].keywords, ['build', 'castle', 'sand']);
+  assert.deepStrictEqual(set[7].answer, pack.checkItems[7].tokens);
+  assert.deepStrictEqual(set[7].shuffled.slice().sort(), pack.checkItems[7].tokens.slice().sort());
+  assert.notStrictEqual(set[7].shuffled.join('|'), set[7].answer.join('|'));
+  assert.strictEqual(G.checkSet(pack.checkItems, seeded(11), { limit: 3 }).length, 3);
+});
+
+t('checkItem — 결측·모순은 null (답이 갈리는 최종 점검 문항은 없느니만 못하다)', () => {
+  const mk = (o) => G.checkItem(o, seeded(1));
+  assert.strictEqual(mk(null), null);
+  assert.strictEqual(mk({ id: 'a' }), null, 'slot 없음');
+  assert.strictEqual(mk({ id: 'a', slot: 'listen' }), null, '모르는 슬롯은 조용히 넘기지 않는다');
+  assert.strictEqual(mk({ id: 'a', slot: 'choice', choices: ['x'], answerIdx: 0 }), null, '보기 하나');
+  assert.strictEqual(mk({ id: 'a', slot: 'choice', choices: ['x', 'y'] }), null, 'answerIdx 없음');
+  assert.strictEqual(mk({ id: 'a', slot: 'choice', choices: ['calling', 'Calling', 'to call'], answerIdx: 0 }), null,
+    '같은 보기가 두 번이면 정답이 둘이다');
+  assert.strictEqual(mk({ id: 'a', slot: 'blank', textEn: 'I ______ it ______.', blanks: [{ answers: ['keep'] }] }), null,
+    '빈칸 수와 정답 수 불일치');
+  assert.strictEqual(mk({ id: 'a', slot: 'blank', textEn: 'I ______ it.', blanks: [{ answers: [] }] }), null, '빈 정답');
+  assert.strictEqual(mk({ id: 'a', slot: 'blank', blanks: [{ answers: ['x'] }] }), null, '지문 없음');
+  assert.strictEqual(mk({ id: 'a', slot: 'write', ko: '가나다' }), null, '정답 없음');
+  assert.strictEqual(mk({ id: 'a', slot: 'write', answers: ['We ran.'] }), null, '한글 제시문 없음');
+  assert.strictEqual(mk({ id: 'a', slot: 'arrange', tokens: ['I', 'ran'] }), null, '토큰 2개는 뒤집기뿐');
+  assert.strictEqual(G.checkSet(null, seeded(1)), null, 'checkItems 없음 — 빈 배열을 돌려주면 화면이 조용히 빈다');
+  assert.strictEqual(G.checkSet([], seeded(1)), null);
+  assert.strictEqual(G.checkSet([{ id: 'bad', slot: 'listen' }], seeded(1)), null, '한 문항도 못 만들면 null');
+  const mixed = G.checkSet([{ id: 'bad', slot: 'listen' }].concat(pack.checkItems.slice(6)), seeded(1));
+  assert.strictEqual(mixed.length, 2);
+  assert.deepStrictEqual(mixed.skipped, ['bad'], '건너뛴 칸은 skipped 로 남긴다');
+});
+
 console.log('\n통과 ' + passed + '개 — 문항 생성 모듈 검증 완료');

@@ -370,4 +370,74 @@ t('gradeTranslationChunks — 청크가 없으면 빠뜨릴 것도 없다', () =
   assert.deepStrictEqual(G.gradeTranslationChunks('아무 해석', []).perChunk, []);
 });
 
+/* ── 백지 실패 원인 라우팅 (§3.7) ── */
+
+const bySeq = {}; S.forEach((s) => { bySeq[s.seq] = s; });
+/* 문장 하나만 바꾼 백지 입력을 만들어 그 문장의 원인을 뽑는다 */
+const causeOf = (seq, text) => {
+  const full = S.map((s) => s.en);
+  full[seq - 1] = text;
+  const r = G.diffPassage(full.join(' '), canon);
+  const ps = r.perSentence.filter((x) => x.seq === seq)[0];
+  return { status: ps.status, cause: G.blankCause(ps, bySeq[seq]) };
+};
+/* diffPassage 를 거치지 않는 단위 판정 — 매칭 결과를 직접 만들어 넣는다 */
+const direct = (seq, input) => G.blankCause({ seq: seq, status: 'partial', score: 0.8, input: input, diff: [] }, bySeq[seq]);
+
+t('blankCause — 네 분류: 통째로 빠뜨림 missing · 어순만 order · 동사 형태만 form · 그 밖은 lexical', () => {
+  /* missing — 그 문장을 아예 안 썼다 */
+  const skipped = G.diffPassage([S[0].en, S[1].en, S[3].en, S[4].en].join(' '), canon);
+  const ps3 = skipped.perSentence.filter((x) => x.seq === 3)[0];
+  assert.strictEqual(ps3.status, 'missing');
+  assert.strictEqual(G.blankCause(ps3, bySeq[3]), 'missing');
+  /* order — 낱말은 다 맞고 자리만 옮겼다 */
+  assert.strictEqual(direct(1, 'My family took a slow train to the sea last summer.'), 'order');
+  assert.deepStrictEqual(causeOf(1, 'My family took a slow train to the sea last summer.'), { status: 'partial', cause: 'order' });
+  assert.deepStrictEqual(causeOf(5, 'I will keep that salty morning always in my heart.'), { status: 'partial', cause: 'order' });
+  /* form — verbForms 자리의 동사 형태만 어긋났다 (규칙 굴절도, 불규칙 kept 도) */
+  assert.deepStrictEqual(causeOf(2, 'When the doors opened, I heard seagulls call above the waves.'), { status: 'partial', cause: 'form' });
+  assert.deepStrictEqual(causeOf(1, 'Last summer, my family take a slow train to the sea.'), { status: 'partial', cause: 'form' });
+  assert.deepStrictEqual(causeOf(4, 'My little brother asked me why the tide come in at night.'), { status: 'partial', cause: 'form' });
+  assert.deepStrictEqual(causeOf(3, 'We build a small castle out of warm sand.'), { status: 'partial', cause: 'form' });
+  assert.deepStrictEqual(causeOf(5, 'I will always kept that salty morning in my heart.'), { status: 'partial', cause: 'form' });
+  /* lexical — 낱말이 바뀌었다 */
+  assert.deepStrictEqual(causeOf(3, 'We built a big castle out of warm sand.'), { status: 'partial', cause: 'lexical' });
+  assert.deepStrictEqual(causeOf(1, 'Last summer, my family took a fast train to the sea.'), { status: 'partial', cause: 'lexical' });
+  /* ok — 정규화 후 완전 일치 */
+  const perfect = G.diffPassage(S.map((s) => s.en).join(' '), canon);
+  perfect.perSentence.forEach((ps) => assert.strictEqual(G.blankCause(ps, bySeq[ps.seq]), 'ok'));
+});
+
+t('blankCause — 되돌릴 단계: missing 1 · order 2 · lexical 3 · form 4 (§3.7 표)', () => {
+  assert.strictEqual(G.blankCauseStage('missing'), 1);
+  assert.strictEqual(G.blankCauseStage('order'), 2);
+  assert.strictEqual(G.blankCauseStage('lexical'), 3);
+  assert.strictEqual(G.blankCauseStage('form'), 4);
+  assert.strictEqual(G.blankCauseStage('ok'), null, '맞은 문장은 되돌리지 않는다');
+  assert.strictEqual(G.blankCauseStage(null), null);
+  assert.strictEqual(G.blankCauseStage('constructor'), null, '물려받은 속성을 단계로 읽지 않는다');
+});
+
+t('blankCause — 애매하면 lexical, 부를 수 없는 입력은 null (오탐이 미탐보다 나쁘다)', () => {
+  /* 토큰 수가 다르면 자리를 못 짝지운다 — 동사 형태가 섞여 있어도 낱말로 떨어뜨린다 */
+  assert.strictEqual(direct(4, 'My little brother asked me why the tide comes at night.'), 'lexical', '낱말 하나가 빠짐');
+  assert.strictEqual(direct(1, 'Last summer, my family take a fast train to the sea.'), 'lexical', '형태 + 낱말이 같이 틀림');
+  /* 동사 자리에 아주 다른 말을 썼으면 형태 문제가 아니다 */
+  assert.strictEqual(direct(3, 'We heard a small castle out of warm sand.'), 'lexical');
+  /* 그 문장의 다른 낱말을 동사 자리에 옮겨 적은 것도 형태가 아니다 */
+  assert.strictEqual(direct(5, 'I will always that that salty morning in my heart.'), 'lexical');
+  /* verbForms 가 없는 팩이면 형태 판정 근거가 없다 */
+  assert.strictEqual(G.blankCause({ seq: 1, status: 'partial', input: 'Last summer, my family take a slow train to the sea.', diff: [] },
+    { seq: 1, en: S[0].en }), 'lexical');
+  /* 입력이 없거나 정본이 없으면 판정하지 않는다 */
+  assert.strictEqual(G.blankCause(null, bySeq[1]), null);
+  assert.strictEqual(G.blankCause({}, bySeq[1]), null, 'status 없음');
+  assert.strictEqual(G.blankCause({ seq: 1, status: 'partial', input: 'x' }, null), null, '정본 문장 없음');
+  assert.strictEqual(G.blankCause({ seq: 1, status: 'partial', input: 'x' }, { seq: 1 }), null, '정본 en 없음');
+  assert.strictEqual(G.blankCause({ seq: 1, status: 'partial', input: '' }, bySeq[1]), 'missing', '빈 입력은 안 쓴 것');
+  assert.strictEqual(G.blankCause({ seq: 1, status: 'partial', input: '...' }, bySeq[1]), 'missing', '낱말이 하나도 없는 입력');
+  /* 정규화상 같은 문장은 매칭 상태와 무관하게 ok — 축약·구두점 차이로 되돌리지 않는다 */
+  assert.strictEqual(direct(5, 'i will always keep that salty morning in my heart'), 'ok');
+});
+
 console.log('\n통과 ' + passed + '개 — 채점 모듈 검증 완료');
