@@ -1,7 +1,8 @@
 /* naesin-extract.mjs 검증 — 실제 API를 부르지 않는다(fetch를 갈아 끼운다).
    실행: node reading-server/naesin-extract.test.mjs */
 import assert from 'node:assert';
-import { extract, splitSource, parseJsonBlock, makeQuota, CHUNK_CHARS, KINDS } from './naesin-extract.mjs';
+import { extract, splitSource, parseJsonBlock, makeQuota, CHUNK_CHARS, KINDS, readExtractLimit, EXTRACT_QUOTA_DEFAULT } from './naesin-extract.mjs';
+import { dayKey } from './ai-quota.mjs';
 
 let n = 0;
 const t = async (name, fn) => { await fn(); n += 1; console.log('  ✓ ' + name); };
@@ -154,19 +155,50 @@ await t('스키마 안내에 청크 규칙과 직독직해가 들어 있다', as
 
 await t('일일 한도를 넘으면 부르지 않는다', async () => {
   const f = fakeFetch([{ text: wordsJson(['w-001']) }]);
-  const q = makeQuota({ rec: { count: 5 }, limits: { total: 5 } });
+  const q = makeQuota({ rec: { day: dayKey(Date.now()), count: 5 }, limits: { total: 5 } });
   const r = await extract({ kind: 'words', text: 'x', apiKey: 'k', fetchImpl: f, quota: q });
   assert.strictEqual(r.reason, 'quota');
   assert.strictEqual(f.calls.length, 0);
 });
 
-await t('한도 안이면 사용량을 올린다', async () => {
+await t('한도 안이면 사용량을 올린다 — 장부에 날짜가 함께 남는다', async () => {
   const seen = [];
-  const q = makeQuota({ rec: { count: 2 }, limits: { total: 10 }, onUse: (c) => seen.push(c) });
+  const today = dayKey(Date.now());
+  const q = makeQuota({ rec: { day: today, count: 2 }, limits: { total: 10 }, onUse: (rec) => seen.push(rec) });
   const f = fakeFetch([{ text: wordsJson(['w-001']) }]);
   const r = await extract({ kind: 'words', text: 'x', apiKey: 'k', fetchImpl: f, quota: q });
   assert.strictEqual(r.ok, true);
-  assert.deepStrictEqual(seen, [3]);
+  assert.deepStrictEqual(seen, [{ day: today, count: 3 }]);
+});
+
+await t('어제 장부는 0에서 다시 센다 — 호스트가 날짜를 다루다 틀리는 일이 없게', () => {
+  const q = makeQuota({ rec: { day: '2020-01-01', count: 999 }, limits: { total: 3 } });
+  assert.strictEqual(q.left(), 3);
+  assert.strictEqual(q.take(), true);
+  assert.strictEqual(q.left(), 2);
+});
+
+/* 여기가 §13-8 의 핵심이다 — 한도는 추출 횟수가 아니라 API 호출 횟수를 막아야 한다.
+   원천이 길면 extract() 한 번이 조각 수만큼 부르므로, 앞에서 한 번만 세면 실제 비용의
+   몇 분의 일만 막힌다(고치기 전이 그랬다). */
+await t('한도는 조각(=API 호출)마다 센다 — 긴 원천이 한도를 우회하지 못한다', async () => {
+  const long = Array.from({ length: 150 }, (_, i) => 'line ' + i + ' ' + 'x'.repeat(200)).join('\n');
+  const f = fakeFetch(Array.from({ length: 9 }, (_, i) => ({ text: wordsJson(['w-' + i]) })));
+  const seen = [];
+  const q = makeQuota({ rec: null, limits: { total: 3 }, onUse: (rec) => seen.push(rec.count) });
+  const r = await extract({ kind: 'words', text: long, apiKey: 'k', fetchImpl: f, quota: q });
+  assert.ok(splitSource(long, 6000).length > 3, '이 원천은 조각이 3개보다 많아야 검사가 성립한다');
+  assert.strictEqual(f.calls.length, 3, '한도 3이면 API 호출도 3번이어야 한다');
+  assert.deepStrictEqual(seen, [1, 2, 3]);
+  assert.strictEqual(r.ok, true, '한도에 걸려도 뽑은 만큼은 살린다');
+  assert.ok(r.parts.some((p) => p.reason === 'quota'), '한도로 못 부른 구간을 화면에 알린다');
+});
+
+await t('readExtractLimit — 기본 80, 환경변수로 조절, 이상한 값은 기본값', () => {
+  assert.strictEqual(readExtractLimit({}).total, EXTRACT_QUOTA_DEFAULT);
+  assert.strictEqual(readExtractLimit({ NAESIN_AI_DAILY: '150' }).total, 150);
+  assert.strictEqual(readExtractLimit({ NAESIN_AI_DAILY: '0' }).total, EXTRACT_QUOTA_DEFAULT, '0으로 기능이 죽으면 안 된다');
+  assert.strictEqual(readExtractLimit({ NAESIN_AI_DAILY: 'abc' }).total, EXTRACT_QUOTA_DEFAULT);
 });
 
 console.log('\n== 순수 함수');

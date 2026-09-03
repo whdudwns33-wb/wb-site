@@ -13,6 +13,8 @@
  * 원문을 응답·로그에 되돌려 담지 않는다.
  */
 
+import { dayKey } from './ai-quota.mjs';
+
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-opus-5';
 const MAX_TOKENS = 8000;
@@ -141,16 +143,23 @@ export async function extract({ kind, text, apiKey, model, fetchImpl, quota }) {
   if (!apiKey) return { ok: false, reason: 'no-key' };
   const src = String(text == null ? '' : text).trim();
   if (!src) return { ok: false, reason: 'empty' };
-  /* 비용 거버넌스 — 관리자 추출도 일일 한도를 받는다(기획서 §13-8) */
-  if (quota && typeof quota.take === 'function' && !quota.take()) return { ok: false, reason: 'quota' };
-
   const parts = splitSource(src, CHUNK_CHARS[kind] || 6000);
+  /* 비용 거버넌스(기획서 §13-8) — 한도는 '추출 한 번'이 아니라 'API 호출 한 번'마다 센다.
+     원천이 길면 조각 수만큼 부르므로, 앞에서 한 번만 세면 한도가 실제 비용의 몇 분의 일만
+     막는다. 첫 조각도 못 부르면 그건 실패다. */
+  const take = () => !quota || typeof quota.take !== 'function' || quota.take();
+  if (!take()) return { ok: false, reason: 'quota' };
   const rows = [];
   const extra = {};
   const report = [];
   let usedModel = null;
   let anyOk = false;
   for (let i = 0; i < parts.length; i += 1) {
+    /* 첫 조각 자리는 위에서 잡았다 — 두 번째부터 조각마다 새로 잡는다 */
+    if (i > 0 && !take()) {
+      report.push({ part: i + 1, ok: false, count: 0, reason: 'quota' });
+      continue;
+    }
     const res = await callOnce({
       kind, text: parts[i], part: i + 1, parts: parts.length,
       startIndex: rows.length, apiKey, model, fetchImpl,
@@ -173,16 +182,31 @@ export async function extract({ kind, text, apiKey, model, fetchImpl, quota }) {
 /* ai-quota 의 일일 한도를 추출에 쓰는 어댑터.
    store 는 {get(), put(rec)} — 호스트가 KV/로컬 어느 쪽이든 같은 모양으로 넘긴다. */
 export function makeQuota({ rec, limits, now, onUse }) {
-  let used = 0;
+  const day = dayKey(now == null ? Date.now() : now);
+  /* 날짜가 바뀌면 저절로 0에서 시작한다 — 호스트 두 곳이 각자 날짜를 다루면 한쪽이 틀린다 */
+  const already = (rec && rec.day === day && Number(rec.count)) || 0;
   const cap = (limits && limits.total) || 0;
-  const already = (rec && rec.count) || 0;
+  let used = 0;
   return {
+    day,
+    left: () => (cap ? Math.max(0, cap - already - used) : null),
     take() {
       if (cap && already + used + 1 > cap) return false;
       used += 1;
-      if (typeof onUse === 'function') onUse(already + used, now);
+      if (typeof onUse === 'function') onUse({ day, count: already + used }, now);
       return true;
     },
     used: () => used,
   };
+}
+
+/* 팩 제작 추출의 하루 한도 (기획서 §13-8).
+   비용 근거: 조각 하나가 대략 입력 5천·출력 5천 토큰이고 Opus 5 기준 $5/$25 per 1M 이라
+   호출 한 번이 약 $0.15(=200원 안팎). 과 하나를 만드는 데 종류별 조각을 합쳐 10~15회쯤 부르므로
+   팩 하나가 대략 $2(3천원 아래). 기본 한도 80회는 하루 대여섯 과를 만들 수 있고, 잘못된 반복
+   호출이 있어도 그날 손실이 $12 선에서 멈춘다. NAESIN_AI_DAILY 로 올리거나 내릴 수 있다. */
+export const EXTRACT_QUOTA_DEFAULT = 80;
+export function readExtractLimit(env) {
+  const n = Number((env || {}).NAESIN_AI_DAILY);
+  return { total: Number.isFinite(n) && n > 0 ? Math.floor(n) : EXTRACT_QUOTA_DEFAULT };
 }

@@ -18,9 +18,10 @@
  *   getJobSrc(jobId) → {parts:{[kind]:string}}|null
  *   putJobSrc(jobId, rec)               deleteJobSrc(jobId)
  *   getPack(id) putPack(id, rec) getPackIds() putPackIds(ids)   // 배포용(naesin-api 와 같은 어댑터)
+ *   getAiUse() putAiUse(rec)            // 팩 제작 AI 추출의 하루 장부 {day, count} (§13-8)
  */
 
-import { extract, KINDS } from './naesin-extract.mjs';
+import { extract, makeQuota, readExtractLimit, KINDS } from './naesin-extract.mjs';
 /* 팩 검사 규칙은 브라우저·Node 공용 모듈(IIFE + module.exports 가드)이다. 정적 import 로
    가져온다 — createRequire 를 쓰면 Cloudflare Workers 번들이 'node:module' 을 찾다가
    배포 자체가 실패한다(nodejs_compat 이 없고, 있어도 런타임 require 는 번들러가 못 푼다).
@@ -232,15 +233,26 @@ export async function handleStudio(ctx) {
     const text = (src && src.parts && src.parts[kind]) || '';
     if (!text.trim()) return j(400, { error: '그 종류의 원천 텍스트가 없어요.' });
 
+    /* 비용 한도(기획서 §13-8) — 호출 한 번마다 센다. 장부는 팩 제작 전용이라
+       학생용 AI 한도와 서로를 먹지 않는다. 한도를 넘긴 구간은 res.parts 가 알린다. */
     const ai = ctx.ai || {};
-    const res = await extract({
-      kind, text, apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl, quota: ai.quota,
+    const limits = readExtractLimit(ai.env);
+    let useRec = store.getAiUse ? await store.getAiUse() : null;
+    const quota = ai.quota || makeQuota({
+      rec: useRec, limits, now: ctx.now,
+      onUse: (rec) => { useRec = rec; },
     });
+    const res = await extract({
+      kind, text, apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl, quota,
+    });
+    /* 쓴 만큼은 성공·실패와 무관하게 남긴다 — 실패한 호출도 요금은 나간다 */
+    if (store.putAiUse && useRec) await store.putAiUse(useRec);
+    const aiLeft = typeof quota.left === 'function' ? quota.left() : null;
     if (!res.ok) {
       job.error = kind + ' 추출 실패: ' + res.reason;
       job.updatedAt = nowIso();
       await store.putJob(job.jobId, job);
-      return j(200, { ok: false, reason: res.reason, parts: res.parts || [], job: jobBrief(job) });
+      return j(200, { ok: false, reason: res.reason, parts: res.parts || [], job: jobBrief(job), aiLeft, aiCap: limits.total });
     }
     job.draft = isObj(job.draft) ? job.draft : {};
     job.draft[kind] = res.rows;
@@ -256,6 +268,7 @@ export async function handleStudio(ctx) {
     await store.putJob(job.jobId, job);
     return j(200, {
       ok: true, kind, count: res.rows.length, parts: res.parts, model: res.model,
+      aiLeft, aiCap: limits.total,
       job: jobBrief(job),
       gate: { ok: gate.ok, errors: gate.errors, warns: gate.warns, summary: gate.summary, pending: gate.pending, total: gate.total },
     });
