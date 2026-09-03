@@ -57,6 +57,7 @@ const vocabStore = {
 const naesinRoot = () => {
   db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
   db.naesin.tasks = db.naesin.tasks || {};
+  db.naesin.results = db.naesin.results || {};
   return db.naesin;
 };
 const naesinStore = {
@@ -74,6 +75,22 @@ const naesinStore = {
   listExamScopes: () => Object.keys(naesinRoot().exams),
   getTask: (s) => naesinRoot().tasks[s] || null,
   putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
+  /* 시험 결과 — db.naesin.results[코드][시험일] (워커의 naesin:result:<코드>:<시험일> 과 같은 것).
+     학생 칸이 비면 지운다: 퇴원 확인(저장 파일에 코드가 남지 않는가)이 빈 껍데기에 걸리지 않게. */
+  getResult: (c, d) => (naesinRoot().results[c] || {})[d] || null,
+  putResult: (c, d, rec) => { const R = naesinRoot().results; (R[c] = R[c] || {})[d] = rec; persist(); },
+  deleteResult: (c, d) => {
+    const R = naesinRoot().results;
+    if (R[c]) { delete R[c][d]; if (!Object.keys(R[c]).length) delete R[c]; }
+    persist();
+  },
+  listResults: () => {
+    const out = [];
+    for (const [code, byDate] of Object.entries(naesinRoot().results)) {
+      for (const [examDate, rec] of Object.entries(byDate || {})) if (rec) out.push({ ...rec, code, examDate });
+    }
+    return out;
+  },
   getStudent: (c) => db.students[c] || null,
 };
 
@@ -551,9 +568,12 @@ const server = http.createServer(async (req, res) => {
         drop(db.states, c);
         drop(db.vocab.states, c);
         drop(db.vocab.push || {}, c);
-        /* 내신브레인 — 학습 기록과 이 학생만의 시험 배정(워커와 동일). 반 공통·팩은 학생 것이 아니라 둔다 */
+        /* 내신브레인 — 학습 기록·이 학생만의 시험 배정·시험 결과(워커와 동일).
+           반 공통·팩은 학생 것이 아니라 둔다. 결과가 남으면 같은 코드의 새 학생에게
+           앞 학생 점수가 보이고 원내 성과 분석에도 계속 섞인다. */
         drop(naesinRoot().states, c);
         drop(naesinRoot().exams, c);
+        drop(naesinRoot().results, c);
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */

@@ -135,6 +135,24 @@
     .chip small { display: block; font-weight: 500; color: var(--soft); font-size: 11px; }
     .chip.now { border-color: var(--ind); background: var(--ind-soft); }
 
+    /* ── 통합 시험 범위 — 과 선택·과별 진도·시험 결과 회고 ── */
+    .packseg { display: flex; gap: 4px; padding: 9px 12px 3px; flex: none; flex-wrap: wrap; }
+    .packseg button { min-height: 44px; min-width: 52px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
+      background: var(--panel); font-size: 13.5px; font-weight: 800; color: var(--soft); }
+    .packseg button.on { border-color: var(--ind); background: var(--ind-soft); color: var(--ind); }
+    .packrow { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+      padding: 9px 10px; border-bottom: 1px solid #EFF2F5; min-height: 44px; border-radius: 8px; }
+    .packrow:last-child { border-bottom: none; }
+    .packrow.on { background: var(--ind-soft); }
+    .packrow .pl { flex: 0 0 92px; font-weight: 800; font-size: 13.5px; }
+    .packrow .pl small { display: block; font-weight: 400; font-size: 11px; color: var(--soft);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .packrow .pv { flex: 1; font-size: 12.5px; color: var(--soft); display: flex; gap: 14px; flex-wrap: wrap; }
+    .packrow .pv b { color: var(--ink); font-family: var(--mono); font-weight: 700; }
+    .rescard { border-color: var(--ind); }
+    .rescard .rs { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+    .rechips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
     /* ── 작업 지면 (오른쪽 상세) ── */
     .wh { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; flex-wrap: wrap; }
     .wh h2 { font-size: 16px; font-weight: 900; margin: 0; }
@@ -256,13 +274,18 @@
 (function () {
   /* 저장 키는 학생 코드별이다 — 공용 태블릿에서 앞 학생의 기록이 다음 학생에게 섞이지 않게.
      미연동 기기는 'wbn.v1:demo'. 옛 단일 키 'wbn.v1'은 부팅 때 1회 이관한다. */
-  var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1', PACK_CACHE_KEY = 'wbn.pack';
+  var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1';
+  /* 팩 캐시는 시험 범위 전체다 — 실제 시험은 보통 2~3개 과라 '마지막 교재' 하나만 캐시하면
+     오프라인에서 범위의 나머지 과가 통째로 사라진다. 옛 단일 키('wbn.pack')는 부팅 때 이관한다. */
+  var PACKS_CACHE_KEY = 'wbn.packs', LEGACY_PACK_CACHE_KEY = 'wbn.pack';
   var DEMO_PACK_ID = 'sample-demo-L0';
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
+  var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
   var authed = false, examServer = null, packList = [];
   var selSeq = null, selWordId = null, selType = null, selDlg = null;
-  var taskServer = null;
+  var wordFilter = 'all';      // 단어 목록 필터 — 'unfinished' 는 회고 칩에서 들어온 미완성만 보기
+  var taskServer = null, resultServer = null;
   var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
   var demoMode = false;        // 체험 교재(pack-sample)로 열린 상태 — 미연동 기기 또는 배정 전 연습
   var DUMP_MAX = 20, LOG_MAX = 50;   // 기록 상한 — state 256KB 계약을 넘기지 않기 위해
@@ -272,20 +295,34 @@
      persist(): 학습 결과 — savedAt 갱신 + 팩별 savedAt + 서버 push 예약 */
   function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
+  /* 이번 persist 에서 savedAt 을 올려야 할 과들. 통합 범위 학습은 한 세션에서 여러 과의 단어를
+     같이 푼다 — 현재 과만 올리면 다른 과의 기록이 '오래된 것'으로 남아 다른 기기의 옛 기록에
+     덮인다(pullAdopt 는 팩별 savedAt 으로 병합한다). */
+  var touchedPacks = {};
+  function touchPack(pid) { if (pid != null) touchedPacks[pid] = 1; }
   function persist() {
     DB.savedAt = Date.now();
-    if (pack) {
-      var pd = packDB();
+    if (pack) touchPack(pack.packId);
+    Object.keys(touchedPacks).forEach(function (pid) {
+      var pd = DB.packs[pid];
+      if (!pd) return;
       pd.savedAt = DB.savedAt;
       if (pd.dump.length > DUMP_MAX) pd.dump = pd.dump.slice(-DUMP_MAX);
       if (pd.log.length > LOG_MAX) pd.log = pd.log.slice(-LOG_MAX);
-    }
+    });
+    touchedPacks = {};
     save();
     scheduleSync();
   }
-  function packDB() {
-    var pd = DB.packs[pack.packId];
-    if (!pd) pd = DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 };
+  function blankPd() { return { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 }; }
+  var orphanPd = null;
+  function curPackId() { return pack ? pack.packId : null; }
+  /* 과별 학습 기록. 인자를 생략하면 '지금 보는 과' — 통합 범위 세션은 문항의 packId 로 부른다. */
+  function packDB(pid) {
+    if (pid == null) pid = curPackId();
+    if (pid == null) return (orphanPd || (orphanPd = blankPd()));   // 팩 로드 전 호출 — DB에 남기지 않는다
+    var pd = DB.packs[pid];
+    if (!pd) pd = DB.packs[pid] = blankPd();
     /* 옛 기록엔 나중에 생긴 필드가 없다 — 접근할 때마다 보정해 호출부가 || {} 를 안 쓰게 */
     if (!pd.states || typeof pd.states !== 'object') pd.states = {};
     if (!pd.wrong || typeof pd.wrong !== 'object') pd.wrong = {};
@@ -322,12 +359,34 @@
   /* 네트워크 단절(fetch 자체 실패)과 서버가 답한 오류(api-NNN)를 가른다 — 오프라인 캐시는 전자에만 쓴다 */
   function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
 
-  /* 마지막 교재 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다. */
-  function cachePack(id, p, updatedAt) {
-    try { localStorage.setItem(PACK_CACHE_KEY, JSON.stringify({ id: id, pack: p, updatedAt: updatedAt || null })); } catch (e) {}
+  /* 시험 범위 팩 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다.
+     담는 것은 '지금 범위'뿐이다: 지난 학기 팩까지 쌓으면 localStorage 를 몇 MB씩 먹는다. */
+  function cachePacks(entries) {
+    var out = {};
+    entries.forEach(function (e) { if (e && e.pack && e.pack.packId) out[e.id] = { pack: e.pack, updatedAt: e.updatedAt || null }; });
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out));
+      /* 옛 단일 캐시는 여기서 끝난다 — 남겨 두면 팩 하나(수백 KB~MB)가 영영 자리를 차지한다 */
+      localStorage.removeItem(LEGACY_PACK_CACHE_KEY);
+    } catch (e) {}
   }
-  function loadPackCache() {
-    try { var c = JSON.parse(localStorage.getItem(PACK_CACHE_KEY) || 'null'); return c && c.pack && c.pack.packId ? c : null; } catch (e) { return null; }
+  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다(업그레이드 직후 오프라인) */
+  function loadPacksCache() {
+    var out = null;
+    try { out = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || 'null'); } catch (e) { out = null; }
+    if (!out || typeof out !== 'object') out = {};
+    var legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(LEGACY_PACK_CACHE_KEY) || 'null'); } catch (e) {}
+    if (legacy && legacy.pack && legacy.pack.packId && !out[legacy.id || legacy.pack.packId]) {
+      out[legacy.id || legacy.pack.packId] = { pack: legacy.pack, updatedAt: legacy.updatedAt || null };
+      try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
+    }
+    try { localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
+    var ids = Object.keys(out).filter(function (id) { return out[id] && out[id].pack && out[id].pack.packId; });
+    return ids.length ? out : null;
+  }
+  function clearPackCache() {
+    try { localStorage.removeItem(PACKS_CACHE_KEY); localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
   }
 
   /* 저장 상태 표시 — 실패는 다음 persist 때 자연히 재시도된다(push는 늘 전체 상태) */
@@ -373,8 +432,18 @@
       sentence: { total: n0(s.total), interpreted: n0(s.interpreted), memorized: n0(s.memorized),
         byStage: { 1: n0(bs[1]), 2: n0(bs[2]), 3: n0(bs[3]), 4: n0(bs[4]), 5: n0(bs[5]), 6: n0(bs[6]) } },
       task: task,
+      range: rangeSummaryNow(),
       updatedAt: new Date().toISOString()
     };
+  }
+  /* 계약 R1 의 summary.range — 시험 범위 전체 합계 + 과별 값. 관리 현황판이 "시험 범위 100%"를
+     한 단위로 보게 하는 값이라, 팩 하나만 열려 있어도(단일 범위) 같은 모양으로 낸다.
+     엔진에 범위 API 가 없는 판(옛 engine.js)에서는 아예 붙이지 않는다 — 반쪽 모양을 올리면
+     서버 정규화가 0으로 채운 값이 강사 화면에 진짜 숫자처럼 뜬다. */
+  function rangeSummaryNow() {
+    if (!WBNAESIN.rangeSummary || !pack) return undefined;
+    var r = WBNAESIN.rangeSummary(rangeEntries());
+    return (r && r.packIds && r.packIds.length) ? r : undefined;
   }
   function pushState() {
     if (!authed || !pack || demoMode) return;
@@ -406,8 +475,13 @@
     if (Date.now() - lastWake < 5000) return;
     lastWake = Date.now();
     /* 저장 실패가 남아 있어도 받기부터 한다 — 곧장 올리면 그 사이 다른 기기가 올린 더 새로운 팩 기록이
-       통째로 덮인다(push는 늘 DB 전체를 보낸다). 팩별 savedAt으로 병합한 뒤에 다시 올린다. */
-    pullState().then(function (changed) { if (changed) render(); if (saveStatus === 'failed') pushState(); });
+       통째로 덮인다(push는 늘 DB 전체를 보낸다). 팩별 savedAt으로 병합한 뒤에 다시 올린다.
+       시험 결과도 함께 받는다 — 강사가 수업 중에 점수를 넣으면 학생이 앱으로 돌아올 때 회고 카드가
+       떠야 한다. 부팅 때만 받으면 새로고침 전까지 없는 것처럼 보인다. */
+    Promise.all([
+      pullState(),
+      api('/result').then(function (rr) { resultServer = rr; return true; }).catch(function () { return false; }),
+    ]).then(function (r) { if (r[0] || r[1]) render(); if (saveStatus === 'failed') pushState(); });
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onWake(); });
   window.addEventListener('focus', onWake);
@@ -419,18 +493,20 @@
     return s;
   }
   /* 없는 상태만 만든다. 반환: 새로 만들거나 고친 수 — 0이면 부팅 때 persist(서버 push)할 이유가 없다 */
-  function ensureStates() {
-    var pd = packDB(), now = Date.now(), n = 0;
-    (pack.words || []).forEach(function (w) {
+  function ensureStates(pid) {
+    var p = packOf(pid);
+    if (!p) return 0;
+    var pd = packDB(p.packId), now = Date.now(), n = 0;
+    (p.words || []).forEach(function (w) {
       if (!pd.states[w.id]) { pd.states[w.id] = WBNAESIN.createState(w.id, 'word', now); n += 1; }
     });
-    (pack.sentences || []).forEach(function (s) {
+    (p.sentences || []).forEach(function (s) {
       var id = WBNAESIN.sentenceId(s.seq);
       if (!pd.states[id]) { pd.states[id] = WBNAESIN.createState(id, 'sentence', now); n += 1; }
     });
     /* 대화문 — 3단계(읽기→대화 완성→순서 배열), stage 4 도달 = 완료. kind 'dialogue'는 본문 문장
        집계(해석·백지)에 섞이지 않는다 — 옛 기록의 'sentence' 대화문은 여기서 이관한다. */
-    (pack.dialogues || []).forEach(function (d) {
+    (p.dialogues || []).forEach(function (d) {
       var id = 'd-' + d.id, cur = pd.states[id];
       if (!cur) { pd.states[id] = mkDialogueState(id, now); n += 1; }
       else if (cur.kind !== 'dialogue') { cur.kind = 'dialogue'; if (cur.stage == null) cur.stage = 1; n += 1; }
@@ -438,38 +514,98 @@
     n += tidyPack(pd);
     return n;
   }
-  function dlgState(id) { return packDB().states['d-' + id]; }
+  /* 범위 전체의 상태를 만든다 — 홈의 범위 합계·범위 플랜은 아직 한 번도 열지 않은 과의
+     단어·문장까지 세야 "시험 범위 100%"가 실제 시험 단위와 맞는다. */
+  function ensureStatesAll() {
+    var n = 0;
+    rangeIds().forEach(function (id) { n += ensureStates(id); });
+    return n;
+  }
+  function dlgState(id, pid) { return packDB(pid).states['d-' + id]; }
   function dlgById(id) { for (var i = 0; i < (pack.dialogues || []).length; i++) if (pack.dialogues[i].id === id) return pack.dialogues[i]; return null; }
   function dlgDone(st) { return st && st.stage >= 4; }
   var DLG_STAGES = { 1: '대역 읽기', 2: '대화 완성', 3: '순서 배열' };
-  function statesOfKind(kind) {
-    var pd = packDB(), out = {};
+  function statesOfKind(kind, pid) {
+    var pd = packDB(pid), out = {};
     Object.keys(pd.states).forEach(function (k) { if (pd.states[k] && pd.states[k].kind === kind) out[k] = pd.states[k]; });
     return out;
   }
-  function wordStates() { return statesOfKind('word'); }
-  function senStates() { return statesOfKind('sentence'); }
-  function senState(seq) { return packDB().states[WBNAESIN.sentenceId(seq)]; }
-  /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드 */
-  function exam() { var pd = packDB(); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
+  function wordStates(pid) { return statesOfKind('word', pid); }
+  function senStates(pid) { return statesOfKind('sentence', pid); }
+  function senState(seq, pid) { return packDB(pid).states[WBNAESIN.sentenceId(seq)]; }
+  /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드.
+     시험은 범위 전체에 하나다 — 시험일·오버라이드도 범위의 모든 과에 같이 걸고 같이 푼다
+     (성취도 탭 「적용」·「자율 학습으로」가 rangeIds() 를 돌며 쓴다). */
+  function exam(pid) { var pd = packDB(pid); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
   function examEnded() { var ex = exam(); return !!(ex && ex.examDate && WBNAESIN.daysUntil(ex.examDate, Date.now()) < 0); }
   /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
-  function applyServerExam() {
+  function applyServerExam(pid) {
     var ex = examServer;
     if (!ex || !ex.examDate) return;
-    var pd = packDB();
+    var pd = packDB(pid);
     if (pd.examOverride && pd.examOverrideFor !== ex.examDate) { delete pd.examOverride; delete pd.examOverrideFor; }
     var dl = Number(ex.wordDeadlineDays);
     pd.exam = { examDate: ex.examDate, wordDeadlineDays: (dl >= 3 && dl <= 30) ? Math.round(dl) : 7 };
   }
+  function applyServerExamAll() { rangeIds().forEach(function (id) { applyServerExam(id); touchPack(id); }); }
+
+  /* ── 통합 시험 범위(여러 과) ──
+     packList = 서버가 준 시험 범위 순서, PACKS = 그중 실제로 열린 팩. 지금 보는 과(pack)는
+     범위에 없을 수도 있다(체험 교재·오프라인 단일 캐시) — 그때도 자기 자신은 범위다. */
+  function packOf(pid) {
+    if (pid == null) return pack;
+    if (PACKS[pid]) return PACKS[pid];
+    return (pack && pack.packId === pid) ? pack : null;
+  }
+  function rangeIds() {
+    var ids = packList.filter(function (id) { return !!PACKS[id]; });
+    var cur = curPackId();
+    if (cur && ids.indexOf(cur) < 0) ids.push(cur);
+    return ids;
+  }
+  /* 엔진 범위 API(planRange·gateRange·rangeSummary)의 입력 — [{packId, pack, states}] 범위 순서 */
+  function rangeEntries() {
+    return rangeIds().map(function (id) { return { packId: id, pack: packOf(id), states: packDB(id).states }; })
+      .filter(function (e) { return !!e.pack; });
+  }
+  function isRange() { return rangeIds().length > 1; }
+  /* 과 표시명 — 학생이 아는 단위는 packId 가 아니라 'L6' 이다 */
+  function lessonLabel(pid) {
+    var p = packOf(pid);
+    var l = p && p.lesson;
+    return (l != null && l !== '') ? ('L' + l) : String(pid);
+  }
+  function lessonTitle(pid) {
+    var p = packOf(pid);
+    return p ? String(p.lessonTitle || p.textbook || '') : '';
+  }
+  /* 세 탭의 목록 창 맨 위 과 선택 — 통합 범위에서 '지금 보는 과'를 바꾸는 유일한 상시 입구 */
+  function packSegHtml() {
+    var ids = rangeIds();
+    if (ids.length <= 1) return '';
+    return '<div class="packseg" role="group" aria-label="시험 범위 과 선택">' + ids.map(function (id) {
+      return '<button type="button" data-pks="' + esc(id) + '"' + (id === curPackId() ? ' class="on" aria-current="true"' : '') +
+        ' title="' + esc(lessonTitle(id)) + '">' + esc(lessonLabel(id)) + '</button>';
+    }).join('') + '</div>';
+  }
   /* 최근 학습 로그(핵심표현·문법 확인처럼 엔진 상태가 없는 학습) — 최근 50건 */
-  function logEvent(t, type, ref, ok) {
-    var pd = packDB();
+  function logEvent(t, type, ref, ok, pid) {
+    var pd = packDB(pid);
     pd.log.push({ t: t, type: type, ref: ref, ok: !!ok, at: new Date().toISOString() });
     if (pd.log.length > LOG_MAX) pd.log = pd.log.slice(-LOG_MAX);
+    touchPack(pid == null ? curPackId() : pid);
   }
-  function wordById(id) { for (var i = 0; i < pack.words.length; i++) if (pack.words[i].id === id) return pack.words[i]; return null; }
-  function senBySeq(seq) { for (var i = 0; i < pack.sentences.length; i++) if (pack.sentences[i].seq === seq) return pack.sentences[i]; return null; }
+  /* pid 를 주면 그 과에서 찾는다 — 통합 범위 세션의 문항은 다른 과 것일 수 있다 */
+  function wordById(id, pid) {
+    var p = packOf(pid), ws = (p && p.words) || [];
+    for (var i = 0; i < ws.length; i++) if (ws[i].id === id) return ws[i];
+    return null;
+  }
+  function senBySeq(seq, pid) {
+    var p = packOf(pid), ss = (p && p.sentences) || [];
+    for (var i = 0; i < ss.length; i++) if (ss[i].seq === seq) return ss[i];
+    return null;
+  }
   function dayGroups() {
     var groups = [], cur = null;
     (pack.sentences || []).forEach(function (s) {
@@ -494,6 +630,14 @@
     var b = e.target.closest('button[data-tab]');
     if (b) setTab(b.getAttribute('data-tab'));
   });
+  /* 과 선택([data-pks])은 화면 어디에 있든 같은 동작이다 — 목록 창 세그먼트·홈 과별 진도 표가
+     각각 다시 그려져도 이 위임 하나로 산다(#wrap 자체는 교체되지 않는다). */
+  $('wrap').addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-pks]') : null;
+    if (!b) return;
+    e.preventDefault();
+    switchPack(b.getAttribute('data-pks'));
+  });
   /* 목록 행은 role=button — 키보드(Enter/Space)로도 누른다 */
   $('wrap').addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -505,7 +649,8 @@
   $('whoLine').onclick = function () {
     if (!authed) return;
     if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
-    try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (e) {}
+    try { localStorage.removeItem('wbr.auth'); } catch (e) {}
+    clearPackCache();
     location.href = '/';
   };
   $('offBadge').onclick = function () { location.reload(); };
@@ -539,6 +684,110 @@
 
   /* ════════ 홈 — E 프로그레스 보드 ════════ */
   function heatColor(v) { return ['#F0F3F6', 'var(--b2)', 'var(--b3)', 'var(--b4)'][v] || '#F0F3F6'; }
+
+  /* 오늘의 플랜 — 시험 범위 전체를 한 번에 배분한다(planRange). 과별로 planDay 를 돌려 합치면
+     하루 할당도 마감 계산도 과 수만큼 불어난다. 엔진에 범위 API 가 없는 판에서는 현재 과
+     planDay 로 물러나되 반환 모양은 같게 맞춘다 — 호출부가 두 경우를 몰라도 되게. */
+  function rangePlan(now) {
+    var ents = rangeEntries();
+    if (WBNAESIN.planRange && ents.length) return WBNAESIN.planRange(ents, exam(), now, {});
+    var pid = curPackId();
+    var plan = WBNAESIN.planDay(pack, packDB(pid).states, exam(), now, {});
+    var wrap = function (arr) { return (arr || []).map(function (id) { return { packId: pid, id: id }; }); };
+    var pp = {};
+    pp[pid] = { words: plan.words, sentences: plan.sentences };
+    return {
+      mode: plan.mode, dday: plan.dday,
+      words: { fresh: wrap(plan.words.fresh), review: wrap(plan.words.review), relearn: wrap(plan.words.relearn) },
+      sentences: (plan.sentences || []).map(function (x) { return { packId: pid, seq: x.seq, stage: x.stage }; }),
+      perPack: pp, note: plan.note
+    };
+  }
+  function planWordCount(plan) { return plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length; }
+  /* 범위 요약(엔진) — 없는 판이면 현재 과 값으로 같은 모양을 만든다 */
+  function rangeSums() {
+    var r = rangeSummaryNow();
+    if (r) return r;
+    var w = WBNAESIN.wordSummary(wordStates()), s = WBNAESIN.sentenceSummary(senStates());
+    var packs = {};
+    packs[curPackId()] = { word: { total: w.total, reached: w.reached, stable: w.stable },
+      sentence: { total: s.total, interpreted: s.interpreted, memorized: s.memorized } };
+    return { packIds: [curPackId()], word: w, sentence: s, packs: packs };
+  }
+  /* 과별 진도 — 범위 합계 아래에 과 단위로 펼친다. 행을 누르면 그 과로 전환된다. */
+  function packProgressHtml(rs) {
+    var ids = rangeIds();
+    if (ids.length <= 1) return '';
+    return '<div class="card"><h2>과별 진도 <small>탭하면 그 과로 전환</small></h2>' +
+      ids.map(function (id) {
+        var v = (rs.packs && rs.packs[id]) || { word: { total: 0, reached: 0, stable: 0 }, sentence: { total: 0, interpreted: 0, memorized: 0 } };
+        return '<button type="button" class="packrow' + (id === curPackId() ? ' on' : '') + '" data-pks="' + esc(id) + '">' +
+          '<span class="pl">' + esc(lessonLabel(id)) + '<small>' + esc(lessonTitle(id)) + '</small></span>' +
+          '<span class="pv"><span>단어 도달 <b>' + n0(v.word.reached) + '/' + n0(v.word.total) + '</b></span>' +
+          '<span>안정화 <b>' + n0(v.word.stable) + '</b></span>' +
+          '<span>해석 <b>' + n0(v.sentence.interpreted) + '/' + n0(v.sentence.total) + '</b></span>' +
+          '<span>백지 <b>' + n0(v.sentence.memorized) + '</b></span></span>' +
+          '<span class="lvchip">' + pct(n0(v.word.stable), n0(v.word.total)) + '%</span></button>';
+      }).join('') + '</div>';
+  }
+
+  /* ── 시험 결과 회고(계약 R2, GET /result) ──
+     앱이 재는 것은 전부 앱 안 도달률이다. 지난 시험의 실제 점수와, 그때의 도달률(snapshot)을
+     나란히 놓아야 "무엇이 부족했나"가 다음 시험의 행동으로 이어진다. */
+  function lastResult() {
+    var rs = resultServer && resultServer.results;
+    if (!Array.isArray(rs)) return null;
+    var best = null;
+    rs.forEach(function (r) {
+      if (!r || typeof r !== 'object' || typeof r.examDate !== 'string') return;
+      if (!best || r.examDate > best.examDate) best = r;
+    });
+    return best;
+  }
+  /* 지금 화면에 걸맞은 결과 — 지금 준비 중인 시험보다 뒤의 결과는 회고가 아니다 */
+  function retroResult() {
+    var r = lastResult();
+    if (!r) return null;
+    var ex = exam();
+    if (ex && ex.examDate && r.examDate > ex.examDate) return null;
+    return r;
+  }
+  /* 저장 시점 요약에서 도달률을 뽑는다 — range(범위 합계)가 있으면 그것이 시험과 같은 단위다 */
+  function snapRates(snap) {
+    if (!snap || typeof snap !== 'object') return null;
+    var src = (snap.range && typeof snap.range === 'object') ? snap.range : snap;
+    var w = src.word || {}, s = src.sentence || {};
+    var o = { wTotal: n0(w.total), stable: n0(w.stable), reached: n0(w.reached),
+      sTotal: n0(s.total), memorized: n0(s.memorized), interpreted: n0(s.interpreted) };
+    return (o.wTotal || o.sTotal) ? o : null;
+  }
+  function resultCardHtml() {
+    var r = retroResult();
+    if (!r) {
+      /* 결과가 아직 없는 시험 종료 — 학생이 "내 점수는 왜 안 뜨지?" 하고 헤매지 않게 한 줄 */
+      if (examEnded() && resultServer) return '<div class="card"><p class="muted" style="margin:0">시험 결과는 선생님이 입력합니다.</p></div>';
+      return '';
+    }
+    var rt = snapRates(r.snapshot);
+    var head = '<div class="card rescard"><h2>지난 시험 결과 <small>' + esc(r.examDate) + '</small></h2>' +
+      '<div class="todo"><span class="rs">' + n0(r.score) + '<small style="font-size:14px;color:var(--soft)">점</small></span>' +
+      '<span class="muted" style="flex:1">' +
+      (rt ? '당시 단어 안정화 <b>' + pct(rt.stable, rt.wTotal) + '%</b> · 백지 <b>' + pct(rt.memorized, rt.sTotal) + '%</b>'
+          : '당시 학습 기록이 저장되지 않아 도달률은 표시하지 않습니다.') + '</span></div>';
+    if (!rt) return head + '</div>';
+    var wLeft = Math.max(0, rt.wTotal - rt.stable), sLeft = Math.max(0, rt.sTotal - rt.memorized);
+    return head +
+      '<div class="rechips">' +
+      '<button type="button" class="chip" id="retroW">그때 미완성이던 단어 ' + wLeft + '개<small>단어 탭 · 미완성만 보기</small></button>' +
+      '<button type="button" class="chip" id="retroS">백지 미완 문장 ' + sLeft + '<small>본문 탭</small></button>' +
+      '</div>' +
+      '<p class="muted" style="margin:10px 0 0">이번 범위에서 같은 자리가 남지 않게, 단어 안정화와 백지부터 채웁니다.</p></div>';
+  }
+  function wireResultCard() {
+    var w = $('retroW'), s2 = $('retroS');
+    if (w) w.onclick = function () { wordFilter = 'unfinished'; setTab('words'); };
+    if (s2) s2.onclick = function () { setTab('passage'); };
+  }
   /* 오늘 과제(세션 ⑤ 수업 모드) — 서버 과제의 date가 오늘일 때만 */
   function todayTask() {
     var t = taskServer && taskServer.task;
@@ -570,8 +819,11 @@
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
     if (packList.length <= 1) return '';
+    /* 학생이 아는 단위는 packId 가 아니라 'L6' 이다 — 팩 id 는 title 로만 남긴다 */
     return '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
-      return id === pack.packId ? '<b>' + esc(id) + '</b>' : '<a href="#" data-pk="' + esc(id) + '">' + esc(id) + '</a>';
+      var label = esc(lessonLabel(id)) + (lessonTitle(id) ? ' ' + esc(lessonTitle(id)) : '');
+      return id === pack.packId ? '<b>' + label + '</b>'
+        : '<a href="#" data-pk="' + esc(id) + '" title="' + esc(id) + '">' + label + '</a>';
     }).join(' · ') + '</p>';
   }
   function wireHomeLinks() {
@@ -586,34 +838,48 @@
     var pd = packDB();
     var task = todayTask();
     if (!pd.diagDone) {
-      /* 과제는 진단 없이도 시작할 수 있다 — 수업 시간에 진단부터 2분 쓰게 하지 않는다 */
+      /* 과제는 진단 없이도 시작할 수 있다 — 수업 시간에 진단부터 2분 쓰게 하지 않는다.
+         지난 시험 결과도 여기 보인다 — 새 시험 범위를 막 시작한 학생에게 가장 필요한 회고인데
+         진단 뒤로 숨기면 그 학생은 영영 못 본다(진단은 과마다 한 번뿐이라 이미 지난 화면이 된다). */
       layoutFull(
-        '<div style="max-width:640px;margin:16px auto 0">' + packListHtml() + (task ? taskCardHtml(task) : '') + '</div>' +
+        '<div style="max-width:640px;margin:16px auto 0">' + packSegHtml() + packListHtml() + (task ? taskCardHtml(task) : '') + resultCardHtml() + '</div>' +
         '<div class="card" style="max-width:640px;margin:' + (task || packList.length > 1 ? '0' : '40px') + ' auto 14px"><h2>진단 평가 <small>학습 시작 전 1회 · 약 2분</small></h2>' +
         '<p class="muted" style="font-size:13.5px">현재 알고 있는 단어를 확인해 학습 계획을 세웁니다. 전 단어 ' + pack.words.length + '개. 모르는 단어는 「모름」을 선택하면 됩니다 — 진단이므로 점수와 무관합니다.</p>' +
         '<button class="btn p big" id="startDiag" style="margin-top:8px">진단 평가 시작</button></div>' +
         '<div style="max-width:640px;margin:0 auto">' + demoNotice() + '</div>');
       $('startDiag').onclick = startDiagnostic;
       wireTaskCard(task);
+      wireResultCard();
       wireHomeLinks();
       return;
     }
     var wsum = WBNAESIN.wordSummary(wordStates());
     var ssum = WBNAESIN.sentenceSummary(senStates());
-    var plan = WBNAESIN.planDay(pack, pd.states, exam(), Date.now(), {});
-    var wCount = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
+    var rs = rangeSums();
+    var rw = rs.word, rsen = rs.sentence;
+    var plan = rangePlan(Date.now());
+    var wCount = planWordCount(plan);
+    var firstSen = plan.sentences[0] || null;
     var wrongN = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; }).length;
     var last = (DB.last && DB.last.packId === pack.packId && DB.last.resume) ? DB.last : null;
+    var rangeNote = isRange() ? ' <small>범위 ' + esc(rangeIds().map(lessonLabel).join('·')) + ' 합계</small>' : '';
 
     var html = demoNotice();
     /* 세션 ⑤ 수업 모드 — 강사가 배정한 오늘 과제가 최상단에 온다 */
     if (task) html += taskCardHtml(task);
+    html += resultCardHtml();
     html += packListHtml();
+    /* 큰 지표 3개는 시험 범위 전체 합계다 — 학교 시험이 재는 단위가 과 하나가 아니다 */
     html +=
       '<div class="big3">' +
-      '<div><div class="n">' + pct(wsum.reached, wsum.total) + '<small>%</small></div><div class="l">단어 도달 <b>' + wsum.reached + '/' + wsum.total + '</b> · 안정화 ' + wsum.stable + '</div></div>' +
-      '<div><div class="n">' + pct(ssum.interpreted, ssum.total) + '<small>%</small></div><div class="l">본문 해석 통과 <b>' + ssum.interpreted + '/' + ssum.total + '</b></div></div>' +
-      '<div><div class="n">' + pct(ssum.memorized, ssum.total) + '<small>%</small></div><div class="l">백지 영작 완료 <b>' + ssum.memorized + '/' + ssum.total + '</b></div></div></div>' +
+      '<div><div class="n">' + pct(rw.reached, rw.total) + '<small>%</small></div><div class="l">단어 도달 <b>' + n0(rw.reached) + '/' + n0(rw.total) + '</b> · 안정화 ' + n0(rw.stable) + rangeNote + '</div></div>' +
+      '<div><div class="n">' + pct(rsen.interpreted, rsen.total) + '<small>%</small></div><div class="l">본문 해석 통과 <b>' + n0(rsen.interpreted) + '/' + n0(rsen.total) + '</b>' + rangeNote + '</div></div>' +
+      '<div><div class="n">' + pct(rsen.memorized, rsen.total) + '<small>%</small></div><div class="l">백지 영작 완료 <b>' + n0(rsen.memorized) + '/' + n0(rsen.total) + '</b>' + rangeNote + '</div></div></div>' +
+
+      packProgressHtml(rs) +
+
+      /* 히트맵·매트릭스는 '지금 보는 과'다 — 77칸 히트맵을 범위 전체로 펴면 한 칸이 안 보인다 */
+      (isRange() ? '<div class="card" style="padding:6px 10px;margin-bottom:10px"><div class="todo"><span class="t">지도 · 매트릭스 기준 과</span>' + packSegHtml() + '</div></div>' : '') +
 
       '<div class="boards">' +
       '<div class="card"><h2>단어 안정화 지도 <small>' + wsum.total + '단어 · 진하기 = 안정화 0→3</small></h2>' +
@@ -626,7 +892,8 @@
 
       '<div class="card"><div class="todo"><span class="t">오늘의 학습</span>' +
       '<button class="chip now" data-go="words">단어 ' + wCount + '개<small>신규 ' + plan.words.fresh.length + ' · 복습 ' + plan.words.review.length + ' · 안정화 ' + plan.words.relearn.length + '</small></button>' +
-      '<button class="chip" data-go="passage">본문 ' + plan.sentences.length + '문장<small>단계별 훈련</small></button>' +
+      '<button class="chip" id="senGo" data-go="passage">본문 ' + plan.sentences.length + '문장<small>' +
+      (firstSen && firstSen.packId !== curPackId() ? esc(lessonLabel(firstSen.packId)) + '부터 · 단계별 훈련' : '단계별 훈련') + '</small></button>' +
       '<button class="chip" data-go="quiz">문제 풀이<small>오답 ' + wrongN + '문항 미해결</small></button>' +
       (last ? '<button class="btn dark" id="resumeBtn" style="margin-left:auto">이어서 학습<small style="display:block;font-weight:400;font-size:11px;opacity:.8">' + esc(last.label) + '</small></button>' : '') +
       '</div>' + (plan.note ? '<p class="muted" style="margin:10px 0 0">' + esc(plan.note) + '</p>' : '') + '</div>' +
@@ -663,9 +930,20 @@
       mw.appendChild(row);
     }
     wireHomeLinks();
+    /* 본문 칩 — 범위 플랜의 첫 문장이 다른 과면 그 과로 전환하고 그 문장을 연다(계약 R4).
+       탭만 바꾸면 학생은 "왜 오늘 할 문장이 여기 없지?" 하고 목록을 헤맨다. */
+    if (firstSen) $('senGo').onclick = function (e) { e.stopPropagation(); goSentence(firstSen.packId, firstSen.seq); };
     if (last) $('resumeBtn').onclick = function () { doResume(last.resume); };
     $('startDump').onclick = startDump;
     wireTaskCard(task);
+    wireResultCard();
+  }
+  /* 그 과의 그 문장으로 — 과 전환이 필요하면 전환까지 한 번에 */
+  function goSentence(pid, seq) {
+    if (pid && pid !== curPackId() && packOf(pid)) { openPack(packOf(pid), pid, { seq: seq, tab: 'passage' }); return; }
+    if (seq != null) selSeq = Number(seq);
+    selDlg = null;
+    setTab('passage');
   }
   /* 문법 개념(g-<n>) 확인 문제 — 과제 typeKeys에 패턴 키가 오면 그 패턴의 Let's Use It */
   function patternItems(key) {
@@ -704,17 +982,37 @@
       persist(); render();
     }, { noConfidence: true });
   }
+  /* 과 전환 — 범위 팩은 부팅 때 전부 받아 두므로 대개 즉시다. 캐시에 없을 때만(옛 기록의
+     last, 배정이 방금 바뀐 경우) 서버에서 받아 온다. */
+  function openPack(p, pid, opt) {
+    opt = opt || {};
+    pack = p;
+    PACKS[pid] = p;
+    /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
+    selSeq = opt.seq != null ? Number(opt.seq) : null;
+    selWordId = null; selType = null; selDlg = null; paperMode = false; wordFilter = 'all';
+    applyServerExam(pid);
+    ensureStates(pid);
+    setLast('교재 ' + pid, null);
+    persist();
+    if (opt.tab) setTab(opt.tab); else render();
+  }
   function switchPack(pid) {
+    if (!pid || pid === curPackId()) return;
+    if (PACKS[pid]) { openPack(PACKS[pid], pid); return; }
     api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
-      pack = r.pack;
-      cachePack(pid, r.pack, r.updatedAt);
-      /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
-      selSeq = null; selWordId = null; selType = null; selDlg = null; paperMode = false;
-      applyServerExam();
-      ensureStates();
-      setLast('교재 ' + pid, null);
-      persist(); render();
+      openPack(r.pack, pid);
+      cacheCurrentRange(pid, r.updatedAt);
     }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
+  }
+  /* 지금 열린 범위 팩 전부를 캐시에 다시 쓴다 — 오프라인에서도 범위 전체가 열려야 한다 */
+  function cacheCurrentRange(newId, newUpdatedAt) {
+    if (!authed || demoMode || offlineMode) return;
+    var known = {};
+    try { known = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || '{}') || {}; } catch (e) { known = {}; }
+    cachePacks(rangeIds().map(function (id) {
+      return { id: id, pack: PACKS[id], updatedAt: id === newId ? (newUpdatedAt || null) : ((known[id] && known[id].updatedAt) || null) };
+    }));
   }
   function doResume(r) {
     if (!r) return;
@@ -746,12 +1044,45 @@
   }
 
   /* ════════ 단어 암기 (스플릿) ════════ */
+  /* 통합 범위의 오늘 단어 — 과별로 문항을 만들어 갈마들게 합친다.
+     ① 문항마다 packId 를 실어야 채점·기록이 그 과의 저장소로 간다(gradeItem → packDB(item.packId)).
+        이걸 빠뜨리면 L7 단어를 풀어도 L6 진도만 올라 학생·강사 모두 모르게 진도가 틀어진다.
+     ② 합칠 때 통째로 섞지 않고 '같은 단어의 연속 문항'을 한 덩어리로 보아 과끼리 번갈아 끼운다 —
+        신규 단어의 [뜻 고르기 → 철자] 짝이 떨어지면 그 자리에서 외우고 확인하는 흐름이 깨진다. */
+  function wordItemsOf(plan, now) {
+    var lanes = [];
+    Object.keys(plan.perPack || {}).forEach(function (pid) {
+      var p = packOf(pid);
+      if (!p) return;
+      var sub = plan.perPack[pid];
+      /* states·now를 넘겨야 gen이 미도달 복습 단어를 무힌트 철자로 내고(도달 기회), 로테이션 자리를
+         단어 상태·날짜로 정한다 — 안 넘기면 모든 복습이 재인 문항만 돌아 영원히 미도달이다 */
+      var made = WBGEN.dailySet(p, { words: sub.words, sentences: [] }, Math.random,
+        { states: packDB(pid).states, now: now });
+      var runs = [], cur = null;
+      made.forEach(function (q) {
+        if (!q) return;
+        q.packId = pid;
+        var key = q.wordId != null ? String(q.wordId) : null;
+        if (!cur || key == null || cur.key !== key) { cur = { key: key, items: [q] }; runs.push(cur); }
+        else cur.items.push(q);
+      });
+      if (runs.length) lanes.push(runs);
+    });
+    var out = [];
+    while (lanes.length) {
+      for (var L = 0; L < lanes.length; L++) {
+        var run = lanes[L].shift();
+        if (run) out = out.concat(run.items);
+      }
+      lanes = lanes.filter(function (x) { return x.length; });
+    }
+    return out;
+  }
   function startWordDaily() {
-    var now = Date.now(), states = packDB().states;
-    var plan = WBNAESIN.planDay(pack, states, exam(), now, {});
-    /* states·now를 넘겨야 gen이 미도달 복습 단어를 무힌트 철자로 내고(도달 기회), 로테이션 자리를
-       단어 상태·날짜로 정한다 — 안 넘기면 모든 복습이 재인 문항만 돌아 영원히 미도달이다 */
-    var items = WBGEN.dailySet(pack, { words: plan.words, sentences: [] }, Math.random, { states: states, now: now });
+    var now = Date.now();
+    var plan = rangePlan(now);
+    var items = wordItemsOf(plan, now);
     if (!items.length) { alert('오늘 예정된 단어 학습이 없습니다.'); return; }
     setLast('단어 암기 — 오늘의 학습', { t: 'wordDaily' });
     persist();
@@ -760,21 +1091,31 @@
   function renderWords() {
     var ws = wordStates();
     var sum = WBNAESIN.wordSummary(ws);
-    var listHtml = '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b>' +
-      (sum.needsSpellCheck ? ' · 철자 확인 대기 <b>' + sum.needsSpellCheck + '</b>' : '') + '</span></div><div class="rows" id="wRows">';
-    pack.words.forEach(function (w) {
+    /* 미완성만 보기 — 지난 시험 회고 칩("그때 미완성이던 단어 N개")이 들어오는 자리.
+       '미완성' = 안정화(다른 날 3회) 전 = 시험 전에 아직 채워야 할 단어. */
+    var unfinished = pack.words.filter(function (w) { var st = ws[w.id]; return !(st && WBNAESIN.isStable(st)); });
+    var shown = wordFilter === 'unfinished' ? unfinished : pack.words;
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b>' +
+      (sum.needsSpellCheck ? ' · 철자 확인 대기 <b>' + sum.needsSpellCheck + '</b>' : '') + '</span></div>' +
+      '<div class="hdr"><span>' + (wordFilter === 'unfinished' ? '미완성 ' + unfinished.length + '개만 표시 중' : '전체 ' + pack.words.length + '개') + '</span>' +
+      '<button id="wFilter" type="button">' + (wordFilter === 'unfinished' ? '전체 보기' : '미완성만 (' + unfinished.length + ')') + '</button></div>' +
+      '<div class="rows" id="wRows">';
+    shown.forEach(function (w) {
       var st = ws[w.id], stb = st ? WBNAESIN.stability(st) : 0;
       var cls = st && st.reached ? (WBNAESIN.isStable(st) ? 's' : 'r') : '';
       listHtml += '<div class="row' + (selWordId === w.id ? ' sel' : '') + '" role="button" tabindex="0" data-w="' + esc(w.id) + '">' +
         '<span class="tx">' + esc(w.headword) + '<span class="sub">' + esc((w.meaningKo || [])[0] || '') + (st && st.needsSpellCheck ? ' · 철자 확인 대기' : '') + '</span></span>' +
         '<span class="lvchip ' + cls + '">' + stb + '/3</span></div>';
     });
+    if (!shown.length) listHtml += '<p class="muted" style="padding:14px">이 과의 단어는 모두 안정화되었습니다.</p>';
     listHtml += '</div>';
     var w = selWordId ? wordById(selWordId) : null;
     var workHtml =
       '<div class="card"><h2>오늘의 단어 학습</h2>' +
       '<p class="muted">도달 = 힌트 없이 1회 인출 성공 · 안정화 = 도달 후 서로 다른 날 3회 재확인. 시험 전 전 단어 안정화(3/3)가 목표입니다.' +
       (sum.needsSpellCheck ? ' <b>철자 확인 대기 ' + sum.needsSpellCheck + '개</b> — 진단에서 「안다」고 답한 단어는 철자 입력으로 다시 확인합니다.' : '') + '</p>' +
+      (isRange() ? '<p class="muted" style="margin:6px 0 0">오늘의 단어는 시험 범위 전체(' + esc(rangeIds().map(lessonLabel).join('·')) + ')에서 함께 편성됩니다. 목록·상세는 위에서 고른 과만 보여 줍니다.</p>' : '') +
       '<button class="btn p big" id="trainWords" style="margin-top:8px">단어 학습 시작</button></div>';
     if (w) {
       var st = ws[w.id];
@@ -797,6 +1138,7 @@
       var r = e.target.closest('.row[data-w]');
       if (r) { selWordId = r.getAttribute('data-w'); render(); }
     };
+    $('wFilter').onclick = function () { wordFilter = wordFilter === 'unfinished' ? 'all' : 'unfinished'; render(); };
     $('trainWords').onclick = startWordDaily;
   }
 
@@ -818,7 +1160,8 @@
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     var ssum = WBNAESIN.sentenceSummary(senStates());
     if (selSeq == null) selSeq = (pack.sentences[0] || {}).seq;
-    var listHtml = '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
     dayGroups().forEach(function (gr, gi) {
       var doneAll = gr.sentences.every(function (s) { var st = senState(s.seq); return st && st.reached; });
       listHtml += '<div class="hdr"><span>' + esc(gr.header) + (doneAll ? ' · 백지 완료' : '') + '</span>' +
@@ -1221,15 +1564,30 @@
         { text: u.stem.slice(m.index + m[0].length) }] };
     }).filter(Boolean);
   }
+  /* 실전 모의 문항 — 시험 범위 전체에서 뽑는다. 게이트가 범위 전체 단어를 요구하는데 문항은
+     한 과뿐이면 '실전'이 실제 시험과 다른 범위를 재게 된다. 문항 수는 예전과 같게 두고
+     후보 풀만 범위로 넓힌다(10분 안에 푸는 분량이라 과가 늘어도 늘리지 않는다).
+     문항마다 packId 를 실어 채점·오답노트가 그 과로 간다. */
   function mockItems() {
-    var W = pack.words || [], S = pack.sentences || [];
+    var wordRefs = [], senRefs = [], storedRefs = [];
+    rangeIds().forEach(function (pid) {
+      var p = packOf(pid);
+      if (!p) return;
+      (p.words || []).forEach(function (w) { wordRefs.push({ pid: pid, w: w, W: p.words }); });
+      (p.sentences || []).forEach(function (sn) { senRefs.push({ pid: pid, s: sn }); });
+      (p.items || []).filter(function (it) { return (it.answerCount || 1) === 1; })
+        .forEach(function (it) { storedRefs.push({ pid: pid, it: it }); });
+    });
     var out = [];
-    rndPick(W, 5).forEach(function (w) { var q = WBGEN.vocabMcq(w, W, Math.random); if (q) { q.kind = 'word'; out.push(q); } });
-    rndPick(S, 2).forEach(function (s) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) out.push(q); });
-    S.map(function (s) { return WBGEN.grammarChoiceDrill(s); }).filter(Boolean)
-      .reduce(function (a, b) { return a.concat(b); }, []).slice(0, 3).forEach(function (q) { out.push(q); });
-    var single = (pack.items || []).filter(function (it) { return (it.answerCount || 1) === 1; });
-    storedToRunner(rndPick(single, 5)).forEach(function (q) { out.push(q); });
+    var take = function (q, pid) { if (q) { q.packId = pid; out.push(q); } };
+    rndPick(wordRefs, 5).forEach(function (r) { var q = WBGEN.vocabMcq(r.w, r.W, Math.random); if (q) { q.kind = 'word'; take(q, r.pid); } });
+    rndPick(senRefs, 2).forEach(function (r) { take(WBGEN.keywordBlanks(r.s, 'en'), r.pid); });
+    var gram = [];
+    senRefs.forEach(function (r) {
+      (WBGEN.grammarChoiceDrill(r.s) || []).forEach(function (q) { q.packId = r.pid; gram.push(q); });
+    });
+    rndPick(gram, 3).forEach(function (q) { out.push(q); });
+    rndPick(storedRefs, 5).forEach(function (r) { storedToRunner([r.it]).forEach(function (q) { take(q, r.pid); }); });
     return WBGEN.shuffle(out, Math.random);
   }
   function storedToRunner(items) {
@@ -1301,7 +1659,8 @@
       if (!g) { g = { name: t.group, types: [] }; groups.push(g); }
       g.types.push(t);
     });
-    var listHtml = '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
+    var listHtml = packSegHtml() +
+      '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
     /* 세션 ② 문법 개념 — 문제 앞에 개념 학습이 온다 */
     if ((pack.patterns || []).length) {
       listHtml += '<div class="hdr"><span>문법 개념</span></div>';
@@ -1345,10 +1704,16 @@
         '<button class="btn p big" id="qGo" style="margin-top:10px"' + ((pat.letsUseIt || []).length ? '' : ' disabled') + '>확인 문제 (' + (pat.letsUseIt || []).length + '문항)</button></div>';
     } else {
       var tdef = types.filter(function (t) { return t.key === selType; })[0] || types[0];
+      /* 실전 모의는 시험 범위 전체가 기준이다(§4.4) — 본문 사다리 5·6단계는 그 과의 단어지만,
+         실전은 시험 그 자체를 흉내 내므로 범위 단어가 다 완성되기 전에는 열지 않는다. */
+      var mg = tdef.key === 'mock' ? rangeGate() : null;
       workHtml = '<div class="wh"><h2>' + esc(tdef.name) + '</h2><span class="tag t-ind">' + esc(tdef.group) + '</span></div>' +
         '<div class="card"><p class="muted">' + esc(tdef.desc) +
         (tdef.key === 'mock' ? ' · 시험처럼 정답을 바로 보여 주지 않고, 종료 후 점수와 오답을 한꺼번에 확인합니다.' : ' · 문항 단위 즉시 채점되며, 오답은 정답·해설과 함께 오답노트에 기록됩니다.') + '</p>' +
-        '<button class="btn p big" id="qGo">시작</button></div>';
+        (mg && !mg.open
+          ? '<div class="notice">시험 범위 단어 선행 기준(' + mg.done + '/' + mg.total + ' 도달) 충족 전에는 실전 모의가 잠깁니다. 단어 암기를 먼저 완성하십시오.</div>'
+          : '') +
+        '<button class="btn p big" id="qGo"' + (mg && !mg.open ? ' disabled' : '') + '>시작</button></div>';
     }
     layoutSplit(listHtml, workHtml);
     $('qRows').onclick = function (e) {
@@ -1372,9 +1737,16 @@
         runQueue(items2, '개념 확인 · 패턴 ' + pat.patternNo, function (it, ok) { logEvent('concept', 'kwblank', it.ref, ok); },
           function () { persist(); render(); }, { noConfidence: true });
       } else if (selType === 'mock') {
+        if (!rangeGate().open) return;
         runMock();
       } else runQuizType(selType);
     };
+  }
+
+  /* 범위 전체 단어 게이트 — 엔진에 gateRange 가 없는 판이면 현재 과 게이트로 물러난다 */
+  function rangeGate() {
+    if (WBNAESIN.gateRange) return WBNAESIN.gateRange(rangeEntries(), exam(), Date.now(), {});
+    return WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
   }
 
   /* 세션 ④ 실전 모의 — 즉시 채점 없이 수집, 종료 후 결과 리포트 */
@@ -1430,8 +1802,8 @@
   }
   /* 오답 노트 공통 — 틀리면 클리어 날짜를 비운다(다시 틀리면 처음부터, 계약 0.6).
      항목엔 엔진 상태 객체를 두지 않는다 — clearWrong은 wrongClearDates 배열만 본다. */
-  function markWrong(k, seed, ok, now) {
-    var pd = packDB(), e = pd.wrong[k];
+  function markWrong(k, seed, ok, now, pid) {
+    var pd = packDB(pid), e = pd.wrong[k];
     if (!ok) {
       if (!e) { e = pd.wrong[k] = seed; e.tries = 0; e.wrongClearDates = []; e.cleared = false; e.firstAt = new Date(now).toISOString(); }
       e.tries += 1; e.wrongClearDates = []; e.cleared = false; e.at = new Date(now).toISOString();
@@ -1440,15 +1812,15 @@
       if (r && r.cleared) e.cleared = true;
     }
   }
-  function recordStoredResult(q, ok, now) {
-    markWrong('i-' + q.no, { kind: 'item', no: q.no }, ok, now);
+  function recordStoredResult(q, ok, now, pid) {
+    markWrong('i-' + q.no, { kind: 'item', no: q.no }, ok, now, pid);
   }
   /* 생성형 문항의 오답 노트 키 유형 — 재시험 생성기가 있는 유형만(REGEN). 유형 태그가 없으면 문항 모양에서 유추. */
   var GEN_KEYS = ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 's-gram', 's-verb', 's-order', 's-kw', 'w-poly', 'w-syn'];
-  function genTypeKeyOf(item) {
+  function genTypeKeyOf(item, pid) {
     if (item.typeKey) return GEN_KEYS.indexOf(item.typeKey) >= 0 ? item.typeKey : null;
     switch (item.type) {
-      case 'mcq': if (!item.wordId) return null; var w = wordById(item.wordId); return (w && item.prompt === w.headword) ? 'w-e2k' : 'w-k2e';
+      case 'mcq': if (!item.wordId) return null; var w = wordById(item.wordId, pid); return (w && item.prompt === w.headword) ? 'w-e2k' : 'w-k2e';
       case 'cloze': return item.wordId ? 'w-cloze' : null;
       case 'defpick': return item.wordId ? 'w-def' : null;
       case 'spell': return item.wordId ? 'w-spell' : null;
@@ -1459,12 +1831,12 @@
     }
     return null;
   }
-  function recordGenResult(item, ok, now) {
-    var type = genTypeKeyOf(item);
+  function recordGenResult(item, ok, now, pid) {
+    var type = genTypeKeyOf(item, pid);
     if (!type) return;
     var ref = item.wordId ? String(item.wordId) : (item.seq != null ? 's' + item.seq : null);
     if (!ref) return;
-    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, now);
+    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, now, pid);
   }
 
   /* ════════ 성취도 (전체 폭) ════════ */
@@ -1484,11 +1856,13 @@
     } else {
       examMsg = '등록된 시험이 없어 자율 학습 모드입니다.';
     }
+    var curNote = isRange() ? ' <b>' + esc(lessonLabel(curPackId())) + '</b>' : '';
     var html =
+      (isRange() ? '<div class="card" style="padding:6px 10px"><div class="todo"><span class="t">과 선택</span>' + packSegHtml() + '</div></div>' : '') +
       '<div class="big3">' +
-      '<div><div class="n">' + wsum.reached + '<small>/' + wsum.total + '</small></div><div class="l">단어 도달 · 안정화 ' + wsum.stable + '</div></div>' +
-      '<div><div class="n">' + ssum.interpreted + '<small>/' + ssum.total + '</small></div><div class="l">본문 해석 통과</div></div>' +
-      '<div><div class="n">' + ssum.memorized + '<small>/' + ssum.total + '</small></div><div class="l">백지 영작 완료</div></div></div>' +
+      '<div><div class="n">' + wsum.reached + '<small>/' + wsum.total + '</small></div><div class="l">단어 도달 · 안정화 ' + wsum.stable + curNote + '</div></div>' +
+      '<div><div class="n">' + ssum.interpreted + '<small>/' + ssum.total + '</small></div><div class="l">본문 해석 통과' + curNote + '</div></div>' +
+      '<div><div class="n">' + ssum.memorized + '<small>/' + ssum.total + '</small></div><div class="l">백지 영작 완료' + curNote + '</div></div></div>' +
 
       '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말 · 3단계 이상 = 통과</small></h2><div id="ipRows">' +
       pack.sentences.map(function (s) {
@@ -1509,6 +1883,8 @@
           '<span class="tx">' + esc(s.en) + '</span>' + stgMini(stage, done) + mark + '</div>';
       }).join('') + '</div>' +
       (paperMode ? '<p class="muted" style="margin-top:8px">선생님과 함께 종이 백지시험 결과를 문장별 ○/×로 입력합니다. ○는 암기 완료 기록에 반영됩니다.</p>' : '') + '</div>' +
+
+      predictionHtml() +
 
       '<div class="card"><h2>시험 설정</h2>' +
       '<p class="muted">' + examMsg + '</p>' +
@@ -1534,21 +1910,41 @@
       if (go) { selSeq = Number(go.getAttribute('data-go')); setTab('passage'); }
     });
     $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
+    /* 시험은 범위 전체에 하나다 — 시험일도 「자율 학습으로」도 범위의 모든 과에 같이 건다.
+       한 과만 바꾸면 같은 화면의 D-day 와 과별 플랜 모드가 서로 다른 말을 하게 된다. */
     $('examSet').onclick = function () {
-      var v = $('examIn').value, pd2 = packDB();
+      var v = $('examIn').value;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하십시오.'); return; }
-      pd2.exam = { examDate: v, wordDeadlineDays: (pd2.exam && pd2.exam.wordDeadlineDays) || 7 };
-      delete pd2.examOverride; delete pd2.examOverrideFor;
+      rangeIds().forEach(function (id) {
+        var q = packDB(id);
+        q.exam = { examDate: v, wordDeadlineDays: (q.exam && q.exam.wordDeadlineDays) || 7 };
+        delete q.examOverride; delete q.examOverrideFor;
+        touchPack(id);
+      });
       persist(); render();
     };
     /* 「자율 학습으로」는 오버라이드로 저장한다 — 시험일을 지우면 부팅 때 서버 배정이 다시 덮어쓴다.
        서버 시험일이 바뀌면(applyServerExam) 오버라이드는 자동으로 풀린다. */
     $('examClear').onclick = function () {
-      var pd2 = packDB();
-      pd2.examOverride = 'practice';
-      pd2.examOverrideFor = (pd2.exam && pd2.exam.examDate) || null;
+      rangeIds().forEach(function (id) {
+        var q = packDB(id);
+        q.examOverride = 'practice';
+        q.examOverrideFor = (q.exam && q.exam.examDate) || null;
+        touchPack(id);
+      });
       persist(); render();
     };
+  }
+  /* 예상 점수대(계약 R2 prediction) — 원내 시험 결과가 충분히 쌓였을 때만 서버가 준다.
+     확정·과장 어조를 쓰지 않는다: 도달률과 점수의 관계에서 나온 참고 구간일 뿐이다. */
+  function predictionHtml() {
+    var pr = resultServer && resultServer.prediction;
+    if (!pr || typeof pr !== 'object') return '';
+    var lo = Number(pr.low), hi = Number(pr.high);
+    if (!isFinite(lo) || !isFinite(hi)) return '';
+    return '<div class="card"><h2>예상 점수대 <small>참고용</small></h2>' +
+      '<p style="font-size:15px;margin:0 0 4px">현재 도달률 기준 예상 점수대 <b class="num">' + Math.round(lo) + '~' + Math.round(hi) + '점</b></p>' +
+      '<p class="muted" style="margin:0">원내 ' + n0(pr.n) + '회 시험 데이터로 계산한 참고값입니다. 실제 점수는 시험 범위·난이도·문항 구성에 따라 달라질 수 있습니다.</p></div>';
   }
 
   /* ════════ 러너 공통 ════════ */
@@ -1560,12 +1956,17 @@
        단어 문항       → 철자(완전 인출)는 recordCriterion, 나머지는 recordQuiz — 문항별 그대로
        생성형 오답     → 오답 노트(gen:<유형>:<ref>) */
   function gradeItem(item, ok, meta, now, seqRes) {
-    var pd = packDB();
-    if (item.type === 'storedmcq') { recordStoredResult(item, ok, now); return; }
+    /* 문항이 어느 과의 것인가 — 통합 범위 세션은 한 세트에 여러 과의 단어가 섞여 있다.
+       packId 가 없는 문항(그 과 안에서 만든 유형별 세트)은 지금 보는 과의 것이다. */
+    var pid = item.packId != null ? item.packId : curPackId();
+    var pd = packDB(pid);
+    touchPack(pid);
+    if (item.type === 'storedmcq') { recordStoredResult(item, ok, now, pid); return; }
     if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
-      var st = senState(item.seq);
+      var st = senState(item.seq, pid);
       if (st && seqRes) {
-        var r = seqRes[item.seq] || (seqRes[item.seq] = { st: st, allOk: true });
+        var key = pid + '#' + item.seq;      // 과가 다르면 같은 seq 라도 다른 문장이다
+        var r = seqRes[key] || (seqRes[key] = { st: st, allOk: true });
         if (!ok) r.allOk = false;
       }
     } else if (item.wordId && pd.states[item.wordId]) {
@@ -1574,16 +1975,16 @@
       if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, confidence: meta.confidence, hinted: hinted }, now);
       else WBNAESIN.recordQuiz(ws, { correct: ok, confidence: meta.confidence, hinted: false }, now);
     }
-    recordGenResult(item, ok, now);
+    recordGenResult(item, ok, now, pid);
   }
   function runItems(items, title, opts) {
     var seqRes = {}, session = newSession();
     runQueue(items, title, function (item, ok, ans, meta) {
       gradeItem(item, ok, meta, Date.now(), seqRes);
     }, function (finished) {
-      /* 세트 단위 진급 — 끝까지 풀었고(✕ 중단 아님) 그 문장의 문항을 모두 맞혔을 때만, seq당 1회 */
+      /* 세트 단위 진급 — 끝까지 풀었고(✕ 중단 아님) 그 문장의 문항을 모두 맞혔을 때만, 문장당 1회 */
       var now = Date.now();
-      Object.keys(seqRes).forEach(function (seq) { WBNAESIN.advanceStage(seqRes[seq].st, finished && seqRes[seq].allOk, now, { session: session }); });
+      Object.keys(seqRes).forEach(function (k) { WBNAESIN.advanceStage(seqRes[k].st, finished && seqRes[k].allOk, now, { session: session }); });
       persist(); render();
     }, opts || {});
   }
@@ -1732,6 +2133,8 @@
       : (item.kind === 'word' || item.wordId ? '단어'
       : (item.type === 'grammar' ? '어법 선택' + (item.seq != null ? ' · 문장 ' + item.seq : '')
       : (item.seq != null ? '본문 문장 ' + item.seq : '')));
+    /* 통합 범위 세션은 과가 섞인다 — 지금 보는 과가 아닌 문항엔 어느 과인지 붙인다 */
+    if (item.packId != null && item.packId !== curPackId()) stageLabel = lessonLabel(item.packId) + ' · ' + stageLabel;
     var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
 
     if (item.type === 'storedmcq') return renderStored(item, root);
@@ -1829,7 +2232,7 @@
       root.innerHTML = head + '<div class="prompt sm" style="color:var(--soft)" id="ordKo"></div>' +
         '<div class="built" id="built"></div><div class="tokens" id="toks"></div>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
-      var sen = senBySeq(item.seq);
+      var sen = senBySeq(item.seq, item.packId);
       $('ordKo').textContent = sen ? sen.ko : '어순에 맞게 배열하시오';
       var picked = [];
       function draw() {
@@ -1942,12 +2345,37 @@
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
   function openLoaded() {
-    var n = ensureStates();
+    var n = ensureStatesAll();       // 범위 전체 — 아직 안 연 과의 단어·문장도 합계에 들어가야 한다
     if (n) persist(); else save();   // 실제로 상태를 만들었을 때만 서버 push — 열기만으로 savedAt을 올리지 않는다
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { pack = p; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { pack = p; PACKS[p.packId] = p; demoMode = true; openLoaded(); });
+  }
+  /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
+     한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
+  function loadRangePacks() {
+    if (!packList.length) return Promise.reject(new Error('no-pack'));
+    var errs = [];
+    return Promise.all(packList.map(function (id) {
+      return api('/pack?id=' + encodeURIComponent(id))
+        .then(function (r) { return { id: id, pack: r.pack, updatedAt: r.updatedAt || null }; })
+        .catch(function (e) { errs.push(e); return null; });
+    })).then(function (list) {
+      var got = list.filter(function (x) { return x && x.pack && x.pack.packId; });
+      if (!got.length) {
+        /* 배정 밖(403)만이면 '아직 배정되지 않음'이다 — 서버 오류가 아니라 A7 안내 화면 */
+        if (errs.length && errs.every(function (e) { return e && e.message === 'api-403'; })) throw new Error('no-pack');
+        throw errs[0] || new Error('no-pack');
+      }
+      got.forEach(function (g) { PACKS[g.id] = g.pack; });
+      cachePacks(got);
+      /* 지금 열 과 — 마지막으로 보던 과가 범위에 남아 있으면 그것, 아니면 범위의 첫 과 */
+      var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : got[0].id;
+      pack = PACKS[pid];
+      applyServerExamAll();
+      return got;
+    });
   }
   function fatal(html) { layoutFull('<div class="card" style="max-width:560px;margin:40px auto">' + html + '</div>'); }
   function bootError(e) {
@@ -1955,7 +2383,7 @@
     if (msg === 'api-401') {
       fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
         '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
-      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (x) {} location.href = '/'; };
+      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/'; };
       return;
     }
     if (msg === 'no-pack') {
@@ -1966,10 +2394,19 @@
       return;
     }
     if (isNetErr(e)) {
-      var c = loadPackCache();
+      var c = loadPacksCache();
       if (c) {
-        /* 오프라인 — 마지막 교재로 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다(팩별 savedAt 병합). */
-        pack = c.pack; offlineMode = true;
+        /* 오프라인 — 캐시된 시험 범위 전체를 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다
+           (팩별 savedAt 병합). 범위가 여러 과면 오프라인에서도 과 전환이 그대로 된다. */
+        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = c[id].pack; });
+        var ids = packList.filter(function (id) { return !!PACKS[id]; });
+        if (!ids.length) ids = Object.keys(PACKS);
+        /* /exam 도 못 받은 상태다 — 캐시에 담긴 팩 목록이 곧 마지막으로 아는 시험 범위다.
+           이걸 안 채우면 범위를 캐시해 두고도 과 선택이 사라져 한 과만 열린다. */
+        packList = ids.slice();
+        var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : ids[0];
+        pack = PACKS[pid];
+        offlineMode = true;
         openLoaded();
         return;
       }
@@ -2030,19 +2467,13 @@
         });
         if (localNewer) scheduleSync();
       }).catch(function () {}).then(function () {
-        return api('/task').then(function (tr) { taskServer = tr; }).catch(function () {});
+        /* 과제·지난 시험 결과는 학습을 막지 않는다 — 없거나 라우트가 아직 없으면 조용히 넘어간다 */
+        return Promise.all([
+          api('/task').then(function (tr) { taskServer = tr; }).catch(function () {}),
+          api('/result').then(function (rr) { resultServer = rr; }).catch(function () {})
+        ]);
       }).then(function () {
-        var pid = (DB.last && packList.indexOf(DB.last.packId) >= 0) ? DB.last.packId : packList[0];
-        if (!pid) throw new Error('no-pack');
-        /* 배정 밖 팩의 403은 서버 오류가 아니라 '아직 배정되지 않음'이다 — A7 안내 화면으로 보낸다 */
-        return api('/pack?id=' + encodeURIComponent(pid)).catch(function (e) {
-          if (e && e.message === 'api-403') throw new Error('no-pack');
-          throw e;
-        }).then(function (r2) {
-          pack = r2.pack;
-          cachePack(pid, r2.pack, r2.updatedAt);
-          applyServerExam();
-        });
+        return loadRangePacks();
       });
     }).then(function () { openLoaded(); }).catch(bootError);
   }
