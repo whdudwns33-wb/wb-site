@@ -23,6 +23,14 @@
    `workbench/backup/private-seed.enc.json` 재암호화 커밋(backup/README) →
    `workbench/backup/last-drive-import.json`(fileId·modifiedTime) 갱신. 매일 아침 루틴이 이를 자동 수행한다.
 
+## 병행 작업 규칙 (Claude 세션·Codex·다른 컴퓨터가 같이 쓸 때)
+- **작업 시작 전 반드시 `git pull origin claude/agent-performance-optimization-rj8ql6`** — 자동 루틴이 커밋을 만든다.
+- 자동 루틴 시간대 **매일 07:50~08:15 KST**(Drive 백업 반영·수행평가)와 **매년 6월 1일 오전**(진학 실적 재수집)에는
+  워크벤치 소스를 건드리지 않는다. 겹치면 푸시 거부·짝 불일치 배포가 날 수 있다.
+- 배포(main 푸시)는 한 번에 한 주체만. 배포 직후 라이브 해시 2개(index·bulk) 대조를 끝내기 전에는 다른 주체가 배포하지 않는다.
+- 충돌이 나면 `app.html`은 수동 병합(자동 병합 금지 — 단일 파일이라 조용히 깨진다), `index.html`·`bulk.enc.json`은 병합하지 말고 재빌드로 다시 만든다.
+- 비공개 파일(`private-seed.json`·`bulk-data.json`)을 바꾼 주체가 `backup/*.enc.json` 재암호화까지 책임진다.
+
 ## 절대 규칙 (위반 시 커밋 금지)
 1. **공개 파일에 학생 실명·연락처 0건.** `app.html`·문서·커밋 메시지 포함.
    검사: `grep -c "한수빈\|박세윤\|조유빈\|강준서\|마윤서\|김아린\|강현서\|김태련\|고현준\|오수아\|남혁준\|윤시현" workbench/src/app.html` → 0.
