@@ -922,6 +922,15 @@
   /* ── 통합 시험 범위(여러 과) ──
      packList = 서버가 준 시험 범위 순서, PACKS = 그중 실제로 열린 팩. 지금 보는 과(pack)는
      범위에 없을 수도 있다(체험 교재·오프라인 단일 캐시) — 그때도 자기 자신은 범위다. */
+  /* 팩이 앱에 들어오는 길목의 방어선 — 화면 코드는 pack.words/pack.sentences 를 가드 없이 읽는다.
+     팩 검사(pack-check)가 둘 다 필수로 막지만, 그 관문을 통과하기 전에 만들어진 옛 팩이나
+     캐시가 남아 있으면 첫 화면에서 TypeError로 앱이 통째로 안 뜬다 — 배열만 세워 두고 연다. */
+  function normPack(p) {
+    if (!p || typeof p !== 'object') return p;
+    if (!Array.isArray(p.words)) p.words = [];
+    if (!Array.isArray(p.sentences)) p.sentences = [];
+    return p;
+  }
   function packOf(pid) {
     if (pid == null) return pack;
     if (PACKS[pid]) return PACKS[pid];
@@ -1427,8 +1436,8 @@
      last, 배정이 방금 바뀐 경우) 서버에서 받아 온다. */
   function openPack(p, pid, opt) {
     opt = opt || {};
-    pack = p;
-    PACKS[pid] = p;
+    pack = normPack(p);
+    PACKS[pid] = pack;
     /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
     selSeq = opt.seq != null ? Number(opt.seq) : null;
     selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all';
@@ -3855,7 +3864,7 @@
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { pack = p; PACKS[p.packId] = p; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { pack = normPack(p); PACKS[p.packId] = pack; demoMode = true; openLoaded(); });
   }
   /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
      한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
@@ -3873,7 +3882,7 @@
         if (errs.length && errs.every(function (e) { return e && e.message === 'api-403'; })) throw new Error('no-pack');
         throw errs[0] || new Error('no-pack');
       }
-      got.forEach(function (g) { PACKS[g.id] = g.pack; });
+      got.forEach(function (g) { PACKS[g.id] = normPack(g.pack); });
       cachePacks(got);
       /* 지금 열 과 — 마지막으로 보던 과가 범위에 남아 있으면 그것, 아니면 범위의 첫 과 */
       var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : got[0].id;
@@ -3903,7 +3912,7 @@
       if (c) {
         /* 오프라인 — 캐시된 시험 범위 전체를 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다
            (팩별 savedAt 병합). 범위가 여러 과면 오프라인에서도 과 전환이 그대로 된다. */
-        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = c[id].pack; });
+        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = normPack(c[id].pack); });
         var ids = packList.filter(function (id) { return !!PACKS[id]; });
         if (!ids.length) ids = Object.keys(PACKS);
         /* /exam 도 못 받은 상태다 — 캐시에 담긴 팩 목록이 곧 마지막으로 아는 시험 범위다.
