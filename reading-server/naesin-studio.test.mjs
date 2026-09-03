@@ -3,6 +3,8 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import {
   handleStudio, assemble, publishGate, rowKey, jobBrief, newJobId, isStudioPath, JOB_STATUS, REVIEW_STATES,
@@ -256,9 +258,9 @@ await t('검증기와 판정이 같다(같은 팩을 두 경로에 걸어 비교
 
 await t('CLI 검증기(pack-validate)와 같은 결과를 낸다', async () => {
   /* 같은 팩을 CLI 가 읽는 파일 구성으로 떨어뜨려 두 경로의 오류 수를 비교한다 */
-  const dir = '/tmp/wb-studio-cmp';
-  fs.rmSync(dir, { recursive: true, force: true });
-  fs.mkdirSync(dir, { recursive: true });
+  /* 경로는 이 파일 위치에서 뽑는다 — 절대 경로를 박으면 내 기계에서만 통과하고 CI 에서 깨진다 */
+  const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-studio-cmp-'));
   const p = clone(SAMPLE);
   p.sentences[0].chunks[0].en = '어긋난 청크';       // 오류를 하나 심는다
   const hdr = { packId: p.packId, textbook: p.textbook, grade: p.grade, lesson: p.lesson };
@@ -266,9 +268,11 @@ await t('CLI 검증기(pack-validate)와 같은 결과를 낸다', async () => {
   fs.writeFileSync(path.join(dir, 'sentences.json'), JSON.stringify({ ...hdr, sentences: p.sentences, oddOneItems: p.oddOneItems, checkItems: p.checkItems }));
   const { execFileSync } = await import('node:child_process');
   let cliOut = '';
-  try { cliOut = execFileSync('node', ['naesin/pack-validate.mjs', dir], { cwd: '/home/user/wb-site', encoding: 'utf8' }); }
-  catch (e) { cliOut = String(e.stdout || ''); }
+  try { cliOut = execFileSync(process.execPath, [path.join(ROOT, 'naesin', 'pack-validate.mjs'), dir], { cwd: ROOT, encoding: 'utf8' }); }
+  catch (e) { cliOut = String(e.stdout || '') + String(e.stderr || ''); }
   const cliErrors = (cliOut.match(/^오류 (\d+)건/m) || [])[1];
+  /* CLI 를 못 돌렸으면 비교가 아니라 통과가 된다 — 그 조용한 통과를 막는다(이 테스트의 존재 이유다) */
+  assert.ok(cliErrors != null, 'CLI 검증기를 돌리지 못했다 — 비교가 성립하지 않는다:\n' + cliOut);
 
   const job = { packId: p.packId, meta: {}, draft: { words: p.words, sentences: p.sentences, oddOneItems: p.oddOneItems, checkItems: p.checkItems }, review: {} };
   approveAll(job);
