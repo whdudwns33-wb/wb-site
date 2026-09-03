@@ -410,19 +410,27 @@ function renderJob(){
   </div>
 
   <div class="card"><h2>초안 만들기</h2>
-    <p class="muted">종류마다 따로 추출합니다 — 한 번에 다 돌리면 서버 시간 한도를 넘습니다. 다시 추출하면 그 종류의 검수 상태는 초기화됩니다.</p>
-    <div class="filters">
-      ${srcKinds.length?srcKinds.map(k=>`<button class="btn sm" data-ex="${esc(k)}">${esc(kindKo(k))} AI 추출</button>`).join('')
-        :'<span class="muted">붙인 원천이 없어 AI 추출은 못 씁니다 — 아래 초안 JSON 경로를 쓰세요.</span>'}
-    </div>
     <div id="exOut"></div>
-    <details><summary style="cursor:pointer;font-weight:800;color:var(--navy)">초안 JSON 붙여넣기 (AI 키가 없을 때)</summary>
-      <p class="muted">다른 도구로 만든 팩 JSON을 그대로 붙여넣습니다. 최상위 키는
-        <code>words</code>·<code>sentences</code>·<code>oddOneItems</code>·<code>checkItems</code>·<code>dialogues</code>·<code>patterns</code>·<code>items</code>.</p>
+    <h3>초안 JSON 넣기 <small class="muted">기본 경로</small></h3>
+    <p class="muted">Claude Code 세션에서 교재 PDF 를 읽어 만든 팩 JSON 을 여기 넣습니다.
+      파일 여러 개(<code>words.json</code>·<code>sentences.json</code>…)를 한 번에 골라도 되고,
+      통짜 팩 하나여도 됩니다 — 배열이 아닌 키(<code>packId</code>·<code>textbook</code> 등)는 알아서 버립니다.</p>
+    <div class="filters">
+      <input type="file" id="draftFile" accept=".json,application/json" multiple>
+      <button class="btn" id="btnDraftFile">파일로 넣기</button>
+    </div>
+    <div id="draftPick" class="muted"></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">붙여넣기로 넣기</summary>
+      <p class="muted">작은 조각만 고쳐 넣을 때 씁니다. 큰 팩은 파일이 낫습니다.</p>
       <textarea id="draftJson" rows="7" placeholder='{"words":[...],"sentences":[...]}' spellcheck="false"></textarea>
-      <div style="margin-top:8px"><button class="btn ghost" id="btnDraft">초안으로 넣기</button></div>
-      <div id="draftOut"></div>
+      <div style="margin-top:8px"><button class="btn ghost" id="btnDraft">붙여넣은 것으로 넣기</button></div>
     </details>
+    <div id="draftOut"></div>
+    ${srcKinds.length?`<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">서버에서 AI 추출 (선택 — 서버에 API 키가 있을 때만)</summary>
+      <p class="muted">원장 구독(Claude Max)으로 만드는 것이 기본 경로라 평소에는 쓰지 않습니다.
+        무인으로 돌려야 할 때만 서버에 키를 넣고 씁니다 — 그때는 호출마다 요금이 따로 나갑니다.</p>
+      <div class="filters">${srcKinds.map(k=>`<button class="btn sm ghost" data-ex="${esc(k)}">${esc(kindKo(k))} 추출</button>`).join('')}</div>
+    </details>`:''}
   </div>
 
   ${kinds.length?`<div class="card"><h2>검수 <small>${num(rows.length)||0}행 보임</small></h2>
@@ -447,7 +455,12 @@ function renderJob(){
   $('#btnBack').onclick=openList;
   $('#btnPub').onclick=publish;
   document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>runExtract(b.dataset.ex,b));
-  $('#btnDraft').onclick=putDraft;
+  $('#btnDraft').onclick=()=>putDraft($('#draftJson').value, '붙여넣기');
+  $('#btnDraftFile').onclick=putDraftFiles;
+  $('#draftFile').onchange=()=>{
+    const fs2=[...$('#draftFile').files];
+    $('#draftPick').textContent=fs2.length?('고른 파일 '+fs2.length+'개: '+fs2.map(f=>f.name).join(', ')):'';
+  };
   document.querySelectorAll('[data-only]').forEach(b=>b.onclick=()=>{FONLY=b.dataset.only;SEL=null;renderJob();});
   document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{FKIND=b.dataset.kind;SEL=null;renderJob();});
   const bulk=$('#btnBulk');if(bulk)bulk.onclick=bulkOk;
@@ -604,8 +617,23 @@ function aiLeftHtml(j){
   const left=num(j.aiLeft),cap=num(j.aiCap);
   return '<div class="muted">오늘 남은 AI 호출 '+left+'/'+cap+'회 — 팩 하나에 10~15회쯤 듭니다.</div>';
 }
-async function putDraft(){
-  const raw=$('#draftJson').value;
+/* 파일 여러 개를 한 초안으로 병합한다 — 관리 웹의 팩 업로드와 같은 결이다.
+   같은 종류가 두 파일에 나뉘어 있으면 이어 붙인다(단어를 나눠 만든 경우). */
+async function putDraftFiles(){
+  const files=[...$('#draftFile').files];
+  if(!files.length){$('#draftOut').innerHTML='<p class="err">파일을 고르세요.</p>';return;}
+  const merged={};const bad=[];
+  for(const f of files){
+    let obj;
+    try{obj=JSON.parse(await f.text());}
+    catch(e){bad.push(f.name+' — JSON 을 읽지 못했어요');continue;}
+    if(!obj||typeof obj!=='object'||Array.isArray(obj)){bad.push(f.name+' — 최상위가 객체가 아니에요');continue;}
+    for(const [k,v] of Object.entries(obj))if(Array.isArray(v)&&v.length)merged[k]=(merged[k]||[]).concat(v);
+  }
+  if(bad.length){$('#draftOut').innerHTML='<div class="issues bad">'+bad.map(esc).join('<br>')+'</div>';return;}
+  sendDraft(merged, files.length+'개 파일');
+}
+function putDraft(raw, how){
   let obj;
   try{obj=JSON.parse(raw);}
   catch(e){$('#draftOut').innerHTML='<p class="err">JSON 을 읽지 못했어요 — '+esc(e.message)+'</p>';return;}
@@ -613,11 +641,16 @@ async function putDraft(){
   /* 팩 통짜 JSON을 그대로 붙여도 되게 — 배열이 아닌 최상위 키(packId·textbook 등)는 버린다 */
   const draft={};
   for(const [k,v] of Object.entries(obj))if(Array.isArray(v)&&v.length)draft[k]=v;
+  sendDraft(draft, how);
+}
+async function sendDraft(draft, how){
   if(!Object.keys(draft).length){$('#draftOut').innerHTML='<p class="err">넣을 배열이 없어요.</p>';return;}
+  $('#draftOut').innerHTML='<p class="muted">넣는 중…</p>';
   try{
     await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:JOB.jobId,draft})});
     await openJob(JOB.jobId);
-    $('#exOut').innerHTML='<div class="issues ok">'+esc(Object.keys(draft).map(k=>kindKo(k)+' '+draft[k].length+'행').join(' · '))+' 을 초안으로 넣었어요.</div>';
+    $('#exOut').innerHTML='<div class="issues ok">'+esc(how)+' 에서 '
+      +esc(Object.keys(draft).map(k=>kindKo(k)+' '+draft[k].length+'행').join(' · '))+' 을 초안으로 넣었어요.</div>';
   }catch(e){if(isAuth(e))return;$('#draftOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
 }
 async function publish(){
