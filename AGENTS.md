@@ -38,9 +38,12 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
    var 전역 + `module.exports` 가드(브라우저/Node 공용), 외부 의존성 없음, 한국어 주석은
    "왜"를 적는다. 새 로직 모듈에는 반드시 `.test.cjs`/`.test.mjs`를 같이 만든다.
 3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 PIN 토큰.
-   모든 앱 `_headers`는 noindex + no-store.
+   배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
+   `vocab/_headers`는 그리로 안내하는 주석 파일이다. 내신 팩은 자기 시험 범위에 배정된 것만 받는다.
 4. **서버 응답은 래핑 계약**: `/api/naesin/pack` → `{pack, updatedAt}`,
    `/state` → `{state, updatedAt}`, `/exam` → `{exam, scope}` — 클라이언트와 함께 맞춘다.
+   학생이 올린 `state.summary`는 서버가 화이트리스트로 정규화하고 화면은 다시 이스케이프한다 —
+   강사 화면은 학생 기기가 올린 값을 그리는 곳이라 두 겹을 모두 유지한다.
 5. 배포 자산 캐시는 `build-dist.mjs`가 내용 해시로 스탬프한다 — SW `VERSION`을 손으로
    만지지 않는다.
 

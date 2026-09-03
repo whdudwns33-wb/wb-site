@@ -45,6 +45,23 @@ jobs:
         run: node naesin/grade.test.cjs
       - name: 내신브레인 문항 생성 테스트
         run: node naesin/gen.test.cjs
+      - name: 내신브레인 체험 팩 검증 (pack-validate)
+        # 검증기는 팩 디렉터리(words.json·sentences.json…)를 받는다. 저장소의 유일한 팩인 pack-sample.json 은
+        # 관리 웹이 병합한 형태라, 업로드 전 형태로 도로 쪼개 같은 검증 게이트를 통과시킨다 — 체험 팩이
+        # 검증기와 어긋난 채 배포되면 학생 앱의 미연동 체험 모드가 첫 화면에서 깨진다.
+        run: |
+          node -e '
+            const fs = require("fs"); const p = require("./naesin/pack-sample.json"); const dir = "/tmp/wb-pack-sample";
+            fs.mkdirSync(dir, { recursive: true });
+            const hdr = { packId: p.packId, source: p.source, curriculum: p.curriculum, textbook: p.textbook, grade: p.grade, lesson: p.lesson, lessonTitle: p.lessonTitle };
+            const w = (n, o) => fs.writeFileSync(dir + "/" + n, JSON.stringify({ ...hdr, ...o }));
+            w("words.json", { counts: { words: (p.words || []).length }, words: p.words || [] });
+            w("sentences.json", { passage: p.passage, sentences: p.sentences || [] });
+            if (p.dialogues) w("dialogues.json", { dialogues: p.dialogues });
+            if (p.patterns) w("patterns.json", { patterns: p.patterns });
+            if (p.items) w("items-sample.json", { items: p.items });
+          '
+          node naesin/pack-validate.mjs /tmp/wb-pack-sample
       - name: 내신브레인 서버 라우트 테스트
         run: node reading-server/naesin-api.test.mjs
       - name: 교재 코칭 테스트

@@ -18,6 +18,9 @@ const empty = () => ({ students: {}, states: {}, tokens: {}, pending: {}, levelL
 
 let db = empty();
 
+/* db.json 은 살아 있는 저장소라 내신 팩 본문(db.naesin.packs — KV의 naesin:pack:* 에 해당)도 여기 있다.
+   backups/ 의 일일 스냅샷은 팩을 싣지 않으며(naesinSnapshot) 기동 시 자동 복원되지도 않는다 —
+   복원은 관리 export/import 로 사람이 한다. db.json 에 팩이 있든 없든 스냅샷과는 무관하다. */
 export function load() {
   try {
     if (fs.existsSync(FILE)) {
@@ -31,12 +34,23 @@ export function load() {
   return db;
 }
 
+/* 내신 칸의 스냅샷 — 팩 본문(packs)은 뺀다. 팩은 라이선스 원문이라 백업 파일로 흩어지면 안 되고,
+   원장이 보관한 원본 JSON 으로 언제든 재업로드할 수 있다. id 목록만 남겨 무엇이 있었는지는 알게 한다.
+   워커의 fullDump 와 같은 모양({packIds, states, exams, tasks}) — 로컬 /api/admin/export 도 이걸 쓴다. */
+export function naesinSnapshot(n) {
+  const src = n || {};
+  return {
+    packIds: Array.isArray(src.packIds) ? src.packIds : Object.keys(src.packs || {}),
+    states: src.states || {}, exams: src.exams || {}, tasks: src.tasks || {},
+  };
+}
+
 /* 스냅샷에 담을 것 — 학생 기록만이 아니라 강사가 손으로 만든 것(교재 검수·발행 상태)까지.
    이게 빠지면 복구했을 때 낱말 검수를 처음부터 다시 해야 한다. */
 function snapshotBody() {
   return { service: 'wb-reading', savedAt: new Date().toISOString(),
     students: db.students, states: db.states, vocab: db.vocab,
-    textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: db.naesin || {},
+    textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
     textbookSrc: db.textbookSrc || {} };
 }
 

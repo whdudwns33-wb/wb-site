@@ -37,11 +37,24 @@
     .seg { display: flex; background: var(--bg); border-radius: 9px; padding: 3px; }
     .seg button { padding: 7px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 700; color: var(--soft); white-space: nowrap; }
     .seg button.on { background: var(--panel); color: var(--ind); box-shadow: 0 1px 3px rgba(20,30,60,.12); }
-    .bar .who { margin-left: auto; font-size: 12.5px; color: var(--soft); text-align: right; line-height: 1.35; }
+    .bar .who { margin-left: auto; font-size: 12.5px; color: var(--soft); text-align: right; line-height: 1.35;
+      padding: 4px 6px; border-radius: 6px; min-height: 44px; display: inline-flex; align-items: center; }
     .bar .who b { color: var(--ink); }
+    .bar .who.linked { cursor: pointer; }            /* 이름 탭 = 다른 학생으로 연동 (공용 태블릿) */
+    .bar .who.linked:hover { background: var(--bg); }
     .bar .dd { background: var(--red-soft); color: var(--red); font-weight: 800; font-size: 12.5px;
       border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
     .bar .dd.practice { background: var(--ind-soft); color: var(--ind); }
+    .bar .dd.offline { background: var(--amber-soft); color: var(--amber); cursor: pointer; }
+    /* 저장 상태 점 — 서버 동기화가 조용히 실패하는 일을 학생·강사가 눈으로 안다 */
+    .savedot { font-size: 11.5px; color: var(--soft); white-space: nowrap; }
+    .savedot i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #B7C0CC; margin-right: 5px; vertical-align: 1px; }
+    .savedot.saved i { background: var(--green); }
+    .savedot.pending i { background: var(--amber); }
+    .savedot.failed i, .savedot.toobig i { background: var(--red); }
+    .savedot.failed, .savedot.toobig { color: var(--red); }
+    .banner { background: var(--red-soft); color: var(--red); border-bottom: 1px solid var(--red); padding: 8px 16px; font-size: 13px; font-weight: 700; flex: none; }
+    [hidden] { display: none !important; }
 
     /* ── 본체: 스플릿 ── */
     .wrap { flex: 1; display: flex; min-height: 0; }
@@ -51,9 +64,14 @@
       display: flex; justify-content: space-between; gap: 8px; flex: none; }
     .list .lh b { color: var(--ink); }
     .rows { flex: 1; overflow-y: auto; }
-    .hdr { padding: 7px 14px; background: #F7F8FA; font-size: 11.5px; font-weight: 800; color: var(--soft);
-      border-bottom: 1px solid #EFF2F5; position: sticky; top: 0; }
-    .row { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-bottom: 1px solid #EFF2F5; cursor: pointer; }
+    .hdr { padding: 4px 8px 4px 14px; background: #F7F8FA; font-size: 11.5px; font-weight: 800; color: var(--soft);
+      border-bottom: 1px solid #EFF2F5; position: sticky; top: 0; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+    /* 터치 타깃 ≥44px — 태블릿에서 손가락으로 누르는 것들은 전부 이 크기를 지킨다 */
+    .hdr button { min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 11px; font-weight: 800; color: var(--ind); border-radius: 7px; }
+    .hdr button:disabled { opacity: .4; cursor: default; }
+    .row { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-bottom: 1px solid #EFF2F5; cursor: pointer; min-height: 44px; }
+    .row[role="button"]:focus-visible { outline-offset: -2px; }
     .row .no { width: 22px; font-size: 12px; font-weight: 800; color: var(--soft); flex: none; font-family: var(--mono); }
     .row .tx { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #3A4656; }
     .row .sub { display: block; font-size: 11px; color: var(--soft); }
@@ -76,7 +94,7 @@
     .card h2 small { font-weight: 500; color: var(--soft); font-size: 12px; }
     .muted { color: var(--soft); font-size: 12.5px; }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9px;
-      padding: 11px 18px; font-weight: 700; font-size: 14px; background: var(--panel);
+      padding: 11px 18px; min-height: 44px; font-weight: 700; font-size: 14px; background: var(--panel);
       color: var(--ink); border: 1px solid var(--line); }
     .btn.p { background: var(--ind); color: #fff; border-color: var(--ind); }
     .btn.dark { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -89,6 +107,7 @@
     .t-green { background: var(--green-soft); color: var(--green); }
     .t-red { background: var(--red-soft); color: var(--red); }
     .t-gray { background: var(--bg); color: var(--soft); }
+    .tag.tb { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; vertical-align: middle; }
     .notice { border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 9px;
       padding: 10px 14px; font-size: 12.5px; margin: 0 0 12px; }
 
@@ -134,7 +153,8 @@
     .runner .rshell { max-width: 760px; margin: 0 auto; padding: 14px 18px 40px; }
     .rtop { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
     .rtop .prog { flex: 1; }
-    .rtop .quit { flex: none; font-size: 1.15rem; color: var(--soft); padding: 4px 10px; }
+    .rtop .quit { flex: none; font-size: 1.15rem; color: var(--soft); padding: 4px 10px; min-width: 44px; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center; }
     .bar2 { height: 5px; background: #E5E9EF; border-radius: 3px; overflow: hidden; }
     .bar2 i { display: block; height: 100%; background: var(--ind); }
     .q { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
@@ -143,21 +163,23 @@
     .q .prompt.sm { font-size: 1.02rem; font-weight: 500; }
     .choices { display: flex; flex-direction: column; gap: 8px; }
     .choices button { text-align: left; background: var(--panel); border: 1px solid var(--line);
-      border-radius: 9px; padding: 12px 15px; font-weight: 500; font-size: 15px; }
+      border-radius: 9px; padding: 12px 15px; font-weight: 500; font-size: 15px; min-height: 44px; }
     .choices button.sel { border-color: var(--ind); background: var(--ind-soft); }
     .choices button.right { border-color: var(--green); background: var(--green-soft); }
     .choices button.wrongpick { border-color: var(--red); background: var(--red-soft); }
+    /* 입력 폰트 16px 이상 — iOS가 포커스 시 화면을 확대하지 않게 */
     .blankline { display: inline-block; min-width: 74px; border: none; border-bottom: 2px solid var(--ind);
-      background: transparent; padding: 2px 6px; margin: 0 2px; text-align: center; font-weight: 700; font-size: 15px; }
+      background: transparent; padding: 2px 6px; margin: 0 2px; text-align: center; font-weight: 700; font-size: 16px; }
+    input.ans, textarea.ans { font-size: 16px; }
     .blankline.ok { border-color: var(--green); color: var(--green); }
     .blankline.bad { border-color: var(--red); color: var(--red); }
     .hintko { font-size: 11px; color: var(--amber); display: inline-block; margin: 0 2px; }
     .tokens { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-    .tokens button { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 8px 13px; font-weight: 600; }
+    .tokens button { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 8px 13px; min-height: 44px; font-weight: 600; }
     .tokens button:disabled { opacity: .3; }
     .built { min-height: 48px; background: var(--bg); border: 1px dashed #C9D1DB; border-radius: 9px;
       padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-    .built button { background: var(--panel); border: 1px solid var(--ind); border-radius: 7px; padding: 6px 11px; font-weight: 600; }
+    .built button { background: var(--panel); border: 1px solid var(--ind); border-radius: 7px; padding: 6px 11px; min-height: 44px; font-weight: 600; }
     textarea.ans { width: 100%; min-height: 96px; border: 1px solid var(--line); border-radius: 9px;
       padding: 11px 13px; background: var(--panel); resize: vertical; }
     input.ans { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; background: var(--panel); }
@@ -168,7 +190,7 @@
     .result .exp { margin-top: 6px; color: var(--soft); font-size: 13px; }
     .confrow { display: flex; gap: 8px; margin-top: 14px; }
     .confrow button { flex: 1; border: 1px solid var(--line); border-radius: 9px; padding: 10px 4px;
-      font-size: 13.5px; font-weight: 700; background: var(--panel); }
+      font-size: 13.5px; font-weight: 700; background: var(--panel); min-height: 44px; }
     .confrow .cl { font-size: 11px; color: var(--soft); display: block; font-weight: 500; }
     .rnext { margin-top: 14px; }
     .diffline { margin: 6px 0; padding: 9px 11px; border-radius: 7px; font-size: 13.5px; background: var(--bg); }
@@ -177,7 +199,7 @@
     .diffline .d-missing { color: var(--red); text-decoration: underline; }
     .diffline .d-extra { color: var(--amber); text-decoration: line-through; }
     .diffline .lbl { font-size: 11px; font-weight: 800; margin-right: 6px; font-family: var(--mono); }
-    .paperbtn { border: 1px solid var(--line); border-radius: 6px; padding: 2px 11px; font-weight: 800; }
+    .paperbtn { border: 1px solid var(--line); border-radius: 6px; padding: 2px 11px; font-weight: 800; min-width: 44px; min-height: 44px; }
     .paperbtn.y { background: var(--green-soft); border-color: var(--green); color: var(--green); }
     .paperbtn.n { background: var(--red-soft); border-color: var(--red); color: var(--red); }
     .typerow { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
@@ -191,7 +213,7 @@
       .list { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); }
       .boards { grid-template-columns: 1fr; }
       .big3 .n { font-size: 28px; }
-      .bar .who { display: none; }
+      .bar .who { font-size: 11.5px; }   /* 세로 태블릿에서도 보인다 — 「다른 학생으로 연동」 입구가 사라지면 안 된다 */
     }
   </style>
 </head>
@@ -205,16 +227,19 @@
     <button data-tab="quiz">문제 풀이</button>
     <button data-tab="progress">성취도</button>
   </nav>
-  <span class="who" id="whoLine"></span>
+  <button class="who" id="whoLine" type="button"></button>
+  <span class="savedot" id="saveDot" hidden><i></i><span></span></span>
+  <span class="dd offline" id="offBadge" hidden title="서버에 연결되지 않아 마지막으로 열었던 교재로 학습 중입니다. 누르면 다시 연결을 시도합니다.">오프라인 — 마지막 교재</span>
   <span class="dd" id="ddayBadge">—</span>
 </header>
+<div class="banner" id="topBanner" hidden></div>
 <div class="wrap" id="wrap"></div>
 
-<div class="runner" id="runner"><div class="rshell">
+<div class="runner" id="runner" role="dialog" aria-modal="true" aria-label="학습 진행" tabindex="-1"><div class="rshell">
   <div class="rtop">
     <div class="prog"><div class="bar2"><i id="rBar" style="width:0%"></i></div>
       <span class="muted" id="rCount"></span></div>
-    <button class="quit" id="rQuit" aria-label="닫기">✕</button>
+    <button class="quit" id="rQuit" aria-label="중단하고 닫기">✕</button>
   </div>
   <div id="rBody"></div>
 </div></div>
@@ -229,25 +254,60 @@
    레이아웃: D 스플릿 워크스페이스(좌 목록 + 우 지면) + E 프로그레스 보드(홈).
    훈련 실행은 전체 화면 집중 지면(러너). 엔진·채점·생성 모듈은 순수 로직 그대로. */
 (function () {
-  var KEY = 'wbn.v1';
+  /* 저장 키는 학생 코드별이다 — 공용 태블릿에서 앞 학생의 기록이 다음 학생에게 섞이지 않게.
+     미연동 기기는 'wbn.v1:demo'. 옛 단일 키 'wbn.v1'은 부팅 때 1회 이관한다. */
+  var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1', PACK_CACHE_KEY = 'wbn.pack';
+  var DEMO_PACK_ID = 'sample-demo-L0';
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
   var authed = false, examServer = null, packList = [];
   var selSeq = null, selWordId = null, selType = null, selDlg = null;
   var taskServer = null;
+  var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
+  var demoMode = false;        // 체험 교재(pack-sample)로 열린 상태 — 미연동 기기 또는 배정 전 연습
+  var DUMP_MAX = 20, LOG_MAX = 50;   // 기록 상한 — state 256KB 계약을 넘기지 않기 위해
 
-  /* ── 저장소·동기화 (기존 계약 유지) ── */
+  /* ── 저장소·동기화 ──
+     save()   : 로컬 쓰기만(savedAt 안 올림) — 원격에서 받아 적거나 서버 값 반영 같은 '내 학습이 아닌' 변경
+     persist(): 학습 결과 — savedAt 갱신 + 팩별 savedAt + 서버 push 예약 */
   function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
   function persist() {
     DB.savedAt = Date.now();
-    try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {}
+    if (pack) {
+      var pd = packDB();
+      pd.savedAt = DB.savedAt;
+      if (pd.dump.length > DUMP_MAX) pd.dump = pd.dump.slice(-DUMP_MAX);
+      if (pd.log.length > LOG_MAX) pd.log = pd.log.slice(-LOG_MAX);
+    }
+    save();
     scheduleSync();
   }
   function packDB() {
-    if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
-    return DB.packs[pack.packId];
+    var pd = DB.packs[pack.packId];
+    if (!pd) pd = DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, taskLog: {}, log: [], exam: null, savedAt: 0 };
+    /* 옛 기록엔 나중에 생긴 필드가 없다 — 접근할 때마다 보정해 호출부가 || {} 를 안 쓰게 */
+    if (!pd.states || typeof pd.states !== 'object') pd.states = {};
+    if (!pd.wrong || typeof pd.wrong !== 'object') pd.wrong = {};
+    if (!Array.isArray(pd.dump)) pd.dump = [];
+    if (!pd.paper || typeof pd.paper !== 'object') pd.paper = {};
+    if (!pd.taskLog || typeof pd.taskLog !== 'object') pd.taskLog = {};
+    if (!Array.isArray(pd.log)) pd.log = [];
+    if (pd.exam === undefined) pd.exam = null;
+    return pd;
   }
-  function setLast(label, resume) { DB.last = { packId: pack.packId, label: label, resume: resume, at: Date.now() }; }
+  /* 오답 항목엔 엔진 상태 객체를 넣지 않는다(크기·혼동) — 옛 항목의 state는 날짜 배열만 남기고 걷어낸다 */
+  function tidyPack(pd) {
+    var n = 0;
+    Object.keys(pd.wrong).forEach(function (k) {
+      var e = pd.wrong[k];
+      if (!e || typeof e !== 'object') { delete pd.wrong[k]; n += 1; return; }
+      if (e.state) { e.wrongClearDates = (e.state.wrongClearDates || []).slice(); delete e.state; n += 1; }
+      if (!Array.isArray(e.wrongClearDates)) { e.wrongClearDates = []; n += 1; }
+    });
+    return n;
+  }
+  function setLast(label, resume) { DB.last = { packId: pack.packId, label: label, resume: resume || null, at: Date.now() }; }
   function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
   function api(path, opt) {
     var a = auth();
@@ -259,70 +319,155 @@
       return r.json();
     });
   }
+  /* 네트워크 단절(fetch 자체 실패)과 서버가 답한 오류(api-NNN)를 가른다 — 오프라인 캐시는 전자에만 쓴다 */
+  function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
+
+  /* 마지막 교재 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다. */
+  function cachePack(id, p, updatedAt) {
+    try { localStorage.setItem(PACK_CACHE_KEY, JSON.stringify({ id: id, pack: p, updatedAt: updatedAt || null })); } catch (e) {}
+  }
+  function loadPackCache() {
+    try { var c = JSON.parse(localStorage.getItem(PACK_CACHE_KEY) || 'null'); return c && c.pack && c.pack.packId ? c : null; } catch (e) { return null; }
+  }
+
+  /* 저장 상태 표시 — 실패는 다음 persist 때 자연히 재시도된다(push는 늘 전체 상태) */
+  var saveStatus = 'saved';
+  var SAVE_LABEL = { saved: ['저장됨', '학습 기록이 서버에 저장되었습니다'], pending: ['저장 대기', '3초 뒤 서버에 저장합니다'],
+    failed: ['저장 실패', '서버에 저장하지 못했습니다 — 다음 학습 기록 때 다시 시도합니다'],
+    toobig: ['기록 초과', '기록이 너무 커서 저장되지 않았습니다'] };
+  function setSaveStatus(s) {
+    saveStatus = s;
+    var el = $('saveDot');
+    if (!authed || demoMode) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'savedot ' + s;
+    el.querySelector('span').textContent = SAVE_LABEL[s][0];
+    el.title = SAVE_LABEL[s][1];
+    if (s === 'toobig') showBanner('기록이 너무 커서 저장되지 않았습니다. 선생님께 알려 주세요.');
+    else if (s === 'saved') showBanner('');
+  }
+  function showBanner(msg) { var b = $('topBanner'); b.textContent = msg; b.hidden = !msg; }
+
   var syncTimer = null;
+  /* 체험 교재(배정 전 연습)는 서버에 올리지 않는다 — 관리 overview에 예시 교재 요약이 학생 기록으로 뜨면 안 된다 */
   function scheduleSync() {
-    if (!authed) return;
+    if (!authed || demoMode) return;
+    setSaveStatus('pending');
     clearTimeout(syncTimer);
     syncTimer = setTimeout(pushState, 3000);
   }
+  function n0(v) { v = Number(v); return isFinite(v) ? Math.round(v) : 0; }
+  /* 관리 overview의 원천(계약 0.1) — 형태를 정확히 지킨다. 서버가 화이트리스트로 정규화한다. */
   function summaryOf() {
-    var pd = packDB(), w = {}, s = {};
-    Object.keys(pd.states).forEach(function (k) {
-      var st = pd.states[k];
-      if (st.kind === 'sentence') s[k] = st; else w[k] = st;
-    });
-    var pd2 = packDB();
-    return { packId: pack.packId, word: WBNAESIN.wordSummary(w), sentence: WBNAESIN.sentenceSummary(s),
-      task: (pd2.taskLog || {})[WBNAESIN.localDate(Date.now())] || null,
-      updatedAt: new Date().toISOString() };
+    var pd = packDB();
+    var w = WBNAESIN.wordSummary(wordStates()), s = WBNAESIN.sentenceSummary(senStates());
+    var task = null, dates = Object.keys(pd.taskLog).sort();
+    if (dates.length) {
+      var d = dates[dates.length - 1], tl = pd.taskLog[d] || {};
+      task = { date: d, taskAt: String(tl.taskAt || ''), title: String(tl.title || '').slice(0, 80), correct: n0(tl.correct), total: n0(tl.total) };
+    }
+    var bs = s.byStage || {};
+    return {
+      packId: pack.packId,
+      word: { total: n0(w.total), reached: n0(w.reached), stable: n0(w.stable), risky: n0(w.risky), needsSpellCheck: n0(w.needsSpellCheck) },
+      sentence: { total: n0(s.total), interpreted: n0(s.interpreted), memorized: n0(s.memorized),
+        byStage: { 1: n0(bs[1]), 2: n0(bs[2]), 3: n0(bs[3]), 4: n0(bs[4]), 5: n0(bs[5]), 6: n0(bs[6]) } },
+      task: task,
+      updatedAt: new Date().toISOString()
+    };
   }
   function pushState() {
-    if (!authed) return;
-    var body = { state: { v: 1, packs: DB.packs, last: DB.last || null, summary: summaryOf(), savedAt: DB.savedAt } };
-    api('/state', { method: 'PUT', body: JSON.stringify(body) }).catch(function () {});
+    if (!authed || !pack || demoMode) return;
+    var sentAt = DB.savedAt;
+    var body = { state: { v: 1, owner: DB.owner || null, packs: DB.packs, last: DB.last || null, summary: summaryOf(), savedAt: DB.savedAt } };
+    api('/state', { method: 'PUT', body: JSON.stringify(body) }).then(function () {
+      if (DB.savedAt === sentAt) setSaveStatus('saved');   // 그 사이 새 persist가 있었으면 '대기'가 맞다
+    }).catch(function (e) {
+      setSaveStatus(e && e.message === 'api-413' ? 'toobig' : 'failed');
+    });
   }
+  /* 원격 채택은 팩 단위 — 팩별 savedAt이 더 새로운 것만 받는다. 다른 기기에서 다른 팩을
+     공부한 기록이 이 기기의 팩 기록을 통째로 덮지 않는다. 러너가 열려 있으면 받지 않는다
+     (진행 중인 세션이 참조하는 상태 객체가 바뀌면 안 된다). 반환: 무언가 바뀌었는가. */
   function pullState() {
+    if (!authed) return Promise.resolve(false);
     return api('/state').then(function (r) {
-      var remote = r && r.state;
-      if (remote && remote.packs && (remote.savedAt || 0) > (DB.savedAt || 0)) {
-        DB.packs = remote.packs;
-        if (remote.last) DB.last = remote.last;
-      }
-    }).catch(function () {});
+      if ($('runner').classList.contains('open')) return false;
+      var changed = pullAdopt(r && r.state);
+      if (changed && pack) { tidyPack(packDB()); save(); }
+      return changed;
+    }).catch(function () { return false; });
   }
+  /* 앱으로 돌아올 때(다른 탭·기기에서 공부하고 온 경우) 원격을 다시 받는다 — 러너 중엔 안 한다 */
+  var lastWake = 0;
+  function onWake() {
+    if (!authed || !pack || offlineMode) return;
+    if ($('runner').classList.contains('open')) return;
+    if (Date.now() - lastWake < 5000) return;
+    lastWake = Date.now();
+    /* 저장 실패가 남아 있어도 받기부터 한다 — 곧장 올리면 그 사이 다른 기기가 올린 더 새로운 팩 기록이
+       통째로 덮인다(push는 늘 DB 전체를 보낸다). 팩별 savedAt으로 병합한 뒤에 다시 올린다. */
+    pullState().then(function (changed) { if (changed) render(); if (saveStatus === 'failed') pushState(); });
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onWake(); });
+  window.addEventListener('focus', onWake);
 
   /* ── 상태 접근 ── */
+  function mkDialogueState(id, now) {
+    var s = WBNAESIN.createState(id, 'dialogue', now);
+    if (s.stage == null) s.stage = 1;   // 엔진이 dialogue에 stage를 안 붙이는 판이어도 3단계 사다리는 돈다
+    return s;
+  }
+  /* 없는 상태만 만든다. 반환: 새로 만들거나 고친 수 — 0이면 부팅 때 persist(서버 push)할 이유가 없다 */
   function ensureStates() {
-    var pd = packDB(), now = Date.now();
+    var pd = packDB(), now = Date.now(), n = 0;
     (pack.words || []).forEach(function (w) {
-      if (!pd.states[w.id]) pd.states[w.id] = WBNAESIN.createState(w.id, 'word', now);
+      if (!pd.states[w.id]) { pd.states[w.id] = WBNAESIN.createState(w.id, 'word', now); n += 1; }
     });
     (pack.sentences || []).forEach(function (s) {
       var id = WBNAESIN.sentenceId(s.seq);
-      if (!pd.states[id]) pd.states[id] = WBNAESIN.createState(id, 'sentence', now);
+      if (!pd.states[id]) { pd.states[id] = WBNAESIN.createState(id, 'sentence', now); n += 1; }
     });
-    /* 대화문 — 3단계(읽기→대화 완성→순서 배열), stage 4 도달 = 완료 */
+    /* 대화문 — 3단계(읽기→대화 완성→순서 배열), stage 4 도달 = 완료. kind 'dialogue'는 본문 문장
+       집계(해석·백지)에 섞이지 않는다 — 옛 기록의 'sentence' 대화문은 여기서 이관한다. */
     (pack.dialogues || []).forEach(function (d) {
-      var id = 'd-' + d.id;
-      if (!pd.states[id]) pd.states[id] = WBNAESIN.createState(id, 'sentence', now);
+      var id = 'd-' + d.id, cur = pd.states[id];
+      if (!cur) { pd.states[id] = mkDialogueState(id, now); n += 1; }
+      else if (cur.kind !== 'dialogue') { cur.kind = 'dialogue'; if (cur.stage == null) cur.stage = 1; n += 1; }
     });
+    n += tidyPack(pd);
+    return n;
   }
   function dlgState(id) { return packDB().states['d-' + id]; }
   function dlgById(id) { for (var i = 0; i < (pack.dialogues || []).length; i++) if (pack.dialogues[i].id === id) return pack.dialogues[i]; return null; }
   function dlgDone(st) { return st && st.stage >= 4; }
   var DLG_STAGES = { 1: '대역 읽기', 2: '대화 완성', 3: '순서 배열' };
-  function wordStates() {
+  function statesOfKind(kind) {
     var pd = packDB(), out = {};
-    Object.keys(pd.states).forEach(function (k) { if (pd.states[k].kind !== 'sentence') out[k] = pd.states[k]; });
+    Object.keys(pd.states).forEach(function (k) { if (pd.states[k] && pd.states[k].kind === kind) out[k] = pd.states[k]; });
     return out;
   }
-  function senStates() {
-    var pd = packDB(), out = {};
-    Object.keys(pd.states).forEach(function (k) { if (pd.states[k].kind === 'sentence') out[k] = pd.states[k]; });
-    return out;
-  }
+  function wordStates() { return statesOfKind('word'); }
+  function senStates() { return statesOfKind('sentence'); }
   function senState(seq) { return packDB().states[WBNAESIN.sentenceId(seq)]; }
-  function exam() { return packDB().exam || null; }
+  /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드 */
+  function exam() { var pd = packDB(); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
+  function examEnded() { var ex = exam(); return !!(ex && ex.examDate && WBNAESIN.daysUntil(ex.examDate, Date.now()) < 0); }
+  /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
+  function applyServerExam() {
+    var ex = examServer;
+    if (!ex || !ex.examDate) return;
+    var pd = packDB();
+    if (pd.examOverride && pd.examOverrideFor !== ex.examDate) { delete pd.examOverride; delete pd.examOverrideFor; }
+    var dl = Number(ex.wordDeadlineDays);
+    pd.exam = { examDate: ex.examDate, wordDeadlineDays: (dl >= 3 && dl <= 30) ? Math.round(dl) : 7 };
+  }
+  /* 최근 학습 로그(핵심표현·문법 확인처럼 엔진 상태가 없는 학습) — 최근 50건 */
+  function logEvent(t, type, ref, ok) {
+    var pd = packDB();
+    pd.log.push({ t: t, type: type, ref: ref, ok: !!ok, at: new Date().toISOString() });
+    if (pd.log.length > LOG_MAX) pd.log = pd.log.slice(-LOG_MAX);
+  }
   function wordById(id) { for (var i = 0; i < pack.words.length; i++) if (pack.words[i].id === id) return pack.words[i]; return null; }
   function senBySeq(seq) { for (var i = 0; i < pack.sentences.length; i++) if (pack.sentences[i].seq === seq) return pack.sentences[i]; return null; }
   function dayGroups() {
@@ -349,16 +494,36 @@
     var b = e.target.closest('button[data-tab]');
     if (b) setTab(b.getAttribute('data-tab'));
   });
+  /* 목록 행은 role=button — 키보드(Enter/Space)로도 누른다 */
+  $('wrap').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var r = e.target && e.target.closest ? e.target.closest('.row[role="button"]') : null;
+    if (!r || e.target !== r) return;
+    e.preventDefault(); r.click();
+  });
+  /* 이름 탭 → 다른 학생으로 연동 (공용 태블릿에서 학생이 바뀔 때) */
+  $('whoLine').onclick = function () {
+    if (!authed) return;
+    if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
+    try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (e) {}
+    location.href = '/';
+  };
+  $('offBadge').onclick = function () { location.reload(); };
 
   function renderHeader() {
-    var a = auth();
-    $('whoLine').innerHTML = (a && a.name ? '<b>' + esc(a.name) + '</b> · ' : (authed ? '' : '체험 모드 · ')) +
-      (pack ? esc((pack.textbook || '') + ' L' + pack.lesson) : '');
+    var a = auth(), who = $('whoLine');
+    who.innerHTML = '<span>' + (authed && a && a.name ? '<b>' + esc(a.name) + '</b> · ' : (authed ? '' : '체험 모드 · ')) +
+      (pack ? esc((pack.textbook || '') + ' L' + pack.lesson) : '') +
+      (authed ? '<small style="display:block;font-size:10.5px;font-weight:400">다른 학생으로 연동 ↻</small>' : '') + '</span>';
+    who.className = 'who' + (authed ? ' linked' : '');
+    who.title = authed ? '누르면 다른 학생으로 연동합니다' : '';
+    $('offBadge').hidden = !offlineMode;
+    setSaveStatus(saveStatus);
     var ex = exam(), b = $('ddayBadge');
     if (ex && ex.examDate) {
       var d = WBNAESIN.daysUntil(ex.examDate, Date.now());
-      b.textContent = d >= 0 ? 'D-' + d : '시험 종료';
-      b.className = 'dd';
+      if (d >= 0) { b.textContent = 'D-' + d; b.className = 'dd'; }
+      else { b.textContent = '시험 종료 · 자율 학습'; b.className = 'dd practice'; }
     } else { b.textContent = '자율 학습'; b.className = 'dd practice'; }
   }
 
@@ -374,15 +539,63 @@
 
   /* ════════ 홈 — E 프로그레스 보드 ════════ */
   function heatColor(v) { return ['#F0F3F6', 'var(--b2)', 'var(--b3)', 'var(--b4)'][v] || '#F0F3F6'; }
+  /* 오늘 과제(세션 ⑤ 수업 모드) — 서버 과제의 date가 오늘일 때만 */
+  function todayTask() {
+    var t = taskServer && taskServer.task;
+    return (t && t.date === WBNAESIN.localDate(Date.now())) ? t : null;
+  }
+  /* 완료 = 같은 날짜의 로그가 '그 배정'(updatedAt)에 대한 것일 때만 — 같은 날 재배정하면 다시 미완료 */
+  function taskDone(task) {
+    var tl = packDB().taskLog[task.date];
+    return (tl && tl.taskAt === task.updatedAt) ? tl : null;
+  }
+  function taskCardHtml(task) {
+    var done = taskDone(task);
+    return '<div class="card" style="border-color:var(--ind)"><div class="todo"><span class="t">오늘 수업 과제</span>' +
+      '<span style="flex:1"><b>' + esc(task.title) + '</b><span class="muted" style="display:block">학습 유형 ' + (task.typeKeys || []).length + '종' +
+      (task.seqFrom ? ' · 본문 문장 ' + esc(task.seqFrom) + '–' + esc(task.seqTo) : '') + '</span></span>' +
+      (done ? '<span class="tag t-green">완료 · ' + n0(done.correct) + '/' + n0(done.total) + '</span><button class="btn" id="taskGo">다시 풀기</button>'
+            : '<button class="btn p" id="taskGo">과제 시작</button>') + '</div></div>';
+  }
+  function wireTaskCard(task) {
+    var tg = $('taskGo');
+    if (tg && task) tg.onclick = function () { runTask(task); };
+  }
+  function demoNotice() {
+    if (!demoMode) return '';
+    return authed
+      ? '<div class="notice">배정 전 연습 — 체험 교재입니다. 선생님이 시험 범위를 배정하면 새로고침 때 내 학교 교재가 열립니다.</div>'
+      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다.</div>';
+  }
+  /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
+  function packListHtml() {
+    if (packList.length <= 1) return '';
+    return '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
+      return id === pack.packId ? '<b>' + esc(id) + '</b>' : '<a href="#" data-pk="' + esc(id) + '">' + esc(id) + '</a>';
+    }).join(' · ') + '</p>';
+  }
+  function wireHomeLinks() {
+    $('workPane').addEventListener('click', function (e) {
+      var g = e.target.closest('[data-go]');
+      if (g) { setTab(g.getAttribute('data-go')); return; }
+      var pk = e.target.closest('a[data-pk]');
+      if (pk) { e.preventDefault(); switchPack(pk.getAttribute('data-pk')); }
+    });
+  }
   function renderHome() {
     var pd = packDB();
+    var task = todayTask();
     if (!pd.diagDone) {
+      /* 과제는 진단 없이도 시작할 수 있다 — 수업 시간에 진단부터 2분 쓰게 하지 않는다 */
       layoutFull(
-        '<div class="card" style="max-width:640px;margin:40px auto"><h2>진단 평가 <small>학습 시작 전 1회 · 약 2분</small></h2>' +
+        '<div style="max-width:640px;margin:16px auto 0">' + packListHtml() + (task ? taskCardHtml(task) : '') + '</div>' +
+        '<div class="card" style="max-width:640px;margin:' + (task || packList.length > 1 ? '0' : '40px') + ' auto 14px"><h2>진단 평가 <small>학습 시작 전 1회 · 약 2분</small></h2>' +
         '<p class="muted" style="font-size:13.5px">현재 알고 있는 단어를 확인해 학습 계획을 세웁니다. 전 단어 ' + pack.words.length + '개. 모르는 단어는 「모름」을 선택하면 됩니다 — 진단이므로 점수와 무관합니다.</p>' +
         '<button class="btn p big" id="startDiag" style="margin-top:8px">진단 평가 시작</button></div>' +
-        (authed ? '' : '<div class="notice" style="max-width:640px;margin:0 auto">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재가 열립니다.</div>'));
+        '<div style="max-width:640px;margin:0 auto">' + demoNotice() + '</div>');
       $('startDiag').onclick = startDiagnostic;
+      wireTaskCard(task);
+      wireHomeLinks();
       return;
     }
     var wsum = WBNAESIN.wordSummary(wordStates());
@@ -390,25 +603,12 @@
     var plan = WBNAESIN.planDay(pack, pd.states, exam(), Date.now(), {});
     var wCount = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
     var wrongN = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; }).length;
-    var last = DB.last && DB.last.packId === pack.packId ? DB.last : null;
+    var last = (DB.last && DB.last.packId === pack.packId && DB.last.resume) ? DB.last : null;
 
-    var html = authed ? '' : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다.</div>';
+    var html = demoNotice();
     /* 세션 ⑤ 수업 모드 — 강사가 배정한 오늘 과제가 최상단에 온다 */
-    var todayStr = WBNAESIN.localDate(Date.now());
-    var task = (taskServer && taskServer.task && taskServer.task.date === todayStr) ? taskServer.task : null;
-    var taskLog = (pd.taskLog || {})[todayStr];
-    if (task) {
-      html += '<div class="card" style="border-color:var(--ind)"><div class="todo"><span class="t">오늘 수업 과제</span>' +
-        '<span style="flex:1"><b>' + esc(task.title) + '</b><span class="muted" style="display:block">학습 유형 ' + task.typeKeys.length + '종' +
-        (task.seqFrom ? ' · 본문 문장 ' + task.seqFrom + '–' + task.seqTo : '') + '</span></span>' +
-        (taskLog ? '<span class="tag t-green">완료 · ' + taskLog.correct + '/' + taskLog.total + '</span>'
-                 : '<button class="btn p" id="taskGo">과제 시작</button>') + '</div></div>';
-    }
-    if (packList.length > 1) {
-      html += '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
-        return id === pack.packId ? '<b>' + esc(id) + '</b>' : '<a href="#" data-pk="' + esc(id) + '">' + esc(id) + '</a>';
-      }).join(' · ') + '</p>';
-    }
+    if (task) html += taskCardHtml(task);
+    html += packListHtml();
     html +=
       '<div class="big3">' +
       '<div><div class="n">' + pct(wsum.reached, wsum.total) + '<small>%</small></div><div class="l">단어 도달 <b>' + wsum.reached + '/' + wsum.total + '</b> · 안정화 ' + wsum.stable + '</div></div>' +
@@ -417,12 +617,12 @@
 
       '<div class="boards">' +
       '<div class="card"><h2>단어 안정화 지도 <small>' + wsum.total + '단어 · 진하기 = 안정화 0→3</small></h2>' +
-      '<div class="legend">0<i style="background:#F0F3F6"></i>1<i style="background:var(--b2)"></i>2<i style="background:var(--b3)"></i>3<i style="background:var(--b4)"></i></div>' +
-      '<div class="heat" id="heat"></div></div>' +
+      '<div class="legend" aria-hidden="true">0<i style="background:#F0F3F6"></i>1<i style="background:var(--b2)"></i>2<i style="background:var(--b3)"></i>3<i style="background:var(--b4)"></i></div>' +
+      '<div class="heat" id="heat" role="img" aria-label="단어 안정화 지도 — 안정화 완료 ' + wsum.stable + '개, 도달 ' + wsum.reached + '개, 전체 ' + wsum.total + '개"></div></div>' +
       '<div class="card"><h2>본문 ' + ssum.total + '문장 × 6단계 <small>행 = 단계 · 열 = 문장</small></h2>' +
-      '<div class="rowlbl"><span>6단계(백지)</span><span>문장 1 → ' + ssum.total + '</span></div>' +
-      '<div id="mtxWrap"></div>' +
-      '<div class="rowlbl"><span>1단계(대역)</span></div></div></div>' +
+      '<div class="rowlbl" aria-hidden="true"><span>6단계(백지)</span><span>문장 1 → ' + ssum.total + '</span></div>' +
+      '<div id="mtxWrap" role="img" aria-label="본문 단계 매트릭스 — 해석 통과 ' + ssum.interpreted + '문장, 백지 완료 ' + ssum.memorized + '문장, 전체 ' + ssum.total + '문장"></div>' +
+      '<div class="rowlbl" aria-hidden="true"><span>1단계(대역)</span></div></div></div>' +
 
       '<div class="card"><div class="todo"><span class="t">오늘의 학습</span>' +
       '<button class="chip now" data-go="words">단어 ' + wCount + '개<small>신규 ' + plan.words.fresh.length + ' · 복습 ' + plan.words.review.length + ' · 안정화 ' + plan.words.relearn.length + '</small></button>' +
@@ -449,34 +649,39 @@
     });
     var mw = $('mtxWrap'), N = pack.sentences.length;
     for (var stage = 6; stage >= 1; stage--) {
-      var row = document.createElement('div');
+      var row = document.createElement('div'), passedN = 0;
       row.className = 'mtx';
       row.style.gridTemplateColumns = 'repeat(' + N + ',1fr)';
       pack.sentences.forEach(function (s) {
         var st = senState(s.seq);
         var cur = st ? (st.reached ? 7 : st.stage) : 1;
         var e = document.createElement('i');
-        if (cur > stage) e.style.background = (stage === 6 ? 'var(--green)' : (stage >= 4 ? 'var(--b4)' : (stage >= 2 ? 'var(--b3)' : 'var(--b1)')));
+        if (cur > stage) { passedN += 1; e.style.background = (stage === 6 ? 'var(--green)' : (stage >= 4 ? 'var(--b4)' : (stage >= 2 ? 'var(--b3)' : 'var(--b1)'))); }
         row.appendChild(e);
       });
+      row.setAttribute('aria-label', stage + '단계 통과 ' + passedN + '/' + N);
       mw.appendChild(row);
     }
-    $('workPane').addEventListener('click', function (e) {
-      var g = e.target.closest('[data-go]');
-      if (g) { setTab(g.getAttribute('data-go')); return; }
-      var pk = e.target.closest('a[data-pk]');
-      if (pk) { e.preventDefault(); switchPack(pk.getAttribute('data-pk')); }
-    });
+    wireHomeLinks();
     if (last) $('resumeBtn').onclick = function () { doResume(last.resume); };
     $('startDump').onclick = startDump;
-    var tg = $('taskGo');
-    if (tg && task) tg.onclick = function () { runTask(task); };
+    wireTaskCard(task);
+  }
+  /* 문법 개념(g-<n>) 확인 문제 — 과제 typeKeys에 패턴 키가 오면 그 패턴의 Let's Use It */
+  function patternItems(key) {
+    var pat = (pack.patterns || []).filter(function (p) { return 'g-' + p.patternNo === key; })[0];
+    return pat ? luiItems(pat) : [];
   }
   function runTask(task) {
     var items = [], types = quizTypes();
-    task.typeKeys.forEach(function (k) {
+    (task.typeKeys || []).forEach(function (k) {
       var t = types.filter(function (x) { return x.key === k; })[0];
-      if (t) items = items.concat(t.make().slice(0, 10));
+      var made = t ? t.make() : (/^g-\d+$/.test(k) ? patternItems(k) : []);
+      made.slice(0, 10).forEach(function (q) {
+        if (!q) return;
+        if (!q.typeKey && GEN_KEYS.indexOf(k) >= 0) q.typeKey = k;
+        items.push(q);
+      });
     });
     if (task.seqFrom) {
       pack.sentences.filter(function (s) { return s.seq >= task.seqFrom && s.seq <= task.seqTo; })
@@ -490,22 +695,30 @@
     runQueue(items, '수업 과제 · ' + task.title, function (item, ok) {
       total += 1; if (ok) correct += 1;
       applyMockGrade(item, ok);
-    }, function () {
-      var pd = packDB();
-      pd.taskLog = pd.taskLog || {};
-      pd.taskLog[task.date] = { correct: correct, total: total, title: task.title, at: new Date().toISOString() };
+    }, function (finished) {
+      /* ✕ 중단은 완료가 아니다(계약 0.7) — 끝까지 푼 것만 과제 로그에 남긴다 */
+      if (finished) {
+        packDB().taskLog[task.date] = { correct: correct, total: total, title: task.title, at: new Date().toISOString(), taskAt: task.updatedAt || null };
+        logEvent('task', 'task', task.date, correct === total);
+      }
       persist(); render();
     }, { noConfidence: true });
   }
   function switchPack(pid) {
     api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
-      pack = r.pack; ensureStates();
-      if (examServer && examServer.examDate) packDB().exam = { examDate: examServer.examDate, wordDeadlineDays: examServer.wordDeadlineDays || 7 };
+      pack = r.pack;
+      cachePack(pid, r.pack, r.updatedAt);
+      /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
+      selSeq = null; selWordId = null; selType = null; selDlg = null; paperMode = false;
+      applyServerExam();
+      ensureStates();
+      setLast('교재 ' + pid, null);
       persist(); render();
     }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
   }
   function doResume(r) {
     if (!r) return;
+    selDlg = null;
     if (r.t === 'wordDaily') { setTab('words'); return startWordDaily(); }
     if (r.t === 'sentence') { selSeq = r.seq; setTab('passage'); return; }
     if (r.t === 'quizType') { selType = r.key; setTab('quiz'); return; }
@@ -517,9 +730,11 @@
   function startDiagnostic() {
     var items = WBGEN.diagnosticSet(pack, Math.random);
     var results = [];
+    /* silent: 진단은 채점 표시 없이 500ms 뒤 자동 진행 — 정답을 보여 주면 진단이 학습이 된다 */
     runQueue(items, '진단 평가', function (item, ok, answerKey) {
       results.push({ id: item.wordId, known: ok && answerKey !== item.unknownKey });
-    }, function () {
+    }, function (finished) {
+      if (!finished) { render(); return; }   // 중단 — 진단 미완료, 아무것도 적용하지 않는다
       var pd = packDB();
       WBNAESIN.applyDiagnostic(pd.states, results, Date.now());
       pd.diagDone = true;
@@ -527,13 +742,16 @@
       var known = results.filter(function (r) { return r.known; }).length;
       alert('진단 완료.\n아는 단어 ' + known + '개 / 전체 ' + pack.words.length + '개.\n학습 계획은 남은 ' + (pack.words.length - known) + '개 기준으로 편성됩니다.');
       render();
-    }, { noConfidence: true });
+    }, { noConfidence: true, silent: true });
   }
 
   /* ════════ 단어 암기 (스플릿) ════════ */
   function startWordDaily() {
-    var plan = WBNAESIN.planDay(pack, packDB().states, exam(), Date.now(), {});
-    var items = WBGEN.dailySet(pack, { words: plan.words, sentences: [] }, Math.random);
+    var now = Date.now(), states = packDB().states;
+    var plan = WBNAESIN.planDay(pack, states, exam(), now, {});
+    /* states·now를 넘겨야 gen이 미도달 복습 단어를 무힌트 철자로 내고(도달 기회), 로테이션 자리를
+       단어 상태·날짜로 정한다 — 안 넘기면 모든 복습이 재인 문항만 돌아 영원히 미도달이다 */
+    var items = WBGEN.dailySet(pack, { words: plan.words, sentences: [] }, Math.random, { states: states, now: now });
     if (!items.length) { alert('오늘 예정된 단어 학습이 없습니다.'); return; }
     setLast('단어 암기 — 오늘의 학습', { t: 'wordDaily' });
     persist();
@@ -542,19 +760,21 @@
   function renderWords() {
     var ws = wordStates();
     var sum = WBNAESIN.wordSummary(ws);
-    var listHtml = '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b></span></div><div class="rows" id="wRows">';
+    var listHtml = '<div class="lh"><span>단어 ' + sum.total + '개</span><span>도달 <b>' + sum.reached + '</b> · 안정화 <b>' + sum.stable + '</b>' +
+      (sum.needsSpellCheck ? ' · 철자 확인 대기 <b>' + sum.needsSpellCheck + '</b>' : '') + '</span></div><div class="rows" id="wRows">';
     pack.words.forEach(function (w) {
       var st = ws[w.id], stb = st ? WBNAESIN.stability(st) : 0;
       var cls = st && st.reached ? (WBNAESIN.isStable(st) ? 's' : 'r') : '';
-      listHtml += '<div class="row' + (selWordId === w.id ? ' sel' : '') + '" data-w="' + esc(w.id) + '">' +
-        '<span class="tx">' + esc(w.headword) + '<span class="sub">' + esc((w.meaningKo || [])[0] || '') + '</span></span>' +
+      listHtml += '<div class="row' + (selWordId === w.id ? ' sel' : '') + '" role="button" tabindex="0" data-w="' + esc(w.id) + '">' +
+        '<span class="tx">' + esc(w.headword) + '<span class="sub">' + esc((w.meaningKo || [])[0] || '') + (st && st.needsSpellCheck ? ' · 철자 확인 대기' : '') + '</span></span>' +
         '<span class="lvchip ' + cls + '">' + stb + '/3</span></div>';
     });
     listHtml += '</div>';
     var w = selWordId ? wordById(selWordId) : null;
     var workHtml =
       '<div class="card"><h2>오늘의 단어 학습</h2>' +
-      '<p class="muted">도달 = 힌트 없이 1회 인출 성공 · 안정화 = 도달 후 서로 다른 날 3회 재확인. 시험 전 전 단어 안정화(3/3)가 목표입니다.</p>' +
+      '<p class="muted">도달 = 힌트 없이 1회 인출 성공 · 안정화 = 도달 후 서로 다른 날 3회 재확인. 시험 전 전 단어 안정화(3/3)가 목표입니다.' +
+      (sum.needsSpellCheck ? ' <b>철자 확인 대기 ' + sum.needsSpellCheck + '개</b> — 진단에서 「안다」고 답한 단어는 철자 입력으로 다시 확인합니다.' : '') + '</p>' +
       '<button class="btn p big" id="trainWords" style="margin-top:8px">단어 학습 시작</button></div>';
     if (w) {
       var st = ws[w.id];
@@ -590,7 +810,7 @@
     return h + '</span>';
   }
   function stgMini(stage, done) {
-    var h = '<span class="stg">';
+    var h = '<span class="stg" role="img" aria-label="' + (done ? '암기 완료' : stage + '단계') + '">';
     for (var i = 1; i <= 6; i++) h += '<i class="' + (done ? 'dn' : (i < stage ? 'dn' : (i === stage ? 'on' : ''))) + '"></i>';
     return h + '</span>';
   }
@@ -601,25 +821,25 @@
     var listHtml = '<div class="lh"><span>본문 ' + ssum.total + '문장</span><span>해석 <b>' + ssum.interpreted + '</b> · 백지 <b>' + ssum.memorized + '</b></span></div><div class="rows" id="sRows">';
     dayGroups().forEach(function (gr, gi) {
       var doneAll = gr.sentences.every(function (s) { var st = senState(s.seq); return st && st.reached; });
-      listHtml += '<div class="hdr">' + esc(gr.header) + (doneAll ? ' · 백지 완료' : '') +
-        ' <button data-blank="' + gi + '" style="float:right;font-size:11px;font-weight:800;color:var(--ind)"' + (g.open ? '' : ' disabled') + '>단락 백지 시험</button></div>';
+      listHtml += '<div class="hdr"><span>' + esc(gr.header) + (doneAll ? ' · 백지 완료' : '') + '</span>' +
+        '<button data-blank="' + gi + '"' + (g.open ? '' : ' disabled') + '>단락 백지 시험</button></div>';
       gr.sentences.forEach(function (s) {
         var st = senState(s.seq);
-        listHtml += '<div class="row' + (s.seq === selSeq ? ' sel' : '') + '" data-seq="' + s.seq + '">' +
+        listHtml += '<div class="row' + (s.seq === selSeq ? ' sel' : '') + '" role="button" tabindex="0" data-seq="' + s.seq + '">' +
           '<span class="no">' + s.seq + '</span><span class="tx">' + esc(s.en) + '</span>' +
           stgMini(st ? st.stage : 1, st && st.reached) + '</div>';
       });
     });
     if ((pack.dialogues || []).length) {
-      listHtml += '<div class="hdr">대화문 · 의사소통 기능</div>';
+      listHtml += '<div class="hdr"><span>대화문 · 의사소통 기능</span></div>';
       pack.dialogues.forEach(function (d) {
         var st = dlgState(d.id);
-        listHtml += '<div class="row' + (selDlg === d.id ? ' sel' : '') + '" data-dlg="' + esc(d.id) + '">' +
+        listHtml += '<div class="row' + (selDlg === d.id ? ' sel' : '') + '" role="button" tabindex="0" data-dlg="' + esc(d.id) + '">' +
           '<span class="tx">' + esc(d.section) + '<span class="sub">' + d.lines.length + '줄 · ' + (dlgDone(st) ? '완료' : (st ? st.stage : 1) + '단계 ' + DLG_STAGES[Math.min(st ? st.stage : 1, 3)]) + '</span></span>' +
           '<span class="lvchip ' + (dlgDone(st) ? 's' : '') + '">' + (dlgDone(st) ? '완료' : (Math.min(st ? st.stage : 1, 3)) + '/3') + '</span></div>';
       });
       if ((pack.keyExpressions || []).length) {
-        listHtml += '<div class="row' + (selDlg === '__key__' ? ' sel' : '') + '" data-dlg="__key__">' +
+        listHtml += '<div class="row' + (selDlg === '__key__' ? ' sel' : '') + '" role="button" tabindex="0" data-dlg="__key__">' +
           '<span class="tx">핵심표현<span class="sub">의사소통 기능 표현 ' + pack.keyExpressions.length + '개 빈칸 확인</span></span></div>';
       }
     }
@@ -666,7 +886,8 @@
     var d = dlgById(id), st = dlgState(id);
     var tts = $('dlgTts');
     if (tts) tts.onclick = function () {
-      if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speakSeq(d.lines.map(function (l) { return { text: l.en, lang: 'en' }; }));
+      /* speakSeq(list, opt)는 문자열 배열을 받는다(shared/voice.js) — 줄마다 영어 목소리로 차례 읽기 */
+      if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), { lang: 'en' });
     };
     if (go) go.onclick = function () { trainDialogue(d, st); };
   }
@@ -706,30 +927,31 @@
       var item = { type: 'order', shuffled: WBGEN.shuffle(lines, Math.random), answer: lines };
       if (item.shuffled.join('|') === lines.join('|')) item.shuffled = WBGEN.shuffle(lines, Math.random);
       var allOk = true;
-      runQueue([item], '대화문 3단계 · 순서 배열', function (it, ok) { if (!ok) allOk = false; },
-        function () { WBNAESIN.advanceStage(st, allOk, Date.now()); persist(); render(); }, { noConfidence: true });
+      runQueue([item], '대화문 3단계 · 순서 배열', function (it, ok) { if (!ok) allOk = false; logEvent('dialogue', 'order', d.id, ok); },
+        function (finished) { WBNAESIN.advanceStage(st, finished && allOk, Date.now(), { session: newSession() }); persist(); render(); }, { noConfidence: true });
       return;
     }
-    /* 2단계(대화 완성) — 완료된 대화의 재연습도 이 형식 */
+    /* 2단계(대화 완성) — 완료된 대화의 재연습도 이 형식. 통과 = 끝까지 풀고(✕ 중단 아님) 실패 없음 */
     var items = dlgClozeItems(d);
     if (!items.length) { advanceAndRefresh(st, true); return; }
     var all = true;
-    runQueue(items, '대화문 · 대화 완성', function (it, ok) { if (!ok) all = false; },
-      function () { if (!dlgDone(st)) WBNAESIN.advanceStage(st, all, Date.now()); persist(); render(); }, { noConfidence: true });
+    runQueue(items, '대화문 · 대화 완성', function (it, ok) { if (!ok) all = false; logEvent('dialogue', 'kwblank', d.id, ok); },
+      function (finished) { if (!dlgDone(st)) WBNAESIN.advanceStage(st, finished && all, Date.now(), { session: newSession() }); persist(); render(); }, { noConfidence: true });
   }
   function runKeyExpressions() {
-    var items = (pack.keyExpressions || []).map(function (k) {
+    var items = (pack.keyExpressions || []).map(function (k, i) {
       var ansRaw = String(k.blankAnswer || '');
       var idx = k.en.toLowerCase().indexOf(ansRaw.toLowerCase());
       if (idx < 0) return null;
       var surface = k.en.slice(idx, idx + ansRaw.length);
-      return { type: 'kwblank', koFull: k.ko, parts: [
+      return { type: 'kwblank', ref: 'k' + (i + 1), koFull: k.ko, parts: [
         { text: k.en.slice(0, idx) }, { blank: { answers: [surface, ansRaw] } }, { text: k.en.slice(idx + ansRaw.length) }] };
     }).filter(Boolean);
     if (!items.length) { alert('핵심표현 데이터가 없습니다.'); return; }
     setLast('대화문 · 핵심표현', { t: 'dialogue', id: '__key__' });
     persist();
-    runQueue(items, '핵심표현 확인', function () {}, function () { persist(); render(); }, { noConfidence: true });
+    /* 엔진 상태가 없는 학습 — 결과는 최근 학습 로그(pd.log)에 남긴다 */
+    runQueue(items, '핵심표현 확인', function (it, ok) { logEvent('key', 'kwblank', it.ref, ok); }, function () { persist(); render(); }, { noConfidence: true });
   }
   function sentenceWorkHtml(seq, g) {
     var s = senBySeq(seq), st = senState(seq);
@@ -747,7 +969,7 @@
       stageSteps(st.stage, st.reached) + '</div>' +
       '<div class="card">' +
       '<p style="font-size:16.5px;font-weight:600;line-height:1.7;margin:0 0 6px">' + esc(s.en) +
-      ' <button id="ttsBtn" class="tag t-ind">듣기</button></p>' +
+      ' <button id="ttsBtn" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></p>' +
       '<p class="muted" style="font-size:13.5px;margin:0 0 10px">' + esc(s.ko) + '</p>' +
       (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(해석 쓰기)까지 표시됩니다.</p>') +
       '</div>' +
@@ -784,7 +1006,12 @@
     }
     if (stage === 5) { var w = WBGEN.writingPrompt(s); if (w) { w.stage = 5; w.seq = seq; return runItems([w], '본문 5단계 · 문장 영작'); } return advanceAndRefresh(st, true); }
   }
-  function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now()); persist(); render(); }
+  /* 진급 세션 id — 엔진의 이중 진급 가드는 session이 없으면 '1분 안 재호출'을 중복으로 본다.
+     1단계 읽기 완료 직후 2단계 해석을 1분 안에 통과하는 빠른 학생의 정당한 진급이 먹히지 않게
+     앱은 학습 세트(러너 1회)마다 새 session을 넘긴다 — 같은 세트 안의 재호출만 막힌다. */
+  var stageSessionNo = 0;
+  function newSession() { stageSessionNo += 1; return stageSessionNo + ':' + Date.now(); }
+  function advanceAndRefresh(st, passed) { WBNAESIN.advanceStage(st, passed, Date.now(), { session: newSession() }); persist(); render(); }
 
   function stageRead(s, st) {
     var chunksHtml = (s.chunks || []).map(function (c) {
@@ -795,7 +1022,7 @@
     }).join('');
     runCustom('본문 1단계 · 대역 읽기',
       '<div class="q"><div class="qmeta">문장 ' + s.seq + '</div>' +
-      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn2" class="tag t-ind">듣기</button></div>' +
+      '<div class="prompt">' + esc(s.en) + ' <button id="ttsBtn2" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></div>' +
       '<div class="prompt sm" style="color:var(--soft)">' + esc(s.ko) + '</div>' + chunksHtml + notes +
       '<div class="rnext"><button class="btn p big" id="okBtn">읽기 완료 — 해석 단계로</button></div></div>',
       function () {
@@ -807,7 +1034,7 @@
     runCustom('본문 2단계 · 해석 쓰기',
       '<div class="q"><div class="qmeta">문장 ' + s.seq + ' — 영어를 보고 우리말로 해석하시오</div>' +
       '<div class="prompt">' + esc(s.en) + '</div>' +
-      '<textarea class="ans" id="trIn" placeholder="우리말 해석 입력"></textarea>' +
+      '<textarea class="ans" id="trIn"' + INATTR + ' placeholder="우리말 해석 입력"></textarea>' +
       '<div class="rnext"><button class="btn p big" id="okBtn">확인</button></div>' +
       '<div id="trOut"></div></div>',
       function () {
@@ -834,7 +1061,7 @@
     persist();
     runCustom('백지 시험 · ' + group.header,
       '<div class="q"><div class="qmeta">' + esc(group.header) + ' — ' + targets.length + '문장을 순서대로, 아무것도 보지 않고 쓰시오</div>' +
-      '<textarea class="ans" id="bkIn" style="min-height:170px" placeholder="기억나는 대로 영어로 작성 (줄바꿈으로 문장 구분 가능)"></textarea>' +
+      '<textarea class="ans" id="bkIn" style="min-height:170px"' + INATTR + ' placeholder="기억나는 대로 영어로 작성 (줄바꿈으로 문장 구분 가능)"></textarea>' +
       '<div class="rnext"><button class="btn p big" id="okBtn">채점</button></div>' +
       '<div id="bkOut"></div></div>',
       function () {
@@ -875,7 +1102,7 @@
     if (!studied.length) { alert('학습한 문장이 아직 없습니다. 본문 1단계부터 시작하십시오.'); return; }
     runCustom('백지 점검 (기록 없음)',
       '<div class="q"><div class="qmeta">지금까지 학습한 문장 ' + studied.length + '개 — 기억나는 대로 쓰시오. 채점·기록이 없는 자기 점검입니다.</div>' +
-      '<textarea class="ans" id="dpIn" style="min-height:170px" placeholder="기억나는 문장을 자유롭게 작성"></textarea>' +
+      '<textarea class="ans" id="dpIn" style="min-height:170px"' + INATTR + ' placeholder="기억나는 문장을 자유롭게 작성"></textarea>' +
       '<div class="rnext"><button class="btn p big" id="okBtn">대조 확인</button></div>' +
       '<div id="dpOut"></div></div>',
       function () {
@@ -891,7 +1118,7 @@
           $('dpOut').innerHTML = html;
           packDB().dump.push({ at: new Date().toISOString(), scope: 'dump', ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
           persist();
-          $('dpDone').onclick = closeCustom;
+          $('dpDone').onclick = function () { closeCustom(); render(); };
         };
       });
   }
@@ -943,37 +1170,44 @@
       make: mockItems });
     return types;
   }
+  /* 단어 하나의 다의어 문항들 — 오답 재시험(gen:w-poly:<id>)도 이걸로 다시 만든다 */
+  function polyItemsFor(w) {
+    var out = [];
+    if (!w.senses || w.senses.length < 2) return out;
+    w.senses.forEach(function (sn, si) {
+      if (!sn.example) return;
+      out.push({ type: 'mcq', typeKey: 'w-poly', kind: 'word', wordId: w.id,
+        prompt: sn.example.en,
+        choices: w.senses.map(function (s2, i) { return { key: String(i + 1), text: s2.meaningKo }; }),
+        answerKey: String(si + 1) });
+    });
+    return out;
+  }
   function polyItems() {
     var out = [];
-    (pack.words || []).forEach(function (w) {
-      if (!w.senses || w.senses.length < 2) return;
-      w.senses.forEach(function (sn, si) {
-        if (!sn.example) return;
-        out.push({ kind: 'word', wordId: w.id,
-          prompt: sn.example.en,
-          choices: w.senses.map(function (s2, i) { return { key: String(i + 1), text: s2.meaningKo }; }),
-          answerKey: String(si + 1) });
-      });
-    });
+    (pack.words || []).forEach(function (w) { out = out.concat(polyItemsFor(w)); });
     return WBGEN.shuffle(out, Math.random).slice(0, 10);
+  }
+  function synItemsFor(w, W) {
+    var out = [];
+    [['synonyms', '유의어'], ['antonyms', '반의어']].forEach(function (pair) {
+      var arr = w[pair[0]] || [];
+      if (!arr.length) return;
+      var correct = String(arr[0]).replace(/\s*\(.*\)$/, '');
+      var pool = W.filter(function (x) { return x.id !== w.id; }).map(function (x) { return x.headword; });
+      var dis = rndPick(pool, 3);
+      if (dis.length < 2) return;
+      var opts = WBGEN.shuffle([correct].concat(dis), Math.random);
+      out.push({ type: 'mcq', typeKey: 'w-syn', kind: 'word', wordId: w.id,
+        prompt: '"' + w.headword + '"의 ' + pair[1] + '로 알맞은 것은?',
+        choices: opts.map(function (t, i) { return { key: String(i + 1), text: t }; }),
+        answerKey: String(opts.indexOf(correct) + 1) });
+    });
+    return out;
   }
   function synItems() {
     var W = pack.words || [], out = [];
-    W.forEach(function (w) {
-      [['synonyms', '유의어'], ['antonyms', '반의어']].forEach(function (pair) {
-        var arr = w[pair[0]] || [];
-        if (!arr.length) return;
-        var correct = String(arr[0]).replace(/\s*\(.*\)$/, '');
-        var pool = W.filter(function (x) { return x.id !== w.id; }).map(function (x) { return x.headword; });
-        var dis = rndPick(pool, 3);
-        if (dis.length < 2) return;
-        var opts = WBGEN.shuffle([correct].concat(dis), Math.random);
-        out.push({ kind: 'word', wordId: w.id,
-          prompt: '"' + w.headword + '"의 ' + pair[1] + '로 알맞은 것은?',
-          choices: opts.map(function (t, i) { return { key: String(i + 1), text: t }; }),
-          answerKey: String(opts.indexOf(correct) + 1) });
-      });
-    });
+    W.forEach(function (w) { out = out.concat(synItemsFor(w, W)); });
     return WBGEN.shuffle(out, Math.random).slice(0, 10);
   }
   function luiItems(pat) {
@@ -981,7 +1215,7 @@
       var m = String(u.stem || '').match(/_{3,}/);
       if (!m) return null;
       var bank = (u.wordBank || []).length ? '  [보기: ' + u.wordBank.join(' · ') + ']' : '';
-      return { type: 'kwblank', koFull: (u.ko || '') + bank, parts: [
+      return { type: 'kwblank', ref: 'p' + pat.patternNo + '-' + (u.no != null ? u.no : ''), koFull: (u.ko || '') + bank, parts: [
         { text: u.stem.slice(0, m.index) },
         { blank: { answers: u.answers || [] } },
         { text: u.stem.slice(m.index + m[0].length) }] };
@@ -1015,10 +1249,46 @@
     if (!tdef) return;
     var items = tdef.make();
     if (!items.length) { alert('이 유형은 현재 교재에서 출제할 문항이 없습니다.'); return; }
+    /* 오답 노트 키(gen:<유형>:<ref>)에 쓸 유형을 문항에 붙인다 — 같은 mcq라도 영→뜻과 뜻→영은 다른 문제다 */
+    if (GEN_KEYS.indexOf(key) >= 0) items.forEach(function (q) { if (!q.typeKey) q.typeKey = key; });
     setLast('문제 풀이 · ' + tdef.name, { t: 'quizType', key: key });
     persist();
-    if (key.charAt(0) === 'i') runStoredItems(items, tdef.name);
-    else runItems(items, tdef.name);
+    runItems(items, tdef.name);
+  }
+  /* 오답 재시험 문항 — 저장 문항(i-*)은 그대로, 생성형(gen:*)은 유형별 생성기로 다시 만든다.
+     생성이 안 되는 것(단어·문장이 팩에서 사라짐 등)은 건너뛴다. */
+  var REGEN = {
+    'w-e2k': function (w, s, W) { return tagWord(WBGEN.vocabMcq(w, W, Math.random)); },
+    'w-k2e': function (w, s, W) { return tagWord(WBGEN.vocabMcqReverse(w, W, Math.random)); },
+    'w-spell': function (w) { return tagWord(WBGEN.spelling(w)); },
+    'w-cloze': function (w) { return tagWord(WBGEN.exampleCloze(w)); },
+    'w-def': function (w, s, W) { return tagWord(WBGEN.definitionPick(w, W, Math.random)); },
+    's-gram': function (w, s) { return WBGEN.grammarChoiceDrill(s); },
+    's-verb': function (w, s) { return WBGEN.verbFormDrill(s); },
+    's-order': function (w, s) { return WBGEN.tokenOrder(s, Math.random); },
+    's-kw': function (w, s) { return WBGEN.keywordBlanks(s, 'en'); },
+    'w-poly': function (w) { return rndPick(polyItemsFor(w), 1); },
+    'w-syn': function (w, s, W) { return rndPick(synItemsFor(w, W), 1); }
+  };
+  function regenWrong(e) {
+    var gen = REGEN[e.type];
+    if (!gen) return [];
+    var w = wordById(String(e.ref)), s = null, m;
+    if (!w && (m = /^s(\d+)$/.exec(String(e.ref)))) s = senBySeq(Number(m[1]));
+    if (e.type.charAt(0) === 'w' ? !w : !s) return [];
+    var q = gen(w, s, pack.words || []);
+    if (!q) return [];
+    return (Array.isArray(q) ? q : [q]).map(function (x) { x.typeKey = e.type; return x; });
+  }
+  function wrongRetryItems(keys) {
+    var pd = packDB(), out = [];
+    var stored = (pack.items || []).filter(function (it) { return keys.indexOf('i-' + it.no) >= 0; });
+    storedToRunner(stored).forEach(function (q) { out.push(q); });
+    keys.forEach(function (k) {
+      var e = pd.wrong[k];
+      if (e && e.kind === 'gen') regenWrong(e).forEach(function (q) { out.push(q); });
+    });
+    return out;
   }
   function renderQuiz() {
     var pd = packDB();
@@ -1034,28 +1304,30 @@
     var listHtml = '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
     /* 세션 ② 문법 개념 — 문제 앞에 개념 학습이 온다 */
     if ((pack.patterns || []).length) {
-      listHtml += '<div class="hdr">문법 개념</div>';
+      listHtml += '<div class="hdr"><span>문법 개념</span></div>';
       pack.patterns.forEach(function (p) {
         var k = 'g-' + p.patternNo;
-        listHtml += '<div class="row' + (k === selType ? ' sel' : '') + '" data-qt="' + k + '">' +
+        listHtml += '<div class="row' + (k === selType ? ' sel' : '') + '" role="button" tabindex="0" data-qt="' + k + '">' +
           '<span class="tx">패턴 ' + p.patternNo + ' · ' + esc(p.title) + '<span class="sub">개념 정리 + 확인 문제 ' + (p.letsUseIt || []).length + '문항</span></span></div>';
       });
     }
     groups.forEach(function (g) {
-      listHtml += '<div class="hdr">' + esc(g.name) + '</div>';
+      listHtml += '<div class="hdr"><span>' + esc(g.name) + '</span></div>';
       g.types.forEach(function (t) {
-        listHtml += '<div class="row' + (t.key === selType ? ' sel' : '') + '" data-qt="' + esc(t.key) + '">' +
+        listHtml += '<div class="row' + (t.key === selType ? ' sel' : '') + '" role="button" tabindex="0" data-qt="' + esc(t.key) + '">' +
           '<span class="tx">' + esc(t.name) + '<span class="sub">' + esc(t.desc) + '</span></span></div>';
       });
     });
-    listHtml += '<div class="hdr">복습</div>' +
-      '<div class="row' + (selType === 'wrong' ? ' sel' : '') + '" data-qt="wrong"><span class="tx">오답 재시험<span class="sub">서로 다른 날 2회 정답 시 해결</span></span>' +
+    listHtml += '<div class="hdr"><span>복습</span></div>' +
+      '<div class="row' + (selType === 'wrong' ? ' sel' : '') + '" role="button" tabindex="0" data-qt="wrong"><span class="tx">오답 재시험<span class="sub">서로 다른 날 2회 정답 시 해결</span></span>' +
       '<span class="lvchip r">' + wrongs.length + '</span></div></div>';
     var workHtml;
     if (selType === 'wrong') {
+      var genN = wrongs.filter(function (k) { return k.indexOf('gen:') === 0; }).length;
       workHtml = '<div class="wh"><h2>오답 재시험</h2><span class="tag t-red">' + wrongs.length + '문항 미해결</span></div>' +
-        '<div class="card"><p class="muted">틀린 문항은 같은 날 다시 맞혀도 해결되지 않습니다 — <b>서로 다른 날 2회 정답</b>이어야 해결 처리됩니다. 해결된 문항 ' +
-        Object.keys(pd.wrong).filter(function (k) { return pd.wrong[k].cleared; }).length + '개.</p>' +
+        '<div class="card"><p class="muted">틀린 문항은 같은 날 다시 맞혀도 해결되지 않습니다 — <b>서로 다른 날 2회 정답</b>이어야 해결 처리됩니다. 다시 틀리면 처음부터 셉니다. 해결된 문항 ' +
+        Object.keys(pd.wrong).filter(function (k) { return pd.wrong[k].cleared; }).length + '개' +
+        (genN ? ' · 단어·본문 생성 문항 ' + genN + '개는 같은 단어·문장으로 새로 출제됩니다' : '') + '.</p>' +
         '<button class="btn p big" id="qGo"' + (wrongs.length ? '' : ' disabled') + '>재시험 시작</button></div>';
     } else if (selType.charAt(0) === 'g' && selType.charAt(1) === '-') {
       var pat = (pack.patterns || []).filter(function (p) { return 'g-' + p.patternNo === selType; })[0];
@@ -1085,15 +1357,20 @@
     };
     $('qGo').onclick = function () {
       if (selType === 'wrong') {
-        var items = (pack.items || []).filter(function (it) { return wrongs.indexOf('i-' + it.no) >= 0; });
-        runStoredItems(storedToRunner(items), '오답 재시험', true);
+        var items = wrongRetryItems(wrongs);
+        if (!items.length) { alert('재시험으로 출제할 수 있는 문항이 없습니다.'); return; }
+        setLast('문제 풀이 · 오답 재시험', { t: 'quizType', key: 'wrong' });
+        persist();
+        runItems(items, '오답 재시험');
       } else if (selType.charAt(0) === 'g' && selType.charAt(1) === '-') {
         var pat = (pack.patterns || []).filter(function (p) { return 'g-' + p.patternNo === selType; })[0];
         var items2 = pat ? luiItems(pat) : [];
         if (!items2.length) { alert('확인 문제가 없습니다.'); return; }
         setLast('문법 개념 · 패턴 ' + pat.patternNo, { t: 'quizType', key: selType });
         persist();
-        runQueue(items2, '개념 확인 · 패턴 ' + pat.patternNo, function () {}, function () { persist(); render(); }, { noConfidence: true });
+        /* 개념 확인 결과도 최근 학습 로그에 남긴다 — "기록된다"는 안내와 실제가 같아야 한다 */
+        runQueue(items2, '개념 확인 · 패턴 ' + pat.patternNo, function (it, ok) { logEvent('concept', 'kwblank', it.ref, ok); },
+          function () { persist(); render(); }, { noConfidence: true });
       } else if (selType === 'mock') {
         runMock();
       } else runQuizType(selType);
@@ -1130,8 +1407,9 @@
     runQueue(items, '실전 모의', function (item, ok) {
       results.push({ item: item, ok: ok });
       applyMockGrade(item, ok);
-    }, function () {
+    }, function (finished) {
       persist();
+      if (!finished) { render(); return; }   // ✕ 중단 — 리포트 없음(시간 종료는 finished)
       var correct = results.filter(function (r) { return r.ok; }).length;
       var wrong = results.filter(function (r) { return !r.ok; });
       var html = '<div class="q"><div class="qmeta">실전 모의 결과</div>' +
@@ -1145,24 +1423,48 @@
       runCustom('실전 모의 · 결과', html, function () { $('mkDone').onclick = function () { closeCustom(); render(); }; });
     }, { noConfidence: true, mock: true, timeLimit: 600 });
   }
+  /* 확신도를 묻지 않는 경로(모의·과제) — 'unsure'로 기록한다. 'sure'로 넣으면 모의에서 한 번
+     틀린 단어가 과신 오류(2계단 후퇴·위험 단어)로 잡힌다. */
   function applyMockGrade(item, ok) {
-    var pd = packDB(), now = Date.now();
-    if (item.type === 'storedmcq') { recordStoredResult(item, ok); return; }
-    if (item.wordId && pd.states[item.wordId]) WBNAESIN.recordQuiz(pd.states[item.wordId], { correct: ok, confidence: 'sure', hinted: false }, now);
+    gradeItem(item, ok, { confidence: 'unsure' }, Date.now(), null);
   }
-  function recordStoredResult(q, ok) {
-    var pd = packDB(), k = 'i-' + q.no, now = Date.now();
+  /* 오답 노트 공통 — 틀리면 클리어 날짜를 비운다(다시 틀리면 처음부터, 계약 0.6).
+     항목엔 엔진 상태 객체를 두지 않는다 — clearWrong은 wrongClearDates 배열만 본다. */
+  function markWrong(k, seed, ok, now) {
+    var pd = packDB(), e = pd.wrong[k];
     if (!ok) {
-      if (!pd.wrong[k]) pd.wrong[k] = { firstAt: new Date().toISOString(), tries: 0, cleared: false, state: WBNAESIN.createState(k, 'word', now) };
-      pd.wrong[k].tries += 1;
-    } else if (pd.wrong[k] && !pd.wrong[k].cleared) {
-      var r = WBNAESIN.clearWrong(pd.wrong[k].state, now);
-      if (r && r.cleared) pd.wrong[k].cleared = true;
+      if (!e) { e = pd.wrong[k] = seed; e.tries = 0; e.wrongClearDates = []; e.cleared = false; e.firstAt = new Date(now).toISOString(); }
+      e.tries += 1; e.wrongClearDates = []; e.cleared = false; e.at = new Date(now).toISOString();
+    } else if (e && !e.cleared) {
+      var r = WBNAESIN.clearWrong(e, now);
+      if (r && r.cleared) e.cleared = true;
     }
   }
-  function runStoredItems(qs, title, isRetry) {
-    runQueue(qs, title, function (q, ok) { recordStoredResult(q, ok); },
-      function () { persist(); render(); }, { noConfidence: true });
+  function recordStoredResult(q, ok, now) {
+    markWrong('i-' + q.no, { kind: 'item', no: q.no }, ok, now);
+  }
+  /* 생성형 문항의 오답 노트 키 유형 — 재시험 생성기가 있는 유형만(REGEN). 유형 태그가 없으면 문항 모양에서 유추. */
+  var GEN_KEYS = ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 's-gram', 's-verb', 's-order', 's-kw', 'w-poly', 'w-syn'];
+  function genTypeKeyOf(item) {
+    if (item.typeKey) return GEN_KEYS.indexOf(item.typeKey) >= 0 ? item.typeKey : null;
+    switch (item.type) {
+      case 'mcq': if (!item.wordId) return null; var w = wordById(item.wordId); return (w && item.prompt === w.headword) ? 'w-e2k' : 'w-k2e';
+      case 'cloze': return item.wordId ? 'w-cloze' : null;
+      case 'defpick': return item.wordId ? 'w-def' : null;
+      case 'spell': return item.wordId ? 'w-spell' : null;
+      case 'grammar': return item.seq != null ? 's-gram' : null;
+      case 'verb': return item.seq != null ? 's-verb' : null;
+      case 'order': return item.seq != null ? 's-order' : null;
+      case 'kwblank': return item.seq != null ? 's-kw' : null;
+    }
+    return null;
+  }
+  function recordGenResult(item, ok, now) {
+    var type = genTypeKeyOf(item);
+    if (!type) return;
+    var ref = item.wordId ? String(item.wordId) : (item.seq != null ? 's' + item.seq : null);
+    if (!ref) return;
+    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, now);
   }
 
   /* ════════ 성취도 (전체 폭) ════════ */
@@ -1171,7 +1473,17 @@
     var pd = packDB();
     var wsum = WBNAESIN.wordSummary(wordStates());
     var ssum = WBNAESIN.sentenceSummary(senStates());
-    var ex = exam();
+    var ex = exam(), raw = pd.exam;   // ex = 유효 시험(오버라이드 반영), raw = 등록된 시험일
+    var examMsg;
+    if (ex && ex.examDate) {
+      examMsg = examEnded()
+        ? '시험일 <b>' + esc(ex.examDate) + '</b> — 시험이 끝나 자율 학습으로 전환되었습니다.'
+        : '시험일 <b>' + esc(ex.examDate) + '</b> — 시험 모드로 학습량이 자동 편성됩니다.';
+    } else if (raw && raw.examDate && pd.examOverride === 'practice') {
+      examMsg = '시험일 <b>' + esc(raw.examDate) + '</b>이 등록되어 있지만 <b>자율 학습으로 전환</b>한 상태입니다. 「적용」을 누르면 시험 모드로 돌아갑니다.';
+    } else {
+      examMsg = '등록된 시험이 없어 자율 학습 모드입니다.';
+    }
     var html =
       '<div class="big3">' +
       '<div><div class="n">' + wsum.reached + '<small>/' + wsum.total + '</small></div><div class="l">단어 도달 · 안정화 ' + wsum.stable + '</div></div>' +
@@ -1181,27 +1493,27 @@
       '<div class="card"><h2>본문 해석 현황 <small>영어 → 우리말 · 3단계 이상 = 통과</small></h2><div id="ipRows">' +
       pack.sentences.map(function (s) {
         var st = senState(s.seq), ok = st && st.stage >= 3;
-        return '<div class="row" data-go="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
+        return '<div class="row" role="button" tabindex="0" data-go="' + s.seq + '"><span class="no">' + s.seq + '</span>' +
           '<span class="tx">' + esc(s.en) + '</span><span class="lvchip ' + (ok ? 's' : '') + '">' + (ok ? '통과' : '미완') + '</span></div>';
       }).join('') + '</div></div>' +
 
       '<div class="card"><h2>본문 암기 현황 <small>백지 영작</small>' +
-      '<button class="tag ' + (paperMode ? 't-red' : 't-gray') + '" id="paperToggle" style="margin-left:auto">' + (paperMode ? '입력 종료' : '종이 백지시험 결과 입력') + '</button></h2><div>' +
+      '<button class="tag tb ' + (paperMode ? 't-red' : 't-gray') + '" id="paperToggle" style="margin-left:auto">' + (paperMode ? '입력 종료' : '종이 백지시험 결과 입력') + '</button></h2><div>' +
       pack.sentences.map(function (s) {
         var st = senState(s.seq), stage = st ? st.stage : 1, done = st && st.reached;
         var paper = pd.paper[s.seq];
         var mark = paperMode
-          ? '<button class="paperbtn ' + (paper === true ? 'y' : paper === false ? 'n' : '') + '" data-paper="' + s.seq + '">' + (paper === true ? '○' : paper === false ? '×' : '—') + '</button>'
+          ? '<button class="paperbtn ' + (paper === true ? 'y' : paper === false ? 'n' : '') + '" data-paper="' + s.seq + '" aria-label="문장 ' + s.seq + ' 종이 시험 결과: ' + (paper === true ? '정답' : paper === false ? '오답' : '미입력') + '">' + (paper === true ? '○' : paper === false ? '×' : '—') + '</button>'
           : '<span class="lvchip ' + (done ? 's' : '') + '">' + (done ? '완료' : stage + '단계') + '</span>';
-        return '<div class="row"><span class="no">' + s.seq + '</span>' +
+        return '<div class="row" style="cursor:default"><span class="no">' + s.seq + '</span>' +
           '<span class="tx">' + esc(s.en) + '</span>' + stgMini(stage, done) + mark + '</div>';
       }).join('') + '</div>' +
       (paperMode ? '<p class="muted" style="margin-top:8px">선생님과 함께 종이 백지시험 결과를 문장별 ○/×로 입력합니다. ○는 암기 완료 기록에 반영됩니다.</p>' : '') + '</div>' +
 
       '<div class="card"><h2>시험 설정</h2>' +
-      '<p class="muted">' + (ex && ex.examDate ? '시험일 <b>' + esc(ex.examDate) + '</b> — 시험 모드로 학습량이 자동 편성됩니다.' : '등록된 시험이 없어 자율 학습 모드입니다.') + '</p>' +
-      '<div class="row2" style="max-width:520px"><input class="ans" type="date" id="examIn" value="' + esc((ex && ex.examDate) || '') + '">' +
-      '<button class="btn" id="examSet">적용</button><button class="btn" id="examClear">자율 학습으로</button></div>' +
+      '<p class="muted">' + examMsg + '</p>' +
+      '<div class="row2" style="max-width:520px"><input class="ans" type="date" id="examIn" value="' + esc((raw && raw.examDate) || '') + '">' +
+      '<button class="btn" id="examSet">적용</button><button class="btn" id="examClear"' + (ex ? '' : ' disabled') + '>자율 학습으로</button></div>' +
       '<p class="muted" style="margin-top:8px">' + (authed ? '학습 기록이 서버에 저장되어 선생님 화면과 연동됩니다.' : '이 기기에만 저장 중입니다 (체험 모드).') + '</p></div>';
     layoutFull(html);
     $('workPane').addEventListener('click', function (e) {
@@ -1223,33 +1535,84 @@
     });
     $('paperToggle').onclick = function () { paperMode = !paperMode; render(); };
     $('examSet').onclick = function () {
-      var v = $('examIn').value;
+      var v = $('examIn').value, pd2 = packDB();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { alert('시험일을 선택하십시오.'); return; }
-      packDB().exam = { examDate: v, wordDeadlineDays: 7 };
+      pd2.exam = { examDate: v, wordDeadlineDays: (pd2.exam && pd2.exam.wordDeadlineDays) || 7 };
+      delete pd2.examOverride; delete pd2.examOverrideFor;
       persist(); render();
     };
-    $('examClear').onclick = function () { packDB().exam = null; persist(); render(); };
+    /* 「자율 학습으로」는 오버라이드로 저장한다 — 시험일을 지우면 부팅 때 서버 배정이 다시 덮어쓴다.
+       서버 시험일이 바뀌면(applyServerExam) 오버라이드는 자동으로 풀린다. */
+    $('examClear').onclick = function () {
+      var pd2 = packDB();
+      pd2.examOverride = 'practice';
+      pd2.examOverrideFor = (pd2.exam && pd2.exam.examDate) || null;
+      persist(); render();
+    };
   }
 
   /* ════════ 러너 공통 ════════ */
   var RQ = null;
-  function runItems(items, title) {
-    runQueue(items, title, function (item, ok, ans, meta) {
-      var pd = packDB(), now = Date.now();
-      if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
-        var st = senState(item.seq);
-        if (st) WBNAESIN.advanceStage(st, ok, now);
-      } else if (item.wordId) {
-        var ws = pd.states[item.wordId];
-        if (!ws) return;
-        if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, confidence: meta.confidence }, now);
-        else WBNAESIN.recordQuiz(ws, { correct: ok, confidence: meta.confidence, hinted: false }, now);
+  /* 문항 하나의 결과를 상태에 반영하는 공통 경로.
+       저장 문항(i-*)  → 오답 노트
+       문장 문항       → seqRes에 모아 두고 세트가 끝날 때 seq당 1회만 진급(4단계는 클로즈+배열 2문항 —
+                         문항마다 진급시키면 한 세트에 두 단계를 뛴다)
+       단어 문항       → 철자(완전 인출)는 recordCriterion, 나머지는 recordQuiz — 문항별 그대로
+       생성형 오답     → 오답 노트(gen:<유형>:<ref>) */
+  function gradeItem(item, ok, meta, now, seqRes) {
+    var pd = packDB();
+    if (item.type === 'storedmcq') { recordStoredResult(item, ok, now); return; }
+    if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
+      var st = senState(item.seq);
+      if (st && seqRes) {
+        var r = seqRes[item.seq] || (seqRes[item.seq] = { st: st, allOk: true });
+        if (!ok) r.allOk = false;
       }
-    }, function () { persist(); render(); });
+    } else if (item.wordId && pd.states[item.wordId]) {
+      var ws = pd.states[item.wordId];
+      var hinted = item.hinted != null ? !!item.hinted : !!item.hint;   // 힌트 본 철자는 완전 인출이 아니다
+      if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, confidence: meta.confidence, hinted: hinted }, now);
+      else WBNAESIN.recordQuiz(ws, { correct: ok, confidence: meta.confidence, hinted: false }, now);
+    }
+    recordGenResult(item, ok, now);
+  }
+  function runItems(items, title, opts) {
+    var seqRes = {}, session = newSession();
+    runQueue(items, title, function (item, ok, ans, meta) {
+      gradeItem(item, ok, meta, Date.now(), seqRes);
+    }, function (finished) {
+      /* 세트 단위 진급 — 끝까지 풀었고(✕ 중단 아님) 그 문장의 문항을 모두 맞혔을 때만, seq당 1회 */
+      var now = Date.now();
+      Object.keys(seqRes).forEach(function (seq) { WBNAESIN.advanceStage(seqRes[seq].st, finished && seqRes[seq].allOk, now, { session: session }); });
+      persist(); render();
+    }, opts || {});
   }
   function mmss(ms) {
     var s = Math.max(0, Math.round(ms / 1000));
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  /* 러너 열기/닫기 — 열릴 때 포커스를 옮기고 뒤 화면 스크롤을 잠근다(대화상자). 닫힐 때 원래 자리로. */
+  var lastFocus = null;
+  function openRunner() {
+    var r = $('runner');
+    if (!r.classList.contains('open')) lastFocus = document.activeElement;
+    r.classList.add('open');
+    r.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    try { r.focus(); } catch (e) {}
+  }
+  function closeRunner() {
+    $('runner').classList.remove('open');
+    document.body.style.overflow = '';
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus(); } catch (e) {} }
+    lastFocus = null;
+  }
+  /* 러너 종료 계약(0.7): finished=true 는 마지막 문항까지 채점됨(또는 모의 시간 종료), false 는 ✕ 중단 */
+  function endQueue(finished) {
+    var q = RQ; RQ = null;
+    if (q && q.timerId) clearInterval(q.timerId);
+    closeRunner();
+    if (q && q.onDone) q.onDone(finished === true);
   }
   function runQueue(items, title, onGrade, onDone, opts) {
     RQ = { items: items, i: 0, title: title, onGrade: onGrade, onDone: onDone, opts: opts || {} };
@@ -1257,11 +1620,11 @@
       RQ.deadline = Date.now() + RQ.opts.timeLimit * 1000;
       RQ.timerId = setInterval(function () {
         if (!RQ) return;
-        if (Date.now() >= RQ.deadline) { $('rQuit').onclick(); return; }  /* 시간 종료 — 푼 데까지 결과 */
+        if (Date.now() >= RQ.deadline) { endQueue(true); return; }  /* 시간 종료 — 푼 데까지 결과, 완료로 본다 */
         countLine();
       }, 500);
     }
-    $('runner').classList.add('open');
+    openRunner();
     stepRunner();
   }
   function countLine() {
@@ -1270,33 +1633,51 @@
       (RQ.deadline ? ' · 남은 시간 ' + mmss(RQ.deadline - Date.now()) : '');
   }
   $('rQuit').onclick = function () {
-    $('runner').classList.remove('open');
-    if (RQ && RQ.timerId) clearInterval(RQ.timerId);
-    if (RQ && RQ.onDone) RQ.onDone();
-    RQ = null;
+    if (!RQ) { closeRunner(); return; }
+    if (RQ.custom) {
+      /* 백지·해석처럼 쓰던 글이 있으면 실수로 날리지 않게 한 번 묻는다 */
+      var typed = Array.prototype.some.call($('rBody').querySelectorAll('textarea.ans, input.ans'), function (el) { return el.value.trim(); });
+      if (typed && !confirm('중단하면 이번 세션 결과는 기록되지 않습니다. 중단할까요?')) return;
+      closeCustom(); render(); return;
+    }
+    if (!confirm('중단하면 이번 세션 결과는 기록되지 않습니다. 중단할까요?')) return;
+    endQueue(false);
   };
   function stepRunner() {
     if (!RQ) return;
-    if (RQ.i >= RQ.items.length) { $('rQuit').onclick(); return; }
+    if (RQ.i >= RQ.items.length) { endQueue(true); return; }
     $('rBar').style.width = Math.round(RQ.i / RQ.items.length * 100) + '%';
     countLine();
     renderItem(RQ.items[RQ.i], $('rBody'));
   }
   function finishItem(item, ok, answerKey, resultHtml) {
+    if (!RQ) return;
+    var q0 = RQ;
+    /* 진단(silent) — 채점을 보여 주지 않고 500ms 뒤 자동 다음. 그 사이 ✕로 닫혔으면 아무것도 안 한다 */
+    if (RQ.opts.silent) {
+      setTimeout(function () {
+        if (RQ !== q0) return;
+        if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: 'unsure' });
+        RQ.i += 1; stepRunner();
+      }, 500);
+      return;
+    }
     /* 모의 모드 — 시험처럼 정답을 보여 주지 않고 즉시 다음 문항으로 */
-    if (RQ && RQ.opts.mock) {
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: 'sure' });
+    if (RQ.opts.mock) {
+      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: 'unsure' });
       RQ.i += 1; stepRunner();
       return;
     }
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}  // 태블릿 키보드 내리기
     var box = document.createElement('div');
     box.className = 'result ' + (ok ? 'good' : 'bad');
     box.innerHTML = '<b class="mark">' + (ok ? '정답' : '오답') + '</b>' + (resultHtml || '');
-    $('rBody').querySelector('.q').appendChild(box);
     var q = $('rBody').querySelector('.q');
-    var needConf = !RQ.opts.noConfidence && item.wordId && item.type !== undefined;
+    q.appendChild(box);
+    var needConf = !RQ.opts.noConfidence && !!item.wordId;
     function next(conf) {
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: conf || 'sure' });
+      if (RQ !== q0) return;
+      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: conf || 'unsure' });
       RQ.i += 1; stepRunner();
     }
     if (needConf) {
@@ -1315,31 +1696,52 @@
     } else {
       var nb = document.createElement('div');
       nb.className = 'rnext';
-      nb.innerHTML = '<button class="btn p big">다음</button>';
-      nb.querySelector('button').onclick = function () { next('sure'); };
+      nb.innerHTML = '<button class="btn p big" id="nextBtn">다음</button>';
+      nb.querySelector('button').onclick = function () { next('unsure'); };
       q.appendChild(nb);
-      nb.querySelector('button').focus();
+      try { nb.querySelector('button').focus({ preventScroll: true }); } catch (e) {}
     }
+    try { box.scrollIntoView({ block: 'nearest' }); } catch (e) {}
   }
+  /* 답 입력 <input>에서 Enter = 확인(채점 뒤엔 다음). textarea는 줄바꿈이 필요하니 제외. */
+  $('rBody').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    var t = e.target;
+    if (!t || t.tagName !== 'INPUT') return;
+    e.preventDefault();
+    var b = $('subBtn');
+    if (b && !b.getAttribute('data-done')) { b.click(); return; }
+    var nb = $('nextBtn');
+    if (nb) nb.click();
+  });
   function runCustom(title, html, wire) {
     RQ = { custom: true };
-    $('runner').classList.add('open');
+    openRunner();
     $('rBar').style.width = '100%';
     $('rCount').textContent = title;
     $('rBody').innerHTML = html;
     wire();
   }
-  function closeCustom() { $('runner').classList.remove('open'); RQ = null; }
+  function closeCustom() { closeRunner(); RQ = null; }
 
   /* ── 문항 렌더 (유형별) ── */
+  /* 답 입력창 공통 속성 — 자동 교정·대문자화·맞춤법 밑줄은 영어 철자 시험을 망친다 */
+  var INATTR = ' autocorrect="off" spellcheck="false" autocomplete="off" autocapitalize="off" enterkeyhint="done"';
   function renderItem(item, root) {
-    var stageLabel = item.stage ? '본문 ' + Math.floor(item.stage) + '단계' : (item.kind === 'word' || item.wordId ? '단어' : '');
+    var stageLabel = item.stage ? '본문 ' + Math.floor(item.stage) + '단계'
+      : (item.kind === 'word' || item.wordId ? '단어'
+      : (item.type === 'grammar' ? '어법 선택' + (item.seq != null ? ' · 문장 ' + item.seq : '')
+      : (item.seq != null ? '본문 문장 ' + item.seq : '')));
     var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
 
     if (item.type === 'storedmcq') return renderStored(item, root);
 
     if (item.choices) {
-      root.innerHTML = head + '<div class="prompt">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div></div>';
+      /* prompt가 없는 문항(어법 선택 — parts로만 옴)은 빈칸(____)을 넣어 조립한 문장 + 우리말을 보인다 */
+      var ptxt = item.prompt != null ? String(item.prompt) : promptOf(item);
+      root.innerHTML = head +
+        (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') +
+        '<div class="prompt' + (item.prompt != null ? '' : ' sm') + '">' + esc(ptxt) + '</div><div class="choices" id="chs"></div></div>';
       var chs = $('chs');
       var list = item.choices.slice();
       if (item.unknownKey) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
@@ -1353,10 +1755,13 @@
         chs.setAttribute('data-done', '1');
         var k = b.getAttribute('data-k');
         var ok = k === item.answerKey;
-        var all = chs.querySelectorAll('button');
-        for (var i = 0; i < all.length; i++) {
-          if (all[i].getAttribute('data-k') === item.answerKey) all[i].classList.add('right');
-          else if (all[i] === b) all[i].classList.add('wrongpick');
+        if (RQ && RQ.opts.silent) { b.classList.add('sel'); }   // 진단 — 정오답을 드러내지 않는다
+        else {
+          var all = chs.querySelectorAll('button');
+          for (var i = 0; i < all.length; i++) {
+            if (all[i].getAttribute('data-k') === item.answerKey) all[i].classList.add('right');
+            else if (all[i] === b) all[i].classList.add('wrongpick');
+          }
         }
         finishItem(item, ok, k, '');
       };
@@ -1365,8 +1770,9 @@
 
     if (item.type === 'spell') {
       root.innerHTML = head + '<div class="prompt sm">뜻: <b>' + esc(item.promptKo) + '</b></div>' +
-        '<div class="prompt" style="letter-spacing:2px">' + esc(item.hint) + '</div>' +
-        '<input class="ans" id="spellIn" autocomplete="off" autocapitalize="off" placeholder="영어 단어 입력">' +
+        (item.hint ? '<div class="prompt" style="letter-spacing:2px">' + esc(item.hint) + '</div>'
+                   : '<p class="muted">힌트 없음 — 철자 전체를 떠올려 쓰세요.</p>') +
+        '<input class="ans" id="spellIn"' + INATTR + ' placeholder="영어 단어 입력">' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {
         var v = $('spellIn').value;
@@ -1379,7 +1785,7 @@
 
     if (item.type === 'cloze') {
       root.innerHTML = head + '<div class="prompt sm">' + esc(item.textParts[0]) +
-        '<input class="blankline" id="czIn" autocomplete="off" autocapitalize="off">' + esc(item.textParts[1]) + '</div>' +
+        '<input class="blankline" id="czIn"' + INATTR + ' aria-label="빈칸">' + esc(item.textParts[1]) + '</div>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {
         var v = $('czIn').value;
@@ -1390,14 +1796,15 @@
       return;
     }
 
-    if (item.type === 'kwblank' || item.type === 'verb') {
+    /* parts+blank 형식 전부 — 핵심어 빈칸(3단계)·구 클로즈(4단계, clozewide)·동사 형태 */
+    if (item.type === 'kwblank' || item.type === 'verb' || item.type === 'clozewide' || (item.parts && !item.choices)) {
       var html = head + (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') + '<div class="prompt sm">';
       var bi = 0;
       item.parts.forEach(function (p) {
         if (p.text != null) html += esc(p.text);
         else {
           var hint = p.blank.hintKo ? '<span class="hintko">' + esc(p.blank.hintKo) + '</span>' : (p.blank.base ? '<span class="hintko">(' + esc(p.blank.base) + ')</span>' : '');
-          html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '" autocomplete="off" autocapitalize="off">' + hint + '</span>';
+          html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '"' + INATTR + ' aria-label="빈칸 ' + (bi + 1) + '">' + hint + '</span>';
           bi += 1;
         }
       });
@@ -1455,13 +1862,14 @@
         ? '<p class="muted">활용 단어: ' + esc((item.keywords || []).join(', ')) + '</p>'
         : '<p class="muted">제시어: <b>' + esc(item.hint) + '</b></p>';
       root.innerHTML = head + '<div class="prompt sm">' + esc(item.ko || '다음 문장을 영어로 쓰시오.') + '</div>' + hintHtml +
-        '<textarea class="ans" id="wrIn" autocapitalize="off" placeholder="영어 문장 전체를 쓰시오"></textarea>' +
+        '<textarea class="ans" id="wrIn"' + INATTR + ' placeholder="영어 문장 전체를 쓰시오"></textarea>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
       bindSubmit(function () {
         var v = $('wrIn').value;
         var g = WBGRADE.gradeAnswer(v, item.answers);
         var sim = WBGRADE.similarity(v, item.answers[0]);
-        var ok = g.correct || sim >= 0.92;
+        /* 6단계 백지와 같은 임계 — 정규화 완전 일치만 통과. 유사도는 화면 피드백(일치율)에만 쓴다 */
+        var ok = g.correct;
         finishItem(item, ok, v, '<div class="exp">모범 답안: ' + esc(item.answers[0]) + (ok ? '' : ' (일치율 ' + Math.round(sim * 100) + '%)') + '</div>');
       });
       $('wrIn').focus();
@@ -1527,43 +1935,133 @@
     else renderProgress();
   }
 
-  /* ── 부팅: 연동 확인 → 배정된 내 학교 교재를 이어서 연다 ── */
+  /* ── 부팅: 연동 확인 → 배정된 내 학교 교재를 이어서 연다 ──
+     연동 기기는 어떤 실패에도 체험 모드로 떨어지지 않는다 — 학생 기록이 데모 팩에 섞이거나,
+     "왜 예시 교재가 뜨지?" 하고 지나가는 일이 없게 원인별 화면을 보인다. */
   function loadDemo() {
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
-  function boot() {
-    DB = loadDB() || { v: 1, packs: {}, savedAt: 0 };
-    var a = auth();
-    var flow;
-    if (a && a.token) {
-      flow = api('/exam').then(function (r) {
-        authed = true;
-        var ex = (r && r.exam) || {};
-        examServer = ex;
-        packList = (ex.packIds || []).slice();
-        return Promise.all([pullState(),
-          api('/task').then(function (tr) { taskServer = tr; }).catch(function () {})
-        ]).then(function () {
-          var pid = (DB.last && packList.indexOf(DB.last.packId) >= 0) ? DB.last.packId : packList[0];
-          if (!pid) throw new Error('no-pack');
-          return api('/pack?id=' + encodeURIComponent(pid)).then(function (r2) {
-            pack = r2.pack;
-            if (ex.examDate) {
-              if (!DB.packs[pack.packId]) DB.packs[pack.packId] = { states: {}, diagDone: false, wrong: {}, dump: [], paper: {}, exam: null };
-              DB.packs[pack.packId].exam = { examDate: ex.examDate, wordDeadlineDays: ex.wordDeadlineDays || 7 };
-            }
-          });
-        });
-      }).catch(function () { return loadDemo().then(function (p) { pack = p; }); });
-    } else {
-      flow = loadDemo().then(function (p) { pack = p; });
+  function openLoaded() {
+    var n = ensureStates();
+    if (n) persist(); else save();   // 실제로 상태를 만들었을 때만 서버 push — 열기만으로 savedAt을 올리지 않는다
+    setTab('home');
+  }
+  function openDemo() {
+    return loadDemo().then(function (p) { pack = p; demoMode = true; openLoaded(); });
+  }
+  function fatal(html) { layoutFull('<div class="card" style="max-width:560px;margin:40px auto">' + html + '</div>'); }
+  function bootError(e) {
+    var msg = (e && e.message) || '';
+    if (msg === 'api-401') {
+      fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
+        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
+      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); localStorage.removeItem(PACK_CACHE_KEY); } catch (x) {} location.href = '/'; };
+      return;
     }
-    flow.then(function () {
-      ensureStates(); persist();
-      setTab('home');
-    }).catch(function () {
-      layoutFull('<div class="card"><p>교재를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하십시오.</p></div>');
+    if (msg === 'no-pack') {
+      fatal('<h2>배정된 교재가 없습니다</h2><p class="muted">선생님이 아직 시험 범위(교재)를 배정하지 않았습니다. 배정되면 다시 시도를 누르세요.</p>' +
+        '<div class="row2" style="margin-top:10px"><button class="btn p" id="retryBtn">다시 시도</button><button class="btn" id="demoBtn">체험 교재로 연습</button></div>');
+      $('retryBtn').onclick = function () { location.reload(); };
+      $('demoBtn').onclick = function () { openDemo().catch(function () { fatal('<p>체험 교재를 불러오지 못했습니다.</p>'); }); };
+      return;
+    }
+    if (isNetErr(e)) {
+      var c = loadPackCache();
+      if (c) {
+        /* 오프라인 — 마지막 교재로 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다(팩별 savedAt 병합). */
+        pack = c.pack; offlineMode = true;
+        openLoaded();
+        return;
+      }
+      fatal('<h2>연결 실패</h2><p class="muted">서버에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도하세요.</p>' +
+        '<button class="btn p" id="retryBtn" style="margin-top:10px">다시 시도</button>');
+      $('retryBtn').onclick = function () { location.reload(); };
+      return;
+    }
+    fatal('<h2>서버 오류</h2><p class="muted">교재를 불러오지 못했습니다 (' + esc(msg) + '). 잠시 후 다시 시도하세요.</p>' +
+      '<button class="btn p" id="retryBtn" style="margin-top:10px">다시 시도</button>');
+    $('retryBtn').onclick = function () { location.reload(); };
+  }
+  /* 옛 단일 키(wbn.v1) 이관 — 원격에도 새 키에도 기록이 없을 때 1회. 원격이 있으면 원격이 정본이다. */
+  function migrateLegacy() {
+    var legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null'); } catch (e) {}
+    if (!legacy || !legacy.packs || Object.keys(legacy.packs).length === 0) return false;
+    if (Object.keys(DB.packs).length) return false;
+    DB.packs = legacy.packs;
+    if (legacy.last) DB.last = legacy.last;
+    DB.savedAt = legacy.savedAt || 0;
+    try { localStorage.removeItem(LEGACY_KEY); } catch (e) {}
+    return true;
+  }
+  function boot() {
+    var a = auth();
+    var code = (a && a.token && a.code) ? String(a.code) : null;
+    KEY = 'wbn.v1:' + (code || 'demo');
+    DB = loadDB();
+    if (!DB || (code && DB.owner && DB.owner !== code)) DB = { v: 1, packs: {}, savedAt: 0 };
+    if (code) DB.owner = code;
+    if (!DB.packs || typeof DB.packs !== 'object') DB.packs = {};
+    if (!code) {
+      openDemo().catch(function () { fatal('<p>교재를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하십시오.</p>'); });
+      return;
+    }
+    authed = true;
+    layoutFull('<p class="muted">교재를 불러오는 중…</p>');
+    api('/exam').then(function (r) {
+      var ex = (r && r.exam) || {};
+      examServer = ex;
+      packList = (ex.packIds || []).slice();
+      /* 원격 pull이 먼저다 — 로컬에 뭐가 있든 원격이 더 새로우면 그것을 받은 뒤 팩을 연다 */
+      return api('/state').then(function (sr) {
+        var remote = sr && sr.state;
+        var pulled = pullAdopt(remote);
+        if (!pulled && !(remote && remote.packs && Object.keys(remote.packs).length)) {
+          if (migrateLegacy()) { save(); scheduleSync(); }
+        }
+        /* pull이 됐으면 옛 단일 키는 이 기기에서 역할이 끝났다 — 남겨 두면 공용 태블릿에서 다음 학생이
+           부팅할 때 남의 레거시 기록이 이관되어 그 학생의 서버 상태로 올라간다. */
+        try { localStorage.removeItem(LEGACY_KEY); } catch (e) {}
+        /* 오프라인에서 공부한 분량 — 로컬이 더 새로운 팩이 하나라도 있으면 다음 학습 행동을 기다리지 않고
+           지금 올린다(관리 현황판이 재부팅 후에도 뒤처지지 않게). */
+        var localNewer = Object.keys(DB.packs).some(function (pid) {
+          var lp = DB.packs[pid] || {}, rp = remote && remote.packs && remote.packs[pid];
+          return (lp.savedAt || 0) > ((rp && rp.savedAt) || 0);
+        });
+        if (localNewer) scheduleSync();
+      }).catch(function () {}).then(function () {
+        return api('/task').then(function (tr) { taskServer = tr; }).catch(function () {});
+      }).then(function () {
+        var pid = (DB.last && packList.indexOf(DB.last.packId) >= 0) ? DB.last.packId : packList[0];
+        if (!pid) throw new Error('no-pack');
+        /* 배정 밖 팩의 403은 서버 오류가 아니라 '아직 배정되지 않음'이다 — A7 안내 화면으로 보낸다 */
+        return api('/pack?id=' + encodeURIComponent(pid)).catch(function (e) {
+          if (e && e.message === 'api-403') throw new Error('no-pack');
+          throw e;
+        }).then(function (r2) {
+          pack = r2.pack;
+          cachePack(pid, r2.pack, r2.updatedAt);
+          applyServerExam();
+        });
+      });
+    }).then(function () { openLoaded(); }).catch(bootError);
+  }
+  /* 원격 상태를 팩별 savedAt 비교로 받아 적는다(pullState와 같은 규칙, 부팅용 동기 버전) */
+  function pullAdopt(remote) {
+    if (!remote || !remote.packs || typeof remote.packs !== 'object') return false;
+    var changed = false;
+    Object.keys(remote.packs).forEach(function (pid) {
+      var rp = remote.packs[pid], lp = DB.packs[pid];
+      if (!rp || typeof rp !== 'object') return;
+      if (!lp || (rp.savedAt || 0) > (lp.savedAt || 0)) { DB.packs[pid] = rp; changed = true; }
     });
+    if ((remote.savedAt || 0) > (DB.savedAt || 0)) {
+      if (remote.last) DB.last = remote.last;
+      DB.savedAt = remote.savedAt;
+      changed = true;
+    }
+    if (changed) save();
+    return changed;
   }
   boot();
 
