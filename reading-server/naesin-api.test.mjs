@@ -554,6 +554,78 @@ await t('[R1] PUT /state → overview 까지 range 가 살아서 간다 (관리 
   assert.deepStrictEqual(r.body.students[0].summary.range, range, 'overview 출력에도 실려 나간다');
 });
 
+await t('[P1] normalizeSummary passage — 본문 3트랙 진행(계약 3.6) 화이트리스트·정수 강제·check 두 키', () => {
+  const xss = '<img src=x onerror=alert(1)>';
+  const n = normalizeSummary({
+    packId: 'dummy-e2-mid1',
+    passage: { chunkDone: '2', chunkTotal: 3.9, paraBlank: -1, paraTotal: Infinity, cumulative: xss,
+      check: { correct: '31', total: 40, hack: xss }, senMiss: { 3: 2 }, evil: xss },
+  });
+  assert.deepStrictEqual(Object.keys(n.passage).sort(), ['check', 'chunkDone', 'chunkTotal', 'cumulative', 'paraBlank', 'paraTotal'].sort(),
+    '계약 3.6 키만 남는다 — senMiss·evil 같은 팩 저장소 기록은 요약에 실려 오지 않는다');
+  assert.deepStrictEqual(n.passage, { chunkDone: 2, chunkTotal: 3, paraBlank: 0, paraTotal: 0, cumulative: 0, check: { correct: 31, total: 40 } },
+    '문자열 XSS→0, 소수→정수, 음수→0, 비유한→0');
+  assert.deepStrictEqual(Object.keys(n.passage.check).sort(), ['correct', 'total'], 'check 는 두 키뿐');
+  assert.ok(!JSON.stringify(n).includes('senMiss') && !JSON.stringify(n).includes('evil') && !JSON.stringify(n).includes('hack'),
+    '모르는 키는 어디에도 남지 않는다 — 관리 화면에 학생 기기의 문자열이 새 칸으로 끼어들 길이 없다');
+
+  /* 종합 Check 는 '아직 안 봤다'(null)와 '0점'이 다르다 — 화면이 '—'와 0을 가를 수 있어야 한다 */
+  assert.strictEqual(normalizeSummary({ passage: { chunkDone: 1 } }).passage.check, null, 'check 없으면 null');
+  assert.strictEqual(normalizeSummary({ passage: { check: 'x' } }).passage.check, null, 'check 가 객체가 아니면 null');
+  assert.strictEqual(normalizeSummary({ passage: { check: [1, 2] } }).passage.check, null, 'check 가 배열이면 null');
+  assert.deepStrictEqual(normalizeSummary({ passage: { check: { correct: 0, total: 40 } } }).passage.check, { correct: 0, total: 40 }, '0점은 0점으로 남는다');
+
+  /* 옛 저장본 무해 — passage 를 모르던 클라이언트의 요약에 빈 칸을 만들지 않는다(range 와 같은 결) */
+  assert.strictEqual('passage' in normalizeSummary({ packId: 'dummy-e2-mid1' }), false);
+  assert.strictEqual('passage' in normalizeSummary({ passage: 'x' }), false);
+  assert.strictEqual('passage' in normalizeSummary({ passage: [1, 2] }), false);
+  assert.strictEqual('passage' in normalizeSummary({ passage: null }), false);
+  assert.strictEqual('passage' in normalizeSummary({ range: { packIds: [] } }).range, false, '범위 합계도 마찬가지');
+
+  const clean = { packId: 'dummy-e2-mid1', word: { total: 77, reached: 41, stable: 12, risky: 3, needsSpellCheck: 2 },
+    sentence: { total: 25, interpreted: 10, memorized: 4, byStage: { 1: 5, 2: 6, 3: 4, 4: 3, 5: 3, 6: 4 } },
+    passage: { chunkDone: 2, chunkTotal: 3, paraBlank: 1, paraTotal: 3, cumulative: 2, check: { correct: 31, total: 40 } },
+    task: null, updatedAt: '2026-09-20T05:00:00.000Z' };
+  assert.deepStrictEqual(normalizeSummary(clean), clean, '계약대로 온 값은 한 글자도 안 바뀐다');
+});
+
+await t('[P1] range.passage — 범위 전체 본문 진행 합계도 같은 화이트리스트를 탄다', () => {
+  const xss = '<img src=x onerror=alert(1)>';
+  const n = normalizeSummary({
+    range: { packIds: ['dummy-e2-mid1', 'dummy-e2-mid2'],
+      passage: { chunkDone: '5', chunkTotal: 6, paraBlank: 2.7, paraTotal: '6', cumulative: 4, check: { correct: xss, total: '40' }, extra: xss } },
+  });
+  assert.deepStrictEqual(Object.keys(n.range).sort(), ['packIds', 'packs', 'passage', 'sentence', 'word'], 'range 에 passage 가 더해진다');
+  assert.deepStrictEqual(n.range.passage, { chunkDone: 5, chunkTotal: 6, paraBlank: 2, paraTotal: 6, cumulative: 4, check: { correct: 0, total: 40 } });
+  assert.ok(!JSON.stringify(n.range).includes('extra'));
+});
+
+await t('[P1] PUT /state → overview 까지 passage 가 살아서 간다 (관리 현황판 「본문 진행」의 원천)', async () => {
+  const store = memStore();
+  const xss = '<img src=x onerror=alert(1)>';
+  const passage = { chunkDone: 2, chunkTotal: 3, paraBlank: 1, paraTotal: 3, cumulative: 2, check: { correct: 31, total: 40 } };
+  const rangePassage = { chunkDone: 5, chunkTotal: 6, paraBlank: 3, paraTotal: 6, cumulative: 4, check: { correct: 33, total: 40 } };
+  await call(store, { method: 'PUT', getBody: async () => ({ state: { summary: {
+    packId: 'dummy-e2-mid1', word: { total: 77 }, sentence: { total: 25 },
+    passage: { ...passage, script: xss },
+    range: { packIds: ['dummy-e2-mid1', 'dummy-e2-mid2'], passage: rangePassage },
+  } } }) });
+  const saved = store.getState('st-1').state.summary;
+  assert.deepStrictEqual(saved.passage, passage, '저장본에 본문 진행이 정규화된 모양으로 남는다');
+  assert.deepStrictEqual(saved.range.passage, rangePassage, '범위 합계도 함께 남는다');
+  assert.ok(!JSON.stringify(saved).includes('script'), '저장본에 화이트리스트 밖 키가 없다');
+
+  /* 정규화 이전에 들어온(혹은 손으로 넣은) 저장본도 출력 때 다시 걸린다 */
+  store.putState('st-2', { state: { summary: { passage: { chunkDone: xss, check: { correct: xss, total: xss, evil: xss } } } }, updatedAt: '2026-09-01T09:00:00Z' });
+  const r = await call(store, { path: '/api/naesin/admin/overview', who: ADMIN });
+  const a = r.body.students.find((s) => s.code === 'st-1');
+  assert.deepStrictEqual(a.summary.passage, passage, 'overview 출력에도 실려 나간다');
+  assert.deepStrictEqual(a.summary.range.passage, rangePassage);
+  const b = r.body.students.find((s) => s.code === 'st-2');
+  assert.deepStrictEqual(b.summary.passage, { chunkDone: 0, chunkTotal: 0, paraBlank: 0, paraTotal: 0, cumulative: 0, check: { correct: 0, total: 0 } },
+    '출력 시 다시 정규화 — 강사 화면에 문자열이 그대로 흘러가지 않는다');
+});
+
 /* 결과 픽스처 — 단어 10·문장 10짜리 요약. m = 0.04·안정화 + 0.03·해석 + 0.03·백지 */
 const snap = (stable, interpreted, memorized) => ({
   packId: 'dummy-e2-mid1', word: { total: 10, reached: stable, stable, risky: 0, needsSpellCheck: 0 },

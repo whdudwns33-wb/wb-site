@@ -56,7 +56,7 @@ jobs:
             const hdr = { packId: p.packId, source: p.source, curriculum: p.curriculum, textbook: p.textbook, grade: p.grade, lesson: p.lesson, lessonTitle: p.lessonTitle };
             const w = (n, o) => fs.writeFileSync(dir + "/" + n, JSON.stringify({ ...hdr, ...o }));
             w("words.json", { counts: { words: (p.words || []).length }, words: p.words || [] });
-            w("sentences.json", { passage: p.passage, sentences: p.sentences || [] });
+            w("sentences.json", { passage: p.passage, sentences: p.sentences || [], oddOneItems: p.oddOneItems || [], checkItems: p.checkItems || [] });
             if (p.dialogues) w("dialogues.json", { dialogues: p.dialogues });
             if (p.patterns) w("patterns.json", { patterns: p.patterns });
             if (p.items) w("items-sample.json", { items: p.items });

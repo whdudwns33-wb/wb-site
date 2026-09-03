@@ -421,6 +421,78 @@ var WBGRADE = (function () {
     };
   }
 
+  /* ── 백지 실패 원인 라우팅 (§3.7) ──
+     diffPassage 의 문장별 결과 하나를 보고 "이 문장을 어느 단으로 되돌릴지"를 정한다.
+       missing 통째로 빠뜨림   → 1단계(줄 해석)        order 낱말은 다 맞고 순서만 → 2단계(영어 청크 배열)
+       lexical 낱말이 어긋남   → 3단계(핵심어 빈칸)     form  동사 형태만 어긋남     → 4단계(문법 형태)
+     판정 근거를 좁게 잡는다 — 엉뚱한 단으로 되돌리는 오탐이 미탐보다 나쁘다:
+       order 는 정본과 학생의 토큰 다중집합이 완전히 같고 순서만 다를 때만,
+       form 은 토큰 수가 같고 어긋난 자리가 전부 verbForms[].answer 이며 그 자리에 쓴 말이
+       같은 동사의 다른 형태일 때만. 그 밖은 전부 lexical 로 떨어뜨린다.
+     문장별 결과나 정본 문장이 없으면 null — 부르는 쪽의 실수를 조용히 삼키지 않는다. */
+
+  var VOWELS = 'aeiou';
+
+  /* 규칙 굴절만 만든다(불규칙 사전은 채점기가 들 것이 아니다) — keep→keeps·keeping·keeped … */
+  function regularForms(base) {
+    var b = String(base == null ? '' : base).toLowerCase(), out = {};
+    if (!b) return out;
+    out[b] = true;
+    ['s', 'es', 'ed', 'd', 'ing', 'n', 'en'].forEach(function (sfx) { out[b + sfx] = true; });
+    var last = b.charAt(b.length - 1), prev = b.charAt(b.length - 2);
+    if (last === 'e') { out[b.slice(0, -1) + 'ing'] = true; out[b.slice(0, -1) + 'ed'] = true; }
+    if (last === 'y' && prev && VOWELS.indexOf(prev) < 0) {
+      out[b.slice(0, -1) + 'ies'] = true; out[b.slice(0, -1) + 'ied'] = true;
+    }
+    if (b.length >= 3 && VOWELS.indexOf(last) < 0 && VOWELS.indexOf(prev) >= 0) {
+      out[b + last + 'ing'] = true; out[b + last + 'ed'] = true;
+    }
+    return out;
+  }
+
+  /* 이 자리에 쓴 말이 '같은 동사의 다른 형태'인가. 규칙 굴절이면 바로 참.
+     불규칙형(keep→kept)은 규칙으로 못 잇는다 — 동사 자리에서 정본과 한두 글자만 다르고
+     그 문장의 다른 낱말도 아닌 말만 형태 오류로 본다. 그 밖은 낱말 오류로 떨어진다. */
+  function sameVerbForm(base, canonTok, stuTok, canonKeys) {
+    if (!stuTok) return false;
+    if (regularForms(base)[stuTok]) return true;
+    if (canonKeys[stuTok]) return false;
+    if (stuTok.charAt(0) !== canonTok.charAt(0)) return false;
+    if (stuTok.length < 3 || canonTok.length < 3) return false;
+    return editDist(canonTok, stuTok) <= 2;
+  }
+
+  function blankCause(res, sentence) {
+    if (!res || !res.status || !sentence || !sentence.en) return null;
+    if (res.status === 'ok') return 'ok';
+    if (res.status === 'missing' || !res.input) return 'missing';
+    var canon = tokensOfNorm(sentence.en), stu = tokensOfNorm(res.input), i;
+    if (!canon.length || !stu.length) return 'missing';
+    if (canon.join(' ') === stu.join(' ')) return 'ok';
+    if (canon.slice().sort().join(' ') === stu.slice().sort().join(' ')) return 'order';
+    if (canon.length !== stu.length) return 'lexical';      // 길이가 다르면 자리를 못 짝지운다 — 애매하면 낱말
+    var vfs = sentence.verbForms || [], canonKeys = {}, diffs = [];
+    for (i = 0; i < canon.length; i++) canonKeys[canon[i]] = true;
+    for (i = 0; i < canon.length; i++) if (canon[i] !== stu[i]) diffs.push(i);
+    if (!diffs.length || !vfs.length) return 'lexical';
+    for (i = 0; i < diffs.length; i++) {
+      var c = canon[diffs[i]], s = stu[diffs[i]], hit = false;
+      for (var k = 0; k < vfs.length; k++) {
+        var vf = vfs[k];
+        if (!vf || normalizeEn(vf.answer) !== c) continue;
+        if (sameVerbForm(normalizeEn(vf.base), c, s, canonKeys)) { hit = true; break; }
+      }
+      if (!hit) return 'lexical';
+    }
+    return 'form';
+  }
+
+  /* 원인 → 되돌릴 사다리 단계(§3.7 표). 앱과 테스트가 같은 표를 보게 여기 둔다. */
+  var CAUSE_STAGE = { missing: 1, order: 2, lexical: 3, form: 4 };
+  function blankCauseStage(cause) {
+    return Object.prototype.hasOwnProperty.call(CAUSE_STAGE, cause) ? CAUSE_STAGE[cause] : null;
+  }
+
   /* ── 해석 셀프 체크 보조 (§14-2, Phase 1 — AI 없이) ──
      청크 모범 해석의 핵심 토큰이 학생 해석 어딘가에 있는지만 본다. 조사를 떼고
      (가족은→가족), 용언은 종결어미를 근사로 뗀다(들었다→들었 — 들었어요 도 잡힌다).
@@ -506,6 +578,7 @@ var WBGRADE = (function () {
   return {
     normalizeEn: normalizeEn, gradeAnswer: gradeAnswer, gradeBlanks: gradeBlanks,
     similarity: similarity, splitSentences: splitSentences, diffPassage: diffPassage,
+    blankCause: blankCause, blankCauseStage: blankCauseStage,
     gradeTranslationChunks: gradeTranslationChunks,
   };
 })();
