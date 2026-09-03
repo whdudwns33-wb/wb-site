@@ -20,10 +20,46 @@ t('자체 창작 샘플 팩은 오류 0', () => {
   assert.ok(r.summary.length >= 5, '요약 줄이 섹션마다 나와야 한다');
 });
 
-t('빈 팩은 "검사할 내용 없음" 하나', () => {
+t('빈 팩은 "검사할 내용 없음" + 필수 배열 둘', () => {
   const r = CHECK.checkPack({});
-  assert.strictEqual(r.errors.length, 1);
   assert.ok(has(r.errors, '검사할 팩 내용이 하나도 없음'));
+  assert.ok(has(r.errors, 'words 가 비었음'));
+  assert.ok(has(r.errors, 'sentences 가 비었음'));
+  assert.strictEqual(r.errors.length, 3);
+});
+
+/* ── 필수 배열 (2026-09-03 결함) ──
+   스튜디오 assemble 은 행이 0인 종류를 팩에서 아예 뺀다. 한 종류만 넣고 만든 팩은
+   words 또는 sentences 키가 없는 채로 나오는데, 학생 앱은 그 둘을 가드 없이 읽어
+   (index.html 의 홈 진단 카드·본문 매트릭스) 첫 화면이 TypeError 로 죽는다.
+   오류 메시지도 없이 '교재를 불러오는 중…' 에 멈춘다.
+   전에는 이런 팩이 오류 0·경고 0 으로 배포 관문을 통과했다. */
+t('문장만 있는 팩은 배포를 막는다 — words 없이는 학생 앱이 안 뜬다', () => {
+  const p = { packId: SAMPLE.packId, sentences: clone(SAMPLE.sentences) };
+  const r = CHECK.checkPack(p);
+  assert.ok(has(r.errors, 'words 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
+  assert.ok(has(r.errors, 'WORD TEST'), '어느 자료가 필요한지 알려 줘야 한다');
+  assert.ok(!has(r.errors, 'sentences 가 비었음'), '있는 것을 없다고 하면 안 된다');
+});
+
+t('단어만 있는 팩도 막는다 — sentences 없이는 본문·홈·성취도가 죽는다', () => {
+  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words) };
+  const r = CHECK.checkPack(p);
+  assert.ok(has(r.errors, 'sentences 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
+  assert.ok(has(r.errors, '본문 워크북'));
+});
+
+t('배열이 있어도 비면 막는다 — 검수에서 전 행을 버린 경우', () => {
+  const p = clone(SAMPLE);
+  p.words = [];
+  const r = CHECK.checkPack(p);
+  assert.ok(has(r.errors, 'words 가 비었음'));
+});
+
+t('둘 다 있으면 통과 — 나머지 종류는 없어도 된다', () => {
+  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words), sentences: clone(SAMPLE.sentences) };
+  const r = CHECK.checkPack(p);
+  assert.deepStrictEqual(r.errors, [], '대화문·패턴·문항이 없다고 막으면 안 된다: ' + JSON.stringify(r.errors));
 });
 
 t('팩이 객체가 아니면 오류', () => {
@@ -272,9 +308,12 @@ t('섹션 함수를 따로 부를 수 있다', () => {
   assert.ok(c.summary[0].indexOf('words: 1개') === 0, c.summary[0]);
 });
 
-t('없는 섹션은 검사하지 않는다(부분 팩도 통과)', () => {
+/* 없는 섹션의 내용 검사는 건너뛴다 — 부분 팩이라도 "그 섹션 규칙 위반" 오류가 붙으면 안 된다.
+   (필수 배열 관문은 별개로 걸리므로, 그 한 줄만 남는 것이 정상) */
+t('없는 섹션의 내용은 검사하지 않는다', () => {
   const r = CHECK.checkPack({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] });
-  assert.deepStrictEqual(r.errors, []);
+  assert.strictEqual(r.errors.length, 1, JSON.stringify(r.errors));
+  assert.ok(has(r.errors, 'sentences 가 비었음'), JSON.stringify(r.errors));
   assert.strictEqual(r.summary.length, 1);
 });
 
