@@ -16,13 +16,17 @@ naesin/
   grade.js          채점 — 영어 정규화·백지 문장 diff·해석 청크 커버리지        [WBGRADE]
   gen.js            문항 생성 — 마스터 데이터 → 훈련 문항 런타임 생성           [WBGEN]
   pack-schema.md    레슨 팩(콘텐츠) 스키마 정의
-  pack-validate.mjs 팩 검증기 (검수 게이트의 자동 검증 단계)
+  pack-check.js     팩 검사 규칙 — CLI 검증기·관리 업로드·스튜디오 배포가 같이 쓴다   [WBPACKCHECK]
+  pack-validate.mjs 팩 검증기 CLI (파일 병합 + pack-check.js 위임)
   pack-sample.json  자체 창작 체험 팩 — 테스트 픽스처 겸 미연동 데모 (커밋 가능한 유일한 팩)
   *.test.cjs        각 모듈 테스트 (node로 바로 실행)
 reading-server/
   naesin-api.mjs    /api/naesin/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
   naesin-results.mjs  시험 결과 분석·예측 (복합 도달률·상관·최소제곱) — 순수 함수
-  public/naesin-admin.html  관리 웹 — 팩 업로드·시험 등록·반 성취도
+  naesin-studio.mjs   팩 제작 스튜디오 — 추출 작업(Job) 저장소·검수·배포 관문
+  naesin-extract.mjs  AI 추출 — 원천 텍스트 → 종류별 JSON (Claude, fetch 주입 가능)
+  public/naesin-admin.html   관리 웹(운영) — 팩 업로드·시험 등록·반 성취도·팩 커버리지·문항 신고
+  public/naesin-studio.html  관리 웹(제작) — 원천 붙이기 → AI 추출 → 검수 → 배포
 ```
 
 핵심 데이터 흐름: **PDF(구매 자료) → [추출·검증] → 팩 JSON → 관리 웹 업로드 → KV
@@ -74,6 +78,15 @@ reading-server/
   `GET /admin/results?examDate=` → `{results, analysis}`
 - 학생: `GET /result` → `{results, prediction}` — 자기 결과만. `prediction`은 원내 표본 5건
   이상일 때만 나오고(상관은 3건 이상), 아니면 `null`이다
+- 문항 신고(정오표): 학생 `POST /report {packId, itemRef, reason, memo?}` — **자기 시험 범위의
+  팩만**(아니면 403), 같은 학생·같은 문항의 미처리 신고는 합친다 · 관리
+  `GET /admin/reports?packId=` → 문항별로 묶어 건수 내림차순 · `POST /admin/reports/resolve {packId, id|itemRef}`
+- 제작 스튜디오(naesin-studio.mjs): `POST /admin/job` (원천 텍스트 종류별) · `GET /admin/jobs` ·
+  `GET /admin/job?id=[&src=1]` → `{job, gate}` (`src=1`이면 원천까지) · `POST /admin/job/extract {jobId, kind}` ·
+  `POST /admin/job/draft {jobId, draft}` (AI 키 없이 쓰는 길) · `POST /admin/job/review {jobId, rows|key,…}` ·
+  `POST /admin/job/publish {jobId}` · `DELETE /admin/job {jobId}`.
+  **배포 관문은 CLI 검증기와 같은 함수**(`pack-check.js`)를 쓴다 — 규칙을 복제하면 "검증기는
+  통과인데 배포가 막히는" 상태가 생긴다. 원천은 `naesin:jobsrc:*`에만 있고 작업을 지우면 함께 지운다.
 
 공통: 몸통은 파싱 전 `content-length`로 끊는다(팩 4.5MB / 그 외 300KB). 학생 삭제(퇴원)는
 `naesin:state:<코드>`·`naesin:exam:<코드>`까지 지운다 — 같은 코드를 재사용해도 앞 학생 기록이
@@ -100,6 +113,14 @@ reading-server/
 5. **업로드**: `/admin/naesin-admin.html` → 파일 전부 선택(브라우저가 병합·재검증) →
    업로드 → 시험 등록. packId 규칙: `<개정>-<출판사저자>-<학년>-L<과>`
    (예: `2022-ne-kimgitaek-m2-L6`).
+
+**또는 제작 스튜디오(`/admin/naesin-studio.html`)로 2~5를 한 화면에서**: PDF에서 복사한 텍스트를
+종류별로 붙이고 → 종류마다 AI 추출(한 번에 다 돌리면 워커 CPU 한도를 넘는다) → **자동 대조가 잡은
+행만** 검수(`j`/`k` 이동, `a` 승인, `x` 버림, `e` 편집)하고 나머지는 일괄 승인 → 배포.
+왼쪽 칸에 그 행의 원문이 강조돼 뜬다. 서버에 AI 키가 없으면 추출이 `no-key`로 내려가고
+「초안 JSON 붙여넣기」로 검수·배포만 쓸 수 있다 — 키 없는 환경에서도 나머지 전부가 동작한다.
+**배포는 학생에게 서빙이 아니다** — 시험 범위에 넣어야 받는다(운영 화면의 팩 커버리지 카드가
+어느 쪽이 빠졌는지 짚어 준다).
 
 첫 팩(NE능률(김기택) 중2 L6: 단어 77·문장 25·청크 74·대화 6·패턴 2·문항 20 샘플)은
 원장이 JSON 사본을 보관 중이며 KV에 업로드되어 있다.
@@ -142,13 +163,24 @@ Enter 제출, 러너 접근성.
 끝난다. 그때까지 쓰지 않던 자료 두 가지(어색한 곳 찾기 6문항, 종합 Check 40슬롯)도 제자리를 얻었다.
 하루 부담은 평균 47세션·최대 61세션(대부분 단어)이고, 분량이 많으면 학습 안내문에 실제 숫자가 뜬다.
 
+**팩 제작 스튜디오(2026-09-03, 기획서 §15-2)** — 팩 하나를 사람이 반나절에 만들면 다출판사
+확장이 불가능하다. 원천 텍스트를 붙이면 AI가 초안을 내고, 사람은 **자동 대조가 잡은 행만** 보고
+배포한다. 검사 규칙은 `pack-check.js` 하나로 합쳐 CLI 검증기·관리 업로드·스튜디오 배포가
+같은 판정을 내린다(테스트가 CLI와 배포 관문의 결과를 직접 비교한다). 규칙도 이때 촘촘해졌다 —
+청크 연결이 정본과 다르면 오류, 어색한 문장 찾기의 `correction`을 되돌려 정본이 되지 않으면 오류
+(문항 자신의 정답 근거를 검사한다), 종합 Check는 슬롯별로 풀 수 있는지까지 본다. 첫 팩의 일기
+날짜였던 `dayGroup` 화이트리스트(`8/1`…)는 뺐다 — 다른 출판사 팩이 전부 실패했을 값이다.
+운영 화면에는 두 카드가 붙었다: **팩 커버리지**(시험 범위 ↔ 업로드된 팩을 양방향 대조 —
+서버가 없는 팩 등록과 배정된 팩 삭제를 모두 막으므로 실제로 나는 구멍은 "올렸는데 어느 시험에도
+안 넣은 팩"이다)와 **문항 신고**(학생이 수업 중 발견한 오류를 문항별로 묶어 건수 순으로).
+
 **Phase 2 백로그** (기획서 §12·§14 매핑):
 - 문항 확장: Grammar 객관식 21~45 + 워크북(07)·주관식(09) 전량, 내용정리 점검 문항
 - AI 채점: 해석 청크 enum 판정(+KV 캐시·표본 감사, §14-2) · 백지 실패 원인 라우팅 ·
   종이 답안 촬영 채점(§14-3) — Claude API는 vocab-api.mjs의 호출 패턴·ai-quota 재사용
 - 회복 triage(targetRefs 역인덱스) · 결석 감지→개입 카드 · 학부모 D-day 브리핑(§14-5,
   기존 발송 승인 워크플로우 경유) · 21:00 푸시에 내신 복습 포함
-- 관리: 팩 업로드를 PDF→AI 추출까지 확장(§7), 학교↔교과서 매핑
+- 관리: 학교↔교과서 매핑(팩 커버리지가 이것 없이 시험의 packIds 기준으로만 계산한다)
 - 시험 후 워드브레인 이관(§4.5)
 
 **미결(원장)**: 이그잼포유 라이선스 서면 확인(§13-1) · git 이력 사본 정리 방식(§13-6 —
