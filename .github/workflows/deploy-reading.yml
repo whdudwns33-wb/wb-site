@@ -9,6 +9,9 @@ on:
       - 'vocab/**'
       - 'naesin/**'
       - 'shared/**'
+      # 배포 파이프라인 자체가 바뀌면 그 판으로 한 번 돌려 봐야 한다 — 이 줄이 없으면
+      # 워크플로 수정은 CI 를 한 번도 안 거치고 들어가서, 다음 콘텐츠 변경 때 처음 터진다.
+      - '.github/workflows/deploy-reading.yml'
   workflow_dispatch:
 
 env:
