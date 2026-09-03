@@ -364,9 +364,13 @@
   function cachePacks(entries) {
     var out = {};
     entries.forEach(function (e) { if (e && e.pack && e.pack.packId) out[e.id] = { pack: e.pack, updatedAt: e.updatedAt || null }; });
-    try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
+    try {
+      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out));
+      /* 옛 단일 캐시는 여기서 끝난다 — 남겨 두면 팩 하나(수백 KB~MB)가 영영 자리를 차지한다 */
+      localStorage.removeItem(LEGACY_PACK_CACHE_KEY);
+    } catch (e) {}
   }
-  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다 */
+  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다(업그레이드 직후 오프라인) */
   function loadPacksCache() {
     var out = null;
     try { out = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || 'null'); } catch (e) { out = null; }
@@ -471,8 +475,13 @@
     if (Date.now() - lastWake < 5000) return;
     lastWake = Date.now();
     /* 저장 실패가 남아 있어도 받기부터 한다 — 곧장 올리면 그 사이 다른 기기가 올린 더 새로운 팩 기록이
-       통째로 덮인다(push는 늘 DB 전체를 보낸다). 팩별 savedAt으로 병합한 뒤에 다시 올린다. */
-    pullState().then(function (changed) { if (changed) render(); if (saveStatus === 'failed') pushState(); });
+       통째로 덮인다(push는 늘 DB 전체를 보낸다). 팩별 savedAt으로 병합한 뒤에 다시 올린다.
+       시험 결과도 함께 받는다 — 강사가 수업 중에 점수를 넣으면 학생이 앱으로 돌아올 때 회고 카드가
+       떠야 한다. 부팅 때만 받으면 새로고침 전까지 없는 것처럼 보인다. */
+    Promise.all([
+      pullState(),
+      api('/result').then(function (rr) { resultServer = rr; return true; }).catch(function () { return false; }),
+    ]).then(function (r) { if (r[0] || r[1]) render(); if (saveStatus === 'failed') pushState(); });
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onWake(); });
   window.addEventListener('focus', onWake);
@@ -525,7 +534,8 @@
   function senStates(pid) { return statesOfKind('sentence', pid); }
   function senState(seq, pid) { return packDB(pid).states[WBNAESIN.sentenceId(seq)]; }
   /* 유효 시험 — 「자율 학습으로」 오버라이드가 있으면 서버 시험일이 있어도 연습 모드.
-     시험은 범위 전체에 하나다 — 오버라이드도 범위의 모든 과에 같이 걸고 같이 푼다(setExamAll). */
+     시험은 범위 전체에 하나다 — 시험일·오버라이드도 범위의 모든 과에 같이 걸고 같이 푼다
+     (성취도 탭 「적용」·「자율 학습으로」가 rangeIds() 를 돌며 쓴다). */
   function exam(pid) { var pd = packDB(pid); if (pd.examOverride === 'practice') return null; return pd.exam || null; }
   function examEnded() { var ex = exam(); return !!(ex && ex.examDate && WBNAESIN.daysUntil(ex.examDate, Date.now()) < 0); }
   /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
@@ -809,8 +819,11 @@
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
     if (packList.length <= 1) return '';
+    /* 학생이 아는 단위는 packId 가 아니라 'L6' 이다 — 팩 id 는 title 로만 남긴다 */
     return '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
-      return id === pack.packId ? '<b>' + esc(id) + '</b>' : '<a href="#" data-pk="' + esc(id) + '">' + esc(id) + '</a>';
+      var label = esc(lessonLabel(id)) + (lessonTitle(id) ? ' ' + esc(lessonTitle(id)) : '');
+      return id === pack.packId ? '<b>' + label + '</b>'
+        : '<a href="#" data-pk="' + esc(id) + '" title="' + esc(id) + '">' + label + '</a>';
     }).join(' · ') + '</p>';
   }
   function wireHomeLinks() {
@@ -825,15 +838,18 @@
     var pd = packDB();
     var task = todayTask();
     if (!pd.diagDone) {
-      /* 과제는 진단 없이도 시작할 수 있다 — 수업 시간에 진단부터 2분 쓰게 하지 않는다 */
+      /* 과제는 진단 없이도 시작할 수 있다 — 수업 시간에 진단부터 2분 쓰게 하지 않는다.
+         지난 시험 결과도 여기 보인다 — 새 시험 범위를 막 시작한 학생에게 가장 필요한 회고인데
+         진단 뒤로 숨기면 그 학생은 영영 못 본다(진단은 과마다 한 번뿐이라 이미 지난 화면이 된다). */
       layoutFull(
-        '<div style="max-width:640px;margin:16px auto 0">' + packSegHtml() + packListHtml() + (task ? taskCardHtml(task) : '') + '</div>' +
+        '<div style="max-width:640px;margin:16px auto 0">' + packSegHtml() + packListHtml() + (task ? taskCardHtml(task) : '') + resultCardHtml() + '</div>' +
         '<div class="card" style="max-width:640px;margin:' + (task || packList.length > 1 ? '0' : '40px') + ' auto 14px"><h2>진단 평가 <small>학습 시작 전 1회 · 약 2분</small></h2>' +
         '<p class="muted" style="font-size:13.5px">현재 알고 있는 단어를 확인해 학습 계획을 세웁니다. 전 단어 ' + pack.words.length + '개. 모르는 단어는 「모름」을 선택하면 됩니다 — 진단이므로 점수와 무관합니다.</p>' +
         '<button class="btn p big" id="startDiag" style="margin-top:8px">진단 평가 시작</button></div>' +
         '<div style="max-width:640px;margin:0 auto">' + demoNotice() + '</div>');
       $('startDiag').onclick = startDiagnostic;
       wireTaskCard(task);
+      wireResultCard();
       wireHomeLinks();
       return;
     }
@@ -1548,15 +1564,30 @@
         { text: u.stem.slice(m.index + m[0].length) }] };
     }).filter(Boolean);
   }
+  /* 실전 모의 문항 — 시험 범위 전체에서 뽑는다. 게이트가 범위 전체 단어를 요구하는데 문항은
+     한 과뿐이면 '실전'이 실제 시험과 다른 범위를 재게 된다. 문항 수는 예전과 같게 두고
+     후보 풀만 범위로 넓힌다(10분 안에 푸는 분량이라 과가 늘어도 늘리지 않는다).
+     문항마다 packId 를 실어 채점·오답노트가 그 과로 간다. */
   function mockItems() {
-    var W = pack.words || [], S = pack.sentences || [];
+    var wordRefs = [], senRefs = [], storedRefs = [];
+    rangeIds().forEach(function (pid) {
+      var p = packOf(pid);
+      if (!p) return;
+      (p.words || []).forEach(function (w) { wordRefs.push({ pid: pid, w: w, W: p.words }); });
+      (p.sentences || []).forEach(function (sn) { senRefs.push({ pid: pid, s: sn }); });
+      (p.items || []).filter(function (it) { return (it.answerCount || 1) === 1; })
+        .forEach(function (it) { storedRefs.push({ pid: pid, it: it }); });
+    });
     var out = [];
-    rndPick(W, 5).forEach(function (w) { var q = WBGEN.vocabMcq(w, W, Math.random); if (q) { q.kind = 'word'; out.push(q); } });
-    rndPick(S, 2).forEach(function (s) { var q = WBGEN.keywordBlanks(s, 'en'); if (q) out.push(q); });
-    S.map(function (s) { return WBGEN.grammarChoiceDrill(s); }).filter(Boolean)
-      .reduce(function (a, b) { return a.concat(b); }, []).slice(0, 3).forEach(function (q) { out.push(q); });
-    var single = (pack.items || []).filter(function (it) { return (it.answerCount || 1) === 1; });
-    storedToRunner(rndPick(single, 5)).forEach(function (q) { out.push(q); });
+    var take = function (q, pid) { if (q) { q.packId = pid; out.push(q); } };
+    rndPick(wordRefs, 5).forEach(function (r) { var q = WBGEN.vocabMcq(r.w, r.W, Math.random); if (q) { q.kind = 'word'; take(q, r.pid); } });
+    rndPick(senRefs, 2).forEach(function (r) { take(WBGEN.keywordBlanks(r.s, 'en'), r.pid); });
+    var gram = [];
+    senRefs.forEach(function (r) {
+      (WBGEN.grammarChoiceDrill(r.s) || []).forEach(function (q) { q.packId = r.pid; gram.push(q); });
+    });
+    rndPick(gram, 3).forEach(function (q) { out.push(q); });
+    rndPick(storedRefs, 5).forEach(function (r) { storedToRunner([r.it]).forEach(function (q) { take(q, r.pid); }); });
     return WBGEN.shuffle(out, Math.random);
   }
   function storedToRunner(items) {
