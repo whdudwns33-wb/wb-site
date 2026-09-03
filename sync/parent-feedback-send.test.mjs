@@ -861,6 +861,121 @@ test('feedback delivery status is reduced to safe enums without exposing provide
   }
 });
 
+test('scheduled status refresh serializes multiple messageIds as repeated query params', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+  const messageHash = v2FeedbackMessageHash();
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_query_a', status: 'accepted', statusCode: '2000',
+    groupId: 'GROUP_QUERY_A', messageId: 'MSG_QUERY_A', messageHash,
+    createdAt: now - 2_000, updatedAt: now - 2_000
+  });
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_query_b', status: 'accepted', statusCode: '2000',
+    groupId: 'GROUP_QUERY_B', messageId: 'MSG_QUERY_B', messageHash,
+    createdAt: now - 1_000, updatedAt: now - 1_000
+  });
+
+  let listFetches = 0;
+  const refreshed = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    listFetches += 1;
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    assert.deepEqual(parsed.searchParams.getAll('messageIds'), ['MSG_QUERY_A', 'MSG_QUERY_B']);
+    assert.equal(parsed.searchParams.get('messageIds')?.startsWith('['), false,
+      '복수 ID를 JSON 배열 문자열 한 값으로 보내면 안 된다');
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_QUERY_A: { messageId: 'MSG_QUERY_A', groupId: 'GROUP_QUERY_A', statusCode: '4000' },
+        MSG_QUERY_B: { messageId: 'MSG_QUERY_B', groupId: 'GROUP_QUERY_B', statusCode: '4000' }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(listFetches, 1);
+  assert.equal(refreshed.updated, 2, JSON.stringify(refreshed));
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE provider_status_code='4000'"
+  ).first().count, 2);
+});
+
+test('corrected lookup heals a legacy SOLAPI_STATUS_NOT_FOUND row to delivered without resending', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_legacy_not_found', status: 'unknown', statusCode: '2000',
+    groupId: 'GROUP_LEGACY', messageId: 'MSG_LEGACY',
+    safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND', messageHash: v2FeedbackMessageHash(),
+    createdAt: now - 2 * 24 * 60 * 60_000, updatedAt: now - 60_000
+  });
+
+  let listFetches = 0;
+  const refreshed = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    listFetches += 1;
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET', '상태 복구 중 재발송 POST를 하면 안 된다');
+    assert.deepEqual(parsed.searchParams.getAll('messageIds'), ['MSG_LEGACY']);
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_LEGACY: { messageId: 'MSG_LEGACY', groupId: 'GROUP_LEGACY', statusCode: '4000' }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(listFetches, 1);
+  assert.equal(refreshed.updated, 1, JSON.stringify(refreshed));
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_status_code,safe_error_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(sendId).first() }, {
+    status: 'accepted', provider_status_code: '4000', safe_error_code: null
+  });
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+  ).bind(requestKey).first() }, { status: 'sent', review_note: null });
+});
+
+test('legacy SOLAPI_STATUS_NOT_FOUND becomes terminal after one corrected lookup still finds no message', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_legacy_still_missing', status: 'unknown', statusCode: '2000',
+    groupId: 'GROUP_MISSING', messageId: 'MSG_MISSING',
+    safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND', messageHash: v2FeedbackMessageHash(),
+    createdAt: now - 2 * 24 * 60 * 60_000, updatedAt: now - 60_000
+  });
+
+  let listFetches = 0;
+  const first = await withFetch(async (url, init = {}) => {
+    listFetches += 1;
+    assert.equal(new URL(String(url)).pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    return new Response(JSON.stringify({ messageList: {} }), {
+      status: 200, headers: { 'content-type': 'application/json' }
+    });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(first.updated, 1, JSON.stringify(first));
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_status_code,safe_error_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(sendId).first() }, {
+    status: 'unknown', provider_status_code: '2000',
+    safe_error_code: 'SOLAPI_STATUS_CONFIRMED_NOT_FOUND'
+  });
+
+  const second = await withFetch(async () => {
+    listFetches += 1;
+    throw new Error('확정 누락은 이후 cron에서 반복 조회하면 안 된다');
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000));
+  assert.equal(second.ok, true, JSON.stringify(second));
+  assert.equal(second.checked, 0);
+  assert.equal(listFetches, 1, '수정된 형식으로 딱 한 번만 재조회해야 한다');
+});
+
 test('scheduled status refresh recovers a delivered orphan by exact customFields wbSendId and blocks every repeat send', async () => {
   const db = new TestD1();
   const now = Date.now();

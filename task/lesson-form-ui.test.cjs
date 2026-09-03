@@ -498,8 +498,9 @@ test('parent feedback is enabled for all students without enabling the other gua
   assert.match(html, /if \(res\.status === 'sent'\)/);
   assert.match(html, /보호자 알림톡 발송 요청이 접수됐습니다/);
   assert.match(html, /접수 여부 확인 필요/);
-  assert.match(html, /if \(note\.startsWith\('접수 여부 확인 필요'\)\) return '⚠ 접수 여부 확인 — '/);
-  assert.match(html, /if \(note\.startsWith\('카카오 발송이 거절되었습니다'\)\) return '발송 거절 — '/);
+  assert.match(html, /const category = feedbackDeliveryCategory\(item\)/);
+  assert.match(html, /if \(category === 'unknown'\) return '⚠ 상태 확인 필요 — '/);
+  assert.match(html, /if \(category === 'failed'\) return '발송 실패 — '/);
   assert.match(html, /item\.status === 'content_approved_send_blocked'[\s\S]{0,260}data-act="fbsend"/);
   assert.doesNotMatch(html, /sendState\.retry/);
   assert.doesNotMatch(html, /승인 없이 바로 카카오 알림톡이 나갑니다|학부모 피드백 문자/);

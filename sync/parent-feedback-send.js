@@ -633,7 +633,15 @@ function providerMessages(payload) {
 async function fetchProviderMessagePage(config, params) {
   const url = new URL(SOLAPI_LIST_URL);
   for (const [key, value] of Object.entries(params || {})) {
-    if (value != null && value !== '') url.searchParams.set(key, String(value));
+    if (Array.isArray(value)) {
+      // Solapi 공식 SDK는 배열을 JSON 문자열 한 개가 아니라 같은 query key의
+      // 반복값으로 직렬화한다. JSON 문자열은 정상 200 응답이어도 빈 목록이 올 수 있다.
+      for (const item of value) {
+        if (item != null && item !== '') url.searchParams.append(key, String(item));
+      }
+    } else if (value != null && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
   }
   const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
   const controller = new AbortController();
@@ -662,7 +670,7 @@ async function fetchProviderMessagePage(config, params) {
 
 async function fetchProviderStatuses(config, messageIds) {
   const page = await fetchProviderMessagePage(config, {
-    messageIds: JSON.stringify(messageIds), limit: messageIds.length
+    messageIds, limit: messageIds.length
   });
   if (!page) return null;
   return new Map(page.messages.map(message => [message.messageId, message]));
@@ -894,7 +902,8 @@ export async function handleScheduledParentFeedbackStatusRefresh(env, scheduledT
       "(s.status='accepted' AND (s.provider_status_code IN ('2000','3000') OR " +
         "s.provider_status_code IS NULL OR s.provider_status_code NOT IN ('2000','3000','4000'))) OR " +
       "s.status='dispatching' OR (s.status='unknown' AND COALESCE(s.safe_error_code,'') " +
-        "NOT IN ('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES','SOLAPI_STATUS_NOT_FOUND') " +
+        "NOT IN ('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+          "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') " +
         "AND COALESCE(s.safe_error_code,'') NOT LIKE 'SOLAPI_STATUS_STALE_%') OR (" +
       "s.send_id=(SELECT effective.send_id FROM parent_feedback_sends effective " +
         "WHERE effective.app=s.app AND effective.feedback_request_key=s.feedback_request_key ORDER BY " +
@@ -908,14 +917,16 @@ export async function handleScheduledParentFeedbackStatusRefresh(env, scheduledT
         "(s.status='rejected' AND (f.status<>'content_approved_send_blocked' OR " +
           "COALESCE(f.review_note,'')<>'카카오 발송 결과가 실패로 확인되었습니다')) OR " +
         "(s.status='unknown' AND (COALESCE(s.safe_error_code,'') IN " +
-          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES','SOLAPI_STATUS_NOT_FOUND') OR " +
+          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+            "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') OR " +
           "COALESCE(s.safe_error_code,'') LIKE 'SOLAPI_STATUS_STALE_%') AND " +
           "(f.status<>'content_approved_send_blocked' OR COALESCE(f.review_note,'')<>" +
           "'발송 결과를 자동으로 확인하지 못했습니다 — 관리자 확인 전 재발송 금지')))))" +
       " ORDER BY CASE WHEN s.status IN ('dispatching') OR " +
         "(s.status='accepted' AND COALESCE(s.provider_status_code,'')<>'4000') OR " +
         "(s.status='unknown' AND COALESCE(s.safe_error_code,'') NOT IN " +
-          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES','SOLAPI_STATUS_NOT_FOUND') " +
+          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+            "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') " +
           "AND COALESCE(s.safe_error_code,'') NOT LIKE 'SOLAPI_STATUS_STALE_%') THEN 0 ELSE 1 END," +
       's.updated_at,s.created_at,s.send_id LIMIT ?'
     ).bind(STATUS_REFRESH_LIMIT).all();
@@ -924,7 +935,8 @@ export async function handleScheduledParentFeedbackStatusRefresh(env, scheduledT
   }
   const rows = result.results || [];
   const terminalUnknown = row => row.status === 'unknown' && (
-    ['SOLAPI_STATUS_RECOVERY_NOT_FOUND', 'SOLAPI_STATUS_MULTIPLE_MATCHES', 'SOLAPI_STATUS_NOT_FOUND']
+    ['SOLAPI_STATUS_RECOVERY_NOT_FOUND', 'SOLAPI_STATUS_MULTIPLE_MATCHES',
+      'SOLAPI_STATUS_CONFIRMED_NOT_FOUND']
       .includes(String(row.safe_error_code || '')) || String(row.safe_error_code || '').startsWith('SOLAPI_STATUS_STALE_')
   );
   const completed = rows.filter(row =>
@@ -961,7 +973,13 @@ export async function handleScheduledParentFeedbackStatusRefresh(env, scheduledT
         (currentCode === '3000' && age >= CARRIER_STATUS_MAX_AGE_MS) ||
         (!currentCode && age >= STATUS_RECOVERY_MAX_AGE_MS);
       if (stale) {
-        const marked = await markStatusUnknown(env, row, 'SOLAPI_STATUS_NOT_FOUND', now);
+        // 잘못된 JSON-array query로 과거에 NOT_FOUND가 된 행은 수정된 query로
+        // 딱 한 번 더 확인한다. 또 없을 때만 새 terminal 코드로 닫아 무한 재조회를 막는다.
+        const missingCode = row.status === 'unknown' &&
+          String(row.safe_error_code || '') === 'SOLAPI_STATUS_NOT_FOUND'
+          ? 'SOLAPI_STATUS_CONFIRMED_NOT_FOUND'
+          : 'SOLAPI_STATUS_NOT_FOUND';
+        const marked = await markStatusUnknown(env, row, missingCode, now);
         updated += marked.updated; requestUpdated += marked.requestUpdated;
       }
     }
