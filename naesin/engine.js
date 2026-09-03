@@ -236,106 +236,160 @@ var WBNAESIN = (function () {
     return { cleared: s.wrongClearDates.length >= 2, days: s.wrongClearDates.length };
   }
 
-  /* 오늘의 플랜(§5.4 회복 내장 편성) — 매 호출이 전면 재계산이다.
-     "밀린 것 N개"는 없다: 미도달 잔량을 잔여일로 나눈 '오늘의 새 플랜'만 있다.
+  /* ── 오늘의 플랜(§5.4 회복 내장 편성) ─────────────────────────────────────────
+     매 호출이 전면 재계산이다. "밀린 것 N개"는 없다: 미도달 잔량을 잔여일로 나눈
+     '오늘의 새 플랜'만 있다.
      레인(앱 호환): fresh = 손도 안 댄 단어, review = 학습 중·만기(미도달이면 gen이 무힌트
      철자로 도달 기회를 준다), relearn = 완전 인출(무힌트 철자) — 안정화 회전 + 철자 재검증.
      시험 모드: 단어 초회 도달 마감 = 시험 D-wordDeadlineDays(기본 7, 당일 포함),
      D-7~D-1엔 도달 단어의 안정화 회전을 잔여일로 나눠 배분(§14-1 망각 사각지대 방지).
      D-7 전에도 만기 도달 단어는 review로 돌려 SRS를 끊지 않는다. 시험 당일(D-0)은 마지막
      복습이 가장 중요하니 아직 시험 모드다 — 시험이 지나야(D-1 이하) 'after'가 되어 신규
-     편성 없이 자율 복습만 남는다(학생 앱의 daysUntil < 0 '시험 종료'와 같은 경계). */
-  function planDay(pack, states, exam, now, opts) {
-    now = ms(now);
-    opts = opts || {};
-    states = states || {};
-    exam = examOf(exam);
-    var wordsArr = (pack && pack.words) || [];
-    var total = wordsArr.length;
+     편성 없이 자율 복습만 남는다(학생 앱의 daysUntil < 0 '시험 종료'와 같은 경계).
+     내부는 [후보 수집 wordCandidates] → [배분 allocateWords] 두 단계다 — 통합 범위
+     플랜(planRange)이 여러 과의 후보를 합쳐 한 번만 배분하려면 두 단계가 갈라져 있어야
+     한다(과별로 배분하면 하루 할당이 과 수만큼 불어난다). */
+
+  /* 시험 설정 → 플랜이 공유하는 시간·모드 맥락. total은 상한 계산의 분모라 범위
+     플랜에선 범위 전체 단어 수가 들어온다. */
+  function planContext(exam, now, total) {
     var deadlineDays = exam && exam.wordDeadlineDays != null ? +exam.wordDeadlineDays : 7;
     if (!(deadlineDays >= 1)) deadlineDays = 7;
-    var maxNew = opts.maxNewWords == null ? 10 : opts.maxNewWords;
-    /* 안정화 상한 기본값은 팩 크기에서 나온다 — 77단어×3회전을 7일에 끝내려면 하루 33개인데
-       늦게 도달한 단어는 앞쪽 며칠을 못 쓰므로 (마감-2)일로 나눠 여유를 둔다 */
-    var maxRe = opts.maxRelearn == null
-      ? Math.max(15, Math.ceil(total * RELEARN_TARGET / Math.max(1, deadlineDays - 2)))
-      : opts.maxRelearn;
-    var maxRev = opts.maxReview == null ? 20 : opts.maxReview;
-    var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
-    var today = localDate(now);
     var dday = exam ? daysUntil(exam.examDate, now) : null;
     var mode = !exam ? 'practice' : (dday < 0 ? 'after' : 'exam');   // D-0(시험 당일)은 아직 시험 모드
-    var inWindow = mode === 'exam' && dday <= deadlineDays;   // D-마감~D-1 안정화 구간
+    return {
+      mode: mode, dday: dday, today: localDate(now),
+      deadlineDays: deadlineDays, total: total,
+      inWindow: mode === 'exam' && dday <= deadlineDays               // D-마감~D-1 안정화 구간
+    };
+  }
 
-    var freshCand = [], reviewCand = [], relearnCand = [];
-    var rotations = 0, doneN = 0, spellN = 0, order = {};
+  /* 한 과의 단어를 레인별 후보로 나눈다(planDay·planRange 공용).
+     ref = {packId, pi, nPacks} — 후보의 rank는 여러 과를 한 번에 배분할 때 과가 번갈아
+     나오도록 접은 순번(과 안 순번×과 수 + 과 번호)이다. 한 과면 rank = 팩 안 순번 그대로라
+     기존 편성 순서가 그대로 유지되고, 두 과면 L6-1·L7-1·L6-2… 로 갈마들어 한 과가 상한을
+     독식해 다른 과를 굶기지 않는다. */
+  function wordCandidates(pack, states, now, ctx, ref) {
+    states = states || {};
+    var packId = ref && ref.packId != null ? ref.packId : null;
+    var np = ref && ref.nPacks > 1 ? ref.nPacks : 1;
+    var pi = ref && ref.pi > 0 ? ref.pi : 0;
+    var out = { packId: packId, fresh: [], review: [], relearn: [], rotations: 0, doneN: 0, spellN: 0, total: 0 };
+    var wordsArr = (pack && pack.words) || [];
+    out.total = wordsArr.length;
     wordsArr.forEach(function (w, idx) {
-      order[w.id] = idx;
+      var c = { packId: packId, id: w.id, s: null, rank: idx * np + pi };
       var s = states[w.id];
-      if (!s || s.last == null) { freshCand.push(w.id); return; }          // 손도 안 댄 단어
-      if (!s.reached) { if (s.due <= now) reviewCand.push(w.id); return; }  // 학습 중 + 만기
-      if (isDone(s)) doneN += 1;
+      if (!s || s.last == null) { out.fresh.push(c); return; }             // 손도 안 댄 단어
+      c.s = s;
+      if (!s.reached) { if (s.due <= now) out.review.push(c); return; }    // 학습 중 + 만기
+      if (isDone(s)) out.doneN += 1;
       if (s.needsSpellCheck) {
         /* 진단·찍음 도달분의 철자 재검증 — D-day와 무관하게 매일 상한 안에서 */
-        if (successToday(s, now, today)) return;
-        relearnCand.push(w.id); spellN += 1;
-        rotations += RELEARN_TARGET - s.relearnCount;
+        if (successToday(s, now, ctx.today)) return;
+        out.relearn.push(c); out.spellN += 1;
+        out.rotations += RELEARN_TARGET - s.relearnCount;
         return;
       }
-      if (isStable(s)) return;                              // 안정화 완료 — 오늘 몫 없음
-      if (successToday(s, now, today)) return;              // 오늘 이미 성공 — 같은 날 중복 불인정
-      if (mode === 'exam' && !inWindow) {
-        if (s.due <= now) reviewCand.push(w.id);            // D-7 전 — 만기면 복습(SRS 유지)
+      if (isStable(s)) return;                                 // 안정화 완료 — 오늘 몫 없음
+      if (successToday(s, now, ctx.today)) return;             // 오늘 이미 성공 — 같은 날 중복 불인정
+      if (ctx.mode === 'exam' && !ctx.inWindow) {
+        if (s.due <= now) out.review.push(c);                  // D-7 전 — 만기면 복습(SRS 유지)
         return;
       }
-      if (mode !== 'exam' && s.due > now) return;           // 연습·시험 후는 due 기준
-      relearnCand.push(w.id);
-      rotations += RELEARN_TARGET - s.relearnCount;
+      if (ctx.mode !== 'exam' && s.due > now) return;           // 연습·시험 후는 due 기준
+      out.relearn.push(c);
+      out.rotations += RELEARN_TARGET - s.relearnCount;
     });
+    return out;
+  }
 
-    /* 신규 할당 — 미도달 잔량 ÷ 마감까지 잔여일(마감 당일 포함). 마감 경과면 오늘 다(상한만) */
-    var fresh, lateDeadline = false;
-    if (mode === 'exam') {
-      var remain = dday - deadlineDays + 1;
+  /* 후보 → 오늘 몫. 상한·마감은 넘겨받은 ctx 하나로 계산한다 — 범위 플랜이면 그 값이
+     범위 전체 기준이라, 과가 둘이어도 마감·상한을 두 번 세지 않는다. */
+  function allocateWords(cand, ctx, opts) {
+    opts = opts || {};
+    /* 안정화 상한 기본값은 (범위) 단어 수에서 나온다 — 77단어×3회전을 7일에 끝내려면 하루
+       33개인데 늦게 도달한 단어는 앞쪽 며칠을 못 쓰므로 (마감-2)일로 나눠 여유를 둔다 */
+    var maxRe = opts.maxRelearn == null
+      ? Math.max(15, Math.ceil(ctx.total * RELEARN_TARGET / Math.max(1, ctx.deadlineDays - 2)))
+      : opts.maxRelearn;
+
+    /* 신규 할당 — 미도달 잔량 ÷ 마감까지 남은 날. 나누는 날수는 마감 하루 전까지다:
+       fresh 레인은 4지선다+힌트 철자라 그날은 '도달'이 아니고, 무힌트 철자(=도달)는 다음 날
+       복습 레인에서 나온다. 마감 당일에 처음 꺼낸 단어는 마감을 못 지킨다 — 하루 앞당겨
+       나눠야 마감이 곧 '초회 도달 완료'가 된다(목표③).
+       상한 기본값도 여기서 나온다: max(10, 오늘 필요량) — 고정 상한(옛 10)은 범위가 커질수록
+       마감을 이겨 버려서, 상한 때문에 마감을 못 지키는 일이 생겼다(2과 154단어에서 130개만
+       도달). 상한은 하루 분량의 안전판이지 마감을 무르는 장치가 아니다. 명시
+       opts.maxNewWords는 그대로 이긴다 — 그때는 못 지키는 마감을 노트가 밝힌다. */
+    var freshCand = cand.fresh.slice().sort(byRank);
+    var fresh, lateDeadline = false, needNew = 0, maxNew, capped = false, aim = 1;
+    if (ctx.mode === 'exam') {
+      var remain = ctx.dday - ctx.deadlineDays + 1;
       if (remain < 1) { remain = 1; lateDeadline = freshCand.length > 0; }
-      fresh = freshCand.slice(0, Math.min(maxNew, Math.ceil(freshCand.length / remain)));
-    } else if (mode === 'after') {
+      aim = Math.max(1, remain - 1);            // 마감 하루 전까지 남은 날
+      needNew = Math.ceil(freshCand.length / aim);
+      maxNew = opts.maxNewWords == null ? Math.max(10, needNew) : opts.maxNewWords;
+      capped = needNew > maxNew;
+      fresh = freshCand.slice(0, Math.min(maxNew, needNew));
+    } else if (ctx.mode === 'after') {
       fresh = [];
     } else {
+      /* 연습 모드는 마감이 없다 — 자동 산정할 분모가 없으니 하루 10개 고정 */
+      maxNew = opts.maxNewWords == null ? 10 : opts.maxNewWords;
       fresh = freshCand.slice(0, maxNew);
     }
 
     /* 복습 — 미도달(도달 기회가 급하다)이 먼저, 그다음 만기 오래된 순. 상한으로 자른다:
-       결석 뒤 만기 60개를 한 화면에 쏟으면 그게 곧 "밀린 것 60개"다 */
-    var review = reviewCand.slice().sort(function (a, b) {
-      var ra = states[a].reached ? 1 : 0, rb = states[b].reached ? 1 : 0;
-      return ra - rb || states[a].due - states[b].due || order[a] - order[b];
+       결석 뒤 만기 60개를 한 화면에 쏟으면 그게 곧 "밀린 것 60개"다.
+       다만 시험 모드에선 도달 대기(미도달)만큼은 자리를 비워 둔다 — 어제 꺼낸 단어가
+       '도달'하는 자리가 바로 이 레인이라(fresh는 힌트 철자, 무힌트 철자는 다음 날 여기서
+       나온다) 상한이 신규보다 작으면 도달이 매일 조금씩 밀려 마감을 못 지킨다. 밀린 도달
+       잔량도 신규와 같은 눈으로 마감까지 고르게 나눈다 — 결석 뒤 60개를 한 날에 쏟지 않는다. */
+    var reachN = 0;
+    cand.review.forEach(function (c) { if (!c.s.reached) reachN += 1; });
+    var maxRev = opts.maxReview == null
+      ? (ctx.mode === 'exam' ? Math.max(20, needNew, Math.ceil(reachN / aim)) : 20)
+      : opts.maxReview;
+    var review = cand.review.slice().sort(function (a, b) {
+      var ra = a.s.reached ? 1 : 0, rb = b.s.reached ? 1 : 0;
+      return ra - rb || a.s.due - b.s.due || a.rank - b.rank;
     }).slice(0, maxRev);
 
     /* 안정화 회전 — 재검증 대기가 먼저, 그다음 회전을 적게 받은 단어부터(동률이면 오래된
-       성공부터). 팩 앞쪽만 계속 뽑히면 뒤쪽 단어는 D-1까지 회전을 못 받는다. */
-    relearnCand.sort(function (a, b) {
-      var sa = states[a], sb = states[b];
-      var na = sa.needsSpellCheck ? 0 : 1, nb = sb.needsSpellCheck ? 0 : 1;
+       성공부터). 팩 앞쪽만 계속 뽑히면 뒤쪽 단어는 D-1까지 회전을 못 받는다. 범위 플랜에선
+       이 정렬이 그대로 과 사이 공정성이 된다 — 어제 회전을 받은 과는 relearnCount가 올라가
+       오늘은 뒤로 밀린다. */
+    var relearnCand = cand.relearn.slice().sort(function (a, b) {
+      var na = a.s.needsSpellCheck ? 0 : 1, nb = b.s.needsSpellCheck ? 0 : 1;
       if (na !== nb) return na - nb;
-      if (sa.relearnCount !== sb.relearnCount) return sa.relearnCount - sb.relearnCount;
-      var da = sa.lastCriterionDate || '', db = sb.lastCriterionDate || '';
+      if (a.s.relearnCount !== b.s.relearnCount) return a.s.relearnCount - b.s.relearnCount;
+      var da = a.s.lastCriterionDate || '', db = b.s.lastCriterionDate || '';
       if (da !== db) return da < db ? -1 : 1;
-      return order[a] - order[b];
+      return a.rank - b.rank;
     });
     var relearnN;
-    if (inWindow) {
-      relearnN = Math.min(relearnCand.length, maxRe, Math.max(spellN, Math.ceil(rotations / Math.max(1, dday))));
+    if (ctx.inWindow) {
+      relearnN = Math.min(relearnCand.length, maxRe, Math.max(cand.spellN, Math.ceil(cand.rotations / Math.max(1, ctx.dday))));
     } else {
       relearnN = Math.min(relearnCand.length, maxRe);
     }
-    var relearn = relearnCand.slice(0, relearnN);
+    return {
+      fresh: fresh, review: review, relearn: relearnCand.slice(0, relearnN),
+      freshCand: freshCand.length, lateDeadline: lateDeadline,
+      needNew: needNew, maxNew: maxNew, capped: capped
+    };
+  }
 
-    /* 문장 — 단락(seq) 순서로, 암송 완료 전 문장의 현재 단계 도전.
-       게이트 잠김이면 5·6단계는 보류(§4.4 — 병행·오버라이드면 열린다).
-       백지 통과 문장도 안정화(다른 날 3회)가 끝날 때까지 만기마다 6단계로 다시 부른다. */
-    var g = gateDecision(doneN, total, mode === 'exam' ? exam : null, opts);
-    var sentences = [], redo = [];
+  function byRank(a, b) { return a.rank - b.rank; }
+
+  /* 문장 편성 — 단락(seq) 순서로, 암송 완료 전 문장의 현재 단계 도전.
+     게이트 잠김이면 5·6단계는 보류(§4.4 — 병행·오버라이드면 열린다). 게이트는 '그 과의
+     단어' 기준이다(범위 전체가 아니라 — 실전 모의만 gateRange를 본다).
+     백지 통과 문장도 안정화(다른 날 3회)가 끝날 때까지 만기마다 6단계로 다시 부른다. */
+  function sentenceCandidates(pack, states, now, today, open) {
+    states = states || {};
+    var pending = [], redo = [];
     ((pack && pack.sentences) || []).slice()
       .sort(function (a, b) { return a.seq - b.seq; })
       .forEach(function (sen) {
@@ -345,30 +399,212 @@ var WBNAESIN = (function () {
           return;
         }
         var stage = s ? stageOf(s) : 1;
-        if (!g.open && stage >= 5) return;
-        sentences.push({ seq: sen.seq, stage: stage });
+        if (!open && stage >= 5) return;
+        pending.push({ seq: sen.seq, stage: stage });
       });
-    sentences = sentences.concat(redo).slice(0, maxSen);
+    return { pending: pending, redo: redo };
+  }
 
+  /* 플랜 한 줄 요약 — 범위가 여러 과면 그 사실을 모드 바로 뒤에 박는다("L6·L7 범위") */
+  function planNote(ctx, flags, counts, rangeLabel) {
     var parts = [];
-    if (mode === 'exam') {
-      parts.push('D-' + dday);
-      if (lateDeadline) parts.push('단어 마감 경과 — 회복 편성');
-      if (!g.open) parts.push('단어 게이트 잠김(5·6단계 보류)');
-      if (g.reason === 'parallel') parts.push('병행 모드 — 미완성 단어 선차감');
-    } else if (mode === 'after') {
-      parts.push('시험 종료 — 자율 복습');
-    } else {
-      parts.push('연습 모드 — 자율 진도');
+    if (ctx.mode === 'exam') parts.push('D-' + ctx.dday);
+    else if (ctx.mode === 'after') parts.push('시험 종료 — 자율 복습');
+    else parts.push('연습 모드 — 자율 진도');
+    if (rangeLabel) parts.push(rangeLabel);
+    if (ctx.mode === 'exam') {
+      if (flags.lateDeadline) parts.push('단어 마감 경과 — 회복 편성');
+      /* 하루 분량이 평상시(10개)를 넘으면 그 숫자를 그대로 보여 준다 — 범위를 두세 과로
+         잡으면 마감을 지키는 데 얼마가 드는지가 강사·학생이 먼저 알아야 할 사실이다 */
+      if (flags.heavy) parts.push('하루 신규 ' + flags.needNew + '개 필요 — 범위가 큽니다');
+      if (flags.capped) parts.push('신규 상한 ' + flags.maxNew + '개 — 마감까지 도달 어려움');
+      if (flags.locked) parts.push('단어 게이트 잠김(5·6단계 보류)');
+      if (flags.parallel) parts.push('병행 모드 — 미완성 단어 선차감');
     }
-    parts.push('신규 ' + fresh.length + '/' + freshCand.length +
-      ' · 복습 ' + review.length + ' · 안정화 ' + relearn.length);
+    parts.push('신규 ' + counts.fresh + '/' + counts.freshCand +
+      ' · 복습 ' + counts.review + ' · 안정화 ' + counts.relearn);
+    return parts.join(' · ');
+  }
+
+  function ids(list) { return list.map(function (c) { return c.id; }); }
+
+  /* 한 과의 오늘 플랜 — 시그니처·반환은 학생 앱(gen.dailySet)과의 계약이라 그대로다 */
+  function planDay(pack, states, exam, now, opts) {
+    now = ms(now);
+    opts = opts || {};
+    states = states || {};
+    exam = examOf(exam);
+    var ctx = planContext(exam, now, ((pack && pack.words) || []).length);
+    var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
+
+    var cand = wordCandidates(pack, states, now, ctx, null);
+    var alloc = allocateWords(cand, ctx, opts);
+
+    var g = gateDecision(cand.doneN, cand.total, ctx.mode === 'exam' ? exam : null, opts);
+    var sen = sentenceCandidates(pack, states, now, ctx.today, g.open);
+    var sentences = sen.pending.concat(sen.redo).slice(0, maxSen);
 
     return {
-      mode: mode, dday: dday,
-      words: { fresh: fresh, review: review, relearn: relearn },
-      sentences: sentences, note: parts.join(' · ')
+      mode: ctx.mode, dday: ctx.dday,
+      words: { fresh: ids(alloc.fresh), review: ids(alloc.review), relearn: ids(alloc.relearn) },
+      sentences: sentences,
+      note: planNote(ctx, {
+        lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
+        needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        locked: !g.open, parallel: g.reason === 'parallel'
+      }, {
+        fresh: alloc.fresh.length, freshCand: alloc.freshCand,
+        review: alloc.review.length, relearn: alloc.relearn.length
+      }, null)
     };
+  }
+
+  /* 시험 범위 엔트리 정규화 — [{packId, pack, states}] (범위 순서 유지).
+     packId가 없으면 팩의 packId, 그것도 없으면 자리 번호. 같은 packId가 두 번 오면
+     첫 것만 남긴다(perPack 키 충돌·이중 집계 방지). */
+  function rangeEntries(entries) {
+    var out = [], seen = {};
+    (Array.isArray(entries) ? entries : []).forEach(function (e, i) {
+      if (!e || typeof e !== 'object') return;
+      var pid = e.packId != null ? String(e.packId)
+        : (e.pack && e.pack.packId != null ? String(e.pack.packId) : '#' + i);
+      if (Object.prototype.hasOwnProperty.call(seen, pid)) return;
+      seen[pid] = true;
+      out.push({ packId: pid, pack: e.pack || null, states: e.states || {} });
+    });
+    return out;
+  }
+
+  /* 과 표시명 — 학생이 아는 단위는 packId가 아니라 'L6'이다 */
+  function packLabel(e) {
+    var lesson = e.pack && e.pack.lesson;
+    if (lesson != null && lesson !== '') return 'L' + lesson;
+    return e.packId;
+  }
+
+  /* 통합 시험 범위(여러 과)의 오늘 플랜 — 실제 학교 시험 범위는 보통 2~3개 과다.
+     과별로 planDay를 돌려 합치면 하루 할당도 마감 계산도 과 수만큼 불어난다. 여기서는
+     후보를 합쳐 한 번만 배분하므로 상한·마감이 범위 전체에 한 번 걸린다.
+     반환: words/sentences는 {packId,…}가 붙은 범위 전체 목록, perPack은 그대로
+     gen.dailySet(pack, perPack[packId], …)에 넘길 수 있는 과별 하위 계획.
+     문장 순서는 팩 순서 → seq (학생이 보는 교재 순서), 5·6단계 게이트는 그 과의 단어. */
+  function planRange(entries, exam, now, opts) {
+    now = ms(now);
+    opts = opts || {};
+    exam = examOf(exam);
+    var list = rangeEntries(entries);
+    var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
+    var total = 0;
+    list.forEach(function (e) { total += ((e.pack && e.pack.words) || []).length; });
+    var ctx = planContext(exam, now, total);
+
+    var merged = { fresh: [], review: [], relearn: [], rotations: 0, spellN: 0 };
+    var gates = [];
+    list.forEach(function (e, i) {
+      var c = wordCandidates(e.pack, e.states, now, ctx, { packId: e.packId, pi: i, nPacks: list.length });
+      merged.fresh = merged.fresh.concat(c.fresh);
+      merged.review = merged.review.concat(c.review);
+      merged.relearn = merged.relearn.concat(c.relearn);
+      merged.rotations += c.rotations;
+      merged.spellN += c.spellN;
+      gates.push(gateDecision(c.doneN, c.total, ctx.mode === 'exam' ? exam : null, opts));
+    });
+    var alloc = allocateWords(merged, ctx, opts);
+
+    /* 문장 — 팩 순서 → seq. 미완 문장이 먼저, 백지 복습(redo)은 뒤. 상한도 범위 전체에 한 번 */
+    var pending = [], redo = [];
+    list.forEach(function (e, i) {
+      var sc = sentenceCandidates(e.pack, e.states, now, ctx.today, gates[i].open);
+      sc.pending.forEach(function (x) { pending.push({ packId: e.packId, seq: x.seq, stage: x.stage }); });
+      sc.redo.forEach(function (x) { redo.push({ packId: e.packId, seq: x.seq, stage: x.stage }); });
+    });
+    var sentences = pending.concat(redo).slice(0, maxSen);
+
+    /* perPack — 배분된 결과만 담는다(상한에 잘린 뒤의 진짜 오늘 몫) */
+    var perPack = {};
+    list.forEach(function (e) {
+      perPack[e.packId] = { words: { fresh: [], review: [], relearn: [] }, sentences: [] };
+    });
+    ['fresh', 'review', 'relearn'].forEach(function (lane) {
+      alloc[lane].forEach(function (c) {
+        if (perPack[c.packId]) perPack[c.packId].words[lane].push(c.id);
+      });
+    });
+    sentences.forEach(function (x) {
+      if (perPack[x.packId]) perPack[x.packId].sentences.push({ seq: x.seq, stage: x.stage });
+    });
+
+    var locked = false, parallel = false;
+    gates.forEach(function (g) {
+      if (!g.open) locked = true;
+      if (g.reason === 'parallel') parallel = true;
+    });
+    var label = list.length > 1
+      ? list.map(packLabel).join('·') + ' 범위'
+      : null;
+
+    return {
+      mode: ctx.mode, dday: ctx.dday,
+      words: {
+        fresh: alloc.fresh.map(refOf), review: alloc.review.map(refOf), relearn: alloc.relearn.map(refOf)
+      },
+      sentences: sentences,
+      perPack: perPack,
+      note: planNote(ctx, {
+        lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
+        needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        locked: locked, parallel: parallel
+      }, {
+        fresh: alloc.fresh.length, freshCand: alloc.freshCand,
+        review: alloc.review.length, relearn: alloc.relearn.length
+      }, label)
+    };
+  }
+
+  function refOf(c) { return { packId: c.packId, id: c.id }; }
+
+  /* 범위 전체 단어 게이트 — 실전 모의(§4.4)는 시험 범위 전부가 기준이다.
+     완료 기준은 gate와 같은 isDone(도달 + 철자 재검증 완료). */
+  function gateRange(entries, exam, now, opts) {
+    now = ms(now);
+    exam = examOf(exam);
+    if (exam && daysUntil(exam.examDate, now) < 0) exam = null;
+    var done = 0, total = 0;
+    rangeEntries(entries).forEach(function (e) {
+      values(e.states).forEach(function (s) {
+        if (!s || s.kind !== 'word') return;
+        total += 1;
+        if (isDone(s)) done += 1;
+      });
+    });
+    var g = gateDecision(done, total, exam, opts);
+    return { open: g.open, reason: g.reason, done: done, total: total };
+  }
+
+  /* 범위 요약(계약 R1의 state.summary.range) — 관리 현황판·홈 보드가 "시험 범위 전체"를
+     한 단위로 보게 하는 값. 합계와 함께 과별 값(packs)도 남긴다(펼침 표시용). */
+  function rangeSummary(entries) {
+    var list = rangeEntries(entries);
+    var out = {
+      packIds: [],
+      word: { total: 0, reached: 0, stable: 0, risky: 0, needsSpellCheck: 0 },
+      sentence: { total: 0, interpreted: 0, memorized: 0, byStage: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 } },
+      packs: {}
+    };
+    list.forEach(function (e) {
+      var w = wordSummary(e.states), s = sentenceSummary(e.states);
+      out.packIds.push(e.packId);
+      out.word.total += w.total; out.word.reached += w.reached; out.word.stable += w.stable;
+      out.word.risky += w.risky; out.word.needsSpellCheck += w.needsSpellCheck;
+      out.sentence.total += s.total; out.sentence.interpreted += s.interpreted;
+      out.sentence.memorized += s.memorized;
+      [1, 2, 3, 4, 5, 6].forEach(function (k) { out.sentence.byStage[k] += s.byStage[k]; });
+      out.packs[e.packId] = {
+        word: { total: w.total, reached: w.reached, stable: w.stable },
+        sentence: { total: s.total, interpreted: s.interpreted, memorized: s.memorized }
+      };
+    });
+    return out;
   }
 
   /* 성취도 화면의 원천(§4.2) — 본문 문장(kind 'sentence')만. 해석은 2단계에서 먼저 잡고,
@@ -431,7 +667,8 @@ var WBNAESIN = (function () {
     stability: stability, isStable: isStable, isDone: isDone,
     applyDiagnostic: applyDiagnostic, wordSummary: wordSummary,
     gate: gate, clearWrong: clearWrong, planDay: planDay,
-    sentenceSummary: sentenceSummary, advanceStage: advanceStage
+    sentenceSummary: sentenceSummary, advanceStage: advanceStage,
+    planRange: planRange, gateRange: gateRange, rangeSummary: rangeSummary
   };
 })();
 

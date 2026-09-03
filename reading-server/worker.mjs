@@ -150,6 +150,21 @@ function naesinStore(env) {
     listExamScopes: async () => (await kvListAll(env, 'naesin:exam:')).map(k => k.slice('naesin:exam:'.length)),
     getTask: (s) => env.DB.get('naesin:task:' + s, 'json'),
     putTask: (s, rec) => env.DB.put('naesin:task:' + s, JSON.stringify(rec)),
+    /* 시험 결과 — 키는 naesin:result:<코드>:<시험일>. 코드도 날짜도 콜론을 못 쓰므로
+       키에서 둘을 그대로 되읽을 수 있다(listResults). 학생 하나가 시험마다 한 줄. */
+    getResult: (c, d) => env.DB.get('naesin:result:' + c + ':' + d, 'json'),
+    putResult: (c, d, rec) => env.DB.put('naesin:result:' + c + ':' + d, JSON.stringify(rec)),
+    deleteResult: (c, d) => env.DB.delete('naesin:result:' + c + ':' + d),
+    listResults: async () => {
+      const out = [];
+      for (const k of await kvListAll(env, 'naesin:result:')) {
+        const rec = await env.DB.get(k, 'json');
+        if (!rec) continue;
+        const [code, examDate] = k.slice('naesin:result:'.length).split(':');
+        out.push({ ...rec, code, examDate });
+      }
+      return out;
+    },
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }
@@ -181,13 +196,19 @@ async function fullDump(env) {
   const [textbook, pubmap, textbookSrc] = await Promise.all([env.DB.get('textbook','json'), env.DB.get('pubmap','json'), env.DB.get('textbook-src','json')]);
   /* 내신브레인 — 학생 기록·시험 배정만 담는다. 팩 본문은 원장이 보관한 원본 JSON으로
      재업로드할 수 있고, 담으면 스냅샷이 팩 크기(수 MB)만큼 부풀어서 id 목록만 남긴다. */
-  const naesin = { packIds: (await env.DB.get('naesin:packs', 'json')) || [], states: {}, exams: {}, tasks: {} };
+  const naesin = { packIds: (await env.DB.get('naesin:packs', 'json')) || [], states: {}, exams: {}, tasks: {}, results: {} };
   for (const k of await kvListAll(env, 'naesin:state:'))
     naesin.states[k.slice('naesin:state:'.length)] = await env.DB.get(k, 'json');
   for (const k of await kvListAll(env, 'naesin:exam:'))
     naesin.exams[k.slice('naesin:exam:'.length)] = await env.DB.get(k, 'json');
   for (const k of await kvListAll(env, 'naesin:task:'))
     naesin.tasks[k.slice('naesin:task:'.length)] = await env.DB.get(k, 'json');
+  /* 시험 결과는 강사가 손으로 넣은 유일한 실제 성과 자료다 — 잃으면 다시 만들 수 없어서 담는다.
+     로컬 store.naesinSnapshot 과 같은 모양({[코드]:{[시험일]:rec}}). */
+  for (const k of await kvListAll(env, 'naesin:result:')) {
+    const [code, examDate] = k.slice('naesin:result:'.length).split(':');
+    (naesin.results[code] = naesin.results[code] || {})[examDate] = await env.DB.get(k, 'json');
+  }
   return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, textbookSrc: textbookSrc || {} };
 }
 
@@ -718,6 +739,9 @@ export default {
            앞 학생의 시험 범위(팩)를 그대로 받는다. 반 공통(default)·팩은 학생 것이 아니라 그대로 둔다. */
         await drop('naesin:state:' + c);
         await drop('naesin:exam:' + c);
+        /* 시험 결과도 이 학생 것이다 — 남으면 같은 코드의 새 학생 화면에 앞 학생 점수가 뜨고,
+           원내 성과 분석에도 퇴원생이 계속 섞인다. 키가 코드로 시작하니 접두로 훑는다. */
+        for (const k of await kvListAll(env, 'naesin:result:' + c + ':')) await drop(k);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */

@@ -12,6 +12,7 @@
 naesin/
   index.html        학생 앱 (탭: 오늘·단어·본문·문제·성취도)
   engine.js         암기 엔진 — SRS·안정화(다른 날 3회)·단어 게이트·D-day 플랜  [WBNAESIN]
+                    범위(여러 과) 버전: planRange·gateRange·rangeSummary
   grade.js          채점 — 영어 정규화·백지 문장 diff·해석 청크 커버리지        [WBGRADE]
   gen.js            문항 생성 — 마스터 데이터 → 훈련 문항 런타임 생성           [WBGEN]
   pack-schema.md    레슨 팩(콘텐츠) 스키마 정의
@@ -20,6 +21,7 @@ naesin/
   *.test.cjs        각 모듈 테스트 (node로 바로 실행)
 reading-server/
   naesin-api.mjs    /api/naesin/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
+  naesin-results.mjs  시험 결과 분석·예측 (복합 도달률·상관·최소제곱) — 순수 함수
   public/naesin-admin.html  관리 웹 — 팩 업로드·시험 등록·반 성취도
 ```
 
@@ -58,6 +60,11 @@ reading-server/
 - 과제: `GET/POST /admin/task` — `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
   학생 앱 `quizTypes()`·관리 웹 `TYPE_LIST`와 같은 목록이어야 한다
 - `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열
+- 시험 결과: `POST /admin/result {code, examDate, score, wrongTypes?, memo?}` — 서버가 저장 시점의
+  `state.summary` 스냅샷과 시험 범위를 함께 붙인다 · `DELETE /admin/result {code, examDate}` ·
+  `GET /admin/results?examDate=` → `{results, analysis}`
+- 학생: `GET /result` → `{results, prediction}` — 자기 결과만. `prediction`은 원내 표본 5건
+  이상일 때만 나오고(상관은 3건 이상), 아니면 `null`이다
 
 공통: 몸통은 파싱 전 `content-length`로 끊는다(팩 4.5MB / 그 외 300KB). 학생 삭제(퇴원)는
 `naesin:state:<코드>`·`naesin:exam:<코드>`까지 지운다 — 같은 코드를 재사용해도 앞 학생 기록이
@@ -107,6 +114,15 @@ E 프로그레스 보드 홈(안정화 히트맵·문장×단계 매트릭스). 
 경로(서버 정규화 + 화면 이스케이프), 개별 시험 배정이 영구히 반 공통을 이기던 해석,
 퇴원 후에도 남던 내신 기록, 배정 밖 팩 열람. 태블릿 UX: 44px 터치 타깃, 자동교정 차단,
 Enter 제출, 러너 접근성.
+
+**통합 시험 범위 + 성과 검증(2026-09-03, 기획서 §15-1)**: 학교 시험 범위가 2~3개 과인 현실에
+맞춰 범위 전체를 한 단위로 다룬다. 엔진에 `planRange`·`gateRange`·`rangeSummary`가 생겨 하루
+할당·단어 마감·게이트가 범위 전체 기준으로 한 번만 걸린다. 신규·복습 상한은 범위 크기와 마감에서
+자동 산정한다 — 2과 154단어가 마감(D-7)까지 전량 도달하고 D-1까지 안정화된다(고정 상한 10일 때는
+130/154에서 멈췄다). 학생 앱은 범위 팩을 모두 열고 과 세그먼트로 전환하며, 홈 지표는 범위 합계에
+과별 진도표가 붙는다. 시험이 끝나면 강사가 점수와 틀린 유형을 넣고, 저장 시점 도달률 스냅샷과 함께
+쌓여 도달률↔점수 상관·백지 그룹 비교·산점도가 관리 웹에 나온다. 학생에게는 표본 5건 이상일 때만
+예상 점수대를 참고용으로 보여 준다(표본이 적을 때 상관을 단정하지 않는다).
 
 **Phase 2 백로그** (기획서 §12·§14 매핑):
 - 문항 확장: Grammar 객관식 21~45 + 워크북(07)·주관식(09) 전량, 내용정리 점검 문항
