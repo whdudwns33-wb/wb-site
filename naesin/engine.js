@@ -24,6 +24,9 @@ var WBNAESIN = (function () {
   var TRACK_STAGES = { chunk: 3, para: 3 };
   var PARA_STEPS = ['summary', 'odd', 'blank'];   // 단락 관문 stage 1·2·3의 이름
   var CUE_MAX = 3;            // 단서 농도 상한 — 3 전사 · 2 첫 글자+글자 수 · 1 첫 글자 · 0 빈칸만
+  var PASSAGE_BASE = 5;       // 본문 하루 상한의 바닥값(연습 모드는 이 고정값)
+  var FRESH_EVERY = 3;        // 본문 자리 세 칸에 한 칸은 '아직 손대지 않은 문장' 몫
+  var HEAVY_DAY = 60;         // 하루 분량(단어+본문)이 이만큼을 넘으면 노트에 숫자를 그대로 밝힌다
 
   /* now는 ms 숫자가 정본이다 — Date를 그대로 받으면 now + DAY가 문자열 연결이 되어
      due가 "Tue Sep 01 ..."이 된다. 모든 공개 함수 입구에서 한 번 정규화한다. */
@@ -510,6 +513,8 @@ var WBNAESIN = (function () {
       out.chunk.push({ kind: 'chunk', day: g.day, stage: s ? stageOf(s) : 1 });
     });
 
+    /* 손댄 적 없는 문장(untouched)과 이미 손댄 문장을 따로 모은다 — 아래에서 자리를 짠다 */
+    var untouched = [], touched = [];
     groups.forEach(function (g) {
       if (!chunkGate(pack, states, g.day).open) return;
       g.sentences.forEach(function (sen) {
@@ -522,9 +527,10 @@ var WBNAESIN = (function () {
         }
         var stage = s ? stageOf(s) : 1;
         if (!open && stage >= 5) return;
-        out.pending.push({ kind: 'sentence', seq: sen.seq, stage: stage });
+        (s && s.last != null ? touched : untouched).push({ kind: 'sentence', seq: sen.seq, stage: stage });
       });
     });
+    out.pending = weavePending(untouched, touched);
 
     groups.forEach(function (g) {
       var s = states[paraId(g.day)];
@@ -550,11 +556,85 @@ var WBNAESIN = (function () {
     return out;
   }
 
-  var CAND_LANES = ['chunk', 'pending', 'redo', 'para', 'tail'];
-  function flattenCandidates(b) {
-    var out = [];
-    CAND_LANES.forEach(function (k) { out = out.concat(b[k]); });
+  /* 문장 자리 짜기 — 세 칸에 한 칸(FRESH_EVERY)은 아직 손대지 않은 문장에 먼저 준다.
+     seq 순으로만 채우면 앞 문장이 한 단계에 정체할 때(단서가 안 지워지거나 학생이 그 단계를
+     건너뛸 때) 뒤 문장은 상한에 밀려 영영 1단계도 못 받는다 — 25문장 팩에서 실제로 5문장만
+     해석이 열리는 것을 시뮬레이션으로 봤다. 안정화 레인이 '회전을 적게 받은 단어'부터 도는
+     것과 같은 정신이다: 굶는 쪽을 먼저 부른다. 한쪽이 떨어지면 남은 쪽이 순서대로 채운다. */
+  function weavePending(untouched, touched) {
+    var out = [], ui = 0, ti = 0, i = 0;
+    while (ui < untouched.length || ti < touched.length) {
+      var takeNew = ti >= touched.length || (i % FRESH_EVERY === 0 && ui < untouched.length);
+      out.push(takeNew ? untouched[ui++] : touched[ti++]);
+      i += 1;
+    }
     return out;
+  }
+
+  /* 본문 잔여 작업량 — 상한 자동 산정의 분자다. 러너 한 번(한 단계 통과) = 1로 센다.
+       ladder    청크 단계 + 문장 단계 + 단락 관문 단계 — 여러 개를 하루에 몰아 할 수 있다
+       tailDays  누적 백지 + 종합 Check — 하루 한 칸씩 직렬이라 '나눌 양'이 아니라 '먹는 날수'다
+     tail을 날수로 세는 이유: 마지막 며칠에 누적만 남으면 종합 Check까지 못 간다.
+     그만큼 날짜를 먼저 떼고 나머지 날에 사다리를 나눠야 시험 전에 끝난다. */
+  function passageWork(pack, states, rec) {
+    states = states || {};
+    var groups = dayGroups(pack);
+    var out = { ladder: 0, tailDays: 0 };
+    groups.forEach(function (g) {
+      if (hasChunks(g)) {
+        var ck = states[chunkId(g.day)];
+        if (!(ck && ck.reached)) out.ladder += TRACK_STAGES.chunk - (ck ? stageOf(ck) : 1) + 1;
+      }
+      var pg = states[paraId(g.day)];
+      if (!(pg && pg.reached)) out.ladder += TRACK_STAGES.para - (pg ? stageOf(pg) : 1) + 1;
+      g.sentences.forEach(function (sen) {
+        var s = states[sentenceId(sen.seq)];
+        if (s && s.reached) return;
+        out.ladder += STAGE_MAX - (s ? stageOf(s) : 1) + 1;
+      });
+    });
+    if (!groups.length) return out;
+    var cum = rec && rec.cumulative, i = 0;
+    while (i < groups.length && cum && Object.prototype.hasOwnProperty.call(cum, groups[i].day)) i += 1;
+    out.tailDays = (groups.length - i) + ((rec && rec.check) ? 0 : 1);
+    return out;
+  }
+
+  /* 본문 하루 상한 — 단어 레인(maxNewWords·maxReview)과 같은 방식으로 자동 산정한다.
+     고정 상한은 범위가 커질수록 마감을 이겨 버린다: 25문장 팩은 하루 5칸이면 시험까지
+     문장 5개만 백지에 닿는다. 상한은 하루 분량의 안전판이지 마감을 무르는 장치가 아니다.
+     연습 모드는 마감이 없으니 분모가 없다 — 예전대로 하루 5 고정.
+     명시 opts.maxSentences는 그대로 이긴다 — 그때는 못 지키는 마감을 노트가 밝힌다.
+     w = {ladder, tailDays, tailSlots, redoN} (tailSlots·redoN은 그날 몫이라 나누지 않고 더한다) */
+  function passageCap(w, ctx, opts) {
+    var explicit = opts && opts.maxSentences != null ? +opts.maxSentences : null;
+    if (ctx.mode !== 'exam') {
+      return { cap: explicit == null ? PASSAGE_BASE : explicit, need: null, capped: false };
+    }
+    var days = Math.max(1, ctx.dday);                        // D-1까지 끝낸다(시험 당일 아침은 마지막 복습)
+    var ladderDays = Math.max(1, days - w.tailDays);
+    var need = Math.ceil(w.ladder / ladderDays) + w.tailSlots + w.redoN;
+    if (!(need >= PASSAGE_BASE)) need = PASSAGE_BASE;
+    return {
+      cap: explicit == null ? need : explicit,
+      need: need,
+      capped: explicit != null && explicit < need
+    };
+  }
+
+  var CAND_LANES = ['chunk', 'pending', 'para', 'tail', 'redo'];
+  /* 오늘 몫 — 청크 → 문장 → 단락 관문 → 누적 → 종합 순서 그대로다. 두 가지만 더 한다.
+     ① 단락 관문·누적·종합은 자리를 먼저 떼어 둔다. 상한에 걸려 뒤로 밀리면 그날이 통째로
+        날아가고(누적은 하루 한 칸씩 직렬이다) 시험 전에 종합까지 못 간다. 미완 문장은
+        하루 밀려도 다음 날 같은 단계로 다시 나온다 — 밀려도 되는 쪽을 민다.
+     ② 백지 재도전(redo)은 맨 뒤다. 이미 통과한 문장의 안정화 회전이라, 마감이 걸린 새 땅
+        (관문·누적·종합)을 밀어낼 이유가 없다. 25문장 팩에서 매일 redo 25칸이 앞을 막아
+        단락 관문이 시험 전에 한 번도 안 열리는 것을 시뮬레이션으로 봤다. */
+  function takeCandidates(b, cap) {
+    var reserve = b.para.length + b.tail.length;
+    var room = Math.max(0, cap - reserve);
+    return b.chunk.concat(b.pending).slice(0, room)
+      .concat(b.para, b.tail, b.redo).slice(0, cap);
   }
   /* 범위 플랜용 — 항목에 packId를 붙이고(원본은 그대로 둔다) 떼어 낸다 */
   function tagPack(packId, x) {
@@ -581,11 +661,19 @@ var WBNAESIN = (function () {
          잡으면 마감을 지키는 데 얼마가 드는지가 강사·학생이 먼저 알아야 할 사실이다 */
       if (flags.heavy) parts.push('하루 신규 ' + flags.needNew + '개 필요 — 범위가 큽니다');
       if (flags.capped) parts.push('신규 상한 ' + flags.maxNew + '개 — 마감까지 도달 어려움');
+      /* 본문도 같은 눈으로 — 하루 몇 칸이 필요한지, 상한 때문에 못 끝내는지를 감추지 않는다 */
+      if (flags.senNeed > PASSAGE_BASE) parts.push('하루 본문 ' + flags.senNeed + '칸 필요');
+      if (flags.senCapped) parts.push('본문 상한 ' + flags.senMax + '칸 — 시험 전 완료 어려움');
       if (flags.locked) parts.push('단어 게이트 잠김(5·6단계 보류)');
       if (flags.parallel) parts.push('병행 모드 — 미완성 단어 선차감');
     }
     parts.push('신규 ' + counts.fresh + '/' + counts.freshCand +
-      ' · 복습 ' + counts.review + ' · 안정화 ' + counts.relearn);
+      ' · 복습 ' + counts.review + ' · 안정화 ' + counts.relearn +
+      ' · 본문 ' + counts.sentences);
+    /* 하루 분량이 사람이 소화할 수준을 넘으면 그 사실 자체가 강사에게 보여야 한다 —
+       범위를 줄이거나 시작을 앞당기는 판단은 숫자를 본 사람이 한다 */
+    var load = counts.fresh + counts.review + counts.relearn + counts.sentences;
+    if (load > HEAVY_DAY) parts.push('하루 분량 ' + load + '개 — 남은 날에 비해 많습니다');
     return parts.join(' · ');
   }
 
@@ -601,15 +689,18 @@ var WBNAESIN = (function () {
     states = states || {};
     exam = examOf(exam);
     var ctx = planContext(exam, now, ((pack && pack.words) || []).length);
-    var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
 
     var cand = wordCandidates(pack, states, now, ctx, null);
     var alloc = allocateWords(cand, ctx, opts);
 
     var g = gateDecision(cand.doneN, cand.total, ctx.mode === 'exam' ? exam : null, opts);
-    var sentences = flattenCandidates(
-      passageCandidates(pack, states, now, ctx.today, g.open, opts.rec)
-    ).slice(0, maxSen);
+    var buckets = passageCandidates(pack, states, now, ctx.today, g.open, opts.rec);
+    var work = passageWork(pack, states, opts.rec);
+    var pc = passageCap({
+      ladder: work.ladder, tailDays: work.tailDays,
+      tailSlots: work.tailDays > 0 ? 1 : 0, redoN: buckets.redo.length
+    }, ctx, opts);
+    var sentences = takeCandidates(buckets, pc.cap);
 
     return {
       mode: ctx.mode, dday: ctx.dday,
@@ -618,10 +709,12 @@ var WBNAESIN = (function () {
       note: planNote(ctx, {
         lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
         needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        senNeed: pc.need, senCapped: pc.capped, senMax: opts.maxSentences,
         locked: !g.open, parallel: g.reason === 'parallel'
       }, {
         fresh: alloc.fresh.length, freshCand: alloc.freshCand,
-        review: alloc.review.length, relearn: alloc.relearn.length
+        review: alloc.review.length, relearn: alloc.relearn.length,
+        sentences: sentences.length
       }, null)
     };
   }
@@ -662,7 +755,6 @@ var WBNAESIN = (function () {
     opts = opts || {};
     exam = examOf(exam);
     var list = rangeEntries(entries);
-    var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
     var total = 0;
     list.forEach(function (e) { total += ((e.pack && e.pack.words) || []).length; });
     var ctx = planContext(exam, now, total);
@@ -684,13 +776,22 @@ var WBNAESIN = (function () {
        펴고 상한은 범위 전체에 한 번. 종류를 먼저 묶는 이유: 한 과의 관문이 다른 과의 청크
        (뜻 세우기)보다 앞서면 못 읽는 학생이 두 번째 과에서 다시 막힌다. */
     var senLanes = { chunk: [], pending: [], redo: [], para: [], tail: [] };
+    /* 작업량은 과별로 합치되 누적·종합이 먹는 날수는 과끼리 겹친다(같은 날 L6·L7 누적을
+       나란히 본다) — 그래서 ladder는 합, tailDays는 최대, 자리(tailSlots)는 과 수다. */
+    var swork = { ladder: 0, tailDays: 0, tailSlots: 0, redoN: 0 };
     list.forEach(function (e, i) {
       var b = passageCandidates(e.pack, e.states, now, ctx.today, gates[i].open, e.rec);
       CAND_LANES.forEach(function (lane) {
         b[lane].forEach(function (x) { senLanes[lane].push(tagPack(e.packId, x)); });
       });
+      var w = passageWork(e.pack, e.states, e.rec);
+      swork.ladder += w.ladder;
+      swork.tailDays = Math.max(swork.tailDays, w.tailDays);
+      if (w.tailDays > 0) swork.tailSlots += 1;
+      swork.redoN += b.redo.length;
     });
-    var sentences = flattenCandidates(senLanes).slice(0, maxSen);
+    var pc = passageCap(swork, ctx, opts);
+    var sentences = takeCandidates(senLanes, pc.cap);
 
     /* perPack — 배분된 결과만 담는다(상한에 잘린 뒤의 진짜 오늘 몫) */
     var perPack = {};
@@ -725,10 +826,12 @@ var WBNAESIN = (function () {
       note: planNote(ctx, {
         lateDeadline: alloc.lateDeadline, heavy: !alloc.lateDeadline && alloc.needNew > 10,
         needNew: alloc.needNew, capped: alloc.capped, maxNew: alloc.maxNew,
+        senNeed: pc.need, senCapped: pc.capped, senMax: opts.maxSentences,
         locked: locked, parallel: parallel
       }, {
         fresh: alloc.fresh.length, freshCand: alloc.freshCand,
-        review: alloc.review.length, relearn: alloc.relearn.length
+        review: alloc.review.length, relearn: alloc.relearn.length,
+        sentences: sentences.length
       }, label)
     };
   }

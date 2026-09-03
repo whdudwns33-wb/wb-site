@@ -704,7 +704,13 @@ function runItem(e, x, now) {
   if (x.kind === 'para') return E.advanceStage(st(E.paraId(x.day), 'para'), true, now, { fromStage: x.stage });
   if (x.kind === 'cumulative') { e.rec.cumulative[x.lastDay] = { at: now, okCount: 1, total: 1, score: 100 }; return null; }
   if (x.kind === 'check') { e.rec.check = { at: now, correct: 8, total: 8 }; return null; }
-  return E.advanceStage(e.states[E.sentenceId(x.seq)], true, now, { fromStage: x.stage });
+  const s = e.states[E.sentenceId(x.seq)];
+  if (!E.isCueStage(x.stage)) return E.advanceStage(s, true, now, { fromStage: x.stage });
+  /* 단서 단계는 한 세션 안에서 단서를 끝까지 돌린다(앱 권장 리듬 — 문장당 6세션) */
+  for (let i = 0; i < 4 && E.stageOf(s) === x.stage && !s.reached; i++) {
+    E.recordCue(s, true, now, { session: 'cue' + now + '#' + x.seq + '#' + i, fromStage: x.stage });
+  }
+  return s;
 }
 /* n단어 합성 팩 — 상한 검증용 (단어 id는 과마다 달라야 합산 결과가 읽힌다) */
 function mkRangePack(id, lesson, prefix, n) {
@@ -863,10 +869,9 @@ t('planRange — 빈 과도 perPack 키를 갖고, 잘못된 엔트리·중복 p
 t('E-R 2과 범위 완주 — D-14 시작·매일 출석·전답이면 두 과가 함께 도달·안정화', () => {
   const EX = { examDate: '2026-09-30', wordDeadlineDays: 7 };
   const entries = [seedEntry('sample-L6', 6), seedEntry('sample-L7', 7)];
-  /* 본문 상한을 14로 연다 — 새 사다리는 단락당 청크 3세션과 관문 3단이 더 붙어서
-     기본 상한 5로는 2과 10문장이 14일에 안 끝난다(부하 사실을 여기 남긴다).
-     단어 편성은 상한과 무관하므로 아래 단어 검증은 예전 그대로다. */
-  const OPT = { maxSentences: 14 };
+  /* 본문 상한은 넘기지 않는다 — 시험 모드에서는 엔진이 잔여 작업량÷잔여일로 스스로 정한다
+     (옛 고정 5로는 새 사다리가 14일에 안 끝난다). 단어 편성은 상한과 무관하다. */
+  const OPT = {};
   let reachDay = null, stableDay = null, maxGap = 0, firstRelearn = null, senMax = 0;
   for (let d = 16; d <= 29; d++) {                    // 9/16(D-14) ~ 9/29(D-1)
     const now = at(9, d);
@@ -874,7 +879,7 @@ t('E-R 2과 범위 완주 — D-14 시작·매일 출석·전답이면 두 과�
     assert.ok(plan.words.fresh.length <= 10, 'D-' + plan.dday + ' 신규 상한(범위 전체 10)');
     assert.ok(plan.words.review.length <= 20, '복습 상한');
     assert.ok(plan.words.relearn.length <= 15, '안정화 상한(16×3÷5 → 최소 15)');
-    assert.ok(plan.sentences.length <= 14, '본문 상한');
+    assert.ok(plan.sentences.length <= 20, '자동 산정 상한 안: ' + plan.sentences.length);
     senMax = Math.max(senMax, plan.sentences.length);
     if (plan.words.relearn.length && firstRelearn == null) firstRelearn = plan.dday;
     const load = entries.map((e) => {
@@ -1282,6 +1287,84 @@ t('planDay — 본문 후보는 청크 → 문장 → 단락 관문 → 누적 �
   assert.ok(run(null).every((x) => x.kind !== 'cumulative' && x.kind !== 'check'));
 });
 
+t('planDay — 본문 상한은 시험 모드에서 잔여 작업량 ÷ 잔여일로 자동 산정한다', () => {
+  /* 픽스처: 2단락·5문장. 잔여 = 청크 2×3 + 문장 5×6 + 관문 2×3 = 42.
+     누적·종합은 하루 한 칸씩 직렬이라 날짜를 먼저 뗀다: tailDays = 단락 2 + 종합 1 = 3.
+     D-10 → 사다리에 쓸 날 7 → ceil(42/7)=6, 누적 자리 +1 → 하루 7칸.
+     이 역산이 없으면 42/10 = 5칸이 되어 마지막 3일에 누적만 남고 종합까지 못 간다. */
+  const plan = E.planDay(pack, {}, EXAM, d1);
+  assert.strictEqual(plan.dday, 10);
+  assert.ok(plan.note.indexOf('하루 본문 7칸 필요') >= 0, plan.note);
+  /* 연습 모드는 마감이 없다 — 나눌 분모가 없으니 예전대로 하루 5 고정 */
+  assert.ok(E.planDay(pack, {}, null, d1).note.indexOf('하루 본문') < 0);
+  assert.strictEqual(E.planDay(pack, passChunks({}, pack, d1), null, d1).sentences.length, 5, '연습 모드 5 고정');
+  /* 잔여일이 줄면 하루 몫이 따라 오른다(매 호출 전면 재계산 — '밀린 것'을 만들지 않는다) */
+  const late = E.planDay(pack, {}, EXAM, at(9, 9));            // D-3
+  assert.ok(late.note.indexOf('하루 본문 43칸 필요') >= 0, late.note);
+  /* 명시 상한이 이기고, 못 지킬 상한이면 그 사실을 노트가 밝힌다 */
+  const capped = E.planDay(pack, passChunks({}, pack, d1), EXAM, d1, { maxSentences: 3 });
+  assert.strictEqual(capped.sentences.length, 3);
+  assert.ok(capped.note.indexOf('본문 상한 3칸 — 시험 전 완료 어려움') >= 0, capped.note);
+});
+
+t('planDay — 단락 관문·누적·종합은 상한에 먼저 자리를 뗀다(문장이 잘린다)', () => {
+  const states = passChunks({}, pack, d1);
+  pack.sentences.forEach((sn) => {
+    const s = E.createState(E.sentenceId(sn.seq), 'sentence', d1);
+    s.stage = 5; states[s.id] = s;                    // 두 단락 모두 stage 5 → 관문 개방
+  });
+  const plan = E.planDay(pack, states, null, d1, { maxSentences: 3 });
+  assert.deepStrictEqual(plan.sentences.map((x) => x.kind), ['sentence', 'para', 'para'],
+    '관문 2칸을 떼고 남은 1칸에 문장 — 뒤로 밀리면 그날이 통째로 날아간다');
+  /* 백지 재도전(redo)은 맨 뒤 — 이미 통과한 문장의 회전이 새 땅을 밀어내지 않는다 */
+  const done = passChunks({}, pack, d1);
+  pack.sentences.forEach((sn) => {
+    const s = E.createState(E.sentenceId(sn.seq), 'sentence', d1);
+    s.stage = 6; E.advanceStage(s, true, d1, { fromStage: 6 }); done[s.id] = s;
+  });
+  const p2 = E.planDay(pack, done, null, d2 + DAY, { maxSentences: 10 });   // due 지남 → redo 5
+  const kinds = p2.sentences.map((x) => x.kind);
+  assert.strictEqual(kinds.indexOf('para') < kinds.indexOf('sentence'), true,
+    '관문이 redo 앞: ' + JSON.stringify(p2.sentences));
+  assert.strictEqual(p2.sentences.filter((x) => x.kind === 'sentence').length, 5, 'redo 5개는 뒤에 그대로');
+});
+
+t('planDay — 손대지 않은 문장이 세 칸에 한 칸은 들어온다(꼬리 굶주림 완화)', () => {
+  /* seq 순으로만 채우면 앞 문장이 정체할 때 뒤 문장은 상한에 밀려 영영 1단계도 못 받는다.
+     25문장 팩 시뮬레이션에서 해석이 5/25에서 멈추던 자리다. */
+  const states = passChunks({}, pack, d1);
+  [1, 2].forEach((seq) => {
+    const s = E.createState(E.sentenceId(seq), 'sentence', d1);
+    s.stage = 2; s.last = d1; states[s.id] = s;       // 이미 손댄 문장
+  });
+  const plan = E.planDay(pack, states, null, d1, { maxSentences: 10 });
+  assert.deepStrictEqual(plan.sentences.map((x) => x.seq), [3, 1, 2, 4, 5],
+    '손대지 않은 3번이 첫 칸 — 이후 세 칸에 한 칸씩');
+  assert.deepStrictEqual(E.planDay(pack, states, null, d1, { maxSentences: 3 }).sentences.map((x) => x.seq),
+    [3, 1, 2], '상한 3에서도 새 문장이 한 자리를 갖는다');
+  /* 전부 손대지 않았으면 예전 그대로 seq 순 */
+  assert.deepStrictEqual(E.planDay(pack, passChunks({}, pack, d1), null, d1).sentences.map((x) => x.seq),
+    [1, 2, 3, 4, 5]);
+});
+
+t('cue — 한 겹씩 기록해도 한 세션에서 끝까지 돌려도 같은 자리에 닿는다', () => {
+  /* 앱이 화면 한 번에 단서를 두 라운드 돌리든(문장당 6세션) 하루 한 겹씩 지우든(9세션)
+     엔진은 둘 다 받는다 — 리듬은 화면이 정하고 엔진은 단서 수만 센다. */
+  const a = E.createState(E.sentenceId(1), 'sentence', d1);      // 하루 한 겹씩
+  E.recordCue(a, true, d1, { session: 'a1', fromStage: 1 });
+  E.recordCue(a, true, d2, { session: 'a2', fromStage: 1 });
+  const b = E.createState(E.sentenceId(2), 'sentence', d1);      // 한 세션 안에서 끝까지
+  E.recordCue(b, true, d1, { session: 'b1', fromStage: 1 });
+  E.recordCue(b, true, d1, { session: 'b2', fromStage: 1 });
+  assert.deepStrictEqual([a.stage, a.cue], [2, 1]);
+  assert.deepStrictEqual([b.stage, b.cue], [2, 1], '같은 자리에 닿는다');
+  /* 전사(3)에서 시작해도 한 세션에서 네 번 돌리면 진급한다 */
+  const c = E.createState(E.sentenceId(3), 'sentence', d1);
+  c.cue = 3;
+  for (let i = 0; i < 4; i++) E.recordCue(c, true, d1, { session: 'c' + i, fromStage: 1 });
+  assert.deepStrictEqual([c.stage, c.cue], [2, 1]);
+});
+
 t('하위 호환 — 문장 항목의 {seq, stage} 는 그대로고 kind 만 늘었다 (§4.E.6)', () => {
   const states = passChunks({}, pack, d1);
   const plan = E.planDay(pack, states, null, d1);
@@ -1299,6 +1382,57 @@ t('하위 호환 — 문장 항목의 {seq, stage} 는 그대로고 kind 만 늘
   const r = E.rangeSummary([{ packId: 'L6', pack: pack, states: st2 }]);
   assert.deepStrictEqual(Object.keys(r), ['packIds', 'word', 'sentence', 'passage', 'packs']);
   assert.deepStrictEqual(Object.keys(r.packs.L6), ['word', 'sentence'], '과별 값의 모양은 그대로');
+});
+
+t('E-P 25문장·5단락 완주 — D-14 시작이면 누적 백지·종합 Check까지 시험 전에 끝난다', () => {
+  /* 실제 과 규모(25문장·5단락·77단어)에서 자동 상한이 마감을 지키는지가 이 검증의 핵심이다.
+     학생 앱과 같은 고리로 돈다: 하루 시작에 상한(=오늘 분량)을 정하고, 한 세션이 끝날 때마다
+     플랜을 다시 계산해 맨 앞 항목을 집는다(render() → rangePlan(Date.now())). */
+  const EX = { examDate: '2026-09-30', wordDeadlineDays: 7 };
+  const words = [], sentences = [];
+  for (let i = 1; i <= 77; i++) words.push({ id: 'w' + i });
+  for (let p = 1; p <= 5; p++) for (let k = 0; k < 5; k++) {
+    const s = JSON.parse(JSON.stringify(pack.sentences[k]));
+    s.seq = (p - 1) * 5 + k + 1; s.dayGroup = '8/' + p; sentences.push(s);
+  }
+  const big = { packId: 'big', lesson: 6, words, sentences };
+  const e = { packId: 'big', pack: big, states: {}, rec: { cumulative: {}, check: null } };
+  big.words.forEach((w) => { e.states[w.id] = E.createState(w.id, 'word', at(9, 16)); });
+  big.sentences.forEach((s) => { const k = E.sentenceId(s.seq); e.states[k] = E.createState(k, 'sentence', at(9, 16)); });
+
+  let peak = 0, doneDay = null;
+  for (let d = 16; d <= 29; d++) {
+    const now = at(9, d);
+    const plan = E.planDay(big, e.states, EX, now, { rec: e.rec });
+    const wN = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
+    const budget = plan.sentences.length;                 // 오늘 본문 몫 = 하루 시작 상한
+    plan.words.fresh.forEach((id) => {
+      E.recordQuiz(e.states[id], ok, now);
+      E.recordCriterion(e.states[id], { correct: true, confidence: 'sure', hinted: true }, now);
+    });
+    plan.words.review.forEach((id) => {
+      if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
+    });
+    plan.words.relearn.forEach((id) => E.recordCriterion(e.states[id], ok, now));
+    let did = 0;
+    for (let tick = 1; did < budget && tick < 300; tick++) {
+      const x = E.planDay(big, e.states, EX, now + tick * 60000, { rec: e.rec }).sentences[0];
+      if (!x) break;
+      runItem(e, x, now + tick * 60000);
+      did += 1;
+    }
+    peak = Math.max(peak, wN + did);
+    const p = E.passageSummary(big, e.states, e.rec);
+    if (doneDay == null && p.cumulative === 5 && p.check) doneDay = plan.dday;
+  }
+  const S = E.sentenceSummary(e.states), P = E.passageSummary(big, e.states, e.rec);
+  assert.strictEqual(S.interpreted, 25, '25문장 전부 해석 통과');
+  assert.strictEqual(S.memorized, 25, '25문장 전부 백지 통과');
+  assert.deepStrictEqual([P.chunkDone, P.paraBlank, P.cumulative], [5, 5, 5], JSON.stringify(P));
+  assert.ok(P.check && P.check.total === 8, '종합 Check까지 끝난다');
+  assert.ok(doneDay >= 1, '시험 전에 끝난다 — 실제 D-' + doneDay);
+  /* 하루 부담은 단어가 대부분이다. 이 숫자가 커지면 노트가 그 사실을 밝힌다(HEAVY_DAY) */
+  assert.ok(peak <= 70, '하루 최대 세션 ' + peak + '개');
 });
 
 /* ── 픽스처 정합 — 플랜이 실제 팩 구조 위에서 돈다 ── */
