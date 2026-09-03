@@ -45,6 +45,8 @@ jobs:
         run: node naesin/grade.test.cjs
       - name: 내신브레인 문항 생성 테스트
         run: node naesin/gen.test.cjs
+      - name: 내신브레인 팩 검사 규칙 테스트
+        run: node naesin/pack-check.test.cjs
       - name: 내신브레인 체험 팩 검증 (pack-validate)
         # 검증기는 팩 디렉터리(words.json·sentences.json…)를 받는다. 저장소의 유일한 팩인 pack-sample.json 은
         # 관리 웹이 병합한 형태라, 업로드 전 형태로 도로 쪼개 같은 검증 게이트를 통과시킨다 — 체험 팩이
@@ -64,6 +66,10 @@ jobs:
           node naesin/pack-validate.mjs /tmp/wb-pack-sample
       - name: 내신브레인 서버 라우트 테스트
         run: node reading-server/naesin-api.test.mjs
+      - name: 내신브레인 팩 제작 스튜디오 테스트
+        run: node reading-server/naesin-studio.test.mjs
+      - name: 내신브레인 AI 추출 테스트
+        run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 시험 결과 분석·예측 테스트
         run: node reading-server/naesin-results.test.mjs
       - name: 교재 코칭 테스트

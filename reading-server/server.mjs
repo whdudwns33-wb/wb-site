@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
+import { handleStudio } from './naesin-studio.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -58,6 +59,9 @@ const naesinRoot = () => {
   db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
   db.naesin.tasks = db.naesin.tasks || {};
   db.naesin.results = db.naesin.results || {};
+  db.naesin.reports = db.naesin.reports || {};
+  db.naesin.jobs = db.naesin.jobs || {};
+  db.naesin.jobSrc = db.naesin.jobSrc || {};
   return db.naesin;
 };
 const naesinStore = {
@@ -75,6 +79,18 @@ const naesinStore = {
   listExamScopes: () => Object.keys(naesinRoot().exams),
   getTask: (s) => naesinRoot().tasks[s] || null,
   putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
+  /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
+  getReports: (id) => naesinRoot().reports[id] || null,
+  putReports: (id, list) => { naesinRoot().reports[id] = list; persist(); },
+  /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 두고(jobSrc)
+     목록 조회가 매번 수 MB를 읽지 않게 한다. 작업을 지우면 원천도 함께 지운다. */
+  getJob: (id) => naesinRoot().jobs[id] || null,
+  putJob: (id, rec) => { naesinRoot().jobs[id] = rec; persist(); },
+  deleteJob: (id) => { delete naesinRoot().jobs[id]; persist(); },
+  listJobs: () => Object.values(naesinRoot().jobs),
+  getJobSrc: (id) => naesinRoot().jobSrc[id] || null,
+  putJobSrc: (id, rec) => { naesinRoot().jobSrc[id] = rec; persist(); },
+  deleteJobSrc: (id) => { delete naesinRoot().jobSrc[id]; persist(); },
   /* 시험 결과 — db.naesin.results[코드][시험일] (워커의 naesin:result:<코드>:<시험일> 과 같은 것).
      학생 칸이 비면 지운다: 퇴원 확인(저장 파일에 코드가 남지 않는가)이 빈 껍데기에 걸리지 않게. */
   getResult: (c, d) => (naesinRoot().results[c] || {})[d] || null,
@@ -340,10 +356,14 @@ const server = http.createServer(async (req, res) => {
       if (p.startsWith('/api/naesin/')) {
         /* content-length 가 오면 읽기 전에 거른다(워커와 동일) — 없으면(chunked) readBody 의 스트림 상한이 잡는다 */
         if (Number(req.headers['content-length'] || 0) > naesinBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
-        const out = await handleNaesin({
+        const ctx = {
           path: p, method: req.method, who, query: url.searchParams,
           getBody: () => readBody(req, naesinBodyLimit(p)), store: naesinStore,
-        });
+        };
+        /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
+        const st = await handleStudio({ ...ctx, ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.NAESIN_AI_MODEL || '' } });
+        if (st) return json(res, st.status, st.body);
+        const out = await handleNaesin(ctx);
         return json(res, out.status, out.body);
       }
 
@@ -574,6 +594,13 @@ const server = http.createServer(async (req, res) => {
         drop(naesinRoot().states, c);
         drop(naesinRoot().exams, c);
         drop(naesinRoot().results, c);
+        /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
+           다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). 워커와 동일. */
+        for (const [pid, list] of Object.entries(naesinRoot().reports)) {
+          if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
+          naesinRoot().reports[pid] = list.map((r) => (r && r.code === c ? { ...r, code: '' } : r));
+          removed += 1;
+        }
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
