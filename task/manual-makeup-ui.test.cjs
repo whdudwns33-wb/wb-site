@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 
 function block(from, to) {
   const start = html.indexOf(from);
@@ -12,13 +12,13 @@ function block(from, to) {
   return html.slice(start, end);
 }
 
-test('관리자와 개인 인증 선생님 보강 탭에 보강생성 진입점을 표시한다', () => {
+test('관리자와 개인 인증 선생님 보강 탭에 수업무관 보강생성 진입점을 표시한다', () => {
   const view = block('function viewMakeups()', 'async function refreshMakeupsAfterConflict');
 
   assert.match(view, /session\.isAdmin \|\| \(session\.isStaffLink && session\.staffId\)/);
-  assert.match(view, /data-act="mumanualopen">보강생성<\/button>/);
+  assert.match(view, /data-act="mumanualopen">보강생성\(수업무관\)<\/button>/);
   assert.match(view, /관리자·선생님이 직접 생성한 보강/);
-  assert.match(view, /위 보강생성 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요/);
+  assert.match(view, /위 보강생성\(수업무관\) 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요/);
   assert.match(view, /!rosterDb && !rosterErr && !rosterLoading/);
   assert.match(view, /loadRoster\(\)/);
 
