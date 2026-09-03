@@ -633,27 +633,43 @@
     if (cueOf(st) === before) st.cue = passed ? Math.max(0, before - 1) : Math.min(3, before + 1);
     return cueOf(st);
   }
-  /* 문장 사다리 한 세트의 결과 반영. 1·3·5단계는 cue 0 통과에서만 단계가 오르고,
-     실패해도 단계는 유지된다 — 못 하는 학생이 사다리에서 떨어지지 않게 하는 장치다. */
+  function isFadedStage(stage) {
+    if (WBNAESIN.isCueStage) { try { return !!WBNAESIN.isCueStage(stage); } catch (e) {} }
+    return !!FADED_STAGES[stage];
+  }
+  /* 문장 사다리 한 세트의 결과 반영.
+     단서 단계(1·3·5)는 recordCue 하나만 부른다 — 그 함수가 단서 소거와 진급을 함께 처리한다.
+     recordCue 와 advanceStage(faded)를 둘 다 부르면 한 번의 통과가 두 번 세어진다.
+     단서 없는 단계(2·4·6)는 예전처럼 advanceStage 한 번이다. */
   function applyLadder(st, passed, now, session) {
     if (!st) return;
     var stage = stageNum(st);
-    if (st.reached || !FADED_STAGES[stage]) {
+    if (st.reached || !isFadedStage(stage)) {
       WBNAESIN.advanceStage(st, passed, now, { session: session, fromStage: stage });
       return;
     }
+    if (WBNAESIN.recordCue) { WBNAESIN.recordCue(st, passed, now, { session: session, fromStage: stage }); return; }
+    /* 엔진에 recordCue 가 없는 판 — 같은 계약(§3.3)을 앱이 지킨다 */
     if (passed && cueOf(st) === 0) {
-      WBNAESIN.advanceStage(st, true, now, { session: session, fromStage: stage, faded: true });
-      st.cue = 1;                        // 다음 단계는 힌트 1부터 다시
+      WBNAESIN.advanceStage(st, true, now, { session: session, fromStage: stage });
+      st.cue = 1;
       return;
     }
     st.last = now;
     bumpCue(st, passed, now);
   }
-  /* 청크 트랙·단락 관문 진급 — 최고 단계 통과가 곧 그 트랙의 reached(엔진 TRACK_STAGES 와 같은 눈).
-     엔진 advanceStage 는 STAGE_MAX(6) 기준이라 3단 트랙을 여기서 직접 올린다. */
+  /* 청크 트랙·단락 관문 진급 — 3단이고 3단 통과가 그 트랙의 reached다.
+     엔진 advanceStage 가 stageMaxOf 로 트랙별 최고 단계를 알면 그것이 정본이다. */
   function trackAdvance(st, passed, max, now) {
     if (!st) return;
+    if (WBNAESIN.stageMaxOf) {
+      try {
+        if (WBNAESIN.stageMaxOf(st) === max) {
+          WBNAESIN.advanceStage(st, passed, now, { fromStage: stageNum(st) });
+          return;
+        }
+      } catch (e) {}
+    }
     st.last = now;
     if (!passed || st.reached) return;
     var cur = stageNum(st);
@@ -693,11 +709,13 @@
   function paraBlankDone(gr, pid) {
     return !!(gr && gr.sentences.length && gr.sentences.every(function (s) { var st = senState(s.seq, pid); return st && st.reached; }));
   }
+  /* 엔진 passageCandidates 와 같은 눈 — 단락 관문(pg)이 3단(단락 백지)까지 reached 인가.
+     관문 3단은 그 단락 문장이 모두 백지를 통과했을 때만 reached 가 된다(startBlank). */
   function allParasDone(pid) {
     var gs = dayGroupsOf(packOf(pid) || pack);
     return gs.length > 0 && gs.every(function (gr) {
       var st = pgState(gr.day, pid);
-      return !!(st && st.reached) && paraBlankDone(gr, pid);
+      return !!(st && st.reached);
     });
   }
   /* 누적 백지 단계 — 1일차 → 1+2일차 → … → 전체. 앞 칸을 밟아야 다음 칸이 열린다. */
@@ -1477,16 +1495,24 @@
   }
   function chunkCountOf(gr) { return chunksOfGroup(gr).length; }
 
-  /* ① 듣고 짝 맞추기 — 영↔한 4~5쌍씩 */
+  /* ① 듣고 짝 맞추기 — 생성기는 한 판(4~5쌍)씩 준다. next 로 단락 전체를 덮는다. */
   function ckMatchItems(gr) {
-    var made = null;
-    if (WBGEN.chunkMatch) { try { made = WBGEN.chunkMatch(gr.sentences, Math.random); } catch (e) { made = null; } }
-    var list = (Array.isArray(made) ? made : (made ? [made] : [])).filter(function (q) {
-      return q && Array.isArray(q.pairs) && q.pairs.length >= 2 && q.pairs.every(function (p) { return p && p.en && p.ko; });
-    });
-    if (list.length) return list.map(function (q) { return { type: 'ckmatch', pairs: q.pairs.map(function (p) { return { en: String(p.en), ko: String(p.ko) }; }) }; });
+    var out = [];
+    if (WBGEN.chunkMatch) {
+      try {
+        var start = 0;
+        for (var n = 0; n < 20; n++) {
+          var q = WBGEN.chunkMatch(gr.sentences, Math.random, { start: start });
+          if (!q || !Array.isArray(q.pairs) || q.pairs.length < 2) break;
+          out.push({ type: 'ckmatch', pairs: q.pairs.map(function (x) { return { en: String(x.en), ko: String(x.ko) }; }) });
+          if (q.next == null || q.next <= start) break;
+          start = q.next;
+        }
+      } catch (e) { out = []; }
+    }
+    if (out.length) return out;
     if (WBGEN.chunkMatch) genNote('chunkMatch');
-    var all = chunksOfGroup(gr), out = [];
+    var all = chunksOfGroup(gr);
     for (var i = 0; i < all.length; i += 5) {
       var part = all.slice(i, i + 5);
       if (part.length === 1 && out.length) { out[out.length - 1].pairs.push({ en: part[0].en, ko: part[0].ko }); break; }
@@ -1494,16 +1520,22 @@
     }
     return out.filter(function (q) { return q.pairs.length >= 2; });
   }
-  /* ② 뜻 인출 — 영어 청크를 보고(듣고) 한글 고르기. 오답 보기는 같은 단락의 다른 청크에서. */
+  /* ② 뜻 인출 — 생성기는 청크 하나씩 준다(opts.index). 단락의 청크를 차례로 돈다. */
   function ckMeanItems(gr) {
-    var made = null;
-    if (WBGEN.chunkMeaning) { try { made = WBGEN.chunkMeaning(gr.sentences, Math.random); } catch (e) { made = null; } }
-    var list = (Array.isArray(made) ? made : (made ? [made] : [])).filter(function (q) {
-      return q && Array.isArray(q.choices) && q.choices.length >= 2 && q.answerKey != null;
-    });
-    if (list.length) return list.map(function (q) { q.type = 'ckmean'; if (!q.ttsText) q.ttsText = q.prompt; return q; });
+    var all = chunksOfGroup(gr), out = [];
+    if (WBGEN.chunkMeaning) {
+      try {
+        for (var i = 0; i < all.length; i++) {
+          var q = WBGEN.chunkMeaning(gr.sentences, Math.random, { index: i });
+          if (!q || !Array.isArray(q.choices) || q.choices.length < 2 || q.answerKey == null) continue;
+          q.type = 'ckmean';
+          if (!q.ttsText) q.ttsText = q.prompt;
+          out.push(q);
+        }
+      } catch (e) { out = []; }
+    }
+    if (out.length) return out;
     if (WBGEN.chunkMeaning) genNote('chunkMeaning');
-    var all = chunksOfGroup(gr);
     if (all.length < 2) return [];
     return all.map(function (c, i) {
       var pool = all.filter(function (x, j) { return j !== i && x.ko !== c.ko; });
@@ -1514,7 +1546,7 @@
       return { type: 'ckmean', prompt: c.en, ttsText: c.en, choices: chs, answerKey: ans ? ans.key : chs[0].key };
     });
   }
-  /* ③ 순서 세우기 — 한글 청크를 직독직해 순서로. 영어 원문을 늘 곁에 둔다(한글만 있는 화면 금지). */
+  /* ③ 순서 세우기 — 한글 청크를 직독직해 순서로. 영어 원문(enFull)을 늘 곁에 둔다. */
   function ckOrderItems(gr) {
     var out = [];
     (gr ? gr.sentences : []).forEach(function (s) {
@@ -1524,14 +1556,15 @@
         if (WBGEN.chunkOrder) genNote('chunkOrder');
         var kos = (s.chunks || []).map(function (c) { return c.ko; }).filter(Boolean);
         if (kos.length < 2) return;
-        q = { shuffled: shuffleNot(kos), answer: kos };
+        q = { shuffled: shuffleNot(kos), answer: kos, enFull: s.en };
       }
       out.push({ type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
-        answer: q.answer, hintText: s.en, ttsText: s.en, hintLabel: '영어 원문' });
+        answer: q.answer, hintText: q.enFull || s.en, ttsText: q.enFull || s.en, hintLabel: '영어 원문' });
     });
     return out;
   }
-  /* 2단계 — 한글 청크를 순서대로 보여 주고 영어 청크를 배열. 영어를 한 글자도 입력하지 않는다. */
+  /* 2단계 — 한글 청크를 순서대로 보여 주고 영어 청크를 배열. 철자를 한 자도 쓰지 않는다.
+     영어 전문은 화면에도 소리에도 두지 않는다(그게 곧 정답이다) — 생성기가 enFull 을 빼는 이유. */
   function enChunkOrderItem(s) {
     var q = null;
     if (WBGEN.enChunkOrder) { try { q = WBGEN.enChunkOrder(s, Math.random); } catch (e) { q = null; } }
@@ -1540,45 +1573,46 @@
     if (!q || !Array.isArray(q.answer) || q.answer.length < 2) {
       if (WBGEN.enChunkOrder) genNote('enChunkOrder');
       if (ens.length < 2) return null;
-      q = { shuffled: shuffleNot(ens), answer: ens };
+      q = { shuffled: shuffleNot(ens), answer: ens, koChunks: kos };
     }
     return { type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
-      answer: q.answer, hintText: (q.hintText || kos.join(' / ') || s.ko), ttsText: s.en, hintLabel: '한글 청크 순서' };
+      answer: q.answer, hintText: (q.koChunks || kos).join(' / ') || s.ko, hintLabel: '한글 청크 순서' };
   }
 
-  /* ── 단서 농도(§3.3) 적용 — 3 전사 · 2 첫 글자+글자 수 · 1 첫 글자 · 0 빈칸만 ── */
+  /* ── 단서 농도(§3.3) — 3 전사 · 2 첫 글자+글자 수 · 1 첫 글자 · 0 빈칸만 ──
+     생성기가 빈칸마다 hint(화면 문자열)를, 문항에 showAnswer(불리언)+given(전문)을 실어 준다.
+     생성기가 cue 를 모르는 옛 판일 때만 앱이 같은 모양을 만든다. */
   function cueHintOf(ans, cue) {
     var a = String(ans == null ? '' : ans);
     if (!a || cue >= 3 || cue <= 0) return '';
-    var head = a.charAt(0);
-    if (cue === 2) return head + '__ (' + a.replace(/\s/g, '').length + '자)';
-    return head + '__';
+    if (cue === 2) return a.charAt(0) + '__ (' + a.replace(/\s/g, '').length + '자)';
+    return a.charAt(0) + '__';
   }
-  /* 빈칸마다 placeholder 로 단서를 건다 — 생성기가 이미 걸었으면(ph) 건드리지 않는다 */
   function applyCueParts(q, cue) {
     (q.parts || []).forEach(function (p) {
       if (!p || !p.blank) return;
-      if (p.blank.ph == null) p.blank.ph = cueHintOf((p.blank.answers || [])[0], cue);
+      if (p.blank.hint == null && p.blank.ph == null) p.blank.ph = cueHintOf((p.blank.answers || [])[0], cue);
     });
     return q;
   }
-  /* 1단계 줄 해석 — 영어 줄을 보며 한글 뜻을 채운다. 영어 입력이 한 글자도 없는 단계다. */
+  /* 1단계 줄 해석 — 영어 자리를 보며 한글 뜻을 채운다. 영어 입력이 한 글자도 없는 단계다. */
   function koBlankItem(s, cue) {
     var q = null;
     if (WBGEN.koBlanks) { try { q = WBGEN.koBlanks(s, cue); } catch (e) { q = null; } }
     if (!q || !Array.isArray(q.parts) || !q.parts.some(function (p) { return p && p.blank; })) {
       if (WBGEN.koBlanks) genNote('koBlanks');
       q = fallbackKoBlanks(s);
+      if (q && cue >= 3) { q.showAnswer = true; q.given = String(s.ko || ''); }
     }
     if (!q) return null;
     q.type = 'koblank'; q.lang = 'ko'; q.seq = s.seq; q.cue = cue;
     if (q.enFull == null) q.enFull = s.en;
-    q.chunks = (s.chunks || []).slice();
-    if (cue >= 3) q.showAnswer = q.showAnswer || String(s.ko || '');
+    if (!q.chunks) q.chunks = (s.chunks || []).slice();
     return applyCueParts(q, cue);
   }
   function fallbackKoBlanks(s) {
-    var text = String(s.ko || '');
+    var chunks = (s.chunks || []).filter(function (c) { return c && c.ko; });
+    var text = chunks.length ? chunks.map(function (c) { return c.ko; }).join(' / ') : String(s.ko || '');
     if (!text) return null;
     var taken = [], spans = [];
     (s.keywords || []).forEach(function (kw) {
@@ -1598,15 +1632,16 @@
       cur = sp.end;
     });
     if (cur < text.length) parts.push({ text: text.slice(cur) });
-    return { type: 'koblank', parts: parts, enFull: s.en };
+    return { type: 'koblank', parts: parts, enFull: s.en,
+      chunks: chunks.map(function (c) { return { en: c.en || '', ko: c.ko }; }) };
   }
-  /* 3단계 핵심어 빈칸(영어) — 기존 생성기에 cue 를 넘긴다(옛 판은 무시하고 같은 결과를 준다) */
+  /* 3단계 핵심어 빈칸(영어) */
   function kwBlankItem(s, cue) {
     var q = null;
     try { q = WBGEN.keywordBlanks(s, 'en', cue); } catch (e) { q = null; }
     if (!q) return null;
     q.seq = s.seq; q.cue = cue;
-    if (cue >= 3) q.showAnswer = q.showAnswer || String(s.en || '');
+    if (cue >= 3 && q.given == null) { q.showAnswer = true; q.given = String(s.en || ''); }
     return applyCueParts(q, cue);
   }
   /* 5단계 줄 영작 — cue 3 은 모범 문장을 보여 주고 그대로 옮겨 쓰는 전사다 */
@@ -1615,12 +1650,12 @@
     try { q = WBGEN.writingPrompt(s, cue); } catch (e) { q = null; }
     if (!q) return null;
     q.seq = s.seq; q.cue = cue;
-    if (cue >= 3) q.showAnswer = q.showAnswer || String(s.en || '');
-    else if (q.cueHint == null && cue > 0) {
-      q.cueHint = String(s.en || '').split(/\s+/).map(function (w) {
+    if (cue >= 3 && q.given == null) { q.showAnswer = true; q.given = String(s.en || ''); }
+    if (q.hint == null && cue > 0 && cue < 3) {
+      q.hint = String(s.en || '').split(/\s+/).map(function (w) {
         var core = w.replace(/[^A-Za-z']/g, '');
         if (!core) return w;
-        return cue === 2 ? core.charAt(0) + '_'.repeat(Math.max(1, core.length - 1)) : core.charAt(0) + '…';
+        return cue === 2 ? core.charAt(0) + new Array(core.length).join('_') : core.charAt(0);
       }).join(' ');
     }
     return q;
@@ -1640,24 +1675,31 @@
     }
     return out;
   }
-  /* 어색한 곳 찾기 — 단락 텍스트에서 바뀐 곳 고르기. 팩에 oddOneItems 가 없으면 만들 수 없다. */
+  /* 어색한 곳 찾기 — 생성기는 그 단락의 문항을 index 로 하나씩 준다. 팩에 데이터가 없으면 빈 배열. */
   function oddItems(day) {
-    var src = pack.oddOneItems || pack.oddOne || [];
-    var made = null;
-    if (WBGEN.oddOneItem) { try { made = WBGEN.oddOneItem(src, day); } catch (e) { made = null; } }
-    var list = Array.isArray(made) ? made : (made ? [made] : []);
-    if (!list.length) {
-      list = (Array.isArray(src) ? src : []).filter(function (x) {
-        return x && (x.dayGroup == null || x.dayGroup === day) && Array.isArray(x.choices) && x.answerKey != null;
-      });
+    var src = pack.oddOneItems || [];
+    var out = [];
+    if (WBGEN.oddOneItem && src.length) {
+      var n = 0;
+      try {
+        var first = WBGEN.oddOneItem(src, day, { index: 0 });
+        n = first && first.total ? first.total : (first ? 1 : 0);
+        for (var i = 0; i < n; i++) {
+          var q = i === 0 ? first : WBGEN.oddOneItem(src, day, { index: i });
+          if (q && Array.isArray(q.choices) && q.choices.length >= 2 && q.answerKey != null) out.push(q);
+        }
+      } catch (e) { out = []; }
     }
-    return list.filter(function (q) { return q && Array.isArray(q.choices) && q.choices.length >= 2 && q.answerKey != null; })
-      .map(function (q) {
-        var o = {}, k;
-        for (k in q) if (Object.prototype.hasOwnProperty.call(q, k)) o[k] = q[k];
-        o.type = 'oddone';
-        return o;
-      });
+    if (out.length) return out;
+    /* 생성기가 없거나 못 만든 경우 — 팩 항목이 이미 러너 모양이면 그대로 쓴다 */
+    return (Array.isArray(src) ? src : []).filter(function (x) {
+      return x && (x.dayGroup == null || x.dayGroup === day) && Array.isArray(x.choices) && x.choices.length >= 2 && x.answerKey != null;
+    }).map(function (q) {
+      var o = {}, k;
+      for (k in q) if (Object.prototype.hasOwnProperty.call(q, k)) o[k] = q[k];
+      o.type = 'oddone';
+      return o;
+    });
   }
   /* 종합 Check — 팩의 checkItems 를 러너 문항으로. 없으면 사다리 문항을 섞어 대체 점검을 만든다. */
   function checkSetItems() {
@@ -2167,19 +2209,32 @@
     var go = $('stageGo');
     if (go) go.onclick = function () { trainSentence(seq); };
   }
-  /* 사다리 한 세트 — 문장당 1회만 진급시킨다(4단계는 문항이 둘). 1·3·5는 cue 소거를 먼저 탄다. */
-  function runLadder(items, title, st, stage, seq) {
+  /* 사다리 한 세트 — 문장당 1회만 진급시킨다(4단계는 문항이 둘).
+     단서 단계는 한 세션 안에서 두 라운드를 돈다: 통과하면 곧바로 같은 문장을 한 단계 낮은
+     단서로 한 번 더 낸다. 이걸 다음 날로 미루면 문장당 러너 횟수가 6회에서 9회로 불어난다.
+     틀리면 거기서 세션이 끝난다 — 다음에는 더 높은 단서(더 많은 힌트)로 다시 만난다. */
+  var CUE_ROUNDS = 2;
+  function runLadder(items, title, st, stage, seq, round, faded) {
     var pid = curPackId(), allOk = true, session = newSession();
-    runQueue(items, title, function (item, ok, ans, meta) {
+    runQueue(items, title, function (item, ok) {
       if (!ok) allOk = false;
       recordGenResult(item, ok, Date.now(), pid);
       logEvent('sentence', item.type, 's' + seq, ok, pid);
     }, function (finished) {
-      applyLadder(st, finished && allOk, Date.now(), session);
-      touchPack(pid); persist(); render();
+      var before = { stage: stageNum(st), cue: cueOf(st) };
+      var passed = finished && allOk;
+      applyLadder(st, passed, Date.now(), session);
+      touchPack(pid); persist();
+      if (faded && passed && round < CUE_ROUNDS && !st.reached &&
+          stageNum(st) === before.stage && cueOf(st) < before.cue) {
+        setTimeout(function () { trainStageRound(seq, round + 1); }, 260);
+        return;
+      }
+      render();
     }, { noConfidence: true });
   }
-  function trainSentence(seq) {
+  function trainSentence(seq) { return trainStageRound(seq, 1); }
+  function trainStageRound(seq, round) {
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return;
     if (!ckGate(s.dayGroup).open) return;            // 청크 미통과 단락은 1단계도 시작할 수 없다
@@ -2187,8 +2242,10 @@
     var g = WBNAESIN.gate(wordStates(), exam(), Date.now(), {});
     if (stage >= 5 && !g.open && !st.reached) return;
     var cue = cueOf(st);
-    setLast('본문 문장 ' + seq + ' · ' + STAGE_NAMES[Math.min(stage, 6)], { t: 'sentence', seq: seq });
-    persist();
+    if (round <= 1) {
+      setLast('본문 문장 ' + seq + ' · ' + STAGE_NAMES[Math.min(stage, 6)], { t: 'sentence', seq: seq });
+      persist();
+    }
     if (st.reached || stage >= 6) return startBlank(groupOfDay(s.dayGroup));
     var items = [], q;
     if (stage === 1) { q = koBlankItem(s, cue); if (q) items.push(q); }
@@ -2204,9 +2261,11 @@
       persist(); render();
       return;
     }
-    var pid = curPackId();
+    var pid = curPackId(), faded = isFadedStage(stage);
     items.forEach(function (it) { it.stage = stage; it.seq = seq; it.packId = pid; it.kind = 'sentence'; });
-    runLadder(items, '본문 ' + stage + '단계 · ' + STAGE_NAMES[stage], st, stage, seq);
+    if (faded && round > 1) items[0].roundNote = '힌트를 줄여서 한 번 더 — 지금은 ' + CUE_NAMES[cue];
+    runLadder(items, '본문 ' + stage + '단계 · ' + STAGE_NAMES[stage] + (faded && round > 1 ? ' · 힌트 줄여 한 번 더' : ''),
+      st, stage, seq, round, faded);
   }
 
   /* ── 백지 실패 원인 라우팅(§3.7) ── */
@@ -2225,7 +2284,7 @@
   /* 채점기에 blankCause 가 있으면 그것이 정본, 없으면 같은 네 분류를 앱이 근사한다 */
   function causeOf(ps, s) {
     if (WBGRADE.blankCause) {
-      try { var c = WBGRADE.blankCause(ps, s); if (typeof c === 'string' && CAUSE_STAGE[c] != null) return c; if (c === 'ok') return 'ok'; } catch (e) {}
+      try { var c = WBGRADE.blankCause(ps, s); if (c === 'ok' || (typeof c === 'string' && CAUSE_STAGE[c] != null)) return c; } catch (e) {}
     }
     if (!ps || ps.status === 'ok') return 'ok';
     if (ps.status === 'missing' || !ps.input) return 'missing';
@@ -2257,7 +2316,8 @@
     /* 이미 백지를 통과한 문장은 통째로 빠뜨렸을 때만 되돌린다 — 낱말 하나 차이로 '암기 완료'가
        사라지면 사다리가 신뢰를 잃는다. 통째로 못 쓴 것은 실제로 잊은 것이다. */
     if (st.reached) { st.reached = false; st.reachedAt = null; st.relearnCount = 0; }
-    var target = CAUSE_STAGE[cause] || 3;
+    /* 원인 → 단계 표는 채점기(grade.js)에 있다 — 앱과 채점기가 같은 표를 본다 */
+    var target = (WBGRADE.blankCauseStage ? WBGRADE.blankCauseStage(cause) : null) || CAUSE_STAGE[cause] || 3;
     st.stage = Math.min(stageNum(st), target);
     if (cause === 'missing') st.cue = Math.min(3, cueOf(st) + 1);
     st.last = now;
@@ -3113,6 +3173,13 @@
     var b = $(id);
     if (b) b.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(item.ttsText, { lang: 'en' }); };
   }
+  /* 전사(cue 3) 화면에 보여 줄 답 — 생성기는 showAnswer(불리언)+given(전문)으로 준다.
+     옛 판·앱 대체본은 showAnswer 에 문자열을 담기도 해서 둘 다 받는다. */
+  function givenText(item) {
+    if (item.showAnswer === true) return String(item.given || '');
+    if (typeof item.showAnswer === 'string') return item.showAnswer;
+    return '';
+  }
   /* 한글 답 채점 — WBGRADE.normalizeEn 은 한글을 통째로 지우므로 뜻 빈칸에 쓸 수 없다.
      공백·문장부호만 털고 견준다(조사·어미까지 좇지 않는다 — 여기서 재는 것은 '뜻을 아는가'다). */
   function normKo(v) {
@@ -3136,7 +3203,8 @@
       : (item.seq != null ? '본문 문장 ' + item.seq : '')));
     /* 통합 범위 세션은 과가 섞인다 — 지금 보는 과가 아닌 문항엔 어느 과인지 붙인다 */
     if (item.packId != null && item.packId !== curPackId()) stageLabel = lessonLabel(item.packId) + ' · ' + stageLabel;
-    var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>';
+    var head = '<div class="q"><div class="qmeta">' + esc(stageLabel) + '</div>' +
+      (item.roundNote ? '<div class="cuebar"><span>' + esc(item.roundNote) + '</span></div>' : '');
 
     if (item.type === 'storedmcq') return renderStored(item, root);
 
@@ -3245,11 +3313,12 @@
     }
 
     /* parts+blank 형식 전부 — 핵심어 빈칸(3단계)·구 클로즈(4단계, clozewide)·동사 형태 */
-    if (item.type === 'kwblank' || item.type === 'koblank' || item.type === 'verb' || item.type === 'clozewide' || (item.parts && !item.choices)) {
+    if (item.type === 'kwblank' || item.type === 'koblank' || item.type === 'ckblank' || item.type === 'verb' || item.type === 'clozewide' || (item.parts && !item.choices)) {
       var isKo = item.lang === 'ko';
       /* 단서 3(전사) — 답을 보여 주고 그대로 옮겨 쓴다. 실패부터 시키면 학습이 아니라 회피가 생긴다. */
+      var shownAns = givenText(item);
       var html = head +
-        (item.showAnswer ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(item.showAnswer) + '</div>' : '') +
+        (shownAns ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(shownAns) + '</div>' : '') +
         (isKo && item.enFull ? '<div class="enline">' + esc(item.enFull) + ttsBtnHtml({ ttsText: item.enFull }, 'kbTts') + '</div>' : '') +
         (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') +
         '<div class="prompt sm">';
@@ -3260,7 +3329,8 @@
           var hint = p.blank.hintKo ? '<span class="hintko">' + esc(p.blank.hintKo) + '</span>'
             : (p.blank.hintEn ? '<span class="hintko">' + esc(p.blank.hintEn) + '</span>'
             : (p.blank.base ? '<span class="hintko">(' + esc(p.blank.base) + ')</span>' : ''));
-          var ph = p.blank.ph ? ' placeholder="' + esc(p.blank.ph) + '"' : '';
+          var phv = p.blank.hint != null ? p.blank.hint : p.blank.ph;
+          var ph = phv ? ' placeholder="' + esc(phv) + '"' : '';
           html += '<span style="white-space:nowrap"><input class="blankline" data-b="' + bi + '"' + INATTR + ph + ' aria-label="빈칸 ' + (bi + 1) + '">' + hint + '</span>';
           bi += 1;
         }
@@ -3330,9 +3400,11 @@
       var hintHtml = item.type === 'write'
         ? '<p class="muted">활용 단어: ' + esc((item.keywords || []).join(', ')) + '</p>'
         : '<p class="muted">제시어: <b>' + esc(item.hint) + '</b></p>';
-      if (item.cueHint) hintHtml += '<p class="muted" style="font-family:var(--mono);letter-spacing:1px">' + esc(item.cueHint) + '</p>';
+      var shownW = givenText(item);
+      var skel = item.cueHint != null ? item.cueHint : (item.type === 'write' && !shownW ? item.hint : null);
+      if (skel) hintHtml += '<p class="muted" style="font-family:var(--mono);letter-spacing:1px">' + esc(skel) + '</p>';
       root.innerHTML = head +
-        (item.showAnswer ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(item.showAnswer) + '</div>' : '') +
+        (shownW ? '<div class="showans"><small>보고 그대로 옮겨 쓰기</small>' + esc(shownW) + '</div>' : '') +
         '<div class="prompt sm">' + esc(item.ko || '다음 문장을 영어로 쓰시오.') + '</div>' + hintHtml +
         '<textarea class="ans" id="wrIn"' + INATTR + ' placeholder="영어 문장 전체를 쓰시오"></textarea>' +
         '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
